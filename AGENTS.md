@@ -16,8 +16,8 @@
 상위 기준도 기존 계약 변경을 자동으로 허가하지 않는다. 기준이 불일치하거나 확정
 여부가 불분명하면 임의로 구현하거나 기존 코드를 되돌리지 않고 확인한다.
 
-작업할 때는 현재 Jira 업무 항목과 변경 대상 디렉터리의 `README.md`를 먼저 확인하고,
-필요한 절차를 수행하기 전에 관련 세부 문서를 확인한다.
+기존 Jira 업무를 수행하는 경우 현재 Jira 업무 항목과 변경 대상 디렉터리의 `README.md`를
+먼저 확인하고, 필요한 절차를 수행하기 전에 관련 세부 문서를 확인한다.
 
 - 브랜치, 커밋, MR: `docs/git-convention.md`
 - Jira-GitLab 작업 절차: `docs/development-workflow.md`
@@ -97,7 +97,8 @@ API 계약 또는 DB Schema 변경은 영향받는 담당자 간 먼저 합의�
 - 브랜치, 커밋 및 MR 형식은 `docs/git-convention.md`를 따른다.
 - `main`과 `develop`에 직접 Push하지 않는다.
 - MR 생성 전 최신 `origin/develop`을 반영하고 충돌을 확인한다.
-- MR에는 Jira Issue Key, `Closes <JIRA-KEY>`, 작업 내용과 검증 결과를 포함한다.
+- 작업 브랜치에서 `develop`으로 생성하는 작업 MR에는 Jira Issue Key,
+  `Closes <JIRA-KEY>`, 작업 내용과 검증 결과를 포함한다.
 - 작업 MR은 Squash와 병합 후 Source Branch 삭제를 활성화한다.
 
 ## 8. 완료 보고
@@ -113,6 +114,8 @@ API 계약 또는 DB Schema 변경은 영향받는 담당자 간 먼저 합의�
 ## 9. Jira 자동화
 
 - Jira 업무 항목 생성·수정은 사용자가 명시적으로 요청한 경우에만 수행한다.
+- Jira 자동화를 사용하는 경우 `docs/jira/README.md`를 확인한다.
+- 자동화 스크립트와 테스트는 기능 수정 또는 오류 분석이 필요한 경우에만 확인한다.
 - 계획 파일로 생성할 때는 생성 예정 목록을 먼저 제시하고 사용자의 확인을 받은 뒤 실행한다.
 - 실제 생성 전에 최신 `origin/develop`을 확인하고 계획 파일의 변경 및 중복 생성 여부를
   확인한다.
