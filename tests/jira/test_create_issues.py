@@ -29,6 +29,22 @@ class FakeClient:
     def resolve_issue_type_id(self, logical_name):
         return {"Epic": "10000", "Task": "10002"}[logical_name]
 
+    def resolve_field_id(self, *names):
+        return {"Story Points": "customfield_10016", "Sprint": "customfield_10020"}[names[0]]
+
+    def resolve_assignee_account_id(self, query):
+        return f"account:{query}"
+
+    def get_active_sprint_id(self):
+        return 54280
+
+    def get_current_account_id(self):
+        return "current-account"
+
+    def get_project_epics(self, epic_type_id):
+        self.requested_epic_type_id = epic_type_id
+        return [{"key": "TEST-90", "fields": {"summary": "[협업] 협업 환경"}}]
+
 
 class FakeResponse:
     def __init__(self, payload):
@@ -61,6 +77,7 @@ class CreateIssuesTest(unittest.TestCase):
                     "summary": "Task",
                     "description": "Child",
                     "epic": "parent",
+                    "story_points": 2,
                     "done_when": ["Tested"],
                     "jira_key": None,
                 },
@@ -179,6 +196,92 @@ class CreateIssuesTest(unittest.TestCase):
         client._issue_types = [{"id": "10000", "name": "에픽"}, {"id": "10002", "name": "작업"}]
         self.assertEqual(client.resolve_issue_type_id("Epic"), "10000")
         self.assertEqual(client.resolve_issue_type_id("Task"), "10002")
+
+    def test_optional_fields_are_resolved_and_created(self):
+        plan = {
+            "tasks": [
+                {
+                    "id": "extended",
+                    "summary": "[협업] Extended",
+                    "description": "Fields",
+                    "done_when": ["Done"],
+                    "story_points": 3,
+                },
+                {
+                    "id": "plain",
+                    "summary": "[협업] Plain",
+                    "description": "No optional fields",
+                    "done_when": ["Done"],
+                    "story_points": 1,
+                },
+            ]
+        }
+        client = FakeClient()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "tasks.yml"
+            MODULE.save_plan(path, plan)
+            MODULE.apply_plan(path, plan, client)
+        fields = client.created[0]
+        self.assertEqual(fields["customfield_10016"], 3)
+        self.assertEqual(fields["assignee"], {"accountId": "current-account"})
+        self.assertEqual(fields["customfield_10020"], 54280)
+        self.assertEqual(fields["parent"], {"key": "TEST-90"})
+        self.assertIn("customfield_10016", client.created[1])
+        self.assertIn("customfield_10020", client.created[1])
+
+    def test_invalid_story_points_and_manual_automatic_fields_are_rejected(self):
+        base = {
+            "id": "invalid",
+            "summary": "Invalid",
+            "description": "Invalid fields",
+            "done_when": ["Done"],
+        }
+        with self.assertRaises(MODULE.PlanError):
+            MODULE.validate_tasks([{**base, "story_points": -1}])
+        with self.assertRaises(MODULE.PlanError):
+            MODULE.validate_tasks([{**base, "sprint": "active"}])
+        with self.assertRaises(MODULE.PlanError):
+            MODULE.validate_tasks([{**base, "assignee": "someone"}])
+
+    def test_active_sprint_requires_board_id(self):
+        client = MODULE.JiraClient(
+            MODULE.JiraConfig("https://example.atlassian.net", "TEST", "user", "token")
+        )
+        with self.assertRaises(MODULE.PlanError):
+            client.get_active_sprint_id()
+
+    def test_field_and_current_user_resolution(self):
+        client = MODULE.JiraClient(
+            MODULE.JiraConfig("https://example.atlassian.net", "TEST", "user", "token")
+        )
+        client._fields = [{"id": "customfield_1", "name": "Story Points"}]
+        self.assertEqual(client.resolve_field_id("Story Points", "스토리 포인트"), "customfield_1")
+        with patch.object(client, "request", return_value={"accountId": "abc"}):
+            self.assertEqual(client.get_current_account_id(), "abc")
+
+    def test_pending_task_requires_ai_estimated_story_points(self):
+        task = {
+            "id": "estimated",
+            "summary": "[백엔드] API 연동",
+            "description": "DB schema와 API를 변경한다.",
+            "done_when": ["테스트한다.", "문서화한다."],
+        }
+        with self.assertRaises(MODULE.PlanError):
+            MODULE.validate_tasks([task])
+        MODULE.validate_tasks([{**task, "story_points": 12}])
+
+    def test_epic_selection_prefers_matching_area(self):
+        task = {
+            "id": "task",
+            "summary": "[협업] Jira 자동화",
+            "description": "협업 도구를 개선한다.",
+            "done_when": ["완료"],
+        }
+        epics = [
+            {"key": "TEST-1", "fields": {"summary": "[인프라] 배포 환경"}},
+            {"key": "TEST-2", "fields": {"summary": "[협업] 프로젝트 협업 환경"}},
+        ]
+        self.assertEqual(MODULE.select_related_epic(task, epics), "TEST-2")
 
 
 if __name__ == "__main__":

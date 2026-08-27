@@ -21,7 +21,9 @@ import yaml
 
 
 ROOT = Path(__file__).resolve().parents[2]
-REQUIRED_ENV = ("JIRA_BASE_URL", "JIRA_PROJECT_KEY", "JIRA_EMAIL", "JIRA_API_TOKEN")
+REQUIRED_ENV = (
+    "JIRA_BASE_URL", "JIRA_PROJECT_KEY", "JIRA_EMAIL", "JIRA_API_TOKEN", "JIRA_BOARD_ID"
+)
 ALLOWED_TYPES = {"Epic", "Task"}
 TYPE_ALIASES = {"Epic": {"epic", "에픽"}, "Task": {"task", "작업"}}
 JIRA_KEY_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*-[1-9][0-9]*$")
@@ -37,6 +39,7 @@ class JiraConfig:
     project_key: str
     email: str
     api_token: str
+    board_id: str | None = None
 
 
 def load_dotenv(path: Path) -> None:
@@ -60,11 +63,15 @@ def load_config() -> JiraConfig:
     base_url = os.environ["JIRA_BASE_URL"].rstrip("/")
     if not base_url.startswith("https://"):
         raise PlanError("JIRA_BASE_URL은 https:// 주소여야 합니다.")
+    board_id = os.environ["JIRA_BOARD_ID"]
+    if not board_id.isdigit():
+        raise PlanError("JIRA_BOARD_ID는 숫자여야 합니다.")
     return JiraConfig(
         base_url=base_url,
         project_key=os.environ["JIRA_PROJECT_KEY"],
         email=os.environ["JIRA_EMAIL"],
         api_token=os.environ["JIRA_API_TOKEN"],
+        board_id=board_id,
     )
 
 
@@ -102,9 +109,27 @@ def validate_tasks(tasks: list[Any]) -> None:
         issue_type = task.get("issue_type", "Task")
         if issue_type not in ALLOWED_TYPES:
             raise PlanError(f"{label}.issue_type은 Epic 또는 Task여야 합니다.")
-        for field in ("epic", "priority", "jira_key"):
+        for field in ("epic", "priority", "area", "jira_key"):
             if task.get(field) is not None and not isinstance(task[field], str):
                 raise PlanError(f"{label}.{field}은 문자열이어야 합니다.")
+        story_points = task.get("story_points")
+        if story_points is not None and (
+            isinstance(story_points, bool)
+            or not isinstance(story_points, (int, float))
+            or story_points < 0
+        ):
+            raise PlanError(f"{label}.story_points는 0 이상의 숫자여야 합니다.")
+        if issue_type == "Task" and not task.get("jira_key") and (
+            story_points is None or story_points <= 0
+        ):
+            raise PlanError(
+                f"{label}.story_points는 구현 AI가 1포인트=1시간 기준으로 입력해야 합니다."
+            )
+        for automatic_field in ("assignee", "sprint"):
+            if automatic_field in task:
+                raise PlanError(
+                    f"{label}.{automatic_field}은 자동 지정되므로 계획에 입력하지 않습니다."
+                )
         if not isinstance(task["done_when"], list) or not all(
             isinstance(item, str) and item.strip() for item in task["done_when"]
         ):
@@ -143,6 +168,13 @@ def adf_description(task: dict[str, Any]) -> dict[str, Any]:
     return {"type": "doc", "version": 1, "content": content}
 
 
+def task_area(task: dict[str, Any]) -> str | None:
+    if task.get("area"):
+        return str(task["area"]).strip()
+    match = re.match(r"^\[([^]]+)]", str(task.get("summary", "")))
+    return match.group(1).strip() if match else None
+
+
 def resolve_epic(epic: str | None, tasks_by_id: dict[str, dict[str, Any]]) -> str | None:
     if not epic:
         return None
@@ -159,6 +191,7 @@ def issue_fields(
     config: JiraConfig,
     tasks_by_id: dict[str, dict[str, Any]],
     issue_type_id: str | None = None,
+    extra_fields: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     fields: dict[str, Any] = {
         "project": {"key": config.project_key},
@@ -171,6 +204,8 @@ def issue_fields(
     parent_key = resolve_epic(task.get("epic"), tasks_by_id)
     if parent_key:
         fields["parent"] = {"key": parent_key}
+    if extra_fields:
+        fields.update(extra_fields)
     return fields
 
 
@@ -178,6 +213,7 @@ class JiraClient:
     def __init__(self, config: JiraConfig) -> None:
         self.config = config
         self._issue_types: list[dict[str, Any]] | None = None
+        self._fields: list[dict[str, Any]] | None = None
 
     def request(self, path: str, method: str = "GET", payload: dict[str, Any] | None = None) -> Any:
         credentials = base64.b64encode(
@@ -210,8 +246,15 @@ class JiraClient:
         return str(payload["key"])
 
     def check_connection(self) -> list[dict[str, Any]]:
-        self.request("/rest/api/3/myself")
+        self.get_current_account_id()
         return self.get_issue_types()
+
+    def get_current_account_id(self) -> str:
+        payload = self.request("/rest/api/3/myself")
+        account_id = payload.get("accountId") if isinstance(payload, dict) else None
+        if not account_id:
+            raise PlanError("JIRA_EMAIL 인증 계정의 accountId를 확인하지 못했습니다.")
+        return str(account_id)
 
     def get_issue_types(self) -> list[dict[str, Any]]:
         if self._issue_types is not None:
@@ -231,6 +274,54 @@ class JiraClient:
                 return str(issue_type["id"])
         available = ", ".join(str(item.get("name")) for item in self.get_issue_types())
         raise PlanError(f"{logical_name} 업무 유형을 찾지 못했습니다. 생성 가능 유형: {available}")
+
+    def get_fields(self) -> list[dict[str, Any]]:
+        if self._fields is None:
+            payload = self.request("/rest/api/3/field")
+            if not isinstance(payload, list):
+                raise PlanError("Jira 필드 목록 응답이 올바르지 않습니다.")
+            self._fields = payload
+        return self._fields
+
+    def resolve_field_id(self, *names: str) -> str:
+        aliases = {name.casefold() for name in names}
+        matches = [
+            field for field in self.get_fields()
+            if str(field.get("name", "")).casefold() in aliases
+        ]
+        if len(matches) != 1:
+            found = ", ".join(str(field.get("name")) for field in matches) or "없음"
+            raise PlanError(f"Jira 필드를 하나로 결정하지 못했습니다 ({'/'.join(names)}): {found}")
+        return str(matches[0]["id"])
+
+
+    def get_project_epics(self, epic_type_id: str) -> list[dict[str, Any]]:
+        payload = self.request(
+            "/rest/api/3/search/jql",
+            "POST",
+            {
+                "jql": (
+                    f'project = "{self.config.project_key}" AND issuetype = {epic_type_id}'
+                ),
+                "fields": ["summary", "description"],
+                "maxResults": 100,
+            },
+        )
+        issues = payload.get("issues", []) if isinstance(payload, dict) else []
+        return issues if isinstance(issues, list) else []
+
+    def get_active_sprint_id(self) -> int:
+        if not self.config.board_id:
+            raise PlanError("활성 스프린트를 사용하려면 JIRA_BOARD_ID가 필요합니다.")
+        board_id = quote(self.config.board_id, safe="")
+        payload = self.request(f"/rest/agile/1.0/board/{board_id}/sprint?state=active")
+        sprints = payload.get("values", []) if isinstance(payload, dict) else []
+        if len(sprints) != 1 or "id" not in sprints[0]:
+            raise PlanError(
+                f"활성 스프린트를 하나로 결정하지 못했습니다: board={self.config.board_id} "
+                f"(검색 결과 {len(sprints)}개)"
+            )
+        return int(sprints[0]["id"])
 
 
 def save_plan(path: Path, plan: dict[str, Any]) -> None:
@@ -256,16 +347,104 @@ def print_preview(tasks: list[dict[str, Any]]) -> None:
         issue_type = task.get("issue_type", "Task")
         parent = f", epic={task['epic']}" if task.get("epic") else ""
         priority = f", priority={task['priority']}" if task.get("priority") else ""
-        print(f"- [{issue_type}] {task['id']}: {task['summary']}{parent}{priority}")
+        story_points = (
+            f", story_points={task['story_points']}" if issue_type == "Task" else ""
+        )
+        assignee = ", assignee=.env 인증 계정"
+        sprint = ", sprint=active"
+        area = f", area={task_area(task)}" if not task.get("epic") else ""
+        print(
+            f"- [{issue_type}] {task['id']}: {task['summary']}"
+            f"{parent}{priority}{area}{story_points}{assignee}{sprint}"
+        )
+
+
+def select_related_epic(task: dict[str, Any], epics: list[dict[str, Any]]) -> str | None:
+    area = task_area(task)
+    if not area:
+        raise PlanError(f"Epic 자동 선택을 위해 area 또는 [영역] 제목이 필요합니다: {task['id']}")
+    area_text = area.casefold()
+    exact: list[dict[str, Any]] = []
+    for epic in epics:
+        summary = str(epic.get("fields", {}).get("summary", ""))
+        prefix = re.match(r"^\[([^]]+)]", summary)
+        if prefix and prefix.group(1).strip().casefold() == area_text:
+            exact.append(epic)
+    if len(exact) == 1:
+        return str(exact[0]["key"])
+    candidates = exact or epics
+    task_words = set(re.findall(r"[0-9a-zA-Z가-힣]{2,}", (
+        f"{task['summary']} {task['description']} {' '.join(task['done_when'])}"
+    ).casefold()))
+    scored: list[tuple[int, str]] = []
+    for epic in candidates:
+        fields = epic.get("fields", {})
+        epic_text = f"{fields.get('summary', '')} {json.dumps(fields.get('description', ''), ensure_ascii=False)}"
+        epic_words = set(re.findall(r"[0-9a-zA-Z가-힣]{2,}", epic_text.casefold()))
+        score = len(task_words & epic_words) + (5 if area_text in epic_text.casefold() else 0)
+        scored.append((score, str(epic.get("key", ""))))
+    scored.sort(reverse=True)
+    if scored and scored[0][0] > 0 and (len(scored) == 1 or scored[0][0] > scored[1][0]):
+        return scored[0][1]
+    return None
+
+
+def create_automatic_epic(task: dict[str, Any], client: JiraClient, account_id: str) -> str:
+    area = task_area(task)
+    if not area:
+        raise PlanError(f"새 Epic 생성을 위해 area 또는 [영역] 제목이 필요합니다: {task['id']}")
+    core_summary = re.sub(r"^\[[^]]+]\s*", "", task["summary"]).strip()
+    epic_task = {
+        "summary": f"[{area}] {core_summary}",
+        "description": f"{area} 영역의 관련 작업을 묶기 위해 자동 생성한 Epic입니다.",
+        "done_when": ["관련 하위 업무가 Epic에 연결된다."],
+        "issue_type": "Epic",
+    }
+    fields = issue_fields(
+        epic_task,
+        client.config,
+        {},
+        client.resolve_issue_type_id("Epic"),
+        {"assignee": {"accountId": account_id}},
+    )
+    key = client.create_issue(fields)
+    print(f"Epic 자동 생성: {key} ({epic_task['summary']})")
+    return key
 
 
 def apply_plan(path: Path, plan: dict[str, Any], client: JiraClient) -> int:
     created = 0
     tasks_by_id = {task["id"]: task for task in plan["tasks"]}
-    for task in pending_tasks(plan):
+    pending = pending_tasks(plan)
+    has_tasks = any(task.get("issue_type", "Task") == "Task" for task in pending)
+    story_points_field = (
+        client.resolve_field_id("Story Points", "스토리 포인트") if has_tasks else None
+    )
+    sprint_field = client.resolve_field_id("Sprint", "스프린트") if has_tasks else None
+    active_sprint_id = client.get_active_sprint_id() if has_tasks else None
+    account_id = client.get_current_account_id()
+    epic_type_id = client.resolve_issue_type_id("Epic")
+    epics = client.get_project_epics(epic_type_id) if has_tasks else []
+    for task in pending:
         issue_type = task.get("issue_type", "Task")
         type_id = client.resolve_issue_type_id(issue_type)
-        key = client.create_issue(issue_fields(task, client.config, tasks_by_id, type_id))
+        extra_fields: dict[str, Any] = {"assignee": {"accountId": account_id}}
+        if issue_type == "Task":
+            assert story_points_field and sprint_field and active_sprint_id is not None
+            extra_fields[story_points_field] = task["story_points"]
+            extra_fields[sprint_field] = active_sprint_id
+            if not task.get("epic"):
+                epic_key = select_related_epic(task, epics)
+                if epic_key:
+                    print(f"Epic 자동 선택: {task['id']} -> {epic_key}")
+                else:
+                    epic_key = create_automatic_epic(task, client, account_id)
+                    epics.append({"key": epic_key, "fields": {"summary": task["summary"]}})
+                task["epic"] = epic_key
+                save_plan(path, plan)
+        key = client.create_issue(
+            issue_fields(task, client.config, tasks_by_id, type_id, extra_fields)
+        )
         task["jira_key"] = key
         save_plan(path, plan)
         created += 1
