@@ -22,6 +22,7 @@
 - 브랜치, 커밋, MR: `docs/git-convention.md`
 - Jira-GitLab 작업 절차: `docs/development-workflow.md`
 - AI 병렬 작업과 충돌 방지: `docs/ai-collaboration.md`
+- Secret 및 환경변수 관리: `docs/secret-environment-variables.md`
 
 ## 2. 작업 시작
 

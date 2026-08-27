@@ -1,4 +1,13 @@
+# Local environment files may contain credentials.
 .env
+.env.*
+**/.env
+**/.env.*
+
+# Only reviewed templates without real credentials are tracked.
+!.env.example
+!**/.env.example
+
 .venv/
 __pycache__/
 *.py[cod]
