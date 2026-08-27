@@ -95,12 +95,7 @@ API 계약 또는 DB Schema 변경은 영향받는 담당자 간 먼저 합의�
 
 ## 7. 커밋과 MR
 
-- 브랜치, 커밋 및 MR 형식은 `docs/git-convention.md`를 따른다.
-- `main`과 `develop`에 직접 Push하지 않는다.
-- MR 생성 전 최신 `origin/develop`을 반영하고 충돌을 확인한다.
-- 작업 브랜치에서 `develop`으로 생성하는 작업 MR에는 Jira Issue Key,
-  `Closes <JIRA-KEY>`, 작업 내용과 검증 결과를 포함한다.
-- 작업 MR은 Squash와 병합 후 Source Branch 삭제를 활성화한다.
+- 브랜치, 커밋 및 MR 규칙은 `docs/git-convention.md`를 따른다.
 
 ## 8. 완료 보고
 
@@ -115,10 +110,6 @@ API 계약 또는 DB Schema 변경은 영향받는 담당자 간 먼저 합의�
 ## 9. Jira 자동화
 
 - Jira 업무 항목 생성·수정은 사용자가 명시적으로 요청한 경우에만 수행한다.
-- Jira 자동화를 사용하는 경우 `docs/jira/README.md`를 확인한다.
+- Jira 자동화 절차는 `docs/jira/README.md`를 따른다.
 - 자동화 스크립트와 테스트는 기능 수정 또는 오류 분석이 필요한 경우에만 확인한다.
-- 계획 파일로 생성할 때는 생성 예정 목록을 먼저 제시하고 사용자의 확인을 받은 뒤 실행한다.
-- 실제 생성 전에 최신 `origin/develop`을 확인하고 계획 파일의 변경 및 중복 생성 여부를
-  확인한다.
-- 생성 결과의 Jira Key를 기록하고 이미 연결된 항목은 중복 생성하지 않는다.
-- AI는 Jira의 우선순위, 담당자와 Epic을 임의로 변경하지 않는다.
+- Jira의 우선순위, 담당자와 Epic은 사용자의 명시적인 지시나 확정된 계획 없이 변경하지 않는다.
