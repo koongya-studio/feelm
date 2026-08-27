@@ -1,0 +1,10 @@
+tasks:
+- id: claude-code-entry-doc
+  issue_type: Task
+  summary: '[협업] Claude Code AI 지침 진입 파일 추가'
+  description: Claude Code가 저장소 공통 AI 협업 지침을 자동으로 읽도록 AGENTS.md를 참조하는 CLAUDE.md를 저장소에 추가한다.
+  done_when:
+  - CLAUDE.md가 저장소에 추적 대상으로 포함된다.
+  - CLAUDE.md가 AGENTS.md를 참조하여 지침이 중복 관리되지 않는다.
+  - Claude Code 사용자가 별도 설정 없이 저장소 AI 규칙을 적용받는다.
+  jira_key: S15P21E106-40
