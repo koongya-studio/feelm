@@ -121,6 +121,29 @@ class CreateIssuesTest(unittest.TestCase):
         with self.assertRaises(MODULE.PlanError):
             MODULE.validate_tasks([task, task.copy()])
 
+    def test_pending_task_story_points_must_use_complexity_scale(self):
+        task = {
+            "id": "invalid-story-points",
+            "summary": "Task",
+            "description": "Description",
+            "story_points": 4,
+            "done_when": ["Done"],
+        }
+        with self.assertRaisesRegex(MODULE.PlanError, "작업 복잡도"):
+            MODULE.validate_tasks([task])
+
+    def test_pending_task_accepts_each_story_point_value(self):
+        for story_points in (1, 2, 3, 5, 8, 13, 21):
+            with self.subTest(story_points=story_points):
+                task = {
+                    "id": f"story-points-{story_points}",
+                    "summary": "Task",
+                    "description": "Description",
+                    "story_points": story_points,
+                    "done_when": ["Done"],
+                }
+                MODULE.validate_tasks([task])
+
     def test_local_epic_must_be_declared_first(self):
         child = {
             "id": "child",
@@ -259,7 +282,7 @@ class CreateIssuesTest(unittest.TestCase):
         with patch.object(client, "request", return_value={"accountId": "abc"}):
             self.assertEqual(client.get_current_account_id(), "abc")
 
-    def test_pending_task_requires_ai_estimated_story_points(self):
+    def test_pending_task_requires_complexity_based_story_points(self):
         task = {
             "id": "estimated",
             "summary": "[백엔드] API 연동",
@@ -268,7 +291,7 @@ class CreateIssuesTest(unittest.TestCase):
         }
         with self.assertRaises(MODULE.PlanError):
             MODULE.validate_tasks([task])
-        MODULE.validate_tasks([{**task, "story_points": 12}])
+        MODULE.validate_tasks([{**task, "story_points": 13}])
 
     def test_epic_selection_prefers_matching_area(self):
         task = {

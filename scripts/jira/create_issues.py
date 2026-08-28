@@ -27,6 +27,7 @@ REQUIRED_ENV = (
 ALLOWED_TYPES = {"Epic", "Task"}
 TYPE_ALIASES = {"Epic": {"epic", "에픽"}, "Task": {"task", "작업"}}
 JIRA_KEY_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*-[1-9][0-9]*$")
+ALLOWED_STORY_POINTS = {1, 2, 3, 5, 8, 13, 21}
 
 
 class PlanError(ValueError):
@@ -119,11 +120,14 @@ def validate_tasks(tasks: list[Any]) -> None:
             or story_points < 0
         ):
             raise PlanError(f"{label}.story_points는 0 이상의 숫자여야 합니다.")
-        if issue_type == "Task" and not task.get("jira_key") and (
-            story_points is None or story_points <= 0
+        if (
+            issue_type == "Task"
+            and not task.get("jira_key")
+            and story_points not in ALLOWED_STORY_POINTS
         ):
             raise PlanError(
-                f"{label}.story_points는 구현 AI가 1포인트=1시간 기준으로 입력해야 합니다."
+                f"{label}.story_points는 작업 복잡도에 따라 "
+                f"{sorted(ALLOWED_STORY_POINTS)} 중 하나여야 합니다."
             )
         for automatic_field in ("assignee", "sprint"):
             if automatic_field in task:
