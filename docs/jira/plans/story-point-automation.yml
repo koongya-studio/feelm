@@ -1,0 +1,16 @@
+tasks:
+- id: story-point-automation
+  issue_type: Task
+  summary: '[협업] AI 기반 Story Point 산정 규칙 자동화 반영'
+  description: 팀에서 합의한 AI 에이전트 기반 Story Point 산정 기준을 Jira 업무 생성 자동화에 반영한다. 시간이나 코드 작성량 대신 설계 복잡도, 불확실성,
+    영향 범위, 검증 난이도와 인간 개입량을 평가하고, 신규 Task가 합의된 SP 척도만 사용하도록 검증한다.
+  area: 협업
+  story_points: 2
+  done_when:
+  - Jira 자동화 문서에 1, 2, 3, 5, 8, 13, 21 SP별 산정 기준이 명시되어 있다.
+  - 시간 기반 산정 규칙이 AI 기반 복잡도·위험도 산정 규칙으로 교체되어 있다.
+  - 신규 Task는 1, 2, 3, 5, 8, 13, 21 중 하나의 Story Point만 허용한다.
+  - 기존에 생성된 Jira 계획의 호환성을 유지한다.
+  - 허용값과 잘못된 값에 대한 Jira 자동화 테스트가 통과한다.
+  jira_key: S15P21E106-61
+  epic: S15P21E106-12
