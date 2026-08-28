@@ -7,7 +7,7 @@
 - 실제 개발은 Jira 업무 항목 단위의 짧은 작업 브랜치에서 진행한다.
 - `main`과 `develop`에는 직접 Push하지 않고 Merge Request를 통해서만 병합한다.
 - FE, BE, 데이터 등 영역별 장기 develop 브랜치는 만들지 않는다.
-- Merge method는 Fast-forward merge를 사용한다.
+- 프로젝트 Merge method는 Merge commit을 사용한다.
 
 ```text
 main
@@ -136,7 +136,7 @@ MR은 하나의 목적을 유지하고 리뷰 가능한 크기로 작성한다. 
 - 특정 Jira 업무 항목이 아닌 통합 MR이므로 Jira Issue Key를 제목에 강제하지 않는다.
 - MR 생성 시 `Release.md` 템플릿을 직접 선택한다.
 - Squash를 사용하지 않는다.
-- 별도 Merge Commit 없이 `main`을 `develop`의 최신 커밋 위치로 이동한다.
+- `develop`의 Jira 업무 단위 커밋 이력을 유지하도록 Merge commit을 생성한다.
 
 예시:
 
