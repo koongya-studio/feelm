@@ -90,7 +90,7 @@ MR 제목과 본문에는 Jira Issue Key 및 `Closes <JIRA-KEY>`를 포함한다
 3. `develop`에서 `main`으로 MR을 생성한다.
 4. MR 생성 화면에서 `Release.md` 템플릿을 직접 선택한다.
 5. 릴리스 범위, 주요 변경, 환경 변수, DB 변경 및 롤백 방법을 확인한다.
-6. Squash를 해제하고 Fast-forward 방식으로 병합한다.
+6. Squash를 해제하고 Merge commit을 생성해 병합한다.
 
 `develop`에서 `main`으로의 통합 MR은 팀장이 진행하며, 구체적인 주기는 팀 합의로 정한다.
 

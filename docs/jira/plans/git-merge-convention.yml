@@ -1,0 +1,16 @@
+tasks:
+- id: git-merge-convention
+  issue_type: Task
+  summary: '[협업] Git 병합 규칙 문서 최신화'
+  description: 확정된 GitLab 병합 정책에 맞춰 저장소의 Git 컨벤션과 개발 흐름 문서에서 Merge method 및 브랜치별 병합 방식을 일관되게 정리한다. develop에서
+    main으로 통합하는 구체적인 요일은 확정하지 않고 팀 합의 일정으로 유지한다.
+  area: 협업
+  story_points: 1
+  done_when:
+  - 프로젝트 Merge method가 Merge commit임을 Git 컨벤션에 명시한다.
+  - 작업 브랜치에서 develop으로 병합할 때 Squash를 사용한다는 규칙을 유지한다.
+  - develop에서 main으로 병합할 때 Squash 없이 Merge commit을 생성하도록 문서를 수정한다.
+  - develop에서 main으로 통합하는 주기는 특정 요일이 아닌 팀 합의 일정으로 유지한다.
+  - 관련 Git 컨벤션과 Jira-GitLab 개발 흐름 문서 사이에 상충하는 병합 방식이 없다.
+  jira_key: S15P21E106-48
+  epic: S15P21E106-12
