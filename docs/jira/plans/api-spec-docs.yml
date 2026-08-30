@@ -1,0 +1,16 @@
+tasks:
+- id: api-spec-docs
+  issue_type: Task
+  summary: '[협업] API 명세 저장소 문서화'
+  description: 팀 Notion의 API 명세 초안(공통 규약 + API-001~067)을 저장소 docs/api/ 문서로 옮겨 AI 코딩 도구와 팀원이 구현 시 참조하는
+    API 계약 기준 문서로 사용한다. 목록 표와 공통 규약은 색인 문서에, 상세 명세는 도메인별 문서에 정리하고 팀 미확정 항목은 미정으로 표기한다.
+  area: 협업
+  epic: S15P21E106-12
+  story_points: 2
+  done_when:
+  - docs/api/README.md에서 API 전체를 ID·Method·Endpoint·도메인·단계·인증 기준 표로 확인하고 상세 문서로 이동할 수 있다.
+  - 공통 규약(Base URL, 인증, 응답·오류 형식, 페이지네이션, 공통 상태값, 가정 기본값)이 저장소 문서에 있다.
+  - 도메인별 문서에서 각 API의 설명, 인증 및 권한, 파라미터, 요청/응답 예시, 오류 응답, 처리 규칙, 상태값, 미정 사항을 확인할 수 있다.
+  - docs/README.md 설계 문서 색인에서 API 명세로 이동할 수 있다.
+  - Notion 초안과 API 개수(68건)와 ID가 일치한다.
+  jira_key: S15P21E106-82

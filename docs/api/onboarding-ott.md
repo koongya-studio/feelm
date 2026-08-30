@@ -1,0 +1,326 @@
+# API 명세 — 온보딩·OTT
+
+[API 명세 색인](./README.md)으로 돌아가기. 공통 규약(Base URL, 인증, 오류 형식, 페이지네이션, 공통 상태값)은 색인 문서의 [공통 규약](./README.md#공통-규약)을 따릅니다.
+
+| ID | 이름 | Method | Endpoint | 단계 | 인증 |
+|---|---|---|---|---|---|
+| [API-023](#api-023-초기-취향-카드-목록) | 초기 취향 카드 목록 | GET | `/onboarding/cards` | 1차 MVP | 회원 |
+| [API-024](#api-024-초기-취향-제출) | 초기 취향 제출 | POST | `/onboarding/preferences` | 1차 MVP | 회원 |
+| [API-025](#api-025-ott-목록-조회) | OTT 목록 조회 | GET | `/otts` | 1차 MVP | 공개 |
+| [API-026](#api-026-내-구독-ott-조회) | 내 구독 OTT 조회 | GET | `/users/me/otts` | 1차 MVP | 회원 |
+| [API-027](#api-027-내-구독-ott-설정) | 내 구독 OTT 설정 | PUT | `/users/me/otts` | 1차 MVP | 회원 |
+
+## API-023 초기 취향 카드 목록
+
+`GET` `/api/v1/onboarding/cards`
+
+| 항목 | 값 |
+|---|---|
+| 단계 | 1차 MVP |
+| 인증 | 회원 |
+| 관련 요구사항 | FR-02 |
+| 화면 | ④ 취향 초기 설정 |
+| 미정 사항 | 있음 |
+| 비고 | - |
+
+### 설명
+
+온보딩에서 좋아요·싫어요를 선택할 영화 카드 목록을 내려준다.
+
+### 인증 및 권한
+
+- 회원
+
+### Path Parameters
+
+없음
+
+### Query Parameters
+
+- `size` (integer, 기본 20, 최대 40)
+
+### Request Body
+
+없음
+
+### Response
+
+`200 OK`
+
+```json
+{
+  "items": [
+    {
+      "movieId": 550,
+      "title": "파이트 클럽",
+      "posterUrl": "https://image.tmdb.org/t/p/w500/...",
+      "releaseYear": 1999,
+      "genres": ["드라마", "스릴러"],
+      "flavorCode": "FLAVOR_X"
+    }
+  ]
+}
+```
+
+### 오류 응답
+
+- `409 ONBOARDING_ALREADY_COMPLETED` 이미 온보딩을 마친 사용자(가정: 재실행 불가)
+
+### 처리 규칙
+
+- 8개 팝콘 맛이 고루 포함되도록 카드를 구성한다(가정)
+- 대중적으로 인지도가 높은 영화(MovieLens 평가 수 상위) 중에서 선정한다(가정)
+
+### 상태값
+
+없음
+
+### 미정 사항
+
+- [ ] 카드 선정 기준(인지도·맛 분포·최신성)과 개수
+- [ ] 온보딩 재실행 허용 여부
+
+## API-024 초기 취향 제출
+
+`POST` `/api/v1/onboarding/preferences`
+
+| 항목 | 값 |
+|---|---|
+| 단계 | 1차 MVP |
+| 인증 | 회원 |
+| 관련 요구사항 | FR-02 |
+| 화면 | ④ 취향 초기 설정 |
+| 미정 사항 | 없음 |
+| 비고 | - |
+
+### 설명
+
+카드에 대한 LIKE/DISLIKE 선택 결과를 저장하고 온보딩을 완료 처리한다. `차차 찾아갈래요`로 건너뛸 수도 있다.
+
+### 인증 및 권한
+
+- 회원
+
+### Path Parameters
+
+없음
+
+### Query Parameters
+
+없음
+
+### Request Body
+
+```json
+{
+  "preferences": [
+    { "movieId": 550, "preference": "LIKE" },
+    { "movieId": 680, "preference": "DISLIKE" }
+  ],
+  "skipped": false
+}
+```
+
+- 제외한 카드는 배열에 포함하지 않는다
+- `skipped: true`이면 `preferences`는 빈 배열
+
+### Response
+
+`200 OK`
+
+```json
+{ "onboardingCompleted": true, "savedCount": 2, "skipped": false }
+```
+
+### 오류 응답
+
+- `400 VALIDATION_FAILED` `preference` 값 오류, 중복 `movieId`
+- `409 ONBOARDING_ALREADY_COMPLETED`
+
+### 처리 규칙
+
+- 명시적으로 선택한 값만 저장한다. 제외 카드는 저장하지 않는다
+- 온보딩 LIKE/DISLIKE는 감상 후 평가(1~5점)와 별도 테이블에 저장하며 프레임·팝콘을 생성하지 않는다
+- 저장 후 초기 추천(API-045)이 가능하도록 추천 입력 버전을 갱신한다
+
+### 상태값
+
+- OnboardingPreference: `LIKE`, `DISLIKE`
+
+### 미정 사항
+
+없음
+
+## API-025 OTT 목록 조회
+
+`GET` `/api/v1/otts`
+
+| 항목 | 값 |
+|---|---|
+| 단계 | 1차 MVP |
+| 인증 | 공개 |
+| 관련 요구사항 | FR-03, FR-16 |
+| 화면 | ④-1 OTT 설정, ⑪-5 OTT 관리 |
+| 미정 사항 | 있음 |
+| 비고 | - |
+
+### 설명
+
+서비스가 지원하는 OTT 기준정보를 내려준다.
+
+### 인증 및 권한
+
+- 공개
+
+### Path Parameters
+
+없음
+
+### Query Parameters
+
+없음
+
+### Request Body
+
+없음
+
+### Response
+
+`200 OK`
+
+```json
+{
+  "items": [
+    { "ottId": 1, "code": "NETFLIX", "name": "넷플릭스", "logoUrl": "https://..." }
+  ]
+}
+```
+
+### 오류 응답
+
+- 공통 오류만 해당
+
+### 처리 규칙
+
+- 기준정보이므로 캐시 가능(`Cache-Control: max-age=86400`, 가정)
+
+### 상태값
+
+없음
+
+### 미정 사항
+
+- [ ] 지원 OTT 목록(넷플릭스·디즈니+·왓챠·웨이브·티빙·쿠팡플레이 등)과 TMDb watch provider 매핑
+
+## API-026 내 구독 OTT 조회
+
+`GET` `/api/v1/users/me/otts`
+
+| 항목 | 값 |
+|---|---|
+| 단계 | 1차 MVP |
+| 인증 | 회원 |
+| 관련 요구사항 | FR-03 |
+| 화면 | ⑪-5 OTT 관리 |
+| 미정 사항 | 없음 |
+| 비고 | - |
+
+### 설명
+
+사용자가 구독 중으로 설정한 OTT 목록을 조회한다.
+
+### 인증 및 권한
+
+- 회원
+
+### Path Parameters
+
+없음
+
+### Query Parameters
+
+없음
+
+### Request Body
+
+없음
+
+### Response
+
+`200 OK`
+
+```json
+{ "ottIds": [1, 3] }
+```
+
+### 오류 응답
+
+- 공통 오류만 해당
+
+### 처리 규칙
+
+- 설정하지 않았으면 빈 배열
+
+### 상태값
+
+없음
+
+### 미정 사항
+
+없음
+
+## API-027 내 구독 OTT 설정
+
+`PUT` `/api/v1/users/me/otts`
+
+| 항목 | 값 |
+|---|---|
+| 단계 | 1차 MVP |
+| 인증 | 회원 |
+| 관련 요구사항 | FR-03 |
+| 화면 | ④-1 OTT 설정, ⑪-5 OTT 관리 |
+| 미정 사항 | 없음 |
+| 비고 | - |
+
+### 설명
+
+구독 OTT 목록을 전체 교체한다. 온보딩과 설정 화면에서 공통으로 사용한다.
+
+### 인증 및 권한
+
+- 회원
+
+### Path Parameters
+
+없음
+
+### Query Parameters
+
+없음
+
+### Request Body
+
+```json
+{ "ottIds": [1, 3] }
+```
+
+### Response
+
+`200 OK`, API-026과 동일 본문
+
+### 오류 응답
+
+- `400 VALIDATION_FAILED` 존재하지 않는 `ottId`
+
+### 처리 규칙
+
+- 멱등. 빈 배열이면 전체 해제
+- 변경 시 영화 상세의 OTT 정렬(FR-16)과 검색 필터 기본값에 반영된다
+
+### 상태값
+
+없음
+
+### 미정 사항
+
+없음
