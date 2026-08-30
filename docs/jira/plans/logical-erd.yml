@@ -1,0 +1,17 @@
+tasks:
+- id: logical-erd
+  issue_type: Task
+  summary: '[협업] 논리 ERD 작성'
+  description: 요구사항 정의서와 API 명세에서 도출되는 PostgreSQL 엔티티·관계·핵심 속성을 논리 ERD로 정리해 docs/erd.md에 Mermaid erDiagram으로
+    작성한다. 식별자 타입, 파티 모델, 팝콘 맛 기준정보, 감상 기록과 평가의 관계 등 물리 스키마 전에 팀이 결정해야 할 판단을 함께 정리한다. Redis 키 설계와 HDFS
+    레이아웃은 범위에서 제외한다.
+  area: 협업
+  epic: S15P21E106-12
+  story_points: 3
+  done_when:
+  - docs/erd.md에서 사용자·기준정보·영화·온보딩·감상·추천·파티·리포트 영역의 엔티티와 관계를 Mermaid ERD로 확인할 수 있다.
+  - 테이블별 목적, 핵심 컬럼, 관련 요구사항·API ID가 표로 정리되어 있다.
+  - 물리 스키마 전에 결정할 판단 목록(선택지·가정값·영향 범위)이 정리되어 있다.
+  - docs/README.md 설계 문서 색인에서 ERD로 이동할 수 있다.
+  - API 명세의 리소스와 ERD 엔티티가 누락 없이 대응한다.
+  jira_key: S15P21E106-83
