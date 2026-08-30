@@ -1,0 +1,693 @@
+# API 명세 — 파티
+
+[API 명세 색인](./README.md)으로 돌아가기. 공통 규약(Base URL, 인증, 오류 형식, 페이지네이션, 공통 상태값)은 색인 문서의 [공통 규약](./README.md#공통-규약)을 따릅니다.
+
+| ID | 이름 | Method | Endpoint | 단계 | 인증 |
+|---|---|---|---|---|---|
+| [API-049](#api-049-파티-생성) | 파티 생성 | POST | `/parties` | 1차 MVP | 회원 |
+| [API-050](#api-050-활성-파티-조회) | 활성 파티 조회 | GET | `/parties/active` | 1차 MVP | 회원 |
+| [API-051](#api-051-파티-초대) | 파티 초대 | POST | `/parties/{partyId}/invitations` | 1차 MVP | 회원 |
+| [API-052](#api-052-받은-초대-목록) | 받은 초대 목록 | GET | `/parties/invitations` | 1차 MVP | 회원 |
+| [API-053](#api-053-초대-수락) | 초대 수락 | POST | `/parties/invitations/{invitationId}/accept` | 1차 MVP | 회원 |
+| [API-054](#api-054-초대-거절) | 초대 거절 | POST | `/parties/invitations/{invitationId}/decline` | 1차 MVP | 회원 |
+| [API-055](#api-055-파티-나가기) | 파티 나가기 | POST | `/parties/{partyId}/leave` | 1차 MVP | 회원 |
+| [API-056](#api-056-파티-종료) | 파티 종료 | DELETE | `/parties/{partyId}` | 1차 MVP | 회원 |
+| [API-057](#api-057-파티원-팝콘-조회) | 파티원 팝콘 조회 | GET | `/parties/{partyId}/popcorn` | 1차 MVP | 회원 |
+| [API-058](#api-058-파티-영화-추천) | 파티 영화 추천 | GET | `/parties/{partyId}/recommendations` | 1차 MVP | 회원 |
+
+## API-049 파티 생성
+
+`POST` `/api/v1/parties`
+
+| 항목 | 값 |
+|---|---|
+| 단계 | 1차 MVP |
+| 인증 | 회원 |
+| 관련 요구사항 | FR-20 |
+| 화면 | ⑧ 파티 모드 |
+| 미정 사항 | 있음 |
+| 비고 | - |
+
+### 설명
+
+함께 볼 영화를 고르기 위한 파티를 만든다. 생성자가 파티장이 된다.
+
+### 인증 및 권한
+
+- 회원
+
+### Path Parameters
+
+없음
+
+### Query Parameters
+
+없음
+
+### Request Body
+
+```json
+{ "name": "금요일 영화 모임" }
+```
+
+- `name` 선택, 30자 이하(가정)
+
+### Response
+
+`201 Created`
+
+```json
+{
+  "partyId": 9001,
+  "name": "금요일 영화 모임",
+  "status": "ACTIVE",
+  "owner": { "userId": 1024, "nickname": "팝콘러버" },
+  "members": [
+    { "userId": 1024, "nickname": "팝콘러버", "role": "OWNER", "joinedAt": "2026-08-30T05:21:00Z" }
+  ],
+  "maxMembers": 4,
+  "createdAt": "2026-08-30T05:21:00Z"
+}
+```
+
+### 오류 응답
+
+- `409 ACTIVE_PARTY_EXISTS` 이미 활성 파티에 속해 있음
+
+### 처리 규칙
+
+- 사용자는 동시에 하나의 활성 파티에만 속한다(가정)
+- 파티는 파티장 포함 최대 4명
+
+### 상태값
+
+- PartyStatus `ACTIVE`
+
+### 미정 사항
+
+- [ ] 사용자당 활성 파티 1개 제한(가정)
+- [ ] 파티 이름 필수 여부
+
+## API-050 활성 파티 조회
+
+`GET` `/api/v1/parties/active`
+
+| 항목 | 값 |
+|---|---|
+| 단계 | 1차 MVP |
+| 인증 | 회원 |
+| 관련 요구사항 | FR-20 |
+| 화면 | ⑧ 파티 모드 |
+| 미정 사항 | 없음 |
+| 비고 | - |
+
+### 설명
+
+내가 속한 활성 파티를 조회한다.
+
+### 인증 및 권한
+
+- 회원
+
+### Path Parameters
+
+없음
+
+### Query Parameters
+
+없음
+
+### Request Body
+
+없음
+
+### Response
+
+`200 OK`, API-049 응답 + 파티장에게만 `pendingInvitations`
+
+```json
+{
+  "partyId": 9001,
+  "name": "금요일 영화 모임",
+  "status": "ACTIVE",
+  "owner": { "userId": 1024, "nickname": "팝콘러버" },
+  "members": [],
+  "maxMembers": 4,
+  "pendingInvitations": [
+    { "invitationId": 501, "invitee": { "userId": 2048, "nickname": "영화광" }, "createdAt": "2026-08-30T05:21:00Z" }
+  ],
+  "createdAt": "2026-08-30T05:21:00Z"
+}
+```
+
+### 오류 응답
+
+- `404 RESOURCE_NOT_FOUND` 활성 파티 없음
+
+### 처리 규칙
+
+- 종료된 파티는 조회되지 않는다
+
+### 상태값
+
+- PartyStatus
+
+### 미정 사항
+
+없음
+
+## API-051 파티 초대
+
+`POST` `/api/v1/parties/{partyId}/invitations`
+
+| 항목 | 값 |
+|---|---|
+| 단계 | 1차 MVP |
+| 인증 | 회원 |
+| 관련 요구사항 | FR-20, FR-39 |
+| 화면 | ⑧ 파티 모드 |
+| 미정 사항 | 있음 |
+| 비고 | 파티장 전용 |
+
+### 설명
+
+닉네임 검색(API-019)으로 찾은 회원을 파티에 초대한다.
+
+### 인증 및 권한
+
+- 회원. 파티장만
+
+### Path Parameters
+
+- `partyId`
+
+### Query Parameters
+
+없음
+
+### Request Body
+
+```json
+{ "userId": 2048 }
+```
+
+### Response
+
+`201 Created`
+
+```json
+{
+  "invitationId": 501,
+  "partyId": 9001,
+  "invitee": { "userId": 2048, "nickname": "영화광" },
+  "status": "PENDING",
+  "createdAt": "2026-08-30T05:21:00Z"
+}
+```
+
+### 오류 응답
+
+- `403 FORBIDDEN` 파티장이 아님
+- `404 RESOURCE_NOT_FOUND` 파티 없음, 대상 사용자 없음, 차단 관계(존재하지 않는 것처럼 처리)
+- `409 PARTY_CLOSED`
+- `409 PARTY_FULL` 멤버 + 대기 초대가 4명 도달(가정)
+- `409 ALREADY_MEMBER`
+- `409 INVITATION_PENDING` 같은 사용자에게 대기 중 초대 존재
+
+### 처리 규칙
+
+- 초대는 자동 만료되지 않는다
+- 거절한 사용자에게 다시 초대할 수 있다(새 초대 생성)
+- 차단 관계인 사용자는 초대 후보에서 제외한다(FR-39)
+- 초대 알림 전달 방식은 공통 규약 미정 사항 참조(폴링 가정)
+
+### 상태값
+
+- InvitationStatus `PENDING`
+
+### 미정 사항
+
+- [ ] `PARTY_FULL` 계산에 대기 초대 포함 여부(가정: 포함)
+- [ ] 대상이 이미 다른 활성 파티에 있을 때 초대 가능 여부(가정: 가능, 수락 시 검사)
+
+## API-052 받은 초대 목록
+
+`GET` `/api/v1/parties/invitations`
+
+| 항목 | 값 |
+|---|---|
+| 단계 | 1차 MVP |
+| 인증 | 회원 |
+| 관련 요구사항 | FR-20 |
+| 화면 | ⑧ 파티 모드 |
+| 미정 사항 | 없음 |
+| 비고 | - |
+
+### 설명
+
+내가 받은 파티 초대를 조회한다. 기본은 대기 중인 초대만.
+
+### 인증 및 권한
+
+- 회원
+
+### Path Parameters
+
+없음
+
+### Query Parameters
+
+- `status` (string, 선택, 기본 `PENDING`): `PENDING`, `ACCEPTED`, `DECLINED`
+- `cursor`, `size`
+
+### Request Body
+
+없음
+
+### Response
+
+`200 OK`
+
+```json
+{
+  "items": [
+    {
+      "invitationId": 501,
+      "party": {
+        "partyId": 9001,
+        "name": "금요일 영화 모임",
+        "owner": { "userId": 1024, "nickname": "팝콘러버" },
+        "memberCount": 2
+      },
+      "status": "PENDING",
+      "createdAt": "2026-08-30T05:21:00Z"
+    }
+  ],
+  "nextCursor": null,
+  "hasNext": false
+}
+```
+
+### 오류 응답
+
+- 공통 오류만 해당
+
+### 처리 규칙
+
+- 파티가 종료되면 대기 중 초대는 목록에서 제외한다(가정)
+
+### 상태값
+
+- InvitationStatus
+
+### 미정 사항
+
+없음
+
+## API-053 초대 수락
+
+`POST` `/api/v1/parties/invitations/{invitationId}/accept`
+
+| 항목 | 값 |
+|---|---|
+| 단계 | 1차 MVP |
+| 인증 | 회원 |
+| 관련 요구사항 | FR-20 |
+| 화면 | ⑧ 파티 모드 |
+| 미정 사항 | 없음 |
+| 비고 | - |
+
+### 설명
+
+초대를 수락하고 파티에 참여한다.
+
+### 인증 및 권한
+
+- 회원. 초대받은 본인만
+
+### Path Parameters
+
+- `invitationId`
+
+### Query Parameters
+
+없음
+
+### Request Body
+
+없음
+
+### Response
+
+`200 OK`, API-049 파티 응답
+
+### 오류 응답
+
+- `404 RESOURCE_NOT_FOUND`
+- `409 INVITATION_NOT_PENDING` 이미 처리됨
+- `409 PARTY_CLOSED`
+- `409 PARTY_FULL`
+- `409 ACTIVE_PARTY_EXISTS` 내가 이미 다른 활성 파티에 속함. 먼저 나가야 함
+
+### 처리 규칙
+
+- 수락 시 인원이 바뀌므로 파티 추천 캐시(API-058)를 무효화한다
+- 수락 후 파티원 전원에게 파티 정보가 갱신된다(폴링 가정)
+
+### 상태값
+
+- InvitationStatus `PENDING` → `ACCEPTED`
+
+### 미정 사항
+
+없음
+
+## API-054 초대 거절
+
+`POST` `/api/v1/parties/invitations/{invitationId}/decline`
+
+| 항목 | 값 |
+|---|---|
+| 단계 | 1차 MVP |
+| 인증 | 회원 |
+| 관련 요구사항 | FR-20 |
+| 화면 | ⑧ 파티 모드 |
+| 미정 사항 | 없음 |
+| 비고 | - |
+
+### 설명
+
+초대를 거절한다.
+
+### 인증 및 권한
+
+- 회원. 초대받은 본인만
+
+### Path Parameters
+
+- `invitationId`
+
+### Query Parameters
+
+없음
+
+### Request Body
+
+없음
+
+### Response
+
+`200 OK`
+
+```json
+{ "invitationId": 501, "status": "DECLINED" }
+```
+
+### 오류 응답
+
+- `404 RESOURCE_NOT_FOUND`
+- `409 INVITATION_NOT_PENDING`
+
+### 처리 규칙
+
+- 거절해도 파티장은 다시 초대할 수 있다
+
+### 상태값
+
+- InvitationStatus `PENDING` → `DECLINED`
+
+### 미정 사항
+
+없음
+
+## API-055 파티 나가기
+
+`POST` `/api/v1/parties/{partyId}/leave`
+
+| 항목 | 값 |
+|---|---|
+| 단계 | 1차 MVP |
+| 인증 | 회원 |
+| 관련 요구사항 | FR-20 |
+| 화면 | ⑧ 파티 모드 |
+| 미정 사항 | 있음 |
+| 비고 | 인원 변경 시 파티 종료 규칙 |
+
+### 설명
+
+파티에서 나간다. 활성 파티의 인원이 바뀌면 현재 파티는 종료되고 파티장이 새 파티를 만든다(FR-20).
+
+### 인증 및 권한
+
+- 회원. 파티 멤버만
+
+### Path Parameters
+
+- `partyId`
+
+### Query Parameters
+
+없음
+
+### Request Body
+
+없음
+
+### Response
+
+`200 OK`
+
+```json
+{ "partyId": 9001, "status": "CLOSED", "closedReason": "MEMBER_LEFT", "closedAt": "2026-08-30T05:21:00Z" }
+```
+
+### 오류 응답
+
+- `404 RESOURCE_NOT_FOUND`
+- `409 PARTY_CLOSED` 이미 종료됨
+
+### 처리 규칙
+
+- 멤버 또는 파티장이 나가면 파티 상태를 `CLOSED`로 바꾸고 대기 중 초대를 모두 무효화한다
+- 종료된 파티의 추천 이력은 보존된다
+- 남은 멤버로 계속하려면 파티장이 API-049로 새 파티를 만들고 다시 초대한다
+
+### 상태값
+
+- PartyStatus `ACTIVE` → `CLOSED`
+- `closedReason`: `MEMBER_LEFT`, `OWNER_CLOSED`, `OWNER_WITHDRAWN`
+
+### 미정 사항
+
+- [ ] 새 파티를 서버가 자동 생성(남은 멤버 자동 포함)할지, 파티장이 수동 생성할지(가정: 수동)
+
+## API-056 파티 종료
+
+`DELETE` `/api/v1/parties/{partyId}`
+
+| 항목 | 값 |
+|---|---|
+| 단계 | 1차 MVP |
+| 인증 | 회원 |
+| 관련 요구사항 | FR-20 |
+| 화면 | ⑧ 파티 모드 |
+| 미정 사항 | 없음 |
+| 비고 | 파티장 전용 |
+
+### 설명
+
+파티장이 파티를 종료한다.
+
+### 인증 및 권한
+
+- 회원. 파티장만
+
+### Path Parameters
+
+- `partyId`
+
+### Query Parameters
+
+없음
+
+### Request Body
+
+없음
+
+### Response
+
+`200 OK`
+
+```json
+{ "partyId": 9001, "status": "CLOSED", "closedReason": "OWNER_CLOSED", "closedAt": "2026-08-30T05:21:00Z" }
+```
+
+### 오류 응답
+
+- `403 FORBIDDEN`
+- `404 RESOURCE_NOT_FOUND`
+- `409 PARTY_CLOSED`
+
+### 처리 규칙
+
+- 대기 중 초대는 모두 무효화한다
+- 파티 기록은 삭제하지 않고 `CLOSED`로 보존한다(추천 이력 연결)
+
+### 상태값
+
+- PartyStatus → `CLOSED`
+
+### 미정 사항
+
+없음
+
+## API-057 파티원 팝콘 조회
+
+`GET` `/api/v1/parties/{partyId}/popcorn`
+
+| 항목 | 값 |
+|---|---|
+| 단계 | 1차 MVP |
+| 인증 | 회원 |
+| 관련 요구사항 | FR-21 |
+| 화면 | ⑧ 파티 모드, ⑧-1 파티 필름 |
+| 미정 사항 | 있음 |
+| 비고 | - |
+
+### 설명
+
+활성 파티 파티원들의 팝콘 버킷을 한 화면에 보여주기 위한 데이터를 조회한다. 팝콘 기계 애니메이션은 클라이언트가 처리한다.
+
+### 인증 및 권한
+
+- 회원. 파티 멤버만
+
+### Path Parameters
+
+- `partyId`
+
+### Query Parameters
+
+없음
+
+### Request Body
+
+없음
+
+### Response
+
+`200 OK`
+
+```json
+{
+  "partyId": 9001,
+  "members": [
+    {
+      "user": { "userId": 1024, "nickname": "팝콘러버" },
+      "totalCount": 42,
+      "flavors": [
+        { "flavorCode": "FLAVOR_X", "popcornCount": 12, "averageScore": 4.4 }
+      ]
+    }
+  ]
+}
+```
+
+### 오류 응답
+
+- `404 RESOURCE_NOT_FOUND` 파티 없음 또는 멤버 아님
+
+### 처리 규칙
+
+- 프로필 공개 범위가 `PRIVATE`이어도 같은 파티 멤버에게는 팝콘 집계를 노출한다(가정). 개별 프레임·평가는 노출하지 않는다
+- 팝콘 공유·추가 비교 분석은 범위 밖(FR-21)
+
+### 상태값
+
+없음
+
+### 미정 사항
+
+- [ ] `PRIVATE` 사용자의 팝콘을 파티원에게 노출하는 것이 공개 범위 정책과 충돌하지 않는지 확인
+
+## API-058 파티 영화 추천
+
+`GET` `/api/v1/parties/{partyId}/recommendations`
+
+| 항목 | 값 |
+|---|---|
+| 단계 | 1차 MVP |
+| 인증 | 회원 |
+| 관련 요구사항 | FR-22, FR-13 |
+| 화면 | ⑧-1 파티 필름 |
+| 미정 사항 | 있음 |
+| 비고 | 알고리즘 비교 후 확정 |
+
+### 설명
+
+파티원 전체의 취향을 고려해 함께 보기 좋은 영화를 추천한다.
+
+### 인증 및 권한
+
+- 회원. 파티 멤버만
+
+### Path Parameters
+
+- `partyId`
+
+### Query Parameters
+
+- `size` (integer, 기본 3, 최대 10)
+
+### Request Body
+
+없음
+
+### Response
+
+`200 OK`
+
+```json
+{
+  "recommendationSetId": 7101,
+  "partyId": 9001,
+  "generatedAt": "2026-08-30T05:21:00Z",
+  "items": [
+    {
+      "recommendationItemId": 3401,
+      "type": "PARTY",
+      "movie": { "movieId": 550, "title": "파이트 클럽", "posterUrl": "https://...", "ottProviders": ["NETFLIX"] },
+      "reason": {
+        "summary": "모두가 좋아하는 스릴러",
+        "memberFit": [
+          { "userId": 1024, "score": 0.91 },
+          { "userId": 2048, "score": 0.78 }
+        ]
+      }
+    }
+  ]
+}
+```
+
+### 오류 응답
+
+- `404 RESOURCE_NOT_FOUND`
+- `409 PARTY_CLOSED`
+- `503 RECOMMENDATION_UNAVAILABLE`
+
+### 처리 규칙
+
+- 파티원 중 한 명이라도 감상 기록이 있는 영화는 제외한다(가정)
+- 파티 인원이 바뀌면 재계산한다. 인원이 같으면 캐시된 결과를 반환한다
+- 검증 지표: Average·Least Misery 대비 최저 만족도 상승, 만족도 편차 감소, 평균 만족도 유지(FR-22)
+- 결과는 파티 추천 이력에 `source: PARTY`로 저장한다(가정)
+
+### 상태값
+
+- RecommendationType `PARTY`
+
+### 미정 사항
+
+- [ ] 집계 알고리즘(Average / Least Misery / 개선식) 확정
+- [ ] 감상 영화 제외 기준(한 명이라도 vs 전원)
+- [ ] 파티 추천을 개인 추천 이력에 포함할지
