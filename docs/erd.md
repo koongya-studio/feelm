@@ -12,7 +12,7 @@ FEELM 서비스 데이터베이스(PostgreSQL)의 논리 ERD입니다. [요구�
 
 ## 범례
 
-- 다이어그램의 타입은 논리 수준 표기입니다. `bigint` 식별자는 가정값이며 [결정 D-1](#5-물리-스키마-전-결정-사항)에 따라 바뀔 수 있습니다.
+- 다이어그램의 타입은 논리 수준 표기입니다. 식별자는 내부 `bigint`, 공개 URL 노출용은 `users.public_id`입니다(D-1 결정, ADR-0008).
 - `PK` 기본키, `FK` 외래키, `UK` 유일 제약. 복합 유일 제약은 표의 **제약** 열에 적습니다.
 - 열거형 값은 [API 명세 공통 규약 – 상태값](./api/README.md#상태값)과 동일한 코드를 사용합니다.
 - **(가정)** 은 팀 결정 전 초안 기본값입니다.
@@ -52,11 +52,12 @@ erDiagram
 erDiagram
     USERS {
         bigint id PK
+        varchar public_id UK "공개 URL 노출용 (D-1 결정, ADR-0008)"
         varchar email UK "소셜 전용 계정은 제공자 이메일"
         varchar password_hash "소셜 전용 계정은 NULL"
         varchar nickname UK "공백 제거·소문자 정규화 값으로 유일 검사"
-        int age "가정. D-8 참조"
-        varchar gender "MALE / FEMALE / OTHER (가정)"
+        date birth_date "생년월일 (D-8 결정)"
+        varchar gender "MALE / FEMALE / OTHER, NULL 허용 (D-8 결정)"
         varchar visibility "PUBLIC / PRIVATE, 기본 PRIVATE"
         varchar status "PENDING_VERIFICATION / ACTIVE / WITHDRAWN"
         boolean onboarding_completed
@@ -84,13 +85,6 @@ erDiagram
         timestamptz expires_at
         timestamptz used_at
     }
-    REFRESH_TOKENS {
-        bigint id PK
-        bigint user_id FK
-        varchar token_hash UK
-        timestamptz expires_at
-        timestamptz revoked_at
-    }
     NOTIFICATION_SETTINGS {
         bigint user_id PK, FK
         boolean rating_enabled
@@ -107,7 +101,6 @@ erDiagram
     USERS ||--o{ USER_AUTH_PROVIDERS : links
     USERS ||--o{ EMAIL_VERIFICATION_TOKENS : issues
     USERS ||--o{ PASSWORD_RESET_TOKENS : issues
-    USERS ||--o{ REFRESH_TOKENS : issues
     USERS ||--|| NOTIFICATION_SETTINGS : configures
     USERS ||--o{ USER_BLOCKS : blocks
     USERS ||--o{ USER_BLOCKS : blocked_by
@@ -119,9 +112,10 @@ erDiagram
 | `user_auth_providers` | 소셜 로그인 수단 | UK(`provider`, `provider_user_id`). 같은 이메일이어도 기존 계정에 자동 통합하지 않음 | FR-35 · API-007~009 |
 | `email_verification_tokens` | 가입 이메일 인증 | 1회용, 만료 24시간(가정). 해시만 저장 | FR-01 · API-002, API-003 |
 | `password_reset_tokens` | 비밀번호 재설정 | 1회용, 만료 30분(가정). 성공 시 해당 사용자 Refresh Token 전부 폐기 | FR-37 · API-010, API-011 |
-| `refresh_tokens` | Refresh Token 회전·폐기 관리 | Redis 저장으로 대체 가능 — D-2 | API-004~006, API-013 |
 | `notification_settings` | 알림 수신 설정 | 사용자당 1행. 알림 **발송** 기능은 FR 부재 | FR-38 · API-017, API-018 |
 | `user_blocks` | 사용자 차단 | UK(`blocker_id`, `blocked_id`). 양방향 필터는 조회 시 OR 조건 | FR-39 · API-019~022 |
+
+> Refresh Token은 Redis에 TTL로 저장하며 별도 테이블을 두지 않습니다 (D-2 결정, ADR-0009).
 
 ### 2.2 기준정보·영화
 
@@ -210,7 +204,7 @@ erDiagram
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `movies` | 영화 마스터 (TMDb 기준) | `tmdb_id` 유일. `average_rating`·`rating_count`는 평가 집계 반정규화 컬럼(가정, D-10) | FR-34 · API-028~031 |
+| `movies` | 영화 마스터 (TMDb 기준) | `tmdb_id` 유일. `average_rating`·`rating_count`는 평가 집계 반정규화 컬럼(D-10 결정) | FR-34 · API-028~031 |
 | `genres` | 장르 기준정보 | TMDb 장르 ID 매핑 | FR-15 · API-029 |
 | `movie_genres`, `movie_countries`, `movie_people` | 영화 속성 매핑 | `movie_people.role`로 감독·배우 구분 | FR-14, FR-15, FR-34 |
 | `people` | 인물(감독·배우) | 검색 대상(FR-14) | API-028, API-030 |
@@ -251,7 +245,7 @@ erDiagram
         bigint id PK
         bigint user_id FK
         bigint movie_id FK
-        bigint watch_record_id FK "D-6에 따라 NULL 허용 여부 결정"
+        bigint watch_record_id FK "NULL 허용 (D-6 결정: 감상 기록 없는 평가)"
         smallint score "1~5"
         varchar comment "한줄평 200자 이하, NULL 가능"
         varchar visibility "PUBLIC / PRIVATE"
@@ -303,13 +297,13 @@ erDiagram
 |---|---|---|---|
 | `onboarding_preferences` | 초기 취향(LIKE/DISLIKE) | UK(`user_id`, `movie_id`). 평가(1~5점)와 분리 저장, 프레임·팝콘 생성 안 함 | FR-02 · API-023, API-024 |
 | `user_otts` | 구독 OTT | 전체 교체(PUT) | FR-03 · API-026, API-027 |
-| `watch_records` | 감상 상태 머신 | 사용자·영화별 **활성 기록**(EXPIRED 아님)은 1개 — 부분 유일 인덱스(가정, D-6). 만료 후 재클릭은 새 행 | FR-17, FR-18 · API-033~035 |
+| `watch_records` | 감상 상태 머신 | 사용자·영화별 **활성 기록**(EXPIRED 아님)은 1개 — 부분 유일 인덱스(D-6 결정). 만료 후 재클릭은 새 행 | FR-17, FR-18 · API-033~035 |
 | `ratings` | 평가 + 한줄평 | UK(`user_id`, `movie_id`). 한줄평은 컬럼(별도 테이블 아님). 삭제 시 프레임·팝콘 함께 삭제, 감상 기록은 `WATCHED_UNRATED`로 복귀 | FR-19, FR-26 · API-036~039 |
 | `frames` | 필름의 프레임 | 평가와 1:1. 최초 저장 시 생성, 수정으로 변하지 않음 | FR-07, FR-08 · API-042, API-043 |
 | `popcorns` | 팝콘 1알 | 프레임과 1:1. `flavor_id`는 영화 대표 맛. 맛별 집계는 `COUNT`·`AVG(score)`로 계산 | FR-06, FR-09, FR-32 · API-041 |
 | `taste_analyses` | 취향 분석 결과 캐시 | 평가 변경 시 재계산(비동기 가정). FastAPI 도입 시 계산 위치 D-4 | FR-04, FR-05 · API-040 |
 
-> `frames`와 `popcorns`는 요구사항상 별개 개념이지만 생명주기가 평가와 완전히 같습니다. 물리 스키마에서 `ratings` 컬럼으로 흡수할지는 D-7에서 결정합니다.
+> D-7 결정: 필름 중심 파생 기능(프레임 배치·메모·커버 등) 확장 가능성을 위해 `frames`·`popcorns`를 별도 테이블로 유지합니다.
 
 ### 2.4 추천
 
@@ -397,7 +391,7 @@ erDiagram
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `parties` | 파티 | 사용자당 활성 파티 1개(가정, D-3) — `party_members` 기준 부분 유일 인덱스. 인원 변경 시 `CLOSED` 처리 후 새 파티 생성 | FR-20 · API-049, API-050, API-055, API-056 |
+| `parties` | 파티 | 사용자는 여러 활성 파티에 속할 수 있고 1인당 상한(기본 5)은 설정값(D-3 결정). 파티 인원 변경 시 해당 파티를 `CLOSED` 처리하고 파티장이 새로 생성 | FR-20 · API-049, API-050, API-055, API-056 |
 | `party_members` | 파티 구성원 | 파티장 포함 최대 4명은 애플리케이션 검증 | FR-20, FR-21 · API-057 |
 | `party_invitations` | 초대 | 자동 만료 없음. 거절 후 재초대는 새 행. `PENDING` 중복은 UK(`party_id`, `invitee_id`) WHERE status=PENDING(부분 유일) | FR-20 · API-051~054 |
 
@@ -444,7 +438,7 @@ flowchart LR
     B -->|평가 저장| C["RATED"]
     C -->|ratings + frames + popcorns<br/>단일 트랜잭션 생성| D["필름·팝콘 버킷 반영"]
     C -->|평가 삭제| B
-    S["감상 기록 없이 평가<br/>(D-6)"] -.->|허용 시 RATED 기록 생성| C
+    S["감상 기록 없이 평가<br/>(D-6 결정: 허용)"] -.->|허용 시 RATED 기록 생성| C
 ```
 
 - `ratings` 저장·`frames`·`popcorns` 생성·`watch_records.status=RATED` 전이는 **하나의 트랜잭션**으로 처리합니다(NFR-06).
@@ -467,7 +461,7 @@ flowchart LR
 
 | API 리소스 | 주 테이블 | 참조 테이블 |
 |---|---|---|
-| `/auth/*`, `/users/me`, `/users/nickname-availability` | `users`, `user_auth_providers`, `email_verification_tokens`, `password_reset_tokens`, `refresh_tokens` | — |
+| `/auth/*`, `/users/me`, `/users/nickname-availability` | `users`, `user_auth_providers`, `email_verification_tokens`, `password_reset_tokens` | — |
 | `/users/me/notification-settings` | `notification_settings` | — |
 | `/users/search`, `/users/{userId}/block`, `/users/me/blocks` | `users`, `user_blocks` | — |
 | `/onboarding/cards`, `/onboarding/preferences` | `onboarding_preferences` | `movies`, `popcorn_flavors` |
@@ -490,21 +484,21 @@ flowchart LR
 
 ## 5. 물리 스키마 전 결정 사항
 
-물리 스키마·마이그레이션을 작성하기 전에 팀이 확정해야 할 판단입니다. **가정값**은 이 문서와 API 명세가 현재 전제하는 값입니다.
+2026-08-30~31에 대부분 결정되었습니다. 결정 근거·대안은 각 [ADR](./adr/README.md)과 A 회의 안건 페이지를 참조합니다.
 
-| # | 결정 | 선택지 | 가정값 | 영향 범위 |
+| # | 결정 | 선택지 | 결정 결과 | 영향 범위 |
 |---|---|---|---|---|
-| D-1 | 식별자 타입 | `bigint` 시퀀스 / UUID(v7) | `bigint` | 전 테이블, 전 API 응답, URL에 노출되는 `userId` 열거 위험 |
-| D-2 | Refresh Token 저장소 | PostgreSQL `refresh_tokens` / Redis(TTL) | PostgreSQL | 인증 API, 회전·폐기 로직, 탈퇴 처리 |
-| D-3 | 사용자당 활성 파티 수 | 1개 제한 / 복수 허용 | 1개 | `party_members` 부분 유일 인덱스, API-049·053 오류 코드 |
-| D-4 | 취향 분석·추천 이유 계산 위치 | Spring Boot / FastAPI | Spring Boot (README 미정) | `taste_analyses` 갱신 방식, 내부 API 계약 |
-| D-5 | 복수 장르 영화의 대표 맛 규칙 | `flavor_genres.priority` / TMDb 장르 순서 / 별도 큐레이션 | `priority` | `movies.representative_flavor_id` 산출, 팝콘 집계 결과 |
-| D-6 | 감상 기록 없이 평가 허용 | 허용(`ratings.watch_record_id` NULL 가능, 저장 시 `RATED` 기록 생성) / 불허 | 허용 | `watch_records` 유일 제약, 검색·프로필 화면 흐름 |
-| D-7 | 프레임·팝콘 테이블 분리 | `frames`·`popcorns` 별도 / `ratings` 컬럼(`frame_created_at`, `flavor_id`)으로 흡수 | 별도 | 필름·팝콘 조회 쿼리, FR-32 발견 표시 저장 위치 |
-| D-8 | 가입 시 나이 저장 형식 | 정수(`age`) / 연령대 구간 / 생년 | 정수 | `users` 스키마, API-001·008 요청 필드 |
-| D-9 | 탈퇴 사용자 데이터 처리 | 개인 데이터 즉시 삭제 / 기간 보존 후 삭제 / 익명화 유지 | 미정 | `users.status`, 공개 한줄평 표시, 추천 학습 데이터 |
-| D-10 | 평균 별점 집계 방식 | `movies` 반정규화 컬럼 / 조회 시 집계 / 머티리얼라이즈드 뷰 | 반정규화 컬럼 | 평가 트랜잭션 범위, 차단 사용자 평가 제외 여부(API-030) |
-| D-11 | 검색 엔진 | PostgreSQL full-text(`pg_trgm`) / Elasticsearch | PostgreSQL | 인덱스 설계, 인프라 추가 |
-| D-12 | 팝콘 맛 8종 기준정보 | 통합본 2.1 값 확정 | 미정 | `popcorn_flavors`·`flavor_genres` 초기 데이터, 온보딩 카드 구성 |
+| D-1 | 식별자 타입 | `bigint` 시퀀스 / UUID(v7) / 혼합 | **내부 `bigint` + 공개 URL `users.public_id`** (08-30, ADR-0008) | 전 테이블, 전 API 응답 |
+| D-2 | Refresh Token 저장소 | PostgreSQL / Redis(TTL) | **Redis** (08-31, ADR-0009) — `refresh_tokens` 테이블 제거 | 인증 API, 회전·폐기, 탈퇴 처리 |
+| D-3 | 사용자당 활성 파티 수 | 1개 제한 / 복수 허용 | **복수 허용, 상한(기본 5) 설정값** (08-30) | API-049·050·053, ⑧ 화면 |
+| D-4 | 취향 분석·추천 이유 계산 위치 | Spring Boot / FastAPI | **FastAPI** (08-31, ADR-0012) — 내부 API 명세 별도 작성 | `taste_analyses` 갱신 방식, 내부 API 계약 |
+| D-5 | 복수 장르 영화의 대표 맛 규칙 | `flavor_genres.priority` / TMDb 순서 / 큐레이션 | 미정 — A-6과 함께 확정 | `movies.representative_flavor_id`, 팝콘 집계 |
+| D-6 | 감상 기록 없이 평가 허용 | 허용 / 불허 | **허용** (08-30) — `ratings.watch_record_id` NULL 허용 | `watch_records` 유일 제약, ⑩·⑪ 화면 |
+| D-7 | 프레임·팝콘 테이블 분리 | 별도 / `ratings` 흡수 | **별도 유지** (08-30) — 필름 파생 기능 확장 대비 | 필름·팝콘 조회, FR-32 저장 위치 |
+| D-8 | 가입 시 나이 저장 형식 | 정수 / 연령대 / 출생연도 | **생년월일(`birth_date`)** (08-31, 08-30 출생연도에서 변경). 성별 3값 + NULL 허용 | `users`, API-001·008 |
+| D-9 | 탈퇴 사용자 데이터 처리 | 즉시 삭제 / 기간 보존 / 익명화 | 미정 — 출시 전 개인정보 방침과 함께 확정 | `users.status`, 공개 한줄평, 학습 데이터 |
+| D-10 | 평균 별점 집계 방식 | 반정규화 컬럼 / 조회 시 집계 / MView | **반정규화 컬럼, 차단 미반영** (08-30) | 평가 트랜잭션 범위, API-030 |
+| D-11 | 검색 엔진 | PostgreSQL full-text(`pg_trgm`) / Elasticsearch | **PostgreSQL full-text + `pg_trgm`** (08-31, ADR-0010) | 인덱스 설계 |
+| D-12 | 팝콘 맛 8종 기준정보 | 통합본 2.1 값 확정 | 미정 — A-6, 데이터 담당 초안 후 확정 | `popcorn_flavors`·`flavor_genres` 초기 데이터, 온보딩 카드 |
 
-D-1~D-8은 [API 명세 공통 규약 미정 사항](./api/README.md#미정-사항)과 겹치는 항목이 있으므로 같은 회의에서 함께 결정합니다.
+미결은 D-5·D-12(팝콘 맛 기준정보, A-6)와 D-9(출시 전 정책)뿐입니다.
