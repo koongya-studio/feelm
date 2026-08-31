@@ -1,0 +1,30 @@
+# ADR-0009: 인증은 JWT Bearer로 하고 Refresh Token은 httpOnly 쿠키로 전달해 Redis에 저장한다
+
+| 항목 | 값 |
+|---|---|
+| 상태 | 채택 |
+| 결정일 | 2026-08-31 |
+| 결정자 | 박시현(BE). FE 공유 예정 |
+| 관련 | A-8, ERD D-2, NFR-07, API-000, API-004~006, API-013 |
+
+## 맥락
+
+모든 회원 API가 인증 방식에 의존한다. 클라이언트는 Vue 웹 하나(ADR-0005)이고, Redis는 확정 스택(ADR-0004)이다. XSS로 토큰이 탈취되는 위험과 모바일 앱 확장 가능성을 함께 고려해야 한다.
+
+## 결정
+
+Access Token은 응답 본문으로 받아 `Authorization: Bearer` 헤더로 전달하고, Refresh Token은 `httpOnly; Secure; SameSite=Lax` 쿠키로 발급한다. Refresh Token은 Redis에 TTL로 저장하고 사용 시 회전(rotation)하며, 재사용이 감지되면 해당 사용자의 Refresh Token을 전부 폐기한다. 수명(Access 30분 / Refresh 14일)은 설정값이다. ERD의 `refresh_tokens` 테이블은 제거한다.
+
+## 고려한 대안
+
+| 대안 | 장점 | 단점 |
+|---|---|---|
+| httpOnly 쿠키 + Redis (선택) | XSS 안전, TTL·회전·폐기 자연스러움, 탈퇴 시 일괄 폐기 용이 | CORS·쿠키 도메인 설정, 모바일 앱 확장 시 재검토 |
+| 응답 본문 + PostgreSQL | 클라이언트 종류에 무관 | JS 접근 가능해 XSS 노출, 만료 정리 배치 필요 |
+| 세션 쿠키(서버 세션) | 구현 단순 | FastAPI 등 다중 서비스 공유 어려움 |
+
+## 결과
+
+- **얻는 것**: 보안·운영 단순
+- **감수하는 것**: 웹 전용 가정, 쿠키 도메인 정책
+- **후속 작업**: 반영 완료(S15P21E106-91) — ERD `refresh_tokens` 제거, API-000 미정 사항 정리. FE에 쿠키 도메인·CORS 설정 공유 필요
