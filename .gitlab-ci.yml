@@ -1,0 +1,13 @@
+stages:
+  - verify
+
+runner-check:
+  stage: verify
+  tags:
+    - e106-shell
+  script:
+    - echo "E106 GitLab Runner connected"
+    - hostname
+    - whoami
+    - docker --version
+    - docker compose version
