@@ -63,15 +63,15 @@
 | `email` | string | O | RFC 5322 형식, 소문자 정규화 |
 | `password` | string | O | 8~64자, 영문·숫자 포함(가정) |
 | `nickname` | string | O | 2~20자(가정). 공백·대소문자 무시 중복 검사 |
-| `age` | integer | O | 만 나이(가정). 실명·생년월일은 수집하지 않음 |
-| `gender` | string | O | `MALE`, `FEMALE`, `OTHER`(가정) |
+| `birthDate` | string | O | 생년월일 `YYYY-MM-DD` (D-8 결정). 실명은 수집하지 않음 |
+| `gender` | string | O | `MALE` / `FEMALE` / `OTHER`, 선택 입력(NULL 허용) |
 
 ```json
 {
   "email": "user@example.com",
   "password": "p@ssw0rd!",
   "nickname": "팝콘러버",
-  "age": 27,
+  "birthDate": "1999-03-14",
   "gender": "FEMALE"
 }
 ```
@@ -110,7 +110,6 @@
 
 - [ ] 비밀번호 정책(길이·문자 조합)
 - [ ] 닉네임 길이·허용 문자
-- [ ] `age` 정수 vs 연령대 구간, `gender` 값 목록
 - [ ] 미인증 계정 정리 주기
 
 ## API-002 이메일 인증 확인
@@ -519,7 +518,7 @@ OAuth 인가 코드를 받아 소셜 계정을 확인한다. 이미 연결된 �
 {
   "signupToken": "eyJhbGciOi...",
   "nickname": "팝콘러버",
-  "age": 27,
+  "birthDate": "1999-03-14",
   "gender": "FEMALE"
 }
 ```
@@ -883,7 +882,7 @@ OAuth 인가 코드를 받아 소셜 계정을 확인한다. 이미 연결된 �
   "userId": 1024,
   "email": "user@example.com",
   "nickname": "팝콘러버",
-  "age": 27,
+  "birthDate": "1999-03-14",
   "gender": "FEMALE",
   "visibility": "PRIVATE",
   "hasPassword": true,

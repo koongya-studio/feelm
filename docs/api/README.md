@@ -80,20 +80,20 @@ FEELM 서비스 REST API 명세입니다. Notion 「설계 > API 명세서」 �
 | API-047 | [관심없음 표시](./recommendation.md#api-047-관심없음-표시) | POST | `/recommendations/items/{recommendationItemId}/dismiss` | 추천 | 1차 MVP | 회원 | FR-36 | O |
 | API-048 | [추천 이력 조회](./recommendation.md#api-048-추천-이력-조회) | GET | `/recommendations/history` | 추천 | 1차 MVP | 회원 | FR-33, FR-13 |  |
 | API-049 | [파티 생성](./party.md#api-049-파티-생성) | POST | `/parties` | 파티 | 1차 MVP | 회원 | FR-20 | O |
-| API-050 | [활성 파티 조회](./party.md#api-050-활성-파티-조회) | GET | `/parties/active` | 파티 | 1차 MVP | 회원 | FR-20 |  |
+| API-050 | [내 파티 목록](./party.md#api-050-내-파티-목록) | GET | `/parties` | 파티 | 1차 MVP | 회원 | FR-20 |  |
 | API-051 | [파티 초대](./party.md#api-051-파티-초대) | POST | `/parties/{partyId}/invitations` | 파티 | 1차 MVP | 회원 | FR-20, FR-39 | O |
 | API-052 | [받은 초대 목록](./party.md#api-052-받은-초대-목록) | GET | `/parties/invitations` | 파티 | 1차 MVP | 회원 | FR-20 |  |
 | API-053 | [초대 수락](./party.md#api-053-초대-수락) | POST | `/parties/invitations/{invitationId}/accept` | 파티 | 1차 MVP | 회원 | FR-20 |  |
 | API-054 | [초대 거절](./party.md#api-054-초대-거절) | POST | `/parties/invitations/{invitationId}/decline` | 파티 | 1차 MVP | 회원 | FR-20 |  |
-| API-055 | [파티 나가기](./party.md#api-055-파티-나가기) | POST | `/parties/{partyId}/leave` | 파티 | 1차 MVP | 회원 | FR-20 | O |
+| API-055 | [파티 나가기](./party.md#api-055-파티-나가기) | POST | `/parties/{partyId}/leave` | 파티 | 1차 MVP | 회원 | FR-20 |  |
 | API-056 | [파티 종료](./party.md#api-056-파티-종료) | DELETE | `/parties/{partyId}` | 파티 | 1차 MVP | 회원 | FR-20 |  |
 | API-057 | [파티원 팝콘 조회](./party.md#api-057-파티원-팝콘-조회) | GET | `/parties/{partyId}/popcorn` | 파티 | 1차 MVP | 회원 | FR-21 | O |
 | API-058 | [파티 영화 추천](./party.md#api-058-파티-영화-추천) | GET | `/parties/{partyId}/recommendations` | 파티 | 1차 MVP | 회원 | FR-22, FR-13 | O |
 | API-059 | [내 리포트 목록](./report-trend.md#api-059-내-리포트-목록) | GET | `/users/me/reports` | 리포트 | 2차 MVP | 회원 | FR-23 | O |
 | API-060 | [리포트 상세 조회](./report-trend.md#api-060-리포트-상세-조회) | GET | `/reports/{reportId}` | 리포트 | 2차 MVP | 회원 | FR-23 | O |
 | API-061 | [리포트 이미지 카드 생성](./report-trend.md#api-061-리포트-이미지-카드-생성) | POST | `/reports/{reportId}/image` | 리포트 | 2차 MVP | 회원 | FR-24, NFR-07 | O |
-| API-062 | [공개 프로필 조회](./social.md#api-062-공개-프로필-조회) | GET | `/users/{userId}/profile` | 소셜 | 2차 MVP | 선택 | FR-25, FR-39, NFR-07 |  |
-| API-063 | [취향 비교](./social.md#api-063-취향-비교) | GET | `/users/{userId}/taste-comparison` | 소셜 | 2차 MVP | 회원 | FR-25 | O |
+| API-062 | [공개 프로필 조회](./social.md#api-062-공개-프로필-조회) | GET | `/users/{publicId}/profile` | 소셜 | 2차 MVP | 선택 | FR-25, FR-39, NFR-07 |  |
+| API-063 | [취향 비교](./social.md#api-063-취향-비교) | GET | `/users/{publicId}/taste-comparison` | 소셜 | 2차 MVP | 회원 | FR-25 | O |
 | API-064 | [급상승 영화](./report-trend.md#api-064-급상승-영화) | GET | `/movies/trending` | 트렌드 | 2차 MVP | 공개 | FR-27 | O |
 | API-065 | [사용자 랭킹](./social.md#api-065-사용자-랭킹) | GET | `/rankings/users` | 소셜 | 확장 | 선택 | FR-28 | O |
 | API-066 | [오늘의 영화](./recommendation.md#api-066-오늘의-영화) | GET | `/recommendations/today` | 추천 | 확장 | 회원 | FR-30 | O |
@@ -119,7 +119,7 @@ FEELM 서비스 REST API 명세입니다. Notion 「설계 > API 명세서」 �
 
 - 방식: JWT Bearer. 로그인 응답의 `accessToken`을 `Authorization: Bearer <token>` 헤더로 전달한다.
 - Refresh Token은 `httpOnly; Secure; SameSite=Lax` 쿠키 `refresh_token`으로 발급하며 본문에 노출하지 않는다.
-- 유효기간(가정): Access 30분, Refresh 14일. Refresh 사용 시 회전(rotation)한다.
+- Refresh Token은 Redis에 TTL로 저장하고 사용 시 회전(rotation)한다 (ADR-0009). 유효기간은 설정값(기본 Access 30분, Refresh 14일).
 - 인증 구분
 	- **공개**: 비회원 호출 가능
 	- **회원**: 유효한 Access Token 필수. 없거나 만료 시 `401`
@@ -131,7 +131,7 @@ FEELM 서비스 REST API 명세입니다. Notion 「설계 > API 명세서」 �
 - `Content-Type: application/json; charset=utf-8`
 - JSON 키는 camelCase
 - 시간은 ISO 8601 UTC 문자열. 예: `2026-08-30T05:21:00Z`
-- 식별자는 64bit 정수(`Long`)이며 JSON에서는 숫자로 전달한다.
+- 식별자는 64bit 정수(`Long`)이며 JSON에서는 숫자로 전달한다. 공개 URL에 노출되는 사용자 식별자는 별도 `publicId`(불투명 문자열)를 사용한다 (ADR-0008).
 - 열거형 값은 UPPER_SNAKE_CASE 문자열
 
 ### 응답 형식
@@ -237,10 +237,7 @@ FEELM 서비스 REST API 명세입니다. Notion 「설계 > API 명세서」 �
 
 ### 미정 사항
 
-- [ ] Refresh Token 전달 방식: httpOnly 쿠키(가정) vs 응답 본문. 모바일 웹뷰 고려 필요
-- [ ] 토큰 유효기간: Access 30분 / Refresh 14일(가정)
-- [ ] 식별자 타입: Long(가정) vs UUID. 공개 URL에 노출되는 `userId` 열거 위험 검토
-- [ ] 오류 `code` 명명 규칙: 의미 코드(가정) vs 도메인 접두 숫자 코드
-- [ ] Rate limit 정책과 임계치
-- [ ] 파티 초대·감상 확인 알림 전달 방식: 폴링(가정) vs SSE/WebSocket. FR-38 알림 발송 기능 FR 부재와 함께 확정
-- [ ] 백엔드 ↔ 추천 서비스 내부 API: FastAPI 도입 결정 후 별도 작성(NFR-04)
+- [ ] Rate limit 정책과 임계치 — 설정값, 운영 전 확정
+- [ ] 내부 API(Spring ↔ FastAPI) 명세 — ADR-0012 채택, 별도 문서로 작성 예정 (NFR-04)
+
+해소된 항목(2026-08-30~31 결정): 식별자 타입·공개 식별자(ADR-0008), Refresh 전달·저장(ADR-0009), 오류 `code` 규칙(의미 코드), 알림 전달 방식(폴링, ADR-0011). 결정 기록은 [ADR](../adr/README.md)과 [ERD 5장](../erd.md#5-물리-스키마-전-결정-사항)을 참조합니다.

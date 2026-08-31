@@ -5,7 +5,7 @@
 | ID | 이름 | Method | Endpoint | 단계 | 인증 |
 |---|---|---|---|---|---|
 | [API-049](#api-049-파티-생성) | 파티 생성 | POST | `/parties` | 1차 MVP | 회원 |
-| [API-050](#api-050-활성-파티-조회) | 활성 파티 조회 | GET | `/parties/active` | 1차 MVP | 회원 |
+| [API-050](#api-050-내-파티-목록) | 내 파티 목록 | GET | `/parties` | 1차 MVP | 회원 |
 | [API-051](#api-051-파티-초대) | 파티 초대 | POST | `/parties/{partyId}/invitations` | 1차 MVP | 회원 |
 | [API-052](#api-052-받은-초대-목록) | 받은 초대 목록 | GET | `/parties/invitations` | 1차 MVP | 회원 |
 | [API-053](#api-053-초대-수락) | 초대 수락 | POST | `/parties/invitations/{invitationId}/accept` | 1차 MVP | 회원 |
@@ -72,11 +72,11 @@
 
 ### 오류 응답
 
-- `409 ACTIVE_PARTY_EXISTS` 이미 활성 파티에 속해 있음
+- `409 PARTY_LIMIT_EXCEEDED` 활성 파티 상한(설정값, 기본 5) 초과
 
 ### 처리 규칙
 
-- 사용자는 동시에 하나의 활성 파티에만 속한다(가정)
+- 사용자는 여러 활성 파티에 속할 수 있다. 1인당 활성 파티 상한(기본 5)은 설정값이다 (D-3 결정)
 - 파티는 파티장 포함 최대 4명
 
 ### 상태값
@@ -85,12 +85,11 @@
 
 ### 미정 사항
 
-- [ ] 사용자당 활성 파티 1개 제한(가정)
 - [ ] 파티 이름 필수 여부
 
-## API-050 활성 파티 조회
+## API-050 내 파티 목록
 
-`GET` `/api/v1/parties/active`
+`GET` `/api/v1/parties`
 
 | 항목 | 값 |
 |---|---|
@@ -99,11 +98,11 @@
 | 관련 요구사항 | FR-20 |
 | 화면 | ⑧ 파티 모드 |
 | 미정 사항 | 없음 |
-| 비고 | - |
+| 비고 | 복수 활성 파티(D-3 결정)에 따라 목록 조회 |
 
 ### 설명
 
-내가 속한 활성 파티를 조회한다.
+내가 속한 파티 목록을 조회한다. 기본은 활성 파티만 반환한다.
 
 ### 인증 및 권한
 
@@ -115,7 +114,7 @@
 
 ### Query Parameters
 
-없음
+- `status` (string, 선택, 기본 `ACTIVE`): `ACTIVE`, `CLOSED`
 
 ### Request Body
 
@@ -123,30 +122,39 @@
 
 ### Response
 
-`200 OK`, API-049 응답 + 파티장에게만 `pendingInvitations`
+`200 OK`
 
 ```json
 {
-  "partyId": 9001,
-  "name": "금요일 영화 모임",
-  "status": "ACTIVE",
-  "owner": { "userId": 1024, "nickname": "팝콘러버" },
-  "members": [],
-  "maxMembers": 4,
-  "pendingInvitations": [
-    { "invitationId": 501, "invitee": { "userId": 2048, "nickname": "영화광" }, "createdAt": "2026-08-30T05:21:00Z" }
-  ],
-  "createdAt": "2026-08-30T05:21:00Z"
+  "items": [
+    {
+      "partyId": 9001,
+      "name": "금요일 영화 모임",
+      "status": "ACTIVE",
+      "owner": { "userId": 1024, "nickname": "팝콘러버" },
+      "members": [
+        { "userId": 1024, "nickname": "팝콘러버", "role": "OWNER", "joinedAt": "2026-08-30T05:21:00Z" }
+      ],
+      "maxMembers": 4,
+      "pendingInvitations": [
+        { "invitationId": 501, "invitee": { "userId": 2048, "nickname": "영화광" }, "createdAt": "2026-08-30T05:21:00Z" }
+      ],
+      "createdAt": "2026-08-30T05:21:00Z"
+    }
+  ]
 }
 ```
 
+- `pendingInvitations`는 내가 파티장인 파티에만 포함한다
+
 ### 오류 응답
 
-- `404 RESOURCE_NOT_FOUND` 활성 파티 없음
+- 공통 오류만 해당. 파티가 없으면 빈 `items`와 `200`
 
 ### 처리 규칙
 
-- 종료된 파티는 조회되지 않는다
+- 활성 파티가 여러 개일 수 있으며 생성 최신순으로 정렬한다 (D-3 결정)
+- `CLOSED` 파티는 `status=CLOSED`로 조회한다(추천 이력 확인용)
 
 ### 상태값
 
@@ -219,6 +227,7 @@
 - 초대는 자동 만료되지 않는다
 - 거절한 사용자에게 다시 초대할 수 있다(새 초대 생성)
 - 차단 관계인 사용자는 초대 후보에서 제외한다(FR-39)
+- 초대 대상이 다른 활성 파티에 있어도 초대할 수 있으며, 수락 시점에 대상의 활성 파티 상한을 검사한다 (D-3 결정)
 - 초대 알림 전달 방식은 공통 규약 미정 사항 참조(폴링 가정)
 
 ### 상태값
@@ -228,7 +237,6 @@
 ### 미정 사항
 
 - [ ] `PARTY_FULL` 계산에 대기 초대 포함 여부(가정: 포함)
-- [ ] 대상이 이미 다른 활성 파티에 있을 때 초대 가능 여부(가정: 가능, 수락 시 검사)
 
 ## API-052 받은 초대 목록
 
@@ -347,7 +355,7 @@
 - `409 INVITATION_NOT_PENDING` 이미 처리됨
 - `409 PARTY_CLOSED`
 - `409 PARTY_FULL`
-- `409 ACTIVE_PARTY_EXISTS` 내가 이미 다른 활성 파티에 속함. 먼저 나가야 함
+- `409 PARTY_LIMIT_EXCEEDED` 내 활성 파티가 상한(기본 5)에 도달함
 
 ### 처리 규칙
 
@@ -430,7 +438,7 @@
 | 인증 | 회원 |
 | 관련 요구사항 | FR-20 |
 | 화면 | ⑧ 파티 모드 |
-| 미정 사항 | 있음 |
+| 미정 사항 | 없음 |
 | 비고 | 인원 변경 시 파티 종료 규칙 |
 
 ### 설명
@@ -479,7 +487,7 @@
 
 ### 미정 사항
 
-- [ ] 새 파티를 서버가 자동 생성(남은 멤버 자동 포함)할지, 파티장이 수동 생성할지(가정: 수동)
+없음
 
 ## API-056 파티 종료
 

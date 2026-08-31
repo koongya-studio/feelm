@@ -5,8 +5,8 @@
 | ID | 이름 | Method | Endpoint | 단계 | 인증 |
 |---|---|---|---|---|---|
 | [API-032](#api-032-공개-한줄평-목록) | 공개 한줄평 목록 | GET | `/movies/{movieId}/reviews` | 1차 MVP | 선택 |
-| [API-062](#api-062-공개-프로필-조회) | 공개 프로필 조회 | GET | `/users/{userId}/profile` | 2차 MVP | 선택 |
-| [API-063](#api-063-취향-비교) | 취향 비교 | GET | `/users/{userId}/taste-comparison` | 2차 MVP | 회원 |
+| [API-062](#api-062-공개-프로필-조회) | 공개 프로필 조회 | GET | `/users/{publicId}/profile` | 2차 MVP | 선택 |
+| [API-063](#api-063-취향-비교) | 취향 비교 | GET | `/users/{publicId}/taste-comparison` | 2차 MVP | 회원 |
 | [API-065](#api-065-사용자-랭킹) | 사용자 랭킹 | GET | `/rankings/users` | 확장 | 선택 |
 | [API-067](#api-067-커뮤니티) | 커뮤니티 | - | `/community (미정)` | 확장 | 회원 |
 
@@ -84,7 +84,7 @@
 
 ## API-062 공개 프로필 조회
 
-`GET` `/api/v1/users/{userId}/profile`
+`GET` `/api/v1/users/{publicId}/profile`
 
 | 항목 | 값 |
 |---|---|
@@ -105,7 +105,7 @@
 
 ### Path Parameters
 
-- `userId`
+- `publicId`: `users.public_id` (D-1 결정, ADR-0008) — 내부 숫자 ID는 공개 URL에 노출하지 않는다
 
 ### Query Parameters
 
@@ -152,7 +152,7 @@
 
 ## API-063 취향 비교
 
-`GET` `/api/v1/users/{userId}/taste-comparison`
+`GET` `/api/v1/users/{publicId}/taste-comparison`
 
 | 항목 | 값 |
 |---|---|
@@ -173,7 +173,7 @@
 
 ### Path Parameters
 
-- `userId`: 비교 대상
+- `publicId`: 비교 대상의 `users.public_id` (ADR-0008)
 
 ### Query Parameters
 
