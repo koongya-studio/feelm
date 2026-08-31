@@ -314,7 +314,7 @@ erDiagram
         bigint user_id FK "개인 추천. 파티 추천은 NULL"
         bigint party_id FK "파티 추천. 개인 추천은 NULL"
         varchar source "HOME / PARTY"
-        varchar input_version "평가·관심없음·온보딩 변경 버전"
+        varchar input_version "평가·온보딩 변경 버전. 관심없음은 버전을 바꾸지 않음"
         timestamptz generated_at
     }
     RECOMMENDATION_ITEMS {
@@ -325,6 +325,7 @@ erDiagram
         int position
         bigint flavor_id FK
         jsonb reason "추천 이유 스냅샷 (summary, factors)"
+        timestamptz exposed_at "노출 시각. NULL이면 미노출 버퍼분"
         timestamptz dismissed_at
     }
     RECOMMENDATION_DISMISSALS {
@@ -348,10 +349,10 @@ erDiagram
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
 | `recommendation_sets` | 추천 세트(이력 단위) | `user_id`·`party_id` 중 하나만 NOT NULL(CHECK). 입력이 바뀌지 않으면 같은 세트 반환 | FR-10, FR-33 · API-045, API-046, API-048, API-058 |
-| `recommendation_items` | 세트의 후보 영화 + 이유 스냅샷 | `reason`은 생성 시점 값을 JSONB로 보존(이후 영화 정보 변경과 무관) | FR-12, FR-13 · API-045~048 |
+| `recommendation_items` | 세트의 후보 영화 + 이유 스냅샷 | `reason`은 생성 시점 값을 JSONB로 보존(이후 영화 정보 변경과 무관). 세트당 버퍼 20편(설정값)을 저장하고 `exposed_at`으로 노출분을 구분한다(FR-33 이력은 노출분만) | FR-12, FR-13 · API-045~048 |
 | `recommendation_dismissals` | 관심없음 | UK(`user_id`, `movie_id`). 평가와 분리. 해제 기능은 미정 | FR-36 · API-047 |
 
-> 후보 Top-500과 최종 추천 캐시는 Redis, Item Factor는 HDFS에 있으며 이 ERD 범위 밖입니다. `recommendation_sets`는 사용자에게 **노출된 결과**의 이력만 저장합니다.
+> 후보 Top-500은 Redis, Item Factor는 HDFS에 있으며 이 ERD 범위 밖입니다. 추천 세트의 후보 20편(버퍼)은 `recommendation_items`에 **전부 저장**하고, 추천 이력 조회(API-048)는 `exposed_at IS NOT NULL`인 노출분만 반환합니다. Redis의 추천 결과 캐시는 선택적 조회 가속용입니다 (MR !22 합의: PostgreSQL 저장안).
 
 ### 2.5 파티
 
