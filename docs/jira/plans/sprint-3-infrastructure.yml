@@ -2,7 +2,9 @@ tasks:
 - id: sprint3-infrastructure-scaffold-nginx
   issue_type: Task
   summary: '[인프라] 서비스·분산 인프라 기본 구조 및 Nginx 초기 구성'
-  description: 서비스 서버 J15E106과 분산 처리 서버 J15E106A의 역할을 분리해 관리할 수 있도록 infra 디렉터리와 서버별 Docker Compose 파일의 기본 골격을 구성한다. 외부 진입점인 Nginx를 최소 구성으로 실행해 도메인 접속을 확인하고, 이후 로컬 통합환경과 CI/CD 및 서비스 배포 작업이 확장할 기준을 문서화한다. 이 업무에는 애플리케이션·데이터 저장소·분산 처리 컴포넌트의 실제 컨테이너 구성, 서비스별 이미지 빌드, CI/CD 파이프라인 및 배포·롤백 자동화를 포함하지 않는다.
+  description: 서비스 서버 J15E106과 분산 처리 서버 J15E106A의 역할을 분리해 관리할 수 있도록 infra 디렉터리와 서버별 Docker Compose 파일의
+    기본 골격을 구성한다. 외부 진입점인 Nginx를 최소 구성으로 실행해 도메인 접속을 확인하고, 이후 로컬 통합환경과 CI/CD 및 서비스 배포 작업이 확장할 기준을 문서화한다.
+    이 업무에는 애플리케이션·데이터 저장소·분산 처리 컴포넌트의 실제 컨테이너 구성, 서비스별 이미지 빌드, CI/CD 파이프라인 및 배포·롤백 자동화를 포함하지 않는다.
   epic: S15P21E106-38
   story_points: 3
   done_when:
@@ -32,17 +34,49 @@ tasks:
   jira_key: S15P21E106-86
 - id: sprint3-container-build
   issue_type: Task
-  summary: '[인프라] 서비스별 컨테이너 빌드 구성'
-  description: 백엔드, 프론트엔드 및 추천 시스템을 CI와 배포 환경에서 일관되게 실행할 수 있도록 서비스별 컨테이너 이미지 빌드 구성을 작성하고 빌드 기준을 정한다.
+  summary: '[인프라] 백엔드 컨테이너 빌드 구성'
+  description: Spring Boot 백엔드를 CI와 배포 환경에서 일관되게 실행할 수 있도록 Java 21과 Gradle 빌드를 사용하는 운영용 컨테이너 이미지 구성을 작성하고
+    검증한다. 프론트엔드와 추천 Consumer의 컨테이너 구성은 각각 별도 Jira 업무에서 처리한다.
+  epic: S15P21E106-38
+  story_points: 3
+  done_when:
+  - Java 21과 Gradle Wrapper를 사용하는 백엔드 빌드 절차가 컨테이너 구성에 반영된다.
+  - 개발용 의존성과 빌드 도구가 운영 실행 이미지에서 제외된다.
+  - Secret, 로컬 빌드 산출물 및 불필요한 파일이 이미지와 빌드 컨텍스트에 포함되지 않는다.
+  - 백엔드 컨테이너 이미지가 깨끗한 환경에서 빌드된다.
+  - 컨테이너가 8080 포트로 기동되고 /actuator/health 응답이 UP 상태로 확인된다.
+  - 이미지 빌드와 실행 방법이 backend/README.md에 문서화된다.
+  jira_key: S15P21E106-87
+- id: sprint3-frontend-container-build
+  issue_type: Task
+  summary: '[인프라] 프론트엔드 컨테이너 빌드 구성'
+  description: 프론트엔드 기본 프로젝트와 패키지 관리 및 배포 방식이 확정된 뒤, CI와 배포 환경에서 재현 가능한 프론트엔드 컨테이너 이미지 빌드 구성을 작성하고 검증한다.
+  epic: S15P21E106-38
+  story_points: 3
+  done_when:
+  - 프론트엔드 런타임, 패키지 매니저, 잠금 파일 및 빌드 명령이 확정되어 컨테이너 구성에 반영된다.
+  - 개발 의존성과 운영용 정적 산출물이 분리된다.
+  - Secret, 로컬 빌드 산출물 및 불필요한 파일이 이미지와 빌드 컨텍스트에 포함되지 않는다.
+  - 프론트엔드 컨테이너 이미지가 깨끗한 환경에서 빌드된다.
+  - 컨테이너가 확정된 포트로 기동되고 기본 화면 또는 헬스체크 응답이 확인된다.
+  - 이미지 빌드와 실행 방법이 frontend/README.md에 문서화된다.
+  jira_key: S15P21E106-128
+- id: sprint3-recommendation-consumer-container-build
+  issue_type: Task
+  summary: '[인프라] 추천 Consumer 컨테이너 빌드 구성'
+  description: Python 기반 Fold-in Consumer의 실행 구조와 Kafka 연동 계약이 확정된 뒤, CI와 배포 환경에서 재현 가능한 추천 Consumer 컨테이너
+    이미지 빌드 구성을 작성하고 검증한다.
   epic: S15P21E106-38
   story_points: 5
   done_when:
-  - 각 서비스의 확정된 런타임과 빌드 절차가 컨테이너 구성에 반영된다.
-  - 개발 의존성과 운영 실행 산출물이 필요한 범위에서 분리된다.
-  - Secret과 로컬 전용 파일이 이미지와 빌드 컨텍스트에 포함되지 않는다.
-  - 이미지 태그 및 버전 식별 기준이 문서화된다.
-  - 각 서비스 이미지가 깨끗한 환경에서 빌드되고 기본 기동 및 헬스체크를 통과한다.
-  jira_key: S15P21E106-87
+  - Python 버전, 의존성 잠금 방식, Consumer 진입점 및 Kafka 연동 환경변수가 확정되어 컨테이너 구성에 반영된다.
+  - 빌드 의존성과 운영 실행 의존성이 필요한 범위에서 분리된다.
+  - Secret, 모델·데이터 산출물 및 로컬 전용 파일이 이미지와 빌드 컨텍스트에 포함되지 않는다.
+  - 추천 Consumer 컨테이너 이미지가 깨끗한 환경에서 빌드된다.
+  - 컨테이너가 Kafka 연결 실패와 종료 신호를 안전하게 처리하는지 검증된다.
+  - Consumer의 실행 상태를 확인할 로그 또는 헬스체크 기준이 정의된다.
+  - 이미지 빌드와 실행 방법이 recommendation/README.md에 문서화된다.
+  jira_key: S15P21E106-129
 - id: sprint3-gitlab-ci
   issue_type: Task
   summary: '[인프라] GitLab CI 품질 검증 및 이미지 빌드 파이프라인 구성'
