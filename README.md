@@ -258,7 +258,8 @@ flowchart TB
     end
 
     subgraph APP["Application"]
-        BE["Spring Boot<br/>회원 · 영화 · 평가 · 파티 · OTT<br/>Re-ranking · XAI"]
+        BE["Spring Boot<br/>회원 · 영화 · 평가 · 파티 · OTT<br/>공개 API · 인증 · 추천 이력 저장"]
+        RS["FastAPI<br/>Fold-in · Re-ranking<br/>파티 집계 · XAI"]
     end
 
     subgraph STORE["Serving Store"]
@@ -278,6 +279,9 @@ flowchart TB
     FE --> BE
     BE --> PG
     BE --> RD
+    BE -->|"내부 API"| RS
+    RS --> RD
+    LAKE -.->|"Item Factor 로드"| RS
     TMDB --> BE
     LAKE --> SM
     SM --> W1
@@ -296,15 +300,16 @@ flowchart TB
 | **HDFS / Parquet** | MovieLens·TMDb 원본 및 가공 데이터, Item Factor 저장 |
 | **Redis** | 사전 계산한 Candidate와 추천 결과의 빠른 저장·조회 |
 | **PostgreSQL** | 사용자·영화·평가 등 영속 데이터 저장 |
-| **Spring Boot** | 회원·영화·평가·파티 등 서비스 API 및 추천 결과 전달 |
+| **Spring Boot** | 회원·영화·평가·파티 등 공개 API, 인증, 추천 결과 저장·전달 |
+| **FastAPI** | Fold-in·Re-ranking·파티 집계·추천 이유(XAI) 실시간 계산 (ADR-0012) |
 | **Vue** | 필름·팝콘 버킷·파티 추천 UI |
 
 ### 미확정 사항
 
-- **FastAPI 도입 여부는 미정이다.** 위 다이어그램은 FastAPI 없이 Re-ranking과 XAI를 Spring Boot
-  또는 Spark 배치가 담당하는 구성이다. FastAPI를 도입하면 Fold-in·Re-ranking·XAI를 Python 계층으로
-  분리하고 Spring Boot는 최종 응답만 담당한다.
-- 물리 DB와 저장소 제품은 논리 설계 확정 이후 구현 전에 결정한다.
+- 실시간 추천 서빙은 **FastAPI 분리로 확정**했다(ADR-0012). Spring Boot ↔ FastAPI의 세부 계약
+  (데이터 접근 경계, 모델 교체 방식 등)은 [내부 API 명세](./docs/api/internal.md) 초안으로 협의 중이며,
+  다이어그램은 FastAPI가 PostgreSQL에 접근하지 않는 현재 초안 기준이다.
+- 물리 스키마·마이그레이션은 [논리 ERD](./docs/erd.md)를 기준으로 구현 전에 작성한다.
 - 리포트 기능의 결과 이미지는 S3 호환 객체 스토리지에 저장하며 로컬·자체 호스팅은 MinIO를 사용할 수 있다.
 
 ### Spark 자원 계획
@@ -397,7 +402,8 @@ flowchart LR
 | 추천 | ALS, 콘텐츠 기반, Hybrid | 확정 |
 | 파티 추천 | Average / Least Misery / 개선식 | 비교 후 확정 |
 | Backend | Spring Boot | 확정 |
-| 추천 서빙 | FastAPI | **미정** |
+| 추천 서빙 | FastAPI | 확정 |
+| 검색 | PostgreSQL full-text, pg_trgm | 확정 |
 | DB | PostgreSQL | 확정 |
 | Cache | Redis | 확정 |
 | Frontend | Vue | 확정 |
@@ -482,12 +488,12 @@ python -m pytest tests
 
 | 산출물 | 상태 |
 | --- | --- |
-| 요구사항 정의서 | 검토 중 |
-| 최종 요구사항 정의서 | 작성 중 |
-| 데이터 저장 정책 및 논리 ERD | 검토 중 · 물리 DB는 구현 전 확정 |
-| API 설계(OpenAPI/Swagger) | 진행 중 |
+| 요구사항 정의서 | [docs/requirements.md](./docs/requirements.md) · 검토 중(미결 사항은 문서 5장) |
+| 논리 ERD | [docs/erd.md](./docs/erd.md) · 작성 완료, 물리 스키마는 구현 전 작성 |
+| API 명세 | [docs/api](./docs/api/README.md) · 초안 67건 + [내부 API](./docs/api/internal.md) 협의 중 |
+| 기술 결정 기록(ADR) | [docs/adr](./docs/adr/README.md) · 12건 채택 |
 | 와이어프레임 | 29개 화면 · [화면 설계](#5-화면-설계) 참고 · 검색 화면 미정 |
-| 추천 구조 설계 | 검토 중 · FastAPI 도입 여부 미정 |
+| 추천 구조 설계 | FastAPI 분리 확정(ADR-0012) · 파티 집계식은 비교 실험 후 확정 |
 
 기획과 설계 원본은 팀 Notion에서 관리하며, 확정된 계약과 규칙은 이 저장소의 `docs/`에 반영한다.
 

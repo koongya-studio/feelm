@@ -1,0 +1,15 @@
+tasks:
+- id: readme-architecture-sync
+  issue_type: Task
+  summary: '[협업] README 아키텍처·기술 스택 확정 반영'
+  description: ADR 확정 결과를 README에 반영한다. 7장 시스템 아키텍처에 FastAPI 추천 서빙을 추가하고 FastAPI 미정 문구를 내부 API 협의 상태로
+    바꾸며, 10장 기술 스택 표의 추천 서빙·검색을 확정으로 갱신하고 14장 산출물 문서 표를 저장소 설계 문서(요구사항·API·ERD·ADR) 링크와 현재 상태로 맞춘다.
+  area: 협업
+  epic: S15P21E106-12
+  story_points: 1
+  done_when:
+  - 7장 다이어그램에 FastAPI가 Spring Boot의 내부 API 호출 대상으로 표시되고 컴포넌트 역할 표에 포함된다.
+  - FastAPI 도입 여부 미정 문구가 사라지고 내부 API 계약 협의 상태로 대체된다.
+  - 10장 기술 스택 표에서 추천 서빙 FastAPI와 검색 PostgreSQL full-text가 확정으로 표시된다.
+  - 14장 산출물 문서 표가 저장소 설계 문서 링크와 실제 상태를 가리킨다.
+  jira_key: S15P21E106-117
