@@ -12,7 +12,7 @@ FEELM 서비스 REST API 명세입니다. Notion 「설계 > API 명세서」 �
 | [영화·검색](./movies-search.md) | 영화, 검색 | 3 |
 | [감상](./watch.md) | 감상 | 7 |
 | [취향](./taste.md) | 취향 | 5 |
-| [추천](./recommendation.md) | 추천 | 6 |
+| [추천](./recommendation.md) | 추천 | 7 |
 | [파티](./party.md) | 파티 | 10 |
 | [소셜](./social.md) | 소셜 | 5 |
 | [리포트·트렌드](./report-trend.md) | 리포트, 트렌드 | 4 |
@@ -100,6 +100,7 @@ FEELM 서비스 REST API 명세입니다. Notion 「설계 > API 명세서」 �
 | API-065 | [사용자 랭킹](./social.md#api-065-사용자-랭킹) | GET | `/rankings/users` | 소셜 | 확장 | 선택 | FR-28 | O |
 | API-066 | [오늘의 영화](./recommendation.md#api-066-오늘의-영화) | GET | `/recommendations/today` | 추천 | 확장 | 회원 | FR-30 | O |
 | API-067 | [커뮤니티](./social.md#api-067-커뮤니티) | - | `/community (미정)` | 소셜 | 확장 | 회원 | FR-31 | O |
+| API-068 | [OTT 구독 추천](./recommendation.md#api-068-ott-구독-추천) | GET | `/recommendations/otts` | 추천 | 확장 | 회원 | FR-40 | O |
 
 ## 공통 규약
 

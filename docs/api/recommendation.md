@@ -10,6 +10,7 @@
 | [API-047](#api-047-관심없음-표시) | 관심없음 표시 | POST | `/recommendations/items/{recommendationItemId}/dismiss` | 1차 MVP | 회원 |
 | [API-048](#api-048-추천-이력-조회) | 추천 이력 조회 | GET | `/recommendations/history` | 1차 MVP | 회원 |
 | [API-066](#api-066-오늘의-영화) | 오늘의 영화 | GET | `/recommendations/today` | 확장 | 회원 |
+| [API-068](#api-068-ott-구독-추천) | OTT 구독 추천 | GET | `/recommendations/otts` | 확장 | 회원 |
 
 ## API-031 유사 영화 추천
 
@@ -466,3 +467,93 @@
 
 - [ ] 외부 데이터 소스(날씨 API, 공휴일 API) 확정 후 상세 작성(FR-30 비고)
 - [ ] 위치 정보 수집 여부(날씨 반영 시)
+
+## API-068 OTT 구독 추천
+
+`GET` `/api/v1/recommendations/otts`
+
+| 항목 | 값 |
+|---|---|
+| 단계 | 확장 |
+| 인증 | 회원 |
+| 관련 요구사항 | FR-40 |
+| 화면 | - |
+| 미정 사항 | 있음 |
+| 비고 | - |
+
+### 설명
+
+OTT별로 사용자 취향과 유사한 미감상 영화 수를 집계해 구독 효용이 높은 순으로 OTT를 추천한다. OTT마다 유사도 상위 대표 영화 3편을 함께 내려준다.
+
+### 인증 및 권한
+
+- 회원
+
+### Path Parameters
+
+없음
+
+### Query Parameters
+
+없음
+
+### Request Body
+
+없음
+
+### Response
+
+`200 OK`
+
+```json
+{
+  "insufficientData": false,
+  "aggregatedAt": "2026-08-31T00:00:00Z",
+  "items": [
+    {
+      "ott": { "ottId": 1, "code": "NETFLIX", "name": "넷플릭스", "logoUrl": "https://..." },
+      "matchCount": 128,
+      "subscribed": true,
+      "topMovies": [
+        {
+          "movieId": 807,
+          "title": "세븐",
+          "posterUrl": "https://...",
+          "releaseYear": 1995,
+          "similarity": 0.91
+        }
+      ]
+    }
+  ]
+}
+```
+
+- `matchCount`: 취향 매칭 미감상 영화 수
+- `subscribed`: 내 구독 OTT(API-026) 여부
+- `insufficientData: true`이면 `items`는 빈 배열
+
+### 오류 응답
+
+- `503 RECOMMENDATION_UNAVAILABLE`
+
+### 처리 규칙
+
+- 사용자 취향 벡터와 사전 계산된 영화 임베딩의 유사도를 기반으로, 유사도가 임계치 이상이고 감상 기록·관심없음이 없는 영화를 OTT별로 집계한다
+- 집계는 배치로 수행하며 계산 위치는 FastAPI다(ADR-0012 방향, 가정)
+- `items`는 `matchCount` 내림차순으로 정렬한다
+- 순위는 절대 편수 기준이며 OTT 카탈로그 크기로 정규화하지 않는다(FR-40)
+- `topMovies`는 유사도 상위 3편이며 미감상 필터를 동일하게 적용한다
+- 영화별 OTT 제공 정보는 TMDb watch provider 매핑(API-025 미정 사항) 확정이 선행 조건이다
+- 평가·온보딩 데이터가 기준 미만이면 `insufficientData: true`(가정)
+
+### 상태값
+
+없음
+
+### 미정 사항
+
+- [ ] 유사도 임계치 — 설정값, 실데이터로 캘리브레이션
+- [ ] 배치 집계 갱신 주기
+- [ ] 콜드 스타트(평가 부족 사용자) 처리
+- [ ] TMDb watch provider 매핑 확정 선행(API-025)
+- [ ] 화면 배치(어느 화면에 노출할지)
