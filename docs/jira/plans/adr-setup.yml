@@ -1,0 +1,17 @@
+tasks:
+- id: adr-setup
+  issue_type: Task
+  summary: '[협업] 기술 결정 기록(ADR) 도입'
+  description: 아키텍처와 핵심 기술 선택을 결정 1건당 문서 1개(ADR)로 저장소 docs/adr/에 기록한다. 데이터 모델·API 규약·제품 정책 결정은 ERD·API 명세·요구사항 문서에 남긴다. 이미 확정된 기술 스택(Spring Boot,
+    PostgreSQL, Redis, Vue, HDFS·Spark, EC2 2대)을 소급 기록하고, 개발 시작 전 확정 사항 중 기술 선택 항목(식별자 타입, 인증 방식, 검색 엔진, 알림 전달, 추천 서빙 위치)을 ADR로 등록해 팀 회의
+    결과에 따라 상태를 갱신할 수 있게 한다. ADR 작성 규칙과 템플릿, 색인을 함께 제공한다.
+  area: 협업
+  epic: S15P21E106-12
+  story_points: 2
+  done_when:
+  - docs/adr/README.md에서 ADR 작성 규칙, 상태 정의, 전체 목록을 확인할 수 있다.
+  - 템플릿 문서가 있어 새 ADR을 같은 구조로 추가할 수 있다.
+  - 확정된 기술 스택 결정이 배경·대안·결과를 포함한 ADR로 기록되어 있다.
+  - 개발 시작 전 확정 사항 중 기술 선택 5건이 ADR로 등록되어 있고 관련 API·ERD 항목이 연결되어 있다.
+  - docs/README.md 색인에서 ADR로 이동할 수 있다.
+  jira_key: S15P21E106-84
