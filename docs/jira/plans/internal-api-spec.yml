@@ -1,0 +1,17 @@
+tasks:
+- id: internal-api-spec
+  issue_type: Task
+  summary: '[협업] 내부 API 명세(Spring-FastAPI) 작성'
+  description: ADR-0012(실시간 추천 서빙 FastAPI 분리)에 따라 Spring Boot와 FastAPI 사이의 내부 API 계약 초안을 작성한다. 기본 추천,
+    추가 추천, 관심없음 교체, 파티 추천, 취향 분석, 유사 영화, 헬스체크 엔드포인트와 공통 규약(주소·인증·타임아웃·오류·장애 격리)을 정의하고, 데이터 접근 경계(FastAPI의
+    DB 접근 여부, 입력 전달 방식) 등 AI 담당과 협의할 항목을 미정으로 표시한다.
+  area: 협업
+  epic: S15P21E106-12
+  story_points: 3
+  done_when:
+  - docs/api/internal.md에서 내부 엔드포인트의 요청·응답·오류를 확인할 수 있다.
+  - 타임아웃·재시도·장애 격리(NFR-05) 규칙이 공개 API의 503 동작과 연결되어 있다.
+  - Spring과 FastAPI의 데이터 접근 경계가 명시되고 협의 필요 항목이 미정으로 표시되어 있다.
+  - 공개 API 명세(API-040·045~048·058)와 내부 호출 관계가 매핑되어 있다.
+  - AI 담당 리뷰를 위한 초안 상태임이 문서에 명시되어 있다.
+  jira_key: S15P21E106-111

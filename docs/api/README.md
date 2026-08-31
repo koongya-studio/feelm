@@ -17,6 +17,8 @@ FEELM 서비스 REST API 명세입니다. Notion 「설계 > API 명세서」 �
 | [소셜](./social.md) | 소셜 | 5 |
 | [리포트·트렌드](./report-trend.md) | 리포트, 트렌드 | 4 |
 
+서비스 간 계약은 별도 문서로 관리합니다: [내부 API — Spring ↔ FastAPI](./internal.md) (ADR-0012, 클라이언트 비공개)
+
 ## 범례
 
 - **ID**: `API-nnn`. Jira·MR·코드 주석에서 이 ID로 참조합니다. `API-000`은 공통 규약입니다.
@@ -238,6 +240,6 @@ FEELM 서비스 REST API 명세입니다. Notion 「설계 > API 명세서」 �
 ### 미정 사항
 
 - [ ] Rate limit 정책과 임계치 — 설정값, 운영 전 확정
-- [ ] 내부 API(Spring ↔ FastAPI) 명세 — ADR-0012 채택, 별도 문서로 작성 예정 (NFR-04)
+- [ ] [내부 API 명세](./internal.md) 초안의 데이터 접근 경계 — AI 담당 협의 후 확정 (NFR-04)
 
 해소된 항목(2026-08-30~31 결정): 식별자 타입·공개 식별자(ADR-0008), Refresh 전달·저장(ADR-0009), 오류 `code` 규칙(의미 코드), 알림 전달 방식(폴링, ADR-0011). 결정 기록은 [ADR](../adr/README.md)과 [ERD 5장](../erd.md#5-물리-스키마-전-결정-사항)을 참조합니다.
