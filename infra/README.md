@@ -25,6 +25,27 @@ E106 프로젝트의 서비스 및 분산 처리 인프라 설정을 관리합�
 포트, 네트워크, 영속 볼륨과 서비스별 실행 설정은 이 기준을 바탕으로 HDFS, Spark,
 Kafka 구성 업무에서 구체화합니다.
 
+### Local Development on WSL2
+
+Spark, HDFS, Kafka를 로컬에서 실행하려면 Linux 환경이 필요하므로 WSL2 Ubuntu 24.04를
+사용합니다. Spring Boot 백엔드와 React 프론트엔드는 Java 21과 Node가 설치된 Windows에서
+그대로 개발할 수 있으며 WSL2가 필수는 아닙니다.
+
+WSL2를 사용하는 경우 다음을 주의합니다.
+
+- **저장소를 Linux 파일시스템에 둔다.** `/home/<user>/` 아래에 클론합니다.
+  `/mnt/c/` 경로는 파일 I/O가 크게 느리고 POSIX 권한이 유지되지 않습니다.
+- **같은 저장소를 Windows git과 WSL git으로 번갈아 조작하지 않는다.**
+  Windows git은 `core.autocrlf=true`가 기본이라 체크아웃 시 개행문자를 CRLF로
+  바꿔 씁니다. VS Code는 Remote-WSL로 접속해 WSL 안에서 git을 사용합니다.
+- **`sudo git`을 사용하지 않는다.** `.git` 내부에 root 소유 파일이 생기면 이후
+  일반 계정의 모든 쓰기가 `insufficient permission for adding an object to
+  repository database`로 실패합니다. 이미 발생했다면 아래로 복구합니다.
+
+```bash
+sudo chown -R "$USER:$USER" <repo>/.git
+```
+
 ## Server Roles
 
 ### J15E106 - Service Node

@@ -172,7 +172,41 @@ DB migration 및 schema
 공용 컴포넌트와 타입
 ```
 
-## 6. 규칙 변경
+## 6. 개발 환경 규칙
+
+### 개행문자
+
+텍스트 파일은 저장소와 워킹트리 모두 LF를 사용한다. 루트 `.gitattributes`가 이를
+강제하므로 운영체제와 개인 git 설정에 관계없이 동일하게 동작한다.
+
+| 대상 | 개행문자 |
+| --- | --- |
+| 텍스트 파일 전체 | LF |
+| Windows 배치 파일(`.bat`, `.cmd`) | CRLF. 실행에 필요하다 |
+| 이미지, `.jar` 등 바이너리 | 변환하지 않는다 |
+
+### Windows에서 작업하는 경우
+
+Windows용 git은 설치 시 `core.autocrlf=true`가 system 설정에 들어간다. 이 값은
+체크아웃할 때 LF를 CRLF로 바꿔 디스크에 쓴다. `.gitattributes`가 이를 막지만,
+규칙이 적용되기 전에 받아둔 워킹트리가 있으면 한 번 정리한다.
+
+```bash
+git config --global core.autocrlf false
+git rm --cached -r .
+git reset --hard
+```
+
+내용이 같은데도 수정하지 않은 파일이 `git status`에 다수 나타나면 개행문자 문제를
+의심한다. 다음 명령으로 확인할 수 있다.
+
+```bash
+git diff --stat --ignore-cr-at-eol
+```
+
+이 결과가 비어 있으면 내용 차이는 없고 개행문자만 다른 상태다.
+
+## 7. 규칙 변경
 
 - 이 문서를 Git 협업 규칙의 기준 문서로 사용한다.
 - Notion 등 외부 문서는 핵심 내용을 요약하고 이 문서로 연결한다.

@@ -1,0 +1,25 @@
+# 개행문자 정책
+#
+# 텍스트 파일은 저장소와 워킹트리 모두 LF로 통일한다.
+# Windows git은 system 설정 core.autocrlf=true가 기본이라 체크아웃할 때
+# LF를 CRLF로 바꿔 쓴다. 같은 저장소를 WSL이나 Linux에서 열면 내용이
+# 같은데도 모든 줄이 다른 것으로 판정돼 워킹트리가 통째로 수정 상태가 된다.
+# eol=lf는 OS와 개인 git 설정에 관계없이 그 변환을 막는다.
+* text=auto eol=lf
+
+# Windows 배치 파일은 CRLF여야 실행된다.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 바이너리는 변환하지 않는다.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.pdf  binary
+*.jar  binary
+*.zip  binary
+*.woff binary
+*.woff2 binary
