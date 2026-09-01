@@ -22,6 +22,55 @@ FEELM의 회원, 영화, 평가, 파티, OTT 등 서비스 API를 제공하는 S
 Spring Boot DevTools는 개발 환경에서만 사용하며 운영 실행 이미지에는 포함하지
 않습니다.
 
+## 패키지 구조
+
+패키지 구조는 [백엔드 개발 컨벤션 3장](../docs/backend-convention.md)을 따릅니다.
+최상위는 담당자나 화면이 아니라 **도메인 기준**으로 나누고, 도메인 패키지와
+빈 패키지는 실제 코드가 생길 때 만듭니다.
+
+```text
+com.feelm.backend
+├── domain            # 도메인 기준 분할 (아래 담당 표 참고)
+│   ├── user, onboarding, ott
+│   ├── search, movie, watch, social, report, trend
+│   └── taste, recommendation, party
+├── global            # 여러 도메인이 공유하는 공통 코드
+│   ├── config
+│   ├── entity
+│   ├── error
+│   └── response
+└── infrastructure    # Kafka, Redis, 외부 API 등 외부 시스템 연결(필요 시 생성)
+```
+
+담당자별 도메인 매핑은 [백엔드 역할 분배](../docs/backend-role-assignment.md)를
+기준으로 합니다.
+
+| 담당 | 도메인 패키지 |
+| --- | --- |
+| A (계정·온보딩) | `user`, `onboarding`, `ott` |
+| B (콘텐츠·감상·소셜) | `search`, `movie`, `watch`, `social`, `report`, `trend` |
+| C (취향·추천·파티) | `taste`, `recommendation`, `party` |
+
+공통 엔티티는 필요한 감사 컬럼에 따라 `BaseTimeEntity`(createdAt) 또는
+`BaseUpdatableEntity`(createdAt, updatedAt)를 선택해 상속하며, 모든 엔티티에 강제하지 않습니다.
+
+공통 오류는 `ErrorCode`에 HTTP 상태와 사용자용 한국어 메시지를 추가하고 이름을
+UPPER_SNAKE_CASE로 작성합니다. API 계약에 없는 공통 코드를 추가할 때는
+`docs/api/README.md`의 API-000 오류 코드 표를 먼저 함께 갱신합니다.
+
+## 실행 프로파일
+
+기본 프로파일은 `local`이며, 배포 개발 환경은 `dev`를 사용합니다. JPA 스키마 자동 변경은
+모든 프로파일에서 비활성화되어 있습니다.
+
+| 환경 변수 | local 기본값 | dev |
+| --- | --- | --- |
+| `DB_URL` | `jdbc:postgresql://localhost:5432/feelm` | 필수 |
+| `DB_USERNAME` | `feelm` | 필수 |
+| `DB_PASSWORD` | `feelm` | 필수 |
+
+dev 실행 예시: `./gradlew bootRun --args='--spring.profiles.active=dev'`
+
 ## 로컬 실행
 
 Java 21이 설치된 환경에서 `backend` 디렉터리를 기준으로 실행합니다.
