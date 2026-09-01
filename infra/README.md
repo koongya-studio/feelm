@@ -2,6 +2,28 @@
 
 E106 프로젝트의 서비스 및 분산 처리 인프라 설정을 관리합니다.
 
+## Distributed Runtime Baseline
+
+분산 처리 환경은 아래 버전과 실행 방식을 공통 기준으로 사용합니다. 구성요소의 버전을
+변경할 때는 호환성을 검증하고 이 표를 먼저 갱신합니다.
+
+| 구성요소 | 확정 버전·방식 |
+| --- | --- |
+| Python | 3.12.x |
+| Spark | 4.1.3 |
+| PySpark | 4.1.3 |
+| Spark JVM | Eclipse Temurin 21 |
+| Scala | 2.13 (Spark Runtime) |
+| Hadoop / HDFS | 3.4.3 |
+| Kafka | 4.3.1 |
+| Kafka Mode | KRaft |
+| Python Dependencies | uv |
+| Local Development | WSL2 Ubuntu 24.04 |
+| Runtime | Docker / Docker Compose |
+
+포트, 네트워크, 영속 볼륨과 서비스별 실행 설정은 이 기준을 바탕으로 HDFS, Spark,
+Kafka 구성 업무에서 구체화합니다.
+
 ## Server Roles
 
 ### J15E106 - Service Node
