@@ -1,0 +1,19 @@
+tasks:
+- id: backend-agents-pipeline
+  issue_type: Task
+  summary: '[백엔드] AI 작업 파이프라인 정의(backend AGENTS.md)'
+  description: backend 디렉터리에서 작업하는 AI 코딩 도구의 작업 절차를 backend/AGENTS.md로 정의한다. 플랜 작성, 테스트 선행(TDD), 최소 구현,
+    관점별 리뷰의 4단계 파이프라인을 사람이 단계마다 새 세션을 여는 수동 세션 분리 모델로 규정하고, 플랜은 gitignore된 plans/에만 두고 MR 본문·ADR로 승격하는
+    기록 규칙을 포함한다. 헤드리스 격리 실험으로 단계 격리와 산출물 릴레이를 검증했다. 관련 문서(backend-convention.md의 TDD 미정 항목 해소, .gitignore,
+    backend/CLAUDE.md 진입 파일, backend/README.md JDK 지정 안내)를 함께 정비한다.
+  area: 백엔드
+  epic: S15P21E106-69
+  story_points: 3
+  done_when:
+  - backend/AGENTS.md에서 기준 문서, 검증 명령, 적용 범위와 4단계 작업 파이프라인을 확인할 수 있다.
+  - 파이프라인이 수동 세션 분리 모델(사람이 단계마다 새 세션 시작, AI는 자동 진행·생략 금지)로 정의되어 있다.
+  - 플랜과 리뷰 결과는 gitignore된 plans/에 두고 커밋되지 않으며, MR 본문 요약과 ADR 승격 규칙이 있다.
+  - docs/backend-convention.md의 TDD 절차 미정 항목이 backend/AGENTS.md 포인터로 해소되어 있다.
+  - backend/CLAUDE.md가 AGENTS.md를 참조해 Claude Code가 backend 작업 시 자동으로 읽는다.
+  - backend/README.md에 JAVA_HOME으로 JDK 21을 지정하는 안내가 있다.
+  jira_key: S15P21E106-174

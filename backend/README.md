@@ -26,6 +26,19 @@ Spring Boot DevTools는 개발 환경에서만 사용하며 운영 실행 이미
 
 Java 21이 설치된 환경에서 `backend` 디렉터리를 기준으로 실행합니다.
 
+`gradlew`는 `JAVA_HOME`의 JDK를 사용합니다. 시스템 기본 JDK가 21이 아니라면
+실행 전에 `JAVA_HOME`을 JDK 21 설치 경로로 지정합니다.
+
+```powershell
+# Windows (PowerShell)
+$env:JAVA_HOME = "C:\경로\jdk-21"
+```
+
+```bash
+# Linux/macOS
+export JAVA_HOME=/경로/jdk-21
+```
+
 ### Windows
 
 ```powershell

@@ -12,3 +12,6 @@
 __pycache__/
 *.py[cod]
 
+
+# Work plan drafts are local-only and must not be committed. See backend/AGENTS.md.
+/plans/
