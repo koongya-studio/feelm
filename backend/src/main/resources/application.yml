@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: backend
+  profiles:
+    default: local
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false

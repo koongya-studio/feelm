@@ -1,0 +1,5 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/feelm}
+    username: ${DB_USERNAME:feelm}
+    password: ${DB_PASSWORD:feelm}

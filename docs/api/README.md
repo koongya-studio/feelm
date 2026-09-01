@@ -183,7 +183,9 @@ FastAPI 내부 API 초안은 ADR-0016으로 대체되어 사용하지 않습니�
 | 401 | `TOKEN_EXPIRED` | Access Token 만료. 클라이언트는 refresh 후 재시도 |
 | 403 | `FORBIDDEN` | 인증됐으나 권한 없음(예: 파티장 전용) |
 | 404 | `RESOURCE_NOT_FOUND` | 리소스 없음 또는 접근 불가 비공개 리소스 |
+| 405 | `METHOD_NOT_ALLOWED` | 요청 경로에서 허용하지 않는 HTTP 메서드 |
 | 409 | `CONFLICT` | 상태 충돌. 개별 API에서 구체 코드로 세분화 |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | 지원하지 않는 요청 `Content-Type` |
 | 429 | `RATE_LIMITED` | 요청 제한 초과 |
 | 500 | `INTERNAL_ERROR` | 서버 오류 |
 | 503 | `RECOMMENDATION_UNAVAILABLE` | 추천 서비스 장애. 핵심 기능은 정상 동작(NFR-05) |
