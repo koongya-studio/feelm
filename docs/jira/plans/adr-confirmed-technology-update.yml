@@ -1,0 +1,19 @@
+tasks:
+- id: adr-confirmed-technology-update
+  issue_type: Task
+  summary: '[협업] 확정 기술 변경에 따른 ADR 대체·추가'
+  description: 확정된 취향·추천 시스템 기술 구조를 ADR 규칙에 따라 반영한다. Vue 채택 ADR을 React 웹앱 결정으로 대체하고, 다국어 임베딩·pgvector,
+    K-Means·c-TF-IDF, Kafka·Spark Structured Streaming의 기술 결정을 추가한다. 별도 FastAPI 서비스는 제거하고 Spring Boot·Kafka·Spark
+    Structured Streaming·Redis의 책임을 명확히 하며 ADR 색인과 관련 아키텍처 문서를 함께 갱신한다. multilingual-e5-base는 MVP 베이스라인으로
+    기록하고 한국어 영화 데이터 비교 평가 후 최종 체크포인트를 확정한다.
+  epic: S15P21E106-12
+  story_points: 5
+  done_when:
+  - React 웹앱 ADR이 추가되고 기존 Vue ADR이 대체 상태로 연결되어 있다.
+  - 다국어 임베딩·pgvector 기반 콘텐츠 표현과 유사도 검색 결정이 ADR로 기록되어 있다.
+  - multilingual-e5-base가 MVP 베이스라인으로 기록되고 최종 모델 평가 기준이 정의되어 있다.
+  - K-Means·c-TF-IDF 기반 8개 취향 유형 결정이 ADR로 기록되어 있다.
+  - FastAPI를 제외한 Kafka·Spark Structured Streaming·Spring Boot·Redis의 책임 경계가 ADR로 기록되어 있다.
+  - 기존 채택 ADR을 덮어쓰지 않고 대체 관계와 ADR 색인이 갱신되어 있다.
+  - README와 추천 아키텍처 문서가 최종 ADR 내용과 일치한다.
+  jira_key: S15P21E106-127

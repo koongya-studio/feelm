@@ -1,7 +1,11 @@
 # 내부 API 명세 — Spring Boot ↔ FastAPI
 
+> **대체된 초안:** ADR-0012가 ADR-0016으로 대체되어 FastAPI 추천 서빙 서비스는 사용하지 않습니다.
+> 아래 내용은 이전 설계의 추적을 위해 보존하며 현재 구현 계약으로 사용하지 않습니다. 현재 흐름은
+> `Spring Boot → Kafka → Spark Structured Streaming → Redis → Spring Boot`입니다.
+
 [ADR-0012](../adr/0012-realtime-recommendation-serving-location.md)에 따라 실시간 추천 서빙 계산(Fold-in·재정렬·파티 집계·XAI·취향 분석)은
-FastAPI 서비스가 수행하고, Spring Boot가 이 문서의 내부 API로 호출합니다. **클라이언트(Vue)에 공개되는 API가 아니며**, 공개 계약은
+FastAPI 서비스가 수행하고, Spring Boot가 이 문서의 내부 API로 호출합니다. **클라이언트(React)에 공개되는 API가 아니며**, 공개 계약은
 [API 명세](./README.md)를 따릅니다.
 
 > ⚠️ 이 문서는 BE가 작성한 **초안**입니다. 데이터 접근 경계와 입출력 형식은 AI 담당 리뷰 후 확정하며, 협의 항목은 각 절의 미정 사항에 표시했습니다.

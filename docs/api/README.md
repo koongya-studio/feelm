@@ -17,7 +17,7 @@ FEELM 서비스 REST API 명세입니다. Notion 「설계 > API 명세서」 �
 | [소셜](./social.md) | 소셜 | 5 |
 | [리포트·트렌드](./report-trend.md) | 리포트, 트렌드 | 4 |
 
-서비스 간 계약은 별도 문서로 관리합니다: [내부 API — Spring ↔ FastAPI](./internal.md) (ADR-0012, 클라이언트 비공개)
+FastAPI 내부 API 초안은 ADR-0016으로 대체되어 사용하지 않습니다. 이전 계약과 변경 배경은 [폐기된 내부 API 초안](./internal.md)을 참고합니다.
 
 ## 범례
 
@@ -236,11 +236,11 @@ FEELM 서비스 REST API 명세입니다. Notion 「설계 > API 명세서」 �
 
 #### PopcornFlavor — 팝콘 맛 (FR-06)
 
-- 8종 코드·표시명·색상·장르 매핑은 기준정보(통합본 2.1)를 따른다. 코드는 `/popcorn-flavors`(API-044)로 조회한다.
+- 8종 코드·표시명·색상은 기준정보를 따르고, 영화는 ADR-0015의 K-Means 취향 군집 결과로 맛 하나에 배정한다. 코드는 `/popcorn-flavors`(API-044)로 조회한다.
 
 ### 미정 사항
 
 - [ ] Rate limit 정책과 임계치 — 설정값, 운영 전 확정
-- [ ] [내부 API 명세](./internal.md) 초안의 데이터 접근 경계 — AI 담당 협의 후 확정 (NFR-04)
+- [ ] Kafka 이벤트 스키마와 Redis Candidate·행동 Feature·Top-N 키 계약 (ADR-0016, NFR-04)
 
 해소된 항목(2026-08-30~31 결정): 식별자 타입·공개 식별자(ADR-0008), Refresh 전달·저장(ADR-0009), 오류 `code` 규칙(의미 코드), 알림 전달 방식(폴링, ADR-0011). 결정 기록은 [ADR](../adr/README.md)과 [ERD 5장](../erd.md#5-물리-스키마-전-결정-사항)을 참조합니다.
