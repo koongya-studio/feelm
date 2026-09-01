@@ -1,0 +1,16 @@
+tasks:
+- id: jira-backlog-option
+  issue_type: Task
+  summary: '[협업] Jira 자동화에 백로그 생성 옵션 추가'
+  description: create_issues.py가 모든 Task를 활성 스프린트에 강제 배정해 여러 스프린트 분량의 계획을 한 번에 생성할 수 없는 제약을 해소한다. Task별
+    sprint 필드(active 기본값, backlog)를 추가해 백로그 생성을 지원하고 문서를 갱신한다.
+  epic: S15P21E106-12
+  priority: Low
+  story_points: 2
+  done_when:
+  - sprint 필드를 생략한 기존 계획 파일이 이전과 같이 활성 스프린트로 생성된다.
+  - sprint를 backlog로 지정한 Task가 스프린트 배정 없이 백로그에 생성된다.
+  - sprint에 잘못된 값이나 Epic 지정 시 미리보기 단계에서 검증 오류가 발생한다.
+  - 미리보기 출력에 Task별 sprint 배정 값이 표시된다.
+  - docs/jira/README.md에 sprint 필드 사용법이 반영된다.
+  jira_key: S15P21E106-140

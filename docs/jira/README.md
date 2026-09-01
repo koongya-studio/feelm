@@ -38,6 +38,7 @@ JIRA_BOARD_ID=<Jira 보드 URL의 숫자 ID>
 | `epic` | X | 상위 Epic을 직접 고정할 때 Jira Key 또는 앞서 선언한 로컬 `id` |
 | `priority` | X | Jira 프로젝트에 존재하는 우선순위 이름 |
 | `story_points` | Task 필수 | 구현 AI가 복잡도와 위험을 평가해 선택한 값. `1, 2, 3, 5, 8, 13, 21` 중 하나 |
+| `sprint` | X | Task 전용. `active`(기본값)는 활성 스프린트에 배정, `backlog`는 배정 없이 백로그에 생성 |
 | `done_when` | O | 검증 가능한 완료 조건 목록 |
 | `jira_key` | X | 생성 결과이며 값이 있으면 다시 생성하지 않음 |
 
@@ -59,8 +60,10 @@ tasks:
 같은 파일에서 Epic과 Task를 함께 만들면 Epic을 먼저 작성하고 Task의 `epic`에 Epic의
 로컬 `id`를 사용한다. 생성할 항목은 `jira_key`를 비워 둔다.
 
-모든 Task는 `JIRA_EMAIL`로 인증한 본인에게 할당되고, `JIRA_BOARD_ID` 보드의 활성
-스프린트에 자동 배정된다. 활성 스프린트는 정확히 하나 있어야 한다. `epic`을 생략하면
+모든 Task는 `JIRA_EMAIL`로 인증한 본인에게 할당된다. `sprint`를 생략하거나 `active`로
+지정한 Task는 `JIRA_BOARD_ID` 보드의 활성 스프린트에 배정되며, 이때 활성 스프린트는
+정확히 하나 있어야 한다. `sprint: backlog`로 지정한 Task는 스프린트에 배정하지 않고
+백로그에 생성하므로, 다음 스프린트 계획에서 보드로 당겨온다. `epic`을 생략하면
 `area` 또는 제목의 `[영역]`과 제목·설명·완료 조건을 기존 Epic과 비교해 가장 관련된
 Epic을 선택한다. 관련 Epic을 하나로 결정할 수 없으면 새 Epic을 먼저 생성하고 계획 파일에
 발급된 Epic Key를 기록한다.

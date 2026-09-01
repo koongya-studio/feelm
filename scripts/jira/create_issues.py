@@ -129,11 +129,14 @@ def validate_tasks(tasks: list[Any]) -> None:
                 f"{label}.story_points는 작업 복잡도에 따라 "
                 f"{sorted(ALLOWED_STORY_POINTS)} 중 하나여야 합니다."
             )
-        for automatic_field in ("assignee", "sprint"):
-            if automatic_field in task:
-                raise PlanError(
-                    f"{label}.{automatic_field}은 자동 지정되므로 계획에 입력하지 않습니다."
-                )
+        if "assignee" in task:
+            raise PlanError(f"{label}.assignee은 자동 지정되므로 계획에 입력하지 않습니다.")
+        sprint = task.get("sprint")
+        if sprint is not None:
+            if issue_type != "Task":
+                raise PlanError(f"{label}.sprint는 Task에만 사용할 수 있습니다.")
+            if sprint not in ("active", "backlog"):
+                raise PlanError(f"{label}.sprint는 active 또는 backlog여야 합니다.")
         if not isinstance(task["done_when"], list) or not all(
             isinstance(item, str) and item.strip() for item in task["done_when"]
         ):
@@ -355,7 +358,7 @@ def print_preview(tasks: list[dict[str, Any]]) -> None:
             f", story_points={task['story_points']}" if issue_type == "Task" else ""
         )
         assignee = ", assignee=.env 인증 계정"
-        sprint = ", sprint=active"
+        sprint = f", sprint={task.get('sprint', 'active')}" if issue_type == "Task" else ""
         area = f", area={task_area(task)}" if not task.get("epic") else ""
         print(
             f"- [{issue_type}] {task['id']}: {task['summary']}"
@@ -421,11 +424,17 @@ def apply_plan(path: Path, plan: dict[str, Any], client: JiraClient) -> int:
     tasks_by_id = {task["id"]: task for task in plan["tasks"]}
     pending = pending_tasks(plan)
     has_tasks = any(task.get("issue_type", "Task") == "Task" for task in pending)
+    needs_active_sprint = any(
+        task.get("issue_type", "Task") == "Task" and task.get("sprint", "active") == "active"
+        for task in pending
+    )
     story_points_field = (
         client.resolve_field_id("Story Points", "스토리 포인트") if has_tasks else None
     )
-    sprint_field = client.resolve_field_id("Sprint", "스프린트") if has_tasks else None
-    active_sprint_id = client.get_active_sprint_id() if has_tasks else None
+    sprint_field = (
+        client.resolve_field_id("Sprint", "스프린트") if needs_active_sprint else None
+    )
+    active_sprint_id = client.get_active_sprint_id() if needs_active_sprint else None
     account_id = client.get_current_account_id()
     epic_type_id = client.resolve_issue_type_id("Epic")
     epics = client.get_project_epics(epic_type_id) if has_tasks else []
@@ -434,9 +443,11 @@ def apply_plan(path: Path, plan: dict[str, Any], client: JiraClient) -> int:
         type_id = client.resolve_issue_type_id(issue_type)
         extra_fields: dict[str, Any] = {"assignee": {"accountId": account_id}}
         if issue_type == "Task":
-            assert story_points_field and sprint_field and active_sprint_id is not None
+            assert story_points_field
             extra_fields[story_points_field] = task["story_points"]
-            extra_fields[sprint_field] = active_sprint_id
+            if task.get("sprint", "active") == "active":
+                assert sprint_field and active_sprint_id is not None
+                extra_fields[sprint_field] = active_sprint_id
             if not task.get("epic"):
                 epic_key = select_related_epic(task, epics)
                 if epic_key:
