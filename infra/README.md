@@ -82,6 +82,118 @@ Kafka 구성 업무에서 구체화합니다.
 - `compose/distributed.yml`
   - J15E106A 분산 처리 구성
 
+## HDFS 2-Node Cluster
+
+HDFS는 J15E106A의 NameNode·DataNode 2와 J15E106의 DataNode 1로 구성합니다.
+두 서버에서 저장소 루트를 현재 디렉터리로 두고 아래 명령을 실행합니다.
+
+### Environment
+
+각 서버에서 예시 파일을 복사하고 두 서버가 서로 접근할 수 있는 사설 IP를 입력합니다.
+실제 `infra/.env`는 Git에 추가하지 않습니다.
+
+```bash
+cp infra/.env.example infra/.env
+```
+
+```dotenv
+SERVICE_NODE_IP=<J15E106 사설 IP>
+DISTRIBUTED_NODE_IP=<J15E106A 사설 IP>
+```
+
+Compose 실행 시 환경 파일을 명시적으로 전달합니다.
+
+```bash
+docker compose --env-file infra/.env -f infra/compose/distributed.yml config
+docker compose --env-file infra/.env -f infra/compose/service.yml config
+```
+
+### Network and Ports
+
+HDFS 컨테이너는 두 서버 사이의 직접 통신을 위해 host network를 사용합니다. 아래 포트는
+두 서버의 사설 IP 사이에서만 허용하고 인터넷에 공개하지 않습니다.
+
+| 포트 | 용도 |
+| --- | --- |
+| `8020/tcp` | NameNode RPC |
+| `9870/tcp` | NameNode Web UI 및 헬스체크 |
+| `9864/tcp` | DataNode Web UI 및 헬스체크 |
+| `9866/tcp` | DataNode 데이터 전송 |
+
+`hdfs-namenode`, `hdfs-datanode-1`, `hdfs-datanode-2`는 두 서버에서 동일한 IP로
+해석되어야 합니다. Compose의 `extra_hosts`가 `infra/.env`의 두 사설 IP를 사용해 이
+계약을 적용합니다.
+
+### First-time Initialization
+
+NameNode 포맷은 **새 클러스터에서 최초 한 번만** J15E106A에서 실행합니다. 포맷 명령은
+`-nonInteractive`를 사용하므로 기존 메타데이터가 있으면 덮어쓰지 않고 실패합니다.
+
+```bash
+docker compose --env-file infra/.env -f infra/compose/distributed.yml \
+  --profile init run --rm hdfs-namenode-init
+```
+
+볼륨을 삭제하거나 NameNode를 다시 포맷하면 기존 HDFS 메타데이터와 파일을 복구하지 못할
+수 있습니다. 운영 중에는 `docker compose down -v`를 사용하지 않습니다.
+
+### Startup Order
+
+먼저 J15E106A에서 NameNode와 DataNode 2를 시작합니다.
+
+```bash
+docker compose --env-file infra/.env -f infra/compose/distributed.yml \
+  up -d hdfs-namenode hdfs-datanode-2
+```
+
+NameNode가 healthy 상태가 된 뒤 J15E106에서 DataNode 1을 시작합니다.
+
+```bash
+docker compose --env-file infra/.env -f infra/compose/service.yml \
+  up -d hdfs-datanode-1
+```
+
+### Verification
+
+J15E106A의 NameNode 컨테이너에서 두 DataNode의 등록 상태를 확인합니다.
+
+```bash
+docker exec feelm-hdfs-namenode hdfs dfsadmin -report
+```
+
+기본 파일 작업을 검증합니다.
+
+```bash
+docker exec feelm-hdfs-namenode hdfs dfs -mkdir -p /smoke
+docker exec feelm-hdfs-namenode bash -c \
+  'echo hdfs-smoke > /tmp/hdfs-smoke.txt && hdfs dfs -put -f /tmp/hdfs-smoke.txt /smoke/input.txt'
+docker exec feelm-hdfs-namenode hdfs dfs -cat /smoke/input.txt
+docker exec feelm-hdfs-namenode hdfs dfs -rm -r /smoke
+```
+
+컨테이너 재기동 후 `hdfs dfsadmin -report`와 파일 조회를 다시 실행해 NameNode 메타데이터와
+DataNode 블록이 Named Volume에 유지되는지 확인합니다.
+
+### DataNode Failure and Recovery
+
+DataNode 하나를 중단한 뒤 NameNode 보고서에서 `Dead datanodes` 상태를 확인합니다. 복제
+계수가 2이므로 DataNode 하나가 중단된 동안 새 블록은 목표 복제 수를 충족하지 못할 수
+있습니다.
+
+```bash
+# 중단할 DataNode가 실행 중인 서버에서 수행
+docker stop feelm-hdfs-datanode-1
+
+# J15E106A에서 상태 확인
+docker exec feelm-hdfs-namenode hdfs dfsadmin -report
+
+# 원래 서버에서 복구
+docker start feelm-hdfs-datanode-1
+```
+
+복구 후 두 DataNode가 모두 `Live datanodes`로 표시되고 기존 파일을 읽을 수 있는지
+확인합니다.
+
 ## Deployment
 
 인프라 설정 파일은 GitLab에서 관리하며, 서버에서 직접 수정하지 않는 것을 원칙으로 합니다.
