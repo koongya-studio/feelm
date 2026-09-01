@@ -1,0 +1,79 @@
+services:
+  hdfs-namenode-init:
+    image: apache/hadoop:3.4.3
+    container_name: feelm-hdfs-namenode-init
+    network_mode: host
+
+    extra_hosts:
+      - "hdfs-namenode:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+      - "hdfs-datanode-1:${SERVICE_NODE_IP:?SERVICE_NODE_IP is required}"
+      - "hdfs-datanode-2:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+
+    volumes:
+      - ../hadoop/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml:ro
+      - ../hadoop/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml:ro
+      - hdfs_namenode:/data/hdfs/namenode
+
+    command: ["hdfs", "namenode", "-format", "-nonInteractive", "feelm"]
+    restart: "no"
+    profiles:
+      - init
+
+  hdfs-namenode:
+    image: apache/hadoop:3.4.3
+    container_name: feelm-hdfs-namenode
+    hostname: hdfs-namenode
+    restart: unless-stopped
+    network_mode: host
+
+    extra_hosts:
+      - "hdfs-namenode:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+      - "hdfs-datanode-1:${SERVICE_NODE_IP:?SERVICE_NODE_IP is required}"
+      - "hdfs-datanode-2:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+
+    volumes:
+      - ../hadoop/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml:ro
+      - ../hadoop/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml:ro
+      - hdfs_namenode:/data/hdfs/namenode
+
+    command: ["hdfs", "namenode"]
+
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9870'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  hdfs-datanode-2:
+    image: apache/hadoop:3.4.3
+    container_name: feelm-hdfs-datanode-2
+    hostname: hdfs-datanode-2
+    restart: unless-stopped
+    network_mode: host
+
+    extra_hosts:
+      - "hdfs-namenode:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+      - "hdfs-datanode-1:${SERVICE_NODE_IP:?SERVICE_NODE_IP is required}"
+      - "hdfs-datanode-2:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+
+    environment:
+      HDFS_DATANODE_OPTS: "-Ddfs.datanode.hostname=hdfs-datanode-2"
+
+    volumes:
+      - ../hadoop/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml:ro
+      - ../hadoop/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml:ro
+      - hdfs_datanode_2:/data/hdfs/datanode
+
+    command: ["hdfs", "datanode"]
+
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9864'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+volumes:
+  hdfs_namenode:
+  hdfs_datanode_2:

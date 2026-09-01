@@ -9,3 +9,35 @@ services:
 
     volumes:
       - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+  hdfs-datanode-1:
+    image: apache/hadoop:3.4.3
+    container_name: feelm-hdfs-datanode-1
+    hostname: hdfs-datanode-1
+    restart: unless-stopped
+    network_mode: host
+
+    extra_hosts:
+      - "hdfs-namenode:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+      - "hdfs-datanode-1:${SERVICE_NODE_IP:?SERVICE_NODE_IP is required}"
+      - "hdfs-datanode-2:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+
+    environment:
+      HDFS_DATANODE_OPTS: "-Ddfs.datanode.hostname=hdfs-datanode-1"
+
+    volumes:
+      - ../hadoop/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml:ro
+      - ../hadoop/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml:ro
+      - hdfs_datanode_1:/data/hdfs/datanode
+
+    command: ["hdfs", "datanode"]
+
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9864'"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+volumes:
+  hdfs_datanode_1:
