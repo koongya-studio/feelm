@@ -1,0 +1,20 @@
+tasks:
+- id: line-ending-normalization
+  issue_type: Task
+  summary: '[협업] .gitattributes로 저장소 개행문자 LF 통일'
+  description: 저장소에 .gitattributes가 없어 개행문자가 각 작업자의 git 설정에 좌우된다. Windows git은 system 설정 core.autocrlf=true가
+    기본이라 체크아웃 시 LF를 CRLF로 변환해 디스크에 쓰고, WSL 리눅스 git은 변환하지 않는다. 같은 저장소를 두 환경에서 다루면 내용이 같은데도 워킹트리가 통째로 수정된
+    것으로 보인다. S15P21E106-131 작업 중 Windows git의 pull이 문서 33개를 CRLF로 다시 써서 실제 변경과 섞일 뻔한 사례가 있었다. 루트에 .gitattributes를
+    추가해 텍스트 파일을 LF로 고정한다. 저장소에 저장된 blob은 이미 전부 LF이고 워킹트리의 CRLF 파일은 규칙상 CRLF가 맞는 backend/gradlew.bat 하나뿐이므로
+    재정규화로 내용이 바뀌는 파일은 없다. 대량 재작성 커밋이 생기지 않아 열린 MR과 충돌하지 않고 팀원의 재클론도 필요하지 않다.
+  area: 협업
+  priority: Low
+  story_points: 1
+  done_when:
+  - 저장소 루트 .gitattributes에 텍스트 파일을 LF로 고정하는 규칙이 있다.
+  - Windows 배치 파일(.bat, .cmd)은 CRLF 예외로 두고 이미지·jar 등 바이너리는 변환 대상에서 제외한다.
+  - backend/.gitattributes의 기존 규칙(gradlew는 LF, .bat은 CRLF, .jar은 binary)이 유지된다.
+  - git add --renormalize 결과 내용이 바뀌는 추적 파일이 없음을 확인했다.
+  - docs/git-convention.md에 개행문자 규칙과 Windows 사용자를 위한 git 설정 안내가 추가되어 있다.
+  jira_key: S15P21E106-172
+  epic: S15P21E106-12
