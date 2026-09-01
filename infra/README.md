@@ -9,11 +9,12 @@ E106 프로젝트의 서비스 및 분산 처리 인프라 설정을 관리합�
 
 | 구성요소 | 확정 버전·방식 |
 | --- | --- |
-| Python | 3.12.x |
-| Spark | 4.1.3 |
-| PySpark | 4.1.3 |
-| Spark JVM | Eclipse Temurin 21 |
-| Scala | 2.13 (Spark Runtime) |
+| Python (Recommendation Runtime) | 3.12.x |
+| Python (Spark Image Runtime) | 3.10.12 |
+| Spark / PySpark | 4.1.3 |
+| Spark Image | `apache/spark:4.1.3-scala2.13-java21-python3-ubuntu` |
+| Spark JVM | Eclipse Temurin 21.0.11 |
+| Scala | 2.13.17 (Spark Runtime) |
 | Hadoop / HDFS | 3.4.3 |
 | Kafka | 4.3.1 |
 | Kafka Mode | KRaft |
@@ -81,6 +82,107 @@ Kafka 구성 업무에서 구체화합니다.
 
 - `compose/distributed.yml`
   - J15E106A 분산 처리 구성
+
+## Spark 2-Worker Standalone Cluster
+
+Spark는 J15E106A의 Master·Worker 2와 J15E106의 Worker 1로 구성합니다. 각 Worker는
+2 Core와 4 GiB 메모리를 Spark 애플리케이션에 제공하며, 컨테이너는 두 서버 사이의 직접
+통신을 위해 host network를 사용합니다.
+
+### Network and Ports
+
+아래 포트는 두 서버의 사설 IP 사이에서만 허용하고 인터넷에 공개하지 않습니다. Master
+Web UI를 로컬에서 확인할 때는 SSH port forwarding을 사용합니다.
+
+| 포트 | 용도 |
+| --- | --- |
+| `7077/tcp` | Spark Master RPC |
+| `6066/tcp` | Spark Standalone REST submission |
+| `8080/tcp` | Spark Master Web UI |
+| `7078/tcp` | Spark Worker RPC |
+| `8081/tcp` | Spark Worker Web UI |
+
+`spark-master`, `spark-worker-1`, `spark-worker-2`는 두 서버에서 동일한 사설 IP로 해석되어야
+합니다. Compose의 `extra_hosts`가 `infra/.env`의 IP를 사용해 이 계약을 적용합니다.
+
+### Startup Order
+
+먼저 J15E106A에서 Master와 Worker 2를 시작합니다.
+
+```bash
+docker compose --env-file infra/.env -f infra/compose/distributed.yml \
+  up -d spark-master spark-worker-2
+```
+
+Master가 시작된 뒤 J15E106에서 Worker 1을 시작합니다.
+
+```bash
+docker compose --env-file infra/.env -f infra/compose/service.yml \
+  up -d spark-worker-1
+```
+
+각 서버에서 컨테이너와 최근 로그를 확인합니다.
+
+```bash
+docker ps --filter name=feelm-spark
+docker logs --tail 100 feelm-spark-master
+docker logs --tail 100 feelm-spark-worker-1
+docker logs --tail 100 feelm-spark-worker-2
+```
+
+Master Web UI에서 Worker 2개가 모두 `ALIVE`이고 전체 자원이 4 Core / 8 GiB로 표시되는지
+확인합니다.
+
+### Distributed PySpark Verification
+
+J15E106A에서 검증 스크립트를 Master 컨테이너에 복사하고 client mode로 제출합니다. Executor
+2개에 각각 2 Core와 2 GiB를 할당해 두 Worker가 실제 Partition을 처리하는지 확인합니다.
+
+```bash
+docker cp infra/spark/cluster-check.py \
+  feelm-spark-master:/tmp/cluster-check.py
+
+docker exec feelm-spark-master \
+  /opt/spark/bin/spark-submit \
+  --master spark://spark-master:7077 \
+  --deploy-mode client \
+  --conf spark.executor.instances=2 \
+  --conf spark.executor.cores=2 \
+  --conf spark.executor.memory=2g \
+  /tmp/cluster-check.py
+```
+
+출력에서 다음 항목을 확인합니다.
+
+- `spark-worker-1`, `spark-worker-2`가 Partition 결과에 모두 표시된다.
+- `UNIQUE_EXECUTOR_HOSTS=2`가 표시된다.
+- `E106 SPARK DISTRIBUTED CHECK: SUCCESS`가 표시된다.
+- Master Web UI에서 `E106-Spark-Distributed-Check` 애플리케이션이 `FINISHED`로 표시된다.
+
+### Worker Failure and Recovery
+
+J15E106에서 Worker 1을 중단합니다.
+
+```bash
+docker stop feelm-spark-worker-1
+```
+
+Master Web UI에서 상태가 `1 Alive, 1 Dead`로 바뀌고 가용 자원이 2 Core / 4 GiB로 감소하는지
+확인합니다. Worker 2는 `ALIVE` 상태를 유지해야 합니다.
+
+Worker 1을 다시 시작하고 재등록 로그를 확인합니다.
+
+```bash
+docker start feelm-spark-worker-1
+docker logs --tail 100 feelm-spark-worker-1
+```
+
+로그에서 `Successfully registered with master`를 확인하고 Master Web UI에서 다시
+`2 Alive, 0 Dead`와 4 Core / 8 GiB가 표시되는지 확인합니다. Worker 프로세스를 다시
+시작하면 새로운 Worker ID로 등록될 수 있으며 이는 정상입니다.
+
+Spark의 HDFS 읽기·쓰기와 Kafka 이벤트 연동은 통합 파이프라인 업무에서 별도로 구성하고
+검증합니다.
 
 ## HDFS 2-Node Cluster
 

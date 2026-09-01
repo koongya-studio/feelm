@@ -74,6 +74,56 @@ services:
       retries: 12
       start_period: 30s
 
+  spark-master:
+    image: apache/spark:4.1.3-scala2.13-java21-python3-ubuntu
+    container_name: feelm-spark-master
+    hostname: spark-master
+    restart: unless-stopped
+    network_mode: host
+
+    extra_hosts:
+      - "spark-master:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+
+    entrypoint:
+      - /opt/spark/bin/spark-class
+
+    command:
+      - org.apache.spark.deploy.master.Master
+      - --host
+      - ${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}
+      - --port
+      - "7077"
+      - --webui-port
+      - "8080"
+
+  spark-worker-2:
+    image: apache/spark:4.1.3-scala2.13-java21-python3-ubuntu
+    container_name: feelm-spark-worker-2
+    hostname: spark-worker-2
+    restart: unless-stopped
+    network_mode: host
+
+    extra_hosts:
+      - "spark-master:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+      - "spark-worker-2:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+
+    entrypoint:
+      - /opt/spark/bin/spark-class
+
+    command:
+      - org.apache.spark.deploy.worker.Worker
+      - --host
+      - ${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}
+      - --port
+      - "7078"
+      - --webui-port
+      - "8081"
+      - --cores
+      - "2"
+      - --memory
+      - "4g"
+      - spark://spark-master:7077
+
 volumes:
   hdfs_namenode:
   hdfs_datanode_2:
