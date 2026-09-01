@@ -274,7 +274,7 @@ flowchart TB
     end
 
     LAKE[("HDFS / Parquet<br/>MovieLens · TMDb 원본 및 가공<br/>Item Factor")]
-    KF["Kafka<br/>Rating · View · Click · OTT Click"]
+    KF["Kafka<br/>Rating · Onboarding · Dismiss<br/>View · Click · OTT Click"]
     TMDB["TMDb API"]
 
     FE --> BE
@@ -303,7 +303,7 @@ flowchart TB
 | 컴포넌트 | 역할 |
 | --- | --- |
 | **Spark / PySpark Batch** | 전처리, ALS 학습, E5 임베딩, K-Means 취향 군집, 초기 Candidate 생성 |
-| **Kafka** | 평점·조회·추천 클릭·OTT 클릭 이벤트 전달 |
+| **Kafka** | 평점·온보딩·관심없음·조회·추천 클릭·OTT 클릭 이벤트 전달 |
 | **Spark Structured Streaming** | 사용자 Fold-in, Candidate 갱신, 행동 Feature 집계, 개인 Re-ranking·XAI |
 | **HDFS / Parquet** | MovieLens·TMDb 원본 및 가공 데이터, Item Factor 저장 |
 | **Redis** | User Vector, Candidate Top-500, 행동 Feature, 최종 Top-N·추천 근거 저장 |
@@ -338,7 +338,7 @@ flowchart LR
     C --> D["Item Factor · Embedding<br/>Taste Cluster"]
     D --> E["초기 Candidate Top-500"]
     E --> F["Redis"]
-    G["평점 · 조회 · 클릭"] --> H["Spring → Kafka"]
+    G["평점 · 온보딩 · 관심없음<br/>조회 · 클릭"] --> H["Spring → Kafka"]
     H --> I["Spark Structured Streaming"]
     I --> J["Fold-in · Candidate Refresh<br/>행동 Feature"]
     J --> K["Weighted Re-ranking · XAI"]

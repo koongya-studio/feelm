@@ -1,0 +1,16 @@
+tasks:
+  - id: event-redis-contract
+    issue_type: Task
+    summary: "[설계] Kafka 이벤트 스키마 및 Redis 추천 키 계약 확정"
+    description: "ADR-0016으로 FastAPI 서빙 계층이 제거되면서 내부 API 명세(S15P21E106-111)가 대체되었고, Spring Boot와 Spark Structured Streaming이 주고받을 계약이 정의되지 않은 상태다. Kafka 이벤트 스키마와 Redis 키 구조를 확정해 백엔드의 이벤트 발행 구현과 추천 파이프라인 구현이 서로를 기다리지 않도록 한다. 이 업무에는 이벤트 발행과 Streaming 처리의 실제 구현을 포함하지 않는다."
+    epic: S15P21E106-21
+    priority: Low
+    story_points: 5
+    done_when:
+      - "RATING, VIEW, RECOMMENDATION_CLICK, OTT_CLICK 이벤트의 Topic 이름과 필드, 타입, 시각 형식이 정의된다."
+      - "eventId 기반 멱등 처리 기준과 재처리 시 중복 반영을 방지하는 방식이 정의된다."
+      - "User Vector, Candidate Top-500, 행동 Feature, 최종 Top-N, 추천 근거의 Redis 키 형식과 값 구조가 정의된다."
+      - "Redis 값의 만료 기준과 모델 버전 변경 시 무효화 방식이 정의된다."
+      - "이벤트 발행부터 추천 결과 반영까지 허용 지연과 유효 결과가 없을 때의 503 처리 기준이 정의된다."
+      - "대체된 내부 API 명세와의 관계가 문서에 표시되고 백엔드와 추천 담당자가 계약에 합의한다."
+    jira_key: S15P21E106-131
