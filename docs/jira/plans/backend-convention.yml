@@ -1,0 +1,16 @@
+tasks:
+- id: backend-convention
+  issue_type: Task
+  summary: '[백엔드] 코드 스타일 컨벤션 확정 및 Spotless 자동 포맷팅 적용'
+  description: 백엔드 코드 스타일 기준을 Google Java Style AOSP 변형(들여쓰기 4칸, 100자)으로 확정하고 문서화한다. Spotless와 google-java-format을
+    Gradle 빌드에 통합해 스타일을 자동 강제하고, 기존 소스를 규칙에 맞게 정리한다. 패키지 구조 등 포맷터가 강제하지 못하는 규칙은 미정 항목으로 문서에 남기고 팀 합의 후
+    추가한다.
+  area: 백엔드
+  story_points: 2
+  done_when:
+  - docs/backend-convention.md에 스타일 기준과 Spotless 사용법이 문서화되어 있다.
+  - backend/build.gradle에 Spotless가 설정되어 spotlessCheck로 위반을 검출할 수 있다.
+  - spotlessCheck가 check 태스크에 포함되어 gradlew build 시 스타일 위반이 빌드 실패로 이어진다.
+  - 기존 백엔드 Java 소스가 spotlessCheck를 통과한다.
+  jira_key: S15P21E106-139
+  epic: S15P21E106-69
