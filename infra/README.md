@@ -205,6 +205,154 @@ docker logs --tail 100 feelm-spark-worker-1
 Spark의 HDFS 읽기·쓰기와 Kafka 이벤트 연동은 통합 파이프라인 업무에서 별도로 구성하고
 검증합니다.
 
+## Kafka KRaft Broker
+
+Kafka는 J15E106A에서 ZooKeeper 없이 단일 노드 KRaft 모드로 실행합니다. 하나의 Kafka
+프로세스가 Broker와 Controller 역할을 함께 수행하며, 컨테이너는 서버 간 직접 통신을 위해
+host network를 사용합니다.
+
+단일 Broker 구성이므로 토픽의 복제 계수는 `1`입니다. Kafka 프로세스나 서버 장애가 발생하면
+서비스가 중단될 수 있으므로, 고가용성이 필요해지면 별도의 다중 Broker 구성을 검토합니다.
+
+### Environment and Cluster ID
+
+J15E106A의 `infra/.env`에 분산 처리 노드의 사설 IP와 KRaft Cluster ID를 설정합니다. 실제
+환경 파일은 Git에 추가하지 않습니다.
+
+```dotenv
+DISTRIBUTED_NODE_IP=<J15E106A 사설 IP>
+KAFKA_CLUSTER_ID=<KRaft Cluster ID>
+```
+
+Cluster ID는 클러스터를 최초로 구성할 때 한 번 생성합니다.
+
+```bash
+docker run --rm apache/kafka:4.3.1 \
+  /opt/kafka/bin/kafka-storage.sh random-uuid
+```
+
+출력값을 `KAFKA_CLUSTER_ID`에 저장합니다. `kafka_data` 볼륨을 유지하는 동안 Cluster ID를
+변경하지 않습니다. 기존 데이터와 다른 Cluster ID를 사용하면 Kafka가 기동하지 못할 수
+있습니다.
+
+### Network and Ports
+
+아래 포트는 두 EC2 서버의 사설 IP 사이에서만 허용하고 인터넷에 공개하지 않습니다.
+
+| 포트 | 용도 |
+| --- | --- |
+| `9092/tcp` | Producer, Consumer 및 관리용 Broker Listener |
+| `9093/tcp` | KRaft Controller Listener |
+
+Kafka는 `0.0.0.0:9092`에서 요청을 수신하고 클라이언트에는
+`${DISTRIBUTED_NODE_IP}:9092`를 Broker 주소로 알립니다. 서비스 노드에서 해당 사설 IP와
+포트로 접속할 수 있어야 합니다. Controller 포트는 클라이언트가 사용하지 않습니다.
+
+### Startup and Status
+
+J15E106A에서 Kafka를 시작하고 로그를 확인합니다.
+
+```bash
+docker compose --env-file infra/.env -f infra/compose/distributed.yml \
+  up -d kafka
+docker logs --tail 100 feelm-kafka
+```
+
+KRaft Metadata Quorum에서 현재 Controller의 상태를 확인합니다.
+
+```bash
+docker exec feelm-kafka \
+  /opt/kafka/bin/kafka-metadata-quorum.sh \
+  --bootstrap-server localhost:9092 \
+  describe --status
+```
+
+`ClusterId`, `LeaderId`와 `CurrentVoters`가 출력되고 `LeaderId`가 현재 노드 ID인 `1`인지
+확인합니다.
+
+### Topic and Message Verification
+
+아래의 `e106-kafka-check`는 인프라 검증 전용 토픽이며 애플리케이션에서는 사용하지 않습니다.
+
+```bash
+docker exec feelm-kafka \
+  /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 \
+  --create \
+  --if-not-exists \
+  --topic e106-kafka-check \
+  --partitions 3 \
+  --replication-factor 1
+```
+
+Producer에서 검증 메시지를 전송합니다.
+
+```bash
+echo "E106 Kafka OK" | docker exec -i feelm-kafka \
+  /opt/kafka/bin/kafka-console-producer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic e106-kafka-check
+```
+
+Consumer에서 같은 메시지가 조회되는지 확인합니다.
+
+```bash
+docker exec feelm-kafka \
+  /opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic e106-kafka-check \
+  --from-beginning \
+  --timeout-ms 10000
+```
+
+J15E106 서비스 노드에서는 Kafka 클라이언트 컨테이너로 서버 간 접속을 검증합니다.
+
+```bash
+docker run --rm --network host apache/kafka:4.3.1 \
+  /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server <J15E106A 사설 IP>:9092 \
+  --describe \
+  --topic e106-kafka-check
+```
+
+### Persistence and Recovery Verification
+
+검증 메시지를 전송한 뒤 Kafka 컨테이너를 재시작합니다.
+
+```bash
+echo "persistence-check" | docker exec -i feelm-kafka \
+  /opt/kafka/bin/kafka-console-producer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic e106-kafka-check
+docker restart feelm-kafka
+```
+
+재기동 후 토픽을 다시 조회하고, 앞의 Consumer 명령으로 `persistence-check` 메시지가 남아
+있는지 확인합니다. 토픽 메타데이터와 메시지는 `kafka_data` Named Volume에 저장됩니다.
+
+일반 재기동은 `docker restart` 또는 `docker compose down` 후 `up -d`로 수행합니다.
+데이터를 보존해야 하는 환경에서는 `docker compose down -v`나 `docker volume rm`을 사용하지
+않습니다. 장애 복구 후에는 Kafka 로그, Metadata Quorum, 토픽, 메시지 순서로 상태를
+확인합니다.
+
+### Application Connection Contract
+
+애플리케이션과 Consumer는 다음 환경변수 이름을 사용합니다. 실제 값은 배포 환경에서
+주입하며 저장소에 비밀정보나 서버 주소를 커밋하지 않습니다.
+
+| 환경변수 | 값·용도 |
+| --- | --- |
+| `KAFKA_BOOTSTRAP_SERVERS` | `<J15E106A 사설 IP>:9092` |
+| `KAFKA_RATING_TOPIC` | `feelm.rating.v1` |
+| `KAFKA_DISMISS_TOPIC` | `feelm.dismiss.v1` |
+| `KAFKA_VIEW_TOPIC` | `feelm.view.v1` |
+| `KAFKA_RECOMMENDATION_CLICK_TOPIC` | `feelm.recommendation-click.v1` |
+| `KAFKA_OTT_CLICK_TOPIC` | `feelm.ott-click.v1` |
+
+토픽 이름, 이벤트 봉투와 파티션 키 계약은 `docs/api/streaming-contract.md`를 기준으로 합니다.
+추천 Fold-in Consumer는 강한 신호인 `feelm.rating.v1`을 소비하며, Consumer Group ID와
+Offset 처리 정책은 Consumer 구현 업무에서 확정합니다.
+
 ## HDFS 2-Node Cluster
 
 HDFS는 J15E106A의 NameNode·DataNode 2와 J15E106의 DataNode 1로 구성합니다.
