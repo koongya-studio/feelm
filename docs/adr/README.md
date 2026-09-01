@@ -28,6 +28,8 @@
 
 - 파일명은 `NNNN-kebab-case.md`, 번호는 순차 증가하며 재사용하지 않습니다. 새 ADR은 [`0000-template.md`](./0000-template.md)를 복사해 작성합니다.
 - **채택된 ADR의 결정 내용은 수정하지 않습니다.** 바꾸려면 새 ADR을 쓰고 이전 ADR을 `대체`로 표시합니다. 오타·링크 수정은 예외입니다.
+- `맥락`·`고려한 대안`은 **결정 당시의 사실**을 남기는 기록이므로, 이후 다른 ADR로 상황이 바뀌어도 갱신하지 않습니다. ADR-0006의 "필요 시 FastAPI", ADR-0009의 "클라이언트는 Vue 웹 하나"는 그때의 전제라 그대로 둡니다. 지금 무엇이 유효한지는 아래 목록의 `상태`와 대체 ADR로 확인합니다.
+- 다만 **가리키는 대상이 바뀐 참조 링크는 정정**합니다. 예: ADR-0002의 콘텐츠 임베딩 참조를 대체된 ADR-0012에서 ADR-0014로 바꾼 것은 위 "링크 수정" 예외에 해당합니다.
 - 제안 → 채택으로 바뀌면 상태·결정일·결정자를 채우고 본문의 `(가정)`을 제거합니다. 같은 MR에서 관련 API 명세·ERD의 `(가정)` 표기도 정리합니다.
 - ADR 추가·상태 변경도 Jira 업무와 MR을 거칩니다. 회의에서 결정만 하고 문서 반영은 담당자가 MR로 올립니다.
 - `관련` 항목에는 요구사항(FR/NFR), API ID, ERD 결정 번호(D-n), 회의 안건 번호(A-n)를 적어 추적할 수 있게 합니다.
@@ -42,13 +44,13 @@
 | [ADR-0002](./0002-als-content-hybrid-recommendation.md) | 추천 모델은 ALS + 콘텐츠 기반 Hybrid로 구성한다 | 채택 |
 | [ADR-0003](./0003-spring-boot-backend.md) | 서비스 백엔드는 Spring Boot로 구현한다 | 채택 |
 | [ADR-0004](./0004-postgresql-redis-serving-store.md) | 서비스 데이터는 PostgreSQL, 캐시·후보는 Redis에 저장한다 | 채택 |
-| [ADR-0005](./0005-vue-frontend.md) | 웹 클라이언트는 Vue로 구현한다 | 채택 |
+| [ADR-0005](./0005-vue-frontend.md) | 웹 클라이언트는 Vue로 구현한다 | 대체 → ADR-0013 |
 | [ADR-0006](./0006-aws-ec2-two-nodes.md) | 인프라는 AWS EC2 2대로 Spark 클러스터와 서비스를 함께 운영한다 | 채택 |
 | [ADR-0007](./0007-tmdb-movielens-data-sources.md) | 영화 메타데이터는 TMDb, 학습 원천은 MovieLens 32M을 사용하고 사용자는 연결하지 않는다 | 채택 |
 
 ### 개발 시작 전 확정 사항 중 아키텍처·기술 선택
 
-A 회의 안건 12건 중 아키텍처·기술 선택에 해당하는 5건입니다. 나머지(A-2~A-7, A-9)는 데이터 모델·API 규약·제품 정책이라 ERD·API 명세·요구사항 문서에 기록합니다. 5건 모두 채택되었습니다.
+A 회의 안건 12건 중 아키텍처·기술 선택에 해당하는 5건입니다. 나머지(A-2~A-7, A-9)는 데이터 모델·API 규약·제품 정책이라 ERD·API 명세·요구사항 문서에 기록합니다. 이 중 ADR-0012는 후속 기술 결정 ADR-0016으로 대체되었습니다.
 
 | ADR | 안건 | 결정 | 상태 |
 |---|---|---|---|
@@ -56,9 +58,18 @@ A 회의 안건 12건 중 아키텍처·기술 선택에 해당하는 5건입니
 | [ADR-0009](./0009-jwt-auth-httponly-refresh-redis.md) | A-8 | 인증은 JWT Bearer로 하고 Refresh Token은 httpOnly 쿠키로 전달해 Redis에 저장한다 | 채택 (2026-08-31) |
 | [ADR-0010](./0010-search-postgresql-fulltext.md) | A-10 | 영화 검색은 PostgreSQL full-text와 pg_trgm으로 구현한다 | 채택 (2026-08-31) |
 | [ADR-0011](./0011-notification-polling.md) | A-11 | 알림은 1차 MVP에서 폴링으로 전달하고 알림 발송 기능은 2차로 미룬다 | 채택 (2026-08-31) |
-| [ADR-0012](./0012-realtime-recommendation-serving-location.md) | A-12 | 실시간 추천 서빙 계산(Fold-in·재정렬·파티 집계·XAI)은 FastAPI 서비스에서 수행한다 | 채택 (2026-08-31) |
+| [ADR-0012](./0012-realtime-recommendation-serving-location.md) | A-12 | 실시간 추천 서빙 계산을 FastAPI 서비스에서 수행한다 | 대체 → ADR-0016 |
+
+### 확정 기술 변경
+
+| ADR | 결정 | 상태 |
+|---|---|---|
+| [ADR-0013](./0013-react-web-client.md) | 웹 클라이언트는 React + Vite 기반 반응형 웹앱으로 구현한다 | 채택 (2026-08-31) |
+| [ADR-0014](./0014-e5-pgvector-content-embedding.md) | 영화 콘텐츠는 다국어 임베딩과 pgvector로 검색한다 | 채택 (2026-08-31) |
+| [ADR-0015](./0015-kmeans-ctfidf-taste-clusters.md) | 팝콘 8개 취향 유형은 K-Means와 c-TF-IDF로 생성한다 | 채택 (2026-08-31) |
+| [ADR-0016](./0016-kafka-spark-streaming-recommendation-serving.md) | 실시간 추천 갱신은 Kafka와 Spark Structured Streaming으로 수행한다 | 채택 (2026-08-31) |
 
 ## 관련 문서
 
 - [요구사항 정의서](../requirements.md) · [API 명세](../api/README.md) · [논리 ERD](../erd.md)
-- ERD 5장 D-1~D-12와 API 명세 공통 규약 미정 사항 중 기술 선택에 해당하는 항목은 위 ADR로, 나머지는 각 문서의 결정 표로 수렴합니다.
+- ERD 5장 D-1~D-13과 API 명세 공통 규약 미정 사항 중 기술 선택에 해당하는 항목은 위 ADR로, 나머지는 각 문서의 결정 표로 수렴합니다.

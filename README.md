@@ -46,7 +46,7 @@ MovieLens 32M 규모의 평점 데이터를 **Hadoop/HDFS와 Spark로 분산 처
 | **프레임(Frame)** | 감상·평가를 완료한 영화 1편의 기록 단위 |
 | **필름(Film)** | 한 사용자의 전체 프레임 모음 및 그 시각화 화면 |
 | **팝콘 버킷** | 사용자의 취향 분포를 팝콘 맛으로 시각화한 화면 |
-| **팝콘 맛** | 장르를 기준으로 구분한 취향 축. 8개 예정 |
+| **팝콘 맛** | E5 영화 임베딩을 K-Means로 군집화한 8개 취향 유형 |
 | **팝콘 맛 별 양** | 해당 맛의 팝콘 수로 **감상량**을 나타낸다 |
 | **팝콘 맛 선호도** | 해당 맛의 평균 평점으로 **선호도**를 나타내며 감상량과 독립이다 |
 | **새로운 맛** | 팝콘 수가 임계치 미만인 맛으로 발견 추천의 대상 |
@@ -254,40 +254,46 @@ stateDiagram-v2
 ```mermaid
 flowchart TB
     subgraph CLIENT["Client"]
-        FE["Vue<br/>필름 · 팝콘 버킷 · 파티 UI"]
+        FE["React + Vite Web App<br/>필름 · 팝콘 버킷 · 파티 UI"]
     end
 
     subgraph APP["Application"]
-        BE["Spring Boot<br/>회원 · 영화 · 평가 · 파티 · OTT<br/>공개 API · 인증 · 추천 이력 저장"]
-        RS["FastAPI<br/>Fold-in · Re-ranking<br/>파티 집계 · XAI"]
+        BE["Spring Boot<br/>서비스 API · Kafka 발행<br/>파티·OTT 집계 · 추천 서빙"]
     end
 
     subgraph STORE["Serving Store"]
-        PG[("PostgreSQL<br/>회원 · 영화 · 평가 · 감상 · TMDb 메타")]
-        RD[("Redis<br/>Candidate Top-500 · 최종 추천 캐시")]
+        PG[("PostgreSQL + pgvector<br/>서비스 데이터 · 영화 임베딩")]
+        RD[("Redis<br/>User Vector · Candidate · 행동 Feature<br/>최종 Top-N · XAI")]
     end
 
     subgraph SPARK["Spark Cluster · EC2 2대"]
-        SM["Spark Master"]
+        SM["Spark Batch<br/>ALS · E5 · K-Means"]
+        SS["Structured Streaming<br/>Fold-in · Candidate Refresh<br/>행동 집계 · Re-ranking"]
         W1["Worker 1"]
         W2["Worker 2"]
     end
 
     LAKE[("HDFS / Parquet<br/>MovieLens · TMDb 원본 및 가공<br/>Item Factor")]
+    KF["Kafka<br/>Rating · View · Click · OTT Click"]
     TMDB["TMDb API"]
 
     FE --> BE
     BE --> PG
     BE --> RD
-    BE -->|"내부 API"| RS
-    RS --> RD
-    LAKE -.->|"Item Factor 로드"| RS
+    BE --> KF
+    KF --> SS
+    SS --> RD
+    BE -->|"유사 영화 벡터 검색"| PG
     TMDB --> BE
     LAKE --> SM
     SM --> W1
     SM --> W2
+    W1 --> SS
+    W2 --> SS
     W1 --> RD
     W2 --> RD
+    W1 --> PG
+    W2 --> PG
     W1 --> LAKE
     W2 --> LAKE
 ```
@@ -296,19 +302,19 @@ flowchart TB
 
 | 컴포넌트 | 역할 |
 | --- | --- |
-| **Spark / PySpark** | ALS 학습, 데이터 전처리, Candidate 생성 등 무거운 배치 계산 |
+| **Spark / PySpark Batch** | 전처리, ALS 학습, E5 임베딩, K-Means 취향 군집, 초기 Candidate 생성 |
+| **Kafka** | 평점·조회·추천 클릭·OTT 클릭 이벤트 전달 |
+| **Spark Structured Streaming** | 사용자 Fold-in, Candidate 갱신, 행동 Feature 집계, 개인 Re-ranking·XAI |
 | **HDFS / Parquet** | MovieLens·TMDb 원본 및 가공 데이터, Item Factor 저장 |
-| **Redis** | 사전 계산한 Candidate와 추천 결과의 빠른 저장·조회 |
-| **PostgreSQL** | 사용자·영화·평가 등 영속 데이터 저장 |
-| **Spring Boot** | 회원·영화·평가·파티 등 공개 API, 인증, 추천 결과 저장·전달 |
-| **FastAPI** | Fold-in·Re-ranking·파티 집계·추천 이유(XAI) 실시간 계산 (ADR-0012) |
-| **Vue** | 필름·팝콘 버킷·파티 추천 UI |
+| **Redis** | User Vector, Candidate Top-500, 행동 Feature, 최종 Top-N·추천 근거 저장 |
+| **PostgreSQL + pgvector** | 영속 데이터와 영화 임베딩 저장, 유사 영화 벡터 검색 |
+| **Spring Boot** | 서비스 API, Kafka 발행, 파티·OTT 집계, Redis 추천 서빙·이력 저장 |
+| **React + Vite** | 필름·팝콘 버킷·개인·파티 추천 UI와 SVG 시각화 |
 
 ### 미확정 사항
 
-- 실시간 추천 서빙은 **FastAPI 분리로 확정**했다(ADR-0012). Spring Boot ↔ FastAPI의 세부 계약
-  (데이터 접근 경계, 모델 교체 방식 등)은 [내부 API 명세](./docs/api/internal.md) 초안으로 협의 중이며,
-  다이어그램은 FastAPI가 PostgreSQL에 접근하지 않는 현재 초안 기준이다.
+- 실시간 추천 갱신은 **Kafka + Spark Structured Streaming**으로 확정했다(ADR-0016). Kafka 이벤트 스키마,
+  Redis 키, Re-ranking 가중치와 파티·OTT 점수식은 구현 전에 세부 계약으로 확정한다.
 - 물리 스키마·마이그레이션은 [논리 ERD](./docs/erd.md)를 기준으로 구현 전에 작성한다.
 - 리포트 기능의 결과 이미지는 S3 호환 객체 스토리지에 저장하며 로컬·자체 호스팅은 MinIO를 사용할 수 있다.
 
@@ -327,17 +333,18 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-    A["1 MovieLens 전처리"] --> B["2 Spark ALS 학습"]
-    B --> C["3 Top-N 추출"]
-    C --> D["4 Precision / Recall 평가"]
-    D --> E["5 콘텐츠 기반 추천"]
-    E --> F["6 ALS + Content Hybrid"]
-    F --> G["7 서비스 사용자 Fold-in"]
-    G --> H["8 Candidate Top-500 배치"]
-    H --> I["9 Re-ranking"]
-    I --> J["10 취향 발견 추천"]
-    J --> K["11 XAI 추천 근거"]
-    K --> L["12 Redis / Spring 연동"]
+    A["MovieLens · TMDb"] --> B["HDFS / Parquet"]
+    B --> C["Spark Batch<br/>ALS · E5 · K-Means"]
+    C --> D["Item Factor · Embedding<br/>Taste Cluster"]
+    D --> E["초기 Candidate Top-500"]
+    E --> F["Redis"]
+    G["평점 · 조회 · 클릭"] --> H["Spring → Kafka"]
+    H --> I["Spark Structured Streaming"]
+    I --> J["Fold-in · Candidate Refresh<br/>행동 Feature"]
+    J --> K["Weighted Re-ranking · XAI"]
+    K --> F
+    F --> L["Spring Boot"]
+    L --> M["React + Vite Web App"]
 ```
 
 ### 추천 종류
@@ -399,14 +406,17 @@ flowchart LR
 | --- | --- | --- |
 | 분산 저장 | Hadoop HDFS, Parquet | 확정 |
 | 분산 처리 | Apache Spark / PySpark | 확정 |
+| 이벤트 스트림 | Kafka, Spark Structured Streaming | 확정 |
 | 추천 | ALS, 콘텐츠 기반, Hybrid | 확정 |
+| 콘텐츠 임베딩 | 다국어 임베딩, pgvector (`multilingual-e5-base`는 MVP 베이스라인) | 모델 비교 평가 후 체크포인트 확정 |
+| 취향 유형 | K-Means 8군집, c-TF-IDF | 확정 |
 | 파티 추천 | Average / Least Misery / 개선식 | 비교 후 확정 |
 | Backend | Spring Boot | 확정 |
-| 추천 서빙 | FastAPI | 확정 |
+| 추천 갱신·서빙 | Spark Structured Streaming, Redis, Spring Boot | 확정 |
 | 검색 | PostgreSQL full-text, pg_trgm | 확정 |
-| DB | PostgreSQL | 확정 |
+| DB·벡터 검색 | PostgreSQL, pgvector(HNSW) | 확정 |
 | Cache | Redis | 확정 |
-| Frontend | Vue | 확정 |
+| Frontend | React, Vite | 확정 |
 | 영화 정보 | TMDb API | 확정 |
 | 객체 스토리지 | S3 호환 스토리지 / MinIO | 리포트 기능 시점 |
 | Infra | AWS EC2 2대 | 확정 |
@@ -419,7 +429,7 @@ flowchart LR
 ```text
 S15P21E106
 ├── backend/          Spring Boot 서비스 API
-├── frontend/         Vue 웹 클라이언트
+├── frontend/         React + Vite 웹 클라이언트
 │   └── docs/         와이어프레임 목업과 화면 캡처
 ├── recommendation/   추천 알고리즘 및 Spark 배치 코드
 ├── data/             데이터 수집·전처리 및 데이터셋 관리
@@ -490,10 +500,10 @@ python -m pytest tests
 | --- | --- |
 | 요구사항 정의서 | [docs/requirements.md](./docs/requirements.md) · 검토 중(미결 사항은 문서 5장) |
 | 논리 ERD | [docs/erd.md](./docs/erd.md) · 작성 완료, 물리 스키마는 구현 전 작성 |
-| API 명세 | [docs/api](./docs/api/README.md) · 초안 67건 + [내부 API](./docs/api/internal.md) 협의 중 |
-| 기술 결정 기록(ADR) | [docs/adr](./docs/adr/README.md) · 12건 채택 |
+| API 명세 | [docs/api](./docs/api/README.md) · 초안 67건, FastAPI 내부 API 초안은 ADR-0016으로 대체 |
+| 기술 결정 기록(ADR) | [docs/adr](./docs/adr/README.md) · 16건(채택 14, 대체 2) |
 | 와이어프레임 | 29개 화면 · [화면 설계](#5-화면-설계) 참고 · 검색 화면 미정 |
-| 추천 구조 설계 | FastAPI 분리 확정(ADR-0012) · 파티 집계식은 비교 실험 후 확정 |
+| 추천 구조 설계 | Kafka·Spark Structured Streaming 확정(ADR-0016) · 파티 집계식은 비교 실험 후 확정 |
 
 기획과 설계 원본은 팀 Notion에서 관리하며, 확정된 계약과 규칙은 이 저장소의 `docs/`에 반영한다.
 

@@ -132,7 +132,8 @@ erDiagram
         int runtime_minutes
         varchar poster_url
         varchar backdrop_url
-        bigint representative_flavor_id FK "대표 맛. 규칙은 D-5"
+        bigint representative_flavor_id FK "K-Means 대표 맛. ADR-0015"
+        varchar taste_model_version "취향 군집 모델 버전"
         numeric average_rating "서비스 평가 집계"
         int rating_count
         timestamptz synced_at "TMDb 동기화 시각"
@@ -184,10 +185,14 @@ erDiagram
         varchar color "변경 가능"
         int sort_order
     }
-    FLAVOR_GENRES {
-        bigint flavor_id PK, FK
-        bigint genre_id PK, FK
-        int priority "대표 맛 결정 우선순위 (가정)"
+    FLAVOR_CLUSTER_MAPPINGS {
+        bigint id PK
+        varchar taste_model_version "K-Means 학습 버전"
+        int cluster_id "K-Means 원시 Cluster ID, 공개 API 미노출"
+        bigint popcorn_flavor_id FK
+        jsonb representative_keywords "버전별 c-TF-IDF 대표 키워드"
+        boolean is_active "현재 서빙 버전 여부"
+        timestamptz created_at
     }
 
     MOVIES ||--o{ MOVIE_GENRES : classified
@@ -197,9 +202,8 @@ erDiagram
     PEOPLE ||--o{ MOVIE_PEOPLE : credited
     MOVIES ||--o{ MOVIE_OTT_PROVIDERS : available_on
     OTTS ||--o{ MOVIE_OTT_PROVIDERS : provides
-    POPCORN_FLAVORS ||--o{ FLAVOR_GENRES : maps
-    GENRES ||--o{ FLAVOR_GENRES : mapped
     POPCORN_FLAVORS ||--o{ MOVIES : representative
+    POPCORN_FLAVORS ||--o{ FLAVOR_CLUSTER_MAPPINGS : mapped_by
 ```
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
@@ -210,8 +214,8 @@ erDiagram
 | `people` | 인물(감독·배우) | 검색 대상(FR-14) | API-028, API-030 |
 | `otts` | OTT 기준정보 | 지원 목록은 미정(API-025) | FR-03, FR-16 · API-025 |
 | `movie_ott_providers` | 영화별 시청 가능 OTT | TMDb watch provider 동기화 | FR-16 · API-030 |
-| `popcorn_flavors` | 팝콘 맛 8종 기준정보 | `code` 불변, 표시명·색상 변경 가능(FR-06). 8종 값은 미정 | FR-06 · API-044 |
-| `flavor_genres` | 맛 ↔ 장르 매핑 | 복수 장르 영화의 대표 맛 결정에 `priority` 사용(가정) — D-5 | FR-09 · API-044 |
+| `popcorn_flavors` | 팝콘 맛 8종 기준정보 | `code` 불변, 표시명·색상 변경 가능. 모델 버전과 무관하게 8행 고정이며, 군집 매핑과 대표 키워드는 `flavor_cluster_mappings`가 보관 | FR-06 · API-044 · ADR-0015 |
+| `flavor_cluster_mappings` | 모델 버전별 (Cluster ID → 맛 코드) 매핑 | UK(`taste_model_version`, `cluster_id`)와 UK(`taste_model_version`, `popcorn_flavor_id`)로 버전 안에서 1:1. 재학습 시 새 버전 행을 추가하고 이전 버전은 이력으로 보존한다. `is_active`가 true인 버전은 1개(부분 유일 인덱스). 원시 `cluster_id`는 공개 API에 노출하지 않는다(ADR-0015) | FR-06 · API-044 · ADR-0015 |
 
 ### 2.3 온보딩·감상·취향
 
@@ -300,8 +304,8 @@ erDiagram
 | `watch_records` | 감상 상태 머신 | 사용자·영화별 **활성 기록**(EXPIRED 아님)은 1개 — 부분 유일 인덱스(D-6 결정). 만료 후 재클릭은 새 행 | FR-17, FR-18 · API-033~035 |
 | `ratings` | 평가 + 한줄평 | UK(`user_id`, `movie_id`). 한줄평은 컬럼(별도 테이블 아님). 삭제 시 프레임·팝콘 함께 삭제, 감상 기록은 `WATCHED_UNRATED`로 복귀 | FR-19, FR-26 · API-036~039 |
 | `frames` | 필름의 프레임 | 평가와 1:1. 최초 저장 시 생성, 수정으로 변하지 않음 | FR-07, FR-08 · API-042, API-043 |
-| `popcorns` | 팝콘 1알 | 프레임과 1:1. `flavor_id`는 영화 대표 맛. 맛별 집계는 `COUNT`·`AVG(score)`로 계산 | FR-06, FR-09, FR-32 · API-041 |
-| `taste_analyses` | 취향 분석 결과 캐시 | 평가 변경 시 재계산(비동기 가정). FastAPI 도입 시 계산 위치 D-4 | FR-04, FR-05 · API-040 |
+| `popcorns` | 팝콘 1알 | 프레임과 1:1. `flavor_id`는 생성 시점의 영화 대표 맛이며 재학습으로 바뀌지 않는다(ADR-0015). 맛별 집계는 `COUNT`·`AVG(score)`로 계산 | FR-06, FR-09, FR-32 · API-041 |
+| `taste_analyses` | 취향 분석 결과 캐시 | Spring이 평가와 영화 취향 유형을 집계해 갱신. 추천 Re-ranking·XAI는 Spark Streaming이 담당(D-4) | FR-04, FR-05 · API-040 |
 
 > D-7 결정: 필름 중심 파생 기능(프레임 배치·메모·커버 등) 확장 가능성을 위해 `frames`·`popcorns`를 별도 테이블로 유지합니다.
 
@@ -473,7 +477,7 @@ flowchart LR
 | `/movies/{movieId}/ott-clicks`, `/watch-records/*` | `watch_records` | `otts` |
 | `/movies/{movieId}/ratings`, `/ratings/{ratingId}`, `/users/me/ratings` | `ratings`, `frames`, `popcorns` | `watch_records`, `popcorn_flavors` |
 | `/users/me/taste` | `taste_analyses` | `ratings` |
-| `/users/me/popcorn`, `/popcorn-flavors` | `popcorns`, `popcorn_flavors` | `flavor_genres` |
+| `/users/me/popcorn`, `/popcorn-flavors` | `popcorns`, `popcorn_flavors`, `flavor_cluster_mappings` | `movies.representative_flavor_id` |
 | `/users/me/frames`, `/frames/{frameId}` | `frames` | `ratings`, `movies`, `watch_records` |
 | `/recommendations*` | `recommendation_sets`, `recommendation_items`, `recommendation_dismissals` | `movies`, `popcorn_flavors` |
 | `/parties*` | `parties`, `party_members`, `party_invitations` | `users`, `popcorns`(파티원 팝콘) |
@@ -492,14 +496,15 @@ flowchart LR
 | D-1 | 식별자 타입 | `bigint` 시퀀스 / UUID(v7) / 혼합 | **내부 `bigint` + 공개 URL `users.public_id`** (08-30, ADR-0008) | 전 테이블, 전 API 응답 |
 | D-2 | Refresh Token 저장소 | PostgreSQL / Redis(TTL) | **Redis** (08-31, ADR-0009) — `refresh_tokens` 테이블 제거 | 인증 API, 회전·폐기, 탈퇴 처리 |
 | D-3 | 사용자당 활성 파티 수 | 1개 제한 / 복수 허용 | **복수 허용, 상한(기본 5) 설정값** (08-30) | API-049·050·053, ⑧ 화면 |
-| D-4 | 취향 분석·추천 이유 계산 위치 | Spring Boot / FastAPI | **FastAPI** (08-31, ADR-0012) — 내부 API 명세 별도 작성 | `taste_analyses` 갱신 방식, 내부 API 계약 |
-| D-5 | 복수 장르 영화의 대표 맛 규칙 | `flavor_genres.priority` / TMDb 순서 / 큐레이션 | 미정 — A-6과 함께 확정 | `movies.representative_flavor_id`, 팝콘 집계 |
+| D-4 | 취향 분석·추천 이유 계산 위치 | Spring Boot / FastAPI / Spark Streaming | **취향 집계는 Spring, 개인 Re-ranking·XAI는 Spark Streaming** (08-31, ADR-0016) | `taste_analyses` 갱신, Kafka 이벤트·Redis 결과 계약 |
+| D-5 | 영화의 대표 맛 규칙 | 장르 규칙 / K-Means / 큐레이션 | **E5 임베딩 K-Means의 최근접 Centroid 하나에 배정** (08-31, ADR-0015) | `movies.representative_flavor_id`, 팝콘 집계 |
 | D-6 | 감상 기록 없이 평가 허용 | 허용 / 불허 | **허용** (08-30) — `ratings.watch_record_id` NULL 허용 | `watch_records` 유일 제약, ⑩·⑪ 화면 |
 | D-7 | 프레임·팝콘 테이블 분리 | 별도 / `ratings` 흡수 | **별도 유지** (08-30) — 필름 파생 기능 확장 대비 | 필름·팝콘 조회, FR-32 저장 위치 |
 | D-8 | 가입 시 나이 저장 형식 | 정수 / 연령대 / 출생연도 | **생년월일(`birth_date`)** (08-31, 08-30 출생연도에서 변경). 성별 3값 + NULL 허용 | `users`, API-001·008 |
 | D-9 | 탈퇴 사용자 데이터 처리 | 즉시 삭제 / 기간 보존 / 익명화 | 미정 — 출시 전 개인정보 방침과 함께 확정 | `users.status`, 공개 한줄평, 학습 데이터 |
 | D-10 | 평균 별점 집계 방식 | 반정규화 컬럼 / 조회 시 집계 / MView | **반정규화 컬럼, 차단 미반영** (08-30) | 평가 트랜잭션 범위, API-030 |
 | D-11 | 검색 엔진 | PostgreSQL full-text(`pg_trgm`) / Elasticsearch | **PostgreSQL full-text + `pg_trgm`** (08-31, ADR-0010) | 인덱스 설계 |
-| D-12 | 팝콘 맛 8종 기준정보 | 통합본 2.1 값 확정 | 미정 — A-6, 데이터 담당 초안 후 확정 | `popcorn_flavors`·`flavor_genres` 초기 데이터, 온보딩 카드 |
+| D-12 | 팝콘 맛 8종 기준정보 | 고정 장르 그룹 / ML 취향 군집 | **K-Means 8군집 + c-TF-IDF 대표 키워드, 안정 코드 매핑** (08-31, ADR-0015). 매핑은 `flavor_cluster_mappings`(`taste_model_version` + `cluster_id` → `popcorn_flavors.code`)에 버전별로 보존 | `popcorn_flavors`, `flavor_cluster_mappings` 초기 데이터, 온보딩 카드 |
+| D-13 | 재학습 시 기존 데이터 처리 | 전면 재배정 / 생성 시점 코드 보존 | **프레임·팝콘은 생성 시점 맛 코드 보존** (ADR-0015). 미정 — `movies.representative_flavor_id`·`taste_model_version` 재배정 절차와 `is_active` 버전 전환 시점 | `movies`, `frames`, `popcorns`, `flavor_cluster_mappings` |
 
-미결은 D-5·D-12(팝콘 맛 기준정보, A-6)와 D-9(출시 전 정책)뿐입니다.
+미결은 D-9(출시 전 정책), D-13(재학습 재배정 절차)와 팝콘 표시명·색상, 추천 임계치 같은 설정값입니다.

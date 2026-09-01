@@ -685,8 +685,10 @@
 
 ### 처리 규칙
 
+- Spring이 Redis의 파티원별 Candidate 점수를 합쳐 요청 시 파티 점수를 계산한다. 별도 ML 추론 서비스는 사용하지 않는다(ADR-0016)
 - 파티원 중 한 명이라도 감상 기록이 있는 영화는 제외한다(가정)
-- 파티 인원이 바뀌면 재계산한다. 인원이 같으면 캐시된 결과를 반환한다
+- **Rating Candidate 버전**은 파티원 한 명의 Candidate 점수 집합이 몇 번째로 갱신된 것인지 나타내는 값이다. Spark Structured Streaming이 그 사용자의 평가·행동 이벤트를 반영해 Redis의 사용자별 Candidate 점수를 갱신할 때 함께 발급·기록하며, 저장 위치는 해당 사용자 Candidate 키와 같은 Redis 네임스페이스다. Spring은 값을 읽기만 한다(ADR-0016)
+- 파티 점수 캐시 키는 `partyId` + 파티원 목록 + 파티원별 Rating Candidate 버전으로 구성한다. 파티 인원이나 파티원의 Rating Candidate 버전이 바뀌면 재계산하고, 입력 버전이 같으면 캐시된 결과를 반환한다
 - 검증 지표: Average·Least Misery 대비 최저 만족도 상승, 만족도 편차 감소, 평균 만족도 유지(FR-22)
 - 결과는 파티 추천 이력에 `source: PARTY`로 저장한다(가정)
 
@@ -699,3 +701,4 @@
 - [ ] 집계 알고리즘(Average / Least Misery / 개선식) 확정
 - [ ] 감상 영화 제외 기준(한 명이라도 vs 전원)
 - [ ] 파티 추천을 개인 추천 이력에 포함할지
+- [ ] Rating Candidate 버전 값의 형식(단조 증가 정수 / 갱신 타임스탬프)과 Redis 키 이름 — Redis 키 설계 문서에서 확정
