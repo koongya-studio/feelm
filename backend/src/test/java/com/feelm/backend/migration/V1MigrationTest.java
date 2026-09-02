@@ -1,6 +1,7 @@
 package com.feelm.backend.migration;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.sql.Connection;
@@ -119,6 +120,32 @@ class V1MigrationTest {
                                                 + " DATE '1999-03-14', 'DELETED')"))
                 .isInstanceOf(SQLException.class)
                 .hasMessageContaining("ck_users_status");
+    }
+
+    @Test
+    @DisplayName("탈퇴 계정은 생년월일과 성별을 비울 수 있다")
+    void allowsPersonalDataRemovalForWithdrawnUser() {
+        assertThatCode(
+                        () ->
+                                execute(
+                                        "INSERT INTO users"
+                                                + " (email, nickname, birth_date, gender, status)"
+                                                + " VALUES ('withdrawn@feelm.test', '탈퇴계정', NULL,"
+                                                + " NULL, 'WITHDRAWN')"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("비탈퇴 계정은 생년월일이 필수다")
+    void requiresBirthDateForNonWithdrawnUser() {
+        assertThatThrownBy(
+                        () ->
+                                execute(
+                                        "INSERT INTO users (email, nickname, birth_date, status)"
+                                                + " VALUES ('active-without-birth@feelm.test',"
+                                                + " '생년월일없음', NULL, 'ACTIVE')"))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("ck_users_birth_date_required_unless_withdrawn");
     }
 
     @Test
