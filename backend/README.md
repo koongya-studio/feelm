@@ -139,18 +139,105 @@ Refresh Token은 사용될 때마다 회전하며, 폐기된 토큰이 다시 �
   애플리케이션이 기동에 실패합니다. 잘못된 내용은 새 마이그레이션으로 고칩니다.
 - 병합 순서와 버전 순서가 어긋나 로컬 기동이 실패하면 DB 볼륨을 지우고 다시 만듭니다.
 
-로컬 PostgreSQL은 인프라와 합의한 것과 같은 이미지를 써야 합니다. 순정 `postgres`
-이미지에는 pgvector가 없어 확장 생성이 실패합니다.
+Spring Boot 4의 Flyway 자동 설정은 `spring-boot-starter-flyway`가 제공하고 PostgreSQL
+지원은 `flyway-database-postgresql` 모듈을 사용합니다. 마이그레이션 자체는
+`V1MigrationTest`가 Testcontainers의 실제 PostgreSQL에도 적용해 검증합니다.
+
+### 로컬 PostgreSQL 기동
+
+독립 `docker run` 대신 인프라의 공통 Compose를 사용합니다. 순정 `postgres` 이미지에는
+pgvector가 없어 확장 생성이 실패하므로 이미지나 실행 옵션을 별도로 바꾸지 않습니다.
+저장소 루트에서 다음을 실행합니다.
 
 ```bash
-docker run -d --name feelm-postgres -p 5432:5432 \
-  -e POSTGRES_DB=feelm -e POSTGRES_USER=feelm -e POSTGRES_PASSWORD=feelm \
-  -e POSTGRES_INITDB_ARGS=--locale=C.UTF-8 -e TZ=UTC \
-  pgvector/pgvector:0.8.6-pg17-bookworm
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  -f infra/compose/local.yml \
+  config --quiet
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  -f infra/compose/local.yml \
+  up -d postgres
+docker ps --filter name=feelm-postgres
 ```
 
-마이그레이션 자체는 `V1MigrationTest`가 Testcontainers로 실제 PostgreSQL에 적용해
-검증합니다. 실행에 Docker가 필요하며, Docker가 없으면 이 테스트만 실패합니다.
+상태가 `healthy`여야 하며 로컬 포트는 `127.0.0.1:5432`에만 바인딩됩니다. `backend/.env`의
+접속 정보는 `infra/.env`와 일치시킵니다.
+
+```dotenv
+DB_URL=jdbc:postgresql://localhost:5432/feelm
+DB_USERNAME=feelm
+DB_PASSWORD=<infra/.env의 POSTGRES_PASSWORD와 같은 값>
+```
+
+백엔드 컨테이너가 같은 Compose 네트워크에서 실행될 때는
+`jdbc:postgresql://postgres:5432/feelm`을 사용합니다.
+
+### Flyway 기동 검증
+
+`backend`를 작업 디렉터리로 애플리케이션을 실행합니다. 빈 DB의 최초 기동에서는 Migration이
+적용되고 이후 기동에서는 `Schema "public" is up to date. No migration necessary.`가
+출력되어야 합니다.
+
+```bash
+./gradlew bootRun
+```
+
+적용 이력, 확장과 공통 선행 테이블을 확인합니다.
+
+```bash
+docker exec feelm-postgres psql -U feelm -d feelm \
+  -c "SELECT version, description, success FROM flyway_schema_history ORDER BY installed_rank;"
+docker exec feelm-postgres psql -U feelm -d feelm \
+  -c "SELECT extname, extversion FROM pg_extension WHERE extname IN ('vector', 'pg_trgm') ORDER BY extname;"
+docker exec feelm-postgres psql -U feelm -d feelm \
+  -c "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename;"
+```
+
+`202609021030`이 성공 상태여야 하고 `vector`, `pg_trgm`, `users`, `movies`, `genres`,
+`otts`, `people`, `popcorn_flavors`가 조회되어야 합니다. 애플리케이션 재기동 뒤 성공한
+Migration 수가 증가하지 않는지도 확인합니다.
+
+```bash
+docker exec feelm-postgres psql -U feelm -d feelm \
+  -c "SELECT COUNT(*) FROM flyway_schema_history WHERE success = true;"
+```
+
+기존 데이터를 지우지 않고 최초 적용을 다시 검증하려면 별도 DB를 사용합니다.
+
+```bash
+docker exec feelm-postgres createdb -U feelm feelm_183_verify
+./gradlew bootRun \
+  --args='--spring.profiles.active=local --spring.datasource.url=jdbc:postgresql://localhost:5432/feelm_183_verify'
+docker exec feelm-postgres dropdb -U feelm feelm_183_verify
+```
+
+검증용 DB는 애플리케이션을 종료하고 결과 확인을 마친 뒤에만 삭제합니다.
+
+### 연결 실패와 복구
+
+잘못된 비밀번호 검증에서는 애플리케이션이 `password authentication failed`와 함께 기동에
+실패해야 합니다. 실제 Secret 대신 명시적인 검증 문자열을 일회성 실행 인자로 사용합니다.
+
+```bash
+./gradlew bootRun \
+  --args='--spring.profiles.active=local --spring.datasource.password=intentionally-wrong-password'
+```
+
+연결 실패 시 PostgreSQL 상태와 준비 상태를 먼저 확인한 뒤 `DB_URL`, `DB_USERNAME`,
+`DB_PASSWORD`가 `infra/.env`와 일치하는지 확인합니다.
+
+```bash
+docker ps --filter name=feelm-postgres
+docker exec feelm-postgres sh -c \
+  'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+docker logs --tail 100 feelm-postgres
+```
+
+PostgreSQL 볼륨을 만든 뒤 `infra/.env`의 비밀번호만 변경해도 DB 내부 사용자 비밀번호는
+바뀌지 않습니다. 기존 데이터가 있으면 `psql`의 `\password`로 사용자의 비밀번호를 먼저
+변경한 뒤 환경 파일을 갱신합니다. `docker compose down -v`는 PostgreSQL과 Redis 볼륨을
+삭제할 수 있으므로 명시적인 데이터 초기화 외에는 사용하지 않습니다.
 
 ## 로컬 실행
 
