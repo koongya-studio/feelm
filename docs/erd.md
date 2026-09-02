@@ -1,8 +1,8 @@
 # 논리 ERD
 
 FEELM 서비스 데이터베이스(PostgreSQL)의 논리 ERD입니다. [요구사항 정의서](./requirements.md)와 [API 명세](./api/README.md)에서
-도출한 엔티티·관계·핵심 속성을 정리하며, 물리 스키마(타입·제약·인덱스·마이그레이션)는 [5. 물리 스키마 전 결정 사항](#5-물리-스키마-전-결정-사항)이
-확정된 뒤 백엔드 첫 스프린트에서 작성합니다.
+도출한 엔티티·관계·핵심 속성을 정리합니다. 물리 스키마(타입·제약·인덱스·마이그레이션)의 규칙은
+[물리 스키마 규칙과 마이그레이션 정책](./db-schema-convention.md)에 있습니다.
 
 ## 범위
 
@@ -108,7 +108,7 @@ erDiagram
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `users` | 서비스 계정 | `nickname`은 정규화 값(공백 제거·소문자)으로 유일. 탈퇴 시 `status=WITHDRAWN`으로 전환하고 이메일·닉네임 재사용 허용 여부는 D-9 | FR-01, FR-37, FR-38 · API-001~016 |
+| `users` | 서비스 계정 | `nickname`은 정규화 값(공백 제거·소문자)으로 유일. 탈퇴 시 `status=WITHDRAWN`으로 전환하고 이메일·닉네임을 익명화 치환해 즉시 재사용을 허용합니다(D-9) | FR-01, FR-37, FR-38 · API-001~016 |
 | `user_auth_providers` | 소셜 로그인 수단 | UK(`provider`, `provider_user_id`). 같은 이메일이어도 기존 계정에 자동 통합하지 않음 | FR-35 · API-007~009 |
 | `email_verification_tokens` | 가입 이메일 인증 | 1회용, 만료 24시간(가정). 해시만 저장 | FR-01 · API-002, API-003 |
 | `password_reset_tokens` | 비밀번호 재설정 | 1회용, 만료 30분(가정). 성공 시 해당 사용자 Refresh Token 전부 폐기 | FR-37 · API-010, API-011 |
@@ -501,10 +501,10 @@ flowchart LR
 | D-6 | 감상 기록 없이 평가 허용 | 허용 / 불허 | **허용** (08-30) — `ratings.watch_record_id` NULL 허용 | `watch_records` 유일 제약, ⑩·⑪ 화면 |
 | D-7 | 프레임·팝콘 테이블 분리 | 별도 / `ratings` 흡수 | **별도 유지** (08-30) — 필름 파생 기능 확장 대비 | 필름·팝콘 조회, FR-32 저장 위치 |
 | D-8 | 가입 시 나이 저장 형식 | 정수 / 연령대 / 출생연도 | **생년월일(`birth_date`)** (08-31, 08-30 출생연도에서 변경). 성별 3값 + NULL 허용 | `users`, API-001·008 |
-| D-9 | 탈퇴 사용자 데이터 처리 | 즉시 삭제 / 기간 보존 / 익명화 | 미정 — 출시 전 개인정보 방침과 함께 확정 | `users.status`, 공개 한줄평, 학습 데이터 |
+| D-9 | 탈퇴 사용자 데이터 처리 | 즉시 삭제 / 기간 보존 / 익명화 | **계정 영역 확정: 익명화 치환 + 즉시 재사용 허용** (09-02, BE-A). 공개 한줄평과 학습 데이터는 각 도메인 담당 결정 대기 | `users.status`, 공개 한줄평, 학습 데이터 |
 | D-10 | 평균 별점 집계 방식 | 반정규화 컬럼 / 조회 시 집계 / MView | **반정규화 컬럼, 차단 미반영** (08-30) | 평가 트랜잭션 범위, API-030 |
 | D-11 | 검색 엔진 | PostgreSQL full-text(`pg_trgm`) / Elasticsearch | **PostgreSQL full-text + `pg_trgm`** (08-31, ADR-0010) | 인덱스 설계 |
 | D-12 | 팝콘 맛 8종 기준정보 | 고정 장르 그룹 / ML 취향 군집 | **K-Means 8군집 + c-TF-IDF 대표 키워드, 안정 코드 매핑** (08-31, ADR-0015). 매핑은 `flavor_cluster_mappings`(`taste_model_version` + `cluster_id` → `popcorn_flavors.code`)에 버전별로 보존 | `popcorn_flavors`, `flavor_cluster_mappings` 초기 데이터, 온보딩 카드 |
 | D-13 | 재학습 시 기존 데이터 처리 | 전면 재배정 / 생성 시점 코드 보존 | **프레임·팝콘은 생성 시점 맛 코드 보존** (ADR-0015). 미정 — `movies.representative_flavor_id`·`taste_model_version` 재배정 절차와 `is_active` 버전 전환 시점 | `movies`, `frames`, `popcorns`, `flavor_cluster_mappings` |
 
-미결은 D-9(출시 전 정책), D-13(재학습 재배정 절차)와 팝콘 표시명·색상, 추천 임계치 같은 설정값입니다.
+미결은 D-9의 계정 외 영역(공개 한줄평, 학습 데이터), D-13(재학습 재배정 절차)와 팝콘 표시명·색상, 추천 임계치 같은 설정값입니다.

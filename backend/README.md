@@ -14,8 +14,10 @@ FEELM의 회원, 영화, 평가, 파티, OTT 등 서비스 API를 제공하는 S
 | Web | Spring Web MVC | HTTP 요청 처리 |
 | Validation | Jakarta Validation | 요청 데이터 검증 |
 | Monitoring | Spring Boot Actuator | 애플리케이션 상태 확인 |
+| Persistence | Spring Data JPA, PostgreSQL | 서비스 데이터 저장 |
+| Migration | Flyway | DB 스키마 버전 관리 |
 | Build | Gradle 9.7.1 Wrapper | 빌드, 테스트 및 의존성 관리 |
-| Test | JUnit 5, Spring Boot Test | 단위·통합 테스트 |
+| Test | JUnit 5, Spring Boot Test, Testcontainers | 단위·통합 테스트, 마이그레이션 검증 |
 | Utility | Lombok | 반복 코드 축소 |
 | Container | Docker, Eclipse Temurin 21 | 운영 이미지 빌드 및 실행 |
 
@@ -117,6 +119,33 @@ Refresh Token은 사용될 때마다 회전하며, 폐기된 토큰이 다시 �
 구분의 API만 허용 목록에 등록합니다. 규칙을 빠뜨린 새 API가 조용히 열리지 않도록 한 것이므로,
 도메인의 공개 API를 추가할 때는 `SecurityConfig`의 허용 경로에 함께 등록해야 합니다. 이
 파일은 전원이 공유하는 공통 계약 파일이라 변경 시 `AGENTS.md` 5장에 따라 영향 범위를 알립니다.
+
+## DB 마이그레이션
+
+스키마는 Flyway가 관리합니다. 규칙과 정책은
+[물리 스키마 규칙과 마이그레이션 정책](../docs/db-schema-convention.md)을 따릅니다.
+
+- 위치: `src/main/resources/db/migration`
+- 파일명: `V<YYYYMMDDHHmm>__<설명>.sql` — 담당 3인이 병렬로 작성하므로 순번 대신
+  타임스탬프를 씁니다.
+- 모든 프로파일에서 애플리케이션 기동 시 자동 적용됩니다. `ddl-auto`는 `none`을 유지하며
+  스키마의 유일한 출처는 마이그레이션입니다.
+- **이미 적용된 마이그레이션 파일은 수정하지 않습니다.** 체크섬 검증에 걸려 다른 사람의
+  애플리케이션이 기동에 실패합니다. 잘못된 내용은 새 마이그레이션으로 고칩니다.
+- 병합 순서와 버전 순서가 어긋나 로컬 기동이 실패하면 DB 볼륨을 지우고 다시 만듭니다.
+
+로컬 PostgreSQL은 인프라와 합의한 것과 같은 이미지를 써야 합니다. 순정 `postgres`
+이미지에는 pgvector가 없어 확장 생성이 실패합니다.
+
+```bash
+docker run -d --name feelm-postgres -p 5432:5432 \
+  -e POSTGRES_DB=feelm -e POSTGRES_USER=feelm -e POSTGRES_PASSWORD=feelm \
+  -e POSTGRES_INITDB_ARGS=--locale=C.UTF-8 -e TZ=UTC \
+  pgvector/pgvector:0.8.6-pg17-bookworm
+```
+
+마이그레이션 자체는 `V1MigrationTest`가 Testcontainers로 실제 PostgreSQL에 적용해
+검증합니다. 실행에 Docker가 필요하며, Docker가 없으면 이 테스트만 실패합니다.
 
 ## 로컬 실행
 
