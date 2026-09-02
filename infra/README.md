@@ -104,6 +104,206 @@ sudo chown -R "$USER:$USER" <repo>/.git
 - `compose/distributed.yml`
   - J15E106A 분산 처리 구성
 
+- `compose/local.yml`
+  - 로컬 개발에서만 필요한 포트 바인딩을 `compose/service.yml`에 추가하는 오버레이
+
+## PostgreSQL Runtime
+
+PostgreSQL은 서비스 영속 데이터를 저장하며 J15E106 서비스 노드에서
+`pgvector/pgvector:0.8.6-pg17-bookworm` 이미지를 digest로 고정해 실행합니다. PostgreSQL
+메이저 버전은 17, pgvector 버전은 0.8.6이며 데이터는 `postgres_data` Named Volume에
+저장합니다. 로컬과 서비스 서버는 같은 이미지와 초기화 설정을 사용합니다.
+
+이 구성은 PostgreSQL 런타임 제공만 담당합니다. 업무 테이블, Flyway 등 Migration,
+인덱스, PostgreSQL 확장 생성과 기준정보 Seed는 백엔드 DB 스키마 업무에서 별도로
+관리합니다. 이미지에는 `vector` 확장 파일이 포함되어 있으며, 후속 Flyway Migration에서
+`vector`와 `pg_trgm` 확장을 `CREATE EXTENSION IF NOT EXISTS`로 생성합니다.
+
+데이터베이스는 최초 초기화 시 `C.UTF-8` 로케일을 사용하고 서버 타임존은 UTC로
+고정합니다. 로케일은 데이터 디렉터리 생성 후 변경할 수 없으므로 기존 볼륨에 설정을
+소급 적용하려면 데이터를 백업한 뒤 해당 PostgreSQL 볼륨을 재생성해야 합니다.
+
+### Environment
+
+예시 파일을 복사해 실제 환경 파일을 준비합니다. 실제 비밀번호가 들어 있는
+`infra/.env`는 Git에 추가하지 않습니다.
+
+```bash
+cp infra/.env.example infra/.env
+```
+
+```dotenv
+POSTGRES_DB=feelm
+POSTGRES_USER=feelm
+POSTGRES_PASSWORD=<필수 비밀번호>
+```
+
+Spring Boot를 호스트에서 실행하고 로컬 PostgreSQL 컨테이너에 연결할 때는 다음 주소를
+사용합니다. 백엔드 환경변수 목록은 `backend/.env.example`에서 관리합니다.
+
+```dotenv
+DB_URL=jdbc:postgresql://localhost:5432/feelm
+DB_USERNAME=feelm
+DB_PASSWORD=<POSTGRES_PASSWORD와 같은 값>
+```
+
+백엔드도 PostgreSQL과 같은 Compose 네트워크의 컨테이너로 실행할 때는 호스트 이름을
+Compose 서비스명인 `postgres`로 변경합니다.
+
+```dotenv
+DB_URL=jdbc:postgresql://postgres:5432/feelm
+```
+
+### Local Startup
+
+로컬에서는 `compose/local.yml`을 함께 적용해 PostgreSQL을
+`127.0.0.1:5432`에만 바인딩합니다. 외부 인터페이스에는 포트를 공개하지 않습니다.
+
+```bash
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  -f infra/compose/local.yml \
+  config
+
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  -f infra/compose/local.yml \
+  up -d postgres
+```
+
+포트 바인딩은 다음 명령으로 확인합니다. 결과가 `127.0.0.1:5432`를 가리켜야 합니다.
+
+```bash
+docker port feelm-postgres 5432
+```
+
+### Service Server Startup
+
+J15E106에서는 로컬 오버레이 없이 실행합니다. 기본 `service.yml`은 PostgreSQL 포트를
+호스트에 게시하지 않으며, 같은 Compose 네트워크의 서비스만 `postgres:5432`로 접근합니다.
+
+```bash
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  config
+
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  up -d postgres
+```
+
+### Health and Connection Verification
+
+컨테이너 상태와 PostgreSQL 준비 상태를 확인합니다.
+
+```bash
+docker ps --filter name=feelm-postgres
+
+docker exec feelm-postgres sh -c \
+  'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+`docker ps`에서 상태가 `healthy`이고 `pg_isready`가 `accepting connections`를 반환해야
+합니다. 이어서 실제 SQL 실행을 확인합니다.
+
+```bash
+docker exec feelm-postgres sh -c \
+  'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT 1;"'
+```
+
+초기화 로케일과 서버 타임존을 확인합니다. `Collate`와 `Ctype`은 `C.UTF-8`, 타임존은
+`UTC`여야 합니다.
+
+```bash
+docker exec feelm-postgres psql -U feelm -d feelm -c "\l feelm"
+docker exec feelm-postgres psql -U feelm -d feelm -c "SHOW timezone;"
+```
+
+### Extension Availability Verification
+
+이 인프라 업무에서는 PostgreSQL 확장을 직접 생성하지 않습니다. `vector`와 `pg_trgm`
+확장의 실제 생성은 후속 Flyway Migration에서 관리합니다.
+
+PostgreSQL 이미지에서 두 확장을 사용할 수 있는지 확인합니다.
+
+```bash
+docker exec feelm-postgres psql -U feelm -d feelm \
+  -c "SELECT name, default_version, installed_version
+      FROM pg_available_extensions
+      WHERE name IN ('vector', 'pg_trgm')
+      ORDER BY name;"
+```
+
+`vector`의 `default_version`이 0.8.6이고 `pg_trgm`도 조회되어야 합니다.
+`installed_version`은 아직 확장을 생성하지 않은 환경에서는 비어 있을 수 있으며 이는
+정상입니다. 확장 설치 상태의 기준은 후속 Flyway Migration입니다.
+
+pgvector 이미지에 포함된 확장 정의를 확인합니다.
+
+```bash
+docker exec feelm-postgres \
+  cat /usr/share/postgresql/17/extension/vector.control
+```
+
+`default_version = '0.8.6'`이 확인되어야 합니다. `vector.control`에는 `trusted = true`가
+없으므로, 향후 애플리케이션 계정을 비슈퍼유저로 분리할 때는 확장 생성용 Migration 계정
+또는 초기화 절차를 별도로 설계해야 합니다.
+
+### Persistence Verification
+
+검증용 테이블에 값을 저장하고 컨테이너를 재시작합니다.
+
+```bash
+docker exec feelm-postgres sh -c \
+  'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+  -c "CREATE TABLE IF NOT EXISTS infra_persistence_check (value text NOT NULL); \
+      TRUNCATE infra_persistence_check; \
+      INSERT INTO infra_persistence_check VALUES ('"'"'persisted'"'"');"'
+
+docker restart feelm-postgres
+```
+
+재기동 후 컨테이너가 다시 `healthy`가 되면 저장한 값을 조회합니다.
+
+```bash
+docker exec feelm-postgres sh -c \
+  'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+  -c "SELECT value FROM infra_persistence_check;"'
+```
+
+`persisted`가 출력되면 Named Volume의 데이터 보존이 정상입니다. 확인이 끝나면 검증용
+테이블을 제거합니다.
+
+```bash
+docker exec feelm-postgres sh -c \
+  'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+  -c "DROP TABLE infra_persistence_check;"'
+```
+
+### Stop and Recovery
+
+일반 종료와 재기동은 Named Volume을 유지합니다.
+
+```bash
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  stop postgres
+
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  up -d postgres
+```
+
+기동 실패 시 컨테이너 상태와 로그를 먼저 확인합니다.
+
+```bash
+docker inspect feelm-postgres --format '{{json .State.Health}}'
+docker logs --tail 100 feelm-postgres
+```
+
+`docker compose down -v` 또는 `docker volume rm`은 `postgres_data`를 삭제해 데이터 복구가
+어려울 수 있으므로 데이터 초기화가 명시적으로 필요한 경우 외에는 사용하지 않습니다.
+
 ## Spark 2-Worker Standalone Cluster
 
 Spark는 J15E106A의 Master·Worker 2와 J15E106의 Worker 1로 구성합니다. 각 Worker는
