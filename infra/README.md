@@ -872,12 +872,16 @@ GitLab에서 관리하고 서버에서 직접 수정하지 않습니다.
 ### Pipeline and Deployment
 
 Merge Request Pipeline은 백엔드 테스트와 Spotless 검사를 실행합니다. `develop`에 병합되면
-`backend-image` Job이 다음 형식의 변경 불가능한 이미지 태그를 GitLab Registry에
+`backend-image` Job이 다음 형식의 변경 불가능한 이미지 태그를 Docker Hub에
 Push합니다.
 
 ```text
-<CI_REGISTRY_IMAGE>/backend:<CI_COMMIT_SHA>
+<DOCKERHUB_NAMESPACE>/feelm-backend:<CI_COMMIT_SHA>
 ```
+
+Docker Hub 로그인에는 GitLab CI/CD Variables의 `DOCKERHUB_USERNAME`과
+`DOCKERHUB_TOKEN`을 사용합니다. 저장소 경로는 `DOCKERHUB_NAMESPACE`로 구성하며 토큰은
+Masked로 관리하고 로그에 출력하지 않습니다.
 
 이미지 빌드가 성공한 뒤 승인된 사용자가 수동 `deploy-backend` Job을 실행합니다. 배포
 스크립트는 실행 중인 이미지 이름을 먼저 보관하고 후보 이미지를 기동한 뒤 최대 2분 동안
@@ -924,7 +928,7 @@ docker exec feelm-postgres sh -c \
 
 ```bash
 ./infra/scripts/rollback-backend.sh \
-  <CI_REGISTRY_IMAGE>/backend:<정상-CI_COMMIT_SHA>
+  <DOCKERHUB_NAMESPACE>/feelm-backend:<정상-CI_COMMIT_SHA>
 ```
 
 롤백 후 `docker inspect`의 실행 이미지가 지정한 SHA 태그와 일치하고 상태가 healthy인지

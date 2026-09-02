@@ -33,9 +33,9 @@ backend-image:
   needs:
     - backend-test
   before_script:
-    - printf '%s' "$CI_JOB_TOKEN" | docker login -u gitlab-ci-token --password-stdin "$CI_REGISTRY"
+    - printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
   script:
-    - BACKEND_IMAGE="$CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA"
+    - BACKEND_IMAGE="$DOCKERHUB_NAMESPACE/feelm-backend:$CI_COMMIT_SHA"
     - docker build --pull -t "$BACKEND_IMAGE" ./backend
     - docker push "$BACKEND_IMAGE"
     - echo "Built backend image $BACKEND_IMAGE"
@@ -52,9 +52,9 @@ deploy-backend:
   environment:
     name: service
   before_script:
-    - printf '%s' "$CI_JOB_TOKEN" | docker login -u gitlab-ci-token --password-stdin "$CI_REGISTRY"
+    - printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
   script:
-    - BACKEND_IMAGE="$CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA"
+    - BACKEND_IMAGE="$DOCKERHUB_NAMESPACE/feelm-backend:$CI_COMMIT_SHA"
     - ./infra/scripts/deploy-backend.sh "$BACKEND_IMAGE"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
