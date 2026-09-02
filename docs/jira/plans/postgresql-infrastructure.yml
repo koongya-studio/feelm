@@ -1,0 +1,22 @@
+tasks:
+- id: postgresql-runtime-infrastructure
+  issue_type: Task
+  summary: '[인프라] PostgreSQL 개발·스테이징 실행환경 구성'
+  description: 서비스 영속 데이터 저장소인 PostgreSQL을 로컬 개발환경과 J15E106 서비스 서버에서 동일한 방식으로 실행할 수 있도록 버전, Docker Compose
+    서비스, 영속 볼륨, 헬스체크, 네트워크 및 환경변수 계약을 구성하고 검증한다. 이 업무는 데이터베이스 런타임 제공만을 범위로 하며 업무 테이블 설계, Flyway 등 Migration
+    도입, 스키마·인덱스·확장 기능 생성과 기준정보 Seed는 포함하지 않는다.
+  epic: S15P21E106-38
+  story_points: 5
+  sprint: active
+  done_when:
+  - 팀에서 사용할 PostgreSQL 버전이 확정되고 이미지 태그가 고정된다.
+  - J15E106용 Docker Compose에서 PostgreSQL 컨테이너가 재현 가능하게 기동된다.
+  - 데이터 디렉터리가 Named Volume에 저장되고 컨테이너 재시작 후에도 데이터베이스와 검증 데이터가 유지된다.
+  - PostgreSQL 헬스체크가 구성되고 정상 기동과 비정상 상태를 확인할 수 있다.
+  - 데이터베이스명, 사용자명, 비밀번호와 Spring Boot 접속 URL의 환경변수 계약이 .env.example 및 관련 문서에 반영된다.
+  - 실제 비밀번호와 서버별 설정값이 저장소, 이미지 및 로그에 포함되지 않는다.
+  - 5432 포트의 로컬 개발 및 EC2 사설망 접근 범위가 정의되고 인터넷에 직접 공개되지 않는다.
+  - psql 또는 동등한 클라이언트에서 접속과 SELECT 1 실행이 성공한다.
+  - 기동, 종료, 상태 확인, 데이터 보존과 기본 장애 대응 절차가 infra/README.md에 문서화된다.
+  - 업무 테이블, Migration, 인덱스, PostgreSQL 확장 및 Seed 데이터가 후속 DB 스키마 업무 범위로 명시된다.
+  jira_key: S15P21E106-177

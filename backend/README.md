@@ -81,6 +81,10 @@ UPPER_SNAKE_CASE로 작성합니다. API 계약에 없는 공통 코드를 추�
 변수 목록과 용도는 [`.env.example`](./.env.example)에서 관리합니다. 실제 값은 커밋하지
 않는 개인 `.env`에만 둡니다([Secret 및 환경변수 관리 규칙](../docs/secret-environment-variables.md)).
 
+환경변수 이름과 로컬 접속 예시는 `backend/.env.example`을 기준으로 합니다. `.env.example`은
+변수 계약 문서이며 Spring Boot가 `.env` 파일을 자동으로 읽지는 않으므로, 실행 시 셸이나
+IDE 실행 설정을 통해 실제 값을 주입합니다.
+
 dev 실행 예시: `./gradlew bootRun --args='--spring.profiles.active=dev'`
 
 ## 인증
