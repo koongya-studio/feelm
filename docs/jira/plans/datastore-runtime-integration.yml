@@ -1,17 +1,18 @@
 tasks:
-  - id: staging-deployment-datastore-update
+  - id: service-deployment-rollback
     issue_type: Task
-    summary: '[인프라] 스테이징 서버 배포 및 롤백 절차 구성'
+    summary: '[인프라] 서비스 서버 사전 배포 검증 및 롤백 절차 구성'
     description: >-
-      GitLab Registry의 검증된 이미지를 스테이징 서버에 배포하고 장애 시 이전 버전으로
-      복구할 수 있는 최소 배포 절차를 구성한다. PostgreSQL과 Redis 실행환경이 별도
-      업무에서 제공되므로, 백엔드 컨테이너의 실제 데이터 저장소 연결, Flyway 적용,
-      헬스체크 실패와 롤백 검증을 배포 완료 조건에 포함한다.
+      별도의 스테이징 서버 없이 J15E106 단일 서비스 서버에서 검증된 GitLab Registry
+      이미지를 사전 배포 검증한 뒤 서비스에 반영하고, 장애 시 직전 정상 버전으로
+      복구할 수 있는 배포·롤백 절차를 구성한다. J15E106A는 분산 처리 전용 서버로
+      유지하며 백엔드 서비스 배포 대상에서 제외한다. 로컬에서 공통 Docker Compose로
+      검증한 PostgreSQL과 Redis 구성을 J15E106에 적용한다.
     epic: S15P21E106-38
     story_points: 8
     sprint: active
     done_when:
-      - 스테이징 서버의 네트워크, 저장공간, 런타임 및 접근 권한 전제조건이 확인된다.
+      - J15E106의 네트워크, 저장공간, 런타임 및 접근 권한 전제조건이 확인된다.
       - 승인된 사용자 또는 보호 브랜치만 배포를 실행할 수 있다.
       - 배포 대상 이미지 버전과 실행 중인 버전을 확인할 수 있다.
       - 백엔드 컨테이너에 dev 프로파일과 DB·Redis 접속 환경변수가 Secret으로 주입된다.
