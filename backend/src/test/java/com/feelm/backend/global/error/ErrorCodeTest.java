@@ -41,9 +41,33 @@ class ErrorCodeTest {
     }
 
     @Test
-    @DisplayName("공통 오류 코드는 11종이다 — 도메인 세부 코드는 각 도메인 업무에서 추가한다")
-    void containsExactlyElevenCommonCodes() {
-        assertThat(ErrorCode.values()).hasSize(11);
+    @DisplayName("등록된 오류 코드는 공통 11종과 도메인 코드뿐이다 — 도메인 코드는 각 도메인 업무에서 추가한다")
+    void containsOnlyRegisteredCodes() {
+        assertThat(ErrorCode.values())
+                .extracting(Enum::name)
+                .containsExactlyInAnyOrder(
+                        // API-000 공통 오류 코드 표 11종
+                        "VALIDATION_FAILED",
+                        "UNAUTHORIZED",
+                        "TOKEN_EXPIRED",
+                        "FORBIDDEN",
+                        "RESOURCE_NOT_FOUND",
+                        "METHOD_NOT_ALLOWED",
+                        "CONFLICT",
+                        "UNSUPPORTED_MEDIA_TYPE",
+                        "RATE_LIMITED",
+                        "INTERNAL_ERROR",
+                        "RECOMMENDATION_UNAVAILABLE",
+                        // 인증 도메인 — API-006 토큰 재발급 전용
+                        "REFRESH_TOKEN_INVALID",
+                        "REFRESH_TOKEN_EXPIRED");
+    }
+
+    @Test
+    @DisplayName("API-006 재발급 전용 코드는 401로 매핑된다")
+    void refreshTokenCodesAreUnauthorized() {
+        assertThat(ErrorCode.REFRESH_TOKEN_INVALID.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(ErrorCode.REFRESH_TOKEN_EXPIRED.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test

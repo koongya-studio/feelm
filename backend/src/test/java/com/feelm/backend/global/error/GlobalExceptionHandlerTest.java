@@ -9,11 +9,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+// 인증 필터를 끄고 예외 처리 자체만 검증한다. 인증 실패 응답은 AuthContractTest가 다룬다.
+@AutoConfigureMockMvc(addFilters = false)
 @WebMvcTest(controllers = ErrorContractTestController.class)
 @Import(GlobalExceptionHandler.class)
 @DisplayName("GlobalExceptionHandler — API-000 오류 응답 형식")

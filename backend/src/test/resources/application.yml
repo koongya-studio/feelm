@@ -8,3 +8,22 @@ spring:
     hibernate:
       ddl-auto: create-drop
     open-in-view: false
+
+feelm:
+  jwt:
+    # 테스트 전용 값이며 실제 환경의 Secret과 무관하다.
+    secret: feelm-test-signing-key-for-hs256-at-least-32-bytes
+    access-token-ttl: 30m
+    refresh-token-ttl: 14d
+    refresh-cookie:
+      name: refresh_token
+      path: /api/v1/auth
+      # 테스트의 MockMvc는 평문 요청이므로 Secure 속성을 끈다. 운영 기본값은 true다.
+      secure: false
+      same-site: Lax
+  auth:
+    allowed-origins:
+      - http://localhost:5173
+    mock:
+      enabled: false
+      user-id: 1

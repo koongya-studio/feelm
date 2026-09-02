@@ -5,7 +5,15 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 public record ErrorResponse(
         String code, String message, @JsonInclude(JsonInclude.Include.NON_NULL) Object details) {
 
-    static ErrorResponse from(ErrorCode errorCode, Object details) {
+    /**
+     * 오류 응답 본문을 만드는 단일 지점이다. Security 필터처럼 {@code @RestControllerAdvice}가 처리하지 못하는 위치에서도 같은 형식을 쓰도록
+     * 공개한다.
+     */
+    public static ErrorResponse from(ErrorCode errorCode, Object details) {
         return new ErrorResponse(errorCode.name(), errorCode.getMessage(), details);
+    }
+
+    public static ErrorResponse from(ErrorCode errorCode) {
+        return from(errorCode, null);
     }
 }

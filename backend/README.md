@@ -31,14 +31,15 @@ Spring Boot DevTools는 개발 환경에서만 사용하며 운영 실행 이미
 ```text
 com.feelm.backend
 ├── domain            # 도메인 기준 분할 (아래 담당 표 참고)
-│   ├── user, onboarding, ott
+│   ├── auth, user, onboarding, ott
 │   ├── search, movie, watch, social, report, trend
 │   └── taste, recommendation, party
 ├── global            # 여러 도메인이 공유하는 공통 코드
 │   ├── config
 │   ├── entity
 │   ├── error
-│   └── response
+│   ├── response
+│   └── security      # 토큰 발급·검증, 인증 필터, 인가·CORS 정책
 └── infrastructure    # Kafka, Redis, 외부 API 등 외부 시스템 연결(필요 시 생성)
 ```
 
@@ -47,7 +48,7 @@ com.feelm.backend
 
 | 담당 | 도메인 패키지 |
 | --- | --- |
-| A (계정·온보딩) | `user`, `onboarding`, `ott` |
+| A (계정·온보딩) | `auth`, `user`, `onboarding`, `ott` |
 | B (콘텐츠·감상·소셜) | `search`, `movie`, `watch`, `social`, `report`, `trend` |
 | C (취향·추천·파티) | `taste`, `recommendation`, `party` |
 
@@ -68,8 +69,54 @@ UPPER_SNAKE_CASE로 작성합니다. API 계약에 없는 공통 코드를 추�
 | `DB_URL` | `jdbc:postgresql://localhost:5432/feelm` | 필수 |
 | `DB_USERNAME` | `feelm` | 필수 |
 | `DB_PASSWORD` | `feelm` | 필수 |
+| `REDIS_HOST` | `localhost` | 필수 |
+| `REDIS_PORT` | `6379` | `6379` |
+| `JWT_SECRET` | **필수(기본값 없음)** | 필수 |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | 필수 |
+| `AUTH_MOCK_ENABLED` | `true` | `true` |
+| `AUTH_MOCK_USER_ID` | `1` | `1` |
+
+변수 목록과 용도는 [`.env.example`](./.env.example)에서 관리합니다. 실제 값은 커밋하지
+않는 개인 `.env`에만 둡니다([Secret 및 환경변수 관리 규칙](../docs/secret-environment-variables.md)).
 
 dev 실행 예시: `./gradlew bootRun --args='--spring.profiles.active=dev'`
+
+## 인증
+
+인증 방식은 [ADR-0009](../docs/adr/0009-jwt-auth-httponly-refresh-redis.md)와
+[API 공통 규약](../docs/api/README.md#인증-및-권한)을 따릅니다. 구현은
+`global/security`(토큰·필터·정책)와 `domain/auth`(재발급·폐기)로 나뉩니다.
+
+### 보안 설정값
+
+| 설정 | 기본값 | 근거 |
+| --- | --- | --- |
+| `feelm.jwt.access-token-ttl` | `30m` | 무상태라 취소할 수 없어 짧게 유지 |
+| `feelm.jwt.refresh-token-ttl` | `14d` | Redis에서 폐기 가능하므로 길게 허용 |
+| `feelm.jwt.refresh-cookie.name` | `refresh_token` | API-000 |
+| `feelm.jwt.refresh-cookie.path` | `/api/v1/auth` | 다른 API 요청에는 쿠키를 싣지 않음 |
+| `feelm.jwt.refresh-cookie.secure` | `true` | 평문 전송 차단. `localhost`는 브라우저가 예외로 허용 |
+| `feelm.jwt.refresh-cookie.same-site` | `Lax` | 크로스 사이트 요청의 CSRF 차단 |
+| `feelm.auth.allowed-origins` | 비어 있음 | 쿠키 전송에 `credentials`가 필요해 와일드카드를 쓸 수 없음 |
+
+서명은 HS256 대칭키를 사용하며 `JWT_SECRET`은 최소 32바이트여야 합니다. 소스에 기본값을
+두지 않으므로 값이 없으면 기동에 실패합니다.
+
+Refresh Token은 사용될 때마다 회전하며, 폐기된 토큰이 다시 들어오면 탈취로 간주해 해당
+사용자의 Refresh Token을 모두 폐기합니다(API-006 처리 규칙).
+
+### 개발용 mock 인증
+
+로그인(API-004)이 구현되기 전까지 회원 API를 호출할 수 있도록, `AUTH_MOCK_ENABLED=true`인
+환경에서는 인증 없는 요청에 고정 사용자를 주입합니다. **인증을 무력화하는 임시 장치이므로
+로그인이 병합되면 제거합니다.** 실제 토큰 흐름을 확인하려면 `AUTH_MOCK_ENABLED=false`로 끕니다.
+
+### 공개 경로 추가
+
+`SecurityConfig`는 기본 정책을 "인증 필요"로 두고, 비회원도 호출할 수 있는 **공개**·**선택**
+구분의 API만 허용 목록에 등록합니다. 규칙을 빠뜨린 새 API가 조용히 열리지 않도록 한 것이므로,
+도메인의 공개 API를 추가할 때는 `SecurityConfig`의 허용 경로에 함께 등록해야 합니다. 이
+파일은 전원이 공유하는 공통 계약 파일이라 변경 시 `AGENTS.md` 5장에 따라 영향 범위를 알립니다.
 
 ## 로컬 실행
 
@@ -87,6 +134,26 @@ $env:JAVA_HOME = "C:\경로\jdk-21"
 # Linux/macOS
 export JAVA_HOME=/경로/jdk-21
 ```
+
+### 환경변수 주입
+
+`.env` 파일은 `bootRun`이 자동으로 읽지 않습니다. `JWT_SECRET`은 기본값이 없어
+주입하지 않으면 기동에 실패하므로, 실행 전에 `.env`의 값을 셸 환경변수로 올립니다.
+
+```powershell
+# Windows (PowerShell). backend 디렉터리의 .env를 현재 셸에 적용합니다.
+Get-Content .env | Where-Object { $_ -match '^\s*[^#\s].*=' } | ForEach-Object {
+    $name, $value = $_ -split '=', 2
+    [Environment]::SetEnvironmentVariable($name.Trim(), $value.Trim(), 'Process')
+}
+```
+
+```bash
+# Linux/macOS
+set -a && . ./.env && set +a
+```
+
+IDE에서 실행할 때는 실행 구성의 환경변수 항목에 같은 값을 등록합니다.
 
 ### Windows
 
@@ -127,8 +194,12 @@ Docker 이미지는 JDK 21 빌드 단계와 JRE 21 실행 단계가 분리된 �
 
 ```bash
 docker build -t feelm-backend .
-docker run --rm -p 8080:8080 --name feelm-backend feelm-backend
+docker run --rm -p 8080:8080 --env-file .env --name feelm-backend feelm-backend
 ```
+
+컨테이너도 `.env`를 자동으로 읽지 않으므로 `--env-file`로 전달합니다. 호스트의
+PostgreSQL과 Redis에 붙는 경우 `.env`의 `DB_URL`과 `REDIS_HOST`는 `localhost` 대신
+`host.docker.internal`을 가리켜야 합니다.
 
 `.dockerignore`를 통해 Secret, 로컬 빌드 산출물과 IDE 설정 파일이 빌드 컨텍스트에서
 제외됩니다.

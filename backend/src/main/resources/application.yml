@@ -7,3 +7,21 @@ spring:
     hibernate:
       ddl-auto: none
     open-in-view: false
+
+feelm:
+  jwt:
+    # 필수 Secret. 기본값을 두지 않으므로 값이 없으면 기동에 실패한다.
+    secret: ${JWT_SECRET}
+    access-token-ttl: 30m
+    refresh-token-ttl: 14d
+    refresh-cookie:
+      name: refresh_token
+      path: /api/v1/auth
+      secure: true
+      same-site: Lax
+  auth:
+    # 쿠키를 주고받으려면 credentials가 필요하고, 그때는 와일드카드를 쓸 수 없어 환경별로 명시한다.
+    allowed-origins: []
+    mock:
+      enabled: false
+      user-id: 1
