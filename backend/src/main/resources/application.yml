@@ -3,8 +3,16 @@ spring:
     name: backend
   profiles:
     default: local
+  flyway:
+    enabled: true
+    # 빈 DB에서 시작하므로 baseline이 필요 없다.
+    baseline-on-migrate: false
+    validate-on-migrate: true
+    # 병렬 작성으로 버전 순서가 어긋나면 로컬은 볼륨을 재생성한다.
+    out-of-order: false
   jpa:
     hibernate:
+      # 스키마의 유일한 출처는 Flyway 마이그레이션이다.
       ddl-auto: none
     open-in-view: false
 

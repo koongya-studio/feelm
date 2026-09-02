@@ -4,6 +4,10 @@ spring:
     username: sa
     password:
     driver-class-name: org.h2.Driver
+  flyway:
+    # 기본 테스트는 H2를 쓴다. Flyway SQL은 PostgreSQL 문법이라 실행되지 않으므로 끈다.
+    # 마이그레이션 자체는 V1MigrationTest가 실제 PostgreSQL에서 검증한다.
+    enabled: false
   jpa:
     hibernate:
       ddl-auto: create-drop
