@@ -1,0 +1,79 @@
+tasks:
+  - id: staging-deployment-datastore-update
+    issue_type: Task
+    summary: '[인프라] 스테이징 서버 배포 및 롤백 절차 구성'
+    description: >-
+      GitLab Registry의 검증된 이미지를 스테이징 서버에 배포하고 장애 시 이전 버전으로
+      복구할 수 있는 최소 배포 절차를 구성한다. PostgreSQL과 Redis 실행환경이 별도
+      업무에서 제공되므로, 백엔드 컨테이너의 실제 데이터 저장소 연결, Flyway 적용,
+      헬스체크 실패와 롤백 검증을 배포 완료 조건에 포함한다.
+    epic: S15P21E106-38
+    story_points: 8
+    sprint: active
+    done_when:
+      - 스테이징 서버의 네트워크, 저장공간, 런타임 및 접근 권한 전제조건이 확인된다.
+      - 승인된 사용자 또는 보호 브랜치만 배포를 실행할 수 있다.
+      - 배포 대상 이미지 버전과 실행 중인 버전을 확인할 수 있다.
+      - 백엔드 컨테이너에 dev 프로파일과 DB·Redis 접속 환경변수가 Secret으로 주입된다.
+      - 백엔드 컨테이너가 Compose 서비스명 postgres:5432로 PostgreSQL에 연결된다.
+      - 백엔드 컨테이너가 Compose 서비스명 redis:6379로 Redis에 연결된다.
+      - 최초 배포 시 Flyway 마이그레이션이 정상 적용되고 flyway_schema_history에서 성공 상태를 확인한다.
+      - 재배포 시 적용된 Flyway 마이그레이션이 중복 실행되지 않는다.
+      - 배포 후 /actuator/health에서 PostgreSQL과 Redis를 포함한 애플리케이션 상태가 정상으로 확인된다.
+      - 데이터 저장소 연결 또는 서비스 헬스체크 실패 시 배포가 중단되고 직전 정상 이미지로 복구된다.
+      - 직전 정상 이미지로 롤백하는 절차가 실제로 검증된다.
+      - 서버의 Secret은 저장소와 이미지 밖에서 주입되고 로그에 노출되지 않는다.
+      - 배포, 검증, 롤백 및 기본 장애 대응 절차가 infra/README.md에 문서화된다.
+    jira_key: S15P21E106-89
+
+  - id: redis-runtime-infrastructure
+    issue_type: Task
+    summary: '[인프라] Redis 개발·스테이징 실행환경 구성'
+    description: >-
+      Refresh Token과 추천 결과·사용자 벡터·실시간 Feature 저장에 사용할 Redis를
+      로컬 개발환경과 J15E106 서비스 서버에서 동일한 방식으로 실행할 수 있도록 버전,
+      Docker Compose 서비스, 헬스체크, 네트워크, 영속성, 메모리 및 환경변수 계약을
+      구성하고 검증한다. Refresh Token Repository 구현, 추천 Key·TTL 구현, Spark 적재,
+      Redis Cluster·Sentinel 고가용성 구성은 범위에 포함하지 않는다.
+    epic: S15P21E106-38
+    story_points: 5
+    sprint: active
+    done_when:
+      - 팀에서 사용할 Redis 버전과 이미지 digest가 고정된다.
+      - 로컬과 J15E106에서 동일한 Redis 이미지와 설정을 사용한다.
+      - Redis 컨테이너에 healthcheck와 재시작 정책이 구성된다.
+      - 로컬에서는 127.0.0.1:6379로만 접근할 수 있다.
+      - J15E106에서는 호스트에 6379를 게시하지 않고 같은 Compose 네트워크에서 redis:6379로 접근한다.
+      - REDIS_HOST, REDIS_PORT와 필요한 인증 환경변수 계약이 예시 파일과 관련 문서에 반영된다.
+      - redis-cli PING이 PONG을 반환하고 기본 Key 저장·조회·삭제가 정상 동작한다.
+      - Refresh Token과 추천 데이터의 요구사항을 고려해 AOF·RDB 영속성 및 재시작 후 데이터 보존 정책이 확정된다.
+      - 메모리 상한과 maxmemory-policy가 확정되고 인증 데이터가 캐시 축출 정책으로 유실되지 않도록 근거가 기록된다.
+      - 컨테이너 재생성 또는 재시작 후 유지 대상으로 정한 데이터의 보존 여부가 검증된다.
+      - 실제 비밀번호와 서버 주소가 저장소, 이미지 및 로그에 포함되지 않는다.
+      - 기동, 종료, 상태 확인, 데이터 보존 및 장애 대응 절차가 infra/README.md에 문서화된다.
+    jira_key: S15P21E106-182
+
+  - id: backend-postgresql-compose-integration
+    issue_type: Task
+    summary: '[백엔드] PostgreSQL Compose 연동 및 Flyway 기동 검증'
+    description: >-
+      S15P21E106-177의 공통 PostgreSQL Compose 실행환경과 S15P21E106-178의 Flyway
+      마이그레이션을 실제 Spring Boot local 프로파일에서 통합 검증한다. 백엔드 문서의
+      독립 docker run 안내를 공통 Compose 방식으로 통일하고, 환경변수 주입, 최초
+      마이그레이션, 재기동 멱등성 및 연결 실패 동작을 검증한다. 신규 스키마 설계와
+      마이그레이션 구현은 범위에 포함하지 않는다.
+    epic: S15P21E106-141
+    story_points: 2
+    sprint: active
+    done_when:
+      - infra/compose/service.yml과 infra/compose/local.yml로 실행한 PostgreSQL에 Spring Boot local 프로파일이 연결된다.
+      - backend/README.md의 독립 PostgreSQL docker run 안내가 공통 Compose 실행 방식으로 통일된다.
+      - DB_URL, DB_USERNAME, DB_PASSWORD가 backend/.env에서 정상 주입되고 실제 값은 저장소에 포함되지 않는다.
+      - 애플리케이션 최초 기동 시 기존 Flyway 마이그레이션이 정상 적용된다.
+      - flyway_schema_history에서 적용된 버전과 성공 상태를 확인할 수 있다.
+      - vector와 pg_trgm 확장이 Flyway에 의해 생성된다.
+      - users, movies, genres, otts, people, popcorn_flavors 공통 선행 테이블이 생성된다.
+      - 애플리케이션 재기동 시 기존 Flyway 마이그레이션이 중복 적용되지 않는다.
+      - 잘못된 DB 비밀번호 또는 접속 URL에서는 명확한 연결 오류와 함께 기동에 실패한다.
+      - 로컬 DB 연결, 초기화 및 장애 대응 절차가 backend/README.md에 문서화된다.
+    jira_key: S15P21E106-183

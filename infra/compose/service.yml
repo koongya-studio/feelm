@@ -36,6 +36,41 @@ services:
       retries: 5
       start_period: 10s
 
+  redis:
+    image: redis:8.2.9-alpine@sha256:30abb90e62f14b737010746def3ba99cc79fe19dcdb3d37b41f21fc62e7da19d
+    container_name: feelm-redis
+    restart: unless-stopped
+
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+
+    command:
+      - sh
+      - -c
+      - >-
+        exec redis-server
+        --requirepass "$$REDIS_PASSWORD"
+        --appendonly yes
+        --appendfsync everysec
+        --maxmemory 512mb
+        --maxmemory-policy noeviction
+
+    volumes:
+      - redis_data:/data
+
+    mem_limit: 768m
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "REDISCLI_AUTH=$${REDIS_PASSWORD} redis-cli --no-auth-warning ping | grep -q PONG"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   hdfs-datanode-1:
     image: apache/hadoop:3.4.3
     container_name: feelm-hdfs-datanode-1
@@ -95,4 +130,5 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
   hdfs_datanode_1:
