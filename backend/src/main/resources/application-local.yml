@@ -1,4 +1,7 @@
 spring:
+  config:
+    # IDE와 Gradle에서 같은 로컬 설정을 사용하도록 backend/.env를 불러온다.
+    import: optional:file:${LOCAL_ENV_FILE:.env}[.properties]
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/feelm}
     username: ${DB_USERNAME:feelm}
@@ -7,6 +10,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
 
 feelm:
   auth:

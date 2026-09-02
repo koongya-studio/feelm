@@ -73,6 +73,7 @@ UPPER_SNAKE_CASE로 작성합니다. API 계약에 없는 공통 코드를 추�
 | `DB_PASSWORD` | `feelm` | 필수 |
 | `REDIS_HOST` | `localhost` | 필수 |
 | `REDIS_PORT` | `6379` | `6379` |
+| `REDIS_PASSWORD` | **필수(기본값 없음)** | 필수 |
 | `JWT_SECRET` | **필수(기본값 없음)** | 필수 |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | 필수 |
 | `AUTH_MOCK_ENABLED` | `true` | `true` |
@@ -81,9 +82,9 @@ UPPER_SNAKE_CASE로 작성합니다. API 계약에 없는 공통 코드를 추�
 변수 목록과 용도는 [`.env.example`](./.env.example)에서 관리합니다. 실제 값은 커밋하지
 않는 개인 `.env`에만 둡니다([Secret 및 환경변수 관리 규칙](../docs/secret-environment-variables.md)).
 
-환경변수 이름과 로컬 접속 예시는 `backend/.env.example`을 기준으로 합니다. `.env.example`은
-변수 계약 문서이며 Spring Boot가 `.env` 파일을 자동으로 읽지는 않으므로, 실행 시 셸이나
-IDE 실행 설정을 통해 실제 값을 주입합니다.
+환경변수 이름과 로컬 접속 예시는 `backend/.env.example`을 기준으로 합니다. local 프로파일은
+실행 작업 디렉터리의 `.env`를 자동으로 읽습니다. dev 프로파일과 컨테이너 실행은 저장소 밖의
+환경변수 또는 Secret을 명시적으로 주입합니다.
 
 dev 실행 예시: `./gradlew bootRun --args='--spring.profiles.active=dev'`
 
@@ -170,23 +171,13 @@ export JAVA_HOME=/경로/jdk-21
 
 ### 환경변수 주입
 
-`.env` 파일은 `bootRun`이 자동으로 읽지 않습니다. `JWT_SECRET`은 기본값이 없어
-주입하지 않으면 기동에 실패하므로, 실행 전에 `.env`의 값을 셸 환경변수로 올립니다.
+local 프로파일은 작업 디렉터리의 `.env`를 Spring 설정 파일로 자동으로 읽습니다. IntelliJ,
+STS와 Gradle 모두 실행 작업 디렉터리를 `backend`로 지정합니다. 그러면 IDE 실행 설정에
+환경변수를 중복 등록할 필요가 없습니다.
 
-```powershell
-# Windows (PowerShell). backend 디렉터리의 .env를 현재 셸에 적용합니다.
-Get-Content .env | Where-Object { $_ -match '^\s*[^#\s].*=' } | ForEach-Object {
-    $name, $value = $_ -split '=', 2
-    [Environment]::SetEnvironmentVariable($name.Trim(), $value.Trim(), 'Process')
-}
-```
-
-```bash
-# Linux/macOS
-set -a && . ./.env && set +a
-```
-
-IDE에서 실행할 때는 실행 구성의 환경변수 항목에 같은 값을 등록합니다.
+다른 작업 디렉터리에서 실행해야 하면 `LOCAL_ENV_FILE`에 `.env`의 경로를 지정합니다.
+`LOCAL_ENV_FILE`은 `.env` 자체를 찾기 위한 부트스트랩 값이므로 IDE 실행 설정이나 셸에서
+주입합니다. dev 프로파일은 `.env`를 자동으로 읽지 않습니다.
 
 ### Windows
 

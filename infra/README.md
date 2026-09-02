@@ -304,6 +304,191 @@ docker logs --tail 100 feelm-postgres
 `docker compose down -v` 또는 `docker volume rm`은 `postgres_data`를 삭제해 데이터 복구가
 어려울 수 있으므로 데이터 초기화가 명시적으로 필요한 경우 외에는 사용하지 않습니다.
 
+## Redis Runtime
+
+Redis는 Refresh Token, 추천 결과, 사용자 Vector 및 실시간 Feature를 저장하며
+J15E106 서비스 노드에서 실행합니다. 로컬과 서비스 서버는 다음 이미지와 설정을 공유합니다.
+
+```text
+redis:8.2.9-alpine@sha256:30abb90e62f14b737010746def3ba99cc79fe19dcdb3d37b41f21fc62e7da19d
+```
+
+- 영속성: `redis_data:/data`, AOF `everysec`와 기본 RDB 정책
+- 메모리: Redis `512mb`, 컨테이너 `768m`
+- 축출 정책: 인증 데이터 보호를 위한 `noeviction`; 한도 도달 시 새 쓰기가 실패함
+- 네트워크: 로컬은 `127.0.0.1:6379`, J15E106은 호스트 포트 없이 내부 `redis:6379`
+
+Refresh Token Repository, 추천 Key와 TTL, Spark 적재 및 Redis Cluster·Sentinel
+구성은 이 실행환경 업무의 범위에 포함하지 않습니다.
+
+### Environment
+
+실제 Redis 비밀번호는 저장소에 포함되지 않는 `infra/.env`에 저장합니다.
+
+```dotenv
+REDIS_PASSWORD=<필수 비밀번호>
+```
+
+Spring Boot를 호스트에서 실행할 때는 다음 값을 `backend/.env`에 설정합니다.
+
+```dotenv
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=<infra/.env와 같은 값>
+```
+
+백엔드도 같은 Compose 네트워크에서 컨테이너로 실행하면 호스트 이름으로 Compose
+서비스명인 `redis`를 사용합니다. dev 프로파일과 컨테이너에는 승인된 Secret을 별도로
+주입하며 `.env`를 이미지나 저장소에 포함하지 않습니다.
+
+```dotenv
+REDIS_HOST=redis
+REDIS_PORT=6379
+```
+
+### Startup
+
+로컬은 `local.yml` 오버레이를 적용합니다.
+
+```bash
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  -f infra/compose/local.yml \
+  config --quiet
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  -f infra/compose/local.yml \
+  up -d redis
+docker port feelm-redis 6379
+```
+
+마지막 결과는 `127.0.0.1:6379`여야 합니다. J15E106에서는 `local.yml`을 제외합니다.
+
+```bash
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  config --quiet
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  up -d redis
+docker port feelm-redis 6379
+```
+
+J15E106의 마지막 명령은 출력이 없어야 하며 같은 Compose 네트워크에서는
+`redis:6379`로 접근해야 합니다.
+
+### Verification
+
+상태와 인증을 확인합니다. 비밀번호는 명령 인자 대신 `REDISCLI_AUTH`로 전달합니다.
+
+```bash
+docker ps --filter name=feelm-redis
+docker exec feelm-redis sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning PING'
+docker exec feelm-redis redis-cli PING
+```
+
+결과는 `healthy`, `PONG`, `NOAUTH Authentication required.`여야 합니다. 이어서 기본
+Key 저장·조회·삭제를 확인합니다.
+
+```bash
+docker exec feelm-redis sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning SET infra:check hello'
+docker exec feelm-redis sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning GET infra:check'
+docker exec feelm-redis sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning DEL infra:check'
+```
+
+각 결과는 순서대로 `OK`, `hello`, `(integer) 1`이어야 합니다.
+
+실행 설정도 확인합니다.
+
+```bash
+docker exec feelm-redis sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning CONFIG GET appendonly'
+docker exec feelm-redis sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning CONFIG GET appendfsync'
+docker exec feelm-redis sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning CONFIG GET maxmemory'
+docker exec feelm-redis sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning CONFIG GET maxmemory-policy'
+```
+
+결과는 각각 `yes`, `everysec`, `536870912`, `noeviction`이어야 합니다. Redis 기본 RDB
+저장 규칙은 별도로 덮어쓰지 않으므로 함께 유지됩니다.
+
+### Persistence and Backend Verification
+
+Key를 저장하고 재시작한 뒤 값이 남아 있는지 확인합니다. 이어서 Named Volume을 유지한
+채 컨테이너를 재생성하고 같은 값을 다시 조회합니다.
+
+```bash
+docker exec feelm-redis sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning SET infra:persistence persisted'
+docker restart feelm-redis
+docker exec feelm-redis sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning GET infra:persistence'
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  -f infra/compose/local.yml \
+  up -d --force-recreate redis
+docker exec feelm-redis sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning GET infra:persistence'
+docker exec feelm-redis sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning DEL infra:persistence'
+```
+
+두 조회 결과는 `persisted`여야 합니다. J15E106에서는 재생성 명령에서 `local.yml`을
+제외합니다.
+
+로컬 Spring Boot는 `backend`를 작업 디렉터리로 사용하면 local 프로파일에서
+`backend/.env`를 자동으로 읽습니다. 애플리케이션 기동 후 Actuator 상태를 확인합니다.
+
+```bash
+cd backend
+./gradlew bootRun
+```
+
+```bash
+curl http://localhost:8080/actuator/health
+```
+
+응답의 `status`가 `UP`이어야 합니다. dev 프로파일 또는 백엔드 컨테이너는 `.env`를
+자동으로 읽지 않습니다.
+
+### Stop and Recovery
+
+일반 종료와 재기동은 `redis_data` Named Volume을 유지합니다.
+
+```bash
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  stop redis
+
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  up -d redis
+```
+
+기동 또는 healthcheck 실패 시 상태, 로그, 메모리와 마운트를 확인합니다.
+
+```bash
+docker inspect feelm-redis --format '{{json .State.Health}}'
+docker logs --tail 100 feelm-redis
+docker stats feelm-redis --no-stream
+docker inspect feelm-redis \
+  --format '{{range .Mounts}}{{println .Name .Destination}}{{end}}'
+```
+
+`noeviction`에서 메모리가 가득 차면 새로운 쓰기가 실패합니다. 이때 기존 Key를 임의로
+삭제하지 말고 불필요한 추천·Feature Key의 TTL과 메모리 상한을 담당자와 확인합니다.
+AOF 손상이 의심되면 원본 볼륨을 삭제하지 않고 먼저 백업한 뒤 복구 절차를 결정합니다.
+
+`docker compose down -v` 또는 `docker volume rm`은 같은 Compose 프로젝트의 Redis와
+PostgreSQL 데이터를 삭제할 수 있으므로 데이터 초기화가 명시적으로 필요한 경우 외에는
+사용하지 않습니다.
+
 ## Spark 2-Worker Standalone Cluster
 
 Spark는 J15E106A의 Master·Worker 2와 J15E106의 Worker 1로 구성합니다. 각 Worker는
