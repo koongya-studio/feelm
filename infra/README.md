@@ -852,4 +852,81 @@ docker start feelm-hdfs-datanode-1
 
 ## Deployment
 
-인프라 설정 파일은 GitLab에서 관리하며, 서버에서 직접 수정하지 않는 것을 원칙으로 합니다.
+별도 스테이징 서버를 두지 않습니다. `J15E106`에서 사전 검증을 통과한 백엔드 이미지를
+그대로 서비스하며, `J15E106A`는 분산 처리 전용으로 유지합니다. 인프라 설정 파일은
+GitLab에서 관리하고 서버에서 직접 수정하지 않습니다.
+
+### Prerequisites
+
+- `develop`은 보호 브랜치이며 직접 Push와 Force Push가 금지되어야 합니다.
+- `e106-shell` Runner가 J15E106에서 Docker를 실행할 수 있어야 합니다.
+- PostgreSQL과 Redis가 J15E106의 같은 Compose 네트워크에서 healthy 상태여야 합니다.
+- 배포 변수는 GitLab CI/CD Variables에 `service` 환경 범위와 Protected 속성으로 등록합니다.
+- 비밀번호와 JWT 키는 Masked and hidden으로 등록하며 Pipeline 로그에 출력하지 않습니다.
+
+백엔드가 사용하는 주요 변수는 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `REDIS_HOST`,
+`REDIS_PORT`, `REDIS_PASSWORD`, `JWT_SECRET`, `CORS_ALLOWED_ORIGINS`와
+`AUTH_MOCK_ENABLED`입니다. 컨테이너에서는 `postgres:5432`와 `redis:6379`를 사용합니다.
+실제 값은 저장소, 이미지와 MR에 포함하지 않습니다.
+
+### Pipeline and Deployment
+
+Merge Request Pipeline은 백엔드 테스트와 Spotless 검사를 실행합니다. `develop`에 병합되면
+`backend-image` Job이 다음 형식의 변경 불가능한 이미지 태그를 GitLab Registry에
+Push합니다.
+
+```text
+<CI_REGISTRY_IMAGE>/backend:<CI_COMMIT_SHA>
+```
+
+이미지 빌드가 성공한 뒤 승인된 사용자가 수동 `deploy-backend` Job을 실행합니다. 배포
+스크립트는 실행 중인 이미지 이름을 먼저 보관하고 후보 이미지를 기동한 뒤 최대 2분 동안
+Docker healthcheck와 `http://127.0.0.1:8080/actuator/health`를 확인합니다. 성공한 경우에만
+후보 이미지를 정상 배포로 인정합니다.
+
+첫 배포에는 되돌릴 이전 이미지가 없으므로, 첫 정상 배포를 완료해 롤백 기준 이미지를 먼저
+확보합니다. 이후 배포부터 헬스체크 실패 시 직전 실행 이미지가 자동으로 복구됩니다.
+
+### Verification
+
+J15E106에서 실행 이미지와 상태를 확인합니다.
+
+```bash
+docker inspect feelm-backend \
+  --format 'image={{.Config.Image}} health={{.State.Health.Status}}'
+curl --fail http://127.0.0.1:8080/actuator/health
+```
+
+PostgreSQL과 Redis가 호스트 외부에 게시되지 않고 Compose 내부에서만 접근되는지 확인합니다.
+
+```bash
+docker port feelm-postgres 5432
+docker port feelm-redis 6379
+```
+
+두 명령 모두 공개 포트가 없다는 결과여야 합니다. Flyway 적용 상태를 확인하고 백엔드를
+재배포한 뒤에도 같은 Migration이 중복되지 않았는지 확인합니다.
+
+```bash
+docker exec feelm-postgres sh -c \
+  'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+  -c "SELECT installed_rank, version, description, success FROM flyway_schema_history ORDER BY installed_rank;"'
+```
+
+### Rollback
+
+후보 이미지의 기동 또는 헬스체크가 실패하면 `deploy-backend.sh`가 직전 실행 이미지를
+`rollback-backend.sh`에 전달합니다. 복구 이미지도 healthy 상태와 Actuator 응답을 통과해야
+롤백 성공으로 처리하며, 후보 배포 Job은 실패 상태를 유지합니다.
+
+승인된 환경변수를 주입할 수 있는 J15E106 셸에서 특정 정상 이미지로 직접 되돌릴 수도
+있습니다.
+
+```bash
+./infra/scripts/rollback-backend.sh \
+  <CI_REGISTRY_IMAGE>/backend:<정상-CI_COMMIT_SHA>
+```
+
+롤백 후 `docker inspect`의 실행 이미지가 지정한 SHA 태그와 일치하고 상태가 healthy인지
+확인합니다. 장애 로그나 캡처에는 환경변수 전체, 비밀번호, JWT 키와 내부 IP를 포함하지
+않습니다.
