@@ -1,0 +1,16 @@
+tasks:
+- id: docs-erd-nullable-notation
+  summary: '[백엔드] ERD nullable 표기와 물리 스키마 NULL 규칙 정합성 정리'
+  description: docs/erd.md 2.2·2.3의 mermaid 블록에 "NULL 가능" 표기가 빠져 있어 db-schema-convention.md §4("ERD에 NULL
+    가능이 명시된 컬럼만 nullable로 두고 나머지는 NOT NULL")와 실제 마이그레이션이 어긋난다. S15P21E106-180 리뷰에서 표기 없이 nullable로 만들어진
+    컬럼 11개를 확인했다(watch_records 상태 시각 6개, movie_people.character_name·display_order, movie_ott_providers.watch_url·synced_at,
+    ratings.visibility). 구현이 계약에 맞고 ERD 표기가 누락된 쪽이므로 ERD를 채우고 §4에 상태 머신 시각과 계약상 선택 항목의 nullable 예외를 명시한다.
+    규칙이 3인 공용이므로 S15P21E106-181(BE-C) 착수 전에 정리한다. 마이그레이션 검증 테스트가 셋으로 늘어난 것을 반영해 §8과 테스트 설정 주석도 함께 갱신한다.
+    담당 박시현(BE-A).
+  epic: S15P21E106-141
+  story_points: 2
+  done_when:
+  - docs/erd.md의 nullable 표기가 적용된 마이그레이션과 양방향으로 일치한다.
+  - db-schema-convention.md §4가 상태 머신 시각과 계약상 선택 항목의 nullable 예외를 규정한다.
+  - 마이그레이션 검증 테스트를 가리키는 §8과 테스트 설정 주석이 현재 테스트 구성과 일치한다.
+  jira_key: S15P21E106-186

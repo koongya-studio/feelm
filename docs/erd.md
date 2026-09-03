@@ -62,7 +62,7 @@ erDiagram
         varchar status "PENDING_VERIFICATION / ACTIVE / WITHDRAWN"
         boolean onboarding_completed
         timestamptz created_at
-        timestamptz withdrawn_at
+        timestamptz withdrawn_at "탈퇴 시각, 탈퇴 전 NULL"
     }
     USER_AUTH_PROVIDERS {
         bigint id PK
@@ -76,14 +76,14 @@ erDiagram
         bigint user_id FK
         varchar token_hash UK
         timestamptz expires_at
-        timestamptz used_at
+        timestamptz used_at "사용 시각, 미사용 상태는 NULL"
     }
     PASSWORD_RESET_TOKENS {
         bigint id PK
         bigint user_id FK
         varchar token_hash UK
         timestamptz expires_at
-        timestamptz used_at
+        timestamptz used_at "사용 시각, 미사용 상태는 NULL"
     }
     NOTIFICATION_SETTINGS {
         bigint user_id PK, FK
@@ -126,17 +126,17 @@ erDiagram
         int tmdb_id UK
         int movielens_id "학습 데이터 매핑용, NULL 가능"
         varchar title
-        varchar original_title
-        text synopsis
-        date release_date
-        int runtime_minutes
-        varchar poster_url
-        varchar backdrop_url
-        bigint representative_flavor_id FK "K-Means 대표 맛. ADR-0015"
-        varchar taste_model_version "취향 군집 모델 버전"
+        varchar original_title "TMDb 미제공 시 NULL 가능"
+        text synopsis "TMDb 미제공 시 NULL 가능"
+        date release_date "TMDb 미제공 시 NULL 가능"
+        int runtime_minutes "TMDb 미제공 시 NULL 가능"
+        varchar poster_url "TMDb 미제공 시 NULL 가능"
+        varchar backdrop_url "TMDb 미제공 시 NULL 가능"
+        bigint representative_flavor_id FK "K-Means 대표 맛, 배정 전 NULL. ADR-0015"
+        varchar taste_model_version "취향 군집 모델 버전, 배정 전 NULL"
         numeric average_rating "서비스 평가 집계"
         int rating_count
-        timestamptz synced_at "TMDb 동기화 시각"
+        timestamptz synced_at "TMDb 동기화 시각, 동기화 전 NULL"
     }
     GENRES {
         bigint id PK
@@ -156,27 +156,27 @@ erDiagram
         bigint id PK
         int tmdb_person_id UK
         varchar name
-        varchar profile_url
+        varchar profile_url "TMDb 미제공 시 NULL 가능"
     }
     MOVIE_PEOPLE {
         bigint movie_id PK, FK
         bigint person_id PK, FK
         varchar role PK "DIRECTOR / ACTOR"
-        varchar character_name
-        int display_order
+        varchar character_name "배역명, 감독은 NULL 가능"
+        int display_order "크레딧 노출 순서, NULL 가능"
     }
     OTTS {
         bigint id PK
         varchar code UK "NETFLIX 등"
         varchar name
-        varchar logo_url
+        varchar logo_url "미제공 시 NULL 가능"
         int tmdb_provider_id UK
     }
     MOVIE_OTT_PROVIDERS {
         bigint movie_id PK, FK
         bigint ott_id PK, FK
-        varchar watch_url
-        timestamptz synced_at
+        varchar watch_url "TMDb 미제공 시 NULL 가능"
+        timestamptz synced_at "동기화 전 NULL 가능"
     }
     POPCORN_FLAVORS {
         bigint id PK
@@ -238,12 +238,12 @@ erDiagram
         bigint movie_id FK
         bigint ott_id FK "클릭한 OTT, NULL 가능"
         varchar status "LINK_CLICKED / WATCHED_UNRATED / RATED / EXPIRED"
-        timestamptz clicked_at
-        timestamptz confirm_due_at "clicked_at + 2일"
-        timestamptz expires_at "clicked_at + 7일"
-        timestamptz watched_at
-        timestamptz rated_at
-        timestamptz expired_at
+        timestamptz clicked_at "OTT 링크 클릭 시각, 감상 기록 없는 평가는 NULL (D-6 결정)"
+        timestamptz confirm_due_at "clicked_at + 2일, 전이 전 NULL 가능"
+        timestamptz expires_at "clicked_at + 7일, 전이 전 NULL 가능"
+        timestamptz watched_at "감상 확인 시각, 전이 전 NULL 가능"
+        timestamptz rated_at "평가 시각, 전이 전 NULL 가능"
+        timestamptz expired_at "만료 시각, 전이 전 NULL 가능"
     }
     RATINGS {
         bigint id PK
@@ -252,7 +252,7 @@ erDiagram
         bigint watch_record_id FK "NULL 허용 (D-6 결정: 감상 기록 없는 평가)"
         smallint score "1~5"
         varchar comment "한줄평 200자 이하, NULL 가능"
-        varchar visibility "PUBLIC / PRIVATE"
+        varchar visibility "PUBLIC / PRIVATE, comment 없으면 NULL 가능 (API-036)"
         timestamptz created_at
         timestamptz updated_at
     }
