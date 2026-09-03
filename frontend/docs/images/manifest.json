@@ -1,0 +1,147 @@
+[
+  {
+    "no": 1,
+    "label": "① 앱 홈",
+    "file": "01-home.png"
+  },
+  {
+    "no": 2,
+    "label": "② 회원가입",
+    "file": "02-signup.png"
+  },
+  {
+    "no": 3,
+    "label": "③ 회원가입 완료",
+    "file": "03-signup-done.png"
+  },
+  {
+    "no": 4,
+    "label": "⑫ 로그인",
+    "file": "04-login.png"
+  },
+  {
+    "no": 5,
+    "label": "④ 취향 초기 설정",
+    "file": "05-taste-onboarding.png"
+  },
+  {
+    "no": 6,
+    "label": "④-1 OTT 설정",
+    "file": "06-ott-setup.png"
+  },
+  {
+    "no": 7,
+    "label": "⑤ 초기 결과 추천",
+    "file": "07-initial-recommend.png"
+  },
+  {
+    "no": 8,
+    "label": "⑥ 취향 맞춤 & 확장 추천",
+    "file": "08-recommend-feed.png"
+  },
+  {
+    "no": 9,
+    "label": "⑥-1 카드 상호작용",
+    "file": "09-card-interaction.png"
+  },
+  {
+    "no": 10,
+    "label": "⑥-2 영화 상세페이지",
+    "file": "10-movie-detail.png"
+  },
+  {
+    "no": 11,
+    "label": "⑥-3 평가 알림 메시지",
+    "file": "11-rating-nudge.png"
+  },
+  {
+    "no": 12,
+    "label": "⑥-4 평가페이지",
+    "file": "12-rating.png"
+  },
+  {
+    "no": 13,
+    "label": "⑥-5 평가 후 포스터를 필름에 기입",
+    "file": "13-frame-added.png"
+  },
+  {
+    "no": 14,
+    "label": "⑥-6 필름 추가 알림",
+    "file": "14-frame-alert.png"
+  },
+  {
+    "no": 15,
+    "label": "⑦ 취향 리포트 발급",
+    "file": "15-report-issue.png"
+  },
+  {
+    "no": 16,
+    "label": "⑦-1 취향 리포트 상세",
+    "file": "16-report-detail.png"
+  },
+  {
+    "no": 17,
+    "label": "⑧ 그룹 모드 (파티 모드)",
+    "file": "17-party-mode.png"
+  },
+  {
+    "no": 18,
+    "label": "⑧-1 공통된 취향으로 새 필름 현상",
+    "file": "18-party-film.png"
+  },
+  {
+    "no": 19,
+    "label": "⑨ 한눈에 보기 (100알의 취향)",
+    "file": "19-popcorn-bucket.png"
+  },
+  {
+    "no": 20,
+    "label": "⑩ 검색 홈 (입력 전) (미정)",
+    "file": "20-search-home.png"
+  },
+  {
+    "no": 21,
+    "label": "⑩-1 영화 검색 결과 (미정)",
+    "file": "21-search-result.png"
+  },
+  {
+    "no": 22,
+    "label": "⑪ 프로필 대시보드",
+    "file": "22-profile-dashboard.png"
+  },
+  {
+    "no": 23,
+    "label": "⑪-1 취향 리포트",
+    "file": "23-profile-report.png"
+  },
+  {
+    "no": 24,
+    "label": "⑪-1-a 취향 리포트 상세 (⑦-1과 동일)",
+    "file": "24-profile-report-detail.png"
+  },
+  {
+    "no": 25,
+    "label": "⑪-2 추천 기록",
+    "file": "25-recommend-history.png"
+  },
+  {
+    "no": 26,
+    "label": "⑪-3 평가",
+    "file": "26-ratings.png"
+  },
+  {
+    "no": 27,
+    "label": "⑪-4 평가 안 남긴 영화",
+    "file": "27-unrated.png"
+  },
+  {
+    "no": 28,
+    "label": "⑪-5 OTT 관리",
+    "file": "28-ott-manage.png"
+  },
+  {
+    "no": 29,
+    "label": "⑪-6 설정",
+    "file": "29-settings.png"
+  }
+]

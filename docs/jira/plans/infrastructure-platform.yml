@@ -1,0 +1,30 @@
+tasks:
+- id: infrastructure-platform
+  issue_type: Epic
+  summary: '[인프라] 개발·배포 및 운영 환경 구축'
+  description: 재현 가능한 개발환경, GitLab CI/CD, 서버 배포, 데이터 처리 실행환경 및 모니터링 체계를 단계적으로 구축한다. 구체적인 기술은 서비스 요구사항과
+    서버 조건을 확인한 뒤 하위 Jira 업무에서 결정한다.
+  done_when:
+  - 재현 가능한 로컬 개발환경이 구성된다.
+  - 테스트·빌드·이미지 생성 CI가 구성된다.
+  - 서버 배포와 롤백 절차가 검증된다.
+  - 데이터 처리 요구사항에 적합한 실행 방식이 결정되고 구성된다.
+  - 서버와 서비스의 Metric·로그·장애 알림 체계가 구성된다.
+  - 운영 절차와 미확정 사항이 문서화된다.
+  jira_key: S15P21E106-38
+- id: gitlab-runner-deployment-strategy
+  issue_type: Task
+  summary: '[인프라] GitLab Runner 및 CI/CD 배포 방식 확인'
+  description: 기술 스택과 서버 배포가 확정되기 전에 GitLab Runner, Container Registry 및 서버 배포 방식의 사용 가능 조건을 조사하고 프로젝트의
+    기본 CI/CD 실행 구조를 결정한다.
+  epic: infrastructure-platform
+  done_when:
+  - 사용 가능한 Shared, Group 또는 Project Runner와 Runner 태그가 확인된다.
+  - Runner에서 Docker 이미지 빌드가 가능한지 확인된다.
+  - GitLab Container Registry 사용 가능 여부와 Push/Pull 권한이 확인된다.
+  - Protected, Masked 및 File CI/CD Variable 사용 조건이 확인된다.
+  - PEM 기반 SSH 배포와 EC2 전용 Runner 방식의 장단점이 비교된다.
+  - CI와 CD의 역할, 대상 브랜치 및 수동 승인 원칙 초안이 작성된다.
+  - GitLab 관리자와 서버 제공자에게 요청할 권한 및 설정 목록이 정리된다.
+  - 후속 CI Pipeline 및 서버 배포 작업의 전제조건이 문서화된다.
+  jira_key: S15P21E106-39

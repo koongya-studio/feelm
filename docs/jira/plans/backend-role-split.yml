@@ -1,0 +1,342 @@
+tasks:
+- id: be-epic-common
+  issue_type: Epic
+  summary: '[개발] 백엔드 공통 기반·계약'
+  description: 백엔드 전원이 의존하는 공통 골격과 계약을 관리한다. 공통 응답·오류 규약, 인증 골격, Kafka 이벤트 계약과 공통 발행 모듈을 포함한다. 도메인 기능
+    구현은 담당별 Epic에서 처리한다.
+  done_when:
+  - 공통 응답·오류·인증 골격이 develop에 병합되어 담당별 도메인 구현이 병렬로 시작된다.
+  - Kafka 이벤트 계약과 공통 발행 모듈이 발행·소비 담당 간 합의된 규격으로 제공된다.
+  jira_key: S15P21E106-141
+- id: be-epic-account
+  summary: '[개발] 백엔드 계정·온보딩'
+  issue_type: Epic
+  description: 사용자(인증·프로필·차단), 온보딩, OTT 구독 도메인의 API 27건을 구현한다. 담당 박시현(BE-A).
+  done_when:
+  - 사용자·온보딩·OTT 도메인의 1차 MVP API가 명세(docs/api)대로 동작한다.
+  jira_key: S15P21E106-142
+- id: be-epic-content
+  summary: '[개발] 백엔드 콘텐츠·감상·소셜'
+  issue_type: Epic
+  description: 영화 데이터 적재, 검색, 감상 기록, 평가, 소셜(한줄평·공개 프로필), 리포트·트렌드 도메인의 API 19건을 구현한다. 담당 유정(BE-B).
+  done_when:
+  - 영화·검색·감상 도메인의 1차 MVP API가 명세(docs/api)대로 동작한다.
+  - TMDb/MovieLens 데이터가 적재되어 검색·상세 조회가 실데이터로 검증된다.
+  jira_key: S15P21E106-143
+- id: be-epic-recsys
+  summary: '[개발] 백엔드 취향·추천·파티'
+  issue_type: Epic
+  description: 취향 분석·팝콘·프레임, 추천 버퍼 서빙, 파티 도메인의 API 22건과 추천 파이프라인(Spark)과의 서비스 측 연동을 구현한다. 담당 서현(BE-C).
+    파이프라인 자체 (S15P21E106-124)와 구분해 이 Epic은 Spring 서빙 측만 다룬다.
+  done_when:
+  - 취향·추천·파티 도메인의 1차 MVP API가 명세(docs/api)대로 동작한다.
+  - 추천 버퍼가 내부 API 계약(docs/api/internal.md)대로 저장·노출·교체된다.
+  jira_key: S15P21E106-144
+- id: be-scaffold-common-contract
+  summary: '[백엔드] 프로젝트 스캐폴드 및 공통 응답·오류 규약 구현'
+  description: Spring Boot 프로젝트 골격과 전원이 사용하는 공통 계약을 구현한다. 공통 응답 포맷, UPPER_SNAKE 오류 코드(A-9), 전역 예외 처리,
+    BaseEntity, 프로파일별 설정을 포함한다. 백엔드 전원의 선행 의존이므로 최우선으로 병합한다.
+  epic: be-epic-common
+  story_points: 5
+  done_when:
+  - 공통 규약(API-000)의 응답·오류 형식이 코드로 구현되고 예시 오류가 규약대로 반환된다.
+  - 전역 예외 처리가 미처리 예외를 공통 오류 형식으로 변환한다.
+  - BaseEntity와 프로파일별 설정(local·dev)이 구성된다.
+  - 담당자별 도메인 패키지 구조 기준이 backend/README.md에 문서화된다.
+  jira_key: S15P21E106-145
+- id: be-auth-skeleton
+  summary: '[백엔드] JWT 인증 골격 및 개발용 mock 인증 구현'
+  description: A-8 결정(JWT + httpOnly Refresh + Redis)의 인증 골격을 구현한다. Access 발급·검증 필터, Refresh 저장·재발급, 현재
+    사용자 조회 지점, dev 프로파일의 고정 사용자 주입(mock 인증)을 포함한다. 회원가입·소셜 로그인 등 계정 기능은 별도 업무로 분리한다.
+  epic: be-epic-common
+  story_points: 8
+  done_when:
+  - Access Token 발급·검증과 인증 실패 응답이 공통 오류 규약으로 동작한다.
+  - Refresh Token이 httpOnly 쿠키와 Redis 저장소로 관리되고 재발급이 동작한다.
+  - 컨트롤러에서 현재 사용자를 조회하는 단일 지점이 제공된다.
+  - dev 프로파일에서 mock 인증으로 회원 API를 로그인 구현 전에 테스트할 수 있다.
+  - 토큰 수명·쿠키 속성 등 보안 설정값이 문서화된다.
+  jira_key: S15P21E106-146
+- id: be-kafka-event-contract
+  summary: '[백엔드] Kafka 이벤트 계약 및 Redis 키 설계 문서화'
+  description: 서비스에서 추천 파이프라인으로 흐르는 행동 이벤트(평가·클릭·온보딩 등)의 토픽·스키마·발행 시점과 Redis 키 네임스페이스를 문서로 확정한다. 소비 측(AI·Spark)
+    담당과 합의해 확정하며, 스키마 변경 절차를 포함한다.
+  epic: be-epic-common
+  story_points: 5
+  done_when:
+  - 이벤트별 토픽 이름, 메시지 스키마, 발행 시점이 docs 문서로 확정된다.
+  - 강한 신호(별점·관심없음·온보딩)와 약한 신호(조회·클릭)의 처리 경로가 구분된다.
+  - Redis 키 네임스페이스와 TTL 기준이 정의된다.
+  - AI 담당 리뷰를 거쳐 발행·소비 담당 간 합의가 기록된다.
+  - 스키마 변경 절차(합의 후 별도 브랜치)가 문서에 포함된다.
+  jira_key: S15P21E106-147
+- id: be-kafka-publisher-module
+  summary: '[백엔드] Kafka 공통 이벤트 발행 모듈 구현'
+  description: 확정된 이벤트 계약을 바탕으로 토픽 상수, 이벤트 DTO, 직렬화 설정, 프로듀서 팩토리, 재시도·오류 정책을 공통 모듈로 구현한다. 각 도메인은 이 모듈을
+    호출해 발행하고 Kafka 설정을 직접 다루지 않는다.
+  epic: be-epic-common
+  story_points: 5
+  done_when:
+  - 이벤트 DTO와 토픽 상수가 계약 문서와 일치한다.
+  - 도메인 코드가 공통 발행 컴포넌트 호출만으로 이벤트를 발행할 수 있다.
+  - 직렬화·재시도·오류 정책이 단일 지점에서 관리된다.
+  - 발행 실패가 서비스 트랜잭션을 실패시키지 않는 기준이 구현되고 문서화된다.
+  - 로컬 Kafka(infra compose)에서 발행이 검증된다.
+  jira_key: S15P21E106-148
+- id: be-account-email-auth
+  sprint: backlog
+  summary: '[계정] 이메일 회원가입·로그인·토큰 재발급 구현'
+  description: API-001~006(이메일 회원가입, 이메일 인증 확인·재발송, 로그인, 로그아웃, 토큰 재발급)을 구현한다. 인증 메일 발송 인프라 구성을 포함한다.
+  epic: be-epic-account
+  story_points: 8
+  done_when:
+  - 회원가입부터 이메일 인증, 로그인, 재발급, 로그아웃까지 전체 흐름이 동작한다.
+  - 인증 메일이 실제 발송되고 재발송 제한 기준이 적용된다.
+  - 미인증 계정의 로그인 처리 기준이 명세와 일치한다.
+  - 실패 사례(중복 이메일·잘못된 토큰 등)가 공통 오류 규약으로 응답된다.
+  jira_key: S15P21E106-149
+- id: be-account-oauth
+  sprint: backlog
+  summary: '[계정] 소셜 로그인 및 계정 연결 구현'
+  description: API-007~009(소셜 로그인, 소셜 회원가입 완료, 소셜 계정 연결)를 구현한다. 지원 provider 범위와 미정 사항은 구현 전 확정한다.
+  epic: be-epic-account
+  story_points: 8
+  done_when:
+  - 확정된 provider로 소셜 로그인과 신규 가입 완료 흐름이 동작한다.
+  - 기존 이메일 계정에 소셜 계정 연결이 동작하고 중복 연결이 거부된다.
+  - provider 오류·취소 사례가 공통 오류 규약으로 응답된다.
+  jira_key: S15P21E106-150
+- id: be-account-password-withdrawal
+  sprint: backlog
+  summary: '[계정] 비밀번호 재설정·변경 및 회원 탈퇴 구현'
+  description: API-010~013(비밀번호 재설정 요청·재설정·변경, 회원 탈퇴)을 구현한다. 탈퇴 데이터 정책(D-9)은 미결이므로 구현 전 팀 확정이 필요하다.
+  epic: be-epic-account
+  story_points: 5
+  done_when:
+  - 재설정 메일 요청부터 새 비밀번호 설정까지의 흐름이 동작하고 토큰이 만료 처리된다.
+  - 탈퇴 시 데이터 처리(D-9 확정안)가 구현되고 탈퇴 계정의 토큰이 무효화된다.
+  - 재설정 토큰 재사용 등 실패 사례가 검증된다.
+  jira_key: S15P21E106-151
+- id: be-account-profile-settings
+  sprint: backlog
+  summary: '[계정] 프로필·닉네임·알림 설정 구현'
+  description: API-014~018(내 프로필 조회·수정, 닉네임 사용 가능 확인, 알림 설정 조회·변경)을 구현한다. 기존 패턴을 적용하는 CRUD 중심 업무다.
+  epic: be-epic-account
+  story_points: 3
+  done_when:
+  - 프로필 조회·수정이 birth_date(A-2) 기준으로 동작한다.
+  - 닉네임 중복 확인이 가입·수정 검증과 같은 규칙을 사용한다.
+  - 알림 설정 항목이 명세와 일치하게 저장·조회된다.
+  jira_key: S15P21E106-152
+- id: be-account-block
+  sprint: backlog
+  summary: '[계정] 사용자 검색·차단 및 공통 차단 필터 구현'
+  description: API-019~022(사용자 검색, 차단, 차단 해제, 차단 목록)를 구현한다. 한줄평· 파티 초대 등 다른 도메인이 공용으로 사용하는 차단 필터 로직을 공통
+    컴포넌트로 제공한다.
+  epic: be-epic-account
+  story_points: 5
+  done_when:
+  - 차단·해제·목록이 동작하고 중복 차단이 거부된다.
+  - 다른 도메인이 사용할 수 있는 차단 필터 공통 지점이 제공되고 사용법이 문서화된다.
+  - 사용자 검색에 차단 관계가 명세대로 반영된다.
+  jira_key: S15P21E106-153
+- id: be-onboarding
+  sprint: backlog
+  summary: '[계정] 온보딩 초기 취향 수집 구현'
+  description: API-023~024(초기 취향 카드 목록, 초기 취향 제출)를 구현한다. 제출 결과는 강한 신호로 이벤트를 발행해 추천 파이프라인에 전달한다.
+  epic: be-epic-account
+  story_points: 3
+  done_when:
+  - 취향 카드 목록이 선정 기준(미정 사항 확정안)대로 반환된다.
+  - 초기 취향 제출이 저장되고 계약대로 이벤트가 발행된다.
+  - 중복 제출 처리 기준이 명세와 일치한다.
+  jira_key: S15P21E106-154
+- id: be-ott-subscription
+  sprint: backlog
+  summary: '[계정] OTT 목록 및 내 구독 관리 구현'
+  description: API-025~027(OTT 목록, 내 구독 OTT 조회·설정)를 구현한다. API-025의 TMDb watch provider 매핑 기준은 미정이므로 구현
+    전 확정하며, 매핑 적재는 콘텐츠 적재 업무와 조율한다.
+  epic: be-epic-account
+  story_points: 3
+  done_when:
+  - OTT 기준 목록이 확정된 매핑 기준으로 반환된다.
+  - 내 구독 OTT 설정·조회가 동작하고 추천 필터(FR-12)가 참조할 수 있는 형태로 저장된다.
+  jira_key: S15P21E106-155
+- id: be-content-ingestion
+  summary: '[콘텐츠] TMDb·MovieLens 영화 데이터 적재 파이프라인 구현'
+  description: TMDb API와 MovieLens 데이터셋에서 영화 메타데이터(제목·장르·포스터·OTT 제공처 등)를 적재하고 서비스 DB와 MovieLens ID 매핑을
+    구축한다. 인증과 무관하며 리드타임이 가장 길어 최우선 착수한다.
+  epic: be-epic-content
+  story_points: 8
+  done_when:
+  - 영화 메타데이터가 서비스 DB에 적재되고 재실행해도 중복 생성되지 않는다.
+  - MovieLens ID와 서비스 movieId 매핑이 구축된다.
+  - TMDb 호출 제한·실패 처리와 재개 절차가 구현된다.
+  - 적재 실행 방법과 데이터 갱신 절차가 문서화된다.
+  - API Key 등 Secret이 저장소에 포함되지 않는다.
+  jira_key: S15P21E106-156
+- id: be-content-search
+  sprint: backlog
+  summary: '[콘텐츠] 영화 검색 및 필터 구현'
+  description: API-028~029(영화 검색, 검색 필터 옵션)를 A-10 결정(PostgreSQL full-text + pg_trgm)대로 구현한다. 인덱스 설계와 검색
+    성능 검증을 포함한다.
+  epic: be-epic-content
+  story_points: 5
+  done_when:
+  - 제목 부분 일치·오타 허용 검색이 pg_trgm 인덱스로 동작한다.
+  - 장르·연도 등 필터 조합이 명세대로 동작한다.
+  - 적재된 실데이터 기준 검색 응답 시간이 확인되고 실행 계획이 인덱스를 사용한다.
+  - 로그인 사용자의 차단·개인화 반영 기준(인증 선택)이 명세와 일치한다.
+  jira_key: S15P21E106-157
+- id: be-content-movie-detail
+  sprint: backlog
+  summary: '[콘텐츠] 영화 상세 조회 구현'
+  description: API-030(영화 상세)을 구현한다. 메타데이터, OTT 제공처, 평균 별점(A-7 반정규화 값), 로그인 시 내 평가 여부를 포함한다.
+  epic: be-epic-content
+  story_points: 3
+  done_when:
+  - 영화 상세가 명세의 응답 필드대로 반환된다.
+  - 비로그인·로그인(선택 인증) 사례의 응답 차이가 명세와 일치한다.
+  - 존재하지 않는 영화 조회가 공통 오류 규약으로 응답된다.
+  jira_key: S15P21E106-158
+- id: be-watch-records
+  sprint: backlog
+  summary: '[감상] OTT 클릭 기록 및 감상 확인 구현'
+  description: API-033~035(OTT 링크 클릭 기록, 감상 기록 목록, 감상 확인 응답)를 구현한다. 클릭은 약한 신호로 이벤트를 발행하고, 감상 확인 흐름의 미정
+    사항은 구현 전 확정한다.
+  epic: be-epic-content
+  story_points: 5
+  done_when:
+  - OTT 클릭이 기록되고 계약대로 이벤트가 발행된다.
+  - 클릭 기록이 감상 확인 대기 상태로 전환되는 규칙이 확정안대로 동작한다.
+  - 감상 확인 응답(봤어요·안봤어요)이 감상 기록 상태를 갱신한다.
+  jira_key: S15P21E106-159
+- id: be-rating
+  sprint: backlog
+  summary: '[감상] 평가 생성·수정·삭제 및 평균 별점 반정규화 구현'
+  description: API-036~039(평가 생성·수정·삭제, 내 평가 목록)를 구현한다. 평가는 추천의 핵심 입력 신호로 강한 신호 이벤트를 발행하고, movies 평균 별점
+    반정규화(A-7)를 정합성 있게 갱신한다. 프레임·팝콘 적립과의 연동 지점은 취향 담당과 합의한다.
+  epic: be-epic-content
+  story_points: 8
+  done_when:
+  - 평가 생성·수정·삭제가 명세대로 동작하고 감상 기록 없는 평가(A-4)가 허용된다.
+  - 평균 별점이 동시 요청에서도 정확하게 갱신된다.
+  - 평가 변경마다 계약대로 강한 신호 이벤트가 발행된다.
+  - 평가 삭제 시 연관 데이터(프레임·팝콘) 처리 기준이 합의안대로 동작한다.
+  jira_key: S15P21E106-160
+- id: be-social-reviews
+  sprint: backlog
+  summary: '[소셜] 공개 한줄평 목록 구현'
+  description: API-032(영화별 공개 한줄평 목록)를 구현한다. 평가의 한줄평을 노출하고 차단 필터 공통 컴포넌트를 적용한다.
+  epic: be-epic-content
+  story_points: 2
+  done_when:
+  - 영화별 공개 한줄평이 페이지네이션 규약대로 반환된다.
+  - 로그인 사용자의 차단 상대 한줄평이 제외된다.
+  - 스포일러 등 노출 규칙이 명세와 일치한다.
+  jira_key: S15P21E106-161
+- id: be-taste-popcorn-frames
+  sprint: backlog
+  summary: '[취향] 팝콘 버킷·필름·프레임 조회 구현'
+  description: API-041~044(팝콘 버킷, 내 필름, 프레임 상세, 팝콘 맛 기준정보)를 구현한다. 프레임·팝콘 별도 테이블(A-3) 기준이며, 팝콘 맛 8종 정의(A-6)는
+    미결이므로 기준정보는 설정값으로 구현해 확정 시 교체한다.
+  epic: be-epic-recsys
+  story_points: 3
+  done_when:
+  - 팝콘 버킷·필름·프레임 조회가 명세대로 동작한다.
+  - 팝콘 맛 기준정보가 코드 수정 없이 교체 가능한 형태(설정·기준 테이블)로 제공된다.
+  - 평가 적립과의 연동 지점이 감상 담당과 합의되어 동작한다.
+  jira_key: S15P21E106-162
+- id: be-taste-analysis
+  sprint: backlog
+  summary: '[취향] 취향 분석·키워드 조회 구현'
+  description: API-040(취향 분석·키워드 조회)을 구현한다. taste_analyses의 갱신 주체와 시점은 미결이므로 AI 담당과 확정 후 구현한다.
+  epic: be-epic-recsys
+  story_points: 5
+  done_when:
+  - 취향 분석 결과와 키워드가 명세대로 반환된다.
+  - 분석 데이터 갱신 주체·시점 합의가 문서에 기록되고 구현과 일치한다.
+  - 분석 데이터가 없는 신규 사용자 응답 기준이 명세와 일치한다.
+  jira_key: S15P21E106-163
+- id: be-recommendation-serving
+  sprint: backlog
+  summary: '[추천] 추천 버퍼 저장 및 기본·추가 추천 서빙 구현'
+  description: API-045~046(기본 추천, 추가 추천)을 내부 API 계약(IN-01)대로 구현한다. 추천 20편 버퍼의 recommendation_items 저장,
+    exposed_at 기반 3편씩 노출, 소진 시 재생성 요청, inputVersion 캐시 무효화를 포함한다.
+  epic: be-epic-recsys
+  story_points: 8
+  done_when:
+  - 추천 버퍼가 내부 API에서 수신되어 recommendation_items에 저장된다.
+  - 기본·추가 추천이 3편씩 노출되고 exposed_at으로 노출 이력이 관리된다.
+  - 버퍼 소진 시 재생성 흐름과 강한 신호의 inputVersion 무효화가 동작한다.
+  - 구독 OTT 필터(FR-12) 적용 기준이 명세와 일치한다.
+  - 동시 요청에서 같은 영화가 중복 노출되지 않는다.
+  jira_key: S15P21E106-164
+- id: be-recommendation-dismiss
+  sprint: backlog
+  summary: '[추천] 관심없음 처리 구현'
+  description: API-047(관심없음)을 합의안(대안 A)대로 구현한다. 버퍼 내 교체, 소진 시 replacement null 응답, 다음 버퍼 제외, 강한 신호 이벤트
+    발행을 포함한다.
+  epic: be-epic-recsys
+  story_points: 5
+  done_when:
+  - 관심없음 표시 시 버퍼에서 다음 후보로 교체되고 소진 시 replacement null로 응답한다.
+  - 관심없음 영화가 다음 추천 버퍼에서 제외된다.
+  - 강한 신호 이벤트가 계약대로 발행된다.
+  jira_key: S15P21E106-165
+- id: be-recommendation-history
+  sprint: backlog
+  summary: '[추천] 추천 이력 조회 구현'
+  description: API-048(추천 이력)을 구현한다. 노출된 추천(exposed_at 기록분)만 이력으로 반환한다.
+  epic: be-epic-recsys
+  story_points: 2
+  done_when:
+  - 노출된 추천만 이력으로 페이지네이션 규약대로 반환된다.
+  - 관심없음 처리된 항목의 표시 기준이 명세와 일치한다.
+  jira_key: S15P21E106-166
+- id: be-similar-movies
+  sprint: backlog
+  summary: '[추천] pgvector 기반 유사 영화 추천 구현'
+  description: API-031(유사 영화)을 Spring + pgvector 조회로 구현한다. pgvector 확장과 임베딩 테이블 물리 스키마 확정을 포함하며, 임베딩 적재
+    주체는 AI 담당과 합의한다.
+  epic: be-epic-recsys
+  story_points: 5
+  done_when:
+  - pgvector 확장과 임베딩 테이블 스키마가 확정되어 ERD 문서에 반영된다.
+  - 유사 영화 조회가 벡터 인덱스를 사용해 동작한다.
+  - 임베딩이 없는 영화(신작 등)의 폴백 기준이 명세와 일치한다.
+  jira_key: S15P21E106-167
+- id: be-party-core
+  sprint: backlog
+  summary: '[파티] 파티 생성·초대·수락·종료 구현'
+  description: API-049~056(파티 생성, 내 파티 목록, 초대, 받은 초대 목록, 수락, 거절, 나가기, 종료)을 구현한다. 복수 활성 파티 상한 5(A-5, 설정값)와
+    초대·수락의 동시성 검증을 포함한다.
+  epic: be-epic-recsys
+  story_points: 8
+  done_when:
+  - 파티 생성부터 초대·수락·거절·나가기·종료까지 상태 전이가 명세대로 동작한다.
+  - 활성 파티 상한 초과가 동시 수락 상황에서도 PARTY_LIMIT_EXCEEDED로 거부된다.
+  - 차단 관계의 초대 처리 기준이 명세와 일치한다.
+  - 파티 종료·나가기 시 인원 변경 정책(A-5 종료 후 재생성)이 반영된다.
+  jira_key: S15P21E106-168
+- id: be-party-recommendation
+  sprint: backlog
+  summary: '[파티] 파티원 팝콘 조회 및 파티 영화 추천 구현'
+  description: API-057~058(파티원 팝콘 조회, 파티 영화 추천)을 구현한다. 파티 생성 직후 즉시 집계 방안 기준이며, 집계·서빙 경계는 AI 담당과 확정 후 구현한다.
+  epic: be-epic-recsys
+  story_points: 5
+  done_when:
+  - 파티원 팝콘 조회가 명세대로 동작한다.
+  - 파티 추천이 확정된 집계 방식으로 생성·조회된다.
+  - 파티원 변동(수락·나가기) 시 추천 갱신 기준이 확정안대로 동작한다.
+  jira_key: S15P21E106-169
+- id: be-role-split-doc
+  summary: '[협업] 백엔드 역할 분배 문서화'
+  description: 백엔드 3인의 도메인 수직 분할 담당(계정·온보딩/콘텐츠·감상·소셜/취향· 추천·파티), 공통 기반 선행 원칙과 도메인 간 경계 규칙을 docs 문서로 기록한다.
+  epic: S15P21E106-12
+  story_points: 1
+  done_when:
+  - 담당별 도메인·API 범위와 선행 작업이 docs 문서에 기록된다.
+  - Kafka 공통 층 소유, 평가 이벤트 발행·계약, 차단 필터 공유 등 경계 규칙이 포함된다.
+  - docs/README.md 색인에 문서가 추가된다.
+  jira_key: S15P21E106-170

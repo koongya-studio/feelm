@@ -1,0 +1,14 @@
+tasks:
+- id: withdrawal-personal-data-scope
+  issue_type: Task
+  summary: '[협업] 탈퇴 시 개인정보 처리 범위 정정'
+  description: API-013 처리 규칙의 birth_date·gender 삭제 요구와 V1 스키마의 birth_date NOT NULL 제약이 어긋난다. 이메일·닉네임을 치환해도
+    users.id·public_id와 다른 사용자 데이터의 연결이 남으므로 행 전체가 익명정보라고 전제하지 않고, 탈퇴 시 처리 목적이 끝난 생년월일·성별을 삭제한다. birth_date를
+    nullable로 바꾸되 비탈퇴 계정에는 필수인 상태 기반 CHECK 제약을 추가하고, API-013과 D-9에 처리 범위와 근거를 기록한다. 담당 박시현(BE-A).
+  epic: S15P21E106-12
+  story_points: 1
+  done_when:
+  - API-013 처리 규칙에 탈퇴 시 birth_date·gender 삭제와 판단 근거가 남는다.
+  - D-9 결정 표에 계정 영역의 삭제 범위와 익명성 한계가 기록된다.
+  - 탈퇴 계정은 birth_date를 비울 수 있고 비탈퇴 계정에는 필수인 DB 제약이 검증된다.
+  jira_key: S15P21E106-184

@@ -1,0 +1,22 @@
+spring:
+  config:
+    # IDE와 Gradle에서 같은 로컬 설정을 사용하도록 backend/.env를 불러온다.
+    import: optional:file:${LOCAL_ENV_FILE:.env}[.properties]
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/feelm}
+    username: ${DB_USERNAME:feelm}
+    password: ${DB_PASSWORD:feelm}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD}
+
+feelm:
+  auth:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+    mock:
+      # 로그인(API-004) 구현 전까지 회원 API를 시험하기 위한 임시 설정이다.
+      # 실제 토큰 흐름을 확인하려면 AUTH_MOCK_ENABLED=false로 끈다.
+      enabled: ${AUTH_MOCK_ENABLED:true}
+      user-id: ${AUTH_MOCK_USER_ID:1}

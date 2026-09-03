@@ -1,0 +1,14 @@
+tasks:
+- id: readme-team-roles
+  issue_type: Task
+  summary: '[협업] README 팀 역할 정보 최신화'
+  description: 현재 팀 구성과 역할 분담에 맞게 루트 README의 역할 정보를 최신화한다.
+  area: 협업
+  story_points: 1
+  done_when:
+  - README에 팀원별 역할이 최신 정보로 반영된다.
+  - 기존 협업 가이드 링크와 문서 구조가 유지된다.
+  - 역할 정보 외의 내용을 불필요하게 변경하지 않는다.
+  - 변경 결과를 직접 검토해 누락이나 오기가 없음을 확인한다.
+  jira_key: S15P21E106-62
+  epic: S15P21E106-12
