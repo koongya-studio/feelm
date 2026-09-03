@@ -44,7 +44,7 @@ flowchart LR
 ### 2.1 제외 필터를 Spring이 담당하는 이유
 
 `API-045`는 "감상 기록이 있는 영화(`LINK_CLICKED` 포함)와 관심없음 영화는 제외한다"를 요구합니다.
-이 데이터는 PostgreSQL이 원본이며 `ratings`·`frames`·`popcorns`가 단일 트랜잭션으로 묶여 있습니다(NFR-06).
+이 데이터는 PostgreSQL이 원본이며 평가 저장과 프레임 생성이 단일 트랜잭션으로 묶여 있습니다(NFR-06).
 
 Spark가 미리 제외하려면 제외 목록의 복제본을 상태로 유지해야 하며, 다음 문제가 생깁니다.
 
@@ -60,7 +60,7 @@ Spark가 미리 제외하려면 제외 목록의 복제본을 상태로 유지�
 
 Fold-in은 사용자의 평가 전체를 입력으로 하며, Spark는 이를 **읽기 전용 롤**로 PostgreSQL에서 조회합니다.
 
-- 대상: `ratings`(`user_id`, `movie_id`, `score`), `onboarding_preferences`(`user_id`, `movie_id`, `preference`), `popcorns`(`user_id`, `flavor_id` — `DISCOVERY` 판정용, 아래)
+- 대상: `ratings`(`user_id`, `movie_id`, `score`), `onboarding_preferences`(`user_id`, `movie_id`, `preference`), `movies`(`representative_flavor_id` — `DISCOVERY` 판정용, 아래)
 - 쓰기 권한을 부여하지 않으며 서비스 테이블을 갱신하지 않는다
 - 이벤트의 `movieId`·`score`는 로깅·디버깅용 참고값이며 계산에는 조회 결과를 사용한다
 
@@ -74,15 +74,14 @@ Fold-in은 사용자의 평가 전체를 입력으로 하며, Spark는 이를 **
 | 데이터 | 출처 | 이유 |
 |---|---|---|
 | 영화 제목 · 장르 라벨 · 영화 대표 맛(`movies.representative_flavor_id` → `popcorn_flavors.code`) | **HDFS 야간 배치 산출물** | 기준정보에 가깝고 전체 영화가 대상이다. 이벤트마다 PG를 조회하면 부하가 크므로 배치가 만든 스냅샷을 Spark가 broadcast join으로 사용한다 |
-| 사용자 맛 분포(`popcorns`의 사용자별 `flavor_id` 집계) | **PostgreSQL 읽기 전용 롤** | 사용자 행동에 따라 실시간으로 바뀌고 대상이 사용자 한 명이다. Fold-in의 `ratings` 조회와 같은 트랜잭션 시점을 쓴다 |
+| 사용자 맛 분포(`ratings JOIN movies`의 사용자별 `representative_flavor_id` 집계) | **PostgreSQL 읽기 전용 롤** | 사용자 행동에 따라 실시간으로 바뀌고 대상이 사용자 한 명이다. Fold-in의 `ratings` 조회와 같은 트랜잭션 시점을 쓴다 |
 
 `DISCOVERY` 판정은 [취향 API](./taste.md)의 `newFlavorThreshold` 기준을 그대로 씁니다.
 사용자의 `popcornCount`가 임계치 미만인 맛을 대표 맛으로 갖는 영화가 `DISCOVERY`, 나머지가 `TASTE`입니다.
 
-생성 시점 맛 코드를 보존하는 대상은 프레임·팝콘이며(ADR-0015), `movies.representative_flavor_id`의
-재학습 시 재배정 절차는 미정입니다([ERD](../erd.md) D-13). 따라서 이 절의 전제는 두 출처가 같은
-맛 코드 체계(`popcorn_flavors.code`)를 쓴다는 것까지이며, 재배정이 도입되면 배치 스냅샷의 대표 맛과
-사용자 맛 분포가 최대 하루 어긋날 수 있습니다. D-13이 확정되면 이 절과 아래 신선도 규칙을 함께 갱신합니다.
+맛 모델은 버전이나 재학습 없이 고정된 Centroid를 사용합니다(ADR-0015). 신규 영화는 기존 K-Means의
+`predict`로 맛을 배정하고 `movies.representative_flavor_id`에 저장합니다. 배치 스냅샷과 PostgreSQL 집계는
+동일한 `popcorn_flavors.code` 체계를 사용합니다.
 
 - 배치 스냅샷의 신선도는 하루이며, 신규 영화는 다음 야간 배치 이후 추천 대상이 된다
 - `movies` · `genres` · `movie_genres` · `popcorn_flavors`는 Spark가 PG에서 직접 조회하지 않는다
@@ -177,7 +176,7 @@ Fold-in은 `x = (Σ yᵢyᵢᵀ + λI)⁻¹ (Σ rᵢyᵢ)` 이며 A와 B가 모�
 { "movieId": 550, "recommendationItemId": 3301 }
 ```
 
-- 노출 제외 용도가 아니라 **점수 감점 신호**다. 제외는 Spring이 `recommendation_dismissals`로 처리한다
+- 노출 제외 용도가 아니라 **점수 감점 신호**다. 제외는 Spring이 `user_movie_dismissals`로 처리한다
 
 **`VIEW`**
 
@@ -307,7 +306,6 @@ Spark 내부 상태이며 Spring이 의존하지 않습니다.
 ```json
 {
   "modelVersion": "als-2026-09-05",
-  "tasteModelVersion": "taste-e5-kmeans-2026-09-05",
   "generatedAt": "2026-08-31T07:21:03Z",
   "items": [
     {
@@ -343,7 +341,6 @@ Spring은 이 목록을 읽어 **① 감상·관심없음 제외 → ② TASTE 2
 ```json
 {
   "modelVersion": "als-2026-09-05",
-  "tasteModelVersion": "taste-e5-kmeans-2026-09-05",
   "embeddingModelVersion": "e5-2026-09-05",
   "factorDimension": 64,
   "trainedAt": "2026-09-05T18:00:00Z"
@@ -419,7 +416,6 @@ ADR-0016에 따라 Streaming 지연·장애 시에도 **마지막으로 성공�
 - [ ] 허용 지연 초기값과 Structured Streaming 트리거 주기 — 실측 후 확정
 - [ ] 비활성 사용자 Redis 키 정리 주기
 - [ ] `candidates` 키가 유실된 사용자의 `candidateVersion` 시작값 결정 방식 — 구현 단계에서 확정
-- [ ] 재학습 시 `movies.representative_flavor_id` 재배정 절차 — ERD D-13에서 확정(2.2의 `DISCOVERY` 판정 전제에 영향)
 - [ ] 콜드 스타트 처리 주체(Spark 사전 생성 vs Spring 폴백)
 - [ ] 추천 이유 문장 생성 방식(템플릿 vs LLM) — 내부 API 명세에서 이월
 - [ ] Kafka 발행 실패 시 재시도·보상 정책(트랜잭셔널 아웃박스 도입 여부)

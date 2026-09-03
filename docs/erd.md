@@ -36,8 +36,6 @@ erDiagram
     MOVIES ||--o{ RECOMMENDATION_ITEMS : candidate
     MOVIES }o--|| POPCORN_FLAVORS : representative_flavor
     RATINGS ||--|| FRAMES : creates
-    FRAMES ||--|| POPCORNS : creates
-    POPCORNS }o--|| POPCORN_FLAVORS : flavor
     PARTIES ||--o{ PARTY_MEMBERS : has
     PARTIES ||--o{ RECOMMENDATION_SETS : party_recommendation
 ```
@@ -133,7 +131,6 @@ erDiagram
         varchar poster_url "TMDb 미제공 시 NULL 가능"
         varchar backdrop_url "TMDb 미제공 시 NULL 가능"
         bigint representative_flavor_id FK "K-Means 대표 맛, 배정 전 NULL. ADR-0015"
-        varchar taste_model_version "취향 군집 모델 버전, 배정 전 NULL"
         numeric average_rating "서비스 평가 집계"
         int rating_count
         timestamptz synced_at "TMDb 동기화 시각, 동기화 전 NULL"
@@ -180,19 +177,12 @@ erDiagram
     }
     POPCORN_FLAVORS {
         bigint id PK
+        int cluster_id UK "K-Means 원시 Cluster ID, 공개 API 미노출"
         varchar code UK "불변"
         varchar display_name "변경 가능"
         varchar color "변경 가능"
         int sort_order
-    }
-    FLAVOR_CLUSTER_MAPPINGS {
-        bigint id PK
-        varchar taste_model_version "K-Means 학습 버전"
-        int cluster_id "K-Means 원시 Cluster ID, 공개 API 미노출"
-        bigint popcorn_flavor_id FK
-        jsonb representative_keywords "버전별 c-TF-IDF 대표 키워드"
-        boolean is_active "현재 서빙 버전 여부"
-        timestamptz created_at
+        jsonb representative_keywords "c-TF-IDF 대표 키워드"
     }
 
     MOVIES ||--o{ MOVIE_GENRES : classified
@@ -203,7 +193,6 @@ erDiagram
     MOVIES ||--o{ MOVIE_OTT_PROVIDERS : available_on
     OTTS ||--o{ MOVIE_OTT_PROVIDERS : provides
     POPCORN_FLAVORS ||--o{ MOVIES : representative
-    POPCORN_FLAVORS ||--o{ FLAVOR_CLUSTER_MAPPINGS : mapped_by
 ```
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
@@ -214,8 +203,7 @@ erDiagram
 | `people` | 인물(감독·배우) | 검색 대상(FR-14) | API-028, API-030 |
 | `otts` | OTT 기준정보 | 지원 목록은 미정(API-025) | FR-03, FR-16 · API-025 |
 | `movie_ott_providers` | 영화별 시청 가능 OTT | TMDb watch provider 동기화 | FR-16 · API-030 |
-| `popcorn_flavors` | 팝콘 맛 8종 기준정보 | `code` 불변, 표시명·색상 변경 가능. 모델 버전과 무관하게 8행 고정이며, 군집 매핑과 대표 키워드는 `flavor_cluster_mappings`가 보관 | FR-06 · API-044 · ADR-0015 |
-| `flavor_cluster_mappings` | 모델 버전별 (Cluster ID → 맛 코드) 매핑 | UK(`taste_model_version`, `cluster_id`)와 UK(`taste_model_version`, `popcorn_flavor_id`)로 버전 안에서 1:1. 재학습 시 새 버전 행을 추가하고 이전 버전은 이력으로 보존한다. `is_active`가 true인 버전은 1개(부분 유일 인덱스). 원시 `cluster_id`는 공개 API에 노출하지 않는다(ADR-0015) | FR-06 · API-044 · ADR-0015 |
+| `popcorn_flavors` | 팝콘 맛 8종 기준정보와 군집 매핑 | `cluster_id`와 `code`는 각각 유일하며 고정된 8개 Centroid와 1:1로 대응한다. 표시명·색상은 변경 가능하고 대표 키워드도 함께 보관한다. 원시 `cluster_id`는 공개 API에 노출하지 않는다 | FR-06 · API-044 · ADR-0015 |
 
 ### 2.3 온보딩·감상·취향
 
@@ -261,19 +249,11 @@ erDiagram
         bigint rating_id FK, UK
         bigint user_id FK
         bigint movie_id FK
-        bigint flavor_id FK
-        timestamptz created_at
-    }
-    POPCORNS {
-        bigint id PK
-        bigint frame_id FK, UK
-        bigint user_id FK
-        bigint flavor_id FK
-        boolean discovery "새로운 맛 발견 여부 (FR-32 확장)"
         timestamptz created_at
     }
     TASTE_ANALYSES {
-        bigint user_id PK, FK
+        bigint id PK
+        bigint user_id FK, UK
         jsonb analysis "장르·국가·시대·감독 집계"
         jsonb keywords "취향 키워드 3~5개"
         int rating_count
@@ -291,23 +271,19 @@ erDiagram
     MOVIES ||--o{ RATINGS : rated
     WATCH_RECORDS o|--o| RATINGS : rated_from
     RATINGS ||--|| FRAMES : creates
-    FRAMES ||--|| POPCORNS : creates
-    POPCORN_FLAVORS ||--o{ FRAMES : flavor
-    POPCORN_FLAVORS ||--o{ POPCORNS : flavor
     USERS ||--o| TASTE_ANALYSES : analyzed
 ```
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `onboarding_preferences` | 초기 취향(LIKE/DISLIKE) | UK(`user_id`, `movie_id`). 평가(1~5점)와 분리 저장, 프레임·팝콘 생성 안 함 | FR-02 · API-023, API-024 |
+| `onboarding_preferences` | 초기 취향(LIKE/DISLIKE) | UK(`user_id`, `movie_id`). 평가(1~5점)와 분리 저장하며 프레임을 생성하지 않음 | FR-02 · API-023, API-024 |
 | `user_otts` | 구독 OTT | 전체 교체(PUT) | FR-03 · API-026, API-027 |
 | `watch_records` | 감상 상태 머신 | 사용자·영화별 **활성 기록**(EXPIRED 아님)은 1개 — 부분 유일 인덱스(D-6 결정). 만료 후 재클릭은 새 행 | FR-17, FR-18 · API-033~035 |
-| `ratings` | 평가 + 한줄평 | UK(`user_id`, `movie_id`). 한줄평은 컬럼(별도 테이블 아님). 삭제 시 프레임·팝콘 함께 삭제, 감상 기록은 `WATCHED_UNRATED`로 복귀 | FR-19, FR-26 · API-036~039 |
-| `frames` | 필름의 프레임 | 평가와 1:1. 최초 저장 시 생성, 수정으로 변하지 않음 | FR-07, FR-08 · API-042, API-043 |
-| `popcorns` | 팝콘 1알 | 프레임과 1:1. `flavor_id`는 생성 시점의 영화 대표 맛이며 재학습으로 바뀌지 않는다(ADR-0015). 맛별 집계는 `COUNT`·`AVG(score)`로 계산 | FR-06, FR-09, FR-32 · API-041 |
-| `taste_analyses` | 취향 분석 결과 캐시 | Spring이 평가와 영화 취향 유형을 집계해 갱신. 추천 Re-ranking·XAI는 Spark Streaming이 담당(D-4) | FR-04, FR-05 · API-040 |
+| `ratings` | 평가 + 한줄평 | UK(`user_id`, `movie_id`). 한줄평은 컬럼(별도 테이블 아님). 삭제 시 프레임도 삭제되고 감상 기록은 `WATCHED_UNRATED`로 복귀 | FR-19, FR-26 · API-036~039 |
+| `frames` | 필름의 프레임 | 평가와 1:1. 조회용 `user_id`·`movie_id`를 보관하고 인덱싱하며 애플리케이션이 평가와의 일치를 보장한다. 맛은 영화 조인으로 조회한다 | FR-07, FR-08 · API-042, API-043 |
+| `taste_analyses` | 취향 분석 결과 캐시 | 별도 `id`와 UK(`user_id`), `rating_count >= 0` CHECK를 둔다. Spring이 평가 추가·수정·삭제 시 평가와 영화 정보를 집계해 갱신하며 평가가 없으면 행을 만들지 않는다 | FR-04, FR-05 · API-040 |
 
-> D-7 결정: 필름 중심 파생 기능(프레임 배치·메모·커버 등) 확장 가능성을 위해 `frames`·`popcorns`를 별도 테이블로 유지합니다.
+> D-7 결정: 필름 중심 파생 기능(프레임 배치·메모·커버 등) 확장 가능성을 위해 `frames`를 별도 테이블로 유지합니다. 팝콘 버킷은 별도 팝콘 행 없이 `ratings`와 `movies.representative_flavor_id`를 집계합니다.
 
 ### 2.4 추천
 
@@ -317,22 +293,20 @@ erDiagram
         bigint id PK
         bigint user_id FK "개인 추천. 파티 추천은 NULL"
         bigint party_id FK "파티 추천. 개인 추천은 NULL"
-        varchar source "HOME / PARTY"
         varchar input_version "평가·온보딩 변경 버전. 관심없음은 버전을 바꾸지 않음"
+        varchar model_version "ALS 추천 모델 버전"
         timestamptz generated_at
     }
     RECOMMENDATION_ITEMS {
         bigint id PK
         bigint set_id FK
         bigint movie_id FK
-        varchar type "TASTE / DISCOVERY / SIMILAR / PARTY"
+        varchar type "TASTE / DISCOVERY / PARTY"
         int position
-        bigint flavor_id FK
         jsonb reason "추천 이유 스냅샷 (summary, factors)"
         timestamptz exposed_at "노출 시각. NULL이면 미노출 버퍼분"
-        timestamptz dismissed_at
     }
-    RECOMMENDATION_DISMISSALS {
+    USER_MOVIE_DISMISSALS {
         bigint id PK
         bigint user_id FK
         bigint movie_id FK
@@ -344,17 +318,16 @@ erDiagram
     PARTIES ||--o{ RECOMMENDATION_SETS : receives
     RECOMMENDATION_SETS ||--|{ RECOMMENDATION_ITEMS : contains
     MOVIES ||--o{ RECOMMENDATION_ITEMS : candidate
-    POPCORN_FLAVORS o|--o{ RECOMMENDATION_ITEMS : flavor
-    USERS ||--o{ RECOMMENDATION_DISMISSALS : dismisses
-    MOVIES ||--o{ RECOMMENDATION_DISMISSALS : dismissed
-    RECOMMENDATION_ITEMS o|--o| RECOMMENDATION_DISMISSALS : from
+    USERS ||--o{ USER_MOVIE_DISMISSALS : dismisses
+    MOVIES ||--o{ USER_MOVIE_DISMISSALS : dismissed
+    RECOMMENDATION_ITEMS o|--o| USER_MOVIE_DISMISSALS : optional_source
 ```
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `recommendation_sets` | 추천 세트(이력 단위) | `user_id`·`party_id` 중 하나만 NOT NULL(CHECK). 입력이 바뀌지 않으면 같은 세트 반환 | FR-10, FR-33 · API-045, API-046, API-048, API-058 |
-| `recommendation_items` | 세트의 후보 영화 + 이유 스냅샷 | `reason`은 생성 시점 값을 JSONB로 보존(이후 영화 정보 변경과 무관). 세트당 버퍼 20편(설정값)을 저장하고 `exposed_at`으로 노출분을 구분한다(FR-33 이력은 노출분만) | FR-12, FR-13 · API-045~048 |
-| `recommendation_dismissals` | 관심없음 | UK(`user_id`, `movie_id`). 평가와 분리. 해제 기능은 미정 | FR-36 · API-047 |
+| `recommendation_sets` | 추천 세트(이력 단위) | `user_id`·`party_id` 중 하나만 NOT NULL(CHECK). 개인/파티 구분은 이 두 FK로 판단한다. `input_version`과 ALS `model_version`이 같으면 같은 세트를 반환하며 소유자별 부분 유일 인덱스를 둔다 | FR-10, FR-33 · API-045, API-046, API-048, API-058 |
+| `recommendation_items` | 세트의 후보 영화 + 이유 스냅샷 | 유형은 `TASTE`·`DISCOVERY`·`PARTY`. UK(`set_id`, `position`), UK(`set_id`, `movie_id`), `position >= 1`. 후보 20편을 모두 저장하고 `exposed_at`으로 실제 노출분을 구분한다 | FR-12, FR-13 · API-045~048 |
+| `user_movie_dismissals` | 사용자별 영화 관심없음 | UK(`user_id`, `movie_id`). 모든 화면의 모든 영화에 적용한다. `recommendation_item_id`는 선택적 출처이며 아이템 삭제 시 NULL로 전환한다 | FR-36 · API-047 |
 
 > 후보 Top-500은 Redis, Item Factor는 HDFS에 있으며 이 ERD 범위 밖입니다. 추천 세트의 후보 20편(버퍼)은 `recommendation_items`에 **전부 저장**하고, 추천 이력 조회(API-048)는 `exposed_at IS NOT NULL`인 노출분만 반환합니다. Redis의 추천 결과 캐시는 선택적 조회 가속용입니다 (MR !22 합의: PostgreSQL 저장안).
 
@@ -364,16 +337,17 @@ erDiagram
 erDiagram
     PARTIES {
         bigint id PK
-        varchar name "NULL 가능 (가정)"
+        varchar name "필수, 최대 20자"
         bigint owner_id FK
         varchar status "ACTIVE / CLOSED"
-        varchar closed_reason "MEMBER_LEFT / OWNER_CLOSED / OWNER_WITHDRAWN"
+        varchar closed_reason "INSUFFICIENT_MEMBERS / OWNER_CLOSED"
         timestamptz created_at
         timestamptz closed_at
     }
     PARTY_MEMBERS {
-        bigint party_id PK, FK
-        bigint user_id PK, FK
+        bigint id PK
+        bigint party_id FK
+        bigint user_id FK
         varchar role "OWNER / MEMBER"
         timestamptz joined_at
     }
@@ -396,9 +370,9 @@ erDiagram
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `parties` | 파티 | 사용자는 여러 활성 파티에 속할 수 있고 1인당 상한(기본 5)은 설정값(D-3 결정). 파티 인원 변경 시 해당 파티를 `CLOSED` 처리하고 파티장이 새로 생성 | FR-20 · API-049, API-050, API-055, API-056 |
-| `party_members` | 파티 구성원 | 파티장 포함 최대 4명은 애플리케이션 검증 | FR-20, FR-21 · API-057 |
-| `party_invitations` | 초대 | 자동 만료 없음. 거절 후 재초대는 새 행. `PENDING` 중복은 UK(`party_id`, `invitee_id`) WHERE status=PENDING(부분 유일) | FR-20 · API-051~054 |
+| `parties` | 파티 | 이름 필수, 최대 20자. `ACTIVE`이면 종료 사유·시각이 모두 NULL이고 `CLOSED`이면 모두 NOT NULL이다. 오너가 나간 뒤 2명 이상이면 최초 가입자에게 승계하고, 1명만 남으면 `INSUFFICIENT_MEMBERS`로 종료한다 | FR-20 · API-049, API-050, API-055, API-056 |
+| `party_members` | 파티 구성원 | 별도 `id`를 사용하고 UK(`party_id`, `user_id`)를 둔다. 오너도 `OWNER` 역할로 저장한다. 파티별 OWNER는 부분 유일 인덱스로 최대 1명을 보장하고, OWNER 존재·`parties.owner_id` 일치·최대 4명은 애플리케이션이 보장한다 | FR-20, FR-21 · API-057 |
+| `party_invitations` | 초대 | 현재 멤버라면 누구나 초대 가능하다. 자기 자신 초대 금지 CHECK와 `PENDING` 중복 부분 유일 인덱스를 두며, 기존 멤버·초대 발신자의 현재 멤버 여부는 애플리케이션에서 검증한다. `PENDING`이면 `responded_at`은 NULL이고 응답 완료 시 NOT NULL이다 | FR-20 · API-051~054 |
 
 ### 2.6 리포트 (2차 MVP)
 
@@ -434,20 +408,21 @@ erDiagram
 
 ## 3. 주요 상태 전이와 데이터 규칙
 
-### 감상 → 평가 → 프레임·팝콘
+### 감상 → 평가 → 프레임·팝콘 버킷
 
 ```mermaid
 flowchart LR
     A["OTT 링크 클릭<br/>watch_records: LINK_CLICKED"] -->|2일 후 접속, 감상함| B["WATCHED_UNRATED"]
     A -->|감상 안 함 또는 7일 미응답| X["EXPIRED"]
     B -->|평가 저장| C["RATED"]
-    C -->|ratings + frames + popcorns<br/>단일 트랜잭션 생성| D["필름·팝콘 버킷 반영"]
+    C -->|ratings + frames<br/>단일 트랜잭션 생성| D["필름 반영·팝콘 버킷 재집계"]
     C -->|평가 삭제| B
     S["감상 기록 없이 평가<br/>(D-6 결정: 허용)"] -.->|허용 시 RATED 기록 생성| C
 ```
 
-- `ratings` 저장·`frames`·`popcorns` 생성·`watch_records.status=RATED` 전이는 **하나의 트랜잭션**으로 처리합니다(NFR-06).
-- `ratings` 삭제 시 `frames`·`popcorns`는 CASCADE 삭제, `watch_records`는 `WATCHED_UNRATED`로 되돌립니다(FR-18).
+- `ratings` 저장·`frames` 생성·`watch_records.status=RATED` 전이는 **하나의 트랜잭션**으로 처리합니다(NFR-06).
+- `ratings` 삭제 시 `frames`는 CASCADE 삭제되고 `watch_records`는 `WATCHED_UNRATED`로 되돌립니다(FR-18).
+- 팝콘 버킷은 별도 행을 생성하지 않고 `ratings JOIN movies`를 맛별로 집계합니다.
 - `movies.average_rating`·`rating_count`와 `taste_analyses`는 평가 변경 시 갱신되는 파생 데이터입니다.
 
 ### 차단·공개 범위
@@ -457,7 +432,8 @@ flowchart LR
 
 ### 파티 인원 변경
 
-- 멤버가 나가거나 파티장이 종료하면 `parties.status=CLOSED`, `closed_reason` 기록, 대기 중 초대는 모두 `DECLINED` 처리합니다.
+- 오너 탈퇴 후 남은 멤버가 2명 이상이면 `joined_at ASC, user_id ASC`의 첫 멤버에게 오너를 승계하고 `ACTIVE`를 유지합니다.
+- 멤버 탈퇴 후 1명만 남으면 `INSUFFICIENT_MEMBERS`, 오너가 직접 종료하면 `OWNER_CLOSED`로 닫고 대기 중 초대를 모두 `DECLINED` 처리합니다.
 - 종료된 파티의 `recommendation_sets`는 보존합니다(추천 이력).
 
 ---
@@ -475,15 +451,15 @@ flowchart LR
 | `/movies/{movieId}/similar` | — (추천 서비스) | `movies` |
 | `/movies/{movieId}/reviews` | `ratings` | `users`, `user_blocks` |
 | `/movies/{movieId}/ott-clicks`, `/watch-records/*` | `watch_records` | `otts` |
-| `/movies/{movieId}/ratings`, `/ratings/{ratingId}`, `/users/me/ratings` | `ratings`, `frames`, `popcorns` | `watch_records`, `popcorn_flavors` |
+| `/movies/{movieId}/ratings`, `/ratings/{ratingId}`, `/users/me/ratings` | `ratings`, `frames` | `watch_records`, `movies`, `popcorn_flavors` |
 | `/users/me/taste` | `taste_analyses` | `ratings` |
-| `/users/me/popcorn`, `/popcorn-flavors` | `popcorns`, `popcorn_flavors`, `flavor_cluster_mappings` | `movies.representative_flavor_id` |
+| `/users/me/popcorn`, `/popcorn-flavors` | `popcorn_flavors`, `ratings` | `movies.representative_flavor_id` |
 | `/users/me/frames`, `/frames/{frameId}` | `frames` | `ratings`, `movies`, `watch_records` |
-| `/recommendations*` | `recommendation_sets`, `recommendation_items`, `recommendation_dismissals` | `movies`, `popcorn_flavors` |
-| `/parties*` | `parties`, `party_members`, `party_invitations` | `users`, `popcorns`(파티원 팝콘) |
+| `/recommendations*`, `/movies/{movieId}/dismiss` | `recommendation_sets`, `recommendation_items`, `user_movie_dismissals` | `movies`, `popcorn_flavors` |
+| `/parties*` | `parties`, `party_members`, `party_invitations` | `users`, `ratings`, `movies` |
 | `/users/me/reports`, `/reports/*` | `taste_reports`, `report_images` | — |
-| `/users/{userId}/profile`, `/users/{userId}/taste-comparison` | `users` | `frames`, `popcorns`, `ratings`, `user_blocks` |
-| `/movies/trending`, `/rankings/users`, `/recommendations/today`, 커뮤니티 | 미정 (2차·확장) | `ratings`, `popcorns` 집계 |
+| `/users/{userId}/profile`, `/users/{userId}/taste-comparison` | `users` | `frames`, `ratings`, `movies`, `user_blocks` |
+| `/movies/trending`, `/rankings/users`, `/recommendations/today`, 커뮤니티 | 미정 (2차·확장) | `ratings`, `movies` 집계 |
 
 ---
 
@@ -499,12 +475,12 @@ flowchart LR
 | D-4 | 취향 분석·추천 이유 계산 위치 | Spring Boot / FastAPI / Spark Streaming | **취향 집계는 Spring, 개인 Re-ranking·XAI는 Spark Streaming** (08-31, ADR-0016) | `taste_analyses` 갱신, Kafka 이벤트·Redis 결과 계약 |
 | D-5 | 영화의 대표 맛 규칙 | 장르 규칙 / K-Means / 큐레이션 | **E5 임베딩 K-Means의 최근접 Centroid 하나에 배정** (08-31, ADR-0015) | `movies.representative_flavor_id`, 팝콘 집계 |
 | D-6 | 감상 기록 없이 평가 허용 | 허용 / 불허 | **허용** (08-30) — `ratings.watch_record_id` NULL 허용 | `watch_records` 유일 제약, ⑩·⑪ 화면 |
-| D-7 | 프레임·팝콘 테이블 분리 | 별도 / `ratings` 흡수 | **별도 유지** (08-30) — 필름 파생 기능 확장 대비 | 필름·팝콘 조회, FR-32 저장 위치 |
+| D-7 | 프레임·팝콘 저장 구조 | 별도 테이블 / 평가·영화에서 조회 | **프레임만 별도 유지**, 팝콘 버킷은 평가와 영화 맛을 집계 | 필름·팝콘 조회 |
 | D-8 | 가입 시 나이 저장 형식 | 정수 / 연령대 / 출생연도 | **생년월일(`birth_date`)** (08-31, 08-30 출생연도에서 변경). 성별 3값 + NULL 허용 | `users`, API-001·008 |
 | D-9 | 탈퇴 사용자 데이터 처리 | 즉시 삭제 / 기간 보존 / 익명화 | **계정 영역 확정: 이메일·닉네임 치환 + 즉시 재사용 허용** (09-02, BE-A). `password_hash`·`birth_date`·`gender`, 소셜 연결 수단과 인증 토큰은 삭제한다. 내부·공개 식별자 및 다른 사용자 데이터와의 연결이 남으므로 계정 행 전체가 익명정보라고 전제하지 않는다. 공개 한줄평과 학습 데이터는 각 도메인 담당 결정 대기 | `users.status`, 공개 한줄평, 학습 데이터 |
 | D-10 | 평균 별점 집계 방식 | 반정규화 컬럼 / 조회 시 집계 / MView | **반정규화 컬럼, 차단 미반영** (08-30) | 평가 트랜잭션 범위, API-030 |
 | D-11 | 검색 엔진 | PostgreSQL full-text(`pg_trgm`) / Elasticsearch | **PostgreSQL full-text + `pg_trgm`** (08-31, ADR-0010) | 인덱스 설계 |
-| D-12 | 팝콘 맛 8종 기준정보 | 고정 장르 그룹 / ML 취향 군집 | **K-Means 8군집 + c-TF-IDF 대표 키워드, 안정 코드 매핑** (08-31, ADR-0015). 매핑은 `flavor_cluster_mappings`(`taste_model_version` + `cluster_id` → `popcorn_flavors.code`)에 버전별로 보존 | `popcorn_flavors`, `flavor_cluster_mappings` 초기 데이터, 온보딩 카드 |
-| D-13 | 재학습 시 기존 데이터 처리 | 전면 재배정 / 생성 시점 코드 보존 | **프레임·팝콘은 생성 시점 맛 코드 보존** (ADR-0015). 미정 — `movies.representative_flavor_id`·`taste_model_version` 재배정 절차와 `is_active` 버전 전환 시점 | `movies`, `frames`, `popcorns`, `flavor_cluster_mappings` |
+| D-12 | 팝콘 맛 8종 기준정보 | 고정 장르 그룹 / ML 취향 군집 | **고정 K-Means 8군집 + c-TF-IDF 대표 키워드**. `popcorn_flavors.cluster_id`와 맛 코드가 1:1로 대응한다 (ADR-0015) | `popcorn_flavors` 초기 데이터, 온보딩 카드 |
+| D-13 | 신규 영화 맛 배정 | 전체 재학습 / 고정 Centroid 예측 | **재학습·모델 버전 없이 기존 K-Means `predict`로 최근접 Centroid에 배정** (ADR-0015) | `movies.representative_flavor_id`, 신규 영화 분류 파이프라인 |
 
-미결은 D-9의 계정 외 영역(공개 한줄평, 학습 데이터), D-13(재학습 재배정 절차)와 팝콘 표시명·색상, 추천 임계치 같은 설정값입니다.
+미결은 D-9의 계정 외 영역(공개 한줄평, 학습 데이터), 팝콘 표시명·색상과 추천 임계치 같은 설정값입니다.
