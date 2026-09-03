@@ -75,26 +75,31 @@ sudo chown -R "$USER:$USER" <repo>/.git
   - ALS 학습
   - 콘텐츠 기반 후보 계산
   - Hybrid 추천 후보 생성
-  - 사용자별 추천 후보 Top-K 사전 계산
+  - 모델·Item Factor 산출과 사용자별 추천 재구축 요청
 
 - Python Fold-in Consumer
   - Kafka의 명시적 평가 이벤트 소비
   - 사용자 ALS Vector 갱신
   - 해당 사용자의 추천 후보 Top-K 재계산
+  - Re-Ranking·XAI 생성 후 최종 추천 Top-N 저장
 
 - Spark Streaming
   - 조회, 클릭 등 실시간 행동 이벤트 처리
   - 실시간 취향 Feature 계산
+  - 여러 사용자의 영화 조회를 이벤트 시간 윈도우로 집계
+  - 실시간 인기 영화 스냅샷 생성
 
 - Redis
   - 추천 후보
   - 사용자 Vector
   - 실시간 Feature 저장
+  - 최종 추천 Top-N·추천 근거 저장
+  - 실시간 인기 영화 스냅샷 저장
 
 - Spring Boot
-  - Redis의 추천 후보 조회
-  - 실시간 Feature 기반 Re-Ranking
-  - 최종 추천 API 제공
+  - Redis의 최종 추천 Top-N과 인기 영화 스냅샷 조회
+  - 감상·관심없음 제외와 추천 세트 버퍼 저장
+  - 최종 추천·급상승 영화 API 제공
 
 ## Compose
 

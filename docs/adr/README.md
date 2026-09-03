@@ -50,7 +50,7 @@
 
 ### 개발 시작 전 확정 사항 중 아키텍처·기술 선택
 
-A 회의 안건 12건 중 아키텍처·기술 선택에 해당하는 5건입니다. 나머지(A-2~A-7, A-9)는 데이터 모델·API 규약·제품 정책이라 ERD·API 명세·요구사항 문서에 기록합니다. 이 중 ADR-0012는 후속 기술 결정 ADR-0016으로 대체되었습니다.
+A 회의 안건 12건 중 아키텍처·기술 선택에 해당하는 5건입니다. 나머지(A-2~A-7, A-9)는 데이터 모델·API 규약·제품 정책이라 ERD·API 명세·요구사항 문서에 기록합니다. 이 중 ADR-0012는 ADR-0016을 거쳐 ADR-0017로 대체되었습니다.
 
 | ADR | 안건 | 결정 | 상태 |
 |---|---|---|---|
@@ -67,7 +67,8 @@ A 회의 안건 12건 중 아키텍처·기술 선택에 해당하는 5건입니
 | [ADR-0013](./0013-react-web-client.md) | 웹 클라이언트는 React + Vite 기반 반응형 웹앱으로 구현한다 | 채택 (2026-08-31) |
 | [ADR-0014](./0014-e5-pgvector-content-embedding.md) | 영화 콘텐츠는 다국어 임베딩과 pgvector로 검색한다 | 채택 (2026-08-31) |
 | [ADR-0015](./0015-kmeans-ctfidf-taste-clusters.md) | 팝콘 8개 취향 유형은 K-Means와 c-TF-IDF로 생성한다 | 채택 (2026-08-31) |
-| [ADR-0016](./0016-kafka-spark-streaming-recommendation-serving.md) | 실시간 추천 갱신은 Kafka와 Spark Structured Streaming으로 수행한다 | 채택 (2026-08-31) |
+| [ADR-0016](./0016-kafka-spark-streaming-recommendation-serving.md) | 실시간 추천 갱신은 Kafka와 Spark Structured Streaming으로 수행한다 | 대체 → ADR-0017 |
+| [ADR-0017](./0017-python-foldin-spark-trending-split.md) | 개인 Fold-in은 Python Consumer, 전역 인기 집계는 Spark Structured Streaming으로 분리한다 | 채택 (2026-09-01) |
 
 ## 관련 문서
 
