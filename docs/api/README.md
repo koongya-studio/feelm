@@ -17,7 +17,7 @@ FEELM 서비스 REST API 명세입니다. Notion 「설계 > API 명세서」 �
 | [소셜](./social.md) | 소셜 | 5 |
 | [리포트·트렌드](./report-trend.md) | 리포트, 트렌드 | 4 |
 
-FastAPI 내부 API 초안은 ADR-0016으로 대체되어 사용하지 않습니다. 이전 계약과 변경 배경은 [폐기된 내부 API 초안](./internal.md)을 참고합니다.
+FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용하지 않습니다. 현재 이벤트·Redis 경계는 [스트리밍 계약](./streaming-contract.md), 이전 계약과 변경 배경은 [폐기된 내부 API 초안](./internal.md)을 참고합니다.
 
 ## 범례
 
@@ -243,6 +243,6 @@ FastAPI 내부 API 초안은 ADR-0016으로 대체되어 사용하지 않습니�
 ### 미정 사항
 
 - [ ] Rate limit 정책과 임계치 — 설정값, 운영 전 확정
-- [ ] Kafka 이벤트 스키마와 Redis Candidate·행동 Feature·Top-N 키 계약 (ADR-0016, NFR-04)
+- [ ] Python Fold-in Consumer·Spark Streaming 구현의 Kafka Consumer Group과 운영 설정 (ADR-0017, NFR-04)
 
 해소된 항목(2026-08-30~31 결정): 식별자 타입·공개 식별자(ADR-0008), Refresh 전달·저장(ADR-0009), 오류 `code` 규칙(의미 코드), 알림 전달 방식(폴링, ADR-0011). 결정 기록은 [ADR](../adr/README.md)과 [ERD 5장](../erd.md#5-물리-스키마-전-결정-사항)을 참조합니다.

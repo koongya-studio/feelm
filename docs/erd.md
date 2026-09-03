@@ -281,7 +281,7 @@ erDiagram
 | `watch_records` | 감상 상태 머신 | 사용자·영화별 **활성 기록**(EXPIRED 아님)은 1개 — 부분 유일 인덱스(D-6 결정). 만료 후 재클릭은 새 행 | FR-17, FR-18 · API-033~035 |
 | `ratings` | 평가 + 한줄평 | UK(`user_id`, `movie_id`). 한줄평은 컬럼(별도 테이블 아님). 삭제 시 프레임도 삭제되고 감상 기록은 `WATCHED_UNRATED`로 복귀 | FR-19, FR-26 · API-036~039 |
 | `frames` | 필름의 프레임 | 평가와 1:1. 조회용 `user_id`·`movie_id`를 보관하고 인덱싱하며 애플리케이션이 평가와의 일치를 보장한다. 맛은 영화 조인으로 조회한다 | FR-07, FR-08 · API-042, API-043 |
-| `taste_analyses` | 취향 분석 결과 캐시 | 별도 `id`와 UK(`user_id`), `rating_count >= 0` CHECK를 둔다. Spring이 평가 추가·수정·삭제 시 평가와 영화 정보를 집계해 갱신하며 평가가 없으면 행을 만들지 않는다 | FR-04, FR-05 · API-040 |
+| `taste_analyses` | 취향 분석 결과 캐시 | 별도 `id`와 UK(`user_id`), `rating_count >= 0` CHECK를 둔다. Spring이 평가 추가·수정·삭제 시 평가와 영화 정보를 집계해 갱신하며 평가가 없으면 행을 만들지 않는다. 기본 Re-ranking·XAI 근거는 Python Consumer, 행동 Feature 경량 재정렬·최종 XAI 조립은 Spring이 담당한다(D-4) | FR-04, FR-05 · API-040 |
 
 > D-7 결정: 필름 중심 파생 기능(프레임 배치·메모·커버 등) 확장 가능성을 위해 `frames`를 별도 테이블로 유지합니다. 팝콘 버킷은 별도 팝콘 행 없이 `ratings`와 `movies.representative_flavor_id`를 집계합니다.
 
@@ -459,7 +459,8 @@ flowchart LR
 | `/parties*` | `parties`, `party_members`, `party_invitations` | `users`, `ratings`, `movies` |
 | `/users/me/reports`, `/reports/*` | `taste_reports`, `report_images` | — |
 | `/users/{userId}/profile`, `/users/{userId}/taste-comparison` | `users` | `frames`, `ratings`, `movies`, `user_blocks` |
-| `/movies/trending`, `/rankings/users`, `/recommendations/today`, 커뮤니티 | 미정 (2차·확장) | `ratings`, `movies` 집계 |
+| `/movies/trending` | Redis 실시간 인기 스냅샷(ADR-0017) | `movies`, Kafka `VIEW` 이벤트 |
+| `/rankings/users`, `/recommendations/today`, 커뮤니티 | 미정 (확장) | `ratings`, `movies` 집계 |
 
 ---
 
@@ -472,7 +473,7 @@ flowchart LR
 | D-1 | 식별자 타입 | `bigint` 시퀀스 / UUID(v7) / 혼합 | **내부 `bigint` + 공개 URL `users.public_id`** (08-30, ADR-0008) | 전 테이블, 전 API 응답 |
 | D-2 | Refresh Token 저장소 | PostgreSQL / Redis(TTL) | **Redis** (08-31, ADR-0009) — `refresh_tokens` 테이블 제거 | 인증 API, 회전·폐기, 탈퇴 처리 |
 | D-3 | 사용자당 활성 파티 수 | 1개 제한 / 복수 허용 | **복수 허용, 상한(기본 5) 설정값** (08-30) | API-049·050·053, ⑧ 화면 |
-| D-4 | 취향 분석·추천 이유 계산 위치 | Spring Boot / FastAPI / Spark Streaming | **취향 집계는 Spring, 개인 Re-ranking·XAI는 Spark Streaming** (08-31, ADR-0016) | `taste_analyses` 갱신, Kafka 이벤트·Redis 결과 계약 |
+| D-4 | 취향 분석·추천 이유 계산 위치 | Spring Boot / FastAPI / Python Consumer / Spark Streaming | **취향 집계와 행동 Feature 경량 재정렬·최종 XAI 조립은 Spring, 개인 Fold-in·Candidate·기본 Top-N/XAI는 Python Consumer, 행동 Feature 집계와 전역 인기는 Spark Streaming** (09-01, ADR-0017) | `taste_analyses` 갱신, Kafka 이벤트·Redis 결과 계약 |
 | D-5 | 영화의 대표 맛 규칙 | 장르 규칙 / K-Means / 큐레이션 | **E5 임베딩 K-Means의 최근접 Centroid 하나에 배정** (08-31, ADR-0015) | `movies.representative_flavor_id`, 팝콘 집계 |
 | D-6 | 감상 기록 없이 평가 허용 | 허용 / 불허 | **허용** (08-30) — `ratings.watch_record_id` NULL 허용 | `watch_records` 유일 제약, ⑩·⑪ 화면 |
 | D-7 | 프레임·팝콘 저장 구조 | 별도 테이블 / 평가·영화에서 조회 | **프레임만 별도 유지**, 팝콘 버킷은 평가와 영화 맛을 집계 | 필름·팝콘 조회 |

@@ -163,8 +163,9 @@
 - 감상 기록이 있는 영화(`LINK_CLICKED` 포함, 평가 여부 무관)와 관심없음 영화는 제외한다
 - 추천 입력(평가·온보딩 선택)이 바뀌지 않으면 같은 `recommendationSetId`와 결과를 반환한다. 입력이 바뀌면 새 세트를 생성한다. 관심없음은 입력 변경으로 취급하지 않고 세트 내 교체로 처리한다(API-047)
 - 온보딩을 건너뛰고 평가가 없는 사용자는 인기 기반 후보로 `TASTE`를 채운다(가정)
-- Spark Streaming이 Redis에 갱신한 최종 Top-N에서 Spring이 후보 20편(설정값)을 읽고, 세트 버퍼로 저장해 3편씩 노출한다
-- 버퍼는 PostgreSQL `recommendation_items`에 저장하고 `exposed_at`으로 노출 여부를 구분한다. 강한 신호는 Kafka 이벤트로 Candidate와 Top-N을 갱신하고, 약한 신호는 다음 Streaming 재정렬에 반영한다(ADR-0016)
+- Python Consumer가 Redis에 갱신한 기본 Top-N을 Spring이 최신 행동 Feature로 경량 재정렬하고 후보 20편(설정값)을 세트 버퍼로 저장해 3편씩 노출한다
+- 버퍼는 PostgreSQL `recommendation_items`에 저장하고 `exposed_at`으로 노출 여부를 구분한다. 강한 신호는 Python Consumer가 Candidate와 기본 Top-N·XAI를 같은 사용자 단위 처리에서 갱신하고, 약한 신호는 Spark Streaming이 행동 Feature를 갱신해 Spring의 다음 세트 생성 때 반영한다. 약한 신호만으로 현재 세트는 무효화하지 않는다(ADR-0017)
+- 강한 신호로 세트 버퍼가 무효화된 뒤 `topn.candidateVersion`이 최신 `candidates.candidateVersion`보다 낮으면 Spring은 부분 갱신 상태로 보고 이전 `topn`으로 새 세트를 만들지 않는다. 짧은 재시도 후에도 버전이 맞지 않으면 `503 RECOMMENDATION_UNAVAILABLE`을 반환한다
 - 새 세트 생성 시 추천 이력(FR-33)에 시각·유형·이유·후보를 저장한다
 - `reason.factors[].type`: `GENRE`, `DIRECTOR`, `ACTOR`, `COUNTRY`, `ERA`, `SIMILAR_MOVIE`, `NEW_FLAVOR`(가정)
 
@@ -176,7 +177,7 @@
 
 - [ ] 콜드 스타트 전략(온보딩 건너뛴 사용자)
 - [ ] 추천 이유 factor 타입 목록과 문장 생성 방식(템플릿 vs LLM)
-- [ ] Kafka 이벤트 스키마, Redis 추천 키와 Streaming 반영 지연 계약
+- [ ] Re-ranking 가중치와 추천 이유 생성 방식
 
 ## API-046 추가 영화 추천
 
@@ -543,7 +544,7 @@ OTT별로 사용자 취향과 유사한 미감상 영화 수를 집계해 구독
 
 ### 처리 규칙
 
-- 집계 기준은 Spark가 사용자 취향 벡터와 사전 계산된 영화 임베딩의 유사도로 산출해 Redis에 적재한 **사용자별 영화 점수** 하나다. Spring은 이 점수가 임계치 이상이고 감상 기록·관심없음이 없는 영화를 OTT 제공처별로 집계한다(ADR-0016)
+- 집계 기준은 Python Consumer가 사용자 취향 벡터와 사전 계산된 영화 Factor로 산출해 Redis에 적재한 **사용자별 영화 점수** 하나다. Spring은 이 점수가 임계치 이상이고 감상 기록·관심없음이 없는 영화를 OTT 제공처별로 집계한다(ADR-0017)
 - `items`는 `matchCount` 내림차순으로 정렬한다
 - 순위는 절대 편수 기준이며 OTT 카탈로그 크기로 정규화하지 않는다(FR-40)
 - `topMovies`는 같은 점수 기준 상위 3편이며 미감상 필터를 동일하게 적용한다

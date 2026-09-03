@@ -52,7 +52,7 @@ MovieLens 32M 규모의 평점 데이터를 **Hadoop/HDFS와 Spark로 분산 처
 | **새로운 맛** | 팝콘 수가 임계치 미만인 맛으로 발견 추천의 대상 |
 | **발견** | 새로운 맛의 영화를 감상하고 **평가까지 완료**하는 행위 |
 | **파티(Party)** | 함께 볼 영화를 고르기 위한 모임. 문서와 코드 모두 `Party`로 통일한다 |
-| **후보(Candidate)** | Spark 배치가 사전 생성한 사용자별 Top-N 목록. 500편 기준 |
+| **후보(Candidate)** | Python Fold-in Consumer가 ALS Item Factor로 생성하는 사용자별 추천 후보 목록. 500편 기준 |
 
 > 필름은 **기록 축**, 팝콘 버킷은 **취향 축**으로 분리한다.
 
@@ -129,7 +129,7 @@ MovieLens 32M 규모의 평점 데이터를 **Hadoop/HDFS와 Spark로 분산 처
 | FR-24 | 리포트 | 취향 리포트를 카드 형태로 외부 공유 |
 | FR-25 | 소셜 | 공개 설정한 사용자의 필름과 팝콘 버킷 조회 및 비교 |
 | FR-26 | 소셜 | 영화별 한줄평 조회·작성 |
-| FR-27 | 트렌드 | 전체 사용자 평가 데이터 기반 급상승 영화 제공 |
+| FR-27 | 트렌드 | 전체 사용자의 영화 조회 추이를 실시간 집계해 급상승 영화 제공 |
 
 ### 확장 기능
 
@@ -263,25 +263,28 @@ flowchart TB
 
     subgraph STORE["Serving Store"]
         PG[("PostgreSQL + pgvector<br/>서비스 데이터 · 영화 임베딩")]
-        RD[("Redis<br/>User Vector · Candidate · 행동 Feature<br/>최종 Top-N · XAI")]
+        RD[("Redis<br/>User Vector · Candidate · 행동 Feature<br/>기본 Top-N · 실시간 인기")]
     end
 
     subgraph SPARK["Spark Cluster · EC2 2대"]
         SM["Spark Batch<br/>ALS · E5 · K-Means"]
-        SS["Structured Streaming<br/>Fold-in · Candidate Refresh<br/>행동 집계 · Re-ranking"]
+        SS["Structured Streaming<br/>행동 Feature<br/>전역 인기 윈도우 집계"]
         W1["Worker 1"]
         W2["Worker 2"]
     end
 
     LAKE[("HDFS / Parquet<br/>MovieLens · TMDb 원본 및 가공<br/>Item Factor")]
-    KF["Kafka<br/>Rating · Onboarding · Dismiss<br/>View · Click · OTT Click"]
+    KF["Kafka<br/>Rating · Onboarding<br/>Dismiss · View · Click · OTT Click"]
+    PC["Python Fold-in Consumer<br/>User Vector · Candidate · 기본 Top-N/XAI"]
     TMDB["TMDb API"]
 
     FE --> BE
     BE --> PG
     BE --> RD
     BE --> KF
-    KF --> SS
+    KF -->|"Rating · Onboarding"| PC
+    PC --> RD
+    KF -->|"View · Click · Dismiss"| SS
     SS --> RD
     BE -->|"유사 영화 벡터 검색"| PG
     TMDB --> BE
@@ -302,19 +305,20 @@ flowchart TB
 
 | 컴포넌트 | 역할 |
 | --- | --- |
-| **Spark / PySpark Batch** | 전처리, ALS 학습, E5 임베딩, K-Means 취향 군집, 초기 Candidate 생성 |
+| **Spark / PySpark Batch** | 전처리, ALS 학습, E5 임베딩, K-Means 취향 군집, 모델·Item Factor 산출 |
 | **Kafka** | 평점·온보딩·관심없음·조회·추천 클릭·OTT 클릭 이벤트 전달 |
-| **Spark Structured Streaming** | 사용자 Fold-in, Candidate 갱신, 행동 Feature 집계, 개인 Re-ranking·XAI |
+| **Python Fold-in Consumer** | 평가·온보딩 변경 사용자의 User Vector, Candidate Top-500, 기본 Top-N·XAI 갱신 |
+| **Spark Structured Streaming** | 행동 Feature와 전체 사용자 실시간 인기 윈도우 집계 |
 | **HDFS / Parquet** | MovieLens·TMDb 원본 및 가공 데이터, Item Factor 저장 |
-| **Redis** | User Vector, Candidate Top-500, 행동 Feature, 최종 Top-N·추천 근거 저장 |
+| **Redis** | User Vector, Candidate Top-500, 행동 Feature, 기본 Top-N·추천 근거와 실시간 인기 스냅샷 저장 |
 | **PostgreSQL + pgvector** | 영속 데이터와 영화 임베딩 저장, 유사 영화 벡터 검색 |
-| **Spring Boot** | 서비스 API, Kafka 발행, 파티·OTT 집계, Redis 추천 서빙·이력 저장 |
+| **Spring Boot** | 서비스 API, Kafka 발행, 행동 Feature 기반 경량 재정렬, 파티·OTT 집계, Redis 추천 서빙·이력 저장 |
 | **React + Vite** | 필름·팝콘 버킷·개인·파티 추천 UI와 SVG 시각화 |
 
 ### 미확정 사항
 
-- 실시간 추천 갱신은 **Kafka + Spark Structured Streaming**으로 확정했다(ADR-0016). Kafka 이벤트 스키마,
-  Redis 키, Re-ranking 가중치와 파티·OTT 점수식은 구현 전에 세부 계약으로 확정한다.
+- 실시간 처리는 **Python Fold-in Consumer + Spark Structured Streaming**으로 책임을 분리했다(ADR-0017).
+  Kafka 이벤트·Redis 키 계약은 [스트리밍 계약](./docs/api/streaming-contract.md)을 따르며 Re-ranking 가중치와 파티·OTT 점수식은 구현 전에 확정한다.
 - 물리 스키마·마이그레이션은 [논리 ERD](./docs/erd.md)를 기준으로 구현 전에 작성한다.
 - 리포트 기능의 결과 이미지는 S3 호환 객체 스토리지에 저장하며 로컬·자체 호스팅은 MinIO를 사용할 수 있다.
 
@@ -336,15 +340,20 @@ flowchart LR
     A["MovieLens · TMDb"] --> B["HDFS / Parquet"]
     B --> C["Spark Batch<br/>ALS · E5 · K-Means"]
     C --> D["Item Factor · Embedding<br/>Taste Cluster"]
-    D --> E["초기 Candidate Top-500"]
+    D --> E["Model Version · Item Factor 갱신"]
     E --> F["Redis"]
-    G["평점 · 온보딩 · 관심없음<br/>조회 · 클릭"] --> H["Spring → Kafka"]
-    H --> I["Spark Structured Streaming"]
-    I --> J["Fold-in · Candidate Refresh<br/>행동 Feature"]
-    J --> K["Weighted Re-ranking · XAI"]
-    K --> F
-    F --> L["Spring Boot"]
-    L --> M["React + Vite Web App"]
+    G["평점 · 온보딩"] --> BEE["Spring Boot 이벤트 발행"]
+    BEE --> H["Kafka"]
+    H -->|"평가 · 온보딩"| I["Python Fold-in Consumer"]
+    E -->|"전체 사용자 재구축 요청"| I
+    I --> J["User Vector · Candidate · 기본 Top-N/XAI"]
+    J --> F
+    BH["조회 · 클릭 · 관심없음"] --> BEE
+    H -->|"조회 · 클릭 · 관심없음"| M["Spark Structured Streaming"]
+    M --> N["행동 Feature<br/>전역 인기 윈도우 집계"]
+    N --> F
+    F --> SB["Spring Boot<br/>행동 Feature 경량 재정렬"]
+    SB --> O["React + Vite Web App"]
 ```
 
 ### 추천 종류
@@ -406,13 +415,13 @@ flowchart LR
 | --- | --- | --- |
 | 분산 저장 | Hadoop HDFS, Parquet | 확정 |
 | 분산 처리 | Apache Spark / PySpark | 확정 |
-| 이벤트 스트림 | Kafka, Spark Structured Streaming | 확정 |
+| 이벤트 스트림 | Kafka, Python Consumer, Spark Structured Streaming | 확정 |
 | 추천 | ALS, 콘텐츠 기반, Hybrid | 확정 |
 | 콘텐츠 임베딩 | 다국어 임베딩, pgvector (`multilingual-e5-base`는 MVP 베이스라인) | 모델 비교 평가 후 체크포인트 확정 |
 | 취향 유형 | K-Means 8군집, c-TF-IDF | 확정 |
 | 파티 추천 | Average / Least Misery / 개선식 | 비교 후 확정 |
 | Backend | Spring Boot | 확정 |
-| 추천 갱신·서빙 | Spark Structured Streaming, Redis, Spring Boot | 확정 |
+| 추천 갱신·인기 집계·서빙 | Python Consumer, Spark Structured Streaming, Redis, Spring Boot | 확정 |
 | 검색 | PostgreSQL full-text, pg_trgm | 확정 |
 | DB·벡터 검색 | PostgreSQL, pgvector(HNSW) | 확정 |
 | Cache | Redis | 확정 |
@@ -500,10 +509,10 @@ python -m pytest tests
 | --- | --- |
 | 요구사항 정의서 | [docs/requirements.md](./docs/requirements.md) · 검토 중(미결 사항은 문서 5장) |
 | 논리 ERD | [docs/erd.md](./docs/erd.md) · 작성 완료, 물리 스키마는 구현 전 작성 |
-| API 명세 | [docs/api](./docs/api/README.md) · 초안 67건, FastAPI 내부 API 초안은 ADR-0016으로 대체 |
-| 기술 결정 기록(ADR) | [docs/adr](./docs/adr/README.md) · 16건(채택 14, 대체 2) |
+| API 명세 | [docs/api](./docs/api/README.md) · 초안 68건, FastAPI 내부 API 초안은 ADR-0017로 대체 |
+| 기술 결정 기록(ADR) | [docs/adr](./docs/adr/README.md) · 17건(채택 14, 대체 3) |
 | 와이어프레임 | 29개 화면 · [화면 설계](#5-화면-설계) 참고 · 검색 화면 미정 |
-| 추천 구조 설계 | Kafka·Spark Structured Streaming 확정(ADR-0016) · 파티 집계식은 비교 실험 후 확정 |
+| 추천·인기 처리 구조 설계 | Python Fold-in Consumer·Spark Structured Streaming 책임 분할 확정(ADR-0017) · 파티 집계식은 비교 실험 후 확정 |
 
 기획과 설계 원본은 팀 Notion에서 관리하며, 확정된 계약과 규칙은 이 저장소의 `docs/`에 반영한다.
 
