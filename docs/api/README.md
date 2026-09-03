@@ -79,7 +79,7 @@ FastAPI 내부 API 초안은 ADR-0016으로 대체되어 사용하지 않습니�
 | API-044 | [팝콘 맛 기준정보 조회](./taste.md#api-044-팝콘-맛-기준정보-조회) | GET | `/popcorn-flavors` | 취향 | 1차 MVP | 공개 | FR-06 | O |
 | API-045 | [기본 추천 조회](./recommendation.md#api-045-기본-추천-조회) | GET | `/recommendations` | 추천 | 1차 MVP | 회원 | FR-10, FR-12, FR-13 | O |
 | API-046 | [추가 영화 추천](./recommendation.md#api-046-추가-영화-추천) | POST | `/recommendations/more` | 추천 | 1차 MVP | 회원 | FR-10 | O |
-| API-047 | [관심없음 표시](./recommendation.md#api-047-관심없음-표시) | POST | `/recommendations/items/{recommendationItemId}/dismiss` | 추천 | 1차 MVP | 회원 | FR-36 | O |
+| API-047 | [관심없음 표시](./recommendation.md#api-047-관심없음-표시) | POST | `/movies/{movieId}/dismiss` | 추천 | 1차 MVP | 회원 | FR-36 | O |
 | API-048 | [추천 이력 조회](./recommendation.md#api-048-추천-이력-조회) | GET | `/recommendations/history` | 추천 | 1차 MVP | 회원 | FR-33, FR-13 |  |
 | API-049 | [파티 생성](./party.md#api-049-파티-생성) | POST | `/parties` | 파티 | 1차 MVP | 회원 | FR-20 | O |
 | API-050 | [내 파티 목록](./party.md#api-050-내-파티-목록) | GET | `/parties` | 파티 | 1차 MVP | 회원 | FR-20 |  |
@@ -205,7 +205,7 @@ FastAPI 내부 API 초안은 ADR-0016으로 대체되어 사용하지 않습니�
 |---|---|---|
 | `LINK_CLICKED` | OTT 보러가기 클릭. 감상 확정 아님 | 클릭 2일 후 접속 시 감상 확인 질문 대상 |
 | `WATCHED_UNRATED` | 감상 완료(평가 전) | 감상 확인에 '감상함' 응답 |
-| `RATED` | 평가 완료. 프레임·팝콘 생성됨 | 평가 저장. 평가 삭제 시 `WATCHED_UNRATED`로 복귀 |
+| `RATED` | 평가 완료. 프레임이 생성되고 팝콘 버킷 집계에 반영됨 | 평가 저장. 평가 삭제 시 `WATCHED_UNRATED`로 복귀 |
 | `EXPIRED` | 만료. 추천 신호로 사용하지 않음 | '감상하지 않음' 응답 또는 7일 미응답 |
 
 #### Visibility — 공개 범위
@@ -214,7 +214,7 @@ FastAPI 내부 API 초안은 ADR-0016으로 대체되어 사용하지 않습니�
 
 #### RecommendationType — 추천 유형
 
-- `TASTE` 취향 기반(FR-10), `DISCOVERY` 취향 발견(FR-12), `SIMILAR` 유사 영화(FR-11), `PARTY` 파티(FR-22)
+- `TASTE` 취향 기반(FR-10), `DISCOVERY` 취향 발견(FR-12), `PARTY` 파티(FR-22). 유사 영화는 영화 벡터 기반 별도 API이며 추천 이력 유형에 포함하지 않는다
 
 #### OnboardingPreference — 온보딩 반응
 

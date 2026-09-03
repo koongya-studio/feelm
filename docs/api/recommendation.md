@@ -7,7 +7,7 @@
 | [API-031](#api-031-유사-영화-추천) | 유사 영화 추천 | GET | `/movies/{movieId}/similar` | 1차 MVP | 선택 |
 | [API-045](#api-045-기본-추천-조회) | 기본 추천 조회 | GET | `/recommendations` | 1차 MVP | 회원 |
 | [API-046](#api-046-추가-영화-추천) | 추가 영화 추천 | POST | `/recommendations/more` | 1차 MVP | 회원 |
-| [API-047](#api-047-관심없음-표시) | 관심없음 표시 | POST | `/recommendations/items/{recommendationItemId}/dismiss` | 1차 MVP | 회원 |
+| [API-047](#api-047-관심없음-표시) | 관심없음 표시 | POST | `/movies/{movieId}/dismiss` | 1차 MVP | 회원 |
 | [API-048](#api-048-추천-이력-조회) | 추천 이력 조회 | GET | `/recommendations/history` | 1차 MVP | 회원 |
 | [API-066](#api-066-오늘의-영화) | 오늘의 영화 | GET | `/recommendations/today` | 확장 | 회원 |
 | [API-068](#api-068-ott-구독-추천) | OTT 구독 추천 | GET | `/recommendations/otts` | 확장 | 회원 |
@@ -76,15 +76,15 @@
 - 기준 영화 자체는 결과에 포함하지 않는다
 - Spring이 PostgreSQL/pgvector HNSW 인덱스에서 Top-K를 조회하고 영화 메타데이터를 결합한다
 - 콘텐츠 기반이므로 비회원에게도 동일 결과를 제공한다
+- 사용자·파티 추천 세트와 무관한 영화 벡터 기반 결과이므로 `recommendation_items`와 추천 이력에 저장하지 않는다
 
 ### 상태값
 
-- RecommendationType `SIMILAR`
+없음
 
 ### 미정 사항
 
 - [ ] 로그인 사용자의 감상 영화 제외 여부
-- [ ] 유사 추천을 추천 이력(FR-33)에 기록할지
 
 ## API-045 기본 추천 조회
 
@@ -250,7 +250,7 @@
 
 ## API-047 관심없음 표시
 
-`POST` `/api/v1/recommendations/items/{recommendationItemId}/dismiss`
+`POST` `/api/v1/movies/{movieId}/dismiss`
 
 | 항목 | 값 |
 |---|---|
@@ -263,15 +263,15 @@
 
 ### 설명
 
-추천 카드를 관심없음으로 표시하고 같은 유형의 새 후보 1편으로 즉시 교체한다.
+영화를 관심없음으로 표시한다. 추천 카드에서 호출한 경우 선택적으로 추천 항목 출처를 기록하고 같은 유형의 새 후보 1편으로 즉시 교체한다. 영화 상세 등 다른 화면에서도 모든 영화에 사용할 수 있다.
 
 ### 인증 및 권한
 
-- 회원. 본인 추천 항목만
+- 회원
 
 ### Path Parameters
 
-- `recommendationItemId`
+- `movieId`
 
 ### Query Parameters
 
@@ -279,7 +279,11 @@
 
 ### Request Body
 
-없음
+```json
+{ "recommendationItemId": 3301 }
+```
+
+- `recommendationItemId`는 추천 카드에서 호출할 때만 보내는 선택값이다
 
 ### Response
 
@@ -287,7 +291,6 @@
 
 ```json
 {
-  "dismissedItemId": 3301,
   "movieId": 550,
   "replacement": {
     "recommendationItemId": 3305,
@@ -308,7 +311,9 @@
 
 ### 처리 규칙
 
-- 관심없음은 평가가 아니며 평가 테이블과 분리해 저장한다. 팝콘·프레임에 영향 없음
+- 관심없음은 `user_movie_dismissals`에 사용자·영화별 1건으로 저장하며 평가·팝콘 버킷·프레임에 영향이 없다
+- 추천 외 화면에서 호출하면 `recommendation_item_id`는 NULL이고 교체 후보도 반환하지 않는다
+- `recommendationItemId`를 보냈다면 본인 추천 항목이며 경로의 `movieId`와 일치하는지 검증한다
 - 관심없음 영화는 이후 모든 개인 추천에서 제외한다. 유사 영화 추천(API-031) 제외 여부는 미정
 - 관심없음은 세트가 갱신되지 않도록 현재 세트 내 교체로 처리한다(버퍼의 다음 같은 타입 후보 승격, 추천 서비스 호출 없음). 같은 타입 후보가 소진되면 `replacement: null`을 `200`으로 반환하고 세트와 `inputVersion`은 유지한다
 - 관심없음 영화는 다음 버퍼 생성 시 `excludeMovieIds`에 포함되어 제외된다
@@ -364,7 +369,6 @@
     {
       "recommendationSetId": 7001,
       "generatedAt": "2026-08-30T05:21:00Z",
-      "source": "HOME",
       "items": [
         {
           "recommendationItemId": 3301,
@@ -389,7 +393,7 @@
 ### 처리 규칙
 
 - 이력은 생성 시점 스냅샷이며 이후 영화 정보 변경과 무관하게 추천 이유를 보존한다
-- `source`: `HOME`(기본 추천), `PARTY`(파티 추천, 가정)
+- 개인·파티 추천 구분은 세트의 `user_id`·`party_id` 중 어느 값이 존재하는지로 판단하며 별도 `source`는 저장하지 않는다
 - 관심없음 처리한 항목은 `dismissed: true`로 남긴다
 
 ### 상태값
