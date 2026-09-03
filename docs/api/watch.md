@@ -147,7 +147,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### 처리 규칙
 
-- 기본 정렬은 `clickedAt` 내림차순
+- 기본 정렬은 `clickedAt` 내림차순이며, `clickedAt`이 `null`인 기록은 뒤에 배치하고 동일 시각은 `watchRecordId` 내림차순으로 정렬한다 (`ORDER BY clicked_at DESC NULLS LAST, id DESC`)
 - 7일 만료 처리는 서버 배치(매시, 가정)가 수행하며 조회 시점에도 만료 조건을 만족하면 `EXPIRED`로 계산해 응답한다
 
 ### 상태값
