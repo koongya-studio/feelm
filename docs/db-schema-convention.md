@@ -54,6 +54,17 @@ Hibernate 매핑이 번거롭다. `varchar` + CHECK로 통일한다.
 ## 4. NULL과 기본값
 
 - ERD에 "NULL 가능"이 명시된 컬럼만 nullable로 두고 나머지는 `NOT NULL`이다.
+- 다음 세 가지는 nullable이며, ERD에도 표기를 남긴다. 값이 없는 상태와 채워진 상태를
+  구분하는 것이 컬럼의 목적이므로, 기본값으로 채우면 그 구분이 사라진다.
+  - **상태 머신의 전이 시각** — 해당 전이 전까지 NULL이다.
+    `watch_records`의 `clicked_at`·`confirm_due_at`·`expires_at`·`watched_at`·
+    `rated_at`·`expired_at`, `users.withdrawn_at`, 1회용 토큰의 `used_at`
+  - **계약이 조건부로만 요구하는 값** — `ratings.visibility`는 API-036이 `comment`가
+    있을 때만 요구한다
+  - **원천 데이터에 없을 수 있는 적재 항목** — TMDb·MovieLens에서 내려오지 않는 값과
+    배치·모델이 나중에 채우는 값. `movies`의 상세 정보와 `representative_flavor_id`·
+    `taste_model_version`·`synced_at`, `movie_people.character_name`·`display_order`,
+    `movie_ott_providers.watch_url`·`synced_at`, `people.profile_url`, `otts.logo_url`
 - `created_at`은 `NOT NULL DEFAULT now()`다. 실제 값은 JPA Auditing이 채우며, DB
   기본값은 Seed나 적재 파이프라인의 직접 삽입에 대한 방어다.
 - 상태 컬럼에는 기본값을 두지 않는다. 삽입 시 명시적으로 지정하게 한다.
@@ -142,9 +153,11 @@ Hibernate 매핑이 번거롭다. `varchar` + CHECK로 통일한다.
 
 ### 테스트
 
-`V1MigrationTest`가 인프라와 합의한 것과 같은 이미지로 PostgreSQL 컨테이너를 띄우고
-마이그레이션 전체를 적용한다. Flyway SQL은 PostgreSQL 문법이라 H2에서 실행되지 않으므로,
-마이그레이션이 실제로 도는지 확인하는 지점은 이 테스트뿐이다. 실행에 Docker가 필요하다.
+`com.feelm.backend.migration`의 Testcontainers 테스트가 인프라와 합의한 것과 같은 이미지로
+PostgreSQL 컨테이너를 띄우고 마이그레이션 전체를 적용한다. 공통 선행은 `V1MigrationTest`가
+맡고, 도메인별 마이그레이션은 각 담당이 같은 패키지에 테스트를 추가한다. Flyway SQL은
+PostgreSQL 문법이라 H2에서 실행되지 않으므로, 마이그레이션이 실제로 도는지 확인하는 지점은
+이 테스트들뿐이다. 실행에 Docker가 필요하다.
 
 ## 9. 미결
 
