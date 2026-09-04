@@ -512,6 +512,13 @@ Web UI를 로컬에서 확인할 때는 SSH port forwarding을 사용합니다.
 | `8080/tcp` | Spark Master Web UI |
 | `7078/tcp` | Spark Worker RPC |
 | `8081/tcp` | Spark Worker Web UI |
+| `7079/tcp` | 검증 Driver RPC: 서비스 노드 → 분산 노드 |
+| `7080/tcp` | 검증 Driver BlockManager: 서비스 노드 → 분산 노드 |
+| `7081/tcp` | 검증 Executor BlockManager: 두 노드 사이 |
+
+아래 검증 명령은 분산 노드에서 client mode로 실행하며 Driver와 BlockManager 포트를
+고정합니다. 해당 포트는 필요한 두 서버 사이에서만 허용하고 인터넷에 공개하지 않습니다.
+같은 고정 포트를 사용하는 검증 작업은 동시에 실행하지 않습니다.
 
 `spark-master`, `spark-worker-1`, `spark-worker-2`는 두 서버에서 동일한 사설 IP로 해석되어야
 합니다. Compose의 `extra_hosts`가 `infra/.env`의 IP를 사용해 이 계약을 적용합니다.
@@ -557,9 +564,14 @@ docker exec feelm-spark-master \
   /opt/spark/bin/spark-submit \
   --master spark://spark-master:7077 \
   --deploy-mode client \
-  --conf spark.executor.instances=2 \
-  --conf spark.executor.cores=2 \
-  --conf spark.executor.memory=2g \
+  --total-executor-cores 4 \
+  --executor-cores 2 \
+  --executor-memory 2g \
+  --conf spark.driver.host=spark-master \
+  --conf spark.driver.bindAddress=0.0.0.0 \
+  --conf spark.driver.port=7079 \
+  --conf spark.driver.blockManager.port=7080 \
+  --conf spark.blockManager.port=7081 \
   /tmp/cluster-check.py
 ```
 
@@ -592,8 +604,12 @@ docker logs --tail 100 feelm-spark-worker-1
 `2 Alive, 0 Dead`와 4 Core / 8 GiB가 표시되는지 확인합니다. Worker 프로세스를 다시
 시작하면 새로운 Worker ID로 등록될 수 있으며 이는 정상입니다.
 
-Spark의 HDFS 읽기·쓰기와 Kafka 이벤트 연동은 통합 파이프라인 업무에서 별도로 구성하고
-검증합니다.
+Spark의 HDFS 읽기·쓰기와 Kafka 이벤트 연동은 S15P21E106-137에서 검증합니다.
+2026-09-04의 정상 처리, 체크포인트 재개, 수동 중단·복구 결과와 미검증 범위는
+[통합 파이프라인 검증 기록](verification/S15P21E106-137.md)을 참고합니다.
+재사용 가능한 검증 명령과 로컬 테스트는 [Spark 검증 실행 안내](spark/README.md)를 참고합니다.
+스크립트 저장본은 2026-09-04 서버에서 최초 10건 처리, 무신규 재실행 10건 유지,
+신규 이벤트 재개 15건 및 새 출력·체크포인트의 실제 복제본 2개를 확인했습니다.
 
 ## Kafka KRaft Broker
 
