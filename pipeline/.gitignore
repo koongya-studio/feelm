@@ -12,8 +12,8 @@ metastore_db/
 spark-warehouse/
 
 # Data and model artifacts are external inputs/outputs.
-data/
-artifacts/
-models/
-checkpoints/
+/data/
+/artifacts/
+/models/
+/checkpoints/
 *.parquet

@@ -70,8 +70,7 @@ Conventional Commits 형식을 사용한다.
 | --- | --- |
 | `fe` | `frontend/` |
 | `be` | `backend/` |
-| `reco` | `recommendation/` |
-| `data` | `data/` |
+| `pipe` | `pipeline/` |
 | `infra` | `infra/` 및 인프라 설정 |
 | `docs` | `docs/` 및 문서 |
 
@@ -167,8 +166,7 @@ MR은 하나의 목적을 유지하고 리뷰 가능한 크기로 작성한다. 
 ```text
 frontend/
 backend/
-recommendation/
-data/
+pipeline/
 infra/
 docs/
 ```

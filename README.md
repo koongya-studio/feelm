@@ -440,8 +440,7 @@ S15P21E106
 ├── backend/          Spring Boot 서비스 API
 ├── frontend/         React + Vite 웹 클라이언트
 │   └── docs/         와이어프레임 목업과 화면 캡처
-├── recommendation/   추천 알고리즘 및 Spark 배치 코드
-├── data/             데이터 수집·전처리 및 데이터셋 관리
+├── pipeline/         데이터 수집·추천 계산 파이프라인
 ├── infra/            인프라 구성과 배포 자료
 ├── scripts/          운영 스크립트
 │   └── jira/         Jira 업무 생성 자동화

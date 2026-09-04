@@ -24,7 +24,7 @@ wheels = [
 ]
 
 [[package]]
-name = "feelm-recommendation-batch"
+name = "feelm-pipeline-spark"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
