@@ -83,6 +83,9 @@ services:
 
     extra_hosts:
       - "spark-master:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+      - "hdfs-namenode:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+      - "hdfs-datanode-1:${SERVICE_NODE_IP:?SERVICE_NODE_IP is required}"
+      - "hdfs-datanode-2:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
 
     entrypoint:
       - /opt/spark/bin/spark-class
@@ -106,6 +109,9 @@ services:
     extra_hosts:
       - "spark-master:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
       - "spark-worker-2:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+      - "hdfs-namenode:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+      - "hdfs-datanode-1:${SERVICE_NODE_IP:?SERVICE_NODE_IP is required}"
+      - "hdfs-datanode-2:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
 
     entrypoint:
       - /opt/spark/bin/spark-class
