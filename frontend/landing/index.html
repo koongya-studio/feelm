@@ -1,0 +1,1688 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Feelm · 취향으로 이어지는 영화</title>
+<meta name="description" content="좋아하는 영화가 모여 나만의 필름이 됩니다. Feelm에서 취향을 발견하고 다음에 볼 한 편을 만나보세요." />
+<!-- React 앱 배포 후 content에 같은 사이트 경로(예: /app/) 또는 HTTPS 주소를 입력합니다. -->
+<meta name="feelm-app-url" content="">
+<meta name="theme-color" content="#0A0A0A" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+
+<style>
+/* ==========================================================================
+   Feelm
+
+   팔레트는 세 색이 전부다. 파생 hex 를 만들지 않는다.
+     Linen     #E5E4E2
+     Dark Wine #0A0A0A
+     Ash Grey  #536878
+   그 외 모든 색은 위 세 값의 rgba() 이다.
+
+   대비 (WCAG AA 기준)
+     Linen on Wine  9.08:1   본문 통과
+     Wine  on Linen 9.08:1   본문 통과
+     Wine  on Ash   5.70:1   본문 통과
+     Ash   on Wine  9.68:1   본문 통과
+     Linen on Ash   1.59:1   사용 금지
+   ========================================================================== */
+
+*{ box-sizing:border-box; margin:0; padding:0 }
+html{ font-size:16px; -webkit-font-smoothing:antialiased }
+body{
+  background:#E5E4E2; color:#0A0A0A;
+  font-family:"Pretendard Variable",Pretendard,'Space Grotesk',sans-serif;
+  overflow-x:hidden;
+}
+a{ color:inherit; text-decoration:none }
+button{ font:inherit; color:inherit; background:none; border:none; cursor:pointer }
+ul{ list-style:none }
+img{ display:block }
+.sr-only{ position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0 }
+:focus-visible{ outline:2px solid currentColor; outline-offset:2px }
+
+/* --- rem 기반 적응형 그리드. 루트 폰트가 뷰포트를 따라간다. ---------------- */
+@media (max-width:1920px){ html{ font-size:0.833333vw } }
+@media (max-width:1440px){ html{ font-size:1.111111vw } }
+@media (max-width:1024px){ html{ font-size:1.5625vw } }
+@media (max-width:640px){  html{ font-size:4.444444vw } }
+
+:root{
+  /* 글자만 키우는 배율. 여백과 폭은 건드리지 않는다. */
+  --fs:1.15;
+
+  --paper:#E5E4E2;
+  --ink:#0A0A0A;
+  --slate:#536878;
+
+  --radius-pill:9999px;
+  --radius-card:2rem;
+  --radius-card-sm:1.25rem;
+  --radius-control:0.875rem;
+  --text-watermark:13rem;
+  --container-shell:88rem;
+
+  --e-line:cubic-bezier(.215,.61,.355,1);
+  --e-word:cubic-bezier(.165,.84,.44,1);
+  --e-spring:cubic-bezier(.22,1,.36,1);
+  --e-snap:cubic-bezier(.2,.8,.2,1);
+}
+
+.shell{ max-width:var(--container-shell); margin-inline:auto }
+
+/* 그레인. 고정 오버레이에만. 스크롤 컨테이너에는 걸지 않는다. */
+.grain{
+  position:fixed; inset:0; z-index:100; pointer-events:none;
+  opacity:.075; mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ==========================================================================
+   리빌 (라인 / 단어 / 요소)
+   전부 IntersectionObserver 로 한 번만 재생된다.
+   ========================================================================== */
+.line{ display:block; overflow:hidden }
+.line > i{
+  display:block; font-style:normal;
+  transform:translateY(100%); opacity:0;
+  transition:transform .9s var(--e-line), opacity .9s var(--e-line);
+}
+.is-in .line > i{ transform:translateY(0); opacity:1 }
+
+.word{
+  display:inline-block;
+  transform:translateY(24px); opacity:0;
+  transition:transform .7s var(--e-word), opacity .7s var(--e-word);
+}
+.is-in .word{ transform:translateY(0); opacity:1 }
+
+.rv{
+  opacity:0; transform:translateY(var(--rv-y,16px)) scale(var(--rv-s,1));
+  transition:opacity .8s var(--e-spring), transform .8s var(--e-spring);
+}
+.rv.is-in{ opacity:var(--rv-o,1); transform:translateY(0) scale(1) }
+
+/* ==========================================================================
+   공통 부품
+   ========================================================================== */
+.eyebrow{ display:inline-flex; align-items:center; gap:.5rem; font-size:calc(.875rem * var(--fs)); font-weight:500; color:rgba(10,10,10,.7) }
+.eyebrow::before{ content:""; width:.375rem; height:.375rem; border-radius:9999px; background:rgba(10,10,10,.5) }
+.eyebrow.light{ color:var(--paper) }
+.eyebrow.light::before{ background:rgba(229,228,226,.6) }
+.eyebrow.boxed{ border:1px solid rgba(10,10,10,.18); border-radius:9999px; padding:.375rem 1rem }
+
+.pill{ display:inline-block }
+.pill > span{
+  display:inline-flex; align-items:center; gap:.75rem;
+  border-radius:9999px; font-size:calc(.875rem * var(--fs)); font-weight:500;
+  padding:.875rem 1.75rem;
+  transition:transform .35s var(--e-snap);
+}
+.pill.arrow > span{ padding:.375rem .375rem .375rem 1.5rem }
+.pill:hover > span{ transform:scale(1.04) }
+.pill .badge{
+  width:2.25rem; height:2.25rem; display:grid; place-items:center;
+  border-radius:9999px; font-size:calc(1rem * var(--fs));
+}
+.pill .badge svg{ transition:transform .35s var(--e-snap) }
+.pill:hover .badge svg{ transform:translate(3px,0) }
+.pill.up:hover .badge svg{ transform:translate(2px,-2px) }
+
+.pill.dark > span{ background:var(--ink); color:var(--paper) }
+.pill.dark .badge{ background:var(--paper); color:var(--ink) }
+.pill.light > span{ background:var(--paper); color:var(--ink) }
+.pill.light .badge{ background:var(--ink); color:var(--paper) }
+.pill.outline > span{ border:1px solid rgba(10,10,10,.28); color:var(--ink) }
+.pill.outline .badge{ background:var(--ink); color:var(--paper) }
+.pill.outline-light > span{ border:1px solid rgba(229,228,226,.4); color:var(--paper) }
+.pill.outline-light .badge{ background:var(--paper); color:var(--ink) }
+
+.alink{ display:inline-flex }
+.alink > span{ opacity:.65; transition:transform .35s var(--e-snap), opacity .35s var(--e-snap) }
+.alink:hover > span{ transform:translateX(4px); opacity:1 }
+
+.skip{
+  position:fixed; left:1rem; top:1rem; z-index:130;
+  border-radius:.875rem; background:var(--ink); padding:.5rem 1rem;
+  font-size:calc(.875rem * var(--fs)); color:var(--paper);
+  transform:translateY(-200%);
+}
+.skip:focus{ transform:translateY(0) }
+
+/* ==========================================================================
+   로더
+   ========================================================================== */
+#loader{
+  position:fixed; inset:0; z-index:120;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2rem;
+  background:var(--ink); color:var(--paper);
+  border-radius:0 0 2rem 2rem;
+  transform:translateY(0);
+}
+#loader.out{ transform:translateY(-100%); transition:transform .7s var(--e-spring) }
+.loader-center{ display:flex; flex-direction:column; align-items:center; gap:1.25rem; text-align:center; transition:opacity .55s var(--e-spring), transform .55s var(--e-spring) }
+#loader.out .loader-center{ opacity:0; transform:translateY(-12px) }
+.loader-brand{ display:flex; align-items:center; gap:.5rem; font-weight:600; font-size:calc(1.5rem * var(--fs)); letter-spacing:.02em }
+.loader-brand svg{ font-size:calc(1.875rem * var(--fs)) }
+.loader-tag{ max-width:24ch; font-size:calc(.875rem * var(--fs)); color:rgba(229,228,226,.62) }
+.loader-progress{ width:min(22rem,72vw); display:flex; flex-direction:column; gap:.75rem }
+.loader-track{ height:1px; background:rgba(229,228,226,.20) }
+.loader-fill{ height:100%; background:var(--slate); width:0%; transition:width .1s ease-out }
+.loader-meta{ display:flex; justify-content:space-between; font-size:calc(.75rem * var(--fs)); font-weight:500; text-transform:uppercase; letter-spacing:.05em; color:rgba(229,228,226,.6) }
+.loader-count{ font-variant-numeric:tabular-nums; color:rgba(229,228,226,.85) }
+@media (min-width:640px){ .loader-brand{ font-size:calc(1.875rem * var(--fs)) } }
+
+/* ==========================================================================
+   헤더
+   ========================================================================== */
+.hdr{
+  position:fixed; inset-inline:0; top:0; z-index:50;
+  background:rgba(229,228,226,.92); backdrop-filter:blur(14px);
+  border-bottom:1px solid rgba(10,10,10,.12);
+  /* 헤더는 토글 위에 그려진다. 빈 칸이 클릭을 먹지 않게 통째로 비운다. */
+  pointer-events:none;
+  opacity:0; transform:translateY(-14px);
+  transition:opacity .7s var(--e-spring), transform .7s var(--e-spring);
+  color:var(--ink);
+}
+.hdr.in{ opacity:1; transform:translateY(0) }
+.hdr.on-dark{ color:var(--ink) }
+.hdr .shell{ display:flex; align-items:center; justify-content:space-between; gap:1.5rem; padding:1.25rem }
+.brand, .mainnav{ pointer-events:auto }
+.brand{ display:flex; align-items:center; gap:.5rem; font-size:calc(1.125rem * var(--fs)); font-weight:600; letter-spacing:-.01em; transition:transform .35s var(--e-snap) }
+.brand:hover{ transform:scale(1.04) }
+.brand svg{ font-size:calc(1.25rem * var(--fs)) }
+
+.mainnav{ display:block }
+.mainnav ul{ display:flex; gap:1.25rem; font-size:calc(.875rem * var(--fs)); font-weight:500; white-space:nowrap }
+/* 메뉴 버튼을 없앴으므로 좁은 화면에서도 한 줄에 들어가야 한다. */
+@media (max-width:640px){
+  .mainnav ul{ gap:.625rem; font-size:calc(.75rem * var(--fs)) }
+  .wordmark{ font-size:calc(1rem * var(--fs)); letter-spacing:.1em }
+  .hdr .shell{ gap:.75rem }
+}
+@media (min-width:1024px){ .mainnav ul{ gap:2rem } }
+/* 헤더는 Blue Slate 면 위에 뜬다. 알파 .8 이면 3.72:1 로 미달하므로
+   투명도를 걷고 호버는 이동으로만 준다. */
+.mainnav button > span{ display:inline-block; transition:transform .35s var(--e-snap) }
+.mainnav button:hover > span{ transform:translateY(-2px) }
+
+.hdr-right{ display:flex; align-items:center; gap:.75rem }
+.chip{
+  display:none; align-items:center; gap:.75rem;
+  border:1px solid currentColor; border-radius:.875rem;
+  padding:.5rem .75rem; font-size:calc(.75rem * var(--fs));
+}
+.chip .k{ letter-spacing:.08em; text-transform:uppercase; font-size:calc(.6875rem * var(--fs)) }
+.chip .v{ min-width:3.5rem; font-variant-numeric:tabular-nums; font-weight:500; font-family:'Space Grotesk',monospace }
+.menubtn{ border:1px solid currentColor; border-radius:.875rem }
+.menubtn > span{ display:inline-flex; align-items:center; gap:.5rem; padding:.5rem 1rem; font-size:calc(.75rem * var(--fs)); font-weight:500; text-transform:uppercase; letter-spacing:.05em; transition:transform .35s var(--e-snap) }
+.menubtn:hover > span{ transform:scale(1.05) }
+.menubtn .label{ display:none }
+@media (min-width:640px){ .hdr .shell{ padding:1.5rem 2rem } .menubtn .label{ display:inline } }
+@media (min-width:768px){ .chip{ display:flex } }
+
+
+/* ==========================================================================
+   1. 히어로
+   ========================================================================== */
+/* 히어로는 스크롤 길이를 갖고, 내부는 sticky 로 고정된다.
+   조각 96개(12 x 8)가 스크롤에 따라 대각선으로 하나씩 맞춰진다. */
+#home{ position:relative; height:300vh; background:#536878 }
+.hero-view{
+  position:sticky; top:0; min-height:100dvh; height:100dvh;
+  overflow:hidden; isolation:isolate; border-radius:0 0 2rem 2rem;
+  display:flex; flex-direction:column;
+  /* 은청색 바닥판. 광원은 상단 중앙에서 약간 오른쪽. */
+  background:
+    radial-gradient(ellipse 42% 34% at 64% 2%, rgba(229,228,226,1), rgba(229,228,226,0) 62%),
+    linear-gradient(190deg, rgba(229,228,226,.86) 0%, rgba(83,104,120,.42) 48%, rgba(83,104,120,.86) 100%),
+    #536878;
+}
+
+/* WebGL 캔버스가 들어가는 자리. 원근은 Three.js 카메라가 담당한다. */
+.glass-stage{ position:absolute; inset:0; z-index:0; cursor:pointer }
+.glass-stage canvas{ display:block }
+  100% { stroke-opacity:1; stroke-width:2.2; filter:none }
+}
+
+/* 스크림 두 겹. 세로는 상하단 글자를, 가로는 좌측 카피를 보호한다. */
+.vignette{
+  position:absolute; inset:0; z-index:2; pointer-events:none;
+  background:
+    radial-gradient(ellipse 98% 92% at 52% 34%, rgba(10,10,10,0) 46%, rgba(10,10,10,.42) 100%);
+}
+/* 글자 뒤 그늘. 흰 베일은 안개처럼 뿌옇게 만들어서 쓰지 않는다.
+   어두운 스크림은 유리의 반사와 하이라이트를 그대로 남긴다. */
+.hero-veil{
+  position:absolute; inset:0; z-index:3; pointer-events:none;
+  background:radial-gradient(ellipse 64% 74% at 50% 50%,
+    rgba(10,10,10,.74) 0%, rgba(10,10,10,.66) 46%, rgba(10,10,10,.44) 70%,
+    rgba(10,10,10,.14) 88%, rgba(10,10,10,0) 100%);
+}
+
+/* 중앙 정렬 히어로. 조각 위에 얹히지만 커서는 통과시켜 선택이 살아 있다. */
+.hero-mid{
+  position:absolute; inset:0; z-index:20;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:1.5rem; text-align:center;
+  padding:7rem 1.5rem 5rem;
+  color:var(--paper);
+  pointer-events:none;
+}
+.hero-mid .pill{ pointer-events:auto }
+.hero-mid .eyebrow{ color:var(--paper) }
+.hero-mid .eyebrow::before{ background:rgba(229,228,226,.7) }
+.hero-h1{
+  max-width:17ch; font-weight:700;
+  font-size:calc(clamp(2rem,4.6vw,4rem) * var(--fs)); line-height:1.12; letter-spacing:-.035em;
+  text-wrap:balance;
+}
+.hero-sub{
+  max-width:42ch; font-size:calc(clamp(.9375rem,1.15vw,1.0625rem) * var(--fs)); line-height:1.75;
+  color:rgba(229,228,226,.88);
+}
+.hero-mid .cta-row{ justify-content:center; margin-top:.5rem }
+/* 씬 밝기와 무관하게 읽히도록 자체 면을 준다. */
+.hero-mid .pill.outline-light > span{ background:rgba(10,10,10,.52); border-color:rgba(229,228,226,.55) }
+.hero-mid .pill.outline-light:hover > span{ background:rgba(10,10,10,.72); border-color:var(--paper) }
+
+@media (max-width:640px){
+  .hero-mid{ gap:1.25rem; padding:6rem 1.25rem 4rem }
+  /* 좁은 화면에서는 글자 블록이 더 길어지므로 그늘을 세로로 넓힌다. */
+  .hero-veil{ background:radial-gradient(ellipse 92% 62% at 50% 50%,
+    rgba(10,10,10,.78) 0%, rgba(10,10,10,.70) 48%, rgba(10,10,10,.40) 74%, rgba(10,10,10,0) 100%) }
+}
+
+/* ==========================================================================
+   2. 소개
+   ========================================================================== */
+#about{ background:var(--paper) }
+#about .shell{ display:grid; grid-template-columns:1fr; align-items:center; gap:3rem; padding:5rem 1.25rem }
+.about-left{ position:relative; min-height:14rem }
+.about-glyph{ position:absolute; left:-1rem; top:50%; transform:translateY(-50%); font-size:12rem; color:rgba(10,10,10,.10) }
+.about-note{ position:absolute; left:0; bottom:0; display:flex; align-items:center; gap:.75rem; font-size:calc(.875rem * var(--fs)); color:rgba(10,10,10,.72) }
+.about-note svg{ font-size:calc(1.5rem * var(--fs)); color:var(--ink) }
+.about-note span{ max-width:14rem }
+.about-right{ display:flex; flex-direction:column; gap:2.5rem }
+.about-h2{ font-size:calc(1.5rem * var(--fs)); font-weight:600; line-height:1.4; letter-spacing:-.015em }
+.about-h2 .dim{ color:rgba(10,10,10,.5) }
+.about-foot{ display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:1.5rem; border-top:1px solid rgba(10,10,10,.16); padding-top:1.5rem }
+.about-foot .k{ font-size:calc(.875rem * var(--fs)); color:rgba(10,10,10,.68) }
+.chips{ display:flex; gap:.5rem; margin-top:.75rem }
+.chips a{ width:2.25rem; height:2.25rem; display:grid; place-items:center; border-radius:9999px; font-size:calc(.875rem * var(--fs)) }
+.chips a svg{ transition:transform .35s var(--e-snap) }
+.chips a:hover svg{ transform:scale(1.18) }
+.chips .a1{ background:var(--ink); color:var(--paper) }
+.chips .a2{ background:var(--slate); color:var(--paper) }
+@media (min-width:640px){ #about .shell{ padding-inline:2rem } .about-h2{ font-size:calc(1.875rem * var(--fs)) } .about-glyph{ font-size:16rem } }
+@media (min-width:1024px){
+  #about .shell{ grid-template-columns:1fr 1fr; padding-block:7rem }
+  .about-left{ min-height:20rem }
+  .about-glyph{ left:-1.5rem; font-size:20rem }
+}
+
+/* ==========================================================================
+   3. 밴드
+   ========================================================================== */
+#band{ background:var(--paper) }
+#band ul{ display:flex; flex-direction:column; gap:.75rem; padding:2.5rem 1.25rem }
+#band li{ flex:1 }
+#band li > span{
+  display:grid; place-items:center; height:6rem; border-radius:9999px;
+  font-size:calc(1.875rem * var(--fs)); font-weight:600; letter-spacing:-.02em;
+  transition:transform .4s var(--e-snap);
+}
+#band li:hover > span{ transform:scale(1.03) }
+#band .v-light > span{ background:var(--slate); color:var(--paper) }
+#band .v-accent > span{ background:var(--ink); color:var(--paper) }
+#band .v-dark > span{ background:var(--slate); color:var(--paper); font-size:calc(2.25rem * var(--fs)) }
+#band .v-ghost > span{ background:rgba(83,104,120,.22); color:rgba(10,10,10,.5) }
+@media (min-width:640px){
+  #band ul{ flex-direction:row; gap:1rem; padding-inline:2rem }
+  #band li > span{ height:10rem; font-size:calc(2.25rem * var(--fs)) }
+  #band .v-dark > span{ font-size:calc(3rem * var(--fs)) }
+}
+
+/* ==========================================================================
+   4. 필름 포스터 (회전 링)
+   ========================================================================== */
+#map{ position:relative; height:400vh; background:var(--slate); color:var(--paper) }
+.map-view{
+  position:sticky; top:0; min-height:100dvh; height:100dvh;
+  overflow:hidden; display:grid; place-items:center; perspective:1250px;
+}
+.map-glow{
+  position:absolute; width:70vw; height:70vw; max-width:900px; max-height:900px;
+  left:50%; top:46%; transform:translate(-50%,-50%); border-radius:50%; pointer-events:none;
+  background:radial-gradient(circle, rgba(229,228,226,.78), rgba(229,228,226,0) 66%);
+  filter:blur(40px);
+}
+.scene{
+  position:relative; transform-style:preserve-3d;
+  transform:translateY(-2vh) translateX(var(--push,0rem)) scale(calc(var(--scene-scale,1) * var(--pull,1)));
+  transition:transform .78s var(--e-spring);
+}
+/* 패널이 들어오는 동안 링은 왼쪽으로 물러난다. */
+body.cube-open .scene{ --push:-16rem; --pull:.76 }
+body.cube-open .map-toggle{ opacity:0 }
+.map-toggle{ transition:transform .78s var(--e-spring), opacity .5s ease }
+/* 물러난 링 위에 그늘을 덮어 깊이를 만든다. */
+.map-scrim{
+  position:absolute; inset:0; z-index:7; pointer-events:none;
+  background:rgba(10,10,10,.6); opacity:0; transition:opacity .62s ease;
+}
+body.cube-open .map-scrim{ opacity:1 }
+.ring{ position:relative; width:0; height:0; transform-style:preserve-3d; will-change:transform;
+  animation:ringSpin 48s linear infinite }
+@keyframes ringSpin{
+  from{ transform:rotateX(-8deg) rotateY(0deg) }
+  to{   transform:rotateX(-8deg) rotateY(-360deg) }
+}
+/* 도는 타일은 누르기 어렵다. 손이 올라오면 멈춘다. */
+.scene:hover .ring, .scene:focus-within .ring{ animation-play-state:paused }
+/* 타일은 영화 포스터 비율인 3:4 직사각형이다.
+   반지름 32rem 원주를 20 으로 나누면 10.05rem 이므로 폭 8rem 이면 2rem 이 남는다.
+   틈이 벌어져야 가운데 카드가 보인다. */
+.slot{
+  --t:1;
+  position:absolute; width:8rem; height:10.667rem; margin-left:-4rem; margin-top:-5.333rem;
+  transform:rotateY(calc(var(--i) * 18deg)) translateZ(32rem) scale(var(--s,1));
+  transform-style:preserve-3d;
+  transition:transform .9s var(--e-spring), filter .35s var(--e-spring);
+  cursor:pointer;
+}
+/* 누를 수 있다는 걸 알리는 최소한의 반응. 3D 안이라 그림자 대신 밝기로 준다. */
+.slot:hover, .slot:focus-visible{ --s:1.06; filter:brightness(1.22) }
+.slot:focus-visible{ outline:2px solid var(--paper); outline-offset:4px }
+.slot:active{ --s:1.02 }
+/* filter 는 걸지 않는다. preserve-3d 컨텍스트를 평면화해서
+   backface-visibility 와 깊이 정렬이 깨진다. */
+.pzTile{
+  position:absolute; inset:0; width:100%; height:100%;
+  backface-visibility:hidden; overflow:visible;
+}
+/* 뒤편에서 보이는 면. 유리 몸체만 보여준다. */
+.pzTile.back{ transform:rotateY(180deg); opacity:.55 }
+/* 본 영화가 들어찬 상태 */
+.pzTile .on{ opacity:var(--t) }
+/* 안 본 상태의 유리는 채워질수록 물러난다. */
+.pzTile .off{ opacity:calc(1 - var(--t) * .55) }
+.ring.spiral .slot{ transform:rotateY(calc(var(--i) * 36deg)) translateZ(calc(17rem + var(--i) * .75rem)) translateY(calc(9rem - var(--i) * 1rem)) }
+
+/* 링 한가운데. 3D 씬 안에 z=0 으로 서 있어서
+   앞으로 지나가는 포스터가 그림을 가리고, 뒤쪽 포스터는 그림에 가린다.
+   Vibe 가 절반을 넘으면 물음표가 느낌표로 바뀐다. */
+.core{
+  position:absolute; top:50%; left:50%; width:14.5rem; height:26rem;
+  margin:-18rem 0 0 -7.25rem;
+  transform:translateZ(0);
+  pointer-events:none;
+}
+.vibe-art{ position:relative; width:100%; height:100% }
+.vibe-art img{
+  position:absolute; inset:0; width:100%; height:100%; object-fit:contain;
+  object-position:50% 100%;
+  transition:opacity .35s ease;
+  /* 바닥에서 떠 보이지 않게 아래로 옅은 그림자를 깐다. */
+  filter:drop-shadow(0 .75rem 1rem rgba(10,10,10,.32));
+}
+/* 발밑 그림자 */
+.vibe-art::after{
+  content:""; position:absolute; left:50%; bottom:-.25rem; transform:translateX(-50%);
+  width:60%; height:1.25rem; border-radius:50%;
+  background:radial-gradient(ellipse, rgba(10,10,10,.34), rgba(10,10,10,0) 70%);
+}
+/* 0% 쪽이면 물음표, 절반을 넘기면 느낌표. 겹쳐 보이지 않게 가파르게 넘긴다. */
+.vibe-art .q{ opacity:clamp(0, calc((.53 - var(--p,0)) * 60), 1) }
+.vibe-art .x{ opacity:clamp(0, calc((var(--p,0) - .5) * 60), 1) }
+
+/* 읽는 값은 3D 밖에 둔다. 씬 안에 있으면 포스터에 가려 안 읽힌다. */
+.vibe-read{
+  position:absolute; z-index:5; left:50%; bottom:4.5rem; transform:translateX(-50%);
+  display:flex; flex-direction:column; align-items:center; gap:.5rem;
+  transition:transform .78s var(--e-spring), opacity .5s ease;
+}
+body.cube-open .vibe-read{ transform:translateX(calc(-50% - 5rem)); opacity:.12 }
+body.cube-open .core{ opacity:.12 }
+.core{ transition:opacity .5s ease }
+.core .k{ font-family:'Space Grotesk',sans-serif; font-size:calc(.6875rem * var(--fs)); letter-spacing:.24em; text-transform:uppercase; color:var(--paper) }
+.core .v{ font-family:'Space Grotesk',monospace; font-size:calc(1.75rem * var(--fs)); font-weight:500; line-height:1; font-variant-numeric:tabular-nums; color:var(--paper) }
+.core .u{ font-size:calc(.75rem * var(--fs)); margin-left:.15rem }
+/* 채워지는 눈금. 퍼센트만큼 왼쪽부터 찬다. */
+.vibe-bar{
+  position:relative; width:7.5rem; height:3px; border-radius:9999px;
+  background:rgba(229,228,226,.3); overflow:hidden;
+}
+.vibe-bar::after{
+  content:""; position:absolute; left:0; top:0; bottom:0;
+  width:calc(var(--p,0) * 100%); background:var(--paper);
+}
+
+/* 서리유리 토글. 뒤 화면을 흐려서 비춘다.
+   판에 backdrop-filter 가 걸리면 그 안이 backdrop root 가 되어
+   자식 버튼의 렌즈가 죽는다. 그래서 고른 쪽은 렌즈가 아니라
+   아주 옅은 막 한 겹으로 만든다. */
+.map-toggle{
+  position:absolute; z-index:51; left:50%; top:1rem; transform:translateX(-50%);
+  display:flex; gap:.125rem; padding:.25rem; border-radius:9999px;
+  background:transparent;
+  border:1px solid rgba(229,228,226,.3);
+  backdrop-filter:blur(16px) saturate(1.3);
+  -webkit-backdrop-filter:blur(16px) saturate(1.3);
+}
+.map-toggle button{
+  position:relative;
+  height:1.875rem; padding:0 .75rem; border-radius:9999px;
+  font-family:'Space Grotesk',sans-serif; font-size:calc(.8125rem * var(--fs)); font-weight:500; letter-spacing:.16em;
+  background:transparent; color:var(--paper);
+  transition:background .3s var(--e-snap), box-shadow .3s var(--e-snap);
+}
+.map-toggle button:hover{ background:rgba(10,10,10,.22) }
+/* 판 안으로 눌려 들어간 자리. 색이 아니라 깊이로 구분한다. */
+.map-toggle button[aria-pressed="true"]{
+  background:rgba(10,10,10,.24);
+  box-shadow:
+    inset 0 .0625rem .1875rem rgba(10,10,10,.34),
+    inset 0 -.0625rem 0 rgba(229,228,226,.26),
+    inset 0 0 0 1px rgba(229,228,226,.13);
+}
+/* 다음 면으로 넘어가는 이음새. 처음부터 계속 깔려 있다.
+   1. 색을 섞지 않고 Linen 한 색의 투명도만 올린다. 두 색을 크로스페이드하면 중간이 탁해진다.
+   2. 스톱을 촘촘히 둬서 완만하게 시작하고 완만하게 끝난다. 두 스톱짜리는 가운데에 띠가 생긴다. */
+.seam{
+  position:absolute; left:0; right:0; bottom:0; height:34vh; z-index:6; pointer-events:none;
+  background:linear-gradient(180deg,
+    rgba(229,228,226,0)    0%,
+    rgba(229,228,226,.03) 18%,
+    rgba(229,228,226,.09) 32%,
+    rgba(229,228,226,.20) 45%,
+    rgba(229,228,226,.37) 57%,
+    rgba(229,228,226,.57) 68%,
+    rgba(229,228,226,.76) 78%,
+    rgba(229,228,226,.90) 87%,
+    rgba(229,228,226,.98) 95%,
+    rgba(229,228,226,1)  100%);
+}
+@media (max-width:1024px){ .map-view{ --scene-scale:.62 } }
+@media (max-width:640px){
+  .map-view{ --scene-scale:.5 }
+  .core{ width:11.4rem; height:20.5rem; margin:-17.1rem 0 0 -5.7rem }
+  .map-toggle{ top:5.5rem }
+}
+
+/* ==========================================================================
+   3.5 카드 상자
+   화면 네 장이 사각기둥의 면이 된다. 스크롤이 한 면씩 돌려서 앞으로 가져온다.
+   ========================================================================== */
+/* 스크롤 흐름에서 빼내 오른쪽에 세워둔다. 포스터를 누르면 옆에서 들어온다. */
+#cube{
+  position:fixed; inset:0; z-index:114; display:none;
+  background:var(--paper); color:var(--ink);
+  transform:translate3d(100%,0,0); will-change:transform;
+}
+#cube.show{ display:block }
+#cube.in{ transform:translate3d(0,0,0) }
+#cube.slide{ transition:transform .72s var(--e-spring) }
+#cube{ box-shadow:-2.5rem 0 5rem rgba(10,10,10,.55) }
+.cube-close{
+  position:absolute; right:clamp(1.25rem,4vw,3rem); top:clamp(1.25rem,4vw,3rem); z-index:8;
+  opacity:0; transition:opacity .4s ease;
+  width:2.75rem; height:2.75rem; display:grid; place-items:center; border-radius:9999px;
+  background:rgba(229,228,226,.5); color:var(--ink); border:1px solid rgba(10,10,10,.26);
+}
+.cube-close:hover{ background:var(--ink); color:var(--paper) }
+#cube.in .cube-close{ opacity:1; transition-delay:.4s }
+.cube-nav{
+  position:absolute; z-index:8; left:50%; bottom:clamp(1.5rem,5vh,3rem);
+  transform:translate(-50%, 1.25rem); opacity:0;
+  display:flex; align-items:center; gap:1rem;
+  transition:opacity .5s var(--e-spring), transform .5s var(--e-spring);
+}
+#cube.in .cube-nav{ opacity:1; transform:translate(-50%, 0); transition-delay:.34s }
+.cube-nav button{
+  width:2.75rem; height:2.75rem; display:grid; place-items:center; border-radius:9999px;
+  background:rgba(229,228,226,.5); color:var(--ink); border:1px solid rgba(10,10,10,.26);
+}
+.cube-nav button:hover{ background:var(--ink); color:var(--paper) }
+.cube-nav .prev svg{ transform:rotate(180deg) }
+.cube-view{
+  position:absolute; inset:0; overflow:hidden;
+  display:grid; place-items:center; perspective:1600px; perspective-origin:50% 46%;
+  /* 가운데는 흰빛, 가장자리로 갈수록 Blue Slate 가 얇게 올라온다. */
+  background:
+    radial-gradient(ellipse 58% 68% at 50% 40%, rgba(229,228,226,.9), rgba(229,228,226,0) 70%),
+    radial-gradient(circle 44rem at 88% 10%, rgba(229,228,226,.6), rgba(229,228,226,0) 74%),
+    radial-gradient(ellipse 78% 70% at 50% 44%, rgba(83,104,120,0) 38%, rgba(83,104,120,.52) 100%);
+}
+.cube-glow{
+  position:absolute; width:72vw; height:72vw; max-width:920px; max-height:920px;
+  left:50%; top:42%; transform:translate(-50%,-50%); border-radius:50%; pointer-events:none;
+  background:radial-gradient(circle, rgba(229,228,226,.9), rgba(229,228,226,.3) 48%, rgba(229,228,226,0) 72%);
+  filter:blur(54px);
+}
+.cube-head{
+  position:absolute; z-index:5; left:clamp(1.25rem,5vw,4.5rem); top:7rem;
+  opacity:0; transform:translateX(-1.5rem);
+  transition:opacity .5s var(--e-spring), transform .5s var(--e-spring);
+}
+#cube.in .cube-head{ opacity:1; transform:translateX(0); transition-delay:.2s }
+.cube-head h2{ margin-top:1rem; max-width:14ch; font-size:calc(2.25rem * var(--fs)); font-weight:700; letter-spacing:-.03em; line-height:1.1 }
+
+/* 정사각 기둥이므로 면을 폭의 절반만큼 밀어낸다. */
+.cube{
+  position:relative; z-index:3; width:24rem; height:32rem;
+  transform-style:preserve-3d;
+  transform:rotateX(-6deg) rotateY(calc(var(--face,0) * -90deg));
+  transition:transform .78s var(--e-spring), opacity .5s ease;
+  will-change:transform;
+  opacity:0;
+}
+#cube.in .cube{ opacity:1; transition-delay:0s, .12s }
+.face{
+  position:absolute; inset:0;
+  transform:rotateY(calc(var(--n) * 90deg)) translateZ(12rem);
+  backface-visibility:hidden;
+  border-radius:1.5rem; overflow:hidden;
+  background:var(--ink);
+  box-shadow:0 1.5rem 3.5rem rgba(10,10,10,.45), inset 0 0 0 1px rgba(229,228,226,.18);
+}
+.face img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover }
+.face .veil{
+  position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(180deg,
+    rgba(10,10,10,0) 40%,
+    rgba(10,10,10,.10) 52%,
+    rgba(10,10,10,.30) 61%,
+    rgba(10,10,10,.78) 70%,
+    rgba(10,10,10,.92) 100%);
+}
+.face .body{ position:absolute; inset:auto 0 0 0; padding:2rem; display:flex; flex-direction:column; gap:.625rem }
+.face .step{ font-family:'Space Grotesk',monospace; font-size:calc(.75rem * var(--fs)); letter-spacing:.18em; color:var(--paper) }
+.face h3{ font-size:calc(1.75rem * var(--fs)); font-weight:700; letter-spacing:-.02em; color:var(--paper) }
+.face p{ font-size:calc(.9375rem * var(--fs)); line-height:1.7; color:var(--paper) }
+
+.cube-dots{ position:absolute; z-index:5; left:50%; bottom:clamp(3rem,9vh,5.5rem); transform:translateX(-50%); display:flex; gap:.5rem }
+.cube-dots i{ width:.375rem; height:.375rem; flex:none; border-radius:9999px; background:rgba(10,10,10,.5); transition:all .4s var(--e-spring) }
+.cube-dots i.on{ width:1.75rem; background:var(--ink) }
+
+@media (max-width:1024px){ .cube{ width:19rem; height:25rem } .face{ transform:rotateY(calc(var(--n) * 90deg)) translateZ(9.5rem) } .cube-head{ top:6rem } }
+@media (max-width:640px){ .cube{ width:15rem; height:20rem } .face{ transform:rotateY(calc(var(--n) * 90deg)) translateZ(7.5rem) } .cube-head h2{ font-size:calc(1.875rem * var(--fs)) } .face .body{ padding:1.25rem } .face h3{ font-size:calc(1.375rem * var(--fs)) } }
+
+/* ==========================================================================
+   5. 기능
+   ========================================================================== */
+#services{ background:var(--paper) }
+#services .shell{ padding:5rem 1.25rem }
+.svc-h2{ margin:1.25rem 0 3rem; max-width:16ch; font-size:calc(2.25rem * var(--fs)); font-weight:700; letter-spacing:-.03em; line-height:1.1 }
+.svc-row{ border-top:1px solid rgba(10,10,10,.16) }
+.svc-row:first-child{ border-top:0 }
+.svc-row a{
+  display:flex; align-items:center; gap:1rem; border-radius:1.25rem;
+  padding:1.5rem; background:rgba(83,104,120,0);
+  transition:background .5s var(--e-spring), padding .5s var(--e-spring);
+}
+.svc-row a:hover{ background:rgba(83,104,120,.24); padding-left:2rem; padding-right:1.25rem }
+.svc-row .n{ width:1.75rem; font-family:'Space Grotesk',monospace; font-size:calc(.875rem * var(--fs)); font-weight:500; color:rgba(10,10,10,.62) }
+.svc-row h3{ flex:1; font-size:calc(1.5rem * var(--fs)); font-weight:600; letter-spacing:-.02em }
+.svc-row p{ display:none; max-width:20rem; font-size:calc(.875rem * var(--fs)); color:rgba(10,10,10,.6) }
+.svc-row .go{ width:2.5rem; height:2.5rem; display:grid; place-items:center; border-radius:9999px; background:var(--ink); color:var(--paper) }
+.svc-row .go svg{ transition:transform .4s var(--e-snap) }
+.svc-row a:hover .go svg{ transform:translateX(5px) }
+@media (min-width:640px){
+  #services .shell{ padding-inline:2rem }
+  .svc-h2{ margin-bottom:3.5rem; font-size:calc(3rem * var(--fs)) }
+  .svc-row a{ gap:1.5rem; padding-block:2rem }
+  .svc-row .n{ width:2.5rem }
+  .svc-row h3{ font-size:calc(1.875rem * var(--fs)) }
+  .svc-row .go{ width:3rem; height:3rem }
+}
+@media (min-width:1024px){ #services .shell{ padding-block:7rem } .svc-row p{ display:block } .svc-row h3{ font-size:calc(2.25rem * var(--fs)) } }
+
+/* ==========================================================================
+   6. 숫자
+   ========================================================================== */
+#stats{ background:var(--paper) }
+#stats .shell{ padding:0 1.25rem 5rem }
+.stats-panel{ border-radius:2rem; background:var(--ink); padding:3rem 1.5rem; color:var(--paper) }
+.stats-h2{ margin-top:1rem; max-width:20ch; font-size:calc(1.875rem * var(--fs)); font-weight:600; letter-spacing:-.02em; line-height:1.25 }
+.stats-grid{ margin-top:3.5rem; display:grid; grid-template-columns:repeat(2,1fr); column-gap:2rem; row-gap:3rem }
+.stat .num{ font-family:'Space Grotesk',sans-serif; font-size:calc(3rem * var(--fs)); font-weight:700; letter-spacing:-.03em; font-variant-numeric:tabular-nums }
+.stat .lbl{ margin-top:.75rem; font-size:calc(.875rem * var(--fs)); color:rgba(229,228,226,.68) }
+@media (min-width:640px){ #stats .shell{ padding-inline:2rem } .stats-panel{ padding:4rem 2rem } .stat .num{ font-size:calc(3.75rem * var(--fs)) } }
+@media (min-width:768px){ .stats-panel{ padding-inline:4rem } .stats-h2{ font-size:calc(2.25rem * var(--fs)) } .stat .num{ font-size:calc(4.5rem * var(--fs)) } }
+@media (min-width:1024px){ #stats .shell{ padding-bottom:7rem } .stats-grid{ grid-template-columns:repeat(4,1fr) } }
+
+/* ==========================================================================
+   7. 푸터
+   ========================================================================== */
+.ftr{ position:relative; overflow:hidden; border-radius:2rem 2rem 0 0; background:var(--ink); color:var(--paper) }
+.ftr .shell{ position:relative; z-index:10; padding:5rem 1.25rem 2.5rem }
+.ftr-cta{ display:flex; flex-direction:column; gap:2rem; border-bottom:1px solid rgba(229,228,226,.18); padding-bottom:4rem }
+.ftr-cta h2{ max-width:16ch; font-size:calc(2.25rem * var(--fs)); font-weight:700; letter-spacing:-.03em; line-height:1.1 }
+.ftr-cols{ display:grid; grid-template-columns:1fr; gap:3rem; padding-block:4rem }
+.ftr-brand{ display:flex; align-items:center; gap:.5rem; font-size:calc(1.125rem * var(--fs)); font-weight:600 }
+.ftr-tag{ margin-top:1rem; max-width:20rem; font-size:calc(.875rem * var(--fs)); color:rgba(229,228,226,.65) }
+.ftr-col h3{ font-size:calc(.75rem * var(--fs)); text-transform:uppercase; letter-spacing:.025em; color:rgba(229,228,226,.6); margin-bottom:1rem }
+.ftr-col li{ font-size:calc(.875rem * var(--fs)); margin-bottom:.625rem }
+.ftr-legal{ display:flex; flex-direction:column; align-items:center; justify-content:space-between; gap:1rem; border-top:1px solid rgba(229,228,226,.18); padding-top:2rem; font-size:calc(.75rem * var(--fs)); color:rgba(229,228,226,.58) }
+.ftr-legal .r{ display:flex; gap:1.5rem }
+.ftr-wm{ position:absolute; inset-inline:0; bottom:-1.5rem; z-index:0; text-align:center; pointer-events:none; user-select:none; font-weight:700; line-height:1; font-size:var(--text-watermark); letter-spacing:-.03em; color:rgba(229,228,226,.08) }
+@media (max-width:1024px){ .ftr-wm{ font-size:7rem } }
+@media (min-width:640px){ .ftr .shell{ padding-inline:2rem } .ftr-cta h2{ font-size:calc(3rem * var(--fs)) } .ftr-legal{ flex-direction:row } }
+@media (min-width:768px){ .ftr-cols{ grid-template-columns:repeat(2,1fr) } }
+@media (min-width:1024px){
+  .ftr .shell{ padding-top:6rem }
+  .ftr-cta{ flex-direction:row; align-items:flex-end; justify-content:space-between }
+  .ftr-cta h2{ font-size:calc(3.75rem * var(--fs)) }
+  .ftr-cols{ grid-template-columns:repeat(4,1fr) }
+}
+
+/* ==========================================================================
+   오버레이: 메뉴 / 모달
+   ========================================================================== */
+#navmenu{
+  position:fixed; inset:0; z-index:115; display:none; flex-direction:column;
+  background:var(--ink); color:var(--paper); opacity:0; transition:opacity .5s var(--e-spring);
+}
+#navmenu.show{ display:flex }
+#navmenu.in{ opacity:1 }
+.nm-top{ display:flex; align-items:center; justify-content:space-between; padding:1.25rem }
+.nm-brand{ display:flex; align-items:center; gap:.5rem; font-size:calc(1.125rem * var(--fs)); font-weight:600 }
+.nm-brand svg{ color:var(--paper) }
+.nm-close{ display:inline-flex; gap:.5rem; align-items:center; border:1px solid rgba(229,228,226,.2); border-radius:.875rem; padding:.5rem 1rem; font-size:calc(.75rem * var(--fs)); font-weight:500; text-transform:uppercase; letter-spacing:.05em; color:rgba(229,228,226,.7) }
+.nm-close:hover{ border-color:var(--paper); color:var(--paper) }
+.nm-nav{ flex:1; display:flex; flex-direction:column; justify-content:center }
+.nm-nav ul{ display:flex; flex-direction:column; gap:.25rem }
+.nm-nav button{ width:100%; display:flex; gap:1rem; align-items:baseline; padding-block:.5rem; text-align:left; font-size:calc(2.25rem * var(--fs)); font-weight:700; letter-spacing:-.03em; transform:translateY(1rem); opacity:0; transition:all .5s ease-out }
+#navmenu.in .nm-nav button{ transform:translateY(0); opacity:1 }
+.nm-nav .n{ font-family:'Space Grotesk',monospace; font-size:calc(1rem * var(--fs)); font-weight:400; color:rgba(229,228,226,.58) }
+.nm-nav .t{ color:rgba(229,228,226,.75); transition:color .3s }
+.nm-nav button:hover .t{ color:var(--paper) }
+.nm-nav button:hover .n{ color:var(--slate) }
+.nm-bot{ display:flex; flex-direction:column; gap:.75rem; border-top:1px solid rgba(229,228,226,.15); padding:1.5rem 1.25rem; font-size:calc(.75rem * var(--fs)); text-transform:uppercase; letter-spacing:.025em; color:rgba(229,228,226,.62) }
+@media (min-width:640px){
+  .nm-top{ padding:1.5rem 2rem } .nm-bot{ flex-direction:row; justify-content:space-between; padding-inline:2rem }
+  .nm-nav button{ font-size:calc(3.75rem * var(--fs)) }
+}
+
+#modal{
+  position:fixed; inset:0; z-index:110; display:none; align-items:flex-end; justify-content:center;
+  padding:1rem; background:rgba(10,10,10,.35); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+  opacity:0; transition:opacity .45s var(--e-spring);
+}
+#modal.show{ display:flex }
+#modal.in{ opacity:1 }
+.mo-panel{
+  position:relative; width:100%; max-width:32rem; overflow:hidden; border-radius:2rem;
+  background:var(--paper); padding:1.5rem; border:1px solid rgba(10,10,10,.14);
+  transform:translateY(28px); transition:transform .45s var(--e-spring);
+}
+#modal.in .mo-panel{ transform:translateY(0) }
+.mo-close{ position:absolute; right:1rem; top:1rem; width:2.25rem; height:2.25rem; display:grid; place-items:center; border-radius:9999px; background:var(--ink); color:var(--paper) }
+.mo-head{ margin-bottom:1.5rem; display:flex; flex-direction:column; gap:.375rem }
+.mo-head h2{ font-size:calc(1.5rem * var(--fs)); font-weight:700; letter-spacing:-.02em }
+.mo-form{ display:flex; flex-direction:column; gap:1rem }
+.mo-form label{ display:flex; flex-direction:column; gap:.5rem }
+.mo-form .cap{ font-size:calc(.75rem * var(--fs)); font-weight:500; text-transform:uppercase; letter-spacing:.025em; color:rgba(10,10,10,.7) }
+.mo-form input,.mo-form textarea{
+  width:100%; border:1px solid rgba(10,10,10,.2); background:rgba(83,104,120,.28);
+  border-radius:.875rem; padding:.75rem 1rem; font-size:calc(.875rem * var(--fs)); font-family:inherit;
+  color:var(--ink); outline:none; transition:border-color .25s, background .25s;
+}
+.mo-form textarea{ resize:none }
+.mo-form input::placeholder,.mo-form textarea::placeholder{ color:rgba(10,10,10,.6) }
+.mo-form input:focus,.mo-form textarea:focus{ border-color:var(--ink); background:var(--paper) }
+.mo-bottom{ margin-top:.5rem; display:flex; align-items:center; justify-content:space-between; gap:1rem }
+.mo-note{ font-size:calc(.75rem * var(--fs)); color:rgba(10,10,10,.68) }
+.mo-done{ display:none; flex-direction:column; align-items:center; text-align:center; padding-block:2rem; gap:1rem }
+.mo-done .badge2{ width:3.5rem; height:3.5rem; display:grid; place-items:center; border-radius:9999px; background:var(--ink); color:var(--slate); font-size:calc(1.5rem * var(--fs)) }
+.mo-done h2{ font-size:calc(1.5rem * var(--fs)); font-weight:700 }
+.mo-done p{ max-width:32ch; font-size:calc(.875rem * var(--fs)); color:rgba(10,10,10,.65) }
+@media (min-width:640px){ #modal{ align-items:center } .mo-panel{ padding:2rem } .mo-head h2{ font-size:calc(1.875rem * var(--fs)) } }
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation:none !important; transition:none !important }
+  .line > i,.word,.rv{ opacity:1 !important; transform:none !important }
+  .hdr{ opacity:1; transform:none }
+  .hero-veil,.hero-mid{ opacity:1; transform:none }
+  .grain{ display:none }
+}
+@media (prefers-reduced-transparency: reduce){
+  .chip,.menubtn,.core{ backdrop-filter:none; -webkit-backdrop-filter:none }
+  .map-toggle{ background:rgba(10,10,10,.62) }
+  .map-toggle button:hover{ backdrop-filter:none; -webkit-backdrop-filter:none; background:rgba(10,10,10,.2) }
+  .map-toggle button[aria-pressed="true"]{ backdrop-filter:none; -webkit-backdrop-filter:none; background:var(--paper) }
+}
+
+.landing-info{padding:5rem 1.5rem;max-width:76rem;margin:auto;scroll-margin-top:2rem}
+.landing-info h2{font-size:clamp(1.8rem,4vw,3rem);margin-bottom:1.5rem}
+.landing-info p{font-size:1rem;line-height:1.8;max-width:48rem}
+.feature-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem;margin:2rem 0}
+.feature-grid article{border:1px solid #536878;border-radius:1rem;padding:1.5rem}
+.feature-grid h3{font-size:1.2rem;margin-bottom:.75rem}
+.ready-dialog{margin:auto;width:min(90vw,28rem);border:0;border-radius:1rem;padding:2rem;background:#E5E4E2;color:#0A0A0A}
+.ready-dialog::backdrop{background:rgba(0,0,0,.55)}
+.ready-dialog h2{font-size:1.5rem;margin-bottom:1rem}
+.ready-dialog p{line-height:1.7;margin-bottom:1.5rem}
+.ready-dialog button,.landing-cta{display:inline-block;padding:.85rem 1.5rem;border-radius:2rem;background:#0A0A0A;color:#E5E4E2}
+@media(max-width:640px){.feature-grid{grid-template-columns:1fr}.landing-info{padding:3rem 1.25rem}}
+
+.mobile-actions{display:none;pointer-events:auto;align-items:center;gap:1rem}
+.mobile-actions button{font-size:.875rem;padding:.65rem .8rem;border:1px solid rgba(10,10,10,.25);border-radius:2rem}
+#navmenu{width:100%;max-width:none;height:100%;max-height:none;border:0;margin:0}
+@media(max-width:640px){.mainnav{display:none}.mobile-actions{display:flex}.hdr .shell{padding:.75rem 1rem}.nm-top,.nm-nav,.nm-bot{width:100%}}
+</style>
+</head>
+<body>
+
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<div class="grain" aria-hidden="true"></div>
+
+<!-- ==========================================================================
+     퍼즐 마크 스프라이트
+     pz        작은 크기용 단색 실루엣 (currentColor)
+     pzLight   어두운 면 위. 민트와 리넨으로 만든 유리
+     pzDark    밝은 면 위. 와인으로 만든 유리
+     레퍼런스의 하늘색은 쓰지 않고 팔레트 세 색으로만 유리감을 만든다.
+     ========================================================================== -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="gLbody" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#E5E4E2" stop-opacity=".46"/>
+      <stop offset=".5" stop-color="#536878" stop-opacity=".20"/>
+      <stop offset="1" stop-color="#E5E4E2" stop-opacity=".36"/>
+    </linearGradient>
+    <radialGradient id="gLcore" cx=".5" cy=".52" r=".46">
+      <stop offset="0" stop-color="#536878" stop-opacity=".88"/>
+      <stop offset=".55" stop-color="#536878" stop-opacity=".30"/>
+      <stop offset="1" stop-color="#536878" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gLrim" x1="0" y1="0" x2=".85" y2="1">
+      <stop offset="0" stop-color="#E5E4E2"/>
+      <stop offset=".34" stop-color="#536878"/>
+      <stop offset=".68" stop-color="#E5E4E2"/>
+      <stop offset="1" stop-color="#536878"/>
+    </linearGradient>
+
+    <linearGradient id="gDbody" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0A0A0A" stop-opacity=".20"/>
+      <stop offset=".5" stop-color="#0A0A0A" stop-opacity=".06"/>
+      <stop offset="1" stop-color="#0A0A0A" stop-opacity=".17"/>
+    </linearGradient>
+    <radialGradient id="gDcore" cx=".5" cy=".52" r=".46">
+      <stop offset="0" stop-color="#0A0A0A" stop-opacity=".58"/>
+      <stop offset=".55" stop-color="#0A0A0A" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#0A0A0A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gDrim" x1="0" y1="0" x2=".85" y2="1">
+      <stop offset="0" stop-color="#0A0A0A"/>
+      <stop offset=".34" stop-color="#0A0A0A" stop-opacity=".42"/>
+      <stop offset=".68" stop-color="#0A0A0A"/>
+      <stop offset="1" stop-color="#0A0A0A" stop-opacity=".5"/>
+    </linearGradient>
+
+    <!-- 필름 포스터 타일. 민트 면 위에 놓이는 와인 유리. -->
+    <linearGradient id="tileBody" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0A0A0A" stop-opacity=".36"/>
+      <stop offset=".5" stop-color="#0A0A0A" stop-opacity=".15"/>
+      <stop offset="1" stop-color="#0A0A0A" stop-opacity=".31"/>
+    </linearGradient>
+    <radialGradient id="tileCore" cx=".5" cy=".52" r=".48">
+      <stop offset="0" stop-color="#0A0A0A" stop-opacity=".48"/>
+      <stop offset=".6" stop-color="#0A0A0A" stop-opacity=".14"/>
+      <stop offset="1" stop-color="#0A0A0A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="tileRim" x1="0" y1="0" x2=".85" y2="1">
+      <stop offset="0" stop-color="#E5E4E2"/>
+      <stop offset=".3" stop-color="#0A0A0A"/>
+      <stop offset=".62" stop-color="#E5E4E2"/>
+      <stop offset="1" stop-color="#0A0A0A"/>
+    </linearGradient>
+  </defs>
+
+  <symbol id="pz" viewBox="4.5 -4.5 96 96">
+    <path d="M22 14H38C38 2 58 2 58 14H74A8 8 0 0 1 82 22V38C94 38 94 58 82 58V74A8 8 0 0 1 74 82H58C58 70 38 70 38 82H22A8 8 0 0 1 14 74V58C26 58 26 38 14 38V22A8 8 0 0 1 22 14Z"/>
+  </symbol>
+
+  <symbol id="pzLight" viewBox="4.5 -4.5 96 96">
+    <path d="M22 14H38C38 2 58 2 58 14H74A8 8 0 0 1 82 22V38C94 38 94 58 82 58V74A8 8 0 0 1 74 82H58C58 70 38 70 38 82H22A8 8 0 0 1 14 74V58C26 58 26 38 14 38V22A8 8 0 0 1 22 14Z" fill="url(#gLbody)"/>
+    <path d="M22 14H38C38 2 58 2 58 14H74A8 8 0 0 1 82 22V38C94 38 94 58 82 58V74A8 8 0 0 1 74 82H58C58 70 38 70 38 82H22A8 8 0 0 1 14 74V58C26 58 26 38 14 38V22A8 8 0 0 1 22 14Z" fill="url(#gLcore)"/>
+    <path d="M22 14H38C38 2 58 2 58 14H74A8 8 0 0 1 82 22V38C94 38 94 58 82 58V74A8 8 0 0 1 74 82H58C58 70 38 70 38 82H22A8 8 0 0 1 14 74V58C26 58 26 38 14 38V22A8 8 0 0 1 22 14Z" fill="none" stroke="url(#gLrim)" stroke-width="3"/>
+    <path d="M30 25C25.5 33 25.5 46 30 54" fill="none" stroke="#E5E4E2" stroke-opacity=".92" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M68 35C71.5 42 71.5 51 68 58" fill="none" stroke="#E5E4E2" stroke-opacity=".5" stroke-width="2" stroke-linecap="round"/>
+  </symbol>
+
+  <symbol id="pzDark" viewBox="4.5 -4.5 96 96">
+    <path d="M22 14H38C38 2 58 2 58 14H74A8 8 0 0 1 82 22V38C94 38 94 58 82 58V74A8 8 0 0 1 74 82H58C58 70 38 70 38 82H22A8 8 0 0 1 14 74V58C26 58 26 38 14 38V22A8 8 0 0 1 22 14Z" fill="url(#gDbody)"/>
+    <path d="M22 14H38C38 2 58 2 58 14H74A8 8 0 0 1 82 22V38C94 38 94 58 82 58V74A8 8 0 0 1 74 82H58C58 70 38 70 38 82H22A8 8 0 0 1 14 74V58C26 58 26 38 14 38V22A8 8 0 0 1 22 14Z" fill="url(#gDcore)"/>
+    <path d="M22 14H38C38 2 58 2 58 14H74A8 8 0 0 1 82 22V38C94 38 94 58 82 58V74A8 8 0 0 1 74 82H58C58 70 38 70 38 82H22A8 8 0 0 1 14 74V58C26 58 26 38 14 38V22A8 8 0 0 1 22 14Z" fill="none" stroke="url(#gDrim)" stroke-width="3"/>
+    <path d="M30 25C25.5 33 25.5 46 30 54" fill="none" stroke="#E5E4E2" stroke-opacity=".85" stroke-width="2.6" stroke-linecap="round"/>
+    <path d="M68 35C71.5 42 71.5 51 68 58" fill="none" stroke="#E5E4E2" stroke-opacity=".55" stroke-width="2" stroke-linecap="round"/>
+  </symbol>
+</svg>
+
+<!-- ===================== 로더 ===================== -->
+<div id="loader">
+  <div class="loader-center">
+    <div class="loader-brand">
+      <svg viewBox="0 0 96 96" width="1em" height="1em" aria-hidden="true"><use href="#pzLight"/></svg>
+      Feelm
+    </div>
+    <p class="loader-tag">당신의 취향이 한 편의 필름으로.</p>
+  </div>
+  <div class="loader-progress">
+    <div class="loader-track"><div class="loader-fill" id="loaderFill"></div></div>
+    <div class="loader-meta"><span>Loading</span><span class="loader-count" id="loaderCount">000</span></div>
+  </div>
+</div>
+
+<!-- ===================== 헤더 ===================== -->
+<header class="hdr" id="hdr">
+  <div class="shell">
+    <button class="brand" data-goto="map" aria-label="Feelm 홈">
+      <svg viewBox="0 0 96 96" width="1em" height="1em" fill="currentColor" aria-hidden="true"><use href="#pz"/></svg>
+      Feelm
+    </button>
+
+    <nav class="mainnav" aria-label="주요 메뉴">
+      <ul>
+        <li><button data-goto="map" aria-current="page"><span>홈</span></button></li>
+        <li><button data-goto="about"><span>소개</span></button></li>
+        <li><button data-goto="services"><span>기능</span></button></li>
+        <li><button data-goto="home"><span>시작하기</span></button></li>
+        <li><button data-modal><span>문의</span></button></li>
+      </ul>
+    </nav>
+    <div class="mobile-actions">
+      <button type="button" data-goto="home">시작하기</button>
+      <button type="button" id="menuOpen" aria-controls="navmenu" aria-expanded="false">메뉴</button>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ===================== 1. 필름 (첫 화면) ===================== -->
+<section id="map" data-scroll="pin" aria-label="취향을 담은 영화 필름">
+  <div class="map-view" id="mapView">
+    <div class="map-glow" aria-hidden="true"></div>
+    <div class="map-scrim" aria-hidden="true"></div>
+
+
+    <div class="scene">
+      <div class="ring" id="ring" role="list" aria-label="영화 타일"></div>
+      <div class="core">
+        <div class="vibe-art" aria-hidden="true">
+          <img class="q" src="art/vibe-q.png" alt="" decoding="async">
+          <img class="x" src="art/vibe-x.png" alt="" decoding="async">
+        </div>
+      </div>
+    </div>
+
+    <div class="vibe-read">
+      <span class="k">Vibe</span>
+      <span class="v"><span id="coreVal">0.0</span><span class="u">%</span></span>
+      <span class="vibe-bar" aria-hidden="true"></span>
+    </div>
+
+    <div class="map-toggle" role="group" aria-label="영화 포스터 배치 방식">
+      <button type="button" data-view="rings" aria-pressed="true">RINGS</button>
+      <button type="button" data-view="spiral" aria-pressed="false">SPIRAL</button>
+    </div>
+
+    <p class="sr-only">스크롤에 따라 20개의 영화 포스터가 순서대로 나타나며 Vibe 시각 효과가 0퍼센트에서 100퍼센트까지 채워집니다. 실제 취향 분석 결과가 아닌 화면 연출입니다.</p>
+    <div class="seam" aria-hidden="true"></div>
+  </div>
+</section>
+
+
+
+
+
+<section id="about" class="landing-info" aria-labelledby="aboutTitle">
+  <h2 id="aboutTitle">취향이 이어지는 나만의 필름, Feelm</h2>
+  <p>Feelm은 영화 취향을 알아가고 다음에 볼 영화를 찾는 서비스를 준비하고 있습니다.
+  좋아하는 영화와 감상 기록을 바탕으로, 나에게 맞는 한 편을 만나는 경험을 만들고자 합니다.</p>
+</section>
+<section id="services" class="landing-info" aria-labelledby="servicesTitle">
+  <h2 id="servicesTitle">Feelm에서 만나게 될 기능</h2>
+  <p>아래 기능은 준비 중입니다. 현재 페이지에서는 서비스 소개와 영화 포스터 화면을 둘러볼 수 있습니다.</p>
+  <div class="feature-grid">
+    <article><h3>취향 기반 추천</h3><p>좋아하는 영화와 평가를 바탕으로 다음에 볼 영화를 찾습니다.</p></article>
+    <article><h3>감상 기록</h3><p>감상한 영화와 관심 있는 영화를 모아 취향을 돌아봅니다.</p></article>
+    <article><h3>함께 볼 영화 찾기</h3><p>함께 보는 사람들의 취향을 고려해 영화를 고릅니다.</p></article>
+  </div>
+  <button type="button" class="landing-cta" data-goto="home">Feelm 시작하기</button>
+</section>
+</main>
+
+<!-- ===================== 메뉴 오버레이 ===================== -->
+<dialog id="navmenu" aria-modal="true" aria-label="전체 메뉴">
+  <div class="shell nm-top">
+    <div class="nm-brand">
+      <svg viewBox="0 0 96 96" width="1.25rem" height="1.25rem" fill="currentColor" aria-hidden="true"><use href="#pz"/></svg>
+      Feelm
+    </div>
+    <button class="nm-close" id="menuClose">
+      <svg viewBox="0 0 24 24" width=".875em" height=".875em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l16 16M20 4 4 20"/></svg>
+      Close
+    </button>
+  </div>
+  <nav class="shell nm-nav" aria-label="전체 메뉴 항목">
+    <ul id="nmList"></ul>
+  </nav>
+  <div class="shell nm-bot">
+    <span>Feelm</span>
+    <button data-goto="home" style="color:rgba(229,228,226,.75)">시작하기</button>
+  </div>
+</dialog>
+
+<dialog id="readyDialog" class="ready-dialog" aria-labelledby="readyTitle" aria-describedby="readyMessage">
+  <h2 id="readyTitle">준비중입니다</h2>
+  <p id="readyMessage">서비스를 준비하고 있습니다. 조금만 기다려 주세요.</p>
+  <form method="dialog"><button type="submit" autofocus>확인</button></form>
+</dialog>
+
+<script type="importmap">
+{
+  "imports": {
+    "lenis": "https://unpkg.com/lenis@1.3.23/dist/lenis.mjs",
+    "three": "https://unpkg.com/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import Lenis from 'lenis';
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const root = document.documentElement;
+
+/* ==========================================================================
+   적응형 그리드. 1920 이상에서는 JS 로 계속 키운다.
+   ========================================================================== */
+function applyAdaptiveGrid(){
+  const FONT_BASE = 16, baseWidth = 1920, coef = 0.6666;
+  const w = innerWidth;
+  const widthReduction = ((baseWidth - w) / baseWidth) * 100;
+  const size = FONT_BASE - (FONT_BASE * (widthReduction * coef)) / 100;
+  if (size > FONT_BASE) root.style.fontSize = size + 'px';
+  else root.style.removeProperty('font-size');
+}
+applyAdaptiveGrid();
+addEventListener('resize', applyAdaptiveGrid);
+
+/* ==========================================================================
+   Lenis + 스크롤 락
+   ========================================================================== */
+scrollTo(0, 0);
+const lenis = new Lenis({ smoothWheel: true });
+function raf(t){ lenis.raf(t); requestAnimationFrame(raf) }
+requestAnimationFrame(raf);
+
+let scrollEnabled = true;
+function stopScroll(){
+  scrollEnabled = false;
+  lenis.stop();
+  root.style.position = 'relative';
+  root.style.overflow = 'hidden';
+  root.style.height = '100%';
+}
+function startScroll(){
+  scrollEnabled = true;
+  lenis.start();
+  root.style.removeProperty('position');
+  root.style.removeProperty('overflow');
+  root.style.removeProperty('height');
+}
+function goto(id){
+  const el = document.getElementById(id);
+  if (!el) return;
+  const was = scrollEnabled;
+  scrollEnabled = false;
+  setTimeout(() => {
+    const offset = document.getElementById('hdr').getBoundingClientRect().height + 16;
+    scrollTo({ top: Math.max(0, el.getBoundingClientRect().top + pageYOffset - offset), behavior: REDUCE ? 'instant' : 'smooth' });
+    setTimeout(() => { scrollEnabled = was }, 100);
+  }, 50);
+}
+
+/* ==========================================================================
+   데이터
+   ========================================================================== */
+
+const NAV_ITEMS = [
+  ['홈','map'], ['소개','about'], ['기능','services'], ['시작하기','home'], ['문의','modal']
+];
+/* 포스터는 프로토타입 플레이스홀더. 실서비스에서는 TMDB poster_path (w342) 로 교체할 것. */
+/* ==========================================================================
+   포스터 소스
+
+   local  posters/01.jpg ~ 20.jpg 를 읽는다. 파일을 직접 넣는 방식.
+   tmdb   TMDB_KEY 를 채우면 인기작 포스터를 받아온다.
+
+   파일이나 키가 없으면 해당 칸은 빈 타일로 남는다. 깨진 이미지는 뜨지 않는다.
+   ========================================================================== */
+const POSTER_MODE = 'local';
+const TMDB_KEY = '';
+const TMDB_LIST = 'https://api.themoviedb.org/3/movie/top_rated?language=ko-KR&page=1&api_key=';
+const TMDB_IMG = 'https://image.tmdb.org/t/p/w342';
+
+/* 타일은 빈 이미지로 시작한다. 소스가 정해지면 그때 href 를 채운다. */
+const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+const poster = () => BLANK;
+const POSTER_EXT = ['jpg', 'jpeg', 'png', 'webp'];
+const posterPath = (n, ext) => 'posters/' + String(n).padStart(2, '0') + '.' + ext;
+
+/* 확장자를 하나씩 시도한다. 성공한 것만 href 로 붙이므로 깨진 이미지가 남지 않는다. */
+function tryLoad(n){
+  return new Promise(resolve => {
+    let k = 0;
+    const next = () => {
+      if (k >= POSTER_EXT.length) return resolve(null);
+      const src = posterPath(n, POSTER_EXT[k++]);
+      const im = new Image();
+      im.onload = () => resolve(src);
+      im.onerror = next;
+      im.src = src;
+    };
+    next();
+  });
+}
+
+/* 폴더가 비어 있을 때 요청이 쏟아지지 않도록 첫 칸부터 순서대로 확인한다.
+   중간에 비는 번호가 있어도 나머지는 계속 채운다. */
+/* 두 갈래로 채운다.
+   1. movies.json (SSAFY 데이터셋) + posters/{tmdb id}.jpg  - 데이터셋 포스터가 들어오면 이쪽
+   2. posters.json (지금 폴더에 있는 포스터 목록)           - 그 전까지는 이쪽 */
+let MOVIES = [], POSTERS = [];
+async function loadJson(name){
+  try {
+    const res = await fetch(name, { cache: 'no-cache' });
+    if (res.ok) return await res.json();
+  } catch { /* 파일이 없어도 화면은 그대로 뜬다 */ }
+  return [];
+}
+async function loadMovieList(){
+  MOVIES = await loadJson('movies.json');
+  POSTERS = await loadJson('posters.json');
+}
+
+/* 경로 하나만 확인한다. 성공하면 그 경로, 실패하면 null. */
+function tryLoadSrc(src){
+  return new Promise(resolve => {
+    const im = new Image();
+    im.onload = () => resolve(src);
+    im.onerror = () => resolve(null);
+    im.src = src;
+  });
+}
+
+/* 데이터셋 포스터가 폴더에 들어와 있는지 첫 한 장으로만 확인한다.
+   없는데 20칸을 전부 두드리면 404 가 80번 난다. */
+async function probeDatasetExt(){
+  const m = MOVIES[0];
+  if (!m) return null;
+  for (const ext of POSTER_EXT){
+    if (await tryLoadSrc('posters/' + m.id + '.' + ext)) return ext;
+  }
+  return null;
+}
+
+async function loadLocalPosters(){
+  if (POSTER_MODE !== 'local') return;
+  await loadMovieList();
+
+  const slots = [...document.querySelectorAll('#ring .slot')];
+
+  /* 낭독기에는 몇 번 자리인지 대신 영화 제목을 읽힌다. */
+  slots.forEach((s, i) => {
+    const m = MOVIES[i];
+    if (m) s.setAttribute('aria-label', m.title + ' 자세히 보기');
+  });
+
+  const dsExt = await probeDatasetExt();
+  if (dsExt){
+    /* 데이터셋 포스터가 있다. 파일명은 tmdb id 다. */
+    for (let i = 0; i < slots.length; i++){
+      const m = MOVIES[i];
+      if (!m) continue;
+      const im = slots[i].querySelector('.on image');
+      const src = await tryLoadSrc('posters/' + m.id + '.' + dsExt);
+      if (src && im) im.setAttribute('href', src);
+    }
+    return;
+  }
+
+  /* 데이터셋 포스터는 아직 없다. 폴더에 있는 포스터 목록으로 채운다. */
+  if (POSTERS.length){
+    for (let i = 0; i < slots.length; i++){
+      const p = POSTERS[i];
+      if (!p) continue;
+      const im = slots[i].querySelector('.on image');
+      const src = await tryLoadSrc('posters/' + p.file);
+      if (src && im) im.setAttribute('href', src);
+      slots[i].setAttribute('aria-label', p.title + ' 자세히 보기');
+    }
+    return;
+  }
+
+  /* 목록도 없다. 번호만 보고 채운다. */
+  const first = await tryLoad(1);
+  if (!first) return;                       /* 폴더가 비었다. 빈 타일로 둔다. */
+  const won = first.split('.').pop();
+  POSTER_EXT.sort((a, b) => (a === won ? -1 : b === won ? 1 : 0));
+  const imgs = slots.map(s => s.querySelector('.on image'));
+  if (imgs[0]) imgs[0].setAttribute('href', first);
+  for (let i = 1; i < imgs.length; i++){
+    const src = await tryLoad(i + 1);
+    if (src && imgs[i]) imgs[i].setAttribute('href', src);
+  }
+}
+
+/* TMDB 를 쓰면 로드 후 링 타일의 이미지를 실제 포스터로 갈아끼운다. */
+async function loadTmdbPosters(){
+  if (POSTER_MODE !== 'tmdb' || !TMDB_KEY) return;
+  try {
+    const res = await fetch(TMDB_LIST + TMDB_KEY);
+    if (!res.ok) return;
+    const data = await res.json();
+    const paths = (data.results || []).map(m => m.poster_path).filter(Boolean);
+    document.querySelectorAll('.slot .on image').forEach((img, i) => {
+      if (paths[i]) img.setAttribute('href', TMDB_IMG + paths[i]);
+    });
+  } catch (e) {
+    /* 네트워크나 키 문제면 로컬 파일 상태 그대로 둔다. */
+  }
+}
+
+/* ==========================================================================
+   리빌 (한 번만 재생)
+   ========================================================================== */
+let ready = REDUCE;
+const gated = [];
+
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (!e.isIntersecting) return;
+    play(e.target);
+    io.unobserve(e.target);
+  });
+}, { threshold: 0.15 });
+
+function play(el){
+  const delay = +(el.dataset.delay || 0);
+  if (el.dataset.gate === 'ready' && !ready){ gated.push(el); return; }
+  setTimeout(() => el.classList.add('is-in'), delay);
+}
+
+/* 라인 리빌: 각 줄에 스태거를 건다. */
+document.querySelectorAll('.reveal-lines').forEach(h => {
+  const stagger = +(h.dataset.stagger || 0);
+  h.querySelectorAll('.line > i').forEach((i, n) => {
+    i.style.transitionDelay = (n * stagger) + 'ms';
+  });
+  io.observe(h);
+});
+
+/* 단어 리빌: 공백으로 쪼개고 35ms 씩 밀어준다. */
+document.querySelectorAll('.reveal-words').forEach(h => {
+  const walk = (node) => {
+    [...node.childNodes].forEach(n => {
+      if (n.nodeType === 3){
+        const frag = document.createDocumentFragment();
+        n.textContent.split(/(\s+)/).forEach(part => {
+          if (!part.trim()){ frag.appendChild(document.createTextNode(part)); return }
+          const s = document.createElement('span');
+          s.className = 'word';
+          s.textContent = part;
+          frag.appendChild(s);
+        });
+        n.replaceWith(frag);
+      } else if (n.nodeType === 1){ walk(n) }
+    });
+  };
+  walk(h);
+  h.querySelectorAll('.word').forEach((w, n) => { w.style.transitionDelay = (n * 35) + 'ms' });
+  io.observe(h);
+});
+
+document.querySelectorAll('.rv').forEach(el => io.observe(el));
+
+function releaseGated(){
+  ready = true;
+  gated.splice(0).forEach(el => setTimeout(() => el.classList.add('is-in'), +(el.dataset.delay || 0)));
+}
+
+/* ==========================================================================
+   히어로 유리 퍼즐 (WebGL)
+   MeshPhysicalMaterial 의 transmission 으로 실제 굴절을 계산한다.
+   인접 조각은 같은 베지어 곡선을 공유하므로 정확히 맞물린다.
+   ========================================================================== */
+const COLS = 7, ROWS = 6, CELL = 1, AMP = 0.72;
+
+const hero3d = (function(){
+  const host = document.querySelector('.glass-stage');
+  if (!host || REDUCE) return null;
+
+  let renderer;
+  try {
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+  } catch (e) {
+    /* WebGL 을 못 쓰면 CSS 바닥판만 남는다. */
+    return null;
+  }
+  const SMALL = innerWidth < 900;
+  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, SMALL ? 1.25 : 1.6));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.02;
+  renderer.domElement.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block';
+  host.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(39, 1, 0.1, 100);
+
+  /* 환경광. 유리가 비출 대상이 있어야 굴절이 보인다. */
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  let envRT = null;
+  try {
+    envRT = pmrem.fromScene(new RoomEnvironment(), 0.04);
+    scene.environment = envRT.texture;
+  } catch (e) {}
+
+  /* 우상단 키 라이트. 레퍼런스의 광원 위치. */
+  const key = new THREE.DirectionalLight(0xE5E4E2, 1.9);
+  key.position.set(2.6, 4.4, 1.2);
+  scene.add(key);
+  scene.add(new THREE.AmbientLight(0x536878, 0.5));
+
+  /* 은청색 바닥판 */
+  const plate = new THREE.Mesh(
+    new THREE.PlaneGeometry(60, 60),
+    new THREE.MeshStandardMaterial({ color: 0x536878, roughness: 0.52, metalness: 0.12 })
+  );
+  plate.rotation.x = -Math.PI / 2;
+  plate.position.y = -0.02;
+  scene.add(plate);
+
+  /* ---- 퍼즐 윤곽. SVG 때와 같은 탭 파라미터를 쓴다. ---- */
+  const rnd = n => { const x = Math.sin(n * 12.9898) * 43758.5453; return x - Math.floor(x) };
+  const TAB = [
+    [[.35,0],[.40,0],[.42,.05]],
+    [[.44,.13],[.34,.16],[.34,.24]],
+    [[.34,.35],[.66,.35],[.66,.24]],
+    [[.66,.16],[.56,.13],[.58,.05]],
+    [[.60,0],[.65,0],[1,0]]
+  ];
+  function makeEdge(x1, y1, x2, y2, dir){
+    const dx = x2 - x1, dy = y2 - y1, px = -dy, py = dx;
+    const P = (t, n) => [x1 + dx * t + px * n * dir * AMP, y1 + dy * t + py * n * dir * AMP];
+    return TAB.map(seg => seg.map(q => P(q[0], q[1])));
+  }
+  const hE = {}, vE = {};
+  for (let r = 1; r < ROWS; r++) for (let c = 0; c < COLS; c++)
+    hE[r + '_' + c] = makeEdge(c * CELL, r * CELL, (c + 1) * CELL, r * CELL, rnd(r * 97 + c) > .5 ? 1 : -1);
+  for (let r = 0; r < ROWS; r++) for (let c = 1; c < COLS; c++)
+    vE[r + '_' + c] = makeEdge(c * CELL, r * CELL, c * CELL, (r + 1) * CELL, rnd(r * 53 + c * 7 + 11) > .5 ? 1 : -1);
+
+  /* 유리 재질. attenuationColor 로 팔레트 색을 입힌다. */
+  const glass = new THREE.MeshPhysicalMaterial({
+    color: 0xE5E4E2,
+    transmission: 1,
+    thickness: 0.55,
+    ior: 1.52,
+    roughness: 0.055,
+    metalness: 0,
+    clearcoat: 1,
+    clearcoatRoughness: 0.04,
+    envMapIntensity: 1.35,
+    attenuationColor: new THREE.Color(0x536878),
+    attenuationDistance: 0.62,
+    emissive: new THREE.Color(0xE5E4E2),
+    emissiveIntensity: 0
+  });
+
+  const EX = { depth: 0.34, bevelEnabled: true, bevelThickness: 0.05, bevelSize: 0.045, bevelSegments: 2, curveSegments: 12 };
+  const meshes = [];
+  const gx = COLS * CELL / 2, gy = ROWS * CELL / 2;
+
+  for (let r = 0; r < ROWS; r++){
+    for (let c = 0; c < COLS; c++){
+      const cx = (c + 0.5) * CELL, cy = (r + 0.5) * CELL;
+      const shape = new THREE.Shape();
+      const M = (q) => shape.moveTo(q[0] - cx, q[1] - cy);
+      const L = (x, y) => shape.lineTo(x - cx, y - cy);
+      const B = segs => segs.forEach(sg =>
+        shape.bezierCurveTo(sg[0][0] - cx, sg[0][1] - cy, sg[1][0] - cx, sg[1][1] - cy, sg[2][0] - cx, sg[2][1] - cy));
+      const Brev = (segs, sx, sy) => {
+        const pts = [[sx, sy]].concat(segs.map(sg => sg[2]));
+        for (let i = segs.length - 1; i >= 0; i--)
+          shape.bezierCurveTo(segs[i][1][0] - cx, segs[i][1][1] - cy, segs[i][0][0] - cx, segs[i][0][1] - cy, pts[i][0] - cx, pts[i][1] - cy);
+      };
+      const x0 = c * CELL, y0 = r * CELL, x1 = x0 + CELL, y1 = y0 + CELL;
+      M([x0, y0]);
+      if (r === 0) L(x1, y0); else B(hE[r + '_' + c]);
+      if (c === COLS - 1) L(x1, y1); else B(vE[r + '_' + (c + 1)]);
+      if (r === ROWS - 1) L(x0, y1); else Brev(hE[(r + 1) + '_' + c], x0, y1);
+      if (c === 0) L(x0, y0); else Brev(vE[r + '_' + c], x0, y0);
+
+      const geo = new THREE.ExtrudeGeometry(shape, EX);
+      geo.rotateX(-Math.PI / 2);      /* 압출 방향이 위를 향하게 */
+      geo.center();
+      const mesh = new THREE.Mesh(geo, glass.clone());
+      mesh.scale.set(0.93, 1, 0.93);
+      const baseY = rnd((r * COLS + c) * 3.7 + 2.4) * 0.06;
+      mesh.position.set(cx - gx, baseY, -(cy - gy));
+      mesh.userData = { r: r, c: c, baseY: baseY, lift: 0, glow: 0 };
+      scene.add(mesh);
+      meshes.push(mesh);
+    }
+  }
+
+  /* 먼 쪽 대각선부터 맞춰진다. r 이 클수록 카메라에서 멀다. */
+  const order = meshes.map((m, i) => i).sort((i, j) => {
+    const A = meshes[i].userData, B2 = meshes[j].userData;
+    return (B2.r + (COLS - 1 - B2.c)) - (A.r + (COLS - 1 - A.c));
+  });
+
+  /* ---- 커서 선택 ---- */
+  const ray = new THREE.Raycaster();
+  const ndc = new THREE.Vector2(-2, -2);
+  let hovered = -1;
+  renderer.domElement.addEventListener('pointermove', e => {
+    const b = renderer.domElement.getBoundingClientRect();
+    ndc.x = ((e.clientX - b.left) / b.width) * 2 - 1;
+    ndc.y = -((e.clientY - b.top) / b.height) * 2 + 1;
+  }, { passive: true });
+  renderer.domElement.addEventListener('pointerleave', () => { ndc.set(-2, -2) }, { passive: true });
+
+  /* 카메라는 두 지점 사이를 오간다.
+     A  비스듬히 내려다보는 3D 시점
+     B  바로 위에서 내려다보는 정면 시점. 완성된 퍼즐이 2D 로 읽힌다. */
+  const camA = new THREE.Vector3(), camB = new THREE.Vector3();
+  const lookA = new THREE.Vector3(0, 0, -0.15), lookB = new THREE.Vector3(0, 0, 0);
+  const lookTmp = new THREE.Vector3();
+
+  function resize(){
+    const b = host.getBoundingClientRect();
+    if (!b.width || !b.height) return;
+    renderer.setSize(Math.round(b.width), Math.round(b.height), false);
+    const ar = b.width / b.height;
+    camera.aspect = ar;
+    camera.updateProjectionMatrix();
+    /* 화면이 좁아지면 뒤로, 위로 더 빼야 판이 안 잘린다. */
+    camA.set(0.3, 4.1, ar < 1.2 ? 4.6 : 3.5);
+    const fit = Math.max(ROWS * CELL, (COLS * CELL) / ar) * 1.12;
+    camB.set(0, fit / (2 * Math.tan(camera.fov * Math.PI / 360)), 0.001);
+  }
+  new ResizeObserver(resize).observe(host);
+  addEventListener('resize', resize);
+  resize();
+
+  let progress = 0;
+
+  function frame(){
+    /* 0 ~ 0.62 조각이 순서대로 내려앉는다. */
+    const n = order.length;
+    const asm = Math.min(1, progress / 0.62);
+    for (let k = 0; k < n; k++){
+      const m = meshes[order[k]];
+      const t = Math.max(0, Math.min(1, asm * n - k));
+      const ease = 1 - Math.pow(1 - t, 3);
+      m.userData.lift += ((1 - ease) * 1.6 - m.userData.lift) * 0.18;
+    }
+
+    /* 0.62 ~ 1 카메라가 정면 위로 올라가고 조각 높이가 평평해진다.
+       다 채워진 퍼즐이 2D 판으로 마무리된다. */
+    let f = (progress - 0.62) / 0.38;
+    f = f < 0 ? 0 : f > 1 ? 1 : f;
+    const fe = f * f * (3 - 2 * f);
+    camera.position.lerpVectors(camA, camB, fe);
+    lookTmp.lerpVectors(lookA, lookB, fe);
+    camera.lookAt(lookTmp);
+
+    /* 커서 아래 조각 찾기 */
+    ray.setFromCamera(ndc, camera);
+    const hit = ndc.x > -1.5 ? ray.intersectObjects(meshes, false)[0] : null;
+    const next = hit ? meshes.indexOf(hit.object) : -1;
+    hovered = next;
+
+    for (let i = 0; i < meshes.length; i++){
+      const m = meshes[i], u = m.userData;
+      const wantGlow = i === hovered ? 1 : 0;
+      u.glow += (wantGlow - u.glow) * 0.16;
+      const wantHover = i === hovered ? 0.16 : 0;
+      m.position.y = u.baseY * (1 - fe) + u.lift + wantHover * u.glow;
+      m.material.emissiveIntensity = u.glow * 0.45;
+      m.material.envMapIntensity = 1.35 + u.glow * 0.9;
+    }
+    renderer.render(scene, camera);
+  }
+
+  return {
+    frame: frame,
+    setProgress: v => { progress = v },
+    dispose: () => { renderer.dispose(); if (envRT) envRT.dispose(); pmrem.dispose() }
+  };
+})();
+
+/* ==========================================================================
+   장르 / 기능 / 숫자 목록
+   ========================================================================== */
+
+document.getElementById('nmList').innerHTML = NAV_ITEMS.map(([t, target], i) => `
+  <li><button ${target === 'modal' ? 'data-modal' : `data-goto="${target}"`} style="transition-delay:${i * 45 + 80}ms">
+    <span class="n">0${i + 1}</span><span class="t">${t}</span>
+  </button></li>`).join('');
+
+/* 새로 만든 요소도 관찰 대상에 넣는다. */
+document.querySelectorAll('.rv:not(.is-in)').forEach(el => io.observe(el));
+
+/* ==========================================================================
+   필름 포스터 링
+   ========================================================================== */
+const ring = document.getElementById('ring');
+const mapSec = document.getElementById('map');
+
+const mapView = document.getElementById('mapView');
+const coreVal = document.getElementById('coreVal');
+/* 타일은 3:4 포스터 프레임이다. 스트로크가 잘리지 않도록 2 만큼 안쪽으로 넣는다. */
+const TILE_VIEW = '0 0 96 128';
+const TILE = 'x="2" y="2" width="92" height="124" rx="8"';
+
+(function buildRing(){
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < 20; i++){
+    const slot = document.createElement('div');
+    slot.className = 'slot';
+    slot.style.setProperty('--i', i);
+    slot.setAttribute('role', 'listitem');
+    slot.tabIndex = 0;
+    slot.setAttribute('aria-label', (i + 1) + '번 자리 자세히 보기');
+    slot.dataset.idx = i;
+
+    /* 안 본 영화. 유리 몸체와 안쪽 발광만 둔다.
+       테두리도 반사광도 없이 면으로만 존재한다. */
+    const glass =
+      '<g class="off">' +
+        '<rect ' + TILE + ' fill="url(#tileBody)"/>' +
+        '<rect ' + TILE + ' fill="url(#tileCore)"/>' +
+      '</g>';
+    /* 타일에 테두리는 두지 않는다. 유리 몸체와 반사광만으로 형태를 읽힌다. */
+    slot.innerHTML =
+      '<svg class="pzTile back" viewBox="' + TILE_VIEW + '" aria-hidden="true">' + glass + '</svg>' +
+      '<svg class="pzTile front" viewBox="' + TILE_VIEW + '" aria-hidden="true">' +
+        '<defs><clipPath id="pzc' + i + '"><rect ' + TILE + '/></clipPath></defs>' +
+        glass +
+        '<g class="on">' +
+          '<image href="' + poster() + '" x="2" y="2" width="92" height="124" ' +
+            'preserveAspectRatio="xMidYMid slice" clip-path="url(#pzc' + i + ')" ' +
+            'onerror="this.remove()"/>' +
+        '</g>' +
+      '</svg>';
+
+    frag.appendChild(slot);
+  }
+  ring.appendChild(frag);
+
+  document.querySelectorAll('.map-toggle button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.map-toggle button').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+      ring.classList.toggle('spiral', btn.dataset.view === 'spiral');
+    });
+  });
+
+  loadLocalPosters();
+  loadTmdbPosters();
+})();
+
+/* ==========================================================================
+   단일 rAF 루프
+   scroll 이벤트 리스너를 쓰지 않는다. transform 과 CSS 변수만 갱신한다.
+   ========================================================================== */
+const hdr = document.getElementById('hdr');
+const homeSec = document.getElementById('home');
+const counters = [...document.querySelectorAll('[data-count]')];
+const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
+let lastRing = -1, ringDone = false, lastCount = 0;
+
+function loop(now){
+  const vh = innerHeight;
+
+  /* 링 진행률 */
+  const mr = mapSec.getBoundingClientRect();
+  if (mr.bottom > 0 && mr.top < vh){
+    const travel = mr.height - vh;
+    const p = travel > 0 ? clamp01(-mr.top / travel) : 0;
+    mapSec.style.setProperty('--p', p);
+    const shown = Math.round(p * 1000);
+    if (shown !== lastRing){ lastRing = shown; coreVal.textContent = (p * 100).toFixed(1) }
+    const done = p > 0.995;
+    if (done !== ringDone){ ringDone = done; mapView.classList.toggle('done', done) }
+  }
+
+  /* 숫자 카운트업. top bottom -> center center 구간. 30ms 스로틀. */
+  if (now - lastCount > 30){
+    lastCount = now;
+    counters.forEach(el => {
+      const r = el.getBoundingClientRect();
+      const startY = vh, endY = vh / 2;
+      const cur = r.top + r.height / 2;
+      const p = clamp01((startY - cur) / (startY - endY));
+      const target = +el.dataset.count;
+      const v = Math.round(p * target);
+      if (el.textContent !== String(v)) el.textContent = v;
+    });
+  }
+
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ==========================================================================
+   로더
+   ========================================================================== */
+(function loader(){
+  const el = document.getElementById('loader');
+  const fill = document.getElementById('loaderFill');
+  const count = document.getElementById('loaderCount');
+  const FILL_MS = 1300;
+  const easeInOutCubic = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+  stopScroll();
+  const t0 = performance.now();
+
+  function step(now){
+    const t = Math.min((now - t0) / FILL_MS, 1);
+    const v = Math.round(easeInOutCubic(t) * 100);
+    fill.style.width = v + '%';
+    count.textContent = String(v).padStart(3, '0');
+    if (t < 1){ requestAnimationFrame(step); return }
+    el.classList.add('out');
+    setTimeout(() => {
+      startScroll();
+      el.remove();
+      hdr.classList.add('in');
+      releaseGated();
+    }, 700);
+  }
+  requestAnimationFrame(step);
+})();
+
+/* ==========================================================================
+   메뉴 / 모달 / 라우팅
+   ========================================================================== */
+const navmenu = document.getElementById('navmenu');
+const readyDialog = document.getElementById('readyDialog');
+const readyMessage = document.getElementById('readyMessage');
+function showReady(message){
+  readyMessage.textContent = message;
+  if (!readyDialog.open) readyDialog.showModal();
+}
+const menuOpen = document.getElementById('menuOpen');
+menuOpen.addEventListener('click', () => {
+  navmenu.showModal();
+  navmenu.classList.add('show', 'in');
+  menuOpen.setAttribute('aria-expanded', 'true');
+  stopScroll();
+  document.getElementById('menuClose').focus();
+});
+navmenu.addEventListener('cancel', e => { e.preventDefault(); closeMenu(); });
+function closeMenu(){
+  if (navmenu.open) navmenu.close();
+  menuOpen.setAttribute('aria-expanded', 'false');
+  navmenu.classList.remove('in', 'show');
+  startScroll();
+}
+document.getElementById('menuClose').addEventListener('click', closeMenu);
+addEventListener('resize', () => { if (innerWidth > 640 && navmenu.open) closeMenu(); });
+addEventListener('keydown', e => {
+  if (e.key === 'Escape' && navmenu.classList.contains('show')) closeMenu();
+});
+readyDialog.addEventListener('click', e => {
+  if (e.target !== readyDialog) return;
+  const r = readyDialog.getBoundingClientRect();
+  if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) readyDialog.close();
+});
+function startApp(){
+  const address = document.querySelector('meta[name="feelm-app-url"]').content.trim();
+  if (address){
+    try {
+      const url = new URL(address, location.href);
+      if (url.protocol === 'https:' && !url.username && !url.password){
+        location.assign(url.href);
+        return;
+      }
+    } catch { /* 잘못된 주소는 공개하지 않고 준비 안내를 표시합니다. */ }
+  }
+  showReady('Feelm 서비스를 준비하고 있습니다. 오픈 후 이 버튼으로 바로 시작할 수 있습니다.');
+}
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-goto]');
+  const m = e.target.closest('[data-modal]');
+  if (!g && !m) return;
+  if (navmenu.classList.contains('show')) closeMenu();
+  if (m){
+    showReady('문의 기능은 준비중입니다. 현재 문의나 신청 정보를 접수하지 않습니다.');
+    return;
+  }
+  if (g.dataset.goto === 'home'){ startApp(); return; }
+  const target = document.getElementById(g.dataset.goto);
+  if (!target){ showReady('이 기능은 준비중입니다.'); return; }
+  document.querySelectorAll('.mainnav [data-goto]').forEach(button => {
+    if (button === g) button.setAttribute('aria-current', 'location');
+    else button.removeAttribute('aria-current');
+  });
+  goto(g.dataset.goto);
+});
+</script>
+
+</body>
+</html>
