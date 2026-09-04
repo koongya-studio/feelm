@@ -939,3 +939,145 @@ docker exec feelm-postgres sh -c \
 롤백 후 `docker inspect`의 실행 이미지가 지정한 SHA 태그와 일치하고 상태가 healthy인지
 확인합니다. 장애 로그나 캡처에는 환경변수 전체, 비밀번호, JWT 키와 내부 IP를 포함하지
 않습니다.
+
+## HTML Landing and HTTPS (S15P21E106-196)
+
+J15E106 서비스 노드의 Nginx가 `https://j15e106.p.ssafy.io/`에서 Feelm 랜딩
+페이지를 제공합니다. 정적 파일은 `frontend/landing/`에서 관리하며 HTML과 함께 JSON,
+`posters/`, `art/`를 배포합니다. React 및 백엔드 기능 연동은 포함하지 않습니다.
+일반 HTTP 요청은 같은 경로의 HTTPS 주소로 301 전환하고,
+`/.well-known/acme-challenge/`는 인증서 갱신을 위해 HTTP로 제공합니다.
+
+랜딩 디렉터리를 `infra/landing/`에서 `frontend/landing/`으로 옮긴 버전을 적용할 때는
+Compose의 새 bind mount 경로를 반영하기 위해 Nginx 컨테이너를 재생성해야 합니다.
+코드를 받기만 하거나 Nginx reload만 실행해서는 기존 컨테이너의 연결 경로가 바뀌지 않습니다.
+아래 Deploy and validate 절차로 설정을 검사한 뒤 Nginx만 재생성합니다.
+
+### Server prerequisites and certificate storage
+
+- 도메인 DNS가 서비스 노드를 가리키고 외부 80·443 포트가 열려 있어야 합니다.
+- Ubuntu의 Certbot과 `certbot.timer`, Docker Compose를 사용합니다.
+- `/var/www/certbot`은 인증용 webroot이며 Nginx에 읽기 전용으로 연결합니다.
+- `/etc/letsencrypt` 전체를 읽기 전용으로 연결합니다. `live/` 인증서의 심볼릭 링크가
+  참조하는 `archive/`도 필요하므로 `live/`만 복사하지 않습니다.
+- 인증서 개인키·계정 키는 서버에서 root 권한으로 관리하고 Git·이미지·로그에 넣지 않습니다.
+  개인키 접근 권한을 완화하지 않으며, 백업이 필요하면 접근 제한된 암호화 저장소를 사용합니다.
+  인증서 자동 갱신과 타이머 로그를 점검하고 백업 접근 권한·복구 방법은 운영자가 관리합니다.
+
+```bash
+sudo install -d -m 755 /var/www/certbot
+sudo install -d -m 700 /etc/letsencrypt
+sudo certbot certificates
+```
+
+최초 인증서 발급은 ACME 경로를 제공하는 HTTP Nginx가 먼저 실행되어 있어야 합니다.
+현재 TLS 설정은 인증서가 없는 서버에서 기동되지 않습니다. 신규 서버는 Git에서 관리하는
+HTTP 준비 설정(이 업무의 `9a8b8d4` 커밋)을 별도 배포 체크아웃으로 준비해 HTTP를 제공한 뒤,
+인증서 발급 후 최신 HTTPS 설정으로 전환합니다. 실행 중인 저장소에 강제 checkout을 하지 않습니다.
+
+```bash
+sudo certbot certonly --webroot -w /var/www/certbot \
+  --cert-name j15e106.p.ssafy.io -d j15e106.p.ssafy.io
+```
+
+이메일 및 약관 동의는 운영자가 직접 입력합니다. 실제 인증서 경로는
+`/etc/letsencrypt/live/j15e106.p.ssafy.io/{fullchain,privkey}.pem`입니다.
+
+### Deploy and validate
+
+서버 저장소 루트에서 승인된 배포 브랜치·커밋을 받은 뒤 실행합니다. 기존 `infra/.env`와
+배포 환경변수를 사용합니다. Compose는 Nginx만 실행할 때도 전체 설정을 해석하므로
+`BACKEND_IMAGE`가 필요합니다. 기존 백엔드가 실행 중이면 다음처럼 실제 이미지 값을 사용합니다.
+백엔드가 없는 신규 서버에서는 승인된 배포 이미지 값을 준비해야 합니다.
+
+```bash
+export BACKEND_IMAGE="$(docker inspect feelm-backend --format '{{.Config.Image}}')"
+docker compose --env-file infra/.env -f infra/compose/service.yml config --quiet
+docker compose --env-file infra/.env -f infra/compose/service.yml \
+  run --rm --no-deps nginx nginx -t
+```
+
+검사가 성공한 경우에만 Nginx를 재생성합니다. 다른 서비스는 재기동하지 않으며 Nginx에는
+짧은 접속 중단이 발생할 수 있습니다. 배포 전 정상 커밋을 기록하고 설정은 Git에서 관리합니다.
+
+```bash
+docker compose --env-file infra/.env -f infra/compose/service.yml \
+  up -d --no-deps --force-recreate nginx
+curl -I http://j15e106.p.ssafy.io/
+curl -I https://j15e106.p.ssafy.io/
+curl -I https://j15e106.p.ssafy.io/movies.json
+curl -I https://j15e106.p.ssafy.io/posters/01.jpg
+```
+
+HTTP는 HTTPS 주소를 가리키는 301, HTTPS 페이지·정적 자원은 200이어야 합니다.
+인증서 검증을 건너뛰는 `curl -k`는 사용하지 않습니다. 브라우저에서 인증서 경고,
+모바일 표시, 이미지 및 데이터 로딩도 확인합니다.
+
+### Automatic renewal and reload
+
+Ubuntu 패키지로 설치한 Certbot의 타이머를 사용합니다. 갱신 성공 후 Nginx가 새 인증서를
+읽도록 서버에 다음 deploy hook을 설치합니다. 아래 파일은 서버 운영 설정이며 개인키가 아닙니다.
+
+```bash
+sudo install -d /etc/letsencrypt/renewal-hooks/deploy
+sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-feelm-nginx.sh >/dev/null <<'EOF'
+#!/bin/sh
+set -eu
+docker exec feelm-nginx nginx -t
+docker exec feelm-nginx nginx -s reload
+EOF
+sudo chmod 750 /etc/letsencrypt/renewal-hooks/deploy/reload-feelm-nginx.sh
+sudo systemctl enable --now certbot.timer
+systemctl is-enabled certbot.timer
+systemctl list-timers --all certbot.timer
+sudo certbot renew --dry-run
+sudo /etc/letsencrypt/renewal-hooks/deploy/reload-feelm-nginx.sh
+```
+
+`enabled`와 다음 실행 시간이 표시되어야 합니다. 타이머는 갱신 필요 여부를 주기적으로
+확인하며 매 실행마다 인증서를 교체하지는 않습니다. `--dry-run`은 시험 갱신이며 기본적으로
+실제 deploy hook 실행을 검증하지 않으므로 위에서는 hook도 별도로 실행합니다.
+실제 예약 갱신 및 hook의 결합 동작은 이후 로그로 확인합니다.
+
+```bash
+sudo journalctl -u certbot.service --since '7 days ago' --no-pager
+sudo certbot certificates
+docker logs --tail 50 feelm-nginx
+```
+
+### Recovery and remaining checks
+
+- 설정 검사 실패 시 실행 중인 Nginx를 재생성하지 않고 인증서 경로·권한 및 설정 오류를 확인합니다.
+- 배포 후 실패하면 Git에 기록된 직전 정상 설정과 정적 파일을 복구용 변경으로 준비합니다.
+  다른 작업자의 파일을 덮어쓰지 않고 승인된 복구 버전을 배포한 뒤 위 검사·재생성·접속 확인을 반복합니다.
+- 기존 인증서·개인키와 데이터 볼륨은 유지합니다. 복구를 위해 `docker compose down -v`를 실행하지 않습니다.
+- 인증서 문제로 HTTPS를 제공할 수 없을 때 HTTP 전용 전환은 암호화가 사라지는 별도 운영 결정입니다.
+  자동으로 HTTP로 되돌리지 말고 인증서 복구·재발급을 우선 검토합니다.
+- 재기동 검증은 운영자가 접속 중단 시간을 정해 Nginx 재시작 후 HTTPS와 정적 자원 응답을 확인합니다.
+  서버 전체 재부팅 및 실제 이전 버전 복구 시험은 별도 일정으로 수행합니다.
+
+### Verification record (2026-09-04)
+
+아래 서버 결과는 운영자가 제공한 화면 및 응답에 근거하며 AI가 서버에 직접 접속한 결과는 아닙니다.
+
+| 항목 | 결과 및 근거 |
+| --- | --- |
+| HTTP 랜딩 화면 | 운영자 정상 표시 확인 |
+| Certbot 인증서 발급 | 운영자 발급 완료 확인 |
+| HTTPS 랜딩 화면 | 설정 적용 후 운영자 정상 표시 확인 |
+| 인증서 시험 갱신 | 화면에서 `all simulated renewals succeeded` 확인 |
+| Nginx deploy hook 수동 실행 | `syntax is ok`, `test is successful`, `signal process started` 확인 |
+| 자동 갱신 예약 | `certbot.timer` enabled 및 NEXT 실행 시각 확인 |
+| 로컬 정적 검사 | JavaScript 문법, JSON, 포스터 참조 및 diff 공백 검사 통과 |
+| Nginx 재기동 | 운영자 성공 확인. 재기동 후 `nginx -t` 성공 및 아래 HTTP 응답 기록 확인 |
+| HTTPS 페이지·정적 자원 | 제공된 응답에서 `/`, `/movies.json`, `/posters/01.jpg` 모두 200 확인. Content-Type은 각각 text/html, application/json, image/jpeg |
+| HTTP 리다이렉트 | `/` 요청의 301 및 `Location: https://j15e106.p.ssafy.io/` 확인 |
+| 정상 설정 백업·복원 | 서버 커밋 `785211b`에서 nginx.conf 백업·복원, 설정 검사, Nginx 재생성, 파일 동일성 및 접속 확인 절차의 성공을 운영자가 확인 |
+| 아직 미검증 | 모바일 화면, 실제 이전 버전 롤백·장애 자동 복구, 서버 전체 재부팅, 실제 예약 갱신과 hook 결합 실행 |
+
+정상 설정 복원 시험은 현재 정상 nginx.conf를 저장소 밖에 백업한 뒤 동일한 설정을 복원하고,
+`nginx -t` 성공 후 Nginx만 재생성하는 절차로 수행했습니다. `cmp` 및 `git diff`로 파일
+동일성을 확인하고 HTTPS 200·HTTP 301·정적 자원 200을 재확인했습니다. 인증서는 유지했습니다.
+이는 이전 버전 롤백이나 의도적으로 발생시킨 장애의 자동 복구 시험을 의미하지 않습니다.
+
+MR의 서버 검증 상태는 위 근거와 동일하게 유지하며 미검증 항목을 완료로 표시하지 않습니다.
