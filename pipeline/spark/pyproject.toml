@@ -1,7 +1,7 @@
 [project]
-name = "feelm-recommendation-batch"
+name = "feelm-pipeline-spark"
 version = "0.1.0"
-description = "FEELM PySpark recommendation batch jobs"
+description = "FEELM PySpark pipeline batch and streaming jobs"
 requires-python = ">=3.10,<3.11"
 dependencies = [
   "pyspark==4.1.3",

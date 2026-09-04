@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pyspark.sql import SparkSession
 
-from jobs.parquet_roundtrip import copy_parquet
+from jobs.batch.parquet_roundtrip import copy_parquet
 
 
 def test_copy_parquet_roundtrip(tmp_path: Path) -> None:
