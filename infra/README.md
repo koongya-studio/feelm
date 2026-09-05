@@ -119,7 +119,7 @@ sudo chown -R "$USER:$USER" <repo>/.git
   - J15E106A 분산 처리 구성
 
 - `compose/local.yml`
-  - 로컬 개발에서만 필요한 포트 바인딩을 `compose/service.yml`에 추가하는 오버레이
+  - 로컬 Redis 포트를 추가하고 PostgreSQL의 공통 루프백 바인딩을 유지하는 오버레이
 
 ## PostgreSQL Runtime
 
@@ -170,8 +170,8 @@ DB_URL=jdbc:postgresql://postgres:5432/feelm
 
 ### Local Startup
 
-로컬에서는 `compose/local.yml`을 함께 적용해 PostgreSQL을
-`127.0.0.1:5432`에만 바인딩합니다. 외부 인터페이스에는 포트를 공개하지 않습니다.
+PostgreSQL은 기본 `compose/service.yml`에서 `127.0.0.1:5432`에만 바인딩합니다.
+로컬에서는 `compose/local.yml`을 함께 적용해도 같은 바인딩을 유지합니다.
 
 ```bash
 docker compose --env-file infra/.env \
@@ -193,8 +193,9 @@ docker port feelm-postgres 5432
 
 ### Service Server Startup
 
-J15E106에서는 로컬 오버레이 없이 실행합니다. 기본 `service.yml`은 PostgreSQL 포트를
-호스트에 게시하지 않으며, 같은 Compose 네트워크의 서비스만 `postgres:5432`로 접근합니다.
+J15E106에서는 로컬 오버레이 없이 실행합니다. 기본 `service.yml`은 PostgreSQL을
+서버의 `127.0.0.1:5432`에만 게시해 SSH 터널의 접속 대상으로 사용합니다.
+같은 Compose 네트워크의 서비스는 기존처럼 `postgres:5432`로 접근합니다.
 
 ```bash
 docker compose --env-file infra/.env \
@@ -205,6 +206,23 @@ docker compose --env-file infra/.env \
   -f infra/compose/service.yml \
   up -d postgres
 ```
+
+### SSH를 통한 개발 DB 접속
+
+S15P21E106-224에서 합의한 루프백 바인딩입니다. DBeaver의 SSH 연결에는 서비스 서버
+주소와 SSH 계정을, DB 연결에는 `127.0.0.1:5432`와 별도 발급된 개발 DB 계정을 사용합니다.
+[접속 안내](https://www.notion.so/3d2a10dfbffa81198d9fe9093bc6773b)를 참고합니다.
+SSH 접속이 가능한 서버 사용자도 해당 포트에 접근할 수 있으므로 DB 계정 권한으로
+조회·변경 범위를 제한합니다. 운영 전환 시 개발 계정과 포트 유지 여부를 재검토합니다.
+
+기존 컨테이너에는 설정 파일 반영만으로 포트가 추가되지 않습니다. 병합 후 서버에서
+기존 Compose 프로젝트명·환경변수·볼륨을 유지하고 PostgreSQL만 재생성해야 합니다.
+재생성 중 DB 연결은 잠시 끊깁니다. `down -v`로 데이터 볼륨을 삭제하지 않습니다.
+백엔드 배포 작업은 backend만 재생성하므로 PostgreSQL 포트 설정을 자동 적용하지 않습니다.
+
+적용 후 `docker port feelm-postgres 5432`가 `127.0.0.1:5432`인지 확인하고,
+DBeaver에서 `SELECT 1;`을 실행합니다. 설정 검증과 실제 서버 적용·접속 검증을 구분합니다.
+이 변경의 Push만으로 서버 적용이나 DBeaver 접속 성공을 의미하지 않습니다.
 
 ### Health and Connection Verification
 

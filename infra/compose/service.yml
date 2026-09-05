@@ -19,6 +19,10 @@ services:
     container_name: feelm-postgres
     restart: unless-stopped
 
+    # SSH tunnel destination on the service host.
+    ports:
+      - "127.0.0.1:5432:5432"
+
     environment:
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
