@@ -1,0 +1,61 @@
+tasks:
+- id: be-account-entities
+  summary: '[계정] 계정 엔티티와 공통 오류 코드 추가'
+  description: 계정 도메인의 기반을 만든다. users·notification_settings·email_verification_tokens 테이블을 매핑하는 엔티티와 리포지터리,
+    API-001~004가 쓰는 오류 코드 7종, BCrypt PasswordEncoder 빈을 추가한다. 엔드포인트는 포함하지 않는다. S15P21E106-149(이메일 회원가입·로그인)를
+    리뷰 단위가 작아지도록 4개로 분할한 첫 조각이며, 149는 이 분할로 대체되어 폐기한다. 담당 박시현(BE-A).
+  epic: S15P21E106-142
+  story_points: 2
+  sprint: active
+  done_when:
+  - 엔티티의 테이블·컬럼 매핑이 V202609021030·V202609021130 마이그레이션과 일치한다.
+  - notification_settings 기본값이 엔티티 필드 초기값으로 정의되어 H2 테스트 스키마에서도 같은 값이 나온다.
+  - ErrorCode 7종의 HTTP 상태가 API 명세와 일치하고 ErrorCodeTest가 이를 검증한다.
+  - 기존 테스트와 build가 통과한다.
+  jira_key: S15P21E106-200
+- id: be-mail-infrastructure
+  summary: '[계정] 인증 메일 발송 인프라 구성'
+  description: 인증 메일 발송 수단을 구성한다. smtp(Gmail SMTP + 앱 비밀번호)·log(로컬 확인용) 두 구현체, log 모드가 local·test 밖에서
+    켜지면 기동을 실패시키는 가드, feelm.mail.* 설정(모드 기본값 없음), spring-boot-starter-mail 의존성, mail health indicator
+    비활성화, 테스트용 발송 스파이 빈을 포함한다. dev가 요구하는 FRONTEND_BASE_URL·MAIL_USERNAME·MAIL_PASSWORD를 infra/.env.example과
+    compose에 함께 추가한다. 149 분할 두 번째 조각. 담당 박시현(BE-A), 인프라 파일은 조은채 리뷰.
+  epic: S15P21E106-142
+  story_points: 3
+  sprint: active
+  done_when:
+  - MAIL_MODE를 지정하지 않으면 기동에 실패하고, log 모드는 local·test 밖 프로파일에서 기동에 실패한다.
+  - smtp 모드는 spring.mail.* 설정으로 JavaMailSender를 통해 발송하고 log 모드는 인증 링크를 로그로만 남긴다.
+  - /actuator/health가 SMTP 접속 상태에 영향받지 않는다.
+  - infra/.env.example과 service.yml에 dev 필수 변수 3개가 required로 선언되어 있다.
+  - 테스트가 로그를 파싱하지 않고 스파이 빈에서 발송 내용을 얻을 수 있다.
+  jira_key: S15P21E106-201
+- id: be-signup-email-verification
+  summary: '[계정] 이메일 회원가입·인증 확인·재발송 구현'
+  description: API-001 회원가입, API-002 이메일 인증 확인, API-003 인증 메일 재발송을 구현한다. 비밀번호 3종 조합·닉네임 2~10자 검증, 이메일
+    소문자 정규화, 24시간 경과 미인증 계정 삭제 후 재가입, 불투명 난수 토큰과 SHA-256 해시 저장, 1회용·24시간 만료, 커밋 후 메일 발송 이벤트, 재발송 1분 제한(Redis)을
+    포함한다. 계약 문서의 관련 '가정' 표기를 확정값으로 정정한다. 149 분할 세 번째 조각으로 엔티티·메일 인프라 조각에 의존한다. 담당 박시현(BE-A).
+  epic: S15P21E106-142
+  story_points: 5
+  sprint: active
+  done_when:
+  - 가입→인증→활성화 흐름이 계약 테스트로 검증되고 상태 코드·응답 필드·오류 코드가 API-001~003 명세와 일치한다.
+  - 이메일·닉네임 중복, 검증 실패, 토큰 재사용·만료·위조, 이미 활성 계정이 명세의 오류 코드로 응답한다.
+  - 재발송은 계정 존재 여부를 노출하지 않고 1분 제한을 적용한다.
+  - docs/api/users.md의 API-001~003 미정·가정 문구가 확정값으로 정정되어 있다.
+  jira_key: S15P21E106-202
+- id: be-login-logout
+  summary: '[계정] 이메일 로그인·로그아웃 구현'
+  description: API-004 이메일 로그인과 API-005 로그아웃을 구현한다. 없는 이메일·비밀번호 불일치·탈퇴 계정을 동일한 INVALID_CREDENTIALS로 응답하고
+    더미 해시 비교로 응답 시간 차이를 줄인다. 미인증 계정은 EMAIL_NOT_VERIFIED, 연속 실패 5회/10분 제한은 Redis 카운터를 Lua 스크립트로 원자화한다.
+    로그아웃은 쿠키가 없어도 204로 멱등하게 처리한다. 로그인이 생기므로 AUTH_MOCK_ENABLED 기본값을 false로 내리고 문서를 정정한다. 149 분할 마지막 조각.
+    담당 박시현(BE-A).
+  epic: S15P21E106-142
+  story_points: 3
+  sprint: active
+  done_when:
+  - 로그인 성공 시 Access Token·사용자 요약·Refresh 쿠키가 명세대로 발급되고 그 토큰으로 회원 API를 호출할 수 있다.
+  - 실패 경로 3종이 같은 코드로 응답하고 5회 실패 후 6번째 요청부터 429가 되며 성공 시 카운터가 초기화된다.
+  - 실패 카운터에 TTL이 항상 걸려 무기한 차단이 발생하지 않는다.
+  - 로그아웃 후 같은 Refresh Token으로 재발급이 거절된다.
+  - AUTH_MOCK_ENABLED 기본값이 local·dev 모두 false이고 README·.env.example 문구가 이에 맞다.
+  jira_key: S15P21E106-203
