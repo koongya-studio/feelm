@@ -1,0 +1,18 @@
+// Applies only to the exported, operator-reviewed backend snapshot.
+gradle.projectsEvaluated {
+    def p = gradle.rootProject
+    def support = new File(System.getenv('CI222_SUPPORT'))
+    def policy = p.tasks.register('compileCi222Policy', JavaCompile) {
+        source = p.files(new File(support, 'LoopbackContainers.java'))
+        classpath = p.configurations.testCompileClasspath
+        destinationDirectory = p.layout.buildDirectory.dir('ci222-policy')
+        javaCompiler = p.javaToolchains.compilerFor { languageVersion = JavaLanguageVersion.of(21) }
+        options.encoding = 'UTF-8'
+    }
+    p.tasks.named('test', Test) {
+        dependsOn policy
+        classpath = p.files(policy.flatMap { it.destinationDirectory }, support) + classpath
+        maxParallelForks = 1
+        maxHeapSize = '768m'
+    }
+}

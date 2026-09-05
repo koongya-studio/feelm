@@ -1,0 +1,22 @@
+[Unit]
+Description=Feelm CI 222 fixed-policy GitLab MR Runner
+Requires=feelm-ci-guard.service
+After=network-online.target feelm-ci-guard.service
+Wants=network-online.target
+ConditionPathExists=/home/feelm-ci-test/gitlab-runner/config.toml
+
+[Service]
+Type=simple
+User=feelm-ci-test
+Group=feelm-ci-test
+WorkingDirectory=/home/feelm-ci-test/gitlab-runner
+UMask=0077
+ExecStart=/usr/bin/gitlab-runner run --config /home/feelm-ci-test/gitlab-runner/config.toml --working-directory /home/feelm-ci-test/gitlab-runner --service feelm-ci222-gitlab-runner
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=120
+KillMode=control-group
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target
