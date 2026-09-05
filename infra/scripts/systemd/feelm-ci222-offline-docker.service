@@ -1,0 +1,26 @@
+[Unit]
+Description=Feelm 222 reviewed offline Docker pilot (not an MR runner)
+Requires=feelm-ci-guard.service
+After=feelm-ci-guard.service
+
+[Service]
+Type=simple
+User=feelm-ci-test
+Group=feelm-ci-test
+Slice=user-1001.slice
+Delegate=yes
+PrivateNetwork=yes
+RuntimeDirectory=feelm-ci222-offline
+RuntimeDirectoryMode=0700
+UMask=0077
+ExecStart=/usr/bin/python3 -I /usr/local/lib/feelm-ci222/ci-offline-docker-launch.py launch
+KillMode=control-group
+Restart=no
+TimeoutStopSec=45
+RuntimeMaxSec=3600
+CPUQuota=200%
+MemoryHigh=5G
+MemoryMax=6G
+TasksMax=2048
+# No Install section: manually started reviewed pilot; no boot enablement.
+# No NoNewPrivileges: rootless newuidmap/newgidmap require their setuid helpers.
