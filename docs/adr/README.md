@@ -69,6 +69,7 @@ A 회의 안건 12건 중 아키텍처·기술 선택에 해당하는 5건입니
 | [ADR-0015](./0015-kmeans-ctfidf-taste-clusters.md) | 팝콘 8개 취향 유형은 K-Means와 c-TF-IDF로 생성한다 | 채택 (2026-08-31) |
 | [ADR-0016](./0016-kafka-spark-streaming-recommendation-serving.md) | 실시간 추천 갱신은 Kafka와 Spark Structured Streaming으로 수행한다 | 대체 → ADR-0017 |
 | [ADR-0017](./0017-python-foldin-spark-trending-split.md) | 개인 Fold-in은 Python Consumer, 전역 인기 집계는 Spark Structured Streaming으로 분리한다 | 채택 (2026-09-01) |
+| [ADR-0018](./0018-polling-transactional-outbox.md) | Kafka 이벤트는 폴링 기반 트랜잭셔널 아웃박스로 발행한다 | 제안 |
 
 ## 관련 문서
 

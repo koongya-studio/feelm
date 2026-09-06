@@ -117,7 +117,7 @@ Fold-in은 `x = (Σ yᵢyᵢᵀ + λI)⁻¹ (Σ rᵢyᵢ)` 이며 A와 B가 모�
 - 시각: ISO 8601 UTC 문자열. 예 `2026-08-31T07:21:00Z`
 - 식별자: 64bit 정수. `movieId`는 **서비스 DB 영화 ID**이며 MovieLens ID는 모델 내부 매핑에만 사용한다(S15P21E106-118)
 - Topic 이름: `feelm.<이벤트>.v1`. 계약이 깨지는 변경만 `v2`를 병행했다가 이전 버전을 제거한다
-- 파티션 키: 사용자 단위 이벤트는 `userId`. 같은 사용자의 이벤트 순서를 보장한다
+- 파티션 키: 사용자 단위 이벤트는 `userId`. 같은 Topic의 같은 Partition 안에서 Kafka에 실제 기록된 순서를 보장한다
 - Redis 키 이름: `feelm:<대상>:<식별자>:<용도>`
 - Consumer Group: Python Fold-in과 Spark Streaming은 서로 다른 Group을 사용하며 Offset·Checkpoint를 공유하지 않는다
 
@@ -224,9 +224,16 @@ Offset을 커밋합니다. 중간 실패로 재시도되면 같은 DB 상태를 
 
 ### 4.5 순서 보장
 
-- 파티션 키가 `userId`이므로 한 사용자의 이벤트는 발행 순서대로 도착한다
-- 서로 다른 사용자 사이의 순서는 보장하지 않으며 필요하지도 않다
+- 파티션 키가 `userId`이므로 같은 Topic에서 한 사용자의 이벤트는 같은 Partition에 기록된다
+- Kafka는 해당 Partition에 Producer가 실제로 기록한 순서를 유지하지만, [ADR-0018](../adr/0018-polling-transactional-outbox.md)의
+  독립 재시도로 인해 사건 발생 순서와 실제 발행·도착 순서는 달라질 수 있다
+- 서로 다른 Topic 또는 사용자 사이의 순서는 보장하지 않으며 필요하지도 않다
+- Consumer는 도착 순서만으로 최신 상태를 판단하지 않는다. 강한 신호는 PostgreSQL 최신 상태를 다시 읽고,
+  시간 기준이 필요한 신호는 `occurredAt`을 사용한다
 - Spring은 PostgreSQL 커밋 성공 후 발행한다. 커밋 실패 시 발행하지 않는다
+
+> **추천 담당자 리뷰 필요:** 장기 지연된 약한 신호가 Spark watermark 밖으로 밀리는 경우의 처리와
+> 중복 판정 창을 벗어난 재발행의 허용 범위는 Consumer 구현 전에 확인한다.
 
 ### 4.6 Candidate·기본 Top-N 갱신과 서빙 재정렬
 
@@ -467,7 +474,7 @@ ALS 재학습 배치가 끝나면 Python Consumer에 전체 사용자 추천 재
 - [ ] `candidates` 키가 유실된 사용자의 `candidateVersion` 시작값 결정 방식 — 구현 단계에서 확정
 - [ ] 콜드 스타트 처리 주체(Python 사전 생성 vs Spring 폴백)
 - [ ] 추천 이유 문장 생성 방식(템플릿 vs LLM) — 내부 API 명세에서 이월
-- [ ] Kafka 발행 실패 시 재시도·보상 정책(트랜잭셔널 아웃박스 도입 여부)
+- [ ] Kafka 발행 실패 시 재시도·보상 정책 — 폴링 기반 트랜잭셔널 아웃박스 제안(ADR-0018, 추천 담당자 리뷰 후 채택)
 - [ ] Python Consumer가 사용할 PostgreSQL 읽기 전용 롤의 계정 발급(접근 대상 테이블은 2.2에서 확정)
 - [ ] 인기 집계 윈도우·중복 처리·최소 사용자 수·점수식·반영 지연
 - [ ] 인기 집계 결과의 Redis 키·값 구조와 장애 시 폴백·오류 기준
