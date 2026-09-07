@@ -1,0 +1,94 @@
+/* 와이어프레임 2.5 실측값 */
+.page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  padding: 52px var(--screen-padding-x) 0;
+}
+
+.title {
+  font-size: 21px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.movie {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 16px;
+  margin: 22px var(--screen-padding-x) 0;
+}
+
+.movieInfo {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.movieTitle {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.movieMeta {
+  color: var(--color-ink-muted);
+  font-size: 12.5px;
+}
+
+.question {
+  flex: none;
+  margin-top: 38px;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.ratingArea {
+  display: flex;
+  flex: none;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.commentArea {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 6px;
+  margin: 24px var(--screen-padding-x) 0;
+}
+
+/*
+ * 공개 범위 선택 컨트롤을 만들지 않는 대신 적용되는 기본값을 알린다(CR-05).
+ * 지시서가 반영되면 이 안내를 선택 컨트롤로 교체한다.
+ */
+.visibilityNote {
+  color: var(--color-ink-hint);
+  font-size: 11px;
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px var(--screen-padding-x) 14px;
+}
+
+.notice {
+  color: var(--color-ink-hint);
+  font-size: 11px;
+  text-align: center;
+}

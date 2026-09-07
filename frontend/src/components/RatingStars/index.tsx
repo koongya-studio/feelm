@@ -3,7 +3,7 @@
  *
  * 점수는 0.5점 단위 0.5~5.0이다 (팀 합의, 2026-09-07).
  * 와이어프레임 2.5의 `4.5 / 5.0 · 0.5점 단위` 표기를 따른다.
- * FR-19와 API-036의 MovieLens 32M 기준(0.5~5.0, 0.5점 단위)을 따른다.
+ * 계약도 같은 규칙이다 (FR-19, API-036 `multipleOf: 0.5`, `erd.md` CHECK).
  *
  * 별 모양과 반쪽 별 그라디언트는 와이어프레임의 SVG를 그대로 쓴다.
  * 채운 별 #3C3A36, 빈 별은 흰 배경에 #8A8781 테두리.
@@ -16,6 +16,7 @@
  */
 import { useId } from 'react';
 import VisuallyHidden from '../VisuallyHidden';
+import type { CSSProperties } from 'react';
 import styles from './RatingStars.module.css';
 
 const STAR_PATH =
@@ -43,18 +44,24 @@ type Props = {
   score: number;
   /** 별 하나의 크기(px) */
   size?: number;
+  /** 별 사이 간격(px). 와이어프레임 2.4는 3px, 2.5 입력은 10px */
+  gap?: number;
   /** 숫자 값을 화면에도 표시할지 */
   showValue?: boolean;
 };
 
-export default function RatingStars({ score, size = 17, showValue = false }: Props) {
+export default function RatingStars({ score, size = 17, gap = 1, showValue = false }: Props) {
   const gradientId = useId();
   const fills = toFills(score);
   const label = score.toFixed(1);
 
   return (
     <span className={styles.wrapper}>
-      <span className={styles.stars} aria-hidden="true">
+      <span
+        className={styles.stars}
+        style={{ '--rating-stars-gap': `${gap}px` } as CSSProperties}
+        aria-hidden="true"
+      >
         {fills.includes('half') ? (
           <svg width="0" height="0" className={styles.defs} focusable="false">
             <defs>

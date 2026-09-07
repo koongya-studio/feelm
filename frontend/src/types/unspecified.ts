@@ -14,6 +14,7 @@
  * | runtimeMinutes | 2.1 `케이퍼 · 범죄 · 128분` | API-045 요약에 없음. API-030 상세에는 `runtimeMinutes`가 있음. CR 미등록 |
  * | AvailableNowMovie | 2.1 `내 OTT에서 지금 볼 수 있어요` 4편 | CR-14 결정 대기. 응답 형태 자체가 미정 |
  * | newPopcornCount | 2.1 `멤버 4명 · 새 팝콘 2개` | API-050에 없음. CR 미등록 |
+ * | weeklyFrameDelta | 2.6 `99프레임 · 이번 주 +3` · 2.7 `100프레임 · 이번 주 +4` | 주간 증가 수를 내려주는 필드가 없음. API-014 `stats.frameCount`와 API-042 `totalCount`는 누적 수만 준다. CR 미등록 |
  */
 import type { Party } from './party';
 import type { RecommendedMovie } from './movie';
@@ -53,4 +54,10 @@ export type AvailableNowMovie = {
 /** 파티 요약 + 새 팝콘 수 */
 export type PartyView = Party & {
   newPopcornCount: number;
+};
+
+/** 2.6 · 2.7의 `이번 주 +N` */
+export type WeeklyFrameDelta = {
+  /** 이번 주에 추가된 프레임 수 */
+  weeklyFrameDelta: number;
 };

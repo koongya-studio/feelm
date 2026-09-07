@@ -7,7 +7,7 @@
 .stars {
   display: inline-flex;
   align-items: center;
-  gap: 1px;
+  gap: var(--rating-stars-gap, 1px);
 }
 
 /* 반쪽 별 그라디언트 정의만 담는다. 화면 공간을 차지하지 않는다. */

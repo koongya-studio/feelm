@@ -1,9 +1,14 @@
+/*
+ * 화면 높이를 고정한다.
+ * 2.4는 본문만 스크롤하고 뒤로 가기 · 더 보기 버튼이 위에 고정된 구조이고,
+ * 2.6 · 2.7도 남은 높이를 채우는 배치다. AppLayout · OnboardingLayout과 같은 이유다.
+ */
 .layout {
   display: flex;
   width: 100%;
   max-width: var(--layout-max-width);
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   flex-direction: column;
   margin: 0 auto;
   padding-bottom: env(safe-area-inset-bottom, 0px);

@@ -196,6 +196,62 @@ export function PersonIcon() {
   );
 }
 
+/** 2.4 영화 상세 — 더 보기 */
+export function MoreVerticalIcon() {
+  return (
+    <svg width="4" height="16" viewBox="0 0 4 16" fill="currentColor" {...hidden}>
+      <circle cx="2" cy="2" r="1.8" />
+      <circle cx="2" cy="8" r="1.8" />
+      <circle cx="2" cy="14" r="1.8" />
+    </svg>
+  );
+}
+
+/** 2.4 영화 상세 — OTT 링크로 이동 */
+export function ExternalLinkIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 13 13" fill="none" {...hidden}>
+      <path
+        d="M5 1H2a1 1 0 00-1 1v9a1 1 0 001 1h9a1 1 0 001-1V8M8 1h4m0 0v4m0-4L5.5 7.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** 2.6 필름 추가 중 — 새 프레임 표식 */
+export function HeartIcon() {
+  return (
+    <svg width="12" height="11" viewBox="0 0 30 27" fill="none" {...hidden}>
+      <path
+        d="M15 25S2 17 2 8.5C2 4.4 5.2 2 8.5 2c2.7 0 5 1.6 6.5 4C16.5 3.6 18.8 2 21.5 2 24.8 2 28 4.4 28 8.5 28 17 15 25 15 25z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+}
+
+/**
+ * 2.7 필름 추가 완료 — 결과 카드 표식.
+ * 홈 헤더의 BellIcon과 모양이 비슷하지만 와이어프레임의 다른 그림이라 따로 둔다.
+ */
+export function ResultBellIcon() {
+  return (
+    <svg width="20" height="22" viewBox="0 0 18 20" fill="none" {...hidden}>
+      <path
+        d="M9 1.5c-3.6 0-6 2.7-6 6v4L1 15h16l-2-3.5v-4c0-3.3-2.4-6-6-6z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path d="M7 17.5a2 2 0 004 0" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 /** 2.3 카드 메뉴 — 관심없음 */
 export function BlockIcon() {
   return (
