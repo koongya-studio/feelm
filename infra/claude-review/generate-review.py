@@ -155,14 +155,29 @@ def parse_result(result: subprocess.CompletedProcess[str], allowed_files: set[st
         raise GenerationError("CLAUDE_RESULT_TOO_LARGE")
     try:
         envelope = json.loads(result.stdout)
-        review = json.loads(envelope["result"])
-    except (TypeError, KeyError, json.JSONDecodeError):
-        raise GenerationError("INVALID_CLAUDE_RESULT") from None
+    except json.JSONDecodeError:
+        raise GenerationError("INVALID_CLAUDE_ENVELOPE") from None
     if (not isinstance(envelope, dict) or envelope.get("type") != "result"
             or envelope.get("subtype") != "success" or envelope.get("is_error") is not False):
-        raise GenerationError("INVALID_CLAUDE_RESULT")
+        raise GenerationError("INVALID_CLAUDE_ENVELOPE")
+    review = parse_review_text(envelope.get("result"))
     validate_review(review, allowed_files)
     return review
+
+
+def parse_review_text(value: object) -> object:
+    if not isinstance(value, str):
+        raise GenerationError("INVALID_CLAUDE_RESULT")
+    text = value.strip()
+    if text.startswith("```") and text.endswith("```"):
+        first_line, separator, remainder = text.partition("\n")
+        if not separator or first_line not in ("```", "```json"):
+            raise GenerationError("INVALID_CLAUDE_RESULT")
+        text = remainder[:-3].strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        raise GenerationError("INVALID_CLAUDE_RESULT") from None
 
 
 def validate_review(review: object, allowed_files: set[str]) -> None:

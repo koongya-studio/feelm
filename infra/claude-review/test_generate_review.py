@@ -72,6 +72,32 @@ class GenerateReviewTests(unittest.TestCase):
             generator.parse_result(invalid, {"backend/example.py"})
         self.assertEqual(raised.exception.code, "INVALID_REVIEW_SCHEMA")
 
+    def test_accepts_single_plain_or_fenced_json_review(self):
+        raw = json.dumps(review(), ensure_ascii=False)
+        for model_text in (raw, "```json\n" + raw + "\n```", "```\n" + raw + "\n```"):
+            envelope = {"type": "result", "subtype": "success", "is_error": False,
+                        "result": model_text}
+            result = subprocess.CompletedProcess([], 0, json.dumps(envelope, ensure_ascii=False), "")
+            with self.subTest(model_text=model_text[:8]):
+                self.assertEqual(generator.parse_result(result, {"backend/example.py"}), review())
+
+    def test_rejects_prose_or_ambiguous_fenced_output(self):
+        raw = json.dumps(review(), ensure_ascii=False)
+        for model_text in ("리뷰 결과:\n" + raw, "```JSON\n" + raw + "\n```",
+                           "```json extra\n" + raw + "\n```", "```json\n" + raw + "\n```\nextra"):
+            envelope = {"type": "result", "subtype": "success", "is_error": False,
+                        "result": model_text}
+            result = subprocess.CompletedProcess([], 0, json.dumps(envelope, ensure_ascii=False), "")
+            with self.subTest(model_text=model_text[:12]), self.assertRaises(generator.GenerationError) as raised:
+                generator.parse_result(result, {"backend/example.py"})
+            self.assertEqual(raised.exception.code, "INVALID_CLAUDE_RESULT")
+
+    def test_distinguishes_invalid_cli_envelope_from_model_result(self):
+        result = subprocess.CompletedProcess([], 0, "not-json", "")
+        with self.assertRaises(generator.GenerationError) as raised:
+            generator.parse_result(result, {"backend/example.py"})
+        self.assertEqual(raised.exception.code, "INVALID_CLAUDE_ENVELOPE")
+
     def test_rejects_findings_for_unchanged_files_and_boolean_lines(self):
         for changed in [dict(review()["findings"][0], file="unrelated.py"),
                         dict(review()["findings"][0], line=True)]:
