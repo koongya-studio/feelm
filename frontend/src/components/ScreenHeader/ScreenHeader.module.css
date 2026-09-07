@@ -41,3 +41,8 @@
   display: flex;
   align-items: center;
 }
+
+/* 2.2 · 2.2-A는 제목을 가운데 둔다 */
+.header[data-align='center'] .title {
+  text-align: center;
+}
