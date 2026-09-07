@@ -320,7 +320,7 @@ public record RatingResponse(Long ratingId, int score, String comment) {
 - 명세에 없는 API, Entity, 필드, 의존성을 임의로 추가하지 않는다.
 - 다른 담당자 소유 도메인과 공통 설정을 임의로 수정하지 않는다.
 - 컨벤션을 적용할 수 없거나 예외가 필요하면 구현 전에 사용자에게 이유와 대안을 제시한다.
-- 작업 시작·검증·완료 보고 형식과 충돌 방지 절차는 `ai-collaboration.md`를 따른다.
+- 작업 시작·검증·완료 보고는 루트 `AGENTS.md`를, 충돌 방지 절차는 `ai-collaboration.md`를 따른다.
 
 ## 14. 결정 대기 및 후속 확정 사항
 
