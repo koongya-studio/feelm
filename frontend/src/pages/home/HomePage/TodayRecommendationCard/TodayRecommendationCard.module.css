@@ -1,0 +1,45 @@
+/* 와이어프레임 2.1 오늘의 추천 실측값 */
+.card {
+  display: flex;
+  gap: 14px;
+}
+
+.posterLink {
+  display: block;
+  flex: none;
+  border-radius: 8px;
+}
+
+.info {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.meta {
+  font-size: 12px;
+  color: var(--color-ink-muted);
+}
+
+.badgeRow {
+  align-self: flex-start;
+}
+
+.reason {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-ink-dim);
+}
+
+.ottList {
+  display: flex;
+  margin-top: auto;
+  gap: 4px;
+}

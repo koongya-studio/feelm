@@ -112,3 +112,66 @@ export function ChevronLeftIcon() {
     </svg>
   );
 }
+
+/** 2.1 참여 중인 파티 카드 — 더 보기 */
+export function ChevronRightIcon() {
+  return (
+    <svg width="7" height="12" viewBox="0 0 7 12" fill="none" {...hidden}>
+      <path d="M1 1l5 5-5 5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** 2.1 참여 중인 파티 카드 — 파티 */
+export function PartyGroupIcon() {
+  return (
+    <svg width="20" height="16" viewBox="0 0 20 16" fill="none" {...hidden}>
+      <circle cx="7" cy="5" r="2.6" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="13.5" cy="6" r="2.1" stroke="currentColor" strokeWidth="1.4" />
+      <path
+        d="M2 14c.8-2.6 2.8-3.7 5-3.7s4.2 1.1 5 3.7M12.5 10.6c1.9.1 3.7 1.1 4.4 3.4"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/** 2.3 카드 메뉴 — OTT에서 바로 보기 */
+export function PlayIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" {...hidden}>
+      <path
+        d="M4.5 2.8v8.4L11.5 7 4.5 2.8z"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** 2.3 카드 메뉴 — 영화 상세 보기 */
+export function LinkIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" {...hidden}>
+      <path
+        d="M5.5 8.5l3-3M6 3.8l1.2-1.2a2.3 2.3 0 013.2 3.2L9.2 7M8 10.2l-1.2 1.2a2.3 2.3 0 01-3.2-3.2L4.8 7"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/** 2.3 카드 메뉴 — 관심없음 */
+export function BlockIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" {...hidden}>
+      <circle cx="7" cy="7" r="5.5" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M3.2 3.2l7.6 7.6" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  );
+}

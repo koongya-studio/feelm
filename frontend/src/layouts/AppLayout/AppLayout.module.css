@@ -1,9 +1,17 @@
+/*
+ * 화면 높이를 고정한다.
+ * 와이어프레임은 모든 탭 화면에서 하단 내비가 고정이고 본문만 스크롤된다.
+ * min-height로 두면 본문이 길어질 때 문서 전체가 스크롤되어 내비가 위로 밀려
+ * 올라간다. height로 고정하고 .body가 내부에서 스크롤하도록 한다.
+ *
+ * 100dvh를 지원하지 않는 브라우저를 위해 100vh를 먼저 둔다.
+ */
 .layout {
   display: flex;
   width: 100%;
   max-width: var(--layout-max-width);
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   flex-direction: column;
   margin: 0 auto;
   background: var(--color-bg);

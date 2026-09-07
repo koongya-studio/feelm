@@ -25,13 +25,24 @@ type Props = {
   showBack?: boolean;
   /** 우측 액션 영역 */
   action?: ReactNode;
+  /**
+   * 제목 정렬. 와이어프레임 2.2 · 2.2-A는 제목을 가운데 두고, 나머지 화면은
+   * 왼쪽에 둔다. 기본값은 기존 화면과 같은 왼쪽이다.
+   */
+  align?: 'left' | 'center';
 };
 
-export default function ScreenHeader({ title, subtitle, showBack = false, action }: Props) {
+export default function ScreenHeader({
+  title,
+  subtitle,
+  showBack = false,
+  action,
+  align = 'left',
+}: Props) {
   const navigate = useNavigate();
 
   return (
-    <header className={styles.header}>
+    <header className={styles.header} data-align={align}>
       <div className={styles.row}>
         {showBack ? (
           <button type="button" className={styles.back} onClick={() => navigate(-1)}>

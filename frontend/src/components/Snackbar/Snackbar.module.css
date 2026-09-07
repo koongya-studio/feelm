@@ -1,0 +1,30 @@
+.snackbar {
+  display: flex;
+  height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 16px;
+  border-radius: 12px;
+  background: var(--color-nav-active);
+  color: var(--color-on-dark);
+}
+
+.message {
+  font-size: 13px;
+}
+
+/* 터치 영역을 넓히되 와이어프레임의 글자 크기는 유지한다 */
+.action {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-on-dark);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+  cursor: pointer;
+}
