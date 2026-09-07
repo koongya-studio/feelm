@@ -1,0 +1,325 @@
+/* 와이어프레임 2.4 실측값 */
+.page {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+/* 뒤로 가기 · 더 보기는 스크롤과 무관하게 위에 고정된다 */
+.floating {
+  position: absolute;
+  top: 64px;
+  right: 20px;
+  left: 20px;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  /* 보이는 버튼만 누를 수 있게 하고 사이 영역은 스크롤을 막지 않는다 */
+  pointer-events: none;
+}
+
+.floating > * {
+  pointer-events: auto;
+}
+
+.scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.backdrop {
+  position: relative;
+}
+
+/* 포스터 아래쪽을 흰색으로 흘려 본문과 이어 붙인다 */
+.backdropFade {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 360px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.25) 30%, var(--color-bg) 96%);
+}
+
+.body {
+  position: relative;
+  display: flex;
+  margin-top: -70px;
+  flex-direction: column;
+  gap: 9px;
+  padding: 0 var(--screen-padding-x) 30px;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.title {
+  flex: 1;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.ratingAction {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.ratingActionLabel {
+  color: var(--color-ink-muted);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.meta {
+  color: var(--color-ink-muted);
+  font-size: 13px;
+}
+
+/* 번호가 붙은 영역 카드 */
+.card {
+  margin-top: 6px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-line-subtle);
+  border-radius: var(--radius-control);
+  background: var(--color-bg);
+}
+
+.cardTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cardNumber {
+  display: flex;
+  width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--color-nav-active);
+  border-radius: 50%;
+  color: var(--color-nav-active);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.cardChevron {
+  display: flex;
+  margin-left: auto;
+  color: var(--color-ink-weak);
+}
+
+.cardBody {
+  margin: 8px 0 0 32px;
+  color: var(--color-ink-dim);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.ottList {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 9px 0 0 32px;
+}
+
+.ottItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ottName {
+  color: var(--color-ink-dim);
+  font-size: 12.5px;
+}
+
+.ottLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-ink);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.ottLinkNote {
+  margin-left: 4px;
+  color: var(--color-ink-hint);
+  font-size: 10px;
+}
+
+.ottLinkIcon {
+  display: inline-flex;
+  margin-left: 4px;
+  color: var(--color-nav-active);
+  vertical-align: middle;
+}
+
+/* 감상평 자리. 입력란처럼 보이지만 평가 화면으로 가는 버튼이다 */
+.commentPlaceholder {
+  display: flex;
+  width: 100%;
+  height: 38px;
+  box-sizing: border-box;
+  align-items: center;
+  margin: 9px 0 2px 32px;
+  padding: 0 12px;
+  border: 1px solid var(--color-line-section);
+  border-radius: 10px;
+  background: var(--color-bg);
+  color: var(--color-ink-hint);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.similarList {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0 2px 32px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.similarItem {
+  flex: none;
+}
+
+.similarButton {
+  display: flex;
+  width: 64px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.similarReason {
+  color: var(--color-ink-faint);
+  font-size: 9.5px;
+  line-height: 1.35;
+}
+
+/* 제목은 와이어프레임에 없지만 링크에 이름이 필요하다 */
+.similarTitle {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.peopleList {
+  display: flex;
+  gap: 14px;
+  margin-top: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.personItem {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.personPhoto {
+  display: block;
+  width: 52px;
+  height: 52px;
+  box-sizing: border-box;
+  border: 1px solid var(--color-poster-line);
+  border-radius: 50%;
+  background:
+    linear-gradient(
+      to top right,
+      transparent 49.5%,
+      var(--color-poster-fill) 49.5% 50.5%,
+      transparent 50.5%
+    ),
+    linear-gradient(
+      to bottom right,
+      transparent 49.5%,
+      var(--color-poster-fill) 49.5% 50.5%,
+      transparent 50.5%
+    ),
+    var(--color-bg);
+}
+
+.personName {
+  color: var(--color-ink-faint);
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.reviewList {
+  margin-top: 8px;
+}
+
+.reviewItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.reviewHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reviewUser {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.reviewScore {
+  color: var(--color-ink-subtle);
+  font-size: 10.5px;
+}
+
+.reviewBody {
+  color: rgba(60, 58, 54, 0.75);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.notFound {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-ink-muted);
+  font-size: 14px;
+}

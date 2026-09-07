@@ -1,0 +1,165 @@
+/* 와이어프레임 2.6 · 2.7 실측값 */
+.page {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.stage {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+/* 2.7은 뒤 화면을 흐리게 두고 결과 카드를 올린다 */
+.stage[data-done='true'] {
+  opacity: 0.3;
+}
+
+.header {
+  flex: none;
+  padding: 56px var(--screen-padding-x) 0;
+  text-align: center;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.counts {
+  margin-top: 5px;
+  color: var(--color-ink-muted);
+  font-size: 12.5px;
+}
+
+.stripArea {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  justify-content: center;
+  margin-top: 16px;
+  overflow: hidden;
+}
+
+/* 아직 채워지지 않은 칸 */
+.emptyFrame {
+  display: block;
+  width: 166px;
+  height: 118px;
+  flex: none;
+  border: 1.5px dashed rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+}
+
+/* 이번에 추가되는 프레임 */
+.newFrame {
+  position: relative;
+  display: block;
+  flex: none;
+  border-radius: 4px;
+  box-shadow:
+    0 0 0 2px var(--color-nav-active),
+    0 8px 30px rgba(0, 0, 0, 0.35);
+}
+
+.newBadge {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  display: flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-nav-active);
+  color: var(--color-bg);
+}
+
+.progress {
+  flex: none;
+  padding: 12px var(--screen-padding-x) 20px;
+  color: var(--color-ink-dim);
+  font-size: 11px;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+/* 2.7 결과 카드 */
+.result {
+  position: absolute;
+  right: 14px;
+  bottom: 84px;
+  left: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 22px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 20px;
+  background: var(--color-bg);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+.resultIcon {
+  display: flex;
+  width: 52px;
+  height: 52px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.15);
+  color: var(--color-nav-active);
+}
+
+.resultTitle {
+  font-size: 16.5px;
+  font-weight: 700;
+}
+
+.resultText {
+  color: var(--color-ink-muted);
+  font-size: 13px;
+}
+
+.resultRow {
+  display: flex;
+  align-self: stretch;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.resultFlavor {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.resultBucket {
+  color: var(--color-ink-faint);
+  white-space: nowrap;
+}
+
+.resultActions {
+  display: flex;
+  align-self: stretch;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}

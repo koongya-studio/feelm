@@ -1,0 +1,28 @@
+.field {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 와이어프레임 2.5 실측값 */
+.input {
+  height: 50px;
+  box-sizing: border-box;
+  padding: 15px 16px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  border-radius: 13px;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: 13.5px;
+  line-height: 1.4;
+  resize: none;
+}
+
+.input::placeholder {
+  color: var(--color-ink-hint);
+}
+
+.input:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
