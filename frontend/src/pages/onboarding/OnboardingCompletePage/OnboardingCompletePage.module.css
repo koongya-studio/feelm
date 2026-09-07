@@ -1,0 +1,43 @@
+/*
+ * 와이어프레임 1.3 기준.
+ *
+ * 와이어프레임은 필름 영역 위에 원형 터치 표식과 `터치할 수 있어요` 말풍선을 겹쳐
+ * 두었다. 터치 시 동작이 미확정이라 표식은 넣지 않고 문구만 필름 아래에 두었다.
+ * `필름 늘리기`도 와이어프레임은 높이 48px에 내용 너비지만, 공통 Button(52px, 전체 폭)을
+ * 그대로 썼다. 둘 다 알려진 차이로 보고했다.
+ */
+.page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.stage {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 14px 0;
+  overflow-y: auto;
+}
+
+.hint {
+  flex: none;
+  padding: 4px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-badge);
+  background: var(--color-bg);
+  color: var(--color-nav-active);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.actions {
+  flex: none;
+  padding: 0 var(--screen-padding-x) 92px;
+}

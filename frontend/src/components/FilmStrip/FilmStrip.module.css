@@ -1,0 +1,30 @@
+/* 와이어프레임 2.2 · 2.3 스트립 실측값 */
+.strip {
+  position: relative;
+  display: flex;
+  width: var(--film-strip-width);
+  height: max-content;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 0;
+  background: var(--color-surface-strip);
+}
+
+.perforation {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  border-radius: 3px;
+  background: repeating-linear-gradient(180deg, var(--color-bg) 0 8px, transparent 8px 21px);
+}
+
+.perforation[data-side='left'] {
+  left: 5px;
+}
+
+.perforation[data-side='right'] {
+  right: 5px;
+}

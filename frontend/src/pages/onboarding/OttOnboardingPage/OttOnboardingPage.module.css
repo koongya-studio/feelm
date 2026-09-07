@@ -1,0 +1,25 @@
+/* 와이어프레임 1.2 실측값 */
+.page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.list {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 9px;
+  margin: 20px var(--screen-padding-x) 0;
+  overflow-y: auto;
+}
+
+.actions {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px var(--screen-padding-x) 14px;
+}

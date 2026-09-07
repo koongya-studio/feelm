@@ -5,7 +5,7 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-icon);
+  border-radius: var(--ott-badge-radius);
   font-size: var(--ott-badge-font-size);
   font-weight: 700;
 }
@@ -13,6 +13,12 @@
 .badge[data-variant='default'] {
   background: var(--color-nav-inactive);
   color: var(--color-ink);
+}
+
+.badge[data-variant='unselected'] {
+  background: var(--color-nav-inactive);
+  color: var(--color-on-dark);
+  font-weight: 800;
 }
 
 .badge[data-variant='selected'] {

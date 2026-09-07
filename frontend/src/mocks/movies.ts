@@ -99,6 +99,70 @@ export const mockMovies: Record<number, RecommendedMovieView> = {
     ottProviders: ['DISNEY_PLUS'],
     runtimeMinutes: 131,
   },
+
+  // 1.1 영화 취향 초기 설정의 카드 6장.
+  // 와이어프레임은 카드에 제목을 표시하지 않는다. 대체 텍스트에 필요하므로 자리표시자
+  // 제목을 두고, 2.1 목록의 `영화 제목 1~4`와 구분되도록 알파벳을 쓴다.
+  301: {
+    movieId: 301,
+    title: '영화 제목 A',
+    posterUrl: null,
+    releaseYear: 2015,
+    genres: ['액션'],
+    averageRating: 4.1,
+    ottProviders: ['NETFLIX'],
+    runtimeMinutes: 126,
+  },
+  302: {
+    movieId: 302,
+    title: '영화 제목 B',
+    posterUrl: null,
+    releaseYear: 2012,
+    genres: ['스릴러'],
+    averageRating: 4.4,
+    ottProviders: ['TVING'],
+    runtimeMinutes: 138,
+  },
+  303: {
+    movieId: 303,
+    title: '영화 제목 C',
+    posterUrl: null,
+    releaseYear: 2019,
+    genres: ['드라마'],
+    averageRating: 3.9,
+    ottProviders: ['WAVVE'],
+    runtimeMinutes: 114,
+  },
+  304: {
+    movieId: 304,
+    title: '영화 제목 D',
+    posterUrl: null,
+    releaseYear: 2008,
+    genres: ['범죄'],
+    averageRating: 4.6,
+    ottProviders: ['NETFLIX'],
+    runtimeMinutes: 152,
+  },
+  305: {
+    movieId: 305,
+    title: '영화 제목 E',
+    posterUrl: null,
+    releaseYear: 2021,
+    genres: ['코미디'],
+    averageRating: 3.5,
+    ottProviders: ['DISNEY_PLUS'],
+    runtimeMinutes: 101,
+  },
+  306: {
+    movieId: 306,
+    title: '영화 제목 F',
+    posterUrl: null,
+    releaseYear: 2017,
+    genres: ['SF'],
+    averageRating: 4.0,
+    ottProviders: ['COUPANG_PLAY'],
+    runtimeMinutes: 143,
+  },
 };
 
 export function findMockMovie(movieId: number): RecommendedMovieView {
