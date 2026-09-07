@@ -1,5 +1,8 @@
 # Runner 통신 격리 파일럿 (S15P21E106-222)
 
+MR 61의 신규 메일 의존성을 포함하는 오프라인 캐시 갱신과 Runner 전환 전 독립 검증 절차는
+[S15P21E106-251 캐시 갱신 절차](OFFLINE-CACHE-REFRESH.md)를 따른다.
+
 일반 MR 전환 전 남은 접근 경계와 구현 순서는
 [MR 실행 경계 설계안](MR-EXECUTION-BOUNDARY.md)을 참고한다. 후속
 [GitLab MR 전용 어댑터](GITLAB-MR-ADAPTER.md)는 `backend-mr-test`를 새 태그로 분리하고

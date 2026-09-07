@@ -22,8 +22,8 @@ FILES = (
     'rootless-backend/META-INF/services/org.testcontainers.core.CreateContainerCmdModifier',
     'systemd/feelm-ci222-gitlab-runner.service',
 )
-SOURCE_SHA = 'b045a76f85d8373dec543a58ec1a72e8aacebe288d0856bbfe678db8d5c4d3b1'
-REVISION = '9631afd9c616e047abbdd0ad7bf8192231f7f35c'
+SOURCE_SHA = '3e151aef092a1db51f1295f6f9c27e7a68141a7ced838503e67b1eaf21e82ceb'
+REVISION = '0e2bab04ef2fa7601747f4718d239eaabdc79df8'
 
 
 def archive_bytes():

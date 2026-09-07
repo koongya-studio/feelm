@@ -18,10 +18,9 @@ HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('backend_pilot', HERE / 'ci-rootless-backend-check.py')
 pilot = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(pilot)
-REVISION = '9631afd9c616e047abbdd0ad7bf8192231f7f35c'
-ARCHIVE_SHA = 'b045a76f85d8373dec543a58ec1a72e8aacebe288d0856bbfe678db8d5c4d3b1'
+REVISION = '0e2bab04ef2fa7601747f4718d239eaabdc79df8'
+ARCHIVE_SHA = '3e151aef092a1db51f1295f6f9c27e7a68141a7ced838503e67b1eaf21e82ceb'
 RUNS = Path('/home/feelm-ci-test/backend-checks')
-SOURCE_RUN = RUNS / 'ee737a8331104a619b767a40ae996129'
 OUTPUT = Path('/home/feelm-ci-test/offline-inputs')
 IMAGES = {
     'redis:8-alpine': 'redis@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576',
@@ -150,7 +149,7 @@ def prepare(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=['plan', 'inspect', 'prepare'], nargs='?', default='plan')
-    parser.add_argument('--source-run', default=str(SOURCE_RUN))
+    parser.add_argument('--source-run')
     parser.add_argument('--archive', default=f'/home/feelm-ci-test/pilot-222/backend-{REVISION}.tar')
     parser.add_argument('--confirm-cache-idle', action='store_true')
     args = parser.parse_args()
@@ -158,8 +157,12 @@ def main():
         print('PLAN: recorded source archive + selected cache copy + local image digest inspection; '
               'keep full offline test/spotless tasks; STOP before Docker boundary or test execution')
     elif args.action == 'inspect':
+        if not args.source_run:
+            parser.error('inspect requires --source-run from the reviewed online run')
         inspect(args)
     else:
+        if not args.source_run:
+            parser.error('prepare requires --source-run from the reviewed online run')
         if not args.confirm_cache_idle:
             parser.error('prepare requires --confirm-cache-idle; no concurrent tests/Gradle allowed')
         prepare(args)
