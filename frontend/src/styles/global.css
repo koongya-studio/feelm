@@ -1,0 +1,62 @@
+/*
+ * 전역 기본 스타일.
+ * 디자인 토큰은 src/styles/tokens.css에 둔다.
+ */
+
+@import './tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family:
+    'IBM Plex Sans KR',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Apple SD Gothic Neo',
+    'Malgun Gothic',
+    sans-serif;
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+figure {
+  margin: 0;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+/* 기본 초점 표시를 제거하지 않는다. */
+:focus-visible {
+  outline: 2px solid var(--color-nav-active);
+  outline-offset: 2px;
+}

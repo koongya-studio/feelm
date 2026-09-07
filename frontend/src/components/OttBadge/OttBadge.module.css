@@ -1,0 +1,22 @@
+.badge {
+  display: inline-flex;
+  width: var(--ott-badge-size);
+  height: var(--ott-badge-size);
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-icon);
+  font-size: var(--ott-badge-font-size);
+  font-weight: 700;
+}
+
+.badge[data-variant='default'] {
+  background: var(--color-nav-inactive);
+  color: var(--color-ink);
+}
+
+.badge[data-variant='selected'] {
+  background: var(--color-nav-active);
+  color: var(--color-on-dark);
+  font-weight: 800;
+}

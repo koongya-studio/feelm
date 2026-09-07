@@ -1,0 +1,18 @@
+.layout {
+  display: flex;
+  width: 100%;
+  max-width: var(--layout-max-width);
+  min-height: 100vh;
+  min-height: 100dvh;
+  flex-direction: column;
+  margin: 0 auto;
+  background: var(--color-bg);
+}
+
+.body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+}

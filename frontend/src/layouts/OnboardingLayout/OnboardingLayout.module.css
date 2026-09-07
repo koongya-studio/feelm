@@ -1,0 +1,11 @@
+.layout {
+  display: flex;
+  width: 100%;
+  max-width: var(--layout-max-width);
+  min-height: 100vh;
+  min-height: 100dvh;
+  flex-direction: column;
+  margin: 0 auto;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--color-bg);
+}

@@ -1,0 +1,51 @@
+/*
+ * 디자인 토큰.
+ * 확정된 값만 둔다. 미확정 항목은 DESIGN_GOALS.md 2.1~2.8을 따르며 확정 후 추가한다.
+ * 값의 근거는 frontend/docs/screens/common-components.md 6.2절을 따른다.
+ *
+ * 팝콘 맛 색상은 여기에 두지 않는다. API-044로 조회한 런타임 값을 사용한다.
+ */
+
+:root {
+  /* 색 — DESIGN_GOALS.md 1.1 · 1.2 확정 */
+  --color-bg: #ffffff;
+  --color-ink: #2e2c29;
+
+  /* 색 — REF-01 하단 내비게이션 가이드 확정 */
+  --color-nav-active: #3c3a36;
+  --color-nav-inactive: #a5a29b;
+
+  /* 와이어프레임에서 관찰한 값. 확정 사양이 아니므로 디자인 확정 시 교체한다. */
+  --color-line: rgba(0, 0, 0, 0.12);
+  --color-line-strong: rgba(0, 0, 0, 0.25);
+  --color-line-section: rgba(0, 0, 0, 0.15);
+  --color-ink-muted: rgba(60, 58, 54, 0.55);
+  --color-ink-subtle: rgba(60, 58, 54, 0.5);
+  --color-ink-faint: rgba(60, 58, 54, 0.6);
+  --color-on-dark: #ffffff;
+  --color-poster-line: #c7c4be;
+  --color-poster-fill: #d5d2cc;
+  --color-star-empty-line: #8a8781;
+
+  /* 반경 — 와이어프레임 관찰값 */
+  --radius-control: 14px;
+  --radius-section: 16px;
+  --radius-badge: 999px;
+  --radius-icon: 8px;
+
+  /* 컨트롤 높이 — 와이어프레임 관찰값 */
+  --control-height: 52px;
+
+  /* 치수 — REF-01 확정 */
+  --nav-height: 66px;
+
+  /*
+   * 콘텐츠 최대 폭.
+   * 와이어프레임이 Android 412px 프레임 기준이고 업무 17이 와이어프레임 일치를
+   * 검증하므로 같은 폭을 상한으로 둔다. 넓은 화면 대응은 디자인 확정 후 정한다.
+   */
+  --layout-max-width: 412px;
+
+  /* 화면 좌우 여백. 와이어프레임에서 가장 많이 관찰된 값 */
+  --screen-padding-x: 22px;
+}

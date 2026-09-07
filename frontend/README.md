@@ -4,15 +4,52 @@ React + Vite 기반 반응형 웹 애플리케이션 소스와 관련 문서를 
 
 ## 디렉터리 구성
 
+- `src/`: React 애플리케이션 소스
 - `landing/`: 독립적으로 배포하는 Feelm 정적 HTML 랜딩 페이지와 이미지·JSON 자료
 - `docs/`: 화면 목업 및 프론트엔드 설계 자료
 
-향후 React 프로젝트는 `frontend/`를 루트로 구성합니다. 현재 랜딩 페이지는
-`landing/index.html`에 두어 React 진입 파일과 분리합니다. React 프로젝트 초기 구성은
-이번 랜딩 페이지 작업에 포함하지 않습니다.
+React 프로젝트는 `frontend/`를 루트로 구성합니다. 랜딩 페이지는 `landing/index.html`에
+두어 React 진입 파일과 분리하며, React 빌드와 lint · 포맷 검사 대상에서 제외합니다.
 
 랜딩 페이지는 `landing/` 전체를 배포해야 하며 별도 빌드는 필요하지 않습니다.
 Nginx·Compose 및 인증서 운영 절차는 [인프라 문서](../infra/README.md)를 참고합니다.
+
+화면 설계 문서는 [`docs/screens/`](./docs/screens/README.md)에 있습니다.
+
+## 실행 방법
+
+Node 20.19 이상이 필요합니다. 패키지 매니저는 npm을 사용하며 `package-lock.json`을
+저장소에 포함합니다.
+
+```bash
+cd frontend
+npm install
+```
+
+| 명령 | 설명 |
+| --- | --- |
+| `npm run dev` | 개발 서버 실행 (http://localhost:5173) |
+| `npm run build` | 타입 검사 후 Production Build. 결과는 `dist/` |
+| `npm run preview` | Build 결과를 로컬에서 확인 |
+| `npm run lint` | ESLint 검사 |
+| `npm run lint:fix` | ESLint 자동 수정 |
+| `npm run format` | Prettier 포맷 적용 |
+| `npm run format:check` | Prettier 포맷 검사 |
+
+커밋 전에 `npm run lint`와 `npm run format:check`를 통과하는지 확인합니다. CI에
+프론트엔드 잡은 아직 없습니다.
+
+`dist/`와 `node_modules/`는 저장소 루트 `.gitignore`에서 제외합니다.
+
+## 환경 변수
+
+Vite는 `VITE_` 접두사가 붙은 변수만 클라이언트 코드에 노출합니다. 접두사가 없는 변수는
+번들에 포함되지 않습니다.
+
+현재 필요한 환경 변수는 없습니다. 목업 데이터로 동작하며 실제 API를 호출하지 않습니다.
+변수를 추가할 때는 `frontend/.env.example`을 만들어 키 이름만 기록하고 실제 값은
+커밋하지 않습니다. 자세한 기준은
+[Secret 및 환경변수 관리 규칙](../docs/secret-environment-variables.md)을 따릅니다.
 
 ## 랜딩 메뉴 및 앱 연결
 
