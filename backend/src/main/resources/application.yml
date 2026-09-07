@@ -15,6 +15,27 @@ spring:
       # 스키마의 유일한 출처는 Flyway 마이그레이션이다.
       ddl-auto: none
     open-in-view: false
+  mail:
+    # 인증 메일 발송용 SMTP. feelm.mail.mode=smtp일 때만 실제로 사용한다.
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    # 계정 정보는 Secret이므로 소스에 기본값을 두지 않고 환경변수로만 주입한다.
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+management:
+  health:
+    mail:
+      # spring.mail.host가 설정되면 Boot가 mail health indicator를 자동 등록해 /actuator/health 호출마다
+      # SMTP 접속을 시도한다. 인프라 헬스체크(10초 주기)가 이 경로를 보므로, 메일 서버 상태가
+      # 백엔드 컨테이너의 healthy 판정을 좌우하지 않도록 끈다. 발송 실패는 재발송(API-003)으로 복구한다.
+      enabled: false
 
 feelm:
   jwt:
@@ -33,3 +54,10 @@ feelm:
     mock:
       enabled: false
       user-id: 1
+  mail:
+    # 필수. log는 발송 대신 인증 링크를 로그로 남기는 로컬 확인용이고, local·test 밖에서 log면 기동에 실패한다.
+    # 기본값을 두지 않는다. 프로파일 없이 뜬 배포가 조용히 log 모드로 흘러가 토큰이 로그에 남는 것을 막기 위해서다.
+    mode: ${MAIL_MODE}
+    from: ${MAIL_FROM:no-reply@feelm.local}
+    # 링크는 프론트 화면으로 가고 프론트가 API-002를 호출한다.
+    verification-url: ${FRONTEND_BASE_URL:http://localhost:5173}/verify-email
