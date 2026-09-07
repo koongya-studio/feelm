@@ -12,6 +12,9 @@
 __pycache__/
 *.py[cod]
 
+# Jira creation plans are disposable inputs; tracked historical plans remain unchanged.
+/.jira/tmp/
+
 
 # Work plan drafts are local-only and must not be committed. See backend/AGENTS.md.
 /plans/
