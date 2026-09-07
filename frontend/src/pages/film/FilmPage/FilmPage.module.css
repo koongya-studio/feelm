@@ -1,0 +1,183 @@
+/*
+ * 3.1 취향 필름 메인. 값은 와이어프레임 실측값이다.
+ *
+ * 필름 스트립이 화면 폭을 채우므로 좌우 여백은 .page가 아니라 .content가 가진다.
+ */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 12px 0 16px;
+}
+
+/* 릴 장식을 얹기 위한 기준 상자. 와이어프레임은 위아래 10px 여백을 둔다 */
+.stripArea {
+  position: relative;
+  padding: 10px 0;
+}
+
+.frameButton {
+  display: block;
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+/* + 계속 감기는 중 */
+.moreTile {
+  display: flex;
+  width: 118px;
+  height: 166px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  background: var(--color-surface-on-dark);
+  color: var(--color-on-dark-faint);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/*
+ * 필름 릴 — 스트립 위에 얹히는 장식.
+ * 프레임 버튼 위를 덮으므로 클릭을 가로채지 않게 pointer-events를 끈다.
+ */
+.reel {
+  position: absolute;
+  top: -8px;
+  right: 16px;
+  width: 56px;
+  height: 56px;
+  box-sizing: border-box;
+  border: 8px solid var(--color-nav-active);
+  border-radius: 50%;
+  background: var(--color-bg);
+  pointer-events: none;
+}
+
+.reelHub {
+  position: absolute;
+  top: 12px;
+  right: 36px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-nav-active);
+  pointer-events: none;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 var(--screen-padding-x);
+}
+
+/* 헤더 우측 카운트 */
+.counts {
+  color: var(--color-ink-muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.countStrong {
+  color: var(--color-ink);
+}
+
+/* 요즘 취향 흐름 */
+.flowCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--color-line-section);
+  border-radius: var(--radius-section);
+}
+
+.flowLabel {
+  color: var(--color-ink-subtle);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.flowSentence {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.keywordList {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.keywordItem {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.keywordRationale {
+  color: var(--color-ink-faint);
+  font-size: 11px;
+}
+
+/* 최근 추가된 영화 */
+.recentSection {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.sectionTitle {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.recentList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.recentItem {
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.recentInfo {
+  min-width: 0;
+  flex: 1;
+}
+
+.recentTitle {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.recentMeta {
+  display: block;
+  color: var(--color-ink-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}

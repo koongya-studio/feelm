@@ -37,6 +37,11 @@
   --color-surface-muted: #f1efea;
   --color-track: #efede9;
   --color-scrim-light: rgba(255, 255, 255, 0.94);
+  /* 어두운 면 위의 옅은 요소. 3.1 필름 스트립의 `+ 계속 감기는 중` 타일 */
+  --color-surface-on-dark: rgba(255, 255, 255, 0.12);
+  --color-on-dark-faint: rgba(255, 255, 255, 0.55);
+  /* 카드 안쪽 구분선. 3.1-A 한줄평 위 */
+  --color-line-faint: rgba(0, 0, 0, 0.08);
 
   /* 반경 — 와이어프레임 관찰값 */
   --radius-control: 14px;

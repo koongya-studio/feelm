@@ -10,6 +10,7 @@
  * 안 되므로 제목 · 연도 · 장르 · 상영 시간 · 평균 별점은 mocks/movies.ts의 값을 따르고,
  * 여기서는 와이어프레임 2.4에만 있는 값을 채웠다. 목업 정합성은 업무 -262에서 정리한다.
  */
+import { mockMyRatings } from './frames';
 import { findMockMovie } from './movies';
 import type { MovieDetail } from '../types/movie';
 
@@ -89,6 +90,50 @@ const detailExtras: Record<number, DetailExtras> = {
     ottProviders: ottProviders(['TVING', 'WAVVE'], ['TVING']),
     myRating: null,
     myWatchStatus: null,
+  },
+
+  /*
+   * 3.1 취향 필름의 프레임 3개(401~403).
+   *
+   * 3.1과 3.1-A가 2.4로 이동하므로 상세도 있어야 흐름이 이어진다. 프레임은 평가와
+   * 1:1이라 이미 평가한 영화이므로 `myRating`은 mocks/frames.ts의 `mockMyRatings`를
+   * 그대로 쓰고 `myWatchStatus`는 `RATED`다. 101~103은 아직 평가하지 않은 추천 영화라
+   * `myRating: null`을 그대로 둔다.
+   *
+   * 시놉시스 · 감독 · 출연 이름은 와이어프레임에 없어 102 · 103과 같은 자리표시자다.
+   */
+  401: {
+    synopsis: '한 조직의 자금을 쫓는 형사와 내부 조력자가 서로를 이용하는 이야기.',
+    countries: [{ code: 'KR', name: '한국' }],
+    directors: [{ personId: 9031, name: '감독 D' }],
+    cast: [{ personId: 9032, name: '배우 D1' }],
+    ratingCount: 520,
+    flavorCode: 'FLAVOR_CRIME',
+    ottProviders: ottProviders(['NETFLIX'], ['NETFLIX']),
+    myRating: mockMyRatings[401],
+    myWatchStatus: 'RATED',
+  },
+  402: {
+    synopsis: '무대 위 마술이 곧 알리바이가 되는 한탕 계획을 담았다.',
+    countries: [{ code: 'US', name: '미국' }],
+    directors: [{ personId: 9041, name: '감독 E' }],
+    cast: [{ personId: 9042, name: '배우 E1' }],
+    ratingCount: 980,
+    flavorCode: 'FLAVOR_CAPER',
+    ottProviders: ottProviders(['NETFLIX'], ['NETFLIX']),
+    myRating: mockMyRatings[402],
+    myWatchStatus: 'RATED',
+  },
+  403: {
+    synopsis: '비 내리는 도시에서 옛 동료를 다시 만난 남자의 하룻밤.',
+    countries: [{ code: 'FR', name: '프랑스' }],
+    directors: [{ personId: 9051, name: '감독 F' }],
+    cast: [{ personId: 9052, name: '배우 F1' }],
+    ratingCount: 310,
+    flavorCode: 'FLAVOR_NOIR',
+    ottProviders: ottProviders(['TVING'], ['TVING']),
+    myRating: mockMyRatings[403],
+    myWatchStatus: 'RATED',
   },
 };
 
