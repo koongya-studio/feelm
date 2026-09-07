@@ -1,0 +1,20 @@
+[Unit]
+Description=Feelm Claude 리뷰 계정 네트워크 보호
+After=ufw.service nftables.service
+Before=feelm-claude-review-runner.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+ExecStart=/usr/bin/python3 -I -B /usr/local/lib/feelm-ci-review/network-guard.py ensure
+ExecReload=/usr/bin/python3 -I -B /usr/local/lib/feelm-ci-review/network-guard.py verify
+# 서비스를 중지해도 네트워크 제한을 제거하지 않도록 ExecStop을 두지 않는다.
+TimeoutStartSec=120
+UMask=0077
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
