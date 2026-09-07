@@ -68,6 +68,7 @@ google-java-format(AOSP 모드)이 설정되어 있다.
 ```text
 com.feelm.backend
 ├── domain
+│   ├── auth
 │   ├── user
 │   ├── onboarding
 │   ├── ott
@@ -82,6 +83,7 @@ com.feelm.backend
 │   └── trend
 ├── global
 │   ├── config
+│   ├── entity
 │   ├── error
 │   ├── response
 │   └── security
@@ -92,7 +94,9 @@ com.feelm.backend
     └── mail
 ```
 
-도메인 내부는 필요한 계층만 생성한다. 사용하지 않는 빈 패키지를 미리 만들지 않는다.
+도메인 패키지와 그 내부 계층은 실제 코드가 생길 때 만든다. 사용하지 않는 빈 패키지를 미리
+만들지 않는다. 담당자별 도메인은 [`backend-role-assignment.md`](./backend-role-assignment.md)를
+따른다.
 
 ```text
 domain/movie
@@ -105,8 +109,11 @@ domain/movie
     └── response
 ```
 
-- `global`: 여러 도메인이 함께 사용하는 설정·오류·보안 등 기술 독립적인 공통 코드
+- `global`: 여러 도메인이 함께 사용하는 설정·공통 엔티티·오류·응답·보안 등 기술 독립적인
+  공통 코드. `global/security`는 토큰 발급·검증, 인증 필터, 인가·CORS 정책을 담당한다.
 - `infrastructure`: Kafka, Redis, 외부 API, 메일처럼 외부 시스템과 연결하는 코드
+- `auth`: 로그인, 토큰 재발급과 폐기처럼 인증 유스케이스를 담당한다. 토큰과 필터 자체는
+  `global/security`에 둔다.
 - `search`: 영화 검색과 검색 필터를 담당한다. 영화 상세와 기준정보는 `movie`에 둔다.
 - `watch`: 감상 기록과 평가를 담당하며 한줄평의 저장·수정·삭제도 평가에 포함한다.
 - `social`: 공개 한줄평 목록, 공개 프로필, 취향 비교, 사용자 랭킹과 커뮤니티 유스케이스를
@@ -222,6 +229,9 @@ public record RatingResponse(Long ratingId, int score, String comment) {
   형식을 따른다.
 - 모든 Entity에 공통 `id`, `status`, `deletedAt`을 강제하지 않는다. 복합키와 도메인별
   생명주기를 존중한다.
+- 감사 컬럼이 필요한 Entity는 `global/entity`의 `BaseTimeEntity`(createdAt) 또는
+  `BaseUpdatableEntity`(createdAt, updatedAt)를 선택해 상속한다. 모든 Entity에 강제하지
+  않는다.
 
 ## 7. JPA 연관관계 규칙
 
@@ -288,6 +298,10 @@ public record RatingResponse(Long ratingId, int score, String comment) {
 - 성공 응답은 공통 envelope로 감싸지 않고 Response DTO를 그대로 반환한다.
 - 생성은 `201 Created`, 삭제 성공은 `204 No Content` 등 명세의 HTTP 상태를 사용한다.
 - 오류는 공통 `ErrorResponse`와 의미 있는 `ErrorCode`로 통일한다.
+- `ErrorCode`에는 HTTP 상태와 사용자용 한국어 메시지를 함께 정의하고 이름은
+  `UPPER_SNAKE_CASE`로 작성한다.
+- API 계약에 없는 공통 오류 코드를 추가할 때는 `docs/api/README.md`의 API-000 오류 코드
+  표를 먼저 함께 갱신한다.
 - Service는 비즈니스 예외를 발생시키고, 전역 예외 처리기가 HTTP 상태와 오류 응답으로
   변환한다.
 - 예외 메시지 문자열을 Controller마다 직접 작성하지 않는다.
@@ -304,6 +318,10 @@ public record RatingResponse(Long ratingId, int score, String comment) {
   경계 또는 이벤트 방식으로 재설계한다.
 - 공통 DTO, 오류 코드, DB Schema, Kafka 이벤트 스키마를 변경할 때는 역할 분배 및 AI 협업
   문서의 공통 계약 변경 절차를 따른다.
+- `SecurityConfig`는 기본 정책을 "인증 필요"로 두고, 비회원도 호출할 수 있는 **공개**·**선택**
+  구분의 API만 허용 목록에 등록한다. 규칙을 빠뜨린 새 API가 조용히 열리지 않도록 한 것이므로,
+  도메인의 공개 API를 추가할 때는 `SecurityConfig`의 허용 경로에 함께 등록한다. 이 파일은
+  전원이 공유하는 공통 파일이라 변경 전에 루트 `AGENTS.md` 5장에 따라 영향 범위를 알린다.
 
 ## 12. 로깅과 민감정보
 
@@ -315,12 +333,9 @@ public record RatingResponse(Long ratingId, int score, String comment) {
 
 ## 13. AI 생성 코드 적용 규칙
 
-- AI가 생성한 코드도 이 문서의 패키지·계층·Entity·JPA 규칙을 그대로 적용한다.
-- 구현 전 관련 API 명세, ERD, ADR, 역할 분배 문서를 확인한다.
-- 명세에 없는 API, Entity, 필드, 의존성을 임의로 추가하지 않는다.
-- 다른 담당자 소유 도메인과 공통 설정을 임의로 수정하지 않는다.
-- 컨벤션을 적용할 수 없거나 예외가 필요하면 구현 전에 사용자에게 이유와 대안을 제시한다.
-- 작업 시작·검증·완료 보고는 루트 `AGENTS.md`를, 충돌 방지 절차는 `ai-collaboration.md`를 따른다.
+AI가 생성한 코드도 이 문서의 규칙을 그대로 적용한다. AI가 확인할 기준 문서와 작업
+절차는 `backend/AGENTS.md`가, 작업 시작·검증·완료 보고는 루트 `AGENTS.md`가, 충돌 방지
+절차는 `ai-collaboration.md`가 정의한다.
 
 ## 14. 결정 대기 및 후속 확정 사항
 

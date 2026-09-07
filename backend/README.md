@@ -26,40 +26,11 @@ Spring Boot DevTools는 개발 환경에서만 사용하며 운영 실행 이미
 
 ## 패키지 구조
 
-패키지 구조는 [백엔드 개발 컨벤션 3장](../docs/backend-convention.md)을 따릅니다.
-최상위는 담당자나 화면이 아니라 **도메인 기준**으로 나누고, 도메인 패키지와
-빈 패키지는 실제 코드가 생길 때 만듭니다.
-
-```text
-com.feelm.backend
-├── domain            # 도메인 기준 분할 (아래 담당 표 참고)
-│   ├── auth, user, onboarding, ott
-│   ├── search, movie, watch, social, report, trend
-│   └── taste, recommendation, party
-├── global            # 여러 도메인이 공유하는 공통 코드
-│   ├── config
-│   ├── entity
-│   ├── error
-│   ├── response
-│   └── security      # 토큰 발급·검증, 인증 필터, 인가·CORS 정책
-└── infrastructure    # Kafka, Redis, 외부 API 등 외부 시스템 연결(필요 시 생성)
-```
-
-담당자별 도메인 매핑은 [백엔드 역할 분배](../docs/backend-role-assignment.md)를
-기준으로 합니다.
-
-| 담당 | 도메인 패키지 |
-| --- | --- |
-| A (계정·온보딩) | `auth`, `user`, `onboarding`, `ott` |
-| B (콘텐츠·감상·소셜) | `search`, `movie`, `watch`, `social`, `report`, `trend` |
-| C (취향·추천·파티) | `taste`, `recommendation`, `party` |
-
-공통 엔티티는 필요한 감사 컬럼에 따라 `BaseTimeEntity`(createdAt) 또는
-`BaseUpdatableEntity`(createdAt, updatedAt)를 선택해 상속하며, 모든 엔티티에 강제하지 않습니다.
-
-공통 오류는 `ErrorCode`에 HTTP 상태와 사용자용 한국어 메시지를 추가하고 이름을
-UPPER_SNAKE_CASE로 작성합니다. API 계약에 없는 공통 코드를 추가할 때는
-`docs/api/README.md`의 API-000 오류 코드 표를 먼저 함께 갱신합니다.
+패키지 구조와 도메인별 책임은 [백엔드 개발 컨벤션 3장](../docs/backend-convention.md#3-패키지-구조)을,
+담당자별 도메인은 [백엔드 역할 분배](../docs/backend-role-assignment.md)를 따릅니다.
+공통 엔티티 상속과 `ErrorCode` 작성 규칙은 같은 컨벤션 문서의
+[6장](../docs/backend-convention.md#6-entity-작성-규칙)과
+[10장](../docs/backend-convention.md#10-api-응답과-예외-처리)에 있습니다.
 
 ## 실행 프로파일
 
@@ -120,10 +91,9 @@ Refresh Token은 사용될 때마다 회전하며, 폐기된 토큰이 다시 �
 
 ### 공개 경로 추가
 
-`SecurityConfig`는 기본 정책을 "인증 필요"로 두고, 비회원도 호출할 수 있는 **공개**·**선택**
-구분의 API만 허용 목록에 등록합니다. 규칙을 빠뜨린 새 API가 조용히 열리지 않도록 한 것이므로,
-도메인의 공개 API를 추가할 때는 `SecurityConfig`의 허용 경로에 함께 등록해야 합니다. 이
-파일은 전원이 공유하는 공통 계약 파일이라 변경 시 `AGENTS.md` 5장에 따라 영향 범위를 알립니다.
+`SecurityConfig`는 기본 정책이 "인증 필요"이므로 비회원이 호출하는 새 API는 허용 목록에
+등록해야 동작합니다. 등록 규칙과 변경 시 절차는
+[백엔드 개발 컨벤션 11장](../docs/backend-convention.md#11-도메인-간-참조와-공통-코드)을 따릅니다.
 
 ## DB 마이그레이션
 

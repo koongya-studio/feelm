@@ -6,9 +6,15 @@ AI 코딩 도구가 따라야 할 작업 절차를 정의한다.
 ## 1. 기준 문서
 
 - 코드 스타일과 코드 규칙: `docs/backend-convention.md`
-- API 계약: `docs/api/`, DB 스키마: `docs/erd.md`
+  - 컨벤션을 적용할 수 없거나 예외가 필요하면 구현 전에 사용자에게 이유와 대안을
+    제시한다.
+- API 계약: `docs/api/`, 논리 스키마: `docs/erd.md`, 물리 스키마와 마이그레이션:
+  `docs/db-schema-convention.md`
   - 구현은 계약을 따른다. 계약과 다르게 구현해야 하면 임의로 진행하지 않고
     합의 후 문서를 먼저 수정한다.
+  - 명세에 없는 API, Entity, 필드를 임의로 추가하지 않는다.
+- 담당 도메인과 공통 코드 소유권: `docs/backend-role-assignment.md`
+  - 다른 담당자 소유 도메인과 공통 설정을 임의로 수정하지 않는다.
 - 아키텍처 결정: `docs/adr/`
 - 실행, 빌드와 Docker: `backend/README.md`
 
