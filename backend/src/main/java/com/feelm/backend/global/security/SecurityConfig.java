@@ -32,11 +32,16 @@ public class SecurityConfig {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
-    /** 인증 없이 호출할 수 있는 경로. 도메인별 공개 API는 여기에 추가한다. */
+    /**
+     * 인증 없이 호출할 수 있는 경로. 도메인별 공개 API는 여기에 추가한다.
+     *
+     * <p>로그아웃(API-005)은 회원 구분이므로 넣지 않는다. 자기 세션만 끊을 수 있어야 하기 때문이다.
+     */
     private static final String[] PUBLIC_PATHS = {
         "/api/v1/auth/signup",
         "/api/v1/auth/email/verify",
         "/api/v1/auth/email/resend",
+        "/api/v1/auth/login",
         "/api/v1/auth/token/refresh"
     };
 
