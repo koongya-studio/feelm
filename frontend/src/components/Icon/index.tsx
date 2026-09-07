@@ -166,6 +166,36 @@ export function LinkIcon() {
   );
 }
 
+/** 1.2 OTT 선택 — 선택됨 */
+export function CheckIcon() {
+  return (
+    <svg width="11" height="9" viewBox="0 0 32 24" fill="none" {...hidden}>
+      <path
+        d="M3 12.5L12 21 29 3"
+        stroke="currentColor"
+        strokeWidth="5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** 1.1 취향 배치 영역 중앙 — 나 */
+export function PersonIcon() {
+  return (
+    <svg width="30" height="32" viewBox="0 0 34 36" fill="none" {...hidden}>
+      <circle cx="17" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+      <path
+        d="M3 34c2-8 7.5-11.5 14-11.5S29 26 31 34"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 /** 2.3 카드 메뉴 — 관심없음 */
 export function BlockIcon() {
   return (

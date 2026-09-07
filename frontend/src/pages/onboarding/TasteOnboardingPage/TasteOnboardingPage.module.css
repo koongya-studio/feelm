@@ -1,0 +1,139 @@
+/*
+ * 와이어프레임 1.1 실측값.
+ * 헤더 좌우 여백은 와이어프레임 28px, 공통 ScreenHeader 22px이다. 공통값을 그대로 쓴다.
+ */
+.intro {
+  flex: none;
+  padding: 6px var(--screen-padding-x) 0;
+  text-align: center;
+}
+
+.guide {
+  font-size: 13px;
+  color: var(--color-ink-muted);
+}
+
+.legend {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 9px;
+  color: rgba(60, 58, 54, 0.65);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/*
+ * 카드를 놓는 영역. 남은 높이를 모두 쓴다.
+ * `⊖`의 터치 영역(44px)이 카드 밖으로 나가므로 영역 밖으로 새지 않게 잘라 낸다.
+ */
+.board {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  margin: 4px 0;
+  overflow: hidden;
+  touch-action: none;
+}
+
+/* 점선 원 — 지름 292px, 중심 (50%, 47%) */
+.ring {
+  position: absolute;
+  top: 47%;
+  left: 50%;
+  width: 292px;
+  height: 292px;
+  box-sizing: border-box;
+  border: 2px dashed rgba(60, 58, 54, 0.55);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.028);
+  transform: translate(-50%, -50%);
+}
+
+.center {
+  position: absolute;
+  top: 47%;
+  left: 50%;
+  display: flex;
+  width: 84px;
+  height: 84px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-nav-active);
+  border-radius: 50%;
+  background: var(--color-bg);
+  color: var(--color-nav-active);
+  transform: translate(-50%, -50%);
+}
+
+/* 카드를 탭하면 열리는 선택 버튼 묶음 */
+.picker {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-badge);
+  background: var(--color-bg);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+  white-space: nowrap;
+}
+
+.pickerOption {
+  display: flex;
+  height: 32px;
+  box-sizing: border-box;
+  align-items: center;
+  padding: 0 13px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-badge);
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.pickerOption[data-selected='true'] {
+  border-color: transparent;
+  background: var(--color-nav-active);
+  color: var(--color-on-dark);
+  font-weight: 600;
+}
+
+.footer {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 var(--screen-padding-x) 36px;
+}
+
+.hint {
+  color: var(--color-ink-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* 와이어프레임은 높이 50px · radius 14px로 공통 Button의 52px 사양과 다르다 */
+.submit {
+  display: flex;
+  height: 50px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-bg);
+  color: rgba(60, 58, 54, 0.75);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.submit:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
