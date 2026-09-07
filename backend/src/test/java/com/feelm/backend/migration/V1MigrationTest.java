@@ -115,9 +115,9 @@ class V1MigrationTest {
                         () ->
                                 execute(
                                         "INSERT INTO users"
-                                                + " (email, nickname, birth_date, status) VALUES"
-                                                + " ('bad-status@feelm.test', '잘못된상태',"
-                                                + " DATE '1999-03-14', 'DELETED')"))
+                                                + " (email, nickname, birth_date, gender, status)"
+                                                + " VALUES ('bad-status@feelm.test', '잘못된상태',"
+                                                + " DATE '1999-03-14', 'FEMALE', 'DELETED')"))
                 .isInstanceOf(SQLException.class)
                 .hasMessageContaining("ck_users_status");
     }
@@ -141,11 +141,25 @@ class V1MigrationTest {
         assertThatThrownBy(
                         () ->
                                 execute(
-                                        "INSERT INTO users (email, nickname, birth_date, status)"
+                                        "INSERT INTO users"
+                                                + " (email, nickname, birth_date, gender, status)"
                                                 + " VALUES ('active-without-birth@feelm.test',"
-                                                + " '생년월일없음', NULL, 'ACTIVE')"))
+                                                + " '생년월일없음', NULL, 'FEMALE', 'ACTIVE')"))
                 .isInstanceOf(SQLException.class)
                 .hasMessageContaining("ck_users_birth_date_required_unless_withdrawn");
+    }
+
+    @Test
+    @DisplayName("비탈퇴 계정은 성별이 필수다")
+    void requiresGenderForNonWithdrawnUser() {
+        assertThatThrownBy(
+                        () ->
+                                execute(
+                                        "INSERT INTO users (email, nickname, birth_date, status)"
+                                                + " VALUES ('active-without-gender@feelm.test',"
+                                                + " '성별없음', DATE '1999-03-14', 'ACTIVE')"))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("ck_users_gender_required_unless_withdrawn");
     }
 
     @Test
@@ -158,11 +172,11 @@ class V1MigrationTest {
 
     private static void insertUser(String email, String nickname) throws SQLException {
         execute(
-                "INSERT INTO users (email, nickname, birth_date, status) VALUES ('"
+                "INSERT INTO users (email, nickname, birth_date, gender, status) VALUES ('"
                         + email
                         + "', '"
                         + nickname
-                        + "', DATE '1999-03-14', 'ACTIVE')");
+                        + "', DATE '1999-03-14', 'FEMALE', 'ACTIVE')");
     }
 
     private static void execute(String sql) throws SQLException {

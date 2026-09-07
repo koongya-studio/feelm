@@ -11,6 +11,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
@@ -29,6 +30,14 @@ import lombok.NoArgsConstructor;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User extends BaseTimeEntity {
+
+    /**
+     * 미인증 상태로 이 기간이 지난 계정은 같은 이메일의 재가입에 자리를 내준다(API-001 처리 규칙).
+     *
+     * <p>재발송(API-003)도 같은 기준을 쓴다. 기간이 지난 계정에 새 토큰을 보내면 재가입이 그 계정을 지워 링크가 죽으므로, 두 경로가 하나의 기준을 공유해야
+     * 한다.
+     */
+    public static final Duration PENDING_VERIFICATION_RETENTION = Duration.ofHours(24);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -113,6 +122,20 @@ public class User extends BaseTimeEntity {
 
     public boolean isPendingVerification() {
         return status == UserStatus.PENDING_VERIFICATION;
+    }
+
+    /** 인증 메일로 아직 활성화할 수 있는 미인증 계정인지. 보존 기간이 지난 계정은 재가입이 지울 수 있으므로 메일을 보내지 않는다. */
+    public boolean isAwaitingVerification(Instant now) {
+        return isPendingVerification() && !isPastRetention(now);
+    }
+
+    /** 보존 기간이 지난 미인증 계정인지. 같은 이메일의 재가입(API-001)이 이 계정을 지우고 새로 만든다. */
+    public boolean isStalePendingVerification(Instant now) {
+        return isPendingVerification() && isPastRetention(now);
+    }
+
+    private boolean isPastRetention(Instant now) {
+        return !getCreatedAt().isAfter(now.minus(PENDING_VERIFICATION_RETENTION));
     }
 
     public boolean isActive() {

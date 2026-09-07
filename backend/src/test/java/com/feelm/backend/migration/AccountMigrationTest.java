@@ -322,11 +322,11 @@ class AccountMigrationTest {
 
     private static long insertUser(String email, String nickname) throws SQLException {
         return insertReturningId(
-                "INSERT INTO users (email, nickname, birth_date, status) VALUES ('"
+                "INSERT INTO users (email, nickname, birth_date, gender, status) VALUES ('"
                         + email
                         + "', '"
                         + nickname
-                        + "', DATE '1999-03-14', 'ACTIVE') RETURNING id");
+                        + "', DATE '1999-03-14', 'FEMALE', 'ACTIVE') RETURNING id");
     }
 
     private static long insertMovie(int tmdbId, String title) throws SQLException {
