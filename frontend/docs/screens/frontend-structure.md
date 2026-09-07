@@ -507,7 +507,7 @@ Screen Spec 8.1절에서 계약 기준으로 확정한 항목은 타입에도 �
 
 | 항목 | 타입 |
 | --- | --- |
-| 평가 점수 | `score: number` — 정수 1~5. 0.5 단위를 허용하지 않음 |
+| 평가 점수 | `score: number` — 0.5~5.0, 0.5점 단위. 평균 평점에는 이 단위 제약을 적용하지 않음 |
 | 감상 확인 응답 | `watched: boolean` — 2개 값 |
 | 한줄평 공개 범위 | `visibility: Visibility` — `comment`가 있으면 필수 |
 

@@ -238,7 +238,7 @@ erDiagram
         bigint user_id FK
         bigint movie_id FK
         bigint watch_record_id FK "NULL 허용 (D-6 결정: 감상 기록 없는 평가)"
-        smallint score "1~5"
+        numeric score "0.5~5.0, 0.5점 단위 CHECK"
         varchar comment "한줄평 200자 이하, NULL 가능"
         varchar visibility "PUBLIC / PRIVATE, comment 없으면 NULL 가능 (API-036)"
         timestamptz created_at
@@ -276,7 +276,7 @@ erDiagram
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `onboarding_preferences` | 초기 취향(LIKE/DISLIKE) | UK(`user_id`, `movie_id`). 평가(1~5점)와 분리 저장하며 프레임을 생성하지 않음 | FR-02 · API-023, API-024 |
+| `onboarding_preferences` | 초기 취향(LIKE/DISLIKE) | UK(`user_id`, `movie_id`). 평가(0.5~5.0점, 0.5점 단위)와 분리 저장하며 프레임을 생성하지 않음 | FR-02 · API-023, API-024 |
 | `user_otts` | 구독 OTT | 전체 교체(PUT) | FR-03 · API-026, API-027 |
 | `watch_records` | 감상 상태 머신 | 사용자·영화별 **활성 기록**(EXPIRED 아님)은 1개 — 부분 유일 인덱스(D-6 결정). 만료 후 재클릭은 새 행 | FR-17, FR-18 · API-033~035 |
 | `ratings` | 평가 + 한줄평 | UK(`user_id`, `movie_id`). 한줄평은 컬럼(별도 테이블 아님). 삭제 시 프레임도 삭제되고 감상 기록은 `WATCHED_UNRATED`로 복귀 | FR-19, FR-26 · API-036~039 |
@@ -484,4 +484,10 @@ flowchart LR
 | D-12 | 팝콘 맛 8종 기준정보 | 고정 장르 그룹 / ML 취향 군집 | **고정 K-Means 8군집 + c-TF-IDF 대표 키워드**. `popcorn_flavors.cluster_id`와 맛 코드가 1:1로 대응한다 (ADR-0015) | `popcorn_flavors` 초기 데이터, 온보딩 카드 |
 | D-13 | 신규 영화 맛 배정 | 전체 재학습 / 고정 Centroid 예측 | **재학습·모델 버전 없이 기존 K-Means `predict`로 최근접 Centroid에 배정** (ADR-0015) | `movies.representative_flavor_id`, 신규 영화 분류 파이프라인 |
 
-미결은 D-9의 계정 외 영역(공개 한줄평, 학습 데이터), 팝콘 표시명·색상과 추천 임계치 같은 설정값입니다.
+맞춤·발견 추천은 모두 D-5·D-12의 K-Means 취향 군집을 기반으로 합니다(2026-09-07 합의).
+두 유형의 구분 방식과 기준값은 미정이며, 군집·대표 맛 관계만으로 유형을 확정하지 않습니다.
+평점 범위·간격은 FR-19에 따라 0.5~5.0점·0.5점 단위입니다. 물리 스키마에서는 scale 없는
+`numeric`과 범위·배수 CHECK를 사용합니다([물리 규칙](./db-schema-convention.md)).
+
+미결은 D-9의 계정 외 영역(공개 한줄평, 학습 데이터), 팝콘 표시명·색상,
+맞춤·발견 판정 방식·기준값 등입니다.

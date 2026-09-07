@@ -204,7 +204,7 @@ Repository는 영속성 조회·저장만 담당한다.
 - MyBatis `Mapper.xml`은 사용하지 않는다. DB 접근 방식 예외가 필요하면 9장의 기준을 따른다.
 
 ```java
-public record RatingResponse(Long ratingId, int score, String comment) {
+public record RatingResponse(Long ratingId, BigDecimal score, String comment) {
 
     public static RatingResponse from(Rating rating) {
         return new RatingResponse(rating.getId(), rating.getScore(), rating.getComment());
