@@ -122,6 +122,24 @@ export function ChevronRightIcon() {
   );
 }
 
+/** 5.8 멤버 카드 — 펼침 상태 */
+export function ChevronUpIcon() {
+  return (
+    <svg width="12" height="7" viewBox="0 0 16 9" fill="none" {...hidden}>
+      <path d="M1 8l7-7 7 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** 5.8 멤버 카드 — 접힘 상태 */
+export function ChevronDownIcon() {
+  return (
+    <svg width="12" height="7" viewBox="0 0 16 9" fill="none" {...hidden}>
+      <path d="M1 1l7 7 7-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 /** 2.1 참여 중인 파티 카드 — 파티 */
 export function PartyGroupIcon() {
   return (

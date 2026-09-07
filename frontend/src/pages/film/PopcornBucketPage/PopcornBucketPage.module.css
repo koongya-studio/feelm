@@ -1,0 +1,137 @@
+/*
+ * 3.2 100알의 취향. 값은 와이어프레임 실측값이다.
+ *
+ * 와이어프레임 배경은 `#F7F3F2`이지만 확정 토큰인 흰색을 쓴다(팀 결정 2026-09-07).
+ */
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 13px;
+  padding: 26px var(--screen-padding-x) 18px;
+}
+
+.count {
+  color: var(--color-ink-body);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.lead {
+  align-self: stretch;
+  text-align: center;
+}
+
+.leadTitle {
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.leadText {
+  margin-top: 6px;
+  color: var(--color-ink-faint);
+  font-size: 14px;
+}
+
+/*
+ * 팝콘 버킷. 겉면 · 안쪽 면 · 테두리 띠를 겹쳐 사다리꼴 통을 만든다.
+ * 알은 SVG로 그리고 통 위에 얹는다.
+ */
+.bucketArea {
+  position: relative;
+  display: flex;
+  width: 330px;
+  max-width: 100%;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.bucketOuter {
+  position: absolute;
+  inset: 0;
+  background: var(--color-nav-active);
+  clip-path: polygon(2% 0, 98% 0, 88% 100%, 12% 100%);
+}
+
+.bucketInner {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  bottom: 2px;
+  left: 2px;
+  background: var(--color-bg);
+  clip-path: polygon(2.3% 0, 97.7% 0, 88% 100%, 12% 100%);
+}
+
+.bucketRim {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 9px;
+  border-radius: var(--radius-badge);
+  background: var(--color-nav-active);
+}
+
+.kernels {
+  position: relative;
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-top: 6px;
+}
+
+/* 맛 범례 */
+.legend {
+  display: grid;
+  width: 330px;
+  max-width: 100%;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 20px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/*
+ * 맛 표식. 8번째 맛은 흰색에 가까워 옅은 테두리를 둔다. 어두운 색에서는 보이지 않는다
+ */
+.swatch {
+  display: block;
+  width: 11px;
+  height: 11px;
+  flex: none;
+  box-sizing: border-box;
+  border: 1px solid var(--color-line);
+  border-radius: 50%;
+}
+
+.legendText {
+  color: var(--color-ink-body);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.legendScore {
+  color: var(--color-ink-hint);
+}
+
+.note {
+  color: var(--color-ink-hint);
+  font-size: 10.5px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.summary {
+  padding: 10px 0 0;
+  color: var(--color-ink-body);
+  font-size: 13.5px;
+  text-align: center;
+}
