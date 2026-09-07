@@ -76,6 +76,13 @@ UPPER_SNAKE_CASE로 작성합니다. API 계약에 없는 공통 코드를 추�
 | `REDIS_PASSWORD` | **필수(기본값 없음)** | 필수 |
 | `JWT_SECRET` | **필수(기본값 없음)** | 필수 |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | 필수 |
+| `FRONTEND_BASE_URL` | `http://localhost:5173` | 필수 |
+| `MAIL_MODE` | `log`(`.env`에서 지정, 기본값 없음) | `smtp` |
+| `MAIL_HOST` | `smtp.gmail.com` | `smtp.gmail.com` |
+| `MAIL_PORT` | `587` | `587` |
+| `MAIL_USERNAME` | 비어 있음 | 필수 |
+| `MAIL_PASSWORD` | 비어 있음 | **필수(Secret)** |
+| `MAIL_FROM` | `no-reply@feelm.local` | 선택(비우면 `MAIL_USERNAME`. Gmail은 From을 계정으로 강제) |
 | `AUTH_MOCK_ENABLED` | `true` | `true` |
 | `AUTH_MOCK_USER_ID` | `1` | `1` |
 
@@ -117,6 +124,23 @@ Refresh Token은 사용될 때마다 회전하며, 폐기된 토큰이 다시 �
 로그인(API-004)이 구현되기 전까지 회원 API를 호출할 수 있도록, `AUTH_MOCK_ENABLED=true`인
 환경에서는 인증 없는 요청에 고정 사용자를 주입합니다. **인증을 무력화하는 임시 장치이므로
 로그인이 병합되면 제거합니다.** 실제 토큰 흐름을 확인하려면 `AUTH_MOCK_ENABLED=false`로 끕니다.
+
+### 인증 메일 발송
+
+가입 인증 메일은 `MAIL_MODE`로 발송 수단을 고릅니다.
+
+| 값 | 동작 | 용도 |
+| --- | --- | --- |
+| `log` | 발송하지 않고 인증 링크를 로그로 남깁니다 | 로컬 수동 확인 |
+| `smtp` | `spring.mail.*` 설정으로 실제 발송합니다 | dev·운영 |
+
+`MAIL_MODE`는 **기본값이 없어** 지정하지 않으면 기동에 실패합니다. `log`는 인증 링크가 로그에 남으므로
+로컬·테스트 전용이며, 허용 프로파일(`local`, `test`, 프로파일을 지정하지 않은 테스트 실행의 `default`) 밖에서
+`MAIL_MODE=log`이면 기동에 실패합니다. `smtp`는 `MAIL_USERNAME`과 앱 비밀번호
+`MAIL_PASSWORD`가 필요하며, 값은 개인 `.env` 또는 배포 환경의 Secret으로만 주입합니다.
+
+인증 링크는 `${FRONTEND_BASE_URL}/verify-email?token=...` 형식입니다. 링크는 프론트 화면으로
+이동하고 프론트가 API-002를 호출합니다. 토큰은 불투명 난수 문자열이며 서버는 해시만 저장합니다.
 
 ### 공개 경로 추가
 

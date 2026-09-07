@@ -8,6 +8,10 @@ spring:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD}
+  mail:
+    # dev는 실제로 메일을 보내므로 계정 정보에 기본값을 두지 않는다. 값이 없으면 기동에 실패한다.
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
 
 feelm:
   auth:
@@ -17,3 +21,9 @@ feelm:
       # 인증을 무력화하므로 로그인이 병합되면 AUTH_MOCK_ENABLED=false로 끄고 이 블록을 제거한다.
       enabled: ${AUTH_MOCK_ENABLED:true}
       user-id: ${AUTH_MOCK_USER_ID:1}
+  mail:
+    # dev·운영은 실제 발송이 기본이다. MAIL_MODE=log로 내리면 기동에 실패한다(플랜 결정 13).
+    mode: ${MAIL_MODE:smtp}
+    # Gmail SMTP는 From을 인증 계정으로 강제하므로 별도 값이 없으면 계정 주소를 그대로 쓴다.
+    from: ${MAIL_FROM:${MAIL_USERNAME}}
+    verification-url: ${FRONTEND_BASE_URL}/verify-email
