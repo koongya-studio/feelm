@@ -165,7 +165,7 @@ class ServerPilotTests(unittest.TestCase):
     def test_backend_accepts_only_validated_snapshot_and_dynamic_count(self):
         source = (HERE / 'ci-server-manager-pilot.py').read_text()
         self.assertIn('source_installer=job_io.install_snapshot', source)
-        self.assertIn('expected_tests = 82', source)
+        self.assertIn('expected_tests = 90', source)
         self.assertIn('expected_tests = None', source)
         self.assertIn("glob('ci222-server-*.service')", source)
 
