@@ -43,7 +43,7 @@
 | 코드·열거값 | `varchar(n)` + CHECK | 허용값은 [API 공통 규약의 상태값](./api/README.md)과 일치시킨다 |
 | 자유 텍스트 | `text` | 이름, 제목, 줄거리, URL 등 계약상 상한이 없는 값 |
 | 길이 제한이 계약에 있는 문자열 | `varchar(n)` | 예: 닉네임 `varchar(20)`, 한줄평 `varchar(200)` |
-| 평점 | `smallint` + CHECK(1~5) | `ratings.score` |
+| 평점 | `numeric` + CHECK(0.5~5.0 및 0.5 배수) | `ratings.score`. Java는 `BigDecimal` |
 | 평균 평점 | `numeric(3,2)` + CHECK(0~5) | `movies.average_rating` |
 | 국가 코드 | `varchar(2)` | ISO 3166-1 alpha-2 |
 | 구조화 데이터 | `jsonb` | `reason`, `analysis`, `keywords`, `content` |
@@ -52,6 +52,11 @@
 
 **PostgreSQL enum 타입을 쓰지 않는다.** 값을 추가할 때마다 `ALTER TYPE`이 필요하고
 Hibernate 매핑이 번거롭다. `varchar` + CHECK로 통일한다.
+
+개인 평점은 `score BETWEEN 0.5 AND 5.0`과 `mod(score, 0.5) = 0`을 모두 검사한다.
+`numeric(2,1)`처럼 scale을 고정하면 4.49가 4.5로 반올림된 뒤 CHECK를 통과하므로,
+scale 없는 `numeric`으로 입력값을 그대로 검사한다. 기존 정수 점수도 같은 값으로 보존한다.
+이 단위 제약은 개인 평점에만 적용하며 평균 평점·추천 예측 점수에는 적용하지 않는다.
 
 ## 4. NULL과 기본값
 

@@ -82,8 +82,12 @@ Fold-in은 사용자의 평가 전체를 입력으로 하며, Python Consumer는
 | 영화 제목 · 장르 라벨 · 영화 대표 맛(`movies.representative_flavor_id` → `popcorn_flavors.code`) | **HDFS 야간 배치 산출물** | 기준정보에 가깝고 전체 영화가 대상이다. 이벤트마다 PG를 조회하면 부하가 크므로 배치가 만든 스냅샷을 Python Consumer가 로드해 사용한다 |
 | 사용자 맛 분포(`ratings JOIN movies`의 사용자별 `representative_flavor_id` 집계) | **PostgreSQL 읽기 전용 롤** | 사용자 행동에 따라 실시간으로 바뀌고 대상이 사용자 한 명이다. Python Consumer의 `ratings` 조회와 같은 트랜잭션 시점을 쓴다 |
 
-`DISCOVERY` 판정은 [취향 API](./taste.md)의 `newFlavorThreshold` 기준을 그대로 씁니다.
-사용자의 `popcornCount`가 임계치 미만인 맛을 대표 맛으로 갖는 영화가 `DISCOVERY`, 나머지가 `TASTE`입니다.
+`TASTE`와 `DISCOVERY`는 모두 K-Means로 나눈 영화 취향 군집을 기반으로 합니다(2026-09-07 합의).
+군집별 감상량·선호도·거리 등을 어떻게 사용해 두 유형을 구분할지는 미정입니다.
+기존의 `popcornCount < newFlavorThreshold`이면 `DISCOVERY`, 나머지는 `TASTE`라는 규칙은
+미합의 가정으로 정정합니다. [취향 API](./taste.md)의 새로운 맛 표시와 추천 유형의 관계도
+함께 확정해야 하며, 임계치 예시만으로 유형을 생성하거나 나머지를 자동으로 맞춤으로 분류하지 않습니다.
+군집 기반과 유형별 노출·교체 계약은 유지하고, 구체 판정은 합의·실험 후 이 문서에 반영합니다.
 
 맛 모델은 버전이나 재학습 없이 고정된 Centroid를 사용합니다(ADR-0015). 신규 영화는 기존 K-Means의
 `predict`로 맛을 배정하고 `movies.representative_flavor_id`에 저장합니다. 배치 스냅샷과 PostgreSQL 집계는
@@ -163,10 +167,11 @@ Fold-in은 `x = (Σ yᵢyᵢᵀ + λI)⁻¹ (Σ rᵢyᵢ)` 이며 A와 B가 모�
 **`RATING`**
 
 ```json
-{ "action": "CREATE", "movieId": 550, "score": 5 }
+{ "action": "CREATE", "movieId": 550, "score": 4.5 }
 ```
 
 - `action`: `CREATE` / `UPDATE` / `DELETE`. `DELETE`는 `score`를 생략한다
+- `CREATE`·`UPDATE`의 `score`는 API-036과 같은 0.5~5.0점, 0.5점 단위의 JSON 숫자다. DB 조회·이벤트 직렬화·Fold-in 입력에서 정수로 절삭하지 않는다
 - Python Consumer는 `action`을 계산에 사용하지 않고 로깅에만 사용한다. 어떤 값이든 처리는 "해당 사용자 Fold-in 재계산"으로 동일하다
 
 **`ONBOARDING`**
@@ -468,6 +473,7 @@ ALS 재학습 배치가 끝나면 Python Consumer에 전체 사용자 추천 재
 - [ ] Kafka 파티션 수와 복제 계수 — 인프라 담당 협의(EC2 2대 구성)
 - [ ] Python Fold-in Consumer와 Spark Streaming의 Consumer Group 이름·배포 환경변수 — 구현 업무에서 확정
 - [ ] 행동 Feature 목록과 Re-ranking 가중치 — Re-ranking 설계에서 확정
+- [ ] K-Means 군집 기반 TASTE/DISCOVERY 판정 방식·기준값과 저이력·온보딩 사용자 처리 — FR-10·FR-12, API-041·045
 - [ ] `topn` 후보 수 100편, `candidates` 500편 — 실데이터로 캘리브레이션
 - [ ] 허용 지연 초기값과 Structured Streaming 트리거 주기 — 실측 후 확정
 - [ ] 비활성 사용자 Redis 키 정리 주기
