@@ -24,7 +24,7 @@ claude-auth-check:
       when: manual
       allow_failure: true
 
-claude-mr-collect:
+claude-mr-review:
   stage: verify
   tags:
     - e106-claude-review
@@ -39,7 +39,8 @@ claude-mr-collect:
   cache: []
   script:
     - /usr/bin/python3 -I -B infra/claude-review/collect-mr.py
-  timeout: 5m
+    - /usr/bin/python3 -I -B infra/claude-review/generate-review.py
+  timeout: 10m
   interruptible: true
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "web"'
