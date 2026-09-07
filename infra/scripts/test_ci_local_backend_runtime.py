@@ -87,7 +87,7 @@ class RuntimeTests(unittest.TestCase):
             (work / 'gradle-exit').write_text('0')
             (work / 'remaining-containers').write_text('')
             reports = work / 'backend/build/test-results/test'; reports.mkdir(parents=True)
-            tree = ET.Element('testsuite', tests='82', skipped='0')
+            tree = ET.Element('testsuite', tests='90', skipped='0')
             ET.ElementTree(tree).write(reports / 'TEST-fixture.xml')
             with patch.object(runtime.inputs.prep.pilot, 'report_summary', return_value=True):
                 self.assertTrue(runtime.report(root, 0))

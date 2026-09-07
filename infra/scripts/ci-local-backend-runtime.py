@@ -161,7 +161,7 @@ def report(root, process_exit):
         suites = [ET.parse(path).getroot() for path in files]
         count = sum(int(s.get('tests', '0')) for s in suites)
         skipped = sum(int(s.get('skipped', '0')) for s in suites)
-        success = process_exit == 0 and gradle_exit == 0 and passed and count == 82 and skipped == 0 and not remaining
+        success = process_exit == 0 and gradle_exit == 0 and passed and count == 90 and skipped == 0 and not remaining
         result = {'gradle_exit': gradle_exit, 'tests': count, 'skipped': skipped,
                   'reports_pass': passed, 'remaining_containers': remaining, 'passed': success}
     except (OSError, ValueError, ET.ParseError) as exc:

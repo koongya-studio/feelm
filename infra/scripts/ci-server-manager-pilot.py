@@ -394,7 +394,7 @@ class BackendJobDriver:
             marker = b'DISK_LIMIT_ENOSPC' if self.mode == 'disk-full' else b'PRIVILEGED_HOST_NAMESPACE_PROBE_PASSED'
             return {'passed': process_exit == 0 and marker in contents}
         destination = self.attempt / 'evidence'; destination.mkdir(mode=0o700)
-        expected_tests = 82
+        expected_tests = 90
         if self.safety_lease is not None and self.safety_lease.get('source_sha') is not None:
             expected_tests = None
         try:
