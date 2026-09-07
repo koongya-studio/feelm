@@ -54,7 +54,7 @@ Spring Boot DevTools는 개발 환경에서만 사용하며 운영 실행 이미
 | `MAIL_USERNAME` | 비어 있음 | 필수 |
 | `MAIL_PASSWORD` | 비어 있음 | **필수(Secret)** |
 | `MAIL_FROM` | `no-reply@feelm.local` | 선택(비우면 `MAIL_USERNAME`. Gmail은 From을 계정으로 강제) |
-| `AUTH_MOCK_ENABLED` | `true` | `true` |
+| `AUTH_MOCK_ENABLED` | `false` | `false` |
 | `AUTH_MOCK_USER_ID` | `1` | `1` |
 
 변수 목록과 용도는 [`.env.example`](./.env.example)에서 관리합니다. 실제 값은 커밋하지
@@ -92,9 +92,9 @@ Refresh Token은 사용될 때마다 회전하며, 폐기된 토큰이 다시 �
 
 ### 개발용 mock 인증
 
-로그인(API-004)이 구현되기 전까지 회원 API를 호출할 수 있도록, `AUTH_MOCK_ENABLED=true`인
-환경에서는 인증 없는 요청에 고정 사용자를 주입합니다. **인증을 무력화하는 임시 장치이므로
-로그인이 병합되면 제거합니다.** 실제 토큰 흐름을 확인하려면 `AUTH_MOCK_ENABLED=false`로 끕니다.
+`AUTH_MOCK_ENABLED=true`인 환경에서는 인증 없는 요청에 고정 사용자를 주입합니다. 로그인 없이
+회원 API를 호출해 보고 싶을 때만 켜는 개발 편의 기능이며, 인증을 무력화하므로 **기본값은
+`false`입니다.** 실제 인증 흐름은 로그인(API-004)으로 발급한 Access Token으로 확인합니다.
 
 ### 인증 메일 발송
 

@@ -286,12 +286,13 @@
 
 - `401 INVALID_CREDENTIALS` 이메일 또는 비밀번호 불일치(어느 쪽인지 구분하지 않음)
 - `403 EMAIL_NOT_VERIFIED` 미인증 계정
-- `429 RATE_LIMITED` 연속 실패 제한(5회/10분, 가정)
+- `429 RATE_LIMITED` 연속 실패 제한(5회/10분)
 
 ### 처리 규칙
 
 - `onboardingCompleted`가 `false`면 프론트는 ④ 취향 초기 설정으로 이동한다
 - 탈퇴한 계정은 `INVALID_CREDENTIALS`로 응답한다
+- 연속 실패 5회까지는 `401`이고 그 다음 요청부터 `429`다. 로그인에 성공하면 실패 횟수를 초기화한다
 
 ### 상태값
 

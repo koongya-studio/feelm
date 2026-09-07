@@ -3,7 +3,6 @@ package com.feelm.backend.domain.auth;
 import java.time.Duration;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
@@ -14,23 +13,23 @@ import org.springframework.stereotype.Component;
  * <p>키에는 이메일 원문 대신 해시를 쓴다. Redis 키 목록만으로 어떤 이메일이 서비스에 있는지 알 수 있으면 안 되기 때문이다. 네임스페이스는 Refresh Token이
  * 쓰는 {@code auth:}를 이어 사용한다.
  *
- * <p>카운터는 로그인 실패 응답과 함께 남아야 하므로 DB 트랜잭션과 무관하게 즉시 반영된다. Redis가 응답하지 않으면 예외가 그대로 올라가 인증 요청은 500으로
- * 실패한다(fail-closed). 로그인 성공 자체가 Refresh Token을 Redis에 저장해야 하므로 리미터만 열어 두어도 얻는 것이 없고, 재발송 제한을 열면 장애
- * 중 메일 폭탄이 가능해지기 때문이다. 장애 시 정책을 바꾸려면 후속 업무에서 정한다.
+ * <p>로그인 제한은 실패를 나중에 기록하는 대신 시도를 먼저 센다. 확인과 기록이 분리되어 있으면 동시 요청이 모두 확인을 통과해 제한 횟수보다 많은 비밀번호 대조가 일어나기
+ * 때문이다. 카운터는 DB 트랜잭션과 무관하게 즉시 반영된다. Redis가 응답하지 않으면 예외가 그대로 올라가 인증 요청은 500으로 실패한다(fail-closed). 로그인
+ * 성공 자체가 Refresh Token을 Redis에 저장해야 하므로 리미터만 열어 두어도 얻는 것이 없고, 재발송 제한을 열면 장애 중 메일 폭탄이 가능해지기 때문이다. 장애
+ * 시 정책을 바꾸려면 후속 업무에서 정한다.
  */
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class AuthRateLimiter {
 
     private static final String RESEND_KEY_PREFIX = "auth:email-resend:";
     private static final String LOGIN_FAILURE_KEY_PREFIX = "auth:login-fail:";
 
     /**
-     * 실패 횟수를 올리고 만료를 보장하는 스크립트. {@code INCR}와 {@code PEXPIRE}를 따로 보내면 그 사이에 연결이 끊겼을 때 TTL 없는 카운터가
-     * 남아 해당 이메일이 무기한 429가 된다. 첫 실패이거나(카운터가 1) 어떤 이유로든 TTL이 없으면 만료를 다시 건다.
+     * 시도 횟수를 올리고 만료를 보장한 뒤 올린 횟수를 돌려주는 스크립트. {@code INCR}와 {@code PEXPIRE}를 따로 보내면 그 사이에 연결이 끊겼을 때
+     * TTL 없는 카운터가 남아 해당 이메일이 무기한 429가 된다. 첫 시도이거나(카운터가 1) 어떤 이유로든 TTL이 없으면 만료를 다시 건다.
      */
-    private static final DefaultRedisScript<Long> RECORD_FAILURE_SCRIPT =
+    private static final DefaultRedisScript<Long> RECORD_ATTEMPT_SCRIPT =
             new DefaultRedisScript<>(
                     "local count = redis.call('INCR', KEYS[1]); "
                             + "if count == 1 or redis.call('PTTL', KEYS[1]) < 0 then "
@@ -44,8 +43,8 @@ public class AuthRateLimiter {
     /** 로그인 연속 실패를 세는 기간. */
     private static final Duration LOGIN_FAILURE_WINDOW = Duration.ofMinutes(10);
 
-    /** 이 횟수까지는 401로 응답하고, 도달한 뒤의 요청은 429로 막는다(플랜 결정 14). */
-    private static final long LOGIN_FAILURE_LIMIT = 5;
+    /** 이 횟수까지는 비밀번호를 대조하고, 넘는 시도는 대조 없이 429로 막는다(플랜 결정 14). */
+    private static final long LOGIN_ATTEMPT_LIMIT = 5;
 
     private final StringRedisTemplate redisTemplate;
 
@@ -60,35 +59,26 @@ public class AuthRateLimiter {
         return !Boolean.FALSE.equals(acquired);
     }
 
-    /** 연속 실패 제한에 걸리지 않았는지 확인한다. 비밀번호를 대조하기 전에 호출한다. */
-    public boolean isLoginAllowed(String email) {
-        String recorded = redisTemplate.opsForValue().get(loginFailureKey(email));
-        return failureCount(recorded) < LOGIN_FAILURE_LIMIT;
+    /**
+     * 로그인 시도 자리를 확보한다. 비밀번호를 대조하기 전에 호출한다.
+     *
+     * <p>확인과 기록을 한 번의 원자적 증가로 합쳐, 동시 요청이 몰려도 한 창 안에서 대조가 정확히 제한 횟수만 일어난다. 첫 시도에 만료를 걸어 최초 시도 시점부터
+     * 기간이 흐른다. 시도가 실패로 남을지는 호출자가 정한다. 비밀번호가 맞으면 {@link #clearLoginAttempts}로 지우고, 틀리면 그대로 둔다.
+     *
+     * @return 대조해도 되면 {@code true}, 제한을 넘었으면 {@code false}
+     */
+    public boolean tryAcquireLoginAttempt(String email) {
+        Long count =
+                redisTemplate.execute(
+                        RECORD_ATTEMPT_SCRIPT,
+                        List.of(loginFailureKey(email)),
+                        Long.toString(LOGIN_FAILURE_WINDOW.toMillis()));
+        return count != null && count <= LOGIN_ATTEMPT_LIMIT;
     }
 
-    /** 로그인 실패를 기록한다. 첫 실패에 만료를 걸어 최초 실패 시점부터 기간이 흐르게 하며, 증가와 만료 설정은 한 스크립트로 원자적으로 수행한다. */
-    public void recordLoginFailure(String email) {
-        redisTemplate.execute(
-                RECORD_FAILURE_SCRIPT,
-                List.of(loginFailureKey(email)),
-                Long.toString(LOGIN_FAILURE_WINDOW.toMillis()));
-    }
-
-    /** 로그인에 성공하면 실패 기록을 지운다. */
-    public void clearLoginFailures(String email) {
+    /** 자격이 확인되면 시도 기록을 지운다. */
+    public void clearLoginAttempts(String email) {
         redisTemplate.delete(loginFailureKey(email));
-    }
-
-    private long failureCount(String recorded) {
-        if (recorded == null) {
-            return 0;
-        }
-        try {
-            return Long.parseLong(recorded);
-        } catch (NumberFormatException exception) {
-            log.warn("로그인 실패 카운터 값을 해석할 수 없어 0으로 봅니다.");
-            return 0;
-        }
     }
 
     private String resendKey(String email) {
