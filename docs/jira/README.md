@@ -25,8 +25,10 @@ JIRA_BOARD_ID=<Jira 보드 URL의 숫자 ID>
 
 ## 계획 작성
 
-계획마다 `docs/jira/plans/<name>.yml` 파일을 만들고 다음 필드를 사용한다. 하나의 공용
-파일에 모든 계획을 누적하지 않는다.
+신규 계획은 Git이 추적하지 않는 `.jira/tmp/<name>.yml`에 작성한다. YAML은 Jira 생성
+요청을 검토하고 실패 시 재시도하기 위한 임시 입력이며 Jira가 업무 정보의 기준이다.
+장기 보존할 필요가 있는 계획만 `docs/jira/plans/<name>.yml`에 문서로 추가한다. 기존
+`docs/jira/plans/` 파일은 과거 생성 기록과 하위 호환을 위해 그대로 유지한다.
 
 | 필드 | 필수 | 설명 |
 | --- | --- | --- |
@@ -41,6 +43,7 @@ JIRA_BOARD_ID=<Jira 보드 URL의 숫자 ID>
 | `sprint` | X | Task 전용. `active`(기본값)는 활성 스프린트에 배정, `backlog`는 배정 없이 백로그에 생성 |
 | `done_when` | O | 검증 가능한 완료 조건 목록 |
 | `jira_key` | X | 생성 결과이며 값이 있으면 다시 생성하지 않음 |
+| `automation_id` | X | 동일 생성 요청의 재시도를 식별하는 값. 미리보기 시 자동 발급되므로 직접 작성하지 않음 |
 
 ```yaml
 tasks:
@@ -57,8 +60,22 @@ tasks:
     jira_key:
 ```
 
+최초 미리보기는 `jira-auto-`로 시작하는 `automation_id`를 발급해 계획 파일에 저장한다.
+같은 요청을 재시도할 때는 이 파일과 식별자를 유지해야 한다. 자동화는 Jira 라벨에서
+`project + automation_id`를 정확히 검색하며, 하나가 발견되면 새 업무를 만들지 않고
+기존 Jira Key를 계획에 복원한다. 둘 이상 발견되면 데이터 이상으로 판단해 생성을
+중단한다. 제목과 설명이 같은 새 계획에 새 식별자가 발급되는 것은 별개의 생성 요청이므로
+자동으로 같은 업무로 간주하지 않는다.
+
 같은 파일에서 Epic과 Task를 함께 만들면 Epic을 먼저 작성하고 Task의 `epic`에 Epic의
 로컬 `id`를 사용한다. 생성할 항목은 `jira_key`를 비워 둔다.
+
+같은 제목의 수동 생성 업무가 검색되면 자동화는 기본적으로 생성을 중단하고 후보 Jira
+Key를 보여준다. 기존 업무가 맞는지 Jira에서 확인한 뒤 해당 Key를 `jira_key`에 기록하면
+신규 생성 없이 사용할 수 있다. 실제로 별개 업무인 경우에만
+`--allow-existing-summary`를 명시한다. 제목 검색은 안전장치일 뿐 의미가 유사한 모든
+업무를 판별하지 않으므로, 적용 전 담당자와 열린 업무를 함께 확인한다. 자동화는 기존
+수동 업무에 라벨을 임의로 추가하거나 내용을 수정하지 않는다.
 
 모든 Task는 `JIRA_EMAIL`로 인증한 본인에게 할당된다. `sprint`를 생략하거나 `active`로
 지정한 Task는 `JIRA_BOARD_ID` 보드의 활성 스프린트에 배정되며, 이때 활성 스프린트는
@@ -110,17 +127,41 @@ ID를 메타데이터에서 찾아 사용한다.
 먼저 생성 예정 목록을 확인한다.
 
 ```bash
-python scripts/jira/create_issues.py --file docs/jira/plans/infra-p0.yml
+python scripts/jira/create_issues.py --file .jira/tmp/infra-p0.yml
 ```
+
+미리보기는 Jira를 변경하지 않지만, 재시도에 사용할 `automation_id`를 임시 계획 파일에
+기록한다. 미리보기 이후 실제 생성까지 같은 파일을 사용한다.
 
 목록이 맞을 때만 실제 생성을 요청한다.
 
 ```bash
 git fetch origin
-python scripts/jira/create_issues.py --file docs/jira/plans/infra-p0.yml --apply
+python scripts/jira/create_issues.py \
+  --file .jira/tmp/infra-p0.yml \
+  --apply \
+  --delete-on-success
 ```
 
-실행 전 최신 `origin/develop`의 같은 계획 파일과 열린 MR을 확인해 다른 작업자가 이미
-생성하지 않았는지 확인한다. 각 업무가 생성되는 즉시 Jira Key가 계획 파일에 저장되므로
-도중에 실패해도 이미 Key가 기록된 업무는 재실행 시 건너뛴다. Jira의 Epic, 우선순위 또는
-필드 이름이 유효하지 않으면 API 오류를 확인하고 계획을 수정한 뒤 다시 미리보기한다.
+실행 전 최신 `origin/develop`, Jira의 관련 업무와 열린 MR을 확인해 다른 작업자가 이미
+진행 중인지 확인한다. 각 업무가 생성되거나 기존 업무로 확인되는 즉시 Jira Key가 계획
+파일에 저장되므로 도중에 실패해도 완료된 항목은 재실행 시 건너뛴다. Jira 생성에는
+`automation_id` 라벨이 포함되므로 Jira 생성 직후 응답을 받지 못한 경우에도 같은 임시
+파일로 재실행하면 기존 업무를 찾을 수 있다. 자동 생성 Epic도 Task 식별자에서 파생한
+별도 라벨로 중복 생성을 방지한다.
+
+`--delete-on-success`는 모든 `jira_key`가 실제 Jira에 존재하는지 다시 확인한 다음 계획
+파일을 삭제한다. 삭제 범위는 실수로 추적 문서를 지우지 않도록 `.jira/tmp/` 아래로
+제한된다. 미리보기, 일부 실패, 중복 후보 발견 또는 Jira 확인 실패 시에는 파일을 보존한다.
+보존된 파일을 수정하지 않고 다시 실행한다. Jira의 Epic, 우선순위 또는 필드 이름이
+유효하지 않으면 API 오류를 확인하고 계획을 수정한 뒤 다시 미리보기한다.
+
+같은 제목의 업무가 있어도 별개로 생성하기로 확인한 경우에는 다음과 같이 실행한다.
+
+```bash
+python scripts/jira/create_issues.py \
+  --file .jira/tmp/infra-p0.yml \
+  --apply \
+  --allow-existing-summary \
+  --delete-on-success
+```
