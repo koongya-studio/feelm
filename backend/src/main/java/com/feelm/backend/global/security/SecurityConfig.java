@@ -33,7 +33,12 @@ public class SecurityConfig {
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
     /** 인증 없이 호출할 수 있는 경로. 도메인별 공개 API는 여기에 추가한다. */
-    private static final String[] PUBLIC_PATHS = {"/api/v1/auth/token/refresh"};
+    private static final String[] PUBLIC_PATHS = {
+        "/api/v1/auth/signup",
+        "/api/v1/auth/email/verify",
+        "/api/v1/auth/email/resend",
+        "/api/v1/auth/token/refresh"
+    };
 
     private final TokenProvider tokenProvider;
     private final AuthProperties authProperties;

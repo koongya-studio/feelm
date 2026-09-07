@@ -55,7 +55,7 @@ erDiagram
         varchar password_hash "소셜 전용 계정은 NULL"
         varchar nickname UK "공백 제거·소문자 정규화 값으로 유일 검사"
         date birth_date "생년월일, 탈퇴 시 NULL (D-8·D-9 결정)"
-        varchar gender "MALE / FEMALE / OTHER, NULL 허용 (D-8 결정)"
+        varchar gender "MALE / FEMALE / OTHER, 탈퇴 시 NULL (D-8·D-9 결정)"
         varchar visibility "PUBLIC / PRIVATE, 기본 PRIVATE"
         varchar status "PENDING_VERIFICATION / ACTIVE / WITHDRAWN"
         boolean onboarding_completed
@@ -477,7 +477,7 @@ flowchart LR
 | D-5 | 영화의 대표 맛 규칙 | 장르 규칙 / K-Means / 큐레이션 | **E5 임베딩 K-Means의 최근접 Centroid 하나에 배정** (08-31, ADR-0015) | `movies.representative_flavor_id`, 팝콘 집계 |
 | D-6 | 감상 기록 없이 평가 허용 | 허용 / 불허 | **허용** (08-30) — `ratings.watch_record_id` NULL 허용 | `watch_records` 유일 제약, ⑩·⑪ 화면 |
 | D-7 | 프레임·팝콘 저장 구조 | 별도 테이블 / 평가·영화에서 조회 | **프레임만 별도 유지**, 팝콘 버킷은 평가와 영화 맛을 집계 | 필름·팝콘 조회 |
-| D-8 | 가입 시 나이 저장 형식 | 정수 / 연령대 / 출생연도 | **생년월일(`birth_date`)** (08-31, 08-30 출생연도에서 변경). 성별 3값 + NULL 허용 | `users`, API-001·008 |
+| D-8 | 가입 시 나이 저장 형식 | 정수 / 연령대 / 출생연도 | **생년월일(`birth_date`)** (08-31, 08-30 출생연도에서 변경). 성별 3값이며 가입 시 필수 (09-05 `NULL 허용`에서 정정, 플랜 결정 11). 두 값 모두 컬럼은 탈퇴 파기를 위해 NULL을 허용한다(D-9) | `users`, API-001·008 |
 | D-9 | 탈퇴 사용자 데이터 처리 | 즉시 삭제 / 기간 보존 / 익명화 | **계정 영역 확정: 이메일·닉네임 치환 + 즉시 재사용 허용** (09-02, BE-A). `password_hash`·`birth_date`·`gender`, 소셜 연결 수단과 인증 토큰은 삭제한다. 내부·공개 식별자 및 다른 사용자 데이터와의 연결이 남으므로 계정 행 전체가 익명정보라고 전제하지 않는다. 공개 한줄평과 학습 데이터는 각 도메인 담당 결정 대기 | `users.status`, 공개 한줄평, 학습 데이터 |
 | D-10 | 평균 별점 집계 방식 | 반정규화 컬럼 / 조회 시 집계 / MView | **반정규화 컬럼, 차단 미반영** (08-30) | 평가 트랜잭션 범위, API-030 |
 | D-11 | 검색 엔진 | PostgreSQL full-text(`pg_trgm`) / Elasticsearch | **PostgreSQL full-text + `pg_trgm`** (08-31, ADR-0010) | 인덱스 설계 |

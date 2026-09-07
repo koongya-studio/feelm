@@ -62,7 +62,8 @@ Hibernate 매핑이 번거롭다. `varchar` + CHECK로 통일한다.
     `watch_records`의 `clicked_at`·`confirm_due_at`·`expires_at`·`watched_at`·
     `rated_at`·`expired_at`, `users.withdrawn_at`, 1회용 토큰의 `used_at`
   - **계약이 조건부로만 요구하는 값** — `ratings.visibility`는 API-036이 `comment`가
-    있을 때만 요구한다
+    있을 때만 요구한다. `users.birth_date`·`gender`는 가입 시 필수지만 탈퇴 시
+    파기하므로(D-9) `NOT NULL` 대신 상태 기반 CHECK로 필수성을 표현한다
   - **원천 데이터에 없을 수 있는 적재 항목** — TMDb·MovieLens에서 내려오지 않는 값과
     배치·모델이 나중에 채우는 값. `movies`의 상세 정보와 `representative_flavor_id`·
     `synced_at`, `movie_people.character_name`·`display_order`,

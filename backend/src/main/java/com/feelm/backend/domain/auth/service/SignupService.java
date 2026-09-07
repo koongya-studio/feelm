@@ -1,0 +1,132 @@
+package com.feelm.backend.domain.auth.service;
+
+import com.feelm.backend.domain.auth.VerificationTokenIssuer;
+import com.feelm.backend.domain.auth.dto.request.SignupRequest;
+import com.feelm.backend.domain.auth.dto.response.SignupResponse;
+import com.feelm.backend.domain.auth.event.VerificationMailRequestedEvent;
+import com.feelm.backend.domain.auth.repository.EmailVerificationTokenRepository;
+import com.feelm.backend.domain.user.entity.NotificationSettings;
+import com.feelm.backend.domain.user.entity.User;
+import com.feelm.backend.domain.user.repository.NotificationSettingsRepository;
+import com.feelm.backend.domain.user.repository.UserRepository;
+import com.feelm.backend.global.error.BusinessException;
+import com.feelm.backend.global.error.ErrorCode;
+import java.time.Instant;
+import java.util.Locale;
+import lombok.RequiredArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/** API-001 이메일 회원가입. */
+@Service
+@RequiredArgsConstructor
+public class SignupService {
+
+    private final UserRepository userRepository;
+    private final NotificationSettingsRepository notificationSettingsRepository;
+    private final EmailVerificationTokenRepository tokenRepository;
+    private final VerificationTokenIssuer tokenIssuer;
+    private final PasswordEncoder passwordEncoder;
+    private final ApplicationEventPublisher eventPublisher;
+
+    /**
+     * 계정과 알림 설정 기본행, 인증 토큰을 한 트랜잭션에서 만든다.
+     *
+     * <p>인증 메일은 커밋 이후에 발송한다. 이벤트만 발행하고 실제 발송은 {@code VerificationMailEventListener}가 맡는다.
+     */
+    @Transactional
+    public SignupResponse signup(SignupRequest request) {
+        String email = normalize(request.email());
+        userRepository.findByEmail(email).ifPresent(this::deleteStalePendingOrReject);
+        rejectDuplicatedNickname(request.nickname());
+
+        User user = save(request, email);
+        notificationSettingsRepository.save(NotificationSettings.createDefault(user.getId()));
+
+        String verificationToken = tokenIssuer.issue(user.getId());
+        eventPublisher.publishEvent(
+                new VerificationMailRequestedEvent(user.getId(), email, verificationToken));
+        return SignupResponse.from(user);
+    }
+
+    private User save(SignupRequest request, String email) {
+        User user =
+                User.register(
+                        email,
+                        passwordEncoder.encode(request.password()),
+                        request.nickname(),
+                        request.birthDate(),
+                        request.gender());
+        try {
+            return userRepository.saveAndFlush(user);
+        } catch (DataIntegrityViolationException exception) {
+            // 중복 검사와 삽입 사이에 다른 요청이 끼어든 경우다. 유일 제약을 같은 오류 코드로 옮긴다.
+            throw duplicationOf(exception);
+        }
+    }
+
+    /**
+     * 미인증 상태로 보존 기간이 지난 계정은 지우고 재가입을 허용한다(플랜 결정 3). 인증을 마친 계정과 탈퇴 계정은 대상이 아니다.
+     *
+     * <p>계정 삭제는 상태·생성 시각 조건이 붙은 삭제문으로 즉시 실행한다. 조회와 삭제 사이에 다른 요청이 인증을 마쳤으면 조건에 걸려 지워지지 않으므로, 그때는
+     * 재가입을 거절하고 트랜잭션을 되돌려 먼저 지운 의존 행도 복구한다. 삭제문을 즉시 실행하는 것은 삽입이 먼저 나가 이메일 유일 제약을 위반하는 것도 막는다.
+     */
+    private void deleteStalePendingOrReject(User existing) {
+        Instant now = Instant.now();
+        if (!existing.isStalePendingVerification(now)) {
+            throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
+        }
+        tokenRepository.deleteByUserId(existing.getId());
+        notificationSettingsRepository.deleteByUserId(existing.getId());
+        int deleted =
+                userRepository.deleteIfStalePendingVerification(
+                        existing.getId(), now.minus(User.PENDING_VERIFICATION_RETENTION));
+        if (deleted == 0) {
+            throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
+        }
+    }
+
+    /** DB 유일 인덱스와 같은 정규화 식으로 확인한다. 공백은 닉네임 규칙에서 이미 금지되므로 대소문자만 실질적으로 문제가 된다. */
+    private void rejectDuplicatedNickname(String nickname) {
+        if (userRepository.countByNormalizedNickname(nickname) > 0) {
+            throw new BusinessException(ErrorCode.NICKNAME_DUPLICATED);
+        }
+    }
+
+    /** 이메일은 소문자로 정규화해 저장한다(API-001 Request 규칙). */
+    private String normalize(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private RuntimeException duplicationOf(DataIntegrityViolationException exception) {
+        String constraint = constraintNameOf(exception);
+        if (constraint.contains("email")) {
+            return new BusinessException(ErrorCode.EMAIL_DUPLICATED);
+        }
+        if (constraint.contains("nickname")) {
+            return new BusinessException(ErrorCode.NICKNAME_DUPLICATED);
+        }
+        return exception;
+    }
+
+    /**
+     * 위반된 제약 이름을 찾는다. 이름을 알 수 없으면 빈 문자열을 돌려주고 호출자가 원래 예외를 그대로 던지게 한다.
+     *
+     * <p>Hibernate가 제약 이름을 예외에 담아 주므로 메시지를 문자열로 뒤지지 않는다.
+     */
+    private String constraintNameOf(DataIntegrityViolationException exception) {
+        Throwable cause = exception;
+        while (cause != null) {
+            if (cause instanceof ConstraintViolationException violation
+                    && violation.getConstraintName() != null) {
+                return violation.getConstraintName().toLowerCase(Locale.ROOT);
+            }
+            cause = cause.getCause();
+        }
+        return "";
+    }
+}

@@ -28,6 +28,11 @@ spring:
           auth: true
           starttls:
             enable: true
+          # 메일은 커밋 뒤 요청 스레드에서 동기로 보낸다. Jakarta Mail 기본값은 무한 대기라 SMTP 장애가
+          # 가입·재발송 응답을 멈추게 하므로 연결·읽기·쓰기에 상한(ms)을 둔다. 실패는 재발송(API-003)으로 복구한다.
+          connectiontimeout: 5000
+          timeout: 10000
+          writetimeout: 10000
 
 management:
   health:
