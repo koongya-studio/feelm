@@ -1,0 +1,28 @@
+.poster {
+  display: block;
+  width: var(--poster-width);
+  height: var(--poster-height);
+  box-sizing: border-box;
+  flex: none;
+  border: 1px solid var(--color-poster-line);
+  border-radius: var(--poster-radius);
+  object-fit: cover;
+}
+
+/* 와이어프레임의 포스터 자리표시자 — 대각선 두 줄 교차 */
+.poster[data-placeholder='true'] {
+  background:
+    linear-gradient(
+      to top right,
+      transparent 49.5%,
+      var(--color-poster-fill) 49.5% 50.5%,
+      transparent 50.5%
+    ),
+    linear-gradient(
+      to bottom right,
+      transparent 49.5%,
+      var(--color-poster-fill) 49.5% 50.5%,
+      transparent 50.5%
+    ),
+    var(--color-bg);
+}

@@ -1,0 +1,17 @@
+.wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-nav-active);
+}

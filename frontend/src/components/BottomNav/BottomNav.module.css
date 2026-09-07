@@ -1,0 +1,51 @@
+.nav {
+  display: flex;
+  height: var(--nav-height);
+  flex: none;
+  align-items: stretch;
+  padding: 0 8px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  border-top: 1px solid var(--color-line);
+  background: var(--color-bg);
+}
+
+.tab {
+  display: flex;
+  min-width: 44px;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: var(--color-nav-inactive);
+  text-decoration: none;
+}
+
+.tab[data-active='true'] {
+  color: var(--color-nav-active);
+}
+
+/* 필름 탭 강조. 와이어프레임 REF-01 사양 */
+.emphasis {
+  display: flex;
+  width: 42px;
+  height: 28px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid currentColor;
+  border-radius: 9px;
+}
+
+.label {
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+.label[data-emphasized='true'] {
+  font-weight: 600;
+}
+
+.tab[data-active='true'] .label {
+  font-weight: 700;
+}

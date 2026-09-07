@@ -18,3 +18,8 @@ __pycache__/
 
 # Work plan drafts are local-only and must not be committed. See backend/AGENTS.md.
 /plans/
+
+
+# Frontend dependencies and build outputs.
+node_modules/
+frontend/dist/

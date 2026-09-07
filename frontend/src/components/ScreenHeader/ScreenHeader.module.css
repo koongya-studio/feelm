@@ -1,0 +1,43 @@
+.header {
+  flex: none;
+  padding: 52px var(--screen-padding-x) 0;
+}
+
+.row {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 10px;
+}
+
+.title {
+  flex: 1;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.subtitle {
+  margin-top: 5px;
+  font-size: 12.5px;
+  color: var(--color-ink-muted);
+}
+
+/* 보이는 아이콘 크기는 와이어프레임을 따르고 터치 영역만 44px로 넓힌다 */
+.back {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  margin-left: -12px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  color: var(--color-nav-active);
+  cursor: pointer;
+}
+
+.action {
+  display: flex;
+  align-items: center;
+}
