@@ -24,6 +24,28 @@ claude-auth-check:
       when: manual
       allow_failure: true
 
+claude-mr-collect:
+  stage: verify
+  tags:
+    - e106-claude-review
+  needs: []
+  variables:
+    GIT_DEPTH: "1"
+    GIT_SUBMODULE_STRATEGY: none
+  environment:
+    name: claude-review
+    action: prepare
+  resource_group: claude-review
+  cache: []
+  script:
+    - /usr/bin/python3 -I -B infra/claude-review/collect-mr.py
+  timeout: 5m
+  interruptible: true
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "web"'
+      when: manual
+      allow_failure: true
+
 runner-check:
   stage: verify
   tags:
