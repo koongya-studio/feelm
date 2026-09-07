@@ -36,8 +36,6 @@ lifecycle = module('server_job_lifecycle', 'ci-job-lifecycle.py')
 bounded_output = module('server_bounded_output', 'ci-bounded-output.py')
 DOCKER_SHA = '803d433f226db4776e1768fd319fc6c6e4935a456acf84fcc0080818b854bc8f'
 DOCKER_URL = 'https://download.docker.com/linux/static/stable/x86_64/docker-29.7.2.tgz'
-MANIFEST = Path('/home/feelm-ci-test/offline-inputs/9627ce2a9b774f11a71743bcfb8aec93/manifest.json')
-CACHE = Path('/home/feelm-ci-test/backend-checks/ee737a8331104a619b767a40ae996129/home/.gradle')
 IMAGES = Path('/home/feelm-ci-test/ci222-backend-images-E4nFHV/backend-images.tar')
 BASE_PATTERN = r'/var/tmp/ci222-server-[a-z0-9_]+'
 SYSFS_WAIT = '''#!/bin/sh
@@ -107,12 +105,12 @@ def download(url, target, expected):
     backend.inputs.checked_file(target, expected, 512 * 1024**2)
 
 
-def prepare(base):
+def prepare(base, cache_manifest, cache_root, manifest_sha):
     if shutil.disk_usage(base).free < 12 * 1024**3:
         raise ValueError('At least 12 GiB free required')
     bundle = base / 'bundle'; bundle.mkdir()
     copy_checked(base / 'backend.tar', bundle / 'backend.tar', backend.inputs.prep.ARCHIVE_SHA, 64 * 1024**2)
-    copy_checked(MANIFEST, bundle / 'cache-manifest.json', backend.MANIFEST_SHA, 32 * 1024**2)
+    copy_checked(cache_manifest, bundle / 'cache-manifest.json', manifest_sha, 32 * 1024**2)
     metadata = json.loads((bundle / 'cache-manifest.json').read_text())
     entries = metadata['cache']
     if not 0 < len(entries) <= 100000 or sum(x['size'] for x in entries.values()) > 2 * 1024**3:
@@ -123,7 +121,7 @@ def prepare(base):
                 or not (name.startswith('caches/') or name.startswith('wrapper/dists/'))
                 or name.endswith('.lock')):
             raise ValueError('Unsafe selected cache path')
-        copy_checked(CACHE / name, bundle / 'gradle-cache' / name, entry['sha256'], entry['size'])
+        copy_checked(cache_root / name, bundle / 'gradle-cache' / name, entry['sha256'], entry['size'])
     copy_checked(IMAGES, bundle / 'backend-images.tar', backend.inputs.IMAGE_ARCHIVE_SHA, 2 * 1024**3)
     download(transfer.JDK_URL, bundle / 'jdk.tar.gz', backend.JDK_SHA)
     download(DOCKER_URL, base / 'docker.tgz', DOCKER_SHA)
@@ -137,10 +135,11 @@ def prepare(base):
     run(['dpkg-deb', '-x', str(debs[0]), str(package / 'extracted')])
     nspawn = package / 'extracted/usr/bin/systemd-nspawn'
     version_text = run([str(nspawn), '--version'], capture_output=True, text=True).stdout
-    backend.inputs.inspect_bundle(bundle, backend.MANIFEST_SHA, backend.JDK_SHA)
+    backend.inputs.inspect_bundle(bundle, manifest_sha, backend.JDK_SHA)
     tools = {'systemd': version, 'nspawn_version': version_text.splitlines()[0],
              'nspawn_sha': backend.inputs.prep.digest(nspawn),
-             'docker_sha': DOCKER_SHA, 'source_revision': backend.inputs.prep.REVISION}
+             'docker_sha': DOCKER_SHA, 'source_revision': backend.inputs.prep.REVISION,
+             'cache_manifest_sha256': manifest_sha}
     (base / 'prepared.json').write_text(json.dumps(tools, indent=2))
     print('SERVER_PREPARATION: PASS; files only, no host packages installed', flush=True)
 
@@ -197,9 +196,11 @@ def build_root(base, attempt, action):
         if source_archive.exists():
             source_payload = source_archive.read_bytes()
             source_sha = (attempt / 'source.sha256').read_text().strip()
+        prepared = json.loads((base / 'prepared.json').read_text())
         backend.prepare(base / 'bundle', root, manager.copy_binary,
                         source_installer=job_io.install_snapshot,
-                        source_payload=source_payload, source_sha=source_sha)
+                        source_payload=source_payload, source_sha=source_sha,
+                        manifest_sha=prepared['cache_manifest_sha256'])
         if action != 'backend':
             (root / 'backend-check.sh').write_text(backend_lifecycle_payload())
         script += '\n/bin/sh /backend-check.sh\n'
@@ -641,6 +642,9 @@ def main():
                                          'internal-build', 'internal-launch'])
     parser.add_argument('--confirm-server-pilot', action='store_true')
     parser.add_argument('--prepared-base', type=Path)
+    parser.add_argument('--cache-manifest', type=Path)
+    parser.add_argument('--cache-root', type=Path)
+    parser.add_argument('--cache-manifest-sha256')
     parser.add_argument('--attempt', type=Path)
     parser.add_argument('--mode', choices=['diagnose', 'probe', 'backend', 'cancel', 'timeout',
                                           'backend-cancel', 'backend-timeout', 'disk-full', 'log-full', 'artifact-link'])
@@ -655,7 +659,10 @@ def main():
         return internal(base, args.action, args.attempt, args.mode, args.prepared_base)
     if args.action == 'prepare':
         if args.prepared_base: parser.error('prepare cannot reuse existing inputs')
-        prepare(base)
+        if not args.cache_manifest or not args.cache_root or not re.fullmatch(
+                r'[0-9a-f]{64}', args.cache_manifest_sha256 or ''):
+            parser.error('prepare requires cache manifest, cache root and reviewed manifest SHA256')
+        prepare(base, args.cache_manifest, args.cache_root, args.cache_manifest_sha256)
         return 0
     if args.action in ('backend', 'backend-cancel', 'backend-timeout'):
         return execute_backend_job(base, args.prepared_base or base, args.action)

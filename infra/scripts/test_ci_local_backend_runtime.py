@@ -13,6 +13,13 @@ spec.loader.exec_module(runtime)
 
 
 class RuntimeTests(unittest.TestCase):
+    def test_manifest_hash_can_be_supplied_by_server_preparation(self):
+        with patch.object(runtime.inputs, 'inspect_bundle', side_effect=RuntimeError('checked')) as inspect, \
+                tempfile.TemporaryDirectory() as directory, self.assertRaisesRegex(RuntimeError, 'checked'):
+            runtime.prepare(Path(directory), Path(directory) / 'root', lambda *_: None,
+                            manifest_sha='a' * 64)
+        inspect.assert_called_once_with(Path(directory), 'a' * 64, runtime.JDK_SHA)
+
     def test_payload_is_offline_full_suite_and_cleanup(self):
         for expected in ('clean test spotlessCheck --offline', '--no-daemon',
                          'TESTCONTAINERS_RYUK_DISABLED=false', 'remaining-containers', 'gradle-exit'):

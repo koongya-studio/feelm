@@ -38,6 +38,12 @@ class OfflinePreparationTests(unittest.TestCase):
                 offline.main()
             prepare.assert_not_called()
 
+    def test_inspect_and_prepare_require_explicit_source_run(self):
+        for action in ('inspect', 'prepare'):
+            with patch.object(offline.sys, 'argv', ['offline', action]), \
+                    contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                offline.main()
+
     def test_selected_cache_excludes_personal_state_and_locks(self):
         with tempfile.TemporaryDirectory() as directory:
             cache_fixture(Path(directory))

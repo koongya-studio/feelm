@@ -103,8 +103,9 @@ def extract_jdk(archive_path, destination):
                 target.chmod(0o644)
 
 
-def prepare(bundle, root, copy_binary, source_installer=None, source_payload=None, source_sha=None):
-    audit = inputs.inspect_bundle(bundle, MANIFEST_SHA, JDK_SHA)
+def prepare(bundle, root, copy_binary, source_installer=None, source_payload=None, source_sha=None,
+            manifest_sha=MANIFEST_SHA):
+    audit = inputs.inspect_bundle(bundle, manifest_sha, JDK_SHA)
     work = root / 'work'; work.mkdir()
     if source_payload is not None and (source_installer is None or source_sha is None):
         raise ValueError('Dynamic source requires an installer and trusted digest')

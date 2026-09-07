@@ -27,6 +27,26 @@ class ServerPilotTests(unittest.TestCase):
             self.assertEqual(pilot.main(), 0)
             check.assert_not_called()
 
+    def test_prepare_requires_explicit_reviewed_cache_inputs(self):
+        with patch('sys.argv', ['pilot', 'prepare', '--confirm-server-pilot']), \
+                patch.object(pilot, 'check_base'), patch.object(pilot, 'prepare') as prepare, \
+                self.assertRaises(SystemExit):
+            pilot.main()
+        prepare.assert_not_called()
+
+    def test_prepare_passes_reviewed_cache_inputs(self):
+        args = ['pilot', 'prepare', '--confirm-server-pilot',
+                '--cache-manifest', '/home/feelm-ci-test/offline-inputs/new/manifest.json',
+                '--cache-root', '/home/feelm-ci-test/backend-checks/new/home/.gradle',
+                '--cache-manifest-sha256', 'a' * 64]
+        with patch('sys.argv', args), patch.object(pilot, 'check_base'), \
+                patch.object(pilot, 'prepare') as prepare:
+            self.assertEqual(pilot.main(), 0)
+        prepare.assert_called_once_with(
+            pilot.HERE.parent,
+            Path('/home/feelm-ci-test/offline-inputs/new/manifest.json'),
+            Path('/home/feelm-ci-test/backend-checks/new/home/.gradle'), 'a' * 64)
+
     def test_confirmation_required(self):
         with patch('sys.argv', ['pilot', 'backend']), patch.object(pilot, 'execute') as execute:
             pilot.main(); execute.assert_not_called()
