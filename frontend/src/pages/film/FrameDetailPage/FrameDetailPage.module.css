@@ -1,0 +1,118 @@
+/*
+ * 3.1-A 프레임 상세. 값은 와이어프레임 실측값이다.
+ *
+ * 헤더는 고정이고 본문만 스크롤한다. FullScreenLayout은 높이만 고정하므로
+ * 스크롤 영역은 이 화면이 가진다.
+ */
+.page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px var(--screen-padding-x);
+  overflow-y: auto;
+}
+
+.frameArea {
+  display: flex;
+  flex: none;
+  justify-content: center;
+}
+
+.movie {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+}
+
+.movieTitle {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.movieMeta {
+  color: var(--color-ink-muted);
+  font-size: 12px;
+}
+
+/* 기록 카드 */
+.record {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-line-section);
+  border-radius: var(--radius-section);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rowLabel {
+  color: var(--color-ink-muted);
+  font-size: 12.5px;
+}
+
+.rowValue {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rowStrong {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.score {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.comment {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-line-faint);
+}
+
+.commentBody {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.actions {
+  display: flex;
+  gap: 9px;
+}
+
+/* 두 버튼이 같은 폭을 나눠 가진다 */
+.actions > * {
+  flex: 1;
+}
+
+.detailLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-ink-faint);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.notFound {
+  padding: 40px var(--screen-padding-x);
+  color: var(--color-ink-muted);
+  text-align: center;
+}

@@ -100,6 +100,49 @@ export const mockMovies: Record<number, RecommendedMovieView> = {
     runtimeMinutes: 131,
   },
 
+  /*
+   * 3.1 취향 필름 · 3.1-A 프레임 상세의 프레임 3개.
+   *
+   * 와이어프레임 3.1의 `최근 추가된 영화`도 `영화 제목 1~3`을 쓰지만 2.1 목록(201~203)
+   * 과는 다른 영화다. 프레임은 평가와 1:1이므로(API-042) 이미 평가한 영화여야 하고,
+   * 201~203은 2.1에서 `아직 안 본 영화`로 표시되기 때문이다.
+   *
+   * 402의 연도 · 장르 · 상영 시간은 와이어프레임 3.1-A의 `2013 · 케이퍼 · 115분`을
+   * 그대로 맞췄다. 3.1-A는 제목만 실제 영화(`나우 유 씨 미`)를 쓰고 3.1 목록은
+   * 자리표시자를 쓰므로, 기존 기준(mocks/movieDetails.ts 주석)대로 제목은 자리표시자를
+   * 유지한다.
+   */
+  401: {
+    movieId: 401,
+    title: '영화 제목 1',
+    posterUrl: null,
+    releaseYear: 2020,
+    genres: ['범죄'],
+    averageRating: 4.0,
+    ottProviders: ['NETFLIX'],
+    runtimeMinutes: 118,
+  },
+  402: {
+    movieId: 402,
+    title: '영화 제목 2',
+    posterUrl: null,
+    releaseYear: 2013,
+    genres: ['케이퍼'],
+    averageRating: 3.7,
+    ottProviders: ['NETFLIX'],
+    runtimeMinutes: 115,
+  },
+  403: {
+    movieId: 403,
+    title: '영화 제목 3',
+    posterUrl: null,
+    releaseYear: 2016,
+    genres: ['느와르'],
+    averageRating: 4.1,
+    ottProviders: ['TVING'],
+    runtimeMinutes: 121,
+  },
+
   // 1.1 영화 취향 초기 설정의 카드 6장.
   // 와이어프레임은 카드에 제목을 표시하지 않는다. 대체 텍스트에 필요하므로 자리표시자
   // 제목을 두고, 2.1 목록의 `영화 제목 1~4`와 구분되도록 알파벳을 쓴다.
