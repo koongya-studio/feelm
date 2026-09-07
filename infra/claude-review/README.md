@@ -127,11 +127,39 @@ OAuth 토큰과 고정 실행 환경만 전달하며 GitLab 토큰, Anthropic AP
 
 ## 남은 작업
 
-- 보호된 `develop`에서 실제 Claude 구독 인증 확인
-- MR 변경 내용의 안전한 수집과 크기 제한
+- `collect-mr.py`를 실제 MR API 응답으로 검증
 - 한국어 리뷰 생성과 GitLab 댓글 등록
 - 커밋 SHA 확인, 중복 실행 및 stale 리뷰 방지
 - 실패 유형별 운영 처리와 자동 실행 전환
+
+보호된 `develop` 파이프라인의 `claude-auth-check` 성공은 2026-09-07 운영자 확인으로
+검증했다. 이 기록은 토큰 원문이나 실행 응답을 저장소에 남기지 않는다.
+
+## MR 입력 수집기
+
+`collect-mr.py`는 MR 브랜치를 checkout하거나 MR의 코드·CI·hook을 실행하지 않고 GitLab
+API의 MR 메타데이터와 diff만 `/tmp/feelm-claude-review/input.json`에 0600 권한으로
+기록한다. 출력에는 `untrusted_data: true`를 넣어 이후 Claude 입력 조립 단계에서도 신뢰할
+수 없는 데이터임을 명시한다.
+
+수집기는 보호된 `develop`의 push 또는 web 파이프라인과 `claude-review` 환경에서만
+동작한다. 동일 프로젝트의 열린 MR, `develop` 대상 브랜치와 호출자가 전달한 현재 HEAD
+SHA가 모두 일치해야 한다. 외부 Fork, 변경 파일 100개 초과, 파일별 diff 128 KiB 초과,
+전체 diff 512 KiB 초과, GitLab이 생략한 collapsed/too-large diff는 검토하지 않고 실패한다.
+MR 제목은 1 KiB, 설명은 16 KiB로 제한한다.
+
+필요한 입력은 `CI_API_V4_URL`, `CI_PROJECT_ID`, `REVIEW_MR_IID`, `REVIEW_MR_SHA`와
+`GITLAB_REVIEW_TOKEN`이다. 토큰과 diff는 표준 출력에 기록하지 않으며 성공 시
+`MR_COLLECTION: PASS`, 실패 시 분류된 오류 코드만 출력한다. 전용 토큰은 최소 API 읽기와
+향후 MR 댓글 작성 권한만 부여하고 Protected, Masked/hidden, 환경 범위
+`claude-review`, 변수 확장 비활성화로 관리한다.
+
+루트 CI의 `claude-mr-collect` Job은 보호된 `develop`의 web 파이프라인에서만 수동으로
+표시된다. 파이프라인을 만들 때 `REVIEW_MR_IID`에 MR 번호, `REVIEW_MR_SHA`에 그 MR의 현재
+40자리 HEAD SHA를 입력한 뒤 Job을 실행한다. Job은 MR 브랜치가 아니라 보호된 `develop`을
+얕게 checkout해 저장소에 고정된 수집기만 실행하며 submodule, cache와 artifact를 사용하지
+않는다. 이전 실행의 입력 파일은 새 API 요청 전에 삭제되어 실패한 실행이 오래된 입력을
+남기지 않는다.
 
 참고 문서: [systemd 255 실행 설정](https://manpages.ubuntu.com/manpages/noble/man5/systemd.exec.5.html),
 [GitLab protected Runner](https://docs.gitlab.com/ci/runners/configure_runners/)
