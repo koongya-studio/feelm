@@ -177,13 +177,20 @@
 }
 
 /* 참여 중인 파티 */
+/* 5.8 파티원 팝콘으로 가는 버튼이다. 배치와 색은 와이어프레임 그대로다 */
 .partyCard {
   display: flex;
+  width: 100%;
+  box-sizing: border-box;
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
   border: 1px solid var(--color-line-section);
   border-radius: var(--radius-section);
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
 }
 
 .partyIcon {

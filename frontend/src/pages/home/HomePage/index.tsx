@@ -17,7 +17,7 @@
  * 지금은 데이터를 받기 전에 아무것도 그리지 않고, 실패한 섹션은 표시하지 않는다.
  */
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import IconButton from '../../../components/IconButton';
 import Section from '../../../components/Section';
 import ScreenHeader from '../../../components/ScreenHeader';
@@ -57,6 +57,8 @@ function summarizeGenres(taste: TasteAnalysis) {
 }
 
 export default function HomePage() {
+  const navigate = useNavigate();
+
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [otts, setOtts] = useState<Ott[]>([]);
   const [today, setToday] = useState<RecommendationItemView | null>(null);
@@ -228,8 +230,15 @@ export default function HomePage() {
         </section>
 
         {party ? (
-          // 파티 목록(5.1)은 범위 밖이라 이동하지 않는다
-          <section className={styles.partyCard}>
+          /*
+           * 파티 목록(5.1)이 범위 밖이라 5.8 파티원 팝콘으로 바로 보낸다.
+           * 배치 · 문구 · 색은 그대로이고 누를 수 있게만 바꿨다(팀 결정 2026-09-07).
+           */
+          <button
+            type="button"
+            className={styles.partyCard}
+            onClick={() => void navigate(path.partyPopcorn(party.partyId))}
+          >
             <span className={styles.partyIcon}>
               <PartyGroupIcon />
             </span>
@@ -244,7 +253,7 @@ export default function HomePage() {
             <span className={styles.partyChevron}>
               <ChevronRightIcon />
             </span>
-          </section>
+          </button>
         ) : null}
       </div>
     </>

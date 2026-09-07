@@ -1,0 +1,174 @@
+/*
+ * 5.9 파티 팝콘 섞기. 값은 와이어프레임 실측값이다.
+ *
+ * 와이어프레임 배경은 `#F6EFE3`이고 카드가 흰색이지만, 확정 토큰인 흰 배경을 쓰기로
+ * 했으므로 카드는 테두리로만 구분한다(팀 결정 2026-09-07).
+ */
+.page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px var(--screen-padding-x) 16px;
+  overflow-y: auto;
+}
+
+.card {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-section);
+}
+
+.cardTitle {
+  color: var(--color-ink-subtle);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+/* ① 참여자 취향 비교 — 두 칸씩 줄바꿈한다 */
+.memberGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.memberCard {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+}
+
+.memberHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.avatar {
+  display: block;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  box-sizing: border-box;
+  border: 1px solid var(--color-line);
+  border-radius: 50%;
+  background: var(--color-surface-muted);
+}
+
+.memberName {
+  font-size: 13.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.shareRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shareLabel {
+  flex: none;
+  color: var(--color-ink-faint);
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.shareValue {
+  flex: none;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+/*
+ * 진행 막대. ① 은 가로줄 안에서 남은 폭을 채우고, ③ 은 세로로 쌓인 칸에 들어간다.
+ * 세로 칸에서 flex: 1을 그대로 두면 높이가 늘어나 6px 규격이 깨진다.
+ */
+.track {
+  display: block;
+  width: 100%;
+  height: 6px;
+  flex: none;
+  border-radius: var(--radius-badge);
+  background: var(--color-track);
+  overflow: hidden;
+}
+
+.shareRow .track {
+  width: auto;
+  min-width: 0;
+  flex: 1;
+}
+
+.trackFill {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-badge);
+  background: var(--color-nav-active);
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+/* ② 팝콘 믹서 — 시각 표현 미확정이라 자리만 둔다 */
+.assetSlot {
+  height: 190px;
+  border: 1px dashed var(--color-poster-line);
+  border-radius: 12px;
+  background: var(--color-surface-muted);
+}
+
+.assetNote {
+  color: var(--color-ink-hint);
+  font-size: 11px;
+  text-align: center;
+}
+
+/* ③ 공통 취향 결과 */
+.resultRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.resultAsset {
+  width: 96px;
+  height: 96px;
+  flex: none;
+  box-sizing: border-box;
+  border: 1px solid var(--color-line-faint);
+  border-radius: 12px;
+  background: var(--color-surface-muted);
+}
+
+.resultBody {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.resultTitle {
+  font-size: 14.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.notFound {
+  padding: 40px var(--screen-padding-x);
+  color: var(--color-ink-muted);
+  text-align: center;
+}
