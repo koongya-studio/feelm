@@ -20,6 +20,22 @@ class RuntimeTests(unittest.TestCase):
                             manifest_sha='a' * 64)
         inspect.assert_called_once_with(Path(directory), 'a' * 64, runtime.JDK_SHA)
 
+    def test_bundle_source_digest_is_used_for_dynamic_stage_snapshot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            bundle = base / 'bundle'; bundle.mkdir()
+            root = base / 'root'; root.mkdir()
+            payload = b'dynamic reviewed source'
+            (bundle / 'backend.tar').write_bytes(payload)
+            with patch.object(runtime.inputs, 'inspect_bundle', return_value={}), \
+                    patch.object(runtime, 'source_installer', create=True) as installer:
+                installer.side_effect = RuntimeError('digest checked')
+                with self.assertRaisesRegex(RuntimeError, 'digest checked'):
+                    runtime.prepare(bundle, root, lambda *_: None,
+                                    source_installer=installer,
+                                    bundle_source_sha='d' * 64)
+            installer.assert_called_once_with(payload, 'd' * 64, root / 'work')
+
     def test_payload_is_offline_full_suite_and_cleanup(self):
         for expected in ('clean test spotlessCheck --offline', '--no-daemon',
                          'TESTCONTAINERS_RYUK_DISABLED=false', 'remaining-containers', 'gradle-exit'):
