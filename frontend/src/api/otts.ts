@@ -3,12 +3,32 @@
  * 대응 명세는 docs/api/onboarding-ott.md이다.
  */
 import { mockOtts } from '../mocks/otts';
+import { getSubscribedOttIds, setSubscribedOttIds } from '../mocks/sessionStore';
 import { respond } from './mockTransport';
 import type { Ott } from '../types/ott';
+
+/**
+ * 아직 구독 OTT를 설정하지 않았을 때 쓰는 기준값.
+ *
+ * 와이어프레임 2.1의 `내 OTT`가 넷플릭스 · 티빙 · 웨이브 세 개를 보여준다. 온보딩(1.2)을
+ * 거치지 않고 홈으로 바로 들어가도 화면이 비어 보이지 않도록 이 셋을 기본으로 둔다.
+ */
+const DEFAULT_SUBSCRIBED_OTT_IDS = [1, 2, 3];
 
 /** API-025 OTT 목록 조회 · GET /api/v1/otts */
 export async function getOtts(): Promise<Ott[]> {
   return respond(mockOtts);
+}
+
+/**
+ * API-026 내 구독 OTT 조회 · GET /api/v1/users/me/otts
+ *
+ * 이번 세션에 1.2에서 고른 목록이 있으면 그것을, 없으면 기준값을 돌려준다.
+ */
+export async function getMyOtts(): Promise<Ott[]> {
+  const ottIds = getSubscribedOttIds() ?? DEFAULT_SUBSCRIBED_OTT_IDS;
+
+  return respond(mockOtts.filter((ott) => ottIds.includes(ott.ottId)));
 }
 
 /**
@@ -18,5 +38,7 @@ export async function getOtts(): Promise<Ott[]> {
  * 온보딩(1.2)과 OTT 관리 화면(6.1, 범위 밖)이 같은 API를 쓴다.
  */
 export async function setMyOtts(ottIds: number[]): Promise<Ott[]> {
+  setSubscribedOttIds(ottIds);
+
   return respond(mockOtts.filter((ott) => ottIds.includes(ott.ottId)));
 }

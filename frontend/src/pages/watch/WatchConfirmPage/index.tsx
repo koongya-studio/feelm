@@ -11,20 +11,25 @@
  * 벗어나면 상태가 `LINK_CLICKED`로 남고 7일 뒤 서버가 `EXPIRED`로 바꾸므로, 그 의도는
  * 기본 동작이 대신한다. 하단 안내 문구도 두 선택지에 맞춰 줄였다.
  *
- * `[?]` 어느 영화의 기록인지는 API-034 감상 기록 목록으로 조회해야 알 수 있다. 이번
- * 단계는 목업이라 화면에 넘겨받은 값이 없으면 첫 추천 영화를 보여준다.
+ * 어느 영화의 기록인지는 감상 기록에서 읽는다. 세션 저장소가 생기면서 2.4에서 만든
+ * 기록을 그대로 찾을 수 있게 됐다(업무 -262). URL로 직접 들어와 기록이 없으면 첫 추천
+ * 영화를 보여준다.
+ *
+ * `[?]` 계약에 감상 기록 단건 조회 API가 없다. `getWatchRecord`는 그 자리를 메우는
+ * 임시 함수이며 대응 API(API-034 계열)가 정해지면 교체한다.
  */
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import Poster from '../../../components/Poster';
-import { confirmWatch } from '../../../api/watch';
+import { confirmWatch, getWatchRecord } from '../../../api/watch';
 import { getMovieDetail } from '../../../api/movies';
 import { path } from '../../../routes/paths';
+import { directionParticle } from '../../../utils/korean';
 import styles from './WatchConfirmPage.module.css';
 import type { MovieDetail } from '../../../types/movie';
 
-/** 목업 기본 영화. 감상 기록에서 영화를 찾는 조회는 API-034 범위다 */
+/** 기록을 찾지 못했을 때 보여줄 영화 (URL 직접 접근) */
 const FALLBACK_MOVIE_ID = 101;
 
 export default function WatchConfirmPage() {
@@ -37,16 +42,20 @@ export default function WatchConfirmPage() {
   useEffect(() => {
     let active = true;
 
-    void getMovieDetail(FALLBACK_MOVIE_ID).then((detail) => {
-      if (active) {
-        setMovie(detail);
-      }
-    });
+    void getWatchRecord(Number(watchRecordId))
+      .then((record) => record.movieId)
+      .catch(() => FALLBACK_MOVIE_ID)
+      .then((movieId) => getMovieDetail(movieId))
+      .then((detail) => {
+        if (active) {
+          setMovie(detail);
+        }
+      });
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [watchRecordId]);
 
   async function respond(watched: boolean) {
     setSubmitting(true);
@@ -74,7 +83,11 @@ export default function WatchConfirmPage() {
 
       <div className={styles.movie}>
         <p className={styles.title}>{movie.title}</p>
-        <p className={styles.note}>{ottName}로 이동한 지 2일이 지났어요</p>
+        {/* OTT 이름이 API-025 값이라 조사를 받침에 맞춰 고른다 (`티빙으로` · `웨이브로`) */}
+        <p className={styles.note}>
+          {ottName}
+          {directionParticle(ottName)} 이동한 지 2일이 지났어요
+        </p>
       </div>
 
       <h1 className={styles.question}>이 영화, 잘 보셨나요?</h1>
