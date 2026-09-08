@@ -219,10 +219,8 @@ def validate_review(review: object, allowed_files: set[str]) -> None:
         raise GenerationError("INVALID_REVIEW_SCHEMA")
     if not isinstance(review["summary"], str):
         raise GenerationError("INVALID_REVIEW_SCHEMA")
-    summary_lines = [line.strip() for line in review["summary"].splitlines() if line.strip()]
-    if (not 2 <= len(summary_lines) <= 5
-            or any(len(line.encode("utf-8")) > 1024 for line in summary_lines)
-            or "\n".join(summary_lines) != review["summary"]):
+    if (not review["summary"].strip()
+            or len(review["summary"].encode("utf-8")) > 4096):
         raise GenerationError("INVALID_REVIEW_SCHEMA")
     findings = review["findings"]
     if not isinstance(findings, list) or len(findings) > 50:

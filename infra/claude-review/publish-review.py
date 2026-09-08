@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import stat
+import textwrap
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
@@ -191,10 +192,7 @@ def validate_files(payload: object, review: object, iid: int, sha: str) -> None:
             or not isinstance(review["summary"], str) or not review["summary"].strip()
             or not isinstance(review["findings"], list) or len(review["findings"]) > 50):
         raise PublishError("INVALID_REVIEW_FILE")
-    summary_lines = [line.strip() for line in review["summary"].splitlines() if line.strip()]
-    if (not 2 <= len(summary_lines) <= 5
-            or any(len(line.encode("utf-8")) > 1024 for line in summary_lines)
-            or "\n".join(summary_lines) != review["summary"]):
+    if len(review["summary"].encode("utf-8")) > 4096:
         raise PublishError("INVALID_REVIEW_FILE")
     expected = {"severity", "file", "line", "condition", "evidence", "recommendation"}
     for finding in review["findings"]:
@@ -217,6 +215,22 @@ def code_block(value: str) -> str:
     longest = max((len(group) for group in re.findall(r"`+", value)), default=0)
     fence = "`" * max(3, longest + 1)
     return f"{fence}\n{value}\n{fence}"
+
+
+def readable_summary(value: str) -> str:
+    supplied_lines = [line.strip() for line in value.splitlines() if line.strip()]
+    if 2 <= len(supplied_lines) <= 5:
+        lines = supplied_lines
+    else:
+        normalized = " ".join(supplied_lines)
+        lines = [part.strip() for part in re.split(r"(?<=[.!?。！？])\s+", normalized)
+                 if part.strip()]
+        if len(lines) == 1 and len(lines[0]) > 160:
+            lines = textwrap.wrap(lines[0], width=160, break_long_words=False,
+                                  break_on_hyphens=False)
+        if len(lines) > 5:
+            lines = lines[:4] + [" ".join(lines[4:])]
+    return "\n".join("- " + line for line in lines)
 
 
 def format_comment(review: dict[str, object], project_id: int, iid: int, sha: str,
@@ -249,7 +263,7 @@ def format_comment(review: dict[str, object], project_id: int, iid: int, sha: st
                 "**수정 제안**", code_block(finding["recommendation"]),
             ])
     parts.extend([
-        "### 검토 요약", code_block(review["summary"]),
+        "### 검토 요약", code_block(readable_summary(review["summary"])),
         "### 검토 범위와 한계",
         "- MR에서 변경된 diff와 직접 관련된 저장소 규칙·계약을 검토했습니다.\n"
         "- 변경되지 않은 코드의 전수 검사, 코드 실행, 통합·성능·배포 검증은 포함하지 않습니다.",

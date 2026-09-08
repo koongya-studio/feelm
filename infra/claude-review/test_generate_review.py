@@ -143,9 +143,13 @@ class GenerateReviewTests(unittest.TestCase):
                 generator.parse_result(completed(value), {"backend/example.py"})
             self.assertEqual(raised.exception.code, "INVALID_REVIEW_SCHEMA")
 
-    def test_requires_two_to_five_clean_summary_lines(self):
-        for summary in ("한 줄뿐이다.", "첫 줄이다.\n\n셋째 줄이다.",
-                        "1\n2\n3\n4\n5\n6", " 첫 줄이다.\n둘째 줄이다."):
+    def test_accepts_unstructured_summary_but_rejects_empty_or_oversized_value(self):
+        for summary in ("한 줄 요약도 허용한다.", " 첫 줄이다.\n\n둘째 줄이다. "):
+            value = dict(review(), summary=summary)
+            parsed_review, _ = generator.parse_result(
+                completed(value), {"backend/example.py"})
+            self.assertEqual(parsed_review["summary"], summary)
+        for summary in (" ", "가" * 4097):
             value = dict(review(), summary=summary)
             with self.subTest(summary=summary), self.assertRaises(generator.GenerationError) as raised:
                 generator.parse_result(completed(value), {"backend/example.py"})
