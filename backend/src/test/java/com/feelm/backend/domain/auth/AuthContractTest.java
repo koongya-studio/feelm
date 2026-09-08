@@ -31,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.testcontainers.junit.jupiter.Container;
@@ -52,6 +53,8 @@ class AuthContractTest {
     private static final String MEMBER_PATH = "/api/v1/test/security/me";
     private static final String PRIVATE_AUTH_PATH = "/api/v1/auth/private-test";
     private static final String REFRESH_PATH = "/api/v1/auth/token/refresh";
+    private static final String RESET_REQUEST_PATH = "/api/v1/auth/password/reset-request";
+    private static final String RESET_PATH = "/api/v1/auth/password/reset";
     private static final String COOKIE_NAME = "refresh_token";
 
     @Container @ServiceConnection
@@ -125,6 +128,23 @@ class AuthContractTest {
         mockMvc.perform(get(PRIVATE_AUTH_PATH))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("비밀번호 재설정 경로는 공개 경로로 등록되어 인증 없이 호출된다")
+    void passwordResetPathsArePublic() throws Exception {
+        mockMvc.perform(
+                        post(RESET_REQUEST_PATH)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"email\":\"nobody@example.com\"}"))
+                .andExpect(status().isAccepted());
+
+        mockMvc.perform(
+                        post(RESET_PATH)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"token\":\"none\",\"newPassword\":\"N3wP@ssw0rd\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("RESET_TOKEN_INVALID"));
     }
 
     @Test

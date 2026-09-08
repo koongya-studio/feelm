@@ -42,7 +42,9 @@ public class SecurityConfig {
         "/api/v1/auth/email/verify",
         "/api/v1/auth/email/resend",
         "/api/v1/auth/login",
-        "/api/v1/auth/token/refresh"
+        "/api/v1/auth/token/refresh",
+        "/api/v1/auth/password/reset-request",
+        "/api/v1/auth/password/reset"
     };
 
     private final TokenProvider tokenProvider;

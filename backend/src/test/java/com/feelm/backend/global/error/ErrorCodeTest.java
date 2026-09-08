@@ -68,7 +68,11 @@ class ErrorCodeTest {
                         "VERIFICATION_TOKEN_EXPIRED",
                         "ALREADY_VERIFIED",
                         "INVALID_CREDENTIALS",
-                        "EMAIL_NOT_VERIFIED");
+                        "EMAIL_NOT_VERIFIED",
+                        // 계정 도메인 — API-010~012 (S15P21E106-151)
+                        "RESET_TOKEN_INVALID",
+                        "RESET_TOKEN_EXPIRED",
+                        "PASSWORD_NOT_SET");
     }
 
     @Test
@@ -89,6 +93,14 @@ class ErrorCodeTest {
         assertThat(ErrorCode.VERIFICATION_TOKEN_EXPIRED.getStatus()).isEqualTo(HttpStatus.GONE);
         assertThat(ErrorCode.INVALID_CREDENTIALS.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(ErrorCode.EMAIL_NOT_VERIFIED.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    @DisplayName("API-010~012 비밀번호 오류 코드는 각 명세의 HTTP 상태로 매핑된다")
+    void passwordCodesMatchSpecifiedStatuses() {
+        assertThat(ErrorCode.RESET_TOKEN_INVALID.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.RESET_TOKEN_EXPIRED.getStatus()).isEqualTo(HttpStatus.GONE);
+        assertThat(ErrorCode.PASSWORD_NOT_SET.getStatus()).isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test
