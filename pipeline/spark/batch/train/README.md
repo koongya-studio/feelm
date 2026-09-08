@@ -1,4 +1,16 @@
-# ALS 데이터 분할
+# ALS 학습 배치
+
+## 단일 설정 모델 학습
+
+`train_als_model()`은 검증된 학습용 평점 DataFrame, `AlsConfig`, ALS 초기화 seed를 받아
+명시적 평점 ALSModel 하나를 학습한다. `rank`, `regParam`, `maxIter`, `seed`를 적용하며
+MovieLens 사용자·영화 ID와 원본 별점을 사용한다.
+
+이 함수는 데이터 분할, 서비스 영화 ID 매핑, 평가와 저장을 수행하지 않는다. 따라서 같은 함수를
+train, train + validation, 검증된 전체 평점에 재사용할 수 있으며, 서비스에 매핑되지 않은 영화도
+입력에 있으면 학습에 포함한다.
+
+## 데이터 분할
 
 `split_ratings()`는 입력 검증을 통과한 평점 DataFrame을 사용자별 시간순으로
 `train`, `validation`, `test`에 배정합니다. 사용자·영화 ID는 MovieLens ID입니다.
@@ -69,9 +81,10 @@ finally:
 
 ```bash
 cd pipeline/spark
-uv run pytest tests/batch/test_als_splits.py
-uv run ruff check batch/train/splits.py tests/batch/test_als_splits.py
+uv run pytest tests/batch/test_als_training.py tests/batch/test_als_splits.py
+uv run ruff check batch/train/training.py batch/train/splits.py tests/batch/test_als_training.py tests/batch/test_als_splits.py
 ```
 
-테스트는 행 보존·중복 없는 배정, 시간순 분할, 파티션 수와 입력 순서 변경 시 재현성,
+학습 테스트는 ALS 파라미터 전달, 실제 모델 생성과 서비스 미매핑 영화 Factor 보존을 확인합니다.
+분할 테스트는 행 보존·중복 없는 배정, 시간순 분할, 파티션 수와 입력 순서 변경 시 재현성,
 동일 시각·희소 사용자·빈 입력, 사용자/영화 cold-start 통계와 잘못된 설정을 확인합니다.
