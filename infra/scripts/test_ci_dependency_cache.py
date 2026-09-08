@@ -105,7 +105,7 @@ class ManagerTests(unittest.TestCase):
             with patch.object(cache, 'OPERATORS', operators), \
                  patch.object(Path, 'lstat', return_value=trusted), \
                  patch.object(cache, 'api_json', return_value=job), \
-                 self.assertRaises(cache.PolicyError):
+                 self.assertRaisesRegex(cache.PolicyError, 'cache operator'):
                 cache.verify_job(self.context())
 
     def test_current_job_identity_must_match_requested_action(self):
@@ -118,12 +118,12 @@ class ManagerTests(unittest.TestCase):
             'user': {'id': 7, 'username': 'infra-user', 'state': 'active'},
         }
         with patch.object(cache, 'api_json', return_value=job), \
-             self.assertRaises(cache.PolicyError):
+             self.assertRaisesRegex(cache.PolicyError, 'job_name'):
             cache.verify_job(self.context('prepare'))
         wrong_project = self.context('promote')
         wrong_project['project_id'] = 1
         with patch.object(cache, 'api_json', return_value=job), \
-             self.assertRaises(cache.PolicyError):
+             self.assertRaisesRegex(cache.PolicyError, 'project'):
             cache.verify_job(wrong_project)
 
     def test_switch_restores_config_when_runner_restart_fails(self):

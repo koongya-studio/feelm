@@ -125,25 +125,41 @@ def operator_usernames():
 
 def verify_job(context, opener=None):
     job = api_json('job', context['token'], opener)
-    pipeline = job.get('pipeline') if isinstance(job, dict) else None
-    commit = job.get('commit') if isinstance(job, dict) else None
-    user = job.get('user') if isinstance(job, dict) else None
+    if not isinstance(job, dict):
+        raise PolicyError('Current GitLab job is not authorized: response')
+    pipeline = job.get('pipeline')
+    commit = job.get('commit')
+    user = job.get('user')
     expected_name = 'backend-cache-' + context['action']
-    if (not isinstance(pipeline, dict) or not isinstance(commit, dict)
-            or not isinstance(user, dict)
-            or job.get('id') != context['job_id'] or job.get('name') != expected_name
-            or job.get('stage') != 'verify' or job.get('status') != 'running'
-            or job.get('ref') != 'develop' or job.get('source') != 'web'
-            or context['project_id'] != PROJECT_ID
-            or pipeline.get('id') != context['pipeline_id']
-            or pipeline.get('project_id') != context['project_id']
-            or pipeline.get('ref') != 'develop'
-            or not re.fullmatch(r'[0-9a-f]{40}', str(pipeline.get('sha', '')))
-            or commit.get('id') != pipeline.get('sha')
-            or type(user.get('id')) is not int or user['id'] <= 0
-            or user.get('state') != 'active'
-            or user.get('username') not in operator_usernames()):
-        raise PolicyError('Current GitLab job or cache operator is not authorized')
+    checks = (
+        ('pipeline', isinstance(pipeline, dict)),
+        ('commit', isinstance(commit, dict)),
+        ('user', isinstance(user, dict)),
+        ('job_id', job.get('id') == context['job_id']),
+        ('job_name', job.get('name') == expected_name),
+        ('job_stage', job.get('stage') == 'verify'),
+        ('job_status', job.get('status') == 'running'),
+        ('job_ref', job.get('ref') == 'develop'),
+        ('job_source', job.get('source') == 'web'),
+        ('project', context['project_id'] == PROJECT_ID),
+        ('pipeline_id', isinstance(pipeline, dict)
+         and pipeline.get('id') == context['pipeline_id']),
+        ('pipeline_project', isinstance(pipeline, dict)
+         and pipeline.get('project_id') == context['project_id']),
+        ('pipeline_ref', isinstance(pipeline, dict) and pipeline.get('ref') == 'develop'),
+        ('pipeline_sha', isinstance(pipeline, dict)
+         and re.fullmatch(r'[0-9a-f]{40}', str(pipeline.get('sha', ''))) is not None),
+        ('commit_sha', isinstance(commit, dict) and isinstance(pipeline, dict)
+         and commit.get('id') == pipeline.get('sha')),
+        ('user_id', isinstance(user, dict) and type(user.get('id')) is int
+         and user['id'] > 0),
+        ('user_state', isinstance(user, dict) and user.get('state') == 'active'),
+    )
+    failures = [name for name, passed in checks if not passed]
+    if failures:
+        raise PolicyError('Current GitLab job is not authorized: ' + ','.join(failures))
+    if user.get('username') not in operator_usernames():
+        raise PolicyError('Current GitLab cache operator is not authorized')
     return user['username']
 
 
