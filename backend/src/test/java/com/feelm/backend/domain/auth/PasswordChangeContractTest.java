@@ -1,5 +1,6 @@
 package com.feelm.backend.domain.auth;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -104,6 +105,70 @@ class PasswordChangeContractTest extends EmailAuthApiTestSupport {
         changePassword(loggedIn, account.password(), NEW_PASSWORD)
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("비밀번호가 없는 계정은 재설정 토큰도 무효화되지 않는다")
+    void passwordlessAccountDoesNotInvalidateResetToken(CapturedOutput output) throws Exception {
+        TestAccount account = newAccount();
+        long userId = signupActive(account, output);
+        MvcResult loggedIn = loginResult(account);
+        requestPasswordResetToken(account.email());
+        clearPassword(userId);
+
+        changePassword(loggedIn, account.password(), NEW_PASSWORD)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PASSWORD_NOT_SET"));
+
+        assertThat(unusedPasswordResetTokenCount(userId)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("탈퇴한 계정은 재설정 토큰도 무효화되지 않는다")
+    void withdrawnAccountDoesNotInvalidateResetToken(CapturedOutput output) throws Exception {
+        TestAccount account = newAccount();
+        long userId = signupActive(account, output);
+        MvcResult loggedIn = loginResult(account);
+        requestPasswordResetToken(account.email());
+        withdrawUser(userId);
+
+        changePassword(loggedIn, account.password(), NEW_PASSWORD)
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+
+        assertThat(unusedPasswordResetTokenCount(userId)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("변경하면 미사용 비밀번호 재설정 토큰도 모두 무효화된다")
+    void changeInvalidatesOutstandingResetToken(CapturedOutput output) throws Exception {
+        TestAccount account = newAccount();
+        long userId = signupActive(account, output);
+        MvcResult loggedIn = loginResult(account);
+        String resetToken = requestPasswordResetToken(account.email());
+
+        changePassword(loggedIn, account.password(), NEW_PASSWORD)
+                .andExpect(status().isNoContent());
+
+        assertThat(unusedPasswordResetTokenCount(userId)).isEqualTo(0);
+        resetPassword(resetToken, "An0ther@Pass")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("RESET_TOKEN_INVALID"));
+    }
+
+    @Test
+    @DisplayName("현재 비밀번호가 틀리면 재설정 토큰은 무효화되지 않는다")
+    void wrongCurrentPasswordDoesNotInvalidateResetToken(CapturedOutput output) throws Exception {
+        TestAccount account = newAccount();
+        long userId = signupActive(account, output);
+        MvcResult loggedIn = loginResult(account);
+        requestPasswordResetToken(account.email());
+
+        changePassword(loggedIn, "Wr0ng@Pass", NEW_PASSWORD)
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+
+        assertThat(unusedPasswordResetTokenCount(userId)).isEqualTo(1);
     }
 
     @Test

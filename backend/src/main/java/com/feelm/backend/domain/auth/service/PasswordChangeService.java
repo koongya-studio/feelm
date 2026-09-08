@@ -1,5 +1,6 @@
 package com.feelm.backend.domain.auth.service;
 
+import com.feelm.backend.domain.auth.PasswordResetTokenIssuer;
 import com.feelm.backend.domain.auth.RefreshTokenService;
 import com.feelm.backend.domain.user.entity.User;
 import com.feelm.backend.domain.user.repository.UserRepository;
@@ -18,6 +19,7 @@ public class PasswordChangeService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
+    private final PasswordResetTokenIssuer resetTokenIssuer;
 
     /**
      * 현재 비밀번호를 확인한 뒤 새 비밀번호로 바꾸고 해당 사용자의 모든 Refresh Token을 폐기한다.
@@ -33,22 +35,45 @@ public class PasswordChangeService {
      * <p>해시가 없는 계정에는 대조를 시도할 수 없고, 소셜 전용 계정에는 불일치(401)가 아니라 수단이 없다는 사실(409)을 알려 주어야 한다.
      *
      * <p>계정 행을 잠그고 읽어 같은 사용자의 동시 변경 요청이 서로의 결과를 덮어쓰지 않게 한다.
+     *
+     * <p>미사용 비밀번호 재설정 토큰이 있으면 함께 무효화한다(151 리뷰 R-8). 재설정 메일이 유출된 상태에서 이 경로로 비밀번호를 바꿔도 남은 링크가 최대 30분
+     * 더 유효해서는 안 되기 때문이다. 이 호출을 계정 행 잠금보다 먼저 두는 이유는 잠금 순서 때문이다. 재설정(API-011)이 토큰→계정 순서로 잠그므로 (이메일 인증
+     * API-002와 동일), 이 메서드가 반대 순서(계정→토큰)로 잠그면 같은 사용자에 대한 재설정과 비밀번호 변경이 동시에 들어왔을 때 교착할 수 있다. 검증에 실패해
+     * 예외가 나면 무효화도 함께 롤백된다.
+     *
+     * <p>그래서 잠금 없는 사전 검사를 먼저 한다(283 리뷰 발견 2). 현재 비밀번호가 틀렸거나 계정이 비활성인 요청은 애초에 실패할 것이므로, 토큰 잠금(사용자 단위
+     * JVM 락, {@link PasswordResetTokenIssuer#invalidateAllUnused})조차 걸 필요가 없다. 사전 검사는 행 잠금이 없는 일반
+     * 조회라 계정 행을 먼저 잠그는 것이 아니며(토큰→계정 잠금 순서 불변식은 유지된다), 사전 검사 통과 뒤에도 잠금 있는 최종 검사를 그대로 다시 거쳐 판단을 내린다 —
+     * 사전 검사는 통과했지만 그 사이 다른 트랜잭션이 상태를 바꿨을 가능성까지 커버하기 위해서다.
      */
     @Transactional
     public void change(long userId, String currentPassword, String newPassword) {
+        User precheck =
+                userRepository
+                        .findById(userId)
+                        .filter(User::isActive)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
+        assertCanChangePassword(precheck, currentPassword);
+
+        resetTokenIssuer.invalidateAllUnused(userId);
+
         User user =
                 userRepository
                         .findByIdForUpdate(userId)
                         .filter(User::isActive)
                         .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
+        assertCanChangePassword(user, currentPassword);
+
+        user.changePassword(passwordEncoder.encode(newPassword));
+        refreshTokenService.revokeAll(userId);
+    }
+
+    private void assertCanChangePassword(User user, String currentPassword) {
         if (!user.hasPassword()) {
             throw new BusinessException(ErrorCode.PASSWORD_NOT_SET);
         }
         if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
-
-        user.changePassword(passwordEncoder.encode(newPassword));
-        refreshTokenService.revokeAll(userId);
     }
 }
