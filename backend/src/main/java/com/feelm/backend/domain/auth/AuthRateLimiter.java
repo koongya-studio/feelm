@@ -24,6 +24,7 @@ public class AuthRateLimiter {
 
     private static final String RESEND_KEY_PREFIX = "auth:email-resend:";
     private static final String LOGIN_FAILURE_KEY_PREFIX = "auth:login-fail:";
+    private static final String PASSWORD_RESET_KEY_PREFIX = "auth:password-reset:";
 
     /**
      * 시도 횟수를 올리고 만료를 보장한 뒤 올린 횟수를 돌려주는 스크립트. {@code INCR}와 {@code PEXPIRE}를 따로 보내면 그 사이에 연결이 끊겼을 때
@@ -39,6 +40,9 @@ public class AuthRateLimiter {
 
     /** 인증 메일 재발송 최소 간격. */
     private static final Duration RESEND_INTERVAL = Duration.ofMinutes(1);
+
+    /** 비밀번호 재설정 요청 최소 간격. 재발송과 같은 값을 쓴다. 둘 다 이메일 발송을 유발하는 공개 엔드포인트다. */
+    private static final Duration PASSWORD_RESET_INTERVAL = Duration.ofMinutes(1);
 
     /** 로그인 연속 실패를 세는 기간. */
     private static final Duration LOGIN_FAILURE_WINDOW = Duration.ofMinutes(10);
@@ -56,6 +60,22 @@ public class AuthRateLimiter {
     public boolean tryAcquireResendSlot(String email) {
         Boolean acquired =
                 redisTemplate.opsForValue().setIfAbsent(resendKey(email), "1", RESEND_INTERVAL);
+        return !Boolean.FALSE.equals(acquired);
+    }
+
+    /**
+     * 비밀번호 재설정 요청 간격을 확보한다.
+     *
+     * <p>계정 존재 여부와 무관하게 요청 이메일 기준으로 센다. 존재하는 계정만 셌다면 429 응답 자체가 가입 여부를 알려 주는 신호가 되기 때문이다(API-010 처리
+     * 규칙).
+     *
+     * @return 처리해도 되면 {@code true}, 아직 간격이 지나지 않았으면 {@code false}
+     */
+    public boolean tryAcquirePasswordResetSlot(String email) {
+        Boolean acquired =
+                redisTemplate
+                        .opsForValue()
+                        .setIfAbsent(passwordResetKey(email), "1", PASSWORD_RESET_INTERVAL);
         return !Boolean.FALSE.equals(acquired);
     }
 
@@ -87,5 +107,9 @@ public class AuthRateLimiter {
 
     private String loginFailureKey(String email) {
         return LOGIN_FAILURE_KEY_PREFIX + Sha256Hasher.hex(email);
+    }
+
+    private String passwordResetKey(String email) {
+        return PASSWORD_RESET_KEY_PREFIX + Sha256Hasher.hex(email);
     }
 }

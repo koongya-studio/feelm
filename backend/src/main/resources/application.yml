@@ -66,3 +66,5 @@ feelm:
     from: ${MAIL_FROM:no-reply@feelm.local}
     # 링크는 프론트 화면으로 가고 프론트가 API-002를 호출한다.
     verification-url: ${FRONTEND_BASE_URL:http://localhost:5173}/verify-email
+    # 재설정 링크도 프론트 화면으로 가고 프론트가 API-011을 호출한다.
+    password-reset-url: ${FRONTEND_BASE_URL:http://localhost:5173}/reset-password

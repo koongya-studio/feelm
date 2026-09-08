@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.feelm.backend.infrastructure.mail.RecordingPasswordResetMailSender;
 import com.feelm.backend.infrastructure.mail.RecordingVerificationMailSender;
 import com.redis.testcontainers.RedisContainer;
 import jakarta.servlet.http.Cookie;
@@ -23,6 +24,7 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -46,12 +48,15 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>인증 토큰 원문은 DB에 SHA-256 해시로만 남으므로(플랜 결정 8) 테스트가 되돌릴 수 없다. 그래서 발송 지점을 대체하는 스파이 빈({@link
  * RecordingVerificationMailSender})에서 원문을 얻는다(플랜 결정 13). 발송 로그를 파싱하지 않으므로 인증 토큰을 로그에 남기지 않는 컨벤션
- * 12장과 충돌하지 않는다.
+ * 12장과 충돌하지 않는다. 비밀번호 재설정 토큰(API-010)도 같은 이유로 {@link RecordingPasswordResetMailSender}에서 얻는다.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ExtendWith(OutputCaptureExtension.class)
-@Import(RecordingVerificationMailSender.Registrar.class)
+@Import({
+    RecordingVerificationMailSender.Registrar.class,
+    RecordingPasswordResetMailSender.Registrar.class
+})
 abstract class EmailAuthApiTestSupport {
 
     static final String SIGNUP_PATH = "/api/v1/auth/signup";
@@ -60,6 +65,9 @@ abstract class EmailAuthApiTestSupport {
     static final String LOGIN_PATH = "/api/v1/auth/login";
     static final String LOGOUT_PATH = "/api/v1/auth/logout";
     static final String REFRESH_PATH = "/api/v1/auth/token/refresh";
+    static final String RESET_REQUEST_PATH = "/api/v1/auth/password/reset-request";
+    static final String RESET_PATH = "/api/v1/auth/password/reset";
+    static final String CHANGE_PASSWORD_PATH = "/api/v1/users/me/password";
     static final String MEMBER_PATH = "/api/v1/test/security/me";
     static final String COOKIE_NAME = "refresh_token";
 
@@ -81,11 +89,14 @@ abstract class EmailAuthApiTestSupport {
     @Autowired protected JdbcTemplate jdbcTemplate;
     @Autowired protected ObjectMapper objectMapper;
     @Autowired protected RecordingVerificationMailSender verificationMailSender;
+    @Autowired protected RecordingPasswordResetMailSender passwordResetMailSender;
+    @Autowired protected StringRedisTemplate redisTemplate;
 
     /** 컨텍스트를 공유하는 테스트 사이에 발송 기록이 남지 않게 한다. 발송 횟수 검증이 자기 테스트의 발송만 세야 한다. */
     @BeforeEach
-    void clearSentVerificationMails() {
+    void clearSentMails() {
         verificationMailSender.clear();
+        passwordResetMailSender.clear();
     }
 
     /** 테스트용 계정 값. 이메일과 닉네임은 같은 일련번호를 공유해 로그에서 짝을 알아보기 쉽게 한다. */
@@ -129,6 +140,16 @@ abstract class EmailAuthApiTestSupport {
                 LOGIN_PATH, "{\"email\":\"%s\",\"password\":\"%s\"}".formatted(email, password));
     }
 
+    ResultActions requestPasswordReset(String email) throws Exception {
+        return postJson(RESET_REQUEST_PATH, "{\"email\":\"%s\"}".formatted(email));
+    }
+
+    ResultActions resetPassword(String token, String newPassword) throws Exception {
+        return postJson(
+                RESET_PATH,
+                "{\"token\":\"%s\",\"newPassword\":\"%s\"}".formatted(token, newPassword));
+    }
+
     /** 가입만 마친 {@code PENDING_VERIFICATION} 사용자를 만들고 userId를 돌려준다. */
     long signupPending(TestAccount account) throws Exception {
         MvcResult result = signup(signupBody(account)).andExpect(status().isCreated()).andReturn();
@@ -154,6 +175,19 @@ abstract class EmailAuthApiTestSupport {
     String latestVerificationToken(CapturedOutput output) {
         List<String> tokens = verificationTokens(output);
         assertThat(tokens).as("인증 메일 발송 로그에서 인증 토큰을 찾지 못했다").isNotEmpty();
+        return tokens.getLast();
+    }
+
+    /** 발송된 재설정 토큰 원문을 발송 순서대로 모은다. 발송 횟수 검증에도 쓴다. */
+    List<String> passwordResetTokens() {
+        return passwordResetMailSender.tokens();
+    }
+
+    /** 재설정 요청(API-010)을 보내고 발송된 토큰 원문을 돌려준다. */
+    String requestPasswordResetToken(String email) throws Exception {
+        requestPasswordReset(email).andExpect(status().isAccepted());
+        List<String> tokens = passwordResetTokens();
+        assertThat(tokens).as("재설정 메일이 발송되지 않았다").isNotEmpty();
         return tokens.getLast();
     }
 
@@ -199,7 +233,40 @@ abstract class EmailAuthApiTestSupport {
                 "update email_verification_tokens set used_at = null where user_id = ?", userId);
     }
 
-    /** 탈퇴 계정을 만든다. 회원 탈퇴(API-013)는 이 업무 범위가 아니다. */
+    /** 재설정 토큰을 만료시킨다. 만료(410) 경로는 API로 만들 수 없다. */
+    void expirePasswordResetTokens(long userId) {
+        jdbcTemplate.update(
+                "update password_reset_tokens set expires_at = ? where user_id = ?",
+                utc(Instant.now().minus(Duration.ofMinutes(1))),
+                userId);
+    }
+
+    long unusedPasswordResetTokenCount(long userId) {
+        return jdbcTemplate.queryForObject(
+                "select count(*) from password_reset_tokens"
+                        + " where user_id = ? and used_at is null",
+                Long.class,
+                userId);
+    }
+
+    /**
+     * 비밀번호가 없는 계정을 만든다. 소셜 전용 계정(API-007~009)은 -150·-209 범위라 API로 만들 수 없어, 그 계정이 갖는 상태인 {@code
+     * password_hash IS NULL}만 직접 만든다.
+     */
+    void clearPassword(long userId) {
+        jdbcTemplate.update("update users set password_hash = null where id = ?", userId);
+    }
+
+    /**
+     * 재설정 요청의 간격 제한(1분)을 지운다. 같은 이메일로 두 번 요청해야 하는 시나리오는 이 제한 때문에 기다리지 않고는 만들 수 없다.
+     *
+     * <p>키 형식을 테스트가 알아야 하는 결합은 감수한다. 대안은 1분을 실제로 기다리거나 리미터에 테스트 전용 진입점을 두는 것인데, 둘 다 이보다 나쁘다.
+     */
+    void clearPasswordResetInterval(String email) {
+        redisTemplate.delete("auth:password-reset:" + Sha256Hasher.hex(email));
+    }
+
+    /** 탈퇴 계정을 만든다. 회원 탈퇴(API-013)는 이 업무 범위가 아니다(S15P21E106-198). */
     void withdrawUser(long userId) {
         jdbcTemplate.update(
                 "update users set status = 'WITHDRAWN', withdrawn_at = ? where id = ?",

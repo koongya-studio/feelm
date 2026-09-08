@@ -124,6 +124,24 @@ public class User extends BaseTimeEntity {
         return status == UserStatus.PENDING_VERIFICATION;
     }
 
+    /**
+     * 이메일 로그인 수단을 가진 계정인지. 소셜 전용 계정과 탈퇴 계정은 해시가 없다.
+     *
+     * <p>비밀번호 재설정(API-010)과 변경(API-012)이 대상 계정을 가릴 때 쓴다.
+     */
+    public boolean hasPassword() {
+        return passwordHash != null;
+    }
+
+    /**
+     * 비밀번호를 새 해시로 바꾼다. 재설정(API-011)과 변경(API-012)이 함께 쓴다.
+     *
+     * <p>해시로 만드는 책임은 호출자에게 둔다. Entity가 {@code PasswordEncoder}를 알면 영속성 모델이 보안 설정에 의존하게 된다.
+     */
+    public void changePassword(String encodedPassword) {
+        this.passwordHash = encodedPassword;
+    }
+
     /** 인증 메일로 아직 활성화할 수 있는 미인증 계정인지. 보존 기간이 지난 계정은 재가입이 지울 수 있으므로 메일을 보내지 않는다. */
     public boolean isAwaitingVerification(Instant now) {
         return isPendingVerification() && !isPastRetention(now);
