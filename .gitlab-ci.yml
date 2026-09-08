@@ -100,6 +100,14 @@ backend-mr-test:
   timeout: 30m
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
+      # Compare the whole MR with its target branch, not only the latest commit.
+      changes:
+        - backend/**/*
+        - .gitlab-ci.yml
+        - .gitattributes
+        - infra/scripts/ci-*.py
+        - infra/scripts/rootless-backend/**/*
+        - infra/scripts/systemd/feelm-ci*.service
 
 .backend-cache-action:
   stage: verify

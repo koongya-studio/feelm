@@ -26,13 +26,44 @@ Job·프로젝트·테스트 명령을 추가할 때 기존 어댑터를 느슨�
 
 ## CI 분리
 
-- MR → develop: `backend-mr-test`, `e106-mr-isolated`, 30분, 취소 가능
+- MR → develop: 백엔드 관련 경로 변경 시 `backend-mr-test`, `e106-mr-isolated`, 30분, 취소 가능
 - develop push: 기존 `backend-test`와 빌드·수동 배포, `e106-shell`
 - `runner-check`: develop에서만 실행
 
 MR Job에는 `GIT_STRATEGY: none`을 사용한다. 소스는 Runner checkout 결과가 아니라 인증된
 GitLab API의 정확한 커밋 archive를 사용한다. MR이 `.gitlab-ci.yml`을 바꿔 새 태그를 요청해도
 어댑터의 고정 Job 정책과 다르면 실패한다.
+
+### MR 테스트 실행 경로 (S15P21E106-291)
+
+`.gitlab-ci.yml`의 `backend-mr-test.rules`는 develop 대상 MR 조건과 `changes`를
+동시에 만족해야 한다. 경로는 다음 이유로 포함한다.
+
+| 경로 | 포함 이유 |
+| --- | --- |
+| `backend/**/*` | 소스, 테스트, Gradle 설정·Wrapper 및 테스트 자원 |
+| `.gitlab-ci.yml` | Job 명령, 실행 조건 및 Runner 연결 설정 |
+| `.gitattributes` | 백엔드 파일의 체크아웃 개행·속성 |
+| `infra/scripts/ci-*.py` | 격리 실행기, 캐시, 입력 준비 및 GitLab 어댑터 구현 |
+| `infra/scripts/rootless-backend/**/*` | Gradle 초기화 및 Testcontainers 실행 보조 코드 |
+| `infra/scripts/systemd/feelm-ci*.service` | 테스트 Runner·가드·오프라인 Docker 서비스 정의 |
+
+프론트엔드, 파이프라인 코드, `docs/`, 인프라 Markdown 문서만 변경하면 이 Job은
+생성하지 않는다. `backend/README.md`처럼 backend 내부 문서도 보수적으로 포함한다.
+삭제·이름 변경도 변경 경로에 해당한다. MR 전체 변경을 대상 브랜치와 비교하므로,
+백엔드를 수정한 MR에 문서 커밋만 추가해도 백엔드 테스트는 계속 실행된다.
+별도 `compare_to`나 마지막 커밋 비교로 이 기준을 바꾸지 않는다.
+
+공통 CI·Runner 파일 변경 시 Job이 생성되는 것과 해당 파일이 서버에 적용되는 것은
+별개다. 현재 어댑터는 backend archive만 전달하므로, 실행기 변경 자체는 해당
+단위 테스트와 기존 서버 적용 절차로 별도 검증해야 한다.
+
+`backend-cache-status`의 의존성 경로는 모두 `backend/**/*`에 포함된다. 캐시 상태
+확인 조건, 수동 캐시 전환, Runner 정책, develop 테스트·이미지·배포 조건은 유지한다.
+변경 경로를 새로 추가할 때는 캐시 관련 변경에서 테스트가 빠지지 않는지 확인한다.
+
+실행할 MR Job이 없는 경우의 병합 기준과 검증 결과는
+[291 검증 기록](../verification/S15P21E106-291.md)을 참고한다.
 
 ## 구성 요소
 
