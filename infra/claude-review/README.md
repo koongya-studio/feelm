@@ -226,5 +226,39 @@ finding으로 반복하지 않도록 요청한다. MR 설명만 인용한 프로
 병합 후 열린 테스트 MR의 IID와 현재 HEAD SHA로 수동 Job을 실행해 첫 실행의 댓글 등록,
 동일 SHA 재실행의 중복 건너뛰기, 실행 중 SHA 변경 시 stale 댓글 제거를 순서대로 확인한다.
 
+## MR 댓글 명령 트리거
+
+`comment-trigger.py`는 MR 댓글의 정확한 전체 내용이 `/claude-review`일 때만 보호된
+`develop` API 파이프라인을 생성한다. GitLab Note Webhook의 secret을 상수 시간으로
+검증하고, 고정 프로젝트의 Developer 이상 작성자인지 API로 확인한 다음 열린 MR, 동일
+프로젝트, `develop` 대상 브랜치와 현재 HEAD SHA를 다시 조회한다. 검증된 IID와 SHA만
+파이프라인 변수로 전달하며 MR 브랜치의 CI나 코드를 실행하지 않는다. 동일 MR의 성공한
+요청에는 5분 간격을 적용하고 API 호출이 실패하면 재시도를 막지 않는다.
+
+`claude-mr-review` Job은 기존 web 파이프라인에서는 수동 상태를 유지한다. API 파이프라인은
+`CLAUDE_REVIEW_TRIGGER=comment`일 때만 자동 실행되며 수집기, 생성기와 게시기도 같은 표식을
+검증한다. 댓글 명령이 트리거한 파이프라인에서도 protected `develop`과 `claude-review`
+환경의 기존 `CLAUDE_CODE_OAUTH_TOKEN`, `GITLAB_REVIEW_TOKEN`을 사용한다. 이 API
+파이프라인에서는 Runner 확인, 백엔드 테스트, 이미지 빌드와 배포 Job을 명시적으로 제외해
+리뷰 Job만 실행한다.
+
+서버 적용에는 다음 운영 작업이 필요하다.
+
+1. `comment-trigger.py`를 root 소유의 `/usr/local/lib/feelm-ci-review/`에 설치한다.
+2. `feelm-claude-review-webhook.service`를 root 소유 0644로 설치한다.
+3. 충분히 긴 임의값을 `/etc/feelm-ci-review/webhook-token`, API scope와 파이프라인 생성 및
+   멤버 조회 권한을 가진 전용 Project Access Token을 `gitlab-api-token`에 root 소유 0400으로
+   저장한다. 토큰 원문은 저장소, CI 변수나 로그에 넣지 않는다.
+4. 127.0.0.1:8765의 `/hooks/gitlab/claude-review`만 외부 HTTPS 경로로 전달하도록 기존
+   reverse proxy를 설정한다. 요청 본문 제한은 64 KiB로 둔다.
+5. GitLab Project Webhook에서 Comments 이벤트와 secret token을 등록하고 SSL 검증을 유지한다.
+6. `/etc/feelm-ci-review/enable-webhook`을 만든 뒤 서비스를 시작한다.
+
+Webhook의 공개 URL과 reverse proxy 구성은 서버별 값이라 저장소에 고정하지 않는다. 최초
+적용 시 권한 없는 사용자, 다른 프로젝트, 일반 댓글, 닫힌 MR이 파이프라인을 만들지 못하는지
+확인하고 `/claude-review` 한 번이 보호된 develop의 `claude-mr-review` 하나만 실행하는지
+검증한다. 5분 제한은 단일 프로세스 메모리 기준이므로 서비스 재시작을 가로지르는 남용 방지는
+reverse proxy 또는 GitLab 측 rate limit을 함께 적용한다.
+
 참고 문서: [systemd 255 실행 설정](https://manpages.ubuntu.com/manpages/noble/man5/systemd.exec.5.html),
 [GitLab protected Runner](https://docs.gitlab.com/ci/runners/configure_runners/)

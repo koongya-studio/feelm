@@ -135,6 +135,13 @@ class CollectorTests(unittest.TestCase):
             with self.subTest(key=key):
                 self.assertFalse(collector.trusted_context(dict(valid, **{key: value})))
 
+    def test_accepts_only_tagged_api_trigger_context(self):
+        valid = {"CI_COMMIT_BRANCH": "develop", "CI_COMMIT_REF_PROTECTED": "true",
+                 "CI_ENVIRONMENT_NAME": "claude-review", "CI_PIPELINE_SOURCE": "api",
+                 "CLAUDE_REVIEW_TRIGGER": "comment"}
+        self.assertTrue(collector.trusted_context(valid))
+        self.assertFalse(collector.trusted_context(dict(valid, CLAUDE_REVIEW_TRIGGER="manual")))
+
     def test_main_writes_private_file_and_does_not_print_token_or_diff(self):
         environment = {
             "CI_COMMIT_BRANCH": "develop", "CI_COMMIT_REF_PROTECTED": "true",

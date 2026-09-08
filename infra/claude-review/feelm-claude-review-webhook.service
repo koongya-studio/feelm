@@ -1,0 +1,46 @@
+[Unit]
+Description=Feelm Claude MR 리뷰 댓글 명령 Webhook
+Wants=network-online.target
+After=network-online.target feelm-claude-review-guard.service
+Requires=feelm-claude-review-guard.service
+ConditionPathExists=/etc/feelm-ci-review/enable-webhook
+
+[Service]
+Type=simple
+User=feelm-ci-review
+Group=feelm-ci-review
+WorkingDirectory=/tmp
+Environment=CLAUDE_REVIEW_GITLAB_API_URL=https://lab.ssafy.com/api/v4
+Environment=CLAUDE_REVIEW_PROJECT_ID=1441379
+Environment=CLAUDE_REVIEW_WEBHOOK_PORT=8765
+LoadCredential=webhook-token:/etc/feelm-ci-review/webhook-token
+LoadCredential=gitlab-api-token:/etc/feelm-ci-review/gitlab-api-token
+UMask=0077
+ExecStartPre=+/usr/bin/python3 -I -B /usr/local/lib/feelm-ci-review/network-guard.py verify
+ExecStart=/usr/bin/python3 -I -B /usr/local/lib/feelm-ci-review/comment-trigger.py
+Restart=on-failure
+RestartSec=10
+CPUQuota=25%
+MemoryMax=256M
+MemorySwapMax=0
+TasksMax=32
+LimitNOFILE=256
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+InaccessiblePaths=-/run/docker.sock -/run/containerd -/run/dbus -/run/systemd/private -/run/user -/var/lib/docker -/var/lib/containerd -/etc/gitlab-runner -/srv
+
+[Install]
+WantedBy=multi-user.target
