@@ -14,6 +14,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -79,6 +80,13 @@ abstract class EmailAuthApiTestSupport {
 
     private static final AtomicInteger SEQUENCE = new AtomicInteger();
 
+    /**
+     * 요청마다 다른 클라이언트 IP를 만드는 일련번호. 메일 발송 제한이 IP 단위로 걸리므로(S15P21E106-281 결정 D-12) 컨텍스트를 공유하는 테스트가 같은
+     * {@code 127.0.0.1}을 쓰면 서로의 IP 예산을 갉아먹는다. 제한 자체를 검증하는 테스트만 {@link #nextClientIp()}로 얻은 IP를 고정해서
+     * 쓴다.
+     */
+    private static final AtomicInteger IP_SEQUENCE = new AtomicInteger();
+
     @ServiceConnection static RedisContainer redis = new RedisContainer("redis:8-alpine");
 
     static {
@@ -119,8 +127,29 @@ abstract class EmailAuthApiTestSupport {
                 .formatted(email, password, nickname, VALID_BIRTH_DATE, VALID_GENDER);
     }
 
+    /** 테스트 사이에 IP 단위 발송 제한이 섞이지 않도록 요청마다 다른 IP에서 보낸다. */
     ResultActions postJson(String path, String body) throws Exception {
-        return mockMvc.perform(post(path).contentType(MediaType.APPLICATION_JSON).content(body));
+        return postJsonFrom(nextClientIp(), path, body);
+    }
+
+    /** 같은 IP에서 여러 번 보내야 하는 시나리오(IP 단위 발송 제한)용. */
+    ResultActions postJsonFrom(String clientIp, String path, String body) throws Exception {
+        return mockMvc.perform(
+                post(path)
+                        .with(
+                                request -> {
+                                    request.setRemoteAddr(clientIp);
+                                    return request;
+                                })
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body));
+    }
+
+    /** 다른 테스트와 겹치지 않는 클라이언트 IP를 하나 얻는다. 사설 주소 대역({@code 10/8})에서만 만든다. */
+    static String nextClientIp() {
+        int sequence = IP_SEQUENCE.incrementAndGet();
+        return "10.%d.%d.%d"
+                .formatted((sequence >> 16) & 0xFF, (sequence >> 8) & 0xFF, sequence & 0xFF);
     }
 
     ResultActions signup(String body) throws Exception {
@@ -135,6 +164,11 @@ abstract class EmailAuthApiTestSupport {
         return postJson(RESEND_PATH, "{\"email\":\"%s\"}".formatted(email));
     }
 
+    /** 재발송(API-003)을 지정한 IP에서 보낸다. */
+    ResultActions resendFrom(String clientIp, String email) throws Exception {
+        return postJsonFrom(clientIp, RESEND_PATH, "{\"email\":\"%s\"}".formatted(email));
+    }
+
     ResultActions login(String email, String password) throws Exception {
         return postJson(
                 LOGIN_PATH, "{\"email\":\"%s\",\"password\":\"%s\"}".formatted(email, password));
@@ -142,6 +176,11 @@ abstract class EmailAuthApiTestSupport {
 
     ResultActions requestPasswordReset(String email) throws Exception {
         return postJson(RESET_REQUEST_PATH, "{\"email\":\"%s\"}".formatted(email));
+    }
+
+    /** 재설정 요청(API-010)을 지정한 IP에서 보낸다. */
+    ResultActions requestPasswordResetFrom(String clientIp, String email) throws Exception {
+        return postJsonFrom(clientIp, RESET_REQUEST_PATH, "{\"email\":\"%s\"}".formatted(email));
     }
 
     ResultActions resetPassword(String token, String newPassword) throws Exception {
@@ -264,6 +303,30 @@ abstract class EmailAuthApiTestSupport {
      */
     void clearPasswordResetInterval(String email) {
         redisTemplate.delete("auth:password-reset:" + Sha256Hasher.hex(email));
+    }
+
+    /** IP 단위 발송 제한 카운터 키(S15P21E106-281 결정 D-7). */
+    String mailIpLimitKey(String clientIp, Duration window) {
+        return "auth:mail:ip:" + Sha256Hasher.hex(clientIp) + ":" + window.toSeconds();
+    }
+
+    /** 전역 발송 제한 카운터 키(S15P21E106-281 결정 D-7). */
+    String mailGlobalLimitKey(Duration window) {
+        return "auth:mail:global:" + window.toSeconds();
+    }
+
+    /**
+     * IP·전역 발송 제한 카운터를 모두 지운다. 전역 카운터는 컨텍스트를 공유하는 모든 테스트가 함께 소모하므로, 한도까지 채워 검증한 테스트가 그 상태를 남기면 이후
+     * 테스트가 전부 429가 된다.
+     *
+     * <p>창 길이가 키에 들어가 설정에 따라 달라지므로 접두사 패턴으로 지운다. 이메일 간격 키({@code auth:email-resend:}, {@code
+     * auth:password-reset:})는 접두사가 달라 함께 지워지지 않는다.
+     */
+    void clearMailSendRateLimits() {
+        Set<String> keys = redisTemplate.keys("auth:mail:*");
+        if (keys != null && !keys.isEmpty()) {
+            redisTemplate.delete(keys);
+        }
     }
 
     /** 탈퇴 계정을 만든다. 회원 탈퇴(API-013)는 이 업무 범위가 아니다(S15P21E106-198). */

@@ -3,6 +3,7 @@ package com.feelm.backend.domain.auth.controller;
 import com.feelm.backend.domain.auth.dto.request.PasswordResetMailRequest;
 import com.feelm.backend.domain.auth.dto.request.PasswordResetRequest;
 import com.feelm.backend.domain.auth.service.PasswordResetService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -24,11 +25,17 @@ public class PasswordResetController {
 
     private final PasswordResetService passwordResetService;
 
-    /** API-010 비밀번호 재설정 요청. 계정 존재 여부를 노출하지 않도록 본문 없이 202로 응답한다. */
+    /**
+     * API-010 비밀번호 재설정 요청. 계정 존재 여부를 노출하지 않도록 본문 없이 202로 응답한다.
+     *
+     * <p>클라이언트 IP는 IP 단위 발송 제한에 쓴다({@link com.feelm.backend.domain.auth.AuthRateLimiter}). {@code
+     * X-Forwarded-For}를 읽지 않으므로, Nginx가 이 경로를 프록시하게 되면 리미터 주석의 후속 처리가 함께 필요하다.
+     */
     @PostMapping("/reset-request")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    void requestPasswordReset(@RequestBody @Valid PasswordResetMailRequest request) {
-        passwordResetService.request(request.email());
+    void requestPasswordReset(
+            @RequestBody @Valid PasswordResetMailRequest request, HttpServletRequest httpRequest) {
+        passwordResetService.request(request.email(), httpRequest.getRemoteAddr());
     }
 
     /** API-011 비밀번호 재설정. */

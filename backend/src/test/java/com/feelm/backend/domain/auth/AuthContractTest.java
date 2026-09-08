@@ -130,6 +130,11 @@ class AuthContractTest {
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }
 
+    /**
+     * 재설정 요청은 IP 단위 발송 제한을 받는다(S15P21E106-281). 이 클래스는 요청마다 IP를 바꾸지 않아 모두 {@code 127.0.0.1}에서 나가므로,
+     * 이 경로 요청을 IP 한도({@code feelm.mail.rate-limit.ip}, 테스트 설정 기준 3건)보다 많이 보내면 429로 깨진다. 늘려야 하면
+     * {@link EmailAuthApiTestSupport}처럼 요청마다 remote addr을 바꾼다.
+     */
     @Test
     @DisplayName("비밀번호 재설정 경로는 공개 경로로 등록되어 인증 없이 호출된다")
     void passwordResetPathsArePublic() throws Exception {
