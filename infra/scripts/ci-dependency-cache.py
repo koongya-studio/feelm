@@ -165,53 +165,85 @@ def verify_job(context, opener=None):
 def verify_mr(context, opener=None):
     base = f'projects/{PROJECT_API}/merge_requests/{context["mr_iid"]}'
     mr = api_json(base, context['token'], opener)
+    diff_refs = mr.get('diff_refs') if isinstance(mr, dict) else None
     if (not isinstance(mr, dict) or mr.get('state') != 'opened'
             or mr.get('target_branch') != 'develop'
             or mr.get('source_project_id') != mr.get('target_project_id')
-            or mr.get('sha') != context['revision']):
+            or mr.get('sha') != context['revision']
+            or not isinstance(diff_refs, dict)
+            or diff_refs.get('head_sha') != context['revision']
+            or any(re.fullmatch(r'[0-9a-f]{40}', str(diff_refs.get(name, ''))) is None
+                   for name in ('base_sha', 'start_sha'))):
         raise PolicyError('MR is not one open same-project MR at the approved revision')
-    changes = api_json(base + '/diffs?per_page=100', context['token'], opener)
-    if not isinstance(changes, list) or len(changes) >= 100:
-        raise PolicyError('MR diff is missing or too large to approve automatically')
-    paths = sorted({item.get(key) for item in changes if isinstance(item, dict)
-                    for key in ('old_path', 'new_path') if isinstance(item.get(key), str)})
-    dependency_changes = [path for path in paths if path in DEPENDENCY_FILES]
-    if not dependency_changes:
-        raise PolicyError('MR does not change an approved backend dependency file')
+    return mr
+
+
+def review_dependency_changes(context, mr):
+    base_sha = mr['diff_refs']['base_sha']
+    with tempfile.TemporaryDirectory(prefix='ci271-diff-') as directory:
+        repository = Path(directory) / 'repository.git'
+        environment = git_environment(context['token'], directory)
+        quiet = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL,
+                 'check': True, 'timeout': 120}
+        subprocess.run(['/usr/bin/git', 'init', '--bare', str(repository)],
+                       env=environment, **quiet)
+        remote = GITLAB_URL + '/' + PROJECT_PATH + '.git'
+        for revision, reference in ((base_sha, 'base'), (context['revision'], 'head')):
+            subprocess.run(['/usr/bin/git', '-C', str(repository), 'fetch', '--no-tags', '--depth=1',
+                            remote, revision + ':refs/review/' + reference], env=environment, **quiet)
+        names = subprocess.run(
+            ['/usr/bin/git', '-C', str(repository), 'diff', '--name-only', '-z',
+             '--no-ext-diff', '--no-renames', 'refs/review/base', 'refs/review/head'],
+            env=environment, capture_output=True, check=True, timeout=60).stdout
+        if len(names) > 128 * 1024:
+            raise PolicyError('MR diff is missing or too large to approve automatically')
+        raw_paths = names.decode('utf-8').split('\0') if names else []
+        paths = sorted(set(path for path in raw_paths if path))
+        if not paths or len(paths) >= 100 or any('\n' in path or '\r' in path for path in paths):
+            raise PolicyError('MR diff is missing or too large to approve automatically')
+        dependency_changes = [path for path in paths if path in DEPENDENCY_FILES]
+        if not dependency_changes:
+            raise PolicyError('MR does not change an approved backend dependency file')
+        result = subprocess.run(
+            ['/usr/bin/git', '-C', str(repository), 'diff', '--unified=0', '--no-ext-diff',
+             '--no-renames', 'refs/review/base', 'refs/review/head', '--', *dependency_changes],
+            env=environment, capture_output=True, check=True, timeout=60)
+        if len(result.stdout) > 512 * 1024:
+            raise PolicyError('Dependency diff is missing or oversized')
+        diff = result.stdout.decode('utf-8')
+
     declarations = []
     declaration = re.compile(
         r'^[+-]\s*(?:id\s|classpath\s|implementation\s|api\s|compileOnly\s|'
         r'annotationProcessor\s|runtimeOnly\s|developmentOnly\s|test[A-Za-z]*\s|'
         r'mavenCentral\s*\(|gradlePluginPortal\s*\(|maven\s*\{)')
-    for item in changes:
-        if not isinstance(item, dict) or item.get('new_path') not in dependency_changes:
-            continue
-        diff = item.get('diff', '')
-        if not isinstance(diff, str) or len(diff) > 512 * 1024:
-            raise PolicyError('Dependency diff is missing or oversized')
-        for line in diff.splitlines():
-            if declaration.match(line) and len(line) <= 300:
-                declarations.append(line)
-                if len(declarations) > 200:
-                    raise PolicyError('Dependency declaration diff is too large')
+    for line in diff.splitlines():
+        if declaration.match(line) and len(line) <= 300:
+            declarations.append(line)
+            if len(declarations) > 200:
+                raise PolicyError('Dependency declaration diff is too large')
     if not declarations:
         raise PolicyError('Dependency files changed without a reviewable declaration diff')
-    return mr, dependency_changes, declarations
+    return dependency_changes, declarations
+
+
+def git_environment(token, home):
+    authorization = __import__('base64').b64encode(
+        ('gitlab-ci-token:' + token).encode()).decode()
+    return {
+        'PATH': '/usr/bin:/bin', 'HOME': str(home), 'LANG': 'C.UTF-8',
+        'GIT_TERMINAL_PROMPT': '0', 'GIT_CONFIG_NOSYSTEM': '1',
+        'GIT_CONFIG_GLOBAL': '/dev/null', 'GIT_CONFIG_COUNT': '2',
+        'GIT_CONFIG_KEY_0': 'http.extraHeader',
+        'GIT_CONFIG_VALUE_0': 'Authorization: Basic ' + authorization,
+        'GIT_CONFIG_KEY_1': 'http.followRedirects', 'GIT_CONFIG_VALUE_1': 'false',
+    }
 
 
 def fetch_archive(context):
-    authorization = __import__('base64').b64encode(
-        ('gitlab-ci-token:' + context['token']).encode()).decode()
     with tempfile.TemporaryDirectory(prefix='ci271-git-') as directory:
         repository = Path(directory) / 'repository.git'
-        environment = {
-            'PATH': '/usr/bin:/bin', 'HOME': directory, 'LANG': 'C.UTF-8',
-            'GIT_TERMINAL_PROMPT': '0', 'GIT_CONFIG_NOSYSTEM': '1',
-            'GIT_CONFIG_GLOBAL': '/dev/null', 'GIT_CONFIG_COUNT': '2',
-            'GIT_CONFIG_KEY_0': 'http.extraHeader',
-            'GIT_CONFIG_VALUE_0': 'Authorization: Basic ' + authorization,
-            'GIT_CONFIG_KEY_1': 'http.followRedirects', 'GIT_CONFIG_VALUE_1': 'false',
-        }
+        environment = git_environment(context['token'], directory)
         quiet = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL,
                  'check': True, 'timeout': 120}
         subprocess.run(['/usr/bin/git', 'init', '--bare', str(repository)], env=environment, **quiet)
@@ -294,7 +326,8 @@ def candidate_file(revision):
 def prepare(context):
     if candidate_file(context['revision']).exists():
         raise PolicyError('A candidate already exists for this revision')
-    _, changes, declarations = verify_mr(context)
+    mr = verify_mr(context)
+    changes, declarations = review_dependency_changes(context, mr)
     archive, archive_sha = fetch_archive(context)
     ARCHIVES.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chown(ARCHIVES, 1001, 1001)

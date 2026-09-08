@@ -70,17 +70,27 @@ class ManagerTests(unittest.TestCase):
 
     def test_mr_requires_exact_open_head_and_dependency_change(self):
         mr = {'state': 'opened', 'target_branch': 'develop', 'source_project_id': 7,
-              'target_project_id': 7, 'sha': 'a' * 40}
-        diffs = [{'old_path': 'backend/build.gradle', 'new_path': 'backend/build.gradle',
-                  'diff': "+ implementation 'org.springframework.kafka:spring-kafka'\n"}]
-        with patch.object(cache, 'api_json', side_effect=[mr, diffs]):
-            _, changes, declarations = cache.verify_mr(self.context())
-        self.assertEqual(changes, ['backend/build.gradle'])
-        self.assertEqual(declarations, ["+ implementation 'org.springframework.kafka:spring-kafka'"])
-        with patch.object(cache, 'api_json', side_effect=[mr, [
-                {'old_path': 'backend/src/A.java', 'new_path': 'backend/src/A.java'}]]):
+              'target_project_id': 7, 'sha': 'a' * 40,
+              'diff_refs': {'base_sha': 'b' * 40, 'start_sha': 'b' * 40,
+                            'head_sha': 'a' * 40}}
+        with patch.object(cache, 'api_json', return_value=mr):
+            self.assertEqual(cache.verify_mr(self.context()), mr)
+        invalid = dict(mr, diff_refs=dict(mr['diff_refs'], head_sha='c' * 40))
+        with patch.object(cache, 'api_json', return_value=invalid):
             with self.assertRaises(cache.PolicyError):
                 cache.verify_mr(self.context())
+
+    def test_dependency_review_uses_git_diff_instead_of_mr_diffs_api(self):
+        mr = {'diff_refs': {'base_sha': 'b' * 40}}
+        names = b'backend/build.gradle\0backend/src/A.java\0'
+        diff = b"+ implementation 'org.springframework.kafka:spring-kafka'\n"
+        completed = [SimpleNamespace(stdout=b''), SimpleNamespace(stdout=b''),
+                     SimpleNamespace(stdout=b''), SimpleNamespace(stdout=names),
+                     SimpleNamespace(stdout=diff)]
+        with patch.object(cache.subprocess, 'run', side_effect=completed):
+            changes, declarations = cache.review_dependency_changes(self.context(), mr)
+        self.assertEqual(changes, ['backend/build.gradle'])
+        self.assertEqual(declarations, ["+ implementation 'org.springframework.kafka:spring-kafka'"])
 
     def test_current_job_and_root_operator_policy_are_verified(self):
         job = {
