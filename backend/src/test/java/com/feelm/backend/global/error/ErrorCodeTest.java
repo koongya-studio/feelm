@@ -69,10 +69,31 @@ class ErrorCodeTest {
                         "ALREADY_VERIFIED",
                         "INVALID_CREDENTIALS",
                         "EMAIL_NOT_VERIFIED",
+                        // 계정 도메인 — API-007~009 소셜 로그인·연결 (S15P21E106-150)
+                        "UNSUPPORTED_PROVIDER",
+                        "OAUTH_CODE_INVALID",
+                        "OAUTH_PROVIDER_ERROR",
+                        "OAUTH_EMAIL_REQUIRED",
+                        "SIGNUP_TOKEN_INVALID",
+                        "OAUTH_ACCOUNT_ALREADY_LINKED",
+                        "PROVIDER_ALREADY_LINKED",
                         // 계정 도메인 — API-010~012 (S15P21E106-151)
                         "RESET_TOKEN_INVALID",
                         "RESET_TOKEN_EXPIRED",
                         "PASSWORD_NOT_SET");
+    }
+
+    @Test
+    @DisplayName("API-007~009 소셜 계정 오류 코드는 각 명세의 HTTP 상태로 매핑된다")
+    void socialAccountCodesMatchSpecifiedStatuses() {
+        assertThat(ErrorCode.UNSUPPORTED_PROVIDER.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.OAUTH_CODE_INVALID.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.OAUTH_EMAIL_REQUIRED.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.OAUTH_PROVIDER_ERROR.getStatus()).isEqualTo(HttpStatus.BAD_GATEWAY);
+        assertThat(ErrorCode.SIGNUP_TOKEN_INVALID.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(ErrorCode.OAUTH_ACCOUNT_ALREADY_LINKED.getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+        assertThat(ErrorCode.PROVIDER_ALREADY_LINKED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test

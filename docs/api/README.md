@@ -48,7 +48,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-004 | [이메일 로그인](./users.md#api-004-이메일-로그인) | POST | `/auth/login` | 사용자 | 1차 MVP | 공개 | FR-01 |  |
 | API-005 | [로그아웃](./users.md#api-005-로그아웃) | POST | `/auth/logout` | 사용자 | 1차 MVP | 회원 | FR-01 |  |
 | API-006 | [토큰 재발급](./users.md#api-006-토큰-재발급) | POST | `/auth/token/refresh` | 사용자 | 1차 MVP | 공개 | FR-01 |  |
-| API-007 | [소셜 로그인](./users.md#api-007-소셜-로그인) | POST | `/auth/oauth/{provider}` | 사용자 | 1차 MVP | 공개 | FR-35 | O |
+| API-007 | [소셜 로그인](./users.md#api-007-소셜-로그인) | POST | `/auth/oauth/{provider}` | 사용자 | 1차 MVP | 공개 | FR-35 |  |
 | API-008 | [소셜 회원가입 완료](./users.md#api-008-소셜-회원가입-완료) | POST | `/auth/oauth/signup` | 사용자 | 1차 MVP | 공개 | FR-35 |  |
 | API-009 | [소셜 계정 연결](./users.md#api-009-소셜-계정-연결) | POST | `/users/me/oauth/{provider}` | 사용자 | 1차 MVP | 회원 | FR-35 | O |
 | API-010 | [비밀번호 재설정 요청](./users.md#api-010-비밀번호-재설정-요청) | POST | `/auth/password/reset-request` | 사용자 | 1차 MVP | 공개 | FR-37 |  |

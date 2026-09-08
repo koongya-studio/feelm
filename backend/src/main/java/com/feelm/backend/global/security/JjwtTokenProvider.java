@@ -26,6 +26,11 @@ public class JjwtTokenProvider implements TokenProvider {
     private static final String CLAIM_TOKEN_TYPE = "typ";
     private static final String TOKEN_TYPE_ACCESS = "access";
     private static final String TOKEN_TYPE_REFRESH = "refresh";
+    private static final String TOKEN_TYPE_SIGNUP = "signup";
+
+    private static final String CLAIM_PROVIDER = "provider";
+    private static final String CLAIM_EMAIL = "email";
+    private static final String CLAIM_NICKNAME = "nickname";
 
     /** 서명 알고리즘. 키 길이에 따라 HS384·HS512로 바뀌지 않도록 고정한다. */
     private static final MacAlgorithm SIGNATURE_ALGORITHM = Jwts.SIG.HS256;
@@ -39,11 +44,13 @@ public class JjwtTokenProvider implements TokenProvider {
     private final SecretKey key;
     private final Duration accessTokenTtl;
     private final Duration refreshTokenTtl;
+    private final Duration signupTokenTtl;
 
     public JjwtTokenProvider(JwtProperties properties) {
         this.key = toKey(properties.secret());
         this.accessTokenTtl = properties.accessTokenTtl();
         this.refreshTokenTtl = properties.refreshTokenTtl();
+        this.signupTokenTtl = properties.signupTokenTtl();
     }
 
     /**
@@ -88,6 +95,46 @@ public class JjwtTokenProvider implements TokenProvider {
                 .expiration(Date.from(now.plus(refreshTokenTtl)))
                 .signWith(key, SIGNATURE_ALGORITHM)
                 .compact();
+    }
+
+    /**
+     * 소셜 가입 토큰을 발급한다.
+     *
+     * <p>제공자가 주지 않은 값은 클레임에 넣지 않는다. jjwt는 {@code null} 값을 클레임에서 제거하므로 되읽을 때도 {@code null}이 된다.
+     */
+    @Override
+    public String createSignupToken(SignupTokenClaims claims) {
+        Instant now = Instant.now();
+        return Jwts.builder()
+                .subject(claims.providerUserId())
+                .claim(CLAIM_TOKEN_TYPE, TOKEN_TYPE_SIGNUP)
+                .claim(CLAIM_PROVIDER, claims.provider())
+                .claim(CLAIM_EMAIL, claims.email())
+                .claim(CLAIM_NICKNAME, claims.nickname())
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plus(signupTokenTtl)))
+                .signWith(key, SIGNATURE_ALGORITHM)
+                .compact();
+    }
+
+    @Override
+    public SignupTokenClaims parseSignupToken(String token) {
+        Claims claims =
+                parse(
+                        token,
+                        ErrorCode.SIGNUP_TOKEN_INVALID,
+                        ErrorCode.SIGNUP_TOKEN_INVALID,
+                        TOKEN_TYPE_SIGNUP);
+        String providerUserId = claims.getSubject();
+        String provider = claims.get(CLAIM_PROVIDER, String.class);
+        if (providerUserId == null || providerUserId.isBlank() || provider == null) {
+            throw new BusinessException(ErrorCode.SIGNUP_TOKEN_INVALID);
+        }
+        return new SignupTokenClaims(
+                provider,
+                providerUserId,
+                claims.get(CLAIM_EMAIL, String.class),
+                claims.get(CLAIM_NICKNAME, String.class));
     }
 
     @Override

@@ -56,6 +56,10 @@ Spring Boot DevTools는 개발 환경에서만 사용하며 운영 실행 이미
 | `MAIL_FROM` | `no-reply@feelm.local` | 선택(비우면 `MAIL_USERNAME`. Gmail은 From을 계정으로 강제) |
 | `AUTH_MOCK_ENABLED` | `false` | `false` |
 | `AUTH_MOCK_USER_ID` | `1` | `1` |
+| `OAUTH_ALLOWED_REDIRECT_URIS` | 비어 있음(소셜 로그인 사용 불가) | 필수 |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | 비어 있음 | 선택(**Secret**) |
+| `KAKAO_CLIENT_ID` / `KAKAO_CLIENT_SECRET` | 비어 있음 | 선택(**Secret**) |
+| `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` | 비어 있음 | 선택(**Secret**) |
 
 변수 목록과 용도는 [`.env.example`](./.env.example)에서 관리합니다. 실제 값은 커밋하지
 않는 개인 `.env`에만 둡니다([Secret 및 환경변수 관리 규칙](../docs/secret-environment-variables.md)).
@@ -95,6 +99,26 @@ Refresh Token은 사용될 때마다 회전하며, 폐기된 토큰이 다시 �
 `AUTH_MOCK_ENABLED=true`인 환경에서는 인증 없는 요청에 고정 사용자를 주입합니다. 로그인 없이
 회원 API를 호출해 보고 싶을 때만 켜는 개발 편의 기능이며, 인증을 무력화하므로 **기본값은
 `false`입니다.** 실제 인증 흐름은 로그인(API-004)으로 발급한 Access Token으로 확인합니다.
+
+### 소셜 로그인
+
+소셜 로그인(API-007~009)은 프론트가 받은 인가 코드를 백엔드가 제공자와 교환하는 방식입니다.
+
+| 설정 | 기본값 | 설명 |
+| --- | --- | --- |
+| `feelm.oauth.allowed-redirect-uris` | 비어 있음 | 정확히 일치하는 `redirectUri`만 허용. 비어 있으면 모든 요청을 거절 |
+| `feelm.oauth.providers.<provider>.client-id` | 비어 있음 | 값이 없는 제공자는 등록되지 않음 |
+| `feelm.oauth.providers.<provider>.client-secret` | 비어 있음 | **Secret** |
+| `feelm.jwt.signup-token-ttl` | `10m` | 소셜 가입을 마치기 전까지만 유효한 토큰(API-007) |
+
+- 허용 목록에 없는 `redirectUri`는 제공자를 호출하기 전에 `400 VALIDATION_FAILED`로 거절합니다.
+  목록을 열어 두면 공격자가 자신의 화면으로 인가 코드를 돌려받을 수 있습니다.
+- 자격 증명이 없는 제공자는 기동을 막지 않고 호출 시 `400 UNSUPPORTED_PROVIDER`로 응답합니다.
+  제공자별 앱 등록이 끝나는 시점이 달라도 서비스는 뜰 수 있어야 하기 때문입니다.
+- 소셜 계정의 이메일이 기존 이메일 계정과 같으면 통합하지 않고 `409 EMAIL_DUPLICATED`로 거절합니다.
+  이메일로 로그인한 뒤 계정 연결(API-009)로 같은 결과를 얻습니다.
+- 제공자가 이메일을 주지 않으면 가입(API-007)은 `400 OAUTH_EMAIL_REQUIRED`로 거절하고, 이미 있는
+  계정에 수단을 더하는 연결(API-009)은 이메일 없이도 진행합니다.
 
 ### 인증 메일 발송
 

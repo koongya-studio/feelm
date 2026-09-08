@@ -43,6 +43,9 @@ public class SecurityConfig {
         "/api/v1/auth/email/resend",
         "/api/v1/auth/login",
         "/api/v1/auth/token/refresh",
+        // 소셜 로그인(API-007)과 소셜 회원가입 완료(API-008). 계정 연결(API-009)은 회원 구분이라
+        // /api/v1/users/me/oauth/** 로 따로 두고 여기에 넣지 않는다.
+        "/api/v1/auth/oauth/*",
         "/api/v1/auth/password/reset-request",
         "/api/v1/auth/password/reset"
     };

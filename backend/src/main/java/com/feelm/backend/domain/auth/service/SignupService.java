@@ -14,7 +14,6 @@ import com.feelm.backend.global.error.ErrorCode;
 import java.time.Instant;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
-import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -65,7 +64,7 @@ public class SignupService {
             return userRepository.saveAndFlush(user);
         } catch (DataIntegrityViolationException exception) {
             // 중복 검사와 삽입 사이에 다른 요청이 끼어든 경우다. 유일 제약을 같은 오류 코드로 옮긴다.
-            throw duplicationOf(exception);
+            throw ConstraintViolations.accountDuplicationOf(exception);
         }
     }
 
@@ -100,33 +99,5 @@ public class SignupService {
     /** 이메일은 소문자로 정규화해 저장한다(API-001 Request 규칙). */
     private String normalize(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
-    }
-
-    private RuntimeException duplicationOf(DataIntegrityViolationException exception) {
-        String constraint = constraintNameOf(exception);
-        if (constraint.contains("email")) {
-            return new BusinessException(ErrorCode.EMAIL_DUPLICATED);
-        }
-        if (constraint.contains("nickname")) {
-            return new BusinessException(ErrorCode.NICKNAME_DUPLICATED);
-        }
-        return exception;
-    }
-
-    /**
-     * 위반된 제약 이름을 찾는다. 이름을 알 수 없으면 빈 문자열을 돌려주고 호출자가 원래 예외를 그대로 던지게 한다.
-     *
-     * <p>Hibernate가 제약 이름을 예외에 담아 주므로 메시지를 문자열로 뒤지지 않는다.
-     */
-    private String constraintNameOf(DataIntegrityViolationException exception) {
-        Throwable cause = exception;
-        while (cause != null) {
-            if (cause instanceof ConstraintViolationException violation
-                    && violation.getConstraintName() != null) {
-                return violation.getConstraintName().toLowerCase(Locale.ROOT);
-            }
-            cause = cause.getCause();
-        }
-        return "";
     }
 }

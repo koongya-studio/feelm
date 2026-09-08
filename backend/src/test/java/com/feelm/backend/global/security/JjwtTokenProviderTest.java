@@ -24,11 +24,17 @@ class JjwtTokenProviderTest {
     private final JjwtTokenProvider provider = provider(SECRET, Duration.ofMinutes(30));
 
     private static JjwtTokenProvider provider(String secret, Duration accessTtl) {
+        return provider(secret, accessTtl, Duration.ofMinutes(10));
+    }
+
+    private static JjwtTokenProvider provider(
+            String secret, Duration accessTtl, Duration signupTtl) {
         return new JjwtTokenProvider(
                 new JwtProperties(
                         secret,
                         accessTtl,
                         Duration.ofDays(14),
+                        signupTtl,
                         new JwtProperties.RefreshCookie(
                                 "refresh_token", "/api/v1/auth", true, "Lax")));
     }
@@ -119,6 +125,66 @@ class JjwtTokenProviderTest {
     void shortSecretIsRejectedOnStartup() {
         assertThatThrownBy(() -> provider("too-short", Duration.ofMinutes(30)))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    @DisplayName("발급한 소셜 가입 토큰에서 provider 정보를 되읽는다 (API-007·008)")
+    void parsesClaimsFromIssuedSignupToken() {
+        TokenProvider.SignupTokenClaims claims =
+                new TokenProvider.SignupTokenClaims(
+                        "GOOGLE", "provider-user-1", "social@example.com", "소셜사용자");
+
+        assertThat(provider.parseSignupToken(provider.createSignupToken(claims))).isEqualTo(claims);
+    }
+
+    @Test
+    @DisplayName("이메일이 없는 소셜 가입 토큰도 그대로 되읽는다")
+    void parsesSignupTokenWithoutEmail() {
+        TokenProvider.SignupTokenClaims claims =
+                new TokenProvider.SignupTokenClaims("KAKAO", "provider-user-2", null, null);
+
+        assertThat(provider.parseSignupToken(provider.createSignupToken(claims))).isEqualTo(claims);
+    }
+
+    @Test
+    @DisplayName("만료된 소셜 가입 토큰은 SIGNUP_TOKEN_INVALID로 거절한다")
+    void expiredSignupTokenIsRejected() {
+        JjwtTokenProvider expiring =
+                provider(SECRET, Duration.ofMinutes(30), Duration.ofSeconds(-1));
+        String token =
+                expiring.createSignupToken(
+                        new TokenProvider.SignupTokenClaims(
+                                "GOOGLE", "provider-user-3", "social@example.com", "소셜사용자"));
+
+        assertThatThrownBy(() -> provider.parseSignupToken(token))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.SIGNUP_TOKEN_INVALID);
+    }
+
+    @Test
+    @DisplayName("Access Token을 소셜 가입 토큰 자리에 쓸 수 없다")
+    void accessTokenIsNotAcceptedAsSignupToken() {
+        String accessToken = provider.createAccessToken(42L);
+
+        assertThatThrownBy(() -> provider.parseSignupToken(accessToken))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.SIGNUP_TOKEN_INVALID);
+    }
+
+    @Test
+    @DisplayName("소셜 가입 토큰을 Access Token 자리에 쓸 수 없다")
+    void signupTokenIsNotAcceptedAsAccessToken() {
+        String signupToken =
+                provider.createSignupToken(
+                        new TokenProvider.SignupTokenClaims(
+                                "GOOGLE", "provider-user-4", "social@example.com", "소셜사용자"));
+
+        assertThatThrownBy(() -> provider.parseAccessToken(signupToken))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.UNAUTHORIZED);
     }
 
     private static String headerOf(String token) {

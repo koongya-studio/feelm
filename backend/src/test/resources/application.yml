@@ -34,3 +34,9 @@ feelm:
   mail:
     # 테스트는 발송하지 않고 스파이 빈으로 토큰을 얻지만, 모드에 기본값이 없으므로 명시한다.
     mode: log
+  oauth:
+    # provider 호출은 테스트 대역이 대신하므로 자격 증명은 두지 않는다. 허용 목록(D-4)만
+    # 검증 대상이라 명시한다.
+    allowed-redirect-uris:
+      - https://feelm.app/oauth/callback
+      - https://feelm.app/oauth/link-callback
