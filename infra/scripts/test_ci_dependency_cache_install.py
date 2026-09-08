@@ -24,6 +24,8 @@ class CacheInstallTests(unittest.TestCase):
         self.assertIn("'ci222-owner-*.service'", source)
         self.assertIn('/usr/local/lib/feelm-ci222/gitlab/ci-dependency-cache.py',
                       installer.SUDOERS_TEXT)
+        self.assertIn('gitlab-runner ALL=(root) NOPASSWD:', installer.SUDOERS_TEXT)
+        self.assertNotIn('ubuntu ALL=(root) NOPASSWD:', installer.SUDOERS_TEXT)
 
 
 if __name__ == '__main__':

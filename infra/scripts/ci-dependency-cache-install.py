@@ -19,7 +19,7 @@ SERVICE = 'feelm-ci222-gitlab-runner.service'
 SUDOERS_TEXT = (
     'feelm-ci-test ALL=(root) NOPASSWD: /usr/bin/python3 -I -B '
     '/usr/local/lib/feelm-ci222/gitlab/ci-gitlab-job-adapter.py run\n'
-    'ubuntu ALL=(root) NOPASSWD: /usr/bin/python3 -I -B '
+    'gitlab-runner ALL=(root) NOPASSWD: /usr/bin/python3 -I -B '
     '/usr/local/lib/feelm-ci222/gitlab/ci-dependency-cache.py\n'
 )
 

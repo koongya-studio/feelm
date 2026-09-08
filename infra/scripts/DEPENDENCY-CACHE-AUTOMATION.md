@@ -44,9 +44,9 @@ sudo python3 <SERVER_STAGE>/scripts/ci-dependency-cache-install.py --confirm-upd
 ```
 
 GitLab의 `dependency-cache` environment를 Protected로 설정하고 인프라 담당자만 deploy 권한을
-갖게 한다. 이 프로젝트 설정 전에는 수동 캐시 Job을 실행하지 않는다. sudoers는 현재 서버의
-`e106-shell` Runner 계정인 `ubuntu`에 cache manager 한 명령만 허용한다. 계정이 다르면 임의로
-권한을 넓히지 말고 실제 Runner 사용자와 설치 내용을 다시 검토한다.
+갖게 한다. 이 프로젝트 설정 전에는 수동 캐시 Job을 실행하지 않는다. sudoers는 서버에서
+확인한 `e106-shell` Runner Job 계정인 `gitlab-runner`에 cache manager 한 명령만 허용한다.
+계정이 다르면 임의로 권한을 넓히지 말고 실제 Runner 사용자와 설치 내용을 다시 검토한다.
 
 ## 준비와 전환
 
