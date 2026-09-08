@@ -3,7 +3,9 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import stat
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -29,7 +31,7 @@ class ContextTests(unittest.TestCase):
             'CI_PROJECT_PATH': 's15-bigdata-dist-sub1/S15P21E106',
             'CACHE_ACTION': 'prepare', 'CACHE_MR_IID': '98',
             'CACHE_COMMIT_SHA': 'a' * 40, 'CI_JOB_TOKEN': 'x' * 24,
-            'CI_PIPELINE_ID': '123', 'CI_JOB_ID': '456',
+            'CI_PROJECT_ID': '1441379', 'CI_PIPELINE_ID': '123', 'CI_JOB_ID': '456',
         }
         value.update(changes)
         return value
@@ -49,11 +51,14 @@ class ContextTests(unittest.TestCase):
             context_module.context(self.environment(CACHE_COMMIT_SHA='main'))
         with self.assertRaises(ValueError):
             context_module.context(self.environment(CI_JOB_TOKEN='short'))
+        with self.assertRaises(ValueError):
+            context_module.context(self.environment(CI_PROJECT_ID='0'))
 
 
 class ManagerTests(unittest.TestCase):
     def context(self, action='prepare'):
-        return {'action': action, 'pipeline_id': 1, 'job_id': 2, 'mr_iid': 98,
+        return {'action': action, 'project_id': 1441379, 'pipeline_id': 1,
+                'job_id': 2, 'mr_iid': 98,
                 'revision': 'a' * 40, 'token': 'x' * 24}
 
     def test_stdin_context_is_exact_and_bounded(self):
@@ -76,6 +81,50 @@ class ManagerTests(unittest.TestCase):
                 {'old_path': 'backend/src/A.java', 'new_path': 'backend/src/A.java'}]]):
             with self.assertRaises(cache.PolicyError):
                 cache.verify_mr(self.context())
+
+    def test_current_job_and_root_operator_policy_are_verified(self):
+        job = {
+            'id': 2, 'name': 'backend-cache-prepare', 'stage': 'verify',
+            'status': 'running', 'ref': 'develop', 'source': 'web',
+            'pipeline': {'id': 1, 'project_id': 1441379, 'ref': 'develop',
+                         'sha': 'b' * 40},
+            'commit': {'id': 'b' * 40},
+            'user': {'id': 7, 'username': 'infra-user', 'state': 'active'},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            operators = Path(directory) / 'cache-operators.json'
+            operators.write_text(json.dumps({'usernames': ['infra-user']}))
+            operators.chmod(0o600)
+            trusted = SimpleNamespace(st_mode=stat.S_IFREG | 0o600, st_uid=0)
+            with patch.object(cache, 'OPERATORS', operators), \
+                 patch.object(Path, 'lstat', return_value=trusted), \
+                 patch.object(cache, 'api_json', return_value=job) as api:
+                self.assertEqual(cache.verify_job(self.context()), 'infra-user')
+            api.assert_called_once_with('job', 'x' * 24, None)
+            operators.write_text(json.dumps({'usernames': ['someone-else']}))
+            with patch.object(cache, 'OPERATORS', operators), \
+                 patch.object(Path, 'lstat', return_value=trusted), \
+                 patch.object(cache, 'api_json', return_value=job), \
+                 self.assertRaises(cache.PolicyError):
+                cache.verify_job(self.context())
+
+    def test_current_job_identity_must_match_requested_action(self):
+        job = {
+            'id': 2, 'name': 'backend-cache-promote', 'stage': 'verify',
+            'status': 'running', 'ref': 'develop', 'source': 'web',
+            'pipeline': {'id': 1, 'project_id': 1441379, 'ref': 'develop',
+                         'sha': 'b' * 40},
+            'commit': {'id': 'b' * 40},
+            'user': {'id': 7, 'username': 'infra-user', 'state': 'active'},
+        }
+        with patch.object(cache, 'api_json', return_value=job), \
+             self.assertRaises(cache.PolicyError):
+            cache.verify_job(self.context('prepare'))
+        wrong_project = self.context('promote')
+        wrong_project['project_id'] = 1
+        with patch.object(cache, 'api_json', return_value=job), \
+             self.assertRaises(cache.PolicyError):
+            cache.verify_job(wrong_project)
 
     def test_switch_restores_config_when_runner_restart_fails(self):
         old = {'gitlab_url': cache.GITLAB_URL, 'project_path': cache.PROJECT_PATH,

@@ -15,6 +15,13 @@ class CacheInstallTests(unittest.TestCase):
             self.assertEqual(installer.main(), 0)
             update.assert_not_called()
 
+    def test_operator_usernames_are_explicit_and_bounded(self):
+        self.assertEqual(installer.normalized_operators(['infra.user', 'infra.user']),
+                         ['infra.user'])
+        for values in ([], ['bad user'], ['x' * 65]):
+            with self.subTest(values=values), self.assertRaises(ValueError):
+                installer.normalized_operators(values)
+
     def test_installer_preserves_previous_versions_and_has_rollback(self):
         source = Path(installer.__file__).read_text()
         self.assertIn("'.previous-'", source)
@@ -26,6 +33,7 @@ class CacheInstallTests(unittest.TestCase):
                       installer.SUDOERS_TEXT)
         self.assertIn('gitlab-runner ALL=(root) NOPASSWD:', installer.SUDOERS_TEXT)
         self.assertNotIn('ubuntu ALL=(root) NOPASSWD:', installer.SUDOERS_TEXT)
+        self.assertLess(source.index("if active:"), source.index("prefix='.gitlab-ci271-'"))
 
 
 if __name__ == '__main__':

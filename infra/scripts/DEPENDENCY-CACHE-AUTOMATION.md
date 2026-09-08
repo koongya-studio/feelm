@@ -40,13 +40,17 @@ python infra/scripts/ci-server-pilot-stage.py --confirm-server-stage
 
 ```text
 sudo python3 <SERVER_STAGE>/scripts/ci-dependency-cache-install.py
-sudo python3 <SERVER_STAGE>/scripts/ci-dependency-cache-install.py --confirm-update
+sudo python3 <SERVER_STAGE>/scripts/ci-dependency-cache-install.py \
+  --confirm-update --operator-username <GitLab 사용자명>
 ```
 
-GitLab의 `dependency-cache` environment를 Protected로 설정하고 인프라 담당자만 deploy 권한을
-갖게 한다. 이 프로젝트 설정 전에는 수동 캐시 Job을 실행하지 않는다. sudoers는 서버에서
-확인한 `e106-shell` Runner Job 계정인 `gitlab-runner`에 cache manager 한 명령만 허용한다.
-계정이 다르면 임의로 권한을 넓히지 말고 실제 Runner 사용자와 설치 내용을 다시 검토한다.
+현재 GitLab 인스턴스에는 Protected Environments 설정이 없다. 설치기는 명시적으로 받은 GitLab
+사용자명을 root 소유 0600 `cache-operators.json`에 기록한다. cache manager는 Job Token의
+`GET /job` 응답으로 현재 Job ID와 이름, pipeline, 보호된 `develop`, web 실행과 실제 실행자를
+다시 확인하고 허용 목록의 사용자만 실행시킨다. pipeline variable의 `GITLAB_USER_*` 값은
+권한 판정에 사용하지 않는다. sudoers는 서버에서 확인한 `e106-shell` Runner Job 계정인
+`gitlab-runner`에 cache manager 한 명령만 허용한다. 계정이 다르면 임의로 권한을 넓히지 말고
+실제 Runner 사용자와 설치 내용을 다시 검토한다.
 
 ## 준비와 전환
 
@@ -59,8 +63,8 @@ CACHE_MR_IID=<MR 번호>
 CACHE_COMMIT_SHA=<현재 MR HEAD 40자리 SHA>
 ```
 
-생성된 pipeline에서 `backend-cache-prepare`를 인프라 담당자가 실행한다. 성공 로그에서 다음 값을
-검토한다.
+생성된 pipeline에서 `backend-cache-prepare`를 설치 시 등록한 GitLab 사용자가 실행한다. 등록되지
+않은 사용자가 Job을 실행하면 서버의 실행자 검사에서 거부한다. 성공 로그에서 다음 값을 검토한다.
 
 - `CACHE_DEPENDENCY_CHANGES`
 - `CACHE_CANDIDATE_VERIFIED`

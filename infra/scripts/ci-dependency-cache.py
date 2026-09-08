@@ -25,11 +25,13 @@ HERE = Path(__file__).resolve().parent
 GITLAB_URL = 'https://lab.ssafy.com'
 PROJECT_PATH = 's15-bigdata-dist-sub1/S15P21E106'
 PROJECT_API = urllib.parse.quote(PROJECT_PATH, safe='')
+PROJECT_ID = 1441379
 STATE = Path('/var/lib/feelm-ci271')
 ARCHIVES = Path('/home/feelm-ci-test/cache-archives')
 ADAPTER_CONFIG = Path('/etc/feelm-ci222/gitlab-adapter.json')
 RUNNER_SERVICE = 'feelm-ci222-gitlab-runner.service'
 LOCK = Path('/run/lock/feelm-ci271.lock')
+OPERATORS = HERE / 'cache-operators.json'
 MAX_JSON = 8 * 1024**2
 DEPENDENCY_FILES = {
     'backend/build.gradle', 'backend/build.gradle.kts',
@@ -75,10 +77,13 @@ def read_context(stream=None):
         value = json.loads(raw)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise PolicyError('Invalid CI context') from exc
-    if set(value) != {'action', 'pipeline_id', 'job_id', 'mr_iid', 'revision', 'token'}:
+    if set(value) != {'action', 'project_id', 'pipeline_id', 'job_id', 'mr_iid',
+                      'revision', 'token'}:
         raise PolicyError('Unexpected CI context fields')
     if value['action'] not in {'prepare', 'promote', 'rollback'}:
         raise PolicyError('Unsupported action')
+    if type(value['project_id']) is not int or value['project_id'] <= 0:
+        raise PolicyError('Invalid project identity')
     if type(value['pipeline_id']) is not int or value['pipeline_id'] <= 0:
         raise PolicyError('Invalid pipeline identity')
     if type(value['job_id']) is not int or value['job_id'] <= 0:
@@ -103,6 +108,43 @@ def api_json(path, token, opener=None):
     if len(raw) > MAX_JSON:
         raise RuntimeError('GitLab response exceeds policy limit')
     return json.loads(raw)
+
+
+def operator_usernames():
+    info = OPERATORS.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077:
+        raise PolicyError('Cache operator policy is not trusted root-owned state')
+    value = json.loads(OPERATORS.read_text())
+    usernames = value.get('usernames') if isinstance(value, dict) and set(value) == {'usernames'} else None
+    if (not isinstance(usernames, list) or not usernames or usernames != sorted(set(usernames))
+            or any(not isinstance(name, str) or not re.fullmatch(r'[A-Za-z0-9_.-]{1,64}', name)
+                   for name in usernames)):
+        raise PolicyError('Cache operator policy is invalid')
+    return set(usernames)
+
+
+def verify_job(context, opener=None):
+    job = api_json('job', context['token'], opener)
+    pipeline = job.get('pipeline') if isinstance(job, dict) else None
+    commit = job.get('commit') if isinstance(job, dict) else None
+    user = job.get('user') if isinstance(job, dict) else None
+    expected_name = 'backend-cache-' + context['action']
+    if (not isinstance(pipeline, dict) or not isinstance(commit, dict)
+            or not isinstance(user, dict)
+            or job.get('id') != context['job_id'] or job.get('name') != expected_name
+            or job.get('stage') != 'verify' or job.get('status') != 'running'
+            or job.get('ref') != 'develop' or job.get('source') != 'web'
+            or context['project_id'] != PROJECT_ID
+            or pipeline.get('id') != context['pipeline_id']
+            or pipeline.get('project_id') != context['project_id']
+            or pipeline.get('ref') != 'develop'
+            or not re.fullmatch(r'[0-9a-f]{40}', str(pipeline.get('sha', '')))
+            or commit.get('id') != pipeline.get('sha')
+            or type(user.get('id')) is not int or user['id'] <= 0
+            or user.get('state') != 'active'
+            or user.get('username') not in operator_usernames()):
+        raise PolicyError('Current GitLab job or cache operator is not authorized')
+    return user['username']
 
 
 def verify_mr(context, opener=None):
@@ -370,6 +412,8 @@ def main():
         print('CACHE_AUTOMATION_REJECTED: root stdin-only entry point required', file=sys.stderr)
         return 2
     context = read_context()
+    operator = verify_job(context)
+    print('CACHE_OPERATOR=' + operator)
     LOCK.parent.mkdir(parents=True, exist_ok=True)
     with LOCK.open('a+b') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)

@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 try:
     import pwd
 except ImportError:  # Windows unit-test collection only; install is Linux-only.
@@ -21,6 +22,7 @@ CONFIG = Path('/etc/feelm-ci222/gitlab-adapter.json')
 RUNNER_HOME = Path('/home/feelm-ci-test/gitlab-runner')
 UNIT = Path('/etc/systemd/system/feelm-ci222-gitlab-runner.service')
 SUDOERS = Path('/etc/sudoers.d/feelm-ci222-gitlab')
+OPERATORS = TARGET / 'cache-operators.json'
 SUDOERS_LINE = ('feelm-ci-test ALL=(root) NOPASSWD: /usr/bin/python3 -I -B '
                  '/usr/local/lib/feelm-ci222/gitlab/ci-gitlab-job-adapter.py run\n'
                  'gitlab-runner ALL=(root) NOPASSWD: /usr/bin/python3 -I -B '
@@ -77,9 +79,17 @@ def write_new(path, content, mode):
         output.write(content); output.flush(); os.fsync(output.fileno())
 
 
-def install():
+def normalized_operators(values):
+    result = sorted(set(values or []))
+    if not result or any(not re.fullmatch(r'[A-Za-z0-9_.-]{1,64}', name) for name in result):
+        raise ValueError('At least one valid cache operator username is required')
+    return result
+
+
+def install(operators):
     base, account = preflight()
     copy_scripts()
+    write_new(OPERATORS, json.dumps({'usernames': operators}, sort_keys=True) + '\n', 0o600)
     config = {'gitlab_url': 'https://lab.ssafy.com',
               'project_path': 's15-bigdata-dist-sub1/S15P21E106',
               'prepared_base': str(base)}
@@ -102,11 +112,12 @@ def install():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--confirm-install', action='store_true')
+    parser.add_argument('--operator-username', action='append', default=[])
     args = parser.parse_args()
     if not args.confirm_install:
         print('PLAN: create new GitLab adapter/config/Runner paths; no registration, token, start or enable')
         return 0
-    install()
+    install(normalized_operators(args.operator_username))
     return 0
 
 
