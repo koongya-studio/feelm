@@ -1,6 +1,9 @@
 import importlib.util
 import json
+import os
 from pathlib import Path
+import socket
+import tempfile
 import unittest
 from unittest.mock import Mock
 
@@ -88,6 +91,30 @@ class CommentTriggerTests(unittest.TestCase):
             with self.assertRaises(trigger.TriggerError):
                 app.handle("hook-secret", "Note Hook", json.dumps(event()).encode())
         self.assertEqual(client.verify_and_trigger.call_count, 2)
+
+    def test_prepares_only_owned_unix_socket_path(self):
+        if os.name == "nt":
+            self.skipTest("Unix socket is available on the review server")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "webhook.sock"
+            server = socket.socket(socket.AF_UNIX)
+            server.bind(str(path))
+            server.close()
+            trigger.prepare_socket(path)
+            self.assertFalse(path.exists())
+
+            path.write_text("not a socket", encoding="utf-8")
+            with self.assertRaises(trigger.TriggerError) as raised:
+                trigger.prepare_socket(path)
+            self.assertEqual(raised.exception.code, "UNSAFE_SOCKET_PATH")
+
+    def test_nginx_proxies_exact_path_to_mounted_socket(self):
+        root = Path(__file__).parents[2]
+        nginx = (root / "infra/nginx/nginx.conf").read_text(encoding="utf-8")
+        compose = (root / "infra/compose/service.yml").read_text(encoding="utf-8")
+        self.assertIn("location = /hooks/gitlab/claude-review", nginx)
+        self.assertIn("proxy_pass http://unix:/run/feelm-claude-review/webhook.sock:", nginx)
+        self.assertIn("/run/feelm-claude-review:/run/feelm-claude-review:ro", compose)
 
 
 if __name__ == "__main__":

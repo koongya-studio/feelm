@@ -4,11 +4,13 @@
 from __future__ import annotations
 
 import hmac
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler
 import json
 import os
 from pathlib import Path
 import re
+import socketserver
+import stat
 import threading
 import time
 from urllib.error import HTTPError, URLError
@@ -22,6 +24,7 @@ MIN_ACCESS_LEVEL = 30
 COOLDOWN_SECONDS = 300
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 TRIGGER_PATH = "/hooks/gitlab/claude-review"
+SOCKET_PATH = Path("/run/feelm-claude-review/webhook.sock")
 
 
 class TriggerError(RuntimeError):
@@ -47,7 +50,7 @@ class GitLabClient:
             headers["Content-Type"] = "application/json"
         request = Request(self.api_url + path, data=body, headers=headers, method=method)
         try:
-            with self.opener(request, timeout=20) as response:
+            with self.opener(request, timeout=3) as response:
                 raw = response.read(MAX_REQUEST_BYTES + 1)
                 if len(raw) > MAX_REQUEST_BYTES:
                     raise TriggerError("GITLAB_RESPONSE_TOO_LARGE", 502)
@@ -184,6 +187,24 @@ class Handler(BaseHTTPRequestHandler):
         return
 
 
+UnixStreamServer = getattr(socketserver, "UnixStreamServer", socketserver.TCPServer)
+
+
+class ThreadingUnixHTTPServer(socketserver.ThreadingMixIn, UnixStreamServer):
+    daemon_threads = True
+    application: TriggerApplication
+
+
+def prepare_socket(path: Path) -> None:
+    try:
+        details = path.lstat()
+    except FileNotFoundError:
+        return
+    if not stat.S_ISSOCK(details.st_mode) or details.st_uid != os.getuid():
+        raise TriggerError("UNSAFE_SOCKET_PATH", 500)
+    path.unlink()
+
+
 def credential(name: str) -> str:
     directory = os.environ.get("CREDENTIALS_DIRECTORY", "")
     try:
@@ -198,17 +219,26 @@ def credential(name: str) -> str:
 def main() -> None:
     try:
         project_id = int(os.environ.get("CLAUDE_REVIEW_PROJECT_ID", ""))
-        port = int(os.environ.get("CLAUDE_REVIEW_WEBHOOK_PORT", "8765"))
     except ValueError:
         raise SystemExit("COMMENT_TRIGGER: INVALID_CONFIG") from None
-    if project_id <= 0 or not 1024 <= port <= 65535:
+    if project_id <= 0:
         raise SystemExit("COMMENT_TRIGGER: INVALID_CONFIG")
     webhook_token = credential("webhook-token")
     api_token = credential("gitlab-api-token")
     client = GitLabClient(os.environ.get("CLAUDE_REVIEW_GITLAB_API_URL", ""), project_id, api_token)
-    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    server.application = TriggerApplication(project_id, webhook_token, client)  # type: ignore[attr-defined]
-    server.serve_forever()
+    prepare_socket(SOCKET_PATH)
+    server = ThreadingUnixHTTPServer(str(SOCKET_PATH), Handler)
+    SOCKET_PATH.chmod(0o666)
+    server.application = TriggerApplication(project_id, webhook_token, client)
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
+        try:
+            if SOCKET_PATH.exists() and stat.S_ISSOCK(SOCKET_PATH.lstat().st_mode):
+                SOCKET_PATH.unlink()
+        except OSError:
+            pass
 
 
 if __name__ == "__main__":
