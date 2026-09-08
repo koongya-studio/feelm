@@ -13,8 +13,9 @@
  *
  * `[?]` `나중에 평가하기`가 어디로 가는지는 미확정이다. 이 화면으로 온 경로가 영화 상세든
  * 감상 확인이든 되돌아가는 것이 자연스러워 뒤로 가기로 두었다.
- * `[?]` 감상 정보(`6월 2일 · 넷플릭스에서 시청`)는 감상 기록이 없으면 표시하지 않는다.
- * API-043의 `watchRecord`는 `null`일 수 있다.
+ * 감상 정보(`6월 2일 · 넷플릭스에서 시청`)는 감상 기록 목록(API-034)에서 읽는다. 2.4-A에서
+ * `봤어요`를 고른 기록의 `watchedAt`과 `ott`를 쓰므로 실제로 이동한 OTT가 나온다
+ * (업무 -263). 2.4에서 바로 들어와 감상 기록이 없으면 이 줄을 표시하지 않는다.
  */
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
@@ -25,8 +26,10 @@ import RatingInput from '../../../components/RatingInput';
 import TextArea from '../../../components/TextArea';
 import { ChevronLeftIcon } from '../../../components/Icon';
 import { getMovieDetail } from '../../../api/movies';
-import { createRating, getCountsBeforeRating } from '../../../api/watch';
+import { getOtts } from '../../../api/otts';
+import { createRating, getCountsBeforeRating, getWatchRecords } from '../../../api/watch';
 import { path } from '../../../routes/paths';
+import { formatMonthDay } from '../../../utils/date';
 import styles from './MovieRatingPage.module.css';
 import type { MovieDetail } from '../../../types/movie';
 
@@ -37,6 +40,8 @@ export default function MovieRatingPage() {
   const id = Number(movieId);
 
   const [movie, setMovie] = useState<MovieDetail | null>(null);
+  /** 2.5의 감상 정보 줄. 감상을 확인한 기록이 없으면 null */
+  const [watchNote, setWatchNote] = useState<string | null>(null);
   const [score, setScore] = useState(0);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -50,6 +55,25 @@ export default function MovieRatingPage() {
         setScore(detail.myRating?.score ?? 0);
         setComment(detail.myRating?.comment ?? '');
       }
+    });
+
+    void Promise.all([getWatchRecords(), getOtts()]).then(([records, otts]) => {
+      // 목록은 최근 순이므로 가장 최근에 감상을 확인한 기록을 쓴다
+      const record = records.items.find(
+        (item) => item.movie.movieId === id && item.watchedAt !== null,
+      );
+
+      if (!active || !record?.watchedAt) {
+        return;
+      }
+
+      const ottName = otts.find((ott) => ott.ottId === record.ott.ottId)?.name;
+
+      setWatchNote(
+        ottName
+          ? `${formatMonthDay(record.watchedAt)} · ${ottName}에서 시청`
+          : formatMonthDay(record.watchedAt),
+      );
     });
 
     return () => {
@@ -109,6 +133,7 @@ export default function MovieRatingPage() {
           <p className={styles.movieTitle}>{movie.title}</p>
           <p className={styles.movieMeta}>{meta}</p>
           {/* 감상 기록이 없으면 이 줄을 표시하지 않는다 */}
+          {watchNote ? <p className={styles.movieMeta}>{watchNote}</p> : null}
         </div>
       </div>
 

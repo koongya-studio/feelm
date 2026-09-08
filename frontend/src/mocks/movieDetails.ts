@@ -46,14 +46,17 @@ const ottMaster: Record<string, { ottId: number; name: string }> = {
 /*
  * `watchUrl`은 목업에 실제 주소를 두지 않는다. 화면은 주소가 없으면 외부로 이동하지 않고
  * OTT 링크 클릭만 기록한다(API-033). 실제 주소는 연동 단계에서 채워진다.
+ *
+ * `subscribed`는 여기서 정하지 않는다. 사용자가 1.2에서 고른 구독 목록에 따라 달라지므로
+ * api/movies.ts가 API-026 값으로 채우고 구독 중인 OTT를 앞으로 옮긴다(FR-16, 업무 -263).
  */
-function ottProviders(codes: string[], subscribed: string[]) {
+function ottProviders(codes: string[]) {
   return codes.map((code) => ({
     ottId: ottMaster[code].ottId,
     code,
     name: ottMaster[code].name,
     watchUrl: null,
-    subscribed: subscribed.includes(code),
+    subscribed: false,
   }));
 }
 
@@ -70,8 +73,7 @@ const detailExtras: Record<number, DetailExtras> = {
     ],
     ratingCount: 1280,
     flavorCode: 'FLAVOR_CAPER',
-    // 구독 중인 OTT를 앞에 둔다(FR-16). 1.2 목업 선택과 무관하게 이 화면의 예시 값이다
-    ottProviders: ottProviders(['NETFLIX', 'WAVVE'], ['NETFLIX']),
+    ottProviders: ottProviders(['NETFLIX', 'WAVVE']),
     myRating: null,
     myWatchStatus: null,
   },
@@ -82,7 +84,7 @@ const detailExtras: Record<number, DetailExtras> = {
     cast: [{ personId: 9012, name: '배우 B1' }],
     ratingCount: 640,
     flavorCode: 'FLAVOR_THRILL',
-    ottProviders: ottProviders(['WAVVE'], []),
+    ottProviders: ottProviders(['WAVVE']),
     myRating: null,
     myWatchStatus: null,
   },
@@ -93,7 +95,7 @@ const detailExtras: Record<number, DetailExtras> = {
     cast: [{ personId: 9022, name: '배우 C1' }],
     ratingCount: 410,
     flavorCode: 'FLAVOR_NOIR',
-    ottProviders: ottProviders(['TVING', 'WAVVE'], ['TVING']),
+    ottProviders: ottProviders(['TVING', 'WAVVE']),
     myRating: null,
     myWatchStatus: null,
   },
@@ -115,7 +117,7 @@ const detailExtras: Record<number, DetailExtras> = {
     cast: [{ personId: 9032, name: '배우 D1' }],
     ratingCount: 520,
     flavorCode: 'FLAVOR_CRIME',
-    ottProviders: ottProviders(['NETFLIX'], ['NETFLIX']),
+    ottProviders: ottProviders(['NETFLIX']),
     myRating: mockMyRatings[401],
     myWatchStatus: 'RATED',
   },
@@ -126,7 +128,7 @@ const detailExtras: Record<number, DetailExtras> = {
     cast: [{ personId: 9042, name: '배우 E1' }],
     ratingCount: 980,
     flavorCode: 'FLAVOR_CAPER',
-    ottProviders: ottProviders(['NETFLIX'], ['NETFLIX']),
+    ottProviders: ottProviders(['NETFLIX']),
     myRating: mockMyRatings[402],
     myWatchStatus: 'RATED',
   },
@@ -137,7 +139,7 @@ const detailExtras: Record<number, DetailExtras> = {
     cast: [{ personId: 9052, name: '배우 F1' }],
     ratingCount: 310,
     flavorCode: 'FLAVOR_NOIR',
-    ottProviders: ottProviders(['TVING'], ['TVING']),
+    ottProviders: ottProviders(['TVING']),
     myRating: mockMyRatings[403],
     myWatchStatus: 'RATED',
   },

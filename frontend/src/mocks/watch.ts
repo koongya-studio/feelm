@@ -8,7 +8,10 @@
  * mocks/user.ts · mocks/frames.ts · mocks/popcornBucket.ts의 100이고, 현재 수치는
  * 거기에 이번 세션의 평가를 더해 계산한다.
  */
-import type { Rating, WatchConfirmResult, WatchRecord } from '../types/watch';
+import { findMockMovie } from './movies';
+import { mockOtts } from './otts';
+import type { StoredWatchRecord } from './sessionStore';
+import type { Rating, WatchConfirmResult, WatchRecordListItem } from '../types/watch';
 import type { Visibility } from '../types/enums';
 
 /**
@@ -21,21 +24,49 @@ let nextWatchRecordId = 5001;
 let nextRatingId = 91;
 let nextFrameId = 77;
 
-export function createMockWatchRecord(movieId: number): WatchRecord {
-  const now = new Date();
+/** 클릭 시각 기준의 감상 확인 시점 · 만료 시점 (API-033 응답 예시: 2일 · 7일) */
+export function mockWatchDeadlines(clickedAt: Date) {
   const addDays = (days: number) =>
-    new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+    new Date(clickedAt.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
 
+  return { clickedAt: clickedAt.toISOString(), confirmDueAt: addDays(2), expiresAt: addDays(7) };
+}
+
+export function createMockWatchRecord(movieId: number, ottId: number): StoredWatchRecord {
   nextWatchRecordId += 1;
 
   return {
     watchRecordId: nextWatchRecordId,
     movieId,
     status: 'LINK_CLICKED',
-    clickedAt: now.toISOString(),
-    // 클릭 2일 후 감상 확인, 7일 후 만료 (API-033 응답 예시)
-    confirmDueAt: addDays(2),
-    expiresAt: addDays(7),
+    ...mockWatchDeadlines(new Date()),
+    ottId,
+    watchedAt: null,
+    ratingId: null,
+  };
+}
+
+/**
+ * 저장소의 기록을 API-034 목록 항목 모양으로 만든다.
+ *
+ * 영화 표시값은 mocks/movies.ts 한 곳에서만 오고(frontend-structure.md 7.3),
+ * OTT는 기준정보(mocks/otts.ts)에서 코드를 찾는다. 계약의 `ott`에는 `ottId`와 `code`만
+ * 있어 표시명은 화면이 API-025로 따로 조회한다.
+ */
+export function toMockWatchRecordListItem(record: StoredWatchRecord): WatchRecordListItem {
+  const movie = findMockMovie(record.movieId);
+  const ott = mockOtts.find((candidate) => candidate.ottId === record.ottId);
+
+  return {
+    watchRecordId: record.watchRecordId,
+    movie: { movieId: movie.movieId, title: movie.title, posterUrl: movie.posterUrl },
+    status: record.status,
+    ott: { ottId: record.ottId, code: ott?.code ?? '' },
+    clickedAt: record.clickedAt,
+    confirmDueAt: record.confirmDueAt,
+    expiresAt: record.expiresAt,
+    watchedAt: record.watchedAt,
+    ratingId: record.ratingId,
   };
 }
 

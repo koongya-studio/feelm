@@ -8,26 +8,55 @@
  */
 import {
   addWatchRecord,
-  findWatchRecord,
+  findLatestWatchRecordByMovie,
   getRatings,
+  getWatchRecords as getStoredWatchRecords,
   saveRating,
   updateWatchRecord,
 } from '../mocks/sessionStore';
-import { BASE_WEEKLY_FRAME_DELTA, createMockRating, createMockWatchRecord } from '../mocks/watch';
+import {
+  BASE_WEEKLY_FRAME_DELTA,
+  createMockRating,
+  createMockWatchRecord,
+  mockWatchDeadlines,
+  toMockWatchRecordListItem,
+} from '../mocks/watch';
 import { getMyFrameCount, getMyPopcornCount } from './taste';
-import { respond, respondError } from './mockTransport';
-import type { Rating, RatingInputValue, WatchConfirmResult, WatchRecord } from '../types/watch';
+import { respond } from './mockTransport';
+import type {
+  Rating,
+  RatingInputValue,
+  WatchConfirmResult,
+  WatchRecord,
+  WatchRecordList,
+} from '../types/watch';
 
 /**
  * API-033 OTT 링크 클릭 기록 · POST /api/v1/movies/{movieId}/ott-clicks
  *
  * 링크 클릭은 감상 확정이 아니며 프레임을 만들지 않는다. 클라이언트는 응답과 무관하게
  * 외부 시청 페이지를 열지만, 목업에는 실제 주소가 없어 이 단계에서는 열지 않는다.
+ *
+ * 같은 영화를 다시 누를 때의 처리 규칙도 계약을 따른다(API-033).
+ * `LINK_CLICKED` 기록이 있으면 시각만 갱신하고, 이미 `WATCHED_UNRATED` · `RATED`이면
+ * 상태를 바꾸지 않고 기존 기록을 돌려준다. `EXPIRED`면 새 기록을 만든다.
  */
 export async function recordOttClick(movieId: number, ottId: number): Promise<WatchRecord> {
-  void ottId;
+  const existing = findLatestWatchRecordByMovie(movieId);
 
-  const record = createMockWatchRecord(movieId);
+  if (existing && existing.status !== 'EXPIRED') {
+    const patch =
+      existing.status === 'LINK_CLICKED'
+        ? { ...mockWatchDeadlines(new Date()), ottId }
+        : // 감상이 확정된 기록은 상태도 시각도 건드리지 않는다
+          {};
+
+    updateWatchRecord(existing.watchRecordId, patch);
+
+    return respond({ ...existing, ...patch });
+  }
+
+  const record = createMockWatchRecord(movieId, ottId);
 
   addWatchRecord(record);
 
@@ -35,20 +64,20 @@ export async function recordOttClick(movieId: number, ottId: number): Promise<Wa
 }
 
 /**
- * 2.4-A가 표시할 감상 기록 조회.
+ * API-034 감상 기록 목록 · GET /api/v1/watch-records
  *
- * 계약에 단건 조회 API가 없다. 2.4-A는 지금까지 목업 값을 새로 만들어 썼는데, 세션
- * 저장소가 생기면서 실제로 만들어진 기록을 읽을 수 있게 됐다. 대응 API가 정해지면
- * 이 함수만 교체한다.
+ * 정렬은 계약의 처리 규칙대로 `clickedAt` 내림차순, 같으면 `watchRecordId` 내림차순이다.
+ * 2.4-A가 URL의 기록을 찾고, 2.5가 감상 정보 줄(`9월 8일 · 티빙에서 시청`)을 만들 때 쓴다.
+ *
+ * 계약의 `status` · `confirmDue` · `cursor` · `size`는 구현하지 않았다. 이 값들이 필요한
+ * 화면(8.1 알림 · 7.7 평가하지 않은 영화)은 이번 범위 밖이다.
  */
-export async function getWatchRecord(watchRecordId: number): Promise<WatchRecord> {
-  const record = findWatchRecord(watchRecordId);
+export async function getWatchRecords(): Promise<WatchRecordList> {
+  const items = getStoredWatchRecords()
+    .map(toMockWatchRecordListItem)
+    .sort((a, b) => b.clickedAt.localeCompare(a.clickedAt) || b.watchRecordId - a.watchRecordId);
 
-  if (!record) {
-    return respondError(404, 'RESOURCE_NOT_FOUND', '감상 기록을 찾을 수 없습니다.');
-  }
-
-  return respond(record);
+  return respond({ items, nextCursor: null, hasNext: false });
 }
 
 /**
@@ -62,8 +91,7 @@ export async function confirmWatch(
   const status = watched ? 'WATCHED_UNRATED' : 'EXPIRED';
   const watchedAt = watched ? new Date().toISOString() : null;
 
-  // API-033 응답에는 `watchedAt`이 없다. 기록에는 상태만 반영한다
-  updateWatchRecord(watchRecordId, { status });
+  updateWatchRecord(watchRecordId, { status, watchedAt });
 
   return respond({ watchRecordId, status, watchedAt });
 }
@@ -92,6 +120,17 @@ export async function createRating(
   );
 
   saveRating(rating);
+
+  /*
+   * 감상 기록과 평가는 1:1로 이어진다(erd.md). OTT 링크를 눌러 들어온 흐름이면 그
+   * 기록을 `RATED`로 옮기고 평가 번호를 붙여, API-034 목록에서 평가 완료로 보이게 한다.
+   * 2.4에서 바로 평가한 경우에는 기록이 없어 아무 것도 하지 않는다.
+   */
+  const record = findLatestWatchRecordByMovie(movieId);
+
+  if (record && record.status !== 'EXPIRED') {
+    updateWatchRecord(record.watchRecordId, { status: 'RATED', ratingId: rating.ratingId });
+  }
 
   return respond(rating);
 }

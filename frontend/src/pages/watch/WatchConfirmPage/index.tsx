@@ -11,46 +11,74 @@
  * 벗어나면 상태가 `LINK_CLICKED`로 남고 7일 뒤 서버가 `EXPIRED`로 바꾸므로, 그 의도는
  * 기본 동작이 대신한다. 하단 안내 문구도 두 선택지에 맞춰 줄였다.
  *
- * 어느 영화의 기록인지는 감상 기록에서 읽는다. 세션 저장소가 생기면서 2.4에서 만든
- * 기록을 그대로 찾을 수 있게 됐다(업무 -262). URL로 직접 들어와 기록이 없으면 첫 추천
- * 영화를 보여준다.
+ * 어느 영화의 어느 OTT 기록인지는 감상 기록 목록(API-034)에서 읽는다. 2.4에서 OTT
+ * 링크를 누를 때 남은 기록을 그대로 찾으므로, 실제로 누른 OTT가 문구에 나온다
+ * (업무 -263). URL로 직접 들어와 기록이 없으면 첫 추천 영화를 보여준다.
  *
- * `[?]` 계약에 감상 기록 단건 조회 API가 없다. `getWatchRecord`는 그 자리를 메우는
- * 임시 함수이며 대응 API(API-034 계열)가 정해지면 교체한다.
+ * 계약에 단건 조회 API는 없고 목록만 있어(API-034) 목록에서 번호로 찾는다.
  */
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import Poster from '../../../components/Poster';
-import { confirmWatch, getWatchRecord } from '../../../api/watch';
+import { confirmWatch, getWatchRecords } from '../../../api/watch';
 import { getMovieDetail } from '../../../api/movies';
+import { getOtts } from '../../../api/otts';
 import { path } from '../../../routes/paths';
 import { directionParticle } from '../../../utils/korean';
 import styles from './WatchConfirmPage.module.css';
-import type { MovieDetail } from '../../../types/movie';
 
 /** 기록을 찾지 못했을 때 보여줄 영화 (URL 직접 접근) */
 const FALLBACK_MOVIE_ID = 101;
+
+/** 이 화면이 표시하는 값 */
+type ConfirmView = {
+  movieId: number;
+  title: string;
+  posterUrl: string | null;
+  /** 실제로 이동한 OTT의 표시명. 표시명은 계약상 API-025에만 있다 */
+  ottName: string;
+};
+
+async function loadConfirmView(watchRecordId: number): Promise<ConfirmView> {
+  const [records, otts] = await Promise.all([getWatchRecords(), getOtts()]);
+  const record = records.items.find((item) => item.watchRecordId === watchRecordId);
+
+  if (record) {
+    return {
+      movieId: record.movie.movieId,
+      title: record.movie.title,
+      posterUrl: record.movie.posterUrl,
+      ottName: otts.find((ott) => ott.ottId === record.ott.ottId)?.name ?? 'OTT',
+    };
+  }
+
+  // 기록 없이 URL로 들어온 경우
+  const detail = await getMovieDetail(FALLBACK_MOVIE_ID);
+
+  return {
+    movieId: detail.movieId,
+    title: detail.title,
+    posterUrl: detail.posterUrl,
+    ottName: detail.ottProviders[0]?.name ?? 'OTT',
+  };
+}
 
 export default function WatchConfirmPage() {
   const { watchRecordId } = useParams();
   const navigate = useNavigate();
 
-  const [movie, setMovie] = useState<MovieDetail | null>(null);
+  const [movie, setMovie] = useState<ConfirmView | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     let active = true;
 
-    void getWatchRecord(Number(watchRecordId))
-      .then((record) => record.movieId)
-      .catch(() => FALLBACK_MOVIE_ID)
-      .then((movieId) => getMovieDetail(movieId))
-      .then((detail) => {
-        if (active) {
-          setMovie(detail);
-        }
-      });
+    void loadConfirmView(Number(watchRecordId)).then((view) => {
+      if (active) {
+        setMovie(view);
+      }
+    });
 
     return () => {
       active = false;
@@ -75,8 +103,6 @@ export default function WatchConfirmPage() {
     return null;
   }
 
-  const ottName = movie.ottProviders[0]?.name ?? 'OTT';
-
   return (
     <div className={styles.page}>
       <Poster width={120} height={168} radius={10} src={movie.posterUrl ?? undefined} title="" />
@@ -85,8 +111,8 @@ export default function WatchConfirmPage() {
         <p className={styles.title}>{movie.title}</p>
         {/* OTT 이름이 API-025 값이라 조사를 받침에 맞춰 고른다 (`티빙으로` · `웨이브로`) */}
         <p className={styles.note}>
-          {ottName}
-          {directionParticle(ottName)} 이동한 지 2일이 지났어요
+          {movie.ottName}
+          {directionParticle(movie.ottName)} 이동한 지 2일이 지났어요
         </p>
       </div>
 
