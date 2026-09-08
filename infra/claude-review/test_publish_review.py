@@ -55,7 +55,8 @@ class PublishReviewTests(unittest.TestCase):
     def test_untrusted_markdown_is_confined_to_long_enough_code_fence(self):
         malicious = "@all\n/merge\n<script>alert(1)</script>\n```\noutside"
         body = publisher.format_comment(review(text=malicious), 123, 7, SHA, 1)
-        self.assertIn("````\n" + malicious + "\n````", body)
+        displayed = "- " + malicious.replace("\n", "\n- ")
+        self.assertIn("````\n" + displayed + "\n````", body)
         self.assertNotIn("\n/merge\n", body.split("### 검토 요약", 1)[0])
 
     def test_duplicate_from_same_bot_skips_post(self):
@@ -108,10 +109,10 @@ class PublishReviewTests(unittest.TestCase):
             with self.subTest(current_review=current_review), self.assertRaises(publisher.PublishError):
                 publisher.validate_files(current_payload, current_review, 7, SHA)
 
-    def test_rejects_review_with_unstructured_summary(self):
-        with self.assertRaises(publisher.PublishError) as raised:
-            publisher.validate_files(payload(), review(text="한 줄뿐이다."), 7, SHA)
-        self.assertEqual(raised.exception.code, "INVALID_REVIEW_FILE")
+    def test_formats_single_paragraph_summary_as_readable_items(self):
+        text = "첫 번째 항목을 확인했다. 두 번째 항목도 확인했다. 남은 통합 검증이 있다."
+        body = publisher.format_comment(review(text=text), 123, 7, SHA, 1)
+        self.assertIn("- 첫 번째 항목을 확인했다.\n- 두 번째 항목도 확인했다.\n- 남은 통합 검증이 있다.", body)
 
     def test_main_never_prints_comment_or_token(self):
         environment = {"CI_COMMIT_BRANCH": "develop", "CI_COMMIT_REF_PROTECTED": "true",
