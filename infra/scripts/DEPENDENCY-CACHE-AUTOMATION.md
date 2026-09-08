@@ -46,8 +46,10 @@ sudo python3 <SERVER_STAGE>/scripts/ci-dependency-cache-install.py \
 
 현재 GitLab 인스턴스에는 Protected Environments 설정이 없다. 설치기는 명시적으로 받은 GitLab
 사용자명을 root 소유 0600 `cache-operators.json`에 기록한다. cache manager는 Job Token의
-`GET /job` 응답으로 현재 Job ID와 이름, pipeline, 보호된 `develop`, web 실행과 실제 실행자를
-다시 확인하고 허용 목록의 사용자만 실행시킨다. pipeline variable의 `GITLAB_USER_*` 값은
+`GET /job` 응답으로 현재 Job ID와 이름, pipeline, 보호된 `develop`과 실제 실행자를 다시 확인하고
+허용 목록의 사용자만 실행시킨다. web pipeline 여부는 CI 규칙과 고정 context가 각각 확인한다.
+GitLab 버전에 따라 제공되지 않는 Job `source` 속성은 서버 권한 판정에 사용하지 않는다.
+pipeline variable의 `GITLAB_USER_*` 값은
 권한 판정에 사용하지 않는다. sudoers는 서버에서 확인한 `e106-shell` Runner Job 계정인
 `gitlab-runner`에 cache manager 한 명령만 허용한다. 계정이 다르면 임의로 권한을 넓히지 말고
 실제 Runner 사용자와 설치 내용을 다시 검토한다.

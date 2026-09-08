@@ -85,7 +85,7 @@ class ManagerTests(unittest.TestCase):
     def test_current_job_and_root_operator_policy_are_verified(self):
         job = {
             'id': 2, 'name': 'backend-cache-prepare', 'stage': 'verify',
-            'status': 'running', 'ref': 'develop', 'source': 'web',
+            'status': 'running', 'ref': 'develop',
             'pipeline': {'id': 1, 'project_id': 1441379, 'ref': 'develop',
                          'sha': 'b' * 40},
             'commit': {'id': 'b' * 40},
@@ -111,7 +111,7 @@ class ManagerTests(unittest.TestCase):
     def test_current_job_identity_must_match_requested_action(self):
         job = {
             'id': 2, 'name': 'backend-cache-promote', 'stage': 'verify',
-            'status': 'running', 'ref': 'develop', 'source': 'web',
+            'status': 'running', 'ref': 'develop',
             'pipeline': {'id': 1, 'project_id': 1441379, 'ref': 'develop',
                          'sha': 'b' * 40},
             'commit': {'id': 'b' * 40},
