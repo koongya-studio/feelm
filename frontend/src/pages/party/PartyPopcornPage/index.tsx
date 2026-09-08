@@ -22,6 +22,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import ScreenHeader from '../../../components/ScreenHeader';
+import StatusView from '../../../components/StatusView';
 import { ChevronDownIcon, ChevronUpIcon } from '../../../components/Icon';
 import { getMyParties, getPartyPopcorn } from '../../../api/parties';
 import { getMyProfile } from '../../../api/users';
@@ -54,6 +55,7 @@ export default function PartyPopcornPage() {
   const [flavors, setFlavors] = useState<PopcornFlavor[]>([]);
   const [expanded, setExpanded] = useState<number[]>([]);
   const [failed, setFailed] = useState(false);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -73,19 +75,24 @@ export default function PartyPopcornPage() {
         }
       });
 
-    void getMyParties().then((parties) => {
-      if (active) {
-        setPartyName(parties.find((party) => party.partyId === id)?.name ?? '');
-      }
-    });
+    // 아래 세 가지는 실패해도 본문을 막지 않는다. 이름 · `나` 표시 · 맛 이름만 비워진다
+    getMyParties()
+      .then((parties) => {
+        if (active) {
+          setPartyName(parties.find((party) => party.partyId === id)?.name ?? '');
+        }
+      })
+      .catch(() => undefined);
 
-    void getMyProfile().then((profile) => {
-      if (active) {
-        setMyUserId(profile.userId);
-      }
-    });
+    getMyProfile()
+      .then((profile) => {
+        if (active) {
+          setMyUserId(profile.userId);
+        }
+      })
+      .catch(() => undefined);
 
-    void getPopcornFlavors().then((value) => {
+    getPopcornFlavors().then((value) => {
       if (active) {
         setFlavors(value);
       }
@@ -94,7 +101,7 @@ export default function PartyPopcornPage() {
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, reloadCount]);
 
   function toggle(userId: number) {
     setExpanded((current) =>
@@ -103,11 +110,23 @@ export default function PartyPopcornPage() {
   }
 
   if (failed) {
-    // 오류 화면은 상태 UI 업무(S15P21E106-264) 범위다. 여기서는 최소 안내만 둔다
     return (
       <>
         <ScreenHeader title="파티원 팝콘 한눈에 보기" showBack />
-        <p className={styles.notFound}>파티를 찾을 수 없습니다.</p>
+
+        <StatusView
+          title="파티 정보를 불러오지 못했어요"
+          description="주소가 잘못되었거나 잠시 문제가 생겼어요"
+        >
+          <Button
+            onClick={() => {
+              setFailed(false);
+              setReloadCount((count) => count + 1);
+            }}
+          >
+            다시 시도
+          </Button>
+        </StatusView>
       </>
     );
   }

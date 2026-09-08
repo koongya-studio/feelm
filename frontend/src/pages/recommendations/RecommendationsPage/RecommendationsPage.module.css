@@ -173,78 +173,7 @@
   text-decoration: none;
 }
 
-/* 2.2-A 추천을 불러오지 못한 경우 */
-.errorArea {
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 0 34px;
-}
-
-.errorMark {
-  position: relative;
-  display: flex;
-  width: 76px;
-  height: 56px;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--color-nav-inactive);
-  border-radius: 8px;
-  color: var(--color-nav-inactive);
-  font-size: 26px;
-  font-weight: 800;
-}
-
-/* 필름 구멍 표현 */
-.errorMarkStrip {
-  position: absolute;
-  right: 0;
-  left: 0;
-  height: 5px;
-  background: repeating-linear-gradient(
-    90deg,
-    var(--color-nav-inactive) 0 6px,
-    transparent 6px 13px
-  );
-}
-
-.errorMarkStrip[data-edge='top'] {
-  top: 4px;
-}
-
-.errorMarkStrip[data-edge='bottom'] {
-  bottom: 4px;
-}
-
-.errorText {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  text-align: center;
-}
-
-.errorTitle {
-  font-size: 17px;
-  font-weight: 700;
-}
-
-.errorHint {
-  color: var(--color-ink-faint);
-  font-size: 13px;
-  line-height: 1.6;
-}
-
-.errorActions {
-  display: flex;
-  width: 100%;
-  flex-direction: column;
-  gap: 9px;
-}
-
+/* 2.2-A · 빈 데이터 안내의 보조 동작. 이동이라 Button이 아니라 링크다 */
 .searchLink {
   display: flex;
   height: var(--control-height);

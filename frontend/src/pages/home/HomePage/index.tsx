@@ -13,13 +13,19 @@
  * 범위 밖 화면으로 가는 이동(알림 8.1 · 취향 리포트 3.4 · 파티 5.1 · OTT 추천 EXT-01)은
  * 라우트가 없으므로 링크를 걸지 않는다. 자리와 문구만 와이어프레임대로 둔다.
  *
- * `[?]` 각 섹션의 로딩 · 빈 데이터 상태는 상태 UI 업무(S15P21E106-264)에서 정의한다.
- * 지금은 데이터를 받기 전에 아무것도 그리지 않고, 실패한 섹션은 표시하지 않는다.
+ * 섹션마다 따로 불러온다. 한 번에 `Promise.all`로 받으면 한 섹션이 실패할 때 홈 전체가
+ * 사라진다. **실패한 섹션만 안내로 바뀌고 나머지는 그대로 보인다**(업무 -264).
+ * 데이터가 비어 있을 때의 문구도 여기서 정한다(`screen-spec.md` 2.1 미확정 항목).
+ *
+ * 로딩 표시는 만들지 않는다. 데이터를 받기 전에는 아무것도 그리지 않는다
+ * (팀 결정 2026-09-08). `?mockDelay=800`으로 그 동작을 확인할 수 있다.
  */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import IconButton from '../../../components/IconButton';
 import Section from '../../../components/Section';
+import StatusView from '../../../components/StatusView';
+import Button from '../../../components/Button';
 import ScreenHeader from '../../../components/ScreenHeader';
 import Poster from '../../../components/Poster';
 import OttBadge from '../../../components/OttBadge';
@@ -56,64 +62,83 @@ function summarizeGenres(taste: TasteAnalysis) {
   };
 }
 
+/** 실패했을 때 안내를 보여줄 섹션 */
+type FailedSection = 'recommendation' | 'availableNow' | 'taste' | 'parties';
+
+const NOTHING_FAILED: Record<FailedSection, boolean> = {
+  recommendation: false,
+  availableNow: false,
+  taste: false,
+  parties: false,
+};
+
 export default function HomePage() {
   const navigate = useNavigate();
 
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [otts, setOtts] = useState<Ott[]>([]);
-  const [today, setToday] = useState<RecommendationItemView | null>(null);
-  const [availableNow, setAvailableNow] = useState<AvailableNowMovie[]>([]);
+  /** `null`은 아직 받기 전이다. 빈 배열은 받았지만 보여줄 것이 없는 상태다 */
+  const [recommendations, setRecommendations] = useState<RecommendationItemView[] | null>(null);
+  const [availableNow, setAvailableNow] = useState<AvailableNowMovie[] | null>(null);
   const [taste, setTaste] = useState<TasteAnalysis | null>(null);
-  const [parties, setParties] = useState<PartyView[]>([]);
+  const [tasteLoaded, setTasteLoaded] = useState(false);
+  const [parties, setParties] = useState<PartyView[] | null>(null);
+
+  const [failed, setFailed] = useState(NOTHING_FAILED);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     let active = true;
 
-    async function load() {
-      const [profileResult, ottResult, availableResult, tasteResult, partyResult] =
-        await Promise.all([
-          getMyProfile(),
-          getOtts(),
-          getAvailableNowMovies(),
-          getMyTaste(),
-          getMyParties(),
-        ]);
-
-      if (!active) {
-        return;
-      }
-
-      setProfile(profileResult);
-      setOtts(ottResult);
-      setAvailableNow(availableResult);
-      setTaste(tasteResult);
-      setParties(partyResult);
+    /** 섹션 하나를 불러온다. 실패하면 그 섹션만 안내로 바뀐다 */
+    function load<T>(request: Promise<T>, apply: (value: T) => void, section?: FailedSection) {
+      request
+        .then((value) => {
+          if (active) {
+            apply(value);
+          }
+        })
+        .catch(() => {
+          if (active && section) {
+            setFailed((previous) => ({ ...previous, [section]: true }));
+          }
+        });
     }
 
-    async function loadRecommendation() {
-      try {
-        const set = await getRecommendations();
+    // 인사와 OTT 기준정보는 실패해도 보여줄 안내가 없다. 인사는 사라지고 배지는 코드를 쓴다
+    load(getMyProfile(), setProfile);
+    load(getOtts(), setOtts);
 
-        if (active) {
-          // 홈의 대표 1편은 추천 세트의 첫 항목으로 둔다.
-          // `[?]` 별도 API(확장 단계 API-066)인지 여부는 screen-spec.md 2.1 미확정 항목이다.
-          setToday(set.items[0] ?? null);
-        }
-      } catch {
-        // 홈에는 추천 실패 화면이 없다. 실패하면 섹션을 표시하지 않는다(업무 16에서 정의).
-      }
-    }
-
-    void load();
-    void loadRecommendation();
+    load(getRecommendations(), (set) => setRecommendations(set.items), 'recommendation');
+    load(getAvailableNowMovies(), setAvailableNow, 'availableNow');
+    load(
+      getMyTaste(),
+      (value) => {
+        setTaste(value);
+        setTasteLoaded(true);
+      },
+      'taste',
+    );
+    load(getMyParties(), setParties, 'parties');
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadCount]);
 
+  /** 실패한 섹션의 `다시 시도`. 이미 받은 섹션은 그대로 두고 다시 불러온다 */
+  function handleRetry() {
+    setFailed(NOTHING_FAILED);
+    setReloadCount((count) => count + 1);
+  }
+
+  /*
+   * 홈의 대표 1편은 추천 세트의 첫 항목으로 둔다.
+   * `[?]` 별도 API(확장 단계 API-066)인지 여부는 screen-spec.md 2.1 미확정 항목이다.
+   */
+  const today = recommendations?.[0] ?? null;
   const genreSummary = taste ? summarizeGenres(taste) : null;
-  const party = parties[0] ?? null;
+  const party = parties?.[0] ?? null;
 
   return (
     <>
@@ -128,6 +153,23 @@ export default function HomePage() {
       <div className={styles.page}>
         {profile ? (
           <p className={styles.greeting}>{profile.nickname} 님, 오늘은 어떤 영화를 볼까요?</p>
+        ) : null}
+
+        {failed.recommendation ? (
+          <StatusView size="inline" title="추천을 잠시 불러오지 못했어요">
+            <Button variant="text" onClick={handleRetry}>
+              다시 시도
+            </Button>
+          </StatusView>
+        ) : null}
+
+        {recommendations && !today ? (
+          <StatusView
+            size="inline"
+            variant="empty"
+            title="추천할 영화를 아직 찾지 못했어요"
+            description="영화를 평가하면 취향에 맞는 추천이 쌓여요"
+          />
         ) : null}
 
         {today ? (
@@ -145,7 +187,24 @@ export default function HomePage() {
           </Section>
         ) : null}
 
-        {availableNow.length > 0 ? (
+        {failed.availableNow ? (
+          <StatusView size="inline" title="지금 볼 수 있는 영화를 불러오지 못했어요">
+            <Button variant="text" onClick={handleRetry}>
+              다시 시도
+            </Button>
+          </StatusView>
+        ) : null}
+
+        {availableNow?.length === 0 ? (
+          <StatusView
+            size="inline"
+            variant="empty"
+            title="구독 중인 OTT에서 볼 수 있는 영화가 없어요"
+            description="구독 OTT를 설정하면 그 OTT의 영화를 모아 보여드려요"
+          />
+        ) : null}
+
+        {availableNow && availableNow.length > 0 ? (
           <section className={styles.plainSection}>
             <h2 className={styles.sectionTitle}>내 OTT에서 지금 볼 수 있어요</h2>
 
@@ -183,7 +242,24 @@ export default function HomePage() {
           </section>
         ) : null}
 
-        {taste && genreSummary ? (
+        {failed.taste ? (
+          <StatusView size="inline" title="취향 요약을 불러오지 못했어요">
+            <Button variant="text" onClick={handleRetry}>
+              다시 시도
+            </Button>
+          </StatusView>
+        ) : null}
+
+        {tasteLoaded && !genreSummary?.label ? (
+          <StatusView
+            size="inline"
+            variant="empty"
+            title="아직 취향을 요약할 만큼 평가가 쌓이지 않았어요"
+            description="영화를 평가하면 장르 비중과 키워드를 보여드려요"
+          />
+        ) : null}
+
+        {taste && genreSummary?.label ? (
           <Section label="내 취향 요약">
             <div className={styles.tasteRow}>
               <span className={styles.tasteGenre}>{genreSummary.label}</span>
@@ -228,6 +304,23 @@ export default function HomePage() {
             OTT 추천받기
           </button>
         </section>
+
+        {failed.parties ? (
+          <StatusView size="inline" title="파티 정보를 불러오지 못했어요">
+            <Button variant="text" onClick={handleRetry}>
+              다시 시도
+            </Button>
+          </StatusView>
+        ) : null}
+
+        {parties?.length === 0 ? (
+          <StatusView
+            size="inline"
+            variant="empty"
+            title="참여 중인 파티가 없어요"
+            description="파티를 만들면 친구와 겹치는 취향을 볼 수 있어요"
+          />
+        ) : null}
 
         {party ? (
           /*

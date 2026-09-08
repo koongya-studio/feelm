@@ -21,6 +21,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import Poster from '../../../components/Poster';
+import StatusView from '../../../components/StatusView';
 import { confirmWatch, getWatchRecords } from '../../../api/watch';
 import { getMovieDetail } from '../../../api/movies';
 import { getOtts } from '../../../api/otts';
@@ -69,21 +70,30 @@ export default function WatchConfirmPage() {
   const navigate = useNavigate();
 
   const [movie, setMovie] = useState<ConfirmView | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [reloadCount, setReloadCount] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     let active = true;
 
-    void loadConfirmView(Number(watchRecordId)).then((view) => {
-      if (active) {
-        setMovie(view);
-      }
-    });
+    loadConfirmView(Number(watchRecordId))
+      .then((view) => {
+        if (active) {
+          setMovie(view);
+          setFailed(false);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setFailed(true);
+        }
+      });
 
     return () => {
       active = false;
     };
-  }, [watchRecordId]);
+  }, [watchRecordId, reloadCount]);
 
   async function respond(watched: boolean) {
     setSubmitting(true);
@@ -97,6 +107,30 @@ export default function WatchConfirmPage() {
 
     // 보지 않을래요 → 감상 대기 종료. 홈으로 돌아간다
     void navigate(path.home());
+  }
+
+  if (failed) {
+    return (
+      <div className={styles.page}>
+        <StatusView
+          title="감상 기록을 불러오지 못했어요"
+          description="주소가 잘못되었거나 잠시 문제가 생겼어요"
+        >
+          <Button
+            onClick={() => {
+              setFailed(false);
+              setReloadCount((count) => count + 1);
+            }}
+          >
+            다시 시도
+          </Button>
+
+          <Button variant="text" onClick={() => void navigate(path.home())}>
+            홈으로 이동
+          </Button>
+        </StatusView>
+      </div>
+    );
   }
 
   if (!movie) {

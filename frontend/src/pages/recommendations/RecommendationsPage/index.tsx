@@ -8,16 +8,21 @@
  * 섹션 이름도 계약을 따라 `취향 발견 추천`이다(FR-12, 8.1 #4).
  *
  * `?mock=error`로 2.2-A를 확인할 수 있다. 계약의 `503 RECOMMENDATION_UNAVAILABLE`이
- * 아니면 이 화면을 볼 방법이 없어 둔 목업 전용 입력이다(frontend-structure.md 7.4).
- * 실제 연동 시 제거한다.
+ * 아니면 이 화면을 볼 방법이 없어 둔 목업 전용 입력이며 api/mockTransport.ts가 읽는다
+ * (frontend-structure.md 7.4). 실제 연동 시 제거한다.
+ *
+ * 추천 후보가 모두 빠진 경우(관심없음 · 온보딩 `안 좋았어요`)에도 이 화면에 보여줄 것이
+ * 없다. 와이어프레임에 그 상태가 없어 2.2-A와 같은 자리에 빈 데이터 안내를 둔다
+ * (업무 -264).
  */
 import { useEffect, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import { Link } from 'react-router';
 import Button from '../../../components/Button';
 import Menu from '../../../components/Menu';
 import OttBadge from '../../../components/OttBadge';
 import ScreenHeader from '../../../components/ScreenHeader';
 import Snackbar from '../../../components/Snackbar';
+import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import { BlockIcon, LinkIcon, PlayIcon } from '../../../components/Icon';
 import RecommendationCard from './RecommendationCard';
@@ -37,9 +42,6 @@ type OpenMenu = {
 };
 
 export default function RecommendationsPage() {
-  const [searchParams] = useSearchParams();
-  const scenario = searchParams.get('mock') === 'error' ? 'error' : 'success';
-
   const rootRef = useRef<HTMLDivElement>(null);
   const [otts, setOtts] = useState<Ott[]>([]);
   const [items, setItems] = useState<RecommendationItemView[] | null>(null);
@@ -56,7 +58,7 @@ export default function RecommendationsPage() {
   useEffect(() => {
     let active = true;
 
-    getRecommendations(scenario)
+    getRecommendations()
       .then((set) => {
         if (active) {
           setItems(set.items);
@@ -72,7 +74,7 @@ export default function RecommendationsPage() {
     return () => {
       active = false;
     };
-  }, [scenario, reloadCount]);
+  }, [reloadCount]);
 
   /** 2.2-A 다시 시도 */
   function handleRetry() {
@@ -135,25 +137,33 @@ export default function RecommendationsPage() {
         <ScreenHeader title="오늘의 추천" align="center" />
 
         {/* 2.2-A 추천을 불러오지 못한 경우 */}
-        <div className={styles.errorArea}>
-          <span className={styles.errorMark} aria-hidden="true">
-            <span className={styles.errorMarkStrip} data-edge="top" />!
-            <span className={styles.errorMarkStrip} data-edge="bottom" />
-          </span>
+        <StatusView
+          title="추천을 잠시 불러오지 못했어요"
+          description="검색과 영화 평가는 계속 이용할 수 있어요"
+        >
+          <Button onClick={handleRetry}>다시 시도</Button>
+          {/* 검색(4.1)은 범위 밖이며 탭에서 안내 화면으로 이동한다 */}
+          <Link to={path.search()} className={styles.searchLink}>
+            영화 검색하기
+          </Link>
+        </StatusView>
+      </>
+    );
+  }
 
-          <div className={styles.errorText}>
-            <p className={styles.errorTitle}>추천을 잠시 불러오지 못했어요</p>
-            <p className={styles.errorHint}>검색과 영화 평가는 계속 이용할 수 있어요</p>
-          </div>
+  // 후보가 모두 빠져 보여줄 카드가 없는 경우 (와이어프레임에 없는 상태)
+  if (items && items.length === 0) {
+    return (
+      <>
+        <ScreenHeader title="오늘의 추천" align="center" />
 
-          <div className={styles.errorActions}>
-            <Button onClick={handleRetry}>다시 시도</Button>
-            {/* 검색(4.1)은 범위 밖이며 탭에서 안내 화면으로 이동한다 */}
-            <Link to={path.search()} className={styles.searchLink}>
-              영화 검색하기
-            </Link>
-          </div>
-        </div>
+        <StatusView
+          variant="empty"
+          title="추천할 영화를 아직 찾지 못했어요"
+          description="관심없음으로 넘긴 영화가 많으면 새 추천이 준비될 때까지 기다려야 해요"
+        >
+          <Button onClick={handleRetry}>다시 시도</Button>
+        </StatusView>
       </>
     );
   }

@@ -41,7 +41,7 @@ function sessionFrames(): FrameSummary[] {
 
 /** API-040 취향 분석·키워드 조회 · GET /api/v1/users/me/taste */
 export async function getMyTaste(): Promise<TasteAnalysis> {
-  return respond(mockTasteAnalysis);
+  return respond(mockTasteAnalysis, 'taste');
 }
 
 /**
@@ -81,11 +81,14 @@ export async function getPopcornBucket(): Promise<PopcornBucket> {
     };
   });
 
-  return respond({
-    ...mockPopcornBucket,
-    totalCount: flavors.reduce((sum, flavor) => sum + flavor.popcornCount, 0),
-    flavors,
-  });
+  return respond(
+    {
+      ...mockPopcornBucket,
+      totalCount: flavors.reduce((sum, flavor) => sum + flavor.popcornCount, 0),
+      flavors,
+    },
+    'popcorn',
+  );
 }
 
 /**
@@ -97,11 +100,14 @@ export async function getPopcornBucket(): Promise<PopcornBucket> {
 export async function getMyFrames(): Promise<FrameList> {
   const added = sessionFrames();
 
-  return respond({
-    ...mockFrameList,
-    totalCount: mockFrameList.totalCount + added.length,
-    items: [...added, ...mockFrameList.items],
-  });
+  return respond(
+    {
+      ...mockFrameList,
+      totalCount: mockFrameList.totalCount + added.length,
+      items: [...added, ...mockFrameList.items],
+    },
+    'frames',
+  );
 }
 
 /** 3.1과 2.6 · 2.7이 함께 쓰는 현재 프레임 수 */
@@ -154,7 +160,7 @@ export async function getFrameDetail(frameId: number): Promise<FrameDetailView> 
   const sessionRating = findRatingByFrame(frameId);
 
   if (sessionRating) {
-    return respond(sessionFrameDetail(sessionRating));
+    return respond(sessionFrameDetail(sessionRating), 'frames');
   }
 
   const frame = findMockFrameDetail(frameId);
@@ -167,18 +173,21 @@ export async function getFrameDetail(frameId: number): Promise<FrameDetailView> 
   const updated = findRatingByMovie(frame.movie.movieId);
 
   if (!updated) {
-    return respond(frame);
+    return respond(frame, 'frames');
   }
 
-  return respond({
-    ...frame,
-    rating: {
-      ratingId: updated.ratingId,
-      score: updated.score,
-      comment: updated.comment,
-      visibility: updated.visibility,
+  return respond(
+    {
+      ...frame,
+      rating: {
+        ratingId: updated.ratingId,
+        score: updated.score,
+        comment: updated.comment,
+        visibility: updated.visibility,
+      },
     },
-  });
+    'frames',
+  );
 }
 
 /**
@@ -188,5 +197,5 @@ export async function getFrameDetail(frameId: number): Promise<FrameDetailView> 
  * 않도록 함수만 따로 둔다. 계약이 정해지면 API-040(`getMyTaste`)으로 합친다.
  */
 export async function getTasteFlow(): Promise<TasteFlowView> {
-  return respond(mockTasteFlow);
+  return respond(mockTasteFlow, 'taste');
 }

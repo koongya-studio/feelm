@@ -26,7 +26,9 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 import Chip from '../../../components/Chip';
+import Button from '../../../components/Button';
 import ScreenHeader from '../../../components/ScreenHeader';
+import StatusView from '../../../components/StatusView';
 import { getPartyMix, getPartyPopcorn } from '../../../api/parties';
 import { getPopcornFlavors } from '../../../api/taste';
 import styles from './PartyPopcornMixPage.module.css';
@@ -46,6 +48,7 @@ export default function PartyPopcornMixPage() {
   const [mix, setMix] = useState<PartyMixView | null>(null);
   const [flavors, setFlavors] = useState<PopcornFlavor[]>([]);
   const [failed, setFailed] = useState(false);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -64,23 +67,38 @@ export default function PartyPopcornMixPage() {
         }
       });
 
-    void getPopcornFlavors().then((value) => {
-      if (active) {
-        setFlavors(value);
-      }
-    });
+    // 맛 기준정보는 실패해도 본문을 막지 않는다. 맛 이름만 코드로 남는다
+    getPopcornFlavors()
+      .then((value) => {
+        if (active) {
+          setFlavors(value);
+        }
+      })
+      .catch(() => undefined);
 
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, reloadCount]);
 
   if (failed) {
-    // 오류 화면은 상태 UI 업무(S15P21E106-264) 범위다. 여기서는 최소 안내만 둔다
     return (
       <>
         <ScreenHeader title="파티 팝콘 섞기" showBack />
-        <p className={styles.notFound}>파티를 찾을 수 없습니다.</p>
+
+        <StatusView
+          title="파티 정보를 불러오지 못했어요"
+          description="주소가 잘못되었거나 잠시 문제가 생겼어요"
+        >
+          <Button
+            onClick={() => {
+              setFailed(false);
+              setReloadCount((count) => count + 1);
+            }}
+          >
+            다시 시도
+          </Button>
+        </StatusView>
       </>
     );
   }

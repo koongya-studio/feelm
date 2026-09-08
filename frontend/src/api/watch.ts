@@ -77,7 +77,7 @@ export async function getWatchRecords(): Promise<WatchRecordList> {
     .map(toMockWatchRecordListItem)
     .sort((a, b) => b.clickedAt.localeCompare(a.clickedAt) || b.watchRecordId - a.watchRecordId);
 
-  return respond({ items, nextCursor: null, hasNext: false });
+  return respond({ items, nextCursor: null, hasNext: false }, 'watch');
 }
 
 /**

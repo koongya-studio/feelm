@@ -27,6 +27,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import Button from '../../../components/Button';
 import ScreenHeader from '../../../components/ScreenHeader';
+import StatusView from '../../../components/StatusView';
 import { getPopcornBucket } from '../../../api/taste';
 import { path } from '../../../routes/paths';
 import { conjunctionParticle, subjectParticle } from '../../../utils/korean';
@@ -60,20 +61,65 @@ export default function PopcornBucketPage() {
   const navigate = useNavigate();
 
   const [bucket, setBucket] = useState<PopcornBucket | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     let active = true;
 
-    void getPopcornBucket().then((value) => {
-      if (active) {
-        setBucket(value);
-      }
-    });
+    getPopcornBucket()
+      .then((value) => {
+        if (active) {
+          setBucket(value);
+          setFailed(false);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setFailed(true);
+        }
+      });
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadCount]);
+
+  if (failed) {
+    return (
+      <>
+        <ScreenHeader title="100알의 취향" showBack />
+
+        <StatusView title="팝콘 버킷을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
+          <Button
+            onClick={() => {
+              setFailed(false);
+              setReloadCount((count) => count + 1);
+            }}
+          >
+            다시 시도
+          </Button>
+        </StatusView>
+      </>
+    );
+  }
+
+  // 평가가 하나도 없으면 알이 없다. 와이어프레임에 그 상태가 없다
+  if (bucket && bucket.totalCount === 0) {
+    return (
+      <>
+        <ScreenHeader title="100알의 취향" showBack />
+
+        <StatusView
+          variant="empty"
+          title="아직 담긴 팝콘이 없어요"
+          description="영화를 평가하면 그 영화의 맛이 한 알씩 담겨요"
+        >
+          <Button onClick={() => void navigate(path.recommendations())}>추천 영화 보기</Button>
+        </StatusView>
+      </>
+    );
+  }
 
   if (!bucket) {
     return (

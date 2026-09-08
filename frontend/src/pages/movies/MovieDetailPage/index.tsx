@@ -26,6 +26,8 @@ import IconButton from '../../../components/IconButton';
 import OttBadge from '../../../components/OttBadge';
 import Poster from '../../../components/Poster';
 import RatingStars from '../../../components/RatingStars';
+import Button from '../../../components/Button';
+import StatusView from '../../../components/StatusView';
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -55,6 +57,7 @@ export default function MovieDetailPage() {
   const [similar, setSimilar] = useState<SimilarMovie[]>([]);
   const [reviews, setReviews] = useState<PublicReview[]>([]);
   const [failed, setFailed] = useState(false);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -72,22 +75,32 @@ export default function MovieDetailPage() {
         }
       });
 
-    void getSimilarMovies(id).then((items) => {
-      if (active) {
-        setSimilar(items);
-      }
-    });
+    // 유사 영화와 한줄평은 실패하면 그 섹션만 빈 안내로 남는다. 화면 전체를 덮지 않는다
+    getSimilarMovies(id)
+      .then((items) => {
+        if (active) {
+          setSimilar(items);
+        }
+      })
+      .catch(() => undefined);
 
-    void getMovieReviews(id).then((items) => {
-      if (active) {
-        setReviews(items);
-      }
-    });
+    getMovieReviews(id)
+      .then((items) => {
+        if (active) {
+          setReviews(items);
+        }
+      })
+      .catch(() => undefined);
 
     return () => {
       active = false;
     };
-  }, [id, recommendationItemId]);
+  }, [id, recommendationItemId, reloadCount]);
+
+  function handleRetry() {
+    setFailed(false);
+    setReloadCount((count) => count + 1);
+  }
 
   async function handleOttClick(ottId: number) {
     const record = await recordOttClick(id, ottId);
@@ -97,10 +110,27 @@ export default function MovieDetailPage() {
   }
 
   if (failed) {
-    // 오류 화면은 상태 UI 업무(S15P21E106-264) 범위다. 여기서는 최소 안내만 둔다
+    /*
+     * 이 화면은 상단 제목 없이 떠 있는 뒤로 가기 버튼만 있다. 오류 상태에서도 같은
+     * 버튼을 남겨 돌아갈 길을 만든다.
+     */
     return (
-      <div className={styles.notFound}>
-        <p>영화를 찾을 수 없습니다.</p>
+      <div className={styles.page}>
+        <div className={styles.floating}>
+          <IconButton
+            label="뒤로 가기"
+            icon={<ChevronLeftIcon />}
+            size={34}
+            onClick={() => void navigate(-1)}
+          />
+        </div>
+
+        <StatusView
+          title="영화 정보를 불러오지 못했어요"
+          description="주소가 잘못되었거나 잠시 문제가 생겼어요"
+        >
+          <Button onClick={handleRetry}>다시 시도</Button>
+        </StatusView>
       </div>
     );
   }
@@ -256,6 +286,10 @@ export default function MovieDetailPage() {
               </span>
             </h2>
 
+            {similar.length === 0 ? (
+              <p className={styles.emptyNote}>비슷한 영화를 아직 찾지 못했어요</p>
+            ) : null}
+
             <ul className={styles.similarList}>
               {similar.map((item) => (
                 <li key={item.movieId} className={styles.similarItem}>
@@ -295,6 +329,11 @@ export default function MovieDetailPage() {
           {/* 다른 사용자 한줄평 — 차단 관계는 서버가 걸러 준다 (API-032) */}
           <section className={styles.card}>
             <h2 className={styles.cardTitle}>다른 사용자 한줄평</h2>
+
+            {reviews.length === 0 ? (
+              <p className={styles.emptyNote}>아직 공개된 한줄평이 없어요</p>
+            ) : null}
+
             <ul className={styles.reviewList}>
               {reviews.map((review) => (
                 <li key={review.ratingId} className={styles.reviewItem}>
