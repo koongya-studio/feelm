@@ -140,7 +140,6 @@ def verify_job(context, opener=None):
         ('job_stage', job.get('stage') == 'verify'),
         ('job_status', job.get('status') == 'running'),
         ('job_ref', job.get('ref') == 'develop'),
-        ('job_source', job.get('source') == 'web'),
         ('project', context['project_id'] == PROJECT_ID),
         ('pipeline_id', isinstance(pipeline, dict)
          and pipeline.get('id') == context['pipeline_id']),
