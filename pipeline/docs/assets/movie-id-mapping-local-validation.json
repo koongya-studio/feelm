@@ -1,0 +1,121 @@
+{
+  "jira": "S15P21E106-118",
+  "validation_date": "2026-09-08",
+  "scope": "LOCAL_SYNTHETIC_FIXTURE",
+  "image": "apache/spark:4.1.3-scala2.13-java21-python3-ubuntu",
+  "image_digest": "sha256:bf9d035a7c32a8ca46aa58d6348182ffd7d2dff6409206ecfbb3915ff1fef211",
+  "runtime": {
+    "spark": "4.1.3",
+    "python": "3.10.12",
+    "java": "21.0.11",
+    "master": "local[1]"
+  },
+  "source_branch_revision": "90b3c8212a9459c4f181baed8ec454ffbfc9c0ae",
+  "unit_tests": {
+    "passed": 5,
+    "failed": 0,
+    "errors": 0
+  },
+  "cli_exit_code": 0,
+  "downstream_als_input_validation": "PASS",
+  "full_movielens_32m_executed": false,
+  "production_database_used": false,
+  "ec2_hdfs_executed": false,
+  "validation_report": {
+    "contract_version": 2,
+    "inputs": {
+      "ratings": {
+        "raw": 5,
+        "valid": 4,
+        "invalid_or_missing": 1,
+        "duplicates_removed": 1
+      },
+      "movielens_movies": {
+        "raw": 3,
+        "valid": 3,
+        "invalid_or_missing": 0,
+        "duplicates_removed": 0
+      },
+      "movielens_links": {
+        "raw": 3,
+        "valid": 3,
+        "invalid_or_missing": 0,
+        "duplicates_removed": 0
+      },
+      "service_movies": {
+        "raw": 3,
+        "valid": 3,
+        "invalid_or_missing": 0,
+        "duplicates_removed": 0
+      }
+    },
+    "quality": {
+      "ratings_missing_movie_reference": 1,
+      "links_missing_movie_reference": 0,
+      "movies_missing_links_row": 0
+    },
+    "mapping": {
+      "matched": 2,
+      "ambiguous_tmdb_id": 0,
+      "missing_tmdb_id": 1,
+      "by_status": {
+        "MATCHED": 2,
+        "MOVIELENS_TMDB_ID_MISSING": 1
+      }
+    },
+    "service_mapping": {
+      "matched": 1,
+      "content_based": 2,
+      "ambiguous_tmdb_id": 0,
+      "by_status": {
+        "MATCHED": 1,
+        "SERVICE_ONLY_CONTENT_BASED": 2
+      }
+    },
+    "outputs": {
+      "ratings": 2,
+      "movies": 3,
+      "movie_id_map": 2,
+      "service_movie_id_map": 3
+    },
+    "checks": [
+      {
+        "name": "ratings_output_row_count_matches",
+        "passed": true,
+        "expected": 2,
+        "actual": 2
+      },
+      {
+        "name": "movies_output_row_count_matches",
+        "passed": true,
+        "expected": 3,
+        "actual": 3
+      },
+      {
+        "name": "movie_id_map_excludes_only_missing_tmdb_ids",
+        "passed": true,
+        "expected": 2,
+        "actual": 2
+      },
+      {
+        "name": "links_reference_known_movies",
+        "passed": true,
+        "expected": 0,
+        "actual": 0
+      },
+      {
+        "name": "every_movie_has_a_links_row",
+        "passed": true,
+        "expected": 0,
+        "actual": 0
+      },
+      {
+        "name": "service_movie_id_map_row_count_matches",
+        "passed": true,
+        "expected": 3,
+        "actual": 3
+      }
+    ],
+    "all_checks_passed": true
+  }
+}

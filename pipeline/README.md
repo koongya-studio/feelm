@@ -121,6 +121,11 @@ uv run python -m jobs.batch.parquet_roundtrip --help
 
 ## ALS baseline input and settings
 
+118번 MovieLens 전처리와 영화 ID 매핑은
+[`spark/batch/prepare/movie_id_mapping/`](spark/batch/prepare/movie_id_mapping/README.md)에 있습니다.
+로컬 fixture 검증과 공용 서버 통합 검증 범위는
+[`docs/movie-id-mapping-local-validation.md`](docs/movie-id-mapping-local-validation.md)에서 구분합니다.
+
 ALS 배치는 S15P21E106-118 산출물의 루트 URI를 입력으로 받으며 그 아래 `ratings/`와
 `service-movie-id-map/` Parquet을 읽습니다. 학습 전에 필수 컬럼·타입, 평점 범위,
 사용자-영화 중복 및 서비스 매핑 상태를 검사합니다.
