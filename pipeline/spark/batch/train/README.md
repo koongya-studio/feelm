@@ -10,6 +10,25 @@ MovieLens 사용자·영화 ID와 원본 별점을 사용한다.
 train, train + validation, 검증된 전체 평점에 재사용할 수 있으며, 서비스에 매핑되지 않은 영화도
 입력에 있으면 학습에 포함한다.
 
+## 모델 산출물 저장과 로딩
+
+`artifacts.py`는 저장·읽기, Factor 검증과 파일시스템 처리를 담당한다.
+`artifact_metadata.py`는 메타데이터의 필드·타입 정의, 저장 형식 변환과 값 검증을 담당한다.
+
+`save_als_artifacts()`는 ALSModel, User/Item Factor와 메타데이터를 임시 경로에 저장하고
+재로딩 검증이 끝난 버전만 `<output-uri>/als/<model-version>/`에 공개한다. 이미 존재하는
+모델 버전은 덮어쓰지 않는다. 최종 버전 디렉터리의 존재가 저장 완료를 의미한다.
+
+`load_als_artifacts()`는 네 경로를 다시 읽고 계약 버전, 메타데이터, Factor 스키마·건수,
+ALSModel과 별도 Factor의 일치 여부를 검사한다. 로컬 경로, `file://` URI와 `hdfs://` URI를
+지원하며 경로 해석은 Spark의 Hadoop 파일시스템 설정을 따른다.
+
+최종 공개 시 Linux 로컬 디스크에서는 부모 디렉터리 잠금으로 존재 확인과 rename을
+보호한다. 이 API를 사용하는 스레드·프로세스가 동시에 저장해도 한 작업만 성공한다.
+잠금은 공개 구간에만 적용하고 종료 시 해제하며, 잠금 파일을 남기지 않는다.
+HDFS에서는 덮어쓰기를 금지한 `FileContext.rename(..., Rename.NONE)`을 사용한다.
+객체 저장소와 로컬 경로로 마운트한 네트워크 파일시스템은 지원 대상으로 보지 않는다.
+
 ## 데이터 분할
 
 `split_ratings()`는 입력 검증을 통과한 평점 DataFrame을 사용자별 시간순으로
@@ -81,10 +100,53 @@ finally:
 
 ```bash
 cd pipeline/spark
-uv run pytest tests/batch/test_als_training.py tests/batch/test_als_splits.py
-uv run ruff check batch/train/training.py batch/train/splits.py tests/batch/test_als_training.py tests/batch/test_als_splits.py
+uv run pytest tests/batch/test_als_artifacts.py tests/batch/test_als_training.py tests/batch/test_als_splits.py
+uv run ruff check batch/train tests/batch
 ```
 
+산출물 테스트는 로컬 저장·재로딩과 예측값 유지, 기존 버전 보호, 동시 공개,
+실패한 임시 결과 정리와 손상된 산출물 거부를 확인합니다.
 학습 테스트는 ALS 파라미터 전달, 실제 모델 생성과 서비스 미매핑 영화 Factor 보존을 확인합니다.
 분할 테스트는 행 보존·중복 없는 배정, 시간순 분할, 파티션 수와 입력 순서 변경 시 재현성,
 동일 시각·희소 사용자·빈 입력, 사용자/영화 cold-start 통계와 잘못된 설정을 확인합니다.
+
+### 실제 HDFS 저장소 검증
+
+로컬 테스트 통과는 실제 HDFS 검증 완료를 뜻하지 않는다. HDFS 접근이 가능한 서버에서
+아래 절차를 별도로 실행한다. 작은 합성 평점 60개로 저장 API를 검증하며,
+32M 전체 학습·분산 ALS 실행·Redis 서비스 전환은 검증하지 않는다.
+
+1. [파이프라인 실행 환경](../../../README.md)에 맞는 Python·Java·PySpark ML과 테스트 의존성을
+   준비한다. 실행 프로세스에서 NameNode와 DataNode에 접근할 수 있어야 하며,
+   Spark의 Hadoop 설정과 HDFS 쓰기 권한을 확인한다.
+2. 아래 URI의 주소와 경로를 담당자가 승인한 **검증 전용 HDFS 경로**로 바꾼다.
+   운영 모델 경로는 사용하지 않는다. 테스트마다 `als-check-<UUID>` 하위 경로를 생성한다.
+3. 저장·재로딩, 중복 저장, 저장 중 실패, 동시 공개 테스트 6개를 실행한다.
+
+```bash
+# 저장소 루트에서 실행. URI는 실제 검증 환경 값으로 교체한다.
+cd pipeline/spark
+ALS_ARTIFACT_TEST_ROOT='hdfs://NAME_NODE_PRIVATE_IP:8020/user/feelm/als-verification/RUN_ID' \
+  uv run pytest tests/batch/test_als_artifacts.py -v -s \
+  -k 'complete_artifact_version or overwrite_existing or
+      temporary_version_after_write_failure or concurrent_publication'
+```
+
+`ALS_ARTIFACT_TEST_ROOT`는 테스트 전용 입력이며 서비스 환경변수나 배치 설정이 아니다.
+미지정 시 임시 로컬 디렉터리를 사용한다. 테스트의 Spark 실행 모드는 `local[1]`이지만,
+위 명령의 저장·읽기·rename 대상은 지정한 실제 HDFS다.
+
+| 검증 | 기대 결과 |
+| --- | --- |
+| 저장·재로딩 (3개 단계) | 최종 경로에 `model/`, `user-factors/`, `item-factors/`, `metadata/`만 존재. 사용자 6개·영화 14개 Factor, 메타데이터와 재로딩 전후 예측값 일치 |
+| 같은 버전 재저장 | `FileExistsError` 발생, 기존 모델 유지 |
+| 메타데이터 저장 실패 주입 | 최종 버전과 해당 임시 경로 없음. 로딩은 `FileNotFoundError`로 거부 |
+| 같은 목적지로 동시 공개 (30회) | 매회 한 작업만 성공. 실패 작업의 폴더가 최종 디렉터리 안에 끼어들지 않음 |
+
+실패 주입은 테스트 내부에서만 예외를 발생시킨다. HDFS 중단·권한 변경을 수행하지 않는다.
+동시 공개 테스트는 학습을 반복하지 않고 최소 디렉터리로 실제 rename 구간을 검증한다.
+
+실행 커밋, Python·Java·Spark 버전, HDFS URI와 **6 passed** 결과를 검증 기록으로 남긴다.
+출력의 `artifact verification output:` 경로로 결과를 확인할 수 있다. 검사 후에도 성공 산출물과
+동시 공개 테스트의 패배한 임시 디렉터리는 확인용으로 남는다. 정리는 담당자가 이번 실행의
+정확한 검증 경로를 확인한 뒤 수행하며, 상위 공용 경로는 삭제하지 않는다.
