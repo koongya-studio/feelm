@@ -8,7 +8,9 @@ Gradle 코드를 실행하지 않는다. 기존 `backend-mr-test`는 캐시가 �
 부족하면 안전하게 실패한다.
 
 캐시 갱신은 보호된 `develop`의 web pipeline에서만 실행한다. `backend-cache-prepare`는 입력한
-MR과 SHA가 현재 열린 MR HEAD인지 GitLab API로 다시 확인하고, 다음 단계를 순서대로 수행한다.
+MR과 SHA가 현재 열린 MR HEAD인지 GitLab API로 다시 확인한다. MR diff API는 CI job token의
+허용 엔드포인트가 아니므로, API가 돌려준 `diff_refs`의 기준 SHA와 HEAD SHA를 인증된 Git
+fetch로 가져와 의존성 변경을 검사한 뒤 다음 단계를 순서대로 수행한다.
 
 1. 정확한 SHA의 `backend` archive를 받아 SHA256을 기록한다.
 2. 기존 전용 계정과 네트워크 guard에서 전체 테스트 및 `spotlessCheck`를 실행해 필요한
