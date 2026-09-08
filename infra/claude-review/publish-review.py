@@ -8,7 +8,6 @@ import os
 from pathlib import Path
 import re
 import stat
-import textwrap
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
@@ -211,26 +210,37 @@ def marker(project_id: int, iid: int, sha: str) -> str:
     return f"<!-- {MARKER_NAME} project={project_id} mr={iid} sha={sha} -->"
 
 
-def code_block(value: str) -> str:
-    longest = max((len(group) for group in re.findall(r"`+", value)), default=0)
-    fence = "`" * max(3, longest + 1)
-    return f"{fence}\n{value}\n{fence}"
+def inline_code(value: str) -> str:
+    normalized = re.sub(r"\s+", " ", value).strip()
+    longest = max((len(group) for group in re.findall(r"`+", normalized)), default=0)
+    fence = "`" * max(1, longest + 1)
+    return f"{fence} {normalized} {fence}"
 
 
-def readable_summary(value: str) -> str:
-    supplied_lines = [line.strip() for line in value.splitlines() if line.strip()]
-    if 2 <= len(supplied_lines) <= 5:
-        lines = supplied_lines
+def action_category(severity: str) -> str:
+    if severity in ("BLOCKER", "HIGH"):
+        return "병합 전 수정"
+    if severity == "MEDIUM":
+        return "병합 전 확인"
+    return "후속 작업 후보"
+
+
+def merge_guidance(findings: list[dict[str, object]]) -> str:
+    fix_count = sum(item["severity"] in ("BLOCKER", "HIGH") for item in findings)
+    verify_count = sum(item["severity"] == "MEDIUM" for item in findings)
+    follow_up_count = sum(item["severity"] == "LOW" for item in findings)
+    if fix_count:
+        conclusion = "현재 변경에 병합 전 수정 권장 항목이 있습니다."
+    elif verify_count:
+        conclusion = "병합 전 확인 항목의 처리 여부를 확인한 뒤 병합을 판단하세요."
+    elif follow_up_count:
+        conclusion = "즉시 병합을 막는 항목은 없으며 후속 작업 반영 여부를 확인하세요."
     else:
-        normalized = " ".join(supplied_lines)
-        lines = [part.strip() for part in re.split(r"(?<=[.!?。！？])\s+", normalized)
-                 if part.strip()]
-        if len(lines) == 1 and len(lines[0]) > 160:
-            lines = textwrap.wrap(lines[0], width=160, break_long_words=False,
-                                  break_on_hyphens=False)
-        if len(lines) > 5:
-            lines = lines[:4] + [" ".join(lines[4:])]
-    return "\n".join("- " + line for line in lines)
+        conclusion = "현재 diff에서 근거가 충분한 병합 차단 항목을 찾지 못했습니다."
+    return (f"- **병합 전 수정:** {fix_count}건\n"
+            f"- **병합 전 확인:** {verify_count}건\n"
+            f"- **후속 작업 후보:** {follow_up_count}건\n"
+            f"- **판단:** {conclusion}")
 
 
 def format_comment(review: dict[str, object], project_id: int, iid: int, sha: str,
@@ -256,17 +266,14 @@ def format_comment(review: dict[str, object], project_id: int, iid: int, sha: st
             if finding["line"] is not None:
                 location += ":" + str(finding["line"])
             parts.extend([
-                f"#### {index}. [{finding['severity']}]",
-                "**위치**", code_block(location),
-                "**발생 조건**", code_block(finding["condition"]),
-                "**근거**", code_block(finding["evidence"]),
-                "**수정 제안**", code_block(finding["recommendation"]),
+                f"#### {index}. [{finding['severity']} · {action_category(finding['severity'])}]",
+                "**위치:** " + inline_code(location),
+                "**문제와 근거:** " + inline_code(
+                    finding["condition"] + " " + finding["evidence"]),
+                "**권장 조치:** " + inline_code(finding["recommendation"]),
             ])
     parts.extend([
-        "### 검토 요약", code_block(readable_summary(review["summary"])),
-        "### 검토 범위와 한계",
-        "- MR에서 변경된 diff와 직접 관련된 저장소 규칙·계약을 검토했습니다.\n"
-        "- 변경되지 않은 코드의 전수 검사, 코드 실행, 통합·성능·배포 검증은 포함하지 않습니다.",
+        "### 병합 판단 참고", merge_guidance(findings),
         "> 이 리뷰는 AI가 자동 생성했으며 승인이나 병합을 의미하지 않습니다.",
     ])
     body = "\n\n".join(parts)
