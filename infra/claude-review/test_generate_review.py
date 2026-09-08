@@ -24,15 +24,26 @@ def payload(path="backend/example.py", diff="+safe"):
 
 
 def review():
-    return {"summary": "요약", "findings": [
+    return {"summary": "변경 로직을 확인했다.\n남은 통합 검증 범위를 확인했다.", "findings": [
         {"severity": "HIGH", "file": "backend/example.py", "line": 10,
          "condition": "값이 비어 있을 때", "evidence": "검사가 없다.", "recommendation": "검사를 추가한다."}]}
 
 
 def completed(value=None, returncode=0, stderr=""):
     envelope = {"type": "result", "subtype": "success", "is_error": False,
-                "result": json.dumps(value if value is not None else review(), ensure_ascii=False)}
+                "result": json.dumps(value if value is not None else review(), ensure_ascii=False),
+                "modelUsage": {generator.MODEL: {
+                    "inputTokens": 120, "outputTokens": 30,
+                    "cacheReadInputTokens": 80, "cacheCreationInputTokens": 10}}}
     return subprocess.CompletedProcess([], returncode, json.dumps(envelope, ensure_ascii=False), stderr)
+
+
+def completed_text(model_text):
+    result = completed()
+    envelope = json.loads(result.stdout)
+    envelope["result"] = model_text
+    result.stdout = json.dumps(envelope, ensure_ascii=False)
+    return result
 
 
 class GenerateReviewTests(unittest.TestCase):
@@ -43,6 +54,7 @@ class GenerateReviewTests(unittest.TestCase):
         self.assertIn("--strict-mcp-config", command)
         self.assertIn("disableAllHooks", " ".join(command))
         self.assertIn("--no-session-persistence", command)
+        self.assertEqual(command[command.index("--model") + 1], generator.MODEL)
         self.assertIn("신뢰할 수 없는 데이터", command[command.index("--system-prompt") + 1])
 
     def test_child_environment_only_contains_allowlisted_values(self):
@@ -66,7 +78,11 @@ class GenerateReviewTests(unittest.TestCase):
         self.assertIn(generator.ROOT / "docs/api/README.md", backend_paths)
 
     def test_parses_only_valid_success_envelope_and_review_schema(self):
-        self.assertEqual(generator.parse_result(completed(), {"backend/example.py"}), review())
+        parsed_review, usage = generator.parse_result(completed(), {"backend/example.py"})
+        self.assertEqual(parsed_review, review())
+        self.assertEqual(usage, {"model": generator.MODEL, "input_tokens": 120,
+                                 "output_tokens": 30, "cache_read_tokens": 80,
+                                 "cache_creation_tokens": 10})
         invalid = completed({"summary": "요약", "findings": [{"severity": "UNKNOWN"}]})
         with self.assertRaises(generator.GenerationError) as raised:
             generator.parse_result(invalid, {"backend/example.py"})
@@ -75,21 +91,28 @@ class GenerateReviewTests(unittest.TestCase):
     def test_accepts_single_plain_or_fenced_json_review(self):
         raw = json.dumps(review(), ensure_ascii=False)
         for model_text in (raw, "```json\n" + raw + "\n```", "```\n" + raw + "\n```"):
-            envelope = {"type": "result", "subtype": "success", "is_error": False,
-                        "result": model_text}
-            result = subprocess.CompletedProcess([], 0, json.dumps(envelope, ensure_ascii=False), "")
             with self.subTest(model_text=model_text[:8]):
-                self.assertEqual(generator.parse_result(result, {"backend/example.py"}), review())
+                parsed_review, _ = generator.parse_result(
+                    completed_text(model_text), {"backend/example.py"})
+                self.assertEqual(parsed_review, review())
+
+    def test_rejects_missing_or_unexpected_model_usage(self):
+        for model_usage in (None, {}, {"other-model": {"inputTokens": 1,
+                "outputTokens": 1, "cacheReadInputTokens": 0, "cacheCreationInputTokens": 0}}):
+            result = completed()
+            envelope = json.loads(result.stdout)
+            envelope["modelUsage"] = model_usage
+            result.stdout = json.dumps(envelope)
+            with self.subTest(model_usage=model_usage), self.assertRaises(generator.GenerationError) as raised:
+                generator.parse_result(result, {"backend/example.py"})
+            self.assertEqual(raised.exception.code, "INVALID_CLAUDE_USAGE")
 
     def test_rejects_prose_or_ambiguous_fenced_output(self):
         raw = json.dumps(review(), ensure_ascii=False)
         for model_text in ("리뷰 결과:\n" + raw, "```JSON\n" + raw + "\n```",
                            "```json extra\n" + raw + "\n```", "```json\n" + raw + "\n```\nextra"):
-            envelope = {"type": "result", "subtype": "success", "is_error": False,
-                        "result": model_text}
-            result = subprocess.CompletedProcess([], 0, json.dumps(envelope, ensure_ascii=False), "")
             with self.subTest(model_text=model_text[:12]), self.assertRaises(generator.GenerationError) as raised:
-                generator.parse_result(result, {"backend/example.py"})
+                generator.parse_result(completed_text(model_text), {"backend/example.py"})
             self.assertEqual(raised.exception.code, "INVALID_CLAUDE_RESULT")
 
     def test_distinguishes_invalid_cli_envelope_from_model_result(self):
@@ -103,6 +126,14 @@ class GenerateReviewTests(unittest.TestCase):
                         dict(review()["findings"][0], line=True)]:
             value = {"summary": "요약", "findings": [changed]}
             with self.subTest(changed=changed), self.assertRaises(generator.GenerationError) as raised:
+                generator.parse_result(completed(value), {"backend/example.py"})
+            self.assertEqual(raised.exception.code, "INVALID_REVIEW_SCHEMA")
+
+    def test_requires_two_to_five_clean_summary_lines(self):
+        for summary in ("한 줄뿐이다.", "첫 줄이다.\n\n셋째 줄이다.",
+                        "1\n2\n3\n4\n5\n6", " 첫 줄이다.\n둘째 줄이다."):
+            value = dict(review(), summary=summary)
+            with self.subTest(summary=summary), self.assertRaises(generator.GenerationError) as raised:
                 generator.parse_result(completed(value), {"backend/example.py"})
             self.assertEqual(raised.exception.code, "INVALID_REVIEW_SCHEMA")
 
@@ -130,7 +161,10 @@ class GenerateReviewTests(unittest.TestCase):
                     patch.object(generator.subprocess, "run", return_value=completed()), \
                     contextlib.redirect_stdout(output):
                 self.assertEqual(generator.main(), 0)
-            self.assertEqual(output.getvalue(), "REVIEW_GENERATION: PASS\n")
+            self.assertEqual(output.getvalue(),
+                             "REVIEW_GENERATION: PASS\n"
+                             "REVIEW_MODEL: claude-sonnet-4-6\n"
+                             "REVIEW_USAGE: input=120 output=30 cache_read=80 cache_creation=10\n")
             self.assertNotIn("oauth-secret", output.getvalue())
             self.assertNotIn("요약", output.getvalue())
             self.assertEqual(json.loads(output_path.read_text(encoding="utf-8")), review())
