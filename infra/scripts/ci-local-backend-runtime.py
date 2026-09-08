@@ -119,7 +119,8 @@ def prepare(bundle, root, copy_binary, source_installer=None, source_payload=Non
     else:
         work.chmod(0o700)
         payload = source_payload if source_payload is not None else (bundle / 'backend.tar').read_bytes()
-        digest = source_sha if source_sha is not None else inputs.prep.ARCHIVE_SHA
+        digest = (source_sha if source_sha is not None else bundle_source_sha
+                  if bundle_source_sha is not None else inputs.prep.ARCHIVE_SHA)
         source_installer(payload, digest, work)
     # Rebuild path-sensitive derived Gradle workspaces inside the new rootfs.
     # Keep the transferred bundle intact and copy only dependency/distribution data.
