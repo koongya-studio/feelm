@@ -22,7 +22,7 @@ def payload():
             "files": [{"new_path": "backend/example.py"}]}
 
 
-def review(text="정상 요약", findings=None):
+def review(text="변경 로직을 확인했다.\n남은 검증 범위를 확인했다.", findings=None):
     return {"summary": text, "findings": findings or []}
 
 
@@ -36,17 +36,27 @@ def finding(**changes):
 
 class PublishReviewTests(unittest.TestCase):
     def test_comment_has_stable_identifier_sha_and_ai_notice(self):
-        body = publisher.format_comment(review(findings=[finding()]), 123, 7, SHA)
+        body = publisher.format_comment(review(findings=[finding()]), 123, 7, SHA, 3)
         self.assertIn(publisher.marker(123, 7, SHA), body)
         self.assertIn("Claude 자동 코드 리뷰", body)
         self.assertIn(SHA, body)
+        self.assertIn("⚠️ 문제 1건 발견", body)
+        self.assertIn("**변경 파일:** 3개", body)
+        self.assertIn("**심각도:** HIGH 1", body)
+        self.assertIn("검토 범위와 한계", body)
         self.assertIn("승인이나 병합을 의미하지 않습니다", body)
+
+    def test_comment_without_findings_shows_success_first(self):
+        body = publisher.format_comment(review(), 123, 7, SHA, 1)
+        self.assertLess(body.index("✅ 발견된 문제 없음"), body.index("### 검토 결과"))
+        self.assertNotIn("**심각도:**", body)
+        self.assertIn("현재 변경에서 근거가 충분한 문제를 찾지 못했습니다.", body)
 
     def test_untrusted_markdown_is_confined_to_long_enough_code_fence(self):
         malicious = "@all\n/merge\n<script>alert(1)</script>\n```\noutside"
-        body = publisher.format_comment(review(text=malicious), 123, 7, SHA)
+        body = publisher.format_comment(review(text=malicious), 123, 7, SHA, 1)
         self.assertIn("````\n" + malicious + "\n````", body)
-        self.assertNotIn("\n/merge\n", body.split("### 요약", 1)[0])
+        self.assertNotIn("\n/merge\n", body.split("### 검토 요약", 1)[0])
 
     def test_duplicate_from_same_bot_skips_post(self):
         client = Mock(project_id=123)
@@ -98,6 +108,11 @@ class PublishReviewTests(unittest.TestCase):
             with self.subTest(current_review=current_review), self.assertRaises(publisher.PublishError):
                 publisher.validate_files(current_payload, current_review, 7, SHA)
 
+    def test_rejects_review_with_unstructured_summary(self):
+        with self.assertRaises(publisher.PublishError) as raised:
+            publisher.validate_files(payload(), review(text="한 줄뿐이다."), 7, SHA)
+        self.assertEqual(raised.exception.code, "INVALID_REVIEW_FILE")
+
     def test_main_never_prints_comment_or_token(self):
         environment = {"CI_COMMIT_BRANCH": "develop", "CI_COMMIT_REF_PROTECTED": "true",
                        "CI_ENVIRONMENT_NAME": "claude-review", "CI_PIPELINE_SOURCE": "web",
@@ -107,7 +122,7 @@ class PublishReviewTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             input_path, review_path = Path(directory) / "input.json", Path(directory) / "review.json"
             input_path.write_text(json.dumps(payload()), encoding="utf-8")
-            review_path.write_text(json.dumps(review("private review")), encoding="utf-8")
+            review_path.write_text(json.dumps(review("private review\nprivate limitation")), encoding="utf-8")
             output = io.StringIO()
             with patch.dict(os.environ, environment, clear=True), \
                     patch.object(publisher, "INPUT_PATH", input_path), \

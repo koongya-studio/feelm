@@ -191,6 +191,11 @@ def validate_files(payload: object, review: object, iid: int, sha: str) -> None:
             or not isinstance(review["summary"], str) or not review["summary"].strip()
             or not isinstance(review["findings"], list) or len(review["findings"]) > 50):
         raise PublishError("INVALID_REVIEW_FILE")
+    summary_lines = [line.strip() for line in review["summary"].splitlines() if line.strip()]
+    if (not 2 <= len(summary_lines) <= 5
+            or any(len(line.encode("utf-8")) > 1024 for line in summary_lines)
+            or "\n".join(summary_lines) != review["summary"]):
+        raise PublishError("INVALID_REVIEW_FILE")
     expected = {"severity", "file", "line", "condition", "evidence", "recommendation"}
     for finding in review["findings"]:
         if (not isinstance(finding, dict) or set(finding) != expected
@@ -214,26 +219,42 @@ def code_block(value: str) -> str:
     return f"{fence}\n{value}\n{fence}"
 
 
-def format_comment(review: dict[str, object], project_id: int, iid: int, sha: str) -> str:
-    parts = [marker(project_id, iid, sha), "## 🤖 Claude 자동 코드 리뷰",
-             f"검토 커밋: `{sha}`", "### 요약", code_block(review["summary"])]
+def format_comment(review: dict[str, object], project_id: int, iid: int, sha: str,
+                   changed_file_count: int) -> str:
     findings = review["findings"]
+    if findings:
+        result = f"⚠️ 문제 {len(findings)}건 발견"
+    else:
+        result = "✅ 발견된 문제 없음"
+    severity_counts = [f"{severity} {sum(item['severity'] == severity for item in findings)}"
+                       for severity in ("BLOCKER", "HIGH", "MEDIUM", "LOW")
+                       if any(item["severity"] == severity for item in findings)]
+    parts = [marker(project_id, iid, sha), "## 🤖 Claude 자동 코드 리뷰",
+             f"**결과:** {result}  \n**검토 커밋:** `{sha[:12]}`  \n**변경 파일:** {changed_file_count}개"]
+    if severity_counts:
+        parts.append("**심각도:** " + " · ".join(severity_counts))
     if not findings:
         parts.extend(["### 검토 결과", "현재 변경에서 근거가 충분한 문제를 찾지 못했습니다."])
     else:
-        parts.append("### 발견 사항")
+        parts.append("### 발견된 문제")
         for index, finding in enumerate(findings, 1):
             location = finding["file"]
             if finding["line"] is not None:
                 location += ":" + str(finding["line"])
             parts.extend([
                 f"#### {index}. [{finding['severity']}]",
-                "파일", code_block(location),
-                "발생 조건", code_block(finding["condition"]),
-                "근거", code_block(finding["evidence"]),
-                "수정 제안", code_block(finding["recommendation"]),
+                "**위치**", code_block(location),
+                "**발생 조건**", code_block(finding["condition"]),
+                "**근거**", code_block(finding["evidence"]),
+                "**수정 제안**", code_block(finding["recommendation"]),
             ])
-    parts.append("_이 댓글은 자동 생성된 AI 리뷰이며 승인이나 병합을 의미하지 않습니다._")
+    parts.extend([
+        "### 검토 요약", code_block(review["summary"]),
+        "### 검토 범위와 한계",
+        "- MR에서 변경된 diff와 직접 관련된 저장소 규칙·계약을 검토했습니다.\n"
+        "- 변경되지 않은 코드의 전수 검사, 코드 실행, 통합·성능·배포 검증은 포함하지 않습니다.",
+        "> 이 리뷰는 AI가 자동 생성했으며 승인이나 병합을 의미하지 않습니다.",
+    ])
     body = "\n\n".join(parts)
     if len(body.encode("utf-8")) > MAX_COMMENT_BYTES:
         raise PublishError("COMMENT_TOO_LARGE")
@@ -273,7 +294,7 @@ def main() -> int:
         payload = load_private_json(INPUT_PATH, "REVIEW_INPUT_NOT_FOUND")
         review = load_private_json(REVIEW_PATH, "REVIEW_RESULT_NOT_FOUND")
         validate_files(payload, review, iid, sha)
-        body = format_comment(review, project_id, iid, sha)
+        body = format_comment(review, project_id, iid, sha, len(payload["files"]))
         client = GitLabClient(os.environ.get("CI_API_V4_URL", ""), project_id, token)
         result = publish(client, iid, sha, body)
         print("REVIEW_PUBLISH: " + result)
