@@ -13,6 +13,12 @@ class InstallerTests(unittest.TestCase):
         with patch('sys.argv', ['installer']), patch.object(installer, 'install') as install:
             self.assertEqual(installer.main(), 0); install.assert_not_called()
 
+    def test_operator_usernames_are_explicit_and_bounded(self):
+        self.assertEqual(installer.normalized_operators(['infra-user', 'infra-user']),
+                         ['infra-user'])
+        with self.assertRaises(ValueError): installer.normalized_operators([])
+        with self.assertRaises(ValueError): installer.normalized_operators(['bad user'])
+
     def test_paths_are_separate_and_no_token_or_existing_runner_config(self):
         source = Path(installer.__file__).read_text()
         self.assertEqual(installer.TARGET.as_posix(), '/usr/local/lib/feelm-ci222/gitlab')
@@ -25,6 +31,7 @@ class InstallerTests(unittest.TestCase):
         self.assertIn('/usr/local/lib/feelm-ci222/gitlab/ci-dependency-cache.py', installer.SUDOERS_LINE)
         self.assertIn('gitlab-runner ALL=(root) NOPASSWD:', installer.SUDOERS_LINE)
         self.assertNotIn('ubuntu ALL=(root) NOPASSWD:', installer.SUDOERS_LINE)
+        self.assertEqual(installer.OPERATORS, installer.TARGET / 'cache-operators.json')
 
     @unittest.skipUnless(installer.pwd is not None, 'Linux account database required')
     def test_preflight_refuses_any_existing_target(self):

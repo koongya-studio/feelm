@@ -12,6 +12,7 @@ def context(environment=None):
         'CI_PIPELINE_SOURCE': 'web',
         'CI_COMMIT_BRANCH': 'develop',
         'CI_COMMIT_REF_PROTECTED': 'true',
+        'CI_PROJECT_ID': '1441379',
         'CI_PROJECT_PATH': 's15-bigdata-dist-sub1/S15P21E106',
     }
     if any(env.get(name) != value for name, value in required.items()):
@@ -28,10 +29,16 @@ def context(environment=None):
         raise ValueError('CACHE_COMMIT_SHA must be the full MR commit SHA')
     if not 16 <= len(token) <= 4096 or any(character.isspace() for character in token):
         raise ValueError('Missing or invalid CI job token')
-    return {
-        'action': action,
+    identities = {
+        'project_id': int(env.get('CI_PROJECT_ID', '0')),
         'pipeline_id': int(env.get('CI_PIPELINE_ID', '0')),
         'job_id': int(env.get('CI_JOB_ID', '0')),
+    }
+    if any(value <= 0 for value in identities.values()):
+        raise ValueError('Invalid GitLab job identity')
+    return {
+        'action': action,
+        **identities,
         'mr_iid': int(iid),
         'revision': revision,
         'token': token,

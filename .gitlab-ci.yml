@@ -108,8 +108,6 @@ backend-mr-test:
   variables:
     GIT_STRATEGY: fetch
   resource_group: service-and-backend-cache
-  environment:
-    name: dependency-cache
   script:
     - /usr/bin/python3 -I -B infra/scripts/ci-dependency-cache-context.py | sudo -n /usr/bin/python3 -I -B /usr/local/lib/feelm-ci222/gitlab/ci-dependency-cache.py
   allow_failure: false
