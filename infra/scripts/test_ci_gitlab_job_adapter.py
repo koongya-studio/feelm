@@ -26,6 +26,12 @@ def response(script=None):
     }
 
 
+def cache_response():
+    value = response(adapter.CACHE_STATUS_SCRIPT)
+    value['job_info'].update(name=adapter.CACHE_STATUS_JOB, stage='verify')
+    return value
+
+
 def archive(entries):
     output = io.BytesIO()
     with tarfile.open(fileobj=output, mode='w') as stream:
@@ -45,6 +51,8 @@ class AdapterTests(unittest.TestCase):
             adapter.validate_job_response(response(['curl http://metadata/']))
         changed = response(); changed['services'] = [{'name': 'docker'}]
         with self.assertRaises(adapter.PolicyError): adapter.validate_job_response(changed)
+        cache = adapter.validate_job_response(cache_response())
+        self.assertEqual(cache['job_name'], adapter.CACHE_STATUS_JOB)
 
     def test_archive_strips_gitlab_prefix_and_revalidates(self):
         payload = archive([
@@ -88,6 +96,32 @@ class AdapterTests(unittest.TestCase):
             with self.assertRaisesRegex(
                     adapter.PolicyError, r'metadata mismatch: pipeline.sha,commit.id$'):
                 adapter.verify_current_job(object(), context)
+
+    def test_cache_status_reports_exact_dependency_changes_without_running_source(self):
+        context = cache_response()
+        mr = {'iid': 98}
+        with patch.object(adapter, 'read_private_config', return_value=({}, Path('/prepared'))), \
+             patch.object(adapter, 'verify_current_job'), \
+             patch.object(adapter, 'verify_merge_request', return_value=mr), \
+             patch.object(adapter, 'verify_dependency_change', return_value=['backend/build.gradle']) as verify, \
+             patch.object(adapter, 'fetch_source') as fetch, \
+             patch.object(adapter.safety, 'start') as start:
+            self.assertEqual(adapter.run_job(context, opener=object()), 0)
+            verify.assert_called_once()
+            fetch.assert_not_called()
+            start.assert_not_called()
+
+    def test_cache_status_diff_must_include_approved_dependency_file(self):
+        context = adapter.validate_job_response(cache_response())
+        mr = {'iid': 98}
+        with patch.object(adapter, 'request_json', return_value=[
+                {'old_path': 'backend/build.gradle', 'new_path': 'backend/build.gradle'}]):
+            self.assertEqual(adapter.verify_dependency_change(object(), context, mr),
+                             ['backend/build.gradle'])
+        with patch.object(adapter, 'request_json', return_value=[
+                {'old_path': 'backend/src/A.java', 'new_path': 'backend/src/A.java'}]):
+            with self.assertRaises(adapter.PolicyError):
+                adapter.verify_dependency_change(object(), context, mr)
 
     def test_run_passes_token_only_to_api_and_source_to_safety(self):
         source = archive([('prefix/backend/gradlew', b'x', 0o755)])

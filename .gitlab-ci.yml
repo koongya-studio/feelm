@@ -66,6 +66,27 @@ runner-check:
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop"'
 
+backend-cache-status:
+  stage: verify
+  tags:
+    - e106-mr-isolated
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - echo Backend dependency cache refresh required
+  interruptible: true
+  timeout: 5m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
+      changes:
+        - backend/build.gradle
+        - backend/build.gradle.kts
+        - backend/settings.gradle
+        - backend/settings.gradle.kts
+        - backend/gradle.properties
+        - backend/gradle/libs.versions.toml
+        - backend/gradle/wrapper/gradle-wrapper.properties
+
 backend-mr-test:
   stage: test
   tags:
@@ -79,6 +100,46 @@ backend-mr-test:
   timeout: 30m
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
+
+.backend-cache-action:
+  stage: verify
+  tags:
+    - e106-shell
+  variables:
+    GIT_STRATEGY: fetch
+  resource_group: service-and-backend-cache
+  environment:
+    name: dependency-cache
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-dependency-cache-context.py | sudo -n /usr/bin/python3 -I -B /usr/local/lib/feelm-ci222/gitlab/ci-dependency-cache.py
+  allow_failure: false
+
+backend-cache-prepare:
+  extends: .backend-cache-action
+  variables:
+    CACHE_ACTION: prepare
+  timeout: 60m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web" && $CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CACHE_ACTION == "prepare"'
+      when: manual
+
+backend-cache-promote:
+  extends: .backend-cache-action
+  variables:
+    CACHE_ACTION: promote
+  timeout: 10m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web" && $CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CACHE_ACTION == "promote"'
+      when: manual
+
+backend-cache-rollback:
+  extends: .backend-cache-action
+  variables:
+    CACHE_ACTION: rollback
+  timeout: 10m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "web" && $CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CACHE_ACTION == "rollback"'
+      when: manual
 
 backend-test:
   stage: test
@@ -116,7 +177,7 @@ deploy-backend:
     - e106-shell
   needs:
     - backend-image
-  resource_group: service-deployment
+  resource_group: service-and-backend-cache
   environment:
     name: service
   before_script:

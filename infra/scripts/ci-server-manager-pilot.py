@@ -109,9 +109,13 @@ def prepare(base, cache_manifest, cache_root, manifest_sha):
     if shutil.disk_usage(base).free < 12 * 1024**3:
         raise ValueError('At least 12 GiB free required')
     bundle = base / 'bundle'; bundle.mkdir()
-    copy_checked(base / 'backend.tar', bundle / 'backend.tar', backend.inputs.prep.ARCHIVE_SHA, 64 * 1024**2)
     copy_checked(cache_manifest, bundle / 'cache-manifest.json', manifest_sha, 32 * 1024**2)
     metadata = json.loads((bundle / 'cache-manifest.json').read_text())
+    revision = metadata.get('revision')
+    source_sha = metadata.get('archive_sha256')
+    if not re.fullmatch(r'[0-9a-f]{40}', revision or ''):
+        raise ValueError('Cache manifest lacks a full reviewed revision')
+    copy_checked(base / 'backend.tar', bundle / 'backend.tar', source_sha, 64 * 1024**2)
     entries = metadata['cache']
     if not 0 < len(entries) <= 100000 or sum(x['size'] for x in entries.values()) > 2 * 1024**3:
         raise ValueError('Cache manifest exceeds limits')
@@ -135,10 +139,13 @@ def prepare(base, cache_manifest, cache_root, manifest_sha):
     run(['dpkg-deb', '-x', str(debs[0]), str(package / 'extracted')])
     nspawn = package / 'extracted/usr/bin/systemd-nspawn'
     version_text = run([str(nspawn), '--version'], capture_output=True, text=True).stdout
-    backend.inputs.inspect_bundle(bundle, manifest_sha, backend.JDK_SHA)
+    backend.inputs.inspect_bundle(bundle, manifest_sha, backend.JDK_SHA,
+                                  expected_revision=revision, source_sha=source_sha)
     tools = {'systemd': version, 'nspawn_version': version_text.splitlines()[0],
              'nspawn_sha': backend.inputs.prep.digest(nspawn),
-             'docker_sha': DOCKER_SHA, 'source_revision': backend.inputs.prep.REVISION,
+             'docker_sha': DOCKER_SHA, 'source_revision': revision,
+             'source_archive_sha256': source_sha,
+             'dynamic_identity': metadata.get('dynamic_identity') is True,
              'cache_manifest_sha256': manifest_sha}
     (base / 'prepared.json').write_text(json.dumps(tools, indent=2))
     print('SERVER_PREPARATION: PASS; files only, no host packages installed', flush=True)
@@ -200,7 +207,9 @@ def build_root(base, attempt, action):
         backend.prepare(base / 'bundle', root, manager.copy_binary,
                         source_installer=job_io.install_snapshot,
                         source_payload=source_payload, source_sha=source_sha,
-                        manifest_sha=prepared['cache_manifest_sha256'])
+                        manifest_sha=prepared['cache_manifest_sha256'],
+                        expected_revision=prepared['source_revision'],
+                        bundle_source_sha=prepared['source_archive_sha256'])
         if action != 'backend':
             (root / 'backend-check.sh').write_text(backend_lifecycle_payload())
         script += '\n/bin/sh /backend-check.sh\n'
@@ -395,7 +404,11 @@ class BackendJobDriver:
             return {'passed': process_exit == 0 and marker in contents}
         destination = self.attempt / 'evidence'; destination.mkdir(mode=0o700)
         expected_tests = 90
-        if self.safety_lease is not None and self.safety_lease.get('source_sha') is not None:
+        dynamic_source = self.safety_lease is not None and self.safety_lease.get('source_sha') is not None
+        if not dynamic_source:
+            dynamic_source = json.loads((self.prepared / 'prepared.json').read_text()).get(
+                'dynamic_identity') is True
+        if dynamic_source:
             expected_tests = None
         try:
             result = job_io.collect_reports(self.attempt / 'root', destination, process_exit,

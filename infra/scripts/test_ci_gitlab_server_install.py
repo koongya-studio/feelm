@@ -22,6 +22,7 @@ class InstallerTests(unittest.TestCase):
         self.assertNotIn('systemctl\', \'enable', source)
         self.assertNotIn('systemctl\', \'start', source)
         self.assertIn('/usr/local/lib/feelm-ci222/gitlab/ci-gitlab-job-adapter.py run', installer.SUDOERS_LINE)
+        self.assertIn('/usr/local/lib/feelm-ci222/gitlab/ci-dependency-cache.py', installer.SUDOERS_LINE)
 
     @unittest.skipUnless(installer.pwd is not None, 'Linux account database required')
     def test_preflight_refuses_any_existing_target(self):
