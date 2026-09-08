@@ -74,6 +74,9 @@ public class SecurityConfig {
                         auth ->
                                 auth.requestMatchers(HttpMethod.GET, "/actuator/health")
                                         .permitAll()
+                                        // API-044 기준정보는 로그인 화면에서도 사용할 수 있는 공개 조회다.
+                                        .requestMatchers(HttpMethod.GET, "/api/v1/popcorn-flavors")
+                                        .permitAll()
                                         .requestMatchers(PUBLIC_PATHS)
                                         .permitAll()
                                         .anyRequest()

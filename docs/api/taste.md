@@ -95,8 +95,8 @@
 | 인증 | 회원 |
 | 관련 요구사항 | FR-06, FR-09, FR-32 |
 | 화면 | ⑨ 팝콘 버킷 |
-| 미정 사항 | 있음 |
-| 비고 | 새로운 맛 판정 방식·임계치 및 발견 추천과의 연결 미정 |
+| 미정 사항 | 없음 |
+| 비고 | 8개 맛을 항상 반환하며 평가 영화가 없는 맛은 0개로 표시 |
 
 ### 설명
 
@@ -125,7 +125,6 @@
 ```json
 {
   "totalCount": 42,
-  "newFlavorThreshold": 3,
   "flavors": [
     {
       "flavorCode": "FLAVOR_X",
@@ -133,7 +132,6 @@
       "color": "#E63946",
       "popcornCount": 12,
       "averageScore": 4.4,
-      "isNewFlavor": false,
       "discoveredAt": "2026-07-01T00:00:00Z"
     }
   ]
@@ -141,7 +139,6 @@
 ```
 
 - 8개 맛을 항상 모두 포함하며 팝콘이 없으면 `popcornCount: 0`, `averageScore: null`
-- `newFlavorThreshold: 3`과 `isNewFlavor`는 기존 경험량 기반 가정의 예시다. 필드를 유지하되 판정 방식·기준값이 확정된 것으로 해석하지 않는다
 
 ### 오류 응답
 
@@ -150,9 +147,9 @@
 ### 처리 규칙
 
 - `ratings JOIN movies`를 `movies.representative_flavor_id`로 그룹화해 수량·평균 평점·최초 평가 시각을 계산한다
+- 팝콘 맛 8개를 항상 반환하고 집계 결과가 없는 맛은 `popcornCount: 0`, `averageScore: null`로 반환한다
 - 팝콘 수와 선호도는 독립 지표로 구분해 표시한다
-- 새로운 맛 표시는 K-Means 취향 군집을 기반으로 한다. `isNewFlavor`의 판정 방식과 취향 발견 추천(FR-12) 후보 자격과의 관계는 미정이다
-- `popcornCount < newFlavorThreshold`는 검토할 가정이며 확정 규칙이 아니다. 감상량과 선호도를 혼동하거나 이 조건의 나머지를 자동으로 맞춤 추천으로 분류하지 않는다
+- 감상량 임계값이나 임계값 기반 `isNewFlavor`를 사용하지 않는다. 취향 발견 추천(FR-12)의 판정은 별도 기준으로 다룬다
 - `discoveredAt`은 확장 기능 FR-32용으로 예약. 1차에서는 `null` 가능
 
 ### 상태값
@@ -161,8 +158,7 @@
 
 ### 미정 사항
 
-- [ ] `isNewFlavor` 판정 방식·기준값과 취향 발견 추천 후보 자격과의 관계
-- [ ] 경험량 임계치 방식 채택 여부에 따른 `newFlavorThreshold`의 의미·값·필드 유지 여부
+없음
 
 ## API-042 내 필름(프레임 목록) 조회
 
