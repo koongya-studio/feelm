@@ -9,12 +9,13 @@ ConditionPathExists=/etc/feelm-ci-review/enable-webhook
 Type=simple
 User=feelm-ci-review
 Group=feelm-ci-review
-WorkingDirectory=/tmp
+WorkingDirectory=/run/feelm-claude-review
 Environment=CLAUDE_REVIEW_GITLAB_API_URL=https://lab.ssafy.com/api/v4
 Environment=CLAUDE_REVIEW_PROJECT_ID=1441379
-Environment=CLAUDE_REVIEW_WEBHOOK_PORT=8765
 LoadCredential=webhook-token:/etc/feelm-ci-review/webhook-token
 LoadCredential=gitlab-api-token:/etc/feelm-ci-review/gitlab-api-token
+RuntimeDirectory=feelm-claude-review
+RuntimeDirectoryMode=0755
 UMask=0077
 ExecStartPre=+/usr/bin/python3 -I -B /usr/local/lib/feelm-ci-review/network-guard.py verify
 ExecStart=/usr/bin/python3 -I -B /usr/local/lib/feelm-ci-review/comment-trigger.py

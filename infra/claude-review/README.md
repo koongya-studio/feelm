@@ -249,12 +249,15 @@ finding으로 반복하지 않도록 요청한다. MR 설명만 인용한 프로
 3. 충분히 긴 임의값을 `/etc/feelm-ci-review/webhook-token`, API scope와 파이프라인 생성 및
    멤버 조회 권한을 가진 전용 Project Access Token을 `gitlab-api-token`에 root 소유 0400으로
    저장한다. 토큰 원문은 저장소, CI 변수나 로그에 넣지 않는다.
-4. 127.0.0.1:8765의 `/hooks/gitlab/claude-review`만 외부 HTTPS 경로로 전달하도록 기존
-   reverse proxy를 설정한다. 요청 본문 제한은 64 KiB로 둔다.
+4. Webhook 서비스를 먼저 시작해 `/run/feelm-claude-review/webhook.sock`을 만들고,
+   Compose로 이 디렉터리를 Nginx에 읽기 전용 마운트한다. Nginx는 정확한
+   `/hooks/gitlab/claude-review` 경로만 Unix socket으로 전달하며 요청 본문을 64 KiB로 제한한다.
 5. GitLab Project Webhook에서 Comments 이벤트와 secret token을 등록하고 SSL 검증을 유지한다.
 6. `/etc/feelm-ci-review/enable-webhook`을 만든 뒤 서비스를 시작한다.
 
-Webhook의 공개 URL과 reverse proxy 구성은 서버별 값이라 저장소에 고정하지 않는다. 최초
+Webhook의 공개 URL은 `https://j15e106.p.ssafy.io/hooks/gitlab/claude-review`다. socket은
+컨테이너 밖의 호스트 TCP 포트를 열지 않으며 로컬 프로세스의 연결도 Webhook secret 검증을
+통과해야 한다. 최초
 적용 시 권한 없는 사용자, 다른 프로젝트, 일반 댓글, 닫힌 MR이 파이프라인을 만들지 못하는지
 확인하고 `/claude-review` 한 번이 보호된 develop의 `claude-mr-review` 하나만 실행하는지
 검증한다. 5분 제한은 단일 프로세스 메모리 기준이므로 서비스 재시작을 가로지르는 남용 방지는
