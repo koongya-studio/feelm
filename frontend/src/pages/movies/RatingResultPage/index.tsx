@@ -97,7 +97,14 @@ export default function RatingResultPage() {
             <span className={styles.emptyFrame} aria-hidden="true" />
 
             <span className={styles.newFrame}>
-              <Poster width={166} height={160} radius={4} src={posterUrl ?? undefined} title="" />
+              <Poster
+                width={166}
+                height={160}
+                radius={4}
+                src={posterUrl ?? undefined}
+                title=""
+                seed={rating.movieId}
+              />
               {!done ? (
                 <span className={styles.newBadge} aria-hidden="true">
                   <HeartIcon />

@@ -40,7 +40,14 @@ export default function TodayRecommendationCard({ item, otts }: Props) {
         aria-label={`${movie.title} 상세 보기`}
       >
         {/* 링크가 이름을 제공하므로 포스터의 대체 텍스트는 비운다 */}
-        <Poster width={104} height={148} radius={8} src={movie.posterUrl ?? undefined} title="" />
+        <Poster
+          width={104}
+          height={148}
+          radius={8}
+          src={movie.posterUrl ?? undefined}
+          title=""
+          seed={movie.movieId}
+        />
       </Link>
 
       <div className={styles.info}>

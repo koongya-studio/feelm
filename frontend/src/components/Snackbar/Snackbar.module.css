@@ -8,6 +8,15 @@
   border-radius: 12px;
   background: var(--color-nav-active);
   color: var(--color-on-dark);
+  animation: slideUp var(--motion-base) var(--ease-out) both;
+}
+
+/* 아래에서 올라온다. 어디서 나타났는지 알 수 있을 만큼만 (2.8 상태 전환) */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
 }
 
 .message {

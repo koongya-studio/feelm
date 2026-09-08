@@ -161,20 +161,38 @@ export default function MovieDetailPage() {
 
   return (
     <div className={styles.page}>
+      {/*
+       * 백드롭이 어두운 면이 되어(B안 「암실」, 2026-09-08) 기본 outline 변형으로는
+       * 두 버튼이 읽히지 않는다. 포스터 위에 얹히는 다른 버튼과 같은 translucent를 쓴다.
+       */}
       <div className={styles.floating}>
         <IconButton
           label="뒤로 가기"
           icon={<ChevronLeftIcon />}
           size={34}
+          variant="translucent"
           onClick={() => void navigate(-1)}
         />
         {/* 동작이 정의되지 않아 비활성이다 */}
-        <IconButton label="더 보기" icon={<MoreVerticalIcon />} size={34} disabled />
+        <IconButton
+          label="더 보기"
+          icon={<MoreVerticalIcon />}
+          size={34}
+          variant="translucent"
+          disabled
+        />
       </div>
 
       <div className={styles.scroll}>
         <div className={styles.backdrop}>
-          <Poster width={412} height={340} radius={0} src={movie.posterUrl ?? undefined} title="" />
+          <Poster
+            width={412}
+            height={340}
+            radius={0}
+            src={movie.posterUrl ?? undefined}
+            title=""
+            seed={movie.movieId}
+          />
           <span className={styles.backdropFade} aria-hidden="true" />
         </div>
 
@@ -314,6 +332,7 @@ export default function MovieDetailPage() {
                       radius={6}
                       src={item.posterUrl ?? undefined}
                       title=""
+                      seed={item.movieId}
                     />
                     <span className={styles.similarReason}>{item.reason.summary}</span>
                     <span className={styles.similarTitle}>{item.title}</span>

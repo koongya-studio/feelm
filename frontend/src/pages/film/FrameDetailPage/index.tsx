@@ -110,6 +110,7 @@ export default function FrameDetailPage() {
               radius={4}
               src={movie.posterUrl ?? undefined}
               title={movie.title}
+              seed={movie.movieId}
             />
           </FilmStrip>
         </div>

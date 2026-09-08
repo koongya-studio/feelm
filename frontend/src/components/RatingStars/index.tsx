@@ -6,7 +6,11 @@
  * 계약도 같은 규칙이다 (FR-19, API-036 `multipleOf: 0.5`, `erd.md` CHECK).
  *
  * 별 모양과 반쪽 별 그라디언트는 와이어프레임의 SVG를 그대로 쓴다.
- * 채운 별 #3C3A36, 빈 별은 흰 배경에 #8A8781 테두리.
+ * 빈 별은 흰 배경에 #8A8781 테두리(와이어프레임 실측값)다.
+ *
+ * 채운 별은 와이어프레임의 #3C3A36에서 **accent(`--color-accent-mark`)로 바꿨다**
+ * (디자인 방향 B안 「암실」, 2026-09-08 — accent 적용 지점 3/4).
+ * 별점은 사용자가 남긴 판단이고, 화면에서 잉크와 구별돼야 하는 몇 안 되는 값이다.
  *
  * score는 원본 값을 그대로 받는다. 별 렌더링은 0.5 단위로 맞추되
  * 숫자 표시와 보조기술 읽기는 원본 값을 쓴다. 2.4의 평균 별점처럼
@@ -66,7 +70,7 @@ export default function RatingStars({ score, size = 17, gap = 1, showValue = fal
           <svg width="0" height="0" className={styles.defs} focusable="false">
             <defs>
               <linearGradient id={gradientId}>
-                <stop offset="50%" stopColor="var(--color-nav-active)" />
+                <stop offset="50%" stopColor="var(--color-accent-mark)" />
                 <stop offset="50%" stopColor="var(--color-bg)" />
               </linearGradient>
             </defs>
@@ -79,7 +83,7 @@ export default function RatingStars({ score, size = 17, gap = 1, showValue = fal
               d={STAR_PATH}
               fill={
                 fill === 'full'
-                  ? 'var(--color-nav-active)'
+                  ? 'var(--color-accent-mark)'
                   : fill === 'half'
                     ? `url(#${gradientId})`
                     : 'var(--color-bg)'

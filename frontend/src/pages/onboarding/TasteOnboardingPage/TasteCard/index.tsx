@@ -22,6 +22,8 @@ import type { TasteValue } from '../tasteValue';
 import { tasteValueLabel } from '../tasteValue';
 
 type Props = {
+  /** 자리표시자 색조를 고르는 값 (Poster) */
+  movieId: number;
   title: string;
   posterUrl: string | null;
   value: TasteValue;
@@ -34,6 +36,7 @@ type Props = {
 };
 
 export default function TasteCard({
+  movieId,
   title,
   posterUrl,
   value,
@@ -58,7 +61,14 @@ export default function TasteCard({
         onClick={onClick}
         aria-label={`${title}, ${tasteValueLabel(value)}`}
       >
-        <Poster width={58} height={82} radius={8} src={posterUrl ?? undefined} title="" />
+        <Poster
+          width={58}
+          height={82}
+          radius={8}
+          src={posterUrl ?? undefined}
+          title=""
+          seed={movieId}
+        />
       </button>
 
       <button type="button" className={styles.remove} onClick={onRemove}>

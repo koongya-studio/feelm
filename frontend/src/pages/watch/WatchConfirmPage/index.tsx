@@ -140,7 +140,14 @@ export default function WatchConfirmPage() {
 
   return (
     <div className={styles.page}>
-      <Poster width={120} height={168} radius={10} src={movie.posterUrl ?? undefined} title="" />
+      <Poster
+        width={120}
+        height={168}
+        radius={10}
+        src={movie.posterUrl ?? undefined}
+        title=""
+        seed={movie.movieId}
+      />
 
       <div className={styles.movie}>
         <p className={styles.title}>{movie.title}</p>
