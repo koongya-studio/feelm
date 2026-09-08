@@ -41,6 +41,7 @@ export default function RecommendationCard({ item, otts, menuOpen, onOpenMenu }:
     <div className={styles.card}>
       <Link
         to={path.movieDetail(movie.movieId)}
+        state={{ recommendationItemId: item.recommendationItemId }}
         className={styles.posterLink}
         aria-label={`${movie.title} 상세 보기`}
       >

@@ -67,24 +67,27 @@ export default function MovieRatingPage() {
         }
       });
 
-    void Promise.all([getWatchRecords(), getOtts()]).then(([records, otts]) => {
-      // 목록은 최근 순이므로 가장 최근에 감상을 확인한 기록을 쓴다
-      const record = records.items.find(
-        (item) => item.movie.movieId === id && item.watchedAt !== null,
-      );
+    // 감상 정보 줄에만 쓰이므로 실패하면 그 줄만 표시하지 않는다
+    Promise.all([getWatchRecords(), getOtts()])
+      .then(([records, otts]) => {
+        // 목록은 최근 순이므로 가장 최근에 감상을 확인한 기록을 쓴다
+        const record = records.items.find(
+          (item) => item.movie.movieId === id && item.watchedAt !== null,
+        );
 
-      if (!active || !record?.watchedAt) {
-        return;
-      }
+        if (!active || !record?.watchedAt) {
+          return;
+        }
 
-      const ottName = otts.find((ott) => ott.ottId === record.ott.ottId)?.name;
+        const ottName = otts.find((ott) => ott.ottId === record.ott.ottId)?.name;
 
-      setWatchNote(
-        ottName
-          ? `${formatMonthDay(record.watchedAt)} · ${ottName}에서 시청`
-          : formatMonthDay(record.watchedAt),
-      );
-    });
+        setWatchNote(
+          ottName
+            ? `${formatMonthDay(record.watchedAt)} · ${ottName}에서 시청`
+            : formatMonthDay(record.watchedAt),
+        );
+      })
+      .catch(() => undefined);
 
     return () => {
       active = false;

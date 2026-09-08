@@ -21,7 +21,7 @@
  * 있으면 그 점수를 함께 보여주고 문구는 그대로 둔다.
  */
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router';
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import IconButton from '../../../components/IconButton';
 import OttBadge from '../../../components/OttBadge';
 import Poster from '../../../components/Poster';
@@ -51,7 +51,16 @@ export default function MovieDetailPage() {
   const navigate = useNavigate();
 
   const id = Number(movieId);
-  const recommendationItemId = Number(searchParams.get('recommendationItemId')) || undefined;
+
+  /*
+   * 추천 경로로 들어왔는지는 Router state로 받는다(frontend-structure.md 6.2 —
+   * `recommendationItemId`는 없어도 화면이 성립하는 부가 정보다). state가 없으면
+   * 추천 이유 영역을 표시하지 않으며 계약도 같다(API-030, 6.3 대체 동작).
+   * URL 질의는 이 화면을 URL만으로 확인할 때를 위한 대체 경로로 남겨 둔다.
+   */
+  const routeState = useLocation().state as { recommendationItemId?: number } | null;
+  const queryItemId = Number(searchParams.get('recommendationItemId')) || undefined;
+  const recommendationItemId = routeState?.recommendationItemId ?? queryItemId;
 
   const [movie, setMovie] = useState<MovieDetail | null>(null);
   const [similar, setSimilar] = useState<SimilarMovie[]>([]);
@@ -126,6 +135,7 @@ export default function MovieDetailPage() {
         </div>
 
         <StatusView
+          titleAs="h1"
           title="영화 정보를 불러오지 못했어요"
           description="주소가 잘못되었거나 잠시 문제가 생겼어요"
         >

@@ -52,7 +52,10 @@ export default function RecommendationsPage() {
   const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
-    void getOtts().then(setOtts);
+    // OTT 기준정보는 실패해도 배지가 코드를 쓰므로 화면을 막지 않는다
+    getOtts()
+      .then(setOtts)
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -262,6 +265,7 @@ export default function RecommendationsPage() {
 
               <Link
                 to={path.movieDetail(openMenu.item.movie.movieId)}
+                state={{ recommendationItemId: openMenu.item.recommendationItemId }}
                 className={styles.menuItem}
                 onClick={() => setOpenMenu(null)}
               >

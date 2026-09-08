@@ -18,6 +18,13 @@
  * 오류 종류(503 · 401 · 네트워크 단절)를 문구로 구분하지 않는다. 인증 화면(0.x)이
  * 범위 밖이라 401을 따로 다룰 수단이 없다(팀 결정 2026-09-08 —
  * `screen-spec.md` 2.2-A 미확정 항목).
+ *
+ * `role="status"`는 화면 전체를 덮는 형태에만 붙인다. 2.1처럼 인라인 안내가 여러 개
+ * 붙는 화면에서 라이브 영역을 여럿 두면 보조기술이 동시에 여러 개를 읽는다
+ * (`common-components.md` 6.5는 스낵바와 진행 상태에만 `role="status"`를 정하고 있다).
+ *
+ * 제목의 요소는 `titleAs`로 고른다. 화면에 다른 `h1`이 없는 2.4 · 2.4-A의 오류 상태는
+ * 이 제목이 그 화면의 제목이 된다(화면마다 `h1` 하나 — `common-components.md` 6.5).
  */
 import styles from './StatusView.module.css';
 import type { ReactNode } from 'react';
@@ -27,6 +34,8 @@ type Props = {
   variant?: 'error' | 'empty';
   /** `screen`은 2.2-A 형태로 화면을 채우고, `inline`은 섹션 자리에 들어간다 */
   size?: 'screen' | 'inline';
+  /** 화면에 다른 `h1`이 없을 때 `h1`로 둔다 */
+  titleAs?: 'p' | 'h1';
   /** 무엇이 문제인지 */
   title: string;
   /** 회복 방법이나 보충 안내 (`common-components.md` 6.6) */
@@ -38,12 +47,20 @@ type Props = {
 export default function StatusView({
   variant = 'error',
   size = 'screen',
+  titleAs = 'p',
   title,
   description,
   children,
 }: Props) {
+  const Title = titleAs;
+
   return (
-    <div className={styles.area} data-size={size} data-variant={variant} role="status">
+    <div
+      className={styles.area}
+      data-size={size}
+      data-variant={variant}
+      role={size === 'screen' ? 'status' : undefined}
+    >
       {variant === 'error' && size === 'screen' ? (
         <span className={styles.mark} aria-hidden="true">
           <span className={styles.markStrip} data-edge="top" />!
@@ -52,7 +69,7 @@ export default function StatusView({
       ) : null}
 
       <div className={styles.text}>
-        <p className={styles.title}>{title}</p>
+        <Title className={styles.title}>{title}</Title>
         {description ? <p className={styles.description}>{description}</p> : null}
       </div>
 
