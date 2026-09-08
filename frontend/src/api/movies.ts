@@ -5,6 +5,7 @@
 import { findMockMovieDetail } from '../mocks/movieDetails';
 import { findMockSimilarMovies } from '../mocks/similarMovies';
 import { mockReviews } from '../mocks/reviews';
+import { findLatestWatchRecordByMovie, findRatingByMovie } from '../mocks/sessionStore';
 import { respond, respondError } from './mockTransport';
 import type { MovieDetail, SimilarMovie } from '../types/movie';
 import type { PublicReview } from '../types/watch';
@@ -25,12 +26,31 @@ export async function getMovieDetail(
     return respondError(404, 'RESOURCE_NOT_FOUND', '영화를 찾을 수 없습니다.');
   }
 
+  /*
+   * 이번 세션에 평가했거나 OTT 링크를 눌렀으면 그 상태를 얹는다. 2.4의 `내 별점 남기기`와
+   * `감상평`이 방금 남긴 값을 보여주게 된다.
+   */
+  const rating = findRatingByMovie(movieId);
+  const watchRecord = findLatestWatchRecordByMovie(movieId);
+  const withSession = {
+    ...detail,
+    myRating: rating
+      ? {
+          ratingId: rating.ratingId,
+          score: rating.score,
+          comment: rating.comment,
+          visibility: rating.visibility,
+        }
+      : detail.myRating,
+    myWatchStatus: rating ? ('RATED' as const) : (watchRecord?.status ?? detail.myWatchStatus),
+  };
+
   if (recommendationItemId === undefined) {
-    return respond(detail);
+    return respond(withSession);
   }
 
   return respond({
-    ...detail,
+    ...withSession,
     recommendation: {
       recommendationItemId,
       type: 'TASTE' as const,

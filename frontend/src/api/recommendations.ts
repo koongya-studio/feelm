@@ -5,6 +5,7 @@
  * 화면은 src/mocks/를 직접 import하지 않고 이 파일만 호출한다.
  */
 import { findMockReplacement, mockRecommendationSet } from '../mocks/recommendations';
+import { addDismissedMovie, getDismissedMovieIds } from '../mocks/sessionStore';
 import { respond, respondError } from './mockTransport';
 import type { MockScenario } from './mockTransport';
 import type { DismissResultView, RecommendationSetView } from '../types/unspecified';
@@ -26,7 +27,23 @@ export async function getRecommendations(
     );
   }
 
-  return respond(mockRecommendationSet);
+  /*
+   * 관심없음 처리한 영화는 다시 추천하지 않는다(API-047 처리 규칙). 이번 세션의
+   * 처리 내역을 반영하므로 홈으로 나갔다 돌아와도 그대로다.
+   * 자리가 빈 만큼 같은 유형의 교체 후보를 채운다.
+   */
+  const dismissed = getDismissedMovieIds();
+  const items = mockRecommendationSet.items.flatMap((item) => {
+    if (!dismissed.includes(item.movie.movieId)) {
+      return [item];
+    }
+
+    const replacement = findMockReplacement(item.type);
+
+    return replacement && !dismissed.includes(replacement.movie.movieId) ? [replacement] : [];
+  });
+
+  return respond({ ...mockRecommendationSet, items });
 }
 
 /**
@@ -42,6 +59,8 @@ export async function dismissMovie(
   const item = mockRecommendationSet.items.find(
     (candidate) => candidate.recommendationItemId === recommendationItemId,
   );
+
+  addDismissedMovie(movieId);
 
   return respond({
     movieId,

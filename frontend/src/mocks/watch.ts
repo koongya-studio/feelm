@@ -1,23 +1,21 @@
 /*
  * 감상 기록과 평가 목업. API-033 · API-035 · API-036
  *
- * 이번 단계는 세션 동안 상태를 유지하지 않는다(업무 -262에서 다룬다). 여기서는
- * 화면이 한 번 흐름을 완주할 수 있을 만큼의 값만 만들어 돌려준다.
+ * 여기에는 값을 만드는 함수만 둔다. 만들어진 감상 기록과 평가는 mocks/sessionStore.ts에
+ * 쌓이고, `src/api/`가 기준 목업과 합쳐 응답을 만든다(업무 -262).
  *
- * 2.6 · 2.7의 `99프레임`과 `팝콘 버킷 99알 → 100알`은 와이어프레임 수치를 기준으로
- * 잡았다. `이번 주 +3`은 계약에 대응 필드가 없어 목업에만 둔다
- * (types/unspecified.ts의 `weeklyFrameDelta`).
+ * 프레임 수와 팝콘 알 수는 더 이상 여기 고정값으로 두지 않는다. 기준값은
+ * mocks/user.ts · mocks/frames.ts · mocks/popcornBucket.ts의 100이고, 현재 수치는
+ * 거기에 이번 세션의 평가를 더해 계산한다.
  */
 import type { Rating, WatchConfirmResult, WatchRecord } from '../types/watch';
 import type { Visibility } from '../types/enums';
 
-/** 평가 전 기준 수치. 와이어프레임 2.6의 `99프레임`과 `99알`에 맞춘다 */
-export const mockCountsBeforeRating = {
-  frameCount: 99,
-  popcornCount: 99,
-  /** 계약에 없음 (types/unspecified.ts) */
-  weeklyFrameDelta: 3,
-};
+/**
+ * 이번 주에 추가된 프레임 수의 기준값. **계약에 대응 필드가 없다**
+ * (types/unspecified.ts의 `weeklyFrameDelta`). 와이어프레임 2.6의 `이번 주 +3`이다.
+ */
+export const BASE_WEEKLY_FRAME_DELTA = 3;
 
 let nextWatchRecordId = 5001;
 let nextRatingId = 91;

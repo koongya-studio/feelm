@@ -3,6 +3,7 @@
  * 대응 명세는 docs/api/onboarding-ott.md이다.
  */
 import { mockOnboardingCards } from '../mocks/onboarding';
+import { saveOnboardingPreferences } from '../mocks/sessionStore';
 import { respond } from './mockTransport';
 import type { OnboardingCard, OnboardingPreference } from '../types/onboarding';
 import type { OnboardingSubmitResult } from '../types/onboarding';
@@ -24,6 +25,9 @@ export async function submitOnboardingPreferences(
   skipped: boolean,
 ): Promise<OnboardingSubmitResult> {
   const saved = skipped ? [] : preferences;
+
+  // 세션 동안 유지한다. 홈 추천에 반영하는 것은 업무 -263이다
+  saveOnboardingPreferences(saved);
 
   return respond({
     onboardingCompleted: true,

@@ -12,21 +12,28 @@
 const HANGUL_START = 0xac00;
 const HANGUL_END = 0xd7a3;
 
-/** 마지막 글자에 받침이 있는지. 한글 음절이 아니면 false */
-function hasFinalConsonant(word: string): boolean {
+/** 마지막 글자의 받침 번호. 한글 음절이 아니거나 받침이 없으면 0 */
+function finalConsonant(word: string): number {
   const last = word.trim().at(-1);
 
   if (!last) {
-    return false;
+    return 0;
   }
 
   const code = last.charCodeAt(0);
 
   if (code < HANGUL_START || code > HANGUL_END) {
-    return false;
+    return 0;
   }
 
-  return (code - HANGUL_START) % 28 !== 0;
+  return (code - HANGUL_START) % 28;
+}
+
+/** 받침 ㄹ의 번호 */
+const RIEUL = 8;
+
+function hasFinalConsonant(word: string): boolean {
+  return finalConsonant(word) !== 0;
 }
 
 /** 주격 조사 `이` / `가` */
@@ -37,4 +44,16 @@ export function subjectParticle(word: string): string {
 /** 접속 조사 `과` / `와` */
 export function conjunctionParticle(word: string): string {
   return hasFinalConsonant(word) ? '과' : '와';
+}
+
+/**
+ * 방향 · 수단 조사 `으로` / `로`. 받침 ㄹ은 `로`를 쓴다.
+ *
+ * 2.4-A의 `{OTT 이름}로 이동한 지 2일이 지났어요`에 쓴다. OTT 이름은 API-025가 내려주는
+ * 값이라 `티빙으로`처럼 받침에 따라 조사가 달라진다.
+ */
+export function directionParticle(word: string): string {
+  const final = finalConsonant(word);
+
+  return final === 0 || final === RIEUL ? '로' : '으로';
 }
