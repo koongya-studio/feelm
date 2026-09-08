@@ -18,6 +18,22 @@
 import type { OnboardingPreference } from '../types/onboarding';
 import type { Rating, WatchRecord } from '../types/watch';
 
+/**
+ * 저장소가 보관하는 감상 기록.
+ *
+ * API-033 응답(`WatchRecord`)에는 없지만 API-034 목록이 함께 내려주는 값
+ * (`ott` · `watchedAt` · `ratingId`)을 붙인 것이다. 서버라면 한 행에 들어 있을 값이라
+ * 목업도 한 곳에 모아 두고, `src/api/`가 API별 응답 모양으로 잘라 내려준다.
+ */
+export type StoredWatchRecord = WatchRecord & {
+  /** 어느 OTT 링크를 눌렀는지 (API-033 요청 본문의 `ottId`) */
+  ottId: number;
+  /** 감상 확인에서 `봤어요`를 고른 시각 (API-035) */
+  watchedAt: string | null;
+  /** 이 기록으로 이어진 평가 (API-036) */
+  ratingId: number | null;
+};
+
 type SessionState = {
   /** API-024로 저장한 초기 취향. 건너뛰면 빈 배열 */
   onboardingPreferences: OnboardingPreference[];
@@ -29,8 +45,8 @@ type SessionState = {
   subscribedOttIds: number[] | null;
   /** API-047로 관심없음 처리한 영화 */
   dismissedMovieIds: number[];
-  /** API-033 · API-035 감상 기록 */
-  watchRecords: WatchRecord[];
+  /** API-033 · API-034 · API-035 감상 기록 */
+  watchRecords: StoredWatchRecord[];
   /** API-036 평가. 영화당 한 번만 반영된다 */
   ratings: Rating[];
 };
@@ -97,15 +113,20 @@ export function isDismissed(movieId: number): boolean {
 
 // ─────────────────────────────────────────── 감상 기록
 
-export function addWatchRecord(record: WatchRecord): void {
+export function addWatchRecord(record: StoredWatchRecord): void {
   state.watchRecords.push(record);
 }
 
-export function findWatchRecord(watchRecordId: number): WatchRecord | null {
+/** API-034가 목록으로 내려줄 원본. 정렬은 `src/api/`가 한다 */
+export function getWatchRecords(): StoredWatchRecord[] {
+  return state.watchRecords;
+}
+
+export function findWatchRecord(watchRecordId: number): StoredWatchRecord | null {
   return state.watchRecords.find((record) => record.watchRecordId === watchRecordId) ?? null;
 }
 
-export function updateWatchRecord(watchRecordId: number, patch: Partial<WatchRecord>): void {
+export function updateWatchRecord(watchRecordId: number, patch: Partial<StoredWatchRecord>): void {
   const index = state.watchRecords.findIndex((record) => record.watchRecordId === watchRecordId);
 
   if (index !== -1) {
@@ -114,7 +135,7 @@ export function updateWatchRecord(watchRecordId: number, patch: Partial<WatchRec
 }
 
 /** 영화의 가장 최근 감상 기록. 2.4가 감상 상태를 표시할 때 쓴다 */
-export function findLatestWatchRecordByMovie(movieId: number): WatchRecord | null {
+export function findLatestWatchRecordByMovie(movieId: number): StoredWatchRecord | null {
   return [...state.watchRecords].reverse().find((record) => record.movieId === movieId) ?? null;
 }
 

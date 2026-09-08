@@ -19,6 +19,32 @@ export type WatchRecord = {
   expiresAt: string;
 };
 
+/**
+ * API-034 감상 기록 목록 `items[]`
+ *
+ * API-033 응답(`WatchRecord`)보다 넓다. 어느 OTT로 이동했는지(`ott`), 언제 봤는지
+ * (`watchedAt`), 어떤 평가로 이어졌는지(`ratingId`)가 함께 온다. 2.4-A와 2.5가
+ * 이 값들을 쓴다.
+ */
+export type WatchRecordListItem = {
+  watchRecordId: number;
+  movie: { movieId: number; title: string; posterUrl: string | null };
+  status: WatchStatus;
+  ott: { ottId: number; code: string };
+  clickedAt: string;
+  confirmDueAt: string;
+  expiresAt: string;
+  watchedAt: string | null;
+  ratingId: number | null;
+};
+
+/** API-034 응답 */
+export type WatchRecordList = {
+  items: WatchRecordListItem[];
+  nextCursor: string | null;
+  hasNext: boolean;
+};
+
 /** API-035 감상 확인 응답 */
 export type WatchConfirmResult = {
   watchRecordId: number;

@@ -10,10 +10,11 @@ import type { Ott } from '../types/ott';
 /**
  * 아직 구독 OTT를 설정하지 않았을 때 쓰는 기준값.
  *
- * 와이어프레임 2.1의 `내 OTT`가 넷플릭스 · 티빙 · 웨이브 세 개를 보여준다. 온보딩(1.2)을
- * 거치지 않고 홈으로 바로 들어가도 화면이 비어 보이지 않도록 이 셋을 기본으로 둔다.
+ * 와이어프레임 2.1의 `내 OTT에서 지금 볼 수 있어요`가 넷플릭스 · 티빙 · 웨이브 ·
+ * 디즈니+ 배지(N · T · W · D)를 붙인 4편을 보여준다. 온보딩(1.2)을 거치지 않고 홈으로
+ * 바로 들어가도 그 4편이 그대로 보이도록 이 넷을 기본으로 둔다.
  */
-const DEFAULT_SUBSCRIBED_OTT_IDS = [1, 2, 3];
+const DEFAULT_SUBSCRIBED_OTT_IDS = [1, 2, 3, 4];
 
 /** API-025 OTT 목록 조회 · GET /api/v1/otts */
 export async function getOtts(): Promise<Ott[]> {
