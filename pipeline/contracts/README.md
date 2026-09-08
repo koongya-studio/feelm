@@ -5,3 +5,4 @@
 ## 계약 목록
 
 - [ALS 모델 산출물 계약](./als-model-artifacts.md): ALSModel, User/Item Factor와 학습 메타데이터
+- [서비스 영화 ID 매핑](./movie_id_mapping/service-movie-id-map.md): 118번 전처리의 백엔드 export 입력과 서비스·TMDb·MovieLens ID 매핑
