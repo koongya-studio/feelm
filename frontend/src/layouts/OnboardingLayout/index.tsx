@@ -6,7 +6,7 @@
  * 제공 위치는 이 레이아웃, 소멸 시점은 레이아웃 이탈).
  */
 import { Outlet } from 'react-router';
-import { OnboardingProvider } from '../../contexts/OnboardingContext';
+import { OnboardingProvider } from '../../contexts/OnboardingProvider';
 import styles from './OnboardingLayout.module.css';
 
 export default function OnboardingLayout() {
