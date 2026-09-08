@@ -54,7 +54,10 @@ export default function RatingResultPage() {
   }, [state, navigate]);
 
   useEffect(() => {
-    void getPopcornFlavors().then(setFlavors);
+    // 맛 이름 표시에만 쓰이므로 실패하면 코드가 그대로 보인다
+    getPopcornFlavors()
+      .then(setFlavors)
+      .catch(() => undefined);
   }, []);
 
   useEffect(() => {

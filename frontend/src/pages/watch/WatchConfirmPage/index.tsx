@@ -113,6 +113,7 @@ export default function WatchConfirmPage() {
     return (
       <div className={styles.page}>
         <StatusView
+          titleAs="h1"
           title="감상 기록을 불러오지 못했어요"
           description="주소가 잘못되었거나 잠시 문제가 생겼어요"
         >
