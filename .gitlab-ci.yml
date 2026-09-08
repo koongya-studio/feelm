@@ -40,6 +40,7 @@ claude-mr-review:
   script:
     - /usr/bin/python3 -I -B infra/claude-review/collect-mr.py
     - /usr/bin/python3 -I -B infra/claude-review/generate-review.py
+    - /usr/bin/python3 -I -B infra/claude-review/publish-review.py
   timeout: 10m
   interruptible: true
   rules:

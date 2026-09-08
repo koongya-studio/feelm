@@ -127,15 +127,16 @@ OAuth 토큰과 고정 실행 환경만 전달하며 GitLab 토큰, Anthropic AP
 
 ## 남은 작업
 
-- `claude-mr-review`를 실제 Claude 응답으로 검증
-- 생성된 한국어 리뷰의 GitLab 댓글 등록
-- 커밋 SHA 확인, 중복 실행 및 stale 리뷰 방지
-- 실패 유형별 운영 처리와 자동 실행 전환
+- `claude-mr-review`의 실제 GitLab 댓글 등록, 중복 실행과 stale 처리 검증
+- 실패 유형별 운영 처리와 MR 생성·추가 Push 기반 자동 실행 전환
 
 보호된 `develop` 파이프라인의 `claude-auth-check` 성공은 2026-09-07 운영자 확인으로
 검증했다. 이 기록은 토큰 원문이나 실행 응답을 저장소에 남기지 않는다.
 같은 날 `claude-mr-collect`도 실제 열린 MR의 IID와 HEAD SHA로 실행해 성공했음을 운영자가
 확인했다.
+2026-09-08에는 같은 보호 파이프라인에서 MR 수집과 실제 Claude 리뷰 생성까지
+`MR_COLLECTION: PASS`, `REVIEW_GENERATION: PASS`로 완료했음을 운영자가 확인했다. 생성된
+리뷰 원문은 저장소나 CI 로그에 남기지 않았다.
 
 ## MR 입력 수집기
 
@@ -160,7 +161,7 @@ MR 제목은 1 KiB, 설명은 16 KiB로 제한한다.
 표시된다. 파이프라인을 만들 때 `REVIEW_MR_IID`에 MR 번호, `REVIEW_MR_SHA`에 그 MR의 현재
 40자리 HEAD SHA를 입력한 뒤 Job을 실행한다. Job은 MR 브랜치가 아니라 보호된 `develop`을
 얕게 checkout해 저장소에 고정된 리뷰 스크립트만 실행하며 submodule, cache와 artifact를 사용하지
-않는다. 같은 Job에서 수집기와 생성기를 순서대로 실행하므로 MR 데이터와 리뷰 결과를
+않는다. 같은 Job에서 수집기, 생성기와 댓글 등록기를 순서대로 실행하므로 MR 데이터와 리뷰 결과를
 artifact로 전달하지 않는다. 이전 실행의 입력 파일은 새 API 요청 전에 삭제되어 실패한
 실행이 오래된 입력을 남기지 않는다.
 
@@ -182,6 +183,26 @@ API key, proxy와 프로젝트 환경변수는 전달하지 않는다.
 심각도, 변경되지 않은 파일, 잘못된 줄 번호, 과도한 결과는 게시 단계로 넘기지 않는다.
 성공 로그는 `REVIEW_GENERATION: PASS`뿐이며 Claude 원문과 리뷰 내용은 CI 로그에 출력하지
 않는다. 인증 실패, 구독 사용량 초과, 시간 초과와 잘못된 응답은 구분된 코드로 실패한다.
+
+## GitLab 댓글 등록기
+
+`publish-review.py`는 비공개 `input.json`과 검증된 `review.json`을 읽고 GitLab MR Notes
+API로 한국어 리뷰 댓글 하나만 등록한다. 승인, 병합, 라벨·담당자 변경 등 다른 MR 작업은
+수행하지 않는다. 토큰과 댓글 본문은 CI 로그에 출력하지 않는다.
+
+댓글에는 프로젝트, MR IID와 검토한 HEAD SHA로 만든 숨은 식별자를 포함한다. 같은 토큰
+사용자의 기존 댓글에 동일한 식별자가 있을 때만 `DUPLICATE_REVIEW_SKIPPED`로 종료하므로,
+MR 작성자가 식별자 문자열을 본문에 넣어도 게시를 막을 수 없다. 게시 직전까지 HEAD SHA를
+두 번 확인하고 게시 후 한 번 더 확인한다. 게시 도중 새 커밋이 추가됐다면 이번 실행이 만든
+댓글만 즉시 삭제하고 `STALE_REVIEW_REMOVED`로 실패한다.
+
+MR과 Claude가 제공한 제목, 요약, finding, 파일 경로 등의 값은 내용에 맞춰 길이를 늘린
+Markdown 코드 블록 안에 넣는다. 따라서 `@all`, 링크, HTML, GitLab quick action처럼 보이는
+문자열도 알림이나 명령으로 해석되지 않는다. 댓글이 GitLab 제한을 넘으면 게시하지 않고
+실패한다. 성공 시 로그는 `REVIEW_PUBLISH: PASS`뿐이다.
+
+병합 후 열린 테스트 MR의 IID와 현재 HEAD SHA로 수동 Job을 실행해 첫 실행의 댓글 등록,
+동일 SHA 재실행의 중복 건너뛰기, 실행 중 SHA 변경 시 stale 댓글 제거를 순서대로 확인한다.
 
 참고 문서: [systemd 255 실행 설정](https://manpages.ubuntu.com/manpages/noble/man5/systemd.exec.5.html),
 [GitLab protected Runner](https://docs.gitlab.com/ci/runners/configure_runners/)
