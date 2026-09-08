@@ -10,6 +10,11 @@
  *
  * `[?]` 온보딩 도중 앱을 닫았을 때 진행값을 유지할지는 미확정이다. 유지하지 않으므로
  * 새로 고침하면 초기화되고, 1.2 · 1.3은 1.1로 되돌린다(frontend-structure.md 6.3).
+ *
+ * **파일 이름이 `OnboardingContext.tsx`이면 Windows에서 앱이 뜨지 않는다.** 같은 폴더의
+ * `onboardingContext.ts`와 대소문자만 다르면, 확장자 없는 import를 해석할 때 `.ts`를
+ * 먼저 찾는 규칙과 대소문자를 구분하지 않는 파일 시스템이 겹쳐 상태 파일로 잘못
+ * 이어진다(업무 -265에서 확인). 그래서 이 파일은 `OnboardingProvider.tsx`다.
  */
 import { useCallback, useMemo, useState } from 'react';
 import { OnboardingContext, initialOnboardingState } from './onboardingContext';
