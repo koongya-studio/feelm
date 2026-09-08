@@ -37,5 +37,5 @@ export async function getAvailableNowMovies(): Promise<AvailableNowMovie[]> {
     ];
   });
 
-  return respond(items);
+  return respond(items, 'home');
 }

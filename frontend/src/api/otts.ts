@@ -18,7 +18,7 @@ const DEFAULT_SUBSCRIBED_OTT_IDS = [1, 2, 3, 4];
 
 /** API-025 OTT 목록 조회 · GET /api/v1/otts */
 export async function getOtts(): Promise<Ott[]> {
-  return respond(mockOtts);
+  return respond(mockOtts, 'otts');
 }
 
 /**

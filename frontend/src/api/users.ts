@@ -16,14 +16,17 @@ import type { MyProfile } from '../types/user';
 export async function getMyProfile(): Promise<MyProfile> {
   const added = getRatings().length;
 
-  return respond({
-    ...mockMyProfile,
-    // 온보딩을 마쳤으면 그 사실도 반영한다
-    onboardingCompleted: mockMyProfile.onboardingCompleted || isOnboardingSubmitted(),
-    stats: {
-      frameCount: mockMyProfile.stats.frameCount + added,
-      popcornCount: mockMyProfile.stats.popcornCount + added,
-      ratingCount: mockMyProfile.stats.ratingCount + added,
+  return respond(
+    {
+      ...mockMyProfile,
+      // 온보딩을 마쳤으면 그 사실도 반영한다
+      onboardingCompleted: mockMyProfile.onboardingCompleted || isOnboardingSubmitted(),
+      stats: {
+        frameCount: mockMyProfile.stats.frameCount + added,
+        popcornCount: mockMyProfile.stats.popcornCount + added,
+        ratingCount: mockMyProfile.stats.ratingCount + added,
+      },
     },
-  });
+    'users',
+  );
 }

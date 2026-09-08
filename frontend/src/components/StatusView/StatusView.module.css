@@ -1,0 +1,97 @@
+/* 값은 와이어프레임 2.2-A 실측값이다 */
+.area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.area[data-size='screen'] {
+  min-height: 0;
+  flex: 1;
+  justify-content: center;
+  padding: 0 34px;
+}
+
+/* 섹션 자리에 들어가는 형태. 와이어프레임에 대응 표현이 없다 */
+.area[data-size='inline'] {
+  flex: none;
+  gap: 8px;
+  padding: 18px var(--screen-padding-x);
+}
+
+.mark {
+  position: relative;
+  display: flex;
+  width: 76px;
+  height: 56px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-nav-inactive);
+  border-radius: 8px;
+  color: var(--color-nav-inactive);
+  font-size: 26px;
+  font-weight: 800;
+}
+
+/* 필름 구멍 표현 */
+.markStrip {
+  position: absolute;
+  right: 0;
+  left: 0;
+  height: 5px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-nav-inactive) 0 6px,
+    transparent 6px 13px
+  );
+}
+
+.markStrip[data-edge='top'] {
+  top: 4px;
+}
+
+.markStrip[data-edge='bottom'] {
+  bottom: 4px;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: center;
+}
+
+.area[data-size='inline'] .text {
+  gap: 4px;
+}
+
+.title {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.area[data-size='inline'] .title {
+  font-size: 13px;
+}
+
+.description {
+  color: var(--color-ink-faint);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.area[data-size='inline'] .description {
+  font-size: 12.5px;
+}
+
+.actions {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.area[data-size='inline'] .actions {
+  width: auto;
+}

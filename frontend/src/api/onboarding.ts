@@ -10,7 +10,7 @@ import type { OnboardingSubmitResult } from '../types/onboarding';
 
 /** API-023 초기 취향 카드 목록 · GET /api/v1/onboarding/cards */
 export async function getOnboardingCards(): Promise<OnboardingCard[]> {
-  return respond(mockOnboardingCards);
+  return respond(mockOnboardingCards, 'onboarding');
 }
 
 /**

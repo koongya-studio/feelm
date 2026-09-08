@@ -13,7 +13,7 @@ import type { PartyMixView, PartyView } from '../types/unspecified';
  * 기본은 활성 파티만 반환하며 파티가 없으면 빈 배열이다.
  */
 export async function getMyParties(): Promise<PartyView[]> {
-  return respond(mockParties);
+  return respond(mockParties, 'parties');
 }
 
 /**
@@ -28,7 +28,7 @@ export async function getPartyPopcorn(partyId: number): Promise<PartyPopcorn> {
     return respondError(404, 'RESOURCE_NOT_FOUND', '파티를 찾을 수 없습니다.');
   }
 
-  return respond(popcorn);
+  return respond(popcorn, 'parties');
 }
 
 /**
@@ -44,5 +44,5 @@ export async function getPartyMix(partyId: number): Promise<PartyMixView> {
     return respondError(404, 'RESOURCE_NOT_FOUND', '파티를 찾을 수 없습니다.');
   }
 
-  return respond(mix);
+  return respond(mix, 'parties');
 }

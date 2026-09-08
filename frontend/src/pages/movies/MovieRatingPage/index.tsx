@@ -23,6 +23,7 @@ import Button from '../../../components/Button';
 import IconButton from '../../../components/IconButton';
 import Poster from '../../../components/Poster';
 import RatingInput from '../../../components/RatingInput';
+import StatusView from '../../../components/StatusView';
 import TextArea from '../../../components/TextArea';
 import { ChevronLeftIcon } from '../../../components/Icon';
 import { getMovieDetail } from '../../../api/movies';
@@ -40,6 +41,8 @@ export default function MovieRatingPage() {
   const id = Number(movieId);
 
   const [movie, setMovie] = useState<MovieDetail | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [reloadCount, setReloadCount] = useState(0);
   /** 2.5의 감상 정보 줄. 감상을 확인한 기록이 없으면 null */
   const [watchNote, setWatchNote] = useState<string | null>(null);
   const [score, setScore] = useState(0);
@@ -49,13 +52,20 @@ export default function MovieRatingPage() {
   useEffect(() => {
     let active = true;
 
-    void getMovieDetail(id).then((detail) => {
-      if (active) {
-        setMovie(detail);
-        setScore(detail.myRating?.score ?? 0);
-        setComment(detail.myRating?.comment ?? '');
-      }
-    });
+    getMovieDetail(id)
+      .then((detail) => {
+        if (active) {
+          setMovie(detail);
+          setFailed(false);
+          setScore(detail.myRating?.score ?? 0);
+          setComment(detail.myRating?.comment ?? '');
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setFailed(true);
+        }
+      });
 
     void Promise.all([getWatchRecords(), getOtts()]).then(([records, otts]) => {
       // 목록은 최근 순이므로 가장 최근에 감상을 확인한 기록을 쓴다
@@ -79,7 +89,7 @@ export default function MovieRatingPage() {
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, reloadCount]);
 
   async function submit() {
     if (!movie || score === 0) {
@@ -101,6 +111,36 @@ export default function MovieRatingPage() {
     void navigate(path.ratingResult(movie.movieId), {
       state: { rating, counts, movieTitle: movie.title, posterUrl: movie.posterUrl },
     });
+  }
+
+  if (failed) {
+    return (
+      <>
+        <div className={styles.header}>
+          <IconButton
+            label="뒤로 가기"
+            icon={<ChevronLeftIcon />}
+            size={34}
+            onClick={() => void navigate(-1)}
+          />
+          <h1 className={styles.title}>평가하기</h1>
+        </div>
+
+        <StatusView
+          title="영화 정보를 불러오지 못했어요"
+          description="주소가 잘못되었거나 잠시 문제가 생겼어요"
+        >
+          <Button
+            onClick={() => {
+              setFailed(false);
+              setReloadCount((count) => count + 1);
+            }}
+          >
+            다시 시도
+          </Button>
+        </StatusView>
+      </>
+    );
   }
 
   if (!movie) {

@@ -26,6 +26,7 @@ import OttBadge from '../../../components/OttBadge';
 import Poster from '../../../components/Poster';
 import RatingStars from '../../../components/RatingStars';
 import ScreenHeader from '../../../components/ScreenHeader';
+import StatusView from '../../../components/StatusView';
 import { getFrameDetail } from '../../../api/taste';
 import { path } from '../../../routes/paths';
 import { formatDate } from '../../../utils/date';
@@ -41,6 +42,7 @@ export default function FrameDetailPage() {
 
   const [frame, setFrame] = useState<FrameDetailView | null>(null);
   const [failed, setFailed] = useState(false);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -61,14 +63,27 @@ export default function FrameDetailPage() {
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, reloadCount]);
 
   if (failed) {
-    // 오류 화면은 상태 UI 업무(S15P21E106-264) 범위다. 여기서는 최소 안내만 둔다
     return (
-      <div className={styles.notFound}>
-        <p>프레임을 찾을 수 없습니다.</p>
-      </div>
+      <>
+        <ScreenHeader title="프레임 상세" showBack />
+
+        <StatusView
+          title="프레임을 불러오지 못했어요"
+          description="주소가 잘못되었거나 잠시 문제가 생겼어요"
+        >
+          <Button
+            onClick={() => {
+              setFailed(false);
+              setReloadCount((count) => count + 1);
+            }}
+          >
+            다시 시도
+          </Button>
+        </StatusView>
+      </>
     );
   }
 

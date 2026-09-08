@@ -25,7 +25,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { PersonIcon } from '../../../components/Icon';
+import Button from '../../../components/Button';
 import ScreenHeader from '../../../components/ScreenHeader';
+import StatusView from '../../../components/StatusView';
 import TasteCard from './TasteCard';
 import { getOnboardingCards, submitOnboardingPreferences } from '../../../api/onboarding';
 import { useOnboarding } from '../../../contexts/onboardingContext';
@@ -105,6 +107,8 @@ export default function TasteOnboardingPage() {
   const skipNextClickRef = useRef(false);
 
   const [cards, setCards] = useState<CardState[]>([]);
+  const [failed, setFailed] = useState(false);
+  const [reloadCount, setReloadCount] = useState(0);
   const [openCardId, setOpenCardId] = useState<number | null>(null);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -131,24 +135,31 @@ export default function TasteOnboardingPage() {
   useEffect(() => {
     let active = true;
 
-    void getOnboardingCards().then((items) => {
-      if (!active) {
-        return;
-      }
+    getOnboardingCards()
+      .then((items) => {
+        if (!active) {
+          return;
+        }
 
-      setCards(
-        items.map((card, index) => ({
-          card,
-          value: 'UNSET' as TasteValue,
-          ...INITIAL_POSITIONS[index % INITIAL_POSITIONS.length],
-        })),
-      );
-    });
+        setFailed(false);
+        setCards(
+          items.map((card, index) => ({
+            card,
+            value: 'UNSET' as TasteValue,
+            ...INITIAL_POSITIONS[index % INITIAL_POSITIONS.length],
+          })),
+        );
+      })
+      .catch(() => {
+        if (active) {
+          setFailed(true);
+        }
+      });
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadCount]);
 
   /** 카드 중심이 점선 원 안인지 */
   function valueFromRatio(xRatio: number, yRatio: number): TasteValue {
@@ -312,6 +323,25 @@ export default function TasteOnboardingPage() {
 
   const savedCount = cards.filter((item) => isSavedValue(item.value)).length;
   const openCard = cards.find((item) => item.card.movieId === openCardId) ?? null;
+
+  if (failed) {
+    return (
+      <>
+        <ScreenHeader title="취향 초기 설정" align="center" />
+
+        <StatusView title="영화 카드를 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
+          <Button
+            onClick={() => {
+              setFailed(false);
+              setReloadCount((count) => count + 1);
+            }}
+          >
+            다시 시도
+          </Button>
+        </StatusView>
+      </>
+    );
+  }
 
   return (
     <>

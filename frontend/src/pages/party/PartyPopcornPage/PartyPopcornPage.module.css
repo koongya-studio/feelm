@@ -158,9 +158,3 @@
   color: var(--color-ink-faint);
   font-size: 11.5px;
 }
-
-.notFound {
-  padding: 40px var(--screen-padding-x);
-  color: var(--color-ink-muted);
-  text-align: center;
-}

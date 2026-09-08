@@ -27,6 +27,7 @@ import Chip from '../../../components/Chip';
 import FilmStrip from '../../../components/FilmStrip';
 import Poster from '../../../components/Poster';
 import ScreenHeader from '../../../components/ScreenHeader';
+import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import { getMyFrames, getPopcornBucket, getTasteFlow } from '../../../api/taste';
 import { path } from '../../../routes/paths';
@@ -44,32 +45,82 @@ export default function FilmPage() {
   const [frames, setFrames] = useState<FrameList | null>(null);
   const [flow, setFlow] = useState<TasteFlowView | null>(null);
   const [popcornCount, setPopcornCount] = useState<number | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     let active = true;
 
-    void getMyFrames().then((list) => {
-      if (active) {
-        setFrames(list);
-      }
-    });
+    getMyFrames()
+      .then((list) => {
+        if (active) {
+          setFrames(list);
+          setFailed(false);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setFailed(true);
+        }
+      });
 
-    void getTasteFlow().then((value) => {
-      if (active) {
-        setFlow(value);
-      }
-    });
+    // 흐름 카드와 팝콘 수는 실패하면 그 자리만 비운다. 이 화면의 본문은 필름 목록이다
+    getTasteFlow()
+      .then((value) => {
+        if (active) {
+          setFlow(value);
+        }
+      })
+      .catch(() => undefined);
 
-    void getPopcornBucket().then((bucket) => {
-      if (active) {
-        setPopcornCount(bucket.totalCount);
-      }
-    });
+    getPopcornBucket()
+      .then((bucket) => {
+        if (active) {
+          setPopcornCount(bucket.totalCount);
+        }
+      })
+      .catch(() => undefined);
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadCount]);
+
+  if (failed) {
+    return (
+      <>
+        <ScreenHeader title="취향 필름" />
+
+        <StatusView title="취향 필름을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
+          <Button
+            onClick={() => {
+              setFailed(false);
+              setReloadCount((count) => count + 1);
+            }}
+          >
+            다시 시도
+          </Button>
+        </StatusView>
+      </>
+    );
+  }
+
+  // 평가가 하나도 없으면 프레임이 없다. 와이어프레임에 그 상태가 없다
+  if (frames && frames.totalCount === 0) {
+    return (
+      <>
+        <ScreenHeader title="취향 필름" />
+
+        <StatusView
+          variant="empty"
+          title="아직 감긴 프레임이 없어요"
+          description="영화를 평가하면 프레임 1개와 팝콘 1알이 필름에 쌓여요"
+        >
+          <Button onClick={() => void navigate(path.recommendations())}>추천 영화 보기</Button>
+        </StatusView>
+      </>
+    );
+  }
 
   // 스트립과 최근 목록은 같은 목록(API-042)을 쓴다. 최근 목록은 앞 3개다
   const items = frames?.items ?? [];
@@ -80,10 +131,13 @@ export default function FilmPage() {
       <ScreenHeader
         title="취향 필름"
         action={
-          <span className={styles.counts}>
-            필름 <b className={styles.countStrong}>{frames?.totalCount ?? 0}프레임</b> · 팝콘{' '}
-            {popcornCount ?? 0}알
-          </span>
+          /* 받기 전에는 그리지 않는다. `0프레임`으로 보이면 없는 정보를 말하는 셈이다 */
+          frames && popcornCount !== null ? (
+            <span className={styles.counts}>
+              필름 <b className={styles.countStrong}>{frames.totalCount}프레임</b> · 팝콘{' '}
+              {popcornCount}알
+            </span>
+          ) : null
         }
       />
 

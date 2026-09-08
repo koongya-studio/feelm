@@ -58,26 +58,29 @@ export async function getMovieDetail(
   };
 
   if (recommendationItemId === undefined) {
-    return respond(withSession);
+    return respond(withSession, 'movies');
   }
 
-  return respond({
-    ...withSession,
-    recommendation: {
-      recommendationItemId,
-      type: 'TASTE' as const,
-      // 와이어프레임 2.4의 추천 이유 문구
-      reason: { summary: '좋아한 케이퍼 무비와 가까워요 · 속도감 있는 전개' },
+  return respond(
+    {
+      ...withSession,
+      recommendation: {
+        recommendationItemId,
+        type: 'TASTE' as const,
+        // 와이어프레임 2.4의 추천 이유 문구
+        reason: { summary: '좋아한 케이퍼 무비와 가까워요 · 속도감 있는 전개' },
+      },
     },
-  });
+    'movies',
+  );
 }
 
 /** API-031 유사 영화 추천 · GET /api/v1/movies/{movieId}/similar */
 export async function getSimilarMovies(movieId: number): Promise<SimilarMovie[]> {
-  return respond(findMockSimilarMovies(movieId));
+  return respond(findMockSimilarMovies(movieId), 'movies');
 }
 
 /** API-032 공개 한줄평 목록 · GET /api/v1/movies/{movieId}/reviews */
 export async function getMovieReviews(movieId: number): Promise<PublicReview[]> {
-  return respond(mockReviews[movieId] ?? []);
+  return respond(mockReviews[movieId] ?? [], 'movies');
 }

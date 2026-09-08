@@ -11,8 +11,7 @@ import {
   getDismissedMovieIds,
   getOnboardingPreferences,
 } from '../mocks/sessionStore';
-import { respond, respondError } from './mockTransport';
-import type { MockScenario } from './mockTransport';
+import { isMockError, respond, respondError } from './mockTransport';
 import type { DismissResultView, RecommendationSetView } from '../types/unspecified';
 
 /**
@@ -44,13 +43,12 @@ function onboardingTaste() {
 /**
  * API-045 기본 추천 조회 · GET /api/v1/recommendations
  *
- * `scenario: 'error'`는 2.2-A 화면을 확인하기 위한 목업 전용 입력이다. 계약의
- * `503 RECOMMENDATION_UNAVAILABLE`을 그대로 재현한다. 실제 연동 시 제거한다.
+ * `?mock=error`(또는 `?mockError=recommendations`)는 2.2-A 화면을 확인하기 위한 목업
+ * 전용 입력이다. 계약의 `503 RECOMMENDATION_UNAVAILABLE`을 그대로 재현하므로 공통
+ * 주입(`respond`의 도메인 인자)을 쓰지 않고 여기서 직접 확인한다. 실제 연동 시 제거한다.
  */
-export async function getRecommendations(
-  scenario: MockScenario = 'success',
-): Promise<RecommendationSetView> {
-  if (scenario === 'error') {
+export async function getRecommendations(): Promise<RecommendationSetView> {
+  if (isMockError('recommendations')) {
     return respondError(
       503,
       'RECOMMENDATION_UNAVAILABLE',
@@ -104,9 +102,17 @@ export async function dismissMovie(
 
   addDismissedMovie(movieId);
 
+  /*
+   * 이미 관심없음 처리한 영화를 교체 후보로 다시 올리지 않는다. `getRecommendations`와
+   * 같은 규칙이다. 교체된 카드를 또 관심없음으로 넘기면 같은 영화가 되돌아오는 문제가
+   * 있었다(업무 -264 검증에서 확인).
+   */
+  const candidate = item ? findMockReplacement(item.type) : null;
+  const dismissed = getDismissedMovieIds();
+
   return respond({
     movieId,
-    replacement: item ? findMockReplacement(item.type) : null,
+    replacement: candidate && !dismissed.includes(candidate.movie.movieId) ? candidate : null,
   });
 }
 

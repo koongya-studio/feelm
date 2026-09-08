@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router';
 import Button from '../../../components/Button';
 import OttBadge from '../../../components/OttBadge';
 import ScreenHeader from '../../../components/ScreenHeader';
+import StatusView from '../../../components/StatusView';
 import SelectableTile from '../../../components/SelectableTile';
 import { getOtts, setMyOtts } from '../../../api/otts';
 import { useOnboarding } from '../../../contexts/onboardingContext';
@@ -28,12 +29,21 @@ export default function OttOnboardingPage() {
   const { tasteSubmitted, completeOtt } = useOnboarding();
 
   const [otts, setOtts] = useState<Ott[]>([]);
+  const [failed, setFailed] = useState(false);
+  const [reloadCount, setReloadCount] = useState(0);
   const [selected, setSelected] = useState<number[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    void getOtts().then(setOtts);
-  }, []);
+    getOtts()
+      .then((value) => {
+        setOtts(value);
+        setFailed(false);
+      })
+      .catch(() => {
+        setFailed(true);
+      });
+  }, [reloadCount]);
 
   // 1.1을 거치지 않고 이 화면을 직접 열면 되돌린다 (frontend-structure.md 6.3)
   useEffect(() => {
@@ -55,6 +65,25 @@ export default function OttOnboardingPage() {
     await setMyOtts(ottIds);
     completeOtt(ottIds);
     void navigate(path.onboardingComplete());
+  }
+
+  if (failed) {
+    return (
+      <>
+        <ScreenHeader title="구독 중인 OTT가 있으신가요?" align="center" />
+
+        <StatusView title="OTT 목록을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
+          <Button
+            onClick={() => {
+              setFailed(false);
+              setReloadCount((count) => count + 1);
+            }}
+          >
+            다시 시도
+          </Button>
+        </StatusView>
+      </>
+    );
   }
 
   return (

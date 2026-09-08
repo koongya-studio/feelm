@@ -110,9 +110,3 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
-
-.notFound {
-  padding: 40px var(--screen-padding-x);
-  color: var(--color-ink-muted);
-  text-align: center;
-}

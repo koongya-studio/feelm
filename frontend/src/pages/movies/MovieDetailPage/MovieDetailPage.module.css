@@ -314,12 +314,9 @@
   line-height: 1.55;
 }
 
-.notFound {
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-ink-muted);
-  font-size: 14px;
+/* 섹션에 보여줄 것이 없을 때. 와이어프레임에 대응 표현이 없어 카드 본문 사양을 따른다 */
+.emptyNote {
+  color: var(--color-ink-faint);
+  font-size: 12.5px;
+  line-height: 1.6;
 }
