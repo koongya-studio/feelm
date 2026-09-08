@@ -1,0 +1,126 @@
+# SOURCE scripts/rec_ev_032_basic.py
+def fold_in(factors, raw_ratings, reg):
+    y = np.asarray(factors, dtype=np.float64)
+    r = np.asarray(raw_ratings, dtype=np.float64)
+    require(y.ndim == 2 and r.shape == (len(y),) and np.isfinite(y).all(), "fold-in shape/values")
+    for value in r:
+        rating_index(value)
+    if len(y) == 0:
+        return None
+    return np.linalg.solve(y.T @ y + reg * len(y) * np.eye(y.shape[1]), y.T @ r)
+
+# SOURCE scripts/rec_ev_027_core.py
+def rating_index(raw: bytes | str | float) -> int:
+    value = float(raw)
+    index = int(round(value * 2.0)) - 1
+    if not 0 <= index < 10 or abs(value - float(RATING_VALUES[index])) > 1e-9:
+        raise ValueError(f"rating outside pinned MovieLens bins: {value}")
+    return index
+
+def user_equal_prior(histograms: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    hist = np.asarray(histograms, dtype=np.float64)
+    if hist.ndim != 2 or hist.shape[1] != 10:
+        raise ValueError("users by ten-bin histograms required")
+    totals = hist.sum(axis=1)
+    valid = totals > 0
+    if not bool(valid.any()):
+        raise ValueError("at least one warm training user is required")
+    pi0 = (hist[valid] / totals[valid, None]).mean(axis=0)
+    pi0 /= pi0.sum()
+    g0_mid = np.cumsum(pi0) - 0.5 * pi0
+    return pi0, g0_mid
+
+def smoothed_q(indices: Sequence[int], histogram: Sequence[int], g0_mid: Sequence[float]) -> np.ndarray:
+    idx = np.asarray(indices, dtype=np.int8)
+    hist = np.asarray(histogram, dtype=np.float64)
+    prior = np.asarray(g0_mid, dtype=np.float64)
+    if hist.shape != (10,) or prior.shape != (10,) or bool((idx < 0).any()) or bool((idx > 9).any()):
+        raise ValueError("invalid percentile inputs")
+    below = np.cumsum(hist) - hist
+    return (below[idx] + 0.5 * hist[idx] + 5.0 * prior[idx]) / (hist.sum() + 5.0)
+
+def profile_weights(indices: Sequence[int], g0_mid: Sequence[float], encoding: str) -> np.ndarray:
+    idx = np.asarray(indices, dtype=np.int8)
+    hist = np.bincount(idx, minlength=10)
+    weights = 2.0 * smoothed_q(idx, hist, g0_mid) - 1.0
+    if encoding == "PERCENTILE_MAGNITUDE":
+        return weights
+    if encoding == "BINARY_SIGN":
+        return np.sign(weights)
+    raise ValueError(f"unsupported encoding: {encoding}")
+
+def full_history_q(indices: Sequence[int], histogram: Sequence[int]) -> np.ndarray:
+    idx = np.asarray(indices, dtype=np.int8)
+    hist = np.asarray(histogram, dtype=np.float64)
+    if hist.shape != (10,) or hist.sum() <= 0:
+        raise ValueError("nonempty ten-bin full history required")
+    below = np.cumsum(hist) - hist
+    return (below[idx] + 0.5 * hist[idx]) / hist.sum()
+
+def weighted_similarity_scores(similarity: np.ndarray, weights: Sequence[float]) -> tuple[np.ndarray, bool]:
+    matrix = np.asarray(similarity, dtype=np.float64)
+    vector = np.asarray(weights, dtype=np.float64)
+    if matrix.ndim != 2 or matrix.shape[1] != len(vector):
+        raise ValueError("target by profile similarity required")
+    denominator = float(np.abs(vector).sum())
+    if denominator <= 0 or not math.isfinite(denominator):
+        return np.full(matrix.shape[0], np.nan), False
+    scores = matrix @ vector / denominator
+    active = bool(np.isfinite(scores).all() and np.unique(scores).size >= 2)
+    return scores, active
+
+# SOURCE scripts/rec_ev_022a_core.py
+def _list_values(value: Any) -> list[int]:
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return []
+    return [int(item) for item in value]
+
+def _group_matrix(token_rows: list[list[str]]) -> sparse.csr_matrix:
+    vocabulary = {token: index for index, token in enumerate(sorted({token for row in token_rows for token in row}))}
+    rows: list[int] = []
+    columns: list[int] = []
+    for row_index, tokens in enumerate(token_rows):
+        for token in sorted(set(tokens)):
+            rows.append(row_index)
+            columns.append(vocabulary[token])
+    matrix = sparse.coo_matrix(
+        (np.ones(len(rows), dtype=np.float32), (rows, columns)),
+        shape=(len(token_rows), len(vocabulary)),
+    ).tocsr()
+    norms = np.sqrt(np.asarray(matrix.multiply(matrix).sum(axis=1)).ravel())
+    inverse = np.divide(1.0, norms, out=np.zeros_like(norms), where=norms > 0)
+    return sparse.diags(inverse.astype(np.float32)) @ matrix
+
+def build_structured_full(structured: pd.DataFrame, item_ids: Sequence[int]) -> sparse.csr_matrix:
+    ids = np.asarray(item_ids, dtype=np.int64)
+    indexed = structured.set_index("movie_id", verify_integrity=True).reindex(ids)
+    available = indexed["feature_eligible"].astype("boolean").fillna(False).to_numpy(dtype=bool)
+    genre_rows: list[list[str]] = []
+    context_rows: list[list[str]] = []
+    people_rows: list[list[str]] = []
+    keyword_rows: list[list[str]] = []
+    for row, ok in zip(indexed.itertuples(index=False), available, strict=True):
+        if not ok:
+            genre_rows.append([])
+            context_rows.append([])
+            people_rows.append([])
+            keyword_rows.append([])
+            continue
+        decade = int(row.release_year) // 10 * 10 if pd.notna(row.release_year) else None
+        runtime_bucket = int(row.runtime_minutes) // 30 if pd.notna(row.runtime_minutes) else None
+        genre_rows.append([f"genre:{value}" for value in _list_values(row.genre_ids)])
+        context_rows.append(
+            ([f"language:{row.original_language}"] if pd.notna(row.original_language) else [])
+            + ([f"decade:{decade}"] if decade is not None else [])
+            + ([f"runtime30:{runtime_bucket}"] if runtime_bucket is not None else [])
+        )
+        people_rows.append(
+            [f"director:{value}" for value in _list_values(row.director_ids)]
+            + [f"cast:{value}" for value in _list_values(row.top5_cast_ids)]
+        )
+        keyword_rows.append([f"keyword:{value}" for value in _list_values(row.keyword_ids)])
+    groups = [_group_matrix(rows) for rows in (genre_rows, context_rows, people_rows, keyword_rows)]
+    matrix = sparse.hstack([group * 0.25 for group in groups], format="csr", dtype=np.float32)
+    norms = np.sqrt(np.asarray(matrix.multiply(matrix).sum(axis=1)).ravel())
+    inverse = np.divide(1.0, norms, out=np.zeros_like(norms), where=norms > 0)
+    return (sparse.diags(inverse.astype(np.float32)) @ matrix).tocsr()

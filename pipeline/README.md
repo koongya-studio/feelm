@@ -5,11 +5,19 @@ FEELM의 데이터 수집, 전처리, 추천 계산 코드를 관리합니다.
 - `contracts/`: 파이프라인 내부 HDFS 경로, Parquet 스키마, 모델 산출물 계약
 - `spark/`: Spark Batch와 Structured Streaming 작업
 - `consumer/`: Fold-in, Candidate, Top-N 계산을 담당하는 Python Consumer
+- `configs/`: 학습·평가 설정값 기록. 기존 `settings.py`를 이동하지 않습니다.
+- `artifacts/`: 외부 데이터·모델의 출처, 해시, 공유 상태를 담는 JSON 목록
+- `docs/`: 확정 연구 근거, 평가 설명, 재현 절차와 발표 자료
 
 ## Directory layout
 
 ```text
 pipeline/
+├── configs/                     # 실행·실험 설정값 기록
+├── artifacts/                   # 대용량 파일 대신 목록·해시 JSON
+├── docs/                        # 근거·평가·재현·발표 자료
+│   ├── assets/                  # 소형 집계 결과와 그림
+│   └── presentation/            # 발표 원고와 요약
 ├── contracts/                   # 내부 HDFS·Parquet·모델 산출물 계약
 ├── spark/                       # Spark 4.1.3 / Python 3.10.12 실행환경
 │   ├── common/                  # 환경변수·CLI 설정과 Spark Session 생성
@@ -22,6 +30,10 @@ pipeline/
 │   └── tests/                   # Spark 단위·로컬 통합 테스트
 └── consumer/                    # Python 3.12 Fold-in Consumer 위치
 ```
+
+확정 연구 자료는 [`docs/README.md`](docs/README.md)에서 시작합니다. 계산 참고 코드와
+합성 검증 fixture를 제공하며, 운영 연결과 전체 역사 실험 재실행 범위는
+[`docs/reproduction.md`](docs/reproduction.md)에 구분해 적었습니다.
 
 ## Runtime boundaries
 

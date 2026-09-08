@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "purpose": "RESEARCH_BASELINE_RECORD",
+  "experiment": "REC-EV-032",
+  "rank": 32,
+  "reg_param": 0.1,
+  "max_iter": 10,
+  "seed": 42,
+  "implicit_prefs": false,
+  "nonnegative": false,
+  "user_blocks": 10,
+  "item_blocks": 10,
+  "rating_min": 0.5,
+  "rating_max": 5.0,
+  "rating_step": 0.5,
+  "fold_in_regularization": "reg_param * factor_backed_input_count",
+  "research_split": "DISJOINT_TRAIN_EVAL_USERS",
+  "team_split": "per-user-chronological-v1",
+  "observed_input_counts": [
+    5,
+    10,
+    30
+  ],
+  "input_count_is_product_policy": false,
+  "runtime_loader": "RECORD_ONLY_NOT_READ_BY_EXISTING_JOB"
+}

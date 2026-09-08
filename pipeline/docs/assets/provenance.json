@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "source_repository": "FEELM-standalone",
+  "source_paths_are_archive_identifiers": true,
+  "copied_json_internal_paths": "Historical research references; not team repository links or instructions",
+  "source_files": [
+    {
+      "team_path": "pipeline/docs/assets/als-only-metrics.json",
+      "source": {
+        "source_path": "outputs/recommendation-evidence/rec-ev-032/als-only/metrics.json",
+        "bytes": 10163,
+        "sha256": "896fba91a50c5e1110338a2cca270a827d3aeb689680e447db9aa6949f22f72c"
+      },
+      "bytes": 9782,
+      "sha256": "64fd65f0189f199090d6c21e5b99f82e12ab7cd4c6bbba274c4cbbe8e79f97eb",
+      "transformation": "LF_LINE_ENDINGS_ONLY"
+    },
+    {
+      "team_path": "pipeline/docs/assets/user-resplits-metrics.json",
+      "source": {
+        "source_path": "outputs/recommendation-evidence/rec-ev-032/user-resplits/metrics.json",
+        "bytes": 18518,
+        "sha256": "ae863fcd6417b21ba823a2f07e5a482108fbcba508958b45b9c250500c1dff8b"
+      },
+      "bytes": 17752,
+      "sha256": "690b422443644b5bc70563b64c9bb2c4d8b68d140e8845c7415bf8c3063972bc",
+      "transformation": "LF_LINE_ENDINGS_ONLY"
+    },
+    {
+      "team_path": "pipeline/docs/assets/input-comparison-metrics.json",
+      "source": {
+        "source_path": "outputs/recommendation-evidence/rec-ev-035/metrics.json",
+        "bytes": 15167,
+        "sha256": "e8b267310c6417dbdb5db27592f815e6502d9c9550da89eefb378ba59a31bb80"
+      },
+      "bytes": 14653,
+      "sha256": "cfe77dd0bc7ee73cb95bf560684008d421911f8ca38c08d3a7d81fd06de5fbe9",
+      "transformation": "LF_LINE_ENDINGS_ONLY"
+    },
+    {
+      "team_path": "pipeline/docs/assets/content-primary-inference.json",
+      "source": {
+        "source_path": "outputs/recommendation-evidence/rec-ev-030/analysis/primary-inference.json",
+        "bytes": 2407,
+        "sha256": "1f44423a22ea1d9a393b8819c44888202d884bcc176b2155d8cfa33ccdd612d6"
+      },
+      "bytes": 2311,
+      "sha256": "656499b10364c9c861b5f5946a4f855834459c0a6402295d699b4975d4a6b574",
+      "transformation": "LF_LINE_ENDINGS_ONLY"
+    },
+    {
+      "team_path": "pipeline/docs/assets/content-final-analysis.json",
+      "source": {
+        "source_path": "outputs/recommendation-evidence/rec-ev-030/final-analysis.json",
+        "bytes": 2253,
+        "sha256": "efc3d96768cf565356b75f2c70fe1c3f09ddcddc756b93a35e27d7c2f9ca30b4"
+      },
+      "bytes": 2199,
+      "sha256": "0340dd23cc155a4623a488aa4ad069124d589d6f9edfb8f25eb961cec788bbe0",
+      "transformation": "LF_LINE_ENDINGS_ONLY"
+    },
+    {
+      "team_path": "pipeline/docs/assets/als-only-review.json",
+      "source": {
+        "source_path": "docs/recommendation/experiments/rec-ev-032/als-only/result-review.json",
+        "bytes": 2560,
+        "sha256": "55407c4d10687371330fa75869f1fe83babe93410782af7cddaf9d744e030f72"
+      },
+      "bytes": 2486,
+      "sha256": "cce2edd1cfc8f6e6dedd0e8acb70050ffbc32d1c45b88e67baef51a24cb10f13",
+      "transformation": "LF_LINE_ENDINGS_ONLY"
+    },
+    {
+      "team_path": "pipeline/docs/assets/user-resplits-review.json",
+      "source": {
+        "source_path": "docs/recommendation/experiments/rec-ev-032/user-resplits/result-review.json",
+        "bytes": 4740,
+        "sha256": "53fa950d537f5fac10cd35d619e46eaa7aa06b360c0c33775d9a84031e24945a"
+      },
+      "bytes": 4626,
+      "sha256": "fc7bdb0575b71b7b7d5dc97a7c6bea334c85a82e480748e175841e2d14971e38",
+      "transformation": "LF_LINE_ENDINGS_ONLY"
+    },
+    {
+      "team_path": "pipeline/docs/assets/input-comparison-review.json",
+      "source": {
+        "source_path": "docs/recommendation/experiments/rec-ev-035/result-review.json",
+        "bytes": 6550,
+        "sha256": "bf0518e73947c99d2499726ff66a337c728877dcc0272d5eb81e695f792edfe9"
+      },
+      "bytes": 6382,
+      "sha256": "547772aeb3f05a4b0bcb8f0bec4f73fa74f803450af79242615d47a102c4bab2",
+      "transformation": "LF_LINE_ENDINGS_ONLY"
+    },
+    {
+      "team_path": "pipeline/docs/assets/content-review.json",
+      "source": {
+        "source_path": "docs/recommendation/evidence/rec-ev-030-final-result-independent-audit.json",
+        "bytes": 1388,
+        "sha256": "363c717d1f73d47a784f75aa6fa2b40fb21fcf73d9153e904046a57c911808a1"
+      },
+      "bytes": 1388,
+      "sha256": "363c717d1f73d47a784f75aa6fa2b40fb21fcf73d9153e904046a57c911808a1",
+      "transformation": "LF_LINE_ENDINGS_ONLY"
+    },
+    {
+      "team_path": "pipeline/docs/assets/input-comparison.png",
+      "source": {
+        "source_path": "docs/recommendation/experiments/rec-ev-035/comparison.png",
+        "bytes": 122478,
+        "sha256": "099a30ddab8f710490bb1aef20649f810fd0bfecf44c58404716fdd74b77fb24"
+      },
+      "bytes": 122478,
+      "sha256": "099a30ddab8f710490bb1aef20649f810fd0bfecf44c58404716fdd74b77fb24",
+      "transformation": "BYTE_COPY"
+    },
+    {
+      "kind": "calculation_source",
+      "functions": [
+        "fold_in"
+      ],
+      "source_path": "scripts/rec_ev_032_basic.py",
+      "bytes": 34577,
+      "sha256": "58206af0646fa70a8693a2e60b06da1884fbbdfb9b8c16657eeb8fc1e3676d8d"
+    },
+    {
+      "kind": "calculation_source",
+      "functions": [
+        "rating_index",
+        "user_equal_prior",
+        "smoothed_q",
+        "profile_weights",
+        "full_history_q",
+        "weighted_similarity_scores"
+      ],
+      "source_path": "scripts/rec_ev_027_core.py",
+      "bytes": 8143,
+      "sha256": "1ef6fa55ca781ed2d3f93c61a85b0afc673480cf58736d77f38ac7fcc4fc028f"
+    },
+    {
+      "kind": "calculation_source",
+      "functions": [
+        "_list_values",
+        "_group_matrix",
+        "build_structured_full"
+      ],
+      "source_path": "scripts/rec_ev_022a_core.py",
+      "bytes": 12686,
+      "sha256": "cdc0285e27b76bb16b286e015ca6b000fb2dc3ba128dc98c28e6cfc4b99d9475"
+    },
+    {
+      "kind": "source_report",
+      "source_path": "docs/recommendation/experiments/rec-ev-032/als-only/RESULT.md",
+      "bytes": 9898,
+      "sha256": "a7536a41823167dc913ecbb07481dc5bc3e81cf30f2d5d277be541b640d4bf98"
+    },
+    {
+      "kind": "source_report",
+      "source_path": "docs/recommendation/experiments/rec-ev-032/user-resplits/RESULT.md",
+      "bytes": 15032,
+      "sha256": "41d2444b95df279bd194fd139431cd80ff6ca4ef0445187099cbf60eac58db4c"
+    },
+    {
+      "kind": "source_report",
+      "source_path": "docs/recommendation/experiments/rec-ev-035/RESULT.md",
+      "bytes": 11364,
+      "sha256": "e7905618edf0eece59e9de149c6aad95e7f475a8571a159c2789e195f97573c7"
+    },
+    {
+      "kind": "source_report",
+      "source_path": "docs/recommendation/evidence/REC-EV-027-030-masked-content-personalization-final-report.md",
+      "bytes": 11185,
+      "sha256": "f4a267f00d017ad285baa18981f6c6e3c3b3bb0b0164f62337172f1960dcd4e9"
+    }
+  ],
+  "fixture_generation": "Selected original functions executed on synthetic metadata and ratings; no user labels reopened",
+  "feature_float_tolerance": {
+    "rtol": 1e-06,
+    "atol": 1e-07
+  },
+  "full_historical_rerun_included": false
+}
