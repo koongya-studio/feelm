@@ -105,6 +105,18 @@ public class User extends BaseTimeEntity {
     }
 
     /**
+     * 소셜 가입(API-008)으로 계정을 만든다.
+     *
+     * <p>비밀번호가 없고, 제공자가 이미 이메일 소유를 확인했으므로 인증 메일 없이 곧바로 {@code ACTIVE}다(API-008 처리 규칙).
+     */
+    public static User registerSocial(
+            String email, String nickname, LocalDate birthDate, Gender gender) {
+        User user = new User(email, null, nickname, birthDate, gender);
+        user.status = UserStatus.ACTIVE;
+        return user;
+    }
+
+    /**
      * 이메일 인증(API-002)을 반영해 계정을 활성화한다.
      *
      * @throws BusinessException 이미 활성화된 계정은 {@code ALREADY_VERIFIED}, 탈퇴한 계정은 {@code

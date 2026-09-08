@@ -41,6 +41,10 @@ public record SignupRequest(
     static final String PASSWORD_PATTERN =
             "^(?=.*[A-Za-z])(?=.*[0-9])(?=.*[^A-Za-z0-9])[\\x21-\\x7E]{8,64}$";
 
-    /** 2~10자, 한글·영문·숫자·밑줄(플랜 결정 2). 공백은 허용하지 않는다. */
-    static final String NICKNAME_PATTERN = "^[가-힣a-zA-Z0-9_]{2,10}$";
+    /**
+     * 2~10자, 한글·영문·숫자·밑줄(플랜 결정 2). 공백은 허용하지 않는다.
+     *
+     * <p>소셜 가입(API-008)과 추천 닉네임 생성도 같은 규칙을 써야 하므로 공개한다. 규칙이 두 곳으로 갈라지면 가입 경로에 따라 통과하는 닉네임이 달라진다.
+     */
+    public static final String NICKNAME_PATTERN = "^[가-힣a-zA-Z0-9_]{2,10}$";
 }

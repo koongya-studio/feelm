@@ -59,6 +59,23 @@ feelm:
     mock:
       enabled: false
       user-id: 1
+  oauth:
+    # 소셜 로그인(API-007·009)이 허용할 redirectUri 목록이다. 정확히 일치하는 값만 통과하며,
+    # 비어 있으면 모든 요청을 거절한다. 허용 목록을 열어 두면 인가 코드를 공격자의 화면으로
+    # 돌려받을 수 있어 환경마다 명시한다.
+    allowed-redirect-uris: ${OAUTH_ALLOWED_REDIRECT_URIS:}
+    # 자격 증명이 없는 제공자는 등록되지 않고 호출 시 UNSUPPORTED_PROVIDER로 응답한다.
+    # client-secret은 Secret이므로 소스에 기본값을 두지 않는다.
+    providers:
+      google:
+        client-id: ${GOOGLE_CLIENT_ID:}
+        client-secret: ${GOOGLE_CLIENT_SECRET:}
+      kakao:
+        client-id: ${KAKAO_CLIENT_ID:}
+        client-secret: ${KAKAO_CLIENT_SECRET:}
+      naver:
+        client-id: ${NAVER_CLIENT_ID:}
+        client-secret: ${NAVER_CLIENT_SECRET:}
   mail:
     # 필수. log는 발송 대신 인증 링크를 로그로 남기는 로컬 확인용이고, local·test 밖에서 log면 기동에 실패한다.
     # 기본값을 두지 않는다. 프로파일 없이 뜬 배포가 조용히 log 모드로 흘러가 토큰이 로그에 남는 것을 막기 위해서다.

@@ -70,13 +70,7 @@ public class LoginService {
         }
 
         RefreshTokenService.IssuedTokens tokens = refreshTokenService.issue(user.getId());
-        return new LoginResult(
-                tokens.accessToken(),
-                tokens.refreshToken(),
-                tokens.expiresIn(),
-                user.getId(),
-                user.getNickname(),
-                user.isOnboardingCompleted());
+        return LoginResult.of(tokens, user);
     }
 
     /** 계정이 없거나 익명화로 해시가 지워진 계정도 대조 자체는 수행해 처리 시간을 맞춘다. */
@@ -92,5 +86,17 @@ public class LoginService {
             long expiresIn,
             Long userId,
             String nickname,
-            boolean onboardingCompleted) {}
+            boolean onboardingCompleted) {
+
+        /** 발급한 토큰과 사용자로 결과를 만든다. 이메일 로그인·소셜 로그인·소셜 가입이 모두 같은 모양의 결과를 만들기 때문에 공유한다. */
+        static LoginResult of(RefreshTokenService.IssuedTokens tokens, User user) {
+            return new LoginResult(
+                    tokens.accessToken(),
+                    tokens.refreshToken(),
+                    tokens.expiresIn(),
+                    user.getId(),
+                    user.getNickname(),
+                    user.isOnboardingCompleted());
+        }
+    }
 }
