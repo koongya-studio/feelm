@@ -1,5 +1,10 @@
 # Runner 통신 격리 파일럿 (S15P21E106-222)
 
+백엔드 의존성 변경으로 격리 Runner의 Gradle 캐시가 부족할 때는
+[S15P21E106-271 캐시 자동화](DEPENDENCY-CACHE-AUTOMATION.md)를 사용한다. MR의 변경을 표시하는
+고정 Job과 보호된 `develop`의 준비·검증·전환 Job을 분리하며, 준비와 배포를 직렬화하고 전환
+실패 시 이전 `prepared_base`를 복구한다.
+
 MR 61의 신규 메일 의존성을 포함하는 오프라인 캐시 갱신과 Runner 전환 전 독립 검증 절차는
 [S15P21E106-251 캐시 갱신 절차](OFFLINE-CACHE-REFRESH.md)를 따른다.
 

@@ -86,7 +86,18 @@ def image_inventory(prefix):
     return images
 
 
+def expected_identity(args):
+    revision = getattr(args, 'revision', None) or REVISION
+    archive_sha = getattr(args, 'archive_sha256', None) or ARCHIVE_SHA
+    if not re.fullmatch(r'[0-9a-f]{40}', revision):
+        raise ValueError('Full reviewed revision is required')
+    if not re.fullmatch(r'[0-9a-f]{64}', archive_sha):
+        raise ValueError('Reviewed archive SHA256 is required')
+    return revision, archive_sha
+
+
 def inspect(args):
+    _, archive_sha = expected_identity(args)
     prefix = pilot.network.docker_prefix()  # dedicated user + socket permission check; read only
     run_dir = Path(args.source_run)
     if (run_dir.resolve(strict=True).parent != RUNS.resolve(strict=True)
@@ -97,7 +108,7 @@ def inspect(args):
         raise ValueError('Unexpected home symlink')
     with Path(args.archive).open('rb') as stream:
         archive = stream.read(pilot.MAX_ARCHIVE + 1)
-    if len(archive) > pilot.MAX_ARCHIVE or hashlib.sha256(archive).hexdigest() != ARCHIVE_SHA:
+    if len(archive) > pilot.MAX_ARCHIVE or hashlib.sha256(archive).hexdigest() != archive_sha:
         raise ValueError('Expected the recorded reviewed backend archive')
     validated, _ = pilot.archive_entries(archive)
     validated.close()
@@ -109,6 +120,7 @@ def inspect(args):
 
 
 def prepare(args):
+    revision, archive_sha = expected_identity(args)
     archive, cache, files, size, images = inspect(args)
     if OUTPUT.is_symlink():
         raise ValueError('Unexpected output symlink')
@@ -136,11 +148,15 @@ def prepare(args):
         target = destination / 'support' / name
         target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         shutil.copyfile(HERE / 'rootless-backend' / name, target)
-    manifest = {'state': 'WAITING_DOCKER_BOUNDARY_REVIEW', 'revision': REVISION,
+    dynamic_identity = bool(getattr(args, 'revision', None)
+                            or getattr(args, 'archive_sha256', None))
+    manifest = {'state': ('WAITING_OFFLINE_VERIFICATION' if dynamic_identity
+                          else 'WAITING_DOCKER_BOUNDARY_REVIEW'), 'revision': revision,
                 'source_run': str(Path(args.source_run).resolve()),
-                'archive_sha256': ARCHIVE_SHA, 'cache': files, 'images': images,
+                'archive_sha256': archive_sha, 'cache': files, 'images': images,
                 'planned_gradle_args': GRADLE_ARGS, 'docker_images_exported': False,
                 'tests_executed': False}
+    manifest['dynamic_identity'] = dynamic_identity
     (destination / 'manifest.json').write_text(json.dumps(manifest, indent=2))
     print('PREPARATION_COMPLETE: files only; no Gradle, image pull/export, daemon or network changes')
     print('STOP_BEFORE_DOCKER_BOUNDARY: operator review required; no run action provided')
@@ -151,6 +167,8 @@ def main():
     parser.add_argument('action', choices=['plan', 'inspect', 'prepare'], nargs='?', default='plan')
     parser.add_argument('--source-run')
     parser.add_argument('--archive', default=f'/home/feelm-ci-test/pilot-222/backend-{REVISION}.tar')
+    parser.add_argument('--revision')
+    parser.add_argument('--archive-sha256')
     parser.add_argument('--confirm-cache-idle', action='store_true')
     args = parser.parse_args()
     if args.action == 'plan':

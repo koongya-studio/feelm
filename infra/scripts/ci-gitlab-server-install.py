@@ -22,7 +22,9 @@ RUNNER_HOME = Path('/home/feelm-ci-test/gitlab-runner')
 UNIT = Path('/etc/systemd/system/feelm-ci222-gitlab-runner.service')
 SUDOERS = Path('/etc/sudoers.d/feelm-ci222-gitlab')
 SUDOERS_LINE = ('feelm-ci-test ALL=(root) NOPASSWD: /usr/bin/python3 -I -B '
-                 '/usr/local/lib/feelm-ci222/gitlab/ci-gitlab-job-adapter.py run\n')
+                 '/usr/local/lib/feelm-ci222/gitlab/ci-gitlab-job-adapter.py run\n'
+                 'ubuntu ALL=(root) NOPASSWD: /usr/bin/python3 -I -B '
+                 '/usr/local/lib/feelm-ci222/gitlab/ci-dependency-cache.py\n')
 
 
 def load_pilot():

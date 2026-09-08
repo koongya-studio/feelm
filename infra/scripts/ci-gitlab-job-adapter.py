@@ -39,6 +39,14 @@ PROJECT_PATH = 's15-bigdata-dist-sub1/S15P21E106'
 JOB_NAME = 'backend-mr-test'
 JOB_STAGE = 'test'
 EXPECTED_SCRIPT = ['cd backend', './gradlew clean test spotlessCheck --no-daemon']
+CACHE_STATUS_JOB = 'backend-cache-status'
+CACHE_STATUS_SCRIPT = ['echo Backend dependency cache refresh required']
+CACHE_DEPENDENCY_FILES = {
+    'backend/build.gradle', 'backend/build.gradle.kts',
+    'backend/settings.gradle', 'backend/settings.gradle.kts',
+    'backend/gradle.properties', 'backend/gradle/libs.versions.toml',
+    'backend/gradle/wrapper/gradle-wrapper.properties',
+}
 MAX_CONTEXT = 4 * 1024**2
 MAX_HTTP_JSON = 4 * 1024**2
 MAX_HTTP_ARCHIVE = job_io.MAX_ARCHIVE
@@ -103,9 +111,14 @@ def validate_job_response(response):
         raise PolicyError('Invalid job identity')
     if not isinstance(token, str) or not 16 <= len(token) <= 4096 or any(c.isspace() for c in token):
         raise PolicyError('Invalid job credential')
-    if (not isinstance(info, dict) or info.get('name') != JOB_NAME or info.get('stage') != JOB_STAGE
+    policies = {
+        JOB_NAME: (JOB_STAGE, EXPECTED_SCRIPT),
+        CACHE_STATUS_JOB: ('verify', CACHE_STATUS_SCRIPT),
+    }
+    policy = policies.get(info.get('name')) if isinstance(info, dict) else None
+    if (policy is None or info.get('stage') != policy[0]
             or type(info.get('project_id')) is not int or info['project_id'] <= 0):
-        raise PolicyError('Only the fixed backend MR job is accepted')
+        raise PolicyError('Only fixed backend MR jobs are accepted')
     if not isinstance(git, dict) or not re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', str(git.get('sha', ''))):
         raise PolicyError('Invalid commit identity')
     validate_repo_url(git.get('repo_url'))
@@ -118,9 +131,10 @@ def validate_job_response(response):
     steps = response.get('steps')
     if not isinstance(steps, list) or len(steps) != 1 or not isinstance(steps[0], dict):
         raise PolicyError('Exactly one fixed CI script step is required')
-    if steps[0].get('name') != 'script' or steps[0].get('script') != EXPECTED_SCRIPT:
+    if steps[0].get('name') != 'script' or steps[0].get('script') != policy[1]:
         raise PolicyError('CI script differs from the fixed backend policy')
-    return {'id': job_id, 'token': token, 'project_id': info['project_id'], 'sha': git['sha']}
+    return {'id': job_id, 'token': token, 'project_id': info['project_id'], 'sha': git['sha'],
+            'job_name': info['name'], 'job_stage': info['stage']}
 
 
 def request(opener, url, token, maximum):
@@ -147,8 +161,8 @@ def verify_current_job(opener, context):
     expected_web = GITLAB_URL + '/' + PROJECT_PATH + '/-/jobs/' + str(context['id'])
     checks = {
         'id': isinstance(job, dict) and job.get('id') == context['id'],
-        'name': isinstance(job, dict) and job.get('name') == JOB_NAME,
-        'stage': isinstance(job, dict) and job.get('stage') == JOB_STAGE,
+        'name': isinstance(job, dict) and job.get('name') == context['job_name'],
+        'stage': isinstance(job, dict) and job.get('stage') == context['job_stage'],
         'web_url': isinstance(job, dict) and job.get('web_url') == expected_web,
         'pipeline': isinstance(pipeline, dict),
         'pipeline.project_id': isinstance(pipeline, dict)
@@ -176,6 +190,27 @@ def verify_merge_request(opener, context):
                 and mr.get('target_project_id') == context['project_id'] and head == context['sha']):
             matches.append(mr)
     if len(matches) != 1: raise PolicyError('Commit must belong to one open same-project MR targeting develop')
+    return matches[0]
+
+
+def verify_dependency_change(opener, context, mr):
+    iid = mr.get('iid')
+    if type(iid) is not int or iid <= 0:
+        raise PolicyError('Merge request identity is missing')
+    base = GITLAB_URL + '/api/v4/projects/' + str(context['project_id'])
+    values = request_json(opener, base + '/merge_requests/' + str(iid) + '/diffs?per_page=100',
+                          context['token'])
+    if not isinstance(values, list) or len(values) >= 100:
+        raise PolicyError('Merge request diff is missing or too large')
+    paths = sorted({item.get(key) for item in values if isinstance(item, dict)
+                    for key in ('old_path', 'new_path') if isinstance(item.get(key), str)})
+    changes = [path for path in paths if path in CACHE_DEPENDENCY_FILES]
+    if not changes:
+        raise PolicyError('No approved backend dependency change found')
+    print('CACHE_REFRESH_REQUIRED_MR=' + str(iid))
+    print('CACHE_REFRESH_REVISION=' + context['sha'])
+    print('CACHE_DEPENDENCY_CHANGES=' + json.dumps(changes))
+    return changes
 
 
 def normalized_backend_archive(payload):
@@ -272,8 +307,12 @@ def run_job(response, config_path=CONFIG, opener=None):
     opener = opener or urllib.request.build_opener(NoRedirect())
     try: verify_current_job(opener, context)
     except urllib.error.HTTPError as exc: raise AdapterHttpError('current_job', exc.code) from exc
-    try: verify_merge_request(opener, context)
+    try: mr = verify_merge_request(opener, context)
     except urllib.error.HTTPError as exc: raise AdapterHttpError('merge_request', exc.code) from exc
+    if context['job_name'] == CACHE_STATUS_JOB:
+        try: verify_dependency_change(opener, context, mr)
+        except urllib.error.HTTPError as exc: raise AdapterHttpError('dependency_diff', exc.code) from exc
+        return 0
     payload, digest = fetch_source(context)
     active = {}
 

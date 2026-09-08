@@ -71,18 +71,22 @@ def export_source(repository, destination):
     print('NO_TESTS_EXECUTED')
 
 
-def inspect_bundle(bundle, manifest_sha, jdk_sha):
+def inspect_bundle(bundle, manifest_sha, jdk_sha, expected_revision=None, source_sha=None):
+    expected_revision = expected_revision or prep.REVISION
+    source_sha = source_sha or prep.ARCHIVE_SHA
+    if not re.fullmatch(r'[0-9a-f]{40}', expected_revision):
+        raise ValueError('Full reviewed revision is required')
     root = real_path(bundle)
     if not root.is_dir() or {p.name for p in root.iterdir()} != REQUIRED:
         raise ValueError('Expected only: ' + ', '.join(sorted(REQUIRED)))
-    source = checked_file(root / 'backend.tar', prep.ARCHIVE_SHA, prep.pilot.MAX_ARCHIVE)
+    source = checked_file(root / 'backend.tar', source_sha, prep.pilot.MAX_ARCHIVE)
     archive, _ = prep.pilot.archive_entries(source.read_bytes())
     archive.close()
     checked_file(root / 'backend-images.tar', IMAGE_ARCHIVE_SHA, 2 * 1024**3)
     checked_file(root / 'jdk.tar.gz', jdk_sha, 512 * 1024**2)
     manifest_path = checked_file(root / 'cache-manifest.json', manifest_sha, 32 * 1024**2)
     manifest = json.loads(manifest_path.read_text(), object_pairs_hook=unique_json)
-    if manifest.get('revision') != prep.REVISION or manifest.get('archive_sha256') != prep.ARCHIVE_SHA:
+    if manifest.get('revision') != expected_revision or manifest.get('archive_sha256') != source_sha:
         raise ValueError('Cache manifest is for a different source revision')
     cache = real_path(root / 'gradle-cache')
     inventory, size = prep.cache_inventory(cache)
@@ -98,7 +102,7 @@ def inspect_bundle(bundle, manifest_sha, jdk_sha):
         actual.add(path.relative_to(cache).as_posix())
     if actual != set(inventory) or manifest.get('cache') != inventory:
         raise ValueError('Cache inventory mismatch or unrecorded files')
-    return {'revision': prep.REVISION, 'cache_files': len(inventory), 'cache_bytes': size,
+    return {'revision': expected_revision, 'cache_files': len(inventory), 'cache_bytes': size,
             'source_verified': True, 'image_archive_verified': True,
             'jdk_archive_hash_verified': True, 'java21_runtime_verified': False,
             'tests_executed': False, 'runner_approved': False}

@@ -17,6 +17,7 @@ FILES = (
     'ci-gitlab-job-adapter.py', 'ci-gitlab-custom-executor.py', 'ci-gitlab-server-install.py',
     'ci-server-manager-pilot.py', 'ci-server-sysfs-bootstrap.py', 'ci-local-manager-check.py', 'ci-local-backend-runtime.py',
     'ci-local-backend-inputs.py', 'ci-local-backend-transfer.py', 'ci-backend-offline-prepare.py',
+    'ci-dependency-cache.py', 'ci-dependency-cache-context.py', 'ci-dependency-cache-install.py',
     'ci-rootless-backend-check.py', 'ci-rootless-network-check.py',
     'rootless-backend/LoopbackContainers.java', 'rootless-backend/pilot.init.gradle',
     'rootless-backend/META-INF/services/org.testcontainers.core.CreateContainerCmdModifier',
