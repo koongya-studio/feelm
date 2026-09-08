@@ -1,0 +1,96 @@
+{
+  "status": "COMPLETE_RANDOM_POOLED_USER6_ITEM4_MAX_T",
+  "user_family_size": 6,
+  "item_family_size": 4,
+  "user_critical": 2.460336483780577,
+  "item_critical": 2.471018433566172,
+  "active_rates": {
+    "OWN": 1.0,
+    "SHUFFLE": 1.0
+  },
+  "user_intervals": [
+    {
+      "model": "OWN",
+      "comparator": "RANDOM",
+      "metric": "HARM20",
+      "point": 0.12915089292738663,
+      "low": 0.11882763076768518,
+      "high": 0.13947415508708808
+    },
+    {
+      "model": "OWN",
+      "comparator": "RANDOM",
+      "metric": "TOP2_MIN_Q",
+      "point": 0.08686171551317101,
+      "low": 0.0807838794619605,
+      "high": 0.09293955156438152
+    },
+    {
+      "model": "OWN",
+      "comparator": "RANDOM",
+      "metric": "TOP2_MEAN_Q",
+      "point": 0.07770985571821717,
+      "low": 0.07298287797470962,
+      "high": 0.08243683346172473
+    },
+    {
+      "model": "OWN",
+      "comparator": "SHUFFLE",
+      "metric": "HARM20",
+      "point": 0.08629795714997482,
+      "low": 0.07181976170016463,
+      "high": 0.10077615259978501
+    },
+    {
+      "model": "OWN",
+      "comparator": "SHUFFLE",
+      "metric": "TOP2_MIN_Q",
+      "point": 0.06311249518292672,
+      "low": 0.055163883452154734,
+      "high": 0.07106110691369871
+    },
+    {
+      "model": "OWN",
+      "comparator": "SHUFFLE",
+      "metric": "TOP2_MEAN_Q",
+      "point": 0.057118282092290806,
+      "low": 0.05068315211083937,
+      "high": 0.06355341207374225
+    }
+  ],
+  "item_intervals": [
+    {
+      "model": "OWN",
+      "comparator": "RANDOM",
+      "metric": "ITEM_UTILITY",
+      "point": 0.07043644981788777,
+      "low": 0.03784627554242053,
+      "high": 0.103026624093355
+    },
+    {
+      "model": "OWN",
+      "comparator": "RANDOM",
+      "metric": "ITEM_LOW",
+      "point": 0.07789696887228925,
+      "low": 0.05195631622000292,
+      "high": 0.10383762152457558
+    },
+    {
+      "model": "OWN",
+      "comparator": "SHUFFLE",
+      "metric": "ITEM_UTILITY",
+      "point": 0.06375264508060913,
+      "low": 0.021667120497685807,
+      "high": 0.10583816966353245
+    },
+    {
+      "model": "OWN",
+      "comparator": "SHUFFLE",
+      "metric": "ITEM_LOW",
+      "point": 0.06379962189777558,
+      "low": 0.025901614693281144,
+      "high": 0.10169762910227001
+    }
+  ],
+  "primary_pass": true
+}

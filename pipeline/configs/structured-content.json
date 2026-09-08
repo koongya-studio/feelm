@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "purpose": "RESEARCH_CALCULATION_REFERENCE",
+  "experiment": "REC-EV-030",
+  "feature_transform": "STRUCTURED_DIRECT",
+  "encoding": "PERCENTILE_MAGNITUDE",
+  "groups": [
+    "genres",
+    "language_decade_runtime30",
+    "directors_top5cast",
+    "tmdb_keywords"
+  ],
+  "group_weight": 0.25,
+  "binary_tokens": true,
+  "group_l2": true,
+  "final_l2": true,
+  "shrinkage": 5,
+  "g0_mid": [
+    0.006948313242234156,
+    0.028061727542082113,
+    0.04782947007804391,
+    0.08010480577044088,
+    0.12308437993122404,
+    0.2319073125993648,
+    0.3733391158859562,
+    0.5595814492176165,
+    0.7456334757441637,
+    0.8971794597521175
+  ],
+  "prior_source": {
+    "source_path": "outputs/recommendation-evidence/rec-ev-029/prelabel/prepared/calibration-prior.npz",
+    "bytes": 979,
+    "sha256": "6e1856f4bcd6d9edcf644e1b2f5a8d9fdd112c0535f001574336e45ab32a6eae"
+  },
+  "observed_input_count": 30,
+  "input_count_is_product_policy": false,
+  "runtime_loader": "NOT_CONNECTED_TO_SERVICE"
+}

@@ -13,7 +13,9 @@ spark-warehouse/
 
 # Data and model artifacts are external inputs/outputs.
 /data/
-/artifacts/
+/artifacts/*
+!/artifacts/*.json
+!/artifacts/README.md
 /models/
 /checkpoints/
 *.parquet

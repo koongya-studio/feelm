@@ -1,0 +1,54 @@
+{
+  "status": "COMPLETE_REC_EV_030_UNTOUCHED_CONFIRMATION",
+  "contract": {
+    "path": "docs/recommendation/contracts/rec-ev-030b-confirmation-execution.json",
+    "bytes": 3588,
+    "sha256": "4d4ca00565a7ffc6a97483fe3fd38a6d35b4f0deee4efd38e6aa25ecec489107"
+  },
+  "label_seal": {
+    "path": "outputs/recommendation-evidence/rec-ev-030/labels/label-seal.json",
+    "bytes": 1133,
+    "sha256": "64015bb6cee8ac51a71f4f99cf0f579fd8c00ada9d6fcab54abbd514afc6e778"
+  },
+  "metric_seal": {
+    "path": "outputs/recommendation-evidence/rec-ev-030/metrics/metric-seal.json",
+    "bytes": 1842,
+    "sha256": "0ecc7195ecc3a64361457c451fb4daefcb46a725893447527b035b606c65a058"
+  },
+  "inference": {
+    "path": "outputs/recommendation-evidence/rec-ev-030/analysis/primary-inference.json",
+    "bytes": 2407,
+    "sha256": "1f44423a22ea1d9a393b8819c44888202d884bcc176b2155d8cfa33ccdd612d6"
+  },
+  "descriptive": {
+    "path": "outputs/recommendation-evidence/rec-ev-030/analysis/descriptive-outers.json",
+    "bytes": 7600,
+    "sha256": "67d9cbafee8ca3d5d711f46fa4846d0349885596e95231746a1fde648ccb80ce"
+  },
+  "user_segments": {
+    "path": "outputs/recommendation-evidence/rec-ev-030/analysis/user-segments.parquet",
+    "bytes": 6728,
+    "sha256": "b6cbb38a1e9ac6c45ab453722a3b08f2b671ac9eb5bafdded5d64954d20e1245"
+  },
+  "movie_segments": {
+    "path": "outputs/recommendation-evidence/rec-ev-030/analysis/movie-segments.parquet",
+    "bytes": 6739,
+    "sha256": "18e4c759bf9a6b69189110241dc1213af900d86f9d5d0e886acf8b548f274493"
+  },
+  "user_bootstrap": {
+    "path": "outputs/recommendation-evidence/rec-ev-030/analysis/user-bootstrap.npz",
+    "bytes": 225454,
+    "sha256": "f14e54df08b19959e5c1b0f61f928ddea567225d88a113c8f8f3c34e99807b73"
+  },
+  "item_bootstrap": {
+    "path": "outputs/recommendation-evidence/rec-ev-030/analysis/item-bootstrap.npz",
+    "bytes": 150140,
+    "sha256": "55c18134b940156567df1d6c47b6bafac0ba402a7b919c888f8d69002fd25604"
+  },
+  "primary_pass": true,
+  "status_claim": "CONFIRMED_BIAS_FREE_PERSONALIZATION_ON_MASKED_RATED_ITEMS",
+  "timestamps_opened": false,
+  "locked_test_opened": false,
+  "final_reserve_opened": false,
+  "product_policy_changed": false
+}

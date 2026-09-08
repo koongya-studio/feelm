@@ -1,0 +1,172 @@
+{
+  "fixture_type": "SYNTHETIC_ORIGINAL_IMPLEMENTATION_OUTPUT",
+  "metadata": [
+    {
+      "movie_id": 1,
+      "feature_eligible": true,
+      "genre_ids": [
+        1,
+        1,
+        2
+      ],
+      "original_language": "ko",
+      "release_year": 2001,
+      "runtime_minutes": 100,
+      "director_ids": [
+        10
+      ],
+      "top5_cast_ids": [
+        20,
+        21
+      ],
+      "keyword_ids": [
+        30,
+        31
+      ]
+    },
+    {
+      "movie_id": 2,
+      "feature_eligible": true,
+      "genre_ids": [
+        2
+      ],
+      "original_language": "en",
+      "release_year": 2015,
+      "runtime_minutes": 125,
+      "director_ids": [
+        11
+      ],
+      "top5_cast_ids": [
+        20
+      ],
+      "keyword_ids": [
+        31
+      ]
+    },
+    {
+      "movie_id": 3,
+      "feature_eligible": true,
+      "genre_ids": [],
+      "original_language": null,
+      "release_year": null,
+      "runtime_minutes": null,
+      "director_ids": [],
+      "top5_cast_ids": [],
+      "keyword_ids": [
+        32
+      ]
+    },
+    {
+      "movie_id": 4,
+      "feature_eligible": false,
+      "genre_ids": [
+        1
+      ],
+      "original_language": "ko",
+      "release_year": 2001,
+      "runtime_minutes": 100,
+      "director_ids": [
+        10
+      ],
+      "top5_cast_ids": [
+        20
+      ],
+      "keyword_ids": [
+        30
+      ]
+    },
+    {
+      "movie_id": 5,
+      "feature_eligible": true,
+      "genre_ids": [
+        1
+      ],
+      "original_language": "ko",
+      "release_year": 2008,
+      "runtime_minutes": 100,
+      "director_ids": [],
+      "top5_cast_ids": [],
+      "keyword_ids": []
+    }
+  ],
+  "ratings": [
+    0.5,
+    3.0,
+    5.0
+  ],
+  "factors": [
+    [
+      1,
+      0.2
+    ],
+    [
+      0.3,
+      1.5
+    ],
+    [
+      -0.2,
+      0.8
+    ]
+  ],
+  "prior": [
+    0.006948313242234156,
+    0.028061727542082113,
+    0.04782947007804391,
+    0.08010480577044088,
+    0.12308437993122404,
+    0.2319073125993648,
+    0.3733391158859562,
+    0.5595814492176165,
+    0.7456334757441637,
+    0.8971794597521175
+  ],
+  "expected_fold_in": [
+    -0.6673061112633596,
+    2.763770896135927
+  ],
+  "expected_weights": [
+    -0.8663146084472073,
+    -0.335115859250794,
+    0.7464743246901469
+  ],
+  "expected_similarity": [
+    [
+      1.000000238418579,
+      0.4556155204772949,
+      0.0
+    ],
+    [
+      0.4556155204772949,
+      1.000000238418579,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0
+    ],
+    [
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.6035534143447876,
+      0.0,
+      0.0
+    ]
+  ],
+  "expected_scores": [
+    -0.5231255683580666,
+    -0.37467042702771464,
+    0.3832191016764032,
+    0.0,
+    -0.2684254086073889
+  ],
+  "expected_active": true,
+  "generator_runtime": {
+    "numpy": "1.26.4",
+    "pandas": "2.2.3",
+    "scipy": "1.15.2"
+  }
+}

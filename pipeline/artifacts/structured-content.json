@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "purpose": "HISTORICAL_RESEARCH_INPUT_INVENTORY",
+  "source_repository": "FEELM-standalone",
+  "availability": "LOCAL_ONLY",
+  "shared_uri": null,
+  "production_contract_compatible": false,
+  "files": [
+    {
+      "source_path": "outputs/recommendation-evidence/rec-ev-027-catalog/structured-features.parquet",
+      "bytes": 3739308,
+      "sha256": "231fa0bc2628066ae2fdc2fa65c03b9068cd6a5d8dbcd86c385cadf4e50098b3",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/rec-ev-027/screen/prepared/universe.npz",
+      "bytes": 130999,
+      "sha256": "da1d11d858a6a5206ce396a43cdb2c7688a31eeef4a1a6db9efd14e88ad23247",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/rec-ev-029/prelabel/prepared/calibration-prior.npz",
+      "bytes": 979,
+      "sha256": "6e1856f4bcd6d9edcf644e1b2f5a8d9fdd112c0535f001574336e45ab32a6eae",
+      "shared_uri": null
+    }
+  ],
+  "full_experiment_replay_ready": false,
+  "required_before_full_replay": [
+    "Immutable shared artifact location",
+    "Original split and input/label seals",
+    "Exact historical runner dependency closure and runtime"
+  ],
+  "required_before_serving": [
+    "Official service ID mapping",
+    "Production artifact contract validation",
+    "Consumer integration and EC2 validation"
+  ]
+}
