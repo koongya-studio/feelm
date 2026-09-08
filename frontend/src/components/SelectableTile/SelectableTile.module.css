@@ -12,10 +12,18 @@
   color: var(--color-ink);
   text-align: left;
   cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard);
 }
 
+/*
+ * accent 적용 지점 4/4 — 내가 고른 것.
+ * 배경은 8% tint까지만 쓴다. 면적이 넓어 accent 원색을 깔면 예산을 넘는다.
+ */
 .tile[data-selected='true'] {
-  border-color: var(--color-nav-active);
+  border-color: var(--color-accent-mark);
+  background: var(--color-accent-tint);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.07);
 }
 
@@ -45,6 +53,6 @@
 
 .tile[data-selected='true'] .check {
   border-color: transparent;
-  background: var(--color-nav-active);
-  color: var(--color-on-dark);
+  background: var(--color-accent-mark);
+  color: var(--color-on-accent);
 }

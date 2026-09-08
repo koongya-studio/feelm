@@ -17,8 +17,9 @@
   height: 0;
 }
 
+/* 별과 같은 값이므로 별 채움색을 따른다 */
 .value {
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-nav-active);
+  color: var(--color-accent-mark);
 }

@@ -45,7 +45,14 @@ export default function RecommendationCard({ item, otts, menuOpen, onOpenMenu }:
         className={styles.posterLink}
         aria-label={`${movie.title} 상세 보기`}
       >
-        <Poster width={156} height={220} radius={4} src={movie.posterUrl ?? undefined} title="" />
+        <Poster
+          width={156}
+          height={220}
+          radius={4}
+          src={movie.posterUrl ?? undefined}
+          title=""
+          seed={movie.movieId}
+        />
       </Link>
 
       <span className={styles.menuButton}>

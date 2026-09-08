@@ -13,13 +13,33 @@
   opacity: 0.45;
 }
 
+/*
+ * primary는 예외다. accent에 opacity를 걸면 흰 배경과 섞여 흐린 분홍이 되고, 비활성이
+ * 아니라 다른 색처럼 보인다. 비활성은 색을 빼고 무채색 면으로 둔다.
+ */
+.button[data-variant='primary']:disabled {
+  opacity: 1;
+  background: var(--color-track);
+  color: var(--color-ink-hint);
+}
+
+/*
+ * accent 적용 지점 1/4 — 화면의 주 동작.
+ * 화면마다 primary 버튼은 하나뿐이므로 accent 면적이 5%를 넘지 않는다.
+ */
 .button[data-variant='primary'] {
   height: var(--control-height);
   border-radius: var(--radius-control);
-  background: var(--color-nav-active);
-  color: var(--color-on-dark);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
   font-size: 16px;
   font-weight: 600;
+  transition: opacity var(--motion-press) var(--ease-standard);
+}
+
+/* 눌렀는지 알 수 있을 만큼만 (2.8 상태 전환) */
+.button[data-variant='primary']:active:not(:disabled) {
+  opacity: 0.82;
 }
 
 .button[data-variant='secondary'] {

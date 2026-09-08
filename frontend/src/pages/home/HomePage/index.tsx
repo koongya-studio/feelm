@@ -29,6 +29,7 @@ import Button from '../../../components/Button';
 import ScreenHeader from '../../../components/ScreenHeader';
 import Poster from '../../../components/Poster';
 import OttBadge from '../../../components/OttBadge';
+import Wordmark from '../../../components/Wordmark';
 import { BellIcon, ChevronRightIcon, PartyGroupIcon } from '../../../components/Icon';
 import TodayRecommendationCard from './TodayRecommendationCard';
 import { getMyProfile } from '../../../api/users';
@@ -143,7 +144,7 @@ export default function HomePage() {
   return (
     <>
       <ScreenHeader
-        title={<span className={styles.wordmark}>feelm</span>}
+        title={<Wordmark />}
         action={
           // 알림 목록(8.1)은 범위 밖이라 이동하지 않는다
           <IconButton label="알림" icon={<BellIcon />} size={36} disabled />
@@ -225,6 +226,7 @@ export default function HomePage() {
                         radius={8}
                         src={movie.posterUrl ?? undefined}
                         title=""
+                        seed={movie.movieId}
                       />
                       <span className={styles.availableOtt}>
                         <OttBadge

@@ -371,6 +371,7 @@ export default function TasteOnboardingPage() {
         {(board.width > 0 ? cards : []).map((item) => (
           <TasteCard
             key={item.card.movieId}
+            movieId={item.card.movieId}
             title={item.card.title}
             posterUrl={item.card.posterUrl}
             value={item.value}

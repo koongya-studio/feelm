@@ -170,7 +170,14 @@ export default function MovieRatingPage() {
       </div>
 
       <div className={styles.movie}>
-        <Poster width={88} height={124} radius={10} src={movie.posterUrl ?? undefined} title="" />
+        <Poster
+          width={88}
+          height={124}
+          radius={10}
+          src={movie.posterUrl ?? undefined}
+          title=""
+          seed={movie.movieId}
+        />
 
         <div className={styles.movieInfo}>
           <p className={styles.movieTitle}>{movie.title}</p>

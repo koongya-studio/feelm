@@ -59,8 +59,12 @@
   outline-offset: 4px;
 }
 
+/*
+ * 점수가 없을 때는 `별점을 선택해 주세요`라는 안내가 이 자리에 들어온다. 안내 문구는
+ * 값이 아니라 지시문이라 accent를 쓰지 않는다(accent 예산). 잉크로 둔다.
+ */
 .value {
-  color: var(--color-nav-active);
+  color: var(--color-ink);
   font-size: 13px;
   font-weight: 600;
 }

@@ -1,0 +1,8 @@
+/*
+ * 높이만 주고 폭은 비율로 따라오게 한다. 와이어프레임의 27px 자리에 맞춘다.
+ * `display: block`은 global.css의 svg 규칙에서 이미 적용된다.
+ */
+.wordmark {
+  width: auto;
+  color: inherit;
+}

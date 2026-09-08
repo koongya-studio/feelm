@@ -157,6 +157,7 @@ export default function FilmPage() {
                   radius={4}
                   src={frame.movie.posterUrl ?? undefined}
                   title=""
+                  seed={frame.movie.movieId}
                 />
                 <VisuallyHidden>{frame.movie.title} 프레임 상세</VisuallyHidden>
               </button>
@@ -206,6 +207,7 @@ export default function FilmPage() {
                       radius={5}
                       src={frame.movie.posterUrl ?? undefined}
                       title=""
+                      seed={frame.movie.movieId}
                     />
 
                     <span className={styles.recentInfo}>

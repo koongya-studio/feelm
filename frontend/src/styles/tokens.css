@@ -1,67 +1,137 @@
 /*
  * 디자인 토큰.
- * 확정된 값만 둔다. 미확정 항목은 DESIGN_GOALS.md 2.1~2.8을 따르며 확정 후 추가한다.
- * 값의 근거는 frontend/docs/screens/common-components.md 6.2절을 따른다.
  *
- * 팝콘 맛 색상은 여기에 두지 않는다. API-044로 조회한 런타임 값을 사용한다.
+ * `DESIGN_GOALS.md` Phase 1 시각 방향이 **B안 「암실」로 확정**됐다(2026-09-08).
+ * 그 결정을 수치로 고정한 것이 이 파일이다(`DESIGN_TODO.md` Phase 2).
+ *
+ * | 항목 | 결정 |
+ * | --- | --- |
+ * | 1.1 배경 | 흰색 |
+ * | 1.2 잉크 | 준검정 `#2E2C29` 기준 |
+ * | 2.1 accent | 하나 도입. 화면의 5% 이하 |
+ * | 2.2 oxblood | `#4A0D0D`을 시스템 accent로 승격. **바탕색으로는 쓰지 않는다** |
+ * | 2.3 필름 모티프 | 유지하고 구조로 쓴다(스트립 = 컨테이너) |
+ * | 2.4 티켓·타자기 | 제거. accent만 계승 |
+ * | 2.5 장식 | dashed(빈 컷) · 스프로킷(필름) · 알(한 편) 세 가지만 |
+ * | 2.6 특별 화면 | 임계 순간만(1.3 · 2.6 · 2.7) |
+ * | 2.7 표면 | 2단계 — 흰색 + `#F1EFEA` |
+ * | 2.8 모션 | 상태 전환 + 임계 순간 확장 |
+ * | 은유 | 필름 · 컷 · 알이 하나. 팝콘은 맛 이름이며 별도 은유가 아니다 |
+ *
+ * **잉크는 4단계로 줄이고 전부 WCAG AA(4.5:1) 이상으로 올렸다.** 이전에는
+ * `rgba(60,58,54,0.55)`가 3.11:1, `rgba(60,58,54,0.45)`가 2.41:1로 기준에 못 미쳤다
+ * (`DESIGN_TODO.md` Phase 7 점검 항목).
+ *
+ * 아래 대비값은 WCAG 2.x 공식으로 직접 계산한 값이다. `DESIGN.md`가 적어 둔 값
+ * (`#3C3A36` 10.1:1 · `#2E2C29` 12.3:1)과 조금 다르며, 이 파일의 값이 맞다.
+ *
+ * 팝콘 맛 색상은 여기에 두지 않는다. API-044로 조회한 런타임 값을 쓴다.
  */
 
 :root {
-  /* 색 — DESIGN_GOALS.md 1.1 · 1.2 확정 */
+  /* ─────────────────────────── 표면 (2단계 · 2.7) */
   --color-bg: #ffffff;
-  --color-ink: #2e2c29;
+  /* 한 단계 낮은 캔버스. 섹션이 아니라 화면 배경으로 쓴다 */
+  --color-surface-muted: #f1efea;
 
-  /* 색 — REF-01 하단 내비게이션 가이드 확정 */
+  /* ─────────────────────────── 잉크 (4단계 · 전부 4.5:1 이상) */
+  /* 13.9:1 — 제목 · 본문 */
+  --color-ink: #2e2c29;
+  /* 11.4:1 — 채워진 면(배지 · 스낵바 · 필름 스트립)의 잉크. accent가 아닌 곳 */
   --color-nav-active: #3c3a36;
+  /* 11.4:1 — 본문 강조 */
+  --color-ink-body: #3c3a36;
+  /*  6.7:1 — 메타 · 설명 · 캡션 */
+  --color-ink-muted: #5f5c55;
+  --color-ink-subtle: #5f5c55;
+  --color-ink-faint: #5f5c55;
+  --color-ink-dim: #5f5c55;
+  /*  4.8:1 — 힌트 · 자리표시자. 이보다 흐린 값은 두지 않는다 */
+  --color-ink-hint: #75726b;
+  --color-ink-weak: #75726b;
+  /* 비활성 요소. 텍스트에는 쓰지 않는다 */
   --color-nav-inactive: #a5a29b;
 
-  /* 와이어프레임에서 관찰한 값. 확정 사양이 아니므로 디자인 확정 시 교체한다. */
-  --color-line: rgba(0, 0, 0, 0.12);
-  --color-line-strong: rgba(0, 0, 0, 0.25);
-  --color-line-section: rgba(0, 0, 0, 0.15);
-  --color-ink-muted: rgba(60, 58, 54, 0.55);
-  --color-ink-subtle: rgba(60, 58, 54, 0.5);
-  --color-ink-faint: rgba(60, 58, 54, 0.6);
-  --color-on-dark: #ffffff;
-  --color-poster-line: #c7c4be;
-  --color-poster-fill: #d5d2cc;
-  --color-star-empty-line: #8a8781;
-  --color-ink-hint: rgba(60, 58, 54, 0.45);
-  --color-ink-dim: rgba(60, 58, 54, 0.7);
-  --color-ink-body: rgba(60, 58, 54, 0.8);
-  --color-on-dark-dim: rgba(255, 255, 255, 0.7);
-  /* --color-star-empty-line과 같은 값이다. 디자인 확정 시 하나로 합칠 후보다 */
-  --color-ink-weak: #8a8781;
-  --color-line-subtle: rgba(0, 0, 0, 0.18);
-  --color-surface-strip: #e9e7e1;
-  --color-surface-muted: #f1efea;
-  --color-track: #efede9;
-  --color-scrim-light: rgba(255, 255, 255, 0.94);
-  /* 어두운 면 위의 옅은 요소. 3.1 필름 스트립의 `+ 계속 감기는 중` 타일 */
-  --color-surface-on-dark: rgba(255, 255, 255, 0.12);
-  --color-on-dark-faint: rgba(255, 255, 255, 0.55);
-  /* 카드 안쪽 구분선. 3.1-A 한줄평 위 */
-  --color-line-faint: rgba(0, 0, 0, 0.08);
+  /* ─────────────────────────── Accent — 버건디 (2.1 · 2.2) */
+  /*
+   * 적용 지점을 좁게 유지한다. 화면당 primary 버튼 1개 · 활성 탭 · 별점 채움 ·
+   * 선택 상태뿐이다. 배지나 카드 배경에는 쓰지 않는다(면적이 5%를 넘는다).
+   */
+  /* 15.5:1 — primary 버튼 배경 · 큰 면적 */
+  --color-accent: #4a0d0d;
+  /* 10.3:1 — 표식 · 별점 채움 · 활성 탭. 흰 배경 위에서 붉은 기가 보이는 밝기 */
+  --color-accent-mark: #7a1e1e;
+  /* 선택 상태 배경 */
+  --color-accent-tint: rgba(74, 13, 13, 0.08);
+  /* 15.5:1 — accent 위의 글자 */
+  --color-on-accent: #ffffff;
 
-  /* 반경 — 와이어프레임 관찰값 */
+  /* ─────────────────────────── 어두운 면 위 */
+  --color-on-dark: #ffffff;
+  --color-on-dark-dim: rgba(255, 255, 255, 0.78);
+  --color-on-dark-faint: rgba(255, 255, 255, 0.6);
+  --color-surface-on-dark: rgba(255, 255, 255, 0.12);
+  --color-scrim-light: rgba(255, 255, 255, 0.94);
+
+  /* ─────────────────────────── 선 (3단계) */
+  --color-line: rgba(46, 44, 41, 0.14);
+  --color-line-subtle: rgba(46, 44, 41, 0.18);
+  --color-line-section: rgba(46, 44, 41, 0.15);
+  --color-line-strong: rgba(46, 44, 41, 0.28);
+  --color-line-faint: rgba(46, 44, 41, 0.07);
+
+  /* ─────────────────────────── 필름 (2.3 — 유지하고 구조로) */
+  --color-surface-strip: #e9e7e1;
+  --color-track: #efede9;
+
+  /* 빈 별의 테두리. 텍스트가 아닌 도형 선이라 잉크 4단계에 넣지 않는다 */
+  --color-star-empty-line: #8a8781;
+
+  /* ─────────────────────────── 포스터 */
+  /*
+   * 자리표시자를 회색 X자에서 **인화된 컷**으로 바꿨다. 영화마다 다른 깊은 톤을
+   * 쓰므로(Poster 컴포넌트) 테두리는 어두운 면에 맞춰 옅은 검정 hairline이다.
+   * 실제 포스터 이미지의 권리는 여전히 미확정이다(`PRODUCT.md`).
+   */
+  --color-poster-line: rgba(46, 44, 41, 0.12);
+  /* 인물 사진 자리표시자 등 아직 회색 면이 필요한 곳 */
+  --color-poster-fill: #d5d2cc;
+
+  /* ─────────────────────────── 반경 */
   --radius-control: 14px;
   --radius-section: 16px;
   --radius-badge: 999px;
   --radius-icon: 8px;
 
-  /* 컨트롤 높이 — 와이어프레임 관찰값 */
+  /* ─────────────────────────── 치수 */
   --control-height: 52px;
-
-  /* 치수 — REF-01 확정 */
   --nav-height: 66px;
-
-  /*
-   * 콘텐츠 최대 폭.
-   * 와이어프레임이 Android 412px 프레임 기준이고 업무 17이 와이어프레임 일치를
-   * 검증하므로 같은 폭을 상한으로 둔다. 넓은 화면 대응은 디자인 확정 후 정한다.
-   */
   --layout-max-width: 412px;
-
-  /* 화면 좌우 여백. 와이어프레임에서 가장 많이 관찰된 값 */
   --screen-padding-x: 22px;
+
+  /* ─────────────────────────── 모션 (2.8) */
+  /*
+   * M3의 패턴 분류만 가져오고 수치는 FEELM이 정한다(`DESIGN_GOALS.md` 1.7).
+   * 상태 전환은 눌렀는지 알 수 있을 만큼만 짧게, 임계 순간은 지켜볼 수 있게 길게.
+   */
+  --motion-press: 90ms;
+  --motion-fast: 140ms;
+  --motion-base: 220ms;
+  /* 임계 순간 — 필름에 컷이 감기는 전환 (2.6 → 2.7) */
+  --motion-emphasized: 420ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0.05, 0.7, 0.1, 1);
+}
+
+/*
+ * 시스템에서 애니메이션을 줄이도록 설정하면 전환을 끈다
+ * (`DESIGN_TODO.md` Phase 7 — 모션 감소 설정 대응).
+ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-press: 0ms;
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+    --motion-emphasized: 0ms;
+  }
 }

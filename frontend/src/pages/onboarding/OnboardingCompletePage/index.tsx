@@ -49,7 +49,14 @@ export default function OnboardingCompletePage() {
           {/* 프레임 크기는 와이어프레임 2.3의 필름 칸 실측값(138x196, radius 3)을 쓴다 */}
           <FilmStrip width={190}>
             {frames.map((movieId, index) => (
-              <Poster key={`${movieId}-${index}`} width={138} height={196} radius={3} title="" />
+              <Poster
+                key={`${movieId}-${index}`}
+                width={138}
+                height={196}
+                radius={3}
+                title=""
+                seed={movieId}
+              />
             ))}
           </FilmStrip>
 

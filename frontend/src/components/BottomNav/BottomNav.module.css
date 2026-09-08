@@ -19,10 +19,12 @@
   gap: 3px;
   color: var(--color-nav-inactive);
   text-decoration: none;
+  transition: color var(--motion-fast) var(--ease-standard);
 }
 
+/* accent 적용 지점 2/4 — 지금 어디에 있는지. 다섯 탭 중 하나뿐이다 */
 .tab[data-active='true'] {
-  color: var(--color-nav-active);
+  color: var(--color-accent-mark);
 }
 
 /* 필름 탭 강조. 와이어프레임 REF-01 사양 */

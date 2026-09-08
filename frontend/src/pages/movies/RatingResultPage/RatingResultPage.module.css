@@ -13,6 +13,7 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
+  transition: opacity var(--motion-emphasized) var(--ease-standard);
 }
 
 /* 2.7은 뒤 화면을 흐리게 두고 결과 카드를 올린다 */
@@ -94,6 +95,24 @@
   position: absolute;
   inset: 0;
   background: rgba(255, 255, 255, 0.55);
+  animation: fade var(--motion-emphasized) var(--ease-standard) both;
+}
+
+/*
+ * 임계 순간 — 프레임이 필름에 감기고 결과가 올라온다 (2.8 임계 순간 확장).
+ * 상태 전환보다 길게(420ms) 두어 무슨 일이 일어났는지 지켜볼 수 있게 한다.
+ */
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
 }
 
 /* 2.7 결과 카드 */
@@ -111,6 +130,7 @@
   border-radius: 20px;
   background: var(--color-bg);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  animation: rise var(--motion-emphasized) var(--ease-out) both;
 }
 
 .resultIcon {
