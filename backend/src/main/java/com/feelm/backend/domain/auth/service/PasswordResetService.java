@@ -35,15 +35,20 @@ public class PasswordResetService {
      * 재설정 링크를 메일로 보낸다.
      *
      * <p>계정이 없거나 미인증·탈퇴 상태여도 예외 없이 끝난다. 응답만 보고 계정 존재 여부를 알 수 없어야 하기 때문이다(API-010 처리 규칙). 실제로 발송하는지와
-     * 무관하게 간격 제한을 먼저 적용해, 제한 응답으로도 계정 존재 여부가 드러나지 않게 한다.
+     * 무관하게 발송 제한을 먼저 적용해, 제한 응답으로도 계정 존재 여부가 드러나지 않게 한다.
+     *
+     * <p>제한은 이메일 단위 간격뿐 아니라 IP 단위와 전역 단위로도 걸리고, IP·전역 카운터는 재발송(API-003)과 공유한다(S15P21E106-281 결정
+     * D-2). 어느 축에서 걸렸든 응답은 같은 {@code 429 RATE_LIMITED}다(결정 D-6).
      *
      * <p>대상은 이메일 로그인 수단을 가진 활성 계정뿐이다. 미인증 계정은 인증 메일 재발송(API-003)이 복구 경로이고, 소셜 전용 계정에 이메일 로그인 수단을 붙여
      * 주는 것은 API-008의 미정 사항이라 이 경로로 열지 않는다.
+     *
+     * @param clientIp 요청을 보낸 클라이언트 IP. IP 단위 발송 제한에 쓴다.
      */
     @Transactional
-    public void request(String rawEmail) {
+    public void request(String rawEmail, String clientIp) {
         String email = rawEmail.trim().toLowerCase(Locale.ROOT);
-        if (!rateLimiter.tryAcquirePasswordResetSlot(email)) {
+        if (!rateLimiter.tryAcquirePasswordResetSlot(email, clientIp)) {
             throw new BusinessException(ErrorCode.RATE_LIMITED);
         }
         userRepository

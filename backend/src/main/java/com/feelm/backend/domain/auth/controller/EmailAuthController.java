@@ -59,11 +59,17 @@ public class EmailAuthController {
         return emailVerificationService.verify(request.token());
     }
 
-    /** API-003 인증 메일 재발송. 계정 존재 여부를 노출하지 않도록 본문 없이 202로 응답한다. */
+    /**
+     * API-003 인증 메일 재발송. 계정 존재 여부를 노출하지 않도록 본문 없이 202로 응답한다.
+     *
+     * <p>클라이언트 IP는 IP 단위 발송 제한에 쓴다({@link com.feelm.backend.domain.auth.AuthRateLimiter}). {@code
+     * X-Forwarded-For}를 읽지 않으므로, Nginx가 이 경로를 프록시하게 되면 리미터 주석의 후속 처리가 함께 필요하다.
+     */
     @PostMapping("/email/resend")
     @ResponseStatus(HttpStatus.ACCEPTED)
-    void resendVerificationMail(@RequestBody @Valid EmailResendRequest request) {
-        emailVerificationService.resend(request.email());
+    void resendVerificationMail(
+            @RequestBody @Valid EmailResendRequest request, HttpServletRequest httpRequest) {
+        emailVerificationService.resend(request.email(), httpRequest.getRemoteAddr());
     }
 
     /** API-004 이메일 로그인. Refresh Token은 본문이 아니라 쿠키로만 전달한다. */

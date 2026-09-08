@@ -85,3 +85,20 @@ feelm:
     verification-url: ${FRONTEND_BASE_URL:http://localhost:5173}/verify-email
     # 재설정 링크도 프론트 화면으로 가고 프론트가 API-011을 호출한다.
     password-reset-url: ${FRONTEND_BASE_URL:http://localhost:5173}/reset-password
+    # 인증 메일 재발송(API-003)과 재설정 요청(API-010)의 발송 제한이다. 이메일 간격만으로는
+    # 서로 다른 이메일을 대량으로 넣는 발송 폭탄을 막지 못하므로 IP 단위와 전역 단위를 함께 둔다.
+    # ip·global은 창 목록이라 축을 늘리거나 줄여도 코드가 그대로다(S15P21E106-281 결정 D-8).
+    rate-limit:
+      # 같은 이메일로 다시 요청할 수 있게 되기까지의 최소 간격. 두 경로가 같은 값을 쓴다.
+      email-interval: 1m
+      # 정상 사용자가 한 시간에 인증·재설정 메일을 10건까지 요청할 일은 없다.
+      ip:
+        - limit: 10
+          window: 1h
+      # 전역은 SMTP 계정의 발송 쿼터를 지키기 위한 상한이다. 시간 창만으로는 하루 총량을 묶지
+      # 못해 일 창을 함께 둔다.
+      global:
+        - limit: 100
+          window: 1h
+        - limit: 300
+          window: 24h
