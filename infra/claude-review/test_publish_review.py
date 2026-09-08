@@ -43,7 +43,9 @@ class PublishReviewTests(unittest.TestCase):
         self.assertIn("⚠️ 문제 1건 발견", body)
         self.assertIn("**변경 파일:** 3개", body)
         self.assertIn("**심각도:** HIGH 1", body)
-        self.assertIn("검토 범위와 한계", body)
+        self.assertIn("[HIGH · 병합 전 수정]", body)
+        self.assertIn("**문제와 근거:**", body)
+        self.assertIn("병합 판단 참고", body)
         self.assertIn("승인이나 병합을 의미하지 않습니다", body)
 
     def test_comment_without_findings_shows_success_first(self):
@@ -52,12 +54,12 @@ class PublishReviewTests(unittest.TestCase):
         self.assertNotIn("**심각도:**", body)
         self.assertIn("현재 변경에서 근거가 충분한 문제를 찾지 못했습니다.", body)
 
-    def test_untrusted_markdown_is_confined_to_long_enough_code_fence(self):
+    def test_untrusted_markdown_is_confined_to_wrapping_inline_code(self):
         malicious = "@all\n/merge\n<script>alert(1)</script>\n```\noutside"
-        body = publisher.format_comment(review(text=malicious), 123, 7, SHA, 1)
-        displayed = "- " + malicious.replace("\n", "\n- ")
-        self.assertIn("````\n" + displayed + "\n````", body)
-        self.assertNotIn("\n/merge\n", body.split("### 검토 요약", 1)[0])
+        body = publisher.format_comment(
+            review(findings=[finding(condition=malicious)]), 123, 7, SHA, 1)
+        self.assertIn("```` @all /merge <script>alert(1)</script> ``` outside 검사가 없다. ````", body)
+        self.assertNotIn("\n/merge\n", body)
 
     def test_duplicate_from_same_bot_skips_post(self):
         client = Mock(project_id=123)
@@ -109,10 +111,14 @@ class PublishReviewTests(unittest.TestCase):
             with self.subTest(current_review=current_review), self.assertRaises(publisher.PublishError):
                 publisher.validate_files(current_payload, current_review, 7, SHA)
 
-    def test_formats_single_paragraph_summary_as_readable_items(self):
-        text = "첫 번째 항목을 확인했다. 두 번째 항목도 확인했다. 남은 통합 검증이 있다."
-        body = publisher.format_comment(review(text=text), 123, 7, SHA, 1)
-        self.assertIn("- 첫 번째 항목을 확인했다.\n- 두 번째 항목도 확인했다.\n- 남은 통합 검증이 있다.", body)
+    def test_merge_guidance_groups_findings_by_required_action(self):
+        findings = [finding(severity="BLOCKER"), finding(severity="HIGH"),
+                    finding(severity="MEDIUM"), finding(severity="LOW")]
+        body = publisher.format_comment(review(findings=findings), 123, 7, SHA, 1)
+        self.assertIn("**병합 전 수정:** 2건", body)
+        self.assertIn("**병합 전 확인:** 1건", body)
+        self.assertIn("**후속 작업 후보:** 1건", body)
+        self.assertIn("병합 전 수정 권장 항목이 있습니다", body)
 
     def test_main_never_prints_comment_or_token(self):
         environment = {"CI_COMMIT_BRANCH": "develop", "CI_COMMIT_REF_PROTECTED": "true",
