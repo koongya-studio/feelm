@@ -2,6 +2,9 @@
 
 FEELM의 데이터 수집, 전처리, 추천 계산 코드를 관리합니다.
 
+AI 코딩 도구는 루트 [`AGENTS.md`](../AGENTS.md)의 공통 절차와
+[`pipeline/AGENTS.md`](AGENTS.md)의 파이프라인 전용 작업·검증 절차를 따릅니다.
+
 - `contracts/`: 파이프라인 내부 HDFS 경로, Parquet 스키마, 모델 산출물 계약
 - `spark/`: Spark Batch와 Structured Streaming 작업
 - `consumer/`: Fold-in, Candidate, Top-N 계산을 담당하는 Python Consumer
