@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import re
 import stat
 import subprocess
 import tempfile
@@ -19,7 +20,9 @@ MAX_INPUT_BYTES = 768 * 1024
 MAX_GUIDANCE_BYTES = 256 * 1024
 MAX_RESULT_BYTES = 128 * 1024
 ALLOWED_SEVERITIES = {"BLOCKER", "HIGH", "MEDIUM", "LOW"}
-MODEL = "claude-sonnet-4-6"
+MODEL_NAME_PATTERN = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+MAX_REPORTED_MODELS = 8
+MAX_TOKEN_COUNT = 10 ** 12
 
 SYSTEM_PROMPT = """당신은 GitLab Merge Request 코드 리뷰어다.
 반드시 한국어로 답하고 제공된 JSON 스키마의 JSON 객체 하나만 출력한다.
@@ -135,7 +138,6 @@ def child_environment(token: str, home: Path) -> dict[str, str]:
 
 def command() -> list[str]:
     return [CLAUDE, "-p", "--output-format", "json", "--max-turns", "1",
-            "--model", MODEL,
             "--tools", "", "--disable-slash-commands", "--setting-sources", "",
             "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}',
             "--settings", '{"disableAllHooks":true}', "--no-session-persistence",
@@ -153,10 +155,8 @@ def classify_failure(result: subprocess.CompletedProcess[str]) -> str:
 
 def parse_usage(envelope: dict[str, object]) -> dict[str, int | str]:
     model_usage = envelope.get("modelUsage")
-    if not isinstance(model_usage, dict) or set(model_usage) != {MODEL}:
-        raise GenerationError("INVALID_CLAUDE_USAGE")
-    usage = model_usage[MODEL]
-    if not isinstance(usage, dict):
+    if (not isinstance(model_usage, dict) or not model_usage
+            or len(model_usage) > MAX_REPORTED_MODELS):
         raise GenerationError("INVALID_CLAUDE_USAGE")
     fields = {
         "input_tokens": "inputTokens",
@@ -164,12 +164,21 @@ def parse_usage(envelope: dict[str, object]) -> dict[str, int | str]:
         "cache_read_tokens": "cacheReadInputTokens",
         "cache_creation_tokens": "cacheCreationInputTokens",
     }
-    metrics: dict[str, int | str] = {"model": MODEL}
-    for output_name, input_name in fields.items():
-        value = usage.get(input_name)
-        if type(value) is not int or value < 0:
+    metrics: dict[str, int | str] = {name: 0 for name in fields}
+    model_names = []
+    for model_name in sorted(model_usage):
+        usage = model_usage[model_name]
+        if not isinstance(model_name, str) or not MODEL_NAME_PATTERN.fullmatch(model_name):
             raise GenerationError("INVALID_CLAUDE_USAGE")
-        metrics[output_name] = value
+        if not isinstance(usage, dict):
+            raise GenerationError("INVALID_CLAUDE_USAGE")
+        model_names.append(model_name)
+        for output_name, input_name in fields.items():
+            value = usage.get(input_name)
+            if type(value) is not int or not 0 <= value <= MAX_TOKEN_COUNT:
+                raise GenerationError("INVALID_CLAUDE_USAGE")
+            metrics[output_name] += value
+    metrics["model"] = ",".join(model_names)
     return metrics
 
 
