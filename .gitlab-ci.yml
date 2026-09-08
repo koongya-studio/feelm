@@ -44,6 +44,9 @@ claude-mr-review:
   timeout: 10m
   interruptible: true
   rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
+      when: on_success
+      allow_failure: true
     - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "web"'
       when: manual
       allow_failure: true
@@ -59,6 +62,8 @@ runner-check:
     - docker --version
     - docker compose version
   rules:
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
+      when: never
     - if: '$CI_COMMIT_BRANCH == "develop"'
 
 backend-mr-test:
@@ -83,6 +88,8 @@ backend-test:
     - cd backend
     - ./gradlew clean test spotlessCheck --no-daemon
   rules:
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
+      when: never
     - if: '$CI_COMMIT_BRANCH == "develop"'
 
 backend-image:
@@ -99,6 +106,8 @@ backend-image:
     - docker push "$BACKEND_IMAGE"
     - echo "Built backend image $BACKEND_IMAGE"
   rules:
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
+      when: never
     - if: '$CI_COMMIT_BRANCH == "develop"'
 
 deploy-backend:
@@ -116,6 +125,8 @@ deploy-backend:
     - BACKEND_IMAGE="$DOCKERHUB_NAMESPACE/feelm-backend:$CI_COMMIT_SHA"
     - ./infra/scripts/deploy-backend.sh "$BACKEND_IMAGE"
   rules:
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
+      when: never
     - if: '$CI_COMMIT_BRANCH == "develop"'
       when: manual
   allow_failure: false

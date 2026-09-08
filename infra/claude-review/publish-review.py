@@ -154,10 +154,13 @@ def positive_int(value: str, code: str) -> int:
 
 
 def trusted_context(env: dict[str, str]) -> bool:
+    source = env.get("CI_PIPELINE_SOURCE")
+    allowed_source = (source in ("push", "web")
+                      or (source == "api" and env.get("CLAUDE_REVIEW_TRIGGER") == "comment"))
     return (env.get("CI_COMMIT_BRANCH") == "develop"
             and env.get("CI_COMMIT_REF_PROTECTED") == "true"
             and env.get("CI_ENVIRONMENT_NAME") == "claude-review"
-            and env.get("CI_PIPELINE_SOURCE") in ("push", "web")
+            and allowed_source
             and env.get("CI_DEBUG_TRACE", "").lower() not in ("true", "1")
             and env.get("CI_DEBUG_SERVICES", "").lower() not in ("true", "1"))
 

@@ -35,6 +35,13 @@ def finding(**changes):
 
 
 class PublishReviewTests(unittest.TestCase):
+    def test_accepts_only_tagged_api_trigger_context(self):
+        valid = {"CI_COMMIT_BRANCH": "develop", "CI_COMMIT_REF_PROTECTED": "true",
+                 "CI_ENVIRONMENT_NAME": "claude-review", "CI_PIPELINE_SOURCE": "api",
+                 "CLAUDE_REVIEW_TRIGGER": "comment"}
+        self.assertTrue(publisher.trusted_context(valid))
+        self.assertFalse(publisher.trusted_context(dict(valid, CLAUDE_REVIEW_TRIGGER="manual")))
+
     def test_comment_has_stable_identifier_sha_and_ai_notice(self):
         body = publisher.format_comment(review(findings=[finding()]), 123, 7, SHA, 3)
         self.assertIn(publisher.marker(123, 7, SHA), body)

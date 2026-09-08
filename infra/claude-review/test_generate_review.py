@@ -48,6 +48,13 @@ def completed_text(model_text):
 
 
 class GenerateReviewTests(unittest.TestCase):
+    def test_accepts_only_tagged_api_trigger_context(self):
+        valid = {"CI_COMMIT_BRANCH": "develop", "CI_COMMIT_REF_PROTECTED": "true",
+                 "CI_ENVIRONMENT_NAME": "claude-review", "CI_PIPELINE_SOURCE": "api",
+                 "CLAUDE_REVIEW_TRIGGER": "comment"}
+        self.assertTrue(generator.trusted_context(valid))
+        self.assertFalse(generator.trusted_context(dict(valid, CLAUDE_REVIEW_TRIGGER="manual")))
+
     def test_command_disables_tools_hooks_mcp_and_sessions(self):
         command = generator.command()
         self.assertEqual(command[command.index("--tools") + 1], "")
