@@ -15,7 +15,12 @@
 import styles from './Wordmark.module.css';
 
 type Props = {
-  /** 글자 크기(px). 헤더 기본값은 27px 자리다 */
+  /**
+   * 글자 크기(px). 헤더 기본값은 22px이다.
+   *
+   * 확정 시안이 300px 폭 목업에서 18px을 썼다. 375px 기준으로 환산하면 22.5px이다.
+   * 이전 값 27px은 `--font-size-title`을 그대로 다러 쓴 것이었고 시안보다 컸다.
+   */
   size?: number;
   /**
    * 색 처리. 기본은 브랜드 빨강이다. `inherit`는 부모 색을 따르며, 어두운 면이나
@@ -24,7 +29,7 @@ type Props = {
   tone?: 'brand' | 'inherit';
 };
 
-export default function Wordmark({ size = 27, tone = 'brand' }: Props) {
+export default function Wordmark({ size = 22, tone = 'brand' }: Props) {
   return (
     <span
       className={styles.wordmark}

@@ -1,50 +1,61 @@
 /*
  * 3.1 취향 필름 메인
  *
- * 요소와 순서는 와이어프레임 3.1 그대로다(screen-spec.md 7장 3.1).
- * 제목·카운트 · 가로 필름 스트립 · 요즘 취향 흐름 · 최근 추가된 영화 · 취향 리포트 보기
+ * 구성은 확정 시안을 따른다(`docs/screens/design-concept.md`). 시안은 이 화면이
+ * 한 가지만 말하게 한다. **내 필름이 몇 칸 찼는가.**
  *
- * 연동 API는 API-042(프레임 목록) · API-040(취향 키워드) · API-041(팝콘 알 수)다.
+ * 워드마크 · 검색 · 필름 스트립 · 프레임 수 문장 · 팝콘 범례 · 취향 리포트 보기
  *
- * 계약에 출처가 없는 값(CR-16)은 `getTasteFlow`로 따로 가져온다. `요즘 취향 흐름`
- * 문장과 키워드 근거 문장이 그렇다. 자세한 이유는 types/unspecified.ts에 있다.
+ * 연동 API는 API-042(프레임 목록) · API-041(팝콘 버킷)이다.
  *
- * 팀 결정 2026-09-07
- * - `최근 추가된 영화`의 시각은 상대 시각(`어제` · `지난주`) 대신 절대 날짜로 쓴다.
- *   변환 규칙이 계약에 없다
- * - 와이어프레임에 없는 `내 취향 팝콘 보기` 버튼을 추가해 3.2로 가는 진입점을 만든다.
- *   screen-spec.md 3.1이 `100알의 취향 보기` 진입 요소가 명시되지 않았다고 적어 둔
- *   항목이다(`[!]`)
+ * 팀 결정 2026-09-09 (업무 -100)
+ * - 와이어프레임 3.1의 `요즘 취향 흐름`(태그 칩)과 `최근 추가된 영화` 목록을 뺐다.
+ *   시안에 없고, 한 화면이 세 가지를 동시에 말하면 어느 것도 읽히지 않는다.
+ *   두 블록은 다른 화면으로 옮기지 않고 삭제했다
+ * - 헤더 제목을 `취향 필름`에서 워드마크로 바꿨다. 홈과 같은 헤더다
+ * - 프레임 수는 헤더 우측 카운트가 아니라 본문의 큰 문장이 말한다
+ * - 와이어프레임의 `+ 계속 감기는 중` 타일 대신 빈 칸을 점선으로 둔다. 아직 채울
+ *   자리가 남았다는 뜻이며, 조작할 수 없는 것은 같다
+ *
+ * 팝콘 범례는 어두운 판 위에 둔다. 8색은 밝은 면에서 절반이 판별되지 않는다
+ * (`docs/screens/design-concept.md` 2.5). 이 판이 3.2로 가는 진입점이다.
  *
  * `[?]` `취향 리포트 보기`는 7.3이 범위 밖이라 비활성으로 둔다(2.1과 같은 처리).
- * `[?]` 스트립이 보여줄 프레임 개수와 페이지네이션은 미확정이다. 첫 페이지만 쓰고
- * `+ 계속 감기는 중` 타일은 와이어프레임대로 조작할 수 없는 안내로 둔다.
+ * `[?]` 스트립이 보여줄 프레임 개수와 페이지네이션은 미확정이다. 첫 페이지만 쓴다.
  */
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import Button from '../../../components/Button';
-import Chip from '../../../components/Chip';
 import FilmStrip from '../../../components/FilmStrip';
+import { SearchIcon } from '../../../components/Icon';
 import Poster from '../../../components/Poster';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
-import { getMyFrames, getPopcornBucket, getTasteFlow } from '../../../api/taste';
+import Wordmark from '../../../components/Wordmark';
+import { getMyFrames, getPopcornBucket } from '../../../api/taste';
 import { path } from '../../../routes/paths';
-import { formatDate } from '../../../utils/date';
 import styles from './FilmPage.module.css';
-import type { FrameList } from '../../../types/taste';
-import type { TasteFlowView } from '../../../types/unspecified';
+import type { FrameList, PopcornBucket } from '../../../types/taste';
 
-/** 와이어프레임 3.1의 `최근 추가된 영화`는 3편이다 */
-const RECENT_COUNT = 3;
+/*
+ * 필름 프레임 한 칸. 포스터보다 세로로 길다.
+ *
+ * 시안은 300px 폭에서 60×104를 썼고, 375px 기준으로 환산하면 75×130이다.
+ * 그 비율을 지키면서 판 안쪽 폭 319px에 네 칸이 딱 들어가는 값이 73×126이다
+ * (73×4 + 간격 8×3 = 316). CSS의 `.emptyFrame`이 같은 값을 써야 줄이 흔들리지 않는다.
+ */
+const FRAME_WIDTH = 73;
+const FRAME_HEIGHT = 126;
+
+/** 범례에 올릴 맛 수. 8종을 다 늘어놓으면 판이 표가 된다. 나머지는 3.2에서 본다 */
+const LEGEND_COUNT = 4;
 
 export default function FilmPage() {
   const navigate = useNavigate();
 
   const [frames, setFrames] = useState<FrameList | null>(null);
-  const [flow, setFlow] = useState<TasteFlowView | null>(null);
-  const [popcornCount, setPopcornCount] = useState<number | null>(null);
+  const [bucket, setBucket] = useState<PopcornBucket | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
 
@@ -64,19 +75,11 @@ export default function FilmPage() {
         }
       });
 
-    // 흐름 카드와 팝콘 수는 실패하면 그 자리만 비운다. 이 화면의 본문은 필름 목록이다
-    getTasteFlow()
+    // 팝콘 범례는 실패하면 그 자리만 비운다. 이 화면의 본문은 필름 목록이다
+    getPopcornBucket()
       .then((value) => {
         if (active) {
-          setFlow(value);
-        }
-      })
-      .catch(() => undefined);
-
-    getPopcornBucket()
-      .then((bucket) => {
-        if (active) {
-          setPopcornCount(bucket.totalCount);
+          setBucket(value);
         }
       })
       .catch(() => undefined);
@@ -89,7 +92,7 @@ export default function FilmPage() {
   if (failed) {
     return (
       <>
-        <ScreenHeader title="취향 필름" />
+        <ScreenHeader title={<Wordmark />} />
 
         <StatusView title="취향 필름을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
           <Button
@@ -109,7 +112,7 @@ export default function FilmPage() {
   if (frames && frames.totalCount === 0) {
     return (
       <>
-        <ScreenHeader title="취향 필름" />
+        <ScreenHeader title={<Wordmark />} />
 
         <StatusView
           variant="empty"
@@ -122,28 +125,30 @@ export default function FilmPage() {
     );
   }
 
-  // 스트립과 최근 목록은 같은 목록(API-042)을 쓴다. 최근 목록은 앞 3개다
   const items = frames?.items ?? [];
-  const recent = items.slice(0, RECENT_COUNT);
+
+  // 많이 나온 맛부터 보여준다. 0알인 맛은 아직 발견하지 않은 맛이라 뺀다
+  const legend = bucket
+    ? [...bucket.flavors]
+        .filter((flavor) => flavor.popcornCount > 0)
+        .sort((a, b) => b.popcornCount - a.popcornCount)
+        .slice(0, LEGEND_COUNT)
+    : [];
 
   return (
     <>
       <ScreenHeader
-        title="취향 필름"
+        title={<Wordmark />}
         action={
-          /* 받기 전에는 그리지 않는다. `0프레임`으로 보이면 없는 정보를 말하는 셈이다 */
-          frames && popcornCount !== null ? (
-            <span className={styles.counts}>
-              필름 <b className={styles.countStrong}>{frames.totalCount}프레임</b> · 팝콘{' '}
-              {popcornCount}알
-            </span>
-          ) : null
+          <Link to={path.search()} className={styles.headerAction} aria-label="검색">
+            <SearchIcon />
+          </Link>
         }
       />
 
       <div className={styles.page}>
         <div className={styles.stripArea}>
-          <FilmStrip orientation="horizontal" tone="dark">
+          <FilmStrip orientation="horizontal" tone="paper">
             {items.map((frame) => (
               <button
                 key={frame.frameId}
@@ -152,8 +157,8 @@ export default function FilmPage() {
                 onClick={() => void navigate(path.frameDetail(frame.frameId))}
               >
                 <Poster
-                  width={118}
-                  height={166}
+                  width={FRAME_WIDTH}
+                  height={FRAME_HEIGHT}
                   radius={4}
                   src={frame.movie.posterUrl ?? undefined}
                   title=""
@@ -163,72 +168,62 @@ export default function FilmPage() {
               </button>
             ))}
 
-            {/* 와이어프레임의 안내 타일. 조작할 수 없다 */}
-            <span className={styles.moreTile}>+ 계속 감기는 중</span>
+            {/* 아직 채울 자리가 남았다는 표시. 조작할 수 없다 */}
+            <span className={styles.emptyFrame} aria-hidden="true" />
           </FilmStrip>
-
-          {/* 필름 릴 장식 */}
-          <span className={styles.reel} aria-hidden="true" />
-          <span className={styles.reelHub} aria-hidden="true" />
         </div>
 
         <div className={styles.content}>
-          {/* 요즘 취향 흐름 — 계약에 출처가 없다 (CR-16) */}
-          {flow ? (
-            <section className={styles.flowCard}>
-              <h2 className={styles.flowLabel}>요즘 취향 흐름</h2>
-              <p className={styles.flowSentence}>{flow.flowSentence}</p>
+          <p className={styles.eyebrow}>MY · FILM</p>
 
-              <ul className={styles.keywordList}>
-                {flow.keywords.map((keyword) => (
-                  <li key={keyword.code} className={styles.keywordItem}>
-                    <Chip>{keyword.label}</Chip>
-                    <span className={styles.keywordRationale}>{keyword.rationale}</span>
+          {/* 받기 전에는 그리지 않는다. `0개`로 보이면 없는 정보를 말하는 셈이다 */}
+          {frames ? (
+            <h2 className={styles.headline}>
+              {frames.totalCount}개의 프레임이
+              <br />
+              감겼어요
+            </h2>
+          ) : null}
+
+          {/*
+           * 팝콘 범례이자 3.2 진입점. 어두운 판에 담는다. 팝콘 8색은 밝은 면에서
+           * 절반이 판별 불가라, 팝콘이 나오는 자리는 예외 없이 어두운 면 위에 둔다
+           * (`docs/screens/design-concept.md` 2.5).
+           *
+           * 색은 API-044가 내려주는 값을 그대로 쓴다. 화면이 맛 색을 알지 않는다.
+           */}
+          {bucket ? (
+            <button
+              type="button"
+              className={styles.bucket}
+              onClick={() => void navigate(path.popcornBucket())}
+            >
+              <span className={styles.bucketLabel}>{bucket.totalCount} · KERNELS</span>
+
+              <ul className={styles.legend}>
+                {legend.map((flavor) => (
+                  <li key={flavor.flavorCode} className={styles.legendItem}>
+                    <span
+                      className={styles.kernel}
+                      style={{ background: flavor.color }}
+                      aria-hidden="true"
+                    />
+                    {flavor.displayName} {flavor.popcornCount}
                   </li>
                 ))}
               </ul>
-            </section>
+            </button>
           ) : null}
 
-          <section className={styles.recentSection}>
-            <h2 className={styles.sectionTitle}>최근 추가된 영화</h2>
-
-            <ul className={styles.recentList}>
-              {recent.map((frame) => (
-                <li key={frame.frameId}>
-                  <button
-                    type="button"
-                    className={styles.recentItem}
-                    onClick={() => void navigate(path.movieDetail(frame.movie.movieId))}
-                  >
-                    <Poster
-                      width={34}
-                      height={48}
-                      radius={5}
-                      src={frame.movie.posterUrl ?? undefined}
-                      title=""
-                      seed={frame.movie.movieId}
-                    />
-
-                    <span className={styles.recentInfo}>
-                      <span className={styles.recentTitle}>{frame.movie.title}</span>
-                      <span className={styles.recentMeta}>
-                        {formatDate(frame.createdAt)} · ★ {frame.score.toFixed(1)}
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          {/* 7.3 취향 리포트는 범위 밖이라 비활성이다 */}
-          <Button disabled>취향 리포트 보기</Button>
-
-          {/* 와이어프레임에 없는 요소다. 3.2 진입점으로 추가했다 (팀 결정 2026-09-07) */}
-          <Button variant="secondary" onClick={() => void navigate(path.popcornBucket())}>
-            내 취향 팝콘 보기
-          </Button>
+          {/*
+           * 이 화면의 주 동작. 검정 알약은 한 화면에 하나뿐이고 그 하나가 여기다
+           * (`docs/screens/design-concept.md` 2.4).
+           *
+           * `[?]` 7.3 취향 리포트 화면은 아직 없다(업무 -321). 화면이 생길 때까지는
+           * 눌러도 이동하지 않는다. 시안이 이 자리를 주 동작으로 그리고 있어
+           * 비활성 회색으로 두지 않았다.
+           */}
+          <Button>취향 리포트 보기</Button>
         </div>
       </div>
     </>
