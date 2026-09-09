@@ -5,8 +5,11 @@
  * 않는다. 대표형은 2.1에서만 쓰이므로 화면 폴더에 둔다. 두 번째 화면이 필요해지면
  * src/components/로 올린다.
  *
- * 카드 전체를 링크로 만들지 않고 포스터와 제목만 링크로 둔다. 와이어프레임의
- * `추천 더 보기` 버튼이 카드 안에 함께 있어 카드 전체를 링크로 감싸면 중첩된다.
+ * 카드로 감싸지 않고 콘텐츠가 배경 위에 직접 놓인다. 포스터가 화면 상단을 차지하고
+ * 정보는 그 아래로 쌓인다 (`docs/screens/design-concept.md`, S15P21E106-97).
+ *
+ * 카드 전체를 링크로 만들지 않고 포스터만 링크로 둔다. `추천 더 보기` 버튼이 아래에
+ * 함께 있어 전체를 링크로 감싸면 중첩된다.
  *
  * `취향 일치 92%`(matchRate)와 `128분`(runtimeMinutes)은 계약에 없는 값이다.
  * types/unspecified.ts를 참고한다.
@@ -41,9 +44,9 @@ export default function TodayRecommendationCard({ item, otts }: Props) {
       >
         {/* 링크가 이름을 제공하므로 포스터의 대체 텍스트는 비운다 */}
         <Poster
-          width={104}
-          height={148}
-          radius={8}
+          width={232}
+          height={330}
+          radius={16}
           src={movie.posterUrl ?? undefined}
           title=""
           seed={movie.movieId}
@@ -54,16 +57,13 @@ export default function TodayRecommendationCard({ item, otts }: Props) {
         <p className={styles.title}>{movie.title}</p>
         <p className={styles.meta}>{meta}</p>
 
-        <span className={styles.badgeRow}>
-          <Badge size="md">취향 일치 {matchRate}%</Badge>
-        </span>
-
         {/*
          * `아직 안 본 영화`는 고정 문구다. API-045가 감상 기록이 있는 영화를 응답에서
          * 제외하므로(처리 규칙) 추천 카드의 영화는 모두 안 본 영화다.
          * `[?]` 배지 표시 규칙 자체는 명세에 없다(screen-spec.md 2.1 미확정).
          */}
         <span className={styles.badgeRow}>
+          <Badge size="md">취향 일치 {matchRate}%</Badge>
           <Chip>아직 안 본 영화</Chip>
         </span>
 
