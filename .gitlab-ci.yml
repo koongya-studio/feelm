@@ -91,6 +91,7 @@ backend-mr-test:
   stage: test
   tags:
     - e106-mr-isolated
+  dependencies: []
   variables:
     GIT_STRATEGY: none
   script:
