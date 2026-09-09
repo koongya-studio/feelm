@@ -102,3 +102,12 @@ feelm:
           window: 1h
         - limit: 300
           window: 24h
+  kafka:
+    outbox:
+      bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+      # 별점 저장부터 추천 후보 갱신까지의 실측 결과에 따라 환경변수로 조정한다.
+      poll-interval: ${KAFKA_OUTBOX_POLL_INTERVAL:500ms}
+      batch-size: ${KAFKA_OUTBOX_BATCH_SIZE:100}
+      maximum-retry-delay: ${KAFKA_OUTBOX_MAX_RETRY_DELAY:30s}
+      published-retention: ${KAFKA_OUTBOX_PUBLISHED_RETENTION:7d}
+      cleanup-interval: ${KAFKA_OUTBOX_CLEANUP_INTERVAL:1h}

@@ -119,7 +119,37 @@ sudo chown -R "$USER:$USER" <repo>/.git
   - J15E106A 분산 처리 구성
 
 - `compose/local.yml`
-  - 로컬 Redis 포트를 추가하고 PostgreSQL의 공통 루프백 바인딩을 유지하는 오버레이
+  - 로컬 Kafka·Redis 포트를 추가하고 PostgreSQL의 공통 루프백 바인딩을 유지하는 오버레이
+
+### Local Kafka
+
+Windows에서 실행하는 Spring Boot가 `localhost:9092`로 Kafka에 연결할 수 있도록 로컬
+오버레이는 포트 매핑을 사용하는 단일 노드 KRaft Broker를 제공합니다. 서버용
+`distributed.yml`과 Compose 프로젝트명, 컨테이너 및 데이터 볼륨을 공유하지 않습니다.
+
+`infra/.env`에 `KAFKA_CLUSTER_ID`를 설정한 뒤 로컬 Kafka를 실행합니다.
+
+```bash
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  -f infra/compose/local.yml \
+  up -d kafka
+```
+
+업무 Topic은 자동 생성하지 않습니다. 평점 Topic은 최초 한 번 생성합니다.
+
+```bash
+docker exec feelm-kafka-local \
+  /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 \
+  --create --if-not-exists \
+  --topic feelm.rating.v1 \
+  --partitions 3 \
+  --replication-factor 1
+```
+
+Spring Boot local 프로파일의 기본 Kafka 주소가 `localhost:9092`이므로 별도 환경변수 없이
+연결됩니다.
 
 ## PostgreSQL Runtime
 
@@ -770,12 +800,13 @@ docker restart feelm-kafka
 
 ### Application Connection Contract
 
-애플리케이션과 Consumer는 다음 환경변수 이름을 사용합니다. 실제 값은 배포 환경에서
-주입하며 저장소에 비밀정보나 서버 주소를 커밋하지 않습니다.
+애플리케이션과 Consumer는 다음 환경변수 이름을 사용합니다. 백엔드 컨테이너의
+`KAFKA_BOOTSTRAP_SERVERS`는 Compose가 `DISTRIBUTED_NODE_IP`에 `9092` 포트를 결합해
+주입하며, 저장소에 비밀정보나 서버 주소를 커밋하지 않습니다.
 
 | 환경변수 | 값·용도 |
 | --- | --- |
-| `KAFKA_BOOTSTRAP_SERVERS` | `<J15E106A 사설 IP>:9092` |
+| `KAFKA_BOOTSTRAP_SERVERS` | Compose가 `${DISTRIBUTED_NODE_IP}:9092`로 구성해 백엔드에 주입 |
 | `KAFKA_RATING_TOPIC` | `feelm.rating.v1` |
 | `KAFKA_DISMISS_TOPIC` | `feelm.dismiss.v1` |
 | `KAFKA_VIEW_TOPIC` | `feelm.view.v1` |
