@@ -962,10 +962,29 @@ Docker Hub 로그인에는 GitLab CI/CD Variables의 `DOCKERHUB_USERNAME`과
 `DOCKERHUB_TOKEN`을 사용합니다. 저장소 경로는 `DOCKERHUB_NAMESPACE`로 구성하며 토큰은
 Masked로 관리하고 로그에 출력하지 않습니다.
 
-이미지 빌드가 성공한 뒤 승인된 사용자가 수동 `deploy-backend` Job을 실행합니다. 배포
-스크립트는 실행 중인 이미지 이름을 먼저 보관하고 후보 이미지를 기동한 뒤 최대 2분 동안
-Docker healthcheck와 `http://127.0.0.1:8080/actuator/health`를 확인합니다. 성공한 경우에만
-후보 이미지를 정상 배포로 인정합니다.
+이미지 빌드가 성공하면 보호된 `develop`의 Push Pipeline에서 `deploy-backend` Job이 자동
+실행됩니다. MR, API 및 수동 Web Pipeline은 서비스 배포를 실행하지 않습니다. 배포 직전에
+원격 `develop`의 HEAD가 Pipeline의 commit SHA와 같은지 확인하므로, 재시도되거나 대기하던
+과거 Pipeline이 최신 배포를 덮어쓰지 않습니다. 배포와 의존성 캐시 작업은 같은
+`resource_group`으로 직렬화합니다.
+
+배포 스크립트는 실행 중인 이미지 이름을 먼저 보관하고 후보 이미지를 기동한 뒤 최대 2분
+동안 Docker healthcheck와 `http://127.0.0.1:8080/actuator/health`를 확인합니다. 성공한
+경우에만 후보 이미지를 정상 배포로 인정합니다. 후보 이미지 Pull 실패 시 실행 중인
+서비스를 변경하지 않으며, 컨테이너 교체 명령·이미지 일치·헬스체크 중 하나라도 실패하면
+직전 이미지를 복구하고 복구된 이미지와 상태를 다시 검증합니다.
+
+GitLab Scheduler 또는 Runner 시스템 장애는 최대 2회 자동 재시도합니다. Job timeout,
+배포 스크립트 오류, 애플리케이션 기동 실패와 헬스체크 실패는 자동 재시도하지 않습니다.
+배포 도중 강제 종료된 Job을 자동 재시도하면 실패한 후보를 이전 정상 이미지로 오인할 수
+있으므로 timeout은 원인과 서버 상태를 확인한 뒤 수동 복구 또는 재시도합니다. 그 밖의
+오류는 원인을 수정해 `develop`에 새로 병합하거나, 같은 commit을 다시 실행해야 할 명확한
+이유가 있을 때 GitLab에서 Job을 수동 재시도합니다. 자동 재시도된 과거 commit도 배포 직전
+HEAD 검사를 통과해야 합니다.
+
+후보 배포가 실패하면 이전 이미지 복구 성공 여부와 관계없이 Pipeline은 실패 상태를
+유지합니다. 운영 적용 전에 GitLab의 Pipeline 실패 알림 수신자를 확인해 담당자가 실패와
+수동 복구 필요 여부를 Job 로그에서 확인할 수 있게 합니다.
 
 첫 배포에는 되돌릴 이전 이미지가 없으므로, 첫 정상 배포를 완료해 롤백 기준 이미지를 먼저
 확보합니다. 이후 배포부터 헬스체크 실패 시 직전 실행 이미지가 자동으로 복구됩니다.
@@ -998,9 +1017,10 @@ docker exec feelm-postgres sh -c \
 
 ### Rollback
 
-후보 이미지의 기동 또는 헬스체크가 실패하면 `deploy-backend.sh`가 직전 실행 이미지를
-`rollback-backend.sh`에 전달합니다. 복구 이미지도 healthy 상태와 Actuator 응답을 통과해야
-롤백 성공으로 처리하며, 후보 배포 Job은 실패 상태를 유지합니다.
+후보 이미지의 컨테이너 교체, 기동 또는 헬스체크가 실패하면 `deploy-backend.sh`가 직전
+실행 이미지를 `rollback-backend.sh`에 전달합니다. 복구 이미지도 healthy 상태와 Actuator
+응답을 통과해야 롤백 성공으로 처리하며, 후보 배포 Job은 실패 상태를 유지합니다. 롤백도
+실패하면 Job 로그에 수동 복구가 필요함을 표시합니다.
 
 승인된 환경변수를 주입할 수 있는 J15E106 셸에서 특정 정상 이미지로 직접 되돌릴 수도
 있습니다.
@@ -1013,6 +1033,10 @@ docker exec feelm-postgres sh -c \
 롤백 후 `docker inspect`의 실행 이미지가 지정한 SHA 태그와 일치하고 상태가 healthy인지
 확인합니다. 장애 로그나 캡처에는 환경변수 전체, 비밀번호, JWT 키와 내부 IP를 포함하지
 않습니다.
+
+이미지 롤백은 이미 적용된 Flyway Migration을 되돌리지 않습니다. Migration이 포함된 배포는
+이전 애플리케이션 이미지와의 하위 호환성을 사전에 확인하며, DB 복구가 필요한 변경은 별도
+Migration 및 운영 절차로 처리합니다.
 
 ## HTML Landing and HTTPS (S15P21E106-196)
 

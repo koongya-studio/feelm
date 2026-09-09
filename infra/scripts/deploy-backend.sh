@@ -49,11 +49,40 @@ echo "Previous backend image: ${previous_image:-none}"
 echo "Candidate backend image: ${CANDIDATE_IMAGE}"
 
 if ! docker image inspect "${CANDIDATE_IMAGE}" >/dev/null 2>&1; then
-  docker pull "${CANDIDATE_IMAGE}"
+  if ! docker pull "${CANDIDATE_IMAGE}"; then
+    echo "Candidate image pull failed; running service was not changed" >&2
+    exit 1
+  fi
 fi
 
-BACKEND_IMAGE="${CANDIDATE_IMAGE}" \
-  "${compose[@]}" up -d --no-deps --force-recreate backend
+restore_previous_image() {
+  local reason="$1"
+
+  echo "${reason}" >&2
+  docker logs --tail 100 feelm-backend >&2 || true
+
+  if [[ -z "${previous_image}" ]]; then
+    echo "No previous image is available for rollback" >&2
+    docker stop feelm-backend >/dev/null 2>&1 || true
+    return 1
+  fi
+
+  echo "Restoring previous image: ${previous_image}" >&2
+
+  if ! COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-}" \
+    "${SCRIPT_DIR}/rollback-backend.sh" "${previous_image}"; then
+    echo "Rollback failed; manual recovery is required" >&2
+    return 1
+  fi
+
+  echo "Candidate deployment failed; previous image was restored" >&2
+  return 1
+}
+
+if ! BACKEND_IMAGE="${CANDIDATE_IMAGE}" \
+  "${compose[@]}" up -d --no-deps --force-recreate backend; then
+  restore_previous_image "Candidate deployment command failed"
+fi
 
 if wait_for_healthy \
   && curl --fail --silent --show-error \
@@ -63,27 +92,11 @@ if wait_for_healthy \
   )"
 
   if [[ "${running_image}" != "${CANDIDATE_IMAGE}" ]]; then
-    echo "Running image does not match candidate image" >&2
-    exit 1
+    restore_previous_image "Running image does not match candidate image"
   fi
 
   echo "Deployment completed: ${running_image}"
   exit 0
 fi
 
-echo "Deployment health check failed" >&2
-docker logs --tail 100 feelm-backend >&2
-
-if [[ -z "${previous_image}" ]]; then
-  echo "No previous image is available for rollback" >&2
-  docker stop feelm-backend >/dev/null 2>&1 || true
-  exit 1
-fi
-
-echo "Restoring previous image: ${previous_image}" >&2
-
-COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-}" \
-  "${SCRIPT_DIR}/rollback-backend.sh" "${previous_image}"
-
-echo "Candidate deployment failed; previous image was restored" >&2
-exit 1
+restore_previous_image "Deployment health check failed"

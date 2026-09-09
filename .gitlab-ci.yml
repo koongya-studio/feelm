@@ -153,6 +153,7 @@ backend-test:
   tags:
     - e106-shell
   script:
+    - python3 -B -m unittest infra.scripts.test_ci_deploy_current_commit infra.scripts.test_deploy_backend -v
     - cd backend
     - ./gradlew clean test spotlessCheck --no-daemon
   rules:
@@ -190,11 +191,17 @@ deploy-backend:
   before_script:
     - printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
   script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
     - BACKEND_IMAGE="$DOCKERHUB_NAMESPACE/feelm-backend:$CI_COMMIT_SHA"
     - ./infra/scripts/deploy-backend.sh "$BACKEND_IMAGE"
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - scheduler_failure
+  timeout: 15m
   rules:
     - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
       when: never
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      when: manual
+    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
   allow_failure: false
