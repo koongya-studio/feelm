@@ -50,22 +50,19 @@ services:
     container_name: feelm-redis
     restart: unless-stopped
 
+    ports:
+      - "127.0.0.1:6379:6379"
+
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      REDIS_READONLY_PASSWORD: ${REDIS_READONLY_PASSWORD:-}
 
-    command:
-      - sh
-      - -c
-      - >-
-        exec redis-server
-        --requirepass "$$REDIS_PASSWORD"
-        --appendonly yes
-        --appendfsync everysec
-        --maxmemory 512mb
-        --maxmemory-policy noeviction
+    command: ["sh", "/usr/local/etc/redis/start.sh"]
 
     volumes:
       - redis_data:/data
+      - ../redis/start.sh:/usr/local/etc/redis/start.sh:ro
+      - ../redis/readonly.acl:/usr/local/etc/redis/readonly.acl:ro
 
     mem_limit: 768m
 
