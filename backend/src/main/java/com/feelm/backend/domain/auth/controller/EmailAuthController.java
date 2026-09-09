@@ -73,10 +73,19 @@ public class EmailAuthController {
         emailVerificationService.resend(request.email(), httpRequest.getRemoteAddr());
     }
 
-    /** API-004 이메일 로그인. Refresh Token은 본문이 아니라 쿠키로만 전달한다. */
+    /**
+     * API-004 이메일 로그인. Refresh Token은 본문이 아니라 쿠키로만 전달한다.
+     *
+     * <p>클라이언트 IP는 IP 단위 시도 제한에 쓴다({@link com.feelm.backend.domain.auth.AuthRateLimiter},
+     * S15P21E106-312). 메일 발송 제한과 같이 {@code X-Forwarded-For}를 읽지 않으므로, Nginx가 이 경로를 프록시하게 되면 리미터 주석의
+     * 후속 처리가 함께 필요하다.
+     */
     @PostMapping("/login")
-    ResponseEntity<LoginResponse> login(@RequestBody @Valid LoginRequest request) {
-        LoginService.LoginResult result = loginService.login(request.email(), request.password());
+    ResponseEntity<LoginResponse> login(
+            @RequestBody @Valid LoginRequest request, HttpServletRequest httpRequest) {
+        LoginService.LoginResult result =
+                loginService.login(
+                        request.email(), request.password(), httpRequest.getRemoteAddr());
         return ResponseEntity.ok()
                 .header(
                         HttpHeaders.SET_COOKIE,

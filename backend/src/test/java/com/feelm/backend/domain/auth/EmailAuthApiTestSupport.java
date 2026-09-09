@@ -82,9 +82,9 @@ abstract class EmailAuthApiTestSupport {
     private static final AtomicInteger SEQUENCE = new AtomicInteger();
 
     /**
-     * 요청마다 다른 클라이언트 IP를 만드는 일련번호. 메일 발송 제한이 IP 단위로 걸리므로(S15P21E106-281 결정 D-12) 컨텍스트를 공유하는 테스트가 같은
-     * {@code 127.0.0.1}을 쓰면 서로의 IP 예산을 갉아먹는다. 제한 자체를 검증하는 테스트만 {@link #nextClientIp()}로 얻은 IP를 고정해서
-     * 쓴다.
+     * 요청마다 다른 클라이언트 IP를 만드는 일련번호. 메일 발송 제한(S15P21E106-281 결정 D-12)과 로그인 시도 제한(S15P21E106-312)이 IP
+     * 단위로 걸리므로, 컨텍스트를 공유하는 테스트가 같은 {@code 127.0.0.1}을 쓰면 서로의 IP 예산을 갉아먹는다. 제한 자체를 검증하는 테스트만 {@link
+     * #nextClientIp()}로 얻은 IP를 고정해서 쓴다.
      */
     private static final AtomicInteger IP_SEQUENCE = new AtomicInteger();
 
@@ -209,8 +209,15 @@ abstract class EmailAuthApiTestSupport {
     }
 
     ResultActions login(String email, String password) throws Exception {
-        return postJson(
-                LOGIN_PATH, "{\"email\":\"%s\",\"password\":\"%s\"}".formatted(email, password));
+        return loginFrom(nextClientIp(), email, password);
+    }
+
+    /** 로그인(API-004)을 지정한 IP에서 보낸다. IP 단위 시도 제한을 검증하는 시나리오용(S15P21E106-312). */
+    ResultActions loginFrom(String clientIp, String email, String password) throws Exception {
+        return postJsonFrom(
+                clientIp,
+                LOGIN_PATH,
+                "{\"email\":\"%s\",\"password\":\"%s\"}".formatted(email, password));
     }
 
     ResultActions requestPasswordReset(String email) throws Exception {
@@ -349,6 +356,19 @@ abstract class EmailAuthApiTestSupport {
     /** IP 단위 발송 제한 카운터 키(S15P21E106-281 결정 D-7). 해시 입력은 IP 원문이 아니라 집계 버킷이다(S15P21E106-288). */
     String mailIpLimitKey(String clientIp, Duration window) {
         return "auth:mail:ip:"
+                + Sha256Hasher.hex(ClientIpBucket.of(clientIp, clientIpPrefixes))
+                + ":"
+                + window.toSeconds();
+    }
+
+    /** 이메일 단위 로그인 시도 카운터 키. IP 축에서 거절된 요청이 이 키를 만들지 않는지 확인하는 데 쓴다. */
+    String loginFailureKey(String email) {
+        return "auth:login-fail:" + Sha256Hasher.hex(email);
+    }
+
+    /** IP 단위 로그인 시도 제한 카운터 키(S15P21E106-312). 해시 입력은 메일 축과 같은 집계 버킷이다(S15P21E106-288). */
+    String loginIpLimitKey(String clientIp, Duration window) {
+        return "auth:login:ip:"
                 + Sha256Hasher.hex(ClientIpBucket.of(clientIp, clientIpPrefixes))
                 + ":"
                 + window.toSeconds();

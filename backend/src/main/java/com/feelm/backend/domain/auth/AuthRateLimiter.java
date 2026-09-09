@@ -1,6 +1,6 @@
 package com.feelm.backend.domain.auth;
 
-import com.feelm.backend.domain.auth.MailRateLimitProperties.Quota;
+import jakarta.annotation.PostConstruct;
 import java.time.Duration;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -48,20 +48,43 @@ import org.springframework.stereotype.Component;
  * <p>키에는 이메일과 IP 원문 대신 해시를 쓴다. Redis 키 목록만으로 어떤 이메일이 서비스에 있는지, 어떤 IP가 서비스를 썼는지 알 수 있으면 안 되고, IPv6까지
  * 길이가 고르게 된다. 네임스페이스는 Refresh Token이 쓰는 {@code auth:}를 이어 사용한다.
  *
- * <p><b>창 길이를 키에 넣는 것은 메일 축뿐이다</b>(결정 D-7). 그래서 메일 제한은 설정을 바꿔도 이전 창의 카운터가 새 설정에 섞이지 않는다. 로그인 키는 창을
- * 담지 않으므로, 창 길이를 바꾸면 <b>이미 만들어진 카운터는 옛 창이 만료될 때까지 옛 길이를 유지한다</b>. 스크립트가 만료를 다시 거는 조건이 {@code count
- * == 1}이거나 TTL이 없을 때뿐이기 때문이다. 값을 바꾼 직후에는 설정과 관측이 한 창 동안 어긋날 수 있다. 로그인 키도 창을 담게 맞추는 안은 기존 계약 테스트가 이
- * 키 형식을 알고 있어 별도 업무로 판단한다(S15P21E106-311 리뷰 A-5·B-4).
+ * <p><b>창 길이를 키에 담지 않는 것은 로그인 이메일 축뿐이다</b>(결정 D-7). 메일 축과 로그인 IP 축은 키에 창 길이가 들어 있어 설정을 바꿔도 이전 창의
+ * 카운터가 새 설정에 섞이지 않는다. 로그인 이메일 키는 창을 담지 않으므로, 창 길이를 바꾸면 <b>이미 만들어진 카운터는 옛 창이 만료될 때까지 옛 길이를 유지한다</b>.
+ * 스크립트가 만료를 다시 거는 조건이 {@code count == 1}이거나 TTL이 없을 때뿐이기 때문이다. 값을 바꾼 직후에는 설정과 관측이 한 창 동안 어긋날 수 있다.
+ * 로그인 이메일 키도 창을 담게 맞추는 안은 기존 계약 테스트가 이 키 형식을 알고 있어 별도 업무로 판단한다(S15P21E106-311 리뷰 A-5·B-4).
  *
  * <p>제한 값은 코드가 아니라 설정에 둔다. 메일 발송은 {@link MailRateLimitProperties}, 로그인은 {@link
  * LoginRateLimitProperties}가 읽고, 잘못된 값은 기동에 실패한다(S15P21E106-311). 로그인 제한만 상수로 남으면 같은 성격의 값이 설정과 코드로
  * 갈려 조정 지점이 둘이 된다. 다만 값은 jar에 담기는 {@code application.yml}에 있고 배포 환경변수 통로는 아직 없어, 바꾸려면 재배포가 필요하다(리뷰
  * B-7, 후속 업무 후보).
  *
- * <p>로그인 제한은 실패를 나중에 기록하는 대신 시도를 먼저 센다. 확인과 기록이 분리되어 있으면 동시 요청이 모두 확인을 통과해 제한 횟수보다 많은 비밀번호 대조가 일어나기
- * 때문이다. 카운터는 DB 트랜잭션과 무관하게 즉시 반영된다. Redis가 응답하지 않으면 예외가 그대로 올라가 인증 요청은 500으로 실패한다(fail-closed). 로그인
- * 성공 자체가 Refresh Token을 Redis에 저장해야 하므로 리미터만 열어 두어도 얻는 것이 없고, 발송 제한을 열면 장애 중 메일 폭탄이 가능해지기 때문이다(결정
- * D-10). 장애 시 정책을 바꾸려면 후속 업무에서 정한다.
+ * <p>로그인은 IP 축과 이메일 축을 함께 본다(S15P21E106-312). 이메일 축만 있으면 두 경로가 열려 있다. 비밀번호 하나를 서로 다른 계정 수천 개에 한 번씩
+ * 넣는 password spraying은 계정당 한도에 걸리지 않고, 피해자 이메일만 알면 틀린 비밀번호 몇 번으로 그 계정을 창 길이만큼 반복해서 잠글 수 있는데 그 시도를
+ * 어디에서도 세지 않았다. IP 축은 계정 잠금 자체를 없애지는 못하지만 한 IP가 잠글 수 있는 계정 수를 묶고 spraying을 카운터에 드러낸다.
+ *
+ * <p>IP 축은 <b>실패가 아니라 시도</b>를 센다. 확인과 기록을 원자적 증가 하나로 합쳐야 동시 요청이 몰려도 한 창에서 비밀번호 대조가 한도만큼만 일어난다. 실패만
+ * 세려면 대조를 마친 뒤에 기록해야 하고, 그러면 병렬 요청이 모두 게이트를 통과해 BCrypt 대조에 들어간다. 시도를 세면 카운터 소모 여부가 계정 존재나 비밀번호 일치를
+ * 알려 주는 신호가 되지도 않는다(메일 축 결정 D-4와 같은 이유). 대가는 정상 로그인도 예산을 소모하는 것이라, 한도는 공유 NAT를 기준으로 넉넉히 둔다({@code
+ * application.yml}).
+ *
+ * <p>평가 순서는 <b>IP → 이메일</b>이다. 메일 축(결정 D-3)과 순서가 다른 이유는 반복 요청의 성격이 다르기 때문이다. 같은 이메일을 다시 넣는 메일 요청은
+ * 정상 사용자의 재시도이지만, 같은 이메일에 틀린 비밀번호를 반복하는 로그인은 그 자체가 공격 형태다. IP를 먼저 세면 한 계정을 반복해서 잠그려는 시도가 자기 IP 예산을
+ * 소모해 결국 IP 축에서 끊긴다. 이메일을 먼저 보면 그 시도는 계정별 429만 받으며 IP 예산을 전혀 쓰지 않는다. 이 순서에서는 IP에서 거절된 요청이 이메일 카운터를
+ * 올리지 않는 성질도 함께 얻는다. 공유 NAT의 정상 사용자가 남의 IP 예산 때문에 429를 받아도 자기 계정까지 잠기지는 않는다.
+ *
+ * <p>로그인의 IP 예산은 메일 축의 IP 예산과 공유하지 않는다. 메일 축을 두 엔드포인트가 공유한 이유는 둘이 같은 SMTP 발송 쿼터를 소모하기 때문인데(결정 D-2),
+ * 로그인 시도는 발송 수단을 쓰지 않아 한쪽이 다른 쪽 예산을 마르게 할 이유가 없다.
+ *
+ * <p>IP 한도에 도달하면 <b>창마다 한 번</b> WARN을 남긴다(메일 전역 축과 같은 방식). 차단된 요청도 카운터를 계속 올리므로 카운터 값 자체는 지표가 되지
+ * 못하고, 거절되는 모든 요청에 로그를 남기면 공격이 이어지는 동안 같은 줄이 초당 요청 수만큼 쌓인다. IP 원문과 이메일은 남기지 않는다({@code
+ * docs/backend-convention.md} 12장). 기동 시에는 유효 한도를 한 줄 남긴다(리뷰 B-3·B-5).
+ *
+ * <p>IP 카운터는 로그인 성공에 지워지지 않는다. 이메일 카운터와 달리 여러 계정의 시도가 함께 쌓이는 예산이라, 유효한 계정 하나로 성공할 수 있는 공격자가 창마다 예산을
+ * 되돌릴 수 있으면 spraying 한도가 사라진다.
+ *
+ * <p>두 축의 카운터는 DB 트랜잭션과 무관하게 즉시 반영된다. Redis가 응답하지 않으면 예외가 그대로 올라가 인증 요청은 500으로 실패한다(fail-closed).
+ * 로그인 성공 자체가 Refresh Token을 Redis에 저장해야 하므로 리미터만 열어 두어도 얻는 것이 없고, 발송 제한을 열면 장애 중 메일 폭탄이 가능해지기
+ * 때문이다(결정 D-10). 장애 시 정책을 바꾸려면 후속 업무에서 정한다.
  */
 @Component
 @RequiredArgsConstructor
@@ -75,6 +98,7 @@ public class AuthRateLimiter {
 
     private static final String RESEND_KEY_PREFIX = "auth:email-resend:";
     private static final String LOGIN_FAILURE_KEY_PREFIX = "auth:login-fail:";
+    private static final String LOGIN_IP_KEY_PREFIX = "auth:login:ip:";
     private static final String PASSWORD_RESET_KEY_PREFIX = "auth:password-reset:";
     private static final String MAIL_IP_KEY_PREFIX = "auth:mail:ip:";
     private static final String MAIL_GLOBAL_KEY_PREFIX = "auth:mail:global:";
@@ -122,29 +146,76 @@ public class AuthRateLimiter {
     /**
      * 로그인 시도 자리를 확보한다. 비밀번호를 대조하기 전에 호출한다.
      *
-     * <p>확인과 기록을 한 번의 원자적 증가로 합쳐, 동시 요청이 몰려도 한 창 안에서 대조가 정확히 제한 횟수만 일어난다. 첫 시도에 만료를 걸어 최초 시도 시점부터
-     * 기간이 흐른다. 시도가 실패로 남을지는 호출자가 정한다. 비밀번호가 맞으면 {@link #clearLoginAttempts}로 지우고, 틀리면 그대로 둔다.
+     * <p>IP 축을 먼저 보고 이메일 축을 본다(클래스 주석의 평가 순서). 두 축 모두 확인과 기록을 한 번의 원자적 증가로 합쳐, 동시 요청이 몰려도 한 창 안에서
+     * 대조가 정확히 제한 횟수만 일어난다. 첫 시도에 만료를 걸어 최초 시도 시점부터 기간이 흐른다. IP 축에서 거절되면 이메일 카운터는 올리지 않는다.
      *
-     * <p>한도와 창 길이는 {@link LoginRateLimitProperties}에서 온다(S15P21E106-311). 운영 기본값은 5회/10분이다.
+     * <p>이메일 축의 시도가 실패로 남을지는 호출자가 정한다. 비밀번호가 맞으면 {@link #clearLoginAttempts}로 지우고, 틀리면 그대로 둔다. IP
+     * 카운터는 성공에도 지우지 않는다.
      *
-     * <p>{@link #recordAttempt}를 쓰지 않고 스크립트를 직접 부르는 이유는 값이 없을 때의 처리를 한도와 독립으로 두기 위해서다. 그 헬퍼는 값을 받지
-     * 못하면 어떤 한도보다도 큰 값을 돌려주는데, 한도가 설정값이 된 뒤에는 {@code attempt-limit}을 {@code Long.MAX_VALUE}로 두면 그
-     * 신호가 한도와 같아져 fail-closed가 fail-open으로 뒤집힌다(리뷰 A-1·B-2).
+     * <p>한도와 창 길이는 {@link LoginRateLimitProperties}에서 온다(S15P21E106-311·-312). 이메일 축의 운영 기본값은
+     * 5회/10분이고, IP 축의 운영 기본값은 {@code application.yml}에 있다.
      *
-     * @return 대조해도 되면 {@code true}, 제한을 넘었으면 {@code false}
+     * @param clientIp 요청을 보낸 클라이언트 IP
+     * @return 대조해도 되면 {@code true}, 어느 한 축이라도 제한을 넘었으면 {@code false}
      */
-    public boolean tryAcquireLoginAttempt(String email) {
-        Long count =
-                redisTemplate.execute(
-                        RECORD_ATTEMPT_SCRIPT,
-                        List.of(loginFailureKey(email)),
-                        Long.toString(loginRateLimit.attemptWindow().toMillis()));
-        return count != null && count <= loginRateLimit.attemptLimit();
+    public boolean tryAcquireLoginAttempt(String email, String clientIp) {
+        return tryAcquireLoginIpBudget(clientIp) && tryAcquireEmailLoginAttempt(email);
     }
 
-    /** 자격이 확인되면 시도 기록을 지운다. */
+    /** 자격이 확인되면 그 이메일의 시도 기록을 지운다. IP 예산은 여러 계정이 함께 쓰는 값이라 남긴다. */
     public void clearLoginAttempts(String email) {
         redisTemplate.delete(loginFailureKey(email));
+    }
+
+    /**
+     * 클라이언트 IP의 시도 예산을 창마다 확보한다(S15P21E106-312).
+     *
+     * <p>목록이 비어 있으면 IP 축은 제한하지 않는다. 앞 창에서 막히면 뒤 창의 카운터는 올리지 않는다(결정 D-3과 같은 방향).
+     *
+     * <p>{@link #recordAttempt}를 쓰지 않는 이유는 {@link #tryAcquireEmailLoginAttempt}와 같다. 그 헬퍼의 "값을 받지
+     * 못했다" 신호가 설정된 한도와 같아지면 fail-closed가 fail-open으로 뒤집힌다.
+     */
+    private boolean tryAcquireLoginIpBudget(String clientIp) {
+        for (LoginRateLimitProperties.Quota quota : loginRateLimit.ip()) {
+            Long count = increment(loginIpKey(clientIp, quota.window()), quota.window());
+            if (count == null || count > quota.limit()) {
+                if (count != null && count == quota.limit() + 1) {
+                    log.warn(
+                            "로그인 시도의 IP 단위 제한에 도달했습니다. 창 길이: {}, 한도: {}회",
+                            quota.window(),
+                            quota.limit());
+                }
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 기동 시 로그인 IP 축의 유효 한도를 남긴다.
+     *
+     * <p>목록이 비어 있으면 그 축은 아무 요청도 막지 않는데, 설정 블록을 지우거나 키를 잘못 적어도 기동은 성공한다. 계약 문서(API-004)는 기본값을 약속하므로
+     * 실제 값이 무엇인지 기동 로그에 남겨, 조용히 열린 상태를 운영에서 알아볼 수 있게 한다(리뷰 A-1·B-5).
+     */
+    @PostConstruct
+    void logLoginIpBudget() {
+        if (loginRateLimit.ip().isEmpty()) {
+            log.warn("로그인 IP 단위 시도 제한이 설정되지 않았습니다(feelm.auth.login.ip). IP 축은 어떤 요청도 막지 않습니다.");
+            return;
+        }
+        log.info("로그인 IP 단위 시도 제한: {}", loginRateLimit.ip());
+    }
+
+    /**
+     * 이메일 축의 시도 자리를 확보한다.
+     *
+     * <p>{@link #recordAttempt}를 쓰지 않고 값을 직접 보는 이유는 값이 없을 때의 처리를 한도와 독립으로 두기 위해서다. 그 헬퍼는 값을 받지 못하면
+     * 어떤 한도보다도 큰 값을 돌려주는데, 한도가 설정값이 된 뒤에는 {@code attempt-limit}을 {@code Long.MAX_VALUE}로 두면 그 신호가
+     * 한도와 같아져 fail-closed가 fail-open으로 뒤집힌다(리뷰 A-1·B-2).
+     */
+    private boolean tryAcquireEmailLoginAttempt(String email) {
+        Long count = increment(loginFailureKey(email), loginRateLimit.attemptWindow());
+        return count != null && count <= loginRateLimit.attemptLimit();
     }
 
     /**
@@ -181,13 +252,13 @@ public class AuthRateLimiter {
      * 줄이 쌓여, 정작 로그가 필요한 순간에 다른 기록을 밀어낸다. 창이 만료되고 카운터가 다시 한도를 넘으면 그 창의 WARN이 다시 한 번 남는다.
      */
     private boolean tryAcquireMailSendBudget(String clientIp) {
-        for (Quota quota : mailRateLimit.ip()) {
+        for (MailRateLimitProperties.Quota quota : mailRateLimit.ip()) {
             if (recordAttempt(mailIpKey(clientIp, quota.window()), quota.window())
                     > quota.limit()) {
                 return false;
             }
         }
-        for (Quota quota : mailRateLimit.global()) {
+        for (MailRateLimitProperties.Quota quota : mailRateLimit.global()) {
             long count = recordAttempt(mailGlobalKey(quota.window()), quota.window());
             if (count > quota.limit()) {
                 if (count == quota.limit() + 1) {
@@ -209,10 +280,14 @@ public class AuthRateLimiter {
      * 방향이 같다.
      */
     private long recordAttempt(String key, Duration window) {
-        Long count =
-                redisTemplate.execute(
-                        RECORD_ATTEMPT_SCRIPT, List.of(key), Long.toString(window.toMillis()));
+        Long count = increment(key, window);
         return count == null ? Long.MAX_VALUE : count;
+    }
+
+    /** 창 카운터를 하나 올리고 스크립트가 준 값을 그대로 돌려준다. 값을 받지 못하면 {@code null}이다. */
+    private Long increment(String key, Duration window) {
+        return redisTemplate.execute(
+                RECORD_ATTEMPT_SCRIPT, List.of(key), Long.toString(window.toMillis()));
     }
 
     private String resendKey(String email) {
@@ -221,6 +296,19 @@ public class AuthRateLimiter {
 
     private String loginFailureKey(String email) {
         return LOGIN_FAILURE_KEY_PREFIX + Sha256Hasher.hex(email);
+    }
+
+    /**
+     * 로그인 IP 카운터 키. 메일 IP 키와 같이 창 길이를 담아 설정을 바꿔도 옛 창의 카운터가 섞이지 않게 한다(결정 D-7).
+     *
+     * <p>예산 주체는 주소 하나가 아니라 {@link ClientIpBucket}이 정한 버킷이다. 메일 축과 같은 단위를 쓰지 않으면 IPv6 클라이언트가 같은
+     * {@code /64} 안에서 주소만 바꿔 로그인 IP 예산을 새로 얻는다(S15P21E106-288).
+     */
+    private String loginIpKey(String clientIp, Duration window) {
+        return LOGIN_IP_KEY_PREFIX
+                + Sha256Hasher.hex(ClientIpBucket.of(clientIp, clientIpPrefixes))
+                + ":"
+                + window.toSeconds();
     }
 
     private String passwordResetKey(String email) {
