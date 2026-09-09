@@ -119,7 +119,7 @@ sudo chown -R "$USER:$USER" <repo>/.git
   - J15E106A 분산 처리 구성
 
 - `compose/local.yml`
-  - 로컬 Kafka·Redis 포트를 추가하고 PostgreSQL의 공통 루프백 바인딩을 유지하는 오버레이
+  - 로컬 Kafka 포트를 추가하고 PostgreSQL·Redis의 공통 루프백 바인딩을 유지하는 오버레이
 
 ### Local Kafka
 
@@ -378,7 +378,8 @@ redis:8.2.9-alpine@sha256:30abb90e62f14b737010746def3ba99cc79fe19dcdb3d37b41f21f
 - 영속성: `redis_data:/data`, AOF `everysec`와 기본 RDB 정책
 - 메모리: Redis `512mb`, 컨테이너 `768m`
 - 축출 정책: 인증 데이터 보호를 위한 `noeviction`; 한도 도달 시 새 쓰기가 실패함
-- 네트워크: 로컬은 `127.0.0.1:6379`, J15E106은 호스트 포트 없이 내부 `redis:6379`
+- 네트워크: 로컬·서비스 서버 모두 `127.0.0.1:6379`, 컨테이너 간에는 기존 `redis:6379`
+- 조회 계정: [Redis 조회 접속 설정](redis/README.md). 선택 비밀번호 미설정 시 비활성화
 
 Refresh Token Repository, 추천 Key와 TTL, Spark 적재 및 Redis Cluster·Sentinel
 구성은 이 실행환경 업무의 범위에 포함하지 않습니다.
@@ -436,8 +437,8 @@ docker compose --env-file infra/.env \
 docker port feelm-redis 6379
 ```
 
-J15E106의 마지막 명령은 출력이 없어야 하며 같은 Compose 네트워크에서는
-`redis:6379`로 접근해야 합니다.
+J15E106에서도 마지막 결과는 `127.0.0.1:6379`여야 합니다. 같은 Compose 네트워크에서는
+기존 `redis:6379`로 접근합니다. 설정 적용 중 Redis 연결은 잠시 끊깁니다.
 
 ### Verification
 
@@ -999,14 +1000,14 @@ docker inspect feelm-backend \
 curl --fail http://127.0.0.1:8080/actuator/health
 ```
 
-PostgreSQL과 Redis가 호스트 외부에 게시되지 않고 Compose 내부에서만 접근되는지 확인합니다.
+PostgreSQL과 Redis가 호스트 루프백에만 게시되는지 확인합니다.
 
 ```bash
 docker port feelm-postgres 5432
 docker port feelm-redis 6379
 ```
 
-두 명령 모두 공개 포트가 없다는 결과여야 합니다. Flyway 적용 상태를 확인하고 백엔드를
+각 결과가 `127.0.0.1:5432`, `127.0.0.1:6379`여야 합니다. Flyway 적용 상태를 확인하고 백엔드를
 재배포한 뒤에도 같은 Migration이 중복되지 않았는지 확인합니다.
 
 ```bash
