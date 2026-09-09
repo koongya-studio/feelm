@@ -32,6 +32,36 @@ Spring Boot DevTools는 개발 환경에서만 사용하며 운영 실행 이미
 [6장](../docs/backend-convention.md#6-entity-작성-규칙)과
 [10장](../docs/backend-convention.md#10-api-응답과-예외-처리)에 있습니다.
 
+## Kafka 이벤트 발행
+
+도메인 코드는 Kafka Producer나 Topic 설정을 직접 다루지 않고 공통
+`KafkaEventPublisher`를 호출합니다. 도메인 데이터 저장과 아웃박스 기록이 함께 성공하거나
+함께 롤백되도록 반드시 같은 `@Transactional` 서비스 메서드 안에서 호출해야 합니다.
+
+```java
+@Transactional
+public void createRating(long userId, long movieId, int score) {
+    ratingRepository.save(/* 도메인 데이터 */);
+
+    kafkaEventPublisher.publish(
+            KafkaEventType.RATING,
+            userId,
+            new RatingEventPayload(RatingAction.CREATE, movieId, score));
+}
+```
+
+`publish()`는 Kafka에 즉시 전송하지 않습니다. 공통 봉투를 생성해 `outbox_events`에
+`PENDING`으로 저장하고, 별도 Relay가 이를 조회해 계약에 정의된 Topic으로 발행합니다. Kafka
+장애 시 도메인 요청에서 완료된 데이터는 유지되며 이벤트는 `PENDING` 상태로 재시도됩니다.
+호출 결과로 반환되는 UUID는 해당 이벤트의 `eventId`입니다.
+
+이벤트별 Topic·payload와 멱등 처리 기준은
+[스트리밍 계약](../docs/api/streaming-contract.md#4-kafka-이벤트)을 따릅니다. 새로운 이벤트 종류나
+payload를 임의로 추가하지 말고 계약과 공통 타입을 먼저 합의해 변경합니다. 아웃박스의
+트랜잭션·재시도·순서 보장 범위는
+[ADR-0018](../docs/adr/0018-polling-transactional-outbox.md)을 참고합니다. 로컬 Kafka 기동과
+Topic 확인 방법은 [인프라 README](../infra/README.md#local-kafka)를 따릅니다.
+
 ## 실행 프로파일
 
 기본 프로파일은 `local`이며, 배포 개발 환경은 `dev`를 사용합니다. JPA 스키마 자동 변경은
@@ -45,6 +75,8 @@ Spring Boot DevTools는 개발 환경에서만 사용하며 운영 실행 이미
 | `REDIS_HOST` | `localhost` | 필수 |
 | `REDIS_PORT` | `6379` | `6379` |
 | `REDIS_PASSWORD` | **필수(기본값 없음)** | 필수 |
+| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | **필수(분산 처리 노드 사설 IP:9092)** |
+| `KAFKA_OUTBOX_*` | `.env.example`의 초기값 | 선택(실측 후 조정) |
 | `JWT_SECRET` | **필수(기본값 없음)** | 필수 |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | 필수 |
 | `FRONTEND_BASE_URL` | `http://localhost:5173` | 필수 |
