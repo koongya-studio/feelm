@@ -63,6 +63,12 @@ class AdapterHttpError(Exception):
         self.status = status
 
 
+class AdapterGitError(Exception):
+    def __init__(self, stage):
+        super().__init__(stage)
+        self.stage = stage
+
+
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         raise urllib.error.HTTPError(req.full_url, code, 'redirect refused', headers, fp)
@@ -193,17 +199,60 @@ def verify_merge_request(opener, context):
     return matches[0]
 
 
-def verify_dependency_change(opener, context, mr):
+def git_environment(token, home):
+    authorization = __import__('base64').b64encode(
+        ('gitlab-ci-token:' + token).encode()).decode()
+    return {
+        'PATH': '/usr/bin:/bin', 'HOME': str(home), 'LANG': 'C.UTF-8',
+        'GIT_TERMINAL_PROMPT': '0', 'GIT_CONFIG_NOSYSTEM': '1',
+        'GIT_CONFIG_GLOBAL': '/dev/null', 'GIT_CONFIG_COUNT': '2',
+        'GIT_CONFIG_KEY_0': 'http.extraHeader',
+        'GIT_CONFIG_VALUE_0': 'Authorization: Basic ' + authorization,
+        'GIT_CONFIG_KEY_1': 'http.followRedirects', 'GIT_CONFIG_VALUE_1': 'false',
+    }
+
+
+def run_git(command, environment, stage, **options):
+    try:
+        return subprocess.run(command, env=environment, check=True, timeout=120, **options)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise AdapterGitError(stage) from exc
+
+
+def verify_dependency_change(context, mr):
     iid = mr.get('iid')
     if type(iid) is not int or iid <= 0:
         raise PolicyError('Merge request identity is missing')
-    base = GITLAB_URL + '/api/v4/projects/' + str(context['project_id'])
-    values = request_json(opener, base + '/merge_requests/' + str(iid) + '/diffs?per_page=100',
-                          context['token'])
-    if not isinstance(values, list) or len(values) >= 100:
+    diff_refs = mr.get('diff_refs') if isinstance(mr, dict) else None
+    base_sha = diff_refs.get('base_sha') if isinstance(diff_refs, dict) else None
+    head_sha = diff_refs.get('head_sha') if isinstance(diff_refs, dict) else None
+    if (re.fullmatch(r'[0-9a-f]{40}', str(base_sha or '')) is None
+            or head_sha != context['sha']):
+        raise PolicyError('Merge request diff revisions are missing or inconsistent')
+    with tempfile.TemporaryDirectory(prefix='ci271-status-diff-') as directory:
+        repository = Path(directory) / 'repository.git'
+        environment = git_environment(context['token'], directory)
+        remote = GITLAB_URL + '/' + PROJECT_PATH + '.git'
+        quiet = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL}
+        run_git(['/usr/bin/git', 'init', '--bare', str(repository)], environment,
+                'dependency_git_init', **quiet)
+        for revision, reference in ((base_sha, 'base'), (head_sha, 'head')):
+            run_git(['/usr/bin/git', '-C', str(repository), 'fetch', '--no-tags', '--depth=1',
+                     remote, revision + ':refs/review/' + reference], environment,
+                    'dependency_fetch', **quiet)
+        names = run_git(
+            ['/usr/bin/git', '-C', str(repository), 'diff', '--name-only', '-z',
+             '--no-ext-diff', '--no-renames', 'refs/review/base', 'refs/review/head'],
+            environment, 'dependency_diff', capture_output=True).stdout
+    if len(names) > 128 * 1024:
         raise PolicyError('Merge request diff is missing or too large')
-    paths = sorted({item.get(key) for item in values if isinstance(item, dict)
-                    for key in ('old_path', 'new_path') if isinstance(item.get(key), str)})
+    try:
+        raw_paths = names.decode('utf-8').split('\0') if names else []
+    except UnicodeDecodeError as exc:
+        raise PolicyError('Merge request diff contains an invalid path encoding') from exc
+    paths = sorted(set(path for path in raw_paths if path))
+    if not paths or len(paths) >= 100 or any('\n' in path or '\r' in path for path in paths):
+        raise PolicyError('Merge request diff is missing or too large')
     changes = [path for path in paths if path in CACHE_DEPENDENCY_FILES]
     if not changes:
         raise PolicyError('No approved backend dependency change found')
@@ -263,18 +312,9 @@ def normalized_backend_archive(payload):
 
 def fetch_source(context):
     """Fetch one authenticated, verified commit without exposing the job token."""
-    authorization = __import__('base64').b64encode(
-        ('gitlab-ci-token:' + context['token']).encode()).decode()
     with tempfile.TemporaryDirectory(prefix='ci222-git-') as directory:
         repository = Path(directory) / 'repository.git'
-        environment = {
-            'PATH': '/usr/bin:/bin', 'HOME': directory, 'LANG': 'C.UTF-8',
-            'GIT_TERMINAL_PROMPT': '0', 'GIT_CONFIG_NOSYSTEM': '1',
-            'GIT_CONFIG_GLOBAL': '/dev/null', 'GIT_CONFIG_COUNT': '2',
-            'GIT_CONFIG_KEY_0': 'http.extraHeader',
-            'GIT_CONFIG_VALUE_0': 'Authorization: Basic ' + authorization,
-            'GIT_CONFIG_KEY_1': 'http.followRedirects', 'GIT_CONFIG_VALUE_1': 'false',
-        }
+        environment = git_environment(context['token'], directory)
         quiet = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL,
                  'check': True, 'timeout': 120}
         subprocess.run(['/usr/bin/git', 'init', '--bare', str(repository)],
@@ -310,8 +350,7 @@ def run_job(response, config_path=CONFIG, opener=None):
     try: mr = verify_merge_request(opener, context)
     except urllib.error.HTTPError as exc: raise AdapterHttpError('merge_request', exc.code) from exc
     if context['job_name'] == CACHE_STATUS_JOB:
-        try: verify_dependency_change(opener, context, mr)
-        except urllib.error.HTTPError as exc: raise AdapterHttpError('dependency_diff', exc.code) from exc
+        verify_dependency_change(context, mr)
         return 0
     payload, digest = fetch_source(context)
     active = {}
@@ -346,6 +385,9 @@ def main():
     except AdapterHttpError as exc:
         print('MR_ADAPTER_HTTP_ERROR: stage=' + exc.stage + ' status=' + str(exc.status),
               file=sys.stderr)
+        return 70
+    except AdapterGitError as exc:
+        print('MR_ADAPTER_GIT_ERROR: stage=' + exc.stage, file=sys.stderr)
         return 70
     except Exception as exc:
         print('MR_ADAPTER_ERROR: ' + type(exc).__name__, file=sys.stderr); return 70

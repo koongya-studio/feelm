@@ -3,8 +3,10 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import subprocess
 import tarfile
 import tempfile
+from types import SimpleNamespace
 import unittest
 import urllib.error
 from unittest.mock import patch
@@ -113,15 +115,83 @@ class AdapterTests(unittest.TestCase):
 
     def test_cache_status_diff_must_include_approved_dependency_file(self):
         context = adapter.validate_job_response(cache_response())
-        mr = {'iid': 98}
-        with patch.object(adapter, 'request_json', return_value=[
-                {'old_path': 'backend/build.gradle', 'new_path': 'backend/build.gradle'}]):
-            self.assertEqual(adapter.verify_dependency_change(object(), context, mr),
+        mr = {'iid': 98, 'diff_refs': {'base_sha': 'b' * 40, 'head_sha': 'a' * 40}}
+        completed = [SimpleNamespace(stdout=b'') for _ in range(3)]
+        completed.append(SimpleNamespace(
+            stdout=b'backend/build.gradle\0backend/src/A.java\0'))
+        with patch.object(adapter, 'request_json') as api, \
+             patch.object(adapter.subprocess, 'run', side_effect=completed) as run:
+            self.assertEqual(adapter.verify_dependency_change(context, mr),
                              ['backend/build.gradle'])
-        with patch.object(adapter, 'request_json', return_value=[
-                {'old_path': 'backend/src/A.java', 'new_path': 'backend/src/A.java'}]):
+        api.assert_not_called()
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertEqual(commands[-1][-2:], ['refs/review/base', 'refs/review/head'])
+        self.assertNotIn(context['token'], repr(commands))
+        environment = run.call_args_list[1].kwargs['env']
+        self.assertEqual(environment['GIT_TERMINAL_PROMPT'], '0')
+        self.assertEqual(environment['GIT_CONFIG_KEY_0'], 'http.extraHeader')
+        self.assertNotIn(context['token'], repr(environment.keys()))
+
+        unrelated = [SimpleNamespace(stdout=b'') for _ in range(3)]
+        unrelated.append(SimpleNamespace(stdout=b'backend/src/A.java\0'))
+        with patch.object(adapter.subprocess, 'run', side_effect=unrelated):
             with self.assertRaises(adapter.PolicyError):
-                adapter.verify_dependency_change(object(), context, mr)
+                adapter.verify_dependency_change(context, mr)
+
+    def test_cache_status_requires_exact_diff_revisions(self):
+        context = adapter.validate_job_response(cache_response())
+        for mr in (
+                {'iid': 98},
+                {'iid': 98, 'diff_refs': {'base_sha': 'short', 'head_sha': 'a' * 40}},
+                {'iid': 98, 'diff_refs': {'base_sha': 'b' * 40, 'head_sha': 'c' * 40}}):
+            with self.subTest(mr=mr), patch.object(adapter.subprocess, 'run') as run, \
+                 self.assertRaisesRegex(adapter.PolicyError, 'diff revisions'):
+                adapter.verify_dependency_change(context, mr)
+            run.assert_not_called()
+
+    def test_cache_status_git_failure_reports_bounded_stage(self):
+        context = adapter.validate_job_response(cache_response())
+        mr = {'iid': 98, 'diff_refs': {'base_sha': 'b' * 40, 'head_sha': 'a' * 40}}
+        failure = subprocess.CalledProcessError(1, ['/usr/bin/git', 'fetch'])
+        cases = (
+            ('dependency_git_init', [failure]),
+            ('dependency_fetch', [SimpleNamespace(stdout=b''), failure]),
+            ('dependency_diff', [SimpleNamespace(stdout=b'') for _ in range(3)] + [failure]),
+        )
+        for stage, results in cases:
+            with self.subTest(stage=stage), \
+                 patch.object(adapter.subprocess, 'run', side_effect=results), \
+                 self.assertRaises(adapter.AdapterGitError) as raised:
+                adapter.verify_dependency_change(context, mr)
+            self.assertEqual(raised.exception.stage, stage)
+            self.assertNotIn(context['token'], str(raised.exception))
+
+        stderr = io.StringIO()
+        with patch.object(adapter.sys, 'argv', ['ci-gitlab-job-adapter.py', 'run']), \
+             patch.object(adapter, 'read_stdin', return_value=cache_response()), \
+             patch.object(adapter, 'run_job',
+                          side_effect=adapter.AdapterGitError('dependency_fetch')), \
+             patch.object(adapter.sys, 'stderr', stderr):
+            self.assertEqual(adapter.main(), 70)
+        self.assertEqual(stderr.getvalue(),
+                         'MR_ADAPTER_GIT_ERROR: stage=dependency_fetch\n')
+
+    def test_cache_status_rejects_unsafe_diff_output(self):
+        context = adapter.validate_job_response(cache_response())
+        mr = {'iid': 98, 'diff_refs': {'base_sha': 'b' * 40, 'head_sha': 'a' * 40}}
+        outputs = (
+            b'backend/build.gradle\nmalicious\0',
+            b'\xff\0',
+            b'\0'.join(('file-' + str(index)).encode() for index in range(100)) + b'\0',
+            b'x' * (128 * 1024 + 1),
+        )
+        for output in outputs:
+            completed = [SimpleNamespace(stdout=b'') for _ in range(3)]
+            completed.append(SimpleNamespace(stdout=output))
+            with self.subTest(output=output[:32]), \
+                 patch.object(adapter.subprocess, 'run', side_effect=completed), \
+                 self.assertRaises(adapter.PolicyError):
+                adapter.verify_dependency_change(context, mr)
 
     def test_run_passes_token_only_to_api_and_source_to_safety(self):
         source = archive([('prefix/backend/gradlew', b'x', 0o755)])

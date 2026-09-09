@@ -1,0 +1,27 @@
+tasks:
+- id: backend-cache-status-job-token-diff
+  issue_type: Task
+  summary: '[인프라] backend-cache-status Job Token diff 조회 오류 수정'
+  description: >-
+    MR !98의 백엔드 의존성 캐시를 prepare·promote한 뒤 파이프라인을 재실행했으나
+    backend-cache-status가 MR_ADAPTER_HTTP_ERROR: stage=dependency_diff status=404로 실패했다.
+    현재 root Runner 어댑터는 GitLab Job Token으로 merge_requests/:iid/diffs API를 호출하며,
+    이 GitLab 환경에서는 해당 엔드포인트가 Job Token 요청을 404로 반환한다.
+    S15P21E106-271의 cache prepare가 사용하는 검증된 MR diff_refs와 인증된 Git fetch 방식을
+    backend-cache-status에도 적용해 API 권한 차이에 의존하지 않고 승인된 백엔드 의존성 파일
+    변경을 확인한다. Job Token 비노출, 고정 프로젝트·MR·SHA 검증, fail-closed 정책과 기존
+    격리 Runner 권한 경계는 유지한다. 수정된 root 어댑터의 서버 적용 및 롤백 절차를 확인하고,
+    캐시 전환이 완료된 MR !98에서 status Job 통과와 backend-mr-test 실행을 실제 검증한다.
+    Gradle 캐시 생성·전환 로직과 MR !98의 Kafka 기능 구현 변경은 이 Task 범위에서 제외한다.
+    5 SP: GitLab Job Token 호환성, root Runner 보안 경계, 서버 재적용과 실제 MR 통합 검증이 필요하다.
+  epic: S15P21E106-38
+  story_points: 5
+  done_when:
+  - backend-cache-status가 Job Token으로 merge_requests/:iid/diffs API를 호출하지 않고, 검증된 MR base SHA와 정확한 HEAD SHA를 인증된 Git fetch로 가져와 변경 경로를 판정한다.
+  - 고정 프로젝트의 열린 동일 프로젝트 MR과 develop 대상, 정확한 commit SHA를 계속 검증하며 기준·HEAD revision이 누락되거나 모호하면 실행하지 않는다.
+  - backend/build.gradle 등 승인된 의존성 파일 변경만 캐시 갱신 대상으로 인정하고, 무관한 변경·과도한 변경·Git fetch 또는 diff 실패는 명확한 단계와 함께 fail-closed로 처리한다.
+  - Job Token이 명령행·환경 외부·작업 rootfs·로그에 노출되지 않고, 리다이렉트 및 고정 GitLab 프로젝트 밖의 원격 접근을 허용하지 않는다.
+  - 기존 dependency_diff 404 회귀, 정상 의존성 변경, 무관한 변경, MR·SHA 불일치 및 Git 조회 실패를 단위 테스트로 검증한다.
+  - 수정된 root 어댑터를 서버에 안전하게 적용하고 실패 시 이전 설치로 복구하는 절차와 검증 결과를 문서화한다.
+  - 캐시가 promote된 MR !98의 동일 HEAD에서 backend-cache-status가 통과하고 backend-mr-test가 실제로 시작되어 캐시 누락 없이 완료된다.
+  jira_key: S15P21E106-314
