@@ -3,6 +3,7 @@ import importlib.util
 import io
 import json
 from pathlib import Path
+import re
 import subprocess
 import tarfile
 import tempfile
@@ -46,6 +47,12 @@ def archive(entries):
 
 
 class AdapterTests(unittest.TestCase):
+    def test_backend_mr_job_disables_runner_dependencies(self):
+        config = (HERE.parent.parent / '.gitlab-ci.yml').read_text()
+        job = re.search(r'(?ms)^backend-mr-test:\n(?P<body>.*?)(?=^\S|\Z)', config)
+        self.assertIsNotNone(job)
+        self.assertIn('  dependencies: []\n', job.group('body'))
+
     def test_context_accepts_only_fixed_job_and_script(self):
         result = adapter.validate_job_response(response())
         self.assertEqual(result['project_id'], 99)
