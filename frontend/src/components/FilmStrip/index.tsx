@@ -35,8 +35,14 @@ type Props = {
   width?: number;
   /** 방향. 기본값은 기존 화면과 같은 세로 */
   orientation?: 'vertical' | 'horizontal';
-  /** 색조. 기본값은 기존 화면과 같은 밝은 색 */
-  tone?: 'light' | 'dark';
+  /**
+   * 색조. 기본값은 기존 화면과 같은 밝은 색이다.
+   *
+   * `paper`는 신규 디자인의 밝은 판이다. 반투명 흰색 바탕에 얇은 테두리를 두르고
+   * 구멍을 잍크로 뚫는다. 밝은 벅 위에 필름이 놓인 모양으로, 3.1이 쓴다
+   * (`docs/screens/design-concept.md`).
+   */
+  tone?: 'light' | 'dark' | 'paper';
   children?: ReactNode;
 };
 

@@ -99,3 +99,38 @@
 .strip[data-fit='fill'] .track {
   padding: 0 var(--screen-padding-x);
 }
+
+/*
+ * 밝은 판. 신규 디자인의 3.1이 쓴다(`docs/screens/design-concept.md`).
+ *
+ * 어두운 스트립은 밝은 벽 위에서 너무 무겁게 앉는다. 벽에 걸린 필름은 빛을
+ * 통과시키므로, 반투명 흰 바탕에 얇은 테두리만 두르고 구멍을 잉크로 뚫는다.
+ */
+.strip[data-tone='paper'] {
+  border: 0.5px solid var(--color-line-strong);
+  border-radius: var(--radius-icon);
+  background: var(--color-surface-raised);
+}
+
+.strip[data-tone='paper'][data-orientation='horizontal'][data-fit='fill'] .perforation {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-line-strong) 0 6px,
+    transparent 6px 14px
+  );
+}
+
+/*
+ * 밝은 판은 화면 가장자리에 붙지 않는다. 테두리와 둥근 모서리가 보여야 벽에 걸린
+ * 판으로 읽힌다. 그래서 프레임 줄의 좌우 여백은 화면 여백이 아니라 판 안쪽 여백이다.
+ */
+.strip[data-tone='paper'][data-fit='fill'] .track {
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+}
+
+/* 구멍도 판 안쪽에 뚫린다. 모서리를 넘지 않게 좌우를 들인다 */
+.strip[data-tone='paper'][data-orientation='horizontal'][data-fit='fill'] .perforation {
+  right: var(--space-2);
+  left: var(--space-2);
+}
