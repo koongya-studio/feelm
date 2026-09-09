@@ -8,15 +8,19 @@ import com.feelm.backend.domain.party.dto.response.PartyListItemResponse;
 import com.feelm.backend.domain.party.dto.response.PartyListItemResponse.PendingInvitation;
 import com.feelm.backend.domain.party.dto.response.PartyResponse;
 import com.feelm.backend.domain.party.dto.response.PartyResponse.Member;
+import com.feelm.backend.domain.party.dto.response.PartyStateResponse;
 import com.feelm.backend.domain.party.entity.Party;
+import com.feelm.backend.domain.party.entity.PartyInvitation;
 import com.feelm.backend.domain.party.entity.PartyMember;
 import com.feelm.backend.domain.party.entity.PartyStatus;
+import com.feelm.backend.domain.party.repository.PartyInvitationRepository;
 import com.feelm.backend.domain.party.repository.PartyMemberRepository;
 import com.feelm.backend.domain.party.repository.PartyQueryRepository;
 import com.feelm.backend.domain.party.repository.PartyRepository;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
 import com.feelm.backend.global.response.CursorPageResponse;
+import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,6 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PartyService {
     private final PartyRepository partyRepository;
     private final PartyMemberRepository memberRepository;
+    private final PartyInvitationRepository invitationRepository;
     private final PartyQueryRepository queryRepository;
 
     /** 파티와 생성자의 OWNER 멤버 정보를 함께 저장하고 생성 결과를 반환한다. */
@@ -101,5 +106,39 @@ public class PartyService {
         String nextCursor =
                 hasNext ? new PartyCursor(last.getCreatedAt(), last.getId()).encode() : null;
         return new CursorPageResponse<>(items, nextCursor, hasNext);
+    }
+
+    /** 현재 파티장만 다른 현재 멤버를 강퇴하고, 남은 인원에 따라 파티를 종료한다. */
+    @Transactional
+    public PartyStateResponse kick(long requesterId, long partyId, long targetUserId) {
+        Party party =
+                partyRepository
+                        .findAccessibleByIdForUpdate(partyId, requesterId)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        if (party.getOwner().getId() != requesterId) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        if (party.getStatus() == PartyStatus.CLOSED) {
+            throw new BusinessException(ErrorCode.PARTY_CLOSED);
+        }
+        if (targetUserId == requesterId) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED);
+        }
+
+        PartyMember target =
+                memberRepository
+                        .findByPartyIdAndUserId(partyId, targetUserId)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        memberRepository.delete(target);
+        memberRepository.flush();
+
+        if (memberRepository.countByPartyId(partyId) == 1) {
+            Instant respondedAt = Instant.now();
+            party.closeForInsufficientMembers(respondedAt);
+            invitationRepository
+                    .findAllByPartyIdAndStatus(partyId, PartyInvitation.Status.PENDING)
+                    .forEach(invitation -> invitation.decline(respondedAt));
+        }
+        return PartyStateResponse.from(party);
     }
 }

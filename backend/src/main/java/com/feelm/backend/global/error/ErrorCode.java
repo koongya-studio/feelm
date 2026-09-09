@@ -25,6 +25,7 @@ public enum ErrorCode {
     RESET_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "유효하지 않은 비밀번호 재설정 링크입니다. 재설정을 다시 요청해 주세요."),
     RESET_TOKEN_EXPIRED(HttpStatus.GONE, "비밀번호 재설정 링크가 만료되었습니다. 재설정을 다시 요청해 주세요."),
     PASSWORD_NOT_SET(HttpStatus.CONFLICT, "비밀번호가 설정되지 않은 계정입니다. 소셜 로그인을 사용해 주세요."),
+    PARTY_CLOSED(HttpStatus.CONFLICT, "이미 종료된 파티입니다."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "허용되지 않은 HTTP 메서드입니다."),

@@ -80,7 +80,9 @@ class ErrorCodeTest {
                         // 계정 도메인 — API-010~012 (S15P21E106-151)
                         "RESET_TOKEN_INVALID",
                         "RESET_TOKEN_EXPIRED",
-                        "PASSWORD_NOT_SET");
+                        "PASSWORD_NOT_SET",
+                        // 파티 도메인 — API-055·056·069
+                        "PARTY_CLOSED");
     }
 
     @Test
@@ -122,6 +124,12 @@ class ErrorCodeTest {
         assertThat(ErrorCode.RESET_TOKEN_INVALID.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(ErrorCode.RESET_TOKEN_EXPIRED.getStatus()).isEqualTo(HttpStatus.GONE);
         assertThat(ErrorCode.PASSWORD_NOT_SET.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("종료된 파티의 상태 충돌은 409로 매핑된다")
+    void partyClosedIsConflict() {
+        assertThat(ErrorCode.PARTY_CLOSED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test

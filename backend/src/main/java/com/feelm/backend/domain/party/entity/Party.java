@@ -58,6 +58,16 @@ public class Party extends BaseTimeEntity {
         return party;
     }
 
+    public void closeForInsufficientMembers(Instant closedAt) {
+        if (status != PartyStatus.ACTIVE || closedAt == null) {
+            throw new IllegalStateException(
+                    "Only an active party can close for insufficient members");
+        }
+        status = PartyStatus.CLOSED;
+        closedReason = ClosedReason.INSUFFICIENT_MEMBERS;
+        this.closedAt = closedAt;
+    }
+
     public enum ClosedReason {
         INSUFFICIENT_MEMBERS,
         OWNER_CLOSED
