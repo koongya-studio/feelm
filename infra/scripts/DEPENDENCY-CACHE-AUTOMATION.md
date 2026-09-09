@@ -3,14 +3,15 @@
 ## 동작 경계
 
 MR이 백엔드 의존성 선언이나 저장소 설정을 변경하면 `backend-cache-status`가 격리 Runner의
-고정 어댑터에서 MR 번호, 정확한 commit SHA와 변경 파일을 출력한다. 이 Job은 MR의 셸이나
-Gradle 코드를 실행하지 않는다. 기존 `backend-mr-test`는 캐시가 충분하면 그대로 실행되고,
-부족하면 안전하게 실패한다.
+고정 어댑터에서 MR 번호, 정확한 commit SHA와 변경 파일을 출력한다. 이 Job은 검증된 MR
+`diff_refs`의 기준 SHA와 HEAD SHA를 인증된 Git fetch로 가져와 경로만 비교하며, Job Token이
+허용하지 않는 MR diff API를 호출하지 않는다. MR의 셸이나 Gradle 코드는 실행하지 않는다.
+기존 `backend-mr-test`는 캐시가 충분하면 그대로 실행되고, 부족하면 안전하게 실패한다.
 
 캐시 갱신은 보호된 `develop`의 web pipeline에서만 실행한다. `backend-cache-prepare`는 입력한
-MR과 SHA가 현재 열린 MR HEAD인지 GitLab API로 다시 확인한다. MR diff API는 CI job token의
-허용 엔드포인트가 아니므로, API가 돌려준 `diff_refs`의 기준 SHA와 HEAD SHA를 인증된 Git
-fetch로 가져와 의존성 변경을 검사한 뒤 다음 단계를 순서대로 수행한다.
+MR과 SHA가 현재 열린 MR HEAD인지 GitLab API로 다시 확인한다. status와 prepare 모두 MR diff
+API 대신 API가 돌려준 `diff_refs`의 기준 SHA와 HEAD SHA를 인증된 Git fetch로 가져와 의존성
+변경을 검사한 뒤 다음 단계를 순서대로 수행한다.
 
 1. 정확한 SHA의 `backend` archive를 받아 SHA256을 기록한다.
 2. 기존 전용 계정과 네트워크 guard에서 전체 테스트 및 `spotlessCheck`를 실행해 필요한
@@ -90,6 +91,21 @@ Runner에 연결되지 않는다.
 rollback 요청을 거부한다. 자동 재시작 복구까지 실패한 경우 `/etc/feelm-ci222/gitlab-adapter.json`
 및 출력된 `PREVIOUS_INSTALL`, `PREVIOUS_SUDOERS`, `PREVIOUS_STAGE`를 기준으로 운영자가 Runner를
 중지한 상태에서 복구하고, 설정의 root 소유권·0600 권한과 서비스 active 상태를 확인한다.
+
+## status Job 404 복구와 어댑터 갱신
+
+`backend-cache-status`가 `MR_ADAPTER_HTTP_ERROR: stage=dependency_diff status=404`로 실패하면
+캐시 stage가 아니라 서버에 설치된 root 어댑터가 MR diff API를 호출하는 이전 버전인지 먼저
+확인한다. 캐시 `prepare`·`promote`는 Gradle cache와 `prepared_base`만 전환하며
+`/usr/local/lib/feelm-ci222/gitlab/ci-gitlab-job-adapter.py`를 갱신하지 않는다.
+
+S15P21E106-314 수정본을 병합한 최신 `develop`에서 새 server stage를 만들고, **최초 적용**의
+`ci-dependency-cache-install.py --confirm-update` 절차로 설치 스크립트 전체를 원자적으로
+교체한다. 설치기는 실행 중인 MR test가 있으면 거부하고, MR Runner를 중지한 뒤 기존 설치와
+sudoers를 `PREVIOUS_INSTALL`, `PREVIOUS_SUDOERS`로 보존하며 재시작 실패 시 자동 복구한다.
+갱신 후 같은 MR HEAD의 `backend-cache-status`를 다시 실행한다. Git 조회가 실패하면 로그의
+`MR_ADAPTER_GIT_ERROR: stage=dependency_git_init|dependency_fetch|dependency_diff`로 실패 단계를
+구분하되 원격 URL, 명령 출력과 Job Token은 노출하지 않는다.
 
 ## MR !98 검증
 
