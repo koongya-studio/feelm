@@ -129,6 +129,7 @@ Spec에서 다루고, 이 문서는 그룹 단위까지만 기록합니다.
 | 산출물 | 위치 |
 | --- | --- |
 | 문서 지도 (이 문서) | `frontend/docs/screens/README.md` |
+| **디자인 컨셉 (현재 기준)** | [`design-concept.md`](./design-concept.md) |
 | Screen Spec | `frontend/docs/screens/` |
 | React 화면 구조 설계 | `frontend/docs/screens/` |
 | 공통 컴포넌트 구조 및 사용 기준 | `frontend/docs/screens/` |
