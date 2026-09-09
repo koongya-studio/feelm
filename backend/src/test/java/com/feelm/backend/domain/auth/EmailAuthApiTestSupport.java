@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.feelm.backend.infrastructure.mail.MailDispatcher;
 import com.feelm.backend.infrastructure.mail.RecordingPasswordResetMailSender;
 import com.feelm.backend.infrastructure.mail.RecordingVerificationMailSender;
 import com.redis.testcontainers.RedisContainer;
@@ -87,6 +88,9 @@ abstract class EmailAuthApiTestSupport {
      */
     private static final AtomicInteger IP_SEQUENCE = new AtomicInteger();
 
+    /** 비동기 발송 완료를 기다리는 상한. 넘기면 테스트를 실패시킨다. */
+    private static final Duration MAIL_DISPATCH_TIMEOUT = Duration.ofSeconds(10);
+
     @ServiceConnection static RedisContainer redis = new RedisContainer("redis:8-alpine");
 
     static {
@@ -98,13 +102,47 @@ abstract class EmailAuthApiTestSupport {
     @Autowired protected ObjectMapper objectMapper;
     @Autowired protected RecordingVerificationMailSender verificationMailSender;
     @Autowired protected RecordingPasswordResetMailSender passwordResetMailSender;
+    @Autowired protected MailDispatcher mailDispatcher;
     @Autowired protected StringRedisTemplate redisTemplate;
 
-    /** 컨텍스트를 공유하는 테스트 사이에 발송 기록이 남지 않게 한다. 발송 횟수 검증이 자기 테스트의 발송만 세야 한다. */
+    /**
+     * 컨텍스트를 공유하는 테스트 사이에 발송 기록이 남지 않게 한다. 발송 횟수 검증이 자기 테스트의 발송만 세야 한다.
+     *
+     * <p>비우기 전에 붙잡아 둔 래치를 풀고 진행 중인 발송을 기다린다. 발송이 요청 스레드를 떠났으므로(S15P21E106-282) 앞 테스트의 발송이 이 테스트로
+     * 넘어와 기록될 수 있다.
+     */
     @BeforeEach
     void clearSentMails() {
+        verificationMailSender.releaseSends();
+        passwordResetMailSender.releaseSends();
+        awaitMailsDispatched();
         verificationMailSender.clear();
         passwordResetMailSender.clear();
+    }
+
+    /**
+     * 제출된 비동기 발송이 모두 끝날 때까지 기다린다.
+     *
+     * <p>발송은 응답보다 늦게 끝나므로 발송 기록을 읽기 전에 이 지점이 필요하다. 제출은 응답이 나가기 전에 끝나기 때문에(커밋 후 리스너가 요청 스레드에서 제출한다)
+     * 요청을 받은 뒤에 기다리면 발송을 놓치지 않는다.
+     */
+    protected void awaitMailsDispatched() {
+        Instant deadline = Instant.now().plus(MAIL_DISPATCH_TIMEOUT);
+        while (!mailDispatcher.isIdle()) {
+            if (Instant.now().isAfter(deadline)) {
+                throw new IllegalStateException("메일 발송이 " + MAIL_DISPATCH_TIMEOUT + " 안에 끝나지 않았다");
+            }
+            sleepBriefly();
+        }
+    }
+
+    private static void sleepBriefly() {
+        try {
+            Thread.sleep(5);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("발송 완료 대기가 중단됐다", interrupted);
+        }
     }
 
     /** 테스트용 계정 값. 이메일과 닉네임은 같은 일련번호를 공유해 로그에서 짝을 알아보기 쉽게 한다. */
@@ -208,6 +246,7 @@ abstract class EmailAuthApiTestSupport {
      * <p>{@code output}은 쓰지 않는다. 3단계가 발송 로그 대신 스파이 빈을 seam으로 제공하면서 이 메서드만 교체했고, 호출 측 시그니처는 그대로 두었다.
      */
     List<String> verificationTokens(CapturedOutput output) {
+        awaitMailsDispatched();
         return verificationMailSender.tokens();
     }
 
@@ -219,6 +258,7 @@ abstract class EmailAuthApiTestSupport {
 
     /** 발송된 재설정 토큰 원문을 발송 순서대로 모은다. 발송 횟수 검증에도 쓴다. */
     List<String> passwordResetTokens() {
+        awaitMailsDispatched();
         return passwordResetMailSender.tokens();
     }
 

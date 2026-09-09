@@ -1,7 +1,6 @@
 package com.feelm.backend.infrastructure.mail;
 
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -14,21 +13,35 @@ import org.springframework.context.annotation.Primary;
  */
 public class RecordingVerificationMailSender implements VerificationMailSender {
 
-    private final List<String> tokens = new CopyOnWriteArrayList<>();
+    private final RecordingMailSends sends = new RecordingMailSends();
 
     @Override
     public void send(String email, String verificationToken) {
-        tokens.add(verificationToken);
+        sends.record(verificationToken);
     }
 
     /** 발송 순서대로 모은 토큰 원문. 발송 횟수 검증에도 쓴다. */
     public List<String> tokens() {
-        return List.copyOf(tokens);
+        return sends.tokens();
     }
 
-    /** 컨텍스트를 공유하는 테스트 사이에 기록이 남지 않도록 각 테스트 시작 시점에 비운다. */
+    /** 컨텍스트를 공유하는 테스트 사이에 기록·래치·지시한 실패가 남지 않도록 각 테스트 시작 시점에 비운다. */
     public void clear() {
-        tokens.clear();
+        sends.clear();
+    }
+
+    /** 다음 발송들을 발송 지점에서 붙잡는다(S15P21E106-282 T1~T3). */
+    public void blockSends() {
+        sends.blockSends();
+    }
+
+    public void releaseSends() {
+        sends.releaseSends();
+    }
+
+    /** 다음 발송 한 건을 실패시킨다(S15P21E106-282 T4). */
+    public void failNextSend() {
+        sends.failNextSend();
     }
 
     /** 운영 구현({@code log}·{@code smtp}) 대신 이 스파이가 주입되도록 등록한다. */
