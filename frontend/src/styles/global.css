@@ -101,3 +101,20 @@ button {
   outline: 2px solid var(--color-ink);
   outline-offset: 2px;
 }
+
+.preview-badge {
+  position: fixed;
+  top: max(0.75rem, env(safe-area-inset-top));
+  right: 0.75rem;
+  z-index: 1000;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid rgb(229 228 226 / 35%);
+  border-radius: 999px;
+  background: rgb(10 10 10 / 82%);
+  color: #e5e4e2;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+}
