@@ -104,6 +104,7 @@ abstract class EmailAuthApiTestSupport {
     @Autowired protected RecordingPasswordResetMailSender passwordResetMailSender;
     @Autowired protected MailDispatcher mailDispatcher;
     @Autowired protected StringRedisTemplate redisTemplate;
+    @Autowired protected ClientIpProperties clientIpPrefixes;
 
     /**
      * 컨텍스트를 공유하는 테스트 사이에 발송 기록이 남지 않게 한다. 발송 횟수 검증이 자기 테스트의 발송만 세야 한다.
@@ -345,9 +346,12 @@ abstract class EmailAuthApiTestSupport {
         redisTemplate.delete("auth:password-reset:" + Sha256Hasher.hex(email));
     }
 
-    /** IP 단위 발송 제한 카운터 키(S15P21E106-281 결정 D-7). */
+    /** IP 단위 발송 제한 카운터 키(S15P21E106-281 결정 D-7). 해시 입력은 IP 원문이 아니라 집계 버킷이다(S15P21E106-288). */
     String mailIpLimitKey(String clientIp, Duration window) {
-        return "auth:mail:ip:" + Sha256Hasher.hex(clientIp) + ":" + window.toSeconds();
+        return "auth:mail:ip:"
+                + Sha256Hasher.hex(ClientIpBucket.of(clientIp, clientIpPrefixes))
+                + ":"
+                + window.toSeconds();
     }
 
     /** 전역 발송 제한 카운터 키(S15P21E106-281 결정 D-7). */

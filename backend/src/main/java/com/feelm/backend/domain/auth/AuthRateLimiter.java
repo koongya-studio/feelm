@@ -30,10 +30,20 @@ import org.springframework.stereotype.Component;
  * <p>창 카운터는 로그인 제한과 같은 고정 창이다(결정 D-5). 창 경계에서 최대 2배 버스트가 가능하지만, 슬라이딩 윈도로 얻는 정확도보다 구현·검증의 단순함이 크다고
  * 보았다.
  *
- * <p>클라이언트 IP는 호출자가 {@code HttpServletRequest#getRemoteAddr()}로 얻어 넘긴다. {@code X-Forwarded-For}는 믿지
- * 않는다. 신뢰할 프록시 목록 없이 헤더를 믿으면 헤더 한 줄로 IP 제한을 우회할 수 있기 때문이다(결정 D-9). <b>Nginx가 API를 프록시하게 되면</b> 모든
- * 요청이 Nginx 컨테이너 IP 하나로 보여 전체 사용자가 IP 제한에 함께 걸린다. 그때 {@code X-Forwarded-For} 전달과 {@code
- * server.forward-headers-strategy}를 함께 도입해야 한다(후속 업무).
+ * <p>클라이언트 IP는 호출자가 {@code HttpServletRequest#getRemoteAddr()}로 얻어 넘긴다. 그 값이 헤더에서 오는 것은 <b>신뢰 경계 안의
+ * 프록시</b>가 보낸 경우뿐이다(S15P21E106-288). Tomcat {@code RemoteIpValve}가 {@code
+ * server.tomcat.remoteip.internal-proxies}에 있는 발신지의 요청에서만 헤더를 읽으므로, 그 밖에서 직접 온 요청의 헤더는 무시되고 실제 발신
+ * IP가 남는다. 신뢰 목록 없이 헤더를 믿으면 헤더 한 줄로 IP 제한을 우회할 수 있다(결정 D-9).
+ *
+ * <p>읽는 헤더는 {@code X-Forwarded-For}가 아니라 {@code X-Real-IP}다(리뷰 A-7·B-3). Nginx는 이미 {@code /api}를
+ * 프록시하며 {@code X-Real-IP}를 {@code $remote_addr}로 <b>덮어써</b> 보내므로 클라이언트가 보낸 값이 남지 않고 항목도 하나다. {@code
+ * X-Forwarded-For}는 {@code $proxy_add_x_forwarded_for}로 이어 붙이는데, 목록의 항목이 모두 신뢰 대역이면 밸브가 <b>맨 왼쪽</b>
+ * 값을 채택한다. backend 컨테이너는 호스트 포트를 공개하지 않아 Tomcat에 닿는 모든 요청의 발신지가 신뢰 대역이므로, 그 성질을 그대로 두면 내부 대역에서 온
+ * 요청이 헤더로 예산 주체를 바꿀 수 있다.
+ *
+ * <p>IP 축의 예산은 주소 하나가 아니라 {@link ClientIpBucket}이 정한 <b>버킷 단위</b>로 나눈다. IPv6 클라이언트는 주소만 바꾸면 예산을 새로
+ * 얻으므로 기본 {@code /64}로 묶고, NAT 뒤 공용 주소를 더 넓히지 않도록 IPv4는 주소 단위를 유지한다. 길이는 {@link
+ * ClientIpProperties}에 있고, 값이 없거나 주소 리터럴이 아닌 요청은 한 버킷을 공유한다.
  *
  * <p>키에는 이메일과 IP 원문 대신 해시를 쓴다. Redis 키 목록만으로 어떤 이메일이 서비스에 있는지, 어떤 IP가 서비스를 썼는지 알 수 있으면 안 되고, IPv6까지
  * 길이가 고르게 된다. 네임스페이스는 Refresh Token이 쓰는 {@code auth:}를 이어 사용한다.
@@ -56,7 +66,11 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@EnableConfigurationProperties({MailRateLimitProperties.class, LoginRateLimitProperties.class})
+@EnableConfigurationProperties({
+    MailRateLimitProperties.class,
+    LoginRateLimitProperties.class,
+    ClientIpProperties.class
+})
 public class AuthRateLimiter {
 
     private static final String RESEND_KEY_PREFIX = "auth:email-resend:";
@@ -80,6 +94,7 @@ public class AuthRateLimiter {
     private final StringRedisTemplate redisTemplate;
     private final MailRateLimitProperties mailRateLimit;
     private final LoginRateLimitProperties loginRateLimit;
+    private final ClientIpProperties clientIpPrefixes;
 
     /**
      * 인증 메일 재발송(API-003)의 발송 자리를 확보한다.
@@ -213,7 +228,10 @@ public class AuthRateLimiter {
     }
 
     private String mailIpKey(String clientIp, Duration window) {
-        return MAIL_IP_KEY_PREFIX + Sha256Hasher.hex(clientIp) + ":" + window.toSeconds();
+        return MAIL_IP_KEY_PREFIX
+                + Sha256Hasher.hex(ClientIpBucket.of(clientIp, clientIpPrefixes))
+                + ":"
+                + window.toSeconds();
     }
 
     private String mailGlobalKey(Duration window) {

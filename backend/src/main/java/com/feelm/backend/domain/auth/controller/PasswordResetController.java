@@ -29,7 +29,8 @@ public class PasswordResetController {
      * API-010 비밀번호 재설정 요청. 계정 존재 여부를 노출하지 않도록 본문 없이 202로 응답한다.
      *
      * <p>클라이언트 IP는 IP 단위 발송 제한에 쓴다({@link com.feelm.backend.domain.auth.AuthRateLimiter}). {@code
-     * X-Forwarded-For}를 읽지 않으므로, Nginx가 이 경로를 프록시하게 되면 리미터 주석의 후속 처리가 함께 필요하다.
+     * getRemoteAddr()}는 신뢰 경계 안의 프록시가 보낸 {@code X-Real-IP}일 때만 그 값을 돌려준다(S15P21E106-288, {@code
+     * server.tomcat.remoteip.internal-proxies}).
      */
     @PostMapping("/reset-request")
     @ResponseStatus(HttpStatus.ACCEPTED)
