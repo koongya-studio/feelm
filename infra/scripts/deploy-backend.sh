@@ -85,7 +85,8 @@ if ! BACKEND_IMAGE="${CANDIDATE_IMAGE}" \
 fi
 
 if wait_for_healthy \
-  && docker exec feelm-backend curl --fail --silent --show-error http://localhost:8080/actuator/health >/dev/null; then
+  && docker exec feelm-backend curl --fail --silent --show-error http://localhost:8080/actuator/health >/dev/null \
+  && bash "${SCRIPT_DIR}/verify-datastores.sh"; then
   running_image="$(
     docker inspect --format '{{.Config.Image}}' feelm-backend
   )"

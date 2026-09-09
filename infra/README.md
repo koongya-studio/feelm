@@ -951,6 +951,13 @@ GitLab에서 관리하고 서버에서 직접 수정하지 않습니다.
 
 ### Pipeline and Deployment
 
+데이터 저장소 관련 파일이 보호된 `develop`에 병합되면 `datastore-config-check` Job이
+Compose와 셸 스크립트 문법을 검사하고, 포트를 게시하지 않은 임시 Redis에서 관리자
+인증·미인증 차단·조회 전용 ACL을 확인합니다. 이 Job을 통과해야 백엔드 이미지를 빌드하고
+배포할 수 있습니다. 검사에는 고정된 가짜 인증정보만 사용하며 GitLab CI/CD Variable의 실제
+Secret을 출력하거나 임시 Redis에 전달하지 않습니다. MR 코드를 서비스 호스트에서 실행하지
+않도록 같은 검사는 MR 제출 전에 로컬에서 `infra/scripts/verify-datastore-config.sh`로 실행합니다.
+
 Merge Request Pipeline은 백엔드 테스트와 Spotless 검사를 실행합니다. `develop`에 병합되면
 `backend-image` Job이 다음 형식의 변경 불가능한 이미지 태그를 Docker Hub에
 Push합니다.
@@ -970,7 +977,8 @@ Masked로 관리하고 로그에 출력하지 않습니다.
 `resource_group`으로 직렬화합니다.
 
 배포 스크립트는 실행 중인 이미지 이름을 먼저 보관하고 후보 이미지를 기동한 뒤 최대 2분
-동안 Docker healthcheck와 `http://127.0.0.1:8080/actuator/health`를 확인합니다. 성공한
+동안 Docker healthcheck와 컨테이너 내부 Actuator 응답을 확인합니다. 이어서 PostgreSQL과
+Redis의 health, 루프백 포트, PostgreSQL `SELECT 1`, Redis 인증과 조회 전용 ACL을 검사한
 경우에만 후보 이미지를 정상 배포로 인정합니다. 후보 이미지 Pull 실패 시 실행 중인
 서비스를 변경하지 않으며, 컨테이너 교체 명령·이미지 일치·헬스체크 중 하나라도 실패하면
 직전 이미지를 복구하고 복구된 이미지와 상태를 다시 검증합니다.

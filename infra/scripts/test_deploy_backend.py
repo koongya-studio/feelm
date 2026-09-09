@@ -86,6 +86,48 @@ class DeployBackendTest(unittest.TestCase):
               exit 0
             fi
 
+            if [[ "$1" == "port" ]]; then
+              printf '127.0.0.1:%s\n' "$3"
+              exit 0
+            fi
+
+            if [[ "$1 $2" == "exec feelm-postgres" ]]; then
+              if [[ "${FAIL_DATASTORE_VERIFY:-0}" == "1" ]]; then
+                printf '0\n'
+              else
+                printf '1\n'
+              fi
+              exit 0
+            fi
+
+            if [[ "$1 $2" == "exec feelm-redis" ]]; then
+              command="$*"
+              if [[ "$command" == *"test -n"* ]]; then
+                exit 0
+              fi
+              if [[ "$command" == *"ACL USERS"* ]]; then
+                printf 'default\nfeelm_readonly\n'
+                exit 0
+              fi
+              if [[ "$command" == *"ACL DRYRUN"* ]]; then
+                if [[ "$command" == *" SET "* || "$command" == *" DEL "* ]]; then
+                  printf 'User feelm_readonly has no permissions to run the command\n'
+                else
+                  printf 'OK\n'
+                fi
+                exit 0
+              fi
+              if [[ "$command" == *"--user feelm_readonly"* ]]; then
+                exit 0
+              fi
+              if [[ "$command" == *"REDISCLI_AUTH"* ]]; then
+                printf 'PONG\n'
+              else
+                printf 'NOAUTH Authentication required.\n'
+              fi
+              exit 0
+            fi
+
             if [[ "$1 $2" == "exec feelm-backend" ]]; then
               shift 2
               "$@"
@@ -177,6 +219,13 @@ class DeployBackendTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(current, "registry/backend:previous")
         self.assertIn("Candidate deployment failed; previous image was restored", result.stderr)
+
+    def test_datastore_verification_failure_restores_previous_image(self):
+        result, current, _ = self.run_deploy(FAIL_DATASTORE_VERIFY=1)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(current, "registry/backend:previous")
+        self.assertIn("PostgreSQL SELECT 1 verification failed", result.stderr)
 
     def test_first_deployment_failure_stops_failed_candidate(self):
         result, current, events = self.run_deploy(previous="", FAIL_CANDIDATE_HEALTH=1)
