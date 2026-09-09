@@ -32,15 +32,20 @@ claude-mr-review:
   variables:
     GIT_DEPTH: "1"
     GIT_SUBMODULE_STRATEGY: none
+    RUNNER_SCRIPT_TIMEOUT: "8m"
+    RUNNER_AFTER_SCRIPT_TIMEOUT: "1m"
   environment:
     name: claude-review
     action: prepare
   resource_group: claude-review
   cache: []
   script:
+    - /usr/bin/python3 -I -B infra/claude-review/review-status.py running
     - /usr/bin/python3 -I -B infra/claude-review/collect-mr.py
     - /usr/bin/python3 -I -B infra/claude-review/generate-review.py
     - /usr/bin/python3 -I -B infra/claude-review/publish-review.py
+  after_script:
+    - /usr/bin/python3 -I -B infra/claude-review/review-status.py "$CI_JOB_STATUS"
   timeout: 10m
   interruptible: true
   rules:
