@@ -36,8 +36,17 @@ import org.springframework.stereotype.Component;
  * server.forward-headers-strategy}를 함께 도입해야 한다(후속 업무).
  *
  * <p>키에는 이메일과 IP 원문 대신 해시를 쓴다. Redis 키 목록만으로 어떤 이메일이 서비스에 있는지, 어떤 IP가 서비스를 썼는지 알 수 있으면 안 되고, IPv6까지
- * 길이가 고르게 된다. 창 길이를 키에 넣어 설정을 바꿔도 이전 창의 카운터가 새 설정에 섞이지 않게 한다(결정 D-7). 네임스페이스는 Refresh Token이 쓰는
- * {@code auth:}를 이어 사용한다.
+ * 길이가 고르게 된다. 네임스페이스는 Refresh Token이 쓰는 {@code auth:}를 이어 사용한다.
+ *
+ * <p><b>창 길이를 키에 넣는 것은 메일 축뿐이다</b>(결정 D-7). 그래서 메일 제한은 설정을 바꿔도 이전 창의 카운터가 새 설정에 섞이지 않는다. 로그인 키는 창을
+ * 담지 않으므로, 창 길이를 바꾸면 <b>이미 만들어진 카운터는 옛 창이 만료될 때까지 옛 길이를 유지한다</b>. 스크립트가 만료를 다시 거는 조건이 {@code count
+ * == 1}이거나 TTL이 없을 때뿐이기 때문이다. 값을 바꾼 직후에는 설정과 관측이 한 창 동안 어긋날 수 있다. 로그인 키도 창을 담게 맞추는 안은 기존 계약 테스트가 이
+ * 키 형식을 알고 있어 별도 업무로 판단한다(S15P21E106-311 리뷰 A-5·B-4).
+ *
+ * <p>제한 값은 코드가 아니라 설정에 둔다. 메일 발송은 {@link MailRateLimitProperties}, 로그인은 {@link
+ * LoginRateLimitProperties}가 읽고, 잘못된 값은 기동에 실패한다(S15P21E106-311). 로그인 제한만 상수로 남으면 같은 성격의 값이 설정과 코드로
+ * 갈려 조정 지점이 둘이 된다. 다만 값은 jar에 담기는 {@code application.yml}에 있고 배포 환경변수 통로는 아직 없어, 바꾸려면 재배포가 필요하다(리뷰
+ * B-7, 후속 업무 후보).
  *
  * <p>로그인 제한은 실패를 나중에 기록하는 대신 시도를 먼저 센다. 확인과 기록이 분리되어 있으면 동시 요청이 모두 확인을 통과해 제한 횟수보다 많은 비밀번호 대조가 일어나기
  * 때문이다. 카운터는 DB 트랜잭션과 무관하게 즉시 반영된다. Redis가 응답하지 않으면 예외가 그대로 올라가 인증 요청은 500으로 실패한다(fail-closed). 로그인
@@ -47,7 +56,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-@EnableConfigurationProperties(MailRateLimitProperties.class)
+@EnableConfigurationProperties({MailRateLimitProperties.class, LoginRateLimitProperties.class})
 public class AuthRateLimiter {
 
     private static final String RESEND_KEY_PREFIX = "auth:email-resend:";
@@ -68,14 +77,9 @@ public class AuthRateLimiter {
                             + "return count",
                     Long.class);
 
-    /** 로그인 연속 실패를 세는 기간. */
-    private static final Duration LOGIN_FAILURE_WINDOW = Duration.ofMinutes(10);
-
-    /** 이 횟수까지는 비밀번호를 대조하고, 넘는 시도는 대조 없이 429로 막는다(플랜 결정 14). */
-    private static final long LOGIN_ATTEMPT_LIMIT = 5;
-
     private final StringRedisTemplate redisTemplate;
     private final MailRateLimitProperties mailRateLimit;
+    private final LoginRateLimitProperties loginRateLimit;
 
     /**
      * 인증 메일 재발송(API-003)의 발송 자리를 확보한다.
@@ -106,6 +110,12 @@ public class AuthRateLimiter {
      * <p>확인과 기록을 한 번의 원자적 증가로 합쳐, 동시 요청이 몰려도 한 창 안에서 대조가 정확히 제한 횟수만 일어난다. 첫 시도에 만료를 걸어 최초 시도 시점부터
      * 기간이 흐른다. 시도가 실패로 남을지는 호출자가 정한다. 비밀번호가 맞으면 {@link #clearLoginAttempts}로 지우고, 틀리면 그대로 둔다.
      *
+     * <p>한도와 창 길이는 {@link LoginRateLimitProperties}에서 온다(S15P21E106-311). 운영 기본값은 5회/10분이다.
+     *
+     * <p>{@link #recordAttempt}를 쓰지 않고 스크립트를 직접 부르는 이유는 값이 없을 때의 처리를 한도와 독립으로 두기 위해서다. 그 헬퍼는 값을 받지
+     * 못하면 어떤 한도보다도 큰 값을 돌려주는데, 한도가 설정값이 된 뒤에는 {@code attempt-limit}을 {@code Long.MAX_VALUE}로 두면 그
+     * 신호가 한도와 같아져 fail-closed가 fail-open으로 뒤집힌다(리뷰 A-1·B-2).
+     *
      * @return 대조해도 되면 {@code true}, 제한을 넘었으면 {@code false}
      */
     public boolean tryAcquireLoginAttempt(String email) {
@@ -113,8 +123,8 @@ public class AuthRateLimiter {
                 redisTemplate.execute(
                         RECORD_ATTEMPT_SCRIPT,
                         List.of(loginFailureKey(email)),
-                        Long.toString(LOGIN_FAILURE_WINDOW.toMillis()));
-        return count != null && count <= LOGIN_ATTEMPT_LIMIT;
+                        Long.toString(loginRateLimit.attemptWindow().toMillis()));
+        return count != null && count <= loginRateLimit.attemptLimit();
     }
 
     /** 자격이 확인되면 시도 기록을 지운다. */

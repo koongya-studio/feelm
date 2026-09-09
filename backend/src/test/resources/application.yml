@@ -31,6 +31,10 @@ feelm:
     mock:
       enabled: false
       user-id: 1
+    # 운영 기본값을 그대로 명시한다. 기존 로그인 계약 테스트가 5회/10분 동작을 검증한다.
+    login:
+      attempt-limit: 5
+      attempt-window: 10m
   mail:
     # 테스트는 발송하지 않고 스파이 빈으로 토큰을 얻지만, 모드에 기본값이 없으므로 명시한다.
     mode: log
