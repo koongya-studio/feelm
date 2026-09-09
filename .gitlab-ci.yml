@@ -166,6 +166,23 @@ backend-test:
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop"'
 
+frontend-test:
+  stage: test
+  tags:
+    - e106-shell
+  script:
+    - docker run --rm --pull always --volume "$CI_PROJECT_DIR/frontend:/src:ro" --workdir /app node:20.19-alpine sh -c 'cp -R /src/. /app && npm ci && npm run lint && npm run format:check && npm run build'
+  interruptible: true
+  timeout: 15m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - frontend/**/*
+        - .gitlab-ci.yml
+        - .gitattributes
+
 backend-image:
   stage: build
   tags:
@@ -183,6 +200,29 @@ backend-image:
     - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop"'
+
+frontend-image:
+  stage: build
+  tags:
+    - e106-shell
+  needs:
+    - frontend-test
+  before_script:
+    - printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+  script:
+    - FRONTEND_IMAGE="$DOCKERHUB_NAMESPACE/feelm-frontend:$CI_COMMIT_SHA"
+    - docker build --pull -t "$FRONTEND_IMAGE" ./frontend
+    - docker push "$FRONTEND_IMAGE"
+    - echo "Built frontend image $FRONTEND_IMAGE"
+  timeout: 30m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - frontend/**/*
+        - .gitlab-ci.yml
+        - .gitattributes
 
 deploy-backend:
   stage: deploy

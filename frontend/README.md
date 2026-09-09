@@ -36,8 +36,18 @@ npm install
 | `npm run format` | Prettier 포맷 적용 |
 | `npm run format:check` | Prettier 포맷 검사 |
 
-커밋 전에 `npm run lint`와 `npm run format:check`를 통과하는지 확인합니다. CI에
-프론트엔드 잡은 아직 없습니다.
+커밋 전에 `npm run lint`와 `npm run format:check`를 통과하는지 확인합니다.
+
+`frontend/`, `.gitlab-ci.yml` 또는 `.gitattributes` 변경이 `develop`에 Push되면 CI가
+일회성 Node 컨테이너에서 의존성을 새로 설치하고 lint, 포맷 검사 및 Production Build를
+실행합니다. 검증에 성공하면 같은 커밋의 프론트엔드 이미지를 빌드해
+`$DOCKERHUB_NAMESPACE/feelm-frontend:$CI_COMMIT_SHA` 태그로 Docker Hub에 Push합니다.
+실패 시 `frontend-test` 로그에서 최초 실패 명령을 확인하고, 이미지 빌드·인증·Push 실패는
+`frontend-image` 로그와 보호·마스킹된 Docker Hub CI/CD Variable 상태를 확인합니다.
+
+MR 코드를 실행하는 전용 Runner는 현재 백엔드 Job만 허용하므로 프론트엔드 검증은 보호된
+`develop` Push에서만 자동 실행됩니다. 전용 Runner의 입력·명령 정책을 확장하기 전에는
+비보호 MR을 운영 Runner에서 실행하지 않습니다.
 
 `dist/`와 `node_modules/`는 저장소 루트 `.gitignore`에서 제외합니다.
 
