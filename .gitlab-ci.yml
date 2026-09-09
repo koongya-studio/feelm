@@ -71,6 +71,24 @@ runner-check:
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop"'
 
+datastore-config-check:
+  stage: verify
+  tags:
+    - e106-shell
+  script:
+    - bash ./infra/scripts/verify-datastore-config.sh
+  interruptible: true
+  timeout: 10m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - .gitlab-ci.yml
+        - infra/compose/service.yml
+        - infra/redis/**/*
+        - infra/scripts/verify-datastore-config.sh
+        - infra/scripts/verify-datastores.sh
+        - infra/scripts/deploy-backend.sh
+
 backend-cache-status:
   stage: verify
   tags:
@@ -188,7 +206,9 @@ backend-image:
   tags:
     - e106-shell
   needs:
-    - backend-test
+    - job: backend-test
+    - job: datastore-config-check
+      optional: true
   before_script:
     - printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
   script:
