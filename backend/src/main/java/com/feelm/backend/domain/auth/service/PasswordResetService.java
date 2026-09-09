@@ -10,6 +10,7 @@ import com.feelm.backend.domain.user.entity.User;
 import com.feelm.backend.domain.user.repository.UserRepository;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
+import com.feelm.backend.infrastructure.mail.MailSendBudget;
 import java.time.Instant;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ public class PasswordResetService {
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
     private final AuthRateLimiter rateLimiter;
+    private final MailSendBudget sendBudget;
     private final ApplicationEventPublisher eventPublisher;
 
     /**
@@ -37,8 +39,11 @@ public class PasswordResetService {
      * <p>계정이 없거나 미인증·탈퇴 상태여도 예외 없이 끝난다. 응답만 보고 계정 존재 여부를 알 수 없어야 하기 때문이다(API-010 처리 규칙). 실제로 발송하는지와
      * 무관하게 발송 제한을 먼저 적용해, 제한 응답으로도 계정 존재 여부가 드러나지 않게 한다.
      *
-     * <p>제한은 이메일 단위 간격뿐 아니라 IP 단위와 전역 단위로도 걸리고, IP·전역 카운터는 재발송(API-003)과 공유한다(S15P21E106-281 결정
-     * D-2). 어느 축에서 걸렸든 응답은 같은 {@code 429 RATE_LIMITED}다(결정 D-6).
+     * <p>제한은 이메일 단위 간격뿐 아니라 IP 단위로도 걸리고, IP 카운터는 재발송(API-003)과 공유한다(S15P21E106-281 결정 D-2). 어느 축에서
+     * 걸렸든 응답은 같은 {@code 429 RATE_LIMITED}다(결정 D-6).
+     *
+     * <p>계정 메일 전체의 전역 발송 상한은 이 자리에 없다. 그 상한은 실제 발송을 세고 발송 스레드에서 소모하므로 응답을 바꾸지 않는다(S15P21E106-287 결정
+     * D-2). 여기서 통과한 요청의 메일이 상한 때문에 나가지 않을 수 있고, 그때도 응답은 {@code 202}다.
      *
      * <p>대상은 이메일 로그인 수단을 가진 활성 계정뿐이다. 미인증 계정은 인증 메일 재발송(API-003)이 복구 경로이고, 소셜 전용 계정에 이메일 로그인 수단을 붙여
      * 주는 것은 API-008의 미정 사항이라 이 경로로 열지 않는다.
@@ -50,6 +55,12 @@ public class PasswordResetService {
         String email = rawEmail.trim().toLowerCase(Locale.ROOT);
         if (!rateLimiter.tryAcquirePasswordResetSlot(email, clientIp)) {
             throw new BusinessException(ErrorCode.RATE_LIMITED);
+        }
+        // 예산이 마른 동안에는 토큰을 회전시키지 않는다(S15P21E106-287 리뷰 B-2). 회전은 트랜잭션 안에서 기존 링크를
+        // 무효화하는데, 발송 여부는 커밋 뒤 발송 스레드가 정하므로 그대로 두면 사용자가 이미 받은 살아 있는 링크만 죽고
+        // 새 메일은 오지 않는다. 확인은 소모 없이 읽기만 하고 계정 존재 여부와 무관하게 모든 요청에 건다.
+        if (!sendBudget.hasCapacity()) {
+            return;
         }
         userRepository
                 .findByEmail(email)

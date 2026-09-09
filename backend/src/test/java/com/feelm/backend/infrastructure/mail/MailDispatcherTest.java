@@ -44,6 +44,8 @@ class MailDispatcherTest {
 
     private final MovableClock clock = new MovableClock();
 
+    private final RecordingBudget budget = new RecordingBudget();
+
     @Test
     @DisplayName("큐가 차면 발송을 버리고 호출 스레드에서 대신 실행하지 않는다")
     void rejectedSendIsNotRunOnCallerThread() {
@@ -113,7 +115,7 @@ class MailDispatcherTest {
     void alternatingRejectionsStillWarnOncePerWindow(CapturedOutput output) {
         AtomicBoolean reject = new AtomicBoolean(true);
         MailDispatcher dispatcher =
-                new MailDispatcher(drainingExecutor(reject), () -> false, clock);
+                new MailDispatcher(drainingExecutor(reject), () -> false, clock, budget);
 
         for (int attempt = 0; attempt < 20; attempt++) {
             dispatcher.dispatch(MailKind.VERIFICATION, attempt, () -> {});
@@ -136,7 +138,8 @@ class MailDispatcherTest {
     @Test
     @DisplayName("종료 중의 거절은 큐 포화가 아니라 종료로 기록된다")
     void rejectionWhileShuttingDownIsNotReportedAsSaturation(CapturedOutput output) {
-        MailDispatcher dispatcher = new MailDispatcher(rejectingExecutor(), () -> true, clock);
+        MailDispatcher dispatcher =
+                new MailDispatcher(rejectingExecutor(), () -> true, clock, budget);
 
         dispatcher.dispatch(MailKind.PASSWORD_RESET, 7L, () -> {});
 
@@ -153,7 +156,7 @@ class MailDispatcherTest {
                 task -> {
                     throw new IllegalStateException("ThreadPoolTaskExecutor not initialized");
                 };
-        MailDispatcher dispatcher = new MailDispatcher(broken, () -> false, clock);
+        MailDispatcher dispatcher = new MailDispatcher(broken, () -> false, clock, budget);
 
         assertThatCode(() -> dispatcher.dispatch(MailKind.VERIFICATION, 8L, () -> {}))
                 .doesNotThrowAnyException();
@@ -170,7 +173,8 @@ class MailDispatcherTest {
     @Test
     @DisplayName("발송 실패는 호출자에게 전파되지 않고 수신 주소를 가린 채 기록된다")
     void sendFailureIsLoggedWithoutEmailOrToken(CapturedOutput output) {
-        MailDispatcher dispatcher = new MailDispatcher(new SyncTaskExecutor(), () -> false, clock);
+        MailDispatcher dispatcher =
+                new MailDispatcher(new SyncTaskExecutor(), () -> false, clock, budget);
 
         dispatcher.dispatch(
                 MailKind.PASSWORD_RESET,
@@ -194,7 +198,8 @@ class MailDispatcherTest {
     @Test
     @DisplayName("아주 긴 실패 메시지는 상한에서 잘리고 잘린 뒤에도 주소는 남지 않는다")
     void longFailureMessageIsTruncated(CapturedOutput output) {
-        MailDispatcher dispatcher = new MailDispatcher(new SyncTaskExecutor(), () -> false, clock);
+        MailDispatcher dispatcher =
+                new MailDispatcher(new SyncTaskExecutor(), () -> false, clock, budget);
         String longMessage = "x".repeat(5000) + " 550 5.1.1 <user@example.com> not found";
 
         dispatcher.dispatch(
@@ -209,8 +214,95 @@ class MailDispatcherTest {
         assertThat(output).doesNotContain("user@example.com");
     }
 
+    /**
+     * 전역 발송 상한을 넘긴 메일은 보내지 않는다(S15P21E106-287 결정 D-6). 상한 확인이 발송 스레드에 있으므로 응답 경로에는 아무 영향이 없고, 버려진
+     * 발송이 예외로 새어 나가지도 않는다.
+     */
+    @Test
+    @DisplayName("전역 발송 상한을 넘기면 발송하지 않고 조용히 버린다")
+    void skipsSendWhenBudgetRefuses(CapturedOutput output) {
+        MailDispatcher dispatcher =
+                new MailDispatcher(new SyncTaskExecutor(), () -> false, clock, budget);
+        budget.refuse();
+        AtomicBoolean sent = new AtomicBoolean();
+
+        assertThatCode(() -> dispatcher.dispatch(MailKind.VERIFICATION, 11L, () -> sent.set(true)))
+                .doesNotThrowAnyException();
+
+        assertThat(sent).as("상한을 넘긴 메일은 발송하지 않는다").isFalse();
+        assertThat(dispatcher.isIdle()).as("버려진 발송이 미완료로 남지 않는다").isTrue();
+        assertThat(output).as("버려지는 메일마다 줄을 남기지 않는다").doesNotContain("발송에 실패했습니다");
+    }
+
+    /**
+     * 예산은 실제 발송만 센다(결정 D-1). 큐가 차서 버려진 발송이 예산을 소모하면, 보내지도 않은 메일 때문에 상한이 마르는 옛 문제가 다른 자리에서 되살아난다.
+     */
+    @Test
+    @DisplayName("큐에서 버려진 발송은 전역 예산을 소모하지 않는다")
+    void rejectedSubmissionDoesNotConsumeBudget() {
+        MailDispatcher dispatcher =
+                new MailDispatcher(rejectingExecutor(), () -> false, clock, budget);
+
+        dispatcher.dispatch(MailKind.VERIFICATION, 12L, () -> {});
+
+        assertThat(budget.consumed()).as("제출되지 못한 발송의 예산 소모").isZero();
+    }
+
+    /** 상한 확인이 실패하면 보내지 않는다(fail-closed, 결정 D-11). 원인은 발송 실패와 같은 자리에 남는다. */
+    @Test
+    @DisplayName("상한을 확인하지 못하면 발송하지 않고 원인을 남긴다")
+    void doesNotSendWhenBudgetCheckFails(CapturedOutput output) {
+        MailDispatcher dispatcher =
+                new MailDispatcher(new SyncTaskExecutor(), () -> false, clock, budget);
+        budget.fail();
+        AtomicBoolean sent = new AtomicBoolean();
+
+        assertThatCode(
+                        () ->
+                                dispatcher.dispatch(
+                                        MailKind.PASSWORD_RESET, 13L, () -> sent.set(true)))
+                .doesNotThrowAnyException();
+
+        assertThat(sent).isFalse();
+        assertThat(output).contains("비밀번호 재설정 메일 발송 상한을 확인하지 못해 보내지 않았습니다", "사용자 13");
+        assertThat(dispatcher.isIdle()).isTrue();
+    }
+
+    /**
+     * 이 상한이 지키는 것은 SMTP 계정의 쿼터이고 실패한 발송은 쿼터를 쓰지 않는다(리뷰 B-4). 되돌리지 않으면 자격 증명 폐기처럼 즉시 실패하는 장애에서 상한이 몇
+     * 초 만에 마르고, 원인을 고쳐도 창이 끝날 때까지 메일이 나가지 않는다.
+     */
+    @Test
+    @DisplayName("발송이 실패하면 확보한 예산 자리를 되돌린다")
+    void releasesBudgetWhenSendFails() {
+        MailDispatcher dispatcher =
+                new MailDispatcher(new SyncTaskExecutor(), () -> false, clock, budget);
+
+        dispatcher.dispatch(
+                MailKind.VERIFICATION,
+                44L,
+                () -> {
+                    throw new MailSendException("Failed messages");
+                });
+
+        assertThat(budget.consumed()).as("확보").isEqualTo(1);
+        assertThat(budget.released()).as("되돌림").isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("발송에 성공하면 예산을 되돌리지 않는다")
+    void keepsBudgetWhenSendSucceeds() {
+        MailDispatcher dispatcher =
+                new MailDispatcher(new SyncTaskExecutor(), () -> false, clock, budget);
+
+        dispatcher.dispatch(MailKind.VERIFICATION, 45L, () -> {});
+
+        assertThat(budget.consumed()).isEqualTo(1);
+        assertThat(budget.released()).isZero();
+    }
+
     private MailDispatcher dispatcher(TaskExecutor executor) {
-        return new MailDispatcher(executor, () -> false, clock);
+        return new MailDispatcher(executor, () -> false, clock, budget);
     }
 
     private static void dispatch(
@@ -318,6 +410,50 @@ class MailDispatcherTest {
 
         void advance(Duration amount) {
             offsetMillis.addAndGet(amount.toMillis());
+        }
+    }
+
+    /** 예산 판정을 테스트가 쥔다. 소모 횟수는 "실제 발송만 센다"를 확인하는 데 쓴다. */
+    private static final class RecordingBudget implements MailSendBudget {
+
+        private final AtomicLong consumed = new AtomicLong();
+        private final AtomicLong released = new AtomicLong();
+        private volatile boolean allow = true;
+        private volatile boolean broken;
+
+        @Override
+        public boolean tryConsume() {
+            if (broken) {
+                throw new IllegalStateException("Redis에 닿지 못했다");
+            }
+            consumed.incrementAndGet();
+            return allow;
+        }
+
+        @Override
+        public void release() {
+            released.incrementAndGet();
+        }
+
+        @Override
+        public boolean hasCapacity() {
+            return allow;
+        }
+
+        long released() {
+            return released.get();
+        }
+
+        void refuse() {
+            allow = false;
+        }
+
+        void fail() {
+            broken = true;
+        }
+
+        long consumed() {
+            return consumed.get();
         }
     }
 }

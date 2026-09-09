@@ -13,17 +13,21 @@ import org.springframework.stereotype.Component;
 /**
  * 인증·재설정 메일 발송과 로그인 연속 실패를 Redis로 제한한다(플랜 결정 4).
  *
- * <p>메일 발송은 세 축을 함께 본다. 이메일 단위 최소 간격, IP 단위 창 카운터, 전역 창 카운터다(S15P21E106-281 결정 D-1). 이메일 간격만으로는 서로
- * 다른 이메일을 대량으로 넣는 발송 폭탄을 막지 못한다. IP·전역 카운터는 재발송(API-003)과 재설정 요청(API-010)이 공유한다. 두 경로가 같은 SMTP 계정의
- * 발송 쿼터를 소모하므로 공격자에게는 같은 발송 수단이고, 경로별로 나누면 한쪽을 막아도 다른 쪽으로 같은 양을 더 보낼 수 있기 때문이다(결정 D-2). 이메일 간격은
- * 지금처럼 경로별로 분리한다. 재발송과 재설정은 사용자가 서로 다른 이유로 요청하는 정상 흐름이다.
+ * <p>메일 요청은 두 축을 함께 본다. 이메일 단위 최소 간격과 IP 단위 창 카운터다(S15P21E106-281 결정 D-1). 이메일 간격만으로는 서로 다른 이메일을
+ * 대량으로 넣는 발송 폭탄을 막지 못한다. IP 카운터는 재발송(API-003)과 재설정 요청(API-010)이 공유한다. 두 경로가 같은 SMTP 계정의 발송 쿼터를
+ * 소모하므로 공격자에게는 같은 발송 수단이고, 경로별로 나누면 한쪽을 막아도 다른 쪽으로 같은 양을 더 보낼 수 있기 때문이다(결정 D-2). 이메일 간격은 지금처럼 경로별로
+ * 분리한다. 재발송과 재설정은 사용자가 서로 다른 이유로 요청하는 정상 흐름이다.
  *
- * <p>평가 순서는 이메일 간격 → IP → 전역이다(결정 D-3). 같은 이메일을 반복해서 넣는 요청은 이메일 간격에서 먼저 막혀 IP·전역 예산을 소모하지 않는다. 앞 축을
- * 통과하며 올린 카운터는 뒤 축이 거절해도 되돌리지 않는다. 되돌리려면 원자성이 깨지고, 거절된 요청이 예산을 조금 소모하는 쪽이 방어에 안전한 방향이다. 카운터는 계정 존재
- * 여부나 실제 발송 여부와 무관하게 시도 시점에 센다. 발송한 것만 세면 카운터 소모 여부가 계정 존재를 알려 주는 신호가 된다(결정 D-4).
+ * <p><b>전역 축은 여기에 없다</b>(S15P21E106-287 결정 D-1·D-4). 요청을 세는 전역 상한은 메일을 한 통도 보내지 않고 예산을 말릴 수 있어, 버킷
+ * 서른 개면 하루치 상한이 마르고 그동안 정상 사용자의 재발송·재설정이 모두 429가 됐다. SMTP 쿼터를 지키는 상한은 실제 발송을 세는 {@code
+ * MailSendBudget}으로 옮겨 발송 스레드에서 본다. 그 카운터는 응답을 바꾸지 않으므로 발송을 세면서도 계정 존재를 드러내지 않는다(결정 D-2).
+ *
+ * <p>평가 순서는 이메일 간격 → IP다(결정 D-3). 같은 이메일을 반복해서 넣는 요청은 이메일 간격에서 먼저 막혀 IP 예산을 소모하지 않는다. 앞 축을 통과하며 올린
+ * 카운터는 뒤 축이 거절해도 되돌리지 않는다. 되돌리려면 원자성이 깨지고, 거절된 요청이 예산을 조금 소모하는 쪽이 방어에 안전한 방향이다. 카운터는 계정 존재 여부나 실제
+ * 발송 여부와 무관하게 시도 시점에 센다. 이 축들은 429로 응답을 바꾸므로, 발송한 것만 세면 카운터 소모 여부가 계정 존재를 알려 주는 신호가 된다(결정 D-4).
  *
  * <p>이메일 간격만은 <b>확인을 먼저 하고 기록은 마지막</b>에 한다(결정 D-3의 보완, 2026-09-08). 카운터를 되돌리지 않는 원칙은 요청을 보낸 쪽이 자기
- * 예산을 조금 잃는 데까지만 안전하다. 이메일 간격 슬롯은 요청자의 것이 아니라 <b>그 이메일 주인</b>의 것이어서, IP·전역에서 거절될 요청이 슬롯을 심으면 예산을 이미
+ * 예산을 조금 잃는 데까지만 안전하다. 이메일 간격 슬롯은 요청자의 것이 아니라 <b>그 이메일 주인</b>의 것이어서, IP 축에서 거절될 요청이 슬롯을 심으면 예산을 이미
  * 넘긴 공격자가 임의의 이메일에 대해 재설정·재발송을 분당 한 건씩 무기한 지연시킬 수 있다. 공유 NAT에서 남의 IP 예산 때문에 429를 받은 사용자도 자기 요청이 심은
  * 슬롯에 다시 걸린다.
  *
@@ -55,8 +59,8 @@ import org.springframework.stereotype.Component;
  *
  * <p>제한 값은 코드가 아니라 설정에 둔다. 메일 발송은 {@link MailRateLimitProperties}, 로그인은 {@link
  * LoginRateLimitProperties}가 읽고, 잘못된 값은 기동에 실패한다(S15P21E106-311). 로그인 제한만 상수로 남으면 같은 성격의 값이 설정과 코드로
- * 갈려 조정 지점이 둘이 된다. 다만 값은 jar에 담기는 {@code application.yml}에 있고 배포 환경변수 통로는 아직 없어, 바꾸려면 재배포가 필요하다(리뷰
- * B-7, 후속 업무 후보).
+ * 갈려 조정 지점이 둘이 된다. 메일 축의 값은 {@code application.yml}에서 환경변수로 열려 있어 이미지를 다시 만들지 않고 배포 환경변수로 조정한다
+ * (S15P21E106-287 결정 D-9). 로그인 축의 값은 아직 그 통로가 없어 바꾸려면 재배포가 필요하다.
  *
  * <p>로그인은 IP 축과 이메일 축을 함께 본다(S15P21E106-312). 이메일 축만 있으면 두 경로가 열려 있다. 비밀번호 하나를 서로 다른 계정 수천 개에 한 번씩
  * 넣는 password spraying은 계정당 한도에 걸리지 않고, 피해자 이메일만 알면 틀린 비밀번호 몇 번으로 그 계정을 창 길이만큼 반복해서 잠글 수 있는데 그 시도를
@@ -75,7 +79,7 @@ import org.springframework.stereotype.Component;
  * <p>로그인의 IP 예산은 메일 축의 IP 예산과 공유하지 않는다. 메일 축을 두 엔드포인트가 공유한 이유는 둘이 같은 SMTP 발송 쿼터를 소모하기 때문인데(결정 D-2),
  * 로그인 시도는 발송 수단을 쓰지 않아 한쪽이 다른 쪽 예산을 마르게 할 이유가 없다.
  *
- * <p>IP 한도에 도달하면 <b>창마다 한 번</b> WARN을 남긴다(메일 전역 축과 같은 방식). 차단된 요청도 카운터를 계속 올리므로 카운터 값 자체는 지표가 되지
+ * <p>IP 한도에 도달하면 <b>창마다 한 번</b> WARN을 남긴다(전역 발송 상한과 같은 방식). 차단된 요청도 카운터를 계속 올리므로 카운터 값 자체는 지표가 되지
  * 못하고, 거절되는 모든 요청에 로그를 남기면 공격이 이어지는 동안 같은 줄이 초당 요청 수만큼 쌓인다. IP 원문과 이메일은 남기지 않는다({@code
  * docs/backend-convention.md} 12장). 기동 시에는 유효 한도를 한 줄 남긴다(리뷰 B-3·B-5).
  *
@@ -101,7 +105,6 @@ public class AuthRateLimiter {
     private static final String LOGIN_IP_KEY_PREFIX = "auth:login:ip:";
     private static final String PASSWORD_RESET_KEY_PREFIX = "auth:password-reset:";
     private static final String MAIL_IP_KEY_PREFIX = "auth:mail:ip:";
-    private static final String MAIL_GLOBAL_KEY_PREFIX = "auth:mail:global:";
 
     /**
      * 시도 횟수를 올리고 만료를 보장한 뒤 올린 횟수를 돌려주는 스크립트. {@code INCR}와 {@code PEXPIRE}를 따로 보내면 그 사이에 연결이 끊겼을 때
@@ -123,11 +126,30 @@ public class AuthRateLimiter {
     /**
      * 인증 메일 재발송(API-003)의 발송 자리를 확보한다.
      *
+     * <p>자리를 얻어도 메일이 반드시 나가지는 않는다. 전역 발송 상한은 발송 스레드가 따로 본다(S15P21E106-287).
+     *
      * @param clientIp 요청을 보낸 클라이언트 IP
-     * @return 발송해도 되면 {@code true}, 어느 한 축이라도 제한을 넘었으면 {@code false}
+     * @return 요청을 처리해도 되면 {@code true}, 두 축 중 하나라도 제한을 넘었으면 {@code false}
      */
     public boolean tryAcquireResendSlot(String email, String clientIp) {
         return tryAcquireMailSendSlot(resendKey(email), clientIp);
+    }
+
+    /**
+     * 가입(API-001)의 발송 자리를 IP 축으로 확보한다(리뷰 B-1).
+     *
+     * <p>가입 인증 메일도 같은 SMTP 계정의 쿼터를 쓰는데(결정 D-5) 이 경로에는 요청 제한이 없었다. 그대로 두면 한 IP에서 가입을 반복하는 것만으로 전역 발송
+     * 상한이 말라, 정상 사용자의 인증 메일 재발송(API-003)과 비밀번호 재설정(API-010)이 조용히 나가지 않는다. 전역 축을 발송 기준으로 옮기면서 예산에
+     * 유일하게 남은 무방비 입구였다.
+     *
+     * <p>이메일 축은 두지 않는다. 같은 이메일의 반복 가입은 이미 중복 검사가 막고, 간격 슬롯을 심으면 그 이메일의 재가입 경로까지 잠근다. IP 카운터는
+     * 재발송·재설정과 공유한다. 세 경로가 같은 발송 수단을 쓰므로 한 경로만 막으면 총량을 묶을 수 없다는 결정 D-2가 그대로 적용된다.
+     *
+     * @param clientIp 요청을 보낸 클라이언트 IP
+     * @return 가입을 처리해도 되면 {@code true}, IP 축의 제한을 넘었으면 {@code false}
+     */
+    public boolean tryAcquireSignupSlot(String clientIp) {
+        return tryAcquireMailSendBudget(clientIp);
     }
 
     /**
@@ -137,7 +159,7 @@ public class AuthRateLimiter {
      * 규칙).
      *
      * @param clientIp 요청을 보낸 클라이언트 IP
-     * @return 처리해도 되면 {@code true}, 어느 한 축이라도 제한을 넘었으면 {@code false}
+     * @return 처리해도 되면 {@code true}, 두 축 중 하나라도 제한을 넘었으면 {@code false}
      */
     public boolean tryAcquirePasswordResetSlot(String email, String clientIp) {
         return tryAcquireMailSendSlot(passwordResetKey(email), clientIp);
@@ -219,13 +241,13 @@ public class AuthRateLimiter {
     }
 
     /**
-     * 세 축을 순서대로 확보한다. 이메일 간격은 먼저 확인하고 기록은 마지막에 한다.
+     * 두 축을 순서대로 확보한다. 이메일 간격은 먼저 확인하고 기록은 마지막에 한다.
      *
-     * <p>확인을 앞에 두어 같은 이메일을 반복하는 요청이 IP·전역 예산을 소모하지 않는 D-3의 성질을 유지하고, 기록을 뒤로 미뤄 IP·전역에서 거절될 요청이 그
-     * 이메일의 간격 슬롯을 소모하지 않게 한다(클래스 주석의 보완 항목).
+     * <p>확인을 앞에 두어 같은 이메일을 반복하는 요청이 IP 예산을 소모하지 않는 D-3의 성질을 유지하고, 기록을 뒤로 미뤄 IP 축에서 거절될 요청이 그 이메일의
+     * 간격 슬롯을 소모하지 않게 한다(클래스 주석의 보완 항목).
      *
      * <p>확인과 기록이 나뉘어 그 사이에 같은 이메일의 요청이 동시에 들어올 수 있지만, 기록이 {@code SET NX}라 정확히 한 건만 통과한다. 경합에서 진 요청은
-     * IP·전역 카운터를 하나 올린 채 거절되는데, 이는 거절된 요청이 예산을 조금 소모하는 D-3의 방향과 같다.
+     * IP 카운터를 하나 올린 채 거절되는데, 이는 거절된 요청이 예산을 조금 소모하는 D-3의 방향과 같다.
      */
     private boolean tryAcquireMailSendSlot(String emailIntervalKey, String clientIp) {
         if (Boolean.TRUE.equals(redisTemplate.hasKey(emailIntervalKey))) {
@@ -242,31 +264,15 @@ public class AuthRateLimiter {
     }
 
     /**
-     * IP 단위 예산과 전역 예산을 순서대로 확보한다. 앞 축에서 막히면 뒤 축의 카운터는 올리지 않는다(결정 D-3).
+     * IP 단위 예산을 창마다 확보한다. 앞 창에서 막히면 뒤 창의 카운터는 올리지 않는다(결정 D-3).
      *
-     * <p>전역 제한에 걸린 경우에만 WARN을 남긴다. 한 IP가 자기 예산을 다 쓰는 것은 정상 운영 중에도 일어나지만, 전역 예산이 마르는 것은 정상 사용자까지 메일을
-     * 받지 못하는 상태라 운영 중 인지해야 한다. IP와 이메일 원문은 남기지 않는다({@code docs/backend-convention.md} 12장, 결정
-     * D-11).
-     *
-     * <p>WARN은 <b>창마다 한 번</b>, 카운터가 한도를 처음 넘는 요청에서만 남긴다. 거절되는 모든 요청에 남기면 공격이 이어지는 동안 초당 요청 수만큼 같은
-     * 줄이 쌓여, 정작 로그가 필요한 순간에 다른 기록을 밀어낸다. 창이 만료되고 카운터가 다시 한도를 넘으면 그 창의 WARN이 다시 한 번 남는다.
+     * <p>한 IP가 자기 예산을 다 쓰는 것은 정상 운영 중에도 일어나므로 WARN을 남기지 않는다. 운영 중 인지해야 하는 상태는 정상 사용자까지 메일을 받지 못하는
+     * 전역 상한 도달이고, 그 로그는 {@code RedisMailSendBudget}이 남긴다(S15P21E106-287 결정 D-8).
      */
     private boolean tryAcquireMailSendBudget(String clientIp) {
         for (MailRateLimitProperties.Quota quota : mailRateLimit.ip()) {
             if (recordAttempt(mailIpKey(clientIp, quota.window()), quota.window())
                     > quota.limit()) {
-                return false;
-            }
-        }
-        for (MailRateLimitProperties.Quota quota : mailRateLimit.global()) {
-            long count = recordAttempt(mailGlobalKey(quota.window()), quota.window());
-            if (count > quota.limit()) {
-                if (count == quota.limit() + 1) {
-                    log.warn(
-                            "인증·재설정 메일 발송의 전역 제한에 도달했습니다. 창 길이: {}, 한도: {}건",
-                            quota.window(),
-                            quota.limit());
-                }
                 return false;
             }
         }
@@ -320,9 +326,5 @@ public class AuthRateLimiter {
                 + Sha256Hasher.hex(ClientIpBucket.of(clientIp, clientIpPrefixes))
                 + ":"
                 + window.toSeconds();
-    }
-
-    private String mailGlobalKey(Duration window) {
-        return MAIL_GLOBAL_KEY_PREFIX + window.toSeconds();
     }
 }

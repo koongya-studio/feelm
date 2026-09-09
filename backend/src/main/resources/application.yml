@@ -166,22 +166,37 @@ feelm:
     verification-url: ${FRONTEND_BASE_URL:http://localhost:5173}/verify-email
     # 재설정 링크도 프론트 화면으로 가고 프론트가 API-011을 호출한다.
     password-reset-url: ${FRONTEND_BASE_URL:http://localhost:5173}/reset-password
-    # 인증 메일 재발송(API-003)과 재설정 요청(API-010)의 발송 제한이다. 이메일 간격만으로는
-    # 서로 다른 이메일을 대량으로 넣는 발송 폭탄을 막지 못하므로 IP 단위와 전역 단위를 함께 둔다.
-    # ip·global은 창 목록이라 축을 늘리거나 줄여도 코드가 그대로다(S15P21E106-281 결정 D-8).
+    # 인증 메일 재발송(API-003)과 재설정 요청(API-010)의 요청 단위 제한이다. 이메일 간격만으로는
+    # 서로 다른 이메일을 대량으로 넣는 발송 폭탄을 막지 못하므로 IP 단위를 함께 둔다. ip는 창
+    # 목록이라 창을 늘리거나 줄여도 코드가 그대로다(S15P21E106-281 결정 D-8).
+    #
+    # 전역 축은 여기에 없다. 요청을 세는 전역 상한은 메일을 한 통도 보내지 않고 예산을 말릴 수
+    # 있어(IP 버킷 30개면 하루치가 마른다) 정상 사용자의 계정 복구를 막는 지렛대였다. SMTP 쿼터를
+    # 지키는 상한은 실제 발송을 세는 아래 send-budget으로 옮겼다(S15P21E106-287 결정 D-1·D-4).
     rate-limit:
       # 같은 이메일로 다시 요청할 수 있게 되기까지의 최소 간격. 두 경로가 같은 값을 쓴다.
-      email-interval: 1m
-      # 정상 사용자가 한 시간에 인증·재설정 메일을 10건까지 요청할 일은 없다.
+      email-interval: ${MAIL_RATE_LIMIT_EMAIL_INTERVAL:1m}
+      # 공용 NAT 뒤 IPv4 한 버킷을 수십 명이 함께 쓰는 시연·캠퍼스망에서는 10건이 정상 사용자끼리
+      # 소모할 수 있는 양이다. 로그인 IP 축을 공유 NAT 기준으로 넉넉히 잡은 것과 같은 논리로 30건에
+      # 둔다(S15P21E106-287 결정 D-7). 예산 주체는 주소 하나가 아니라 feelm.auth.client-ip가
+      # 정한 프리픽스 버킷이다.
       ip:
-        - limit: 10
+        - limit: ${MAIL_RATE_LIMIT_IP_LIMIT:30}
+          window: ${MAIL_RATE_LIMIT_IP_WINDOW:1h}
+    # 계정 메일 전체(가입 인증·재발송·재설정)의 전역 발송 상한이다. SMTP 계정의 발송 쿼터를 지키는
+    # 값이라 시도가 아니라 실제 발송을 세고, 요청 경로가 아니라 발송 스레드에서 소모한다. 그래서 이
+    # 상한은 응답(202·201)을 바꾸지 않으며, 상한을 넘긴 메일은 발송하지 않고 버린다. 사용자의
+    # 재발송·재요청·재가입이 복구 경로다(S15P21E106-287 결정 D-2·D-5·D-6).
+    #
+    # 값의 근거는 팀 Gmail 계정의 일 발송 상한(무료 계정 500통)이다. 그 아래에서 시간 창과 일 창을
+    # 함께 두어, 짧은 폭주와 하루 총량을 각각 묶는다. 목록이 비어 있으면 상한이 없다(기동 시 WARN).
+    # 상한의 80%에 닿을 때와 상한을 넘을 때 창마다 한 번씩 WARN이 남고, 현재 사용량은 읽기 전용
+    # Redis로 조회한다(backend/README.md).
+    send-budget:
+      windows:
+        - limit: ${MAIL_SEND_BUDGET_HOURLY_LIMIT:100}
           window: 1h
-      # 전역은 SMTP 계정의 발송 쿼터를 지키기 위한 상한이다. 시간 창만으로는 하루 총량을 묶지
-      # 못해 일 창을 함께 둔다.
-      global:
-        - limit: 100
-          window: 1h
-        - limit: 300
+        - limit: ${MAIL_SEND_BUDGET_DAILY_LIMIT:300}
           window: 24h
   kafka:
     outbox:

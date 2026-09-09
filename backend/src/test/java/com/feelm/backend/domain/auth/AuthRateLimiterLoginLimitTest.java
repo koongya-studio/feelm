@@ -41,7 +41,7 @@ class AuthRateLimiterLoginLimitTest {
         AuthRateLimiter rateLimiter =
                 new AuthRateLimiter(
                         redisTemplate,
-                        new MailRateLimitProperties(Duration.ofMinutes(1), List.of(), List.of()),
+                        new MailRateLimitProperties(Duration.ofMinutes(1), List.of()),
                         new LoginRateLimitProperties(2, Duration.ofSeconds(30), List.of()),
                         new ClientIpProperties(32, 64));
         when(redisTemplate.<Long>execute(any(RedisScript.class), anyList(), any()))
@@ -71,7 +71,7 @@ class AuthRateLimiterLoginLimitTest {
         AuthRateLimiter rateLimiter =
                 new AuthRateLimiter(
                         redisTemplate,
-                        new MailRateLimitProperties(Duration.ofMinutes(1), List.of(), List.of()),
+                        new MailRateLimitProperties(Duration.ofMinutes(1), List.of()),
                         new LoginRateLimitProperties(5, Duration.ofMinutes(10), List.of()),
                         new ClientIpProperties(32, 64));
         when(redisTemplate.<Long>execute(any(RedisScript.class), anyList(), any()))
@@ -175,7 +175,7 @@ class AuthRateLimiterLoginLimitTest {
             StringRedisTemplate redisTemplate, long attemptLimit, List<Quota> ipQuotas) {
         return new AuthRateLimiter(
                 redisTemplate,
-                new MailRateLimitProperties(Duration.ofMinutes(1), List.of(), List.of()),
+                new MailRateLimitProperties(Duration.ofMinutes(1), List.of()),
                 new LoginRateLimitProperties(attemptLimit, Duration.ofMinutes(10), ipQuotas),
                 PREFIXES);
     }

@@ -5,6 +5,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 /**
@@ -29,7 +30,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
  * 한 풀을 공유하면 다른 작업이 큐를 채워 메일이 버려질 수 있다.
  */
 @Configuration
-@EnableConfigurationProperties(MailAsyncProperties.class)
+@EnableConfigurationProperties({MailAsyncProperties.class, MailSendBudgetProperties.class})
 class MailDispatchConfig {
 
     @Bean
@@ -51,10 +52,22 @@ class MailDispatchConfig {
      * 접근자가 예외를 던지므로 디스패처가 그 예외를 삼킨다.
      */
     @Bean
-    MailDispatcher mailDispatcher(ThreadPoolTaskExecutor mailTaskExecutor) {
+    MailDispatcher mailDispatcher(ThreadPoolTaskExecutor mailTaskExecutor, MailSendBudget budget) {
         return new MailDispatcher(
                 mailTaskExecutor,
                 () -> mailTaskExecutor.getThreadPoolExecutor().isShutdown(),
-                Clock.systemUTC());
+                Clock.systemUTC(),
+                budget);
+    }
+
+    /**
+     * 전역 발송 상한을 Redis 카운터로 지키는 구현을 등록한다(S15P21E106-287).
+     *
+     * <p>디스패처와 같은 설정에 두는 이유는 수명이 아니라 짝이다. 상한은 발송 스레드에서만 쓰이므로 이 둘이 함께 바뀐다.
+     */
+    @Bean
+    MailSendBudget mailSendBudget(
+            StringRedisTemplate redisTemplate, MailSendBudgetProperties properties) {
+        return new RedisMailSendBudget(redisTemplate, properties);
     }
 }
