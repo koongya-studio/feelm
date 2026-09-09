@@ -7,11 +7,11 @@
   justify-content: center;
   border-radius: var(--ott-badge-radius);
   font-size: var(--ott-badge-font-size);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }
 
 .badge[data-variant='default'] {
-  background: var(--color-nav-inactive);
+  background: var(--color-surface-sunken);
   color: var(--color-ink);
 }
 
@@ -20,13 +20,13 @@
  * (`DESIGN_TODO.md` Phase 7 점검 항목). 잉크로 두면 5.4:1이 된다.
  */
 .badge[data-variant='unselected'] {
-  background: var(--color-nav-inactive);
+  background: var(--color-surface-sunken);
   color: var(--color-ink);
-  font-weight: 800;
+  font-weight: var(--font-weight-bold);
 }
 
 .badge[data-variant='selected'] {
-  background: var(--color-nav-active);
+  background: var(--color-ink);
   color: var(--color-on-dark);
-  font-weight: 800;
+  font-weight: var(--font-weight-bold);
 }

@@ -95,15 +95,15 @@
   height: 6px;
   flex: 1;
   overflow: hidden;
-  border-radius: var(--radius-badge);
-  background: var(--color-track);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
 }
 
 .tasteBar {
   display: block;
   height: 100%;
-  border-radius: var(--radius-badge);
-  background: var(--color-nav-active);
+  border-radius: var(--radius-pill);
+  background: var(--color-ink);
 }
 
 .tastePercent {
@@ -114,7 +114,7 @@
 
 .tasteKeyword {
   font-size: 12.5px;
-  color: var(--color-ink-dim);
+  color: var(--color-ink-muted);
 }
 
 .reportLink {
@@ -136,8 +136,8 @@
   flex-direction: column;
   gap: 6px;
   padding: 16px;
-  border-radius: var(--radius-section);
-  background: var(--color-nav-active);
+  border-radius: var(--radius-card);
+  background: var(--color-ink);
   color: var(--color-on-dark);
 }
 
@@ -149,7 +149,7 @@
 .bannerText {
   font-size: 12px;
   line-height: 1.5;
-  color: var(--color-on-dark-dim);
+  color: var(--color-on-dark-muted);
 }
 
 .bannerButton {
@@ -177,8 +177,8 @@
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
-  border: 1px solid var(--color-line-section);
-  border-radius: var(--radius-section);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
   background: none;
   color: inherit;
   cursor: pointer;
@@ -193,8 +193,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 12px;
-  background: var(--color-surface-muted);
-  color: var(--color-nav-active);
+  background: var(--color-surface);
+  color: var(--color-ink);
 }
 
 .partyBody {
@@ -215,5 +215,26 @@
 .partyChevron {
   display: flex;
   flex: none;
-  color: var(--color-ink-weak);
+  color: var(--color-ink-hint);
+}
+
+/*
+ * 헤더 우측 액션. 검색이 하단 탭에서 여기로 옮겨와 알림과 나란히 선다
+ * (S15P21E106-329).
+ */
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* 터치 대상은 44px을 확보하고 아이콘만 보이게 한다 */
+.headerAction {
+  display: flex;
+  width: var(--tap-target-min);
+  height: var(--tap-target-min);
+  align-items: center;
+  justify-content: center;
+  color: var(--color-ink);
+  text-decoration: none;
 }

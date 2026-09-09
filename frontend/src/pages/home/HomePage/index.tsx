@@ -30,7 +30,7 @@ import ScreenHeader from '../../../components/ScreenHeader';
 import Poster from '../../../components/Poster';
 import OttBadge from '../../../components/OttBadge';
 import Wordmark from '../../../components/Wordmark';
-import { BellIcon, ChevronRightIcon, PartyGroupIcon } from '../../../components/Icon';
+import { BellIcon, ChevronRightIcon, PartyGroupIcon, SearchIcon } from '../../../components/Icon';
 import TodayRecommendationCard from './TodayRecommendationCard';
 import { getMyProfile } from '../../../api/users';
 import { getRecommendations } from '../../../api/recommendations';
@@ -146,8 +146,14 @@ export default function HomePage() {
       <ScreenHeader
         title={<Wordmark />}
         action={
-          // 알림 목록(8.1)은 범위 밖이라 이동하지 않는다
-          <IconButton label="알림" icon={<BellIcon />} size={36} disabled />
+          <div className={styles.headerActions}>
+            {/* 검색은 하단 탭에서 헤더로 옮겼다 (S15P21E106-329) */}
+            <Link to={path.search()} className={styles.headerAction} aria-label="검색">
+              <SearchIcon />
+            </Link>
+            {/* 알림 목록(8.1)은 범위 밖이라 이동하지 않는다 */}
+            <IconButton label="알림" icon={<BellIcon />} size={36} disabled />
+          </div>
         }
       />
 

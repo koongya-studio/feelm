@@ -70,7 +70,7 @@ export default function RatingStars({ score, size = 17, gap = 1, showValue = fal
           <svg width="0" height="0" className={styles.defs} focusable="false">
             <defs>
               <linearGradient id={gradientId}>
-                <stop offset="50%" stopColor="var(--color-accent-mark)" />
+                <stop offset="50%" stopColor="var(--color-brand)" />
                 <stop offset="50%" stopColor="var(--color-bg)" />
               </linearGradient>
             </defs>
@@ -83,12 +83,12 @@ export default function RatingStars({ score, size = 17, gap = 1, showValue = fal
               d={STAR_PATH}
               fill={
                 fill === 'full'
-                  ? 'var(--color-accent-mark)'
+                  ? 'var(--color-brand)'
                   : fill === 'half'
                     ? `url(#${gradientId})`
                     : 'var(--color-bg)'
               }
-              stroke={fill === 'full' ? 'none' : 'var(--color-star-empty-line)'}
+              stroke={fill === 'full' ? 'none' : 'var(--color-ink-disabled)'}
               strokeWidth={fill === 'full' ? undefined : 1.3}
               // 별 꼭짓점의 기본 miter join이 뾰족하게 뻗어 외곽선이 겹쳐 보인다
               strokeLinejoin="round"

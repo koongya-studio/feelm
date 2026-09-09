@@ -1,7 +1,7 @@
 .wrapper {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .stars {
@@ -19,7 +19,7 @@
 
 /* 별과 같은 값이므로 별 채움색을 따른다 */
 .value {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-accent-mark);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-brand);
 }

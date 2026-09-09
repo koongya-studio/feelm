@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .control {
@@ -54,8 +54,8 @@
 
 /* range가 투명하므로 초점 표시를 별 묶음에 그린다 */
 .control:focus-within {
-  border-radius: 8px;
-  outline: 2px solid var(--color-nav-active);
+  border-radius: var(--radius-icon);
+  outline: 2px solid var(--color-ink);
   outline-offset: 4px;
 }
 
@@ -65,6 +65,6 @@
  */
 .value {
   color: var(--color-ink);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
 }

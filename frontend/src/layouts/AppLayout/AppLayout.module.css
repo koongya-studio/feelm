@@ -1,12 +1,19 @@
 /*
  * 화면 높이를 고정한다.
- * 와이어프레임은 모든 탭 화면에서 하단 내비가 고정이고 본문만 스크롤된다.
- * min-height로 두면 본문이 길어질 때 문서 전체가 스크롤되어 내비가 위로 밀려
- * 올라간다. height로 고정하고 .body가 내부에서 스크롤하도록 한다.
+ * 모든 탭 화면에서 하단 내비가 고정이고 본문만 스크롤된다. min-height로 두면
+ * 본문이 길어질 때 문서 전체가 스크롤되어 내비가 위로 밀려 올라간다. height로
+ * 고정하고 .body가 내부에서 스크롤하도록 한다.
  *
  * 100dvh를 지원하지 않는 브라우저를 위해 100vh를 먼저 둔다.
+ *
+ * 하단 내비가 떠 있는 알약이라 흐름에서 빠져 있다. `position: relative`로 그
+ * 기준점을 만든다.
+ *
+ * 배경은 body가 한 벌만 깔므로 여기서 다시 칠하지 않는다
+ * (`docs/screens/design-concept.md` 2.1).
  */
 .layout {
+  position: relative;
   display: flex;
   width: 100%;
   max-width: var(--layout-max-width);
@@ -14,13 +21,17 @@
   height: 100dvh;
   flex-direction: column;
   margin: 0 auto;
-  background: var(--color-bg);
 }
 
+/*
+ * 알약이 콘텐츠 위에 떠 있으므로, 끝까지 스크롤했을 때 마지막 요소가 가리지
+ * 않도록 알약 높이와 아래 여백만큼 자리를 비운다.
+ */
 .body {
   display: flex;
   min-height: 0;
   flex: 1;
   flex-direction: column;
   overflow-y: auto;
+  padding-bottom: calc(var(--nav-height) + var(--space-4) * 2 + env(safe-area-inset-bottom, 0px));
 }

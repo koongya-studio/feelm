@@ -3,18 +3,17 @@
   flex-direction: column;
 }
 
-/* 와이어프레임 2.5 실측값 */
 .input {
-  height: 50px;
+  height: var(--control-height);
   box-sizing: border-box;
-  padding: 15px 16px;
-  border: 1px solid rgba(0, 0, 0, 0.18);
-  border-radius: 13px;
-  background: var(--color-bg);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
   color: var(--color-ink);
   font-family: inherit;
-  font-size: 13.5px;
-  line-height: 1.4;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
   resize: none;
 }
 

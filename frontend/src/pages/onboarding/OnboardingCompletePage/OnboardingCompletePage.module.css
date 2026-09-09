@@ -29,9 +29,9 @@
   flex: none;
   padding: 4px 12px;
   border: 1px solid rgba(0, 0, 0, 0.2);
-  border-radius: var(--radius-badge);
+  border-radius: var(--radius-pill);
   background: var(--color-bg);
-  color: var(--color-nav-active);
+  color: var(--color-ink);
   font-size: 11.5px;
   font-weight: 600;
   white-space: nowrap;

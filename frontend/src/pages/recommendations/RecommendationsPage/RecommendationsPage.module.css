@@ -27,7 +27,7 @@
   align-items: center;
   gap: 16px;
   padding: 16px 0;
-  background: var(--color-surface-strip);
+  background: var(--color-surface-sunken);
 }
 
 .perforation {
@@ -53,7 +53,7 @@
   flex: none;
   padding: 4px 0;
   border: 1px solid var(--color-line-strong);
-  border-radius: var(--radius-badge);
+  border-radius: var(--radius-pill);
   background: var(--color-bg);
   color: var(--color-ink);
   font-size: 11px;
@@ -63,7 +63,7 @@
 
 .sectionPill[data-tone='dark'] {
   border-color: transparent;
-  background: var(--color-nav-active);
+  background: var(--color-ink);
   color: var(--color-on-dark);
 }
 
@@ -77,7 +77,7 @@
 }
 
 .sectionNote {
-  color: var(--color-ink-faint);
+  color: var(--color-ink-muted);
   font-size: 9.5px;
   line-height: 1.4;
   text-align: center;
@@ -125,7 +125,7 @@
   height: 1px;
   margin: 0 0 10px;
   border: 0;
-  background: var(--color-line-subtle);
+  background: var(--color-line);
 }
 
 .menuItems {
@@ -153,7 +153,7 @@
 }
 
 .menuItem[data-tone='muted'] {
-  color: var(--color-ink-weak);
+  color: var(--color-ink-hint);
 }
 
 .menuItem:disabled {
@@ -169,7 +169,7 @@
 }
 
 .menuItem[data-tone='muted'] .menuItemLabel {
-  color: var(--color-ink-dim);
+  color: var(--color-ink-muted);
   text-decoration: none;
 }
 

@@ -1,39 +1,42 @@
 .header {
   flex: none;
-  padding: 52px var(--screen-padding-x) 0;
+  padding: var(--space-12) var(--screen-padding-x) 0;
 }
 
 .row {
   display: flex;
-  min-height: 44px;
+  min-height: var(--tap-target-min);
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2);
 }
 
 .title {
   flex: 1;
-  font-size: 20px;
-  font-weight: 700;
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  font-weight: var(--font-weight-bold);
   color: var(--color-ink);
 }
 
 .subtitle {
-  margin-top: 5px;
-  font-size: 12.5px;
+  margin-top: var(--space-1);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
   color: var(--color-ink-muted);
 }
 
-/* 보이는 아이콘 크기는 와이어프레임을 따르고 터치 영역만 44px로 넓힌다 */
+/* 보이는 아이콘은 작게 두고 터치 영역만 44px로 넓힌다 */
 .back {
   display: flex;
-  width: 44px;
-  height: 44px;
-  margin-left: -12px;
+  width: var(--tap-target-min);
+  height: var(--tap-target-min);
+  margin-left: calc(var(--space-3) * -1);
   align-items: center;
   justify-content: center;
   border: 0;
   background: none;
-  color: var(--color-nav-active);
+  color: var(--color-ink);
   cursor: pointer;
 }
 
@@ -42,7 +45,6 @@
   align-items: center;
 }
 
-/* 2.2 · 2.2-A는 제목을 가운데 둔다 */
 .header[data-align='center'] .title {
   text-align: center;
 }

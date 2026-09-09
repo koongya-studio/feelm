@@ -101,7 +101,7 @@
 .card {
   margin-top: 6px;
   padding: 12px 16px;
-  border: 1px solid var(--color-line-subtle);
+  border: 1px solid var(--color-line);
   border-radius: var(--radius-control);
   background: var(--color-bg);
 }
@@ -122,9 +122,9 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  border: 1.5px solid var(--color-nav-active);
+  border: 1.5px solid var(--color-ink);
   border-radius: 50%;
-  color: var(--color-nav-active);
+  color: var(--color-ink);
   font-size: 11.5px;
   font-weight: 600;
 }
@@ -132,12 +132,12 @@
 .cardChevron {
   display: flex;
   margin-left: auto;
-  color: var(--color-ink-weak);
+  color: var(--color-ink-hint);
 }
 
 .cardBody {
   margin: 8px 0 0 32px;
-  color: var(--color-ink-dim);
+  color: var(--color-ink-muted);
   font-size: 12.5px;
   line-height: 1.6;
 }
@@ -156,7 +156,7 @@
 }
 
 .ottName {
-  color: var(--color-ink-dim);
+  color: var(--color-ink-muted);
   font-size: 12.5px;
 }
 
@@ -180,7 +180,7 @@
 .ottLinkIcon {
   display: inline-flex;
   margin-left: 4px;
-  color: var(--color-nav-active);
+  color: var(--color-ink);
   vertical-align: middle;
 }
 
@@ -193,7 +193,7 @@
   align-items: center;
   margin: 9px 0 2px 32px;
   padding: 0 12px;
-  border: 1px solid var(--color-line-section);
+  border: 1px solid var(--color-line);
   border-radius: 10px;
   background: var(--color-bg);
   color: var(--color-ink-hint);
@@ -227,7 +227,7 @@
 }
 
 .similarReason {
-  color: var(--color-ink-faint);
+  color: var(--color-ink-muted);
   font-size: 9.5px;
   line-height: 1.35;
 }
@@ -263,26 +263,26 @@
   width: 52px;
   height: 52px;
   box-sizing: border-box;
-  border: 1px solid var(--color-poster-line);
+  border: 1px solid var(--color-line);
   border-radius: 50%;
   background:
     linear-gradient(
       to top right,
       transparent 49.5%,
-      var(--color-poster-fill) 49.5% 50.5%,
+      var(--color-surface-sunken) 49.5% 50.5%,
       transparent 50.5%
     ),
     linear-gradient(
       to bottom right,
       transparent 49.5%,
-      var(--color-poster-fill) 49.5% 50.5%,
+      var(--color-surface-sunken) 49.5% 50.5%,
       transparent 50.5%
     ),
     var(--color-bg);
 }
 
 .personName {
-  color: var(--color-ink-faint);
+  color: var(--color-ink-muted);
   font-size: 10.5px;
   white-space: nowrap;
 }
@@ -311,7 +311,7 @@
 }
 
 .reviewScore {
-  color: var(--color-ink-subtle);
+  color: var(--color-ink-muted);
   font-size: 10.5px;
 }
 
@@ -323,7 +323,7 @@
 
 /* 섹션에 보여줄 것이 없을 때. 와이어프레임에 대응 표현이 없어 카드 본문 사양을 따른다 */
 .emptyNote {
-  color: var(--color-ink-faint);
+  color: var(--color-ink-muted);
   font-size: 12.5px;
   line-height: 1.6;
 }

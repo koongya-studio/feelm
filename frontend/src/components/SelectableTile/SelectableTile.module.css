@@ -4,11 +4,11 @@
   width: 100%;
   box-sizing: border-box;
   align-items: center;
-  gap: 13px;
-  padding: 14px 16px;
-  border: 1px solid var(--color-line-section);
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
   border-radius: var(--radius-control);
-  background: var(--color-bg);
+  background: var(--color-surface-raised);
   color: var(--color-ink);
   text-align: left;
   cursor: pointer;
@@ -22,9 +22,9 @@
  * 배경은 8% tint까지만 쓴다. 면적이 넓어 accent 원색을 깔면 예산을 넘는다.
  */
 .tile[data-selected='true'] {
-  border-color: var(--color-accent-mark);
-  background: var(--color-accent-tint);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.07);
+  border-color: var(--color-brand);
+  background: var(--color-brand-tint);
+  box-shadow: var(--shadow-raised);
 }
 
 .leading {
@@ -34,8 +34,8 @@
 
 .label {
   flex: 1;
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
   white-space: nowrap;
 }
 
@@ -53,6 +53,6 @@
 
 .tile[data-selected='true'] .check {
   border-color: transparent;
-  background: var(--color-accent-mark);
-  color: var(--color-on-accent);
+  background: var(--color-brand);
+  color: var(--color-on-action);
 }

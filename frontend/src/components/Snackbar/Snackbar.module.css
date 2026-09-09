@@ -1,17 +1,17 @@
 .snackbar {
   display: flex;
-  height: 48px;
+  height: var(--control-height-sm);
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 0 16px;
-  border-radius: 12px;
-  background: var(--color-nav-active);
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-dark);
   color: var(--color-on-dark);
   animation: slideUp var(--motion-base) var(--ease-out) both;
 }
 
-/* 아래에서 올라온다. 어디서 나타났는지 알 수 있을 만큼만 (2.8 상태 전환) */
+/* 아래에서 올라온다. 어디서 나타났는지 알 수 있을 만큼만 */
 @keyframes slideUp {
   from {
     opacity: 0;
@@ -20,18 +20,19 @@
 }
 
 .message {
-  font-size: 13px;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
 }
 
-/* 터치 영역을 넓히되 와이어프레임의 글자 크기는 유지한다 */
+/* 터치 영역을 넓히되 글자 크기는 유지한다 */
 .action {
-  min-height: 44px;
+  min-height: var(--tap-target-min);
   padding: 0;
   border: 0;
   background: none;
   color: var(--color-on-dark);
-  font-size: 13px;
-  font-weight: 700;
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
   text-decoration: underline;
   text-underline-offset: 2px;
   white-space: nowrap;
