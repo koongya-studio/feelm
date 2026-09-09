@@ -23,7 +23,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import IconButton from '../../../components/IconButton';
-import Section from '../../../components/Section';
 import StatusView from '../../../components/StatusView';
 import Button from '../../../components/Button';
 import ScreenHeader from '../../../components/ScreenHeader';
@@ -180,18 +179,20 @@ export default function HomePage() {
         ) : null}
 
         {today ? (
-          <Section label="오늘의 추천">
+          <section className={styles.hero}>
+            <p className={styles.eyebrow}>오늘의 추천</p>
+
             <TodayRecommendationCard item={today} otts={otts} />
 
             {/*
-             * 와이어프레임에서는 테두리만 있는 컨트롤이다. 동작이 2.2로의 화면 이동이므로
-             * 버튼이 아니라 링크로 둔다(common-components.md 4.2 미확정 항목).
-             * 높이 42px · radius 12px는 Button의 52px 사양과 달라 화면에서 스타일을 둔다.
+             * 동작이 2.2로의 화면 이동이므로 버튼이 아니라 링크로 둔다
+             * (common-components.md 4.2 미확정 항목). 화면의 주 동작이라 검정 알약
+             * 모양을 따른다.
              */}
             <Link to={path.recommendations()} className={styles.moreLink}>
               추천 더 보기
             </Link>
-          </Section>
+          </section>
         ) : null}
 
         {failed.availableNow ? (
@@ -268,7 +269,9 @@ export default function HomePage() {
         ) : null}
 
         {taste && genreSummary?.label ? (
-          <Section label="내 취향 요약">
+          <section className={styles.plainSection}>
+            <h2 className={styles.sectionTitle}>내 취향 요약</h2>
+
             <div className={styles.tasteRow}>
               <span className={styles.tasteGenre}>{genreSummary.label}</span>
               <span
@@ -297,7 +300,7 @@ export default function HomePage() {
             <button type="button" className={styles.reportLink} disabled>
               취향 리포트 보기
             </button>
-          </Section>
+          </section>
         ) : null}
 
         {/*

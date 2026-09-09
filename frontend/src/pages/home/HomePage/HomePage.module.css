@@ -8,26 +8,50 @@
 .page {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 10px var(--screen-padding-x) 16px;
+  gap: var(--space-8);
+  padding: var(--space-3) var(--screen-padding-x) var(--space-4);
 }
 
 .greeting {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  font-weight: var(--font-weight-bold);
 }
 
-/* 추천 더 보기 — 와이어프레임은 높이 42px, radius 12px, 13.5px/600이다 */
+/*
+ * 오늘의 추천 히어로. 카드로 감싸지 않고 배경 위에 직접 놓인다
+ * (`docs/screens/design-concept.md`).
+ */
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* 자간 넓은 소제목. 제목 위에 얹어 층을 만든다 */
+.eyebrow {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  letter-spacing: var(--letter-spacing-wide);
+  color: var(--color-ink-hint);
+  text-transform: uppercase;
+}
+
+/*
+ * 화면의 주 동작. 검정 알약이며 한 화면에 하나뿐이다
+ * (`design-concept.md` 2.4). 동작이 화면 이동이라 button이 아니라 링크다.
+ */
 .moreLink {
   display: flex;
-  height: 42px;
+  height: var(--control-height);
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--color-line-strong);
-  border-radius: 12px;
-  color: var(--color-ink);
-  font-size: 13.5px;
-  font-weight: 600;
+  border-radius: var(--radius-pill);
+  background: var(--color-action);
+  color: var(--color-on-action);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
   text-decoration: none;
 }
 
@@ -35,17 +59,19 @@
 .plainSection {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .sectionTitle {
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  font-weight: var(--font-weight-bold);
 }
 
 .availableList {
   display: flex;
-  gap: 10px;
+  gap: var(--space-3);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -55,7 +81,7 @@
   width: 104px;
   flex: none;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .availablePoster {
@@ -71,7 +97,7 @@
 
 .availableTitle {
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -81,11 +107,11 @@
 .tasteRow {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .tasteGenre {
-  font-size: 14px;
+  font-size: var(--font-size-meta);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -107,13 +133,13 @@
 }
 
 .tastePercent {
-  font-size: 13px;
+  font-size: var(--font-size-meta);
   font-weight: 700;
   white-space: nowrap;
 }
 
 .tasteKeyword {
-  font-size: 12.5px;
+  font-size: var(--font-size-caption);
   color: var(--color-ink-muted);
 }
 
@@ -123,7 +149,7 @@
   border: 0;
   background: none;
   color: var(--color-ink);
-  font-size: 12.5px;
+  font-size: var(--font-size-caption);
   font-weight: 600;
   text-align: left;
   text-decoration: underline;
@@ -134,20 +160,20 @@
 .banner {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 16px;
+  gap: var(--space-2);
+  padding: var(--space-4);
   border-radius: var(--radius-card);
   background: var(--color-ink);
   color: var(--color-on-dark);
 }
 
 .bannerTitle {
-  font-size: 15px;
+  font-size: var(--font-size-body);
   font-weight: 700;
 }
 
 .bannerText {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   line-height: 1.5;
   color: var(--color-on-dark-muted);
 }
@@ -157,13 +183,13 @@
   height: 36px;
   align-self: flex-start;
   align-items: center;
-  margin-top: 6px;
-  padding: 0 16px;
+  margin-top: var(--space-2);
+  padding: 0 var(--space-4);
   border: 0;
-  border-radius: 11px;
+  border-radius: var(--radius-control);
   background: var(--color-bg);
   color: var(--color-ink);
-  font-size: 12.5px;
+  font-size: var(--font-size-caption);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -175,8 +201,8 @@
   width: 100%;
   box-sizing: border-box;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
   background: none;
@@ -192,7 +218,7 @@
   flex: none;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: var(--radius-icon);
   background: var(--color-surface);
   color: var(--color-ink);
 }
@@ -203,12 +229,12 @@
 }
 
 .partyName {
-  font-size: 13px;
+  font-size: var(--font-size-meta);
   font-weight: 700;
 }
 
 .partyMeta {
-  font-size: 11.5px;
+  font-size: var(--font-size-caption);
   color: var(--color-ink-muted);
 }
 
