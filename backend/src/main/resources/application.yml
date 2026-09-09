@@ -28,8 +28,15 @@ spring:
           auth: true
           starttls:
             enable: true
-          # 메일은 커밋 뒤 요청 스레드에서 동기로 보낸다. Jakarta Mail 기본값은 무한 대기라 SMTP 장애가
-          # 가입·재발송 응답을 멈추게 하므로 연결·읽기·쓰기에 상한(ms)을 둔다. 실패는 재발송(API-003)으로 복구한다.
+          # 메일은 커밋 뒤 전용 스레드 풀에서 보낸다(S15P21E106-282). Jakarta Mail 기본값은 무한 대기라
+          # SMTP 장애가 발송 스레드를 영구히 붙잡아 발송 큐를 마르게 하므로 연결·읽기·쓰기에 상한(ms)을 둔다.
+          # 실패는 재발송(API-003)으로 복구한다.
+          #
+          # 이 값들은 발송 1건 전체의 상한이 아니다. timeout과 writetimeout은 소켓 read·write마다 다시
+          # 적용되고, 한 건 발송은 greeting·EHLO·STARTTLS·AUTH·MAIL FROM·RCPT TO·DATA·QUIT로 왕복이
+          # 여러 번 일어난다. 서버가 매 응답을 느리게 주면 한 건이 수십 초 이상 걸린다. Jakarta Mail에는
+          # 발송 1건 전체에 상한을 거는 설정이 없다. 풀 크기·큐 크기와 종료 대기는 이 사실을 전제로
+          # 정했다(MailAsyncProperties, MailDispatchConfig).
           connectiontimeout: 5000
           timeout: 10000
           writetimeout: 10000
