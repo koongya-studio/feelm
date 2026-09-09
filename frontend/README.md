@@ -41,6 +41,30 @@ npm install
 
 `dist/`와 `node_modules/`는 저장소 루트 `.gitignore`에서 제외합니다.
 
+## 컨테이너 이미지
+
+프론트엔드 이미지는 Node 20.19 기반 빌드 단계에서 `npm ci`와 `npm run build`를
+실행하고, 운영 단계에는 빌드 결과인 `dist/`와 Nginx만 포함합니다. 컨테이너는 80번
+포트에서 React 앱을 제공하며, 클라이언트 라우트로 직접 접근해도 `index.html`로
+연결됩니다.
+
+```bash
+docker build --pull -t feelm-frontend:local ./frontend
+docker run --rm -p 8081:80 --name feelm-frontend feelm-frontend:local
+```
+
+다른 터미널에서 기본 화면과 헬스체크를 확인합니다.
+
+```bash
+curl --fail http://127.0.0.1:8081/
+curl --fail http://127.0.0.1:8081/healthz
+docker inspect --format '{{.State.Health.Status}}' feelm-frontend
+```
+
+종료할 때는 실행 중인 터미널에서 `Ctrl+C`를 누릅니다. 운영 이미지는 개발 의존성,
+소스 코드, 로컬 `node_modules/`, `dist/`, `.env*`, 문서와 독립 배포 대상인
+`landing/`을 포함하지 않습니다.
+
 ## 환경 변수
 
 Vite는 `VITE_` 접두사가 붙은 변수만 클라이언트 코드에 노출합니다. 접두사가 없는 변수는
