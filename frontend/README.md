@@ -44,6 +44,8 @@ npm install
 `$DOCKERHUB_NAMESPACE/feelm-frontend:$CI_COMMIT_SHA` 태그로 Docker Hub에 Push합니다.
 실패 시 `frontend-test` 로그에서 최초 실패 명령을 확인하고, 이미지 빌드·인증·Push 실패는
 `frontend-image` 로그와 보호·마스킹된 Docker Hub CI/CD Variable 상태를 확인합니다.
+이미지 Push가 성공하면 `deploy-frontend`가 같은 SHA 이미지를 서비스 서버에 배포하고
+`https://j15e106.p.ssafy.io/app/healthz`까지 확인합니다.
 
 MR 코드를 실행하는 전용 Runner는 현재 백엔드 Job만 허용하므로 프론트엔드 검증은 보호된
 `develop` Push에서만 자동 실행됩니다. 전용 Runner의 입력·명령 정책을 확장하기 전에는
@@ -55,8 +57,9 @@ MR 코드를 실행하는 전용 Runner는 현재 백엔드 Job만 허용하므�
 
 프론트엔드 이미지는 Node 20.19 기반 빌드 단계에서 `npm ci`와 `npm run build`를
 실행하고, 운영 단계에는 빌드 결과인 `dist/`와 Nginx만 포함합니다. 컨테이너는 80번
-포트에서 React 앱을 제공하며, 클라이언트 라우트로 직접 접근해도 `index.html`로
-연결됩니다.
+포트의 `/app/` 경로에서 React 앱을 제공하며, 클라이언트 라우트로 직접 접근해도
+`/app/index.html`로 연결됩니다. 정적 자원과 Browser Router도 `/app/`을 기준으로
+생성되므로 운영 Nginx는 접두사를 제거하지 않고 프론트엔드 컨테이너에 전달합니다.
 
 ```bash
 docker build --pull -t feelm-frontend:local ./frontend
@@ -66,8 +69,11 @@ docker run --rm -p 8081:80 --name feelm-frontend feelm-frontend:local
 다른 터미널에서 기본 화면과 헬스체크를 확인합니다.
 
 ```bash
-curl --fail http://127.0.0.1:8081/
+curl --fail --location http://127.0.0.1:8081/
+curl --fail http://127.0.0.1:8081/app/
+curl --fail http://127.0.0.1:8081/app/movies/1
 curl --fail http://127.0.0.1:8081/healthz
+curl --fail http://127.0.0.1:8081/app/healthz
 docker inspect --format '{{.State.Health.Status}}' feelm-frontend
 ```
 
@@ -87,13 +93,10 @@ Vite는 `VITE_` 접두사가 붙은 변수만 클라이언트 코드에 노출�
 
 ## 랜딩 메뉴 및 앱 연결
 
-소개·기능 메뉴는 페이지 내 해당 섹션으로 이동합니다. 시작하기는 앱 주소가 비어 있으면
-준비 안내를 표시하며, 문의도 준비 안내만 표시하고 개인정보를 수집하거나 전송하지 않습니다.
-
-React 앱 배포 후 `landing/index.html`의 `meta[name="feelm-app-url"]` content를
-배포된 같은 사이트 경로(예: `/app/`) 또는 HTTPS URL로 설정합니다. 현재 값은 빈 문자열입니다.
-실제 React 배포와 Nginx 경로 연결은 별도 작업이며, 주소를 설정하기 전에 대상 페이지가
-정상 동작하는지 확인해야 합니다. HTTPS 외 프로토콜 및 계정정보를 포함한 URL은 연결하지 않습니다.
+소개·기능 메뉴는 페이지 내 해당 섹션으로 이동합니다. 시작하기는 같은 사이트의 `/app/`으로
+이동하며, 문의는 준비 안내만 표시하고 개인정보를 수집하거나 전송하지 않습니다.
+React 앱은 현재 실제 API와 인증을 사용하지 않는 프리뷰이므로 화면에 `PREVIEW · 목업 데이터`
+표시를 고정해서 운영 기능으로 오인하지 않게 합니다.
 
 내비게이션은 반투명 배경으로 상단에 고정되며, 모바일에서는 시작하기와 메뉴 버튼을 제공합니다.
 메뉴 이동은 헤더 높이를 제외한 위치로 스크롤하고 Vibe 진행률과 관계없이 사용할 수 있습니다.

@@ -176,7 +176,7 @@ backend-test:
   tags:
     - e106-shell
   script:
-    - python3 -B -m unittest infra.scripts.test_ci_deploy_current_commit infra.scripts.test_deploy_backend -v
+    - python3 -B -m unittest infra.scripts.test_ci_deploy_current_commit infra.scripts.test_deploy_backend infra.scripts.test_deploy_frontend -v
     - cd backend
     - ./gradlew clean test spotlessCheck --no-daemon
   rules:
@@ -198,6 +198,11 @@ frontend-test:
     - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
       changes:
         - frontend/**/*
+        - infra/compose/service.yml
+        - infra/nginx/nginx.conf
+        - infra/scripts/deploy-frontend.sh
+        - infra/scripts/rollback-frontend.sh
+        - infra/scripts/test_deploy_frontend.py
         - .gitlab-ci.yml
         - .gitattributes
 
@@ -241,6 +246,46 @@ frontend-image:
     - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
       changes:
         - frontend/**/*
+        - infra/compose/service.yml
+        - infra/nginx/nginx.conf
+        - infra/scripts/deploy-frontend.sh
+        - infra/scripts/rollback-frontend.sh
+        - infra/scripts/test_deploy_frontend.py
+        - .gitlab-ci.yml
+        - .gitattributes
+
+deploy-frontend:
+  stage: deploy
+  tags:
+    - e106-shell
+  needs:
+    - frontend-image
+  resource_group: service-and-backend-cache
+  environment:
+    name: service
+  before_script:
+    - printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
+    - FRONTEND_IMAGE="$DOCKERHUB_NAMESPACE/feelm-frontend:$CI_COMMIT_SHA"
+    - bash ./infra/scripts/deploy-frontend.sh "$FRONTEND_IMAGE"
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - scheduler_failure
+  timeout: 15m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - frontend/**/*
+        - infra/compose/service.yml
+        - infra/nginx/nginx.conf
+        - infra/scripts/deploy-frontend.sh
+        - infra/scripts/rollback-frontend.sh
+        - infra/scripts/test_deploy_frontend.py
         - .gitlab-ci.yml
         - .gitattributes
 

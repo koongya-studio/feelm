@@ -932,15 +932,17 @@ docker start feelm-hdfs-datanode-1
 
 ## Deployment
 
-별도 스테이징 서버를 두지 않습니다. `J15E106`에서 사전 검증을 통과한 백엔드 이미지를
-그대로 서비스하며, `J15E106A`는 분산 처리 전용으로 유지합니다. 인프라 설정 파일은
-GitLab에서 관리하고 서버에서 직접 수정하지 않습니다.
+별도 스테이징 서버를 두지 않습니다. `J15E106`에서 사전 검증을 통과한 백엔드와 프론트엔드
+이미지를 그대로 서비스하며, `J15E106A`는 분산 처리 전용으로 유지합니다. 인프라 설정 파일은
+GitLab에서 관리하고 서버에서 직접 수정하지 않습니다. 현재 프론트엔드는 실제 API·인증을
+사용하지 않는 프리뷰이며 `/app/`에서만 공개합니다.
 
 ### Prerequisites
 
 - `develop`은 보호 브랜치이며 직접 Push와 Force Push가 금지되어야 합니다.
 - `e106-shell` Runner가 J15E106에서 Docker를 실행할 수 있어야 합니다.
 - PostgreSQL과 Redis가 J15E106의 같은 Compose 네트워크에서 healthy 상태여야 합니다.
+- 서비스 Nginx가 frontend 컨테이너와 같은 Compose 네트워크에 있어야 합니다.
 - 배포 변수는 GitLab CI/CD Variables에 `service` 환경 범위와 Protected 속성으로 등록합니다.
 - 비밀번호와 JWT 키는 Masked and hidden으로 등록하며 Pipeline 로그에 출력하지 않습니다.
 
@@ -966,17 +968,25 @@ Push합니다.
 <DOCKERHUB_NAMESPACE>/feelm-backend:<CI_COMMIT_SHA>
 ```
 
+프론트엔드 변경이 포함된 `develop` Push에서는 `frontend-test` 통과 후 `frontend-image`가
+다음 불변 태그를 Push합니다.
+
+```text
+<DOCKERHUB_NAMESPACE>/feelm-frontend:<CI_COMMIT_SHA>
+```
+
 Docker Hub 로그인에는 GitLab CI/CD Variables의 `DOCKERHUB_USERNAME`과
 `DOCKERHUB_TOKEN`을 사용합니다. 저장소 경로는 `DOCKERHUB_NAMESPACE`로 구성하며 토큰은
 Masked로 관리하고 로그에 출력하지 않습니다.
 
-이미지 빌드가 성공하면 보호된 `develop`의 Push Pipeline에서 `deploy-backend` Job이 자동
-실행됩니다. MR, API 및 수동 Web Pipeline은 서비스 배포를 실행하지 않습니다. 배포 직전에
+이미지 빌드가 성공하면 보호된 `develop`의 Push Pipeline에서 `deploy-backend` 또는
+`deploy-frontend` Job이 자동 실행됩니다. MR, API 및 수동 Web Pipeline은 서비스 배포를
+실행하지 않습니다. 배포 직전에
 원격 `develop`의 HEAD가 Pipeline의 commit SHA와 같은지 확인하므로, 재시도되거나 대기하던
 과거 Pipeline이 최신 배포를 덮어쓰지 않습니다. 배포와 의존성 캐시 작업은 같은
 `resource_group`으로 직렬화합니다.
 
-배포 스크립트는 실행 중인 이미지 이름을 먼저 보관하고 후보 이미지를 기동한 뒤 최대 2분
+백엔드 배포 스크립트는 실행 중인 이미지 이름을 먼저 보관하고 후보 이미지를 기동한 뒤 최대 2분
 동안 Docker healthcheck와 컨테이너 내부 Actuator 응답을 확인합니다. 이어서 PostgreSQL과
 Redis의 health, 루프백 포트, PostgreSQL `SELECT 1`, Redis 인증과 조회 전용 ACL을 검사한
 경우에만 후보 이미지를 정상 배포로 인정합니다. 후보 이미지 Pull 실패 시 실행 중인
@@ -998,6 +1008,15 @@ HEAD 검사를 통과해야 합니다.
 첫 배포에는 되돌릴 이전 이미지가 없으므로, 첫 정상 배포를 완료해 롤백 기준 이미지를 먼저
 확보합니다. 이후 배포부터 헬스체크 실패 시 직전 실행 이미지가 자동으로 복구됩니다.
 
+프론트엔드 배포도 같은 방식으로 실행 중 이미지를 보관합니다. 후보 컨테이너가 healthy가
+된 뒤 Nginx 설정 검사를 통과한 경우에만 Nginx를 재생성하고, 공개
+`https://j15e106.p.ssafy.io/app/healthz` 응답까지 성공해야 배포를 완료합니다. 실패하면
+직전 이미지를 복구하며 후보 배포 Job은 실패 상태를 유지합니다. 첫 배포 실패에는 복구할
+이미지가 없으므로 실패한 컨테이너를 중지하고 운영자가 로그와 Nginx 상태를 확인합니다.
+
+Compose 전체를 수동으로 기동할 때는 `infra/.env`의 `FRONTEND_IMAGE`에 검증된 불변 SHA
+이미지를 설정합니다. 프론트엔드 단독 자동 배포는 Job이 후보 값을 직접 주입합니다.
+
 ### Verification
 
 J15E106에서 실행 이미지와 상태를 확인합니다.
@@ -1006,6 +1025,11 @@ J15E106에서 실행 이미지와 상태를 확인합니다.
 docker inspect feelm-backend \
   --format 'image={{.Config.Image}} health={{.State.Health.Status}}'
 curl --fail http://127.0.0.1:8080/actuator/health
+docker inspect feelm-frontend \
+  --format 'image={{.Config.Image}} health={{.State.Health.Status}}'
+curl --fail https://j15e106.p.ssafy.io/app/
+curl --fail https://j15e106.p.ssafy.io/app/healthz
+curl --fail https://j15e106.p.ssafy.io/app/movies/1
 ```
 
 PostgreSQL과 Redis가 호스트 루프백에만 게시되는지 확인합니다.
@@ -1047,11 +1071,21 @@ docker exec feelm-postgres sh -c \
 이전 애플리케이션 이미지와의 하위 호환성을 사전에 확인하며, DB 복구가 필요한 변경은 별도
 Migration 및 운영 절차로 처리합니다.
 
+프론트엔드를 특정 정상 이미지로 수동 복구할 때는 서비스 서버의 승인된 환경에서 실행합니다.
+
+```bash
+bash ./infra/scripts/rollback-frontend.sh \
+  <DOCKERHUB_NAMESPACE>/feelm-frontend:<정상-CI_COMMIT_SHA>
+```
+
+복구 스크립트는 frontend와 Nginx만 재생성하고 공개 `/app/healthz`, Docker healthcheck와
+실행 이미지 일치를 확인합니다. 랜딩, `/api/`, Swagger 경로는 재기동 후 별도로 확인합니다.
+
 ## HTML Landing and HTTPS (S15P21E106-196)
 
 J15E106 서비스 노드의 Nginx가 `https://j15e106.p.ssafy.io/`에서 Feelm 랜딩
 페이지를 제공합니다. 정적 파일은 `frontend/landing/`에서 관리하며 HTML과 함께 JSON,
-`posters/`, `art/`를 배포합니다. React 및 백엔드 기능 연동은 포함하지 않습니다.
+`posters/`, `art/`를 배포합니다. 시작하기 버튼은 `/app/` 프론트엔드 프리뷰로 이동합니다.
 일반 HTTP 요청은 같은 경로의 HTTPS 주소로 301 전환하고,
 `/.well-known/acme-challenge/`는 인증서 갱신을 위해 HTTP로 제공합니다.
 

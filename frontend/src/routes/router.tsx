@@ -28,40 +28,43 @@ import NotInScopePage from '../pages/system/NotInScopePage';
 import WatchConfirmPage from '../pages/watch/WatchConfirmPage';
 import { ROUTE_PATTERN } from './paths';
 
-export const router = createBrowserRouter([
-  {
-    element: <OnboardingLayout />,
-    children: [
-      { path: ROUTE_PATTERN.onboardingTaste, element: <TasteOnboardingPage /> },
-      { path: ROUTE_PATTERN.onboardingOtt, element: <OttOnboardingPage /> },
-      { path: ROUTE_PATTERN.onboardingComplete, element: <OnboardingCompletePage /> },
-    ],
-  },
-  {
-    element: <AppLayout />,
-    children: [
-      { path: ROUTE_PATTERN.home, element: <HomePage /> },
-      { path: ROUTE_PATTERN.recommendations, element: <RecommendationsPage /> },
-      { path: ROUTE_PATTERN.film, element: <FilmPage /> },
-      { path: ROUTE_PATTERN.popcornBucket, element: <PopcornBucketPage /> },
+export const router = createBrowserRouter(
+  [
+    {
+      element: <OnboardingLayout />,
+      children: [
+        { path: ROUTE_PATTERN.onboardingTaste, element: <TasteOnboardingPage /> },
+        { path: ROUTE_PATTERN.onboardingOtt, element: <OttOnboardingPage /> },
+        { path: ROUTE_PATTERN.onboardingComplete, element: <OnboardingCompletePage /> },
+      ],
+    },
+    {
+      element: <AppLayout />,
+      children: [
+        { path: ROUTE_PATTERN.home, element: <HomePage /> },
+        { path: ROUTE_PATTERN.recommendations, element: <RecommendationsPage /> },
+        { path: ROUTE_PATTERN.film, element: <FilmPage /> },
+        { path: ROUTE_PATTERN.popcornBucket, element: <PopcornBucketPage /> },
 
-      // 이번 단계 구현 범위가 아닌 탭. REF-01의 5탭 구성을 검증하기 위해 라우트는 둔다.
-      { path: ROUTE_PATTERN.search, element: <NotInScopePage /> },
-      { path: ROUTE_PATTERN.party, element: <NotInScopePage /> },
-      { path: ROUTE_PATTERN.my, element: <NotInScopePage /> },
-    ],
-  },
-  {
-    element: <FullScreenLayout />,
-    children: [
-      { path: ROUTE_PATTERN.movieDetail, element: <MovieDetailPage /> },
-      { path: ROUTE_PATTERN.movieRating, element: <MovieRatingPage /> },
-      { path: ROUTE_PATTERN.ratingResult, element: <RatingResultPage /> },
-      { path: ROUTE_PATTERN.watchConfirm, element: <WatchConfirmPage /> },
-      { path: ROUTE_PATTERN.frameDetail, element: <FrameDetailPage /> },
-      { path: ROUTE_PATTERN.partyPopcorn, element: <PartyPopcornPage /> },
-      { path: ROUTE_PATTERN.partyPopcornMix, element: <PartyPopcornMixPage /> },
-      { path: ROUTE_PATTERN.notFound, element: <NotFoundPage /> },
-    ],
-  },
-]);
+        // 이번 단계 구현 범위가 아닌 탭. REF-01의 5탭 구성을 검증하기 위해 라우트는 둔다.
+        { path: ROUTE_PATTERN.search, element: <NotInScopePage /> },
+        { path: ROUTE_PATTERN.party, element: <NotInScopePage /> },
+        { path: ROUTE_PATTERN.my, element: <NotInScopePage /> },
+      ],
+    },
+    {
+      element: <FullScreenLayout />,
+      children: [
+        { path: ROUTE_PATTERN.movieDetail, element: <MovieDetailPage /> },
+        { path: ROUTE_PATTERN.movieRating, element: <MovieRatingPage /> },
+        { path: ROUTE_PATTERN.ratingResult, element: <RatingResultPage /> },
+        { path: ROUTE_PATTERN.watchConfirm, element: <WatchConfirmPage /> },
+        { path: ROUTE_PATTERN.frameDetail, element: <FrameDetailPage /> },
+        { path: ROUTE_PATTERN.partyPopcorn, element: <PartyPopcornPage /> },
+        { path: ROUTE_PATTERN.partyPopcornMix, element: <PartyPopcornMixPage /> },
+        { path: ROUTE_PATTERN.notFound, element: <NotFoundPage /> },
+      ],
+    },
+  ],
+  { basename: '/app' },
+);
