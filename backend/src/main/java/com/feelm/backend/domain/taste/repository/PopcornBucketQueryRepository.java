@@ -20,22 +20,31 @@ public class PopcornBucketQueryRepository {
 
     /** 영화에 미리 저장한 대표 맛 FK를 사용해 해당 사용자의 평가만 맛별로 집계한다. */
     public List<PopcornFlavorAggregate> findRatedMoviesByFlavor(long userId) {
+        return findRatedMoviesByFlavor(List.of(userId));
+    }
+
+    /** 여러 사용자의 팝콘 집계를 한 번에 조회해 파티 등 다른 취향 조회에서도 재사용한다. */
+    public List<PopcornFlavorAggregate> findRatedMoviesByFlavor(List<Long> userIds) {
+        if (userIds.isEmpty()) {
+            return List.of();
+        }
         @SuppressWarnings("unchecked")
         List<Object[]> rows =
                 entityManager
                         .createNativeQuery(
                                 """
-                                SELECT m.representative_flavor_id,
+                                SELECT r.user_id,
+                                       m.representative_flavor_id,
                                        COUNT(r.id),
                                        AVG(r.score),
                                        MIN(r.created_at)
                                 FROM ratings r
                                 JOIN movies m ON m.id = r.movie_id
-                                WHERE r.user_id = :userId
+                                WHERE r.user_id IN (:userIds)
                                   AND m.representative_flavor_id IS NOT NULL
-                                GROUP BY m.representative_flavor_id
+                                GROUP BY r.user_id, m.representative_flavor_id
                                 """)
-                        .setParameter("userId", userId)
+                        .setParameter("userIds", userIds)
                         .getResultList();
 
         return rows.stream().map(this::toAggregate).toList();
@@ -45,8 +54,9 @@ public class PopcornBucketQueryRepository {
         return new PopcornFlavorAggregate(
                 ((Number) row[0]).longValue(),
                 ((Number) row[1]).longValue(),
-                row[2] == null ? null : new BigDecimal(row[2].toString()),
-                toInstant(row[3]));
+                ((Number) row[2]).longValue(),
+                row[3] == null ? null : new BigDecimal(row[3].toString()),
+                toInstant(row[4]));
     }
 
     /** H2와 PostgreSQL JDBC 드라이버의 timestamp 반환 타입 차이를 조회 경계에서 흡수한다. */
@@ -67,5 +77,9 @@ public class PopcornBucketQueryRepository {
     }
 
     public record PopcornFlavorAggregate(
-            long flavorId, long popcornCount, BigDecimal averageScore, Instant discoveredAt) {}
+            long userId,
+            long flavorId,
+            long popcornCount,
+            BigDecimal averageScore,
+            Instant discoveredAt) {}
 }
