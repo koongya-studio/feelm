@@ -6,6 +6,7 @@ import com.feelm.backend.domain.taste.entity.PopcornFlavor;
 import com.feelm.backend.domain.taste.repository.PopcornBucketQueryRepository;
 import com.feelm.backend.domain.taste.repository.PopcornBucketQueryRepository.PopcornFlavorAggregate;
 import com.feelm.backend.domain.taste.repository.PopcornFlavorRepository;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -28,18 +29,39 @@ public class TasteQueryService {
     }
 
     public PopcornBucketResponse getPopcornBucket(long userId) {
-        Map<Long, PopcornFlavorAggregate> aggregates =
-                popcornBucketQueryRepository.findRatedMoviesByFlavor(userId).stream()
+        return getPopcornBuckets(List.of(userId)).get(userId);
+    }
+
+    /** 여러 사용자의 팝콘 버킷을 같은 기준 맛 목록과 단일 집계 조회로 생성한다. */
+    public Map<Long, PopcornBucketResponse> getPopcornBuckets(List<Long> userIds) {
+        Map<Long, Map<Long, PopcornFlavorAggregate>> aggregatesByUser =
+                popcornBucketQueryRepository.findRatedMoviesByFlavor(userIds).stream()
                         .collect(
-                                Collectors.toMap(
-                                        PopcornFlavorAggregate::flavorId, Function.identity()));
+                                Collectors.groupingBy(
+                                        PopcornFlavorAggregate::userId,
+                                        Collectors.toMap(
+                                                PopcornFlavorAggregate::flavorId,
+                                                Function.identity())));
+        List<PopcornFlavor> flavors = popcornFlavorRepository.findAllByOrderBySortOrderAsc();
+        Map<Long, PopcornBucketResponse> buckets = new LinkedHashMap<>();
+        userIds.forEach(
+                userId ->
+                        buckets.put(
+                                userId,
+                                toPopcornBucket(
+                                        flavors, aggregatesByUser.getOrDefault(userId, Map.of()))));
+        return buckets;
+    }
+
+    private PopcornBucketResponse toPopcornBucket(
+            List<PopcornFlavor> flavors, Map<Long, PopcornFlavorAggregate> aggregates) {
         long totalCount =
                 aggregates.values().stream().mapToLong(PopcornFlavorAggregate::popcornCount).sum();
-        List<PopcornBucketResponse.FlavorBucket> flavors =
-                popcornFlavorRepository.findAllByOrderBySortOrderAsc().stream()
+        List<PopcornBucketResponse.FlavorBucket> buckets =
+                flavors.stream()
                         .map(flavor -> toFlavorBucket(flavor, aggregates.get(flavor.getId())))
                         .toList();
-        return new PopcornBucketResponse(totalCount, flavors);
+        return new PopcornBucketResponse(totalCount, buckets);
     }
 
     public PopcornFlavorListResponse getPopcornFlavors() {
