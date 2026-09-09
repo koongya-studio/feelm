@@ -24,6 +24,18 @@ compose+=(
   -f "${PROJECT_ROOT}/infra/compose/service.yml"
 )
 
+backend_image="${BACKEND_IMAGE:-}"
+if [[ -z "${backend_image}" ]]; then
+  backend_image="$(
+    docker inspect --format '{{.Config.Image}}' feelm-backend 2>/dev/null || true
+  )"
+fi
+
+if [[ -z "${backend_image}" ]]; then
+  echo "BACKEND_IMAGE is not set and the running feelm-backend image could not be determined" >&2
+  exit 1
+fi
+
 wait_for_healthy() {
   local attempts="${DEPLOY_HEALTH_ATTEMPTS:-24}"
 
@@ -49,12 +61,14 @@ wait_for_healthy() {
 }
 
 echo "Rolling back frontend to ${TARGET_IMAGE}"
+echo "Backend image for Compose: ${backend_image}"
 
 if ! docker image inspect "${TARGET_IMAGE}" >/dev/null 2>&1; then
   docker pull "${TARGET_IMAGE}"
 fi
 
-FRONTEND_IMAGE="${TARGET_IMAGE}" \
+BACKEND_IMAGE="${backend_image}" \
+  FRONTEND_IMAGE="${TARGET_IMAGE}" \
   "${compose[@]}" up -d --no-deps --force-recreate frontend
 
 if ! wait_for_healthy; then
@@ -64,7 +78,8 @@ if ! wait_for_healthy; then
 fi
 
 if [[ "${RECREATE_FRONTEND_NGINX:-1}" == "1" ]]; then
-  FRONTEND_IMAGE="${TARGET_IMAGE}" \
+  BACKEND_IMAGE="${backend_image}" \
+    FRONTEND_IMAGE="${TARGET_IMAGE}" \
     "${compose[@]}" up -d --no-deps --force-recreate nginx
 
   health_response="$(

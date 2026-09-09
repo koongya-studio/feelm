@@ -1014,6 +1014,14 @@ HEAD 검사를 통과해야 합니다.
 직전 이미지를 복구하며 후보 배포 Job은 실패 상태를 유지합니다. 첫 배포 실패에는 복구할
 이미지가 없으므로 실패한 컨테이너를 중지하고 운영자가 로그와 Nginx 상태를 확인합니다.
 
+Compose는 frontend나 Nginx만 대상으로 실행해도 전체 `service.yml`을 해석하므로 필수
+`BACKEND_IMAGE` 값이 필요합니다. 프론트엔드 배포와 롤백 스크립트는 호출 환경에
+`BACKEND_IMAGE`가 있으면 그 값을 사용하고, 없으면 실행 중인 `feelm-backend` 컨테이너의
+이미지를 조회해 모든 Compose 호출에 전달합니다. 두 방법 모두로 백엔드 이미지를 확인할 수
+없으면 frontend 이미지 Pull이나 컨테이너 교체 전에 종료합니다. 이 오류는 같은 Job을
+재시도해도 해결되지 않으므로 백엔드 컨테이너 상태 또는 승인된 `BACKEND_IMAGE` 값을 먼저
+복구한 뒤 재시도합니다. 이 과정은 백엔드 컨테이너를 재생성하지 않습니다.
+
 Compose 전체를 수동으로 기동할 때는 `infra/.env`의 `FRONTEND_IMAGE`에 검증된 불변 SHA
 이미지를 설정합니다. 프론트엔드 단독 자동 배포는 Job이 후보 값을 직접 주입합니다.
 
@@ -1072,9 +1080,14 @@ docker exec feelm-postgres sh -c \
 Migration 및 운영 절차로 처리합니다.
 
 프론트엔드를 특정 정상 이미지로 수동 복구할 때는 서비스 서버의 승인된 환경에서 실행합니다.
+실행 중인 `feelm-backend`가 없으면 승인된 백엔드 이미지도 함께 지정합니다.
 
 ```bash
 bash ./infra/scripts/rollback-frontend.sh \
+  <DOCKERHUB_NAMESPACE>/feelm-frontend:<정상-CI_COMMIT_SHA>
+
+BACKEND_IMAGE=<DOCKERHUB_NAMESPACE>/feelm-backend:<정상-CI_COMMIT_SHA> \
+  bash ./infra/scripts/rollback-frontend.sh \
   <DOCKERHUB_NAMESPACE>/feelm-frontend:<정상-CI_COMMIT_SHA>
 ```
 
