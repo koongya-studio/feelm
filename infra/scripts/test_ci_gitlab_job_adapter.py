@@ -102,16 +102,38 @@ class AdapterTests(unittest.TestCase):
     def test_cache_status_reports_exact_dependency_changes_without_running_source(self):
         context = cache_response()
         mr = {'iid': 98}
+        detail = {'iid': 98, 'diff_refs': {'base_sha': 'b' * 40, 'head_sha': 'a' * 40}}
         with patch.object(adapter, 'read_private_config', return_value=({}, Path('/prepared'))), \
              patch.object(adapter, 'verify_current_job'), \
              patch.object(adapter, 'verify_merge_request', return_value=mr), \
+             patch.object(adapter, 'fetch_merge_request_detail', return_value=detail) as fetch_detail, \
              patch.object(adapter, 'verify_dependency_change', return_value=['backend/build.gradle']) as verify, \
              patch.object(adapter, 'fetch_source') as fetch, \
              patch.object(adapter.safety, 'start') as start:
             self.assertEqual(adapter.run_job(context, opener=object()), 0)
+            fetch_detail.assert_called_once()
             verify.assert_called_once()
             fetch.assert_not_called()
             start.assert_not_called()
+
+    def test_cache_status_fetches_and_revalidates_mr_detail(self):
+        context = adapter.validate_job_response(cache_response())
+        summary = {'iid': 98, 'sha': 'a' * 40}
+        detail = {
+            'iid': 98, 'state': 'opened', 'target_branch': 'develop',
+            'source_project_id': 99, 'target_project_id': 99, 'sha': 'a' * 40,
+            'diff_refs': {'base_sha': 'b' * 40, 'start_sha': 'b' * 40,
+                          'head_sha': 'a' * 40},
+        }
+        with patch.object(adapter, 'request_json', return_value=detail) as request:
+            self.assertEqual(adapter.fetch_merge_request_detail(object(), context, summary), detail)
+        self.assertEqual(request.call_args.args[1],
+                         adapter.GITLAB_URL + '/api/v4/projects/99/merge_requests/98')
+
+        invalid = dict(detail, diff_refs=dict(detail['diff_refs'], head_sha='c' * 40))
+        with patch.object(adapter, 'request_json', return_value=invalid), \
+             self.assertRaisesRegex(adapter.PolicyError, 'diff_refs.head_sha'):
+            adapter.fetch_merge_request_detail(object(), context, summary)
 
     def test_cache_status_diff_must_include_approved_dependency_file(self):
         context = adapter.validate_job_response(cache_response())

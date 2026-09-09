@@ -62,8 +62,11 @@ GitLab API의 정확한 커밋 archive를 사용한다. MR이 `.gitlab-ci.yml`�
 확인 조건, 수동 캐시 전환, Runner 정책, develop 테스트·이미지·배포 조건은 유지한다.
 변경 경로를 새로 추가할 때는 캐시 관련 변경에서 테스트가 빠지지 않는지 확인한다.
 
-캐시 상태 Job은 현재 Job과 열린 MR을 GitLab API로 검증한 뒤 MR `diff_refs`의 기준 SHA와
-정확한 HEAD SHA를 고정 프로젝트에서 인증된 Git fetch로 가져와 변경 경로를 비교한다.
+캐시 상태 Job은 현재 Job과 commit에 연결된 열린 MR을 GitLab API로 검증한다. 이 목록 응답은
+GitLab 버전에 따라 `diff_refs`를 생략하므로, 검증한 IID의 MR 상세 응답에서 상태·프로젝트·대상
+브랜치·SHA와 `diff_refs`를 다시 확인한다. 그 기준 SHA와 정확한 HEAD SHA를 고정 프로젝트에서
+인증된 Git fetch로 가져와 변경 경로를 비교한다. 일반 `backend-mr-test`는 이 상세 조회를 하지
+않는다.
 GitLab Job Token이 허용하지 않는 `merge_requests/:iid/diffs` API에는 의존하지 않는다.
 Git 명령은 고정 remote, 비대화형 인증, redirect 차단 환경에서 실행하고 출력은 폐기하거나
 크기를 제한한다. 초기화·fetch·diff 실패는 단계 이름만 출력하며 Job Token과 원격 응답은

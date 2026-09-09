@@ -3,9 +3,10 @@
 ## 동작 경계
 
 MR이 백엔드 의존성 선언이나 저장소 설정을 변경하면 `backend-cache-status`가 격리 Runner의
-고정 어댑터에서 MR 번호, 정확한 commit SHA와 변경 파일을 출력한다. 이 Job은 검증된 MR
-`diff_refs`의 기준 SHA와 HEAD SHA를 인증된 Git fetch로 가져와 경로만 비교하며, Job Token이
-허용하지 않는 MR diff API를 호출하지 않는다. MR의 셸이나 Gradle 코드는 실행하지 않는다.
+고정 어댑터에서 MR 번호, 정확한 commit SHA와 변경 파일을 출력한다. 이 Job은 commit에 연결된
+열린 MR을 먼저 검증하고, 해당 IID의 상세 응답에서 `diff_refs`를 다시 확인한다. 상세 응답의
+기준 SHA와 HEAD SHA를 인증된 Git fetch로 가져와 경로만 비교하며, Job Token이 허용하지 않는
+MR diff API를 호출하지 않는다. MR의 셸이나 Gradle 코드는 실행하지 않는다.
 기존 `backend-mr-test`는 캐시가 충분하면 그대로 실행되고, 부족하면 안전하게 실패한다.
 
 캐시 갱신은 보호된 `develop`의 web pipeline에서만 실행한다. `backend-cache-prepare`는 입력한
@@ -106,6 +107,11 @@ sudoers를 `PREVIOUS_INSTALL`, `PREVIOUS_SUDOERS`로 보존하며 재시작 실�
 갱신 후 같은 MR HEAD의 `backend-cache-status`를 다시 실행한다. Git 조회가 실패하면 로그의
 `MR_ADAPTER_GIT_ERROR: stage=dependency_git_init|dependency_fetch|dependency_diff`로 실패 단계를
 구분하되 원격 URL, 명령 출력과 Job Token은 노출하지 않는다.
+
+commit에 연결된 MR 목록 응답은 GitLab 버전에 따라 `diff_refs`를 생략한다. 목록 응답의
+`iid`·상태·프로젝트·대상 브랜치·HEAD로 MR 연결을 먼저 확인하고, cache status Job에서만
+`merge_requests/:iid` 상세 응답을 추가 조회한다. 상세 응답의 동일 필드와 `diff_refs`의
+base·start·HEAD를 다시 검증한 뒤 Git 비교를 시작한다.
 
 ## MR !98 검증
 
