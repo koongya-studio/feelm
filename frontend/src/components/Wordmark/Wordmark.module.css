@@ -1,8 +1,17 @@
 /*
- * 높이만 주고 폭은 비율로 따라오게 한다. 와이어프레임의 27px 자리에 맞춘다.
- * `display: block`은 global.css의 svg 규칙에서 이미 적용된다.
+ * 로고 전용 서체다. 본문에는 쓰지 않는다
+ * (`docs/screens/design-concept.md` 2.6).
+ *
+ * `line-height: 1`로 두어 크기를 준 만큼만 자리를 차지하게 한다. Gluten은
+ * 통통해서 기본 행간을 두면 위아래 여백이 크게 생긴다.
  */
 .wordmark {
-  width: auto;
+  display: inline-block;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: inherit;
+  letter-spacing: -0.03em;
+  line-height: 1;
   color: inherit;
+  white-space: nowrap;
 }
