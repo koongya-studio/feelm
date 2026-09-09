@@ -15,6 +15,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -31,6 +32,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
+    private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
     /**
      * 인증 없이 호출할 수 있는 경로. 도메인별 공개 API는 여기에 추가한다.
@@ -49,6 +51,24 @@ public class SecurityConfig {
         "/api/v1/auth/password/reset-request",
         "/api/v1/auth/password/reset"
     };
+
+    /** Nginx가 별도 접근 제어하는 Swagger 문서 경로. 일반 API 공개 목록과 분리한다. */
+    private static final String[] SWAGGER_PATHS = {
+        "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs", "/v3/api-docs.yaml", "/v3/api-docs/**"
+    };
+
+    /** OpenAPI가 런타임과 같은 공개 API 계약을 표시할 때 사용하는 판정이다. */
+    public static boolean isPublicApi(HttpMethod method, String path) {
+        if (HttpMethod.GET.equals(method) && "/api/v1/popcorn-flavors".equals(path)) {
+            return true;
+        }
+        for (String pattern : PUBLIC_PATHS) {
+            if (PATH_MATCHER.match(pattern, path)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private final TokenProvider tokenProvider;
     private final AuthProperties authProperties;
@@ -78,6 +98,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(
                         auth ->
                                 auth.requestMatchers(HttpMethod.GET, "/actuator/health")
+                                        .permitAll()
+                                        .requestMatchers(HttpMethod.GET, SWAGGER_PATHS)
                                         .permitAll()
                                         // API-044 기준정보는 로그인 화면에서도 사용할 수 있는 공개 조회다.
                                         .requestMatchers(HttpMethod.GET, "/api/v1/popcorn-flavors")

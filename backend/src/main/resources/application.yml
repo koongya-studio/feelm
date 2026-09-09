@@ -49,6 +49,14 @@ management:
       # 백엔드 컨테이너의 healthy 판정을 좌우하지 않도록 끈다. 발송 실패는 재발송(API-003)으로 복구한다.
       enabled: false
 
+springdoc:
+  paths-to-match: /api/v1/**
+  paths-to-exclude: /api/v1/test/**
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}
+
 feelm:
   jwt:
     # 필수 Secret. 기본값을 두지 않으므로 값이 없으면 기동에 실패한다.

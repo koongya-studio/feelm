@@ -86,6 +86,12 @@ class DeployBackendTest(unittest.TestCase):
               exit 0
             fi
 
+            if [[ "$1 $2" == "exec feelm-backend" ]]; then
+              shift 2
+              "$@"
+              exit
+            fi
+
             if [[ "$1" == "logs" ]]; then
               printf 'fake backend logs\n' >&2
               exit 0

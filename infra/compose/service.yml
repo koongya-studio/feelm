@@ -14,6 +14,7 @@ services:
       - /var/www/certbot:/var/www/certbot:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /run/feelm-claude-review:/run/feelm-claude-review:ro
+      - ${SWAGGER_HTPASSWD_PATH:-/dev/null}:/run/secrets/swagger_htpasswd:ro
 
   postgres:
     image: pgvector/pgvector:0.8.6-pg17-bookworm@sha256:cf134a767f474095eeba57e0117be8e568e011a63f33fbf252f14c9b760f8e6f
@@ -84,6 +85,7 @@ services:
 
     environment:
       SPRING_PROFILES_ACTIVE: dev
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
       DB_URL: ${DB_URL:?DB_URL is required}
       DB_USERNAME: ${DB_USERNAME:?DB_USERNAME is required}
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
@@ -102,9 +104,6 @@ services:
       FRONTEND_BASE_URL: ${FRONTEND_BASE_URL:?FRONTEND_BASE_URL is required}
       MAIL_USERNAME: ${MAIL_USERNAME:?MAIL_USERNAME is required}
       MAIL_PASSWORD: ${MAIL_PASSWORD:?MAIL_PASSWORD is required}
-
-    ports:
-      - "127.0.0.1:8080:8080"
 
     depends_on:
       postgres:

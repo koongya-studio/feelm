@@ -79,6 +79,7 @@ Topic 확인 방법은 [인프라 README](../infra/README.md#local-kafka)를 따
 | `KAFKA_OUTBOX_*` | `.env.example`의 초기값 | 선택(실측 후 조정) |
 | `JWT_SECRET` | **필수(기본값 없음)** | 필수 |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | 필수 |
+| `SWAGGER_ENABLED` | `false` | `false`(팀 접근 보호 구성 후 명시적으로 활성화) |
 | `FRONTEND_BASE_URL` | `http://localhost:5173` | 필수 |
 | `MAIL_MODE` | `log`(`.env`에서 지정, 기본값 없음) | `smtp` |
 | `MAIL_HOST` | `smtp.gmail.com` | `smtp.gmail.com` |
@@ -101,6 +102,18 @@ Topic 확인 방법은 [인프라 README](../infra/README.md#local-kafka)를 따
 환경변수 또는 Secret을 명시적으로 주입합니다.
 
 dev 실행 예시: `./gradlew bootRun --args='--spring.profiles.active=dev'`
+
+## OpenAPI와 Swagger UI
+
+OpenAPI JSON과 Swagger UI는 기본적으로 비활성화되어 있습니다. 로컬에서 확인할 때만
+`.env`의 `SWAGGER_ENABLED=true`로 활성화합니다.
+
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- OpenAPI JSON: `http://localhost:8080/v3/api-docs`
+- OpenAPI YAML: `http://localhost:8080/v3/api-docs.yaml`
+
+문서에는 `/api/v1/**` 제품 API만 포함되며 JWT Bearer 입력을 지원합니다. 공유 서버에서는
+Nginx의 팀 전용 접근 보호와 직접 포트 우회 차단이 적용되기 전에 활성화하지 않습니다.
 
 ## 인증
 

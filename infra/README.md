@@ -1144,6 +1144,52 @@ sudo certbot certificates
 docker logs --tail 50 feelm-nginx
 ```
 
+### Swagger 팀 전용 접근
+
+공유 서버의 Swagger UI와 OpenAPI 문서는 HTTPS Nginx의 팀 공통 Basic Auth로 보호합니다.
+인증 파일은 저장소에 포함하지 않고 서비스 노드의 `/etc/feelm/swagger.htpasswd`에서
+관리합니다.
+
+최초 설정 시 서비스 노드에서 다음을 실행합니다.
+
+```bash
+sudo apt-get update
+sudo apt-get install -y apache2-utils
+sudo install -d -m 700 /etc/feelm
+sudo htpasswd -cB /etc/feelm/swagger.htpasswd e106
+
+NGINX_GID="$(docker exec feelm-nginx id -g nginx)"
+sudo chown root:"${NGINX_GID}" /etc/feelm/swagger.htpasswd
+sudo chmod 640 /etc/feelm/swagger.htpasswd
+```
+
+비밀번호를 변경할 때는 `-c` 없이 실행합니다. 비밀번호를 명령행이나 저장소에 기록하지
+않습니다.
+
+```bash
+sudo htpasswd -B /etc/feelm/swagger.htpasswd e106
+```
+
+배포용 GitLab CI/CD Variables에는 다음 값을 설정합니다.
+
+```dotenv
+SWAGGER_ENABLED=true
+SWAGGER_HTPASSWD_PATH=/etc/feelm/swagger.htpasswd
+```
+
+`SWAGGER_HTPASSWD_PATH`를 지정하지 않은 비활성 환경은 `/dev/null`을 읽기 전용으로
+마운트합니다. 따라서 인증 파일 없이 Compose를 기동할 수 있고, Swagger를 잘못 활성화해도
+인증 가능한 계정이 없어 문서 경로가 닫힌 상태를 유지합니다.
+
+Swagger 접속 경로는 다음과 같습니다.
+
+```text
+https://j15e106.p.ssafy.io/swagger-ui.html
+```
+
+일반 `/api/**` 요청에는 Basic Auth를 적용하지 않으며 기존 JWT 인증 정책을 유지합니다.
+백엔드는 host port를 공개하지 않고 Nginx를 통해서만 접근합니다.
+
 ### Recovery and remaining checks
 
 - 설정 검사 실패 시 실행 중인 Nginx를 재생성하지 않고 인증서 경로·권한 및 설정 오류를 확인합니다.
