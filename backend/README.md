@@ -416,3 +416,382 @@ curl http://localhost:8080/actuator/health
 ```json
 {"status":"UP"}
 ```
+
+## TMDb 초기 데이터 적재 스크립트
+
+이 작업은 백엔드 애플리케이션 기능이 아니라 백엔드 또는 인프라 담당자가 합의된 환경에서
+실행하는 Bash 스크립트다. `run-tmdb-ingestion.sh`는 TMDb 원본 응답을 파일로 보존하면서 PostgreSQL의 영화
+메타데이터를 적재하고, `run-initial-data-load.sh`는 합의된 MovieLens·TMDb 원천 파일을 HDFS에
+업로드한다. 두 저장소의 완료 상태는 서로 대신하지 않으며 각각 별도 결과 파일을 남긴다.
+HDFS는 J15E106A에서 실행하고, PostgreSQL은 J15E106의 Docker 또는 SSH 터널을 통한 적재
+계정으로 접속하므로 두 단계를 한 명령으로 묶지 않는다.
+MovieLens 사용자는 서비스 `users`와 연결하지 않고 영화만 TMDb ID로 연결한다. Spark 학습과
+Redis 반영은 후속 작업이며 이 스크립트의 범위에 포함하지 않는다.
+
+### 사전 조건
+
+- PostgreSQL Docker 모드: J15E106, 실행 중인 `feelm-postgres`, `bash`, `curl`, `jq`, `docker`
+- PostgreSQL 직접 접속 모드: `bash`, `curl`, `jq`, `psql`, J15E106 SSH 접속 정보와 별도
+  발급된 적재 계정. DB 포트는 외부에 공개하지 않고 SSH 터널을 사용한다.
+- HDFS 단계: J15E106A, 실행 중인 `feelm-hdfs-namenode`, Live DataNode 2대, Safe mode OFF
+- TMDb Token은 저장소나 명령 인자에 넣지 않고 실행 셸의 `TMDB_TOKEN`으로만 주입한다.
+- HDFS 대상 경로, 데이터 버전·범위와 중복 정책은 관련 담당자와 합의한 값을 사용한다.
+- OTT는 승인된 매핑 CSV를 받은 경우에만 동기화한다. 현재 영화 적재 매핑은
+  넷플릭스·디즈니+·왓챠·웨이브·티빙 5종이며 `watch/providers.results.KR`의 정기구독
+  `flatrate`만 저장한다. 파일을 생략하면 기존 OTT 관계를 삭제하지 않고 미승인 provider
+  발생 건수만 보고한다. 쿠팡플레이는 영화 provider ID와 실제 영화 연결을 검증하기 전까지
+  현재 매핑에 포함하지 않는다.
+
+백엔드가 인프라에 전달할 데이터 디렉터리에는 확정 원천 파일만 두고, 다음 정보를 함께
+전달한다. 값은 스크립트가 생성하는 manifest와 일치해야 한다.
+
+| 전달 항목 | 값 |
+| --- | --- |
+| 전달 위치 | 인프라와 합의한 팀 전용 경로(저장소에는 대용량 원천 파일을 커밋하지 않음) |
+| 버전 | MovieLens 배포명 또는 TMDb 스냅샷 일자처럼 재현 가능한 불변 값 |
+| 범위 | 전체/샘플 및 포함한 파일·TMDb ID 범위 |
+| 파일 수·크기·체크섬 | `hdfs-manifest.json` 또는 `input-manifest.json` 기준 |
+
+프로젝트의 HDFS 원천 데이터 경로는 `/data/raw/<dataset>/<version>` 규칙을 사용한다.
+MovieLens 32M은 `/data/raw/movielens/ml-32m`, TMDb 스냅샷은
+`/data/raw/tmdb/<YYYYMMDD>`가 된다. 스크립트가 `--dataset`과 `--version`으로 이 경로를
+자동 생성하며, 인프라 환경에서 다른 경로가 필요한 경우에만 `--hdfs-target`으로 재정의한다.
+
+전달 파일 범위는 다음처럼 구분한다.
+
+- MovieLens: 배포 ZIP을 풀어 얻은 `ratings.csv`, `movies.csv`, `tags.csv`, `links.csv`,
+  `README.txt`, `checksums.txt` 원본. 즉 **데이터 CSV 4개 + 메타 파일 2개 = 총 6개**다.
+  추천 매핑은 반드시 `links.csv`의 `tmdbId`를 사용한다.
+- TMDb: 확정 TMDb ID 입력 파일과 수집 단계에서 보존한 `raw-tmdb/<tmdb_id>.json`.
+  API 응답에는 인증 Token이 포함되지 않는다.
+
+대용량 데이터 자체는 GitLab에 올리지 않고 합의한 팀 전용 전달 경로를 사용한다. GitLab에는
+스크립트와 이 실행 안내만 포함하고, 실제 전달 위치와 manifest는 인프라 담당자에게 별도로
+전달한다.
+
+OTT 매핑 파일은 다음 헤더를 정확히 사용한다. 코드에는 `A-Z`, 숫자와 `_`만 사용할 수 있고,
+`logo_path`에는 TMDb 응답의 `/...` 경로를 넣는다. 스크립트가 이미지 base URL과 결합해
+`otts.logo_url`로 저장한다.
+
+```csv
+tmdb_provider_id,code,name,logo_path
+```
+
+현재 승인 코드는 `NETFLIX`, `DISNEY_PLUS`, `WATCHA`, `WAVVE`, `TVING`이다. provider ID와
+`logo_path`는 추측하거나 과거 값을 복사하지 않고 적재 시점의 TMDb 영화 provider 응답으로
+확인한다.
+
+2026-09-08 KR provider 조회에서 `Netflix`(8), `Disney Plus`(337), `Watcha`(97),
+`wavve`(356), `TVING`(1883)은 확인했다. 영화 provider 응답에 없는 `Coupang Play`는
+TV provider ID를 대신 사용하지 않고 별도 검증 전까지 매핑을 보류한다.
+`Netflix Standard with Ads`(1796)는 1차 지원 목록의 독립 OTT가 아니므로 제외한다.
+현재 검증된 매핑은 `backend/scripts/samples/ott-provider-mapping.csv`에 보관한다.
+
+```bash
+{ printf 'header = "Authorization: Bearer %s"\n' "$TMDB_TOKEN"; } \
+  | curl --config - --silent --show-error --fail \
+  "https://api.themoviedb.org/3/watch/providers/movie?watch_region=KR" \
+  | jq -r '.results[] | [.provider_id, .provider_name, .logo_path] | @tsv'
+```
+
+영화별 제공처는 `.results.KR.flatrate`에서만 선택한다. `rent`, `buy`, `free`, `ads`는
+구독 중인 OTT 필터의 의미와 맞지 않아 저장하지 않는다. `movie_ott_providers.watch_url`에는
+TMDb가 반환하는 `results.KR.link`를 저장한다. 이 URL은 provider별 OTT 앱 딥링크가 아니라
+지역 단위 TMDb/JustWatch 안내 페이지이며, 1차 MVP에서 사용하는 절충안이다.
+`otts`는 API-025 담당자의 기준정보이므로 지원 목록·code·표시명·로고를 변경할 때는 해당
+담당자와 먼저 합의한다. 매핑 CSV를 바꾼 뒤 기존 checkpoint에 적용하려면 합의 후
+`--refresh`로 대상 영화를 다시 동기화한다.
+
+### 1. 전달 데이터 manifest와 입력 검증
+
+MovieLens·TMDb 원천 파일을 인프라에 전달하기 전에 로컬에서 파일 위치, 버전·범위, 파일 수,
+전체 크기와 SHA-256 manifest를 만든다. 이 명령은 HDFS에 접속하거나 파일을 업로드하지 않는다.
+
+기본 범위는 MovieLens 32M `links.csv`의 유효한 고유 TMDb ID다. 현재 원본 기준으로
+87,585행 중 TMDb ID가 있는 행은 87,461개, 결측은 124개, 중복 제거 후 적재 대상은
+87,425개다. MovieLens 원본의 중복 행은 수정하지 않고 HDFS에 그대로 보존하며,
+PostgreSQL 입력에서만 TMDb ID를 중복 제거한다. 아래 명령으로 기본 목록과 5편 샘플을
+생성한다.
+
+```bash
+bash ./backend/scripts/prepare-tmdb-input.sh \
+  --movielens-links <ml-32m/links.csv> \
+  --scope movielens-ml-32m-linked-tmdb \
+  --sample-size 5 \
+  --output-dir <영속-입력-준비-디렉터리>
+```
+
+생성 결과는 `tmdb-ids.txt`, `tmdb-ids-sample.txt`, `tmdb-id-sources.csv`,
+`tmdb-input-manifest.json`, `sample-expected.json`이다. SSAFY 30건 샘플은 소량 실행 계약
+검증에만 사용하며 운영용 `tmdb-ids.txt`에 합치지 않는다. 저장소의
+`backend/scripts/samples/`에는 실행 계약 확인용 5편 입력과 예상 결과가 있으며 운영 데이터나
+완료 증빙으로 사용하지 않는다.
+
+이번 전달 범위는 MovieLens 32M의 87,425개 TMDb ID에 MovieLens 생성 다음 날인
+`2023-10-13`부터 수집일 `2026-09-07`까지 TMDb `primary_release_date` 기준 영화를 추가한다.
+추가 Discover 조회에만 `include_adult=false`, `include_video=false`를 적용하고 전체 결과를
+`tmdb_id`로 중복 제거한다. MovieLens 기본 입력은 원본 연결 범위를 보존하므로 이 필터의
+적용 대상이 아니다. 따라서 최종 합집합의 서비스 노출 가능 여부는 적재와 별도로 판단한다.
+MovieLens 32M은 1995년 1월 9일부터 2023년 10월 12일까지 발생한 평점·태그를 포함하고
+2023년 10월 13일 생성된 배포본이다.
+다음 한 명령은 날짜별 Discover 응답을 보존해 최종 ID 목록과 버전·범위 manifest를 만든 뒤,
+그 목록의 원본 JSON까지 수집한다. 중단되면 같은 명령을 다시 실행해 이미 받은 Discover
+페이지와 영화 원본부터 이어서 진행한다.
+
+```bash
+bash ./backend/scripts/prepare-tmdb-raw-handoff.sh \
+  --base-input <MovieLens-기본-tmdb-ids.txt> \
+  --from-date 2023-10-13 \
+  --to-date 2026-09-07 \
+  --output-dir <TMDb-전체-전달-디렉터리>
+```
+
+출력은 최종 `tmdb-ids.txt`, ID별 출처 `tmdb-id-sources.csv`, API 응답
+`discover-pages/`, 범위·건수·체크섬을 기록한 `tmdb-input-manifest.json`과
+`raw-tmdb/<tmdb_id>.json`이다. 각 영화는 성공 즉시 원자적으로 저장되고 checkpoint에
+기록된다. PostgreSQL 계정은 필요하지 않다. `Ctrl+C`, 네트워크 끊김 또는 PC 재시작 뒤
+같은 명령을 실행하면 유효한 기존 파일은 API를 다시 호출하지 않고 건너뛴다.
+원본 수집은 TMDb의 `append_to_response`로 상세·크레딧·시청 제공처를 한 요청에 받고,
+기본 8개 작업을 병렬 실행한다. API가 `429`를 반환하면 `Retry-After`를 따라 자동 재시도한다.
+
+모든 후보를 조회한 완전 완료 조건은 `collection-manifest.json`의 `status`가 `COMPLETE`, 실패와
+누락이 모두 `0`, `raw-files.sha256`의 파일 수가 최종 TMDb ID 수와 같은 것이다. 조회 시점의
+HTTP 404 등으로 가져올 수 없는 ID가 남아 팀이 그 범위를 승인한 경우에는 `PARTIAL` 상태도 성공 원본과
+실패 목록을 함께 전달할 수 있다. 이때 전체 후보를 성공했다고 표현하지 않고 성공·실패 분모와
+HTTP 상태를 manifest와 `failure-report.json`에 그대로 기록한다. 함께 전달할 파일은
+`tmdb-input-manifest.json`, `collection-manifest.json`, `collection-summary.txt`,
+`raw-files.sha256`, `failure-report.json`, `tmdb-ids.txt`, `tmdb-id-sources.csv`,
+`discover-pages/`, `raw-tmdb/`이다. `TMDB_TOKEN`은 어떤 전달 파일에도 포함하지 않는다.
+
+TMDb 키워드는 영화 상세 원본과 별도 endpoint이므로 같은 최종 ID 목록으로 따로 수집한다.
+이 작업은 `raw-tmdb/`를 변경하지 않으며 별도의 checkpoint, checksum, manifest와 실패 목록을
+생성한다. 중단 후 같은 명령을 실행하면 검증된 파일은 재사용한다.
+
+```bash
+bash ./backend/scripts/collect-tmdb-keywords.sh \
+  --input <TMDb-전체-전달-디렉터리>/tmdb-ids.txt \
+  --output-dir <TMDb-전체-전달-디렉터리> \
+  --scope "movielens-ml-32m+tmdb-release-2023-10-13_to_2026-09-07" \
+  --workers 16
+```
+
+키워드 산출물은 `raw-keywords/<tmdb_id>.json`, `keywords-checkpoint-success.txt`,
+`keywords-files.sha256`, `keywords-collection-manifest.json`,
+`keywords-collection-summary.txt`, `keywords-failure-report.json`이다. 키워드 배열이 비어 있어도
+유효한 TMDb 응답이면 성공 파일로 보존한다.
+
+```bash
+bash ./backend/scripts/run-initial-data-load.sh manifest \
+  --dataset movielens \
+  --version ml-32m \
+  --scope full-official-release \
+  --output-dir <영속-결과-디렉터리> \
+  --file <ml-32m/links.csv> \
+  --file <ml-32m/movies.csv> \
+  --file <ml-32m/ratings.csv> \
+  --file <ml-32m/tags.csv> \
+  --file <ml-32m/README.txt> \
+  --file <ml-32m/checksums.txt>
+```
+
+`movielens`·`ml-32m`·`full-official-release` 조합은 위 6개가 정확히 모두 있어야 manifest를
+생성한다. CSV 4개만 지정하거나 메타 파일이 빠지면 전달 범위 오류로 실패한다. 다른 데이터셋은
+필요한 원천 파일을 반복 지정한다.
+
+```bash
+bash ./backend/scripts/run-initial-data-load.sh manifest \
+  --dataset <movielens-or-tmdb> \
+  --version <확정-버전> \
+  --scope <확정-범위> \
+  --output-dir <영속-결과-디렉터리> \
+  --file <원천파일-1> \
+  --file <원천파일-2>
+```
+
+서버 전달 전 로컬 또는 J15E106에서 입력 파일의 ID, 크기와 SHA-256을 확인한다. SSAFY `|`
+구분 파일은 `id` 헤더를 사용하고, 단순 목록은 한 줄에 양의 TMDb ID 하나를 사용한다.
+
+```bash
+bash ./backend/scripts/run-tmdb-ingestion.sh \
+  --input <확정-TMDb-ID-파일> \
+  --output-dir <영속-결과-디렉터리> \
+  --limit 5 \
+  --validate-only
+```
+
+### 2. 소량 TMDb·PostgreSQL 공동 검증
+
+터미널 기록에 토큰이 남지 않도록 대화형으로 입력한 뒤 소량 dry-run, 실제 적재, 같은 입력
+재실행 순서로 확인한다.
+
+```bash
+read -rsp 'TMDb token: ' TMDB_TOKEN && printf '\n'
+export TMDB_TOKEN
+
+bash ./backend/scripts/run-tmdb-ingestion.sh \
+  --input <확정-TMDb-ID-파일> \
+  --output-dir <영속-결과-디렉터리> \
+  --limit 5 \
+  --dry-run
+
+bash ./backend/scripts/run-tmdb-ingestion.sh \
+  --input <확정-TMDb-ID-파일> \
+  --output-dir <영속-결과-디렉터리> \
+  --limit 5 \
+  --ott-mapping <승인된-OTT-매핑-CSV>
+```
+
+은채님이 별도 적재 계정을 발급한 경우에는 먼저 다른 터미널에서 SSH 터널을 유지한다. 실제
+SSH 사용자·서버 주소·DB 계정은 저장소에 기록하지 않는다.
+
+```bash
+ssh -N -L 15432:127.0.0.1:5432 <SSH_USER>@<SERVICE_SERVER>
+```
+
+적재 터미널에서는 접속값과 비밀번호를 현재 셸에만 주입하고 `direct` 모드로 실행한다.
+`PGPASSWORD`와 `TMDB_TOKEN`은 명령 인자, GitLab, MM, 결과 파일에 기록하지 않는다.
+
+```bash
+export PGHOST=127.0.0.1
+export PGPORT=15432
+export PGDATABASE=<전달받은-DB명>
+export PGUSER=<전달받은-적재계정>
+read -rsp 'PostgreSQL password: ' PGPASSWORD && printf '\n'
+export PGPASSWORD
+
+bash ./backend/scripts/run-tmdb-ingestion.sh \
+  --postgres-mode direct \
+  --input <확정-TMDb-ID-파일> \
+  --raw-dir <TMDb-전체-전달-디렉터리>/raw-tmdb \
+  --output-dir <영속-결과-디렉터리> \
+  --limit 5
+
+unset PGPASSWORD TMDB_TOKEN
+```
+
+직접 접속 모드는 실행 전에 `SELECT 1`과 필수 테이블·`movies.tmdb_id` 유일 제약을 확인하고,
+접속 또는 권한이 부족하면 데이터 변경 전에 실패한다. 5건 실제 적재와 결과 검증이 끝난 뒤에만
+`--limit`을 제거한다.
+
+`--raw-dir`을 사용하면 수집 완료 원본을 읽으므로 PostgreSQL 적재 때 TMDb API를 다시
+호출하거나 Token을 다시 전달할 필요가 없다. 동일 명령을 다시 실행했을 때 성공 checkpoint의
+영화는 건너뛰어야 한다. 동일 원본을 DB에 다시 반영할 때만 `--refresh`를 추가한다. 전체
+적재는 소량 검증 후 `--limit`을 제거해 실행한다.
+
+PostgreSQL 단계의 주요 산출물은 다음과 같다.
+
+- `raw-tmdb/<tmdb_id>.json`: 토큰을 포함하지 않는 TMDb 원본 응답
+- `checkpoint-success.txt`: DB transaction이 성공한 TMDb ID
+- `failure-report.json`: 실패 ID와 재처리 가능한 오류 분류
+- `service-movies.csv`: 찬형 담당 파이프라인 입력, 정확한 `service_movie_id,tmdb_id` 헤더
+- `postgres-sample.csv`: 입력의 앞 5개 TMDb ID에 대한 영화와 관계 건수 샘플 조회 결과
+- `input-manifest.json`, `run-manifest.json`, `run-summary.txt`: 입력 및 실행 결과
+
+영화는 `tmdb_id`로 upsert해 기존 `movies.id`를 유지한다. `average_rating`, `rating_count`,
+`movielens_id`, `representative_flavor_id`는 수정하지 않는다. 한 영화의 본체와 장르·국가·인물·
+승인된 OTT 관계는 하나의 PostgreSQL transaction으로 처리한다.
+
+PostgreSQL 필드 매핑은 현재 Flyway Migration을 기준으로 다음과 같다.
+
+| TMDb 원천 | PostgreSQL 대상 | 처리 |
+| --- | --- | --- |
+| `details.id` | `movies.tmdb_id` | 유일 키, 이 값으로 upsert |
+| `details.title`, `original_title`, `overview` | `movies.title`, `original_title`, `synopsis` | 제목이 없으면 원제 사용, 빈 줄거리는 그대로 보존 |
+| `details.release_date`, `runtime` | `movies.release_date`, `runtime_minutes` | 빈 날짜·0분은 `NULL` |
+| `details.poster_path`, `backdrop_path` | `movies.poster_url`, `backdrop_url` | 포스터는 `w500`, 배경은 `w1280` TMDb CDN URL로 변환 |
+| `details.genres[]` | `genres`, `movie_genres` | `genres.tmdb_genre_id`로 기준정보 upsert 후 관계 교체 |
+| `details.production_countries[]` | `movie_countries.country_code` | ISO 3166-1 alpha-2만 저장 |
+| `credits.crew[job=Director]`, `cast[]` | `people`, `movie_people` | `tmdb_person_id` upsert, 역할은 `DIRECTOR`/`ACTOR` |
+| `watch/providers.results.KR.flatrate` | `otts`, `movie_ott_providers` | 현재 승인된 5개 OTT만 동기화하고 다른 offer type은 제외 |
+| DB identity | `movies.id` | 직접 입력하지 않으며 재적재 시 기존 ID 유지 |
+
+이미지 파일을 적재하거나 원본 JSON을 변형하지 않는다. `raw-tmdb`에는 TMDb의
+`poster_path`·`backdrop_path`가 그대로 남으므로, 추후 제공 크기를 바꿔도 TMDb 메타데이터를
+다시 수집할 필요가 없다.
+
+한국어 `overview`가 비어 있는 영화도 적재 실패로 처리하지 않고 원본 값 그대로 저장한다.
+줄거리 보강은 초기 적재의 완료 조건이 아닌 별도 데이터 품질 작업이다. 보강할 때는 기존
+`tmdb_id`와 서비스 영화 ID를 유지하고 대상·언어·수집 시각을 기록한다.
+
+`movielens_id`, `representative_flavor_id`, `average_rating`, `rating_count`는 후속 매핑·추천·
+서비스 집계 영역이므로 이 스크립트가 수정하지 않는다. 적재 완료 후 `service-movies.csv`는
+반드시 적재한 환경의 DB에서 아래 계약으로 새로 생성된다.
+
+```sql
+SELECT id AS service_movie_id, tmdb_id
+FROM movies
+ORDER BY id;
+```
+
+소량 실제 적재의 예상 결과는 명령 종료 코드 `0`, `run-manifest.json`의 PostgreSQL 상태
+`SUCCESS`, 실패 `0`, `postgres-sample.csv`에서 성공한 샘플 영화가 조회되는 것이다. 같은
+명령을 다시 실행하면 신규·갱신 대신 checkpoint 건너뜀 건수가 증가하고 DB 행은 중복되지
+않아야 한다. 일부 영화가 실패하면 종료 코드 `3`과 `PARTIAL_FAILURE`가 기록되며 성공 영화는
+checkpoint에 남아 다음 실행에서 건너뛴다.
+
+필수 객체·배열이 누락되거나 응답 ID가 요청과 다르면 불완전 응답으로 실패 처리한다.
+`genres: []`, `production_countries: []`, `cast: []`, `crew: []`, `results: {}`는
+정상적인 빈 결과다. 구조 검증은 raw 수집, 개별 API 수집, 기존 raw 적재 모두에 적용하며,
+검증에 실패하면 기존 raw와 영화 관계를 보존한다.
+
+전체 영화가 실패하거나 CSV 내보내기가 실패해도 `failure-report.json`,
+`run-manifest.json`, `run-summary.txt`에 진단 결과를 남기고 종료 코드 `3`을 반환한다.
+manifest의 최상위 `status`는 실행 전체 결과이며, `postgresql`의 건수는 영화 처리 결과다.
+`service_movie_export`와 `postgres_sample`은 각각 내보내기 상태와 실패 사유를 기록한다.
+실패한 내보내기의 행 수·체크섬은 `null`이며, 이전 실행의 CSV가 남아 있어도 이번 실행의
+성공 산출물로 간주하지 않는다.
+
+초기 적재 회귀 테스트는 `bash backend/scripts/tests/initial-data-load-test.sh`로 실행한다.
+Bash, jq, GNU coreutils와 Docker가 필요하다. 실제 API 대신 fake curl을 사용하고,
+백엔드 통합 테스트와 같은 pgvector 이미지로 네트워크·호스트 포트·볼륨이 없는 임시
+PostgreSQL 컨테이너를 생성해 SQL을 검증한 뒤 삭제한다. 운영 DB 접속 정보는 사용하지 않는다.
+
+### 3. HDFS 원천 파일 검증과 업로드
+
+J15E106A에서 업로드 없이 HDFS 상태·파일·경로를 검증한다.
+
+```bash
+bash ./backend/scripts/run-initial-data-load.sh validate \
+  --dataset <movielens-or-tmdb> \
+  --version <확정-버전> \
+  --scope <확정-범위> \
+  --output-dir <영속-결과-디렉터리> \
+  --file <원천파일-1> \
+  --file <원천파일-2>
+```
+
+공동 확인 후 `validate`를 `hdfs`로 바꾸어 업로드한다. 기본 중복 정책 `skip-if-same`은 기존
+경로의 파일명·파일 수·크기·SHA-256이 모두 같을 때만 적재를 건너뛰고, 하나라도 다르면
+실패하여 기존 원본을 보호한다. `replace`는 명시한 경우에만 staging 검증 후 교체한다.
+
+HDFS 단계는 `hdfs-manifest.json`과 `hdfs-summary.txt`에 경로, 파일 수·전체 크기와 파일별
+원본 위치·HDFS 위치·SHA-256 및 원격 검증 여부를 기록한다. 스크립트는 NameNode를 포맷하거나
+Docker Named Volume을 삭제하지 않는다.
+
+소량 HDFS 적재의 예상 결과는 `hdfs-manifest.json` 상태 `SUCCESS`, 합의 경로의 파일 수·크기와
+로컬 SHA-256 일치, `checksum_verified: true`다. 같은 경로에 재실행했을 때 내용이 완전히 같으면
+`SKIPPED_IDENTICAL`로 끝나고, 다르면 기존 경로를 변경하지 않은 채 실패한다. 실패한 staging은 제거되고,
+`replace` 도중 실패하면 기존 경로의 backup 복원을 시도한다.
+
+### 완료 보고
+
+- HDFS: `hdfs-manifest.json`의 상태·대상 경로·파일 수·크기·체크섬
+- PostgreSQL: `run-manifest.json`의 신규·갱신·건너뜀·성공·실패 건수와 CSV checksum
+- 남은 작업: `failure-report.json`의 실패 사유 및 같은 명령을 이용한 재처리 계획
+
+공유 메시지에는 다음 양식을 사용한다. HDFS와 PostgreSQL은 한쪽만 성공해도 다른 쪽을 완료로
+표시하지 않는다.
+
+```text
+HDFS: SUCCESS | 경로=<확정 경로> | 파일=<개수> | 크기=<bytes> | checksum=<검증 결과>
+PostgreSQL: SUCCESS | 신규=<n> | 갱신=<n> | 건너뜀=<n> | 실패=<n>
+샘플 조회: postgres-sample.csv <n>행 확인
+추천 전달: service-movies.csv <n>행 | sha256=<값>
+남은 작업: 없음 또는 <실패 사유와 재처리 명령>
+```
+
+첫 적재는 인프라 담당자와 함께 `--limit 5` 소량 검증 후 실행자를 합의한다. 서버 접근이
+제한되면 백엔드는 데이터·스크립트·manifest를 전달하고 인프라가 같은 명령을 실행하며,
+백엔드는 반환된 manifest와 샘플 조회 결과를 검증한다.
+
+실제 IP, DB 비밀번호와 TMDb Token은 결과 파일·문서·MR에 기록하지 않는다.

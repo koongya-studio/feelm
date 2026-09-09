@@ -1,0 +1,11 @@
+{
+  "input": "tmdb-ids-sample.txt",
+  "expected": {
+    "input_ids": 5,
+    "postgresql_status": "SUCCESS",
+    "failed": 0,
+    "rerun_skips": 5,
+    "service_movie_csv_header": "service_movie_id,tmdb_id",
+    "hdfs_status": "NOT_RUN_BY_POSTGRES_SCRIPT"
+  }
+}
