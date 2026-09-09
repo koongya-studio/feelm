@@ -48,13 +48,19 @@ public class LoginService {
      * <p>없는 이메일·비밀번호 불일치·탈퇴 계정을 모두 {@code INVALID_CREDENTIALS}로 응답해 어떤 계정이 존재하는지 드러내지 않는다. 미인증 계정만
      * {@code EMAIL_NOT_VERIFIED}로 구분하는데, 이는 비밀번호를 맞힌 본인에게만 보여 주는 안내다.
      *
-     * <p>연속 실패 제한은 대조 전에 시도를 세는 방식이다. 제한을 넘은 시도는 비밀번호를 보지 않고 429가 되고, 자격이 확인된 시도만 카운터를 지운다. 그래서 동시
-     * 요청이 몰려도 한 창 안에서 대조는 제한 횟수만 일어나며, 미인증 계정이 맞는 비밀번호로 반복 시도해도 차단되지 않는다.
+     * <p>연속 실패 제한은 대조 전에 시도를 세는 방식이다. 제한을 넘은 시도는 비밀번호를 보지 않고 429가 되고, 자격이 확인된 시도만 이메일 카운터를 지운다. 그래서
+     * 동시 요청이 몰려도 한 창 안에서 대조는 제한 횟수만 일어나며, 미인증 계정이 맞는 비밀번호로 반복 시도해도 차단되지 않는다.
+     *
+     * <p>제한은 이메일 축과 클라이언트 IP 축을 함께 본다(S15P21E106-312). IP 축을 먼저 보므로 IP 예산을 넘긴 요청은 이메일 카운터를 소모하지 않고,
+     * 두 축의 429는 같은 {@code RATE_LIMITED} 응답이라 어느 축에서 막혔는지도 가입 여부도 드러내지 않는다. 축과 순서의 근거는 {@link
+     * AuthRateLimiter} 주석에 있다.
+     *
+     * @param clientIp 요청을 보낸 클라이언트 IP. IP 단위 시도 제한에 쓴다
      */
     @Transactional(readOnly = true)
-    public LoginResult login(String rawEmail, String password) {
+    public LoginResult login(String rawEmail, String password, String clientIp) {
         String email = rawEmail.trim().toLowerCase(Locale.ROOT);
-        if (!rateLimiter.tryAcquireLoginAttempt(email)) {
+        if (!rateLimiter.tryAcquireLoginAttempt(email, clientIp)) {
             throw new BusinessException(ErrorCode.RATE_LIMITED);
         }
 
