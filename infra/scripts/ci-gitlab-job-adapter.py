@@ -199,6 +199,38 @@ def verify_merge_request(opener, context):
     return matches[0]
 
 
+def fetch_merge_request_detail(opener, context, summary):
+    iid = summary.get('iid') if isinstance(summary, dict) else None
+    if type(iid) is not int or iid <= 0:
+        raise PolicyError('Merge request identity is missing')
+    base = GITLAB_URL + '/api/v4/projects/' + str(context['project_id'])
+    detail = request_json(opener, base + '/merge_requests/' + str(iid), context['token'])
+    diff_refs = detail.get('diff_refs') if isinstance(detail, dict) else None
+    head_sha = diff_refs.get('head_sha') if isinstance(diff_refs, dict) else None
+    checks = {
+        'iid': isinstance(detail, dict) and detail.get('iid') == iid,
+        'state': isinstance(detail, dict) and detail.get('state') == 'opened',
+        'target_branch': isinstance(detail, dict) and detail.get('target_branch') == 'develop',
+        'source_project_id': isinstance(detail, dict)
+                             and detail.get('source_project_id') == context['project_id'],
+        'target_project_id': isinstance(detail, dict)
+                             and detail.get('target_project_id') == context['project_id'],
+        'sha': isinstance(detail, dict) and detail.get('sha') == context['sha'],
+        'diff_refs': isinstance(diff_refs, dict),
+        'diff_refs.head_sha': head_sha == context['sha'],
+        'diff_refs.base_sha': isinstance(diff_refs, dict)
+                              and re.fullmatch(r'[0-9a-f]{40}', str(diff_refs.get('base_sha', '')))
+                              is not None,
+        'diff_refs.start_sha': isinstance(diff_refs, dict)
+                               and re.fullmatch(r'[0-9a-f]{40}', str(diff_refs.get('start_sha', '')))
+                               is not None,
+    }
+    mismatches = [name for name, matched in checks.items() if not matched]
+    if mismatches:
+        raise PolicyError('Merge request detail mismatch: ' + ','.join(mismatches))
+    return detail
+
+
 def git_environment(token, home):
     authorization = __import__('base64').b64encode(
         ('gitlab-ci-token:' + token).encode()).decode()
@@ -350,7 +382,10 @@ def run_job(response, config_path=CONFIG, opener=None):
     try: mr = verify_merge_request(opener, context)
     except urllib.error.HTTPError as exc: raise AdapterHttpError('merge_request', exc.code) from exc
     if context['job_name'] == CACHE_STATUS_JOB:
-        verify_dependency_change(context, mr)
+        try: detail = fetch_merge_request_detail(opener, context, mr)
+        except urllib.error.HTTPError as exc:
+            raise AdapterHttpError('merge_request_detail', exc.code) from exc
+        verify_dependency_change(context, detail)
         return 0
     payload, digest = fetch_source(context)
     active = {}
