@@ -35,6 +35,11 @@ feelm:
     login:
       attempt-limit: 5
       attempt-window: 10m
+    # 운영 기본값을 그대로 명시한다. 공유 컨텍스트 테스트가 nextClientIp()의 10.x.y.z로 IP 예산을
+    # 격리하는데, 그 격리는 ipv4-prefix-length가 32라는 전제에 매달린다(리뷰 A-9).
+    client-ip:
+      ipv4-prefix-length: 32
+      ipv6-prefix-length: 64
   mail:
     # 테스트는 발송하지 않고 스파이 빈으로 토큰을 얻지만, 모드에 기본값이 없으므로 명시한다.
     mode: log

@@ -96,6 +96,37 @@ class MailSendRateLimitContractTest extends EmailAuthApiTestSupport {
         resendFrom(nextClientIp(), newAccount().email()).andExpect(status().isAccepted());
     }
 
+    /**
+     * IPv6 클라이언트는 보통 {@code /64} 이상을 배정받아, 주소 단위로 세면 주소만 바꿔 예산을 무한히 새로 얻는다. 같은 프리픽스의 주소들이 한 예산을 쓰는지
+     * 본다(S15P21E106-288 결정 D-4).
+     */
+    @Test
+    @DisplayName("같은 /64 안의 서로 다른 IPv6 주소는 IP 예산을 함께 쓴다")
+    void ipLimitSharesBudgetAcrossSameIpv6Prefix() throws Exception {
+        for (long sent = 0; sent < ipLimit; sent++) {
+            resendFrom("2001:db8:1::" + (sent + 1), newAccount().email())
+                    .andExpect(status().isAccepted());
+        }
+
+        resendFrom("2001:db8:1::ffff", newAccount().email())
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("RATE_LIMITED"));
+    }
+
+    /** 묶는 단위가 지나치게 넓으면 무관한 회선이 함께 걸린다. 프리픽스가 다르면 예산도 분리되는지 본다. */
+    @Test
+    @DisplayName("/64가 다른 IPv6 주소는 서로의 IP 예산을 소모하지 않는다")
+    void ipLimitSeparatesDifferentIpv6Prefixes() throws Exception {
+        for (long sent = 0; sent < ipLimit; sent++) {
+            resendFrom("2001:db8:2::" + (sent + 1), newAccount().email())
+                    .andExpect(status().isAccepted());
+        }
+        resendFrom("2001:db8:2::ffff", newAccount().email())
+                .andExpect(status().isTooManyRequests());
+
+        resendFrom("2001:db8:3::1", newAccount().email()).andExpect(status().isAccepted());
+    }
+
     @Test
     @DisplayName("IP 카운터를 API-003과 API-010이 공유한다")
     void ipCounterIsSharedBetweenResendAndPasswordReset() throws Exception {

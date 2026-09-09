@@ -41,6 +41,33 @@ spring:
           timeout: 10000
           writetimeout: 10000
 
+# 리버스 프록시 뒤에서 실제 클라이언트 IP를 쓰기 위한 설정이다(S15P21E106-288). Nginx는 이미 /api를
+# 프록시하므로(infra/nginx/nginx.conf), 이 설정이 없으면 모든 요청의 발신지가 Nginx 컨테이너 IP 하나로
+# 보이고 전체 사용자가 IP 단위 제한의 한 예산을 함께 소모한다.
+server:
+  # native는 Tomcat RemoteIpValve를 쓴다. framework(ForwardedHeaderFilter)에는 신뢰할 프록시 목록
+  # 개념이 없어 발신지를 가리지 않고 헤더를 믿는다.
+  forward-headers-strategy: native
+  tomcat:
+    remoteip:
+      # X-Forwarded-For가 아니라 X-Real-IP를 읽는다(리뷰 A-7·B-3). Nginx는 모든 프록시 블록에서
+      # X-Real-IP를 $remote_addr로 덮어써 보내므로 클라이언트가 보낸 값이 남지 않고 항목도 하나다.
+      # XFF는 $proxy_add_x_forwarded_for로 이어 붙이는데, 목록의 항목이 모두 신뢰 대역이면 밸브가
+      # 맨 왼쪽 값을 채택한다. 그래서 내부 대역에서 온 요청은 헤더로 예산 주체를 바꿀 수 있다.
+      remote-ip-header: x-real-ip
+      protocol-header: x-forwarded-proto
+      # 밸브는 host·port 헤더도 기본으로 신뢰한다. Nginx는 X-Forwarded-Host를 정리하지 않으므로
+      # 클라이언트가 보낸 값이 getServerName()을 바꿀 수 있다. 지금은 요청에서 절대 URL을 만드는
+      # 코드가 없어 실피해가 없지만, 생기면 조용히 결함이 되므로 끈다(리뷰 A-8·B-5).
+      host-header: ""
+      port-header: ""
+      # 이 목록에 있는 발신지가 보낸 헤더만 받아들인다. backend 컨테이너는 호스트 포트를 공개하지
+      # 않아 Compose 네트워크에서만 닿으므로 실제 판정은 172.16.0.0/12가 전담한다. 루프백은 컨테이너
+      # 자기 헬스체크와 로컬·테스트 실행 경로다. Boot 기본값은 사설 대역 전체(10/8, 100.64/10,
+      # fc00::/7 포함)라 필요보다 넓다. 배포 환경의 Nginx 컨테이너 대역이 이 목록에 드는지 확인해야
+      # 한다(S15P21E106-326).
+      internal-proxies: 127.0.0.0/8,::1/128,172.16.0.0/12
+
 management:
   health:
     mail:
@@ -83,6 +110,12 @@ feelm:
     login:
       attempt-limit: 5
       attempt-window: 10m
+    # IP 단위 제한이 예산을 나누는 집계 단위다(S15P21E106-288). IPv6 종단 사용자는 보통 /64 이상을
+    # 배정받아 주소 단위로 세면 주소만 바꿔 예산을 새로 얻는다. IPv4는 NAT 뒤 공용 주소를 이미 여러
+    # 사용자가 나눠 쓰므로 더 넓히지 않는다. 1 미만이거나 대역 상한을 넘는 값은 기동에 실패한다.
+    client-ip:
+      ipv4-prefix-length: 32
+      ipv6-prefix-length: 64
   oauth:
     # 소셜 로그인(API-007·009)이 허용할 redirectUri 목록이다. 정확히 일치하는 값만 통과하며,
     # 비어 있으면 모든 요청을 거절한다. 허용 목록을 열어 두면 인가 코드를 공격자의 화면으로
