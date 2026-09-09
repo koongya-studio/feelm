@@ -472,7 +472,7 @@ flowchart LR
 |---|---|---|---|---|
 | D-1 | 식별자 타입 | `bigint` 시퀀스 / UUID(v7) / 혼합 | **내부 `bigint` + 공개 URL `users.public_id`** (08-30, ADR-0008) | 전 테이블, 전 API 응답 |
 | D-2 | Refresh Token 저장소 | PostgreSQL / Redis(TTL) | **Redis** (08-31, ADR-0009) — `refresh_tokens` 테이블 제거 | 인증 API, 회전·폐기, 탈퇴 처리 |
-| D-3 | 사용자당 활성 파티 수 | 1개 제한 / 복수 허용 | **복수 허용, 상한(기본 5) 설정값** (08-30) | API-049·050·053, ⑧ 화면 |
+| D-3 | 사용자당 활성 파티 수 | 1개 제한 / 복수 허용 | **참여 파티 수 무제한, 파티당 최대 4명 유지** (09-09 변경) | API-049·050·053, ⑧ 화면 |
 | D-4 | 취향 분석·추천 이유 계산 위치 | Spring Boot / FastAPI / Python Consumer / Spark Streaming | **취향 집계와 행동 Feature 경량 재정렬·최종 XAI 조립은 Spring, 개인 Fold-in·Candidate·기본 Top-N/XAI는 Python Consumer, 행동 Feature 집계와 전역 인기는 Spark Streaming** (09-01, ADR-0017) | `taste_analyses` 갱신, Kafka 이벤트·Redis 결과 계약 |
 | D-5 | 영화의 대표 맛 규칙 | 장르 규칙 / K-Means / 큐레이션 | **E5 임베딩 K-Means의 최근접 Centroid 하나에 배정** (08-31, ADR-0015) | `movies.representative_flavor_id`, 팝콘 집계 |
 | D-6 | 감상 기록 없이 평가 허용 | 허용 / 불허 | **허용** (08-30) — `ratings.watch_record_id` NULL 허용 | `watch_records` 유일 제약, ⑩·⑪ 화면 |
