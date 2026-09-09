@@ -1,17 +1,21 @@
 /*
- * 하단 내비게이션 바.
- * 사양은 와이어프레임 REF-01 하단 내비게이션 가이드를 그대로 따른다.
+ * 하단 내비게이션.
  *
- * - 5개 탭: 홈 · 검색 · 필름 · 파티 · MY
- * - 가운데 필름 탭은 테두리를 둘러 약간만 강조한다. 플로팅 버튼이 아니다
- * - 선택 #3C3A36, 비선택 #A5A29B, 높이 66px, 하단 Safe Area 여백 자동 확보
+ * 화면 폭을 채우는 바가 아니라 **떠 있는 알약**이다. 내용에 맞춰 좁게 잡고 좌우
+ * 여백을 남겨, 콘텐츠가 알약 뒤로 지나가며 아래까지 이어져 보이게 한다
+ * (`docs/screens/design-concept.md`).
  *
- * 검색 · 파티 · MY는 이번 단계 구현 범위가 아니지만 REF-01의 5탭 구성을
- * 검증하기 위해 탭을 모두 표시하고 자리 화면으로 이동한다.
+ * 4탭이다. 와이어프레임 REF-01은 검색을 포함한 5탭이었으나, 검색은 상단 헤더
+ * 아이콘으로 옮겨 탭 하나를 줄였다. 남은 넷의 폭이 넓어지고 검색 진입점이
+ * 중복되지 않는다. `/search` 라우트는 그대로 살아 있고 헤더에서 들어간다.
+ *
+ * 필름 탭만 테두리로 강조하던 REF-01 사양도 뺐다. 활성 탭은 색으로만 구분한다.
+ * 알약 안에 강조 면을 하나 더 두면 화면에서 solid 요소가 둘이 되어, 주 버튼과
+ * 경쟁한다.
  */
 import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router';
-import { FilmIcon, HomeIcon, MyIcon, PartyIcon, SearchIcon } from '../Icon';
+import { FilmIcon, HomeIcon, MyIcon, PartyIcon } from '../Icon';
 import { path, TAB_MATCH } from '../../routes/paths';
 import styles from './BottomNav.module.css';
 
@@ -20,14 +24,11 @@ type Tab = {
   label: string;
   to: string;
   icon: ReactNode;
-  /** 필름 탭만 테두리로 강조한다 */
-  emphasized?: boolean;
 };
 
 const TABS: Tab[] = [
   { key: 'home', label: '홈', to: path.home(), icon: <HomeIcon /> },
-  { key: 'search', label: '검색', to: path.search(), icon: <SearchIcon /> },
-  { key: 'film', label: '필름', to: path.film(), icon: <FilmIcon />, emphasized: true },
+  { key: 'film', label: '필름', to: path.film(), icon: <FilmIcon /> },
   { key: 'party', label: '파티', to: path.party(), icon: <PartyIcon /> },
   { key: 'my', label: 'MY', to: path.my(), icon: <MyIcon /> },
 ];
@@ -55,10 +56,8 @@ export default function BottomNav() {
             data-active={active}
             aria-current={active ? 'page' : undefined}
           >
-            {tab.emphasized ? <span className={styles.emphasis}>{tab.icon}</span> : tab.icon}
-            <span className={styles.label} data-emphasized={tab.emphasized}>
-              {tab.label}
-            </span>
+            {tab.icon}
+            <span className={styles.label}>{tab.label}</span>
           </Link>
         );
       })}

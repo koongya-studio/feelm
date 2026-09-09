@@ -24,7 +24,7 @@
 }
 
 .note {
-  color: var(--color-ink-subtle);
+  color: var(--color-ink-muted);
   font-size: 12px;
 }
 

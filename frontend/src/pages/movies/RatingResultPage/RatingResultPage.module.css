@@ -64,7 +64,7 @@
   flex: none;
   border-radius: 4px;
   box-shadow:
-    0 0 0 2px var(--color-nav-active),
+    0 0 0 2px var(--color-ink),
     0 8px 30px rgba(0, 0, 0, 0.35);
 }
 
@@ -78,14 +78,14 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--color-nav-active);
+  background: var(--color-ink);
   color: var(--color-bg);
 }
 
 .progress {
   flex: none;
   padding: 12px var(--screen-padding-x) 20px;
-  color: var(--color-ink-dim);
+  color: var(--color-ink-muted);
   font-size: 11px;
   line-height: 1.55;
   text-align: center;
@@ -141,7 +141,7 @@
   justify-content: center;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.15);
-  color: var(--color-nav-active);
+  color: var(--color-ink);
 }
 
 .resultTitle {
@@ -172,7 +172,7 @@
 }
 
 .resultBucket {
-  color: var(--color-ink-faint);
+  color: var(--color-ink-muted);
   white-space: nowrap;
 }
 

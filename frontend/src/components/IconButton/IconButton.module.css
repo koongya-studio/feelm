@@ -1,8 +1,8 @@
 /* 터치 영역은 44px 이상, 보이는 상자는 --icon-button-size */
 .button {
   display: inline-flex;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: var(--tap-target-min);
+  min-height: var(--tap-target-min);
   align-items: center;
   justify-content: center;
   padding: 0;
@@ -30,15 +30,21 @@
 }
 
 .button[data-variant='outline'] .box {
-  border: 1px solid rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--color-line-strong);
 }
 
+/*
+ * 유리. 콘텐츠 위에 겹치는 자리라 흐림이 실제로 보인다
+ * (`docs/screens/design-concept.md` 2.7).
+ */
 .button[data-variant='translucent'] .box {
-  border: 1px solid rgba(0, 0, 0, 0.3);
-  background: rgba(255, 255, 255, 0.92);
+  border: 0.5px solid var(--color-glass-line);
+  background: var(--color-glass);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
 }
 
 .button[data-variant='filled'] .box {
-  background: var(--color-nav-active);
+  background: var(--color-ink);
   color: var(--color-on-dark);
 }

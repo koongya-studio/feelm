@@ -27,11 +27,11 @@
 
 /* 가까이 = 좋아요 */
 .card[data-value='LIKE'] .surface {
-  box-shadow: 0 0 0 1px var(--color-nav-active);
+  box-shadow: 0 0 0 1px var(--color-ink);
 }
 
 .card[data-value='LIKE'] .surface > * {
-  border-color: var(--color-nav-active);
+  border-color: var(--color-ink);
 }
 
 /* 멀리 = 싫어요 */
@@ -61,7 +61,7 @@
   width: 22px;
   height: 22px;
   box-sizing: border-box;
-  border: 1.5px solid var(--color-nav-active);
+  border: 1.5px solid var(--color-ink);
   border-radius: 50%;
   background: var(--color-bg);
   content: '';
@@ -72,5 +72,5 @@
   width: 10px;
   height: 2px;
   border-radius: 2px;
-  background: var(--color-nav-active);
+  background: var(--color-ink);
 }

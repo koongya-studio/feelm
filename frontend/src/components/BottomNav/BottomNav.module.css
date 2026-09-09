@@ -1,53 +1,61 @@
+/*
+ * 떠 있는 알약. 화면 폭을 채우지 않고 내용만큼만 차지한다.
+ *
+ * `position: absolute`로 흐름에서 빼내 콘텐츠가 뒤로 지나가게 한다. 자리를 비워
+ * 두는 일은 각 화면의 하단 여백이 맡는다.
+ *
+ * 유리는 여기와 상단 아이콘 버튼에만 쓴다. 스크롤 콘텐츠가 뒤로 지나가서 흐림이
+ * 실제로 보이는 자리다. `backdrop-filter`를 지원하지 않는 브라우저에서는 반투명
+ * 배경만 남는데, 테두리가 있어 경계는 유지된다.
+ */
 .nav {
+  position: absolute;
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+  left: 50%;
   display: flex;
   height: var(--nav-height);
-  flex: none;
-  align-items: stretch;
-  padding: 0 8px;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  border-top: 1px solid var(--color-line);
-  background: var(--color-bg);
+  align-items: center;
+  padding: 0 var(--space-5);
+  border: 0.5px solid var(--color-glass-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-glass);
+  box-shadow: var(--shadow-glass);
+  gap: var(--space-6);
+  transform: translateX(-50%);
+  backdrop-filter: var(--blur-glass);
+  -webkit-backdrop-filter: var(--blur-glass);
 }
 
+/*
+ * 터치 대상을 알약 높이만큼 확보한다. 아이콘과 라벨이 작아도 누르는 면은 넓다.
+ */
 .tab {
   display: flex;
-  min-width: 44px;
-  flex: 1;
+  min-width: var(--tap-target-min);
+  height: 100%;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  color: var(--color-nav-inactive);
+  gap: 2px;
+  color: var(--color-ink-hint);
   text-decoration: none;
   transition: color var(--motion-fast) var(--ease-standard);
 }
 
-/* accent 적용 지점 2/4 — 지금 어디에 있는지. 다섯 탭 중 하나뿐이다 */
+/*
+ * 활성 탭은 빨강이다. 빨강을 면적이 아닌 표식으로만 쓰는 규칙에 맞다
+ * (`design-concept.md` 2.3).
+ */
 .tab[data-active='true'] {
-  color: var(--color-accent-mark);
-}
-
-/* 필름 탭 강조. 와이어프레임 REF-01 사양 */
-.emphasis {
-  display: flex;
-  width: 42px;
-  height: 28px;
-  box-sizing: border-box;
-  align-items: center;
-  justify-content: center;
-  border: 1.5px solid currentColor;
-  border-radius: 9px;
+  color: var(--color-brand);
 }
 
 .label {
-  font-size: 10.5px;
-  font-weight: 500;
-}
-
-.label[data-emphasized='true'] {
-  font-weight: 600;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  font-weight: var(--font-weight-medium);
 }
 
 .tab[data-active='true'] .label {
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
 }

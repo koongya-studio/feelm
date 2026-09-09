@@ -3,21 +3,21 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .area[data-size='screen'] {
   min-height: 0;
   flex: 1;
   justify-content: center;
-  padding: 0 34px;
+  padding: 0 var(--space-8);
 }
 
 /* 섹션 자리에 들어가는 형태. 와이어프레임에 대응 표현이 없다 */
 .area[data-size='inline'] {
   flex: none;
-  gap: 8px;
-  padding: 18px var(--screen-padding-x);
+  gap: var(--space-2);
+  padding: var(--space-5) var(--screen-padding-x);
 }
 
 .mark {
@@ -27,11 +27,11 @@
   height: 56px;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--color-nav-inactive);
-  border-radius: 8px;
-  color: var(--color-nav-inactive);
-  font-size: 26px;
-  font-weight: 800;
+  border: 2px solid var(--color-ink-disabled);
+  border-radius: var(--radius-icon);
+  color: var(--color-ink-disabled);
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
 }
 
 /* 필름 구멍 표현 */
@@ -42,7 +42,7 @@
   height: 5px;
   background: repeating-linear-gradient(
     90deg,
-    var(--color-nav-inactive) 0 6px,
+    var(--color-ink-disabled) 0 6px,
     transparent 6px 13px
   );
 }
@@ -58,38 +58,39 @@
 .text {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
   text-align: center;
 }
 
 .area[data-size='inline'] .text {
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .title {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+  font-weight: var(--font-weight-bold);
 }
 
 .area[data-size='inline'] .title {
-  font-size: 13px;
+  font-size: var(--font-size-meta);
 }
 
 .description {
-  color: var(--color-ink-faint);
-  font-size: 13px;
-  line-height: 1.6;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-body);
 }
 
 .area[data-size='inline'] .description {
-  font-size: 12.5px;
+  font-size: var(--font-size-caption);
 }
 
 .actions {
   display: flex;
   width: 100%;
   flex-direction: column;
-  gap: 9px;
+  gap: var(--space-2);
 }
 
 .area[data-size='inline'] .actions {

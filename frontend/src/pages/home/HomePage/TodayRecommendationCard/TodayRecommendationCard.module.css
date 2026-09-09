@@ -35,7 +35,7 @@
 .reason {
   font-size: 12px;
   line-height: 1.5;
-  color: var(--color-ink-dim);
+  color: var(--color-ink-muted);
 }
 
 .ottList {

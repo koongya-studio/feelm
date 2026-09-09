@@ -34,6 +34,33 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/*
+ * 벽에 지는 사선 그림자. 평평한 회색이 종이처럼 보이지 않게 하는 최소한의
+ * 깊이다. 흐리게 깔고 화면 아래쪽에만 두어 콘텐츠를 방해하지 않는다.
+ *
+ * body 배경에 함께 넣지 않고 별도 레이어로 두는 이유는 blur를 걸어야 하기
+ * 때문이다. background-image에는 filter를 적용할 수 없다.
+ */
+body::before {
+  position: fixed;
+  z-index: 0;
+  top: 40%;
+  right: -20%;
+  bottom: -10%;
+  left: -20%;
+  background: var(--gradient-wall-shadow);
+  content: '';
+  filter: blur(18px);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* 그림자는 배경이므로 앱 콘텐츠가 그 위에 온다 */
+#root {
+  position: relative;
+  z-index: 1;
+}
+
 h1,
 h2,
 h3,

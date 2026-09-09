@@ -207,53 +207,6 @@
 }
 
 /*
- * ─────────────────────────── 구 토큰 호환 (한시적)
- *
- * 「암실」 토큰을 쓰는 화면 코드가 아직 남아 있다. 이름을 새 토큰으로 이어 두어
- * 화면이 깨지지 않게 한다. **새 코드에서는 쓰지 않는다.**
- *
- * 컴포넌트를 새 토큰으로 옮기는 작업이 끝나면 이 블록을 통째로 지운다. 남은
- * 참조는 `grep -rn 'color-accent\|ink-faint\|radius-section' src/`로 찾는다.
- *
- * 색이 바뀌는 것에 주의한다. 구 accent는 버건디였고 주 버튼 배경이었지만, 새
- * 방향에서 행동은 검정이고 빨강은 표식이다. 따라서 --color-accent는 검정으로,
- * --color-accent-mark는 빨강으로 각각 다른 토큰에 연결한다.
- */
-:root {
-  --color-accent: var(--color-action);
-  --color-accent-mark: var(--color-brand);
-  --color-accent-tint: var(--color-brand-tint);
-  --color-on-accent: var(--color-on-action);
-
-  --color-ink-subtle: var(--color-ink-muted);
-  --color-ink-faint: var(--color-ink-muted);
-  --color-ink-dim: var(--color-ink-muted);
-  --color-ink-weak: var(--color-ink-hint);
-
-  --color-line-subtle: var(--color-line);
-  --color-line-section: var(--color-line);
-
-  --color-nav-active: var(--color-ink);
-  --color-nav-inactive: var(--color-ink-disabled);
-
-  --color-on-dark-dim: var(--color-on-dark-muted);
-  --color-on-dark-faint: var(--color-on-dark-hint);
-  --color-surface-on-dark: rgba(255, 255, 255, 0.12);
-  --color-scrim-light: rgba(255, 255, 255, 0.94);
-
-  --color-surface-muted: var(--color-surface);
-  --color-surface-strip: var(--color-surface-sunken);
-  --color-track: var(--color-surface);
-
-  --color-poster-fill: var(--color-surface-sunken);
-  --color-poster-line: var(--color-line);
-  --color-star-empty-line: var(--color-ink-disabled);
-
-  --radius-badge: var(--radius-pill);
-  --radius-section: var(--radius-card);
-}
-
-/*
  * 시스템에서 애니메이션을 줄이도록 설정하면 전환을 끈다.
  */
 @media (prefers-reduced-motion: reduce) {

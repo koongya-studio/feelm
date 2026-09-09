@@ -34,8 +34,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 4px;
-  background: var(--color-surface-on-dark);
-  color: var(--color-on-dark-faint);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--color-on-dark-hint);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -51,7 +51,7 @@
   width: 56px;
   height: 56px;
   box-sizing: border-box;
-  border: 8px solid var(--color-nav-active);
+  border: 8px solid var(--color-ink);
   border-radius: 50%;
   background: var(--color-bg);
   pointer-events: none;
@@ -64,7 +64,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--color-nav-active);
+  background: var(--color-ink);
   pointer-events: none;
 }
 
@@ -92,12 +92,12 @@
   flex-direction: column;
   gap: 8px;
   padding: 14px;
-  border: 1px solid var(--color-line-section);
-  border-radius: var(--radius-section);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
 }
 
 .flowLabel {
-  color: var(--color-ink-subtle);
+  color: var(--color-ink-muted);
   font-size: 12.5px;
   font-weight: 700;
 }
@@ -123,7 +123,7 @@
 }
 
 .keywordRationale {
-  color: var(--color-ink-faint);
+  color: var(--color-ink-muted);
   font-size: 11px;
 }
 
