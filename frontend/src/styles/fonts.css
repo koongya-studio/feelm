@@ -1,0 +1,23 @@
+/*
+ * 서체 로드.
+ *
+ * | 용도 | 서체 | 근거 |
+ * | --- | --- | --- |
+ * | 로고 | Gluten Bold 700 | 확정 워드마크. **로고에만** 쓴다 |
+ * | 그 외 전부 | Pretendard | 중립적이라 로고가 돋보인다 |
+ *
+ * 둘 다 SIL OFL이라 임베딩과 상용에 제약이 없다.
+ *
+ * 이전에는 `global.css`가 `IBM Plex Sans KR`을 지정만 하고 로드하지 않아, 실제
+ * 화면은 시스템 기본 서체(Windows에서 맑은 고딕)로 그려지고 있었다. 그 선언을
+ * 제거하고 여기서 실제로 로드한다.
+ *
+ * Pretendard는 **dynamic-subset**을 쓴다. 한글 글리프를 유니코드 구간별로 쪼개
+ * 화면에 실제로 나온 글자가 속한 구간만 내려받는다. 전체를 받으면 무겁다.
+ * Variable이라 400·500·600을 파일 하나로 처리한다.
+ *
+ * Gluten은 로고 한 단어에만 쓰므로 700 하나만 받는다.
+ */
+
+@import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
+@import '@fontsource/gluten/700.css';

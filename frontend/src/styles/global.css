@@ -1,8 +1,9 @@
 /*
  * 전역 기본 스타일.
- * 디자인 토큰은 src/styles/tokens.css에 둔다.
+ * 서체 로드는 src/styles/fonts.css, 디자인 토큰은 src/styles/tokens.css에 둔다.
  */
 
+@import './fonts.css';
 @import './tokens.css';
 
 *,
@@ -15,17 +16,22 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+/*
+ * 배경은 화면 전체에 한 벌만 깔린다. 화면마다 바꾸지 않는다
+ * (`docs/screens/design-concept.md` 2.1).
+ */
 body {
   margin: 0;
-  font-family:
-    'IBM Plex Sans KR',
-    -apple-system,
-    BlinkMacSystemFont,
-    'Apple SD Gothic Neo',
-    'Malgun Gothic',
-    sans-serif;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  letter-spacing: var(--letter-spacing-body);
   background: var(--color-bg);
+  background-image: var(--gradient-page);
+  background-attachment: fixed;
   color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
 }
 
 h1,
@@ -35,6 +41,14 @@ h4,
 p,
 figure {
   margin: 0;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-heading);
 }
 
 ul,
@@ -57,6 +71,6 @@ button {
 
 /* 기본 초점 표시를 제거하지 않는다. */
 :focus-visible {
-  outline: 2px solid var(--color-nav-active);
+  outline: 2px solid var(--color-ink);
   outline-offset: 2px;
 }

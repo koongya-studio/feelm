@@ -1,137 +1,267 @@
 /*
  * 디자인 토큰.
  *
- * `DESIGN_GOALS.md` Phase 1 시각 방향이 **B안 「암실」로 확정**됐다(2026-09-08).
- * 그 결정을 수치로 고정한 것이 이 파일이다(`DESIGN_TODO.md` Phase 2).
+ * 시각 방향은 `docs/screens/design-concept.md`가 정의한다. 한 줄로는
+ * **밝은 벽에 어두운 것들을 건다**이다. 화면은 밝은 회색 벽이고, 그 위에 걸리는
+ * 포스터와 팝콘만 어둡고 색을 가진다. UI는 유채색을 쓰지 않는다.
  *
  * | 항목 | 결정 |
  * | --- | --- |
- * | 1.1 배경 | 흰색 |
- * | 1.2 잉크 | 준검정 `#2E2C29` 기준 |
- * | 2.1 accent | 하나 도입. 화면의 5% 이하 |
- * | 2.2 oxblood | `#4A0D0D`을 시스템 accent로 승격. **바탕색으로는 쓰지 않는다** |
- * | 2.3 필름 모티프 | 유지하고 구조로 쓴다(스트립 = 컨테이너) |
- * | 2.4 티켓·타자기 | 제거. accent만 계승 |
- * | 2.5 장식 | dashed(빈 컷) · 스프로킷(필름) · 알(한 편) 세 가지만 |
- * | 2.6 특별 화면 | 임계 순간만(1.3 · 2.6 · 2.7) |
- * | 2.7 표면 | 2단계 — 흰색 + `#F1EFEA` |
- * | 2.8 모션 | 상태 전환 + 임계 순간 확장 |
- * | 은유 | 필름 · 컷 · 알이 하나. 팝콘은 맛 이름이며 별도 은유가 아니다 |
+ * | 배경 | 쿨 라이트 그레이 단일 그라디언트. 화면마다 바꾸지 않는다 |
+ * | 색 | 포스터 · 팝콘 8색 · 빨강 표식 세 곳에만 |
+ * | 빨강 | 표식 전용. 면적을 차지하지 않고 버튼 배경으로 쓰지 않는다 |
+ * | 행동 | 검정 알약. 한 화면에 하나 |
+ * | 팝콘 | 어두운 블록 안에서만. 밝은 면에서는 4종이 사라진다 |
+ * | 서체 | 로고 Gluten · 그 외 Pretendard |
+ * | 모드 | 라이트 단일. 다크 모드는 만들지 않는다 |
  *
- * **잉크는 4단계로 줄이고 전부 WCAG AA(4.5:1) 이상으로 올렸다.** 이전에는
- * `rgba(60,58,54,0.55)`가 3.11:1, `rgba(60,58,54,0.45)`가 2.41:1로 기준에 못 미쳤다
- * (`DESIGN_TODO.md` Phase 7 점검 항목).
+ * 값의 출처는 스플래시 이미지(`Feelm 배경.png`)를 픽셀 샘플링한 결과다. 배경
+ * 그라디언트, 잉크(안경테), 빨강(로고)이 모두 그 이미지에서 나왔다.
  *
- * 아래 대비값은 WCAG 2.x 공식으로 직접 계산한 값이다. `DESIGN.md`가 적어 둔 값
- * (`#3C3A36` 10.1:1 · `#2E2C29` 12.3:1)과 조금 다르며, 이 파일의 값이 맞다.
+ * **아래 대비값은 WCAG 2.x 공식으로 직접 계산했다.** 본문급은 4.5:1, 큰 글자와
+ * 도형은 3:1을 기준으로 삼았다.
  *
- * 팝콘 맛 색상은 여기에 두지 않는다. API-044로 조회한 런타임 값을 쓴다.
+ * 팝콘 맛 색상은 여기 두지 않는다. 맛 코드에 매인 데이터이므로 `src/mocks`와
+ * `src/api`가 다루고, 이 파일은 팝콘이 놓일 어두운 면만 정의한다.
+ *
+ * 다크 모드를 만들지 않지만 토큰 이름은 역할 기반으로 둔다. 나중에 추가할 때
+ * 값만 바꾸면 되도록 하기 위한 것이고, 지금 다크 값을 정의하지는 않는다.
  */
 
 :root {
-  /* ─────────────────────────── 표면 (2단계 · 2.7) */
-  --color-bg: #ffffff;
-  /* 한 단계 낮은 캔버스. 섹션이 아니라 화면 배경으로 쓴다 */
-  --color-surface-muted: #f1efea;
+  /* ─────────────────────────── 표면 */
+  /* 화면 배경. 그라디언트는 --gradient-page를 쓴다 */
+  --color-bg: #eff0f3;
+  /* 한 단계 낮은 면. 카드 안쪽, 입력 필드 바닥 */
+  --color-surface: #e6e7ec;
+  /* 가장 낮은 면. 벽의 그늘 쪽 */
+  --color-surface-sunken: #d6d7dd;
+  /* 벽 위에 뜨는 면. 반투명이라 배경이 비친다 */
+  --color-surface-raised: rgba(255, 255, 255, 0.72);
 
-  /* ─────────────────────────── 잉크 (4단계 · 전부 4.5:1 이상) */
-  /* 13.9:1 — 제목 · 본문 */
-  --color-ink: #2e2c29;
-  /* 11.4:1 — 채워진 면(배지 · 스낵바 · 필름 스트립)의 잉크. accent가 아닌 곳 */
-  --color-nav-active: #3c3a36;
-  /* 11.4:1 — 본문 강조 */
-  --color-ink-body: #3c3a36;
-  /*  6.7:1 — 메타 · 설명 · 캡션 */
-  --color-ink-muted: #5f5c55;
-  --color-ink-subtle: #5f5c55;
-  --color-ink-faint: #5f5c55;
-  --color-ink-dim: #5f5c55;
-  /*  4.8:1 — 힌트 · 자리표시자. 이보다 흐린 값은 두지 않는다 */
-  --color-ink-hint: #75726b;
-  --color-ink-weak: #75726b;
+  /*
+   * 배경 그라디언트. 스플래시 이미지의 빛 방향을 따른다. 왼쪽 위가 밝고
+   * 오른쪽 중간이 어둡다.
+   */
+  --gradient-page:
+    radial-gradient(70% 40% at 20% 8%, #f6f7f9 0%, rgba(246, 247, 249, 0) 60%),
+    radial-gradient(60% 40% at 92% 40%, #c6c7cd 0%, rgba(198, 199, 205, 0) 62%),
+    linear-gradient(168deg, #eff0f3 0%, #e6e7ec 46%, #d6d7dd 100%);
+
+  /*
+   * 벽에 지는 사선 그림자. 평평한 회색이 종이처럼 보이지 않게 하는 최소한의
+   * 깊이다. 스플래시 사진의 그림자 각도(112deg)를 그대로 쓴다.
+   */
+  --gradient-wall-shadow: linear-gradient(
+    112deg,
+    rgba(120, 121, 128, 0.26) 0 40px,
+    rgba(120, 121, 128, 0) 40px 100px
+  );
+
+  /* ─────────────────────────── 잉크 (전부 밝은 배경 기준) */
+  /* 13.1:1 — 제목 · 본문 */
+  --color-ink: #262729;
+  /*  9.5:1 — 본문 강조 */
+  --color-ink-body: #3c3d42;
+  /*  4.7:1 — 메타 · 설명 · 캡션 */
+  --color-ink-muted: #6a6b70;
+  /*  3.3:1 — 힌트 · 자리표시자. 본문에는 쓰지 않는다 */
+  --color-ink-hint: #83848a;
   /* 비활성 요소. 텍스트에는 쓰지 않는다 */
-  --color-nav-inactive: #a5a29b;
+  --color-ink-disabled: #adaeb4;
 
-  /* ─────────────────────────── Accent — 버건디 (2.1 · 2.2) */
+  /* ─────────────────────────── 빨강 — 브랜드 표식 */
   /*
-   * 적용 지점을 좁게 유지한다. 화면당 primary 버튼 1개 · 활성 탭 · 별점 채움 ·
-   * 선택 상태뿐이다. 배지나 카드 배경에는 쓰지 않는다(면적이 5%를 넘는다).
+   * 로고에서 뽑은 값이다. 4.1:1이라 **본문에 쓸 수 없다.** 로고처럼 큰 글자,
+   * 그리고 점 · 테두리 · 진행 바 같은 표식에만 쓴다.
+   * 버튼 배경으로 쓰지 않는다. 행동은 --color-action이 맡는다.
    */
-  /* 15.5:1 — primary 버튼 배경 · 큰 면적 */
-  --color-accent: #4a0d0d;
-  /* 10.3:1 — 표식 · 별점 채움 · 활성 탭. 흰 배경 위에서 붉은 기가 보이는 밝기 */
-  --color-accent-mark: #7a1e1e;
-  /* 선택 상태 배경 */
-  --color-accent-tint: rgba(74, 13, 13, 0.08);
-  /* 15.5:1 — accent 위의 글자 */
-  --color-on-accent: #ffffff;
+  --color-brand: #e51a2c;
+  /* 5.3:1 — 수치 · 라벨처럼 작은 글자에 쓰는 빨강 */
+  --color-brand-ink: #c41425;
+  /* 선택 상태 배경. 면적이 커지지 않게 아주 옅게 */
+  --color-brand-tint: rgba(229, 26, 44, 0.08);
 
-  /* ─────────────────────────── 어두운 면 위 */
+  /* ─────────────────────────── 행동 */
+  /* 13.1:1 — 주 버튼 배경. 화면에서 가장 강한 요소 */
+  --color-action: #262729;
+  --color-action-hover: #3c3d42;
+  /* 15.0:1 — 주 버튼 위 글자 */
+  --color-on-action: #ffffff;
+
+  /* ─────────────────────────── 어두운 면 (팝콘 블록 · 포스터 자리) */
+  /*
+   * 팝콘 8색이 밝은 배경에서 4종(기본 1.02:1 · 쿠키앤크림 1.02:1 ·
+   * 체다 1.30:1 · 블루베리 1.38:1) 판별 불가라, 팝콘이 나오는 화면은 예외 없이
+   * 이 면 위에 올린다. 8색 전부 3.9~15.1:1로 살아난다.
+   */
+  --color-surface-dark: #1c1c1f;
+  /* 17.0:1 */
   --color-on-dark: #ffffff;
-  --color-on-dark-dim: rgba(255, 255, 255, 0.78);
-  --color-on-dark-faint: rgba(255, 255, 255, 0.6);
-  --color-surface-on-dark: rgba(255, 255, 255, 0.12);
-  --color-scrim-light: rgba(255, 255, 255, 0.94);
+  /*  8.3:1 */
+  --color-on-dark-muted: #b4b5ba;
+  /*  5.0:1 */
+  --color-on-dark-hint: #8a8b91;
+  --color-line-on-dark: rgba(255, 255, 255, 0.16);
 
-  /* ─────────────────────────── 선 (3단계) */
-  --color-line: rgba(46, 44, 41, 0.14);
-  --color-line-subtle: rgba(46, 44, 41, 0.18);
-  --color-line-section: rgba(46, 44, 41, 0.15);
-  --color-line-strong: rgba(46, 44, 41, 0.28);
-  --color-line-faint: rgba(46, 44, 41, 0.07);
+  /* ─────────────────────────── 선 */
+  --color-line: rgba(38, 39, 41, 0.11);
+  --color-line-strong: rgba(38, 39, 41, 0.18);
+  --color-line-faint: rgba(38, 39, 41, 0.06);
 
-  /* ─────────────────────────── 필름 (2.3 — 유지하고 구조로) */
-  --color-surface-strip: #e9e7e1;
-  --color-track: #efede9;
+  /* ─────────────────────────── 상태 */
+  /* 이전 토큰에는 상태색이 아예 없었다. 전부 본문급 4.5:1을 넘긴다 */
+  --color-success: #1f7a45;
+  --color-warning: #8a5a00;
+  --color-danger: #c41425;
 
-  /* 빈 별의 테두리. 텍스트가 아닌 도형 선이라 잉크 4단계에 넣지 않는다 */
-  --color-star-empty-line: #8a8781;
-
-  /* ─────────────────────────── 포스터 */
+  /* ─────────────────────────── 유리 */
   /*
-   * 자리표시자를 회색 X자에서 **인화된 컷**으로 바꿨다. 영화마다 다른 깊은 톤을
-   * 쓰므로(Poster 컴포넌트) 테두리는 어두운 면에 맞춰 옅은 검정 hairline이다.
-   * 실제 포스터 이미지의 권리는 여전히 미확정이다(`PRODUCT.md`).
+   * `backdrop-filter`는 모바일 웹에서 비용이 크다. 스크롤 콘텐츠 위에 겹쳐서
+   * 효과가 실제로 보이는 곳 — 하단 알약과 상단 아이콘 버튼에만 쓴다.
    */
-  --color-poster-line: rgba(46, 44, 41, 0.12);
-  /* 인물 사진 자리표시자 등 아직 회색 면이 필요한 곳 */
-  --color-poster-fill: #d5d2cc;
+  --color-glass: rgba(255, 255, 255, 0.82);
+  --color-glass-line: rgba(38, 39, 41, 0.1);
+  --blur-glass: blur(16px);
+
+  /* ─────────────────────────── 그림자 */
+  /* 밝은 배경이라 그림자가 깊이를 만든다. 포스터는 벽에 걸린 것처럼 보여야 한다 */
+  --shadow-poster: 0 16px 40px rgba(38, 39, 41, 0.22);
+  --shadow-raised: 0 6px 20px rgba(38, 39, 41, 0.1);
+  --shadow-glass: 0 5px 16px rgba(38, 39, 41, 0.1);
+
+  /* ─────────────────────────── 타이포 */
+  /*
+   * 이전 토큰에는 타이포 스케일이 없어 화면에 10~26px이 12종 하드코딩돼 있었다.
+   * 5단계로 줄인다. 제목이 클수록 자간을 좁혀야 Pretendard가 흐물거리지 않는다.
+   */
+  --font-sans:
+    'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo',
+    'Malgun Gothic', sans-serif;
+  /* 로고 전용. 본문에 쓰지 않는다 */
+  --font-display: 'Gluten', var(--font-sans);
+
+  /* 화면 제목 */
+  --font-size-title: 27px;
+  --line-height-title: 1.2;
+  --letter-spacing-title: -0.035em;
+  /* 섹션 제목 · 카드 제목 */
+  --font-size-heading: 19px;
+  --line-height-heading: 1.35;
+  --letter-spacing-heading: -0.03em;
+  /* 본문 */
+  --font-size-body: 15px;
+  --line-height-body: 1.65;
+  --letter-spacing-body: -0.01em;
+  /* 메타 · 설명 */
+  --font-size-meta: 13px;
+  --line-height-meta: 1.55;
+  /* 캡션 · 힌트 */
+  --font-size-caption: 11px;
+  --line-height-caption: 1.45;
+
+  /* 자간 넓은 라벨(`O N E · A · D A Y`)용 */
+  --letter-spacing-wide: 0.26em;
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 600;
+
+  /* ─────────────────────────── 간격 — 4px 배수 */
+  /* 이전에는 3~56px이 22종 흩어져 있었다. 4의 배수로 통일한다 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
 
   /* ─────────────────────────── 반경 */
   --radius-control: 14px;
-  --radius-section: 16px;
-  --radius-badge: 999px;
-  --radius-icon: 8px;
+  --radius-card: 20px;
+  --radius-poster: 16px;
+  --radius-pill: 999px;
+  --radius-icon: 10px;
 
   /* ─────────────────────────── 치수 */
   --control-height: 52px;
-  --nav-height: 66px;
+  --control-height-sm: 44px;
+  /* 터치 최소 크기. 이보다 작은 조작 대상을 만들지 않는다 */
+  --tap-target-min: 44px;
+  --nav-height: 56px;
   --layout-max-width: 412px;
-  --screen-padding-x: 22px;
+  --screen-padding-x: 20px;
 
-  /* ─────────────────────────── 모션 (2.8) */
-  /*
-   * M3의 패턴 분류만 가져오고 수치는 FEELM이 정한다(`DESIGN_GOALS.md` 1.7).
-   * 상태 전환은 눌렀는지 알 수 있을 만큼만 짧게, 임계 순간은 지켜볼 수 있게 길게.
-   */
+  /* ─────────────────────────── 모션 */
   --motion-press: 90ms;
   --motion-fast: 140ms;
   --motion-base: 220ms;
-  /* 임계 순간 — 필름에 컷이 감기는 전환 (2.6 → 2.7) */
+  /* 누름 표시가 번졌다 사라지는 시간. 터치는 순간이라 여운이 필요하다 */
+  --motion-press-echo: 520ms;
   --motion-emphasized: 420ms;
   --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --ease-out: cubic-bezier(0.05, 0.7, 0.1, 1);
 }
 
 /*
- * 시스템에서 애니메이션을 줄이도록 설정하면 전환을 끈다
- * (`DESIGN_TODO.md` Phase 7 — 모션 감소 설정 대응).
+ * ─────────────────────────── 구 토큰 호환 (한시적)
+ *
+ * 「암실」 토큰을 쓰는 화면 코드가 아직 남아 있다. 이름을 새 토큰으로 이어 두어
+ * 화면이 깨지지 않게 한다. **새 코드에서는 쓰지 않는다.**
+ *
+ * 컴포넌트를 새 토큰으로 옮기는 작업이 끝나면 이 블록을 통째로 지운다. 남은
+ * 참조는 `grep -rn 'color-accent\|ink-faint\|radius-section' src/`로 찾는다.
+ *
+ * 색이 바뀌는 것에 주의한다. 구 accent는 버건디였고 주 버튼 배경이었지만, 새
+ * 방향에서 행동은 검정이고 빨강은 표식이다. 따라서 --color-accent는 검정으로,
+ * --color-accent-mark는 빨강으로 각각 다른 토큰에 연결한다.
+ */
+:root {
+  --color-accent: var(--color-action);
+  --color-accent-mark: var(--color-brand);
+  --color-accent-tint: var(--color-brand-tint);
+  --color-on-accent: var(--color-on-action);
+
+  --color-ink-subtle: var(--color-ink-muted);
+  --color-ink-faint: var(--color-ink-muted);
+  --color-ink-dim: var(--color-ink-muted);
+  --color-ink-weak: var(--color-ink-hint);
+
+  --color-line-subtle: var(--color-line);
+  --color-line-section: var(--color-line);
+
+  --color-nav-active: var(--color-ink);
+  --color-nav-inactive: var(--color-ink-disabled);
+
+  --color-on-dark-dim: var(--color-on-dark-muted);
+  --color-on-dark-faint: var(--color-on-dark-hint);
+  --color-surface-on-dark: rgba(255, 255, 255, 0.12);
+  --color-scrim-light: rgba(255, 255, 255, 0.94);
+
+  --color-surface-muted: var(--color-surface);
+  --color-surface-strip: var(--color-surface-sunken);
+  --color-track: var(--color-surface);
+
+  --color-poster-fill: var(--color-surface-sunken);
+  --color-poster-line: var(--color-line);
+  --color-star-empty-line: var(--color-ink-disabled);
+
+  --radius-badge: var(--radius-pill);
+  --radius-section: var(--radius-card);
+}
+
+/*
+ * 시스템에서 애니메이션을 줄이도록 설정하면 전환을 끈다.
  */
 @media (prefers-reduced-motion: reduce) {
   :root {
     --motion-press: 0ms;
     --motion-fast: 0ms;
     --motion-base: 0ms;
+    --motion-press-echo: 0ms;
     --motion-emphasized: 0ms;
   }
 }
