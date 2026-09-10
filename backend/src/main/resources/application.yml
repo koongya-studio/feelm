@@ -69,12 +69,24 @@ server:
       internal-proxies: 127.0.0.0/8,::1/128,172.16.0.0/12
 
 management:
+  endpoints:
+    web:
+      # health는 컨테이너 상태 판정, prometheus는 내부 모니터링 수집에만 사용한다.
+      exposure:
+        include: health,prometheus
   health:
     mail:
       # spring.mail.host가 설정되면 Boot가 mail health indicator를 자동 등록해 /actuator/health 호출마다
       # SMTP 접속을 시도한다. 인프라 헬스체크(10초 주기)가 이 경로를 보므로, 메일 서버 상태가
       # 백엔드 컨테이너의 healthy 판정을 좌우하지 않도록 끈다. 발송 실패는 재발송(API-003)으로 복구한다.
       enabled: false
+  metrics:
+    tags:
+      application: ${spring.application.name}
+    distribution:
+      # 평균만으로 숨겨지는 느린 요청을 Grafana에서 P95로 확인한다.
+      percentiles-histogram:
+        http.server.requests: true
 
 springdoc:
   paths-to-match: /api/v1/**
