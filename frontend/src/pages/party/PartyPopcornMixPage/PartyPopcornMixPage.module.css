@@ -1,168 +1,153 @@
 /*
- * 5.9 파티 팝콘 섞기. 값은 와이어프레임 실측값이다.
+ * 5.9 파티 팝콘 섞기. 구성은 확정 시안을 따른다
+ * (`docs/screens/design-concept.md`).
  *
- * 와이어프레임 배경은 `#F6EFE3`이고 카드가 흰색이지만, 확정 토큰인 흰 배경을 쓰기로
- * 했으므로 카드는 테두리로만 구분한다(팀 결정 2026-09-07).
+ * 이 화면이 말하는 한 가지는 **우리 취향이 얼마나 겹치는가**다. 그래서 섞인 팝콘 통이
+ * 가운데에 놓이고 참여자 비교와 결과가 위아래에서 그 통을 설명한다.
+ *
+ * 카드로 감싸지 않는다. 이전 구현은 테두리 카드 세 개(①②③)가 쌓여 화면이 목록처럼
+ * 보였다. 홈·취향 필름·영화 상세와 같이 카드 없는 섹션으로 둔다.
+ *
+ * 통은 밝은 벽에 그대로 놓인다. 시안 2.5장의 어두운 블록 규칙은 **팝콘 8색**
+ * (범례·막대)에 대한 것이고, 3D 렌더는 3.2와 같이 벽에 걸린다.
  */
 .page {
   display: flex;
-  min-height: 0;
-  flex: 1;
+  flex: 1 0 auto;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px var(--screen-padding-x) 16px;
-  overflow-y: auto;
+  gap: var(--space-10);
+  padding: var(--space-5) var(--screen-padding-x) var(--space-8);
 }
 
-.card {
+.section {
   display: flex;
-  flex: none;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
+  gap: var(--space-4);
 }
 
-.cardTitle {
-  color: var(--color-ink-muted);
-  font-size: 12.5px;
-  font-weight: 700;
+.sectionTitle {
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
 }
 
-/* ① 참여자 취향 비교 — 두 칸씩 줄바꿈한다 */
+/* 참여자 카드. 두 칸으로 두어 4명까지 두 줄에 들어간다 */
 .memberGrid {
   display: grid;
+  gap: var(--space-4);
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
 }
 
 .memberCard {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  border: 1px solid var(--color-line);
-  border-radius: 12px;
+  gap: var(--space-2);
 }
 
 .memberHead {
   display: flex;
+  min-width: 0;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .avatar {
-  display: block;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   flex: none;
-  box-sizing: border-box;
-  border: 1px solid var(--color-line);
-  border-radius: 50%;
-  background: var(--color-surface);
+  border: 0.5px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
 }
 
 .memberName {
-  font-size: 13.5px;
-  font-weight: 700;
+  overflow: hidden;
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .shareRow {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: var(--space-1);
 }
 
 .shareLabel {
-  flex: none;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
   color: var(--color-ink-muted);
-  font-size: 11.5px;
-  white-space: nowrap;
-}
-
-.shareValue {
-  flex: none;
-  font-size: 11.5px;
-  font-weight: 700;
 }
 
 /*
- * 진행 막대. ① 은 가로줄 안에서 남은 폭을 채우고, ③ 은 세로로 쌓인 칸에 들어간다.
- * 세로 칸에서 flex: 1을 그대로 두면 높이가 늘어나 6px 규격이 깨진다.
+ * 비율 막대. 진행 표시는 빨강을 쓴다(시안 2.2). 트랙은 벽보다 한 단계 낮은 면이다.
  */
 .track {
   display: block;
-  width: 100%;
   height: 6px;
-  flex: none;
-  border-radius: var(--radius-pill);
-  background: var(--color-surface);
   overflow: hidden;
-}
-
-.shareRow .track {
-  width: auto;
-  min-width: 0;
-  flex: 1;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
 }
 
 .trackFill {
   display: block;
   height: 100%;
   border-radius: var(--radius-pill);
-  background: var(--color-ink);
+  background: var(--color-brand);
+}
+
+/* 수치는 작은 글자라 짙은 빨강이다(시안 2.3) */
+.shareValue {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-brand-ink);
 }
 
 .tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: var(--space-1);
 }
 
-/* ② 팝콘 믹서 — 시각 표현 미확정이라 자리만 둔다 */
-.assetSlot {
-  height: 190px;
-  border: 1px dashed var(--color-line);
-  border-radius: 12px;
-  background: var(--color-surface);
+/*
+ * 섞인 팝콘 통. 이 화면의 그림이다.
+ *
+ * 파티원 전원의 맛을 합쳐 한 통에 담는다. 통 아래 문구가 몇 명의 팝콘인지 말한다.
+ */
+.mixer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
 }
 
-.assetNote {
-  color: var(--color-ink-hint);
-  font-size: 11px;
+.mixerNote {
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
   text-align: center;
 }
 
-/* ③ 공통 취향 결과 */
+/*
+ * 공통 취향 결과. 일치율이 이 화면의 답이라 본문보다 크게 둔다.
+ */
 .resultRow {
   display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.resultAsset {
-  width: 96px;
-  height: 96px;
-  flex: none;
-  box-sizing: border-box;
-  border: 1px solid var(--color-line-faint);
-  border-radius: 12px;
-  background: var(--color-surface);
-}
-
-.resultBody {
-  display: flex;
-  min-width: 0;
-  flex: 1;
   flex-direction: column;
-  gap: 7px;
+  gap: var(--space-3);
 }
 
 .resultTitle {
-  font-size: 14.5px;
-  font-weight: 700;
-  white-space: nowrap;
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  letter-spacing: var(--letter-spacing-title);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
 }
