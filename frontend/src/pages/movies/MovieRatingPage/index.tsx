@@ -1,7 +1,17 @@
 /*
  * 2.5 영화 평가
  *
- * 요소와 문구는 와이어프레임 2.5 그대로다(screen-spec.md 6장 2.5).
+ * 구성은 확정 시안을 따른다(`docs/screens/design-concept.md`). 시안은 이 화면이
+ * 한 가지만 말하게 한다. **몇 점인가.**
+ *
+ * 팀 결정 2026-09-10 (업무 -99)
+ * - 직접 만든 헤더를 공통 `ScreenHeader`로 바꿨다. 명세의 뒤로가기형 헤더가 바로
+ *   이 컴포넌트이고, 제목을 h1으로 렌더하는 것도 여기 한 곳에서 하게 된다
+ * - 질문을 화면 제목 크기로 올렸다. 이 화면이 묻는 한 문장이다
+ * - 질문과 별점을 화면 가운데로 모으고 주 동작을 아래에 붙였다. 이전에는 위에서부터
+ *   차곡차곡 쌓여 별점이 다른 요소와 같은 무게로 읽혔다
+ *
+ * 요소와 문구는 와이어프레임 2.5를 따른다(screen-spec.md 6장 2.5).
  * 별점은 0.5점 단위 0.5~5.0이며 계약도 같은 규칙이다(FR-19, API-036 `multipleOf: 0.5`).
  *
  * 계약 기준으로 확정한 것(screen-spec.md 8.1 #11): `보지 않은 영화로 처리`는 제외한다.
@@ -20,12 +30,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
-import IconButton from '../../../components/IconButton';
 import Poster from '../../../components/Poster';
 import RatingInput from '../../../components/RatingInput';
+import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import TextArea from '../../../components/TextArea';
-import { ChevronLeftIcon } from '../../../components/Icon';
 import { getMovieDetail } from '../../../api/movies';
 import { getOtts } from '../../../api/otts';
 import { createRating, getCountsBeforeRating, getWatchRecords } from '../../../api/watch';
@@ -33,6 +42,10 @@ import { path } from '../../../routes/paths';
 import { formatMonthDay } from '../../../utils/date';
 import styles from './MovieRatingPage.module.css';
 import type { MovieDetail } from '../../../types/movie';
+
+/** 무엇을 평가하는지 확인시키는 작은 포스터. 이 화면의 주인공은 별점이다 */
+const POSTER_WIDTH = 88;
+const POSTER_HEIGHT = 132;
 
 export default function MovieRatingPage() {
   const { movieId } = useParams();
@@ -119,15 +132,7 @@ export default function MovieRatingPage() {
   if (failed) {
     return (
       <>
-        <div className={styles.header}>
-          <IconButton
-            label="뒤로 가기"
-            icon={<ChevronLeftIcon />}
-            size={34}
-            onClick={() => void navigate(-1)}
-          />
-          <h1 className={styles.title}>평가하기</h1>
-        </div>
+        <ScreenHeader title="평가하기" showBack />
 
         <StatusView
           title="영화 정보를 불러오지 못했어요"
@@ -158,71 +163,66 @@ export default function MovieRatingPage() {
   ].join(' · ');
 
   return (
-    <div className={styles.page}>
-      <div className={styles.header}>
-        <IconButton
-          label="뒤로 가기"
-          icon={<ChevronLeftIcon />}
-          size={34}
-          onClick={() => void navigate(-1)}
-        />
-        <h1 className={styles.title}>평가하기</h1>
-      </div>
+    <>
+      <ScreenHeader title="평가하기" showBack />
 
-      <div className={styles.movie}>
-        <Poster
-          width={88}
-          height={124}
-          radius={10}
-          src={movie.posterUrl ?? undefined}
-          title=""
-          seed={movie.movieId}
-        />
+      <div className={styles.page}>
+        <div className={styles.movie}>
+          <Poster
+            width={POSTER_WIDTH}
+            height={POSTER_HEIGHT}
+            radius={10}
+            src={movie.posterUrl ?? undefined}
+            title={movie.title}
+            seed={movie.movieId}
+          />
 
-        <div className={styles.movieInfo}>
-          <p className={styles.movieTitle}>{movie.title}</p>
-          <p className={styles.movieMeta}>{meta}</p>
-          {/* 감상 기록이 없으면 이 줄을 표시하지 않는다 */}
-          {watchNote ? <p className={styles.movieMeta}>{watchNote}</p> : null}
+          <div className={styles.movieInfo}>
+            <p className={styles.movieTitle}>{movie.title}</p>
+            <p className={styles.movieMeta}>{meta}</p>
+            {/* 감상 기록이 없으면 이 줄을 표시하지 않는다 */}
+            {watchNote ? <p className={styles.movieMeta}>{watchNote}</p> : null}
+          </div>
+        </div>
+
+        {/* 이 화면이 묻는 한 문장과 그 답. 화면 가운데를 차지한다 */}
+        <div className={styles.ask}>
+          <p className={styles.question}>
+            이 영화를
+            <br />
+            어떻게 평가하시겠어요?
+          </p>
+
+          <RatingInput value={score} onChange={setScore} disabled={submitting} />
+        </div>
+
+        <div className={styles.commentArea}>
+          <TextArea
+            label="한줄평"
+            value={comment}
+            onChange={setComment}
+            placeholder="한 줄 감상 남기기 (선택)"
+            disabled={submitting}
+          />
+          {comment.trim() ? (
+            <p className={styles.visibilityNote}>
+              한줄평은 비공개로 저장돼요 · 공개 범위 선택은 준비 중이에요
+            </p>
+          ) : null}
+        </div>
+
+        <div className={styles.actions}>
+          <Button disabled={score === 0 || submitting} onClick={() => void submit()}>
+            평가 완료
+          </Button>
+
+          <p className={styles.notice}>평가는 영화당 한 번만 반영돼요 · 프레임 1개 + 팝콘 1알</p>
+
+          <Button variant="text" disabled={submitting} onClick={() => void navigate(-1)}>
+            나중에 평가하기
+          </Button>
         </div>
       </div>
-
-      <p className={styles.question}>
-        이 영화를
-        <br />
-        어떻게 평가하시겠어요?
-      </p>
-
-      <div className={styles.ratingArea}>
-        <RatingInput value={score} onChange={setScore} disabled={submitting} />
-      </div>
-
-      <div className={styles.commentArea}>
-        <TextArea
-          label="한줄평"
-          value={comment}
-          onChange={setComment}
-          placeholder="한 줄 감상 남기기 (선택)"
-          disabled={submitting}
-        />
-        {comment.trim() ? (
-          <p className={styles.visibilityNote}>
-            한줄평은 비공개로 저장돼요 · 공개 범위 선택은 준비 중이에요
-          </p>
-        ) : null}
-      </div>
-
-      <div className={styles.actions}>
-        <Button disabled={score === 0 || submitting} onClick={() => void submit()}>
-          평가 완료
-        </Button>
-
-        <p className={styles.notice}>평가는 영화당 한 번만 반영돼요 · 프레임 1개 + 팝콘 1알</p>
-
-        <Button variant="text" disabled={submitting} onClick={() => void navigate(-1)}>
-          나중에 평가하기
-        </Button>
-      </div>
-    </div>
+    </>
   );
 }
