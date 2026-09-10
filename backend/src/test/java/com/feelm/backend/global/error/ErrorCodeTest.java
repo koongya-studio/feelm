@@ -81,6 +81,9 @@ class ErrorCodeTest {
                         "RESET_TOKEN_INVALID",
                         "RESET_TOKEN_EXPIRED",
                         "PASSWORD_NOT_SET",
+                        // 사용자 도메인 — API-020 차단 (S15P21E106-211)
+                        "CANNOT_BLOCK_SELF",
+                        "ALREADY_BLOCKED",
                         // 파티 도메인 — API-051·055·056·069
                         "PARTY_CLOSED",
                         "PARTY_FULL",
@@ -128,6 +131,13 @@ class ErrorCodeTest {
         assertThat(ErrorCode.RESET_TOKEN_INVALID.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(ErrorCode.RESET_TOKEN_EXPIRED.getStatus()).isEqualTo(HttpStatus.GONE);
         assertThat(ErrorCode.PASSWORD_NOT_SET.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("API-020 차단 오류 코드는 명세의 HTTP 상태로 매핑된다")
+    void blockCodesMatchSpecifiedStatuses() {
+        assertThat(ErrorCode.CANNOT_BLOCK_SELF.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.ALREADY_BLOCKED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test

@@ -321,6 +321,15 @@ public record RatingResponse(Long ratingId, BigDecimal score, String comment) {
   경계 또는 이벤트 방식으로 재설계한다.
 - 공통 DTO, 오류 코드, DB Schema, Kafka 이벤트 스키마를 변경할 때는 역할 분배 및 AI 협업
   문서의 공통 계약 변경 절차를 따른다.
+- **차단 필터**는 `domain/user/service/UserBlockFilter`가 제공하는 읽기 전용 컴포넌트다.
+  차단은 `user_blocks`에 단방향 행으로 저장하지만 노출 차단은 양방향이므로, 각 도메인이
+  `user_blocks`를 직접 조회하지 않고 이 컴포넌트를 호출한다(FR-39, 소유·사용 경계는
+  [`backend-role-assignment.md`](./backend-role-assignment.md)). 상대가 한 명이면
+  `isBlocked(userId, otherUserId)`, 후보 집합이 정해져 있으면 `blockedAmong(userId, candidateIds)`,
+  후보를 미리 좁힐 수 없으면 `blockedCounterpartIds(userId)`를 쓰고 반환된 id를 결과에서 제외한다.
+  `blockedAmong`의 후보는 `in` 절에 그대로 들어가므로 한 번에 1,000건 이하로 나눠 호출한다.
+  차단 관계를 만들거나 지우는 경로는 `UserBlockService`뿐이며, 그 쓰기 메서드는 최상위
+  트랜잭션에서만 호출한다(실패를 예외로 바꿔 던지고 벌크 삭제가 영속성 컨텍스트를 비운다).
 - `SecurityConfig`는 기본 정책을 "인증 필요"로 두고, 비회원도 호출할 수 있는 **공개**·**선택**
   구분의 API만 허용 목록에 등록한다. 규칙을 빠뜨린 새 API가 조용히 열리지 않도록 한 것이므로,
   도메인의 공개 API를 추가할 때는 `SecurityConfig`의 허용 경로에 함께 등록한다. 이 파일은
