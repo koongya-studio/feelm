@@ -1014,6 +1014,14 @@ HEAD 검사를 통과해야 합니다.
 직전 이미지를 복구하며 후보 배포 Job은 실패 상태를 유지합니다. 첫 배포 실패에는 복구할
 이미지가 없으므로 실패한 컨테이너를 중지하고 운영자가 로그와 Nginx 상태를 확인합니다.
 
+Nginx 컨테이너의 `Started` 상태는 HTTPS 요청 준비 완료를 보장하지 않습니다. 배포 스크립트는
+Nginx 재생성 후 공개 `/app/healthz`, `/app/`, `/app/movies/1`을 최대 12회, 5초 간격으로
+검사하며 롤백도 `/app/healthz`에 같은 대기 정책을 적용합니다. 각 요청은 연결과 전체 응답을
+각각 5초로 제한합니다. 테스트나 장애 조사에서만
+`FRONTEND_PUBLIC_HEALTH_ATTEMPTS`, `FRONTEND_PUBLIC_HEALTH_INTERVAL_SECONDS`,
+`FRONTEND_PUBLIC_HEALTH_REQUEST_TIMEOUT_SECONDS`로 값을 재정의합니다. 제한된 검사가 모두
+실패하면 기존 자동 롤백과 수동 복구 필요 처리로 진행하며 TLS 인증서 검증을 우회하지 않습니다.
+
 Compose는 frontend나 Nginx만 대상으로 실행해도 전체 `service.yml`을 해석하므로 필수
 `BACKEND_IMAGE` 값이 필요합니다. 프론트엔드 배포와 롤백 스크립트는 호출 환경에
 `BACKEND_IMAGE`가 있으면 그 값을 사용하고, 없으면 실행 중인 `feelm-backend` 컨테이너의
