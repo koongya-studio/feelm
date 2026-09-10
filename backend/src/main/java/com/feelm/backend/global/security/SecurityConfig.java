@@ -99,6 +99,10 @@ public class SecurityConfig {
                         auth ->
                                 auth.requestMatchers(HttpMethod.GET, "/actuator/health")
                                         .permitAll()
+                                        // Prometheus가 JWT 없이 수집한다. 백엔드는 내부 Compose
+                                        // 네트워크에만 있고 Nginx는 이 경로를 프록시하지 않는다.
+                                        .requestMatchers(HttpMethod.GET, "/actuator/prometheus")
+                                        .permitAll()
                                         .requestMatchers(HttpMethod.GET, SWAGGER_PATHS)
                                         .permitAll()
                                         // API-044 기준정보는 로그인 화면에서도 사용할 수 있는 공개 조회다.

@@ -13,7 +13,7 @@ FEELM의 회원, 영화, 평가, 파티, OTT 등 서비스 API를 제공하는 S
 | Framework | Spring Boot 4.1.1 | REST API 서버 구성 |
 | Web | Spring Web MVC | HTTP 요청 처리 |
 | Validation | Jakarta Validation | 요청 데이터 검증 |
-| Monitoring | Spring Boot Actuator | 애플리케이션 상태 확인 |
+| Monitoring | Spring Boot Actuator, Micrometer Prometheus | 상태 확인 및 애플리케이션 메트릭 제공 |
 | Persistence | Spring Data JPA, PostgreSQL | 서비스 데이터 저장 |
 | Migration | Flyway | DB 스키마 버전 관리 |
 | Build | Gradle 9.7.1 Wrapper | 빌드, 테스트 및 의존성 관리 |
@@ -23,6 +23,16 @@ FEELM의 회원, 영화, 평가, 파티, OTT 등 서비스 API를 제공하는 S
 
 Spring Boot DevTools는 개발 환경에서만 사용하며 운영 실행 이미지에는 포함하지
 않습니다.
+
+### 모니터링 메트릭
+
+Actuator는 컨테이너 상태 판정을 위한 `/actuator/health`와 Prometheus 수집용
+`/actuator/prometheus`만 노출합니다. Prometheus 엔드포인트는 JWT 없이 수집할 수 있지만
+운영 백엔드가 내부 Compose 네트워크에만 있고 Nginx가 해당 경로를 프록시하지 않는 것을 보안
+전제로 합니다. 외부 프록시 경로를 추가할 때는 메트릭 엔드포인트를 공개하지 않습니다.
+
+전체 모니터링 스택의 기동과 검증 방법은
+[`infra/monitoring/README.md`](../infra/monitoring/README.md)를 따릅니다.
 
 ## 패키지 구조
 
