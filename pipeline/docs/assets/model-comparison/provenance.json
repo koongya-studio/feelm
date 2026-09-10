@@ -1,0 +1,1061 @@
+{
+  "schema_version": 1,
+  "jira": "S15P21E106-337",
+  "source_repository": "FEELM-standalone",
+  "team_base_commit": "4247473",
+  "publication_scope": "Completed experiment evidence only",
+  "source_files": [
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/comparison.png",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/comparison.png",
+      "source": {
+        "bytes": 210183,
+        "sha256": "d442c52384c1e34c32f4d12b69ed793261fa47742b89a2e634f7daff025b7356"
+      },
+      "published": {
+        "bytes": 210183,
+        "sha256": "d442c52384c1e34c32f4d12b69ed793261fa47742b89a2e634f7daff025b7356"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/metrics.csv",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/metrics.csv",
+      "source": {
+        "bytes": 40470,
+        "sha256": "680d3a112f8b30d59e3ec0b386621ac47096617c7659cde0d41d5c7cd7b2aa0a"
+      },
+      "published": {
+        "bytes": 40069,
+        "sha256": "8eca5824506c871fe4dd185acaefffa1f0053bf3aef64f70dc2b5819105435d2"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/contrasts.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/contrasts.json",
+      "source": {
+        "bytes": 25343,
+        "sha256": "22938cd08f1edc4eae19ddf42e8ccc6b3f26af561edf48e6997d99b33d8b5ea6"
+      },
+      "published": {
+        "bytes": 24242,
+        "sha256": "c18f1f0bb276d22a48cd2bf697dc8623bdc664ac87b39303b32e2c2abab004bf"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/pre-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/pre-review.json",
+      "source": {
+        "bytes": 2087,
+        "sha256": "0576f2a7d92d44d55f9314b85c5674bb1c5c022839a750563c8486c7506863d4"
+      },
+      "published": {
+        "bytes": 2031,
+        "sha256": "290cb393a4665107c59977310e09177488154a44746d7c34d8b3f903e6cb077e"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/prepared-data-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/prepared-data-review.json",
+      "source": {
+        "bytes": 1002,
+        "sha256": "ec8e324cd0924fa0e14b946105a9a3f801d4f2b05a050323292bfe133d925d13"
+      },
+      "published": {
+        "bytes": 974,
+        "sha256": "aa84d0821a8b44f28c9fb42ec68379920ac637068e778169221b01164c0d69fd"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/portable-inference-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/portable-inference-review.json",
+      "source": {
+        "bytes": 419,
+        "sha256": "8f51a9b28db6befc3e143f3525801007bff14cd60e6a66319e053a4bd25536c8"
+      },
+      "published": {
+        "bytes": 406,
+        "sha256": "04e06c63f1a33c0ec8a9fce4e9baad1ae75c417496206b518eba047db3a8b6f0"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/result-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/result-review.json",
+      "source": {
+        "bytes": 4552,
+        "sha256": "d75b617c9731e02ab8f56fc7596e7b3d35b6593e36e9543a21fc9afbe9de21ba"
+      },
+      "published": {
+        "bytes": 4442,
+        "sha256": "33e5d722b92d2fcc126f6f49131959f515e0c2f2973dd1db48d0f20876d5f569"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/candidate-fingerprint.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/candidate-fingerprint.json",
+      "source": {
+        "bytes": 1335,
+        "sha256": "cd2c71f9689d14c2e9749c194c6f6ae12252b2e2a16f1707d938b46ef181cd96"
+      },
+      "published": {
+        "bytes": 1298,
+        "sha256": "24f8dbf8447c6f3a696c9b289a300b51287a00d6e3605b00a0f1257f4db220a6"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/data-audit/population-audit.png",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/data-audit/population-audit.png",
+      "source": {
+        "bytes": 170525,
+        "sha256": "466f190303df8d0cd193435763fb1f0619a172c95b78b9a59c5b4d4345d5cec7"
+      },
+      "published": {
+        "bytes": 170525,
+        "sha256": "466f190303df8d0cd193435763fb1f0619a172c95b78b9a59c5b4d4345d5cec7"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/data-audit/result-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/data-audit/result-review.json",
+      "source": {
+        "bytes": 2163,
+        "sha256": "d5a0d3e973c4f00a91cc25d80c5a9b6143ca6384b04af08614b35a369f136bd3"
+      },
+      "published": {
+        "bytes": 2118,
+        "sha256": "54ee9ab4aec16a9bd55a06b75f6b7d70e4fc452d94fd5608b1b10b2a08e60116"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/data-audit/data-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/data-audit/data-review.json",
+      "source": {
+        "bytes": 1089,
+        "sha256": "d8ee8d76272747e7984d00c63a9262df6907014a7e4862d7125ecbd198fe5c68"
+      },
+      "published": {
+        "bytes": 1059,
+        "sha256": "e7b62182c5e9d4f89fe8ea595093e0a98d2d6de983c96cb53c8a2125eaf6c5a2"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/data-audit/pre-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/data-audit/pre-review.json",
+      "source": {
+        "bytes": 1500,
+        "sha256": "bd295acb3cb776807072a28a05e857e5ad62f0200690469da436d24d7897626b"
+      },
+      "published": {
+        "bytes": 1463,
+        "sha256": "e82866d1374a4f0b00d8a896bb682df87f0f3699ac24b00871b95b9848e2e90c"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/data-audit/input-pins.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/data-audit/input-pins.json",
+      "source": {
+        "bytes": 6515,
+        "sha256": "0af31deb68cdb1fbc26d9c2cd9117e60b9563e1c2ee118b3b2730e4a20b5ef51"
+      },
+      "published": {
+        "bytes": 6340,
+        "sha256": "8ac52b4776bdef0362289a48ad7eb68da9810904bd6fb9ec82f5f99dd53d1bac"
+      },
+      "transformations": [
+        "CRLF_TO_LF",
+        "HISTORICAL_ARCHIVE_PATH_TO_SYMBOL"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/data-audit/role-summaries.csv",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/data-audit/role-summaries.csv",
+      "source": {
+        "bytes": 3700,
+        "sha256": "130c78588305b789691bd1b2745d033c6298c6f3110e4a4f5396bf508c6a4511"
+      },
+      "published": {
+        "bytes": 3678,
+        "sha256": "f3142f508161e0743dbc8a09cb70d47838bcc3747fb98639ab1654373a7baad5"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/data-audit/user-distributions.csv",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/data-audit/user-distributions.csv",
+      "source": {
+        "bytes": 6321,
+        "sha256": "d4235a4a2bf29e917bffa57d0ba0659ae1a1925d9050e648469d448af3121800"
+      },
+      "published": {
+        "bytes": 6252,
+        "sha256": "0f1d8a5ad5c70f0476eed0b35504b4f37b8d803565f45876a691f349e97655cb"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/data-audit/movie-distributions.csv",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/data-audit/movie-distributions.csv",
+      "source": {
+        "bytes": 18812,
+        "sha256": "65a31ab51287d8e10d22ce172d31f709f59fcbb8c24604a4ac1e7edff6ddf552"
+      },
+      "published": {
+        "bytes": 18496,
+        "sha256": "577bf76828e03e437a3ce3678726aa73c8ae81239d69b66b6cca5d963d959bc3"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/data-audit/retention.csv",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/data-audit/retention.csv",
+      "source": {
+        "bytes": 434,
+        "sha256": "a0d046e68241a0a429779a9d90dfeb6f5b0795cc8daa9249c52c8cd315914ebd"
+      },
+      "published": {
+        "bytes": 430,
+        "sha256": "c3fa2b985646b49f52adce00458dcbcd5f4ba162e618d9bcba38b05835dcaae5"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/data-audit/cell-counts.csv",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/data-audit/cell-counts.csv",
+      "source": {
+        "bytes": 6844,
+        "sha256": "09b6303be91eded12e64275f2ee0adcbe221bad43726fd7ffbb47afc162ca350"
+      },
+      "published": {
+        "bytes": 6693,
+        "sha256": "836cb824ee2a71143903720ab6f7dd6af590f7a7a34340dedd471ff526c8b245"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/data-audit/cell-metrics.csv",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/data-audit/cell-metrics.csv",
+      "source": {
+        "bytes": 312639,
+        "sha256": "c73e29350839ee2036683e464dcd407240220b1abf6a297cb14413d33d323174"
+      },
+      "published": {
+        "bytes": 311138,
+        "sha256": "21c8e883f723350aa3dc92cf92bdae751314a893e814b1de186a1cb04a9108c6"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/data-audit/weighting-diagnostic.csv",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-046/data-audit/weighting-diagnostic.csv",
+      "source": {
+        "bytes": 17722,
+        "sha256": "c05b6f8acbd6a041a6a86db56fae2e72c5afa732e2e8103a6b6bfe22fc46debe"
+      },
+      "published": {
+        "bytes": 17521,
+        "sha256": "2f3ae065979300f8b320cc10c7d888877062c526ed886c4255508b3a9c7ea89a"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/learning-curves.png",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-047/learning-curves.png",
+      "source": {
+        "bytes": 195911,
+        "sha256": "c074ad65263b9c81904a8f0e2b4bbb3c5713d5d7f1411bd72d5282a196d0c5ea"
+      },
+      "published": {
+        "bytes": 195911,
+        "sha256": "c074ad65263b9c81904a8f0e2b4bbb3c5713d5d7f1411bd72d5282a196d0c5ea"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/metrics.csv",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-047/metrics.csv",
+      "source": {
+        "bytes": 91623,
+        "sha256": "273c5976cd562e2d4f5fcda8656f3219fa04b856021b27a202a686e8011113a8"
+      },
+      "published": {
+        "bytes": 90722,
+        "sha256": "77e589788b8b110a442e063134be3b55713d275ebda7fb4eaa866c15d1c418b0"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/contrasts.csv",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-047/contrasts.csv",
+      "source": {
+        "bytes": 3282,
+        "sha256": "0ce7274edfa3777e8f453453c7bc89dccb9cbf45f8dc939c389193a107a12357"
+      },
+      "published": {
+        "bytes": 3255,
+        "sha256": "acc728014d037e187476f123ad235b1701af519e0cee4f3f3916d03ddb15f1c9"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/strata.csv",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-047/strata.csv",
+      "source": {
+        "bytes": 222498,
+        "sha256": "5a4d42df1d91a48b763e0484a9f2fe05d633aaa6fa93b2824efb7b507c469bbb"
+      },
+      "published": {
+        "bytes": 218897,
+        "sha256": "45c0c3a5b0a65db3510c64b0c09955fa84cd3a32458b97ec54e3a008dc20c55a"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/support-summary.csv",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-047/support-summary.csv",
+      "source": {
+        "bytes": 14052,
+        "sha256": "96cf29cf81a9e723182d557ded4fb75172baf7f26d76223a91f1a1ad56be405b"
+      },
+      "published": {
+        "bytes": 13851,
+        "sha256": "c86947aaf6bd7d37f13c93ff0a48986bc4387dd05a5a63a8f087727a11ffbe7a"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/training-composition.csv",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-047/training-composition.csv",
+      "source": {
+        "bytes": 1956,
+        "sha256": "af0424d53826099c84dc952b9ff51ba40d60fb09af00224143dfa4d57820b4a4"
+      },
+      "published": {
+        "bytes": 1925,
+        "sha256": "0d5663404c2826a0962efd0c0c5cce2c1903d7f1c3cc2cde78d917e0a7fe1dbd"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/runtime.csv",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-047/runtime.csv",
+      "source": {
+        "bytes": 1968,
+        "sha256": "84c4eb37bf023852be7a91a12396c5d98743d6d787375e37b94263984b9a58b8"
+      },
+      "published": {
+        "bytes": 1943,
+        "sha256": "22018eeaf177fd0f80845d506d1bb57e1f21046970e586e413b52bd15f1650e1"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/population.csv",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-047/population.csv",
+      "source": {
+        "bytes": 1390,
+        "sha256": "e146649f770ed831bbd58b5b167b436e4ae020c5c64e83745ab6da00a378fc90"
+      },
+      "published": {
+        "bytes": 1365,
+        "sha256": "91cf2d6a485aca38f29f5795152f35ff1a6801c3bda58ec27cb41f2522717451"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/aggregate-export.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-047/aggregate-export.json",
+      "source": {
+        "bytes": 1614,
+        "sha256": "35b483760740904f600af3688e3a820c2c9dfa9c754a8aad2b8e18b621fd2d9a"
+      },
+      "published": {
+        "bytes": 1569,
+        "sha256": "b05ce3583a46b1b2ede7347fa01e7afb263aa86a0a56e106d8d5ee9ae63f0e18"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/result-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-047/result-review.json",
+      "source": {
+        "bytes": 6450,
+        "sha256": "a79ac36a277b23ac400be1b2bb27c4c777bf5b904b9765c341346df0dd85da10"
+      },
+      "published": {
+        "bytes": 6285,
+        "sha256": "670c05380350502e624d8f5c09e338eeed9b65c6d9d8750a3e9fcf0e6fc13c09"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/evaluation-data-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-047/evaluation-data-review.json",
+      "source": {
+        "bytes": 3556,
+        "sha256": "0118842c9254e88c6e465eea3d70fad0438e4aa0f5b53e6b1478f18c8c95077e"
+      },
+      "published": {
+        "bytes": 3468,
+        "sha256": "b6ffac934d5b535a67b439c80c390fcd1bb3732fa528ae030e0ea2488a542d7a"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/evaluation-model-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-047/evaluation-model-review.json",
+      "source": {
+        "bytes": 3096,
+        "sha256": "5a93c8453ab37f2165f1a776a861e8d54e44db20b2e1967d996653b6d17f2a29"
+      },
+      "published": {
+        "bytes": 3015,
+        "sha256": "d5b41476f0cf1ba59b236495ab20421361e6386e00fa94e02b6477d0dd307afd"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/validation-data-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-047/validation-data-review.json",
+      "source": {
+        "bytes": 2842,
+        "sha256": "63c8ad4f1814a7a0bbef7da744d5c2d56206a08613b7eab3c24668015e374be9"
+      },
+      "published": {
+        "bytes": 2768,
+        "sha256": "915804e811eeae4801bc441a17cf49e1ba90f43a6cc5259b7562accf8e9d60ae"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/validation-model-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-047/validation-model-review.json",
+      "source": {
+        "bytes": 2753,
+        "sha256": "ed9991ae9ab849f1403c9ece0a5590957e8fad66a1725f5308e85cab08218002"
+      },
+      "published": {
+        "bytes": 2683,
+        "sha256": "4682fee48b16ce2bbc9dc183e0957010ee1a05d7be4931ab4fdd0b77e1d89ea8"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/selection-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-047/selection-review.json",
+      "source": {
+        "bytes": 2871,
+        "sha256": "dbfcef03195f4520006a35e5859427853e8f94edb9a87ea7d2f95058e13ea7b8"
+      },
+      "published": {
+        "bytes": 2796,
+        "sha256": "0ef6f1323e7a172b98432ed1e9323ad8ce88b4ae60277d53ff6ac9d8c17c22ea"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/execution-pre-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-047/execution-pre-review.json",
+      "source": {
+        "bytes": 3046,
+        "sha256": "3b879650791c0e66bfc1d3f955af8d4a3069e4510986cc2555308fe45c62be52"
+      },
+      "published": {
+        "bytes": 2969,
+        "sha256": "131372c620d713839a2a4f01dca8c5aeb535a802b916ec6f71ea2c00c5b698d0"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/readiness-pre-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-047/readiness-pre-review.json",
+      "source": {
+        "bytes": 1427,
+        "sha256": "976cdcdd235a79ab3c9d7adb171d5b7868e5f3c8a3a5d82ebd6aea9fc76548b0"
+      },
+      "published": {
+        "bytes": 1366,
+        "sha256": "ca78c4c0e9336f1d558cc4aeeb29b6dd39c5be33ece6ad8ac7eef5382a0f3523"
+      },
+      "transformations": [
+        "CRLF_TO_LF",
+        "HISTORICAL_ARCHIVE_PATH_TO_SYMBOL"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/readiness-result-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/rec-ev-047/readiness-result-review.json",
+      "source": {
+        "bytes": 570,
+        "sha256": "48c38351ad4770e83c34d556f5ca5431bfb07d492f27a74f5df39a45147907b6"
+      },
+      "published": {
+        "bytes": 552,
+        "sha256": "cb9fac2ae58d109f7ba8182c75dff7f18d3a7c0474c66244999e20f3c325942d"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "scripts/rec046_common.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/rec046_common.py",
+      "source": {
+        "bytes": 8001,
+        "sha256": "42dd14e83ecbee0c02c5e4233abb4b6a8d807ad2213c24a22cfb82350bc47848"
+      },
+      "published": {
+        "bytes": 8001,
+        "sha256": "42dd14e83ecbee0c02c5e4233abb4b6a8d807ad2213c24a22cfb82350bc47848"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/rec046_prepare.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/rec046_prepare.py",
+      "source": {
+        "bytes": 12096,
+        "sha256": "770bdad3b7a01c400ae22d56238b680756ea13ed9bb77cd78abbbd3fda094f84"
+      },
+      "published": {
+        "bytes": 12096,
+        "sha256": "770bdad3b7a01c400ae22d56238b680756ea13ed9bb77cd78abbbd3fda094f84"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/rec046_worker.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/rec046_worker.py",
+      "source": {
+        "bytes": 7410,
+        "sha256": "c090c1f85d6ed8c5e3065bafa1b88dadeec946cbd960254759c5b9e96a9adabd"
+      },
+      "published": {
+        "bytes": 7410,
+        "sha256": "c090c1f85d6ed8c5e3065bafa1b88dadeec946cbd960254759c5b9e96a9adabd"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/rec046_run.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/rec046_run.py",
+      "source": {
+        "bytes": 12353,
+        "sha256": "4559108bfd0acc0264c37e1a9a769f5fe15b2123c674e074fbc6415354c71888"
+      },
+      "published": {
+        "bytes": 12353,
+        "sha256": "4559108bfd0acc0264c37e1a9a769f5fe15b2123c674e074fbc6415354c71888"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/rec046_evaluate.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/rec046_evaluate.py",
+      "source": {
+        "bytes": 9208,
+        "sha256": "66be2442220e56cc702fda195e2c287f3e4b7258e388b37b99869e5a5a56b93a"
+      },
+      "published": {
+        "bytes": 9208,
+        "sha256": "66be2442220e56cc702fda195e2c287f3e4b7258e388b37b99869e5a5a56b93a"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/test_rec046.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/test_rec046.py",
+      "source": {
+        "bytes": 3717,
+        "sha256": "80c2c9aac7177b531992538f08124dfc7c21f07cbdb15b24611663bbb3ad32aa"
+      },
+      "published": {
+        "bytes": 3717,
+        "sha256": "80c2c9aac7177b531992538f08124dfc7c21f07cbdb15b24611663bbb3ad32aa"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/render_rec046.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/render_rec046.py",
+      "source": {
+        "bytes": 3330,
+        "sha256": "e79aefaeb341dfa02e48fdf9905e2ebef27836e1ac954a6ee327f1ef3fc96daf"
+      },
+      "published": {
+        "bytes": 3330,
+        "sha256": "e79aefaeb341dfa02e48fdf9905e2ebef27836e1ac954a6ee327f1ef3fc96daf"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/audit_rec046_population.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/audit_rec046_population.py",
+      "source": {
+        "bytes": 31546,
+        "sha256": "582d0cd807017364fa2cbd813b815ba8e4d9e84edb4cf951e6146fa4f86c837f"
+      },
+      "published": {
+        "bytes": 31546,
+        "sha256": "582d0cd807017364fa2cbd813b815ba8e4d9e84edb4cf951e6146fa4f86c837f"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/test_rec046_population.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/test_rec046_population.py",
+      "source": {
+        "bytes": 1558,
+        "sha256": "22e78ef93280e24385264476963b9f7a4c807b4e607c3b438dfba1785dbd241c"
+      },
+      "published": {
+        "bytes": 1558,
+        "sha256": "22e78ef93280e24385264476963b9f7a4c807b4e607c3b438dfba1785dbd241c"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/render_rec046_population.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/render_rec046_population.py",
+      "source": {
+        "bytes": 5085,
+        "sha256": "731150da3a60903873de9f59b9d379443d8e3c4e51485cd6383752a1b093322a"
+      },
+      "published": {
+        "bytes": 5085,
+        "sha256": "731150da3a60903873de9f59b9d379443d8e3c4e51485cd6383752a1b093322a"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/rec047_common.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/rec047_common.py",
+      "source": {
+        "bytes": 5855,
+        "sha256": "a51d5c4fe9d487caf5c45606ead4cc244654c83fbe39339c40c56c165e792c16"
+      },
+      "published": {
+        "bytes": 5855,
+        "sha256": "a51d5c4fe9d487caf5c45606ead4cc244654c83fbe39339c40c56c165e792c16"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/rec047_features.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/rec047_features.py",
+      "source": {
+        "bytes": 5791,
+        "sha256": "a6f3fdc26cc88cceea2f6b1fe1244285bd9e29f7175874f7ab2eb8fae5904268"
+      },
+      "published": {
+        "bytes": 5791,
+        "sha256": "a6f3fdc26cc88cceea2f6b1fe1244285bd9e29f7175874f7ab2eb8fae5904268"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/rec047_readiness.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/rec047_readiness.py",
+      "source": {
+        "bytes": 8271,
+        "sha256": "eb5a6a46655975e9f2923947ff16400ab400c47238217c90bf73104afaeac8b7"
+      },
+      "published": {
+        "bytes": 8271,
+        "sha256": "eb5a6a46655975e9f2923947ff16400ab400c47238217c90bf73104afaeac8b7"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/rec047_prepare.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/rec047_prepare.py",
+      "source": {
+        "bytes": 12774,
+        "sha256": "033d9ca141436ad9ff742506090238fd4ad03b4889f382ac29aae0abcd4e1824"
+      },
+      "published": {
+        "bytes": 12774,
+        "sha256": "033d9ca141436ad9ff742506090238fd4ad03b4889f382ac29aae0abcd4e1824"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/rec047_worker.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/rec047_worker.py",
+      "source": {
+        "bytes": 7063,
+        "sha256": "73e4f049641fb3b8308888ca721694b9611a217c0e1d72fe98967c29fe9fb766"
+      },
+      "published": {
+        "bytes": 7063,
+        "sha256": "73e4f049641fb3b8308888ca721694b9611a217c0e1d72fe98967c29fe9fb766"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/rec047_run.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/rec047_run.py",
+      "source": {
+        "bytes": 13998,
+        "sha256": "bd9db81789c64b5da8d56f703676d807df29ce98007e1632bb8ef6462f66ecfc"
+      },
+      "published": {
+        "bytes": 13998,
+        "sha256": "bd9db81789c64b5da8d56f703676d807df29ce98007e1632bb8ef6462f66ecfc"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/rec047_evaluate.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/rec047_evaluate.py",
+      "source": {
+        "bytes": 12185,
+        "sha256": "113553b414cc0621f405fb6b8a53c795a41cee95895eca23b2dbfafc8645fed3"
+      },
+      "published": {
+        "bytes": 12185,
+        "sha256": "113553b414cc0621f405fb6b8a53c795a41cee95895eca23b2dbfafc8645fed3"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/rec047_runtime_smoke.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/rec047_runtime_smoke.py",
+      "source": {
+        "bytes": 4984,
+        "sha256": "8865083c06b5184ea024e506c0c2cbc8a6011790576e1a6068c6b7e8d8f73429"
+      },
+      "published": {
+        "bytes": 4984,
+        "sha256": "8865083c06b5184ea024e506c0c2cbc8a6011790576e1a6068c6b7e8d8f73429"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/test_rec047.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/test_rec047.py",
+      "source": {
+        "bytes": 4266,
+        "sha256": "f18dafc2fddfc6195a7ccabe1e7aabfdd05272b3b5d13cdd46116d171b136b6e"
+      },
+      "published": {
+        "bytes": 4266,
+        "sha256": "f18dafc2fddfc6195a7ccabe1e7aabfdd05272b3b5d13cdd46116d171b136b6e"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/summarize_rec047.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/summarize_rec047.py",
+      "source": {
+        "bytes": 4554,
+        "sha256": "f74e6f151ef590cf04da161b67dcc87a66c05bffc77cafa34659a6ceb0bfc8d3"
+      },
+      "published": {
+        "bytes": 4454,
+        "sha256": "b305da2594748417a826671da06eeae379476177a3ba96300ab971a603eb3b9a"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "scripts/render_rec047.py",
+      "published_path": "pipeline/docs/assets/model-comparison/source/scripts/render_rec047.py",
+      "source": {
+        "bytes": 3923,
+        "sha256": "34da82ace93bfb149d1073376e800951664d015be2e58d8d01f2404b770c910b"
+      },
+      "published": {
+        "bytes": 3809,
+        "sha256": "6e0b43f583a5153c95f1278763220981afeaefe1a3f2f513225a51b8ccdd27fb"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "performance/rec046.Dockerfile",
+      "published_path": "pipeline/docs/assets/model-comparison/source/performance/rec046.Dockerfile",
+      "source": {
+        "bytes": 302,
+        "sha256": "38905feb655e4c8fe9b4a6125a71f5f17eb87f202c07f97591f391d5a417420e"
+      },
+      "published": {
+        "bytes": 302,
+        "sha256": "38905feb655e4c8fe9b4a6125a71f5f17eb87f202c07f97591f391d5a417420e"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/README.md",
+      "published_path": "pipeline/docs/assets/model-comparison/source/docs/recommendation/experiments/rec-ev-046/README.md.txt",
+      "source": {
+        "bytes": 10042,
+        "sha256": "b2ad2bbc2b47e9c6f39571fec7fac9f159c9f786a166275238cb47cdaaeb8784"
+      },
+      "published": {
+        "bytes": 10042,
+        "sha256": "b2ad2bbc2b47e9c6f39571fec7fac9f159c9f786a166275238cb47cdaaeb8784"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/config.json",
+      "published_path": "pipeline/docs/assets/model-comparison/source/docs/recommendation/experiments/rec-ev-046/config.json",
+      "source": {
+        "bytes": 2072,
+        "sha256": "2e619c1fa276c781768102a3ec293a299aee90935bc8d994d2978e1f0aafda14"
+      },
+      "published": {
+        "bytes": 1958,
+        "sha256": "542563ad428c4c8578faf9ffdb245cbc15d6e7829bb9c069ea2552a4f42da999"
+      },
+      "transformations": [
+        "CRLF_TO_LF",
+        "HISTORICAL_ARCHIVE_PATH_TO_SYMBOL"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/pre-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/source/docs/recommendation/experiments/rec-ev-046/pre-review.json",
+      "source": {
+        "bytes": 2087,
+        "sha256": "0576f2a7d92d44d55f9314b85c5674bb1c5c022839a750563c8486c7506863d4"
+      },
+      "published": {
+        "bytes": 2031,
+        "sha256": "290cb393a4665107c59977310e09177488154a44746d7c34d8b3f903e6cb077e"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/data-audit/README.md",
+      "published_path": "pipeline/docs/assets/model-comparison/source/docs/recommendation/experiments/rec-ev-046/data-audit/README.md.txt",
+      "source": {
+        "bytes": 6559,
+        "sha256": "582fbebd1bf8c19deefa20edfa03749a6f0461899d5db0c0a328425fded5bdd2"
+      },
+      "published": {
+        "bytes": 6559,
+        "sha256": "582fbebd1bf8c19deefa20edfa03749a6f0461899d5db0c0a328425fded5bdd2"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/data-audit/input-pins.json",
+      "published_path": "pipeline/docs/assets/model-comparison/source/docs/recommendation/experiments/rec-ev-046/data-audit/input-pins.json",
+      "source": {
+        "bytes": 6515,
+        "sha256": "0af31deb68cdb1fbc26d9c2cd9117e60b9563e1c2ee118b3b2730e4a20b5ef51"
+      },
+      "published": {
+        "bytes": 6340,
+        "sha256": "8ac52b4776bdef0362289a48ad7eb68da9810904bd6fb9ec82f5f99dd53d1bac"
+      },
+      "transformations": [
+        "CRLF_TO_LF",
+        "HISTORICAL_ARCHIVE_PATH_TO_SYMBOL"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-046/data-audit/pre-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/source/docs/recommendation/experiments/rec-ev-046/data-audit/pre-review.json",
+      "source": {
+        "bytes": 1500,
+        "sha256": "bd295acb3cb776807072a28a05e857e5ad62f0200690469da436d24d7897626b"
+      },
+      "published": {
+        "bytes": 1463,
+        "sha256": "e82866d1374a4f0b00d8a896bb682df87f0f3699ac24b00871b95b9848e2e90c"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/README.md",
+      "published_path": "pipeline/docs/assets/model-comparison/source/docs/recommendation/experiments/rec-ev-047/README.md.txt",
+      "source": {
+        "bytes": 6078,
+        "sha256": "06c6f5039148cbe51fec1ced87cc7fdc18e99065e061911dfcd33ec361d8428a"
+      },
+      "published": {
+        "bytes": 6057,
+        "sha256": "1232d9932d8103dfa06f27d00b9bf1474e95ac2bb45cf0e3cd987f975947cf60"
+      },
+      "transformations": [
+        "HISTORICAL_ARCHIVE_PATH_TO_SYMBOL"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/EXECUTION.md",
+      "published_path": "pipeline/docs/assets/model-comparison/source/docs/recommendation/experiments/rec-ev-047/EXECUTION.md.txt",
+      "source": {
+        "bytes": 10912,
+        "sha256": "8d33ab74fbc75fd25e27e9e2b992bdb4f507dfb80ec9f6395780144978f23f6b"
+      },
+      "published": {
+        "bytes": 10912,
+        "sha256": "8d33ab74fbc75fd25e27e9e2b992bdb4f507dfb80ec9f6395780144978f23f6b"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/config.json",
+      "published_path": "pipeline/docs/assets/model-comparison/source/docs/recommendation/experiments/rec-ev-047/config.json",
+      "source": {
+        "bytes": 2735,
+        "sha256": "16a9a53ed087132293912c921a295fca9dac1fff09a9cf0db7d5ffd058fdd6ea"
+      },
+      "published": {
+        "bytes": 2622,
+        "sha256": "2a9670a647611eedaad800caf99eaa74c0ffc8950c79e9f8291a6fbd83a00d67"
+      },
+      "transformations": [
+        "CRLF_TO_LF",
+        "HISTORICAL_ARCHIVE_PATH_TO_SYMBOL"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/execution-pre-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/source/docs/recommendation/experiments/rec-ev-047/execution-pre-review.json",
+      "source": {
+        "bytes": 3046,
+        "sha256": "3b879650791c0e66bfc1d3f955af8d4a3069e4510986cc2555308fe45c62be52"
+      },
+      "published": {
+        "bytes": 2969,
+        "sha256": "131372c620d713839a2a4f01dca8c5aeb535a802b916ec6f71ea2c00c5b698d0"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/readiness-pre-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/source/docs/recommendation/experiments/rec-ev-047/readiness-pre-review.json",
+      "source": {
+        "bytes": 1427,
+        "sha256": "976cdcdd235a79ab3c9d7adb171d5b7868e5f3c8a3a5d82ebd6aea9fc76548b0"
+      },
+      "published": {
+        "bytes": 1366,
+        "sha256": "ca78c4c0e9336f1d558cc4aeeb29b6dd39c5be33ece6ad8ac7eef5382a0f3523"
+      },
+      "transformations": [
+        "CRLF_TO_LF",
+        "HISTORICAL_ARCHIVE_PATH_TO_SYMBOL"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/rec-ev-047/readiness-result-review.json",
+      "published_path": "pipeline/docs/assets/model-comparison/source/docs/recommendation/experiments/rec-ev-047/readiness-result-review.json",
+      "source": {
+        "bytes": 570,
+        "sha256": "48c38351ad4770e83c34d556f5ca5431bfb07d492f27a74f5df39a45147907b6"
+      },
+      "published": {
+        "bytes": 552,
+        "sha256": "cb9fac2ae58d109f7ba8182c75dff7f18d3a7c0474c66244999e20f3c325942d"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    }
+  ],
+  "historical_review_scope": "PASS applies to original source bytes. Publication transforms and current packet verification are recorded separately.",
+  "original_result_reports": {
+    "rec-ev-046": {
+      "bytes": 11705,
+      "sha256": "1049d7e0180637248df02b0dc890f29cf540bc0b492504569fd3e3748733d32a"
+    },
+    "rec-ev-047": {
+      "bytes": 14835,
+      "sha256": "37a9e612777f9163eb0dab3b077b60272930c0b2d53689a7bd4c34b511b6f48e"
+    }
+  },
+  "result_copy_policy": "No original RESULT.md is copied; team summary is checked against sealed aggregate results.",
+  "excluded": [
+    "Raw ratings",
+    "Per-user predictions, labels and metrics",
+    "Parquet and trained models",
+    "Data collection and ongoing research"
+  ]
+}

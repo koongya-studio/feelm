@@ -6,6 +6,7 @@ Jira: [S15P21E106-295](https://ssafy.atlassian.net/browse/S15P21E106-295)
 루트 `docs/`는 기존 API·DB·아키텍처·협업 문서 위치를 유지한다.
 
 1. [ALS 기준선](als-baseline.md): 왜 원별점 ALS를 비교 기준으로 유지했는가.
+   후속 근거: [모델 5종·학습량 비교](model-comparison.md) — 입력·영화 지원량별 결과와 평가 자료의 한계.
 2. [구조 콘텐츠](structured-content.md): TMDB 정보에서 개인화 신호가 있었는가.
 3. [평가 기준](evaluation.md): 무엇을 채점했고 무엇을 아직 모르는가.
 4. [재현·EC2 인계](reproduction.md): 지금 실행할 수 있는 것과 필요한 외부 산출물.
