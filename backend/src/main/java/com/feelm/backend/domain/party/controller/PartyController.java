@@ -3,6 +3,7 @@ package com.feelm.backend.domain.party.controller;
 import com.feelm.backend.domain.party.dto.request.PartyCreateRequest;
 import com.feelm.backend.domain.party.dto.request.PartyInvitationCreateRequest;
 import com.feelm.backend.domain.party.dto.response.PartyInvitationResponse;
+import com.feelm.backend.domain.party.dto.response.PartyInvitationStatusResponse;
 import com.feelm.backend.domain.party.dto.response.PartyListItemResponse;
 import com.feelm.backend.domain.party.dto.response.PartyResponse;
 import com.feelm.backend.domain.party.dto.response.PartyStateResponse;
@@ -61,6 +62,18 @@ public class PartyController {
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false) Integer size) {
         return partyService.listInvitations(userId, status, cursor, size);
+    }
+
+    @PostMapping("/invitations/{invitationId}/accept")
+    public PartyResponse acceptInvitation(
+            @AuthenticationPrincipal Long userId, @PathVariable long invitationId) {
+        return partyService.acceptInvitation(userId, invitationId);
+    }
+
+    @PostMapping("/invitations/{invitationId}/decline")
+    public PartyInvitationStatusResponse declineInvitation(
+            @AuthenticationPrincipal Long userId, @PathVariable long invitationId) {
+        return partyService.declineInvitation(userId, invitationId);
     }
 
     @DeleteMapping("/{partyId}/members/{userId}")

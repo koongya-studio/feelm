@@ -65,21 +65,6 @@ public class PartyQueryRepository {
                 .getResultList();
     }
 
-    public boolean hasBlockBetweenInviteeAndPartyMembers(long partyId, long inviteeId) {
-        Number count =
-                (Number)
-                        entityManager
-                                .createNativeQuery(
-                                        "select count(*) from user_blocks b"
-                                                + " join party_members m on m.party_id = :partyId"
-                                                + " and ((b.blocker_id = m.user_id and b.blocked_id = :inviteeId)"
-                                                + " or (b.blocker_id = :inviteeId and b.blocked_id = m.user_id))")
-                                .setParameter("partyId", partyId)
-                                .setParameter("inviteeId", inviteeId)
-                                .getSingleResult();
-        return count.longValue() > 0;
-    }
-
     public List<PartyInvitation> findReceivedInvitations(
             long inviteeId,
             PartyInvitation.Status status,

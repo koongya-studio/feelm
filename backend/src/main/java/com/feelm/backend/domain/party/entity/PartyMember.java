@@ -56,6 +56,19 @@ public class PartyMember {
         return member;
     }
 
+    public static PartyMember memberOf(Party party, User user, Instant joinedAt) {
+        if (party == null || user == null || joinedAt == null) {
+            throw new IllegalArgumentException(
+                    "Party member requires a party, user, and join time");
+        }
+        PartyMember member = new PartyMember();
+        member.party = party;
+        member.user = user;
+        member.role = Role.MEMBER;
+        member.joinedAt = joinedAt;
+        return member;
+    }
+
     public enum Role {
         OWNER,
         MEMBER
