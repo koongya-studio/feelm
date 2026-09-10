@@ -33,7 +33,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /**
      * 계정 행을 잠그고 읽는다. 같은 계정을 동시에 바꾸는 요청들이 서로의 결과를 덮어쓰지 않게 한다.
      *
-     * <p>호출자는 셋이다.
+     * <p>호출자는 넷이다.
      *
      * <ul>
      *   <li>이메일 인증(API-002, {@code EmailVerificationService.verify}) — 상태를 활성으로 바꾸는 동안
@@ -42,10 +42,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
      *       변경이 끼어들지 않게 한다.
      *   <li>비밀번호 변경(API-012, {@code PasswordChangeService.change}) — 같은 사용자의 동시 변경 요청이 서로의 결과를 덮어쓰지
      *       않게 한다.
+     *   <li>파티 생성(API-049, {@code PartyService.create}) — 생성과 초대 수락이 동시에 실행돼도 사용자별 활성 파티 상한을 넘지 않게
+     *       한다.
      * </ul>
      *
-     * <p><b>잠금 순서는 토큰 → 계정</b>이며 세 경로가 모두 지킨다. 재가입의 삭제 경로도 토큰을 먼저 지우고 계정을 지운다. API-012는 계정 행을 잠그기
-     * 전에 재설정 토큰 무효화를 먼저 호출해 이 순서를 지키므로, 재설정과 비밀번호 변경이 동시에 들어와도 교착하지 않는다.
+     * <p>인증의 세 경로는 <b>토큰 → 계정</b> 잠금 순서를 지킨다. 재가입의 삭제 경로도 토큰을 먼저 지우고 계정을 지운다. API-012는 계정 행을 잠그기 전에
+     * 재설정 토큰 무효화를 먼저 호출해 이 순서를 지키므로, 재설정과 비밀번호 변경이 동시에 들어와도 교착하지 않는다.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.id = :id")

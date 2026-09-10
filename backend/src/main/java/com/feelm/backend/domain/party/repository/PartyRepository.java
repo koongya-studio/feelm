@@ -10,6 +10,10 @@ import org.springframework.data.repository.query.Param;
 
 public interface PartyRepository extends JpaRepository<Party, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Party p join fetch p.owner where p.id = :partyId")
+    Optional<Party> findByIdForUpdate(@Param("partyId") long partyId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query(
             "select p from Party p join fetch p.owner"
                     + " where p.id = :partyId"

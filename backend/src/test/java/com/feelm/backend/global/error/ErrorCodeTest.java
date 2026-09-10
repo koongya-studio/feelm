@@ -81,8 +81,12 @@ class ErrorCodeTest {
                         "RESET_TOKEN_INVALID",
                         "RESET_TOKEN_EXPIRED",
                         "PASSWORD_NOT_SET",
-                        // 파티 도메인 — API-055·056·069
-                        "PARTY_CLOSED");
+                        // 파티 도메인 — API-051·055·056·069
+                        "PARTY_CLOSED",
+                        "PARTY_FULL",
+                        "ACTIVE_PARTY_LIMIT_REACHED",
+                        "ALREADY_MEMBER",
+                        "INVITATION_PENDING");
     }
 
     @Test
@@ -127,9 +131,13 @@ class ErrorCodeTest {
     }
 
     @Test
-    @DisplayName("종료된 파티의 상태 충돌은 409로 매핑된다")
-    void partyClosedIsConflict() {
+    @DisplayName("파티 상태 충돌 오류는 409로 매핑된다")
+    void partyConflictCodesAreConflict() {
         assertThat(ErrorCode.PARTY_CLOSED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(ErrorCode.PARTY_FULL.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(ErrorCode.ACTIVE_PARTY_LIMIT_REACHED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(ErrorCode.ALREADY_MEMBER.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(ErrorCode.INVITATION_PENDING.getStatus()).isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test

@@ -1,9 +1,12 @@
 package com.feelm.backend.domain.party.controller;
 
 import com.feelm.backend.domain.party.dto.request.PartyCreateRequest;
+import com.feelm.backend.domain.party.dto.request.PartyInvitationCreateRequest;
+import com.feelm.backend.domain.party.dto.response.PartyInvitationResponse;
 import com.feelm.backend.domain.party.dto.response.PartyListItemResponse;
 import com.feelm.backend.domain.party.dto.response.PartyResponse;
 import com.feelm.backend.domain.party.dto.response.PartyStateResponse;
+import com.feelm.backend.domain.party.dto.response.ReceivedPartyInvitationResponse;
 import com.feelm.backend.domain.party.service.PartyService;
 import com.feelm.backend.global.response.CursorPageResponse;
 import jakarta.validation.Valid;
@@ -40,6 +43,24 @@ public class PartyController {
             @RequestParam(required = false) String cursor,
             @RequestParam(required = false) Integer size) {
         return partyService.list(userId, status, cursor, size);
+    }
+
+    @PostMapping("/{partyId}/invitations")
+    @ResponseStatus(HttpStatus.CREATED)
+    public PartyInvitationResponse invite(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable long partyId,
+            @Valid @RequestBody PartyInvitationCreateRequest request) {
+        return partyService.invite(userId, partyId, request.userId());
+    }
+
+    @GetMapping("/invitations")
+    public CursorPageResponse<ReceivedPartyInvitationResponse> listInvitations(
+            @AuthenticationPrincipal Long userId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer size) {
+        return partyService.listInvitations(userId, status, cursor, size);
     }
 
     @DeleteMapping("/{partyId}/members/{userId}")

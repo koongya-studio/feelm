@@ -24,6 +24,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Party extends BaseTimeEntity {
     public static final int MAX_MEMBERS = 4;
+    public static final int MAX_ACTIVE_PARTIES_PER_USER = 10;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
