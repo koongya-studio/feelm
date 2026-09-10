@@ -49,3 +49,50 @@ export type PartyPopcorn = {
   partyId: number;
   members: PartyMemberPopcorn[];
 };
+
+/** API-052 받은 초대 목록 `items[].party` */
+export type InvitationParty = {
+  partyId: number;
+  name: string;
+  owner: { userId: number; nickname: string };
+  memberCount: number;
+};
+
+/** API-052 받은 초대 목록 `items[]` */
+export type PartyInvitation = {
+  invitationId: number;
+  party: InvitationParty;
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED';
+  createdAt: string;
+};
+
+/** API-058 파티 영화 추천 `items[].reason.memberFit[]` */
+export type PartyMemberFit = {
+  userId: number;
+  /** 0~1 */
+  score: number;
+};
+
+/** API-058 파티 영화 추천 `items[]` */
+export type PartyRecommendationItem = {
+  recommendationItemId: number;
+  type: 'PARTY';
+  movie: {
+    movieId: number;
+    title: string;
+    posterUrl: string | null;
+    ottProviders: string[];
+  };
+  reason: {
+    summary: string;
+    memberFit: PartyMemberFit[];
+  };
+};
+
+/** API-058 파티 영화 추천 */
+export type PartyRecommendationSet = {
+  recommendationSetId: number;
+  partyId: number;
+  generatedAt: string;
+  items: PartyRecommendationItem[];
+};

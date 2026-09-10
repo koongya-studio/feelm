@@ -46,6 +46,14 @@ export const ROUTE_PATTERN = {
   partyPopcorn: '/parties/:partyId/popcorn',
   partyPopcornMix: '/parties/:partyId/popcorn/mix',
 
+  // 파티 만들기와 초대 (5.2 ~ 5.7)
+  partyNew: '/party/new',
+  partySetup: '/party/new/setup',
+  partyAnalyzing: '/parties/:partyId/analyzing',
+  partyRecommendations: '/parties/:partyId/recommendations',
+  partyInvitation: '/parties/invitations/:invitationId',
+  partyJoined: '/parties/:partyId/joined',
+
   // 없는 경로
   notFound: '*',
 } as const;
@@ -80,6 +88,13 @@ export const path = {
   frameDetail: (frameId: string | number) => `/frames/${frameId}`,
   partyPopcorn: (partyId: string | number) => `/parties/${partyId}/popcorn`,
   partyPopcornMix: (partyId: string | number) => `/parties/${partyId}/popcorn/mix`,
+
+  partyNew: () => ROUTE_PATTERN.partyNew,
+  partySetup: () => ROUTE_PATTERN.partySetup,
+  partyAnalyzing: (partyId: string | number) => `/parties/${partyId}/analyzing`,
+  partyRecommendations: (partyId: string | number) => `/parties/${partyId}/recommendations`,
+  partyInvitation: (invitationId: string | number) => `/parties/invitations/${invitationId}`,
+  partyJoined: (partyId: string | number) => `/parties/${partyId}/joined`,
 } as const;
 
 /** 하단 내비 탭이 선택 상태로 보여야 하는 경로 접두사. 공통 내비 구현에서 사용한다. */

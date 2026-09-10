@@ -1,0 +1,75 @@
+/*
+ * 5.3 파티 만들기 및 친구 초대.
+ */
+.page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--screen-padding-x) var(--space-8);
+  overflow-y: auto;
+}
+
+.members,
+.invite {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.label {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+.note {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
+}
+
+.slots {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  margin: var(--space-1) 0 0;
+  list-style: none;
+}
+
+.slot {
+  display: flex;
+  height: 52px;
+  align-items: center;
+  padding: 0 var(--space-4);
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-card);
+  font-size: var(--font-size-meta);
+  color: var(--color-ink-hint);
+}
+
+.slot[data-mine='true'] {
+  border-style: solid;
+  background: var(--color-surface-raised);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+.inviteButtons {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.inviteButtons > * {
+  flex: 1;
+}
+
+/* 이 화면의 유일한 검정 알약 (`design-concept.md` 2.4) */
+.actions {
+  margin-top: auto;
+  padding-top: var(--space-4);
+}
