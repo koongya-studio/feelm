@@ -5,8 +5,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.feelm.backend.infrastructure.mail.MailDispatcher;
-import com.feelm.backend.infrastructure.mail.RecordingPasswordResetMailSender;
-import com.feelm.backend.infrastructure.mail.RecordingVerificationMailSender;
+import com.feelm.backend.infrastructure.mail.MailKind;
+import com.feelm.backend.infrastructure.mail.RecordingAuthMailSender;
+import com.feelm.backend.infrastructure.mail.RecordingMailSends;
 import com.redis.testcontainers.RedisContainer;
 import jakarta.servlet.http.Cookie;
 import java.time.Duration;
@@ -49,16 +50,13 @@ import tools.jackson.databind.ObjectMapper;
  * 타임아웃된다. JVM 수명 동안 한 번만 띄우고 정리는 Testcontainers의 Ryuk에 맡긴다.
  *
  * <p>인증 토큰 원문은 DB에 SHA-256 해시로만 남으므로(플랜 결정 8) 테스트가 되돌릴 수 없다. 그래서 발송 지점을 대체하는 스파이 빈({@link
- * RecordingVerificationMailSender})에서 원문을 얻는다(플랜 결정 13). 발송 로그를 파싱하지 않으므로 인증 토큰을 로그에 남기지 않는 컨벤션
- * 12장과 충돌하지 않는다. 비밀번호 재설정 토큰(API-010)도 같은 이유로 {@link RecordingPasswordResetMailSender}에서 얻는다.
+ * RecordingAuthMailSender})에서 원문을 얻는다(플랜 결정 13). 발송 로그를 파싱하지 않으므로 인증 토큰을 로그에 남기지 않는 컨벤션 12장과 충돌하지
+ * 않는다. 비밀번호 재설정 토큰(API-010)도 같은 스파이가 종류별로 나눠 기록한다(S15P21E106-284).
  */
 @SpringBootTest
 @AutoConfigureMockMvc
 @ExtendWith(OutputCaptureExtension.class)
-@Import({
-    RecordingVerificationMailSender.Registrar.class,
-    RecordingPasswordResetMailSender.Registrar.class
-})
+@Import(RecordingAuthMailSender.Registrar.class)
 abstract class EmailAuthApiTestSupport {
 
     static final String SIGNUP_PATH = "/api/v1/auth/signup";
@@ -100,8 +98,7 @@ abstract class EmailAuthApiTestSupport {
     @Autowired protected MockMvc mockMvc;
     @Autowired protected JdbcTemplate jdbcTemplate;
     @Autowired protected ObjectMapper objectMapper;
-    @Autowired protected RecordingVerificationMailSender verificationMailSender;
-    @Autowired protected RecordingPasswordResetMailSender passwordResetMailSender;
+    @Autowired protected RecordingAuthMailSender authMailSender;
     @Autowired protected MailDispatcher mailDispatcher;
     @Autowired protected StringRedisTemplate redisTemplate;
     @Autowired protected ClientIpProperties clientIpPrefixes;
@@ -114,11 +111,19 @@ abstract class EmailAuthApiTestSupport {
      */
     @BeforeEach
     void clearSentMails() {
-        verificationMailSender.releaseSends();
-        passwordResetMailSender.releaseSends();
+        authMailSender.releaseAll();
         awaitMailsDispatched();
-        verificationMailSender.clear();
-        passwordResetMailSender.clear();
+        authMailSender.clearAll();
+    }
+
+    /** 인증 메일의 발송 기록과 제어 수단. 종류별로 분리돼 있어 한쪽을 붙잡아도 다른 쪽 발송은 진행된다. */
+    protected RecordingMailSends verificationMails() {
+        return authMailSender.sends(MailKind.VERIFICATION);
+    }
+
+    /** 비밀번호 재설정 메일의 발송 기록과 제어 수단. */
+    protected RecordingMailSends passwordResetMails() {
+        return authMailSender.sends(MailKind.PASSWORD_RESET);
     }
 
     /**
@@ -260,7 +265,7 @@ abstract class EmailAuthApiTestSupport {
      */
     List<String> verificationTokens(CapturedOutput output) {
         awaitMailsDispatched();
-        return verificationMailSender.tokens();
+        return verificationMails().tokens();
     }
 
     String latestVerificationToken(CapturedOutput output) {
@@ -272,7 +277,7 @@ abstract class EmailAuthApiTestSupport {
     /** 발송된 재설정 토큰 원문을 발송 순서대로 모은다. 발송 횟수 검증에도 쓴다. */
     List<String> passwordResetTokens() {
         awaitMailsDispatched();
-        return passwordResetMailSender.tokens();
+        return passwordResetMails().tokens();
     }
 
     /** 재설정 요청(API-010)을 보내고 발송된 토큰 원문을 돌려준다. */

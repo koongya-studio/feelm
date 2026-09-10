@@ -1,12 +1,9 @@
 package com.feelm.backend.infrastructure.mail;
 
+import com.feelm.backend.global.properties.WindowQuotas;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.boot.convert.DurationUnit;
@@ -40,38 +37,15 @@ import org.springframework.boot.convert.DurationUnit;
 @ConfigurationProperties(prefix = "feelm.mail.send-budget")
 public record MailSendBudgetProperties(@DefaultValue List<Quota> windows) {
 
-    /** 창의 하한. Redis 만료를 밀리초로 넘기므로 1초 미만은 카운터가 쌓이지 않는 구간을 만든다. */
-    private static final Duration MINIMUM_WINDOW = Duration.ofSeconds(1);
-
-    /** 창의 상한. 이보다 긴 창은 한 번 마르면 사실상 영구 차단이다(리뷰 A-8). */
-    private static final Duration MAXIMUM_WINDOW = Duration.ofHours(24);
-
     /**
-     * 목록은 값이 없으면 빈 목록으로 맞추고, 창 길이 오름차순으로 정규화한다.
+     * 목록은 값이 없으면 빈 목록으로 맞추고, 창 중복을 거부한 뒤 창 길이 오름차순으로 정규화한다.
      *
-     * <p>정렬과 창 중복 거부의 이유는 {@code feelm.auth.login.ip}와 같다. 앞 창에서 막히면 뒤 창의 카운터를 올리지 않으므로 목록 순서가 정책을
-     * 바꾸고, 창을 초 단위로 키에 담으므로 {@code 1h}와 {@code 3600}은 같은 카운터가 되어 한 번의 발송이 같은 값을 두 번 올린다.
+     * <p>규칙과 근거는 {@link WindowQuotas}에 있고 세 축이 같은 규칙을 쓴다(S15P21E106-284). 앞 창에서 막히면 뒤 창의 카운터를 올리지
+     * 않으므로 목록 순서가 정책을 바꾸고, 창을 초 단위로 키에 담으므로 {@code 1h}와 {@code 3600}은 같은 카운터가 되어 한 번의 발송이 같은 값을 두 번
+     * 올린다.
      */
     public MailSendBudgetProperties {
-        windows = normalizeQuotas(windows);
-    }
-
-    private static List<Quota> normalizeQuotas(List<Quota> quotas) {
-        if (quotas == null || quotas.isEmpty()) {
-            return List.of();
-        }
-        Set<Long> windowSeconds = new HashSet<>();
-        for (Quota quota : quotas) {
-            if (!windowSeconds.add(quota.window().toSeconds())) {
-                throw new IllegalArgumentException(
-                        ("feelm.mail.send-budget.windows에 같은 창이 두 번 있습니다. 창은 초 단위로 카운터 키에"
-                                        + " 들어가므로 표기가 달라도 %d초는 하나만 쓸 수 있습니다. 현재 값: %s")
-                                .formatted(quota.window().toSeconds(), quotas));
-            }
-        }
-        List<Quota> sorted = new ArrayList<>(quotas);
-        sorted.sort(Comparator.comparing(Quota::window));
-        return List.copyOf(sorted);
+        windows = WindowQuotas.normalize("feelm.mail.send-budget.windows", windows, Quota::window);
     }
 
     /**
@@ -88,24 +62,7 @@ public record MailSendBudgetProperties(@DefaultValue List<Quota> windows) {
                 throw new IllegalArgumentException(
                         "feelm.mail.send-budget.windows의 limit은 1 이상이어야 합니다. 현재 값: " + limit);
             }
-            requireWindowInRange(window);
-        }
-
-        private static void requireWindowInRange(Duration window) {
-            if (window == null) {
-                throw new IllegalArgumentException(
-                        "feelm.mail.send-budget.windows의 window는 반드시 있어야 합니다.");
-            }
-            if (window.compareTo(MINIMUM_WINDOW) < 0) {
-                throw new IllegalArgumentException(
-                        "feelm.mail.send-budget.windows의 window는 %s 이상이어야 합니다. 현재 값: %s"
-                                .formatted(MINIMUM_WINDOW, window));
-            }
-            if (window.compareTo(MAXIMUM_WINDOW) > 0) {
-                throw new IllegalArgumentException(
-                        "feelm.mail.send-budget.windows의 window는 %s 이하여야 합니다. 현재 값: %s"
-                                .formatted(MAXIMUM_WINDOW, window));
-            }
+            WindowQuotas.requireWindowInRange("feelm.mail.send-budget.windows의 window", window);
         }
     }
 }

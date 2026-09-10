@@ -4,12 +4,13 @@ import com.feelm.backend.domain.auth.AuthRateLimiter;
 import com.feelm.backend.domain.auth.PasswordResetTokenIssuer;
 import com.feelm.backend.domain.auth.RefreshTokenService;
 import com.feelm.backend.domain.auth.entity.PasswordResetToken;
-import com.feelm.backend.domain.auth.event.PasswordResetMailRequestedEvent;
+import com.feelm.backend.domain.auth.event.AuthMailRequestedEvent;
 import com.feelm.backend.domain.auth.repository.PasswordResetTokenRepository;
 import com.feelm.backend.domain.user.entity.User;
 import com.feelm.backend.domain.user.repository.UserRepository;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
+import com.feelm.backend.infrastructure.mail.MailKind;
 import com.feelm.backend.infrastructure.mail.MailSendBudget;
 import java.time.Instant;
 import java.util.Locale;
@@ -68,7 +69,8 @@ public class PasswordResetService {
                 .ifPresent(
                         user ->
                                 eventPublisher.publishEvent(
-                                        new PasswordResetMailRequestedEvent(
+                                        new AuthMailRequestedEvent(
+                                                MailKind.PASSWORD_RESET,
                                                 user.getId(),
                                                 email,
                                                 tokenIssuer.issue(user.getId()))));

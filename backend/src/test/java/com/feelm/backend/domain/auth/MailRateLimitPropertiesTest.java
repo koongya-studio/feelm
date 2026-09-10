@@ -66,6 +66,18 @@ class MailRateLimitPropertiesTest {
     }
 
     @Test
+    @DisplayName("잘못된 값의 메시지가 메일 축의 설정 키를 가리킨다")
+    void messagesPointAtMailKeys() {
+        assertThatThrownBy(() -> new Quota(0, ONE_HOUR))
+                .as("검증 규칙이 공통 헬퍼로 옮겨진 뒤에도 메시지는 자기 설정 키를 가리켜야 한다")
+                .hasMessageContaining("feelm.mail.rate-limit");
+        assertThatThrownBy(() -> new Quota(100, null))
+                .hasMessageContaining("feelm.mail.rate-limit의 window");
+        assertThatThrownBy(() -> new MailRateLimitProperties(Duration.ZERO, List.of()))
+                .hasMessageContaining("feelm.mail.rate-limit.email-interval");
+    }
+
+    @Test
     @DisplayName("이메일 간격이 1초 미만이거나 24시간을 넘으면 만들 수 없다")
     void propertiesRejectEmailIntervalOutOfRange() {
         assertThatThrownBy(() -> properties(Duration.ofMillis(600)))
@@ -101,6 +113,7 @@ class MailRateLimitPropertiesTest {
                                                 new Quota(30, ONE_HOUR),
                                                 new Quota(10, Duration.ofSeconds(3600)))))
                 .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("feelm.mail.rate-limit.ip")
                 .hasMessageContaining("3600");
     }
 

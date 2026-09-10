@@ -24,14 +24,14 @@ class AsyncMailDispatchTest extends EmailAuthApiTestSupport {
     void signupDoesNotWaitForMailSend() throws Exception {
         TestAccount account = newAccount();
 
-        verificationMailSender.blockSends();
+        verificationMails().blockSends();
         signup(signupBody(account)).andExpect(status().isCreated());
 
-        assertThat(verificationMailSender.tokens()).as("응답 시점에는 발송이 끝나지 않았다").isEmpty();
+        assertThat(verificationMails().tokens()).as("응답 시점에는 발송이 끝나지 않았다").isEmpty();
 
-        verificationMailSender.releaseSends();
+        verificationMails().releaseSends();
         awaitMailsDispatched();
-        assertThat(verificationMailSender.tokens()).as("발송은 응답 뒤에 끝난다").hasSize(1);
+        assertThat(verificationMails().tokens()).as("발송은 응답 뒤에 끝난다").hasSize(1);
     }
 
     @Test
@@ -40,16 +40,16 @@ class AsyncMailDispatchTest extends EmailAuthApiTestSupport {
         TestAccount account = newAccount();
         signupPending(account);
         awaitMailsDispatched();
-        verificationMailSender.clear();
+        verificationMails().clear();
 
-        verificationMailSender.blockSends();
+        verificationMails().blockSends();
         resend(account.email()).andExpect(status().isAccepted());
 
-        assertThat(verificationMailSender.tokens()).as("응답 시점에는 발송이 끝나지 않았다").isEmpty();
+        assertThat(verificationMails().tokens()).as("응답 시점에는 발송이 끝나지 않았다").isEmpty();
 
-        verificationMailSender.releaseSends();
+        verificationMails().releaseSends();
         awaitMailsDispatched();
-        assertThat(verificationMailSender.tokens()).hasSize(1);
+        assertThat(verificationMails().tokens()).hasSize(1);
     }
 
     @Test
@@ -57,16 +57,16 @@ class AsyncMailDispatchTest extends EmailAuthApiTestSupport {
     void passwordResetRequestDoesNotWaitForMailSend(CapturedOutput output) throws Exception {
         TestAccount account = newAccount();
         signupActive(account, output);
-        passwordResetMailSender.clear();
+        passwordResetMails().clear();
 
-        passwordResetMailSender.blockSends();
+        passwordResetMails().blockSends();
         requestPasswordReset(account.email()).andExpect(status().isAccepted());
 
-        assertThat(passwordResetMailSender.tokens()).as("응답 시점에는 발송이 끝나지 않았다").isEmpty();
+        assertThat(passwordResetMails().tokens()).as("응답 시점에는 발송이 끝나지 않았다").isEmpty();
 
-        passwordResetMailSender.releaseSends();
+        passwordResetMails().releaseSends();
         awaitMailsDispatched();
-        assertThat(passwordResetMailSender.tokens()).hasSize(1);
+        assertThat(passwordResetMails().tokens()).hasSize(1);
     }
 
     @Test
@@ -74,9 +74,9 @@ class AsyncMailDispatchTest extends EmailAuthApiTestSupport {
     void mailSendFailureKeepsResponseAndNextSend(CapturedOutput output) throws Exception {
         TestAccount account = newAccount();
         signupActive(account, output);
-        passwordResetMailSender.clear();
+        passwordResetMails().clear();
 
-        passwordResetMailSender.failNextSend();
+        passwordResetMails().failNextSend();
         requestPasswordReset(account.email()).andExpect(status().isAccepted());
         assertThat(passwordResetTokens()).as("실패한 발송은 기록되지 않는다").isEmpty();
 

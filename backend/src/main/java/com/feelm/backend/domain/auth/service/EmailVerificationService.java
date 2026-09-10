@@ -4,12 +4,13 @@ import com.feelm.backend.domain.auth.AuthRateLimiter;
 import com.feelm.backend.domain.auth.VerificationTokenIssuer;
 import com.feelm.backend.domain.auth.dto.response.EmailVerificationResponse;
 import com.feelm.backend.domain.auth.entity.EmailVerificationToken;
-import com.feelm.backend.domain.auth.event.VerificationMailRequestedEvent;
+import com.feelm.backend.domain.auth.event.AuthMailRequestedEvent;
 import com.feelm.backend.domain.auth.repository.EmailVerificationTokenRepository;
 import com.feelm.backend.domain.user.entity.User;
 import com.feelm.backend.domain.user.repository.UserRepository;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
+import com.feelm.backend.infrastructure.mail.MailKind;
 import com.feelm.backend.infrastructure.mail.MailSendBudget;
 import java.time.Instant;
 import java.util.Locale;
@@ -99,7 +100,8 @@ public class EmailVerificationService {
                 .ifPresent(
                         user ->
                                 eventPublisher.publishEvent(
-                                        new VerificationMailRequestedEvent(
+                                        new AuthMailRequestedEvent(
+                                                MailKind.VERIFICATION,
                                                 user.getId(),
                                                 email,
                                                 tokenIssuer.issue(user.getId()))));

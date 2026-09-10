@@ -1,12 +1,9 @@
 package com.feelm.backend.domain.auth;
 
+import com.feelm.backend.global.properties.WindowQuotas;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.boot.convert.DurationUnit;
@@ -54,8 +51,9 @@ import org.springframework.boot.convert.DurationUnit;
  * 어떤 키가 왜 잘못됐는지 메시지에 담기 위해서다.
  *
  * <p>{@link Quota}를 {@link MailRateLimitProperties.Quota}와 공유하지 않은 이유는 잘못된 값의 메시지가 어떤 키를 가리키는지에 있다.
- * 메일 쪽 record는 메시지에 자기 접두사를 담고 있어, 그 타입을 그대로 쓰면 로그인 설정 오타가 {@code feelm.mail.rate-limit}을 가리키는 메시지로
- * 기동에 실패한다. 접두사를 알려 줄 통로가 바인딩 시점에 없고, 검증 범위도 메일 쪽(양수)보다 좁다(1초~24시간).
+ * 타입을 공유하면 로그인 설정 오타가 {@code feelm.mail.rate-limit}을 가리키는 메시지로 기동에 실패한다. 접두사를 알려 줄 통로가 바인딩 시점에 없기
+ * 때문이다. 대신 <b>검증 규칙</b>은 {@link WindowQuotas}로 공유하고, 어떤 키에서 잘못됐는지는 이 record가 문자열로 넘긴다
+ * (S15P21E106-284).
  *
  * @param attemptLimit 한 이메일에 대해 한 창에서 비밀번호를 대조하는 시도 횟수. 이 횟수를 넘는 시도는 대조 없이 429다
  * @param attemptWindow 이메일 축이 시도를 세는 기간. 첫 시도 시점부터 흐르는 고정 창이며 단위를 생략하면 초로 읽는다
@@ -68,51 +66,17 @@ public record LoginRateLimitProperties(
         @DefaultValue("10m") @DurationUnit(ChronoUnit.SECONDS) Duration attemptWindow,
         @DefaultValue List<Quota> ip) {
 
-    /** 창의 하한. Redis 만료를 밀리초로 넘기므로 1초 미만은 카운터가 쌓이지 않는 구간을 만든다. */
-    private static final Duration MINIMUM_WINDOW = Duration.ofSeconds(1);
-
-    /** 창의 상한. 이보다 긴 창은 사실상 영구 잠금이고, 더 크면 밀리초 변환이 넘친다. */
-    private static final Duration MAXIMUM_WINDOW = Duration.ofHours(24);
-
     /**
-     * 목록은 값이 없으면 빈 목록으로 맞추고, 창 길이 오름차순으로 정규화한다.
-     *
-     * <p>키만 있고 항목이 없는 설정({@code ip:})이 {@code null}로 들어와도 되게 한다.
-     *
-     * <p><b>정렬하는 이유</b>: 앞 창에서 막히면 뒤 창의 카운터를 올리지 않으므로(리미터의 평가 방식) 목록 순서가 정책을 바꾼다. 긴 창을 먼저 두면 짧은 시간에
-     * 몰아치는 시도가 긴 창의 카운터를 먼저 태워, 10분짜리 폭주가 1시간 차단으로 확대된다. 설정 파일에 적은 순서가 정책이 되면 사람이 알기 어려운 함정이라, 어떤
-     * 순서로 적어도 짧은 창이 먼저 평가되게 고정한다(리뷰 A-2).
-     *
-     * <p><b>창 중복을 거부하는 이유</b>: 키에 창을 <b>초 단위</b>로 담으므로 {@code 10m}과 {@code 600}처럼 표기가 달라도 같은 키가 된다.
-     * 그 설정은 한 요청이 같은 카운터를 두 번 올려 실효 한도를 절반으로 떨어뜨리는데, 기동도 성공하고 로그도 남지 않는다(리뷰 B-4·A-5). 1초 미만은 이미
-     * 거부하므로 절삭으로 0초가 되는 경우는 없다.
+     * 목록은 값이 없으면 빈 목록으로 맞추고, 창 중복을 거부한 뒤 창 길이 오름차순으로 정규화한다. 규칙과 그 근거는 {@link WindowQuotas}에 있고, 세
+     * 축이 같은 규칙을 쓴다(S15P21E106-284).
      */
     public LoginRateLimitProperties {
         if (attemptLimit < 1) {
             throw new IllegalArgumentException(
                     "feelm.auth.login.attempt-limit은 1 이상이어야 합니다. 현재 값: " + attemptLimit);
         }
-        requireWindowInRange("feelm.auth.login.attempt-window", attemptWindow);
-        ip = normalizeQuotas(ip);
-    }
-
-    /** 빈 목록으로 맞추고, 창 중복을 거부한 뒤 창 길이 오름차순으로 정렬한다. */
-    private static List<Quota> normalizeQuotas(List<Quota> quotas) {
-        if (quotas == null || quotas.isEmpty()) {
-            return List.of();
-        }
-        Set<Long> windowSeconds = new HashSet<>();
-        for (Quota quota : quotas) {
-            if (!windowSeconds.add(quota.window().toSeconds())) {
-                throw new IllegalArgumentException(
-                        ("feelm.auth.login.ip에 같은 창이 두 번 있습니다. 창은 초 단위로 카운터 키에 들어가므로"
-                                        + " 표기가 달라도 %d초는 하나만 쓸 수 있습니다. 현재 값: %s")
-                                .formatted(quota.window().toSeconds(), quotas));
-            }
-        }
-        List<Quota> sorted = new ArrayList<>(quotas);
-        sorted.sort(Comparator.comparing(Quota::window));
-        return List.copyOf(sorted);
+        WindowQuotas.requireWindowInRange("feelm.auth.login.attempt-window", attemptWindow);
+        ip = WindowQuotas.normalize("feelm.auth.login.ip", ip, Quota::window);
     }
 
     /**
@@ -132,22 +96,7 @@ public record LoginRateLimitProperties(
                 throw new IllegalArgumentException(
                         "feelm.auth.login.ip의 limit은 1 이상이어야 합니다. 현재 값: " + limit);
             }
-            requireWindowInRange("feelm.auth.login.ip의 window", window);
-        }
-    }
-
-    /** 창이 있고 Redis 만료로 넘길 수 있는 범위인지 본다. 두 축의 창이 같은 이유로 같은 범위를 갖는다. */
-    private static void requireWindowInRange(String property, Duration window) {
-        if (window == null) {
-            throw new IllegalArgumentException("%s는 반드시 있어야 합니다.".formatted(property));
-        }
-        if (window.compareTo(MINIMUM_WINDOW) < 0) {
-            throw new IllegalArgumentException(
-                    "%s는 %s 이상이어야 합니다. 현재 값: %s".formatted(property, MINIMUM_WINDOW, window));
-        }
-        if (window.compareTo(MAXIMUM_WINDOW) > 0) {
-            throw new IllegalArgumentException(
-                    "%s는 %s 이하여야 합니다. 현재 값: %s".formatted(property, MAXIMUM_WINDOW, window));
+            WindowQuotas.requireWindowInRange("feelm.auth.login.ip의 window", window);
         }
     }
 }

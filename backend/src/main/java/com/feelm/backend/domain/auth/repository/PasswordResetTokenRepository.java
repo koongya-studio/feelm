@@ -4,10 +4,9 @@ import com.feelm.backend.domain.auth.entity.PasswordResetToken;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
-import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 
-public interface PasswordResetTokenRepository extends JpaRepository<PasswordResetToken, Long> {
+public interface PasswordResetTokenRepository extends OneTimeTokenRepository<PasswordResetToken> {
 
     /**
      * 토큰 원문이 아닌 해시로 조회한다.
@@ -25,9 +24,13 @@ public interface PasswordResetTokenRepository extends JpaRepository<PasswordRese
      *
      * <p><b>이 잠금만으로는 부족하다.</b> {@code SELECT ... FOR UPDATE}는 이미 존재하는 행만 잠그고, 이 조회 시점에 아직 커밋되지 않은
      * 다른 트랜잭션의 INSERT(재요청으로 발급 중인 새 토큰)는 보이지도 잠기지도 않는다. 그래서 {@code
-     * PasswordResetTokenIssuer.invalidateUnused()}가 이 메서드를 호출하기 전에 사용자 단위 애플리케이션 락으로 {@code
+     * PasswordResetTokenIssuer.beforeInvalidate()}가 이 메서드가 불리기 전에 사용자 단위 애플리케이션 락으로 {@code
      * issue()}·{@code invalidateAllUnused()} 동시 호출 자체를 직렬화한다(283 리뷰 발견 1).
+     *
+     * <p>공통 상한({@link OneTimeTokenRepository})에도 같은 이름의 조회가 있지만 여기서 다시 선언한다. 이 축에만 행 잠금이 붙으므로 상속만으로
+     * 애노테이션이 적용되는지에 기대지 않는다(S15P21E106-284).
      */
+    @Override
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<PasswordResetToken> findAllByUserIdAndUsedAtIsNull(Long userId);
 }

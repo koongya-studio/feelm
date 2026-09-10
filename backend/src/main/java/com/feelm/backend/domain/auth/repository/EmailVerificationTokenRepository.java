@@ -4,11 +4,10 @@ import com.feelm.backend.domain.auth.entity.EmailVerificationToken;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
-import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 
 public interface EmailVerificationTokenRepository
-        extends JpaRepository<EmailVerificationToken, Long> {
+        extends OneTimeTokenRepository<EmailVerificationToken> {
 
     /**
      * 토큰 원문이 아닌 해시로 조회한다(플랜 결정 8).
@@ -18,7 +17,13 @@ public interface EmailVerificationTokenRepository
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<EmailVerificationToken> findByTokenHash(String tokenHash);
 
-    /** 아직 소진되지 않은 토큰. 재발송(API-003)이 이전 토큰을 무효화할 때 사용한다. */
+    /**
+     * 아직 소진되지 않은 토큰. 재발송(API-003)이 이전 토큰을 무효화할 때 사용한다.
+     *
+     * <p>공통 상한({@link OneTimeTokenRepository})에도 있지만 여기서 다시 선언한다. 재설정 토큰 쪽은 같은 이름의 조회에 행 잠금을 걸고 이쪽은
+     * 걸지 않아, 잠금 유무가 각 리포지토리에 드러나 있어야 한다(S15P21E106-284).
+     */
+    @Override
     List<EmailVerificationToken> findAllByUserIdAndUsedAtIsNull(Long userId);
 
     /** 계정 행을 삭제하는 경로에서 함께 정리한다. FK CASCADE에만 의존하지 않는 이유는 알림 설정 쪽과 같다. */
