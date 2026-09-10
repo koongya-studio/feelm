@@ -1,4 +1,9 @@
-/* 와이어프레임 1.1 카드 실측값 */
+/*
+ * 1.1 배치 카드.
+ *
+ * 크기 58x82와 `⊖`의 22/44px은 부모의 상수와 짝이 맞아야 하는 기하값이라 그대로 둔다.
+ * 색은 전부 토큰을 쓴다.
+ */
 .card {
   position: absolute;
   top: var(--card-y);
@@ -25,13 +30,19 @@
   cursor: grabbing;
 }
 
-/* 가까이 = 좋아요 */
+/*
+ * 가까이 = 좋아요.
+ *
+ * 선택 상태는 빨강이다(`docs/screens/design-concept.md` 2.2). 1px 테두리는 면이 아니라
+ * 표식이므로 2.3장의 "빨강은 표식이지 면이 아니다"에도 맞다. 검정은 이 화면에서 주 동작
+ * 알약 하나에만 쓴다(2.4장).
+ */
 .card[data-value='LIKE'] .surface {
-  box-shadow: 0 0 0 1px var(--color-ink);
+  box-shadow: 0 0 0 1.5px var(--color-brand);
 }
 
 .card[data-value='LIKE'] .surface > * {
-  border-color: var(--color-ink);
+  border-color: var(--color-brand);
 }
 
 /* 멀리 = 싫어요 */
