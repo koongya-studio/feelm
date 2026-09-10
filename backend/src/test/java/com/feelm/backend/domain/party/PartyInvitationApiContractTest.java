@@ -1,0 +1,624 @@
+package com.feelm.backend.domain.party;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.feelm.backend.global.security.TokenProvider;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+/** API-051·052: 파티 초대 생성과 받은 초대 목록의 HTTP 계약 테스트. */
+@SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
+@AutoConfigureMockMvc
+@Testcontainers
+class PartyInvitationApiContractTest {
+    private static final String LIST_PATH = "/api/v1/parties/invitations";
+    private static final Instant CREATED_AT = Instant.parse("2026-09-01T00:00:00Z");
+
+    @Container
+    static final PostgreSQLContainer<?> POSTGRES =
+            new PostgreSQLContainer<>(
+                    DockerImageName.parse("pgvector/pgvector:0.8.6-pg17-bookworm")
+                            .asCompatibleSubstituteFor("postgres"));
+
+    @DynamicPropertySource
+    static void database(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
+        registry.add("spring.datasource.username", POSTGRES::getUsername);
+        registry.add("spring.datasource.password", POSTGRES::getPassword);
+        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
+    }
+
+    @Autowired MockMvc mvc;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired TokenProvider tokens;
+    @Autowired ObjectMapper json;
+    @Autowired PlatformTransactionManager transactionManager;
+
+    private ExecutorService executor;
+
+    @BeforeEach
+    void fixtures() {
+        jdbc.execute("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
+        for (long id = 10; id <= 80; id += 10) {
+            user(id);
+        }
+    }
+
+    @AfterEach
+    void shutdownExecutor() throws InterruptedException {
+        if (executor == null) return;
+        executor.shutdownNow();
+        assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @Test
+    void requiresAuthentication() throws Exception {
+        long party = party(10, "ACTIVE", CREATED_AT);
+
+        mvc.perform(
+                        post(invitationPath(party))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"userId\":20}"))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get(LIST_PATH)).andExpect(status().isUnauthorized());
+        assertThat(invitationCount()).isZero();
+    }
+
+    @Test
+    void invitesUserAndReturnsPendingInvitation() throws Exception {
+        long party = party(10, "ACTIVE", CREATED_AT);
+
+        JsonNode response =
+                body(
+                        invite(party, 20, 10)
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.partyId").value(party))
+                                .andExpect(jsonPath("$.invitee.userId").value(20))
+                                .andExpect(jsonPath("$.invitee.nickname").value("member20"))
+                                .andExpect(jsonPath("$.status").value("PENDING"))
+                                .andExpect(jsonPath("$.createdAt").isNotEmpty()));
+
+        assertThat(response.get("invitationId").asLong()).isPositive();
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT party_id,inviter_id,invitee_id,status,responded_at"
+                                        + " FROM party_invitations"))
+                .containsEntry("party_id", party)
+                .containsEntry("inviter_id", 10L)
+                .containsEntry("invitee_id", 20L)
+                .containsEntry("status", "PENDING")
+                .containsEntry("responded_at", null);
+    }
+
+    @Test
+    void allowsCurrentNonOwnerMemberToInvite() throws Exception {
+        long party = party(10, "ACTIVE", CREATED_AT);
+        member(party, 20);
+
+        invite(party, 30, 20).andExpect(status().isCreated());
+
+        assertThat(jdbc.queryForObject("SELECT inviter_id FROM party_invitations", Long.class))
+                .isEqualTo(20);
+    }
+
+    @Test
+    void allowsInvitingUserWithTenActiveParties() throws Exception {
+        for (int i = 0; i < 10; i++) {
+            long joinedParty = party(10, "ACTIVE", CREATED_AT.plusSeconds(i));
+            member(joinedParty, 20);
+        }
+        long targetParty = party(30, "ACTIVE", CREATED_AT.plusSeconds(20));
+
+        invite(targetParty, 20, 30).andExpect(status().isCreated());
+
+        assertThat(invitationCount()).isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT status FROM party_invitations WHERE invitee_id=20",
+                                String.class))
+                .isEqualTo("PENDING");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{\"userId\":null}", "{\"userId\":0}", "{\"userId\":-1}", "{"})
+    void rejectsInvalidInvitationRequest(String request) throws Exception {
+        long party = party(10, "ACTIVE", CREATED_AT);
+
+        mvc.perform(
+                        post(invitationPath(party))
+                                .header("Authorization", bearer(10))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(request))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        assertThat(invitationCount()).isZero();
+    }
+
+    @Test
+    void hidesMissingPartyAndInvitee() throws Exception {
+        invite(9999, 20, 10)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+        long party = party(10, "ACTIVE", CREATED_AT);
+        invite(party, 9999, 10)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+        assertThat(invitationCount()).isZero();
+    }
+
+    @Test
+    void hidesInactiveInvitees() throws Exception {
+        long party = party(10, "ACTIVE", CREATED_AT);
+        jdbc.update("UPDATE users SET status='PENDING_VERIFICATION' WHERE id=20");
+        jdbc.update(
+                "UPDATE users SET status='WITHDRAWN', withdrawn_at=? WHERE id=30",
+                Timestamp.from(CREATED_AT));
+
+        for (long target : List.of(20L, 30L)) {
+            invite(party, target, 10)
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+        }
+        assertThat(invitationCount()).isZero();
+    }
+
+    @Test
+    void rejectsRequesterOutsideParty() throws Exception {
+        long party = party(10, "ACTIVE", CREATED_AT);
+
+        invite(party, 30, 20)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        assertThat(invitationCount()).isZero();
+    }
+
+    @Test
+    void rejectsInvitationToClosedParty() throws Exception {
+        long party = party(10, "CLOSED", CREATED_AT);
+
+        invite(party, 20, 10)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PARTY_CLOSED"));
+        assertThat(invitationCount()).isZero();
+    }
+
+    @Test
+    void rejectsSelfAndExistingMemberInvitation() throws Exception {
+        long party = party(10, "ACTIVE", CREATED_AT);
+        member(party, 20);
+
+        for (long target : List.of(10L, 20L)) {
+            invite(party, target, 10)
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.code").value("ALREADY_MEMBER"));
+        }
+        assertThat(invitationCount()).isZero();
+    }
+
+    @Test
+    void rejectsPendingDuplicateButAllowsReinviteAfterDecline() throws Exception {
+        long party = party(10, "ACTIVE", CREATED_AT);
+        invitation(party, 10, 20, "PENDING", CREATED_AT);
+
+        invite(party, 20, 10)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVITATION_PENDING"));
+        jdbc.update(
+                "UPDATE party_invitations SET status='DECLINED', responded_at=?",
+                Timestamp.from(CREATED_AT.plusSeconds(1)));
+        invite(party, 20, 10).andExpect(status().isCreated());
+
+        assertThat(invitationCount()).isEqualTo(2);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM party_invitations WHERE status='PENDING'",
+                                Long.class))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void rejectsInvitationWhenPartyCapacityIsReserved() throws Exception {
+        long party = party(10, "ACTIVE", CREATED_AT);
+        member(party, 20);
+        invitation(party, 10, 30, "PENDING", CREATED_AT);
+        invitation(party, 10, 40, "PENDING", CREATED_AT.plusSeconds(1));
+
+        invite(party, 50, 10)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PARTY_FULL"));
+        assertThat(invitationCount()).isEqualTo(2);
+    }
+
+    @Test
+    void hidesInviteeBlockedInEitherDirection() throws Exception {
+        long firstParty = party(10, "ACTIVE", CREATED_AT);
+        block(20, 10);
+        invite(firstParty, 20, 10)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+
+        jdbc.execute("DELETE FROM user_blocks");
+        long secondParty = party(30, "ACTIVE", CREATED_AT.plusSeconds(1));
+        member(secondParty, 40);
+        block(40, 50);
+        invite(secondParty, 50, 30)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+        assertThat(invitationCount()).isZero();
+    }
+
+    @Test
+    void serializesConcurrentInvitationsAtLastCapacity() throws Exception {
+        long party = party(10, "ACTIVE", CREATED_AT);
+        member(party, 20);
+        invitation(party, 10, 30, "PENDING", CREATED_AT);
+
+        List<InviteResult> results = concurrentInvites(party, 40, 50);
+
+        assertThat(results).extracting(InviteResult::status).containsExactlyInAnyOrder(201, 409);
+        assertThat(results)
+                .filteredOn(result -> result.status() == 409)
+                .singleElement()
+                .extracting(InviteResult::code)
+                .isEqualTo("PARTY_FULL");
+        assertThat(
+                        jdbc.queryForObject(
+                                        "SELECT count(*) FROM party_members WHERE party_id=?",
+                                        Long.class,
+                                        party)
+                                + invitationCount(party, "PENDING"))
+                .isEqualTo(4);
+    }
+
+    @Test
+    void waitsUntilPartyRowLockIsReleased() throws Exception {
+        long party = party(10, "ACTIVE", CREATED_AT);
+        executor = Executors.newFixedThreadPool(2);
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        Future<?> lockHolder =
+                executor.submit(
+                        () ->
+                                new TransactionTemplate(transactionManager)
+                                        .executeWithoutResult(
+                                                ignored -> {
+                                                    jdbc.queryForObject(
+                                                            "SELECT id FROM parties WHERE id=? FOR UPDATE",
+                                                            Long.class,
+                                                            party);
+                                                    locked.countDown();
+                                                    await(release);
+                                                }));
+        assertThat(locked.await(5, TimeUnit.SECONDS)).isTrue();
+        Future<InviteResult> blockedRequest =
+                executor.submit(() -> performInvite(party, 20, bearer(10)));
+        try {
+            assertThatThrownBy(() -> blockedRequest.get(300, TimeUnit.MILLISECONDS))
+                    .isInstanceOf(TimeoutException.class);
+        } finally {
+            release.countDown();
+        }
+        lockHolder.get(5, TimeUnit.SECONDS);
+        assertThat(blockedRequest.get(5, TimeUnit.SECONDS).status()).isEqualTo(201);
+    }
+
+    @Test
+    void listsPendingInvitationsByDefault() throws Exception {
+        long oldest = party(20, "ACTIVE", CREATED_AT);
+        member(oldest, 30);
+        invitation(oldest, 20, 10, "PENDING", CREATED_AT);
+        long newest = party(30, "ACTIVE", CREATED_AT.plusSeconds(2));
+        invitation(newest, 30, 10, "PENDING", CREATED_AT.plusSeconds(2));
+        invitation(
+                party(40, "ACTIVE", CREATED_AT.plusSeconds(3)),
+                40,
+                10,
+                "ACCEPTED",
+                CREATED_AT.plusSeconds(3));
+        invitation(
+                party(50, "ACTIVE", CREATED_AT.plusSeconds(4)),
+                50,
+                20,
+                "PENDING",
+                CREATED_AT.plusSeconds(4));
+
+        list(10).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(2)))
+                .andExpect(jsonPath("$.items[0].party.partyId").value(newest))
+                .andExpect(jsonPath("$.items[0].party.owner.userId").value(30))
+                .andExpect(jsonPath("$.items[0].party.memberCount").value(1))
+                .andExpect(jsonPath("$.items[0].status").value("PENDING"))
+                .andExpect(jsonPath("$.items[1].party.partyId").value(oldest))
+                .andExpect(jsonPath("$.items[1].party.memberCount").value(2));
+    }
+
+    @Test
+    void filtersInvitationsByStatus() throws Exception {
+        long party = party(20, "ACTIVE", CREATED_AT);
+        invitation(party, 20, 10, "PENDING", CREATED_AT);
+        invitation(party, 20, 10, "ACCEPTED", CREATED_AT.plusSeconds(1));
+        invitation(party, 20, 10, "DECLINED", CREATED_AT.plusSeconds(2));
+
+        for (String requested : List.of("PENDING", "ACCEPTED", "DECLINED")) {
+            mvc.perform(
+                            get(LIST_PATH)
+                                    .param("status", requested)
+                                    .header("Authorization", bearer(10)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items", hasSize(1)))
+                    .andExpect(jsonPath("$.items[0].status").value(requested));
+        }
+    }
+
+    @Test
+    void excludesClosedPartyFromPendingInvitations() throws Exception {
+        long active = party(20, "ACTIVE", CREATED_AT);
+        long closed = party(30, "CLOSED", CREATED_AT.plusSeconds(1));
+        invitation(active, 20, 10, "PENDING", CREATED_AT);
+        invitation(closed, 30, 10, "PENDING", CREATED_AT.plusSeconds(1));
+
+        list(10).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].party.partyId").value(active));
+    }
+
+    @Test
+    void paginatesInvitationsWithStableCursor() throws Exception {
+        long first = invitation(party(20, "ACTIVE", CREATED_AT), 20, 10, "PENDING", CREATED_AT);
+        long second = invitation(party(30, "ACTIVE", CREATED_AT), 30, 10, "PENDING", CREATED_AT);
+        long newest =
+                invitation(
+                        party(40, "ACTIVE", CREATED_AT.plusSeconds(1)),
+                        40,
+                        10,
+                        "PENDING",
+                        CREATED_AT.plusSeconds(1));
+        List<Long> expected = List.of(newest, second, first);
+        String cursor = null;
+
+        for (int page = 0; page < expected.size(); page++) {
+            var request = get(LIST_PATH).param("size", "1").header("Authorization", bearer(10));
+            if (cursor != null) request.param("cursor", cursor);
+            boolean hasNext = page < expected.size() - 1;
+            ResultActions result =
+                    mvc.perform(request)
+                            .andExpect(status().isOk())
+                            .andExpect(jsonPath("$.items", hasSize(1)))
+                            .andExpect(
+                                    jsonPath("$.items[0].invitationId").value(expected.get(page)))
+                            .andExpect(jsonPath("$.hasNext").value(hasNext));
+            if (hasNext) {
+                cursor = body(result).get("nextCursor").asText();
+                assertThat(cursor).isNotBlank();
+            } else {
+                result.andExpect(jsonPath("$.nextCursor").isEmpty());
+            }
+        }
+    }
+
+    @Test
+    void usesDefaultAndMaximumInvitationPageSize() throws Exception {
+        for (int i = 0; i < 51; i++) {
+            long party = party(20, "ACTIVE", CREATED_AT.plusSeconds(i));
+            invitation(party, 20, 10, "PENDING", CREATED_AT.plusSeconds(i));
+        }
+
+        list(10).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(20)))
+                .andExpect(jsonPath("$.hasNext").value(true));
+        mvc.perform(get(LIST_PATH).param("size", "50").header("Authorization", bearer(10)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(50)))
+                .andExpect(jsonPath("$.hasNext").value(true));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "-1", "51", "word"})
+    void rejectsInvalidInvitationListSize(String size) throws Exception {
+        mvc.perform(get(LIST_PATH).param("size", size).header("Authorization", bearer(10)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    void rejectsInvalidInvitationListStatusAndCursor() throws Exception {
+        for (String parameter : List.of("status", "cursor")) {
+            mvc.perform(
+                            get(LIST_PATH)
+                                    .param(parameter, "INVALID!")
+                                    .header("Authorization", bearer(10)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        }
+    }
+
+    @Test
+    void returnsEmptyInvitationPage() throws Exception {
+        list(10).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(0)))
+                .andExpect(jsonPath("$.nextCursor").isEmpty())
+                .andExpect(jsonPath("$.hasNext").value(false));
+    }
+
+    private List<InviteResult> concurrentInvites(long party, long firstTarget, long secondTarget)
+            throws Exception {
+        executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        String token = bearer(10);
+        Future<InviteResult> first =
+                executor.submit(() -> concurrentInvite(party, firstTarget, token, ready, start));
+        Future<InviteResult> second =
+                executor.submit(() -> concurrentInvite(party, secondTarget, token, ready, start));
+        assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+        start.countDown();
+        return List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS));
+    }
+
+    private InviteResult concurrentInvite(
+            long party, long target, String token, CountDownLatch ready, CountDownLatch start)
+            throws Exception {
+        ready.countDown();
+        assertThat(start.await(5, TimeUnit.SECONDS)).isTrue();
+        return performInvite(party, target, token);
+    }
+
+    private InviteResult performInvite(long party, long target, String token) throws Exception {
+        var response =
+                mvc.perform(
+                                post(invitationPath(party))
+                                        .header("Authorization", token)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content("{\"userId\":" + target + "}"))
+                        .andReturn()
+                        .getResponse();
+        String responseBody = response.getContentAsString();
+        String code =
+                responseBody.isBlank()
+                        ? null
+                        : json.readTree(responseBody).path("code").asText(null);
+        return new InviteResult(response.getStatus(), code);
+    }
+
+    private void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Timed out waiting for test latch");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for test latch", exception);
+        }
+    }
+
+    private ResultActions invite(long party, long target, long requester) throws Exception {
+        return mvc.perform(
+                post(invitationPath(party))
+                        .header("Authorization", bearer(requester))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"userId\":" + target + "}"));
+    }
+
+    private ResultActions list(long userId) throws Exception {
+        return mvc.perform(get(LIST_PATH).header("Authorization", bearer(userId)));
+    }
+
+    private String invitationPath(long party) {
+        return "/api/v1/parties/" + party + "/invitations";
+    }
+
+    private String bearer(long userId) {
+        return "Bearer " + tokens.createAccessToken(userId);
+    }
+
+    private JsonNode body(ResultActions result) throws Exception {
+        return json.readTree(result.andReturn().getResponse().getContentAsString());
+    }
+
+    private void user(long id) {
+        jdbc.update(
+                "INSERT INTO users(id,email,nickname,birth_date,gender,status)"
+                        + " VALUES (?,?,?,DATE '2000-01-01','OTHER','ACTIVE')",
+                id,
+                "party" + id + "@example.test",
+                "member" + id);
+    }
+
+    private long party(long owner, String status, Instant createdAt) {
+        long id =
+                jdbc.queryForObject(
+                        "INSERT INTO parties(name,owner_id,status,created_at,closed_reason,closed_at)"
+                                + " VALUES ('party',?,?,?,?,?) RETURNING id",
+                        Long.class,
+                        owner,
+                        status,
+                        Timestamp.from(createdAt),
+                        status.equals("CLOSED") ? "OWNER_CLOSED" : null,
+                        status.equals("CLOSED") ? Timestamp.from(createdAt.plusSeconds(1)) : null);
+        jdbc.update(
+                "INSERT INTO party_members(party_id,user_id,role,joined_at) VALUES (?,?,?,?)",
+                id,
+                owner,
+                "OWNER",
+                Timestamp.from(createdAt));
+        return id;
+    }
+
+    private void member(long party, long user) {
+        jdbc.update(
+                "INSERT INTO party_members(party_id,user_id,role,joined_at)"
+                        + " VALUES (?,?, 'MEMBER',?)",
+                party,
+                user,
+                Timestamp.from(CREATED_AT));
+    }
+
+    private long invitation(
+            long party, long inviter, long invitee, String status, Instant createdAt) {
+        return jdbc.queryForObject(
+                "INSERT INTO party_invitations"
+                        + " (party_id,inviter_id,invitee_id,status,created_at,responded_at)"
+                        + " VALUES (?,?,?,?,?,?) RETURNING id",
+                Long.class,
+                party,
+                inviter,
+                invitee,
+                status,
+                Timestamp.from(createdAt),
+                status.equals("PENDING") ? null : Timestamp.from(createdAt.plusSeconds(1)));
+    }
+
+    private void block(long blocker, long blocked) {
+        jdbc.update(
+                "INSERT INTO user_blocks(blocker_id,blocked_id) VALUES (?,?)", blocker, blocked);
+    }
+
+    private long invitationCount() {
+        return jdbc.queryForObject("SELECT count(*) FROM party_invitations", Long.class);
+    }
+
+    private long invitationCount(long party, String status) {
+        return jdbc.queryForObject(
+                "SELECT count(*) FROM party_invitations WHERE party_id=? AND status=?",
+                Long.class,
+                party,
+                status);
+    }
+
+    private record InviteResult(int status, String code) {}
+}

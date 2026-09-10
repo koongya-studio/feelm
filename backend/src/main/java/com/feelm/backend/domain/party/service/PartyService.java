@@ -4,11 +4,13 @@ import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.mapping;
 import static java.util.stream.Collectors.toList;
 
+import com.feelm.backend.domain.party.dto.response.PartyInvitationResponse;
 import com.feelm.backend.domain.party.dto.response.PartyListItemResponse;
 import com.feelm.backend.domain.party.dto.response.PartyListItemResponse.PendingInvitation;
 import com.feelm.backend.domain.party.dto.response.PartyResponse;
 import com.feelm.backend.domain.party.dto.response.PartyResponse.Member;
 import com.feelm.backend.domain.party.dto.response.PartyStateResponse;
+import com.feelm.backend.domain.party.dto.response.ReceivedPartyInvitationResponse;
 import com.feelm.backend.domain.party.entity.Party;
 import com.feelm.backend.domain.party.entity.PartyInvitation;
 import com.feelm.backend.domain.party.entity.PartyMember;
@@ -17,6 +19,7 @@ import com.feelm.backend.domain.party.repository.PartyInvitationRepository;
 import com.feelm.backend.domain.party.repository.PartyMemberRepository;
 import com.feelm.backend.domain.party.repository.PartyQueryRepository;
 import com.feelm.backend.domain.party.repository.PartyRepository;
+import com.feelm.backend.domain.user.repository.UserRepository;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
 import com.feelm.backend.global.response.CursorPageResponse;
@@ -34,14 +37,20 @@ public class PartyService {
     private final PartyMemberRepository memberRepository;
     private final PartyInvitationRepository invitationRepository;
     private final PartyQueryRepository queryRepository;
+    private final UserRepository userRepository;
 
     /** 파티와 생성자의 OWNER 멤버 정보를 함께 저장하고 생성 결과를 반환한다. */
     @Transactional
     public PartyResponse create(long userId, String name) {
         var owner =
-                queryRepository
-                        .findUser(userId)
+                userRepository
+                        .findByIdForUpdate(userId)
+                        .filter(user -> user.isActive())
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        if (memberRepository.countActivePartiesByUserId(userId)
+                >= Party.MAX_ACTIVE_PARTIES_PER_USER) {
+            throw new BusinessException(ErrorCode.ACTIVE_PARTY_LIMIT_REACHED);
+        }
         Party party = partyRepository.save(Party.create(name, owner));
         PartyMember member = memberRepository.save(PartyMember.ownerOf(party));
         return PartyResponse.from(party, List.of(Member.from(member)));
@@ -105,6 +114,96 @@ public class PartyService {
         Party last = page.getLast();
         String nextCursor =
                 hasNext ? new PartyCursor(last.getCreatedAt(), last.getId()).encode() : null;
+        return new CursorPageResponse<>(items, nextCursor, hasNext);
+    }
+
+    /** 현재 파티원이 사용자를 초대하고 PENDING 초대를 반환한다. */
+    @Transactional
+    public PartyInvitationResponse invite(long requesterId, long partyId, long inviteeId) {
+        Party party =
+                partyRepository
+                        .findByIdForUpdate(partyId)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        if (!memberRepository.existsByPartyIdAndUserId(partyId, requesterId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        if (party.getStatus() == PartyStatus.CLOSED) {
+            throw new BusinessException(ErrorCode.PARTY_CLOSED);
+        }
+        var invitee =
+                queryRepository
+                        .findUser(inviteeId)
+                        .filter(user -> user.isActive())
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        if (memberRepository.existsByPartyIdAndUserId(partyId, inviteeId)) {
+            throw new BusinessException(ErrorCode.ALREADY_MEMBER);
+        }
+        if (queryRepository.hasBlockBetweenInviteeAndPartyMembers(partyId, inviteeId)) {
+            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
+        }
+        if (invitationRepository.existsByPartyIdAndInviteeIdAndStatus(
+                partyId, inviteeId, PartyInvitation.Status.PENDING)) {
+            throw new BusinessException(ErrorCode.INVITATION_PENDING);
+        }
+        long reserved =
+                memberRepository.countByPartyId(partyId)
+                        + invitationRepository.countByPartyIdAndStatus(
+                                partyId, PartyInvitation.Status.PENDING);
+        if (reserved >= Party.MAX_MEMBERS) {
+            throw new BusinessException(ErrorCode.PARTY_FULL);
+        }
+        PartyInvitation invitation =
+                invitationRepository.saveAndFlush(
+                        PartyInvitation.create(party, requesterId, invitee));
+        return PartyInvitationResponse.from(invitation);
+    }
+
+    /** 내가 받은 초대를 상태별·최신순으로 페이지 조회한다. */
+    public CursorPageResponse<ReceivedPartyInvitationResponse> listInvitations(
+            long userId, String requestedStatus, String encodedCursor, Integer requestedSize) {
+        int size = requestedSize == null ? 20 : requestedSize;
+        if (size < 1 || size > 50) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED);
+        }
+        PartyInvitation.Status status;
+        try {
+            status =
+                    requestedStatus == null
+                            ? PartyInvitation.Status.PENDING
+                            : PartyInvitation.Status.valueOf(requestedStatus);
+        } catch (IllegalArgumentException exception) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED);
+        }
+        PartyInvitationCursor cursor = PartyInvitationCursor.decode(encodedCursor);
+        List<PartyInvitation> invitations =
+                queryRepository.findReceivedInvitations(
+                        userId,
+                        status,
+                        cursor == null ? null : cursor.createdAt(),
+                        cursor == null ? 0 : cursor.invitationId(),
+                        size + 1);
+        boolean hasNext = invitations.size() > size;
+        List<PartyInvitation> page = hasNext ? invitations.subList(0, size) : invitations;
+        if (page.isEmpty()) {
+            return new CursorPageResponse<>(List.of(), null, false);
+        }
+        var memberCounts =
+                queryRepository.countMembers(
+                        page.stream().map(invitation -> invitation.getParty().getId()).toList());
+        var items =
+                page.stream()
+                        .map(
+                                invitation ->
+                                        ReceivedPartyInvitationResponse.from(
+                                                invitation,
+                                                memberCounts.getOrDefault(
+                                                        invitation.getParty().getId(), 0L)))
+                        .toList();
+        PartyInvitation last = page.getLast();
+        String nextCursor =
+                hasNext
+                        ? new PartyInvitationCursor(last.getCreatedAt(), last.getId()).encode()
+                        : null;
         return new CursorPageResponse<>(items, nextCursor, hasNext);
     }
 

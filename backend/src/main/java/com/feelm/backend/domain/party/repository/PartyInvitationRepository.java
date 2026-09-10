@@ -6,4 +6,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface PartyInvitationRepository extends JpaRepository<PartyInvitation, Long> {
     List<PartyInvitation> findAllByPartyIdAndStatus(long partyId, PartyInvitation.Status status);
+
+    boolean existsByPartyIdAndInviteeIdAndStatus(
+            long partyId, long inviteeId, PartyInvitation.Status status);
+
+    long countByPartyIdAndStatus(long partyId, PartyInvitation.Status status);
 }

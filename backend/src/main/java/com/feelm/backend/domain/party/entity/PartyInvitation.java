@@ -18,7 +18,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-/** 내 파티 목록의 대기 초대 조회에 사용한다. 초대 변경 유스케이스는 별도 업무다. */
+/** 파티 초대와 초대 상태를 보관한다. */
 @Entity
 @Table(name = "party_invitations")
 @Getter
@@ -44,6 +44,18 @@ public class PartyInvitation extends BaseTimeEntity {
     private Status status;
 
     private Instant respondedAt;
+
+    public static PartyInvitation create(Party party, long inviterId, User invitee) {
+        if (party == null || inviterId < 1 || invitee == null || invitee.getId() == inviterId) {
+            throw new IllegalArgumentException("Invitation requires a party and distinct users");
+        }
+        PartyInvitation invitation = new PartyInvitation();
+        invitation.party = party;
+        invitation.inviterId = inviterId;
+        invitation.invitee = invitee;
+        invitation.status = Status.PENDING;
+        return invitation;
+    }
 
     public void decline(Instant respondedAt) {
         if (status != Status.PENDING || respondedAt == null) {

@@ -1,6 +1,7 @@
 package com.feelm.backend.domain.party;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -11,6 +12,11 @@ import com.feelm.backend.global.security.TokenProvider;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -24,6 +30,8 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -57,6 +65,7 @@ class PartyApiContractTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired TokenProvider tokens;
     @Autowired ObjectMapper json;
+    @Autowired PlatformTransactionManager transactionManager;
 
     @BeforeEach
     void fixtures() {
@@ -152,13 +161,75 @@ class PartyApiContractTest {
     }
 
     @Test
-    void allowsCreationBeyondFiveActiveMemberships() throws Exception {
-        for (int i = 0; i < 6; i++) {
+    void allowsTenthActivePartyButRejectsEleventh() throws Exception {
+        for (int i = 0; i < 9; i++) {
             member(party(20, "ACTIVE"), 10);
-            party(10, "ACTIVE");
         }
-        create("{\"name\":\"another party\"}").andExpect(status().isCreated());
-        assertThat(activeCount()).isEqualTo(13);
+        create("{\"name\":\"tenth party\"}").andExpect(status().isCreated());
+        assertThat(activeCount()).isEqualTo(10);
+
+        create("{\"name\":\"eleventh party\"}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ACTIVE_PARTY_LIMIT_REACHED"));
+        assertThat(activeCount()).isEqualTo(10);
+    }
+
+    @Test
+    void serializesConcurrentCreationAtActivePartyLimit() throws Exception {
+        for (int i = 0; i < 9; i++) {
+            member(party(20, "ACTIVE"), 10);
+        }
+        CountDownLatch start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<CreateResult> first =
+                    executor.submit(() -> createAfter(start, "concurrent one"));
+            Future<CreateResult> second =
+                    executor.submit(() -> createAfter(start, "concurrent two"));
+            start.countDown();
+
+            List<CreateResult> results = List.of(first.get(), second.get());
+            assertThat(results)
+                    .extracting(CreateResult::status)
+                    .containsExactlyInAnyOrder(201, 409);
+            assertThat(results.stream().filter(result -> result.status() == 409).findFirst())
+                    .hasValueSatisfying(
+                            result ->
+                                    assertThat(result.code())
+                                            .isEqualTo("ACTIVE_PARTY_LIMIT_REACHED"));
+        }
+        assertThat(activeCount()).isEqualTo(10);
+    }
+
+    @Test
+    void waitsUntilUserRowLockIsReleased() throws Exception {
+        CountDownLatch locked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            Future<?> lockHolder =
+                    executor.submit(
+                            () ->
+                                    new TransactionTemplate(transactionManager)
+                                            .executeWithoutResult(
+                                                    ignored -> {
+                                                        jdbc.queryForObject(
+                                                                "SELECT id FROM users WHERE id=? FOR UPDATE",
+                                                                Long.class,
+                                                                10);
+                                                        locked.countDown();
+                                                        await(release);
+                                                    }));
+            assertThat(locked.await(5, TimeUnit.SECONDS)).isTrue();
+            Future<CreateResult> blockedRequest =
+                    executor.submit(() -> performCreate("locked user party"));
+            try {
+                assertThatThrownBy(() -> blockedRequest.get(300, TimeUnit.MILLISECONDS))
+                        .isInstanceOf(TimeoutException.class);
+            } finally {
+                release.countDown();
+            }
+            lockHolder.get(5, TimeUnit.SECONDS);
+            assertThat(blockedRequest.get(5, TimeUnit.SECONDS).status()).isEqualTo(201);
+        }
     }
 
     @Test
@@ -307,6 +378,38 @@ class PartyApiContractTest {
                         .content(request));
     }
 
+    private CreateResult createAfter(CountDownLatch start, String name) throws Exception {
+        start.await();
+        return performCreate(name);
+    }
+
+    private CreateResult performCreate(String name) throws Exception {
+        var response =
+                mvc.perform(
+                                post(PATH)
+                                        .header("Authorization", bearer())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content("{\"name\":\"" + name + "\"}"))
+                        .andReturn()
+                        .getResponse();
+        String code =
+                response.getContentAsString().isBlank()
+                        ? null
+                        : json.readTree(response.getContentAsString()).path("code").asText(null);
+        return new CreateResult(response.getStatus(), code);
+    }
+
+    private void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("Timed out waiting for test latch");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for test latch", exception);
+        }
+    }
+
     private ResultActions list() throws Exception {
         return mvc.perform(get(PATH).header("Authorization", bearer()));
     }
@@ -370,4 +473,6 @@ class PartyApiContractTest {
                         + " WHERE m.user_id=10 AND p.status='ACTIVE'",
                 Long.class);
     }
+
+    private record CreateResult(int status, String code) {}
 }
