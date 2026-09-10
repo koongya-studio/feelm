@@ -8,6 +8,11 @@
  * 프레임 칸의 내용은 온보딩에서 좋아요로 고른 영화다. 온보딩 LIKE/DISLIKE는 프레임을
  * 생성하지 않으므로(API-024 처리 규칙) 실제 프레임이 아니라 표시용이다.
  *
+ * 팀 결정 2026-09-10 (업무 -98)
+ * - **필름 칸을 줄였다.** 와이어프레임 실측값 138x196으로 세 칸을 쌓으면 스트립이
+ *   652px이 되어 375x812에서 `터치할 수 있어요` 힌트가 화면 밖으로 밀려났다.
+ *   비율을 유지하며 힌트까지 들어가는 크기로 맞췄다
+ *
  * `[?]` 필름 영역 터치 시 동작(확대 · 애니메이션 · 이동)은 미확정이다. 와이어프레임의
  * `터치할 수 있어요` 힌트는 그대로 두고 동작은 넣지 않았다.
  * `[?]` `홈으로 이동` 진입점이 와이어프레임에 없어 `필름 늘리기`만 두었다.
@@ -21,6 +26,19 @@ import ScreenHeader from '../../../components/ScreenHeader';
 import { useOnboarding } from '../../../contexts/onboardingContext';
 import { path } from '../../../routes/paths';
 import styles from './OnboardingCompletePage.module.css';
+
+/*
+ * 필름 칸 크기.
+ *
+ * 와이어프레임 2.3의 실측값은 138x196이지만, 세 칸을 쌓으면 스트립 높이가
+ * 3x196 + 간격 32 + 여백 32 = 652px이 된다. 375x812에서 헤더·주 동작·힌트를 뺀
+ * 남은 높이가 약 554px이라 `터치할 수 있어요` 힌트가 스크롤 밖으로 밀려났다.
+ * 비율(0.704)을 유지하며 세 칸과 힌트가 함께 들어가는 값으로 줄였다.
+ */
+const FRAME_WIDTH = 110;
+const FRAME_HEIGHT = 156;
+/** 스트립 폭. 칸 좌우로 구멍 자리가 남는 비율(190/138)을 유지한다 */
+const STRIP_WIDTH = 152;
 
 export default function OnboardingCompletePage() {
   const navigate = useNavigate();
@@ -46,13 +64,12 @@ export default function OnboardingCompletePage() {
 
       <div className={styles.page}>
         <div className={styles.stage}>
-          {/* 프레임 크기는 와이어프레임 2.3의 필름 칸 실측값(138x196, radius 3)을 쓴다 */}
-          <FilmStrip width={190}>
+          <FilmStrip width={STRIP_WIDTH}>
             {frames.map((movieId, index) => (
               <Poster
                 key={`${movieId}-${index}`}
-                width={138}
-                height={196}
+                width={FRAME_WIDTH}
+                height={FRAME_HEIGHT}
                 radius={3}
                 title=""
                 seed={movieId}

@@ -1,25 +1,34 @@
 /*
- * 와이어프레임 1.1 실측값.
- * 헤더 좌우 여백은 와이어프레임 28px, 공통 ScreenHeader 22px이다. 공통값을 그대로 쓴다.
+ * 1.1 영화 취향 초기 설정. 구성은 확정 시안을 따른다
+ * (`docs/screens/design-concept.md`).
+ *
+ * 이 화면이 말하는 한 가지는 **어느 영화를 내 쪽으로 당길 것인가**다. 그래서 포스터
+ * 카드만 색을 갖고, 공간·표식·힌트는 전부 색을 쓰지 않는다(시안 2.2장).
+ *
+ * 이전 구현은 `와이어프레임 1.1 실측값`으로 13px · 11px · 292px · 84px · 50px 같은
+ * 값이 하드코딩돼 있었고, `rgba(60, 58, 54, …)`처럼 **폐기된 「암실」안의 따뜻한 회색**이
+ * 남아 있었다(시안 4장). 전부 현재 토큰으로 바꿨다.
  */
 .intro {
   flex: none;
-  padding: 6px var(--screen-padding-x) 0;
+  padding: var(--space-1) var(--screen-padding-x) 0;
   text-align: center;
 }
 
 .guide {
-  font-size: 13px;
-  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-body);
 }
 
 .legend {
   display: flex;
   justify-content: center;
-  gap: 12px;
-  margin-top: 9px;
-  color: rgba(60, 58, 54, 0.65);
-  font-size: 11px;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
   white-space: nowrap;
 }
 
@@ -31,12 +40,22 @@
   position: relative;
   min-height: 0;
   flex: 1;
-  margin: 4px 0;
+  margin: var(--space-1) 0;
   overflow: hidden;
   touch-action: none;
 }
 
-/* 점선 원 — 지름 292px, 중심 (50%, 47%) */
+/*
+ * 점선 원 — 내 쪽 공간이다. 지름 292px는 와이어프레임 실측값이고, 카드 여섯 장이
+ * 안팎으로 놀 수 있는 크기라 그대로 쓴다.
+ *
+ * 선을 얇게 하고 안쪽 면만 벽보다 한 톤 낮춘다. 이전에는 2px 파선에 폐기 팔레트
+ * 색이라 공간이 카드보다 강하게 읽혔다. 이 화면의 주인공은 포스터다.
+ *
+ * **면에만 알파를 준다.** `opacity`를 요소에 걸면 파선 테두리까지 함께 흐려져 공간의
+ * 경계가 뭉개진다. 경계는 선명해야 안팎이 읽히므로 테두리는 온전한 선 토큰을 쓰고,
+ * 낮추려는 것은 배경뿐이라 배경 색에 직접 알파를 넣는다.
+ */
 .ring {
   position: absolute;
   top: 47%;
@@ -44,26 +63,33 @@
   width: 292px;
   height: 292px;
   box-sizing: border-box;
-  border: 2px dashed rgba(60, 58, 54, 0.55);
+  border: 1.5px dashed var(--color-line);
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.028);
+  /* --color-surface(#e6e7ec)를 55%로. 벽 위에 옅게 얹히는 면이다 */
+  background: rgb(230 231 236 / 55%);
   transform: translate(-50%, -50%);
 }
 
+/*
+ * 공간의 가운데 표식 — 나다.
+ *
+ * 이전에는 2px 검정 테두리에 흰 면이라 카드와 무게를 다퉜다. 검정은 이 화면에서
+ * 주 동작 알약 하나뿐이어야 한다(시안 2.4장). 얇은 선과 옅은 잉크로 낮춘다.
+ */
 .center {
   position: absolute;
   top: 47%;
   left: 50%;
   display: flex;
-  width: 84px;
-  height: 84px;
+  width: 76px;
+  height: 76px;
   box-sizing: border-box;
   align-items: center;
   justify-content: center;
-  border: 2px solid var(--color-ink);
+  border: 0.5px solid var(--color-line-strong);
   border-radius: 50%;
   background: var(--color-bg);
-  color: var(--color-ink);
+  color: var(--color-ink-muted);
   transform: translate(-50%, -50%);
 }
 
@@ -72,12 +98,12 @@
   position: absolute;
   z-index: 3;
   display: flex;
-  gap: 6px;
-  padding: 6px 8px;
-  border: 1px solid var(--color-line-strong);
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 0.5px solid var(--color-line-strong);
   border-radius: var(--radius-pill);
   background: var(--color-bg);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14);
+  box-shadow: var(--shadow-raised);
   white-space: nowrap;
 }
 
@@ -86,54 +112,45 @@
   height: 32px;
   box-sizing: border-box;
   align-items: center;
-  padding: 0 13px;
-  border: 1px solid var(--color-line-strong);
+  padding: 0 var(--space-3);
+  border: 0.5px solid var(--color-line-strong);
   border-radius: var(--radius-pill);
   background: var(--color-bg);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
   color: var(--color-ink);
-  font-size: 12px;
-  font-weight: 500;
   cursor: pointer;
 }
 
+/* 선택 상태. 잉크 면으로 채워 무엇이 골라졌는지 한눈에 보이게 한다 */
 .pickerOption[data-selected='true'] {
   border-color: transparent;
-  background: var(--color-ink);
-  color: var(--color-on-dark);
-  font-weight: 600;
+  background: var(--color-action);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-on-action);
 }
 
 .footer {
   display: flex;
   flex: none;
   flex-direction: column;
-  gap: 12px;
-  margin: 0 var(--screen-padding-x) 36px;
+  gap: var(--space-3);
+  margin: 0 var(--screen-padding-x) var(--space-8);
 }
 
+/*
+ * 조작 힌트. 한 문장이 길어 두 줄로 흐른다.
+ *
+ * `word-break: keep-all`이 없으면 한글이 단어 중간에서 끊긴다(`목록에서 제` / `거`).
+ * 브라우저 기본값은 한글을 음절 단위로 쪼갤 수 있기 때문이며, 어절 단위로 끊으려면
+ * 이 값이 필요하다. 저장소 전체에 이 선언이 한 곳도 없어 다른 화면도 같은 위험이
+ * 있지만, 전역에 넣으면 이미 확정된 화면들의 줄바꿈이 함께 바뀌므로 후속 작업으로
+ * 남겼다.
+ */
 .hint {
-  color: var(--color-ink-muted);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-body);
+  color: var(--color-ink-hint);
   text-align: center;
-}
-
-/* 와이어프레임은 높이 50px · radius 14px로 공통 Button의 52px 사양과 다르다 */
-.submit {
-  display: flex;
-  height: 50px;
-  box-sizing: border-box;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--color-line-strong);
-  border-radius: var(--radius-control);
-  background: var(--color-bg);
-  color: rgba(60, 58, 54, 0.75);
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.submit:disabled {
-  cursor: default;
-  opacity: 0.45;
+  word-break: keep-all;
 }
