@@ -41,8 +41,13 @@ describe('5.6 파티 초대 수신', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '초대 수락하기' }));
 
-    await waitFor(() => expect(getInvitationStatus(INVITATION_ID)).toBe('ACCEPTED'));
-    expect(screen.getByTestId('location').textContent).toBe('/party');
+    /*
+     * 이동까지 기다린다. 상태는 `acceptInvitation` 안에서 동기로 바뀌지만 화면 이동은 그
+     * 뒤 promise가 풀린 다음이라, 상태만 기다리면 아직 이동하지 않은 순간에 단정문이
+     * 찍힌다. 로컬에서는 통과하고 CI에서만 터진다(파이프라인 #188361).
+     */
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/party'));
+    expect(getInvitationStatus(INVITATION_ID)).toBe('ACCEPTED');
   });
 
   it('수락하면 그 파티가 내 파티 목록에 들어간다', async () => {
