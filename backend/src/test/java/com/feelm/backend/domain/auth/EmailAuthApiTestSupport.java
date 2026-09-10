@@ -195,6 +195,11 @@ abstract class EmailAuthApiTestSupport {
         return postJson(SIGNUP_PATH, body);
     }
 
+    /** 가입(API-001)을 지정한 IP에서 보낸다. IP 단위 요청 제한을 검증하는 시나리오용(S15P21E106-287 리뷰 B-1). */
+    ResultActions signupFrom(String clientIp, String body) throws Exception {
+        return postJsonFrom(clientIp, SIGNUP_PATH, body);
+    }
+
     ResultActions verifyEmail(String token) throws Exception {
         return postJson(VERIFY_PATH, "{\"token\":\"%s\"}".formatted(token));
     }
@@ -374,14 +379,14 @@ abstract class EmailAuthApiTestSupport {
                 + window.toSeconds();
     }
 
-    /** 전역 발송 제한 카운터 키(S15P21E106-281 결정 D-7). */
-    String mailGlobalLimitKey(Duration window) {
-        return "auth:mail:global:" + window.toSeconds();
+    /** 전역 발송 상한 카운터 키(S15P21E106-287 결정 D-10). 세는 대상이 시도가 아니라 실제 발송이라 옛 전역 키와 이름이 다르다. */
+    String mailSentKey(Duration window) {
+        return "auth:mail:sent:" + window.toSeconds();
     }
 
     /**
-     * IP·전역 발송 제한 카운터를 모두 지운다. 전역 카운터는 컨텍스트를 공유하는 모든 테스트가 함께 소모하므로, 한도까지 채워 검증한 테스트가 그 상태를 남기면 이후
-     * 테스트가 전부 429가 된다.
+     * IP 요청 제한과 전역 발송 상한 카운터를 모두 지운다. 전역 카운터는 컨텍스트를 공유하는 모든 테스트의 발송이 함께 소모하므로, 상한까지 채워 검증한 테스트가 그
+     * 상태를 남기면 이후 테스트의 메일이 전부 사라진다.
      *
      * <p>창 길이가 키에 들어가 설정에 따라 달라지므로 접두사 패턴으로 지운다. 이메일 간격 키({@code auth:email-resend:}, {@code
      * auth:password-reset:})는 접두사가 달라 함께 지워지지 않는다.

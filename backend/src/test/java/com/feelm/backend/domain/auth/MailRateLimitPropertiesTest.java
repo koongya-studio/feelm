@@ -10,7 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * 발송 제한 설정값의 검증을 확인한다(S15P21E106-281).
+ * 요청 단위 발송 제한 설정값의 검증을 확인한다(S15P21E106-281). 전역 발송 상한은 {@code MailSendBudgetPropertiesTest}가 본다.
  *
  * <p>잘못된 설정이 기동에 실패해야 하는 이유는 실패하지 않을 때의 결과가 런타임 장애이기 때문이다. {@code window}가 없으면 첫 요청에서 {@code
  * NullPointerException}(500)이 되고, {@code limit: 0}은 두 공개 엔드포인트를 통째로 막고, {@code email-interval: 0s}는
@@ -51,6 +51,30 @@ class MailRateLimitPropertiesTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    /**
+     * 이 값들은 배포 환경변수로 열려 있어 사람이 직접 적는다(S15P21E106-287 결정 D-9). 단위 없는 숫자는 초로 읽히고, 1초 미만은 {@code
+     * PEXPIRE key 0}이 카운터를 곧바로 지워 IP 축을 조용히 무력화한다(리뷰 A-3·B-6).
+     */
+    @Test
+    @DisplayName("창 길이가 1초 미만이거나 24시간을 넘으면 만들 수 없다")
+    void quotaRejectsWindowOutOfRange() {
+        assertThatThrownBy(() -> new Quota(30, Duration.ofMillis(600)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("window");
+        assertThatThrownBy(() -> new Quota(30, Duration.ofHours(25)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("이메일 간격이 1초 미만이거나 24시간을 넘으면 만들 수 없다")
+    void propertiesRejectEmailIntervalOutOfRange() {
+        assertThatThrownBy(() -> properties(Duration.ofMillis(600)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("email-interval");
+        assertThatThrownBy(() -> properties(Duration.ofHours(25)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test
     @DisplayName("이메일 간격이 없거나 0 이하이면 만들 수 없다")
     void propertiesRejectNonPositiveEmailInterval() {
@@ -61,33 +85,58 @@ class MailRateLimitPropertiesTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    /**
+     * {@code AuthRateLimiter}가 창을 초 단위로 카운터 키에 담으므로({@code auth:mail:ip:<hash>:<초>}) {@code 1h}와
+     * {@code 3600}은 같은 키다. 그 설정은 한 번의 요청이 같은 카운터를 두 번 올려 실효 한도를 절반으로 떨어뜨리는데, 기동도 성공하고 로그도 남지
+     * 않는다(S15P21E106-287 리뷰 B).
+     */
+    @Test
+    @DisplayName("같은 창을 두 번 넣으면 만들 수 없다")
+    void rejectsDuplicatedWindow() {
+        assertThatThrownBy(
+                        () ->
+                                new MailRateLimitProperties(
+                                        Duration.ofMinutes(1),
+                                        List.of(
+                                                new Quota(30, ONE_HOUR),
+                                                new Quota(10, Duration.ofSeconds(3600)))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("3600");
+    }
+
+    /** 앞 창에서 막히면 뒤 창의 카운터를 올리지 않으므로 목록 순서가 정책을 바꾼다. 어떤 순서로 적어도 짧은 창이 먼저 평가돼야 한다. */
+    @Test
+    @DisplayName("창은 어떤 순서로 적어도 짧은 창이 앞에 온다")
+    void quotasAreSortedByWindowLength() {
+        Quota hourly = new Quota(30, ONE_HOUR);
+        Quota tenMinutes = new Quota(5, Duration.ofMinutes(10));
+
+        MailRateLimitProperties properties =
+                new MailRateLimitProperties(Duration.ofMinutes(1), List.of(hourly, tenMinutes));
+
+        assertThat(properties.ip()).containsExactly(tenMinutes, hourly);
+    }
+
     /** 목록 키만 있고 항목이 없는 설정({@code ip:})은 그 축만 제한하지 않는 상태이고, 기동을 막을 이유는 아니다. */
     @Test
-    @DisplayName("축 목록이 비어 있거나 없으면 빈 목록이 된다")
+    @DisplayName("IP 목록이 비어 있거나 없으면 빈 목록이 된다")
     void missingAxisBindsToEmptyList() {
-        MailRateLimitProperties properties =
-                new MailRateLimitProperties(Duration.ofMinutes(1), null, List.of());
-
-        assertThat(properties.ip()).isEmpty();
-        assertThat(properties.global()).isEmpty();
+        assertThat(new MailRateLimitProperties(Duration.ofMinutes(1), null).ip()).isEmpty();
+        assertThat(new MailRateLimitProperties(Duration.ofMinutes(1), List.of()).ip()).isEmpty();
     }
 
     @Test
     @DisplayName("정상 값은 그대로 유지된다")
     void validValuesArePreserved() {
-        Quota hourly = new Quota(100, ONE_HOUR);
-
         MailRateLimitProperties properties =
                 new MailRateLimitProperties(
-                        Duration.ofMinutes(1), List.of(new Quota(10, ONE_HOUR)), List.of(hourly));
+                        Duration.ofMinutes(1), List.of(new Quota(30, ONE_HOUR)));
 
         assertThat(properties.emailInterval()).isEqualTo(Duration.ofMinutes(1));
-        assertThat(properties.ip()).containsExactly(new Quota(10, ONE_HOUR));
-        assertThat(properties.global()).containsExactly(hourly);
+        assertThat(properties.ip()).containsExactly(new Quota(30, ONE_HOUR));
     }
 
     private MailRateLimitProperties properties(Duration emailInterval) {
-        return new MailRateLimitProperties(
-                emailInterval, List.of(new Quota(10, ONE_HOUR)), List.of());
+        return new MailRateLimitProperties(emailInterval, List.of(new Quota(10, ONE_HOUR)));
     }
 }

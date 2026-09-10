@@ -202,6 +202,57 @@ Refresh Token은 사용될 때마다 회전하며, 폐기된 토큰이 다시 �
 
 메일 발송에 영속 재시도가 필요해지면 그때 아웃박스(ADR-0018)와 같은 수단을 별도로 결정합니다.
 
+#### 전역 발송 상한
+
+계정 메일 전체(가입 인증·재발송·재설정)에는 발송 계정의 쿼터를 지키는 전역 상한이 있습니다
+(`feelm.mail.send-budget`, 기본 100건/1시간·300건/24시간). 이 상한은 **요청이 아니라 실제 발송**을 세고
+발송 스레드에서 소모하므로, 상한에 걸려도 API 응답은 `202`·`201` 그대로이고 그 시점의 메일만 버려집니다.
+요청 시점에 세면 메일을 한 통도 보내지 않는 요청만으로 상한을 말려 정상 사용자의 계정 복구를 막을 수 있고,
+응답이 바뀌는 순간 실제 발송을 세는 카운터가 계정 존재 여부를 알려 주는 신호가 됩니다(S15P21E106-287).
+
+상한에 걸린 상태는 **사용자에게 아무 신호도 남기지 않으므로** 다음 두 가지로 확인합니다.
+
+1. 로그. 사용률이 상한의 80%에 닿을 때와 상한을 넘을 때 창마다 한 번씩 WARN이 남습니다. 기동 시에는 유효한
+   상한을 `INFO`로 한 줄 남기므로, 설정이 비어 상한 없이 떠 있는 상태도 로그로 드러납니다.
+
+```bash
+docker logs feelm-backend | grep "전역 발송 상한"
+```
+
+2. 카운터 직접 조회. 현재 사용량은 Redis 키 `auth:mail:sent:<창 초>`에 있습니다(기본값이면 `3600`과
+   `86400`). TTL은 그 창이 언제 비워지는지를 알려 줍니다.
+
+   조회에는 읽기 전용 계정 `feelm_readonly`를 씁니다. 이 계정은 `infra/.env`의 `REDIS_READONLY_PASSWORD`가
+   **비어 있으면 꺼진 상태로 기동**하므로(`infra/redis/start.sh`), 값을 채우고 Redis 컨테이너를 다시 만든
+   환경에서만 동작합니다. 비밀번호는 컨테이너 안에서 확장되도록 넘겨 호스트 셸 기록에 남지 않게 합니다.
+
+```bash
+docker exec feelm-redis sh -c 'REDISCLI_AUTH="$REDIS_READONLY_PASSWORD" redis-cli --no-auth-warning --user feelm_readonly mget auth:mail:sent:3600 auth:mail:sent:86400'
+docker exec feelm-redis sh -c 'REDISCLI_AUTH="$REDIS_READONLY_PASSWORD" redis-cli --no-auth-warning --user feelm_readonly ttl auth:mail:sent:3600'
+```
+
+마른 상한은 창이 만료되면 스스로 풀립니다. 시연처럼 기다릴 수 없는 상황에서는 관리 계정으로 해당 카운터를
+지우면 즉시 회복됩니다. 지우기 전에 무엇이 예산을 태웠는지(로그의 경고와 카운터 값) 먼저 확인합니다.
+
+```bash
+docker exec feelm-redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning del auth:mail:sent:3600'
+```
+
+상한과 IP 단위 요청 제한은 이미지를 다시 만들지 않고 `infra/.env`의 `MAIL_SEND_BUDGET_*`,
+`MAIL_RATE_LIMIT_*`로 조정합니다(값 목록은 `infra/.env.example`). 바꾼 뒤에는 backend 컨테이너를 다시
+만들어야 반영되며, 창 길이가 키에 들어 있어 이전 창의 카운터가 새 설정에 섞이지 않습니다. 창 길이를 나타내는
+값(`MAIL_RATE_LIMIT_IP_WINDOW`, `MAIL_RATE_LIMIT_EMAIL_INTERVAL`)에 단위를 생략하면 **초**로 읽습니다.
+
+Redis에 닿지 못하면 계정 메일은 발송하지 않습니다(fail-closed). 인증 제한과 방향을 맞춘 선택이며, 장애 중
+발송 폭탄을 허용하지 않는 대신 가입 인증 메일까지 함께 멈춥니다. 복구 경로는
+재발송(API-003)·재요청(API-010)·재가입입니다.
+
+이때 **응답은 두 갈래**입니다. 발송 상한은 발송 스레드에서 보므로 그 확인이 실패해도 응답은 `201`·`202` 그대로이고
+메일만 나가지 않습니다. 반면 IP 단위 요청 제한은 요청 경로에서 판정하고 같은 Redis를 쓰므로, 장애 중에는 그 판정이
+먼저 걸려 가입(API-001)·재발송(API-003)·재설정 요청(API-010)이 `500 INTERNAL_ERROR`로 실패합니다. 즉 Redis
+장애 중 사용자에게 실제로 보이는 것은 "메일만 안 오는 상태"가 아니라 **요청 실패**입니다. 가입 경로는
+S15P21E106-287에서 요청 제한이 추가되기 전까지 Redis 없이도 성공했으므로, 이 성질은 그때 함께 생겼습니다.
+
 인증 링크는 `${FRONTEND_BASE_URL}/verify-email?token=...`, 비밀번호 재설정 링크는
 `${FRONTEND_BASE_URL}/reset-password?token=...` 형식입니다. 두 링크 모두 프론트 화면으로 이동하고
 프론트가 각각 API-002·API-011을 호출합니다. 토큰은 불투명 난수 문자열이며 서버는 해시만 저장합니다.

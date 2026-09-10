@@ -49,8 +49,9 @@ public class EmailAuthController {
     /** API-001 이메일 회원가입. */
     @PostMapping("/signup")
     @ResponseStatus(HttpStatus.CREATED)
-    SignupResponse signup(@RequestBody @Valid SignupRequest request) {
-        return signupService.signup(request);
+    SignupResponse signup(
+            @RequestBody @Valid SignupRequest request, HttpServletRequest httpRequest) {
+        return signupService.signup(request, httpRequest.getRemoteAddr());
     }
 
     /** API-002 이메일 인증 확인. */

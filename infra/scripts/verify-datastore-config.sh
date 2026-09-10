@@ -92,4 +92,13 @@ docker_cli exec "${CONTAINER_NAME}" sh -c \
   'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_readonly SET feelm:user:1:topn value' \
   | grep -q 'no permissions'
 
+# 계정 메일 전역 발송 상한 카운터(S15P21E106-287). 운영 중 사용량 확인이 읽기 전용 계정으로 되어야 하고,
+# 그 계정이 쓰기까지 얻지는 않아야 한다.
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_readonly GET auth:mail:sent:3600' \
+  | grep -qx OK
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_readonly SET auth:mail:sent:3600 0' \
+  | grep -q 'no permissions'
+
 echo "Datastore configuration verification passed"

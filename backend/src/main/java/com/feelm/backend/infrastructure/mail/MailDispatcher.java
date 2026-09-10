@@ -26,6 +26,11 @@ import org.springframework.core.task.TaskExecutor;
  *
  * <p>발송 실패도 요청을 되돌리지 않는다. 응답은 이미 나갔고, 계정과 토큰은 만들어져 있어 사용자가 재발송·재요청으로 복구할 수 있다. 로그에는 사용자 식별자만 남기고
  * 이메일과 토큰은 남기지 않는다(컨벤션 12장). 실패 원인은 예외 객체 대신 {@link #summarize(Throwable)}가 만든 요약으로 남긴다.
+ *
+ * <p>전역 발송 상한({@link MailSendBudget})도 이 풀의 스레드에서 본다(S15P21E106-287). 상한을 요청 경로가 아니라 여기에 둔 것은 그 확인이
+ * <b>보낼 메일이 있을 때만</b> 일어나기 때문이다. 커밋 후 리스너에서 확인하면 계정이 있는 경로에만 Redis 왕복이 더해져 이 클래스가 없앤 응답 시간 차가
+ * 되살아나고, 상한이 응답을 바꾸면 실제 발송을 세는 카운터가 계정 존재 여부를 알려 주는 신호가 된다. 이 자리에서는 큐에서 버려진 발송이 예산을 소모하지 않는 성질도 함께
+ * 얻는다.
  */
 @Slf4j
 public class MailDispatcher {
@@ -58,6 +63,9 @@ public class MailDispatcher {
     /** 실행기가 종료 중인지 알려준다. 유실 로그의 원인 문구를 고르는 데만 쓴다. */
     private final BooleanSupplier shuttingDown;
 
+    /** 전역 발송 상한. 발송 스레드에서 발송 직전에 본다(S15P21E106-287). */
+    private final MailSendBudget budget;
+
     private final Clock clock;
 
     /** 제출했지만 아직 끝나지 않은 발송 수. {@link #isIdle()}의 근거다. */
@@ -72,10 +80,15 @@ public class MailDispatcher {
     /** 포화 경고를 마지막으로 남긴 시각(epoch ms). */
     private final AtomicLong lastWarnAt = new AtomicLong(NEVER);
 
-    public MailDispatcher(TaskExecutor executor, BooleanSupplier shuttingDown, Clock clock) {
+    public MailDispatcher(
+            TaskExecutor executor,
+            BooleanSupplier shuttingDown,
+            Clock clock,
+            MailSendBudget budget) {
         this.executor = executor;
         this.shuttingDown = shuttingDown;
         this.clock = clock;
+        this.budget = budget;
     }
 
     /**
@@ -83,6 +96,8 @@ public class MailDispatcher {
      *
      * <p>제출 실패는 거절({@link RejectedExecutionException})뿐 아니라 어떤 런타임 예외도 삼킨다. 이 메서드는 커밋 후 리스너에서 불리므로
      * 여기서 나가는 예외는 커밋 호출자로 전파되어 201·202를 500으로 바꾼다. 거절만 잡으면 실행기 상태 이상처럼 확률이 낮은 경로가 열려 있다(리뷰 F7).
+     *
+     * <p>제출에 성공해도 발송이 보장되지는 않는다. 전역 발송 상한을 넘으면 풀의 스레드가 이 메일을 버린다(S15P21E106-287).
      *
      * @param kind 메일 종류. 실패·유실 로그의 문구와 복구 경로를 정한다
      * @param userId 로그에 남길 사용자 식별자
@@ -110,18 +125,64 @@ public class MailDispatcher {
         return pending.get() == 0;
     }
 
+    /**
+     * 발송 스레드에서 전역 상한을 확보한 뒤 실제로 보낸다.
+     *
+     * <p>상한을 넘으면 이 메일은 <b>버린다</b>. 큐 포화 유실과 같은 성질이고 복구 경로도 같다. 여기서 남기는 로그는 없다. 상한 도달은 {@link
+     * MailSendBudget}이 창마다 한 번 남기고, 버려지는 메일마다 줄을 남기면 그 기록이 밀려나기 때문이다(S15P21E106-287 결정 D-6·D-8).
+     *
+     * <p>발송이 실패하면 확보한 자리를 되돌린다(리뷰 B-4). 이 상한이 지키는 것은 SMTP 계정의 쿼터이고 실패한 발송은 쿼터를 쓰지 않는다.
+     */
     private void run(MailKind kind, long userId, Runnable send) {
         try {
-            send.run();
-        } catch (RuntimeException exception) {
+            if (!consumeBudget(kind, userId)) {
+                return;
+            }
+            try {
+                send.run();
+            } catch (RuntimeException exception) {
+                releaseBudget();
+                log.error(
+                        "{} 발송에 실패했습니다. 사용자 {}는 {}으로 복구할 수 있습니다. 원인: {}",
+                        kind.label(),
+                        userId,
+                        kind.recovery(),
+                        summarize(exception));
+            }
+        } finally {
+            pending.decrementAndGet();
+        }
+    }
+
+    /**
+     * 상한을 확인한다. 확인 자체가 실패하면 보내지 않고 원인을 남긴다(fail-closed, 결정 D-11).
+     *
+     * <p>발송 실패와 다른 문구를 쓰는 이유는 복구 방법이 다르기 때문이다. 발송 실패는 SMTP 쪽을 보게 하고, 이 줄은 Redis 쪽을 보게 한다.
+     */
+    private boolean consumeBudget(MailKind kind, long userId) {
+        try {
+            return budget.tryConsume();
+        } catch (RuntimeException budgetFailure) {
             log.error(
-                    "{} 발송에 실패했습니다. 사용자 {}는 {}으로 복구할 수 있습니다. 원인: {}",
+                    "{} 발송 상한을 확인하지 못해 보내지 않았습니다. 사용자 {}는 {}으로 복구할 수 있습니다. 원인: {}",
                     kind.label(),
                     userId,
                     kind.recovery(),
-                    summarize(exception));
-        } finally {
-            pending.decrementAndGet();
+                    summarize(budgetFailure));
+            return false;
+        }
+    }
+
+    /**
+     * 실패한 발송이 소모한 자리를 되돌린다(리뷰 B-4).
+     *
+     * <p>되돌리기가 실패해도 삼킨다. 이 경로는 이미 발송 실패를 기록하는 중이고, 여기서 던지면 그 기록이 사라진다. 되돌리지 못한 자리는 창이 끝날 때 함께 사라진다.
+     */
+    private void releaseBudget() {
+        try {
+            budget.release();
+        } catch (RuntimeException releaseFailure) {
+            log.debug("발송 상한 자리를 되돌리지 못했습니다. 원인: {}", summarize(releaseFailure));
         }
     }
 
