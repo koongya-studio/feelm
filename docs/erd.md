@@ -445,7 +445,7 @@ flowchart LR
 
 | API 리소스 | 주 테이블 | 참조 테이블 |
 |---|---|---|
-| `/auth/*`, `/users/me`, `/users/nickname-availability` | `users`, `user_auth_providers`, `email_verification_tokens`, `password_reset_tokens` | — |
+| `/auth/*`, `/users/me`, `/users/nickname-availability` | `users`, `user_auth_providers`, `email_verification_tokens`, `password_reset_tokens` | `frames`, `ratings`(API-014 `stats` 집계), `movies.representative_flavor_id`, `popcorn_flavors`(팝콘 수) |
 | `/users/me/notification-settings` | `notification_settings` | — |
 | `/users/search`, `/users/{userId}/block`, `/users/me/blocks` | `users`, `user_blocks` | — |
 | `/onboarding/cards`, `/onboarding/preferences` | `onboarding_preferences` | `movies`, `popcorn_flavors` |

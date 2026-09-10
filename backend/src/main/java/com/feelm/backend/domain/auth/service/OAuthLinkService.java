@@ -6,6 +6,7 @@ import com.feelm.backend.domain.auth.repository.UserAuthProviderRepository;
 import com.feelm.backend.domain.user.entity.User;
 import com.feelm.backend.domain.user.repository.UserRepository;
 import com.feelm.backend.global.error.BusinessException;
+import com.feelm.backend.global.error.ConstraintViolations;
 import com.feelm.backend.global.error.ErrorCode;
 import com.feelm.backend.infrastructure.oauth.OAuthUserProfile;
 import java.time.Instant;

@@ -52,6 +52,16 @@ public class SecurityConfig {
         "/api/v1/auth/password/reset"
     };
 
+    /**
+     * GET만 공개인 조회 API. 메서드를 함께 묶어 같은 경로에 쓰기 계열이 생겨도 자동으로 열리지 않게 한다(리뷰 B-3).
+     *
+     * <p>API-044 팝콘 맛 기준정보와 API-016 닉네임 사용 가능 확인이 여기에 속한다. 후자는 회원 구분인 {@code /api/v1/users/me} 계열과
+     * 접두사를 공유하므로 와일드카드 없이 정확 경로만 적는다.
+     */
+    private static final String[] PUBLIC_GET_PATHS = {
+        "/api/v1/popcorn-flavors", "/api/v1/users/nickname-availability"
+    };
+
     /** Nginx가 별도 접근 제어하는 Swagger 문서 경로. 일반 API 공개 목록과 분리한다. */
     private static final String[] SWAGGER_PATHS = {
         "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs", "/v3/api-docs.yaml", "/v3/api-docs/**"
@@ -59,8 +69,12 @@ public class SecurityConfig {
 
     /** OpenAPI가 런타임과 같은 공개 API 계약을 표시할 때 사용하는 판정이다. */
     public static boolean isPublicApi(HttpMethod method, String path) {
-        if (HttpMethod.GET.equals(method) && "/api/v1/popcorn-flavors".equals(path)) {
-            return true;
+        if (HttpMethod.GET.equals(method)) {
+            for (String getOnlyPath : PUBLIC_GET_PATHS) {
+                if (getOnlyPath.equals(path)) {
+                    return true;
+                }
+            }
         }
         for (String pattern : PUBLIC_PATHS) {
             if (PATH_MATCHER.match(pattern, path)) {
@@ -105,8 +119,9 @@ public class SecurityConfig {
                                         .permitAll()
                                         .requestMatchers(HttpMethod.GET, SWAGGER_PATHS)
                                         .permitAll()
-                                        // API-044 기준정보는 로그인 화면에서도 사용할 수 있는 공개 조회다.
-                                        .requestMatchers(HttpMethod.GET, "/api/v1/popcorn-flavors")
+                                        // API-044 기준정보와 API-016 닉네임 확인은 로그인 전 화면에서도
+                                        // 쓰는 공개 조회다. GET에만 열어 둔다.
+                                        .requestMatchers(HttpMethod.GET, PUBLIC_GET_PATHS)
                                         .permitAll()
                                         .requestMatchers(PUBLIC_PATHS)
                                         .permitAll()

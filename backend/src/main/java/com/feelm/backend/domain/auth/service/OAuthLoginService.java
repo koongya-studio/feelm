@@ -1,10 +1,10 @@
 package com.feelm.backend.domain.auth.service;
 
 import com.feelm.backend.domain.auth.RefreshTokenService;
-import com.feelm.backend.domain.auth.dto.request.SignupRequest;
 import com.feelm.backend.domain.auth.entity.OAuthProvider;
 import com.feelm.backend.domain.auth.entity.UserAuthProvider;
 import com.feelm.backend.domain.auth.repository.UserAuthProviderRepository;
+import com.feelm.backend.domain.user.NicknamePolicy;
 import com.feelm.backend.domain.user.entity.User;
 import com.feelm.backend.domain.user.repository.UserRepository;
 import com.feelm.backend.global.error.BusinessException;
@@ -30,7 +30,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class OAuthLoginService {
 
-    private static final Pattern NICKNAME = Pattern.compile(SignupRequest.NICKNAME_PATTERN);
+    private static final Pattern NICKNAME = Pattern.compile(NicknamePolicy.PATTERN);
 
     /** 추천 닉네임을 만들 수 없을 때 붙이는 임의 숫자의 범위. 제공자 이름과 합쳐도 10자를 넘지 않는다. */
     private static final int FALLBACK_SUFFIX_BOUND = 1000;

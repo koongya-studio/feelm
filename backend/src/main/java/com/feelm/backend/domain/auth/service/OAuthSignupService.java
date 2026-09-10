@@ -11,6 +11,7 @@ import com.feelm.backend.domain.user.entity.User;
 import com.feelm.backend.domain.user.repository.NotificationSettingsRepository;
 import com.feelm.backend.domain.user.repository.UserRepository;
 import com.feelm.backend.global.error.BusinessException;
+import com.feelm.backend.global.error.ConstraintViolations;
 import com.feelm.backend.global.error.ErrorCode;
 import com.feelm.backend.global.security.TokenProvider;
 import java.time.Instant;

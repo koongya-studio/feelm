@@ -1,5 +1,6 @@
 package com.feelm.backend.domain.auth.dto.request;
 
+import com.feelm.backend.domain.user.NicknamePolicy;
 import com.feelm.backend.domain.user.entity.Gender;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -25,9 +26,7 @@ public record SignupRequest(
                         message = "비밀번호는 8~64자이며 영문·숫자·특수문자를 각각 1자 이상 포함해야 합니다.")
                 String password,
         @NotBlank(message = "닉네임을 입력해 주세요.")
-                @Pattern(
-                        regexp = SignupRequest.NICKNAME_PATTERN,
-                        message = "닉네임은 2~10자이며 한글·영문·숫자·밑줄만 사용할 수 있습니다.")
+                @Pattern(regexp = NicknamePolicy.PATTERN, message = NicknamePolicy.MESSAGE)
                 String nickname,
         @NotNull(message = "생년월일을 입력해 주세요.") LocalDate birthDate,
         @NotNull(message = "성별을 선택해 주세요.") Gender gender) {
@@ -40,11 +39,4 @@ public record SignupRequest(
      */
     static final String PASSWORD_PATTERN =
             "^(?=.*[A-Za-z])(?=.*[0-9])(?=.*[^A-Za-z0-9])[\\x21-\\x7E]{8,64}$";
-
-    /**
-     * 2~10자, 한글·영문·숫자·밑줄(플랜 결정 2). 공백은 허용하지 않는다.
-     *
-     * <p>소셜 가입(API-008)과 추천 닉네임 생성도 같은 규칙을 써야 하므로 공개한다. 규칙이 두 곳으로 갈라지면 가입 경로에 따라 통과하는 닉네임이 달라진다.
-     */
-    public static final String NICKNAME_PATTERN = "^[가-힣a-zA-Z0-9_]{2,10}$";
 }
