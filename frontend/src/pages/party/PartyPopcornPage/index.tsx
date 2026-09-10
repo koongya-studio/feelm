@@ -17,10 +17,28 @@
  * 렌더한다. 그래서 설명 문구도 `파티원 모두 상위 3개 맛에 포함돼요`로 일반화했다.
  *
  * 첫 멤버 카드만 펼친 상태로 시작한다. 와이어프레임이 첫 카드를 펼쳐 두었다.
+ *
+ * 팀 결정 2026-09-10 (업무 -320)
+ * - **멤버마다 팝콘 통을 그린다.** 이전에는 맛 분포를 누적 색 막대와 8종 색 스와치로
+ *   보여줬다. 색 라벨을 읽어야 분포를 알 수 있는 구조인데, 이 화면이 보여줄 것은
+ *   "저 사람 통에 무엇이 담겼나"이지 색표가 아니다. -101에서 구운 3D 통과 알을
+ *   `PopcornBucket`으로 쌓아 통에 팝콘이 얹힌 그림으로 바꿨다
+ * - 그 결과 **어두운 판이 필요 없어졌다.** 색 막대·스와치를 쓸 때는 시안 2.5장에 따라
+ *   어두운 블록이 필수였는데, 3D 렌더는 3.2·5.9와 같이 밝은 벽에서 읽힌다. 밝은 면에
+ *   놀 수 없던 것이 사라지니 판도 사라진다
+ * - 펼친 상태의 8종 맛 개수는 남긴다(와이어프레임 요소). 다만 색 점에는 테두리를 둔다.
+ *   밝은 면에서 8색은 1.01~2.55:1이라 면만으로는 안 보인다(3.1 범례와 같은 처리)
+ * - 카드 테두리를 걷어냈다. 홈·취향 필름·영화 상세와 같이 카드 없는 섹션으로 둔다
+ * - `서로 겹치는 맛`은 맛 이름만 쓴다
+ *
+ * **파티원 수 배치 규칙** (팀 결정 2026-09-10): 멤버는 세로로 순서대로 쌓는다. 파티는
+ * 최대 4명이므로(FR-20) 인원이 늘어도 규칙이 바뀌지 않고 목록이 길어질 뿐이다. 첫 카드만
+ * 펼친 상태로 시작하는 것도 인원과 무관하다.
  */
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
+import PopcornBucket from '../../../components/PopcornBucket';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import { ChevronDownIcon, ChevronUpIcon } from '../../../components/Icon';
@@ -34,6 +52,19 @@ import type { PopcornFlavor } from '../../../types/taste';
 
 /** 겹치는 맛을 고르는 기준. 와이어프레임 설명 문구가 `상위 3개 맛`으로 적고 있다 */
 const TOP_FLAVOR_COUNT = 3;
+
+/**
+ * 멤버 통이 그려지는 폭(px). 네 명이 세로로 쌓이므로 3.2(196px)보다 작다.
+ * 이름·대표 맛이 옆에 붙을 폭을 남기는 값이다.
+ */
+const BUCKET_WIDTH = 132;
+
+/** 통 위에 쌓을 알을 맛 분포대로 펼친다. 한 알이 영화 한 편이다 (3.2와 같은 규칙) */
+function kernelFlavors(member: PartyMemberPopcorn): string[] {
+  return member.flavors.flatMap((flavor) =>
+    Array.from({ length: flavor.popcornCount }, () => flavor.flavorCode),
+  );
+}
 
 /** 알이 가장 많은 맛의 코드 */
 function topFlavorCodes(member: PartyMemberPopcorn, count: number): string[] {
@@ -162,52 +193,41 @@ export default function PartyPopcornPage() {
           const isMe = member.user.userId === myUserId;
           const leadCode = topFlavorCodes(member, 1)[0];
           const leadName = leadCode ? (flavorByCode.get(leadCode)?.displayName ?? '') : '';
-          // 막대는 맛 순서대로 그린다. 와이어프레임 첫 카드와 같은 순서다
-          const ordered = flavors
-            .map((flavor) => ({
-              flavor,
-              count:
-                member.flavors.find((item) => item.flavorCode === flavor.code)?.popcornCount ?? 0,
-            }))
-            .filter((item) => item.count > 0);
 
           return (
             <section key={member.user.userId} className={styles.memberCard}>
+              {/*
+               * 이 멤버의 통. 맛 분포대로 알이 쌓이므로 무엇이 담겼는지 그림으로 보인다.
+               * 통과 알은 -101에서 구운 3D 스프라이트다.
+               */}
               <button
                 type="button"
                 className={styles.memberHead}
                 aria-expanded={isOpen}
                 onClick={() => toggle(member.user.userId)}
               >
-                <span className={styles.avatar} aria-hidden="true" />
+                <PopcornBucket
+                  kernelFlavors={kernelFlavors(member)}
+                  width={BUCKET_WIDTH}
+                  label={`${member.user.nickname}의 팝콘 ${member.totalCount}알`}
+                />
 
                 <span className={styles.memberInfo}>
                   <span className={styles.memberName}>
                     {member.user.nickname}
                     {isMe ? ' (나)' : ''}
                   </span>
-                  <span className={styles.memberMeta}>
-                    대표 맛 {leadName} · 팝콘 {member.totalCount}알
+                  <span className={styles.memberMeta}>대표 맛 {leadName}</span>
+                  <span className={styles.memberCount}>팝콘 {member.totalCount}알</span>
+
+                  <span className={styles.expandHint}>
+                    {isOpen ? '접기' : '펼쳐서 8가지 맛 개수 보기'}
+                    <span className={styles.memberChevron} aria-hidden="true">
+                      {isOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
+                    </span>
                   </span>
                 </span>
-
-                <span className={styles.memberChevron} aria-hidden="true">
-                  {isOpen ? <ChevronUpIcon /> : <ChevronDownIcon />}
-                </span>
               </button>
-
-              <span className={styles.bar} aria-hidden="true">
-                {ordered.map((item) => (
-                  <span
-                    key={item.flavor.code}
-                    className={styles.barPart}
-                    style={{
-                      width: `${((item.count / member.totalCount) * 100).toFixed(1)}%`,
-                      background: item.flavor.color,
-                    }}
-                  />
-                ))}
-              </span>
 
               {isOpen ? (
                 <ul className={styles.flavorList}>
@@ -227,9 +247,7 @@ export default function PartyPopcornPage() {
                     </li>
                   ))}
                 </ul>
-              ) : (
-                <p className={styles.expandHint}>펼쳐서 8가지 맛 개수 보기</p>
-              )}
+              ) : null}
             </section>
           );
         })}
