@@ -39,8 +39,8 @@ PROJECT_PATH = 's15-bigdata-dist-sub1/S15P21E106'
 JOB_NAME = 'backend-mr-test'
 JOB_STAGE = 'test'
 EXPECTED_SCRIPT = ['cd backend', './gradlew clean test spotlessCheck --no-daemon']
-CACHE_STATUS_JOB = 'backend-cache-status'
-CACHE_STATUS_SCRIPT = ['echo Backend dependency cache refresh required']
+CACHE_PREPARE_JOB = 'backend-cache-prepare'
+CACHE_PREPARE_SCRIPT = ['echo Prepare verified backend dependency cache for this MR revision']
 CACHE_DEPENDENCY_FILES = {
     'backend/build.gradle', 'backend/build.gradle.kts',
     'backend/settings.gradle', 'backend/settings.gradle.kts',
@@ -119,7 +119,7 @@ def validate_job_response(response):
         raise PolicyError('Invalid job credential')
     policies = {
         JOB_NAME: (JOB_STAGE, EXPECTED_SCRIPT),
-        CACHE_STATUS_JOB: ('verify', CACHE_STATUS_SCRIPT),
+        CACHE_PREPARE_JOB: ('verify', CACHE_PREPARE_SCRIPT),
     }
     policy = policies.get(info.get('name')) if isinstance(info, dict) else None
     if (policy is None or info.get('stage') != policy[0]
@@ -171,6 +171,8 @@ def verify_current_job(opener, context):
         'stage': isinstance(job, dict) and job.get('stage') == context['job_stage'],
         'web_url': isinstance(job, dict) and job.get('web_url') == expected_web,
         'pipeline': isinstance(pipeline, dict),
+        'pipeline.id': isinstance(pipeline, dict) and type(pipeline.get('id')) is int
+                       and pipeline['id'] > 0,
         'pipeline.project_id': isinstance(pipeline, dict)
                                and pipeline.get('project_id') == context['project_id'],
         'pipeline.sha': isinstance(pipeline, dict) and pipeline.get('sha') == context['sha'],
@@ -180,6 +182,7 @@ def verify_current_job(opener, context):
     mismatches = [name for name, matched in checks.items() if not matched]
     if mismatches:
         raise PolicyError('Authenticated job metadata mismatch: ' + ','.join(mismatches))
+    return job
 
 
 def verify_merge_request(opener, context):
@@ -251,7 +254,7 @@ def run_git(command, environment, stage, **options):
         raise AdapterGitError(stage) from exc
 
 
-def verify_dependency_change(context, mr):
+def dependency_changes(context, mr):
     iid = mr.get('iid')
     if type(iid) is not int or iid <= 0:
         raise PolicyError('Merge request identity is missing')
@@ -285,13 +288,28 @@ def verify_dependency_change(context, mr):
     paths = sorted(set(path for path in raw_paths if path))
     if not paths or len(paths) >= 100 or any('\n' in path or '\r' in path for path in paths):
         raise PolicyError('Merge request diff is missing or too large')
-    changes = [path for path in paths if path in CACHE_DEPENDENCY_FILES]
-    if not changes:
-        raise PolicyError('No approved backend dependency change found')
-    print('CACHE_REFRESH_REQUIRED_MR=' + str(iid))
-    print('CACHE_REFRESH_REVISION=' + context['sha'])
-    print('CACHE_DEPENDENCY_CHANGES=' + json.dumps(changes))
-    return changes
+    return [path for path in paths if path in CACHE_DEPENDENCY_FILES]
+
+
+def verified_candidate(context, mr_iid):
+    manager = load('gitlab_dependency_cache', 'ci-dependency-cache.py')
+    try:
+        return manager.prepared_candidate(context['sha'], mr_iid)
+    except manager.PolicyError as exc:
+        raise PolicyError(str(exc)) from exc
+
+
+def prepare_candidate(context, job, mr):
+    manager = load('gitlab_dependency_cache_prepare', 'ci-dependency-cache.py')
+    manager_context = {
+        'action': 'prepare', 'project_id': context['project_id'],
+        'pipeline_id': job['pipeline']['id'], 'job_id': context['id'],
+        'mr_iid': mr['iid'], 'revision': context['sha'], 'token': context['token'],
+    }
+    try:
+        manager.automatic_prepare(manager_context)
+    except manager.PolicyError as exc:
+        raise PolicyError(str(exc)) from exc
 
 
 def normalized_backend_archive(payload):
@@ -377,16 +395,21 @@ def run_job(response, config_path=CONFIG, opener=None):
     context = validate_job_response(response)
     _, prepared = read_private_config(config_path)
     opener = opener or urllib.request.build_opener(NoRedirect())
-    try: verify_current_job(opener, context)
+    try: job = verify_current_job(opener, context)
     except urllib.error.HTTPError as exc: raise AdapterHttpError('current_job', exc.code) from exc
     try: mr = verify_merge_request(opener, context)
     except urllib.error.HTTPError as exc: raise AdapterHttpError('merge_request', exc.code) from exc
-    if context['job_name'] == CACHE_STATUS_JOB:
-        try: detail = fetch_merge_request_detail(opener, context, mr)
-        except urllib.error.HTTPError as exc:
-            raise AdapterHttpError('merge_request_detail', exc.code) from exc
-        verify_dependency_change(context, detail)
+    try: detail = fetch_merge_request_detail(opener, context, mr)
+    except urllib.error.HTTPError as exc:
+        raise AdapterHttpError('merge_request_detail', exc.code) from exc
+    changes = dependency_changes(context, detail)
+    if context['job_name'] == CACHE_PREPARE_JOB:
+        if not changes:
+            raise PolicyError('No approved backend dependency change found')
+        prepare_candidate(context, job, detail)
         return 0
+    if changes:
+        prepared = verified_candidate(context, detail['iid'])
     payload, digest = fetch_source(context)
     active = {}
 

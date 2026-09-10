@@ -1,18 +1,12 @@
-# S15P21E106-271: 백엔드 의존성 캐시 자동화
+# S15P21E106-271·294: 백엔드 의존성 캐시 자동화
 
 ## 동작 경계
 
-MR이 백엔드 의존성 선언이나 저장소 설정을 변경하면 `backend-cache-status`가 격리 Runner의
-고정 어댑터에서 MR 번호, 정확한 commit SHA와 변경 파일을 출력한다. 이 Job은 commit에 연결된
-열린 MR을 먼저 검증하고, 해당 IID의 상세 응답에서 `diff_refs`를 다시 확인한다. 상세 응답의
-기준 SHA와 HEAD SHA를 인증된 Git fetch로 가져와 경로만 비교하며, Job Token이 허용하지 않는
-MR diff API를 호출하지 않는다. MR의 셸이나 Gradle 코드는 실행하지 않는다.
-기존 `backend-mr-test`는 캐시가 충분하면 그대로 실행되고, 부족하면 안전하게 실패한다.
-
-캐시 갱신은 보호된 `develop`의 web pipeline에서만 실행한다. `backend-cache-prepare`는 입력한
-MR과 SHA가 현재 열린 MR HEAD인지 GitLab API로 다시 확인한다. status와 prepare 모두 MR diff
-API 대신 API가 돌려준 `diff_refs`의 기준 SHA와 HEAD SHA를 인증된 Git fetch로 가져와 의존성
-변경을 검사한 뒤 다음 단계를 순서대로 수행한다.
+MR이 백엔드 의존성 선언이나 저장소 설정을 변경하면 `backend-cache-prepare`가 격리 Runner의
+고정 어댑터에서 자동 실행됩니다. 어댑터는 GitLab이 생성한 셸을 실행하지 않고 인증된 현재 Job,
+같은 프로젝트의 열린 develop 대상 MR, 정확한 HEAD SHA와 허용된 변경 파일을 다시 확인합니다.
+MR 상세 응답의 기준 SHA와 HEAD SHA를 인증된 Git fetch로 가져와 경로를 비교하며 Job Token이
+허용하지 않는 MR diff API를 호출하지 않습니다. 검증 후 다음 단계를 수행합니다.
 
 1. 정확한 SHA의 `backend` archive를 받아 SHA256을 기록한다.
 2. 기존 전용 계정과 네트워크 guard에서 전체 테스트 및 `spotlessCheck`를 실행해 필요한
@@ -21,14 +15,20 @@ API 대신 API가 돌려준 `diff_refs`의 기준 SHA와 HEAD SHA를 인증된 G
 4. 새 stage를 외부 네트워크가 차단된 격리 환경에서 다시 실행한다.
 5. 전체 테스트, `spotlessCheck`, 컨테이너 정리와 증빙 수집이 성공한 후보만 `VERIFIED`로 기록한다.
 
-`backend-cache-promote`는 같은 MR과 SHA를 다시 확인한다. 실행 중인 격리 작업이 없을 때 Runner를
-중지하고 `/etc/feelm-ci222/gitlab-adapter.json`을 원자적으로 교체한 뒤 Runner의 active 상태를
-확인한다. 재시작 실패 시 이전 설정을 즉시 복구한다. `backend-cache-rollback`은 현재 stage가
-해당 전환 기록과 일치할 때만 기록된 이전 stage로 되돌린다. 후보, 이전 stage와 증빙은 자동
-삭제하지 않는다.
+후보는 MR HEAD SHA별로 분리됩니다. `backend-mr-test`는 MR diff에 의존성 파일이 있으면 자신의
+SHA와 MR IID가 일치하는 `VERIFIED` 후보만 선택하고, 일반 코드 MR은 현재 기본 캐시를 사용합니다.
+후보 생성은 전역 `prepared_base`를 바꾸지 않습니다.
 
-세 작업과 백엔드 배포는 `service-and-backend-cache` resource group을 공유한다. 이 직렬화와
-호스트 lock을 함께 사용해 갱신·전환·배포 및 중복 갱신이 겹치지 않게 한다.
+MR이 develop에 병합되어 의존성 파일이 변경되면 보호된 push pipeline의
+`backend-cache-promote`가 병합 commit과 정확히 연결된 MR을 다시 찾습니다. 검증된 후보가 하나일
+때만 Runner를 중지하고 기본 `prepared_base`를 원자적으로 교체합니다. 재시작 실패 시 이전 설정을
+즉시 복구합니다. `backend-cache-rollback`은 운영자가 현재 stage와 승격 기록을 확인한 경우에만
+이전 stage로 되돌립니다. 후보, 이전 stage와 증빙은 자동 삭제하지 않습니다.
+
+자동 준비, MR 테스트, 자동 승격, rollback과 백엔드 배포는
+`service-and-backend-cache` resource group을 공유합니다. GitLab 직렬화와 호스트 lock을 함께
+사용해 복수 MR의 후보 생성·테스트, 전환과 배포가 서로 덮어쓰이지 않게 합니다. 같은 SHA의 성공
+후보를 재시도하면 기존 검증 결과를 재사용하고 다른 MR이나 SHA의 후보는 선택하지 않습니다.
 
 ## 최초 적용
 
@@ -48,42 +48,34 @@ sudo python3 <SERVER_STAGE>/scripts/ci-dependency-cache-install.py \
   --confirm-update --operator-username <GitLab 사용자명>
 ```
 
-현재 GitLab 인스턴스에는 Protected Environments 설정이 없다. 설치기는 명시적으로 받은 GitLab
-사용자명을 root 소유 0600 `cache-operators.json`에 기록한다. cache manager는 Job Token의
-`GET /job` 응답으로 현재 Job ID와 이름, pipeline, 보호된 `develop`과 실제 실행자를 다시 확인하고
-허용 목록의 사용자만 실행시킨다. web pipeline 여부는 CI 규칙과 고정 context가 각각 확인한다.
+현재 GitLab 인스턴스에는 Protected Environments 설정이 없습니다. 설치기는 rollback 권한을 가진
+GitLab 사용자명만 root 소유 0600 `cache-operators.json`에 기록합니다. 자동 준비는 설치된 Custom
+executor가 인증된 MR Job context로만 호출하고, 자동 승격은 보호된 develop push Job과 merge
+commit을 다시 확인합니다. 운영자 허용 목록은 자동 준비·승격 권한으로 사용하지 않습니다.
 GitLab 버전에 따라 제공되지 않는 Job `source` 속성은 서버 권한 판정에 사용하지 않는다.
 pipeline variable의 `GITLAB_USER_*` 값은
 권한 판정에 사용하지 않는다. sudoers는 서버에서 확인한 `e106-shell` Runner Job 계정인
 `gitlab-runner`에 cache manager 한 명령만 허용한다. 계정이 다르면 임의로 권한을 넓히지 말고
 실제 Runner 사용자와 설치 내용을 다시 검토한다.
 
-## 준비와 전환
+## 자동 준비와 전환
 
-GitLab의 **Build > Pipelines > New pipeline**에서 branch를 `develop`으로 선택하고 다음 변수를
-입력한다. 짧은 SHA나 이전 pipeline SHA를 사용하지 않는다.
-
-```text
-CACHE_ACTION=prepare
-CACHE_MR_IID=<MR 번호>
-CACHE_COMMIT_SHA=<현재 MR HEAD 40자리 SHA>
-```
-
-생성된 pipeline에서 `backend-cache-prepare`를 설치 시 등록한 GitLab 사용자가 실행한다. 등록되지
-않은 사용자가 Job을 실행하면 서버의 실행자 검사에서 거부한다. 성공 로그에서 다음 값을 검토한다.
+허용된 의존성 파일을 변경한 develop 대상 MR pipeline에서 `backend-cache-prepare`가 자동으로
+생성됩니다. 성공 로그에서 다음 값을 확인할 수 있습니다.
 
 - `CACHE_DEPENDENCY_CHANGES`
 - `CACHE_CANDIDATE_VERIFIED`
 - `CACHE_MANIFEST_SHA256`
 - `CANDIDATE_STAGE`
 
-준비가 성공한 뒤 새 web pipeline을 같은 MR과 SHA로 만들고 `CACHE_ACTION=promote`를 지정한다.
-`backend-cache-promote` 성공 로그의 `PREVIOUS_STAGE`와 `CURRENT_STAGE`를 기록한 뒤 대상 MR의
-`backend-mr-test`를 재실행한다.
+같은 pipeline의 `backend-mr-test`는 준비가 끝난 뒤 해당 SHA 후보를 자동 선택합니다. MR HEAD가
+바뀌거나 의존성 파일 변경이 없거나 온라인·오프라인 검사 중 하나라도 실패하면 후보를 선택하지
+않습니다. 준비 Job 중단 시 완성되지 않은 후보는 활성 Runner에 연결되지 않습니다.
 
-MR HEAD가 바뀌거나, 의존성 파일 변경이 없거나, 온라인·오프라인 검사 중 하나라도 실패하거나,
-실행 중인 MR 테스트가 있으면 전환하지 않는다. 준비 Job 중단 시 완성되지 않은 후보는 활성
-Runner에 연결되지 않는다.
+병합 후 develop push pipeline의 `backend-cache-promote`가 자동 실행됩니다. 성공 로그의
+`CACHE_PROMOTED`, `CACHE_MERGED_REVISION`, `PREVIOUS_STAGE`, `CURRENT_STAGE`를 기록합니다. 후보가
+없거나 병합 commit과 MR 연결이 모호하거나 오래된 pipeline이면 기존 기본 캐시를 유지하고
+실패합니다.
 
 ## 복구
 
@@ -93,9 +85,9 @@ rollback 요청을 거부한다. 자동 재시작 복구까지 실패한 경우 
 및 출력된 `PREVIOUS_INSTALL`, `PREVIOUS_SUDOERS`, `PREVIOUS_STAGE`를 기준으로 운영자가 Runner를
 중지한 상태에서 복구하고, 설정의 root 소유권·0600 권한과 서비스 active 상태를 확인한다.
 
-## status Job 404 복구와 어댑터 갱신
+## prepare Job 404 복구와 어댑터 갱신
 
-`backend-cache-status`가 `MR_ADAPTER_HTTP_ERROR: stage=dependency_diff status=404`로 실패하면
+`backend-cache-prepare`가 `MR_ADAPTER_HTTP_ERROR: stage=dependency_diff status=404`로 실패하면
 캐시 stage가 아니라 서버에 설치된 root 어댑터가 MR diff API를 호출하는 이전 버전인지 먼저
 확인한다. 캐시 `prepare`·`promote`는 Gradle cache와 `prepared_base`만 전환하며
 `/usr/local/lib/feelm-ci222/gitlab/ci-gitlab-job-adapter.py`를 갱신하지 않는다.
@@ -104,12 +96,12 @@ S15P21E106-314 수정본을 병합한 최신 `develop`에서 새 server stage를
 `ci-dependency-cache-install.py --confirm-update` 절차로 설치 스크립트 전체를 원자적으로
 교체한다. 설치기는 실행 중인 MR test가 있으면 거부하고, MR Runner를 중지한 뒤 기존 설치와
 sudoers를 `PREVIOUS_INSTALL`, `PREVIOUS_SUDOERS`로 보존하며 재시작 실패 시 자동 복구한다.
-갱신 후 같은 MR HEAD의 `backend-cache-status`를 다시 실행한다. Git 조회가 실패하면 로그의
+갱신 후 같은 MR HEAD의 `backend-cache-prepare`를 다시 실행합니다. Git 조회가 실패하면 로그의
 `MR_ADAPTER_GIT_ERROR: stage=dependency_git_init|dependency_fetch|dependency_diff`로 실패 단계를
 구분하되 원격 URL, 명령 출력과 Job Token은 노출하지 않는다.
 
-commit에 연결된 MR 목록 응답은 GitLab 버전에 따라 `diff_refs`를 생략한다. 목록 응답의
-`iid`·상태·프로젝트·대상 브랜치·HEAD로 MR 연결을 먼저 확인하고, cache status Job에서만
+commit에 연결된 MR 목록 응답은 GitLab 버전에 따라 `diff_refs`를 생략합니다. 목록 응답의
+`iid`·상태·프로젝트·대상 브랜치·HEAD로 MR 연결을 먼저 확인하고, cache prepare Job에서
 `merge_requests/:iid` 상세 응답을 추가 조회한다. 상세 응답의 동일 필드와 `diff_refs`의
 base·start·HEAD를 다시 검증한 뒤 Git 비교를 시작한다.
 
@@ -122,7 +114,7 @@ MR !98의 현재 HEAD와 `backend/build.gradle` 변경을 다시 확인해 prepa
 
 ## 리뷰 순서와 변경 크기
 
-1. `.gitlab-ci.yml`의 감지 Job, 보호된 수동 Job과 배포 직렬화
+1. `.gitlab-ci.yml`의 자동 준비·승격 Job과 테스트·배포 직렬화
 2. `ci-dependency-cache-context.py`의 보호 브랜치·입력 검증
 3. `ci-dependency-cache.py`의 MR 재검증, 후보 생성, 오프라인 검증과 원자적 전환
 4. 기존 offline input과 server manager에 추가한 동적 revision·SHA 전달

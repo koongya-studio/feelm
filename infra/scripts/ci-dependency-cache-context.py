@@ -8,22 +8,19 @@ import sys
 
 def context(environment=None):
     env = environment or os.environ
-    required = {
-        'CI_PIPELINE_SOURCE': 'web',
-        'CI_COMMIT_BRANCH': 'develop',
-        'CI_COMMIT_REF_PROTECTED': 'true',
-        'CI_PROJECT_ID': '1441379',
-        'CI_PROJECT_PATH': 's15-bigdata-dist-sub1/S15P21E106',
-    }
-    if any(env.get(name) != value for name, value in required.items()):
-        raise ValueError('Dependency-cache actions require a protected develop web pipeline')
     action = env.get('CACHE_ACTION')
-    if action not in {'prepare', 'promote', 'rollback'}:
+    source = 'push' if action == 'promote' else 'web'
+    required = {'CI_PIPELINE_SOURCE': source, 'CI_COMMIT_BRANCH': 'develop',
+                'CI_COMMIT_REF_PROTECTED': 'true', 'CI_PROJECT_ID': '1441379',
+                'CI_PROJECT_PATH': 's15-bigdata-dist-sub1/S15P21E106'}
+    if any(env.get(name) != value for name, value in required.items()):
+        raise ValueError('Dependency-cache action has an invalid protected develop pipeline source')
+    if action not in {'promote', 'rollback'}:
         raise ValueError('Unsupported cache action')
-    iid = env.get('CACHE_MR_IID', '')
-    revision = env.get('CACHE_COMMIT_SHA', '')
+    iid = None if action == 'promote' else env.get('CACHE_MR_IID', '')
+    revision = env.get('CI_COMMIT_SHA', '') if action == 'promote' else env.get('CACHE_COMMIT_SHA', '')
     token = env.get('CI_JOB_TOKEN', '')
-    if not re.fullmatch(r'[1-9][0-9]{0,9}', iid):
+    if action == 'rollback' and not re.fullmatch(r'[1-9][0-9]{0,9}', iid):
         raise ValueError('CACHE_MR_IID must be a positive number')
     if not re.fullmatch(r'[0-9a-f]{40}', revision):
         raise ValueError('CACHE_COMMIT_SHA must be the full MR commit SHA')
@@ -39,7 +36,7 @@ def context(environment=None):
     return {
         'action': action,
         **identities,
-        'mr_iid': int(iid),
+        'mr_iid': None if iid is None else int(iid),
         'revision': revision,
         'token': token,
     }

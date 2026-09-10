@@ -2,10 +2,11 @@
 
 백엔드 의존성 변경으로 격리 Runner의 Gradle 캐시가 부족할 때는
 [S15P21E106-271 캐시 자동화](DEPENDENCY-CACHE-AUTOMATION.md)를 사용한다. MR의 변경을 표시하는
-고정 Job과 보호된 `develop`의 준비·검증·전환 Job을 분리하며, 준비와 배포를 직렬화하고 전환
-실패 시 이전 `prepared_base`를 복구한다.
-Protected Environments가 없는 현재 GitLab에서는 Job Token의 `GET /job` 응답과 설치 시 만든
-root 소유 운영자 허용 목록으로 실제 수동 Job 실행자를 검증한다.
+고정 Custom executor가 MR SHA별 후보를 자동 준비·검증하고, 각 MR 테스트는 자신의 후보만
+선택합니다. develop 병합 후 보호된 push pipeline이 기본 캐시를 자동 승격하며, 준비·테스트·
+승격·배포를 직렬화하고 전환 실패 시 이전 `prepared_base`를 복구합니다. Job Token의
+`GET /job`과 MR/commit 재검증을 신뢰 경계로 사용하고, root 소유 운영자 허용 목록은 수동
+rollback에만 사용합니다.
 
 MR 61의 신규 메일 의존성을 포함하는 오프라인 캐시 갱신과 Runner 전환 전 독립 검증 절차는
 [S15P21E106-251 캐시 갱신 절차](OFFLINE-CACHE-REFRESH.md)를 따른다.

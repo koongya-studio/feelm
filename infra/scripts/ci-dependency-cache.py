@@ -53,6 +53,12 @@ class PolicyError(Exception):
     pass
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, request, file_pointer, code, message, headers, new_url):
+        raise urllib.error.HTTPError(request.full_url, code, 'redirect refused', headers,
+                                     file_pointer)
+
+
 def load(name, filename):
     spec = importlib.util.spec_from_file_location(name, HERE / filename)
     module = importlib.util.module_from_spec(spec)
@@ -80,7 +86,7 @@ def read_context(stream=None):
     if set(value) != {'action', 'project_id', 'pipeline_id', 'job_id', 'mr_iid',
                       'revision', 'token'}:
         raise PolicyError('Unexpected CI context fields')
-    if value['action'] not in {'prepare', 'promote', 'rollback'}:
+    if value['action'] not in {'promote', 'rollback'}:
         raise PolicyError('Unsupported action')
     if type(value['project_id']) is not int or value['project_id'] <= 0:
         raise PolicyError('Invalid project identity')
@@ -88,8 +94,11 @@ def read_context(stream=None):
         raise PolicyError('Invalid pipeline identity')
     if type(value['job_id']) is not int or value['job_id'] <= 0:
         raise PolicyError('Invalid job identity')
-    if type(value['mr_iid']) is not int or value['mr_iid'] <= 0:
+    if (value['action'] != 'promote'
+            and (type(value['mr_iid']) is not int or value['mr_iid'] <= 0)):
         raise PolicyError('Invalid MR identity')
+    if value['action'] == 'promote' and value['mr_iid'] is not None:
+        raise PolicyError('Automatic promotion discovers its merged MR')
     if not re.fullmatch(r'[0-9a-f]{40}', str(value['revision'])):
         raise PolicyError('Invalid revision')
     token = value['token']
@@ -101,7 +110,7 @@ def read_context(stream=None):
 def api_json(path, token, opener=None):
     url = GITLAB_URL + '/api/v4/' + path.lstrip('/')
     request = urllib.request.Request(url, headers={'JOB-TOKEN': token, 'Accept': 'application/json'})
-    with (opener or urllib.request.build_opener()).open(request, timeout=30) as response:
+    with (opener or urllib.request.build_opener(NoRedirect())).open(request, timeout=30) as response:
         if response.status != 200:
             raise RuntimeError('GitLab returned a non-success status')
         raw = response.read(MAX_JSON + 1)
@@ -157,9 +166,36 @@ def verify_job(context, opener=None):
     failures = [name for name, passed in checks if not passed]
     if failures:
         raise PolicyError('Current GitLab job is not authorized: ' + ','.join(failures))
-    if user.get('username') not in operator_usernames():
+    if context['action'] == 'promote' and pipeline.get('sha') != context['revision']:
+        raise PolicyError('Automatic promotion revision does not match the develop pipeline')
+    if context['action'] == 'rollback' and user.get('username') not in operator_usernames():
         raise PolicyError('Current GitLab cache operator is not authorized')
-    return user['username']
+    return 'automatic-develop-pipeline' if context['action'] == 'promote' else user['username']
+
+
+def merged_mr(context, opener=None):
+    path = (f'projects/{PROJECT_ID}/repository/commits/'
+            f'{urllib.parse.quote(context["revision"], safe="")}/merge_requests')
+    summaries = api_json(path, context['token'], opener)
+    if not isinstance(summaries, list) or len(summaries) > 20:
+        raise PolicyError('Unexpected merged MR response')
+    matches = []
+    for summary in summaries:
+        iid = summary.get('iid') if isinstance(summary, dict) else None
+        if type(iid) is not int or iid <= 0:
+            continue
+        detail = api_json(f'projects/{PROJECT_API}/merge_requests/{iid}', context['token'], opener)
+        diff_refs = detail.get('diff_refs') if isinstance(detail, dict) else None
+        merged_revisions = {detail.get('merge_commit_sha'), detail.get('squash_commit_sha')}
+        if (detail.get('state') == 'merged' and detail.get('target_branch') == 'develop'
+                and detail.get('source_project_id') == detail.get('target_project_id') == PROJECT_ID
+                and context['revision'] in merged_revisions and isinstance(diff_refs, dict)
+                and diff_refs.get('head_sha') == detail.get('sha')
+                and re.fullmatch(r'[0-9a-f]{40}', str(detail.get('sha', '')))):
+            matches.append(detail)
+    if len(matches) != 1:
+        raise PolicyError('Develop commit must belong to one merged dependency MR')
+    return matches[0]
 
 
 def verify_mr(context, opener=None):
@@ -325,7 +361,9 @@ def candidate_file(revision):
 
 def prepare(context):
     if candidate_file(context['revision']).exists():
-        raise PolicyError('A candidate already exists for this revision')
+        prepared_candidate(context['revision'], context['mr_iid'])
+        print('CACHE_CANDIDATE_REUSED=' + context['revision'])
+        return
     mr = verify_mr(context)
     changes, declarations = review_dependency_changes(context, mr)
     archive, archive_sha = fetch_archive(context)
@@ -378,13 +416,50 @@ def prepare(context):
 
 def read_candidate(context, expected_state):
     path = candidate_file(context['revision'])
+    if not path.exists() or path.is_symlink():
+        raise PolicyError('Verified cache candidate is missing for this revision')
     info = path.lstat()
     if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077:
         raise PolicyError('Candidate record is not trusted root-owned state')
     value = json.loads(path.read_text())
-    if value.get('state') != expected_state or value.get('mr_iid') != context['mr_iid']:
+    states = {expected_state} if isinstance(expected_state, str) else set(expected_state)
+    if value.get('state') not in states or value.get('mr_iid') != context['mr_iid']:
         raise PolicyError('Candidate state or MR does not match the requested action')
     return path, value
+
+
+def prepared_candidate(revision, mr_iid):
+    context = {'revision': revision, 'mr_iid': mr_iid}
+    _, candidate = read_candidate(context, {'VERIFIED', 'PROMOTED'})
+    pilot = load('ci294_candidate_pilot', 'ci-server-manager-pilot.py')
+    stage = Path(candidate['stage'])
+    pilot.check_base(stage)
+    prepared = json.loads((stage / 'prepared.json').read_text())
+    if (prepared.get('source_revision') != revision
+            or prepared.get('cache_manifest_sha256') != candidate.get('manifest_sha256')):
+        raise PolicyError('Prepared stage identity does not match verified candidate')
+    print('CACHE_SELECTED_REVISION=' + revision)
+    print('CACHE_SELECTED_STAGE=' + str(stage))
+    return stage
+
+
+def automatic_prepare(context):
+    expected = {'action', 'project_id', 'pipeline_id', 'job_id', 'mr_iid', 'revision', 'token'}
+    if (set(context) != expected or context.get('action') != 'prepare'
+            or context.get('project_id') != PROJECT_ID
+            or any(type(context.get(name)) is not int or context[name] <= 0
+                   for name in ('pipeline_id', 'job_id', 'mr_iid'))
+            or re.fullmatch(r'[0-9a-f]{40}', str(context.get('revision', ''))) is None
+            or not isinstance(context.get('token'), str)
+            or not 16 <= len(context['token']) <= 4096
+            or any(character.isspace() for character in context['token'])):
+        raise PolicyError('Automatic cache preparation context is invalid')
+    if fcntl is None or not hasattr(os, 'geteuid') or os.geteuid() != 0:
+        raise PolicyError('Automatic cache preparation requires the trusted root adapter')
+    LOCK.parent.mkdir(parents=True, exist_ok=True)
+    with LOCK.open('a+b') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        prepare(context)
 
 
 def atomic_config(value):
@@ -417,25 +492,33 @@ def switch_stage(old_config, new_stage):
 
 
 def promote(context):
-    verify_mr(context)
-    path, candidate = read_candidate(context, 'VERIFIED')
+    mr = merged_mr(context)
+    candidate_context = dict(context, mr_iid=mr['iid'], revision=mr['sha'])
+    path, candidate = read_candidate(candidate_context, 'VERIFIED')
     pilot = load('ci271_server_manager', 'ci-server-manager-pilot.py')
     stage = Path(candidate['stage'])
     pilot.check_base(stage)
     prepared = json.loads((stage / 'prepared.json').read_text())
-    if (prepared.get('source_revision') != context['revision']
+    if (prepared.get('source_revision') != candidate_context['revision']
             or prepared.get('cache_manifest_sha256') != candidate['manifest_sha256']):
         raise PolicyError('Prepared stage identity does not match verified candidate')
     old = json.loads(ADAPTER_CONFIG.read_text())
     if set(old) != {'gitlab_url', 'project_path', 'prepared_base'}:
         raise PolicyError('Unexpected adapter configuration')
     switch_stage(old, str(stage))
-    candidate.update(state='PROMOTED', previous_stage=old['prepared_base'],
-                     promote_pipeline_id=context['pipeline_id'], promote_job_id=context['job_id'])
-    temporary = path.with_suffix('.json.new')
-    write_private(temporary, json.dumps(candidate, indent=2).encode())
-    os.replace(temporary, path)
-    print('CACHE_PROMOTED=' + context['revision'])
+    promoted = dict(candidate, state='PROMOTED', previous_stage=old['prepared_base'],
+                    merged_revision=context['revision'],
+                    promote_pipeline_id=context['pipeline_id'], promote_job_id=context['job_id'])
+    temporary = path.with_name(path.name + '.' + uuid.uuid4().hex + '.new')
+    try:
+        write_private(temporary, json.dumps(promoted, indent=2).encode())
+        os.replace(temporary, path)
+    except Exception:
+        current = dict(old, prepared_base=str(stage))
+        switch_stage(current, old['prepared_base'])
+        raise
+    print('CACHE_PROMOTED=' + candidate_context['revision'])
+    print('CACHE_MERGED_REVISION=' + context['revision'])
     print('PREVIOUS_STAGE=' + old['prepared_base'])
     print('CURRENT_STAGE=' + str(stage))
 
@@ -448,7 +531,7 @@ def rollback(context):
     switch_stage(current, candidate['previous_stage'])
     candidate.update(state='ROLLED_BACK', rollback_pipeline_id=context['pipeline_id'],
                      rollback_job_id=context['job_id'])
-    temporary = path.with_suffix('.json.new')
+    temporary = path.with_name(path.name + '.' + uuid.uuid4().hex + '.new')
     write_private(temporary, json.dumps(candidate, indent=2).encode())
     os.replace(temporary, path)
     print('CACHE_ROLLED_BACK=' + context['revision'])
@@ -460,12 +543,12 @@ def main():
         print('CACHE_AUTOMATION_REJECTED: root stdin-only entry point required', file=sys.stderr)
         return 2
     context = read_context()
-    operator = verify_job(context)
-    print('CACHE_OPERATOR=' + operator)
+    actor = verify_job(context)
+    print('CACHE_ACTOR=' + actor)
     LOCK.parent.mkdir(parents=True, exist_ok=True)
     with LOCK.open('a+b') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        {'prepare': prepare, 'promote': promote, 'rollback': rollback}[context['action']](context)
+        {'promote': promote, 'rollback': rollback}[context['action']](context)
     return 0
 
 

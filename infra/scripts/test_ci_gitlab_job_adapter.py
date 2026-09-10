@@ -30,8 +30,8 @@ def response(script=None):
 
 
 def cache_response():
-    value = response(adapter.CACHE_STATUS_SCRIPT)
-    value['job_info'].update(name=adapter.CACHE_STATUS_JOB, stage='verify')
+    value = response(adapter.CACHE_PREPARE_SCRIPT)
+    value['job_info'].update(name=adapter.CACHE_PREPARE_JOB, stage='verify')
     return value
 
 
@@ -61,7 +61,7 @@ class AdapterTests(unittest.TestCase):
         changed = response(); changed['services'] = [{'name': 'docker'}]
         with self.assertRaises(adapter.PolicyError): adapter.validate_job_response(changed)
         cache = adapter.validate_job_response(cache_response())
-        self.assertEqual(cache['job_name'], adapter.CACHE_STATUS_JOB)
+        self.assertEqual(cache['job_name'], adapter.CACHE_PREPARE_JOB)
 
     def test_archive_strips_gitlab_prefix_and_revalidates(self):
         payload = archive([
@@ -89,7 +89,8 @@ class AdapterTests(unittest.TestCase):
         job = {'id': 55, 'name': 'backend-mr-test', 'stage': 'test',
                'source': 'merge_request_event',
                'web_url': 'https://lab.ssafy.com/s15-bigdata-dist-sub1/S15P21E106/-/jobs/55',
-               'pipeline': {'project_id': 99, 'sha': 'a' * 40}, 'commit': {'id': 'a' * 40}}
+               'pipeline': {'id': 77, 'project_id': 99, 'sha': 'a' * 40},
+               'commit': {'id': 'a' * 40}}
         mr = [{'state': 'opened', 'target_branch': 'develop', 'source_project_id': 99,
                'target_project_id': 99, 'sha': 'a' * 40}]
         with patch.object(adapter, 'request_json', side_effect=[job, mr]):
@@ -106,22 +107,36 @@ class AdapterTests(unittest.TestCase):
                     adapter.PolicyError, r'metadata mismatch: pipeline.sha,commit.id$'):
                 adapter.verify_current_job(object(), context)
 
-    def test_cache_status_reports_exact_dependency_changes_without_running_source(self):
+    def test_cache_prepare_runs_trusted_manager_without_running_source(self):
         context = cache_response()
         mr = {'iid': 98}
         detail = {'iid': 98, 'diff_refs': {'base_sha': 'b' * 40, 'head_sha': 'a' * 40}}
         with patch.object(adapter, 'read_private_config', return_value=({}, Path('/prepared'))), \
-             patch.object(adapter, 'verify_current_job'), \
+             patch.object(adapter, 'verify_current_job', return_value={'pipeline': {'id': 77}}), \
              patch.object(adapter, 'verify_merge_request', return_value=mr), \
              patch.object(adapter, 'fetch_merge_request_detail', return_value=detail) as fetch_detail, \
-             patch.object(adapter, 'verify_dependency_change', return_value=['backend/build.gradle']) as verify, \
+             patch.object(adapter, 'dependency_changes', return_value=['backend/build.gradle']) as verify, \
+             patch.object(adapter, 'prepare_candidate') as prepare, \
              patch.object(adapter, 'fetch_source') as fetch, \
              patch.object(adapter.safety, 'start') as start:
             self.assertEqual(adapter.run_job(context, opener=object()), 0)
             fetch_detail.assert_called_once()
             verify.assert_called_once()
+            prepare.assert_called_once()
             fetch.assert_not_called()
             start.assert_not_called()
+
+    def test_cache_prepare_rejects_pipeline_without_dependency_change(self):
+        context = cache_response()
+        with patch.object(adapter, 'read_private_config', return_value=({}, Path('/prepared'))), \
+             patch.object(adapter, 'verify_current_job', return_value={'pipeline': {'id': 77}}), \
+             patch.object(adapter, 'verify_merge_request', return_value={'iid': 98}), \
+             patch.object(adapter, 'fetch_merge_request_detail', return_value={'iid': 98}), \
+             patch.object(adapter, 'dependency_changes', return_value=[]), \
+             patch.object(adapter, 'prepare_candidate') as prepare, \
+             self.assertRaisesRegex(adapter.PolicyError, 'No approved'):
+            adapter.run_job(context, opener=object())
+        prepare.assert_not_called()
 
     def test_cache_status_fetches_and_revalidates_mr_detail(self):
         context = adapter.validate_job_response(cache_response())
@@ -150,7 +165,7 @@ class AdapterTests(unittest.TestCase):
             stdout=b'backend/build.gradle\0backend/src/A.java\0'))
         with patch.object(adapter, 'request_json') as api, \
              patch.object(adapter.subprocess, 'run', side_effect=completed) as run:
-            self.assertEqual(adapter.verify_dependency_change(context, mr),
+            self.assertEqual(adapter.dependency_changes(context, mr),
                              ['backend/build.gradle'])
         api.assert_not_called()
         commands = [call.args[0] for call in run.call_args_list]
@@ -164,8 +179,7 @@ class AdapterTests(unittest.TestCase):
         unrelated = [SimpleNamespace(stdout=b'') for _ in range(3)]
         unrelated.append(SimpleNamespace(stdout=b'backend/src/A.java\0'))
         with patch.object(adapter.subprocess, 'run', side_effect=unrelated):
-            with self.assertRaises(adapter.PolicyError):
-                adapter.verify_dependency_change(context, mr)
+            self.assertEqual(adapter.dependency_changes(context, mr), [])
 
     def test_cache_status_requires_exact_diff_revisions(self):
         context = adapter.validate_job_response(cache_response())
@@ -175,7 +189,7 @@ class AdapterTests(unittest.TestCase):
                 {'iid': 98, 'diff_refs': {'base_sha': 'b' * 40, 'head_sha': 'c' * 40}}):
             with self.subTest(mr=mr), patch.object(adapter.subprocess, 'run') as run, \
                  self.assertRaisesRegex(adapter.PolicyError, 'diff revisions'):
-                adapter.verify_dependency_change(context, mr)
+                adapter.dependency_changes(context, mr)
             run.assert_not_called()
 
     def test_cache_status_git_failure_reports_bounded_stage(self):
@@ -191,7 +205,7 @@ class AdapterTests(unittest.TestCase):
             with self.subTest(stage=stage), \
                  patch.object(adapter.subprocess, 'run', side_effect=results), \
                  self.assertRaises(adapter.AdapterGitError) as raised:
-                adapter.verify_dependency_change(context, mr)
+                adapter.dependency_changes(context, mr)
             self.assertEqual(raised.exception.stage, stage)
             self.assertNotIn(context['token'], str(raised.exception))
 
@@ -220,13 +234,16 @@ class AdapterTests(unittest.TestCase):
             with self.subTest(output=output[:32]), \
                  patch.object(adapter.subprocess, 'run', side_effect=completed), \
                  self.assertRaises(adapter.PolicyError):
-                adapter.verify_dependency_change(context, mr)
+                adapter.dependency_changes(context, mr)
 
     def test_run_passes_token_only_to_api_and_source_to_safety(self):
         source = archive([('prefix/backend/gradlew', b'x', 0o755)])
         context = response()
         with patch.object(adapter, 'read_private_config', return_value=({}, Path('/prepared'))), \
-             patch.object(adapter, 'verify_current_job'), patch.object(adapter, 'verify_merge_request'), \
+             patch.object(adapter, 'verify_current_job', return_value={'pipeline': {'id': 1}}), \
+             patch.object(adapter, 'verify_merge_request', return_value={'iid': 98}), \
+             patch.object(adapter, 'fetch_merge_request_detail', return_value={'iid': 98}), \
+             patch.object(adapter, 'dependency_changes', return_value=[]), \
              patch.object(adapter, 'fetch_source', return_value=(source, hashlib.sha256(source).hexdigest())), \
              patch.object(adapter.safety, 'start', return_value=0) as start:
             self.assertEqual(adapter.run_job(context, opener=object()), 0)
@@ -234,6 +251,22 @@ class AdapterTests(unittest.TestCase):
             self.assertEqual(args[:3], (Path('/prepared'), Path('/prepared'), 'backend'))
             self.assertNotIn(context['token'].encode(), args[3])
             self.assertEqual(hashlib.sha256(args[3]).hexdigest(), args[4])
+
+    def test_dependency_mr_test_selects_only_its_verified_candidate(self):
+        source = archive([('prefix/backend/gradlew', b'x', 0o755)])
+        context = response()
+        selected = Path('/candidate-for-a')
+        with patch.object(adapter, 'read_private_config', return_value=({}, Path('/default'))), \
+             patch.object(adapter, 'verify_current_job', return_value={'pipeline': {'id': 1}}), \
+             patch.object(adapter, 'verify_merge_request', return_value={'iid': 98}), \
+             patch.object(adapter, 'fetch_merge_request_detail', return_value={'iid': 98}), \
+             patch.object(adapter, 'dependency_changes', return_value=['backend/build.gradle']), \
+             patch.object(adapter, 'verified_candidate', return_value=selected) as candidate, \
+             patch.object(adapter, 'fetch_source', return_value=(source, hashlib.sha256(source).hexdigest())), \
+             patch.object(adapter.safety, 'start', return_value=0) as start:
+            self.assertEqual(adapter.run_job(context, opener=object()), 0)
+        candidate.assert_called_once_with(adapter.validate_job_response(context), 98)
+        self.assertEqual(start.call_args.args[:3], (selected, selected, 'backend'))
 
     def test_http_error_reports_only_stage_and_status(self):
         context = response()
