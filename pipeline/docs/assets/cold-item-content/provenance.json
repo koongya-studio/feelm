@@ -1,0 +1,440 @@
+{
+  "schema_version": 1,
+  "jira": "S15P21E106-338",
+  "source_repository": "FEELM-standalone",
+  "team_base_commit": "4247473",
+  "publication_scope": "Completed experiment evidence only",
+  "source_files": [
+    {
+      "source_path": "docs/recommendation/experiments/cold-item-content/comparison.png",
+      "published_path": "pipeline/docs/assets/cold-item-content/cold-item-content/comparison.png",
+      "source": {
+        "bytes": 251665,
+        "sha256": "4dbdaea20dacd75dcbeb2000fefaee1c3207de8ba7219f34de7b4c1873b9f5ae"
+      },
+      "published": {
+        "bytes": 251665,
+        "sha256": "4dbdaea20dacd75dcbeb2000fefaee1c3207de8ba7219f34de7b4c1873b9f5ae"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "docs/recommendation/experiments/cold-item-content/metrics.csv",
+      "published_path": "pipeline/docs/assets/cold-item-content/cold-item-content/metrics.csv",
+      "source": {
+        "bytes": 89997,
+        "sha256": "8db4094a8c49875351df69ac71e5ea81673d6edc41cf2c7c7fbb01e611da4a01"
+      },
+      "published": {
+        "bytes": 89372,
+        "sha256": "e8f7f9bc770fb10e26382e248f9520b1ef4fd637e5583f2efff4e4fab41e8a8c"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/cold-item-content/contrasts.csv",
+      "published_path": "pipeline/docs/assets/cold-item-content/cold-item-content/contrasts.csv",
+      "source": {
+        "bytes": 8983,
+        "sha256": "9fea0d6b9cf72cd633131f0168fefc315598b22336c01093816739775ce6b460"
+      },
+      "published": {
+        "bytes": 8898,
+        "sha256": "2da3db12e9e2db77c2e734189afedcaea30d3655681b945064dfa107ce438e72"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/cold-item-content/strata.csv",
+      "published_path": "pipeline/docs/assets/cold-item-content/cold-item-content/strata.csv",
+      "source": {
+        "bytes": 307273,
+        "sha256": "1a4737627fb9f43f98eee4262b47617eae7bc633f2158a6aa22aa66d88c2bb27"
+      },
+      "published": {
+        "bytes": 303528,
+        "sha256": "833075f7fabb96839783ba42640c4924778af640eb5a5629bc946de0ad231635"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/cold-item-content/training-composition.csv",
+      "published_path": "pipeline/docs/assets/cold-item-content/cold-item-content/training-composition.csv",
+      "source": {
+        "bytes": 243,
+        "sha256": "8e293ca5215546a19e2f7686b287a4eca567c72faa0f57274bc599956590f715"
+      },
+      "published": {
+        "bytes": 237,
+        "sha256": "a580ffe862b5c2c2f0df9a5cf849f19ba1105843e9853ed7baf415819abc6e06"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/cold-item-content/training-resources.csv",
+      "published_path": "pipeline/docs/assets/cold-item-content/cold-item-content/training-resources.csv",
+      "source": {
+        "bytes": 1272,
+        "sha256": "30590bbda387441b73325a011e433b4e53bfdcdd38ecc4f2323cd2972e218782"
+      },
+      "published": {
+        "bytes": 1259,
+        "sha256": "d724d5fbe26d1ac71a4288b1e7b24f0d82c4990debd5b799801b38a97bc1f8df"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/cold-item-content/feature-availability.csv",
+      "published_path": "pipeline/docs/assets/cold-item-content/cold-item-content/feature-availability.csv",
+      "source": {
+        "bytes": 1779,
+        "sha256": "02f4f2db566ce27469fb785c071ee580cee74542c859bea94fd6c2908f36e9bd"
+      },
+      "published": {
+        "bytes": 1758,
+        "sha256": "afb9d72224d26296aac9e095a199a3c199b48ca89914f92534ac1849916d4003"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/cold-item-content/aggregate-export.json",
+      "published_path": "pipeline/docs/assets/cold-item-content/cold-item-content/aggregate-export.json",
+      "source": {
+        "bytes": 1902,
+        "sha256": "844422bab47f4d5563c5251caea742cb922b6d5f993238b1844d137f4e129eb2"
+      },
+      "published": {
+        "bytes": 1845,
+        "sha256": "73355361ec068f08755da2687243fbe3ff4f2eface7426b924cb03acf9eb71a4"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/cold-item-content/execution-review.json",
+      "published_path": "pipeline/docs/assets/cold-item-content/cold-item-content/execution-review.json",
+      "source": {
+        "bytes": 2635,
+        "sha256": "d8d99e5f2bfce0f54c89d492a11f303a97ec23f10246a4a0b79b6552a38c5c14"
+      },
+      "published": {
+        "bytes": 2564,
+        "sha256": "646c65b994725fe089bd023c8f46215a06777d381639631601f04a3fb0bd7c42"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/cold-item-content/prepared-data-review.json",
+      "published_path": "pipeline/docs/assets/cold-item-content/cold-item-content/prepared-data-review.json",
+      "source": {
+        "bytes": 3101,
+        "sha256": "44bac2cc865c1af1cec3d506db87b3c71351d2d86d626ac71f5a71b6bf75a1de"
+      },
+      "published": {
+        "bytes": 3017,
+        "sha256": "8f594a98f47b20dc483d1a357c8c8ec27ba0c4bc17fb5f3b1d0bc9507015e2cd"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/cold-item-content/model-review.json",
+      "published_path": "pipeline/docs/assets/cold-item-content/cold-item-content/model-review.json",
+      "source": {
+        "bytes": 6120,
+        "sha256": "ce539f5eea7ec9e1098f8558a8ecabe1c412168b36f4f16e4fbaa92c68f47da1"
+      },
+      "published": {
+        "bytes": 6120,
+        "sha256": "ce539f5eea7ec9e1098f8558a8ecabe1c412168b36f4f16e4fbaa92c68f47da1"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "docs/recommendation/experiments/cold-item-content/result-review.json",
+      "published_path": "pipeline/docs/assets/cold-item-content/cold-item-content/result-review.json",
+      "source": {
+        "bytes": 7893,
+        "sha256": "1273b90cff3b4fc6c569bbfe4639beb528c9ac2a6b4e762e3ef1bb4a68c50c40"
+      },
+      "published": {
+        "bytes": 7676,
+        "sha256": "d55e463b7e86b725fe4f5f6284772279f94d91d6f1949713f7dfd9dd80920c99"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/cold-item-content/report-code-review.json",
+      "published_path": "pipeline/docs/assets/cold-item-content/cold-item-content/report-code-review.json",
+      "source": {
+        "bytes": 629,
+        "sha256": "2b8b9bebe675404d2ece54026f88c9ff66d2a9d4bdb85f009e6e5cf51ecf2f6d"
+      },
+      "published": {
+        "bytes": 612,
+        "sha256": "49efb204283ee8f2cb10997d445871f2cb1802629b294d3346dd490ee5c32e75"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    },
+    {
+      "source_path": "scripts/cold_item_common.py",
+      "published_path": "pipeline/docs/assets/cold-item-content/source/scripts/cold_item_common.py",
+      "source": {
+        "bytes": 4622,
+        "sha256": "94d5a2c0823c0e54e20c3c577751a1b6e88d1b3cec0f0314df2769b898b5aab2"
+      },
+      "published": {
+        "bytes": 4622,
+        "sha256": "94d5a2c0823c0e54e20c3c577751a1b6e88d1b3cec0f0314df2769b898b5aab2"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/cold_item_features.py",
+      "published_path": "pipeline/docs/assets/cold-item-content/source/scripts/cold_item_features.py",
+      "source": {
+        "bytes": 4838,
+        "sha256": "78ed5bbea151dc12d7a8bb144fa389333c779550fcfdff66d28d90c6900a4cec"
+      },
+      "published": {
+        "bytes": 4838,
+        "sha256": "78ed5bbea151dc12d7a8bb144fa389333c779550fcfdff66d28d90c6900a4cec"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/cold_item_prepare.py",
+      "published_path": "pipeline/docs/assets/cold-item-content/source/scripts/cold_item_prepare.py",
+      "source": {
+        "bytes": 9554,
+        "sha256": "e1fc97fd475d1d87af9135d6f84f32e62312fd33a5d9aa63fe91b6e84eba3881"
+      },
+      "published": {
+        "bytes": 9554,
+        "sha256": "e1fc97fd475d1d87af9135d6f84f32e62312fd33a5d9aa63fe91b6e84eba3881"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/cold_item_worker.py",
+      "published_path": "pipeline/docs/assets/cold-item-content/source/scripts/cold_item_worker.py",
+      "source": {
+        "bytes": 4272,
+        "sha256": "b3b78b332fde524b868deb51dc2ec87d82b8046793f152d4b073cfc09f81b1d5"
+      },
+      "published": {
+        "bytes": 4272,
+        "sha256": "b3b78b332fde524b868deb51dc2ec87d82b8046793f152d4b073cfc09f81b1d5"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/cold_item_run.py",
+      "published_path": "pipeline/docs/assets/cold-item-content/source/scripts/cold_item_run.py",
+      "source": {
+        "bytes": 6244,
+        "sha256": "62df960f951e6255f3ba6c42786559f8cc615e23ad7d2e5da3079fa90f36422c"
+      },
+      "published": {
+        "bytes": 6244,
+        "sha256": "62df960f951e6255f3ba6c42786559f8cc615e23ad7d2e5da3079fa90f36422c"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/cold_item_evaluate.py",
+      "published_path": "pipeline/docs/assets/cold-item-content/source/scripts/cold_item_evaluate.py",
+      "source": {
+        "bytes": 7289,
+        "sha256": "5af3305eef64a8170a7f04b5e42e432b258badfae8a7d4c7e2039fc4a3a08635"
+      },
+      "published": {
+        "bytes": 7289,
+        "sha256": "5af3305eef64a8170a7f04b5e42e432b258badfae8a7d4c7e2039fc4a3a08635"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/test_cold_item.py",
+      "published_path": "pipeline/docs/assets/cold-item-content/source/scripts/test_cold_item.py",
+      "source": {
+        "bytes": 4207,
+        "sha256": "38e5579deb4fd10ad6fa9dbf0e02d2d1e1afcc049f7f79fd4442c3e7d469f490"
+      },
+      "published": {
+        "bytes": 4207,
+        "sha256": "38e5579deb4fd10ad6fa9dbf0e02d2d1e1afcc049f7f79fd4442c3e7d469f490"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/cold_item_diagnostics.py",
+      "published_path": "pipeline/docs/assets/cold-item-content/source/scripts/cold_item_diagnostics.py",
+      "source": {
+        "bytes": 2163,
+        "sha256": "4608614bb9293dca48a6a7f9d3daad664ae0e7845a169a1173e2b5a70b761325"
+      },
+      "published": {
+        "bytes": 2163,
+        "sha256": "4608614bb9293dca48a6a7f9d3daad664ae0e7845a169a1173e2b5a70b761325"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/report_cold_item.py",
+      "published_path": "pipeline/docs/assets/cold-item-content/source/scripts/report_cold_item.py",
+      "source": {
+        "bytes": 10810,
+        "sha256": "0beea8067814562ae7b5eb91b20e15b10415f948414f876435fd991c65c7939d"
+      },
+      "published": {
+        "bytes": 10810,
+        "sha256": "0beea8067814562ae7b5eb91b20e15b10415f948414f876435fd991c65c7939d"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/rec046_common.py",
+      "published_path": "pipeline/docs/assets/cold-item-content/source/scripts/rec046_common.py",
+      "source": {
+        "bytes": 8001,
+        "sha256": "42dd14e83ecbee0c02c5e4233abb4b6a8d807ad2213c24a22cfb82350bc47848"
+      },
+      "published": {
+        "bytes": 8001,
+        "sha256": "42dd14e83ecbee0c02c5e4233abb4b6a8d807ad2213c24a22cfb82350bc47848"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/rec047_common.py",
+      "published_path": "pipeline/docs/assets/cold-item-content/source/scripts/rec047_common.py",
+      "source": {
+        "bytes": 5855,
+        "sha256": "a51d5c4fe9d487caf5c45606ead4cc244654c83fbe39339c40c56c165e792c16"
+      },
+      "published": {
+        "bytes": 5855,
+        "sha256": "a51d5c4fe9d487caf5c45606ead4cc244654c83fbe39339c40c56c165e792c16"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/rec047_features.py",
+      "published_path": "pipeline/docs/assets/cold-item-content/source/scripts/rec047_features.py",
+      "source": {
+        "bytes": 5791,
+        "sha256": "a6f3fdc26cc88cceea2f6b1fe1244285bd9e29f7175874f7ab2eb8fae5904268"
+      },
+      "published": {
+        "bytes": 5791,
+        "sha256": "a6f3fdc26cc88cceea2f6b1fe1244285bd9e29f7175874f7ab2eb8fae5904268"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "scripts/rec047_readiness.py",
+      "published_path": "pipeline/docs/assets/cold-item-content/source/scripts/rec047_readiness.py",
+      "source": {
+        "bytes": 8271,
+        "sha256": "eb5a6a46655975e9f2923947ff16400ab400c47238217c90bf73104afaeac8b7"
+      },
+      "published": {
+        "bytes": 8271,
+        "sha256": "eb5a6a46655975e9f2923947ff16400ab400c47238217c90bf73104afaeac8b7"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "performance/rec046.Dockerfile",
+      "published_path": "pipeline/docs/assets/cold-item-content/source/performance/rec046.Dockerfile",
+      "source": {
+        "bytes": 302,
+        "sha256": "38905feb655e4c8fe9b4a6125a71f5f17eb87f202c07f97591f391d5a417420e"
+      },
+      "published": {
+        "bytes": 302,
+        "sha256": "38905feb655e4c8fe9b4a6125a71f5f17eb87f202c07f97591f391d5a417420e"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "docs/recommendation/experiments/cold-item-content/EXECUTION.md",
+      "published_path": "pipeline/docs/assets/cold-item-content/source/docs/recommendation/experiments/cold-item-content/EXECUTION.md.txt",
+      "source": {
+        "bytes": 9950,
+        "sha256": "d152e7a13a22779ccfd28e82a1876dd8699a2b254db09e06628ffbdb3d478f8f"
+      },
+      "published": {
+        "bytes": 9950,
+        "sha256": "d152e7a13a22779ccfd28e82a1876dd8699a2b254db09e06628ffbdb3d478f8f"
+      },
+      "transformations": []
+    },
+    {
+      "source_path": "docs/recommendation/experiments/cold-item-content/config.json",
+      "published_path": "pipeline/docs/assets/cold-item-content/source/docs/recommendation/experiments/cold-item-content/config.json",
+      "source": {
+        "bytes": 3113,
+        "sha256": "6300e727a82165ffdcc56c0874c1829513bdec89dd62fe506164225d7a4fde16"
+      },
+      "published": {
+        "bytes": 2993,
+        "sha256": "d9fe7373bca7c7161d3b650480759c1cdad605b4c1858380e649fe2bdc9a6dcf"
+      },
+      "transformations": [
+        "CRLF_TO_LF",
+        "HISTORICAL_ARCHIVE_PATH_TO_SYMBOL"
+      ]
+    },
+    {
+      "source_path": "docs/recommendation/experiments/cold-item-content/execution-review.json",
+      "published_path": "pipeline/docs/assets/cold-item-content/source/docs/recommendation/experiments/cold-item-content/execution-review.json",
+      "source": {
+        "bytes": 2635,
+        "sha256": "d8d99e5f2bfce0f54c89d492a11f303a97ec23f10246a4a0b79b6552a38c5c14"
+      },
+      "published": {
+        "bytes": 2564,
+        "sha256": "646c65b994725fe089bd023c8f46215a06777d381639631601f04a3fb0bd7c42"
+      },
+      "transformations": [
+        "CRLF_TO_LF"
+      ]
+    }
+  ],
+  "historical_review_scope": "PASS applies to original source bytes. Publication transforms and current packet verification are recorded separately.",
+  "original_result_reports": {
+    "cold-item-content": {
+      "bytes": 11065,
+      "sha256": "75fcc11698ab407b1cd6caceabcc9d5e4a6bb0aaa96ae313198645018d2bef44"
+    }
+  },
+  "result_copy_policy": "No original RESULT.md is copied; team summary is checked against sealed aggregate results.",
+  "excluded": [
+    "Raw ratings",
+    "Per-user predictions, labels and metrics",
+    "Parquet and trained models",
+    "Data collection and ongoing research"
+  ]
+}

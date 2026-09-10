@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "purpose": "COMPLETED_RESEARCH_RECORD",
+  "runtime_loader": "NONE_NOT_READ_BY_TEAM_JOBS",
+  "rating_step": 0.5,
+  "service_policy_adopted": false,
+  "experiments": {
+    "cold-item-content": {
+      "historical_config": "../docs/assets/cold-item-content/source/docs/recommendation/experiments/cold-item-content/config.json",
+      "source_sha256": "6300e727a82165ffdcc56c0874c1829513bdec89dd62fe506164225d7a4fde16",
+      "models": {
+        "FM": {
+          "factorSize": 16,
+          "regParam": 0.01,
+          "maxIter": 150,
+          "stepSize": 0.01,
+          "miniBatchFraction": 0.25
+        },
+        "RIDGE": {
+          "regParam": 0.01,
+          "maxIter": 150
+        },
+        "GBT": {
+          "maxDepth": 5,
+          "maxIter": 60,
+          "stepSize": 0.05
+        }
+      },
+      "image_id": "sha256:de611d62db982bb833b0737a7ddd72a7cd49ab1a7dc9128669cdabae39f46df8"
+    }
+  }
+}
