@@ -154,6 +154,30 @@ public class User extends BaseTimeEntity {
         this.passwordHash = encodedPassword;
     }
 
+    /**
+     * 프로필 수정(API-015)으로 닉네임을 바꾼다.
+     *
+     * <p>형식 검증은 Request DTO가, 중복 판정은 Service와 DB 유일 인덱스가 맡는다. Entity는 값을 받은 사실만 반영한다.
+     */
+    public void changeNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    /** 프로필 수정(API-015)으로 생년월일을 바꾼다. */
+    public void changeBirthDate(LocalDate birthDate) {
+        this.birthDate = birthDate;
+    }
+
+    /** 프로필 수정(API-015)으로 성별을 바꾼다. */
+    public void changeGender(Gender gender) {
+        this.gender = gender;
+    }
+
+    /** 프로필 공개 범위를 바꾼다(API-015). {@code PRIVATE}이면 공개 프로필(API-062)이 즉시 404가 된다. */
+    public void changeVisibility(Visibility visibility) {
+        this.visibility = visibility;
+    }
+
     /** 인증 메일로 아직 활성화할 수 있는 미인증 계정인지. 보존 기간이 지난 계정은 재가입이 지울 수 있으므로 메일을 보내지 않는다. */
     public boolean isAwaitingVerification(Instant now) {
         return isPendingVerification() && !isPastRetention(now);

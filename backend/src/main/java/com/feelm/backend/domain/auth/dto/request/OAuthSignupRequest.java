@@ -1,5 +1,6 @@
 package com.feelm.backend.domain.auth.dto.request;
 
+import com.feelm.backend.domain.user.NicknamePolicy;
 import com.feelm.backend.domain.user.entity.Gender;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -17,9 +18,7 @@ import java.time.LocalDate;
 public record OAuthSignupRequest(
         @NotBlank(message = "가입 토큰이 필요합니다.") String signupToken,
         @NotBlank(message = "닉네임을 입력해 주세요.")
-                @Pattern(
-                        regexp = SignupRequest.NICKNAME_PATTERN,
-                        message = "닉네임은 2~10자이며 한글·영문·숫자·밑줄만 사용할 수 있습니다.")
+                @Pattern(regexp = NicknamePolicy.PATTERN, message = NicknamePolicy.MESSAGE)
                 String nickname,
         @NotNull(message = "생년월일을 입력해 주세요.") LocalDate birthDate,
         @NotNull(message = "성별을 선택해 주세요.") Gender gender) {}
