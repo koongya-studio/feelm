@@ -43,3 +43,15 @@ if (!window.ResizeObserver) {
     disconnect() {}
   };
 }
+
+/*
+ * `document.fonts`(FontFaceSet)도 jsdom에 없다. 스플래시가 서체 로드를 준비 신호로
+ * 쓰므로(`components/SplashScreen`) 없으면 그 화면이 여기서 터진다. 이미 로드된
+ * 것으로 답해, 테스트가 서체를 기다리며 멈추지 않게 한다.
+ */
+if (!document.fonts) {
+  Object.defineProperty(document, 'fonts', {
+    configurable: true,
+    value: { ready: Promise.resolve() },
+  });
+}
