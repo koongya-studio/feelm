@@ -16,6 +16,7 @@
  * 파일)은 그대로 두고, `src/api/`가 둘을 합쳐 응답을 만든다.
  */
 import type { OnboardingPreference } from '../types/onboarding';
+import type { PartyView } from '../types/unspecified';
 import type { Rating, WatchRecord } from '../types/watch';
 
 /**
@@ -57,6 +58,10 @@ type SessionState = {
    * 시작해야 하므로(이 파일 머리말) 다른 세션 상태와 같이 메모리에 둔다.
    */
   recentSearchQueries: string[];
+  /** API-049로 만든 파티. 기준 목업(`mocks/parties.ts`) 뒤에 붙는다 */
+  createdParties: PartyView[];
+  /** API-053 · API-054로 답한 초대. `invitationId` → 바뀐 상태 */
+  invitationStatuses: Record<number, 'ACCEPTED' | 'DECLINED'>;
 };
 
 function emptyState(): SessionState {
@@ -69,6 +74,8 @@ function emptyState(): SessionState {
     ratings: [],
     // 와이어프레임 4.1이 최근 검색어 세 개가 있는 상태를 그리므로 그 값으로 시작한다
     recentSearchQueries: ['케이퍼 무비', '크리스토퍼 놀란', 'SF 명작'],
+    createdParties: [],
+    invitationStatuses: {},
   };
 }
 
@@ -135,6 +142,34 @@ export function removeRecentSearchQuery(query: string): void {
 
 export function clearRecentSearchQueries(): void {
   state.recentSearchQueries = [];
+}
+
+// ─────────────────────────────────────────── 파티
+
+export function addCreatedParty(party: PartyView): void {
+  state.createdParties = [party, ...state.createdParties];
+}
+
+export function getCreatedParties(): PartyView[] {
+  return state.createdParties;
+}
+
+/**
+ * 다음에 만들 파티의 id.
+ *
+ * 서버가 정하는 값이라 목업이 흉내 낼 뿐이다. 기준 목업이 9001을 쓰고 초대 목업이
+ * 9002를 쓰므로 9100부터 센다.
+ */
+export function nextPartyId(): number {
+  return 9100 + state.createdParties.length;
+}
+
+export function setInvitationStatus(invitationId: number, status: 'ACCEPTED' | 'DECLINED'): void {
+  state.invitationStatuses = { ...state.invitationStatuses, [invitationId]: status };
+}
+
+export function getInvitationStatus(invitationId: number): 'ACCEPTED' | 'DECLINED' | null {
+  return state.invitationStatuses[invitationId] ?? null;
 }
 
 // ─────────────────────────────────────────── 관심없음

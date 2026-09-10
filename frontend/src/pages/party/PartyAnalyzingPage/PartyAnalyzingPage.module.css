@@ -1,0 +1,96 @@
+/*
+ * 5.4 파티 공통 취향 분석 중. 기다리는 화면이라 가운데 한 덩어리만 있다.
+ *
+ * `공통 필름 현상`은 필름을 현상하는 장면이다. 어두운 띠 위를 빛이 지나가는 것으로
+ * 표현했다 — 필름이 콘텐츠이므로 어두운 면이 맞다(`design-concept.md` 2.5의 연장).
+ */
+.page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: var(--space-4) var(--screen-padding-x);
+}
+
+.stage {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+.lead {
+  text-align: center;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  color: var(--color-ink-muted);
+}
+
+/* 현상 중인 필름 띠 */
+.strip {
+  position: relative;
+  width: 100%;
+  max-width: 240px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-dark);
+  overflow: hidden;
+}
+
+.light {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-on-dark);
+  animation: sweep 1.4s var(--ease-standard) infinite;
+}
+
+@keyframes sweep {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(250%);
+  }
+}
+
+/* 움직임을 줄여 달라고 한 사용자에게는 멈춰 둔다 */
+@media (prefers-reduced-motion: reduce) {
+  .light {
+    animation: none;
+    width: 100%;
+  }
+}
+
+.members {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.member {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-caption);
+  color: var(--color-ink-body);
+}

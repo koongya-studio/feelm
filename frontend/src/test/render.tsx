@@ -9,7 +9,7 @@
  * 그러면 "무엇을 호출했는가"를 보게 되고 "어디로 갔는가"는 못 본다.
  */
 import { render } from '@testing-library/react';
-import { MemoryRouter, useLocation } from 'react-router';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import type { ReactElement, ReactNode } from 'react';
 
 /** 현재 경로를 DOM에 노출한다. 이동 결과를 단정문으로 읽기 위한 것이다 */
@@ -22,12 +22,26 @@ function LocationProbe() {
 type Options = {
   /** 시작 주소. 기본값은 루트다 */
   route?: string;
+  /**
+   * 라우트 패턴. `useParams`를 쓰는 화면에 필요하다.
+   *
+   * 없으면 화면을 그대로 그린다 — 대부분의 화면은 파라미터가 없어 패턴이 필요 없고,
+   * `Routes`로 감싸면 그만큼 실제 구조와 멀어진다. 업무 -304에서 `/parties/:partyId`
+   * 형태의 화면이 생기며 추가했다.
+   */
+  path?: string;
 };
 
-export function renderWithRouter(ui: ReactElement, { route = '/' }: Options = {}) {
+export function renderWithRouter(ui: ReactElement, { route = '/', path }: Options = {}) {
   return render(
     <MemoryRouter initialEntries={[route]}>
-      {ui}
+      {path ? (
+        <Routes>
+          <Route path={path} element={ui} />
+        </Routes>
+      ) : (
+        ui
+      )}
       <LocationProbe />
     </MemoryRouter>,
   );

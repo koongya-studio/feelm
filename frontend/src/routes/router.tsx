@@ -31,7 +31,14 @@ import RatingResultPage from '../pages/movies/RatingResultPage';
 import OnboardingCompletePage from '../pages/onboarding/OnboardingCompletePage';
 import OttOnboardingPage from '../pages/onboarding/OttOnboardingPage';
 import TasteOnboardingPage from '../pages/onboarding/TasteOnboardingPage';
+import PartyAnalyzingPage from '../pages/party/PartyAnalyzingPage';
+import PartyInvitationPage from '../pages/party/PartyInvitationPage';
+import PartyJoinedPage from '../pages/party/PartyJoinedPage';
+import PartyListPage from '../pages/party/PartyListPage';
 import PartyPopcornMixPage from '../pages/party/PartyPopcornMixPage';
+import PartyRecommendationPage from '../pages/party/PartyRecommendationPage';
+import PartySetupPage from '../pages/party/PartySetupPage';
+import PartySizePage from '../pages/party/PartySizePage';
 import PartyPopcornPage from '../pages/party/PartyPopcornPage';
 import RecommendationsPage from '../pages/recommendations/RecommendationsPage';
 import SearchPage from '../pages/search/SearchPage';
@@ -74,7 +81,7 @@ export const router = createBrowserRouter(
         { path: ROUTE_PATTERN.ottManage, element: <OttManagePage /> },
 
         // 이번 단계 구현 범위가 아닌 탭. REF-01의 5탭 구성을 검증하기 위해 라우트는 둔다.
-        { path: ROUTE_PATTERN.party, element: <NotInScopePage /> },
+        { path: ROUTE_PATTERN.party, element: <PartyListPage /> },
         { path: ROUTE_PATTERN.my, element: <NotInScopePage /> },
       ],
     },
@@ -88,6 +95,12 @@ export const router = createBrowserRouter(
         { path: ROUTE_PATTERN.frameDetail, element: <FrameDetailPage /> },
         { path: ROUTE_PATTERN.partyPopcorn, element: <PartyPopcornPage /> },
         { path: ROUTE_PATTERN.partyPopcornMix, element: <PartyPopcornMixPage /> },
+        { path: ROUTE_PATTERN.partyNew, element: <PartySizePage /> },
+        { path: ROUTE_PATTERN.partySetup, element: <PartySetupPage /> },
+        { path: ROUTE_PATTERN.partyAnalyzing, element: <PartyAnalyzingPage /> },
+        { path: ROUTE_PATTERN.partyRecommendations, element: <PartyRecommendationPage /> },
+        { path: ROUTE_PATTERN.partyInvitation, element: <PartyInvitationPage /> },
+        { path: ROUTE_PATTERN.partyJoined, element: <PartyJoinedPage /> },
         { path: ROUTE_PATTERN.notFound, element: <NotFoundPage /> },
       ],
     },

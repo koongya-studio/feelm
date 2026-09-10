@@ -15,6 +15,7 @@ Epic [S15P21E106-266] `[FE] Feelm 와이어프레임 기반 프론트엔드 초�
 | `frontend/docs/screens/` | 이번 에픽의 화면 설계 산출물 (Screen Spec, 화면 구조, 공통 컴포넌트 기준) |
 | [`screen-spec-auth.md`](./screen-spec-auth.md) | 에픽 `S15P21E106-301`의 가입·로그인 화면(0.1 ~ 0.7-A) |
 | [`screen-spec-search-ott.md`](./screen-spec-search-ott.md) | 에픽 `S15P21E106-301`의 검색·OTT 관리 화면(4.1 ~ 4.4, 6.1) |
+| [`screen-spec-party.md`](./screen-spec-party.md) | 에픽 `S15P21E106-301`의 파티 화면(5.1 ~ 5.7) |
 | `frontend/docs/FEELM-UI-Mockup.html` | 이전 UI 목업. 기준 자료가 아닙니다 |
 | `frontend/docs/images/` | 위 목업의 화면 캡처 29장과 [`manifest.json`](../images/manifest.json) |
 | `frontend/landing/` | 독립 배포하는 정적 랜딩 페이지. 이번 에픽 범위가 아닙니다 |
