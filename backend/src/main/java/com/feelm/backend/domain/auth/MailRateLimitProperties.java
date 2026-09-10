@@ -2,7 +2,11 @@ package com.feelm.backend.domain.auth;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.boot.convert.DurationUnit;
@@ -18,7 +22,9 @@ import org.springframework.boot.convert.DurationUnit;
  * D-1·D-4).
  *
  * <p>{@code ip}는 창 하나가 아니라 목록으로 받는다. 짧은 창과 긴 창을 함께 두어야 몰아치는 요청과 오래 끄는 요청을 같이 잡을 수 있고, 목록이면 창을 늘리거나
- * 줄여도 코드가 그대로다. 운영 기본값은 {@code application.yml}에 있고, 목록이 비어 있으면 그 축은 제한하지 않는다.
+ * 줄여도 코드가 그대로다. 운영 기본값은 {@code application.yml}에 있고, 목록이 비어 있으면 그 축은 제한하지 않는다. 목록은 창 중복을 거부하고 창 길이
+ * 오름차순으로 정규화한다({@code feelm.auth.login.ip}·{@code feelm.mail.send-budget}과 같은 규칙, S15P21E106-287 리뷰
+ * B).
  *
  * <p>기간에 {@link DurationUnit}으로 초를 못박은 이유는 단위 없는 숫자의 Spring 기본 해석이 <b>밀리초</b>이기 때문이다(리뷰 A-3·B-6). 이
  * 값들은 배포 환경변수로 열려 있어(S15P21E106-287 결정 D-9) 운영 중에 사람이 직접 적는다. {@code
@@ -42,10 +48,39 @@ public record MailRateLimitProperties(
     /** 창의 상한. 이보다 긴 창은 사실상 영구 차단이다. */
     private static final Duration MAXIMUM_WINDOW = Duration.ofHours(24);
 
-    /** 목록은 값이 없으면 빈 목록으로 맞춘다. 키만 있고 항목이 없는 설정({@code ip:})이 {@code null}로 들어와도 그 축만 제한하지 않게 된다. */
+    /**
+     * 목록은 값이 없으면 빈 목록으로 맞추고, 창 길이 오름차순으로 정규화한다. 키만 있고 항목이 없는 설정({@code ip:})이 {@code null}로 들어와도 그
+     * 축만 제한하지 않게 된다.
+     */
     public MailRateLimitProperties {
         requireDurationInRange("feelm.mail.rate-limit.email-interval", emailInterval);
-        ip = ip == null ? List.of() : List.copyOf(ip);
+        ip = normalizeQuotas(ip);
+    }
+
+    /**
+     * 창 중복을 거부하고 창 길이 오름차순으로 맞춘다. 이유는 {@code feelm.auth.login.ip}·{@code
+     * feelm.mail.send-budget.windows}와 같다(S15P21E106-287 리뷰 B).
+     *
+     * <p>{@code AuthRateLimiter}가 창을 초 단위로 카운터 키에 담으므로({@code auth:mail:ip:<hash>:<초>}) {@code 1h}와
+     * {@code 3600}은 같은 카운터가 되어 한 번의 요청이 같은 값을 두 번 올리고 실효 한도가 절반이 된다. 앞 창에서 막히면 뒤 창의 카운터를 올리지 않으므로
+     * 목록 순서도 정책을 바꾼다. 두 사고 모두 기동은 성공하고 로그도 남지 않아 기동 실패로 드러내는 편이 낫다.
+     */
+    private static List<Quota> normalizeQuotas(List<Quota> quotas) {
+        if (quotas == null || quotas.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> windowSeconds = new HashSet<>();
+        for (Quota quota : quotas) {
+            if (!windowSeconds.add(quota.window().toSeconds())) {
+                throw new IllegalArgumentException(
+                        ("feelm.mail.rate-limit.ip에 같은 창이 두 번 있습니다. 창은 초 단위로 카운터 키에 들어가므로"
+                                        + " 표기가 달라도 %d초는 하나만 쓸 수 있습니다. 현재 값: %s")
+                                .formatted(quota.window().toSeconds(), quotas));
+            }
+        }
+        List<Quota> sorted = new ArrayList<>(quotas);
+        sorted.sort(Comparator.comparing(Quota::window));
+        return List.copyOf(sorted);
     }
 
     /**

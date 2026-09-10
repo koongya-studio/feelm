@@ -82,9 +82,14 @@ public class RedisMailSendBudget implements MailSendBudget {
                     List.class);
 
     /**
-     * 소모한 자리를 되돌린다. 창이 이미 만료됐으면 아무것도 하지 않는다.
+     * 소모한 자리를 되돌린다. 창이 만료돼 키가 사라졌으면 아무것도 하지 않는다.
      *
      * <p>{@code EXISTS} 확인 없이 {@code DECR}하면 만료된 창에 TTL 없는 음수 카운터가 새로 생겨, 그 창이 상한만큼 더 발송을 허용하게 된다.
+     *
+     * <p>{@code EXISTS}가 막지 못하는 경로가 하나 있다(리뷰 C). 키 이름에 창 epoch가 없어 만료 후 재생성돼도 이름이 같으므로, {@link
+     * #tryConsume()}과 이 호출 사이에 창이 만료되고 <b>다음 창의 첫 발송</b>이 키를 다시 만들면 여기서 다음 창의 카운터를 깎는다. 카운터가 0이 되면
+     * 그다음 {@code INCR}가 {@code count == 1}로 TTL을 다시 걸어 고정 창도 그만큼 연장된다. 어긋나는 양은 창 경계에 걸친 in-flight
+     * 발송 수(발송 풀 크기)로 묶여 SMTP 쿼터를 의미 있게 넘기지 않으므로, 창 epoch를 키에 담는 대신 이 성질을 감수한다.
      */
     private static final DefaultRedisScript<Long> RELEASE_SCRIPT =
             new DefaultRedisScript<>(
@@ -103,7 +108,13 @@ public class RedisMailSendBudget implements MailSendBudget {
      * 발송 한 건의 자리를 확보한다. 창 목록이 비어 있으면 상한을 적용하지 않는다.
      *
      * <p>막힌 창의 카운터는 올리지 않으므로, 마른 창이 다른 창의 예산을 함께 태우지 않는다(리뷰 A-2).
+     *
+     * <p>{@code @SuppressWarnings}는 {@link #CONSUME_SCRIPT}의 raw {@code List} 때문이다. {@code
+     * RedisTemplate#execute}는 반환 타입을 {@code Class}로 받아 {@code List<Long>.class}를 표현할 방법이 없으므로 raw
+     * {@code List.class}가 유일한 선택이고, 스크립트가 Lua 정수만 돌려주므로 원소는 항상 {@code Long}이다. 경고를 남겨 두면 다음 사람이
+     * 실수인지 판단할 수 없다(리뷰 E).
      */
+    @SuppressWarnings("unchecked")
     @Override
     public boolean tryConsume() {
         List<MailSendBudgetProperties.Quota> windows = properties.windows();

@@ -85,14 +85,44 @@ class MailRateLimitPropertiesTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    /**
+     * {@code AuthRateLimiter}가 창을 초 단위로 카운터 키에 담으므로({@code auth:mail:ip:<hash>:<초>}) {@code 1h}와
+     * {@code 3600}은 같은 키다. 그 설정은 한 번의 요청이 같은 카운터를 두 번 올려 실효 한도를 절반으로 떨어뜨리는데, 기동도 성공하고 로그도 남지
+     * 않는다(S15P21E106-287 리뷰 B).
+     */
+    @Test
+    @DisplayName("같은 창을 두 번 넣으면 만들 수 없다")
+    void rejectsDuplicatedWindow() {
+        assertThatThrownBy(
+                        () ->
+                                new MailRateLimitProperties(
+                                        Duration.ofMinutes(1),
+                                        List.of(
+                                                new Quota(30, ONE_HOUR),
+                                                new Quota(10, Duration.ofSeconds(3600)))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("3600");
+    }
+
+    /** 앞 창에서 막히면 뒤 창의 카운터를 올리지 않으므로 목록 순서가 정책을 바꾼다. 어떤 순서로 적어도 짧은 창이 먼저 평가돼야 한다. */
+    @Test
+    @DisplayName("창은 어떤 순서로 적어도 짧은 창이 앞에 온다")
+    void quotasAreSortedByWindowLength() {
+        Quota hourly = new Quota(30, ONE_HOUR);
+        Quota tenMinutes = new Quota(5, Duration.ofMinutes(10));
+
+        MailRateLimitProperties properties =
+                new MailRateLimitProperties(Duration.ofMinutes(1), List.of(hourly, tenMinutes));
+
+        assertThat(properties.ip()).containsExactly(tenMinutes, hourly);
+    }
+
     /** 목록 키만 있고 항목이 없는 설정({@code ip:})은 그 축만 제한하지 않는 상태이고, 기동을 막을 이유는 아니다. */
     @Test
     @DisplayName("IP 목록이 비어 있거나 없으면 빈 목록이 된다")
     void missingAxisBindsToEmptyList() {
-        MailRateLimitProperties properties =
-                new MailRateLimitProperties(Duration.ofMinutes(1), null);
-
-        assertThat(properties.ip()).isEmpty();
+        assertThat(new MailRateLimitProperties(Duration.ofMinutes(1), null).ip()).isEmpty();
+        assertThat(new MailRateLimitProperties(Duration.ofMinutes(1), List.of()).ip()).isEmpty();
     }
 
     @Test

@@ -15,8 +15,9 @@ import org.springframework.boot.convert.DurationUnit;
  * 계정 메일의 전역 발송 상한이다(S15P21E106-287 결정 D-1).
  *
  * <p>접두사는 {@code feelm.mail.send-budget}이다. 이 값은 SMTP 계정의 발송 쿼터를 지키는 상한이라 발송 수단 쪽 관심사이고, 값을 읽는 쪽도
- * {@link MailDispatcher} 하나뿐이라 record를 발송 인프라에 둔다. 요청 단위 제한({@code feelm.mail.rate-limit})은 인증 도메인의
- * 관심사라 그대로 둔다.
+ * {@link RedisMailSendBudget} 하나뿐이라 record를 발송 인프라에 둔다({@link MailSendBudget} 자체는 요청 경로의 {@code
+ * hasCapacity()} 확인 때문에 인증 도메인의 서비스도 주입받지만, 그 서비스들은 이 설정값을 보지 않는다). 요청 단위 제한({@code
+ * feelm.mail.rate-limit})은 인증 도메인의 관심사라 그대로 둔다.
  *
  * <p>이 상한은 <b>실제 발송</b>을 센다. S15P21E106-281은 세 축을 모두 시도 기준으로 두었는데(결정 D-4), 전역 축까지 시도를 세면 메일을 한 통도
  * 보내지 않고 예산을 말릴 수 있었다. 기본값에서 IP 버킷 30개가 각각 IP 한도를 채우면 하루 상한이 마르고, 그동안 정상 사용자의 인증 메일 재발송(API-003)과
