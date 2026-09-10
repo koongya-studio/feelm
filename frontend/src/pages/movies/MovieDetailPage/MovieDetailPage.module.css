@@ -1,329 +1,314 @@
-/* 와이어프레임 2.4 실측값 */
+/*
+ * 2.4 영화 상세. 구성은 확정 시안을 따른다
+ * (`docs/screens/design-concept.md`).
+ *
+ * 카드로 감싸지 않는다. 포스터가 벽에 걸리고 이야기는 아래에 쌓인다. 검정은
+ * 화면에 하나뿐이며 그 하나는 감상 상태에 따라 바뀌는 주 동작 알약이다.
+ *
+ * 이전 구현의 전면 배경 포스터와 흰색 페이드는 걷어냈다. 시안 3장이 포스터 색을
+ * 배경으로 번지게 하지 않는다고 정한다. 포스터 색은 포스터 프레임 안에 머문다.
+ */
+
+/*
+ * `flex: 1 0 auto`로 둔다. 내용이 화면보다 짧으면 늘어나고, 길어지면 줄지 않아
+ * 넘친 높이가 그대로 스크롤 높이가 된다(3.2와 같은 처리).
+ */
 .page {
-  position: relative;
   display: flex;
-  min-height: 0;
-  flex: 1;
+  flex: 1 0 auto;
   flex-direction: column;
+  padding: var(--space-3) var(--screen-padding-x) var(--space-12);
 }
 
-/* 뒤로 가기 · 더 보기는 스크롤과 무관하게 위에 고정된다 */
-.floating {
-  position: absolute;
-  top: 64px;
-  right: 20px;
-  left: 20px;
-  z-index: 2;
+.top {
   display: flex;
-  justify-content: space-between;
-  /* 보이는 버튼만 누를 수 있게 하고 사이 영역은 스크롤을 막지 않는다 */
-  pointer-events: none;
-}
-
-.floating > * {
-  pointer-events: auto;
-}
-
-.scroll {
-  min-height: 0;
-  flex: 1;
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-width: none;
-}
-
-.backdrop {
-  position: relative;
+  margin-left: calc(var(--space-2) * -1);
 }
 
 /*
- * 포스터 아래쪽을 흰색으로 흘려 본문과 이어 붙인다.
- *
- * 와이어프레임은 위에서부터 흰색 25%를 덮었다. 자리표시자가 무채색일 때는 문제가 없었지만
- * 색이 들어오면 화면에서 가장 큰 면이 흐릿한 베일을 쓴 것처럼 보인다. 그래서 위쪽은
- * 투명하게 두고 아래쪽 흰색 전환만 남겼다(B안 「암실」, 2026-09-08). 제목이 놓이는
- * 아래쪽은 그대로 흰색이라 가독성은 달라지지 않는다.
+ * 포스터가 걸리는 자리. 가운데 정렬하고 위아래로 숨을 준다.
+ * 그림자는 `--shadow-poster`가 맡는다. 밝은 벽에서 그림자가 없으면 포스터가
+ * 벽에 붙은 종이처럼 보인다.
  */
-.backdropFade {
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: 360px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 34%, var(--color-bg) 96%);
+.hero {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-5) 0 var(--space-8);
 }
 
-.body {
-  position: relative;
+.hero > * {
+  box-shadow: var(--shadow-poster);
+}
+
+.head {
   display: flex;
-  margin-top: -70px;
   flex-direction: column;
-  gap: 9px;
-  padding: 0 var(--screen-padding-x) 30px;
-}
-
-.titleRow {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+  gap: var(--space-2);
 }
 
 .title {
-  flex: 1;
-  font-size: 26px;
-  font-weight: 700;
-}
-
-.ratingAction {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-}
-
-.ratingActionLabel {
-  color: var(--color-ink-muted);
-  font-size: 10.5px;
-  white-space: nowrap;
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  letter-spacing: var(--letter-spacing-title);
+  color: var(--color-ink);
 }
 
 .meta {
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
   color: var(--color-ink-muted);
-  font-size: 13px;
 }
 
-/* 번호가 붙은 영역 카드 */
-.card {
-  margin-top: 6px;
-  padding: 12px 16px;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-control);
-  background: var(--color-bg);
-}
-
-.cardTitle {
+/* 평균 별점. 별은 표식이므로 빨강을 쓴다(시안 2.2) */
+.average {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  font-weight: 600;
+  gap: var(--space-2);
 }
 
-.cardNumber {
-  display: flex;
-  width: 22px;
-  height: 22px;
-  box-sizing: border-box;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  border: 1.5px solid var(--color-ink);
-  border-radius: 50%;
+.averageValue {
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
   color: var(--color-ink);
-  font-size: 11.5px;
-  font-weight: 600;
 }
 
-.cardChevron {
-  display: flex;
-  margin-left: auto;
+.averageCount {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
   color: var(--color-ink-hint);
 }
 
-.cardBody {
-  margin: 8px 0 0 32px;
-  color: var(--color-ink-muted);
-  font-size: 12.5px;
-  line-height: 1.6;
+/*
+ * 주 동작. 이 화면의 검정 알약 하나다
+ * (`docs/screens/design-concept.md` 2.4).
+ */
+.action {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-6) 0 0;
+}
+
+.actionHint {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
+  text-align: center;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding-top: var(--space-10);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/*
+ * 자간 넓은 소제목. 큰 문장 하나 위에만 얹는다(2.1 `오늘의 추천`과 같은 자리).
+ * 0.26em은 라틴·숫자를 위한 값이라 한글 여섯 줄에 반복하면 글자가 흩어진다.
+ */
+.eyebrow {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  letter-spacing: var(--letter-spacing-wide);
+  color: var(--color-ink-hint);
+  text-transform: uppercase;
+}
+
+/* 반복되는 섹션 제목. 2.1과 같은 단계다 */
+.sectionTitle {
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+/* 추천 이유는 이 화면이 왜 이 영화를 보여주는지에 대한 답이라 본문보다 크다 */
+.reason {
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  color: var(--color-ink);
+}
+
+.synopsis {
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  letter-spacing: var(--letter-spacing-body);
+  color: var(--color-ink-body);
 }
 
 .ottList {
   display: flex;
-  align-items: center;
-  gap: 16px;
-  margin: 9px 0 0 32px;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .ottItem {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
 }
 
 .ottName {
-  color: var(--color-ink-muted);
-  font-size: 12.5px;
-}
-
-.ottLink {
-  padding: 0;
-  border: 0;
-  background: none;
+  font-size: var(--font-size-body);
   color: var(--color-ink);
-  font: inherit;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
 }
 
-.ottLinkNote {
-  margin-left: 4px;
-  color: var(--color-ink-hint);
-  font-size: 10px;
+/* 구독 중 표식. 선택 상태이므로 빨강을 쓰되 작은 글자라 짙은 쪽이다(시안 2.3) */
+.ottMine {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-brand-ink);
 }
 
-.ottLinkIcon {
-  display: inline-flex;
-  margin-left: 4px;
-  color: var(--color-ink);
-  vertical-align: middle;
+.myComment {
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  letter-spacing: var(--letter-spacing-body);
+  color: var(--color-ink-body);
 }
 
-/* 감상평 자리. 입력란처럼 보이지만 평가 화면으로 가는 버튼이다 */
-.commentPlaceholder {
-  display: flex;
-  width: 100%;
-  height: 38px;
-  box-sizing: border-box;
-  align-items: center;
-  margin: 9px 0 2px 32px;
-  padding: 0 12px;
-  border: 1px solid var(--color-line);
-  border-radius: 10px;
-  background: var(--color-bg);
-  color: var(--color-ink-hint);
-  font-size: 12.5px;
-  text-align: left;
-  cursor: pointer;
-}
-
+/*
+ * 유사 영화. 가로로 밀어 본다. 세로 목록으로 두면 이 섹션이 화면을 다 먹고,
+ * 아래의 출연·한줄평까지 닿지 않는다.
+ *
+ * 화면 좌우 여백을 넘겨 끝까지 흐르게 한다. 목록이 잘려 보이면 더 있다는 뜻이다.
+ */
 .similarList {
   display: flex;
-  gap: 8px;
-  margin: 10px 0 2px 32px;
+  gap: var(--space-4);
+  margin: 0 calc(var(--screen-padding-x) * -1);
+  padding: 0 var(--screen-padding-x);
   overflow-x: auto;
   scrollbar-width: none;
 }
 
-.similarItem {
-  flex: none;
+.similarList::-webkit-scrollbar {
+  display: none;
 }
 
 .similarButton {
   display: flex;
-  width: 64px;
+  width: 84px;
   flex-direction: column;
-  gap: 4px;
-  padding: 0;
+  gap: var(--space-2);
   border: 0;
   background: none;
-  text-align: left;
+  color: var(--color-ink);
   cursor: pointer;
+  text-align: left;
+}
+
+.similarButton > :first-child {
+  box-shadow: var(--shadow-raised);
+}
+
+.similarTitle {
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink);
 }
 
 .similarReason {
-  color: var(--color-ink-muted);
-  font-size: 9.5px;
-  line-height: 1.35;
-}
-
-/* 제목은 와이어프레임에 없지만 링크에 이름이 필요하다 */
-.similarTitle {
-  position: absolute;
-  overflow: hidden;
-  width: 1px;
-  height: 1px;
-  clip-path: inset(50%);
-  white-space: nowrap;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
 }
 
 .peopleList {
   display: flex;
-  gap: 14px;
-  margin-top: 12px;
+  gap: var(--space-4);
+  margin: 0 calc(var(--screen-padding-x) * -1);
+  padding: 0 var(--screen-padding-x);
   overflow-x: auto;
   scrollbar-width: none;
 }
 
-.personItem {
-  display: flex;
-  flex: none;
-  flex-direction: column;
-  align-items: center;
-  gap: 5px;
+.peopleList::-webkit-scrollbar {
+  display: none;
 }
 
+.personItem {
+  display: flex;
+  width: 64px;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+
+/*
+ * 인물 사진 자리. API-030에 사진 주소가 없어 빈 원으로 둔다. 이름이 정보를
+ * 다 말하므로 원은 자리만 잡는다.
+ */
 .personPhoto {
-  display: block;
-  width: 52px;
-  height: 52px;
-  box-sizing: border-box;
-  border: 1px solid var(--color-line);
-  border-radius: 50%;
-  background:
-    linear-gradient(
-      to top right,
-      transparent 49.5%,
-      var(--color-surface-sunken) 49.5% 50.5%,
-      transparent 50.5%
-    ),
-    linear-gradient(
-      to bottom right,
-      transparent 49.5%,
-      var(--color-surface-sunken) 49.5% 50.5%,
-      transparent 50.5%
-    ),
-    var(--color-bg);
+  width: 48px;
+  height: 48px;
+  border: 0.5px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
 }
 
 .personName {
-  color: var(--color-ink-muted);
-  font-size: 10.5px;
-  white-space: nowrap;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink);
+}
+
+.personRole {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
 }
 
 .reviewList {
-  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
 .reviewItem {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 10px 0;
-  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  gap: var(--space-1);
 }
 
 .reviewHead {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: baseline;
+  gap: var(--space-2);
 }
 
 .reviewUser {
-  font-size: 11px;
-  font-weight: 600;
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
 }
 
+/* 별점 수치는 작은 글자라 짙은 빨강이다(시안 2.3) */
 .reviewScore {
-  color: var(--color-ink-muted);
-  font-size: 10.5px;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-brand-ink);
 }
 
 .reviewBody {
-  color: rgba(60, 58, 54, 0.75);
-  font-size: 12.5px;
-  line-height: 1.55;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  letter-spacing: var(--letter-spacing-body);
+  color: var(--color-ink-body);
 }
 
-/* 섹션에 보여줄 것이 없을 때. 와이어프레임에 대응 표현이 없어 카드 본문 사양을 따른다 */
 .emptyNote {
-  color: var(--color-ink-muted);
-  font-size: 12.5px;
-  line-height: 1.6;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-hint);
 }

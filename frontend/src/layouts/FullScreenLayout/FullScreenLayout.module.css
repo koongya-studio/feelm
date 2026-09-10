@@ -1,7 +1,14 @@
 /*
  * 화면 높이를 고정한다.
- * 2.4는 본문만 스크롤하고 뒤로 가기 · 더 보기 버튼이 위에 고정된 구조이고,
- * 2.6 · 2.7도 남은 높이를 채우는 배치다. AppLayout · OnboardingLayout과 같은 이유다.
+ * 2.4는 본문만 스크롤하고 뒤로 가기 버튼이 위에 고정된 구조이고, 2.6 · 2.7도 남은
+ * 높이를 채우는 배치다. AppLayout · OnboardingLayout과 같은 이유다.
+ *
+ * **배경을 다시 칠하지 않는다.** body가 한 벌만 깔고 화면마다 바꾸지 않는다
+ * (`docs/screens/design-concept.md` 2.1). 이전에는 여기서 단색 `--color-bg`를
+ * 칠했는데, 이 상자는 `100dvh`까지만 덮으므로 콘텐츠가 화면보다 길면 그 아래에서
+ * body의 그라디언트가 드러났다. 단색과 그라디언트가 만나는 지점에 가로선이
+ * 생긴다(밝기 240 → 233, 한 픽셀에 7단계). AppLayout은 같은 이유로 처음부터
+ * 칠하지 않았다.
  */
 .layout {
   display: flex;
@@ -12,5 +19,4 @@
   flex-direction: column;
   margin: 0 auto;
   padding-bottom: env(safe-area-inset-bottom, 0px);
-  background: var(--color-bg);
 }

@@ -1,48 +1,75 @@
-/* 와이어프레임 2.4-A 실측값 */
+/*
+ * 2.4-A 감상 확인. 구성은 확정 시안을 따른다
+ * (`docs/screens/design-concept.md`).
+ *
+ * 이 화면은 질문 하나짜리다. **이 영화, 잘 보셨나요?** 그래서 포스터와 제목은
+ * 무엇에 대한 질문인지만 알려주고, 질문이 화면에서 가장 큰 글자가 된다.
+ *
+ * 이전 구현은 와이어프레임 실측값(21px · 16px · 12px · 18px · 32px)이 하드코딩돼
+ * 있었다. 전부 토큰으로 바꿨고, 질문을 화면 제목 크기로 올려 층을 만들었다.
+ */
 .page {
   display: flex;
-  min-height: 0;
-  flex: 1;
+  flex: 1 0 auto;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
-  padding: 0 32px;
-  overflow-y: auto;
+  gap: var(--space-6);
+  padding: var(--space-12) var(--screen-padding-x);
+}
+
+/* 포스터는 벽에 걸린다. 밝은 벽에서 그림자가 없으면 종이처럼 보인다 */
+.page > :first-child {
+  box-shadow: var(--shadow-poster);
 }
 
 .movie {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-1);
   text-align: center;
 }
 
 .title {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
 }
 
 .note {
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
   color: var(--color-ink-muted);
-  font-size: 12px;
 }
 
+/* 이 화면이 묻는 한 문장. 화면에서 가장 큰 글자다 */
 .question {
-  font-size: 21px;
-  font-weight: 700;
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  letter-spacing: var(--letter-spacing-title);
+  color: var(--color-ink);
+  text-align: center;
 }
 
+/*
+ * 주 동작. 이 화면의 검정 알약 하나는 `봤어요`다
+ * (`docs/screens/design-concept.md` 2.4). `보지 않을래요`는 글자 버튼이라
+ * 무게를 나눠 갖지 않는다. 두 선택지를 같은 무게로 두면 무엇이 기본 흐름인지
+ * 읽히지 않는다.
+ */
 .actions {
   display: flex;
   width: 100%;
   flex-direction: column;
-  gap: 9px;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
 }
 
 .hint {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
   color: var(--color-ink-hint);
-  font-size: 11px;
-  line-height: 1.6;
   text-align: center;
 }
