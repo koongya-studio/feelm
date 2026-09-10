@@ -10,6 +10,16 @@
  */
 
 export const ROUTE_PATTERN = {
+  // 인증 (하단 내비 없음). 0.1 ~ 0.7-A
+  authStart: '/start',
+  signupMethod: '/signup',
+  signupSocial: '/signup/social',
+  signupEmail: '/signup/email',
+  signupComplete: '/signup/complete',
+  login: '/login',
+  accountFind: '/account/find',
+  passwordReset: '/account/reset',
+
   // 온보딩 (하단 내비 없음)
   onboardingTaste: '/onboarding/taste',
   onboardingOtt: '/onboarding/ott',
@@ -38,6 +48,15 @@ export const ROUTE_PATTERN = {
 } as const;
 
 export const path = {
+  authStart: () => ROUTE_PATTERN.authStart,
+  signupMethod: () => ROUTE_PATTERN.signupMethod,
+  signupSocial: () => ROUTE_PATTERN.signupSocial,
+  signupEmail: () => ROUTE_PATTERN.signupEmail,
+  signupComplete: () => ROUTE_PATTERN.signupComplete,
+  login: () => ROUTE_PATTERN.login,
+  accountFind: () => ROUTE_PATTERN.accountFind,
+  passwordReset: () => ROUTE_PATTERN.passwordReset,
+
   onboardingTaste: () => ROUTE_PATTERN.onboardingTaste,
   onboardingOtt: () => ROUTE_PATTERN.onboardingOtt,
   onboardingComplete: () => ROUTE_PATTERN.onboardingComplete,

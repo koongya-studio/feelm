@@ -1,0 +1,85 @@
+/*
+ * 0.7 계정 찾기.
+ *
+ * 선택한 탭은 밑줄과 진한 글자로 표시한다. 빨강은 표식이므로 밑줄에만 쓰고 면으로
+ * 깔지 않는다(`design-concept.md` 2.3).
+ */
+.page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--screen-padding-x) var(--space-8);
+  overflow-y: auto;
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.tab {
+  flex: 1;
+  padding: var(--space-3) 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+.tab[aria-selected='true'] {
+  border-bottom-color: var(--color-brand);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+/* 안내 문구는 두 줄이다. 문자열의 줄바꿈을 그대로 살린다 */
+.lead {
+  margin: var(--space-2) 0 var(--space-3);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-body);
+  color: var(--color-ink-muted);
+  white-space: pre-line;
+}
+
+/* 남은 시간. 자리수가 바뀌어도 폭이 흔들리지 않게 등폭으로 둔다 */
+.remaining {
+  font-size: var(--font-size-meta);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-ink-muted);
+}
+
+/* 한 문장이므로 흐름 배치에 둔다. flex로 두면 좁은 폭에서 양끝으로 벌어진다 */
+.resend {
+  text-align: center;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+/* 다시 보내기. 이동이 아니라 동작이므로 버튼이되 문장 안에 앉는다 */
+.resendAction {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}

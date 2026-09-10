@@ -1,0 +1,106 @@
+/*
+ * 0.1 시작 화면.
+ *
+ * 기울인 포스터 격자 위에 아래로 갈수록 짙어지는 베일을 덮고, 그 위에 로고와 주 동작을
+ * 올린다. 와이어프레임 0.1의 구성이다.
+ *
+ * 베일의 끝 색은 흰색이 아니라 `--color-bg`다. 배경을 다시 칠하지 않는다는 규칙
+ * (`design-concept.md` 2.1)을 지키면서, 아래쪽에서 격자가 가려져 글자 대비가 확보된다.
+ */
+.page {
+  position: relative;
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 기울인 격자. 화면 밖으로 넘겨 잘린 단면이 보이지 않게 한다 */
+.backdrop {
+  position: absolute;
+  top: -70px;
+  right: -60px;
+  left: -60px;
+  display: flex;
+  gap: var(--space-3);
+  transform: rotate(-8deg);
+}
+
+.column {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* 열마다 시작 높이를 어긋나게 둔다(와이어프레임 0 · 52 · 24px) */
+.column[data-column='1'] {
+  margin-top: 52px;
+}
+
+.column[data-column='2'] {
+  margin-top: var(--space-6);
+}
+
+/*
+ * 격자를 덮는 베일. 아래쪽은 완전히 불투명해야 로고와 문구가 읽힌다.
+ *
+ * 와이어프레임은 74%에서 불투명해지지만, 확정 배경이 흰색이 아니라 회색이라 같은
+ * 지점에서는 포스터가 비쳐 본문 대비가 떨어졌다. 로고가 시작하는 높이(약 62%)보다
+ * 위에서 불투명해지도록 당겼다.
+ */
+.veil {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(239, 240, 243, 0.3) 0%,
+    rgba(239, 240, 243, 0.6) 32%,
+    var(--color-bg) 58%
+  );
+}
+
+/*
+ * 로고와 주 동작. 와이어프레임은 화면 아래에서 88px 띄운다.
+ */
+.content {
+  position: relative;
+  display: flex;
+  margin-top: auto;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: 0 var(--screen-padding-x) var(--space-12);
+}
+
+.logo {
+  margin: 0;
+  line-height: 1;
+}
+
+.tagline {
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  color: var(--color-ink-muted);
+}
+
+/*
+ * `이미 계정이 있나요? 로그인`. 텍스트 버튼이 문장 안에 들어간다.
+ *
+ * flex로 두면 문장과 버튼이 각각 flex 항목이 되어 좁은 폭에서 양끝으로 벌어진다.
+ * 한 문장이므로 흐름 배치에 두고 버튼만 inline으로 앉힌다.
+ */
+.login {
+  text-align: center;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+/* 문장 안의 이동. 버튼이 아니라 링크다 */
+.link {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}

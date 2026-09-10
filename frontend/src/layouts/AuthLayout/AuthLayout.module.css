@@ -1,0 +1,18 @@
+/*
+ * 화면 높이를 고정한다. 0.1은 배경 격자가 화면을 채우고, 0.2 · 0.6은 내용이 세로
+ * 가운데에 서므로 높이가 정해져 있어야 한다.
+ *
+ * **배경을 다시 칠하지 않는다.** body가 한 벌만 깔고 화면마다 바꾸지 않는다
+ * (`docs/screens/design-concept.md` 2.1). OnboardingLayout이 단색을 칠했다가 콘텐츠가
+ * 화면보다 길 때 그라디언트와 만나는 가로선이 생긴 전례가 있다.
+ */
+.layout {
+  display: flex;
+  width: 100%;
+  max-width: var(--layout-max-width);
+  height: 100vh;
+  height: 100dvh;
+  flex-direction: column;
+  margin: 0 auto;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
