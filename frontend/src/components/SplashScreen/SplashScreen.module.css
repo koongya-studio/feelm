@@ -1,0 +1,55 @@
+/*
+ * 스플래시 화면 (업무 S15P21E106-331). 구성은 확정 시안 2.8을 따른다
+ * (`docs/screens/design-concept.md`).
+ *
+ * 시안은 `Feelm 배경.png`(3D 안경 사진)를 **그대로** 쓰라고 정했다. 워드마크와
+ * `YOUR TASTE ON FILM`이 사진 안에 이미 들어 있으므로 위에 로고를 겹쳐 올리지
+ * 않는다. 겹쳐 올리면 같은 글자가 두 벌 보인다.
+ */
+.splash {
+  position: fixed;
+  z-index: 1100; /* .preview-badge(1000)보다 위. 첫 화면에 목업 배지가 끼지 않게 한다 */
+  inset: 0;
+  /*
+   * 사진이 디코드되기 전 한 프레임을 덮는 바탕이다. 사진 상단 2%의 실측 평균
+   * (R195 G196 B201)이라 사진이 뜨는 순간 색이 튀지 않는다. 앱 내부 배경
+   * (`--gradient-page`, G232)과는 값이 다르므로 그 토큰을 쓰지 않는다.
+   */
+  background: #c3c4c9;
+  opacity: 1;
+  transition: opacity var(--motion-emphasized) ease-out;
+}
+
+/*
+ * 사라지는 중. `--motion-emphasized`는 `prefers-reduced-motion: reduce`에서
+ * 0ms로 접히므로(`tokens.css`) 페이드 여부를 JS에서 따로 판단하지 않는다.
+ */
+.splash[data-leaving='true'] {
+  opacity: 0;
+  /* 사라지는 동안의 탭은 아래 화면으로 통과시킨다 */
+  pointer-events: none;
+}
+
+/*
+ * 사진은 화면을 빈틈없이 채운다(`object-fit: cover`). 잘리는 쪽을 정하는 값이
+ * `object-position`의 65%다. 사진(853x1843, 세로/가로 2.16)에서 지켜야 할
+ * 범위를 실측하면 안경 프레임이 위 16.3%, 태그라인 아래끝이 91.3%
+ * (하단 여백 8.7%)에 있다.
+ *
+ * 세로가 짧은 기기에서 잘리는 총량 T = (2.16 - 화면비) / 2.16이고, 65%는 그중
+ * 위에서 0.65T, 아래에서 0.35T를 잘라 낸다. 아래 여백 8.7%를 지키려면
+ * 0.35T <= 0.087, 즉 **화면비 1.68까지** 태그라인이 온전하다. 가운데(50%)로
+ * 두면 1.88까지만 버텨 16:9에서 태그라인이 잘린다.
+ *
+ * 실측(412x915 · 393x852 · 375x667)에서 워드마크·안경·태그라인이 모두 남고
+ * 빈 띠도 생기지 않았다. 4:3(1.33)에서는 태그라인이 잘리는데, 태블릿 /
+ * expanded width 대응은 `docs/screens/design-goals.md` 2.5가 미확정·범위 밖으로
+ * 두고 있어 여기서 정하지 않는다. 정해지면 이 값 대신 좌우를 채우는 방식이
+ * 필요하다.
+ */
+.photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 65%;
+}
