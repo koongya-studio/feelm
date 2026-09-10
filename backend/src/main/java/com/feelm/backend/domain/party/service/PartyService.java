@@ -5,6 +5,7 @@ import static java.util.stream.Collectors.mapping;
 import static java.util.stream.Collectors.toList;
 
 import com.feelm.backend.domain.party.dto.response.PartyInvitationResponse;
+import com.feelm.backend.domain.party.dto.response.PartyInvitationStatusResponse;
 import com.feelm.backend.domain.party.dto.response.PartyListItemResponse;
 import com.feelm.backend.domain.party.dto.response.PartyListItemResponse.PendingInvitation;
 import com.feelm.backend.domain.party.dto.response.PartyResponse;
@@ -20,6 +21,7 @@ import com.feelm.backend.domain.party.repository.PartyMemberRepository;
 import com.feelm.backend.domain.party.repository.PartyQueryRepository;
 import com.feelm.backend.domain.party.repository.PartyRepository;
 import com.feelm.backend.domain.user.repository.UserRepository;
+import com.feelm.backend.domain.user.service.UserBlockFilter;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
 import com.feelm.backend.global.response.CursorPageResponse;
@@ -38,6 +40,7 @@ public class PartyService {
     private final PartyInvitationRepository invitationRepository;
     private final PartyQueryRepository queryRepository;
     private final UserRepository userRepository;
+    private final UserBlockFilter userBlockFilter;
 
     /** 파티와 생성자의 OWNER 멤버 정보를 함께 저장하고 생성 결과를 반환한다. */
     @Transactional
@@ -138,7 +141,7 @@ public class PartyService {
         if (memberRepository.existsByPartyIdAndUserId(partyId, inviteeId)) {
             throw new BusinessException(ErrorCode.ALREADY_MEMBER);
         }
-        if (queryRepository.hasBlockBetweenInviteeAndPartyMembers(partyId, inviteeId)) {
+        if (hasBlockBetweenInviteeAndPartyMembers(partyId, inviteeId)) {
             throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
         }
         if (invitationRepository.existsByPartyIdAndInviteeIdAndStatus(
@@ -205,6 +208,80 @@ public class PartyService {
                         ? new PartyInvitationCursor(last.getCreatedAt(), last.getId()).encode()
                         : null;
         return new CursorPageResponse<>(items, nextCursor, hasNext);
+    }
+
+    /** 받은 대기 초대를 수락하고 파티의 일반 멤버로 참여한다. */
+    @Transactional
+    public PartyResponse acceptInvitation(long userId, long invitationId) {
+        var invitee =
+                userRepository
+                        .findByIdForUpdate(userId)
+                        .filter(user -> user.isActive())
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        long partyId =
+                invitationRepository
+                        .findPartyIdByIdAndInviteeId(invitationId, userId)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        Party party =
+                partyRepository
+                        .findByIdForUpdate(partyId)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        PartyInvitation invitation = lockedInvitation(invitationId, userId);
+
+        requirePending(invitation);
+        if (party.getStatus() == PartyStatus.CLOSED) {
+            throw new BusinessException(ErrorCode.PARTY_CLOSED);
+        }
+        if (hasBlockBetweenInviteeAndPartyMembers(partyId, userId)) {
+            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
+        }
+        if (memberRepository.countActivePartiesByUserId(userId)
+                >= Party.MAX_ACTIVE_PARTIES_PER_USER) {
+            throw new BusinessException(ErrorCode.ACTIVE_PARTY_LIMIT_REACHED);
+        }
+        if (memberRepository.countByPartyId(partyId) >= Party.MAX_MEMBERS) {
+            throw new BusinessException(ErrorCode.PARTY_FULL);
+        }
+
+        Instant respondedAt = Instant.now();
+        memberRepository.saveAndFlush(PartyMember.memberOf(party, invitee, respondedAt));
+        invitation.accept(respondedAt);
+        List<Member> members =
+                queryRepository.findMembers(List.of(partyId)).stream().map(Member::from).toList();
+        return PartyResponse.from(party, members);
+    }
+
+    /** 받은 대기 초대를 거절하고 응답 상태를 반환한다. */
+    @Transactional
+    public PartyInvitationStatusResponse declineInvitation(long userId, long invitationId) {
+        userRepository
+                .findByIdForUpdate(userId)
+                .filter(user -> user.isActive())
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        PartyInvitation invitation = lockedInvitation(invitationId, userId);
+        requirePending(invitation);
+        invitation.decline(Instant.now());
+        return PartyInvitationStatusResponse.from(invitation);
+    }
+
+    private PartyInvitation lockedInvitation(long invitationId, long inviteeId) {
+        return invitationRepository
+                .findByIdAndInviteeIdForUpdate(invitationId, inviteeId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+    }
+
+    private void requirePending(PartyInvitation invitation) {
+        if (invitation.getStatus() != PartyInvitation.Status.PENDING) {
+            throw new BusinessException(ErrorCode.INVITATION_NOT_PENDING);
+        }
+    }
+
+    private boolean hasBlockBetweenInviteeAndPartyMembers(long partyId, long inviteeId) {
+        List<Long> memberIds =
+                queryRepository.findMembers(List.of(partyId)).stream()
+                        .map(member -> member.getUser().getId())
+                        .toList();
+        return !userBlockFilter.blockedAmong(inviteeId, memberIds).isEmpty();
     }
 
     /** 현재 파티장만 다른 현재 멤버를 강퇴하고, 남은 인원에 따라 파티를 종료한다. */

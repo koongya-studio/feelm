@@ -32,6 +32,7 @@ public enum ErrorCode {
     ACTIVE_PARTY_LIMIT_REACHED(HttpStatus.CONFLICT, "참여 가능한 활성 파티 수를 초과했습니다."),
     ALREADY_MEMBER(HttpStatus.CONFLICT, "이미 파티에 참여 중인 사용자입니다."),
     INVITATION_PENDING(HttpStatus.CONFLICT, "이미 대기 중인 초대가 있습니다."),
+    INVITATION_NOT_PENDING(HttpStatus.CONFLICT, "이미 처리된 초대입니다."),
     FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없습니다."),
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "요청한 리소스를 찾을 수 없습니다."),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "허용되지 않은 HTTP 메서드입니다."),

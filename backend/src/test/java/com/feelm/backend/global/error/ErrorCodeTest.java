@@ -89,7 +89,8 @@ class ErrorCodeTest {
                         "PARTY_FULL",
                         "ACTIVE_PARTY_LIMIT_REACHED",
                         "ALREADY_MEMBER",
-                        "INVITATION_PENDING");
+                        "INVITATION_PENDING",
+                        "INVITATION_NOT_PENDING");
     }
 
     @Test
@@ -148,6 +149,7 @@ class ErrorCodeTest {
         assertThat(ErrorCode.ACTIVE_PARTY_LIMIT_REACHED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(ErrorCode.ALREADY_MEMBER.getStatus()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(ErrorCode.INVITATION_PENDING.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(ErrorCode.INVITATION_NOT_PENDING.getStatus()).isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test

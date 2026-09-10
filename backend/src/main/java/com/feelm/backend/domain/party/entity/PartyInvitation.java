@@ -65,6 +65,14 @@ public class PartyInvitation extends BaseTimeEntity {
         this.respondedAt = respondedAt;
     }
 
+    public void accept(Instant respondedAt) {
+        if (status != Status.PENDING || respondedAt == null) {
+            throw new IllegalStateException("Only a pending invitation can be accepted");
+        }
+        status = Status.ACCEPTED;
+        this.respondedAt = respondedAt;
+    }
+
     public enum Status {
         PENDING,
         ACCEPTED,
