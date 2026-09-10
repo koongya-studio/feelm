@@ -1,0 +1,75 @@
+/*
+ * 0.4 이메일 회원가입 정보 입력. 입력이 여덟 줄이라 화면을 넘기므로 스크롤한다.
+ */
+.page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--screen-padding-x) var(--space-8);
+  overflow-y: auto;
+}
+
+/* 성별. 세 선택지가 한 줄에 균등하게 놓인다 */
+.genders {
+  display: flex;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  margin: 0;
+}
+
+.legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.gender {
+  height: var(--control-height-sm);
+  flex: 1;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-control);
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+/*
+ * 선택 상태. 빨강은 면이 아니라 표식이므로 테두리와 글자에만 쓴다
+ * (`design-concept.md` 2.3).
+ */
+.gender[aria-pressed='true'] {
+  border-color: var(--color-brand);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-brand-ink);
+}
+
+/* 소셜로 돌아서는 줄. 입력이 아니라 이동이므로 텍스트로 둔다 */
+.social {
+  padding: var(--space-2);
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+/* 이 화면의 유일한 검정 알약이다 (`design-concept.md` 2.4) */
+.submit {
+  margin-top: var(--space-2);
+}

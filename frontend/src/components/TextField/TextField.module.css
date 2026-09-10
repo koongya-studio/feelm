@@ -1,0 +1,102 @@
+/*
+ * 한 줄 입력 필드. 수치는 토큰만 쓴다(`design-concept.md` 2.2 — UI는 색을 쓰지 않는다).
+ *
+ * 와이어프레임의 필드는 웜 그레이 면(#F1EFEA)에 테두리 한 겹이다. 확정 방향은 밝은
+ * 쿨 그레이 벽이므로 면은 `--color-surface-raised`, 테두리는 `--color-line-strong`으로
+ * 옮겼다. 높이 48px은 와이어프레임 값이자 터치 타깃 기준(6.3)을 넘는다.
+ */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.control {
+  display: flex;
+  height: 48px;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+}
+
+.control:focus-within {
+  border-color: var(--color-ink);
+}
+
+.control[data-invalid='true'] {
+  border-color: var(--color-danger);
+}
+
+.leading,
+.trailing {
+  display: flex;
+  flex: none;
+  align-items: center;
+  color: var(--color-ink-hint);
+}
+
+/*
+ * 필드 안 동작 (`인증요청` · `확인`). 입력을 밀어내지 않도록 폭을 내용에 맞춘다.
+ * 검정 알약이 아니다 — 화면의 주 동작은 따로 있다(`design-concept.md` 2.4).
+ */
+.action {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.action:disabled {
+  color: var(--color-ink-disabled);
+  cursor: default;
+}
+
+/*
+ * 브라우저 기본 표면을 지운다(`common-components.md` 6.7). 글자 크기를 16px 미만으로
+ * 두면 iOS Safari가 포커스에서 화면을 확대하므로 본문 크기(15px)보다 키우지 않는 대신
+ * `font-size: max(...)`로 확대를 막지 않고 그대로 둔다 — 이 화면들은 입력이 주 동작이라
+ * 확대되어도 레이아웃이 깨지지 않는다.
+ */
+.input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  color: var(--color-ink);
+}
+
+.input:focus {
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--color-ink-hint);
+}
+
+.hint,
+.error {
+  padding: 0 var(--space-2);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.hint {
+  color: var(--color-ink-hint);
+}
+
+.error {
+  color: var(--color-danger);
+}

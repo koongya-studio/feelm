@@ -1,0 +1,40 @@
+/*
+ * 0.5 회원가입 완료. 1.3과 같은 완료 화면 구성이다 — 내용이 가운데 서고 주 동작만
+ * 아래에 붙는다.
+ */
+.page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.stage {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--screen-padding-x);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+.lead {
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  color: var(--color-ink-muted);
+}
+
+.actions {
+  flex: none;
+  padding: 0 var(--screen-padding-x) var(--space-12);
+}

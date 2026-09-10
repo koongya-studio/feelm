@@ -3,13 +3,23 @@
  * 경로와 레이아웃 배정은 frontend/docs/screens/frontend-structure.md 3·4장을 따른다.
  * 레이아웃 라우트는 경로가 없는(pathless) 라우트이므로 하위 라우트에 절대 경로를 쓴다.
  *
- * 인증에 따른 라우트 보호는 이번 범위가 아니다. 인증 화면(0.x)이 범위 밖이며,
- * 보호 계층이 필요해지면 이 파일에서 레이아웃 라우트를 감싸 처리한다.
+ * 인증 화면(0.x)은 업무 -302에서 AuthLayout 아래에 추가했다. 인증 **상태**에 따른
+ * 라우트 보호는 여전히 범위 밖이다(와이어프레임 이동표 `비로그인 ⇢ 0.6`). 보호 계층이
+ * 필요해지면 이 파일에서 레이아웃 라우트를 감싸 처리한다.
  */
 import { createBrowserRouter } from 'react-router';
 import AppLayout from '../layouts/AppLayout';
+import AuthLayout from '../layouts/AuthLayout';
 import FullScreenLayout from '../layouts/FullScreenLayout';
 import OnboardingLayout from '../layouts/OnboardingLayout';
+import AccountFindPage from '../pages/auth/AccountFindPage';
+import EmailSignupPage from '../pages/auth/EmailSignupPage';
+import LoginPage from '../pages/auth/LoginPage';
+import PasswordResetPage from '../pages/auth/PasswordResetPage';
+import SignupCompletePage from '../pages/auth/SignupCompletePage';
+import SignupMethodPage from '../pages/auth/SignupMethodPage';
+import SocialSignupPage from '../pages/auth/SocialSignupPage';
+import StartPage from '../pages/auth/StartPage';
 import FilmPage from '../pages/film/FilmPage';
 import FrameDetailPage from '../pages/film/FrameDetailPage';
 import PopcornBucketPage from '../pages/film/PopcornBucketPage';
@@ -30,6 +40,19 @@ import { ROUTE_PATTERN } from './paths';
 
 export const router = createBrowserRouter(
   [
+    {
+      element: <AuthLayout />,
+      children: [
+        { path: ROUTE_PATTERN.authStart, element: <StartPage /> },
+        { path: ROUTE_PATTERN.signupMethod, element: <SignupMethodPage /> },
+        { path: ROUTE_PATTERN.signupSocial, element: <SocialSignupPage /> },
+        { path: ROUTE_PATTERN.signupEmail, element: <EmailSignupPage /> },
+        { path: ROUTE_PATTERN.signupComplete, element: <SignupCompletePage /> },
+        { path: ROUTE_PATTERN.login, element: <LoginPage /> },
+        { path: ROUTE_PATTERN.accountFind, element: <AccountFindPage /> },
+        { path: ROUTE_PATTERN.passwordReset, element: <PasswordResetPage /> },
+      ],
+    },
     {
       element: <OnboardingLayout />,
       children: [
