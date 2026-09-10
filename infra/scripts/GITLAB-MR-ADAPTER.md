@@ -5,13 +5,14 @@
 
 ## 목적과 제한
 
-`backend-mr-test` 한 Job만 `e106-mr-isolated` 태그의 별도 Runner에서 받는다. 이 Runner의
+`backend-mr-test`와 의존성 변경 시 생성되는 `backend-cache-prepare`만
+`e106-mr-isolated` 태그의 별도 Runner에서 받습니다. 이 Runner의
 Custom executor는 GitLab이 생성한 셸 스크립트를 실행하지 않는다. 다음 조건을 모두 다시
 확인한 뒤 현재 커밋의 `backend` 디렉터리만 기존 S15P21E106-222 격리 실행기에 전달한다.
 
 - GitLab 주소가 `https://lab.ssafy.com`이고 프로젝트 경로가
   `s15-bigdata-dist-sub1/S15P21E106`이다.
-- 인증된 현재 Job이 `backend-mr-test`, `test`이고 Job 응답의 프로젝트·커밋과 일치한다.
+- 인증된 현재 Job이 고정된 `backend-mr-test` 또는 `backend-cache-prepare` 정책과 일치한다.
 - 같은 프로젝트의 열린 MR 하나가 해당 커밋을 가리키며 대상 브랜치가 `develop`이다.
 - CI script가 고정된 두 줄과 일치하고 service, image, cache, dependency, artifact가 없다.
 - GitLab archive는 64 MiB 이하의 비압축 tar이며 `backend` 아래 일반 파일·디렉터리만 담는다.
@@ -26,7 +27,8 @@ Job·프로젝트·테스트 명령을 추가할 때 기존 어댑터를 느슨�
 
 ## CI 분리
 
-- MR → develop: 백엔드 관련 경로 변경 시 `backend-mr-test`, `e106-mr-isolated`, 30분, 취소 가능
+- MR → develop: 백엔드 관련 경로 변경 시 `backend-mr-test`, 의존성 파일 변경 시
+  `backend-cache-prepare`, `e106-mr-isolated`, 취소 가능
 - develop push: 기존 `backend-test`와 빌드·수동 배포, `e106-shell`
 - `runner-check`: develop에서만 실행
 
@@ -58,15 +60,15 @@ GitLab API의 정확한 커밋 archive를 사용한다. MR이 `.gitlab-ci.yml`�
 별개다. 현재 어댑터는 backend archive만 전달하므로, 실행기 변경 자체는 해당
 단위 테스트와 기존 서버 적용 절차로 별도 검증해야 한다.
 
-`backend-cache-status`의 의존성 경로는 모두 `backend/**/*`에 포함된다. 캐시 상태
-확인 조건, 수동 캐시 전환, Runner 정책, develop 테스트·이미지·배포 조건은 유지한다.
+`backend-cache-prepare`의 의존성 경로는 모두 `backend/**/*`에 포함됩니다. 자동 준비,
+MR SHA별 후보 선택, develop 병합 후 자동 승격과 Runner 정책을 함께 검증합니다.
 변경 경로를 새로 추가할 때는 캐시 관련 변경에서 테스트가 빠지지 않는지 확인한다.
 
-캐시 상태 Job은 현재 Job과 commit에 연결된 열린 MR을 GitLab API로 검증한다. 이 목록 응답은
+캐시 준비 Job은 현재 Job과 commit에 연결된 열린 MR을 GitLab API로 검증합니다. 이 목록 응답은
 GitLab 버전에 따라 `diff_refs`를 생략하므로, 검증한 IID의 MR 상세 응답에서 상태·프로젝트·대상
 브랜치·SHA와 `diff_refs`를 다시 확인한다. 그 기준 SHA와 정확한 HEAD SHA를 고정 프로젝트에서
-인증된 Git fetch로 가져와 변경 경로를 비교한다. 일반 `backend-mr-test`는 이 상세 조회를 하지
-않는다.
+인증된 Git fetch로 가져와 변경 경로를 비교합니다. `backend-mr-test`도 같은 상세 diff를 확인해
+의존성 변경 MR이면 정확한 SHA의 검증 후보만 선택합니다.
 GitLab Job Token이 허용하지 않는 `merge_requests/:iid/diffs` API에는 의존하지 않는다.
 Git 명령은 고정 remote, 비대화형 인증, redirect 차단 환경에서 실행하고 출력은 폐기하거나
 크기를 제한한다. 초기화·fetch·diff 실패는 단계 이름만 출력하며 Job Token과 원격 응답은
