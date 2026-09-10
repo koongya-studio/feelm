@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Root-side, fixed-policy GitLab bridge for the S15P21E106 backend MR job.
+"""Root-side, fixed-policy GitLab bridge for S15P21E106 isolated MR jobs.
 
 The job token is accepted only on stdin, authenticated against GitLab, and is
 never forwarded to the workload.  CI-generated shell text is not executed.
@@ -33,12 +33,18 @@ def load(name, filename):
 
 safety = load('gitlab_safety', 'ci-job-safety.py')
 job_io = load('gitlab_job_io', 'ci-job-io.py')
+frontend_boundary = load('gitlab_frontend_boundary', 'ci-frontend-mr-boundary.py')
+frontend_runner = load('gitlab_frontend_runner', 'ci-frontend-mr-runner.py')
 CONFIG = Path('/etc/feelm-ci222/gitlab-adapter.json')
 GITLAB_URL = 'https://lab.ssafy.com'
 PROJECT_PATH = 's15-bigdata-dist-sub1/S15P21E106'
 JOB_NAME = 'backend-mr-test'
 JOB_STAGE = 'test'
 EXPECTED_SCRIPT = ['cd backend', './gradlew clean test spotlessCheck --no-daemon']
+FRONTEND_JOB_NAME = 'frontend-mr-test'
+FRONTEND_EXPECTED_SCRIPT = [
+    'cd frontend', 'npm ci', 'npm run lint', 'npm run format:check', 'npm run build',
+]
 CACHE_PREPARE_JOB = 'backend-cache-prepare'
 CACHE_PREPARE_SCRIPT = ['echo Prepare verified backend dependency cache for this MR revision']
 CACHE_DEPENDENCY_FILES = {
@@ -74,7 +80,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         raise urllib.error.HTTPError(req.full_url, code, 'redirect refused', headers, fp)
 
 
-def read_private_config(path=CONFIG):
+def read_private_config(path=CONFIG, require_prepared=True):
     info = path.lstat()
     if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077
             or info.st_nlink != 1 or info.st_size > 4096):
@@ -85,7 +91,8 @@ def read_private_config(path=CONFIG):
     if value['gitlab_url'] != GITLAB_URL or value['project_path'] != PROJECT_PATH:
         raise RuntimeError('Adapter is configured for a different GitLab project')
     prepared = Path(value['prepared_base'])
-    safety.pilot.check_base(prepared)
+    if require_prepared:
+        safety.pilot.check_base(prepared)
     return value, prepared
 
 
@@ -118,13 +125,14 @@ def validate_job_response(response):
     if not isinstance(token, str) or not 16 <= len(token) <= 4096 or any(c.isspace() for c in token):
         raise PolicyError('Invalid job credential')
     policies = {
-        JOB_NAME: (JOB_STAGE, EXPECTED_SCRIPT),
-        CACHE_PREPARE_JOB: ('verify', CACHE_PREPARE_SCRIPT),
+        JOB_NAME: (JOB_STAGE, EXPECTED_SCRIPT, 'backend'),
+        FRONTEND_JOB_NAME: (JOB_STAGE, FRONTEND_EXPECTED_SCRIPT, 'frontend'),
+        CACHE_PREPARE_JOB: ('verify', CACHE_PREPARE_SCRIPT, 'cache'),
     }
     policy = policies.get(info.get('name')) if isinstance(info, dict) else None
     if (policy is None or info.get('stage') != policy[0]
             or type(info.get('project_id')) is not int or info['project_id'] <= 0):
-        raise PolicyError('Only fixed backend MR jobs are accepted')
+        raise PolicyError('Only fixed isolated MR jobs are accepted')
     if not isinstance(git, dict) or not re.fullmatch(r'[0-9a-f]{40}|[0-9a-f]{64}', str(git.get('sha', ''))):
         raise PolicyError('Invalid commit identity')
     validate_repo_url(git.get('repo_url'))
@@ -138,9 +146,9 @@ def validate_job_response(response):
     if not isinstance(steps, list) or len(steps) != 1 or not isinstance(steps[0], dict):
         raise PolicyError('Exactly one fixed CI script step is required')
     if steps[0].get('name') != 'script' or steps[0].get('script') != policy[1]:
-        raise PolicyError('CI script differs from the fixed backend policy')
+        raise PolicyError('CI script differs from the fixed isolated policy')
     return {'id': job_id, 'token': token, 'project_id': info['project_id'], 'sha': git['sha'],
-            'job_name': info['name'], 'job_stage': info['stage']}
+            'job_name': info['name'], 'job_stage': info['stage'], 'service': policy[2]}
 
 
 def request(opener, url, token, maximum):
@@ -312,7 +320,9 @@ def prepare_candidate(context, job, mr):
         raise PolicyError(str(exc)) from exc
 
 
-def normalized_backend_archive(payload):
+def normalized_service_archive(payload, service):
+    if service not in ('backend', 'frontend'):
+        raise PolicyError('Unsupported source service')
     if not payload or len(payload) > MAX_HTTP_ARCHIVE:
         raise PolicyError('Repository archive exceeds policy limit')
     entries = []
@@ -328,7 +338,9 @@ def normalized_backend_archive(payload):
                 if len(parts) == 1 and entry.isdir(): continue
                 if len(parts) < 2: raise PolicyError('Archive member is outside its root')
                 name = '/'.join(parts[1:])
-                if name != 'backend' and not name.startswith('backend/'):
+                if name != service and not name.startswith(service + '/'):
+                    if service == 'frontend':
+                        raise PolicyError('Repository archive contains out-of-scope source')
                     continue
                 if not name or not (entry.isdir() or entry.isfile()) or entry.sparse is not None:
                     raise PolicyError('Unsupported repository archive member')
@@ -344,7 +356,7 @@ def normalized_backend_archive(payload):
                 entries.append((name, entry.isdir(), data, entry.mode))
     except tarfile.TarError as exc:
         raise PolicyError('Invalid repository tar archive') from exc
-    if not entries: raise PolicyError('Repository archive has no backend source')
+    if not entries: raise PolicyError('Repository archive has no ' + service + ' source')
     output = io.BytesIO()
     with tarfile.open(fileobj=output, mode='w') as target:
         for name, directory, data, mode in entries:
@@ -356,11 +368,21 @@ def normalized_backend_archive(payload):
             if output.tell() > job_io.MAX_ARCHIVE: raise PolicyError('Normalized archive exceeds policy')
     result = output.getvalue()
     digest = hashlib.sha256(result).hexdigest()
-    job_io.source_plan(result, digest)
+    try:
+        if service == 'backend':
+            job_io.source_plan(result, digest)
+        else:
+            frontend_boundary.source_plan(result, digest)
+    except ValueError as exc:
+        raise PolicyError(str(exc)) from exc
     return result, digest
 
 
-def fetch_source(context):
+def normalized_backend_archive(payload):
+    return normalized_service_archive(payload, 'backend')
+
+
+def fetch_source(context, service='backend'):
     """Fetch one authenticated, verified commit without exposing the job token."""
     with tempfile.TemporaryDirectory(prefix='ci222-git-') as directory:
         repository = Path(directory) / 'repository.git'
@@ -375,12 +397,12 @@ def fetch_source(context):
         archive_path = Path(directory) / 'source.tar'
         with archive_path.open('xb') as output:
             subprocess.run(['/usr/bin/git', '-C', str(repository), 'archive', '--format=tar',
-                            '--prefix=source/', 'FETCH_HEAD', 'backend'],
+                            '--prefix=source/', 'FETCH_HEAD', service],
                            env=environment, stdout=output, stderr=subprocess.DEVNULL,
                            check=True, timeout=60)
         if archive_path.stat().st_size > MAX_HTTP_ARCHIVE:
             raise PolicyError('Repository archive exceeds policy limit')
-        return normalized_backend_archive(archive_path.read_bytes())
+        return normalized_service_archive(archive_path.read_bytes(), service)
 
 
 def stop_owner_unit(unit):
@@ -393,7 +415,8 @@ def stop_owner_unit(unit):
 
 def run_job(response, config_path=CONFIG, opener=None):
     context = validate_job_response(response)
-    _, prepared = read_private_config(config_path)
+    _, prepared = read_private_config(
+        config_path, require_prepared=context['service'] != 'frontend')
     opener = opener or urllib.request.build_opener(NoRedirect())
     try: job = verify_current_job(opener, context)
     except urllib.error.HTTPError as exc: raise AdapterHttpError('current_job', exc.code) from exc
@@ -402,15 +425,15 @@ def run_job(response, config_path=CONFIG, opener=None):
     try: detail = fetch_merge_request_detail(opener, context, mr)
     except urllib.error.HTTPError as exc:
         raise AdapterHttpError('merge_request_detail', exc.code) from exc
-    changes = dependency_changes(context, detail)
+    changes = dependency_changes(context, detail) if context['service'] in ('backend', 'cache') else []
     if context['job_name'] == CACHE_PREPARE_JOB:
         if not changes:
             raise PolicyError('No approved backend dependency change found')
         prepare_candidate(context, job, detail)
         return 0
-    if changes:
+    if changes and context['service'] == 'backend':
         prepared = verified_candidate(context, detail['iid'])
-    payload, digest = fetch_source(context)
+    payload, digest = fetch_source(context, context['service'])
     active = {}
 
     def started(attempt, lease):
@@ -427,6 +450,8 @@ def run_job(response, config_path=CONFIG, opener=None):
     previous_term = signal.signal(signal.SIGTERM, interrupted)
     previous_int = signal.signal(signal.SIGINT, interrupted)
     try:
+        if context['service'] == 'frontend':
+            return frontend_runner.start(payload, digest, started)
         return safety.start(prepared, prepared, 'backend', payload, digest, started)
     finally:
         signal.signal(signal.SIGTERM, previous_term); signal.signal(signal.SIGINT, previous_int)

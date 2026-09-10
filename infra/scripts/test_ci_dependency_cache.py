@@ -312,7 +312,7 @@ class ManagerTests(unittest.TestCase):
         self.assertIn("run / 'lifecycle.json'", source)
 
     def test_ci_serializes_prepare_test_promotion_and_deploy(self):
-        config = (HERE.parent.parent / '.gitlab-ci.yml').read_text()
+        config = (HERE.parent.parent / '.gitlab/ci/backend.yml').read_text()
         for job in ('backend-cache-prepare', 'backend-mr-test', 'deploy-backend'):
             block = config.split('\n' + job + ':', 1)[1].split('\n\n', 1)[0]
             self.assertIn('resource_group: service-and-backend-cache', block)

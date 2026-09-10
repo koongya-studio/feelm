@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unprivileged GitLab Custom executor callback for one fixed backend MR job."""
+"""Unprivileged GitLab Custom executor callback for reviewed isolated MR jobs."""
 import json
 import os
 from pathlib import Path
@@ -80,7 +80,7 @@ def main():
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             print('MR_EXECUTOR_ERROR: ' + type(exc).__name__, file=sys.stderr)
             return exit_code('SYSTEM_FAILURE_EXIT_CODE', 2)
-        print(json.dumps({'driver': {'name': 'feelm-ci222-fixed-backend', 'version': '1'},
+        print(json.dumps({'driver': {'name': 'feelm-ci222-fixed-mr-jobs', 'version': '2'},
                           'builds_dir': '/var/empty/feelm-ci222-builds',
                           'cache_dir': '/var/empty/feelm-ci222-cache',
                           'builds_dir_is_shared': False}))
