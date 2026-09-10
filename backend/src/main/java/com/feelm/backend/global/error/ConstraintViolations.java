@@ -53,6 +53,21 @@ public final class ConstraintViolations {
         return exception;
     }
 
+    /**
+     * 차단 중복 제약 위반을 옮긴다(API-020).
+     *
+     * <p>{@code uk_user_blocks_blocker_id_blocked_id}만 이미 차단한 상대를 뜻한다. 같은 표에는 자기 차단을 막는 CHECK 제약과
+     * 사용자 FK도 있어 그것까지 409로 바꾸면 500이어야 할 상황이 "이미 차단됨"으로 위장된다(S15P21E106-211 리뷰 #2).
+     *
+     * @return 판별한 {@link BusinessException}, 알 수 없는 제약이면 원래 예외
+     */
+    public static RuntimeException blockDuplicationOf(DataIntegrityViolationException exception) {
+        if (nameOf(exception).contains("uk_user_blocks_blocker_id_blocked_id")) {
+            return new BusinessException(ErrorCode.ALREADY_BLOCKED);
+        }
+        return exception;
+    }
+
     /** 위반된 제약 이름. 이름을 알 수 없으면 빈 문자열이며 호출자가 원래 예외를 그대로 던진다. */
     private static String nameOf(DataIntegrityViolationException exception) {
         Throwable cause = exception;
