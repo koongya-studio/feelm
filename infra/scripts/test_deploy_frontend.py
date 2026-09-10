@@ -24,6 +24,7 @@ class DeployFrontendTest(unittest.TestCase):
         self.bin_dir.mkdir()
         self.state_file = self.root / "current-image"
         self.events_file = self.root / "events"
+        self.curl_attempts_file = self.root / "curl-attempts"
         self._write_fake_commands()
 
     @staticmethod
@@ -144,6 +145,12 @@ class DeployFrontendTest(unittest.TestCase):
             [[ -n "$image" ]]
             url="${!#}"
             if [[ "$url" == */healthz ]]; then
+              attempts="$(cat "$DEPLOY_TEST_CURL_ATTEMPTS" 2>/dev/null || printf '0')"
+              attempts="$((attempts + 1))"
+              printf '%s' "$attempts" >"$DEPLOY_TEST_CURL_ATTEMPTS"
+              if ((attempts <= ${PUBLIC_HEALTH_FAILURES_BEFORE_SUCCESS:-0})); then
+                exit 1
+              fi
               printf 'ok\n'
             else
               printf '<!doctype html>\n'
@@ -165,7 +172,11 @@ class DeployFrontendTest(unittest.TestCase):
                 "DEPLOY_TEST_CANDIDATE": candidate,
                 "DEPLOY_TEST_PREVIOUS": previous,
                 "DEPLOY_TEST_BACKEND_IMAGE": "registry/backend:running",
+                "DEPLOY_TEST_CURL_ATTEMPTS": str(self.curl_attempts_file),
                 "DEPLOY_HEALTH_ATTEMPTS": "1",
+                "FRONTEND_PUBLIC_HEALTH_ATTEMPTS": "3",
+                "FRONTEND_PUBLIC_HEALTH_INTERVAL_SECONDS": "0",
+                "FRONTEND_PUBLIC_HEALTH_REQUEST_TIMEOUT_SECONDS": "1",
                 "FRONTEND_PUBLIC_BASE_URL": "https://example.test/app/",
                 "CURL_BIN": str(self.bin_dir / "curl"),
             }
@@ -199,7 +210,11 @@ class DeployFrontendTest(unittest.TestCase):
                 "DEPLOY_TEST_CANDIDATE": target_image,
                 "DEPLOY_TEST_PREVIOUS": current_image,
                 "DEPLOY_TEST_BACKEND_IMAGE": "registry/backend:running",
+                "DEPLOY_TEST_CURL_ATTEMPTS": str(self.curl_attempts_file),
                 "DEPLOY_HEALTH_ATTEMPTS": "1",
+                "FRONTEND_PUBLIC_HEALTH_ATTEMPTS": "3",
+                "FRONTEND_PUBLIC_HEALTH_INTERVAL_SECONDS": "0",
+                "FRONTEND_PUBLIC_HEALTH_REQUEST_TIMEOUT_SECONDS": "1",
                 "FRONTEND_PUBLIC_BASE_URL": "https://example.test/app/",
                 "CURL_BIN": str(self.bin_dir / "curl"),
             }
@@ -226,7 +241,17 @@ class DeployFrontendTest(unittest.TestCase):
         self.assertEqual(current, "registry/frontend:candidate")
         self.assertIn("nginx nginx -t", events)
         self.assertIn("compose-backend-image registry/backend:running", events)
+        self.assertIn("--connect-timeout 1 --max-time 1", events)
         self.assertIn("Deployment completed", result.stdout)
+
+    def test_transient_public_failure_succeeds_without_rollback(self):
+        result, current, events = self.run_deploy(PUBLIC_HEALTH_FAILURES_BEFORE_SUCCESS=2)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(current, "registry/frontend:candidate")
+        self.assertEqual(events.count("app/healthz"), 3)
+        self.assertEqual(events.count("force-recreate nginx"), 1)
+        self.assertIn("Public frontend is not ready; retrying", result.stderr)
 
     def test_explicit_backend_image_is_used_without_container_lookup(self):
         result, current, events = self.run_deploy(
@@ -289,6 +314,17 @@ class DeployFrontendTest(unittest.TestCase):
         self.assertEqual(current, "registry/frontend:previous")
         self.assertGreaterEqual(events.count("force-recreate nginx"), 2)
 
+    def test_public_and_rollback_health_failure_requires_manual_recovery(self):
+        result, current, events = self.run_deploy(
+            FAIL_PUBLIC_HEALTH=1,
+            FAIL_ROLLBACK_PUBLIC_HEALTH=1,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(current, "registry/frontend:previous")
+        self.assertEqual(events.count("app/healthz"), 6)
+        self.assertIn("Rollback failed; manual recovery is required", result.stderr)
+
     def test_first_deployment_failure_stops_failed_candidate(self):
         result, current, events = self.run_deploy(previous="", FAIL_CANDIDATE_HEALTH=1)
 
@@ -304,6 +340,22 @@ class DeployFrontendTest(unittest.TestCase):
         self.assertEqual(current, "registry/frontend:rollback")
         self.assertIn("compose-backend-image registry/backend:running", events)
         self.assertIn("Rollback completed", result.stdout)
+
+    def test_rollback_retries_transient_public_failure(self):
+        result, current, events = self.run_rollback(PUBLIC_HEALTH_FAILURES_BEFORE_SUCCESS=2)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(current, "registry/frontend:rollback")
+        self.assertEqual(events.count("app/healthz"), 3)
+        self.assertIn("Rollback public frontend is not ready; retrying", result.stderr)
+
+    def test_rollback_public_failure_stops_after_attempt_limit(self):
+        result, current, events = self.run_rollback(FAIL_PUBLIC_HEALTH=1)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(current, "registry/frontend:rollback")
+        self.assertEqual(events.count("app/healthz"), 3)
+        self.assertIn("failed after all attempts", result.stderr)
 
     def test_rollback_missing_backend_image_fails_before_frontend_change(self):
         result, current, events = self.run_rollback(

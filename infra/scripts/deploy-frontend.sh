@@ -62,14 +62,40 @@ wait_for_healthy() {
 
 check_public_frontend() {
   local health_response
+  local request_timeout="${FRONTEND_PUBLIC_HEALTH_REQUEST_TIMEOUT_SECONDS:-5}"
 
   health_response="$(
-    "${CURL_BIN}" --fail --silent --show-error "${PUBLIC_BASE_URL}healthz"
+    "${CURL_BIN}" --fail --silent --show-error \
+      --connect-timeout "${request_timeout}" --max-time "${request_timeout}" \
+      "${PUBLIC_BASE_URL}healthz"
   )" || return 1
 
   [[ "${health_response}" == "ok" ]] \
-    && "${CURL_BIN}" --fail --silent --show-error "${PUBLIC_BASE_URL}" >/dev/null \
-    && "${CURL_BIN}" --fail --silent --show-error "${PUBLIC_BASE_URL}movies/1" >/dev/null
+    && "${CURL_BIN}" --fail --silent --show-error \
+      --connect-timeout "${request_timeout}" --max-time "${request_timeout}" \
+      "${PUBLIC_BASE_URL}" >/dev/null \
+    && "${CURL_BIN}" --fail --silent --show-error \
+      --connect-timeout "${request_timeout}" --max-time "${request_timeout}" \
+      "${PUBLIC_BASE_URL}movies/1" >/dev/null
+}
+
+wait_for_public_frontend() {
+  local attempts="${FRONTEND_PUBLIC_HEALTH_ATTEMPTS:-12}"
+  local interval="${FRONTEND_PUBLIC_HEALTH_INTERVAL_SECONDS:-5}"
+  local i
+
+  for ((i = 1; i <= attempts; i++)); do
+    if check_public_frontend; then
+      return 0
+    fi
+
+    if ((i < attempts)); then
+      echo "Public frontend is not ready; retrying (${i}/${attempts})" >&2
+      sleep "${interval}"
+    fi
+  done
+
+  return 1
 }
 
 previous_image="$(
@@ -138,7 +164,7 @@ if ! BACKEND_IMAGE="${backend_image}" \
   restore_previous_image "Nginx deployment command failed"
 fi
 
-if check_public_frontend; then
+if wait_for_public_frontend; then
   running_image="$(docker inspect --format '{{.Config.Image}}' feelm-frontend)"
 
   if [[ "${running_image}" != "${CANDIDATE_IMAGE}" ]]; then
