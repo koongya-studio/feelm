@@ -1,0 +1,117 @@
+frontend-mr-test:
+  stage: test
+  tags: [e106-mr-isolated]
+  dependencies: []
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - cd frontend
+    - npm ci
+    - npm run lint
+    - npm run format:check
+    - npm run build
+  resource_group: frontend-mr-isolated
+  interruptible: true
+  timeout: 15m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
+      changes:
+        - frontend/**/*
+        - .gitlab-ci.yml
+        - .gitlab/ci/common.yml
+        - .gitlab/ci/frontend.yml
+        - .gitattributes
+        - infra/scripts/ci-frontend-mr-*.py
+        - infra/scripts/test_ci_frontend_mr.py
+        - infra/scripts/test_ci_config.py
+        - infra/scripts/ci-gitlab-custom-executor.py
+        - infra/scripts/ci-gitlab-job-adapter.py
+        - infra/scripts/ci-bounded-output.py
+        - infra/scripts/ci-network-guard.py
+        - infra/scripts/ci-job-*.py
+        - infra/scripts/ci-server-manager-pilot.py
+        - infra/scripts/systemd/feelm-ci*.service
+
+frontend-test:
+  stage: test
+  tags: [e106-shell]
+  script:
+    - docker run --rm --pull always --volume "$CI_PROJECT_DIR/frontend:/src:ro" --workdir /app node:20.19-alpine sh -c 'cp -R /src/. /app && npm ci && npm run lint && npm run format:check && npm run build'
+  interruptible: true
+  timeout: 15m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - frontend/**/*
+        - infra/compose/service.yml
+        - infra/nginx/nginx.conf
+        - infra/scripts/deploy-frontend.sh
+        - infra/scripts/rollback-frontend.sh
+        - infra/scripts/test_deploy_frontend.py
+        - .gitlab-ci.yml
+        - .gitlab/ci/common.yml
+        - .gitlab/ci/frontend.yml
+        - .gitattributes
+
+frontend-image:
+  stage: build
+  tags: [e106-shell]
+  needs: [frontend-test]
+  before_script:
+    - printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+  script:
+    - FRONTEND_IMAGE="$DOCKERHUB_NAMESPACE/feelm-frontend:$CI_COMMIT_SHA"
+    - docker build --pull -t "$FRONTEND_IMAGE" ./frontend
+    - docker push "$FRONTEND_IMAGE"
+    - echo "Built frontend image $FRONTEND_IMAGE"
+  timeout: 30m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - frontend/**/*
+        - infra/compose/service.yml
+        - infra/nginx/nginx.conf
+        - infra/scripts/deploy-frontend.sh
+        - infra/scripts/rollback-frontend.sh
+        - infra/scripts/test_deploy_frontend.py
+        - .gitlab-ci.yml
+        - .gitlab/ci/common.yml
+        - .gitlab/ci/frontend.yml
+        - .gitattributes
+
+deploy-frontend:
+  stage: deploy
+  tags: [e106-shell]
+  needs: [frontend-image]
+  resource_group: service-and-backend-cache
+  environment:
+    name: service
+  before_script:
+    - printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
+    - FRONTEND_IMAGE="$DOCKERHUB_NAMESPACE/feelm-frontend:$CI_COMMIT_SHA"
+    - bash ./infra/scripts/deploy-frontend.sh "$FRONTEND_IMAGE"
+  retry:
+    max: 2
+    when: [runner_system_failure, scheduler_failure]
+  timeout: 15m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - frontend/**/*
+        - infra/compose/service.yml
+        - infra/nginx/nginx.conf
+        - infra/scripts/deploy-frontend.sh
+        - infra/scripts/rollback-frontend.sh
+        - infra/scripts/test_deploy_frontend.py
+        - .gitlab-ci.yml
+        - .gitlab/ci/common.yml
+        - .gitlab/ci/frontend.yml
+        - .gitattributes

@@ -17,14 +17,18 @@ spec = importlib.util.spec_from_file_location('gitlab_adapter', HERE / 'ci-gitla
 adapter = importlib.util.module_from_spec(spec); spec.loader.exec_module(adapter)
 
 
-def response(script=None):
+def response(script=None, job_name='backend-mr-test'):
+    policies = {
+        'backend-mr-test': adapter.EXPECTED_SCRIPT,
+        'frontend-mr-test': adapter.FRONTEND_EXPECTED_SCRIPT,
+    }
     return {
         'id': 55, 'token': 'valid-job-token-123456789',
-        'job_info': {'name': 'backend-mr-test', 'stage': 'test', 'project_id': 99},
+        'job_info': {'name': job_name, 'stage': 'test', 'project_id': 99},
         'git_info': {'repo_url': 'https://gitlab-ci-token:hidden@lab.ssafy.com/'
                      's15-bigdata-dist-sub1/S15P21E106.git',
                      'sha': 'a' * 40, 'ref_type': 'branch'},
-        'steps': [{'name': 'script', 'script': script or adapter.EXPECTED_SCRIPT}],
+        'steps': [{'name': 'script', 'script': script or policies[job_name]}],
         'services': [], 'artifacts': [], 'cache': [], 'dependencies': [], 'image': {'name': ''},
     }
 
@@ -48,7 +52,7 @@ def archive(entries):
 
 class AdapterTests(unittest.TestCase):
     def test_backend_mr_job_disables_runner_dependencies(self):
-        config = (HERE.parent.parent / '.gitlab-ci.yml').read_text()
+        config = (HERE.parent.parent / '.gitlab/ci/backend.yml').read_text()
         job = re.search(r'(?ms)^backend-mr-test:\n(?P<body>.*?)(?=^\S|\Z)', config)
         self.assertIsNotNone(job)
         self.assertIn('  dependencies: []\n', job.group('body'))
@@ -62,6 +66,49 @@ class AdapterTests(unittest.TestCase):
         with self.assertRaises(adapter.PolicyError): adapter.validate_job_response(changed)
         cache = adapter.validate_job_response(cache_response())
         self.assertEqual(cache['job_name'], adapter.CACHE_PREPARE_JOB)
+        frontend = adapter.validate_job_response(response(job_name='frontend-mr-test'))
+        self.assertEqual(frontend['service'], 'frontend')
+
+    def test_frontend_archive_accepts_only_validated_frontend_files(self):
+        package = json.dumps({'scripts': adapter.frontend_boundary.EXPECTED_SCRIPTS}).encode()
+        lock = json.dumps({'lockfileVersion': 3, 'packages': {}}).encode()
+        payload = archive([
+            ('source/', b'', 0o755),
+            ('source/frontend/package.json', package, 0o644),
+            ('source/frontend/package-lock.json', lock, 0o644),
+            ('source/frontend/src/App.tsx', b'export default 1', 0o644),
+        ])
+        result, digest = adapter.normalized_service_archive(payload, 'frontend')
+        files, _ = adapter.frontend_boundary.source_plan(result, digest)
+        self.assertIn('frontend/src/App.tsx', files)
+
+        outside = archive([
+            ('source/frontend/package.json', package, 0o644),
+            ('source/frontend/package-lock.json', lock, 0o644),
+            ('source/backend/secret.txt', b'outside', 0o644),
+        ])
+        with self.assertRaisesRegex(adapter.PolicyError, 'out-of-scope'):
+            adapter.normalized_service_archive(outside, 'frontend')
+
+    def test_frontend_job_routes_only_validated_source_to_frontend_runner(self):
+        context = response(job_name='frontend-mr-test')
+        source = b'validated-frontend-source'
+        digest = hashlib.sha256(source).hexdigest()
+        with patch.object(adapter, 'read_private_config',
+                          return_value=({}, Path('/prepared'))) as private_config, \
+             patch.object(adapter, 'verify_current_job', return_value={'pipeline': {'id': 1}}), \
+             patch.object(adapter, 'verify_merge_request', return_value={'iid': 98}), \
+             patch.object(adapter, 'fetch_merge_request_detail', return_value={'iid': 98}), \
+             patch.object(adapter, 'dependency_changes') as dependency, \
+             patch.object(adapter, 'fetch_source', return_value=(source, digest)) as fetch, \
+             patch.object(adapter.frontend_runner, 'start', return_value=0) as frontend, \
+             patch.object(adapter.safety, 'start') as backend:
+            self.assertEqual(adapter.run_job(context, opener=object()), 0)
+        dependency.assert_not_called()
+        private_config.assert_called_once_with(adapter.CONFIG, require_prepared=False)
+        fetch.assert_called_once_with(adapter.validate_job_response(context), 'frontend')
+        frontend.assert_called_once()
+        backend.assert_not_called()
 
     def test_archive_strips_gitlab_prefix_and_revalidates(self):
         payload = archive([

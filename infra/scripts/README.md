@@ -13,9 +13,13 @@ MR 61의 신규 메일 의존성을 포함하는 오프라인 캐시 갱신과 R
 
 일반 MR 전환 전 남은 접근 경계와 구현 순서는
 [MR 실행 경계 설계안](MR-EXECUTION-BOUNDARY.md)을 참고한다. 후속
-[GitLab MR 전용 어댑터](GITLAB-MR-ADAPTER.md)는 `backend-mr-test`를 새 태그로 분리하고
-인증된 현재 MR의 backend archive만 기존 격리 실행기에 전달한다. 코드는 로컬 검증 단계이며
-서버 설치·Runner 등록·토큰 입력은 아직 수행하지 않았다.
+[GitLab MR 전용 어댑터](GITLAB-MR-ADAPTER.md)는 검토된 MR Job을 새 태그로 분리하고
+인증된 현재 MR에서 Job별 source archive만 격리 실행기에 전달한다. 서버 설치·Runner 등록·
+토큰 입력은 저장소 변경과 별도의 운영 절차다.
+
+[프론트엔드 MR 격리 검증](FRONTEND-MR-ISOLATION.md)은 공통·백엔드·프론트 CI 파일 분리,
+프론트 변경 경로별 Job 생성, 인증된 frontend archive와 고정 Node 실행 정책, 서버 적용 및
+의존성·이미지 갱신 절차를 정의한다.
 
 [서버 manager 파일럿](SERVER-MANAGER-PILOT.md)은 별도 임시 폴더에서 진행했다.
 자원 제어와 readonly/private sysfs 준비를 보완하여 고정 경계 probe,

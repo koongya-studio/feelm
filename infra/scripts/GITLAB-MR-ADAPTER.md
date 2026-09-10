@@ -5,17 +5,20 @@
 
 ## 목적과 제한
 
-`backend-mr-test`와 의존성 변경 시 생성되는 `backend-cache-prepare`만
+`backend-mr-test`, `frontend-mr-test`와 의존성 변경 시 생성되는 `backend-cache-prepare`만
 `e106-mr-isolated` 태그의 별도 Runner에서 받습니다. 이 Runner의
 Custom executor는 GitLab이 생성한 셸 스크립트를 실행하지 않는다. 다음 조건을 모두 다시
-확인한 뒤 현재 커밋의 `backend` 디렉터리만 기존 S15P21E106-222 격리 실행기에 전달한다.
+확인한 뒤 현재 커밋에서 Job에 대응하는 `backend` 또는 `frontend` 디렉터리만 검증된 격리
+실행기에 전달한다. 프론트 실행 정책과 서버 적용 순서는
+[프론트엔드 MR 격리 검증](FRONTEND-MR-ISOLATION.md)을 따른다.
 
 - GitLab 주소가 `https://lab.ssafy.com`이고 프로젝트 경로가
   `s15-bigdata-dist-sub1/S15P21E106`이다.
-- 인증된 현재 Job이 고정된 `backend-mr-test` 또는 `backend-cache-prepare` 정책과 일치한다.
+- 인증된 현재 Job이 고정된 `backend-mr-test`, `frontend-mr-test` 또는
+  `backend-cache-prepare` 정책과 일치한다.
 - 같은 프로젝트의 열린 MR 하나가 해당 커밋을 가리키며 대상 브랜치가 `develop`이다.
-- CI script가 고정된 두 줄과 일치하고 service, image, cache, dependency, artifact가 없다.
-- GitLab archive는 64 MiB 이하의 비압축 tar이며 `backend` 아래 일반 파일·디렉터리만 담는다.
+- CI script가 각 Job의 고정 명령과 일치하고 service, image, cache, dependency, artifact가 없다.
+- GitLab archive는 64 MiB 이하의 비압축 tar이며 선택한 영역 아래 일반 파일·디렉터리만 담는다.
 
 Job token은 Custom executor가 만든 `JOB_RESPONSE_FILE`에서 읽어 root 어댑터의 표준입력으로만
 보낸다. GitLab의 현재 Job/MR/archive API 호출 후 폐기하며, 작업 rootfs·Gradle·Docker·로그·
@@ -29,6 +32,7 @@ Job·프로젝트·테스트 명령을 추가할 때 기존 어댑터를 느슨�
 
 - MR → develop: 백엔드 관련 경로 변경 시 `backend-mr-test`, 의존성 파일 변경 시
   `backend-cache-prepare`, `e106-mr-isolated`, 취소 가능
+- MR → develop: 프론트엔드 관련 경로 변경 시 `frontend-mr-test`, `e106-mr-isolated`, 취소 가능
 - develop push: 기존 `backend-test`와 빌드·수동 배포, `e106-shell`
 - `runner-check`: develop에서만 실행
 
@@ -38,13 +42,14 @@ GitLab API의 정확한 커밋 archive를 사용한다. MR이 `.gitlab-ci.yml`�
 
 ### MR 테스트 실행 경로 (S15P21E106-291)
 
-`.gitlab-ci.yml`의 `backend-mr-test.rules`는 develop 대상 MR 조건과 `changes`를
+`.gitlab/ci/backend.yml`의 `backend-mr-test.rules`는 develop 대상 MR 조건과 `changes`를
 동시에 만족해야 한다. 경로는 다음 이유로 포함한다.
 
 | 경로 | 포함 이유 |
 | --- | --- |
 | `backend/**/*` | 소스, 테스트, Gradle 설정·Wrapper 및 테스트 자원 |
-| `.gitlab-ci.yml` | Job 명령, 실행 조건 및 Runner 연결 설정 |
+| `.gitlab-ci.yml`, `.gitlab/ci/common.yml` | 공통 stage, include 및 Runner 연결 설정 |
+| `.gitlab/ci/backend.yml` | 백엔드 Job 명령과 실행 조건 |
 | `.gitattributes` | 백엔드 파일의 체크아웃 개행·속성 |
 | `infra/scripts/ci-*.py` | 격리 실행기, 캐시, 입력 준비 및 GitLab 어댑터 구현 |
 | `infra/scripts/rootless-backend/**/*` | Gradle 초기화 및 Testcontainers 실행 보조 코드 |

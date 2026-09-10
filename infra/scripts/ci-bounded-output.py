@@ -1,4 +1,5 @@
 """Drain subprocess output through a bounded, supervisor-owned pipe/file."""
+import os
 import subprocess
 import threading
 import time
@@ -13,7 +14,9 @@ class CappedProcess:
         self.limit = limit
         self.overflow = threading.Event()
         self.failed = threading.Event()
-        self.output = path.open('xb')
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL
+                             | getattr(os, 'O_NOFOLLOW', 0), 0o600)
+        self.output = os.fdopen(descriptor, 'wb')
         try:
             self.child = subprocess.Popen(command, stdout=subprocess.PIPE,
                                           stderr=subprocess.STDOUT, close_fds=True)
