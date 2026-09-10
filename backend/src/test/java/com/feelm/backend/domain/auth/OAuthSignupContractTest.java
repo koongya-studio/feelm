@@ -8,11 +8,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.feelm.backend.domain.auth.entity.OAuthProvider;
+import com.feelm.backend.global.security.JjwtTokenProvider;
+import com.feelm.backend.global.security.JwtProperties;
+import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.infrastructure.oauth.OAuthUserProfile;
 import java.time.Duration;
 import java.util.Locale;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -24,6 +28,8 @@ import org.springframework.test.web.servlet.MvcResult;
  */
 @DisplayName("소셜 회원가입 완료 — API-008")
 class OAuthSignupContractTest extends OAuthApiTestSupport {
+
+    @Autowired private JwtProperties jwtProperties;
 
     @Test
     @DisplayName("정상 가입은 201과 로그인 본문·쿠키를 주고 활성 계정과 연결 정보를 만든다")
@@ -66,6 +72,39 @@ class OAuthSignupContractTest extends OAuthApiTestSupport {
     @DisplayName("위조된 signupToken은 401 SIGNUP_TOKEN_INVALID다")
     void forgedSignupTokenIsRejected() throws Exception {
         oauthSignup("eyJhbGciOiJIUzI1NiJ9.forged.signature", "소셜가입")
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("SIGNUP_TOKEN_INVALID"))
+                .andExpect(cookie().doesNotExist(COOKIE_NAME));
+    }
+
+    /**
+     * 만료 처리는 {@code parseSignupToken}이 {@code ExpiredJwtException}을 {@code SIGNUP_TOKEN_INVALID}로
+     * 옮기며 이뤄진다. 그 매핑이 사라지거나 다른 코드로 갈리면 명세(만료와 위조를 같은 코드로 응답)가 깨지는데, 위조 케이스만으로는 드러나지 않는다.
+     *
+     * <p>토큰은 같은 Secret과 <b>음수 TTL</b>로 발급기를 따로 만들어 얻는다. 프로퍼티를 덮어쓴 컨텍스트를 하나 더 띄우거나 실제 유효기간(10분)을
+     * 기다리지 않기 위해서다. 정상 흐름(API-007 → API-008)은 위의 가입 테스트가 검증한다.
+     */
+    @Test
+    @DisplayName("만료된 signupToken은 401 SIGNUP_TOKEN_INVALID다")
+    void expiredSignupTokenIsRejected() throws Exception {
+        OAuthUserProfile profile = newProfile();
+        TokenProvider expiredTokenProvider =
+                new JjwtTokenProvider(
+                        new JwtProperties(
+                                jwtProperties.secret(),
+                                jwtProperties.accessTokenTtl(),
+                                jwtProperties.refreshTokenTtl(),
+                                Duration.ofMinutes(-1),
+                                jwtProperties.refreshCookie()));
+        String expired =
+                expiredTokenProvider.createSignupToken(
+                        new TokenProvider.SignupTokenClaims(
+                                OAuthProvider.GOOGLE.name(),
+                                profile.providerUserId(),
+                                profile.email(),
+                                profile.nickname()));
+
+        oauthSignup(expired, "소셜가입")
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("SIGNUP_TOKEN_INVALID"))
                 .andExpect(cookie().doesNotExist(COOKIE_NAME));

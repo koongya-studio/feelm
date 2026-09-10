@@ -102,6 +102,9 @@ feelm:
     secret: ${JWT_SECRET}
     access-token-ttl: 30m
     refresh-token-ttl: 14d
+    # 소셜 가입을 마칠 때까지만 유효한 토큰의 수명(API-007 처리 규칙). 코드 기본값과 같은 값을 여기에
+    # 두는 이유는 계약값이 바뀐 사실이 설정 diff로 드러나야 하기 때문이다(S15P21E106-311과 같은 판단).
+    signup-token-ttl: 10m
     refresh-cookie:
       name: refresh_token
       path: /api/v1/auth

@@ -514,7 +514,7 @@ OAuth 인가 코드를 받아 소셜 계정을 확인한다. 이미 연결된 �
   하지 않는다 (S15P21E106-150 확정)
 - 자격 증명이 설정되지 않은 제공자는 서비스 기동을 막지 않고 `400 UNSUPPORTED_PROVIDER`로 응답한다
   (S15P21E106-150 확정)
-- `signupToken` 유효기간 10분(가정), 제공자 식별자(`providerUserId`)를 담는다
+- `signupToken` 유효기간 10분(가정, 설정값 `feelm.jwt.signup-token-ttl`), 제공자 식별자(`providerUserId`)를 담는다
 - `suggestedNickname`은 제공자 닉네임이 닉네임 규칙(2~10자)을 만족할 때만 그 값을 쓰고, 아니면 규칙에 맞는
   값으로 대체한다
 - 로그인 응답의 `onboardingCompleted`는 API-004와 동일하게 처리
