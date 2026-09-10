@@ -85,6 +85,7 @@ com.feelm.backend
 │   ├── config
 │   ├── entity
 │   ├── error
+│   ├── properties
 │   ├── response
 │   └── security
 └── infrastructure
@@ -111,6 +112,8 @@ domain/movie
 
 - `global`: 여러 도메인이 함께 사용하는 설정·공통 엔티티·오류·응답·보안 등 기술 독립적인
   공통 코드. `global/security`는 토큰 발급·검증, 인증 필터, 인가·CORS 정책을 담당한다.
+  `global/properties`는 여러 패키지의 `@ConfigurationProperties`가 공유하는 설정값 검증 규칙을
+  담당한다. 설정 레코드 자체는 값을 읽는 도메인 또는 인프라 패키지에 두고, 규칙만 이곳에 둔다.
 - `infrastructure`: Kafka, Redis, 외부 API, 메일처럼 외부 시스템과 연결하는 코드
 - `auth`: 로그인, 토큰 재발급과 폐기처럼 인증 유스케이스를 담당한다. 토큰과 필터 자체는
   `global/security`에 둔다.

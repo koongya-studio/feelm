@@ -96,7 +96,7 @@ class MailSendBudgetContractTest extends EmailAuthApiTestSupport {
         TestAccount account = newAccount();
         signupPending(account);
         verificationTokens(output);
-        verificationMailSender.clear();
+        verificationMails().clear();
         fillSendBudget(budgetLimit);
 
         resendFrom(nextClientIp(), account.email()).andExpect(status().isAccepted());
@@ -114,7 +114,7 @@ class MailSendBudgetContractTest extends EmailAuthApiTestSupport {
         TestAccount active = newAccount();
         signupActive(active, output);
         verificationTokens(output);
-        verificationMailSender.clear();
+        verificationMails().clear();
         fillSendBudget(budgetLimit - 1);
 
         signup(signupBody(newAccount())).andExpect(status().isCreated());
@@ -202,7 +202,7 @@ class MailSendBudgetContractTest extends EmailAuthApiTestSupport {
     @Test
     @DisplayName("발송이 실패하면 예산 자리를 되돌린다")
     void failedSendReleasesBudget(CapturedOutput output) throws Exception {
-        verificationMailSender.failNextSend();
+        verificationMails().failNextSend();
 
         signupPending(newAccount());
         awaitMailsDispatched();

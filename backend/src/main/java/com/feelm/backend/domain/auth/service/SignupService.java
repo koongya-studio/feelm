@@ -4,7 +4,7 @@ import com.feelm.backend.domain.auth.AuthRateLimiter;
 import com.feelm.backend.domain.auth.VerificationTokenIssuer;
 import com.feelm.backend.domain.auth.dto.request.SignupRequest;
 import com.feelm.backend.domain.auth.dto.response.SignupResponse;
-import com.feelm.backend.domain.auth.event.VerificationMailRequestedEvent;
+import com.feelm.backend.domain.auth.event.AuthMailRequestedEvent;
 import com.feelm.backend.domain.auth.repository.EmailVerificationTokenRepository;
 import com.feelm.backend.domain.user.entity.NotificationSettings;
 import com.feelm.backend.domain.user.entity.User;
@@ -12,6 +12,7 @@ import com.feelm.backend.domain.user.repository.NotificationSettingsRepository;
 import com.feelm.backend.domain.user.repository.UserRepository;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
+import com.feelm.backend.infrastructure.mail.MailKind;
 import java.time.Instant;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +38,7 @@ public class SignupService {
     /**
      * 계정과 알림 설정 기본행, 인증 토큰을 한 트랜잭션에서 만든다.
      *
-     * <p>인증 메일은 커밋 이후에 발송한다. 이벤트만 발행하고 실제 발송은 {@code VerificationMailEventListener}가 맡는다.
+     * <p>인증 메일은 커밋 이후에 발송한다. 이벤트만 발행하고 실제 발송은 {@code AuthMailEventListener}가 맡는다.
      *
      * <p>IP 단위 요청 제한을 가장 먼저 본다(S15P21E106-287 리뷰 B-1). 가입 인증 메일도 전역 발송 상한을 소모하므로, 이 경로에 제한이 없으면 한
      * IP의 반복 가입만으로 상한이 말라 정상 사용자의 계정 복구 메일이 나가지 않는다. 중복 검사보다 앞에 두어 제한을 넘긴 요청이 이메일·닉네임의 사용 여부를 알아내는
@@ -59,7 +60,8 @@ public class SignupService {
 
         String verificationToken = tokenIssuer.issue(user.getId());
         eventPublisher.publishEvent(
-                new VerificationMailRequestedEvent(user.getId(), email, verificationToken));
+                new AuthMailRequestedEvent(
+                        MailKind.VERIFICATION, user.getId(), email, verificationToken));
         return SignupResponse.from(user);
     }
 

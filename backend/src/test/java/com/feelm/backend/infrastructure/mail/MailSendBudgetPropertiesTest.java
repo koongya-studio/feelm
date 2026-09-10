@@ -36,6 +36,18 @@ class MailSendBudgetPropertiesTest {
     }
 
     @Test
+    @DisplayName("잘못된 값의 메시지가 전역 상한의 설정 키를 가리킨다")
+    void messagesPointAtSendBudgetKeys() {
+        assertThatThrownBy(() -> new Quota(0, ONE_HOUR))
+                .as("검증 규칙이 공통 헬퍼로 옮겨진 뒤에도 메시지는 자기 설정 키를 가리켜야 한다")
+                .hasMessageContaining("feelm.mail.send-budget.windows");
+        assertThatThrownBy(() -> new Quota(100, null))
+                .hasMessageContaining("feelm.mail.send-budget.windows의 window");
+        assertThatThrownBy(() -> new Quota(100, Duration.ofMillis(600)))
+                .hasMessageContaining("feelm.mail.send-budget.windows의 window");
+    }
+
+    @Test
     @DisplayName("창 길이가 없는 항목은 만들 수 없다")
     void quotaRejectsMissingWindow() {
         assertThatThrownBy(() -> new Quota(100, null))
@@ -73,6 +85,7 @@ class MailSendBudgetPropertiesTest {
                                                 new Quota(100, ONE_HOUR),
                                                 new Quota(300, Duration.ofSeconds(3600)))))
                 .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("feelm.mail.send-budget.windows")
                 .hasMessageContaining("3600");
     }
 

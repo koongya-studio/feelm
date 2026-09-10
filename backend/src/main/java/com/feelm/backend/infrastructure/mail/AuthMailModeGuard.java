@@ -1,6 +1,6 @@
 package com.feelm.backend.infrastructure.mail;
 
-import com.feelm.backend.infrastructure.mail.VerificationMailProperties.Mode;
+import com.feelm.backend.infrastructure.mail.AuthMailProperties.Mode;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -11,19 +11,20 @@ import org.springframework.core.env.Environment;
 /**
  * {@code log} 모드가 로컬·테스트 밖에서 켜지지 않도록 기동 시점에 검사한다(플랜 결정 13).
  *
- * <p>{@code log} 모드는 인증 링크를 로그에 남기므로 dev·운영에서 켜지면 두 가지가 동시에 문제가 된다. 인증 메일이 실제로 나가지 않고, 컨벤션 12장이 금지한
- * 인증 토큰이 로그에 남는다. 잘못된 설정을 런타임까지 끌고 가지 않도록 기동을 실패시킨다.
+ * <p>{@code log} 모드는 계정 메일의 링크를 로그에 남기므로 dev·운영에서 켜지면 두 가지가 동시에 문제가 된다. 인증 메일과 비밀번호 재설정 메일이 실제로 나가지
+ * 않고, 컨벤션 12장이 금지한 1회용 토큰이 로그에 남는다. 두 메일이 같은 {@code feelm.mail.mode}를 쓰므로 이 검사 하나가 둘을 함께 막는다. 잘못된
+ * 설정을 런타임까지 끌고 가지 않도록 기동을 실패시킨다.
  *
  * <p>판정은 프로파일 <b>허용</b> 목록으로 한다. 허용 목록을 쓰면 새 프로파일이 추가됐을 때 기본이 "차단"이 되어 안전하다. 활성 프로파일이 없는 실행에서는
  * Spring이 보고하는 기본 프로파일을 기준으로 삼는데, 테스트는 활성 프로파일 없이 도는 경우가 있어 이때 기본 프로파일 이름인 {@code default}도 허용 대상에
  * 넣는다.
  */
-class VerificationMailModeGuard {
+class AuthMailModeGuard {
 
     /** {@code log} 모드를 허용하는 프로파일. {@code default}는 활성 프로파일을 지정하지 않은 실행(테스트 포함)을 뜻한다. */
     static final Set<String> LOG_MODE_PROFILES = Set.of("default", "local", "test");
 
-    VerificationMailModeGuard(Environment environment, VerificationMailProperties properties) {
+    AuthMailModeGuard(Environment environment, AuthMailProperties properties) {
         verify(properties.mode(), effectiveProfiles(environment));
     }
 
