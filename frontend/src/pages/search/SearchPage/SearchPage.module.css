@@ -1,0 +1,145 @@
+/*
+ * 4.1 검색 홈 · 4.2 검색 결과 · 4.4 결과 없음.
+ *
+ * 검색 입력이 위에 고정으로 서고 그 아래가 상태에 따라 바뀐다. 하단 내비가 있는 탭
+ * 화면이므로 아래 여백은 AppLayout이 만든다.
+ */
+.page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--screen-padding-x);
+  overflow-y: auto;
+}
+
+/* 검색 입력 줄. 입력 · 취소 · 필터가 한 줄에 놓인다 */
+.searchBar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.input {
+  min-width: 0;
+  height: var(--control-height-sm);
+  flex: 1;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  font-family: inherit;
+  font-size: var(--font-size-body);
+  color: var(--color-ink);
+}
+
+.input:focus {
+  border-color: var(--color-ink);
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--color-ink-hint);
+}
+
+.cancel,
+.filterButton {
+  flex: none;
+  padding: var(--space-2);
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-size-meta);
+  color: var(--color-ink-muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.filterButton:disabled {
+  color: var(--color-ink-disabled);
+  cursor: default;
+}
+
+/* 필터가 걸려 있으면 표식으로 알린다 (`design-concept.md` 2.3) */
+.filterButton[aria-pressed='true'] {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-brand-ink);
+}
+
+.sectionLabel {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+/* `· 최근 사용자 평가 기준`처럼 라벨에 붙는 보조 문구 */
+.sectionNote {
+  font-weight: var(--font-weight-regular);
+  color: var(--color-ink-hint);
+}
+
+.recent,
+.results,
+.trending {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.recentHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.clear {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-size-caption);
+  color: var(--color-ink-hint);
+  cursor: pointer;
+}
+
+.recentList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* 최근 검색어. 누르면 그 말로 다시 찾는다 */
+.recentItem {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-size-caption);
+  color: var(--color-ink-body);
+  cursor: pointer;
+}
+
+.resultList,
+.trendingList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+/* 목록 아래 안내. 와이어프레임이 목록 끝에 둔 문구다 */
+.hint {
+  padding-top: var(--space-2);
+  text-align: center;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
+}

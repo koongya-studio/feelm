@@ -24,6 +24,7 @@ import FilmPage from '../pages/film/FilmPage';
 import FrameDetailPage from '../pages/film/FrameDetailPage';
 import PopcornBucketPage from '../pages/film/PopcornBucketPage';
 import HomePage from '../pages/home/HomePage';
+import OttManagePage from '../pages/otts/OttManagePage';
 import MovieDetailPage from '../pages/movies/MovieDetailPage';
 import MovieRatingPage from '../pages/movies/MovieRatingPage';
 import RatingResultPage from '../pages/movies/RatingResultPage';
@@ -33,6 +34,7 @@ import TasteOnboardingPage from '../pages/onboarding/TasteOnboardingPage';
 import PartyPopcornMixPage from '../pages/party/PartyPopcornMixPage';
 import PartyPopcornPage from '../pages/party/PartyPopcornPage';
 import RecommendationsPage from '../pages/recommendations/RecommendationsPage';
+import SearchPage from '../pages/search/SearchPage';
 import NotFoundPage from '../pages/system/NotFoundPage';
 import NotInScopePage from '../pages/system/NotInScopePage';
 import WatchConfirmPage from '../pages/watch/WatchConfirmPage';
@@ -68,9 +70,10 @@ export const router = createBrowserRouter(
         { path: ROUTE_PATTERN.recommendations, element: <RecommendationsPage /> },
         { path: ROUTE_PATTERN.film, element: <FilmPage /> },
         { path: ROUTE_PATTERN.popcornBucket, element: <PopcornBucketPage /> },
+        { path: ROUTE_PATTERN.search, element: <SearchPage /> },
+        { path: ROUTE_PATTERN.ottManage, element: <OttManagePage /> },
 
         // 이번 단계 구현 범위가 아닌 탭. REF-01의 5탭 구성을 검증하기 위해 라우트는 둔다.
-        { path: ROUTE_PATTERN.search, element: <NotInScopePage /> },
         { path: ROUTE_PATTERN.party, element: <NotInScopePage /> },
         { path: ROUTE_PATTERN.my, element: <NotInScopePage /> },
       ],

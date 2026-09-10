@@ -49,6 +49,14 @@ type SessionState = {
   watchRecords: StoredWatchRecord[];
   /** API-036 평가. 영화당 한 번만 반영된다 */
   ratings: Rating[];
+  /**
+   * 4.1 · 4.2의 최근 검색어. 계약이 없다.
+   *
+   * 서버가 보관하는 값이 아니라 이 기기에서 무엇을 찾았는지이므로 API가 없는 것이
+   * 자연스럽다. 실제 앱이라면 `localStorage`가 맞지만, 목업은 매번 같은 상태에서
+   * 시작해야 하므로(이 파일 머리말) 다른 세션 상태와 같이 메모리에 둔다.
+   */
+  recentSearchQueries: string[];
 };
 
 function emptyState(): SessionState {
@@ -59,8 +67,18 @@ function emptyState(): SessionState {
     dismissedMovieIds: [],
     watchRecords: [],
     ratings: [],
+    // 와이어프레임 4.1이 최근 검색어 세 개가 있는 상태를 그리므로 그 값으로 시작한다
+    recentSearchQueries: ['케이퍼 무비', '크리스토퍼 놀란', 'SF 명작'],
   };
 }
+
+/**
+ * 최근 검색어 보관 개수.
+ *
+ * `[?]` 와이어프레임 4.1은 세 개를 그렸지만 상한인지 그때의 개수인지 알 수 없다.
+ * 한 줄에 들어가는 만큼으로 잡았다.
+ */
+const MAX_RECENT_SEARCH_QUERIES = 10;
 
 let state: SessionState = emptyState();
 
@@ -93,6 +111,30 @@ export function setSubscribedOttIds(ottIds: number[]): void {
 /** 아직 설정하지 않았으면 null. 기준 목업을 쓰라는 뜻이다 */
 export function getSubscribedOttIds(): number[] | null {
   return state.subscribedOttIds;
+}
+
+// ─────────────────────────────────────────── 최근 검색어
+
+/** 최신이 앞이다. 같은 검색어를 다시 찾으면 중복을 만들지 않고 앞으로 옮긴다 */
+export function addRecentSearchQuery(query: string): void {
+  const trimmed = query.trim();
+
+  if (!trimmed) return;
+
+  const rest = state.recentSearchQueries.filter((item) => item !== trimmed);
+  state.recentSearchQueries = [trimmed, ...rest].slice(0, MAX_RECENT_SEARCH_QUERIES);
+}
+
+export function getRecentSearchQueries(): string[] {
+  return state.recentSearchQueries;
+}
+
+export function removeRecentSearchQuery(query: string): void {
+  state.recentSearchQueries = state.recentSearchQueries.filter((item) => item !== query);
+}
+
+export function clearRecentSearchQueries(): void {
+  state.recentSearchQueries = [];
 }
 
 // ─────────────────────────────────────────── 관심없음

@@ -34,6 +34,9 @@ export const ROUTE_PATTERN = {
   party: '/party',
   my: '/my',
 
+  // 구독 OTT 관리 (6.1). 탭 화면이지만 탭 자리는 없고 MY에서 들어간다
+  ottManage: '/otts',
+
   // 전체화면 (하단 내비 없음)
   movieDetail: '/movies/:movieId',
   movieRating: '/movies/:movieId/rate',
@@ -68,6 +71,7 @@ export const path = {
   search: () => ROUTE_PATTERN.search,
   party: () => ROUTE_PATTERN.party,
   my: () => ROUTE_PATTERN.my,
+  ottManage: () => ROUTE_PATTERN.ottManage,
 
   movieDetail: (movieId: string | number) => `/movies/${movieId}`,
   movieRating: (movieId: string | number) => `/movies/${movieId}/rate`,
@@ -84,5 +88,5 @@ export const TAB_MATCH = {
   search: [ROUTE_PATTERN.search],
   film: [ROUTE_PATTERN.film, ROUTE_PATTERN.popcornBucket],
   party: [ROUTE_PATTERN.party],
-  my: [ROUTE_PATTERN.my],
+  my: [ROUTE_PATTERN.my, ROUTE_PATTERN.ottManage],
 } as const;

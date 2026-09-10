@@ -1,0 +1,74 @@
+/*
+ * 4.1 급상승 영화 한 줄. 순위 숫자가 왼쪽에 서고 본문과 배지가 따른다.
+ */
+.row {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* 순위. 자리수가 늘어도 본문 시작점이 흔들리지 않게 폭을 고정한다 */
+.rank {
+  width: 20px;
+  flex: none;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--color-ink);
+}
+
+.body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.title {
+  overflow: hidden;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  color: var(--color-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-muted);
+}
+
+.score {
+  margin-left: 2px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-brand-ink);
+}
+
+.otts {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* 보조기술에만 읽히는 순위 변동 설명 */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
