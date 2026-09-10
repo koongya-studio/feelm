@@ -1,137 +1,117 @@
 /*
- * 3.2 100알의 취향. 값은 와이어프레임 실측값이다.
+ * 3.2 100알의 취향. 구성은 확정 시안을 따른다
+ * (`docs/screens/design-concept.md`).
  *
- * 와이어프레임 배경은 `#F7F3F2`이지만 확정 토큰인 흰색을 쓴다(팀 결정 2026-09-07).
+ * 카드로 감싸지 않는다. 팝콘 통이 위에 놓이고 이야기는 아래에 쌓인다. 검정은
+ * 화면에 하나뿐이며 그 하나는 `파티 팝콘 섞기 보기` CTA다.
+ */
+/*
+ * `flex: 1 0 auto`로 둔다. 내용이 화면보다 짧으면 늘어나 `.content`의
+ * `margin-top: auto`가 아래로 밀어주고, 길어지면 줄지 않아 넘친 높이가
+ * 그대로 스크롤 높이가 된다. `flex: 1`만 두면 넘친 부분이 스크롤에 잡히지
+ * 않아 마지막 요소가 하단바 뒤로 숨는다.
  */
 .page {
   display: flex;
+  flex: 1 0 auto;
   flex-direction: column;
-  align-items: center;
-  gap: 13px;
-  padding: 26px var(--screen-padding-x) 18px;
+  padding: var(--space-3) var(--screen-padding-x) var(--space-4);
 }
 
-.count {
-  color: var(--color-ink-body);
-  font-size: 13px;
-  white-space: nowrap;
-}
-
-.lead {
-  align-self: stretch;
-  text-align: center;
-}
-
-.leadTitle {
-  font-size: 21px;
-  font-weight: 700;
-}
-
-.leadText {
-  margin-top: 6px;
-  color: var(--color-ink-muted);
-  font-size: 14px;
+.top {
+  display: flex;
+  margin-left: calc(var(--space-2) * -1);
 }
 
 /*
- * 팝콘 버킷. 겉면 · 안쪽 면 · 테두리 띠를 겹쳐 사다리꼴 통을 만든다.
- * 알은 SVG로 그리고 통 위에 얹는다.
+ * 팝콘 통이 놓이는 자리. 시안은 화면 위쪽에 통 하나만 크게 둔다.
+ * 좌우 여백 없이 가운데 정렬한다.
  */
 .bucketArea {
-  position: relative;
   display: flex;
-  width: 330px;
-  max-width: 100%;
   justify-content: center;
-  padding: 16px 0;
+  padding: var(--space-6) 0;
 }
 
-.bucketOuter {
-  position: absolute;
-  inset: 0;
-  background: var(--color-ink);
-  clip-path: polygon(2% 0, 98% 0, 88% 100%, 12% 100%);
+/*
+ * 본문은 화면 아래에 붙는다. 통은 위에 걸리고 이야기는 아래에 쌓인다.
+ * 사이의 빈 범이 시안의 숨이다.
+ */
+.content {
+  display: flex;
+  flex-direction: column;
+  margin-top: auto;
+  gap: var(--space-4);
 }
 
-.bucketInner {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  bottom: 2px;
-  left: 2px;
-  background: var(--color-bg);
-  clip-path: polygon(2.3% 0, 97.7% 0, 88% 100%, 12% 100%);
+/* 자간 넓은 소제목. 제목 위에 얹어 층을 만든다 */
+.eyebrow {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  letter-spacing: var(--letter-spacing-wide);
+  color: var(--color-ink-hint);
 }
 
-.bucketRim {
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: 9px;
-  border-radius: var(--radius-pill);
-  background: var(--color-ink);
+/* 이 화면이 말하는 한 문장. 두 줄로 끊어 크게 앉힌다 */
+.headline {
+  margin-top: calc(var(--space-2) * -1);
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  letter-spacing: var(--letter-spacing-title);
+  font-weight: var(--font-weight-bold);
 }
 
-.kernels {
-  position: relative;
-  display: block;
-  max-width: 100%;
-  height: auto;
-  margin-top: 6px;
-}
-
-/* 맛 범례 */
+/*
+ * 맛 범례. 필름 화면의 범례와 같은 밝은 반투명 재질이다.
+ *
+ * 두 칸으로 접어 보았으나 맛 이름이 길어(`비스코프 에스프레소 크런치`)
+ * 세 줄까지 접힌다. 한 칸으로 두고 줄 높이를 낮춰 전체 높이를 맞춘다.
+ */
 .legend {
-  display: grid;
-  width: 330px;
-  max-width: 100%;
-  grid-template-columns: 1fr 1fr;
-  gap: 5px 20px;
-  padding: 0;
-  margin: 0;
-  list-style: none;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) var(--space-4);
+  border: 0.5px solid var(--color-line-strong);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
 }
 
 .legendItem {
   display: flex;
   align-items: center;
-  gap: 6px;
+  padding: var(--space-1) 0;
+  gap: var(--space-3);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
 }
 
-/*
- * 맛 표식. 8번째 맛은 흰색에 가까워 옅은 테두리를 둔다. 어두운 색에서는 보이지 않는다
- */
-.swatch {
-  display: block;
-  width: 11px;
-  height: 11px;
-  flex: none;
-  box-sizing: border-box;
-  border: 1px solid var(--color-line);
-  border-radius: 50%;
-}
-
-.legendText {
+.legendName {
+  flex: 1;
+  min-width: 0;
   color: var(--color-ink-body);
-  font-size: 11px;
-  white-space: nowrap;
+}
+
+.legendCount {
+  color: var(--color-ink);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
 }
 
 .legendScore {
-  color: var(--color-ink-hint);
+  color: var(--color-ink-muted);
+  font-variant-numeric: tabular-nums;
 }
 
-.note {
-  color: var(--color-ink-hint);
-  font-size: 10.5px;
-  line-height: 1.5;
-  text-align: center;
-}
-
-.summary {
-  padding: 10px 0 0;
-  color: var(--color-ink-body);
-  font-size: 13.5px;
-  text-align: center;
+/*
+ * 팝콘 알. 파스텔 8색은 밝은 판 위에서 1.09~2.17:1로 면이 배경에 묻힌다.
+ * 테두리를 둘러 알의 윤곽을 살린다. `--color-ink-body`는 판 대비 10.48:1,
+ * 8색 중 가장 가까운 카라멜 대비 4.84:1로 둘 다 3:1을 넘는다.
+ */
+.kernel {
+  width: 11px;
+  height: 11px;
+  box-sizing: border-box;
+  flex: none;
+  border: 1px solid var(--color-ink-body);
+  border-radius: var(--radius-pill);
 }

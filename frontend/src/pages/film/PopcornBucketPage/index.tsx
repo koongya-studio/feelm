@@ -1,66 +1,68 @@
 /*
  * 3.2 100알의 취향
  *
- * 요소와 순서는 와이어프레임 3.2 그대로다(screen-spec.md 7장 3.2).
- * 제목·카운트 · 안내 문구 · 팝콘 버킷 · 맛 범례 8개 · 설명 · 요약 문장
+ * 구성은 확정 시안을 따른다(`docs/screens/design-concept.md`). 시안은 이 화면이
+ * 한 가지만 말하게 한다. **내 취향이 어느 맛으로 기울었는가.**
  *
- * 계약 기준으로 확정한 세 가지를 적용한다(screen-spec.md 8.1).
- * - 맛 이름·색상은 API-044의 `displayName`·`color`를 쓰고 장르명을 하드코딩하지 않는다
- * - `테마 · 장르 · 별점` 3개 탭은 구현하지 않는다. API-041에 대응이 없다
- * - 맛 선호도(평균 평점)를 범례에 함께 표시한다(FR-06 인수 조건)
+ * 팝콘 통 · 기울기 문장 · 맛 범례 · 파티 팝콘 진입
  *
- * 팝콘 알은 SVG로 렌더한다(ADR-0013). 와이어프레임은 22px 원 100개를 10열 격자에
- * 6px 간격으로 둔다. 알은 맛 순서대로 채운다.
+ * 연동 API는 API-041(팝콘 버킷)이다. 맛 이름·색상은 API-044의 `displayName`·`color`를
+ * 쓰고 장르명을 하드코딩하지 않는다(screen-spec.md 8.1).
  *
- * 팀 결정 2026-09-07
- * - 배경은 확정 토큰(흰색)을 쓴다. 와이어프레임 3.2만 `#F7F3F2`이고 다른 화면은 모두
- *   흰색이며 `DESIGN_GOALS.md` 1.1 · 1.2가 흰색으로 확정돼 있다
- * - 와이어프레임에 없는 `파티 팝콘 섞기 보기` 버튼을 추가해 5.9 진입점을 만든다.
- *   screen-spec.md 3.2가 진입 요소 미명시로 표시한 항목이다
+ * 팀 결정 2026-09-09 (업무 -101)
+ * - **와이어프레임의 22px 원 100개 격자를 걷어냈다.** 격자는 와이어프레임 표기였을
+ *   뿐이고, 취향을 한눈에 보여주는 자리는 3D 팝콘 통이다
+ * - 안내 문구(`한 알이 영화 한 편이에요`)와 설명 문단(`8가지 팝콘 맛 · …`)을 뺐다.
+ *   시안에 없고, 요약 문장이 큰 제목으로 올라가면서 같은 말을 세 번 하게 된다
+ * - 요약 문장을 본문 제목으로 올렸다. 화면이 말하는 한 문장이다
+ * - 범례에서 비율(%)을 뺐다. 계약에 없는 값이고 알 수가 이미 같은 말을 한다.
+ *   평균 평점은 FR-06 인수 조건이라 남긴다
  *
+ * 팝콘 통은 디자인이 만든 3D 통을 구운 스프라이트다. 무늬·색 4종을 이 화면에 늘어놓고
+ * 비교해 **세로 필름 · 빨강/검정**으로 정했다(팀 결정 2026-09-10). 가로 무늬 2종은 로고가
+ * 통 옆면에서 잘려 `Feelm Fee…`로 읽혔고, 고른 빨강은 하단 네비 `필름` 탭의 강조색과 맞다.
  * `[?]` 화면 문구가 100알을 전제로 쓰여 있다. 합이 100이 아닐 때의 표현은 미확정이라
  * 수치를 그대로 넣어 문장을 만든다.
- * `[?]` `새로운 맛`(API-041 `isNewFlavor`) 표시는 와이어프레임에 없어 쓰지 않는다.
+ * `[?]` `새로운 맛`(API-041 `isNewFlavor`) 표시는 시안에 없어 쓰지 않는다.
  * `[?]` 평균 평점 표기 형식은 FR-06이 정하지 않아 `★ 4.4`로 둔다.
  */
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import Button from '../../../components/Button';
+import { ChevronLeftIcon } from '../../../components/Icon';
+import IconButton from '../../../components/IconButton';
+import PopcornBucket from '../../../components/PopcornBucket';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
+import VisuallyHidden from '../../../components/VisuallyHidden';
 import { getPopcornBucket } from '../../../api/taste';
 import { path } from '../../../routes/paths';
-import { conjunctionParticle, subjectParticle } from '../../../utils/korean';
 import styles from './PopcornBucketPage.module.css';
-import type { PopcornBucket, PopcornBucketFlavor } from '../../../types/taste';
-
-/** 와이어프레임 실측값. 알 22px · 간격 6px · 10열 */
-const KERNEL_SIZE = 22;
-const KERNEL_GAP = 6;
-const COLUMNS = 10;
+import type { PopcornBucket as PopcornBucketData, PopcornBucketFlavor } from '../../../types/taste';
 
 /** 목업 파티. 파티 목록(5.1)이 범위 밖이라 파티를 고르는 화면이 없다 */
 const FALLBACK_PARTY_ID = 9001;
 
-/** 알 하나가 어느 맛인지. 맛 순서대로 채운다 */
-function kernelColors(flavors: PopcornBucketFlavor[]): string[] {
+/** 시안의 뒤로 가기 원 지름(px). 300px 폭 시안의 31px을 375px 기준으로 환산했다 */
+const BACK_BUTTON_SIZE = 39;
+
+/**
+ * 통이 그려지는 폭(px). 시안은 232px이지만 8종 범례가 한 칸으로 내려오면
+ * 본문이 길어져 CTA가 하단바 뒤로 밀린다. 통을 줄여 한 화면에 맞춘다.
+ */
+const BUCKET_WIDTH = 196;
+
+/** 통 위에 쌓는 알을 맛 분포대로 펼친다. 한 알이 영화 한 편이다 */
+function kernelFlavors(flavors: PopcornBucketFlavor[]): string[] {
   return flavors.flatMap((flavor) =>
-    Array.from({ length: flavor.popcornCount }, () => flavor.color),
+    Array.from({ length: flavor.popcornCount }, () => flavor.flavorCode),
   );
-}
-
-function percent(count: number, total: number): number {
-  if (total === 0) {
-    return 0;
-  }
-
-  return Math.round((count / total) * 100);
 }
 
 export default function PopcornBucketPage() {
   const navigate = useNavigate();
 
-  const [bucket, setBucket] = useState<PopcornBucket | null>(null);
+  const [bucket, setBucket] = useState<PopcornBucketData | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
 
@@ -122,107 +124,90 @@ export default function PopcornBucketPage() {
   }
 
   if (!bucket) {
-    return (
-      <>
-        <ScreenHeader title="100알의 취향" showBack />
-      </>
-    );
+    return <ScreenHeader title="100알의 취향" showBack />;
   }
 
   const total = bucket.totalCount;
-  const colors = kernelColors(bucket.flavors);
-  const rows = Math.max(1, Math.ceil(colors.length / COLUMNS));
-  const gridSize = (size: number) => size * KERNEL_SIZE + (size - 1) * KERNEL_GAP;
 
-  // 상위 두 맛으로 요약 문장을 만든다. 산출 규칙은 계약에 없어 화면에서 계산한다
-  const top = [...bucket.flavors].sort((a, b) => b.popcornCount - a.popcornCount).slice(0, 2);
-  const topShare = top.reduce((sum, flavor) => sum + percent(flavor.popcornCount, total), 0);
-  const summary = top
-    .map((flavor, index) =>
-      index === top.length - 1
-        ? `${flavor.displayName}${subjectParticle(flavor.displayName)}`
-        : `${flavor.displayName}${conjunctionParticle(flavor.displayName)}`,
-    )
-    .join(' ');
+  // 가장 많이 담긴 맛이 기울기를 말한다. 0알인 맛은 아직 발견하지 않은 맛이라 뺀다
+  const found = bucket.flavors.filter((flavor) => flavor.popcornCount > 0);
+  const ranked = [...found].sort((a, b) => b.popcornCount - a.popcornCount);
+  const leaning = ranked[0] ?? null;
 
   return (
     <>
-      <ScreenHeader
-        title="100알의 취향"
-        showBack
-        action={<span className={styles.count}>본 영화 {total}편</span>}
-      />
+      {/*
+       * 시안의 헤더는 뒤로 가기 원 하나뿐이다. 제목은 화면에 두지 않지만 h1은
+       * 있어야 하므로 숨겨서 남긴다.
+       */}
+      <VisuallyHidden>
+        <h1>100알의 취향</h1>
+      </VisuallyHidden>
 
       <div className={styles.page}>
-        <div className={styles.lead}>
-          <p className={styles.leadTitle}>한 알이 영화 한 편이에요</p>
-          <p className={styles.leadText}>
-            {total}편이 {total}알로 모였어요
-          </p>
+        <div className={styles.top}>
+          <IconButton
+            label="뒤로 가기"
+            icon={<ChevronLeftIcon />}
+            size={BACK_BUTTON_SIZE}
+            variant="translucent"
+            onClick={() => navigate(-1)}
+          />
         </div>
 
+        {/* 팝콘 통. 맛 분포대로 알이 쌓인다 */}
         <div className={styles.bucketArea}>
-          <span className={styles.bucketOuter} aria-hidden="true" />
-          <span className={styles.bucketInner} aria-hidden="true" />
-          <span className={styles.bucketRim} aria-hidden="true" />
-
-          <svg
-            className={styles.kernels}
-            width={gridSize(COLUMNS)}
-            height={gridSize(rows)}
-            viewBox={`0 0 ${gridSize(COLUMNS)} ${gridSize(rows)}`}
-            role="img"
-            aria-label={`팝콘 ${total}알`}
-            data-testid="popcorn-kernels"
-          >
-            {colors.map((color, index) => (
-              <circle
-                key={index}
-                cx={(index % COLUMNS) * (KERNEL_SIZE + KERNEL_GAP) + KERNEL_SIZE / 2}
-                cy={Math.floor(index / COLUMNS) * (KERNEL_SIZE + KERNEL_GAP) + KERNEL_SIZE / 2}
-                r={KERNEL_SIZE / 2}
-                fill={color}
-              />
-            ))}
-          </svg>
+          <PopcornBucket
+            kernelFlavors={kernelFlavors(bucket.flavors)}
+            width={BUCKET_WIDTH}
+            label={`팝콘 ${total}알`}
+          />
         </div>
 
-        <ul className={styles.legend}>
-          {bucket.flavors.map((flavor) => (
-            <li key={flavor.flavorCode} className={styles.legendItem}>
-              <span
-                className={styles.swatch}
-                style={{ background: flavor.color }}
-                aria-hidden="true"
-              />
-              <span className={styles.legendText}>
-                {flavor.displayName} {flavor.popcornCount}알 · {percent(flavor.popcornCount, total)}
-                %{/* 맛 선호도는 감상량과 구분해 표시한다 (FR-06) */}
+        <div className={styles.content}>
+          <p className={styles.eyebrow}>{total} · KERNELS</p>
+
+          {leaning ? (
+            <h2 className={styles.headline}>
+              {leaning.displayName} 쪽으로
+              <br />
+              기울었어요
+            </h2>
+          ) : null}
+
+          {/*
+           * 맛 범례. 색 · 이름 · 알 수 · 평균 평점으로 말한다. 팝콘 8색은 밝은 면에서
+           * 전원 1.09~2.17:1이라 면만으로는 안 보인다. 알에 테두리를 둘러 윤곽을
+           * 살린다(`.kernel` 참고).
+           */}
+          <ul className={styles.legend}>
+            {bucket.flavors.map((flavor) => (
+              <li key={flavor.flavorCode} className={styles.legendItem}>
+                <span
+                  className={styles.kernel}
+                  style={{ background: flavor.color }}
+                  aria-hidden="true"
+                />
+                <span className={styles.legendName}>{flavor.displayName}</span>
+                <span className={styles.legendCount}>{flavor.popcornCount}</span>
+                {/* 맛 선호도는 감상량과 구분해 표시한다 (FR-06) */}
                 {flavor.averageScore === null ? null : (
-                  <span className={styles.legendScore}> · ★ {flavor.averageScore.toFixed(1)}</span>
+                  <span className={styles.legendScore}>★ {flavor.averageScore.toFixed(1)}</span>
                 )}
-              </span>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
 
-        <p className={styles.note}>
-          8가지 팝콘 맛 · 한 알 = 영화 한 편 · 총 {total}알 = 평가한 영화 {total}편 · 데이터에 따라
-          색과 비율이 달라져요
-        </p>
-
-        {/* 맛 이름이 API-044 값이라 조사를 받침에 맞춰 고른다 */}
-        <p className={styles.summary}>
-          {summary} 내 영화의 {topShare}%예요.
-        </p>
-
-        {/* 와이어프레임에 없는 요소다. 5.9 진입점으로 추가했다 (팀 결정 2026-09-07) */}
-        <Button
-          variant="secondary"
-          onClick={() => void navigate(path.partyPopcornMix(FALLBACK_PARTY_ID))}
-        >
-          파티 팝콘 섞기 보기
-        </Button>
+          {/*
+           * 이 화면의 주 동작. 검정 알약은 한 화면에 하나뿐이고 그 하나가 여기다
+           * (`docs/screens/design-concept.md` 2.4).
+           *
+           * 와이어프레임에 없는 요소다. 5.9 진입점으로 추가했다 (팀 결정 2026-09-07).
+           */}
+          <Button onClick={() => void navigate(path.partyPopcornMix(FALLBACK_PARTY_ID))}>
+            파티 팝콘 섞기 보기
+          </Button>
+        </div>
       </div>
     </>
   );

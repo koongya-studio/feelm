@@ -1,0 +1,229 @@
+/*
+ * 팝콘 통.
+ *
+ * 취향을 한눈에 보여주는 자리다(3.2). 통과 알 모두 디자인이 만든 3D 모델을 구운
+ * 스프라이트다.
+ *
+ * - 통: `src/assets/bucket`. 세로 필름 무늬 · 빨강/검정으로 384px로 렌더했다.
+ *   디자인이 준 4종을 화면에서 비교해 고른 것이다(팀 결정 2026-09-10). 가로 무늬는
+ *   로고가 통 옆면에서 잘려 `Feelm Fee…`로 읽혀 뺐다.
+ *   **빈 통**이다. 알을 따로 쌓아야 취향 분포가 그림에 반영되기 때문이다.
+ * - 알: `src/assets/popcorn`. 8종을 96px로 렌더했다.
+ *
+ * 알은 맛 분포대로 통 입구에 쌓인다. **알 더미는 그림이고 데이터를 읽는 채널이
+ * 아니다.** 알 수와 맛 이름은 범례가 말한다.
+ *
+ * 자리와 방향은 index로만 정해진다. 난수를 쓰지 않으므로 다시 그려도 더미가 흔들리지
+ * 않는다. 한 맛의 알이 모두 같은 그림이라 index로 좌우를 뒤집고 조금씩 돌려 변화를 준다.
+ *
+ * 통 스프라이트가 한 장이라 알을 통 앞벽 뒤로 숨길 수 없다. 그래서 더미를 입구 안에서
+ * 시작해 위로 쌓는다. 넘칠 듯 담긴 모양이 되고, 앞쪽 테두리에 걸치는 알은 입구에 얹힌
+ * 것처럼 읽힌다.
+ */
+import bucketSprite from '../../assets/bucket/bucket-film-vertical-red-black.png';
+import biscoffEspresso from '../../assets/popcorn/popcorn-biscoff-espresso.png';
+import blueberryMacaron from '../../assets/popcorn/popcorn-blueberry-macaron.png';
+import caramel from '../../assets/popcorn/popcorn-caramel.png';
+import cheese from '../../assets/popcorn/popcorn-cheese.png';
+import chocolate from '../../assets/popcorn/popcorn-chocolate.png';
+import cookie from '../../assets/popcorn/popcorn-cookie.png';
+import loveStrawberry from '../../assets/popcorn/popcorn-love-strawberry.png';
+import original from '../../assets/popcorn/popcorn-original.png';
+import styles from './PopcornBucket.module.css';
+
+/*
+ * 맛 코드 -> 3D 팝콘 스프라이트.
+ *
+ * 화면은 맛의 표시명과 색을 API-044에서 받지만 그림 파일은 저장소에 있는 것이라
+ * 코드로 짝지어야 한다. 코드는 불변이므로(FR-06) 이 대응은 이름이 바뀌어도 살아남는다.
+ * 모르는 코드가 오면 기본 맛으로 그린다.
+ */
+const KERNEL_SPRITE: Record<string, string> = {
+  FLAVOR_CAPER: original,
+  FLAVOR_THRILL: caramel,
+  FLAVOR_NOIR: cheese,
+  FLAVOR_CRIME: chocolate,
+  FLAVOR_ACTION: cookie,
+  FLAVOR_DRAMA: biscoffEspresso,
+  FLAVOR_COMEDY: loveStrawberry,
+  FLAVOR_SF: blueberryMacaron,
+};
+
+/* 좌표계. 통 하나가 들어가는 상자다 */
+const VIEW_WIDTH = 200;
+const VIEW_HEIGHT = 230;
+
+/*
+ * 통 스프라이트를 놓는 자리.
+ *
+ * 384px 원본에서 통은 y 34~349를 차지하고, 가장 넓은 줄(= 테두리 타원의 세로 중심)이
+ * y 65에서 x 11~372다. 아래 값은 그 통이 이 좌표계의 폭을 꽉 채우도록 맞춘 것이다.
+ */
+const SPRITE_X = -6;
+const SPRITE_Y = 17;
+const SPRITE_SIZE = 212;
+
+/*
+ * 테두리 타원. 알을 이 안에 담는다.
+ *
+ * 384px 원본에서 통의 가장 넓은 줄이 y 65, x 11~372였다. 이 좌표계로 옮기면 중심이
+ * (100, 53), 가로 반지름이 약 100이다. 타원의 세로 반지름은 통 꼭대기(y 36)까지의
+ * 거리인 17이다.
+ */
+const RIM_X = 100;
+const RIM_Y = 53;
+/** 입구 타원의 실제 크기. 알을 가두는 클립이 이 타원이다 */
+const RIM_RX = 98;
+const RIM_RY = 17;
+
+/**
+ * 알이 퍼지는 범위. 입구보다 좁게 잡아 통 벽에 붙지 않게 한다.
+ *
+ * 원본 렌더를 보면 팝콘이 통 안쪽까지 담겨 있고 앞쪽 테두리가 아래 알을 가린다.
+ * 그 가림을 `clipPath`가 만든다. 클립은 입구 타원과 그 위쪽을 합친 모양이라, 테두리
+ * 아래로 내려간 알은 타원 밖에서 잘려 통 뒤로 들어간 것처럼 보인다.
+ */
+const PILE_RX = 82;
+
+/**
+ * 더미가 테두리 위로 솟는 높이.
+ *
+ * 알을 평면에 늘어놓으면 통 위에 얹힌 판처럼 보인다. 입구를 밑면으로 하는 반구 안에
+ * 알을 뿌려 실제로 담긴 더미가 되게 한다.
+ */
+const MOUND_HEIGHT = 46;
+
+/** 더미를 통 안으로 내려 담는 깊이. 팝콘이 입구에 걸친 것처럼 보이게 한다 */
+const PILE_SINK = 10;
+
+/** 입구 클립의 id. 한 화면에 통이 하나라 고정 문자열로 충분하다 */
+const CLIP_ID = 'bucket-mouth';
+
+/** 알 한 알이 차지하는 정사각형 한 변 */
+const KERNEL_SIZE = 30;
+/** 앞뒤 거리에 따른 크기 차이. 앞이 크고 뒤가 작아야 더미에 깊이가 생긴다 */
+const DEPTH_SCALE = 0.22;
+
+/**
+ * index만으로 0~1 값을 만든다. 같은 index는 항상 같은 값이라 더미가 고정된다.
+ * 난수 생성기를 쓰지 않는 이유는 다시 그릴 때마다 알이 튀지 않게 하려는 것이다.
+ */
+function noise(index: number, salt: number): number {
+  const value = Math.sin(index * 127.1 + salt * 311.7) * 43758.5453;
+
+  return value - Math.floor(value);
+}
+
+type Kernel = {
+  x: number;
+  y: number;
+  size: number;
+  sprite: string;
+  angle: number;
+  flip: number;
+  /** 앞뒤 자리(-1~1). 그리는 순서를 정할 뿐 화면에 직접 쓰이지는 않는다 */
+  depth: number;
+};
+
+/**
+ * 알을 통 입구 위 반구 안에 뿌린다.
+ *
+ * 입구를 원판으로 보고 그 위 반구를 채운다. `dx`·`dz`는 원판 위의 자리이고 `height`는
+ * 그 자리에서 반구가 허용하는 높이다. 가장자리로 갈수록 높이가 0에 가까워지므로 더미가
+ * 테두리에서 자연스럽게 낮아진다.
+ *
+ * `dz`는 앞뒤다. 화면에서는 테두리 타원을 따라 아래위로 옮기고, 알 크기도 같이 키우고
+ * 줄여 원근을 만든다. 뒤쪽 알부터 그려서 앞쪽 알이 그 위를 덮는다.
+ */
+function pileKernels(flavorCodes: string[]): Kernel[] {
+  return flavorCodes
+    .map((code, index) => {
+      // 원판 위 균등 분포. sqrt를 쓰지 않으면 알이 가운데로 몰린다
+      const radius = Math.sqrt(noise(index, 1));
+      const theta = noise(index, 2) * Math.PI * 2;
+      const dx = radius * Math.cos(theta);
+      const dz = radius * Math.sin(theta);
+
+      /*
+       * 더미는 위로 갈수록 좁아진다. 원본 렌더의 팝콘도 반구가 아니라 봉우리에 가깝다.
+       * 지수를 1.6으로 두면 가운데만 솟고 가장자리는 완만해진다.
+       *
+       * 껍질 근처(높이의 70~100%)로 모은다. 부피에 고르게 뿌리면 알 사이가 벌어져
+       * 가운데로 빈 통 안쪽이 비친다.
+       */
+      const peak = MOUND_HEIGHT * (1 - radius ** 1.6);
+      const height = peak * (0.7 + noise(index, 3) * 0.3);
+
+      return {
+        x: RIM_X + dx * PILE_RX,
+        // PILE_SINK만큼 통 안으로 내려 담는다. 입구 아래로 간 알은 클립이 잘라 준다
+        y: RIM_Y + PILE_SINK + dz * RIM_RY - height,
+        size: KERNEL_SIZE * (1 + dz * DEPTH_SCALE),
+        sprite: KERNEL_SPRITE[code] ?? original,
+        angle: (noise(index, 4) * 2 - 1) * 30,
+        flip: noise(index, 5) < 0.5 ? -1 : 1,
+        depth: dz,
+      };
+    })
+    .sort((a, b) => a.depth - b.depth);
+}
+
+type Props = {
+  /** 통 위에 쌓을 알의 맛 코드. 순서는 상관없다 */
+  kernelFlavors?: string[];
+  /** 그려지는 폭(px). 높이는 비율로 따라간다 */
+  width?: number;
+  /** 스크린 리더가 읽을 이름 */
+  label: string;
+};
+
+export default function PopcornBucket({ kernelFlavors = [], width = 232, label }: Props) {
+  const kernels = pileKernels(kernelFlavors);
+
+  return (
+    <svg
+      className={styles.bucket}
+      width={width}
+      height={(width * VIEW_HEIGHT) / VIEW_WIDTH}
+      viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
+      role="img"
+      aria-label={label}
+      data-testid="popcorn-bucket"
+    >
+      <defs>
+        {/*
+         * 입구 타원 + 그 위쪽을 합친 모양. 알은 이 안에서만 보인다.
+         *
+         * 통 스프라이트가 한 장이라 알을 앞벽 뒤로 숨길 수 없다. 대신 입구 밖을
+         * 잘라 테두리 아래로 내려간 알이 통 속으로 들어간 것처럼 보이게 한다.
+         */}
+        <clipPath id={CLIP_ID}>
+          <ellipse cx={RIM_X} cy={RIM_Y} rx={RIM_RX} ry={RIM_RY} />
+          <rect x={RIM_X - RIM_RX} y={0} width={RIM_RX * 2} height={RIM_Y} />
+        </clipPath>
+      </defs>
+
+      <image
+        href={bucketSprite}
+        x={SPRITE_X}
+        y={SPRITE_Y}
+        width={SPRITE_SIZE}
+        height={SPRITE_SIZE}
+      />
+
+      <g clipPath={`url(#${CLIP_ID})`}>
+        {kernels.map((kernel, index) => (
+          <image
+            key={index}
+            href={kernel.sprite}
+            width={kernel.size}
+            height={kernel.size}
+            x={-kernel.size / 2}
+            y={-kernel.size / 2}
+            transform={`translate(${kernel.x} ${kernel.y}) rotate(${kernel.angle}) scale(${kernel.flip} 1)`}
+          />
+        ))}
+      </g>
+    </svg>
+  );
+}

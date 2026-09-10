@@ -1,0 +1,6 @@
+/* 통은 흐름 안에서 자리를 차지한다. 크기는 width prop이 정한다 */
+.bucket {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
