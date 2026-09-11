@@ -1,32 +1,20 @@
 /*
  * 사용자 데이터 접근 함수.
  * 대응 명세는 docs/api/users.md이다.
+ *
+ * 목업을 걷어내고 실제 API를 부르는 첫 도메인이다(업무 S15P21E106-364). 응답에는
+ * 이메일·생년월일 등 더 많은 필드가 있지만 `MyProfile`이 선언한 것만 쓴다. 나머지는
+ * MY 화면 업무에서 타입에 추가한다.
  */
-import { getRatings, isOnboardingSubmitted } from '../mocks/sessionStore';
-import { mockMyProfile } from '../mocks/user';
-import { respond } from './mockTransport';
+import { request } from './client';
 import type { MyProfile } from '../types/user';
 
 /**
  * API-014 내 프로필 조회 · GET /api/v1/users/me
  *
- * 기준 수치에 이번 세션의 평가를 더한다. 평가 하나가 프레임 1개와 팝콘 1알을 만든다
- * (FR-07, FR-09).
+ * 회원 전용이다. 로그인하지 않았거나 세션이 끊겼으면 `401`이며, 호출한 화면이
+ * 오류 상태로 처리한다.
  */
 export async function getMyProfile(): Promise<MyProfile> {
-  const added = getRatings().length;
-
-  return respond(
-    {
-      ...mockMyProfile,
-      // 온보딩을 마쳤으면 그 사실도 반영한다
-      onboardingCompleted: mockMyProfile.onboardingCompleted || isOnboardingSubmitted(),
-      stats: {
-        frameCount: mockMyProfile.stats.frameCount + added,
-        popcornCount: mockMyProfile.stats.popcornCount + added,
-        ratingCount: mockMyProfile.stats.ratingCount + added,
-      },
-    },
-    'users',
-  );
+  return request<MyProfile>('/users/me');
 }

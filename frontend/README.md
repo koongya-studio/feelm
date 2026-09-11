@@ -38,6 +38,24 @@ npm install
 
 커밋 전에 `npm run lint`와 `npm run format:check`를 통과하는지 확인합니다.
 
+### 백엔드 연동
+
+계정 화면(회원가입 · 로그인 · 내 프로필)은 목업이 아니라 실제 백엔드를 호출합니다
+(업무 S15P21E106-364). 개발 서버가 `/api`를 백엔드로 넘기므로 프론트와 백엔드가 같은
+출처가 되고, 브라우저가 교차 출처로 보지 않아 CORS 설정 없이 Refresh Token 쿠키까지
+그대로 오갑니다. 배포에서 Nginx가 하는 일과 같은 구조입니다.
+
+1. 백엔드를 `local` 프로파일로 띄웁니다(`backend/README.md`). 기본 주소는
+   `http://localhost:8080`이며, 다른 주소면 `frontend/.env`에
+   `VITE_API_PROXY_TARGET`을 적습니다.
+2. `npm run dev`로 개발 서버를 띄우고 http://localhost:5173/app/login 으로 들어갑니다.
+
+백엔드를 띄우지 않으면 계정 화면과 홈의 프로필 영역이 오류 상태로 표시됩니다. 영화 ·
+검색 · 감상 · 온보딩 · OTT · 추천은 아직 백엔드가 없어 목업 그대로 동작합니다.
+
+Access Token은 메모리에만 두고 새로고침하면 쿠키의 Refresh Token으로 세션을 되살립니다.
+그래서 브라우저 저장소를 비워도 로그인 상태가 유지되지만, 쿠키를 지우면 로그아웃됩니다.
+
 `frontend/`, `.gitlab-ci.yml` 또는 `.gitattributes` 변경이 `develop`에 Push되면 CI가
 일회성 Node 컨테이너에서 의존성을 새로 설치하고 lint, 포맷 검사 및 Production Build를
 실행합니다. 검증에 성공하면 같은 커밋의 프론트엔드 이미지를 빌드해
@@ -86,9 +104,13 @@ docker inspect --format '{{.State.Health.Status}}' feelm-frontend
 Vite는 `VITE_` 접두사가 붙은 변수만 클라이언트 코드에 노출합니다. 접두사가 없는 변수는
 번들에 포함되지 않습니다.
 
-현재 필요한 환경 변수는 없습니다. 목업 데이터로 동작하며 실제 API를 호출하지 않습니다.
-변수를 추가할 때는 `frontend/.env.example`을 만들어 키 이름만 기록하고 실제 값은
-커밋하지 않습니다. 자세한 기준은
+| 변수 | 쓰이는 곳 | 기본값 |
+| --- | --- | --- |
+| `VITE_API_PROXY_TARGET` | 개발 서버가 `/api`를 넘길 백엔드 주소 (`vite.config.ts`) | `http://localhost:8080` |
+
+`VITE_API_PROXY_TARGET`은 개발 서버 설정에서만 읽으므로 클라이언트 번들에 들어가지
+않습니다. 값을 바꾸려면 `frontend/.env`에 적습니다. 키 이름은
+`frontend/.env.example`에 기록하고 실제 값은 커밋하지 않습니다. 자세한 기준은
 [Secret 및 환경변수 관리 규칙](../docs/secret-environment-variables.md)을 따릅니다.
 
 ## 랜딩 메뉴 및 앱 연결

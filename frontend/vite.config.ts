@@ -1,13 +1,33 @@
 import react from '@vitejs/plugin-react';
 // `test` 블록의 타입은 vitest가 준다. `vite`에서 가져오면 타입 검사에서 걸린다
 import { defineConfig } from 'vitest/config';
+// `loadEnv`는 vitest가 다시 export하지 않으므로 vite에서 직접 가져온다
+import { loadEnv } from 'vite';
+
+/** 개발에서 `/api`를 넘길 백엔드. `.env`의 `VITE_API_PROXY_TARGET`으로 바꾼다 */
+const DEFAULT_API_TARGET = 'http://localhost:8080';
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   base: '/app/',
   plugins: [react()],
   server: {
     port: 5173,
+    /*
+     * 백엔드를 같은 출처로 만든다(업무 S15P21E106-364).
+     *
+     * 프론트가 `/api/v1/...`을 상대 경로로 부르므로 개발에서도 배포와 같은 모양이 된다
+     * (배포는 Nginx가 같은 경로를 넘긴다 · infra/nginx/nginx.conf). 브라우저가 교차
+     * 출처로 보지 않으니 CORS 설정에 기대지 않아도 되고, Refresh Token 쿠키도 그대로
+     * 실린다. 쿠키에 `Secure`가 붙어 있지만 브라우저가 localhost를 보안 컨텍스트로 보아
+     * http에서도 저장된다.
+     */
+    proxy: {
+      '/api': {
+        target: loadEnv(mode, process.cwd(), '').VITE_API_PROXY_TARGET || DEFAULT_API_TARGET,
+        changeOrigin: true,
+      },
+    },
   },
   // landing/은 독립 배포하는 정적 페이지이므로 Vite의 의존성 스캔 대상에서 제외한다.
   // 제외하지 않으면 landing/index.html이 import하는 CDN 의존성을 node_modules에서
@@ -38,4 +58,4 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     css: true,
   },
-});
+}));
