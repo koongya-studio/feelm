@@ -13,6 +13,8 @@ Jira: [S15P21E106-295](https://ssafy.atlassian.net/browse/S15P21E106-295)
 5. [발표 요약](presentation/README.md): 팀원이 설명할 핵심 결론과 표.
 6. [출처 목록](assets/provenance.json): 원본 경로·해시, 복사한 소형 집계·감사 결과.
 7. [이번 인계 검증](verification.md): 실행한 테스트·독립 검토와 미검증 범위.
+8. [ALS 산출물 HDFS 실환경 검증](als-artifact-hdfs-verification.md): 실제 HDFS
+   저장·재로딩, 실패·재시도, 복제 수와 정리 결과.
 
 이 자료는 **확정된 연구 근거의 인계**다. 공식 API·모델 계약과 서비스 정책을
 새로 확정하지 않는다. 팝콘 외부 표현 8개와 실제 별점 0.5 단위는 유지한다.
