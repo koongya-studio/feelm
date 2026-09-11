@@ -201,7 +201,7 @@ erDiagram
 | `genres` | 장르 기준정보 | TMDb 장르 ID 매핑 | FR-15 · API-029 |
 | `movie_genres`, `movie_countries`, `movie_people` | 영화 속성 매핑 | `movie_people.role`로 감독·배우 구분 | FR-14, FR-15, FR-34 |
 | `people` | 인물(감독·배우) | 검색 대상(FR-14) | API-028, API-030 |
-| `otts` | OTT 기준정보 | 지원 목록은 미정(API-025) | FR-03, FR-16 · API-025 |
+| `otts` | OTT 기준정보 | 지원 목록은 5종으로 확정(API-025 처리 규칙). 행은 콘텐츠 적재 경로가 넣는다 | FR-03, FR-16 · API-025 |
 | `movie_ott_providers` | 영화별 시청 가능 OTT | TMDb watch provider 동기화 | FR-16 · API-030 |
 | `popcorn_flavors` | 팝콘 맛 8종 기준정보와 군집 매핑 | `cluster_id`와 `code`는 각각 유일하며 고정된 8개 Centroid와 1:1로 대응한다. 표시명·색상은 변경 가능하고 대표 키워드도 함께 보관한다. 원시 `cluster_id`는 공개 API에 노출하지 않는다 | FR-06 · API-044 · ADR-0015 |
 

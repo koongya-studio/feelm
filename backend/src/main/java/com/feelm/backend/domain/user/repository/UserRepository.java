@@ -44,6 +44,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
      *       않게 한다.
      *   <li>파티 생성(API-049, {@code PartyService.create}) — 생성과 초대 수락이 동시에 실행돼도 사용자별 활성 파티 상한을 넘지 않게
      *       한다.
+     *   <li>구독 OTT 설정(API-027, {@code UserOttService.replaceMyOtts}) — 전체 교체라 동시 요청의 삭제와 삽입이 교차하면
+     *       어느 쪽 요청과도 다른 목록이 남으므로, 교체 구간을 계정 단위로 직렬화한다.
      * </ul>
      *
      * <p>인증의 세 경로는 <b>토큰 → 계정</b> 잠금 순서를 지킨다. 재가입의 삭제 경로도 토큰을 먼저 지우고 계정을 지운다. API-012는 계정 행을 잠그기 전에
