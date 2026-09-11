@@ -263,9 +263,11 @@ Redis에 닿지 못하면 계정 메일은 발송하지 않습니다(fail-closed
 장애 중 사용자에게 실제로 보이는 것은 "메일만 안 오는 상태"가 아니라 **요청 실패**입니다. 가입 경로는
 S15P21E106-287에서 요청 제한이 추가되기 전까지 Redis 없이도 성공했으므로, 이 성질은 그때 함께 생겼습니다.
 
-인증 링크는 `${FRONTEND_BASE_URL}/verify-email?token=...`, 비밀번호 재설정 링크는
-`${FRONTEND_BASE_URL}/reset-password?token=...` 형식입니다. 두 링크 모두 프론트 화면으로 이동하고
-프론트가 각각 API-002·API-011을 호출합니다. 토큰은 불투명 난수 문자열이며 서버는 해시만 저장합니다.
+인증 링크는 `${FRONTEND_BASE_URL}/app/verify-email?token=...`, 비밀번호 재설정 링크는
+`${FRONTEND_BASE_URL}/app/account/reset?token=...` 형식입니다. 두 링크 모두 프론트 화면으로 이동하고
+프론트가 각각 API-002·API-011을 호출합니다. **경로는 프론트엔드 라우트에서 파생된 값입니다.** 앱은
+Vite base가 `/app/`이라 모든 화면이 `/app` 아래에 있고 화면별 경로는 `frontend/src/routes/paths.ts`가
+가지므로, 프론트 경로가 바뀌면 `feelm.mail.verification-url`·`password-reset-url`도 함께 바꿔야 합니다. 토큰은 불투명 난수 문자열이며 서버는 해시만 저장합니다.
 수명은 인증 토큰이 24시간, 재설정 토큰이 30분입니다.
 
 ### 공개 경로 추가
