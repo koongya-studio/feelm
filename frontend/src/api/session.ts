@@ -13,6 +13,9 @@
 /** API-006 토큰 재발급. 쿠키 경로(`/api/v1/auth`)와 같은 접두사여야 쿠키가 실린다 */
 const REFRESH_URL = '/api/v1/auth/token/refresh';
 
+/** 재발급이 거절됐다는 뜻의 상태 코드. 이것만 세션을 끝낸다 */
+const UNAUTHORIZED = 401;
+
 let accessToken: string | null = null;
 
 /**
@@ -94,17 +97,32 @@ async function requestAccessToken(): Promise<string | null> {
     return null;
   }
 
-  if (!response.ok) {
+  /*
+   * 세션이 없다는 신호와 서버가 잠시 응답하지 못한다는 신호를 가른다.
+   *
+   * 계약이 재발급 거절로 정의한 것은 401뿐이다(API-006 `REFRESH_TOKEN_INVALID`).
+   * 5xx는 세션에 대한 판정이 아니라 서버 사정이므로 여기서 세션을 끝내면 안 된다.
+   * 끝내 버리면 `refreshable`이 내려가 백엔드가 돌아와도 재발급을 다시 시도하지
+   * 않고, 사용자는 새로고침해야 로그인 상태로 돌아온다. 배포 중 재시작 한 번으로
+   * 앱을 열어 둔 모두가 로그아웃된 것처럼 보였다(S15P21E106-373).
+   */
+  if (response.status === UNAUTHORIZED) {
     endSession();
 
     return null;
   }
 
+  if (!response.ok) {
+    return null;
+  }
+
+  /*
+   * 본문에 토큰이 없는 200은 계약 위반이지 세션 만료가 아니다. 위와 같은 이유로
+   * 세션을 유지하고 이번 재발급만 실패로 둔다.
+   */
   const token = await readAccessToken(response);
 
   if (!token) {
-    endSession();
-
     return null;
   }
 
