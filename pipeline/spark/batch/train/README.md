@@ -118,15 +118,19 @@ uv run ruff check batch/train tests/batch
 
 1. [파이프라인 실행 환경](../../../README.md)에 맞는 Python·Java·PySpark ML과 테스트 의존성을
    준비한다. 실행 프로세스에서 NameNode와 DataNode에 접근할 수 있어야 하며,
-   Spark의 Hadoop 설정과 HDFS 쓰기 권한을 확인한다.
-2. 아래 URI의 주소와 경로를 담당자가 승인한 **검증 전용 HDFS 경로**로 바꾼다.
-   운영 모델 경로는 사용하지 않는다. 테스트마다 `als-check-<UUID>` 하위 경로를 생성한다.
+   Spark의 Hadoop 설정과 HDFS 쓰기 권한을 확인한다. 검증 client가 NameNode의 기본 복제
+   수를 자동으로 상속한다고 가정하지 않는다. 쓰기 전에 승인된 복제 수가 유효 설정인지
+   확인하고 실행 명령에 명시한다.
+2. 아래 URI의 주소·경로와 `<APPROVED_REPLICATION>`을 담당자가 승인한 **검증 전용 HDFS
+   값**으로 바꾼다. 운영 모델 경로는 사용하지 않는다. 테스트마다 `als-check-<UUID>` 하위
+   경로를 생성한다.
 3. 저장·재로딩, 중복 저장, 저장 중 실패, 동시 공개 테스트 6개를 실행한다.
 
 ```bash
 # 저장소 루트에서 실행. URI는 실제 검증 환경 값으로 교체한다.
 cd pipeline/spark
-ALS_ARTIFACT_TEST_ROOT='hdfs://NAME_NODE_PRIVATE_IP:8020/user/feelm/als-verification/RUN_ID' \
+ALS_ARTIFACT_TEST_ROOT='hdfs://<NAMENODE_AUTHORITY>:8020/user/feelm/als-verification/RUN_ID' \
+PYSPARK_SUBMIT_ARGS='--conf spark.hadoop.dfs.replication=<APPROVED_REPLICATION> pyspark-shell' \
   uv run pytest tests/batch/test_als_artifacts.py -v -s \
   -k 'complete_artifact_version or overwrite_existing or
       temporary_version_after_write_failure or concurrent_publication'
