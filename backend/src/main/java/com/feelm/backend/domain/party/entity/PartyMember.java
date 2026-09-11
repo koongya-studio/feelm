@@ -69,6 +69,10 @@ public class PartyMember {
         return member;
     }
 
+    public void promoteToOwner() {
+        role = Role.OWNER;
+    }
+
     public enum Role {
         OWNER,
         MEMBER

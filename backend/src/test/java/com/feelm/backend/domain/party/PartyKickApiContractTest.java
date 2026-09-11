@@ -109,7 +109,7 @@ class PartyKickApiContractTest {
     }
 
     @Test
-    void closesTwoMemberPartyAndDeclinesPendingInvitations() throws Exception {
+    void keepsTwoMemberPartyActiveAfterKickAndPreservesPendingInvitations() throws Exception {
         long party = party(10, "ACTIVE");
         member(party, 20, "MEMBER", CREATED_AT.plusSeconds(1));
         invitation(party, 30, "PENDING");
@@ -118,18 +118,18 @@ class PartyKickApiContractTest {
         kick(party, 20, 10)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.partyId").value(party))
-                .andExpect(jsonPath("$.status").value("CLOSED"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andExpect(jsonPath("$.ownerId").value(10))
-                .andExpect(jsonPath("$.closedReason").value("INSUFFICIENT_MEMBERS"))
-                .andExpect(jsonPath("$.closedAt").isNotEmpty());
+                .andExpect(jsonPath("$.closedReason").isEmpty())
+                .andExpect(jsonPath("$.closedAt").isEmpty());
 
         assertThat(memberIds(party)).containsExactly(10L);
-        assertParty(party, 10, "CLOSED", "INSUFFICIENT_MEMBERS");
+        assertParty(party, 10, "ACTIVE", null);
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT count(*) FROM party_invitations"
-                                        + " WHERE party_id=? AND status='DECLINED'"
-                                        + " AND responded_at IS NOT NULL",
+                                        + " WHERE party_id=? AND status='PENDING'"
+                                        + " AND responded_at IS NULL",
                                 Long.class,
                                 party))
                 .isEqualTo(2);
@@ -202,31 +202,6 @@ class PartyKickApiContractTest {
     }
 
     @Test
-    void rollsBackAllChangesWhenInvitationInvalidationFails() throws Exception {
-        long party = party(10, "ACTIVE");
-        member(party, 20, "MEMBER", CREATED_AT.plusSeconds(1));
-        invitation(party, 30, "PENDING");
-        jdbc.execute(
-                "ALTER TABLE party_invitations ADD CONSTRAINT test_reject_decline"
-                        + " CHECK (status <> 'DECLINED')");
-        try {
-            kick(party, 20, 10).andExpect(status().is5xxServerError());
-            assertThat(memberIds(party)).containsExactlyInAnyOrder(10L, 20L);
-            assertParty(party, 10, "ACTIVE", null);
-            assertThat(
-                            jdbc.queryForObject(
-                                    "SELECT count(*) FROM party_invitations"
-                                            + " WHERE party_id=? AND status='PENDING'"
-                                            + " AND responded_at IS NULL",
-                                    Long.class,
-                                    party))
-                    .isEqualTo(1);
-        } finally {
-            jdbc.execute("ALTER TABLE party_invitations DROP CONSTRAINT test_reject_decline");
-        }
-    }
-
-    @Test
     void serializesConcurrentKicksInSameParty() throws Exception {
         long party = party(10, "ACTIVE");
         member(party, 20, "MEMBER", CREATED_AT.plusSeconds(1));
@@ -236,7 +211,7 @@ class PartyKickApiContractTest {
 
         assertThat(statuses).containsExactlyInAnyOrder(200, 200);
         assertThat(memberIds(party)).containsExactly(10L);
-        assertParty(party, 10, "CLOSED", "INSUFFICIENT_MEMBERS");
+        assertParty(party, 10, "ACTIVE", null);
     }
 
     @Test

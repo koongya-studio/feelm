@@ -284,6 +284,49 @@ public class PartyService {
         return !userBlockFilter.blockedAmong(inviteeId, memberIds).isEmpty();
     }
 
+    /** 현재 파티에서 나가고, 필요하면 오너를 승계하거나 마지막 멤버가 나간 파티를 종료한다. */
+    @Transactional
+    public PartyStateResponse leave(long userId, long partyId) {
+        Party party = findAccessiblePartyForUpdate(partyId, userId);
+        requireActive(party);
+        PartyMember leavingMember =
+                memberRepository
+                        .findByPartyIdAndUserId(partyId, userId)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        boolean ownerLeaves = party.getOwner().getId() == userId;
+
+        memberRepository.delete(leavingMember);
+        memberRepository.flush();
+        if (memberRepository.countByPartyId(partyId) == 0) {
+            Instant closedAt = Instant.now();
+            party.closeForInsufficientMembers(closedAt);
+            declinePendingInvitations(partyId, closedAt);
+        } else if (ownerLeaves) {
+            PartyMember successor =
+                    memberRepository
+                            .findFirstByPartyIdOrderByJoinedAtAscUserIdAsc(partyId)
+                            .orElseThrow(
+                                    () -> new IllegalStateException("Party successor is missing"));
+            successor.promoteToOwner();
+            party.transferOwnership(successor.getUser());
+        }
+        return PartyStateResponse.from(party);
+    }
+
+    /** 현재 파티장만 활성 파티를 종료하고 대기 중인 초대를 무효화한다. */
+    @Transactional
+    public PartyStateResponse close(long userId, long partyId) {
+        Party party = findAccessiblePartyForUpdate(partyId, userId);
+        if (party.getOwner().getId() != userId) {
+            throw new BusinessException(ErrorCode.FORBIDDEN);
+        }
+        requireActive(party);
+        Instant closedAt = Instant.now();
+        party.closeByOwner(closedAt);
+        declinePendingInvitations(partyId, closedAt);
+        return PartyStateResponse.from(party);
+    }
+
     /** 현재 파티장만 다른 현재 멤버를 강퇴하고, 남은 인원에 따라 파티를 종료한다. */
     @Transactional
     public PartyStateResponse kick(long requesterId, long partyId, long targetUserId) {
@@ -308,13 +351,29 @@ public class PartyService {
         memberRepository.delete(target);
         memberRepository.flush();
 
-        if (memberRepository.countByPartyId(partyId) == 1) {
-            Instant respondedAt = Instant.now();
-            party.closeForInsufficientMembers(respondedAt);
-            invitationRepository
-                    .findAllByPartyIdAndStatus(partyId, PartyInvitation.Status.PENDING)
-                    .forEach(invitation -> invitation.decline(respondedAt));
-        }
         return PartyStateResponse.from(party);
+    }
+
+    private Party findAccessiblePartyForUpdate(long partyId, long userId) {
+        Party party =
+                partyRepository
+                        .findByIdForUpdate(partyId)
+                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        if (!memberRepository.existsByPartyIdAndUserId(partyId, userId)) {
+            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
+        }
+        return party;
+    }
+
+    private void requireActive(Party party) {
+        if (party.getStatus() == PartyStatus.CLOSED) {
+            throw new BusinessException(ErrorCode.PARTY_CLOSED);
+        }
+    }
+
+    private void declinePendingInvitations(long partyId, Instant respondedAt) {
+        invitationRepository
+                .findAllByPartyIdAndStatus(partyId, PartyInvitation.Status.PENDING)
+                .forEach(invitation -> invitation.decline(respondedAt));
     }
 }

@@ -9,6 +9,8 @@ import org.springframework.data.repository.query.Param;
 public interface PartyMemberRepository extends JpaRepository<PartyMember, Long> {
     Optional<PartyMember> findByPartyIdAndUserId(long partyId, long userId);
 
+    Optional<PartyMember> findFirstByPartyIdOrderByJoinedAtAscUserIdAsc(long partyId);
+
     boolean existsByPartyIdAndUserId(long partyId, long userId);
 
     long countByPartyId(long partyId);

@@ -370,8 +370,8 @@ erDiagram
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `parties` | 파티 | 이름 필수, 최대 20자. `ACTIVE`이면 종료 사유·시각이 모두 NULL이고 `CLOSED`이면 모두 NOT NULL이다. 오너가 나간 뒤 2명 이상이면 최초 가입자에게 승계하고, 1명만 남으면 `INSUFFICIENT_MEMBERS`로 종료한다 | FR-20 · API-049, API-050, API-055, API-056 |
-| `party_members` | 파티 구성원 | 별도 `id`를 사용하고 UK(`party_id`, `user_id`)를 둔다. 오너도 `OWNER` 역할로 저장한다. 파티별 OWNER는 부분 유일 인덱스로 최대 1명을 보장하고, OWNER 존재·`parties.owner_id` 일치·최대 4명은 애플리케이션이 보장한다 | FR-20, FR-21 · API-057 |
+| `parties` | 파티 | 이름 필수, 최대 20자. `ACTIVE`이면 종료 사유·시각이 모두 NULL이고 `CLOSED`이면 모두 NOT NULL이다. 오너가 나간 뒤 1명 이상 남으면 최초 가입자에게 승계하고, 마지막 멤버가 나가 0명이 될 때 `INSUFFICIENT_MEMBERS`로 종료한다 | FR-20 · API-049, API-050, API-055, API-056 |
+| `party_members` | 파티 구성원 | 별도 `id`를 사용하고 UK(`party_id`, `user_id`)를 둔다. 활성 파티의 오너도 `OWNER` 역할로 저장한다. 파티별 OWNER는 부분 유일 인덱스로 최대 1명을 보장하고, `ACTIVE` 파티의 OWNER 존재·`parties.owner_id` 일치·최대 4명은 애플리케이션이 보장한다. 멤버가 0명인 `CLOSED` 파티의 `owner_id`는 마지막 오너 이력을 보존한다 | FR-20, FR-21 · API-057 |
 | `party_invitations` | 초대 | 현재 멤버라면 누구나 초대 가능하다. 자기 자신 초대 금지 CHECK와 `PENDING` 중복 부분 유일 인덱스를 두며, 기존 멤버·초대 발신자의 현재 멤버 여부는 애플리케이션에서 검증한다. `PENDING`이면 `responded_at`은 NULL이고 응답 완료 시 NOT NULL이다 | FR-20 · API-051~054 |
 
 ### 2.6 리포트 (2차 MVP)
@@ -433,10 +433,10 @@ flowchart LR
 
 ### 파티 인원 변경
 
-- 오너 탈퇴 후 남은 멤버가 2명 이상이면 `joined_at ASC, user_id ASC`의 첫 멤버에게 오너를 승계하고 `ACTIVE`를 유지합니다.
-- 멤버 탈퇴 후 1명만 남으면 `INSUFFICIENT_MEMBERS`, 오너가 직접 종료하면 `OWNER_CLOSED`로 닫고 대기 중 초대를 모두 `DECLINED` 처리합니다.
+- 오너 탈퇴 후 남은 멤버가 1명 이상이면 `joined_at ASC, user_id ASC`의 첫 멤버에게 오너를 승계하고 `ACTIVE`를 유지합니다.
+- 1인 파티도 `ACTIVE`이며 새 멤버를 초대할 수 있습니다. 마지막 멤버가 탈퇴해 0명이 될 때만 `INSUFFICIENT_MEMBERS`, 오너가 직접 종료하면 `OWNER_CLOSED`로 닫고 대기 중 초대를 모두 `DECLINED` 처리합니다.
 - 종료된 파티의 `recommendation_sets`는 보존합니다(추천 이력).
-- 파티장만 다른 현재 멤버를 강퇴할 수 있습니다(API-069). 해당 `party_members` 행 제거와 인원 부족 종료를 같은 트랜잭션에서 처리합니다. 자기 강퇴는 허용하지 않습니다.
+- 파티장만 다른 현재 멤버를 강퇴할 수 있습니다(API-069). 해당 `party_members` 행 제거와 인원 검사를 같은 트랜잭션에서 처리합니다. 자기 강퇴는 허용하지 않으므로 강퇴만으로 파티가 0명이 되거나 종료되지는 않습니다.
 - 강퇴는 차단을 생성하지 않고 재초대를 금지하는 별도 상태를 저장하지 않습니다. 기존 스키마를 사용합니다.
 
 ---
