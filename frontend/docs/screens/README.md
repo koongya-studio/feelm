@@ -50,7 +50,7 @@ Screen Spec에 남깁니다.
 | `Feelm UI Wireframe Final.html` | 로컬 `Feelm/` 작업 폴더 | UI 기준 와이어프레임 67프레임 |
 | `PRODUCT.md` | 로컬 `Feelm/` 작업 폴더 | 제품 목적, 사용자, 용어, 브랜드 약속, 데모 데이터 취급 원칙 |
 | `DESIGN.md` | 로컬 `Feelm/` 작업 폴더 | 현재 디자인 시스템 관찰 기록. 확정 사양이 아닙니다 |
-| `DESIGN_GOALS.md` | 로컬 `Feelm/` 작업 폴더 | 확정된 디자인 방향과 미확정 항목 |
+| `design-concept.md` | 이 폴더 | 확정된 시각 방향과 미확정 항목 |
 | `figma-export/`, `figma-plugin/` | 로컬 `Feelm/` 작업 폴더 | 디자인 전달 파이프라인. 이번 에픽 범위가 아닙니다 |
 | 기획 문서 | Notion `SSAFY-2` 페이지 | 열람 권한이 있는 팀원이 확인합니다. 내용 미확인 |
 
@@ -151,7 +151,7 @@ Spec에서 다루고, 이 문서는 그룹 단위까지만 기록합니다.
 
 ### 디자인 방향
 
-`DESIGN_GOALS.md`가 미확정으로 표시한 항목입니다.
+`design-concept.md`가 미확정으로 표시한 항목입니다.
 
 | 항목 | 상태 |
 | --- | --- |
