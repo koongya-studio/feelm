@@ -1,0 +1,59 @@
+/*
+ * 0.8 이메일 인증. 와이어프레임에 없는 화면이라 0.5 회원가입 완료와 같은 전환·완료
+ * 구성을 따른다(screen-spec-auth.md 0.8).
+ */
+.page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.stage {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--screen-padding-x);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+.lead {
+  margin: 0;
+  text-align: center;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  color: var(--color-ink-muted);
+}
+
+/* 만료일 때만 나온다. 재발송에는 이메일이 필요한데 토큰에서는 알 수 없다 */
+.resend {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.notice {
+  margin: 0;
+  text-align: center;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+.actions {
+  flex: none;
+  padding: 0 var(--screen-padding-x) var(--space-12);
+}

@@ -20,6 +20,7 @@ import SignupCompletePage from '../pages/auth/SignupCompletePage';
 import SignupMethodPage from '../pages/auth/SignupMethodPage';
 import SocialSignupPage from '../pages/auth/SocialSignupPage';
 import StartPage from '../pages/auth/StartPage';
+import VerifyEmailPage from '../pages/auth/VerifyEmailPage';
 import FilmPage from '../pages/film/FilmPage';
 import FrameDetailPage from '../pages/film/FrameDetailPage';
 import PopcornBucketPage from '../pages/film/PopcornBucketPage';
@@ -60,6 +61,7 @@ export const router = createBrowserRouter(
         { path: ROUTE_PATTERN.login, element: <LoginPage /> },
         { path: ROUTE_PATTERN.accountFind, element: <AccountFindPage /> },
         { path: ROUTE_PATTERN.passwordReset, element: <PasswordResetPage /> },
+        { path: ROUTE_PATTERN.verifyEmail, element: <VerifyEmailPage /> },
       ],
     },
     {

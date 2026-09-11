@@ -19,6 +19,8 @@ export const ROUTE_PATTERN = {
   login: '/login',
   accountFind: '/account/find',
   passwordReset: '/account/reset',
+  // 0.8. 인증 메일 링크가 도착하는 곳이라 백엔드 설정값과 같아야 한다(S15P21E106-367)
+  verifyEmail: '/verify-email',
 
   // 온보딩 (하단 내비 없음)
   onboardingTaste: '/onboarding/taste',
@@ -67,6 +69,7 @@ export const path = {
   login: () => ROUTE_PATTERN.login,
   accountFind: () => ROUTE_PATTERN.accountFind,
   passwordReset: () => ROUTE_PATTERN.passwordReset,
+  verifyEmail: () => ROUTE_PATTERN.verifyEmail,
 
   onboardingTaste: () => ROUTE_PATTERN.onboardingTaste,
   onboardingOtt: () => ROUTE_PATTERN.onboardingOtt,
