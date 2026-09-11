@@ -1,5 +1,26 @@
 # Kafka → Spark → HDFS 검증
 
+## Spark ML 런타임 검증
+
+S15P21E106-290의 `ml-cluster-check.py`는 `spark-submit` client mode Driver와 두 Worker가
+모두 NumPy 2.2.6을 사용하고, 작은 고정 rating 데이터로 ALS 학습·예측이 성공하는지 확인합니다.
+이미지는 저장소 루트의 `infra/spark/Dockerfile`로 두 서버에서 각각 빌드하며 Docker Hub에는
+Push하지 않습니다. NumPy wheel과 hash는 `pipeline/spark/uv.lock`의 Linux x86_64 항목과
+일치합니다. 빌드·적용·롤백 및 전체 제출 명령은 [인프라 운영 문서](../README.md#ml-runtime-image)를
+따릅니다.
+
+Docker가 없는 개발 환경에서도 이미지 계약과 세 Spark 역할의 공통 빌드 설정을 검사합니다.
+
+```bash
+python3 -B -m unittest infra.spark.test_spark_ml_runtime -v
+python3 -B -m py_compile infra/spark/ml-cluster-check.py
+```
+
+서버 검증 전에는 Running Applications와 Drivers가 없는지 확인합니다. 검사는 7079~7081 고정
+포트를 사용하므로 기존 `cluster-check.py` 또는 Kafka-HDFS 검사와 동시에 실행하지 않습니다.
+성공 기준은 Driver·executor의 NumPy `2.2.6`, 서로 다른 executor hostname 2개, 유한한 ALS
+prediction 12개와 마지막 줄 `E106 SPARK ML CHECK: SUCCESS`입니다.
+
 `kafka-hdfs-check.py`는 137의 대화 명령을 재사용할 수 있도록 정리한 소규모 검증 스크립트다.
 `8f840b3`의 저장본은 2026-09-04 운영자가 서버에서 최초 처리 10건, 무신규 재개 10건 유지,
 신규 이벤트 재개 15건 및 실제 HDFS 복제본 2개를 검증했다.

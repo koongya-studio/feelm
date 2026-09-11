@@ -558,6 +558,70 @@ Spark는 J15E106A의 Master·Worker 2와 J15E106의 Worker 1로 구성합니다.
 2 Core와 4 GiB 메모리를 Spark 애플리케이션에 제공하며, 컨테이너는 두 서버 사이의 직접
 통신을 위해 host network를 사용합니다.
 
+### ML Runtime Image
+
+세 Spark 컨테이너는 `SPARK_IMAGE`에 지정한 같은 로컬 이미지를 사용합니다. 기본값은
+`feelm-spark-ml:4.1.3-numpy2.2.6`입니다. `infra/spark/Dockerfile`은 기존 Apache Spark
+4.1.3 Python 이미지를 digest로 고정하고, `pipeline/spark/uv.lock`과 같은 CPython 3.10
+Linux x86_64 NumPy 2.2.6 wheel을 hash 검증 후 설치합니다. Spark·Java·Scala 버전과
+Master·Worker 실행 명령은 변경하지 않습니다.
+
+2026-09-10 사전 확인에서 세 컨테이너는 같은 공식 이미지
+`apache/spark:4.1.3-scala2.13-java21-python3-ubuntu`를 사용했습니다. Master와 Worker 2에는
+NumPy가 없었고, Worker 1도 같은 이미지 ID를 사용하며 Python 패키지 수동 설치 흔적이 없어
+동일한 상태로 판단했습니다.
+
+이미지는 Docker Hub에 Push하지 않고 두 서버에서 각각 빌드합니다. 빌드만으로 실행 중인
+컨테이너가 교체되지는 않습니다. 두 서버의 저장소가 승인된 같은 commit인지 먼저 확인하고,
+J15E106A에서는 Master·Worker 2를, J15E106에서는 Worker 1을 대상으로 빌드합니다.
+
+```bash
+# 두 서버에서 각각 확인
+git rev-parse HEAD
+
+# J15E106A
+docker compose --env-file infra/.env -f infra/compose/distributed.yml \
+  build spark-master spark-worker-2
+
+# J15E106
+docker compose --env-file infra/.env -f infra/compose/service.yml \
+  build spark-worker-1
+```
+
+각 서버에서 이미지에 NumPy 2.2.6이 있고 Spark 제출 명령을 실행할 수 있는지 검사합니다.
+
+```bash
+SPARK_IMAGE="${SPARK_IMAGE:-feelm-spark-ml:4.1.3-numpy2.2.6}"
+docker image inspect "$SPARK_IMAGE" --format 'image={{.Id}} user={{.Config.User}}'
+docker run --rm --entrypoint python3 "$SPARK_IMAGE" \
+  -c 'import numpy; print(numpy.__version__)'
+docker run --rm --entrypoint /opt/spark/bin/spark-submit "$SPARK_IMAGE" --version
+```
+
+두 서버 모두 NumPy `2.2.6`, 이미지 사용자 `spark`, Spark `4.1.3`을 출력해야 합니다. 어느
+검사든 실패하면 실행 중인 Spark 컨테이너를 재생성하지 않습니다.
+
+### ML Runtime Rollout and Rollback
+
+적용 전 Master Web UI의 Running Applications와 Drivers가 비어 있고 팀이 합의한 중단
+시간인지 확인합니다. 먼저 J15E106A의 Master·Worker 2를 교체하고, 이어서 J15E106의 Worker 1을
+교체합니다. HDFS·Kafka와 서비스 컨테이너는 재생성하지 않습니다.
+
+```bash
+# J15E106A
+docker compose --env-file infra/.env -f infra/compose/distributed.yml \
+  up -d --no-deps --force-recreate spark-master spark-worker-2
+
+# J15E106
+docker compose --env-file infra/.env -f infra/compose/service.yml \
+  up -d --no-deps --force-recreate spark-worker-1
+```
+
+롤백은 두 서버의 `SPARK_IMAGE`를 직전 정상 이미지로 함께 지정한 뒤 같은 순서로 세 Spark
+컨테이너만 재생성합니다. 기존 공식 이미지는 클러스터 자체를 복구할 수 있지만 NumPy가 없으므로
+ML 작업은 재개하지 않습니다. `docker compose down`, `down -v`, HDFS·Kafka 볼륨 삭제는
+사용하지 않습니다.
+
 ### Network and Ports
 
 아래 포트는 두 서버의 사설 IP 사이에서만 허용하고 인터넷에 공개하지 않습니다. Master
@@ -608,6 +672,32 @@ docker logs --tail 100 feelm-spark-worker-2
 
 Master Web UI에서 Worker 2개가 모두 `ALIVE`이고 전체 자원이 4 Core / 8 GiB로 표시되는지
 확인합니다.
+
+ML 이미지 적용 후 J15E106A에서 전용 검사도 실행합니다. Driver와 두 Worker의 NumPy 버전,
+두 executor host 사용과 소규모 ALS 학습·예측을 함께 검증합니다. 기존 검사와 같은 고정 포트를
+사용하므로 동시에 실행하지 않습니다.
+
+```bash
+docker cp infra/spark/ml-cluster-check.py feelm-spark-master:/tmp/ml-cluster-check.py
+
+docker exec feelm-spark-master \
+  /opt/spark/bin/spark-submit \
+  --master spark://spark-master:7077 \
+  --deploy-mode client \
+  --total-executor-cores 4 \
+  --executor-cores 2 \
+  --executor-memory 2g \
+  --conf spark.driver.host=spark-master \
+  --conf spark.driver.bindAddress=0.0.0.0 \
+  --conf spark.driver.port=7079 \
+  --conf spark.driver.blockManager.port=7080 \
+  --conf spark.blockManager.port=7081 \
+  --conf spark.port.maxRetries=0 \
+  /tmp/ml-cluster-check.py
+```
+
+`DRIVER_NUMPY_VERSION=2.2.6`, `EXECUTOR_NUMPY_VERSIONS=2.2.6`, 서로 다른 executor hostname
+2개, `ALS_PREDICTION_COUNT=12`와 `E106 SPARK ML CHECK: SUCCESS`를 모두 확인합니다.
 
 ### Distributed PySpark Verification
 
