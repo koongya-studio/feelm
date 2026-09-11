@@ -1,0 +1,85 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--screen-padding-x) var(--space-6);
+  gap: var(--space-5);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* ─────────────────────────── ⋯ 메뉴 */
+
+/*
+ * 2.3의 메뉴 항목은 아이콘이 붙은 작은 줄이라 터치 영역을 넓히지 못했다. 여기는
+ * 아이콘 없는 글자 두 줄뿐이라 44px을 그대로 줄 수 있다.
+ */
+.menuItem {
+  display: flex;
+  min-height: var(--tap-target-min);
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-ink);
+  cursor: pointer;
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  text-align: left;
+}
+
+.menuItem + .menuItem {
+  border-top: 1px solid var(--color-line-faint);
+}
+
+/* 신고하기는 차단보다 덜 쓰이는 동작이라 약하게 둔다(와이어프레임도 옅게 그렸다) */
+.menuItem[data-tone='quiet'] {
+  color: var(--color-ink-muted);
+  font-weight: var(--font-weight-medium);
+}
+
+/* ─────────────────────────── 공개 한줄평 */
+
+.reviews {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.review + .review {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-line-faint);
+}
+
+.reviewComment {
+  color: var(--color-ink-body);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.reviewMeta {
+  display: flex;
+  align-items: center;
+  margin-top: var(--space-1);
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  gap: var(--space-2);
+}
+
+/* ─────────────────────────── 차단 · 신고 안내 */
+
+/*
+ * 계약이 없어 실제로 처리하지 않는다. 무엇이 일어나는지만 알린다.
+ * `role="status"`라 화면 낭독기가 나타날 때 읽는다.
+ */
+.notice {
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-control);
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}

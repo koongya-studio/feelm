@@ -36,12 +36,12 @@
  * 펼친 상태로 시작하는 것도 인원과 무관하다.
  */
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import PopcornBucket from '../../../components/PopcornBucket';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
-import { ChevronDownIcon, ChevronUpIcon } from '../../../components/Icon';
+import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon } from '../../../components/Icon';
 import { getMyParties, getPartyPopcorn } from '../../../api/parties';
 import { getMyProfile } from '../../../api/users';
 import { getPopcornFlavors } from '../../../api/taste';
@@ -228,6 +228,25 @@ export default function PartyPopcornPage() {
                   </span>
                 </span>
               </button>
+
+              {/*
+               * 7.2-B 다른 사용자 공개 프로필로 들어가는 자리 (업무 -305).
+               *
+               * 와이어프레임 이동표에 7.2-B로 들어오는 화살표가 아예 없었고, 5.8에서
+               * 들어가기로 확정했다(2026-09-11, screen-spec-my.md 2장 8번).
+               *
+               * 통 전체를 링크로 만들지 않았다. 통은 이미 펼치기 버튼이라 같은 자리에
+               * 동작이 둘이 되면 어느 쪽이 일어날지 알 수 없다. 별도 줄로 둔다.
+               *
+               * 내 카드에는 두지 않는다. 내 공개 프로필은 7.2-A로 보는 것이고, 여기서
+               * 7.2-B로 들어가면 `다른 사용자` 화면에서 나를 보게 된다.
+               */}
+              {isMe ? null : (
+                <Link to={path.publicProfile(member.user.userId)} className={styles.profileLink}>
+                  {member.user.nickname} 님의 취향 보기
+                  <ChevronRightIcon />
+                </Link>
+              )}
 
               {isOpen ? (
                 <ul className={styles.flavorList}>

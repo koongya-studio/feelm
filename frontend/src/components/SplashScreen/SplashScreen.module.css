@@ -43,7 +43,7 @@
  *
  * 실측(412x915 · 393x852 · 375x667)에서 워드마크·안경·태그라인이 모두 남고
  * 빈 띠도 생기지 않았다. 4:3(1.33)에서는 태그라인이 잘리는데, 태블릿 /
- * expanded width 대응은 `docs/screens/design-goals.md` 2.5가 미확정·범위 밖으로
+ * expanded width 대응은 `docs/screens/design-concept.md` 6장이 미확정·범위 밖으로
  * 두고 있어 여기서 정하지 않는다. 정해지면 이 값 대신 좌우를 채우는 방식이
  * 필요하다.
  */

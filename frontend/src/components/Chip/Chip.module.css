@@ -9,3 +9,15 @@
   font-weight: var(--font-weight-bold);
   white-space: nowrap;
 }
+
+/*
+ * 채운 칩. 잉크 면에 흰 글자다.
+ *
+ * 테두리를 투명으로 두지 않고 같은 색으로 채운다. 테두리를 없애면 채운 칩이
+ * 테두리 칩보다 2px 작아져 한 줄에 섞였을 때 밑선이 어긋난다.
+ */
+.chip[data-variant='solid'] {
+  border-color: var(--color-action);
+  background: var(--color-action);
+  color: var(--color-on-action);
+}

@@ -279,3 +279,23 @@ export function BlockIcon() {
     </svg>
   );
 }
+
+/*
+ * 7.2 프로필 편집 — 프로필 이미지 변경.
+ *
+ * 와이어프레임 7.2는 아바타 우하단에 원형 뱃지를 두고 그 안에 카메라를 그렸다.
+ * 원본 SVG가 아이콘 하나로 분리돼 있지 않아 같은 모양으로 다시 그렸다.
+ */
+export function CameraIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 18 18" fill="none" {...hidden}>
+      <path
+        d="M2.4 5.4h2.7l1.2-1.8h4.8l1.2 1.8h2.7a1.2 1.2 0 011.2 1.2v6.6a1.2 1.2 0 01-1.2 1.2H2.4a1.2 1.2 0 01-1.2-1.2V6.6a1.2 1.2 0 011.2-1.2z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <circle cx="9" cy="9.9" r="2.7" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  );
+}

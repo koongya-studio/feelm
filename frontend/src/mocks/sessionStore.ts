@@ -62,6 +62,13 @@ type SessionState = {
   createdParties: PartyView[];
   /** API-053 · API-054로 답한 초대. `invitationId` → 바뀐 상태 */
   invitationStatuses: Record<number, 'ACCEPTED' | 'DECLINED'>;
+  /**
+   * 7.2 프로필 편집이 저장한 **계약에 없는 값**. `null`이면 아직 편집하지 않았다.
+   *
+   * 닉네임 · 생년월일 · 성별 · 공개 범위는 여기 없다. API-015가 실제로 저장하므로
+   * 로컬에 둘 이유가 없다(`api/users.ts`). 한 줄 소개만 계약에 자리가 없어 남는다.
+   */
+  profileEdit: { introduction: string } | null;
 };
 
 function emptyState(): SessionState {
@@ -76,6 +83,7 @@ function emptyState(): SessionState {
     recentSearchQueries: ['케이퍼 무비', '크리스토퍼 놀란', 'SF 명작'],
     createdParties: [],
     invitationStatuses: {},
+    profileEdit: null,
   };
 }
 
@@ -170,6 +178,17 @@ export function setInvitationStatus(invitationId: number, status: 'ACCEPTED' | '
 
 export function getInvitationStatus(invitationId: number): 'ACCEPTED' | 'DECLINED' | null {
   return state.invitationStatuses[invitationId] ?? null;
+}
+
+// ─────────────────────────────────────────── 프로필 편집
+
+export function saveProfileEdit(update: { introduction: string }): void {
+  state.profileEdit = { ...update };
+}
+
+/** 아직 편집하지 않았으면 null. 기준 목업을 쓰라는 뜻이다 */
+export function getProfileEdit(): { introduction: string } | null {
+  return state.profileEdit;
 }
 
 // ─────────────────────────────────────────── 관심없음

@@ -25,6 +25,11 @@ import FilmPage from '../pages/film/FilmPage';
 import FrameDetailPage from '../pages/film/FrameDetailPage';
 import PopcornBucketPage from '../pages/film/PopcornBucketPage';
 import HomePage from '../pages/home/HomePage';
+import MyDashboardPage from '../pages/my/MyDashboardPage';
+import ProfileEditPage from '../pages/my/ProfileEditPage';
+import ProfilePreviewPage from '../pages/my/ProfilePreviewPage';
+import PublicProfilePage from '../pages/my/PublicProfilePage';
+import TasteComparePage from '../pages/my/TasteComparePage';
 import OttManagePage from '../pages/otts/OttManagePage';
 import MovieDetailPage from '../pages/movies/MovieDetailPage';
 import MovieRatingPage from '../pages/movies/MovieRatingPage';
@@ -82,9 +87,21 @@ export const router = createBrowserRouter(
         { path: ROUTE_PATTERN.search, element: <SearchPage /> },
         { path: ROUTE_PATTERN.ottManage, element: <OttManagePage /> },
 
+        // 7.1 MY 대시보드 (업무 -305). 이전에는 NotInScopePage였다
+        { path: ROUTE_PATTERN.my, element: <MyDashboardPage /> },
+
         // 이번 단계 구현 범위가 아닌 탭. REF-01의 5탭 구성을 검증하기 위해 라우트는 둔다.
         { path: ROUTE_PATTERN.party, element: <PartyListPage /> },
-        { path: ROUTE_PATTERN.my, element: <NotInScopePage /> },
+
+        /*
+         * 7.1 메뉴가 가리키는 화면 중 306~308 몫(7.3 · 7.5 · 7.6 · 7.8).
+         * 경로를 두는 이유는 paths.ts 주석에 적었다 — `아직 안 만든 화면`과
+         * `잘못된 주소`가 구분돼야 이동 경로를 검증할 수 있다.
+         */
+        { path: ROUTE_PATTERN.tasteReports, element: <NotInScopePage /> },
+        { path: ROUTE_PATTERN.recommendationHistory, element: <NotInScopePage /> },
+        { path: ROUTE_PATTERN.myRatings, element: <NotInScopePage /> },
+        { path: ROUTE_PATTERN.settings, element: <NotInScopePage /> },
       ],
     },
     {
@@ -103,6 +120,12 @@ export const router = createBrowserRouter(
         { path: ROUTE_PATTERN.partyRecommendations, element: <PartyRecommendationPage /> },
         { path: ROUTE_PATTERN.partyInvitation, element: <PartyInvitationPage /> },
         { path: ROUTE_PATTERN.partyJoined, element: <PartyJoinedPage /> },
+
+        // MY 프로필 (업무 -305). 7.1만 탭 화면이고 나머지는 전체화면이다
+        { path: ROUTE_PATTERN.profileEdit, element: <ProfileEditPage /> },
+        { path: ROUTE_PATTERN.profilePreview, element: <ProfilePreviewPage /> },
+        { path: ROUTE_PATTERN.publicProfile, element: <PublicProfilePage /> },
+        { path: ROUTE_PATTERN.tasteCompare, element: <TasteComparePage /> },
         { path: ROUTE_PATTERN.notFound, element: <NotFoundPage /> },
       ],
     },
