@@ -21,6 +21,9 @@
  * | PartyTasteView.tasteShare | 5.9 `액션 · 모험` `46%` · `스릴러 · 범죄` `38%` | CR-17 결정 대기. 무엇의 비율인지 정의가 없고 API-057 집계로 재현되지 않음 |
  * | PartyTasteView.tags | 5.9 `케이퍼` `빠른 전개` `반전` `느와르` | CR-17 결정 대기. API-044 `representativeKeywords`나 API-040 `keywords`로 보이나 값이 맞지 않음 |
  * | PartyMixView.commonRate · tags | 5.9 `공통 취향 일치 72%` · `스릴러` `빠른 전개` | CR-17 결정 대기. 산출 규칙이 계약에 없음 |
+ * | PublicProfileView | 7.2-A · 7.2-B 공개 프로필 | API-062가 있으나 **2차 MVP**라 미구현. 응답 모양도 다름 |
+ * | TasteCompareView | 7.2-C `76%` · 장르 82 · 국가 74 · 시대 71 · 감독 68 | API-063이 있으나 **2차 MVP**라 미구현. **4줄 비교는 계약에 없음** |
+ * | introduction | 7.2 한 줄 소개 · 7.2-A · 7.2-B 소개 문구 | 와이어프레임에 없고 레퍼런스 지시로 추가. 계약에 자리가 없음. CR 미등록 |
  */
 import type { FrameDetail } from './taste';
 import type { Party } from './party';
@@ -122,4 +125,100 @@ export type PartyMixView = {
   commonRate: number;
   /** 공통 취향 태그 */
   tags: string[];
+};
+
+/*
+ * ─────────────────────────────────────────── MY 공개 프로필 (업무 -305)
+ *
+ * 7.2-A · 7.2-B · 7.2-C가 쓰는 값이다.
+ *
+ * **계약은 있다 — API-062 공개 프로필 조회 · API-063 취향 비교(`docs/api/social.md`).
+ * 다만 둘 다 2차 MVP라 아직 없다.** 305는 계약을 찾기 전에 화면 기준으로 만들었고,
+ * 그래서 아래 타입은 계약의 응답 모양과 다르다. 계약이 열릴 때 맞춘다.
+ *
+ * `[!]` 어긋난 곳
+ * - API-062는 `user` · `recentFrames` · `popcorn.flavors` · `publicReviewCount` ·
+ *   `isBlockedByMe`로 내려준다. 아래는 평평한 모양이다
+ * - API-063은 `similarity`(0~1) · `sharedFlavors` · `flavorComparison`(맛별 내 것 /
+ *   상대 것) · `commonMovies`를 준다. **장르 · 국가 · 시대 · 감독 4줄에 해당하는 값이
+ *   계약에 없다.** 그 4줄은 와이어프레임 7.2-C가 그린 것이다
+ * - 경로 파라미터가 `publicId`(`users.public_id`, ADR-0008)다. 내부 숫자 ID를 공개
+ *   URL에 노출하지 않는다는 결정이라 라우트도 함께 바꿔야 한다
+ *
+ * 공개 범위 자체는 1차 계약에 있다(API-014 · API-015의 `visibility`, 7.8-B 공개 범위
+ * 설정). 무엇이 공개되는지는 그 설정이 정하고, 이 타입은 **그 결과로 남은 것**만 담는다.
+ */
+
+/** 공개 프로필이 보여주는 수치. 팔로워 수 같은 개념은 Feelm에 없다 */
+export type PublicProfileStats = {
+  frameCount: number;
+  popcornCount: number;
+  /** 공개로 남긴 한줄평 수 */
+  publicReviewCount: number;
+};
+
+/** 7.2-A · 7.2-B 공개 프로필 */
+export type PublicProfileView = {
+  userId: number;
+  nickname: string;
+  avatarUrl: string | null;
+  /** 한 줄 소개. 레퍼런스 지시로 추가했다 */
+  introduction: string;
+  stats: PublicProfileStats;
+  /** 공개된 취향 키워드 */
+  keywords: TasteKeywordView[];
+  /** 공개된 취향 필름. 최신순 */
+  frames: {
+    frameId: number;
+    movieId: number;
+    title: string;
+    posterUrl: string | null;
+  }[];
+  /** 공개된 팝콘 맛 분포. 코드와 알 수만 담고 색·이름은 API-044에서 온다 */
+  popcorn: { flavorCode: string; popcornCount: number }[];
+  /**
+   * 공개 한줄평. 7.2-A는 **항상 빈 배열**이다 — 본인 미리보기이고 와이어프레임이
+   * `비공개로 설정한 항목(한줄평)은 표시되지 않아요`로 적고 있다
+   */
+  reviews: {
+    ratingId: number;
+    movieTitle: string;
+    comment: string;
+    score: number;
+  }[];
+  /**
+   * 나와의 취향 일치도(%). 본인 프로필(7.2-A)에서는 `null`이다.
+   * 7.2-C가 보여주는 값과 같은 수치다
+   */
+  matchRate: number | null;
+};
+
+/** 7.2-C 항목별 비교 한 줄 */
+export type TasteCompareItem = {
+  /** 장르 · 국가 · 시대 · 감독 */
+  label: string;
+  /** 일치율(%) */
+  rate: number;
+};
+
+/**
+ * 7.2-C 사용자 취향 비교.
+ *
+ * 산출 규칙이 계약에 없다. 와이어프레임의 값(전체 76% · 장르 82 · 국가 74 · 시대 71 ·
+ * 감독 68)을 그대로 옮겼다.
+ */
+export type TasteCompareView = {
+  me: { userId: number; nickname: string; avatarUrl: string | null };
+  other: { userId: number; nickname: string; avatarUrl: string | null };
+  /** 전체 일치율(%) */
+  matchRate: number;
+  /** 두 사람 모두 상위에 있는 맛의 코드 */
+  sharedFlavorCodes: string[];
+  items: TasteCompareItem[];
+  /** 같이 볼 만한 영화. 레퍼런스 지시로 추가했다 */
+  recommendations: {
+    movieId: number;
+    title: string;
+    posterUrl: string | null;
+  }[];
 };

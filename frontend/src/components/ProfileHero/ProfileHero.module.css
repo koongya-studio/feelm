@@ -1,0 +1,162 @@
+/*
+ * 화면 맨 위부터 전체 폭을 차지한다. 화면 좌우 여백 안에서 쓰이므로 음수 마진으로
+ * 여백을 되돌리고, 위쪽 여백도 걷어내 상태 표시줄까지 올라간다.
+ *
+ * 높이는 화면의 절반이 넘는다. 레퍼런스에서 이미지가 첫인상을 만드는 크기다.
+ * `svh`를 쓰는 이유는 모바일 브라우저의 주소창이 접힐 때 히어로가 출렁이지 않게
+ * 하기 위해서다. 지원하지 않는 브라우저를 위해 `vh`를 먼저 둔다.
+ */
+.hero {
+  position: relative;
+  display: flex;
+  min-height: 54vh;
+  min-height: 54svh;
+  /*
+   * 높이 상한. 화면이 아주 높으면(태블릿 · 데스크톱) 54%가 그대로 늘어나 이미지 위쪽이
+   * 텅 비고 이름만 아래에 붙는다. 휴대폰에서의 크기를 넘지 않게 잘라 둔다.
+   */
+  max-height: 520px;
+  flex-direction: column;
+  margin: 0 calc(var(--screen-padding-x) * -1);
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+  /*
+   * 무채색 어두운 면. 평평하지 않도록 아주 옅은 밝기 차이만 준다.
+   * 포스터 색을 여기로 번지게 하지 않는다(`design-concept.md` 3장).
+   */
+  background:
+    radial-gradient(120% 70% at 50% 0%, #2a2b2f 0%, rgba(42, 43, 47, 0) 70%),
+    var(--color-surface-dark);
+  isolation: isolate;
+  overflow: hidden;
+}
+
+/*
+ * 이미지 위에 떠 있는 상단 줄. 뒤로 가기 · 라벨 · 액션.
+ * 세 칸을 같은 폭으로 두어 가운데 라벨이 실제로 가운데에 온다.
+ */
+.nav {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(var(--space-4) + env(safe-area-inset-top, 0px)) var(--space-3) 0;
+  gap: var(--space-2);
+}
+
+/*
+ * 사진 위에 놓이므로 반투명 검정에 흰 아이콘이다. 무엇 위에 오든 읽힌다.
+ * 보이는 크기는 36px이고 터치 영역은 44px이다.
+ */
+.navButton {
+  position: relative;
+  display: flex;
+  width: var(--tap-target-min);
+  height: var(--tap-target-min);
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-on-dark);
+  cursor: pointer;
+}
+
+/* 오른쪽에 버튼이 없을 때 가운데 라벨이 밀리지 않도록 같은 폭을 비워 둔다 */
+.navSpacer {
+  width: var(--tap-target-min);
+  flex: none;
+}
+
+/*
+ * **`backdrop-filter`를 쓰지 않는다.** 처음에는 유리처럼 흐리게 두었는데, 스크롤하면
+ * 히어로가 통째로 다시 그려지지 않고 빈 자리가 남았다(DOM 위치는 맞는데 화면만 낡은
+ * 상태로 남는 합성 문제). 이 버튼은 이미 흐린 이미지 위에 놓이므로 흐림을 한 겹 더
+ * 얹어도 보이는 차이가 거의 없다. 토큰도 `backdrop-filter`는 효과가 실제로 보이는
+ * 곳에만 쓰라고 적고 있다.
+ */
+.navButton::before {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: var(--radius-pill);
+  background: rgba(14, 14, 16, 0.55);
+  content: '';
+}
+
+.navButton svg {
+  position: relative;
+}
+
+.eyebrow {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: var(--radius-pill);
+  background: rgba(14, 14, 16, 0.55);
+  color: var(--color-on-dark);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+}
+
+/*
+ * 이름은 이미지 한가운데가 아니라 아래쪽 경계에 둔다. 위쪽은 이미지가 그대로 보이고,
+ * 아래로 내려오면서 글자가 나타나는 레퍼런스의 순서다.
+ */
+.content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  width: 100%;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding: var(--space-10) var(--screen-padding-x) var(--space-5);
+  gap: var(--space-3);
+}
+
+/*
+ * 이름은 화면 제목보다 한 단계 크다. 레퍼런스에서 이름은 이미지 위에 놓이는 유일한
+ * 큰 글자이고, 토큰의 제목 크기(27px)로는 이미지에 묻힌다.
+ */
+.name {
+  color: var(--color-on-dark);
+  font-size: calc(var(--font-size-title) * 1.2);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-title);
+  line-height: var(--line-height-title);
+  text-align: center;
+}
+
+/*
+ * 소개는 두 줄까지만 보여준다. 한국어는 길어지기 쉽고, 세 줄이 되면 아래 수치가
+ * 이미지 밖으로 밀린다.
+ */
+.introduction {
+  display: -webkit-box;
+  overflow: hidden;
+  max-width: 30ch;
+  margin-top: calc(var(--space-2) * -1);
+  color: var(--color-on-dark-muted);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  text-align: center;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.extra {
+  width: 100%;
+  margin-top: var(--space-1);
+}
+
+/* 아바타는 이미지 위에 뜬 것처럼 테두리를 두른다(레퍼런스의 인물이 놓인 자리다) */
+.content > :first-child {
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}

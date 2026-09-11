@@ -1,0 +1,74 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--screen-padding-x) var(--space-6);
+  gap: var(--space-3);
+}
+
+/* ─────────────────────────── 일치율 히어로 */
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-6) var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-dark);
+  gap: var(--space-3);
+}
+
+/*
+ * 아바타 — 링 — 아바타. 좁은 화면에서 링이 줄지 않도록 아바타 쪽만 줄어들게 한다.
+ * `MatchRing`은 `flex: none`이다.
+ */
+.faces {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+}
+
+.heroCaption {
+  color: var(--color-on-dark-muted);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  text-align: center;
+}
+
+/* ─────────────────────────── 카드 안쪽 */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.meters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/*
+ * 포스터 가로 스크롤. Section 패딩 안에서 넘치므로 음수 마진으로 카드 끝까지 민다
+ * (TasteShowcase와 같은 처리).
+ */
+.posterTrack {
+  display: flex;
+  overflow-x: auto;
+  margin: 0 calc(var(--space-4) * -1);
+  padding: 0 var(--space-4);
+  gap: var(--space-2);
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.posterTrack::-webkit-scrollbar {
+  display: none;
+}
+
+.posterItem {
+  flex: none;
+  scroll-snap-align: start;
+}

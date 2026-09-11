@@ -1,0 +1,50 @@
+/*
+ * 항목 수만큼 같은 폭으로 나눈다. 사이에는 선을 하나씩 둔다 — 레퍼런스가 선 없이
+ * 여백만으로 나누는데, 한국어 라벨은 길이가 제각각이라 여백만으로는 열이 안 보인다.
+ */
+.row {
+  display: flex;
+  margin: 0;
+}
+
+.item {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.item + .item {
+  border-left: 1px solid var(--color-line);
+}
+
+.label {
+  order: 2;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+/* 수치가 먼저 읽혀야 하므로 order로 위에 올린다. dt/dd 순서는 의미를 따른다 */
+.value {
+  order: 1;
+  margin: 0;
+  font-size: var(--font-size-heading);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-heading);
+}
+
+/* 어두운 면 위 */
+.row[data-on-dark='true'] .item + .item {
+  border-left-color: var(--color-line-on-dark);
+}
+
+.row[data-on-dark='true'] .label {
+  color: var(--color-on-dark-muted);
+}
+
+.row[data-on-dark='true'] .value {
+  color: var(--color-on-dark);
+}
