@@ -68,6 +68,22 @@ public final class ConstraintViolations {
         return exception;
     }
 
+    /**
+     * 구독 OTT 외래키 위반을 옮긴다(API-027).
+     *
+     * <p>{@code fk_user_otts_ott_id}만 "존재하지 않는 OTT"를 뜻한다. 존재 검증과 삽입 사이에 그 OTT가 사라지면 사전 검사를 통과한 삽입이
+     * 실패하는데, 사용자가 보기에는 사전 검사가 걸러 내는 상황과 같으므로 같은 응답을 준다. 사용자 FK는 계정 행을 잠그고 활성 여부까지 확인한 뒤라 여기서 400으로
+     * 바꾸면 500이어야 할 상황을 가릴 수 있어 제외한다(S15P21E106-211 리뷰 #2와 같은 기준).
+     *
+     * @return 판별한 {@link BusinessException}, 알 수 없는 제약이면 원래 예외
+     */
+    public static RuntimeException ottReferenceOf(DataIntegrityViolationException exception) {
+        if (nameOf(exception).contains("fk_user_otts_ott_id")) {
+            return new BusinessException(ErrorCode.VALIDATION_FAILED);
+        }
+        return exception;
+    }
+
     /** 위반된 제약 이름. 이름을 알 수 없으면 빈 문자열이며 호출자가 원래 예외를 그대로 던진다. */
     private static String nameOf(DataIntegrityViolationException exception) {
         Throwable cause = exception;
