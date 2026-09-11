@@ -18,6 +18,8 @@
  * 정했다(팀 결정 2026-09-08). 지연은 그 동작을 확인하고 오류 주입과 함께 쓰기 위한 것이다.
  */
 
+import { ApiError } from './apiError';
+
 /** 오류를 주입할 수 있는 도메인. src/api/ 함수가 `respond`에 넘긴다 */
 export type MockDomain =
   | 'recommendations'
@@ -32,18 +34,11 @@ export type MockDomain =
   | 'onboarding'
   | 'watch';
 
-export class ApiError extends Error {
-  status: number;
-  /** 계약 공통 규약의 오류 코드 (docs/api/README.md) */
-  code: string;
-
-  constructor(status: number, code: string, message: string) {
-    super(message);
-    this.name = 'ApiError';
-    this.status = status;
-    this.code = code;
-  }
-}
+/*
+ * 오류 타입은 `apiError`에 있다. 목업이 사라져도 화면과 HTTP 클라이언트가 계속 쓰므로
+ * 이 파일과 수명을 같이 하면 안 된다. 기존 import 경로를 지키려고 다시 export한다.
+ */
+export { ApiError };
 
 /** 지연 상한. 실수로 큰 값을 넣어도 화면이 멈춘 것처럼 보이지 않게 한다 */
 const MAX_MOCK_DELAY_MS = 5000;
