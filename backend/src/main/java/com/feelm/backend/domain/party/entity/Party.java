@@ -69,6 +69,22 @@ public class Party extends BaseTimeEntity {
         this.closedAt = closedAt;
     }
 
+    public void transferOwnership(User owner) {
+        if (status != PartyStatus.ACTIVE || owner == null) {
+            throw new IllegalStateException("Only an active party can transfer ownership");
+        }
+        this.owner = owner;
+    }
+
+    public void closeByOwner(Instant closedAt) {
+        if (status != PartyStatus.ACTIVE || closedAt == null) {
+            throw new IllegalStateException("Only an active party can be closed by its owner");
+        }
+        status = PartyStatus.CLOSED;
+        closedReason = ClosedReason.OWNER_CLOSED;
+        this.closedAt = closedAt;
+    }
+
     public enum ClosedReason {
         INSUFFICIENT_MEMBERS,
         OWNER_CLOSED

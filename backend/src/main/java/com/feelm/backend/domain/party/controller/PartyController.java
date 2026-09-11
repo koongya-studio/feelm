@@ -76,6 +76,18 @@ public class PartyController {
         return partyService.declineInvitation(userId, invitationId);
     }
 
+    @PostMapping("/{partyId}/leave")
+    public PartyStateResponse leave(
+            @AuthenticationPrincipal Long userId, @PathVariable long partyId) {
+        return partyService.leave(userId, partyId);
+    }
+
+    @DeleteMapping("/{partyId}")
+    public PartyStateResponse close(
+            @AuthenticationPrincipal Long userId, @PathVariable long partyId) {
+        return partyService.close(userId, partyId);
+    }
+
     @DeleteMapping("/{partyId}/members/{userId}")
     public PartyStateResponse kick(
             @AuthenticationPrincipal Long requesterId,
