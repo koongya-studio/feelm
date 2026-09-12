@@ -3,6 +3,7 @@ package com.feelm.backend.domain.user.service;
 import com.feelm.backend.domain.auth.entity.UserAuthProvider;
 import com.feelm.backend.domain.auth.repository.UserAuthProviderRepository;
 import com.feelm.backend.domain.taste.service.TasteQueryService;
+import com.feelm.backend.domain.user.NicknamePolicy;
 import com.feelm.backend.domain.user.dto.request.ProfileUpdateRequest;
 import com.feelm.backend.domain.user.dto.response.UserProfileResponse;
 import com.feelm.backend.domain.user.entity.User;
@@ -12,7 +13,6 @@ import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ConstraintViolations;
 import com.feelm.backend.global.error.ErrorCode;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -77,16 +77,11 @@ public class UserProfileService {
         if (nickname == null) {
             return;
         }
-        if (!normalize(nickname).equals(normalize(user.getNickname()))
+        if (!NicknamePolicy.normalize(nickname).equals(NicknamePolicy.normalize(user.getNickname()))
                 && userRepository.countByNormalizedNickname(nickname) > 0) {
             throw new BusinessException(ErrorCode.NICKNAME_DUPLICATED);
         }
         user.changeNickname(nickname);
-    }
-
-    /** DB 유일 인덱스 {@code uix_users_nickname_normalized}와 같은 식이다. */
-    private String normalize(String nickname) {
-        return nickname.replace(" ", "").toLowerCase(Locale.ROOT);
     }
 
     /**
