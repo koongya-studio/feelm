@@ -60,7 +60,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-016 | [닉네임 사용 가능 확인](./users.md#api-016-닉네임-사용-가능-확인) | GET | `/users/nickname-availability` | 사용자 | 1차 MVP | 공개 | FR-01, FR-38 |  |
 | API-017 | [알림 설정 조회](./users.md#api-017-알림-설정-조회) | GET | `/users/me/notification-settings` | 사용자 | 1차 MVP | 회원 | FR-38 | O |
 | API-018 | [알림 설정 변경](./users.md#api-018-알림-설정-변경) | PUT | `/users/me/notification-settings` | 사용자 | 1차 MVP | 회원 | FR-38 |  |
-| API-019 | [사용자 검색](./users.md#api-019-사용자-검색) | GET | `/users/search` | 사용자 | 1차 MVP | 회원 | FR-20, FR-39 | O |
+| API-019 | [사용자 검색](./users.md#api-019-사용자-검색) | GET | `/users/search` | 사용자 | 1차 MVP | 회원 | FR-20, FR-39 |  |
 | API-020 | [사용자 차단](./users.md#api-020-사용자-차단) | POST | `/users/{userId}/block` | 사용자 | 1차 MVP | 회원 | FR-39 | O |
 | API-021 | [사용자 차단 해제](./users.md#api-021-사용자-차단-해제) | DELETE | `/users/{userId}/block` | 사용자 | 1차 MVP | 회원 | FR-39 |  |
 | API-022 | [차단 목록 조회](./users.md#api-022-차단-목록-조회) | GET | `/users/me/blocks` | 사용자 | 1차 MVP | 회원 | FR-39 |  |
