@@ -11,8 +11,8 @@ import lombok.NoArgsConstructor;
 /**
  * 알림 수신 설정. 사용자당 1행이므로 {@code user_id}가 기본키이자 외래키다.
  *
- * <p>가입 트랜잭션에서 기본행을 함께 만든다(플랜 결정 10). 조회·변경(API-017·018)은 별도 업무(S15P21E106-152)가 담당하므로 여기서는 생성만
- * 제공한다.
+ * <p>가입 트랜잭션에서 기본행을 함께 만든다(플랜 결정 10). 조회와 변경(API-017·018)은 S15P21E106-207에서 구현했고, 변경 경로는 세 항목 전체
+ * 교체뿐이다.
  *
  * <p>기본값을 DB DEFAULT가 아니라 필드 초기값으로 두는 이유는 애플리케이션이 만드는 행의 값을 한 곳에서 읽히게 하고, DDL을 JPA로 만드는 테스트 환경에서도
  * 같은 기본값이 적용되게 하기 위해서다. 마이그레이션의 DEFAULT는 SQL로 직접 삽입하는 경로를 위한 이중 안전장치로 남는다.
@@ -43,5 +43,18 @@ public class NotificationSettings {
     /** API-017 처리 규칙의 기본값(평가·추천 수신, 마케팅 미수신)으로 행을 만든다. */
     public static NotificationSettings createDefault(Long userId) {
         return new NotificationSettings(userId);
+    }
+
+    /**
+     * 세 항목을 한 번에 바꾼다(API-018).
+     *
+     * <p>변경 경로가 전체 교체뿐이라 항목별 변경 메서드를 두지 않는다. 세 값을 함께 덮으므로 두 요청이 겹쳐도 어느 한쪽 요청과 같은 상태만 남고 항목이 섞이지
+     * 않는다.
+     */
+    public void replace(
+            boolean ratingEnabled, boolean recommendationEnabled, boolean marketingEnabled) {
+        this.ratingEnabled = ratingEnabled;
+        this.recommendationEnabled = recommendationEnabled;
+        this.marketingEnabled = marketingEnabled;
     }
 }
