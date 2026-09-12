@@ -10,6 +10,7 @@ AI 코딩 도구는 루트 [`AGENTS.md`](../AGENTS.md)의 공통 절차와
 - `consumer/`: Fold-in, Candidate, Top-N 계산을 담당하는 Python Consumer
 - `configs/`: 학습·평가 설정값 기록. 기존 `settings.py`를 이동하지 않습니다.
 - `artifacts/`: 외부 데이터·모델의 출처, 해시, 공유 상태를 담는 JSON 목록
+- `templates/`: Pipeline 작업 플랜과 리뷰 기록 양식
 - `docs/`: 확정 연구 근거, 평가 설명, 재현 절차와 발표 자료
 
 ## Directory layout
@@ -18,6 +19,7 @@ AI 코딩 도구는 루트 [`AGENTS.md`](../AGENTS.md)의 공통 절차와
 pipeline/
 ├── configs/                     # 실행·실험 설정값 기록
 ├── artifacts/                   # 대용량 파일 대신 목록·해시 JSON
+├── templates/                   # Pipeline 작업 플랜·리뷰 양식
 ├── docs/                        # 근거·평가·재현·발표 자료
 │   ├── assets/                  # 소형 집계 결과와 그림
 │   └── presentation/            # 발표 원고와 요약
