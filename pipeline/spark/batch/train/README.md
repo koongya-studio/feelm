@@ -1,5 +1,75 @@
 # ALS 학습 배치
 
+## 기준 모델 통합 실행
+
+`batch.train.baseline.run_baseline()`은 검증된 118번 입력을 한 번 분할하고 다음 순서로
+실행한다.
+
+평가는 결정적으로 배정한 사용자 chunk마다 정확한 후보를 계산한다. 기본
+`--user-chunk-size`는 `100`이며, 실제 사용값은 run report에 기록된다. 이 값은 품질 정책이
+아니라 한 번에 점수화하는 사용자×item 조합의 메모리 경계다. 현재 제한된 로컬·2 worker
+환경에서 보수적으로 시작하기 위한 값이며, 실환경 probe 결과에 따라 CLI로 조정한다.
+
+1. 각 후보는 train만 학습해 `MODEL_SELECTION`으로 저장·재로딩한 뒤 같은 validation
+   모집단에서 평가한다.
+2. MovieLens validation NDCG@10, Recall@10 내림차순과 rank, maxIter, regParam 오름차순으로
+   한 설정을 선택한다. 서비스 카탈로그 지표와 test는 선택에 사용하지 않는다.
+3. 선택 설정을 train+validation으로 다시 학습해 `FINAL_EVALUATION`으로 저장·재로딩하고
+   test를 한 번 평가한다.
+4. 같은 설정을 전체 평점으로 다시 학습해 별도 `SERVING` 버전으로 저장·재로딩한다.
+
+run 경로는 분할 전에 local/HDFS no-overwrite rename으로 예약한다. 같은 run ID가 이미
+예약됐거나 완료·실패 보고서가 있으면 학습과 모델 쓰기 전에 거부하며 기존 산출물을 바꾸지
+않는다. 분할 assignments만 실행 동안 persist하고 성공·실패 모두 unpersist한다. 후보 하나라도
+실패하면 뒤 단계를 실행하거나 다른 후보만으로 선택하지 않는다. 재시도는 같은 입력·정책과
+새 run ID로 전체 실행한다. 이미 공개된 정상 모델과 run은 덮어쓰지 않는다.
+
+실행 보고서는 `<output-uri>/als-runs/<run-id>/report.json`에 저장한다. 성공한 보고서만 같은
+디렉터리의 `_SUCCESS`로 완료를 표시한다. 집계에는 입력 snapshot과 구현 revision, 분할 통계,
+선택 정책, 후보별 설정·MODEL_SELECTION 버전·두 카탈로그 validation 지표, 선택 버전,
+FINAL_EVALUATION test 지표와 SERVING 버전을 구분해 기록한다. `None`은 JSON null로 보존하고
+NaN·무한값은 거부한다. 실패 보고서는 실패 stage와 오류 유형을 기록하며 완료 표시가 없다.
+완료 시 `report.json`을 먼저 기록하고 `_RESERVED` 삭제 성공을 확인한 뒤 `_SUCCESS`를 마지막
+mutation으로 공개한다. 예약 삭제나 완료 marker 기록이 실패하면 run은 완료로 읽히지 않는다.
+
+선택된 MODEL_SELECTION 모델의 validation 결과와 FINAL_EVALUATION 모델의 test 결과는 각각
+`<run>/validation/`과 `<run>/test/` 아래 `candidates/`, `per-user/` Parquet으로 분산 저장한다.
+두 산출물에는 `stage`와 실제 `model_version`을 함께 기록하고 보고서에는 URI와 재로딩한 행
+수를 남긴다. 전체 후보·사용자 행을 driver로 collect하지 않는다.
+선택된 validation/test evidence는 finalize 후에도 complete report가 성공할 때까지 해당 run의
+rollback 대상이다. 후속 단계가 실패하면 소유 canonical evidence 삭제를 모두 시도하고, 삭제
+실패는 원래 Job 예외와 별도로 로그에 남긴다. 기존 다른 run의 evidence·완료 표시와 이미 공개된
+모델은 보존한다.
+
+입력 manifest가 ratings와 service mapping을 함께 고정하므로 `input_snapshot`과
+`mapping_snapshot`은 같은 manifest 식별자를 기록한다. Python·Spark·Java 버전, 실행 설정,
+단계별 학습 평점 수·소요 시간·모델 URI와 전체 소요 시간도 실행 저장소 안의 보고서에 남긴다.
+
+test 지표는 FINAL_EVALUATION 모델에만 귀속되며 SERVING 모델의 품질로 해석하지 않는다.
+`load_run_report(..., require_complete=True)`는 완료 표시를 확인한 뒤 보고서가 참조한 모든
+ALS 모델을 `load_als_artifacts()`로 다시 읽는다. 모델 metadata의 stage·version·input snapshot·
+implementation revision을 보고서와 대조하고, validation/test evidence Parquet도 다시 읽어
+필수 스키마·행 수·stage·model_version 및 run 내부 경로를 검증한다. 실제 URI, credential과
+내부 주소는 공유 문서나 MR에 복사하지 않는다.
+
+run 모드의 `--input-manifest-uri`는 새 환경변수 없이 CLI로만 받는다. manifest 본문 hash와
+`--input-snapshot`을 대조하고, 118번 5종 출력 아래의 보이는 일반 파일을 재귀 열거해 manifest의
+파일 집합 및 SHA-256과 정확히 일치하는지 확인한다. 경로 구성요소가 `.` 또는 `_`로 시작하는
+숨김 파일·디렉터리와 완료 marker는 manifest와 실제 파일 집합에서 제외한다. manifest에는 비어
+있지 않은 문자열 `preprocessing_revision`, 비어 있지 않은 JSON object
+`preprocessing_settings`, 원천 `ratings`·`movies`·`links`·실제 DB `service_movie_export` 역할을
+각각 해시 항목에 연결하는 `sources`가 필수다. validation report 완료 상태와 실제 로딩 건수도
+분할 전에 검증한다. manifest는 `als_input_manifest.py`로 생성하며 118 입력과 원천 4종은 모두
+manifest parent 아래에 두어야 한다. 생성기는 파일을 직접 해시해 no-overwrite로 기록하고 같은
+생산 validator로 validation report와 실제 로딩 건수까지 재검증한다. 실패한 새 manifest는
+제거한다.
+
+run 모드는 `file:///절대/경로` 또는 `hdfs://authority/절대/경로`만 지원하고
+credential·query·fragment 포함 URI는 거부한다. scheme 없는 경로, 상대 `file:` URI와 authority
+없는 `hdfs:/` URI도 Hadoop `defaultFS`·작업 디렉터리 의존성을 없애기 위해 Spark 생성 전에
+거부한다. 명시 URI의 local `file:` 표기와 HDFS host 대소문자·기본 8020 port 표기 차이를
+정규화한 뒤 입력·manifest와 출력의 동일·부모·자식 경로 중첩을 거부한다.
+
 ## 단일 설정 모델 학습
 
 `train_als_model()`은 검증된 학습용 평점 DataFrame, `AlsConfig`, ALS 초기화 seed를 받아

@@ -135,14 +135,15 @@ ALS 배치는 S15P21E106-118 산출물의 루트 URI를 입력으로 받으며 �
 `service-movie-id-map/` Parquet을 읽습니다. 학습 전에 필수 컬럼·타입, 평점 범위,
 사용자-영화 중복 및 서비스 매핑 상태를 검사합니다.
 
-현재 `als_baseline` 진입점은 입력을 읽고 검증 건수만 출력합니다. 데이터 분할, 단일 설정
-ALS 학습과 모델 산출물 저장·로딩 함수는 구현되어 있지만 진입점에는 아직 연결되지 않았으며,
-평가도 수행하지 않습니다. 따라서 `--input-uri`는 필수이고 `--output-uri`는 선택값이며,
-지정해도 현재 실행에서는 파일을 기록하지 않습니다.
+`als_baseline`은 기본 `validate` 모드에서 입력을 읽고 검증 건수만 출력합니다. `run` 모드는
+같은 입력을 한 번 분할해 각 설정을 validation NDCG@10, Recall@10 순으로 비교합니다. 동률이면
+rank, maxIter, regParam이 작은 설정을 선택합니다. 선택 설정의 train+validation 모델로 test를
+한 번 평가한 뒤 전체 평점으로 SERVING 모델을 별도 학습합니다.
 
 ```bash
 cd pipeline/spark
 uv run python -m jobs.batch.als_baseline \
+  --mode validate \
   --spark-master 'local[2]' \
   --input-uri /path/to/movie-mapping/v1 \
   --seed 42 \
@@ -151,9 +152,69 @@ uv run python -m jobs.batch.als_baseline \
 ```
 
 `--als-config`는 `rank:regParam:maxIter` 형식이며 여러 번 지정할 수 있습니다. 생략하면
-기본 비교 설정 4종을 사용합니다. 현재 진입점은 학습 설정을 읽고 유효성만 검사하며,
-분할·학습 함수 연결과 반복 실행은 후속 구현에서 수행합니다. CLI 인자가 같은 이름의
-환경변수보다 우선합니다.
+기본 비교 설정 4종을 사용합니다. 중복 설정과 signed 64-bit 범위 밖의 seed는 실행 전에
+거부합니다. CLI 인자가 같은 이름의 환경변수보다 우선합니다.
+
+전체 로컬 또는 클러스터 실행에는 재현 정보를 CLI로 명시합니다. run ID를 생략하면 고유한
+값을 생성합니다. 입력과 출력의 중첩, credential 포함 URI, `latest` 입력 식별자, 기존 run과
+모델 버전 덮어쓰기는 거부합니다. `run` 모드의 입력·출력·manifest는 Hadoop `defaultFS`나
+현재 작업 디렉터리에 따라 의미가 바뀌지 않도록 `file:///절대/경로` 또는
+`hdfs://authority/절대/경로`로 모두 명시해야 합니다. scheme 없는 경로, 상대 `file:` URI,
+authority 없는 `hdfs:/` URI는 SparkSession 생성 전에 거부합니다.
+
+118 산출물과 원천 4종을 같은 snapshot root 아래에 배치한 뒤 다음 명령으로 manifest를
+생성합니다. 생성기는 보이는 118 파일과 원천 파일을 직접 해시해 no-overwrite로 기록하고,
+그 결과를 생산 validator로 다시 읽어 validation report·로딩 건수까지 확인한 후 snapshot ID를
+출력합니다. `--preprocessing-settings-json`에는 실제 118 실행 설정을 JSON object로 전달합니다.
+
+```bash
+cd pipeline/spark
+uv run spark-submit --master "$RECOMMENDATION_SPARK_MASTER" als_input_manifest.py \
+  --input-uri "$ALS_VERIFY_PREPARED_URI" \
+  --manifest-uri "$ALS_VERIFY_MANIFEST_URI" \
+  --ratings-source "$ALS_VERIFY_RATINGS_URI" \
+  --movies-source "$ALS_VERIFY_MOVIES_URI" \
+  --links-source "$ALS_VERIFY_LINKS_URI" \
+  --service-movie-export "$ALS_VERIFY_SERVICE_MOVIES_URI" \
+  --preprocessing-revision "$ALS_VERIFY_PREPROCESSING_REVISION" \
+  --preprocessing-settings-json "$ALS_VERIFY_PREPROCESSING_SETTINGS_JSON"
+```
+
+manifest와 모든 참조 파일은 manifest parent 아래에 있어야 하며, 기존 manifest는 덮어쓰지
+않습니다. 생성·검증에 실패한 새 manifest는 제거되므로 원인을 고친 뒤 같은 위치에서 다시
+생성할 수 있습니다.
+
+```bash
+cd pipeline/spark
+uv run spark-submit --master "$RECOMMENDATION_SPARK_MASTER" als_baseline.py \
+  --mode run \
+  --input-uri "$ALS_VERIFY_PREPARED_URI" \
+  --output-uri "$ALS_VERIFY_OUTPUT_URI" \
+  --input-manifest-uri "$ALS_VERIFY_MANIFEST_URI" \
+  --input-snapshot "$ALS_VERIFY_SNAPSHOT_ID" \
+  --run-id "$ALS_VERIFY_RUN_ID" \
+  --implementation-revision "$ALS_VERIFY_REVISION" \
+  --seed 42 --train-ratio 0.8 --validation-ratio 0.1 \
+  --positive-rating-threshold 4.0 --candidate-size 500 \
+  --als-config 32:0.1:10 --als-config 64:0.1:10 \
+  --als-config 64:0.05:10 --als-config 64:0.1:15
+```
+
+`--input-manifest-uri`는 CLI 전용이며 manifest JSON 본문의 SHA-256이
+`--input-snapshot`의 `sha256:<digest>`와 같아야 합니다. manifest는 118번의 `ratings/`,
+`movies/`, `movie-id-map/`, `service-movie-id-map/`, `validation-report/` 아래의 보이는 일반 파일을
+빠짐없이 나열하고 각 파일의 SHA-256을 기록해야 합니다. `sources`는 원천 `ratings`, `movies`,
+`links`, 실제 DB `service_movie_export` 네 역할을 각각 `files`의 해시 항목에 연결해야 합니다.
+비어 있지 않은 문자열 `preprocessing_revision`과 비어 있지 않은 JSON object
+`preprocessing_settings`도 필수입니다. 경로 구성요소가 `.` 또는 `_`로 시작하는 숨김 파일·디렉터리와
+`_SUCCESS` 같은 완료 marker는 manifest에 기록하지 않으며 실제 파일 집합 비교에서도 제외합니다.
+실행은 실제 보이는 파일 집합을 열거하고 파일을 다시 해시한 뒤 validation report의 완료 상태와
+ratings·service mapping 건수를 실제 로딩 결과와 대조해야만 분할을 시작합니다.
+
+`ALS_VERIFY_*`는 실행 절차의 셸 변수이며 애플리케이션 환경변수 계약이 아닙니다. 모델은
+`<output-uri>/als/<model-version>/`, 실행 보고서는 `<output-uri>/als-runs/<run-id>/`에
+저장됩니다. 세 모델 단계와 보고서 의미, 실패·재시도 방법은
+[`spark/batch/train/README.md`](spark/batch/train/README.md)를 따릅니다.
 
 환경변수만 사용해 동일한 입력 검증을 실행할 수도 있습니다.
 
@@ -177,7 +238,7 @@ uv run python -m jobs.batch.als_baseline
 | `RECOMMENDATION_SPARK_MASTER` | 없음 | 직접 실행할 Spark master URL |
 | `RECOMMENDATION_SPARK_APP_NAME` | `feelm-als-baseline` | Spark 애플리케이션 이름 |
 | `RECOMMENDATION_INPUT_URI` | 없음 | 118번 산출물 루트 URI. 실행 시 필수 |
-| `RECOMMENDATION_OUTPUT_URI` | 없음 | 후속 모델 저장용 URI. 현재는 선택값이며 사용하지 않음 |
+| `RECOMMENDATION_OUTPUT_URI` | 없음 | 모델과 실행 보고서 루트. `run` 모드에서 필수 |
 | `RECOMMENDATION_ALS_SEED` | `42` | 분할 및 ALS 초기화 seed |
 | `RECOMMENDATION_TRAIN_RATIO` | `0.8` | 사용자별 train 비율 |
 | `RECOMMENDATION_VALIDATION_RATIO` | `0.1` | 사용자별 validation 비율 |

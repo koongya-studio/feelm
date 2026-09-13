@@ -31,8 +31,13 @@ def evaluate_ranking(
     catalog: str,
     positive_rating_threshold: float = 4.0,
     k: int = 10,
+    materialize_per_user: bool = False,
 ) -> RankingEvaluation:
-    """Evaluate a catalog ranking, retaining empty recommendations as zero scores."""
+    """Evaluate a catalog ranking, retaining empty recommendations as zero scores.
+
+    When ``materialize_per_user`` is true, the returned per-user frame is a
+    caller-owned cache. Failures inside this function release that cache.
+    """
     if k <= 0:
         raise ValueError("k must be positive")
 
@@ -88,23 +93,33 @@ def evaluate_ranking(
         .select(USER, "recall_at_10", "ndcg_at_10")
     )
 
-    population = target_users.agg(F.count(F.lit(1)).alias("target_users")).first()
-    positive_summary = positive_counts.agg(
-        F.count(F.lit(1)).alias("evaluated_users"),
-        F.coalesce(F.sum("positive_count"), F.lit(0)).alias("positive_items"),
-    ).first()
-    averages = scored.agg(
-        F.avg("recall_at_10").alias("recall_at_10"),
-        F.avg("ndcg_at_10").alias("ndcg_at_10"),
-    ).first()
-    evaluated_users = positive_summary["evaluated_users"]
-    summary = {
-        "target_users": population["target_users"],
-        "evaluated_users": evaluated_users,
-        "users_without_positives": population["target_users"] - evaluated_users,
-        "positive_items": positive_summary["positive_items"],
-        "recall_at_10": averages["recall_at_10"],
-        "ndcg_at_10": averages["ndcg_at_10"],
-        "duplicate_recommendations_removed": recommendation_count - deduplicated_count,
-    }
-    return RankingEvaluation(per_user=scored, summary=summary)
+    if materialize_per_user:
+        scored = scored.persist()
+
+    try:
+        population = target_users.agg(F.count(F.lit(1)).alias("target_users")).first()
+        positive_summary = positive_counts.agg(
+            F.count(F.lit(1)).alias("evaluated_users"),
+            F.coalesce(F.sum("positive_count"), F.lit(0)).alias("positive_items"),
+        ).first()
+        if materialize_per_user:
+            scored.count()
+        averages = scored.agg(
+            F.avg("recall_at_10").alias("recall_at_10"),
+            F.avg("ndcg_at_10").alias("ndcg_at_10"),
+        ).first()
+        evaluated_users = positive_summary["evaluated_users"]
+        summary = {
+            "target_users": population["target_users"],
+            "evaluated_users": evaluated_users,
+            "users_without_positives": population["target_users"] - evaluated_users,
+            "positive_items": positive_summary["positive_items"],
+            "recall_at_10": averages["recall_at_10"],
+            "ndcg_at_10": averages["ndcg_at_10"],
+            "duplicate_recommendations_removed": recommendation_count - deduplicated_count,
+        }
+        return RankingEvaluation(per_user=scored, summary=summary)
+    except Exception:
+        if materialize_per_user:
+            scored.unpersist()
+        raise
