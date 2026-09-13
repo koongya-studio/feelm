@@ -4,6 +4,8 @@ import importlib
 import math
 
 import pytest
+from pyspark.sql import functions as F
+from pyspark.sql.types import DoubleType
 
 from tests.fixtures.als_evaluation import (
     ITEM,
@@ -75,6 +77,38 @@ def test_no_eligible_users_returns_null_averages(spark, holdout_rows):
     assert result.summary["evaluated_users"] == 0
     assert result.summary["recall_at_10"] is None
     assert result.summary["ndcg_at_10"] is None
+
+
+def test_materialized_per_user_is_shared_by_summary_and_later_consumers(spark):
+    rating_calls = spark.sparkContext.accumulator(0)
+
+    @F.udf(returnType=DoubleType())
+    def observed_rating(value):
+        rating_calls.add(1)
+        return value
+
+    holdout = ratings(spark, [(1, 2, 5.0)]).withColumn(
+        "rating", observed_rating("rating")
+    )
+    users = holdout.select("movielens_user_id")
+    module = importlib.import_module("batch.evaluation.metrics")
+    result = module.evaluate_ranking(
+        candidates(spark, [(1, 2, 1.0, 1)]),
+        holdout,
+        users,
+        catalog="movielens",
+        positive_rating_threshold=4.0,
+        k=10,
+        materialize_per_user=True,
+    )
+    try:
+        assert result.per_user.is_cached
+        assert rating_calls.value == 2
+        result.per_user.collect()
+        result.per_user.count()
+        assert rating_calls.value == 2
+    finally:
+        result.per_user.unpersist()
 
 
 def test_duplicates_keep_highest_score_then_recompute_contiguous_ranks(spark):

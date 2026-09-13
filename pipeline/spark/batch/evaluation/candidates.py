@@ -49,6 +49,60 @@ def generate_candidates(
     Only users and items with factors are scored. Every known user-item pair is
     excluded regardless of rating; holdout data is deliberately not accepted.
     """
+    eligible, matched, prediction_col = _candidate_inputs(
+        model, users, known_ratings, service_movie_map, candidate_size
+    )
+    scored = model.transform(eligible).select(
+        USER, ITEM, F.col(prediction_col).alias("score")
+    )
+    _assert_finite_scores(scored)
+    return _catalog_candidates(scored, matched, candidate_size)
+
+
+def generate_materialized_candidates(
+    model,
+    users: DataFrame,
+    known_ratings: DataFrame,
+    service_movie_map: DataFrame,
+    candidate_size: int = 500,
+    *,
+    matched_movies: DataFrame | None = None,
+) -> DataFrame:
+    """Return a caller-owned cache backed by one complete score materialization."""
+    eligible, matched, prediction_col = _candidate_inputs(
+        model,
+        users,
+        known_ratings,
+        service_movie_map,
+        candidate_size,
+        matched_movies=matched_movies,
+    )
+    scored = model.transform(eligible).select(
+        USER, ITEM, F.col(prediction_col).alias("score")
+    ).persist()
+    candidates = None
+    try:
+        _assert_finite_scores(scored)
+        candidates = _catalog_candidates(scored, matched, candidate_size).persist()
+        candidates.count()
+    except Exception:
+        if candidates is not None:
+            candidates.unpersist()
+        raise
+    finally:
+        scored.unpersist(blocking=True)
+    return candidates
+
+
+def _candidate_inputs(
+    model,
+    users,
+    known_ratings,
+    service_movie_map,
+    candidate_size,
+    *,
+    matched_movies=None,
+):
     if candidate_size <= 0:
         raise ValueError("candidate_size must be positive")
 
@@ -58,16 +112,20 @@ def generate_candidates(
     if user_col != USER or item_col != ITEM:
         raise ValueError("ALS model must use MovieLens user and movie ID columns")
 
-    matched = _assert_unique_matched_movies(service_movie_map)
+    matched = (
+        _assert_unique_matched_movies(service_movie_map)
+        if matched_movies is None
+        else matched_movies
+    )
     factor_users = model.userFactors.select(F.col("id").cast("int").alias(USER))
     factor_items = model.itemFactors.select(F.col("id").cast("int").alias(ITEM))
     requested_users = users.select(USER).distinct().join(factor_users, USER, "inner")
     known = known_ratings.select(USER, ITEM).distinct()
     eligible = requested_users.crossJoin(factor_items).join(known, [USER, ITEM], "left_anti")
-    scored = model.transform(eligible).select(
-        USER, ITEM, F.col(prediction_col).alias("score")
-    )
-    _assert_finite_scores(scored)
+    return eligible, matched, prediction_col
+
+
+def _catalog_candidates(scored, matched, candidate_size):
 
     movielens = (
         _rank(scored, candidate_size)
