@@ -50,17 +50,21 @@ export const ROUTE_PATTERN = {
   publicProfile: '/users/:userId',
   tasteCompare: '/users/:userId/compare',
 
+  // MY 기록 목록 (업무 -306). 7.5 · 7.6 · 7.7. 7.6-A 한줄평 관리는 7.6 위의 시트라 경로가 없다
+  recommendationHistory: '/my/recommendations',
+  myRatings: '/my/ratings',
+  /** 7.7. 7.6과 같은 화면의 다른 탭이지만 이동표가 `7.6 → 7.7`로 따로 적어 경로를 나눈다 */
+  unratedMovies: '/my/ratings/unrated',
+
   /*
-   * 7.1 메뉴가 가리키는 화면 중 아직 만들지 않은 것(7.3 · 7.5 · 7.6 · 7.8).
-   * 306~308 몫이며 지금은 `NotInScopePage`로 간다.
+   * 7.1 메뉴가 가리키는 화면 중 아직 만들지 않은 것(7.3 · 7.8).
+   * 307 · 308 몫이며 지금은 `NotInScopePage`로 간다.
    *
    * 경로를 미리 두는 이유는 **7.1 → 각 화면 이동 자체가 검증 대상**이기 때문이다
    * (screen-spec-my.md 2장 13번). 경로가 없으면 `*`에 걸려 404로 떨어져서
    * `아직 안 만든 화면`과 `잘못된 주소`가 구분되지 않는다.
    */
   tasteReports: '/my/reports',
-  recommendationHistory: '/my/recommendations',
-  myRatings: '/my/ratings',
   settings: '/my/settings',
 
   // 전체화면 (하단 내비 없음)
@@ -113,9 +117,10 @@ export const path = {
   publicProfile: (userId: string | number) => `/users/${userId}`,
   tasteCompare: (userId: string | number) => `/users/${userId}/compare`,
 
-  tasteReports: () => ROUTE_PATTERN.tasteReports,
   recommendationHistory: () => ROUTE_PATTERN.recommendationHistory,
   myRatings: () => ROUTE_PATTERN.myRatings,
+  unratedMovies: () => ROUTE_PATTERN.unratedMovies,
+  tasteReports: () => ROUTE_PATTERN.tasteReports,
   settings: () => ROUTE_PATTERN.settings,
 
   movieDetail: (movieId: string | number) => `/movies/${movieId}`,

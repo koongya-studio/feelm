@@ -5,7 +5,11 @@
 import { findMockMovieDetail } from '../mocks/movieDetails';
 import { findMockSimilarMovies } from '../mocks/similarMovies';
 import { mockReviews } from '../mocks/reviews';
-import { findLatestWatchRecordByMovie, findRatingByMovie } from '../mocks/sessionStore';
+import {
+  findLatestWatchRecordByMovie,
+  findRatingByMovie,
+  withRatingEdit,
+} from '../mocks/sessionStore';
 import { getMyOtts } from './otts';
 import { respond, respondError } from './mockTransport';
 import type { MovieDetail, SimilarMovie } from '../types/movie';
@@ -53,7 +57,8 @@ export async function getMovieDetail(
           comment: rating.comment,
           visibility: rating.visibility,
         }
-      : detail.myRating,
+      : // 기준 목업 평가도 7.6 · 7.6-A에서 고쳤으면 그 값이다(API-037)
+        detail.myRating && withRatingEdit(detail.myRating),
     myWatchStatus: rating ? ('RATED' as const) : (watchRecord?.status ?? detail.myWatchStatus),
   };
 

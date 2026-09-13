@@ -14,10 +14,14 @@
  *
  * 여기 담는 것은 **사용자가 이번 세션에 만든 변화**뿐이다. 기준 목업(mocks/의 나머지
  * 파일)은 그대로 두고, `src/api/`가 둘을 합쳐 응답을 만든다.
+ *
+ * 예외는 두 가지다. 최근 검색어와 7.7의 감상 기록은 와이어프레임이 그린 상태로 시작한다.
+ * 둘 다 사용자가 지우거나 바꾸는 값이라 저장소 안에 있어야 변화가 남는다.
  */
+import { createSeedWatchRecords } from './watch';
 import type { OnboardingPreference } from '../types/onboarding';
 import type { PartyView } from '../types/unspecified';
-import type { Rating, WatchRecord } from '../types/watch';
+import type { Rating, RatingUpdateInput, WatchRecord } from '../types/watch';
 
 /**
  * 저장소가 보관하는 감상 기록.
@@ -51,6 +55,15 @@ type SessionState = {
   /** API-036 평가. 영화당 한 번만 반영된다 */
   ratings: Rating[];
   /**
+   * API-037로 고친 **기준 목업 평가**. `ratingId` → 고친 값.
+   *
+   * 기준 평가(mocks/frames.ts `mockMyRatings`)를 `ratings`에 넣으면 안 된다. `ratings`는
+   * 이번 세션에 새로 만든 평가라서 하나마다 프레임 1개와 팝콘 1알로 셈해진다
+   * (api/taste.ts). 수정은 프레임을 만들지 않으므로(API-037 처리 규칙) 따로 둔다.
+   * 이번 세션에 만든 평가를 고치면 `ratings`의 그 항목을 바로 고친다.
+   */
+  ratingEdits: Record<number, RatingUpdateInput>;
+  /**
    * 4.1 · 4.2의 최근 검색어. 계약이 없다.
    *
    * 서버가 보관하는 값이 아니라 이 기기에서 무엇을 찾았는지이므로 API가 없는 것이
@@ -77,8 +90,10 @@ function emptyState(): SessionState {
     onboardingSubmitted: false,
     subscribedOttIds: null,
     dismissedMovieIds: [],
-    watchRecords: [],
+    // 7.7이 그리는 `평가 안 남긴 영화`로 시작한다. 이유는 createSeedWatchRecords 주석에 있다
+    watchRecords: createSeedWatchRecords(),
     ratings: [],
+    ratingEdits: {},
     // 와이어프레임 4.1이 최근 검색어 세 개가 있는 상태를 그리므로 그 값으로 시작한다
     recentSearchQueries: ['케이퍼 무비', '크리스토퍼 놀란', 'SF 명작'],
     createdParties: [],
@@ -239,7 +254,8 @@ export function findLatestWatchRecordByMovie(movieId: number): StoredWatchRecord
 
 /**
  * 평가는 영화당 한 번만 반영된다(2.5 안내 문구). 같은 영화를 다시 평가하면 덮어쓴다.
- * 계약상 수정은 API-037이지만 이 단계에서는 구분하지 않는다.
+ * 이미 평가한 영화는 2.5가 수정(API-037, `updateSessionRating`)으로 보내므로 덮어쓰는
+ * 경우는 실제 흐름에 없다(업무 -306).
  */
 export function saveRating(rating: Rating): void {
   const index = state.ratings.findIndex((saved) => saved.movieId === rating.movieId);
@@ -261,4 +277,37 @@ export function findRatingByMovie(movieId: number): Rating | null {
 
 export function findRatingByFrame(frameId: number): Rating | null {
   return state.ratings.find((rating) => rating.frame.frameId === frameId) ?? null;
+}
+
+/**
+ * 평가 수정(API-037). 이번 세션에 만든 평가면 그 항목을 고치고 true를 돌려준다.
+ * 기준 목업 평가라 여기 없으면 false다 — 그때는 `saveRatingEdit`을 쓴다.
+ */
+export function updateSessionRating(ratingId: number, input: RatingUpdateInput): boolean {
+  const index = state.ratings.findIndex((rating) => rating.ratingId === ratingId);
+
+  if (index === -1) {
+    return false;
+  }
+
+  state.ratings[index] = { ...state.ratings[index], ...input };
+
+  return true;
+}
+
+export function saveRatingEdit(ratingId: number, input: RatingUpdateInput): void {
+  state.ratingEdits = { ...state.ratingEdits, [ratingId]: { ...input } };
+}
+
+/**
+ * 기준 목업 평가에 고친 값을 얹는다. 고친 적 없으면 그대로 돌려준다.
+ *
+ * **기준 평가를 읽는 곳은 전부 이 함수를 거친다.** 영화 상세(2.4 · 2.5) · 프레임
+ * 목록과 상세(3.1 · 3.1-A) · 내 평가 목록(7.6)이다. 한 곳이라도 빠지면 고친 별점이
+ * 그 화면에서만 옛 값으로 보인다.
+ */
+export function withRatingEdit<T extends RatingUpdateInput & { ratingId: number }>(rating: T): T {
+  const edit = state.ratingEdits[rating.ratingId];
+
+  return edit ? { ...rating, ...edit } : rating;
 }

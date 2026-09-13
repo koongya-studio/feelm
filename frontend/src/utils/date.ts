@@ -38,6 +38,33 @@ export function formatMonthDay(isoString: string): string {
 }
 
 /**
+ * ISO 8601 문자열을 `8. 24` 형식으로 만든다.
+ *
+ * 7.5 · 7.6 · 7.7 목록의 날짜다(업무 -306). 목록이 월 단위로 묶이거나 최근 기록이라
+ * 와이어프레임이 연도를 적지 않는다. `formatDate`에서 연도만 뺀 형태다.
+ */
+export function formatShortDate(isoString: string): string {
+  const date = new Date(isoString);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return `${date.getMonth() + 1}. ${date.getDate()}`;
+}
+
+/** ISO 8601 문자열을 `2026년 8월` 형식으로 만든다. 7.5 추천 기록의 월 제목이다 */
+export function formatYearMonth(isoString: string): string {
+  const date = new Date(isoString);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return `${date.getFullYear()}년 ${date.getMonth() + 1}월`;
+}
+
+/**
  * ISO 8601 문자열을 `2026.08` 형식으로 만든다.
  *
  * 7.1 MY 대시보드의 `2026.08 가입`이 쓴다(API-014 `createdAt`). 월을 두 자리로 맞추는

@@ -143,6 +143,58 @@ const detailExtras: Record<number, DetailExtras> = {
     myRating: mockMyRatings[403],
     myWatchStatus: 'RATED',
   },
+
+  /*
+   * 7.5 추천 기록에 나오는 지난 추천(104)과 7.7 평가하지 않은 영화(411~413).
+   *
+   * 7.5 ⇢ 2.4 · 7.7 ⇢ 2.5가 영화 상세를 읽으므로 상세가 없으면 그 경로가 404로 끊긴다.
+   * 411~413은 감상을 확인한 영화라 `WATCHED_UNRATED`다. 다만 화면이 보는 감상 상태는
+   * 세션 저장소의 감상 기록이 정한다(api/movies.ts).
+   */
+  104: {
+    synopsis: '오래 묻어 둔 사건 기록이 다시 열리며 두 형사가 서로를 의심하기 시작한다.',
+    countries: [{ code: 'KR', name: '한국' }],
+    directors: [{ personId: 9061, name: '감독 G' }],
+    cast: [{ personId: 9062, name: '배우 G1' }],
+    ratingCount: 640,
+    flavorCode: 'FLAVOR_CRIME',
+    ottProviders: ottProviders(['NETFLIX']),
+    myRating: null,
+    myWatchStatus: null,
+  },
+  411: {
+    synopsis: '마지막 상영을 앞둔 동네 극장에 오래된 단골들이 하나둘 모여든다.',
+    countries: [{ code: 'KR', name: '한국' }],
+    directors: [{ personId: 9071, name: '감독 H' }],
+    cast: [{ personId: 9072, name: '배우 H1' }],
+    ratingCount: 230,
+    flavorCode: 'FLAVOR_DRAMA',
+    ottProviders: ottProviders(['NETFLIX']),
+    myRating: null,
+    myWatchStatus: 'WATCHED_UNRATED',
+  },
+  412: {
+    synopsis: '가업을 물려받기 싫은 막내가 사흘 동안 가게를 맡으며 벌어지는 소동.',
+    countries: [{ code: 'KR', name: '한국' }],
+    directors: [{ personId: 9081, name: '감독 I' }],
+    cast: [{ personId: 9082, name: '배우 I1' }],
+    ratingCount: 180,
+    flavorCode: 'FLAVOR_COMEDY',
+    ottProviders: ottProviders(['TVING']),
+    myRating: null,
+    myWatchStatus: 'WATCHED_UNRATED',
+  },
+  413: {
+    synopsis: '바다 밑 연구 기지와 연락이 끊기고, 구조대는 기지의 마지막 기록을 따라 내려간다.',
+    countries: [{ code: 'US', name: '미국' }],
+    directors: [{ personId: 9091, name: '감독 J' }],
+    cast: [{ personId: 9092, name: '배우 J1' }],
+    ratingCount: 450,
+    flavorCode: 'FLAVOR_SF',
+    ottProviders: ottProviders(['WAVVE']),
+    myRating: null,
+    myWatchStatus: 'WATCHED_UNRATED',
+  },
 };
 
 export function findMockMovieDetail(movieId: number): MovieDetail | null {

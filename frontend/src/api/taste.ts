@@ -6,11 +6,16 @@
  * 이번 세션의 평가를 더해 응답을 만든다. 평가 하나가 프레임 1개와 팝콘 1알을 만들기
  * 때문이다(FR-07, FR-09). 그래서 2.5에서 평가하면 3.1과 3.2가 함께 올라간다.
  */
-import { findMockFrameDetail, mockFrameList } from '../mocks/frames';
+import { findMockFrameDetail, mockFrameList, mockMyRatings } from '../mocks/frames';
 import { findMockMovie } from '../mocks/movies';
 import { mockPopcornBucket } from '../mocks/popcornBucket';
 import { mockPopcornFlavors } from '../mocks/popcornFlavors';
-import { findRatingByFrame, findRatingByMovie, getRatings } from '../mocks/sessionStore';
+import {
+  findRatingByFrame,
+  findRatingByMovie,
+  getRatings,
+  withRatingEdit,
+} from '../mocks/sessionStore';
 import { mockTasteAnalysis, mockTasteFlow } from '../mocks/taste';
 import { respond, respondError } from './mockTransport';
 import type {
@@ -99,12 +104,17 @@ export async function getPopcornBucket(): Promise<PopcornBucket> {
  */
 export async function getMyFrames(): Promise<FrameList> {
   const added = sessionFrames();
+  // 기준 프레임의 별점도 7.6에서 고쳤으면 그 값이다. 프레임 수는 그대로다(API-037)
+  const base = mockFrameList.items.map((frame) => ({
+    ...frame,
+    score: withRatingEdit(mockMyRatings[frame.movie.movieId]).score,
+  }));
 
   return respond(
     {
       ...mockFrameList,
       totalCount: mockFrameList.totalCount + added.length,
-      items: [...added, ...mockFrameList.items],
+      items: [...added, ...base],
     },
     'frames',
   );
@@ -173,7 +183,8 @@ export async function getFrameDetail(frameId: number): Promise<FrameDetailView> 
   const updated = findRatingByMovie(frame.movie.movieId);
 
   if (!updated) {
-    return respond(frame, 'frames');
+    // 7.6 · 7.6-A에서 고친 기준 평가(API-037)
+    return respond({ ...frame, rating: withRatingEdit(frame.rating) }, 'frames');
   }
 
   return respond(

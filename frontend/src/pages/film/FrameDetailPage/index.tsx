@@ -12,7 +12,8 @@
  * `[?]` 상영 시간(`115분`)은 API-043 `movie`에 없다. 와이어프레임에 있으므로
  * types/unspecified.ts 기준에 따라 목업에만 둔다.
  * `[?]` `영화 상세 보기`의 이동 대상이 이동표에 없다. 2.4로 본다(screen-spec.md 3.1-A).
- * `[?]` `한줄평 관리`(7.6-A)는 범위 밖이라 비활성으로 둔다.
+ * `한줄평 관리`는 7.6-A 시트를 연다(업무 -306). 한줄평이 없으면 비활성이다.
+ * `평가 수정`은 2.5로 가며, 2.5는 이미 평가한 영화를 수정으로 처리한다.
  *
  * 와이어프레임은 제목을 실제 영화(`나우 유 씨 미`)로 적지만 3.1의 목록은
  * `영화 제목 2` 자리표시자를 쓴다. 같은 영화가 화면마다 다르게 보이면 안 되므로
@@ -21,6 +22,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
+import CommentManageSheet from '../../../components/CommentManageSheet';
 import FilmStrip from '../../../components/FilmStrip';
 import OttBadge from '../../../components/OttBadge';
 import Poster from '../../../components/Poster';
@@ -43,6 +45,7 @@ export default function FrameDetailPage() {
   const [frame, setFrame] = useState<FrameDetailView | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
+  const [managingComment, setManagingComment] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -169,8 +172,12 @@ export default function FrameDetailPage() {
             평가 수정
           </Button>
 
-          {/* 7.6-A 한줄평 관리는 범위 밖이다 */}
-          <Button variant="secondary" disabled>
+          {/* 3.1-A ⇢ 7.6-A. 한줄평이 없으면 관리할 것이 없다 */}
+          <Button
+            variant="secondary"
+            disabled={!rating.comment}
+            onClick={() => setManagingComment(true)}
+          >
             한줄평 관리
           </Button>
         </div>
@@ -183,6 +190,18 @@ export default function FrameDetailPage() {
           영화 상세 보기
         </button>
       </div>
+
+      {managingComment ? (
+        <CommentManageSheet
+          movie={movie}
+          rating={rating}
+          onClose={() => setManagingComment(false)}
+          onSaved={() => {
+            setManagingComment(false);
+            setReloadCount((count) => count + 1);
+          }}
+        />
+      ) : null}
     </>
   );
 }
