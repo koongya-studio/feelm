@@ -25,8 +25,11 @@
  * | TasteCompareView | 7.2-C `76%` · 장르 82 · 국가 74 · 시대 71 · 감독 68 | API-063이 있으나 **2차 MVP**라 미구현. **4줄 비교는 계약에 없음** |
  * | introduction | 7.2 한 줄 소개 · 7.2-A · 7.2-B 소개 문구 | 와이어프레임에 없고 레퍼런스 지시로 추가. 계약에 자리가 없음. CR 미등록 |
  * | RecommendationHistoryItemView.ott | 7.5 `8. 24 · 넷플릭스` | API-048 `movie`에 OTT가 없음. 제공처가 여럿일 때 기준도 없음. CR 미등록 |
+ * | NotificationSettingsView.PARTY_INVITE · REPORT | 7.8-C `파티 초대 알림` · `리포트 발급 알림` | API-017 NotificationType에 없음. CR 미등록 |
+ * | PrivacySettingsView | 7.8-B 항목 4개 × `전체 공개 · 파티원만 · 비공개` | 계약은 프로필 `visibility` 하나 · 2단계(API-015). CR 미등록 |
  */
 import type { FrameDetail } from './taste';
+import type { NotificationSettings } from './user';
 import type { Party } from './party';
 import type { RecommendedMovie } from './movie';
 import type {
@@ -229,6 +232,34 @@ export type TasteCompareView = {
     title: string;
     posterUrl: string | null;
   }[];
+};
+
+/**
+ * 7.8-C 알림 설정. 계약의 세 키(API-017) + 와이어프레임에만 있는 둘.
+ *
+ * `PARTY_INVITE`(파티 초대 알림) · `REPORT`(리포트 발급 알림)는 계약의 NotificationType에
+ * 없다. 와이어프레임대로 그리기로 했다(팀 결정 2026-09-13, 업무 -307).
+ */
+export type NotificationSettingsView = NotificationSettings & {
+  PARTY_INVITE: boolean;
+  REPORT: boolean;
+};
+
+/** 7.8-B 공개 범위 한 단계. 계약의 `Visibility`는 `PUBLIC` · `PRIVATE` 둘뿐이다 */
+export type PrivacyLevel = 'PUBLIC' | 'PARTY' | 'PRIVATE';
+
+/**
+ * 7.8-B 공개 범위 설정. 항목 넷 × 단계 셋.
+ *
+ * 계약에는 프로필 하나의 `visibility`(API-014 · API-015, `PUBLIC` · `PRIVATE`)만 있다.
+ * 항목별 공개 범위와 `파티원만` 단계는 없다. 와이어프레임대로 그리기로 했다
+ * (팀 결정 2026-09-13, 업무 -307).
+ */
+export type PrivacySettingsView = {
+  profile: PrivacyLevel;
+  film: PrivacyLevel;
+  popcorn: PrivacyLevel;
+  review: PrivacyLevel;
 };
 
 /**

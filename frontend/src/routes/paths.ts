@@ -56,16 +56,23 @@ export const ROUTE_PATTERN = {
   /** 7.7. 7.6과 같은 화면의 다른 탭이지만 이동표가 `7.6 → 7.7`로 따로 적어 경로를 나눈다 */
   unratedMovies: '/my/ratings/unrated',
 
+  // 설정 (업무 -307). 7.8만 탭 화면이고 나머지는 전체화면이다
+  settings: '/my/settings',
+  accountManage: '/my/settings/account',
+  withdraw: '/my/settings/account/withdraw',
+  privacySettings: '/my/settings/privacy',
+  notificationSettings: '/my/settings/notifications',
+  blockedUsers: '/my/settings/blocks',
+
   /*
-   * 7.1 메뉴가 가리키는 화면 중 아직 만들지 않은 것(7.3 · 7.8).
-   * 307 · 308 몫이며 지금은 `NotInScopePage`로 간다.
+   * 7.1 메뉴가 가리키는 화면 중 아직 만들지 않은 것(7.3).
+   * 308 몫이며 지금은 `NotInScopePage`로 간다.
    *
    * 경로를 미리 두는 이유는 **7.1 → 각 화면 이동 자체가 검증 대상**이기 때문이다
    * (screen-spec-my.md 2장 13번). 경로가 없으면 `*`에 걸려 404로 떨어져서
    * `아직 안 만든 화면`과 `잘못된 주소`가 구분되지 않는다.
    */
   tasteReports: '/my/reports',
-  settings: '/my/settings',
 
   // 전체화면 (하단 내비 없음)
   movieDetail: '/movies/:movieId',
@@ -120,8 +127,13 @@ export const path = {
   recommendationHistory: () => ROUTE_PATTERN.recommendationHistory,
   myRatings: () => ROUTE_PATTERN.myRatings,
   unratedMovies: () => ROUTE_PATTERN.unratedMovies,
-  tasteReports: () => ROUTE_PATTERN.tasteReports,
   settings: () => ROUTE_PATTERN.settings,
+  accountManage: () => ROUTE_PATTERN.accountManage,
+  withdraw: () => ROUTE_PATTERN.withdraw,
+  privacySettings: () => ROUTE_PATTERN.privacySettings,
+  notificationSettings: () => ROUTE_PATTERN.notificationSettings,
+  blockedUsers: () => ROUTE_PATTERN.blockedUsers,
+  tasteReports: () => ROUTE_PATTERN.tasteReports,
 
   movieDetail: (movieId: string | number) => `/movies/${movieId}`,
   movieRating: (movieId: string | number) => `/movies/${movieId}/rate`,

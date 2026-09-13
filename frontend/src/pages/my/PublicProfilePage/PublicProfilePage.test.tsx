@@ -5,10 +5,16 @@
  * 하고 누구와 비교하는지가 빠지면 화면은 열리지만 경로는 끊긴 것이다
  * (screen-spec-my.md 2장 9번).
  */
-import { describe, expect, it } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import PublicProfilePage from './index';
+import { resetSessionStore } from '../../../mocks/sessionStore';
 import { renderWithRouter } from '../../../test/render';
+
+// 차단이 세션 저장소에 남으므로 매번 비운다(업무 -307)
+beforeEach(() => {
+  resetSessionStore();
+});
 
 /** `mocks/publicProfiles.ts`의 무비버디. 5.8 파티원과 같은 사람이다 */
 const USER_ID = 2048;
@@ -45,19 +51,34 @@ describe('7.2-B 다른 사용자 공개 프로필', () => {
     expect(screen.queryByText(/팔로워|팔로잉/)).not.toBeInTheDocument();
   });
 
-  it('차단은 확인 안내까지만 하고 실제로 처리하지 않는다', async () => {
+  it('차단은 확인을 거쳐 7.8-D로 간다', async () => {
     /*
-     * 차단 · 신고는 계약이 없다. 이동표 `7.2-B ⇢ 7.8-D`의 7.8-D도 아직 없어
-     * 이동하지 않는다(screen-spec-my.md 2장 14번).
+     * 이동표 `7.2-B ⇢ 7.8-D`. 305에서는 7.8-D가 없어 안내만 했다(업무 -307에서 연결).
+     * 확인 창은 공동 파티에서 나가게 된다는 것을 알려야 한다(API-020 처리 규칙).
      */
     await renderProfile();
 
     fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
     fireEvent.click(screen.getByRole('button', { name: '사용자 차단' }));
 
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      '무비버디 님을 차단하면 서로의 콘텐츠가 보이지 않아요',
+    const dialog = await screen.findByRole('alertdialog', { name: '무비버디 님을 차단할까요?' });
+    expect(dialog).toHaveTextContent('함께 있는 파티에서는 나가게 돼요');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: '차단' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location').textContent).toBe('/my/settings/blocks'),
     );
+  });
+
+  it('차단을 취소하면 아무 일도 없다', async () => {
+    await renderProfile();
+
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
+    fireEvent.click(screen.getByRole('button', { name: '사용자 차단' }));
+    fireEvent.click(await screen.findByRole('button', { name: '취소' }));
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(screen.getByTestId('location').textContent).toBe(`/users/${USER_ID}`);
   });
 

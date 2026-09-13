@@ -1,0 +1,12 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) var(--screen-padding-x) var(--space-6);
+  gap: var(--space-5);
+}
+
+.notice {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}

@@ -1,0 +1,49 @@
+/* 화면 폭 안에서 가운데에 뜬다. 뒤에 시트가 있어도 그 위다 */
+.layer {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  width: 100%;
+  max-width: var(--layout-max-width);
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  padding: var(--screen-padding-x);
+  margin: 0 auto;
+  background: rgba(38, 39, 41, 0.32);
+  inset: 0;
+}
+
+.dialog {
+  display: flex;
+  width: 100%;
+  max-width: 300px;
+  box-sizing: border-box;
+  flex-direction: column;
+  padding: var(--space-5);
+  border-radius: var(--radius-card);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-raised);
+  gap: var(--space-1);
+  /* 부르는 화면의 정렬을 물려받지 않는다. 7.8-A-1은 가운데 정렬 화면이다 */
+  text-align: left;
+}
+
+.title {
+  color: var(--color-ink);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-body);
+}
+
+.description {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.actions {
+  display: flex;
+  margin-top: var(--space-4);
+  gap: var(--space-2);
+}
