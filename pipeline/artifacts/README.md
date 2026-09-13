@@ -1,5 +1,9 @@
 # 외부 산출물 목록
 
+- [service-v1.json](service-v1.json): GBT/FM230·ALS·GKT·KOBIS 등 추천 v1 준비에 재사용할
+  선별 로컬 파일과 NOT_BUILT 목록. 새245 모델이나 EC2 배포본이 아니다.
+  [전달·검증 절차](../docs/service-v1/REPRODUCTION.md)를 따른다.
+
 이 폴더에는 README와 JSON 목록만 커밋한다. `artifacts.py` 같은 Python 모듈과는
 역할이 다르므로 기존 모듈 이름을 바꾸지 않는다.
 

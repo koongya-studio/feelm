@@ -1,0 +1,125 @@
+{
+  "auditor_fingerprint": {
+    "docs/recommendation/experiments/hybrid345/DESIGN.md": {
+      "bytes": 16289,
+      "sha256": "18ca3c22ffacaace55ca6483620ff36d76230902bb38557d7b2a34aaf1906884"
+    },
+    "docs/recommendation/experiments/hybrid345/catalog-code-review.json": {
+      "bytes": 8500,
+      "sha256": "c7c24976a1f5dbd51e5624621455d9a1b35ef35880b4628d901b7a9bf00bef0e"
+    },
+    "docs/recommendation/experiments/hybrid345/config.json": {
+      "bytes": 22142,
+      "sha256": "f975cd83b179c8b61dac09e0a3a527c4f2c4794389e88b0be4fd3c69d0679506"
+    },
+    "docs/recommendation/experiments/hybrid345/evaluation-code-review.json": {
+      "bytes": 8692,
+      "sha256": "d7d651c3766207e920df93a6d25c8e27083d62f4d2fdef8cdff2c9d286214010"
+    },
+    "docs/recommendation/experiments/hybrid345/prelabel-code-review.json": {
+      "bytes": 11985,
+      "sha256": "be590bd5f5831582c0b7311f6b754a27f6b5557f699e26f04673a92c0469f5dc"
+    },
+    "scripts/audit_hybrid345_results.py": {
+      "bytes": 94315,
+      "sha256": "4c50635523566ce3c0d4791c542b70e6fc7e28595b395a0677d34aa9e0c1717b"
+    },
+    "scripts/hybrid345_catalog.py": {
+      "bytes": 32261,
+      "sha256": "7aa2b2123d291d4849c9c8984a237b59b2f30ec96d971f2553fb3afe44017796"
+    },
+    "scripts/hybrid345_evaluate.py": {
+      "bytes": 70337,
+      "sha256": "146bd0dc4fa8fde49182528205b7f787edc5f5d55becb04e4a62b09060e9d1c9"
+    },
+    "scripts/report_hybrid345.py": {
+      "bytes": 20447,
+      "sha256": "06856ad5108950adc3e0ef65385f1e39f18271f57a45f1ea4da023bcdcefbc06"
+    },
+    "scripts/test_audit_hybrid345_results.py": {
+      "bytes": 16156,
+      "sha256": "298c9bcfbd094dc10cf929d8a47ca168db8d2c55d2dc815008ee8eba7bc1f001"
+    },
+    "scripts/test_hybrid345_catalog.py": {
+      "bytes": 5656,
+      "sha256": "af2ff2c8707fd3a68b4f9b0f4b0f1f3adcf7c1d53416404e55ee1613f7881f77"
+    },
+    "scripts/test_hybrid345_evaluate.py": {
+      "bytes": 14271,
+      "sha256": "abe67769529a171f9e7c38a5bbdb4f8fcb21803ec77288dc85684abf271084d1"
+    }
+  },
+  "checks": {
+    "bootstrap_samples_per_eligible_contrast": 20000,
+    "catalog_eligible_movies": 85517,
+    "catalog_rows": 15,
+    "catalog_users": 124,
+    "denominator_groups": 810,
+    "development_only_language": "PASS",
+    "diagnostic_rows": 247,
+    "formal_contrasts": 14,
+    "page_metric_rows": 188100,
+    "page_summary_rows": 12150,
+    "paired_contrast_rows": 1389,
+    "result_report": "MATCH",
+    "row_error_rows": 787995,
+    "selection": {
+      "cold_common_users": 38,
+      "cold_head": "GBT120_s339",
+      "warm_common_users": 56,
+      "warm_weight": 0.0
+    },
+    "summary_core_metrics": 22680,
+    "user_metric_rows": 62700
+  },
+  "labels": {
+    "movies": 6625,
+    "pin": {
+      "bytes": 75490,
+      "sha256": "e3bf301a6e2ea7885b59bcab7fe83c2d3ad84f93f2f1bbb2d54d943b9a658db8"
+    },
+    "rows": 18959,
+    "users": 270
+  },
+  "labels_opened_after_all_lineage_gates": true,
+  "reviews": {
+    "audit": {
+      "bytes": 7699,
+      "sha256": "f9de5171ebcb8d3d232c101af232f51dd65da24f811adb32c58d7cdc2ec9d4b4"
+    },
+    "catalog": {
+      "bytes": 8500,
+      "sha256": "c7c24976a1f5dbd51e5624621455d9a1b35ef35880b4628d901b7a9bf00bef0e"
+    },
+    "evaluation": {
+      "bytes": 8692,
+      "sha256": "d7d651c3766207e920df93a6d25c8e27083d62f4d2fdef8cdff2c9d286214010"
+    },
+    "prelabel": {
+      "bytes": 11985,
+      "sha256": "be590bd5f5831582c0b7311f6b754a27f6b5557f699e26f04673a92c0469f5dc"
+    }
+  },
+  "schema_version": 1,
+  "scope": "DEVELOPMENT_ONLY",
+  "seals": {
+    "catalog": {
+      "bytes": 4489,
+      "sha256": "76bcccadf974a29f281a7ab646729abf8593c0c7f222929fb7c5aa21b830302d"
+    },
+    "evaluation": {
+      "bytes": 2507,
+      "sha256": "974c7403e32d24155971b99d6eee93757bd53986ce81a4adacf89b48e569583b"
+    },
+    "prediction": {
+      "bytes": 26728,
+      "sha256": "7e229ba1de750286a0e7e12655c71cf7633de5c11946bacfb66cb777cba209c6"
+    },
+    "report": {
+      "bytes": 1948,
+      "sha256": "798fe06b58df52fc42cd8cbd56877f846ac667e1d143d7b49fbe35b7a043d0f1"
+    }
+  },
+  "service_adoption": false,
+  "status": "PASS"
+}

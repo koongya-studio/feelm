@@ -1,0 +1,358 @@
+{
+  "schema_version": 1,
+  "jira": "S15P21E106-387",
+  "availability": "LOCAL_ONLY",
+  "shared_uri": null,
+  "scope": "Selected source-pinned existing research artifacts; not a complete historical training dependency closure.",
+  "artifacts": [
+    {
+      "source_path": ".codex-tmp/fixed-k8-discovery-v2-20260913/outputs/fixed-k8-discovery-v2/feelm-discovery-v2-r2/final/bundle.pkl",
+      "bytes": 10302746,
+      "sha256": "ddb2f2155745d6631151bdd18d84255a24551dd7d34381b9c791f8600bef8114",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": ".codex-tmp/fixed-k8-discovery-v2-20260913/outputs/fixed-k8-discovery-v2/feelm-discovery-v2-r2/cluster/GKT-K128-hierarchy.pkl",
+      "bytes": 11570337,
+      "sha256": "b51347ef483f4585a415cbc863cc4b7cb7387c5d154474b30e4aef7db915baf9",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": ".codex-tmp/fixed-k8-discovery-v2-20260913/outputs/fixed-k8-discovery-v2/feelm-discovery-v2-r2/cluster/GKT-K128-assignments.npz",
+      "bytes": 1116111,
+      "sha256": "60df623e838c6df0c6813ecfedd90092c840343fff087af1d04245261914bbf3",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": ".codex-tmp/fixed-k8-discovery-v2-20260913/outputs/fixed-k8-discovery-v2/feelm-discovery-v2-r2/prepare/catalog.parquet",
+      "bytes": 42113282,
+      "sha256": "8bda180eb6530188a6ebf08da599d4d68124247a878ca0911f0d3f38512415cd",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": ".codex-tmp/fixed-k8-discovery-v2-20260913/outputs/fixed-k8-discovery-v2/feelm-discovery-v2-r2/prepare/content.npy",
+      "bytes": 249232344,
+      "sha256": "a28ea24016ef1786111e0ece976c650ff20e6f4bcbeeea2c0f9047d78eaefd5b",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/kobis-expanded-20260913/annual-observations.parquet",
+      "bytes": 5472892,
+      "sha256": "e463bf59cdb56469f93336c902ed1215ab759af216a3af2002f95c6c4723ce92",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/linked-observations.parquet",
+      "bytes": 5730764,
+      "sha256": "7ab2e64096ab225f8fc371098d69c2b668ba5e96a6d5de60a480df4b4b595dfd",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/kobis-expanded-20260913/annual-observations.csv",
+      "bytes": 34811753,
+      "sha256": "b1cdc000af96a4fba5e5637c494e2e4a2e1090b4a70c69cad96ce964c8c36630",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/confirmed-movie-comparison.csv",
+      "bytes": 974554,
+      "sha256": "38ec5d5e2d03a553fc463576541fccdb0200d7f6217ab519183a8cdc5be088d9",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "docs/recommendation/experiments/final341/runtime.csv",
+      "bytes": 335,
+      "sha256": "bfddc10aea9bf96e15e39ae6e9923ffd32be72408b523a45d05ef0b3361c135c",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/combination340/ALS/item-factors/._SUCCESS.crc",
+      "bytes": 8,
+      "sha256": "1d44f510ec2ed7595badbec80583316defc14e8dd89130d719724149adfaa07d",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/combination340/ALS/item-factors/.part-00000-bdcc1753-c6f9-4e6d-a9c6-df4b64b3d65c-c000.snappy.parquet.crc",
+      "bytes": 5012,
+      "sha256": "11178dfd21ed556940979fa479b90e4aa8428664a408092c0e764ff6510136bd",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/combination340/ALS/item-factors/.part-00001-bdcc1753-c6f9-4e6d-a9c6-df4b64b3d65c-c000.snappy.parquet.crc",
+      "bytes": 5956,
+      "sha256": "d8ebea0b42fe459706af7a5345d4b33eece9a2915aae3c5c24938c20947315a9",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/combination340/ALS/item-factors/.part-00002-bdcc1753-c6f9-4e6d-a9c6-df4b64b3d65c-c000.snappy.parquet.crc",
+      "bytes": 5124,
+      "sha256": "5302d3a66499097662b384cd57766a05b2b5a5440f54f44a9d0b63321a411289",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/combination340/ALS/item-factors/.part-00003-bdcc1753-c6f9-4e6d-a9c6-df4b64b3d65c-c000.snappy.parquet.crc",
+      "bytes": 5944,
+      "sha256": "0340a491786074efad6361c5780b3ff2e65551093a26f0e9e6ddd1e6121171fc",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/combination340/ALS/item-factors/.part-00004-bdcc1753-c6f9-4e6d-a9c6-df4b64b3d65c-c000.snappy.parquet.crc",
+      "bytes": 4968,
+      "sha256": "ea8bdfa93384e93bac31484c7c6fdc3d130885d92c22a921d7a84144665bdd30",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/combination340/ALS/item-factors/.part-00005-bdcc1753-c6f9-4e6d-a9c6-df4b64b3d65c-c000.snappy.parquet.crc",
+      "bytes": 6140,
+      "sha256": "f1c2e1de9731f9952b87c3ff6d7bf6ca84ed9926f9e3fbd5731029a711f38f29",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/combination340/ALS/item-factors/.part-00006-bdcc1753-c6f9-4e6d-a9c6-df4b64b3d65c-c000.snappy.parquet.crc",
+      "bytes": 4988,
+      "sha256": "ebc504ac0f2382deb12b70929da9a103bdf005b6c52c1b5409fa1ca3651b3a5b",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/combination340/ALS/item-factors/.part-00007-bdcc1753-c6f9-4e6d-a9c6-df4b64b3d65c-c000.snappy.parquet.crc",
+      "bytes": 6292,
+      "sha256": "10d719359e51b9f57198eefb75099636080a96c61ee04153cc467732d9cb7cff",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/combination340/ALS/item-factors/_SUCCESS",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/combination340/ALS/item-factors/part-00000-bdcc1753-c6f9-4e6d-a9c6-df4b64b3d65c-c000.snappy.parquet",
+      "bytes": 640387,
+      "sha256": "f6d328a55d9059e5e4170215071aeb522381e9aceb247a195cddee2df249ee66",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/combination340/ALS/item-factors/part-00001-bdcc1753-c6f9-4e6d-a9c6-df4b64b3d65c-c000.snappy.parquet",
+      "bytes": 761270,
+      "sha256": "de79f165b1ae21beabd1bf6352d029b88b6383567689192f2280a45b9f680fa6",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/combination340/ALS/item-factors/part-00002-bdcc1753-c6f9-4e6d-a9c6-df4b64b3d65c-c000.snappy.parquet",
+      "bytes": 654425,
+      "sha256": "0c761ca6573a8c35162af0b77294030b9c4f00cef30b3fbb549689d05397c9aa",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/combination340/ALS/item-factors/part-00003-bdcc1753-c6f9-4e6d-a9c6-df4b64b3d65c-c000.snappy.parquet",
+      "bytes": 759762,
+      "sha256": "9819744e3bad16494129969a423a6ee650d5ee3b2ca6e07b18f9121614ca5d76",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/combination340/ALS/item-factors/part-00004-bdcc1753-c6f9-4e6d-a9c6-df4b64b3d65c-c000.snappy.parquet",
+      "bytes": 634621,
+      "sha256": "c0230036ee3de8fab7d2b6138a8b45f4ba2b1f15adc19093f16503c4fc5d39c6",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/combination340/ALS/item-factors/part-00005-bdcc1753-c6f9-4e6d-a9c6-df4b64b3d65c-c000.snappy.parquet",
+      "bytes": 784751,
+      "sha256": "666787c824db1064feb0f8563d49180a7de87beb18e9a82e8554b313fbb7537b",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/combination340/ALS/item-factors/part-00006-bdcc1753-c6f9-4e6d-a9c6-df4b64b3d65c-c000.snappy.parquet",
+      "bytes": 636997,
+      "sha256": "089631f252fbcc9a9cc875836ee0c62db7002b16c175f7f96f997fce37b337f6",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/combination340/ALS/item-factors/part-00007-bdcc1753-c6f9-4e6d-a9c6-df4b64b3d65c-c000.snappy.parquet",
+      "bytes": 804047,
+      "sha256": "1fb552c709468dca889e02d184a61fe911c7ba70e64a24bc5fe0a2b07dbf828b",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/final344/GBT120_s339/model/native/data/._SUCCESS.crc",
+      "bytes": 8,
+      "sha256": "1d44f510ec2ed7595badbec80583316defc14e8dd89130d719724149adfaa07d",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/final344/GBT120_s339/model/native/data/.part-00000-e7e2dc8b-cdda-4868-9253-b14fd95f91ac-c000.snappy.parquet.crc",
+      "bytes": 3012,
+      "sha256": "5ef380301225269d0a28c114b005b39a08b410993bd1300bdef6fc42e43730f1",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/final344/GBT120_s339/model/native/data/_SUCCESS",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/final344/GBT120_s339/model/native/data/part-00000-e7e2dc8b-cdda-4868-9253-b14fd95f91ac-c000.snappy.parquet",
+      "bytes": 384363,
+      "sha256": "e452afcf37877ca89178719a5650b74165f2046d2f1dcba905c37300b899c954",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/final344/GBT120_s339/model/native/metadata/._SUCCESS.crc",
+      "bytes": 8,
+      "sha256": "1d44f510ec2ed7595badbec80583316defc14e8dd89130d719724149adfaa07d",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/final344/GBT120_s339/model/native/metadata/.part-00000-e11eaefa-48c6-4f6b-9cca-e139658fb1ac-c000.txt.crc",
+      "bytes": 20,
+      "sha256": "ff8bfabca6dc777506799d2452bf166102a9ecc2ee504d5a09206d66cbec65e0",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/final344/GBT120_s339/model/native/metadata/_SUCCESS",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/final344/GBT120_s339/model/native/metadata/part-00000-e11eaefa-48c6-4f6b-9cca-e139658fb1ac-c000.txt",
+      "bytes": 1041,
+      "sha256": "e142b0461fd249cbf2531b75507a5a7b128344b2cf59fbfb2f035983855f7ee3",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/final344/GBT120_s339/model/native/treesMetadata/._SUCCESS.crc",
+      "bytes": 8,
+      "sha256": "1d44f510ec2ed7595badbec80583316defc14e8dd89130d719724149adfaa07d",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/final344/GBT120_s339/model/native/treesMetadata/.part-00000-c31239f9-4151-4df0-bb64-226d76a48c04-c000.snappy.parquet.crc",
+      "bytes": 88,
+      "sha256": "f73ed93e1b6739f371f427d97df67a22efac41388ce478cb244ae73d551d8f96",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/final344/GBT120_s339/model/native/treesMetadata/_SUCCESS",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/final344/GBT120_s339/model/native/treesMetadata/part-00000-c31239f9-4151-4df0-bb64-226d76a48c04-c000.snappy.parquet",
+      "bytes": 9942,
+      "sha256": "f60e6580439ac6e15fedd7c3da18ab54f90104051dad6c1266c0c50f1b8acc38",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/final344/FM150_s339/model/portable.npz",
+      "bytes": 31181,
+      "sha256": "3dff9a84c2e43988efd0eed1cf64e8e8f4cdcce1398beb02372463c3b0b8cf5c",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/hybrid345/calibration.json",
+      "bytes": 14939,
+      "sha256": "6b2baf1dd27997cffe7f69fdc1e69e9fe80d26a29f467ee53958c2dc6f46e562",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/foundation340/RH/train.parquet",
+      "bytes": 832717601,
+      "sha256": "9d8d33a252991c032704d4072003b4fb9f400136f3c411a2698ae5fee592fa45",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/foundation340/RH/score.parquet",
+      "bytes": 2985357,
+      "sha256": "9832425537943823f524ae6730aa1059b77d2c0464664f1dc29357bf95078f9b",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/text339/ratings.parquet",
+      "bytes": 32950407,
+      "sha256": "28b46687abec2e0edb3a892ec4f4dbd9d5cca701bf220b2812f9e7cf9b905a63",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/text339/episodes.parquet",
+      "bytes": 574777,
+      "sha256": "5902393f1ae158bab1e0ad84d9ae361fb729c69917cb72211f52be7c157b2d79",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/text339/catalog.parquet",
+      "bytes": 728100,
+      "sha256": "0bde668e0e26f5f82b5c41d90d62c7569fd350bf2a2fd4b59bb4402f438c5947",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    },
+    {
+      "source_path": "outputs/recommendation-evidence/text339/contexts.json",
+      "bytes": 12290713,
+      "sha256": "951fc2464bd3aea25ea486c79c33084f6241f7846a3ed626e9d5fc3907a7aab7",
+      "availability": "LOCAL_ONLY",
+      "shared_uri": null
+    }
+  ],
+  "not_built": [
+    "verified-kobis-service-crosswalk",
+    "row-lineage",
+    "kobis-q99-training-prior",
+    "GBT-B1",
+    "GBT-B2",
+    "GBT-B3-245",
+    "FM-B3-245",
+    "calibration-45-users-v1",
+    "GKT-service-id-export",
+    "pgvector-index"
+  ],
+  "readiness": "NOT_READY_FOR_SERVICE_ACTIVATION"
+}

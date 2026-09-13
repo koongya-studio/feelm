@@ -1,0 +1,1342 @@
+{
+  "schema_version": 1,
+  "review_id": "kobis-document-update-20260913-independent-document-review",
+  "reviewer": "/root/kobis_doc_consistency_audit",
+  "reviewed_at_utc": "2026-09-13T06:08:26.177331+00:00",
+  "status": "PASS",
+  "scope": "Local documentation consistency and provenance only. No new collection, model training, cross-source identity verification, recommendation evaluation, team runtime/API/DB change, or external write.",
+  "reviewed_documents": [
+    {
+      "path": "docs/recommendation/active-experiment.md",
+      "bytes": 40884,
+      "sha256": "416f3229a74e38186ea92e7232ce2bed7eb7d4a221863b12eac9bb6e9640474f"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/ACCEPTANCE.md",
+      "bytes": 11591,
+      "sha256": "69db1b5f1d2475c76fd8b0d7eb9b842bdac3063bae0d169789718a0fb223b871"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/CONTRACTS.md",
+      "bytes": 39593,
+      "sha256": "dc5f818b0c0948c9eb73463a282b71d776164740a7549342e4949dd844024411"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/EVALUATION.md",
+      "bytes": 12238,
+      "sha256": "79d33f73f63cbb94012c2c549bd399d5519b6fe09d81da302050575ff9aaecb8"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/KOBIS-DATA.md",
+      "bytes": 9451,
+      "sha256": "fe7ac7faa32ee64bfaf1e56e0a2bfc5cb5217fc3ef32c335f4de92dd3b8c8c37"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/MODELS.md",
+      "bytes": 24979,
+      "sha256": "514b6a081c00249d5f8641d7620a46c0d40cf62177c6f6b8e5003eaa2b6d1fc1"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/OPERATIONS.md",
+      "bytes": 26436,
+      "sha256": "7db4d35d61aa7f07039e1d3b4da31cb9d7c98945f963b77bcf568d426b9f6588"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/POLICY.md",
+      "bytes": 16152,
+      "sha256": "7565aa24dd664c5f26d42f2b7694559577afaae14c9b48a306858dd95b606494"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/README.md",
+      "bytes": 9992,
+      "sha256": "ec5dc2e5e75b08cd3a996c18aae66cb8a40c74e8ffea20c1a2aaa876fb418b5a"
+    },
+    {
+      "path": "docs/research/kobis-expanded-20260913/REPORT.md",
+      "bytes": 10360,
+      "sha256": "c17c010add50ca7c061f6221a234e976570e7ced343d313105b324b2a2aa7c19"
+    },
+    {
+      "path": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+      "bytes": 15989,
+      "sha256": "91c899694d5cd241e2212b146ae95c7471564555fb41b40b0052edb6c4a0c807"
+    }
+  ],
+  "before_copies": [
+    {
+      "path": "docs\\recommendation\\service-v1-20260913\\ACCEPTANCE.md",
+      "preserved": true
+    },
+    {
+      "path": "docs\\recommendation\\service-v1-20260913\\CONTRACTS.md",
+      "preserved": true
+    },
+    {
+      "path": "docs\\recommendation\\service-v1-20260913\\EVALUATION.md",
+      "preserved": true
+    },
+    {
+      "path": "docs\\recommendation\\service-v1-20260913\\GROUPS.md",
+      "preserved": true
+    },
+    {
+      "path": "docs\\recommendation\\service-v1-20260913\\HYBRID-COMPARISONS.md",
+      "preserved": true
+    },
+    {
+      "path": "docs\\recommendation\\service-v1-20260913\\MODELS.md",
+      "preserved": true
+    },
+    {
+      "path": "docs\\recommendation\\service-v1-20260913\\OPERATIONS.md",
+      "preserved": true
+    },
+    {
+      "path": "docs\\recommendation\\service-v1-20260913\\POLICY.md",
+      "preserved": true
+    },
+    {
+      "path": "docs\\recommendation\\service-v1-20260913\\README.md",
+      "preserved": true
+    },
+    {
+      "path": "docs\\recommendation\\service-v1-20260913\\comparison-registry.v1.json",
+      "preserved": true
+    },
+    {
+      "path": "docs\\recommendation\\service-v1-20260913\\config.v1.json",
+      "preserved": true
+    },
+    {
+      "path": "docs\\recommendation\\service-v1-20260913\\feature-schema.v1.json",
+      "preserved": true
+    },
+    {
+      "path": "docs\\recommendation\\service-v1-20260913\\group-recipe.v1.json",
+      "preserved": true
+    },
+    {
+      "path": "docs\\recommendation\\service-v1-20260913\\training-recipe.v1.json",
+      "preserved": true
+    },
+    {
+      "path": "docs\\research\\tmdb-kobis-v1-20260913\\REPORT.md",
+      "preserved": true
+    },
+    {
+      "path": "docs\\research\\kobis-expanded-20260913\\REPORT.md",
+      "preserved": true
+    },
+    {
+      "path": "docs\\recommendation\\active-experiment.md",
+      "preserved": true
+    }
+  ],
+  "unchanged_numeric_json": [
+    {
+      "path": "docs\\recommendation\\service-v1-20260913\\comparison-registry.v1.json",
+      "unchanged": true,
+      "sha256": "b872a4dc1e16147118d5419fc936fa316256b340c71218bb24308e09df68f4ba"
+    },
+    {
+      "path": "docs\\recommendation\\service-v1-20260913\\config.v1.json",
+      "unchanged": true,
+      "sha256": "bb466512e1d948c5db3ae28b5733ffac9af71ffbbe533e021ebc84095a80112a"
+    },
+    {
+      "path": "docs\\recommendation\\service-v1-20260913\\feature-schema.v1.json",
+      "unchanged": true,
+      "sha256": "1c4c8aef5cce42c0c4bc74d2d9f3e113a972d4b2ea521592760bde042d7f56ec"
+    },
+    {
+      "path": "docs\\recommendation\\service-v1-20260913\\group-recipe.v1.json",
+      "unchanged": true,
+      "sha256": "3fd587b1b74fdf9803dd5e93328081ea196848583e0b5ef3d015cf60e16df483"
+    },
+    {
+      "path": "docs\\recommendation\\service-v1-20260913\\training-recipe.v1.json",
+      "unchanged": true,
+      "sha256": "66a3cebafc5344f981431f4bd5ce2601cd26e1cc06a065f905b4cb84dd0f8c2a"
+    }
+  ],
+  "protected_artifact_check": {
+    "files": 294,
+    "bytes": 339941241,
+    "all_unchanged": true,
+    "start_inventory": {
+      "path": "outputs/recommendation-evidence/kobis-document-update-20260913/audit-protected-start.json",
+      "bytes": 62579,
+      "sha256": "c9bdc680b119391cb9ac45be1e42abedde0fef85f5c3b659aa9f8ad59c75fa9e"
+    }
+  },
+  "historical_manifest_checks": [
+    {
+      "manifest": {
+        "path": "outputs/recommendation-evidence/kobis-expanded-20260913/delivery-manifest.json",
+        "bytes": 3375,
+        "sha256": "77132cf300c764fb8d954ea7c387aef6abbd538b759cf959333ecccb6c51f3d3"
+      },
+      "pins": [
+        {
+          "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\result-review.json",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\result-link-v2-review.json",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\docs\\research\\kobis-expanded-20260913\\REPORT.md",
+          "matched": "preserved_before"
+        },
+        {
+          "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\annual-observations.parquet",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\annual-observations.csv",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\manifest.json",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\summary.json",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\scripts\\collect_kobis_expanded.py",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\scripts\\link_kobis_expanded.py",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\scripts\\audit_kobis_expanded.py",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\scripts\\kobis_movie_statistics.py",
+          "matched": "current"
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/manifest.json",
+        "bytes": 3770,
+        "sha256": "4311b71dfb6b28a83e8be402992dceec4fa955ab336bcc126ba2e5eab60e00f9"
+      },
+      "pins": [
+        {
+          "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\annual-observations.parquet",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\.codex-tmp\\fixed-k8-discovery-v2-20260913\\outputs\\fixed-k8-discovery-v2\\feelm-discovery-v2-r2\\prepare\\catalog.parquet",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\outputs\\recommendation-evidence\\presentation-data-20260913\\movie-rating-aggregates.parquet",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\scripts\\link_kobis_expanded.py",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\collection-summary.json",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\confirmed-movie-comparison.csv",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\confirmed-movie-comparison.parquet",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\linked-observations.csv",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\linked-observations.parquet",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\nation-link-coverage.csv",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\REPORT.md",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\summary.json",
+          "matched": "current"
+        },
+        {
+          "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\yearly-link-coverage.csv",
+          "matched": "current"
+        }
+      ]
+    },
+    {
+      "manifest": {
+        "path": "outputs/recommendation-evidence/tmdb-kobis-v1-20260913/publication-manifest.json",
+        "bytes": 4115,
+        "sha256": "85022ac049ff0dcd63b0ac81a9a64002762cc9300183f9f166b75e64d4c649a6"
+      },
+      "pins": [
+        {
+          "path": "outputs/recommendation-evidence/tmdb-kobis-v1-20260913/manifest.json",
+          "matched": "current"
+        },
+        {
+          "path": "outputs/recommendation-evidence/tmdb-kobis-v1-20260913/result-review.json",
+          "matched": "current"
+        },
+        {
+          "path": "outputs/recommendation-evidence/tmdb-kobis-v1-20260913/publication-history/REPORT.generated.md",
+          "matched": "current"
+        },
+        {
+          "path": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+          "matched": "preserved_before"
+        },
+        {
+          "path": "docs/research/tmdb-kobis-v1-20260913/data/01-counts-and-ratios.png",
+          "matched": "current"
+        },
+        {
+          "path": "docs/research/tmdb-kobis-v1-20260913/data/01-counts-and-ratios.svg",
+          "matched": "current"
+        },
+        {
+          "path": "docs/research/tmdb-kobis-v1-20260913/data/02-scale-imbalance.png",
+          "matched": "current"
+        },
+        {
+          "path": "docs/research/tmdb-kobis-v1-20260913/data/02-scale-imbalance.svg",
+          "matched": "current"
+        },
+        {
+          "path": "docs/research/tmdb-kobis-v1-20260913/data/03-rating-relations.png",
+          "matched": "current"
+        },
+        {
+          "path": "docs/research/tmdb-kobis-v1-20260913/data/03-rating-relations.svg",
+          "matched": "current"
+        },
+        {
+          "path": "docs/research/tmdb-kobis-v1-20260913/data/04-rating-dispersion.png",
+          "matched": "current"
+        },
+        {
+          "path": "docs/research/tmdb-kobis-v1-20260913/data/04-rating-dispersion.svg",
+          "matched": "current"
+        },
+        {
+          "path": "docs/research/tmdb-kobis-v1-20260913/data/between-film-rating-distributions.csv",
+          "matched": "current"
+        },
+        {
+          "path": "docs/research/tmdb-kobis-v1-20260913/data/count-and-rating-relations.csv",
+          "matched": "current"
+        },
+        {
+          "path": "docs/research/tmdb-kobis-v1-20260913/data/coverage.csv",
+          "matched": "current"
+        },
+        {
+          "path": "docs/research/tmdb-kobis-v1-20260913/data/movielens-same-film-rating-sd.csv",
+          "matched": "current"
+        },
+        {
+          "path": "docs/research/tmdb-kobis-v1-20260913/data/tmdb-kobis-pairs.csv",
+          "matched": "current"
+        },
+        {
+          "path": "docs/research/tmdb-kobis-v1-20260913/data/within-film-ml-sd-distributions.csv",
+          "matched": "current"
+        }
+      ]
+    }
+  ],
+  "markdown_file_links": {
+    "checked": 181,
+    "all_resolve": true,
+    "checks": [
+      {
+        "source": "docs/recommendation/service-v1-20260913/ACCEPTANCE.md",
+        "target": "POLICY.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/ACCEPTANCE.md",
+        "target": "MODELS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/ACCEPTANCE.md",
+        "target": "CONTRACTS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/ACCEPTANCE.md",
+        "target": "OPERATIONS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/ACCEPTANCE.md",
+        "target": "GROUPS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/ACCEPTANCE.md",
+        "target": "KOBIS-DATA.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/CONTRACTS.md",
+        "target": "POLICY.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/CONTRACTS.md",
+        "target": "MODELS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/CONTRACTS.md",
+        "target": "OPERATIONS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/CONTRACTS.md",
+        "target": "KOBIS-DATA.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/CONTRACTS.md",
+        "target": "../../../outputs/recommendation-evidence/service-v1-implementation-20260913/team-contract-audit.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/CONTRACTS.md",
+        "target": "comparison-registry.v1.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/CONTRACTS.md",
+        "target": "HYBRID-COMPARISONS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/CONTRACTS.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/delivery-manifest.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/CONTRACTS.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/result-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/CONTRACTS.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/result-link-v2-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/CONTRACTS.md",
+        "target": "ACCEPTANCE.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/EVALUATION.md",
+        "target": "MODELS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/EVALUATION.md",
+        "target": "HYBRID-COMPARISONS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/EVALUATION.md",
+        "target": "KOBIS-DATA.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/MODELS.md",
+        "target": "POLICY.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/MODELS.md",
+        "target": "feature-schema.v1.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/MODELS.md",
+        "target": "OPERATIONS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/MODELS.md",
+        "target": "HYBRID-COMPARISONS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/MODELS.md",
+        "target": "comparison-registry.v1.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/MODELS.md",
+        "target": "GROUPS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/MODELS.md",
+        "target": "group-recipe.v1.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/MODELS.md",
+        "target": "KOBIS-DATA.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/MODELS.md",
+        "target": "training-recipe.v1.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/MODELS.md",
+        "target": "KOBIS-DATA.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/MODELS.md",
+        "target": "EVALUATION.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/OPERATIONS.md",
+        "target": "POLICY.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/OPERATIONS.md",
+        "target": "MODELS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/OPERATIONS.md",
+        "target": "CONTRACTS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/OPERATIONS.md",
+        "target": "KOBIS-DATA.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/OPERATIONS.md",
+        "target": "HYBRID-COMPARISONS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/POLICY.md",
+        "target": "README.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/POLICY.md",
+        "target": "config.v1.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/POLICY.md",
+        "target": "CONTRACTS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/POLICY.md",
+        "target": "KOBIS-DATA.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/POLICY.md",
+        "target": "GROUPS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "POLICY.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "KOBIS-DATA.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "MODELS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "HYBRID-COMPARISONS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "comparison-registry.v1.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "GROUPS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "CONTRACTS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "OPERATIONS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "config.v1.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "feature-schema.v1.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "training-recipe.v1.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "group-recipe.v1.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "ACCEPTANCE.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "EVALUATION.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "../../research/tmdb-kobis-v1-20260913/REPORT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "presentation/feelm-recommendation-v1.pptx",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "KOBIS-DATA.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "../../../outputs/recommendation-evidence/tmdb-kobis-v1-20260913/result-review.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "../../../outputs/recommendation-evidence/service-v1-implementation-20260913/model-policy-review.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "../../../outputs/recommendation-evidence/service-v1-implementation-20260913/model-policy-review-r2.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "../../../outputs/recommendation-evidence/service-v1-implementation-20260913/evaluation-design-review-r2.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "../../../outputs/recommendation-evidence/service-v1-implementation-20260913/delivery-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "../../../outputs/recommendation-evidence/hybrid-comparison-extension-20260913/delivery-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-document-update-20260913/document-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "../experiments/hybrid345/RESULT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/README.md",
+        "target": "MODELS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "../kobis-expanded-20260913/REPORT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "../../recommendation/service-v1-20260913/KOBIS-DATA.md",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "data/coverage.csv",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "data/tmdb-kobis-pairs.csv",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "data/01-counts-and-ratios.png",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "data/02-scale-imbalance.png",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "data/count-and-rating-relations.csv",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "data/03-rating-relations.png",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "data/between-film-rating-distributions.csv",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "data/04-rating-dispersion.png",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "data/within-film-ml-sd-distributions.csv",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "data/movielens-same-film-rating-sd.csv",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "DESIGN.md",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/tmdb-kobis-v1-20260913/manifest.json",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/tmdb-kobis-v1-20260913/result-review.md",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/tmdb-kobis-v1-20260913/result-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/tmdb-kobis-v1-20260913/publication-manifest.json",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/delivery-manifest.json",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/result-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/result-link-v2-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/summary.json",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-document-update-20260913/before.json",
+        "exists": true
+      },
+      {
+        "source": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-document-update-20260913/document-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/research/kobis-expanded-20260913/REPORT.md",
+        "target": "../tmdb-kobis-v1-20260913/REPORT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/research/kobis-expanded-20260913/REPORT.md",
+        "target": "../../recommendation/service-v1-20260913/KOBIS-DATA.md",
+        "exists": true
+      },
+      {
+        "source": "docs/research/kobis-expanded-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/annual-observations.parquet",
+        "exists": true
+      },
+      {
+        "source": "docs/research/kobis-expanded-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/annual-observations.csv",
+        "exists": true
+      },
+      {
+        "source": "docs/research/kobis-expanded-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/linked-observations.parquet",
+        "exists": true
+      },
+      {
+        "source": "docs/research/kobis-expanded-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/confirmed-movie-comparison.csv",
+        "exists": true
+      },
+      {
+        "source": "docs/research/kobis-expanded-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/summary.json",
+        "exists": true
+      },
+      {
+        "source": "docs/research/kobis-expanded-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/collection-summary.json",
+        "exists": true
+      },
+      {
+        "source": "docs/research/kobis-expanded-20260913/REPORT.md",
+        "target": "../../../scripts/collect_kobis_expanded.py",
+        "exists": true
+      },
+      {
+        "source": "docs/research/kobis-expanded-20260913/REPORT.md",
+        "target": "../../../scripts/link_kobis_expanded.py",
+        "exists": true
+      },
+      {
+        "source": "docs/research/kobis-expanded-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/result-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/research/kobis-expanded-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/result-link-v2-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/research/kobis-expanded-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/delivery-manifest.json",
+        "exists": true
+      },
+      {
+        "source": "docs/research/kobis-expanded-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-document-update-20260913/before.json",
+        "exists": true
+      },
+      {
+        "source": "docs/research/kobis-expanded-20260913/REPORT.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-document-update-20260913/document-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "../research/kobis-expanded-20260913/REPORT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "service-v1-20260913/KOBIS-DATA.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "service-v1-20260913/README.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "service-v1-20260913/HYBRID-COMPARISONS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "../research/tmdb-kobis-v1-20260913/REPORT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "service-popularity-v2-20260913/README.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "service-popularity-v2-20260913/DESIGN.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "service-final-20260913/README.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "service-final-20260913/POLICY-DETAILS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "service-final-20260913/OPERATIONS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "service-final-20260913/KOBIS-DATA.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/hybrid345/PRESENTATION-DECISION.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "model-selection-review-2026-09-11.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/diagnostic342/RESULT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/research343/DESIGN.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/research343/RESULT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/research343/result-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "plans/final-fm-gbt/README.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "plans/final-fm-gbt/DESIGN.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/final344/README.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/final344/RESULT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/foundation340/EXECUTION.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/final341/README.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/final341/DETAILS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/final341/result-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/combination340/EXECUTION.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/policy341/EXECUTION.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/text339-clean/README.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "plans/text-to-final-recommendation/README.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "plans/text-to-final-recommendation/DESIGN.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "plans/text-to-final-recommendation/design-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "plans/text-to-final-recommendation/JIRA.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/text339/EXECUTION.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/text339/README.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/text339/README.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/text339/result-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "plans/text-to-final-recommendation/training-input-distribution.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "../research/wikipedia-collection/PLAN.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "../research/wikipedia-collection/result-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "../research/wikipedia-collection/RESULT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "../research/wikipedia-collection/QUALITY.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "plans/als-reference-cold-item-comparison.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/cold-item-content/EXECUTION.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/cold-item-content/RESULT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/cold-item-content/result-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/rec-ev-047/RESULT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/rec-ev-047/result-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/rec-ev-046/data-audit/RESULT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/rec-ev-046/README.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/rec-ev-046/RESULT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "2026-korea-data-and-evaluation-redesign.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "../research/movielens-release-distribution/REPORT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "../research/movielens-release-distribution/BY_YEAR.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "analysis-scope.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "plans/multidimensional-preference-analysis.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "plans/multidimensional-feature-support.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/rec-ev-045/README.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/rec-ev-045/temporal-design.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/rec-ev-045/RESULT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/rec-ev-044/README.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/rec-ev-044/RESULT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/rec-ev-043/README.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/rec-ev-043/RESULT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/active-experiment.md",
+        "target": "experiments/rec-ev-042/RESULT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/KOBIS-DATA.md",
+        "target": "POLICY.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/KOBIS-DATA.md",
+        "target": "MODELS.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/KOBIS-DATA.md",
+        "target": "../../research/kobis-expanded-20260913/REPORT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/KOBIS-DATA.md",
+        "target": "../../research/kobis-expanded-20260913/REPORT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/KOBIS-DATA.md",
+        "target": "../../research/tmdb-kobis-v1-20260913/REPORT.md",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/KOBIS-DATA.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/delivery-manifest.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/KOBIS-DATA.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/result-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/KOBIS-DATA.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/result-link-v2-review.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/KOBIS-DATA.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/annual-observations.parquet",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/KOBIS-DATA.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/linked-observations.parquet",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/KOBIS-DATA.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-document-update-20260913/before.json",
+        "exists": true
+      },
+      {
+        "source": "docs/recommendation/service-v1-20260913/KOBIS-DATA.md",
+        "target": "../../../outputs/recommendation-evidence/kobis-document-update-20260913/document-review.json",
+        "exists": true
+      }
+    ],
+    "external_links": "Not fetched; retained source citations and prior collected evidence only."
+  },
+  "annual_descriptive_count_recheck": {
+    "source": {
+      "path": "outputs/recommendation-evidence/kobis-expanded-20260913/annual-observations.csv",
+      "bytes": 34811753,
+      "sha256": "b1cdc000af96a4fba5e5637c494e2e4a2e1090b4a70c69cad96ce964c8c36630"
+    },
+    "expected": {
+      "rows": 72700,
+      "annual_negative": 16,
+      "annual_0_to_9999": 66445,
+      "annual_10000_to_999999": 5352,
+      "annual_at_least_1000000": 887,
+      "blank_open_date": 28424
+    },
+    "actual": {
+      "rows": 72700,
+      "annual_negative": 16,
+      "annual_0_to_9999": 66445,
+      "annual_10000_to_999999": 5352,
+      "annual_at_least_1000000": 887,
+      "blank_open_date": 28424
+    },
+    "equal": true
+  },
+  "historical_statistics_text": {
+    "report": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+    "original_sections": "2 through 6",
+    "characters": 3572,
+    "sha256_utf8_text": "2d3cc7b1d6dab7f5c3204a8c28fd95d2883b51e8d973fa3683e01652a501dbca",
+    "preserved_verbatim_in_current_report": true
+  },
+  "semantic_review": {
+    "72700_movie_year_observations_not_unique_movies": "PASS",
+    "2300_direct_rows_2176_codes_first_100_rows_per_year_selected_sample": "PASS",
+    "70400_unresolved_rows_2682_code_proposals_not_confirmed": "PASS",
+    "1792_direct_movie_tmdb_and_13779_other_row_proposals_not_additive_unique_count": "PASS",
+    "expanded_confirmed_cross_source_ids_zero_and_no_attached_rating_values": "PASS",
+    "annual_period_end_cumulative_current_detail_and_statistics_dates_distinguished": "PASS",
+    "last_observed_direct_rows_not_current_or_complete_lifetime": "PASS",
+    "signed_16_rows_retained_missing_not_zero": "PASS",
+    "reviewed_mapping_scope_cutoff_required_before_K_validity": "PASS",
+    "KO_LOW_cumulative_and_KO_ONLY_not_mapping_failure": "PASS",
+    "old_TK371_B337_statistics_kept_as_Top200_exploratory_history": "PASS",
+    "collection_PASS_not_KOBIS245_training_or_quality_readiness": "PASS",
+    "GBT_FM_ALS_and_hybrid_roles_2plus1_10x10_K10_candidate500_unchanged": "PASS",
+    "staging_logic_not_deployed_DB_API_migration": "PASS",
+    "new_data_acceptance_cases_are_unexecuted_specification": "PASS",
+    "stale_Top200_only_current_readiness_claims_replaced_or_explicit_history": "PASS",
+    "historical_manifests_preserved_and_before_report_versions_retained": "PASS"
+  },
+  "blocking_findings": [],
+  "limits": [
+    "No proposed film identity was independently confirmed in this document audit.",
+    "The audit preserves previous numeric result reviews; it does not rerun models or broaden statistical claims.",
+    "Old report pins refer to preserved before snapshots, not to newly edited REPORT.md files."
+  ],
+  "audit_script": {
+    "path": "outputs/recommendation-evidence/kobis-document-update-20260913/audit_documents.py",
+    "bytes": 10520,
+    "sha256": "6c6e5d0b4789bd56df0ef2cd0a1f230bf58e7ed431d0d8c317bc8bf01e63d4df"
+  }
+}

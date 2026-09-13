@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "review_id": "service-v1-evaluation-statistical-design-review-r2-20260913",
+  "status": "PASS",
+  "reviewed_at_utc": "2026-09-13T04:58:01.4859577Z",
+  "reviewer": "/root/als_final_comparison_audit",
+  "scope": "Independent read-only re-review of the corrected future evaluation specification and its MODELS activation gate. No training, evaluation, bootstrap, sign-flip, or other resampling was executed.",
+  "blocking_findings": [],
+  "required_changes": [],
+  "pins": [
+    {
+      "path": "docs/recommendation/service-v1-20260913/EVALUATION.md",
+      "bytes": 10743,
+      "sha256": "5502936732e2580852cc58a8da27695a99b4eaacae39b7c9f4c3bdd7a10641d7",
+      "role": "primary corrected evaluation specification"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/MODELS.md",
+      "bytes": 23137,
+      "sha256": "ffd9f00873bc4db09ef96a2038e90b642d2fae788d0208ef57a13f130f0ab5ce",
+      "role": "corrected readiness and activation-gate linkage"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/README.md",
+      "bytes": 8273,
+      "sha256": "96680b354dcaae01fafc12d1ce259e382a7e119ca4f6a1f5c563aa78741568fd",
+      "role": "legacy metric provenance and separation from the unrun KOBIS245 evaluation"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/training-recipe.v1.json",
+      "bytes": 16847,
+      "sha256": "66a3cebafc5344f981431f4bd5ce2601cd26e1cc06a065f905b4cb84dd0f8c2a",
+      "role": "fixed B0/B1/B2/B3 variant recipe"
+    },
+    {
+      "path": "outputs/recommendation-evidence/service-v1-implementation-20260913/evaluation-design-review.json",
+      "bytes": 12188,
+      "sha256": "da53ec55666e07a548f26ba93998cbf6fe0f20448c18952ed70cfee4d5f56dd3",
+      "role": "preserved REVISION_REQUIRED review that identified the pre-correction gaps"
+    }
+  ],
+  "resolved_prior_findings": [
+    {
+      "id": "GATE-CORE-MSE-POPULATION-UNDEFINED",
+      "status": "RESOLVED",
+      "evidence": [
+        "EVALUATION.md:85-100 defines natural-view cap10 common supported target rows and enumerates ALL, ALS_TARGET_SUPPORTED, ALS_TARGET_UNSUPPORTED, KR, KO_LOW, KO_ONLY, and KO_RESPONSE with exact predicates and required B variants.",
+        "EVALUATION.md:102-107 fixes the factor-versus-fold-in distinction, minimum 30 users, 30 unique target movies, and 200 rows separately in selection45 and confirmation180, plus the common-user minimum for NDCG/low.",
+        "EVALUATION.md:109-112 requires every listed segment for the applicable B variant to pass and makes insufficient strata a non-pass.",
+        "MODELS.md:278-280 delegates to the same exact EVALUATION segment definitions."
+      ]
+    },
+    {
+      "id": "GATE-SPLIT-AND-BOOTSTRAP-RULE-UNDEFINED",
+      "status": "RESOLVED",
+      "evidence": [
+        "EVALUATION.md:109-112 requires selection45 to pass before confirmation180 and requires confirmation180 to pass after all coefficients, features, and settings are frozen; a favorable confirmation result cannot trigger model or coefficient reselection.",
+        "EVALUATION.md:114-120 restarts PCG64(339) from the fixed user list for each segment, recomputes Bn and B0 macro MSE inside every shared draw, defines draw-level B0=0 behavior, and maps invalid draws to an indeterminate non-pass.",
+        "EVALUATION.md:121-124 fixes inclusive endpoint rules: NDCG lower bound >= -0.01, Top2-low upper bound <= +0.02, and every segment's relative-MSE upper bound <= +0.05. The user bootstrap is the official gate and the movie bootstrap remains sensitivity only."
+      ]
+    }
+  ],
+  "checks": {
+    "user_block_paired_bootstrap_10000": {
+      "status": "PASS",
+      "evidence": "EVALUATION.md:60-64 uses equal-weight users, resamples every user's complete rows and rankings together, shares each draw across models, fixes 10,000 draws and PCG64 seed339, and reports 2.5/97.5 linear-interpolation percentiles separately for selection and confirmation."
+    },
+    "film_block_sensitivity_separate": {
+      "status": "PASS",
+      "evidence": "EVALUATION.md:65-70 fixes 10,000 movie-cluster draws with seed340, applies movie multiplicity to every target row, handles users with no rows and empty draws, forbids ranking-candidate duplication, and explicitly says this is not a two-way clustered test."
+    },
+    "three_sign_flip_contrasts_and_holm": {
+      "status": "PASS",
+      "evidence": "EVALUATION.md:72-77 fixes exactly B1-B0, B2-B0, and B3-B0 user-macro MSE contrasts. Because improvement is negative, the lower-tail `permuted_delta <= observed_delta` count is correct. It fixes 10,000 paired sign flips, PCG64 seed341, add-one Monte Carlo p-values, the same flip matrix, the common user intersection, Holm step-down, and family alpha .05. Insufficient or failed contrasts remain p=1."
+    },
+    "activation_segments_and_denominators": {
+      "status": "PASS",
+      "evidence": "EVALUATION.md:85-107 defines the row universe, common support, user-macro order, every segment predicate and applicable model, minimum users/movies/rows, NDCG/low common-user denominator, and INSUFFICIENT behavior. Overlapping segments remain separate rather than being merged into a favorable average."
+    },
+    "low_audience_boundary_consistency": {
+      "status": "PASS",
+      "evidence": "EVALUATION.md:98 defines KO_LOW as 10,000 <= valid cumulative KOBIS audience < 1,000,000. MODELS.md:238 now states the same '10 thousand or more to below 1 million' boundary, and MODELS.md:278 points to EVALUATION for the exact predicate."
+    },
+    "selection_then_confirmation_gate": {
+      "status": "PASS",
+      "evidence": "EVALUATION.md:109-112 requires all selection45 safety conditions before entering confirmation180, freezes settings, then requires all confirmation180 conditions for final noninferiority. Failure leaves B3 not ready."
+    },
+    "draw_level_relative_mse_and_ci_endpoints": {
+      "status": "PASS",
+      "evidence": "EVALUATION.md:114-124 recomputes the relative MSE in each paired user draw, handles zero denominators and invalid draws, uses the user bootstrap as the official decision distribution, and fixes the correct lower or upper percentile endpoint with inclusive boundaries."
+    },
+    "observed_candidates_vs_service_unknown": {
+      "status": "PASS",
+      "evidence": "EVALUATION.md:9-23 and 53-56 keep observed-target error/reranking, same-pool shadow, end-to-end service output, and UNKNOWN slots as different estimands. UNKNOWN items cannot be deleted to rebuild Top2, cannot receive invented labels, and block service-output NDCG while observed-slot summaries remain explicitly conditional."
+    },
+    "new_definitions_do_not_reuse_legacy_numbers": {
+      "status": "PASS",
+      "evidence": "EVALUATION.md:3-5 says no new model or policy evaluation was run; EVALUATION.md:45-46 preserves legacy NDCG under its old formula/calibration/denominator. README.md:91-100 labels all displayed MSE/NDCG values as prior hybrid345 development results with differing denominators and explicitly says they are not KOBIS245 scores or validation of the new service policy."
+    },
+    "no_blind_test_or_population_overclaim": {
+      "status": "PASS",
+      "evidence": "MODELS.md:181-194 says confirmation180 has already been viewed, is not a new blind test, cannot be used to retune, and does not validate 2026 Korean users. EVALUATION.md:91-94 and 128-135 keep operational support and UNKNOWN metrics separate from satisfaction."
+    },
+    "models_gate_linkage": {
+      "status": "PASS",
+      "evidence": "MODELS.md:253-280 delegates exact labels, denominators, bootstrap, Holm family, required segments, both-stage pass, draw-level ratio, zero-denominator handling, and interval direction to the corrected EVALUATION specification. The two documents now give one reproducible activation decision."
+    }
+  },
+  "interpretation_limits": [
+    "Bootstrap intervals and sign-flip p-values describe the fixed, already viewed development users; they are not a blind-test result or evidence for the 2026 Korean service population.",
+    "The movie-block analysis is sensitivity to repeated films, not simultaneous two-way user-and-film cluster inference.",
+    "Holm superiority and the multi-endpoint noninferiority gate answer different questions; statistical superiority is not required for the safety gate, and a safety pass is not a population-level superiority claim.",
+    "Actual service items without an observed rating remain UNKNOWN, so catalog coverage and operational behavior can be evaluated without inventing satisfaction labels."
+  ],
+  "nonblocking_implementation_notes": [
+    "When reporting sign-flip results on both selection45 and confirmation180, label the two split-specific families separately and do not select the favorable split.",
+    "For any paired movie-sensitivity difference, apply each seed340 movie multiplicity vector to every compared model; this preserves the intended paired interpretation.",
+    "Persist exact segment membership counts, common-user IDs, invalid-draw counts, unadjusted p-values, Holm-adjusted p-values, and interval endpoints in the future evaluation artifact."
+  ],
+  "final_assessment": "PASS. The corrected EVALUATION and MODELS documents now specify a reproducible fixed-development-data gate: exact populations and denominators, selection45 then frozen confirmation180, draw-level paired relative MSE, zero/invalid handling, directional interval endpoints, three Holm-adjusted superiority contrasts, and strict separation of observed candidates from service UNKNOWN. No severe statistical contradiction remains."
+}

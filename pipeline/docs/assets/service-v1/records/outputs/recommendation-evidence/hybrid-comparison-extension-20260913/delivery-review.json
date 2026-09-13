@@ -1,0 +1,97 @@
+{
+  "status": "PASS",
+  "verifiedAt": "2026-09-13T05:15:27.729875+00:00",
+  "scope": "ALS+GBT and ALS+FM comparison specification/registry extension; no model fitting, scoring experiment, or service implementation",
+  "files": [
+    {
+      "path": "docs/recommendation/service-v1-20260913/README.md",
+      "bytes": 8969,
+      "sha256": "b6f93335f37d52ddb44a9117502f17dcb8736b04a6ae521466547027dd68481d"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/MODELS.md",
+      "bytes": 23560,
+      "sha256": "87f7f2ae9c32dbb559aba2df644c993818559e7f7f745a2998f8b5592fff2843"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/EVALUATION.md",
+      "bytes": 11206,
+      "sha256": "f426a6eab0d1ea901812ab9296390063e7dbdcca8d9d1fa1be6423694fa582f6"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/CONTRACTS.md",
+      "bytes": 34631,
+      "sha256": "24f6914831c9ea93142a5d9c04aab0e4d382490c4e7e9770d450ddd89a7dd4b8"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/OPERATIONS.md",
+      "bytes": 22843,
+      "sha256": "13171e80c3769ebddb645fd4836407dbb0c332080e417de9da173cb511ac2273"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/config.v1.json",
+      "bytes": 3215,
+      "sha256": "bb466512e1d948c5db3ae28b5733ffac9af71ffbbe533e021ebc84095a80112a"
+    },
+    {
+      "path": "docs/recommendation/active-experiment.md",
+      "bytes": 39878,
+      "sha256": "0ad49dc889a3a86ad235a45aa4f55583c0b193eec62313dc8de2ad6eca52226e"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/HYBRID-COMPARISONS.md",
+      "bytes": 10379,
+      "sha256": "3ebbe65e0204abcd232f7ffc24ee65c29548e4d50cfd39c4c19e229344e4c407"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/comparison-registry.v1.json",
+      "bytes": 4706,
+      "sha256": "b872a4dc1e16147118d5419fc936fa316256b340c71218bb24308e09df68f4ba"
+    }
+  ],
+  "independentReview": {
+    "path": "outputs/recommendation-evidence/hybrid-comparison-extension-20260913/design-review.json",
+    "bytes": 10388,
+    "sha256": "31160ca781cd8b8cbed14a28fb2508d7eb4c2ed20e1ca01de3bfd05e2d4552be"
+  },
+  "priorDelivery": {
+    "path": "outputs/recommendation-evidence/service-v1-implementation-20260913/delivery-review.json",
+    "bytes": 6080,
+    "sha256": "a420e4aeff11e450d7f168354c8f931ec577180071ada0166e1e2f1709fbc7d7"
+  },
+  "beforeSnapshot": {
+    "path": "outputs/recommendation-evidence/hybrid-comparison-extension-20260913/before.json",
+    "bytes": 2140,
+    "sha256": "54b3288b775363b88f5462de1b7bf7302b683e3bb245c8a0b708b46309909a8f"
+  },
+  "checks": {
+    "postReviewHashes": "9/9",
+    "localLinks": 47,
+    "comparisonPaths": 7,
+    "baseModels": 3,
+    "compositionPolicies": 4,
+    "provenanceHashes": "3/3",
+    "defaultExposureAndAllExistingConfigValues": "UNCHANGED",
+    "existingStatisticalReportAndPptx": "UNCHANGED",
+    "documentArithmeticExamples": "PASS",
+    "newTrainingOrPredictionRuns": 0
+  },
+  "repositoryStatus": {
+    "standalone": {
+      "path": "outputs/recommendation-evidence/hybrid-comparison-extension-20260913/git-status-standalone.txt",
+      "bytes": 6569,
+      "sha256": "bf034abc9ea4667e01e541de8a57b88efe7982890c44dbdddccb2925eefacde1"
+    },
+    "team": {
+      "path": "outputs/recommendation-evidence/hybrid-comparison-extension-20260913/git-status-team.txt",
+      "bytes": 103,
+      "sha256": "8e85a1341a9e0ddad7821f8df6cad37406fe7e36b1202f0d3704a6d0547da322"
+    }
+  },
+  "notPerformed": [
+    "Service scorer implementation",
+    "New model learning/calibration/scoring",
+    "GitLab/Notion/Jira writes",
+    "Commit/push/deployment"
+  ]
+}

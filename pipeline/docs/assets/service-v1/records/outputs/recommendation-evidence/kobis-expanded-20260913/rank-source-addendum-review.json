@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "review_id": "kobis-expanded-20260913-rank-source-addendum-review",
+  "status": "PASS",
+  "reviewed_at_utc": "2026-09-13T05:35:04.9927127Z",
+  "reviewer": "/root/als_final_comparison_audit",
+  "scope": "Pre-execution review of the single rank-validation correction made after the first 2004 official period export showed a gap in KOBIS source ranks. This addendum authorizes the newly pinned collector for the same raw-collection scope as the original execution review and changes no model, feature, evaluation, deployment, or publication authorization.",
+  "base_execution_review": {
+    "path": "outputs/recommendation-evidence/kobis-expanded-20260913/execution-review.json",
+    "bytes": 8830,
+    "sha256": "8eceb578b8718fdc2aa6b0c71f934f68c75f1b0e9689d8ef3d4c2be2aef83464",
+    "status": "PASS",
+    "superseded_field": "authorized_fingerprint.script only"
+  },
+  "authorized_fingerprint": {
+    "script": {
+      "path": "scripts/collect_kobis_expanded.py",
+      "bytes": 9739,
+      "sha256": "26b921ca80a853a2aed85db4d2e5167d7616c3a0a882d2860a8c027b215cc1c0"
+    },
+    "design_unchanged": {
+      "path": "docs/research/kobis-expanded-20260913/DESIGN.md",
+      "bytes": 2599,
+      "sha256": "17717c5eea0db160f8e8aa1fea2601d864ad5e8782ceb9fce1a254fd2dd7ff89"
+    }
+  },
+  "authorized_command": "python scripts/collect_kobis_expanded.py --execute --start-year 2004 --end-year 2026",
+  "triggering_official_input": {
+    "raw_path": "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2004-full.html",
+    "raw_bytes": 367224,
+    "raw_sha256": "cbac908f48934694d5876cc93d4fc87ccc378201dfa1f9f02e4e48be85460850",
+    "metadata_path": "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2004-full.json",
+    "request_period": "2004-01-01 through 2004-12-31",
+    "observed_rank_evidence": {
+      "row_count": 309,
+      "local_row_39_to_42_source_ranks": [
+        39,
+        40,
+        42,
+        43
+      ],
+      "last_source_rank": 292,
+      "source_ranks_non_decreasing": true,
+      "annual_admissions_non_increasing": true
+    }
+  },
+  "reviewed_change": {
+    "removed_invalid_assumption": "Do not recompute or require a continuous competition-rank sequence from row ordinal and annual admissions. The official 2004 export omits source rank 41 while the exported rows and official totals remain internally complete.",
+    "new_rank_contract": [
+      "Parse each official source rank as a positive integer.",
+      "Require source ranks to be non-decreasing in export order.",
+      "Require annual admissions to be non-increasing in export order.",
+      "Preserve the official rank as a descriptive source value; never use it as row identity or as a completeness proof."
+    ],
+    "row_identity_unchanged": "source_row_id remains screening_year:ordinal, so rank gaps or ties cannot create collisions.",
+    "screen_code_assignment_unchanged": "A direct movie code is still attached only to the same first-100 export ordinal after exact rank, title, opening-date, annual-admissions, and cumulative-admissions equality.",
+    "syntax_compile": "PASS"
+  },
+  "independent_offline_2004_reproduction": {
+    "status": "PASS",
+    "period_rows": 309,
+    "source_ranks_non_decreasing": true,
+    "annual_admissions_non_increasing": true,
+    "annual_admissions_sum": 69237708,
+    "official_annual_admissions_total": 69237708,
+    "annual_sales_krw_sum": 440633636706,
+    "official_annual_sales_krw_total": 440633636706
+  },
+  "retained_fail_closed_checks": [
+    "Exact query-echo and export-schema validation",
+    "Signed annual admissions and sales equality to each official total row",
+    "Complete period-versus-annual export multiset equality including duplicates and tail rows",
+    "Period screen total equality to full export row count",
+    "Exactly min(100,total) visible coded rows and exact same-ordinal five-field identity",
+    "Eight-character ASCII alphanumeric movie-code format",
+    "Hash-checked raw checkpoints and fatal incomplete-cache handling",
+    "No training, scoring, service write, credentials, or non-reviewed endpoint"
+  ],
+  "assessment": "PASS. The former continuous competition-rank assertion was contradicted by a pinned official 2004 response and was not a valid completeness test. Treating rank as a positive non-decreasing source field while independently enforcing audience order, official signed totals, complete-export multiset equality, screen total, and same-ordinal code identity is stricter about the properties the collector actually relies on and permits no inferred rows or codes.",
+  "blocking_findings": []
+}

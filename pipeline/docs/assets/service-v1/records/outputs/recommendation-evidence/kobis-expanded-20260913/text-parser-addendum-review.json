@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "review_id": "kobis-expanded-20260913-text-parser-addendum-review",
+  "status": "PASS",
+  "reviewed_at_utc": "2026-09-13T05:46:35.5304985Z",
+  "reviewer": "/root/als_final_comparison_audit",
+  "scope": "Pre-regeneration review of the HTML text extraction correction. This addendum authorizes rebuilding derived KOBIS Parquet, CSV, checks, and summary from the already pinned 69 complete raw HTML/metadata cache pairs. It does not authorize model work or reinterpret the collection scope.",
+  "authorized_fingerprint": {
+    "script": {
+      "path": "scripts/collect_kobis_expanded.py",
+      "bytes": 9993,
+      "sha256": "ce9982c3ee497e05fef6405672abd64007d006f4abfd026241d2ff8740fc52f8"
+    },
+    "design_unchanged": {
+      "path": "docs/research/kobis-expanded-20260913/DESIGN.md",
+      "bytes": 2599,
+      "sha256": "17717c5eea0db160f8e8aa1fea2601d864ad5e8782ceb9fce1a254fd2dd7ff89"
+    },
+    "prior_script_archived": {
+      "path": "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/collect_kobis_expanded.py",
+      "bytes": 9739,
+      "sha256": "26b921ca80a853a2aed85db4d2e5167d7616c3a0a882d2860a8c027b215cc1c0"
+    }
+  },
+  "prior_rank_addendum": {
+    "path": "outputs/recommendation-evidence/kobis-expanded-20260913/rank-source-addendum-review.json",
+    "bytes": 4641,
+    "sha256": "70d9863d7d24e55bbd269d483ac7ff6f4815640ab899167ddf242b4b92dd3897",
+    "status": "PASS"
+  },
+  "authorized_command": "python scripts/collect_kobis_expanded.py --execute --start-year 2004 --end-year 2026",
+  "raw_cache_precondition": {
+    "complete_html_files": 69,
+    "complete_metadata_files": 69,
+    "expected_pairs": "period full, annual full, and period screen for each year 2004-2026",
+    "cache_behavior": "Each raw body SHA, URL, and exact query is checked before reuse. All reviewed pairs were present, so regeneration needs zero new network requests; a missing or half-written pair is not authorized by this addendum."
+  },
+  "triggering_defect": {
+    "cause": "The former regular expression treated source text enclosed in literal angle brackets as if it were an HTML tag and deleted it.",
+    "pinned_example": {
+      "source_row_id": "2007:408",
+      "raw_text": "필름포럼 기획전 <3인의 거장>",
+      "former_derived_text": "필름포럼 기획전",
+      "corrected_text": "필름포럼 기획전 <3인의 거장>"
+    },
+    "impact": "Numeric totals were unchanged, but title and other descriptive text are identity inputs, so every derived collection and linkage result from the former parser must remain historical and must not be treated as the final audited dataset."
+  },
+  "reviewed_change": {
+    "diff_scope": "One standard-library import and replacement of the clean function only.",
+    "implementation": "html.parser.HTMLParser(convert_charrefs=True) collects handle_data text, then applies whitespace normalization.",
+    "literal_angle_text_preserved": true,
+    "character_references_decoded": true,
+    "schema_numeric_identity_and_network_logic_unchanged": true,
+    "syntax_compile": "PASS"
+  },
+  "independent_full_raw_offline_check": {
+    "status": "PASS",
+    "period_rows": 72700,
+    "changed_cells_against_former_parser": 138,
+    "changed_physical_rows": 138,
+    "changed_columns_by_period_export_index": {
+      "1_title": 123,
+      "12_production_companies": 12,
+      "13_distributors": 3
+    },
+    "numeric_changed_cells": 0,
+    "period_vs_annual_full_multiset_failed_years": [],
+    "screen_total_or_top100_same_ordinal_identity_failed_years": [],
+    "years_checked": "2004-2026"
+  },
+  "preservation_and_followup": [
+    "The former derived dataset, its collector, review, and existing linked output remain archived under history/pre-text-repair or their original linked directory and must not be silently overwritten as review evidence.",
+    "Regenerated outputs require a new independent collection result audit with the corrected script and exact output pins.",
+    "Any linkage must be regenerated into a new output directory from the corrected collection and reviewed separately; the existing linked result cannot inherit PASS."
+  ],
+  "blocking_findings": [],
+  "final_assessment": "PASS. The exact pinned text-parser change repairs a demonstrated loss of literal angle-bracket text, changes only 138 descriptive cells across 72,700 period rows in the full offline comparison, leaves every numeric cell unchanged, and preserves all complete-export, official-total, screen-identity, raw-cache, and collection-scope checks. Offline regeneration from the 69 reviewed cache pairs is authorized."
+}

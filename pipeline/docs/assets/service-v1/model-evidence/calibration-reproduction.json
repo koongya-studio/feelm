@@ -1,0 +1,401 @@
+{
+  "status": "PASS",
+  "tolerance": 1e-12,
+  "source": "<research-root>\\outputs\\recommendation-evidence\\final344\\final-calibration.json",
+  "source_pin": {
+    "bytes": 10863,
+    "sha256": "f62d86e59bbb0f50b1412ee97d61e611a89bc4488e04aa0e2a20e50a3f4eab76"
+  },
+  "checks": [
+    {
+      "model": "FM150_s339",
+      "cap": 0,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "FM150_s339",
+      "cap": 1,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "FM150_s339",
+      "cap": 5,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "FM150_s339",
+      "cap": 10,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "FM150_s339",
+      "cap": 30,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "FM150_s344",
+      "cap": 0,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "FM150_s344",
+      "cap": 1,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "FM150_s344",
+      "cap": 5,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "FM150_s344",
+      "cap": 10,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "FM150_s344",
+      "cap": 30,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "FM150_s345",
+      "cap": 0,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "FM150_s345",
+      "cap": 1,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "FM150_s345",
+      "cap": 5,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "FM150_s345",
+      "cap": 10,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "FM150_s345",
+      "cap": 30,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "GBT120_s339",
+      "cap": 0,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "GBT120_s339",
+      "cap": 1,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "GBT120_s339",
+      "cap": 5,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "GBT120_s339",
+      "cap": 10,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "GBT120_s339",
+      "cap": 30,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "GBT120_s344",
+      "cap": 0,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "GBT120_s344",
+      "cap": 1,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "GBT120_s344",
+      "cap": 5,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "GBT120_s344",
+      "cap": 10,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "GBT120_s344",
+      "cap": 30,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "GBT120_s345",
+      "cap": 0,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "GBT120_s345",
+      "cap": 1,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "GBT120_s345",
+      "cap": 5,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "GBT120_s345",
+      "cap": 10,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    },
+    {
+      "model": "GBT120_s345",
+      "cap": 30,
+      "passed": true,
+      "differences": {
+        "a": 0.0,
+        "b": 0.0,
+        "variance": 0.0,
+        "covariance": 0.0
+      },
+      "users": 90,
+      "rows": 6523
+    }
+  ]
+}
