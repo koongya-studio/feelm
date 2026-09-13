@@ -143,6 +143,45 @@ export const mockMovies: Record<number, RecommendedMovieView> = {
     runtimeMinutes: 121,
   },
 
+  /*
+   * 7.7 평가하지 않은 영화 3편. 감상은 확인했지만 평가를 남기지 않은 영화다.
+   *
+   * 2.1의 `영화 제목 1~4`(아직 안 본 영화)나 3.1의 프레임(이미 평가한 영화)을 쓰면 같은
+   * 영화가 화면마다 다른 상태로 보이므로 따로 둔다. 번호는 2.1 목록과 겹치지 않게 5부터다.
+   * 와이어프레임 7.7의 날짜와 OTT(8. 26 넷플릭스 · 8. 20 티빙 · 8. 14 웨이브)는
+   * mocks/watch.ts의 감상 기록에 있다.
+   */
+  411: {
+    movieId: 411,
+    title: '영화 제목 5',
+    posterUrl: null,
+    releaseYear: 2022,
+    genres: ['드라마'],
+    averageRating: 3.9,
+    ottProviders: ['NETFLIX'],
+    runtimeMinutes: 117,
+  },
+  412: {
+    movieId: 412,
+    title: '영화 제목 6',
+    posterUrl: null,
+    releaseYear: 2023,
+    genres: ['코미디'],
+    averageRating: 3.6,
+    ottProviders: ['TVING'],
+    runtimeMinutes: 116,
+  },
+  413: {
+    movieId: 413,
+    title: '영화 제목 7',
+    posterUrl: null,
+    releaseYear: 2019,
+    genres: ['SF'],
+    averageRating: 4.2,
+    ottProviders: ['WAVVE'],
+    runtimeMinutes: 129,
+  },
+
   // 1.1 영화 취향 초기 설정의 카드 6장.
   // 와이어프레임은 카드에 제목을 표시하지 않는다. 대체 텍스트에 필요하므로 자리표시자
   // 제목을 두고, 2.1 목록의 `영화 제목 1~4`와 구분되도록 알파벳을 쓴다.

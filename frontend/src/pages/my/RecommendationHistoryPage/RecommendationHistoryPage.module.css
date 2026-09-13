@@ -1,0 +1,61 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--screen-padding-x) var(--space-6);
+  gap: var(--space-5);
+}
+
+.month {
+  display: flex;
+  flex-direction: column;
+}
+
+.monthLabel {
+  padding-bottom: var(--space-1);
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-meta);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+}
+
+.list > li + li {
+  border-top: 1px solid var(--color-line-faint);
+}
+
+.meta {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.dismissed {
+  color: var(--color-ink-hint);
+}
+
+/*
+ * 추천 출처. 와이어프레임대로 테두리만 있는 작은 알약이다. 색으로 출처를 나누지 않는다 —
+ * UI는 유채색을 쓰지 않고(`design-concept.md` 2.2), 문구가 이미 구분한다.
+ */
+.source {
+  align-self: flex-start;
+  margin-top: 2px;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  color: var(--color-ink-body);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-caption);
+}
+
+.total {
+  color: var(--color-ink-hint);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  text-align: center;
+}

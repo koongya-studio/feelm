@@ -24,11 +24,19 @@
  * | PublicProfileView | 7.2-A · 7.2-B 공개 프로필 | API-062가 있으나 **2차 MVP**라 미구현. 응답 모양도 다름 |
  * | TasteCompareView | 7.2-C `76%` · 장르 82 · 국가 74 · 시대 71 · 감독 68 | API-063이 있으나 **2차 MVP**라 미구현. **4줄 비교는 계약에 없음** |
  * | introduction | 7.2 한 줄 소개 · 7.2-A · 7.2-B 소개 문구 | 와이어프레임에 없고 레퍼런스 지시로 추가. 계약에 자리가 없음. CR 미등록 |
+ * | RecommendationHistoryItemView.ott | 7.5 `8. 24 · 넷플릭스` | API-048 `movie`에 OTT가 없음. 제공처가 여럿일 때 기준도 없음. CR 미등록 |
  */
 import type { FrameDetail } from './taste';
 import type { Party } from './party';
 import type { RecommendedMovie } from './movie';
-import type { DismissResult, RecommendationItem, RecommendationSet } from './recommendation';
+import type {
+  DismissResult,
+  RecommendationHistory,
+  RecommendationHistoryItem,
+  RecommendationHistorySet,
+  RecommendationItem,
+  RecommendationSet,
+} from './recommendation';
 
 /** 추천 요약에 없는 상영 시간 */
 export type UnspecifiedMovieFields = {
@@ -221,4 +229,23 @@ export type TasteCompareView = {
     title: string;
     posterUrl: string | null;
   }[];
+};
+
+/**
+ * 7.5 추천 기록 한 줄. API-048 항목 + 이 영화를 볼 수 있는 OTT.
+ *
+ * 와이어프레임은 날짜 옆에 `넷플릭스` 같은 OTT 이름을 적는다. API-048 `movie`에는
+ * 제목 · 포스터만 있어 **어느 OTT인지 알 수 없다.** 제공 OTT가 여러 곳이면 무엇을
+ * 적을지도 정해지지 않았다. 목업은 영화의 첫 제공처를 쓴다.
+ */
+export type RecommendationHistoryItemView = RecommendationHistoryItem & {
+  ott: { code: string; name: string } | null;
+};
+
+export type RecommendationHistorySetView = Omit<RecommendationHistorySet, 'items'> & {
+  items: RecommendationHistoryItemView[];
+};
+
+export type RecommendationHistoryView = Omit<RecommendationHistory, 'items'> & {
+  items: RecommendationHistorySetView[];
 };

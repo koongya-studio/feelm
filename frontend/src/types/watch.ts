@@ -1,6 +1,6 @@
 /*
  * 감상 기록과 평가 타입.
- * 대응 명세는 docs/api/watch.md(API-033 · 035 · 036 · 037)와
+ * 대응 명세는 docs/api/watch.md(API-033 ~ 039)와
  * docs/api/social.md(API-032)이다.
  *
  * 점수는 0.5~5.0의 0.5점 단위다. 계약도 같은 규칙이며(API-036 `multipleOf: 0.5`,
@@ -73,6 +73,34 @@ export type Rating = {
   popcorn: { flavorCode: string; isNewFlavor: boolean; flavorCount: number };
   watchStatus: WatchStatus;
   createdAt: string;
+};
+
+/**
+ * API-037 요청 본문. 세 필드를 모두 보낸다.
+ * 한줄평을 지우려면 `comment: null`이다(API-037 설명).
+ */
+export type RatingUpdateInput = {
+  score: number;
+  comment: string | null;
+  visibility: Visibility;
+};
+
+/** API-039 내 평가 목록 `items[]` */
+export type MyRatingListItem = {
+  ratingId: number;
+  movie: { movieId: number; title: string; posterUrl: string | null };
+  score: number;
+  comment: string | null;
+  visibility: Visibility;
+  frameId: number;
+  createdAt: string;
+};
+
+/** API-039 응답 */
+export type MyRatingList = {
+  items: MyRatingListItem[];
+  nextCursor: string | null;
+  hasNext: boolean;
 };
 
 /** API-032 공개 한줄평 목록 `items[]` */

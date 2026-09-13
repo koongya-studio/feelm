@@ -32,6 +32,34 @@ export function mockWatchDeadlines(clickedAt: Date) {
   return { clickedAt: clickedAt.toISOString(), confirmDueAt: addDays(2), expiresAt: addDays(7) };
 }
 
+/**
+ * 세션이 시작될 때 이미 있는 감상 기록 — 7.7 평가하지 않은 영화 3편.
+ *
+ * 와이어프레임 7.7의 날짜와 OTT를 옮겼다(`8. 26 · 넷플릭스에서 시청` 등). 7.7은
+ * 다섯 줄을 그리지만 영화 목업을 늘리지 않으려고 세 줄만 둔다.
+ *
+ * **기준 목업이지만 세션 저장소에 넣어 시작한다**(mocks/sessionStore.ts `emptyState`).
+ * 7.7 ⇢ 2.5에서 평가하면 이 기록이 `RATED`로 바뀌어야 7.7에서 빠진다. 기준 목업에
+ * 따로 두면 그 변화를 기록할 곳이 없어 평가한 뒤에도 목록에 남는다.
+ *
+ * 저장소가 기록을 고치므로 매번 새 객체를 만든다. 번호는 새로 만드는 기록(5001~)과
+ * 겹치지 않게 4001부터다. 시각은 정오 기준이다(mocks/frames.ts와 같은 이유).
+ */
+export function createSeedWatchRecords(): StoredWatchRecord[] {
+  const seed = (watchRecordId: number, movieId: number, ottId: number, watchedDay: string) => ({
+    watchRecordId,
+    movieId,
+    status: 'WATCHED_UNRATED' as const,
+    ...mockWatchDeadlines(new Date(`2026-08-${Number(watchedDay) - 1}T12:00:00Z`)),
+    ottId,
+    watchedAt: `2026-08-${watchedDay}T12:00:00Z`,
+    ratingId: null,
+  });
+
+  // 목록은 `clickedAt` 순으로 정렬되므로 넣는 순서는 상관없다
+  return [seed(4001, 411, 1, '26'), seed(4002, 412, 2, '20'), seed(4003, 413, 3, '14')];
+}
+
 export function createMockWatchRecord(movieId: number, ottId: number): StoredWatchRecord {
   nextWatchRecordId += 1;
 

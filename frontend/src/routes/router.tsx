@@ -26,9 +26,11 @@ import FrameDetailPage from '../pages/film/FrameDetailPage';
 import PopcornBucketPage from '../pages/film/PopcornBucketPage';
 import HomePage from '../pages/home/HomePage';
 import MyDashboardPage from '../pages/my/MyDashboardPage';
+import MyRatingsPage from '../pages/my/MyRatingsPage';
 import ProfileEditPage from '../pages/my/ProfileEditPage';
 import ProfilePreviewPage from '../pages/my/ProfilePreviewPage';
 import PublicProfilePage from '../pages/my/PublicProfilePage';
+import RecommendationHistoryPage from '../pages/my/RecommendationHistoryPage';
 import TasteComparePage from '../pages/my/TasteComparePage';
 import OttManagePage from '../pages/otts/OttManagePage';
 import MovieDetailPage from '../pages/movies/MovieDetailPage';
@@ -93,14 +95,17 @@ export const router = createBrowserRouter(
         // 이번 단계 구현 범위가 아닌 탭. REF-01의 5탭 구성을 검증하기 위해 라우트는 둔다.
         { path: ROUTE_PATTERN.party, element: <PartyListPage /> },
 
+        // MY 기록 목록 (업무 -306). 와이어프레임이 하단 내비를 그리는 탭 화면이다
+        { path: ROUTE_PATTERN.recommendationHistory, element: <RecommendationHistoryPage /> },
+        { path: ROUTE_PATTERN.myRatings, element: <MyRatingsPage tab="rated" /> },
+        { path: ROUTE_PATTERN.unratedMovies, element: <MyRatingsPage tab="unrated" /> },
+
         /*
-         * 7.1 메뉴가 가리키는 화면 중 306~308 몫(7.3 · 7.5 · 7.6 · 7.8).
+         * 7.1 메뉴가 가리키는 화면 중 307 · 308 몫(7.3 · 7.8).
          * 경로를 두는 이유는 paths.ts 주석에 적었다 — `아직 안 만든 화면`과
          * `잘못된 주소`가 구분돼야 이동 경로를 검증할 수 있다.
          */
         { path: ROUTE_PATTERN.tasteReports, element: <NotInScopePage /> },
-        { path: ROUTE_PATTERN.recommendationHistory, element: <NotInScopePage /> },
-        { path: ROUTE_PATTERN.myRatings, element: <NotInScopePage /> },
         { path: ROUTE_PATTERN.settings, element: <NotInScopePage /> },
       ],
     },

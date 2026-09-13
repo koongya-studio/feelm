@@ -21,6 +21,9 @@
  * 기본값인 `PRIVATE`을 붙여 보내고, 그 사실을 화면에 안내한다(팀 결정 2026-09-07).
  * CR-05가 반영되면 이 안내를 선택 컨트롤로 교체한다.
  *
+ * 이미 평가한 영화로 들어오면 수정이다(업무 -306, API-037). 7.6 · 3.1-A의 `평가 수정`과
+ * 2.4의 `내 별점 남기기`가 여기로 온다. 저장 후 2.6 · 2.7이 아니라 온 곳으로 돌아간다.
+ *
  * `[?]` `나중에 평가하기`가 어디로 가는지는 미확정이다. 이 화면으로 온 경로가 영화 상세든
  * 감상 확인이든 되돌아가는 것이 자연스러워 뒤로 가기로 두었다.
  * 감상 정보(`6월 2일 · 넷플릭스에서 시청`)는 감상 기록 목록(API-034)에서 읽는다. 2.4-A에서
@@ -37,7 +40,12 @@ import StatusView from '../../../components/StatusView';
 import TextArea from '../../../components/TextArea';
 import { getMovieDetail } from '../../../api/movies';
 import { getOtts } from '../../../api/otts';
-import { createRating, getCountsBeforeRating, getWatchRecords } from '../../../api/watch';
+import {
+  createRating,
+  getCountsBeforeRating,
+  getWatchRecords,
+  updateRating,
+} from '../../../api/watch';
 import { path } from '../../../routes/paths';
 import { formatMonthDay } from '../../../utils/date';
 import styles from './MovieRatingPage.module.css';
@@ -115,6 +123,25 @@ export default function MovieRatingPage() {
     setSubmitting(true);
 
     const trimmed = comment.trim();
+
+    /*
+     * 이미 평가한 영화는 수정이다(API-037). 새 평가를 만들면 프레임과 팝콘이 한 번 더
+     * 쌓인다 — 업무 -306 전에는 3.1-A `평가 수정`이 실제로 그렇게 동작했다.
+     * 수정은 프레임을 만들지 않으므로 2.6 · 2.7로 가지 않고 온 곳으로 돌아간다
+     * (7.6 · 3.1-A · 2.4).
+     */
+    if (movie.myRating) {
+      await updateRating(movie.myRating.ratingId, {
+        score,
+        comment: trimmed || null,
+        visibility: movie.myRating.visibility,
+      });
+
+      void navigate(-1);
+
+      return;
+    }
+
     const counts = await getCountsBeforeRating();
     const rating = await createRating(
       movie.movieId,
@@ -155,6 +182,7 @@ export default function MovieRatingPage() {
     return null;
   }
 
+  const isEditing = movie.myRating !== null;
   const releaseYear = movie.releaseDate.slice(0, 4);
   const meta = [
     releaseYear,
@@ -206,7 +234,9 @@ export default function MovieRatingPage() {
           />
           {comment.trim() ? (
             <p className={styles.visibilityNote}>
-              한줄평은 비공개로 저장돼요 · 공개 범위 선택은 준비 중이에요
+              {isEditing
+                ? `한줄평은 ${movie.myRating?.visibility === 'PUBLIC' ? '공개' : '비공개'}로 저장돼요 · 공개 범위는 한줄평 관리에서 바꿀 수 있어요`
+                : '한줄평은 비공개로 저장돼요 · 공개 범위 선택은 준비 중이에요'}
             </p>
           ) : null}
         </div>
@@ -216,7 +246,12 @@ export default function MovieRatingPage() {
             평가 완료
           </Button>
 
-          <p className={styles.notice}>평가는 영화당 한 번만 반영돼요 · 프레임 1개 + 팝콘 1알</p>
+          {/* `[?]` 수정일 때의 안내는 와이어프레임에 없다. 원래 문구는 새 평가에만 맞는다 */}
+          <p className={styles.notice}>
+            {isEditing
+              ? '평가를 고쳐도 프레임과 팝콘은 그대로예요'
+              : '평가는 영화당 한 번만 반영돼요 · 프레임 1개 + 팝콘 1알'}
+          </p>
 
           <Button variant="text" disabled={submitting} onClick={() => void navigate(-1)}>
             나중에 평가하기

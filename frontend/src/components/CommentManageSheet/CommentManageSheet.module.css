@@ -1,0 +1,236 @@
+/*
+ * 7.6-A 한줄평 관리 시트. 겹치는 방식은 4.3 검색 필터 시트와 같다 — 화면 폭 안에서
+ * 아래에 붙고, 시트는 벽 색이며 뒤에는 옅은 막을 깐다(`design-concept.md` 2.1).
+ */
+.overlay {
+  position: fixed;
+  z-index: 20;
+  display: flex;
+  width: 100%;
+  max-width: var(--layout-max-width);
+  align-items: flex-end;
+  inset: 0;
+  margin: 0 auto;
+}
+
+.scrim {
+  position: absolute;
+  border: 0;
+  background: rgba(38, 39, 41, 0.32);
+  cursor: pointer;
+  inset: 0;
+}
+
+.sheet {
+  position: relative;
+  display: flex;
+  max-height: 88%;
+  width: 100%;
+  box-sizing: border-box;
+  flex-direction: column;
+  padding: var(--space-3) var(--screen-padding-x) var(--space-6);
+  overflow-y: auto;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--color-bg);
+  box-shadow: 0 -8px 24px rgba(38, 39, 41, 0.12);
+  gap: var(--space-4);
+}
+
+.handle {
+  width: 44px;
+  height: 4px;
+  align-self: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-line-strong);
+}
+
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--font-size-heading);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-heading);
+  outline: none;
+}
+
+/* ─────────────────────────── 영화와 내 별점 */
+
+.movie {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.movieText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.movieTitle {
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.myScore {
+  display: flex;
+  align-items: center;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  gap: var(--space-1);
+}
+
+.scoreValue {
+  color: var(--color-ink);
+  font-weight: var(--font-weight-bold);
+}
+
+/* ─────────────────────────── 입력 */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* 한 줄 입력칸이 아니라 문장을 쓰는 곳이라 세 줄 높이를 준다 */
+.field textarea {
+  height: auto;
+  min-height: calc(var(--font-size-meta) * var(--line-height-meta) * 3 + var(--space-4) * 2);
+}
+
+.counter {
+  align-self: flex-end;
+  color: var(--color-ink-hint);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+/* ─────────────────────────── 공개 스위치. 6.1 구독 토글과 같은 모양이다 */
+
+.visibility {
+  display: flex;
+  min-height: var(--tap-target-min);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  gap: var(--space-3);
+}
+
+.visibilityLabel {
+  color: var(--color-ink);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-meta);
+}
+
+.toggle {
+  position: relative;
+  width: 46px;
+  height: 26px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
+  cursor: pointer;
+  transition: background var(--motion-press) var(--ease-standard);
+}
+
+.toggle[aria-checked='true'] {
+  background: var(--color-action);
+}
+
+.toggle:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-on-action);
+  transition: transform var(--motion-press) var(--ease-standard);
+}
+
+.toggle[aria-checked='true'] .knob {
+  transform: translateX(20px);
+}
+
+.error {
+  color: var(--color-danger);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+/* `수정 완료`가 주 동작이라 더 넓다. 와이어프레임도 2 : 1로 그렸다 */
+.actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.actions > *:first-child {
+  flex: 2;
+}
+
+.actions > *:last-child {
+  flex: 1;
+}
+
+/* ─────────────────────────── 삭제 확인 */
+
+.confirmLayer {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--screen-padding-x);
+  background: rgba(38, 39, 41, 0.32);
+  inset: 0;
+}
+
+.confirm {
+  display: flex;
+  width: 100%;
+  max-width: 300px;
+  box-sizing: border-box;
+  flex-direction: column;
+  padding: var(--space-5);
+  border-radius: var(--radius-card);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-raised);
+  gap: var(--space-1);
+}
+
+.confirmTitle {
+  color: var(--color-ink);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-body);
+}
+
+.confirmDescription {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.confirmActions {
+  display: flex;
+  margin-top: var(--space-4);
+  gap: var(--space-2);
+}
