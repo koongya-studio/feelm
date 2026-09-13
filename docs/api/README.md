@@ -69,7 +69,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-025 | [OTT 목록 조회](./onboarding-ott.md#api-025-ott-목록-조회) | GET | `/otts` | OTT | 1차 MVP | 공개 | FR-03, FR-16 |  |
 | API-026 | [내 구독 OTT 조회](./onboarding-ott.md#api-026-내-구독-ott-조회) | GET | `/users/me/otts` | OTT | 1차 MVP | 회원 | FR-03 |  |
 | API-027 | [내 구독 OTT 설정](./onboarding-ott.md#api-027-내-구독-ott-설정) | PUT | `/users/me/otts` | OTT | 1차 MVP | 회원 | FR-03 |  |
-| API-028 | [영화 검색](./movies-search.md#api-028-영화-검색) | GET | `/movies/search` | 검색 | 1차 MVP | 선택 | FR-14, FR-15 | O |
+| API-028 | [영화 검색](./movies-search.md#api-028-영화-검색) | GET | `/movies/search` | 검색 | 1차 MVP | 회원 | FR-14, FR-15 | O |
 | API-029 | [검색 필터 옵션 조회](./movies-search.md#api-029-검색-필터-옵션-조회) | GET | `/movies/filter-options` | 검색 | 1차 MVP | 공개 | FR-15 |  |
 | API-030 | [영화 상세 조회](./movies-search.md#api-030-영화-상세-조회) | GET | `/movies/{movieId}` | 영화 | 1차 MVP | 선택 | FR-34, FR-16, FR-13 | O |
 | API-031 | [유사 영화 추천](./recommendation.md#api-031-유사-영화-추천) | GET | `/movies/{movieId}/similar` | 추천 | 1차 MVP | 선택 | FR-11 | O |

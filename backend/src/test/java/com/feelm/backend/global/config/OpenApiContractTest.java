@@ -85,6 +85,49 @@ class OpenApiContractTest {
                                 .path("security")
                                 .findValues(OpenApiConfig.BEARER_AUTH_SCHEME))
                 .isNotEmpty();
+        assertThat(
+                        document.path("paths")
+                                .path("/api/v1/movies/search")
+                                .path("get")
+                                .path("security")
+                                .findValues(OpenApiConfig.BEARER_AUTH_SCHEME))
+                .isNotEmpty();
+
+        JsonNode movieSearch = document.path("paths").path("/api/v1/movies/search").path("get");
+        assertThat(movieSearch.path("summary").asText()).isEqualTo("영화 검색");
+        assertThat(movieSearch.path("description").asText()).isNotBlank();
+        assertThat(
+                        StreamSupport.stream(movieSearch.path("parameters").spliterator(), false)
+                                .map(parameter -> parameter.path("name").asText())
+                                .toList())
+                .containsExactlyInAnyOrder(
+                        "q",
+                        "genre",
+                        "country",
+                        "yearFrom",
+                        "yearTo",
+                        "ott",
+                        "sort",
+                        "cursor",
+                        "size");
+        assertThat(
+                        StreamSupport.stream(movieSearch.path("parameters").spliterator(), false)
+                                .map(parameter -> parameter.path("description").asText())
+                                .toList())
+                .allMatch(description -> !description.isBlank());
+        assertThat(movieSearch.path("responses").has("200")).isTrue();
+        assertThat(movieSearch.path("responses").has("400")).isTrue();
+        assertThat(movieSearch.path("responses").has("401")).isTrue();
+
+        JsonNode movieSearchSchema =
+                document.path("components").path("schemas").path("MovieSearchPageResponse");
+        assertThat(movieSearchSchema.path("properties").has("totalCount")).isTrue();
+        assertThat(
+                        StreamSupport.stream(
+                                        movieSearchSchema.path("required").spliterator(), false)
+                                .map(JsonNode::asText)
+                                .toList())
+                .contains("totalCount", "items", "hasNext");
     }
 
     @Test
