@@ -15,13 +15,15 @@
  * 여기 담는 것은 **사용자가 이번 세션에 만든 변화**뿐이다. 기준 목업(mocks/의 나머지
  * 파일)은 그대로 두고, `src/api/`가 둘을 합쳐 응답을 만든다.
  *
- * 예외는 두 가지다. 최근 검색어와 7.7의 감상 기록은 와이어프레임이 그린 상태로 시작한다.
- * 둘 다 사용자가 지우거나 바꾸는 값이라 저장소 안에 있어야 변화가 남는다.
+ * 예외는 셋이다. 최근 검색어 · 7.7과 8.1의 감상 기록 · 8.1 알림은 와이어프레임이 그린
+ * 상태로 시작한다. 모두 사용자가 지우거나 바꾸는 값이라 저장소 안에 있어야 변화가 남는다.
  */
+import { createSeedNotifications } from './notifications';
 import { createSeedWatchRecords } from './watch';
 import type { OnboardingPreference } from '../types/onboarding';
 import type {
   NotificationSettingsView,
+  NotificationView,
   PartyView,
   PrivacySettingsView,
 } from '../types/unspecified';
@@ -98,6 +100,16 @@ type SessionState = {
    * 목록 전체를 옮겨 온다.
    */
   blockedUsers: BlockedUser[] | null;
+  /**
+   * 8.1 알림. 와이어프레임 네 건으로 시작한다. 누르면 읽음이 되고 그 상태가 남아야
+   * 다시 들어왔을 때 표식이 사라진다(업무 -308).
+   */
+  notifications: NotificationView[];
+  /**
+   * 3.3 새 리포트 발급 화면을 이미 본 리포트. 2.1 `취향 리포트 보기`가 안 본 리포트면
+   * 3.3을 거쳐 3.4로, 본 리포트면 3.4로 바로 간다(업무 -308).
+   */
+  seenReportIds: number[];
 };
 
 function emptyState(): SessionState {
@@ -118,6 +130,8 @@ function emptyState(): SessionState {
     notificationSettings: null,
     privacySettings: null,
     blockedUsers: null,
+    notifications: createSeedNotifications(),
+    seenReportIds: [],
   };
 }
 
@@ -252,6 +266,28 @@ export function saveBlockedUsers(users: BlockedUser[]): void {
 /** 바꾼 적 없으면 null. 기준 목업을 쓰라는 뜻이다 */
 export function getBlockedUsers(): BlockedUser[] | null {
   return state.blockedUsers;
+}
+
+// ─────────────────────────────────────────── 알림 · 리포트 (업무 -308)
+
+export function getNotifications(): NotificationView[] {
+  return state.notifications;
+}
+
+export function markNotificationRead(notificationId: number): void {
+  state.notifications = state.notifications.map((item) =>
+    item.notificationId === notificationId ? { ...item, read: true } : item,
+  );
+}
+
+export function markReportSeen(reportId: number): void {
+  if (!state.seenReportIds.includes(reportId)) {
+    state.seenReportIds = [...state.seenReportIds, reportId];
+  }
+}
+
+export function isReportSeen(reportId: number): boolean {
+  return state.seenReportIds.includes(reportId);
 }
 
 // ─────────────────────────────────────────── 관심없음

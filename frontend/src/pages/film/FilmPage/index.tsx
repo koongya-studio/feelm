@@ -20,7 +20,6 @@
  * 팝콘 범례는 어두운 판 위에 둔다. 8색은 밝은 면에서 절반이 판별되지 않는다
  * (`docs/screens/design-concept.md` 2.5). 이 판이 3.2로 가는 진입점이다.
  *
- * `[?]` `취향 리포트 보기`는 7.3이 범위 밖이라 비활성으로 둔다(2.1과 같은 처리).
  * `[?]` 스트립이 보여줄 프레임 개수와 페이지네이션은 미확정이다. 첫 페이지만 쓴다.
  */
 import { useEffect, useState } from 'react';
@@ -218,12 +217,9 @@ export default function FilmPage() {
           {/*
            * 이 화면의 주 동작. 검정 알약은 한 화면에 하나뿐이고 그 하나가 여기다
            * (`docs/screens/design-concept.md` 2.4).
-           *
-           * `[?]` 7.3 취향 리포트 화면은 아직 없다(업무 -321). 화면이 생길 때까지는
-           * 눌러도 이동하지 않는다. 시안이 이 자리를 주 동작으로 그리고 있어
-           * 비활성 회색으로 두지 않았다.
+           * 3.1 ⇢ 7.3 (업무 -308)
            */}
-          <Button>취향 리포트 보기</Button>
+          <Button onClick={() => void navigate(path.tasteReports())}>취향 리포트 보기</Button>
         </div>
       </div>
     </>

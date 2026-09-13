@@ -38,6 +38,30 @@ export function formatMonthDay(isoString: string): string {
 }
 
 /**
+ * 알림 시각을 `방금 전` · `30분 전` · `2시간 전` · `어제` · `9월 2일`로 만든다.
+ *
+ * 8.1 알림 목록이 쓴다(업무 -308). 3.1은 상대 시각 규칙이 계약에 없어 절대 날짜로 정했지만
+ * (위 머리말, 팀 결정 2026-09-07), 알림은 **언제 왔는지**가 내용 자체라 와이어프레임대로
+ * 상대 시각을 쓴다. 이틀이 지나면 날짜로 바꾼다 — 그때부터는 몇 시간 전인지가 의미 없다.
+ */
+export function formatRelativeTime(isoString: string, now: Date = new Date()): string {
+  const date = new Date(isoString);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const minutes = Math.floor((now.getTime() - date.getTime()) / (60 * 1000));
+
+  if (minutes < 1) return '방금 전';
+  if (minutes < 60) return `${minutes}분 전`;
+  if (minutes < 24 * 60) return `${Math.floor(minutes / 60)}시간 전`;
+  if (minutes < 48 * 60) return '어제';
+
+  return formatMonthDay(isoString);
+}
+
+/**
  * ISO 8601 문자열을 `8. 24` 형식으로 만든다.
  *
  * 7.5 · 7.6 · 7.7 목록의 날짜다(업무 -306). 목록이 월 단위로 묶이거나 최근 기록이라

@@ -9,8 +9,7 @@
  * 5.7은 초대한 사용자에게 보이는 상태다.** 그래서 두 화면이 짝이 아니라 서로 다른
  * 사람이 본다.
  *
- * `[?]` 거절하면 8.1 알림 목록으로 가야 하지만 8.1은 아직 없다(업무 -308). 지금은 5.1
- * 내 파티로 보낸다. 8.1이 생기면 이 한 줄만 바꾼다.
+ * 거절하면 8.1 알림 목록으로 간다(업무 -308에서 이었다). 수락은 5.1 내 파티다.
  *
  * `[?]` `2인`은 **나까지 세었을 때의 인원**이다. API-052 `memberCount`는 지금 참여 중인
  * 사람 수라 여기에 1을 더한다(`mocks/partyInvitations.ts` 머리말).
@@ -59,7 +58,7 @@ export default function PartyInvitationPage() {
 
     request
       .then(() => {
-        void navigate(path.party(), { replace: true });
+        void navigate(accept ? path.party() : path.notifications(), { replace: true });
       })
       .catch(() => {
         setSubmitting(false);

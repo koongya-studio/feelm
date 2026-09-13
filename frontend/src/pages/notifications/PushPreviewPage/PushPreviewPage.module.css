@@ -1,0 +1,89 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--screen-padding-x) var(--space-6);
+}
+
+/* 기기의 잠금화면. 화면에서 유일한 어두운 블록 */
+.lock {
+  display: flex;
+  min-height: 560px;
+  box-sizing: border-box;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-8) var(--space-4);
+  border-radius: 28px;
+  background: var(--color-surface-dark);
+  gap: var(--space-1);
+}
+
+.date {
+  color: var(--color-on-dark-muted);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.time {
+  margin-bottom: var(--space-8);
+  color: var(--color-on-dark);
+  font-size: 56px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+/* 잠금화면 위 알림 한 장. 유리처럼 비친다 — 유리를 쓰는 드문 자리다(`design-concept.md` 2.7) */
+.card {
+  display: flex;
+  width: 100%;
+  align-items: flex-start;
+  padding: var(--space-3);
+  border: 1px solid var(--color-line-on-dark);
+  border-radius: var(--radius-card);
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--color-on-dark);
+  cursor: pointer;
+  font-family: inherit;
+  gap: var(--space-3);
+  text-align: left;
+}
+
+.appIcon {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--color-on-dark);
+  color: var(--color-surface-dark);
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: var(--font-weight-bold);
+}
+
+.cardText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.app {
+  color: var(--color-on-dark-hint);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.cardTitle {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-body);
+}
+
+.cardBody {
+  color: var(--color-on-dark-muted);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}

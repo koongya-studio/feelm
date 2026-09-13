@@ -17,15 +17,18 @@
  * `[?]` 요금제와 월 요금(`프리미엄 · 매월 17,000원`)은 계약에 없다. 와이어프레임이
  * 적어 두었으나 API-025 기준정보에도 API-026에도 대응 필드가 없어 넣지 않았다. 사용자가
  * 직접 입력하는 값인지 서비스가 아는 값인지부터 정해야 한다.
- * `[?]` `나에게 맞는 OTT 찾기`(EXT-01)는 확장 기능이라 진입점을 두지 않았다.
+ * `나에게 맞는 OTT 찾기`(EXT-01)는 목록 아래 글자 링크로 둔다(업무 -308). 확장 기능이라
+ * 이 화면의 주 동작보다 가볍게 둔다.
  */
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router';
 import ScreenHeader from '../../../components/ScreenHeader';
 import OttBadge from '../../../components/OttBadge';
 import StatusView from '../../../components/StatusView';
 import Switch from '../../../components/Switch';
 import Button from '../../../components/Button';
 import { getMyOtts, getOtts, setMyOtts } from '../../../api/otts';
+import { path } from '../../../routes/paths';
 import { ottBadgeLetter } from '../../../utils/ott';
 import type { Ott } from '../../../types/ott';
 import styles from './OttManagePage.module.css';
@@ -116,6 +119,11 @@ export default function OttManagePage() {
             <OttGroup label="미구독" otts={unsubscribed} subscribed={false} onToggle={toggle} />
 
             <p className={styles.note}>끄면 해당 OTT 작품은 추천에서 제외돼요</p>
+
+            {/* 6.1 ⇢ EXT-01 (업무 -308) */}
+            <Link to={path.ottFinder()} className={styles.finder}>
+              나에게 맞는 OTT 찾기
+            </Link>
           </>
         ) : null}
       </div>

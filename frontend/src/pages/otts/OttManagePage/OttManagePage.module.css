@@ -73,3 +73,15 @@
   line-height: var(--line-height-caption);
   color: var(--color-ink-hint);
 }
+
+/* EXT-01 진입. 확장 기능이라 글자 링크로 가볍게 둔다 */
+.finder {
+  display: inline-flex;
+  min-height: var(--tap-target-min);
+  align-self: center;
+  align-items: center;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

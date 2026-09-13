@@ -33,7 +33,7 @@ export function mockWatchDeadlines(clickedAt: Date) {
 }
 
 /**
- * 세션이 시작될 때 이미 있는 감상 기록 — 7.7 평가하지 않은 영화 3편.
+ * 세션이 시작될 때 이미 있는 감상 기록 — 7.7 평가하지 않은 영화 3편과 8.1 감상 확인 1건.
  *
  * 와이어프레임 7.7의 날짜와 OTT를 옮겼다(`8. 26 · 넷플릭스에서 시청` 등). 7.7은
  * 다섯 줄을 그리지만 영화 목업을 늘리지 않으려고 세 줄만 둔다.
@@ -56,8 +56,28 @@ export function createSeedWatchRecords(): StoredWatchRecord[] {
     ratingId: null,
   });
 
+  /*
+   * 8.1 첫 알림 `영화 잘 보셨나요?`가 가리키는 기록(업무 -308). OTT 링크만 누르고 감상을
+   * 확인하지 않은 상태라 `LINK_CLICKED`다. 2.4-A가 이 번호로 찾는다(mocks/notifications.ts).
+   * 104는 7.5의 지난 파티 추천이다 — 추천받고 링크를 눌렀다는 흐름이 이어진다.
+   */
+  const linkClicked: StoredWatchRecord = {
+    watchRecordId: 4004,
+    movieId: 104,
+    status: 'LINK_CLICKED',
+    ...mockWatchDeadlines(new Date('2026-09-10T12:00:00Z')),
+    ottId: 1,
+    watchedAt: null,
+    ratingId: null,
+  };
+
   // 목록은 `clickedAt` 순으로 정렬되므로 넣는 순서는 상관없다
-  return [seed(4001, 411, 1, '26'), seed(4002, 412, 2, '20'), seed(4003, 413, 3, '14')];
+  return [
+    seed(4001, 411, 1, '26'),
+    seed(4002, 412, 2, '20'),
+    seed(4003, 413, 3, '14'),
+    linkClicked,
+  ];
 }
 
 export function createMockWatchRecord(movieId: number, ottId: number): StoredWatchRecord {

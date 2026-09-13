@@ -10,8 +10,8 @@
  * - 취향 일치 % (CR-13) · 내 OTT에서 지금 볼 수 있어요 (CR-14)
  * - 나에게 맞는 OTT 찾기 배너 (CR-18) · 새 팝콘 수 (CR 미등록)
  *
- * 범위 밖 화면으로 가는 이동(알림 8.1 · 취향 리포트 3.4 · 파티 5.1 · OTT 추천 EXT-01)은
- * 라우트가 없으므로 링크를 걸지 않는다. 자리와 문구만 와이어프레임대로 둔다.
+ * 알림 8.1 · 취향 리포트 3.3/3.4 · OTT 추천 EXT-01은 업무 -308에서 이었다. 취향 리포트는
+ * 3.3 발급 화면을 본 적 없는 최신 리포트면 3.3을 거친다(`api/reports.ts`).
  *
  * 섹션마다 따로 불러온다. 한 번에 `Promise.all`로 받으면 한 섹션이 실패할 때 홈 전체가
  * 사라진다. **실패한 섹션만 안내로 바뀌고 나머지는 그대로 보인다**(업무 -264).
@@ -22,7 +22,6 @@
  */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import IconButton from '../../../components/IconButton';
 import StatusView from '../../../components/StatusView';
 import Button from '../../../components/Button';
 import ScreenHeader from '../../../components/ScreenHeader';
@@ -37,6 +36,7 @@ import { getAvailableNowMovies } from '../../../api/home';
 import { getMyTaste } from '../../../api/taste';
 import { getMyParties } from '../../../api/parties';
 import { getOtts } from '../../../api/otts';
+import { getLatestReadyReport } from '../../../api/reports';
 import { path } from '../../../routes/paths';
 import { ottBadgeLetter } from '../../../utils/ott';
 import styles from './HomePage.module.css';
@@ -126,6 +126,21 @@ export default function HomePage() {
     };
   }, [reloadCount]);
 
+  /** 최신 리포트로 간다. 만든 리포트가 없으면 목록(7.3)에서 안내한다 */
+  async function openLatestReport() {
+    const latest = await getLatestReadyReport().catch(() => null);
+
+    if (!latest) {
+      void navigate(path.tasteReports());
+
+      return;
+    }
+
+    void navigate(
+      latest.needsIntro ? path.reportIssued(latest.reportId) : path.report(latest.reportId),
+    );
+  }
+
   /** 실패한 섹션의 `다시 시도`. 이미 받은 섹션은 그대로 두고 다시 불러온다 */
   function handleRetry() {
     setFailed(NOTHING_FAILED);
@@ -150,8 +165,10 @@ export default function HomePage() {
             <Link to={path.search()} className={styles.headerAction} aria-label="검색">
               <SearchIcon />
             </Link>
-            {/* 알림 목록(8.1)은 범위 밖이라 이동하지 않는다 */}
-            <IconButton label="알림" icon={<BellIcon />} size={36} disabled />
+            {/* 2.1 → 8.1 (업무 -308) */}
+            <Link to={path.notifications()} className={styles.headerAction} aria-label="알림">
+              <BellIcon />
+            </Link>
           </div>
         }
       />
@@ -292,28 +309,27 @@ export default function HomePage() {
               <p className={styles.tasteKeyword}>{taste.keywords[0].label}</p>
             ) : null}
 
-            {/*
-             * 취향 리포트(3.4)는 범위 밖이라 이동할 곳이 없다. 링크처럼 보이는 문단을
-             * 두면 눌러도 아무 일이 없으므로, 문구와 모양은 유지하고 동작하지 않음이
-             * 보조기술에도 전달되도록 비활성 버튼으로 둔다.
-             */}
-            <button type="button" className={styles.reportLink} disabled>
+            {/* 2.1 ⇢ 3.4 취향 리포트 보기. 안 본 리포트면 3.3을 거친다(업무 -308) */}
+            <button
+              type="button"
+              className={styles.reportLink}
+              onClick={() => void openLatestReport()}
+            >
               취향 리포트 보기
             </button>
           </section>
         ) : null}
 
         {/*
-         * 나에게 맞는 OTT 찾기 (CR-18)
-         * API-068은 확장 단계이고 EXT 화면도 Phase 2다. 와이어프레임대로 표시하되
-         * 진입 화면이 없으므로 버튼은 동작하지 않는다.
+         * 나에게 맞는 OTT 찾기 (CR-18) → EXT-01 (업무 -308)
+         * API-068은 확장 단계라 EXT 화면은 목업으로 동작한다.
          */}
         <section className={styles.banner}>
           <h2 className={styles.bannerTitle}>나에게 맞는 OTT 찾기</h2>
           <p className={styles.bannerText}>감상 기록을 분석해 OTT별 취향 일치도를 알려드려요</p>
-          <button type="button" className={styles.bannerButton} disabled>
+          <Link to={path.ottFinder()} className={styles.bannerButton}>
             OTT 추천받기
-          </button>
+          </Link>
         </section>
 
         {failed.parties ? (

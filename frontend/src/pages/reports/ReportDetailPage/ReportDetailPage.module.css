@@ -1,0 +1,95 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--screen-padding-x) var(--space-6);
+  gap: var(--space-5);
+}
+
+/* Section이 이미 테두리 상자라 안에서 다시 두르지 않는다 */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.groupLabel {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-meta);
+}
+
+.paragraph {
+  color: var(--color-ink-body);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.people {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.person {
+  display: flex;
+  justify-content: space-between;
+  color: var(--color-ink);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.count {
+  color: var(--color-ink-muted);
+}
+
+.keywords {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.keyword {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.rationale {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.compare {
+  display: flex;
+  justify-content: space-between;
+  color: var(--color-ink);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.delta {
+  font-weight: var(--font-weight-bold);
+}
+
+/* 줄어든 값은 흐리게. 색으로 가르지 않는다 */
+.delta[data-negative='true'] {
+  color: var(--color-ink-muted);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.actions > * {
+  flex: 1;
+}

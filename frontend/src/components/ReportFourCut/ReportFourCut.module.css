@@ -1,0 +1,74 @@
+/*
+ * 4컷 띠. 좁고 긴 어두운 띠 안에 사진 칸 넷이 위에서 아래로 이어진다.
+ * 폭은 와이어프레임 3.4의 띠(250px)를 기준으로 화면 폭을 넘지 않게 둔다.
+ */
+.strip {
+  display: flex;
+  width: 100%;
+  max-width: 248px;
+  box-sizing: border-box;
+  flex-direction: column;
+  align-self: center;
+  padding: var(--space-3) var(--space-3) 0;
+  margin: 0 auto;
+  border-radius: 6px;
+  background: var(--color-surface-dark);
+  box-shadow: var(--shadow-poster);
+}
+
+.cuts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+}
+
+/* 사진 한 칸. 와이어프레임 칸(190 × 130)의 비율이다 */
+.cut {
+  position: relative;
+  display: flex;
+  box-sizing: border-box;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: var(--space-3);
+  aspect-ratio: 19 / 13;
+  border-radius: 2px;
+  background: var(--color-bg);
+  gap: 2px;
+}
+
+.number {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-3);
+  color: var(--color-ink-hint);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-caption);
+}
+
+.eyebrow {
+  color: var(--color-ink-hint);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.value {
+  color: var(--color-ink);
+  font-size: var(--font-size-heading);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-heading);
+  line-height: var(--line-height-heading);
+  word-break: keep-all;
+}
+
+/* 띠 아래 여백. 4컷 사진의 날짜 자리 */
+.caption {
+  padding: var(--space-3) 0;
+  color: var(--color-on-dark-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-wide);
+  line-height: var(--line-height-caption);
+  text-align: center;
+}
