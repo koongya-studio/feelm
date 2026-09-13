@@ -1,0 +1,14 @@
+{
+  "status": "COLLECTED_PENDING_IDENTITY_LINK_AND_AUDIT",
+  "years": [
+    2004,
+    2026
+  ],
+  "period_end": "2026-09-12",
+  "rows": 72700,
+  "direct_code_rows": 2300,
+  "direct_unique_codes": 2176,
+  "negative_adjustment_rows": 16,
+  "script_sha256": "ce9982c3ee497e05fef6405672abd64007d006f4abfd026241d2ff8740fc52f8",
+  "new_model_training": false
+}

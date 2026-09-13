@@ -1,0 +1,1349 @@
+{
+  "schema_version": 1,
+  "jira": "S15P21E106-387",
+  "notes": [
+    "source hashes identify original local files; published hashes identify these copies",
+    "Archived review pins refer to their original revision, not the current published documents.",
+    "JSON configuration values are unchanged; embedded source paths are research snapshot identifiers, resolved through this inventory."
+  ],
+  "files": [
+    {
+      "path": "pipeline/docs/service-v1/ACCEPTANCE.md",
+      "bytes": 12286,
+      "sha256": "3392e456512a0a3aa35e1950dcf307dcb8ab43085f38d95a4bdb7b2202b2f07c",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/service-v1-20260913/ACCEPTANCE.md",
+        "bytes": 12388,
+        "sha256": "d8e806b772601458a71699d2776dd5efdc0356bffd29e3bf742670fe715bffa4"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/service-v1/CONTRACTS.md",
+      "bytes": 41848,
+      "sha256": "ece068584ee0efd273be2aa3a7ab328c96156a8fdcc741b0e35d19c7e62d54bf",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/service-v1-20260913/CONTRACTS.md",
+        "bytes": 41898,
+        "sha256": "57405d4428441116a4b13c617a8e49ef3748db23acdbfc9d1fcb9730e1b1baf1"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE;TRAILING_WHITESPACE_NORMALIZATION"
+    },
+    {
+      "path": "pipeline/docs/service-v1/EVALUATION.md",
+      "bytes": 12466,
+      "sha256": "db7bd86f6b72b2edee7b6a65610bdb177c65937b518288417e3c6bdbb02bf3e3",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/service-v1-20260913/EVALUATION.md",
+        "bytes": 12466,
+        "sha256": "db7bd86f6b72b2edee7b6a65610bdb177c65937b518288417e3c6bdbb02bf3e3"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/service-v1/GROUPS.md",
+      "bytes": 11224,
+      "sha256": "b20325f243a97cf4cc084bd84a766653e29a4efabfbdb0f9bf445bed224a0d41",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/service-v1-20260913/GROUPS.md",
+        "bytes": 11344,
+        "sha256": "08c66f6e16482ca4cef438b491d28f594bd8612a4ca2aa6541914b198e3714cb"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/service-v1/HYBRID-COMPARISONS.md",
+      "bytes": 10404,
+      "sha256": "8fc2868ab58f5b49e5e0eb4bff3412a3bc809978e3e72f0658de6db42d33a752",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/service-v1-20260913/HYBRID-COMPARISONS.md",
+        "bytes": 10379,
+        "sha256": "3ebbe65e0204abcd232f7ffc24ee65c29548e4d50cfd39c4c19e229344e4c407"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/service-v1/KOBIS-DATA.md",
+      "bytes": 9422,
+      "sha256": "575e0591a1ef18ff34c5e4f1941b19c80000772230175c1c8b8135506eab4602",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/service-v1-20260913/KOBIS-DATA.md",
+        "bytes": 9451,
+        "sha256": "fe7ac7faa32ee64bfaf1e56e0a2bfc5cb5217fc3ef32c335f4de92dd3b8c8c37"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/service-v1/MODELS.md",
+      "bytes": 25079,
+      "sha256": "5ad4c852b89ca02da00c30f0fc184aa6018db4abf1808c057772a4908d376701",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/service-v1-20260913/MODELS.md",
+        "bytes": 24979,
+        "sha256": "514b6a081c00249d5f8641d7620a46c0d40cf62177c6f6b8e5003eaa2b6d1fc1"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/service-v1/OPERATIONS.md",
+      "bytes": 28034,
+      "sha256": "3107d8274b1a79499c3e0e2bf722ab5de8940f64a73993038a8ad29dd4c83882",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/service-v1-20260913/OPERATIONS.md",
+        "bytes": 28124,
+        "sha256": "678e35caf59daec84f32479aea5d261e405718574a82b17d58f55cf523fbbeda"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE;TRAILING_WHITESPACE_NORMALIZATION"
+    },
+    {
+      "path": "pipeline/docs/service-v1/POLICY.md",
+      "bytes": 17004,
+      "sha256": "52512dcb018c2677c733810562335f3d5bd026cf0bc98becc71d65a1de40e618",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/service-v1-20260913/POLICY.md",
+        "bytes": 17211,
+        "sha256": "64be393f40f4c4328b5d4e5c414c211ef3061f459c35ce3676d16571e3023327"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/service-v1/README.md",
+      "bytes": 12068,
+      "sha256": "268dbfaa51fe4d792cfce1f9c1516138e068f0f9e6890d7741aee6e03e5f148c",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/service-v1-20260913/README.md",
+        "bytes": 11423,
+        "sha256": "516e2ddaaaca652b6be6e5a62227bab51e6ca3136bd36b9cfa48b6e98755a0ff"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/service-v1/SIMILAR-MOVIES.md",
+      "bytes": 20507,
+      "sha256": "56207c326479362c620427f371b6c573ae29e178d1021142899b648ff72c12d0",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/service-v1-20260913/SIMILAR-MOVIES.md",
+        "bytes": 20442,
+        "sha256": "c1625ffe64366ce1d0944d244f2eb9e807ea9409dcdc2e08a049d8c4da03db3a"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/configs/service-v1/comparison-registry.v1.json",
+      "bytes": 4561,
+      "sha256": "bf92e84fb316d17206df8f6524187c9b9776426d5f5b568998236d780612b121",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/service-v1-20260913/comparison-registry.v1.json",
+        "bytes": 4706,
+        "sha256": "b872a4dc1e16147118d5419fc936fa316256b340c71218bb24308e09df68f4ba"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/configs/service-v1/config.v1.json",
+      "bytes": 3114,
+      "sha256": "ca92ff91b7e5dcff65b997e1b53e622d5d62a6a394adb779f018fc4a98b1c289",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/service-v1-20260913/config.v1.json",
+        "bytes": 3215,
+        "sha256": "bb466512e1d948c5db3ae28b5733ffac9af71ffbbe533e021ebc84095a80112a"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/configs/service-v1/feature-schema.v1.json",
+      "bytes": 39243,
+      "sha256": "fda2be4f40b76e46b88dbb53523ef404bbf8a13c68bbf012acc58da9a63948ca",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/service-v1-20260913/feature-schema.v1.json",
+        "bytes": 40752,
+        "sha256": "1c4c8aef5cce42c0c4bc74d2d9f3e113a972d4b2ea521592760bde042d7f56ec"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/configs/service-v1/group-recipe.v1.json",
+      "bytes": 14392,
+      "sha256": "2e791e5bd90f3e9dc1ecf96efedcba2b26acbb474a746d2a4de01e837e531a13",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/service-v1-20260913/group-recipe.v1.json",
+        "bytes": 14871,
+        "sha256": "3fd587b1b74fdf9803dd5e93328081ea196848583e0b5ef3d015cf60e16df483"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/configs/service-v1/similar-movies.v1.json",
+      "bytes": 2059,
+      "sha256": "897b03df72875e71700630b48501e600267405a3b4b095e28cc0194334bad186",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/service-v1-20260913/similar-movies.v1.json",
+        "bytes": 2059,
+        "sha256": "897b03df72875e71700630b48501e600267405a3b4b095e28cc0194334bad186"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/configs/service-v1/training-recipe.v1.json",
+      "bytes": 15764,
+      "sha256": "d403a27fab09453f98b9988fcfb3867b83e41ae217f9f5f3be5976321eef8d7b",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/service-v1-20260913/training-recipe.v1.json",
+        "bytes": 16847,
+        "sha256": "66a3cebafc5344f981431f4bd5ce2601cd26e1cc06a065f905b4cb84dd0f8c2a"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/service-v1/presentation/feelm-recommendation-v1.pptx",
+      "bytes": 38053,
+      "sha256": "7fa50ee7e1447ff2a054110624a8082910fa822031308ced4639f40b26400479",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/service-v1-20260913/presentation/feelm-recommendation-v1.pptx",
+        "bytes": 37771,
+        "sha256": "2727a5f061ad67d6453194715d9e3845018b50f6a8273abd1a8e41af3cca4970"
+      },
+      "transformation": "PPTX_SPEAKER_NOTE_SOURCE_LINKS_ONLY"
+    },
+    {
+      "path": "pipeline/docs/service-v1/data-analysis/tmdb-kobis-v1-20260913/REPORT.md",
+      "bytes": 16103,
+      "sha256": "2b57ad0af9217d395d0ab635bb9ffe316014d4c539cb0a9b67106df2fe115ea5",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+        "bytes": 15989,
+        "sha256": "91c899694d5cd241e2212b146ae95c7471564555fb41b40b0052edb6c4a0c807"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/service-v1/data-analysis/tmdb-kobis-v1-20260913/DESIGN.md",
+      "bytes": 5182,
+      "sha256": "2f50f606b5d546bd09142deaa0107371fdbcf29267fd09e9a68ba8013ae33ac1",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/research/tmdb-kobis-v1-20260913/DESIGN.md",
+        "bytes": 5182,
+        "sha256": "2f50f606b5d546bd09142deaa0107371fdbcf29267fd09e9a68ba8013ae33ac1"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/service-v1/data-analysis/tmdb-kobis-v1-20260913/data/01-counts-and-ratios.png",
+      "bytes": 213662,
+      "sha256": "1c05b06e85d16a93c8a5404215860023cf3b103b7ddc5135828e45e40ef4f3b3",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/research/tmdb-kobis-v1-20260913/data/01-counts-and-ratios.png",
+        "bytes": 213662,
+        "sha256": "1c05b06e85d16a93c8a5404215860023cf3b103b7ddc5135828e45e40ef4f3b3"
+      },
+      "transformation": "BINARY_IDENTICAL"
+    },
+    {
+      "path": "pipeline/docs/service-v1/data-analysis/tmdb-kobis-v1-20260913/data/01-counts-and-ratios.svg",
+      "bytes": 87784,
+      "sha256": "7c14d8f0a807a65b49109217a5a96bc68855a2e0426f00b76757a44770dc47fa",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/research/tmdb-kobis-v1-20260913/data/01-counts-and-ratios.svg",
+        "bytes": 89221,
+        "sha256": "c738a0b1789bd2922e18aba5229433779151138f32d55f3f5b115341c4649cee"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE;TRAILING_WHITESPACE_NORMALIZATION"
+    },
+    {
+      "path": "pipeline/docs/service-v1/data-analysis/tmdb-kobis-v1-20260913/data/02-scale-imbalance.png",
+      "bytes": 111585,
+      "sha256": "6df096c73e017b794a7069db56cd236c94f0650d0fa87343ab701225ba77d8bf",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/research/tmdb-kobis-v1-20260913/data/02-scale-imbalance.png",
+        "bytes": 111585,
+        "sha256": "6df096c73e017b794a7069db56cd236c94f0650d0fa87343ab701225ba77d8bf"
+      },
+      "transformation": "BINARY_IDENTICAL"
+    },
+    {
+      "path": "pipeline/docs/service-v1/data-analysis/tmdb-kobis-v1-20260913/data/02-scale-imbalance.svg",
+      "bytes": 20848,
+      "sha256": "4008b5da202c35d3e865fc360158252eacf278df9a205a5d16a88415ca1cc128",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/research/tmdb-kobis-v1-20260913/data/02-scale-imbalance.svg",
+        "bytes": 21533,
+        "sha256": "c17da094afd2e55c30d54ee1a0d5f2e909aa720039ff0fd8ba0710653fe84d3e"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE;TRAILING_WHITESPACE_NORMALIZATION"
+    },
+    {
+      "path": "pipeline/docs/service-v1/data-analysis/tmdb-kobis-v1-20260913/data/03-rating-relations.png",
+      "bytes": 234269,
+      "sha256": "6f69dfbf6babe91a4f0c3bcba2ae0c90703ba784f91cd84ad23a8da3d706f92e",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/research/tmdb-kobis-v1-20260913/data/03-rating-relations.png",
+        "bytes": 234269,
+        "sha256": "6f69dfbf6babe91a4f0c3bcba2ae0c90703ba784f91cd84ad23a8da3d706f92e"
+      },
+      "transformation": "BINARY_IDENTICAL"
+    },
+    {
+      "path": "pipeline/docs/service-v1/data-analysis/tmdb-kobis-v1-20260913/data/03-rating-relations.svg",
+      "bytes": 137733,
+      "sha256": "40c08d19cf64f95a076c93d041f404fd64c9bfc1671c503770bd22db2829256a",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/research/tmdb-kobis-v1-20260913/data/03-rating-relations.svg",
+        "bytes": 139380,
+        "sha256": "81912fb141623276df56945d20a041fbd3042367e3864f5325643b6be683a2ef"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE;TRAILING_WHITESPACE_NORMALIZATION"
+    },
+    {
+      "path": "pipeline/docs/service-v1/data-analysis/tmdb-kobis-v1-20260913/data/04-rating-dispersion.png",
+      "bytes": 136749,
+      "sha256": "7068f2de75a66ecd604b4fadfe3c7d227264b6e5965a4f059c2d1b8897814f72",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/research/tmdb-kobis-v1-20260913/data/04-rating-dispersion.png",
+        "bytes": 136749,
+        "sha256": "7068f2de75a66ecd604b4fadfe3c7d227264b6e5965a4f059c2d1b8897814f72"
+      },
+      "transformation": "BINARY_IDENTICAL"
+    },
+    {
+      "path": "pipeline/docs/service-v1/data-analysis/tmdb-kobis-v1-20260913/data/04-rating-dispersion.svg",
+      "bytes": 24890,
+      "sha256": "36bedbe16719efd0ceab25a8f800ea8d8d46225b4872cacb3d94ff2ea5fbeb33",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/research/tmdb-kobis-v1-20260913/data/04-rating-dispersion.svg",
+        "bytes": 25647,
+        "sha256": "c360d78aaefd899e7afbf9c89f92e5710c4d45cf9d4973380727e844359396f5"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE;TRAILING_WHITESPACE_NORMALIZATION"
+    },
+    {
+      "path": "pipeline/docs/service-v1/data-analysis/tmdb-kobis-v1-20260913/data/between-film-rating-distributions.csv",
+      "bytes": 2829,
+      "sha256": "bdd81b1e0da3e284a11f322e53a3d8749e495c42876b2c8021b613c287bd4bf1",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/research/tmdb-kobis-v1-20260913/data/between-film-rating-distributions.csv",
+        "bytes": 2845,
+        "sha256": "0ae00d35a4c1c037af3aee4545e8dd8ce057e731007be0cb93574067fd14389d"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/service-v1/data-analysis/tmdb-kobis-v1-20260913/data/count-and-rating-relations.csv",
+      "bytes": 7777,
+      "sha256": "5920c9f472ac6981ec1ca23a9f1b7ded87dfb153e4bf4b6292e578818c1e489f",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/research/tmdb-kobis-v1-20260913/data/count-and-rating-relations.csv",
+        "bytes": 7797,
+        "sha256": "48fce8b412ca4bd65f53794bd1973d65c9b97711cb0a54ccd058bf0ae1ae02cd"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/service-v1/data-analysis/tmdb-kobis-v1-20260913/data/coverage.csv",
+      "bytes": 421,
+      "sha256": "fb72c85d4baffe371923375804f433c74c838d521db1fd647e2c39198c67ce2d",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/research/tmdb-kobis-v1-20260913/data/coverage.csv",
+        "bytes": 425,
+        "sha256": "55f8b56a663de25327e51492a4ee7bdc3ffcb3f4a94f5bb9f5d4ee04d3a8a3b5"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/service-v1/data-analysis/tmdb-kobis-v1-20260913/data/movielens-same-film-rating-sd.csv",
+      "bytes": 87682,
+      "sha256": "c5520641f027e5f3a05f5bf3c0db1c2e2ca1baa2575e9b02f606a3991999873e",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/research/tmdb-kobis-v1-20260913/data/movielens-same-film-rating-sd.csv",
+        "bytes": 88020,
+        "sha256": "066e2b429f8141df28cf47892c8ddc5b6ea717bd9cb3b640e877f30d97cd99cb"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/service-v1/data-analysis/tmdb-kobis-v1-20260913/data/tmdb-kobis-pairs.csv",
+      "bytes": 82420,
+      "sha256": "cf2c824e9e5795a280f798895aa2b225f54a10355697409c130eb073055700a6",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/research/tmdb-kobis-v1-20260913/data/tmdb-kobis-pairs.csv",
+        "bytes": 82792,
+        "sha256": "ceb0bae58844ae020a61a0ae4fbca4242b041296630c73684c5f019b39d68f7f"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/service-v1/data-analysis/tmdb-kobis-v1-20260913/data/within-film-ml-sd-distributions.csv",
+      "bytes": 1686,
+      "sha256": "27f85b55b99112a73b51e94697e17b7352bc72683b84c3b28e075be87bd14bad",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/research/tmdb-kobis-v1-20260913/data/within-film-ml-sd-distributions.csv",
+        "bytes": 1693,
+        "sha256": "80276b22a4ff00b10c2de60b45538839d449650c5217e7e7a889fb0e6ebff4b4"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/service-v1/data-analysis/kobis-expanded-20260913/REPORT.md",
+      "bytes": 10322,
+      "sha256": "8df63e67c18104104e0066ce8f776a7364711e3121d9f831639908e736f27dd2",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/research/kobis-expanded-20260913/REPORT.md",
+        "bytes": 10360,
+        "sha256": "c17c010add50ca7c061f6221a234e976570e7ced343d313105b324b2a2aa7c19"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/service-v1/data-analysis/kobis-expanded-20260913/DESIGN.md",
+      "bytes": 2599,
+      "sha256": "17717c5eea0db160f8e8aa1fea2601d864ad5e8782ceb9fce1a254fd2dd7ff89",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/research/kobis-expanded-20260913/DESIGN.md",
+        "bytes": 2599,
+        "sha256": "17717c5eea0db160f8e8aa1fea2601d864ad5e8782ceb9fce1a254fd2dd7ff89"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/reference/rec046_common.py",
+      "bytes": 8001,
+      "sha256": "42dd14e83ecbee0c02c5e4233abb4b6a8d807ad2213c24a22cfb82350bc47848",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "scripts/rec046_common.py",
+        "bytes": 8001,
+        "sha256": "42dd14e83ecbee0c02c5e4233abb4b6a8d807ad2213c24a22cfb82350bc47848"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/reference/rec047_features.py",
+      "bytes": 5791,
+      "sha256": "a6f3fdc26cc88cceea2f6b1fe1244285bd9e29f7175874f7ab2eb8fae5904268",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "scripts/rec047_features.py",
+        "bytes": 5791,
+        "sha256": "a6f3fdc26cc88cceea2f6b1fe1244285bd9e29f7175874f7ab2eb8fae5904268"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/reference/cold_item_features.py",
+      "bytes": 4838,
+      "sha256": "78ed5bbea151dc12d7a8bb144fa389333c779550fcfdff66d28d90c6900a4cec",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "scripts/cold_item_features.py",
+        "bytes": 4838,
+        "sha256": "78ed5bbea151dc12d7a8bb144fa389333c779550fcfdff66d28d90c6900a4cec"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/reference/foundation340_features.py",
+      "bytes": 7264,
+      "sha256": "83e2586d9acc8bfb8aec8dc47b8133f4bc0da8678ba0d82bdd295b5c7bf13cf9",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "scripts/foundation340_features.py",
+        "bytes": 7264,
+        "sha256": "83e2586d9acc8bfb8aec8dc47b8133f4bc0da8678ba0d82bdd295b5c7bf13cf9"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/reference/text339_relations.py",
+      "bytes": 3040,
+      "sha256": "b01470cebe891c1dde5eae865ca16199ba2b0ac7c9ef2343fdd6cc341f1abd9b",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "scripts/text339_relations.py",
+        "bytes": 3117,
+        "sha256": "fdc970a6506cfd27dcc2df15cd2785ce5f221f76bd74eaeb24aa6d73c5ccd4d6"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/reference/final344_adapter.py",
+      "bytes": 5100,
+      "sha256": "15b6a53c5be9e6207cb215857058570304b61c17c5aa88198341efd55f688894",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "scripts/final344_adapter.py",
+        "bytes": 5100,
+        "sha256": "15b6a53c5be9e6207cb215857058570304b61c17c5aa88198341efd55f688894"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/reference/combination340_models.py",
+      "bytes": 4025,
+      "sha256": "a519586b25d81574a96e1847dc6a4d8d08d3ded276deff64c5d82ff0bcdecd25",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "scripts/combination340_models.py",
+        "bytes": 4025,
+        "sha256": "a519586b25d81574a96e1847dc6a4d8d08d3ded276deff64c5d82ff0bcdecd25"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/reference/final344_evaluate.py",
+      "bytes": 47236,
+      "sha256": "01c7089a287591585235b7dba6c6e17b3dd606020841943674b008ebf37df071",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "scripts/final344_evaluate.py",
+        "bytes": 47236,
+        "sha256": "01c7089a287591585235b7dba6c6e17b3dd606020841943674b008ebf37df071"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/reference/test_final344_adapter.py",
+      "bytes": 8599,
+      "sha256": "92a478de94f3400cada20560173f6329add6a73d17120dca49c92893164a0374",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "scripts/test_final344_adapter.py",
+        "bytes": 8599,
+        "sha256": "92a478de94f3400cada20560173f6329add6a73d17120dca49c92893164a0374"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/reference/test_final344_evaluate.py",
+      "bytes": 24804,
+      "sha256": "ae1e6b0abfc7cb2cb883c67969373f5470594e86b8f1827fd3354e373dc5201f",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "scripts/test_final344_evaluate.py",
+        "bytes": 24804,
+        "sha256": "ae1e6b0abfc7cb2cb883c67969373f5470594e86b8f1827fd3354e373dc5201f"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/source/collect_kobis_expanded.py.txt",
+      "bytes": 9993,
+      "sha256": "ce9982c3ee497e05fef6405672abd64007d006f4abfd026241d2ff8740fc52f8",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "scripts/collect_kobis_expanded.py",
+        "bytes": 9993,
+        "sha256": "ce9982c3ee497e05fef6405672abd64007d006f4abfd026241d2ff8740fc52f8"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/source/link_kobis_expanded.py.txt",
+      "bytes": 28384,
+      "sha256": "67efc1ef2427931f828ecc7d8c97b2a78ffad711f74695b25b47893cee76ed97",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "scripts/link_kobis_expanded.py",
+        "bytes": 28384,
+        "sha256": "67efc1ef2427931f828ecc7d8c97b2a78ffad711f74695b25b47893cee76ed97"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/source/audit_kobis_expanded.py.txt",
+      "bytes": 25091,
+      "sha256": "f5ec238d8e38fda21931718a85e201f3149d8dbeb6c84cb5b18f2790f09de22e",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "scripts/audit_kobis_expanded.py",
+        "bytes": 25091,
+        "sha256": "f5ec238d8e38fda21931718a85e201f3149d8dbeb6c84cb5b18f2790f09de22e"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/source/kobis_movie_statistics.py.txt",
+      "bytes": 9560,
+      "sha256": "af0a30ecd656e537d2a9b0b9b7d2d65b2e0b21a95552ba2df831fa6bfadb1c45",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "scripts/kobis_movie_statistics.py",
+        "bytes": 9560,
+        "sha256": "af0a30ecd656e537d2a9b0b9b7d2d65b2e0b21a95552ba2df831fa6bfadb1c45"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/source/report_tmdb_kobis_v1.py.txt",
+      "bytes": 33836,
+      "sha256": "46ad85a67bef8ed95c6bfa55a58f92dde2c9ffab40636df876bb07f6e421635e",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "scripts/report_tmdb_kobis_v1.py",
+        "bytes": 33858,
+        "sha256": "70b68473201c31147d8865a658b8093f4a82b77748f37e441682798dfe7ab420"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE;MACHINE_PATH_REDACTION"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/source/foundation340_prepare.py.txt",
+      "bytes": 5895,
+      "sha256": "586cf99c01d8e8d389800d27df8c6c7fad4580672517a3eadabf02b3170e4e65",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "scripts/foundation340_prepare.py",
+        "bytes": 5895,
+        "sha256": "586cf99c01d8e8d389800d27df8c6c7fad4580672517a3eadabf02b3170e4e65"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/source/final344_worker.py.txt",
+      "bytes": 5400,
+      "sha256": "8727969bbc456e5b593c12e5a4684d18454ec9d9b1491211928cb227e8100840",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "scripts/final344_worker.py",
+        "bytes": 5400,
+        "sha256": "8727969bbc456e5b593c12e5a4684d18454ec9d9b1491211928cb227e8100840"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/source/rec046.Dockerfile.txt",
+      "bytes": 302,
+      "sha256": "38905feb655e4c8fe9b4a6125a71f5f17eb87f202c07f97591f391d5a417420e",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "performance/rec046.Dockerfile",
+        "bytes": 302,
+        "sha256": "38905feb655e4c8fe9b4a6125a71f5f17eb87f202c07f97591f391d5a417420e"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/research-history/text339/README.md",
+      "bytes": 6821,
+      "sha256": "f1bfcb73fde5e208238befdea164b55e741c987fae4edeadaa83d926eb56bb54",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/experiments/text339/README.md",
+        "bytes": 6695,
+        "sha256": "9e9d194cbd90f0ca755321c116a30d1e1d56a8e3d79084e70152da6ebf792fcc"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/research-history/text339/result-review.json",
+      "bytes": 5873,
+      "sha256": "6d0d26c93386e61bd37fd468243fd2ec91002e1ff117d1d8b87e928183fdfe4c",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/experiments/text339/result-review.json",
+        "bytes": 6031,
+        "sha256": "30eb580a20d1c65ced1215b71d544f51546d841d3912593021bfec0f45730eea"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/research-history/text339-clean/README.md",
+      "bytes": 5520,
+      "sha256": "5232e928efc2da36c88ae91e57a4efc2a66b1ee6e1b2972e21c127f1d46fc46b",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/experiments/text339-clean/README.md",
+        "bytes": 5139,
+        "sha256": "376abd467370291cb41fe228ab0b4e7a21f261f8f879f087f6c46a82068b5607"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE;HISTORICAL_IMAGE_TO_NOTICE_LINK"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/research-history/foundation340/EXECUTION.md",
+      "bytes": 8601,
+      "sha256": "572c0aca1b1cbf06dbf75312d0d711689d94d08bc24d1e9bf312caba12783c38",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/experiments/foundation340/EXECUTION.md",
+        "bytes": 8601,
+        "sha256": "572c0aca1b1cbf06dbf75312d0d711689d94d08bc24d1e9bf312caba12783c38"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/research-history/combination340/EXECUTION.md",
+      "bytes": 6549,
+      "sha256": "d1fd59a01ed2aeb17c2e5018302ca6c2f216893febfb8eb783f1dc331a7a03c2",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/experiments/combination340/EXECUTION.md",
+        "bytes": 6549,
+        "sha256": "d1fd59a01ed2aeb17c2e5018302ca6c2f216893febfb8eb783f1dc331a7a03c2"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/research-history/policy341/EXECUTION.md",
+      "bytes": 5579,
+      "sha256": "02ae7c179fdf4465ccf5f8f4f620ff19db54bd28969f485345875981bedf513c",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/experiments/policy341/EXECUTION.md",
+        "bytes": 5579,
+        "sha256": "02ae7c179fdf4465ccf5f8f4f620ff19db54bd28969f485345875981bedf513c"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/research-history/final341/README.md",
+      "bytes": 7351,
+      "sha256": "676aa97a4ce28a37005697b2a65f00c65d05f0a5c28bb35b6bb05d4adea11fd0",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/experiments/final341/README.md",
+        "bytes": 7245,
+        "sha256": "f92d7888e57f37f394687814eadafbe41027c427a790bf92a3e3908e9c99cbb1"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE;HISTORICAL_IMAGE_TO_NOTICE_LINK"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/research-history/final341/result-review.json",
+      "bytes": 1715,
+      "sha256": "72fc5e45631008a5faec569162101541cb5c885faa17370ba13931b2ae767bcc",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/experiments/final341/result-review.json",
+        "bytes": 1715,
+        "sha256": "72fc5e45631008a5faec569162101541cb5c885faa17370ba13931b2ae767bcc"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/source/dv2_predictor.py.txt",
+      "bytes": 19085,
+      "sha256": "db3c1c92278fdfc889e8e951c1aa53495c631772dcf2f07bc6644d545ecc4086",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": ".codex-tmp/fixed-k8-discovery-v2-20260913/scripts/dv2_predictor.py",
+        "bytes": 19085,
+        "sha256": "db3c1c92278fdfc889e8e951c1aa53495c631772dcf2f07bc6644d545ecc4086"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/source/rec047_run.py.txt",
+      "bytes": 13998,
+      "sha256": "bd9db81789c64b5da8d56f703676d807df29ce98007e1632bb8ef6462f66ecfc",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "scripts/rec047_run.py",
+        "bytes": 13998,
+        "sha256": "bd9db81789c64b5da8d56f703676d807df29ce98007e1632bb8ef6462f66ecfc"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/source/rec_ev_032_basic.py.txt",
+      "bytes": 34577,
+      "sha256": "58206af0646fa70a8693a2e60b06da1884fbbdfb9b8c16657eeb8fc1e3676d8d",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": ".codex-tmp/fixed-k8-discovery-v2-20260913/scripts/rec_ev_032_basic.py",
+        "bytes": 35228,
+        "sha256": "ee17ef12d7ba0ec136d5e581b566ca2d652540edd134190daee5f0836851634f"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/foundation340/RH/feature-info.json",
+      "bytes": 11176,
+      "sha256": "a5950ff504365f21ef9f8e780daef1935234aeb8459be2b4d32e92ddb7304f2c",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/foundation340/RH/feature-info.json",
+        "bytes": 11646,
+        "sha256": "8b871f51b027b5ae3fb8c52ac4fa2b67bee7b3e819d06c3f4389a425e9549094"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/.codex-tmp/fixed-k8-discovery-v2-20260913/outputs/fixed-k8-discovery-v2/feelm-discovery-v2-r2/cluster/report.json",
+      "bytes": 6297,
+      "sha256": "2dd1af29b4ddd6cb602791cbba61f83e8a31df9c35e646efd8bdfde525be7fcd",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": ".codex-tmp/fixed-k8-discovery-v2-20260913/outputs/fixed-k8-discovery-v2/feelm-discovery-v2-r2/cluster/report.json",
+        "bytes": 6409,
+        "sha256": "f8d01d935d4b8316c235bb657e21af2085f309cc1e7a164f72b4aaa6462bfbfa"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/source/k8_common.py.txt",
+      "bytes": 7346,
+      "sha256": "b87f79cca4499f1310c9ab1c96a6ad14f59e21f3d2081212a6e053dd5676a349",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": ".codex-tmp/fixed-k8-discovery-20260912/scripts/k8_common.py",
+        "bytes": 7346,
+        "sha256": "b87f79cca4499f1310c9ab1c96a6ad14f59e21f3d2081212a6e053dd5676a349"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/source/dv2_cluster.py.txt",
+      "bytes": 7726,
+      "sha256": "ef1965108a39c28e04480d9fe99fd3f223026655c59d554f4b5bbf55844ac150",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": ".codex-tmp/fixed-k8-discovery-v2-20260913/scripts/dv2_cluster.py",
+        "bytes": 7726,
+        "sha256": "ef1965108a39c28e04480d9fe99fd3f223026655c59d554f4b5bbf55844ac150"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/source/dv2_common.py.txt",
+      "bytes": 7715,
+      "sha256": "6a45cc381aca7053a9e098c59a859c87a09825c866d1430cbc9e31e81394ba7a",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": ".codex-tmp/fixed-k8-discovery-v2-20260913/scripts/dv2_common.py",
+        "bytes": 7715,
+        "sha256": "6a45cc381aca7053a9e098c59a859c87a09825c866d1430cbc9e31e81394ba7a"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/final344/GBT120_s339/model/resolved-estimator.json",
+      "bytes": 490,
+      "sha256": "9a9cb27416d3e3099406319d0ab2b2027c913df36e71a8af4202fbfc035576f2",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/final344/GBT120_s339/model/resolved-estimator.json",
+        "bytes": 490,
+        "sha256": "9a9cb27416d3e3099406319d0ab2b2027c913df36e71a8af4202fbfc035576f2"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/final344/FM150_s339/model/resolved-estimator.json",
+      "bytes": 310,
+      "sha256": "9e2ab5c80349bfdf85eab1e584bcc35b8297aa09ac379eb44bc912e8adfe09d5",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/final344/FM150_s339/model/resolved-estimator.json",
+        "bytes": 310,
+        "sha256": "9e2ab5c80349bfdf85eab1e584bcc35b8297aa09ac379eb44bc912e8adfe09d5"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/text339/prepared-seal.json",
+      "bytes": 4886,
+      "sha256": "8b51e7408839993924bed28684acd3d190fce2ffade647e7b5fffb995cb87856",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/text339/prepared-seal.json",
+        "bytes": 5024,
+        "sha256": "d27709a42bd0d5511a36f3740365637325d59b521c7f62eae04850523782fdd8"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/service-v1-implementation-20260913/team-contract-audit.md",
+      "bytes": 12101,
+      "sha256": "a8b829c8fa740e3258f768ed143627a0377f7f519462a42b17b61f087600d4e2",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/service-v1-implementation-20260913/team-contract-audit.md",
+        "bytes": 12101,
+        "sha256": "a8b829c8fa740e3258f768ed143627a0377f7f519462a42b17b61f087600d4e2"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/kobis-expanded-20260913/delivery-manifest.json",
+      "bytes": 3020,
+      "sha256": "8be90aac095b4ef6689f47c2461eeaae5c988e0be0c3224bc4bcd71bd263c5d5",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/kobis-expanded-20260913/delivery-manifest.json",
+        "bytes": 3375,
+        "sha256": "77132cf300c764fb8d954ea7c387aef6abbd538b759cf959333ecccb6c51f3d3"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE;MACHINE_PATH_REDACTION"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/kobis-expanded-20260913/result-review.json",
+      "bytes": 86365,
+      "sha256": "8c665f44095d7dadddd8fdf9ca6831af770cf391e5635617e2fad2168dc56605",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/kobis-expanded-20260913/result-review.json",
+        "bytes": 88536,
+        "sha256": "15def26da5e532440877e68da5c7e12b428a14806aeded9167f1c3727f97a9e4"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/kobis-expanded-20260913/result-link-v2-review.json",
+      "bytes": 4914,
+      "sha256": "58e4acc7682018170b70d8490dda205ff1480126fc1cd57f98f108c7f2a3e398",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/kobis-expanded-20260913/result-link-v2-review.json",
+        "bytes": 4914,
+        "sha256": "58e4acc7682018170b70d8490dda205ff1480126fc1cd57f98f108c7f2a3e398"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/kobis-document-update-20260913/before.json",
+      "bytes": 3096,
+      "sha256": "fead42af99584265eb69e3bd1310a5b29719f7b022124d5bd4bc07d8ef595257",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/kobis-document-update-20260913/before.json",
+        "bytes": 3182,
+        "sha256": "50b471f5711bb90c0a83719fe0f9eb8f62967019822d40dac75c467d00f505ea"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/kobis-document-update-20260913/document-review.json",
+      "bytes": 47468,
+      "sha256": "2fbe499a0b8d2004389defaffa04c0937c78531a28653d521f6737a21e172f07",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/kobis-document-update-20260913/document-review.json",
+        "bytes": 49362,
+        "sha256": "68faef37b198adab6b331d4ef914e1f1b687d400a7c25571c6a487c7973b2806"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE;MACHINE_PATH_REDACTION"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/tmdb-kobis-v1-20260913/result-review.md",
+      "bytes": 7008,
+      "sha256": "186a52f169eea5993e0cf9122c979b533d7ef661be9bed1b22eccc6c54f73caf",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/tmdb-kobis-v1-20260913/result-review.md",
+        "bytes": 7004,
+        "sha256": "fa94b7b43331b67cc0cd9f4beb6e868c2677939bf8a6bed762e9301a183a785b"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE;TRAILING_WHITESPACE_NORMALIZATION"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/service-v1-implementation-20260913/model-policy-review.md",
+      "bytes": 5715,
+      "sha256": "97366201e95735eaf59a3d056426fe2a0715e5252bbf6abfa06e1365c803af21",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/service-v1-implementation-20260913/model-policy-review.md",
+        "bytes": 5614,
+        "sha256": "7441c5589c7010f4d995779ccabc6ed5eeea88ac40e77bc99b71739c7ff38779"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/service-v1-implementation-20260913/model-policy-review-r2.json",
+      "bytes": 7364,
+      "sha256": "da897c2542a8fad8e0a1d633ba84b0857abb68e2c40b2516371d9a9b2345805c",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/service-v1-implementation-20260913/model-policy-review-r2.json",
+        "bytes": 7539,
+        "sha256": "ea09803722b7029ed25d748532f4f1c564a18ca3dd039353d97365d2cde1e24c"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/service-v1-implementation-20260913/evaluation-design-review-r2.json",
+      "bytes": 9619,
+      "sha256": "512cc53eec3b85cd2bbbf646d7c26aa5e46a958732e89cdd9f55d4e59c8ed268",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/service-v1-implementation-20260913/evaluation-design-review-r2.json",
+        "bytes": 9619,
+        "sha256": "512cc53eec3b85cd2bbbf646d7c26aa5e46a958732e89cdd9f55d4e59c8ed268"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/service-v1-implementation-20260913/delivery-review.json",
+      "bytes": 5927,
+      "sha256": "81443f65cee795621b1efa7fbd01935868fe911bb98bf6e8fcc2631495756963",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/service-v1-implementation-20260913/delivery-review.json",
+        "bytes": 6080,
+        "sha256": "a420e4aeff11e450d7f168354c8f931ec577180071ada0166e1e2f1709fbc7d7"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/hybrid-comparison-extension-20260913/delivery-review.json",
+      "bytes": 3664,
+      "sha256": "e1dad96828dc2f4771d3744d939dbb95424729a89dddd685bd3c74988abfffbd",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/hybrid-comparison-extension-20260913/delivery-review.json",
+        "bytes": 3761,
+        "sha256": "1fb79ba890eaa2d64572d59ee037d73ddda8f337762b1433d62363ef5bc9b604"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/similar-movies-design-20260913/design-review.json",
+      "bytes": 13647,
+      "sha256": "b6d07efdb715f19b5f2ed4c08a5769145abd59b7c3a99b57eb36db0305b6ce3b",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/similar-movies-design-20260913/design-review.json",
+        "bytes": 13647,
+        "sha256": "b6d07efdb715f19b5f2ed4c08a5769145abd59b7c3a99b57eb36db0305b6ce3b"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/similar-movies-design-20260913/before.json",
+      "bytes": 2882,
+      "sha256": "32b985d426d5e67e8ba824d7295be6cc3b959bb6f9efe0f3e68adabb2c511257",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/similar-movies-design-20260913/before.json",
+        "bytes": 2964,
+        "sha256": "e2b186ff50078bca2fc7643f8f74a31d8e64e2e32c5311da6299f6a7a5792714"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/tmdb-kobis-v1-20260913/manifest.json",
+      "bytes": 6919,
+      "sha256": "85b3460ba45eb0794161763b6efe0c772b10ceb05a94e1e00f44541224b8ab18",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/tmdb-kobis-v1-20260913/manifest.json",
+        "bytes": 7774,
+        "sha256": "352946bddffe687c58f3e026bdb6ec12d9cf1c58490ab6e5910fefa858fba302"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE;MACHINE_PATH_REDACTION"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/tmdb-kobis-v1-20260913/result-review.json",
+      "bytes": 14742,
+      "sha256": "8d4578a86e9fed57f76872b21462401643b957b753537913e4447fe4102e054d",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/tmdb-kobis-v1-20260913/result-review.json",
+        "bytes": 14764,
+        "sha256": "b8dd92655be7dcf25ba1c41af9305fa4abf08ca53a784b7ddcae31467fd5791a"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE;MACHINE_PATH_REDACTION"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/tmdb-kobis-v1-20260913/publication-manifest.json",
+      "bytes": 4015,
+      "sha256": "03adf1d213a1550a472d6b5f959f6d9f796be78c68b1bc02a2c28d591f275d23",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/tmdb-kobis-v1-20260913/publication-manifest.json",
+        "bytes": 4115,
+        "sha256": "85022ac049ff0dcd63b0ac81a9a64002762cc9300183f9f166b75e64d4c649a6"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/summary.json",
+      "bytes": 23128,
+      "sha256": "5e6a423ee1f615a428c8bce8c003b6e72a0a075f7541b5ff42fa921861e8353d",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/summary.json",
+        "bytes": 23738,
+        "sha256": "72a3bfae8443851dc3cdb7c245531479f64f2a8855baffe83b5c6619f7fa2276"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/kobis-expanded-20260913/collection-summary.json",
+      "bytes": 355,
+      "sha256": "818ce5235d1794b22e56a05351e2269d52d92da66292979560926b0b0e4bf232",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/kobis-expanded-20260913/collection-summary.json",
+        "bytes": 369,
+        "sha256": "f94dde0c9858a41355661339ffa5a7796481affdbc28451b017225ff566ba060"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/manifest.json",
+      "bytes": 3396,
+      "sha256": "97627c168c9c0b1a9de1c5c68a9459bca9495824e526da504229ba5de450036e",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/manifest.json",
+        "bytes": 3770,
+        "sha256": "4311b71dfb6b28a83e8be402992dceec4fa955ab336bcc126ba2e5eab60e00f9"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE;MACHINE_PATH_REDACTION"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/yearly-link-coverage.csv",
+      "bytes": 1787,
+      "sha256": "7149675762f783d9cc14d476e7889d6beaeb466f25653977891c0c8951aefbb8",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/yearly-link-coverage.csv",
+        "bytes": 1814,
+        "sha256": "9e8f17d1fdbbd9047c8b0a9ed8985e2eca33f8b7f0f9504c86e793a4dd9fa531"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/nation-link-coverage.csv",
+      "bytes": 605,
+      "sha256": "e52f156c735e0d00172c155a5bb7d88845ebc273fd0dade04649f506659fcbfa",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/nation-link-coverage.csv",
+        "bytes": 633,
+        "sha256": "d4ce371fbbdf46cb8af27e87e340d254157ee140bc7c4003516279c795178662"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/kobis-expanded-20260913/rank-source-addendum-review.json",
+      "bytes": 4641,
+      "sha256": "70d9863d7d24e55bbd269d483ac7ff6f4815640ab899167ddf242b4b92dd3897",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/kobis-expanded-20260913/rank-source-addendum-review.json",
+        "bytes": 4641,
+        "sha256": "70d9863d7d24e55bbd269d483ac7ff6f4815640ab899167ddf242b4b92dd3897"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/records/outputs/recommendation-evidence/kobis-expanded-20260913/text-parser-addendum-review.json",
+      "bytes": 4631,
+      "sha256": "66d4a00736b65c8b0b78f2c54408386eca311d5dc6df3d55d9ad8d84e2000ccc",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/kobis-expanded-20260913/text-parser-addendum-review.json",
+        "bytes": 4631,
+        "sha256": "66d4a00736b65c8b0b78f2c54408386eca311d5dc6df3d55d9ad8d84e2000ccc"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/model-evidence/summary.csv",
+      "bytes": 1182440,
+      "sha256": "62a0cc3624272db618dd73aefdceec3a7201b1acd7aaade1e567b05d74303154",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/hybrid345/summary.csv",
+        "bytes": 1205121,
+        "sha256": "cc8228d78b29ee97c31a464fea9310674502a05e3447c5f2f2a3d4dec95976c6"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/model-evidence/denominators.csv",
+      "bytes": 34464,
+      "sha256": "69d414f001bd0abffa98111cc00144f7c7cbd75326fc1daea867ccb90daf8d3e",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/hybrid345/denominators.csv",
+        "bytes": 35275,
+        "sha256": "33f27c6785e4085e8ab51eaa208f94b2bf9f9df45898c1d86d78d0a0d35cfb9e"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/model-evidence/result-audit.json",
+      "bytes": 4105,
+      "sha256": "9984df64cc203732aed10b23ce99b5d7a5e3e97d6c35426b7719852b6e725f52",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/hybrid345/result-audit.json",
+        "bytes": 4230,
+        "sha256": "cd54dc95a87b80c94b405385db4189ff6f2ee6d8cef572e1571d3c1a19466f04"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/model-evidence/calibration-reproduction.json",
+      "bytes": 7423,
+      "sha256": "abc77bac6dc89e02c0f0731a9463d4da6655cbc6187c39eb1a622aaefcfdfec8",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/hybrid345/calibration-reproduction.json",
+        "bytes": 7847,
+        "sha256": "57761f008023494353d5d540909ea3ab5dfaf17fff26d89657bb333309b57ed9"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE;MACHINE_PATH_REDACTION"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/model-evidence/RESULT.source.md",
+      "bytes": 14620,
+      "sha256": "245988d28acf7a742d6b5ea0ee7c4711045ac23f60b0c51c548d60d869b397c9",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "docs/recommendation/experiments/hybrid345/RESULT.md",
+        "bytes": 14758,
+        "sha256": "cca2778f3917c2585981a610702f9e21b0ccc1ee1ab40f3e0bf4134694e32e4c"
+      },
+      "transformation": "LF_AND_HANDOFF_LINKS_OR_PROSE;TRAILING_WHITESPACE_NORMALIZATION;HISTORICAL_IMAGE_TO_NOTICE_LINK"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/model-evidence/final344-primary-contrasts.csv",
+      "bytes": 784,
+      "sha256": "6e9ed38a6fb5c335d7bed77869fef76d6605ab33b9133417e80f6b8d8a31cb1c",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/final344/primary-contrasts.csv",
+        "bytes": 789,
+        "sha256": "3f377615d4e617a6b60aa2f4ede899386f7f7f90c74a16ded83cf5a4a1239092"
+      },
+      "transformation": "LF_NORMALIZATION"
+    },
+    {
+      "path": "pipeline/docs/assets/service-v1/model-evidence/final344-catalog-summary.csv",
+      "bytes": 15388,
+      "sha256": "48e355a9e610eaf709053efc813d360876023827bb4f8d7b3006b21c6f095090",
+      "source": {
+        "repository": "FEELM-standalone",
+        "path": "outputs/recommendation-evidence/final344/catalog-summary.csv",
+        "bytes": 15497,
+        "sha256": "c8b0e877e5b0efb64a607aa4775376ba983ff0a1599bc75158f1da8c5d5ec776"
+      },
+      "transformation": "LF_NORMALIZATION"
+    }
+  ],
+  "historical_links_redirected": [
+    {
+      "source": "docs/recommendation/experiments/text339/README.md",
+      "link": "RESULT.md"
+    },
+    {
+      "source": "docs/recommendation/experiments/text339/README.md",
+      "link": "INTERPRETATION.md"
+    },
+    {
+      "source": "docs/recommendation/experiments/text339/README.md",
+      "link": "../../plans/text-to-final-recommendation/training-input-distribution.md"
+    },
+    {
+      "source": "docs/recommendation/experiments/text339/README.md",
+      "link": "model-result-review.json"
+    },
+    {
+      "source": "docs/recommendation/experiments/text339/README.md",
+      "link": "INTERPRETATION.md"
+    },
+    {
+      "source": "docs/recommendation/experiments/text339/README.md",
+      "link": "EXECUTION.md"
+    },
+    {
+      "source": "docs/recommendation/experiments/text339-clean/README.md",
+      "link": "EXAMPLES.md"
+    },
+    {
+      "source": "docs/recommendation/experiments/text339-clean/README.md",
+      "link": "comparison.png"
+    },
+    {
+      "source": "docs/recommendation/experiments/text339-clean/README.md",
+      "link": "RESULT.md"
+    },
+    {
+      "source": "docs/recommendation/experiments/text339-clean/README.md",
+      "link": "../../plans/text-to-final-recommendation/training-input-distribution.md"
+    },
+    {
+      "source": "docs/recommendation/experiments/text339-clean/README.md",
+      "link": "result-review.json"
+    },
+    {
+      "source": "docs/recommendation/experiments/text339-clean/README.md",
+      "link": "RESULT.md"
+    },
+    {
+      "source": "docs/recommendation/experiments/text339-clean/README.md",
+      "link": "EXAMPLES.md"
+    },
+    {
+      "source": "docs/recommendation/experiments/text339-clean/README.md",
+      "link": "PLAN.md"
+    },
+    {
+      "source": "docs/recommendation/experiments/text339-clean/README.md",
+      "link": "REPRODUCTION.md"
+    },
+    {
+      "source": "docs/recommendation/experiments/final341/README.md",
+      "link": "comparison.png"
+    },
+    {
+      "source": "docs/recommendation/experiments/final341/README.md",
+      "link": "DETAILS.md"
+    },
+    {
+      "source": "docs/recommendation/experiments/final341/README.md",
+      "link": "../foundation340/RUNTIME-RECOVERY.md"
+    },
+    {
+      "source": "outputs/recommendation-evidence/service-v1-implementation-20260913/model-policy-review.md",
+      "link": "model-policy-review.json"
+    },
+    {
+      "source": "outputs/recommendation-evidence/service-v1-implementation-20260913/model-policy-review.md",
+      "link": "model-policy-review-static-checks.json"
+    },
+    {
+      "source": "outputs/recommendation-evidence/service-v1-implementation-20260913/model-policy-review.md",
+      "link": "group-contract-review.json"
+    },
+    {
+      "source": "docs/recommendation/experiments/hybrid345/RESULT.md",
+      "link": "comparison.png"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "seed": 339,
+  "maxDepth": 5,
+  "maxBins": 32,
+  "minInstancesPerNode": 1,
+  "minInfoGain": 0.0,
+  "maxMemoryInMB": 128,
+  "cacheNodeIds": false,
+  "subsamplingRate": 0.8,
+  "checkpointInterval": 10,
+  "lossType": "squared",
+  "maxIter": 120,
+  "stepSize": 0.05,
+  "impurity": "variance",
+  "featureSubsetStrategy": "sqrt",
+  "validationTol": 0.01,
+  "leafCol": "",
+  "minWeightFractionPerNode": 0.0,
+  "predictionCol": "prediction",
+  "featuresCol": "features",
+  "labelCol": "label"
+}

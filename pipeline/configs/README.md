@@ -1,5 +1,8 @@
 # 학습·평가 설정 기록
 
+- [service-v1](service-v1/config.v1.json): 사용자 검토를 거친 로컬 v1의 정책·특징·학습·그룹·비교·유사 영화 설정6개.
+  [설계 인계](../docs/service-v1/HANDOFF.md)와 함께 읽는다. 팀 Job의 자동 입력이나 새 모델 학습 완료 표시가 아니다.
+
 이 폴더에는 실행별로 재사용할 **값**을 JSON으로 보관한다. 기존
 `spark/batch/train/settings.py`는 설정을 읽고 검증하는 **코드**이며 그대로 둔다.
 모든 settings.py를 여기로 이동하는 구조가 아니다.

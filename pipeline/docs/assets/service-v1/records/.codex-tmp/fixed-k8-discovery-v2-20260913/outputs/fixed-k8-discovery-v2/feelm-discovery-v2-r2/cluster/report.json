@@ -1,0 +1,113 @@
+{
+  "hierarchies": {
+    "v1-fixed16": {
+      "n_groups": 16,
+      "groups_hash": "aea299f98915ecb3c5602f80023fe142080a7cccea7264aafaaff0931a7b9064",
+      "centers_hash": [
+        "dede37a4bdbd284c3429d404f81adf722d7b8ec8f7ac4a02a16025446b7a289e",
+        "d3c0616c3b24a3557e3527277cf64ea314964eb4e1ee4566f1dba3da5d3ce85a",
+        "60138d3e09d3283fea19cedfeb36071bdcdf1a56773a3230701a9304acc28bd7",
+        "ffb3c984b538512451c03623b4e423798e021903753519f060cbb25742d8a520",
+        "6ce1f229dbb6bbe5cd51c4e5cfd02906c07227508bbfaec9ee2521846626937d",
+        "2ac5ee6eb4359317df6b3893e7a351568f9f422f92baf862b2a146941e45f04a",
+        "f5bb3ceaef5eb26d88d9b474c87bf26f47ea5b6a3f31cd1f2a748c11072c8fb0",
+        "6f452493aad778ab76429bb87844d78a45dee74482f3c4f64b92bf8907a5d3cb"
+      ],
+      "mean_hash": "f1946322cc0bbe815d0174f922773191bfd63e65fd7fda8fca366269dc7cb147"
+    },
+    "GKT-K2": {
+      "n_groups": 16,
+      "groups_hash": "c851875382b224e0f0a2e81f84ab834ecabbe32c468ea187662f5dfed6d9062a",
+      "centers_hash": [
+        "91a57be0a09501c50d8c6585328ea6926adbc01695c9446d1ddc7eee3d70229a",
+        "6443fdf8853b19ad90b314e03e5d6b21aa2e9001d1a78af4d1ec1c64f0f4ee0c",
+        "c03e809c33d3c3586ba9de0d062d21543864f4b2366b2fb4b59f31547ca2c00e",
+        "6bea9f05668955780783231e24fe1009003041ad95261c575214c3cd906f1abf",
+        "6e78662c201afe07ec0d2ff081ca981b029b0948a8f8ff73344291062822251f",
+        "c5e5dfb324233929e5ebaa6e257601fab4abc3f07b3a4818e36a411cbaac58a3",
+        "a5cd15fa11492bac53d01b8858741ea0badd6fcae66085ce1f3d9e4cc42c8489",
+        "6e8d0c3d32ee5c98cbd7d6a95e1684ee8306a74209c9ad882e7e1a73fd75ca9d"
+      ],
+      "mean_hash": "ea684c3bbc3b1702ec0874a4dc2cba82204481494f1cce35c756fd98b72302ae"
+    },
+    "GKT-K8": {
+      "n_groups": 64,
+      "groups_hash": "37d745567a3b8dd665298f9ffff044f9ce57cef07ae439f60f03222b2d4fb28c",
+      "centers_hash": [
+        "7d7fdd24d0e5564f164ee6e352e9bbf908d427811bb37dcbd8d7b6028a80d77f",
+        "ea850252ac85e798975e3c703866724b8de90a7dde268cfeeb94da0354b19f4f",
+        "ffa15417269c7a3cab84d1da19399e79298f5929b4c4172b7b964bae0ef6bddf",
+        "d4cd43f1b1be0d0a35e5ef6eb473b593810ac977056f7edbc264b91ce02e4d7e",
+        "17d10a41e5f8d16cf67080d9203fee4394e07ad729a816e323cf27a140dc3455",
+        "4a4fc36008e3f43684b1124a3095ee7095a65954ba5f703457a6baf5ea17ee7a",
+        "c2bed12ff225f09930c01b2239d9e8c07cf62eaec7c2e5974c8040a7c1a69576",
+        "7ea55f2392c7aec06a32dbaabc178254c5cab3d284c529c537e23d715d1b3337"
+      ],
+      "mean_hash": "f30085e49fbb4cb4dbc56d84e866705af2dc5bc4f855a1b1d060d42142b1aca4"
+    },
+    "GKT-K32": {
+      "n_groups": 256,
+      "groups_hash": "dbced4169398af462c41e3e66e2739f61775a3f5dda990b8c144e028a9e21572",
+      "centers_hash": [
+        "a59b0314cb8ce9eb0f1e9eeca763a8e39f94c1be064a7a143e8f6b07b259690a",
+        "c4b1f40a997cd03e76698f8cf71962b535542fcc499c7085bede5792573030ae",
+        "a79e322b7179301be6604d4a5cc8c821c120a0ca970ebdf66d47a1fb2445518d",
+        "3ea77abc8c4c180f208829f00d2b16f12f267a401856bd919d770a502f5d0fe6",
+        "f83f10c86238a09c1f2ef5fe76df5c039705dec4e9e675d9ea68f5b37cbc6dbf",
+        "6bfcf63b1cf021bf038962866c7f253dc68308c748ee66053374db47653e5b9c",
+        "0fba9de2c89803ece2f8c0d77cfc6b9d7ce2b27ec938b2889c11ddc2f62e0238",
+        "036947e6c2de950e346acbf16f51663babc51f33945f8f10440b764837753b29"
+      ],
+      "mean_hash": "a9543dc475b9a5b8c0879871e6d18c0bc70b2548311a55582f5da1962e232960"
+    },
+    "GKT-K64": {
+      "n_groups": 512,
+      "groups_hash": "db67cda17f8821a30b48698caf06d6a315e3e5d2e2112e0972777c0ab20f1655",
+      "centers_hash": [
+        "dcdab98264d809069209b6037a868e2790a356101e749c2ae169d679a00ef5a4",
+        "aabd8e328a28b7ecfb7003f3d84783ac180fc48e9d040bbc871d71bfef99d9f9",
+        "344547e5cb9663f0834949e7db3e42c4eb5963f6173e6b0d5172dce148a80290",
+        "4d0093482f666c2542be40d22cfa14d8e572be4bffcd0411fa20ab8b1ce517c0",
+        "960ba86a01037dcc26e0fec4eca107fd9ab728f6dee0a8f359307a286dcf4653",
+        "47be7abb877c51d45956b21c388b8c586fabf83ccab59771ab03836fa8d94d86",
+        "b4d28d74f874d676d3c847f1bc900224b860841d6dd92439d9d03a355aba118b",
+        "6d7639ef6e194d1c7d7b1f3281d560aa7b0abff6b84a45d92ac724bca2ebdea4"
+      ],
+      "mean_hash": "be0eac3e3b768bed0bdd7c16927abd445dde0083ef4af1ebd17601f58e66a6f7"
+    },
+    "GKT-K128": {
+      "n_groups": 1024,
+      "groups_hash": "b1e43ac80e20e0e9cb1ae5d3bb1837ce4775795c2c0b3b249f96ad88459e48d5",
+      "centers_hash": [
+        "2ed672e826663e3ebcc5bbfbd868bf561ab90788507cbce45d2705121e4fc4b8",
+        "4531c1dd0fdd3c099e789cef8c1a7440bdfd5723ddf0e8427184bdf95c71a144",
+        "74a0fd0ad7cd407e8432aabd018f3293e7a440fea06ac35e7d53631d777b95a3",
+        "8d039f04ed634179bf82d1e88d82d941456391c6f849d08ea0cba1532a92d7cc",
+        "b3a051a21e714404f98ef099d294c3bf817ac16c58f449422076348ff4296c1e",
+        "247d46f78cc1b8abb21915cf0e44676cb0d754d5283925416f359b04ec659529",
+        "60fa1280dfc491171b9265c283ba33439023a9fe0f3cd0db345dbdb225e2b0b0",
+        "c1096f444ce50a97677ea8442950545c0a9f43d8835c8d6abe163badfd50dcc7"
+      ],
+      "mean_hash": "9edd5442abfa94b867bd2d29db0af3dd458c500c9e5468e00bf485ed4d8a3701"
+    },
+    "GKT-K256": {
+      "n_groups": 2048,
+      "groups_hash": "08c31ea07d5553d3f016d5059c56bfeee8a677ec83e1c87710bf7795ac698207",
+      "centers_hash": [
+        "fa19bb8177ebbdb278d8165316f0d54b5a21b4c6e7510f68507a3b0af3cceeda",
+        "6c43d75be962c2856bec9f3fd2083b91237aace49365c55d1729b94400d6f26c",
+        "f859658bf9b48fc3a8e8a2d9a877fa1995cb81c378c03e70f9324a77535f770c",
+        "9de3292252b6b79efdaaa839afefc025e3cc14d289858cc238f5b36c9e7741b0",
+        "42310fc4923ad5f6688ab6d62a19178b0a7a5f2e6b9fb58e24f3b533c27f564e",
+        "d360375aeb6a6d4a9402335d792337bbcbbb64113f7ccc917476aef6b5744569",
+        "7a846833515583d77141733aa326bd0116d8ea880fca4fb201636213a928a667",
+        "1d81f79bef67ad84045bc9dd2cc5c82ee2853a78c73366bfbe6fa797c8bcd1ca"
+      ],
+      "mean_hash": "58c0034f78c8fb2a260b5e83c49646d5cb662ba25eee5b8806751ecc6048e4cf"
+    }
+  },
+  "small_group_rule": "No statistical minimum100; all feasible K trained and retained",
+  "top_assignment_hash": "fb00237ea9cabfedc2726bdfd64a68f9450a0bb933a5bee44d53dffcfde5a4c5",
+  "fit_count": 48,
+  "fit_seconds": 70.08704509998643
+}

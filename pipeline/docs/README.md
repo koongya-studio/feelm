@@ -1,5 +1,9 @@
 # Pipeline 근거와 인계 자료
 
+최신 서비스 설계 인계: [추천 v1](service-v1/HANDOFF.md) — GBT 기본, 맞춤2+발견1,
+배치500 재정렬, 발견10×10, TMDB/KOBIS와 상세 유사 영화. 아래 기존 연구 결론과
+새 v1 설계/미구현 상태를 구분한다. Jira387에서 팀 리뷰에 넘기는 자료이며 기존 계약을 자동 변경하지 않는다.
+
 Jira: [S15P21E106-295](https://ssafy.atlassian.net/browse/S15P21E106-295)
 
 추천·데이터 저장소 내부이므로 `docs/recommendation/`을 중첩하지 않고 여기서 관리한다.

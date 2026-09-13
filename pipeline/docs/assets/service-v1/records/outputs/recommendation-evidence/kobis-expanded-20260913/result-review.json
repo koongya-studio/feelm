@@ -1,0 +1,2171 @@
+{
+  "schema_version": 1,
+  "review_id": "kobis-expanded-20260913-independent-result-review",
+  "reviewer": "/root/kobis_collection_result_audit",
+  "reviewed_at_utc": "2026-09-13T05:48:17.600608+00:00",
+  "status": "PASS",
+  "scope": "Offline full annual observation collection integrity only; identity linking, final lifetime cumulative admissions, model features, training and recommendation-quality claims excluded.",
+  "yearly": [
+    {
+      "year": 2004,
+      "status": "PASS",
+      "period_start": "2004-01-01",
+      "period_end": "2004-12-31",
+      "is_partial_year": false,
+      "rows": 309,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 209,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 315,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 309,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 315,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 309,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 440633636706,
+        "누적매출액": 447914347206,
+        "관객수": 69237708,
+        "누적관객수": 70374834,
+        "스크린수": 12946,
+        "상영횟수": 1156097
+      },
+      "annual_signed_totals": {
+        "매출액": 440633636706,
+        "관객수": 69237708,
+        "스크린수": 12946,
+        "상영횟수": 1156097
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 9,
+      "opening_before_2004_rows": 45,
+      "source_rank_gap_count": 8
+    },
+    {
+      "year": 2005,
+      "status": "PASS",
+      "period_start": "2005-01-01",
+      "period_end": "2005-12-31",
+      "is_partial_year": false,
+      "rows": 439,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 339,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 445,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 439,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 445,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 439,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 780025235967,
+        "누적매출액": 896780035573,
+        "관객수": 123300701,
+        "누적관객수": 141711027,
+        "스크린수": 28017,
+        "상영횟수": 2484632
+      },
+      "annual_signed_totals": {
+        "매출액": 780025235967,
+        "관객수": 123300701,
+        "스크린수": 28017,
+        "상영횟수": 2484632
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 17,
+      "opening_before_2004_rows": 40,
+      "source_rank_gap_count": 19
+    },
+    {
+      "year": 2006,
+      "status": "PASS",
+      "period_start": "2006-01-01",
+      "period_end": "2006-12-31",
+      "is_partial_year": false,
+      "rows": 511,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 411,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 517,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 511,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 517,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 511,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 892039799000,
+        "누적매출액": 1122892628909,
+        "관객수": 144187504,
+        "누적관객수": 180809384,
+        "스크린수": 36026,
+        "상영횟수": 2945729
+      },
+      "annual_signed_totals": {
+        "매출액": 892039799000,
+        "관객수": 144187504,
+        "스크린수": 36026,
+        "상영횟수": 2945729
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 20,
+      "opening_before_2004_rows": 31,
+      "source_rank_gap_count": 22
+    },
+    {
+      "year": 2007,
+      "status": "PASS",
+      "period_start": "2007-01-01",
+      "period_end": "2007-12-31",
+      "is_partial_year": false,
+      "rows": 897,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 797,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 903,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 897,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 903,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 897,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 965244864038,
+        "누적매출액": 1476811147138,
+        "관객수": 151980683,
+        "누적관객수": 234755928,
+        "스크린수": 47404,
+        "상영횟수": 3852678
+      },
+      "annual_signed_totals": {
+        "매출액": 965244864038,
+        "관객수": 151980683,
+        "스크린수": 47404,
+        "상영횟수": 3852678
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 177,
+      "opening_before_2004_rows": 32,
+      "source_rank_gap_count": 187
+    },
+    {
+      "year": 2008,
+      "status": "PASS",
+      "period_start": "2008-01-01",
+      "period_end": "2008-12-31",
+      "is_partial_year": false,
+      "rows": 1819,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 1719,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 1825,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 1819,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 1825,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 1819,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 961447290251,
+        "누적매출액": 1657423641095,
+        "관객수": 147427621,
+        "누적관객수": 257132685,
+        "스크린수": 53823,
+        "상영횟수": 4157999
+      },
+      "annual_signed_totals": {
+        "매출액": 961447290251,
+        "관객수": 147427621,
+        "스크린수": 53823,
+        "상영횟수": 4157999
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 592,
+      "opening_before_2004_rows": 128,
+      "source_rank_gap_count": 985
+    },
+    {
+      "year": 2009,
+      "status": "PASS",
+      "period_start": "2009-01-01",
+      "period_end": "2009-12-31",
+      "is_partial_year": false,
+      "rows": 1182,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 1082,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 1188,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 1182,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 1188,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 1182,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 1083189400450,
+        "누적매출액": 1734696373631,
+        "관객수": 155397624,
+        "누적관객수": 256449350,
+        "스크린수": 54521,
+        "상영횟수": 4277650
+      },
+      "annual_signed_totals": {
+        "매출액": 1083189400450,
+        "관객수": 155397624,
+        "스크린수": 54521,
+        "상영횟수": 4277650
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 401,
+      "opening_before_2004_rows": 74,
+      "source_rank_gap_count": 392
+    },
+    {
+      "year": 2010,
+      "status": "PASS",
+      "period_start": "2010-01-01",
+      "period_end": "2010-12-31",
+      "is_partial_year": false,
+      "rows": 1358,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 1258,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 1364,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 1358,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 1364,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 1358,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 1157259388050,
+        "누적매출액": 1770662495400,
+        "관객수": 147759844,
+        "누적관객수": 238486670,
+        "스크린수": 57118,
+        "상영횟수": 4362880
+      },
+      "annual_signed_totals": {
+        "매출액": 1157259388050,
+        "관객수": 147759844,
+        "스크린수": 57118,
+        "상영횟수": 4362880
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 425,
+      "opening_before_2004_rows": 84,
+      "source_rank_gap_count": 504
+    },
+    {
+      "year": 2011,
+      "status": "PASS",
+      "period_start": "2011-01-01",
+      "period_end": "2011-12-31",
+      "is_partial_year": false,
+      "rows": 2153,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 2053,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 2159,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 2153,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 2159,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 2153,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 1235820592200,
+        "누적매출액": 2291551137854,
+        "관객수": 159727809,
+        "누적관객수": 304031854,
+        "스크린수": 67073,
+        "상영횟수": 4246810
+      },
+      "annual_signed_totals": {
+        "매출액": 1235820592200,
+        "관객수": 159727809,
+        "스크린수": 67073,
+        "상영횟수": 4246810
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 1183,
+      "opening_before_2004_rows": 147,
+      "source_rank_gap_count": 1167
+    },
+    {
+      "year": 2012,
+      "status": "PASS",
+      "period_start": "2012-01-01",
+      "period_end": "2012-12-31",
+      "is_partial_year": false,
+      "rows": 3291,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 3191,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 3297,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 3291,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 3297,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 3291,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 1455140892435,
+        "누적매출액": 2442486057557,
+        "관객수": 194890643,
+        "누적관객수": 336773182,
+        "스크린수": 80178,
+        "상영횟수": 4614375
+      },
+      "annual_signed_totals": {
+        "매출액": 1455140892435,
+        "관객수": 194890643,
+        "스크린수": 80178,
+        "상영횟수": 4614375
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 2031,
+      "opening_before_2004_rows": 235,
+      "source_rank_gap_count": 2031
+    },
+    {
+      "year": 2013,
+      "status": "PASS",
+      "period_start": "2013-01-01",
+      "period_end": "2013-12-31",
+      "is_partial_year": false,
+      "rows": 3627,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 3527,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 3633,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 3627,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 3633,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 3627,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 1551347305721,
+        "누적매출액": 2913360595545,
+        "관객수": 213350407,
+        "누적관객수": 401396349,
+        "스크린수": 94584,
+        "상영횟수": 4850588
+      },
+      "annual_signed_totals": {
+        "매출액": 1551347305721,
+        "관객수": 213350407,
+        "스크린수": 94584,
+        "상영횟수": 4850588
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 1935,
+      "opening_before_2004_rows": 274,
+      "source_rank_gap_count": 2173
+    },
+    {
+      "year": 2014,
+      "status": "PASS",
+      "period_start": "2014-01-01",
+      "period_end": "2014-12-31",
+      "is_partial_year": false,
+      "rows": 3363,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 3263,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 3369,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 3363,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 3369,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 3363,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 1664232333160,
+        "누적매출액": 3672940209400,
+        "관객수": 215068922,
+        "누적관객수": 493461758,
+        "스크린수": 109230,
+        "상영횟수": 5132237
+      },
+      "annual_signed_totals": {
+        "매출액": 1664232333160,
+        "관객수": 215068922,
+        "스크린수": 109230,
+        "상영횟수": 5132237
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 1402,
+      "opening_before_2004_rows": 276,
+      "source_rank_gap_count": 1837
+    },
+    {
+      "year": 2015,
+      "status": "PASS",
+      "period_start": "2015-01-01",
+      "period_end": "2015-12-31",
+      "is_partial_year": false,
+      "rows": 3456,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 3356,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 3462,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 3456,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 3462,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 3456,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 1715501384678,
+        "누적매출액": 4248650842077,
+        "관객수": 217299499,
+        "누적관객수": 565385193,
+        "스크린수": 117892,
+        "상영횟수": 5504533
+      },
+      "annual_signed_totals": {
+        "매출액": 1715501384678,
+        "관객수": 217299499,
+        "스크린수": 117892,
+        "상영횟수": 5504533
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 1301,
+      "opening_before_2004_rows": 329,
+      "source_rank_gap_count": 2057
+    },
+    {
+      "year": 2016,
+      "status": "PASS",
+      "period_start": "2016-01-01",
+      "period_end": "2016-12-31",
+      "is_partial_year": false,
+      "rows": 4297,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 4197,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 4303,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 4297,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 4303,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 4297,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 1743194055370,
+        "누적매출액": 4339822072949,
+        "관객수": 217026130,
+        "누적관객수": 564434203,
+        "스크린수": 144257,
+        "상영횟수": 5815314
+      },
+      "annual_signed_totals": {
+        "매출액": 1743194055370,
+        "관객수": 217026130,
+        "스크린수": 144257,
+        "상영횟수": 5815314
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 1669,
+      "opening_before_2004_rows": 365,
+      "source_rank_gap_count": 2751
+    },
+    {
+      "year": 2017,
+      "status": "PASS",
+      "period_start": "2017-01-01",
+      "period_end": "2017-12-31",
+      "is_partial_year": false,
+      "rows": 4806,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 4706,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 4812,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 4806,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 4812,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 4806,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 1756577851113,
+        "누적매출액": 4994822762670,
+        "관객수": 219876227,
+        "누적관객수": 650261115,
+        "스크린수": 165937,
+        "상영횟수": 6261651
+      },
+      "annual_signed_totals": {
+        "매출액": 1756577851113,
+        "관객수": 219876227,
+        "스크린수": 165937,
+        "상영횟수": 6261651
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 1841,
+      "opening_before_2004_rows": 427,
+      "source_rank_gap_count": 3278
+    },
+    {
+      "year": 2018,
+      "status": "PASS",
+      "period_start": "2018-01-01",
+      "period_end": "2018-12-31",
+      "is_partial_year": false,
+      "rows": 5003,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 4903,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 5009,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 5003,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 5009,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 5003,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 1813963827238,
+        "누적매출액": 5944549850261,
+        "관객수": 216385271,
+        "누적관객수": 757086229,
+        "스크린수": 165875,
+        "상영횟수": 6543796
+      },
+      "annual_signed_totals": {
+        "매출액": 1813963827238,
+        "관객수": 216385271,
+        "스크린수": 165875,
+        "상영횟수": 6543796
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 1799,
+      "opening_before_2004_rows": 481,
+      "source_rank_gap_count": 3415
+    },
+    {
+      "year": 2019,
+      "status": "PASS",
+      "period_start": "2019-01-01",
+      "period_end": "2019-12-31",
+      "is_partial_year": false,
+      "rows": 4889,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 4789,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 4895,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 4889,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 4895,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 4889,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 1913984720858,
+        "누적매출액": 6139350462898,
+        "관객수": 226678228,
+        "누적관객수": 779685403,
+        "스크린수": 180154,
+        "상영횟수": 6871845
+      },
+      "annual_signed_totals": {
+        "매출액": 1913984720858,
+        "관객수": 226678228,
+        "스크린수": 180154,
+        "상영횟수": 6871845
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 1772,
+      "opening_before_2004_rows": 370,
+      "source_rank_gap_count": 3320
+    },
+    {
+      "year": 2020,
+      "status": "PASS",
+      "period_start": "2020-01-01",
+      "period_end": "2020-12-31",
+      "is_partial_year": false,
+      "rows": 4545,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 4445,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 4551,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 4545,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 4551,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 4545,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 510373922191,
+        "누적매출액": 5475705509240,
+        "관객수": 59523866,
+        "누적관객수": 686966342,
+        "스크린수": 147468,
+        "상영횟수": 4410939
+      },
+      "annual_signed_totals": {
+        "매출액": 510373922191,
+        "관객수": 59523866,
+        "스크린수": 147468,
+        "상영횟수": 4410939
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 1515,
+      "opening_before_2004_rows": 254,
+      "source_rank_gap_count": 3301
+    },
+    {
+      "year": 2021,
+      "status": "PASS",
+      "period_start": "2021-01-01",
+      "period_end": "2021-12-31",
+      "is_partial_year": false,
+      "rows": 4944,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 4844,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 4950,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 4944,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 4950,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 4944,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 584539145200,
+        "누적매출액": 3226880006745,
+        "관객수": 60531076,
+        "누적관객수": 399783084,
+        "스크린수": 149380,
+        "상영횟수": 4667052
+      },
+      "annual_signed_totals": {
+        "매출액": 584539145200,
+        "관객수": 60531076,
+        "스크린수": 149380,
+        "상영횟수": 4667052
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 1921,
+      "opening_before_2004_rows": 311,
+      "source_rank_gap_count": 3643
+    },
+    {
+      "year": 2022,
+      "status": "PASS",
+      "period_start": "2022-01-01",
+      "period_end": "2022-12-31",
+      "is_partial_year": false,
+      "rows": 4617,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 4517,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 4623,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 4617,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 4623,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 4617,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 1160213494400,
+        "누적매출액": 4626594974110,
+        "관객수": 112805095,
+        "누적관객수": 545171915,
+        "스크린수": 149737,
+        "상영횟수": 5685321
+      },
+      "annual_signed_totals": {
+        "매출액": 1160213494400,
+        "관객수": 112805095,
+        "스크린수": 149737,
+        "상영횟수": 5685321
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 1692,
+      "opening_before_2004_rows": 264,
+      "source_rank_gap_count": 3424
+    },
+    {
+      "year": 2023,
+      "status": "PASS",
+      "period_start": "2023-01-01",
+      "period_end": "2023-12-31",
+      "is_partial_year": false,
+      "rows": 4367,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 4267,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 4373,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 4367,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 4373,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 4367,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 1261412017092,
+        "누적매출액": 5945548892468,
+        "관객수": 125136265,
+        "누적관객수": 691736014,
+        "스크린수": 156288,
+        "상영횟수": 6046745
+      },
+      "annual_signed_totals": {
+        "매출액": 1261412017092,
+        "관객수": 125136265,
+        "스크린수": 156288,
+        "상영횟수": 6046745
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 1718,
+      "opening_before_2004_rows": 231,
+      "source_rank_gap_count": 3017
+    },
+    {
+      "year": 2024,
+      "status": "PASS",
+      "period_start": "2024-01-01",
+      "period_end": "2024-12-31",
+      "is_partial_year": false,
+      "rows": 4319,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 4219,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 4325,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 4319,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 4325,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 4319,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 1194535533963,
+        "누적매출액": 5392333034755,
+        "관객수": 123125371,
+        "누적관객수": 624693882,
+        "스크린수": 164699,
+        "상영횟수": 6306325
+      },
+      "annual_signed_totals": {
+        "매출액": 1194535533963,
+        "관객수": 123125371,
+        "스크린수": 164699,
+        "상영횟수": 6306325
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 1830,
+      "opening_before_2004_rows": 236,
+      "source_rank_gap_count": 2834
+    },
+    {
+      "year": 2025,
+      "status": "PASS",
+      "period_start": "2025-01-01",
+      "period_end": "2025-12-31",
+      "is_partial_year": false,
+      "rows": 4756,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 4656,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 4762,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 4756,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 4762,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 4756,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 1046986024380,
+        "누적매출액": 6142422544173,
+        "관객수": 106088601,
+        "누적관객수": 712270373,
+        "스크린수": 165554,
+        "상영횟수": 5652837
+      },
+      "annual_signed_totals": {
+        "매출액": 1046986024380,
+        "관객수": 106088601,
+        "스크린수": 165554,
+        "상영횟수": 5652837
+      },
+      "negative_adjustment_rows": 16,
+      "negative_fields": {
+        "annual_admissions": 16,
+        "annual_sales_krw": 16,
+        "cumulative_admissions_at_period_end": 14,
+        "cumulative_sales_krw_at_period_end": 14
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 1910,
+      "opening_before_2004_rows": 230,
+      "source_rank_gap_count": 3386
+    },
+    {
+      "year": 2026,
+      "status": "PASS",
+      "period_start": "2026-01-01",
+      "period_end": "2026-09-12",
+      "is_partial_year": true,
+      "rows": 3752,
+      "direct_code_rows": 100,
+      "unresolved_code_rows": 3652,
+      "period_physical_rows": {
+        "all_physical_tr_rows": 3758,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 3752,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "annual_physical_rows": {
+        "all_physical_tr_rows": 3758,
+        "descriptive_rows_before_header": 4,
+        "header_rows": 1,
+        "movie_rows": 3752,
+        "total_rows": 1,
+        "unclassified_or_skipped_rows": 0
+      },
+      "period_signed_totals": {
+        "매출액": 931308533829,
+        "누적매출액": 4905803547112,
+        "관객수": 90329911,
+        "누적관객수": 554819187,
+        "스크린수": 102662,
+        "상영횟수": 3814012
+      },
+      "annual_signed_totals": {
+        "매출액": 931308533829,
+        "관객수": 90329911,
+        "스크린수": 102662,
+        "상영횟수": 3814012
+      },
+      "negative_adjustment_rows": 0,
+      "negative_fields": {
+        "annual_admissions": 0,
+        "annual_sales_krw": 0,
+        "cumulative_admissions_at_period_end": 0,
+        "cumulative_sales_krw_at_period_end": 0
+      },
+      "all_rows_all_columns_parquet_equal": true,
+      "full_annual_period_nine_field_multiset_equal": true,
+      "direct_codes_match_same_ordinal_screen_and_tail_is_null": true,
+      "blank_open_date_rows": 1264,
+      "opening_before_2004_rows": 207,
+      "source_rank_gap_count": 2583
+    }
+  ],
+  "blocking_findings": [],
+  "resolved_text_repair": {
+    "status": "RESOLVED",
+    "prior_review": "history/pre-text-repair/result-review.json",
+    "corrected_cells": 138,
+    "affected_rows": 138,
+    "corrected_columns": {
+      "title": 123,
+      "production_companies": 12,
+      "distributors": 3
+    },
+    "all_numeric_scope_identity_and_provenance_cells_unchanged": true,
+    "original_derived_outputs_and_collector_hashes_verified": true
+  },
+  "totals": {
+    "years": [
+      2004,
+      2026
+    ],
+    "period_end": "2026-09-12",
+    "rows": 72700,
+    "direct_code_rows": 2300,
+    "direct_unique_codes": 2176,
+    "negative_adjustment_rows": 16,
+    "script_sha256": "ce9982c3ee497e05fef6405672abd64007d006f4abfd026241d2ff8740fc52f8",
+    "new_model_training": false,
+    "raw_snapshot_pairs": 69,
+    "verified_years": 23,
+    "unresolved_code_rows": 70400
+  },
+  "checks": {
+    "reviewed_collector_design_and_approval_chain": "PASS",
+    "all_raw_url_query_status_bytes_sha_and_utc_metadata": "PASS",
+    "all_physical_rows_classified_without_rank_based_row_count": "PASS",
+    "all_signed_annual_and_cumulative_totals": "PASS",
+    "annual_and_period_full_nine_field_multisets": "PASS",
+    "all_per_year_parquet_cells_against_raw": "PASS",
+    "combined_parquet_and_csv_all_cells_against_raw": "PASS",
+    "unique_source_row_id": "PASS",
+    "full_screening_year_scope_and_2026_partial_to_september_12": "PASS",
+    "negative_correction_flags": "PASS",
+    "only_direct_screen_top100_codes_and_no_guessed_tail_codes": "PASS",
+    "saved_checks_and_collection_summary": "PASS",
+    "complete_snapshot_inventory": "PASS",
+    "all_inputs_stable_during_audit": "PASS",
+    "diagnosed_text_loss_repaired_and_original_failure_preserved": "PASS"
+  },
+  "completed_at_utc": "2026-09-13T05:48:39.563938+00:00",
+  "input_fingerprints": {
+    "outputs/recommendation-evidence/kobis-expanded-20260913/execution-review.json": {
+      "bytes": 8830,
+      "sha256": "8eceb578b8718fdc2aa6b0c71f934f68c75f1b0e9689d8ef3d4c2be2aef83464"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/rank-source-addendum-review.json": {
+      "bytes": 4641,
+      "sha256": "70d9863d7d24e55bbd269d483ac7ff6f4815640ab899167ddf242b4b92dd3897"
+    },
+    "docs/research/kobis-expanded-20260913/DESIGN.md": {
+      "bytes": 2599,
+      "sha256": "17717c5eea0db160f8e8aa1fea2601d864ad5e8782ceb9fce1a254fd2dd7ff89"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/text-parser-addendum-review.json": {
+      "bytes": 4631,
+      "sha256": "66d4a00736b65c8b0b78f2c54408386eca311d5dc6df3d55d9ad8d84e2000ccc"
+    },
+    "scripts/collect_kobis_expanded.py": {
+      "bytes": 9993,
+      "sha256": "ce9982c3ee497e05fef6405672abd64007d006f4abfd026241d2ff8740fc52f8"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/collect_kobis_expanded.py": {
+      "bytes": 9739,
+      "sha256": "26b921ca80a853a2aed85db4d2e5167d7616c3a0a882d2860a8c027b215cc1c0"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2004-full.html": {
+      "bytes": 367224,
+      "sha256": "cbac908f48934694d5876cc93d4fc87ccc378201dfa1f9f02e4e48be85460850"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2004-full.json": {
+      "bytes": 541,
+      "sha256": "31b745bf84289013dafbc3326cfb9560f45f962f18b597436299cf1b10ac2c89"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2004-full.html": {
+      "bytes": 214481,
+      "sha256": "b781af72136bcbd84552967b0f063f903259337bf9a5c53f7c5831e3cd512da7"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2004-full.json": {
+      "bytes": 507,
+      "sha256": "ca1f79547cf49213ea512dd05741149ca1346f5614c66872eb5981ca767b7680"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2004-screen.html": {
+      "bytes": 144716,
+      "sha256": "b0509db629b8d7a50710ba38bbb1421489a0d44c0ad887ece4a20dae406efdb5"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2004-screen.json": {
+      "bytes": 542,
+      "sha256": "8ffae9751a64e69f0049626ea10cb30dd7519bfe02fe9afd02ed8d43d3213fa8"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2004.parquet": {
+      "bytes": 70462,
+      "sha256": "7ed430ab1dada2cbe414a25289d887d5e5df79563336b667aa2bdde4836c56c8"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2004.json": {
+      "bytes": 2084,
+      "sha256": "d5f697d74dbafd59200c60fb91e527340047a73ec8213a08b60087ffd2cf0d50"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2005-full.html": {
+      "bytes": 513544,
+      "sha256": "17c7b2ec946c812f574bd6a6810f2416a6446fb888874529731a6611986e0b3f"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2005-full.json": {
+      "bytes": 541,
+      "sha256": "f82c53703f4d55accff005512f33e53f7f2c5f08bf88dae3f69840fff03a7dc0"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2005-full.html": {
+      "bytes": 301143,
+      "sha256": "ce5d3b2242b433321b86d17875859273761463efab8cdbc09ea34dda0b3839c0"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2005-full.json": {
+      "bytes": 507,
+      "sha256": "3aac940ba934e155e962b434a704e0fdd4b85e5aadf2840187790c4f325d907b"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2005-screen.html": {
+      "bytes": 145002,
+      "sha256": "539a2dc870fa8e430c1a15c6a6fbd2e74ade44fd8957ee25a25451ab09848304"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2005-screen.json": {
+      "bytes": 542,
+      "sha256": "7605810b2b66b81577f3baca819609f25c320d592b0f12ffb63d86a99ad3a9ef"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2005.parquet": {
+      "bytes": 88102,
+      "sha256": "62b6e4f9dcb753ece447cea49b80a7b441281b591d707fe73872599b72140608"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2005.json": {
+      "bytes": 2085,
+      "sha256": "058b299c904c9ebcc6b094df3e23b43b59cf29584d7d689e4a4ef7d1f16d309c"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2006-full.html": {
+      "bytes": 601037,
+      "sha256": "cc96fc6ab1ec703d5871d51b01720e93eb01a8c369e9cf37502500a383e1efd6"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2006-full.json": {
+      "bytes": 541,
+      "sha256": "7d2279936e0f81d878f6f29389a0a698390831a213d534ecfd445a9b2ff9ad15"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2006-full.html": {
+      "bytes": 350265,
+      "sha256": "64094f1c9d221917624378a8f7e47aee50aa39bd425052fb216939097ba11a15"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2006-full.json": {
+      "bytes": 507,
+      "sha256": "bec2a07e3db673fac48f5f00bbb66d0ed25750d6ce21e1b526b1efdae743f255"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2006-screen.html": {
+      "bytes": 144814,
+      "sha256": "6844d2c3727a6ef0e4f32e709d355e6dfdd622030b80579d586ade35416dc290"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2006-screen.json": {
+      "bytes": 542,
+      "sha256": "00c97d99ca4ad244c1402df3fbe43b62a7a78362e674f92ab4586e2e9ab10089"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2006.parquet": {
+      "bytes": 99709,
+      "sha256": "7f00e95adc021921d300f4e489c7618b829f703fc72a80675c8a226a05753a24"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2006.json": {
+      "bytes": 2085,
+      "sha256": "50debbb7411dd67d9c2993474493eda2c878fe1403eae8c046b6d48fd9b43cce"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2007-full.html": {
+      "bytes": 1007033,
+      "sha256": "43f4021ad012503a2e04e2aff89e8c48c3e901fc04f73b5dd9592d21d691532b"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2007-full.json": {
+      "bytes": 542,
+      "sha256": "1843bda7125c8cdb00dad0e751cbdc19af08ee93eb81ac225f62b2a3d8eab359"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2007-full.html": {
+      "bytes": 607334,
+      "sha256": "7c69810ce162479000c1a1f6b35d73b552db5a9dbac799cc952f2e13717037ab"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2007-full.json": {
+      "bytes": 507,
+      "sha256": "c5f4b291660e33804f53970592919419641896afdf33775d704b8616146edf72"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2007-screen.html": {
+      "bytes": 144946,
+      "sha256": "4ce508cc28b508f54f9161ded780a958516a223048de59a01ac6ec6388967fb1"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2007-screen.json": {
+      "bytes": 542,
+      "sha256": "2fceef23f5455ce6fe8cbe36aeb0a3bdb92e1847928182b65964909637f26360"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2007.parquet": {
+      "bytes": 131756,
+      "sha256": "89d5f3bc3cf44e45bd115e7ac1443c7d994f1008bc9c1ea4c70311ff10f6d661"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2007.json": {
+      "bytes": 2086,
+      "sha256": "6dcdeb5a35c559d4f75fceb377f4acbafdab09e467f115fa955e7de930bee7e2"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2008-full.html": {
+      "bytes": 1964633,
+      "sha256": "2891358f97601d1b61d7d82b9151514aa2c9286f4bb6c431a1444ab70c69c1f7"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2008-full.json": {
+      "bytes": 542,
+      "sha256": "3471d504fef3d2796e05672ec9938331751acf60021f2a3562f0fa5085caf976"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2008-full.html": {
+      "bytes": 1210613,
+      "sha256": "6d3da66ca39bc84b3b32bb17b75c32b8ece1cdfbb31d4c73b1daafd6b460cc2e"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2008-full.json": {
+      "bytes": 508,
+      "sha256": "46d87ac3ba9e942a472614f0e03002c727bd8c89eff43a54a240a161eb465261"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2008-screen.html": {
+      "bytes": 145498,
+      "sha256": "872b640fc02c678cd38e48260c99bfa0973b01b78b4778cc069b1fdf27810d9a"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2008-screen.json": {
+      "bytes": 542,
+      "sha256": "95ba3cbeb2c0049565c8efaa7ac3e5c80118a853df6b930f0bbd85036ed46042"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2008.parquet": {
+      "bytes": 200635,
+      "sha256": "60f981fa5f20018b78ea1ff5de40f27b596afd2b82a854480f82e58539f630c6"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2008.json": {
+      "bytes": 2089,
+      "sha256": "d1f448249e62a8d8be3e94d1e8d5176c2e9f53d83b077d8ce8ad8e971b88523d"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2009-full.html": {
+      "bytes": 1315620,
+      "sha256": "c22b818e5357a8d12eefcf64ef99697acc75d0d536b2819750872bf49b94980d"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2009-full.json": {
+      "bytes": 542,
+      "sha256": "50a2bcd7a63d0f8cf1df192f6903b6d7a52a74738686bc8df7625da0ce7ac2f2"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2009-full.html": {
+      "bytes": 796459,
+      "sha256": "db7a1385b8f910ce45b8fb666fab39ecdb8050e53050bcd050a26e0a090511f3"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2009-full.json": {
+      "bytes": 507,
+      "sha256": "726ea85d2043df6c420114872033e6d6645d660f710e14d75687425d97a979e6"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2009-screen.html": {
+      "bytes": 145173,
+      "sha256": "f3190288bbe20a632aef8db8b370436cb4bb9e8c33548babb6bf07a1e0477329"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2009-screen.json": {
+      "bytes": 542,
+      "sha256": "4e47658bf92bfbd840afa34ce6e29980405ec1a658fa06017dd738f3709ce664"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2009.parquet": {
+      "bytes": 163298,
+      "sha256": "93be70ddd9ce1befc83a06b895356323a9c31215d9ba772522da07d8f2b94ae6"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2009.json": {
+      "bytes": 2089,
+      "sha256": "f962fdbb2075d53ef111bb37e1c26ba9b31b5e965c255b6fdc91870c596232d2"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2010-full.html": {
+      "bytes": 1513745,
+      "sha256": "578a063862609503b85328c4444fe13f507bcc62c82cf59ffaf35a6065cd1e06"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2010-full.json": {
+      "bytes": 542,
+      "sha256": "de0b78796ef7ebaa936cdc48e7c0b127e55c0a4e9abc72adb71b601a7e2057b5"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2010-full.html": {
+      "bytes": 911560,
+      "sha256": "e5603d66cd23a182ea0580e6c012db4e76bb1eb7363d68239e26581967950b1f"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2010-full.json": {
+      "bytes": 507,
+      "sha256": "bdf77e50d07c247dd121800cb04902726d28d3a0027c29ca4279f673bdddf61c"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2010-screen.html": {
+      "bytes": 145239,
+      "sha256": "07dc55d04c6669ccf0e1577042ad9d026077ec1fffdf8d160744d835947334fc"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2010-screen.json": {
+      "bytes": 542,
+      "sha256": "f981fd1e8d15c114fce7cc0b56f12077362e72430b32a394720c939e34764b8e"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2010.parquet": {
+      "bytes": 185539,
+      "sha256": "a6281e21ae260ed0476f3bf01a5052a24bc66e3182fe2720682e4eea1ba94677"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2010.json": {
+      "bytes": 2089,
+      "sha256": "eadc300ac8dba93fe16b61e295aa6943d1e759acde4c8be716fecc9eb9319721"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2011-full.html": {
+      "bytes": 2327259,
+      "sha256": "d811f8f06bcd0d7251dd46d7311a551532b57f513fd414ae6110517d386e7ef3"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2011-full.json": {
+      "bytes": 542,
+      "sha256": "7a4f5b3214ec8c2228fa6685e826dd3211bf31283ec64b8d6bdf52b4e0597bee"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2011-full.html": {
+      "bytes": 1424479,
+      "sha256": "2fd8d3b607c6f6f35208fff7e2d3bf9a7fddbe0ddfb2feb00d5b0186b1381546"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2011-full.json": {
+      "bytes": 508,
+      "sha256": "054e9ce0b983a01d99246c65f4ff871ff6b7e39f59ec2c8dde1f165bb7eb22f6"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2011-screen.html": {
+      "bytes": 145300,
+      "sha256": "07fe2495a1a2bcdbafecf83b7e09f8a642e083d3c978027b4304463673dd288d"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2011-screen.json": {
+      "bytes": 542,
+      "sha256": "f9baaebf263b7af4ccc147a61a6206b16c66bacfc70f58eb7cd2c15b8abe564e"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2011.parquet": {
+      "bytes": 235348,
+      "sha256": "3c6fe428c24f39ef4293a4e2bfd05dec8b6d1896ef7aad1f7c7fb86db4bc6762"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2011.json": {
+      "bytes": 2090,
+      "sha256": "554ea277d5e115f18948fac93458cb77f142be2e3d0f8e53aea7628705a4434c"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2012-full.html": {
+      "bytes": 3491835,
+      "sha256": "8bcd1c6adc675db6cf9d4974e469fe665cd02dc85208355d9896fcfb8ebb693e"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2012-full.json": {
+      "bytes": 542,
+      "sha256": "9110e299b9012495e27f4b84845bdb5021baaa7e0bb217de2f8ddd38ce0659a4"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2012-full.html": {
+      "bytes": 2150099,
+      "sha256": "e6a94ef997b823be8fbb7fbcf28fac6a937019b187ccc4b34940ec70f254ae62"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2012-full.json": {
+      "bytes": 508,
+      "sha256": "c837b75f54ba28a5845bb672a0d5193e96c124c5c3139fe4616621cb60ee7fd4"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2012-screen.html": {
+      "bytes": 145572,
+      "sha256": "0e56e1ab0003ee67d0c72a57a6eb5ef001380c17cba00f5eff8085c9572f6fc2"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2012-screen.json": {
+      "bytes": 542,
+      "sha256": "4791122254b782803c313257857a77fee64ffcfb1942e7bb2d85bd81fd0ed24d"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2012.parquet": {
+      "bytes": 308151,
+      "sha256": "d15fcbc0ddb3b549558805900812aeb6f0017459d7ea61862f16ffa8b315a315"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2012.json": {
+      "bytes": 2090,
+      "sha256": "363a5c4860474261a1d26c91654b3ef90174ef7daada9157c131f106bb8a8add"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2013-full.html": {
+      "bytes": 3895177,
+      "sha256": "c7c5f1ada2291ebb3521d6eaf17d8c7b249b225cffbbd7931154c676522ab8bf"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2013-full.json": {
+      "bytes": 542,
+      "sha256": "d904fd5606d646977dce751b712138c6b162e7270c424cee0119378b097bb9df"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2013-full.html": {
+      "bytes": 2385535,
+      "sha256": "c3f4d39abc80445c6d980a6b3fe20e4e252eb24bb384ada18e72e65406d613d5"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2013-full.json": {
+      "bytes": 508,
+      "sha256": "c13cf8df9b7917c2ef2d6f92f10d0b23b1ca9273b5910c2e019cee544a14322f"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2013-screen.html": {
+      "bytes": 145146,
+      "sha256": "d750dc03c38d82b83b346b18087ab52237c59f5d88baa458a28b5f54c3180f3e"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2013-screen.json": {
+      "bytes": 542,
+      "sha256": "5e557c1a48c42f6cb6b3981af41317ed584f26059e83ce00cae09b63850c16e9"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2013.parquet": {
+      "bytes": 361671,
+      "sha256": "eb33fb815a3c7e8e7d567dceed9737f91837006c54bdfe0b704bae5fafeeeb22"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2013.json": {
+      "bytes": 2090,
+      "sha256": "bd690db192eecbc0e7d82b97e912b999df329f05f0028e752d6a3a59cc244212"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2014-full.html": {
+      "bytes": 3676056,
+      "sha256": "e5ab9928bb7f1d2d0cb1085fd2e4de2fc9e5972501f9682cb862d3077e4445fa"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2014-full.json": {
+      "bytes": 542,
+      "sha256": "25104ca1cd00bc2262f74698b41d7724af8e738c10bcbae3eb89e0fb4a657003"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2014-full.html": {
+      "bytes": 2235033,
+      "sha256": "d9b364ff76d2a11f21ce350c45c3c04e8ae80dbe3ae57edcb1358bba6a9e873c"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2014-full.json": {
+      "bytes": 508,
+      "sha256": "54dde1f1092c1c5153a67e99e0373370ff1b18fad5c51bdbc4b937fab61dc436"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2014-screen.html": {
+      "bytes": 145356,
+      "sha256": "f1b17810811bfd67c79a03b21f8fa8e49dc05c214885764e188a572d243fd394"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2014-screen.json": {
+      "bytes": 542,
+      "sha256": "0da9fd27050ec5c277bcee0c013ed27282ffc3b8790782f720e974896253d11b"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2014.parquet": {
+      "bytes": 368294,
+      "sha256": "554ab44f1ad7c13ade8832ce22ef8c321e6beeaa15f5418250bb00715ac3a650"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2014.json": {
+      "bytes": 2090,
+      "sha256": "0dfe1dfa5f6109563c7119150fd281244368263356dd2c51d74b6a5a77d7af8c"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2015-full.html": {
+      "bytes": 3807374,
+      "sha256": "fd109b5c5110ddba654a5b7dc1c676e17957eebe8f985715389ab38bab8122b5"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2015-full.json": {
+      "bytes": 542,
+      "sha256": "b4278469d68b3e0a644c7b0f10a8fbe10eb3e245efcc0f8c82e0ce0e2ec14835"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2015-full.html": {
+      "bytes": 2301285,
+      "sha256": "405e5cfb0362113dd3ea9ee366debd57dc2e54ee1bb6720ffcbcd3373067cd9d"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2015-full.json": {
+      "bytes": 508,
+      "sha256": "2539b063d995aefbdc295b3ad178d279e8ab57a03169d881e5e6da8eac49465a"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2015-screen.html": {
+      "bytes": 145148,
+      "sha256": "203bf549dfbcc1aef005a292e6e6369d14773023dc8e4c4633d17e0ccd83216b"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2015-screen.json": {
+      "bytes": 542,
+      "sha256": "403d8ed2df8602397d261a438cc9b8fa0e10de6f7267b5b626b3a1bbf96b9961"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2015.parquet": {
+      "bytes": 390402,
+      "sha256": "2ea411e9557a4562d0da42ad6ef8f46d308e252e0194b218de4b185c5b1ad47a"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2015.json": {
+      "bytes": 2090,
+      "sha256": "42d12abcccb4eda098d41bd6bc16a8ef4b071db914150ea57662e314c26900f6"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2016-full.html": {
+      "bytes": 4729305,
+      "sha256": "d7d51ecd1a62d7dd971e5e3ae098ea6ceb0523a7c4c87e6ded68b5e81fe755e1"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2016-full.json": {
+      "bytes": 542,
+      "sha256": "ae2a55f3b9a2a3a981509ec6541ce97acf0732e229b95d69172fd8b672d9a6be"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2016-full.html": {
+      "bytes": 2858856,
+      "sha256": "2105d9497cb84e6984cc1ea7a94d9cb33e4ff1dee7c872d241700e2c05005581"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2016-full.json": {
+      "bytes": 508,
+      "sha256": "e7bd2f67bbd950e16e382800a8d9b024e4ef79795f5eef9df23e2b96fa388a2b"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2016-screen.html": {
+      "bytes": 145350,
+      "sha256": "0eb788e8970848e80ffa560e4ce65635b18f9d200215dbcdc97ac50999225910"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2016-screen.json": {
+      "bytes": 542,
+      "sha256": "76467e700397386a50e7869d1ed2948d9fe48cc1a8fb3aa6a713a4efd66cdcdc"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2016.parquet": {
+      "bytes": 465656,
+      "sha256": "f345b07d8e237d49dff3e14679a3ca34ae35767b37bf987b0787dad91626befa"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2016.json": {
+      "bytes": 2090,
+      "sha256": "c894fc06da7f7b0779c2998ac2cdce084095b274725d2fb018d18121ef5c022f"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2017-full.html": {
+      "bytes": 5237401,
+      "sha256": "9a3f4b977f32df43ec695b190695d0c377d9b9b2633630cf43801822b401909f"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2017-full.json": {
+      "bytes": 542,
+      "sha256": "2ddcd6f5d6aa47eecae22ef0ee1b0cff5ffd5f522bbaec234527bbc316ec15da"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2017-full.html": {
+      "bytes": 3197706,
+      "sha256": "0b0caa76c95265d5d16bb573c29ee9e30e3f963097a01514304d272a4cc05893"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2017-full.json": {
+      "bytes": 508,
+      "sha256": "9d71ef9669aedfc497c3723097259ae4269cef84c4b4f093133613afacaba25f"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2017-screen.html": {
+      "bytes": 145182,
+      "sha256": "dcfbd31b96e63cea9594fb1638eee4a43c7335588653f4426e5374dd05eaf492"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2017-screen.json": {
+      "bytes": 542,
+      "sha256": "bac89831179aea9e08e091d66d56caae7aea427e264cee6edcf8ee7092dac105"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2017.parquet": {
+      "bytes": 473787,
+      "sha256": "58ed3b0962fecd9d26beef2ca0493ee540810259406219d5df637b09d928b073"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2017.json": {
+      "bytes": 2090,
+      "sha256": "83d6dc646e41be7f0c71612da7a84f68b218a3ad44e54e8967c219900da5c3be"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2018-full.html": {
+      "bytes": 5480104,
+      "sha256": "90b80d8bcbefb738b5542eb179245b544d7da7b934e43a199659f7f2f6c177b4"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2018-full.json": {
+      "bytes": 542,
+      "sha256": "a54102f6a4f18806fc3ff82598a40abc6d8bcb8098c730a4f7ccd5e2c05af150"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2018-full.html": {
+      "bytes": 3327244,
+      "sha256": "0ba59f9551650a4d6babb3f13b8bfcd8b1a884c63d31ff25b20793caa651d42a"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2018-full.json": {
+      "bytes": 508,
+      "sha256": "5df47f411df939e40a041e3a51fc267780ad857e96cba69f6f3eedeb16189a88"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2018-screen.html": {
+      "bytes": 145176,
+      "sha256": "7bae02661655e2fe6d1278277ba09cc8854a95ed83e4e48d5e57463f7a42274b"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2018-screen.json": {
+      "bytes": 542,
+      "sha256": "9b1997a11221bc5656e8fb36e9b75ec9caafb5bb486c4f8cb3bb0b38393587d1"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2018.parquet": {
+      "bytes": 501148,
+      "sha256": "61c46a35dd5a3d9c1d3b42c68f91f4634b7322a59bcb79e87625b3fdf038e074"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2018.json": {
+      "bytes": 2090,
+      "sha256": "6c48807045b55d5468eafbcffd021cbf9dc4736877e850792b776a4139e3eba8"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2019-full.html": {
+      "bytes": 5398095,
+      "sha256": "a16d22470702eb28d8f4b5aeacd8bb1a610663014f97cff50119e3a4fb3dca3a"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2019-full.json": {
+      "bytes": 542,
+      "sha256": "da2727df04705cb842f5cd124d1f5462ad69de248fa005b2ce4f0ad9b6125897"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2019-full.html": {
+      "bytes": 3250544,
+      "sha256": "72711ec019d1b9f86044caf041b80d60b3d65112e0ead35d1e1e58d8101c9460"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2019-full.json": {
+      "bytes": 508,
+      "sha256": "cbcaee4d889a83afe103f825d2e2269cc0e47e2ae889870a3fdfb57595194f75"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2019-screen.html": {
+      "bytes": 145538,
+      "sha256": "79d81b0b1bf0eebad0354b5def3ff10a43b5b20ff97222b881c445567e572b0f"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2019-screen.json": {
+      "bytes": 542,
+      "sha256": "f7560c7da151d528f8eea60e713ba0f9e04d5559fa84768c41a2c077c939dffb"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2019.parquet": {
+      "bytes": 516993,
+      "sha256": "2547553dc26f91045dec679c9937150e64729f3ef18c8d25cb148dd1b0e1d3a6"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2019.json": {
+      "bytes": 2090,
+      "sha256": "3a649d6aea78884a35915b92f658606f9c60393d1da65935a01e1055aed7956f"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2020-full.html": {
+      "bytes": 5035025,
+      "sha256": "7d3cf21a71c63a57eca4d835ccf9959f49c55d5562568cee5266a6c1a49a2adf"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2020-full.json": {
+      "bytes": 542,
+      "sha256": "9ffae0394ad79a3c7d469045ee0366561909f4f811311d192c6f867627bf83d0"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2020-full.html": {
+      "bytes": 3035713,
+      "sha256": "047b43099cb45c3701880ab0f253a66b6e3d87fc24170b969b959bd231b35a4d"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2020-full.json": {
+      "bytes": 508,
+      "sha256": "e5d59a828d9aa7179536e494da5f04c6acb5a9c9e19c1fe4344b092075bcf9cf"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2020-screen.html": {
+      "bytes": 145369,
+      "sha256": "19d64487e90e55a6dcab3de7d0f201a5f70b1a463696d0315defc9e572a8a5d2"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2020-screen.json": {
+      "bytes": 542,
+      "sha256": "fc429785252edb5d4ada2099ab29967a9e5401144d3cac40ae2ecf0af78e3a8a"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2020.parquet": {
+      "bytes": 477743,
+      "sha256": "adc1194bbc92b62f10090e21070e9339382a990d1d0d048d6dcbbe2bed23c3be"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2020.json": {
+      "bytes": 2088,
+      "sha256": "6d4a642097b51da1d4874d1275d68189ebc888416c9c0a5bd1fb04e8394c9ea4"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2021-full.html": {
+      "bytes": 5424124,
+      "sha256": "72ff31cd9c50bf2c59403e8d78e084d256af34bfc64f5c39903841b430765601"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2021-full.json": {
+      "bytes": 542,
+      "sha256": "31db6932d371c46efd3a34faeef3f4baff34d3caf8f26a0647b9bef10040cbc0"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2021-full.html": {
+      "bytes": 3288541,
+      "sha256": "427d421eaa4234957570ae5973f6098b3f802a5c37ae26ad3e994ea7fd4e6567"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2021-full.json": {
+      "bytes": 508,
+      "sha256": "59cd5260a7d8856e2be1b5caabd979d9e4162dea693b29e3571cd8b539e090d8"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2021-screen.html": {
+      "bytes": 145162,
+      "sha256": "0f86b2260b35dc60ffb1c054602173e85fc6f0aa28927d34e10fe22c3bca3664"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2021-screen.json": {
+      "bytes": 542,
+      "sha256": "982899820b119b903d503a869baec4cbec0270f551eb3e43616589df89db5a01"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2021.parquet": {
+      "bytes": 491120,
+      "sha256": "0444150b723e22fde2e4785986180621dbe89f0fc89d6be47e9b435121e12d38"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2021.json": {
+      "bytes": 2088,
+      "sha256": "9c281272ec0ea8c1d045a0ab3a9f0948e1416c38f6dffa22d07d96eef0a2bcce"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2022-full.html": {
+      "bytes": 5092822,
+      "sha256": "b87218ab773270d01a5ed071190fa3b14b8cca098f905c4f58d5792c884c996e"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2022-full.json": {
+      "bytes": 542,
+      "sha256": "1bfebe1e77d8e1a6b6da696bd0e87092bf826dd137f6570acb642863cf48222e"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2022-full.html": {
+      "bytes": 3079467,
+      "sha256": "0bb559b988d025418691bb516c0f74074e05b7e4d938977b4f500545c61cfb9f"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2022-full.json": {
+      "bytes": 508,
+      "sha256": "d6ba96fa8bab3b2a3e4d185f05e4fc5d9d84c8c801bda17aff8960c759fffae1"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2022-screen.html": {
+      "bytes": 145911,
+      "sha256": "b5caf52c4a591f7ab4c511a7ce048f870d65604c5a346e0eb0242a351c3f5a28"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2022-screen.json": {
+      "bytes": 542,
+      "sha256": "7e454dd856c52e03ca36d2d73205dbf23c063fe0c84f57c57201dce02e7caa7e"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2022.parquet": {
+      "bytes": 467458,
+      "sha256": "a25fe301583fd01f3a2874dda5baea527f0579b38839cc658d75bcfaacf7c2d8"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2022.json": {
+      "bytes": 2090,
+      "sha256": "83931b6a15462ac50530ab9157529c182050256f949f91f761b5b030a9b64a2f"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2023-full.html": {
+      "bytes": 4813966,
+      "sha256": "0bf411d542d3611f4f1bb57b1692f67669abe7a5d497c2d1a6fa93bb027e59f7"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2023-full.json": {
+      "bytes": 542,
+      "sha256": "d6a04a4b3e8766c8bfe27e89e3c6fa27431e0fbb1384909a2fe441dc3a17bc6d"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2023-full.html": {
+      "bytes": 2921661,
+      "sha256": "3eb4748d292e5fbc377f785fee44e3802133e2a6ffe28b042f6639fa06297a3f"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2023-full.json": {
+      "bytes": 508,
+      "sha256": "b0dbc6e4bd56173285474dcb98e523ae2a9aacc898e61c82faf4c55179411c1a"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2023-screen.html": {
+      "bytes": 145890,
+      "sha256": "46add06b3d98b7130b10aed80a687da19013a6ff3a900f3570e87d0f19aa43e7"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2023-screen.json": {
+      "bytes": 542,
+      "sha256": "46ff896d55c05470eea96e961b10a1a1b91adb3abb9f324cc44ca05b664a2ea2"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2023.parquet": {
+      "bytes": 454416,
+      "sha256": "d3adb4393280b9bd0f0ac4db19cb3c5daaf4a2f38728ad2852025a7e9d39a31c"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2023.json": {
+      "bytes": 2090,
+      "sha256": "7a31acbd9989acdbecc6b83ac80af6875bd43615511600677a5adb132017a348"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2024-full.html": {
+      "bytes": 4726189,
+      "sha256": "a9f2a02623831d77fa08cad442b3ef7d2cbaccf22572edb514bdb5a9cd75486b"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2024-full.json": {
+      "bytes": 542,
+      "sha256": "81d43b833ab6095e7906223c79259150d40a7194568227d89dc67ab2daf09936"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2024-full.html": {
+      "bytes": 2890455,
+      "sha256": "0d3879c1db95241982c6bf2291d284c70288702ed4dff469f2adaf9ee6e2ecf9"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2024-full.json": {
+      "bytes": 508,
+      "sha256": "e583c98b19b5cefe6cc1c7998348ab04e10edd3d3ccf046e263579879e3f5bad"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2024-screen.html": {
+      "bytes": 145748,
+      "sha256": "243b69d2a4d3771b6e51f0f4a0208f87ff84d35faef86c6c85e23e2137faa1c7"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2024-screen.json": {
+      "bytes": 542,
+      "sha256": "f17653dfa93667db01257ae1f3b4985e66fe0f0c53d9391e58b9df030f2645ba"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2024.parquet": {
+      "bytes": 435064,
+      "sha256": "502c9b8e367d0495999be3c3034f2a428cb5621c65499cbb1dd619257bd985e5"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2024.json": {
+      "bytes": 2090,
+      "sha256": "b71daa89755056f9fc9a50b6a6c9ca7fffbab32e386cc610d33f8c86cef9de1a"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2025-full.html": {
+      "bytes": 5206532,
+      "sha256": "44b95cbdbedef184ad0002a80d1176dbe37358e29ebcf867a0de49969f2252b5"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2025-full.json": {
+      "bytes": 542,
+      "sha256": "9b0ff11a8092df41acaa39ad76a9ef33ca17db72dc914880002b26787c0d7f17"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2025-full.html": {
+      "bytes": 3193677,
+      "sha256": "320066382d9585d551579f20b472a8b3d629030f6e1a84db01bb1a85301a16eb"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2025-full.json": {
+      "bytes": 508,
+      "sha256": "501366cc798172bc5a4c2b965bc8315c7b5088b259126b8983d41945bd425642"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2025-screen.html": {
+      "bytes": 145896,
+      "sha256": "d23ed8e317c5f20781e411bbdd6529b2596258b32000734228ebe5ad6fca8220"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2025-screen.json": {
+      "bytes": 542,
+      "sha256": "c49222cf7265c8d61a5adcab2980cf0d318bccb9b7269b296ae990018c332891"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2025.parquet": {
+      "bytes": 469398,
+      "sha256": "68dbef17ada4248df68450d6b71151d754b4466e0c37a1de93074df80d6c7c7e"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2025.json": {
+      "bytes": 2091,
+      "sha256": "e234335ca38796779a9cab378d1408742a9cca2afad9b917fa1db1439f999b5a"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2026-full.html": {
+      "bytes": 4105367,
+      "sha256": "411a7981cc7ecb3b60d6da6f612ae6a35502d0ef935dd67a3eeab844068b96c5"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2026-full.json": {
+      "bytes": 542,
+      "sha256": "359e230d4bb453f619abdc8724574d4c4483d9ada27f2dd37f8316e35e5a00e5"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2026-full.html": {
+      "bytes": 2527548,
+      "sha256": "b71a32ef4ea9e59bee9de5bba57f09d6b495959c56fbd9a6fafffab254fd6c83"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/annual-2026-full.json": {
+      "bytes": 508,
+      "sha256": "468b9306f67cc15361e7a9322dcc18b4d89155527fd7a14fc3d67e1ba2f0ebe8"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2026-screen.html": {
+      "bytes": 146368,
+      "sha256": "b06299af7380b2e7ca3dbea738ae3401f163d730aaa967370e1da7d8b2bd3016"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/raw/period-2026-screen.json": {
+      "bytes": 542,
+      "sha256": "271cc9def7a6b950d875abaf491ba6a55b3fadddf3c2bdc718aea0e1bd9f7069"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/year-2026.parquet": {
+      "bytes": 363412,
+      "sha256": "ac54cbd95f1e5980ae98d195ef4dd6e8122d7bc5c50ae0771ce6d1c3783c6219"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/checks/2026.json": {
+      "bytes": 2088,
+      "sha256": "fb99a94fbfb887d8e3aa0c401223382a243b708b8201fe836d3d952a5a30d301"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/annual-observations.parquet": {
+      "bytes": 5472892,
+      "sha256": "e463bf59cdb56469f93336c902ed1215ab759af216a3af2002f95c6c4723ce92"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/annual-observations.csv": {
+      "bytes": 34811753,
+      "sha256": "b1cdc000af96a4fba5e5637c494e2e4a2e1090b4a70c69cad96ce964c8c36630"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/collection-summary.json": {
+      "bytes": 369,
+      "sha256": "f94dde0c9858a41355661339ffa5a7796481affdbc28451b017225ff566ba060"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/result-review.json": {
+      "bytes": 14352,
+      "sha256": "e3d59faae4f8106e1c22ebb00dec48970d1cefa78aa2c3fbd14be4ede72fc0e0"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/result-review.md": {
+      "bytes": 1017,
+      "sha256": "908bf6f110848befbce8614ece25e3f2b5b338bd0a7ac230bda90bcfa1bc3ac0"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/archive-manifest.json": {
+      "bytes": 10918,
+      "sha256": "da677034c86dadd912b3508a9021b745655d9c495f6c0abe29b03ed9084acfea"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2004.parquet": {
+      "bytes": 70462,
+      "sha256": "7ed430ab1dada2cbe414a25289d887d5e5df79563336b667aa2bdde4836c56c8"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2005.parquet": {
+      "bytes": 88102,
+      "sha256": "62b6e4f9dcb753ece447cea49b80a7b441281b591d707fe73872599b72140608"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2006.parquet": {
+      "bytes": 99709,
+      "sha256": "7f00e95adc021921d300f4e489c7618b829f703fc72a80675c8a226a05753a24"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2007.parquet": {
+      "bytes": 131734,
+      "sha256": "96c859c6d51fcf21ec36720166e0849291dc5dc9d0b1adf98c68dfc6fb8a0df7"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2008.parquet": {
+      "bytes": 200536,
+      "sha256": "4f15e4530da19bfaca98f5ee9c5bbc7829d04897b09dfb7527c6c29483c7a11d"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2009.parquet": {
+      "bytes": 163243,
+      "sha256": "2f45961b1f4d740ff633e4f161d274908777d2c7b0227e81bbe6d24da6933208"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2010.parquet": {
+      "bytes": 185482,
+      "sha256": "5016011a6cbcb5c7dabde57cae1eadb84a101475ff58cb712e800fc62d3d9c5e"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2011.parquet": {
+      "bytes": 235245,
+      "sha256": "3fa8341ea08712cc905f01e7e7aad45f4b4ccfafb07ef2833630cd280a490421"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2012.parquet": {
+      "bytes": 308146,
+      "sha256": "cfb6e0c479e05ff86be15b6881eaa9d06bc3d4ec5895c1021ae6b95c3c8925e8"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2013.parquet": {
+      "bytes": 361623,
+      "sha256": "58601490b0952e6e9046110a98b313c002c3d4c1c18645e571d3d6974680a98e"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2014.parquet": {
+      "bytes": 367939,
+      "sha256": "a48c18b68b599bffbaccb8b881bd65f36291d66db544c2257b9d0a50359f409d"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2015.parquet": {
+      "bytes": 390263,
+      "sha256": "e43c534c2c6c2e0e33fd3be1622691172a48db82b23e53706e200599613dc0f4"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2016.parquet": {
+      "bytes": 465572,
+      "sha256": "0f87eb1b85434f22a3a5d817485bff832f44cc8a5b649cfffc7e9c13ad6cd742"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2017.parquet": {
+      "bytes": 473631,
+      "sha256": "65a7a451812ac6c2d9d71b8053acb35a85b25ba3554398e8cb60d4f36dd1eed6"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2018.parquet": {
+      "bytes": 501184,
+      "sha256": "e22995a52b13faf806763f875c0e8ed59e778ad4c7f63f92a0e13b167e88a021"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2019.parquet": {
+      "bytes": 516799,
+      "sha256": "88dad92703719fa0e77eaa049cbe47a77486e4f073027e7d787d36407c88589f"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2020.parquet": {
+      "bytes": 477426,
+      "sha256": "9acdda8e5d591f81991a9ab181604fafa8a728796e872998fcaa40f3764fc85c"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2021.parquet": {
+      "bytes": 490994,
+      "sha256": "f0e7b3329e46f851a07f0142a5e590a76f7aff56c06882b70408613c3e5ff94b"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2022.parquet": {
+      "bytes": 467423,
+      "sha256": "bd8c38813bf2c148cbef0dd4d54f9aaff10259fbac0e892df82e78cc9d308c4d"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2023.parquet": {
+      "bytes": 454280,
+      "sha256": "a863e593e17bf6adfe39b92a248337848d74e10c5046f17cac089240f1f3c45e"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2024.parquet": {
+      "bytes": 434712,
+      "sha256": "7f1d52e8f17dbf39356764f1a1ddd8bca00108b87548e467ed157bcf61a660e4"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2025.parquet": {
+      "bytes": 469276,
+      "sha256": "567b40db57c74e596f7d1118fe8669c2239133f6c9f4ee024b8e6a12156dae88"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/year-2026.parquet": {
+      "bytes": 363292,
+      "sha256": "5f47964f317115e69c756d9f634119d242898c2953f9f8d96caf49473317427e"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/annual-observations.parquet": {
+      "bytes": 5470809,
+      "sha256": "a9bbb11d145d33392290c723b34665ef72b5d205da847dcde745d133435822ff"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/annual-observations.csv": {
+      "bytes": 34808429,
+      "sha256": "56451b2e2d0e03c48f5b2e8c2f0a661877d563417eb82353313d5c2bfa1ffc78"
+    },
+    "outputs/recommendation-evidence/kobis-expanded-20260913/history/pre-text-repair/collection-summary.json": {
+      "bytes": 369,
+      "sha256": "beda591842a7aeb4201405b4b7b52f5e4c90143f5e5550da18f9f0bb96573892"
+    }
+  },
+  "auditor": {
+    "path": "scripts/audit_kobis_expanded.py",
+    "sha256": "f5ec238d8e38fda21931718a85e201f3149d8dbeb6c84cb5b18f2790f09de22e"
+  }
+}

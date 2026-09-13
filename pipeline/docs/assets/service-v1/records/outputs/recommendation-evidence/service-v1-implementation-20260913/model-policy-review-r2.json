@@ -1,0 +1,175 @@
+{
+  "status": "PASS",
+  "reviewRound": 2,
+  "reviewDate": "2026-09-13",
+  "reviewer": "/root/fm_gbt_service_fit",
+  "scope": "Incremental technical-model and policy consistency review of EVALUATION/MODELS changes. README changed evidence links also read. Statistical methodology approval belongs to separate reviewer.",
+  "previousReceipt": {
+    "path": "outputs/recommendation-evidence/service-v1-implementation-20260913/model-policy-review.json",
+    "sha256": "1f31c5c038980bc903c6e6e0fe22ecab32955f7052f989a337e320a5599c8cb3",
+    "bytes": 9360
+  },
+  "previousReceiptPreserved": true,
+  "previousReport": {
+    "path": "outputs/recommendation-evidence/service-v1-implementation-20260913/model-policy-review.md",
+    "sha256": "7441c5589c7010f4d995779ccabc6ed5eeea88ac40e77bc99b71739c7ff38779",
+    "bytes": 5614
+  },
+  "changedDocuments": [
+    {
+      "path": "docs/recommendation/service-v1-20260913/EVALUATION.md",
+      "previousSha256": "34c3aec2f267fe4693f3687dd284df78d7431dbf06b649f9bfc4c191a4b2ed0c",
+      "currentSha256": "5502936732e2580852cc58a8da27695a99b4eaacae39b7c9f4c3bdd7a10641d7"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/MODELS.md",
+      "previousSha256": "f88e92434263478041c01904ffb296b1aaf0d5e4bd36dc40a912dfa6544aac99",
+      "currentSha256": "ffd9f00873bc4db09ef96a2038e90b642d2fae788d0208ef57a13f130f0ab5ce"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/README.md",
+      "previousSha256": "544fa6b90b9e5b46fb5194f44000841fb05b4d8ceae57d4431e919630e7362cc",
+      "currentSha256": "96680b354dcaae01fafc12d1ce259e382a7e119ca4f6a1f5c563aa78741568fd"
+    }
+  ],
+  "unchangedDocumentCount": 9,
+  "reviewedFiles": [
+    {
+      "path": "docs/recommendation/service-v1-20260913/ACCEPTANCE.md",
+      "sha256": "18e9cbeb0cc60be38934e5e4c9e930418f970eb04ead27deda743155f3102362",
+      "bytes": 8737
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/config.v1.json",
+      "sha256": "042fbcff7f54d6342a3bcb89709b209aaab479744e03270fd3f368cf1e5f9916",
+      "bytes": 3153
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/CONTRACTS.md",
+      "sha256": "e67f937668ceaed3ae8308fde772d62df2c4288bb91b2c8cea30ddd989b26cf4",
+      "bytes": 34201
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/EVALUATION.md",
+      "sha256": "5502936732e2580852cc58a8da27695a99b4eaacae39b7c9f4c3bdd7a10641d7",
+      "bytes": 10743
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/feature-schema.v1.json",
+      "sha256": "1c4c8aef5cce42c0c4bc74d2d9f3e113a972d4b2ea521592760bde042d7f56ec",
+      "bytes": 40752
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/group-recipe.v1.json",
+      "sha256": "3fd587b1b74fdf9803dd5e93328081ea196848583e0b5ef3d015cf60e16df483",
+      "bytes": 14871
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/GROUPS.md",
+      "sha256": "ee210dea5bf6804d9940a8526b7273730fa96eae57b2986864c9695291c734c7",
+      "bytes": 10638
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/MODELS.md",
+      "sha256": "ffd9f00873bc4db09ef96a2038e90b642d2fae788d0208ef57a13f130f0ab5ce",
+      "bytes": 23137
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/OPERATIONS.md",
+      "sha256": "3e2e2031daa57ccfbc3291e2da84a1be9ed5823f41530e0364932c0d1bf0a0df",
+      "bytes": 22509
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/POLICY.md",
+      "sha256": "7c40466e59d46e8eddf353170e8a13b07ac90fb6bbda1b35615bfd96529c57e3",
+      "bytes": 15690
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/README.md",
+      "sha256": "96680b354dcaae01fafc12d1ce259e382a7e119ca4f6a1f5c563aa78741568fd",
+      "bytes": 8273
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/training-recipe.v1.json",
+      "sha256": "66a3cebafc5344f981431f4bd5ce2601cd26e1cc06a065f905b4cb84dd0f8c2a",
+      "bytes": 16847
+    }
+  ],
+  "reviewedSetHashEncoding": "SHA256 of UTF-8 compact JSON reviewedFiles array, ensure_ascii=false, sorted keys",
+  "reviewedSetSha256": "fd55322d558a06ddbf23a7d5f9438159b9f9e03875095cf792ea85cab3b987fd",
+  "checks": [
+    {
+      "id": "R2-01",
+      "status": "PASS",
+      "check": "Natural cap10 observed targets and Bn/B0 common supported rows agree with frozen history/target contract; training masks and service UNKNOWN are not substitute truths."
+    },
+    {
+      "id": "R2-02",
+      "status": "PASS",
+      "check": "ALS target factor-present strata are explicitly separate from actual ALS fold-in support and do not inject surrogate scores."
+    },
+    {
+      "id": "R2-03",
+      "status": "PASS",
+      "check": "KO_RESPONSE m>=2 and variance>1e-8 agree with KO15 response_estimable; country/low/only strata are evaluation partitions, not new feature values or additive bonuses."
+    },
+    {
+      "id": "R2-04",
+      "status": "PASS",
+      "check": "Bn required strata apply to selection45 and confirmation180, preserving fixed calibration45 and the no-refit/no-model-switch confirmation contract."
+    },
+    {
+      "id": "R2-05",
+      "status": "PASS",
+      "check": "B3 remains the only245 target; B1/B2 success, missing natural strata, or failed checks do not imply B3 READY."
+    },
+    {
+      "id": "R2-06",
+      "status": "PASS",
+      "check": "Per-draw relative MSE and zero/NA/infinite handling and CI endpoint rules change evaluation mechanics only, not raw model, clipping, features, or training labels."
+    },
+    {
+      "id": "R2-07",
+      "status": "PASS",
+      "check": "Training, feature and group recipes plus remaining core files are unchanged; existing37 static checks are reused without claiming rerun."
+    },
+    {
+      "id": "R2-08",
+      "status": "PASS",
+      "check": "README now links r2/evaluation/delivery review evidence and retains explicit not-trained/not-deployed scope."
+    },
+    {
+      "id": "R2-09",
+      "status": "PASS",
+      "check": "Final MODELS low-audience wording 1만 이상~100만 미만 equals EVALUATION KO_LOW lower inclusive10000 and upper exclusive1000000."
+    }
+  ],
+  "blockingFindings": [],
+  "reusedStaticEvidence": {
+    "path": "outputs/recommendation-evidence/service-v1-implementation-20260913/model-policy-review-static-checks.json",
+    "sha256": "fd7236b6aaf2d902412acf24d13c93951e6707bd4f3aa6334c5ee40955871596",
+    "bytes": 3483
+  },
+  "staticChecksRerun": false,
+  "independence": "This r2 does not assert independent statistical methodology approval or reapprove self-authored GROUPS; independent root group receipt remains valid because those files are unchanged.",
+  "readinessReminder": "Natural ALS/KOBIS target strata sample feasibility must be checked as specified before new model preparation; insufficiency leaves B3 NOT_READY. No sample feasibility or statistical power result was newly established here.",
+  "notExecuted": [
+    "source collection",
+    "training",
+    "feature transformation",
+    "group assignment",
+    "model inference",
+    "calibration fitting",
+    "performance evaluation",
+    "native-serving parity",
+    "runtime integration tests",
+    "deployment",
+    "external modifications"
+  ],
+  "passIsNot": [
+    "statistical methodology reviewer PASS",
+    "model readiness",
+    "2026 Korea satisfaction validation",
+    "execution test success"
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "status": "COLLECTION_AND_PROPOSAL_DATA_VALIDATED",
+  "created_at_utc": "2026-09-13T05:55:23.981354+00:00",
+  "screening_period": [
+    "2004-01-01",
+    "2026-09-12"
+  ],
+  "movie_year_observations": 72700,
+  "direct_kobis_code_rows": 2300,
+  "direct_kobis_codes": 2176,
+  "confirmed_tmdb_cross_source_ids": 0,
+  "links_are_proposals": true,
+  "new_model_training": false,
+  "runtime": {
+    "python": "3.12.5",
+    "pandas": "2.2.3",
+    "pyarrow": "23.0.1"
+  },
+  "files": [
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\result-review.json",
+      "bytes": 88536,
+      "sha256": "15def26da5e532440877e68da5c7e12b428a14806aeded9167f1c3727f97a9e4"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\result-link-v2-review.json",
+      "bytes": 4914,
+      "sha256": "58e4acc7682018170b70d8490dda205ff1480126fc1cd57f98f108c7f2a3e398"
+    },
+    {
+      "path": "<research-root>\\docs\\research\\kobis-expanded-20260913\\REPORT.md",
+      "bytes": 5934,
+      "sha256": "a6edef9e3f338fbe78b7e118447ae09bc5d5fd05b30f0c154ba32ccc9cb5af43"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\annual-observations.parquet",
+      "bytes": 5472892,
+      "sha256": "e463bf59cdb56469f93336c902ed1215ab759af216a3af2002f95c6c4723ce92"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\annual-observations.csv",
+      "bytes": 34811753,
+      "sha256": "b1cdc000af96a4fba5e5637c494e2e4a2e1090b4a70c69cad96ce964c8c36630"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\manifest.json",
+      "bytes": 3770,
+      "sha256": "4311b71dfb6b28a83e8be402992dceec4fa955ab336bcc126ba2e5eab60e00f9"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\summary.json",
+      "bytes": 23738,
+      "sha256": "72a3bfae8443851dc3cdb7c245531479f64f2a8855baffe83b5c6619f7fa2276"
+    },
+    {
+      "path": "<research-root>\\scripts\\collect_kobis_expanded.py",
+      "bytes": 9993,
+      "sha256": "ce9982c3ee497e05fef6405672abd64007d006f4abfd026241d2ff8740fc52f8"
+    },
+    {
+      "path": "<research-root>\\scripts\\link_kobis_expanded.py",
+      "bytes": 28384,
+      "sha256": "67efc1ef2427931f828ecc7d8c97b2a78ffad711f74695b25b47893cee76ed97"
+    },
+    {
+      "path": "<research-root>\\scripts\\audit_kobis_expanded.py",
+      "bytes": 25091,
+      "sha256": "f5ec238d8e38fda21931718a85e201f3149d8dbeb6c84cb5b18f2790f09de22e"
+    },
+    {
+      "path": "<research-root>\\scripts\\kobis_movie_statistics.py",
+      "bytes": 9560,
+      "sha256": "af0a30ecd656e537d2a9b0b9b7d2d65b2e0b21a95552ba2df831fa6bfadb1c45"
+    }
+  ],
+  "superseded_outputs": [
+    "linked/",
+    "history/pre-text-repair/"
+  ],
+  "authoritative_report": "<research-root>\\docs\\research\\kobis-expanded-20260913\\REPORT.md"
+}

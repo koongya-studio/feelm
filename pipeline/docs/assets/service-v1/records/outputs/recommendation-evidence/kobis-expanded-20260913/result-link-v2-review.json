@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "review_id": "kobis-expanded-20260913-linked-v2-result-review",
+  "status": "PASS",
+  "reviewed_at_utc": "2026-09-13T05:54:30Z",
+  "reviewer": "/root/als_final_comparison_audit",
+  "scope": "Independent result audit of the corrected local KOBIS identity and cross-source proposal outputs. This validates reproducibility, preservation, counts, and proposal boundaries; it does not verify proposed cross-source identities or establish recommendation performance.",
+  "approval_chain": {
+    "collection_result_review": {
+      "path": "outputs/recommendation-evidence/kobis-expanded-20260913/result-review.json",
+      "bytes": 88536,
+      "sha256": "15def26da5e532440877e68da5c7e12b428a14806aeded9167f1c3727f97a9e4",
+      "status": "PASS"
+    },
+    "link_v2_execution_review": {
+      "path": "outputs/recommendation-evidence/kobis-expanded-20260913/link-v2-execution-review.json",
+      "bytes": 4915,
+      "sha256": "4ac719dc91a81f07f1f9381a82acda0fd3536e80f3f65ca49e09a12ff961bf78",
+      "status": "PASS"
+    }
+  },
+  "reviewed_manifest": {
+    "path": "outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/manifest.json",
+    "bytes": 3770,
+    "sha256": "4311b71dfb6b28a83e8be402992dceec4fa955ab336bcc126ba2e5eab60e00f9",
+    "all_source_pins_match_current_files": true,
+    "all_output_pins_match_current_files": true,
+    "script_sha256": "67efc1ef2427931f828ecc7d8c97b2a78ffad711f74695b25b47893cee76ed97",
+    "corrected_collection_sha256": "e463bf59cdb56469f93336c902ed1215ab759af216a3af2002f95c6c4723ce92",
+    "new_network_requests": 0,
+    "new_model_training": false
+  },
+  "artifact_parity": {
+    "linked_observations_csv_equals_parquet_regeneration": true,
+    "confirmed_movie_comparison_csv_equals_parquet_regeneration": true,
+    "yearly_coverage_csv_equals_summary_regeneration": true,
+    "nation_coverage_csv_equals_summary_regeneration": true,
+    "report_key_counts_and_claim_boundaries_match_summary": true
+  },
+  "independent_recalculation": {
+    "original_observation_rows": 72700,
+    "original_columns_and_values_frame_equal": true,
+    "direct_source_code_rows": 2300,
+    "resolved_kobis_code_rows": 2300,
+    "resolved_code_nonnull_if_and_only_if_direct": true,
+    "unique_kobis_code_proposal_rows": 2682,
+    "resolved_and_proposed_overlap": 0,
+    "direct_kobis_movie_rollups": 2176,
+    "direct_observations_used_by_rollups": 2300,
+    "rollup_counts_equal_direct_rows_by_code": true,
+    "latest_period_cumulative_values_recomputed_from_direct_rows_equal": true,
+    "tmdb_proposal_status_counts": {
+      "PROPOSED_UNIQUE": 1792,
+      "NO_VERIFIED_TMDB_CANDIDATE": 379,
+      "AMBIGUOUS_TMDB_CANDIDATES": 3,
+      "MULTIPLE_KOBIS_CODES_ONE_TMDB_REQUIRES_REVIEW": 2
+    },
+    "confirmed_cross_source_tmdb_ids": 0,
+    "all_confirmed_tmdb_service_movielens_ids_and_attached_values_null": true,
+    "ambiguous_tmdb_rows": 3,
+    "ambiguous_rows_with_nonempty_candidate_to_source_evidence": 3,
+    "code_unresolved_rows_with_unique_tmdb_proposal": 13779,
+    "row_tmdb_proposal_confirmed_true_count": 0,
+    "yearly_coverage_observation_sum": 72700,
+    "nation_coverage_movie_sum": 2176
+  },
+  "superseded_history": {
+    "prior_linked_directory": "outputs/recommendation-evidence/kobis-expanded-20260913/linked",
+    "prior_result_review": {
+      "path": "outputs/recommendation-evidence/kobis-expanded-20260913/result-link-review.json",
+      "sha256": "a1bfb2874ca53c583c1c2f0d966b218bbf7f5b90186e648ce1fa7dc452b7e4fe",
+      "status": "REVISION_REQUIRED"
+    },
+    "preserved_and_not_used_as_v2_input": true
+  },
+  "interpretation_limits": [
+    "The 2,176 movie entities are KOBIS codes directly observed on official screens; the 70,400 code-free rows are observations, not a unique-film count.",
+    "The 2,682 KOBIS and 13,779 row-level TMDB similarities are proposals only and do not enter confirmed movie rollups.",
+    "PROPOSED_UNIQUE means one catalog candidate under the documented metadata rule, not a shared-ID or manual identity verification.",
+    "No TMDB, service, or MovieLens identity is confirmed by this output, and no MovieLens rating is attached to a proposal.",
+    "Last-observed cumulative values use only direct-code rows at their recorded period_end and are neither current values nor complete original-lifetime totals.",
+    "This result contains no model training, recommendation lift, Korean-user preference validation, or service-readiness evidence."
+  ],
+  "blocking_findings": [],
+  "final_assessment": "PASS. linked-v2 exactly preserves the independently audited 72,700-row corrected collection, restricts confirmed KOBIS movie rollups to 2,300 direct-code observations, keeps all metadata-based KOBIS and TMDB identities as auditable proposals, leaves every cross-source confirmed ID and attached rating value null, and matches its pinned manifest, CSV/Parquet pairs, summary, and report."
+}

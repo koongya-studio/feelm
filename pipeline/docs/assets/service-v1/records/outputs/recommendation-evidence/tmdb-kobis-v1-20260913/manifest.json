@@ -1,0 +1,160 @@
+{
+  "status": "GENERATED_PENDING_INDEPENDENT_RESULT_REVIEW",
+  "fingerprint": {
+    "script": {
+      "path": "<research-root>\\scripts\\report_tmdb_kobis_v1.py",
+      "bytes": 33858,
+      "sha256": "70b68473201c31147d8865a658b8093f4a82b77748f37e441682798dfe7ab420"
+    },
+    "design": {
+      "path": "<research-root>\\docs\\research\\tmdb-kobis-v1-20260913\\DESIGN.md",
+      "bytes": 5182,
+      "sha256": "2f50f606b5d546bd09142deaa0107371fdbcf29267fd09e9a68ba8013ae33ac1"
+    }
+  },
+  "inputs": [
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-service-final-20260913\\movie-comparison.parquet",
+      "bytes": 76524,
+      "sha256": "9969d47da9298b736211caccefc946b131c311b1c11290eff1d3dad08c6f3c68"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\presentation-data-20260913\\movie-rating-aggregates.parquet",
+      "bytes": 3114038,
+      "sha256": "b552b85ddad2a73a315ce2f176e79f6410807cbb4fa8ee241bfd8acbdca8524e"
+    },
+    {
+      "path": "<MOVIELENS_ARCHIVE>",
+      "bytes": 238950008,
+      "sha256": "e4a68655d7386b8f95f2f2424b2ff975dfdd15ffd59e0d864a14dca43e99d6ee"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-service-final-20260913\\manifest.json",
+      "bytes": 3833,
+      "sha256": "f2f01b5c61b118feeb85d656a37e32408b8bea8aa6c362c0a9657cb08172df09"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-service-final-audit-20260913\\result-review.json",
+      "bytes": 5734,
+      "sha256": "8db52c1076f22cba7521a407d43863fdc67b018bdd6369944116d3ec6d1fd3b5"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-service-final-audit-20260913\\sensitivity-b.json",
+      "bytes": 15184,
+      "sha256": "31fdd74502dfe8bd0068f4e4d39a9676165d5182ed7a0460de21452d914824a4"
+    },
+    {
+      "path": "<research-root>\\docs\\research\\tmdb-kobis-v1-20260913\\execution-review.json",
+      "bytes": 1334,
+      "sha256": "680b92b43a7ff81a241518e5baad0ddeb805f83390ad9b68ad7b3c803ce50a82"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "<research-root>\\docs\\research\\tmdb-kobis-v1-20260913\\data\\01-counts-and-ratios.png",
+      "bytes": 213662,
+      "sha256": "1c05b06e85d16a93c8a5404215860023cf3b103b7ddc5135828e45e40ef4f3b3"
+    },
+    {
+      "path": "<research-root>\\docs\\research\\tmdb-kobis-v1-20260913\\data\\01-counts-and-ratios.svg",
+      "bytes": 89221,
+      "sha256": "c738a0b1789bd2922e18aba5229433779151138f32d55f3f5b115341c4649cee"
+    },
+    {
+      "path": "<research-root>\\docs\\research\\tmdb-kobis-v1-20260913\\data\\02-scale-imbalance.png",
+      "bytes": 111585,
+      "sha256": "6df096c73e017b794a7069db56cd236c94f0650d0fa87343ab701225ba77d8bf"
+    },
+    {
+      "path": "<research-root>\\docs\\research\\tmdb-kobis-v1-20260913\\data\\02-scale-imbalance.svg",
+      "bytes": 21533,
+      "sha256": "c17da094afd2e55c30d54ee1a0d5f2e909aa720039ff0fd8ba0710653fe84d3e"
+    },
+    {
+      "path": "<research-root>\\docs\\research\\tmdb-kobis-v1-20260913\\data\\03-rating-relations.png",
+      "bytes": 234269,
+      "sha256": "6f69dfbf6babe91a4f0c3bcba2ae0c90703ba784f91cd84ad23a8da3d706f92e"
+    },
+    {
+      "path": "<research-root>\\docs\\research\\tmdb-kobis-v1-20260913\\data\\03-rating-relations.svg",
+      "bytes": 139380,
+      "sha256": "81912fb141623276df56945d20a041fbd3042367e3864f5325643b6be683a2ef"
+    },
+    {
+      "path": "<research-root>\\docs\\research\\tmdb-kobis-v1-20260913\\data\\04-rating-dispersion.png",
+      "bytes": 136749,
+      "sha256": "7068f2de75a66ecd604b4fadfe3c7d227264b6e5965a4f059c2d1b8897814f72"
+    },
+    {
+      "path": "<research-root>\\docs\\research\\tmdb-kobis-v1-20260913\\data\\04-rating-dispersion.svg",
+      "bytes": 25647,
+      "sha256": "c360d78aaefd899e7afbf9c89f92e5710c4d45cf9d4973380727e844359396f5"
+    },
+    {
+      "path": "<research-root>\\docs\\research\\tmdb-kobis-v1-20260913\\data\\between-film-rating-distributions.csv",
+      "bytes": 2845,
+      "sha256": "0ae00d35a4c1c037af3aee4545e8dd8ce057e731007be0cb93574067fd14389d"
+    },
+    {
+      "path": "<research-root>\\docs\\research\\tmdb-kobis-v1-20260913\\data\\count-and-rating-relations.csv",
+      "bytes": 7797,
+      "sha256": "48fce8b412ca4bd65f53794bd1973d65c9b97711cb0a54ccd058bf0ae1ae02cd"
+    },
+    {
+      "path": "<research-root>\\docs\\research\\tmdb-kobis-v1-20260913\\data\\coverage.csv",
+      "bytes": 425,
+      "sha256": "55f8b56a663de25327e51492a4ee7bdc3ffcb3f4a94f5bb9f5d4ee04d3a8a3b5"
+    },
+    {
+      "path": "<research-root>\\docs\\research\\tmdb-kobis-v1-20260913\\data\\movielens-same-film-rating-sd.csv",
+      "bytes": 88020,
+      "sha256": "066e2b429f8141df28cf47892c8ddc5b6ea717bd9cb3b640e877f30d97cd99cb"
+    },
+    {
+      "path": "<research-root>\\docs\\research\\tmdb-kobis-v1-20260913\\data\\tmdb-kobis-pairs.csv",
+      "bytes": 82792,
+      "sha256": "ceb0bae58844ae020a61a0ae4fbca4242b041296630c73684c5f019b39d68f7f"
+    },
+    {
+      "path": "<research-root>\\docs\\research\\tmdb-kobis-v1-20260913\\data\\within-film-ml-sd-distributions.csv",
+      "bytes": 1693,
+      "sha256": "80276b22a4ff00b10c2de60b45538839d449650c5217e7e7a889fb0e6ebff4b4"
+    },
+    {
+      "path": "<research-root>\\docs\\research\\tmdb-kobis-v1-20260913\\REPORT.md",
+      "bytes": 9616,
+      "sha256": "bf2a236efda13bec9c8323e781ad52b5298e3ae18701f6b0596358f68d6e1d36"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\tmdb-kobis-v1-20260913\\summary.json",
+      "bytes": 660,
+      "sha256": "044fe3bc82679076441551c07a300fc4dae3c6521ec50b58465394a08ef66cc5"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\tmdb-kobis-v1-20260913\\raw-ml-sd-scan.json",
+      "bytes": 405,
+      "sha256": "fb8d051b8d306a39b424fa2e5f1a79337a90a2cb5c48117424600a5b1d62bc6e"
+    }
+  ],
+  "analysis_scope": "Descriptive existing-data analysis; no recommender superiority or population causal claim",
+  "render_fix": {
+    "record": {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\tmdb-kobis-v1-20260913\\render-history\\render-fix.json",
+      "bytes": 6399,
+      "sha256": "530a65ae0a509ed7546c2e2eb022b511f2e8ea272ba450d4cafa129dd642c753"
+    },
+    "initial_manifest": {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\tmdb-kobis-v1-20260913\\render-history\\initial-manifest.json",
+      "bytes": 6744,
+      "sha256": "4ae7c9bf01023ac1ac830edcead52ab5b83f06af56661d8a845da4da32f7ce55"
+    },
+    "canonical_report": "<research-root>\\docs\\research\\tmdb-kobis-v1-20260913\\REPORT.md",
+    "canonical_figure_directory": "<research-root>\\docs\\research\\tmdb-kobis-v1-20260913\\data",
+    "numerical_csv_hashes_unchanged": true,
+    "changed_files": [
+      "01-counts-and-ratios.png",
+      "01-counts-and-ratios.svg"
+    ],
+    "independent_result_review": "PENDING"
+  }
+}

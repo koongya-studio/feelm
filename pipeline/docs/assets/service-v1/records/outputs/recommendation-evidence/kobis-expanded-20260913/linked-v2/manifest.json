@@ -1,0 +1,75 @@
+{
+  "sources": [
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\annual-observations.parquet",
+      "bytes": 5472892,
+      "sha256": "e463bf59cdb56469f93336c902ed1215ab759af216a3af2002f95c6c4723ce92"
+    },
+    {
+      "path": "<research-root>\\.codex-tmp\\fixed-k8-discovery-v2-20260913\\outputs\\fixed-k8-discovery-v2\\feelm-discovery-v2-r2\\prepare\\catalog.parquet",
+      "bytes": 42113282,
+      "sha256": "8bda180eb6530188a6ebf08da599d4d68124247a878ca0911f0d3f38512415cd"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\presentation-data-20260913\\movie-rating-aggregates.parquet",
+      "bytes": 3114038,
+      "sha256": "b552b85ddad2a73a315ce2f176e79f6410807cbb4fa8ee241bfd8acbdca8524e"
+    },
+    {
+      "path": "<research-root>\\scripts\\link_kobis_expanded.py",
+      "bytes": 28384,
+      "sha256": "67efc1ef2427931f828ecc7d8c97b2a78ffad711f74695b25b47893cee76ed97"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\collection-summary.json",
+      "bytes": 369,
+      "sha256": "f94dde0c9858a41355661339ffa5a7796481affdbc28451b017225ff566ba060"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\confirmed-movie-comparison.csv",
+      "bytes": 974554,
+      "sha256": "38ec5d5e2d03a553fc463576541fccdb0200d7f6217ab519183a8cdc5be088d9"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\confirmed-movie-comparison.parquet",
+      "bytes": 253672,
+      "sha256": "96aa2b6377c3f450e5021ae7cf43829550ee27187108493693a9d06ddae61f46"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\linked-observations.csv",
+      "bytes": 43146150,
+      "sha256": "ec9b72d09e836ddf3b82db5c0381c3196c8d9891bb6f5688823ab5b00153e63b"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\linked-observations.parquet",
+      "bytes": 5730764,
+      "sha256": "7ab2e64096ab225f8fc371098d69c2b668ba5e96a6d5de60a480df4b4b595dfd"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\nation-link-coverage.csv",
+      "bytes": 633,
+      "sha256": "d4ce371fbbdf46cb8af27e87e340d254157ee140bc7c4003516279c795178662"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\REPORT.md",
+      "bytes": 2237,
+      "sha256": "b85d1c1d32dd50137fb506cd4f69c385f09faed94dca6380f8c3b54eaa4a8569"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\summary.json",
+      "bytes": 23738,
+      "sha256": "72a3bfae8443851dc3cdb7c245531479f64f2a8855baffe83b5c6619f7fa2276"
+    },
+    {
+      "path": "<research-root>\\outputs\\recommendation-evidence\\kobis-expanded-20260913\\linked-v2\\yearly-link-coverage.csv",
+      "bytes": 1814,
+      "sha256": "9e8f17d1fdbbd9047c8b0a9ed8985e2eca33f8b7f0f9504c86e793a4dd9fa531"
+    }
+  ],
+  "created_at_utc": "2026-09-13T05:53:24.926733+00:00",
+  "new_network_requests": 0,
+  "new_model_training": false,
+  "country_rule_version": "explicit-korean-country-labels-v1-no-unknown-inference"
+}
