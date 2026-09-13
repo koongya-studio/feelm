@@ -65,14 +65,29 @@ export const ROUTE_PATTERN = {
   blockedUsers: '/my/settings/blocks',
 
   /*
-   * 7.1 메뉴가 가리키는 화면 중 아직 만들지 않은 것(7.3).
-   * 308 몫이며 지금은 `NotInScopePage`로 간다.
-   *
-   * 경로를 미리 두는 이유는 **7.1 → 각 화면 이동 자체가 검증 대상**이기 때문이다
-   * (screen-spec-my.md 2장 13번). 경로가 없으면 `*`에 걸려 404로 떨어져서
-   * `아직 안 만든 화면`과 `잘못된 주소`가 구분되지 않는다.
+   * 취향 리포트 (업무 -308). 같은 리포트를 두 길로 본다.
+   * - 필름 쪽: 2.1 → 3.3 새 리포트 발급 → 3.4 상세. `/reports` 아래
+   * - MY 쪽: 7.1 · 3.1 → 7.3 목록 → 7.4 상세. `/my/reports` 아래라 하단 탭이 MY로 남는다
+   * 3.5 공유는 3.4 · 7.4 위의 시트라 경로가 없다
    */
   tasteReports: '/my/reports',
+  myReport: '/my/reports/:reportId',
+  reportIssued: '/reports/:reportId/new',
+  report: '/reports/:reportId',
+
+  // 알림 (업무 -308). 8.2는 OS 잠금화면 예시라 들어오는 화살표가 없다. 주소로만 연다
+  notifications: '/notifications',
+  pushPreview: '/notifications/push-preview',
+
+  /*
+   * 나에게 맞는 OTT 찾기 (업무 -308). EXT-01 ~ EXT-05. API-068은 확장 단계라 목업이다.
+   * `analyzing` · `result` · `insufficient`는 고정 경로라 `:ottId`보다 먼저 맞는다
+   */
+  ottFinder: '/otts/recommend',
+  ottAnalyzing: '/otts/recommend/analyzing',
+  ottResult: '/otts/recommend/result',
+  ottInsufficient: '/otts/recommend/insufficient',
+  ottResultDetail: '/otts/recommend/:ottId',
 
   // 전체화면 (하단 내비 없음)
   movieDetail: '/movies/:movieId',
@@ -134,6 +149,16 @@ export const path = {
   notificationSettings: () => ROUTE_PATTERN.notificationSettings,
   blockedUsers: () => ROUTE_PATTERN.blockedUsers,
   tasteReports: () => ROUTE_PATTERN.tasteReports,
+  myReport: (reportId: string | number) => `/my/reports/${reportId}`,
+  reportIssued: (reportId: string | number) => `/reports/${reportId}/new`,
+  report: (reportId: string | number) => `/reports/${reportId}`,
+  notifications: () => ROUTE_PATTERN.notifications,
+  pushPreview: () => ROUTE_PATTERN.pushPreview,
+  ottFinder: () => ROUTE_PATTERN.ottFinder,
+  ottAnalyzing: () => ROUTE_PATTERN.ottAnalyzing,
+  ottResult: () => ROUTE_PATTERN.ottResult,
+  ottInsufficient: () => ROUTE_PATTERN.ottInsufficient,
+  ottResultDetail: (ottId: string | number) => `/otts/recommend/${ottId}`,
 
   movieDetail: (movieId: string | number) => `/movies/${movieId}`,
   movieRating: (movieId: string | number) => `/movies/${movieId}/rate`,

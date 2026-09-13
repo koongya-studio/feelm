@@ -38,7 +38,14 @@ import RecommendationHistoryPage from '../pages/my/RecommendationHistoryPage';
 import SettingsPage from '../pages/my/SettingsPage';
 import WithdrawPage from '../pages/my/WithdrawPage';
 import TasteComparePage from '../pages/my/TasteComparePage';
+import NotificationListPage from '../pages/notifications/NotificationListPage';
+import PushPreviewPage from '../pages/notifications/PushPreviewPage';
+import OttAnalyzingPage from '../pages/otts/OttAnalyzingPage';
+import OttFinderPage from '../pages/otts/OttFinderPage';
+import OttInsufficientPage from '../pages/otts/OttInsufficientPage';
 import OttManagePage from '../pages/otts/OttManagePage';
+import OttResultDetailPage from '../pages/otts/OttResultDetailPage';
+import OttResultPage from '../pages/otts/OttResultPage';
 import MovieDetailPage from '../pages/movies/MovieDetailPage';
 import MovieRatingPage from '../pages/movies/MovieRatingPage';
 import RatingResultPage from '../pages/movies/RatingResultPage';
@@ -55,9 +62,11 @@ import PartySetupPage from '../pages/party/PartySetupPage';
 import PartySizePage from '../pages/party/PartySizePage';
 import PartyPopcornPage from '../pages/party/PartyPopcornPage';
 import RecommendationsPage from '../pages/recommendations/RecommendationsPage';
+import ReportDetailPage from '../pages/reports/ReportDetailPage';
+import ReportIssuedPage from '../pages/reports/ReportIssuedPage';
+import ReportListPage from '../pages/reports/ReportListPage';
 import SearchPage from '../pages/search/SearchPage';
 import NotFoundPage from '../pages/system/NotFoundPage';
-import NotInScopePage from '../pages/system/NotInScopePage';
 import WatchConfirmPage from '../pages/watch/WatchConfirmPage';
 import { ROUTE_PATTERN } from './paths';
 
@@ -106,12 +115,8 @@ export const router = createBrowserRouter(
         { path: ROUTE_PATTERN.myRatings, element: <MyRatingsPage tab="rated" /> },
         { path: ROUTE_PATTERN.unratedMovies, element: <MyRatingsPage tab="unrated" /> },
 
-        /*
-         * 7.1 메뉴가 가리키는 화면 중 308 몫(7.3).
-         * 경로를 두는 이유는 paths.ts 주석에 적었다 — `아직 안 만든 화면`과
-         * `잘못된 주소`가 구분돼야 이동 경로를 검증할 수 있다.
-         */
-        { path: ROUTE_PATTERN.tasteReports, element: <NotInScopePage /> },
+        // 7.3 취향 리포트 목록 (업무 -308). 와이어프레임이 하단 내비를 그렸다
+        { path: ROUTE_PATTERN.tasteReports, element: <ReportListPage /> },
 
         // 7.8 설정 (업무 -307). 와이어프레임이 하단 내비를 그린 유일한 설정 화면이다
         { path: ROUTE_PATTERN.settings, element: <SettingsPage /> },
@@ -146,6 +151,18 @@ export const router = createBrowserRouter(
         { path: ROUTE_PATTERN.privacySettings, element: <PrivacySettingsPage /> },
         { path: ROUTE_PATTERN.notificationSettings, element: <NotificationSettingsPage /> },
         { path: ROUTE_PATTERN.blockedUsers, element: <BlockedUsersPage /> },
+
+        // 취향 리포트 · 알림 · OTT 찾기 (업무 -308). 와이어프레임에 하단 내비가 없다
+        { path: ROUTE_PATTERN.reportIssued, element: <ReportIssuedPage /> },
+        { path: ROUTE_PATTERN.report, element: <ReportDetailPage from="film" /> },
+        { path: ROUTE_PATTERN.myReport, element: <ReportDetailPage from="my" /> },
+        { path: ROUTE_PATTERN.notifications, element: <NotificationListPage /> },
+        { path: ROUTE_PATTERN.pushPreview, element: <PushPreviewPage /> },
+        { path: ROUTE_PATTERN.ottFinder, element: <OttFinderPage /> },
+        { path: ROUTE_PATTERN.ottAnalyzing, element: <OttAnalyzingPage /> },
+        { path: ROUTE_PATTERN.ottResult, element: <OttResultPage /> },
+        { path: ROUTE_PATTERN.ottInsufficient, element: <OttInsufficientPage /> },
+        { path: ROUTE_PATTERN.ottResultDetail, element: <OttResultDetailPage /> },
         { path: ROUTE_PATTERN.notFound, element: <NotFoundPage /> },
       ],
     },

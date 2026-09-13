@@ -26,8 +26,13 @@
  * | introduction | 7.2 한 줄 소개 · 7.2-A · 7.2-B 소개 문구 | 와이어프레임에 없고 레퍼런스 지시로 추가. 계약에 자리가 없음. CR 미등록 |
  * | RecommendationHistoryItemView.ott | 7.5 `8. 24 · 넷플릭스` | API-048 `movie`에 OTT가 없음. 제공처가 여럿일 때 기준도 없음. CR 미등록 |
  * | NotificationSettingsView.PARTY_INVITE · REPORT | 7.8-C `파티 초대 알림` · `리포트 발급 알림` | API-017 NotificationType에 없음. CR 미등록 |
+ * | ReportDetailView | 3.3 · 3.4 · 7.4 국가 · 시대 비율 · 키워드 근거 · 지난 반기 비교 % · 대표 카드 문구 | API-060에 없음. 장르는 편수만, 비교는 맛별 알 수만 줌. CR 미등록 |
+ * | NotificationView | 8.1 알림 4종 · 탭 · 읽음 | 알림 목록 API가 없음. ADR-0011은 API-034 · API-052 폴링. CR 미등록 |
+ * | OttRecommendationView | EXT-01 ~ EXT-05 일치도 % · 이유 · 항목별 일치도 · 분석 요약 | API-068은 `matchCount`만 줌. **확장 단계**. CR 미등록 |
  * | PrivacySettingsView | 7.8-B 항목 4개 × `전체 공개 · 파티원만 · 비공개` | 계약은 프로필 `visibility` 하나 · 2단계(API-015). CR 미등록 |
  */
+import type { OttRecommendationItem } from './ott';
+import type { ReportDetail } from './report';
 import type { FrameDetail } from './taste';
 import type { NotificationSettings } from './user';
 import type { Party } from './party';
@@ -279,4 +284,76 @@ export type RecommendationHistorySetView = Omit<RecommendationHistorySet, 'items
 
 export type RecommendationHistoryView = Omit<RecommendationHistory, 'items'> & {
   items: RecommendationHistorySetView[];
+};
+
+/** 3.4 · 7.4 비율 한 줄. `share`는 0~100 */
+export type ReportShare = { label: string; share: number };
+
+/**
+ * 3.3 · 3.4 · 7.4 취향 리포트 상세. API-060 + 와이어프레임에만 있는 값.
+ *
+ * 팀 결정 2026-09-13(업무 -308): 와이어프레임대로 그린다. API-060은 장르를 **편수**로만 주고
+ * 국가 · 시대 · 키워드 · 지난 반기와의 비교 %가 없다. 비교는 맛별 알 수(`flavorChanges`)뿐이다.
+ */
+export type ReportDetailView = ReportDetail & {
+  /** 3.3 · 3.4 · 7.4 4컷의 네 칸. 장르 · 감독 · 배우 · 캐릭터의 대표값 */
+  headline: { genre: string; director: string; actor: string; character: string };
+  genreShares: ReportShare[];
+  countryShares: ReportShare[];
+  eraShares: ReportShare[];
+  keywords: TasteKeywordView[];
+  /** 지난 반기와 비교. `isNew`면 `+4% 신규`처럼 적는다 */
+  comparisons: { label: string; delta: number; isNew: boolean }[];
+  /** 3.3 발급 화면의 요약 세 줄 */
+  highlights: string[];
+};
+
+/**
+ * 8.1 알림 한 건. **계약에 알림 목록이 없다**(ADR-0011은 폴링).
+ *
+ * 와이어프레임 4종을 그대로 둔다(팀 결정 2026-09-13). 누르면 가는 곳은 이동표를 따른다 —
+ * 감상 확인 2.4-A · 파티 초대 5.6 · 오늘의 추천 2.2 · 필름 추가 3.1.
+ */
+export type NotificationView = {
+  notificationId: number;
+  type: 'WATCH_CONFIRM' | 'PARTY_INVITE' | 'RECOMMENDATION' | 'FRAME_ADDED';
+  title: string;
+  body: string;
+  createdAt: string;
+  read: boolean;
+  /** 감상 기록 · 초대 번호. 오늘의 추천 · 필름 추가는 목적지가 하나라 없다 */
+  targetId: number | null;
+};
+
+/**
+ * EXT-03 · EXT-04 OTT 한 곳. API-068 항목 + 와이어프레임에만 있는 값.
+ *
+ * 팀 결정 2026-09-13(업무 -308): 와이어프레임대로 그린다. 계약은 `matchCount`(편수)로만
+ * 순위를 매긴다. 일치도 % · 장르 요약 · 이유 · 항목별 일치도는 산출 규칙이 없다.
+ */
+export type OttRecommendationItemView = OttRecommendationItem & {
+  /** 콘텐츠 취향 일치도(%) */
+  matchRate: number;
+  /** `액션 · 스릴러` */
+  genreSummary: string;
+  /** EXT-03 1위 카드의 한 줄 */
+  headline: string;
+  reasons: string[];
+  itemRates: { label: string; rate: number }[];
+};
+
+/** EXT-01 분석 요약 · EXT-05 진행도. 계약에 없다 */
+export type OttAnalysisBasis = {
+  watchedCount: number;
+  ratingCount: number;
+  favoriteGenres: string;
+  frequentActor: string;
+  /** 분석에 필요한 최소 평가 수. 와이어프레임 EXT-05의 10 */
+  requiredRatingCount: number;
+};
+
+export type OttRecommendationView = {
+  insufficientData: boolean;
+  aggregatedAt: string;
+  items: OttRecommendationItemView[];
 };

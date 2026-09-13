@@ -299,3 +299,18 @@ export function CameraIcon() {
     </svg>
   );
 }
+
+/** 3.4 · 7.4 취향 리포트 — 공유하기 (업무 -308. 와이어프레임 헤더 오른쪽 아이콘) */
+export function ShareIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" {...hidden}>
+      <path
+        d="M8 10V2M5 4.8L8 2l3 2.8M3 8.5v4.2c0 .7.6 1.3 1.3 1.3h7.4c.7 0 1.3-.6 1.3-1.3V8.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
