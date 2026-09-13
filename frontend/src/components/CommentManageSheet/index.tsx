@@ -20,8 +20,10 @@
  */
 import { useEffect, useId, useRef, useState } from 'react';
 import Button from '../Button';
+import ConfirmDialog from '../ConfirmDialog';
 import Poster from '../Poster';
 import RatingStars from '../RatingStars';
+import Switch from '../Switch';
 import TextArea from '../TextArea';
 import { updateRating } from '../../api/watch';
 import styles from './CommentManageSheet.module.css';
@@ -47,36 +49,22 @@ export default function CommentManageSheet({ movie, rating, onClose, onSaved }: 
 
   const id = useId();
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const confirmRef = useRef<HTMLDivElement>(null);
 
   // 시트가 열리면 초점을 안으로 들인다. 밖에 두면 뒤 목록을 계속 읽는다
   useEffect(() => {
     titleRef.current?.focus();
   }, []);
 
-  // 삭제 확인이 뜨면 되돌릴 수 있는 쪽(취소, 첫 버튼)에 초점을 둔다
-  useEffect(() => {
-    if (confirmingDelete) {
-      confirmRef.current?.querySelector('button')?.focus();
-    }
-  }, [confirmingDelete]);
-
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key !== 'Escape' || saving) return;
-
-      // 확인 창이 떠 있으면 그것만 닫는다
-      if (confirmingDelete) {
-        setConfirmingDelete(false);
-      } else {
-        onClose();
-      }
+      // 확인 창이 떠 있으면 그 창이 먼저 받아 막는다(ConfirmDialog)
+      if (event.key === 'Escape' && !saving) onClose();
     }
 
     window.addEventListener('keydown', onKeyDown);
 
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [confirmingDelete, onClose, saving]);
+  }, [onClose, saving]);
 
   async function save(nextComment: string | null) {
     setSaving(true);
@@ -147,17 +135,12 @@ export default function CommentManageSheet({ movie, rating, onClose, onSaved }: 
             공개 한줄평 · 다른 사용자에게 노출
           </span>
 
-          <button
-            type="button"
-            className={styles.toggle}
-            role="switch"
-            aria-checked={isPublic}
-            aria-labelledby={`${id}-visibility`}
+          <Switch
+            checked={isPublic}
+            onChange={setIsPublic}
+            labelledBy={`${id}-visibility`}
             disabled={saving}
-            onClick={() => setIsPublic((value) => !value)}
-          >
-            <span className={styles.knob} aria-hidden="true" />
-          </button>
+          />
         </div>
 
         {failed ? (
@@ -182,36 +165,14 @@ export default function CommentManageSheet({ movie, rating, onClose, onSaved }: 
       </div>
 
       {confirmingDelete ? (
-        <div className={styles.confirmLayer}>
-          <div
-            ref={confirmRef}
-            className={styles.confirm}
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby={`${id}-delete-title`}
-            aria-describedby={`${id}-delete-description`}
-          >
-            <p id={`${id}-delete-title`} className={styles.confirmTitle}>
-              한줄평을 삭제할까요?
-            </p>
-            <p id={`${id}-delete-description`} className={styles.confirmDescription}>
-              삭제하면 되돌릴 수 없어요
-            </p>
-
-            <div className={styles.confirmActions}>
-              <Button
-                variant="secondary"
-                disabled={saving}
-                onClick={() => setConfirmingDelete(false)}
-              >
-                취소
-              </Button>
-              <Button disabled={saving} onClick={() => void save(null)}>
-                삭제
-              </Button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title="한줄평을 삭제할까요?"
+          description="삭제하면 되돌릴 수 없어요"
+          confirmLabel="삭제"
+          busy={saving}
+          onConfirm={() => void save(null)}
+          onCancel={() => setConfirmingDelete(false)}
+        />
       ) : null}
     </div>
   );

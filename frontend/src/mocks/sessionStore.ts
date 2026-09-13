@@ -20,7 +20,12 @@
  */
 import { createSeedWatchRecords } from './watch';
 import type { OnboardingPreference } from '../types/onboarding';
-import type { PartyView } from '../types/unspecified';
+import type {
+  NotificationSettingsView,
+  PartyView,
+  PrivacySettingsView,
+} from '../types/unspecified';
+import type { BlockedUser } from '../types/user';
 import type { Rating, RatingUpdateInput, WatchRecord } from '../types/watch';
 
 /**
@@ -82,6 +87,17 @@ type SessionState = {
    * 로컬에 둘 이유가 없다(`api/users.ts`). 한 줄 소개만 계약에 자리가 없어 남는다.
    */
   profileEdit: { introduction: string } | null;
+  /** 7.8-C에서 바꾼 알림 설정. `null`이면 기준 목업(mocks/settings.ts)이다 */
+  notificationSettings: NotificationSettingsView | null;
+  /** 7.8-B에서 바꾼 공개 범위. `null`이면 기준 목업이다 */
+  privacySettings: PrivacySettingsView | null;
+  /**
+   * API-020 · API-021로 바뀐 차단 목록 **전체**. `null`이면 기준 목업이다.
+   *
+   * 기준 목업의 사람을 해제할 수 있어야 하므로 추가분만 따로 두지 않고 처음 바뀔 때
+   * 목록 전체를 옮겨 온다.
+   */
+  blockedUsers: BlockedUser[] | null;
 };
 
 function emptyState(): SessionState {
@@ -99,6 +115,9 @@ function emptyState(): SessionState {
     createdParties: [],
     invitationStatuses: {},
     profileEdit: null,
+    notificationSettings: null,
+    privacySettings: null,
+    blockedUsers: null,
   };
 }
 
@@ -204,6 +223,35 @@ export function saveProfileEdit(update: { introduction: string }): void {
 /** 아직 편집하지 않았으면 null. 기준 목업을 쓰라는 뜻이다 */
 export function getProfileEdit(): { introduction: string } | null {
   return state.profileEdit;
+}
+
+// ─────────────────────────────────────────── 설정 (업무 -307)
+
+export function saveNotificationSettings(settings: NotificationSettingsView): void {
+  state.notificationSettings = { ...settings };
+}
+
+/** 바꾼 적 없으면 null. 기준 목업을 쓰라는 뜻이다 */
+export function getNotificationSettings(): NotificationSettingsView | null {
+  return state.notificationSettings;
+}
+
+export function savePrivacySettings(settings: PrivacySettingsView): void {
+  state.privacySettings = { ...settings };
+}
+
+/** 바꾼 적 없으면 null. 기준 목업을 쓰라는 뜻이다 */
+export function getPrivacySettings(): PrivacySettingsView | null {
+  return state.privacySettings;
+}
+
+export function saveBlockedUsers(users: BlockedUser[]): void {
+  state.blockedUsers = [...users];
+}
+
+/** 바꾼 적 없으면 null. 기준 목업을 쓰라는 뜻이다 */
+export function getBlockedUsers(): BlockedUser[] | null {
+  return state.blockedUsers;
 }
 
 // ─────────────────────────────────────────── 관심없음

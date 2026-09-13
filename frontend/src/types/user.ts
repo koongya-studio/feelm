@@ -54,3 +54,36 @@ export type MyProfileUpdate = {
   gender?: Gender;
   visibility?: Visibility;
 };
+
+/**
+ * API-017 · API-018 알림 설정. 세 키가 모두 있어야 한다(API-018 `400 VALIDATION_FAILED`).
+ *
+ * 7.8-C는 토글 다섯 개를 그리지만 계약은 셋이다. 나머지 둘은 `types/unspecified.ts`의
+ * `NotificationSettingsView`가 더한다.
+ */
+export type NotificationSettings = {
+  /** 감상 확인 알림 */
+  RATING: boolean;
+  RECOMMENDATION: boolean;
+  MARKETING: boolean;
+};
+
+/** API-022 차단 목록 `items[]` */
+export type BlockedUser = {
+  userId: number;
+  nickname: string;
+  blockedAt: string;
+};
+
+/** API-022 응답 */
+export type BlockedUserList = {
+  items: BlockedUser[];
+  nextCursor: string | null;
+  hasNext: boolean;
+};
+
+/** API-020 응답 */
+export type BlockResult = {
+  blockedUserId: number;
+  blockedAt: string;
+};

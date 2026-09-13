@@ -19,6 +19,7 @@ import {
 import { getProfileEdit, saveProfileEdit } from '../mocks/sessionStore';
 import { mockMyIntroduction } from '../mocks/user';
 import { request } from './client';
+import { isBlockedUser } from './settings';
 import { respond, respondError } from './mockTransport';
 import type { PublicProfileView, TasteCompareView } from '../types/unspecified';
 import type { MyProfile, MyProfileUpdate } from '../types/user';
@@ -110,7 +111,11 @@ export async function getMyPublicProfile(): Promise<PublicProfileView> {
 export async function getPublicProfile(userId: number): Promise<PublicProfileView> {
   const profile = findMockPublicProfile(userId);
 
-  if (!profile) {
+  /*
+   * 차단한 사람의 프로필은 보이지 않는다(API-020 설명). 계약은 없음 · 비공개 · 차단을
+   * 모두 404로 합치므로 같은 응답을 쓴다. 7.2-B에서 차단하면 이 분기로 들어온다(업무 -307).
+   */
+  if (!profile || isBlockedUser(userId)) {
     // 계약은 없음 · PRIVATE · 차단 관계를 모두 404로 합친다
     return respondError(404, 'RESOURCE_NOT_FOUND', '프로필을 찾을 수 없습니다.');
   }

@@ -252,6 +252,32 @@ describe('7.6 ⇢ 7.6-A', () => {
   });
 });
 
+describe('7.6-A 확인 창', () => {
+  it('Escape는 삭제 확인 창만 닫고 시트는 남긴다', async () => {
+    /*
+     * 307에서 확인 창을 공용 ConfirmDialog로 꺼냈다. 시트도 Escape로 닫히므로 두 처리가
+     * 같은 키를 받으면 시트까지 한꺼번에 닫혀 고치던 한줄평을 잃는다.
+     */
+    renderApp([ROUTE_PATTERN.myRatings]);
+
+    fireEvent.click(await screen.findByRole('button', { name: '영화 제목 2 한줄평 관리' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: '한줄평 관리' })).getByRole('button', {
+        name: '삭제',
+      }),
+    );
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: '한줄평 관리' })).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
 describe('3.1-A ⇢ 7.6-A · 3.1-A ⇢ 2.5', () => {
   it('프레임 상세에서 한줄평 관리가 열리고 고친 값이 보인다', async () => {
     renderApp(['/frames/502']);

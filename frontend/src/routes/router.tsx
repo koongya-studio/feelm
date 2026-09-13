@@ -25,12 +25,18 @@ import FilmPage from '../pages/film/FilmPage';
 import FrameDetailPage from '../pages/film/FrameDetailPage';
 import PopcornBucketPage from '../pages/film/PopcornBucketPage';
 import HomePage from '../pages/home/HomePage';
+import AccountManagePage from '../pages/my/AccountManagePage';
+import BlockedUsersPage from '../pages/my/BlockedUsersPage';
 import MyDashboardPage from '../pages/my/MyDashboardPage';
 import MyRatingsPage from '../pages/my/MyRatingsPage';
+import NotificationSettingsPage from '../pages/my/NotificationSettingsPage';
+import PrivacySettingsPage from '../pages/my/PrivacySettingsPage';
 import ProfileEditPage from '../pages/my/ProfileEditPage';
 import ProfilePreviewPage from '../pages/my/ProfilePreviewPage';
 import PublicProfilePage from '../pages/my/PublicProfilePage';
 import RecommendationHistoryPage from '../pages/my/RecommendationHistoryPage';
+import SettingsPage from '../pages/my/SettingsPage';
+import WithdrawPage from '../pages/my/WithdrawPage';
 import TasteComparePage from '../pages/my/TasteComparePage';
 import OttManagePage from '../pages/otts/OttManagePage';
 import MovieDetailPage from '../pages/movies/MovieDetailPage';
@@ -101,12 +107,14 @@ export const router = createBrowserRouter(
         { path: ROUTE_PATTERN.unratedMovies, element: <MyRatingsPage tab="unrated" /> },
 
         /*
-         * 7.1 메뉴가 가리키는 화면 중 307 · 308 몫(7.3 · 7.8).
+         * 7.1 메뉴가 가리키는 화면 중 308 몫(7.3).
          * 경로를 두는 이유는 paths.ts 주석에 적었다 — `아직 안 만든 화면`과
          * `잘못된 주소`가 구분돼야 이동 경로를 검증할 수 있다.
          */
         { path: ROUTE_PATTERN.tasteReports, element: <NotInScopePage /> },
-        { path: ROUTE_PATTERN.settings, element: <NotInScopePage /> },
+
+        // 7.8 설정 (업무 -307). 와이어프레임이 하단 내비를 그린 유일한 설정 화면이다
+        { path: ROUTE_PATTERN.settings, element: <SettingsPage /> },
       ],
     },
     {
@@ -131,6 +139,13 @@ export const router = createBrowserRouter(
         { path: ROUTE_PATTERN.profilePreview, element: <ProfilePreviewPage /> },
         { path: ROUTE_PATTERN.publicProfile, element: <PublicProfilePage /> },
         { path: ROUTE_PATTERN.tasteCompare, element: <TasteComparePage /> },
+
+        // 설정 하위 화면 (업무 -307). 와이어프레임에 하단 내비가 없다
+        { path: ROUTE_PATTERN.accountManage, element: <AccountManagePage /> },
+        { path: ROUTE_PATTERN.withdraw, element: <WithdrawPage /> },
+        { path: ROUTE_PATTERN.privacySettings, element: <PrivacySettingsPage /> },
+        { path: ROUTE_PATTERN.notificationSettings, element: <NotificationSettingsPage /> },
+        { path: ROUTE_PATTERN.blockedUsers, element: <BlockedUsersPage /> },
         { path: ROUTE_PATTERN.notFound, element: <NotFoundPage /> },
       ],
     },

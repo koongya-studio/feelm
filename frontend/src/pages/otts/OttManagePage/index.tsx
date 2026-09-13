@@ -23,6 +23,7 @@ import { useEffect, useState } from 'react';
 import ScreenHeader from '../../../components/ScreenHeader';
 import OttBadge from '../../../components/OttBadge';
 import StatusView from '../../../components/StatusView';
+import Switch from '../../../components/Switch';
 import Button from '../../../components/Button';
 import { getMyOtts, getOtts, setMyOtts } from '../../../api/otts';
 import { ottBadgeLetter } from '../../../utils/ott';
@@ -157,16 +158,11 @@ function OttGroup({
               <span className={styles.state}>{subscribed ? '구독 중' : '구독 안 함'}</span>
             </span>
 
-            <button
-              type="button"
-              className={styles.toggle}
-              role="switch"
-              aria-checked={subscribed}
-              aria-label={`${ott.name} 구독`}
-              onClick={() => onToggle(ott.ottId)}
-            >
-              <span className={styles.knob} aria-hidden="true" />
-            </button>
+            <Switch
+              checked={subscribed}
+              label={`${ott.name} 구독`}
+              onChange={() => onToggle(ott.ottId)}
+            />
           </li>
         ))}
       </ul>

@@ -1,0 +1,75 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) var(--screen-padding-x) var(--space-6);
+  gap: var(--space-4);
+}
+
+/* 안내는 가라앉은 면이다. 경고가 아니라 설명이라 색을 쓰지 않는다 */
+.info {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-sunken);
+  color: var(--color-ink-body);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  gap: var(--space-3);
+}
+
+.row + .row {
+  border-top: 1px solid var(--color-line-faint);
+}
+
+.nickname {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--color-ink);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 7.6 줄 끝 동작(MyRatingsPage.module.css `.rowAction`)과 같은 테두리 알약이다 */
+.unblock {
+  display: inline-flex;
+  min-height: var(--tap-target-min);
+  box-sizing: border-box;
+  align-items: center;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--color-ink);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
+.unblock:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.notice {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}

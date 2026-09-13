@@ -15,12 +15,16 @@
  * 진입 경로: **5.8 파티원 카드**에서 들어온다. 와이어프레임 이동표에 7.2-B로 들어오는
  * 화살표가 없었고 2026-09-11에 확정했다(screen-spec-my.md 2장 8번).
  *
- * `[?]` 차단 · 신고는 계약이 없다. 확인 창까지만 만들고 실제 처리는 하지 않는다.
- * 이동표는 `7.2-B ⇢ 7.8-D`지만 7.8-D 차단 사용자 관리가 아직 없어 안내로 끝낸다.
+ * 차단은 확인 창을 거쳐 차단하고 7.8-D로 간다(이동표 `7.2-B ⇢ 7.8-D`, 업무 -307). 확인 창은
+ * 공동 파티에서 나가게 된다는 것을 알린다 — API-020이 차단 전에 안내하라고 적었다. 이동은
+ * `replace`다. 차단한 사람의 프로필은 404라 뒤로 가기가 여기로 돌아오면 안 된다.
+ *
+ * `[?]` 신고는 계약이 없다. 안내만 하고 실제 처리는 하지 않는다.
  */
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
+import ConfirmDialog from '../../../components/ConfirmDialog';
 import Menu from '../../../components/Menu';
 import ProfileHero from '../../../components/ProfileHero';
 import RatingStars from '../../../components/RatingStars';
@@ -28,6 +32,7 @@ import Section from '../../../components/Section';
 import StatRow from '../../../components/StatRow';
 import StatusView from '../../../components/StatusView';
 import TasteShowcase from '../../../components/TasteShowcase';
+import { blockUser } from '../../../api/settings';
 import { getPublicProfile } from '../../../api/users';
 import { path } from '../../../routes/paths';
 import styles from './PublicProfilePage.module.css';
@@ -44,8 +49,10 @@ export default function PublicProfilePage() {
 
   const [profile, setProfile] = useState<PublicProfileView | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  /** 차단 · 신고를 고른 뒤의 안내. 계약이 없어 실제 처리는 하지 않는다 */
+  /** 신고를 고른 뒤의 안내. 계약이 없어 실제 처리는 하지 않는다 */
   const [notice, setNotice] = useState('');
+  const [confirmingBlock, setConfirmingBlock] = useState(false);
+  const [blocking, setBlocking] = useState(false);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
 
@@ -94,6 +101,19 @@ export default function PublicProfilePage() {
     return null;
   }
 
+  async function handleBlock() {
+    setBlocking(true);
+
+    try {
+      await blockUser(id);
+      void navigate(path.blockedUsers(), { replace: true });
+    } catch {
+      setBlocking(false);
+      setConfirmingBlock(false);
+      setNotice('차단하지 못했어요. 잠시 후 다시 시도해 주세요');
+    }
+  }
+
   return (
     <>
       {menuOpen ? (
@@ -103,7 +123,7 @@ export default function PublicProfilePage() {
             className={styles.menuItem}
             onClick={() => {
               setMenuOpen(false);
-              setNotice(`${profile.nickname} 님을 차단하면 서로의 콘텐츠가 보이지 않아요`);
+              setConfirmingBlock(true);
             }}
           >
             사용자 차단
@@ -121,6 +141,17 @@ export default function PublicProfilePage() {
             신고하기
           </button>
         </Menu>
+      ) : null}
+
+      {confirmingBlock ? (
+        <ConfirmDialog
+          title={`${profile.nickname} 님을 차단할까요?`}
+          description="서로의 프로필·취향 필름·팝콘·한줄평이 보이지 않아요. 함께 있는 파티에서는 나가게 돼요"
+          confirmLabel="차단"
+          busy={blocking}
+          onConfirm={() => void handleBlock()}
+          onCancel={() => setConfirmingBlock(false)}
+        />
       ) : null}
 
       {/*
