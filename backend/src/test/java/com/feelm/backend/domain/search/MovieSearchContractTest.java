@@ -10,6 +10,8 @@ import com.feelm.backend.global.security.JjwtTokenProvider;
 import com.feelm.backend.global.security.JwtProperties;
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedPostgresContractTest;
+import com.feelm.backend.support.SharedRedisContainer;
+import com.feelm.backend.support.SharedRedisState;
 import com.redis.testcontainers.RedisContainer;
 import jakarta.persistence.EntityManagerFactory;
 import java.nio.charset.StandardCharsets;
@@ -32,6 +34,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -40,8 +43,6 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -60,15 +61,13 @@ import tools.jackson.databind.node.ObjectNode;
             "feelm.auth.mock.enabled=false"
         })
 @AutoConfigureMockMvc
-@Testcontainers
 @Transactional
 @DisplayName("API-028 영화 검색 — PostgreSQL 계약")
 class MovieSearchContractTest extends SharedPostgresContractTest {
 
     private static final String PATH = "/api/v1/movies/search";
 
-    @Container @ServiceConnection
-    static final RedisContainer REDIS = new RedisContainer("redis:8-alpine");
+    @ServiceConnection static final RedisContainer REDIS = SharedRedisContainer.instance();
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
@@ -76,9 +75,11 @@ class MovieSearchContractTest extends SharedPostgresContractTest {
     @Autowired private TokenProvider tokenProvider;
     @Autowired private JwtProperties jwtProperties;
     @Autowired private EntityManagerFactory entityManagerFactory;
+    @Autowired private StringRedisTemplate redisTemplate;
 
     @BeforeEach
     void seed() {
+        SharedRedisState.clear(redisTemplate);
         MovieSearchFixture.seed(jdbc);
     }
 

@@ -24,6 +24,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedPostgresContractTest;
+import com.feelm.backend.support.SharedRedisContainer;
+import com.feelm.backend.support.SharedRedisState;
 import com.redis.testcontainers.RedisContainer;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -44,13 +46,12 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -63,25 +64,25 @@ import tools.jackson.databind.ObjectMapper;
         })
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 @Import(MovieDetailQueryRecorder.Configuration.class)
-@Testcontainers
 @Transactional
 @DisplayName("API-030 영화 상세 — PostgreSQL 계약")
 class MovieDetailContractTest extends SharedPostgresContractTest {
 
     private static final String PATH = "/api/v1/movies/{movieId}";
 
-    @Container @ServiceConnection
-    static final RedisContainer REDIS = new RedisContainer("redis:8-alpine");
+    @ServiceConnection static final RedisContainer REDIS = SharedRedisContainer.instance();
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private TokenProvider tokenProvider;
     @Autowired private MovieDetailQueryRecorder recorder;
+    @Autowired private StringRedisTemplate redisTemplate;
     private MovieDetailFixture fixture;
 
     @BeforeEach
     void seed() {
+        SharedRedisState.clear(redisTemplate);
         fixture = new MovieDetailFixture(jdbc);
         fixture.seed();
     }

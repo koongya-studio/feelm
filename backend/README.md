@@ -444,6 +444,24 @@ STS와 Gradle 모두 실행 작업 디렉터리를 `backend`로 지정합니다.
 
 ## 테스트와 빌드
 
+### Testcontainers와 Spring Context 계약
+
+PostgreSQL·Redis 기반 계약 테스트는 테스트 클래스마다 컨테이너를 만들지 않고 JVM 수명의
+공유 실행 환경을 사용합니다. 컨테이너 주소가 고정돼야 같은 Spring 설정을 사용하는 테스트가
+ApplicationContext를 재사용할 수 있습니다.
+
+- PostgreSQL 계약 테스트는 `SharedPostgresContractTest`를 상속합니다.
+- Redis는 `SharedRedisContainer.instance()`를 `@ServiceConnection`에 연결하고, 각 테스트
+  시작 시 `SharedRedisState.clear()`로 키를 비웁니다.
+- fixture는 자신이 사용하는 DB 테이블을 테스트 전에 명시적으로 초기화합니다. 공유 DB에
+  이전 클래스의 데이터가 남아 있어도 단독 실행과 같은 결과가 나와야 합니다.
+- `@SpringBootTest` 속성·web environment·`@Import`가 다르면 Context cache가 분리됩니다.
+  테스트 의미에 필요한 차이만 추가하고, 같은 설정은 공통 지원 클래스에 둡니다.
+- database 단위 격리가 필요한 migration 테스트는 `MigrationPostgresSupport`를 사용합니다.
+  병렬 실행이나 별도 장애 격리가 필요한 경우에는 공유 여부와 초기화 경계를 먼저 합의합니다.
+- 허용된 공통 지원 코드 밖에서 `PostgreSQLContainer`나 `RedisContainer`를 직접 생성하면
+  `SharedTestcontainerPolicyTest`가 빌드를 실패시킵니다.
+
 ### Windows
 
 ```powershell
