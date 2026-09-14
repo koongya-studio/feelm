@@ -42,25 +42,26 @@ def build_movie_metadata(
 ) -> DataFrame:
     """Join service mappings to TMDb JSON and attach one immutable revision.
 
-    ``service_mapping`` is the existing mapping producer output. ``tmdb_movies``
-    must expose TMDb's ``id``, ``title`` and ``genres`` fields. Flavor input is
-    optional until that producer is available; null is an explicit value, not a
-    fabricated flavor classification.
+    ``service_mapping`` is the existing mapping producer output. Every service
+    movie is included regardless of ``mapping_status`` so content-only and
+    ambiguous movies can be served as content-based candidates (S15P21E106-416).
+    ``tmdb_movies`` must expose TMDb's ``id``, ``title`` and ``genres`` fields.
+    Flavor input is optional until that producer is available; null is an
+    explicit value, not a fabricated flavor classification.
     """
     if not input_snapshot or input_snapshot.lower() == "latest":
         raise ValueError("input_snapshot must be immutable")
-    matched = service_mapping.filter(F.col("mapping_status") == "MATCHED")
     tmdb = tmdb_movies.select(
         F.col("id").cast("int").alias("tmdb_id"),
         F.col("title").cast("string").alias("title"),
         F.expr("transform(genres, value -> value.name)").alias("genre_codes"),
     )
-    missing_metadata = matched.select("service_movie_id", "tmdb_id").join(
+    missing_metadata = service_mapping.select("service_movie_id", "tmdb_id").join(
         tmdb.select("tmdb_id"), "tmdb_id", "left_anti"
     )
     if missing_metadata.limit(1).count():
-        raise ValueError("every MATCHED mapping must have TMDb metadata")
-    result = matched.join(tmdb, "tmdb_id", "inner").select(
+        raise ValueError("every service movie mapping must have TMDb metadata")
+    result = service_mapping.join(tmdb, "tmdb_id", "inner").select(
         F.col("service_movie_id").cast("long"),
         "title",
         F.coalesce(F.col("genre_codes"), F.array().cast("array<string>")).alias("genre_codes"),
@@ -114,7 +115,9 @@ def publish_movie_metadata(metadata: DataFrame, output_uri: str) -> str:
     ]
     if len(revisions) != 1:
         raise ValueError("movie metadata snapshot must contain one revision")
-    temporary_uri = f"{output_uri.rstrip('/')}.tmp-{uuid4().hex}"
+    parent, name = output_uri.rstrip("/").rsplit("/", 1)
+    # A hidden sibling is ignored by Spark/pyarrow readers if a hard crash leaves it.
+    temporary_uri = f"{parent}/.{name}.tmp-{uuid4().hex}"
     try:
         metadata.write.mode("errorifexists").parquet(temporary_uri)
         published = spark.read.parquet(temporary_uri)
