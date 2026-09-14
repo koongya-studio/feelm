@@ -84,6 +84,8 @@ class ErrorCodeTest {
                         // 사용자 도메인 — API-020 차단 (S15P21E106-211)
                         "CANNOT_BLOCK_SELF",
                         "ALREADY_BLOCKED",
+                        // 추천 도메인 — API-047 관심없음 (S15P21E106-165)
+                        "ALREADY_DISMISSED",
                         // 파티 도메인 — API-051·055·056·069
                         "PARTY_CLOSED",
                         "PARTY_FULL",
@@ -139,6 +141,12 @@ class ErrorCodeTest {
     void blockCodesMatchSpecifiedStatuses() {
         assertThat(ErrorCode.CANNOT_BLOCK_SELF.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(ErrorCode.ALREADY_BLOCKED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("API-047 관심없음 오류 코드는 409로 매핑된다")
+    void dismissCodeIsConflict() {
+        assertThat(ErrorCode.ALREADY_DISMISSED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test
