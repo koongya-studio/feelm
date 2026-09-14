@@ -194,6 +194,7 @@ uv run spark-submit --master "$RECOMMENDATION_SPARK_MASTER" als_baseline.py \
   --input-snapshot "$ALS_VERIFY_SNAPSHOT_ID" \
   --run-id "$ALS_VERIFY_RUN_ID" \
   --implementation-revision "$ALS_VERIFY_REVISION" \
+  --movie-metadata-revision "$MOVIE_METADATA_REVISION" \
   --seed 42 --train-ratio 0.8 --validation-ratio 0.1 \
   --positive-rating-threshold 4.0 --candidate-size 500 \
   --als-config 32:0.1:10 --als-config 64:0.1:10 \
@@ -210,6 +211,9 @@ uv run spark-submit --master "$RECOMMENDATION_SPARK_MASTER" als_baseline.py \
 `_SUCCESS` 같은 완료 marker는 manifest에 기록하지 않으며 실제 파일 집합 비교에서도 제외합니다.
 실행은 실제 보이는 파일 집합을 열거하고 파일을 다시 해시한 뒤 validation report의 완료 상태와
 ratings·service mapping 건수를 실제 로딩 결과와 대조해야만 분할을 시작합니다.
+`run` 모드는 `service-movie-id-map` 전체에서 유일한 `mapping_revision`을 검증해 모델 메타데이터에
+기록합니다. `--movie-metadata-revision`에는 먼저 공개하고 검증한 영화 metadata snapshot의
+`sha256:<64 소문자 hex>` revision을 전달하며, 누락되거나 형식이 잘못되면 학습 전에 거부합니다.
 
 `ALS_VERIFY_*`는 실행 절차의 셸 변수이며 애플리케이션 환경변수 계약이 아닙니다. 모델은
 `<output-uri>/als/<model-version>/`, 실행 보고서는 `<output-uri>/als-runs/<run-id>/`에

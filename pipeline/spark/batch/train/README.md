@@ -64,6 +64,10 @@ manifest parent 아래에 두어야 한다. 생성기는 파일을 직접 해시
 생산 validator로 validation report와 실제 로딩 건수까지 재검증한다. 실패한 새 manifest는
 제거한다.
 
+run 모드는 `service-movie-id-map`의 모든 행에 동일한 SHA-256 `mapping_revision`이 있는지
+검증하고 모델 metadata에 기록한다. 별도로 먼저 공개·검증한 영화 metadata snapshot의
+revision은 `--movie-metadata-revision`으로 전달하며 같은 SHA-256 형식을 만족해야 한다.
+
 run 모드는 `file:///절대/경로` 또는 `hdfs://authority/절대/경로`만 지원하고
 credential·query·fragment 포함 URI는 거부한다. scheme 없는 경로, 상대 `file:` URI와 authority
 없는 `hdfs:/` URI도 Hadoop `defaultFS`·작업 디렉터리 의존성을 없애기 위해 Spark 생성 전에

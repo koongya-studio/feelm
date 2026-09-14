@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from pyspark.sql import DataFrame, SparkSession
@@ -35,6 +36,7 @@ SERVICE_MOVIE_MAP_SCHEMA = {
     "tmdb_id": IntegerType,
     "movielens_movie_id": IntegerType,
     "mapping_status": StringType,
+    "mapping_revision": StringType,
 }
 
 
@@ -47,6 +49,7 @@ class TrainingInputs:
     ratings_count: int
     service_movie_count: int
     matched_service_movie_count: int
+    mapping_revision: str
 
 
 def _validate_schema(
@@ -119,7 +122,7 @@ def validate_ratings(frame: DataFrame) -> tuple[DataFrame, int]:
     return ratings, row_count
 
 
-def validate_service_movie_map(frame: DataFrame) -> tuple[DataFrame, int, int]:
+def validate_service_movie_map(frame: DataFrame) -> tuple[DataFrame, int, int, str]:
     """Validate and select the S15P21E106-118 service mapping contract."""
     _validate_schema(frame, SERVICE_MOVIE_MAP_SCHEMA, "service-movie-id-map")
     service_movie_map = frame.select(*SERVICE_MOVIE_MAP_SCHEMA)
@@ -152,6 +155,12 @@ def validate_service_movie_map(frame: DataFrame) -> tuple[DataFrame, int, int]:
         raise ValueError(f"service-movie-id-map contains {summary['invalid_count']} invalid rows")
     if matched_count == 0:
         raise ValueError("service-movie-id-map contains no MATCHED movies")
+    revisions = [
+        row["mapping_revision"]
+        for row in service_movie_map.select("mapping_revision").distinct().collect()
+    ]
+    if len(revisions) != 1 or not re.fullmatch(r"sha256:[0-9a-f]{64}", revisions[0] or ""):
+        raise ValueError("service-movie-id-map requires one sha256 mapping revision")
 
     _assert_no_duplicate_key(
         service_movie_map,
@@ -163,7 +172,7 @@ def validate_service_movie_map(frame: DataFrame) -> tuple[DataFrame, int, int]:
         ["tmdb_id"],
         "service-movie-id-map",
     )
-    return service_movie_map, row_count, matched_count
+    return service_movie_map, row_count, matched_count, revisions[0]
 
 
 def load_training_inputs(
@@ -173,7 +182,7 @@ def load_training_inputs(
 ) -> TrainingInputs:
     """Read and validate both Parquet inputs required by ALS training."""
     ratings, ratings_count = validate_ratings(spark.read.parquet(ratings_uri))
-    service_movie_map, service_movie_count, matched_service_movie_count = (
+    service_movie_map, service_movie_count, matched_service_movie_count, mapping_revision = (
         validate_service_movie_map(spark.read.parquet(service_movie_map_uri))
     )
     return TrainingInputs(
@@ -182,4 +191,5 @@ def load_training_inputs(
         ratings_count=ratings_count,
         service_movie_count=service_movie_count,
         matched_service_movie_count=matched_service_movie_count,
+        mapping_revision=mapping_revision,
     )

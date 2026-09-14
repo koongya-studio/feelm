@@ -10,6 +10,7 @@ from batch.train.inputs import (
     validate_service_movie_map,
 )
 from tests.fixtures.als_baseline import (
+    MAPPING_REVISION,
     RATING_ROWS,
     RATINGS_SCHEMA,
     SERVICE_MOVIE_MAP_ROWS,
@@ -48,6 +49,7 @@ def test_loads_118_contract_and_preserves_unmapped_ratings(
     assert inputs.ratings_count == 60
     assert inputs.service_movie_count == 14
     assert inputs.matched_service_movie_count == 12
+    assert inputs.mapping_revision == MAPPING_REVISION
     assert inputs.ratings.select("movielens_user_id").distinct().count() == 6
     assert inputs.ratings.filter("movielens_movie_id IN (13, 14)").count() > 0
     assert (
@@ -122,7 +124,7 @@ def test_rejects_incompatible_118_schema(spark: SparkSession) -> None:
 
 
 def test_rejects_unknown_mapping_status(spark: SparkSession) -> None:
-    invalid_row = (*SERVICE_MOVIE_MAP_ROWS[0][:-1], "UNKNOWN")
+    invalid_row = (*SERVICE_MOVIE_MAP_ROWS[0][:-2], "UNKNOWN", MAPPING_REVISION)
     service_movie_map = spark.createDataFrame(
         [invalid_row, *SERVICE_MOVIE_MAP_ROWS[1:]],
         SERVICE_MOVIE_MAP_SCHEMA,
@@ -135,14 +137,14 @@ def test_rejects_unknown_mapping_status(spark: SparkSession) -> None:
 @pytest.mark.parametrize(
     ("row_index", "invalid_row"),
     [
-        (0, (10_001, 20_001, None, "MATCHED")),
-        (-2, (10_901, 20_901, 13, "SERVICE_ONLY_CONTENT_BASED")),
+        (0, (10_001, 20_001, None, "MATCHED", MAPPING_REVISION)),
+        (-2, (10_901, 20_901, 13, "SERVICE_ONLY_CONTENT_BASED", MAPPING_REVISION)),
     ],
 )
 def test_rejects_mapping_status_id_mismatch(
     spark: SparkSession,
     row_index: int,
-    invalid_row: tuple[int, int, int | None, str],
+    invalid_row: tuple[int, int, int | None, str, str],
 ) -> None:
     rows = list(SERVICE_MOVIE_MAP_ROWS)
     rows[row_index] = invalid_row
@@ -150,3 +152,21 @@ def test_rejects_mapping_status_id_mismatch(
 
     with pytest.raises(ValueError, match="invalid rows"):
         validate_service_movie_map(service_movie_map)
+
+
+@pytest.mark.parametrize(
+    "revisions",
+    [
+        ["sha256:not-a-digest"] * len(SERVICE_MOVIE_MAP_ROWS),
+        [MAPPING_REVISION] * (len(SERVICE_MOVIE_MAP_ROWS) - 1) + ["sha256:" + "c" * 64],
+    ],
+)
+def test_rejects_invalid_or_mixed_mapping_revisions(spark: SparkSession, revisions) -> None:
+    rows = [
+        (*row[:-1], revision)
+        for row, revision in zip(SERVICE_MOVIE_MAP_ROWS, revisions, strict=True)
+    ]
+    frame = spark.createDataFrame(rows, SERVICE_MOVIE_MAP_SCHEMA)
+
+    with pytest.raises(ValueError, match="mapping revision"):
+        validate_service_movie_map(frame)
