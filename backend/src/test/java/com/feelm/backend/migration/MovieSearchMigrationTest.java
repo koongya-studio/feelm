@@ -6,6 +6,7 @@ import com.feelm.backend.domain.search.dto.request.MovieSearchCriteria;
 import java.util.List;
 import java.util.stream.Stream;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,10 +16,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * ADR-0010과 157 플랜의 검색 GIN 인덱스를 실제 Flyway 마이그레이션으로 검증한다.
@@ -26,36 +23,31 @@ import org.testcontainers.utility.DockerImageName;
  * <p>테스트는 인덱스를 생성하지 않는다. 작은 fixture의 실행 계획은 인덱스 사용 가능성을 검증할 뿐, 156 실데이터의 실행 계획·응답 시간 완료 조건을 대신하지
  * 않는다.
  */
-@Testcontainers
 @DisplayName("영화 검색 마이그레이션 — GIN 인덱스와 검색 실행 계획")
 class MovieSearchMigrationTest {
 
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>(
-                            DockerImageName.parse("pgvector/pgvector:0.8.6-pg17-bookworm")
-                                    .asCompatibleSubstituteFor("postgres"))
-                    .withEnv("POSTGRES_INITDB_ARGS", "--locale=C.UTF-8");
+    private static final MigrationPostgresSupport.MigrationTestDatabase DATABASE =
+            MigrationPostgresSupport.database("movie_search");
 
     private static JdbcTemplate jdbc;
 
     @BeforeAll
     static void migrateAndSeed() {
         Flyway.configure()
-                .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+                .dataSource(DATABASE.getJdbcUrl(), DATABASE.getUsername(), DATABASE.getPassword())
                 .target("202609121200")
                 .load()
                 .migrate();
         Flyway.configure()
-                .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+                .dataSource(DATABASE.getJdbcUrl(), DATABASE.getUsername(), DATABASE.getPassword())
                 .load()
                 .migrate();
         jdbc =
                 new JdbcTemplate(
                         new DriverManagerDataSource(
-                                POSTGRES.getJdbcUrl(),
-                                POSTGRES.getUsername(),
-                                POSTGRES.getPassword()));
+                                DATABASE.getJdbcUrl(),
+                                DATABASE.getUsername(),
+                                DATABASE.getPassword()));
         jdbc.update(
                 """
                 INSERT INTO movies (id, tmdb_id, title, original_title)
@@ -75,6 +67,11 @@ class MovieSearchMigrationTest {
         jdbc.update("UPDATE people SET name = 'PersonNeedle actor' WHERE id = 1");
         jdbc.execute("ANALYZE movies");
         jdbc.execute("ANALYZE people");
+    }
+
+    @AfterAll
+    static void dropDatabase() {
+        DATABASE.close();
     }
 
     @Test

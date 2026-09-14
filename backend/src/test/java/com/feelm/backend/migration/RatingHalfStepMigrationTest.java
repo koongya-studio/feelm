@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -14,29 +13,18 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
-@Testcontainers
 @DisplayName("MovieLens 범위의 반별점 마이그레이션")
 class RatingHalfStepMigrationTest {
 
-    @Container
-    private static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>(
-                            DockerImageName.parse("pgvector/pgvector:0.8.6-pg17-bookworm")
-                                    .asCompatibleSubstituteFor("postgres"))
-                    .withDatabaseName("feelm")
-                    .withUsername("feelm")
-                    .withPassword("feelm")
-                    .withEnv("POSTGRES_INITDB_ARGS", "--locale=C.UTF-8");
+    private static final MigrationPostgresSupport.MigrationTestDatabase DATABASE =
+            MigrationPostgresSupport.database("rating_half_step");
 
     private static final AtomicInteger MOVIE_IDS = new AtomicInteger(980_000);
     private static final List<Long> LEGACY_RATINGS = new ArrayList<>();
@@ -45,7 +33,7 @@ class RatingHalfStepMigrationTest {
     @BeforeAll
     static void migrateWithExistingIntegerRatings() throws SQLException {
         Flyway.configure()
-                .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+                .dataSource(DATABASE.getJdbcUrl(), DATABASE.getUsername(), DATABASE.getPassword())
                 .target("202609051000")
                 .load()
                 .migrate();
@@ -65,9 +53,14 @@ class RatingHalfStepMigrationTest {
         }
 
         Flyway.configure()
-                .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+                .dataSource(DATABASE.getJdbcUrl(), DATABASE.getUsername(), DATABASE.getPassword())
                 .load()
                 .migrate();
+    }
+
+    @AfterAll
+    static void dropDatabase() {
+        DATABASE.close();
     }
 
     @Test
@@ -175,7 +168,6 @@ class RatingHalfStepMigrationTest {
     }
 
     private static Connection connect() throws SQLException {
-        return DriverManager.getConnection(
-                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+        return DATABASE.connect();
     }
 }
