@@ -37,6 +37,7 @@ def settings():
         output_uri="/output",
         input_snapshot="sha256:fixture-v1",
         implementation_revision="abc123",
+        movie_metadata_revision="sha256:" + "b" * 64,
         run_id="run-a1",
         seed=42,
         train_ratio=0.8,
@@ -62,8 +63,10 @@ def test_stage_order_data_boundaries_reload_and_metric_attribution(monkeypatch):
         ratings=source,
         service_movie_map=Frame("map"),
         ratings_count=64,
+        mapping_revision="sha256:" + "a" * 64,
     )
     events = []
+    artifact_revisions = []
     versions = iter(("selection-a", "selection-b", "final-b", "serving-b"))
 
     monkeypatch.setattr(module, "split_ratings", lambda *args, **kwargs: splits)
@@ -77,6 +80,9 @@ def test_stage_order_data_boundaries_reload_and_metric_attribution(monkeypatch):
     monkeypatch.setattr(module, "train_als_model", train_model)
 
     def save(_spark, model, output_uri, metadata):
+        artifact_revisions.append(
+            (metadata.mapping_revision, metadata.movie_metadata_revision)
+        )
         events.append(
             (
                 "save",
@@ -264,6 +270,9 @@ def test_stage_order_data_boundaries_reload_and_metric_attribution(monkeypatch):
     assert selected_report["evidence"]["stage"] == "validation"
     assert report["final_evaluation"]["evidence"]["stage"] == "test"
     assert result.serving_model_version == "serving-b"
+    assert artifact_revisions == [
+        ("sha256:" + "a" * 64, "sha256:" + "b" * 64)
+    ] * 4
 
 
 def test_existing_run_is_rejected_before_split_training_or_writes(monkeypatch):
@@ -282,7 +291,8 @@ def test_existing_run_is_rejected_before_split_training_or_writes(monkeypatch):
     monkeypatch.setattr(module, "ChunkedEvidenceWriter", pytest.fail, raising=False)
     monkeypatch.setattr(module, "write_run_report", pytest.fail)
     inputs = SimpleNamespace(
-        ratings=Frame("source"), service_movie_map=Frame("map"), ratings_count=64
+        ratings=Frame("source"), service_movie_map=Frame("map"), ratings_count=64,
+        mapping_revision="sha256:" + "a" * 64,
     )
 
     with pytest.raises(FileExistsError) as caught:
@@ -354,7 +364,8 @@ def test_candidate_failure_stops_later_stages_and_never_completes_report(monkeyp
         lambda spark, output, report, *, complete: reports.append((report, complete)),
     )
     inputs = SimpleNamespace(
-        ratings=Frame("source"), service_movie_map=Frame("map"), ratings_count=64
+        ratings=Frame("source"), service_movie_map=Frame("map"), ratings_count=64,
+        mapping_revision="sha256:" + "a" * 64,
     )
 
     with pytest.raises(RuntimeError, match="injected candidate failure"):
@@ -414,7 +425,8 @@ def test_chunk_failure_context_is_kept_in_incomplete_report(monkeypatch):
         lambda spark, output, report, *, complete: reports.append((report, complete)),
     )
     inputs = SimpleNamespace(
-        ratings=Frame("source"), service_movie_map=Frame("map"), ratings_count=64
+        ratings=Frame("source"), service_movie_map=Frame("map"), ratings_count=64,
+        mapping_revision="sha256:" + "a" * 64,
     )
 
     with pytest.raises(RuntimeError, match="injected chunk failure"):
@@ -449,7 +461,8 @@ def test_report_records_explicit_user_chunk_size(monkeypatch):
     monkeypatch.setattr(module, "split_ratings", stop_after_report_initialization)
 
     inputs = SimpleNamespace(
-        ratings=Frame("source"), service_movie_map=Frame("map"), ratings_count=64
+        ratings=Frame("source"), service_movie_map=Frame("map"), ratings_count=64,
+        mapping_revision="sha256:" + "a" * 64,
     )
     with pytest.raises(RuntimeError, match="stop after report initialization"):
         module.run_baseline(object(), inputs, settings())
@@ -521,7 +534,8 @@ def test_job_failure_abort_logs_all_owned_evidence_cleanup_failures(monkeypatch,
 
     caplog.set_level(logging.ERROR, logger=module.__name__)
     inputs = SimpleNamespace(
-        ratings=Frame("source"), service_movie_map=Frame("map"), ratings_count=64
+        ratings=Frame("source"), service_movie_map=Frame("map"), ratings_count=64,
+        mapping_revision="sha256:" + "a" * 64,
     )
 
     with pytest.raises(RuntimeError) as caught:
@@ -692,7 +706,8 @@ def test_finalized_evidence_rolls_back_after_later_job_failure(
     monkeypatch.setattr(report_module, "_hadoop_path", hadoop_path)
     caplog.set_level(logging.ERROR, logger=module.__name__)
     inputs = SimpleNamespace(
-        ratings=Frame("source"), service_movie_map=Frame("map"), ratings_count=64
+        ratings=Frame("source"), service_movie_map=Frame("map"), ratings_count=64,
+        mapping_revision="sha256:" + "a" * 64,
     )
     with pytest.raises(RuntimeError) as caught:
         module.run_baseline(evidence_spark, inputs, config)

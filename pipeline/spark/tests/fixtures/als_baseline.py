@@ -31,6 +31,7 @@ SERVICE_MOVIE_MAP_SCHEMA = StructType(
         StructField("tmdb_id", IntegerType(), False),
         StructField("movielens_movie_id", IntegerType(), True),
         StructField("mapping_status", StringType(), False),
+        StructField("mapping_revision", StringType(), False),
     ]
 )
 
@@ -55,10 +56,14 @@ def _rating_rows() -> list[tuple[int, int, float, int, datetime]]:
 
 
 RATING_ROWS = _rating_rows()
+MAPPING_REVISION = "sha256:" + "a" * 64
 SERVICE_MOVIE_MAP_ROWS = [
-    *[(10_000 + movie_id, 20_000 + movie_id, movie_id, "MATCHED") for movie_id in range(1, 13)],
-    (10_901, 20_901, None, "SERVICE_ONLY_CONTENT_BASED"),
-    (10_902, 20_902, None, "TMDB_ID_AMBIGUOUS"),
+    *[
+        (10_000 + movie_id, 20_000 + movie_id, movie_id, "MATCHED", MAPPING_REVISION)
+        for movie_id in range(1, 13)
+    ],
+    (10_901, 20_901, None, "SERVICE_ONLY_CONTENT_BASED", MAPPING_REVISION),
+    (10_902, 20_902, None, "TMDB_ID_AMBIGUOUS", MAPPING_REVISION),
 ]
 
 

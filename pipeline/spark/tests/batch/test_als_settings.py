@@ -5,6 +5,8 @@ import pytest
 
 from batch.train.settings import DEFAULT_ALS_CONFIGS, AlsConfig, AlsJobSettings
 
+MOVIE_METADATA_REVISION = "sha256:" + "b" * 64
+
 
 def test_uses_reproducible_baseline_defaults() -> None:
     settings = AlsJobSettings.from_sources(environ={}, argv=[])
@@ -140,6 +142,7 @@ def test_run_mode_requires_write_and_reproduction_values() -> None:
         "--input-manifest-uri",
         "--input-snapshot",
         "--implementation-revision",
+        "--movie-metadata-revision",
     ):
         arguments = [
             "--mode",
@@ -154,6 +157,8 @@ def test_run_mode_requires_write_and_reproduction_values() -> None:
             "sha256:fixture-v1",
             "--implementation-revision",
             "abc123",
+            "--movie-metadata-revision",
+            MOVIE_METADATA_REVISION,
         ]
         del arguments[arguments.index(missing_option) : arguments.index(missing_option) + 2]
         message = missing_option.removeprefix("--").replace("-", " ")
@@ -179,6 +184,8 @@ def test_run_context_is_fully_resolved_before_spark_creation() -> None:
             "run-20260909-a1",
             "--implementation-revision",
             "abc123",
+            "--movie-metadata-revision",
+            MOVIE_METADATA_REVISION,
         ],
     )
     context = settings.require_run_context()
@@ -187,6 +194,7 @@ def test_run_context_is_fully_resolved_before_spark_creation() -> None:
     assert context.input_snapshot == "sha256:fixture-v1"
     assert context.run_id == "run-20260909-a1"
     assert context.implementation_revision == "abc123"
+    assert context.movie_metadata_revision == MOVIE_METADATA_REVISION
 
 
 def test_new_run_fields_are_cli_only_and_run_id_is_generated() -> None:
@@ -201,6 +209,8 @@ def test_new_run_fields_are_cli_only_and_run_id_is_generated() -> None:
         "file:///snapshots/fixture-v1/manifest.json",
         "--input-snapshot",
         "sha256:fixture-v1",
+        "--movie-metadata-revision",
+        MOVIE_METADATA_REVISION,
         "--implementation-revision",
         "cli-revision",
     ]
@@ -214,6 +224,13 @@ def test_new_run_fields_are_cli_only_and_run_id_is_generated() -> None:
     assert first.implementation_revision == "cli-revision"
     assert first.run_id != second.run_id
     assert first.run_id.startswith("als-")
+
+
+@pytest.mark.parametrize("revision", ["", "latest", "sha256:not-a-digest", "sha256:" + "A" * 64])
+def test_run_rejects_invalid_movie_metadata_revision(revision: str) -> None:
+    arguments = run_arguments("--movie-metadata-revision", revision)
+    with pytest.raises(ValueError, match="(?i)movie metadata revision"):
+        AlsJobSettings.from_sources(environ={}, argv=arguments)
 
 
 @pytest.mark.parametrize(
@@ -241,6 +258,8 @@ def test_run_rejects_unsafe_paths_and_mutable_identifiers(arguments) -> None:
         "sha256:fixture-v1",
         "--implementation-revision",
         "abc123",
+        "--movie-metadata-revision",
+        MOVIE_METADATA_REVISION,
     ]
     overridden = {arguments[index]: arguments[index + 1] for index in range(0, len(arguments), 2)}
     options = {base[index]: base[index + 1] for index in range(0, len(base), 2)}
@@ -283,6 +302,7 @@ def run_arguments(*overrides: str) -> list[str]:
         "--input-manifest-uri": "file:///snapshots/fixture-v1/manifest.json",
         "--input-snapshot": "sha256:fixture-v1",
         "--implementation-revision": "abc123",
+        "--movie-metadata-revision": MOVIE_METADATA_REVISION,
     }
     options.update(
         {overrides[index]: overrides[index + 1] for index in range(0, len(overrides), 2)}

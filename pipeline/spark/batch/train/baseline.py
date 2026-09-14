@@ -61,6 +61,7 @@ def run_baseline(spark, inputs, settings) -> BaselineResult:
             input_snapshot=settings.input_snapshot,
             run_id=settings.run_id,
             implementation_revision=settings.implementation_revision,
+            movie_metadata_revision=settings.movie_metadata_revision,
         )
     reserve_run_report(spark, context.output_uri, context.run_id)
     assignments = None
@@ -126,6 +127,8 @@ def run_baseline(spark, inputs, settings) -> BaselineResult:
                 config,
                 source_count,
                 train_count,
+                inputs.mapping_revision,
+                context.movie_metadata_revision,
             )
             artifact_uri = save_als_artifacts(spark, model, context.output_uri, metadata)
             loaded = load_als_artifacts(spark, context.output_uri, version)
@@ -203,6 +206,8 @@ def run_baseline(spark, inputs, settings) -> BaselineResult:
                 selected.config,
                 source_count,
                 train_count + validation_count,
+                inputs.mapping_revision,
+                context.movie_metadata_revision,
             ),
         )
         final_loaded = load_als_artifacts(spark, context.output_uri, final_version)
@@ -256,6 +261,8 @@ def run_baseline(spark, inputs, settings) -> BaselineResult:
                 selected.config,
                 source_count,
                 source_count,
+                inputs.mapping_revision,
+                context.movie_metadata_revision,
             ),
         )
         load_als_artifacts(spark, context.output_uri, serving_version)
@@ -298,7 +305,17 @@ def run_baseline(spark, inputs, settings) -> BaselineResult:
             assignments.unpersist()
 
 
-def _metadata(settings, context, version, stage, config, source_count, training_count):
+def _metadata(
+    settings,
+    context,
+    version,
+    stage,
+    config,
+    source_count,
+    training_count,
+    mapping_revision,
+    movie_metadata_revision,
+):
     split_values = {}
     if stage != SERVING:
         split_values = {
@@ -319,6 +336,8 @@ def _metadata(settings, context, version, stage, config, source_count, training_
         source_ratings_count=source_count,
         training_ratings_count=training_count,
         implementation_revision=context.implementation_revision,
+        mapping_revision=mapping_revision,
+        movie_metadata_revision=movie_metadata_revision,
         **split_values,
     )
 

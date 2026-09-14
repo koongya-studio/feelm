@@ -29,6 +29,7 @@ class AlsRunContext:
     input_snapshot: str
     run_id: str
     implementation_revision: str
+    movie_metadata_revision: str
 
 
 DEFAULT_ALS_CONFIGS = (
@@ -86,6 +87,7 @@ class AlsJobSettings:
     input_snapshot: str | None
     run_id: str | None
     implementation_revision: str | None
+    movie_metadata_revision: str | None
 
     @classmethod
     def from_sources(
@@ -147,6 +149,7 @@ class AlsJobSettings:
         parser.add_argument("--input-manifest-uri")
         parser.add_argument("--run-id")
         parser.add_argument("--implementation-revision")
+        parser.add_argument("--movie-metadata-revision")
         arguments = parser.parse_args(argv)
 
         configured_values = arguments.als_config
@@ -174,6 +177,7 @@ class AlsJobSettings:
             input_snapshot=arguments.input_snapshot,
             run_id=arguments.run_id or (_new_run_id() if arguments.mode == "run" else None),
             implementation_revision=arguments.implementation_revision,
+            movie_metadata_revision=arguments.movie_metadata_revision,
         )
         settings.validate()
         if settings.mode == "run":
@@ -226,6 +230,10 @@ class AlsJobSettings:
             raise ValueError("input snapshot must be an immutable identifier")
         if not self.implementation_revision:
             raise ValueError("implementation revision is required")
+        if not self.movie_metadata_revision:
+            raise ValueError("movie metadata revision is required")
+        if not re.fullmatch(r"sha256:[0-9a-f]{64}", self.movie_metadata_revision):
+            raise ValueError("movie metadata revision must be a sha256 digest")
         if not self.input_uri:
             raise ValueError("input URI is required")
         validate_storage_uri(self.input_uri, "input")
@@ -244,6 +252,7 @@ class AlsJobSettings:
             input_snapshot=self.input_snapshot,
             run_id=run_id,
             implementation_revision=self.implementation_revision,
+            movie_metadata_revision=self.movie_metadata_revision,
         )
 
 

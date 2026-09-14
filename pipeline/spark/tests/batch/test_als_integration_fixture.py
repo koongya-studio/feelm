@@ -103,6 +103,8 @@ def test_small_real_als_run_saves_reloads_and_attributes_versions(spark, tmp_pat
             "fixture-run",
             "--implementation-revision",
             "synthetic-test-fixture",
+            "--movie-metadata-revision",
+            "sha256:" + "b" * 64,
             "--candidate-size",
             "10",
             "--als-config",
@@ -134,6 +136,11 @@ def test_small_real_als_run_saves_reloads_and_attributes_versions(spark, tmp_pat
     assert report["final_evaluation"]["model_version"] != result.serving_model_version
     assert report["final_evaluation"]["test"]["movielens"]["evaluated_users"] > 0
     assert report["status"] == "SUCCEEDED"
+    serving = baseline.load_als_artifacts(
+        spark, output.as_uri(), result.serving_model_version
+    ).metadata.first()
+    assert serving.mapping_revision == inputs.mapping_revision
+    assert serving.movie_metadata_revision == "sha256:" + "b" * 64
 
 
 def test_cluster_submit_wrapper_exists_at_spark_project_root():
