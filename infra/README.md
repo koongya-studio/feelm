@@ -1043,6 +1043,14 @@ GitLab에서 관리하고 서버에서 직접 수정하지 않습니다. 현재 
 
 ### Pipeline and Deployment
 
+`runner-check`는 보호된 `develop`의 Push Pipeline에서 `.gitlab-ci.yml`, 공통 CI Job 설정,
+GitLab Runner 설치 스크립트 또는 Runner가 의존하는 systemd·네트워크 가드 파일이 변경될
+때만 자동 실행합니다. 애플리케이션 코드나 문서만 변경한 Pipeline에서는 자동 실행하지 않고
+비차단 수동 Job으로 남습니다. Runner 연결이나 Docker 실행 환경을 즉시 점검해야 하는 운영자는
+가장 최근의 보호된 `develop` Push Pipeline에서 `runner-check`의 실행 버튼을 누릅니다.
+이 Job은 호스트·실행 계정과 `docker --version`, `docker compose version`을 확인하며, 수동
+실행 실패는 기능 Pipeline을 차단하지 않습니다. 별도 정기 Scheduler는 운영하지 않습니다.
+
 데이터 저장소 관련 파일이 보호된 `develop`에 병합되면 `datastore-config-check` Job이
 Compose와 셸 스크립트 문법을 검사하고, 포트를 게시하지 않은 임시 Redis에서 관리자
 인증·미인증 차단·조회 전용 ACL을 확인합니다. 이 Job을 통과해야 백엔드 이미지를 빌드하고
