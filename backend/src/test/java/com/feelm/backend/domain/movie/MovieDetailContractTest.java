@@ -23,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.feelm.backend.global.security.TokenProvider;
+import com.feelm.backend.support.SharedPostgresContractTest;
 import com.redis.testcontainers.RedisContainer;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -45,15 +46,11 @@ import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -69,27 +66,12 @@ import tools.jackson.databind.ObjectMapper;
 @Testcontainers
 @Transactional
 @DisplayName("API-030 영화 상세 — PostgreSQL 계약")
-class MovieDetailContractTest {
+class MovieDetailContractTest extends SharedPostgresContractTest {
 
     private static final String PATH = "/api/v1/movies/{movieId}";
 
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>(
-                            DockerImageName.parse("pgvector/pgvector:0.8.6-pg17-bookworm")
-                                    .asCompatibleSubstituteFor("postgres"))
-                    .withEnv("POSTGRES_INITDB_ARGS", "--locale=C.UTF-8");
-
     @Container @ServiceConnection
     static final RedisContainer REDIS = new RedisContainer("redis:8-alpine");
-
-    @DynamicPropertySource
-    static void databaseProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-    }
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;

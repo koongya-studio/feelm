@@ -13,6 +13,7 @@ final class MovieSearchFixture {
     private MovieSearchFixture() {}
 
     static void seed(JdbcTemplate jdbc) {
+        jdbc.execute("TRUNCATE TABLE users, movies, genres, otts, people RESTART IDENTITY CASCADE");
         jdbc.update(
                 """
                 INSERT INTO users (id, email, nickname, birth_date, gender, status)

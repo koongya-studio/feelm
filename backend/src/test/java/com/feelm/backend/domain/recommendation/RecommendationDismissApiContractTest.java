@@ -17,6 +17,7 @@ import com.feelm.backend.domain.recommendation.service.RecommendationDismissServ
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.infrastructure.kafka.KafkaEventPublisher;
 import com.feelm.backend.infrastructure.kafka.KafkaEventType;
+import com.feelm.backend.support.SharedPostgresContractTest;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -36,15 +37,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /** API-047: 실제 마이그레이션과 PostgreSQL을 사용하는 관심없음 HTTP 계약 테스트. */
 @SpringBootTest(
@@ -54,9 +49,8 @@ import org.testcontainers.utility.DockerImageName;
             "spring.task.scheduling.enabled=false"
         })
 @AutoConfigureMockMvc
-@Testcontainers
 @DisplayName("API-047 관심없음 처리")
-class RecommendationDismissApiContractTest {
+class RecommendationDismissApiContractTest extends SharedPostgresContractTest {
 
     private static final long USER = 10;
     private static final long OTHER_USER = 20;
@@ -71,20 +65,6 @@ class RecommendationDismissApiContractTest {
     private static final long DISCOVERY_ITEM = 3002;
     private static final long OTHER_USER_ITEM = 4000;
 
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>(
-                    DockerImageName.parse("pgvector/pgvector:0.8.6-pg17-bookworm")
-                            .asCompatibleSubstituteFor("postgres"));
-
-    @DynamicPropertySource
-    static void database(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-    }
-
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired TokenProvider tokens;
@@ -98,7 +78,8 @@ class RecommendationDismissApiContractTest {
     void fixtures() {
         jdbc.execute(
                 "TRUNCATE TABLE outbox_events, user_movie_dismissals, recommendation_items,"
-                        + " recommendation_sets, movies, users RESTART IDENTITY CASCADE");
+                        + " recommendation_sets, movies, users, popcorn_flavors, genres, otts"
+                        + " RESTART IDENTITY CASCADE");
         user(USER, "user");
         user(OTHER_USER, "other");
         movie(TASTE_MOVIE, "현재 취향 추천");
