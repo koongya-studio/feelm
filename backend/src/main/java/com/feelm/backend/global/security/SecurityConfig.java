@@ -55,12 +55,15 @@ public class SecurityConfig {
     /**
      * GET만 공개인 조회 API. 메서드를 함께 묶어 같은 경로에 쓰기 계열이 생겨도 자동으로 열리지 않게 한다(리뷰 B-3).
      *
-     * <p>API-044 팝콘 맛 기준정보, API-016 닉네임 사용 가능 확인, API-025 OTT 목록이 여기에 속한다. 닉네임 확인은 회원 구분인 {@code
-     * /api/v1/users/me} 계열과 접두사를 공유하므로 와일드카드 없이 정확 경로만 적는다. OTT도 같은 이유로 구독 설정 경로({@code
-     * /api/v1/users/me/otts})와 분리된 정확 경로만 연다.
+     * <p>API-044 팝콘 맛 기준정보, API-016 닉네임 사용 가능 확인, API-025 OTT 목록, API-029 검색 필터 옵션이 여기에 속한다. 닉네임
+     * 확인은 회원 구분인 {@code /api/v1/users/me} 계열과 접두사를 공유하므로 와일드카드 없이 정확 경로만 적는다. OTT도 같은 이유로 구독 설정
+     * 경로({@code /api/v1/users/me/otts})와 분리된 정확 경로만 연다.
      */
     private static final String[] PUBLIC_GET_PATHS = {
-        "/api/v1/popcorn-flavors", "/api/v1/users/nickname-availability", "/api/v1/otts"
+        "/api/v1/popcorn-flavors",
+        "/api/v1/users/nickname-availability",
+        "/api/v1/otts",
+        "/api/v1/movies/filter-options"
     };
 
     /** Nginx가 별도 접근 제어하는 Swagger 문서 경로. 일반 API 공개 목록과 분리한다. */
@@ -120,8 +123,8 @@ public class SecurityConfig {
                                         .permitAll()
                                         .requestMatchers(HttpMethod.GET, SWAGGER_PATHS)
                                         .permitAll()
-                                        // API-044·API-025 기준정보와 API-016 닉네임 확인은 로그인 전
-                                        // 화면에서도 쓰는 공개 조회다. GET에만 열어 둔다.
+                                        // API-044·API-025·API-029 기준정보와 API-016 닉네임 확인은
+                                        // 로그인 전 화면에서도 쓰는 공개 조회다. GET에만 열어 둔다.
                                         .requestMatchers(HttpMethod.GET, PUBLIC_GET_PATHS)
                                         .permitAll()
                                         .requestMatchers(PUBLIC_PATHS)
