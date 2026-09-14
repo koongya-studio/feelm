@@ -462,6 +462,13 @@ ApplicationContext를 재사용할 수 있습니다.
 - 허용된 공통 지원 코드 밖에서 `PostgreSQLContainer`나 `RedisContainer`를 직접 생성하면
   `SharedTestcontainerPolicyTest`가 빌드를 실패시킵니다.
 
+JUnit은 테스트 클래스 두 개를 병렬로 실행하되, 한 클래스 안의 테스트 메서드는 순차로
+실행합니다. `@SpringBootTest` 또는 공유 PostgreSQL·Redis를 사용하는 테스트는
+`@SharedTestRuntime`을 직접 선언하거나 해당 annotation이 붙은 공통 지원 클래스를
+상속해야 합니다. 이 테스트들은 동일한 resource lock을 사용해 서로 순차 실행되고, 공유
+상태가 없는 단위 테스트와 database 단위로 격리된 migration 테스트만 병렬 실행됩니다.
+`ParallelTestExecutionPolicyTest`는 병렬 설정과 Spring 통합 테스트의 lock 누락을 검사합니다.
+
 ### Windows
 
 ```powershell

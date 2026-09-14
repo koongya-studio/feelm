@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import com.feelm.backend.global.security.TokenProvider;
+import com.feelm.backend.support.SharedTestRuntime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,7 @@ import org.springframework.test.web.servlet.MvcResult;
         })
 @AutoConfigureMockMvc
 @DisplayName("Swagger 비활성 환경 — 문서 미노출")
+@SharedTestRuntime
 class OpenApiDisabledContractTest {
 
     @Autowired private MockMvc mockMvc;

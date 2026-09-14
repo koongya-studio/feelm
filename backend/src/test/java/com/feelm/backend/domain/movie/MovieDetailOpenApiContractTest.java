@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.feelm.backend.global.error.ErrorCode;
 import com.feelm.backend.global.error.ErrorResponse;
 import com.feelm.backend.global.security.SecurityConfig;
+import com.feelm.backend.support.SharedTestRuntime;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,6 +32,7 @@ import tools.jackson.databind.ObjectMapper;
             "feelm.auth.mock.enabled=false"
         })
 @AutoConfigureMockMvc
+@SharedTestRuntime
 class MovieDetailOpenApiContractTest {
 
     private static final String PATH = "/api/v1/movies/{movieId}";

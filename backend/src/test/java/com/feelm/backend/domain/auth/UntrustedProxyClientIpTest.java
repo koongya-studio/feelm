@@ -2,6 +2,7 @@ package com.feelm.backend.domain.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.feelm.backend.support.SharedTestRuntime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -28,6 +29,7 @@ import org.springframework.context.annotation.Import;
         })
 @Import(ClientIpEchoSecurityConfig.class)
 @DisplayName("신뢰하지 않는 발신지의 전달 헤더 — S15P21E106-288")
+@SharedTestRuntime
 class UntrustedProxyClientIpTest extends ProxyClientIpTestSupport {
 
     private static final String PEER = "127.0.0.1";

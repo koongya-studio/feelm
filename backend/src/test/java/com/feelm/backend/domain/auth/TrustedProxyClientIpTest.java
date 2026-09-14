@@ -2,6 +2,7 @@ package com.feelm.backend.domain.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.feelm.backend.support.SharedTestRuntime;
 import com.redis.testcontainers.RedisContainer;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -36,6 +37,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
         })
 @Import(ClientIpEchoSecurityConfig.class)
 @DisplayName("신뢰하는 프록시의 X-Real-IP — S15P21E106-288")
+@SharedTestRuntime
 class TrustedProxyClientIpTest extends ProxyClientIpTestSupport {
 
     @ServiceConnection static RedisContainer redis = EmailAuthApiTestSupport.redis;

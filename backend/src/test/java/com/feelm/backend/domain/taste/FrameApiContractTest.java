@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.feelm.backend.global.security.TokenProvider;
+import com.feelm.backend.support.SharedTestRuntime;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.sql.Date;
@@ -27,6 +28,7 @@ import tools.jackson.databind.ObjectMapper;
 @SpringBootTest(properties = "spring.jpa.hibernate.ddl-auto=none")
 @AutoConfigureMockMvc
 @DisplayName("프레임 조회 API — API-042·043 계약")
+@SharedTestRuntime
 class FrameApiContractTest {
 
     private static final String FRAMES_PATH = "/api/v1/users/me/frames";

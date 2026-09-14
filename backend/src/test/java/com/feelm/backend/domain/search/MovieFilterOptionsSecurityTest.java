@@ -13,6 +13,7 @@ import com.feelm.backend.domain.search.dto.response.MovieFilterOptionsResponse.O
 import com.feelm.backend.domain.search.dto.response.MovieFilterOptionsResponse.OttOption;
 import com.feelm.backend.domain.search.dto.response.MovieFilterOptionsResponse.YearRange;
 import com.feelm.backend.domain.search.repository.MovieFilterOptionsRepository;
+import com.feelm.backend.support.SharedTestRuntime;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,6 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = "feelm.auth.mock.enabled=false")
 @AutoConfigureMockMvc
+@SharedTestRuntime
 class MovieFilterOptionsSecurityTest {
 
     @Autowired private MockMvc mockMvc;

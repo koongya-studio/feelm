@@ -10,6 +10,7 @@ import com.feelm.backend.infrastructure.mail.RecordingAuthMailSender;
 import com.feelm.backend.infrastructure.mail.RecordingMailSends;
 import com.feelm.backend.support.SharedRedisContainer;
 import com.feelm.backend.support.SharedRedisState;
+import com.feelm.backend.support.SharedTestRuntime;
 import com.redis.testcontainers.RedisContainer;
 import jakarta.servlet.http.Cookie;
 import java.time.Duration;
@@ -22,6 +23,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -56,8 +58,10 @@ import tools.jackson.databind.ObjectMapper;
  * 않는다. 비밀번호 재설정 토큰(API-010)도 같은 스파이가 종류별로 나눠 기록한다(S15P21E106-284).
  */
 @SpringBootTest
+@SharedTestRuntime
 @AutoConfigureMockMvc
 @ExtendWith(OutputCaptureExtension.class)
+@ResourceLock("backend-output-capture")
 @Import(RecordingAuthMailSender.Registrar.class)
 abstract class EmailAuthApiTestSupport {
 

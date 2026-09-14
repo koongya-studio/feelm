@@ -11,6 +11,7 @@ import org.testcontainers.utility.DockerImageName;
  * <p>{@code @Container}로 등록하지 않고 직접 한 번 시작한다. JUnit 클래스 단위 종료로 매핑 포트가 바뀌지 않으므로 동일한 Spring 설정을 사용하는
  * 테스트 클래스는 ApplicationContext도 재사용할 수 있다. 컨테이너 정리는 JVM 종료 시 Testcontainers의 Ryuk에 맡긴다.
  */
+@SharedTestRuntime
 public abstract class SharedPostgresContractTest {
 
     private static final PostgreSQLContainer<?> POSTGRES = startPostgres();
