@@ -7,9 +7,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.feelm.backend.global.security.TokenProvider;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.Base64;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -149,6 +151,36 @@ class FrameApiContractTest {
                                 .header("Authorization", bearerFor(10)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    /**
+     * 형식은 맞지만 커서가 담을 수 있는 범위를 벗어난 시각. 상한을 넘는 값은 질의로 내려가면 드라이버나 DB가 거절해 클라이언트 입력이 500이 되고, 하한 미만은
+     * 저장된 생성 시각일 수 없다.
+     */
+    @Test
+    @DisplayName("허용 범위를 벗어난 시각을 담은 커서는 검증 오류로 응답한다")
+    void rejectsUnstorableCursorInstant() throws Exception {
+        String[] cursors = {
+            forgedCursor("+999999999-12-31T23:59:59Z:1"),
+            forgedCursor("+0500000-01-01T00:00:00Z:1"),
+            forgedCursor("1900-01-01T00:00:00Z:1")
+        };
+
+        for (String cursor : cursors) {
+            mockMvc.perform(
+                            get(FRAMES_PATH)
+                                    .param("cursor", cursor)
+                                    .header("Authorization", bearerFor(10)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        }
+    }
+
+    /** 서버가 만들지 않은 커서를 흉내낸다. 인코딩 형식만 맞추고 값은 임의로 넣는다. */
+    private String forgedCursor(String raw) {
+        return Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(raw.getBytes(StandardCharsets.UTF_8));
     }
 
     @Test
