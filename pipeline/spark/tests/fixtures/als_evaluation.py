@@ -6,7 +6,11 @@ import pytest
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
-from tests.fixtures.als_baseline import RATINGS_SCHEMA, SERVICE_MOVIE_MAP_SCHEMA
+from tests.fixtures.als_baseline import (
+    MAPPING_REVISION,
+    RATINGS_SCHEMA,
+    SERVICE_MOVIE_MAP_SCHEMA,
+)
 
 USER = "movielens_user_id"
 ITEM = "movielens_movie_id"
@@ -42,10 +46,10 @@ def ratings(spark, rows):
 def mapping(spark, items):
     # Deliberately outside int32; a cast to int must fail the assertions.
     return spark.createDataFrame(
-        [(2**33 + i, 1000 + i, i, "MATCHED") for i in items]
+        [(2**33 + i, 1000 + i, i, "MATCHED", MAPPING_REVISION) for i in items]
         + [
-            (2**34, 2000, None, "SERVICE_ONLY_CONTENT_BASED"),
-            (2**34 + 1, 2001, None, "TMDB_ID_AMBIGUOUS"),
+            (2**34, 2000, None, "SERVICE_ONLY_CONTENT_BASED", MAPPING_REVISION),
+            (2**34 + 1, 2001, None, "TMDB_ID_AMBIGUOUS", MAPPING_REVISION),
         ],
         SERVICE_MOVIE_MAP_SCHEMA,
     )
