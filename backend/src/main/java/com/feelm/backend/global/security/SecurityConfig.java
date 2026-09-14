@@ -19,6 +19,7 @@ import org.springframework.util.AntPathMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.util.UrlPathHelper;
 
 /**
  * 인증·인가 필터 체인을 구성한다.
@@ -73,6 +74,9 @@ public class SecurityConfig {
 
     /** OpenAPI가 런타임과 같은 공개 API 계약을 표시할 때 사용하는 판정이다. */
     public static boolean isPublicApi(HttpMethod method, String path) {
+        if (isOptionalAuthenticationApi(method, path)) {
+            return true;
+        }
         if (HttpMethod.GET.equals(method)) {
             for (String getOnlyPath : PUBLIC_GET_PATHS) {
                 if (getOnlyPath.equals(path)) {
@@ -86,6 +90,14 @@ public class SecurityConfig {
             }
         }
         return false;
+    }
+
+    /** API-030은 선택 인증이다. 정적 검색·필터 경로는 영화 ID 템플릿에 포함하지 않는다. */
+    public static boolean isOptionalAuthenticationApi(HttpMethod method, String path) {
+        return HttpMethod.GET.equals(method)
+                && !path.equals("/api/v1/movies/search")
+                && !path.equals("/api/v1/movies/filter-options")
+                && PATH_MATCHER.match("/api/v1/movies/{movieId}", path);
     }
 
     private final TokenProvider tokenProvider;
@@ -123,11 +135,16 @@ public class SecurityConfig {
                                         .permitAll()
                                         .requestMatchers(HttpMethod.GET, SWAGGER_PATHS)
                                         .permitAll()
-                                        // API-044·API-025·API-029 기준정보와 API-016 닉네임 확인은
-                                        // 로그인 전 화면에서도 쓰는 공개 조회다. GET에만 열어 둔다.
-                                        .requestMatchers(HttpMethod.GET, PUBLIC_GET_PATHS)
-                                        .permitAll()
-                                        .requestMatchers(PUBLIC_PATHS)
+                                        // API-029 등 공개 GET과 API-030 선택 인증을 같은 정책으로 판정한다.
+                                        // context path·URL 인코딩도 정규화한다.
+                                        .requestMatchers(
+                                                request ->
+                                                        isPublicApi(
+                                                                HttpMethod.valueOf(
+                                                                        request.getMethod()),
+                                                                UrlPathHelper.defaultInstance
+                                                                        .getPathWithinApplication(
+                                                                                request)))
                                         .permitAll()
                                         .anyRequest()
                                         .authenticated())
