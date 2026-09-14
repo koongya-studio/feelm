@@ -58,7 +58,11 @@ include:
                          'infra/scripts/ci-bounded-output.py',
                          'infra/scripts/ci-network-guard.py'):
                 self.assertIn('- ' + path, block)
-        self.assertIn('- backend/**/*', backend)
+        for path in ('backend/src/**/*', 'backend/scripts/**/*',
+                     'backend/gradle/**/*', 'backend/build.gradle',
+                     'backend/gradlew*', 'backend/Dockerfile*', 'backend/.*'):
+            self.assertIn('- ' + path, backend)
+        self.assertNotIn('- backend/**/*\n', backend)
         self.assertIn('- .gitlab/ci/backend.yml', backend)
         self.assertNotIn('- frontend/**/*', backend)
         self.assertNotIn('- .gitlab/ci/frontend.yml', backend)
