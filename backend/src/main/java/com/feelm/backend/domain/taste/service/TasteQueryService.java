@@ -2,10 +2,12 @@ package com.feelm.backend.domain.taste.service;
 
 import com.feelm.backend.domain.taste.dto.response.PopcornBucketResponse;
 import com.feelm.backend.domain.taste.dto.response.PopcornFlavorListResponse;
+import com.feelm.backend.domain.taste.dto.response.TasteAnalysisResponse;
 import com.feelm.backend.domain.taste.entity.PopcornFlavor;
 import com.feelm.backend.domain.taste.repository.PopcornBucketQueryRepository;
 import com.feelm.backend.domain.taste.repository.PopcornBucketQueryRepository.PopcornFlavorAggregate;
 import com.feelm.backend.domain.taste.repository.PopcornFlavorRepository;
+import com.feelm.backend.domain.taste.repository.TasteAnalysisRepository;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,12 +22,22 @@ public class TasteQueryService {
 
     private final PopcornFlavorRepository popcornFlavorRepository;
     private final PopcornBucketQueryRepository popcornBucketQueryRepository;
+    private final TasteAnalysisRepository tasteAnalysisRepository;
 
     public TasteQueryService(
             PopcornFlavorRepository popcornFlavorRepository,
-            PopcornBucketQueryRepository popcornBucketQueryRepository) {
+            PopcornBucketQueryRepository popcornBucketQueryRepository,
+            TasteAnalysisRepository tasteAnalysisRepository) {
         this.popcornFlavorRepository = popcornFlavorRepository;
         this.popcornBucketQueryRepository = popcornBucketQueryRepository;
+        this.tasteAnalysisRepository = tasteAnalysisRepository;
+    }
+
+    public TasteAnalysisResponse getTasteAnalysis(long userId) {
+        return tasteAnalysisRepository
+                .findByUserId(userId)
+                .map(TasteAnalysisResponse::from)
+                .orElseGet(TasteAnalysisResponse::empty);
     }
 
     public PopcornBucketResponse getPopcornBucket(long userId) {

@@ -64,6 +64,23 @@
 }
 ```
 
+아직 생성된 취향 분석 캐시가 없으면 다음과 같이 반환한다.
+
+```json
+{
+  "ratingCount": 0,
+  "insufficientData": true,
+  "analysis": {
+    "genres": [],
+    "countries": [],
+    "eras": [],
+    "directors": []
+  },
+  "keywords": [],
+  "analyzedAt": null
+}
+```
+
 ### 오류 응답
 
 - 공통 오류만 해당
@@ -73,7 +90,9 @@
 - 분석 요소는 최소 장르·국가·시대·감독을 포함한다
 - Spring은 평가 추가·수정·삭제 트랜잭션에서 `taste_analyses` 캐시를 갱신하고 이 API는 캐시된 결과를 반환한다
 - 평가가 하나도 없으면 `taste_analyses` 행을 만들지 않는다
-- 평가가 기준 미만(5건, 가정)이면 `insufficientData: true`와 빈 `keywords`
+- 캐시가 없거나 캐시의 `keywords`가 비어 있으면 `insufficientData: true`로 반환한다
+- `analysis` JSON은 `genres`, `countries`, `eras`, `directors` 배열로 구성하며 누락된 배열은 빈 배열로 반환한다
+- 캐시 JSON에 조회 API가 모르는 필드가 추가되어도 알려진 필드만 반환한다
 - 키워드는 사전 정의 목록에서만 선택하며 사용자당 3~5개
 
 ### 상태값
