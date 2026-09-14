@@ -34,7 +34,8 @@ Job·프로젝트·테스트 명령을 추가할 때 기존 어댑터를 느슨�
   `backend-cache-prepare`, `e106-mr-isolated`, 취소 가능
 - MR → develop: 프론트엔드 관련 경로 변경 시 `frontend-mr-test`, `e106-mr-isolated`, 취소 가능
 - develop push: 기존 `backend-test`와 빌드·수동 배포, `e106-shell`
-- `runner-check`: develop에서만 실행
+- `runner-check`: 보호된 develop push에서 공통 CI 연결 설정이나 Runner 설치·서비스·가드
+  파일이 바뀌면 자동 실행하고, 그 밖의 변경에는 비차단 수동 Job으로 대기
 
 MR Job에는 `GIT_STRATEGY: none`을 사용한다. 소스는 Runner checkout 결과가 아니라 인증된
 GitLab API의 정확한 커밋 archive를 사용한다. MR이 `.gitlab-ci.yml`을 바꿔 새 태그를 요청해도
