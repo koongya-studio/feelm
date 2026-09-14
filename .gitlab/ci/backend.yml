@@ -53,7 +53,17 @@ backend-mr-test:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
       changes:
-        - backend/**/*
+        - backend/src/**/*
+        - backend/scripts/**/*
+        - backend/gradle/**/*
+        - backend/build.gradle
+        - backend/build.gradle.kts
+        - backend/settings.gradle
+        - backend/settings.gradle.kts
+        - backend/gradle.properties
+        - backend/gradlew*
+        - backend/Dockerfile*
+        - backend/.*
         - .gitlab-ci.yml
         - .gitlab/ci/common.yml
         - .gitlab/ci/backend.yml
@@ -65,6 +75,7 @@ backend-mr-test:
         - infra/scripts/ci-job-*.py
         - infra/scripts/test_ci_gitlab_job_adapter.py
         - infra/scripts/test_ci_config.py
+        - infra/scripts/test_ci_backend_mr_paths.py
         - infra/scripts/ci-local-backend-*.py
         - infra/scripts/ci-server-manager-pilot.py
         - infra/scripts/rootless-backend/**/*
@@ -109,7 +120,7 @@ backend-test:
   stage: test
   tags: [e106-shell]
   script:
-    - python3 -B -m unittest infra.scripts.test_ci_config infra.scripts.test_ci_deploy_current_commit infra.scripts.test_deploy_backend infra.scripts.test_deploy_frontend -v
+    - python3 -B -m unittest infra.scripts.test_ci_config infra.scripts.test_ci_backend_mr_paths infra.scripts.test_ci_deploy_current_commit infra.scripts.test_deploy_backend infra.scripts.test_deploy_frontend -v
     - cd backend
     - ./gradlew clean test spotlessCheck --no-daemon --init-script gradle/test-timing.gradle
   rules:
