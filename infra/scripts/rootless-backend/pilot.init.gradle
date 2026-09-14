@@ -4,6 +4,8 @@ def allowedRepositoryUrls = [
     'https://plugins.gradle.org/m2/'
 ] as Set
 
+apply from: new File(gradle.startParameter.currentDir, 'gradle/test-timing.gradle')
+
 def enforceRepository = { repository ->
     if (!repository.hasProperty('url')) {
         throw new GradleException("CI dependency cache rejects non-Maven repository: ${repository.name}")

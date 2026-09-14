@@ -83,6 +83,24 @@ Git 명령은 고정 remote, 비대화형 인증, redirect 차단 환경에서 �
 실행할 MR Job이 없는 경우의 병합 기준과 검증 결과는
 [291 검증 기록](../verification/S15P21E106-291.md)을 참고한다.
 
+### 백엔드 테스트 실행시간 계측 (S15P21E106-412)
+
+백엔드 Gradle 빌드는 `backend/gradle/test-timing.gradle`에서 JVM 시작 이후 전체 시간과
+실행된 Gradle task 중 오래 걸린 20개를 기록한다. 테스트 클래스 시간은 Gradle이 생성한
+JUnit XML의 `testcase.time`을 합산해 상위 10개만 `BACKEND_TEST_TIMING=` JSON 한 줄로
+출력한다. 이 값은 성능 진단용이며 테스트 성공이나 격리 증거로 사용하지 않는다.
+
+develop의 `backend-test`는 Gradle 로그에서 이 줄을 직접 확인한다. 격리된
+`backend-mr-test`는 작업 출력 전체를 계속 숨기고, cgroup·컨테이너·임시 파일시스템 정리가
+검증된 뒤 root 수집기가 JUnit 건수와 시간 형식, 클래스명, 크기 제한을 재검증한 요약만
+외부 Job 로그에 출력한다. 비정상·과대·중복 값은 거부하며 Secret, 테스트 표준 출력 및
+테스트 메서드 이름은 공개하지 않는다.
+
+측정할 때는 동일 커밋 또는 같은 테스트 집합에서 각 Job을 3회 실행하고, Runner 대기시간은
+제외한 Job 실행시간의 중앙값과 범위를 기록한다. `gradle_seconds`, `slowest_tasks`,
+`slowest_classes`를 함께 비교해 컴파일·테스트·Spotless·개별 통합 테스트 중 후속 최적화
+대상을 선정한다.
+
 ## 구성 요소
 
 - `ci-gitlab-custom-executor.py`: 비특권 Runner callback. 생성된 셸 파일은 실행하지 않는다.

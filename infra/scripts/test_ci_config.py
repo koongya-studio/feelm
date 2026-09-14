@@ -78,6 +78,7 @@ include:
             self.assertNotIn(forbidden, block)
 
     def test_develop_build_and_deploy_chains_remain_serialized(self):
+        backend_test = job_block(self.backend, 'backend-test')
         backend_image = job_block(self.backend, 'backend-image')
         backend_deploy = job_block(self.backend, 'deploy-backend')
         frontend_image = job_block(self.frontend, 'frontend-image')
@@ -90,6 +91,7 @@ include:
         for block in (backend_deploy, frontend_deploy):
             self.assertIn('resource_group: service-and-backend-cache', block)
             self.assertIn('ci-deploy-current-commit.py', block)
+        self.assertIn('--init-script gradle/test-timing.gradle', backend_test)
 
 
 if __name__ == '__main__':

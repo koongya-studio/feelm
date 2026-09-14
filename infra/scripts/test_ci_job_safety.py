@@ -1,4 +1,6 @@
+from contextlib import redirect_stdout
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -129,6 +131,36 @@ class SafetyTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'bad'):
                 safety.start(Path('/stage'), Path('/prepared'), 'backend', b'bad', '0' * 64)
             validate.assert_called_once_with(b'bad', '0' * 64)
+
+    def test_backend_timing_publishes_only_validated_summary(self):
+        timing = {
+            'schema_version': 1, 'gradle_seconds': 12.345,
+            'slowest_tasks': [{'path': ':test', 'seconds': 8.5}],
+            'test_case_seconds': 1.25, 'test_count': 1,
+            'slowest_classes': [
+                {'class_name': 'com.example.Tests', 'seconds': 1.25, 'tests': 1}
+            ],
+            'informational_only': True,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            attempt = Path(directory)
+            evidence = attempt / 'evidence'; evidence.mkdir()
+            manifest = evidence / 'manifest.json'
+            manifest.write_text(json.dumps({'timing': timing}))
+            trusted = type('Info', (), {'st_uid': 0, 'st_mode': 0o100600,
+                                         'st_nlink': 1, 'st_size': manifest.stat().st_size})()
+            output = io.StringIO()
+            with patch.object(Path, 'lstat', return_value=trusted), redirect_stdout(output):
+                safety.publish_backend_timing(attempt, 'backend', required=True)
+            self.assertTrue(output.getvalue().startswith('BACKEND_TEST_TIMING='))
+
+    def test_backend_timing_rejects_unvalidated_content_on_success(self):
+        with tempfile.TemporaryDirectory() as directory:
+            attempt = Path(directory)
+            evidence = attempt / 'evidence'; evidence.mkdir()
+            (evidence / 'manifest.json').write_text(json.dumps({'timing': {'unsafe': 'value'}}))
+            with self.assertRaisesRegex(RuntimeError, 'timing evidence missing'):
+                safety.publish_backend_timing(attempt, 'backend', required=True)
 
     def test_child_is_bound_to_owner_without_host_settings(self):
         args = safety.pilot.service_command('ci222-server-0123456789ab.service', Path('/stage'),

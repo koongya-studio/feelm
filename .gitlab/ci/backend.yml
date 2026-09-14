@@ -111,7 +111,7 @@ backend-test:
   script:
     - python3 -B -m unittest infra.scripts.test_ci_config infra.scripts.test_ci_deploy_current_commit infra.scripts.test_deploy_backend infra.scripts.test_deploy_frontend -v
     - cd backend
-    - ./gradlew clean test spotlessCheck --no-daemon
+    - ./gradlew clean test spotlessCheck --no-daemon --init-script gradle/test-timing.gradle
   rules:
     - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
       when: never
