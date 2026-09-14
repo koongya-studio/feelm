@@ -1,5 +1,10 @@
 # Runner 통신 격리 파일럿 (S15P21E106-222)
 
+분산 런타임의 수동 배포 진입점은 `deploy-distributed.sh`와 `deploy-service.sh`입니다.
+두 스크립트는 공통 `deploy-distributed-runtime.py`를 각각 분산 노드와 서비스 노드 역할로
+호출합니다. 기본 실행은 계획 출력이며, 실제 적용 조건·순서·검증·복구 방법은
+[`infra/README.md`](../README.md#manual-distributed-runtime-deployment)를 따릅니다.
+
 백엔드 의존성 변경으로 격리 Runner의 Gradle 캐시가 부족할 때는
 [S15P21E106-271 캐시 자동화](DEPENDENCY-CACHE-AUTOMATION.md)를 사용한다. MR의 변경을 표시하는
 고정 Custom executor가 MR SHA별 후보를 자동 준비·검증하고, 각 MR 테스트는 자신의 후보만

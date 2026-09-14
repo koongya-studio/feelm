@@ -554,6 +554,72 @@ PostgreSQL 데이터를 삭제할 수 있으므로 데이터 초기화가 명시
 
 ## Spark 2-Worker Standalone Cluster
 
+### Manual distributed runtime deployment
+
+S15P21E106-413의 Spark 정상 배포·롤백·재배포 결과와 남은 Kafka·HDFS 검증 범위는
+[실환경 검증 기록](verification/S15P21E106-413.md)에 구분해 기록합니다.
+
+GitLab CD에 연결하기 전에는 두 서버에서 명시적으로 검토한 Git checkout과 직전 정상
+checkout을 함께 유지합니다. 배포 스크립트는 기본적으로 계획만 출력하며
+`--confirm-deploy`, 대상 commit SHA, 복구 checkout을 모두 지정해야 컨테이너를 변경합니다.
+`--components`에는 실제로 변경한 `spark`, `kafka`, `hdfs`만 쉼표로 지정합니다.
+
+배포 전에 두 checkout의 Compose 설정을 검사하고, Spark를 포함하면 실행 중인 Application과
+Driver가 없는지 확인합니다. 적용은 선택한 서비스에만 `up -d --no-deps --force-recreate`를
+사용합니다. NameNode 초기화 프로필, `compose down`, `down -v` 및 Volume 삭제는 실행하지
+않습니다. 실패하면 직전 checkout과 실행 중이던 Spark 이미지로 해당 노드의 서비스를
+복원하고 복원 후 상태 검사까지 수행합니다.
+
+먼저 J15E106A에서 분산 노드를 배포한 뒤 J15E106 서비스 노드를 배포합니다. 아래의 경로와
+SHA 및 이미지 이름은 운영자가 검토한 실제 값으로 바꿉니다. 환경 파일은 두 checkout과
+별도로 유지하는 승인된 동일 파일을 사용합니다.
+
+```bash
+# J15E106A
+infra/scripts/deploy-distributed.sh \
+  --components spark,kafka,hdfs \
+  --source-root /srv/feelm/releases/<candidate-sha> \
+  --rollback-root /srv/feelm/releases/<previous-sha> \
+  --env-file /srv/feelm/runtime/infra.env \
+  --expected-commit <candidate-sha> \
+  --expected-rollback-commit <previous-sha> \
+  --spark-image feelm-spark-ml:<candidate-tag> \
+  --confirm-deploy
+
+# J15E106
+infra/scripts/deploy-service.sh \
+  --components spark,hdfs \
+  --source-root /srv/feelm/releases/<candidate-sha> \
+  --rollback-root /srv/feelm/releases/<previous-sha> \
+  --env-file /srv/feelm/runtime/infra.env \
+  --expected-commit <candidate-sha> \
+  --expected-rollback-commit <previous-sha> \
+  --spark-image feelm-spark-ml:<candidate-tag> \
+  --spark-idle-checked-on-master \
+  --confirm-deploy
+```
+
+두 번째 서버 배포가 실패해 첫 번째 서버도 이전 버전으로 되돌려야 하면 source와 rollback을
+서로 바꾸고 이전 SHA·Spark 이미지를 명시하여 같은 스크립트를 다시 실행합니다. 이는 설정과
+이미지를 이전 release checkout으로 되돌리는 절차이며 HDFS 파일, Kafka 로그, Spark
+체크포인트를 과거 상태로 되돌리지 않습니다. 롤백 자체가 실패하면 추가 재시도를 반복하지
+말고 출력된 실패 노드와 컨테이너 로그를 확인해 수동 복구합니다.
+
+배포 후 스크립트는 선택한 범위에서 다음을 확인합니다.
+
+- 컨테이너 실행 상태와 선언된 Docker healthcheck
+- Kafka Metadata Quorum 응답
+- HDFS의 Live DataNode 2개
+- Spark Master의 ALIVE Worker 2개 및 배포된 Spark 이미지
+
+서비스 노드에서는 Master Web UI 포트를 열지 않습니다. 분산 노드에서 Application과 Driver가
+없음을 확인한 직후 서비스 노드를 배포하고 `--spark-idle-checked-on-master`로 그 확인을
+명시합니다. 서비스 노드는 새 Worker 컨테이너 로그에서 Master 등록 성공을 확인합니다.
+분산 노드에서 Spark 작업 중 강제 배포가 불가피한 경우에만 팀이 중단 영향을 확인한 후
+`--allow-active-spark-workloads`를 사용합니다. 두 옵션 모두 작업을 안전하게 drain하거나
+체크포인트를 검증해 주지 않습니다. Kafka Topic 메시지 왕복과 Kafka→Spark→HDFS 데이터
+정합성 검사는 배포마다 데이터를 생성하지 않도록 별도 통합 검증 절차로 유지합니다.
+
 Spark는 J15E106A의 Master·Worker 2와 J15E106의 Worker 1로 구성합니다. 각 Worker는
 2 Core와 4 GiB 메모리를 Spark 애플리케이션에 제공하며, 컨테이너는 두 서버 사이의 직접
 통신을 위해 host network를 사용합니다.
