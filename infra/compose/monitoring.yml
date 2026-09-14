@@ -16,6 +16,9 @@ services:
       - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
 
+    extra_hosts:
+      - "feelm-distributed-node:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+
   grafana:
     image: grafana/grafana:13.1.0
     container_name: feelm-grafana

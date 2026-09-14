@@ -304,8 +304,8 @@
       },
       "targets": [
         {
-          "expr": "100 - (avg(rate(node_cpu_seconds_total{job=\"node\",mode=\"idle\"}[5m])) * 100)",
-          "legendFormat": "CPU",
+          "expr": "100 - (avg by (node_name) (rate(node_cpu_seconds_total{job=\"node\",node_name=~\".+\",mode=\"idle\"}[5m])) * 100)",
+          "legendFormat": "{{node_name}}",
           "refId": "A"
         }
       ],
@@ -349,13 +349,145 @@
       },
       "targets": [
         {
-          "expr": "100 * (1 - node_memory_MemAvailable_bytes{job=\"node\"} / node_memory_MemTotal_bytes{job=\"node\"})",
-          "legendFormat": "memory",
+          "expr": "100 * (1 - max by (node_name) (node_memory_MemAvailable_bytes{job=\"node\",node_name=~\".+\"}) / max by (node_name) (node_memory_MemTotal_bytes{job=\"node\",node_name=~\".+\"}))",
+          "legendFormat": "{{node_name}}",
           "refId": "A"
         }
       ],
       "title": "Host memory usage",
       "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 19
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (node_name) (rate(node_disk_read_bytes_total{job=\"node\",node_name=~\".+\"}[5m]))",
+          "legendFormat": "{{node_name}} read",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (node_name) (rate(node_disk_written_bytes_total{job=\"node\",node_name=~\".+\"}[5m]))",
+          "legendFormat": "{{node_name}} write",
+          "refId": "B"
+        }
+      ],
+      "title": "Host disk throughput",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "max": 100,
+          "min": 0,
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 19
+      },
+      "id": 12,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "100 * max by (node_name, mountpoint) (node_filesystem_avail_bytes{job=\"node\",node_name=~\".+\",fstype!~\"tmpfs|overlay|squashfs\"}) / max by (node_name, mountpoint) (node_filesystem_size_bytes{job=\"node\",node_name=~\".+\",fstype!~\"tmpfs|overlay|squashfs\"})",
+          "legendFormat": "{{node_name}} {{mountpoint}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Host filesystem available",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 19
+      },
+      "id": 13,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (node_name) (rate(node_network_receive_bytes_total{job=\"node\",node_name=~\".+\",device!~\"lo|veth.*|docker.*|br-.*\"}[5m]))",
+          "legendFormat": "{{node_name}} receive",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (node_name) (rate(node_network_transmit_bytes_total{job=\"node\",node_name=~\".+\",device!~\"lo|veth.*|docker.*|br-.*\"}[5m]))",
+          "legendFormat": "{{node_name}} transmit",
+          "refId": "B"
+        }
+      ],
+      "title": "Host network throughput",
+      "type": "timeseries"
     },
     {
       "datasource": {
@@ -372,7 +504,7 @@
         "h": 7,
         "w": 8,
         "x": 0,
-        "y": 19
+        "y": 26
       },
       "id": 8,
       "options": {
@@ -412,7 +544,7 @@
         "h": 7,
         "w": 8,
         "x": 8,
-        "y": 19
+        "y": 26
       },
       "id": 9,
       "options": {
@@ -454,7 +586,7 @@
         "h": 7,
         "w": 8,
         "x": 16,
-        "y": 19
+        "y": 26
       },
       "id": 10,
       "options": {
