@@ -52,13 +52,11 @@ server:
     remoteip:
       # X-Forwarded-For가 아니라 X-Real-IP를 읽는다(리뷰 A-7·B-3). Nginx는 모든 프록시 블록에서
       # X-Real-IP를 $remote_addr로 덮어써 보내므로 클라이언트가 보낸 값이 남지 않고 항목도 하나다.
-      # XFF는 $proxy_add_x_forwarded_for로 이어 붙이는데, 목록의 항목이 모두 신뢰 대역이면 밸브가
-      # 맨 왼쪽 값을 채택한다. 그래서 내부 대역에서 온 요청은 헤더로 예산 주체를 바꿀 수 있다.
+      # X-Forwarded-For도 Nginx가 $remote_addr 하나로 덮어써 클라이언트가 보낸 체인을 제거한다.
       remote-ip-header: x-real-ip
       protocol-header: x-forwarded-proto
-      # 밸브는 host·port 헤더도 기본으로 신뢰한다. Nginx는 X-Forwarded-Host를 정리하지 않으므로
-      # 클라이언트가 보낸 값이 getServerName()을 바꿀 수 있다. 지금은 요청에서 절대 URL을 만드는
-      # 코드가 없어 실피해가 없지만, 생기면 조용히 결함이 되므로 끈다(리뷰 A-8·B-5).
+      # 밸브는 host·port 헤더도 기본으로 신뢰하므로 애플리케이션에서는 읽지 않고, Nginx도
+      # 클라이언트가 보낸 X-Forwarded-Host·X-Forwarded-Port를 제거한다(리뷰 A-8·B-5).
       host-header: ""
       port-header: ""
       # 이 목록에 있는 발신지가 보낸 헤더만 받아들인다. backend 컨테이너는 호스트 포트를 공개하지

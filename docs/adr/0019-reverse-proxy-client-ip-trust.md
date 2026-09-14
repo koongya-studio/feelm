@@ -69,9 +69,10 @@ feelm:
 - `protocol-header`를 켠 결과로 `X-Forwarded-Proto: https`인 요청은 `isSecure()`가 참이 되고
   `getServerPort()`가 443이 된다. 현재 이 값을 읽는 코드는 없고 Refresh 쿠키의 `Secure`는 설정값이다.
 
-Nginx 쪽 후속 정리(`X-Forwarded-For`를 `$remote_addr`로 덮어쓰기, `X-Forwarded-Host`·`X-Forwarded-Port`
-정리, 배포 환경의 Nginx 컨테이너 대역이 신뢰 목록에 드는지 확인)는 S15P21E106-326에서 인프라 담당이
-수행한다. 그 정리 전에도 이 결정만으로 목적은 성립한다.
+Nginx 쪽 후속 정리는 S15P21E106-326에서 구성한다. 모든 backend 프록시 경로가
+`X-Forwarded-For`도 `$remote_addr`로 덮어쓰고 `X-Forwarded-Host`·`X-Forwarded-Port`를 제거한다.
+배포 환경에서는 Nginx와 backend가 공유하는 Compose 네트워크의 Nginx 주소가 신뢰 목록에 포함되는지
+[`infra/README.md`](../../infra/README.md)의 절차로 확인한다.
 
 ## 고려한 대안
 
@@ -108,7 +109,7 @@ Nginx 쪽 후속 정리(`X-Forwarded-For`를 `$remote_addr`로 덮어쓰기, `X-
   - Redis 키의 해시 입력이 IP 원문에서 버킷 표기로 바뀌어, 적용 시점에 진행 중이던 창의 카운터는 이어지지
     않고 만료로 사라진다. 롤링 배포 중에는 두 키 모양이 공존한다.
 - **후속 작업**:
-  - S15P21E106-326: Nginx의 `X-Forwarded-For` 덮어쓰기와 `X-Forwarded-Host`·`X-Forwarded-Port` 정리,
-    배포 환경에서 Nginx 컨테이너 대역 확인.
+  - S15P21E106-326: 변경된 Nginx 설정을 적용한 뒤 배포 환경의 공유 네트워크 대역과 위조 헤더 요청을
+    검증한다.
   - S15P21E106-312: 로그인 시도(API-004)에 IP 단위 제한을 추가할 때 같은 버킷과 같은 클라이언트 IP 판정을
     쓴다. 현재 정본 문서와 코드의 API-004에는 IP 축이 없다.

@@ -1192,6 +1192,45 @@ BACKEND_IMAGE=<DOCKERHUB_NAMESPACE>/feelm-backend:<정상-CI_COMMIT_SHA> \
 복구 스크립트는 frontend와 Nginx만 재생성하고 공개 `/app/healthz`, Docker healthcheck와
 실행 이미지 일치를 확인합니다. 랜딩, `/api/`, Swagger 경로는 재기동 후 별도로 확인합니다.
 
+## Reverse Proxy Client IP Trust (S15P21E106-326)
+
+Nginx는 backend로 전달하는 모든 경로에서 클라이언트가 보낸 전달 헤더를 그대로 신뢰하지
+않습니다. `X-Real-IP`와 `X-Forwarded-For`는 모두 Nginx가 확인한 `$remote_addr` 하나로
+덮어쓰고, `X-Forwarded-Host`와 `X-Forwarded-Port`는 전달하지 않습니다.
+`X-Forwarded-Proto`만 현재 TLS 연결의 `$scheme`으로 설정합니다. backend의 Tomcat은 신뢰
+대역 안의 프록시가 보낸 `X-Real-IP`만 실제 클라이언트 주소로 사용합니다.
+
+배포 전 정적 계약 검사를 실행합니다.
+
+```bash
+python3 -m unittest infra/scripts/test_swagger_access_policy.py
+python3 -m unittest infra/scripts/test_verify_nginx_client_ip_trust.py
+```
+
+서비스 노드에서 Nginx와 backend가 실행 중일 때 공유 Docker 네트워크의 Nginx 주소와 대역
+전체가 `server.tomcat.remoteip.internal-proxies`에 포함되는지 확인합니다. 이 검사는 Docker
+조회 명령만 사용하며 컨테이너나 네트워크를 변경하지 않습니다.
+
+```bash
+python3 infra/scripts/verify-nginx-client-ip-trust.py
+```
+
+`NGINX_CLIENT_IP_TRUST: PASS`가 출력되어야 합니다. 실패하면 신뢰 목록을 넓히거나 Docker
+네트워크를 즉시 재생성하지 말고, 실제 Compose 네트워크와 접근 경계를 확인해 변경 범위와
+적용 순서를 먼저 합의합니다.
+
+설정 적용 전 실행 중인 Nginx는 변경하지 않은 채 구문을 검사합니다.
+
+```bash
+docker compose --env-file infra/.env -f infra/compose/service.yml \
+  run --rm --no-deps nginx nginx -t
+```
+
+적용 후에는 외부에서 위조한 `X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Host` 및
+`X-Forwarded-Port`를 붙여 인증 메일 API를 호출하고, backend에서 실제 접속 IP 기준의 동일한
+IP 제한 버킷으로 집계되는지 확인합니다. 응답이나 로그에 내부 IP, 인증정보 또는 메일 주소를
+검증 기록으로 남기지 않습니다.
+
 ## HTML Landing and HTTPS (S15P21E106-196)
 
 J15E106 서비스 노드의 Nginx가 `https://j15e106.p.ssafy.io/`에서 Feelm 랜딩

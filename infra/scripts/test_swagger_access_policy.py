@@ -8,6 +8,8 @@ NGINX_CONFIG = REPOSITORY_ROOT / "infra" / "nginx" / "nginx.conf"
 SERVICE_COMPOSE = REPOSITORY_ROOT / "infra" / "compose" / "service.yml"
 DEPLOY_SCRIPT = REPOSITORY_ROOT / "infra" / "scripts" / "deploy-backend.sh"
 ROLLBACK_SCRIPT = REPOSITORY_ROOT / "infra" / "scripts" / "rollback-backend.sh"
+BACKEND_CONFIG = REPOSITORY_ROOT / "backend" / "src" / "main" / "resources" / "application.yml"
+BACKEND_PROXY_PATHS = ("/swagger-ui.html", "/swagger-ui/", "/v3/api-docs", "/api/")
 
 
 def location_body(config: str, path: str) -> str:
@@ -28,6 +30,7 @@ class SwaggerAccessPolicyTest(unittest.TestCase):
         cls.compose = SERVICE_COMPOSE.read_text(encoding="utf-8")
         cls.deploy_script = DEPLOY_SCRIPT.read_text(encoding="utf-8")
         cls.rollback_script = ROLLBACK_SCRIPT.read_text(encoding="utf-8")
+        cls.backend_config = BACKEND_CONFIG.read_text(encoding="utf-8")
 
     def test_every_swagger_entry_point_requires_team_basic_auth(self) -> None:
         for path in ("/swagger-ui.html", "/swagger-ui/", "/v3/api-docs"):
@@ -44,6 +47,21 @@ class SwaggerAccessPolicyTest(unittest.TestCase):
         api_body = location_body(self.nginx, "/api/")
         self.assertNotRegex(api_body, r"\bauth_basic\b")
         self.assertRegex(api_body, r"\bproxy_pass\s+http://backend:8080(?:/)?\s*;")
+
+    def test_backend_proxy_replaces_client_supplied_forwarding_headers(self) -> None:
+        for path in BACKEND_PROXY_PATHS:
+            with self.subTest(path=path):
+                body = location_body(self.nginx, path)
+                self.assertRegex(body, r"\bproxy_set_header\s+X-Real-IP\s+\$remote_addr\s*;")
+                self.assertRegex(body, r"\bproxy_set_header\s+X-Forwarded-For\s+\$remote_addr\s*;")
+                self.assertRegex(body, r'\bproxy_set_header\s+X-Forwarded-Host\s+""\s*;')
+                self.assertRegex(body, r'\bproxy_set_header\s+X-Forwarded-Port\s+""\s*;')
+
+    def test_backend_trusts_the_compose_bridge_range(self) -> None:
+        self.assertRegex(
+            self.backend_config,
+            r"(?m)^\s+internal-proxies:\s*127\.0\.0\.0/8,::1/128,172\.16\.0\.0/12\s*$",
+        )
 
     def test_team_password_file_is_read_only_and_not_stored_in_repository(self) -> None:
         self.assertIn(
