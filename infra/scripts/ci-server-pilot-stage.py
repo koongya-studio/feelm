@@ -11,20 +11,17 @@ import subprocess
 import tarfile
 
 HERE = Path(__file__).resolve().parent
-FILES = (
-    'ci-job-safety.py', 'ci-bounded-output.py',
-    'ci-job-io.py', 'ci-job-lifecycle.py',
+spec = importlib.util.spec_from_file_location(
+    'ci414_runtime_contract', HERE / 'ci-backend-runtime-contract.py')
+runtime = importlib.util.module_from_spec(spec); spec.loader.exec_module(runtime)
+FILES = runtime.FILES + (
     'ci-gitlab-job-adapter.py', 'ci-gitlab-custom-executor.py', 'ci-gitlab-server-install.py',
-    'ci-server-manager-pilot.py', 'ci-server-sysfs-bootstrap.py', 'ci-local-manager-check.py', 'ci-local-backend-runtime.py',
-    'ci-local-backend-inputs.py', 'ci-local-backend-transfer.py', 'ci-backend-offline-prepare.py',
     'ci-dependency-cache.py', 'ci-dependency-cache-context.py', 'ci-dependency-cache-install.py',
-    'ci-rootless-backend-check.py', 'ci-rootless-network-check.py',
-    'rootless-backend/LoopbackContainers.java', 'rootless-backend/pilot.init.gradle',
-    'rootless-backend/META-INF/services/org.testcontainers.core.CreateContainerCmdModifier',
+    'ci-frontend-mr-boundary.py', 'ci-frontend-mr-runner.py', 'ci-network-guard.py',
     'systemd/feelm-ci222-gitlab-runner.service',
 )
-SOURCE_SHA = '3e151aef092a1db51f1295f6f9c27e7a68141a7ced838503e67b1eaf21e82ceb'
-REVISION = '0e2bab04ef2fa7601747f4718d239eaabdc79df8'
+SOURCE_SHA = '388ae26fd74dca6864f5fb469fdf47b2d4a34e42b4989d7f29caf36662b4f875'
+REVISION = 'e5588d312bdfe058b03d15b34b1cbfa3a9935093'
 
 
 def archive_bytes():

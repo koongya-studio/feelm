@@ -1,3 +1,4 @@
+import ast
 import hashlib
 import importlib.util
 import io
@@ -96,6 +97,37 @@ class ServerPilotTests(unittest.TestCase):
             with self.assertRaises(ValueError): stage.archive_bytes()
         self.assertNotIn('.gitlab-ci.yml', stage.FILES)
         self.assertNotIn('infra/.env', stage.FILES)
+        self.assertEqual(stage.REVISION, 'e5588d312bdfe058b03d15b34b1cbfa3a9935093')
+
+    def test_upload_includes_frontend_adapter_runtime_closure(self):
+        for name in ('ci-frontend-mr-boundary.py', 'ci-frontend-mr-runner.py',
+                     'ci-network-guard.py'):
+            self.assertIn(name, stage.FILES)
+
+    def test_upload_archive_matches_pinned_backend_and_runtime_files(self):
+        payload, hashes = stage.archive_bytes()
+        self.assertEqual(hashes['backend.tar'], stage.SOURCE_SHA)
+        with tarfile.open(fileobj=io.BytesIO(payload), mode='r') as archive:
+            names = set(archive.getnames())
+        self.assertIn('scripts/ci-backend-runtime-contract.py', names)
+        self.assertIn('scripts/ci-frontend-mr-boundary.py', names)
+        self.assertIn('upload-manifest.json', names)
+
+    def test_upload_contains_declared_local_python_load_dependencies(self):
+        staged = set(stage.FILES)
+        for name in sorted(staged):
+            if not name.endswith('.py'):
+                continue
+            tree = ast.parse((HERE / name).read_text(encoding='utf-8'))
+            for call in (node for node in ast.walk(tree) if isinstance(node, ast.Call)):
+                function = call.func.id if isinstance(call.func, ast.Name) else None
+                if function not in {'load', 'module'}:
+                    continue
+                for argument in call.args:
+                    if (isinstance(argument, ast.Constant)
+                            and isinstance(argument.value, str)
+                            and argument.value.endswith('.py')):
+                        self.assertIn(argument.value, staged, f'{name} loads an unstaged module')
 
     def test_upload_bootstrap_is_exclusive(self):
         code = stage.remote_bootstrap({'scripts/a.py': '0' * 64})

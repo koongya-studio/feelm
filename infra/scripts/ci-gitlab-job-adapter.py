@@ -33,6 +33,7 @@ def load(name, filename):
 
 safety = load('gitlab_safety', 'ci-job-safety.py')
 job_io = load('gitlab_job_io', 'ci-job-io.py')
+runtime = load('gitlab_runtime_contract', 'ci-backend-runtime-contract.py')
 frontend_boundary = load('gitlab_frontend_boundary', 'ci-frontend-mr-boundary.py')
 frontend_runner = load('gitlab_frontend_runner', 'ci-frontend-mr-runner.py')
 CONFIG = Path('/etc/feelm-ci222/gitlab-adapter.json')
@@ -417,6 +418,8 @@ def run_job(response, config_path=CONFIG, opener=None):
     context = validate_job_response(response)
     _, prepared = read_private_config(
         config_path, require_prepared=context['service'] != 'frontend')
+    if context['service'] == 'backend':
+        runtime.require_same(HERE, prepared / 'scripts')
     opener = opener or urllib.request.build_opener(NoRedirect())
     try: job = verify_current_job(opener, context)
     except urllib.error.HTTPError as exc: raise AdapterHttpError('current_job', exc.code) from exc

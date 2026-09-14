@@ -116,9 +116,18 @@ sudo python3 "$SERVER_STAGE/scripts/ci-server-manager-pilot.py" backend \
 성공 기준은 `GRADLE_EXIT=0`, 전체 테스트·`spotlessCheck` 성공, 잔존 컨테이너 없음,
 `SERVER_PILOT_BACKEND: PASS`다. 이 단계까지는 기존 Runner 설정을 변경하지 않는다.
 
-## 중단 지점
+## 6. 설치본과 prepared stage 원자 전환
 
-이 문서의 절차는 새 입력의 독립 오프라인 검증에서 멈춘다. Runner 서비스 중지,
-`/etc/feelm-ci222/gitlab-adapter.json`의 `prepared_base` 변경, 서비스 재시작과 MR 61 재실행은
-검증 결과 리뷰 후 별도 적용 단계에서 수행한다. 실패 시 기존 prepared input을 수정하거나
-삭제하지 않고 새 stage와 실행 증빙을 보존한다.
+독립 검증을 통과한 동일 `SERVER_STAGE`를 설치 입력과 `prepared_base`로 함께 지정한다.
+
+```bash
+sudo python3 "$SERVER_STAGE/scripts/ci-dependency-cache-install.py" \
+  --confirm-update \
+  --operator-username <GitLab 사용자명> \
+  --prepared-base "$SERVER_STAGE"
+```
+
+설치기는 backend 런타임 계약이 다르거나 실행 중인 MR test가 있으면 변경 전에 거부한다.
+성공 로그의 `PREVIOUS_INSTALL`, `PREVIOUS_SUDOERS`, `PREVIOUS_CONFIG`와 새 `prepared_base`를
+기록하고 Runner가 active인지 확인한다. 실패 시 기존 prepared input을 수정하거나 삭제하지
+않고 새 stage와 실행 증빙을 보존한다.

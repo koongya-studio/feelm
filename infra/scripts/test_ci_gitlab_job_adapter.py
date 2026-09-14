@@ -287,6 +287,7 @@ class AdapterTests(unittest.TestCase):
         source = archive([('prefix/backend/gradlew', b'x', 0o755)])
         context = response()
         with patch.object(adapter, 'read_private_config', return_value=({}, Path('/prepared'))), \
+             patch.object(adapter.runtime, 'require_same'), \
              patch.object(adapter, 'verify_current_job', return_value={'pipeline': {'id': 1}}), \
              patch.object(adapter, 'verify_merge_request', return_value={'iid': 98}), \
              patch.object(adapter, 'fetch_merge_request_detail', return_value={'iid': 98}), \
@@ -304,6 +305,7 @@ class AdapterTests(unittest.TestCase):
         context = response()
         selected = Path('/candidate-for-a')
         with patch.object(adapter, 'read_private_config', return_value=({}, Path('/default'))), \
+             patch.object(adapter.runtime, 'require_same'), \
              patch.object(adapter, 'verify_current_job', return_value={'pipeline': {'id': 1}}), \
              patch.object(adapter, 'verify_merge_request', return_value={'iid': 98}), \
              patch.object(adapter, 'fetch_merge_request_detail', return_value={'iid': 98}), \
@@ -319,12 +321,26 @@ class AdapterTests(unittest.TestCase):
         context = response()
         error = urllib.error.HTTPError('https://secret.invalid/path', 403, 'forbidden', {}, None)
         with patch.object(adapter, 'read_private_config', return_value=({}, Path('/prepared'))), \
+             patch.object(adapter.runtime, 'require_same'), \
              patch.object(adapter, 'verify_current_job'), \
              patch.object(adapter, 'verify_merge_request', side_effect=error):
             with self.assertRaises(adapter.AdapterHttpError) as raised:
                 adapter.run_job(context, opener=object())
         self.assertEqual((raised.exception.stage, raised.exception.status), ('merge_request', 403))
         self.assertNotIn('secret.invalid', str(raised.exception))
+
+    def test_runtime_mismatch_is_rejected_before_gitlab_or_workload(self):
+        context = response()
+        with patch.object(adapter, 'read_private_config', return_value=({}, Path('/prepared'))), \
+             patch.object(adapter.runtime, 'require_same', side_effect=RuntimeError(
+                 'Installed and prepared backend runtimes differ')) as compatible, \
+             patch.object(adapter, 'verify_current_job') as current, \
+             patch.object(adapter.safety, 'start') as start, \
+             self.assertRaisesRegex(RuntimeError, 'backend runtimes differ'):
+            adapter.run_job(context, opener=object())
+        compatible.assert_called_once_with(adapter.HERE, Path('/prepared/scripts'))
+        current.assert_not_called()
+        start.assert_not_called()
 
     def test_owner_stop_accepts_only_owned_unit_name(self):
         with patch.object(adapter.subprocess, 'run') as run:

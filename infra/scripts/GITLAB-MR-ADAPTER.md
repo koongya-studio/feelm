@@ -105,6 +105,8 @@ develop의 `backend-test`는 Gradle 로그에서 이 줄을 직접 확인한다.
 
 - `ci-gitlab-custom-executor.py`: 비특권 Runner callback. 생성된 셸 파일은 실행하지 않는다.
 - `ci-gitlab-job-adapter.py`: root 정책 검증, GitLab 인증·archive 정규화, 안전 실행기 호출.
+- backend Job은 설치본과 활성 `prepared_base/scripts`의 런타임 계약 fingerprint가 일치할
+  때만 GitLab 조회와 격리 작업을 시작하며, 불일치는 장시간 테스트 전에 거부한다.
 - `ci-gitlab-server-install.py`: 새 전용 경로만 만드는 token-free 설치기. 기본은 계획 출력이며
   기존 Runner 설정을 수정하거나 Runner를 등록·시작·활성화하지 않는다.
 - `ci-job-safety.py`: 동적 archive의 해시와 파일 정책을 root 소유 lease에 묶는다.
