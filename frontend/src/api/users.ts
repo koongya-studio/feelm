@@ -22,7 +22,7 @@ import { request } from './client';
 import { isBlockedUser } from './settings';
 import { respond, respondError } from './mockTransport';
 import type { PublicProfileView, TasteCompareView } from '../types/unspecified';
-import type { MyProfile, MyProfileUpdate } from '../types/user';
+import type { MyProfile, MyProfileUpdate, NicknameAvailability } from '../types/user';
 
 /**
  * API-014 내 프로필 조회 · GET /api/v1/users/me
@@ -47,6 +47,19 @@ export async function getMyProfile(): Promise<MyProfile> {
  */
 export async function updateMyProfile(update: MyProfileUpdate): Promise<MyProfile> {
   return request<MyProfile>('/users/me', { method: 'PATCH', body: update });
+}
+
+/**
+ * API-016 닉네임 사용 가능 확인 · GET /api/v1/users/nickname-availability
+ *
+ * 공개 API다. 0.4 `중복 확인`이 부른다. 확인 결과는 예약이 아니라 가입(API-001)이 다시
+ * 검사하므로, 확인을 통과해도 가입에서 `409 NICKNAME_DUPLICATED`가 올 수 있다.
+ */
+export async function checkNicknameAvailability(nickname: string): Promise<NicknameAvailability> {
+  return request<NicknameAvailability>('/users/nickname-availability', {
+    query: { nickname },
+    auth: 'none',
+  });
 }
 
 /**

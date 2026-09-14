@@ -56,6 +56,17 @@ export type MyProfileUpdate = {
 };
 
 /**
+ * API-016 닉네임 사용 가능 확인 응답.
+ *
+ * 형식 위반도 `400`이 아니라 `available: false`인 `200`이다. `reason`은 사용 가능하면 `null`이다.
+ */
+export type NicknameAvailability = {
+  nickname: string;
+  available: boolean;
+  reason: 'DUPLICATED' | 'INVALID_FORMAT' | null;
+};
+
+/**
  * API-017 · API-018 알림 설정. 세 키가 모두 있어야 한다(API-018 `400 VALIDATION_FAILED`).
  *
  * 7.8-C는 토글 다섯 개를 그리지만 계약은 셋이다. 나머지 둘은 `types/unspecified.ts`의

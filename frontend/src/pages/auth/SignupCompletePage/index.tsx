@@ -12,10 +12,28 @@
  * 온보딩으로 보내면 세션이 없어 회원 API가 막힌다(screen-spec-auth.md 0.5, CR-19).
  *
  * 이메일로 왔는지는 0.4가 넘긴 `state.email`로 판단한다.
+ *
+ * **봉인된 편지 → 열린 봉투 → 초대장이 올라오는 모션** (팀 결정 2026-09-14, S15P21E106-319).
+ * - 첫 장면은 받은 봉인된 빨간 편지 사진이다. 봉인이 한 번 눌린 뒤 사라지며 열린 봉투로
+ *   바뀐다. 두 그림은 구도가 달라 조각을 이어 붙일 수 없으므로 겹쳐서 넘긴다
+ * - 열린 봉투는 받은 아트워크(`Welcome!` 초대장이 꽂힌 누끼 PNG)를 WebP로 옮긴 것이다.
+ *   초대장 문구는 그림 안에 있다
+ * - 그림 한 장을 같은 자리에 네 번 깔고 봉투 뒷면 · 초대장 · 앞 주머니 · 봉인으로 오린다.
+ *   끝 상태에서는 원래 그림과 똑같고, 초대장 조각만 봉투 안에서 올라온다. 초대장이 비운
+ *   자리(봉투 안쪽)만 코드로 칠한다
+ * - 봉투와 봉인의 빨강은 UI가 아니라 아트워크 안의 색이다(`design-concept.md` 3장)
+ * - CSS 애니메이션만 쓴다. 기본 스타일이 끝 상태라 `prefers-reduced-motion`이면 곧바로
+ *   끝 상태로 그린다
+ *
+ * 문구가 그림 안에 있으므로 제목(h1)은 화면에 보이지 않게 두어 보조기술이 읽게 한다.
  */
 import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router';
+import sealedArt from '../../../assets/signup/feelm-sealed-envelope.webp';
+import envelopeArt from '../../../assets/signup/feelm-welcome-envelope.webp';
 import Button from '../../../components/Button';
+import VisuallyHidden from '../../../components/VisuallyHidden';
 import { resendVerificationMail } from '../../../api/auth';
 import { path } from '../../../routes/paths';
 import styles from './SignupCompletePage.module.css';
@@ -49,12 +67,42 @@ export default function SignupCompletePage() {
   return (
     <div className={styles.page}>
       <div className={styles.stage}>
-        <h1 className={styles.title}>회원가입 완료!</h1>
+        <VisuallyHidden>
+          <h1>회원가입이 완료되었습니다</h1>
+        </VisuallyHidden>
+
+        <div
+          className={styles.scene}
+          style={
+            {
+              '--envelope-image': `url(${envelopeArt})`,
+              '--sealed-image': `url(${sealedArt})`,
+            } as CSSProperties
+          }
+          aria-hidden="true"
+        >
+          <div className={styles.envelope}>
+            <div className={styles.inside} />
+            <div className={`${styles.art} ${styles.back}`} />
+            <div className={styles.slot}>
+              <div className={`${styles.art} ${styles.card}`} />
+            </div>
+            <div className={`${styles.art} ${styles.pocket}`} />
+            <div className={`${styles.art} ${styles.seal}`} />
+          </div>
+
+          {/* 첫 장면. 봉인된 빨간 편지가 먼저 나오고, 봉인이 눌린 뒤 열린 봉투로 바뀐다 */}
+          <div className={styles.sealed}>
+            <div className={styles.sealedStamp} />
+          </div>
+        </div>
 
         {email ? (
-          <>
+          <div className={styles.after}>
             <p className={styles.lead}>
-              {email} 으로 인증 메일을 보냈어요. 메일의 링크를 눌러야 로그인할 수 있어요.
+              <span className={styles.email}>{email}</span>으로 인증 메일을 보냈어요.
+              <br />
+              메일의 링크를 눌러야 로그인할 수 있어요.
             </p>
 
             {resent ? (
@@ -66,13 +114,13 @@ export default function SignupCompletePage() {
                 메일이 오지 않았나요? 다시 보내기
               </Button>
             )}
-          </>
+          </div>
         ) : (
-          <p className={styles.lead}>첫 취향 필름을 만들어볼까요?</p>
+          <p className={`${styles.lead} ${styles.after}`}>첫 취향 필름을 만들어볼까요?</p>
         )}
       </div>
 
-      <div className={styles.actions}>
+      <div className={`${styles.actions} ${styles.after}`}>
         {email ? (
           <Button onClick={() => void navigate(path.login())}>로그인하러 가기</Button>
         ) : (

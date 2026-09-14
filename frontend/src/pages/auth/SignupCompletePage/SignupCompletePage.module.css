@@ -1,12 +1,20 @@
 /*
  * 0.5 회원가입 완료. 1.3과 같은 완료 화면 구성이다 — 내용이 가운데 서고 주 동작만
- * 아래에 붙는다.
+ * 아래에 붙는다. 내용 맨 위에서 초대장이 빨간 봉투에서 올라온다.
+ *
+ * 기본 스타일이 **끝 상태**(초대장이 다 올라온 모습)다. 애니메이션은 `from`에서 시작
+ * 상태를 그리고 `both`로 채운다. 그래서 움직임을 줄이면 끝 상태로 곧바로 그린다.
+ */
+/*
+ * 가로 넘침을 자른다. 열린 봉투는 1.25배로 시작해 줄어드는데, 그 순간 화면 폭을 넘어
+ * 페이지가 옆으로 밀렸다(상단 PREVIEW 표시가 잘려 보였다).
  */
 .page {
   display: flex;
   min-height: 0;
   flex: 1;
   flex-direction: column;
+  overflow-x: clip;
 }
 
 .stage {
@@ -18,23 +26,237 @@
   justify-content: center;
   gap: var(--space-3);
   padding: var(--space-4) var(--screen-padding-x);
+  text-align: center;
 }
 
-.title {
-  margin: 0;
-  font-size: var(--font-size-title);
-  line-height: var(--line-height-title);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-ink);
+/*
+ * 봉투 그림. 1536:1024 누끼라 벽 위에 그대로 선다. 조각의 좌표는 원본 그림에서 잰 값이다.
+ * - 초대장: 가로 13.7% ~ 86.5%, 윗변 14.8%. 가장자리 흰 픽셀이 뒷면에 남지 않도록 0.4%씩
+ *   넉넉히 자른다
+ * - 앞 주머니 윗선: 좌우 끝(9.4%, 43%)에서 가운데(50%, 77.1%)로 내려오는 V. 초대장 흰
+ *   픽셀이 주머니에 섞이지 않도록 0.8% 아래로 자른다
+ * - 봉인: 중심 (49.5%, 73.7%), 반지름 가로 8.9% · 세로 13.3%
+ */
+.scene {
+  position: relative;
+  width: 100%;
+  margin-bottom: var(--space-4);
+}
+
+.envelope {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1536 / 1024;
+  transform-origin: 49.5% 73.7%;
+  animation: envelope-in 560ms var(--ease-out) 1250ms both;
+}
+
+/*
+ * 첫 장면. 봉인된 빨간 편지 사진(1672:941)을 열린 봉투 자리에 겹친다. 편지지 모서리는
+ * 사진 그대로 각지게 둔다(팀 결정 2026-09-14). 봉인이 한 번 눌린 뒤 줄어들며 사라지고,
+ * 그 사이 열린 봉투가 나타난다. 기본 스타일은 사라진 뒤(끝 상태)다.
+ */
+.sealed {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  /*
+   * 두 그림의 봉인이 같은 자리에 오도록 내린다. 열린 봉투의 봉인은 높이 73.7%(폭의
+   * 49.13%), 봉인된 편지의 봉인은 높이 52.7%(폭의 29.66%)라 그 차이인 폭의 19.47%다
+   */
+  margin-top: 19.47%;
+  transform-origin: 50.4% 52.7%;
+  aspect-ratio: 1672 / 941;
+  background: var(--sealed-image) center / 100% 100% no-repeat;
+  box-shadow: var(--shadow-poster);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  animation: sealed-life 1650ms var(--ease-standard) both;
+}
+
+/* 봉인만 오려 한 번 누른다. 봉인 크기와 위치는 사진에서 잰 값이다 */
+.sealedStamp {
+  position: absolute;
+  inset: 0;
+  background: inherit;
+  mask-image: radial-gradient(ellipse 14.6% 23.3% at 50.4% 52.7%, #000 86%, transparent 100%);
+  transform-origin: 50.4% 52.7%;
+  animation: seal-press 380ms var(--ease-out) 650ms both;
+}
+
+/* 그림 조각. 모두 같은 자리에 같은 크기로 깔려 끝 상태에서는 원래 그림과 똑같다 */
+.art {
+  position: absolute;
+  inset: 0;
+  background: var(--envelope-image) center / 100% 100% no-repeat;
+}
+
+/*
+ * 봉투 안쪽. 초대장이 내려가 있는 동안 그 자리에 보이는 봉투 속이다. 그림의 덮개 색
+ * (#6d0f18)보다 한 단계 어둡다. 봉투 뒷면 윤곽(가운데 뾰족한 덮개와 양옆 날개)을 따라
+ * 오려야 봉투 밖으로 네모가 삐져나오지 않는다. 윤곽은 그림에서 잰 값이다.
+ */
+.inside {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #4a0810 0%, #620c16 100%);
+  clip-path: polygon(50% 0.5%, 84% 37.5%, 90.7% 45%, 90.7% 98%, 9.3% 98%, 9.3% 45%, 16% 37.5%);
+}
+
+/* 봉투 뒷면. 그림에서 초대장 자리만 비운다 */
+.back {
+  clip-path: polygon(
+    evenodd,
+    0 0,
+    100% 0,
+    100% 100%,
+    0 100%,
+    0 0,
+    13.3% 14.4%,
+    86.9% 14.4%,
+    86.9% 100%,
+    13.3% 100%,
+    13.3% 14.4%
+  );
+}
+
+/*
+ * 초대장이 드나드는 틈. 내려간 초대장 조각이 봉투 아랫변(98.8%) 밑으로 비치지 않도록
+ * 그 위에서 자른다. 초대장 조각 아래쪽에는 앞 주머니 픽셀도 들어 있어서, 자르지 않으면
+ * 봉투 아래 모서리에 붉은 부스러기가 보였다.
+ */
+.slot {
+  position: absolute;
+  inset: 0 0 1.6%;
+  overflow: hidden;
+}
+
+/* 초대장. 봉투 안(앞 주머니 뒤)에서 제자리까지 올라온다 */
+.card {
+  clip-path: polygon(13.3% 14.4%, 86.9% 14.4%, 86.9% 100%, 13.3% 100%);
+  animation: card-rise 900ms var(--ease-out) 1720ms both;
+}
+
+/* 앞 주머니. 초대장을 가리는 V자 앞면이다 */
+.pocket {
+  clip-path: polygon(0 43.8%, 9.4% 43.8%, 50% 77.9%, 90.8% 43.8%, 100% 43.8%, 100% 100%, 0 100%);
+}
+
+/*
+ * 봉인. V자 꼭짓점에 걸쳐 있어 윗부분이 초대장 조각에도 들어 있다. 초대장이 움직이는 동안
+ * 봉인이 쪼개지지 않게 따로 오려 맨 위에 둔다. 봉인은 물결 모양이라 타원으로 딱 자르면
+ * 위쪽에 초대장 흰 픽셀이 초승달로 남으므로 가장자리를 흐린다.
+ */
+.seal {
+  mask-image: radial-gradient(ellipse 8.9% 13.3% at 49.5% 73.7%, #000 86%, transparent 100%);
+}
+
+/* 봉투 아래 안내와 버튼. 초대장이 다 올라온 뒤에 뜬다 */
+.after {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  animation: fade-up var(--motion-emphasized) var(--ease-out) 2550ms both;
+}
+
+/*
+ * 봉인 크기가 두 그림에서 다르다(봉인된 편지 지름은 폭의 29.1%, 열린 봉투는 17.8%).
+ * 봉인을 축으로 봉인된 편지는 줄어들며 사라지고 열린 봉투는 커진 채 나타나 제 크기로
+ * 돌아온다. 그래서 바뀌는 동안 봉인이 제자리에 머무는 것처럼 보인다.
+ */
+@keyframes envelope-in {
+  from {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+}
+
+/* 봉인된 편지: 떠오름 → 머묾(이 사이 봉인이 눌림) → 봉인을 축으로 줄어들며 사라짐 */
+@keyframes sealed-life {
+  0% {
+    opacity: 0;
+    visibility: visible;
+    transform: translateY(16px);
+  }
+
+  20% {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+
+  72% {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+
+  100% {
+    opacity: 0;
+    visibility: visible;
+    transform: scale(0.72);
+  }
+}
+
+@keyframes seal-press {
+  from {
+    transform: scale(1);
+  }
+
+  45% {
+    transform: scale(0.9);
+  }
+
+  to {
+    transform: scale(1);
+  }
+}
+
+/* 초대장이 앞 주머니 뒤로 완전히 숨은 자리(윗변이 V자 꼭짓점 아래)에서 올라온다 */
+@keyframes card-rise {
+  from {
+    transform: translateY(64%);
+  }
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+/* 움직임을 줄이면 처음부터 끝 상태로 그린다 */
+@media (prefers-reduced-motion: reduce) {
+  .envelope,
+  .sealed,
+  .sealedStamp,
+  .card,
+  .after {
+    animation: none;
+  }
 }
 
 .lead {
+  margin: 0;
   font-size: var(--font-size-body);
   line-height: var(--line-height-body);
   color: var(--color-ink-muted);
+  word-break: keep-all;
+}
+
+/* 긴 이메일은 어디서든 끊겨야 화면을 넘지 않는다 */
+.email {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink-body);
+  overflow-wrap: anywhere;
 }
 
 .actions {
+  display: block;
   flex: none;
   padding: 0 var(--screen-padding-x) var(--space-12);
 }
