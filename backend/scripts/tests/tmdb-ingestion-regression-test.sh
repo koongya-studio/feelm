@@ -129,11 +129,7 @@ group="${1:-all}"
 
 if [[ "$group" == all || "$group" == ott ]]; then
   printf 'ingestion regression: approved OTT SQL and repeat\n'
-  db -q <<'SQL'
-INSERT INTO otts (tmdb_provider_id,code,name,logo_url)
-VALUES (337,'DISNEY_PLUS','Disney Plus','/disney.jpg'), (97,'WATCHA','Watcha','/watcha.jpg'),
-       (356,'WAVVE','wavve','/wavve.jpg'), (1883,'TVING','TVING','/tving.jpg');
-SQL
+  [[ "$(db -qAt -c "SELECT count(*) FROM otts WHERE (code,tmdb_provider_id) IN (('DISNEY_PLUS',337),('WATCHA',97),('WAVVE',356),('TVING',1883))")" == 4 ]]
   run_ingestion "$test_dir/ott" --raw-dir "$test_dir/raw" --ott-mapping "$test_dir/approved.csv" >/dev/null
   [[ "$(db -qAt -c 'SELECT o.tmdb_provider_id FROM movie_ott_providers p JOIN otts o ON o.id=p.ott_id ORDER BY o.tmdb_provider_id')" == 8 ]]
   jq -e '.unknown_ott_provider_occurrences == 1' "$test_dir/ott/run-manifest.json" >/dev/null
@@ -175,7 +171,10 @@ if [[ "$group" == all || "$group" == invalid ]]; then
       expect_failure run_ingestion "$output" --refresh --ott-mapping "$test_dir/approved.csv" "${args[@]}"
       jq -e '.postgresql.succeeded == 0 and .postgresql.failed == 1 and .postgresql.status != "SUCCESS"' "$output/run-manifest.json" >/dev/null
       jq -e 'length == 1 and .[0].tmdb_id == 2 and (.[0].reason | length > 0)' "$output/failure-report.json" >/dev/null
-      if grep -Eq 'DELETE FROM movie_|INSERT INTO movies|BEGIN;' "$SQL_LOG"; then
+      # The approved catalog now has its own transaction before raw validation.
+      # Exactly that one may begin; invalid raw must never start a movie transaction.
+      if grep -Eq 'DELETE FROM movie_|INSERT INTO movies' "$SQL_LOG" \
+          || [[ "$(grep -c '^BEGIN;$' "$SQL_LOG")" != 1 ]]; then
         printf 'invalid response reached movie transaction: %s (%s)\n' "$filter" "$mode" >&2; exit 1
       fi
       if [[ "$mode" == api-fresh ]]; then
