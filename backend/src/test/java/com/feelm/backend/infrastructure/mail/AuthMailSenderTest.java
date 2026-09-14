@@ -8,6 +8,7 @@ import com.feelm.backend.infrastructure.mail.AuthMailProperties.Mode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
@@ -25,6 +26,7 @@ import org.springframework.mail.javamail.JavaMailSender;
  */
 @DisplayName("계정 메일 발송 — 종류별 제목·본문·링크")
 @ExtendWith(OutputCaptureExtension.class)
+@ResourceLock("backend-output-capture")
 class AuthMailSenderTest {
 
     private static final AuthMailProperties PROPERTIES =

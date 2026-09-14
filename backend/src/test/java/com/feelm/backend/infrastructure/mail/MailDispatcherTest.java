@@ -18,6 +18,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.parallel.ResourceLock;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.core.task.SyncTaskExecutor;
@@ -36,6 +37,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
  */
 @DisplayName("계정 메일 디스패처 — 포화와 실패")
 @ExtendWith(OutputCaptureExtension.class)
+@ResourceLock("backend-output-capture")
 class MailDispatcherTest {
 
     private static final Duration IDLE_TIMEOUT = Duration.ofSeconds(5);

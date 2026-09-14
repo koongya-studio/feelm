@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.feelm.backend.global.security.TokenProvider;
+import com.feelm.backend.support.SharedTestRuntime;
 import java.sql.Timestamp;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest(properties = "spring.jpa.hibernate.ddl-auto=none")
 @AutoConfigureMockMvc
 @DisplayName("취향 분석·키워드 조회 API — API-040 계약")
+@SharedTestRuntime
 class TasteAnalysisApiContractTest {
 
     private static final String TASTE_PATH = "/api/v1/users/me/taste";

@@ -12,6 +12,7 @@ import com.feelm.backend.domain.movie.repository.MovieDetailRepository.MovieMeta
 import com.feelm.backend.domain.movie.repository.MovieDetailRepository.Personalization;
 import com.feelm.backend.domain.movie.repository.MovieDetailRepository.RecommendationSnapshot;
 import com.feelm.backend.global.security.TokenProvider;
+import com.feelm.backend.support.SharedTestRuntime;
 import java.math.BigDecimal;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 /** JSONB는 문법 오류를 저장할 수 없으므로 이 실패 경로만 Repository projection 대역으로 재현한다. */
 @SpringBootTest(properties = "feelm.auth.mock.enabled=false")
 @AutoConfigureMockMvc
+@SharedTestRuntime
 class MovieDetailFailureContractTest {
 
     @Autowired private MockMvc mvc;

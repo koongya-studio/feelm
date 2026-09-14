@@ -1,6 +1,7 @@
 package com.feelm.backend.domain.user;
 
 import com.feelm.backend.global.security.TokenProvider;
+import com.feelm.backend.support.SharedTestRuntime;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Timestamp;
@@ -24,6 +25,7 @@ import tools.jackson.databind.ObjectMapper;
  * 지우고 다시 만들지 않고 없을 때만 만든 뒤 행만 비운다. 반대로 취향 쪽 테이블은 테스트마다 열 구성이 달라 매번 다시 만든다.
  */
 @SpringBootTest(properties = "spring.jpa.hibernate.ddl-auto=none")
+@SharedTestRuntime
 @AutoConfigureMockMvc
 abstract class UserProfileApiTestSupport {
 

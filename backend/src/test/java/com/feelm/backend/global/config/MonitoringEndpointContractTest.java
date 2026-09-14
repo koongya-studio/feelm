@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.feelm.backend.global.security.TokenProvider;
+import com.feelm.backend.support.SharedTestRuntime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
         })
 @AutoConfigureMockMvc
 @DisplayName("Prometheus 모니터링 엔드포인트 계약")
+@SharedTestRuntime
 class MonitoringEndpointContractTest {
 
     @Autowired private MockMvc mockMvc;

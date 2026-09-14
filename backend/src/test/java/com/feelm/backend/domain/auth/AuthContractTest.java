@@ -16,6 +16,7 @@ import com.feelm.backend.global.security.JwtProperties;
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedRedisContainer;
 import com.feelm.backend.support.SharedRedisState;
+import com.feelm.backend.support.SharedTestRuntime;
 import com.redis.testcontainers.RedisContainer;
 import jakarta.servlet.http.Cookie;
 import java.time.Duration;
@@ -47,6 +48,7 @@ import tools.jackson.databind.ObjectMapper;
  * Redis를 띄워 검증한다.
  */
 @SpringBootTest
+@SharedTestRuntime
 @AutoConfigureMockMvc
 @DisplayName("인증 골격 — API-000 인증 규약과 API-006 재발급")
 class AuthContractTest {

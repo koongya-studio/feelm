@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.feelm.backend.global.security.SecurityConfig;
+import com.feelm.backend.support.SharedTestRuntime;
 import java.net.URI;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -19,6 +20,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = "feelm.auth.mock.enabled=false")
 @AutoConfigureMockMvc
+@SharedTestRuntime
 class MovieDetailSecurityContractTest {
 
     @Autowired private MockMvc mvc;

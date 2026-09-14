@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.feelm.backend.global.security.TokenProvider;
+import com.feelm.backend.support.SharedTestRuntime;
 import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,6 +29,7 @@ import tools.jackson.databind.ObjectMapper;
         })
 @AutoConfigureMockMvc
 @DisplayName("Swagger 활성 환경 — 문서 생성과 기존 JWT 계약")
+@SharedTestRuntime
 class OpenApiContractTest {
 
     private static final String API_DOCS_PATH = "/v3/api-docs";
