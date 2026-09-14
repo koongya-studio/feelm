@@ -1,0 +1,196 @@
+from __future__ import annotations
+
+import logging
+import signal
+from collections.abc import Callable
+from time import sleep
+from typing import Any
+
+import psycopg
+import redis
+from confluent_kafka import Consumer, KafkaException, TopicPartition
+
+from feelm_consumer.artifacts import ArtifactBundle, load_bundle
+from feelm_consumer.events import EventValidationError, parse_event
+from feelm_consumer.postgres import load_profile, readonly_snapshot
+from feelm_consumer.redis_store import (
+    StalePartitionFenceError,
+    claim_partition_fence,
+    current_version,
+    publish,
+)
+from feelm_consumer.service import calculate_user_results
+from feelm_consumer.settings import Settings
+
+LOG = logging.getLogger(__name__)
+
+
+def _expected_version(store: Any, user_id: int, partition_fence: tuple[str, str]) -> int:
+    return current_version(store, user_id, partition_fence)
+
+
+def process_user(
+    store: Any,
+    connect: Callable[[], Any],
+    bundle: ArtifactBundle,
+    user_id: int,
+    *,
+    attempts: int = 3,
+    backoff_seconds: float = 0.25,
+    is_still_owned: Callable[[], bool] | None = None,
+    partition_fence: tuple[str, str] | None = None,
+) -> bool | None:
+    for attempt in range(attempts):
+        try:
+            if partition_fence is None:
+                raise ValueError("partition fence is required")
+            expected = _expected_version(store, user_id, partition_fence)
+            with readonly_snapshot(connect) as connection:
+                ratings, onboarding = load_profile(connection, user_id)
+            results = calculate_user_results(bundle, ratings, onboarding, expected + 1)
+            if results is None:
+                LOG.warning("fold-in produced no publishable result user_id=%s", user_id)
+                return False
+            if is_still_owned is not None and not is_still_owned():
+                LOG.warning("partition ownership lost before Redis publish user_id=%s", user_id)
+                return False
+            publish(store, user_id, expected, *results, partition_fence)
+            return True
+        except StalePartitionFenceError:
+            LOG.info("partition fence lost before Redis publish user_id=%s", user_id)
+            return None
+        except (redis.RedisError, psycopg.Error, ValueError) as exc:
+            # Do not log DSNs, Redis URLs, or event payloads.  The user id is an
+            # operational partition key and is sufficient to investigate.
+            LOG.warning("fold-in dependency or data failure user_id=%s code=%s", user_id, type(exc).__name__)
+            if attempt + 1 < attempts:
+                sleep(backoff_seconds * (2**attempt))
+    return False
+
+
+def run(settings: Settings) -> None:
+    bundle = load_bundle(settings.model_uri, settings.mapping_uri, settings.metadata_uri)
+    store = redis.Redis.from_url(settings.redis_url, decode_responses=True)
+    consumer = Consumer(
+        {
+            "bootstrap.servers": settings.kafka_bootstrap_servers,
+            "group.id": settings.kafka_group_id,
+            "enable.auto.commit": False,
+            "auto.offset.reset": "earliest",
+        }
+    )
+    stopping = False
+    paused: dict[tuple[str, int], int] = {}
+    owned: set[tuple[str, int]] = set()
+    fences: dict[tuple[str, int], tuple[str, str]] = {}
+    assignment_failed = False
+
+    def stop(_signum: int, _frame: object) -> None:
+        nonlocal stopping
+        stopping = True
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+    def on_assign(client: Consumer, partitions: list[TopicPartition]) -> None:
+        nonlocal assignment_failed
+        claims: dict[tuple[str, int], tuple[str, str]] = {}
+        try:
+            for partition in partitions:
+                key = (partition.topic, partition.partition)
+                claims[key] = claim_partition_fence(
+                    store, settings.kafka_group_id, partition.topic, partition.partition
+                )
+        except redis.RedisError as exc:
+            LOG.error("partition fence claim failed; Consumer restart required code=%s", type(exc).__name__)
+            assignment_failed = True
+            return
+        owned.update((partition.topic, partition.partition) for partition in partitions)
+        fences.update(claims)
+        client.assign(partitions)
+
+    def on_revoke(client: Consumer, partitions: list[TopicPartition]) -> None:
+        for partition in partitions:
+            paused.pop((partition.topic, partition.partition), None)
+            owned.discard((partition.topic, partition.partition))
+            fences.pop((partition.topic, partition.partition), None)
+        client.unassign()
+
+    def pause_for_failure(message: Any, partition: TopicPartition, reason: str) -> None:
+        paused[(message.topic(), message.partition())] = 0
+        LOG.error(
+            "%s; partition paused topic=%s partition=%s offset=%s",
+            reason,
+            message.topic(),
+            message.partition(),
+            message.offset(),
+        )
+        consumer.pause([partition])
+
+    try:
+        consumer.subscribe([settings.kafka_topic], on_assign=on_assign, on_revoke=on_revoke)
+        while not stopping:
+            if assignment_failed:
+                raise RuntimeError("partition fence claim failed; Consumer restart required")
+            message = consumer.poll(settings.kafka_poll_timeout_seconds)
+            if assignment_failed:
+                raise RuntimeError("partition fence claim failed; Consumer restart required")
+            for key in paused:
+                paused[key] += 1
+            if paused and max(paused.values()) >= settings.max_paused_polls:
+                LOG.error("paused partition restart required partitions=%s", len(paused))
+                raise RuntimeError("paused Kafka partition requires restart")
+            if message is None:
+                continue
+            if message.error():
+                LOG.warning("Kafka record error topic=%s partition=%s", message.topic(), message.partition())
+                continue
+            partition = TopicPartition(message.topic(), message.partition())
+            try:
+                event = parse_event(message.value(), message.key())
+            except EventValidationError:
+                # A poison record must not take down unrelated partitions and
+                # must remain uncommitted for explicit operator recovery.
+                pause_for_failure(message, partition, "invalid Kafka event")
+                continue
+            processed = process_user(
+                store,
+                lambda: psycopg.connect(settings.postgres_dsn),
+                bundle,
+                event.user_id,
+                attempts=settings.retry_attempts,
+                backoff_seconds=settings.retry_backoff_seconds,
+                is_still_owned=lambda: (message.topic(), message.partition()) in owned,
+                partition_fence=fences.get((message.topic(), message.partition())),
+            )
+            if processed is None:
+                LOG.warning(
+                    "partition fence lost before commit topic=%s partition=%s",
+                    message.topic(),
+                    message.partition(),
+                )
+                continue
+            if not processed:
+                if (message.topic(), message.partition()) not in owned:
+                    LOG.warning(
+                        "partition ownership lost before commit topic=%s partition=%s",
+                        message.topic(),
+                        message.partition(),
+                    )
+                    continue
+                pause_for_failure(message, partition, "processing failed")
+                continue
+            if (message.topic(), message.partition()) not in owned:
+                LOG.warning(
+                    "partition ownership lost before commit topic=%s partition=%s",
+                    message.topic(),
+                    message.partition(),
+                )
+                continue
+            try:
+                consumer.commit(message=message, asynchronous=False)
+            except KafkaException:
+                # Publishing may already have succeeded.  Never advance this
+                # partition past an unconfirmed commit; replay is intentional.
+                pause_for_failure(message, partition, "Kafka commit failed")
+    finally:
+        consumer.close()

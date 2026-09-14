@@ -21,7 +21,7 @@ from pyspark.sql.types import (
 
 from batch.train.settings import AlsConfig
 
-CONTRACT_VERSION = "als-artifacts-v1"
+CONTRACT_VERSION = "als-artifacts-v2"
 MODEL_SELECTION = "MODEL_SELECTION"
 FINAL_EVALUATION = "FINAL_EVALUATION"
 SERVING = "SERVING"
@@ -56,6 +56,8 @@ METADATA_SCHEMA = StructType(
         StructField("user_factor_count", LongType(), False),
         StructField("item_factor_count", LongType(), False),
         StructField("implementation_revision", StringType(), True),
+        StructField("mapping_revision", StringType(), False),
+        StructField("movie_metadata_revision", StringType(), False),
     ]
 )
 
@@ -79,6 +81,8 @@ class AlsArtifactMetadata:
     validation_ratio: float | None = None
     min_eval_ratings: int | None = None
     implementation_revision: str | None = None
+    mapping_revision: str = ""
+    movie_metadata_revision: str = ""
 
 
 def build_metadata_row(
@@ -129,6 +133,11 @@ def validate_metadata_input(metadata: AlsArtifactMetadata) -> None:
         raise ValueError("rating counts do not satisfy the artifact contract")
     if metadata.implementation_revision is not None and not metadata.implementation_revision:
         raise ValueError("implementation revision must not be empty")
+    revision_pattern = re.compile(r"^sha256:[0-9a-f]{64}$")
+    if not revision_pattern.fullmatch(metadata.mapping_revision):
+        raise ValueError("mapping revision must be a sha256 digest")
+    if not revision_pattern.fullmatch(metadata.movie_metadata_revision):
+        raise ValueError("movie metadata revision must be a sha256 digest")
 
     split_values = (
         metadata.split_method,
