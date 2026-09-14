@@ -66,7 +66,14 @@ include:
         self.assertIn('- .gitlab/ci/backend.yml', backend)
         self.assertNotIn('- frontend/**/*', backend)
         self.assertNotIn('- .gitlab/ci/frontend.yml', backend)
-        self.assertIn('- frontend/**/*', frontend)
+        for path in ('frontend/src/**/*', 'frontend/public/**/*',
+                     'frontend/index.html', 'frontend/package.json',
+                     'frontend/package-lock.json', 'frontend/tsconfig*.json',
+                     'frontend/vite.config.*', 'frontend/eslint.config.*',
+                     'frontend/.prettier*', 'frontend/Dockerfile*',
+                     'frontend/nginx.conf', 'frontend/.dockerignore'):
+            self.assertIn('- ' + path, frontend)
+        self.assertNotIn('- frontend/**/*\n', frontend)
         self.assertIn('- .gitlab/ci/frontend.yml', frontend)
         self.assertNotIn('- backend/**/*', frontend)
         self.assertNotIn('- .gitlab/ci/backend.yml', frontend)
