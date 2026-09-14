@@ -25,6 +25,7 @@ public enum ErrorCode {
     RESET_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "유효하지 않은 비밀번호 재설정 링크입니다. 재설정을 다시 요청해 주세요."),
     RESET_TOKEN_EXPIRED(HttpStatus.GONE, "비밀번호 재설정 링크가 만료되었습니다. 재설정을 다시 요청해 주세요."),
     PASSWORD_NOT_SET(HttpStatus.CONFLICT, "비밀번호가 설정되지 않은 계정입니다. 소셜 로그인을 사용해 주세요."),
+    ONBOARDING_ALREADY_COMPLETED(HttpStatus.CONFLICT, "이미 초기 취향 설정을 마쳤습니다."),
     CANNOT_BLOCK_SELF(HttpStatus.BAD_REQUEST, "자기 자신은 차단할 수 없습니다."),
     ALREADY_BLOCKED(HttpStatus.CONFLICT, "이미 차단한 사용자입니다."),
     ALREADY_DISMISSED(HttpStatus.CONFLICT, "이미 관심없음 처리한 영화입니다."),

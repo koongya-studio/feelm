@@ -178,6 +178,16 @@ public class User extends BaseTimeEntity {
         this.visibility = visibility;
     }
 
+    /**
+     * 초기 취향 제출(API-024)로 온보딩을 완료 처리한다. 건너뛴 제출도 완료다.
+     *
+     * <p>재실행은 허용하지 않으므로 이 플래그가 두 온보딩 API의 {@code ONBOARDING_ALREADY_COMPLETED} 판정 기준이다. 판정과 전이가
+     * 엇갈리지 않도록 호출자가 계정 행을 잠근 뒤 호출한다.
+     */
+    public void completeOnboarding() {
+        this.onboardingCompleted = true;
+    }
+
     /** 인증 메일로 아직 활성화할 수 있는 미인증 계정인지. 보존 기간이 지난 계정은 재가입이 지울 수 있으므로 메일을 보내지 않는다. */
     public boolean isAwaitingVerification(Instant now) {
         return isPendingVerification() && !isPastRetention(now);

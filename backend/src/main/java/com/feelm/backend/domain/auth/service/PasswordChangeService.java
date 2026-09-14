@@ -3,6 +3,7 @@ package com.feelm.backend.domain.auth.service;
 import com.feelm.backend.domain.auth.PasswordResetTokenIssuer;
 import com.feelm.backend.domain.auth.RefreshTokenService;
 import com.feelm.backend.domain.user.entity.User;
+import com.feelm.backend.domain.user.repository.PasswordCredentials;
 import com.feelm.backend.domain.user.repository.UserRepository;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
@@ -45,15 +46,18 @@ public class PasswordChangeService {
      * JVM 락, {@link PasswordResetTokenIssuer#invalidateAllUnused})조차 걸 필요가 없다. 사전 검사는 행 잠금이 없는 일반
      * 조회라 계정 행을 먼저 잠그는 것이 아니며(토큰→계정 잠금 순서 불변식은 유지된다), 사전 검사 통과 뒤에도 잠금 있는 최종 검사를 그대로 다시 거쳐 판단을 내린다 —
      * 사전 검사는 통과했지만 그 사이 다른 트랜잭션이 상태를 바꿨을 가능성까지 커버하기 위해서다.
+     *
+     * <p>그 최종 검사가 실제로 최신 값을 보도록 사전 검사는 Entity가 아니라 {@link PasswordCredentials}로 읽는다. 이유는 {@link
+     * UserRepository#findPasswordCredentialsById}에 있다(MR !214 리뷰 2).
      */
     @Transactional
     public void change(long userId, String currentPassword, String newPassword) {
-        User precheck =
+        PasswordCredentials precheck =
                 userRepository
-                        .findById(userId)
-                        .filter(User::isActive)
+                        .findPasswordCredentialsById(userId)
+                        .filter(PasswordCredentials::isActive)
                         .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
-        assertCanChangePassword(precheck, currentPassword);
+        assertCanChangePassword(precheck.passwordHash(), currentPassword);
 
         resetTokenIssuer.invalidateAllUnused(userId);
 
@@ -62,17 +66,18 @@ public class PasswordChangeService {
                         .findByIdForUpdate(userId)
                         .filter(User::isActive)
                         .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
-        assertCanChangePassword(user, currentPassword);
+        assertCanChangePassword(user.getPasswordHash(), currentPassword);
 
         user.changePassword(passwordEncoder.encode(newPassword));
         refreshTokenService.revokeAll(userId);
     }
 
-    private void assertCanChangePassword(User user, String currentPassword) {
-        if (!user.hasPassword()) {
+    /** 해시가 없으면 이메일 로그인 수단이 없는 계정이다({@code User.hasPassword()}와 같은 판정). */
+    private void assertCanChangePassword(String passwordHash, String currentPassword) {
+        if (passwordHash == null) {
             throw new BusinessException(ErrorCode.PASSWORD_NOT_SET);
         }
-        if (!passwordEncoder.matches(currentPassword, user.getPasswordHash())) {
+        if (!passwordEncoder.matches(currentPassword, passwordHash)) {
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
     }

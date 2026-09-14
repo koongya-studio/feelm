@@ -84,6 +84,8 @@ class ErrorCodeTest {
                         // 사용자 도메인 — API-020 차단 (S15P21E106-211)
                         "CANNOT_BLOCK_SELF",
                         "ALREADY_BLOCKED",
+                        // 온보딩 도메인 — API-023·024 (S15P21E106-154)
+                        "ONBOARDING_ALREADY_COMPLETED",
                         // 추천 도메인 — API-047 관심없음 (S15P21E106-165)
                         "ALREADY_DISMISSED",
                         // 파티 도메인 — API-051·055·056·069
@@ -141,6 +143,13 @@ class ErrorCodeTest {
     void blockCodesMatchSpecifiedStatuses() {
         assertThat(ErrorCode.CANNOT_BLOCK_SELF.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(ErrorCode.ALREADY_BLOCKED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("API-023·024 온보딩 오류 코드는 명세의 HTTP 상태로 매핑된다")
+    void onboardingCodeMatchesSpecifiedStatus() {
+        assertThat(ErrorCode.ONBOARDING_ALREADY_COMPLETED.getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test

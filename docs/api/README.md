@@ -64,7 +64,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-020 | [사용자 차단](./users.md#api-020-사용자-차단) | POST | `/users/{userId}/block` | 사용자 | 1차 MVP | 회원 | FR-39 | O |
 | API-021 | [사용자 차단 해제](./users.md#api-021-사용자-차단-해제) | DELETE | `/users/{userId}/block` | 사용자 | 1차 MVP | 회원 | FR-39 |  |
 | API-022 | [차단 목록 조회](./users.md#api-022-차단-목록-조회) | GET | `/users/me/blocks` | 사용자 | 1차 MVP | 회원 | FR-39 |  |
-| API-023 | [초기 취향 카드 목록](./onboarding-ott.md#api-023-초기-취향-카드-목록) | GET | `/onboarding/cards` | 온보딩 | 1차 MVP | 회원 | FR-02 | O |
+| API-023 | [초기 취향 카드 목록](./onboarding-ott.md#api-023-초기-취향-카드-목록) | GET | `/onboarding/cards` | 온보딩 | 1차 MVP | 회원 | FR-02 |  |
 | API-024 | [초기 취향 제출](./onboarding-ott.md#api-024-초기-취향-제출) | POST | `/onboarding/preferences` | 온보딩 | 1차 MVP | 회원 | FR-02 |  |
 | API-025 | [OTT 목록 조회](./onboarding-ott.md#api-025-ott-목록-조회) | GET | `/otts` | OTT | 1차 MVP | 공개 | FR-03, FR-16 |  |
 | API-026 | [내 구독 OTT 조회](./onboarding-ott.md#api-026-내-구독-ott-조회) | GET | `/users/me/otts` | OTT | 1차 MVP | 회원 | FR-03 |  |
