@@ -56,6 +56,19 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByIdForUpdate(@Param("id") Long id);
 
     /**
+     * 비밀번호 대조에 필요한 값만 읽는다. 비밀번호 변경(API-012)의 잠금 없는 사전 검사가 쓴다.
+     *
+     * <p>Entity로 읽지 않는 이유는 영속성 컨텍스트다. 같은 트랜잭션에서 {@code User}를 Entity로 한 번 읽어 두면 뒤따르는 {@link
+     * #findByIdForUpdate}가 행을 다시 읽고 잠그면서도 먼저 읽어 둔 인스턴스를 그대로 돌려준다. 그러면 잠금 뒤의 최종 검사가 사전 검사와 같은 값을 다시
+     * 보는 셈이라 "사전 검사 통과 뒤에 다른 트랜잭션이 상태를 바꿨을 가능성"을 잡지 못하고, 이어지는 저장이 그 사이 바뀐 열까지 낡은 값으로 되돌린다 (MR !214
+     * 리뷰 2 — 온보딩 완료 직후 비밀번호를 바꾸면 {@code onboarding_completed}가 {@code false}로 돌아갔다).
+     */
+    @Query(
+            "select new com.feelm.backend.domain.user.repository.PasswordCredentials("
+                    + "u.status, u.passwordHash) from User u where u.id = :id")
+    Optional<PasswordCredentials> findPasswordCredentialsById(@Param("id") Long id);
+
+    /**
      * 보존 기간이 지난 미인증 계정을 지운다. 상태와 생성 시각을 삭제문의 조건에 넣어, 조회 뒤 삭제 전에 다른 요청이 인증을 마쳤으면 지우지 않는다.
      *
      * @return 지운 행 수. {@code 0}이면 그 사이에 계정이 활성화된 것이므로 호출자가 재가입을 거절한다
