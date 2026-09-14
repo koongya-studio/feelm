@@ -240,6 +240,39 @@ def junit_class_timings(data):
     return result
 
 
+def junit_lifecycle_timing(data):
+    """Split one Gradle per-class XML suite into testcase and class lifecycle time."""
+    root = junit_root(data)
+    elapsed = root.get('time', '')
+    if not re.fullmatch(r'[0-9]{1,7}(?:\.[0-9]{1,9})?', elapsed):
+        raise ValueError('Invalid JUnit testsuite timing')
+    try:
+        suite_seconds = Decimal(elapsed)
+    except InvalidOperation as exc:
+        raise ValueError('Invalid JUnit testsuite timing') from exc
+    if suite_seconds > Decimal(86400):
+        raise ValueError('JUnit testsuite timing exceeds one day')
+    classes = junit_class_timings(data)
+    if len(classes) != 1:
+        raise ValueError('Expected one testcase class per Gradle report')
+    classname, timing = next(iter(classes.items()))
+    case_seconds = timing['seconds']
+    # Gradle serializes every testcase independently, so their accumulated
+    # rounding error grows with the case count. Normalize only that bounded
+    # difference; a larger contradiction still fails closed.
+    rounding_tolerance = Decimal('0.001') * timing['tests']
+    if suite_seconds + rounding_tolerance < case_seconds:
+        raise ValueError('JUnit testsuite duration is shorter than its testcases')
+    suite_seconds = max(suite_seconds, case_seconds)
+    lifecycle_seconds = max(Decimal(0), suite_seconds - case_seconds)
+    return classname, {
+        'suite_seconds': suite_seconds,
+        'case_seconds': case_seconds,
+        'lifecycle_seconds': lifecycle_seconds,
+        'tests': timing['tests'],
+    }
+
+
 def seconds_value(value, label, maximum=2400):
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError('Invalid ' + label)
@@ -281,11 +314,17 @@ def gradle_timing(data):
             'slowest_tasks': tasks}
 
 
-def public_timing(gradle, class_timings):
+def public_timing(gradle, class_timings, lifecycle_timings):
+    if set(class_timings) != set(lifecycle_timings):
+        raise ValueError('JUnit class and lifecycle timing sets differ')
     classes = []
     total_tests = 0
     total_seconds = Decimal(0)
     for classname, timing in class_timings.items():
+        lifecycle = lifecycle_timings[classname]
+        if (timing['seconds'] != lifecycle['case_seconds']
+                or timing['tests'] != lifecycle['tests']):
+            raise ValueError('JUnit class and lifecycle timing values differ')
         duration = timing['seconds']
         count = timing['tests']
         total_seconds += duration
@@ -294,23 +333,60 @@ def public_timing(gradle, class_timings):
                         'seconds': float(duration.quantize(Decimal('0.001'), rounding=ROUND_HALF_UP)),
                         'tests': count})
     classes.sort(key=lambda item: (-item['seconds'], item['class_name']))
-    return {'schema_version': 1, **gradle, 'test_case_seconds': float(
-                total_seconds.quantize(Decimal('0.001'), rounding=ROUND_HALF_UP)),
-            'test_count': total_tests, 'slowest_classes': classes[:10],
-            'informational_only': True}
+    suite_seconds = sum((item['suite_seconds'] for item in lifecycle_timings.values()), Decimal(0))
+    lifecycle_seconds = sum(
+        (item['lifecycle_seconds'] for item in lifecycle_timings.values()), Decimal(0))
+    lifecycle_classes = [{
+        'class_name': classname,
+        'seconds': float(item['lifecycle_seconds'].quantize(
+            Decimal('0.001'), rounding=ROUND_HALF_UP)),
+        'tests': item['tests'],
+    } for classname, item in lifecycle_timings.items()]
+    lifecycle_classes.sort(key=lambda item: (-item['seconds'], item['class_name']))
+    test_tasks = [Decimal(str(item['seconds'])) for item in gradle['slowest_tasks']
+                  if item['path'] == ':test']
+    if len(test_tasks) != 1:
+        raise ValueError('Missing unique Gradle test task timing')
+    test_task_seconds = test_tasks[0]
+    unattributed_seconds = max(Decimal(0), test_task_seconds - suite_seconds)
+    return {
+        'schema_version': 2,
+        **gradle,
+        'test_task_seconds': float(test_task_seconds.quantize(
+            Decimal('0.001'), rounding=ROUND_HALF_UP)),
+        'test_suite_seconds': float(suite_seconds.quantize(
+            Decimal('0.001'), rounding=ROUND_HALF_UP)),
+        'test_case_seconds': float(total_seconds.quantize(
+            Decimal('0.001'), rounding=ROUND_HALF_UP)),
+        'test_class_lifecycle_seconds': float(lifecycle_seconds.quantize(
+            Decimal('0.001'), rounding=ROUND_HALF_UP)),
+        'test_task_unattributed_seconds': float(unattributed_seconds.quantize(
+            Decimal('0.001'), rounding=ROUND_HALF_UP)),
+        'test_count': total_tests,
+        'slowest_classes': classes[:10],
+        'slowest_lifecycle_classes': lifecycle_classes[:10],
+        'informational_only': True,
+    }
 
 
 def validated_public_timing(value):
-    expected = {'schema_version', 'gradle_seconds', 'slowest_tasks', 'test_case_seconds',
-                'test_count', 'slowest_classes', 'informational_only'}
-    if (not isinstance(value, dict) or set(value) != expected or value['schema_version'] != 1
+    legacy = {'schema_version', 'gradle_seconds', 'slowest_tasks', 'test_case_seconds',
+              'test_count', 'slowest_classes', 'informational_only'}
+    detailed = legacy | {'test_task_seconds', 'test_suite_seconds',
+                         'test_class_lifecycle_seconds', 'test_task_unattributed_seconds',
+                         'slowest_lifecycle_classes'}
+    if (not isinstance(value, dict) or value.get('schema_version') not in (1, 2)
+            or set(value) != (legacy if value.get('schema_version') == 1 else detailed)
             or value['informational_only'] is not True or type(value['test_count']) is not int
             or not 0 <= value['test_count'] <= 1000000
             or not isinstance(value['slowest_tasks'], list) or len(value['slowest_tasks']) > 20
-            or not isinstance(value['slowest_classes'], list) or len(value['slowest_classes']) > 10):
+            or not isinstance(value['slowest_classes'], list) or len(value['slowest_classes']) > 10
+            or (value.get('schema_version') == 2
+                and (not isinstance(value['slowest_lifecycle_classes'], list)
+                     or len(value['slowest_lifecycle_classes']) > 10))):
         raise ValueError('Unexpected public timing schema')
     result = {
-        'schema_version': 1,
+        'schema_version': value['schema_version'],
         'gradle_seconds': float(seconds_value(value['gradle_seconds'], 'Gradle duration')),
         'slowest_tasks': [],
         'test_case_seconds': float(seconds_value(
@@ -319,6 +395,19 @@ def validated_public_timing(value):
         'slowest_classes': [],
         'informational_only': True,
     }
+    if value['schema_version'] == 2:
+        result.update({
+            'test_task_seconds': float(seconds_value(
+                value['test_task_seconds'], 'test task duration')),
+            'test_suite_seconds': float(seconds_value(
+                value['test_suite_seconds'], 'test suite duration', maximum=86400 * 1000000)),
+            'test_class_lifecycle_seconds': float(seconds_value(
+                value['test_class_lifecycle_seconds'], 'test class lifecycle duration',
+                maximum=86400 * 1000000)),
+            'test_task_unattributed_seconds': float(seconds_value(
+                value['test_task_unattributed_seconds'], 'unattributed test task duration')),
+            'slowest_lifecycle_classes': [],
+        })
     seen_tasks = set()
     for item in value['slowest_tasks']:
         if (not isinstance(item, dict) or set(item) != {'path', 'seconds'}
@@ -350,6 +439,35 @@ def validated_public_timing(value):
         })
     if class_tests > result['test_count']:
         raise ValueError('Slow test class count exceeds total tests')
+    if value['schema_version'] == 2:
+        seen_lifecycle_classes = set()
+        lifecycle_tests = 0
+        for item in value['slowest_lifecycle_classes']:
+            if (not isinstance(item, dict) or set(item) != {'class_name', 'seconds', 'tests'}
+                    or not isinstance(item['class_name'], str)
+                    or not re.fullmatch(r'[A-Za-z0-9_.$]{1,512}', item['class_name'])
+                    or item['class_name'] in seen_lifecycle_classes
+                    or type(item['tests']) is not int or not 1 <= item['tests'] <= 1000000):
+                raise ValueError('Invalid public test lifecycle timing')
+            seen_lifecycle_classes.add(item['class_name'])
+            lifecycle_tests += item['tests']
+            result['slowest_lifecycle_classes'].append({
+                'class_name': item['class_name'],
+                'seconds': float(seconds_value(
+                    item['seconds'], 'test lifecycle duration', maximum=86400 * 1000000)),
+                'tests': item['tests'],
+            })
+        if lifecycle_tests > result['test_count']:
+            raise ValueError('Slow lifecycle class count exceeds total tests')
+        case = Decimal(str(result['test_case_seconds']))
+        suite = Decimal(str(result['test_suite_seconds']))
+        lifecycle = Decimal(str(result['test_class_lifecycle_seconds']))
+        task = Decimal(str(result['test_task_seconds']))
+        unattributed = Decimal(str(result['test_task_unattributed_seconds']))
+        tolerance = Decimal('0.002')
+        if (abs(suite - case - lifecycle) > tolerance
+                or abs(max(Decimal(0), task - suite) - unattributed) > tolerance):
+            raise ValueError('Inconsistent public test lifecycle totals')
     return result
 
 
@@ -362,7 +480,7 @@ def collect_reports(stopped_root, destination, process_exit, required_classes=fr
     """
     if expected_tests is not None and (type(expected_tests) is not int or not 1 <= expected_tests <= 1000000):
         raise ValueError('Invalid trusted test-count policy')
-    reports, classes, class_timings = {}, set(), {}
+    reports, classes, class_timings, lifecycle_timings = {}, set(), {}, {}
     totals = dict.fromkeys(('tests', 'failures', 'errors', 'skipped'), 0)
     with directory_fd(stopped_root) as root_fd:
         with child_directory(root_fd, relative_parts(REPORT_DIRECTORY)) as report_fd:
@@ -379,6 +497,7 @@ def collect_reports(stopped_root, destination, process_exit, required_classes=fr
                 if total_bytes > MAX_REPORT_TOTAL: raise ValueError('Report bundle exceeds limit')
                 counts, found = junit_summary(data)
                 timings = junit_class_timings(data)
+                lifecycle_class, lifecycle = junit_lifecycle_timing(data)
                 if classes.intersection(found): raise ValueError('Duplicate testcase class across reports')
                 classes.update(found)
                 for key, value in counts.items(): totals[key] += value
@@ -387,6 +506,9 @@ def collect_reports(stopped_root, destination, process_exit, required_classes=fr
                         classname, {'seconds': Decimal(0), 'tests': 0})
                     current['seconds'] += timing['seconds']
                     current['tests'] += timing['tests']
+                if lifecycle_class in lifecycle_timings:
+                    raise ValueError('Duplicate test lifecycle class across reports')
+                lifecycle_timings[lifecycle_class] = lifecycle
                 reports[name] = data
     if not reports: raise ValueError('No test reports')
     missing = sorted(set(required_classes) - classes)
@@ -397,7 +519,7 @@ def collect_reports(stopped_root, destination, process_exit, required_classes=fr
         parts = relative_parts(TIMING_FILE)
         with child_directory(root_fd, parts[:-1]) as timing_fd:
             timing_data = read_regular(timing_fd, parts[-1], MAX_TIMING_FILE)
-    timing = public_timing(gradle_timing(timing_data), class_timings)
+    timing = public_timing(gradle_timing(timing_data), class_timings, lifecycle_timings)
     if timing['test_count'] != totals['tests']:
         raise ValueError('Timing test count does not match JUnit summary')
     result = {'process_exit': process_exit, 'summary': totals, 'missing_classes': missing,

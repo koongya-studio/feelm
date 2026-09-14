@@ -101,6 +101,26 @@ develop의 `backend-test`는 Gradle 로그에서 이 줄을 직접 확인한다.
 `slowest_classes`를 함께 비교해 컴파일·테스트·Spotless·개별 통합 테스트 중 후속 최적화
 대상을 선정한다.
 
+### 테스트 lifecycle 상세 계측 (S15P21E106-420)
+
+격리 Runner 수집기는 Gradle의 클래스별 JUnit XML `testsuite.time`과 각
+`testcase.time`을 함께 검증한다. 공개되는 schema version 2 요약은 기존 필드를 유지하면서
+다음 값을 추가한다.
+
+- `test_task_seconds`: Gradle `:test` task 전체 시간
+- `test_suite_seconds`: 클래스별 JUnit suite 시간 합계
+- `test_case_seconds`: 기존 테스트 메서드 시간 합계
+- `test_class_lifecycle_seconds`: suite 시간에서 testcase 시간을 뺀 합계. 클래스 fixture,
+  Spring Context 및 해당 클래스에 귀속되는 컨테이너·DB 준비/정리 후보 구간이다.
+- `test_task_unattributed_seconds`: `:test`에서 suite 합계를 뺀 시간. Test worker 시작·종료,
+  discovery, 클래스 사이 대기 및 task 수준 준비/정리 후보 구간이다.
+- `slowest_lifecycle_classes`: lifecycle 시간이 긴 클래스 상위 10개
+
+JUnit 시간은 반올림 오차를 제외하고 `suite = testcase + lifecycle` 관계를 만족해야 하며,
+task 미귀속 시간도 수집기가 다시 계산해 불일치 값을 거부한다. 구버전 schema version 1은
+배포 전환과 기존 증빙 확인을 위해 계속 읽을 수 있다. 모든 값은 성능 진단용이고 테스트 성공,
+격리 또는 보안 판정을 완화하지 않는다.
+
 ## 구성 요소
 
 - `ci-gitlab-custom-executor.py`: 비특권 Runner callback. 생성된 셸 파일은 실행하지 않는다.
