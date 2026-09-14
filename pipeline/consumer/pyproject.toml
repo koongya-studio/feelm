@@ -1,0 +1,35 @@
+[project]
+name = "feelm-foldin-consumer"
+version = "0.1.0"
+description = "Kafka-driven ALS Fold-in candidate updater"
+requires-python = ">=3.12"
+dependencies = [
+  "confluent-kafka>=2.6,<3",
+  "numpy>=2.0,<3",
+  "psycopg[binary]>=3.2,<4",
+  "pyarrow>=18,<20",
+  "redis>=5.2,<6",
+]
+
+[project.scripts]
+feelm-foldin-consumer = "feelm_consumer.__main__:main"
+
+[dependency-groups]
+dev = ["pytest>=8.3,<9", "ruff>=0.8,<1"]
+
+[tool.pytest.ini_options]
+testpaths = ["src"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/feelm_consumer"]

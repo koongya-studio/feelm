@@ -34,7 +34,7 @@ def parse_args(arguments: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output", required=True, help="Output directory or HDFS URI")
     parser.add_argument(
         "--write-mode",
-        choices=["errorifexists", "overwrite"],
+        choices=["errorifexists"],
         default="errorifexists",
     )
     return parser.parse_args(arguments)

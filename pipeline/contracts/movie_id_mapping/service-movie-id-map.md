@@ -56,6 +56,7 @@ service_movie_id,tmdb_id
 | `tmdb_id` | 32-bit integer |
 | `movielens_movie_id` | 32-bit integer, nullable |
 | `mapping_status` | string |
+| `mapping_revision` | string, non-null, 모든 행이 같은 `sha256:<64 소문자 hex>` |
 
 | 상태 | 의미 |
 | --- | --- |
@@ -64,4 +65,8 @@ service_movie_id,tmdb_id
 | `TMDB_ID_AMBIGUOUS` | 같은 TMDb ID가 여러 MovieLens ID와 연결되어 자동 연결에서 제외됨 |
 
 MovieLens ID가 연결되지 않은 상태의 `movielens_movie_id`는 `NULL`이다. 콘텐츠 기반 추천에
-필요한 TMDb 메타데이터는 S15P21E106-132의 산출물을 사용한다.
+필요한 TMDb 메타데이터는 HDFS의 immutable movie metadata snapshot 산출물을 사용한다.
+
+`mapping_revision`은 immutable mapping snapshot의 canonical content SHA-256이다. producer는
+임시 경로에서 전체 산출물·revision·one-to-one을 검증한 뒤 새 최종 경로로 공개한다. Consumer는
+ALS model metadata의 `mapping_revision`과 정확히 일치하지 않으면 시작을 거부한다.

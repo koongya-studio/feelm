@@ -59,7 +59,7 @@ null 조건은 실제 데이터 값에 대한 제약이다. Parquet을 읽은 Sp
 
 | 컬럼 | Spark 타입 | 필수 여부 | 의미 |
 | --- | --- | --- | --- |
-| `contract_version` | `string` | 필수 | `als-artifacts-v1` |
+| `contract_version` | `string` | 필수 | `als-artifacts-v2` |
 | `model_version` | `string` | 필수 | 버전 디렉터리명과 같은 식별자 |
 | `model_uid` | `string` | 필수 | 저장한 Spark ALSModel의 UID |
 | `artifact_stage` | `string` | 필수 | `MODEL_SELECTION`, `FINAL_EVALUATION`, `SERVING` |
@@ -82,6 +82,8 @@ null 조건은 실제 데이터 값에 대한 제약이다. Parquet을 읽은 Sp
 | `user_factor_count` | `long` | 필수 | User Factor 행 수 |
 | `item_factor_count` | `long` | 필수 | Item Factor 행 수 |
 | `implementation_revision` | `string` | 선택 | 실제 실행 코드를 식별하는 commit SHA 또는 소스 해시 |
+| `mapping_revision` | `string` | 필수(v2) | service movie mapping 산출물의 `sha256:<64 소문자 hex>` revision |
+| `movie_metadata_revision` | `string` | 필수(v2) | 영화 metadata snapshot 산출물의 `sha256:<64 소문자 hex>` revision |
 
 - 선택 컬럼은 생략하거나 null로 둘 수 있다. 기록했다면 실제 실행 및 필수 컬럼과 일치해야 한다.
   v1의 고정값인 명시적 평점 여부·비음수 제약·float32 타입은 별도 메타데이터 컬럼으로 반복하지 않는다.
@@ -130,6 +132,12 @@ null 조건은 실제 데이터 값에 대한 제약이다. Parquet을 읽은 Sp
 - 저장된 모델을 사용하는 후속 Spark 평가 작업은 `model/`에서 ALSModel을 읽는다.
   다른 Spark 버전에서 읽으려면 호환성을 별도 검증한다.
 - Python Consumer는 `item-factors/`와 `metadata/`를 읽으며 Spark 네이티브 모델 형식에 의존하지 않는다.
+- v2 Consumer는 mapping·영화 metadata 산출물 전체에서 각각 하나의 자체 revision만 허용하고,
+  model metadata의 두 revision과 정확히 일치할 때만 기동한다. `MATCHED` mapping의
+  `service_movie_id`와 `movielens_movie_id`는 각각 one-to-one이어야 한다.
+- 공개 순서는 immutable mapping·movie metadata snapshot을 검증·공개한 뒤 그 revision을 기록한
+  model version을 검증·공개하는 순서다. Consumer는 세 고정 URI만 함께 읽으며 부분 공개나
+  서로 다른 revision을 보충해 읽지 않는다.
 
 파일 저장 완료 후 서비스 전환은 [스트리밍 계약](../../docs/api/streaming-contract.md#54-야간-배치-재구축)을
 따른다. 데이터·품질 검증과 사용자 추천 재구축 후 서비스에 게시할 때

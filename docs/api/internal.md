@@ -4,7 +4,7 @@
 > 아래 내용은 이전 설계의 추적을 위해 보존하며 현재 구현 계약으로 사용하지 않습니다. 현재 흐름은
 > 현재 계약은 `Spring Boot → Kafka → Python Consumer / Spark Structured Streaming → Redis → Spring Boot`입니다.
 > 2026-09-07 합의는 현행 [평가 API](./watch.md)와 [이벤트·Redis 계약](./streaming-contract.md)을 따릅니다.
-> 평점은 0.5~5.0·0.5점 단위이고 맞춤·발견은 K-Means 군집 기반입니다. 아래 경험량 임계치 기반 유형 판정은 미합의 가정이며 현행 규칙이 아닙니다.
+> 평점은 0.5~5.0·0.5점 단위입니다. 현행 정책에서 맞춤은 사용자 선호 기반이고 발견만 K-Means 영화 군집을 향후 사용합니다. 아래 경험량 임계치 기반 유형 판정은 미합의 가정이며 현행 규칙이 아닙니다.
 
 [ADR-0012](../adr/0012-realtime-recommendation-serving-location.md)에 따라 실시간 추천 서빙 계산(Fold-in·재정렬·파티 집계·XAI·취향 분석)은
 FastAPI 서비스가 수행하고, Spring Boot가 이 문서의 내부 API로 호출합니다. **클라이언트(React)에 공개되는 API가 아니며**, 공개 계약은

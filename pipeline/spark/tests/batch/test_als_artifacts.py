@@ -78,6 +78,8 @@ def _serving_metadata(model_version: str) -> AlsArtifactMetadata:
         source_ratings_count=len(RATING_ROWS),
         training_ratings_count=len(RATING_ROWS),
         implementation_revision="test-revision",
+        mapping_revision="sha256:" + "a" * 64,
+        movie_metadata_revision="sha256:" + "b" * 64,
     )
 
 
@@ -114,7 +116,7 @@ def test_saves_and_loads_complete_artifact_version(
     assert loaded.version_uri == version_uri
     assert loaded.model.rank == 3
     assert loaded.metadata.asDict() == {
-        "contract_version": "als-artifacts-v1",
+        "contract_version": "als-artifacts-v2",
         "model_version": metadata.model_version,
         "model_uid": model.uid,
         "artifact_stage": stage,
@@ -137,6 +139,8 @@ def test_saves_and_loads_complete_artifact_version(
         "user_factor_count": 6,
         "item_factor_count": 14,
         "implementation_revision": "test-revision",
+        "mapping_revision": "sha256:" + "a" * 64,
+        "movie_metadata_revision": "sha256:" + "b" * 64,
     }
     assert loaded.user_factors.count() == 6
     assert loaded.item_factors.count() == 14

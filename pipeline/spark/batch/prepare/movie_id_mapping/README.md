@@ -3,7 +3,7 @@
 MovieLens 32M의 평점·영화 데이터를 정제하고 MovieLens `movieId`, TMDb ID, 서비스 DB
 `movies.id`의 매핑 Parquet을 생성한다.
 
-TMDb 메타데이터 수집·정제는 S15P21E106-132에서 수행한다. 이 파이프라인은 제목이나 감독
+TMDb 메타데이터 수집·정제는 별도 데이터 준비 단계에서 수행한다. 이 파이프라인은 제목이나 감독
 정보로 영화를 추측해 연결하지 않고 MovieLens가 제공하는 `links.csv`의 `tmdbId`만 사용한다.
 
 실행환경은 [공통 분산 런타임](../../../../../infra/README.md)을 사용한다. 이 파이프라인은 Spark,
