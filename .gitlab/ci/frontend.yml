@@ -16,13 +16,25 @@ frontend-mr-test:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
       changes:
-        - frontend/**/*
+        - frontend/src/**/*
+        - frontend/public/**/*
+        - frontend/index.html
+        - frontend/package.json
+        - frontend/package-lock.json
+        - frontend/tsconfig*.json
+        - frontend/vite.config.*
+        - frontend/eslint.config.*
+        - frontend/.prettier*
+        - frontend/Dockerfile*
+        - frontend/nginx.conf
+        - frontend/.dockerignore
         - .gitlab-ci.yml
         - .gitlab/ci/common.yml
         - .gitlab/ci/frontend.yml
         - .gitattributes
         - infra/scripts/ci-frontend-mr-*.py
         - infra/scripts/test_ci_frontend_mr.py
+        - infra/scripts/test_ci_frontend_paths.py
         - infra/scripts/test_ci_config.py
         - infra/scripts/ci-gitlab-custom-executor.py
         - infra/scripts/ci-gitlab-job-adapter.py
@@ -36,6 +48,7 @@ frontend-test:
   stage: test
   tags: [e106-shell]
   script:
+    - python3 -B -m unittest infra.scripts.test_ci_frontend_paths -v
     - docker run --rm --pull always --volume "$CI_PROJECT_DIR/frontend:/src:ro" --workdir /app node:20.19-alpine sh -c 'cp -R /src/. /app && npm ci && npm run lint && npm run format:check && npm run test:run && npm run build'
   interruptible: true
   timeout: 15m
@@ -44,7 +57,19 @@ frontend-test:
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
       changes:
-        - frontend/**/*
+        - frontend/src/**/*
+        - frontend/public/**/*
+        - frontend/index.html
+        - frontend/package.json
+        - frontend/package-lock.json
+        - frontend/tsconfig*.json
+        - frontend/vite.config.*
+        - frontend/eslint.config.*
+        - frontend/.prettier*
+        - frontend/Dockerfile*
+        - frontend/nginx.conf
+        - frontend/.dockerignore
+        - infra/scripts/test_ci_frontend_paths.py
         - infra/compose/service.yml
         - infra/nginx/nginx.conf
         - infra/scripts/deploy-frontend.sh
@@ -72,7 +97,18 @@ frontend-image:
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
       changes:
-        - frontend/**/*
+        - frontend/src/**/*
+        - frontend/public/**/*
+        - frontend/index.html
+        - frontend/package.json
+        - frontend/package-lock.json
+        - frontend/tsconfig*.json
+        - frontend/vite.config.*
+        - frontend/eslint.config.*
+        - frontend/.prettier*
+        - frontend/Dockerfile*
+        - frontend/nginx.conf
+        - frontend/.dockerignore
         - infra/compose/service.yml
         - infra/nginx/nginx.conf
         - infra/scripts/deploy-frontend.sh
@@ -105,7 +141,18 @@ deploy-frontend:
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
       changes:
-        - frontend/**/*
+        - frontend/src/**/*
+        - frontend/public/**/*
+        - frontend/index.html
+        - frontend/package.json
+        - frontend/package-lock.json
+        - frontend/tsconfig*.json
+        - frontend/vite.config.*
+        - frontend/eslint.config.*
+        - frontend/.prettier*
+        - frontend/Dockerfile*
+        - frontend/nginx.conf
+        - frontend/.dockerignore
         - infra/compose/service.yml
         - infra/nginx/nginx.conf
         - infra/scripts/deploy-frontend.sh
