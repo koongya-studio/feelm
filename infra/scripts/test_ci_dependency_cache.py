@@ -329,6 +329,7 @@ class ManagerTests(unittest.TestCase):
         self.assertIn('https://plugins.gradle.org/m2/', source)
         self.assertIn('settings.pluginManagement.repositories.whenObjectAdded', source)
         self.assertIn('project.buildscript.repositories.whenObjectAdded', source)
+        self.assertIn("apply from: new File(gradle.startParameter.currentDir, 'gradle/test-timing.gradle')", source)
         self.assertNotIn('mavenLocal()', source)
 
 

@@ -194,6 +194,24 @@ def write_private(path, payload):
         output.write(payload); output.flush(); os.fsync(output.fileno())
 
 
+def publish_backend_timing(attempt, mode, required):
+    if mode != 'backend': return
+    path = attempt / 'evidence/manifest.json'
+    try:
+        info = path.lstat()
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077
+                or info.st_nlink != 1 or info.st_size > 512 * 1024):
+            raise ValueError('Untrusted timing evidence')
+        manifest = json.loads(path.read_text(encoding='utf-8'))
+        if not isinstance(manifest, dict): raise ValueError('Invalid timing evidence manifest')
+        timing = pilot.job_io.validated_public_timing(manifest.get('timing'))
+    except (OSError, ValueError, UnicodeError, json.JSONDecodeError, TypeError):
+        if required: raise RuntimeError('Validated backend timing evidence missing')
+        return
+    print('BACKEND_TEST_TIMING=' + json.dumps(
+        timing, sort_keys=True, separators=(',', ':')), flush=True)
+
+
 def start(base, prepared, mode, source_payload=None, source_sha=None, on_started=None):
     pilot.check_base(base); pilot.check_base(prepared)
     if (source_payload is None) != (source_sha is None):
@@ -227,6 +245,7 @@ def start(base, prepared, mode, source_payload=None, source_sha=None, on_started
         proof = attempt / 'cleanup.json'
         if not proof.is_file() or json.loads(proof.read_text()) != {'id': token, 'clean': True}:
             raise RuntimeError('Missing cleanup proof; new jobs blocked')
+        publish_backend_timing(attempt, mode, required=result.returncode == 0)
         return result.returncode
     finally: lock.close()
 

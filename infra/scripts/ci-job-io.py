@@ -6,6 +6,7 @@ and verify the complete workload before collecting reports. XML is job output,
 never evidence of isolation or authority to change the executor's state.
 """
 from contextlib import contextmanager
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import hashlib
 import io
 import json
@@ -25,6 +26,8 @@ MAX_REPORT_FILE = 4 * 1024**2
 MAX_REPORT_TOTAL = 16 * 1024**2
 MAX_REPORTS = 256
 REPORT_DIRECTORY = 'work/backend/build/test-results/test'
+TIMING_FILE = 'work/backend/build/reports/test-timing.json'
+MAX_TIMING_FILE = 64 * 1024
 
 
 def relative_parts(name):
@@ -183,7 +186,7 @@ def read_regular(parent_fd, name, maximum):
         os.close(fd)
 
 
-def junit_summary(data):
+def junit_root(data):
     if len(data) > MAX_REPORT_FILE: raise ValueError('XML exceeds limit')
     text = data.decode('utf-8', errors='strict')
     if '\x00' in text or re.search(r'<!\s*(DOCTYPE|ENTITY)', text, re.IGNORECASE):
@@ -195,6 +198,11 @@ def junit_summary(data):
         node, depth = pending.pop(); nodes += 1
         if nodes > 100000 or depth > 32: raise ValueError('XML structure exceeds limit')
         pending.extend((child, depth + 1) for child in node)
+    return root
+
+
+def junit_summary(data):
+    root = junit_root(data)
     cases = root.findall('testcase')
     actual = {'tests': len(cases), 'failures': 0, 'errors': 0, 'skipped': 0}
     classes = set()
@@ -211,6 +219,140 @@ def junit_summary(data):
     return actual, classes
 
 
+def junit_class_timings(data):
+    root = junit_root(data)
+    result = {}
+    for case in root.findall('testcase'):
+        classname = case.get('classname', '')
+        elapsed = case.get('time', '')
+        if (not re.fullmatch(r'[A-Za-z0-9_.$]{1,512}', classname)
+                or not re.fullmatch(r'[0-9]{1,7}(?:\.[0-9]{1,9})?', elapsed)):
+            raise ValueError('Invalid JUnit testcase timing')
+        try:
+            duration = Decimal(elapsed)
+        except InvalidOperation as exc:
+            raise ValueError('Invalid JUnit testcase timing') from exc
+        if duration > Decimal(86400): raise ValueError('JUnit testcase timing exceeds one day')
+        current = result.setdefault(classname, {'seconds': Decimal(0), 'tests': 0})
+        current['seconds'] += duration
+        current['tests'] += 1
+    if not result: raise ValueError('Empty test timing refused')
+    return result
+
+
+def seconds_value(value, label, maximum=2400):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError('Invalid ' + label)
+    try:
+        decimal = Decimal(str(value))
+    except InvalidOperation as exc:
+        raise ValueError('Invalid ' + label) from exc
+    if not decimal.is_finite() or decimal < 0 or decimal > maximum:
+        raise ValueError('Invalid ' + label)
+    return decimal.quantize(Decimal('0.001'), rounding=ROUND_HALF_UP)
+
+
+def gradle_timing(data):
+    if not isinstance(data, bytes) or len(data) > MAX_TIMING_FILE:
+        raise ValueError('Gradle timing exceeds limit')
+    try:
+        value = json.loads(data.decode('utf-8', errors='strict'))
+    except (UnicodeError, json.JSONDecodeError) as exc:
+        raise ValueError('Invalid Gradle timing JSON') from exc
+    expected = {'schemaVersion', 'gradleSeconds', 'slowestTasks', 'testCount',
+                'slowestClasses', 'informationalOnly'}
+    if (not isinstance(value, dict) or set(value) != expected or value['schemaVersion'] != 1
+            or value['informationalOnly'] is not True or type(value['testCount']) is not int
+            or not 0 <= value['testCount'] <= 1000000
+            or not isinstance(value['slowestTasks'], list) or len(value['slowestTasks']) > 20
+            or not isinstance(value['slowestClasses'], list) or len(value['slowestClasses']) > 10):
+        raise ValueError('Unexpected Gradle timing schema')
+    tasks = []
+    seen = set()
+    for item in value['slowestTasks']:
+        if (not isinstance(item, dict) or set(item) != {'path', 'seconds'}
+                or not isinstance(item['path'], str) or not re.fullmatch(r':[A-Za-z0-9_.:-]{1,255}', item['path'])
+                or item['path'] in seen):
+            raise ValueError('Invalid Gradle task timing')
+        seen.add(item['path'])
+        tasks.append({'path': item['path'],
+                      'seconds': float(seconds_value(item['seconds'], 'Gradle task timing'))})
+    return {'gradle_seconds': float(seconds_value(value['gradleSeconds'], 'Gradle duration')),
+            'slowest_tasks': tasks}
+
+
+def public_timing(gradle, class_timings):
+    classes = []
+    total_tests = 0
+    total_seconds = Decimal(0)
+    for classname, timing in class_timings.items():
+        duration = timing['seconds']
+        count = timing['tests']
+        total_seconds += duration
+        total_tests += count
+        classes.append({'class_name': classname,
+                        'seconds': float(duration.quantize(Decimal('0.001'), rounding=ROUND_HALF_UP)),
+                        'tests': count})
+    classes.sort(key=lambda item: (-item['seconds'], item['class_name']))
+    return {'schema_version': 1, **gradle, 'test_case_seconds': float(
+                total_seconds.quantize(Decimal('0.001'), rounding=ROUND_HALF_UP)),
+            'test_count': total_tests, 'slowest_classes': classes[:10],
+            'informational_only': True}
+
+
+def validated_public_timing(value):
+    expected = {'schema_version', 'gradle_seconds', 'slowest_tasks', 'test_case_seconds',
+                'test_count', 'slowest_classes', 'informational_only'}
+    if (not isinstance(value, dict) or set(value) != expected or value['schema_version'] != 1
+            or value['informational_only'] is not True or type(value['test_count']) is not int
+            or not 0 <= value['test_count'] <= 1000000
+            or not isinstance(value['slowest_tasks'], list) or len(value['slowest_tasks']) > 20
+            or not isinstance(value['slowest_classes'], list) or len(value['slowest_classes']) > 10):
+        raise ValueError('Unexpected public timing schema')
+    result = {
+        'schema_version': 1,
+        'gradle_seconds': float(seconds_value(value['gradle_seconds'], 'Gradle duration')),
+        'slowest_tasks': [],
+        'test_case_seconds': float(seconds_value(
+            value['test_case_seconds'], 'test case duration', maximum=86400 * 1000000)),
+        'test_count': value['test_count'],
+        'slowest_classes': [],
+        'informational_only': True,
+    }
+    seen_tasks = set()
+    for item in value['slowest_tasks']:
+        if (not isinstance(item, dict) or set(item) != {'path', 'seconds'}
+                or not isinstance(item['path'], str)
+                or not re.fullmatch(r':[A-Za-z0-9_.:-]{1,255}', item['path'])
+                or item['path'] in seen_tasks):
+            raise ValueError('Invalid public Gradle task timing')
+        seen_tasks.add(item['path'])
+        result['slowest_tasks'].append({
+            'path': item['path'],
+            'seconds': float(seconds_value(item['seconds'], 'Gradle task timing')),
+        })
+    seen_classes = set()
+    class_tests = 0
+    for item in value['slowest_classes']:
+        if (not isinstance(item, dict) or set(item) != {'class_name', 'seconds', 'tests'}
+                or not isinstance(item['class_name'], str)
+                or not re.fullmatch(r'[A-Za-z0-9_.$]{1,512}', item['class_name'])
+                or item['class_name'] in seen_classes or type(item['tests']) is not int
+                or not 1 <= item['tests'] <= 1000000):
+            raise ValueError('Invalid public test class timing')
+        seen_classes.add(item['class_name'])
+        class_tests += item['tests']
+        result['slowest_classes'].append({
+            'class_name': item['class_name'],
+            'seconds': float(seconds_value(
+                item['seconds'], 'test class duration', maximum=86400 * 1000000)),
+            'tests': item['tests'],
+        })
+    if class_tests > result['test_count']:
+        raise ValueError('Slow test class count exceeds total tests')
+    return result
+
+
 def collect_reports(stopped_root, destination, process_exit, required_classes=frozenset(), expected_tests=None):
     """Call ONLY after verified full cgroup teardown, never on a live workload.
 
@@ -220,7 +362,7 @@ def collect_reports(stopped_root, destination, process_exit, required_classes=fr
     """
     if expected_tests is not None and (type(expected_tests) is not int or not 1 <= expected_tests <= 1000000):
         raise ValueError('Invalid trusted test-count policy')
-    reports, classes = {}, set()
+    reports, classes, class_timings = {}, set(), {}
     totals = dict.fromkeys(('tests', 'failures', 'errors', 'skipped'), 0)
     with directory_fd(stopped_root) as root_fd:
         with child_directory(root_fd, relative_parts(REPORT_DIRECTORY)) as report_fd:
@@ -236,18 +378,32 @@ def collect_reports(stopped_root, destination, process_exit, required_classes=fr
                 total_bytes += len(data)
                 if total_bytes > MAX_REPORT_TOTAL: raise ValueError('Report bundle exceeds limit')
                 counts, found = junit_summary(data)
+                timings = junit_class_timings(data)
                 if classes.intersection(found): raise ValueError('Duplicate testcase class across reports')
                 classes.update(found)
                 for key, value in counts.items(): totals[key] += value
+                for classname, timing in timings.items():
+                    current = class_timings.setdefault(
+                        classname, {'seconds': Decimal(0), 'tests': 0})
+                    current['seconds'] += timing['seconds']
+                    current['tests'] += timing['tests']
                 reports[name] = data
     if not reports: raise ValueError('No test reports')
     missing = sorted(set(required_classes) - classes)
     success = (type(process_exit) is int and process_exit == 0 and not missing
                and (expected_tests is None or totals['tests'] == expected_tests)
                and not any(totals[k] for k in ('failures', 'errors', 'skipped')))
+    with directory_fd(stopped_root) as root_fd:
+        parts = relative_parts(TIMING_FILE)
+        with child_directory(root_fd, parts[:-1]) as timing_fd:
+            timing_data = read_regular(timing_fd, parts[-1], MAX_TIMING_FILE)
+    timing = public_timing(gradle_timing(timing_data), class_timings)
+    if timing['test_count'] != totals['tests']:
+        raise ValueError('Timing test count does not match JUnit summary')
     result = {'process_exit': process_exit, 'summary': totals, 'missing_classes': missing,
               'expected_tests': expected_tests,
               'passed': success, 'not_isolation_approval': True,
+              'timing': timing,
               'files': {name: {'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
                         for name, data in reports.items()}}
     with directory_fd(destination) as output_fd:

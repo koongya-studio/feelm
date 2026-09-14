@@ -38,7 +38,8 @@ class RuntimeTests(unittest.TestCase):
 
     def test_payload_is_offline_full_suite_and_cleanup(self):
         for expected in ('clean test spotlessCheck --offline', '--no-daemon',
-                         'TESTCONTAINERS_RYUK_DISABLED=false', 'remaining-containers', 'gradle-exit'):
+                         'TESTCONTAINERS_RYUK_DISABLED=false',
+                         'remaining-containers', 'gradle-exit'):
             self.assertIn(expected, runtime.PAYLOAD)
         self.assertNotIn('docker pull', runtime.PAYLOAD)
         self.assertNotIn('spotlessApply', runtime.PAYLOAD)

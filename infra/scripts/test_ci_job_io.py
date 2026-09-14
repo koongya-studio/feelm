@@ -29,9 +29,23 @@ def regular(name='backend/a.txt', data=b'hello', mode=0o644):
     return name, data, tarfile.REGTYPE, mode
 
 
-def xml(extra='', tests=1, failures=0, skipped=0, classname='com.example.Tests'):
+def xml(extra='', tests=1, failures=0, skipped=0, classname='com.example.Tests', elapsed='0.125'):
     return (f'<testsuite tests="{tests}" failures="{failures}" errors="0" skipped="{skipped}">'
-            f'<testcase classname="{classname}" name="test">{extra}</testcase></testsuite>').encode()
+            f'<testcase classname="{classname}" name="test" time="{elapsed}">'
+            f'{extra}</testcase></testsuite>').encode()
+
+
+def timing(test_count=1):
+    return json.dumps({
+        'schemaVersion': 1,
+        'gradleSeconds': 12.345,
+        'slowestTasks': [{'path': ':test', 'seconds': 8.5}],
+        'testCount': test_count,
+        'slowestClasses': [
+            {'className': 'com.example.Tests', 'seconds': 0.125, 'tests': 1}
+        ],
+        'informationalOnly': True,
+    }).encode()
 
 
 class InputValidationTests(unittest.TestCase):
@@ -117,6 +131,32 @@ class InputValidationTests(unittest.TestCase):
         self.assertEqual(job.junit_summary(xml('<failure/>', failures=1))[0]['failures'], 1)
         self.assertEqual(job.junit_summary(xml('<skipped/>', skipped=1))[0]['skipped'], 1)
 
+    def test_junit_class_timing_is_aggregated(self):
+        data = (b'<testsuite tests="2" failures="0" errors="0" skipped="0">'
+                b'<testcase classname="com.example.Tests" name="one" time="0.125"/>'
+                b'<testcase classname="com.example.Tests" name="two" time="1.250"/>'
+                b'</testsuite>')
+        self.assertEqual(job.junit_class_timings(data), {
+            'com.example.Tests': {'seconds': job.Decimal('1.375'), 'tests': 2}
+        })
+
+    def test_junit_timing_rejects_non_finite_missing_or_unsafe_values(self):
+        for elapsed in ('', 'NaN', '-1', '1e3', '86401'):
+            with self.subTest(elapsed=elapsed), self.assertRaises(ValueError):
+                job.junit_class_timings(xml(elapsed=elapsed))
+        with self.assertRaises(ValueError):
+            job.junit_class_timings(xml(classname='bad\nlog'))
+
+    def test_gradle_timing_is_bounded_and_public_summary_is_validated(self):
+        gradle = job.gradle_timing(timing())
+        summary = job.public_timing(gradle, {
+            'com.example.Tests': {'seconds': job.Decimal('0.125'), 'tests': 1}
+        })
+        self.assertEqual(job.validated_public_timing(summary), summary)
+        changed = dict(summary, gradle_seconds=float('nan'))
+        with self.assertRaises(ValueError):
+            job.validated_public_timing(changed)
+
     def test_junit_dtd_utf16_and_deep_nesting_refused(self):
         for data in (b'<!DOCTYPE testsuite [<!ENTITY x "abc">]>' + xml(),
                      xml().decode().encode('utf-16'), xml('<x>' * 40 + '</x>' * 40)):
@@ -137,6 +177,9 @@ class LinuxBoundaryTests(unittest.TestCase):
         directory.mkdir(parents=True)
         path = directory / 'TEST-com.example.Tests.xml'
         path.write_bytes(xml() if data is None else data)
+        timing_path = self.root / job.TIMING_FILE
+        timing_path.parent.mkdir(parents=True)
+        timing_path.write_bytes(timing())
         return path
 
     def test_install_materializes_only_files(self):
@@ -184,6 +227,8 @@ class LinuxBoundaryTests(unittest.TestCase):
         result = job.collect_reports(self.root, self.output, 0, {'com.example.Tests'})
         self.assertTrue(result['passed'])
         self.assertTrue(result['not_isolation_approval'])
+        self.assertEqual(result['timing']['test_count'], 1)
+        self.assertEqual(result['timing']['slowest_classes'][0]['class_name'], 'com.example.Tests')
 
     def test_parent_symlink_refused(self):
         external = self.base / 'outside'; external.mkdir()

@@ -1,0 +1,98 @@
+import groovy.json.JsonOutput
+import java.lang.management.ManagementFactory
+import java.math.RoundingMode
+import java.util.concurrent.ConcurrentHashMap
+import javax.xml.stream.XMLInputFactory
+import javax.xml.stream.XMLStreamConstants
+import org.gradle.api.Task
+import org.gradle.api.execution.TaskExecutionListener
+import org.gradle.api.tasks.TaskState
+
+def gradleStartedAt = ManagementFactory.runtimeMXBean.startTime
+def taskStartedAt = new ConcurrentHashMap<String, Long>()
+def taskDurations = new ConcurrentHashMap<String, BigDecimal>()
+
+def seconds = { long nanos ->
+    BigDecimal.valueOf(nanos, 9).setScale(3, RoundingMode.HALF_UP)
+}
+
+gradle.taskGraph.addTaskExecutionListener([
+    beforeExecute: { Task task ->
+        taskStartedAt.put(task.path, System.nanoTime())
+    },
+    afterExecute: { Task task, TaskState state ->
+        def startedAt = taskStartedAt.remove(task.path)
+        if (startedAt != null) {
+            taskDurations.put(task.path, seconds(System.nanoTime() - startedAt))
+        }
+    }
+] as TaskExecutionListener)
+
+def testClassTimings = {
+    def project = gradle.rootProject
+    def durations = [:].withDefault { BigDecimal.ZERO }
+    def counts = [:].withDefault { 0 }
+    def reportFiles = project.fileTree(project.layout.buildDirectory.dir('test-results/test')) {
+        include 'TEST-*.xml'
+    }.files.sort { left, right -> left.name <=> right.name }
+
+    reportFiles.each { report ->
+        def factory = XMLInputFactory.newFactory()
+        factory.setProperty(XMLInputFactory.SUPPORT_DTD, false)
+        factory.setProperty('javax.xml.stream.isSupportingExternalEntities', false)
+        def input = report.newInputStream()
+        def reader = factory.createXMLStreamReader(input, 'UTF-8')
+        try {
+            while (reader.hasNext()) {
+                if (reader.next() != XMLStreamConstants.START_ELEMENT || reader.localName != 'testcase') {
+                    continue
+                }
+                def className = reader.getAttributeValue(null, 'classname')
+                def elapsed = reader.getAttributeValue(null, 'time')
+                if (className == null || className.length() > 512 || elapsed == null ||
+                        !(elapsed ==~ /[0-9]{1,7}(\.[0-9]{1,9})?/)) {
+                    throw new GradleException("Invalid JUnit timing in ${report.name}")
+                }
+                def value = new BigDecimal(elapsed)
+                if (value > 86400) {
+                    throw new GradleException("JUnit timing exceeds one day in ${report.name}")
+                }
+                durations[className] = durations[className] + value
+                counts[className] = counts[className] + 1
+            }
+        } finally {
+            reader.close()
+            input.close()
+        }
+    }
+
+    def classes = durations.collect { className, duration ->
+        [className: className, seconds: duration.setScale(3, RoundingMode.HALF_UP), tests: counts[className]]
+    }.sort { left, right ->
+        right.seconds <=> left.seconds ?: left.className <=> right.className
+    }
+    [testCount: counts.values().sum() ?: 0, slowestClasses: classes.take(10)]
+}
+
+gradle.buildFinished {
+    def project = gradle.rootProject
+    def slowestTasks = taskDurations.collect { path, duration ->
+        [path: path, seconds: duration]
+    }.sort { left, right ->
+        right.seconds <=> left.seconds ?: left.path <=> right.path
+    }.take(20)
+    def testTimings = testClassTimings()
+    def result = [
+        schemaVersion: 1,
+        gradleSeconds: BigDecimal.valueOf(System.currentTimeMillis() - gradleStartedAt, 3)
+                .setScale(3, RoundingMode.HALF_UP),
+        slowestTasks: slowestTasks,
+        testCount: testTimings.testCount,
+        slowestClasses: testTimings.slowestClasses,
+        informationalOnly: true
+    ]
+    def output = project.layout.buildDirectory.file('reports/test-timing.json').get().asFile
+    output.parentFile.mkdirs()
+    output.setText(JsonOutput.toJson(result), 'UTF-8')
+    project.logger.lifecycle('BACKEND_TEST_TIMING=' + JsonOutput.toJson(result))
+}
