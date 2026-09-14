@@ -29,7 +29,7 @@ Options:
   --help                    Show this help
 
 Exit codes:
-  0 success, 2 configuration/input failure, 3 movie or output failure
+  0 success, 2 configuration/input/catalog failure, 3 movie or output failure
 
 The token is injected through the process environment. The script never writes it to output files.
 Only approved providers in watch/providers.results.KR.flatrate are synchronized.
@@ -282,40 +282,82 @@ fi
 
 declare -A approved_ott_ids=()
 if [[ -n "$ott_mapping" ]]; then
+  declare -A approved_ott_codes=()
   header="$(head -n 1 "$ott_mapping" | tr -d '\r\357\273\277')"
   [[ "$header" == 'tmdb_provider_id,code,name,logo_path' ]] \
     || fail 'OTT mapping header must be exactly tmdb_provider_id,code,name,logo_path'
-  while IFS=',' read -r provider_id provider_code provider_name logo_path extra; do
-    [[ -z "$provider_id$provider_code$provider_name$logo_path${extra:-}" ]] && continue
-    [[ -z "${extra:-}" ]] || fail 'OTT mapping values must not contain commas'
-    [[ "$provider_id" =~ ^[1-9][0-9]*$ ]] || fail 'invalid OTT tmdb_provider_id'
+  tail -n +2 "$ott_mapping" >"$work_dir/ott-rows.csv" || fail 'cannot read OTT mapping'
+  catalog_sql="$work_dir/ott-catalog.sql"
+  cat >"$catalog_sql" <<'SQL' || fail 'cannot stage OTT catalog transaction'
+BEGIN;
+CREATE TEMP TABLE _ott_catalog_input (
+  position int GENERATED ALWAYS AS IDENTITY,
+  code varchar(30) NOT NULL UNIQUE, name text NOT NULL, logo_url text NOT NULL,
+  tmdb_provider_id int NOT NULL UNIQUE
+) ON COMMIT DROP;
+SQL
+  # Parse every row before any catalog write, including an unterminated final line.
+  while IFS= read -r mapping_row || [[ -n "$mapping_row" ]]; do
+    mapping_row="${mapping_row%$'\r'}"
+    [[ -z "$mapping_row" ]] && continue
+    separators="${mapping_row//[^,]/}"
+    [[ "${#separators}" == 3 ]] || fail 'OTT mapping must contain exactly four columns without commas in values'
+    IFS=',' read -r provider_id provider_code provider_name logo_path <<<"$mapping_row"
+    [[ "$provider_id" =~ ^[1-9][0-9]{0,9}$ && "$provider_id" -le 2147483647 ]] \
+      || fail 'invalid or out-of-range OTT tmdb_provider_id'
     [[ "$provider_code" =~ ^[A-Z0-9_]{1,30}$ ]] || fail 'invalid OTT code'
-    [[ -n "$provider_name" ]] || fail 'blank OTT name'
+    [[ "$provider_name" =~ [^[:space:]] ]] || fail 'blank OTT name'
     [[ "$logo_path" =~ ^/[A-Za-z0-9._/-]+$ && "$logo_path" != *'..'* ]] \
       || fail 'OTT logo_path must be a non-empty TMDb path beginning with /'
     [[ -z "${approved_ott_ids[$provider_id]:-}" ]] || fail "duplicate OTT provider: $provider_id"
+    [[ -z "${approved_ott_codes[$provider_code]:-}" ]] || fail "duplicate OTT code: $provider_code"
     approved_ott_ids[$provider_id]=1
+    approved_ott_codes[$provider_code]=1
     if [[ "$dry_run" == 'false' ]]; then
       code_b64="$(printf '%s' "$provider_code" | base64 -w0)"
       name_b64="$(printf '%s' "$provider_name" | base64 -w0)"
       logo_url_b64="$(printf '%s' "$TMDB_IMAGE_BASE$logo_path" | base64 -w0)"
-      if ! postgres_psql -q <<SQL >/dev/null
-INSERT INTO otts (code, name, logo_url, tmdb_provider_id)
+      cat >>"$catalog_sql" <<SQL || fail 'cannot stage OTT catalog row'
+INSERT INTO _ott_catalog_input (code, name, logo_url, tmdb_provider_id)
 VALUES (
   convert_from(decode('$code_b64', 'base64'), 'UTF8'),
   convert_from(decode('$name_b64', 'base64'), 'UTF8'),
   convert_from(decode('$logo_url_b64', 'base64'), 'UTF8'),
   $provider_id
-)
-ON CONFLICT (tmdb_provider_id) DO UPDATE
-SET code = EXCLUDED.code, name = EXCLUDED.name, logo_url = EXCLUDED.logo_url;
+);
 SQL
-      then
-        fail "cannot load approved OTT provider: $provider_id"
-      fi
     fi
-  done < <(tail -n +2 "$ott_mapping" | tr -d '\r')
+  done <"$work_dir/ott-rows.csv"
   ((${#approved_ott_ids[@]} > 0)) || fail 'OTT mapping contains no providers'
+  if [[ "$dry_run" == 'false' ]]; then
+    cat >>"$catalog_sql" <<'SQL' || fail 'cannot complete OTT catalog transaction'
+-- Serialize catalog writers through validation and commit. Existing-ID FK reads
+-- (subscriptions/history) remain possible; no identity or relationship is changed.
+LOCK TABLE otts IN SHARE ROW EXCLUSIVE MODE;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM otts o JOIN _ott_catalog_input i
+      ON o.code = i.code OR o.tmdb_provider_id = i.tmdb_provider_id
+    WHERE o.code <> i.code OR o.tmdb_provider_id <> i.tmdb_provider_id
+  ) THEN
+    RAISE EXCEPTION 'OTT code/provider identity conflict; catalog unchanged';
+  END IF;
+END $$;
+UPDATE otts o SET name = i.name, logo_url = i.logo_url
+FROM _ott_catalog_input i
+WHERE o.code = i.code AND o.tmdb_provider_id = i.tmdb_provider_id
+  AND (o.name, o.logo_url) IS DISTINCT FROM (i.name, i.logo_url);
+INSERT INTO otts (code, name, logo_url, tmdb_provider_id)
+SELECT i.code, i.name, i.logo_url, i.tmdb_provider_id
+FROM _ott_catalog_input i
+WHERE NOT EXISTS (SELECT 1 FROM otts o WHERE o.code = i.code)
+ORDER BY i.position;
+COMMIT;
+SQL
+    postgres_psql -q <"$catalog_sql" >/dev/null \
+      || fail 'cannot load approved OTT catalog; transaction rolled back unless commit acknowledgement was lost'
+  fi
 fi
 # Only numeric IDs that passed the CSV validation above may enter this SQL list.
 # NULL keeps the SQL valid when OTT synchronization is disabled.

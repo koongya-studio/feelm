@@ -230,11 +230,21 @@
   | `WAVVE` | 웨이브 | 356 |
   | `TVING` | 티빙 | 1883 |
 
-- 행의 적재와 갱신은 콘텐츠 적재 경로가 승인된 매핑 CSV(`backend/scripts/samples/ott-provider-mapping.csv`)를
-  기준으로 수행한다. 목록에 추가하거나 이름·로고를 바꾸려면 이 표와 CSV를 함께 고친다
-- 적재 경로는 추가와 갱신(UPSERT)만 자동화한다. 지원 목록에서 OTT를 빼는 절차는 정해져 있지 않다.
-  CSV에서 줄을 지워도 `otts` 행은 남고, 구독 중인 사용자가 있으면 `user_otts`의 외래키가 삭제를 막는다
-- `ottId` 오름차순으로 정렬한다. 식별자가 적재 CSV의 순서를 따르므로 재조회해도 화면의 OTT 순서가 바뀌지 않는다
+- 신규 환경은 승인 CSV(`backend/scripts/samples/ott-provider-mapping.csv`) 5종의 새 Flyway seed
+  `V202609142240__seed_approved_ott_catalog.sql`로 초기화한다. 같은 code/provider 쌍의 기존 행과
+  모든 참조는 보존하고 없는 항목만 추가한다. 식별 관계 충돌은 seed 전체 행 변경과 기동을 실패시킨다
+- 이후 콘텐츠 적재는 같은 CSV 기준으로 추가·메타데이터 갱신을 수행한다. 목록에 추가하거나
+  이름·로고를 바꾸려면 이 표와 CSV를 함께 고친다. 적용된 seed는 수정하지 않고 필요 시 새 버전을 만든다
+- 서비스는 OTT 지원을 종료하지 않는다(2026-09-14 사용자 확정). 종료·비활성화와 이에 따른
+  기존 구독 일괄 해제는 지원하지 않는다. 적재 경로는 추가와 갱신만 자동화한다.
+  CSV에서 줄을 지워도 `otts` 행은 남는다. `user_otts`, `movie_ott_providers`, `watch_records`가
+  모두 삭제를 제한하며, DB 정책은 참조가 없어도 기준정보를 물리 삭제하지 않는다.
+  존재하는 ottId의 구독 설정·유지·사용자에 의한 해제는 기존 계약대로 허용한다.
+  초기화 적용 전 점검·복구 및 지원 목록 보존 절차는
+  [OTT 운영 안내](../../backend/scripts/OTT-CATALOG-OPERATIONS.md)를 따른다
+- 서비스 `ottId`는 TMDb provider ID와 별개다. 적재는 기존 ID와 code/provider 쌍을 보존하며
+  다른 쌍과의 충돌은 전체 카탈로그 적용을 실패시킨다
+- `ottId` 오름차순으로 정렬한다. 기존 환경의 식별자를 보존하므로 CSV 순서와 항상 같다고 가정하지 않는다
 - 기준정보이므로 캐시 가능. 응답에 사용자별 값이 없어 공유 캐시에도 담을 수 있다(`Cache-Control`에
   `max-age=86400`과 `public`. 지시자 순서는 의미가 없다)
 

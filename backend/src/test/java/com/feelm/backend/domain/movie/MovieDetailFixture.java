@@ -34,6 +34,10 @@ final class MovieDetailFixture {
     }
 
     void seed() {
+        // Preserve the fixture's non-sequential IDs; this test transaction rolls back the delete.
+        jdbc.update(
+                "DELETE FROM otts WHERE code IN"
+                        + " ('NETFLIX','DISNEY_PLUS','WATCHA','WAVVE','TVING')");
         for (long user : new long[] {USER, OTHER_USER, OUTSIDER}) {
             jdbc.update(
                     """

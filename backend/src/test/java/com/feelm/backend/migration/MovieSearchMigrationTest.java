@@ -77,16 +77,19 @@ class MovieSearchMigrationTest {
     @Test
     @DisplayName("최신 develop DB 다음에 검색 마이그레이션 3개를 순서대로 적용한다")
     void upgradesLatestDevelopDatabaseInOrder() {
+        // Same-day migrations can belong to other domains, such as the approved OTT seed.
         assertThat(
                         jdbc.queryForList(
                                 """
                                 SELECT version
                                 FROM flyway_schema_history
-                                WHERE version LIKE '20260914%'
+                                WHERE script LIKE '%movie_search%'
                                 ORDER BY installed_rank
                                 """,
                                 String.class))
                 .containsExactly("202609140100", "202609140110", "202609140120");
+        assertThat(DATABASE.flyway().validateWithResult().validationSuccessful).isTrue();
+        assertThat(DATABASE.flyway().info().pending()).isEmpty();
     }
 
     @ParameterizedTest
