@@ -8,10 +8,7 @@ import com.feelm.backend.domain.taste.repository.FrameQueryRepository.FrameDetai
 import com.feelm.backend.domain.taste.repository.FrameQueryRepository.FrameListRow;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.time.format.DateTimeParseException;
-import java.util.Base64;
+import com.feelm.backend.global.response.CursorCodec;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -90,32 +87,10 @@ public class FrameQueryService {
     }
 
     private String encodeCursor(FrameListRow row) {
-        String value = row.createdAt() + ":" + row.frameId();
-        return Base64.getUrlEncoder()
-                .withoutPadding()
-                .encodeToString(value.getBytes(StandardCharsets.UTF_8));
+        return CursorCodec.encode(row.createdAt(), row.frameId());
     }
 
     private FrameCursor decodeCursor(String encodedCursor) {
-        if (encodedCursor == null) {
-            return null;
-        }
-        try {
-            String value =
-                    new String(
-                            Base64.getUrlDecoder().decode(encodedCursor), StandardCharsets.UTF_8);
-            int separator = value.lastIndexOf(':');
-            if (separator < 1 || separator == value.length() - 1) {
-                throw new IllegalArgumentException("cursor payload is incomplete");
-            }
-            Instant createdAt = Instant.parse(value.substring(0, separator));
-            long frameId = Long.parseLong(value.substring(separator + 1));
-            if (frameId < 1) {
-                throw new IllegalArgumentException("frameId must be positive");
-            }
-            return new FrameCursor(createdAt, frameId);
-        } catch (IllegalArgumentException | DateTimeParseException exception) {
-            throw new BusinessException(ErrorCode.VALIDATION_FAILED);
-        }
+        return CursorCodec.decodeInstant(encodedCursor, FrameCursor::new);
     }
 }

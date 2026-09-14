@@ -330,6 +330,22 @@ public record RatingResponse(Long ratingId, BigDecimal score, String comment) {
   `blockedAmong`의 후보는 `in` 절에 그대로 들어가므로 한 번에 1,000건 이하로 나눠 호출한다.
   차단 관계를 만들거나 지우는 경로는 `UserBlockService`뿐이며, 그 쓰기 메서드는 최상위
   트랜잭션에서만 호출한다(실패를 예외로 바꿔 던지고 벌크 삭제가 영속성 컨텍스트를 비운다).
+- **단일 정렬 키와 식별자로 이뤄진 커서 페이지네이션**의 인코딩과 해독은 `global/response/CursorCodec`을
+  사용한다. 공통 응답 규약이 커서를 서버가 발급한 불투명 문자열로 정의하므로([`api/README.md`](./api/README.md))
+  인코딩 형식과 방어 규칙은 한곳에서 정하고 각 도메인은 커서에 담을 값만 정한다. base64url 해독
+  실패, 구분자, 빈 값, 식별자 하한은 진입점이 무조건 확인한다. **시각을 담는 커서는
+  `CursorCodec.decodeInstant`를 쓴다.** 허용 범위 검증이 그 안에 있으므로, `decode`에
+  `Instant.parse`를 직접 부르는 팩토리를 넘기면 범위를 벗어난 시각이 질의로 내려가 500이 된다.
+  그 밖의 커서는 `decode`에 도메인 팩토리를 넘기고, 도메인 고유 규칙은 `CursorFactory` 안에서
+  확인해 `IllegalArgumentException`으로 거절한다. 커서는 클라이언트가 고쳐 보낼 수 있는
+  입력이므로 해독 실패는 모두 `VALIDATION_FAILED`가 되어야 한다. 길이 상한도 `CursorCodec`에
+  있으나 이것은 응답 코드를 가르는 검사가 아니라 해독 이전의 자원 상한이다. 상한을 넘는 값은
+  어차피 다른 검사에 걸리므로, 도메인 검증과 중복돼 보여도 지우지 않는다.
+  커서 record 자체는 도메인에 두고 타입을 공유하지 않는다. 정렬 키가 도메인마다 다르고 도메인
+  내부 타입을 도메인 밖으로 노출하지 않기 위해서다.
+  정렬 키를 여럿 담거나 질의 조건까지 커서에 넣어야 하는 경우는 이 형식에 담기지 않는다
+  (`domain/search/cursor/MovieSearchCursorCodec`). 그런 커서는 도메인이 별도 codec을 두되,
+  해독 실패를 모두 `VALIDATION_FAILED`로 모으는 규칙은 같게 지킨다.
 - `SecurityConfig`는 기본 정책을 "인증 필요"로 두고, 비회원도 호출할 수 있는 **공개**·**선택**
   구분의 API만 허용 목록에 등록한다. 규칙을 빠뜨린 새 API가 조용히 열리지 않도록 한 것이므로,
   도메인의 공개 API를 추가할 때는 `SecurityConfig`의 허용 경로에 함께 등록한다. 이 파일은
