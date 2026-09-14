@@ -29,8 +29,10 @@ def regular(name='backend/a.txt', data=b'hello', mode=0o644):
     return name, data, tarfile.REGTYPE, mode
 
 
-def xml(extra='', tests=1, failures=0, skipped=0, classname='com.example.Tests', elapsed='0.125'):
-    return (f'<testsuite tests="{tests}" failures="{failures}" errors="0" skipped="{skipped}">'
+def xml(extra='', tests=1, failures=0, skipped=0, classname='com.example.Tests',
+        elapsed='0.125', suite_elapsed='0.250'):
+    return (f'<testsuite tests="{tests}" failures="{failures}" errors="0" skipped="{skipped}" '
+            f'time="{suite_elapsed}">'
             f'<testcase classname="{classname}" name="test" time="{elapsed}">'
             f'{extra}</testcase></testsuite>').encode()
 
@@ -132,30 +134,73 @@ class InputValidationTests(unittest.TestCase):
         self.assertEqual(job.junit_summary(xml('<skipped/>', skipped=1))[0]['skipped'], 1)
 
     def test_junit_class_timing_is_aggregated(self):
-        data = (b'<testsuite tests="2" failures="0" errors="0" skipped="0">'
+        data = (b'<testsuite tests="2" failures="0" errors="0" skipped="0" time="2.000">'
                 b'<testcase classname="com.example.Tests" name="one" time="0.125"/>'
                 b'<testcase classname="com.example.Tests" name="two" time="1.250"/>'
                 b'</testsuite>')
         self.assertEqual(job.junit_class_timings(data), {
             'com.example.Tests': {'seconds': job.Decimal('1.375'), 'tests': 2}
         })
+        self.assertEqual(job.junit_lifecycle_timing(data), ('com.example.Tests', {
+            'suite_seconds': job.Decimal('2.000'),
+            'case_seconds': job.Decimal('1.375'),
+            'lifecycle_seconds': job.Decimal('0.625'),
+            'tests': 2,
+        }))
 
     def test_junit_timing_rejects_non_finite_missing_or_unsafe_values(self):
         for elapsed in ('', 'NaN', '-1', '1e3', '86401'):
             with self.subTest(elapsed=elapsed), self.assertRaises(ValueError):
                 job.junit_class_timings(xml(elapsed=elapsed))
+        for elapsed in ('', 'NaN', '-1', '1e3', '86401'):
+            with self.subTest(suite_elapsed=elapsed), self.assertRaises(ValueError):
+                job.junit_lifecycle_timing(xml(suite_elapsed=elapsed))
+        with self.assertRaisesRegex(ValueError, 'shorter'):
+            job.junit_lifecycle_timing(xml(elapsed='2.0', suite_elapsed='1.0'))
+        rounded = job.junit_lifecycle_timing(xml(elapsed='0.125', suite_elapsed='0.124'))[1]
+        self.assertEqual(rounded['suite_seconds'], job.Decimal('0.125'))
+        self.assertEqual(rounded['lifecycle_seconds'], job.Decimal('0'))
         with self.assertRaises(ValueError):
             job.junit_class_timings(xml(classname='bad\nlog'))
 
     def test_gradle_timing_is_bounded_and_public_summary_is_validated(self):
         gradle = job.gradle_timing(timing())
-        summary = job.public_timing(gradle, {
-            'com.example.Tests': {'seconds': job.Decimal('0.125'), 'tests': 1}
-        })
+        summary = job.public_timing(
+            gradle,
+            {'com.example.Tests': {'seconds': job.Decimal('0.125'), 'tests': 1}},
+            {'com.example.Tests': {'suite_seconds': job.Decimal('0.250'),
+                                   'case_seconds': job.Decimal('0.125'),
+                                   'lifecycle_seconds': job.Decimal('0.125'), 'tests': 1}})
         self.assertEqual(job.validated_public_timing(summary), summary)
+        self.assertEqual(summary['schema_version'], 2)
+        self.assertEqual(summary['test_task_seconds'], 8.5)
+        self.assertEqual(summary['test_suite_seconds'], 0.25)
+        self.assertEqual(summary['test_class_lifecycle_seconds'], 0.125)
+        self.assertEqual(summary['test_task_unattributed_seconds'], 8.25)
         changed = dict(summary, gradle_seconds=float('nan'))
         with self.assertRaises(ValueError):
             job.validated_public_timing(changed)
+        inconsistent = dict(summary, test_class_lifecycle_seconds=1.0)
+        with self.assertRaisesRegex(ValueError, 'Inconsistent'):
+            job.validated_public_timing(inconsistent)
+        oversized = dict(summary, slowest_lifecycle_classes=(
+            summary['slowest_lifecycle_classes'] * 11))
+        with self.assertRaisesRegex(ValueError, 'schema'):
+            job.validated_public_timing(oversized)
+
+    def test_public_timing_requires_matching_lifecycle_source(self):
+        gradle = job.gradle_timing(timing())
+        classes = {'com.example.Tests': {'seconds': job.Decimal('0.125'), 'tests': 1}}
+        with self.assertRaisesRegex(ValueError, 'sets differ'):
+            job.public_timing(gradle, classes, {})
+        lifecycle = {'com.example.Tests': {
+            'suite_seconds': job.Decimal('0.250'),
+            'case_seconds': job.Decimal('0.100'),
+            'lifecycle_seconds': job.Decimal('0.150'),
+            'tests': 1,
+        }}
+        with self.assertRaisesRegex(ValueError, 'values differ'):
+            job.public_timing(gradle, classes, lifecycle)
 
     def test_junit_dtd_utf16_and_deep_nesting_refused(self):
         for data in (b'<!DOCTYPE testsuite [<!ENTITY x "abc">]>' + xml(),
