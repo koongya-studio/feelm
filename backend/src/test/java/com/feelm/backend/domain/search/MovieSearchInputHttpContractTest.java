@@ -6,6 +6,8 @@ import com.feelm.backend.global.security.JjwtTokenProvider;
 import com.feelm.backend.global.security.JwtProperties;
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedPostgresContractTest;
+import com.feelm.backend.support.SharedRedisContainer;
+import com.feelm.backend.support.SharedRedisState;
 import com.redis.testcontainers.RedisContainer;
 import jakarta.persistence.EntityManagerFactory;
 import java.math.BigDecimal;
@@ -33,9 +35,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -49,12 +50,10 @@ import tools.jackson.databind.node.ObjectNode;
             "spring.jpa.properties.hibernate.generate_statistics=true",
             "feelm.auth.mock.enabled=false"
         })
-@Testcontainers
 @DisplayName("API-028 영화 검색 — 실제 HTTP 입력 경계")
 class MovieSearchInputHttpContractTest extends SharedPostgresContractTest {
 
-    @Container @ServiceConnection
-    static final RedisContainer REDIS = new RedisContainer("redis:8-alpine");
+    @ServiceConnection static final RedisContainer REDIS = SharedRedisContainer.instance();
 
     @LocalServerPort private int port;
     @Autowired private TokenProvider tokenProvider;
@@ -62,9 +61,11 @@ class MovieSearchInputHttpContractTest extends SharedPostgresContractTest {
     @Autowired private ObjectMapper objectMapper;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private EntityManagerFactory entityManagerFactory;
+    @Autowired private StringRedisTemplate redisTemplate;
 
     @BeforeEach
     void seedCommittedFixture() {
+        SharedRedisState.clear(redisTemplate);
         // 서버 요청은 다른 스레드에서 실행된다. 테스트 트랜잭션 없이 한 번 적재하고 읽기만 한다.
         if (jdbc.queryForObject(
                         "SELECT count(*) FROM users WHERE id = ?",

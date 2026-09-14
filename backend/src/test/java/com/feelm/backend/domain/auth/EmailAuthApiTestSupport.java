@@ -8,6 +8,8 @@ import com.feelm.backend.infrastructure.mail.MailDispatcher;
 import com.feelm.backend.infrastructure.mail.MailKind;
 import com.feelm.backend.infrastructure.mail.RecordingAuthMailSender;
 import com.feelm.backend.infrastructure.mail.RecordingMailSends;
+import com.feelm.backend.support.SharedRedisContainer;
+import com.feelm.backend.support.SharedRedisState;
 import com.redis.testcontainers.RedisContainer;
 import jakarta.servlet.http.Cookie;
 import java.time.Duration;
@@ -89,11 +91,7 @@ abstract class EmailAuthApiTestSupport {
     /** 비동기 발송 완료를 기다리는 상한. 넘기면 테스트를 실패시킨다. */
     private static final Duration MAIL_DISPATCH_TIMEOUT = Duration.ofSeconds(10);
 
-    @ServiceConnection static RedisContainer redis = new RedisContainer("redis:8-alpine");
-
-    static {
-        redis.start();
-    }
+    @ServiceConnection static RedisContainer redis = SharedRedisContainer.instance();
 
     @Autowired protected MockMvc mockMvc;
     @Autowired protected JdbcTemplate jdbcTemplate;
@@ -114,6 +112,7 @@ abstract class EmailAuthApiTestSupport {
         authMailSender.releaseAll();
         awaitMailsDispatched();
         authMailSender.clearAll();
+        SharedRedisState.clear(redisTemplate);
     }
 
     /** 인증 메일의 발송 기록과 제어 수단. 종류별로 분리돼 있어 한쪽을 붙잡아도 다른 쪽 발송은 진행된다. */

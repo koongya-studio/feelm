@@ -10,6 +10,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedPostgresContractTest;
+import com.feelm.backend.support.SharedRedisContainer;
+import com.feelm.backend.support.SharedRedisState;
 import com.redis.testcontainers.RedisContainer;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,12 +21,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -36,21 +37,21 @@ import tools.jackson.databind.ObjectMapper;
             "feelm.auth.mock.enabled=false"
         })
 @AutoConfigureMockMvc
-@Testcontainers
 @Transactional
 class MovieFilterOptionsContractTest extends SharedPostgresContractTest {
     private static final String PATH = "/api/v1/movies/filter-options";
 
-    @Container @ServiceConnection
-    static final RedisContainer REDIS = new RedisContainer("redis:8-alpine");
+    @ServiceConnection static final RedisContainer REDIS = SharedRedisContainer.instance();
 
     @Autowired private MockMvc mockMvc;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private TokenProvider tokenProvider;
+    @Autowired private StringRedisTemplate redisTemplate;
 
     @BeforeEach
     void seed() {
+        SharedRedisState.clear(redisTemplate);
         // 157과 동일한 스키마·영화 생성 경로를 재사용하되 210 데이터는 독립 트랜잭션이다.
         jdbc.execute("TRUNCATE TABLE movies, genres, otts RESTART IDENTITY CASCADE");
         MovieSearchFixture.movie(jdbc, 21001, "최신", null, "2031-12-31", 0);

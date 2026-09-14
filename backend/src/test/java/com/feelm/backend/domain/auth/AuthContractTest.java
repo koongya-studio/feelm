@@ -14,6 +14,8 @@ import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.security.JjwtTokenProvider;
 import com.feelm.backend.global.security.JwtProperties;
 import com.feelm.backend.global.security.TokenProvider;
+import com.feelm.backend.support.SharedRedisContainer;
+import com.feelm.backend.support.SharedRedisState;
 import com.redis.testcontainers.RedisContainer;
 import jakarta.servlet.http.Cookie;
 import java.time.Duration;
@@ -25,17 +27,17 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -46,7 +48,6 @@ import tools.jackson.databind.ObjectMapper;
  */
 @SpringBootTest
 @AutoConfigureMockMvc
-@Testcontainers
 @DisplayName("인증 골격 — API-000 인증 규약과 API-006 재발급")
 class AuthContractTest {
 
@@ -57,8 +58,7 @@ class AuthContractTest {
     private static final String RESET_PATH = "/api/v1/auth/password/reset";
     private static final String COOKIE_NAME = "refresh_token";
 
-    @Container @ServiceConnection
-    static RedisContainer redis = new RedisContainer("redis:8-alpine");
+    @ServiceConnection static RedisContainer redis = SharedRedisContainer.instance();
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
@@ -66,6 +66,12 @@ class AuthContractTest {
     @Autowired private TokenProvider tokenProvider;
     @Autowired private RefreshTokenService refreshTokenService;
     @Autowired private RefreshTokenRepository refreshTokenRepository;
+    @Autowired private StringRedisTemplate redisTemplate;
+
+    @BeforeEach
+    void clearRedis() {
+        SharedRedisState.clear(redisTemplate);
+    }
 
     @Test
     @DisplayName("토큰 없이 회원 API를 호출하면 401 UNAUTHORIZED로 응답한다")
