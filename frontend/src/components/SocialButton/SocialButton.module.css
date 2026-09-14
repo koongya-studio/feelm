@@ -42,6 +42,17 @@
   color: var(--color-on-action);
 }
 
+/* 각 사 로고. 글자 표식과 같은 자리 · 같은 26px 칸에 선다 */
+.logo {
+  position: absolute;
+  left: var(--space-4);
+  display: flex;
+  height: 26px;
+  width: 26px;
+  align-items: center;
+  justify-content: center;
+}
+
 .label {
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-bold);

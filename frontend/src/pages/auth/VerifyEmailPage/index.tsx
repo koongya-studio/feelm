@@ -3,10 +3,14 @@
  *
  * 이동표
  * 메일 링크 ⇢ 0.8
- * 0.8 → 0.6 인증 완료 또는 이미 인증된 계정
+ * 0.8 → 0.8-A 인증 성공
+ * 0.8 ⇢ 0.6 이미 인증된 계정
  *
  * 인증 메일의 링크로 열린다. 주소의 `token`으로 API-002를 호출해 계정을 활성화한다.
  * 토큰은 서버가 발급한 불투명 문자열이므로 해석하지 않고 그대로 넘긴다.
+ *
+ * 성공은 이 화면에 그리지 않고 0.8-A로 넘긴다(팀 결정 2026-09-14). `replace`로 넘겨야
+ * 뒤로 가기가 1회용 토큰을 다시 보내 `이미 인증됨`을 띄우지 않는다.
  *
  * 계약이 가르는 네 상태를 화면도 가른다(screen-spec-auth.md 0.8). 한 문구로 뭉뚱그리면
  * 사용자가 다음에 무엇을 할지 알 수 없다. 만료만 재발송이 필요하고 나머지는 아니다.
@@ -26,7 +30,6 @@ import styles from './VerifyEmailPage.module.css';
 type Result =
   /** 확인하는 중. 링크를 누른 직후다 */
   | { kind: 'pending' }
-  | { kind: 'success' }
   /** 토큰이 위조됐거나 형식이 틀렸다. 주소가 잘린 경우도 여기다 */
   | { kind: 'invalid' }
   | { kind: 'expired' }
@@ -35,7 +38,6 @@ type Result =
   | { kind: 'failed'; message: string };
 
 const MESSAGE: Record<Exclude<Result['kind'], 'pending' | 'failed'>, string> = {
-  success: '이메일 인증이 완료됐어요. 이제 로그인할 수 있어요.',
   invalid: '인증 링크가 올바르지 않아요. 메일의 링크를 다시 확인해 주세요.',
   expired: '인증 링크가 만료됐어요. 메일을 다시 받아 주세요.',
   alreadyVerified: '이미 인증을 마친 계정이에요. 바로 로그인할 수 있어요.',
@@ -89,9 +91,9 @@ export default function VerifyEmailPage() {
     requested.current = true;
 
     void verifyEmail(token)
-      .then(() => setResult({ kind: 'success' }))
+      .then(() => void navigate(path.verifyEmailComplete(), { replace: true }))
       .catch((error: unknown) => setResult(resultOf(error)));
-  }, [token]);
+  }, [navigate, token]);
 
   /* 재발송은 계정 존재 여부를 알려주지 않으므로(API-003) 성공과 실패를 나누지 않는다 */
   const resend = async () => {
@@ -108,7 +110,7 @@ export default function VerifyEmailPage() {
   }
 
   const message = result.kind === 'failed' ? result.message : MESSAGE[result.kind];
-  const canLogIn = result.kind === 'success' || result.kind === 'alreadyVerified';
+  const canLogIn = result.kind === 'alreadyVerified';
 
   return (
     <div className={styles.page}>

@@ -6,6 +6,9 @@
  * 인증 화면(0.x)은 업무 -302에서 AuthLayout 아래에 추가했다. 인증 **상태**에 따른
  * 라우트 보호는 여전히 범위 밖이다(와이어프레임 이동표 `비로그인 ⇢ 0.6`). 보호 계층이
  * 필요해지면 이 파일에서 레이아웃 라우트를 감싸 처리한다.
+ *
+ * 예외는 앱 진입점 `/` 하나다. 앱을 열면 스플래시 뒤에 시작 화면이 나와야 해서, 로그인 전이면
+ * 0.1로 보낸다(`HomeEntry`, 업무 -319).
  */
 import { createBrowserRouter } from 'react-router';
 import AppLayout from '../layouts/AppLayout';
@@ -20,11 +23,11 @@ import SignupCompletePage from '../pages/auth/SignupCompletePage';
 import SignupMethodPage from '../pages/auth/SignupMethodPage';
 import SocialSignupPage from '../pages/auth/SocialSignupPage';
 import StartPage from '../pages/auth/StartPage';
+import VerifyEmailCompletePage from '../pages/auth/VerifyEmailCompletePage';
 import VerifyEmailPage from '../pages/auth/VerifyEmailPage';
 import FilmPage from '../pages/film/FilmPage';
 import FrameDetailPage from '../pages/film/FrameDetailPage';
 import PopcornBucketPage from '../pages/film/PopcornBucketPage';
-import HomePage from '../pages/home/HomePage';
 import AccountManagePage from '../pages/my/AccountManagePage';
 import BlockedUsersPage from '../pages/my/BlockedUsersPage';
 import MyDashboardPage from '../pages/my/MyDashboardPage';
@@ -68,6 +71,7 @@ import ReportListPage from '../pages/reports/ReportListPage';
 import SearchPage from '../pages/search/SearchPage';
 import NotFoundPage from '../pages/system/NotFoundPage';
 import WatchConfirmPage from '../pages/watch/WatchConfirmPage';
+import HomeEntry from './HomeEntry';
 import { ROUTE_PATTERN } from './paths';
 
 export const router = createBrowserRouter(
@@ -84,6 +88,7 @@ export const router = createBrowserRouter(
         { path: ROUTE_PATTERN.accountFind, element: <AccountFindPage /> },
         { path: ROUTE_PATTERN.passwordReset, element: <PasswordResetPage /> },
         { path: ROUTE_PATTERN.verifyEmail, element: <VerifyEmailPage /> },
+        { path: ROUTE_PATTERN.verifyEmailComplete, element: <VerifyEmailCompletePage /> },
       ],
     },
     {
@@ -97,7 +102,8 @@ export const router = createBrowserRouter(
     {
       element: <AppLayout />,
       children: [
-        { path: ROUTE_PATTERN.home, element: <HomePage /> },
+        // 앱 진입점. 로그인 전이면 0.1 시작 화면으로 보낸다(HomeEntry.tsx)
+        { path: ROUTE_PATTERN.home, element: <HomeEntry /> },
         { path: ROUTE_PATTERN.recommendations, element: <RecommendationsPage /> },
         { path: ROUTE_PATTERN.film, element: <FilmPage /> },
         { path: ROUTE_PATTERN.popcornBucket, element: <PopcornBucketPage /> },

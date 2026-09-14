@@ -1,7 +1,10 @@
 /*
- * 0.6 로그인. 내용이 세로 가운데에 선다(와이어프레임 `justify-content:center`).
+ * 0.6 로그인. 영화 티켓 한 장이 세로 가운데에 선다(받은 시안, 2026-09-14, S15P21E106-319).
  *
- * 검정 알약은 `로그인` 하나다. 소셜 세 개는 테두리로 둔다(`design-concept.md` 2.4).
+ * 붉은 알약은 `로그인` 하나다. 소셜 세 개는 테두리로 둔다(`design-concept.md` 2.4 — 주 동작은
+ * 한 화면에 하나). 시안이 주 동작을 브랜드 빨강으로 칠해 검정 대신 빨강을 쓴다.
+ *
+ * 검은 티켓 시안도 받아 적용해 봤으나 흰 티켓으로 되돌렸다(팀 결정 2026-09-14).
  */
 .page {
   display: flex;
@@ -9,13 +12,70 @@
   flex: 1;
   flex-direction: column;
   justify-content: center;
-  gap: var(--space-3);
-  padding: var(--space-6) var(--screen-padding-x);
+  padding: var(--space-5) var(--space-6);
   overflow-y: auto;
 }
 
+/* ─────────────────────────── 티켓 */
+
+.ticket {
+  position: relative;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+}
+
+/* 종이와 테두리. 내용 뒤에 깔린다 */
+.ticketFrame {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  filter: drop-shadow(0 8px 18px rgba(38, 39, 41, 0.1));
+}
+
+.ticketPaper {
+  fill: #fafafa;
+  stroke: var(--color-brand-ink);
+  stroke-width: 2;
+}
+
+.ticketPerforation {
+  stroke: var(--color-brand-ink);
+  stroke-width: 1.5;
+  stroke-dasharray: 7 6;
+}
+
+.ticketBody {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-6) var(--space-4);
+}
+
+/* 절취선 자리. 높이가 없고 위치만 잰다 */
+.perforation {
+  height: 0;
+}
+
+.ticketStub {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding: var(--space-3) var(--space-6) var(--space-5);
+}
+
+.barcode {
+  width: 58%;
+  height: 34px;
+  fill: var(--color-ink);
+}
+
+/* ─────────────────────────── 본문 */
+
 .logo {
-  margin: 0 0 var(--space-4);
+  margin: 0 0 var(--space-3);
   text-align: center;
   line-height: 1;
 }
@@ -23,7 +83,12 @@
 .form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
+}
+
+/* 주 동작. 공용 버튼의 검정 대신 티켓 테두리와 같은 빨강이다 */
+.submit > button[data-variant] {
+  background: var(--color-brand-ink);
 }
 
 /* 아이디 찾기 · 비밀번호 찾기 · 회원가입 */
@@ -31,15 +96,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
 /* 아이디 찾기 · 비밀번호 찾기 · 회원가입. 이동이므로 링크다 */
 .link {
-  padding: var(--space-2) 0;
+  padding: var(--space-1) 0;
   font-size: var(--font-size-meta);
   line-height: var(--line-height-meta);
   color: var(--color-ink-muted);
+  text-decoration: none;
 }
 
 .separator {
@@ -50,7 +116,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin: var(--space-3) var(--space-2) var(--space-1);
+  margin: var(--space-1) var(--space-2) 0;
 }
 
 .divider::before,
@@ -72,7 +138,16 @@
 .providers {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
+}
+
+/*
+ * 소셜 버튼은 부가 동작이라 작은 규격(44px)으로 줄인다. 티켓이 화면 높이의 88%를 차지해
+ * 작은 폰에서 스크롤이 생겼다(2026-09-14). 입력칸과 `로그인`은 52px 그대로다. 줄 사이 간격 ·
+ * 안여백 · 바코드도 함께 줄여 높이 667px 화면에 티켓이 스크롤 없이 들어가게 했다.
+ */
+.providers > button {
+  height: var(--control-height-sm);
 }
 
 /* 로그인 실패 안내. 입력 아래, 제출 버튼 위에 선다 */
@@ -87,7 +162,7 @@
 .notice {
   margin: 0;
   text-align: center;
-  font-size: var(--font-size-meta);
-  line-height: var(--line-height-meta);
-  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
 }

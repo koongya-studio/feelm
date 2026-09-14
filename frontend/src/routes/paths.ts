@@ -10,7 +10,7 @@
  */
 
 export const ROUTE_PATTERN = {
-  // 인증 (하단 내비 없음). 0.1 ~ 0.7-A
+  // 인증 (하단 내비 없음). 0.1 ~ 0.8-A
   authStart: '/start',
   signupMethod: '/signup',
   signupSocial: '/signup/social',
@@ -21,6 +21,8 @@ export const ROUTE_PATTERN = {
   passwordReset: '/account/reset',
   // 0.8. 인증 메일 링크가 도착하는 곳이라 백엔드 설정값과 같아야 한다(S15P21E106-367)
   verifyEmail: '/verify-email',
+  // 0.8-A. 0.8이 인증에 성공하면 넘어온다(팀 결정 2026-09-14, S15P21E106-319)
+  verifyEmailComplete: '/verify-email/complete',
 
   // 온보딩 (하단 내비 없음)
   onboardingTaste: '/onboarding/taste',
@@ -120,6 +122,7 @@ export const path = {
   accountFind: () => ROUTE_PATTERN.accountFind,
   passwordReset: () => ROUTE_PATTERN.passwordReset,
   verifyEmail: () => ROUTE_PATTERN.verifyEmail,
+  verifyEmailComplete: () => ROUTE_PATTERN.verifyEmailComplete,
 
   onboardingTaste: () => ROUTE_PATTERN.onboardingTaste,
   onboardingOtt: () => ROUTE_PATTERN.onboardingOtt,

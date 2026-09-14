@@ -39,20 +39,23 @@ function rejectWith(status: number, code: string) {
 }
 
 describe('0.8 이메일 인증', () => {
-  it('주소의 토큰으로 인증하고 완료를 알린다', async () => {
+  it('주소의 토큰으로 인증하고 0.8-A 완료 화면으로 넘긴다', async () => {
     vi.mocked(verifyEmail).mockResolvedValue({ userId: 1024, status: 'ACTIVE' });
     renderVerify();
 
-    expect(await screen.findByText(/인증이 완료됐어요/)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('location').textContent).toBe('/verify-email/complete');
+    });
     expect(verifyEmail).toHaveBeenCalledWith(TOKEN);
-    expect(screen.getByRole('button', { name: '로그인하러 가기' })).toBeInTheDocument();
   });
 
   it('토큰이 1회용이므로 한 번만 호출한다', async () => {
     vi.mocked(verifyEmail).mockResolvedValue({ userId: 1024, status: 'ACTIVE' });
     renderVerify();
 
-    await screen.findByText(/인증이 완료됐어요/);
+    await waitFor(() => {
+      expect(screen.getByTestId('location').textContent).toBe('/verify-email/complete');
+    });
 
     expect(verifyEmail).toHaveBeenCalledTimes(1);
   });

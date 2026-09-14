@@ -19,6 +19,10 @@
  *
  * `[?]` 소셜 로그인(API-007~009)은 이번 연동 범위가 아니다. 목업으로 로그인한 척하면
  * 세션 없이 홈으로 들어가므로 버튼을 잠가 두었다.
+ *
+ * **영화 티켓 디자인** (받은 시안, 2026-09-14, S15P21E106-319). 모든 요소가 모서리가 파인
+ * 티켓 한 장 위에 선다. 절취선 아래 꼬리표에는 장식 바코드가 찍힌다. 티켓 테두리 · 절취선 ·
+ * `로그인` 버튼은 브랜드 빨강이고, 소셜 버튼은 각 사 로고를 쓴다.
  */
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
@@ -32,6 +36,7 @@ import { ApiError } from '../../../api/apiError';
 import { useAuth } from '../../../contexts/authContext';
 import { path } from '../../../routes/paths';
 import styles from './LoginPage.module.css';
+import Ticket, { Barcode } from './Ticket';
 
 /** 와이어프레임 0.6의 나열 순서다 */
 const PROVIDERS: { provider: SocialProvider; label: string }[] = [
@@ -92,87 +97,97 @@ export default function LoginPage() {
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.logo}>
-        <Wordmark size={40} />
-      </h1>
+      <Ticket stub={<Barcode />}>
+        <h1 className={styles.logo}>
+          <Wordmark size={40} />
+        </h1>
 
-      <form
-        className={styles.form}
-        onSubmit={(event) => {
-          event.preventDefault();
-          void submit();
-        }}
-      >
-        <TextField
-          label="아이디 (이메일)"
-          type="email"
-          placeholder="아이디 (이메일)"
-          autoComplete="username"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-        />
+        <form
+          className={styles.form}
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submit();
+          }}
+        >
+          <TextField
+            label="아이디 (이메일)"
+            type="email"
+            placeholder="아이디 (이메일)"
+            autoComplete="username"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+          />
 
-        <TextField
-          label="비밀번호"
-          type="password"
-          placeholder="비밀번호"
-          autoComplete="current-password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-        />
+          <TextField
+            label="비밀번호"
+            type="password"
+            placeholder="비밀번호"
+            autoComplete="current-password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
 
-        {failure ? (
-          <p className={styles.failure} role="alert">
-            {failure.message}
-          </p>
-        ) : null}
+          {failure ? (
+            <p className={styles.failure} role="alert">
+              {failure.message}
+            </p>
+          ) : null}
 
-        {failure?.code === 'EMAIL_NOT_VERIFIED' && !resent ? (
-          <Button type="button" variant="text" onClick={() => void resend()}>
-            인증 메일 다시 보내기
-          </Button>
-        ) : null}
+          {failure?.code === 'EMAIL_NOT_VERIFIED' && !resent ? (
+            <Button type="button" variant="text" onClick={() => void resend()}>
+              인증 메일 다시 보내기
+            </Button>
+          ) : null}
 
-        {resent ? (
-          <p className={styles.notice} role="status">
-            인증 메일을 다시 보냈습니다. 메일함을 확인해 주세요.
-          </p>
-        ) : null}
+          {resent ? (
+            <p className={styles.notice} role="status">
+              인증 메일을 다시 보냈습니다. 메일함을 확인해 주세요.
+            </p>
+          ) : null}
 
-        <Button type="submit" disabled={pending}>
-          {pending ? '로그인 중…' : '로그인'}
-        </Button>
-      </form>
+          <div className={styles.submit}>
+            <Button type="submit" disabled={pending}>
+              {pending ? '로그인 중…' : '로그인'}
+            </Button>
+          </div>
+        </form>
 
-      <nav className={styles.links} aria-label="계정 도움말">
-        <Link className={styles.link} to={path.accountFind()} state={{ tab: 'id' }}>
-          아이디 찾기
-        </Link>
-        <span className={styles.separator} aria-hidden="true">
-          |
-        </span>
-        <Link className={styles.link} to={path.accountFind()} state={{ tab: 'password' }}>
-          비밀번호 찾기
-        </Link>
-        <span className={styles.separator} aria-hidden="true">
-          |
-        </span>
-        <Link className={styles.link} to={path.signupMethod()}>
-          회원가입
-        </Link>
-      </nav>
+        <nav className={styles.links} aria-label="계정 도움말">
+          <Link className={styles.link} to={path.accountFind()} state={{ tab: 'id' }}>
+            아이디 찾기
+          </Link>
+          <span className={styles.separator} aria-hidden="true">
+            |
+          </span>
+          <Link className={styles.link} to={path.accountFind()} state={{ tab: 'password' }}>
+            비밀번호 찾기
+          </Link>
+          <span className={styles.separator} aria-hidden="true">
+            |
+          </span>
+          <Link className={styles.link} to={path.signupMethod()}>
+            회원가입
+          </Link>
+        </nav>
 
-      <div className={styles.divider}>
-        <span className={styles.dividerLabel}>소셜 로그인</span>
-      </div>
+        <div className={styles.divider}>
+          <span className={styles.dividerLabel}>소셜 로그인</span>
+        </div>
 
-      <div className={styles.providers}>
-        {PROVIDERS.map(({ provider, label }) => (
-          <SocialButton key={provider} provider={provider} label={label} disabled />
-        ))}
-      </div>
+        <div className={styles.providers}>
+          {PROVIDERS.map(({ provider, label }) => (
+            <SocialButton
+              key={provider}
+              provider={provider}
+              label={label}
+              appearance="brand"
+              disabled
+            />
+          ))}
+        </div>
 
-      <p className={styles.notice}>소셜 로그인은 준비 중입니다.</p>
+        <p className={styles.notice}>소셜 로그인은 준비 중입니다.</p>
+      </Ticket>
     </div>
   );
 }
