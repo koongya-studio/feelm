@@ -52,7 +52,16 @@ public class OpenApiConfig {
                                                     (method, operation) -> {
                                                         HttpMethod httpMethod =
                                                                 HttpMethod.valueOf(method.name());
-                                                        if (SecurityConfig.isPublicApi(
+                                                        if (SecurityConfig
+                                                                .isOptionalAuthenticationApi(
+                                                                        httpMethod, path)) {
+                                                            operation.setSecurity(
+                                                                    List.of(
+                                                                            new SecurityRequirement(),
+                                                                            new SecurityRequirement()
+                                                                                    .addList(
+                                                                                            BEARER_AUTH_SCHEME)));
+                                                        } else if (SecurityConfig.isPublicApi(
                                                                 httpMethod, path)) {
                                                             operation.setSecurity(
                                                                     Collections.emptyList());

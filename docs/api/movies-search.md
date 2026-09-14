@@ -213,15 +213,24 @@
 
 ### 인증 및 권한
 
-- 선택. 비회원은 비개인화 정보만. 로그인 시 `myRating`, `myWatchStatus`, OTT `subscribed` 채움
+- 선택 인증. 비회원도 `200`으로 조회하며 `myRating`, `myWatchStatus`, `recommendation`은
+  `null`, 모든 OTT의 `subscribed`는 `false`다. 비회원 조회는 평가·감상·구독·추천 개인화 테이블을 조회하지 않는다.
+- 유효한 Access Token이 있으면 본인의 평가·현재 감상 상태·OTT 구독 정보를 포함한다.
+  유효하지 않은 토큰, Refresh Token, 다른 인증 스킴은 기존 선택 인증 정책대로 비회원으로 처리한다.
+- 추천 이유는 요청 영화와 일치하는 추천 항목에 한해, 개인 추천은 본인 소유일 때,
+  파티 추천은 조회 시점에 해당 `party_members`에 속할 때만 반환한다.
+- 영화 상세 `GET`만 선택 인증이며 검색 `GET`과 인접 평가 생성 등 회원 API는 인증이 필요하다.
+  OpenAPI에도 인증 없음 또는 `bearerAuth`로 표현한다(`security: [{}, {"bearerAuth": []}]`).
 
 ### Path Parameters
 
-- `movieId`
+- `movieId` (integer/int64, 필수): 서비스 영화 ID. `1~9223372036854775807` 범위의 양의 정수
 
 ### Query Parameters
 
-- `recommendationItemId` (integer, 선택): 추천 카드에서 진입한 경우 전달. 해당 추천 이유를 `recommendation`에 포함
+- `recommendationItemId` (integer/int64, 선택): 추천 카드의 항목 ID.
+  제공하면 `1~9223372036854775807` 범위의 양의 정수여야 하며 빈 값은 허용하지 않는다.
+  영화 일치 및 열람 권한을 확인한 추천 이유만 `recommendation`에 포함한다.
 
 ### Request Body
 
@@ -261,19 +270,46 @@
 }
 ```
 
-- 비회원: `myRating`, `myWatchStatus`는 `null`, `subscribed`는 `false`
-- `recommendation`은 `recommendationItemId`가 있고 본인의 추천일 때만 포함
+- 비회원: `myRating`, `myWatchStatus`, `recommendation`은 `null`, `subscribed`는 `false`
+- 응답의 모든 필드를 유지한다. 원제·줄거리·개봉일·상영 시간·이미지 URL·대표 맛처럼
+  원천 값이 없는 선택 필드는 `null`이다. 장르·국가·감독·배우·OTT 연결이 없으면 빈 배열이다.
+  배우의 배역명, OTT 시청 URL, 내 한줄평·공개 범위도 값이 없으면 명시적인 `null`이다.
+- 평가가 없으면 `averageRating=0`, `ratingCount=0`이다. 본인 평가가 없으면 `myRating=null`,
+  활성 감상 기록이 없거나 만료(`EXPIRED`) 기록만 있으면 `myWatchStatus=null`이다.
+- `recommendation`은 `recommendationItemId`가 조회 영화와 일치하고 열람 권한이 있을 때만 포함한다.
+  개인 추천은 본인 소유, 파티 추천은 해당 파티의 현재 `party_members`에 속한 회원에게 허용한다.
+  탈퇴한 멤버나 초대만 받은 사용자는 파티 추천 열람 권한이 없다.
 
 ### 오류 응답
 
-- `404 RESOURCE_NOT_FOUND`
+- `400 VALIDATION_FAILED`: 영화 ID 또는 제공한 추천 ID의 형식 오류, 빈 값, 0·음수·int64 범위 초과
+- `404 RESOURCE_NOT_FOUND`: 해당 영화가 존재하지 않음
+- `500 INTERNAL_ERROR`: 표시명 매핑이 없는 국가 코드, 잘못된 추천 이유 형식 등 내부 데이터 계약 위반
+- 위 오류는 공통 `ErrorResponse`를 `application/json`으로 반환한다.
+  `500` 응답은 `{"code":"INTERNAL_ERROR","message":"서버 내부 오류가 발생했습니다."}`이며,
+  내부 예외 메시지·SQL·클래스명·stack trace를 포함하지 않는다.
 
 ### 처리 규칙
 
-- `ottProviders`는 사용자가 구독 중인 OTT를 우선 정렬한다(FR-16)
-- `averageRating`은 전체 사용자 기준이며 차단 관계 필터를 적용하지 않는다 (D-10 결정). 차단 필터는 한줄평 목록(API-032)에만 적용
+- 영화와 실제 연결된 장르·국가·인물·OTT만 반환하고 같은 관계를 중복 반환하지 않는다.
+- `ottProviders`는 사용자가 구독 중인 OTT를 우선 정렬한다(FR-16).
+  같은 구독 그룹 안에서는 API-025와 동일하게 `ottId` 오름차순이다. 비회원은 전체를 `ottId` 순으로 받는다.
+  API-029의 검색 필터 목록은 별도의 고정 코드 순서를 사용하며, 이 상세 화면의 구독 그룹 정렬 기준은 `ottId`다.
+  지원 OTT는 API-025에서 확정한 Netflix, Disney Plus, Watcha, wavve, TVING 5종이며,
+  DB code `NETFLIX`, `DISNEY_PLUS`, `WATCHA`, `WAVVE`, `TVING`으로 제한한다.
+  해당 영화에 연결된 승인 OTT만 표시하며, 미승인 OTT는 구독 중이어도 제외한다.
+  승인 OTT가 하나도 연결되지 않으면 `ottProviders`는 빈 배열이다.
+- `cast`는 TMDb 순서(`movie_people.display_order` 오름차순)의 상위 10명만 반환한다.
+  순서가 없는 인물은 뒤에 두고, 같은 순서는 `person_id` 오름차순으로 정렬한다.
+- `directors`는 인원 제한 없이 모두 반환하며, `display_order` 오름차순(NULL은 마지막),
+  `person_id` 오름차순으로 정렬한다.
+- `averageRating`, `ratingCount`는 전체 사용자 집계값이며 차단 관계 필터를 적용하지 않는다
+  (D-10 결정). 차단 필터는 한줄평 목록(API-032)에만 적용한다.
 - AI 영화 요약은 범위에서 제외한다(FR-34)
-- 다른 사용자의 `recommendationItemId`를 전달하면 `recommendation`을 생략하고 `200`
+- 다른 사용자 소유, 현재 멤버가 아닌 파티, 다른 영화 또는 존재하지 않는
+  `recommendationItemId`를 전달하면 `recommendation=null`과 `200`을 반환한다.
+- 추천 ID를 생략하면 저장된 추천이 있어도 `recommendation=null`이다.
+- 영화 상세는 읽기 전용 조회다. 추천 결과를 재계산하거나 평가·감상·추천 데이터를 변경하지 않는다.
 
 ### 상태값
 
@@ -281,5 +317,4 @@
 
 ### 미정 사항
 
-- [ ] `cast` 노출 인원 수
 - [ ] TMDb 데이터 동기화 주기와 캐시 정책

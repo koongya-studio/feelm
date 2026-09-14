@@ -115,7 +115,7 @@ class MovieFilterOptionsSecurityTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"/api/v1/movies/999", "/api/v1/movies/filter-options/extra"})
+    @ValueSource(strings = {"/api/v1/movies/999/ratings", "/api/v1/movies/filter-options/extra"})
     void otherMoviePathsStillRequireAuthentication(String path) throws Exception {
         mockMvc.perform(get(path)).andExpect(status().isUnauthorized());
     }
