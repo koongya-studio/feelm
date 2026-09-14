@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.feelm.backend.global.security.JjwtTokenProvider;
 import com.feelm.backend.global.security.JwtProperties;
 import com.feelm.backend.global.security.TokenProvider;
+import com.feelm.backend.support.SharedPostgresContractTest;
 import com.redis.testcontainers.RedisContainer;
 import jakarta.persistence.EntityManagerFactory;
 import java.math.BigDecimal;
@@ -33,12 +34,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -54,25 +51,10 @@ import tools.jackson.databind.node.ObjectNode;
         })
 @Testcontainers
 @DisplayName("API-028 영화 검색 — 실제 HTTP 입력 경계")
-class MovieSearchInputHttpContractTest {
-
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>(
-                            DockerImageName.parse("pgvector/pgvector:0.8.6-pg17-bookworm")
-                                    .asCompatibleSubstituteFor("postgres"))
-                    .withEnv("POSTGRES_INITDB_ARGS", "--locale=C.UTF-8");
+class MovieSearchInputHttpContractTest extends SharedPostgresContractTest {
 
     @Container @ServiceConnection
     static final RedisContainer REDIS = new RedisContainer("redis:8-alpine");
-
-    @DynamicPropertySource
-    static void databaseProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-    }
 
     @LocalServerPort private int port;
     @Autowired private TokenProvider tokenProvider;
@@ -84,7 +66,11 @@ class MovieSearchInputHttpContractTest {
     @BeforeEach
     void seedCommittedFixture() {
         // 서버 요청은 다른 스레드에서 실행된다. 테스트 트랜잭션 없이 한 번 적재하고 읽기만 한다.
-        if (jdbc.queryForObject("SELECT count(*) FROM users", Long.class) == 0) {
+        if (jdbc.queryForObject(
+                        "SELECT count(*) FROM users WHERE id = ?",
+                        Long.class,
+                        MovieSearchFixture.MEMBER_ID)
+                == 0) {
             MovieSearchFixture.seed(jdbc);
         }
     }

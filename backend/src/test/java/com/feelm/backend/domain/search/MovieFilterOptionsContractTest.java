@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.feelm.backend.global.security.TokenProvider;
+import com.feelm.backend.support.SharedPostgresContractTest;
 import com.redis.testcontainers.RedisContainer;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,15 +20,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
-import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -41,26 +38,11 @@ import tools.jackson.databind.ObjectMapper;
 @AutoConfigureMockMvc
 @Testcontainers
 @Transactional
-class MovieFilterOptionsContractTest {
+class MovieFilterOptionsContractTest extends SharedPostgresContractTest {
     private static final String PATH = "/api/v1/movies/filter-options";
-
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>(
-                            DockerImageName.parse("pgvector/pgvector:0.8.6-pg17-bookworm")
-                                    .asCompatibleSubstituteFor("postgres"))
-                    .withEnv("POSTGRES_INITDB_ARGS", "--locale=C.UTF-8");
 
     @Container @ServiceConnection
     static final RedisContainer REDIS = new RedisContainer("redis:8-alpine");
-
-    @DynamicPropertySource
-    static void databaseProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-    }
 
     @Autowired private MockMvc mockMvc;
     @Autowired private JdbcTemplate jdbc;
@@ -70,6 +52,7 @@ class MovieFilterOptionsContractTest {
     @BeforeEach
     void seed() {
         // 157과 동일한 스키마·영화 생성 경로를 재사용하되 210 데이터는 독립 트랜잭션이다.
+        jdbc.execute("TRUNCATE TABLE movies, genres, otts RESTART IDENTITY CASCADE");
         MovieSearchFixture.movie(jdbc, 21001, "최신", null, "2031-12-31", 0);
         MovieSearchFixture.movie(jdbc, 21002, "연도 없음", null, null, 0);
         MovieSearchFixture.movie(jdbc, 21003, "최초", null, "1920-01-01", 0);

@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.feelm.backend.global.security.TokenProvider;
+import com.feelm.backend.support.SharedPostgresContractTest;
 import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -28,40 +29,19 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /** API-049·050: 실제 마이그레이션과 PostgreSQL을 사용하는 HTTP 계약 테스트. */
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 @AutoConfigureMockMvc
-@Testcontainers
-class PartyApiContractTest {
+class PartyApiContractTest extends SharedPostgresContractTest {
     private static final String PATH = "/api/v1/parties";
     private static final Instant CREATED_AT = Instant.parse("2026-09-01T00:00:00Z");
-
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>(
-                    DockerImageName.parse("pgvector/pgvector:0.8.6-pg17-bookworm")
-                            .asCompatibleSubstituteFor("postgres"));
-
-    @DynamicPropertySource
-    static void database(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-    }
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
@@ -71,7 +51,7 @@ class PartyApiContractTest {
 
     @BeforeEach
     void fixtures() {
-        // 이 클래스 전용 일회성 컨테이너에만 적용한다. 로컬 개발 DB를 사용하지 않는다.
+        // 공유 테스트 DB만 초기화한다. 로컬 개발 DB를 사용하지 않는다.
         jdbc.execute("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
         for (long id : new long[] {10, 20, 30, 40}) {
             jdbc.update(

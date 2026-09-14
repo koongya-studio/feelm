@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.feelm.backend.domain.auth.PasswordResetTokenIssuer;
 import com.feelm.backend.domain.auth.RefreshTokenService;
 import com.feelm.backend.global.security.TokenProvider;
+import com.feelm.backend.support.SharedPostgresContractTest;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -33,15 +34,9 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -58,29 +53,14 @@ import tools.jackson.databind.ObjectMapper;
             "feelm.kafka.outbox.poll-interval=1h"
         })
 @AutoConfigureMockMvc
-@Testcontainers
 @DisplayName("API-024 초기 취향 제출")
-class OnboardingSubmitApiContractTest {
+class OnboardingSubmitApiContractTest extends SharedPostgresContractTest {
 
     private static final String SUBMIT_PATH = "/api/v1/onboarding/preferences";
     private static final long LIKED_MOVIE = 101;
     private static final long DISLIKED_MOVIE = 201;
     private static final String CURRENT_PASSWORD = "Cur7ent@Pass";
     private static final String NEW_PASSWORD = "N3wP@ssw0rd";
-
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>(
-                    DockerImageName.parse("pgvector/pgvector:0.8.6-pg17-bookworm")
-                            .asCompatibleSubstituteFor("postgres"));
-
-    @DynamicPropertySource
-    static void database(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-    }
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;

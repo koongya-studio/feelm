@@ -2,6 +2,7 @@ package com.feelm.backend.domain.user.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.feelm.backend.support.SharedPostgresContractTest;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -12,34 +13,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /** FR-39: 다른 도메인이 쓰는 차단 필터가 양방향 차단 관계를 어떻게 보는지 확인한다. */
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
-@Testcontainers
 @DisplayName("UserBlockFilter — 공통 차단 필터")
-class UserBlockFilterTest {
+class UserBlockFilterTest extends SharedPostgresContractTest {
 
     private static final Instant BLOCKED_AT = Instant.parse("2026-09-01T00:00:00Z");
-
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>(
-                    DockerImageName.parse("pgvector/pgvector:0.8.6-pg17-bookworm")
-                            .asCompatibleSubstituteFor("postgres"));
-
-    @DynamicPropertySource
-    static void database(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-    }
 
     @Autowired UserBlockFilter filter;
     @Autowired JdbcTemplate jdbc;

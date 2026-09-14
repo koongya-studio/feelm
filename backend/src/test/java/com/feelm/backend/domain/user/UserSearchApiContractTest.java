@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.feelm.backend.global.security.TokenProvider;
+import com.feelm.backend.support.SharedPostgresContractTest;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -18,23 +19,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /** API-019: 실제 마이그레이션과 PostgreSQL을 사용하는 사용자 검색 HTTP 계약 테스트. */
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 @AutoConfigureMockMvc
-@Testcontainers
 @DisplayName("API-019 사용자 검색")
-class UserSearchApiContractTest {
+class UserSearchApiContractTest extends SharedPostgresContractTest {
 
     private static final String SEARCH_PATH = "/api/v1/users/search";
     private static final long REQUESTER = 10;
@@ -43,22 +37,8 @@ class UserSearchApiContractTest {
      * 정렬이 이 API의 핵심 계약이라 운영과 같은 {@code C.UTF-8} 로케일로 띄운다. 기본 로케일로 두면 정규화 닉네임의 비교 순서가 운영과 달라져, 정렬과
      * 커서 경계를 다른 콜레이션에서 검증하게 된다(마이그레이션 테스트 6종과 같은 설정).
      */
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>(
-                            DockerImageName.parse("pgvector/pgvector:0.8.6-pg17-bookworm")
-                                    .asCompatibleSubstituteFor("postgres"))
-                    .withEnv("POSTGRES_INITDB_ARGS", "--locale=C.UTF-8");
-
-    @DynamicPropertySource
-    static void database(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-    }
-
     @Autowired MockMvc mvc;
+
     @Autowired JdbcTemplate jdbc;
     @Autowired TokenProvider tokens;
     @Autowired ObjectMapper objectMapper;
