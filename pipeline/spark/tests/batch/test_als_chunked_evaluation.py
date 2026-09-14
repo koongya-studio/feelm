@@ -7,7 +7,14 @@ import pytest
 from pyspark.sql import functions as F
 from pyspark.sql.types import DoubleType
 
-from tests.fixtures.als_evaluation import ITEM, USER, ScoredModel, mapping, ratings
+from tests.fixtures.als_evaluation import (
+    ITEM,
+    MAPPING_REVISION,
+    USER,
+    ScoredModel,
+    mapping,
+    ratings,
+)
 from tests.fixtures.als_evaluation import spark as spark_fixture
 
 spark = spark_fixture
@@ -287,7 +294,7 @@ def test_empty_or_all_cold_input_still_rejects_duplicate_matched_mapping(
 ):
     movie_map = mapping(spark, [1])
     duplicate = spark.createDataFrame(
-        [(2**35, 3001, 1, "MATCHED")], movie_map.schema
+        [(2**35, 3001, 1, "MATCHED", MAPPING_REVISION)], movie_map.schema
     )
 
     with pytest.raises(ValueError, match="(?i)(duplicate|ambiguous|multiple)"):

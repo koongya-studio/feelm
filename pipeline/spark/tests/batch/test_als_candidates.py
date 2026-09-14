@@ -7,6 +7,7 @@ from pyspark.sql.types import LongType
 
 from tests.fixtures.als_evaluation import (
     ITEM,
+    MAPPING_REVISION,
     USER,
     ScoredModel,
     mapping,
@@ -74,7 +75,9 @@ def test_short_and_empty_catalogs_are_not_padded(spark):
 
 def test_duplicate_matched_movielens_id_is_rejected(spark):
     movie_map = mapping(spark, [1])
-    duplicate = spark.createDataFrame([(2**35, 3001, 1, "MATCHED")], movie_map.schema)
+    duplicate = spark.createDataFrame(
+        [(2**35, 3001, 1, "MATCHED", MAPPING_REVISION)], movie_map.schema
+    )
     with pytest.raises(ValueError, match="(?i)(duplicate|ambiguous|multiple)"):
         generate(
             ScoredModel(spark),

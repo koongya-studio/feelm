@@ -138,7 +138,7 @@ def test_small_real_als_run_saves_reloads_and_attributes_versions(spark, tmp_pat
     assert report["status"] == "SUCCEEDED"
     serving = baseline.load_als_artifacts(
         spark, output.as_uri(), result.serving_model_version
-    ).metadata.first()
+    ).metadata
     assert serving.mapping_revision == inputs.mapping_revision
     assert serving.movie_metadata_revision == "sha256:" + "b" * 64
 
