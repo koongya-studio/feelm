@@ -15,6 +15,14 @@ class CacheInstallTests(unittest.TestCase):
             self.assertEqual(installer.main(), 0)
             update.assert_not_called()
 
+    def test_confirmed_update_requires_matching_prepared_base(self):
+        with patch('sys.argv', ['installer', '--confirm-update',
+                                '--operator-username', 'infra.user']), \
+             patch.object(installer, 'update') as update, \
+             self.assertRaisesRegex(ValueError, 'matching prepared base'):
+            installer.main()
+        update.assert_not_called()
+
     def test_operator_usernames_are_explicit_and_bounded(self):
         self.assertEqual(installer.normalized_operators(['infra.user', 'infra.user']),
                          ['infra.user'])
@@ -27,6 +35,8 @@ class CacheInstallTests(unittest.TestCase):
         self.assertIn("'.previous-'", source)
         self.assertIn('os.replace(backup, TARGET)', source)
         self.assertIn('os.replace(sudoers_backup, SUDOERS)', source)
+        self.assertIn('os.replace(config_backup, CONFIG)', source)
+        self.assertIn("runtime_contract().require_same(HERE, prepared_base / 'scripts')", source)
         self.assertNotIn('rmtree(', source)
         self.assertIn("'ci222-owner-*.service'", source)
         self.assertIn('/usr/local/lib/feelm-ci222/gitlab/ci-dependency-cache.py',

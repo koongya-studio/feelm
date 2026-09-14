@@ -39,14 +39,11 @@ DEPENDENCY_FILES = {
     'backend/gradle.properties', 'backend/gradle/libs.versions.toml',
     'backend/gradle/wrapper/gradle-wrapper.properties',
 }
-STAGE_FILES = (
-    'ci-job-safety.py', 'ci-bounded-output.py', 'ci-job-io.py', 'ci-job-lifecycle.py',
-    'ci-server-manager-pilot.py', 'ci-server-sysfs-bootstrap.py', 'ci-local-manager-check.py',
-    'ci-local-backend-runtime.py', 'ci-local-backend-inputs.py', 'ci-local-backend-transfer.py',
-    'ci-backend-offline-prepare.py', 'ci-rootless-backend-check.py', 'ci-rootless-network-check.py',
-    'rootless-backend/LoopbackContainers.java', 'rootless-backend/pilot.init.gradle',
-    'rootless-backend/META-INF/services/org.testcontainers.core.CreateContainerCmdModifier',
-)
+_runtime_spec = importlib.util.spec_from_file_location(
+    'ci414_runtime_contract', HERE / 'ci-backend-runtime-contract.py')
+runtime_contract = importlib.util.module_from_spec(_runtime_spec)
+_runtime_spec.loader.exec_module(runtime_contract)
+STAGE_FILES = runtime_contract.FILES
 
 
 class PolicyError(Exception):
@@ -476,6 +473,7 @@ def active_ci_units():
 
 
 def switch_stage(old_config, new_stage):
+    runtime_contract.require_same(HERE, Path(new_stage) / 'scripts')
     if active_ci_units():
         raise PolicyError('MR test units are still running')
     subprocess.run(['systemctl', 'stop', RUNNER_SERVICE], check=True, timeout=120)

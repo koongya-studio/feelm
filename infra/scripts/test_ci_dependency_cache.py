@@ -226,7 +226,8 @@ class ManagerTests(unittest.TestCase):
         old = {'gitlab_url': cache.GITLAB_URL, 'project_path': cache.PROJECT_PATH,
                'prepared_base': '/var/tmp/ci222-server-old'}
         writes = []
-        with patch.object(cache, 'active_ci_units', return_value=[]), \
+        with patch.object(cache.runtime_contract, 'require_same'), \
+             patch.object(cache, 'active_ci_units', return_value=[]), \
              patch.object(cache, 'atomic_config', side_effect=lambda value: writes.append(value.copy())), \
              patch.object(cache.subprocess, 'run') as run:
             run.side_effect = [object(), RuntimeError('restart failed'), object()]
@@ -235,9 +236,20 @@ class ManagerTests(unittest.TestCase):
         self.assertEqual(writes, [dict(old, prepared_base='/var/tmp/ci222-server-new'), old])
 
     def test_switch_refuses_active_mr_test_units(self):
-        with patch.object(cache, 'active_ci_units', return_value=['ci222-owner-a.service']):
+        with patch.object(cache.runtime_contract, 'require_same'), \
+             patch.object(cache, 'active_ci_units', return_value=['ci222-owner-a.service']):
             with self.assertRaises(cache.PolicyError):
                 cache.switch_stage({}, '/var/tmp/ci222-server-new')
+
+    def test_switch_refuses_mismatched_runtime_before_stopping_runner(self):
+        with patch.object(cache.runtime_contract, 'require_same', side_effect=RuntimeError(
+                 'Installed and prepared backend runtimes differ')), \
+             patch.object(cache, 'active_ci_units') as active, \
+             patch.object(cache.subprocess, 'run') as run, \
+             self.assertRaisesRegex(RuntimeError, 'backend runtimes differ'):
+            cache.switch_stage({}, '/var/tmp/ci222-server-new')
+        active.assert_not_called()
+        run.assert_not_called()
 
     def test_promote_records_merge_revision_only_after_switch(self):
         with tempfile.TemporaryDirectory() as directory:

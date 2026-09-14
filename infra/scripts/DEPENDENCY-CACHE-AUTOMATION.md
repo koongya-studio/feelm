@@ -45,8 +45,15 @@ python infra/scripts/ci-server-pilot-stage.py --confirm-server-stage
 ```text
 sudo python3 <SERVER_STAGE>/scripts/ci-dependency-cache-install.py
 sudo python3 <SERVER_STAGE>/scripts/ci-dependency-cache-install.py \
-  --confirm-update --operator-username <GitLab 사용자명>
+  --confirm-update --operator-username <GitLab 사용자명> \
+  --prepared-base <SERVER_STAGE>
 ```
+
+`<SERVER_STAGE>`는 먼저 `ci-server-manager-pilot.py prepare`와 독립 backend 검증을 통과해야
+한다. 설치기는 stage의 backend 런타임 계약과 `prepared_base/scripts`가 정확히 같지 않으면
+Runner를 중지하기 전에 거부한다. 검증 성공 시 설치 디렉터리, sudoers와 adapter config의
+`prepared_base`를 한 번의 중지 구간에서 함께 교체하고 `PREVIOUS_INSTALL`,
+`PREVIOUS_SUDOERS`, `PREVIOUS_CONFIG`를 출력한다.
 
 현재 GitLab 인스턴스에는 Protected Environments 설정이 없습니다. 설치기는 rollback 권한을 가진
 GitLab 사용자명만 root 소유 0600 `cache-operators.json`에 기록합니다. 자동 준비는 설치된 Custom
@@ -93,9 +100,10 @@ rollback 요청을 거부한다. 자동 재시작 복구까지 실패한 경우 
 `/usr/local/lib/feelm-ci222/gitlab/ci-gitlab-job-adapter.py`를 갱신하지 않는다.
 
 S15P21E106-314 수정본을 병합한 최신 `develop`에서 새 server stage를 만들고, **최초 적용**의
-`ci-dependency-cache-install.py --confirm-update` 절차로 설치 스크립트 전체를 원자적으로
-교체한다. 설치기는 실행 중인 MR test가 있으면 거부하고, MR Runner를 중지한 뒤 기존 설치와
-sudoers를 `PREVIOUS_INSTALL`, `PREVIOUS_SUDOERS`로 보존하며 재시작 실패 시 자동 복구한다.
+`ci-dependency-cache-install.py --confirm-update --prepared-base <SERVER_STAGE>` 절차로 설치
+스크립트와 검증된 prepared stage를 원자적으로 교체한다. 설치기는 실행 중인 MR test가 있으면
+거부하고, MR Runner를 중지한 뒤 기존 설치, sudoers와 config를 `PREVIOUS_INSTALL`,
+`PREVIOUS_SUDOERS`, `PREVIOUS_CONFIG`로 보존하며 재시작 실패 시 자동 복구한다.
 갱신 후 같은 MR HEAD의 `backend-cache-prepare`를 다시 실행합니다. Git 조회가 실패하면 로그의
 `MR_ADAPTER_GIT_ERROR: stage=dependency_git_init|dependency_fetch|dependency_diff`로 실패 단계를
 구분하되 원격 URL, 명령 출력과 Job Token은 노출하지 않는다.
