@@ -11,6 +11,13 @@ scrape_configs:
   - job_name: node
     static_configs:
       - targets: ["node-exporter:9100"]
+        labels:
+          node_name: J15E106
+          node_role: service
+      - targets: ["feelm-distributed-node:9100"]
+        labels:
+          node_name: J15E106A
+          node_role: distributed
 
   - job_name: postgres
     static_configs:

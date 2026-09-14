@@ -171,6 +171,28 @@ services:
     volumes:
       - kafka_data:/tmp/kraft-combined-logs
 
+  node-exporter:
+    image: prom/node-exporter:v1.11.1
+    container_name: feelm-node-exporter-distributed
+    restart: unless-stopped
+    pid: host
+    read_only: true
+
+    ports:
+      - "${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}:9100:9100"
+
+    command:
+      - --path.rootfs=/host
+
+    volumes:
+      - /:/host:ro,rslave
+
+    security_opt:
+      - no-new-privileges:true
+
+    cap_drop:
+      - ALL
+
 volumes:
   hdfs_namenode:
   hdfs_datanode_2:
