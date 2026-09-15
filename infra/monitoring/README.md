@@ -1,15 +1,19 @@
 # FEELM Monitoring
 
-Spring Boot, 두 호스트, PostgreSQL과 Redis의 메트릭을 Prometheus가 수집하고 Grafana가
-시각화합니다. 서비스 노드 `J15E106`의 Node Exporter는 Compose 내부에서 수집하고, 분산
-노드 `J15E106A`는 사설 IP에만 게시한 Node Exporter를 중앙 Prometheus가 수집합니다.
-Kafka, Spark, HDFS와 브라우저 RUM 메트릭은 이 구성에 포함하지 않습니다.
+Spring Boot, 두 호스트, PostgreSQL, Redis와 Kafka의 메트릭을 Prometheus가 수집하고
+Grafana가 시각화합니다. 서비스 노드 `J15E106`의 Node Exporter는 Compose 내부에서
+수집하고, 분산 노드 `J15E106A`는 사설 IP에만 게시한 Node Exporter와 Kafka Exporter를
+중앙 Prometheus가 수집합니다. Spark, HDFS와 브라우저 RUM 메트릭은 이 구성에 포함하지
+않습니다.
 
 ## 보안 경계
 
 - Prometheus와 Grafana 호스트 포트는 `127.0.0.1`에만 바인딩합니다.
 - 분산 노드의 Node Exporter `9100/tcp`는 `DISTRIBUTED_NODE_IP`에만 바인딩합니다.
-- 보안 그룹과 호스트 방화벽은 서비스 노드의 사설 IP에서 분산 노드 `9100/tcp`로 향하는
+- 분산 노드의 Kafka Exporter `9308/tcp`도 `DISTRIBUTED_NODE_IP`에만 바인딩하며 Kafka
+  broker에는 같은 호스트의 `127.0.0.1:9092`로만 접속합니다.
+- 보안 그룹과 호스트 방화벽은 서비스 노드의 사설 IP에서 분산 노드 `9100/tcp`와
+  `9308/tcp`로 향하는
   트래픽만 허용합니다. Compose의 사설 IP 바인딩만으로 송신 주체 제한이 완성되지는 않습니다.
 - Nginx는 `/actuator/prometheus`를 프록시하지 않습니다.
 - Grafana 익명 가입과 익명 접근은 비활성화합니다.
@@ -29,23 +33,37 @@ docker compose --env-file infra/.env \
   up -d postgres redis backend prometheus grafana node-exporter postgres-exporter redis-exporter
 ```
 
-분산 노드에서는 기존 분산 Compose 파일의 Node Exporter를 기동합니다. `restart:
-unless-stopped`로 Docker 데몬과 함께 복구되며, 호스트의 `/`는 읽기 전용으로만 마운트합니다.
+분산 노드에서는 기존 분산 Compose 파일의 Node Exporter와 Kafka Exporter를 기동합니다.
+둘 다 `restart: unless-stopped`로 Docker 데몬과 함께 복구됩니다. Node Exporter는 호스트의
+`/`를 읽기 전용으로만 마운트하고 Kafka Exporter는 읽기 전용 root filesystem을 사용합니다.
 
 ```bash
 docker compose --env-file infra/.env \
   -f infra/compose/distributed.yml \
-  up -d node-exporter
+  up -d node-exporter kafka-exporter
 
 docker inspect feelm-node-exporter-distributed \
   --format '{{.HostConfig.RestartPolicy.Name}}'
 docker port feelm-node-exporter-distributed 9100
+docker inspect feelm-kafka-exporter \
+  --format '{{.HostConfig.RestartPolicy.Name}} {{.HostConfig.ReadonlyRootfs}}'
+curl --fail --max-time 5 "http://${DISTRIBUTED_NODE_IP}:9308/metrics"
 ```
 
 두 번째 출력은 `<J15E106A 사설 IP>:9100`, 재시작 정책은 `unless-stopped`여야 합니다.
-클라우드 보안 그룹의 인바운드는 `J15E106 사설 IP/32 -> J15E106A:9100/tcp`만 허용합니다.
+Kafka Exporter 출력은 `unless-stopped true`이고 `/metrics`에는 `kafka_brokers`,
+`kafka_topic_partitions`와 Consumer가 실행된 뒤 `kafka_consumergroup_lag`가 있어야 합니다.
+클라우드 보안 그룹의 인바운드는 서비스 노드 사설 IP에서 분산 노드의 `9100/tcp`와
+`9308/tcp`로 향하는 트래픽만 허용합니다.
 호스트에서 UFW를 사용하는 경우에도 같은 출발지와 목적지로 제한하며, 현재 SSH 허용 규칙을
 확인하지 않은 채 방화벽을 활성화하거나 초기화하지 않습니다.
+
+Kafka Exporter는 `network_mode: host`이므로 Docker의 `DOCKER-USER` 체인이 아니라 호스트
+`INPUT` 정책에서 `9308/tcp`의 송신 주체를 제한합니다. 기존 방화벽 관리 방식에 맞춰 서비스
+노드 사설 IP의 접근을 먼저 허용하고 나머지 접근을 차단합니다. 실제 IP나 전체 방화벽 규칙은
+저장소와 작업 로그에 남기지 않습니다. Broker의 listener, 인증과 데이터 경로는 변경하지
+않으며 exporter는 metadata와 Consumer Group offset을 조회합니다. 동시 scrape마다 Kafka를
+재조회하지 않고 topic worker 수를 10으로 제한해 broker 부하를 제한합니다.
 
 클라우드 보안 그룹을 변경할 수 없는 환경에서는 분산 노드의 Docker `DOCKER-USER` 체인에
 서비스 노드 사설 IP의 `9100/tcp`만 허용하고 나머지는 차단합니다. Docker 기동 뒤 규칙을
@@ -100,6 +118,10 @@ ssh -L 3000:127.0.0.1:3000 <service-host>
 이후 브라우저에서 `http://127.0.0.1:3000`에 접속하고 사용자 `admin`과
 `GRAFANA_ADMIN_PASSWORD` 값으로 로그인합니다. `FEELM / Service Overview` 대시보드는
 provisioning으로 자동 생성됩니다.
+`FEELM / Kafka Overview`에서는 exporter 가용성, broker 수, 토픽별 메시지 증가율,
+partition·under-replicated 상태와 Consumer Group·partition별 lag를 확인합니다. 메시지
+증가율은 broker의 현재 offset 증가량으로 계산한 근사치이며 byte 단위 처리량이나 요청
+지연은 포함하지 않습니다.
 
 ## 검증
 
@@ -126,8 +148,13 @@ Prometheus의 `up` 조회에서 `backend`, `node`, `postgres`, `redis` Job이 �
 
 ```bash
 curl --fail --max-time 5 'http://<J15E106A 사설 IP>:9100/metrics'
+curl --fail --max-time 5 'http://<J15E106A 사설 IP>:9308/metrics'
 curl --fail --get 'http://127.0.0.1:9090/api/v1/query' \
   --data-urlencode 'query=up{job="node"}'
+curl --fail --get 'http://127.0.0.1:9090/api/v1/query' \
+  --data-urlencode 'query=up{job="kafka"}'
+curl --fail --get 'http://127.0.0.1:9090/api/v1/query' \
+  --data-urlencode 'query=sum by (consumergroup,topic) (kafka_consumergroup_lag{job="kafka"})'
 ```
 
 `up{job="node"}` 결과에는 다음 두 시계열이 모두 `1`로 나타나야 합니다.
@@ -136,6 +163,26 @@ curl --fail --get 'http://127.0.0.1:9090/api/v1/query' \
 | --- | --- | --- |
 | 서비스 노드 Compose exporter | `J15E106` | `service` |
 | 분산 노드 사설 IP exporter | `J15E106A` | `distributed` |
+
+`up{job="kafka"}`는 `1`, `kafka_brokers{job="kafka"}`는 현재 단일 broker 구성에서 `1`이어야
+합니다. `feelm.rating.v1`에 테스트 메시지를 쓰고 Consumer를 잠시 중단하면
+`kafka_consumergroup_lag`가 증가하고, Consumer를 재개하면 감소해야 합니다. 운영 데이터에
+시험 메시지를 넣지 말고 승인된 테스트 topic·group 또는 합성 환경에서 검증합니다. Consumer
+Group이 한 번도 offset을 commit하지 않았다면 lag 시계열이 생성되지 않는 것이 정상입니다.
+
+정상 경로는 서비스 노드에서 다음 명령으로 자동 확인할 수 있습니다.
+
+```bash
+python3 infra/scripts/verify_kafka_monitoring.py \
+  --consumer-group feelm-foldin-consumer-v1 \
+  --max-lag 0
+```
+
+lag 증가·회복 경로는 승인된 합성 topic과 group에서 Consumer를 중단한 뒤 `--min-lag 1`로
+증가를 확인하고, 재개 후 `--max-lag 0`으로 회복을 확인합니다. Kafka Exporter 중단 시에는
+같은 명령이 `Kafka exporter target이 DOWN입니다`로 실패해야 합니다. 실제 서비스의 정상
+lag 허용값이 0보다 크다면 운영 합의값을 사용하며 검증을 통과시키기 위해 임의로 늘리지
+않습니다.
 
 Grafana의 `Service Overview` 대시보드에서 두 노드의 CPU, 메모리, 디스크 처리량,
 filesystem 여유 비율과 네트워크 송수신량을 `node_name`별로 구분해 확인합니다. HTTP 요청이
@@ -158,6 +205,19 @@ filesystem 여유 비율과 네트워크 송수신량을 `node_name`별로 구�
 설정 변경만으로 재부팅 후 복구를 완료로 간주하지 않습니다. 운영 적용 시 분산 노드 재부팅
 후 exporter의 실행 상태, 사설 포트 바인딩과 두 `up` 시계열을 다시 확인해 검증 기록에
 남깁니다.
+
+Kafka target만 `DOWN`이면 공개 포트나 넓은 CIDR 허용으로 우회하지 않고 다음 순서로
+확인합니다.
+
+1. 분산 노드에서 `docker ps --filter name=feelm-kafka-exporter`와 exporter 로그를 확인합니다.
+2. exporter 명령의 listen 주소가 분산 노드 사설 IP이고 broker 주소가
+   `127.0.0.1:9092`인지 확인합니다.
+3. 분산 노드의 `/metrics`, 서비스 노드에서 사설 IP의 `/metrics`, Prometheus
+   `up{job="kafka"}` 순으로 장애 경계를 좁힙니다.
+4. broker가 정상인데 exporter만 실패하면 exporter만 재생성합니다. Kafka나 Consumer를
+   함께 재시작하거나 `kafka_data` 볼륨을 삭제하지 않습니다.
+5. exporter를 중지해 Prometheus에서 `up=0`을 확인한 뒤 다시 기동해 `up=1`로 복구되는
+   경로를 검증합니다.
 
 볼륨을 삭제하면 Prometheus 이력과 Grafana 내부 상태가 함께 사라집니다. 운영 중에는
 `docker compose down -v` 또는 `docker volume rm`을 사용하지 않습니다.

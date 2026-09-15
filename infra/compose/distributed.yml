@@ -171,6 +171,32 @@ services:
     volumes:
       - kafka_data:/tmp/kraft-combined-logs
 
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.9.0
+    container_name: feelm-kafka-exporter
+    restart: unless-stopped
+    network_mode: host
+    read_only: true
+
+    command:
+      - --kafka.server=127.0.0.1:9092
+      - --web.listen-address=${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}:9308
+      - --topic.filter=^feelm[.].+$
+      - --group.filter=^feelm[-.].+$
+      - --refresh.metadata=30s
+      - --topic.workers=10
+      - --no-concurrent.enable
+
+    depends_on:
+      kafka:
+        condition: service_started
+
+    security_opt:
+      - no-new-privileges:true
+
+    cap_drop:
+      - ALL
+
   consumer:
     image: ${CONSUMER_IMAGE:-feelm-foldin-consumer:local}
     build:
