@@ -24,6 +24,10 @@ FEATURES_SCHEMA = pa.schema([
     pa.field("indices", pa.list_(pa.field("element", pa.int32(), nullable=False))),
     pa.field("values", pa.list_(pa.field("element", pa.float64(), nullable=False))),
 ])
+VOCABULARY_SCHEMA = pa.schema([
+    pa.field("feature_index", pa.int32()),
+    pa.field("token", pa.string()),
+])
 FEATURE_ROWS = [
     {"service_movie_id": 10, "tmdb_id": 100, "indices": [0, 2], "values": [0.6, 0.8]},
     {"service_movie_id": 20, "tmdb_id": 200, "indices": [1, 3], "values": [0.6, 0.8]},
@@ -71,6 +75,8 @@ def _bundle(
     features_schema: pa.Schema = FEATURES_SCHEMA,
     metadata=None,
     vocabulary_rows: int = 6,
+    vocabulary=None,
+    vocabulary_schema: pa.Schema = VOCABULARY_SCHEMA,
     skip: str | None = None,
 ) -> str:
     # The contract publishes at <output>/content/<content-version>.
@@ -79,7 +85,10 @@ def _bundle(
     if skip != "features":
         _write(root / "features", features if features is not None else FEATURE_ROWS, features_schema)
     if skip != "vocabulary":
-        _write(root / "vocabulary", [{"feature_index": index, "token": f"genre:{index}"} for index in range(vocabulary_rows)])
+        rows = vocabulary if vocabulary is not None else [
+            {"feature_index": index, "token": f"genre:{index}"} for index in range(vocabulary_rows)
+        ]
+        _write(root / "vocabulary", rows, vocabulary_schema)
     if skip != "metadata":
         _write(root / "metadata", [metadata if metadata is not None else _metadata_row()])
     return root.as_uri()
@@ -172,7 +181,11 @@ def test_rejects_two_metadata_rows(tmp_path) -> None:
     root = tmp_path / "content" / "content-fixture-v1"
     root.mkdir(parents=True)
     _write(root / "features", FEATURE_ROWS, FEATURES_SCHEMA)
-    _write(root / "vocabulary", [{"feature_index": index, "token": f"genre:{index}"} for index in range(6)])
+    _write(
+        root / "vocabulary",
+        [{"feature_index": index, "token": f"genre:{index}"} for index in range(6)],
+        VOCABULARY_SCHEMA,
+    )
     _write(root / "metadata", [_metadata_row(), _metadata_row()])
 
     with pytest.raises(ArtifactError, match="exactly one row"):
@@ -198,7 +211,11 @@ def test_rejects_the_writers_mutable_staging_sibling(tmp_path) -> None:
     root = tmp_path / "content" / ".content-fixture-v1.tmp-0123abcd"
     root.mkdir(parents=True)
     _write(root / "features", FEATURE_ROWS, FEATURES_SCHEMA)
-    _write(root / "vocabulary", [{"feature_index": index, "token": f"genre:{index}"} for index in range(6)])
+    _write(
+        root / "vocabulary",
+        [{"feature_index": index, "token": f"genre:{index}"} for index in range(6)],
+        VOCABULARY_SCHEMA,
+    )
     _write(root / "metadata", [_metadata_row()])
 
     with pytest.raises(ArtifactError, match="does not match its path"):
@@ -215,7 +232,11 @@ def test_rejects_directories_that_are_not_the_published_version(tmp_path, direct
     root = tmp_path / "content" / directory
     root.mkdir(parents=True)
     _write(root / "features", FEATURE_ROWS, FEATURES_SCHEMA)
-    _write(root / "vocabulary", [{"feature_index": index, "token": f"genre:{index}"} for index in range(6)])
+    _write(
+        root / "vocabulary",
+        [{"feature_index": index, "token": f"genre:{index}"} for index in range(6)],
+        VOCABULARY_SCHEMA,
+    )
     _write(root / "metadata", [_metadata_row()])
 
     with pytest.raises(ArtifactError, match="does not match its path"):
@@ -225,6 +246,60 @@ def test_rejects_directories_that_are_not_the_published_version(tmp_path, direct
 def test_rejects_vocabulary_size_mismatch(tmp_path) -> None:
     with pytest.raises(ArtifactError, match="vocabulary size does not match"):
         _load(_bundle(tmp_path, vocabulary_rows=5))
+
+
+@pytest.mark.parametrize(
+    ("vocabulary", "schema"),
+    [
+        (
+            [{"feature_index": index, "token": f"genre:{index}"} for index in range(6)],
+            pa.schema([pa.field("feature_index", pa.int64()), pa.field("token", pa.string())]),
+        ),
+        (
+            [{"feature_index": index, "token": f"genre:{index}".encode()} for index in range(6)],
+            pa.schema([pa.field("feature_index", pa.int32()), pa.field("token", pa.binary())]),
+        ),
+    ],
+)
+def test_rejects_vocabulary_with_wrong_physical_types(tmp_path, vocabulary, schema) -> None:
+    with pytest.raises(ArtifactError, match="content vocabulary has incompatible physical types"):
+        _load(_bundle(tmp_path, vocabulary=vocabulary, vocabulary_schema=schema))
+
+
+@pytest.mark.parametrize(
+    "indices",
+    [
+        [1, 2, 3, 4, 5, 6],
+        [0, 1, 2, 3, 4, 6],
+        [0, 1, 2, 2, 4, 5],
+    ],
+)
+def test_rejects_non_contiguous_or_duplicate_vocabulary_indices(tmp_path, indices) -> None:
+    vocabulary = [
+        {"feature_index": index, "token": f"genre:{position}"}
+        for position, index in enumerate(indices)
+    ]
+
+    with pytest.raises(ArtifactError, match="unique and contiguous from zero"):
+        _load(_bundle(tmp_path, vocabulary=vocabulary))
+
+
+@pytest.mark.parametrize(
+    "tokens",
+    [
+        ["", "genre:1", "genre:2", "genre:3", "genre:4", "genre:5"],
+        ["genre:0", "genre:0", "genre:2", "genre:3", "genre:4", "genre:5"],
+        ["actor:0", "genre:1", "genre:2", "genre:3", "genre:4", "genre:5"],
+    ],
+)
+def test_rejects_empty_duplicate_or_unsupported_vocabulary_tokens(tmp_path, tokens) -> None:
+    vocabulary = [
+        {"feature_index": index, "token": token}
+        for index, token in enumerate(tokens)
+    ]
+
+    with pytest.raises(ArtifactError, match="empty, duplicate, or unsupported"):
+        _load(_bundle(tmp_path, vocabulary=vocabulary))
 
 
 @pytest.mark.parametrize(
@@ -259,6 +334,14 @@ def test_rejects_vocabulary_size_mismatch(tmp_path) -> None:
 )
 def test_rejects_invalid_content_features(tmp_path, features, error) -> None:
     with pytest.raises(ArtifactError, match=error):
+        _load(_bundle(tmp_path, features=features))
+
+
+@pytest.mark.parametrize("tmdb_id", [None, 0, -1, 200])
+def test_rejects_null_non_positive_or_duplicate_tmdb_id(tmp_path, tmdb_id) -> None:
+    features = [{**FEATURE_ROWS[0], "tmdb_id": tmdb_id}, *FEATURE_ROWS[1:]]
+
+    with pytest.raises(ArtifactError, match="one positive unique tmdb_id per movie"):
         _load(_bundle(tmp_path, features=features))
 
 

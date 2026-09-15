@@ -30,6 +30,19 @@ FEATURES_TYPES = {
     "indices": pa.list_(pa.int32()),
     "values": pa.list_(pa.float64()),
 }
+VOCABULARY_TYPES = {
+    "feature_index": pa.int32(),
+    "token": pa.string(),
+}
+ALLOWED_FEATURE_PREFIXES = (
+    "genre:",
+    "language:",
+    "decade:",
+    "runtime30:",
+    "director:",
+    "cast:",
+    "keyword:",
+)
 
 
 @dataclass(frozen=True)
@@ -116,6 +129,28 @@ def _prior(metadata: dict[str, object]) -> np.ndarray:
     return prior
 
 
+def _validate_vocabulary(vocabulary: pa.Table, vocabulary_size: int) -> None:
+    """Validate the index space and tokens before any feature vector uses them."""
+    _require_physical_types(vocabulary, VOCABULARY_TYPES, "content vocabulary")
+    indices = vocabulary.column("feature_index").to_pylist()
+    if (
+        any(not isinstance(index, int) or isinstance(index, bool) for index in indices)
+        or sorted(indices) != list(range(vocabulary_size))
+    ):
+        raise ArtifactError("content vocabulary indices must be unique and contiguous from zero")
+
+    tokens = vocabulary.column("token").to_pylist()
+    if (
+        any(
+            not isinstance(token, str)
+            or not any(token.startswith(prefix) and len(token) > len(prefix) for prefix in ALLOWED_FEATURE_PREFIXES)
+            for token in tokens
+        )
+        or len(set(tokens)) != len(tokens)
+    ):
+        raise ArtifactError("content vocabulary tokens are empty, duplicate, or unsupported")
+
+
 def load_content(
     uri: str,
     *,
@@ -159,6 +194,7 @@ def load_content(
     vocabulary = _dataset(uri, "vocabulary")
     if vocabulary.num_rows != vocabulary_size:
         raise ArtifactError("content vocabulary size does not match metadata")
+    _validate_vocabulary(vocabulary, vocabulary_size)
 
     features = _dataset(uri, "features")
     required = set(FEATURES_TYPES)
@@ -187,6 +223,13 @@ def _build_bundle(
     service_movie_ids: set[int],
 ) -> ContentBundle:
     """Flatten the sparse vectors into CSR arrays after validating every row."""
+    tmdb_ids = features.column("tmdb_id").to_pylist()
+    if (
+        any(not isinstance(tmdb_id, int) or isinstance(tmdb_id, bool) or tmdb_id <= 0 for tmdb_id in tmdb_ids)
+        or len(set(tmdb_ids)) != len(tmdb_ids)
+    ):
+        raise ArtifactError("content features must have one positive unique tmdb_id per movie")
+
     ids = features.column("service_movie_id").to_numpy(zero_copy_only=False)
     order = np.argsort(ids, kind="stable")
     sorted_ids = ids[order].astype(np.int64, copy=False)
