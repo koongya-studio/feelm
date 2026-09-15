@@ -116,10 +116,12 @@ class AdapterTests(unittest.TestCase):
             ('S15P21E106-deadbeef/README.md', b'ignored\n', 0o644),
             ('S15P21E106-deadbeef/backend/gradlew', b'#!/bin/sh\n', 0o755),
             ('S15P21E106-deadbeef/backend/src/A.java', b'class A {}\n', 0o644),
+            ('S15P21E106-deadbeef/infra/compose/service.yml', b'services:\n', 0o644),
         ])
         result, digest = adapter.normalized_backend_archive(payload)
         files, _ = adapter.job_io.source_plan(result, digest)
         self.assertEqual(files['backend/src/A.java'][0], b'class A {}\n')
+        self.assertEqual(files['infra/compose/service.yml'][0], b'services:\n')
         self.assertTrue(files['backend/gradlew'][1] & 0o100)
 
     def test_archive_rejects_links_and_multiple_roots(self):

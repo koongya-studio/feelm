@@ -339,7 +339,9 @@ def normalized_service_archive(payload, service):
                 if len(parts) == 1 and entry.isdir(): continue
                 if len(parts) < 2: raise PolicyError('Archive member is outside its root')
                 name = '/'.join(parts[1:])
-                if name != service and not name.startswith(service + '/'):
+                backend_contract = name in ('infra', 'infra/compose', 'infra/compose/service.yml')
+                if name != service and not name.startswith(service + '/') \
+                        and not (service == 'backend' and backend_contract):
                     if service == 'frontend':
                         raise PolicyError('Repository archive contains out-of-scope source')
                     continue
@@ -397,8 +399,11 @@ def fetch_source(context, service='backend'):
                        env=environment, **quiet)
         archive_path = Path(directory) / 'source.tar'
         with archive_path.open('xb') as output:
+            source_paths = [service]
+            if service == 'backend':
+                source_paths.append('infra/compose/service.yml')
             subprocess.run(['/usr/bin/git', '-C', str(repository), 'archive', '--format=tar',
-                            '--prefix=source/', 'FETCH_HEAD', service],
+                            '--prefix=source/', 'FETCH_HEAD', *source_paths],
                            env=environment, stdout=output, stderr=subprocess.DEVNULL,
                            check=True, timeout=60)
         if archive_path.stat().st_size > MAX_HTTP_ARCHIVE:

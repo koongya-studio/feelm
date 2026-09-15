@@ -8,8 +8,9 @@
 `backend-mr-test`, `frontend-mr-test`와 의존성 변경 시 생성되는 `backend-cache-prepare`만
 `e106-mr-isolated` 태그의 별도 Runner에서 받습니다. 이 Runner의
 Custom executor는 GitLab이 생성한 셸 스크립트를 실행하지 않는다. 다음 조건을 모두 다시
-확인한 뒤 현재 커밋에서 Job에 대응하는 `backend` 또는 `frontend` 디렉터리만 검증된 격리
-실행기에 전달한다. 프론트 실행 정책과 서버 적용 순서는
+확인한 뒤 현재 커밋에서 Job에 대응하는 `backend` 또는 `frontend` 디렉터리를 검증된 격리
+실행기에 전달한다. 백엔드는 환경변수 계약 검사를 위해 `infra/compose/service.yml` 한 파일을
+추가로 전달하며 다른 `infra` 파일은 거부한다. 프론트 실행 정책과 서버 적용 순서는
 [프론트엔드 MR 격리 검증](FRONTEND-MR-ISOLATION.md)을 따른다.
 
 - GitLab 주소가 `https://lab.ssafy.com`이고 프로젝트 경로가
@@ -52,6 +53,7 @@ GitLab API의 정확한 커밋 archive를 사용한다. MR이 `.gitlab-ci.yml`�
 | `.gitlab-ci.yml`, `.gitlab/ci/common.yml` | 공통 stage, include 및 Runner 연결 설정 |
 | `.gitlab/ci/backend.yml` | 백엔드 Job 명령과 실행 조건 |
 | `.gitattributes` | 백엔드 파일의 체크아웃 개행·속성 |
+| `infra/compose/service.yml` | 백엔드 환경변수 계약의 실제 Compose 주입 구조 |
 | `infra/scripts/ci-*.py` | 격리 실행기, 캐시, 입력 준비 및 GitLab 어댑터 구현 |
 | `infra/scripts/rootless-backend/**/*` | Gradle 초기화 및 Testcontainers 실행 보조 코드 |
 | `infra/scripts/systemd/feelm-ci*.service` | 테스트 Runner·가드·오프라인 Docker 서비스 정의 |
@@ -63,8 +65,8 @@ GitLab API의 정확한 커밋 archive를 사용한다. MR이 `.gitlab-ci.yml`�
 별도 `compare_to`나 마지막 커밋 비교로 이 기준을 바꾸지 않는다.
 
 공통 CI·Runner 파일 변경 시 Job이 생성되는 것과 해당 파일이 서버에 적용되는 것은
-별개다. 현재 어댑터는 backend archive만 전달하므로, 실행기 변경 자체는 해당
-단위 테스트와 기존 서버 적용 절차로 별도 검증해야 한다.
+별개다. 어댑터와 입력 경계 변경 자체는 해당 단위 테스트와 기존 서버 적용 절차로 별도
+검증해야 한다.
 
 `backend-cache-prepare`의 의존성 경로는 모두 `backend/**/*`에 포함됩니다. 자동 준비,
 MR SHA별 후보 선택, develop 병합 후 자동 승격과 Runner 정책을 함께 검증합니다.

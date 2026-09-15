@@ -48,6 +48,7 @@ include:
 ''', self.root)
 
         cancellable = (
+            (self.backend, 'backend-env-check'),
             (self.backend, 'backend-test'),
             (self.backend, 'backend-image'),
             (self.frontend, 'frontend-test'),
@@ -86,6 +87,7 @@ include:
                          'infra/scripts/ci-network-guard.py'):
                 self.assertIn('- ' + path, block)
         for path in ('backend/src/**/*', 'backend/scripts/**/*',
+                     'backend/config/**/*',
                      'backend/gradle/**/*', 'backend/build.gradle',
                      'backend/gradlew*', 'backend/Dockerfile*', 'backend/.*'):
             self.assertIn('- ' + path, backend)
@@ -117,6 +119,7 @@ include:
 
     def test_main_build_and_deploy_chains_are_protected_and_serialized(self):
         datastore = job_block(self.backend, 'datastore-config-check')
+        backend_env = job_block(self.backend, 'backend-env-check')
         backend_test = job_block(self.backend, 'backend-test')
         backend_image = job_block(self.backend, 'backend-image')
         backend_deploy = job_block(self.backend, 'deploy-backend')
@@ -125,12 +128,13 @@ include:
         main_push = ('$CI_COMMIT_BRANCH == "main" && '
                      '$CI_COMMIT_REF_PROTECTED == "true" && '
                      '$CI_PIPELINE_SOURCE == "push"')
-        for block in (datastore, backend_test, backend_image, backend_deploy,
+        for block in (datastore, backend_env, backend_test, backend_image, backend_deploy,
                       job_block(self.frontend, 'frontend-test'), frontend_image,
                       frontend_deploy):
             self.assertIn(main_push, block)
             self.assertNotIn('$CI_COMMIT_BRANCH == "develop"', block)
         self.assertIn('job: backend-test', backend_image)
+        self.assertIn('job: backend-env-check', backend_image)
         self.assertIn('job: datastore-config-check', backend_image)
         self.assertIn('needs: [backend-image]', backend_deploy)
         for block in (backend_test, backend_image, backend_deploy):
@@ -144,10 +148,13 @@ include:
             self.assertIn('resource_group: service-and-backend-cache', block)
             self.assertIn('ci-deploy-current-commit.py', block)
         self.assertIn('--init-script gradle/test-timing.gradle', backend_test)
+        self.assertIn('action: prepare', backend_env)
+        self.assertIn('ci-backend-env-contract.py --require-values', backend_env)
 
     def test_service_release_jobs_exclude_develop_mr_api_and_web_pipelines(self):
         release_jobs = (
             (self.backend, 'datastore-config-check'),
+            (self.backend, 'backend-env-check'),
             (self.backend, 'backend-test'),
             (self.backend, 'backend-image'),
             (self.backend, 'deploy-backend'),
