@@ -29,7 +29,7 @@ ENV ARROW_LIBHDFS_DIR=/opt/hadoop/lib/native \
     HOME=/tmp \
     JAVA_HOME=/opt/java/openjdk \
     LD_LIBRARY_PATH=/opt/hadoop/lib/native:/opt/java/openjdk/lib/server \
-    PATH="/app/.venv/bin:/opt/hadoop/bin:$PATH" \
+    PATH="/app/.venv/bin:/opt/java/openjdk/bin:/opt/hadoop/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
