@@ -11,6 +11,7 @@ import redis
 from confluent_kafka import Consumer, KafkaException, TopicPartition
 
 from feelm_consumer.artifacts import ArtifactBundle, load_bundle
+from feelm_consumer.content import ContentBundle, load_content
 from feelm_consumer.events import EventValidationError, parse_event
 from feelm_consumer.postgres import load_profile, readonly_snapshot
 from feelm_consumer.redis_store import (
@@ -39,6 +40,9 @@ def process_user(
     backoff_seconds: float = 0.25,
     is_still_owned: Callable[[], bool] | None = None,
     partition_fence: tuple[str, str] | None = None,
+    content: ContentBundle | None = None,
+    hybrid_alpha: float = 0.5,
+    min_input_count: int = 0,
 ) -> bool | None:
     for attempt in range(attempts):
         try:
@@ -47,10 +51,22 @@ def process_user(
             expected = _expected_version(store, user_id, partition_fence)
             with readonly_snapshot(connect) as connection:
                 ratings, onboarding = load_profile(connection, user_id)
-            results = calculate_user_results(bundle, ratings, onboarding, expected + 1)
+            results = calculate_user_results(
+                bundle,
+                ratings,
+                onboarding,
+                expected + 1,
+                content=content,
+                hybrid_alpha=hybrid_alpha,
+                min_input_count=min_input_count,
+            )
             if results is None:
-                LOG.warning("fold-in produced no publishable result user_id=%s", user_id)
-                return False
+                # Not a failure: this user has no signal in either artifact, so
+                # there is nothing to publish and retrying changes nothing.
+                # Treating it as a failure would pause the partition, leave the
+                # offset uncommitted, and replay the same event after restart.
+                LOG.warning("no_publishable_result_skipped user_id=%s", user_id)
+                return True
             if is_still_owned is not None and not is_still_owned():
                 LOG.warning("partition ownership lost before Redis publish user_id=%s", user_id)
                 return False
@@ -70,6 +86,25 @@ def process_user(
 
 def run(settings: Settings) -> None:
     bundle = load_bundle(settings.model_uri, settings.mapping_uri, settings.metadata_uri)
+    content = None
+    if settings.content_uri is not None:
+        content = load_content(
+            settings.content_uri,
+            mapping_revision=bundle.mapping_revision,
+            movie_metadata_revision=bundle.movie_metadata_revision,
+            input_snapshot=bundle.input_snapshot,
+            service_movie_ids=set(bundle.movie_metadata),
+        )
+        LOG.info(
+            "content artifacts loaded version=%s movies=%s supported=%s vocabulary=%s alpha=%s",
+            content.content_version,
+            content.movie_count,
+            int(content.supported.sum()),
+            content.vocabulary_size,
+            settings.hybrid_alpha,
+        )
+    else:
+        LOG.info("content artifacts not configured; publishing ALS-only candidates")
     store = redis.Redis.from_url(settings.redis_url, decode_responses=True)
     consumer = Consumer(
         {
@@ -161,6 +196,9 @@ def run(settings: Settings) -> None:
                 backoff_seconds=settings.retry_backoff_seconds,
                 is_still_owned=lambda: (message.topic(), message.partition()) in owned,
                 partition_fence=fences.get((message.topic(), message.partition())),
+                content=content,
+                hybrid_alpha=settings.hybrid_alpha,
+                min_input_count=settings.min_input_count,
             )
             if processed is None:
                 LOG.warning(
