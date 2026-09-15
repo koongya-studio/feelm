@@ -4,6 +4,9 @@ spring:
     username: sa
     password:
     driver-class-name: org.h2.Driver
+    hikari:
+      maximum-pool-size: 4
+      minimum-idle: 0
   flyway:
     # 기본 테스트는 H2를 쓴다. Flyway SQL은 PostgreSQL 문법이라 실행되지 않으므로 끈다.
     # 마이그레이션 자체는 migration 패키지의 Testcontainers 테스트가 실제 PostgreSQL에서 검증한다.
