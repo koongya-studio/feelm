@@ -62,6 +62,12 @@
 }
 ```
 
+- 응답의 모든 필드를 유지한다. 원천 값이 없는 `releaseYear`와 `posterUrl`은 `null`이다.
+  `movies.release_date`가 비어 있으면 `releaseYear`가, `movies.poster_url`이 비어 있으면
+  `posterUrl`이 `null`이며, 예시는 두 값이 모두 있는 경우다
+- 장르가 없는 영화는 `genres`가 빈 배열이다. `null`을 내려주지 않는다
+- `movieId`, `title`, `flavorCode`는 항상 값이 있다. 대표 맛이 없는 영화는 카드가 되지 않는다
+
 ### 오류 응답
 
 - `400 VALIDATION_FAILED` `size`가 1~40을 벗어남
@@ -235,6 +241,8 @@
   모든 참조는 보존하고 없는 항목만 추가한다. 식별 관계 충돌은 seed 전체 행 변경과 기동을 실패시킨다
 - 이후 콘텐츠 적재는 같은 CSV 기준으로 추가·메타데이터 갱신을 수행한다. 목록에 추가하거나
   이름·로고를 바꾸려면 이 표와 CSV를 함께 고친다. 적용된 seed는 수정하지 않고 필요 시 새 버전을 만든다
+- `logoUrl`은 값이 없으면 `null`이다. 승인 CSV와 seed가 로고 경로를 필수로 요구하므로 지원 5종에는
+  값이 있지만, `otts.logo_url`과 응답 타입은 값 없음을 허용한다. `ottId`, `code`, `name`은 항상 값이 있다
 - 서비스는 OTT 지원을 종료하지 않는다(2026-09-14 사용자 확정). 종료·비활성화와 이에 따른
   기존 구독 일괄 해제는 지원하지 않는다. 적재 경로는 추가와 갱신만 자동화한다.
   CSV에서 줄을 지워도 `otts` 행은 남는다. `user_otts`, `movie_ott_providers`, `watch_records`가
