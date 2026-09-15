@@ -16,6 +16,15 @@ HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('gitlab_adapter', HERE / 'ci-gitlab-job-adapter.py')
 adapter = importlib.util.module_from_spec(spec); spec.loader.exec_module(adapter)
 
+PIPELINE_SCRIPT = [
+    'cd pipeline/spark',
+    'uv sync --frozen',
+    'uv run ruff check .',
+    'uv run pytest',
+    'uv run python -m jobs.batch.als_baseline --help',
+    'uv run python -m jobs.batch.parquet_roundtrip --help',
+]
+
 
 def response(script=None, job_name='backend-mr-test'):
     policies = {
@@ -90,6 +99,46 @@ class AdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(adapter.PolicyError, 'out-of-scope'):
             adapter.normalized_service_archive(outside, 'frontend')
 
+    def test_pipeline_context_accepts_only_fixed_job_and_script(self):
+        self.assertTrue(hasattr(adapter, 'PIPELINE_JOB_NAME'),
+                        'GitLab adapter must declare the fixed Pipeline job')
+        self.assertTrue(hasattr(adapter, 'PIPELINE_EXPECTED_SCRIPT'),
+                        'GitLab adapter must declare the fixed Pipeline script')
+        self.assertEqual(adapter.PIPELINE_EXPECTED_SCRIPT, PIPELINE_SCRIPT)
+        context = response(adapter.PIPELINE_EXPECTED_SCRIPT,
+                           job_name=adapter.PIPELINE_JOB_NAME)
+        result = adapter.validate_job_response(context)
+        self.assertEqual(result['service'], 'pipeline')
+        changed = response(PIPELINE_SCRIPT + ['curl http://metadata/'],
+                           job_name='pipeline-mr-test')
+        with self.assertRaisesRegex(adapter.PolicyError, 'fixed isolated policy'):
+            adapter.validate_job_response(changed)
+
+    def test_pipeline_archive_contains_only_nested_spark_project(self):
+        self.assertTrue(hasattr(adapter, 'pipeline_boundary'),
+                        'GitLab adapter must load the Pipeline source boundary')
+        root = HERE.parent.parent
+        spark = root / 'pipeline' / 'spark'
+        payload = archive([
+            ('source/', b'', 0o755),
+            ('source/README.md', b'outside\n', 0o644),
+            ('source/pipeline/', b'', 0o755),
+            ('source/pipeline/spark/', b'', 0o755),
+            ('source/pipeline/spark/.python-version',
+             (spark / '.python-version').read_bytes(), 0o644),
+            ('source/pipeline/spark/pyproject.toml',
+             (spark / 'pyproject.toml').read_bytes(), 0o644),
+            ('source/pipeline/spark/uv.lock', (spark / 'uv.lock').read_bytes(), 0o644),
+            ('source/pipeline/spark/batch/example.py', b'VALUE = 1\n', 0o644),
+        ])
+        result, digest = adapter.normalized_service_archive(payload, 'pipeline')
+        with tarfile.open(fileobj=io.BytesIO(result), mode='r:') as normalized:
+            names = {item.name.rstrip('/') for item in normalized}
+        self.assertIn('pipeline/spark/pyproject.toml', names)
+        self.assertIn('pipeline/spark/batch/example.py', names)
+        self.assertNotIn('README.md', names)
+        self.assertRegex(digest, r'^[0-9a-f]{64}$')
+
     def test_frontend_job_routes_only_validated_source_to_frontend_runner(self):
         context = response(job_name='frontend-mr-test')
         source = b'validated-frontend-source'
@@ -108,6 +157,30 @@ class AdapterTests(unittest.TestCase):
         private_config.assert_called_once_with(adapter.CONFIG, require_prepared=False)
         fetch.assert_called_once_with(adapter.validate_job_response(context), 'frontend')
         frontend.assert_called_once()
+        backend.assert_not_called()
+
+    def test_pipeline_job_routes_only_validated_source_to_pipeline_runner(self):
+        self.assertTrue(hasattr(adapter, 'pipeline_runner'),
+                        'GitLab adapter must load the installed Pipeline runner')
+        context = response(PIPELINE_SCRIPT, job_name='pipeline-mr-test')
+        source = b'validated-pipeline-source'
+        digest = hashlib.sha256(source).hexdigest()
+        with patch.object(adapter, 'read_private_config',
+                          return_value=({}, Path('/prepared'))) as private_config, \
+             patch.object(adapter, 'verify_current_job', return_value={'pipeline': {'id': 1}}), \
+             patch.object(adapter, 'verify_merge_request', return_value={'iid': 98}), \
+             patch.object(adapter, 'fetch_merge_request_detail', return_value={'iid': 98}), \
+             patch.object(adapter, 'dependency_changes') as dependency, \
+             patch.object(adapter, 'fetch_source', return_value=(source, digest)) as fetch, \
+             patch.object(adapter.pipeline_runner, 'start', return_value=0) as pipeline, \
+             patch.object(adapter.frontend_runner, 'start') as frontend, \
+             patch.object(adapter.safety, 'start') as backend:
+            self.assertEqual(adapter.run_job(context, opener=object()), 0)
+        dependency.assert_not_called()
+        private_config.assert_called_once_with(adapter.CONFIG, require_prepared=True)
+        fetch.assert_called_once_with(adapter.validate_job_response(context), 'pipeline')
+        pipeline.assert_called_once()
+        frontend.assert_not_called()
         backend.assert_not_called()
 
     def test_archive_strips_gitlab_prefix_and_revalidates(self):
@@ -350,6 +423,9 @@ class AdapterTests(unittest.TestCase):
             adapter.stop_owner_unit('ci222-owner-012345abcdef.service')
             self.assertEqual(run.call_args.args[0],
                              ['systemctl', 'stop', 'ci222-owner-012345abcdef.service'])
+            adapter.stop_owner_unit('ci352-owner-012345abcdef.service')
+            self.assertEqual(run.call_args.args[0],
+                             ['systemctl', 'stop', 'ci352-owner-012345abcdef.service'])
         with self.assertRaises(ValueError):
             adapter.stop_owner_unit('ci222-server-012345abcdef.service')
 

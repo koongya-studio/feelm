@@ -16,8 +16,12 @@ spec = importlib.util.spec_from_file_location(
 runtime = importlib.util.module_from_spec(spec); spec.loader.exec_module(runtime)
 FILES = runtime.FILES + (
     'ci-gitlab-job-adapter.py', 'ci-gitlab-custom-executor.py', 'ci-gitlab-server-install.py',
+    'ci-gitlab-adapter-update.py',
+    'ci-frontend-mr-boundary.py', 'ci-frontend-mr-config.py', 'ci-frontend-mr-runner.py',
+    'ci-pipeline-cache-policy.py', 'ci-pipeline-mr-boundary.py',
+    'ci-pipeline-mr-config.py', 'ci-pipeline-mr-prepare.py', 'ci-pipeline-mr-runner.py',
     'ci-dependency-cache.py', 'ci-dependency-cache-context.py', 'ci-dependency-cache-install.py',
-    'ci-frontend-mr-boundary.py', 'ci-frontend-mr-runner.py', 'ci-network-guard.py',
+    'ci-network-guard.py',
     'systemd/feelm-ci222-gitlab-runner.service',
 )
 SOURCE_SHA = '388ae26fd74dca6864f5fb469fdf47b2d4a34e42b4989d7f29caf36662b4f875'

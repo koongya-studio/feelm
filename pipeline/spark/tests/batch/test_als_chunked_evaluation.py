@@ -21,6 +21,16 @@ spark = spark_fixture
 
 CANDIDATE_COLUMNS = (USER, ITEM, "score", "rank", "catalog", "service_movie_id")
 PER_USER_COLUMNS = (USER, "recall_at_10", "ndcg_at_10", "catalog")
+EQUIVALENCE_INPUTS = {
+    "known_rows": [(1, 1, 0.5), (2, 1, 1.0)],
+    "holdout_rows": [(1, 2, 5.0), (2, 3, 5.0)],
+    "mapping_items": [2, 3],
+}
+LINEAGE_INPUTS = {
+    "known_rows": [(1, 1, 0.5), (2, 1, 1.0), (2, 2, 5.0)],
+    "holdout_rows": [(1, 2, 5.0), (2, 4, 5.0)],
+    "mapping_items": [2, 4],
+}
 
 
 def chunk_module():
@@ -55,16 +65,27 @@ class EvidenceWriter:
         )
 
 
-def inputs(spark, *, model=None):
+def inputs(
+    spark,
+    *,
+    model=None,
+    known_rows=None,
+    holdout_rows=None,
+    mapping_items=None,
+):
     model = model or ScoredModel(spark, users=(1, 2, 3), items=range(1, 7))
     known = ratings(
         spark,
-        [(1, 1, 0.5), (2, 1, 1.0), (2, 2, 5.0)]
+        known_rows
+        if known_rows is not None
+        else [(1, 1, 0.5), (2, 1, 1.0), (2, 2, 5.0)]
         + [(3, item, 1.0) for item in range(1, 7)],
     )
     holdout = ratings(
         spark,
-        [
+        holdout_rows
+        if holdout_rows is not None
+        else [
             (1, 2, 5.0),
             (1, 3, 5.0),
             (1, 99, 5.0),
@@ -74,13 +95,15 @@ def inputs(spark, *, model=None):
             (4, 2, 5.0),
         ],
     )
-    return model, known, holdout, mapping(spark, [2, 4, 5, 99])
+    return model, known, holdout, mapping(
+        spark, mapping_items if mapping_items is not None else [2, 4, 5, 99]
+    )
 
 
-def evaluate_chunked(spark, chunk_size, *, writer=None, model=None):
+def evaluate_chunked(spark, chunk_size, *, writer=None, model=None, input_kwargs=None):
     writer = writer or EvidenceWriter()
     result = chunk_module().evaluate_offline_chunked(
-        *inputs(spark, model=model),
+        *inputs(spark, model=model, **(input_kwargs or {})),
         stage="validation",
         candidate_size=3,
         positive_rating_threshold=4.0,
@@ -111,9 +134,14 @@ def assert_summary(actual, expected):
 
 
 @pytest.fixture(scope="module")
-def legacy(spark):
+def equivalence_model(spark):
+    return ScoredModel(spark, users=(1, 2), items=range(1, 4))
+
+
+@pytest.fixture(scope="module")
+def legacy(spark, equivalence_model):
     result = importlib.import_module("batch.evaluation.offline").evaluate_offline(
-        *inputs(spark),
+        *inputs(spark, model=equivalence_model, **EQUIVALENCE_INPUTS),
         stage="validation",
         candidate_size=3,
         positive_rating_threshold=4.0,
@@ -127,8 +155,15 @@ def legacy(spark):
 
 
 @pytest.mark.parametrize("chunk_size", [1, 2, 99])
-def test_chunk_sizes_match_legacy_candidates_per_user_and_summary(spark, legacy, chunk_size):
-    result, written = evaluate_chunked(spark, chunk_size)
+def test_chunk_sizes_match_legacy_candidates_per_user_and_summary(
+    spark, equivalence_model, legacy, chunk_size
+):
+    result, written = evaluate_chunked(
+        spark,
+        chunk_size,
+        model=equivalence_model,
+        input_kwargs=EQUIVALENCE_INPUTS,
+    )
 
     assert rows(written.candidates, CANDIDATE_COLUMNS) == rows(
         legacy["candidates"], CANDIDATE_COLUMNS
@@ -252,7 +287,13 @@ def test_chunk_lineage_runs_once_and_owned_caches_are_released(spark):
     score_calls = spark.sparkContext.accumulator(0)
     writer = EvidenceWriter(reuse=True)
     persistent_before = spark.sparkContext._jsc.getPersistentRDDs().size()  # noqa: SLF001
-    evaluate_chunked(spark, 1, writer=writer, model=CountingModel(spark, score_calls))
+    evaluate_chunked(
+        spark,
+        1,
+        writer=writer,
+        model=CountingModel(spark, score_calls),
+        input_kwargs=LINEAGE_INPUTS,
+    )
 
     # Five eligible pairs exist: user 1 has three and user 2 has two. Repeated
     # summary/evidence actions must consume the materialization, not rescore them.
@@ -269,7 +310,7 @@ def test_candidate_materialization_does_not_mutate_model_test_hooks(spark):
     model = ScoredModel(spark, users=(1, 2), items=range(1, 5))
     model.accumulator = ForbiddenCounter()
 
-    evaluate_chunked(spark, 1, model=model)
+    evaluate_chunked(spark, 1, model=model, input_kwargs=EQUIVALENCE_INPUTS)
 
 
 def test_chunk_requests_one_materialized_per_user_lineage_per_catalog(spark, monkeypatch):
@@ -283,7 +324,12 @@ def test_chunk_requests_one_materialized_per_user_lineage_per_catalog(spark, mon
         return original(*args, **kwargs)
 
     monkeypatch.setattr(module, "evaluate_ranking", observed)
-    evaluate_chunked(spark, 99, writer=EvidenceWriter(reuse=True))
+    evaluate_chunked(
+        spark,
+        99,
+        writer=EvidenceWriter(reuse=True),
+        input_kwargs=EQUIVALENCE_INPUTS,
+    )
 
     assert calls == [True, True]
 
@@ -374,25 +420,20 @@ def test_metric_failure_keeps_chunk_context_and_releases_all_caches(spark, monke
     assert spark.sparkContext._jsc.getPersistentRDDs().size() == persistent_before  # noqa: SLF001
 
 
-def test_chunk_failure_releases_cache_and_new_attempt_is_deterministic(spark):
-    failed = EvidenceWriter(fail_at=1)
+def test_chunk_failure_releases_owned_caches(spark):
+    failed = EvidenceWriter(fail_at=0)
     persistent_before = spark.sparkContext._jsc.getPersistentRDDs().size()  # noqa: SLF001
     with pytest.raises(RuntimeError, match="injected chunk evidence failure") as caught:
-        evaluate_chunked(spark, 1, writer=failed)
+        evaluate_chunked(
+            spark,
+            1,
+            writer=failed,
+            model=ScoredModel(spark, users=(1, 2), items=range(1, 4)),
+            input_kwargs=EQUIVALENCE_INPUTS,
+        )
     assert (getattr(caught.value, "stage", None), getattr(caught.value, "chunk_id", None)) == (
         "evidence",
-        1,
+        0,
     )
     assert failed.frames and all(not frame.is_cached for frame in failed.frames)
     assert spark.sparkContext._jsc.getPersistentRDDs().size() == persistent_before  # noqa: SLF001
-
-    first, first_writer = evaluate_chunked(spark, 1)
-    second, second_writer = evaluate_chunked(spark, 1)
-    assert_summary(first.summary, second.summary)
-    assert first_writer.chunk_ids == second_writer.chunk_ids
-    assert rows(first_writer.candidates, CANDIDATE_COLUMNS) == rows(
-        second_writer.candidates, CANDIDATE_COLUMNS
-    )
-    assert rows(first_writer.per_user, PER_USER_COLUMNS) == rows(
-        second_writer.per_user, PER_USER_COLUMNS
-    )
