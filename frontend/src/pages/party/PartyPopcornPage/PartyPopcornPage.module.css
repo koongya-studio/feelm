@@ -1,0 +1,190 @@
+/*
+ * 5.8 파티원 팝콘 한눈에 보기. 구성은 확정 시안을 따른다
+ * (`docs/screens/design-concept.md`).
+ *
+ * 이 화면이 말하는 한 가지는 **누구 통에 무엇이 담겼고 어디가 겹치는가**다.
+ *
+ * 멤버마다 팝콘 통을 그린다. 이전에는 누적 색 막대와 8종 색 스와치로 분포를 보여줬는데,
+ * 색표를 읽어야 알 수 있는 구조였다. 통에 알이 맛 분포대로 쌓이면 그림이 그대로 답이 된다.
+ *
+ * 그래서 어두운 판이 없다. 색 막대·스와치를 쓸 때는 시안 2.5장에 따라 어두운 블록이
+ * 필수였지만, 3D 렌더는 3.2·5.9와 같이 밝은 벽에서 읽힌다. 밝은 면에 놀 수 없던 것이
+ * 사라지니 판도 사라진다.
+ *
+ * 카드로 감싸지 않는다. 통이 그 자체로 멤버별 묶음을 만든다.
+ */
+.page {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--screen-padding-x) var(--space-8);
+}
+
+.memberCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/*
+ * 통과 이름이 나란히 놀린다. 통이 왼쪽에서 그림을 맡고 이름·대표 맛·알 수가
+ * 오른쪽에서 그것을 읽어 준다.
+ */
+.memberHead {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--space-4);
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.memberInfo {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.memberName {
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+.memberMeta {
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-body);
+}
+
+.memberCount {
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+/* 펼치기 힌트. 통을 눌러도 펼쳐지지만 눌러도 되는 자리임을 글자가 말한다 */
+.expandHint {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-top: var(--space-1);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
+}
+
+.memberChevron {
+  display: flex;
+  flex: none;
+}
+
+/* 8종 맛 개수. 두 칸으로 두면 네 명이 있어도 화면이 지나치게 길어지지 않는다 */
+.flavorList {
+  display: grid;
+  gap: var(--space-2) var(--space-3);
+  grid-template-columns: 1fr 1fr;
+  padding-left: var(--space-1);
+}
+
+/* 점은 첫 줄에 맞춘다. 이름이 두 줄이 되어도 점이 가운데로 내려가지 않게 한다 */
+.flavorItem {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+/*
+ * 맛 색 점. 테두리를 둘러 윤곽을 살린다.
+ *
+ * 팝콘 8색은 밝은 면에서 1.01~2.55:1이라 면만으로는 보이지 않는다. `기본` 1.01:1 ·
+ * `쿠키 앤 크림` 1.01:1이 특히 벽에 묻는다. 3.1 범례가 같은 처리를 한다.
+ */
+.swatch {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border: 0.5px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  /* 캡션 한 줄 높이의 가운데에 맞춘다 */
+  margin-top: 2px;
+}
+
+/*
+ * 맛 이름은 자르지 않는다. `비스코프 에스프레소 크런치`처럼 긴 이름이 잘리면
+ * 무슨 맛인지 알 수 없다. 두 줄이 되게 두고 격자가 행 높이를 맞춘다.
+ */
+.flavorText {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-body);
+}
+
+/* 서로 겹치는 맛. 맛 이름만 쓴다 */
+.sharedCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
+.sharedTitle {
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+.sharedTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* 선택·강조 상태라 빨강을 표식으로 쓴다. 면적을 차지하지 않게 옅은 배경이다(시안 2.3) */
+.sharedTag {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-brand-tint);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-brand-ink);
+}
+
+.sharedNote {
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+/*
+ * 7.2-B 다른 사용자 공개 프로필로 가는 줄 (업무 -305).
+ *
+ * 멤버 카드 안쪽의 보조 동작이라 알약이나 카드로 만들지 않는다. 통을 누르는 것(펼치기)과
+ * 구분되도록 선 하나로 나눈 별도 줄이다.
+ */
+.profileLink {
+  display: flex;
+  min-height: var(--tap-target-min);
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-line-faint);
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+  text-decoration: none;
+}
+
+.profileLink svg {
+  color: var(--color-ink-hint);
+}

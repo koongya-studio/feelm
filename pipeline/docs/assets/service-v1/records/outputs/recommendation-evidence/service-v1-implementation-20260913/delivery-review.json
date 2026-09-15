@@ -1,0 +1,153 @@
+{
+  "status": "PASS",
+  "verifiedAt": "2026-09-13T05:00:57.527581+00:00",
+  "scope": "Local service-v1 specification, independent descriptive analysis, and presentation delivery; implementation/training/deployment not executed",
+  "policy": {
+    "defaultModel": "GBT",
+    "comparison": [
+      "FM",
+      "ALS"
+    ],
+    "personalizedBatchAndRerank": 500,
+    "discovery": "at most 10 supplying groups x at most 10 candidates",
+    "output": "2 personalized + 1 discovery"
+  },
+  "documents": [
+    {
+      "path": "docs/recommendation/service-v1-20260913/ACCEPTANCE.md",
+      "bytes": 8737,
+      "sha256": "18e9cbeb0cc60be38934e5e4c9e930418f970eb04ead27deda743155f3102362"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/config.v1.json",
+      "bytes": 3153,
+      "sha256": "042fbcff7f54d6342a3bcb89709b209aaab479744e03270fd3f368cf1e5f9916"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/CONTRACTS.md",
+      "bytes": 34201,
+      "sha256": "e67f937668ceaed3ae8308fde772d62df2c4288bb91b2c8cea30ddd989b26cf4"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/EVALUATION.md",
+      "bytes": 10743,
+      "sha256": "5502936732e2580852cc58a8da27695a99b4eaacae39b7c9f4c3bdd7a10641d7"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/feature-schema.v1.json",
+      "bytes": 40752,
+      "sha256": "1c4c8aef5cce42c0c4bc74d2d9f3e113a972d4b2ea521592760bde042d7f56ec"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/group-recipe.v1.json",
+      "bytes": 14871,
+      "sha256": "3fd587b1b74fdf9803dd5e93328081ea196848583e0b5ef3d015cf60e16df483"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/GROUPS.md",
+      "bytes": 10638,
+      "sha256": "ee210dea5bf6804d9940a8526b7273730fa96eae57b2986864c9695291c734c7"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/MODELS.md",
+      "bytes": 23137,
+      "sha256": "ffd9f00873bc4db09ef96a2038e90b642d2fae788d0208ef57a13f130f0ab5ce"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/OPERATIONS.md",
+      "bytes": 22509,
+      "sha256": "3e2e2031daa57ccfbc3291e2da84a1be9ed5823f41530e0364932c0d1bf0a0df"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/POLICY.md",
+      "bytes": 15690,
+      "sha256": "7c40466e59d46e8eddf353170e8a13b07ac90fb6bbda1b35615bfd96529c57e3"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/README.md",
+      "bytes": 8273,
+      "sha256": "96680b354dcaae01fafc12d1ce259e382a7e119ca4f6a1f5c563aa78741568fd"
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/training-recipe.v1.json",
+      "bytes": 16847,
+      "sha256": "66a3cebafc5344f981431f4bd5ce2601cd26e1cc06a065f905b4cb84dd0f8c2a"
+    }
+  ],
+  "presentation": {
+    "path": "docs/recommendation/service-v1-20260913/presentation/feelm-recommendation-v1.pptx",
+    "bytes": 37771,
+    "sha256": "2727a5f061ad67d6453194715d9e3845018b50f6a8273abd1a8e41af3cca4970"
+  },
+  "dataReport": {
+    "path": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+    "bytes": 10287,
+    "sha256": "f1db74b79aa5e657d267fcc97da6d79ded33459ee523a77b881ff5004787426c"
+  },
+  "dataPublicationManifest": {
+    "path": "outputs/recommendation-evidence/tmdb-kobis-v1-20260913/publication-manifest.json",
+    "bytes": 4115,
+    "sha256": "85022ac049ff0dcd63b0ac81a9a64002762cc9300183f9f166b75e64d4c649a6"
+  },
+  "independentReviews": [
+    {
+      "path": "outputs/recommendation-evidence/service-v1-implementation-20260913/model-policy-review-r2.json",
+      "bytes": 7539,
+      "sha256": "ea09803722b7029ed25d748532f4f1c564a18ca3dd039353d97365d2cde1e24c"
+    },
+    {
+      "path": "outputs/recommendation-evidence/service-v1-implementation-20260913/evaluation-design-review-r2.json",
+      "bytes": 9619,
+      "sha256": "512cc53eec3b85cd2bbbf646d7c26aa5e46a958732e89cdd9f55d4e59c8ed268"
+    },
+    {
+      "path": "outputs/recommendation-evidence/service-v1-implementation-20260913/group-contract-review.json",
+      "bytes": 3516,
+      "sha256": "9bbdb730c0ce95316c47d7cc8c095cf3b0d767e14f69ae62901afd9deb04b09f"
+    },
+    {
+      "path": "outputs/recommendation-evidence/tmdb-kobis-v1-20260913/result-review.json",
+      "bytes": 14764,
+      "sha256": "b8dd92655be7dcf25ba1c41af9305fa4abf08ca53a784b7ddcae31467fd5791a"
+    },
+    {
+      "path": "outputs/recommendation-evidence/tmdb-kobis-v1-20260913/final-document-review.json",
+      "bytes": 3519,
+      "sha256": "73f1c2016617b2ddd44a9207a4620fbb68d93adc77d543172d7cd18fa28567ba"
+    },
+    {
+      "path": "outputs/recommendation-evidence/service-v1-presentation-20260913/presentation-qa.json",
+      "bytes": 8880,
+      "sha256": "43dca3fa05f9c87fa55e527edee19f1745937dcabe1a82758196d678ddff242e"
+    }
+  ],
+  "checks": {
+    "markdownLocalLinks": 46,
+    "jsonFiles": 4,
+    "jsonExamples": "PASS",
+    "modelStaticChecks": "37/37",
+    "postReviewCoreHashes": "12/12",
+    "groupSourceHashes": "9/9",
+    "originalFourServiceDocs": "UNCHANGED",
+    "sourceStatistics": "PASS - independently rescanned ML sufficient statistics",
+    "slideRendering": "PASS - all six, native editable charts/tables"
+  },
+  "repositoryStatus": {
+    "standalone": {
+      "path": "outputs/recommendation-evidence/service-v1-implementation-20260913/git-status-standalone.txt",
+      "bytes": 6569,
+      "sha256": "bf034abc9ea4667e01e541de8a57b88efe7982890c44dbdddccb2925eefacde1"
+    },
+    "team": {
+      "path": "outputs/recommendation-evidence/service-v1-implementation-20260913/git-status-team.txt",
+      "bytes": 103,
+      "sha256": "8e85a1341a9e0ddad7821f8df6cad37406fe7e36b1202f0d3704a6d0547da322"
+    }
+  },
+  "limits": [
+    "KOBIS245 model not trained",
+    "v1 group export and serving parity not executed",
+    "API/DB/Consumer/batch implementation and EC2 tests not executed",
+    "No GitLab/Notion/Jira changes, commits, pushes, or deployment"
+  ]
+}

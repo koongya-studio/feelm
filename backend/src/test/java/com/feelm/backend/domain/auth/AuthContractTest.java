@@ -14,6 +14,9 @@ import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.security.JjwtTokenProvider;
 import com.feelm.backend.global.security.JwtProperties;
 import com.feelm.backend.global.security.TokenProvider;
+import com.feelm.backend.support.SharedRedisContainer;
+import com.feelm.backend.support.SharedRedisState;
+import com.feelm.backend.support.SharedTestRuntime;
 import com.redis.testcontainers.RedisContainer;
 import jakarta.servlet.http.Cookie;
 import java.time.Duration;
@@ -25,16 +28,17 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -44,18 +48,19 @@ import tools.jackson.databind.ObjectMapper;
  * Redis를 띄워 검증한다.
  */
 @SpringBootTest
+@SharedTestRuntime
 @AutoConfigureMockMvc
-@Testcontainers
 @DisplayName("인증 골격 — API-000 인증 규약과 API-006 재발급")
 class AuthContractTest {
 
     private static final String MEMBER_PATH = "/api/v1/test/security/me";
     private static final String PRIVATE_AUTH_PATH = "/api/v1/auth/private-test";
     private static final String REFRESH_PATH = "/api/v1/auth/token/refresh";
+    private static final String RESET_REQUEST_PATH = "/api/v1/auth/password/reset-request";
+    private static final String RESET_PATH = "/api/v1/auth/password/reset";
     private static final String COOKIE_NAME = "refresh_token";
 
-    @Container @ServiceConnection
-    static RedisContainer redis = new RedisContainer("redis:8-alpine");
+    @ServiceConnection static RedisContainer redis = SharedRedisContainer.instance();
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
@@ -63,6 +68,12 @@ class AuthContractTest {
     @Autowired private TokenProvider tokenProvider;
     @Autowired private RefreshTokenService refreshTokenService;
     @Autowired private RefreshTokenRepository refreshTokenRepository;
+    @Autowired private StringRedisTemplate redisTemplate;
+
+    @BeforeEach
+    void clearRedis() {
+        SharedRedisState.clear(redisTemplate);
+    }
 
     @Test
     @DisplayName("토큰 없이 회원 API를 호출하면 401 UNAUTHORIZED로 응답한다")
@@ -125,6 +136,28 @@ class AuthContractTest {
         mockMvc.perform(get(PRIVATE_AUTH_PATH))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    /**
+     * 재설정 요청은 IP 단위 발송 제한을 받는다(S15P21E106-281). 이 클래스는 요청마다 IP를 바꾸지 않아 모두 {@code 127.0.0.1}에서 나가므로,
+     * 이 경로 요청을 IP 한도({@code feelm.mail.rate-limit.ip}, 테스트 설정 기준 3건)보다 많이 보내면 429로 깨진다. 늘려야 하면
+     * {@link EmailAuthApiTestSupport}처럼 요청마다 remote addr을 바꾼다.
+     */
+    @Test
+    @DisplayName("비밀번호 재설정 경로는 공개 경로로 등록되어 인증 없이 호출된다")
+    void passwordResetPathsArePublic() throws Exception {
+        mockMvc.perform(
+                        post(RESET_REQUEST_PATH)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"email\":\"nobody@example.com\"}"))
+                .andExpect(status().isAccepted());
+
+        mockMvc.perform(
+                        post(RESET_PATH)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"token\":\"none\",\"newPassword\":\"N3wP@ssw0rd\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("RESET_TOKEN_INVALID"));
     }
 
     @Test
@@ -221,6 +254,7 @@ class AuthContractTest {
                                 jwtProperties.secret(),
                                 Duration.ofSeconds(-1),
                                 jwtProperties.refreshTokenTtl(),
+                                jwtProperties.signupTokenTtl(),
                                 jwtProperties.refreshCookie()));
         return expiring.createAccessToken(9L);
     }
@@ -233,6 +267,7 @@ class AuthContractTest {
                                 jwtProperties.secret(),
                                 jwtProperties.accessTokenTtl(),
                                 Duration.ofSeconds(-1),
+                                jwtProperties.signupTokenTtl(),
                                 jwtProperties.refreshCookie()));
         return expiring.createRefreshToken(15L, UUID.randomUUID().toString());
     }

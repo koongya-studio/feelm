@@ -1,0 +1,87 @@
+/*
+ * 1.1 배치 카드.
+ *
+ * 크기 58x82와 `⊖`의 22/44px은 부모의 상수와 짝이 맞아야 하는 기하값이라 그대로 둔다.
+ * 색은 전부 토큰을 쓴다.
+ */
+.card {
+  position: absolute;
+  top: var(--card-y);
+  left: var(--card-x);
+  width: 58px;
+  height: 82px;
+  touch-action: none;
+}
+
+.card[data-dragging='true'] {
+  z-index: 2;
+}
+
+.surface {
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  cursor: grab;
+}
+
+.card[data-dragging='true'] .surface {
+  cursor: grabbing;
+}
+
+/*
+ * 가까이 = 좋아요.
+ *
+ * 선택 상태는 빨강이다(`docs/screens/design-concept.md` 2.2). 1px 테두리는 면이 아니라
+ * 표식이므로 2.3장의 "빨강은 표식이지 면이 아니다"에도 맞다. 검정은 이 화면에서 주 동작
+ * 알약 하나에만 쓴다(2.4장).
+ */
+.card[data-value='LIKE'] .surface {
+  box-shadow: 0 0 0 1.5px var(--color-brand);
+}
+
+.card[data-value='LIKE'] .surface > * {
+  border-color: var(--color-brand);
+}
+
+/* 멀리 = 싫어요 */
+.card[data-value='DISLIKE'] .surface {
+  opacity: 0.55;
+  filter: grayscale(60%);
+}
+
+/* 보이는 크기는 22px, 터치 영역은 44px */
+.remove {
+  position: absolute;
+  top: -19px;
+  right: -19px;
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.remove::before {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--color-ink);
+  border-radius: 50%;
+  background: var(--color-bg);
+  content: '';
+}
+
+.removeBar {
+  position: relative;
+  width: 10px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-ink);
+}

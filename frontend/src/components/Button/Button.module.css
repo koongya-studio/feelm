@@ -1,0 +1,59 @@
+.button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+/*
+ * primary는 예외다. 면에 opacity를 걸면 배경과 섞여 다른 색처럼 보인다.
+ * 비활성은 색을 빼고 무채색 면으로 둔다.
+ */
+.button[data-variant='primary']:disabled {
+  opacity: 1;
+  background: var(--color-surface);
+  color: var(--color-ink-hint);
+}
+
+/*
+ * 화면의 주 동작. 검정 알약이며 배경 대비 13.1:1로 화면에서 가장 강하다.
+ * **한 화면에 하나만 둔다** (`docs/screens/design-concept.md` 2.4).
+ */
+.button[data-variant='primary'] {
+  height: var(--control-height);
+  border-radius: var(--radius-pill);
+  background: var(--color-action);
+  color: var(--color-on-action);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  transition: opacity var(--motion-press) var(--ease-standard);
+}
+
+/* 눌렀는지 알 수 있을 만큼만 */
+.button[data-variant='primary']:active:not(:disabled) {
+  opacity: 0.82;
+}
+
+.button[data-variant='secondary'] {
+  height: var(--control-height);
+  box-sizing: border-box;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  color: var(--color-ink);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+
+.button[data-variant='text'] {
+  padding: var(--space-2) 0;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+}

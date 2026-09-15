@@ -1,0 +1,120 @@
+/*
+ * 전역 기본 스타일.
+ * 서체 로드는 src/styles/fonts.css, 디자인 토큰은 src/styles/tokens.css에 둔다.
+ */
+
+@import './fonts.css';
+@import './tokens.css';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+/*
+ * 배경은 화면 전체에 한 벌만 깔린다. 화면마다 바꾸지 않는다
+ * (`docs/screens/design-concept.md` 2.1).
+ */
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  letter-spacing: var(--letter-spacing-body);
+  background: var(--color-bg);
+  background-image: var(--gradient-page);
+  background-attachment: fixed;
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * 벽에 지는 사선 그림자. 평평한 회색이 종이처럼 보이지 않게 하는 최소한의
+ * 깊이다. 흐리게 깔고 화면 아래쪽에만 두어 콘텐츠를 방해하지 않는다.
+ *
+ * body 배경에 함께 넣지 않고 별도 레이어로 두는 이유는 blur를 걸어야 하기
+ * 때문이다. background-image에는 filter를 적용할 수 없다.
+ */
+body::before {
+  position: fixed;
+  z-index: 0;
+  top: 40%;
+  right: -20%;
+  bottom: -10%;
+  left: -20%;
+  background: var(--gradient-wall-shadow);
+  content: '';
+  filter: blur(18px);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* 그림자는 배경이므로 앱 콘텐츠가 그 위에 온다 */
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+figure {
+  margin: 0;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-heading);
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+/* 기본 초점 표시를 제거하지 않는다. */
+:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+.preview-badge {
+  position: fixed;
+  top: max(0.75rem, env(safe-area-inset-top));
+  right: 0.75rem;
+  z-index: 1000;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid rgb(229 228 226 / 35%);
+  border-radius: 999px;
+  background: rgb(10 10 10 / 82%);
+  color: #e5e4e2;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+}

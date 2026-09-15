@@ -1,0 +1,51 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.label {
+  min-width: 44px;
+  flex: none;
+  color: var(--color-ink-body);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.track {
+  display: block;
+  overflow: hidden;
+  height: 6px;
+  flex: 1;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
+}
+
+/*
+ * 0에서 결과값까지 차오른다. `width` 전환이라 레이아웃을 다시 계산하지만, 바가
+ * 한 화면에 4개뿐이고 한 번만 일어나므로 `transform`으로 바꿀 이유가 없다.
+ * `transform: scaleX`로 하면 둥근 끝이 함께 늘어나 뭉개진다.
+ */
+.fill {
+  display: block;
+  width: var(--meter-rate);
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-action);
+  animation: fill var(--motion-emphasized) var(--ease-out) var(--meter-delay) backwards;
+}
+
+.value {
+  min-width: 34px;
+  flex: none;
+  color: var(--color-ink);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  text-align: right;
+}
+
+@keyframes fill {
+  from {
+    width: 0;
+  }
+}

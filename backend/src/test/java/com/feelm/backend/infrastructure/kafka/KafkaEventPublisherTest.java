@@ -1,0 +1,55 @@
+package com.feelm.backend.infrastructure.kafka;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.UUID;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
+
+@DisplayName("Kafka 공통 이벤트 기록")
+class KafkaEventPublisherTest {
+
+    @Test
+    @DisplayName("고정된 식별자와 시각으로 완성한 이벤트 JSON을 아웃박스에 저장한다")
+    void storesCompletedEventJson() throws Exception {
+        OutboxEventStore store = mock(OutboxEventStore.class);
+        UUID eventId = UUID.fromString("0f3c9a1e-6b2d-4f77-9a10-5c2b8e41d0aa");
+        Instant occurredAt = Instant.parse("2026-09-07T00:00:00Z");
+        ObjectMapper objectMapper = JsonMapper.builder().findAndAddModules().build();
+        KafkaEventPublisher publisher =
+                new KafkaEventPublisher(
+                        store,
+                        objectMapper,
+                        Clock.fixed(occurredAt, ZoneOffset.UTC),
+                        () -> eventId);
+
+        UUID publishedEventId =
+                publisher.publish(
+                        KafkaEventType.RATING,
+                        1024L,
+                        new RatingEventPayload(RatingAction.CREATE, 550L, 5));
+
+        ArgumentCaptor<KafkaEventEnvelope<?>> eventCaptor =
+                ArgumentCaptor.forClass(KafkaEventEnvelope.class);
+        ArgumentCaptor<String> messageCaptor = ArgumentCaptor.forClass(String.class);
+        verify(store).save(eventCaptor.capture(), messageCaptor.capture());
+        KafkaEventEnvelope<?> stored = eventCaptor.getValue();
+        JsonNode message = objectMapper.readTree(messageCaptor.getValue());
+        assertThat(publishedEventId).isEqualTo(eventId);
+        assertThat(stored.eventId()).isEqualTo(eventId);
+        assertThat(stored.occurredAt()).isEqualTo(occurredAt);
+        assertThat(stored.userId()).isEqualTo(1024L);
+        assertThat(stored.eventType()).isEqualTo(KafkaEventType.RATING);
+        assertThat(message.get("eventId").asText()).isEqualTo(eventId.toString());
+        assertThat(message.get("payload").get("movieId").asLong()).isEqualTo(550L);
+    }
+}

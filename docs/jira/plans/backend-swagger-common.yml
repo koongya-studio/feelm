@@ -1,0 +1,24 @@
+tasks:
+- id: backend-swagger-common
+  issue_type: Task
+  summary: '[개발] 백엔드 Swagger 공통 설정 및 팀 전용 접근 구성'
+  description: 조은채가 초기 Swagger UI·OpenAPI·JWT 공통 기반을 담당한다. 공개 서비스는 유지하고 공유 서버 문서 경로를
+    HTTPS Nginx 팀 공통 Basic Auth로 보호한다. 인증 파일 관리·마운트·직접 포트 우회 방지·서버 적용 및 복구 검증을 포함한다.
+    개별 Controller/DTO 설명은 제외한다. 열린 인증 MR 및 진행 중인 인프라 변경과 충돌을 최소화하며 별도 worktree에서 진행한다.
+    Jira 담당자는 인증 계정 E106조은채로 지정했고 기존 공통 기반 Epic에 연결했다.
+  area: 개발
+  story_points: 5
+  sprint: backlog
+  done_when:
+  - 합의된 환경에서 Swagger UI와 OpenAPI JSON으로 구현 API를 확인할 수 있다.
+  - JWT Bearer 입력으로 회원 API를 호출할 수 있고 기존 인증 보호가 유지된다.
+  - mock=false 및 문서 비활성 환경에 대한 접근 정책 회귀 검증이 통과한다.
+  - Controller와 DTO 및 기존 인증 공개 경로를 변경하지 않는다.
+  - 백엔드 빌드와 최신 develop 및 열린 인증 MR에 대한 충돌 검사를 수행하고 미검증 사항을 기록한다.
+  - 접속과 활성화 및 JWT 사용 방법을 문서화한다.
+  - 문서 경로는 팀 계정만 접근하고 일반 API는 기존 JWT 인증을 유지한다.
+  - 인증 파일의 안전한 관리와 팀 공통 계정 생성·비밀번호 변경 절차가 문서화된다.
+  - 직접 포트 및 대체 경로 우회 차단과 공개 서비스·헬스체크 회귀 검증이 통과한다.
+  - Nginx 설정 검사, 서버 적용 및 복구 검증 결과를 남긴다.
+  jira_key: S15P21E106-223
+  epic: S15P21E106-141

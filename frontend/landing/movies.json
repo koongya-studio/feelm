@@ -1,0 +1,417 @@
+[
+ {
+  "id": 846422,
+  "title": "올드 가드 2",
+  "titleEn": "The Old Guard 2",
+  "genre": [
+   "액션",
+   "판타지"
+  ],
+  "year": "2025",
+  "vote": 6.2,
+  "votes": 371,
+  "popularity": 617.5863
+ },
+ {
+  "id": 541671,
+  "title": "발레리나",
+  "titleEn": "Ballerina",
+  "genre": [
+   "액션",
+   "스릴러",
+   "범죄"
+  ],
+  "year": "2025",
+  "vote": 7.4,
+  "votes": 841,
+  "popularity": 594.0901
+ },
+ {
+  "id": 1011477,
+  "title": "가라데 키드: 레전드",
+  "titleEn": "Karate Kid: Legends",
+  "genre": [
+   "액션",
+   "모험",
+   "드라마"
+  ],
+  "year": "2025",
+  "vote": 7.2,
+  "votes": 271,
+  "popularity": 532.1165
+ },
+ {
+  "id": 1119878,
+  "title": "아이스 로드: 벤전스",
+  "titleEn": "Ice Road: Vengeance",
+  "genre": [
+   "액션",
+   "스릴러",
+   "드라마"
+  ],
+  "year": "2025",
+  "vote": 7,
+  "votes": 88,
+  "popularity": 521.0194
+ },
+ {
+  "id": 749170,
+  "title": "국가 원수",
+  "titleEn": "Heads of State",
+  "genre": [
+   "액션",
+   "스릴러",
+   "코미디"
+  ],
+  "year": "2025",
+  "vote": 7,
+  "votes": 326,
+  "popularity": 514.58
+ },
+ {
+  "id": 986056,
+  "title": "썬더볼츠*",
+  "titleEn": "Thunderbolts*",
+  "genre": [
+   "액션",
+   "SF",
+   "모험"
+  ],
+  "year": "2025",
+  "vote": 7.4,
+  "votes": 1683,
+  "popularity": 427.1211
+ },
+ {
+  "id": 1234821,
+  "title": "쥬라기 월드: 새로운 시작",
+  "titleEn": "Jurassic World Rebirth",
+  "genre": [
+   "SF",
+   "모험",
+   "액션"
+  ],
+  "year": "2025",
+  "vote": 6.5,
+  "votes": 466,
+  "popularity": 387.6663
+ },
+ {
+  "id": 574475,
+  "title": "파이널 데스티네이션: 블러드라인",
+  "titleEn": "Final Destination Bloodlines",
+  "genre": [
+   "공포",
+   "미스터리"
+  ],
+  "year": "2025",
+  "vote": 7.2,
+  "votes": 1552,
+  "popularity": 256.4563
+ },
+ {
+  "id": 1287536,
+  "title": "Dora and the Search for Sol Dorado",
+  "titleEn": "Dora and the Search for Sol Dorado",
+  "genre": [
+   "모험",
+   "코미디",
+   "가족"
+  ],
+  "year": "2025",
+  "vote": 7.2,
+  "votes": 34,
+  "popularity": 239.0733
+ },
+ {
+  "id": 1061474,
+  "title": "슈퍼맨",
+  "titleEn": "Superman",
+  "genre": [
+   "SF",
+   "모험",
+   "액션"
+  ],
+  "year": "2025",
+  "vote": 7.2,
+  "votes": 185,
+  "popularity": 226.9138
+ },
+ {
+  "id": 552524,
+  "title": "릴로 & 스티치",
+  "titleEn": "Lilo & Stitch",
+  "genre": [
+   "가족",
+   "SF",
+   "코미디",
+   "모험"
+  ],
+  "year": "2025",
+  "vote": 7.1,
+  "votes": 815,
+  "popularity": 224.4734
+ },
+ {
+  "id": 1151031,
+  "title": "브링 허 백",
+  "titleEn": "Bring Her Back",
+  "genre": [
+   "공포"
+  ],
+  "year": "2025",
+  "vote": 7.3,
+  "votes": 214,
+  "popularity": 223.8848
+ },
+ {
+  "id": 803796,
+  "title": "케이팝 데몬 헌터스",
+  "titleEn": "KPop Demon Hunters",
+  "genre": [
+   "애니메이션",
+   "판타지",
+   "액션",
+   "코미디",
+   "음악"
+  ],
+  "year": "2025",
+  "vote": 8.6,
+  "votes": 511,
+  "popularity": 214.7625
+ },
+ {
+  "id": 1246369,
+  "title": "반란: 무로마치 부라이",
+  "titleEn": "Muromachi Burai",
+  "genre": [
+   "액션",
+   "드라마"
+  ],
+  "year": "2025",
+  "vote": 9.1,
+  "votes": 8,
+  "popularity": 192.1538
+ },
+ {
+  "id": 1087192,
+  "title": "드래곤 길들이기",
+  "titleEn": "How to Train Your Dragon",
+  "genre": [
+   "판타지",
+   "가족",
+   "액션"
+  ],
+  "year": "2025",
+  "vote": 7.9,
+  "votes": 606,
+  "popularity": 181.5258
+ },
+ {
+  "id": 911430,
+  "title": "F1 더 무비",
+  "titleEn": "F1",
+  "genre": [
+   "액션",
+   "드라마"
+  ],
+  "year": "2025",
+  "vote": 7.7,
+  "votes": 651,
+  "popularity": 179.2995
+ },
+ {
+  "id": 1278950,
+  "title": "리추얼",
+  "titleEn": "The Ritual",
+  "genre": [
+   "공포"
+  ],
+  "year": "2025",
+  "vote": 6,
+  "votes": 87,
+  "popularity": 170.0829
+ },
+ {
+  "id": 1233413,
+  "title": "씨너스: 죄인들",
+  "titleEn": "Sinners",
+  "genre": [
+   "공포",
+   "액션",
+   "스릴러"
+  ],
+  "year": "2025",
+  "vote": 7.6,
+  "votes": 1926,
+  "popularity": 132.8717
+ },
+ {
+  "id": 7451,
+  "title": "트리플 엑스",
+  "titleEn": "xXx",
+  "genre": [
+   "액션",
+   "모험",
+   "스릴러",
+   "범죄"
+  ],
+  "year": "2002",
+  "vote": 5.9,
+  "votes": 4457,
+  "popularity": 123.3259
+ },
+ {
+  "id": 605722,
+  "title": "디스턴트",
+  "titleEn": "Long Distance",
+  "genre": [
+   "SF",
+   "코미디",
+   "액션"
+  ],
+  "year": "2024",
+  "vote": 6.3,
+  "votes": 155,
+  "popularity": 111.9343
+ },
+ {
+  "id": 950387,
+  "title": "A MINECRAFT MOVIE 마인크래프트 무비",
+  "titleEn": "A Minecraft Movie",
+  "genre": [
+   "가족",
+   "코미디",
+   "모험",
+   "판타지"
+  ],
+  "year": "2025",
+  "vote": 6.5,
+  "votes": 2024,
+  "popularity": 109.5701
+ },
+ {
+  "id": 575265,
+  "title": "미션 임파서블: 파이널 레코닝",
+  "titleEn": "Mission: Impossible - The Final Reckoning",
+  "genre": [
+   "액션",
+   "모험",
+   "스릴러"
+  ],
+  "year": "2025",
+  "vote": 7.2,
+  "votes": 913,
+  "popularity": 102.8022
+ },
+ {
+  "id": 1100988,
+  "title": "28년 후",
+  "titleEn": "28 Years Later",
+  "genre": [
+   "공포",
+   "스릴러",
+   "SF"
+  ],
+  "year": "2025",
+  "vote": 7.2,
+  "votes": 549,
+  "popularity": 102.5134
+ },
+ {
+  "id": 1429744,
+  "title": "지암",
+  "titleEn": "Ziam",
+  "genre": [
+   "공포",
+   "스릴러",
+   "액션"
+  ],
+  "year": "2025",
+  "vote": 7.2,
+  "votes": 14,
+  "popularity": 100.7696
+ },
+ {
+  "id": 1311844,
+  "title": "메가 트위스터스",
+  "titleEn": "The Twisters",
+  "genre": [
+   "액션",
+   "모험",
+   "드라마"
+  ],
+  "year": "2024",
+  "vote": 5.9,
+  "votes": 54,
+  "popularity": 99.8635
+ },
+ {
+  "id": 1442776,
+  "title": "Kuang Bao Ju Xi",
+  "titleEn": "Crazy Lizard",
+  "genre": [
+   "액션",
+   "스릴러",
+   "공포"
+  ],
+  "year": "2024",
+  "vote": 6,
+  "votes": 24,
+  "popularity": 98.4106
+ },
+ {
+  "id": 1127110,
+  "title": "디아블로",
+  "titleEn": "Diablo",
+  "genre": [
+   "액션",
+   "스릴러"
+  ],
+  "year": "2025",
+  "vote": 7.3,
+  "votes": 81,
+  "popularity": 94.4175
+ },
+ {
+  "id": 1090007,
+  "title": "First Shift",
+  "titleEn": "First Shift",
+  "genre": [
+   "범죄",
+   "스릴러",
+   "액션"
+  ],
+  "year": "2024",
+  "vote": 5.7,
+  "votes": 28,
+  "popularity": 91.326
+ },
+ {
+  "id": 1087891,
+  "title": "아마추어",
+  "titleEn": "The Amateur",
+  "genre": [
+   "스릴러",
+   "액션"
+  ],
+  "year": "2025",
+  "vote": 7,
+  "votes": 744,
+  "popularity": 91.2315
+ },
+ {
+  "id": 1005860,
+  "title": "Seeds",
+  "titleEn": "Seeds",
+  "genre": [
+   "공포",
+   "스릴러",
+   "미스터리"
+  ],
+  "year": "2024",
+  "vote": 5.6,
+  "votes": 9,
+  "popularity": 86.9053
+ }
+]

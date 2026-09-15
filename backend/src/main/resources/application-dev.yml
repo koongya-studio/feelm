@@ -8,12 +8,27 @@ spring:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD}
+  mail:
+    # dev는 실제로 메일을 보내므로 계정 정보에 기본값을 두지 않는다. 값이 없으면 기동에 실패한다.
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
 
 feelm:
+  kafka:
+    outbox:
+      bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
   auth:
     allowed-origins: ${CORS_ALLOWED_ORIGINS}
     mock:
-      # 로그인(API-004)이 구현되기 전까지 회원 API를 시험하기 위한 임시 설정이다.
-      # 인증을 무력화하므로 로그인이 병합되면 AUTH_MOCK_ENABLED=false로 끄고 이 블록을 제거한다.
-      enabled: ${AUTH_MOCK_ENABLED:true}
+      # 인증 없는 요청에 고정 사용자를 주입하는 개발 편의 기능이다. 인증을 무력화하므로 기본은 끔이다.
+      enabled: ${AUTH_MOCK_ENABLED:false}
       user-id: ${AUTH_MOCK_USER_ID:1}
+  mail:
+    # dev·운영은 실제 발송이 기본이다. MAIL_MODE=log로 내리면 기동에 실패한다(플랜 결정 13).
+    mode: ${MAIL_MODE:smtp}
+    # Gmail SMTP는 From을 인증 계정으로 강제하므로 별도 값이 없으면 계정 주소를 그대로 쓴다.
+    from: ${MAIL_FROM:${MAIL_USERNAME}}
+    # 경로에 /app이 붙는 이유는 application.yml 주석을 따른다.
+    verification-url: ${FRONTEND_BASE_URL}/app/verify-email
+    # 재설정 링크도 기본값을 두지 않는다. 값이 없으면 기동에 실패해야 localhost 링크가 나가지 않는다.
+    password-reset-url: ${FRONTEND_BASE_URL}/app/account/reset

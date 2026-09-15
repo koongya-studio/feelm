@@ -1,0 +1,55 @@
+/*
+ * 1.3 첫 취향 필름 생성 완료. 구성은 확정 시안을 따른다
+ * (`docs/screens/design-concept.md`).
+ *
+ * 이 화면이 말하는 한 가지는 **첫 필름이 감겼다**다. 그래서 필름이 화면 가운데를
+ * 차지하고 주 동작만 아래에 붙는다.
+ *
+ * 와이어프레임은 필름 영역 위에 원형 터치 표식과 `터치할 수 있어요` 말풍선을 겹쳐
+ * 두었다. 터치 시 동작이 미확정이라 표식은 넣지 않고 문구만 필름 아래에 두었다.
+ *
+ * 이전 구현은 11.5px · 14px · 92px과 `rgba(0, 0, 0, 0.2)` 직접 값이 하드코딩돼
+ * 있었다. 전부 토큰으로 바꿨다. 하단 여백 92px은 알약이 화면 중앙에서 지나치게
+ * 떨어져 보이게 하던 값이라 줄였다.
+ */
+.page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.stage {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
+  overflow-y: auto;
+}
+
+/* 터치할 수 있다는 힌트. 필름 위가 아니라 아래에 둔다 */
+.hint {
+  flex: none;
+  padding: var(--space-1) var(--space-3);
+  border: 0.5px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink-body);
+  white-space: nowrap;
+}
+
+/*
+ * 주 동작. 검정 알약은 한 화면에 하나이고 그 하나가 `필름 늘리기`다
+ * (`docs/screens/design-concept.md` 2.4).
+ */
+.actions {
+  flex: none;
+  padding: 0 var(--screen-padding-x) var(--space-12);
+}

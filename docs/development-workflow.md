@@ -49,7 +49,8 @@ git switch -c <type>/<JIRA-KEY>-<description>
 2. 영역별 테스트, 정적 검사 또는 수동 검증을 수행한다.
 3. 최신 `origin/develop`을 rebase로 반영하고 충돌 여부를 확인한다.
 4. 불필요한 디버깅 코드와 생성 파일이 포함되지 않았는지 확인한다.
-5. MR이 하나의 목적을 가지며 리뷰 가능한 크기인지 확인한다.
+5. MR이 하나의 목적을 가지며 [Git 컨벤션의 MR 크기 기준](./git-convention.md#mr-크기)을
+   충족하는지 확인한다.
 
 ```bash
 git fetch origin

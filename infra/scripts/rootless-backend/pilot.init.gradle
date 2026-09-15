@@ -1,0 +1,51 @@
+// Applies only to the exported, operator-reviewed backend snapshot.
+def allowedRepositoryUrls = [
+    'https://repo.maven.apache.org/maven2/',
+    'https://plugins.gradle.org/m2/'
+] as Set
+
+apply from: new File(gradle.startParameter.currentDir, 'gradle/test-timing.gradle')
+
+def enforceRepository = { repository ->
+    if (!repository.hasProperty('url')) {
+        throw new GradleException("CI dependency cache rejects non-Maven repository: ${repository.name}")
+    }
+    def normalized = repository.url.toString()
+    if (!normalized.endsWith('/')) normalized += '/'
+    if (!allowedRepositoryUrls.contains(normalized)) {
+        throw new GradleException("CI dependency cache repository is not approved: ${repository.name}")
+    }
+}
+
+gradle.beforeSettings { settings ->
+    settings.pluginManagement.repositories.whenObjectAdded(enforceRepository)
+    settings.dependencyResolutionManagement.repositories.whenObjectAdded(enforceRepository)
+}
+
+gradle.settingsEvaluated { settings ->
+    settings.pluginManagement.repositories.each(enforceRepository)
+    settings.dependencyResolutionManagement.repositories.each(enforceRepository)
+}
+
+gradle.beforeProject { project ->
+    project.repositories.whenObjectAdded(enforceRepository)
+    project.buildscript.repositories.whenObjectAdded(enforceRepository)
+}
+
+gradle.projectsEvaluated {
+    def p = gradle.rootProject
+    def support = new File(System.getenv('CI222_SUPPORT'))
+    def policy = p.tasks.register('compileCi222Policy', JavaCompile) {
+        source = p.files(new File(support, 'LoopbackContainers.java'))
+        classpath = p.configurations.testCompileClasspath
+        destinationDirectory = p.layout.buildDirectory.dir('ci222-policy')
+        javaCompiler = p.javaToolchains.compilerFor { languageVersion = JavaLanguageVersion.of(21) }
+        options.encoding = 'UTF-8'
+    }
+    p.tasks.named('test', Test) {
+        dependsOn policy
+        classpath = p.files(policy.flatMap { it.destinationDirectory }, support) + classpath
+        maxParallelForks = 1
+        maxHeapSize = '768m'
+    }
+}

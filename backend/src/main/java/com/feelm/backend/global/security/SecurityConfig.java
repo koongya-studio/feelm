@@ -11,11 +11,15 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.util.UrlPathHelper;
 
 /**
  * 인증·인가 필터 체인을 구성한다.
@@ -29,9 +33,72 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
+    private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
-    /** 인증 없이 호출할 수 있는 경로. 도메인별 공개 API는 여기에 추가한다. */
-    private static final String[] PUBLIC_PATHS = {"/api/v1/auth/token/refresh"};
+    /**
+     * 인증 없이 호출할 수 있는 경로. 도메인별 공개 API는 여기에 추가한다.
+     *
+     * <p>로그아웃(API-005)은 회원 구분이므로 넣지 않는다. 자기 세션만 끊을 수 있어야 하기 때문이다.
+     */
+    private static final String[] PUBLIC_PATHS = {
+        "/api/v1/auth/signup",
+        "/api/v1/auth/email/verify",
+        "/api/v1/auth/email/resend",
+        "/api/v1/auth/login",
+        "/api/v1/auth/token/refresh",
+        // 소셜 로그인(API-007)과 소셜 회원가입 완료(API-008). 계정 연결(API-009)은 회원 구분이라
+        // /api/v1/users/me/oauth/** 로 따로 두고 여기에 넣지 않는다.
+        "/api/v1/auth/oauth/*",
+        "/api/v1/auth/password/reset-request",
+        "/api/v1/auth/password/reset"
+    };
+
+    /**
+     * GET만 공개인 조회 API. 메서드를 함께 묶어 같은 경로에 쓰기 계열이 생겨도 자동으로 열리지 않게 한다(리뷰 B-3).
+     *
+     * <p>API-044 팝콘 맛 기준정보, API-016 닉네임 사용 가능 확인, API-025 OTT 목록, API-029 검색 필터 옵션이 여기에 속한다. 닉네임
+     * 확인은 회원 구분인 {@code /api/v1/users/me} 계열과 접두사를 공유하므로 와일드카드 없이 정확 경로만 적는다. OTT도 같은 이유로 구독 설정
+     * 경로({@code /api/v1/users/me/otts})와 분리된 정확 경로만 연다.
+     */
+    private static final String[] PUBLIC_GET_PATHS = {
+        "/api/v1/popcorn-flavors",
+        "/api/v1/users/nickname-availability",
+        "/api/v1/otts",
+        "/api/v1/movies/filter-options"
+    };
+
+    /** Nginx가 별도 접근 제어하는 Swagger 문서 경로. 일반 API 공개 목록과 분리한다. */
+    private static final String[] SWAGGER_PATHS = {
+        "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs", "/v3/api-docs.yaml", "/v3/api-docs/**"
+    };
+
+    /** OpenAPI가 런타임과 같은 공개 API 계약을 표시할 때 사용하는 판정이다. */
+    public static boolean isPublicApi(HttpMethod method, String path) {
+        if (isOptionalAuthenticationApi(method, path)) {
+            return true;
+        }
+        if (HttpMethod.GET.equals(method)) {
+            for (String getOnlyPath : PUBLIC_GET_PATHS) {
+                if (getOnlyPath.equals(path)) {
+                    return true;
+                }
+            }
+        }
+        for (String pattern : PUBLIC_PATHS) {
+            if (PATH_MATCHER.match(pattern, path)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** API-030은 선택 인증이다. 정적 검색·필터 경로는 영화 ID 템플릿에 포함하지 않는다. */
+    public static boolean isOptionalAuthenticationApi(HttpMethod method, String path) {
+        return HttpMethod.GET.equals(method)
+                && !path.equals("/api/v1/movies/search")
+                && !path.equals("/api/v1/movies/filter-options")
+                && PATH_MATCHER.match("/api/v1/movies/{movieId}", path);
+    }
 
     private final TokenProvider tokenProvider;
     private final AuthProperties authProperties;
@@ -62,7 +129,22 @@ public class SecurityConfig {
                         auth ->
                                 auth.requestMatchers(HttpMethod.GET, "/actuator/health")
                                         .permitAll()
-                                        .requestMatchers(PUBLIC_PATHS)
+                                        // Prometheus가 JWT 없이 수집한다. 백엔드는 내부 Compose
+                                        // 네트워크에만 있고 Nginx는 이 경로를 프록시하지 않는다.
+                                        .requestMatchers(HttpMethod.GET, "/actuator/prometheus")
+                                        .permitAll()
+                                        .requestMatchers(HttpMethod.GET, SWAGGER_PATHS)
+                                        .permitAll()
+                                        // API-029 등 공개 GET과 API-030 선택 인증을 같은 정책으로 판정한다.
+                                        // context path·URL 인코딩도 정규화한다.
+                                        .requestMatchers(
+                                                request ->
+                                                        isPublicApi(
+                                                                HttpMethod.valueOf(
+                                                                        request.getMethod()),
+                                                                UrlPathHelper.defaultInstance
+                                                                        .getPathWithinApplication(
+                                                                                request)))
                                         .permitAll()
                                         .anyRequest()
                                         .authenticated())
@@ -102,5 +184,16 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", configuration);
         return source;
+    }
+
+    /**
+     * 비밀번호 해시 방식. BCrypt를 쓰고 강도는 기본값(10)을 유지한다.
+     *
+     * <p>{@code PasswordEncoder} 인터페이스로 등록해 두면 나중에 알고리즘을 바꿔도 호출 측이 영향을 받지 않는다. 저장된 해시에 알고리즘 식별자가
+     * 필요해지면 {@code DelegatingPasswordEncoder}로 교체한다.
+     */
+    @Bean
+    PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
 }

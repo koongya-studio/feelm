@@ -55,7 +55,7 @@ erDiagram
         varchar password_hash "소셜 전용 계정은 NULL"
         varchar nickname UK "공백 제거·소문자 정규화 값으로 유일 검사"
         date birth_date "생년월일, 탈퇴 시 NULL (D-8·D-9 결정)"
-        varchar gender "MALE / FEMALE / OTHER, NULL 허용 (D-8 결정)"
+        varchar gender "MALE / FEMALE / OTHER, 탈퇴 시 NULL (D-8·D-9 결정)"
         varchar visibility "PUBLIC / PRIVATE, 기본 PRIVATE"
         varchar status "PENDING_VERIFICATION / ACTIVE / WITHDRAWN"
         boolean onboarding_completed
@@ -106,7 +106,7 @@ erDiagram
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `users` | 서비스 계정 | `nickname`은 정규화 값(공백 제거·소문자)으로 유일. 탈퇴 시 `status=WITHDRAWN`으로 전환하고 이메일·닉네임을 치환해 즉시 재사용을 허용하며 생년월일·성별은 삭제합니다(D-9) | FR-01, FR-37, FR-38 · API-001~016 |
+| `users` | 서비스 계정 | `nickname`은 정규화 값(공백 제거·소문자)으로 유일. 같은 정규화식에 `text_pattern_ops`를 적용한 일반 인덱스를 따로 두어 사용자 검색(API-019)의 접두 조건이 인덱스를 타게 합니다. 탈퇴 시 `status=WITHDRAWN`으로 전환하고 이메일·닉네임을 치환해 즉시 재사용을 허용하며 생년월일·성별은 삭제합니다(D-9) | FR-01, FR-37, FR-38 · API-001~016, API-019 |
 | `user_auth_providers` | 소셜 로그인 수단 | UK(`provider`, `provider_user_id`). 같은 이메일이어도 기존 계정에 자동 통합하지 않음 | FR-35 · API-007~009 |
 | `email_verification_tokens` | 가입 이메일 인증 | 1회용, 만료 24시간(가정). 해시만 저장 | FR-01 · API-002, API-003 |
 | `password_reset_tokens` | 비밀번호 재설정 | 1회용, 만료 30분(가정). 성공 시 해당 사용자 Refresh Token 전부 폐기 | FR-37 · API-010, API-011 |
@@ -201,7 +201,7 @@ erDiagram
 | `genres` | 장르 기준정보 | TMDb 장르 ID 매핑 | FR-15 · API-029 |
 | `movie_genres`, `movie_countries`, `movie_people` | 영화 속성 매핑 | `movie_people.role`로 감독·배우 구분 | FR-14, FR-15, FR-34 |
 | `people` | 인물(감독·배우) | 검색 대상(FR-14) | API-028, API-030 |
-| `otts` | OTT 기준정보 | 지원 목록은 미정(API-025) | FR-03, FR-16 · API-025 |
+| `otts` | OTT 기준정보 | 지원 목록 5종(API-025)을 새 Flyway seed로 초기화한다. 기존 식별쌍·ID·참조는 보존하고 이후 콘텐츠 적재는 같은 쌍의 표시 정보를 갱신한다 | FR-03, FR-16 · API-025 |
 | `movie_ott_providers` | 영화별 시청 가능 OTT | TMDb watch provider 동기화 | FR-16 · API-030 |
 | `popcorn_flavors` | 팝콘 맛 8종 기준정보와 군집 매핑 | `cluster_id`와 `code`는 각각 유일하며 고정된 8개 Centroid와 1:1로 대응한다. 표시명·색상은 변경 가능하고 대표 키워드도 함께 보관한다. 원시 `cluster_id`는 공개 API에 노출하지 않는다 | FR-06 · API-044 · ADR-0015 |
 
@@ -238,7 +238,7 @@ erDiagram
         bigint user_id FK
         bigint movie_id FK
         bigint watch_record_id FK "NULL 허용 (D-6 결정: 감상 기록 없는 평가)"
-        smallint score "1~5"
+        numeric score "0.5~5.0, 0.5점 단위 CHECK"
         varchar comment "한줄평 200자 이하, NULL 가능"
         varchar visibility "PUBLIC / PRIVATE, comment 없으면 NULL 가능 (API-036)"
         timestamptz created_at
@@ -276,7 +276,7 @@ erDiagram
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `onboarding_preferences` | 초기 취향(LIKE/DISLIKE) | UK(`user_id`, `movie_id`). 평가(1~5점)와 분리 저장하며 프레임을 생성하지 않음 | FR-02 · API-023, API-024 |
+| `onboarding_preferences` | 초기 취향(LIKE/DISLIKE) | UK(`user_id`, `movie_id`). 평가(0.5~5.0점, 0.5점 단위)와 분리 저장하며 프레임을 생성하지 않음 | FR-02 · API-023, API-024 |
 | `user_otts` | 구독 OTT | 전체 교체(PUT) | FR-03 · API-026, API-027 |
 | `watch_records` | 감상 상태 머신 | 사용자·영화별 **활성 기록**(EXPIRED 아님)은 1개 — 부분 유일 인덱스(D-6 결정). 만료 후 재클릭은 새 행 | FR-17, FR-18 · API-033~035 |
 | `ratings` | 평가 + 한줄평 | UK(`user_id`, `movie_id`). 한줄평은 컬럼(별도 테이블 아님). 삭제 시 프레임도 삭제되고 감상 기록은 `WATCHED_UNRATED`로 복귀 | FR-19, FR-26 · API-036~039 |
@@ -370,8 +370,8 @@ erDiagram
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `parties` | 파티 | 이름 필수, 최대 20자. `ACTIVE`이면 종료 사유·시각이 모두 NULL이고 `CLOSED`이면 모두 NOT NULL이다. 오너가 나간 뒤 2명 이상이면 최초 가입자에게 승계하고, 1명만 남으면 `INSUFFICIENT_MEMBERS`로 종료한다 | FR-20 · API-049, API-050, API-055, API-056 |
-| `party_members` | 파티 구성원 | 별도 `id`를 사용하고 UK(`party_id`, `user_id`)를 둔다. 오너도 `OWNER` 역할로 저장한다. 파티별 OWNER는 부분 유일 인덱스로 최대 1명을 보장하고, OWNER 존재·`parties.owner_id` 일치·최대 4명은 애플리케이션이 보장한다 | FR-20, FR-21 · API-057 |
+| `parties` | 파티 | 이름 필수, 최대 20자. `ACTIVE`이면 종료 사유·시각이 모두 NULL이고 `CLOSED`이면 모두 NOT NULL이다. 오너가 나간 뒤 1명 이상 남으면 최초 가입자에게 승계하고, 마지막 멤버가 나가 0명이 될 때 `INSUFFICIENT_MEMBERS`로 종료한다 | FR-20 · API-049, API-050, API-055, API-056 |
+| `party_members` | 파티 구성원 | 별도 `id`를 사용하고 UK(`party_id`, `user_id`)를 둔다. 활성 파티의 오너도 `OWNER` 역할로 저장한다. 파티별 OWNER는 부분 유일 인덱스로 최대 1명을 보장하고, `ACTIVE` 파티의 OWNER 존재·`parties.owner_id` 일치·최대 4명은 애플리케이션이 보장한다. 멤버가 0명인 `CLOSED` 파티의 `owner_id`는 마지막 오너 이력을 보존한다 | FR-20, FR-21 · API-057 |
 | `party_invitations` | 초대 | 현재 멤버라면 누구나 초대 가능하다. 자기 자신 초대 금지 CHECK와 `PENDING` 중복 부분 유일 인덱스를 두며, 기존 멤버·초대 발신자의 현재 멤버 여부는 애플리케이션에서 검증한다. `PENDING`이면 `responded_at`은 NULL이고 응답 완료 시 NOT NULL이다 | FR-20 · API-051~054 |
 
 ### 2.6 리포트 (2차 MVP)
@@ -428,13 +428,16 @@ flowchart LR
 ### 차단·공개 범위
 
 - 차단은 `user_blocks`에 단방향 행으로 저장하고, 조회 시 `(blocker=A AND blocked=B) OR (blocker=B AND blocked=A)`로 양방향 필터를 적용합니다(FR-39).
-- `users.visibility=PRIVATE`인 사용자의 필름·팝콘·평가는 본인 외 조회 시 404로 처리합니다(NFR-07). 파티원에게 팝콘 집계를 노출하는지는 API-057 미정 사항입니다.
+- `users.visibility=PRIVATE`인 사용자의 필름·팝콘·평가는 본인 외 조회 시 404로 처리합니다(NFR-07). 단, 같은 활성 파티의 현재 멤버에게는 API-057의 팝콘 집계만 공개합니다. 개별 필름·프레임·평가에는 이 예외를 적용하지 않습니다.
+- 차단자는 파티장 여부와 관계없이 상대와 함께 속한 모든 활성 파티에서 탈퇴합니다. 차단 저장과 탈퇴·승계·종료는 하나의 트랜잭션으로 처리합니다(API-020). 초대·수락 시 현재 파티원 전원과의 양방향 차단 관계를 검사합니다.
 
 ### 파티 인원 변경
 
-- 오너 탈퇴 후 남은 멤버가 2명 이상이면 `joined_at ASC, user_id ASC`의 첫 멤버에게 오너를 승계하고 `ACTIVE`를 유지합니다.
-- 멤버 탈퇴 후 1명만 남으면 `INSUFFICIENT_MEMBERS`, 오너가 직접 종료하면 `OWNER_CLOSED`로 닫고 대기 중 초대를 모두 `DECLINED` 처리합니다.
+- 오너 탈퇴 후 남은 멤버가 1명 이상이면 `joined_at ASC, user_id ASC`의 첫 멤버에게 오너를 승계하고 `ACTIVE`를 유지합니다.
+- 1인 파티도 `ACTIVE`이며 새 멤버를 초대할 수 있습니다. 마지막 멤버가 탈퇴해 0명이 될 때만 `INSUFFICIENT_MEMBERS`, 오너가 직접 종료하면 `OWNER_CLOSED`로 닫고 대기 중 초대를 모두 `DECLINED` 처리합니다.
 - 종료된 파티의 `recommendation_sets`는 보존합니다(추천 이력).
+- 파티장만 다른 현재 멤버를 강퇴할 수 있습니다(API-069). 해당 `party_members` 행 제거와 인원 검사를 같은 트랜잭션에서 처리합니다. 자기 강퇴는 허용하지 않으므로 강퇴만으로 파티가 0명이 되거나 종료되지는 않습니다.
+- 강퇴는 차단을 생성하지 않고 재초대를 금지하는 별도 상태를 저장하지 않습니다. 기존 스키마를 사용합니다.
 
 ---
 
@@ -442,7 +445,7 @@ flowchart LR
 
 | API 리소스 | 주 테이블 | 참조 테이블 |
 |---|---|---|
-| `/auth/*`, `/users/me`, `/users/nickname-availability` | `users`, `user_auth_providers`, `email_verification_tokens`, `password_reset_tokens` | — |
+| `/auth/*`, `/users/me`, `/users/nickname-availability` | `users`, `user_auth_providers`, `email_verification_tokens`, `password_reset_tokens` | `frames`, `ratings`(API-014 `stats` 집계), `movies.representative_flavor_id`, `popcorn_flavors`(팝콘 수) |
 | `/users/me/notification-settings` | `notification_settings` | — |
 | `/users/search`, `/users/{userId}/block`, `/users/me/blocks` | `users`, `user_blocks` | — |
 | `/onboarding/cards`, `/onboarding/preferences` | `onboarding_preferences` | `movies`, `popcorn_flavors` |
@@ -472,16 +475,23 @@ flowchart LR
 |---|---|---|---|---|
 | D-1 | 식별자 타입 | `bigint` 시퀀스 / UUID(v7) / 혼합 | **내부 `bigint` + 공개 URL `users.public_id`** (08-30, ADR-0008) | 전 테이블, 전 API 응답 |
 | D-2 | Refresh Token 저장소 | PostgreSQL / Redis(TTL) | **Redis** (08-31, ADR-0009) — `refresh_tokens` 테이블 제거 | 인증 API, 회전·폐기, 탈퇴 처리 |
-| D-3 | 사용자당 활성 파티 수 | 1개 제한 / 복수 허용 | **복수 허용, 상한(기본 5) 설정값** (08-30) | API-049·050·053, ⑧ 화면 |
+| D-3 | 사용자당 활성 파티 수 | 1개 제한 / 복수 허용 | **최대 10개, 파티당 최대 4명 유지** (09-10 변경) | API-049·050·053, ⑧ 화면 |
 | D-4 | 취향 분석·추천 이유 계산 위치 | Spring Boot / FastAPI / Python Consumer / Spark Streaming | **취향 집계와 행동 Feature 경량 재정렬·최종 XAI 조립은 Spring, 개인 Fold-in·Candidate·기본 Top-N/XAI는 Python Consumer, 행동 Feature 집계와 전역 인기는 Spark Streaming** (09-01, ADR-0017) | `taste_analyses` 갱신, Kafka 이벤트·Redis 결과 계약 |
 | D-5 | 영화의 대표 맛 규칙 | 장르 규칙 / K-Means / 큐레이션 | **E5 임베딩 K-Means의 최근접 Centroid 하나에 배정** (08-31, ADR-0015) | `movies.representative_flavor_id`, 팝콘 집계 |
 | D-6 | 감상 기록 없이 평가 허용 | 허용 / 불허 | **허용** (08-30) — `ratings.watch_record_id` NULL 허용 | `watch_records` 유일 제약, ⑩·⑪ 화면 |
 | D-7 | 프레임·팝콘 저장 구조 | 별도 테이블 / 평가·영화에서 조회 | **프레임만 별도 유지**, 팝콘 버킷은 평가와 영화 맛을 집계 | 필름·팝콘 조회 |
-| D-8 | 가입 시 나이 저장 형식 | 정수 / 연령대 / 출생연도 | **생년월일(`birth_date`)** (08-31, 08-30 출생연도에서 변경). 성별 3값 + NULL 허용 | `users`, API-001·008 |
+| D-8 | 가입 시 나이 저장 형식 | 정수 / 연령대 / 출생연도 | **생년월일(`birth_date`)** (08-31, 08-30 출생연도에서 변경). 성별 3값이며 가입 시 필수 (09-05 `NULL 허용`에서 정정, 플랜 결정 11). 두 값 모두 컬럼은 탈퇴 파기를 위해 NULL을 허용한다(D-9) | `users`, API-001·008 |
 | D-9 | 탈퇴 사용자 데이터 처리 | 즉시 삭제 / 기간 보존 / 익명화 | **계정 영역 확정: 이메일·닉네임 치환 + 즉시 재사용 허용** (09-02, BE-A). `password_hash`·`birth_date`·`gender`, 소셜 연결 수단과 인증 토큰은 삭제한다. 내부·공개 식별자 및 다른 사용자 데이터와의 연결이 남으므로 계정 행 전체가 익명정보라고 전제하지 않는다. 공개 한줄평과 학습 데이터는 각 도메인 담당 결정 대기 | `users.status`, 공개 한줄평, 학습 데이터 |
 | D-10 | 평균 별점 집계 방식 | 반정규화 컬럼 / 조회 시 집계 / MView | **반정규화 컬럼, 차단 미반영** (08-30) | 평가 트랜잭션 범위, API-030 |
 | D-11 | 검색 엔진 | PostgreSQL full-text(`pg_trgm`) / Elasticsearch | **PostgreSQL full-text + `pg_trgm`** (08-31, ADR-0010) | 인덱스 설계 |
 | D-12 | 팝콘 맛 8종 기준정보 | 고정 장르 그룹 / ML 취향 군집 | **고정 K-Means 8군집 + c-TF-IDF 대표 키워드**. `popcorn_flavors.cluster_id`와 맛 코드가 1:1로 대응한다 (ADR-0015) | `popcorn_flavors` 초기 데이터, 온보딩 카드 |
 | D-13 | 신규 영화 맛 배정 | 전체 재학습 / 고정 Centroid 예측 | **재학습·모델 버전 없이 기존 K-Means `predict`로 최근접 Centroid에 배정** (ADR-0015) | `movies.representative_flavor_id`, 신규 영화 분류 파이프라인 |
 
-미결은 D-9의 계정 외 영역(공개 한줄평, 학습 데이터), 팝콘 표시명·색상과 추천 임계치 같은 설정값입니다.
+맞춤은 사용자 평가·온보딩 선호 기반 개인 순위로 생성합니다. 발견은 D-5·D-12의 K-Means
+취향 군집을 바탕으로 별도 선정하며, 군집 산출물과 선정 기준이 준비되기 전에는 발견 슬롯을
+맞춤으로 채웁니다.
+평점 범위·간격은 FR-19에 따라 0.5~5.0점·0.5점 단위입니다. 물리 스키마에서는 scale 없는
+`numeric`과 범위·배수 CHECK를 사용합니다([물리 규칙](./db-schema-convention.md)).
+
+미결은 D-9의 계정 외 영역(공개 한줄평, 학습 데이터), 팝콘 표시명·색상,
+맞춤·발견 판정 방식·기준값 등입니다.

@@ -1,0 +1,69 @@
+/*
+ * 오늘의 추천 — 히어로.
+ *
+ * 카드로 감싸지 않고 콘텐츠가 배경 위에 직접 놓인다
+ * (`docs/screens/design-concept.md`). 포스터가 화면 상단을 차지하고 정보는 그
+ * 아래로 쌓인다.
+ *
+ * 포스터는 벽에 걸린 것처럼 그림자를 준다. 밝은 배경이라 그림자가 깊이를 만든다.
+ */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/*
+ * 포스터가 히어로의 폭을 채운다. Poster는 px을 받지만 화면 폭이 기기마다 달라,
+ * 여기서 폭을 100%로 늘리고 2:3 비율만 지킨다. 넘겨준 px 값은 비율의 근거로만
+ * 남는다.
+ */
+.posterLink {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-poster);
+  box-shadow: var(--shadow-poster);
+}
+
+.posterLink > * {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 2 / 3;
+}
+
+.info {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.title {
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  letter-spacing: var(--letter-spacing-title);
+  font-weight: var(--font-weight-bold);
+}
+
+.meta {
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+.badgeRow {
+  display: flex;
+  align-self: flex-start;
+  gap: var(--space-2);
+}
+
+.reason {
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-body);
+  color: var(--color-ink-muted);
+}
+
+.ottList {
+  display: flex;
+  gap: var(--space-1);
+}

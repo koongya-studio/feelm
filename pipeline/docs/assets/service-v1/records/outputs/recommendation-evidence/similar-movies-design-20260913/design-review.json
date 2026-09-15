@@ -1,0 +1,311 @@
+{
+  "schemaVersion": "feelm-similar-movies-design-review/1",
+  "status": "PASS",
+  "scope": "DESIGN_ONLY",
+  "reviewedAtUtc": "2026-09-13 06:30:59 UTC",
+  "reviewer": "independent-subagent:/root/similar_method_review",
+  "sourcePin": "Parent final-ready, no subsequent source edits reported; hashes below are the reviewed state.",
+  "summary": "GKT131 reuse with existing Spring/pgvector HNSW and shared Top50 cache is a coherent low-cost local design. Public API defaults and response shape are preserved; team representation/schema/auth migration and all runtime validation remain unexecuted.",
+  "openBlockers": [],
+  "reviewCoverage": {
+    "fullRead": [
+      "docs/recommendation/service-v1-20260913/SIMILAR-MOVIES.md",
+      "docs/recommendation/service-v1-20260913/similar-movies.v1.json"
+    ],
+    "integratedMarkdownChanges": [
+      "docs/recommendation/service-v1-20260913/ACCEPTANCE.md",
+      "docs/recommendation/service-v1-20260913/CONTRACTS.md",
+      "docs/recommendation/service-v1-20260913/EVALUATION.md",
+      "docs/recommendation/service-v1-20260913/GROUPS.md",
+      "docs/recommendation/service-v1-20260913/OPERATIONS.md",
+      "docs/recommendation/service-v1-20260913/POLICY.md",
+      "docs/recommendation/service-v1-20260913/README.md",
+      "docs/recommendation/active-experiment.md"
+    ],
+    "baselineContractsRead": [
+      "S15P21E106/AGENTS.md",
+      "FEELM-standalone/AGENTS.md",
+      "S15P21E106/docs/api/recommendation.md API-031 and dismissal scope",
+      "S15P21E106/docs/adr/0014-e5-pgvector-content-embedding.md",
+      "FEELM-standalone/docs/recommendation/service-v1-20260913/GROUPS.md",
+      "FEELM-standalone/docs/recommendation/service-v1-20260913/POLICY.md"
+    ],
+    "teamLocalHead": "b622d5e",
+    "teamCommitsBehindLocalOriginDevelop": 8,
+    "latestRemoteFetched": false
+  },
+  "sourceFiles": [
+    {
+      "path": "docs/recommendation/service-v1-20260913/ACCEPTANCE.md",
+      "sha256": "d8e806b772601458a71699d2776dd5efdc0356bffd29e3bf742670fe715bffa4",
+      "bytes": 12388,
+      "beforeSha256": "69db1b5f1d2475c76fd8b0d7eb9b842bdac3063bae0d169789718a0fb223b871",
+      "unchanged": false
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/CONTRACTS.md",
+      "sha256": "57405d4428441116a4b13c617a8e49ef3748db23acdbfc9d1fcb9730e1b1baf1",
+      "bytes": 41898,
+      "beforeSha256": "dc5f818b0c0948c9eb73463a282b71d776164740a7549342e4949dd844024411",
+      "unchanged": false
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/EVALUATION.md",
+      "sha256": "db7bd86f6b72b2edee7b6a65610bdb177c65937b518288417e3c6bdbb02bf3e3",
+      "bytes": 12466,
+      "beforeSha256": "79d33f73f63cbb94012c2c549bd399d5519b6fe09d81da302050575ff9aaecb8",
+      "unchanged": false
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/GROUPS.md",
+      "sha256": "08c66f6e16482ca4cef438b491d28f594bd8612a4ca2aa6541914b198e3714cb",
+      "bytes": 11344,
+      "beforeSha256": "ee210dea5bf6804d9940a8526b7273730fa96eae57b2986864c9695291c734c7",
+      "unchanged": false
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/HYBRID-COMPARISONS.md",
+      "sha256": "3ebbe65e0204abcd232f7ffc24ee65c29548e4d50cfd39c4c19e229344e4c407",
+      "bytes": 10379,
+      "beforeSha256": "3ebbe65e0204abcd232f7ffc24ee65c29548e4d50cfd39c4c19e229344e4c407",
+      "unchanged": true
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/KOBIS-DATA.md",
+      "sha256": "fe7ac7faa32ee64bfaf1e56e0a2bfc5cb5217fc3ef32c335f4de92dd3b8c8c37",
+      "bytes": 9451,
+      "beforeSha256": "fe7ac7faa32ee64bfaf1e56e0a2bfc5cb5217fc3ef32c335f4de92dd3b8c8c37",
+      "unchanged": true
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/MODELS.md",
+      "sha256": "514b6a081c00249d5f8641d7620a46c0d40cf62177c6f6b8e5003eaa2b6d1fc1",
+      "bytes": 24979,
+      "beforeSha256": "514b6a081c00249d5f8641d7620a46c0d40cf62177c6f6b8e5003eaa2b6d1fc1",
+      "unchanged": true
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/OPERATIONS.md",
+      "sha256": "678e35caf59daec84f32479aea5d261e405718574a82b17d58f55cf523fbbeda",
+      "bytes": 28124,
+      "beforeSha256": "7db4d35d61aa7f07039e1d3b4da31cb9d7c98945f963b77bcf568d426b9f6588",
+      "unchanged": false
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/POLICY.md",
+      "sha256": "64be393f40f4c4328b5d4e5c414c211ef3061f459c35ce3676d16571e3023327",
+      "bytes": 17211,
+      "beforeSha256": "7565aa24dd664c5f26d42f2b7694559577afaae14c9b48a306858dd95b606494",
+      "unchanged": false
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/README.md",
+      "sha256": "516e2ddaaaca652b6be6e5a62227bab51e6ca3136bd36b9cfa48b6e98755a0ff",
+      "bytes": 11423,
+      "beforeSha256": "ec5dc2e5e75b08cd3a996c18aae66cb8a40c74e8ffea20c1a2aaa876fb418b5a",
+      "unchanged": false
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/comparison-registry.v1.json",
+      "sha256": "b872a4dc1e16147118d5419fc936fa316256b340c71218bb24308e09df68f4ba",
+      "bytes": 4706,
+      "beforeSha256": "b872a4dc1e16147118d5419fc936fa316256b340c71218bb24308e09df68f4ba",
+      "unchanged": true
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/config.v1.json",
+      "sha256": "bb466512e1d948c5db3ae28b5733ffac9af71ffbbe533e021ebc84095a80112a",
+      "bytes": 3215,
+      "beforeSha256": "bb466512e1d948c5db3ae28b5733ffac9af71ffbbe533e021ebc84095a80112a",
+      "unchanged": true
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/feature-schema.v1.json",
+      "sha256": "1c4c8aef5cce42c0c4bc74d2d9f3e113a972d4b2ea521592760bde042d7f56ec",
+      "bytes": 40752,
+      "beforeSha256": "1c4c8aef5cce42c0c4bc74d2d9f3e113a972d4b2ea521592760bde042d7f56ec",
+      "unchanged": true
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/group-recipe.v1.json",
+      "sha256": "3fd587b1b74fdf9803dd5e93328081ea196848583e0b5ef3d015cf60e16df483",
+      "bytes": 14871,
+      "beforeSha256": "3fd587b1b74fdf9803dd5e93328081ea196848583e0b5ef3d015cf60e16df483",
+      "unchanged": true
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/training-recipe.v1.json",
+      "sha256": "66a3cebafc5344f981431f4bd5ce2601cd26e1cc06a065f905b4cb84dd0f8c2a",
+      "bytes": 16847,
+      "beforeSha256": "66a3cebafc5344f981431f4bd5ce2601cd26e1cc06a065f905b4cb84dd0f8c2a",
+      "unchanged": true
+    },
+    {
+      "path": "docs/recommendation/active-experiment.md",
+      "sha256": "6bbf96aa0130e844467d775d7a55e5b1ff44608521efee27850c12af081e78ea",
+      "bytes": 41531,
+      "beforeSha256": "416f3229a74e38186ea92e7232ce2bed7eb7d4a221863b12eac9bb6e9640474f",
+      "unchanged": false
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/SIMILAR-MOVIES.md",
+      "sha256": "c1625ffe64366ce1d0944d244f2eb9e807ea9409dcdc2e08a049d8c4da03db3a",
+      "bytes": 20442,
+      "beforeSha256": null,
+      "unchanged": false
+    },
+    {
+      "path": "docs/recommendation/service-v1-20260913/similar-movies.v1.json",
+      "sha256": "897b03df72875e71700630b48501e600267405a3b4b095e28cc0194334bad186",
+      "bytes": 2059,
+      "beforeSha256": null,
+      "unchanged": false
+    }
+  ],
+  "beforeSnapshot": {
+    "manifestPath": "outputs/recommendation-evidence/similar-movies-design-20260913/before.json",
+    "manifestSha256": "e2b186ff50078bca2fc7643f8f74a31d8e64e2e32c5311da6299f6a7a5792714",
+    "copyFilesVerified": 16,
+    "allCopiedBytesAndSha256Match": true
+  },
+  "documentChecks": [
+    {
+      "id": "D01",
+      "status": "PASS",
+      "subject": "Preservation",
+      "detail": "Five original numeric/configuration JSON files retain exact before.json SHA256; only scoped Markdown integrations and two new design files differ."
+    },
+    {
+      "id": "D02",
+      "status": "PASS",
+      "subject": "Architecture and cost",
+      "detail": "Reuse of the existing pgvector contract avoids a new ANN dependency or online model. One bounded miss search, shared cache, optional bounded prewarm, and no full all-pairs prerequisite are explicit."
+    },
+    {
+      "id": "D03",
+      "status": "PASS",
+      "subject": "Vector and score semantics",
+      "detail": "Frozen 131-dimensional float64 source remains authoritative for its original group contract. Similar-movie scoring explicitly uses the separate float32 cosine copy and requires its own future tolerance check. sub_supported is independent of group membership."
+    },
+    {
+      "id": "D04",
+      "status": "PASS",
+      "subject": "Candidate and authorization rules",
+      "detail": "Base access check and candidate public-evidence gate are distinct. User exclusions are applied after the public cache; authentication failure cannot silently become anonymous. Short results are allowed without unrelated fillers."
+    },
+    {
+      "id": "D05",
+      "status": "PASS",
+      "subject": "pgvector query design",
+      "detail": "Version partition and candidate-only partial cosine HNSW are specified. Raw distance ASC LIMIT is retained, ef_search and statement timeout are local to a transaction, iterative scans are off when supported, and LIMIT is not claimed as a graph-work bound."
+    },
+    {
+      "id": "D06",
+      "status": "PASS",
+      "subject": "Versioning and failure",
+      "detail": "Similarity input changes use immutable versions; unrelated public-number updates may reuse the index. Deactivation is checked at return time. Empty support states are distinct from failure; concurrency, queue, and retry limits are explicit."
+    },
+    {
+      "id": "D07",
+      "status": "PASS",
+      "subject": "API, reasons and events",
+      "detail": "API-031 default 10/max 20 and card response remain; reasons use actual shared genres or generic content wording. Similar lists neither create recommendation IDs/sets nor change viewed/rating/inputVersion state."
+    },
+    {
+      "id": "D08",
+      "status": "PASS",
+      "subject": "Evaluation scope",
+      "detail": "Exact comparison is limited to fixed query samples, uses identical eligibility/self/dedup/positive filters, compares final ANN Top10 only, accepts boundary ties, excludes N/A from the equal-query mean, and separates retrieval recall from human content relevance."
+    },
+    {
+      "id": "D09",
+      "status": "PASS",
+      "subject": "Implementation status",
+      "detail": "Local design approval is separated from the team E5 representation contract, migration, code, index construction, S01-S08 execution, latency claims, and content-quality claims."
+    }
+  ],
+  "recipeChecks": {
+    "dimensionsAndPrecision": true,
+    "apiAndPoolBounds": true,
+    "hnswParameters": true,
+    "boundedServing": true,
+    "scopeSeparation": true,
+    "evidenceAndQualityScope": true,
+    "frozenConfiguration": true
+  },
+  "numericVerification": {
+    "sourceRows": 237817,
+    "dimensions": 131,
+    "float32BytesPerElement": 4,
+    "rawArrayBytes": 124616108,
+    "rawArrayDecimalMB": 124.616108,
+    "excludesPostgresRowIndexCacheAndBuildOverhead": true,
+    "scoreExportToleranceIsFutureGate": 0.000001,
+    "retrievalRecallTargetIsFutureGate": 0.95
+  },
+  "resolvedReviewFindings": [
+    {
+      "id": "R01",
+      "status": "RESOLVED",
+      "issue": "Recall numerator/cutoff and self-filter ambiguity",
+      "resolution": "Both paths share filters; only sorted final ANN Top10 is compared with the tie-expanded exact answer set. Denominator and equal-query averaging are explicit."
+    },
+    {
+      "id": "R02",
+      "status": "RESOLVED",
+      "issue": "Fallback reason could overclaim keyword/overview contribution",
+      "resolution": "Without shared genre, the summary is generic content similarity with empty factors; block support alone is not treated as positive evidence."
+    },
+    {
+      "id": "R03",
+      "status": "RESOLVED",
+      "issue": "Unrelated catalog updates could force unnecessary HNSW rebuild",
+      "resolution": "Similarity version changes track actual content/eligible-set/mapping/recipe inputs; original sourceCatalogVersion stays historical when an index is reused."
+    }
+  ],
+  "linkValidation": {
+    "status": "PASS",
+    "changedMarkdownLinkOccurrences": 139,
+    "scope": "Relative Markdown target-file existence; external destinations and heading fragments are not claimed as automatically validated.",
+    "missingNonReviewTargets": [],
+    "finalMissingTargets": 0,
+    "reviewMarkdownLinkOccurrences": 5,
+    "sourceHashesUnchangedAfterReviewArtifactWrite": true
+  },
+  "runtimeAcceptance": {
+    "S01": "NOT_RUN",
+    "S02": "NOT_RUN",
+    "S03": "NOT_RUN",
+    "S04": "NOT_RUN",
+    "S05": "NOT_RUN",
+    "S06": "NOT_RUN",
+    "S07": "NOT_RUN",
+    "S08": "NOT_RUN"
+  },
+  "notExecuted": [
+    "new model training",
+    "new embeddings or vector export",
+    "TMDB API collection",
+    "PostgreSQL migration",
+    "HNSW build or query",
+    "Spring/API/cache implementation",
+    "frontend implementation",
+    "neighbor generation",
+    "runtime/unit/integration acceptance S01-S08",
+    "retrieval recall benchmark",
+    "human content-quality evaluation",
+    "deployment",
+    "commit/push/external publication"
+  ],
+  "readiness": "SIMILARITY_NOT_READY",
+  "references": [
+    {
+      "url": "https://github.com/pgvector/pgvector",
+      "usedFor": "Official cosine storage, HNSW settings/filtering/index-plan semantics; these are design references, not evidence of a deployed index."
+    },
+    {
+      "url": "https://developer.themoviedb.org/reference/movie-similar",
+      "usedFor": "Genres/keywords scope of the alternative API; no API request was sent."
+    }
+  ]
+}

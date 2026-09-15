@@ -1,0 +1,1 @@
+-@all resetkeys resetchannels %R~feelm:user:*:vector %R~feelm:user:*:candidates %R~feelm:user:*:topn %R~feelm:user:*:behavior %R~feelm:model:current %R~auth:mail:sent:* +ping +hello +echo +select +client|setname +client|setinfo +info +scan +get +getrange +mget +strlen +hget +hmget +hgetall +hscan +hlen +hkeys +hvals +type +exists +ttl +pttl

@@ -1,0 +1,139 @@
+/*
+ * 4.3 검색 필터. 검색 화면 위에 겹치는 시트다.
+ *
+ * 화면 폭(`--layout-max-width`) 안에서 아래에 붙는다. 뒤 목록이 살짝 비치도록 어두운
+ * 막을 깔되, 시트 자체는 벽 색(`--color-bg`)이다 — 화면마다 배경을 바꾸지 않는다
+ * (`design-concept.md` 2.1).
+ */
+.overlay {
+  position: fixed;
+  z-index: 20;
+  display: flex;
+  width: 100%;
+  max-width: var(--layout-max-width);
+  align-items: flex-end;
+  inset: 0;
+  margin: 0 auto;
+}
+
+.scrim {
+  position: absolute;
+  border: 0;
+  background: rgba(38, 39, 41, 0.32);
+  cursor: pointer;
+  inset: 0;
+}
+
+.sheet {
+  position: relative;
+  display: flex;
+  max-height: 88%;
+  width: 100%;
+  flex-direction: column;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--color-bg);
+  box-shadow: 0 -8px 24px rgba(38, 39, 41, 0.12);
+}
+
+.header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--screen-padding-x) var(--space-2);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+.close {
+  padding: var(--space-2);
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-size-meta);
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+.body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-2) var(--screen-padding-x) var(--space-4);
+  overflow-y: auto;
+}
+
+.group {
+  padding: 0;
+  border: 0;
+  margin: 0;
+}
+
+.legend {
+  padding: 0 0 var(--space-2);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink-muted);
+}
+
+.options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/*
+ * 선택지. 고른 것은 빨강 테두리와 글자로 표시한다 — 빨강은 면이 아니라 표식이다
+ * (`design-concept.md` 2.3).
+ */
+.option {
+  height: var(--control-height-sm);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-size-meta);
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+.option[aria-pressed='true'] {
+  border-color: var(--color-brand);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-brand-ink);
+}
+
+/* OTT는 글자 대신 배지로 고른다. 선택 상태는 배지 자체가 바뀐다 */
+.ott {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  line-height: 0;
+}
+
+.footer {
+  display: flex;
+  flex: none;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--screen-padding-x) var(--space-6);
+  border-top: 1px solid var(--color-line);
+}
+
+/* `결과 보기`가 이 시트의 주 동작이므로 더 넓게 둔다 */
+.footer > *:last-child {
+  flex: 2;
+}
+
+.footer > *:first-child {
+  flex: 1;
+}

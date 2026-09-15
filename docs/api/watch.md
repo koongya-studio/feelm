@@ -237,7 +237,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### 설명
 
-영화에 1~5점 평가와 선택적 한줄평을 남긴다. 최초 저장 시 프레임을 생성해 필름에 추가하며, 이 평가는 영화의 대표 맛을 기준으로 팝콘 버킷 집계에 반영된다.
+영화에 0.5~5.0점 평가(0.5점 단위)와 선택적 한줄평을 남긴다. 최초 저장 시 프레임을 생성해 필름에 추가하며, 이 평가는 영화의 대표 맛을 기준으로 팝콘 버킷 집계에 반영된다.
 
 ### 인증 및 권한
 
@@ -255,12 +255,12 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|---|---|
-| `score` | integer | O | 1~5 |
+| `score` | number | O | 0.5~5.0, 0.5점 단위 (`minimum: 0.5`, `maximum: 5`, `multipleOf: 0.5`) |
 | `comment` | string | X | 한줄평, 200자 이하 |
 | `visibility` | string | comment 있으면 O | `PUBLIC` 또는 `PRIVATE` |
 
 ```json
-{ "score": 5, "comment": "밤에 보면 안 됨", "visibility": "PUBLIC" }
+{ "score": 4.5, "comment": "밤에 보면 안 됨", "visibility": "PUBLIC" }
 ```
 
 ### Response
@@ -271,7 +271,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 {
   "ratingId": 91,
   "movieId": 550,
-  "score": 5,
+  "score": 4.5,
   "comment": "밤에 보면 안 됨",
   "visibility": "PUBLIC",
   "frame": { "frameId": 77, "createdAt": "2026-08-30T05:21:00Z" },
@@ -283,13 +283,15 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### 오류 응답
 
-- `400 VALIDATION_FAILED` 점수 범위, 200자 초과, `comment` 있는데 `visibility` 없음
+- `400 VALIDATION_FAILED` 점수 범위·0.5점 단위 위반, 200자 초과, `comment` 있는데 `visibility` 없음
 - `404 RESOURCE_NOT_FOUND`
 - `409 RATING_ALREADY_EXISTS` 사용자·영화 조합에 평가가 이미 있음. 수정은 API-037
 
 ### 처리 규칙
 
 - 사용자·영화 조합마다 평가는 하나다
+- `score`는 JSON 숫자로 받고 0.5~5.0 범위와 0.5의 배수 조건을 모두 검증한다. 4.49 같은 값은 반올림·절삭하지 않고 거절한다. Java에서는 `BigDecimal`로 원값을 검증·전달한다
+- 평가 조회(API-030·032·039), 프레임(API-042·043), 공개 프로필(API-062)의 개인 평가 `score`도 같은 숫자 규칙을 따른다. 평균 평점과 추천 예측 점수에는 0.5 배수 조건을 적용하지 않는다
 - 평가 저장·프레임 생성·감상 기록 `RATED` 전이는 하나의 트랜잭션으로 처리한다(NFR-06)
 - 응답의 `popcorn`은 별도 행이 아니라 `ratings JOIN movies`로 계산한 현재 집계 결과다
 - 감상 기록이 없거나 `LINK_CLICKED`인 영화도 평가할 수 있으며, 이때 감상 기록을 `RATED`로 생성·전이한다 (D-6 결정)
@@ -303,7 +305,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### 미정 사항
 
-- [ ] `isNewFlavor` 판정 임계치(FR-06)
+- [ ] `isNewFlavor` 판정 방식·기준값과 발견 추천과의 관계(FR-06·FR-12)
 - [ ] 발견 표시(FR-32, 확장) 응답 필드 예약 여부
 
 ## API-037 평가 수정
@@ -338,7 +340,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 ### Request Body
 
 ```json
-{ "score": 4, "comment": null, "visibility": "PRIVATE" }
+{ "score": 0.5, "comment": null, "visibility": "PRIVATE" }
 ```
 
 ### Response
@@ -353,6 +355,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 ### 처리 규칙
 
 - 프레임은 최초 저장 시 한 번만 생성한다. 점수 수정은 팝콘 수를 바꾸지 않지만 평균 평점 집계에는 반영된다
+- 요청 필드와 점수 범위·0.5점 단위 검증은 API-036과 동일하다. 잘못된 값을 자동으로 보정하지 않는다
 - 점수 변경은 맛 선호도(평균 평점)와 취향 분석에 반영된다
 - `PUBLIC` → `PRIVATE`로 바꾸면 한줄평 목록(API-032)에서 즉시 제외된다
 

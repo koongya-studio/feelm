@@ -64,6 +64,23 @@
 }
 ```
 
+아직 생성된 취향 분석 캐시가 없으면 다음과 같이 반환한다.
+
+```json
+{
+  "ratingCount": 0,
+  "insufficientData": true,
+  "analysis": {
+    "genres": [],
+    "countries": [],
+    "eras": [],
+    "directors": []
+  },
+  "keywords": [],
+  "analyzedAt": null
+}
+```
+
 ### 오류 응답
 
 - 공통 오류만 해당
@@ -73,7 +90,9 @@
 - 분석 요소는 최소 장르·국가·시대·감독을 포함한다
 - Spring은 평가 추가·수정·삭제 트랜잭션에서 `taste_analyses` 캐시를 갱신하고 이 API는 캐시된 결과를 반환한다
 - 평가가 하나도 없으면 `taste_analyses` 행을 만들지 않는다
-- 평가가 기준 미만(5건, 가정)이면 `insufficientData: true`와 빈 `keywords`
+- 캐시가 없거나 캐시의 `keywords`가 비어 있으면 `insufficientData: true`로 반환한다
+- `analysis` JSON은 `genres`, `countries`, `eras`, `directors` 배열로 구성하며 누락된 배열은 빈 배열로 반환한다
+- 캐시 JSON에 조회 API가 모르는 필드가 추가되어도 알려진 필드만 반환한다
 - 키워드는 사전 정의 목록에서만 선택하며 사용자당 3~5개
 
 ### 상태값
@@ -95,8 +114,8 @@
 | 인증 | 회원 |
 | 관련 요구사항 | FR-06, FR-09, FR-32 |
 | 화면 | ⑨ 팝콘 버킷 |
-| 미정 사항 | 있음 |
-| 비고 | 새로운 맛 임계치 미정 |
+| 미정 사항 | 없음 |
+| 비고 | 8개 맛을 항상 반환하며 평가 영화가 없는 맛은 0개로 표시 |
 
 ### 설명
 
@@ -125,7 +144,6 @@
 ```json
 {
   "totalCount": 42,
-  "newFlavorThreshold": 3,
   "flavors": [
     {
       "flavorCode": "FLAVOR_X",
@@ -133,7 +151,6 @@
       "color": "#E63946",
       "popcornCount": 12,
       "averageScore": 4.4,
-      "isNewFlavor": false,
       "discoveredAt": "2026-07-01T00:00:00Z"
     }
   ]
@@ -149,8 +166,9 @@
 ### 처리 규칙
 
 - `ratings JOIN movies`를 `movies.representative_flavor_id`로 그룹화해 수량·평균 평점·최초 평가 시각을 계산한다
+- 팝콘 맛 8개를 항상 반환하고 집계 결과가 없는 맛은 `popcornCount: 0`, `averageScore: null`로 반환한다
 - 팝콘 수와 선호도는 독립 지표로 구분해 표시한다
-- `popcornCount`가 `newFlavorThreshold` 미만인 맛은 `isNewFlavor: true`. 취향 발견 추천(FR-12) 후보 맛과 동일 기준
+- 감상량 임계값이나 임계값 기반 `isNewFlavor`를 사용하지 않는다. 취향 발견 추천(FR-12)의 판정은 별도 기준으로 다룬다
 - `discoveredAt`은 확장 기능 FR-32용으로 예약. 1차에서는 `null` 가능
 
 ### 상태값
@@ -159,7 +177,7 @@
 
 ### 미정 사항
 
-- [ ] `newFlavorThreshold` 값
+없음
 
 ## API-042 내 필름(프레임 목록) 조회
 

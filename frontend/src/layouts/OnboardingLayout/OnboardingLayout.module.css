@@ -1,0 +1,22 @@
+/*
+ * 화면 높이를 고정한다.
+ * 1.1의 원형 배치 영역이 남은 높이를 채우는 구조(와이어프레임 `flex:1`)이므로 높이가
+ * 정해져 있어야 한다. AppLayout과 같은 이유로 min-height가 아니라 height를 쓴다.
+ *
+ * **배경을 다시 칠하지 않는다.** body가 한 벌만 깔고 화면마다 바꾸지 않는다
+ * (`docs/screens/design-concept.md` 2.1). 이전에는 여기서 단색 `--color-bg`를 칠했는데,
+ * 이 상자는 `100dvh`까지만 덮으므로 콘텐츠가 화면보다 길면 그 아래에서 body의
+ * 그라디언트가 드러났다. 단색과 그라디언트가 만나는 지점에 가로선이 생긴다
+ * (밝기 240 → 233, 한 픽셀에 7단계). `FullScreenLayout`에서 같은 버그를 업무 -99에서
+ * 고쳤고, AppLayout은 처음부터 칠하지 않았다.
+ */
+.layout {
+  display: flex;
+  width: 100%;
+  max-width: var(--layout-max-width);
+  height: 100vh;
+  height: 100dvh;
+  flex-direction: column;
+  margin: 0 auto;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}

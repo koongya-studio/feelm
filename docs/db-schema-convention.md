@@ -43,7 +43,7 @@
 | 코드·열거값 | `varchar(n)` + CHECK | 허용값은 [API 공통 규약의 상태값](./api/README.md)과 일치시킨다 |
 | 자유 텍스트 | `text` | 이름, 제목, 줄거리, URL 등 계약상 상한이 없는 값 |
 | 길이 제한이 계약에 있는 문자열 | `varchar(n)` | 예: 닉네임 `varchar(20)`, 한줄평 `varchar(200)` |
-| 평점 | `smallint` + CHECK(1~5) | `ratings.score` |
+| 평점 | `numeric` + CHECK(0.5~5.0 및 0.5 배수) | `ratings.score`. Java는 `BigDecimal` |
 | 평균 평점 | `numeric(3,2)` + CHECK(0~5) | `movies.average_rating` |
 | 국가 코드 | `varchar(2)` | ISO 3166-1 alpha-2 |
 | 구조화 데이터 | `jsonb` | `reason`, `analysis`, `keywords`, `content` |
@@ -52,6 +52,11 @@
 
 **PostgreSQL enum 타입을 쓰지 않는다.** 값을 추가할 때마다 `ALTER TYPE`이 필요하고
 Hibernate 매핑이 번거롭다. `varchar` + CHECK로 통일한다.
+
+개인 평점은 `score BETWEEN 0.5 AND 5.0`과 `mod(score, 0.5) = 0`을 모두 검사한다.
+`numeric(2,1)`처럼 scale을 고정하면 4.49가 4.5로 반올림된 뒤 CHECK를 통과하므로,
+scale 없는 `numeric`으로 입력값을 그대로 검사한다. 기존 정수 점수도 같은 값으로 보존한다.
+이 단위 제약은 개인 평점에만 적용하며 평균 평점·추천 예측 점수에는 적용하지 않는다.
 
 ## 4. NULL과 기본값
 
@@ -62,7 +67,8 @@ Hibernate 매핑이 번거롭다. `varchar` + CHECK로 통일한다.
     `watch_records`의 `clicked_at`·`confirm_due_at`·`expires_at`·`watched_at`·
     `rated_at`·`expired_at`, `users.withdrawn_at`, 1회용 토큰의 `used_at`
   - **계약이 조건부로만 요구하는 값** — `ratings.visibility`는 API-036이 `comment`가
-    있을 때만 요구한다
+    있을 때만 요구한다. `users.birth_date`·`gender`는 가입 시 필수지만 탈퇴 시
+    파기하므로(D-9) `NOT NULL` 대신 상태 기반 CHECK로 필수성을 표현한다
   - **원천 데이터에 없을 수 있는 적재 항목** — TMDb·MovieLens에서 내려오지 않는 값과
     배치·모델이 나중에 채우는 값. `movies`의 상세 정보와 `representative_flavor_id`·
     `synced_at`, `movie_people.character_name`·`display_order`,
@@ -171,6 +177,24 @@ PostgreSQL 문법이라 H2에서 실행되지 않으므로, 마이그레이션�
   `movies` 본체가 아닌 별도 테이블을 권한다.
 - **닉네임 길이·허용 문자**가 API-001 미정 사항이다. 현재 `varchar(20)`은 명세의 가정값을
   반영한 것이다. 확정되면 `ALTER TABLE`로 조정한다.
-- **기준정보 Seed** — `popcorn_flavors` 8종 코드(A-6)와 `otts` 목록(API-025)이 확정되지
-  않아 빈 테이블만 만들었다. 확정 후 별도 마이그레이션으로 넣는다.
+- **기준정보 Seed** — `popcorn_flavors` 8종 코드(A-6)는 별도 확정이 필요하다.
+  `otts`의 지원 5종은 API-025와 승인 CSV를 기준으로 새 Flyway seed
+  `V202609142240__seed_approved_ott_catalog.sql`에서 초기화한다(2026-09-14 확정).
+  기존 code/provider 쌍의 행·ID·표시 정보와 모든 참조를 보존하고 없는 쌍만 추가한다.
+  식별 충돌은 seed의 모든 행 변경을 롤백하고 기동을 중단한다. 적용된 파일은 수정하지 않는다.
+  [사전 점검·복구 절차](../backend/scripts/OTT-CATALOG-OPERATIONS.md)를 따른다.
+  서비스는 OTT 지원을 종료하지 않는다(2026-09-14 사용자 확정). 종료·비활성화 및 이에 따른
+  기존 구독 일괄 해제는 도입하지 않으며 기준정보·구독·영화 관계·감상 이력을 보존한다.
 - **CI에서 Docker 사용 가능 여부** — Testcontainers 테스트의 전제다(S15P21E106-88).
+
+## 파티 참여 수와 마이그레이션
+
+사용자당 참여 가능한 활성 파티는 최대 10개다(ERD D-3, 2026-09-10 변경).
+파티당 정원은 파티장 포함 최대 4명이며 애플리케이션에서 보장한다.
+
+`party_members`의 `(party_id, user_id)` 유일 제약과 파티별 OWNER 최대 1명 제약은 유지한다.
+사용자별 참여 개수를 제한하는 DB 제약이나 `user_id` 단독 유일 제약은 추가하지 않는다.
+기존 `V202609021900__create_taste_recommendation_party_tables.sql`에는 사용자별 참여 개수
+상한 제약이 없으므로 이번 정책 변경에 새 마이그레이션은 필요 없다. 적용된 SQL은 수정하지 않는다.
+생성·수락은 사용자 행을 먼저 잠그고 활성 파티 참여 개수를 검사한다. 10개에 도달하면
+`ACTIVE_PARTY_LIMIT_REACHED`로 거절한다. 사용자와 파티를 함께 잠그는 순서는 사용자 → 파티로 통일한다.

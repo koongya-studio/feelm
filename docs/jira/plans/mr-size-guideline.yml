@@ -1,0 +1,13 @@
+tasks:
+- id: mr-size-guideline
+  issue_type: Task
+  summary: '[협업] 백엔드 MR 크기 기준 문서화'
+  description: 백엔드 작업을 리뷰 가능한 단위로 분할할 수 있도록 구현 변경량과 API 개수에 대한 권장 기준 및 예외 처리 원칙을 Git 협업 문서에 명시한다.
+  area: 협업
+  story_points: 1
+  done_when:
+  - 백엔드 MR의 테스트 제외 수동 구현 변경량 권장 기준과 분할 기준이 문서화된다.
+  - API 개수 기준, 제외 항목과 예외 사유 기록 원칙이 문서화된다.
+  - MR 전 확인 절차가 Git 컨벤션의 MR 크기 기준을 참조한다.
+  jira_key: S15P21E106-204
+  epic: S15P21E106-12

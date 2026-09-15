@@ -1,0 +1,21 @@
+# Local Python environments and caches
+.venv/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+
+# Local Spark runtime files
+.sparkStaging/
+derby.log
+metastore_db/
+spark-warehouse/
+
+# Data and model artifacts are external inputs/outputs.
+/data/
+/artifacts/*
+!/artifacts/*.json
+!/artifacts/README.md
+/models/
+/checkpoints/
+*.parquet

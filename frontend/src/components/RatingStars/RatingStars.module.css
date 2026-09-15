@@ -1,0 +1,25 @@
+.wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.stars {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rating-stars-gap, 1px);
+}
+
+/* 반쪽 별 그라디언트 정의만 담는다. 화면 공간을 차지하지 않는다. */
+.defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+/* 별과 같은 값이므로 별 채움색을 따른다 */
+.value {
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-brand);
+}

@@ -5,51 +5,34 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
-import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 
 /**
  * 실제 PostgreSQL에 마이그레이션을 적용해 검증한다. 기본 테스트는 H2를 쓰지만 Flyway SQL은 PostgreSQL 문법이므로 H2에서 실행되지 않는다. 이
  * 테스트가 마이그레이션이 실제로 도는지 확인하는 유일한 지점이다.
  */
-@Testcontainers
 @DisplayName("V1 마이그레이션 — 확장과 공통 기준 테이블")
 class V1MigrationTest {
 
-    /** 인프라 협의안(S15P21E106-177)과 동일한 이미지. pgvector가 없으면 확장 생성이 실패한다. */
-    private static final DockerImageName IMAGE =
-            DockerImageName.parse("pgvector/pgvector:0.8.6-pg17-bookworm")
-                    .asCompatibleSubstituteFor("postgres");
-
-    @Container
-    private static final PostgreSQLContainer<?> POSTGRES =
-            new PostgreSQLContainer<>(IMAGE)
-                    .withDatabaseName("feelm")
-                    .withUsername("feelm")
-                    .withPassword("feelm")
-                    .withEnv("POSTGRES_INITDB_ARGS", "--locale=C.UTF-8");
+    private static final MigrationPostgresSupport.MigrationTestDatabase DATABASE =
+            MigrationPostgresSupport.database("v1");
 
     @BeforeAll
     static void migrate() {
-        flyway().migrate();
+        DATABASE.flyway().migrate();
     }
 
-    private static Flyway flyway() {
-        return Flyway.configure()
-                .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
-                .load();
+    @AfterAll
+    static void dropDatabase() {
+        DATABASE.close();
     }
 
     @Test
@@ -115,9 +98,9 @@ class V1MigrationTest {
                         () ->
                                 execute(
                                         "INSERT INTO users"
-                                                + " (email, nickname, birth_date, status) VALUES"
-                                                + " ('bad-status@feelm.test', '잘못된상태',"
-                                                + " DATE '1999-03-14', 'DELETED')"))
+                                                + " (email, nickname, birth_date, gender, status)"
+                                                + " VALUES ('bad-status@feelm.test', '잘못된상태',"
+                                                + " DATE '1999-03-14', 'FEMALE', 'DELETED')"))
                 .isInstanceOf(SQLException.class)
                 .hasMessageContaining("ck_users_status");
     }
@@ -141,28 +124,42 @@ class V1MigrationTest {
         assertThatThrownBy(
                         () ->
                                 execute(
-                                        "INSERT INTO users (email, nickname, birth_date, status)"
+                                        "INSERT INTO users"
+                                                + " (email, nickname, birth_date, gender, status)"
                                                 + " VALUES ('active-without-birth@feelm.test',"
-                                                + " '생년월일없음', NULL, 'ACTIVE')"))
+                                                + " '생년월일없음', NULL, 'FEMALE', 'ACTIVE')"))
                 .isInstanceOf(SQLException.class)
                 .hasMessageContaining("ck_users_birth_date_required_unless_withdrawn");
     }
 
     @Test
+    @DisplayName("비탈퇴 계정은 성별이 필수다")
+    void requiresGenderForNonWithdrawnUser() {
+        assertThatThrownBy(
+                        () ->
+                                execute(
+                                        "INSERT INTO users (email, nickname, birth_date, status)"
+                                                + " VALUES ('active-without-gender@feelm.test',"
+                                                + " '성별없음', DATE '1999-03-14', 'ACTIVE')"))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("ck_users_gender_required_unless_withdrawn");
+    }
+
+    @Test
     @DisplayName("마이그레이션을 다시 적용해도 실패하지 않는다")
     void isSafeToReapply() {
-        assertThat(flyway().migrate().migrationsExecuted).isZero();
+        assertThat(DATABASE.flyway().migrate().migrationsExecuted).isZero();
     }
 
     // --- helpers ---------------------------------------------------------
 
     private static void insertUser(String email, String nickname) throws SQLException {
         execute(
-                "INSERT INTO users (email, nickname, birth_date, status) VALUES ('"
+                "INSERT INTO users (email, nickname, birth_date, gender, status) VALUES ('"
                         + email
                         + "', '"
                         + nickname
-                        + "', DATE '1999-03-14', 'ACTIVE')");
+                        + "', DATE '1999-03-14', 'FEMALE', 'ACTIVE')");
     }
 
     private static void execute(String sql) throws SQLException {
@@ -187,7 +184,6 @@ class V1MigrationTest {
     }
 
     private static Connection connect() throws SQLException {
-        return DriverManager.getConnection(
-                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+        return DATABASE.connect();
     }
 }

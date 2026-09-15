@@ -1,0 +1,27 @@
+.field {
+  display: flex;
+  flex-direction: column;
+}
+
+.input {
+  height: var(--control-height);
+  box-sizing: border-box;
+  padding: var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  resize: none;
+}
+
+.input::placeholder {
+  color: var(--color-ink-hint);
+}
+
+.input:disabled {
+  cursor: default;
+  opacity: 0.6;
+}

@@ -1,0 +1,78 @@
+/*
+ * 5.2 새 파티 인원 설정. 인원 선택이 위, 자리 미리보기가 가운데, 주 동작이 아래다.
+ */
+.page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--screen-padding-x) var(--space-8);
+  overflow-y: auto;
+}
+
+.sizes {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.size {
+  height: var(--control-height-sm);
+  flex: 1;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-size-meta);
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+/* 고른 인원. 빨강은 표식으로만 쓴다 (`design-concept.md` 2.3) */
+.size[aria-checked='true'] {
+  border-color: var(--color-brand);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-brand-ink);
+}
+
+.note,
+.progress {
+  text-align: center;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
+}
+
+/* 참여 자리 미리보기. 내 자리와 빈 친구 자리를 세로로 쌓는다 */
+.slots {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  margin: var(--space-4) 0 var(--space-2);
+  list-style: none;
+}
+
+.slot {
+  display: flex;
+  height: 56px;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-card);
+  font-size: var(--font-size-meta);
+  color: var(--color-ink-hint);
+}
+
+/* 내 자리는 이미 찬 자리이므로 점선이 아니다 */
+.slot[data-mine='true'] {
+  border-style: solid;
+  background: var(--color-surface-raised);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+.actions {
+  margin-top: auto;
+  padding-top: var(--space-6);
+}

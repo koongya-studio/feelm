@@ -1,0 +1,383 @@
+{
+  "schema_version": 1,
+  "audit_id": "tmdb-kobis-v1-20260913-independent-result-review",
+  "status": "PASS",
+  "reviewed_at_utc": "2026-09-13T04:39:38.1852956Z",
+  "reviewer": "/root/als_final_comparison_audit",
+  "scope": "Independent post-execution audit of the pinned existing-data TMDB-KOBIS-MovieLens descriptive analysis. No data collection, model fit, prediction, or source-file mutation was performed.",
+  "blocking_findings": [],
+  "verdict": {
+    "numeric_outputs": "PASS",
+    "population_denominators": "PASS",
+    "raw_movielens_sample_sd": "PASS",
+    "report_claim_boundaries": "PASS",
+    "figure_rendering": "PASS",
+    "optional_presentation_r4": "PASS",
+    "summary": "The reported TK371, B337, and B-SD334 populations, sufficient-statistic MovieLens sample SDs, CSV tables, report numbers, and four canonical figures agree with the pinned sources. The report states the selection and time/population limits and does not claim current Korean-user preference or GBT superiority."
+  },
+  "reviewed_execution_contract": {
+    "pre_execution_review": {
+      "path": "docs/research/tmdb-kobis-v1-20260913/execution-review.json",
+      "bytes": 1334,
+      "sha256": "680b92b43a7ff81a241518e5baad0ddeb805f83390ad9b68ad7b3c803ce50a82",
+      "status": "PASS"
+    },
+    "script": {
+      "path": "scripts/report_tmdb_kobis_v1.py",
+      "bytes": 33858,
+      "sha256": "70b68473201c31147d8865a658b8093f4a82b77748f37e441682798dfe7ab420"
+    },
+    "design": {
+      "path": "docs/research/tmdb-kobis-v1-20260913/DESIGN.md",
+      "bytes": 5182,
+      "sha256": "2f50f606b5d546bd09142deaa0107371fdbcf29267fd09e9a68ba8013ae33ac1"
+    },
+    "code_scope_checks": {
+      "network_requests": 0,
+      "model_fits": 0,
+      "prediction_runs": 0,
+      "movielens_columns_read": [
+        "movieId",
+        "rating"
+      ],
+      "user_id_read": false,
+      "individual_rating_rows_saved": 0
+    }
+  },
+  "input_pins": [
+    {
+      "path": "outputs/recommendation-evidence/kobis-service-final-20260913/movie-comparison.parquet",
+      "bytes": 76524,
+      "sha256": "9969d47da9298b736211caccefc946b131c311b1c11290eff1d3dad08c6f3c68"
+    },
+    {
+      "path": "outputs/recommendation-evidence/presentation-data-20260913/movie-rating-aggregates.parquet",
+      "bytes": 3114038,
+      "sha256": "b552b85ddad2a73a315ce2f176e79f6410807cbb4fa8ee241bfd8acbdca8524e"
+    },
+    {
+      "path": "<MOVIELENS_ARCHIVE>",
+      "bytes": 238950008,
+      "sha256": "e4a68655d7386b8f95f2f2424b2ff975dfdd15ffd59e0d864a14dca43e99d6ee"
+    },
+    {
+      "path": "outputs/recommendation-evidence/kobis-service-final-20260913/manifest.json",
+      "bytes": 3833,
+      "sha256": "f2f01b5c61b118feeb85d656a37e32408b8bea8aa6c362c0a9657cb08172df09"
+    },
+    {
+      "path": "outputs/recommendation-evidence/kobis-service-final-audit-20260913/result-review.json",
+      "bytes": 5734,
+      "sha256": "8db52c1076f22cba7521a407d43863fdc67b018bdd6369944116d3ec6d1fd3b5"
+    },
+    {
+      "path": "outputs/recommendation-evidence/kobis-service-final-audit-20260913/sensitivity-b.json",
+      "bytes": 15184,
+      "sha256": "31fdd74502dfe8bd0068f4e4d39a9676165d5182ed7a0460de21452d914824a4"
+    }
+  ],
+  "manifest_integrity": {
+    "path": "outputs/recommendation-evidence/tmdb-kobis-v1-20260913/manifest.json",
+    "bytes": 7774,
+    "sha256": "352946bddffe687c58f3e026bdb6ec12d9cf1c58490ab6e5910fefa858fba302",
+    "status_at_review": "GENERATED_PENDING_INDEPENDENT_RESULT_REVIEW",
+    "pins_checked": 28,
+    "pins_matching": 28,
+    "pin_failures": [],
+    "render_fix_record": {
+      "path": "outputs/recommendation-evidence/tmdb-kobis-v1-20260913/render-history/render-fix.json",
+      "bytes": 6399,
+      "sha256": "530a65ae0a509ed7546c2e2eb022b511f2e8ea272ba450d4cafa129dd642c753",
+      "numerical_csv_hashes_unchanged": true,
+      "changed_files": [
+        "01-counts-and-ratios.png",
+        "01-counts-and-ratios.svg"
+      ]
+    }
+  },
+  "population_rebuild": {
+    "source_rows": 400,
+    "source_definition": "KOBIS Top200 Korean plus Top200 foreign selected sample",
+    "TK": {
+      "definition": "MATCHED, positive KOBIS audience, positive TMDB vote count, TMDB VALID",
+      "movies": 371,
+      "K": 181,
+      "F": 190,
+      "unique_kobis_movie_code": true,
+      "unique_service_movie_id": true,
+      "unique_tmdb_id": true,
+      "without_positive_movielens_ratings": 33
+    },
+    "B": {
+      "definition": "TK with positive MovieLens count, TMDB release date on or before 2023-10-13, and MovieLens title year no later than 2023",
+      "movies": 337,
+      "K": 163,
+      "F": 174,
+      "unique_movie_id": true
+    },
+    "B_SD": {
+      "definition": "B with at least two individual MovieLens ratings",
+      "supported_movies": 334,
+      "single_rating_movies_excluded_from_sd": 3,
+      "single_rating_sd_representation": "missing, not zero"
+    },
+    "result": "PASS"
+  },
+  "raw_movielens_recalculation": {
+    "raw_rows_read": 32000204,
+    "selected_B_rating_rows": 1660456,
+    "columns_read": [
+      "movieId",
+      "rating"
+    ],
+    "aggregation": "For each of the 337 B movieIds, independently accumulated count, sum(2r), and sum((2r)^2) on the half-star integer grid.",
+    "sample_variance_formula": "(n*sum((2r)^2)-sum(2r)^2)/(4*n*(n-1))",
+    "checks": {
+      "all_ratings_on_half_star_grid": true,
+      "nonnegative_variance_numerator_for_supported_movies": true,
+      "count_exact_vs_output_csv": true,
+      "halfstar_sum_exact_vs_output_csv": true,
+      "halfstar_square_sum_exact_vs_output_csv": true,
+      "count_exact_vs_prior_movie_aggregate": true,
+      "rating_sum_exact_vs_prior_movie_aggregate": true,
+      "sd_missing_pattern_exact": true,
+      "max_absolute_sd_difference": 2.220446049250313e-16,
+      "supported_movies": 334,
+      "unsupported_single_rating_movies": 3
+    },
+    "result": "PASS"
+  },
+  "csv_recalculation": {
+    "tmdb-kobis-pairs.csv": {
+      "rows": 371,
+      "source_selection_and_derived_fields": "PASS",
+      "text_and_missingness": "exact",
+      "floating_point_comparison": "within 1.5e-11 absolute error; the largest differences are CSV representation of large counts or ratios"
+    },
+    "movielens-same-film-rating-sd.csv": {
+      "rows": 337,
+      "source_columns": "PASS",
+      "integer_sufficient_statistics": "exact",
+      "sample_sd": "PASS"
+    },
+    "coverage.csv": {
+      "shape": [
+        3,
+        10
+      ],
+      "result": "PASS",
+      "max_absolute_numeric_difference": 1.1102230246251565e-16
+    },
+    "count-and-rating-relations.csv": {
+      "shape": [
+        19,
+        24
+      ],
+      "result": "PASS",
+      "max_absolute_numeric_difference": 1.4551915228366852e-11
+    },
+    "between-film-rating-distributions.csv": {
+      "shape": [
+        15,
+        14
+      ],
+      "result": "PASS",
+      "max_absolute_numeric_difference": 8.881784197001252e-16
+    },
+    "within-film-ml-sd-distributions.csv": {
+      "shape": [
+        6,
+        15
+      ],
+      "result": "PASS",
+      "max_absolute_numeric_difference": 2.220446049250313e-16
+    }
+  },
+  "headline_metric_crosscheck": {
+    "audience_vs_tmdb_vote_count_spearman": {
+      "ALL": -0.0458866453,
+      "K": 0.4030199403,
+      "F": 0.2268577202
+    },
+    "tmdb_mean_vs_audience_spearman": {
+      "ALL": 0.2320974,
+      "K": 0.1632876,
+      "F": 0.3325065
+    },
+    "tmdb_mean_vs_vote_count_spearman": {
+      "ALL": 0.2542134,
+      "K": 0.4494499,
+      "F": 0.355504
+    },
+    "median_audience_per_tmdb_vote": {
+      "ALL": 1435.1298,
+      "K": 35378.3037,
+      "F": 304.72446
+    },
+    "median_tmdb_votes_per_million_kobis_audience": {
+      "ALL": 696.8,
+      "K": 28.27,
+      "F": 3281.66
+    },
+    "between_film_sample_sd_equal_film_weight": {
+      "TK371_tmdb_10_ALL": 0.63933998,
+      "TK371_tmdb_10_K": 0.6256237,
+      "TK371_tmdb_10_F": 0.65123436,
+      "B337_movielens_5_ALL": 0.44502863,
+      "B337_movielens_5_K": 0.49938754,
+      "B337_movielens_5_F": 0.38777467,
+      "B337_tmdb_div2_5_ALL": 0.31400844,
+      "B337_tmdb_div2_5_K": 0.31362169,
+      "B337_tmdb_div2_5_F": 0.31465901
+    },
+    "within_film_movielens_sample_sd_equal_film_weight_summary": {
+      "ALL": {
+        "supported_movies": 334,
+        "mean": 0.9351064,
+        "median": 0.95583775,
+        "p5": 0.5367589,
+        "p95": 1.2014204
+      },
+      "K": {
+        "supported_movies": 160,
+        "mean": 0.8627683,
+        "median": 0.8633931,
+        "p5": 0.3535534,
+        "p95": 1.3240085
+      },
+      "F": {
+        "supported_movies": 174,
+        "mean": 1.0016242,
+        "median": 0.9976964,
+        "p5": 0.8574048,
+        "p95": 1.163313
+      }
+    },
+    "result": "PASS"
+  },
+  "stable_numeric_artifact_pins": [
+    {
+      "path": "docs/research/tmdb-kobis-v1-20260913/data/between-film-rating-distributions.csv",
+      "bytes": 2845,
+      "sha256": "0ae00d35a4c1c037af3aee4545e8dd8ce057e731007be0cb93574067fd14389d"
+    },
+    {
+      "path": "docs/research/tmdb-kobis-v1-20260913/data/count-and-rating-relations.csv",
+      "bytes": 7797,
+      "sha256": "48fce8b412ca4bd65f53794bd1973d65c9b97711cb0a54ccd058bf0ae1ae02cd"
+    },
+    {
+      "path": "docs/research/tmdb-kobis-v1-20260913/data/coverage.csv",
+      "bytes": 425,
+      "sha256": "55f8b56a663de25327e51492a4ee7bdc3ffcb3f4a94f5bb9f5d4ee04d3a8a3b5"
+    },
+    {
+      "path": "docs/research/tmdb-kobis-v1-20260913/data/movielens-same-film-rating-sd.csv",
+      "bytes": 88020,
+      "sha256": "066e2b429f8141df28cf47892c8ddc5b6ea717bd9cb3b640e877f30d97cd99cb"
+    },
+    {
+      "path": "docs/research/tmdb-kobis-v1-20260913/data/tmdb-kobis-pairs.csv",
+      "bytes": 82792,
+      "sha256": "ceb0bae58844ae020a61a0ae4fbca4242b041296630c73684c5f019b39d68f7f"
+    },
+    {
+      "path": "docs/research/tmdb-kobis-v1-20260913/data/within-film-ml-sd-distributions.csv",
+      "bytes": 1693,
+      "sha256": "80276b22a4ff00b10c2de60b45538839d449650c5217e7e7a889fb0e6ebff4b4"
+    },
+    {
+      "path": "outputs/recommendation-evidence/tmdb-kobis-v1-20260913/summary.json",
+      "bytes": 660,
+      "sha256": "044fe3bc82679076441551c07a300fc4dae3c6521ec50b58465394a08ef66cc5"
+    },
+    {
+      "path": "outputs/recommendation-evidence/tmdb-kobis-v1-20260913/raw-ml-sd-scan.json",
+      "bytes": 405,
+      "sha256": "fb8d051b8d306a39b424fa2e5f1a79337a90a2cb5c48117424600a5b1d62bc6e"
+    }
+  ],
+  "report_and_visual_review": {
+    "report": {
+      "path": "docs/research/tmdb-kobis-v1-20260913/REPORT.md",
+      "bytes_at_review": 9616,
+      "sha256_at_review": "bf2a236efda13bec9c8323e781ad52b5298e3ae18701f6b0596358f68d6e1d36",
+      "content_result": "PASS",
+      "status_at_review": "DRAFT - aggregation complete, independent result review pending",
+      "pin_lifecycle": "Provisional document pin. The parent reviewer will update only the review status/receipt link after this PASS, then record the revised report hash in a new manifest revision. Stable numeric CSV, code, and input pins above are the evidence basis for this decision."
+    },
+    "claim_boundary_checks": {
+      "top200_selection_bias_stated": true,
+      "unmatched_movies_not_treated_as_zero": true,
+      "source_time_and_participant_population_mismatch_stated": true,
+      "tmdb_div2_described_as_scale_conversion_only": true,
+      "between_film_sd_not_confused_with_individual_opinion_sd_or_standard_error": true,
+      "tmdb_individual_rating_sd_marked_unavailable": true,
+      "kobis_satisfaction_sd_marked_unavailable": true,
+      "no_current_korean_user_preference_claim": true,
+      "no_causal_claim": true,
+      "no_gbt_superiority_claim": true,
+      "future_recommender_value_requires_separate_fixed_experiment": true
+    },
+    "figures": [
+      {
+        "path": "docs/research/tmdb-kobis-v1-20260913/data/01-counts-and-ratios.png",
+        "bytes": 213662,
+        "sha256": "1c05b06e85d16a93c8a5404215860023cf3b103b7ddc5135828e45e40ef4f3b3",
+        "visual_result": "PASS"
+      },
+      {
+        "path": "docs/research/tmdb-kobis-v1-20260913/data/02-scale-imbalance.png",
+        "bytes": 111585,
+        "sha256": "6df096c73e017b794a7069db56cd236c94f0650d0fa87343ab701225ba77d8bf",
+        "visual_result": "PASS"
+      },
+      {
+        "path": "docs/research/tmdb-kobis-v1-20260913/data/03-rating-relations.png",
+        "bytes": 234269,
+        "sha256": "6f69dfbf6babe91a4f0c3bcba2ae0c90703ba784f91cd84ad23a8da3d706f92e",
+        "visual_result": "PASS"
+      },
+      {
+        "path": "docs/research/tmdb-kobis-v1-20260913/data/04-rating-dispersion.png",
+        "bytes": 136749,
+        "sha256": "7068f2de75a66ecd604b4fadfe3c7d227264b6e5965a4f059c2d1b8897814f72",
+        "visual_result": "PASS"
+      }
+    ],
+    "visual_checks": "Titles, Korean labels, units, legends, sample sizes, footnotes, bounds, and margins are readable without clipping or material overlap. Displayed values match the audited CSVs."
+  },
+  "optional_presentation_review": {
+    "reviewed_revision": {
+      "path": "outputs/recommendation-evidence/service-v1-presentation-20260913/final-r4/feelm-recommendation-v1.pptx",
+      "bytes": 37726,
+      "sha256": "39d0f0140193235554447d1945733b7f3ade6a69256634ddbd887301ee77ffd0"
+    },
+    "slides_reviewed": 6,
+    "render_and_readability": "PASS",
+    "numeric_consistency_with_audited_sources": "PASS",
+    "claim_boundary": "GBT is presented as a product choice with no statistical winner, not as a result proved by this descriptive KOBIS analysis.",
+    "later_revisions_observed_but_not_covered_by_this_receipt": [
+      {
+        "path": "outputs/recommendation-evidence/service-v1-presentation-20260913/final-r5/feelm-recommendation-v1.pptx",
+        "bytes": 37767,
+        "sha256": "5bfb0f615e329253c1e69085644bb48412b4fc3092ace11ce787d0d564bfc5bc"
+      },
+      {
+        "path": "outputs/recommendation-evidence/service-v1-presentation-20260913/final-r6/feelm-recommendation-v1.pptx",
+        "bytes": 37771,
+        "sha256": "2727a5f061ad67d6453194715d9e3845018b50f6a8273abd1a8e41af3cca4970"
+      }
+    ]
+  },
+  "nonblocking_findings": [
+    {
+      "id": "REPORT-STATUS-RECEIPT-PENDING",
+      "detail": "At the audited report pin, REPORT.md and manifest.json still say that independent result review is pending. This is expected sequencing. After this receipt is written, update only the report review status/receipt reference and create a manifest revision that pins the new report body; then perform a document-only final check."
+    },
+    {
+      "id": "PRESENTATION-REVISION-SELECTION",
+      "detail": "The requested optional audit covered final-r4 exactly. final-r5 and final-r6 also exist; choose and pin the intended delivery revision before external sharing."
+    }
+  ]
+}

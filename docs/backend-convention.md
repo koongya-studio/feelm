@@ -68,6 +68,7 @@ google-java-format(AOSP 모드)이 설정되어 있다.
 ```text
 com.feelm.backend
 ├── domain
+│   ├── auth
 │   ├── user
 │   ├── onboarding
 │   ├── ott
@@ -82,7 +83,9 @@ com.feelm.backend
 │   └── trend
 ├── global
 │   ├── config
+│   ├── entity
 │   ├── error
+│   ├── properties
 │   ├── response
 │   └── security
 └── infrastructure
@@ -92,7 +95,9 @@ com.feelm.backend
     └── mail
 ```
 
-도메인 내부는 필요한 계층만 생성한다. 사용하지 않는 빈 패키지를 미리 만들지 않는다.
+도메인 패키지와 그 내부 계층은 실제 코드가 생길 때 만든다. 사용하지 않는 빈 패키지를 미리
+만들지 않는다. 담당자별 도메인은 [`backend-role-assignment.md`](./backend-role-assignment.md)를
+따른다.
 
 ```text
 domain/movie
@@ -105,8 +110,13 @@ domain/movie
     └── response
 ```
 
-- `global`: 여러 도메인이 함께 사용하는 설정·오류·보안 등 기술 독립적인 공통 코드
+- `global`: 여러 도메인이 함께 사용하는 설정·공통 엔티티·오류·응답·보안 등 기술 독립적인
+  공통 코드. `global/security`는 토큰 발급·검증, 인증 필터, 인가·CORS 정책을 담당한다.
+  `global/properties`는 여러 패키지의 `@ConfigurationProperties`가 공유하는 설정값 검증 규칙을
+  담당한다. 설정 레코드 자체는 값을 읽는 도메인 또는 인프라 패키지에 두고, 규칙만 이곳에 둔다.
 - `infrastructure`: Kafka, Redis, 외부 API, 메일처럼 외부 시스템과 연결하는 코드
+- `auth`: 로그인, 토큰 재발급과 폐기처럼 인증 유스케이스를 담당한다. 토큰과 필터 자체는
+  `global/security`에 둔다.
 - `search`: 영화 검색과 검색 필터를 담당한다. 영화 상세와 기준정보는 `movie`에 둔다.
 - `watch`: 감상 기록과 평가를 담당하며 한줄평의 저장·수정·삭제도 평가에 포함한다.
 - `social`: 공개 한줄평 목록, 공개 프로필, 취향 비교, 사용자 랭킹과 커뮤니티 유스케이스를
@@ -197,7 +207,7 @@ Repository는 영속성 조회·저장만 담당한다.
 - MyBatis `Mapper.xml`은 사용하지 않는다. DB 접근 방식 예외가 필요하면 9장의 기준을 따른다.
 
 ```java
-public record RatingResponse(Long ratingId, int score, String comment) {
+public record RatingResponse(Long ratingId, BigDecimal score, String comment) {
 
     public static RatingResponse from(Rating rating) {
         return new RatingResponse(rating.getId(), rating.getScore(), rating.getComment());
@@ -222,6 +232,9 @@ public record RatingResponse(Long ratingId, int score, String comment) {
   형식을 따른다.
 - 모든 Entity에 공통 `id`, `status`, `deletedAt`을 강제하지 않는다. 복합키와 도메인별
   생명주기를 존중한다.
+- 감사 컬럼이 필요한 Entity는 `global/entity`의 `BaseTimeEntity`(createdAt) 또는
+  `BaseUpdatableEntity`(createdAt, updatedAt)를 선택해 상속한다. 모든 Entity에 강제하지
+  않는다.
 
 ## 7. JPA 연관관계 규칙
 
@@ -288,6 +301,10 @@ public record RatingResponse(Long ratingId, int score, String comment) {
 - 성공 응답은 공통 envelope로 감싸지 않고 Response DTO를 그대로 반환한다.
 - 생성은 `201 Created`, 삭제 성공은 `204 No Content` 등 명세의 HTTP 상태를 사용한다.
 - 오류는 공통 `ErrorResponse`와 의미 있는 `ErrorCode`로 통일한다.
+- `ErrorCode`에는 HTTP 상태와 사용자용 한국어 메시지를 함께 정의하고 이름은
+  `UPPER_SNAKE_CASE`로 작성한다.
+- API 계약에 없는 공통 오류 코드를 추가할 때는 `docs/api/README.md`의 API-000 오류 코드
+  표를 먼저 함께 갱신한다.
 - Service는 비즈니스 예외를 발생시키고, 전역 예외 처리기가 HTTP 상태와 오류 응답으로
   변환한다.
 - 예외 메시지 문자열을 Controller마다 직접 작성하지 않는다.
@@ -304,6 +321,35 @@ public record RatingResponse(Long ratingId, int score, String comment) {
   경계 또는 이벤트 방식으로 재설계한다.
 - 공통 DTO, 오류 코드, DB Schema, Kafka 이벤트 스키마를 변경할 때는 역할 분배 및 AI 협업
   문서의 공통 계약 변경 절차를 따른다.
+- **차단 필터**는 `domain/user/service/UserBlockFilter`가 제공하는 읽기 전용 컴포넌트다.
+  차단은 `user_blocks`에 단방향 행으로 저장하지만 노출 차단은 양방향이므로, 각 도메인이
+  `user_blocks`를 직접 조회하지 않고 이 컴포넌트를 호출한다(FR-39, 소유·사용 경계는
+  [`backend-role-assignment.md`](./backend-role-assignment.md)). 상대가 한 명이면
+  `isBlocked(userId, otherUserId)`, 후보 집합이 정해져 있으면 `blockedAmong(userId, candidateIds)`,
+  후보를 미리 좁힐 수 없으면 `blockedCounterpartIds(userId)`를 쓰고 반환된 id를 결과에서 제외한다.
+  `blockedAmong`의 후보는 `in` 절에 그대로 들어가므로 한 번에 1,000건 이하로 나눠 호출한다.
+  차단 관계를 만들거나 지우는 경로는 `UserBlockService`뿐이며, 그 쓰기 메서드는 최상위
+  트랜잭션에서만 호출한다(실패를 예외로 바꿔 던지고 벌크 삭제가 영속성 컨텍스트를 비운다).
+- **단일 정렬 키와 식별자로 이뤄진 커서 페이지네이션**의 인코딩과 해독은 `global/response/CursorCodec`을
+  사용한다. 공통 응답 규약이 커서를 서버가 발급한 불투명 문자열로 정의하므로([`api/README.md`](./api/README.md))
+  인코딩 형식과 방어 규칙은 한곳에서 정하고 각 도메인은 커서에 담을 값만 정한다. base64url 해독
+  실패, 구분자, 빈 값, 식별자 하한은 진입점이 무조건 확인한다. **시각을 담는 커서는
+  `CursorCodec.decodeInstant`를 쓴다.** 허용 범위 검증이 그 안에 있으므로, `decode`에
+  `Instant.parse`를 직접 부르는 팩토리를 넘기면 범위를 벗어난 시각이 질의로 내려가 500이 된다.
+  그 밖의 커서는 `decode`에 도메인 팩토리를 넘기고, 도메인 고유 규칙은 `CursorFactory` 안에서
+  확인해 `IllegalArgumentException`으로 거절한다. 커서는 클라이언트가 고쳐 보낼 수 있는
+  입력이므로 해독 실패는 모두 `VALIDATION_FAILED`가 되어야 한다. 길이 상한도 `CursorCodec`에
+  있으나 이것은 응답 코드를 가르는 검사가 아니라 해독 이전의 자원 상한이다. 상한을 넘는 값은
+  어차피 다른 검사에 걸리므로, 도메인 검증과 중복돼 보여도 지우지 않는다.
+  커서 record 자체는 도메인에 두고 타입을 공유하지 않는다. 정렬 키가 도메인마다 다르고 도메인
+  내부 타입을 도메인 밖으로 노출하지 않기 위해서다.
+  정렬 키를 여럿 담거나 질의 조건까지 커서에 넣어야 하는 경우는 이 형식에 담기지 않는다
+  (`domain/search/cursor/MovieSearchCursorCodec`). 그런 커서는 도메인이 별도 codec을 두되,
+  해독 실패를 모두 `VALIDATION_FAILED`로 모으는 규칙은 같게 지킨다.
+- `SecurityConfig`는 기본 정책을 "인증 필요"로 두고, 비회원도 호출할 수 있는 **공개**·**선택**
+  구분의 API만 허용 목록에 등록한다. 규칙을 빠뜨린 새 API가 조용히 열리지 않도록 한 것이므로,
+  도메인의 공개 API를 추가할 때는 `SecurityConfig`의 허용 경로에 함께 등록한다. 이 파일은
+  전원이 공유하는 공통 파일이라 변경 전에 루트 `AGENTS.md` 5장에 따라 영향 범위를 알린다.
 
 ## 12. 로깅과 민감정보
 
@@ -315,19 +361,16 @@ public record RatingResponse(Long ratingId, int score, String comment) {
 
 ## 13. AI 생성 코드 적용 규칙
 
-- AI가 생성한 코드도 이 문서의 패키지·계층·Entity·JPA 규칙을 그대로 적용한다.
-- 구현 전 관련 API 명세, ERD, ADR, 역할 분배 문서를 확인한다.
-- 명세에 없는 API, Entity, 필드, 의존성을 임의로 추가하지 않는다.
-- 다른 담당자 소유 도메인과 공통 설정을 임의로 수정하지 않는다.
-- 컨벤션을 적용할 수 없거나 예외가 필요하면 구현 전에 사용자에게 이유와 대안을 제시한다.
-- 작업 시작·검증·완료 보고 형식과 충돌 방지 절차는 `ai-collaboration.md`를 따른다.
+AI가 생성한 코드도 이 문서의 규칙을 그대로 적용한다. AI가 확인할 기준 문서와 작업
+절차는 `backend/AGENTS.md`가, 작업 시작·검증·완료 보고는 루트 `AGENTS.md`가, 충돌 방지
+절차는 `ai-collaboration.md`가 정의한다.
 
 ## 14. 결정 대기 및 후속 확정 사항
 
 아래 항목은 개발 시작 전 또는 해당 기능 착수 전에 팀 합의와 관련 문서 갱신이 필요하다.
 확정 전 AI나 구현자가 임의로 선택하지 않는다.
 
-테스트 작성 절차(TDD)와 AI 에이전트 작업 파이프라인은 `backend/AGENTS.md`에서 정의한다.
+테스트 요구 수준(플랜의 인수 테스트 목록)과 AI 에이전트 작업 절차는 `backend/AGENTS.md`에서 정의한다.
 
 - Spring Boot 최종 버전과 라이브러리 호환성
 - Flyway 도입과 마이그레이션 파일 소유·번호 관리 방식

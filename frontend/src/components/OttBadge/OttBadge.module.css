@@ -1,0 +1,32 @@
+.badge {
+  display: inline-flex;
+  width: var(--ott-badge-size);
+  height: var(--ott-badge-size);
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--ott-badge-radius);
+  font-size: var(--ott-badge-font-size);
+  font-weight: var(--font-weight-bold);
+}
+
+.badge[data-variant='default'] {
+  background: var(--color-surface-sunken);
+  color: var(--color-ink);
+}
+
+/*
+ * 미선택 — 흰 글자를 잉크로 바꿨다. `#A5A29B` 위의 흰 글자는 2.50:1로 기준에 못 미쳤다
+ * (`DESIGN_TODO.md` Phase 7 점검 항목). 잉크로 두면 5.4:1이 된다.
+ */
+.badge[data-variant='unselected'] {
+  background: var(--color-surface-sunken);
+  color: var(--color-ink);
+  font-weight: var(--font-weight-bold);
+}
+
+.badge[data-variant='selected'] {
+  background: var(--color-ink);
+  color: var(--color-on-dark);
+  font-weight: var(--font-weight-bold);
+}

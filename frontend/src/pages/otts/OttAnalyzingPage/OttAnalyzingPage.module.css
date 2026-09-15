@@ -1,0 +1,112 @@
+/* EXT-02. 5.4 파티 분석 중(PartyAnalyzingPage.module.css)과 같은 한 덩어리 구성이다 */
+.page {
+  display: flex;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  flex-direction: column;
+  padding: var(--space-4) var(--screen-padding-x);
+}
+
+.stage {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+}
+
+.strip {
+  position: relative;
+  width: 100%;
+  max-width: 240px;
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-dark);
+}
+
+.light {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-on-dark);
+  animation: sweep 1.4s var(--ease-standard) infinite;
+}
+
+@keyframes sweep {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(250%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .light {
+    width: 100%;
+    animation: none;
+  }
+}
+
+.title {
+  color: var(--color-ink);
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-title);
+  text-align: center;
+}
+
+.lead {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.steps {
+  display: flex;
+  width: 100%;
+  max-width: 280px;
+  flex-direction: column;
+  margin-top: var(--space-4);
+  gap: var(--space-3);
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  color: var(--color-ink-hint);
+  font-size: var(--font-size-meta);
+  gap: var(--space-2);
+  line-height: var(--line-height-meta);
+  transition: color var(--motion-base) var(--ease-standard);
+}
+
+.step[data-done='true'] {
+  color: var(--color-ink);
+}
+
+/* 진행 표식. 빨강을 쓰는 자리다(`design-concept.md` 2.2 `진행`) */
+.mark {
+  display: flex;
+  width: 20px;
+  height: 20px;
+  box-sizing: border-box;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--color-line-strong);
+  border-radius: 50%;
+  color: var(--color-on-action);
+}
+
+.step[data-done='true'] .mark {
+  border-color: var(--color-brand);
+  background: var(--color-brand);
+}

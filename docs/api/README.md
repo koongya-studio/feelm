@@ -21,6 +21,15 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 
 ## 범례
 
+### 사용자 평가 점수 공통 계약
+
+개인 평가 `score`는 JSON `number`이며 0.5~5.0점, 0.5점 단위다(FR-19, API-036·037).
+평가·영화 상세·한줄평·프레임·공개 프로필의 요청과 응답에서 같은 원값을 전달한다.
+평균 평점과 모델 예측 점수는 별도 지표이므로 0.5 배수 조건을 적용하지 않는다.
+자세한 검증과 오류는 [평가 생성·수정](./watch.md)을 따른다.
+
+### 표기
+
 - **ID**: `API-nnn`. Jira·MR·코드 주석에서 이 ID로 참조합니다. `API-000`은 공통 규약입니다.
 - **단계**: `1차 MVP` → `2차 MVP` → `확장` 순으로 구현합니다.
 - **인증**: `공개` 비회원 호출 가능 / `회원` Access Token 필수 / `선택` 비회원 가능하나 로그인 시 개인화·차단 필터 적용
@@ -39,7 +48,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-004 | [이메일 로그인](./users.md#api-004-이메일-로그인) | POST | `/auth/login` | 사용자 | 1차 MVP | 공개 | FR-01 |  |
 | API-005 | [로그아웃](./users.md#api-005-로그아웃) | POST | `/auth/logout` | 사용자 | 1차 MVP | 회원 | FR-01 |  |
 | API-006 | [토큰 재발급](./users.md#api-006-토큰-재발급) | POST | `/auth/token/refresh` | 사용자 | 1차 MVP | 공개 | FR-01 |  |
-| API-007 | [소셜 로그인](./users.md#api-007-소셜-로그인) | POST | `/auth/oauth/{provider}` | 사용자 | 1차 MVP | 공개 | FR-35 | O |
+| API-007 | [소셜 로그인](./users.md#api-007-소셜-로그인) | POST | `/auth/oauth/{provider}` | 사용자 | 1차 MVP | 공개 | FR-35 |  |
 | API-008 | [소셜 회원가입 완료](./users.md#api-008-소셜-회원가입-완료) | POST | `/auth/oauth/signup` | 사용자 | 1차 MVP | 공개 | FR-35 |  |
 | API-009 | [소셜 계정 연결](./users.md#api-009-소셜-계정-연결) | POST | `/users/me/oauth/{provider}` | 사용자 | 1차 MVP | 회원 | FR-35 | O |
 | API-010 | [비밀번호 재설정 요청](./users.md#api-010-비밀번호-재설정-요청) | POST | `/auth/password/reset-request` | 사용자 | 1차 MVP | 공개 | FR-37 |  |
@@ -51,16 +60,16 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-016 | [닉네임 사용 가능 확인](./users.md#api-016-닉네임-사용-가능-확인) | GET | `/users/nickname-availability` | 사용자 | 1차 MVP | 공개 | FR-01, FR-38 |  |
 | API-017 | [알림 설정 조회](./users.md#api-017-알림-설정-조회) | GET | `/users/me/notification-settings` | 사용자 | 1차 MVP | 회원 | FR-38 | O |
 | API-018 | [알림 설정 변경](./users.md#api-018-알림-설정-변경) | PUT | `/users/me/notification-settings` | 사용자 | 1차 MVP | 회원 | FR-38 |  |
-| API-019 | [사용자 검색](./users.md#api-019-사용자-검색) | GET | `/users/search` | 사용자 | 1차 MVP | 회원 | FR-20, FR-39 | O |
+| API-019 | [사용자 검색](./users.md#api-019-사용자-검색) | GET | `/users/search` | 사용자 | 1차 MVP | 회원 | FR-20, FR-39 |  |
 | API-020 | [사용자 차단](./users.md#api-020-사용자-차단) | POST | `/users/{userId}/block` | 사용자 | 1차 MVP | 회원 | FR-39 | O |
 | API-021 | [사용자 차단 해제](./users.md#api-021-사용자-차단-해제) | DELETE | `/users/{userId}/block` | 사용자 | 1차 MVP | 회원 | FR-39 |  |
 | API-022 | [차단 목록 조회](./users.md#api-022-차단-목록-조회) | GET | `/users/me/blocks` | 사용자 | 1차 MVP | 회원 | FR-39 |  |
-| API-023 | [초기 취향 카드 목록](./onboarding-ott.md#api-023-초기-취향-카드-목록) | GET | `/onboarding/cards` | 온보딩 | 1차 MVP | 회원 | FR-02 | O |
+| API-023 | [초기 취향 카드 목록](./onboarding-ott.md#api-023-초기-취향-카드-목록) | GET | `/onboarding/cards` | 온보딩 | 1차 MVP | 회원 | FR-02 |  |
 | API-024 | [초기 취향 제출](./onboarding-ott.md#api-024-초기-취향-제출) | POST | `/onboarding/preferences` | 온보딩 | 1차 MVP | 회원 | FR-02 |  |
-| API-025 | [OTT 목록 조회](./onboarding-ott.md#api-025-ott-목록-조회) | GET | `/otts` | OTT | 1차 MVP | 공개 | FR-03, FR-16 | O |
+| API-025 | [OTT 목록 조회](./onboarding-ott.md#api-025-ott-목록-조회) | GET | `/otts` | OTT | 1차 MVP | 공개 | FR-03, FR-16 |  |
 | API-026 | [내 구독 OTT 조회](./onboarding-ott.md#api-026-내-구독-ott-조회) | GET | `/users/me/otts` | OTT | 1차 MVP | 회원 | FR-03 |  |
 | API-027 | [내 구독 OTT 설정](./onboarding-ott.md#api-027-내-구독-ott-설정) | PUT | `/users/me/otts` | OTT | 1차 MVP | 회원 | FR-03 |  |
-| API-028 | [영화 검색](./movies-search.md#api-028-영화-검색) | GET | `/movies/search` | 검색 | 1차 MVP | 선택 | FR-14, FR-15 | O |
+| API-028 | [영화 검색](./movies-search.md#api-028-영화-검색) | GET | `/movies/search` | 검색 | 1차 MVP | 회원 | FR-14, FR-15 | O |
 | API-029 | [검색 필터 옵션 조회](./movies-search.md#api-029-검색-필터-옵션-조회) | GET | `/movies/filter-options` | 검색 | 1차 MVP | 공개 | FR-15 |  |
 | API-030 | [영화 상세 조회](./movies-search.md#api-030-영화-상세-조회) | GET | `/movies/{movieId}` | 영화 | 1차 MVP | 선택 | FR-34, FR-16, FR-13 | O |
 | API-031 | [유사 영화 추천](./recommendation.md#api-031-유사-영화-추천) | GET | `/movies/{movieId}/similar` | 추천 | 1차 MVP | 선택 | FR-11 | O |
@@ -101,6 +110,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-066 | [오늘의 영화](./recommendation.md#api-066-오늘의-영화) | GET | `/recommendations/today` | 추천 | 확장 | 회원 | FR-30 | O |
 | API-067 | [커뮤니티](./social.md#api-067-커뮤니티) | - | `/community (미정)` | 소셜 | 확장 | 회원 | FR-31 | O |
 | API-068 | [OTT 구독 추천](./recommendation.md#api-068-ott-구독-추천) | GET | `/recommendations/otts` | 추천 | 확장 | 회원 | FR-40 | O |
+| API-069 | [파티 멤버 강퇴](./party.md#api-069-파티-멤버-강퇴) | DELETE | `/parties/{partyId}/members/{userId}` | 파티 | 1차 MVP | 회원 | FR-20 |  |
 
 ## 공통 규약
 

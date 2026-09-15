@@ -1,0 +1,87 @@
+/*
+ * 6.1 구독 OTT 관리. 구독 중과 미구독 두 묶음으로 나뉜다.
+ *
+ * 토글의 켠 상태는 검정이다. 빨강을 면으로 쓰지 않는다(`design-concept.md` 2.3).
+ */
+.page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--screen-padding-x) var(--space-8);
+  overflow-y: auto;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.groupLabel {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+}
+
+.body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.name {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-body);
+  color: var(--color-ink);
+}
+
+.state {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
+}
+
+.note {
+  text-align: center;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
+}
+
+/* EXT-01 진입. 확장 기능이라 글자 링크로 가볍게 둔다 */
+.finder {
+  display: inline-flex;
+  min-height: var(--tap-target-min);
+  align-self: center;
+  align-items: center;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

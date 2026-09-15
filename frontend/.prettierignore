@@ -1,0 +1,7 @@
+dist
+node_modules
+landing
+docs
+
+# 마크다운은 저장소 기존 문서 스타일을 따르므로 Prettier 대상에서 제외한다.
+*.md

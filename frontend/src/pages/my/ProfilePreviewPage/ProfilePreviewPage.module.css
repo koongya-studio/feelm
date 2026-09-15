@@ -1,0 +1,36 @@
+/*
+ * 히어로가 화면 폭을 꽉 채워야 하므로 페이지에는 좌우 여백을 주고, 히어로가 음수
+ * 마진으로 그 여백을 되돌린다(ProfileHero.module.css).
+ */
+.page {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--screen-padding-x) var(--space-6);
+  gap: var(--space-5);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/*
+ * 이 화면이 무엇인지 알리는 문구. 헤더를 없앴으므로(ProfileHero가 화면 맨 위를 쓴다)
+ * 이미지 위 `미리보기` 라벨과 함께 목적을 분명히 한다(레퍼런스 지시 3.3).
+ */
+.purpose {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  text-align: center;
+}
+
+.notice {
+  padding: var(--space-3) var(--space-4);
+  border: 1px dashed var(--color-line-strong);
+  border-radius: var(--radius-control);
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}

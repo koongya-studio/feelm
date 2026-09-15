@@ -60,7 +60,54 @@ class ErrorCodeTest {
                         "RECOMMENDATION_UNAVAILABLE",
                         // 인증 도메인 — API-006 토큰 재발급 전용
                         "REFRESH_TOKEN_INVALID",
-                        "REFRESH_TOKEN_EXPIRED");
+                        "REFRESH_TOKEN_EXPIRED",
+                        // 계정 도메인 — API-001~004 (S15P21E106-149)
+                        "EMAIL_DUPLICATED",
+                        "NICKNAME_DUPLICATED",
+                        "VERIFICATION_TOKEN_INVALID",
+                        "VERIFICATION_TOKEN_EXPIRED",
+                        "ALREADY_VERIFIED",
+                        "INVALID_CREDENTIALS",
+                        "EMAIL_NOT_VERIFIED",
+                        // 계정 도메인 — API-007~009 소셜 로그인·연결 (S15P21E106-150)
+                        "UNSUPPORTED_PROVIDER",
+                        "OAUTH_CODE_INVALID",
+                        "OAUTH_PROVIDER_ERROR",
+                        "OAUTH_EMAIL_REQUIRED",
+                        "SIGNUP_TOKEN_INVALID",
+                        "OAUTH_ACCOUNT_ALREADY_LINKED",
+                        "PROVIDER_ALREADY_LINKED",
+                        // 계정 도메인 — API-010~012 (S15P21E106-151)
+                        "RESET_TOKEN_INVALID",
+                        "RESET_TOKEN_EXPIRED",
+                        "PASSWORD_NOT_SET",
+                        // 사용자 도메인 — API-020 차단 (S15P21E106-211)
+                        "CANNOT_BLOCK_SELF",
+                        "ALREADY_BLOCKED",
+                        // 온보딩 도메인 — API-023·024 (S15P21E106-154)
+                        "ONBOARDING_ALREADY_COMPLETED",
+                        // 추천 도메인 — API-047 관심없음 (S15P21E106-165)
+                        "ALREADY_DISMISSED",
+                        // 파티 도메인 — API-051·055·056·069
+                        "PARTY_CLOSED",
+                        "PARTY_FULL",
+                        "ACTIVE_PARTY_LIMIT_REACHED",
+                        "ALREADY_MEMBER",
+                        "INVITATION_PENDING",
+                        "INVITATION_NOT_PENDING");
+    }
+
+    @Test
+    @DisplayName("API-007~009 소셜 계정 오류 코드는 각 명세의 HTTP 상태로 매핑된다")
+    void socialAccountCodesMatchSpecifiedStatuses() {
+        assertThat(ErrorCode.UNSUPPORTED_PROVIDER.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.OAUTH_CODE_INVALID.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.OAUTH_EMAIL_REQUIRED.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.OAUTH_PROVIDER_ERROR.getStatus()).isEqualTo(HttpStatus.BAD_GATEWAY);
+        assertThat(ErrorCode.SIGNUP_TOKEN_INVALID.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(ErrorCode.OAUTH_ACCOUNT_ALREADY_LINKED.getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+        assertThat(ErrorCode.PROVIDER_ALREADY_LINKED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test
@@ -68,6 +115,58 @@ class ErrorCodeTest {
     void refreshTokenCodesAreUnauthorized() {
         assertThat(ErrorCode.REFRESH_TOKEN_INVALID.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(ErrorCode.REFRESH_TOKEN_EXPIRED.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    @DisplayName("API-001~004 계정 오류 코드는 각 명세의 HTTP 상태로 매핑된다")
+    void emailAccountCodesMatchSpecifiedStatuses() {
+        assertThat(ErrorCode.EMAIL_DUPLICATED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(ErrorCode.NICKNAME_DUPLICATED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(ErrorCode.ALREADY_VERIFIED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(ErrorCode.VERIFICATION_TOKEN_INVALID.getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.VERIFICATION_TOKEN_EXPIRED.getStatus()).isEqualTo(HttpStatus.GONE);
+        assertThat(ErrorCode.INVALID_CREDENTIALS.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(ErrorCode.EMAIL_NOT_VERIFIED.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    @DisplayName("API-010~012 비밀번호 오류 코드는 각 명세의 HTTP 상태로 매핑된다")
+    void passwordCodesMatchSpecifiedStatuses() {
+        assertThat(ErrorCode.RESET_TOKEN_INVALID.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.RESET_TOKEN_EXPIRED.getStatus()).isEqualTo(HttpStatus.GONE);
+        assertThat(ErrorCode.PASSWORD_NOT_SET.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("API-020 차단 오류 코드는 명세의 HTTP 상태로 매핑된다")
+    void blockCodesMatchSpecifiedStatuses() {
+        assertThat(ErrorCode.CANNOT_BLOCK_SELF.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.ALREADY_BLOCKED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("API-023·024 온보딩 오류 코드는 명세의 HTTP 상태로 매핑된다")
+    void onboardingCodeMatchesSpecifiedStatus() {
+        assertThat(ErrorCode.ONBOARDING_ALREADY_COMPLETED.getStatus())
+                .isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("API-047 관심없음 오류 코드는 409로 매핑된다")
+    void dismissCodeIsConflict() {
+        assertThat(ErrorCode.ALREADY_DISMISSED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("파티 상태 충돌 오류는 409로 매핑된다")
+    void partyConflictCodesAreConflict() {
+        assertThat(ErrorCode.PARTY_CLOSED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(ErrorCode.PARTY_FULL.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(ErrorCode.ACTIVE_PARTY_LIMIT_REACHED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(ErrorCode.ALREADY_MEMBER.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(ErrorCode.INVITATION_PENDING.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(ErrorCode.INVITATION_NOT_PENDING.getStatus()).isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test

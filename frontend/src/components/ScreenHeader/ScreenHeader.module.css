@@ -1,0 +1,50 @@
+.header {
+  flex: none;
+  padding: var(--space-12) var(--screen-padding-x) 0;
+}
+
+.row {
+  display: flex;
+  min-height: var(--tap-target-min);
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.title {
+  flex: 1;
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+.subtitle {
+  margin-top: var(--space-1);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+/* 보이는 아이콘은 작게 두고 터치 영역만 44px로 넓힌다 */
+.back {
+  display: flex;
+  width: var(--tap-target-min);
+  height: var(--tap-target-min);
+  margin-left: calc(var(--space-3) * -1);
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  color: var(--color-ink);
+  cursor: pointer;
+}
+
+.action {
+  display: flex;
+  align-items: center;
+}
+
+.header[data-align='center'] .title {
+  text-align: center;
+}

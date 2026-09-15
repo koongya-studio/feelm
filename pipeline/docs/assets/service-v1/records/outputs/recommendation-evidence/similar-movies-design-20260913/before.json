@@ -1,0 +1,82 @@
+[
+  {
+    "path": "docs/recommendation/service-v1-20260913/ACCEPTANCE.md",
+    "sha256": "69db1b5f1d2475c76fd8b0d7eb9b842bdac3063bae0d169789718a0fb223b871",
+    "bytes": 11591
+  },
+  {
+    "path": "docs/recommendation/service-v1-20260913/CONTRACTS.md",
+    "sha256": "dc5f818b0c0948c9eb73463a282b71d776164740a7549342e4949dd844024411",
+    "bytes": 39593
+  },
+  {
+    "path": "docs/recommendation/service-v1-20260913/EVALUATION.md",
+    "sha256": "79d33f73f63cbb94012c2c549bd399d5519b6fe09d81da302050575ff9aaecb8",
+    "bytes": 12238
+  },
+  {
+    "path": "docs/recommendation/service-v1-20260913/GROUPS.md",
+    "sha256": "ee210dea5bf6804d9940a8526b7273730fa96eae57b2986864c9695291c734c7",
+    "bytes": 10638
+  },
+  {
+    "path": "docs/recommendation/service-v1-20260913/HYBRID-COMPARISONS.md",
+    "sha256": "3ebbe65e0204abcd232f7ffc24ee65c29548e4d50cfd39c4c19e229344e4c407",
+    "bytes": 10379
+  },
+  {
+    "path": "docs/recommendation/service-v1-20260913/KOBIS-DATA.md",
+    "sha256": "fe7ac7faa32ee64bfaf1e56e0a2bfc5cb5217fc3ef32c335f4de92dd3b8c8c37",
+    "bytes": 9451
+  },
+  {
+    "path": "docs/recommendation/service-v1-20260913/MODELS.md",
+    "sha256": "514b6a081c00249d5f8641d7620a46c0d40cf62177c6f6b8e5003eaa2b6d1fc1",
+    "bytes": 24979
+  },
+  {
+    "path": "docs/recommendation/service-v1-20260913/OPERATIONS.md",
+    "sha256": "7db4d35d61aa7f07039e1d3b4da31cb9d7c98945f963b77bcf568d426b9f6588",
+    "bytes": 26436
+  },
+  {
+    "path": "docs/recommendation/service-v1-20260913/POLICY.md",
+    "sha256": "7565aa24dd664c5f26d42f2b7694559577afaae14c9b48a306858dd95b606494",
+    "bytes": 16152
+  },
+  {
+    "path": "docs/recommendation/service-v1-20260913/README.md",
+    "sha256": "ec5dc2e5e75b08cd3a996c18aae66cb8a40c74e8ffea20c1a2aaa876fb418b5a",
+    "bytes": 9992
+  },
+  {
+    "path": "docs/recommendation/service-v1-20260913/comparison-registry.v1.json",
+    "sha256": "b872a4dc1e16147118d5419fc936fa316256b340c71218bb24308e09df68f4ba",
+    "bytes": 4706
+  },
+  {
+    "path": "docs/recommendation/service-v1-20260913/config.v1.json",
+    "sha256": "bb466512e1d948c5db3ae28b5733ffac9af71ffbbe533e021ebc84095a80112a",
+    "bytes": 3215
+  },
+  {
+    "path": "docs/recommendation/service-v1-20260913/feature-schema.v1.json",
+    "sha256": "1c4c8aef5cce42c0c4bc74d2d9f3e113a972d4b2ea521592760bde042d7f56ec",
+    "bytes": 40752
+  },
+  {
+    "path": "docs/recommendation/service-v1-20260913/group-recipe.v1.json",
+    "sha256": "3fd587b1b74fdf9803dd5e93328081ea196848583e0b5ef3d015cf60e16df483",
+    "bytes": 14871
+  },
+  {
+    "path": "docs/recommendation/service-v1-20260913/training-recipe.v1.json",
+    "sha256": "66a3cebafc5344f981431f4bd5ce2601cd26e1cc06a065f905b4cb84dd0f8c2a",
+    "bytes": 16847
+  },
+  {
+    "path": "docs/recommendation/active-experiment.md",
+    "sha256": "416f3229a74e38186ea92e7232ce2bed7eb7d4a221863b12eac9bb6e9640474f",
+    "bytes": 40884
+  }
+]

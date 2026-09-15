@@ -56,8 +56,7 @@ if ! wait_for_healthy; then
   exit 1
 fi
 
-curl --fail --silent --show-error \
-  http://127.0.0.1:8080/actuator/health >/dev/null
+docker exec feelm-backend curl --fail --silent --show-error http://localhost:8080/actuator/health >/dev/null
 
 running_image="$(
   docker inspect --format '{{.Config.Image}}' feelm-backend

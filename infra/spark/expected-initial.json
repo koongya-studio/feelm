@@ -1,0 +1,12 @@
+[
+  {"event_id": "initial-01", "value": 1},
+  {"event_id": "initial-02", "value": 2},
+  {"event_id": "initial-03", "value": 3},
+  {"event_id": "initial-04", "value": 4},
+  {"event_id": "initial-05", "value": 5},
+  {"event_id": "initial-06", "value": 6},
+  {"event_id": "initial-07", "value": 7},
+  {"event_id": "initial-08", "value": 8},
+  {"event_id": "initial-09", "value": 9},
+  {"event_id": "initial-10", "value": 10}
+]

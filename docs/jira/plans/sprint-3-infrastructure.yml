@@ -75,7 +75,7 @@ tasks:
   - 추천 Consumer 컨테이너 이미지가 깨끗한 환경에서 빌드된다.
   - 컨테이너가 Kafka 연결 실패와 종료 신호를 안전하게 처리하는지 검증된다.
   - Consumer의 실행 상태를 확인할 로그 또는 헬스체크 기준이 정의된다.
-  - 이미지 빌드와 실행 방법이 recommendation/README.md에 문서화된다.
+  - 이미지 빌드와 실행 방법이 pipeline/README.md에 문서화된다.
   jira_key: S15P21E106-129
 - id: sprint3-gitlab-ci
   issue_type: Task

@@ -1,0 +1,7 @@
+# 디자인 작업용 로컬 도구. 소스가 아니며 각각 7MB대라 저장소에 넣지 않는다.
+# 3D 팝콘·버킷을 브라우저에서 확인하려고 옮겨 둔 Three.js 뷰어다.
+popcorn-viewer*.html
+Feelm-popcorn-bucket.html
+
+# 에디터 로컬 설정.
+.claude/

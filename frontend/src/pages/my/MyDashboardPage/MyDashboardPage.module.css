@@ -1,0 +1,198 @@
+/*
+ * 모듈형 대시보드. 레퍼런스(`Dormy App.jpg`)의 비대칭 구성을 따른다.
+ * 카드 크기가 정보 중요도를 나르므로 모든 카드를 같은 폭으로 두지 않는다.
+ */
+.page {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--screen-padding-x) var(--space-6);
+  gap: var(--space-4);
+}
+
+/* ─────────────────────────── 인사말 줄 */
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.identityText {
+  min-width: 0;
+  flex: 1;
+}
+
+.name {
+  font-size: var(--font-size-heading);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-heading);
+}
+
+/* 이메일이 길면 줄바꿈 대신 자른다. 한 줄로 읽히는 보조 정보다 */
+.meta {
+  overflow: hidden;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editLink {
+  display: inline-flex;
+  min-height: var(--tap-target-min);
+  align-items: center;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  color: var(--color-ink);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  text-decoration: none;
+}
+
+/* ─────────────────────────── 취향 필름 — 화면에서 유일한 어두운 블록 */
+
+.filmCard {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-5) 0 var(--space-5) var(--space-5);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-dark);
+  gap: var(--space-4);
+}
+
+.filmHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-right: var(--space-5);
+  gap: var(--space-3);
+}
+
+.filmLabel {
+  color: var(--color-on-dark-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-caption);
+}
+
+.filmCount {
+  color: var(--color-on-dark);
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-title);
+  line-height: var(--line-height-title);
+}
+
+.filmMore {
+  display: inline-flex;
+  min-height: var(--tap-target-min);
+  align-items: center;
+  color: var(--color-on-dark-muted);
+  font-size: var(--font-size-meta);
+  gap: 2px;
+  text-decoration: none;
+}
+
+/*
+ * 가로 스크롤. 오른쪽 여백을 패딩으로 주어 마지막 포스터가 모서리에 붙지 않게 한다.
+ * 스크롤바는 감춘다 — 모바일에서는 보이지 않고 데스크톱 확인 시에만 나온다.
+ */
+.filmTrack {
+  display: flex;
+  overflow-x: auto;
+  padding-right: var(--space-5);
+  gap: var(--space-2);
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.filmTrack::-webkit-scrollbar {
+  display: none;
+}
+
+.filmItem {
+  display: block;
+  border-radius: 6px;
+  scroll-snap-align: start;
+}
+
+.filmEmpty {
+  padding-right: var(--space-5);
+  color: var(--color-on-dark-hint);
+  font-size: var(--font-size-meta);
+}
+
+/* ─────────────────────────── 수치 두 개 */
+
+.statGrid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: 1fr 1fr;
+}
+
+.statCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  color: var(--color-ink);
+  gap: 2px;
+  text-decoration: none;
+}
+
+.statValue {
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-title);
+  line-height: var(--line-height-title);
+}
+
+.statLabel {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.statChevron {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-3);
+  color: var(--color-ink-hint);
+}
+
+/* ─────────────────────────── 메뉴 */
+
+/*
+ * 이동만 하는 항목이라 가장 가볍게 둔다. 카드로 하나씩 감싸면 위의 수치 카드와
+ * 위계가 같아져 무엇이 중요한지 보이지 않는다. 선으로 나눈 목록으로 충분하다.
+ */
+.menu {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+}
+
+.menuItem {
+  display: flex;
+  min-height: var(--tap-target-min);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-ink);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+}
+
+.menuItem + .menuItem {
+  border-top: 1px solid var(--color-line-faint);
+}
+
+.menuItem svg {
+  color: var(--color-ink-hint);
+}

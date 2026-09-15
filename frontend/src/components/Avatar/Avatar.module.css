@@ -1,0 +1,29 @@
+.avatar {
+  display: flex;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+}
+
+/*
+ * 자리표시자. 무채색 두 단계로 대각 그라데이션을 만들고 사람 아이콘을 옅게 얹는다.
+ * 테두리는 밝은 면과 어두운 면 양쪽에서 윤곽을 남기기 위한 것이다.
+ */
+.avatar[data-placeholder='true'] {
+  border: 1px solid var(--color-line);
+  background: linear-gradient(135deg, var(--avatar-dark) 0%, var(--avatar-light) 100%);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/*
+ * 아이콘은 원 지름의 절반이다. 크기가 달라져도 비율이 유지된다.
+ * `PersonIcon`의 viewBox는 34x36으로 정사각이 아니라 높이를 고정하지 않는다.
+ */
+.avatar[data-placeholder='true'] svg {
+  width: calc(var(--avatar-size) * 0.48);
+  height: auto;
+}

@@ -4,59 +4,11 @@ stages:
   - build
   - deploy
 
-runner-check:
-  stage: verify
-  tags:
-    - e106-shell
-  script:
-    - echo "E106 GitLab Runner connected"
-    - hostname
-    - whoami
-    - docker --version
-    - docker compose version
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
 
-backend-test:
-  stage: test
-  tags:
-    - e106-shell
-  script:
-    - cd backend
-    - ./gradlew clean test spotlessCheck --no-daemon
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-
-backend-image:
-  stage: build
-  tags:
-    - e106-shell
-  needs:
-    - backend-test
-  before_script:
-    - printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-  script:
-    - BACKEND_IMAGE="$DOCKERHUB_NAMESPACE/feelm-backend:$CI_COMMIT_SHA"
-    - docker build --pull -t "$BACKEND_IMAGE" ./backend
-    - docker push "$BACKEND_IMAGE"
-    - echo "Built backend image $BACKEND_IMAGE"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-
-deploy-backend:
-  stage: deploy
-  tags:
-    - e106-shell
-  needs:
-    - backend-image
-  resource_group: service-deployment
-  environment:
-    name: service
-  before_script:
-    - printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-  script:
-    - BACKEND_IMAGE="$DOCKERHUB_NAMESPACE/feelm-backend:$CI_COMMIT_SHA"
-    - ./infra/scripts/deploy-backend.sh "$BACKEND_IMAGE"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      when: manual
-  allow_failure: false
+include:
+  - local: .gitlab/ci/common.yml
+  - local: .gitlab/ci/backend.yml
+  - local: .gitlab/ci/frontend.yml
