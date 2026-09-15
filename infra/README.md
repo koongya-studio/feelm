@@ -1104,18 +1104,36 @@ POSTGRES_BIND_ADDRESS=<SERVICE_NODE_IP>
 REDIS_BIND_ADDRESS=<SERVICE_NODE_IP>
 ```
 
-사설 IP bind만으로 송신 주체 제한이 완성되지는 않는다. 보안 그룹과 호스트 방화벽에서
-`DISTRIBUTED_NODE_IP/32`가 서비스 노드의 `5432/tcp`, `6379/tcp`에 접근하는 트래픽만
-허용해야 한다. 기존 SSH 허용 규칙과 연결을 확인하지 않은 상태에서 UFW를 활성화하거나
-초기화하지 않는다. 적용 전에는 운영자가 현재 규칙을 확인하고, 허용 규칙을 먼저 추가한 뒤
-다른 출발지 차단을 확인한다.
+사설 IP bind만으로 송신 주체 제한이 완성되지는 않는다. 보안 그룹은 서비스 노드의
+`5432/tcp`, `6379/tcp` 인바운드를 `DISTRIBUTED_NODE_IP/32`에서만 허용한다. Docker가 게시한
+포트는 UFW의 INPUT 규칙보다 먼저 DNAT될 수 있으므로 UFW 허용 규칙만으로 경계를 구성하지
+않는다. 호스트에서는 `DOCKER-USER`의 첫 규칙으로 분산 노드가 아닌 출발지의 두 포트를
+차단한다. 허용 출발지는 이 규칙을 통과한 뒤 Docker가 만든 게시 포트 규칙으로 처리된다.
 
 ```bash
-sudo ufw status numbered
-sudo ufw allow from "${DISTRIBUTED_NODE_IP}" to "${SERVICE_NODE_IP}" port 5432 proto tcp
-sudo ufw allow from "${DISTRIBUTED_NODE_IP}" to "${SERVICE_NODE_IP}" port 6379 proto tcp
-sudo ufw status numbered
+sudo iptables -I DOCKER-USER 1 \
+  -p tcp ! -s "${DISTRIBUTED_NODE_IP}/32" \
+  -m multiport --dports 5432,6379 -j DROP
+sudo iptables -S DOCKER-USER
 ```
+
+같은 규칙을 중복 삽입하지 않는다. 기존 규칙이 있으면 `iptables -C`로 확인하고, 출발지 IP가
+바뀐 경우 기존 규칙을 `iptables -D`로 제거한 뒤 새 규칙을 1번에 삽입한다. 호스트 재부팅
+후에도 유지되도록 서버의 기존 방화벽 영속화 방식에 등록한다. 운영 방화벽을 초기화하거나
+Docker가 만든 체인을 직접 수정하지 않는다.
+
+`verify-datastores.sh`는 원격 bind일 때 실제 게시 주소가 `SERVICE_NODE_IP`와 일치하고 위
+차단 규칙이 `DOCKER-USER`의 첫 규칙인지 확인한다. 배포 Runner가 일반 사용자라면 아래처럼
+읽기 전용 명령 하나만 비밀번호 없이 실행하도록 호스트의 root 소유 sudoers 파일에 등록한다.
+경로는 서버의 `command -v iptables` 결과를 사용한다.
+
+```sudoers
+gitlab-runner ALL=(root) NOPASSWD: /usr/sbin/iptables -S DOCKER-USER
+```
+
+방화벽 적용 전에는 현재 SSH 연결과 기존 `DOCKER-USER` 규칙을 확인한다. 적용 후 분산
+노드에서는 두 데이터스토어 연결이 성공하고, 허용되지 않은 노드에서는 두 포트의 TCP 연결이
+실패하는지 확인한다.
 
 서비스 노드에서 설정을 검사한 뒤 PostgreSQL과 Redis만 재생성한다. 두 서비스에는 짧은 연결
 중단이 발생할 수 있으므로 적용 시점을 합의하고 `down -v`를 사용하지 않는다.

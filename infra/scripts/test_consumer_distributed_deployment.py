@@ -6,6 +6,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DISTRIBUTED_COMPOSE = ROOT / "infra/compose/distributed.yml"
 SERVICE_COMPOSE = ROOT / "infra/compose/service.yml"
 ENV_EXAMPLE = ROOT / "infra/.env.example"
+RUNTIME_VERIFY = ROOT / "infra/scripts/verify-datastores.sh"
 
 
 class ConsumerDistributedDeploymentTest(unittest.TestCase):
@@ -48,6 +49,16 @@ class ConsumerDistributedDeploymentTest(unittest.TestCase):
             "CONSUMER_METADATA_URI",
         ):
             self.assertIn(f"{name}=", env_example)
+
+    def test_runtime_verification_accepts_only_guarded_remote_bindings(self) -> None:
+        verification = RUNTIME_VERIFY.read_text(encoding="utf-8")
+
+        self.assertIn('postgres_bind_address="${POSTGRES_BIND_ADDRESS:-127.0.0.1}"', verification)
+        self.assertIn('redis_bind_address="${REDIS_BIND_ADDRESS:-127.0.0.1}"', verification)
+        self.assertIn("Remote datastore bindings must both equal SERVICE_NODE_IP", verification)
+        self.assertIn("must be an RFC1918 private IPv4 address", verification)
+        self.assertIn("-S DOCKER-USER", verification)
+        self.assertIn("--dports 5432,6379 -j DROP", verification)
 
 
 if __name__ == "__main__":

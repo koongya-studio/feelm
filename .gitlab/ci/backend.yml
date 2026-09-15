@@ -119,6 +119,9 @@ backend-mr-test:
         - infra/scripts/ci-bounded-output.py
         - infra/scripts/ci-network-guard.py
         - infra/scripts/ci-job-*.py
+        - infra/scripts/verify-datastores.sh
+        - infra/scripts/test_deploy_backend.py
+        - infra/scripts/test_consumer_distributed_deployment.py
         - infra/scripts/test_ci_gitlab_job_adapter.py
         - infra/scripts/test_ci_config.py
         - infra/scripts/test_ci_backend_mr_paths.py
