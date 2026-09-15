@@ -4,11 +4,17 @@
  * 취향을 한눈에 보여주는 자리다(3.2). 통과 알 모두 디자인이 만든 3D 모델을 구운
  * 스프라이트다.
  *
- * - 통: `src/assets/bucket`. 세로 필름 무늬 · 빨강/검정으로 384px로 렌더했다.
- *   디자인이 준 4종을 화면에서 비교해 고른 것이다(팀 결정 2026-09-10). 가로 무늬는
- *   로고가 통 옆면에서 잘려 `Feelm Fee…`로 읽혀 뺐다.
+ * - 통: `src/assets/bucket`. **아이스 화이트 몸통 · 세로 필름 무늬 · 빨간 로고**다(사용자 결정
+ *   2026-09-15, 업무 -322). 디자인의 블랙 · 아이스 화이트 두 통을 3.2 · 5.8 · 5.9 · 7.2-A에
+ *   넣어 비교해 골랐다. 이전 크림 몸통 · 빨강/검정 통(2026-09-10)을 바꿨다.
  *   **빈 통**이다. 알을 따로 쌓아야 취향 분포가 그림에 반영되기 때문이다.
- * - 알: `src/assets/popcorn`. 8종을 96px로 렌더했다.
+ *   렌더 조건 — 디자인 3D 뷰어(`Feelm 팝콘 버킷 디자인`)에서 바닥 그림자를 끄고 투명 배경으로
+ *   384 × 384px에 구웠다. 원근 카메라 FOV 45°, 앞에서 15° 돌리고 24° 내려다본다. 통이 폭
+ *   x 11~372에 꽉 차도록 거리를 맞췄다. 조명은 뷰어 기본(반구광 1 · 방향광 3)이다
+ * - 알: `src/assets/popcorn`. **디자인의 팝콘 8종 라인업**(`Feelm 팝콘 8종 라인업`, 2026-09-15, 업무 -322)을
+ *   한 알씩 192 × 192px 투명 배경으로 구웠다. 8종이 같은 모양 · 같은 방향이고 재질만 다르다.
+ *   라인업의 이름표는 빼고 팝콘만 담았다. 렌더 조건은 통과 같다 — 원근 FOV 45°, 앞에서 15° 돌리고
+ *   24° 내려다본다. 알이 긴 변의 88%를 차지하게 가운데에 맞췄다
  *
  * 알은 맛 분포대로 통 입구에 쌓인다. **알 더미는 그림이고 데이터를 읽는 채널이
  * 아니다.** 알 수와 맛 이름은 범례가 말한다.
@@ -20,15 +26,15 @@
  * 시작해 위로 쌓는다. 넘칠 듯 담긴 모양이 되고, 앞쪽 테두리에 걸치는 알은 입구에 얹힌
  * 것처럼 읽힌다.
  */
-import bucketSprite from '../../assets/bucket/bucket-film-vertical-red-black.png';
-import biscoffEspresso from '../../assets/popcorn/popcorn-biscoff-espresso.png';
-import blueberryMacaron from '../../assets/popcorn/popcorn-blueberry-macaron.png';
+import bucketSprite from '../../assets/bucket/bucket-film-vertical-icewhite.png';
+import blueberry from '../../assets/popcorn/popcorn-blueberry.png';
 import caramel from '../../assets/popcorn/popcorn-caramel.png';
 import cheese from '../../assets/popcorn/popcorn-cheese.png';
 import chocolate from '../../assets/popcorn/popcorn-chocolate.png';
 import cookie from '../../assets/popcorn/popcorn-cookie.png';
-import loveStrawberry from '../../assets/popcorn/popcorn-love-strawberry.png';
 import original from '../../assets/popcorn/popcorn-original.png';
+import pistachio from '../../assets/popcorn/popcorn-pistachio.png';
+import strawberry from '../../assets/popcorn/popcorn-strawberry.png';
 import styles from './PopcornBucket.module.css';
 
 /*
@@ -37,6 +43,10 @@ import styles from './PopcornBucket.module.css';
  * 화면은 맛의 표시명과 색을 API-044에서 받지만 그림 파일은 저장소에 있는 것이라
  * 코드로 짝지어야 한다. 코드는 불변이므로(FR-06) 이 대응은 이름이 바뀌어도 살아남는다.
  * 모르는 코드가 오면 기본 맛으로 그린다.
+ *
+ * `[!]` 새 라인업에는 비스코프 에스프레소 크런치가 없고 피스타치오 화이트초코가 있어,
+ * `FLAVOR_DRAMA` 자리에 피스타치오 그림을 넣었다. 맛 이름 · 범례 색은 API-044(지금은 목업)
+ * 그대로라 이 한 맛만 그림과 이름 · 색이 다르다. 맛 기준정보가 정해지면 맞춘다.
  */
 const KERNEL_SPRITE: Record<string, string> = {
   FLAVOR_CAPER: original,
@@ -44,9 +54,9 @@ const KERNEL_SPRITE: Record<string, string> = {
   FLAVOR_NOIR: cheese,
   FLAVOR_CRIME: chocolate,
   FLAVOR_ACTION: cookie,
-  FLAVOR_DRAMA: biscoffEspresso,
-  FLAVOR_COMEDY: loveStrawberry,
-  FLAVOR_SF: blueberryMacaron,
+  FLAVOR_DRAMA: pistachio,
+  FLAVOR_COMEDY: strawberry,
+  FLAVOR_SF: blueberry,
 };
 
 /* 좌표계. 통 하나가 들어가는 상자다 */
@@ -54,27 +64,40 @@ const VIEW_WIDTH = 200;
 const VIEW_HEIGHT = 230;
 
 /*
+ * 통 크기. 알에 비해 통이 커서 팝콘이 자잘한 알갱이로 보였다(사용자 요청 2026-09-15, 업무 -322).
+ * 알 크기는 그대로 두고 **통만 이 비율로 줄인다.** 통 바닥(y 205)과 가로 가운데를 고정하고 줄이므로
+ * 입구 · 더미의 자리도 같은 비율로 따라온다.
+ */
+const BUCKET_SCALE = 0.8;
+/** 줄일 때 고정하는 점. 통 가로 가운데와 바닥 */
+const ANCHOR_X = 100;
+const ANCHOR_Y = 205;
+const scaleX = (x: number) => ANCHOR_X - (ANCHOR_X - x) * BUCKET_SCALE;
+const scaleY = (y: number) => ANCHOR_Y - (ANCHOR_Y - y) * BUCKET_SCALE;
+
+/*
  * 통 스프라이트를 놓는 자리.
  *
- * 384px 원본에서 통은 y 34~349를 차지하고, 가장 넓은 줄(= 테두리 타원의 세로 중심)이
- * y 65에서 x 11~372다. 아래 값은 그 통이 이 좌표계의 폭을 꽉 채우도록 맞춘 것이다.
+ * 384px 원본에서 통은 y 41~341을 차지하고, 가장 넓은 줄(= 테두리 타원의 세로 중심)이
+ * y 70에서 x 11~372다. 줄이기 전 값은 그 통이 이 좌표계의 폭을 꽉 채우도록 맞춘 것이다
+ * (x −6, y 17, 한 변 212 — 통 바닥이 y 205).
  */
-const SPRITE_X = -6;
-const SPRITE_Y = 17;
-const SPRITE_SIZE = 212;
+const SPRITE_X = scaleX(-6);
+const SPRITE_Y = scaleY(17);
+const SPRITE_SIZE = 212 * BUCKET_SCALE;
 
 /*
  * 테두리 타원. 알을 이 안에 담는다.
  *
- * 384px 원본에서 통의 가장 넓은 줄이 y 65, x 11~372였다. 이 좌표계로 옮기면 중심이
- * (100, 53), 가로 반지름이 약 100이다. 타원의 세로 반지름은 통 꼭대기(y 36)까지의
- * 거리인 17이다.
+ * 384px 원본에서 통의 가장 넓은 줄이 y 70, x 11~372다. 줄이기 전 좌표계로 옮기면(× 212 / 384)
+ * 중심이 (100, 56), 가로 반지름이 약 100이다. 타원의 세로 반지름은 통 꼭대기(y 41)까지의
+ * 거리 29px를 옮긴 16이다. 아래 값은 여기에 통 크기를 적용한 것이다.
  */
-const RIM_X = 100;
-const RIM_Y = 53;
+const RIM_X = scaleX(100);
+const RIM_Y = scaleY(56);
 /** 입구 타원의 실제 크기. 알을 가두는 클립이 이 타원이다 */
-const RIM_RX = 98;
-const RIM_RY = 17;
+const RIM_RX = 98 * BUCKET_SCALE;
+const RIM_RY = 16 * BUCKET_SCALE;
 
 /**
  * 알이 퍼지는 범위. 입구보다 좁게 잡아 통 벽에 붙지 않게 한다.
@@ -83,7 +106,7 @@ const RIM_RY = 17;
  * 그 가림을 `clipPath`가 만든다. 클립은 입구 타원과 그 위쪽을 합친 모양이라, 테두리
  * 아래로 내려간 알은 타원 밖에서 잘려 통 뒤로 들어간 것처럼 보인다.
  */
-const PILE_RX = 82;
+const PILE_RX = 82 * BUCKET_SCALE;
 
 /**
  * 더미가 테두리 위로 솟는 높이.
@@ -94,13 +117,13 @@ const PILE_RX = 82;
 const MOUND_HEIGHT = 46;
 
 /** 더미를 통 안으로 내려 담는 깊이. 팝콘이 입구에 걸친 것처럼 보이게 한다 */
-const PILE_SINK = 10;
+const PILE_SINK = 10 * BUCKET_SCALE;
 
 /** 입구 클립의 id. 한 화면에 통이 하나라 고정 문자열로 충분하다 */
 const CLIP_ID = 'bucket-mouth';
 
-/** 알 한 알이 차지하는 정사각형 한 변 */
-const KERNEL_SIZE = 30;
+/** 알 한 알이 차지하는 정사각형 한 변. 새 스프라이트는 알이 폭의 88%라(이전 92%) 한 칸 키웠다 */
+const KERNEL_SIZE = 31;
 /** 앞뒤 거리에 따른 크기 차이. 앞이 크고 뒤가 작아야 더미에 깊이가 생긴다 */
 const DEPTH_SCALE = 0.22;
 
