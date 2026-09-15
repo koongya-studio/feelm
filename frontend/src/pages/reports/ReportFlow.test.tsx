@@ -149,8 +149,11 @@ describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
     fireEvent.click(await screen.findByRole('link', { name: '취향 리포트' }));
     expect(location()).toBe('/my/reports');
 
-    // 만드는 중인 반기는 누를 수 없다
-    expect(await screen.findByText('만드는 중')).toBeInTheDocument();
+    // 연도마다 반기 4컷을 붙인다. 만드는 중인 반기는 빈 인화지이고 누를 수 없다
+    expect(await screen.findByRole('heading', { name: '2025' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '취향 4컷' })).toBeInTheDocument();
+    expect(screen.getByText('인화 중')).toBeInTheDocument();
+    expect(screen.getByText('만드는 중')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '2026 하반기 취향 리포트' })).toBeNull();
 
     fireEvent.click(screen.getByRole('link', { name: '2025 하반기 취향 리포트' }));

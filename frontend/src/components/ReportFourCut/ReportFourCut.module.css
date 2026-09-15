@@ -49,6 +49,11 @@
 
 /* ─────────────────────────── 머리 · 발 */
 
+/* 머리가 없으면 옆 여백만큼 위를 띄우고 01부터 시작한다(7.3 목록) */
+.strip[data-head='false'] {
+  padding-top: calc(var(--u) * 15);
+}
+
 .head {
   display: flex;
   height: calc(var(--u) * 58);
@@ -328,6 +333,15 @@
   font-family: var(--font-report-serif);
   font-style: italic;
   font-weight: 700;
+}
+
+/*
+ * 이탤릭 끝 글자는 기울어진 만큼 글자 폭 밖으로 삐져나와 상자에 잘린다. 폭 계산(`useFitText`)이
+ * 그만큼을 넣어 재도록 오른쪽에 여유를 둔다. 한글은 기울임을 흉내 내 더 많이 삐져나온다.
+ */
+.directorName .name,
+.characterName .name {
+  padding-right: 0.18em;
 }
 
 .directorName .name {

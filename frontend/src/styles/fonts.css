@@ -5,6 +5,7 @@
  * | --- | --- | --- |
  * | 로고 | Gluten Bold 700 | 확정 워드마크. **로고에만** 쓴다 |
  * | 취향 4컷의 큰 이름 | Anton 400 · Playfair Display 700 이탤릭 · 900 | 사용자 시안(2026-09-15, 업무 -321). **4컷 안에만** 쓴다 |
+ * | 7.3 취향 4컷 목록의 연도 손글씨 | Caveat 700 | 사용자 시안(2026-09-15, 업무 -446). **연도 숫자에만** 쓴다 |
  * | 그 외 전부 | Pretendard | 중립적이라 로고가 돋보인다 |
  *
  * 둘 다 SIL OFL이라 임베딩과 상용에 제약이 없다.
@@ -28,3 +29,4 @@
 @import '@fontsource/anton/latin-400.css';
 @import '@fontsource/playfair-display/latin-700-italic.css';
 @import '@fontsource/playfair-display/latin-900.css';
+@import '@fontsource/caveat/latin-700.css';

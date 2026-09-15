@@ -38,19 +38,26 @@ type Props = {
   owner?: string | null;
   /** 리포트를 만든 시각(API-060 `createdAt`) */
   createdAt: string;
+  /**
+   * 머리(`{닉네임}의 취향 4컷` · 인화한 달)를 그릴지. 7.3 목록의 작은 4컷은 머리 없이 01부터
+   * 시작한다(사용자 시안 2026-09-15, 업무 -446). 발의 로고 · 날짜는 늘 그린다
+   */
+  head?: boolean;
 };
 
-export default function ReportFourCut({ cuts, owner, createdAt }: Props) {
+export default function ReportFourCut({ cuts, owner, createdAt, head = true }: Props) {
   const title = `${owner ? `${owner}의` : '나의'} 취향 4컷`;
   const date = formatPrintDate(createdAt);
 
   return (
     <div className={styles.root}>
-      <figure className={styles.strip} aria-label={title}>
-        <div className={styles.head} aria-hidden="true">
-          <span className={styles.title}>{title}</span>
-          <span className={styles.month}>{date.month}</span>
-        </div>
+      <figure className={styles.strip} data-head={head} aria-label={title}>
+        {head ? (
+          <div className={styles.head} aria-hidden="true">
+            <span className={styles.title}>{title}</span>
+            <span className={styles.month}>{date.month}</span>
+          </div>
+        ) : null}
 
         <ol className={styles.cuts}>
           <GenreCut {...cuts.genre} />

@@ -45,6 +45,7 @@
   align-items: center;
 }
 
-.header[data-align='center'] .title {
+.header[data-align='center'] .title,
+.header[data-align='center'] .subtitle {
   text-align: center;
 }
