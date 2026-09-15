@@ -1,6 +1,7 @@
 package com.feelm.backend.infrastructure.kafka;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import java.math.BigDecimal;
 import java.util.Objects;
 
 /**
@@ -11,7 +12,7 @@ import java.util.Objects;
 public record RatingEventPayload(
         RatingAction action,
         Long movieId,
-        @JsonInclude(JsonInclude.Include.NON_NULL) Integer score) {
+        @JsonInclude(JsonInclude.Include.NON_NULL) BigDecimal score) {
 
     /** action에 따라 score의 필수 여부를 검증한다. */
     public RatingEventPayload {
