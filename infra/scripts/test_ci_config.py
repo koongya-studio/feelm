@@ -97,6 +97,11 @@ include:
         self.assertIn('job: backend-test', backend_image)
         self.assertIn('job: datastore-config-check', backend_image)
         self.assertIn('needs: [backend-image]', backend_deploy)
+        for block in (backend_test, backend_image, backend_deploy):
+            self.assertIn('changes:', block)
+            self.assertIn('- backend/src/**/*', block)
+            self.assertIn('- infra/compose/service.yml', block)
+            self.assertIn('- infra/scripts/deploy-backend.sh', block)
         self.assertIn('needs: [frontend-test]', frontend_image)
         self.assertIn('needs: [frontend-image]', frontend_deploy)
         for block in (backend_deploy, frontend_deploy):
