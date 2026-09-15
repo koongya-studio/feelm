@@ -1,103 +1,212 @@
 /*
- * 칸이 화면 높이를 꽉 채운다(사용자 결정 2026-09-13). 연도 묶음이 남은 높이를 똑같이 나눠 갖고,
- * 칸은 그 높이를 따라 세로로 늘어난다. 비율을 고정하지 않는다 — 화면 크기마다 비율이 달라져야
- * 빈자리 없이 찬다. 화면이 너무 작으면 칸이 최소 높이에서 멈추고 본문이 스크롤된다.
+ * 7.3 취향 4컷 목록 — 모눈 노트에 붙인 4컷(사용자 시안 2026-09-15, 업무 -446).
+ *
+ * 벽 색은 앱 공통 벽 그대로 두고 그 위에 옅은 모눈만 긋는다. 시안 종이는 조금 따뜻하지만
+ * 화면마다 벽 색을 바꾸지 않는다(`design-concept.md` 3장).
+ *
+ * **두 해 네 장이 스크롤 없이 한 화면에 들어온다**(사용자 요청 2026-09-15). 4컷 크기를 화면 높이에서
+ * 거꾸로 구한다. 412 × 892에서 잰 고정 높이는 380px이다 — 머리 124 · 하단 내비 자리 92 · 연도 사이 16 ·
+ * 연도마다 (손글씨 34 + 간격 12 + 간격 8 + 날짜 20) × 2. 남는 높이의 절반이 4컷 한 장의 높이이고,
+ * 폭은 그 높이 × 385 / 1116이다. 화면이 너무 낮으면 72px에서 멈추고 스크롤된다.
+ *
+ * 시안(853px 폭 캡처)에서 잰 비율
+ * - 4컷 폭: 열 폭의 60%를 넘지 않는다
+ * - 연도 손글씨: 약 30px, 조금 기울임. 오른쪽으로 가로줄이 이어진다
+ * - 테이프: 4컷 폭의 약 32%, 윗변 가운데 조금 오른쪽에 걸친다
  */
-.page {
-  display: flex;
-  min-height: 0;
+/* 모눈은 머리까지 한 장으로 깐다. 본문에만 깔면 머리 아래에서 모눈이 끊긴다 */
+.screen {
+  --grid-line: rgba(38, 39, 41, 0.045);
+
   flex: 1;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-position: -1px -1px;
+  background-size: 22px 22px;
+}
+
+.page {
+  --list-chrome: 380px;
+
+  display: flex;
   flex-direction: column;
-  padding: 0 var(--screen-padding-x) var(--space-6);
+  padding: var(--space-2) var(--screen-padding-x) var(--space-4);
   gap: var(--space-4);
 }
 
 .year {
   display: flex;
-  min-height: 0;
-  flex: 1;
   flex-direction: column;
-  gap: var(--space-2);
-}
-
-.yearLabel {
-  color: var(--color-ink);
-  font-size: var(--font-size-heading);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: var(--letter-spacing-heading);
-  line-height: var(--line-height-heading);
-}
-
-.grid {
-  display: grid;
-  flex: 1;
   gap: var(--space-3);
-  grid-template-columns: 1fr 1fr;
 }
 
-.grid > li {
+/* 손글씨 연도와 오른쪽으로 이어지는 가로줄 */
+.yearLabel {
   display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
 
-/* 필름 한 칸. 위아래 구멍 줄 사이에 반기를 적는다. 가로보다 세로가 짧아지지 않게 둔다 */
-.film {
-  display: flex;
-  width: 100%;
-  min-height: 200px;
-  box-sizing: border-box;
-  flex-direction: column;
-  justify-content: space-between;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
-  background: var(--color-surface-raised);
+.yearLabel::after {
+  height: 1px;
+  flex: 1;
+  margin-top: var(--space-2);
+  background: var(--color-line-strong);
+  content: '';
+}
+
+.yearHand {
+  display: inline-block;
   color: var(--color-ink);
+  font-family: var(--font-report-hand);
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  transform: rotate(-6deg);
+  transform-origin: left bottom;
+}
+
+.board {
+  display: grid;
+  padding: 0;
+  margin: 0;
+  gap: var(--space-4);
+  grid-template-columns: 1fr 1fr;
+  list-style: none;
+}
+
+.slot {
+  display: flex;
+  justify-content: center;
+}
+
+/* ─────────────────────────── 붙인 4컷 한 장 */
+
+.pinned {
+  position: relative;
+  display: flex;
+  width: clamp(72px, calc((100dvh - var(--list-chrome)) / 2 * 385 / 1116), 60%);
+  flex-direction: column;
+  align-items: center;
+  color: inherit;
+  gap: var(--space-2);
   text-decoration: none;
 }
 
-.film[data-latest='true'] {
-  border-color: var(--color-ink);
+/* 작은 4컷이라 글자 최소 크기를 끈다(`ReportFourCut.module.css`) */
+.strip,
+.blank {
+  --text-floor: 0;
+
+  width: 100%;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.18),
+    0 8px 18px rgba(38, 39, 41, 0.22);
+  transition: transform var(--motion-press, 160ms) ease-out;
 }
 
-.film[data-generating='true'] {
-  border-style: dashed;
-  background: none;
-  color: var(--color-ink-hint);
+.pinned[data-tilt='left'] .strip,
+.pinned[data-tilt='left'] .blank {
+  transform: rotate(-1deg);
 }
 
-.perforation {
-  height: 6px;
-  background: repeating-linear-gradient(
-    90deg,
-    var(--color-line-strong) 0 6px,
-    transparent 6px 14px
-  );
+.pinned[data-tilt='right'] .strip,
+.pinned[data-tilt='right'] .blank {
+  transform: rotate(1.2deg);
 }
 
-/* 상태 글자는 반기 아래에 띄워 반기 글자의 높이를 다른 칸과 맞춘다 */
-.body {
-  position: relative;
+.pinned:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--color-ink);
+  outline-offset: 6px;
 }
 
-.half {
-  font-size: var(--font-size-title);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: var(--letter-spacing-title);
-  line-height: var(--line-height-title);
+/* 누르거나 올리면 종이가 바로 선다 */
+@media (hover: hover) {
+  .pinned:is(a):hover .strip,
+  .pinned:is(a):hover .blank {
+    transform: rotate(0deg) translateY(-2px);
+  }
 }
 
-.generating {
+/*
+ * 빨간 테이프. 끝이 뜯긴 모양은 좌우 톱니 모양으로 자른다. 4컷 위에 걸쳐 붙는다.
+ * 빨강은 붙인 종이의 일부로 본다 — 4컷 인화지와 같은 콘텐츠 빨강이다.
+ */
+.tape {
   position: absolute;
-  top: 100%;
-  left: 0;
-  margin-top: var(--space-1);
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
+  z-index: 1;
+  top: -7px;
+  left: 50%;
+  width: 36%;
+  height: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 60%),
+    var(--color-brand);
+  clip-path: polygon(
+    0 8%,
+    6% 0,
+    94% 4%,
+    100% 0,
+    97% 30%,
+    100% 55%,
+    96% 78%,
+    100% 100%,
+    5% 96%,
+    0 100%,
+    3% 70%,
+    0 45%,
+    4% 24%
+  );
+  opacity: 0.88;
+  transform: translateX(-30%) rotate(-9deg);
 }
 
-.hint {
-  color: var(--color-ink-hint);
+.pinned[data-tilt='right'] .tape {
+  transform: translateX(-20%) rotate(11deg);
+}
+
+.date {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.12em;
+  line-height: var(--line-height-meta);
+  white-space: nowrap;
+}
+
+/* ─────────────────────────── 빈 인화지 (만드는 중 · 못 불러옴) */
+
+/* 4컷과 같은 비율(385 × 1116, 머리 없음: 위 15 · 칸 1011 · 발 90)의 빈 검정 인화지 */
+.blank {
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2);
+  aspect-ratio: 385 / 1116;
+  background: var(--color-surface-dark);
+}
+
+.blankText {
+  color: var(--color-on-dark-muted);
   font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.08em;
   line-height: var(--line-height-caption);
   text-align: center;
+}
+
+.pinned[data-generating='true'] .blank {
+  background:
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.04) 0 6px, transparent 6px 12px),
+    var(--color-surface-dark);
+  opacity: 0.72;
+}
+
+.pinned[data-generating='true'] .date {
+  color: var(--color-ink-hint);
+  letter-spacing: 0;
 }
