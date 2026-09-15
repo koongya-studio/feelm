@@ -33,6 +33,51 @@ uv run ruff check .
 uv run feelm-foldin-consumer
 ```
 
+## 컨테이너 빌드와 실행
+
+저장소 루트에서 Consumer 전용 build context를 사용한다. Python 런타임과 `uv` 버전,
+`uv.lock`을 고정하며 개발 의존성, 테스트, Secret과 모델·데이터 산출물은 이미지에 넣지
+않는다. 운영 산출물의 `hdfs://` URI를 PyArrow로 읽을 수 있도록 분산 런타임과 같은 Hadoop
+3.4.3 client jar·`libhdfs`와 OpenJDK 17 JRE를 포함한다. 이미지는 현재 서버와 같은
+`linux/amd64`를 대상으로 한다.
+
+```bash
+docker build --tag feelm-foldin-consumer:local pipeline/consumer
+```
+
+로컬 실행 값은 Git에서 제외되는 `pipeline/consumer/.env`에 두고
+`.env.example`의 변수 이름만 복사한다. 실제 DSN, URL과 내부 주소는 이미지 build
+argument나 Dockerfile에 넣지 않는다. 서버에서는 `CONSUMER_MODEL_URI`,
+`CONSUMER_MAPPING_URI`, `CONSUMER_METADATA_URI`에 NameNode authority가 포함된 immutable
+`hdfs://` URI를 주입한다. 로컬 파일 산출물을 사용한다면 버전 디렉터리를 읽기 전용으로
+mount하고 URI도 해당 mount 경로의 명시적인 버전을 가리키게 한다.
+
+```bash
+docker run --rm --name feelm-foldin-consumer \
+  --env-file pipeline/consumer/.env \
+  --mount type=bind,src=/path/to/versioned-artifacts,dst=/artifacts,readonly \
+  feelm-foldin-consumer:local
+```
+
+Consumer에는 HTTP health endpoint가 없다. 컨테이너의 실행 상태와 비민감 운영 로그를
+상태 기준으로 사용한다.
+
+```bash
+docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}}' feelm-foldin-consumer
+docker logs --tail 100 feelm-foldin-consumer
+```
+
+- 정상 상태는 프로세스가 `running`이고 할당·처리 오류가 반복되지 않는 상태다.
+- Kafka가 일시적으로 연결되지 않으면 client가 재접속을 계속하며 broker 오류는 로그로
+  확인한다. 설정·산출물 검증 실패나 복구 불가능한 처리 실패로 프로세스가 종료되면 배포
+  supervisor가 재시작해야 한다.
+- 종료 시 console script가 PID 1로 SIGTERM을 직접 받아 poll loop를 끝내고 Kafka
+  Consumer를 닫는다. `docker stop --time 30 feelm-foldin-consumer`로 정상 종료를 확인한다.
+- 로그에는 event payload, DSN, Redis URL 또는 Secret을 남기지 않는다.
+
+Registry 태그, Compose 서비스와 restart policy는 배포 업무에서 설정한다. 이 Dockerfile은
+이미지 빌드와 단일 Consumer 프로세스 실행 경계만 정의한다.
+
 필수 설정은 `CONSUMER_KAFKA_BOOTSTRAP_SERVERS`, `CONSUMER_KAFKA_GROUP_ID`,
 `CONSUMER_POSTGRES_DSN`, `CONSUMER_REDIS_URL`, `CONSUMER_MODEL_URI`,
 `CONSUMER_MAPPING_URI`, `CONSUMER_METADATA_URI`다. DSN·URL의 실제 값은 Secret으로 관리한다.

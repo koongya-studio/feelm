@@ -121,8 +121,9 @@ uv run ruff check .
 uv run python -m jobs.batch.parquet_roundtrip --help
 ```
 
-`consumer/`는 현재 Python 3.12 런타임 경계만 명시합니다. 독립 `pyproject.toml`,
-`uv.lock`, Kafka·Redis 의존성은 Consumer 구현 시점에 추가합니다.
+`consumer/`는 Python 3.12 독립 프로젝트이며 `pyproject.toml`, `uv.lock`과 전용
+`Dockerfile`을 사용합니다. 로컬 검증과 컨테이너 빌드·실행 방법은
+[`consumer/README.md`](consumer/README.md)를 따릅니다.
 
 ## ALS baseline input and settings
 
