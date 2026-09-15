@@ -22,7 +22,7 @@
 | 인증 | 회원 |
 | 관련 요구사항 | FR-17 |
 | 화면 | ⑥-2 영화 상세 |
-| 미정 사항 | 있음 |
+| 미정 사항 | 없음 |
 | 비고 | - |
 
 ### 설명
@@ -51,6 +51,8 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 `201 Created`
 
+활성 감상 기록을 새로 만들지 않는 재클릭과 기존 감상 완료 상태 유지에는 `200 OK`를 반환한다.
+
 ```json
 {
   "watchRecordId": 5001,
@@ -69,9 +71,11 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 ### 처리 규칙
 
 - 링크 클릭은 감상 확정이 아니며 프레임을 생성하거나 팝콘 버킷 집계에 포함하지 않는다
-- 같은 영화에 `LINK_CLICKED` 기록이 이미 있으면 새로 만들지 않고 `clickedAt`·`confirmDueAt`·`expiresAt`을 갱신한다(가정). 응답은 `200`
-- 이미 `WATCHED_UNRATED` 또는 `RATED`인 영화는 상태를 바꾸지 않고 클릭 로그만 남긴 뒤 기존 기록을 `200`으로 반환한다
+- 같은 영화에 활성 `LINK_CLICKED` 기록이 이미 있으면 새로 만들지 않고 클릭한 `ottId`와 `clickedAt`·`confirmDueAt`·`expiresAt`을 갱신한다. 응답은 `200`
+- 이미 `WATCHED_UNRATED` 또는 `RATED`인 영화는 상태·감상 완료 시각·평가 연결을 바꾸지 않고 클릭 로그만 남긴 뒤 기존 기록을 `200`으로 반환한다
 - `EXPIRED` 기록이 있으면 새 `LINK_CLICKED` 기록을 만든다
+- 성공한 실제 API 호출마다 `OTT_CLICK` 이벤트를 `feelm.ott-click.v1` 아웃박스에 저장한다. payload는 `movieId`, 요청 `ottId`, 처리된 `watchRecordId`만 포함한다
+- `OTT_CLICK`은 행동 Feature 집계에 사용하는 약한 신호다. 클릭만으로 추천 `inputVersion`을 증가시키거나 현재 추천 세트 버퍼를 무효화하지 않고, Spark 집계 후 다음 추천 세트 생성 때 반영한다
 
 ### 상태값
 
@@ -79,8 +83,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### 미정 사항
 
-- [ ] 재클릭 시 기존 기록 갱신(가정) vs 별건 기록
-- [ ] 클릭 로그의 분석 활용 범위(OTT별 전환율 등)
+없음. 재클릭 저장과 클릭 분석 활용 범위는 위 처리 규칙 및 [`streaming-contract.md`](./streaming-contract.md)의 `OTT_CLICK` 계약으로 확정한다.
 
 ## API-034 감상 기록 목록
 
