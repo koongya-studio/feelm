@@ -1,8 +1,12 @@
 # 추천 v1 고정 그룹·콘텐츠 벡터 계약
 
-상태: **APPROVED — 로컬 구현 기준**. 원본 파일 구조·해시를 읽어 확인한 계약이며,
-v1 그룹 bundle의 생성·추론·재학습·서버 배포는 아직 실행하지 않았다.
+상태: **LOCAL REFERENCE PASS — 실제 HDFS 검증 대기**. 원본 파일 구조·해시를 확인하고
+안전 번들 생성·재로딩과 기준 237,817행의 taste/child/group ID 완전 일치를 검증했다. 장르 미지원
+30,577행은 발견 추천에서 제외되어 `groupMapped=true`는 207,240행이다. 실제 HDFS의 복제 수 2·SHA
+대조·원자적 게시와 Consumer 재로딩은 아직 완료하지 않았다.
 [정책](POLICY.md), [정확한 원본·배열 해시와 구성 키](../../configs/service-v1/group-recipe.v1.json)를 함께 사용한다.
+[공식 서빙 산출물 계약](../../contracts/group-serving-artifacts.md)과
+[`group_artifacts`](../../consumer/src/feelm_consumer/group_artifacts.py) reader가 배포 경계를 정의한다.
 
 ## 1. 가져올 파일과 가져오면 안 되는 설정
 
@@ -23,9 +27,11 @@ v1 그룹 bundle의 생성·추론·재학습·서버 배포는 아직 실행하
 반면 K128 파일의 실제 `sub_weights`는 `[0.5,0.35,0.15]`이며 중심은8개의128×131 배열이다.
 
 복사 전 전체 파일 SHA·bytes와 지정 배열 SHA를 모두 확인한다. 원본 ID를 현재 DB ID로
-추정하지 않는다. 기준 카탈로그 `service_movie_id↔tmdb_id`와 현재 DB export를 검증해
-연결하고, ID축이 달라진 배포에서는 TMDB ID를 통해 현재 serviceMovieId를 명시적으로 매핑한다.
-고정 맛·그룹 ID는 재번호화하지 않는다. 기준 할당과 현재 카탈로그 할당은 별도 버전으로 저장한다.
+추정하지 않는다. 기준 카탈로그 `service_movie_id↔tmdb_id`와 현재 DB export를 대조해 기존 service ID가
+다른 TMDb 영화로 재결합되지 않았는지 확인한다. live의 순수 추가·삭제는 허용하며 전체 revision 문자열
+불일치만으로 기존 bundle을 거부하지 않는다. ID축이 달라진 새 bundle에서는 TMDb ID를 통해 현재
+serviceMovieId를 명시적으로 매핑한다. 고정 맛·그룹 ID는 재번호화하지 않는다. 기준 할당과 새 카탈로그
+할당은 별도 버전으로 저장한다.
 
 ## 2. 영화에서131차원 벡터를 만드는 순서
 
@@ -121,7 +127,8 @@ childId,groupId,topSupported,subSupported,groupMapped,vectorHash,sourceHash를 �
 
 ## 6. 실행 전·배포 전 인수 조건
 
-다음은 아직 실행하지 않은 구현 검수다. 소스 파일 구조를 읽은 감사를 추론 PASS로 바꾸지 않는다.
+다음은 구현·배포 인수 조건이다. 로컬 결과는 recipe의 `parity`에 기록하며, 실제 HDFS 결과가 없으면
+HDFS 검증 PASS나 서버 활성화 완료로 바꾸지 않는다.
 
 | ID | 검수 | 통과 조건 |
 | --- | --- | --- |
@@ -130,7 +137,7 @@ childId,groupId,topSupported,subSupported,groupMapped,vectorHash,sourceHash를 �
 | G03 새로운 입력 | 중복/미지 ID·결측/빈 텍스트·장르0·GKT0 | 고정차원·유한값·support 규칙 준수, missing을 긍정근거로 만들지 않음 |
 | G04 수치 경계 | 같은 영화 단건/여러 batch·거리동률·norm 경계 | 배치크기무관 ID 동일, 정확거리동률 낮은ID, eps규칙 동일 |
 | G05 대표 | 불균일 norm·평균과 중심이 다른 fixture | raw frozen mean으로 검색, mean재정규화·중심대체 없음 |
-| G06 ID·업데이트 | DB ID축변경·새영화·정보수정·대중값만변경 | 명시매핑, 새catalog만 재배정, 대중값만 변하면 벡터/그룹 불변, 원학습배열 해시 불변 |
+| G06 ID·업데이트 | DB ID 재결합·순수 추가/삭제·정보수정·대중값만변경 | 기존 service ID 재결합·중복 차단, 추가/삭제 허용 및 건수 기록, 신규 포함 시 새 catalog만 재배정, 대중값만 변하면 벡터/그룹 불변, 원학습배열 해시 불변 |
 | G07 서비스 연결 | 장르0/전체감상/그룹공급 fixture | groupMapped false는 발견/감상분모에서 제외하되 K/H/실제감상제외 유지;10공급그룹·각10상한 |
 
 고정 소스에는 당시 연구용 컬럼/로컬 경로가 있다. 배포 manifest는 위 원본 SHA와 실제 export
