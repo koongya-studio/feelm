@@ -10,18 +10,20 @@ import sys
 
 
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
-BRANCH_PATTERN = re.compile(r"^[A-Za-z0-9._/-]+$")
+DEPLOY_BRANCH = "main"
 
 
 def main() -> int:
     commit_sha = os.environ.get("CI_COMMIT_SHA", "")
     branch = os.environ.get("CI_COMMIT_BRANCH", "")
+    protected = os.environ.get("CI_COMMIT_REF_PROTECTED", "")
+    source = os.environ.get("CI_PIPELINE_SOURCE", "")
 
     if not SHA_PATTERN.fullmatch(commit_sha):
         print("CI_COMMIT_SHA must be a full commit SHA", file=sys.stderr)
         return 2
-    if not BRANCH_PATTERN.fullmatch(branch) or branch.startswith("-") or ".." in branch:
-        print("CI_COMMIT_BRANCH is invalid", file=sys.stderr)
+    if branch != DEPLOY_BRANCH or protected != "true" or source != "push":
+        print("Deployment requires a protected main push pipeline", file=sys.stderr)
         return 2
 
     result = subprocess.run(

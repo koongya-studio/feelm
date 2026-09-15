@@ -15,13 +15,15 @@ SPEC.loader.exec_module(MODULE)
 class DeployCurrentCommitTest(unittest.TestCase):
     commit = "1" * 40
 
-    def run_main(self, *, branch="develop", remote_sha=None, returncode=0):
+    def run_main(self, *, branch="main", protected="true", source="push",
+                 remote_sha=None, returncode=0):
         completed = subprocess.CompletedProcess(
             [], returncode, f"{remote_sha or self.commit}\trefs/heads/{branch}\n", ""
         )
         with patch.dict(
             os.environ,
-            {"CI_COMMIT_SHA": self.commit, "CI_COMMIT_BRANCH": branch},
+            {"CI_COMMIT_SHA": self.commit, "CI_COMMIT_BRANCH": branch,
+             "CI_COMMIT_REF_PROTECTED": protected, "CI_PIPELINE_SOURCE": source},
             clear=True,
         ), patch.object(MODULE.subprocess, "run", return_value=completed) as run:
             result = MODULE.main()
@@ -32,7 +34,7 @@ class DeployCurrentCommitTest(unittest.TestCase):
 
         self.assertEqual(result, 0)
         run.assert_called_once_with(
-            ["git", "ls-remote", "--exit-code", "origin", "refs/heads/develop"],
+            ["git", "ls-remote", "--exit-code", "origin", "refs/heads/main"],
             check=False,
             capture_output=True,
             text=True,
@@ -48,11 +50,20 @@ class DeployCurrentCommitTest(unittest.TestCase):
 
         self.assertEqual(result, 2)
 
-    def test_rejects_invalid_branch_before_running_git(self):
-        result, run = self.run_main(branch="--upload-pack=bad")
+    def test_rejects_non_main_branch_before_running_git(self):
+        result, run = self.run_main(branch="develop")
 
         self.assertEqual(result, 2)
         run.assert_not_called()
+
+    def test_rejects_unprotected_or_non_push_pipeline(self):
+        for environment in ({"protected": "false"}, {"source": "web"},
+                            {"source": "api"}):
+            with self.subTest(environment=environment):
+                result, run = self.run_main(**environment)
+
+                self.assertEqual(result, 2)
+                run.assert_not_called()
 
 
 if __name__ == "__main__":

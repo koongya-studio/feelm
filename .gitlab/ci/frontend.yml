@@ -55,7 +55,7 @@ frontend-test:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
       when: never
-    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
       changes:
         - frontend/src/**/*
         - frontend/public/**/*
@@ -96,7 +96,7 @@ frontend-image:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
       when: never
-    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
       changes:
         - frontend/src/**/*
         - frontend/public/**/*
@@ -141,7 +141,7 @@ deploy-frontend:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
       when: never
-    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
       changes:
         - frontend/src/**/*
         - frontend/public/**/*

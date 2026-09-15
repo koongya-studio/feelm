@@ -115,12 +115,21 @@ include:
         for forbidden in ('image:', 'services:', 'cache:', 'artifacts:', 'before_script:'):
             self.assertNotIn(forbidden, block)
 
-    def test_develop_build_and_deploy_chains_remain_serialized(self):
+    def test_main_build_and_deploy_chains_are_protected_and_serialized(self):
+        datastore = job_block(self.backend, 'datastore-config-check')
         backend_test = job_block(self.backend, 'backend-test')
         backend_image = job_block(self.backend, 'backend-image')
         backend_deploy = job_block(self.backend, 'deploy-backend')
         frontend_image = job_block(self.frontend, 'frontend-image')
         frontend_deploy = job_block(self.frontend, 'deploy-frontend')
+        main_push = ('$CI_COMMIT_BRANCH == "main" && '
+                     '$CI_COMMIT_REF_PROTECTED == "true" && '
+                     '$CI_PIPELINE_SOURCE == "push"')
+        for block in (datastore, backend_test, backend_image, backend_deploy,
+                      job_block(self.frontend, 'frontend-test'), frontend_image,
+                      frontend_deploy):
+            self.assertIn(main_push, block)
+            self.assertNotIn('$CI_COMMIT_BRANCH == "develop"', block)
         self.assertIn('job: backend-test', backend_image)
         self.assertIn('job: datastore-config-check', backend_image)
         self.assertIn('needs: [backend-image]', backend_deploy)
@@ -135,6 +144,31 @@ include:
             self.assertIn('resource_group: service-and-backend-cache', block)
             self.assertIn('ci-deploy-current-commit.py', block)
         self.assertIn('--init-script gradle/test-timing.gradle', backend_test)
+
+    def test_service_release_jobs_exclude_develop_mr_api_and_web_pipelines(self):
+        release_jobs = (
+            (self.backend, 'datastore-config-check'),
+            (self.backend, 'backend-test'),
+            (self.backend, 'backend-image'),
+            (self.backend, 'deploy-backend'),
+            (self.frontend, 'frontend-test'),
+            (self.frontend, 'frontend-image'),
+            (self.frontend, 'deploy-frontend'),
+        )
+        required = ('if: \'$CI_COMMIT_BRANCH == "main" && '
+                    '$CI_COMMIT_REF_PROTECTED == "true" && '
+                    '$CI_PIPELINE_SOURCE == "push"\'')
+        for config, name in release_jobs:
+            block = job_block(config, name)
+            self.assertIn(required, block, name)
+            self.assertNotIn('if: \'$CI_COMMIT_BRANCH == "develop"', block, name)
+            self.assertNotIn('$CI_PIPELINE_SOURCE == "web"', block, name)
+
+        for config, name in ((self.backend, 'backend-mr-test'),
+                             (self.frontend, 'frontend-mr-test')):
+            block = job_block(config, name)
+            self.assertIn('$CI_PIPELINE_SOURCE == "merge_request_event"', block)
+            self.assertIn('$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"', block)
 
 
 if __name__ == '__main__':
