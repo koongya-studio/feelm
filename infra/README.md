@@ -1086,6 +1086,107 @@ docker start feelm-hdfs-datanode-1
 복구 후 두 DataNode가 모두 `Live datanodes`로 표시되고 기존 파일을 읽을 수 있는지
 확인합니다.
 
+## Distributed Consumer Deployment
+
+추천 Consumer는 J15E106A 분산 노드에서 `distributed.yml`의 `consumer` profile로 실행한다.
+이미지는 `pipeline/consumer/Dockerfile`로 분산 노드에서 수동 빌드하며 Registry 게시와 자동
+CD는 별도 업무로 다룬다. profile을 지정하지 않은 기존 HDFS·Spark·Kafka 기동에는 Consumer가
+추가되지 않는다.
+
+### Cross-node datastore boundary
+
+Consumer는 분산 노드의 Kafka·HDFS와 서비스 노드의 PostgreSQL·Redis를 함께 사용한다.
+PostgreSQL과 Redis의 기본 bind address는 계속 `127.0.0.1`이다. Consumer를 배포할 때만
+서비스 노드의 `infra/.env`에서 아래 두 값을 서비스 노드 사설 IP로 바꾼다.
+
+```dotenv
+POSTGRES_BIND_ADDRESS=<SERVICE_NODE_IP>
+REDIS_BIND_ADDRESS=<SERVICE_NODE_IP>
+```
+
+사설 IP bind만으로 송신 주체 제한이 완성되지는 않는다. 보안 그룹과 호스트 방화벽에서
+`DISTRIBUTED_NODE_IP/32`가 서비스 노드의 `5432/tcp`, `6379/tcp`에 접근하는 트래픽만
+허용해야 한다. 기존 SSH 허용 규칙과 연결을 확인하지 않은 상태에서 UFW를 활성화하거나
+초기화하지 않는다. 적용 전에는 운영자가 현재 규칙을 확인하고, 허용 규칙을 먼저 추가한 뒤
+다른 출발지 차단을 확인한다.
+
+```bash
+sudo ufw status numbered
+sudo ufw allow from "${DISTRIBUTED_NODE_IP}" to "${SERVICE_NODE_IP}" port 5432 proto tcp
+sudo ufw allow from "${DISTRIBUTED_NODE_IP}" to "${SERVICE_NODE_IP}" port 6379 proto tcp
+sudo ufw status numbered
+```
+
+서비스 노드에서 설정을 검사한 뒤 PostgreSQL과 Redis만 재생성한다. 두 서비스에는 짧은 연결
+중단이 발생할 수 있으므로 적용 시점을 합의하고 `down -v`를 사용하지 않는다.
+
+```bash
+docker compose --env-file infra/.env -f infra/compose/service.yml config --quiet
+docker compose --env-file infra/.env -f infra/compose/service.yml \
+  up -d --no-deps --force-recreate postgres redis
+docker port feelm-postgres 5432
+docker port feelm-redis 6379
+```
+
+두 `docker port` 결과는 `<SERVICE_NODE_IP>:5432`, `<SERVICE_NODE_IP>:6379`여야 한다.
+
+### Consumer environment
+
+분산 노드의 `infra/.env`에는 다음 값을 추가한다. DSN과 Redis URL의 비밀번호는 URL encoding하고
+실제 값은 저장소, shell history와 로그에 남기지 않는다. 세 HDFS URI는 동일한 immutable
+snapshot revision을 가리켜야 하며 `latest` 별칭을 사용하지 않는다.
+
+```dotenv
+CONSUMER_IMAGE=feelm-foldin-consumer:local
+CONSUMER_KAFKA_TOPIC=feelm.rating.v1
+CONSUMER_KAFKA_GROUP_ID=feelm-foldin-consumer-v1
+CONSUMER_POSTGRES_DSN=postgresql://<user>:<encoded-password>@<SERVICE_NODE_IP>:5432/feelm
+CONSUMER_REDIS_URL=redis://:<encoded-password>@<SERVICE_NODE_IP>:6379/0
+CONSUMER_MODEL_URI=hdfs://hdfs-namenode:9000/<immutable-model-path>
+CONSUMER_MAPPING_URI=hdfs://hdfs-namenode:9000/<immutable-mapping-path>
+CONSUMER_METADATA_URI=hdfs://hdfs-namenode:9000/<immutable-metadata-path>
+```
+
+### Build, deploy and verify
+
+분산 노드에서 승인된 `develop`을 받은 뒤 Compose 설정과 이미지를 검사한다.
+
+```bash
+docker compose --env-file infra/.env -f infra/compose/distributed.yml \
+  --profile consumer config --quiet
+docker compose --env-file infra/.env -f infra/compose/distributed.yml \
+  --profile consumer build consumer
+```
+
+서비스 노드의 두 포트가 준비된 뒤 Consumer를 기동한다. `depends_on`은 같은 Compose의 HDFS
+NameNode health와 Kafka 시작 순서만 보장하며 원격 PostgreSQL·Redis 준비 상태는 보장하지 않는다.
+
+```bash
+docker compose --env-file infra/.env -f infra/compose/distributed.yml \
+  --profile consumer up -d consumer
+docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}}' feelm-foldin-consumer
+docker logs --tail 100 feelm-foldin-consumer
+```
+
+정상 상태는 프로세스가 `running`이고 설정·산출물·연결 오류가 반복되지 않는 상태다. 실제
+검증은 백엔드의 평가 또는 온보딩 흐름으로 `feelm.rating.v1` 이벤트를 발행한 뒤 Consumer
+로그의 처리 완료와 Redis의 해당 사용자 `candidate-version`, `vector`, `candidates` 세 키
+갱신을 확인한다. 이벤트 payload, DSN, Redis URL과 비밀번호를 검증 기록에 남기지 않는다.
+
+정상 종료는 다음처럼 확인한다. Compose의 `stop_grace_period`는 30초이며 Consumer가 PID 1로
+SIGTERM을 받아 Kafka poll loop와 client를 닫는다.
+
+```bash
+docker compose --env-file infra/.env -f infra/compose/distributed.yml \
+  --profile consumer stop consumer
+docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}}' feelm-foldin-consumer
+```
+
+배포 실패 시 새 Consumer만 중단하고 기존 HDFS·Spark·Kafka 및 데이터 볼륨은 유지한다. 설정을
+수정한 뒤 `config --quiet`, `up -d consumer`, 로그 확인 순서로 재시도하며 `down -v`를 사용하지
+않는다. 서비스 노드의 bind address를 다시 루프백으로 복구하려면 Consumer를 먼저 중단하고
+두 값을 `127.0.0.1`로 되돌린 뒤 PostgreSQL과 Redis만 재생성한다.
+
 ## Deployment
 
 별도 스테이징 서버를 두지 않습니다. `J15E106`에서 사전 검증을 통과한 백엔드와 프론트엔드
