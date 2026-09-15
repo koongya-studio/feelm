@@ -30,7 +30,7 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'id'> & {
   action?: { label: string; onClick?: () => void; disabled?: boolean };
   /** 필드 안 오른쪽 표시값 (0.7 남은 시간). 누를 수 없는 것만 넣는다 */
   trailing?: ReactNode;
-  /** 필드 아래 보조 문구 (0.7-A `8자 이상, 영문과 숫자 포함`) */
+  /** 필드 아래 보조 문구 (0.7-A `8~64자, 영문·숫자·특수문자 포함`) */
   hint?: string;
   /** 오류 문구. 있으면 테두리가 바뀌고 보조기술에 오류로 알린다 */
   error?: string;

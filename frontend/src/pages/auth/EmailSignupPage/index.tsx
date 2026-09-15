@@ -40,7 +40,7 @@ import { ApiError } from '../../../api/apiError';
 import { signup } from '../../../api/auth';
 import { checkNicknameAvailability, isValidNickname } from '../../../api/users';
 import { path } from '../../../routes/paths';
-import { PASSWORD_HINT } from '../password';
+import { isValidPassword, PASSWORD_HINT } from '../password';
 import styles from './EmailSignupPage.module.css';
 import Typewriter from './Typewriter';
 import type { Gender } from '../../../types/auth';
@@ -191,6 +191,17 @@ export default function EmailSignupPage() {
   const submit = async () => {
     if (nicknameResult !== 'available') {
       setFailure('닉네임 중복 확인을 해 주세요.');
+
+      return;
+    }
+
+    /*
+     * 비밀번호 규칙은 계약(API-001)에 있고 서버도 검사하지만 화면에서 먼저 본다.
+     * 서버가 거절하면 `VALIDATION_FAILED` 하나로만 돌아와 어느 값이 문제인지
+     * 알려 줄 수 없다(S15P21E106-448).
+     */
+    if (!isValidPassword(password)) {
+      setFailure(`비밀번호는 ${PASSWORD_HINT} 조건을 지켜야 해요.`);
 
       return;
     }
