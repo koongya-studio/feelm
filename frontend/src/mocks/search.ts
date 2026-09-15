@@ -9,6 +9,7 @@
  * `mocks/movies.ts`는 추천이 참조하는 기준 목업이고 movieId 101~로 시작한다. 검색은
  * 그 목록으로는 검색어 대조를 보일 수 없으므로 별도로 둔다. 겹치지 않게 201~을 쓴다.
  */
+import { mockOtts } from './otts';
 import type { FilterOptions, MovieSearchItem } from '../types/search';
 
 /**
@@ -191,12 +192,6 @@ export const mockFilterOptions: FilterOptions = {
     { code: 'ETC', name: '기타' },
   ],
   yearRange: { min: 1920, max: 2026 },
-  otts: [
-    { ottId: 1, code: 'NETFLIX', name: '넷플릭스' },
-    { ottId: 2, code: 'TVING', name: '티빙' },
-    { ottId: 3, code: 'WAVVE', name: '웨이브' },
-    { ottId: 4, code: 'DISNEY_PLUS', name: '디즈니+' },
-    { ottId: 5, code: 'COUPANG_PLAY', name: '쿠팡플레이' },
-    { ottId: 6, code: 'APPLE_TV_PLUS', name: '애플 TV+' },
-  ],
+  // 지원 5종과 식별자는 `mocks/otts.ts`가 기준이다(업무 -379)
+  otts: mockOtts.map(({ ottId, code, name }) => ({ ottId, code, name })),
 };

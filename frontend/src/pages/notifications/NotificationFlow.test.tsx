@@ -16,6 +16,7 @@ import HomePage from '../home/HomePage';
 import PartyInvitationPage from '../party/PartyInvitationPage';
 import WatchConfirmPage from '../watch/WatchConfirmPage';
 import { getMyProfile } from '../../api/users';
+import { mockOtts } from '../../mocks/otts';
 import { resetSessionStore } from '../../mocks/sessionStore';
 import { mockMyProfile } from '../../mocks/user';
 import { ROUTE_PATTERN } from '../../routes/paths';
@@ -24,9 +25,20 @@ vi.mock('../../api/users', () => ({
   getMyProfile: vi.fn(),
 }));
 
+// 2.4-A 감상 확인이 OTT 기준정보를 부른다. 연동(-379) 뒤에는 실제 호출이다
+vi.mock('../../api/otts', () => ({
+  getOtts: vi.fn(),
+  getMyOttIds: vi.fn(),
+  setMyOttIds: vi.fn(),
+}));
+
+const { getOtts, getMyOttIds } = await import('../../api/otts');
+
 beforeEach(() => {
   resetSessionStore();
   vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
+  vi.mocked(getOtts).mockReset().mockResolvedValue(mockOtts);
+  vi.mocked(getMyOttIds).mockReset().mockResolvedValue([mockOtts[0].ottId]);
 });
 
 function LocationProbe() {

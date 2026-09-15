@@ -1,21 +1,54 @@
 /*
  * OTT 기준정보 목업. API-025 OTT 목록 조회
  *
- * 지원 OTT 목록은 API-025 미정 사항이다. 와이어프레임 1.2가 6개를 보여주므로 그 6개를
- * 둔다(넷플릭스 · 티빙 · 웨이브 · 디즈니+ · 쿠팡플레이 · 애플 TV+). 확정되면 이 파일을
- * 교체한다.
+ * **화면은 더 이상 이 목록을 보지 않는다.** `api/otts.ts`가 API-025를 실제로 부르므로
+ * (업무 S15P21E106-379) 여기 남은 것은 아직 연동하지 않은 도메인의 목업이 OTT 이름을
+ * 찾을 때 쓰는 기준표다 — 감상 기록(`mocks/watch.ts`) · 추천(`api/recommendations.ts`) ·
+ * OTT 구독 추천(`mocks/ottRecommendations.ts`).
  *
- * 와이어프레임의 배지 글자는 계약 필드가 아니므로 여기 두지 않고
- * src/utils/ott.ts에서 코드로부터 만든다. 6개 모두 코드 첫 글자가 와이어프레임 표기와
- * 일치한다(N · T · W · D · C · A).
+ * 지원 OTT는 다섯 개로 확정됐다(API-025 처리 규칙 · 업무 S15P21E106-155).
+ * 와이어프레임 1.2를 근거로 담아 두었던 쿠팡플레이 · 애플 TV+는 목록에 없고, 대신
+ * 왓챠가 있다.
+ *
+ * `ottId`와 `logoUrl`은 새 환경의 Flyway seed
+ * (`V202609142240__seed_approved_ott_catalog.sql`)와 같은 값이다. 그래야 실제 API-025가
+ * 내려준 목록과 목업 데이터의 `ottId`가 같은 OTT를 가리킨다. 다만 **적재는 기존 환경의
+ * 식별자를 보존하므로 이 순서가 어디서나 같다고 가정하면 안 된다**(API-025 처리 규칙).
+ * 화면이 쓰는 값은 언제나 API-025 응답이다.
  */
 import type { Ott } from '../types/ott';
 
+const LOGO_BASE = 'https://image.tmdb.org/t/p/original';
+
 export const mockOtts: Ott[] = [
-  { ottId: 1, code: 'NETFLIX', name: '넷플릭스', logoUrl: null },
-  { ottId: 2, code: 'TVING', name: '티빙', logoUrl: null },
-  { ottId: 3, code: 'WAVVE', name: '웨이브', logoUrl: null },
-  { ottId: 4, code: 'DISNEY_PLUS', name: '디즈니+', logoUrl: null },
-  { ottId: 5, code: 'COUPANG_PLAY', name: '쿠팡플레이', logoUrl: null },
-  { ottId: 6, code: 'APPLE_TV_PLUS', name: '애플 TV+', logoUrl: null },
+  {
+    ottId: 1,
+    code: 'NETFLIX',
+    name: '넷플릭스',
+    logoUrl: `${LOGO_BASE}/rK1KljqmbvO9HQa1PBFLILWah72.png`,
+  },
+  {
+    ottId: 2,
+    code: 'DISNEY_PLUS',
+    name: '디즈니+',
+    logoUrl: `${LOGO_BASE}/5eZ872CghnHFLB1j8grszbrx0dx.png`,
+  },
+  {
+    ottId: 3,
+    code: 'WATCHA',
+    name: '왓챠',
+    logoUrl: `${LOGO_BASE}/ppQIS7UMtBwJSspSoGqDR8wO1Gr.png`,
+  },
+  {
+    ottId: 4,
+    code: 'WAVVE',
+    name: '웨이브',
+    logoUrl: `${LOGO_BASE}/mh1vBeclG7Eq15TjRnmyustqp3v.png`,
+  },
+  {
+    ottId: 5,
+    code: 'TVING',
+    name: '티빙',
+    logoUrl: `${LOGO_BASE}/w4ov8Zx73eu2TjHsDs5EmiuYKA4.png`,
+  },
 ];

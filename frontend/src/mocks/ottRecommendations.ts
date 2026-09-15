@@ -5,8 +5,9 @@
  * 이유 · 항목별 일치도는 EXT-04 그대로이고, 나머지 OTT의 상세는 흐름이 이어지게 만든 값이다.
  *
  * - **구독 여부는 여기서 정하지 않는다.** 사용자가 6.1에서 바꾸는 값이라 API-026으로
- *   채운다(`src/api/ottRecommendations.ts`). 와이어프레임은 넷플릭스 · 티빙 구독을 그렸고
- *   기준 목업(mocks/otts.ts의 구독)도 같다
+ *   채운다(`src/api/ottRecommendations.ts`). 와이어프레임은 넷플릭스 · 티빙 구독을
+ *   그렸지만, 연동 뒤에는 서버가 아는 구독만 반영된다 — 설정한 적이 없으면 모두
+ *   미구독이다(업무 -379)
  * - `matchCount`는 EXT-03의 `추천 68편` 같은 수다. 계약의 순위 기준이 바로 이 값이다
  * - 좋아할 만한 영화는 상세가 있는 영화만 쓴다. EXT-04가 `영화 제목 1 ~ 3`을 그렸다
  *
@@ -106,12 +107,13 @@ const seeds: Seed[] = [
     movieIds: [413],
   },
   {
-    code: 'COUPANG_PLAY',
+    // 확정 5종에 맞춰 쿠팡플레이 자리를 왓챠로 바꿨다(업무 -379)
+    code: 'WATCHA',
     matchCount: 24,
     matchRate: 58,
-    genreSummary: '액션 · 예능',
-    headline: '액션 영화가 조금 있어요',
-    reasons: ['액션 영화가 일부 있어요'],
+    genreSummary: '드라마 · 예술영화',
+    headline: '드라마 영화가 조금 있어요',
+    reasons: ['드라마 영화가 일부 있어요'],
     itemRates: [
       { label: '장르', rate: 62 },
       { label: '감독', rate: 50 },
@@ -119,21 +121,6 @@ const seeds: Seed[] = [
       { label: '캐릭터 취향', rate: 55 },
     ],
     movieIds: [101],
-  },
-  {
-    code: 'APPLE_TV_PLUS',
-    matchCount: 15,
-    matchRate: 51,
-    genreSummary: '드라마 · 스릴러',
-    headline: '드라마 영화가 조금 있어요',
-    reasons: ['드라마 장르가 일부 있어요'],
-    itemRates: [
-      { label: '장르', rate: 55 },
-      { label: '감독', rate: 46 },
-      { label: '배우', rate: 50 },
-      { label: '캐릭터 취향', rate: 48 },
-    ],
-    movieIds: [411],
   },
 ];
 

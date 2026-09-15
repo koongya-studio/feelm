@@ -2,7 +2,8 @@
  * 1.2 구독 OTT 초기 설정
  *
  * 요소와 문구는 와이어프레임 1.2 그대로다(screen-spec.md 4장 1.2).
- * OTT 6개는 API-025로 조회한다. 지원 목록 확정은 API-025 미정 사항이다.
+ * OTT 목록은 API-025로 조회한다. **지원 OTT 5종과 각 `ottId`는 서버가 정한다** —
+ * 화면은 응답의 식별자를 그대로 쓰고 개수도 응답을 따른다(업무 S15P21E106-379).
  *
  * `구독 중인 OTT가 없어요`는 빈 배열로 저장한다(API-027 — 빈 배열이면 전체 해제).
  *
@@ -17,7 +18,8 @@ import OttBadge from '../../../components/OttBadge';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import SelectableTile from '../../../components/SelectableTile';
-import { getOtts, setMyOtts } from '../../../api/otts';
+import { ApiError } from '../../../api/apiError';
+import { getOtts, setMyOttIds } from '../../../api/otts';
 import { useOnboarding } from '../../../contexts/onboardingContext';
 import { path } from '../../../routes/paths';
 import { ottBadgeLetter } from '../../../utils/ott';
@@ -33,6 +35,7 @@ export default function OttOnboardingPage() {
   const [reloadCount, setReloadCount] = useState(0);
   const [selected, setSelected] = useState<number[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
 
   useEffect(() => {
     getOtts()
@@ -62,9 +65,25 @@ export default function OttOnboardingPage() {
 
   async function submit(ottIds: number[]) {
     setSubmitting(true);
-    await setMyOtts(ottIds);
-    completeOtt(ottIds);
-    void navigate(path.onboardingComplete());
+    setFailure(null);
+
+    try {
+      /*
+       * 서버가 저장한 결과를 다음 화면으로 넘긴다. 계약이 중복을 제거하고 돌려주므로
+       * 보낸 값이 아니라 받은 값이 구독 상태다(API-027 처리 규칙).
+       */
+      const saved = await setMyOttIds(ottIds);
+
+      completeOtt(saved);
+      void navigate(path.onboardingComplete());
+    } catch (error) {
+      setFailure(
+        error instanceof ApiError
+          ? error.message
+          : '저장하지 못했어요. 잠시 후 다시 시도해 주세요.',
+      );
+      setSubmitting(false);
+    }
   }
 
   if (failed) {
@@ -114,6 +133,7 @@ export default function OttOnboardingPage() {
                     <OttBadge
                       letter={ottBadgeLetter(ott.code)}
                       name={ott.name}
+                      logoUrl={ott.logoUrl}
                       size={38}
                       fontSize={16}
                       radius={10}
@@ -129,6 +149,12 @@ export default function OttOnboardingPage() {
         </ul>
 
         <div className={styles.actions}>
+          {failure ? (
+            <p className={styles.failure} role="alert">
+              {failure}
+            </p>
+          ) : null}
+
           <Button
             disabled={selected.length === 0 || submitting}
             onClick={() => void submit(selected)}

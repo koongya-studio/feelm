@@ -10,7 +10,7 @@ import {
   findRatingByMovie,
   withRatingEdit,
 } from '../mocks/sessionStore';
-import { getMyOtts } from './otts';
+import { getMyOttIds } from './otts';
 import { respond, respondError } from './mockTransport';
 import type { MovieDetail, SimilarMovie } from '../types/movie';
 import type { PublicReview } from '../types/watch';
@@ -40,7 +40,7 @@ export async function getMovieDetail(
    * 사용자가 1.2에서 고른 값이므로(API-026) 목업이 아니라 여기서 정한다.
    * `sort`는 안정 정렬이라 같은 묶음 안의 순서는 계약이 준 그대로다.
    */
-  const subscribedOttIds = (await getMyOtts()).map((ott) => ott.ottId);
+  const subscribedOttIds = await getMyOttIds();
   const ottProviders = detail.ottProviders
     .map((ott) => ({ ...ott, subscribed: subscribedOttIds.includes(ott.ottId) }))
     .sort((a, b) => Number(b.subscribed) - Number(a.subscribed));

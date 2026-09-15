@@ -124,7 +124,13 @@ export default function OttFinderPage() {
           <ul className={styles.badges}>
             {otts.map((ott) => (
               <li key={ott.ottId}>
-                <OttBadge letter={ottBadgeLetter(ott.code)} name={ott.name} size={36} radius={10} />
+                <OttBadge
+                  letter={ottBadgeLetter(ott.code)}
+                  name={ott.name}
+                  logoUrl={ott.logoUrl}
+                  size={36}
+                  radius={10}
+                />
               </li>
             ))}
           </ul>

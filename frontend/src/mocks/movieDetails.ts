@@ -18,6 +18,7 @@
  */
 import { mockMyRatings } from './frames';
 import { findMockMovie } from './movies';
+import { mockOtts } from './otts';
 import type { MovieDetail } from '../types/movie';
 
 /** 상세 화면에만 필요한 필드 */
@@ -34,14 +35,14 @@ type DetailExtras = Pick<
   | 'myWatchStatus'
 >;
 
-const ottMaster: Record<string, { ottId: number; name: string }> = {
-  NETFLIX: { ottId: 1, name: '넷플릭스' },
-  TVING: { ottId: 2, name: '티빙' },
-  WAVVE: { ottId: 3, name: '웨이브' },
-  DISNEY_PLUS: { ottId: 4, name: '디즈니+' },
-  COUPANG_PLAY: { ottId: 5, name: '쿠팡플레이' },
-  APPLE_TV_PLUS: { ottId: 6, name: '애플 TV+' },
-};
+/*
+ * OTT 기준표. 지원 5종과 `ottId`를 여기서 또 적지 않고 `mocks/otts.ts`를 따른다
+ * (업무 -379). 두 벌로 두면 확정 목록이 바뀔 때 한쪽만 고쳐져, 실제 API-026이 준
+ * 구독 식별자와 이 화면의 `ottId`가 다른 OTT를 가리키게 된다.
+ */
+const ottMaster: Record<string, { ottId: number; name: string }> = Object.fromEntries(
+  mockOtts.map((ott) => [ott.code, { ottId: ott.ottId, name: ott.name }]),
+);
 
 /*
  * `watchUrl`은 목업에 실제 주소를 두지 않는다. 화면은 주소가 없으면 외부로 이동하지 않고

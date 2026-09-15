@@ -5,7 +5,8 @@
  *
  * - EXT-02는 응답을 기다린 뒤 EXT-03으로 **바꿔 끼운다.** 뒤로 가기가 분석 중으로 돌아오면
  *   분석이 다시 돈다
- * - 구독 여부는 6.1에서 바꾼 값이어야 한다. 목업이 고정값을 들고 있으면 6.1과 어긋난다
+ * - 구독 여부는 6.1에서 바꾼 값이어야 한다. 목업이 고정값을 들고 있으면 6.1과 어긋난다.
+ *   연동(-379) 뒤에는 그 값이 API-026이므로 OTT 도메인 함수를 대신 세운다
  * - EXT-05는 목업 입력(`?mock=ott-insufficient`)으로 연다. 그 입력은 브라우저 주소에서 읽으므로
  *   jsdom 주소를 바꾼다
  */
@@ -19,8 +20,8 @@ import OttManagePage from './OttManagePage';
 import OttResultDetailPage from './OttResultDetailPage';
 import OttResultPage from './OttResultPage';
 import HomePage from '../home/HomePage';
-import { setMyOtts } from '../../api/otts';
 import { getMyProfile } from '../../api/users';
+import { mockOtts } from '../../mocks/otts';
 import { resetSessionStore } from '../../mocks/sessionStore';
 import { mockMyProfile } from '../../mocks/user';
 import { ROUTE_PATTERN } from '../../routes/paths';
@@ -29,9 +30,23 @@ vi.mock('../../api/users', () => ({
   getMyProfile: vi.fn(),
 }));
 
+vi.mock('../../api/otts', () => ({
+  getOtts: vi.fn(),
+  getMyOttIds: vi.fn(),
+  setMyOttIds: vi.fn(),
+}));
+
+const { getOtts, getMyOttIds } = await import('../../api/otts');
+
+/** API-025가 주는 확정 5종. 화면도 목업 데이터도 이 식별자를 쓴다 */
+const TVING = mockOtts[4];
+
 beforeEach(() => {
   resetSessionStore();
   vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
+  vi.mocked(getOtts).mockReset().mockResolvedValue(mockOtts);
+  // 구독을 설정한 적이 없는 사용자로 시작한다(API-026 — 빈 배열)
+  vi.mocked(getMyOttIds).mockReset().mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -96,7 +111,7 @@ describe('2.1 → EXT-01 → EXT-02 → EXT-03 → EXT-04', () => {
     expect(location()).toBe('/otts/recommend/result');
 
     fireEvent.click(await screen.findByRole('link', { name: /티빙/ }));
-    expect(location()).toBe('/otts/recommend/2');
+    expect(location()).toBe(`/otts/recommend/${TVING.ottId}`);
 
     fireEvent.click(await screen.findByRole('button', { name: '이 OTT 작품을 더 추천받기' }));
     expect(location()).toBe('/recommendations');
@@ -116,7 +131,7 @@ describe('2.1 → EXT-01 → EXT-02 → EXT-03 → EXT-04', () => {
 describe('6.1 ⇢ EXT-01 · EXT-03 ⇢ 6.1', () => {
   it('구독 여부는 6.1에서 바꾼 값을 따른다', async () => {
     // 넷플릭스를 끄고 티빙만 구독한다
-    await setMyOtts([2]);
+    vi.mocked(getMyOttIds).mockResolvedValue([TVING.ottId]);
     renderApp([ROUTE_PATTERN.ottResult]);
 
     const top = within(await screen.findByRole('region', { name: '1위 넷플릭스' }));
