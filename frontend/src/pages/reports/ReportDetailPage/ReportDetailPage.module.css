@@ -5,6 +5,17 @@
   gap: var(--space-5);
 }
 
+/*
+ * 4컷 인화지. 시안 비율(385 × 1165)을 유지한 채 폭만 정한다. 248px이면 높이가 750px쯤이라 4컷을
+ * 다 본 자리에서 `상세 리포트`가 이어진다(사용자 요청 2026-09-15). 작은 글자는 4컷이 최소 크기를 지킨다
+ */
+.fourCut {
+  width: 100%;
+  max-width: 248px;
+  align-self: center;
+  box-shadow: var(--shadow-poster);
+}
+
 /* Section이 이미 테두리 상자라 안에서 다시 두르지 않는다 */
 .card {
   display: flex;

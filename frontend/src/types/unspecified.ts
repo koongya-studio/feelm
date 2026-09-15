@@ -27,6 +27,7 @@
  * | RecommendationHistoryItemView.ott | 7.5 `8. 24 · 넷플릭스` | API-048 `movie`에 OTT가 없음. 제공처가 여럿일 때 기준도 없음. CR 미등록 |
  * | NotificationSettingsView.PARTY_INVITE · REPORT | 7.8-C `파티 초대 알림` · `리포트 발급 알림` | API-017 NotificationType에 없음. CR 미등록 |
  * | ReportDetailView | 3.3 · 3.4 · 7.4 국가 · 시대 비율 · 키워드 근거 · 지난 반기 비교 % · 대표 카드 문구 | API-060에 없음. 장르는 편수만, 비교는 맛별 알 수만 줌. CR 미등록 |
+ * | ReportFourCutView | 3.3 · 3.4 · 7.4 4컷의 사진 · 누끼 · 영문 이름 · 감독 대표작 | API-060은 이름과 `characterCard.imageUrl`만 줌. CR 미등록 |
  * | NotificationView | 8.1 알림 4종 · 탭 · 읽음 | 알림 목록 API가 없음. ADR-0011은 API-034 · API-052 폴링. CR 미등록 |
  * | OttRecommendationView | EXT-01 ~ EXT-05 일치도 % · 이유 · 항목별 일치도 · 분석 요약 | API-068은 `matchCount`만 줌. **확장 단계**. CR 미등록 |
  * | PrivacySettingsView | 7.8-B 항목 4개 × `전체 공개 · 파티원만 · 비공개` | 계약은 프로필 `visibility` 하나 · 2단계(API-015). CR 미등록 |
@@ -286,6 +287,41 @@ export type RecommendationHistoryView = Omit<RecommendationHistory, 'items'> & {
   items: RecommendationHistorySetView[];
 };
 
+/**
+ * 4컷 한 칸의 사진. **사진은 계약에 거의 없다** — API-060은 `characterCard.imageUrl` 하나뿐이다.
+ *
+ * - `url` 원본 사진. 칸을 채우도록 잘린다
+ * - `cutoutUrl` 배경을 지운 인물 PNG. 있으면 인물과 큰 글자를 나눠 겹친다. **화면이 누끼를
+ *   만들지 않는다** — 없으면 원본 사진에 어두운 그라데이션을 깐다
+ * - `position` 자를 때 남길 자리(0~100%). 기본은 가운데
+ * - `zoom` 1보다 크면 `position`을 중심으로 더 당겨 자른다
+ */
+export type ReportCutImage = {
+  url: string | null;
+  cutoutUrl?: string | null;
+  position?: { x: number; y: number };
+  zoom?: number;
+};
+
+/**
+ * 4컷 한 칸의 이름. `name`은 계약의 이름(한글)이고 `displayName`은 크게 쓰는 영문 이름이다.
+ * `displayName`이 없으면 한글 이름을 크게 쓴다. 영문 이름은 계약에 없다.
+ */
+export type ReportCutName = { name: string; displayName?: string | null };
+
+/**
+ * 3.3 · 3.4 · 7.4 취향 4컷(사용자 시안 2026-09-15, 업무 -321).
+ *
+ * 이름은 API-060의 1위(`topGenres[0]` · `topDirectors[0]` · `topActors[0]` · `characterCard`)다.
+ * 사진 · 영문 이름 · 감독 대표작(`director.work`)이 계약에 없다. CR 미등록.
+ */
+export type ReportFourCutView = {
+  genre: ReportCutName & { image: ReportCutImage };
+  director: ReportCutName & { image: ReportCutImage; work: ReportCutImage | null };
+  actor: ReportCutName & { image: ReportCutImage };
+  character: ReportCutName & { image: ReportCutImage };
+};
+
 /** 3.4 · 7.4 비율 한 줄. `share`는 0~100 */
 export type ReportShare = { label: string; share: number };
 
@@ -296,8 +332,8 @@ export type ReportShare = { label: string; share: number };
  * 국가 · 시대 · 키워드 · 지난 반기와의 비교 %가 없다. 비교는 맛별 알 수(`flavorChanges`)뿐이다.
  */
 export type ReportDetailView = ReportDetail & {
-  /** 3.3 · 3.4 · 7.4 4컷의 네 칸. 장르 · 감독 · 배우 · 캐릭터의 대표값 */
-  headline: { genre: string; director: string; actor: string; character: string };
+  /** 3.3 · 3.4 · 7.4 4컷의 네 칸 */
+  fourCut: ReportFourCutView;
   genreShares: ReportShare[];
   countryShares: ReportShare[];
   eraShares: ReportShare[];

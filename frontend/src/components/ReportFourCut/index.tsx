@@ -1,52 +1,303 @@
 /*
- * 취향 리포트 4컷 — 장르 · 감독 · 배우 · 캐릭터를 한 칸씩.
+ * 취향 4컷 리포트 — 장르 · 감독 · 배우 · 캐릭터를 한 칸씩.
  *
- * **리포트는 세로로 네 칸이 이어진 4컷 사진이다**(사용자 결정 2026-09-13, 업무 -308).
- * 와이어프레임 3.4도 좁고 긴 띠 안에 칸 넷을 위에서 아래로 쌓았다. 두 칸씩 나눈 격자로
- * 그리면 그 장면이 사라진다.
+ * **길게 이어진 검정 인화지 안에 같은 크기의 사진 네 컷이 세로로 놓인다**(사용자 시안
+ * 2026-09-15, 업무 -321). 블랙 · 빨강 · 흰색만 쓰는 영화 잡지 모양이다. 위에 `{닉네임}의 취향
+ * 4컷`과 인화한 달, 아래에 Feelm 로고와 날짜를 찍는다.
  *
- * 3.3 발급(인화기에서 나오는 장면)과 3.4 · 7.4 상세(들고 보는 장면)가 같은 4컷을 쓴다.
+ * | 칸 | 사진 | 큰 이름 |
+ * | --- | --- | --- |
+ * | 01 장르 | 흑백 | 굵고 좁은 빨간 글자. 누끼가 있으면 인물 뒤로 들어간다 |
+ * | 02 감독 | 흑백 · 빨간 바탕 · 작은 대표작 | 흰 세리프 이탤릭 대문자 |
+ * | 03 배우 | 흑백을 크게 자름 | 흰 세리프 이탤릭 + 마지막 단어만 빨간 대문자 · 별표 |
+ * | 04 캐릭터 | 컬러 | 흰 세리프 이탤릭 + 빨간 밑줄 |
  *
- * - 띠가 어두운 블록이고 칸이 사진이다. 사진 자리는 밝은 면이다 — 이미지가 계약에 없어
- *   (API-060 `characterCard.imageUrl`만 있다) 글자가 사진을 대신한다
- * - 칸마다 번호(01 ~ 04)를 붙여 한 칸에 하나라는 것을 드러낸다
- * - 맨 아래 띠 여백에 반기를 적는다. 4컷 사진의 날짜 자리다
- * - 영문 머리말(GENRE · DIRECTOR …)은 와이어프레임 표기다
+ * **데이터와 모양을 나눈다.** 사진 · 이름 · 날짜만 props로 받고 칸 크기 · 색 · 서체 · 간격 ·
+ * 글자 상자는 CSS에 고정한다. 모든 길이가 인화지 폭에 비례해서(`--u`), 3.3 인화기 안의 작은
+ * 4컷과 3.4 상세의 큰 4컷이 같은 모양이다.
+ *
+ * - 이름이 길면 최대 두 줄 안에서 글자만 작아진다(`useFitText`)
+ * - 사진 한 칸은 `url`(원본) · `cutoutUrl`(누끼)로 세 가지 모양이 된다(`useCutImage`)
+ *   - 누끼 — 단색 바탕 위에 인물을 올리고 글자와 겹친다
+ *   - 원본 — 원래 배경을 두고 글자 쪽에 어두운 그라데이션을 깐다
+ *   - 없거나 못 불러옴 — 칸 크기는 그대로, 이름을 크게 쓴다
+ * - 이 인화지 안의 빨강은 **콘텐츠**다. 앱 UI의 무채색 규칙(`design-concept.md` 3장)은 인화지
+ *   바깥에 적용된다
  */
+import { useState } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
+import Wordmark from '../Wordmark';
+import { formatPrintDate } from '../../utils/report';
+import { useFitText } from './useFitText';
 import styles from './ReportFourCut.module.css';
-import type { ReportDetailView } from '../../types/unspecified';
+import type { ReportCutImage, ReportCutName, ReportFourCutView } from '../../types/unspecified';
 
 type Props = {
-  headline: ReportDetailView['headline'];
-  /** 띠 아래 여백에 적는 반기. `2026 상반기` */
-  caption: string;
+  cuts: ReportFourCutView;
+  /** 머리의 `{owner}의 취향 4컷`. 프로필을 못 불러왔으면 `나의 취향 4컷` */
+  owner?: string | null;
+  /** 리포트를 만든 시각(API-060 `createdAt`) */
+  createdAt: string;
 };
 
-export default function ReportFourCut({ headline, caption }: Props) {
-  const cuts = [
-    { eyebrow: 'GENRE', label: '장르', value: headline.genre },
-    { eyebrow: 'DIRECTOR', label: '감독', value: headline.director },
-    { eyebrow: 'ACTOR', label: '배우', value: headline.actor },
-    { eyebrow: 'CHARACTER', label: '캐릭터', value: headline.character },
-  ];
+export default function ReportFourCut({ cuts, owner, createdAt }: Props) {
+  const title = `${owner ? `${owner}의` : '나의'} 취향 4컷`;
+  const date = formatPrintDate(createdAt);
 
   return (
-    <figure className={styles.strip}>
-      <ol className={styles.cuts}>
-        {cuts.map((cut, index) => (
-          <li key={cut.eyebrow} className={styles.cut}>
-            <span className={styles.number} aria-hidden="true">
-              {String(index + 1).padStart(2, '0')}
-            </span>
-            <span className={styles.eyebrow}>
-              {cut.eyebrow} · {cut.label}
-            </span>
-            <span className={styles.value}>{cut.value}</span>
-          </li>
-        ))}
-      </ol>
+    <div className={styles.root}>
+      <figure className={styles.strip} aria-label={title}>
+        <div className={styles.head} aria-hidden="true">
+          <span className={styles.title}>{title}</span>
+          <span className={styles.month}>{date.month}</span>
+        </div>
 
-      <figcaption className={styles.caption}>FEELM · {caption}</figcaption>
-    </figure>
+        <ol className={styles.cuts}>
+          <GenreCut {...cuts.genre} />
+          <DirectorCut {...cuts.director} />
+          <ActorCut {...cuts.actor} />
+          <CharacterCut {...cuts.character} />
+        </ol>
+
+        <figcaption className={styles.foot}>
+          <Wordmark tone="inherit" size="calc(var(--u) * 30)" />
+          <span className={styles.stamp}>{date.stamp}</span>
+        </figcaption>
+      </figure>
+    </div>
+  );
+}
+
+// ─────────────────────────── 칸 넷
+
+type CutProps = ReportCutName & { image: ReportCutImage };
+
+function GenreCut({ name, displayName, image }: CutProps) {
+  const photo = useCutImage(image);
+
+  return (
+    <Cut kind="genre" index={1} label="장르" name={name} displayName={displayName} photo={photo}>
+      <FitName text={displayName || name} maxLines={2} stretch={1.9} className={styles.genreName}>
+        {displayName || name}
+      </FitName>
+    </Cut>
+  );
+}
+
+function DirectorCut({
+  name,
+  displayName,
+  image,
+  work,
+}: CutProps & { work: ReportCutImage | null }) {
+  const photo = useCutImage(image);
+  const [workFailed, setWorkFailed] = useState<string | null>(null);
+  const workUrl = work?.url && work.url !== workFailed ? work.url : null;
+
+  return (
+    <Cut
+      kind="director"
+      index={2}
+      label="감독"
+      name={name}
+      displayName={displayName}
+      photo={photo}
+      extra={
+        workUrl ? (
+          <span className={styles.work}>
+            <img
+              src={workUrl}
+              alt=""
+              style={imageStyle(work)}
+              onError={() => setWorkFailed(workUrl)}
+            />
+          </span>
+        ) : null
+      }
+    >
+      <FitName text={displayName || name} maxLines={2} className={styles.directorName}>
+        {displayName || name}
+      </FitName>
+    </Cut>
+  );
+}
+
+function ActorCut({ name, displayName, image }: CutProps) {
+  const photo = useCutImage(image);
+  const text = displayName || name;
+  const words = text.trim().split(/\s+/);
+  const last = words.pop() ?? text;
+  const lead = words.join(' ');
+
+  return (
+    <Cut kind="actor" index={3} label="배우" name={name} displayName={displayName} photo={photo}>
+      {/* 두 단어를 서로 다른 크기로 한 줄씩 쓴다. 줄 수가 아니라 상자 폭 · 높이로만 맞춘다 */}
+      <FitName text={text} maxLines={3} className={styles.actorName}>
+        {lead ? <span className={styles.actorLead}>{lead}</span> : null}
+        <span className={styles.actorLast}>
+          <Sparkle />
+          {last}
+        </span>
+      </FitName>
+    </Cut>
+  );
+}
+
+function CharacterCut({ name, displayName, image }: CutProps) {
+  const photo = useCutImage(image);
+
+  return (
+    <Cut
+      kind="character"
+      index={4}
+      label="캐릭터"
+      name={name}
+      displayName={displayName}
+      photo={photo}
+    >
+      <FitName text={displayName || name} maxLines={2} className={styles.characterName}>
+        <span className={styles.underlined}>
+          {displayName || name}
+          <Underline />
+        </span>
+      </FitName>
+    </Cut>
+  );
+}
+
+// ─────────────────────────── 칸의 뼈대
+
+type CutFrameProps = ReportCutName & {
+  kind: 'genre' | 'director' | 'actor' | 'character';
+  index: number;
+  label: string;
+  photo: CutImageState;
+  /** 사진과 이름 사이에 놓는 장식. 감독 칸의 대표작 */
+  extra?: ReactNode;
+  children: ReactNode;
+};
+
+/*
+ * 칸 하나. 층은 아래부터 사진 → 그라데이션 → 장식 → 큰 이름 → 누끼 인물 → 라벨이다. 누끼
+ * 인물과 큰 이름 중 무엇이 앞인지는 칸마다 CSS가 정한다(장르만 이름이 인물 뒤).
+ *
+ * 영문 이름이 있으면 큰 글자는 장식이라 읽지 않고, 아래의 한글 이름을 읽는다. 영문 이름이
+ * 없으면 한글 이름이 곧 큰 글자라 아래에 한 번 더 쓰지 않는다.
+ */
+function Cut({ kind, index, label, name, displayName, photo, extra, children }: CutFrameProps) {
+  const hasDisplayName = Boolean(displayName) && displayName !== name;
+
+  return (
+    <li className={styles.cut} data-cut={kind} data-mode={photo.mode}>
+      {photo.mode === 'photo' && photo.src ? (
+        <span className={styles.photo}>
+          <img src={photo.src} alt="" style={imageStyle(photo.image)} onError={photo.fail} />
+        </span>
+      ) : null}
+
+      {extra}
+
+      <div className={styles.nameArea} aria-hidden={hasDisplayName || undefined}>
+        {children}
+      </div>
+
+      {photo.mode === 'cutout' && photo.src ? (
+        <span className={styles.figure}>
+          <img src={photo.src} alt="" style={imageStyle(photo.image)} onError={photo.fail} />
+        </span>
+      ) : null}
+
+      <span className={styles.label}>
+        {String(index).padStart(2, '0')} {label}
+      </span>
+      {hasDisplayName ? <span className={styles.caption}>{name}</span> : null}
+    </li>
+  );
+}
+
+type FitNameProps = {
+  text: string;
+  maxLines: number;
+  stretch?: number;
+  className: string;
+  children: ReactNode;
+};
+
+/** 큰 이름 상자. 상자는 CSS가 고정하고 글자 크기만 맞춘다 */
+function FitName({ text, maxLines, stretch, className, children }: FitNameProps) {
+  const boxRef = useFitText<HTMLDivElement>(text, { maxLines, stretch });
+
+  return (
+    <div ref={boxRef} className={`${styles.nameBox} ${className}`}>
+      <p className={styles.name}>{children}</p>
+    </div>
+  );
+}
+
+// ─────────────────────────── 사진
+
+type CutImageState = {
+  mode: 'cutout' | 'photo' | 'none';
+  src: string | null;
+  image: ReportCutImage;
+  fail: () => void;
+};
+
+/**
+ * 누끼 → 원본 → 없음 순으로 쓸 수 있는 사진을 고른다. 못 불러온 주소는 기억해 두고 다음
+ * 것으로 넘어간다. 주소가 바뀌면 기억한 실패와 달라져 저절로 다시 시도한다.
+ */
+function useCutImage(image: ReportCutImage): CutImageState {
+  const [failed, setFailed] = useState<string[]>([]);
+  const usable = (url?: string | null) => (url && !failed.includes(url) ? url : null);
+
+  const cutout = usable(image.cutoutUrl);
+  const original = usable(image.url);
+  const src = cutout ?? original;
+  const mode = cutout ? 'cutout' : original ? 'photo' : 'none';
+
+  return {
+    mode,
+    src,
+    image,
+    fail: () => {
+      if (src) setFailed((list) => [...list, src]);
+    },
+  };
+}
+
+function imageStyle(image: ReportCutImage | null): CSSProperties | undefined {
+  if (!image) return undefined;
+
+  const x = image.position?.x ?? 50;
+  const y = image.position?.y ?? 50;
+
+  return {
+    '--image-x': `${x}%`,
+    '--image-y': `${y}%`,
+    '--image-zoom': String(Math.max(image.zoom ?? 1, 1)),
+  } as CSSProperties;
+}
+
+// ─────────────────────────── 장식
+
+function Sparkle() {
+  return (
+    <svg className={styles.sparkle} viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M10 0 L11 8.6 L20 10 L11 11.4 L10 20 L9 11.4 L0 10 L9 8.6 Z" />
+    </svg>
+  );
+}
+
+function Underline() {
+  return (
+    <svg
+      className={styles.underline}
+      viewBox="0 0 100 8"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <path d="M0 7.2 C 30 5.6, 65 3.2, 100 0.6 L100 2.4 C 65 4.8, 30 7, 0 8 Z" />
+    </svg>
   );
 }

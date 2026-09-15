@@ -12,7 +12,19 @@
  * - 키워드 넷은 3.1 `요즘 취향 흐름`과 같다(mocks/taste.ts). 같은 사용자라 두 번 적지 않는다
  *
  * 시각은 정오 기준이다(mocks/frames.ts와 같은 이유).
+ *
+ * **4컷(`fourCut`)은 사용자 시안(2026-09-15, 업무 -321)의 샘플 데이터다.**
+ * - 2026 상반기(301)의 1위 장르 · 감독 · 배우 · 캐릭터를 시안대로 로맨스 · 웨스 앤더슨 · 엠마 스톤 ·
+ *   아멜리에로 바꿨다. 4컷과 상세의 목록이 같은 사람을 말해야 해서 목록 1위도 함께 바꿨다
+ * - 사진(`images/reports/`)은 시안 이미지에서 잘라 낸 자리표시자다. 사진 권리가 확정되지 않았고
+ *   (`components/Poster`) 계약에도 사진이 없어, API 연동 때 지운다
+ * - 지난 두 리포트(202 · 201)는 사진이 없다. 사진 없는 4컷 모양을 보여 준다
  */
+import actorPortrait from './images/reports/actor-portrait.jpg';
+import characterAmelie from './images/reports/character-amelie.jpg';
+import directorPortrait from './images/reports/director-portrait.jpg';
+import directorWork from './images/reports/director-work.jpg';
+import genreRomance from './images/reports/genre-romance.jpg';
 import { mockTasteFlow } from './taste';
 import type { ReportSummary } from '../types/report';
 import type { ReportDetailView } from '../types/unspecified';
@@ -59,25 +71,25 @@ export const mockReportDetails: Record<number, ReportDetailView> = {
     period: { year: 2026, half: 'H1' },
     summary: { ratingCount: 38, newFlavorCount: 1, averageScore: 4.1 },
     topGenres: [
-      { code: 'ACTION', name: '액션', count: 19 },
+      { code: 'ROMANCE', name: '로맨스', count: 19 },
       { code: 'THRILLER', name: '스릴러', count: 10 },
       { code: 'DRAMA', name: '드라마', count: 9 },
     ],
     topActors: [
-      { personId: 9101, name: '마고 로비', count: 3 },
+      { personId: 9104, name: '엠마 스톤', count: 3 },
       { personId: 9102, name: '라이언 고슬링', count: 2 },
       { personId: 9103, name: '틸다 스윈튼', count: 1 },
     ],
     topDirectors: [
-      { personId: 9201, name: '크리스토퍼 놀란', count: 3 },
+      { personId: 9204, name: '웨스 앤더슨', count: 3 },
       { personId: 9202, name: '봉준호', count: 2 },
       { personId: 9203, name: '드니 빌뇌브', count: 2 },
     ],
     characterCard: {
-      name: '계획형 안티히어로',
+      name: '아멜리에',
       movieTitle: '영화 제목 2',
       description: CHARACTER_DESCRIPTION,
-      imageUrl: null,
+      imageUrl: characterAmelie,
     },
     flavorChanges: [
       { flavorCode: 'FLAVOR_THRILL', before: 14, after: 26 },
@@ -85,14 +97,31 @@ export const mockReportDetails: Record<number, ReportDetailView> = {
       { flavorCode: 'FLAVOR_DRAMA', before: 16, after: 10 },
     ],
     createdAt: '2026-07-01T12:00:00Z',
-    headline: {
-      genre: '액션 · 스릴러 49%',
-      director: '크리스토퍼 놀란',
-      actor: '마고 로비',
-      character: '계획형 안티히어로',
+    fourCut: {
+      genre: {
+        name: '로맨스',
+        displayName: 'ROMANCE',
+        image: { url: genreRomance, position: { x: 50, y: 40 } },
+      },
+      director: {
+        name: '웨스 앤더슨',
+        displayName: 'Wes Anderson',
+        image: { url: directorPortrait, position: { x: 50, y: 20 } },
+        work: { url: directorWork },
+      },
+      actor: {
+        name: '엠마 스톤',
+        displayName: 'Emma Stone',
+        image: { url: actorPortrait, position: { x: 60, y: 30 } },
+      },
+      character: {
+        name: '아멜리에',
+        displayName: 'Amélie',
+        image: { url: characterAmelie, position: { x: 50, y: 30 } },
+      },
     },
     genreShares: [
-      { label: '액션', share: 49 },
+      { label: '로맨스', share: 49 },
       { label: '스릴러', share: 27 },
       { label: '드라마', share: 24 },
     ],
@@ -137,11 +166,11 @@ export const mockReportDetails: Record<number, ReportDetailView> = {
     },
     flavorChanges: [{ flavorCode: 'FLAVOR_DRAMA', before: 10, after: 16 }],
     createdAt: '2026-01-01T12:00:00Z',
-    headline: {
-      genre: '드라마 · 액션 58%',
-      director: '봉준호',
-      actor: '라이언 고슬링',
-      character: '묵묵한 조력자',
+    fourCut: {
+      genre: { name: '드라마', displayName: 'DRAMA', image: { url: null } },
+      director: { name: '봉준호', image: { url: null }, work: null },
+      actor: { name: '라이언 고슬링', displayName: 'Ryan Gosling', image: { url: null } },
+      character: { name: '묵묵한 조력자', image: { url: null } },
     },
     genreShares: [
       { label: '드라마', share: 34 },
@@ -184,11 +213,16 @@ export const mockReportDetails: Record<number, ReportDetailView> = {
     },
     flavorChanges: [{ flavorCode: 'FLAVOR_COMEDY', before: 2, after: 8 }],
     createdAt: '2025-07-01T12:00:00Z',
-    headline: {
-      genre: '액션 · 코미디 52%',
-      director: '드니 빌뇌브',
-      actor: '마고 로비',
-      character: '유쾌한 해결사',
+    fourCut: {
+      genre: { name: '액션', displayName: 'ACTION', image: { url: null } },
+      director: {
+        name: '드니 빌뇌브',
+        displayName: 'Denis Villeneuve',
+        image: { url: null },
+        work: null,
+      },
+      actor: { name: '마고 로비', displayName: 'Margot Robbie', image: { url: null } },
+      character: { name: '유쾌한 해결사', image: { url: null } },
     },
     genreShares: [
       { label: '액션', share: 32 },

@@ -32,6 +32,7 @@ import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import Wordmark from '../../../components/Wordmark';
+import { getLatestReadyReport } from '../../../api/reports';
 import { getMyFrames, getPopcornBucket } from '../../../api/taste';
 import { path } from '../../../routes/paths';
 import styles from './FilmPage.module.css';
@@ -55,6 +56,8 @@ export default function FilmPage() {
 
   const [frames, setFrames] = useState<FrameList | null>(null);
   const [bucket, setBucket] = useState<PopcornBucket | null>(null);
+  /** 아직 3.3에서 받지 않은 새 리포트. 있으면 리포트 버튼이 발급(3.3)으로 간다 */
+  const [newReportId, setNewReportId] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
 
@@ -79,6 +82,15 @@ export default function FilmPage() {
       .then((value) => {
         if (active) {
           setBucket(value);
+        }
+      })
+      .catch(() => undefined);
+
+    // 새 리포트를 확인하지 못해도 리포트 버튼은 목록(7.3)으로 가는 원래 동작을 한다
+    getLatestReadyReport()
+      .then((latest) => {
+        if (active) {
+          setNewReportId(latest?.needsIntro ? latest.reportId : null);
         }
       })
       .catch(() => undefined);
@@ -217,9 +229,21 @@ export default function FilmPage() {
           {/*
            * 이 화면의 주 동작. 검정 알약은 한 화면에 하나뿐이고 그 하나가 여기다
            * (`docs/screens/design-concept.md` 2.4).
-           * 3.1 ⇢ 7.3 (업무 -308)
+           *
+           * **리포트 버튼은 하나다**(사용자 결정 2026-09-15, 업무 -321). 버튼 둘이 붙어 있으면
+           * 차이가 읽히지 않는다.
+           * - 아직 받지 않은 새 리포트가 있으면 `새 취향 리포트 받기` → 3.3 발급. 홈과 같은 규칙
+           *   (`getLatestReadyReport`)이고, 3.3에서 `리포트 보기`를 누르면 받은 것으로 기록된다.
+           *   이동표에 3.3으로 들어오는 화살표가 없어 정한 길이다
+           * - 없으면 `취향 리포트 보기` → 7.3 목록(업무 -308)
            */}
-          <Button onClick={() => void navigate(path.tasteReports())}>취향 리포트 보기</Button>
+          {newReportId !== null ? (
+            <Button onClick={() => void navigate(path.reportIssued(newReportId))}>
+              새 취향 리포트 받기
+            </Button>
+          ) : (
+            <Button onClick={() => void navigate(path.tasteReports())}>취향 리포트 보기</Button>
+          )}
         </div>
       </div>
     </>
