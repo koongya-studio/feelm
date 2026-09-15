@@ -11,6 +11,9 @@ E106 프로젝트의 서비스 및 분산 처리 인프라 설정을 관리합�
 S15P21E106-222의 [Runner 통신 격리 파일럿 스크립트](scripts/README.md)는 별도 준비 단계이며,
 운영 적용·Runner 전환 및 격리 검증 완료를 의미하지 않습니다.
 
+Kafka·Spark 개발 관제 화면의 2026-09-15 적용 결과와 남은 운영 검증 범위는
+[S15P21E106-444 검증 기록](verification/S15P21E106-444.md)을 참고합니다.
+
 ## Distributed Runtime Baseline
 
 분산 처리 환경은 아래 버전과 실행 방식을 공통 기준으로 사용합니다. 구성요소의 버전을
@@ -1204,6 +1207,71 @@ docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}}' feelm-foldi
 수정한 뒤 `config --quiet`, `up -d consumer`, 로그 확인 순서로 재시도하며 `down -v`를 사용하지
 않는다. 서비스 노드의 bind address를 다시 루프백으로 복구하려면 Consumer를 먼저 중단하고
 두 값을 `127.0.0.1`로 되돌린 뒤 PostgreSQL과 Redis만 재생성한다.
+
+## Kafka and Spark development UIs (S15P21E106-444)
+
+분산 노드에서 Kafbat UI와 Spark History Server를 실행합니다. Kafbat UI는 고정된
+read-only 구성으로 Kafka 토픽, 메시지, 파티션, Consumer Group과 Lag를 조회합니다.
+Spark Master·Worker Web UI는 실행 중인 애플리케이션을, History Server는 HDFS의
+`/spark-events`에 기록된 종료 애플리케이션을 보여 줍니다.
+
+관리 화면은 인증 기능을 제공하는 공개 서비스가 아닙니다. 분산 노드의 사설 IP에만
+바인딩하고, 방화벽에서 서비스 노드만 허용한 뒤 SSH 터널로 접속합니다. 인터넷이나
+Nginx 공개 경로로 노출하지 않습니다.
+
+최초 한 번 HDFS event log 디렉터리를 준비한 뒤 서비스를 시작합니다.
+
+```bash
+docker compose --env-file infra/.env -f infra/compose/distributed.yml \
+  --profile init run --rm spark-history-init
+docker compose --env-file infra/.env -f infra/compose/distributed.yml \
+  up -d kafka-ui spark-history-server
+```
+
+분산 노드 방화벽에서 서비스 노드를 출발지로 하는 관리 포트 연결만 허용하고 그 외 출발지는 차단합니다.
+기존 방화벽 영속화 방식에 `4040`, `8080`, `8081`, `8082`, `18080`을 추가하며, 허용 규칙이
+차단 규칙보다 먼저 와야 합니다. 실제 IP와 규칙은 서버 설정으로 관리하고 저장소에
+기록하지 않습니다.
+
+로컬 PC의 SSH config에 서비스 노드가 `e106`으로 등록돼 있다면 각각 다음 터널을 엽니다.
+
+```bash
+ssh -N \
+  -L 18082:<분산 노드 사설 IP>:8082 \
+  -L 18080:<분산 노드 사설 IP>:18080 \
+  -L 18081:<분산 노드 사설 IP>:8080 \
+  -L 18083:<서비스 노드 사설 IP>:8081 \
+  -L 18084:<분산 노드 사설 IP>:8081 \
+  -L 14040:<Spark Driver 노드 사설 IP>:4040 \
+  e106
+```
+
+브라우저 접속 주소는 다음과 같습니다.
+
+- Kafka UI: `http://127.0.0.1:18082`
+- Spark History Server: `http://127.0.0.1:18080`
+- Spark Master Web UI: `http://127.0.0.1:18081`
+- Spark Worker 1 Web UI: `http://127.0.0.1:18083`
+- Spark Worker 2 Web UI: `http://127.0.0.1:18084`
+- 실행 중인 Spark 애플리케이션 UI: `http://127.0.0.1:14040`
+
+Stage·Task·Executor 상세는 실행 중에는 애플리케이션 UI에서 확인합니다. 동시에 여러
+Driver가 실행되면 Spark가 `4041` 이후 포트를 사용할 수 있으므로 해당 Driver 로그의
+`Started SparkUI` 주소를 확인해 같은 방식으로 터널링합니다.
+
+분산 노드에서 상태와 바인딩을 검증합니다.
+
+```bash
+docker ps --filter name=feelm-kafka-ui --filter name=feelm-spark-history-server
+curl --fail --silent http://<분산 노드 사설 IP>:8082/actuator/health
+curl --fail --silent http://<분산 노드 사설 IP>:18080/api/v1/applications
+ss -ltn '( sport = :4040 or sport = :8080 or sport = :8081 or sport = :8082 or sport = :18080 )'
+docker exec feelm-hdfs-namenode hdfs dfs -ls -d /spark-events
+```
+
+Spark 애플리케이션을 하나 정상 종료한 뒤 History Server API와 화면에 나타나는지
+확인합니다. Consumer가 실행 중일 때 Kafka UI에서 Consumer Group과 파티션별 Lag를
+확인합니다. Consumer가 아직 배포되지 않았다면 이 항목은 미검증으로 기록합니다.
 
 ## Deployment
 

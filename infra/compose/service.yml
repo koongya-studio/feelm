@@ -188,6 +188,9 @@ services:
       - "hdfs-datanode-1:${SERVICE_NODE_IP:?SERVICE_NODE_IP is required}"
       - "hdfs-datanode-2:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
 
+    volumes:
+      - ../spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
+
     entrypoint:
       - /opt/spark/bin/spark-class
 
