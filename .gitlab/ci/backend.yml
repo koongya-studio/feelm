@@ -91,6 +91,7 @@ backend-mr-test:
   resource_group: service-and-backend-cache
   script:
     - /usr/bin/python3 -I -B infra/scripts/ci-dependency-cache-context.py | sudo -n /usr/bin/python3 -I -B /usr/local/lib/feelm-ci222/gitlab/ci-dependency-cache.py
+  interruptible: false
   allow_failure: false
 
 backend-cache-promote:
@@ -125,6 +126,7 @@ backend-test:
     - python3 -B -m unittest infra.scripts.test_ci_config infra.scripts.test_ci_backend_mr_paths infra.scripts.test_ci_backend_develop_paths infra.scripts.test_ci_deploy_current_commit infra.scripts.test_deploy_backend infra.scripts.test_deploy_frontend -v
     - cd backend
     - ./gradlew clean test spotlessCheck --no-daemon --init-script gradle/test-timing.gradle
+  interruptible: true
   rules:
     - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
       when: never
@@ -170,6 +172,7 @@ backend-image:
     - docker build --pull -t "$BACKEND_IMAGE" ./backend
     - docker push "$BACKEND_IMAGE"
     - echo "Built backend image $BACKEND_IMAGE"
+  interruptible: true
   rules:
     - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
       when: never
@@ -212,6 +215,7 @@ deploy-backend:
     - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
     - BACKEND_IMAGE="$DOCKERHUB_NAMESPACE/feelm-backend:$CI_COMMIT_SHA"
     - ./infra/scripts/deploy-backend.sh "$BACKEND_IMAGE"
+  interruptible: false
   retry:
     max: 2
     when: [runner_system_failure, scheduler_failure]

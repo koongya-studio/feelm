@@ -4,6 +4,10 @@ stages:
   - build
   - deploy
 
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+
 include:
   - local: .gitlab/ci/common.yml
   - local: .gitlab/ci/backend.yml
