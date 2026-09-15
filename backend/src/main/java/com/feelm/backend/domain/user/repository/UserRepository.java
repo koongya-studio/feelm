@@ -46,10 +46,17 @@ public interface UserRepository extends JpaRepository<User, Long> {
      *       한다.
      *   <li>구독 OTT 설정(API-027, {@code UserOttService.replaceMyOtts}) — 전체 교체라 동시 요청의 삭제와 삽입이 교차하면
      *       어느 쪽 요청과도 다른 목록이 남으므로, 교체 구간을 계정 단위로 직렬화한다.
+     *   <li>회원 탈퇴(API-013, {@code WithdrawnAccountWriter.withdrawAccount}) — 익명화 치환이 프로필 수정·비밀번호
+     *       변경과 교차해 되살아나지 않게 한다.
+     *   <li>소셜 계정 연결(API-009, {@code OAuthLinkWriter.insert}) — 활성 확인과 삽입 사이에 탈퇴가 끼어들면 탈퇴가 지운 연결이
+     *       되살아나 그 소셜 계정으로 재가입할 수 없게 되므로, 탈퇴와 같은 계정 행에서 직렬화한다.
      * </ul>
      *
      * <p>인증의 세 경로는 <b>토큰 → 계정</b> 잠금 순서를 지킨다. 재가입의 삭제 경로도 토큰을 먼저 지우고 계정을 지운다. API-012는 계정 행을 잠그기 전에
      * 재설정 토큰 무효화를 먼저 호출해 이 순서를 지키므로, 재설정과 비밀번호 변경이 동시에 들어와도 교착하지 않는다.
+     *
+     * <p>탈퇴(API-013)는 이 순서를 거스르지 않기 위해 <b>인증 토큰을 이 트랜잭션에서 지우지 않는다.</b> 계정을 {@code WITHDRAWN}으로 커밋한
+     * 뒤 별도 트랜잭션에서 정리한다. 커밋된 뒤의 토큰은 재설정·이메일 인증 어느 경로도 통과시키지 않아 늦게 지워도 무해하다.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.id = :id")

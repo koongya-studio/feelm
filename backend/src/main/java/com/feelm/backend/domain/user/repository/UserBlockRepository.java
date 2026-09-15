@@ -29,6 +29,18 @@ public interface UserBlockRepository extends JpaRepository<UserBlock, Long> {
             @Param("blockerId") long blockerId, @Param("blockedId") long blockedId);
 
     /**
+     * 탈퇴(API-013)가 이 사용자가 걸린 차단 관계를 양방향으로 지운다(플랜 결정 U2).
+     *
+     * <p>상대가 건 차단까지 지우는 이유는 계정이 사라졌는데 상대의 차단 목록(API-022)에 죽은 항목이 남을 이유가 없기 때문이다. 재가입은 새 {@code
+     * users} 행이라 옛 차단이 이어지지도 않는다.
+     *
+     * <p>{@link #deleteByBlockerIdAndBlockedId}와 같은 이유로 실행 전후에 flush·clear 한다.
+     */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("delete from UserBlock b where b.blocker.id = :userId or b.blocked.id = :userId")
+    int deleteAllByUserId(@Param("userId") long userId);
+
+    /**
      * 차단 목록 첫 페이지(API-022). 최신순이며 같은 시각은 id 역순으로 안정 정렬한다.
      *
      * <p>목록이 닉네임을 함께 반환하므로 대상 사용자를 fetch join 해 N+1을 피한다(컨벤션 7장).

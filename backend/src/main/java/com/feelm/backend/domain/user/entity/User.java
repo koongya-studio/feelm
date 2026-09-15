@@ -1,5 +1,6 @@
 package com.feelm.backend.domain.user.entity;
 
+import com.feelm.backend.domain.user.WithdrawnAccount;
 import com.feelm.backend.global.entity.BaseTimeEntity;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
@@ -200,6 +201,31 @@ public class User extends BaseTimeEntity {
 
     private boolean isPastRetention(Instant now) {
         return !getCreatedAt().isAfter(now.minus(PENDING_VERIFICATION_RETENTION));
+    }
+
+    /**
+     * 탈퇴(API-013)를 반영한다. 계정 행은 남기고 개인정보만 지운다.
+     *
+     * <p>행을 지우지 않는 이유는 다른 사용자의 데이터가 이 사용자를 가리키고 있기 때문이다(D-9). 대신 이메일·닉네임을 치환해 두 유일 제약을 풀어 같은 값으로 즉시
+     * 재가입할 수 있게 하고, 계정 처리 목적이 끝난 비밀번호·생년월일·성별은 비운다. 유예기간과 탈퇴 철회는 두지 않는다.
+     *
+     * <p>치환 값에 {@code -}를 넣어 살아 있는 닉네임과 절대 겹치지 않게 한다. 닉네임 규칙은 한글·영문·숫자·밑줄만 허용하므로({@link
+     * com.feelm.backend.domain.user.NicknamePolicy}) 어떤 사용자도 이 모양을 가질 수 없다. 식별자를 붙여 탈퇴 계정끼리도 겹치지
+     * 않는다. 이메일은 예약 TLD {@code .invalid}(RFC 2606)를 써서 실재하는 주소가 되지 않게 한다.
+     *
+     * <p>공개 범위는 {@code PRIVATE}으로 되돌린다. 공개로 두었던 계정이 탈퇴 뒤에도 공개 프로필(API-062)에 남아서는 안 된다.
+     *
+     * <p>치환은 계정 행 전체를 익명정보로 만들지 않는다. 내부 식별자와 {@code public_id}, 다른 사용자 데이터와의 연결이 그대로 남는다(D-9).
+     */
+    public void withdraw(Instant now) {
+        this.email = WithdrawnAccount.email(id);
+        this.nickname = WithdrawnAccount.nickname(id);
+        this.passwordHash = null;
+        this.birthDate = null;
+        this.gender = null;
+        this.visibility = Visibility.PRIVATE;
+        this.status = UserStatus.WITHDRAWN;
+        this.withdrawnAt = now;
     }
 
     public boolean isActive() {

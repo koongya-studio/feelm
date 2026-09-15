@@ -126,4 +126,18 @@ public class UserBlockService {
         return found.filter(User::isActive)
                 .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
     }
+
+    /**
+     * 탈퇴(API-013)가 이 사용자의 차단 관계를 양방향으로 지운다.
+     *
+     * <p>상대가 건 차단까지 지우는 이유는 계정이 사라졌는데 상대의 차단 목록(API-022)에 죽은 항목이 남을 이유가 없기 때문이다. 재가입은 새 {@code
+     * users} 행이라 옛 차단이 이어지지도 않는다.
+     *
+     * <p>이 클래스의 다른 쓰기와 같이 <b>최상위 트랜잭션</b>에서만 부른다. 벌크 삭제가 영속성 컨텍스트를 flush·clear 하므로 탈퇴의 계정 트랜잭션에 묶으면
+     * 그쪽이 들고 있던 {@code User}가 detach 된다. 그래서 탈퇴는 계정 트랜잭션을 커밋한 뒤 이 메서드를 따로 부른다.
+     */
+    @Transactional
+    public void deleteAllForWithdrawal(long userId) {
+        blockRepository.deleteAllByUserId(userId);
+    }
 }

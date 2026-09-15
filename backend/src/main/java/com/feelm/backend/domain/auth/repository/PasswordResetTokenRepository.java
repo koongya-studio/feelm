@@ -33,4 +33,11 @@ public interface PasswordResetTokenRepository extends OneTimeTokenRepository<Pas
     @Override
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<PasswordResetToken> findAllByUserIdAndUsedAtIsNull(Long userId);
+
+    /**
+     * 탈퇴(API-013)가 해당 사용자의 재설정 토큰을 모두 지운다(D-9). 소진 여부를 가리지 않는다 — 탈퇴 뒤 남은 링크로 비밀번호를 되살릴 수 없어야 한다.
+     *
+     * <p>이메일 인증 토큰({@code EmailVerificationTokenRepository#deleteByUserId})과 같은 처리다.
+     */
+    void deleteByUserId(Long userId);
 }

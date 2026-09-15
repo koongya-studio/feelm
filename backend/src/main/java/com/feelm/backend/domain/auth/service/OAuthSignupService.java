@@ -6,6 +6,7 @@ import com.feelm.backend.domain.auth.entity.OAuthProvider;
 import com.feelm.backend.domain.auth.entity.UserAuthProvider;
 import com.feelm.backend.domain.auth.repository.EmailVerificationTokenRepository;
 import com.feelm.backend.domain.auth.repository.UserAuthProviderRepository;
+import com.feelm.backend.domain.user.WithdrawnAccount;
 import com.feelm.backend.domain.user.entity.NotificationSettings;
 import com.feelm.backend.domain.user.entity.User;
 import com.feelm.backend.domain.user.repository.NotificationSettingsRepository;
@@ -51,6 +52,10 @@ public class OAuthSignupService {
         }
 
         rejectAlreadyLinked(provider, claims.providerUserId());
+        if (WithdrawnAccount.isReservedEmail(email)) {
+            // 탈퇴 익명화가 쓰는 예약 도메인(D-9). 이메일 가입과 같은 이유로 막는다.
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED);
+        }
         rejectDuplicatedEmail(email);
         rejectDuplicatedNickname(request.nickname());
 
