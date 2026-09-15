@@ -6,6 +6,7 @@ import com.feelm.backend.domain.auth.dto.request.SignupRequest;
 import com.feelm.backend.domain.auth.dto.response.SignupResponse;
 import com.feelm.backend.domain.auth.event.AuthMailRequestedEvent;
 import com.feelm.backend.domain.auth.repository.EmailVerificationTokenRepository;
+import com.feelm.backend.domain.user.WithdrawnAccount;
 import com.feelm.backend.domain.user.entity.NotificationSettings;
 import com.feelm.backend.domain.user.entity.User;
 import com.feelm.backend.domain.user.repository.NotificationSettingsRepository;
@@ -53,6 +54,7 @@ public class SignupService {
             throw new BusinessException(ErrorCode.RATE_LIMITED);
         }
         String email = normalize(request.email());
+        rejectReservedEmail(email);
         userRepository.findByEmail(email).ifPresent(this::deleteStalePendingOrReject);
         rejectDuplicatedNickname(request.nickname());
 
@@ -107,6 +109,19 @@ public class SignupService {
     private void rejectDuplicatedNickname(String nickname) {
         if (userRepository.countByNormalizedNickname(nickname) > 0) {
             throw new BusinessException(ErrorCode.NICKNAME_DUPLICATED);
+        }
+    }
+
+    /**
+     * 탈퇴 익명화가 쓰는 예약 도메인으로는 가입할 수 없다(D-9).
+     *
+     * <p>막지 않으면 공격자가 대상의 치환 이메일({@code withdrawn-{id}@feelm.invalid})을 미리 선점해, 그 사용자의 탈퇴를 {@code
+     * uk_users_email} 위반으로 영구히 실패시킬 수 있다(리뷰 A-F3·B-F2). {@code .invalid}는 RFC 2606 예약 TLD라 정상 사용자가
+     * 잃는 것은 없다.
+     */
+    private void rejectReservedEmail(String email) {
+        if (WithdrawnAccount.isReservedEmail(email)) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED);
         }
     }
 
