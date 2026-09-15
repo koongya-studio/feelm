@@ -91,6 +91,7 @@ frontend-image:
     - docker build --pull -t "$FRONTEND_IMAGE" ./frontend
     - docker push "$FRONTEND_IMAGE"
     - echo "Built frontend image $FRONTEND_IMAGE"
+  interruptible: true
   timeout: 30m
   rules:
     - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
@@ -132,6 +133,7 @@ deploy-frontend:
     - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
     - FRONTEND_IMAGE="$DOCKERHUB_NAMESPACE/feelm-frontend:$CI_COMMIT_SHA"
     - bash ./infra/scripts/deploy-frontend.sh "$FRONTEND_IMAGE"
+  interruptible: false
   retry:
     max: 2
     when: [runner_system_failure, scheduler_failure]

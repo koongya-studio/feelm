@@ -31,11 +31,38 @@ class CiConfigTests(unittest.TestCase):
   - build
   - deploy
 
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+
 include:
   - local: .gitlab/ci/common.yml
   - local: .gitlab/ci/backend.yml
   - local: .gitlab/ci/frontend.yml
 ''')
+
+    def test_new_commits_cancel_only_interruptible_jobs(self):
+        self.assertIn('''workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+''', self.root)
+
+        cancellable = (
+            (self.backend, 'backend-test'),
+            (self.backend, 'backend-image'),
+            (self.frontend, 'frontend-test'),
+            (self.frontend, 'frontend-image'),
+        )
+        for config, name in cancellable:
+            self.assertIn('interruptible: true', job_block(config, name), name)
+
+        protected = (
+            (self.backend, '.backend-cache-action'),
+            (self.backend, 'deploy-backend'),
+            (self.frontend, 'deploy-frontend'),
+        )
+        for config, name in protected:
+            self.assertIn('interruptible: false', job_block(config, name), name)
 
     def test_job_names_are_unique_across_split_files(self):
         names = []
