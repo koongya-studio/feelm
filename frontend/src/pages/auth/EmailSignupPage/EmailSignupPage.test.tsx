@@ -39,13 +39,16 @@ async function checkNickname(value = '팝콘러버') {
   fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
 }
 
-async function fill({ confirm = 'p@ssw0rd1' }: { confirm?: string } = {}) {
+async function fill({
+  password = 'p@ssw0rd1',
+  confirm = 'p@ssw0rd1',
+}: { password?: string; confirm?: string } = {}) {
   await checkNickname();
   await screen.findByText('사용할 수 있는 닉네임이에요.');
   fireEvent.change(screen.getByLabelText('생년월일'), { target: { value: '1999-03-14' } });
   fireEvent.click(screen.getByRole('button', { name: '여성' }));
   fireEvent.change(screen.getByLabelText('이메일'), { target: { value: 'user@example.com' } });
-  fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: 'p@ssw0rd1' } });
+  fireEvent.change(screen.getByLabelText('비밀번호'), { target: { value: password } });
   fireEvent.change(screen.getByLabelText('비밀번호 재확인'), { target: { value: confirm } });
 }
 
@@ -85,6 +88,16 @@ describe('0.4 이메일 회원가입', () => {
     submit();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('비밀번호가 서로 달라요.');
+    expect(signup).not.toHaveBeenCalled();
+  });
+
+  it('비밀번호가 계약 규칙에 맞지 않으면 보내지 않는다', async () => {
+    renderWithRouter(<EmailSignupPage />, { route: '/signup/email' });
+
+    await fill({ password: 'abcd1234', confirm: 'abcd1234' });
+    submit();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('8~64자, 영문·숫자·특수문자 포함');
     expect(signup).not.toHaveBeenCalled();
   });
 
