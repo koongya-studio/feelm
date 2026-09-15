@@ -125,6 +125,16 @@ class BackendMrPathRulesTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertTrue(matches(path, self.patterns))
 
+    def test_datastore_deployment_validation_inputs_trigger_mr_test(self):
+        inputs = (
+            'infra/scripts/verify-datastores.sh',
+            'infra/scripts/test_deploy_backend.py',
+            'infra/scripts/test_consumer_distributed_deployment.py',
+        )
+        for path in inputs:
+            with self.subTest(path=path):
+                self.assertTrue(matches(path, self.patterns))
+
     def test_mixed_change_and_document_after_code_still_run(self):
         changes = ('backend/src/main/resources/application.yml', 'backend/README.md')
         self.assertTrue(should_run(changes, self.patterns))
