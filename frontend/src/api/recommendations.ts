@@ -5,7 +5,6 @@
  * 화면은 src/mocks/를 직접 import하지 않고 이 파일만 호출한다.
  */
 import { findMockMovie } from '../mocks/movies';
-import { mockOnboardingCards } from '../mocks/onboarding';
 import { mockOtts } from '../mocks/otts';
 import { mockRecommendationHistory } from '../mocks/recommendationHistory';
 import { findMockReplacement, mockRecommendationSet } from '../mocks/recommendations';
@@ -14,7 +13,6 @@ import {
   findLatestWatchRecordByMovie,
   findRatingByMovie,
   getDismissedMovieIds,
-  getOnboardingPreferences,
 } from '../mocks/sessionStore';
 import { isMockError, respond, respondError } from './mockTransport';
 import type {
@@ -24,37 +22,18 @@ import type {
 } from '../types/unspecified';
 
 /**
- * 온보딩(1.1)에서 고른 취향을 추천에 반영하는 규칙 (팀 결정 2026-09-08).
- *
- * - `안 좋았어요`(DISLIKE)로 고른 영화는 추천하지 않는다
- * - `좋았어요`(LIKE)로 고른 영화와 같은 팝콘 맛의 추천을 앞에 둔다
- *
- * 계약에는 이 규칙이 없다. API-045는 서버가 만든 순서를 그대로 내려주고 클라이언트가
- * 다시 정렬하지 않는 것이 맞다. 여기서 계산하는 것은 **목업이 서버 역할을 대신하기
- * 때문**이며, 실제 연동 시에는 이 함수에서 지운다.
- */
-function onboardingTaste() {
-  const preferences = getOnboardingPreferences();
-  const flavorOf = (movieId: number) =>
-    mockOnboardingCards.find((card) => card.movieId === movieId)?.flavorCode;
-
-  return {
-    dislikedMovieIds: preferences
-      .filter((preference) => preference.preference === 'DISLIKE')
-      .map((preference) => preference.movieId),
-    likedFlavorCodes: preferences
-      .filter((preference) => preference.preference === 'LIKE')
-      .map((preference) => flavorOf(preference.movieId))
-      .filter((code): code is string => code !== undefined),
-  };
-}
-
-/**
  * API-045 기본 추천 조회 · GET /api/v1/recommendations
  *
  * `?mock=error`(또는 `?mockError=recommendations`)는 2.2-A 화면을 확인하기 위한 목업
  * 전용 입력이다. 계약의 `503 RECOMMENDATION_UNAVAILABLE`을 그대로 재현하므로 공통
  * 주입(`respond`의 도메인 인자)을 쓰지 않고 여기서 직접 확인한다. 실제 연동 시 제거한다.
+ *
+ * **온보딩(1.1)에서 고른 취향은 목업 추천에 반영하지 않는다**(업무 S15P21E106-442).
+ * 목업 시절에는 `안 좋았어요`로 고른 영화를 빼고 `좋았어요`와 같은 팝콘 맛을 앞으로
+ * 올렸지만, 온보딩이 실제 API가 되면서(업무 S15P21E106-379) 카드의 `movieId`가 서버
+ * 값이라 목업 영화(301~306)와 겹치지 않아 그 계산은 아무 일도 하지 않게 되었다.
+ * 되살릴 대상도 아니다 — API-045를 연동하면 서버가 만든 순서를 그대로 쓰는 것이
+ * 계약이고, 클라이언트가 다시 정렬하지 않는다.
  */
 export async function getRecommendations(): Promise<RecommendationSetView> {
   if (isMockError('recommendations')) {
@@ -66,12 +45,11 @@ export async function getRecommendations(): Promise<RecommendationSetView> {
   }
 
   /*
-   * 관심없음 처리한 영화와 온보딩에서 `안 좋았어요`로 고른 영화는 추천하지 않는다
-   * (API-047 처리 규칙 · 팀 결정 2026-09-08). 이번 세션의 처리 내역을 반영하므로
-   * 홈으로 나갔다 돌아와도 그대로다. 자리가 빈 만큼 같은 유형의 교체 후보를 채운다.
+   * 관심없음 처리한 영화는 추천하지 않는다(API-047 처리 규칙 · 팀 결정 2026-09-08).
+   * 이번 세션의 처리 내역을 반영하므로 홈으로 나갔다 돌아와도 그대로다. 자리가 빈 만큼
+   * 같은 유형의 교체 후보를 채운다.
    */
-  const { dislikedMovieIds, likedFlavorCodes } = onboardingTaste();
-  const excluded = [...getDismissedMovieIds(), ...dislikedMovieIds];
+  const excluded = getDismissedMovieIds();
   const items = mockRecommendationSet.items.flatMap((item) => {
     if (!excluded.includes(item.movie.movieId)) {
       return [item];
@@ -82,17 +60,7 @@ export async function getRecommendations(): Promise<RecommendationSetView> {
     return replacement && !excluded.includes(replacement.movie.movieId) ? [replacement] : [];
   });
 
-  /*
-   * `좋았어요`로 고른 맛과 같은 추천을 앞으로 올린다. 같은 묶음 안의 순서는 그대로다
-   * (Array.prototype.sort는 안정 정렬이다).
-   */
-  const sorted = [...items].sort(
-    (a, b) =>
-      Number(likedFlavorCodes.includes(b.flavorCode)) -
-      Number(likedFlavorCodes.includes(a.flavorCode)),
-  );
-
-  return respond({ ...mockRecommendationSet, items: sorted });
+  return respond({ ...mockRecommendationSet, items });
 }
 
 /**
