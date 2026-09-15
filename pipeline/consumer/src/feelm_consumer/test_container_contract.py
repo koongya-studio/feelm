@@ -19,6 +19,7 @@ def test_runtime_contains_hadoop_client_for_pyarrow() -> None:
     assert "apache/hadoop:3.4.3@sha256:" in dockerfile
     assert "eclipse-temurin:17.0.18_8-jre-jammy@sha256:" in dockerfile
     assert "COPY --from=java /opt/java/openjdk /opt/java/openjdk" in dockerfile
+    assert 'PATH="/app/.venv/bin:/opt/java/openjdk/bin:/opt/hadoop/bin:$PATH"' in dockerfile
     assert "apt-get" not in dockerfile
     for setting in ("HADOOP_HOME", "JAVA_HOME", "ARROW_LIBHDFS_DIR", "CLASSPATH", "LD_LIBRARY_PATH"):
         assert setting in dockerfile
