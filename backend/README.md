@@ -103,8 +103,8 @@ Topic 확인 방법은 [인프라 README](../infra/README.md#local-kafka)를 따
 | `SWAGGER_ENABLED` | `false` | `false`(팀 접근 보호 구성 후 명시적으로 활성화) |
 | `FRONTEND_BASE_URL` | `http://localhost:5173` | 필수 |
 | `MAIL_MODE` | `log`(`.env`에서 지정, 기본값 없음) | `smtp` |
-| `MAIL_HOST` | `smtp.gmail.com` | `smtp.gmail.com` |
-| `MAIL_PORT` | `587` | `587` |
+| `MAIL_HOST` | `smtp.gmail.com` | 선택(비우면 `smtp.gmail.com`) |
+| `MAIL_PORT` | `587` | 선택(비우면 `587`) |
 | `MAIL_USERNAME` | 비어 있음 | 필수 |
 | `MAIL_PASSWORD` | 비어 있음 | **필수(Secret)** |
 | `MAIL_FROM` | `no-reply@feelm.local` | 선택(비우면 `MAIL_USERNAME`. Gmail은 From을 계정으로 강제) |
