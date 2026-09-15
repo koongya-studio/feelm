@@ -13,8 +13,8 @@
  * - `아이디 찾기` · `비밀번호 복구`는 둘 다 0.7로 간다(이동표). 0.7이 두 방법을 한
  *   화면에서 고른다
  *
- * `[?]` `비밀번호 변경`이 가는 화면이 와이어프레임에 없다. API-012는 있지만 입력 화면이
- * 없어 누르면 준비 중 안내만 한다.
+ * `비밀번호 변경`이 가는 화면은 와이어프레임에 없어 새로 만들었다(7.8-A-2, CR-22,
+ * 업무 S15P21E106-391).
  */
 import { useEffect, useState } from 'react';
 import ActionList from '../../../components/ActionList';
@@ -30,7 +30,6 @@ export default function AccountManagePage() {
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
-  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -82,24 +81,11 @@ export default function AccountManagePage() {
         <ActionList
           items={[
             { label: '이메일', value: profile.email },
-            ...(profile.hasPassword
-              ? [
-                  {
-                    label: '비밀번호 변경',
-                    onClick: () => setNotice('비밀번호 변경 화면은 준비 중이에요'),
-                  },
-                ]
-              : []),
+            ...(profile.hasPassword ? [{ label: '비밀번호 변경', to: path.passwordChange() }] : []),
             { label: '아이디 찾기', to: path.accountFind() },
             { label: '비밀번호 복구', to: path.accountFind() },
           ]}
         />
-
-        {notice ? (
-          <p className={styles.notice} role="status">
-            {notice}
-          </p>
-        ) : null}
 
         <ActionList label="위험" items={[{ label: '회원 탈퇴', to: path.withdraw() }]} />
       </div>

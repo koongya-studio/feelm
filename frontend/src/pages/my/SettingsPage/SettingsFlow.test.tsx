@@ -16,6 +16,7 @@ import AccountManagePage from '../AccountManagePage';
 import BlockedUsersPage from '../BlockedUsersPage';
 import MyDashboardPage from '../MyDashboardPage';
 import NotificationSettingsPage from '../NotificationSettingsPage';
+import PasswordChangePage from '../PasswordChangePage';
 import PrivacySettingsPage from '../PrivacySettingsPage';
 import PublicProfilePage from '../PublicProfilePage';
 import WithdrawPage from '../WithdrawPage';
@@ -60,6 +61,7 @@ function renderApp(entries: string[]) {
           <Route path={ROUTE_PATTERN.my} element={<MyDashboardPage />} />
           <Route path={ROUTE_PATTERN.settings} element={<SettingsPage />} />
           <Route path={ROUTE_PATTERN.accountManage} element={<AccountManagePage />} />
+          <Route path={ROUTE_PATTERN.passwordChange} element={<PasswordChangePage />} />
           <Route path={ROUTE_PATTERN.withdraw} element={<WithdrawPage />} />
           <Route path={ROUTE_PATTERN.privacySettings} element={<PrivacySettingsPage />} />
           <Route path={ROUTE_PATTERN.notificationSettings} element={<NotificationSettingsPage />} />
@@ -119,7 +121,17 @@ describe('7.1 → 7.8 → 7.8-A → 7.8-A-1', () => {
     renderApp([ROUTE_PATTERN.accountManage]);
 
     await screen.findByRole('link', { name: /아이디 찾기/ });
-    expect(screen.queryByRole('button', { name: /비밀번호 변경/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /비밀번호 변경/ })).toBeNull();
+  });
+
+  /* 7.8-A-2는 와이어프레임에 없이 새로 만든 화면이다(CR-22, 업무 -391) */
+  it('7.8-A의 비밀번호 변경은 7.8-A-2로 간다', async () => {
+    renderApp([ROUTE_PATTERN.accountManage]);
+
+    fireEvent.click(await screen.findByRole('link', { name: /비밀번호 변경/ }));
+
+    expect(location()).toBe('/my/settings/account/password');
+    expect(screen.getByLabelText('현재 비밀번호')).toBeInTheDocument();
   });
 });
 

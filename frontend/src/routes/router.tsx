@@ -33,6 +33,7 @@ import BlockedUsersPage from '../pages/my/BlockedUsersPage';
 import MyDashboardPage from '../pages/my/MyDashboardPage';
 import MyRatingsPage from '../pages/my/MyRatingsPage';
 import NotificationSettingsPage from '../pages/my/NotificationSettingsPage';
+import PasswordChangePage from '../pages/my/PasswordChangePage';
 import PrivacySettingsPage from '../pages/my/PrivacySettingsPage';
 import ProfileEditPage from '../pages/my/ProfileEditPage';
 import ProfilePreviewPage from '../pages/my/ProfilePreviewPage';
@@ -153,6 +154,8 @@ export const router = createBrowserRouter(
 
         // 설정 하위 화면 (업무 -307). 와이어프레임에 하단 내비가 없다
         { path: ROUTE_PATTERN.accountManage, element: <AccountManagePage /> },
+        // 7.8-A-2 비밀번호 변경 (업무 -391). 와이어프레임에 없이 새로 만든 화면이다
+        { path: ROUTE_PATTERN.passwordChange, element: <PasswordChangePage /> },
         { path: ROUTE_PATTERN.withdraw, element: <WithdrawPage /> },
         { path: ROUTE_PATTERN.privacySettings, element: <PrivacySettingsPage /> },
         { path: ROUTE_PATTERN.notificationSettings, element: <NotificationSettingsPage /> },
