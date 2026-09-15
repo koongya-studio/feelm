@@ -95,6 +95,7 @@ class BackendMrPathRulesTests(unittest.TestCase):
             'backend/Dockerfile.dev',
             'backend/.dockerignore',
             'backend/.env.example',
+            'backend/config/deployment-environment.properties',
             'backend/.gitattributes',
             'backend/.gitignore',
         )
@@ -108,6 +109,7 @@ class BackendMrPathRulesTests(unittest.TestCase):
             '.gitlab/ci/common.yml',
             '.gitlab/ci/backend.yml',
             '.gitattributes',
+            'infra/compose/service.yml',
             'infra/scripts/ci-gitlab-job-adapter.py',
             'infra/scripts/ci-job-safety.py',
             'infra/scripts/ci-local-backend-runtime.py',
@@ -116,6 +118,18 @@ class BackendMrPathRulesTests(unittest.TestCase):
             'infra/scripts/systemd/feelm-ci222-gitlab-runner.service',
             'infra/scripts/test_ci_config.py',
             'infra/scripts/test_ci_backend_mr_paths.py',
+            'infra/scripts/ci-backend-env-contract.py',
+            'infra/scripts/test_ci_backend_env_contract.py',
+        )
+        for path in inputs:
+            with self.subTest(path=path):
+                self.assertTrue(matches(path, self.patterns))
+
+    def test_datastore_deployment_validation_inputs_trigger_mr_test(self):
+        inputs = (
+            'infra/scripts/verify-datastores.sh',
+            'infra/scripts/test_deploy_backend.py',
+            'infra/scripts/test_consumer_distributed_deployment.py',
         )
         for path in inputs:
             with self.subTest(path=path):

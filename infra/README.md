@@ -1086,6 +1086,125 @@ docker start feelm-hdfs-datanode-1
 복구 후 두 DataNode가 모두 `Live datanodes`로 표시되고 기존 파일을 읽을 수 있는지
 확인합니다.
 
+## Distributed Consumer Deployment
+
+추천 Consumer는 J15E106A 분산 노드에서 `distributed.yml`의 `consumer` profile로 실행한다.
+이미지는 `pipeline/consumer/Dockerfile`로 분산 노드에서 수동 빌드하며 Registry 게시와 자동
+CD는 별도 업무로 다룬다. profile을 지정하지 않은 기존 HDFS·Spark·Kafka 기동에는 Consumer가
+추가되지 않는다.
+
+### Cross-node datastore boundary
+
+Consumer는 분산 노드의 Kafka·HDFS와 서비스 노드의 PostgreSQL·Redis를 함께 사용한다.
+PostgreSQL과 Redis의 기본 bind address는 계속 `127.0.0.1`이다. Consumer를 배포할 때만
+서비스 노드의 `infra/.env`에서 아래 두 값을 서비스 노드 사설 IP로 바꾼다.
+
+```dotenv
+POSTGRES_BIND_ADDRESS=<SERVICE_NODE_IP>
+REDIS_BIND_ADDRESS=<SERVICE_NODE_IP>
+```
+
+사설 IP bind만으로 송신 주체 제한이 완성되지는 않는다. 보안 그룹은 서비스 노드의
+`5432/tcp`, `6379/tcp` 인바운드를 `DISTRIBUTED_NODE_IP/32`에서만 허용한다. Docker가 게시한
+포트는 UFW의 INPUT 규칙보다 먼저 DNAT될 수 있으므로 UFW 허용 규칙만으로 경계를 구성하지
+않는다. 호스트에서는 `DOCKER-USER`의 첫 규칙으로 분산 노드가 아닌 출발지의 두 포트를
+차단한다. 허용 출발지는 이 규칙을 통과한 뒤 Docker가 만든 게시 포트 규칙으로 처리된다.
+
+```bash
+sudo iptables -I DOCKER-USER 1 \
+  -p tcp ! -s "${DISTRIBUTED_NODE_IP}/32" \
+  -m multiport --dports 5432,6379 -j DROP
+sudo iptables -S DOCKER-USER
+```
+
+같은 규칙을 중복 삽입하지 않는다. 기존 규칙이 있으면 `iptables -C`로 확인하고, 출발지 IP가
+바뀐 경우 기존 규칙을 `iptables -D`로 제거한 뒤 새 규칙을 1번에 삽입한다. 호스트 재부팅
+후에도 유지되도록 서버의 기존 방화벽 영속화 방식에 등록한다. 운영 방화벽을 초기화하거나
+Docker가 만든 체인을 직접 수정하지 않는다.
+
+`verify-datastores.sh`는 원격 bind일 때 실제 게시 주소가 `SERVICE_NODE_IP`와 일치하고 위
+차단 규칙이 `DOCKER-USER`의 첫 규칙인지 확인한다. 배포 Runner가 일반 사용자라면 아래처럼
+읽기 전용 명령 하나만 비밀번호 없이 실행하도록 호스트의 root 소유 sudoers 파일에 등록한다.
+경로는 서버의 `command -v iptables` 결과를 사용한다.
+
+```sudoers
+gitlab-runner ALL=(root) NOPASSWD: /usr/sbin/iptables -S DOCKER-USER
+```
+
+방화벽 적용 전에는 현재 SSH 연결과 기존 `DOCKER-USER` 규칙을 확인한다. 적용 후 분산
+노드에서는 두 데이터스토어 연결이 성공하고, 허용되지 않은 노드에서는 두 포트의 TCP 연결이
+실패하는지 확인한다.
+
+서비스 노드에서 설정을 검사한 뒤 PostgreSQL과 Redis만 재생성한다. 두 서비스에는 짧은 연결
+중단이 발생할 수 있으므로 적용 시점을 합의하고 `down -v`를 사용하지 않는다.
+
+```bash
+docker compose --env-file infra/.env -f infra/compose/service.yml config --quiet
+docker compose --env-file infra/.env -f infra/compose/service.yml \
+  up -d --no-deps --force-recreate postgres redis
+docker port feelm-postgres 5432
+docker port feelm-redis 6379
+```
+
+두 `docker port` 결과는 `<SERVICE_NODE_IP>:5432`, `<SERVICE_NODE_IP>:6379`여야 한다.
+
+### Consumer environment
+
+분산 노드의 `infra/.env`에는 다음 값을 추가한다. DSN과 Redis URL의 비밀번호는 URL encoding하고
+실제 값은 저장소, shell history와 로그에 남기지 않는다. 세 HDFS URI는 동일한 immutable
+snapshot revision을 가리켜야 하며 `latest` 별칭을 사용하지 않는다.
+
+```dotenv
+CONSUMER_IMAGE=feelm-foldin-consumer:local
+CONSUMER_KAFKA_TOPIC=feelm.rating.v1
+CONSUMER_KAFKA_GROUP_ID=feelm-foldin-consumer-v1
+CONSUMER_POSTGRES_DSN=postgresql://<user>:<encoded-password>@<SERVICE_NODE_IP>:5432/feelm
+CONSUMER_REDIS_URL=redis://:<encoded-password>@<SERVICE_NODE_IP>:6379/0
+CONSUMER_MODEL_URI=hdfs://hdfs-namenode:9000/<immutable-model-path>
+CONSUMER_MAPPING_URI=hdfs://hdfs-namenode:9000/<immutable-mapping-path>
+CONSUMER_METADATA_URI=hdfs://hdfs-namenode:9000/<immutable-metadata-path>
+```
+
+### Build, deploy and verify
+
+분산 노드에서 승인된 `develop`을 받은 뒤 Compose 설정과 이미지를 검사한다.
+
+```bash
+docker compose --env-file infra/.env -f infra/compose/distributed.yml \
+  --profile consumer config --quiet
+docker compose --env-file infra/.env -f infra/compose/distributed.yml \
+  --profile consumer build consumer
+```
+
+서비스 노드의 두 포트가 준비된 뒤 Consumer를 기동한다. `depends_on`은 같은 Compose의 HDFS
+NameNode health와 Kafka 시작 순서만 보장하며 원격 PostgreSQL·Redis 준비 상태는 보장하지 않는다.
+
+```bash
+docker compose --env-file infra/.env -f infra/compose/distributed.yml \
+  --profile consumer up -d consumer
+docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}}' feelm-foldin-consumer
+docker logs --tail 100 feelm-foldin-consumer
+```
+
+정상 상태는 프로세스가 `running`이고 설정·산출물·연결 오류가 반복되지 않는 상태다. 실제
+검증은 백엔드의 평가 또는 온보딩 흐름으로 `feelm.rating.v1` 이벤트를 발행한 뒤 Consumer
+로그의 처리 완료와 Redis의 해당 사용자 `candidate-version`, `vector`, `candidates` 세 키
+갱신을 확인한다. 이벤트 payload, DSN, Redis URL과 비밀번호를 검증 기록에 남기지 않는다.
+
+정상 종료는 다음처럼 확인한다. Compose의 `stop_grace_period`는 30초이며 Consumer가 PID 1로
+SIGTERM을 받아 Kafka poll loop와 client를 닫는다.
+
+```bash
+docker compose --env-file infra/.env -f infra/compose/distributed.yml \
+  --profile consumer stop consumer
+docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}}' feelm-foldin-consumer
+```
+
+배포 실패 시 새 Consumer만 중단하고 기존 HDFS·Spark·Kafka 및 데이터 볼륨은 유지한다. 설정을
+수정한 뒤 `config --quiet`, `up -d consumer`, 로그 확인 순서로 재시도하며 `down -v`를 사용하지
+않는다. 서비스 노드의 bind address를 다시 루프백으로 복구하려면 Consumer를 먼저 중단하고
+두 값을 `127.0.0.1`로 되돌린 뒤 PostgreSQL과 Redis만 재생성한다.
+
 ## Deployment
 
 별도 스테이징 서버를 두지 않습니다. `J15E106`에서 사전 검증을 통과한 백엔드와 프론트엔드
@@ -1107,6 +1226,14 @@ GitLab에서 관리하고 서버에서 직접 수정하지 않습니다. 현재 
 `AUTH_MOCK_ENABLED`입니다. 컨테이너에서는 `postgres:5432`와 `redis:6379`를 사용합니다.
 실제 값은 저장소, 이미지와 MR에 포함하지 않습니다.
 
+백엔드 설정의 필수 변수 계약은 `backend/config/deployment-environment.properties`에
+변수 이름만 기록합니다. develop 대상 MR에서는 Spring 설정, `.env.example`, 계약과 Compose
+주입 구조가 일치하는지 정적으로 검사합니다. 보호된 `main` Push에서는
+`backend-env-check`가 `service` 환경 범위에서 필요한 GitLab CI/CD Variable이 비어 있지
+않은지 확인하며, 통과해야 `backend-image`가 시작됩니다. 실패 로그에는 누락된 변수 이름만
+남고 값은 출력하지 않습니다. 변수의 Protected·Masked·환경 범위 속성은 GitLab 설정에서
+별도로 검토합니다.
+
 ### Pipeline and Deployment
 
 `runner-check`는 보호된 `develop`의 Push Pipeline에서 `.gitlab-ci.yml`, 공통 CI Job 설정,
@@ -1126,7 +1253,7 @@ Secret을 출력하거나 임시 Redis에 전달하지 않습니다. MR 코드�
 
 develop 대상 Merge Request Pipeline은 백엔드 테스트와 Spotless 검사를 실행합니다.
 develop 병합 결과에서는 서비스 이미지 빌드와 배포를 실행하지 않습니다. 검증된 develop을
-main에 반영하면 보호된 main Push Pipeline의 `backend-test`를 통과한 뒤 `backend-image`
+main에 반영하면 보호된 main Push Pipeline의 `backend-test`와 `backend-env-check`를 통과한 뒤 `backend-image`
 Job이 다음 형식의 변경 불가능한 이미지 태그를 Docker Hub에 Push합니다.
 
 ```text

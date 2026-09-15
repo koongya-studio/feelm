@@ -1,6 +1,14 @@
 /*
  * OTT 식별 배지.
- * 와이어프레임은 OTT를 서비스명 첫 글자 한 자로 표시한다. 실제 로고를 쓰지 않는다.
+ *
+ * 와이어프레임은 OTT를 서비스명 첫 글자 한 자로 표시했다. **확정 5종에 왓챠와 웨이브가
+ * 함께 들어오면서 첫 글자가 겹쳤고**(둘 다 `W`), 첫 글자 규칙만으로는 두 OTT를 구분할
+ * 수 없게 됐다. API-025가 로고 URL을 내려주므로 로고를 받은 자리에서는 로고를 쓴다
+ * (팀 결정 2026-09-15, 업무 S15P21E106-379).
+ *
+ * `logoUrl`은 선택값이다. 아직 연동하지 않은 도메인의 목업은 로고를 모르므로 그대로
+ * 글자 배지로 그린다. 로고 주소가 있어도 불러오지 못하면(TMDb 이미지 차단 · 오프라인)
+ * 같은 자리에서 글자로 되돌아간다 — 배지가 빈 사각형으로 남지 않게 한다.
  *
  * 크기가 화면마다 다르므로 size로 받는다. 와이어프레임 실측값이다.
  * 1.2 초기 설정 38px · 2.3 카드 메뉴 28px · 2.4 영화 상세 26px
@@ -9,19 +17,24 @@
  * 글자 크기는 기본적으로 한 변의 절반이다. 1.2만 38px 상자에 16px 글자여서 비율이
  * 다르므로 fontSize로 받는다. 모서리 반경도 1.2는 10px, 나머지는 8px이다.
  *
- * 색은 서비스 브랜드 색이 아니다. 와이어프레임은 무채색이며 세 가지를 쓴다.
+ * 글자 배지의 색은 서비스 브랜드 색이 아니다. 와이어프레임은 무채색이며 세 가지를 쓴다.
  * default    : 배경 #A5A29B, 어두운 글자 — 2.1 · 2.2 · 2.3 카드
  * unselected : 배경 #A5A29B, 흰 글자   — 1.2에서 선택하지 않은 OTT
  * selected   : 배경 #3C3A36, 흰 글자   — 1.2에서 구독 중으로 선택된 OTT
+ * 로고는 브랜드 이미지 그대로라 이 세 가지를 따르지 않는다. 대신 선택 상태는 배지
+ * 테두리로 남는다.
  */
+import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import styles from './OttBadge.module.css';
 
 type Props = {
-  /** 표시할 한 글자. 예: 넷플릭스 N */
+  /** 표시할 한 글자. 예: 넷플릭스 N. `logoUrl`이 없거나 로고를 불러오지 못할 때 쓴다 */
   letter: string;
   /** OTT 이름. 보조기술에 읽히는 이름이 된다 */
   name: string;
+  /** API-025의 로고 주소. 없으면 글자 배지다 */
+  logoUrl?: string | null;
   /** 한 변의 길이(px) */
   size?: number;
   /** 글자 크기(px). 생략하면 한 변의 절반 */
@@ -39,35 +52,57 @@ type Props = {
 export default function OttBadge({
   letter,
   name,
+  logoUrl,
   size = 22,
   fontSize,
   radius,
   variant = 'default',
   labelled = true,
 }: Props) {
+  /*
+   * 불러오지 못한 로고 주소. 참·거짓이 아니라 **주소**를 담는다 — 같은 배지가 다른
+   * OTT로 다시 쓰일 수 있고, 그때 앞의 실패를 물려받으면 멀쩡한 로고가 글자로 떨어진다.
+   */
+  const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
+
   const style = {
     '--ott-badge-size': `${size}px`,
     '--ott-badge-font-size': `${fontSize ?? Math.round(size * 0.5 * 10) / 10}px`,
     '--ott-badge-radius': radius === undefined ? 'var(--radius-icon)' : `${radius}px`,
   } as CSSProperties;
 
+  const showLogo = Boolean(logoUrl) && failedLogoUrl !== logoUrl;
+  const content = showLogo ? (
+    <img
+      className={styles.logo}
+      src={logoUrl ?? undefined}
+      alt=""
+      // 배지 자체가 이름을 읽히므로 이미지는 장식이다
+      aria-hidden="true"
+      onError={() => setFailedLogoUrl(logoUrl ?? null)}
+    />
+  ) : (
+    letter
+  );
+
+  const attributes = {
+    className: styles.badge,
+    'data-variant': variant,
+    'data-logo': showLogo ? 'true' : undefined,
+    style,
+  };
+
   if (!labelled) {
     return (
-      <span className={styles.badge} data-variant={variant} style={style} aria-hidden="true">
-        {letter}
+      <span {...attributes} aria-hidden="true">
+        {content}
       </span>
     );
   }
 
   return (
-    <span
-      className={styles.badge}
-      data-variant={variant}
-      style={style}
-      role="img"
-      aria-label={name}
-    >
-      {letter}
+    <span {...attributes} role="img" aria-label={name}>
+      {content}
     </span>
   );
 }

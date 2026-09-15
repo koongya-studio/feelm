@@ -10,6 +10,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.feelm.backend.domain.user.entity.Gender;
+import com.feelm.backend.domain.user.entity.User;
+import com.feelm.backend.domain.user.repository.UserRepository;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.security.JjwtTokenProvider;
 import com.feelm.backend.global.security.JwtProperties;
@@ -20,6 +23,7 @@ import com.feelm.backend.support.SharedTestRuntime;
 import com.redis.testcontainers.RedisContainer;
 import jakarta.servlet.http.Cookie;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -28,6 +32,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -68,7 +73,10 @@ class AuthContractTest {
     @Autowired private TokenProvider tokenProvider;
     @Autowired private RefreshTokenService refreshTokenService;
     @Autowired private RefreshTokenRepository refreshTokenRepository;
+    @Autowired private UserRepository userRepository;
     @Autowired private StringRedisTemplate redisTemplate;
+
+    private static final AtomicInteger SEQUENCE = new AtomicInteger();
 
     @BeforeEach
     void clearRedis() {
@@ -163,7 +171,8 @@ class AuthContractTest {
     @Test
     @DisplayName("재발급은 새 Access Token과 회전된 httpOnly Refresh 쿠키를 반환한다")
     void refreshRotatesCookieAndReturnsAccessToken() throws Exception {
-        RefreshTokenService.IssuedTokens issued = refreshTokenService.issue(11L);
+        long userId = activeUserId();
+        RefreshTokenService.IssuedTokens issued = refreshTokenService.issue(userId);
 
         MvcResult result =
                 mockMvc.perform(post(REFRESH_PATH).cookie(cookieOf(issued.refreshToken())))
@@ -177,14 +186,15 @@ class AuthContractTest {
                         .andReturn();
 
         assertThat(rotatedCookieValue(result)).isNotEqualTo(issued.refreshToken());
-        assertThat(tokenProvider.parseAccessToken(accessTokenOf(result))).isEqualTo(11L);
+        assertThat(tokenProvider.parseAccessToken(accessTokenOf(result))).isEqualTo(userId);
     }
 
     @Test
     @DisplayName("회전으로 폐기된 Refresh Token을 다시 쓰면 거절하고 해당 사용자의 토큰을 모두 폐기한다")
     void reusedRefreshTokenRevokesEverySessionOfUser() throws Exception {
-        RefreshTokenService.IssuedTokens stolen = refreshTokenService.issue(12L);
-        RefreshTokenService.IssuedTokens otherDevice = refreshTokenService.issue(12L);
+        long userId = activeUserId();
+        RefreshTokenService.IssuedTokens stolen = refreshTokenService.issue(userId);
+        RefreshTokenService.IssuedTokens otherDevice = refreshTokenService.issue(userId);
 
         MvcResult rotated =
                 mockMvc.perform(post(REFRESH_PATH).cookie(cookieOf(stolen.refreshToken())))
@@ -204,7 +214,7 @@ class AuthContractTest {
     @Test
     @DisplayName("같은 Refresh Token으로 동시에 회전해도 한 번만 성공한다")
     void concurrentRotationSucceedsOnlyOnce() throws Exception {
-        RefreshTokenService.IssuedTokens issued = refreshTokenService.issue(14L);
+        RefreshTokenService.IssuedTokens issued = refreshTokenService.issue(activeUserId());
         int attempts = 8;
         ExecutorService executor = Executors.newFixedThreadPool(attempts);
         CountDownLatch start = new CountDownLatch(1);
@@ -242,9 +252,28 @@ class AuthContractTest {
     @Test
     @DisplayName("발급한 Refresh Token 식별자가 Redis에 저장된다")
     void issuedRefreshTokenIsStoredInRedis() {
-        RefreshTokenService.IssuedTokens issued = refreshTokenService.issue(13L);
+        RefreshTokenService.IssuedTokens issued = refreshTokenService.issue(activeUserId());
 
         assertThat(isStored(issued.refreshToken())).isTrue();
+    }
+
+    /**
+     * 회전에 쓸 활성 계정을 만든다.
+     *
+     * <p>예전에는 DB에 없는 식별자로 토큰만 발급해 Redis 동작만 봤다. 회전이 계정 상태를 확인하게 되면서(API-006 처리 규칙, S15P21E106-198)
+     * 실재하는 활성 계정이 필요하다. 검증 대상은 그대로 Redis의 회전·재사용 감지다.
+     */
+    private long activeUserId() {
+        String suffix = String.format("%06d", SEQUENCE.incrementAndGet());
+        User user =
+                User.register(
+                        "auth-contract" + suffix + "@example.com",
+                        "$2a$10$hash",
+                        "auth" + suffix,
+                        LocalDate.of(1999, 3, 14),
+                        Gender.FEMALE);
+        user.activate();
+        return userRepository.saveAndFlush(user).getId();
     }
 
     private String expiredAccessToken() {

@@ -242,7 +242,7 @@ export const mockMovies: Record<number, RecommendedMovieView> = {
     releaseYear: 2017,
     genres: ['SF'],
     averageRating: 4.0,
-    ottProviders: ['COUPANG_PLAY'],
+    ottProviders: ['WATCHA'],
     runtimeMinutes: 143,
   },
 };

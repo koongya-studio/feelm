@@ -60,7 +60,7 @@ class BackendDevelopPathRulesTests(unittest.TestCase):
         cls.ci = BACKEND_CI.read_text()
         cls.blocks = {
             name: job_block(cls.ci, name)
-            for name in ('datastore-config-check', 'backend-cache-promote',
+            for name in ('datastore-config-check', 'backend-env-check', 'backend-cache-promote',
                          'backend-test', 'backend-image', 'deploy-backend')
         }
         cls.patterns = {
@@ -76,7 +76,7 @@ class BackendDevelopPathRulesTests(unittest.TestCase):
             'backend/docs/operations.md',
             'infra/verification/S15P21E106-404.md',
         )
-        for job in ('backend-test', 'backend-image', 'deploy-backend'):
+        for job in ('backend-env-check', 'backend-test', 'backend-image', 'deploy-backend'):
             with self.subTest(job=job):
                 self.assertFalse(should_run(unrelated, self.patterns[job]))
 
@@ -98,8 +98,10 @@ class BackendDevelopPathRulesTests(unittest.TestCase):
             'backend/Dockerfile',
             'backend/Dockerfile.dev',
             'backend/.dockerignore',
+            'backend/.env.example',
+            'backend/config/deployment-environment.properties',
         )
-        for job in ('backend-test', 'backend-image', 'deploy-backend'):
+        for job in ('backend-env-check', 'backend-test', 'backend-image', 'deploy-backend'):
             for path in inputs:
                 with self.subTest(job=job, path=path):
                     self.assertTrue(matches(path, self.patterns[job]))
@@ -115,7 +117,7 @@ class BackendDevelopPathRulesTests(unittest.TestCase):
             'infra/scripts/rollback-backend.sh',
         )
         for path in inputs:
-            for job in ('backend-test', 'backend-image', 'deploy-backend'):
+            for job in ('backend-env-check', 'backend-test', 'backend-image', 'deploy-backend'):
                 with self.subTest(job=job, path=path):
                     self.assertTrue(matches(path, self.patterns[job]))
         for path in inputs:
@@ -129,7 +131,7 @@ class BackendDevelopPathRulesTests(unittest.TestCase):
             (('backend/src/main/resources/legacy.yml', 'backend/docs/legacy.md'), True),
             (('frontend/README.md', 'backend/src/main/resources/application.yml'), True),
         )
-        for job in ('backend-test', 'backend-image', 'deploy-backend'):
+        for job in ('backend-env-check', 'backend-test', 'backend-image', 'deploy-backend'):
             for paths, expected in scenarios:
                 with self.subTest(job=job, paths=paths):
                     self.assertEqual(should_run(paths, self.patterns[job]), expected)
@@ -140,7 +142,7 @@ class BackendDevelopPathRulesTests(unittest.TestCase):
             pattern for pattern in self.patterns['backend-test']
             if pattern.startswith(prefixes)
         }
-        for job in ('backend-image', 'deploy-backend'):
+        for job in ('backend-env-check', 'backend-image', 'deploy-backend'):
             actual = {
                 pattern for pattern in self.patterns[job]
                 if pattern.startswith(prefixes)
@@ -151,7 +153,7 @@ class BackendDevelopPathRulesTests(unittest.TestCase):
         cache_patterns = self.patterns['backend-cache-promote']
         for pattern in cache_patterns:
             representative = pattern.replace('*', 'example')
-            for job in ('backend-test', 'backend-image', 'deploy-backend'):
+            for job in ('backend-env-check', 'backend-test', 'backend-image', 'deploy-backend'):
                 with self.subTest(job=job, pattern=pattern):
                     self.assertTrue(matches(representative, self.patterns[job]))
         cache_action = job_block(self.ci, '.backend-cache-action')
@@ -161,6 +163,7 @@ class BackendDevelopPathRulesTests(unittest.TestCase):
 
     def test_needs_rules_and_dedicated_validation_are_preserved(self):
         self.assertIn('job: backend-test', self.blocks['backend-image'])
+        self.assertIn('job: backend-env-check', self.blocks['backend-image'])
         self.assertIn('job: datastore-config-check', self.blocks['backend-image'])
         self.assertIn('optional: true', self.blocks['backend-image'])
         self.assertIn('needs: [backend-image]', self.blocks['deploy-backend'])
@@ -172,6 +175,7 @@ class BackendDevelopPathRulesTests(unittest.TestCase):
             'infra.scripts.test_ci_backend_develop_paths',
             self.blocks['backend-test'],
         )
+        self.assertIn('infra.scripts.test_ci_backend_env_contract', self.blocks['backend-test'])
 
 
 if __name__ == '__main__':

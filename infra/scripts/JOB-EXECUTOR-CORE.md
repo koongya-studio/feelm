@@ -10,10 +10,12 @@ GitLab job을 받는 실행기 등록이나 `.gitlab-ci.yml` 전환은 하지 �
 
 ## 구현
 
-- `ci-job-io.py`: 전체 검증을 끝낸 backend archive만 새 private 디렉터리에 설치한다.
+- `ci-job-io.py`: 전체 검증을 끝낸 backend archive와 환경변수 계약 검사용
+  `infra/compose/service.yml` 한 파일만 새 private 디렉터리에 설치한다.
   경로 이탈, symlink/hardlink, 특수 파일, 중복/충돌, 권한 비트와 크기 초과를 거부한다.
   `.git`, `.gradle`, 실제 `.env*`는 거부하며 추적된 정확한 `.env.example`만 허용한다.
   archive 소유권·xattr·capability를 복원하지 않는다. 비밀 탐지기를 대체하지 않는다.
+  `infra` 아래 다른 파일은 허용하지 않는다.
 - 보고서는 전체 작업 종료 확인 뒤 고정 경로의 제한된 XML만 읽는다. Linux dirfd와
   `O_NOFOLLOW`, 파일 inode/크기/시간 재검사로 링크 및 읽는 도중 교체를 검사한다.
   소스 최대 64 MiB, 파일당 16 MiB/10,000개, XML당 4 MiB/합계 16 MiB/

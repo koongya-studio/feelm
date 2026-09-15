@@ -6,6 +6,10 @@
  * 1.2 ⇢ 6.1 초기 설정과 동일한 구독 상태 공유
  * 6.1 ⇢ EXT-01 나에게 맞는 OTT 찾기 (확장 기능)
  *
+ * 구독을 한 번도 설정하지 않았으면 **구독 중이 비어 있다**(API-026 — 설정하지 않았으면
+ * 빈 배열). 목업 시절 기준값이던 넷플릭스 · 티빙 · 웨이브 · 디즈니+ 네 개는 계약에
+ * 없는 값이라 더 보여주지 않는다(업무 S15P21E106-379).
+ *
  * **1.2 구독 OTT 초기 설정과 상태를 공유한다.** 와이어프레임이 화면 아래에
  * `기준 구독: 넷플릭스 · 티빙 — 1.2 구독 OTT 초기 설정과 항상 일치해요`라고 못 박아
  * 두었다. 둘 다 API-026으로 읽고 API-027로 쓰므로 저절로 일치한다. 화면이 따로 상태를
@@ -27,7 +31,7 @@ import OttBadge from '../../../components/OttBadge';
 import StatusView from '../../../components/StatusView';
 import Switch from '../../../components/Switch';
 import Button from '../../../components/Button';
-import { getMyOtts, getOtts, setMyOtts } from '../../../api/otts';
+import { getMyOttIds, getOtts, setMyOttIds } from '../../../api/otts';
 import { path } from '../../../routes/paths';
 import { ottBadgeLetter } from '../../../utils/ott';
 import type { Ott } from '../../../types/ott';
@@ -42,12 +46,13 @@ export default function OttManagePage() {
   useEffect(() => {
     let active = true;
 
-    Promise.all([getOtts(), getMyOtts()])
+    Promise.all([getOtts(), getMyOttIds()])
       .then(([all, mine]) => {
         if (!active) return;
 
         setOtts(all);
-        setSubscribedIds(mine.map((ott) => ott.ottId));
+        // API-026은 기준정보가 아니라 식별자만 준다. 이름과 로고는 API-025 목록에서 찾는다
+        setSubscribedIds(mine);
         setFailed(false);
       })
       .catch(() => {
@@ -77,7 +82,7 @@ export default function OttManagePage() {
 
     setSubscribedIds(next);
 
-    setMyOtts(next).catch(() => {
+    setMyOttIds(next).catch(() => {
       setSubscribedIds((current) => {
         if (wasSubscribed) {
           return current.includes(ottId) ? current : [...current, ottId];
@@ -154,6 +159,7 @@ function OttGroup({
             <OttBadge
               letter={ottBadgeLetter(ott.code)}
               name={ott.name}
+              logoUrl={ott.logoUrl}
               size={38}
               fontSize={16}
               radius={10}

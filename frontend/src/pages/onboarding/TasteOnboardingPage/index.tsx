@@ -29,8 +29,12 @@
  * - **점선 원을 얇게 하고 안쪽 면을 한 톤 낮췄다.** 공간이 포스터보다 강하게 읽혔다.
  *   이 화면의 주인공은 포스터다(시안 2.2장 — 색이 보이면 그것은 콘텐츠)
  *
- * `[?]` 카드 개수 · 카드 선정 기준 · 최소 선택 개수 · 초기 배치 위치는 미확정이다.
- * 초기 위치는 와이어프레임의 카드 6장 좌표를 그대로 쓴다.
+ * 카드 개수는 10장으로 정했다(팀 결정 2026-09-15 · `CARD_COUNT`). 카드 선정 기준은
+ * 서버가 정한다 — 팝콘 맛이 고루 들어가도록 맛마다 인기 순위를 매겨 고른다
+ * (API-023 처리 규칙). 화면은 받은 순서를 그대로 늘어놓는다.
+ *
+ * `[?]` 최소 선택 개수는 여전히 미확정이다. 초기 배치 위치는 와이어프레임의 카드 6장
+ * 좌표에 네 자리를 더해 쓴다.
  */
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -39,6 +43,7 @@ import Button from '../../../components/Button';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import TasteCard from './TasteCard';
+import { ApiError } from '../../../api/apiError';
 import { getOnboardingCards, submitOnboardingPreferences } from '../../../api/onboarding';
 import { useOnboarding } from '../../../contexts/onboardingContext';
 import { path } from '../../../routes/paths';
@@ -55,12 +60,29 @@ const CARD_HEIGHT = 82;
 const RING_DIAMETER = 292;
 const RING_CENTER_Y_RATIO = 0.47;
 
+/**
+ * 서버에 요청할 카드 장수(API-023 `size`. 기본 20 · 최대 40).
+ *
+ * 계약은 맛마다 인기 1순위를 한 장씩 깔고 다음 순위로 넘어가는 방식으로 카드를
+ * 구성한다. 팝콘 맛이 여덟 가지이므로 8장보다 적게 받으면 **아예 나오지 않는 맛이
+ * 생긴다.** 10장은 여덟 맛을 한 번씩 덮고 인기 있는 두 맛을 한 장 더 보는 수다
+ * (팀 결정 2026-09-15, 업무 S15P21E106-379).
+ *
+ * 화면이 늘어놓을 수 있는 장수이기도 하다. 초기 좌표가 이 수만큼 있어야 카드가 겹쳐
+ * 쌓이지 않는다.
+ */
+const CARD_COUNT = 10;
+
 /*
- * 와이어프레임 카드 6장의 초기 좌표.
+ * 카드 초기 좌표.
  *
  * 와이어프레임의 배치 영역은 412 x 653이다(892에서 헤더와 하단 영역을 뺀 값).
  * 실제 영역 높이는 헤더 · 하단 높이에 따라 달라지므로 좌표를 비율로 바꿔 둔다.
  * 그러지 않으면 영역이 짧을 때 카드가 가운데 표식과 겹친다.
+ *
+ * 앞의 여섯은 와이어프레임 1.1의 카드 6장 좌표 그대로다. 카드가 10장이 되면서
+ * (`CARD_COUNT`) 네 자리를 같은 영역 아래쪽에 더했다. 서로 겹치지 않고 가운데 표식과도
+ * 떨어지도록 잡은 값이다.
  */
 const WIREFRAME_BOARD = { width: 412, height: 653 };
 
@@ -71,6 +93,10 @@ const INITIAL_POSITIONS = [
   { x: 24, y: 64 },
   { x: 330, y: 110 },
   { x: 316, y: 352 },
+  { x: 240, y: 60 },
+  { x: 40, y: 420 },
+  { x: 330, y: 470 },
+  { x: 120, y: 540 },
 ].map((position) => ({
   xRatio: position.x / WIREFRAME_BOARD.width,
   yRatio: position.y / WIREFRAME_BOARD.height,
@@ -122,6 +148,7 @@ export default function TasteOnboardingPage() {
   const [openCardId, setOpenCardId] = useState<number | null>(null);
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
   const [board, setBoard] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
@@ -145,7 +172,7 @@ export default function TasteOnboardingPage() {
   useEffect(() => {
     let active = true;
 
-    getOnboardingCards()
+    getOnboardingCards(CARD_COUNT)
       .then((items) => {
         if (!active) {
           return;
@@ -160,16 +187,29 @@ export default function TasteOnboardingPage() {
           })),
         );
       })
-      .catch(() => {
-        if (active) {
-          setFailed(true);
+      .catch((error: unknown) => {
+        if (!active) {
+          return;
         }
+
+        /*
+         * 이미 온보딩을 마친 사용자다(API-023 `409`). 로그인은 `onboardingCompleted`로
+         * 갈라 보내므로 여기로 오는 것은 주소를 직접 열었거나 다른 기기에서 마친
+         * 경우다. 다시 할 수 없는 화면에 실패 안내를 세워 두지 않고 홈으로 보낸다.
+         */
+        if (error instanceof ApiError && error.code === 'ONBOARDING_ALREADY_COMPLETED') {
+          void navigate(path.home(), { replace: true });
+
+          return;
+        }
+
+        setFailed(true);
       });
 
     return () => {
       active = false;
     };
-  }, [reloadCount]);
+  }, [reloadCount, navigate]);
 
   /** 카드 중심이 점선 원 안인지 */
   function valueFromRatio(xRatio: number, yRatio: number): TasteValue {
@@ -326,9 +366,27 @@ export default function TasteOnboardingPage() {
     const skipped = preferences.length === 0;
 
     setSubmitting(true);
-    await submitOnboardingPreferences(preferences, skipped);
-    completeTaste(preferences, skipped);
-    void navigate(path.onboardingOtt());
+    setFailure(null);
+
+    try {
+      await submitOnboardingPreferences(preferences, skipped);
+      completeTaste(preferences, skipped);
+      void navigate(path.onboardingOtt());
+    } catch (error) {
+      // 같은 사용자의 제출이 이미 저장됐다면 다시 보낼 것이 없다(API-024 `409`)
+      if (error instanceof ApiError && error.code === 'ONBOARDING_ALREADY_COMPLETED') {
+        void navigate(path.home(), { replace: true });
+
+        return;
+      }
+
+      setFailure(
+        error instanceof ApiError
+          ? error.message
+          : '저장하지 못했어요. 잠시 후 다시 시도해 주세요.',
+      );
+      setSubmitting(false);
+    }
   }
 
   const savedCount = cards.filter((item) => isSavedValue(item.value)).length;
@@ -437,6 +495,12 @@ export default function TasteOnboardingPage() {
          * 없으므로 건너뛰기를 글자 버튼으로 둔다. 같은 버튼이 문구만 바꾸던 이전
          * 구현은 건너뛰기까지 알약 자리를 차지했다.
          */}
+        {failure ? (
+          <p className={styles.failure} role="alert">
+            {failure}
+          </p>
+        ) : null}
+
         {savedCount === 0 ? (
           <Button variant="text" disabled={submitting} onClick={() => void submit()}>
             차차 찾아갈래요 (건너뛰기)

@@ -5,7 +5,7 @@
  * 파일로 옮긴다. 화면이 목업을 직접 import하지 않도록 함수 계층은 유지한다.
  */
 import { mockAvailableNowCandidates } from '../mocks/home';
-import { getMyOtts } from './otts';
+import { getMyOttIds, getOtts } from './otts';
 import { respond } from './mockTransport';
 import type { AvailableNowMovie } from '../types/unspecified';
 
@@ -17,8 +17,12 @@ import type { AvailableNowMovie } from '../types/unspecified';
  * 구독 중인 OTT가 없거나 겹치는 영화가 없으면 빈 목록이다.
  */
 export async function getAvailableNowMovies(): Promise<AvailableNowMovie[]> {
-  const subscribed = await getMyOtts();
-  const codes = subscribed.map((ott) => ott.code);
+  /*
+   * API-026은 식별자만 준다. 후보 목업이 OTT 코드를 들고 있으므로 API-025 기준정보로
+   * 코드를 찾는다(업무 -379).
+   */
+  const [otts, subscribedIds] = await Promise.all([getOtts(), getMyOttIds()]);
+  const codes = otts.filter((ott) => subscribedIds.includes(ott.ottId)).map((ott) => ott.code);
 
   const items = mockAvailableNowCandidates.flatMap((candidate) => {
     const code = candidate.ottProviders.find((provider) => codes.includes(provider));

@@ -12,9 +12,16 @@ DEPLOY_SCRIPT = SCRIPT_DIR / "deploy-backend.sh"
 
 
 class DeployBackendTest(unittest.TestCase):
+    @staticmethod
+    def _bash_path(path: Path) -> str:
+        value = path.as_posix()
+        if os.name == "nt" and len(value) >= 3 and value[1:3] == ":/":
+            return f"/{value[0].lower()}/{value[3:]}"
+        return value
+
     def setUp(self):
-        self.bash = shutil.which("bash")
-        if self.bash is None or os.name == "nt":
+        self.bash = os.environ.get("TEST_BASH") or shutil.which("bash")
+        if self.bash is None:
             self.skipTest("a POSIX bash environment is required")
 
         self.temp_dir = tempfile.TemporaryDirectory()
@@ -87,7 +94,11 @@ class DeployBackendTest(unittest.TestCase):
             fi
 
             if [[ "$1" == "port" ]]; then
-              printf '127.0.0.1:%s\n' "$3"
+              if [[ "$2" == "feelm-postgres" ]]; then
+                printf '%s:%s\n' "${ACTUAL_POSTGRES_BIND_ADDRESS:-${POSTGRES_BIND_ADDRESS:-127.0.0.1}}" "$3"
+              else
+                printf '%s:%s\n' "${ACTUAL_REDIS_BIND_ADDRESS:-${REDIS_BIND_ADDRESS:-127.0.0.1}}" "$3"
+              fi
               exit 0
             fi
 
@@ -130,7 +141,7 @@ class DeployBackendTest(unittest.TestCase):
 
             if [[ "$1 $2" == "exec feelm-backend" ]]; then
               shift 2
-              "$@"
+              "$DEPLOY_TEST_CURL" "$@"
               exit
             fi
 
@@ -164,6 +175,19 @@ class DeployBackendTest(unittest.TestCase):
             """,
         )
         self._write_executable("sleep", "#!/usr/bin/env bash\nexit 0\n")
+        self._write_executable(
+            "iptables",
+            r"""
+            #!/usr/bin/env bash
+            set -eu
+            printf 'iptables %s\n' "$*" >>"$DEPLOY_TEST_EVENTS"
+            if [[ "$*" == "-S DOCKER-USER" && "${FAIL_FIREWALL_VERIFY:-0}" != "1" ]]; then
+              printf '%s\n' "-A DOCKER-USER ! -s ${DISTRIBUTED_NODE_IP}/32 -p tcp -m multiport --dports 5432,6379 -j DROP"
+              exit 0
+            fi
+            exit 1
+            """,
+        )
 
     def run_deploy(self, previous="registry/backend:previous", **behavior):
         self.state_file.write_text(previous, encoding="utf-8")
@@ -171,9 +195,10 @@ class DeployBackendTest(unittest.TestCase):
         env = os.environ.copy()
         env.update(
             {
-                "PATH": f"{self.bin_dir.as_posix()}:{env['PATH']}",
-                "DEPLOY_TEST_STATE": str(self.state_file),
-                "DEPLOY_TEST_EVENTS": str(self.events_file),
+                "PATH": f"{self._bash_path(self.bin_dir)}:{env['PATH']}",
+                "DEPLOY_TEST_STATE": self._bash_path(self.state_file),
+                "DEPLOY_TEST_EVENTS": self._bash_path(self.events_file),
+                "DEPLOY_TEST_CURL": self._bash_path(self.bin_dir / "curl"),
                 "DEPLOY_TEST_CANDIDATE": candidate,
                 "DEPLOY_TEST_PREVIOUS": previous,
                 "DEPLOY_HEALTH_ATTEMPTS": "1",
@@ -181,7 +206,7 @@ class DeployBackendTest(unittest.TestCase):
         )
         env.update({key: str(value) for key, value in behavior.items()})
         result = subprocess.run(
-            [self.bash, str(DEPLOY_SCRIPT), candidate],
+            [self.bash, self._bash_path(DEPLOY_SCRIPT), candidate],
             cwd=SCRIPT_DIR.parent.parent,
             env=env,
             text=True,
@@ -226,6 +251,62 @@ class DeployBackendTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(current, "registry/backend:previous")
         self.assertIn("PostgreSQL SELECT 1 verification failed", result.stderr)
+
+    def test_remote_datastore_bindings_accept_configured_private_address(self):
+        result, current, events = self.run_deploy(
+            SERVICE_NODE_IP="192.168.10.10",
+            DISTRIBUTED_NODE_IP="192.168.10.11",
+            POSTGRES_BIND_ADDRESS="192.168.10.10",
+            REDIS_BIND_ADDRESS="192.168.10.10",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(current, "registry/backend:candidate")
+        self.assertIn("iptables -S DOCKER-USER", events)
+
+    def test_remote_datastore_binding_without_firewall_restores_previous_image(self):
+        result, current, _ = self.run_deploy(
+            SERVICE_NODE_IP="192.168.10.10",
+            DISTRIBUTED_NODE_IP="192.168.10.11",
+            POSTGRES_BIND_ADDRESS="192.168.10.10",
+            REDIS_BIND_ADDRESS="192.168.10.10",
+            FAIL_FIREWALL_VERIFY=1,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(current, "registry/backend:previous")
+        self.assertIn("Cannot read DOCKER-USER firewall rules", result.stderr)
+
+    def test_mixed_datastore_bindings_restore_previous_image(self):
+        result, current, _ = self.run_deploy(
+            SERVICE_NODE_IP="192.168.10.10",
+            DISTRIBUTED_NODE_IP="192.168.10.11",
+            POSTGRES_BIND_ADDRESS="192.168.10.10",
+            REDIS_BIND_ADDRESS="127.0.0.1",
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(current, "registry/backend:previous")
+        self.assertIn("must both use loopback or both use", result.stderr)
+
+    def test_public_remote_datastore_address_restores_previous_image(self):
+        result, current, _ = self.run_deploy(
+            SERVICE_NODE_IP="203.0.113.10",
+            DISTRIBUTED_NODE_IP="192.168.10.11",
+            POSTGRES_BIND_ADDRESS="203.0.113.10",
+            REDIS_BIND_ADDRESS="203.0.113.10",
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(current, "registry/backend:previous")
+        self.assertIn("SERVICE_NODE_IP must be an RFC1918 private IPv4 address", result.stderr)
+
+    def test_unexpected_runtime_binding_restores_previous_image(self):
+        result, current, _ = self.run_deploy(ACTUAL_POSTGRES_BIND_ADDRESS="0.0.0.0")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(current, "registry/backend:previous")
+        self.assertIn("does not match 127.0.0.1:5432", result.stderr)
 
     def test_first_deployment_failure_stops_failed_candidate(self):
         result, current, events = self.run_deploy(previous="", FAIL_CANDIDATE_HEALTH=1)

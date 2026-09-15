@@ -80,6 +80,14 @@ class InputValidationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             job.source_plan(*archive([regular('backend/.ENV.EXAMPLE')]))
 
+    def test_only_reviewed_compose_contract_is_allowed_outside_backend(self):
+        files, _ = job.source_plan(*archive([
+            regular(), regular('infra/compose/service.yml', b'services:\n')]))
+        self.assertIn('infra/compose/service.yml', files)
+        for name in ('infra/compose/frontend.yml', 'infra/secret.txt', 'frontend/a'):
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                job.source_plan(*archive([regular(), regular(name)]))
+
     def test_fixed_reviewed_repository_archive_accepted(self):
         import subprocess
         repo = Path(__file__).resolve().parents[2]

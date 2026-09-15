@@ -1,74 +1,490 @@
 /*
- * 4컷 띠. 좁고 긴 어두운 띠 안에 사진 칸 넷이 위에서 아래로 이어진다.
- * 폭은 와이어프레임 3.4의 띠(250px)를 기준으로 화면 폭을 넘지 않게 둔다.
+ * 취향 4컷 인화지 (사용자 시안 2026-09-15, 업무 -321).
+ *
+ * **모든 길이는 인화지 폭의 비율이다.** 시안의 인화지 폭 385를 기준 단위로 삼아
+ * `--u` = 폭 / 385로 쓴다. 부모가 폭만 정하면 인화기 속 작은 4컷이든 상세의 큰 4컷이든
+ * 칸 비율 · 글자 크기 · 간격이 같다.
+ *
+ * 시안에서 잰 값(단위 u)
+ * - 인화지 385 × 1165 · 옆 여백 15 · 머리 58 · 칸 사이 9 · 발 90
+ * - 칸 355 × 246 · 라벨 왼쪽 위 12 · 10 · 한글 이름 왼쪽 아래 12 · 10
+ * - 감독 대표작 왼쪽 13 · 위 33 · 166 × 101
+ *
+ * **작은 글자에는 최소 크기가 있다**(사용자 요청 2026-09-15). 머리 · 라벨 · 한글 이름 · 날짜는
+ * 폭에 비례하되 `--text-floor`(기본 1)배의 최소 px 아래로 줄지 않는다. 읽으라고 둔 글자라서다.
+ * 3.3 인화기 속 작은 4컷은 연출이라 `--text-floor: 0`으로 최소 크기를 끈다. 큰 이름은 최소
+ * 크기가 없다 — 칸과 함께 줄어야 칸 안에 맞는다.
+ *
+ * 빨강은 브랜드 빨강이다. 이 인화지의 빨강은 UI가 아니라 콘텐츠다(`index.tsx` 머리 주석).
  */
-.strip {
-  display: flex;
+.root {
   width: 100%;
-  max-width: 248px;
+  container-type: inline-size;
+}
+
+.strip {
+  --u: calc(100cqw / 385);
+  --red: var(--color-brand);
+  --paper: #0c0c0d;
+  /* 읽는 글자의 크기. 폭에 비례하되 최소 px 아래로 줄지 않는다 */
+  --title-size: max(calc(var(--text-floor, 1) * 14px), calc(var(--u) * 17));
+  --small-size: max(calc(var(--text-floor, 1) * 11px), calc(var(--u) * 12));
+  --label-size: max(calc(var(--text-floor, 1) * 12px), calc(var(--u) * 15));
+  --caption-size: max(calc(var(--text-floor, 1) * 12px), calc(var(--u) * 14));
+  /* 라벨 · 한글 이름이 차지하는 높이. 큰 이름 상자와 대표작이 이 안으로 들어오지 않는다 */
+  --label-room: calc(var(--u) * 14 + var(--label-size) * 1.2);
+  --caption-room: calc(var(--u) * 14 + var(--caption-size) * 1.2);
+
+  display: flex;
   box-sizing: border-box;
   flex-direction: column;
-  align-self: center;
-  padding: var(--space-3) var(--space-3) 0;
-  margin: 0 auto;
-  border-radius: 6px;
-  background: var(--color-surface-dark);
-  box-shadow: var(--shadow-poster);
+  padding: 0 calc(var(--u) * 15);
+  margin: 0;
+  border-radius: calc(var(--u) * 3);
+  background:
+    radial-gradient(120% 60% at 50% 0%, rgba(255, 255, 255, 0.05), transparent 70%), var(--paper);
+  color: #fff;
+  font-family: var(--font-sans);
 }
+
+/* ─────────────────────────── 머리 · 발 */
+
+/* 머리가 없으면 옆 여백만큼 위를 띄우고 01부터 시작한다(7.3 목록) */
+.strip[data-head='false'] {
+  padding-top: calc(var(--u) * 15);
+}
+
+.head {
+  display: flex;
+  height: calc(var(--u) * 58);
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 calc(var(--u) * 11);
+  gap: calc(var(--u) * 8);
+}
+
+.title {
+  overflow: hidden;
+  font-size: var(--title-size);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.month {
+  flex: none;
+  color: var(--red);
+  font-size: var(--small-size);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+
+.foot {
+  display: flex;
+  height: calc(var(--u) * 90);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--u) * 5);
+}
+
+.stamp {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: var(--small-size);
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  /* 자간이 끝 글자 뒤에도 붙어 가운데에서 밀린다 */
+  text-indent: 0.24em;
+}
+
+/* ─────────────────────────── 칸 */
 
 .cuts {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  gap: calc(var(--u) * 9);
   list-style: none;
 }
 
-/* 사진 한 칸. 와이어프레임 칸(190 × 130)의 비율이다 */
 .cut {
   position: relative;
+  height: calc(var(--u) * 246);
+  overflow: hidden;
+  background: #111;
+  isolation: isolate;
+}
+
+.label,
+.caption {
+  position: absolute;
+  z-index: 5;
+  left: calc(var(--u) * 12);
+  color: #fff;
+  line-height: 1.2;
+  text-shadow: 0 0 calc(var(--u) * 6) rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+}
+
+.label {
+  top: calc(var(--u) * 10);
+  font-size: var(--label-size);
+  font-weight: 600;
+}
+
+.caption {
+  bottom: calc(var(--u) * 10);
+  max-width: calc(100% - var(--u) * 24);
+  overflow: hidden;
+  font-size: var(--caption-size);
+  font-weight: 500;
+  text-overflow: ellipsis;
+}
+
+/* ─────────────────────────── 사진 */
+
+/*
+ * 원본 사진과 누끼 인물의 틀. 칸마다 차지하는 자리만 다르다.
+ * 자르는 자리는 데이터의 `position`(`--image-x` · `--image-y`), 당기는 정도는 `zoom`이다.
+ */
+.photo,
+.figure,
+.work {
+  position: absolute;
+  overflow: hidden;
+}
+
+.photo {
+  z-index: 0;
+  inset: 0;
+}
+
+.figure {
+  z-index: 3;
+  inset: 0;
+}
+
+.photo img,
+.figure img,
+.work img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: var(--image-x, 50%) var(--image-y, 50%);
+  transform: scale(var(--image-zoom, 1));
+  transform-origin: var(--image-x, 50%) var(--image-y, 50%);
+}
+
+/* 누끼는 자르지 않고 칸 바닥에 세운다. 머리가 잘리지 않게 한다 */
+.figure img {
+  object-fit: contain;
+  object-position: var(--image-x, 50%) 100%;
+  transform-origin: var(--image-x, 50%) 100%;
+}
+
+/* 원본 사진 위 그라데이션. 글자가 놓이는 쪽을 어둡게 한다. 칸마다 방향이 다르다 */
+.cut[data-mode='photo']::after {
+  position: absolute;
+  z-index: 1;
+  content: '';
+  inset: 0;
+  pointer-events: none;
+}
+
+/* ─────────────────────────── 큰 이름 */
+
+.nameArea {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* 글자 상자. 칸마다 자리를 고정하고 글자는 `useFitText`가 `--fit`으로 줄인다 */
+.nameBox {
+  position: absolute;
   display: flex;
-  box-sizing: border-box;
+  overflow: hidden;
   flex-direction: column;
   justify-content: flex-end;
-  padding: var(--space-3);
-  aspect-ratio: 19 / 13;
-  border-radius: 2px;
-  background: var(--color-bg);
-  gap: 2px;
 }
 
-.number {
-  position: absolute;
-  top: var(--space-2);
-  left: var(--space-3);
-  color: var(--color-ink-hint);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-caption);
-}
-
-.eyebrow {
-  color: var(--color-ink-hint);
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-}
-
-.value {
-  color: var(--color-ink);
-  font-size: var(--font-size-heading);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: var(--letter-spacing-heading);
-  line-height: var(--line-height-heading);
+.name {
+  margin: 0;
+  overflow-wrap: normal;
   word-break: keep-all;
 }
 
-/* 띠 아래 여백. 4컷 사진의 날짜 자리 */
-.caption {
-  padding: var(--space-3) 0;
-  color: var(--color-on-dark-muted);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: var(--letter-spacing-wide);
-  line-height: var(--line-height-caption);
-  text-align: center;
+/* 가장 작게 줄여도 넘치는 이름. 그때만 단어 중간에서 줄을 바꾼다 */
+.nameBox[data-overflow] .name {
+  overflow-wrap: anywhere;
+}
+
+/* ─── 01 장르. 흑백 사진 위 굵고 좁은 빨간 글자. 누끼면 글자가 인물 뒤로 간다 */
+
+.cut[data-cut='genre'] {
+  background: #0e0e0e;
+}
+
+.cut[data-cut='genre'] .photo img,
+.cut[data-cut='genre'] .figure img {
+  filter: grayscale(1) contrast(1.08);
+}
+
+.cut[data-cut='genre'][data-mode='photo']::after {
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.5) 0%,
+    rgba(0, 0, 0, 0.15) 55%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
+}
+
+.cut[data-cut='genre'] .nameArea {
+  z-index: 2;
+}
+
+.cut[data-cut='genre'][data-mode='photo'] .nameArea {
+  z-index: 4;
+}
+
+.genreName {
+  top: var(--label-room);
+  right: calc(var(--u) * 10);
+  bottom: var(--caption-room);
+  left: calc(var(--u) * 10);
+  justify-content: flex-start;
+}
+
+/* 원본 사진이면 글자가 인물 뒤로 못 들어가 얼굴을 덮는다. 위쪽에만 두고 아래는 사진을 비운다 */
+.cut[data-cut='genre'][data-mode='photo'] .genreName {
+  bottom: calc(var(--u) * 84);
+}
+
+.genreName .name {
+  color: var(--red);
+  font-family: var(--font-report-condensed);
+  font-size: calc(var(--u) * 200 * var(--fit, 1));
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 0.88;
+  text-transform: uppercase;
+  transform: scaleY(var(--stretch, 1));
+  transform-origin: top left;
+}
+
+/* ─── 02 감독. 빨간 바탕 · 오른쪽 흑백 인물 · 왼쪽 위 대표작 · 흰 세리프 이탤릭 */
+
+.cut[data-cut='director'] {
+  background: var(--red);
+}
+
+.cut[data-cut='director'] .photo,
+.cut[data-cut='director'] .figure {
+  left: 44%;
+}
+
+/* 원본 사진은 왼쪽 끝을 빨간 바탕으로 녹인다 */
+.cut[data-cut='director'] .photo {
+  mask-image: linear-gradient(90deg, transparent 0%, #000 22%);
+}
+
+.cut[data-cut='director'] .photo img,
+.cut[data-cut='director'] .figure img {
+  filter: grayscale(1) contrast(1.05);
+}
+
+.cut[data-cut='director'] .figure {
+  z-index: 1;
+}
+
+.cut[data-cut='director'][data-mode='photo']::after {
+  left: 44%;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.45) 0%, transparent 45%);
+}
+
+.work {
+  z-index: 2;
+  top: var(--label-room);
+  left: calc(var(--u) * 13);
+  width: calc(var(--u) * 166);
+  height: calc(var(--u) * 101);
+  box-shadow: 0 calc(var(--u) * 4) calc(var(--u) * 12) rgba(0, 0, 0, 0.25);
+}
+
+.directorName {
+  right: calc(var(--u) * 24);
+  bottom: var(--caption-room);
+  left: calc(var(--u) * 12);
+  height: calc(var(--u) * 100);
+}
+
+/* 사진이 없으면 인물 자리까지 이름이 넓어진다 */
+.cut[data-cut='director'][data-mode='none'] .directorName {
+  height: calc(var(--u) * 170);
+}
+
+.directorName .name,
+.characterName .name,
+.actorLead {
+  font-family: var(--font-report-serif);
+  font-style: italic;
+  font-weight: 700;
+}
+
+/*
+ * 이탤릭 끝 글자는 기울어진 만큼 글자 폭 밖으로 삐져나와 상자에 잘린다. 폭 계산(`useFitText`)이
+ * 그만큼을 넣어 재도록 오른쪽에 여유를 둔다. 한글은 기울임을 흉내 내 더 많이 삐져나온다.
+ */
+.directorName .name,
+.characterName .name {
+  padding-right: 0.18em;
+}
+
+.directorName .name {
+  font-size: calc(var(--u) * 46 * var(--fit, 1));
+  letter-spacing: -0.01em;
+  line-height: 0.96;
+  text-shadow: 0 calc(var(--u) * 2) calc(var(--u) * 14) rgba(0, 0, 0, 0.3);
+  text-transform: uppercase;
+}
+
+/* ─── 03 배우. 검정 바탕 · 오른쪽 흑백 인물 크게 · 흰 이탤릭 + 빨간 대문자 */
+
+.cut[data-cut='actor'] {
+  background: #0b0b0b;
+}
+
+.cut[data-cut='actor'] .photo,
+.cut[data-cut='actor'] .figure {
+  left: 38%;
+}
+
+.cut[data-cut='actor'] .photo {
+  mask-image: linear-gradient(90deg, transparent 0%, #000 34%);
+}
+
+.cut[data-cut='actor'] .photo img,
+.cut[data-cut='actor'] .figure img {
+  filter: grayscale(1) contrast(1.06);
+}
+
+.cut[data-cut='actor'] .figure {
+  z-index: 1;
+}
+
+.cut[data-cut='actor'][data-mode='photo']::after {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.55) 0%, transparent 60%);
+}
+
+.actorName {
+  top: calc(var(--label-room) + var(--u) * 22);
+  bottom: var(--caption-room);
+  left: calc(var(--u) * 14);
+  width: calc(var(--u) * 200);
+}
+
+.cut[data-cut='actor'][data-mode='none'] .actorName {
+  width: calc(var(--u) * 325);
+}
+
+.actorName .name {
+  font-size: calc(var(--u) * 74 * var(--fit, 1));
+  line-height: 1;
+}
+
+.actorLead,
+.actorLast {
+  display: block;
+  white-space: nowrap;
+}
+
+.actorLead {
+  color: #fff;
+  font-size: 0.78em;
+  letter-spacing: -0.01em;
+  line-height: 1.02;
+}
+
+.actorLast {
+  position: relative;
+  color: var(--red);
+  font-family: var(--font-report-serif);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 0.92;
+  text-transform: uppercase;
+}
+
+/* 이름 위의 작은 별. 글자 크기를 따라 커지고 작아진다 */
+.sparkle {
+  position: absolute;
+  top: -1.05em;
+  left: 0.9em;
+  width: 0.34em;
+  height: 0.34em;
+  fill: var(--red);
+}
+
+/* 두 단어면 별이 윗줄 위로 올라간다 */
+.actorLead + .actorLast .sparkle {
+  top: calc(-1.02em * 0.78 - 0.34em);
+}
+
+/* ─── 04 캐릭터. 컬러 사진 · 흰 세리프 이탤릭 · 빨간 밑줄 */
+
+.cut[data-cut='character'] {
+  background: radial-gradient(90% 90% at 70% 30%, #2a2a2a, #121212);
+}
+
+.cut[data-cut='character'] .figure {
+  z-index: 1;
+}
+
+.cut[data-cut='character'][data-mode='photo']::after {
+  background: linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.7) 0%,
+    rgba(0, 0, 0, 0.25) 42%,
+    transparent 62%
+  );
+}
+
+.characterName {
+  right: calc(var(--u) * 40);
+  bottom: var(--caption-room);
+  left: calc(var(--u) * 12);
+  height: calc(var(--u) * 116);
+}
+
+.cut[data-cut='character'][data-mode='none'] .characterName {
+  right: calc(var(--u) * 12);
+  height: calc(var(--u) * 180);
+}
+
+.characterName .name {
+  /* 밑줄이 글자 아래로 내려가 상자에 잘리지 않을 자리 */
+  padding-bottom: 0.24em;
+  font-size: calc(var(--u) * 66 * var(--fit, 1));
+  letter-spacing: -0.015em;
+  line-height: 1;
+  text-shadow: 0 calc(var(--u) * 2) calc(var(--u) * 16) rgba(0, 0, 0, 0.35);
+}
+
+.underlined {
+  position: relative;
+  display: inline-block;
+}
+
+/* 이름 끝에서 왼쪽 아래로 흐르는 붓 밑줄 */
+.underline {
+  position: absolute;
+  right: -0.08em;
+  bottom: -0.2em;
+  width: 70%;
+  height: 0.14em;
+  fill: var(--red);
 }

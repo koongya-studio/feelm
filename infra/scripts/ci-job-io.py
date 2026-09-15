@@ -54,7 +54,9 @@ def source_plan(payload, expected_sha):
         for entry in archive:
             name = entry.name[:-1] if entry.isdir() and entry.name.endswith('/') else entry.name
             parts = relative_parts(name)
-            if (parts[0] != 'backend' or name in seen or len(seen) >= MAX_SOURCE_FILES
+            allowed_source = (parts[0] == 'backend'
+                              or name in ('infra', 'infra/compose', 'infra/compose/service.yml'))
+            if (not allowed_source or name in seen or len(seen) >= MAX_SOURCE_FILES
                     or not (entry.isdir() or entry.isfile()) or entry.sparse is not None
                     or entry.size < 0 or entry.size > MAX_SOURCE_FILE
                     or any(p.casefold() in ('.git', '.gradle')

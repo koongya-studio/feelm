@@ -13,7 +13,7 @@ import {
   mockOttAnalysisBasis,
   mockOttRecommendationItems,
 } from '../mocks/ottRecommendations';
-import { getMyOtts } from './otts';
+import { getMyOttIds } from './otts';
 import { respond, respondError } from './mockTransport';
 import type {
   OttAnalysisBasis,
@@ -52,7 +52,7 @@ export async function getOttRecommendations(): Promise<OttRecommendationView> {
     );
   }
 
-  const subscribedIds = (await getMyOtts()).map((ott) => ott.ottId);
+  const subscribedIds = await getMyOttIds();
   const items: OttRecommendationItemView[] = mockOttRecommendationItems
     .map((item) => ({ ...item, subscribed: subscribedIds.includes(item.ott.ottId) }))
     .sort((a, b) => b.matchCount - a.matchCount);

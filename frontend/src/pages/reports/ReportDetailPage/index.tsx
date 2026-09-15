@@ -14,7 +14,7 @@
  * 계약(API-060)에 없는 값 — 국가 · 시대 비율, 키워드 근거, 비교 % — 도 와이어프레임대로
  * 그린다(팀 결정 2026-09-13). `types/unspecified.ts` `ReportDetailView`.
  *
- * - 어두운 블록은 맨 위 4컷의 띠다(`components/ReportFourCut`)
+ * - 어두운 블록은 맨 위 4컷의 인화지다(`components/ReportFourCut`)
  * - `지난 반기와 비교`의 빼기는 흐리게 쓴다. 색으로 늘고 준 것을 가르지 않는다
  *   (`design-concept.md` 2.2). 와이어프레임도 줄어든 값만 흐렸다
  * - 비교할 지난 반기가 없으면(첫 리포트) 그 칸을 그리지 않는다
@@ -35,6 +35,7 @@ import Section from '../../../components/Section';
 import StatusView from '../../../components/StatusView';
 import { ShareIcon } from '../../../components/Icon';
 import { getReportDetail } from '../../../api/reports';
+import { getMyProfile } from '../../../api/users';
 import { path } from '../../../routes/paths';
 import { formatDelta, formatHalf } from '../../../utils/report';
 import ReportShareSheet from './ReportShareSheet';
@@ -52,6 +53,7 @@ export default function ReportDetailPage({ from }: Props) {
   const id = Number(reportId);
 
   const [report, setReport] = useState<ReportDetailView | null>(null);
+  const [nickname, setNickname] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
   const [sharing, setSharing] = useState(false);
@@ -74,6 +76,21 @@ export default function ReportDetailPage({ from }: Props) {
       active = false;
     };
   }, [id, reloadCount]);
+
+  // 4컷 머리의 `{닉네임}의 취향 4컷`. 못 불러오면 `나의 취향 4컷`으로 둔다
+  useEffect(() => {
+    let active = true;
+
+    getMyProfile()
+      .then((profile) => {
+        if (active) setNickname(profile.nickname);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   function save() {
     if (from === 'my') {
@@ -121,11 +138,10 @@ export default function ReportDetailPage({ from }: Props) {
       />
 
       <div className={styles.page}>
-        {/* 4컷. 띠가 화면에서 유일한 어두운 블록이다 */}
-        <ReportFourCut
-          headline={report.headline}
-          caption={`${report.period.year} ${formatHalf(report.period)}`}
-        />
+        {/* 4컷. 인화지가 화면에서 유일한 어두운 블록이다 */}
+        <div className={styles.fourCut}>
+          <ReportFourCut cuts={report.fourCut} owner={nickname} createdAt={report.createdAt} />
+        </div>
 
         <Section label="상세 리포트">
           <div className={styles.card}>

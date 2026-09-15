@@ -20,7 +20,6 @@
  */
 import { createSeedNotifications } from './notifications';
 import { createSeedWatchRecords } from './watch';
-import type { OnboardingPreference } from '../types/onboarding';
 import type {
   NotificationSettingsView,
   NotificationView,
@@ -47,9 +46,6 @@ export type StoredWatchRecord = WatchRecord & {
 };
 
 type SessionState = {
-  /** API-024로 저장한 초기 취향. 건너뛰면 빈 배열 */
-  onboardingPreferences: OnboardingPreference[];
-  onboardingSubmitted: boolean;
   /**
    * API-027로 설정한 구독 OTT. `null`이면 아직 설정하지 않은 상태이며
    * 기준 목업의 구독 정보를 쓴다.
@@ -114,8 +110,6 @@ type SessionState = {
 
 function emptyState(): SessionState {
   return {
-    onboardingPreferences: [],
-    onboardingSubmitted: false,
     subscribedOttIds: null,
     dismissedMovieIds: [],
     // 7.7이 그리는 `평가 안 남긴 영화`로 시작한다. 이유는 createSeedWatchRecords 주석에 있다
@@ -148,21 +142,6 @@ let state: SessionState = emptyState();
 /** 검증과 개발 확인용. 화면에서는 쓰지 않는다 */
 export function resetSessionStore(): void {
   state = emptyState();
-}
-
-// ─────────────────────────────────────────── 온보딩
-
-export function saveOnboardingPreferences(preferences: OnboardingPreference[]): void {
-  state.onboardingPreferences = preferences;
-  state.onboardingSubmitted = true;
-}
-
-export function getOnboardingPreferences(): OnboardingPreference[] {
-  return state.onboardingPreferences;
-}
-
-export function isOnboardingSubmitted(): boolean {
-  return state.onboardingSubmitted;
 }
 
 // ─────────────────────────────────────────── 구독 OTT

@@ -1,32 +1,45 @@
 /*
- * 7.3 취향 리포트 목록
+ * 7.3 취향 4컷 목록
  *
  * 이동표: 7.1 → 7.3 취향 리포트 · 3.1 ⇢ 7.3 취향 리포트 보기 · 7.3 → 7.4 리포트 선택
  *
- * 요소는 와이어프레임 그대로다 — 반기마다 필름 한 칸(위아래 구멍 줄), 흐린 `2026 하반기`,
- * `리포트를 누르면 상세 필름을 볼 수 있어요`. 연동은 API-059다.
+ * **모눈 노트에 반기마다 받은 4컷을 테이프로 붙여 모아 둔 장면이다**(사용자 시안 2026-09-15,
+ * 업무 -446). 첫 목록(와이어프레임의 필름 칸)을 바꿨다.
  *
- * **연도로 나누고 한 해에 상반기 · 하반기 두 칸을 세로로 세워, 칸이 화면 높이를 꽉 채운다**
- * (사용자 결정 2026-09-13). 와이어프레임은 네 칸을 한 격자에 섞고 칸마다 연도를 적었다.
+ * - 머리는 가운데 `취향 4컷` · `차곡차곡 모아둔 나의 영화 취향`, 오른쪽에 공유
+ * - 연도마다 손글씨 연도와 가로줄, 그 아래 두 반기의 4컷을 나란히 붙인다. 연도는 최신이 위,
+ *   한 해 안에서는 **최근 반기가 왼쪽**이다(시안). 4컷 아래에 인화한 날짜를 적는다
+ * - 4컷은 3.4 · 7.4 상세와 같은 `ReportFourCut`을 머리 없이 작게 쓴다. 누르면 7.4로 간다
+ * - 4컷마다 조금씩 기울이고 윗변에 빨간 테이프를 붙인다
+ * - `GENERATING`(아직 끝나지 않은 반기)은 누를 수 없다(API-060이 409다). 빈 인화지에 `인화 중`을 적는다
+ * - 4컷 한 장을 못 불러오면 그 자리만 빈 인화지로 두고 상세로는 갈 수 있게 한다
  *
- * - 가장 최근 리포트는 테두리를 진하게 둔다. 와이어프레임도 첫 칸만 진하게 그렸다
- * - `GENERATING`(아직 끝나지 않은 반기)은 누를 수 없다. 상세가 409다(API-060)
- * - 필름 구멍은 벽 위의 선이다. 어두운 블록을 쓰지 않는다 — 칸이 여럿이라 전부 어두우면
- *   `화면에 어두운 블록은 하나`(screen-spec-my.md 4장)가 무너진다
+ * `[!]` API-059 목록에는 4컷 값이 없다. 반기마다 API-060 상세를 한 번씩 더 부른다. 반기가 쌓이면
+ * 호출이 늘어나므로 연동 때 목록에 4컷 요약을 넣을지 정해야 한다.
+ * `[?]` 공유가 무엇을 공유하는지 시안에 없다. 기기 공유 메뉴가 있을 때만 이 화면 주소를 넘긴다.
  */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import Button from '../../../components/Button';
+import IconButton from '../../../components/IconButton';
+import ReportFourCut from '../../../components/ReportFourCut';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
-import { getMyReports } from '../../../api/reports';
+import { ShareIcon } from '../../../components/Icon';
+import { getMyReports, getReportDetail } from '../../../api/reports';
 import { path } from '../../../routes/paths';
-import { formatHalf } from '../../../utils/report';
+import { formatHalf, formatPrintDate } from '../../../utils/report';
 import styles from './ReportListPage.module.css';
 import type { ReportSummary } from '../../../types/report';
+import type { ReportDetailView } from '../../../types/unspecified';
+
+const TITLE = '취향 4컷';
+
+/** 반기 한 장. 상세를 못 불러왔으면 `detail`이 null이다 */
+type Entry = { summary: ReportSummary; detail: ReportDetailView | null };
 
 export default function ReportListPage() {
-  const [reports, setReports] = useState<ReportSummary[] | null>(null);
+  const [entries, setEntries] = useState<Entry[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
 
@@ -34,9 +47,20 @@ export default function ReportListPage() {
     let active = true;
 
     getMyReports()
+      .then(({ items }) =>
+        Promise.all(
+          items.map(async (summary) => ({
+            summary,
+            detail:
+              summary.status === 'READY'
+                ? await getReportDetail(summary.reportId).catch(() => null)
+                : null,
+          })),
+        ),
+      )
       .then((value) => {
         if (active) {
-          setReports(value.items);
+          setEntries(value);
           setFailed(false);
         }
       })
@@ -49,7 +73,29 @@ export default function ReportListPage() {
     };
   }, [reloadCount]);
 
-  const header = <ScreenHeader title="취향 리포트" showBack />;
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+
+  const header = (
+    <ScreenHeader
+      title={TITLE}
+      subtitle="차곡차곡 모아둔 나의 영화 취향"
+      align="center"
+      showBack
+      action={
+        canShare ? (
+          <IconButton
+            label="공유하기"
+            icon={<ShareIcon />}
+            onClick={() =>
+              void navigator
+                .share({ title: TITLE, url: window.location.href })
+                .catch(() => undefined)
+            }
+          />
+        ) : undefined
+      }
+    />
+  );
 
   if (failed) {
     return (
@@ -69,102 +115,104 @@ export default function ReportListPage() {
     );
   }
 
-  if (!reports) {
+  if (!entries) {
     return header;
   }
 
-  // 가장 최근의 만든 리포트. 테두리를 진하게 둔다
-  const latestReadyId = reports.find((report) => report.status === 'READY')?.reportId ?? null;
-
-  if (reports.length === 0) {
+  if (entries.length === 0) {
     return (
       <>
         {header}
         <StatusView
           variant="empty"
-          title="아직 발급된 리포트가 없어요"
-          description="반기마다 한 번 취향 리포트를 인화해 드려요"
+          title="아직 인화된 취향 4컷이 없어요"
+          description="반기마다 한 번 취향 4컷을 인화해 드려요"
         />
       </>
     );
   }
 
-  const years = groupByYear(reports);
-
   return (
-    <>
+    <div className={styles.screen}>
       {header}
 
       <div className={styles.page}>
-        {years.map(({ year, halves }) => (
+        {groupByYear(entries).map(({ year, halves }) => (
           <section key={year} className={styles.year} aria-labelledby={`report-year-${year}`}>
             <h2 id={`report-year-${year}`} className={styles.yearLabel}>
-              {year}
+              <span className={styles.yearHand}>{year}</span>
             </h2>
 
-            <ul className={styles.grid}>
-              {halves.map((report) => (
-                <li key={report.reportId}>
-                  <ReportCard report={report} latest={report.reportId === latestReadyId} />
+            <ul className={styles.board}>
+              {halves.map((entry, index) => (
+                <li key={entry.summary.reportId} className={styles.slot}>
+                  <PinnedStrip entry={entry} tilt={index % 2 === 0 ? 'left' : 'right'} />
                 </li>
               ))}
             </ul>
           </section>
         ))}
-
-        <p className={styles.hint}>리포트를 누르면 상세 필름을 볼 수 있어요</p>
       </div>
-    </>
+    </div>
   );
 }
 
 /**
- * 연도로 묶고 한 해 안에서는 상반기 · 하반기 순으로 둔다(사용자 결정 2026-09-13).
- * 연도는 최신이 위다. API-059는 반기를 최신순 한 줄로 주므로 화면에서 다시 묶는다.
+ * 연도로 묶는다. 연도는 최신이 위, 한 해 안에서는 최근 반기(하반기)가 왼쪽이다(시안).
+ * API-059는 반기를 최신순 한 줄로 주므로 화면에서 다시 묶는다.
  */
-function groupByYear(reports: ReportSummary[]) {
-  const years = [...new Set(reports.map((report) => report.period.year))].sort((a, b) => b - a);
+function groupByYear(entries: Entry[]) {
+  const years = [...new Set(entries.map(({ summary }) => summary.period.year))].sort(
+    (a, b) => b - a,
+  );
 
   return years.map((year) => ({
     year,
-    halves: reports
-      .filter((report) => report.period.year === year)
-      .sort((a, b) => a.period.half.localeCompare(b.period.half)),
+    halves: entries
+      .filter(({ summary }) => summary.period.year === year)
+      .sort((a, b) => b.summary.period.half.localeCompare(a.summary.period.half)),
   }));
 }
 
-/** 반기 한 칸. 만드는 중이면 누를 수 없다 */
-function ReportCard({ report, latest }: { report: ReportSummary; latest: boolean }) {
-  const label = formatHalf(report.period);
+/** 테이프로 붙인 4컷 한 장과 그 아래 날짜 */
+function PinnedStrip({ entry, tilt }: { entry: Entry; tilt: 'left' | 'right' }) {
+  const { summary, detail } = entry;
+  const half = `${summary.period.year} ${formatHalf(summary.period)}`;
 
-  if (report.status === 'GENERATING') {
+  if (summary.status === 'GENERATING') {
     return (
-      <div className={styles.film} data-generating="true">
-        <Perforation />
-        {/* 반기 글자가 다른 칸과 같은 높이에 오도록 상태를 한 덩어리로 묶는다 */}
-        <span className={styles.body}>
-          <span className={styles.half}>{label}</span>
-          <span className={styles.generating}>만드는 중</span>
+      <div className={styles.pinned} data-tilt={tilt} data-generating="true">
+        <span className={styles.tape} aria-hidden="true" />
+        <div className={styles.blank}>
+          <span className={styles.blankText}>인화 중</span>
+        </div>
+        <span className={styles.date}>
+          {half} · <span>만드는 중</span>
         </span>
-        <Perforation />
       </div>
     );
   }
 
   return (
     <Link
-      to={path.myReport(report.reportId)}
-      className={styles.film}
-      data-latest={latest}
-      aria-label={report.title}
+      to={path.myReport(summary.reportId)}
+      className={styles.pinned}
+      data-tilt={tilt}
+      aria-label={summary.title}
     >
-      <Perforation />
-      <span className={styles.half}>{label}</span>
-      <Perforation />
+      <span className={styles.tape} aria-hidden="true" />
+      {detail ? (
+        <div className={styles.strip} aria-hidden="true">
+          <ReportFourCut cuts={detail.fourCut} createdAt={detail.createdAt} head={false} />
+        </div>
+      ) : (
+        <div className={styles.blank} aria-hidden="true">
+          <span className={styles.blankText}>{half}</span>
+        </div>
+      )}
+      <span className={styles.date} aria-hidden="true">
+        {formatPrintDate(summary.createdAt).stamp}
+      </span>
     </Link>
   );
-}
-
-function Perforation() {
-  return <span className={styles.perforation} aria-hidden="true" />;
 }

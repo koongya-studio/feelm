@@ -129,6 +129,12 @@
   --color-on-dark-hint: #8a8b91;
   --color-line-on-dark: rgba(255, 255, 255, 0.16);
 
+  /*
+   * 3.3 새 취향 리포트 발급의 벽. **인화기가 있는 이 화면만** 앱 공통 벽 대신 버건디다
+   * (팀 결정 2026-09-14, 업무 -321). 인화기 사진 네 귀퉁이에서 잰 색이다. 3.4 · 7.4 상세는 공통 벽이다.
+   */
+  --gradient-report-wall: linear-gradient(165deg, #7a1b25 0%, #5e0c15 45%, #3c0006 100%);
+
   /* ─────────────────────────── 선 */
   --color-line: rgba(38, 39, 41, 0.11);
   --color-line-strong: rgba(38, 39, 41, 0.18);
@@ -165,6 +171,11 @@
     'Malgun Gothic', sans-serif;
   /* 로고 전용. 본문에 쓰지 않는다 */
   --font-display: 'Gluten', var(--font-sans);
+  /* 취향 4컷 전용(업무 -321). 영문은 이 서체, 한글은 Pretendard로 넘어간다 */
+  --font-report-condensed: 'Anton', var(--font-sans);
+  --font-report-serif: 'Playfair Display', Georgia, var(--font-sans);
+  /* 7.3 목록의 연도 손글씨(업무 -446). 숫자에만 쓴다 */
+  --font-report-hand: 'Caveat', var(--font-sans);
 
   /* 화면 제목 */
   --font-size-title: 27px;

@@ -24,4 +24,7 @@ public interface UserAuthProviderRepository extends JpaRepository<UserAuthProvid
      * <p>계약이 순서를 정하지 않아 provider 이름 오름차순으로 고정한다. 정렬이 없으면 같은 계정의 응답이 조회마다 달라질 수 있다.
      */
     List<UserAuthProvider> findByUserIdOrderByProviderAsc(Long userId);
+
+    /** 탈퇴(API-013)가 연결된 소셜 로그인 수단을 모두 지운다(D-9). 연결이 남으면 탈퇴한 계정으로 소셜 로그인이 된다. */
+    void deleteByUserId(Long userId);
 }

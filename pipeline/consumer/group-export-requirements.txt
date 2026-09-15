@@ -1,0 +1,5 @@
+# Isolated one-time conversion environment; not installed in the running Consumer image.
+numpy==1.26.4
+pyarrow==19.0.1
+scikit-learn==1.9.0
+scipy==1.15.2

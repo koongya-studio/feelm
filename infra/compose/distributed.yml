@@ -171,6 +171,49 @@ services:
     volumes:
       - kafka_data:/tmp/kraft-combined-logs
 
+  consumer:
+    image: ${CONSUMER_IMAGE:-feelm-foldin-consumer:local}
+    build:
+      context: ../../pipeline/consumer
+      dockerfile: Dockerfile
+    container_name: feelm-foldin-consumer
+    restart: unless-stopped
+    network_mode: host
+    stop_grace_period: 30s
+    profiles:
+      - consumer
+
+    extra_hosts:
+      - "hdfs-namenode:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+      - "hdfs-datanode-1:${SERVICE_NODE_IP:?SERVICE_NODE_IP is required}"
+      - "hdfs-datanode-2:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+
+    environment:
+      CONSUMER_KAFKA_BOOTSTRAP_SERVERS: "${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}:9092"
+      CONSUMER_KAFKA_TOPIC: ${CONSUMER_KAFKA_TOPIC:-feelm.rating.v1}
+      CONSUMER_KAFKA_GROUP_ID: ${CONSUMER_KAFKA_GROUP_ID:-feelm-foldin-consumer-v1}
+      CONSUMER_POSTGRES_DSN: ${CONSUMER_POSTGRES_DSN:-}
+      CONSUMER_REDIS_URL: ${CONSUMER_REDIS_URL:-}
+      CONSUMER_MODEL_URI: ${CONSUMER_MODEL_URI:-}
+      CONSUMER_MAPPING_URI: ${CONSUMER_MAPPING_URI:-}
+      CONSUMER_METADATA_URI: ${CONSUMER_METADATA_URI:-}
+      CONSUMER_RETRY_ATTEMPTS: ${CONSUMER_RETRY_ATTEMPTS:-3}
+      CONSUMER_RETRY_BACKOFF_SECONDS: ${CONSUMER_RETRY_BACKOFF_SECONDS:-0.25}
+      CONSUMER_KAFKA_POLL_TIMEOUT_SECONDS: ${CONSUMER_KAFKA_POLL_TIMEOUT_SECONDS:-1.0}
+      CONSUMER_MAX_PAUSED_POLLS: ${CONSUMER_MAX_PAUSED_POLLS:-30}
+
+    depends_on:
+      hdfs-namenode:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+    security_opt:
+      - no-new-privileges:true
+
+    cap_drop:
+      - ALL
+
   node-exporter:
     image: prom/node-exporter:v1.11.1
     container_name: feelm-node-exporter-distributed
