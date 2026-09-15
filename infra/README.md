@@ -1095,7 +1095,7 @@ GitLab에서 관리하고 서버에서 직접 수정하지 않습니다. 현재 
 
 ### Prerequisites
 
-- `develop`은 보호 브랜치이며 직접 Push와 Force Push가 금지되어야 합니다.
+- `develop`과 `main`은 보호 브랜치이며 직접 Push와 Force Push가 금지되어야 합니다.
 - `e106-shell` Runner가 J15E106에서 Docker를 실행할 수 있어야 합니다.
 - PostgreSQL과 Redis가 J15E106의 같은 Compose 네트워크에서 healthy 상태여야 합니다.
 - 서비스 Nginx가 frontend 컨테이너와 같은 Compose 네트워크에 있어야 합니다.
@@ -1117,22 +1117,23 @@ GitLab Runner 설치 스크립트 또는 Runner가 의존하는 systemd·네트�
 이 Job은 호스트·실행 계정과 `docker --version`, `docker compose version`을 확인하며, 수동
 실행 실패는 기능 Pipeline을 차단하지 않습니다. 별도 정기 Scheduler는 운영하지 않습니다.
 
-데이터 저장소 관련 파일이 보호된 `develop`에 병합되면 `datastore-config-check` Job이
+데이터 저장소 관련 파일이 보호된 `main`에 반영되면 `datastore-config-check` Job이
 Compose와 셸 스크립트 문법을 검사하고, 포트를 게시하지 않은 임시 Redis에서 관리자
 인증·미인증 차단·조회 전용 ACL을 확인합니다. 이 Job을 통과해야 백엔드 이미지를 빌드하고
 배포할 수 있습니다. 검사에는 고정된 가짜 인증정보만 사용하며 GitLab CI/CD Variable의 실제
 Secret을 출력하거나 임시 Redis에 전달하지 않습니다. MR 코드를 서비스 호스트에서 실행하지
 않도록 같은 검사는 MR 제출 전에 로컬에서 `infra/scripts/verify-datastore-config.sh`로 실행합니다.
 
-Merge Request Pipeline은 백엔드 테스트와 Spotless 검사를 실행합니다. `develop`에 병합되면
-`backend-image` Job이 다음 형식의 변경 불가능한 이미지 태그를 Docker Hub에
-Push합니다.
+develop 대상 Merge Request Pipeline은 백엔드 테스트와 Spotless 검사를 실행합니다.
+develop 병합 결과에서는 서비스 이미지 빌드와 배포를 실행하지 않습니다. 검증된 develop을
+main에 반영하면 보호된 main Push Pipeline의 `backend-test`를 통과한 뒤 `backend-image`
+Job이 다음 형식의 변경 불가능한 이미지 태그를 Docker Hub에 Push합니다.
 
 ```text
 <DOCKERHUB_NAMESPACE>/feelm-backend:<CI_COMMIT_SHA>
 ```
 
-프론트엔드 변경이 포함된 `develop` Push에서는 `frontend-test` 통과 후 `frontend-image`가
+프론트엔드 변경이 포함된 보호된 `main` Push에서는 `frontend-test` 통과 후 `frontend-image`가
 다음 불변 태그를 Push합니다.
 
 ```text
@@ -1143,12 +1144,18 @@ Docker Hub 로그인에는 GitLab CI/CD Variables의 `DOCKERHUB_USERNAME`과
 `DOCKERHUB_TOKEN`을 사용합니다. 저장소 경로는 `DOCKERHUB_NAMESPACE`로 구성하며 토큰은
 Masked로 관리하고 로그에 출력하지 않습니다.
 
-이미지 빌드가 성공하면 보호된 `develop`의 Push Pipeline에서 `deploy-backend` 또는
+이미지 빌드가 성공하면 보호된 `main`의 Push Pipeline에서 `deploy-backend` 또는
 `deploy-frontend` Job이 자동 실행됩니다. MR, API 및 수동 Web Pipeline은 서비스 배포를
 실행하지 않습니다. 배포 직전에
-원격 `develop`의 HEAD가 Pipeline의 commit SHA와 같은지 확인하므로, 재시도되거나 대기하던
+원격 `main`의 HEAD가 Pipeline의 commit SHA와 같은지 확인하므로, 재시도되거나 대기하던
 과거 Pipeline이 최신 배포를 덮어쓰지 않습니다. 배포와 의존성 캐시 작업은 같은
 `resource_group`으로 직렬화합니다.
+
+새 commit이 같은 브랜치에 반영되면 이전 테스트와 이미지 빌드는 자동 취소할 수 있지만,
+배포와 캐시 승격·롤백은 중간 상태 손상을 막기 위해 취소하지 않습니다. `main` 배포 전에는
+main의 보호 브랜치 상태, `e106-shell` Runner의 Protected 설정과 `service` 환경 범위의
+Protected CI/CD Variable을 확인합니다. 이후 추가하는 서비스 자동 배포도 보호된 main Push만
+배포 기준으로 사용하며 develop, MR, API와 Web Pipeline에 배포 Job을 열지 않습니다.
 
 백엔드 배포 스크립트는 실행 중인 이미지 이름을 먼저 보관하고 후보 이미지를 기동한 뒤 최대 2분
 동안 Docker healthcheck와 컨테이너 내부 Actuator 응답을 확인합니다. 이어서 PostgreSQL과
@@ -1161,7 +1168,7 @@ GitLab Scheduler 또는 Runner 시스템 장애는 최대 2회 자동 재시도�
 배포 스크립트 오류, 애플리케이션 기동 실패와 헬스체크 실패는 자동 재시도하지 않습니다.
 배포 도중 강제 종료된 Job을 자동 재시도하면 실패한 후보를 이전 정상 이미지로 오인할 수
 있으므로 timeout은 원인과 서버 상태를 확인한 뒤 수동 복구 또는 재시도합니다. 그 밖의
-오류는 원인을 수정해 `develop`에 새로 병합하거나, 같은 commit을 다시 실행해야 할 명확한
+오류는 원인을 수정해 develop을 거쳐 `main`에 새로 반영하거나, 같은 commit을 다시 실행해야 할 명확한
 이유가 있을 때 GitLab에서 Job을 수동 재시도합니다. 자동 재시도된 과거 commit도 배포 직전
 HEAD 검사를 통과해야 합니다.
 
