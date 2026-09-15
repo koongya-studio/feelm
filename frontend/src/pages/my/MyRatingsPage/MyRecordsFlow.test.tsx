@@ -11,7 +11,8 @@
  * - 7.6 ⇢ 7.6-A: 시트에서 고친 한줄평이 목록과 영화 상세에 함께 보여야 한다
  *
  * 화면은 실제 라우트 패턴으로 함께 건다(PartyFlow.test.tsx와 같은 방식).
- * `api/users`만 가로챈다 — API-014가 실제 호출이라(MyDashboardPage.test.tsx).
+ * 실제 호출인 도메인만 가로챈다 — API-014 내 프로필(`api/users`)과, 연동(-379) 뒤의
+ * OTT 기준정보 · 구독(`api/otts`)이다. 나머지는 목업이라 그대로 둔다.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -26,6 +27,7 @@ import RecommendationHistoryPage from '../RecommendationHistoryPage';
 import { getMovieDetail } from '../../../api/movies';
 import { getMyFrames } from '../../../api/taste';
 import { getMyProfile } from '../../../api/users';
+import { mockOtts } from '../../../mocks/otts';
 import { resetSessionStore } from '../../../mocks/sessionStore';
 import { mockMyProfile } from '../../../mocks/user';
 import { ROUTE_PATTERN } from '../../../routes/paths';
@@ -34,9 +36,19 @@ vi.mock('../../../api/users', () => ({
   getMyProfile: vi.fn(),
 }));
 
+vi.mock('../../../api/otts', () => ({
+  getOtts: vi.fn(),
+  getMyOttIds: vi.fn(),
+  setMyOttIds: vi.fn(),
+}));
+
+const { getOtts, getMyOttIds } = await import('../../../api/otts');
+
 beforeEach(() => {
   resetSessionStore();
   vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
+  vi.mocked(getOtts).mockReset().mockResolvedValue(mockOtts);
+  vi.mocked(getMyOttIds).mockReset().mockResolvedValue([mockOtts[0].ottId, mockOtts[4].ottId]);
 });
 
 function LocationProbe() {
