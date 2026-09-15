@@ -23,6 +23,22 @@ class ArtifactError(ValueError):
 REVISION_PATTERN = re.compile(r"sha256:[0-9a-f]{64}\Z")
 
 
+def _types_match(actual: pa.DataType, expected: pa.DataType) -> bool:
+    """Compare list columns by element type only.
+
+    Spark writes ``list<element: float not null>`` while ``pa.list_(pa.float32())``
+    builds ``list<item: float>``.  The element field name and its nullability are
+    writer details that no artifact contract fixes, so comparing them rejects every
+    real Spark output.  The element *type* is part of the contract and still is
+    compared exactly, so float64 factors are still rejected.
+    """
+    if pa.types.is_list(expected) or pa.types.is_large_list(expected):
+        if not (pa.types.is_list(actual) or pa.types.is_large_list(actual)):
+            return False
+        return _types_match(actual.value_type, expected.value_type)
+    return actual == expected
+
+
 def _require_physical_types(table: pa.Table, expected: dict[str, pa.DataType], label: str) -> None:
     """Reject Parquet values that happen to coerce but violate the artifact schema."""
     for name, expected_type in expected.items():
@@ -30,7 +46,7 @@ def _require_physical_types(table: pa.Table, expected: dict[str, pa.DataType], l
             actual_type = table.schema.field(name).type
         except KeyError as exc:
             raise ArtifactError(f"{label} has missing columns") from exc
-        if actual_type != expected_type:
+        if not _types_match(actual_type, expected_type):
             raise ArtifactError(f"{label} has incompatible physical types")
 
 
