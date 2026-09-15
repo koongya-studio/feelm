@@ -1,10 +1,10 @@
 {
   "schemaVersion": "feelm-group-recipe/1",
   "policyVersion": "service-v1-20260913",
-  "status": "IMPLEMENTATION_RECIPE_NOT_EXECUTED",
+  "status": "LOCAL_REFERENCE_PARITY_PASS_HDFS_PENDING",
   "sourceGeometryVersion": "feelm-discovery-v2-r2",
   "targetGeometryVersion": "g913-gkt128-mean-v1",
-  "artifactBuildStatus": "NOT_BUILT",
+  "artifactBuildStatus": "LOCAL_REFERENCE_BUNDLE_BUILT",
   "sources": {
     "topAndPreprocessor": {
       "path": ".codex-tmp/fixed-k8-discovery-v2-20260913/outputs/fixed-k8-discovery-v2/feelm-discovery-v2-r2/final/bundle.pkl",
@@ -429,6 +429,14 @@
     "preserveActualRatingsKHistoryWatchedExclusions": true
   },
   "updates": {
+    "liveMappingCompatibility": {
+      "exactRevisionRequired": false,
+      "allowAddedServiceMovies": true,
+      "allowRemovedServiceMovies": true,
+      "addedMoviePolicy": "EXCLUDE_FROM_DISCOVERY_UNTIL_NEXT_IMMUTABLE_BUNDLE",
+      "blockDuplicateIds": true,
+      "blockExistingServiceIdReboundToDifferentTmdbId": true
+    },
     "newMovie": "frozen transform then specified fixed-axis float64 top nearest then child nearest; no fitted estimator predict or fit",
     "contentMetadataChanged": "new catalogVersion assignment using same frozen transform and centers; preserve prior version",
     "publicValuesOnlyChanged": "CONTENT_VECTOR_AND_GROUP_UNCHANGED",
@@ -456,8 +464,16 @@
     ]
   },
   "parity": {
-    "status": "NOT_RUN",
+    "status": "LOCAL_REFERENCE_PASS",
     "sourceRows": 237817,
+    "referenceTasteMismatch": 0,
+    "referenceChildMismatch": 0,
+    "referenceGroupMismatch": 0,
+    "singleMovieTransformSampleRows": 2048,
+    "singleMovieTasteMismatch": 0,
+    "singleMovieChildMismatch": 0,
+    "genreMissingExcludedRows": 30577,
+    "groupMappedRows": 207240,
     "maxAbsVectorDifference": 1e-10,
     "sourceAssignmentMismatchAllowed": 0,
     "singleVsBatchAssignmentsExact": true,
@@ -475,5 +491,5 @@
   },
   "arrayHashEncoding": "SHA256(str(dtype).encode + str(shape_tuple).encode + C-contiguous raw bytes); matches original dv2 array_hash",
   "trainingPerformedByThisRecipe": false,
-  "inferenceExecutedForThisDocument": false
+  "inferenceExecutedForThisDocument": true
 }

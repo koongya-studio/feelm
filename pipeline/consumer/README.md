@@ -12,6 +12,28 @@ Kafka의 평가·온보딩 이벤트를 받아 최신 사용자 입력으로 ALS
 모델을 읽을 때는 [공식 ALS 산출물 계약](../contracts/als-model-artifacts.md)을 따른다.
 연구용 item-only NPZ와 운영용 Parquet 계약을 혼용하지 않는다.
 
+추천 내부 8×128 그룹은 [그룹 서빙 산출물 계약](../contracts/group-serving-artifacts.md)을 따른다.
+`feelm_consumer.group_artifacts.load_group_bundle`은 로컬·HDFS immutable URI를 같은 방식으로 읽고,
+ALS/content와 `mapping_revision`이 다르거나 manifest·Parquet·배열 검증이 실패하면 시작을 거부한다.
+이 loader를 추천 정책에 연결하는 작업은 S15P21E106-415가 담당한다. 공개 팝콘 맛 ID나 DB 컬럼으로
+group ID를 쓰지 않는다.
+
+위 exact revision 비교는 함께 공개된 불변 ALS/content bundle 사이의 세대 검증이다. 현재 PostgreSQL
+live export는 `compare_live_mapping`으로 ID쌍을 비교하며 전체 revision 문자열 일치를 요구하지 않는다.
+순수 추가·삭제는 허용하고, 새 영화는 다음 bundle 전까지 assignment가 없어 발견 추천에서 제외한다.
+기존 `service_movie_id`가 다른 `tmdb_id`로 재결합됐거나 live ID가 중복이면 활성화를 거부한다.
+
+연구 pickle을 안전 번들로 바꾸는 1회성 writer는 실행 중인 Consumer 환경과 분리한다. 아래 요구사항으로
+별도 Python 3.12.5 환경을 만들고, 저장소의 Consumer 소스 경로를 `PYTHONPATH`에 추가해 실행한다. writer는
+recipe에 고정된 원본 바이트·SHA와 NumPy/SciPy/scikit-learn 버전을 먼저 검사한다. 실제 명령의 source,
+mapping, output URI에는 승인된 immutable 버전만 전달한다.
+
+```bash
+python -m pip install -r pipeline/consumer/group-export-requirements.txt
+PYTHONPATH=pipeline/consumer/src \
+  python pipeline/consumer/tools/export_group_bundle.py --help
+```
+
 movie metadata snapshot은 Spark 프로젝트에서 다음 명령으로 mapping snapshot 뒤에 immutable
 version URI로 공개한다. Consumer에는 해당 URI와 그 revision으로 만든 SERVING model만 함께
 전달한다. `latest` 별칭이나 서로 다른 revision 조합은 Consumer가 거부한다.
