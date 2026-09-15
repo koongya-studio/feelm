@@ -61,6 +61,8 @@ export const ROUTE_PATTERN = {
   // 설정 (업무 -307). 7.8만 탭 화면이고 나머지는 전체화면이다
   settings: '/my/settings',
   accountManage: '/my/settings/account',
+  /** 7.8-A-2. 와이어프레임에 없는 화면이다(CR-22, S15P21E106-391) */
+  passwordChange: '/my/settings/account/password',
   withdraw: '/my/settings/account/withdraw',
   privacySettings: '/my/settings/privacy',
   notificationSettings: '/my/settings/notifications',
@@ -147,6 +149,7 @@ export const path = {
   unratedMovies: () => ROUTE_PATTERN.unratedMovies,
   settings: () => ROUTE_PATTERN.settings,
   accountManage: () => ROUTE_PATTERN.accountManage,
+  passwordChange: () => ROUTE_PATTERN.passwordChange,
   withdraw: () => ROUTE_PATTERN.withdraw,
   privacySettings: () => ROUTE_PATTERN.privacySettings,
   notificationSettings: () => ROUTE_PATTERN.notificationSettings,

@@ -19,6 +19,13 @@
  * 따라온다(mocks/sessionStore.ts의 `profileEdit` 주석).
  *
  * 저장 후 7.1로 돌아간다(와이어프레임 이동표 `7.2 ⇢ 7.1`).
+ *
+ * **닉네임은 입력을 멈추면 서버에 사용 가능한지 물어본다**(API-016, 업무
+ * S15P21E106-391). 0.4는 `중복 확인` 버튼으로 묻지만 와이어프레임 7.2에는 그 버튼이
+ * 없고 글자수 카운터와 헬퍼만 있다. 버튼을 새로 그리는 대신 입력이 멎은 뒤 한 번
+ * 물어 헬퍼 자리에 결과를 적는다 — 보이는 요소는 그대로 두고 값만 채우는 쪽이다.
+ * 확인을 통과해도 저장(API-015)이 다시 검사하므로 `409 NICKNAME_DUPLICATED`는 여전히
+ * 올 수 있다(API-016 처리 규칙).
  */
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -33,6 +40,7 @@ import { CameraIcon } from '../../../components/Icon';
 import { getMyTaste } from '../../../api/taste';
 import { ApiError } from '../../../api/apiError';
 import {
+  checkNicknameAvailability,
   getMyIntroduction,
   getMyProfile,
   isValidNickname,
@@ -52,6 +60,32 @@ const SAVED_NOTICE_MS = 700;
 /** 한 줄 소개 상한. 와이어프레임에 없어 히어로에서 두 줄로 끊기는 길이로 잡았다 */
 const INTRODUCTION_MAX = 40;
 
+/** 와이어프레임 7.2의 헬퍼 문구 그대로다 */
+const NICKNAME_HINT = '한글, 영문, 숫자, _ 2~10자';
+
+/**
+ * 입력이 멎었다고 보는 시간(ms).
+ *
+ * 글자마다 부르면 닉네임 하나에 요청이 열 번 나간다. 0.4처럼 버튼으로 부르는 자리가
+ * 없어 이 화면만 시간으로 가른다.
+ */
+const NICKNAME_CHECK_DELAY_MS = 400;
+
+type NicknameState = 'checking' | 'available' | 'duplicated' | 'invalid' | 'failed';
+
+const NICKNAME_MESSAGE: Record<NicknameState, string> = {
+  checking: '확인하는 중이에요',
+  available: '사용할 수 있는 닉네임이에요',
+  duplicated: '이미 사용 중인 닉네임이에요',
+  invalid: `닉네임은 ${NICKNAME_HINT}예요`,
+  failed: '사용 가능한지 확인하지 못했어요',
+};
+
+/** 결과로 저장을 막는 것은 중복뿐이다. 나머지는 알리기만 하고 서버 판정에 맡긴다 */
+function blocksSave(state: NicknameState | null): boolean {
+  return state === 'duplicated';
+}
+
 /** 성별 표시명. 와이어프레임 7.2가 `여성`으로 적는다 */
 const GENDER_LABEL: Record<MyProfile['gender'], string> = {
   FEMALE: '여성',
@@ -67,6 +101,11 @@ export default function ProfileEditPage() {
   const [introduction, setIntroduction] = useState('');
   const [genres, setGenres] = useState<TasteGenre[]>([]);
   const [error, setError] = useState('');
+  /** 어느 닉네임에 대한 결과인지 함께 들고 있어야 입력이 바뀐 뒤의 결과를 쓰지 않는다 */
+  const [availability, setAvailability] = useState<{
+    nickname: string;
+    state: NicknameState;
+  } | null>(null);
   const [saved, setSaved] = useState(false);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
@@ -104,6 +143,52 @@ export default function ProfileEditPage() {
   }, [reloadCount]);
 
   /*
+   * 닉네임 사용 가능 확인(API-016).
+   *
+   * 지금 쓰는 닉네임 그대로면 물을 것이 없다 — 자기 것이라 중복으로 나오지 않지만
+   * 화면을 열자마자 요청이 나가는 것도 이상하다.
+   */
+  useEffect(() => {
+    if (!profile || nickname === profile.nickname) {
+      return;
+    }
+
+    let active = true;
+    const timer = setTimeout(() => {
+      /*
+       * 형식이 틀린 값은 부르지 않는다. 서버가 `INVALID_FORMAT`으로 같은 답을 주므로
+       * 왕복할 이유가 없다(0.4와 같다). 판정을 기다린 뒤에 하는 이유는 두 글자를
+       * 치는 도중에 `2~10자`라고 나무라지 않기 위해서다.
+       */
+      if (!isValidNickname(nickname)) {
+        setAvailability({ nickname, state: 'invalid' });
+
+        return;
+      }
+
+      setAvailability({ nickname, state: 'checking' });
+
+      checkNicknameAvailability(nickname)
+        .then(({ available, reason }) => {
+          if (!active) return;
+
+          setAvailability({
+            nickname,
+            state: available ? 'available' : reason === 'INVALID_FORMAT' ? 'invalid' : 'duplicated',
+          });
+        })
+        .catch(() => {
+          if (active) setAvailability({ nickname, state: 'failed' });
+        });
+    }, NICKNAME_CHECK_DELAY_MS);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [nickname, profile]);
+
+  /*
    * 저장 막대를 잠깐 보여주고 7.1로 돌아간다(이동표 `7.2 ⇢ 7.1`). 타이머를 effect에
    * 두는 이유는 사용자가 그 사이에 뒤로 가기를 눌러도 이동이 따라오지 않게 하기
    * 위해서다. `handleSave` 안에서 `setTimeout`을 걸면 화면을 떠난 뒤에 이동이 실행된다.
@@ -116,11 +201,27 @@ export default function ProfileEditPage() {
     return () => clearTimeout(timer);
   }, [saved, navigate]);
 
+  /*
+   * 확인한 뒤 닉네임을 고쳤으면 그 결과는 지금 값의 것이 아니다(0.4와 같다). 지금 쓰는
+   * 닉네임으로 되돌린 경우도 물어본 적이 없으니 결과가 없다.
+   */
+  const nicknameState =
+    nickname !== profile?.nickname && availability?.nickname === nickname
+      ? availability.state
+      : null;
+
   function handleSave() {
     if (!profile) return;
 
     if (!isValidNickname(nickname)) {
-      setError('닉네임은 한글 · 영문 · 숫자 · _ 2~10자예요');
+      setError(NICKNAME_MESSAGE.invalid);
+
+      return;
+    }
+
+    // 이미 서버가 안 된다고 답한 값이다. 보내 봐야 `409`로 돌아온다
+    if (blocksSave(nicknameState)) {
+      setError(NICKNAME_MESSAGE.duplicated);
 
       return;
     }
@@ -222,8 +323,17 @@ export default function ProfileEditPage() {
               setError('');
             }}
             trailing={`${[...nickname].length}/${NICKNAME_MAX}`}
-            hint="한글, 영문, 숫자, _ 2~10자"
-            error={error || undefined}
+            hint={
+              nicknameState && nicknameState !== 'duplicated' && nicknameState !== 'invalid'
+                ? NICKNAME_MESSAGE[nicknameState]
+                : NICKNAME_HINT
+            }
+            error={
+              error ||
+              (nicknameState === 'duplicated' || nicknameState === 'invalid'
+                ? NICKNAME_MESSAGE[nicknameState]
+                : undefined)
+            }
           />
 
           <TextField

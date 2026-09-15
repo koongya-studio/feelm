@@ -8,6 +8,10 @@
  * **저장 위치가 바뀌었다.** 305 첫 구현은 세션 저장소에 썼는데, API-014가 실제 호출로
  * 바뀌면서(업무 -364) 로컬에만 쓰면 7.1이 옛 닉네임을 보여주게 된다. 지금은 API-015로
  * 나간다. 그래서 이 테스트도 "저장소에 남았나"가 아니라 **"무엇을 보냈나"**를 본다.
+ *
+ * 닉네임 사용 가능 확인(API-016)은 입력이 멎은 뒤에 나간다(업무 -391). 시간으로 가르는
+ * 동작이라 "언제 부르지 않는가"를 함께 고정한다 — 지금 쓰는 닉네임 그대로거나 형식이
+ * 틀린 값이면 부르지 않는다.
  */
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
@@ -15,6 +19,7 @@ import ProfileEditPage from './index';
 import { renderWithRouter } from '../../../test/render';
 import { ApiError } from '../../../api/apiError';
 import {
+  checkNicknameAvailability,
   getMyIntroduction,
   getMyProfile,
   saveMyIntroduction,
@@ -32,6 +37,7 @@ vi.mock('../../../api/users', async (importOriginal) => {
 
   return {
     isValidNickname: actual.isValidNickname,
+    checkNicknameAvailability: vi.fn(),
     getMyProfile: vi.fn(),
     getMyIntroduction: vi.fn(),
     updateMyProfile: vi.fn(),
@@ -48,6 +54,9 @@ beforeEach(() => {
   vi.mocked(getMyIntroduction).mockReset().mockResolvedValue(BASE_INTRO);
   vi.mocked(updateMyProfile).mockReset().mockResolvedValue(mockMyProfile);
   vi.mocked(saveMyIntroduction).mockReset().mockResolvedValue(undefined);
+  vi.mocked(checkNicknameAvailability)
+    .mockReset()
+    .mockResolvedValue({ nickname: '난다킹', available: true, reason: null });
 });
 
 async function renderEdit() {
@@ -95,7 +104,7 @@ describe('7.2 프로필 편집', () => {
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      '닉네임은 한글 · 영문 · 숫자 · _ 2~10자예요',
+      '닉네임은 한글, 영문, 숫자, _ 2~10자예요',
     );
     expect(updateMyProfile).not.toHaveBeenCalled();
     expect(screen.getByTestId('location').textContent).toBe('/my/profile/edit');
@@ -117,6 +126,60 @@ describe('7.2 프로필 편집', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('이미 사용 중인 닉네임입니다.');
     expect(screen.getByTestId('location').textContent).toBe('/my/profile/edit');
+  });
+
+  it('입력이 멎으면 닉네임을 쓸 수 있는지 서버에 물어본다', async () => {
+    await renderEdit();
+
+    fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '난다킹' } });
+
+    await waitFor(() => expect(checkNicknameAvailability).toHaveBeenCalledWith('난다킹'));
+    expect(await screen.findByText('사용할 수 있는 닉네임이에요')).toBeInTheDocument();
+  });
+
+  it('이미 쓰는 닉네임이면 알리고 저장을 보내지 않는다', async () => {
+    vi.mocked(checkNicknameAvailability).mockResolvedValue({
+      nickname: '무비버디',
+      available: false,
+      reason: 'DUPLICATED',
+    });
+
+    await renderEdit();
+
+    fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '무비버디' } });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('이미 사용 중인 닉네임이에요');
+
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+
+    expect(updateMyProfile).not.toHaveBeenCalled();
+    expect(screen.getByTestId('location').textContent).toBe('/my/profile/edit');
+  });
+
+  it('지금 쓰는 닉네임으로 되돌리면 확인 결과도 사라진다', async () => {
+    await renderEdit();
+
+    const field = screen.getByLabelText('닉네임');
+
+    fireEvent.change(field, { target: { value: '난다킹' } });
+    expect(await screen.findByText('사용할 수 있는 닉네임이에요')).toBeInTheDocument();
+
+    // 자기 닉네임은 중복으로 나오지 않지만 물어볼 일도 아니다
+    fireEvent.change(field, { target: { value: BASE_NICKNAME } });
+
+    expect(await screen.findByText('한글, 영문, 숫자, _ 2~10자')).toBeInTheDocument();
+    expect(checkNicknameAvailability).toHaveBeenCalledTimes(1);
+  });
+
+  it('형식이 틀린 값은 서버에 묻지 않는다', async () => {
+    await renderEdit();
+
+    fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '난' } });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '닉네임은 한글, 영문, 숫자, _ 2~10자예요',
+    );
+    expect(checkNicknameAvailability).not.toHaveBeenCalled();
   });
 
   it('연령대는 계약의 생년월일에서 만든다', async () => {
