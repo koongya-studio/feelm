@@ -36,6 +36,8 @@ job_io = load('gitlab_job_io', 'ci-job-io.py')
 runtime = load('gitlab_runtime_contract', 'ci-backend-runtime-contract.py')
 frontend_boundary = load('gitlab_frontend_boundary', 'ci-frontend-mr-boundary.py')
 frontend_runner = load('gitlab_frontend_runner', 'ci-frontend-mr-runner.py')
+pipeline_boundary = load('gitlab_pipeline_boundary', 'ci-pipeline-mr-boundary.py')
+pipeline_runner = load('gitlab_pipeline_runner', 'ci-pipeline-mr-runner.py')
 CONFIG = Path('/etc/feelm-ci222/gitlab-adapter.json')
 GITLAB_URL = 'https://lab.ssafy.com'
 PROJECT_PATH = 's15-bigdata-dist-sub1/S15P21E106'
@@ -45,6 +47,12 @@ EXPECTED_SCRIPT = ['cd backend', './gradlew clean test spotlessCheck --no-daemon
 FRONTEND_JOB_NAME = 'frontend-mr-test'
 FRONTEND_EXPECTED_SCRIPT = [
     'cd frontend', 'npm ci', 'npm run lint', 'npm run format:check', 'npm run build',
+]
+PIPELINE_JOB_NAME = 'pipeline-mr-test'
+PIPELINE_EXPECTED_SCRIPT = [
+    'cd pipeline/spark', 'uv sync --frozen', 'uv run ruff check .', 'uv run pytest',
+    'uv run python -m jobs.batch.als_baseline --help',
+    'uv run python -m jobs.batch.parquet_roundtrip --help',
 ]
 CACHE_PREPARE_JOB = 'backend-cache-prepare'
 CACHE_PREPARE_SCRIPT = ['echo Prepare verified backend dependency cache for this MR revision']
@@ -128,6 +136,7 @@ def validate_job_response(response):
     policies = {
         JOB_NAME: (JOB_STAGE, EXPECTED_SCRIPT, 'backend'),
         FRONTEND_JOB_NAME: (JOB_STAGE, FRONTEND_EXPECTED_SCRIPT, 'frontend'),
+        PIPELINE_JOB_NAME: (JOB_STAGE, PIPELINE_EXPECTED_SCRIPT, 'pipeline'),
         CACHE_PREPARE_JOB: ('verify', CACHE_PREPARE_SCRIPT, 'cache'),
     }
     policy = policies.get(info.get('name')) if isinstance(info, dict) else None
@@ -322,7 +331,7 @@ def prepare_candidate(context, job, mr):
 
 
 def normalized_service_archive(payload, service):
-    if service not in ('backend', 'frontend'):
+    if service not in ('backend', 'frontend', 'pipeline'):
         raise PolicyError('Unsupported source service')
     if not payload or len(payload) > MAX_HTTP_ARCHIVE:
         raise PolicyError('Repository archive exceeds policy limit')
@@ -340,8 +349,13 @@ def normalized_service_archive(payload, service):
                 if len(parts) < 2: raise PolicyError('Archive member is outside its root')
                 name = '/'.join(parts[1:])
                 backend_contract = name in ('infra', 'infra/compose', 'infra/compose/service.yml')
-                if name != service and not name.startswith(service + '/') \
-                        and not (service == 'backend' and backend_contract):
+                in_scope = (name == service or name.startswith(service + '/'))
+                if service == 'backend' and backend_contract:
+                    in_scope = True
+                if service == 'pipeline':
+                    in_scope = (name == 'pipeline' or name == 'pipeline/spark'
+                                or name.startswith('pipeline/spark/'))
+                if not in_scope:
                     if service == 'frontend':
                         raise PolicyError('Repository archive contains out-of-scope source')
                     continue
@@ -374,8 +388,10 @@ def normalized_service_archive(payload, service):
     try:
         if service == 'backend':
             job_io.source_plan(result, digest)
-        else:
+        elif service == 'frontend':
             frontend_boundary.source_plan(result, digest)
+        else:
+            pipeline_boundary.source_plan(result, digest)
     except ValueError as exc:
         raise PolicyError(str(exc)) from exc
     return result, digest
@@ -412,7 +428,7 @@ def fetch_source(context, service='backend'):
 
 
 def stop_owner_unit(unit):
-    if not re.fullmatch(r'ci222-owner-[a-f0-9]{12}\.service', unit):
+    if not re.fullmatch(r'ci(?:222|352)-owner-[a-f0-9]{12}\.service', unit):
         raise ValueError('Refusing unrelated owner unit')
     result = subprocess.run(['systemctl', 'stop', unit], capture_output=True, timeout=120)
     if result.returncode != 0:
@@ -460,6 +476,8 @@ def run_job(response, config_path=CONFIG, opener=None):
     try:
         if context['service'] == 'frontend':
             return frontend_runner.start(payload, digest, started)
+        if context['service'] == 'pipeline':
+            return pipeline_runner.start(payload, digest, started)
         return safety.start(prepared, prepared, 'backend', payload, digest, started)
     finally:
         signal.signal(signal.SIGTERM, previous_term); signal.signal(signal.SIGINT, previous_int)

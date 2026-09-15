@@ -26,6 +26,18 @@ MR 61의 신규 메일 의존성을 포함하는 오프라인 캐시 갱신과 R
 프론트 변경 경로별 Job 생성, 인증된 frontend archive와 고정 Node 실행 정책, 서버 적용 및
 의존성·이미지 갱신 절차를 정의한다.
 
+Pipeline MR 검사는 [GitLab MR 전용 어댑터](GITLAB-MR-ADAPTER.md)의
+`Pipeline MR 실행 경계 (S15P21E106-352)` 절을 따른다. 인증된 `pipeline/spark` archive만
+고정 Python 3.10/Java 21 이미지와 read-only uv 캐시로 전달하며 외부 네트워크 없이
+ruff, pytest와 배치 진입점 help 검사를 수행한다. 서버 이미지·캐시 준비 및 Runner 실제 적용은
+저장소 구현과 분리된 운영자 검증 단계다.
+
+S15P21E106-424의 테스트 실행기는 전체 `test_*.py`를 빠른 비-Spark 계층과 세 Spark
+계층으로 빠짐없이 분할하고, 각 계층을 별도 Python 프로세스에서 직렬 실행한다. 분류 기준과
+로컬 재현 명령은 [`pipeline/spark/tests/README.md`](../../pipeline/spark/tests/README.md)를
+따른다. 각 계층은 시작 마커와 wall time을, Linux에서는 CPU time·최대 RSS·block I/O도
+출력한다. Runner 자원 한도와 테스트별 Spark master 값은 변경하지 않는다.
+
 [서버 manager 파일럿](SERVER-MANAGER-PILOT.md)은 별도 임시 폴더에서 진행했다.
 자원 제어와 readonly/private sysfs 준비를 보완하여 고정 경계 probe,
 백엔드 82개/spotlessCheck 및 취소/timeout fixture가 통과했다. 운영 설정은 유지했다.

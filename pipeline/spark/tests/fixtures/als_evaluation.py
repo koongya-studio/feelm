@@ -22,10 +22,10 @@ CANDIDATE_SCHEMA = (
 @pytest.fixture(scope="module")
 def spark():
     session = (
-        SparkSession.builder.master("local[2]")
+        SparkSession.builder.master("local[1]")
         .appName("als-evaluation-test")
         .config("spark.ui.enabled", "false")
-        .config("spark.sql.shuffle.partitions", "2")
+        .config("spark.sql.shuffle.partitions", "1")
         .getOrCreate()
     )
     session.sparkContext.setLogLevel("ERROR")

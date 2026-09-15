@@ -1,0 +1,37 @@
+pipeline-mr-test:
+  stage: test
+  tags: [e106-mr-isolated]
+  dependencies: []
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - cd pipeline/spark
+    - uv sync --frozen
+    - uv run ruff check .
+    - uv run pytest
+    - uv run python -m jobs.batch.als_baseline --help
+    - uv run python -m jobs.batch.parquet_roundtrip --help
+  resource_group: pipeline-mr-isolated
+  interruptible: true
+  timeout: 30m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
+      changes:
+        - pipeline/spark/**/*.py
+        - pipeline/spark/tests/**/*
+        - pipeline/spark/pyproject.toml
+        - pipeline/spark/uv.lock
+        - pipeline/spark/.python-version
+        - .gitlab-ci.yml
+        - .gitlab/ci/common.yml
+        - .gitlab/ci/pipeline.yml
+        - .gitattributes
+        - infra/scripts/ci-pipeline-mr-*.py
+        - infra/scripts/test_ci_pipeline_mr.py
+        - infra/scripts/ci-gitlab-job-adapter.py
+        - infra/scripts/ci-gitlab-custom-executor.py
+        - infra/scripts/ci-gitlab-server-install.py
+        - infra/scripts/ci-bounded-output.py
+        - infra/scripts/systemd/feelm-ci222-gitlab-runner.service
+        - infra/scripts/test_ci_gitlab_job_adapter.py
+        - infra/scripts/test_ci_config.py
