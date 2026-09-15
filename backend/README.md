@@ -124,6 +124,12 @@ Topic 확인 방법은 [인프라 README](../infra/README.md#local-kafka)를 따
 
 dev 실행 예시: `./gradlew bootRun --args='--spring.profiles.active=dev'`
 
+배포 필수 변수의 이름과 GitLab CI/CD Variable 또는 검토된 dev 기본값의 대응은
+[`config/deployment-environment.properties`](./config/deployment-environment.properties)에서
+관리합니다. `application.yml` 또는 `application-dev.yml`에 기본값 없는 변수를 추가할 때는
+`.env.example`과 이 계약도 함께 변경해야 하며, develop 대상 MR의 백엔드 테스트가 누락을
+차단합니다. 실제 Secret 값은 계약 파일에 기록하지 않습니다.
+
 ## OpenAPI와 Swagger UI
 
 OpenAPI JSON과 Swagger UI는 기본적으로 비활성화되어 있습니다. 로컬에서 확인할 때만

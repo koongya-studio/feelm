@@ -1208,6 +1208,14 @@ GitLab에서 관리하고 서버에서 직접 수정하지 않습니다. 현재 
 `AUTH_MOCK_ENABLED`입니다. 컨테이너에서는 `postgres:5432`와 `redis:6379`를 사용합니다.
 실제 값은 저장소, 이미지와 MR에 포함하지 않습니다.
 
+백엔드 설정의 필수 변수 계약은 `backend/config/deployment-environment.properties`에
+변수 이름만 기록합니다. develop 대상 MR에서는 Spring 설정, `.env.example`, 계약과 Compose
+주입 구조가 일치하는지 정적으로 검사합니다. 보호된 `main` Push에서는
+`backend-env-check`가 `service` 환경 범위에서 필요한 GitLab CI/CD Variable이 비어 있지
+않은지 확인하며, 통과해야 `backend-image`가 시작됩니다. 실패 로그에는 누락된 변수 이름만
+남고 값은 출력하지 않습니다. 변수의 Protected·Masked·환경 범위 속성은 GitLab 설정에서
+별도로 검토합니다.
+
 ### Pipeline and Deployment
 
 `runner-check`는 보호된 `develop`의 Push Pipeline에서 `.gitlab-ci.yml`, 공통 CI Job 설정,
@@ -1227,7 +1235,7 @@ Secret을 출력하거나 임시 Redis에 전달하지 않습니다. MR 코드�
 
 develop 대상 Merge Request Pipeline은 백엔드 테스트와 Spotless 검사를 실행합니다.
 develop 병합 결과에서는 서비스 이미지 빌드와 배포를 실행하지 않습니다. 검증된 develop을
-main에 반영하면 보호된 main Push Pipeline의 `backend-test`를 통과한 뒤 `backend-image`
+main에 반영하면 보호된 main Push Pipeline의 `backend-test`와 `backend-env-check`를 통과한 뒤 `backend-image`
 Job이 다음 형식의 변경 불가능한 이미지 태그를 Docker Hub에 Push합니다.
 
 ```text
