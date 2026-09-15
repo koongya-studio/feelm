@@ -55,6 +55,23 @@ body::before {
   pointer-events: none;
 }
 
+/*
+ * 3.3 새 취향 리포트 발급 화면이 떠 있는 동안의 벽. 화면이 `pages/reports/ReportIssuedPage/useReportWall`로
+ * 켜고 끈다(업무 -321).
+ *
+ * **버건디는 여기 한 곳에서만 칠한다.** 화면 요소에도 그라데이션을 깔면 요소가 끝나는 자리에서
+ * 어두운 끝과 밝은 벽이 맞닿아 선이 생긴다. `background` 줄임 속성을 쓰면 위의
+ * `background-attachment: fixed`가 풀려 그라데이션이 body 높이마다 다시 시작하므로 색과 그림만 바꾼다.
+ */
+body[data-wall='report'] {
+  background-color: #3c0006;
+  background-image: var(--gradient-report-wall);
+}
+
+body[data-wall='report']::before {
+  display: none;
+}
+
 /* 그림자는 배경이므로 앱 콘텐츠가 그 위에 온다 */
 #root {
   position: relative;

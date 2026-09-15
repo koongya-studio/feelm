@@ -65,6 +65,10 @@ describe('2.1 → 3.3 → 3.4 ⇢ 3.1', () => {
     expect(await screen.findByText('2026년 상반기 취향 필름을 인화했어요')).toBeInTheDocument();
     expect(screen.getByText('지난 반기보다 스릴러 취향이 12% 증가했어요')).toBeInTheDocument();
 
+    // 인화 연출은 건너뛸 수 있고, 건너뛰면 버튼이 사라진다
+    fireEvent.click(screen.getByRole('button', { name: '건너뛰기' }));
+    expect(screen.queryByRole('button', { name: '건너뛰기' })).toBeNull();
+
     fireEvent.click(screen.getByRole('button', { name: '리포트 보기' }));
 
     await waitFor(() => expect(location()).toBe('/reports/301'));
@@ -91,7 +95,7 @@ describe('2.1 → 3.3 → 3.4 ⇢ 3.1', () => {
       '42',
     );
     // 4컷의 감독 칸과 감독 목록에 한 번씩
-    expect(screen.getAllByText('크리스토퍼 놀란')).toHaveLength(2);
+    expect(screen.getAllByText('웨스 앤더슨')).toHaveLength(2);
     expect(screen.getByText('계획형 캐릭터 영화 12편에 ★4 이상')).toBeInTheDocument();
     expect(screen.getByText('+4% 신규')).toBeInTheDocument();
     expect(screen.getByText('−6%')).toBeInTheDocument();
@@ -159,10 +163,21 @@ describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
     await waitFor(() => expect(location()).toBe('/my/reports'));
   });
 
-  it('3.1의 취향 리포트 보기도 7.3으로 간다', async () => {
+  it('3.1의 리포트 버튼은 하나다. 새 리포트를 받기 전에는 3.3, 받은 뒤에는 7.3으로 간다', async () => {
+    const first = renderApp([ROUTE_PATTERN.film]);
+
+    fireEvent.click(await screen.findByRole('button', { name: '새 취향 리포트 받기' }));
+    expect(screen.queryByRole('button', { name: '취향 리포트 보기' })).toBeNull();
+    await waitFor(() => expect(location()).toBe('/reports/301/new'));
+
+    fireEvent.click(await screen.findByRole('button', { name: '리포트 보기' }));
+    await waitFor(() => expect(location()).toBe('/reports/301'));
+    first.unmount();
+
     renderApp([ROUTE_PATTERN.film]);
 
     fireEvent.click(await screen.findByRole('button', { name: '취향 리포트 보기' }));
+    expect(screen.queryByRole('button', { name: '새 취향 리포트 받기' })).toBeNull();
     expect(location()).toBe('/my/reports');
   });
 
