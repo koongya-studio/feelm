@@ -34,6 +34,7 @@ import TextField from '../../../components/TextField';
 import Wordmark from '../../../components/Wordmark';
 import { resendVerificationMail } from '../../../api/auth';
 import { ApiError } from '../../../api/apiError';
+import { failureDescription } from '../../../components/StatusView/failure';
 import { useAuth } from '../../../contexts/authContext';
 import { path } from '../../../routes/paths';
 import { isOAuthConfigured, startOAuth } from '../../../utils/oauth';
@@ -80,12 +81,13 @@ export default function LoginPage() {
       void navigate(user.onboardingCompleted ? path.home() : path.onboardingTaste());
     } catch (error) {
       const code = error instanceof ApiError ? error.code : '';
-      const fallback =
-        error instanceof ApiError
-          ? error.message
-          : '로그인하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 
-      setFailure({ code, message: MESSAGE[code] ?? fallback });
+      /*
+       * 화면이 정한 코드 밖의 실패는 다른 화면과 같은 기준으로 원인을 말한다(업무 -374).
+       * 서버에 닿지 못한 것과 서버가 처리하지 못한 것을 가르고, 그 밖의 거절은 서버
+       * 문구를 그대로 쓴다.
+       */
+      setFailure({ code, message: MESSAGE[code] ?? failureDescription(error) });
     } finally {
       setPending(false);
     }

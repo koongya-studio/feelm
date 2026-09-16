@@ -12,13 +12,20 @@
  * 실패 세 가지도 함께 본다. 같은 401·403·429라도 사용자가 다음에 할 일이 다르고,
  * 미인증 계정만 인증 메일 재발송(API-003)을 내보내야 한다.
  *
+ * 그 밖의 실패는 다른 화면과 같은 기준으로 원인을 말한다(업무 -374). 서버에 닿지 못한
+ * 것과 서버가 처리하지 못한 것을 가르고, 그 밖의 거절은 서버 문구를 그대로 쓴다.
+ *
  * `아이디 찾기`와 `비밀번호 찾기`가 같은 0.7로 가면서 탭만 다르다는 것도 함께 본다.
  * 경로가 같아 눈으로는 구분되지 않는 부분이다.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import LoginPage from './index';
-import { ApiError } from '../../../api/apiError';
+import { ApiError, NETWORK_ERROR } from '../../../api/apiError';
+import {
+  NETWORK_FAILURE_DESCRIPTION,
+  SERVER_FAILURE_DESCRIPTION,
+} from '../../../components/StatusView/failure';
 import { AuthProvider } from '../../../contexts/AuthProvider';
 import { renderWithRouter } from '../../../test/render';
 
@@ -140,6 +147,40 @@ describe('0.6 로그인', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('로그인 시도가 너무 많습니다.');
     expect(screen.queryByRole('button', { name: '인증 메일 다시 보내기' })).toBeNull();
+  });
+
+  it('서버에 닿지 못하면 연결을 확인하라고 안내한다', async () => {
+    rejectWith(0, NETWORK_ERROR);
+    renderLogin();
+
+    fillCredentials();
+    click('로그인');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(NETWORK_FAILURE_DESCRIPTION);
+    expect(location()).toBe('/login');
+  });
+
+  it('서버가 처리하지 못하면 서버 문구 대신 잠시 후 다시 시도하라고 안내한다', async () => {
+    rejectWith(500, 'INTERNAL_ERROR');
+    renderLogin();
+
+    fillCredentials();
+    click('로그인');
+
+    const alert = await screen.findByRole('alert');
+
+    expect(alert).toHaveTextContent(SERVER_FAILURE_DESCRIPTION);
+    expect(alert).not.toHaveTextContent('서버가 준 문구');
+  });
+
+  it('화면이 정하지 않은 거절은 서버가 준 사유를 그대로 보여준다', async () => {
+    rejectWith(400, 'VALIDATION_FAILED');
+    renderLogin();
+
+    fillCredentials();
+    click('로그인');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('서버가 준 문구');
   });
 
   it('소셜 로그인은 아직 누를 수 없다', () => {
