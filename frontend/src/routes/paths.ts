@@ -52,12 +52,6 @@ export const ROUTE_PATTERN = {
   publicProfile: '/users/:userId',
   tasteCompare: '/users/:userId/compare',
 
-  // MY 기록 목록 (업무 -306). 7.5 · 7.6 · 7.7. 7.6-A 한줄평 관리는 7.6 위의 시트라 경로가 없다
-  recommendationHistory: '/my/recommendations',
-  myRatings: '/my/ratings',
-  /** 7.7. 7.6과 같은 화면의 다른 탭이지만 이동표가 `7.6 → 7.7`로 따로 적어 경로를 나눈다 */
-  unratedMovies: '/my/ratings/unrated',
-
   // 설정 (업무 -307). 7.8만 탭 화면이고 나머지는 전체화면이다
   settings: '/my/settings',
   accountManage: '/my/settings/account',
@@ -137,6 +131,11 @@ export const path = {
   search: () => ROUTE_PATTERN.search,
   party: () => ROUTE_PATTERN.party,
   my: () => ROUTE_PATTERN.my,
+  /**
+   * MY의 `안 남긴 영화` 탭. 탭은 화면 안 전환이라 라우트가 아니고 주소의 `?tab=`이다.
+   * 화면 밖에서 이 탭으로 보내는 곳이 EXT-05뿐이라 여기 한 줄로 둔다(업무 -495).
+   */
+  myUnrated: () => `${ROUTE_PATTERN.my}?tab=unrated`,
   ottManage: () => ROUTE_PATTERN.ottManage,
 
   profileEdit: () => ROUTE_PATTERN.profileEdit,
@@ -144,9 +143,6 @@ export const path = {
   publicProfile: (userId: string | number) => `/users/${userId}`,
   tasteCompare: (userId: string | number) => `/users/${userId}/compare`,
 
-  recommendationHistory: () => ROUTE_PATTERN.recommendationHistory,
-  myRatings: () => ROUTE_PATTERN.myRatings,
-  unratedMovies: () => ROUTE_PATTERN.unratedMovies,
   settings: () => ROUTE_PATTERN.settings,
   accountManage: () => ROUTE_PATTERN.accountManage,
   passwordChange: () => ROUTE_PATTERN.passwordChange,

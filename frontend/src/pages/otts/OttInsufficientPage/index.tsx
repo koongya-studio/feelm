@@ -88,7 +88,7 @@ export default function OttInsufficientPage() {
         </div>
 
         <div className={styles.actions}>
-          <Button onClick={() => void navigate(path.unratedMovies())}>영화 평가하러 가기</Button>
+          <Button onClick={() => void navigate(path.myUnrated())}>영화 평가하러 가기</Button>
           <Button variant="secondary" onClick={() => void navigate(path.film())}>
             취향 영화 추가하기
           </Button>

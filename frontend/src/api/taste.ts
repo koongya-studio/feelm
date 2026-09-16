@@ -62,7 +62,7 @@ export async function getPopcornBucket(): Promise<PopcornBucket> {
  * API-042 내 필름(프레임 목록) 조회 · GET /api/v1/users/me/frames
  *
  * 계약의 `flavorCode` · `cursor` · `size` 질의 인자는 쓰는 화면이 생기면 추가한다.
- * 3.1 · 7.1 · 7.6은 첫 페이지만 쓴다(기본 20개).
+ * 3.1은 첫 페이지만 쓴다(기본 20개).
  */
 export async function getMyFrames(): Promise<FrameList> {
   return request<FrameList>('/users/me/frames');

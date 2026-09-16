@@ -36,7 +36,7 @@ const NOTIFICATION_SETTINGS_PATH = '/users/me/notification-settings';
  * 차단 목록 한 번에 받는 수. 계약의 상한이다(API-022 `size`는 1 ~ 50).
  *
  * `[?]` 7.8-D에는 더 보기가 없다. 상한을 넘게 차단한 사람은 화면에 나오지 않으므로
- * `hasNext`면 `N명 차단 중`을 감춘다(7.5 `총 N편`과 같은 처리).
+ * `hasNext`면 `N명 차단 중`을 감춘다 — 받은 목록을 세어 총수인 척하지 않는다.
  */
 const BLOCK_PAGE_SIZE = 50;
 

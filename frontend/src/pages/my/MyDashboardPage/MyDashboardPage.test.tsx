@@ -4,26 +4,28 @@
  * 메뉴는 눌러서 어디로 가는지가 전부다. 링크 주소가 어긋나도 화면은 멀쩡해 보이므로
  * 목적지를 고정한다(screen-spec-my.md 2장).
  *
- * 사용자 시안(2026-09-16)으로 **평가 · 추천 기록이 화면 안의 탭이 됐다.** 눌러도 다른
- * 화면으로 가지 않고 아래 피드만 바뀐다. 그래서 이 파일이 잡을 것이 둘로 늘었다.
+ * 사용자 시안(2026-09-16)으로 **평가 · 안 남긴 영화 · 추천 기록이 화면 안의 탭이 됐다.**
+ * 눌러도 다른 화면으로 가지 않고 아래 피드만 바뀐다. 7.5 · 7.6 · 7.7 화면은 지웠다
+ * (업무 -495). 그래서 이 파일이 잡을 것이 둘로 늘었다.
  *
  * - 남은 이동(`설정` · `4컷 리포트` · `편집`)의 목적지. `OTT 관리`는 7.8 설정 안으로
  *   옮겨 이 화면에 없다(`SettingsFlow.test.tsx`가 잡는다)
- * - 탭을 눌렀을 때 **그 탭의 데이터**가 그려지는지. 평가는 API-039, 추천은 API-048이다.
- *   취향 필름(API-042)을 평가 · 추천인 것처럼 쓰면 여기서 걸린다
+ * - 탭을 눌렀을 때 **그 탭의 데이터**가 그려지는지. 평가는 API-039, 안 남긴 영화는
+ *   API-034, 추천은 API-048이다. 취향 필름(API-042)을 이 셋인 것처럼 쓰면 여기서 걸린다
  *
- * `api/users` · `api/watch` · `api/recommendations`를 가로챈다. API-014가 실제 호출이라
- * (업무 -364) 가로채지 않으면 테스트가 네트워크를 두드린다.
+ * `api/users` · `api/watch` · `api/recommendations` · `api/otts`를 가로챈다. API-014와
+ * OTT 기준정보가 실제 호출이라(업무 -364 · -379) 가로채지 않으면 네트워크를 두드린다.
  */
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { fireEvent, screen, within } from '@testing-library/react';
 import MyDashboardPage from './index';
 import { renderWithRouter } from '../../../test/render';
 import { getMyProfile } from '../../../api/users';
-import { getMyRatings } from '../../../api/watch';
+import { getMyRatings, getWatchRecords } from '../../../api/watch';
+import { getOtts } from '../../../api/otts';
 import { getRecommendationHistory } from '../../../api/recommendations';
 import { mockMyProfile } from '../../../mocks/user';
-import type { MyRatingListItem } from '../../../types/watch';
+import type { MyRatingListItem, WatchRecordListItem } from '../../../types/watch';
 import type { RecommendationHistory } from '../../../types/recommendation';
 
 vi.mock('../../../api/users', () => ({
@@ -32,6 +34,11 @@ vi.mock('../../../api/users', () => ({
 
 vi.mock('../../../api/watch', () => ({
   getMyRatings: vi.fn(),
+  getWatchRecords: vi.fn(),
+}));
+
+vi.mock('../../../api/otts', () => ({
+  getOtts: vi.fn(),
 }));
 
 vi.mock('../../../api/recommendations', () => ({
@@ -56,6 +63,21 @@ const ratings: MyRatingListItem[] = [
     visibility: 'PUBLIC',
     frameId: 502,
     createdAt: '2026-09-04T09:00:00Z',
+  },
+];
+
+/** 본 기록은 있는데 평가가 없는 영화. API-034 `WATCHED_UNRATED` */
+const unrated: WatchRecordListItem[] = [
+  {
+    watchRecordId: 701,
+    movie: { movieId: 501, title: '안 남긴 영화 A', posterUrl: null },
+    status: 'WATCHED_UNRATED',
+    ott: { ottId: 1, code: 'NETFLIX' },
+    clickedAt: '2026-08-26T09:00:00Z',
+    confirmDueAt: '2026-08-27T09:00:00Z',
+    expiresAt: '2026-09-26T09:00:00Z',
+    watchedAt: '2026-08-26T09:00:00Z',
+    ratingId: null,
   },
 ];
 
@@ -94,6 +116,12 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue({ items: ratings, nextCursor: null, hasNext: false });
   vi.mocked(getRecommendationHistory).mockReset().mockResolvedValue(history);
+  vi.mocked(getWatchRecords)
+    .mockReset()
+    .mockResolvedValue({ items: unrated, nextCursor: null, hasNext: false });
+  vi.mocked(getOtts)
+    .mockReset()
+    .mockResolvedValue([{ ottId: 1, code: 'NETFLIX', name: '넷플릭스', logoUrl: null }]);
 });
 
 async function renderDashboard() {
@@ -147,6 +175,24 @@ describe('7.1 MY 대시보드', () => {
     expect(cells[0]).toHaveTextContent('평가한 영화 A');
     expect(cells[0]).toHaveTextContent('4.5');
     expect(cells[1]).toHaveTextContent('3.0');
+  });
+
+  it('안 남긴 영화 탭은 감상 기록을 깔고 2.5 평가하기로 간다', async () => {
+    /*
+     * 7.7이 하던 일이다(업무 -495에서 화면을 지우고 탭으로 옮겼다). 날짜와 OTT는
+     * API-034 기록과 API-025 기준정보가 주는 값이다.
+     */
+    await renderDashboard();
+
+    fireEvent.click(screen.getByRole('tab', { name: '안 남긴 영화' }));
+
+    const cells = within(feed()).getAllByRole('link');
+
+    expect(cells).toHaveLength(1);
+    expect(cells[0]).toHaveAttribute('href', '/movies/501/rate');
+    expect(cells[0]).toHaveTextContent('안 남긴 영화 A');
+    expect(cells[0]).toHaveTextContent('넷플릭스');
+    expect(cells[0]).toHaveTextContent('8. 26');
   });
 
   it('추천 기록 탭을 누르면 화면 안에서 피드가 바뀐다', async () => {
