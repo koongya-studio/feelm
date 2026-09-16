@@ -1,7 +1,10 @@
 /*
- * 감상 기록 (업무 S15P21E106-477).
+ * 감상 기록 (업무 S15P21E106-477) · 평가 생성 (업무 S15P21E106-491).
  *
  * 화면에서는 드러나지 않는 것을 고정한다.
+ * - **평가 본문은 계약 필드만 싣는다.** 한줄평이 없으면 `visibility`도 싣지 않는다 —
+ *   목업 시절 함께 넘기던 맛 코드는 서버가 정하므로 보내지 않는다(API-036)
+ * - **추가 전 수치는 실제 API-014 · API-041에서 온다.** 목업 기준값 100에서 세던 자리다
  * - **상태 질의를 같은 이름의 반복으로 싣는 것.** 계약이 그렇게 정했다(API-034).
  *   인덱스 표기(`status[0]=RATED`)는 서버가 **거절하지 않고 무시해** 거른 적 없는 전체
  *   목록이 온다. 한 값만 실려도 목록은 그럴듯해 보이므로 화면으로는 알 수 없다
@@ -19,14 +22,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   confirmWatch,
+  createRating,
   findLinkClickedRecord,
   findWatchRecord,
   findWatchedRecord,
+  getCountsBeforeRating,
   getWatchRecords,
   recordOttClick,
 } from './watch';
 import { resetSessionForTest, startSession } from './session';
-import type { WatchRecordListItem } from '../types/watch';
+import type { Rating, WatchRecordListItem } from '../types/watch';
 
 const fetchMock = vi.fn();
 
@@ -237,6 +242,73 @@ describe('API-035 감상 확인 응답', () => {
     await confirmWatch(5001, false);
 
     expect(requestedInit().body).toBe(JSON.stringify({ watched: false }));
+  });
+});
+
+describe('API-036 평가 생성', () => {
+  const created: Rating = {
+    ratingId: 91,
+    movieId: 550,
+    score: 4.5,
+    comment: null,
+    visibility: 'PRIVATE',
+    frame: { frameId: 77, createdAt: '2026-08-30T05:21:00Z' },
+    popcorn: { flavorCode: 'FLAVOR_A', isNewFlavor: true, flavorCount: 1 },
+    watchStatus: 'RATED',
+    createdAt: '2026-08-30T05:21:00Z',
+  };
+
+  it('영화 경로에 점수만 실어 보내고 응답을 그대로 돌려준다', async () => {
+    fetchMock.mockResolvedValue(json(201, created));
+
+    const rating = await createRating(550, { score: 4.5 });
+
+    expect(requestedUrl().pathname).toBe('/api/v1/movies/550/ratings');
+    expect(requestedInit().method).toBe('POST');
+    // 한줄평이 없으면 `visibility`를 싣지 않는다. 맛 코드는 서버가 정하므로 본문에 없다
+    expect(requestedInit().body).toBe(JSON.stringify({ score: 4.5 }));
+    expect(rating).toEqual(created);
+  });
+
+  it('한줄평이 있으면 공개 범위를 함께 싣는다', async () => {
+    fetchMock.mockResolvedValue(json(201, { ...created, comment: '밤에 보면 안 됨' }));
+
+    await createRating(550, { score: 4.5, comment: '밤에 보면 안 됨', visibility: 'PRIVATE' });
+
+    expect(requestedInit().body).toBe(
+      JSON.stringify({ score: 4.5, comment: '밤에 보면 안 됨', visibility: 'PRIVATE' }),
+    );
+  });
+
+  it('이미 평가한 영화의 `409`는 코드 그대로 올라온다', async () => {
+    fetchMock.mockResolvedValue(
+      json(409, { code: 'RATING_ALREADY_EXISTS', message: '이미 평가한 영화입니다.' }),
+    );
+
+    await expect(createRating(550, { score: 4.5 })).rejects.toMatchObject({
+      status: 409,
+      code: 'RATING_ALREADY_EXISTS',
+    });
+  });
+});
+
+describe('추가 전 수치', () => {
+  it('프레임 수는 API-014, 팝콘 알 수는 API-041에서 읽는다', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      Promise.resolve(
+        url.includes('/users/me/popcorn')
+          ? json(200, { totalCount: 7, flavors: [] })
+          : json(200, { stats: { frameCount: 12, popcornCount: 7, ratingCount: 12 } }),
+      ),
+    );
+
+    const counts = await getCountsBeforeRating();
+
+    const paths = fetchMock.mock.calls.map(
+      (call) => new URL(call[0] as string, 'http://test').pathname,
+    );
+    expect(paths).toEqual(expect.arrayContaining(['/api/v1/users/me', '/api/v1/users/me/popcorn']));
+    expect(counts).toMatchObject({ frameCount: 12, popcornCount: 7 });
   });
 });
 
