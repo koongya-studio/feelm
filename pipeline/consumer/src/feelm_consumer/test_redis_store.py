@@ -89,25 +89,39 @@ def test_real_redis_corrupt_or_partial_version_is_atomically_recovered(real_redi
     assert current_version(real_redis, 42, fence) == 1
 
 
-def test_real_redis_persists_empty_discovery_group_with_matching_generation(real_redis: redis.Redis) -> None:
+def test_real_redis_persists_reason_arrays_with_matching_generation(real_redis: redis.Redis) -> None:
     fence = claim_partition_fence(real_redis, "group", "topic", 0)
     generation_id = "generation-1"
-    vector = {"candidateVersion": 5, "generationId": generation_id, "vector": [0.1]}
+    vector = {"candidateVersion": 6, "generationId": generation_id, "vector": [0.1]}
     candidates = {
-        "candidateVersion": 5,
+        "candidateVersion": 6,
         "generationId": generation_id,
         "taste": [
             {
                 "movieId": 7,
                 "score": 0.5,
-                "reason": {
-                    "code": "SHARED_GENRE",
-                    "sourceMovieIds": [3],
-                    "matchedGenreCodes": ["DRAMA"],
-                },
+                "reasons": [
+                    {
+                        "code": "SHARED_GENRE",
+                        "sourceMovieIds": [3],
+                        "matchedGenreCodes": ["DRAMA"],
+                    }
+                ],
             }
         ],
-        "discovery": [],
+        "discovery": [
+            {
+                "movieId": 8,
+                "score": 0.4,
+                "reasons": [
+                    {
+                        "code": "DISCOVERY_PERSONAL_SCORE",
+                        "sourceMovieIds": [3],
+                        "matchedGenreCodes": ["DRAMA"],
+                    }
+                ],
+            }
+        ],
     }
 
     assert publish(real_redis, 46, 0, vector, candidates, fence) == 1
@@ -117,14 +131,28 @@ def test_real_redis_persists_empty_discovery_group_with_matching_generation(real
         {
             "movieId": 7,
             "score": 0.5,
-            "reason": {
-                "code": "SHARED_GENRE",
-                "sourceMovieIds": [3],
-                "matchedGenreCodes": ["DRAMA"],
-            },
+            "reasons": [
+                {
+                    "code": "SHARED_GENRE",
+                    "sourceMovieIds": [3],
+                    "matchedGenreCodes": ["DRAMA"],
+                }
+            ],
         }
     ]
-    assert saved["discovery"] == []
+    assert saved["discovery"] == [
+        {
+            "movieId": 8,
+            "score": 0.4,
+            "reasons": [
+                {
+                    "code": "DISCOVERY_PERSONAL_SCORE",
+                    "sourceMovieIds": [3],
+                    "matchedGenreCodes": ["DRAMA"],
+                }
+            ],
+        }
+    ]
 
 
 def test_real_redis_rejects_mixed_result_payload_generation(real_redis: redis.Redis) -> None:

@@ -8,7 +8,8 @@
 `personalizedItems`, `discoveryItems`는 당시 제안 형식을 보존한 역사 자료이며 현재 Redis payload나
 Backend 소비 계약이 아니다. 현재 계약은 [`docs/api/streaming-contract.md`](../../docs/api/streaming-contract.md)의
 Candidate v6 `taste`/`discovery` 형식을 따른다. TASTE는 장르·입력 영화 근거를, DISCOVERY는 전체 이력 기반
-저이력 그룹 적합도와 기여 집중도 또는 개인 점수 보충 근거를 구조화된 `reason`으로 사용한다.
+저이력 그룹 적합도와 기여 집중도 또는 개인 점수 보충 근거를 구조화된 `reasons[]` 객체 배열로 사용한다.
+확인 가능한 근거가 없으면 TASTE와 DISCOVERY 모두 빈 `reasons` 배열을 전달한다.
 
 Jira: [S15P21E106-295](https://ssafy.atlassian.net/browse/S15P21E106-295)
 

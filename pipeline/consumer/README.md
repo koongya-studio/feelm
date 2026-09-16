@@ -176,9 +176,9 @@ Spring은 TASTE 2편을 먼저 고르고 양쪽 목록의 중복을 건너뛴 DI
 
 - S15P21E106-415: 이 절의 DISCOVERY 후보 생성과 로컬 정책 검증
 - S15P21E106-471: Candidate v3 `taste`/`discovery` 그룹화와 `generationId` Consumer writer 기준선
-- S15P21E106-481: TASTE 후보별 구조화 `reason`을 추가한 Candidate v4 writer·payload 기준선
+- S15P21E106-481: TASTE 후보별 구조화 `reasons[]`를 추가한 Candidate v4 writer·payload 기준선
 - S15P21E106-488: 전체 평가 또는 온보딩 이력으로 계산한 저이력 그룹 적합도·상위 기여 비율을
-  DISCOVERY 전용 `reason`으로 추가한 Candidate v5 writer·payload 기준선
+  DISCOVERY 전용 `reasons[]`로 추가한 Candidate v5 writer·payload 기준선
 - S15P21E106-505: 입력 수 제한 제거, TASTE 500·DISCOVERY 100 후보 게시와 그룹 부족분 보충,
   `DISCOVERY_PERSONAL_SCORE`를 추가한 현재 Candidate v6 writer·payload 계약. Spring reader·2+1 조립은
   Backend 소비 계약이며 현재 `develop`에는 구현되지 않았다
@@ -321,8 +321,9 @@ Spring이 한다.
 
 입력이 없거나 어떤 성분도 사용자 프로필을 만들 수 없으면(신규 사용자, 두 산출물 모두에 없는 이력)
 ALS에 매핑된 서비스 영화와 콘텐츠 지원 영화의 합집합을 `score=0.0`, 서비스 영화 ID 오름차순으로
-게시하고 `candidate_tie_fallback`을 남긴다. TASTE `reason`은 `TOP_RATED_SOURCE`, DISCOVERY 보충
-`reason`은 `DISCOVERY_PERSONAL_SCORE`를 사용하며 입력이 없으면 둘 다 `sourceMovieIds`가 빈 배열이다.
+게시하고 `candidate_tie_fallback`을 남긴다. 근거가 있으면 TASTE `reasons[]`는 `TOP_RATED_SOURCE`,
+DISCOVERY 보충 `reasons[]`는 `DISCOVERY_PERSONAL_SCORE`를 사용한다. 입력이 없어 근거가 없으면
+두 목록 모두 `reasons: []`로 게시한다.
 사용자 방향이 없더라도 DISCOVERY는 개인 후보 모집단에서 100편을 보충한다. 서비스 가능한 후보 모집단 자체가 비어 있을 때만
 `no_publishable_result_skipped` 정상 처리한다.
 
@@ -356,11 +357,11 @@ Redis 출력은 `candidate-version`, `vector`, `candidates` 세 String 키이며
 opaque token으로 교체하며 후보 결과를 읽는 Spring은 이 키에 의존하지 않는다. key가 유실되면 모든 기존 token은
 비교에서 거부되고, 다음 assign은 새 token을 설치한다. Redis의 과거 snapshot 복원처럼 fence key가 이전 값으로
 되돌아가는 장애는 외부의 durable coordinator 없이는 막지 못하며 이 Consumer의 보장 범위 밖이다.
-`candidates.taste`의 각 항목은 `movieId`, `score`, `reason`을 포함한다.
-`reason`은 Consumer가 만든 구조화된 근거(`code`, `sourceMovieIds`, `matchedGenreCodes`)이며 Spring이 영화·장르명을
+`candidates.taste`의 각 항목은 `movieId`, `score`, `reasons` 객체 배열을 포함한다.
+`reasons[]`는 Consumer가 만든 구조화된 근거(`code`, `sourceMovieIds`, `matchedGenreCodes`)이며 Spring이 영화·장르명을
 조회해 사용자 문구로 변환한다. `SHARED_GENRE`는 고평점 source 영화와 후보의 공통 장르를, `TOP_RATED_SOURCE`는
 공통 장르가 없을 때 가장 높은 평가 source 영화를 뜻한다.
-`candidates.discovery`는 `movieId`, `score`, DISCOVERY 전용 `reason`을 포함한다. 그룹 산출물을 설정하면
+`candidates.discovery`는 `movieId`, `score`, DISCOVERY 전용 `reasons` 객체 배열을 포함한다. 그룹 산출물을 설정하면
 그룹 후보를 먼저 사용하고, 설정하지 않으면 전부 `DISCOVERY_PERSONAL_SCORE` 개인 후보로 최대 100편을
 보충한다. 영화 대표 맛을 포함한 표시용 메타데이터는 Spring이 PostgreSQL에서 조회한다.
 `DISCOVERY_AGGREGATE_AFFINITY`는 전체 평가 이력으로 만든
@@ -371,9 +372,9 @@ opaque token으로 교체하며 후보 결과를 읽는 Spring은 이 키에 의
 제외 후 그룹 내부 대중성 순위를 나타낸다. 공급 그룹 수 같은 전역 진단 값은 Redis에 게시하지 않고 Consumer 로그에만 남긴다.
 그룹 후보가 100편보다 적으면 다음 적격 그룹을 먼저 탐색하고, 모든 적격 그룹의 최초 10편을 사용한 뒤에도
 부족할 때 그룹별 11번째 이후 후보를 적합도 순으로 사용한다. 그래도 부족하면 개인 점수 후보로 채우며 이때
-`reason.code=DISCOVERY_PERSONAL_SCORE`와 TASTE 근거와 같은 `sourceMovieIds`, `matchedGenreCodes`를 저장한다.
+`reasons[].code=DISCOVERY_PERSONAL_SCORE`와 TASTE 근거와 같은 `sourceMovieIds`, `matchedGenreCodes`를 저장한다.
 입력이 없거나 어느 개인 점수 성분도 프로필을 만들 수 없는 `0.0` 동점 fallback은 두 배열 모두
-source와 장르 배열이 비어 있다.
+`reasons: []`로 근거가 없음을 나타낸다.
 두 payload에는 동일한 `candidateVersion=6`(JSON 형식·reason code 버전)와 `generationId`(한 번의 생성 결과 식별자)가
 포함된다. Backend가 v5/v6를 함께 읽는 전환 reader를 먼저 반영하고 Consumer v6 전환과 함께 모든 활성 사용자를
 재게시한다. v6와 `generationId` 일치를 확인한 뒤 Backend의 v5 호환을 제거한다. Consumer는 추천 문구나

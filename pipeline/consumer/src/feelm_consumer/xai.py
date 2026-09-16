@@ -44,9 +44,9 @@ def build_candidate_reasons(
         key=lambda input_: (-input_.score, input_.movie_id),
     )
     if not sources:
-        # The Candidate contract requires a reason object.  A user with no usable
-        # signal has no honest source movie, so keep the generic reason shape and
-        # make the absence explicit with an empty source list.
+        # Keep the generic internal value so callers have a reason entry for every
+        # candidate.  The result serializer emits an empty reasons array because
+        # a user with no usable signal has no honest evidence to publish.
         return {
             candidate.movie_id: CandidateReason(
                 code="TOP_RATED_SOURCE",
