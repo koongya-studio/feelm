@@ -114,7 +114,11 @@ public class RecommendationDismissService {
                         movie.averageRating(),
                         recommendationDismissRepository.findOttCodes(movie.id()));
         return new RecommendationReplacementResponse(
-                item.id(), item.type(), movieResponse, movie.flavorCode(), reason(item.reason()));
+                item.id(),
+                item.type(),
+                movieResponse,
+                item.flavorCode() != null ? item.flavorCode() : movie.flavorCode(),
+                reason(item.reason()));
     }
 
     private JsonNode reason(String reason) {

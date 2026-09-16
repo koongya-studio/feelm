@@ -11,7 +11,7 @@
   재기동 시 사라진다. AOF·볼륨·메모리 한도·축출 정책은 기존 설정을 유지한다.
 - 서버에도 `127.0.0.1:6379`만 게시한다. 기존 로컬 오버레이와 동일한 포트라 병합 시 중복되지 않는다.
 
-현재 초안은 추천 계약의 `vector`, `candidates`, `topn`, `behavior`, `model:current`만
+현재 초안은 추천 계약의 `vector`, `candidates`, `candidate-version`, `behavior`, `model:current`만
 읽는다. Redis Insight가 String 값을 표시할 때 사용하는 `GETRANGE`를 포함해 읽기 명령을
 개별 허용하며 쓰기·삭제·관리·스크립트·Pub/Sub 명령은 허용하지 않는다.
 로그인 키의 값과 추천 계약 밖의 키는 조회할 수 없다.

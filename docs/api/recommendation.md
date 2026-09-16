@@ -175,15 +175,13 @@
   그룹만으로 100편을 채우지 못하면 다음 적격 그룹을 같은 방식으로 탐색하고, 그래도 부족하면
   적합도 순으로 그룹별 11번째 이후 후보를 모집한다. 모집된 최대 100편은 사용자 개인 예측
   점수로 최종 정렬한다.
-- Consumer는 평가·온보딩·확정 감상·관심없음 영화를 DISCOVERY 후보에서 먼저 제외한다.
-  Spring은 최종 노출에서 `LINK_CLICKED`를 포함한 모든 감상 기록과 관심없음을 다시 제외한다
-- 활성 버퍼가 남아 있고 추천 입력(평가·온보딩 선택)이 바뀌지 않으면 같은 `recommendationSetId`와 결과를 반환한다. 입력이 바뀌거나 버퍼가 소진된 상태에서 API-046을 다시 요청하면 새 세트를 생성한다. 관심없음은 입력 변경으로 취급하지 않고 세트 내 교체로 처리한다(API-047)
+- 서비스 DB에 없는 영화, 평가한 영화와 관심없음 영화는 제외한다. 감상·OTT 클릭 이력은 제외나 재가중에 사용하지 않는다
+- 같은 `generationId`의 버퍼가 있으면 같은 `recommendationSetId`를 반환한다. 새 generation을 받으면 새 세트를 생성하며 관심없음은 세트 내 같은 타입 후보로 교체한다(API-047)
 - 온보딩을 건너뛰고 평가가 없는 사용자의 개인 후보 보충 순서 개선과 후보 모집단 밖 POPULAR 확장은
   S15P21E106-483에서 다룬다.
   `discovery-popularity`는 선택된 그룹 안의 공통 후보 진입 순서이며 fallback 목록이 아니다
-- Python Consumer가 Redis에 갱신한 TASTE 최대 500편과 DISCOVERY 최대 100편을 Spring이 OTT 클릭 등
-  최신 행동 신호로 재정렬하고 후보 20편(설정값)을 세트 버퍼로 저장해 3편씩 노출한다
-- 버퍼는 PostgreSQL `recommendation_items`에 저장하고 `exposed_at`으로 노출 여부를 구분한다. 강한 신호는 Python Consumer가 Candidate를 같은 사용자 단위 처리에서 갱신하고, 약한 신호는 Spark Streaming이 행동 Feature를 갱신해 Spring의 다음 세트 생성 때 반영한다. 최종 `reason`은 Spring이 실제 사용한 근거로 만든다.
+- Python Consumer가 Redis에 갱신한 TASTE·DISCOVERY 후보를 Spring이 종류별 점수로 정렬하고 동점을 결정적으로 섞은 뒤 타입별 최대 20편을 독립 버퍼로 저장한다. 조회 시 TASTE 2편과 DISCOVERY 1편을 꺼낸다
+- 버퍼는 PostgreSQL `recommendation_items`에 저장하고 `exposed_at`으로 노출 여부를 구분한다. Consumer가 전달한 구조화된 `reasons[]` 원본도 함께 저장하며, 사용자 문구 생성은 별도 단계에서 처리한다.
 - Consumer는 `vector`·`candidates`·version 키를 원자 게시한다. Spring은 `candidates.taste`와
   `candidates.discovery`를 읽어 제외·재정렬하고 최종 세트를 생성한다. 별도 Redis `topn`은
   사용하지 않는다. 후보가 없거나 유효하지 않으면 짧은 재시도 후 `503 RECOMMENDATION_UNAVAILABLE`을 반환한다.
@@ -194,12 +192,13 @@
 
 - S15P21E106-415에서 DISCOVERY 후보 생성 정책과 Consumer 구현을 완료했다.
 - S15P21E106-471에서 Redis Candidate v3 `taste`/`discovery` 그룹화와 `generationId` writer를
-  반영했고, S15P21E106-481에서 TASTE 후보별 구조화 `reason`을 추가해 Candidate v4가 됐다.
+  반영했고, S15P21E106-481에서 TASTE 후보별 구조화 `reasons[]`를 추가해 Candidate v4가 됐다.
   S15P21E106-488은 전체 평가 또는 온보딩 이력으로 계산한 저이력 그룹 적합도와 상위 기여 비율을
-  DISCOVERY 전용 `reason`으로 추가해 Candidate v5로 올렸다. S15P21E106-505는 입력 수 제한을 제거하고
+  DISCOVERY 전용 `reasons[]` 원소로 추가해 Candidate v5로 올렸다. S15P21E106-505는 입력 수 제한을 제거하고
   DISCOVERY 보충 후보용 `DISCOVERY_PERSONAL_SCORE`를 추가해 Candidate v6로 올린다. 현재 `develop`에는
   Candidate v6 Spring reader와 TASTE 2 + DISCOVERY 1 조립 구현이 없으므로, 위 처리 규칙은 Backend가
-  구현·통합 검증해야 하는 소비 계약이다. 전환은 v5/v6 reader 선반영, Consumer v6 전환과 활성 후보
+  구현·통합 검증해야 하는 소비 계약이다. S15P21E106-164는 기존 v4 배열 계약을 유지하고,
+  S15P21E106-498에서 v6 배열 계약 대응을 진행한다. 전환은 v5/v6 reader 선반영, Consumer v6 전환과 활성 후보
   재게시, v6·`generationId` 검증, v5 호환 제거 순서로 진행한다.
 - S15P21E106-482에서 그룹·그룹 내부 대중성 번들의 HDFS 게시, 두 URI 동시 활성화와 rollback을 검증한다.
 - S15P21E106-483은 개인 후보 보충 순서를 개선하고 후보 모집단 밖까지 확장하는 별도 POPULAR 목록의

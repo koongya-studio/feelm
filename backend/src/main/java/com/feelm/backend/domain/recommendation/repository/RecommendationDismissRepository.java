@@ -87,7 +87,7 @@ public class RecommendationDismissRepository {
     public Optional<ReplacementItem> lockNextReplacement(long userId, long setId, String type) {
         return jdbcTemplate
                 .query(
-                        "SELECT id, movie_id, type, reason::text AS reason"
+                        "SELECT id, movie_id, type, flavor_code, reason::text AS reason"
                                 + " FROM recommendation_items"
                                 + " WHERE set_id = ? AND type = ? AND exposed_at IS NULL"
                                 + " AND NOT EXISTS (SELECT 1 FROM user_movie_dismissals d"
@@ -99,6 +99,7 @@ public class RecommendationDismissRepository {
                                         resultSet.getLong("id"),
                                         resultSet.getLong("movie_id"),
                                         resultSet.getString("type"),
+                                        resultSet.getString("flavor_code"),
                                         resultSet.getString("reason")),
                         setId,
                         type,
@@ -168,7 +169,8 @@ public class RecommendationDismissRepository {
 
     public record SourceItem(long id, long setId, long movieId, String type) {}
 
-    public record ReplacementItem(long id, long movieId, String type, String reason) {}
+    public record ReplacementItem(
+            long id, long movieId, String type, String flavorCode, String reason) {}
 
     public record MovieSummary(
             long id,
