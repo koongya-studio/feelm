@@ -62,6 +62,8 @@ include:
             (self.backend, 'backend-image'),
             (self.frontend, 'frontend-test'),
             (self.frontend, 'frontend-image'),
+            (self.consumer, 'consumer-test'),
+            (self.consumer, 'consumer-image'),
         )
         for config, name in cancellable:
             self.assertIn('interruptible: true', job_block(config, name), name)
@@ -70,6 +72,7 @@ include:
             (self.backend, '.backend-cache-action'),
             (self.backend, 'deploy-backend'),
             (self.frontend, 'deploy-frontend'),
+            (self.consumer, 'deploy-consumer'),
         )
         for config, name in protected:
             self.assertIn('interruptible: false', job_block(config, name), name)
@@ -273,12 +276,15 @@ include:
         backend_deploy = job_block(self.backend, 'deploy-backend')
         frontend_image = job_block(self.frontend, 'frontend-image')
         frontend_deploy = job_block(self.frontend, 'deploy-frontend')
+        consumer_test = job_block(self.consumer, 'consumer-test')
+        consumer_image = job_block(self.consumer, 'consumer-image')
+        consumer_deploy = job_block(self.consumer, 'deploy-consumer')
         main_push = ('$CI_COMMIT_BRANCH == "main" && '
                      '$CI_COMMIT_REF_PROTECTED == "true" && '
                      '$CI_PIPELINE_SOURCE == "push"')
         for block in (datastore, backend_env, backend_test, backend_image, backend_deploy,
                       job_block(self.frontend, 'frontend-test'), frontend_image,
-                      frontend_deploy):
+                      frontend_deploy, consumer_test, consumer_image, consumer_deploy):
             self.assertIn(main_push, block)
             self.assertNotIn('$CI_COMMIT_BRANCH == "develop"', block)
         self.assertIn('job: backend-test', backend_image)
@@ -292,9 +298,14 @@ include:
             self.assertIn('- infra/scripts/deploy-backend.sh', block)
         self.assertIn('needs: [frontend-test]', frontend_image)
         self.assertIn('needs: [frontend-image]', frontend_deploy)
+        self.assertIn('needs: [consumer-test]', consumer_image)
+        self.assertIn('needs: [consumer-image]', consumer_deploy)
         for block in (backend_deploy, frontend_deploy):
             self.assertIn('resource_group: service-and-backend-cache', block)
             self.assertIn('ci-deploy-current-commit.py', block)
+        self.assertIn('resource_group: distributed-consumer', consumer_deploy)
+        self.assertIn('tags: [e106-distributed]', consumer_deploy)
+        self.assertIn('ci-deploy-current-commit.py', consumer_deploy)
         self.assertIn('--init-script gradle/test-timing.gradle', backend_test)
         self.assertIn('action: prepare', backend_env)
         self.assertIn('ci-backend-env-contract.py --require-values', backend_env)
@@ -309,6 +320,9 @@ include:
             (self.frontend, 'frontend-test'),
             (self.frontend, 'frontend-image'),
             (self.frontend, 'deploy-frontend'),
+            (self.consumer, 'consumer-test'),
+            (self.consumer, 'consumer-image'),
+            (self.consumer, 'deploy-consumer'),
         )
         required = ('if: \'$CI_COMMIT_BRANCH == "main" && '
                     '$CI_COMMIT_REF_PROTECTED == "true" && '

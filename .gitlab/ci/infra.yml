@@ -22,6 +22,9 @@ infra-config-test:
         - infra/monitoring/**/*
         - infra/spark/**/*
         - infra/scripts/deploy-distributed-runtime.py
+        - infra/scripts/deploy-consumer.sh
+        - infra/scripts/rollback-consumer.sh
+        - infra/scripts/verify-consumer-e2e.py
         - infra/scripts/run-infra-config-tests.py
         - infra/scripts/verify-kafka-monitoring.py
         - infra/scripts/test_consumer_distributed_deployment.py
@@ -30,6 +33,8 @@ infra-config-test:
         - infra/scripts/test_pipeline_observability.py
         - infra/scripts/test_verify_kafka_monitoring.py
         - infra/scripts/test_deploy_distributed_runtime.py
+        - infra/scripts/test_deploy_consumer.py
+        - infra/scripts/test_verify_consumer_e2e.py
         - infra/scripts/ci-infra-mr-*.py
         - infra/scripts/ci-gitlab-job-adapter.py
         - infra/scripts/ci-gitlab-custom-executor.py

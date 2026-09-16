@@ -72,20 +72,20 @@ def process_user(
                 # candidate population, so retrying changes nothing.
                 # Treating it as a failure would pause the partition, leave the
                 # offset uncommitted, and replay the same event after restart.
-                LOG.warning("no_publishable_result_skipped user_id=%s", user_id)
+                LOG.warning("no_publishable_result_skipped")
                 return True
             if is_still_owned is not None and not is_still_owned():
-                LOG.warning("partition ownership lost before Redis publish user_id=%s", user_id)
+                LOG.warning("partition ownership lost before Redis publish")
                 return False
             publish(store, user_id, expected, *results, partition_fence)
+            LOG.info("candidate published")
             return True
         except StalePartitionFenceError:
-            LOG.info("partition fence lost before Redis publish user_id=%s", user_id)
+            LOG.info("partition fence lost before Redis publish")
             return None
         except (redis.RedisError, psycopg.Error, ValueError) as exc:
-            # Do not log DSNs, Redis URLs, or event payloads.  The user id is an
-            # operational partition key and is sufficient to investigate.
-            LOG.warning("fold-in dependency or data failure user_id=%s code=%s", user_id, type(exc).__name__)
+            # Do not log DSNs, Redis URLs, event payloads, or user identifiers.
+            LOG.warning("fold-in dependency or data failure code=%s", type(exc).__name__)
             if attempt + 1 < attempts:
                 sleep(backoff_seconds * (2**attempt))
     return False
@@ -171,6 +171,11 @@ def run(settings: Settings) -> None:
         owned.update((partition.topic, partition.partition) for partition in partitions)
         fences.update(claims)
         client.assign(partitions)
+        LOG.info(
+            "Kafka partitions assigned count=%s partitions=%s",
+            len(partitions),
+            ",".join(f"{partition.topic}:{partition.partition}" for partition in partitions),
+        )
 
     def on_revoke(client: Consumer, partitions: list[TopicPartition]) -> None:
         for partition in partitions:
@@ -178,6 +183,11 @@ def run(settings: Settings) -> None:
             owned.discard((partition.topic, partition.partition))
             fences.pop((partition.topic, partition.partition), None)
         client.unassign()
+        LOG.info(
+            "Kafka partitions revoked count=%s partitions=%s",
+            len(partitions),
+            ",".join(f"{partition.topic}:{partition.partition}" for partition in partitions),
+        )
 
     def pause_for_failure(message: Any, partition: TopicPartition, reason: str) -> None:
         paused[(message.topic(), message.partition())] = 0
@@ -256,6 +266,12 @@ def run(settings: Settings) -> None:
                 continue
             try:
                 consumer.commit(message=message, asynchronous=False)
+                LOG.info(
+                    "Kafka event committed topic=%s partition=%s offset=%s",
+                    message.topic(),
+                    message.partition(),
+                    message.offset(),
+                )
             except KafkaException:
                 # Publishing may already have succeeded.  Never advance this
                 # partition past an unconfirmed commit; replay is intentional.
