@@ -14,6 +14,9 @@ infra-config-test:
       changes:
         - .gitlab-ci.yml
         - .gitlab/ci/common.yml
+        - .gitlab/ci/backend.yml
+        - .gitlab/ci/frontend.yml
+        - .gitlab/ci/consumer.yml
         - .gitlab/ci/infra.yml
         - infra/.env.example
         - infra/compose/**/*
@@ -26,6 +29,8 @@ infra-config-test:
         - infra/scripts/rollback-consumer.sh
         - infra/scripts/verify-consumer-e2e.py
         - infra/scripts/run-infra-config-tests.py
+        - infra/scripts/notify-deployment.py
+        - infra/scripts/test_notify_deployment.py
         - infra/scripts/verify-kafka-monitoring.py
         - infra/scripts/test_consumer_distributed_deployment.py
         - infra/scripts/test_kafka_monitoring.py

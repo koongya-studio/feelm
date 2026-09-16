@@ -1485,6 +1485,20 @@ Masked로 관리하고 로그에 출력하지 않습니다.
 과거 Pipeline이 최신 배포를 덮어쓰지 않습니다. 배포와 의존성 캐시 작업은 같은
 `resource_group`으로 직렬화합니다.
 
+각 `deploy-backend`, `deploy-frontend`, `deploy-consumer` Job은 `after_script`에서 실제
+`CI_JOB_STATUS`를 Mattermost 팀 채널로 전송합니다. 알림에는 대상 서비스, 배포 환경,
+commit SHA와 GitLab Job·Pipeline 링크만 포함하며 Secret이나 전체 환경변수를 포함하지
+않습니다. Mattermost 장애가 실제 배포 성공·실패 결과를 덮어쓰지 않도록 알림 실패는 경고로
+기록하고 종료 코드 0을 반환합니다. 따라서 경고가 있으면 Job 링크에서 원인을 확인하고
+채널 수신 여부를 별도로 복구합니다.
+
+GitLab 프로젝트 CI/CD Variables에 `MATTERMOST_DEPLOY_WEBHOOK_URL`을 실제 Incoming Webhook
+URL로 등록합니다. 같은 Key와 값을 환경 범위 `service`, `distributed`에 각각 한 번씩 등록하고
+두 항목 모두 `Masked and hidden`, `Protected`로 설정합니다. 저장소, MR, Job 로그와
+스크린샷에는 실제 URL을 남기지 않습니다. 보호된 `main` Push의 배포 환경 Job만 이 변수를
+받으며 MR, API 및 Web Pipeline에서는 배포 알림을 보내지 않습니다. URL을 갱신하거나 폐기할
+때는 두 환경 범위의 값을 함께 변경합니다.
+
 새 commit이 같은 브랜치에 반영되면 이전 테스트와 이미지 빌드는 자동 취소할 수 있지만,
 배포와 캐시 승격·롤백은 중간 상태 손상을 막기 위해 취소하지 않습니다. `main` 배포 전에는
 main의 보호 브랜치 상태, `e106-shell` Runner의 Protected 설정과 `service` 환경 범위의

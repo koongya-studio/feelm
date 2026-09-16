@@ -306,6 +306,35 @@ include:
         self.assertIn('resource_group: distributed-consumer', consumer_deploy)
         self.assertIn('tags: [e106-distributed]', consumer_deploy)
         self.assertIn('ci-deploy-current-commit.py', consumer_deploy)
+        notifications = (
+            (backend_deploy, 'backend'),
+            (frontend_deploy, 'frontend'),
+            (consumer_deploy, 'consumer'),
+        )
+        for block, service in notifications:
+            self.assertIn(
+                'infra/scripts/notify-deployment.py ' + service + ' "$CI_JOB_STATUS"',
+                block,
+            )
+            self.assertIn('after_script:', block)
+        notification_paths = (
+            backend_env,
+            backend_test,
+            backend_image,
+            backend_deploy,
+            job_block(self.frontend, 'frontend-test'),
+            frontend_image,
+            frontend_deploy,
+            consumer_test,
+            consumer_image,
+            consumer_deploy,
+        )
+        for block in notification_paths:
+            self.assertIn('- infra/scripts/notify-deployment.py', block)
+            self.assertIn('- infra/scripts/test_notify_deployment.py', block)
+        infra_test = job_block(self.infra, 'infra-config-test')
+        self.assertIn('- infra/scripts/notify-deployment.py', infra_test)
+        self.assertIn('- infra/scripts/test_notify_deployment.py', infra_test)
         self.assertIn('--init-script gradle/test-timing.gradle', backend_test)
         self.assertIn('action: prepare', backend_env)
         self.assertIn('ci-backend-env-contract.py --require-values', backend_env)

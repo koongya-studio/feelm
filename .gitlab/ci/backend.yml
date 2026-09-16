@@ -54,6 +54,8 @@ backend-env-check:
         - infra/scripts/test_ci_deploy_current_commit.py
         - infra/scripts/ci-backend-env-contract.py
         - infra/scripts/test_ci_backend_env_contract.py
+        - infra/scripts/notify-deployment.py
+        - infra/scripts/test_notify_deployment.py
         - .gitlab-ci.yml
         - .gitlab/ci/common.yml
         - .gitlab/ci/backend.yml
@@ -172,7 +174,7 @@ backend-test:
   stage: test
   tags: [e106-shell]
   script:
-    - python3 -B -m unittest infra.scripts.test_ci_config infra.scripts.test_ci_backend_mr_paths infra.scripts.test_ci_backend_develop_paths infra.scripts.test_ci_backend_env_contract infra.scripts.test_ci_deploy_current_commit infra.scripts.test_deploy_backend infra.scripts.test_deploy_frontend -v
+    - python3 -B -m unittest infra.scripts.test_ci_config infra.scripts.test_notify_deployment infra.scripts.test_ci_backend_mr_paths infra.scripts.test_ci_backend_develop_paths infra.scripts.test_ci_backend_env_contract infra.scripts.test_ci_deploy_current_commit infra.scripts.test_deploy_backend infra.scripts.test_deploy_frontend -v
     - cd backend
     - ./gradlew clean test spotlessCheck --no-daemon --init-script gradle/test-timing.gradle
   interruptible: true
@@ -204,6 +206,8 @@ backend-test:
         - infra/scripts/test_ci_deploy_current_commit.py
         - infra/scripts/ci-backend-env-contract.py
         - infra/scripts/test_ci_backend_env_contract.py
+        - infra/scripts/notify-deployment.py
+        - infra/scripts/test_notify_deployment.py
         - .gitlab-ci.yml
         - .gitlab/ci/common.yml
         - .gitlab/ci/backend.yml
@@ -255,6 +259,8 @@ backend-image:
         - infra/scripts/test_ci_deploy_current_commit.py
         - infra/scripts/ci-backend-env-contract.py
         - infra/scripts/test_ci_backend_env_contract.py
+        - infra/scripts/notify-deployment.py
+        - infra/scripts/test_notify_deployment.py
         - .gitlab-ci.yml
         - .gitlab/ci/common.yml
         - .gitlab/ci/backend.yml
@@ -273,6 +279,8 @@ deploy-backend:
     - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
     - BACKEND_IMAGE="$DOCKERHUB_NAMESPACE/feelm-backend:$CI_COMMIT_SHA"
     - ./infra/scripts/deploy-backend.sh "$BACKEND_IMAGE"
+  after_script:
+    - /usr/bin/python3 -I -B infra/scripts/notify-deployment.py backend "$CI_JOB_STATUS"
   interruptible: false
   retry:
     max: 2
@@ -306,6 +314,8 @@ deploy-backend:
         - infra/scripts/test_ci_deploy_current_commit.py
         - infra/scripts/ci-backend-env-contract.py
         - infra/scripts/test_ci_backend_env_contract.py
+        - infra/scripts/notify-deployment.py
+        - infra/scripts/test_notify_deployment.py
         - .gitlab-ci.yml
         - .gitlab/ci/common.yml
         - .gitlab/ci/backend.yml
