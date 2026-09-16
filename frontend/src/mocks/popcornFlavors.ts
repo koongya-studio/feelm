@@ -17,56 +17,56 @@ export const mockPopcornFlavors: PopcornFlavor[] = [
   {
     code: 'FLAVOR_A',
     displayName: '오리지널 솔트',
-    color: '#FBF1CF', // 아이보리 알맹이, 버터빛 속살
+    color: '#F0D8B4', // 아이보리 알맹이, 버터빛 속살
     representativeKeywords: ['다큐멘터리', '현실 기록', '음악', '역사'],
     sortOrder: 1,
   },
   {
     code: 'FLAVOR_B',
-    displayName: '핫칠리',
-    color: '#DC9A4E', // 윤기 나는 카라멜 글레이즈와 소금 결정
+    displayName: '다크초코',
+    color: '#3C2418', // 윗부분만 다크 초콜릿에 담근 초코송이 스타일
     representativeKeywords: ['공포', '괴물', '초자연', '미스터리', 'SF'],
     sortOrder: 2,
   },
   {
     code: 'FLAVOR_C',
     displayName: '솔티카라멜',
-    color: '#F0D07C', // 보송한 체다 파우더, 깊은 속살만 크림색
+    color: '#B46C24', // 윤기 나는 카라멜 글레이즈와 소금 결정
     representativeKeywords: ['드라마 코미디', '인물', '관계', '로맨스', '블랙코미디'],
     sortOrder: 3,
   },
   {
     code: 'FLAVOR_D',
-    displayName: '다크초코',
-    color: '#5C3020', // 윗부분만 다크 초콜릿에 담근 초코송이 스타일
+    displayName: '피스타치오',
+    color: '#B4B46C', // 연두색 피스타치오 코팅
     representativeKeywords: ['드라마', '인물', '관계', '역사', '전쟁'],
     sortOrder: 4,
   },
   {
     code: 'FLAVOR_E',
-    displayName: '블랙페퍼',
-    color: '#F4F1EA', // 크림 코팅에 박힌 쿠키 조각
+    displayName: '쿠키앤크림',
+    color: '#E4D8B4', // 크림 코팅에 박힌 쿠키 조각
     representativeKeywords: ['스릴러', '범죄', '긴장', '미스터리', '추적'],
     sortOrder: 5,
   },
   {
     code: 'FLAVOR_F',
-    displayName: '갈릭버터',
-    color: '#C48C50', // 비스킷 크럼과 에스프레소 스월
+    displayName: '체다치즈',
+    color: '#D87824', // 보송한 체다 파우더, 깊은 속살만 크림색
     representativeKeywords: ['코미디', '로맨스', '가족', '액션 코미디', '호러 코미디'],
     sortOrder: 6,
   },
   {
     code: 'FLAVOR_G',
-    displayName: '허니버터',
-    color: '#ECAABB', // 딸기 코팅과 과육 조각
+    displayName: '스트로베리',
+    color: '#D89C9C', // 딸기 코팅과 과육 조각
     representativeKeywords: ['애니메이션', '가족', '판타지', '모험', '상상'],
     sortOrder: 7,
   },
   {
     code: 'FLAVOR_H',
-    displayName: '치즈믹스',
-    color: '#D9C6EA', // 블루베리 스월과 마카롱 조각
+    displayName: '블루베리',
+    color: '#A890B4', // 블루베리 스월과 마카롱 조각
     representativeKeywords: ['액션', '모험', 'SF', '판타지', '음악'],
     sortOrder: 8,
   },

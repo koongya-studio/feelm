@@ -74,6 +74,27 @@ describe('PopcornBucket', () => {
     expect(new Set(kernelHrefs).size).toBe(8);
   });
 
+  it('확정된 FLAVOR_A부터 FLAVOR_H까지 맛에 맞는 3D 알을 사용한다', () => {
+    const expectedAssets = [
+      'original',
+      'chocolate',
+      'caramel',
+      'pistachio',
+      'cookie',
+      'cheese',
+      'strawberry',
+      'blueberry',
+    ];
+
+    expectedAssets.forEach((asset, index) => {
+      const code = `FLAVOR_${String.fromCharCode(65 + index)}`;
+      const { container } = render(<PopcornBucket kernelFlavors={[code]} label={code} />);
+      const href = images(container)[1]?.getAttribute('href');
+
+      expect(href).toContain(`popcorn-${asset}.png`);
+    });
+  });
+
   it('같은 입력을 다시 그려도 알 자리가 흔들리지 않는다', () => {
     const codes = ['FLAVOR_A', 'FLAVOR_B', 'FLAVOR_C', 'FLAVOR_D'];
 

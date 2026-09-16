@@ -93,7 +93,7 @@ describe('API-041 팝콘 버킷', () => {
         {
           flavorCode: 'FLAVOR_A',
           displayName: '오리지널 솔트',
-          color: '#FBF1CF',
+          color: '#F0D8B4',
           popcornCount: 3,
           averageScore: 4.4,
           discoveredAt: null,
@@ -112,7 +112,7 @@ describe('API-044 팝콘 맛 기준정보', () => {
     const flavor = {
       code: 'FLAVOR_A',
       displayName: '오리지널 솔트',
-      color: '#FBF1CF',
+      color: '#F0D8B4',
       representativeKeywords: ['다큐멘터리'],
       sortOrder: 1,
     };

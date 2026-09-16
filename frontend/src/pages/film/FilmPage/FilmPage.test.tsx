@@ -52,13 +52,13 @@ const bucket: PopcornBucket = {
   totalCount: 100,
   flavors: [
     flavor('FLAVOR_A', '오리지널 솔트', 12),
-    flavor('FLAVOR_B', '핫칠리', 28),
+    flavor('FLAVOR_B', '다크초코', 28),
     flavor('FLAVOR_C', '솔티카라멜', 0),
-    flavor('FLAVOR_D', '다크초코', 21),
-    flavor('FLAVOR_E', '블랙페퍼', 5),
-    flavor('FLAVOR_F', '갈릭버터', 34),
-    flavor('FLAVOR_G', '허니버터', 0),
-    flavor('FLAVOR_H', '치즈믹스', 0),
+    flavor('FLAVOR_D', '피스타치오', 21),
+    flavor('FLAVOR_E', '쿠키앤크림', 5),
+    flavor('FLAVOR_F', '체다치즈', 34),
+    flavor('FLAVOR_G', '스트로베리', 0),
+    flavor('FLAVOR_H', '블루베리', 0),
   ],
 };
 
@@ -114,7 +114,7 @@ describe('FilmPage', () => {
     );
 
     // 34 · 28 · 21 · 12 순. 0알인 세 맛은 빠지고, 5알은 네 개를 넘겨 잘린다
-    expect(rows).toEqual(['갈릭버터 34', '핫칠리 28', '다크초코 21', '오리지널 솔트 12']);
+    expect(rows).toEqual(['체다치즈 34', '다크초코 28', '피스타치오 21', '오리지널 솔트 12']);
   });
 
   it('팝콘 버킷만 실패하면 화면은 살아 있고 범례 자리만 빈다', async () => {
