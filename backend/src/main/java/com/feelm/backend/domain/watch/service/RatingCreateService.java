@@ -55,6 +55,7 @@ public class RatingCreateService {
                         request.score(),
                         request.comment(),
                         request.visibility(),
+                        request.spoiler(),
                         now);
         repository.refreshMovieRatingAggregate(movieId);
         FrameCreation createdFrame =
@@ -75,6 +76,7 @@ public class RatingCreateService {
                 request.score(),
                 request.comment(),
                 request.visibility(),
+                request.spoiler(),
                 new Frame(createdFrame.frameId(), createdFrame.createdAt()),
                 new Popcorn(movie.flavorCode(), flavorCount == 1, flavorCount),
                 com.feelm.backend.domain.watch.model.WatchStatus.RATED,

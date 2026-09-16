@@ -14,6 +14,72 @@ from unittest.mock import patch
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
 SPARK = ROOT / 'pipeline' / 'spark'
+APPROVED_PROJECT = b'''[project]
+name = "feelm-pipeline-spark"
+version = "0.1.0"
+description = "FEELM PySpark pipeline batch and streaming jobs"
+requires-python = ">=3.10,<3.11"
+dependencies = [
+  "psycopg[binary]==3.2.10",
+  "pyspark[ml]==4.1.3",
+  "torch==2.6.0",
+  "transformers==4.48.3",
+]
+
+[dependency-groups]
+dev = [
+  "pytest==8.4.2",
+  "ruff==0.12.12",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.uv]
+package = false
+
+# The Spark image has no GPU runtime.  Keep the embedding worker on PyTorch's
+# CPU wheel index so resolving torch never adds CUDA/NVIDIA wheels.
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+'''
+APPROVED_LOCK = b'''version = 1
+revision = 3
+requires-python = "==3.10.*"
+
+[[package]]
+name = "feelm-pipeline-spark"
+version = "0.1.0"
+source = { virtual = "." }
+
+[[package]]
+name = "pytest"
+version = "8.4.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/aa/test.tar.gz", hash = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+
+[[package]]
+name = "torch"
+version = "2.6.0+cpu"
+source = { registry = "https://download.pytorch.org/whl/cpu" }
+wheels = [
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch.whl", hash = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+]
+'''
 
 
 def load_required(testcase, name, filename):
@@ -29,8 +95,8 @@ def load_required(testcase, name, filename):
 def snapshot(entries=None):
     values = {
         'pipeline/spark/.python-version': (SPARK / '.python-version').read_bytes(),
-        'pipeline/spark/pyproject.toml': (SPARK / 'pyproject.toml').read_bytes(),
-        'pipeline/spark/uv.lock': (SPARK / 'uv.lock').read_bytes(),
+        'pipeline/spark/pyproject.toml': APPROVED_PROJECT,
+        'pipeline/spark/uv.lock': APPROVED_LOCK,
         'pipeline/spark/batch/example.py': b'VALUE = 1\n',
         'pipeline/spark/tests/fixtures/example.csv': b'id,value\n1,ok\n',
     }
@@ -101,7 +167,7 @@ class PipelineBoundaryTests(unittest.TestCase):
 
     def test_rejects_unapproved_registry_and_lock_identity_mismatch(self):
         boundary = self.boundary()
-        unsafe_lock = (SPARK / 'uv.lock').read_bytes().replace(
+        unsafe_lock = APPROVED_LOCK.replace(
             b'https://pypi.org/simple', b'https://packages.internal.invalid/simple', 1)
         payload = snapshot({'pipeline/spark/uv.lock': unsafe_lock})
         with self.assertRaisesRegex(ValueError, 'registry|source|lock'):
@@ -113,7 +179,7 @@ class PipelineBoundaryTests(unittest.TestCase):
 
     def test_rejects_git_lock_source_manifest_override_and_case_collision(self):
         boundary = self.boundary()
-        original = (SPARK / 'uv.lock').read_bytes()
+        original = APPROVED_LOCK
         git_source = original.replace(
             b'source = { registry = "https://pypi.org/simple" }',
             b'source = { git = "https://example.invalid/repo.git", '
@@ -122,7 +188,7 @@ class PipelineBoundaryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'source|lock'):
             boundary.source_plan(payload, hashlib.sha256(payload).hexdigest())
 
-        manifest = (SPARK / 'pyproject.toml').read_bytes() + (
+        manifest = APPROVED_PROJECT + (
             b'\n[tool.uv.sources]\npyspark = { path = "batch" }\n')
         payload = snapshot({'pipeline/spark/pyproject.toml': manifest})
         with self.assertRaisesRegex(ValueError, 'manifest|source'):
@@ -131,6 +197,47 @@ class PipelineBoundaryTests(unittest.TestCase):
         payload = snapshot({'pipeline/spark/batch/Example.py': b'VALUE = 2\n'})
         with self.assertRaisesRegex(ValueError, 'collision|duplicate'):
             boundary.source_plan(payload, hashlib.sha256(payload).hexdigest())
+
+    def test_rejects_unapproved_pytorch_index_host_path_and_missing_hash(self):
+        boundary = self.boundary()
+        cases = (
+            (APPROVED_PROJECT.replace(
+                b'https://download.pytorch.org/whl/cpu',
+                b'https://download.pytorch.org/whl/nightly'), APPROVED_LOCK),
+            (APPROVED_PROJECT, APPROVED_LOCK.replace(
+                b'https://download-r2.pytorch.org/whl/cpu/torch.whl',
+                b'https://download-r2.pytorch.org/whl/nightly/torch.whl')),
+            (APPROVED_PROJECT, APPROVED_LOCK.replace(
+                b', hash = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"',
+                b'')),
+        )
+        for project, lock in cases:
+            with self.subTest(project=project, lock=lock):
+                payload = snapshot({
+                    'pipeline/spark/pyproject.toml': project,
+                    'pipeline/spark/uv.lock': lock,
+                })
+                with self.assertRaisesRegex(ValueError, 'manifest|source|hash'):
+                    boundary.source_plan(payload, hashlib.sha256(payload).hexdigest())
+
+    def test_rejects_malformed_array_section_and_pytorch_url_authority(self):
+        boundary = self.boundary()
+        cases = (
+            (APPROVED_PROJECT.replace(b'[[tool.uv.index]]', b'[[tool.uv.index]'), APPROVED_LOCK),
+            (APPROVED_PROJECT, APPROVED_LOCK.replace(
+                b'https://download-r2.pytorch.org/whl/cpu/torch.whl',
+                b'https://download-r2.pytorch.org.evil.invalid/whl/cpu/torch.whl')),
+            (APPROVED_PROJECT, APPROVED_LOCK.replace(
+                b'https://download-r2.pytorch.org/whl/cpu/torch.whl',
+                b'https://user@download-r2.pytorch.org/whl/cpu/torch.whl')),
+        )
+        for project, lock in cases:
+            payload = snapshot({
+                'pipeline/spark/pyproject.toml': project,
+                'pipeline/spark/uv.lock': lock,
+            })
+            with self.subTest(project=project, lock=lock), self.assertRaises(ValueError):
+                boundary.source_plan(payload, hashlib.sha256(payload).hexdigest())
 
 
 class PipelineRunnerTests(unittest.TestCase):
@@ -233,8 +340,8 @@ class PipelineRunnerTests(unittest.TestCase):
         config = self.config()
         payload = snapshot()
         files = {
-            'pipeline/spark/pyproject.toml': (SPARK / 'pyproject.toml').read_bytes(),
-            'pipeline/spark/uv.lock': (SPARK / 'uv.lock').read_bytes(),
+            'pipeline/spark/pyproject.toml': APPROVED_PROJECT,
+            'pipeline/spark/uv.lock': APPROVED_LOCK,
         }
         config['project_manifest_sha256'] = hashlib.sha256(
             files['pipeline/spark/pyproject.toml']).hexdigest()

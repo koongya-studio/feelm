@@ -160,6 +160,54 @@ docker compose --env-file infra/.env \
   up -d --no-deps --force-recreate grafana
 ```
 
+## develop 자동 배포
+
+모니터링 Compose와 Prometheus·Grafana 설정이 보호된 `develop`에 병합되면
+`deploy-monitoring` Job이 서비스 노드에서 자동 실행됩니다. MR, Web, API Pipeline과 보호되지
+않은 브랜치는 배포하지 않습니다. Job은 먼저 원격 `develop` HEAD와 현재 commit이 같은지
+확인하고, `ci-variable-preflight`의 실제 변수·GitLab 메타데이터 검사를 통과한 경우에만
+`infra/scripts/deploy-monitoring.sh`를 실행합니다. 변수 계약과 등록 방법은 `infra/README.md`의
+Deployment 절을 따릅니다.
+
+배포 스크립트는 배포 Pipeline별 고유 Compose 프로젝트로 `monitoring.yml`만 해석하므로
+PostgreSQL, Redis, backend, frontend와 Nginx 및 `-rollback` 컨테이너를 Compose 대상으로
+선택하지 않습니다. 후보 프로젝트는 기존 `compose_default` 네트워크와
+`compose_prometheus_data`, `compose_grafana_data` 볼륨을 명시적으로 공유합니다.
+`config --quiet`와 이미지 pull을 컨테이너 변경 전에 수행하고, 기존 모니터링 컨테이너가
+있으면 중지 후 이름 끝에 `-rollback`을 붙여 보존합니다. 후보는
+`--no-deps --force-recreate`로 다음 서비스만 교체합니다.
+
+```text
+prometheus grafana node-exporter postgres-exporter redis-exporter
+```
+
+후보 기동 후 Prometheus readiness, Grafana database health와 Prometheus의 필수 scrape target을
+최대 24회, 5초 간격으로 검사합니다. 기대 target은 `backend` 1개, `node` 2개,
+`kafka`·`postgres`·`redis` 각 1개이며 모두 `up=1`이어야 합니다. 검증이 성공하면 보존한
+컨테이너만 삭제하고 `prometheus_data`, `grafana_data` 볼륨은 유지합니다. 스크립트는
+`docker compose down`, `down -v`와 `docker volume rm`을 사용하지 않습니다.
+
+Compose 적용 또는 health 검증이 실패하면 후보 컨테이너만 제거하고 보존한 컨테이너를 원래
+이름으로 복구한 뒤 같은 health 검사를 다시 수행합니다. 첫 자동 배포처럼 기존 컨테이너가
+없었다면 실패한 후보만 제거합니다. 복구 검증도 실패하면 Job은 수동 복구 필요 상태로
+종료하며 Pipeline 성공으로 처리하지 않습니다.
+
+Job 또는 호스트가 컨테이너 보존 이후 비정상 종료되면 다음 배포는 `-rollback` 컨테이너를
+발견하고 실제 변경 전에 중단합니다. 서비스 노드에서 실행 중인 모니터링 컨테이너와 보존
+컨테이너를 확인한 뒤 다음 명령으로 보존본만 원래 이름에 복구합니다. 이 명령은 볼륨이나
+서비스 컨테이너를 삭제하지 않습니다.
+
+```bash
+bash infra/scripts/deploy-monitoring.sh --recover
+```
+
+복구 명령은 보존본과 같은 이름의 후보만 제거하고 보존 컨테이너를 다시 시작한 뒤 전체
+모니터링 health를 검증합니다. 복구가 실패하면 반복 실행하거나 `-rollback` 컨테이너를
+임의로 삭제하지 말고 `docker ps -a`와 각 모니터링 컨테이너 상태를 확인합니다. 컨테이너
+로그에는 exporter 연결 오류가 포함될 수 있으므로 전체 로그나 환경변수를 CI 출력에 복사하지
+않습니다. 이미지 버전 또는 Grafana 데이터 마이그레이션을 동반하는 변경은 이 컨테이너
+롤백만으로 데이터 형식 복구를 보장하지 않으므로 별도 Jira에서 백업·복구 절차를 합의합니다.
+
 ## 검증
 
 먼저 Compose 구문과 최종 설정을 확인합니다.

@@ -32,7 +32,7 @@ public class RatingCreateController {
     @Operation(
             summary = "평가 생성",
             description =
-                    "영화에 0.5점 단위 평가와 선택적 한줄평을 저장합니다. 평점, 감상 상태, 프레임과 추천 갱신 이벤트는 같은 트랜잭션으로 처리됩니다.")
+                    "영화에 0.5점 단위 평가와 선택적 한줄평을 저장합니다. 한줄평의 스포일러 여부는 생략 시 false입니다. 평점, 감상 상태, 프레임과 추천 갱신 이벤트는 같은 트랜잭션으로 처리됩니다.")
     @ApiResponses({
         @ApiResponse(
                 responseCode = "201",

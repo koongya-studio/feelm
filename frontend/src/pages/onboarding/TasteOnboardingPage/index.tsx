@@ -236,7 +236,7 @@ export default function TasteOnboardingPage() {
          * 경우다. 다시 할 수 없는 화면에 실패 안내를 세워 두지 않고 홈으로 보낸다.
          */
         if (error instanceof ApiError && error.code === 'ONBOARDING_ALREADY_COMPLETED') {
-          void navigate(path.home(), { replace: true });
+          void navigate(path.film(), { replace: true });
 
           return;
         }
@@ -413,7 +413,7 @@ export default function TasteOnboardingPage() {
     } catch (error) {
       // 같은 사용자의 제출이 이미 저장됐다면 다시 보낼 것이 없다(API-024 `409`)
       if (error instanceof ApiError && error.code === 'ONBOARDING_ALREADY_COMPLETED') {
-        void navigate(path.home(), { replace: true });
+        void navigate(path.film(), { replace: true });
 
         return;
       }

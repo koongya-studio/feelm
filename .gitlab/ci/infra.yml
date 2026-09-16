@@ -1,3 +1,63 @@
+ci-variable-contract-check:
+  stage: verify
+  tags: [e106-mr-isolated]
+  dependencies: []
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - python3 -I -B infra/scripts/ci-required-variable-preflight.py
+  resource_group: ci-variable-contract-check
+  interruptible: true
+  timeout: 5m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
+
+ci-variable-preflight:
+  stage: verify
+  tags: [e106-shell]
+  needs: []
+  environment:
+    name: service
+    action: prepare
+  script:
+    - python3 -I -B infra/scripts/ci-required-variable-preflight.py --require-values --check-metadata
+  resource_group: ci-variable-preflight
+  interruptible: true
+  timeout: 5m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+
+deploy-monitoring:
+  stage: deploy
+  tags: [e106-shell]
+  needs: [ci-variable-preflight]
+  environment:
+    name: service
+  script:
+    - python3 -I -B infra/scripts/ci-deploy-current-commit.py --branch develop
+    - bash infra/scripts/deploy-monitoring.sh
+  resource_group: service-and-backend-cache
+  interruptible: false
+  retry:
+    max: 2
+    when: [runner_system_failure, scheduler_failure]
+  timeout: 15m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - .gitlab-ci.yml
+        - .gitlab/ci/infra.yml
+        - infra/config/required-ci-variables.json
+        - infra/compose/monitoring.yml
+        - infra/monitoring/prometheus/**/*
+        - infra/monitoring/grafana/**/*
+        - infra/scripts/ci-deploy-current-commit.py
+        - infra/scripts/test_ci_deploy_current_commit.py
+        - infra/scripts/deploy-monitoring.sh
+        - infra/scripts/test_deploy_monitoring.py
+        - infra/scripts/verify-monitoring-deployment.py
+        - infra/scripts/test_verify_monitoring_deployment.py
+
 infra-config-test:
   stage: test
   tags: [e106-mr-isolated]
@@ -14,8 +74,12 @@ infra-config-test:
       changes:
         - .gitlab-ci.yml
         - .gitlab/ci/common.yml
+        - .gitlab/ci/backend.yml
+        - .gitlab/ci/frontend.yml
+        - .gitlab/ci/consumer.yml
         - .gitlab/ci/infra.yml
         - infra/.env.example
+        - infra/config/required-ci-variables.json
         - infra/compose/**/*
         - infra/hadoop/**/*
         - infra/kafka/**/*
@@ -26,6 +90,16 @@ infra-config-test:
         - infra/scripts/rollback-consumer.sh
         - infra/scripts/verify-consumer-e2e.py
         - infra/scripts/run-infra-config-tests.py
+        - infra/scripts/notify-deployment.py
+        - infra/scripts/test_notify_deployment.py
+        - infra/scripts/ci-required-variable-preflight.py
+        - infra/scripts/test_ci_required_variable_preflight.py
+        - infra/scripts/ci-deploy-current-commit.py
+        - infra/scripts/test_ci_deploy_current_commit.py
+        - infra/scripts/deploy-monitoring.sh
+        - infra/scripts/test_deploy_monitoring.py
+        - infra/scripts/verify-monitoring-deployment.py
+        - infra/scripts/test_verify_monitoring_deployment.py
         - infra/scripts/verify-kafka-monitoring.py
         - infra/scripts/test_consumer_distributed_deployment.py
         - infra/scripts/test_kafka_monitoring.py

@@ -61,7 +61,7 @@ class BackendDevelopPathRulesTests(unittest.TestCase):
         cls.blocks = {
             name: job_block(cls.ci, name)
             for name in ('datastore-config-check', 'backend-env-check', 'backend-cache-promote',
-                         'backend-test', 'backend-image', 'deploy-backend')
+                         'backend-test', 'backend-image', 'deploy-backend', 'deploy-redis')
         }
         cls.patterns = {
             name: change_patterns(block) for name, block in cls.blocks.items()
@@ -109,8 +109,6 @@ class BackendDevelopPathRulesTests(unittest.TestCase):
     def test_deployment_and_datastore_inputs_keep_the_chain_aligned(self):
         inputs = (
             'infra/compose/service.yml',
-            'infra/redis/start.sh',
-            'infra/redis/readonly.acl',
             'infra/scripts/verify-datastore-config.sh',
             'infra/scripts/verify-datastores.sh',
             'infra/scripts/deploy-backend.sh',
@@ -123,6 +121,25 @@ class BackendDevelopPathRulesTests(unittest.TestCase):
         for path in inputs:
             with self.subTest(job='datastore-config-check', path=path):
                 self.assertTrue(matches(path, self.patterns['datastore-config-check']))
+
+    def test_redis_config_changes_use_the_selective_deployment(self):
+        redis_inputs = (
+            'infra/redis/start.sh',
+            'infra/redis/readonly.acl',
+            'infra/scripts/deploy-redis.sh',
+        )
+        for path in redis_inputs:
+            with self.subTest(path=path):
+                self.assertTrue(matches(path, self.patterns['datastore-config-check']))
+                self.assertTrue(matches(path, self.patterns['deploy-redis']))
+                for job in ('backend-env-check', 'backend-test', 'backend-image', 'deploy-backend'):
+                    self.assertFalse(matches(path, self.patterns[job]))
+        self.assertTrue(
+            matches('infra/scripts/test_deploy_redis.py', self.patterns['datastore-config-check'])
+        )
+        self.assertFalse(
+            matches('infra/scripts/test_deploy_redis.py', self.patterns['deploy-redis'])
+        )
 
     def test_mixed_delete_and_rename_scenarios_use_all_changed_paths(self):
         scenarios = (
@@ -169,13 +186,16 @@ class BackendDevelopPathRulesTests(unittest.TestCase):
         self.assertIn('needs: [backend-image]', self.blocks['deploy-backend'])
         self.assertIn('$CI_PIPELINE_SOURCE == "push"', self.blocks['deploy-backend'])
         self.assertIn('$CI_COMMIT_REF_PROTECTED == "true"', self.blocks['deploy-backend'])
-        self.assertIn(
-            'python3 -B -m unittest infra.scripts.test_ci_config '
-            'infra.scripts.test_ci_backend_mr_paths '
-            'infra.scripts.test_ci_backend_develop_paths',
-            self.blocks['backend-test'],
-        )
+        self.assertIn('infra.scripts.test_ci_config', self.blocks['backend-test'])
+        self.assertIn('infra.scripts.test_ci_backend_mr_paths', self.blocks['backend-test'])
+        self.assertIn('infra.scripts.test_ci_backend_develop_paths', self.blocks['backend-test'])
         self.assertIn('infra.scripts.test_ci_backend_env_contract', self.blocks['backend-test'])
+        self.assertIn('job: datastore-config-check', self.blocks['deploy-redis'])
+        self.assertIn('resource_group: service-and-backend-cache', self.blocks['deploy-redis'])
+        self.assertIn('$CI_PIPELINE_SOURCE == "push"', self.blocks['deploy-redis'])
+        self.assertIn('$CI_COMMIT_REF_PROTECTED == "true"', self.blocks['deploy-redis'])
+        self.assertIn('bash infra/scripts/deploy-redis.sh "$CI_COMMIT_SHA"', self.blocks['deploy-redis'])
+        self.assertIn('infra.scripts.test_deploy_redis', self.blocks['backend-test'])
 
 
 if __name__ == '__main__':

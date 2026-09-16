@@ -28,7 +28,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import Button from '../../../components/Button';
 import FilmStrip from '../../../components/FilmStrip';
-import { SearchIcon } from '../../../components/Icon';
+import { BellIcon, SearchIcon } from '../../../components/Icon';
 import Poster from '../../../components/Poster';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
@@ -102,10 +102,29 @@ export default function FilmPage() {
     };
   }, [reloadCount]);
 
+  /*
+   * 헤더 오른쪽. **검색 → 알림 순서다**(사용자 지시 2026-09-16, 업무 -461).
+   * 알림은 홈 헤더에 있던 것이고, 홈을 없애면서 필름으로 왔다.
+   *
+   * 빈 상태 · 실패 상태에서도 같이 선다. 필름은 앱의 시작 화면이라 프레임이 없다고
+   * 검색과 알림으로 가는 길까지 막으면 안 된다.
+   */
+  const headerActions = (
+    <div className={styles.headerActions}>
+      <Link to={path.search()} className={styles.headerAction} aria-label="검색">
+        <SearchIcon />
+      </Link>
+
+      <Link to={path.notifications()} className={styles.headerAction} aria-label="알림">
+        <BellIcon />
+      </Link>
+    </div>
+  );
+
   if (failed) {
     return (
       <>
-        <ScreenHeader title={<Wordmark />} />
+        <ScreenHeader title={<Wordmark />} action={headerActions} />
 
         <StatusView title="취향 필름을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
           <Button
@@ -125,7 +144,7 @@ export default function FilmPage() {
   if (frames && frames.totalCount === 0) {
     return (
       <>
-        <ScreenHeader title={<Wordmark />} />
+        <ScreenHeader title={<Wordmark />} action={headerActions} />
 
         <StatusView
           variant="empty"
@@ -150,14 +169,7 @@ export default function FilmPage() {
 
   return (
     <>
-      <ScreenHeader
-        title={<Wordmark />}
-        action={
-          <Link to={path.search()} className={styles.headerAction} aria-label="검색">
-            <SearchIcon />
-          </Link>
-        }
-      />
+      <ScreenHeader title={<Wordmark />} action={headerActions} />
 
       <div className={styles.page}>
         <div className={styles.stripArea}>
@@ -246,6 +258,20 @@ export default function FilmPage() {
           ) : (
             <Button onClick={() => void navigate(path.tasteReports())}>취향 리포트 보기</Button>
           )}
+
+          {/*
+           * 3.1 → 2.2 추천. **홈에서 오늘의 추천을 빼면서 이 자리로 왔다**(업무 -461).
+           * 추천은 필름을 늘리는 행위라 필름 탭에 속한다는 결정에 따른 것이다.
+           *
+           * 빈 상태(프레임 0개)에만 있던 길을 늘 열어 둔다 — 프레임이 쌓인 뒤에는
+           * 여기가 2.2로 가는 유일한 상시 진입점이다.
+           *
+           * 검정 알약은 위의 리포트 버튼 하나뿐이므로(`design-concept.md` 2.4) 글자
+           * 버튼으로 둔다. 문구는 1.3 온보딩 완료가 쓰는 말과 맞춘다.
+           */}
+          <Button variant="text" onClick={() => void navigate(path.recommendations())}>
+            필름 늘리기
+          </Button>
         </div>
       </div>
     </>

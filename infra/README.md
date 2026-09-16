@@ -142,7 +142,7 @@ docker compose --env-file infra/.env \
   up -d kafka
 ```
 
-업무 Topic은 자동 생성하지 않습니다. 평점 Topic은 최초 한 번 생성합니다.
+업무 Topic은 자동 생성하지 않습니다. 평점과 Candidate 게시 완료 알림 Topic은 최초 한 번 생성합니다.
 
 ```bash
 docker exec feelm-kafka-local \
@@ -150,6 +150,14 @@ docker exec feelm-kafka-local \
   --bootstrap-server localhost:9092 \
   --create --if-not-exists \
   --topic feelm.rating.v1 \
+  --partitions 3 \
+  --replication-factor 1
+
+docker exec feelm-kafka-local \
+  /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 \
+  --create --if-not-exists \
+  --topic feelm.candidate-updated.v1 \
   --partitions 3 \
   --replication-factor 1
 ```
@@ -1433,6 +1441,41 @@ GitLab에서 관리하고 서버에서 직접 수정하지 않습니다. 현재 
 남고 값은 출력하지 않습니다. 변수의 Protected·Masked·환경 범위 속성은 GitLab 설정에서
 별도로 검토합니다.
 
+모니터링 배포가 공통으로 사용하는 필수 CI 변수와 기대 메타데이터는
+`infra/config/required-ci-variables.json`에서 값 없이 관리합니다. 현재 `service` 환경 계약은
+`DISTRIBUTED_NODE_IP`, `GRAFANA_ADMIN_PASSWORD`, `POSTGRES_DB`, `POSTGRES_USER`,
+`POSTGRES_PASSWORD`, `REDIS_PASSWORD`를 포함합니다. 비밀번호는 Protected, Masked and hidden,
+변수 확장 비활성화(`raw`)로 등록하고 나머지 변수도 Protected와 `service` 환경 범위를
+유지합니다. 실제 값은 계약 파일, 문서, MR과 Job 로그에 기록하지 않습니다.
+
+develop 대상 MR의 `ci-variable-contract-check`는 격리 Runner에서 계약 구조만 검사합니다.
+이 Job에는 보호 변수를 전달하지 않으며 Secret 값이나 GitLab API 토큰도 필요하지 않습니다.
+백엔드 의존성 변경 시 이 가벼운 검사가 `backend-cache-prepare`의 명시적 `needs`이므로 계약
+오류가 있으면 비용이 큰 캐시 준비를 시작하지 않습니다. MR 단계는 저장소에 선언한 기대
+메타데이터를 검사하는 경계이며, GitLab에 실제 등록된 상태는 보호된 Pipeline에서만 확인합니다.
+
+보호된 `develop` Push의 `ci-variable-preflight`는 `service` 환경에서 실제 값의 존재와 허용
+형식을 검사한 뒤 GitLab Project Variables API의 Protected, Masked, hidden, raw 및 environment
+scope를 계약과 대조합니다. 오류에는 변수 이름과 불일치한 필드만 남기고 값과 API 응답 본문은
+출력하지 않습니다. `CI_DEBUG_TRACE=true`이면 Secret이 trace에 노출될 수 있으므로 실패합니다.
+후속 배포 Job은 이 Job을 필수 `needs`로 연결하며, 실패 시 이미지 빌드·컨테이너 변경·롤백을
+실행하지 않습니다.
+
+메타데이터 조회용 `CI_VARIABLE_AUDIT_TOKEN`은 프로젝트 범위의 `read_api`만 부여한 만료 기한
+있는 access token으로 발급하고 `service` 환경의 Protected, Masked and hidden 변수로
+등록합니다. 이 API는 응답에 변수 값도 포함하므로 토큰은 보호된 `e106-shell` Runner에만
+전달하고 MR Runner에는 전달하지 않습니다. 토큰 소유 계정 또는 프로젝트 access token에는
+Project Variables 조회에 필요한 최소 프로젝트 역할만 부여하고 변수 수정용 `api` scope는
+사용하지 않습니다. 토큰 원문, API 응답과 전체 환경은 진단 로그에 출력하지 않으며 만료 전에
+교체합니다. GitLab 변수 등록·수정 자체는 자동화하지 않습니다.
+
+로컬에서는 실제 값을 넣지 않고 계약과 단위 테스트만 실행합니다.
+
+```bash
+python3 -I -B infra/scripts/ci-required-variable-preflight.py
+python3 -B -m unittest infra.scripts.test_ci_required_variable_preflight -v
+```
+
 ### Pipeline and Deployment
 
 `runner-check`는 보호된 `develop`의 Push Pipeline에서 `.gitlab-ci.yml`, 공통 CI Job 설정,
@@ -1477,11 +1520,36 @@ Masked로 관리하고 로그에 출력하지 않습니다.
 과거 Pipeline이 최신 배포를 덮어쓰지 않습니다. 배포와 의존성 캐시 작업은 같은
 `resource_group`으로 직렬화합니다.
 
+각 `deploy-backend`, `deploy-frontend`, `deploy-consumer` Job은 `after_script`에서 실제
+`CI_JOB_STATUS`를 Mattermost 팀 채널로 전송합니다. 기존 Jira 일일 알림과 같은
+`MATTERMOST_BASE_URL`, `MATTERMOST_LOGIN_ID`, `MATTERMOST_PASSWORD` 및 채널 선택 변수를
+사용해 로그인하고 게시 후 로그아웃합니다. 알림에는 대상 서비스, 배포 환경, commit SHA와
+GitLab Job·Pipeline 링크만 포함하며 Secret이나 전체 환경변수를 포함하지 않습니다.
+Mattermost 장애가 실제 배포 성공·실패 결과를 덮어쓰지 않도록 알림 실패는 경고로 기록하고
+종료 코드 0을 반환합니다. 따라서 경고가 있으면 Job 링크에서 원인을 확인하고 채널 수신 여부를
+별도로 복구합니다.
+
+GitLab 프로젝트 CI/CD Variables의 기존 Jira 일일 알림용 Mattermost 설정을 그대로
+사용합니다. `MATTERMOST_PASSWORD`는 `Masked and hidden`, `Protected`를 유지하고 나머지
+Mattermost 변수도 `Protected`로 관리합니다. 환경 범위는 Jira 스케줄 Job과 `service`,
+`distributed` 배포 Job이 함께 받을 수 있도록 `All (default)`를 유지합니다. 저장소, MR,
+Job 로그와 스크린샷에는 계정 비밀번호와 세션 토큰을 남기지 않습니다. 채널을 분리하려면
+계정 자체를 재사용하더라도 배포 전용 채널 변수를 도입하는 별도 업무로 처리합니다.
+
+모니터링 설정은 애플리케이션 이미지 배포와 달리 보호된 `develop` Push에서
+`deploy-monitoring` Job으로 적용합니다. 이 Job은 `ci-variable-preflight`를 필수 `needs`로
+사용하고 원격 `develop` HEAD를 다시 확인한 뒤 `monitoring.yml`의 Prometheus, Grafana와 세
+exporter만 교체합니다. 같은 `service-and-backend-cache` resource group을 사용해 백엔드·
+프론트엔드 배포 및 캐시 작업과 동시에 Compose를 변경하지 않습니다. 상세 health 기준,
+컨테이너 보존 롤백과 비정상 종료 복구는
+[`infra/monitoring/README.md`](./monitoring/README.md)의 develop 자동 배포 절을 따릅니다.
+
 새 commit이 같은 브랜치에 반영되면 이전 테스트와 이미지 빌드는 자동 취소할 수 있지만,
 배포와 캐시 승격·롤백은 중간 상태 손상을 막기 위해 취소하지 않습니다. `main` 배포 전에는
 main의 보호 브랜치 상태, `e106-shell` Runner의 Protected 설정과 `service` 환경 범위의
-Protected CI/CD Variable을 확인합니다. 이후 추가하는 서비스 자동 배포도 보호된 main Push만
-배포 기준으로 사용하며 develop, MR, API와 Web Pipeline에 배포 Job을 열지 않습니다.
+Protected CI/CD Variable을 확인합니다. 애플리케이션 이미지 자동 배포는 보호된 main Push만
+배포 기준으로 사용하며 develop, MR, API와 Web Pipeline에 배포 Job을 열지 않습니다. 위
+모니터링 Compose Job은 보호된 develop Push에만 열린 명시적 예외입니다.
 
 백엔드 배포 스크립트는 실행 중인 이미지 이름을 먼저 보관하고 후보 이미지를 기동한 뒤 최대 2분
 동안 Docker healthcheck와 컨테이너 내부 Actuator 응답을 확인합니다. 이어서 PostgreSQL과

@@ -78,7 +78,7 @@ export default function LoginPage() {
     try {
       const user = await signIn(email, password);
 
-      void navigate(user.onboardingCompleted ? path.home() : path.onboardingTaste());
+      void navigate(user.onboardingCompleted ? path.film() : path.onboardingTaste());
     } catch (error) {
       const code = error instanceof ApiError ? error.code : '';
 

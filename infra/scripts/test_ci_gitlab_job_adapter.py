@@ -49,6 +49,60 @@ CONSUMER_SCRIPT = [
     'uv run pytest -v',
 ]
 INFRA_SCRIPT = adapter.INFRA_EXPECTED_SCRIPT
+VARIABLE_CONTRACT_SCRIPT = adapter.CI_VARIABLE_CONTRACT_SCRIPT
+APPROVED_PIPELINE_PROJECT = b'''[project]
+name = "feelm-pipeline-spark"
+version = "0.1.0"
+description = "FEELM PySpark pipeline batch and streaming jobs"
+requires-python = ">=3.10,<3.11"
+dependencies = [
+  "psycopg[binary]==3.2.10",
+  "pyspark[ml]==4.1.3",
+  "torch==2.6.0",
+  "transformers==4.48.3",
+]
+[dependency-groups]
+dev = ["pytest==8.4.2", "ruff==0.12.12"]
+[tool.pytest.ini_options]
+addopts = "-ra"
+pythonpath = ["."]
+testpaths = ["tests"]
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+[tool.uv]
+package = false
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+'''
+APPROVED_PIPELINE_LOCK = b'''version = 1
+revision = 3
+requires-python = "==3.10.*"
+[[package]]
+name = "feelm-pipeline-spark"
+version = "0.1.0"
+source = { virtual = "." }
+[[package]]
+name = "pytest"
+version = "8.4.2"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/aa/pytest.whl", hash = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+]
+[[package]]
+name = "torch"
+version = "2.6.0+cpu"
+source = { registry = "https://download.pytorch.org/whl/cpu" }
+wheels = [
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch.whl", hash = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+]
+'''
 
 
 def response(script=None, job_name='backend-mr-test'):
@@ -57,6 +111,7 @@ def response(script=None, job_name='backend-mr-test'):
         'frontend-mr-test': adapter.FRONTEND_EXPECTED_SCRIPT,
         'consumer-mr-test': CONSUMER_SCRIPT,
         'infra-config-test': INFRA_SCRIPT,
+        'ci-variable-contract-check': VARIABLE_CONTRACT_SCRIPT,
         'docs-mr-check': adapter.DOCS_EXPECTED_SCRIPT,
         **PIPELINE_SCRIPTS,
     }
@@ -69,7 +124,7 @@ def response(script=None, job_name='backend-mr-test'):
         'steps': [{'name': 'script', 'script': script or policies[job_name]}],
         'services': [], 'artifacts': [], 'cache': [], 'dependencies': [], 'image': {'name': ''},
     }
-    if job_name == adapter.DOCS_JOB_NAME:
+    if job_name in (adapter.DOCS_JOB_NAME, adapter.CI_VARIABLE_CONTRACT_JOB):
         value['job_info']['stage'] = 'verify'
     return value
 
@@ -113,6 +168,11 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(consumer['service'], 'consumer')
         infra = adapter.validate_job_response(response(job_name='infra-config-test'))
         self.assertEqual(infra['service'], 'infra')
+        variable_contract = adapter.validate_job_response(
+            response(job_name='ci-variable-contract-check')
+        )
+        self.assertEqual(variable_contract['service'], 'infra')
+        self.assertEqual(variable_contract['pipeline_group'], 'variable-contract')
         docs = adapter.validate_job_response(response(job_name='docs-mr-check'))
         self.assertEqual(docs['service'], 'docs')
 
@@ -236,9 +296,8 @@ class AdapterTests(unittest.TestCase):
             ('source/pipeline/spark/', b'', 0o755),
             ('source/pipeline/spark/.python-version',
              (spark / '.python-version').read_bytes(), 0o644),
-            ('source/pipeline/spark/pyproject.toml',
-             (spark / 'pyproject.toml').read_bytes(), 0o644),
-            ('source/pipeline/spark/uv.lock', (spark / 'uv.lock').read_bytes(), 0o644),
+            ('source/pipeline/spark/pyproject.toml', APPROVED_PIPELINE_PROJECT, 0o644),
+            ('source/pipeline/spark/uv.lock', APPROVED_PIPELINE_LOCK, 0o644),
             ('source/pipeline/spark/batch/example.py', b'VALUE = 1\n', 0o644),
         ])
         result, digest = adapter.normalized_service_archive(payload, 'pipeline')
@@ -288,6 +347,22 @@ class AdapterTests(unittest.TestCase):
         fetch.assert_called_once_with(adapter.validate_job_response(context), 'infra')
         infra.assert_called_once()
         backend.assert_not_called()
+
+    def test_variable_contract_routes_to_fixed_infra_group(self):
+        context = response(job_name='ci-variable-contract-check')
+        source = b'validated-infra-source'
+        digest = hashlib.sha256(source).hexdigest()
+        with patch.object(adapter, 'read_private_config',
+                          return_value=({}, Path('/prepared'))), \
+             patch.object(adapter, 'verify_current_job', return_value={'pipeline': {'id': 1}}), \
+             patch.object(adapter, 'verify_merge_request', return_value={'iid': 98}), \
+             patch.object(adapter, 'fetch_merge_request_detail', return_value={'iid': 98}), \
+             patch.object(adapter, 'dependency_changes'), \
+             patch.object(adapter, 'fetch_source', return_value=(source, digest)), \
+             patch.object(adapter.infra_runner, 'start', return_value=0) as infra:
+            self.assertEqual(adapter.run_job(context, opener=object()), 0)
+        args = infra.call_args.args
+        self.assertEqual(args[:3], (source, digest, 'variable-contract'))
 
     def test_pipeline_job_routes_only_validated_source_to_pipeline_runner(self):
         self.assertTrue(hasattr(adapter, 'pipeline_runner'),

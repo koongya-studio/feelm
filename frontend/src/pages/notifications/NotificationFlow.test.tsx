@@ -12,7 +12,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import NotificationListPage from './NotificationListPage';
 import PushPreviewPage from './PushPreviewPage';
-import HomePage from '../home/HomePage';
+import FilmPage from '../film/FilmPage';
 import PartyInvitationPage from '../party/PartyInvitationPage';
 import WatchConfirmPage from '../watch/WatchConfirmPage';
 import { getMyProfile } from '../../api/users';
@@ -25,6 +25,30 @@ import type { WatchRecordListItem } from '../../types/watch';
 
 vi.mock('../../api/users', () => ({
   getMyProfile: vi.fn(),
+}));
+
+/*
+ * 알림 아이콘이 **홈에서 3.1 필름 헤더로 옮겨왔다**(업무 -461). 필름이 부르는 필름
+ * 목록 · 팝콘 · 리포트는 실제 호출이라 가로채지 않으면 화면이 실패 상태로 떨어져
+ * 헤더의 알림 링크가 나오지 않는다. 이 시험이 잡는 것은 알림 경로라 최소값만 준다.
+ */
+vi.mock('../../api/taste', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../api/taste')>()),
+  getMyFrames: vi.fn().mockResolvedValue({
+    totalCount: 1,
+    items: [
+      {
+        frameId: 1,
+        movie: { movieId: 101, title: '영화', posterUrl: null },
+        flavorCode: 'FLAVOR_A',
+        score: 4,
+        createdAt: '2026-09-01T00:00:00Z',
+      },
+    ],
+    nextCursor: null,
+    hasNext: false,
+  }),
+  getPopcornBucket: vi.fn().mockResolvedValue({ totalCount: 0, flavors: [] }),
 }));
 
 /*
@@ -114,7 +138,7 @@ function renderApp(entries: string[]) {
   return render(
     <MemoryRouter initialEntries={entries} initialIndex={entries.length - 1}>
       <Routes>
-        <Route path={ROUTE_PATTERN.home} element={<HomePage />} />
+        <Route path={ROUTE_PATTERN.film} element={<FilmPage />} />
         <Route path={ROUTE_PATTERN.notifications} element={<NotificationListPage />} />
         <Route path={ROUTE_PATTERN.pushPreview} element={<PushPreviewPage />} />
         <Route path={ROUTE_PATTERN.watchConfirm} element={<WatchConfirmPage />} />
@@ -132,9 +156,9 @@ async function findRow(title: string) {
   return (await screen.findByText(title)).closest('button') as HTMLButtonElement;
 }
 
-describe('2.1 → 8.1 → 2.4-A', () => {
+describe('3.1 → 8.1 → 2.4-A', () => {
   it('감상 확인 알림이 그 감상 기록으로 가고, 돌아오면 읽음이다', async () => {
-    const { unmount } = renderApp([ROUTE_PATTERN.home]);
+    const { unmount } = renderApp([ROUTE_PATTERN.film]);
 
     fireEvent.click(await screen.findByRole('link', { name: '알림' }));
     expect(location()).toBe('/notifications');

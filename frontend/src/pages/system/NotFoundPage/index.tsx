@@ -25,7 +25,7 @@ export default function NotFoundPage() {
         title="이 주소에는 화면이 없어요"
         description={`${pathname} 경로를 찾지 못했어요`}
       >
-        <Button onClick={() => void navigate(path.home())}>홈으로 이동</Button>
+        <Button onClick={() => void navigate(path.film())}>필름으로 이동</Button>
       </StatusView>
     </>
   );

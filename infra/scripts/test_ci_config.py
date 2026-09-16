@@ -73,6 +73,7 @@ include:
             (self.backend, 'deploy-backend'),
             (self.frontend, 'deploy-frontend'),
             (self.consumer, 'deploy-consumer'),
+            (self.infra, 'deploy-monitoring'),
         )
         for config, name in protected:
             self.assertIn('interruptible: false', job_block(config, name), name)
@@ -176,6 +177,59 @@ include:
             self.assertNotIn(excluded, infra)
         self.assertNotIn('- infra/scripts/test_consumer_distributed_deployment.py',
                          job_block(self.backend, 'backend-mr-test'))
+
+    def test_required_variable_contract_and_runtime_preflight_are_separated(self):
+        contract = job_block(self.infra, 'ci-variable-contract-check')
+        for expected in (
+                'stage: verify', 'tags: [e106-mr-isolated]', 'dependencies: []',
+                'GIT_STRATEGY: none', 'resource_group: ci-variable-contract-check',
+                'interruptible: true', 'timeout: 5m',
+                '$CI_PIPELINE_SOURCE == "merge_request_event"',
+                '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"',
+                'ci-required-variable-preflight.py'):
+            self.assertIn(expected, contract)
+        for forbidden in ('CI_VARIABLE_AUDIT_TOKEN', '--require-values', '--check-metadata',
+                          'environment:', 'tags: [e106-shell]'):
+            self.assertNotIn(forbidden, contract)
+
+        preflight = job_block(self.infra, 'ci-variable-preflight')
+        for expected in (
+                'stage: verify', 'tags: [e106-shell]', 'needs: []',
+                'name: service', 'action: prepare',
+                '--require-values --check-metadata',
+                '$CI_COMMIT_BRANCH == "develop"',
+                '$CI_COMMIT_REF_PROTECTED == "true"',
+                '$CI_PIPELINE_SOURCE == "push"',
+                'resource_group: ci-variable-preflight', 'interruptible: true'):
+            self.assertIn(expected, preflight)
+        for forbidden in ('merge_request_event', 'when: manual', 'allow_failure: true'):
+            self.assertNotIn(forbidden, preflight)
+
+        cache = job_block(self.backend, 'backend-cache-prepare')
+        self.assertIn('needs: [ci-variable-contract-check]', cache)
+
+    def test_monitoring_deploy_is_protected_current_develop_only(self):
+        deploy = job_block(self.infra, 'deploy-monitoring')
+        for expected in (
+                'stage: deploy', 'tags: [e106-shell]',
+                'needs: [ci-variable-preflight]', 'name: service',
+                'ci-deploy-current-commit.py --branch develop',
+                'bash infra/scripts/deploy-monitoring.sh',
+                'resource_group: service-and-backend-cache',
+                'interruptible: false', 'timeout: 15m',
+                '$CI_COMMIT_BRANCH == "develop"',
+                '$CI_COMMIT_REF_PROTECTED == "true"',
+                '$CI_PIPELINE_SOURCE == "push"',
+                '- infra/compose/monitoring.yml',
+                '- infra/monitoring/prometheus/**/*',
+                '- infra/monitoring/grafana/**/*',
+                '- infra/config/required-ci-variables.json'):
+            self.assertIn(expected, deploy)
+        for forbidden in (
+                '$CI_COMMIT_BRANCH == "main"', 'merge_request_event',
+                'when: manual', 'allow_failure: true', 'docker compose down',
+                '- infra/monitoring/README.md'):
+            self.assertNotIn(forbidden, deploy)
 
     def test_pipeline_mr_jobs_are_isolated_sharded_and_path_scoped(self):
         self.assertTrue(self.pipeline_path.is_file(), 'Missing Pipeline CI include')
@@ -306,6 +360,35 @@ include:
         self.assertIn('resource_group: distributed-consumer', consumer_deploy)
         self.assertIn('tags: [e106-distributed]', consumer_deploy)
         self.assertIn('ci-deploy-current-commit.py', consumer_deploy)
+        notifications = (
+            (backend_deploy, 'backend'),
+            (frontend_deploy, 'frontend'),
+            (consumer_deploy, 'consumer'),
+        )
+        for block, service in notifications:
+            self.assertIn(
+                'infra/scripts/notify-deployment.py ' + service + ' "$CI_JOB_STATUS"',
+                block,
+            )
+            self.assertIn('after_script:', block)
+        notification_paths = (
+            backend_env,
+            backend_test,
+            backend_image,
+            backend_deploy,
+            job_block(self.frontend, 'frontend-test'),
+            frontend_image,
+            frontend_deploy,
+            consumer_test,
+            consumer_image,
+            consumer_deploy,
+        )
+        for block in notification_paths:
+            self.assertIn('- infra/scripts/notify-deployment.py', block)
+            self.assertIn('- infra/scripts/test_notify_deployment.py', block)
+        infra_test = job_block(self.infra, 'infra-config-test')
+        self.assertIn('- infra/scripts/notify-deployment.py', infra_test)
+        self.assertIn('- infra/scripts/test_notify_deployment.py', infra_test)
         self.assertIn('--init-script gradle/test-timing.gradle', backend_test)
         self.assertIn('action: prepare', backend_env)
         self.assertIn('ci-backend-env-contract.py --require-values', backend_env)

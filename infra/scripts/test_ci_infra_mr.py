@@ -36,7 +36,7 @@ def archive(entries):
 def archive_with_directories(entries):
     output = io.BytesIO()
     with tarfile.open(fileobj=output, mode="w") as stream:
-        for name in (".gitlab/", ".gitlab/ci/", "infra/", "infra/scripts/"):
+        for name in (".gitlab/", ".gitlab/ci/", "infra/", "infra/config/", "infra/scripts/"):
             item = tarfile.TarInfo(name)
             item.type = tarfile.DIRTYPE
             item.mode = 0o700
@@ -54,17 +54,22 @@ class InfraMrTests(unittest.TestCase):
         payload = archive({
             ".gitlab-ci.yml": b"include:\n",
             ".gitlab/ci/infra.yml": b"infra-config-test:\n",
+            "infra/config/required-ci-variables.json": b'{"schema_version":1}',
+            "infra/scripts/ci-required-variable-preflight.py": b"import json\n",
             "infra/scripts/run-infra-config-tests.py": b"import unittest\n",
             "infra/scripts/test_ci_infra_mr.py": b"import unittest\n",
         })
         files, _ = boundary.source_plan(payload, hashlib.sha256(payload).hexdigest())
         self.assertEqual(set(files), {
             ".gitlab-ci.yml", ".gitlab/ci/infra.yml", "infra/scripts/run-infra-config-tests.py",
-            "infra/scripts/test_ci_infra_mr.py"})
+            "infra/scripts/test_ci_infra_mr.py", "infra/config/required-ci-variables.json",
+            "infra/scripts/ci-required-variable-preflight.py"})
 
         rejected = archive({
             ".gitlab-ci.yml": b"include:\n",
             ".gitlab/ci/infra.yml": b"job:\n",
+            "infra/config/required-ci-variables.json": b'{"schema_version":1}',
+            "infra/scripts/ci-required-variable-preflight.py": b"import json\n",
             "infra/scripts/run-infra-config-tests.py": b"test\n",
             "infra/scripts/test_ci_infra_mr.py": b"test\n",
             "backend/.env": b"SECRET=value\n",
@@ -77,11 +82,19 @@ class InfraMrTests(unittest.TestCase):
         self.assertIn("--property=PrivateNetwork=yes", command)
         self.assertIn("--property=ProtectSystem=strict", command)
         self.assertIn(runner.FIXED_COMMAND, command)
+        contract = runner.unit_command(
+            Path("/run/source"), "ci490-infra-0123456789ab.service", "variable-contract"
+        )
+        self.assertIn(runner.CONTRACT_COMMAND, contract)
+        with self.assertRaisesRegex(ValueError, "group"):
+            runner.unit_command(Path("/run/source"), "ci490-infra-0123456789ab.service", "all")
 
     def test_boundary_accepts_normalized_archive_directories(self):
         payload = archive_with_directories({
             ".gitlab-ci.yml": b"include:\n",
             ".gitlab/ci/infra.yml": b"infra-config-test:\n",
+            "infra/config/required-ci-variables.json": b'{"schema_version":1}',
+            "infra/scripts/ci-required-variable-preflight.py": b"import json\n",
             "infra/scripts/run-infra-config-tests.py": b"import unittest\n",
             "infra/scripts/test_ci_infra_mr.py": b"import unittest\n",
         })

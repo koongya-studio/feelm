@@ -8,6 +8,6 @@ RUN python3 -m pip install \
       --no-cache-dir \
       --require-hashes \
       --requirement /opt/spark/requirements-ml.txt \
-    && python3 -c 'import numpy; assert numpy.__version__ == "2.2.6"'
+    && python3 -c 'import numpy, redis; assert numpy.__version__ == "2.2.6"; assert redis.__version__ == "5.3.1"'
 
 USER spark

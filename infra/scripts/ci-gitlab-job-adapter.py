@@ -63,6 +63,10 @@ INFRA_JOB_NAME = 'infra-config-test'
 INFRA_EXPECTED_SCRIPT = [
     'python3 -I -B infra/scripts/run-infra-config-tests.py',
 ]
+CI_VARIABLE_CONTRACT_JOB = 'ci-variable-contract-check'
+CI_VARIABLE_CONTRACT_SCRIPT = [
+    'python3 -I -B infra/scripts/ci-required-variable-preflight.py',
+]
 DOCS_JOB_NAME = 'docs-mr-check'
 DOCS_EXPECTED_SCRIPT = ['python3 -B infra/scripts/check-markdown.py']
 PIPELINE_JOB_GROUPS = {
@@ -184,6 +188,9 @@ def validate_job_response(response):
         FRONTEND_JOB_NAME: (JOB_STAGE, FRONTEND_EXPECTED_SCRIPT, 'frontend', None),
         CONSUMER_JOB_NAME: (JOB_STAGE, CONSUMER_EXPECTED_SCRIPT, 'consumer', None),
         INFRA_JOB_NAME: (JOB_STAGE, INFRA_EXPECTED_SCRIPT, 'infra', None),
+        CI_VARIABLE_CONTRACT_JOB: (
+            'verify', CI_VARIABLE_CONTRACT_SCRIPT, 'infra', 'variable-contract'
+        ),
         DOCS_JOB_NAME: ('verify', DOCS_EXPECTED_SCRIPT, 'docs', None),
         CACHE_PREPARE_JOB: ('verify', CACHE_PREPARE_SCRIPT, 'cache', None),
         **{
@@ -667,7 +674,7 @@ def run_job(response, config_path=CONFIG, opener=None):
         if context['service'] == 'consumer':
             return consumer_runner.start(payload, digest, started)
         if context['service'] == 'infra':
-            return infra_runner.start(payload, digest, started)
+            return infra_runner.start(payload, digest, context['pipeline_group'], started)
         return safety.start(prepared, prepared, 'backend', payload, digest, started)
     finally:
         signal.signal(signal.SIGTERM, previous_term); signal.signal(signal.SIGINT, previous_int)

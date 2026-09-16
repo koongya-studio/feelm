@@ -107,8 +107,8 @@ export default function ReportIssuedPage() {
           >
             다시 시도
           </Button>
-          <Button variant="text" onClick={() => void navigate(path.home())}>
-            홈으로 이동
+          <Button variant="text" onClick={() => void navigate(path.film())}>
+            필름으로 이동
           </Button>
         </StatusView>
       </div>

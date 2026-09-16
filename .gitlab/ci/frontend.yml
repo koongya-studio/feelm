@@ -75,6 +75,8 @@ frontend-test:
         - infra/scripts/deploy-frontend.sh
         - infra/scripts/rollback-frontend.sh
         - infra/scripts/test_deploy_frontend.py
+        - infra/scripts/notify-deployment.py
+        - infra/scripts/test_notify_deployment.py
         - .gitlab-ci.yml
         - .gitlab/ci/common.yml
         - .gitlab/ci/frontend.yml
@@ -115,6 +117,8 @@ frontend-image:
         - infra/scripts/deploy-frontend.sh
         - infra/scripts/rollback-frontend.sh
         - infra/scripts/test_deploy_frontend.py
+        - infra/scripts/notify-deployment.py
+        - infra/scripts/test_notify_deployment.py
         - .gitlab-ci.yml
         - .gitlab/ci/common.yml
         - .gitlab/ci/frontend.yml
@@ -133,6 +137,8 @@ deploy-frontend:
     - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
     - FRONTEND_IMAGE="$DOCKERHUB_NAMESPACE/feelm-frontend:$CI_COMMIT_SHA"
     - bash ./infra/scripts/deploy-frontend.sh "$FRONTEND_IMAGE"
+  after_script:
+    - /usr/bin/python3 -I -B infra/scripts/notify-deployment.py frontend "$CI_JOB_STATUS"
   interruptible: false
   retry:
     max: 2
@@ -160,6 +166,8 @@ deploy-frontend:
         - infra/scripts/deploy-frontend.sh
         - infra/scripts/rollback-frontend.sh
         - infra/scripts/test_deploy_frontend.py
+        - infra/scripts/notify-deployment.py
+        - infra/scripts/test_notify_deployment.py
         - .gitlab-ci.yml
         - .gitlab/ci/common.yml
         - .gitlab/ci/frontend.yml

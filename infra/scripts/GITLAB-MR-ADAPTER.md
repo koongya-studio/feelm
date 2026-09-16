@@ -92,8 +92,10 @@ GitLab API의 정확한 커밋 archive를 사용한다. MR이 `.gitlab-ci.yml`�
 차단된다. Job 이름과 script가 그대로이므로 이 실행 정책 변경에는 서버 어댑터 재배포가 필요 없다.
 
 어댑터는 인증된 커밋에서 `pipeline/spark`만 다시 archive하고, 실행 파일·링크·`.env*`·가상환경과
-범위 밖 경로를 거부한다. Python 3.10.12, PySpark 4.1.3, pytest 8.4.2, ruff 0.12.12 및
-PyPI/file.pythonhosted.org의 해시가 있는 uv lock만 허용한다. 실행기는 digest로 고정한 전용
+범위 밖 경로를 거부한다. Python 3.10.12, PySpark 4.1.3, pytest 8.4.2, ruff 0.12.12와
+검토된 psycopg 3.2.10, PyTorch 2.6.0 CPU, Transformers 4.48.3만 허용한다. uv lock은
+PyPI와 `https://download.pytorch.org/whl/cpu` registry, `files.pythonhosted.org/packages/`와
+`download-r2.pytorch.org/whl/cpu/`의 해시가 있는 패키지만 허용한다. 실행기는 digest로 고정한 전용
 Python/Java 이미지와 root 소유 설정에 고정된 의존성 캐시를 사용한다. 컨테이너는
 `--network=none`, read-only rootfs, capability 제거, CPU·메모리·PID·시간 제한으로 실행한다.
 컨테이너 내부 UID 0은 `/work`와 `/tmp` tmpfs에만 쓰며 Rootless Docker 사용자 네임스페이스의

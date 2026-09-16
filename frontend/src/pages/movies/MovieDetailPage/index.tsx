@@ -244,7 +244,7 @@ export default function MovieDetailPage() {
             title="영화를 찾을 수 없어요"
             description="주소가 잘못되었거나 서비스에서 내려간 영화예요"
           >
-            <Button onClick={() => void navigate(path.home())}>홈으로</Button>
+            <Button onClick={() => void navigate(path.film())}>필름으로</Button>
           </StatusView>
         ) : (
           <StatusView

@@ -30,7 +30,8 @@ class RatingCreateRequestTest {
         for (String score : new String[] {"0", "4.49", "5.5"}) {
             assertThat(violations(score, null, null)).isNotEmpty();
         }
-        assertThat(validator.validate(new RatingCreateRequest(null, null, null))).isNotEmpty();
+        assertThat(validator.validate(new RatingCreateRequest(null, null, null, null)))
+                .isNotEmpty();
     }
 
     @Test
@@ -41,9 +42,51 @@ class RatingCreateRequestTest {
         assertThat(violations("4.0", "a".repeat(201), RatingVisibility.PRIVATE)).isNotEmpty();
     }
 
+    @Test
+    @DisplayName("스포일러 생략과 명시적 true·false를 허용한다")
+    void acceptsOmittedAndExplicitSpoilerValues() {
+        assertThat(new RatingCreateRequest(new BigDecimal("4.0"), null, null, null).spoiler())
+                .isFalse();
+        assertThat(
+                        validator.validate(
+                                new RatingCreateRequest(new BigDecimal("4.0"), null, null, false)))
+                .isEmpty();
+        assertThat(
+                        validator.validate(
+                                new RatingCreateRequest(
+                                        new BigDecimal("4.0"),
+                                        "결말 반전",
+                                        RatingVisibility.PUBLIC,
+                                        true)))
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("내용 없는 한줄평에는 스포일러 표시를 허용하지 않는다")
+    void rejectsSpoilerWithoutVisibleComment() {
+        for (String comment : new String[] {null, "", "\t\n", "\u00A0", "\u3000"}) {
+            assertThat(
+                            validator.validate(
+                                    new RatingCreateRequest(
+                                            new BigDecimal("4.0"),
+                                            comment,
+                                            RatingVisibility.PUBLIC,
+                                            true)))
+                    .isNotEmpty();
+        }
+        assertThat(
+                        validator.validate(
+                                new RatingCreateRequest(
+                                        new BigDecimal("4.0"),
+                                        "\u00A0반전\u3000",
+                                        RatingVisibility.PUBLIC,
+                                        true)))
+                .isEmpty();
+    }
+
     private Set<ConstraintViolation<RatingCreateRequest>> violations(
             String score, String comment, RatingVisibility visibility) {
         return validator.validate(
-                new RatingCreateRequest(new BigDecimal(score), comment, visibility));
+                new RatingCreateRequest(new BigDecimal(score), comment, visibility, false));
     }
 }

@@ -81,7 +81,7 @@ function rejectWith(status: number, code: string) {
 }
 
 describe('0.6 로그인', () => {
-  it('취향 설정을 마친 사용자는 홈으로 간다', async () => {
+  it('취향 설정을 마친 사용자는 필름으로 간다', async () => {
     vi.mocked(login).mockResolvedValue(ACTIVE_USER);
     renderLogin();
 
@@ -89,7 +89,7 @@ describe('0.6 로그인', () => {
     click('로그인');
 
     await waitFor(() => {
-      expect(location()).toBe('/');
+      expect(location()).toBe('/film');
     });
     expect(login).toHaveBeenCalledWith('user@example.com', 'p@ssw0rd!');
   });

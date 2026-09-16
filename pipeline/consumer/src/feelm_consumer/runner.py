@@ -8,9 +8,10 @@ from typing import Any
 
 import psycopg
 import redis
-from confluent_kafka import Consumer, KafkaException, TopicPartition
+from confluent_kafka import Consumer, KafkaException, Producer, TopicPartition
 
 from feelm_consumer.artifacts import ArtifactBundle, load_bundle
+from feelm_consumer.candidate_events import CandidateEventPublishError, publish_candidate_updated
 from feelm_consumer.content import ContentBundle, load_content
 from feelm_consumer.discovery_popularity import load_discovery_popularity
 from feelm_consumer.discovery_release import validate_discovery_artifacts
@@ -48,6 +49,7 @@ def process_user(
     groups: GroupBundle | None = None,
     discovery_popularity: tuple[RankedMovie, ...] | None = None,
     hybrid_alpha: float = 0.5,
+    candidate_event_publisher: Callable[[int], None] | None = None,
 ) -> bool | None:
     for attempt in range(attempts):
         try:
@@ -78,12 +80,14 @@ def process_user(
                 LOG.warning("partition ownership lost before Redis publish")
                 return False
             publish(store, user_id, expected, *results, partition_fence)
+            if candidate_event_publisher is not None:
+                candidate_event_publisher(user_id)
             LOG.info("candidate published")
             return True
         except StalePartitionFenceError:
             LOG.info("partition fence lost before Redis publish")
             return None
-        except (redis.RedisError, psycopg.Error, ValueError) as exc:
+        except (redis.RedisError, psycopg.Error, ValueError, CandidateEventPublishError) as exc:
             # Do not log DSNs, Redis URLs, event payloads, or user identifiers.
             LOG.warning("fold-in dependency or data failure code=%s", type(exc).__name__)
             if attempt + 1 < attempts:
@@ -143,6 +147,23 @@ def run(settings: Settings) -> None:
             "auto.offset.reset": "earliest",
         }
     )
+    producer: Producer | None = None
+
+    def send_candidate_event(user_id: int) -> None:
+        nonlocal producer
+        if producer is None:
+            try:
+                producer = Producer(
+                    {
+                        "bootstrap.servers": settings.kafka_bootstrap_servers,
+                        "enable.idempotence": True,
+                        "acks": "all",
+                    }
+                )
+            except KafkaException as error:
+                raise CandidateEventPublishError("candidate update Kafka producer failed") from error
+        publish_candidate_updated(producer, user_id)
+
     stopping = False
     paused: dict[tuple[str, int], int] = {}
     owned: set[tuple[str, int]] = set()
@@ -239,6 +260,7 @@ def run(settings: Settings) -> None:
                 groups=groups,
                 discovery_popularity=discovery_popularity,
                 hybrid_alpha=settings.hybrid_alpha,
+                candidate_event_publisher=send_candidate_event,
             )
             if processed is None:
                 LOG.warning(

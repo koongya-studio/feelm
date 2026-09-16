@@ -73,7 +73,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-029 | [검색 필터 옵션 조회](./movies-search.md#api-029-검색-필터-옵션-조회) | GET | `/movies/filter-options` | 검색 | 1차 MVP | 공개 | FR-15 |  |
 | API-030 | [영화 상세 조회](./movies-search.md#api-030-영화-상세-조회) | GET | `/movies/{movieId}` | 영화 | 1차 MVP | 선택 | FR-34, FR-16, FR-13 | O |
 | API-031 | [유사 영화 추천](./recommendation.md#api-031-유사-영화-추천) | GET | `/movies/{movieId}/similar` | 추천 | 1차 MVP | 선택 | FR-11 | O |
-| API-032 | [공개 한줄평 목록](./social.md#api-032-공개-한줄평-목록) | GET | `/movies/{movieId}/reviews` | 소셜 | 1차 MVP | 선택 | FR-26, FR-34, FR-39 |  |
+| API-032 | [공개 한줄평 목록](./social.md#api-032-공개-한줄평-목록) | GET | `/movies/{movieId}/reviews` | 소셜 | 1차 MVP | 회원 | FR-26, FR-34, FR-39 |  |
 | API-033 | [OTT 링크 클릭 기록](./watch.md#api-033-ott-링크-클릭-기록) | POST | `/movies/{movieId}/ott-clicks` | 감상 | 1차 MVP | 회원 | FR-17 | O |
 | API-034 | [감상 기록 목록](./watch.md#api-034-감상-기록-목록) | GET | `/watch-records` | 감상 | 1차 MVP | 회원 | FR-18 |  |
 | API-035 | [감상 확인 응답](./watch.md#api-035-감상-확인-응답) | POST | `/watch-records/{watchRecordId}/confirm` | 감상 | 1차 MVP | 회원 | FR-18 |  |

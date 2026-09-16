@@ -61,9 +61,10 @@ class RatingCreateOpenApiContractTest {
                                 .path("schema"));
         assertThat(request.path("properties").properties())
                 .extracting(Map.Entry::getKey)
-                .containsExactlyInAnyOrder("score", "comment", "visibility");
+                .containsExactlyInAnyOrder("score", "comment", "visibility", "spoiler");
         assertThat(request.path("properties").has("scoreStepValid")).isFalse();
         assertThat(request.path("properties").has("commentVisibilityValid")).isFalse();
+        assertThat(request.path("properties").has("spoilerCommentValid")).isFalse();
         assertThat(values(request.path("required"))).contains("score");
         JsonNode score = request.path("properties").path("score");
         assertThat(score.path("minimum").decimalValue()).isEqualByComparingTo("0.5");
@@ -91,10 +92,38 @@ class RatingCreateOpenApiContractTest {
                         "score",
                         "comment",
                         "visibility",
+                        "spoiler",
                         "frame",
                         "popcorn",
                         "watchStatus",
                         "createdAt");
+    }
+
+    @Test
+    @DisplayName("스포일러 요청 기본값과 응답의 필수 boolean을 문서화한다")
+    void documentsSpoilerBoolean() throws Exception {
+        JsonNode document = document();
+        JsonNode operation = document.path("paths").path(PATH).path("post");
+        JsonNode request =
+                resolve(
+                        document,
+                        operation
+                                .path("requestBody")
+                                .path("content")
+                                .path("application/json")
+                                .path("schema"));
+        JsonNode requestSpoiler = request.path("properties").path("spoiler");
+        assertThat(requestSpoiler.path("type").asText()).isEqualTo("boolean");
+        assertThat(requestSpoiler.has("default")).isTrue();
+        assertThat(requestSpoiler.path("default").isBoolean()).isTrue();
+        assertThat(requestSpoiler.path("default").asBoolean()).isFalse();
+        assertThat(values(request.path("required"))).doesNotContain("spoiler");
+
+        JsonNode response =
+                document.path("components").path("schemas").path("RatingCreateResponse");
+        assertThat(response.path("properties").path("spoiler").path("type").asText())
+                .isEqualTo("boolean");
+        assertThat(values(response.path("required"))).contains("spoiler");
     }
 
     private void assertSchema(JsonNode responses, String code, String name) {
