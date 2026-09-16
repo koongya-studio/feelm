@@ -11,6 +11,7 @@ from feelm_consumer.profile import ProfileInput, fold_in, merge_inputs
 from feelm_consumer.ranking import rank_candidates
 from feelm_consumer.results import build_results
 from feelm_consumer.service import calculate_user_results
+from feelm_consumer.xai import build_candidate_reasons
 
 MAPPING_REVISION = "sha256:" + "a" * 64
 METADATA_REVISION = "sha256:" + "b" * 64
@@ -70,6 +71,7 @@ def _legacy_results(bundle: ArtifactBundle, ratings, onboarding, candidate_versi
         factor_backed_input_count=folded.factor_backed_input_count,
         candidates=rank_candidates(folded.vector, service_factors),
         movie_metadata=bundle.movie_metadata,
+        reasons=build_candidate_reasons(rank_candidates(folded.vector, service_factors), merged_inputs, bundle.movie_metadata),
     )
 
 
@@ -404,4 +406,4 @@ def test_candidate_top500_is_selected_after_service_publishability_filtering() -
     assert candidate_items[0]["movieId"] == 11_101
     assert candidate_items[-1]["movieId"] == 10_602
     assert len(results) == 2
-    assert all("reason" not in item and "rerankFeatures" not in item for item in candidate_items)
+    assert all("reason" in item and "rerankFeatures" not in item for item in candidate_items)

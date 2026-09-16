@@ -92,18 +92,38 @@ def test_real_redis_corrupt_or_partial_version_is_atomically_recovered(real_redi
 def test_real_redis_persists_empty_discovery_group_with_matching_generation(real_redis: redis.Redis) -> None:
     fence = claim_partition_fence(real_redis, "group", "topic", 0)
     generation_id = "generation-1"
-    vector = {"candidateVersion": 3, "generationId": generation_id, "vector": [0.1]}
+    vector = {"candidateVersion": 4, "generationId": generation_id, "vector": [0.1]}
     candidates = {
-        "candidateVersion": 3,
+        "candidateVersion": 4,
         "generationId": generation_id,
-        "taste": [{"movieId": 7, "score": 0.5}],
+        "taste": [
+            {
+                "movieId": 7,
+                "score": 0.5,
+                "reason": {
+                    "code": "SHARED_GENRE",
+                    "sourceMovieIds": [3],
+                    "matchedGenreCodes": ["DRAMA"],
+                },
+            }
+        ],
         "discovery": [],
     }
 
     assert publish(real_redis, 46, 0, vector, candidates, fence) == 1
     assert current_version(real_redis, 46, fence) == 1
     saved = json.loads(real_redis.get(user_keys(46)[2]))
-    assert saved["taste"] == [{"movieId": 7, "score": 0.5}]
+    assert saved["taste"] == [
+        {
+            "movieId": 7,
+            "score": 0.5,
+            "reason": {
+                "code": "SHARED_GENRE",
+                "sourceMovieIds": [3],
+                "matchedGenreCodes": ["DRAMA"],
+            },
+        }
+    ]
     assert saved["discovery"] == []
 
 

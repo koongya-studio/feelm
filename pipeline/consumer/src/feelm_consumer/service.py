@@ -10,6 +10,7 @@ from feelm_consumer.hybrid import build_profile, percentile_scores, score_candid
 from feelm_consumer.profile import ProfileInput, fold_in, merge_inputs
 from feelm_consumer.ranking import RankedMovie, rank_candidates
 from feelm_consumer.results import build_results
+from feelm_consumer.xai import build_candidate_reasons
 
 LOG = logging.getLogger(__name__)
 CANDIDATE_LIMIT = 500
@@ -75,13 +76,15 @@ def calculate_user_results(
         service_ranked = rank_candidates(folded.vector, service_factors)
         if len(service_ranked) < CANDIDATE_LIMIT:
             LOG.warning("foldin_candidate_shortage available=%s requested=500", len(service_ranked))
+        candidates = _published_scores(service_ranked)
         return build_results(
             model_version=bundle.model_version,
             vector=folded.vector.tolist() if folded is not None else [],
             rating_count=len(ratings),
             factor_backed_input_count=folded.factor_backed_input_count if folded is not None else 0,
-            candidates=_published_scores(service_ranked),
+            candidates=candidates,
             movie_metadata=bundle.movie_metadata,
+            reasons=build_candidate_reasons(candidates, merged_inputs, bundle.movie_metadata),
         )
 
     als_scores: dict[int, float] = {}
@@ -108,6 +111,7 @@ def calculate_user_results(
         factor_backed_input_count=folded.factor_backed_input_count if folded is not None else 0,
         candidates=ranked,
         movie_metadata=bundle.movie_metadata,
+        reasons=build_candidate_reasons(ranked, merged_inputs, bundle.movie_metadata),
     )
 
 

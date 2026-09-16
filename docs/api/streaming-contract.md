@@ -317,9 +317,17 @@ Spring은 개인 추천에서는 후보를 재정렬하고, 파티·OTT에서는
 ```json
 {
   "modelVersion": "als-2026-09-05",
-  "candidateVersion": 3,
+  "candidateVersion": 4,
   "generationId": "550e8400-e29b-41d4-a716-446655440000",
-  "taste": [{ "movieId": 807, "score": 0.91 }],
+  "taste": [{
+    "movieId": 807,
+    "score": 0.91,
+    "reason": {
+      "code": "SHARED_GENRE",
+      "sourceMovieIds": [550],
+      "matchedGenreCodes": ["THRILLER"]
+    }
+  }],
   "discovery": [],
   "updatedAt": "2026-08-31T07:21:03Z"
 }
@@ -362,7 +370,7 @@ Spring은 개인 추천에서는 후보를 재정렬하고, 파티·OTT에서는
   같은 이유로 상위 500 컷은 동점 무리의 중간을 자를 수 있으며, 그때 탈락 여부도 `movieId`가 정한다.
 - **`score`의 최종 의미와 소비 규칙(파티 집계식, OTT 임계치)은 아직 합의되지 않았다.** 위 정의는
   모델 교체에 영향받지 않는 잠정 기준이며, 합의 시 이 절과 party.md·recommendation.md를 함께 고친다.
-- `candidateVersion`은 Candidate JSON 형식·구성 규칙 버전이며 현재 `3`으로 고정되어 후보 재생성만으로 바꾸지 않는다. `candidate-version` Redis String은 성공한 후보 게시마다 1씩 증가하는 내부 게시 순번이다. `generationId`는 매 생성 실행마다 새로 발급하는 고유 식별자다.
+- `candidateVersion`은 Candidate JSON 형식·구성 규칙 버전이며 현재 `4`로 고정되어 후보 재생성만으로 바꾸지 않는다. `candidate-version` Redis String은 성공한 후보 게시마다 1씩 증가하는 내부 게시 순번이다. `generationId`는 매 생성 실행마다 새로 발급하는 고유 식별자다.
 - OTT 구독 추천(API-068)은 `taste`와 `discovery`에서 임계치 이상인 영화를 OTT 제공처별로 집계한다.
   임계치 값은 recommendation.md의 미정 사항으로 남는다
 
@@ -392,14 +400,18 @@ Spring은 개인 추천에서는 후보를 재정렬하고, 파티·OTT에서는
 
 **후보 부가 정보와 Spring 처리**
 
-`candidates.taste` 항목은 `movieId`, `score`를 포함한다. `candidates.discovery` 항목은 이후 발견 추천 담당 Consumer가 `movieId`, `score`, `flavorCode`로 채운다.
-현재 Consumer는 빈 `discovery` 배열을 생성하며 `reason`은 포함하지 않는다.
-최종 추천 문구는 Spring이 실제 사용한 검증 가능한 근거를 바탕으로 구성한다.
+`candidates.taste`와 `candidates.discovery` 항목은 `movieId`, `score`, `reason`을 포함한다. `discovery`는 이후 발견 추천 담당 Consumer가 `flavorCode`도 채운다.
+`reason.code`는 `SHARED_GENRE` 또는 `TOP_RATED_SOURCE`다. 전자는 `sourceMovieIds`의 고평점 입력 영화와 후보가 공유하는
+`matchedGenreCodes`를, 후자는 공통 장르가 없을 때 가장 높은 평가 입력 영화를 뜻하며 `matchedGenreCodes`는 빈 배열이다.
+Consumer는 구조화된 근거만 저장하고, Spring은 source 영화 제목과 장르 표시명을 조회해 사용자 문구를 만든다.
 Spring은 최대 500개 전체에 행동 가중치와 감상·관심없음 제외를 적용하고 최종 세트를 만든다.
 OTT 제공처는 `movie_ott_providers`·`otts`, 사용자 클릭 정보는 `watch_records`에서 조회한다.
 별도 Redis `topn`은 생성하거나 읽지 않는다. 기존 키 자동 삭제는 하지 않는다. 기존 배포가
 `candidates.items` 형식으로 저장한 값은 새 `taste`/`discovery` 형식과 호환되지 않으므로, Spring reader를
 전환하기 전에 Consumer 전체 재구축 또는 사용자별 재게시로 모든 활성 후보를 새 형식으로 갱신해야 한다.
+`candidateVersion=3`은 `taste`/`discovery` 형식이지만 `reason`이 없으므로, `reason`을 요구하는 Spring reader를
+배포하기 전에도 같은 방식으로 모든 활성 후보를 `candidateVersion=4`로 재게시해야 한다. reader는 version 4 이외의
+payload를 추측해 문구를 만들지 않고 재시도 후 `503 RECOMMENDATION_UNAVAILABLE`을 반환한다.
 
 **`feelm:model:current`**
 
@@ -442,7 +454,7 @@ URI나 Redis에 저장하지 않고 runtime filesystem 설정으로 제공한다
 - 이벤트 유실이나 Redis 데이터 손실이 있어도 하루 한 번 정합이 회복된다
 - 완료 후 `feelm:model:current`를 갱신한다
 - 전체 재구축도 `candidates` 게시이므로 `candidate-version`은 사용자별 기존 값에서 이어서 증가시키며
-  `1`로 초기화하지 않는다. JSON의 `candidateVersion`은 형식 버전 `3`으로 유지하고, 새 게시에는 새 `generationId`를 쓴다
+  `1`로 초기화하지 않는다. JSON의 `candidateVersion`은 형식 버전 `4`로 유지하고, 새 게시에는 새 `generationId`를 쓴다
 - `candidate-version` 키가 없어 이어갈 기존 값을 읽을 수 없는 경우(신규 사용자, Redis 데이터 손실)는 `1`부터 시작한다
 
 ## 6. 지연과 장애 처리
