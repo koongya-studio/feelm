@@ -31,14 +31,12 @@ import PopcornBucketPage from '../pages/film/PopcornBucketPage';
 import AccountManagePage from '../pages/my/AccountManagePage';
 import BlockedUsersPage from '../pages/my/BlockedUsersPage';
 import MyDashboardPage from '../pages/my/MyDashboardPage';
-import MyRatingsPage from '../pages/my/MyRatingsPage';
 import NotificationSettingsPage from '../pages/my/NotificationSettingsPage';
 import PasswordChangePage from '../pages/my/PasswordChangePage';
 import PrivacySettingsPage from '../pages/my/PrivacySettingsPage';
 import ProfileEditPage from '../pages/my/ProfileEditPage';
 import ProfilePreviewPage from '../pages/my/ProfilePreviewPage';
 import PublicProfilePage from '../pages/my/PublicProfilePage';
-import RecommendationHistoryPage from '../pages/my/RecommendationHistoryPage';
 import SettingsPage from '../pages/my/SettingsPage';
 import WithdrawPage from '../pages/my/WithdrawPage';
 import TasteComparePage from '../pages/my/TasteComparePage';
@@ -116,11 +114,6 @@ export const router = createBrowserRouter(
 
         // 이번 단계 구현 범위가 아닌 탭. REF-01의 5탭 구성을 검증하기 위해 라우트는 둔다.
         { path: ROUTE_PATTERN.party, element: <PartyListPage /> },
-
-        // MY 기록 목록 (업무 -306). 와이어프레임이 하단 내비를 그리는 탭 화면이다
-        { path: ROUTE_PATTERN.recommendationHistory, element: <RecommendationHistoryPage /> },
-        { path: ROUTE_PATTERN.myRatings, element: <MyRatingsPage tab="rated" /> },
-        { path: ROUTE_PATTERN.unratedMovies, element: <MyRatingsPage tab="unrated" /> },
 
         // 7.3 취향 리포트 목록 (업무 -308). 와이어프레임이 하단 내비를 그렸다
         { path: ROUTE_PATTERN.tasteReports, element: <ReportListPage /> },

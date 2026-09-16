@@ -56,7 +56,13 @@ afterEach(() => {
 function LocationProbe() {
   const location = useLocation();
 
-  return <div data-testid="location">{location.pathname}</div>;
+  return (
+    <>
+      <div data-testid="location">{location.pathname}</div>
+      {/* MY의 탭은 라우트가 아니라 `?tab=`이라 검색 문자열도 본다(업무 -495) */}
+      <div data-testid="search">{location.search}</div>
+    </>
+  );
 }
 
 function renderApp(entries: string[]) {
@@ -78,8 +84,14 @@ function renderApp(entries: string[]) {
 }
 
 const location = () => screen.getByTestId('location').textContent;
+const search = () => screen.getByTestId('search').textContent;
 
 describe('2.1 → EXT-01 → EXT-02 → EXT-03 → EXT-04', () => {
+  /*
+   * EXT-02 분석 연출을 기다리는 `waitFor`가 5초까지 쓰는데 vitest의 기본 제한도 5초라,
+   * 전체 실행처럼 부하가 있으면 안에서 기다리다 밖에서 끊긴다(develop에서도 같다).
+   * 분석을 기다리는 두 테스트의 제한을 늘린다.
+   */
   it('분석을 마치면 결과로 바꿔 끼우고, 상세와 비교를 오간다', async () => {
     renderApp([ROUTE_PATTERN.home]);
 
@@ -115,7 +127,7 @@ describe('2.1 → EXT-01 → EXT-02 → EXT-03 → EXT-04', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '이 OTT 작품을 더 추천받기' }));
     expect(location()).toBe('/recommendations');
-  });
+  }, 15000);
 
   it('분석 중 화면은 기록에 남지 않는다', async () => {
     renderApp([ROUTE_PATTERN.home, ROUTE_PATTERN.ottFinder]);
@@ -125,7 +137,7 @@ describe('2.1 → EXT-01 → EXT-02 → EXT-03 → EXT-04', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '뒤로 가기' }));
     await waitFor(() => expect(location()).toBe('/otts/recommend'));
-  });
+  }, 15000);
 });
 
 describe('6.1 ⇢ EXT-01 · EXT-03 ⇢ 6.1', () => {
@@ -152,7 +164,7 @@ describe('6.1 ⇢ EXT-01 · EXT-03 ⇢ 6.1', () => {
 });
 
 describe('EXT-01 ⇢ EXT-05', () => {
-  it('평가가 부족하면 분석 대신 안내로 가고, 7.7 · 3.1로 이어진다', async () => {
+  it('평가가 부족하면 분석 대신 안내로 가고, MY 안 남긴 영화 · 3.1로 이어진다', async () => {
     window.history.replaceState({}, '', '/?mock=ott-insufficient');
     const { unmount } = renderApp([ROUTE_PATTERN.ottFinder]);
 
@@ -165,8 +177,13 @@ describe('EXT-01 ⇢ EXT-05', () => {
       '6',
     );
 
+    /*
+     * 7.7 화면을 지우고 MY의 탭으로 옮겼다(업무 -495). 탭은 라우트가 아니라 `?tab=`이라
+     * 경로는 `/my`이고 탭은 검색 문자열에 있다.
+     */
     fireEvent.click(screen.getByRole('button', { name: '영화 평가하러 가기' }));
-    expect(location()).toBe('/my/ratings/unrated');
+    expect(location()).toBe('/my');
+    expect(search()).toBe('?tab=unrated');
     unmount();
 
     renderApp([ROUTE_PATTERN.ottInsufficient]);

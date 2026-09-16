@@ -87,6 +87,9 @@ export async function recordOttClick(movieId: number, ottId: number): Promise<Wa
  * 정렬(`clickedAt` 내림차순 · `null`은 뒤)과 만료 반영은 서버가 한다. 목록을 읽는 것만으로
  * 만료된 `LINK_CLICKED`가 `EXPIRED`로 넘어가므로, 7.7이나 2.4-A를 열면 상태가 최신이다.
  *
+ * `status`는 MY의 `안 남긴 영화` 탭이 `WATCHED_UNRATED`만 받으려고 쓴다(업무 -306의 7.7을
+ * 업무 -495에서 옮겼다).
+ *
  * `cursor`는 **같은 조건으로만** 되돌려 준다. 조건이 섞인 커서는 `400`이다.
  */
 export async function getWatchRecords(query: WatchRecordQuery = {}): Promise<WatchRecordList> {

@@ -13,16 +13,19 @@
  * | 상단 | 3:4 프로필 사진 + 닉네임 |
  * | 버튼 둘 | `프로필 편집`(→ 7.2) · `프로필 공유` |
  * | 바로가기 | `4컷 리포트`(→ 7.3) · `취향 팝콘`(이동 없음) |
- * | 탭 | `평가한 영화` · `추천 기록`. **화면 안에서 아래 피드만 바꾼다** |
+ * | 탭 | `평가한 영화` · `안 남긴 영화` · `추천 기록`. **화면 안에서 아래 피드만 바꾼다** |
  * | 본문 | 고른 탭의 포스터 3열 피드 |
  *
- * **피드는 각 탭의 실제 기록이다.** 평가는 API-039(`getMyRatings`), 추천은
- * API-048(`getRecommendationHistory`)이고 7.6 · 7.5가 쓰는 함수 그대로다. 취향 필름
- * (API-042)은 **부르지 않는다** — 프레임을 평가 · 추천 기록인 것처럼 쓸 수 없다.
+ * **피드는 각 탭의 실제 기록이다.** 평가는 API-039(`getMyRatings`), 안 남긴 영화는
+ * API-034(`getWatchRecords`, `WATCHED_UNRATED`), 추천은 API-048(`getRecommendationHistory`)이다.
+ * 취향 필름(API-042)은 **부르지 않는다** — 프레임을 평가 · 추천 기록인 것처럼 쓸 수 없다.
  * 필름은 하단 내비 `필름` 탭(3.1)이 보여준다.
  *
- * **탭은 이동이 아니다.** 7.6 · 7.5로 가지 않고 이 화면 안에서 목록만 바뀐다. 두 목록을
- * 처음에 함께 읽어 두므로 탭을 눌렀을 때 다시 기다리지 않는다(7.6이 두 탭에 쓰는 방식과 같다).
+ * **탭은 이동이 아니다.** 이 화면 안에서 목록만 바뀐다. 세 목록을 처음에 함께 읽어 두므로
+ * 탭을 눌렀을 때 다시 기다리지 않는다.
+ *
+ * 고른 탭은 주소의 `?tab=`에 남는다. 화면 밖에서 특정 탭으로 보내야 하는 자리가 있기
+ * 때문이다 — EXT-05 OTT 분석 데이터 부족의 `영화 평가하러 가기`가 `안 남긴 영화`로 온다.
  *
  * **통계 수치는 없다**(사용자 결정 2026-09-16). 프레임 · 평가 · 팝콘 수는 API-014가
  * 주지만 이 화면에 두지 않는다. 다른 자리에도 다시 넣지 않는다.
@@ -45,12 +48,12 @@
  * 응답이 주지 않는 값. 프로필 이미지는 **자리만 둔다**. API-014 · API-015에 `avatarUrl`이
  * 없고 업로드 API도 없어 늘 기본 아이콘이다. 누르면 무언가 되는 것처럼 만들지 않았다.
  *
- * `[!]` 7.5 · 7.6 화면으로 가는 입구가 이 화면에서 사라졌다. 두 목록을 여기 탭으로
- * 들였기 때문이다(사용자 결정). 라우트는 남아 있지만 7.5 · 7.6 · 7.7 · 7.6-A(한줄평
- * 관리 시트)에 닿을 길이 앱에 없다. screen-spec-my.md 11장에 적었다.
+ * **7.5 추천 기록 · 7.6 평가한 영화 · 7.7 안 남긴 영화 화면은 지웠다**(업무 -495).
+ * 세 화면이 하던 일을 이 피드가 그대로 한다. 7.6-A 한줄평 관리 시트는 3.1-A 프레임
+ * 상세에서 열리므로 남는다(screen-spec-my.md 11장).
  */
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import Avatar from '../../../components/Avatar';
 import Button from '../../../components/Button';
 import PopcornBucket from '../../../components/PopcornBucket';
@@ -63,11 +66,12 @@ import Snackbar from '../../../components/Snackbar';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import { SettingsIcon } from '../../../components/Icon';
+import { getOtts } from '../../../api/otts';
 import { getRecommendationHistory } from '../../../api/recommendations';
 import { getMyReports, getReportDetail } from '../../../api/reports';
 import { getPopcornBucket } from '../../../api/taste';
 import { getMyProfile } from '../../../api/users';
-import { getMyRatings } from '../../../api/watch';
+import { getMyRatings, getWatchRecords } from '../../../api/watch';
 import { path } from '../../../routes/paths';
 import { formatShortDate } from '../../../utils/date';
 import styles from './MyDashboardPage.module.css';
@@ -75,17 +79,25 @@ import type { RecommendationType } from '../../../types/enums';
 import type { RecommendationHistoryItem } from '../../../types/recommendation';
 import type { ReportDetailView } from '../../../types/unspecified';
 import type { MyProfile } from '../../../types/user';
-import type { MyRatingListItem } from '../../../types/watch';
+import type { MyRatingListItem, WatchRecordListItem } from '../../../types/watch';
 
 /** 포스터 비율 2:3. 격자는 칸 폭이 화면에 따라 달라지므로 비율만 고정한다 */
 const POSTER_RATIO = { width: 2, height: 3 };
 
 const TABS = [
   { key: 'ratings', label: '평가한 영화' },
+  { key: 'unrated', label: '안 남긴 영화' },
   { key: 'recommendations', label: '추천 기록' },
 ] as const;
 
 type TabKey = (typeof TABS)[number]['key'];
+
+/** 탭마다 빈 목록일 때의 문구. 7.6 · 7.7이 쓰던 말을 줄여서 옮겼다 */
+const EMPTY_TEXT: Record<TabKey, string> = {
+  ratings: '아직 평가한 영화가 없어요',
+  unrated: '평가를 기다리는 영화가 없어요',
+  recommendations: '아직 추천받은 기록이 없어요',
+};
 
 /** 7.5의 출처 문구를 그대로 쓴다. 계약의 `type` 세 값과 하나씩 맞는다 */
 const SOURCE_LABEL: Record<RecommendationType, string> = {
@@ -104,6 +116,16 @@ type Feed<T> = { status: 'loading' } | { status: 'failed' } | { status: 'ready';
 
 /** 추천 세트를 한 줄씩 편다. 세트의 `generatedAt`이 그 줄의 날짜다 */
 type HistoryRow = { item: RecommendationHistoryItem; generatedAt: string };
+
+/**
+ * 안 남긴 영화 한 칸. 감상 기록(API-034)에 OTT 이름과 날짜를 얹은 것이다.
+ *
+ * 기록은 `ottId`만 주고 이름은 기준정보(API-025)에 있다. 7.7이 쓰던 방식 그대로다.
+ *
+ * **둘 다 없을 수 있다.** 클릭 없이 평가로 만들어진 기록은 `ott`도 시각도 `null`이다
+ * (업무 -477). 그런 칸은 OTT 이름과 날짜 없이 그린다.
+ */
+type UnratedRow = { record: WatchRecordListItem; ottName?: string; date?: string };
 
 /*
  * 별 하나. `RatingStars`와 같은 모양이지만 그 컴포넌트는 별 다섯 개와 숫자를 함께
@@ -191,8 +213,18 @@ export default function MyDashboardPage() {
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
 
-  const [tab, setTab] = useState<TabKey>('ratings');
+  /*
+   * 고른 탭은 주소에 남긴다(`?tab=`). 화면 밖에서 특정 탭으로 보내는 자리가 있어서다
+   * (EXT-05 → `안 남긴 영화`). 모르는 값이 오면 기본 탭이다.
+   */
+  const [params, setParams] = useSearchParams();
+  const requested = params.get('tab');
+  const tab: TabKey = TABS.some((item) => item.key === requested)
+    ? (requested as TabKey)
+    : 'ratings';
+
   const [ratings, setRatings] = useState<Feed<MyRatingListItem>>({ status: 'loading' });
+  const [unrated, setUnrated] = useState<Feed<UnratedRow>>({ status: 'loading' });
   const [history, setHistory] = useState<Feed<HistoryRow>>({ status: 'loading' });
   const [feedReload, setFeedReload] = useState(0);
   const [notice, setNotice] = useState('');
@@ -239,6 +271,31 @@ export default function MyDashboardPage() {
         if (active) setRatings({ status: 'failed' });
       });
 
+    /*
+     * 안 남긴 영화는 감상 기록과 OTT 기준정보를 함께 읽는다. 기록은 `ottId`만 주고
+     * 이름은 기준정보에 있다(7.7이 쓰던 방식).
+     */
+    Promise.all([getWatchRecords({ status: ['WATCHED_UNRATED'] }), getOtts()])
+      .then(([records, otts]) => {
+        if (!active) return;
+
+        setUnrated({
+          status: 'ready',
+          items: records.items.map((record) => {
+            const watchedOn = record.watchedAt ?? record.clickedAt;
+
+            return {
+              record,
+              ottName: otts.find((ott) => ott.ottId === record.ott?.ottId)?.name,
+              date: watchedOn ? formatShortDate(watchedOn) : undefined,
+            };
+          }),
+        });
+      })
+      .catch(() => {
+        if (active) setUnrated({ status: 'failed' });
+      });
+
     getRecommendationHistory()
       .then((value) => {
         if (active) setHistory({ status: 'ready', items: flatten(value.items) });
@@ -275,7 +332,7 @@ export default function MyDashboardPage() {
     return <ScreenHeader title={<VisuallyHidden>MY</VisuallyHidden>} />;
   }
 
-  const feed = tab === 'ratings' ? ratings : history;
+  const feed = tab === 'ratings' ? ratings : tab === 'unrated' ? unrated : history;
 
   /*
    * 7.2-B 공개 프로필 주소를 기기의 공유 메뉴에 넘긴다. 공유 API가 계약에 없으므로
@@ -306,6 +363,7 @@ export default function MyDashboardPage() {
 
   function retryFeeds() {
     setRatings({ status: 'loading' });
+    setUnrated({ status: 'loading' });
     setHistory({ status: 'loading' });
     setFeedReload((count) => count + 1);
   }
@@ -407,7 +465,7 @@ export default function MyDashboardPage() {
               aria-selected={tab === item.key}
               aria-controls="my-feed"
               className={styles.tab}
-              onClick={() => setTab(item.key)}
+              onClick={() => setParams({ tab: item.key }, { replace: true })}
             >
               {item.label}
             </button>
@@ -433,9 +491,7 @@ export default function MyDashboardPage() {
           )}
 
           {feed.status === 'ready' && feed.items.length === 0 && (
-            <p className={styles.feedNote}>
-              {tab === 'ratings' ? '아직 평가한 영화가 없어요' : '아직 추천받은 기록이 없어요'}
-            </p>
+            <p className={styles.feedNote}>{EMPTY_TEXT[tab]}</p>
           )}
 
           {/*
@@ -464,6 +520,38 @@ export default function MyDashboardPage() {
                         <path d={STAR_PATH} />
                       </svg>
                       {rating.score.toFixed(1)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/*
+           * 안 남긴 영화 탭. 본 기록은 있는데 평가가 없는 영화다(API-034
+           * `WATCHED_UNRATED`). 누르면 2.5 평가하기로 간다 — 7.7이 하던 이동 그대로다.
+           * 날짜와 OTT는 기록이 주는 값이고, 클릭 이력이 없으면 둘 다 없다(업무 -477).
+           */}
+          {tab === 'unrated' && unrated.status === 'ready' && unrated.items.length > 0 && (
+            <ul className={styles.grid}>
+              {unrated.items.map(({ record, ottName, date }) => (
+                <li key={record.watchRecordId}>
+                  <Link to={path.movieRating(record.movie.movieId)} className={styles.cell}>
+                    <Poster
+                      fluid
+                      width={POSTER_RATIO.width}
+                      height={POSTER_RATIO.height}
+                      radius={0}
+                      src={record.movie.posterUrl ?? undefined}
+                      title={record.movie.title}
+                      seed={record.movie.movieId}
+                    />
+
+                    <VisuallyHidden>{record.movie.title} 평가하기</VisuallyHidden>
+
+                    <span className={styles.caption}>
+                      <span className={styles.captionSource}>{ottName ?? '감상 기록'}</span>
+                      {date ? <span className={styles.captionDate}>{date}</span> : null}
                     </span>
                   </Link>
                 </li>

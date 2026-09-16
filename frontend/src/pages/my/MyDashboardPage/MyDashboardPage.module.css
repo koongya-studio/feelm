@@ -161,15 +161,18 @@
 /*
  * 화면 안의 전환이다. 고른 탭만 검정 글씨 + 아래 밑줄이고 나머지는 흐리다.
  * 밑줄은 탭 요소에만 그린다 — 줄 전체에 선을 깔면 벽에 없던 면이 생긴다.
+ *
+ * 칸 수는 탭 수를 따라간다(업무 -495에서 셋이 됐다). 좁은 화면에서 글자가 줄바꿈되지
+ * 않도록 자간과 글자 크기는 그대로 두고 좌우 여백만 줄인다.
  */
 .tabs {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
 }
 
 .tab {
   min-height: var(--tap-target-min);
-  padding: 0 var(--space-2) var(--space-2);
+  padding: 0 var(--space-1) var(--space-2);
   border: 0;
   border-bottom: 2px solid transparent;
   background: none;
