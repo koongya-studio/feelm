@@ -1,6 +1,5 @@
 import importlib.util
 import io
-import json
 import sys
 import unittest
 from pathlib import Path
@@ -15,71 +14,80 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 
-class Response:
-    status = 200
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *_args):
-        return False
-
-
 class NotifyDeploymentTest(unittest.TestCase):
     def setUp(self):
         self.environ = {
-            "MATTERMOST_DEPLOY_WEBHOOK_URL": "https://mattermost.example/hooks/secret-value",
+            "MATTERMOST_BASE_URL": "https://mattermost.example",
+            "MATTERMOST_LOGIN_ID": "deploy-notifier",
+            "MATTERMOST_PASSWORD": "secret-password",
+            "MATTERMOST_CHANNEL_ID": "channel-id",
             "CI_ENVIRONMENT_NAME": "service",
             "CI_COMMIT_SHORT_SHA": "abc12345",
             "CI_JOB_URL": "https://gitlab.example/jobs/10",
             "CI_PIPELINE_URL": "https://gitlab.example/pipelines/20",
         }
 
-    def test_posts_success_message_with_deployment_links(self):
-        with patch.object(MODULE, "urlopen", return_value=Response()) as request:
+    def test_logs_in_posts_success_message_and_logs_out(self):
+        responses = [
+            ({"id": "user-id"}, {"Token": "session-secret"}),
+            ({"id": "post-id"}, {}),
+            (None, {}),
+        ]
+        with patch.object(MODULE, "api_request", side_effect=responses) as request:
             self.assertTrue(MODULE.notify("backend", "success", self.environ))
 
-        sent = request.call_args.args[0]
-        payload = json.loads(sent.data.decode("utf-8"))
-        self.assertEqual(sent.full_url, self.environ["MATTERMOST_DEPLOY_WEBHOOK_URL"])
-        self.assertIn("backend 배포 성공", payload["text"])
-        self.assertIn("`abc12345`", payload["text"])
-        self.assertIn(self.environ["CI_JOB_URL"], payload["text"])
-        self.assertIn(self.environ["CI_PIPELINE_URL"], payload["text"])
-        self.assertEqual(request.call_args.kwargs["timeout"], 10)
+        self.assertTrue(request.call_args_list[0].args[0].endswith("/api/v4/users/login"))
+        post = request.call_args_list[1]
+        self.assertTrue(post.args[0].endswith("/api/v4/posts"))
+        self.assertEqual(post.kwargs["payload"]["channel_id"], "channel-id")
+        message = post.kwargs["payload"]["message"]
+        self.assertIn("backend 배포 성공", message)
+        self.assertIn("`abc12345`", message)
+        self.assertIn(self.environ["CI_JOB_URL"], message)
+        self.assertTrue(request.call_args_list[2].args[0].endswith("/api/v4/users/logout"))
 
     def test_failure_message_identifies_failed_service(self):
         message = MODULE.build_message("consumer", "failed", self.environ)
         self.assertIn("consumer 배포 실패", message)
         self.assertIn("환경: `service`", message)
 
-    def test_missing_webhook_warns_without_failing_deployment(self):
+    def test_missing_account_config_warns_without_failing_deployment(self):
         stderr = io.StringIO()
-        with patch.object(MODULE, "urlopen") as request, patch("sys.stderr", stderr):
+        with patch.object(MODULE, "api_request") as request, patch("sys.stderr", stderr):
             self.assertEqual(MODULE.run(["frontend", "success"], {}), 0)
         request.assert_not_called()
-        self.assertIn("MATTERMOST_DEPLOY_WEBHOOK_URL", stderr.getvalue())
+        self.assertIn("전송 실패", stderr.getvalue())
 
-    def test_delivery_error_does_not_expose_webhook_or_fail_deployment(self):
+    def test_delivery_error_logs_out_without_exposing_credentials_or_failing_deployment(self):
         stderr = io.StringIO()
-        with patch.object(MODULE, "urlopen", side_effect=MODULE.URLError("secret detail")), patch(
+        responses = [
+            ({"id": "user-id"}, {"Token": "session-secret"}),
+            MODULE.DeploymentNotificationError("secret-password session-secret"),
+            (None, {}),
+        ]
+        with patch.object(MODULE, "api_request", side_effect=responses) as request, patch(
             "sys.stderr", stderr
         ):
             self.assertEqual(MODULE.run(["backend", "failed"], self.environ), 0)
         output = stderr.getvalue()
         self.assertIn("전송 실패", output)
-        self.assertNotIn("secret-value", output)
-        self.assertNotIn("secret detail", output)
+        self.assertNotIn("secret-password", output)
+        self.assertNotIn("session-secret", output)
+        self.assertTrue(request.call_args_list[-1].args[0].endswith("/api/v4/users/logout"))
 
-    def test_rejects_non_https_and_credential_bearing_urls(self):
-        for value in (
-            "http://mattermost.example/hooks/value",
-            "https://user:password@mattermost.example/hooks/value",
-            "https://mattermost.example/hooks/value#fragment",
+    def test_logout_error_does_not_change_successful_notification(self):
+        responses = [
+            ({"id": "user-id"}, {"Token": "session-secret"}),
+            ({"id": "post-id"}, {}),
+            MODULE.DeploymentNotificationError("logout secret"),
+        ]
+        stderr = io.StringIO()
+        with patch.object(MODULE, "api_request", side_effect=responses), patch(
+            "sys.stderr", stderr
         ):
-            with self.subTest(value=value):
-                with self.assertRaises(ValueError):
-                    MODULE.https_webhook_url(value)
+            self.assertTrue(MODULE.notify("consumer", "success", self.environ))
+        self.assertIn("로그아웃 실패", stderr.getvalue())
+        self.assertNotIn("logout secret", stderr.getvalue())
 
     def test_untrusted_values_cannot_create_mentions_or_markdown(self):
         environ = {**self.environ, "CI_COMMIT_SHORT_SHA": "abc @channel **boom**"}
