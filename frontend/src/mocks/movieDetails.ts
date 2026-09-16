@@ -1,6 +1,10 @@
 /*
  * 영화 상세 목업. API-030 영화 상세 조회
  *
+ * **화면은 더 이상 이 목업을 보지 않는다.** 영화 상세가 실제 API로 바뀌어(업무 -475)
+ * `api/movies.ts`가 서버 응답을 그대로 준다. 남은 쓰임은 목업 화면들(7.5 · 7.6 · 7.7)의
+ * 이동 경로를 고정하는 흐름 테스트의 서버 대역이다.
+ *
  * 기준 영화 데이터는 mocks/movies.ts에 있고 여기에는 상세 화면에만 필요한 필드
  * (시놉시스 · 국가 · 감독 · 출연 · OTT 링크 · 내 평가 · 감상 상태)를 movieId로 붙인다.
  *
@@ -149,8 +153,7 @@ const detailExtras: Record<number, DetailExtras> = {
    * 7.5 추천 기록에 나오는 지난 추천(104)과 7.7 평가하지 않은 영화(411~413).
    *
    * 7.5 ⇢ 2.4 · 7.7 ⇢ 2.5가 영화 상세를 읽으므로 상세가 없으면 그 경로가 404로 끊긴다.
-   * 411~413은 감상을 확인한 영화라 `WATCHED_UNRATED`다. 다만 화면이 보는 감상 상태는
-   * 세션 저장소의 감상 기록이 정한다(api/movies.ts).
+   * 411~413은 감상을 확인한 영화라 `WATCHED_UNRATED`다.
    */
   104: {
     synopsis: '오래 묻어 둔 사건 기록이 다시 열리며 두 형사가 서로를 의심하기 시작한다.',
@@ -210,6 +213,8 @@ export function findMockMovieDetail(movieId: number): MovieDetail | null {
   return {
     movieId: movie.movieId,
     title: movie.title,
+    // 자리표시자 영화라 원제가 없다
+    originalTitle: null,
     releaseDate: `${movie.releaseYear}-01-01`,
     runtimeMinutes: movie.runtimeMinutes,
     genres: movie.genres.map((name) => ({ code: name, name })),

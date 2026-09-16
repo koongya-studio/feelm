@@ -1,91 +1,63 @@
 /*
  * 영화 데이터 접근 함수.
  * 대응 명세는 docs/api/movies-search.md · recommendation.md · social.md이다.
+ *
+ * 영화 상세(API-030)만 실제 API를 부른다(업무 S15P21E106-475). 같은 파일의 유사 영화와
+ * 공개 한줄평은 백엔드에 아직 없어 목업으로 남는다 — 각 함수 주석에 사유를 적었다.
  */
-import { findMockMovieDetail } from '../mocks/movieDetails';
 import { findMockSimilarMovies } from '../mocks/similarMovies';
 import { mockReviews } from '../mocks/reviews';
-import {
-  findLatestWatchRecordByMovie,
-  findRatingByMovie,
-  withRatingEdit,
-} from '../mocks/sessionStore';
-import { getMyOttIds } from './otts';
-import { respond, respondError } from './mockTransport';
+import { request } from './client';
+import { respond } from './mockTransport';
 import type { MovieDetail, SimilarMovie } from '../types/movie';
 import type { PublicReview } from '../types/watch';
 
 /**
  * API-030 영화 상세 조회 · GET /api/v1/movies/{movieId}
  *
- * `recommendationItemId`가 있으면 추천 이유를 함께 내려준다. 다른 사용자의 추천 항목이면
- * 계약도 `recommendation`을 생략하고 200을 반환한다.
+ * **선택 인증이다.** 토큰이 없어도 `200`이며 그때는 `myRating` · `myWatchStatus` ·
+ * `recommendation`이 `null`이고 모든 OTT의 `subscribed`가 `false`다. 토큰이 있으면
+ * 본인의 평가 · 감상 상태 · 구독이 함께 온다.
+ *
+ * `recommendationItemId`가 있으면 추천 이유를 함께 내려준다. 영화가 다르거나 열람
+ * 권한이 없으면 계약도 `recommendation: null`과 `200`이므로 화면은 추천 이유만
+ * 그리지 않는다.
+ *
+ * 구독 우선 정렬(FR-16)은 서버가 끝내서 준다. 목업 시절에는 이 함수가 API-026 구독
+ * 목록을 따로 불러 `subscribed`를 채우고 정렬했는데, 계약은 정렬까지 마친 목록을
+ * 주므로 화면이 받은 순서를 그대로 쓴다.
+ *
+ * 이번 세션의 평가 · 감상 기록을 얹던 것도 함께 걷어냈다. 평가 API(API-036 · API-037)는
+ * 아직 목업이라 2.5에서 남긴 평가가 이 화면에 보이지 않는다. 평가 계열이 연동되면
+ * (S15P21E106-160 · -213 · -214) 서버가 같은 값을 준다.
  */
 export async function getMovieDetail(
   movieId: number,
   recommendationItemId?: number,
 ): Promise<MovieDetail> {
-  const detail = findMockMovieDetail(movieId);
-
-  if (!detail) {
-    return respondError(404, 'RESOURCE_NOT_FOUND', '영화를 찾을 수 없습니다.');
-  }
-
-  /*
-   * 이번 세션에 평가했거나 OTT 링크를 눌렀으면 그 상태를 얹는다. 2.4의 `내 별점 남기기`와
-   * `감상평`이 방금 남긴 값을 보여주게 된다.
-   */
-  /*
-   * OTT 목록에는 구독 여부를 채우고 구독 중인 것을 앞에 둔다(FR-16). 구독 목록은
-   * 사용자가 1.2에서 고른 값이므로(API-026) 목업이 아니라 여기서 정한다.
-   * `sort`는 안정 정렬이라 같은 묶음 안의 순서는 계약이 준 그대로다.
-   */
-  const subscribedOttIds = await getMyOttIds();
-  const ottProviders = detail.ottProviders
-    .map((ott) => ({ ...ott, subscribed: subscribedOttIds.includes(ott.ottId) }))
-    .sort((a, b) => Number(b.subscribed) - Number(a.subscribed));
-
-  const rating = findRatingByMovie(movieId);
-  const watchRecord = findLatestWatchRecordByMovie(movieId);
-  const withSession = {
-    ...detail,
-    ottProviders,
-    myRating: rating
-      ? {
-          ratingId: rating.ratingId,
-          score: rating.score,
-          comment: rating.comment,
-          visibility: rating.visibility,
-        }
-      : // 기준 목업 평가도 7.6 · 7.6-A에서 고쳤으면 그 값이다(API-037)
-        detail.myRating && withRatingEdit(detail.myRating),
-    myWatchStatus: rating ? ('RATED' as const) : (watchRecord?.status ?? detail.myWatchStatus),
-  };
-
-  if (recommendationItemId === undefined) {
-    return respond(withSession, 'movies');
-  }
-
-  return respond(
-    {
-      ...withSession,
-      recommendation: {
-        recommendationItemId,
-        type: 'TASTE' as const,
-        // 와이어프레임 2.4의 추천 이유 문구
-        reason: { summary: '좋아한 케이퍼 무비와 가까워요 · 속도감 있는 전개' },
-      },
-    },
-    'movies',
-  );
+  return request<MovieDetail>(`/movies/${movieId}`, {
+    auth: 'optional',
+    query: { recommendationItemId },
+  });
 }
 
-/** API-031 유사 영화 추천 · GET /api/v1/movies/{movieId}/similar */
+/**
+ * API-031 유사 영화 추천 · GET /api/v1/movies/{movieId}/similar
+ *
+ * **목업이다.** 백엔드 구현이 S15P21E106-216으로 진행 중이라 부를 API가 없다.
+ * 실제 영화 상세(API-030)로 들어와도 이 목록은 목업 영화라, 항목을 누르면 실제 DB에
+ * 없는 영화로 이동해 상세가 `404`가 된다(업무 -475 검증 기록).
+ */
 export async function getSimilarMovies(movieId: number): Promise<SimilarMovie[]> {
   return respond(findMockSimilarMovies(movieId), 'movies');
 }
 
-/** API-032 공개 한줄평 목록 · GET /api/v1/movies/{movieId}/reviews */
+/**
+ * API-032 공개 한줄평 목록 · GET /api/v1/movies/{movieId}/reviews
+ *
+ * **목업이다.** 평가가 있어야 한줄평이 생기는데 평가 API가 아직 없고, 목록 자체도
+ * S15P21E106-161로 예정만 되어 있다. 실제 영화에는 목업 한줄평이 없어 빈 목록이다.
+ */
 export async function getMovieReviews(movieId: number): Promise<PublicReview[]> {
   return respond(mockReviews[movieId] ?? [], 'movies');
 }

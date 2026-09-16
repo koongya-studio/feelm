@@ -13,7 +13,9 @@
  *
  * 어느 영화의 어느 OTT 기록인지는 감상 기록 목록(API-034)에서 읽는다. 2.4에서 OTT
  * 링크를 누를 때 남은 기록을 그대로 찾으므로, 실제로 누른 OTT가 문구에 나온다
- * (업무 -263). URL로 직접 들어와 기록이 없으면 첫 추천 영화를 보여준다.
+ * (업무 -263). URL로 직접 들어와 기록이 없으면 오류 상태다 — 이전에는 목업 영화 상세를
+ * 대신 보여줬는데, 영화 상세가 실제 API로 바뀌면서(업무 -475) 그 목업 영화가 실제 DB에
+ * 없어 어차피 `404`가 된다. 없는 기록에는 없다고 답하는 쪽이 맞다.
  *
  * 계약에 단건 조회 API는 없고 목록만 있어(API-034) 목록에서 번호로 찾는다.
  */
@@ -23,14 +25,10 @@ import Button from '../../../components/Button';
 import Poster from '../../../components/Poster';
 import StatusView from '../../../components/StatusView';
 import { confirmWatch, getWatchRecords } from '../../../api/watch';
-import { getMovieDetail } from '../../../api/movies';
 import { getOtts } from '../../../api/otts';
 import { path } from '../../../routes/paths';
 import { directionParticle } from '../../../utils/korean';
 import styles from './WatchConfirmPage.module.css';
-
-/** 기록을 찾지 못했을 때 보여줄 영화 (URL 직접 접근) */
-const FALLBACK_MOVIE_ID = 101;
 
 /** 이 화면이 표시하는 값 */
 type ConfirmView = {
@@ -45,23 +43,16 @@ async function loadConfirmView(watchRecordId: number): Promise<ConfirmView> {
   const [records, otts] = await Promise.all([getWatchRecords(), getOtts()]);
   const record = records.items.find((item) => item.watchRecordId === watchRecordId);
 
-  if (record) {
-    return {
-      movieId: record.movie.movieId,
-      title: record.movie.title,
-      posterUrl: record.movie.posterUrl,
-      ottName: otts.find((ott) => ott.ottId === record.ott.ottId)?.name ?? 'OTT',
-    };
+  if (!record) {
+    // 기록 없이 URL로 들어온 경우. 물어볼 감상이 없다
+    throw new Error('감상 기록을 찾지 못했습니다.');
   }
 
-  // 기록 없이 URL로 들어온 경우
-  const detail = await getMovieDetail(FALLBACK_MOVIE_ID);
-
   return {
-    movieId: detail.movieId,
-    title: detail.title,
-    posterUrl: detail.posterUrl,
-    ottName: detail.ottProviders[0]?.name ?? 'OTT',
+    movieId: record.movie.movieId,
+    title: record.movie.title,
+    posterUrl: record.movie.posterUrl,
+    ottName: otts.find((ott) => ott.ottId === record.ott.ottId)?.name ?? 'OTT',
   };
 }
 
@@ -96,11 +87,15 @@ export default function WatchConfirmPage() {
   }, [watchRecordId, reloadCount]);
 
   async function respond(watched: boolean) {
+    if (!movie) {
+      return;
+    }
+
     setSubmitting(true);
     await confirmWatch(Number(watchRecordId), watched);
 
     if (watched) {
-      void navigate(path.movieRating(movie?.movieId ?? FALLBACK_MOVIE_ID));
+      void navigate(path.movieRating(movie.movieId));
 
       return;
     }

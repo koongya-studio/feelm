@@ -10,6 +10,11 @@
  * 연동 API는 API-030(상세) · API-031(유사) · API-032(공개 한줄평) · API-033(링크 클릭
  * 기록) · API-034(감상 기록)이다.
  *
+ * **API-030만 실제 API다**(업무 -475). 나머지 넷은 백엔드가 아직 없어 목업이며, 그래서
+ * 이 화면은 실제 영화 위에 목업 유사 영화 · 한줄평 · 감상 상태가 얹힌 상태로 보인다.
+ * 목업 화면(2.2 · 7.5 · 4.x)에서 넘어온 `movieId`는 실제 DB에 없어 `404`가 되고, 화면은
+ * `영화를 찾을 수 없어요`를 보여준다. 한계는 `verification/S15P21E106-475.md`에 적었다.
+ *
  * 팀 결정 2026-09-10 (업무 -99)
  * - **전면 배경 포스터를 걷어냈다.** 포스터를 화면 폭으로 깔고 흰색으로 페이드하던
  *   구성인데, 시안 3장이 "포스터 색을 배경으로 번지게 하지 않는다"로 금지한다.
@@ -48,9 +53,11 @@ import Poster from '../../../components/Poster';
 import RatingStars from '../../../components/RatingStars';
 import StatusView from '../../../components/StatusView';
 import { ChevronLeftIcon } from '../../../components/Icon';
+import { ApiError } from '../../../api/apiError';
 import { getMovieDetail, getMovieReviews, getSimilarMovies } from '../../../api/movies';
 import { getWatchRecords, recordOttClick } from '../../../api/watch';
 import { path } from '../../../routes/paths';
+import { movieMetaLine } from '../../../utils/movie';
 import styles from './MovieDetailPage.module.css';
 import type { MovieDetail, MovieOttProvider, SimilarMovie } from '../../../types/movie';
 import type { PublicReview } from '../../../types/watch';
@@ -65,6 +72,14 @@ const POSTER_HEIGHT = 264;
 /** 유사 영화 목록의 포스터 */
 const SIMILAR_POSTER_WIDTH = 84;
 const SIMILAR_POSTER_HEIGHT = 126;
+
+/**
+ * 상세를 못 받은 이유. 없는 영화는 다시 눌러도 같은 답이라 재시도를 주지 않는다.
+ *
+ * 목업 화면에서 들어오면 실제로 자주 만나는 상태다. 2.2 오늘의 추천 · 7.5 추천 기록 ·
+ * 4.x 검색은 아직 목업이라 그 카드의 `movieId`가 실제 DB에 없다(업무 -475).
+ */
+type Failure = 'notFound' | 'error';
 
 type PrimaryAction = {
   label: string;
@@ -98,7 +113,7 @@ export default function MovieDetailPage() {
    * API-034로 이 영화의 최근 기록을 찾는다. 실패하면 알약이 OTT 링크로 되돌아간다.
    */
   const [watchRecordId, setWatchRecordId] = useState<number | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<Failure | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
@@ -108,12 +123,12 @@ export default function MovieDetailPage() {
       .then((detail) => {
         if (active) {
           setMovie(detail);
-          setFailed(false);
+          setFailure(null);
         }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (active) {
-          setFailed(true);
+          setFailure(error instanceof ApiError && error.status === 404 ? 'notFound' : 'error');
         }
       });
 
@@ -149,7 +164,7 @@ export default function MovieDetailPage() {
   }, [id, recommendationItemId, reloadCount]);
 
   function handleRetry() {
-    setFailed(false);
+    setFailure(null);
     setReloadCount((count) => count + 1);
   }
 
@@ -160,7 +175,7 @@ export default function MovieDetailPage() {
     void navigate(path.watchConfirm(record.watchRecordId));
   }
 
-  if (failed) {
+  if (failure) {
     /*
      * 이 화면은 상단 제목 없이 떠 있는 뒤로 가기 버튼만 있다. 오류 상태에서도 같은
      * 버튼을 남겨 돌아갈 길을 만든다.
@@ -177,13 +192,23 @@ export default function MovieDetailPage() {
           />
         </div>
 
-        <StatusView
-          titleAs="h1"
-          title="영화 정보를 불러오지 못했어요"
-          description="주소가 잘못되었거나 잠시 문제가 생겼어요"
-        >
-          <Button onClick={handleRetry}>다시 시도</Button>
-        </StatusView>
+        {failure === 'notFound' ? (
+          <StatusView
+            titleAs="h1"
+            title="영화를 찾을 수 없어요"
+            description="주소가 잘못되었거나 서비스에서 내려간 영화예요"
+          >
+            <Button onClick={() => void navigate(path.home())}>홈으로</Button>
+          </StatusView>
+        ) : (
+          <StatusView
+            titleAs="h1"
+            title="영화 정보를 불러오지 못했어요"
+            description="잠시 문제가 생겼어요"
+          >
+            <Button onClick={handleRetry}>다시 시도</Button>
+          </StatusView>
+        )}
       </div>
     );
   }
@@ -192,12 +217,8 @@ export default function MovieDetailPage() {
     return null;
   }
 
-  const releaseYear = movie.releaseDate.slice(0, 4);
-  const meta = [
-    releaseYear,
-    ...movie.genres.map((genre) => genre.name),
-    `${movie.runtimeMinutes}분`,
-  ].join(' · ');
+  // 개봉일 · 장르 · 상영 시간은 원천에 없으면 빠진다(API-030). 있는 값만 잇는다
+  const meta = movieMetaLine(movie);
   const primaryOtt: MovieOttProvider | null = movie.ottProviders[0] ?? null;
   const people = [...movie.directors, ...movie.cast];
   const action = resolvePrimaryAction();
@@ -265,7 +286,7 @@ export default function MovieDetailPage() {
 
       <header className={styles.head}>
         <h1 className={styles.title}>{movie.title}</h1>
-        <p className={styles.meta}>{meta}</p>
+        {meta ? <p className={styles.meta}>{meta}</p> : null}
 
         <p className={styles.average}>
           <RatingStars score={movie.averageRating} size={15} gap={3} />
@@ -284,8 +305,11 @@ export default function MovieDetailPage() {
       </div>
 
       <div className={styles.content}>
-        {/* 추천 이유 — 추천 경로로 진입했을 때만 있다 */}
-        {movie.recommendation ? (
+        {/*
+         * 추천 이유 — 추천 경로로 진입했을 때만 있다. 저장된 이유 스냅샷에 문구가 없으면
+         * 빈 줄만 남으므로 `summary`가 있을 때만 그린다(API-030).
+         */}
+        {movie.recommendation?.reason.summary ? (
           <section className={styles.section}>
             <p className={styles.eyebrow}>추천 이유</p>
             <p className={styles.reason}>{movie.recommendation.reason.summary}</p>
@@ -311,7 +335,11 @@ export default function MovieDetailPage() {
         {/* 시놉시스 — AI 영화 요약은 제외 (FR-34) */}
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>시놉시스</h2>
-          <p className={styles.synopsis}>{movie.synopsis}</p>
+          {movie.synopsis ? (
+            <p className={styles.synopsis}>{movie.synopsis}</p>
+          ) : (
+            <p className={styles.emptyNote}>줄거리가 아직 등록되지 않았어요</p>
+          )}
         </section>
 
         {/* 감상평 — 입력이 아니라 평가 화면으로 이동한다 (API-036) */}
