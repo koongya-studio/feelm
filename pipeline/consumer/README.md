@@ -49,6 +49,10 @@ uv run pytest
 uv run ruff check .
 ```
 
+CI에서는 develop 대상 MR에 `consumer-mr-test`가 자동 실행되고 `pipeline/consumer`만 격리해
+같은 Ruff·pytest 검사를 수행한다. 보호된 `main` push는 Dockerfile의 `test` target을 먼저
+통과한 뒤에만 커밋 SHA 태그 이미지를 게시한다. 이 과정은 배포하지 않는다.
+
 실행 명령은 다음과 같다. 실제 Kafka·PostgreSQL·Redis·HDFS 연결 검증은 별도 통합 환경에서 수행한다.
 
 ```bash

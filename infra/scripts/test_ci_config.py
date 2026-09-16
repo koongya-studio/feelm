@@ -23,6 +23,7 @@ class CiConfigTests(unittest.TestCase):
         cls.common = (CI_DIR / 'common.yml').read_text()
         cls.backend = (CI_DIR / 'backend.yml').read_text()
         cls.frontend = (CI_DIR / 'frontend.yml').read_text()
+        cls.consumer = (CI_DIR / 'consumer.yml').read_text()
         cls.pipeline_path = CI_DIR / 'pipeline.yml'
         cls.pipeline = cls.pipeline_path.read_text() if cls.pipeline_path.exists() else ''
 
@@ -42,6 +43,7 @@ include:
   - local: .gitlab/ci/backend.yml
   - local: .gitlab/ci/frontend.yml
   - local: .gitlab/ci/pipeline.yml
+  - local: .gitlab/ci/consumer.yml
 ''')
 
     def test_new_commits_cancel_only_interruptible_jobs(self):
@@ -70,7 +72,7 @@ include:
 
     def test_job_names_are_unique_across_split_files(self):
         names = []
-        for text in (self.common, self.backend, self.frontend, self.pipeline):
+        for text in (self.common, self.backend, self.frontend, self.pipeline, self.consumer):
             names.extend(re.findall(r'(?m)^([.]?[A-Za-z0-9_-]+):$', text))
         duplicates = sorted({name for name in names if names.count(name) > 1})
         self.assertEqual(duplicates, [])
@@ -109,6 +111,19 @@ include:
         self.assertIn('- .gitlab/ci/frontend.yml', frontend)
         self.assertNotIn('- backend/**/*', frontend)
         self.assertNotIn('- .gitlab/ci/backend.yml', frontend)
+
+    def test_consumer_ci_is_included_and_keeps_service_boundaries(self):
+        consumer = job_block(self.consumer, 'consumer-mr-test')
+        for expected in ('tags: [e106-mr-isolated]', 'dependencies: []',
+                         'GIT_STRATEGY: none', 'resource_group: consumer-mr-test',
+                         '$CI_PIPELINE_SOURCE == "merge_request_event"',
+                         '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"',
+                         '- pipeline/consumer/**/*', '- .gitlab/ci/consumer.yml',
+                         '- infra/scripts/ci-consumer-mr-*.py'):
+            self.assertIn(expected, consumer)
+        self.assertNotIn('- pipeline/spark/**/*', consumer)
+        self.assertNotIn('- backend/**/*', consumer)
+        self.assertNotIn('- frontend/**/*', consumer)
 
     def test_pipeline_mr_jobs_are_isolated_sharded_and_path_scoped(self):
         self.assertTrue(self.pipeline_path.is_file(), 'Missing Pipeline CI include')

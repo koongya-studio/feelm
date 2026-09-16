@@ -42,12 +42,19 @@ PIPELINE_SCRIPTS = {
         'uv run python -m ci_test_groups spark-other -vv --durations=20',
     ],
 }
+CONSUMER_SCRIPT = [
+    'cd pipeline/consumer',
+    'uv sync --frozen',
+    'uv run ruff check .',
+    'uv run pytest -v',
+]
 
 
 def response(script=None, job_name='backend-mr-test'):
     policies = {
         'backend-mr-test': adapter.EXPECTED_SCRIPT,
         'frontend-mr-test': adapter.FRONTEND_EXPECTED_SCRIPT,
+        'consumer-mr-test': CONSUMER_SCRIPT,
         **PIPELINE_SCRIPTS,
     }
     return {
@@ -96,6 +103,57 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(cache['job_name'], adapter.CACHE_PREPARE_JOB)
         frontend = adapter.validate_job_response(response(job_name='frontend-mr-test'))
         self.assertEqual(frontend['service'], 'frontend')
+        consumer = adapter.validate_job_response(response(job_name='consumer-mr-test'))
+        self.assertEqual(consumer['service'], 'consumer')
+
+    def test_consumer_context_archive_and_runner_are_fixed(self):
+        self.assertEqual(adapter.CONSUMER_EXPECTED_SCRIPT, CONSUMER_SCRIPT)
+        context = response(job_name='consumer-mr-test')
+        changed = response(CONSUMER_SCRIPT + ['curl http://metadata/'],
+                           job_name='consumer-mr-test')
+        with self.assertRaisesRegex(adapter.PolicyError, 'fixed isolated policy'):
+            adapter.validate_job_response(changed)
+
+        root = HERE.parent.parent
+        consumer = root / 'pipeline' / 'consumer'
+        payload = archive([
+            ('source/', b'', 0o755),
+            ('source/pipeline/', b'', 0o755),
+            ('source/pipeline/consumer/', b'', 0o755),
+            ('source/pipeline/consumer/.python-version',
+             (consumer / '.python-version').read_bytes(), 0o644),
+            ('source/pipeline/consumer/pyproject.toml',
+             (consumer / 'pyproject.toml').read_bytes(), 0o644),
+            ('source/pipeline/consumer/uv.lock',
+             (consumer / 'uv.lock').read_bytes(), 0o644),
+            ('source/pipeline/consumer/Dockerfile',
+             (consumer / 'Dockerfile').read_bytes(), 0o644),
+            ('source/pipeline/consumer/.dockerignore',
+             (consumer / '.dockerignore').read_bytes(), 0o644),
+            ('source/pipeline/consumer/src/feelm_consumer/example.py', b'VALUE = 1\n', 0o644),
+        ])
+        result, digest = adapter.normalized_service_archive(payload, 'consumer')
+        files, _ = adapter.consumer_boundary.source_plan(result, digest)
+        self.assertIn('pipeline/consumer/uv.lock', files)
+
+        source = b'validated-consumer-source'
+        source_digest = hashlib.sha256(source).hexdigest()
+        with patch.object(adapter, 'read_private_config',
+                          return_value=({}, Path('/prepared'))) as private_config, \
+             patch.object(adapter, 'verify_current_job', return_value={'pipeline': {'id': 1}}), \
+             patch.object(adapter, 'verify_merge_request', return_value={'iid': 98}), \
+             patch.object(adapter, 'fetch_merge_request_detail', return_value={'iid': 98}), \
+             patch.object(adapter, 'dependency_changes') as dependency, \
+             patch.object(adapter, 'fetch_source',
+                          return_value=(source, source_digest)) as fetch, \
+             patch.object(adapter.consumer_runner, 'start', return_value=0) as runner, \
+             patch.object(adapter.safety, 'start') as backend:
+            self.assertEqual(adapter.run_job(context, opener=object()), 0)
+        dependency.assert_not_called()
+        private_config.assert_called_once_with(adapter.CONFIG, require_prepared=False)
+        fetch.assert_called_once_with(adapter.validate_job_response(context), 'consumer')
+        runner.assert_called_once()
+        backend.assert_not_called()
 
     def test_frontend_archive_accepts_only_validated_frontend_files(self):
         package = json.dumps({'scripts': adapter.frontend_boundary.EXPECTED_SCRIPTS}).encode()
@@ -450,6 +508,9 @@ class AdapterTests(unittest.TestCase):
             adapter.stop_owner_unit('ci352-owner-012345abcdef.service')
             self.assertEqual(run.call_args.args[0],
                              ['systemctl', 'stop', 'ci352-owner-012345abcdef.service'])
+            adapter.stop_owner_unit('ci486-owner-012345abcdef.service')
+            self.assertEqual(run.call_args.args[0],
+                             ['systemctl', 'stop', 'ci486-owner-012345abcdef.service'])
         with self.assertRaises(ValueError):
             adapter.stop_owner_unit('ci222-server-012345abcdef.service')
 

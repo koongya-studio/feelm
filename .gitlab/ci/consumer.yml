@@ -1,0 +1,74 @@
+consumer-mr-test:
+  stage: test
+  tags: [e106-mr-isolated]
+  dependencies: []
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - cd pipeline/consumer
+    - uv sync --frozen
+    - uv run ruff check .
+    - uv run pytest -v
+  resource_group: consumer-mr-test
+  interruptible: true
+  timeout: 15m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
+      changes:
+        - pipeline/consumer/**/*
+        - .gitlab-ci.yml
+        - .gitlab/ci/common.yml
+        - .gitlab/ci/consumer.yml
+        - .gitattributes
+        - infra/scripts/ci-consumer-mr-*.py
+        - infra/scripts/ci-gitlab-custom-executor.py
+        - infra/scripts/ci-gitlab-job-adapter.py
+        - infra/scripts/ci-gitlab-server-install.py
+        - infra/scripts/ci-gitlab-adapter-update.py
+        - infra/scripts/test_ci_consumer_mr.py
+        - infra/scripts/test_ci_gitlab_job_adapter.py
+        - infra/scripts/test_ci_config.py
+
+consumer-test:
+  stage: test
+  tags: [e106-shell]
+  script:
+    - CONSUMER_TEST_IMAGE="feelm-foldin-consumer-test:$CI_COMMIT_SHA"
+    - docker build --pull --target test -t "$CONSUMER_TEST_IMAGE" ./pipeline/consumer
+    - docker image rm "$CONSUMER_TEST_IMAGE"
+  interruptible: true
+  timeout: 15m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - pipeline/consumer/**/*
+        - .gitlab-ci.yml
+        - .gitlab/ci/common.yml
+        - .gitlab/ci/consumer.yml
+        - .gitattributes
+
+consumer-image:
+  stage: build
+  tags: [e106-shell]
+  needs: [consumer-test]
+  before_script:
+    - printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+  script:
+    - CONSUMER_IMAGE="$DOCKERHUB_NAMESPACE/feelm-foldin-consumer:$CI_COMMIT_SHA"
+    - docker build --pull -t "$CONSUMER_IMAGE" ./pipeline/consumer
+    - docker push "$CONSUMER_IMAGE"
+    - echo "Built Consumer image $CONSUMER_IMAGE"
+  interruptible: true
+  timeout: 45m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - pipeline/consumer/**/*
+        - .gitlab-ci.yml
+        - .gitlab/ci/common.yml
+        - .gitlab/ci/consumer.yml
+        - .gitattributes
