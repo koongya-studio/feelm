@@ -1154,8 +1154,8 @@ docker port feelm-redis 6379
 ### Consumer environment
 
 분산 노드의 `infra/.env`에는 다음 값을 추가한다. DSN과 Redis URL의 비밀번호는 URL encoding하고
-실제 값은 저장소, shell history와 로그에 남기지 않는다. 세 HDFS URI는 동일한 immutable
-snapshot revision을 가리켜야 하며 `latest` 별칭을 사용하지 않는다.
+실제 값은 저장소, shell history와 로그에 남기지 않는다. 네 HDFS URI는 동일한 immutable
+snapshot revision을 가리켜야 하며 `latest` 별칭이나 staging 경로를 사용하지 않는다.
 
 ```dotenv
 CONSUMER_IMAGE=feelm-foldin-consumer:local
@@ -1163,10 +1163,19 @@ CONSUMER_KAFKA_TOPIC=feelm.rating.v1
 CONSUMER_KAFKA_GROUP_ID=feelm-foldin-consumer-v1
 CONSUMER_POSTGRES_DSN=postgresql://<user>:<encoded-password>@<SERVICE_NODE_IP>:5432/feelm
 CONSUMER_REDIS_URL=redis://:<encoded-password>@<SERVICE_NODE_IP>:6379/0
-CONSUMER_MODEL_URI=hdfs://hdfs-namenode:9000/<immutable-model-path>
-CONSUMER_MAPPING_URI=hdfs://hdfs-namenode:9000/<immutable-mapping-path>
-CONSUMER_METADATA_URI=hdfs://hdfs-namenode:9000/<immutable-metadata-path>
+CONSUMER_MODEL_URI=hdfs://hdfs-namenode:8020/<immutable-model-path>
+CONSUMER_MAPPING_URI=hdfs://hdfs-namenode:8020/<immutable-mapping-path>
+CONSUMER_METADATA_URI=hdfs://hdfs-namenode:8020/<immutable-metadata-path>
+CONSUMER_CONTENT_URI=hdfs://hdfs-namenode:8020/<immutable-content-path>
+CONSUMER_HYBRID_ALPHA=0.5
+CONSUMER_MIN_INPUT_COUNT=10
 ```
+
+`CONSUMER_CONTENT_URI`를 비우면 기존 ALS 전용 모드로 동작한다. 값을 설정하면 Consumer는
+기동 시 Content bundle의 revision을 ALS·mapping·metadata와 대조하고, 불일치하거나 불완전한
+산출물이면 시작을 거부한다. `CONSUMER_HYBRID_ALPHA`는 ALS 점수 가중치이며 0~1 범위여야 한다.
+`CONSUMER_MIN_INPUT_COUNT`는 평점과 온보딩 선호를 합한 최소 입력 수로, 서비스 노출 기준과
+동일한 값으로 운영한다.
 
 ### Build, deploy and verify
 
@@ -1184,12 +1193,15 @@ NameNode health와 Kafka 시작 순서만 보장하며 원격 PostgreSQL·Redis 
 
 ```bash
 docker compose --env-file infra/.env -f infra/compose/distributed.yml \
-  --profile consumer up -d consumer
+  --profile consumer up -d --no-deps --force-recreate consumer
 docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}}' feelm-foldin-consumer
 docker logs --tail 100 feelm-foldin-consumer
 ```
 
-정상 상태는 프로세스가 `running`이고 설정·산출물·연결 오류가 반복되지 않는 상태다. 실제
+정상 상태는 프로세스가 `running`이고 로그에
+`content artifacts loaded version=<immutable-content-version>`이 기록되며 설정·산출물·연결
+오류가 반복되지 않는 상태다. `content artifacts not configured; publishing ALS-only candidates`가
+기록되면 `CONSUMER_CONTENT_URI`가 컨테이너에 전달되지 않은 ALS 전용 배포다. 실제
 검증은 백엔드의 평가 또는 온보딩 흐름으로 `feelm.rating.v1` 이벤트를 발행한 뒤 Consumer
 로그의 처리 완료와 Redis의 해당 사용자 `candidate-version`, `vector`, `candidates` 세 키
 갱신을 확인한다. 이벤트 payload, DSN, Redis URL과 비밀번호를 검증 기록에 남기지 않는다.

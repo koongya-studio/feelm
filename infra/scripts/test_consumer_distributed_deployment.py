@@ -6,6 +6,7 @@ ROOT = Path(__file__).resolve().parents[2]
 DISTRIBUTED_COMPOSE = ROOT / "infra/compose/distributed.yml"
 SERVICE_COMPOSE = ROOT / "infra/compose/service.yml"
 ENV_EXAMPLE = ROOT / "infra/.env.example"
+INFRA_README = ROOT / "infra/README.md"
 RUNTIME_VERIFY = ROOT / "infra/scripts/verify-datastores.sh"
 
 
@@ -26,8 +27,11 @@ class ConsumerDistributedDeploymentTest(unittest.TestCase):
             "CONSUMER_MODEL_URI",
             "CONSUMER_MAPPING_URI",
             "CONSUMER_METADATA_URI",
+            "CONSUMER_CONTENT_URI",
         ):
             self.assertIn(f"{name}: ${{{name}:-}}", compose)
+        self.assertIn("CONSUMER_HYBRID_ALPHA: ${CONSUMER_HYBRID_ALPHA:-0.5}", compose)
+        self.assertIn("CONSUMER_MIN_INPUT_COUNT: ${CONSUMER_MIN_INPUT_COUNT:-10}", compose)
 
     def test_datastores_remain_loopback_by_default(self) -> None:
         compose = SERVICE_COMPOSE.read_text(encoding="utf-8")
@@ -47,8 +51,23 @@ class ConsumerDistributedDeploymentTest(unittest.TestCase):
             "CONSUMER_MODEL_URI",
             "CONSUMER_MAPPING_URI",
             "CONSUMER_METADATA_URI",
+            "CONSUMER_CONTENT_URI",
+            "CONSUMER_HYBRID_ALPHA",
+            "CONSUMER_MIN_INPUT_COUNT",
         ):
             self.assertIn(f"{name}=", env_example)
+
+        self.assertIn("CONSUMER_HYBRID_ALPHA=0.5", env_example)
+        self.assertIn("CONSUMER_MIN_INPUT_COUNT=10", env_example)
+
+    def test_runbook_documents_hybrid_activation_and_verification(self) -> None:
+        readme = INFRA_README.read_text(encoding="utf-8")
+
+        self.assertIn("CONSUMER_CONTENT_URI=hdfs://hdfs-namenode:8020/", readme)
+        self.assertIn("CONSUMER_HYBRID_ALPHA=0.5", readme)
+        self.assertIn("CONSUMER_MIN_INPUT_COUNT=10", readme)
+        self.assertIn("content artifacts loaded version=", readme)
+        self.assertIn("content artifacts not configured; publishing ALS-only candidates", readme)
 
     def test_runtime_verification_accepts_only_guarded_remote_bindings(self) -> None:
         verification = RUNTIME_VERIFY.read_text(encoding="utf-8")
