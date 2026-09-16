@@ -9,15 +9,13 @@
  * 줄도 표시하지 않는다. screen-spec.md 3.1-A의 미확정 항목이며, 없는 값을 빈 줄로
  * 남기지 않는 쪽을 택했다.
  *
- * `[?]` 상영 시간(`115분`)은 API-043 `movie`에 없다. 와이어프레임에 있으므로
- * types/unspecified.ts 기준에 따라 목업에만 둔다.
+ * `[!]` 상영 시간(`115분`)은 API-043 `movie`에 없어 **표시하지 않는다.** 목업일 때는
+ * 영화 기준 목업에서 채웠지만 실제 응답에는 채울 값이 없다(S15P21E106-392).
+ * 개봉 연도와 장르도 응답에 따라 비어 있을 수 있어, 있는 항목만 이어 붙인다.
  * `[?]` `영화 상세 보기`의 이동 대상이 이동표에 없다. 2.4로 본다(screen-spec.md 3.1-A).
  * `한줄평 관리`는 7.6-A 시트를 연다(업무 -306). 한줄평이 없으면 비활성이다.
  * `평가 수정`은 2.5로 가며, 2.5는 이미 평가한 영화를 수정으로 처리한다.
  *
- * 와이어프레임은 제목을 실제 영화(`나우 유 씨 미`)로 적지만 3.1의 목록은
- * `영화 제목 2` 자리표시자를 쓴다. 같은 영화가 화면마다 다르게 보이면 안 되므로
- * mocks/movies.ts의 값을 따른다. 연도 · 장르 · 상영 시간은 와이어프레임과 같다.
  */
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
@@ -34,7 +32,7 @@ import { path } from '../../../routes/paths';
 import { formatDate } from '../../../utils/date';
 import { ottBadgeLetter } from '../../../utils/ott';
 import styles from './FrameDetailPage.module.css';
-import type { FrameDetailView } from '../../../types/unspecified';
+import type { FrameDetail } from '../../../types/taste';
 
 export default function FrameDetailPage() {
   const { frameId } = useParams();
@@ -42,7 +40,7 @@ export default function FrameDetailPage() {
 
   const id = Number(frameId);
 
-  const [frame, setFrame] = useState<FrameDetailView | null>(null);
+  const [frame, setFrame] = useState<FrameDetail | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
   const [managingComment, setManagingComment] = useState(false);
@@ -95,9 +93,10 @@ export default function FrameDetailPage() {
   }
 
   const { movie, rating, watchRecord } = frame;
-  const meta = [String(movie.releaseYear), ...movie.genres, `${movie.runtimeMinutes}분`].join(
-    ' · ',
-  );
+  // 개봉 연도가 없는 영화가 있고 장르도 비어 있을 수 있다. 빈 값은 줄에서 뺀다
+  const meta = [movie.releaseYear === null ? null : String(movie.releaseYear), ...movie.genres]
+    .filter((part): part is string => Boolean(part))
+    .join(' · ');
   const visibilityLabel = rating.visibility === 'PUBLIC' ? '공개' : '비공개';
 
   return (
@@ -120,7 +119,7 @@ export default function FrameDetailPage() {
 
         <div className={styles.movie}>
           <h2 className={styles.movieTitle}>{movie.title}</h2>
-          <p className={styles.movieMeta}>{meta}</p>
+          {meta ? <p className={styles.movieMeta}>{meta}</p> : null}
         </div>
 
         <section className={styles.record}>

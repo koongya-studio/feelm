@@ -17,17 +17,49 @@ import ReportDetailPage from './ReportDetailPage';
 import ReportIssuedPage from './ReportIssuedPage';
 import ReportListPage from './ReportListPage';
 import { getMyProfile } from '../../api/users';
+import { mockPopcornBucket } from '../../mocks/popcornBucket';
 import { resetSessionStore } from '../../mocks/sessionStore';
 import { mockMyProfile } from '../../mocks/user';
 import { ROUTE_PATTERN } from '../../routes/paths';
+import type { FrameList } from '../../types/taste';
 
 vi.mock('../../api/users', () => ({
   getMyProfile: vi.fn(),
 }));
 
+/*
+ * 3.1과 7.1이 부르는 필름 · 팝콘은 실제 API다(업무 -392). 가로채지 않으면 화면이
+ * 실패 상태로 떨어져 리포트 버튼 자체가 나오지 않는다.
+ */
+vi.mock('../../api/taste', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../api/taste')>()),
+  getMyFrames: vi.fn(),
+  getPopcornBucket: vi.fn(),
+}));
+
+const { getMyFrames, getPopcornBucket } = await import('../../api/taste');
+
+/** 3.1의 본문이 나오려면 프레임이 하나는 있어야 한다. 0개면 빈 상태 화면이다 */
+const frames: FrameList = {
+  totalCount: 1,
+  items: [
+    {
+      frameId: 501,
+      movie: { movieId: 401, title: '영화 제목 1', posterUrl: null },
+      score: 4.5,
+      flavorCode: 'FLAVOR_CRIME',
+      createdAt: '2026-09-06T12:30:00Z',
+    },
+  ],
+  nextCursor: null,
+  hasNext: false,
+};
+
 beforeEach(() => {
   resetSessionStore();
   vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
+  vi.mocked(getMyFrames).mockReset().mockResolvedValue(frames);
+  vi.mocked(getPopcornBucket).mockReset().mockResolvedValue(mockPopcornBucket);
 });
 
 function LocationProbe() {

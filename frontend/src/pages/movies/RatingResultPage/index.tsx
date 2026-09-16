@@ -22,7 +22,7 @@ import Button from '../../../components/Button';
 import FilmStrip from '../../../components/FilmStrip';
 import Poster from '../../../components/Poster';
 import { HeartIcon, ResultBellIcon } from '../../../components/Icon';
-import { getPopcornFlavors } from '../../../api/taste';
+import { getMockPopcornFlavors } from '../../../api/taste';
 import { path } from '../../../routes/paths';
 import styles from './RatingResultPage.module.css';
 import type { PopcornFlavor } from '../../../types/taste';
@@ -54,8 +54,11 @@ export default function RatingResultPage() {
   }, [state, navigate]);
 
   useEffect(() => {
-    // 맛 이름 표시에만 쓰이므로 실패하면 코드가 그대로 보인다
-    getPopcornFlavors()
+    /*
+     * 이 화면의 맛 집계는 목업이라 기준정보도 목업을 쓴다. 실제 API-044의 맛 코드와
+     * 목업 집계의 코드가 다르기 때문이다(api/taste.ts `getMockPopcornFlavors`).
+     */
+    getMockPopcornFlavors()
       .then(setFlavors)
       .catch(() => undefined);
   }, []);

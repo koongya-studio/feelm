@@ -11,8 +11,14 @@
  * - 7.6 ⇢ 7.6-A: 시트에서 고친 한줄평이 목록과 영화 상세에 함께 보여야 한다
  *
  * 화면은 실제 라우트 패턴으로 함께 건다(PartyFlow.test.tsx와 같은 방식).
- * 실제 호출인 도메인만 가로챈다 — API-014 내 프로필(`api/users`)과, 연동(-379) 뒤의
- * OTT 기준정보 · 구독(`api/otts`)이다. 나머지는 목업이라 그대로 둔다.
+ * 실제 호출인 도메인만 가로챈다 — API-014 내 프로필(`api/users`), 연동(-379) 뒤의
+ * OTT 기준정보 · 구독(`api/otts`), 연동(-392) 뒤의 필름(`api/taste`)이다. 나머지는
+ * 목업이라 그대로 둔다.
+ *
+ * `api/taste`는 **일부만** 가로챈다. 2.6이 쓰는 `getMyFrameCount` · `getMyPopcornCount`는
+ * 목업 그대로 둬야 평가 흐름이 이어진다. 프레임 상세는 서버가 주는 값이므로, 목업 평가
+ * 저장소를 읽어 상세를 만드는 스텁을 서버 대신 세운다 — 시트에서 고친 한줄평이 다시
+ * 읽을 때 반영되는지가 이 파일이 잡으려는 자리다.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -25,12 +31,15 @@ import RatingResultPage from '../../movies/RatingResultPage';
 import MyDashboardPage from '../MyDashboardPage';
 import RecommendationHistoryPage from '../RecommendationHistoryPage';
 import { getMovieDetail } from '../../../api/movies';
-import { getMyFrames } from '../../../api/taste';
+import { getMyRatings } from '../../../api/watch';
 import { getMyProfile } from '../../../api/users';
+import { mockFrameList, mockMyRatings } from '../../../mocks/frames';
+import { findMockMovie } from '../../../mocks/movies';
 import { mockOtts } from '../../../mocks/otts';
-import { resetSessionStore } from '../../../mocks/sessionStore';
+import { resetSessionStore, withRatingEdit } from '../../../mocks/sessionStore';
 import { mockMyProfile } from '../../../mocks/user';
 import { ROUTE_PATTERN } from '../../../routes/paths';
+import type { FrameDetail } from '../../../types/taste';
 
 vi.mock('../../../api/users', () => ({
   getMyProfile: vi.fn(),
@@ -42,13 +51,51 @@ vi.mock('../../../api/otts', () => ({
   setMyOttIds: vi.fn(),
 }));
 
+vi.mock('../../../api/taste', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../api/taste')>()),
+  getMyFrames: vi.fn(),
+  getFrameDetail: vi.fn(),
+}));
+
 const { getOtts, getMyOttIds } = await import('../../../api/otts');
+const { getMyFrames, getFrameDetail } = await import('../../../api/taste');
+
+/** 프레임 상세를 주는 서버 대역. 목업 평가 저장소의 현재 값을 읽는다 */
+function frameDetail(frameId: number): Promise<FrameDetail> {
+  const frame = mockFrameList.items.find((item) => item.frameId === frameId);
+
+  if (!frame) {
+    return Promise.reject(new Error('없는 프레임'));
+  }
+
+  const movie = findMockMovie(frame.movie.movieId);
+
+  return Promise.resolve({
+    frameId,
+    flavorCode: frame.flavorCode,
+    movie: {
+      movieId: movie.movieId,
+      title: movie.title,
+      posterUrl: movie.posterUrl,
+      releaseYear: movie.releaseYear,
+      genres: movie.genres,
+      directors: [],
+    },
+    rating: withRatingEdit(mockMyRatings[frame.movie.movieId]),
+    watchRecord: { ott: null, clickedAt: null, watchedAt: null, ratedAt: frame.createdAt },
+  });
+}
 
 beforeEach(() => {
   resetSessionStore();
   vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
   vi.mocked(getOtts).mockReset().mockResolvedValue(mockOtts);
   vi.mocked(getMyOttIds).mockReset().mockResolvedValue([mockOtts[0].ottId, mockOtts[4].ottId]);
+  // 평가 API가 없어 서버에는 프레임이 없다. 7.1 필름 카드는 비어 있는 쪽이 실제에 가깝다
+  vi.mocked(getMyFrames)
+    .mockReset()
+    .mockResolvedValue({ totalCount: 0, items: [], nextCursor: null, hasNext: false });
+  vi.mocked(getFrameDetail).mockReset().mockImplementation(frameDetail);
 });
 
 function LocationProbe() {
@@ -118,7 +165,7 @@ describe('7.1 → 7.6 ⇢ 2.5 → 7.6', () => {
 
     fireEvent.click(await screen.findByRole('link', { name: '평가' }));
     expect(location()).toBe('/my/ratings');
-    expect(await findTab('평가 100')).toHaveAttribute('aria-current', 'page');
+    expect(await findTab('평가 3')).toHaveAttribute('aria-current', 'page');
 
     // 402는 별점 4.0에 한줄평이 있는 기준 평가다
     const row = screen.getByRole('link', { name: /영화 제목 2/ });
@@ -131,12 +178,14 @@ describe('7.1 → 7.6 ⇢ 2.5 → 7.6', () => {
     // 2.6 · 2.7이 아니라 온 곳(7.6)으로 돌아온다
     await waitFor(() => expect(location()).toBe('/my/ratings'));
     expect(await screen.findByRole('link', { name: /영화 제목 2.*2\.5/ })).toBeInTheDocument();
-    expect(await findTab('평가 100')).toBeInTheDocument();
+    expect(await findTab('평가 3')).toBeInTheDocument();
 
-    // 필름에도 새 프레임이 생기지 않았고 별점만 바뀌었다
-    const frames = await getMyFrames();
-    expect(frames.totalCount).toBe(100);
-    expect(frames.items.filter((frame) => frame.movie.movieId === 402)).toEqual([
+    /*
+     * 평가가 늘지 않고 점수만 바뀌었다. 필름 프레임 수로 보던 자리인데, 필름이 실제
+     * API로 바뀌어(-392) 목업 평가와 같은 곳을 보지 않는다. 평가 목록에서 확인한다.
+     */
+    const ratings = await getMyRatings();
+    expect(ratings.items.filter((rating) => rating.movie.movieId === 402)).toEqual([
       expect.objectContaining({ frameId: 502, score: 2.5 }),
     ]);
     // 한줄평과 공개 범위는 그대로다
@@ -171,11 +220,11 @@ describe('7.6 → 7.7 ⇢ 2.5', () => {
     renderApp([ROUTE_PATTERN.unratedMovies]);
 
     expect(await findTab('안 남긴 영화 2')).toBeInTheDocument();
-    expect(await findTab('평가 101')).toBeInTheDocument();
+    expect(await findTab('평가 4')).toBeInTheDocument();
     expect(screen.queryByText('영화 제목 5')).not.toBeInTheDocument();
 
     // 7.6 맨 위에 방금 평가가 있다
-    fireEvent.click(await findTab('평가 101'));
+    fireEvent.click(await findTab('평가 4'));
     const list = await screen.findAllByRole('listitem');
     expect(list[0]).toHaveTextContent('영화 제목 5');
   });
@@ -260,7 +309,6 @@ describe('7.6 ⇢ 7.6-A', () => {
     expect((await getMovieDetail(402)).myRating).toEqual(
       expect.objectContaining({ score: 4, comment: null }),
     );
-    expect((await getMyFrames()).totalCount).toBe(100);
   });
 });
 
@@ -319,7 +367,7 @@ describe('3.1-A ⇢ 7.6-A · 3.1-A ⇢ 2.5', () => {
     fireEvent.click(screen.getByRole('button', { name: '평가 완료' }));
 
     await waitFor(() => expect(location()).toBe('/frames/501'));
+    // 다시 읽은 상세가 고친 별점을 보여준다. 프레임이 새로 생겼는지는 서버가 정한다
     expect(await screen.findByText('3.0')).toBeInTheDocument();
-    expect((await getMyFrames()).totalCount).toBe(100);
   });
 });

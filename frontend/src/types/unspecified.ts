@@ -17,7 +17,7 @@
  * | weeklyFrameDelta | 2.6 `99프레임 · 이번 주 +3` · 2.7 `100프레임 · 이번 주 +4` | 주간 증가 수를 내려주는 필드가 없음. API-014 `stats.frameCount`와 API-042 `totalCount`는 누적 수만 준다. CR 미등록 |
  * | TasteFlowView.flowSentence | 3.1 `스릴러에서 느와르로 넓어지고 있어요` | CR-16 결정 대기. 대응 필드가 없음 |
  * | TasteKeywordView.rationale | 3.1 `계획형 캐릭터 영화 12편에 ★4 이상` 등 4개 | CR-16 결정 대기. API-040 `keywords`는 `code`·`label`만 있음 |
- * | FrameDetailView.movie.runtimeMinutes | 3.1-A `2013 · 케이퍼 · 115분` | API-043 `movie`에 없음. runtimeMinutes와 같은 항목이므로 CR 미등록 |
+ * | 3.1-A 상영 시간 | 3.1-A `2013 · 케이퍼 · 115분` | API-043 `movie`에 없음. 실제 연동(S15P21E106-392)으로 채울 값이 사라져 화면에서 뺐다. CR 미등록 |
  * | PartyTasteView.tasteShare | 5.9 `액션 · 모험` `46%` · `스릴러 · 범죄` `38%` | CR-17 결정 대기. 무엇의 비율인지 정의가 없고 API-057 집계로 재현되지 않음 |
  * | PartyTasteView.tags | 5.9 `케이퍼` `빠른 전개` `반전` `느와르` | CR-17 결정 대기. API-044 `representativeKeywords`나 API-040 `keywords`로 보이나 값이 맞지 않음 |
  * | PartyMixView.commonRate · tags | 5.9 `공통 취향 일치 72%` · `스릴러` `빠른 전개` | CR-17 결정 대기. 산출 규칙이 계약에 없음 |
@@ -34,7 +34,6 @@
  */
 import type { OttRecommendationItem } from './ott';
 import type { ReportDetail } from './report';
-import type { FrameDetail } from './taste';
 import type { NotificationSettings } from './user';
 import type { Party } from './party';
 import type { RecommendedMovie } from './movie';
@@ -112,11 +111,6 @@ export type TasteFlowView = {
   flowSentence: string;
   /** 와이어프레임은 4개다. API-040 `keywords`는 3~5개 */
   keywords: TasteKeywordView[];
-};
-
-/** 프레임 상세 + 상영 시간 */
-export type FrameDetailView = Omit<FrameDetail, 'movie'> & {
-  movie: FrameDetail['movie'] & UnspecifiedMovieFields;
 };
 
 /**

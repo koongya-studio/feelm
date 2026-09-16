@@ -5,7 +5,8 @@
  * 세션 저장소에 쓰는 흐름(공개 범위 · 알림 · 차단)은 **나갔다 돌아와서** 값이 남는지 본다.
  * 쓰기만 하고 다시 읽는 쪽을 확인하지 않는 것이 가장 자주 낸 실수다.
  *
- * - `api/users`의 API-014만 가로챈다 — 실제 호출이다. 7.2-B가 쓰는 공개 프로필 목업은 그대로 둔다
+ * - `api/users`의 API-014와 `api/taste`의 API-042만 가로챈다 — 실제 호출이다.
+ *   7.2-B가 쓰는 공개 프로필 목업은 그대로 둔다
  * - 로그아웃은 실제 세션 기능이라 Provider 대신 가짜 `signOut`을 넣어 불렸는지 본다
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -26,6 +27,11 @@ import { resetSessionStore } from '../../../mocks/sessionStore';
 import { mockMyProfile } from '../../../mocks/user';
 import { ROUTE_PATTERN } from '../../../routes/paths';
 import type { AuthValue } from '../../../contexts/authContext';
+
+vi.mock('../../../api/taste', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../api/taste')>()),
+  getMyFrames: vi.fn(async () => ({ totalCount: 0, items: [], nextCursor: null, hasNext: false })),
+}));
 
 vi.mock('../../../api/users', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/users')>()),

@@ -29,7 +29,7 @@ import Poster from '../../../components/Poster';
 import ScreenHeader from '../../../components/ScreenHeader';
 import Section from '../../../components/Section';
 import StatusView from '../../../components/StatusView';
-import { getPopcornFlavors } from '../../../api/taste';
+import { getMockPopcornFlavors } from '../../../api/taste';
 import { getTasteCompare } from '../../../api/users';
 import { path } from '../../../routes/paths';
 import styles from './TasteComparePage.module.css';
@@ -63,8 +63,11 @@ export default function TasteComparePage() {
         }
       });
 
-    // 맛 이름은 실패해도 본문을 막지 않는다. 칩만 비워진다
-    getPopcornFlavors()
+    /*
+     * 이 화면의 맛 집계는 목업이라 기준정보도 목업을 쓴다. 실제 API-044의 맛 코드와
+     * 목업 집계의 코드가 다르기 때문이다(api/taste.ts `getMockPopcornFlavors`).
+     */
+    getMockPopcornFlavors()
       .then((value) => {
         if (active) {
           setFlavors(value);

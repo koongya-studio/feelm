@@ -6,6 +6,7 @@
  *
  * `api/users`를 통째로 가로챈다. API-014가 실제 호출이라(업무 -364) 가로채지 않으면
  * 테스트가 네트워크를 두드린다. develop의 `LoginPage.test.tsx`와 같은 방식이다.
+ * 필름 카드가 부르는 API-042도 같은 이유로 가로챈다(업무 -392).
  */
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { screen } from '@testing-library/react';
@@ -18,8 +19,18 @@ vi.mock('../../../api/users', () => ({
   getMyProfile: vi.fn(),
 }));
 
+vi.mock('../../../api/taste', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../api/taste')>()),
+  getMyFrames: vi.fn(),
+}));
+
+const { getMyFrames } = await import('../../../api/taste');
+
 beforeEach(() => {
   vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
+  vi.mocked(getMyFrames)
+    .mockReset()
+    .mockResolvedValue({ totalCount: 0, items: [], nextCursor: null, hasNext: false });
 });
 
 async function renderDashboard() {
