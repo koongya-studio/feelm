@@ -188,9 +188,12 @@
 
 - S15P21E106-415에서 DISCOVERY 후보 생성 정책과 Consumer 구현을 완료했다.
 - S15P21E106-471에서 Redis Candidate v3 `taste`/`discovery` 그룹화와 `generationId` writer를
-  반영했고, S15P21E106-481에서 후보별 구조화 `reason`을 추가해 현재 Candidate v4가 됐다. 현재
-  `develop`에는 Candidate v4 Spring reader와 TASTE 2 + DISCOVERY 1 조립 구현이 없으므로, 위 처리
-  규칙은 Backend가 구현·통합 검증해야 하는 소비 계약이다.
+  반영했고, S15P21E106-481에서 TASTE 후보별 구조화 `reason`을 추가해 Candidate v4가 됐다.
+  S15P21E106-488은 전체 평가 또는 온보딩 이력으로 계산한 저이력 그룹 적합도와 상위 기여 비율을
+  DISCOVERY 전용 `reason`으로 추가해 Candidate v5로 올린다. 현재
+  `develop`에는 Candidate v5 Spring reader와 TASTE 2 + DISCOVERY 1 조립 구현이 없으므로, 위 처리
+  규칙은 Backend가 구현·통합 검증해야 하는 소비 계약이다. 전환은 v4/v5 reader 선반영, Consumer v5
+  전환과 활성 후보 재게시, v5·`generationId` 검증, v4 호환 제거 순서로 진행한다.
 - S15P21E106-482에서 그룹·그룹 내부 대중성 번들의 HDFS 게시, 두 URI 동시 활성화와 rollback을 검증한다.
 - S15P21E106-483은 후보 부족분용 별도 POPULAR 목록의 정책·산출물·서비스 연동을 담당한다.
 
@@ -200,7 +203,7 @@
 
 ### 미정 사항
 
-- [ ] Candidate v4 Spring reader, 두 목록 조립과 감상 변경 재계산을 구현·통합 검증해야 함
+- [ ] Candidate v5 Spring reader, 두 목록 조립과 감상 변경 재계산을 구현·통합 검증해야 함
 - [ ] TMDB/KOBIS 공개 신호 후보 자격 하한을 합의하고 S15P21E106-482에서 운영 활성화해야 함
 - [ ] 콜드 스타트 전략(온보딩 건너뛴 사용자)
 - [ ] 추천 이유 factor 타입 목록과 문장 생성 방식(템플릿 vs LLM)

@@ -223,8 +223,11 @@ FR-04의 분석 수치를 사전 정의된 취향 키워드로 변환해 제공�
 
 - S15P21E106-415: Consumer의 DISCOVERY 후보 생성 정책과 로컬 검증
 - S15P21E106-471: Redis Candidate v3 `taste`/`discovery` 그룹화와 `generationId` writer 기준선
-- S15P21E106-481: 후보별 구조화 `reason`을 추가한 현재 Candidate v4 writer·payload
-  계약. Spring reader와 조립은 Backend 소비 계약
+- S15P21E106-481: TASTE 후보별 구조화 `reason`을 추가한 Candidate v4 writer·payload 기준선
+- S15P21E106-488: 전체 평가 또는 온보딩 이력으로 계산한 저이력 그룹 적합도·상위 기여 비율을
+  DISCOVERY `reason`으로 추가한 Candidate v5 writer·payload 계약. Spring reader와 문구 조립은 Backend
+  소비 계약이며, v4/v5 전환 reader 선반영 → Consumer v5
+  전환·활성 후보 재게시 → v5 검증 → v4 호환 제거 순으로 적용한다
 - S15P21E106-482: 그룹·그룹 내부 대중성 번들의 HDFS 게시, URI 활성화와 운영 검증
 - S15P21E106-483: TASTE/DISCOVERY 부족분을 채우는 별도 POPULAR fallback. `discovery-popularity`와 다른 산출물
 

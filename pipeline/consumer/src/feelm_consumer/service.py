@@ -146,6 +146,7 @@ def _build_ranked_results(
         LOG.warning("foldin_candidate_shortage available=%s requested=500", len(taste))
 
     discovery = None
+    discovery_reasons = None
     if groups is not None and discovery_popularity is not None:
         selection = select_discovery_candidates(
             groups,
@@ -157,6 +158,7 @@ def _build_ranked_results(
             dismissed_movie_ids=dismissed_movie_ids,
         )
         discovery = selection.candidates
+        discovery_reasons = selection.reasons
         LOG.info(
             "discovery_candidates selected=%s supplying_groups=%s eligible_groups=%s "
             "mapped_viewed=%s direction_source=%s",
@@ -173,8 +175,8 @@ def _build_ranked_results(
         factor_backed_input_count=factor_backed_input_count,
         candidates=taste,
         discovery_candidates=discovery,
-        movie_metadata=bundle.movie_metadata,
         reasons=build_candidate_reasons(taste, merged_inputs, bundle.movie_metadata),
+        discovery_reasons=discovery_reasons,
     )
 
 

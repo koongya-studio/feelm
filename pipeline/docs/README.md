@@ -7,7 +7,8 @@
 `service-v1/`은 2026-09-13 시점의 로컬 설계·인계 snapshot이다. 그 안의 `items`,
 `personalizedItems`, `discoveryItems`는 당시 제안 형식을 보존한 역사 자료이며 현재 Redis payload나
 Backend 소비 계약이 아니다. 현재 계약은 [`docs/api/streaming-contract.md`](../../docs/api/streaming-contract.md)의
-Candidate v4 `taste`/`discovery` 형식을 따른다.
+Candidate v5 `taste`/`discovery` 형식을 따른다. TASTE는 장르·입력 영화 근거를, DISCOVERY는 전체 이력 기반
+저이력 그룹 적합도와 기여 집중도를 각각 구조화된 `reason`으로 사용한다.
 
 Jira: [S15P21E106-295](https://ssafy.atlassian.net/browse/S15P21E106-295)
 
