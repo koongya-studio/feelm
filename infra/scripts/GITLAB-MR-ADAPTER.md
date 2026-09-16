@@ -5,7 +5,7 @@
 
 ## 목적과 제한
 
-`backend-mr-test`, `frontend-mr-test`, `pipeline-mr-test`와 의존성 변경 시 생성되는 `backend-cache-prepare`만
+`backend-mr-test`, `frontend-mr-test`, Pipeline shard 4종과 의존성 변경 시 생성되는 `backend-cache-prepare`만
 `e106-mr-isolated` 태그의 별도 Runner에서 받습니다. 이 Runner의
 Custom executor는 GitLab이 생성한 셸 스크립트를 실행하지 않는다. 다음 조건을 모두 다시
 확인한 뒤 현재 커밋에서 Job에 대응하는 `backend`, `frontend` 또는 `pipeline/spark` 디렉터리를
@@ -16,8 +16,9 @@ Custom executor는 GitLab이 생성한 셸 스크립트를 실행하지 않는�
 
 - GitLab 주소가 `https://lab.ssafy.com`이고 프로젝트 경로가
   `s15-bigdata-dist-sub1/S15P21E106`이다.
-- 인증된 현재 Job이 고정된 `backend-mr-test`, `frontend-mr-test`, `pipeline-mr-test` 또는
-  `backend-cache-prepare` 정책과 일치한다.
+- 인증된 현재 Job이 고정된 `backend-mr-test`, `frontend-mr-test`, `pipeline-unit-test`,
+  `pipeline-spark-als-a-d-test`, `pipeline-spark-als-e-z-test`,
+  `pipeline-spark-other-test` 또는 `backend-cache-prepare` 정책과 일치한다.
 - 같은 프로젝트의 열린 MR 하나가 해당 커밋을 가리키며 대상 브랜치가 `develop`이다.
 - CI script가 각 Job의 고정 명령과 일치하고 service, image, cache, dependency, artifact가 없다.
 - GitLab archive는 64 MiB 이하의 비압축 tar이며 선택한 영역 아래 일반 파일·디렉터리만 담는다.
@@ -35,8 +36,10 @@ Job·프로젝트·테스트 명령을 추가할 때 기존 어댑터를 느슨�
 - MR → develop: 백엔드 관련 경로 변경 시 `backend-mr-test`, 의존성 파일 변경 시
   `backend-cache-prepare`, `e106-mr-isolated`, 취소 가능
 - MR → develop: 프론트엔드 관련 경로 변경 시 `frontend-mr-test`, `e106-mr-isolated`, 취소 가능
-- MR → develop: `pipeline/spark` 실행 코드·테스트·lock 변경 시 `pipeline-mr-test`,
-  `e106-mr-isolated`, 취소 가능
+- MR → develop: `pipeline/spark` 실행 코드·테스트·lock 변경 시 `pipeline-unit-test`와
+  세 `pipeline-spark-*-test`, `e106-mr-isolated`, 취소 가능. 각 shard는 고유 resource group과
+  15분 timeout을 사용한다. 서로 다른 shard의 실제 병렬 실행은 둘 이상의 Runner 실행 슬롯이
+  준비된 경우에만 가능하다.
 - develop push: 기존 `backend-test`와 빌드·수동 배포, `e106-shell`
 - `runner-check`: 보호된 develop push에서 공통 CI 연결 설정이나 Runner 설치·서비스·가드
   파일이 바뀌면 자동 실행하고, 그 밖의 변경에는 비차단 수동 Job으로 대기
@@ -114,7 +117,7 @@ sudo python3 /usr/local/lib/feelm-ci222/gitlab/ci-pipeline-mr-prepare.py \
 `--network=none --offline` 재검증에 성공해야 최종 root 소유 read-only 캐시와 설정을 설치한다.
 uv가 중복 제거용으로 만든 캐시 내부 링크는 cache root 안의 일반 파일·디렉터리만 가리키는지
 검증한 뒤 실제 항목으로 복제하며, 최종 캐시에는 링크를 남기지 않는다.
-성공 출력의 이미지 ID·캐시 경로·digest를 보존하고 `pipeline-mr-test`를 재시도한다.
+성공 출력의 이미지 ID·캐시 경로·digest를 보존하고 실패한 Pipeline shard Job을 재시도한다.
 
 공통 CI·Runner 파일 변경 시 Job이 생성되는 것과 해당 파일이 서버에 적용되는 것은
 별개다. 어댑터는 Job별 archive만 전달하므로, 실행기 변경 자체는 해당 단위 테스트와
@@ -200,7 +203,8 @@ task 미귀속 시간도 수집기가 다시 계산해 불일치 값을 거부�
 - backend Job은 설치본과 활성 `prepared_base/scripts`의 런타임 계약 fingerprint가 일치할
   때만 GitLab 조회와 격리 작업을 시작하며, 불일치는 장시간 테스트 전에 거부한다.
 - `ci-pipeline-mr-boundary.py`: `pipeline/spark` 입력과 Python/uv lock 정책 검증.
-- `ci-pipeline-mr-runner.py`: 고정 offline uv 검사와 Spark 테스트의 격리 실행·정리.
+- `ci-pipeline-mr-runner.py`: Job 이름으로 검증된 단일 테스트 group의 고정 offline uv 검사와
+  Spark 테스트 격리 실행·정리.
 - `ci-pipeline-mr-config.py`: 검토된 이미지 digest와 read-only 의존성 캐시 identity 고정.
 - `ci-pipeline-mr-prepare.py`: 고정 CI 이미지, offline uv 캐시와 최초 설정을 준비·재검증.
 - `ci-gitlab-server-install.py`: 새 전용 경로만 만드는 token-free 설치기. 기본은 계획 출력이며

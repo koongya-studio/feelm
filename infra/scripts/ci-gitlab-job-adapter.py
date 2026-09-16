@@ -48,12 +48,33 @@ FRONTEND_JOB_NAME = 'frontend-mr-test'
 FRONTEND_EXPECTED_SCRIPT = [
     'cd frontend', 'npm ci', 'npm run lint', 'npm run format:check', 'npm run build',
 ]
-PIPELINE_JOB_NAME = 'pipeline-mr-test'
-PIPELINE_EXPECTED_SCRIPT = [
-    'cd pipeline/spark', 'uv sync --frozen', 'uv run ruff check .', 'uv run pytest',
-    'uv run python -m jobs.batch.als_baseline --help',
-    'uv run python -m jobs.batch.parquet_roundtrip --help',
-]
+PIPELINE_JOB_GROUPS = {
+    'pipeline-unit-test': 'unit',
+    'pipeline-spark-als-a-d-test': 'spark-als-a-d',
+    'pipeline-spark-als-e-z-test': 'spark-als-e-z',
+    'pipeline-spark-other-test': 'spark-other',
+}
+PIPELINE_JOB_SCRIPTS = {
+    'pipeline-unit-test': [
+        'cd pipeline/spark', 'uv sync --frozen', 'uv run ruff check .',
+        'uv run python -m ci_test_groups verify',
+        'uv run python -m ci_test_groups unit -vv --durations=20',
+        'uv run python -m jobs.batch.als_baseline --help',
+        'uv run python -m jobs.batch.parquet_roundtrip --help',
+    ],
+    'pipeline-spark-als-a-d-test': [
+        'cd pipeline/spark', 'uv sync --frozen',
+        'uv run python -m ci_test_groups spark-als-a-d -vv --durations=20',
+    ],
+    'pipeline-spark-als-e-z-test': [
+        'cd pipeline/spark', 'uv sync --frozen',
+        'uv run python -m ci_test_groups spark-als-e-z -vv --durations=20',
+    ],
+    'pipeline-spark-other-test': [
+        'cd pipeline/spark', 'uv sync --frozen',
+        'uv run python -m ci_test_groups spark-other -vv --durations=20',
+    ],
+}
 CACHE_PREPARE_JOB = 'backend-cache-prepare'
 CACHE_PREPARE_SCRIPT = ['echo Prepare verified backend dependency cache for this MR revision']
 CACHE_DEPENDENCY_FILES = {
@@ -134,10 +155,13 @@ def validate_job_response(response):
     if not isinstance(token, str) or not 16 <= len(token) <= 4096 or any(c.isspace() for c in token):
         raise PolicyError('Invalid job credential')
     policies = {
-        JOB_NAME: (JOB_STAGE, EXPECTED_SCRIPT, 'backend'),
-        FRONTEND_JOB_NAME: (JOB_STAGE, FRONTEND_EXPECTED_SCRIPT, 'frontend'),
-        PIPELINE_JOB_NAME: (JOB_STAGE, PIPELINE_EXPECTED_SCRIPT, 'pipeline'),
-        CACHE_PREPARE_JOB: ('verify', CACHE_PREPARE_SCRIPT, 'cache'),
+        JOB_NAME: (JOB_STAGE, EXPECTED_SCRIPT, 'backend', None),
+        FRONTEND_JOB_NAME: (JOB_STAGE, FRONTEND_EXPECTED_SCRIPT, 'frontend', None),
+        CACHE_PREPARE_JOB: ('verify', CACHE_PREPARE_SCRIPT, 'cache', None),
+        **{
+            name: (JOB_STAGE, PIPELINE_JOB_SCRIPTS[name], 'pipeline', group)
+            for name, group in PIPELINE_JOB_GROUPS.items()
+        },
     }
     policy = policies.get(info.get('name')) if isinstance(info, dict) else None
     if (policy is None or info.get('stage') != policy[0]
@@ -158,7 +182,8 @@ def validate_job_response(response):
     if steps[0].get('name') != 'script' or steps[0].get('script') != policy[1]:
         raise PolicyError('CI script differs from the fixed isolated policy')
     return {'id': job_id, 'token': token, 'project_id': info['project_id'], 'sha': git['sha'],
-            'job_name': info['name'], 'job_stage': info['stage'], 'service': policy[2]}
+            'job_name': info['name'], 'job_stage': info['stage'], 'service': policy[2],
+            'pipeline_group': policy[3]}
 
 
 def request(opener, url, token, maximum):
@@ -477,7 +502,7 @@ def run_job(response, config_path=CONFIG, opener=None):
         if context['service'] == 'frontend':
             return frontend_runner.start(payload, digest, started)
         if context['service'] == 'pipeline':
-            return pipeline_runner.start(payload, digest, started)
+            return pipeline_runner.start(payload, digest, context['pipeline_group'], started)
         return safety.start(prepared, prepared, 'backend', payload, digest, started)
     finally:
         signal.signal(signal.SIGTERM, previous_term); signal.signal(signal.SIGINT, previous_int)
