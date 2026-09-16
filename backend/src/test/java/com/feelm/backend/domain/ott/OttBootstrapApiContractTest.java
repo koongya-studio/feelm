@@ -29,7 +29,8 @@ import tools.jackson.databind.ObjectMapper;
 @AutoConfigureMockMvc
 class OttBootstrapApiContractTest extends SharedPostgresContractTest {
 
-    private static final String SEED_VERSION = "202609142240";
+    private static final Path SEED =
+            Path.of("src/main/resources/db/migration/V202609142240__seed_approved_ott_catalog.sql");
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
@@ -38,10 +39,10 @@ class OttBootstrapApiContractTest extends SharedPostgresContractTest {
     @Autowired Flyway flyway;
 
     @BeforeEach
-    void resetAndApplySeedMigration() {
+    void resetAndApplySeedMigration() throws Exception {
         jdbc.execute("TRUNCATE TABLE users, movies, otts RESTART IDENTITY CASCADE");
-        jdbc.update("DELETE FROM flyway_schema_history WHERE version = ?", SEED_VERSION);
-        assertThat(flyway.migrate().migrationsExecuted).isEqualTo(1);
+        jdbc.execute(Files.readString(SEED));
+        assertThat(flyway.validateWithResult().validationSuccessful).isTrue();
     }
 
     @Test

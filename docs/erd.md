@@ -135,6 +135,13 @@ erDiagram
         int rating_count
         timestamptz synced_at "TMDb 동기화 시각, 동기화 전 NULL"
     }
+    MOVIE_EMBEDDINGS {
+        bigint id PK
+        bigint movie_id FK, UK
+        vector_768 embedding "다국어 콘텐츠 임베딩"
+        varchar model_version "안정적인 모델 식별자·Revision, 최대 50자"
+        timestamptz updated_at
+    }
     GENRES {
         bigint id PK
         varchar code UK
@@ -191,6 +198,7 @@ erDiagram
     MOVIES ||--o{ MOVIE_PEOPLE : credits
     PEOPLE ||--o{ MOVIE_PEOPLE : credited
     MOVIES ||--o{ MOVIE_OTT_PROVIDERS : available_on
+    MOVIES ||--o| MOVIE_EMBEDDINGS : represented_by
     OTTS ||--o{ MOVIE_OTT_PROVIDERS : provides
     POPCORN_FLAVORS ||--o{ MOVIES : representative
 ```
@@ -198,6 +206,7 @@ erDiagram
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
 | `movies` | 영화 마스터 (TMDb 기준) | `tmdb_id` 유일. `average_rating`·`rating_count`는 평가 집계 반정규화 컬럼(D-10 결정) | FR-34 · API-028~031 |
+| `movie_embeddings` | 영화별 현재 콘텐츠 임베딩 | 별도 `id` PK와 UK(`movie_id`). 확정된 `vector(768)` 및 50자 이내의 안정적인 `model_version`을 저장하고 코사인 HNSW로 검색한다. 전체 산출물 SHA는 파이프라인 manifest에서 관리한다. 영화 삭제 시 함께 삭제하며 Redis에 중복 저장하지 않는다 | FR-11 · API-031 · ADR-0014 |
 | `genres` | 장르 기준정보 | TMDb 장르 ID 매핑 | FR-15 · API-029 |
 | `movie_genres`, `movie_countries`, `movie_people` | 영화 속성 매핑 | `movie_people.role`로 감독·배우 구분 | FR-14, FR-15, FR-34 |
 | `people` | 인물(감독·배우) | 검색 대상(FR-14) | API-028, API-030 |
@@ -451,7 +460,7 @@ flowchart LR
 | `/onboarding/cards`, `/onboarding/preferences` | `onboarding_preferences` | `movies`, `popcorn_flavors` |
 | `/otts`, `/users/me/otts` | `otts`, `user_otts` | — |
 | `/movies/search`, `/movies/filter-options`, `/movies/{movieId}` | `movies`, `movie_genres`, `movie_countries`, `movie_people`, `movie_ott_providers` | `genres`, `people`, `otts`, `ratings`(집계) |
-| `/movies/{movieId}/similar` | — (추천 서비스) | `movies` |
+| `/movies/{movieId}/similar` | `movie_embeddings` | `movies` |
 | `/movies/{movieId}/reviews` | `ratings` | `users`, `user_blocks` |
 | `/movies/{movieId}/ott-clicks`, `/watch-records/*` | `watch_records` | `otts` |
 | `/movies/{movieId}/ratings`, `/ratings/{ratingId}`, `/users/me/ratings` | `ratings`, `frames` | `watch_records`, `movies`, `popcorn_flavors` |

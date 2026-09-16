@@ -48,7 +48,7 @@
 | 국가 코드 | `varchar(2)` | ISO 3166-1 alpha-2 |
 | 구조화 데이터 | `jsonb` | `reason`, `analysis`, `keywords`, `content` |
 | 불리언 | `boolean NOT NULL DEFAULT false` | |
-| 임베딩 | `vector(n)` | 테이블과 차원은 미설계. 아래 8장 참조 |
+| 임베딩 | `vector(768)` | `movie_embeddings.embedding`. ADR-0014와 S15P21E106-419 |
 
 **PostgreSQL enum 타입을 쓰지 않는다.** 값을 추가할 때마다 `ALTER TYPE`이 필요하고
 Hibernate 매핑이 번거롭다. `varchar` + CHECK로 통일한다.
@@ -88,10 +88,11 @@ scale 없는 `numeric`으로 입력값을 그대로 검사한다. 기존 정수 
 | CASCADE | `users` → `user_auth_providers`, `email_verification_tokens`, `password_reset_tokens`, `notification_settings`, `user_otts`, `user_blocks`, `onboarding_preferences` | 계정에 종속된 데이터 |
 | CASCADE | `ratings` → `frames` | ERD 3장에 명시된 규칙 |
 | CASCADE | `recommendation_sets` → `recommendation_items` | 세트 없는 아이템은 의미가 없음 |
+| CASCADE | `movies` → `movie_embeddings` | 영화에서 파생된 임베딩은 원본 영화 없이 의미가 없음 |
 | CASCADE | `parties` → `party_members`, `party_invitations` | 파티에 종속 |
 | CASCADE | `taste_reports` → `report_images` | 리포트에 종속 |
 | SET NULL | `recommendation_items` → `user_movie_dismissals.recommendation_item_id` | 아이템이 사라져도 관심없음 이력은 남는다 |
-| RESTRICT | 기준정보 참조 전부(`movies`, `genres`, `people`, `otts`, `popcorn_flavors`) | 기준정보는 삭제하지 않는다 |
+| RESTRICT | 위 CASCADE 예외를 제외한 기준정보 참조(`movies`, `genres`, `people`, `otts`, `popcorn_flavors`) | 기준정보는 삭제하지 않는다 |
 | RESTRICT | `ratings.watch_record_id` → `watch_records` | 감상 기록은 삭제하지 않고 상태만 전이한다 |
 
 탈퇴는 물리 삭제가 아니라 상태 전이 + 익명화이므로(ERD D-9) `users` 대상 CASCADE는
@@ -109,6 +110,7 @@ scale 없는 `numeric`으로 입력값을 그대로 검사한다. 기존 정수 
   - `party_members` — 파티별 `OWNER` 역할 최대 1명
   - `recommendation_sets` — 개인 세트의 (`user_id`, `input_version`, `model_version`) 유일
   - `recommendation_sets` — 파티 세트의 (`party_id`, `input_version`, `model_version`) 유일
+  - `movie_embeddings` — 영화별 현재 임베딩 한 건을 보장하는 `movie_id` 유일
 - 정규화 값으로 판단하는 유일성은 별도 컬럼을 두지 않고 함수 기반 유일 인덱스를 쓴다.
   규칙이 한 곳에만 있어야 조회 질의와 어긋나지 않는다. 조회 질의는 인덱스와 **같은 식**을
   써야 인덱스를 탄다.
@@ -125,6 +127,25 @@ scale 없는 `numeric`으로 입력값을 그대로 검사한다. 기존 정수 
 볼륨을 가진 환경에 반영되지 않기 때문이다.
 
 `vector`는 이미지에 pgvector가 설치되어 있어야 한다(S15P21E106-177).
+
+### 영화 임베딩
+
+`movie_embeddings`는 별도 identity `id`를 PK로 사용하고 `movie_id`에 유일 제약과
+`movies(id)` 외래키를 둔다. 영화별 현재 임베딩 한 건만 유지하며 과거 모델 버전 이력은
+보관하지 않는다. `embedding`은 `vector(768)`, `model_version`은 기존 추천 세트와 같은
+`varchar(50)`, `updated_at`은 `timestamptz NOT NULL DEFAULT now()`다. 재적재 주체가 upsert할
+때 `updated_at = now()`를 명시하며 이 테이블만을 위한 자동 갱신 트리거는 두지 않는다.
+768차원은 S15P21E106-419에서 확정한 MVP 계약이다. `model_version`에는 50자 이내의 안정적인
+모델 식별자와 리비전을 저장하고, 전체 산출물 SHA와 생성 설정은 파이프라인 manifest에서 관리한다.
+차원이 다른 모델로 교체할 때는 별도 마이그레이션, 전체 재임베딩과 인덱스 재구축이 필요하다.
+
+코사인 검색 인덱스는 `USING hnsw (embedding vector_cosine_ops)`로 생성한다. 인덱스 조회는
+`ORDER BY embedding <=> :query_vector ASC LIMIT :limit` 형태를 유지한다. 코사인 유사도 표시는
+조회 결과에서 `1 - distance`로 변환하되 정렬식을 변형해 HNSW 인덱스 사용을 방해하지 않는다.
+HNSW의 `m`, `ef_construction`, `ef_search`는 기본값으로 시작하고 실제 데이터의 지연 시간과
+recall 측정 없이 마이그레이션에 튜닝값을 고정하지 않는다. API 조회는 기준 영화와 반환 전
+필터에서 제외될 후보 수를 고려해 요청 개수보다 많이 조회하고, 세션의 `hnsw.ef_search`를 내부
+후보 조회 한도 이상으로 둔다. 구체적인 과다 조회량과 튜닝값은 API-031 구현에서 측정해 정한다.
 
 ## 8. Flyway
 
@@ -171,10 +192,6 @@ PostgreSQL 문법이라 H2에서 실행되지 않으므로, 마이그레이션�
 
 ## 9. 미결
 
-- **영화 임베딩 테이블이 논리 ERD에 없다.** ADR-0014와 API-031이 pgvector 저장·조회를
-  전제하는데 해당 엔티티가 정의되어 있지 않다. 테이블 구조, 벡터 차원,
-  `embedding_model_version` 계약을 정해야 한다. 모델이 확정되지 않아 차원이 바뀔 수 있으므로
-  `movies` 본체가 아닌 별도 테이블을 권한다.
 - **닉네임 길이·허용 문자**가 API-001 미정 사항이다. 현재 `varchar(20)`은 명세의 가정값을
   반영한 것이다. 확정되면 `ALTER TABLE`로 조정한다.
 - **기준정보 Seed** — `popcorn_flavors` 8종 코드(A-6)는 별도 확정이 필요하다.
