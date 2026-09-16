@@ -42,6 +42,8 @@ pipeline-unit-test:
 
 pipeline-spark-als-a-d-test:
   extends: .pipeline-mr-test
+  when: manual
+  allow_failure: false
   resource_group: pipeline-spark-als-a-d-test
   script:
     - cd pipeline/spark
@@ -51,6 +53,8 @@ pipeline-spark-als-a-d-test:
 
 pipeline-spark-als-e-z-test:
   extends: .pipeline-mr-test
+  when: manual
+  allow_failure: false
   resource_group: pipeline-spark-als-e-z-test
   script:
     - cd pipeline/spark
@@ -60,6 +64,8 @@ pipeline-spark-als-e-z-test:
 
 pipeline-spark-other-test:
   extends: .pipeline-mr-test
+  when: manual
+  allow_failure: false
   resource_group: pipeline-spark-other-test
   script:
     - cd pipeline/spark
