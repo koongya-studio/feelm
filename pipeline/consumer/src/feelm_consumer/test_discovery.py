@@ -1,0 +1,181 @@
+from __future__ import annotations
+
+import numpy as np
+
+from feelm_consumer.discovery import select_discovery_candidates
+from feelm_consumer.group_artifacts import GroupAssignment
+from feelm_consumer.profile import ProfileInput
+from feelm_consumer.ranking import RankedMovie
+
+
+class FakeGroupBundle:
+    def __init__(self, assignments: dict[int, int]) -> None:
+        self.assignments = assignments
+        self.group_means = np.zeros((1024, 131), dtype=np.float64)
+        for group_id in set(assignments.values()):
+            self.group_means[group_id, group_id % 131] = 1.0
+
+    def assignment_for(self, movie_id: int) -> GroupAssignment | None:
+        group_id = self.assignments.get(movie_id)
+        if group_id is None:
+            return None
+        return GroupAssignment(group_id // 128, group_id % 128, group_id, True, True, True)
+
+
+def test_discovery_limits_ten_groups_and_ten_movies_per_group() -> None:
+    assignments = {1: 0}
+    ranked: list[RankedMovie] = []
+    for group_id in range(1, 13):
+        for offset in range(11):
+            movie_id = 1000 + group_id * 100 + offset
+            assignments[movie_id] = group_id
+            ranked.append(RankedMovie(movie_id, 1.0 - group_id / 100 - offset / 10_000))
+    bundle = FakeGroupBundle(assignments)
+    # Make lower group IDs the most compatible with the user's positive group-0 direction.
+    for group_id in range(1, 13):
+        bundle.group_means[group_id, 0] = 1.0 - group_id / 100
+
+    selection = select_discovery_candidates(
+        bundle, ranked, [ProfileInput(1, 5.0, "rating")], [], popularity_ranking=ranked
+    )
+
+    assert selection.supplying_group_count == 10
+    assert selection.eligible_group_count == 12
+    assert len(selection.candidates) == 100
+    selected_ids = {item.movie_id for item in selection.candidates}
+    assert all(sum(movie_id // 100 == 10 + group_id for movie_id in selected_ids) == 10 for group_id in range(1, 11))
+    assert all(movie_id < 2100 for movie_id in selected_ids)
+
+
+def test_discovery_group_experience_uses_confirmed_viewing_boundary() -> None:
+    assignments = {movie_id: group_id for movie_id, group_id in zip(range(1, 11), range(10), strict=True)}
+    assignments.update({101: 20, 102: 20, 201: 21, 202: 21, 203: 21, 301: 20, 302: 21})
+    bundle = FakeGroupBundle(assignments)
+    ranked = [RankedMovie(301, 0.9), RankedMovie(302, 0.8)]
+    ratings = [ProfileInput(movie_id, 5.0, "rating") for movie_id in range(1, 11)]
+    watched = {101, 102, 201, 202, 203}
+
+    selection = select_discovery_candidates(
+        bundle, ranked, ratings, [], popularity_ranking=ranked, watched_movie_ids=watched
+    )
+
+    # total mapped viewed=15: group 20 has 2/15 and is eligible; group 21 has 3 and is not.
+    assert selection.mapped_viewed_count == 15
+    assert [item.movie_id for item in selection.candidates] == [301]
+
+
+def test_discovery_group_share_accepts_exactly_twenty_percent_only() -> None:
+    assignments = {movie_id: group_id for movie_id, group_id in zip(range(1, 9), range(8), strict=True)}
+    assignments.update({21: 20, 22: 20, 30: 20})
+    bundle = FakeGroupBundle(assignments)
+    ranked = [RankedMovie(30, 1.0)]
+    ratings = [ProfileInput(movie_id, 5.0, "rating") for movie_id in range(1, 9)]
+
+    at_boundary = select_discovery_candidates(
+        bundle, ranked, ratings, [], popularity_ranking=ranked, watched_movie_ids={21, 22}
+    )
+    above_boundary = select_discovery_candidates(
+        bundle, ranked, ratings[:-1], [], popularity_ranking=ranked, watched_movie_ids={21, 22}
+    )
+
+    assert at_boundary.mapped_viewed_count == 10
+    assert [item.movie_id for item in at_boundary.candidates] == [30]
+    assert above_boundary.mapped_viewed_count == 9
+    assert above_boundary.candidates == []
+
+
+def test_discovery_excludes_profile_watched_and_dismissed_movies() -> None:
+    assignments = {1: 0, 2: 1, 3: 1, 4: 1, 5: 1, **{10 + group: 10 + group for group in range(5)}}
+    bundle = FakeGroupBundle(assignments)
+    bundle.group_means[1, 0] = 1.0
+    ranked = [RankedMovie(movie_id, 1.0 - movie_id / 10) for movie_id in (2, 3, 4, 5)]
+
+    selection = select_discovery_candidates(
+        bundle,
+        ranked,
+        [ProfileInput(1, 5.0, "rating")],
+        [ProfileInput(2, 4.271231616529622, "onboarding")],
+        popularity_ranking=ranked,
+        watched_movie_ids={3, 10, 11, 12, 13, 14},
+        dismissed_movie_ids={4},
+    )
+
+    assert [item.movie_id for item in selection.candidates] == [5]
+
+
+def test_onboarding_direction_is_binary_and_rating_direction_wins() -> None:
+    assignments = {1: 0, 2: 1, 3: 2}
+    bundle = FakeGroupBundle(assignments)
+    bundle.group_means[1, 0] = 0.8
+    bundle.group_means[2, 0] = -0.8
+    ranked = [RankedMovie(2, 0.8), RankedMovie(3, 0.7)]
+
+    onboarding_only = select_discovery_candidates(
+        bundle,
+        ranked,
+        [],
+        [ProfileInput(1, 4.271231616529622, "onboarding")],
+        popularity_ranking=ranked,
+    )
+    rating_first = select_discovery_candidates(
+        bundle,
+        ranked,
+        [ProfileInput(1, 0.5, "rating")],
+        [ProfileInput(1, 4.271231616529622, "onboarding")],
+        popularity_ranking=ranked,
+    )
+
+    assert onboarding_only.direction_source == "ONBOARDING"
+    assert rating_first.direction_source == "RATING"
+
+
+def test_onboarding_dislike_reverses_which_tenth_group_is_supplied() -> None:
+    assignments = {1: 0}
+    ranked: list[RankedMovie] = []
+    for group_id in range(1, 12):
+        movie_id = 100 + group_id
+        assignments[movie_id] = group_id
+        ranked.append(RankedMovie(movie_id, 1.0 - group_id / 100))
+    bundle = FakeGroupBundle(assignments)
+    for group_id in range(1, 11):
+        bundle.group_means[group_id, 0] = 1.1 - group_id / 10
+    bundle.group_means[11, 0] = -1.0
+
+    liked = select_discovery_candidates(
+        bundle,
+        ranked,
+        [],
+        [ProfileInput(1, 4.271231616529622, "onboarding")],
+        popularity_ranking=ranked,
+    )
+    disliked = select_discovery_candidates(
+        bundle,
+        ranked,
+        [],
+        [ProfileInput(1, 2.798442509805467, "onboarding")],
+        popularity_ranking=ranked,
+    )
+
+    assert 111 not in {item.movie_id for item in liked.candidates}
+    assert 101 not in {item.movie_id for item in disliked.candidates}
+    assert 111 in {item.movie_id for item in disliked.candidates}
+
+
+def test_popularity_selects_group_pool_then_personal_score_orders_it() -> None:
+    assignments = {1: 0, **{movie_id: 1 for movie_id in range(10, 22)}}
+    bundle = FakeGroupBundle(assignments)
+    bundle.group_means[1, 0] = 1.0
+    personal = [RankedMovie(movie_id, float(movie_id)) for movie_id in range(10, 22)]
+    popularity = [RankedMovie(movie_id, float(100 - movie_id)) for movie_id in range(10, 22)]
+
+    selection = select_discovery_candidates(
+        bundle,
+        personal,
+        [ProfileInput(1, 5.0, "rating")],
+        [],
+        popularity_ranking=popularity,
+    )
+
+    # Popularity admits 10..19 and excludes the personally strongest 20..21.
+    # Personal scores then order only the admitted pool.
+    assert [item.movie_id for item in selection.candidates] == list(range(19, 9, -1))

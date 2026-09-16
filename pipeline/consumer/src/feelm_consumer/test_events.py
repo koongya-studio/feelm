@@ -31,6 +31,14 @@ def test_parse_event_rejects_invalid_half_step_score() -> None:
         )
 
 
+def test_parse_event_rejects_empty_onboarding_submission() -> None:
+    with pytest.raises(EventValidationError):
+        parse_event(
+            b'{"eventId":"123e4567-e89b-12d3-a456-426614174000","userId":7,"eventType":"ONBOARDING","occurredAt":"2026-09-13T00:00:00Z","payload":{"preferenceCount":0}}',
+            b"7",
+        )
+
+
 def test_settings_reports_names_but_not_values() -> None:
     with pytest.raises(SettingsError, match="CONSUMER_REDIS_URL") as error:
         load_settings({"CONSUMER_KAFKA_BOOTSTRAP_SERVERS": "broker"})

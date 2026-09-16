@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from dataclasses import replace
 
+import numpy as np
 import pytest
 import redis
 
 from feelm_consumer import runner
+from feelm_consumer.artifacts import ArtifactError
+from feelm_consumer.ranking import RankedMovie
 from feelm_consumer.settings import load_settings
 
 
@@ -117,6 +120,8 @@ def _null_snapshot(_connect: object) -> _NullSnapshot:
 
 
 class _Supported:
+    size = 2
+
     @staticmethod
     def sum() -> int:
         return 1
@@ -130,6 +135,30 @@ class _Content:
 
 
 CONTENT = _Content()
+
+
+class _Groups:
+    group_version = "groups-v1"
+    mapping_revision = _Bundle.mapping_revision
+    service_movie_ids = np.asarray([10, 20], dtype=np.int64)
+    tmdb_ids = np.asarray([100, 200], dtype=np.int64)
+    group_ids = np.asarray([0, 1], dtype=np.int32)
+    group_mapped = np.asarray([True, False])
+    group_means = np.zeros((2, 3), dtype=np.float64)
+
+
+GROUPS = _Groups()
+
+
+class _Popularity:
+    popularity_version = "popularity-v1"
+    mapping_revision = _Bundle.mapping_revision
+    candidates = (RankedMovie(20, 0.9),)
+    service_movie_ids = np.asarray([20, 10], dtype=np.int64)
+    tmdb_ids = np.asarray([200, 100], dtype=np.int64)
+
+
+POPULARITY = _Popularity()
 
 
 class StoppingConsumer(FakeConsumer):
@@ -216,12 +245,85 @@ def test_content_and_alpha_reach_process_user(monkeypatch) -> None:
     assert seen["hybrid_alpha"] == 0.25
 
 
+def test_group_bundle_is_generation_checked_and_passed_down(monkeypatch) -> None:
+    seen: dict[str, object] = {}
+    healthy = FakeMessage(
+        0,
+        10,
+        b'{"eventId":"123e4567-e89b-12d3-a456-426614174000","userId":7,"eventType":"RATING",'
+        b'"occurredAt":"2026-09-13T00:00:00Z","payload":{"action":"CREATE","movieId":1,"score":5}}',
+    )
+    fake = StoppingConsumer([healthy])
+    _wire_run(monkeypatch, fake)
+    monkeypatch.setattr(runner, "load_bundle", lambda *_args: _Bundle())
+    monkeypatch.setattr(
+        runner,
+        "load_group_bundle",
+        lambda uri, **kwargs: seen.update({"uri": uri, **kwargs}) or GROUPS,
+    )
+    monkeypatch.setattr(
+        runner,
+        "load_discovery_popularity",
+        lambda uri, **kwargs: seen.update({"popularity_uri": uri, "popularity_kwargs": kwargs}) or POPULARITY,
+    )
+    monkeypatch.setattr(runner, "process_user", lambda *_args, **kwargs: seen.update({"process": kwargs}) or True)
+
+    with pytest.raises(SystemExit):
+        runner.run(
+            replace(
+                _settings(),
+                group_uri="groups/groups-v1",
+                discovery_popularity_uri="discovery-popularity/v1",
+            )
+        )
+
+    assert seen["uri"] == "groups/groups-v1"
+    assert seen["expected_mapping_revision"] == _Bundle.mapping_revision
+    assert seen["popularity_uri"] == "discovery-popularity/v1"
+    assert seen["popularity_kwargs"] == {"expected_mapping_revision": _Bundle.mapping_revision}
+    assert seen["process"]["groups"] is GROUPS  # type: ignore[index]
+    assert seen["process"]["discovery_popularity"] == POPULARITY.candidates  # type: ignore[index]
+
+
+def test_mismatched_discovery_catalog_stops_before_external_clients(monkeypatch) -> None:
+    class MismatchedPopularity(_Popularity):
+        tmdb_ids = np.asarray([999, 100], dtype=np.int64)
+
+    monkeypatch.setattr(runner, "load_bundle", lambda *_args: _Bundle())
+    monkeypatch.setattr(runner, "load_group_bundle", lambda *_args, **_kwargs: GROUPS)
+    monkeypatch.setattr(
+        runner,
+        "load_discovery_popularity",
+        lambda *_args, **_kwargs: MismatchedPopularity(),
+    )
+    monkeypatch.setattr(
+        runner.redis.Redis,
+        "from_url",
+        lambda *_args, **_kwargs: pytest.fail("Redis must not be created for a mismatched release"),
+    )
+    monkeypatch.setattr(
+        runner,
+        "Consumer",
+        lambda _config: pytest.fail("Kafka must not be created for a mismatched release"),
+    )
+
+    with pytest.raises(ArtifactError, match="catalogs differ"):
+        runner.run(
+            replace(
+                _settings(),
+                group_uri="groups/groups-v1",
+                discovery_popularity_uri="discovery-popularity/v1",
+            )
+        )
+
+
 def test_user_without_publishable_result_is_committed_and_does_not_pause(monkeypatch, caplog) -> None:
     """No signal is not a failure: pausing would replay the same event forever."""
     published: list[object] = []
     monkeypatch.setattr(runner, "_expected_version", lambda *_args: 4)
     monkeypatch.setattr(runner, "readonly_snapshot", _null_snapshot)
     monkeypatch.setattr(runner, "load_profile", lambda *_args: ([], []))
+    monkeypatch.setattr(runner, "load_user_snapshot", lambda *_args: pytest.fail("group-off snapshot expansion"))
     monkeypatch.setattr(runner, "calculate_user_results", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(runner, "publish", lambda *_args: published.append(_args))
 

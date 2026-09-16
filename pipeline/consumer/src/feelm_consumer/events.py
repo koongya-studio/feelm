@@ -52,7 +52,7 @@ def parse_event(raw: bytes, key: bytes | None) -> RatingEvent:
             raise EventValidationError("invalid score")
     else:
         count = body.get("preferenceCount")
-        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+        if isinstance(count, bool) or not isinstance(count, int) or count <= 0:
             raise EventValidationError("invalid preferenceCount")
     if occurred_at.tzinfo is None or occurred_at.utcoffset() != UTC.utcoffset(occurred_at):
         raise EventValidationError("occurredAt must be UTC")
