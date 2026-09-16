@@ -250,6 +250,7 @@ erDiagram
         numeric score "0.5~5.0, 0.5점 단위 CHECK"
         varchar comment "한줄평 200자 이하, NULL 가능"
         varchar visibility "PUBLIC / PRIVATE, comment 없으면 NULL 가능 (API-036)"
+        boolean is_spoiler "NOT NULL DEFAULT false, 작성자 표시값"
         timestamptz created_at
         timestamptz updated_at
     }
@@ -288,7 +289,7 @@ erDiagram
 | `onboarding_preferences` | 초기 취향(LIKE/DISLIKE) | UK(`user_id`, `movie_id`). 평가(0.5~5.0점, 0.5점 단위)와 분리 저장하며 프레임을 생성하지 않음 | FR-02 · API-023, API-024 |
 | `user_otts` | 구독 OTT | 전체 교체(PUT) | FR-03 · API-026, API-027 |
 | `watch_records` | 감상 상태 머신 | 사용자·영화별 **활성 기록**(EXPIRED 아님)은 1개 — 부분 유일 인덱스(D-6 결정). 만료 후 재클릭은 새 행 | FR-17, FR-18 · API-033~035 |
-| `ratings` | 평가 + 한줄평 | UK(`user_id`, `movie_id`). 한줄평은 컬럼(별도 테이블 아님). 삭제 시 프레임도 삭제되고 감상 기록은 `WATCHED_UNRATED`로 복귀 | FR-19, FR-26 · API-036~039 |
+| `ratings` | 평가 + 한줄평 | UK(`user_id`, `movie_id`). 한줄평은 컬럼(별도 테이블 아님). `is_spoiler`는 NOT NULL·기본 false이며 기존 평가도 false. 삭제 시 프레임도 삭제되고 감상 기록은 `WATCHED_UNRATED`로 복귀 | FR-19, FR-26 · API-032, API-036~039 |
 | `frames` | 필름의 프레임 | 평가와 1:1. 조회용 `user_id`·`movie_id`를 보관하고 인덱싱하며 애플리케이션이 평가와의 일치를 보장한다. 맛은 영화 조인으로 조회한다 | FR-07, FR-08 · API-042, API-043 |
 | `taste_analyses` | 취향 분석 결과 캐시 | 별도 `id`와 UK(`user_id`), `rating_count >= 0` CHECK를 둔다. Spring이 평가 추가·수정·삭제 시 평가와 영화 정보를 집계해 갱신하며 평가가 없으면 행을 만들지 않는다. 기본 Re-ranking·XAI 근거는 Python Consumer, 행동 Feature 경량 재정렬·최종 XAI 조립은 Spring이 담당한다(D-4) | FR-04, FR-05 · API-040 |
 
@@ -440,7 +441,8 @@ flowchart LR
 ### 차단·공개 범위
 
 - 차단은 `user_blocks`에 단방향 행으로 저장하고, 조회 시 `(blocker=A AND blocked=B) OR (blocker=B AND blocked=A)`로 양방향 필터를 적용합니다(FR-39).
-- `users.visibility=PRIVATE`인 사용자의 필름·팝콘·평가는 본인 외 조회 시 404로 처리합니다(NFR-07). 단, 같은 활성 파티의 현재 멤버에게는 API-057의 팝콘 집계만 공개합니다. 개별 필름·프레임·평가에는 이 예외를 적용하지 않습니다.
+- 공개 한줄평(API-032)은 ACTIVE 작성자의 `PUBLIC` 한줄평을 작성자 프로필의 공개 범위와 무관하게 로그인 회원에게 노출하며, 스포일러 여부와 무관하게 원문을 반환합니다. blur/reveal은 FE 로컬 상태이고 별도 서버 상태를 저장하지 않습니다.
+- `users.visibility=PRIVATE`인 사용자의 프로필·필름·팝콘·프로필의 평가 목록은 본인 외 조회 시 404로 처리합니다(NFR-07). 영화별 API-032의 `PUBLIC` 한줄평은 별개이며, 작성자 프로필에 접근하면 비공개 정책을 적용합니다. 같은 활성 파티의 현재 멤버에게는 API-057의 팝콘 집계만 공개하며, 개별 필름·프레임·프로필 평가 목록에는 이 예외를 적용하지 않습니다.
 - 차단자는 파티장 여부와 관계없이 상대와 함께 속한 모든 활성 파티에서 탈퇴합니다. 차단 저장과 탈퇴·승계·종료는 하나의 트랜잭션으로 처리합니다(API-020). 초대·수락 시 현재 파티원 전원과의 양방향 차단 관계를 검사합니다.
 
 ### 파티 인원 변경
@@ -493,7 +495,7 @@ flowchart LR
 | D-6 | 감상 기록 없이 평가 허용 | 허용 / 불허 | **허용** (08-30) — `ratings.watch_record_id` NULL 허용 | `watch_records` 유일 제약, ⑩·⑪ 화면 |
 | D-7 | 프레임·팝콘 저장 구조 | 별도 테이블 / 평가·영화에서 조회 | **프레임만 별도 유지**, 팝콘 버킷은 평가와 영화 맛을 집계 | 필름·팝콘 조회 |
 | D-8 | 가입 시 나이 저장 형식 | 정수 / 연령대 / 출생연도 | **생년월일(`birth_date`)** (08-31, 08-30 출생연도에서 변경). 성별 3값이며 가입 시 필수 (09-05 `NULL 허용`에서 정정, 플랜 결정 11). 두 값 모두 컬럼은 탈퇴 파기를 위해 NULL을 허용한다(D-9) | `users`, API-001·008 |
-| D-9 | 탈퇴 사용자 데이터 처리 | 즉시 삭제 / 기간 보존 / 익명화 | **계정 영역 확정: 이메일·닉네임 치환 + 즉시 재사용 허용** (09-02, BE-A). `password_hash`·`birth_date`·`gender`, 소셜 연결 수단과 인증 토큰은 삭제한다. 내부·공개 식별자 및 다른 사용자 데이터와의 연결이 남으므로 계정 행 전체가 익명정보라고 전제하지 않는다. 공개 한줄평과 학습 데이터는 각 도메인 담당 결정 대기 | `users.status`, 공개 한줄평, 학습 데이터 |
+| D-9 | 탈퇴 사용자 데이터 처리 | 즉시 삭제 / 기간 보존 / 익명화 | **계정 영역 확정: 이메일·닉네임 치환 + 즉시 재사용 허용** (09-02, BE-A). `password_hash`·`birth_date`·`gender`, 소셜 연결 수단과 인증 토큰은 삭제한다. 내부·공개 식별자 및 다른 사용자 데이터와의 연결이 남으므로 계정 행 전체가 익명정보라고 전제하지 않는다. API-032 노출은 ACTIVE 작성자로 제한하며, 공개 한줄평·학습 데이터의 보존 정책은 각 도메인 담당 결정 대기 | `users.status`, 공개 한줄평, 학습 데이터 |
 | D-10 | 평균 별점 집계 방식 | 반정규화 컬럼 / 조회 시 집계 / MView | **반정규화 컬럼, 차단 미반영** (08-30) | 평가 트랜잭션 범위, API-030 |
 | D-11 | 검색 엔진 | PostgreSQL full-text(`pg_trgm`) / Elasticsearch | **PostgreSQL full-text + `pg_trgm`** (08-31, ADR-0010) | 인덱스 설계 |
 | D-12 | 팝콘 맛 8종 기준정보 | 고정 장르 그룹 / ML 취향 군집 | **439 `taste_id 0..7` ↔ `FLAVOR_A..H` 고정 매핑 + 실배정 해석 키워드**. 표시명·색상은 변경 가능하다 (ADR-0020) | `popcorn_flavors` 초기 데이터, 온보딩 카드 |

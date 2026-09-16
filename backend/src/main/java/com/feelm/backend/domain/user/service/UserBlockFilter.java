@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <ul>
  *   <li>상대가 한 명이면 {@link #isBlocked(long, long)} — 프로필·상세 조회, 초대 대상 검사
  *   <li>후보 집합이 이미 정해졌으면 {@link #blockedAmong(long, Collection)} — 파티원 목록, 초대 후보
- *   <li>후보를 미리 좁힐 수 없으면 {@link #blockedCounterpartIds(long)} — 한줄평 목록처럼 조회한 뒤 제외해야 하는 경우
+ *   <li>후보를 미리 좁힐 수 없고 전체 관계가 충분히 작으면 {@link #blockedCounterpartIds(long)} — 전체 상대 id가 필요한 경우
  * </ul>
  */
 @Service
