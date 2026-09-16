@@ -5,6 +5,8 @@ set -Eeuo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 DOCKER_PROJECT_ROOT="${PROJECT_ROOT}"
+REDIS_CONFIG_DIR="${REDIS_CONFIG_DIR:-${PROJECT_ROOT}/infra/redis}"
+DOCKER_REDIS_CONFIG_DIR="${REDIS_CONFIG_DIR}"
 REDIS_IMAGE="redis:8.2.9-alpine@sha256:30abb90e62f14b737010746def3ba99cc79fe19dcdb3d37b41f21fc62e7da19d"
 CONTAINER_NAME="feelm-redis-config-check-${CI_JOB_ID:-$$}"
 
@@ -18,6 +20,7 @@ docker_cli() {
 
 if [[ -n "${MSYSTEM:-}" ]]; then
   DOCKER_PROJECT_ROOT="$(cygpath -w "${PROJECT_ROOT}")"
+  DOCKER_REDIS_CONFIG_DIR="$(cygpath -w "${REDIS_CONFIG_DIR}")"
 fi
 
 cleanup() {
@@ -45,7 +48,7 @@ export MAIL_PASSWORD="ci-mail-placeholder"
 
 bash -n "${PROJECT_ROOT}/infra/scripts/verify-datastore-config.sh"
 bash -n "${PROJECT_ROOT}/infra/scripts/verify-datastores.sh"
-sh -n "${PROJECT_ROOT}/infra/redis/start.sh"
+sh -n "${REDIS_CONFIG_DIR}/start.sh"
 docker_cli compose -f "${DOCKER_PROJECT_ROOT}/infra/compose/service.yml" config --quiet
 
 docker_cli run -d \
@@ -53,8 +56,8 @@ docker_cli run -d \
   --network none \
   -e REDIS_PASSWORD="${REDIS_PASSWORD}" \
   -e REDIS_READONLY_PASSWORD="${REDIS_READONLY_PASSWORD}" \
-  -v "${DOCKER_PROJECT_ROOT}/infra/redis/start.sh:/usr/local/etc/redis/start.sh:ro" \
-  -v "${DOCKER_PROJECT_ROOT}/infra/redis/readonly.acl:/usr/local/etc/redis/readonly.acl:ro" \
+  -v "${DOCKER_REDIS_CONFIG_DIR}/start.sh:/usr/local/etc/redis/start.sh:ro" \
+  -v "${DOCKER_REDIS_CONFIG_DIR}/readonly.acl:/usr/local/etc/redis/readonly.acl:ro" \
   "${REDIS_IMAGE}" \
   sh /usr/local/etc/redis/start.sh >/dev/null
 
