@@ -35,7 +35,14 @@ class OttCatalogSeedMigrationTest {
             references(database, 42);
             String before = snapshot(database);
 
-            assertThat(database.flyway().migrate().migrationsExecuted).isEqualTo(1);
+            assertThat(database.flyway().migrate().migrationsExecuted).isPositive();
+            assertThat(
+                            query(
+                                    database,
+                                    "SELECT count(*) FROM flyway_schema_history WHERE version='"
+                                            + SEED_VERSION
+                                            + "' AND success"))
+                    .isEqualTo("1");
             assertThat(snapshot(database)).isEqualTo(before);
             assertThat(database.flyway().migrate().migrationsExecuted).isZero();
             execute(database, Files.readString(SEED));
