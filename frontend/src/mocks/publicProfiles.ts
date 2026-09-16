@@ -22,7 +22,7 @@ import { mockPopcornBucket } from './popcornBucket';
 import { mockPopcornFlavors } from './popcornFlavors';
 import { mockFrameList } from './frames';
 import { mockTasteFlow } from './taste';
-import { mockMyIntroduction, mockMyProfile } from './user';
+import { mockMyProfile } from './user';
 import type { PublicProfileView, TasteCompareView } from '../types/unspecified';
 
 /** 공개 프로필이 필름을 몇 개까지 보여주는지. 와이어프레임 7.2-A · 7.2-B가 3개를 그렸다 */
@@ -41,14 +41,12 @@ function popcornOf(countsInOrder: number[]) {
 /**
  * 내 공개 프로필 (7.2-A).
  *
- * 닉네임 · 소개 · 아바타는 세션에서 바뀔 수 있으므로 여기 값은 기준값이고,
- * `src/api/users.ts`가 세션 저장소의 변경을 덮어씌운다.
+ * 닉네임은 7.2에서 바뀔 수 있으므로 여기 값은 기준값이고, `src/api/users.ts`가 실제
+ * 프로필의 값으로 덮어씌운다.
  */
 export const mockMyPublicProfile: PublicProfileView = {
   userId: mockMyProfile.userId,
   nickname: mockMyProfile.nickname,
-  avatarUrl: null,
-  introduction: mockMyIntroduction,
   stats: {
     frameCount: mockMyProfile.stats.frameCount,
     popcornCount: mockMyProfile.stats.popcornCount,
@@ -69,8 +67,6 @@ export const mockMyPublicProfile: PublicProfileView = {
   })),
   // 비공개로 설정한 항목은 미리보기에도 나오지 않는다
   reviews: [],
-  // 본인 프로필이라 일치도가 없다
-  matchRate: null,
 };
 
 /** 다른 사용자 공개 프로필 (7.2-B). 지금은 무비버디 한 명이다 */
@@ -78,8 +74,6 @@ export const mockPublicProfiles: Record<number, PublicProfileView> = {
   2048: {
     userId: 2048,
     nickname: '무비버디',
-    avatarUrl: null,
-    introduction: '스릴러로 시작해서 드라마까지 왔어요',
     stats: {
       frameCount: 86,
       popcornCount: 86,
@@ -107,7 +101,6 @@ export const mockPublicProfiles: Record<number, PublicProfileView> = {
         score: 4.0,
       },
     ],
-    matchRate: 76,
   },
 };
 

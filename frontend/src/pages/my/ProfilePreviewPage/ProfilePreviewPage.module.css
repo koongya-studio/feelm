@@ -25,12 +25,3 @@
   line-height: var(--line-height-meta);
   text-align: center;
 }
-
-.notice {
-  padding: var(--space-3) var(--space-4);
-  border: 1px dashed var(--color-line-strong);
-  border-radius: var(--radius-control);
-  color: var(--color-ink-muted);
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-}

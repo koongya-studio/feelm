@@ -1,63 +1,204 @@
 /*
  * 7.1 MY 대시보드
  *
- * 와이어프레임에서 가져온 것은 **기능과 정보**다 — 프로필 요약, 활동 수치, 내 취향 필름,
- * 메뉴 5개(취향 리포트 · 추천 기록 · 평가 · OTT 관리 · 설정). 배치는 가져오지 않았다
- * (screen-spec-my.md 1장).
+ * 와이어프레임에서 가져온 것은 **기능과 정보**다 — 프로필, 취향 리포트 · 추천 기록 ·
+ * 평가 · 설정. 배치는 가져오지 않았다(screen-spec-my.md 1장). `OTT 관리`는 7.8 설정
+ * 안으로 옮겼다(사용자 지시 2026-09-16).
  *
- * 와이어프레임은 같은 폭의 카드를 세로로 쌓는다. 레퍼런스(`Dormy App.jpg`)는 크기가
- * 다른 카드를 조합해 **정보 중요도를 카드 크기로** 나른다. 그쪽을 따랐다.
+ * 배치는 **사용자 시안**(인스타그램형 프로필 · 피드, 2026-09-16 업무 -459)을 따른다.
  *
- * | 자리 | 무엇 | 왜 |
- * | --- | --- | --- |
- * | 상단 | 인사말 + 아바타 + 편집 | 레퍼런스대로 간결하게. 프로필 카드를 크게 두지 않는다 |
- * | 큰 카드 | 내 취향 필름 | 이 화면에서 가장 중요한 정보다. 화면에서 유일한 어두운 블록 |
- * | 작은 카드 2열 | 본 영화 · 팝콘 | 수치는 짧아서 반 폭이면 충분하다 |
- * | 타일 목록 | 메뉴 5개 | 이동만 하는 항목이라 가장 가볍게 |
+ * | 자리 | 무엇 |
+ * | --- | --- |
+ * | 헤더 오른쪽 | `설정` 아이콘 |
+ * | 상단 | 3:4 프로필 사진 + 닉네임 |
+ * | 버튼 둘 | `프로필 편집`(→ 7.2) · `프로필 공유` |
+ * | 바로가기 | `4컷 리포트`(→ 7.3) · `취향 팝콘`(이동 없음) |
+ * | 탭 | `평가한 영화` · `추천 기록`. **화면 안에서 아래 피드만 바꾼다** |
+ * | 본문 | 고른 탭의 포스터 3열 피드 |
  *
- * **어두운 블록은 화면에 하나다**(screen-spec-my.md 4장). 취향 필름 카드가 그 자리를
- * 쓰므로 나머지는 전부 밝은 면이다.
+ * **피드는 각 탭의 실제 기록이다.** 평가는 API-039(`getMyRatings`), 추천은
+ * API-048(`getRecommendationHistory`)이고 7.6 · 7.5가 쓰는 함수 그대로다. 취향 필름
+ * (API-042)은 **부르지 않는다** — 프레임을 평가 · 추천 기록인 것처럼 쓸 수 없다.
+ * 필름은 하단 내비 `필름` 탭(3.1)이 보여준다.
  *
- * 수치는 100 기준이다. 와이어프레임 7.1의 `본 영화 13 · 평가 10`은 같은 사용자의
- * 7.2-A · 3.1 · 3.2와 어긋나 쓰지 않았다(mocks/user.ts).
+ * **탭은 이동이 아니다.** 7.6 · 7.5로 가지 않고 이 화면 안에서 목록만 바뀐다. 두 목록을
+ * 처음에 함께 읽어 두므로 탭을 눌렀을 때 다시 기다리지 않는다(7.6이 두 탭에 쓰는 방식과 같다).
  *
- * 메뉴 5개가 모두 각자의 화면으로 간다. 추천 기록(7.5) · 평가(7.6)는 306, 설정(7.8)은 307,
- * 취향 리포트(7.3)는 308에서 만들었다. 링크를 막지 않고 그대로 두는
- * 이유는 이동 경로 자체가 검증 대상이기 때문이다(screen-spec-my.md 2장 13번).
+ * **통계 수치는 없다**(사용자 결정 2026-09-16). 프레임 · 평가 · 팝콘 수는 API-014가
+ * 주지만 이 화면에 두지 않는다. 다른 자리에도 다시 넣지 않는다.
+ *
+ * **어두운 블록은 없다.** 4장 규칙은 `화면마다 어두운 블록은 하나다`이고 표는 7.2에
+ * `없음`을 적는다 — 최대 하나이지 반드시 하나가 아니다.
+ *
+ * **벽은 앱 공통 벽 그대로다.** 7.1만 다른 배경을 쓰지 않는다. 한때 이 화면만 흰 벽으로
+ * 만들었다가 되돌렸고, 공통 벽 자체를 다른 색으로 바꿨다가도 되돌렸다(2026-09-16).
+ * 화면은 배경을 칠하지 않는다.
+ *
+ * **`프로필 공유`는 계약이 아니라 브라우저가 한다**(사용자 지시 2026-09-16). 공유 API가
+ * 없으므로 서버를 부르지 않고, 7.2-B 공개 프로필 주소(`/users/{userId}`)를 기기의 공유
+ * 메뉴(Web Share API)에 넘긴다. 없는 브라우저에서는 주소를 복사한다. 3.5 리포트 공유가
+ * 쓰는 방법과 같다.
+ * `[!]` 계약의 공개 프로필 키는 `publicId`인데 라우트는 `userId`다(9.4). 주소 규칙이
+ * 정해지면 공유하는 주소도 같이 바꾼다.
+ *
+ * **그 밖에 계약에 없는 것은 넣지 않았다** — 한 줄 소개, 해시태그, 포스터 위에
+ * 응답이 주지 않는 값. 프로필 이미지는 **자리만 둔다**. API-014 · API-015에 `avatarUrl`이
+ * 없고 업로드 API도 없어 늘 기본 아이콘이다. 누르면 무언가 되는 것처럼 만들지 않았다.
+ *
+ * `[!]` 7.5 · 7.6 화면으로 가는 입구가 이 화면에서 사라졌다. 두 목록을 여기 탭으로
+ * 들였기 때문이다(사용자 결정). 라우트는 남아 있지만 7.5 · 7.6 · 7.7 · 7.6-A(한줄평
+ * 관리 시트)에 닿을 길이 앱에 없다. screen-spec-my.md 11장에 적었다.
  */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import Avatar from '../../../components/Avatar';
 import Button from '../../../components/Button';
+import PopcornBucket from '../../../components/PopcornBucket';
+import { kernelFlavors } from '../../../components/PopcornBucket/kernels';
 import Poster from '../../../components/Poster';
+import ReportFourCut from '../../../components/ReportFourCut';
+import ReportTape from '../../../components/ReportTape';
 import ScreenHeader from '../../../components/ScreenHeader';
+import Snackbar from '../../../components/Snackbar';
 import StatusView from '../../../components/StatusView';
-import { ChevronRightIcon } from '../../../components/Icon';
-import { getMyFrames } from '../../../api/taste';
+import VisuallyHidden from '../../../components/VisuallyHidden';
+import { SettingsIcon } from '../../../components/Icon';
+import { getRecommendationHistory } from '../../../api/recommendations';
+import { getMyReports, getReportDetail } from '../../../api/reports';
+import { getPopcornBucket } from '../../../api/taste';
 import { getMyProfile } from '../../../api/users';
+import { getMyRatings } from '../../../api/watch';
 import { path } from '../../../routes/paths';
-import { formatJoinedMonth } from '../../../utils/date';
+import { formatShortDate } from '../../../utils/date';
 import styles from './MyDashboardPage.module.css';
-import type { FrameSummary } from '../../../types/taste';
+import type { RecommendationType } from '../../../types/enums';
+import type { RecommendationHistoryItem } from '../../../types/recommendation';
+import type { ReportDetailView } from '../../../types/unspecified';
 import type { MyProfile } from '../../../types/user';
+import type { MyRatingListItem } from '../../../types/watch';
 
-/** 대시보드 카드에 보여주는 프레임 수. 가로 스크롤이라 넘치면 밀어서 본다 */
-const FRAME_PREVIEW_COUNT = 8;
+/** 포스터 비율 2:3. 격자는 칸 폭이 화면에 따라 달라지므로 비율만 고정한다 */
+const POSTER_RATIO = { width: 2, height: 3 };
 
-/** 메뉴 5개. 와이어프레임 7.1의 순서와 문구 그대로다 */
-const MENU = [
-  { label: '취향 리포트', to: path.tasteReports() },
-  { label: '추천 기록', to: path.recommendationHistory() },
-  { label: '평가', to: path.myRatings() },
-  { label: 'OTT 관리', to: path.ottManage() },
-  { label: '설정', to: path.settings() },
+const TABS = [
+  { key: 'ratings', label: '평가한 영화' },
+  { key: 'recommendations', label: '추천 기록' },
 ] as const;
+
+type TabKey = (typeof TABS)[number]['key'];
+
+/** 7.5의 출처 문구를 그대로 쓴다. 계약의 `type` 세 값과 하나씩 맞는다 */
+const SOURCE_LABEL: Record<RecommendationType, string> = {
+  TASTE: '취향 맞춤',
+  DISCOVERY: '새로운 맛 발견',
+  PARTY: '파티 추천',
+};
+
+/**
+ * 피드 하나의 상태. **셋을 구분한다** — 읽는 중 · 실패 · 빈 목록.
+ *
+ * 빈 목록을 가짜 포스터로 채우지 않는다. 실패도 빈 목록으로 뭉개지 않는다 — 다시
+ * 시도할 수 있어야 하기 때문이다.
+ */
+type Feed<T> = { status: 'loading' } | { status: 'failed' } | { status: 'ready'; items: T[] };
+
+/** 추천 세트를 한 줄씩 편다. 세트의 `generatedAt`이 그 줄의 날짜다 */
+type HistoryRow = { item: RecommendationHistoryItem; generatedAt: string };
+
+/*
+ * 별 하나. `RatingStars`와 같은 모양이지만 그 컴포넌트는 별 다섯 개와 숫자를 함께
+ * 그려 포스터 위 작은 표식으로 쓸 수 없다. 경로만 같이 쓴다.
+ */
+const STAR_PATH =
+  'M10 1.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L10 14.9l-5.3 2.7 1-5.8L1.5 7.7l5.9-.9L10 1.5z';
+
+/*
+ * 바로가기의 4컷 리포트 그림.
+ *
+ * **사용자가 만든 리포트 디자인 그대로다**(`ReportFourCut`, 업무 -321 · -446). 3.4 · 7.4
+ * 상세와 7.3 목록이 쓰는 같은 컴포넌트를 7.3 목록처럼 머리 없이 작게 쓴다. 손으로 그린
+ * 필름 조각을 여기 두었다가 바꿨다(사용자 지시 2026-09-16) — 리포트 모양은 사용자가
+ * 만드는 것이라 흉내 낸 그림을 둘 자리가 아니다.
+ *
+ * **가장 최근에 인화가 끝난 리포트 한 장을 그린다.** 없거나 못 불러오면 7.3과 같은
+ * 빈 인화지다. 칸을 지어내지 않는다.
+ *
+ * 위에 **빨간 테이프**를 붙인다. 7.3이 인화지를 벽에 붙여 둔 모양 그대로다
+ * (`components/ReportTape`, 사용자 지시 2026-09-16).
+ */
+function useLatestReport(): ReportDetailView | null {
+  const [detail, setDetail] = useState<ReportDetailView | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    getMyReports()
+      .then(({ items }) => {
+        // 최신순으로 오므로 먼저 만나는 READY가 가장 최근 리포트다
+        const latest = items.find((item) => item.status === 'READY');
+
+        return latest ? getReportDetail(latest.reportId) : null;
+      })
+      .then((value) => {
+        if (active) setDetail(value);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return detail;
+}
+
+/*
+ * 바로가기의 팝콘 통.
+ *
+ * **실제 맛 분포대로 알을 담는다**(API-041, 3.2 취향 팝콘과 같은 함수). 알 하나가 영화
+ * 한 편이다. 못 불러오거나 기준정보가 아직 없으면 **빈 통**이다 — 아무 맛이나 쌓으면
+ * 없는 취향을 지어내는 것이 된다.
+ */
+function useMyPopcorn(): string[] {
+  const [flavors, setFlavors] = useState<string[]>([]);
+
+  useEffect(() => {
+    let active = true;
+
+    getPopcornBucket()
+      .then((bucket) => {
+        if (active) setFlavors(kernelFlavors(bucket.flavors));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return flavors;
+}
+
+/** 세트 목록을 최신순 그대로 한 줄씩 편다 */
+function flatten(
+  sets: { generatedAt: string; items: RecommendationHistoryItem[] }[],
+): HistoryRow[] {
+  return sets.flatMap((set) => set.items.map((item) => ({ item, generatedAt: set.generatedAt })));
+}
 
 export default function MyDashboardPage() {
   const [profile, setProfile] = useState<MyProfile | null>(null);
-  const [frames, setFrames] = useState<FrameSummary[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
+
+  const [tab, setTab] = useState<TabKey>('ratings');
+  const [ratings, setRatings] = useState<Feed<MyRatingListItem>>({ status: 'loading' });
+  const [history, setHistory] = useState<Feed<HistoryRow>>({ status: 'loading' });
+  const [feedReload, setFeedReload] = useState(0);
+  const [notice, setNotice] = useState('');
+
+  const report = useLatestReport();
+  const popcorn = useMyPopcorn();
 
   useEffect(() => {
     let active = true;
@@ -75,24 +216,46 @@ export default function MyDashboardPage() {
         }
       });
 
-    // 필름은 실패해도 본문을 막지 않는다. 카드만 비워진다
-    getMyFrames()
-      .then((value) => {
-        if (active) {
-          setFrames(value.items);
-        }
-      })
-      .catch(() => undefined);
-
     return () => {
       active = false;
     };
   }, [reloadCount]);
 
+  /*
+   * 두 피드를 함께 읽는다. 탭은 이동이 아니라 화면 안의 전환이라, 눌렀을 때 다시
+   * 기다리지 않아야 한다. 하나가 실패해도 다른 하나는 그려진다.
+   *
+   * 다시 읽기 전에 `loading`으로 되돌리는 것은 `retryFeeds`가 한다. 여기서 하면 효과
+   * 안에서 상태를 바꾸게 된다.
+   */
+  useEffect(() => {
+    let active = true;
+
+    getMyRatings()
+      .then((value) => {
+        if (active) setRatings({ status: 'ready', items: value.items });
+      })
+      .catch(() => {
+        if (active) setRatings({ status: 'failed' });
+      });
+
+    getRecommendationHistory()
+      .then((value) => {
+        if (active) setHistory({ status: 'ready', items: flatten(value.items) });
+      })
+      .catch(() => {
+        if (active) setHistory({ status: 'failed' });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [feedReload]);
+
   if (failed) {
     return (
       <>
-        <ScreenHeader title="MY" />
+        <ScreenHeader title={<VisuallyHidden>MY</VisuallyHidden>} />
 
         <StatusView title="프로필을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
           <Button
@@ -109,99 +272,245 @@ export default function MyDashboardPage() {
   }
 
   if (!profile) {
-    return <ScreenHeader title="MY" />;
+    return <ScreenHeader title={<VisuallyHidden>MY</VisuallyHidden>} />;
   }
 
-  const preview = frames?.slice(0, FRAME_PREVIEW_COUNT) ?? [];
+  const feed = tab === 'ratings' ? ratings : history;
+
+  /*
+   * 7.2-B 공개 프로필 주소를 기기의 공유 메뉴에 넘긴다. 공유 API가 계약에 없으므로
+   * 서버를 부르지 않는다. 공유 메뉴가 없는 브라우저에서는 주소를 복사하고, 그것도
+   * 막혀 있으면 알린다 — 되는 것처럼 보이고 아무 일도 없는 상태를 만들지 않는다.
+   */
+  const shareProfile = async () => {
+    const url = `${window.location.origin}${path.publicProfile(profile.userId)}`;
+    const title = `${profile.nickname}님의 Feelm 프로필`;
+
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title, url });
+      } catch {
+        // 공유 메뉴를 닫은 경우도 여기로 온다. 알리지 않는다
+      }
+
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      setNotice('프로필 주소를 복사했어요');
+    } catch {
+      setNotice('이 브라우저에서는 공유할 수 없어요');
+    }
+  };
+
+  function retryFeeds() {
+    setRatings({ status: 'loading' });
+    setHistory({ status: 'loading' });
+    setFeedReload((count) => count + 1);
+  }
 
   return (
     <>
-      <ScreenHeader title="MY" />
+      {/*
+       * `설정`은 헤더 오른쪽 **아이콘**이다(사용자 지시 2026-09-16). 글자는 남기고
+       * 보이지만 않게 해 스크린 리더가 읽을 이름을 지킨다.
+       *
+       * **`OTT 관리`는 7.8 설정 안으로 옮겼다**(사용자 지시 2026-09-16). 이 화면에서
+       * 6.1로 가는 길은 없어졌고 설정 > 계정 > OTT 관리가 유일한 입구다.
+       *
+       * **화면 제목 `MY`는 보이지 않는다**(사용자 지시 2026-09-16). 바로 아래 프로필이
+       * 여기가 어디인지 말하고 하단 내비의 `MY`에도 표시가 있다. 화면마다 h1이 하나는
+       * 있어야 하므로 글자는 남기고 보이지만 않게 한다.
+       */}
+      <ScreenHeader
+        title={<VisuallyHidden>MY</VisuallyHidden>}
+        action={
+          <Link to={path.settings()} className={styles.headerLink}>
+            <SettingsIcon />
+            <VisuallyHidden>설정</VisuallyHidden>
+          </Link>
+        }
+      />
 
       <div className={styles.page}>
         {/*
-         * 인사말 줄. 레퍼런스대로 아바타 · 이름 · 편집만 둔다. 와이어프레임은 여기에
-         * 테두리 카드를 둘렀지만 그러면 아래 카드들과 위계가 같아진다.
+         * 프로필 머리.
+         *
+         * 프로필 사진(3:4)은 **자리만 있다.** API-014 · API-015에 `avatarUrl`이 없고 올리는
+         * API도 없어 늘 기본 아이콘이다(`Avatar`의 자리표시자). 누를 수 없게 두어
+         * 되는 기능처럼 보이지 않게 했다.
          */}
-        <div className={styles.identity}>
-          <Avatar size={52} nickname={profile.nickname} />
+        <header className={styles.identity}>
+          <Avatar size={84} shape="portrait" nickname={profile.nickname} />
 
-          <div className={styles.identityText}>
-            <p className={styles.name}>{profile.nickname}</p>
-            <p className={styles.meta}>
-              {profile.email} · {formatJoinedMonth(profile.createdAt)} 가입
-            </p>
-          </div>
+          <p className={styles.name}>{profile.nickname}</p>
+        </header>
 
-          <Link to={path.profileEdit()} className={styles.editLink}>
-            편집
+        {/*
+         * 프로필 버튼 둘. `프로필 편집`은 7.2로 가는 기존 입구 그대로이고(이동 경로 2 · 3번
+         * 사슬의 출발점), `프로필 공유`는 기기의 공유 메뉴를 연다.
+         */}
+        <div className={styles.profileActions}>
+          <Link to={path.profileEdit()} className={styles.profileAction}>
+            프로필 편집
           </Link>
+
+          <button
+            type="button"
+            className={styles.profileAction}
+            onClick={() => void shareProfile()}
+          >
+            프로필 공유
+          </button>
         </div>
 
         {/*
-         * 취향 필름 — 이 화면에서 가장 큰 카드이자 유일한 어두운 블록.
-         * 전체 보기는 3.1로 간다(팀 결정 2026-09-11).
+         * 바로가기 그림 둘. 상자 · 테두리 없이 그림과 이름만 둔다. 왼쪽은 그림과 글자가
+         * 하나의 링크로 7.3 취향 리포트 목록에 간다. 오른쪽은 이동이 없다 — 7.1의
+         * 팝콘 → 3.2 이동은 9.2에서 뺐다(3.1 안에 같은 입구가 있다).
          */}
-        <section className={styles.filmCard}>
-          <div className={styles.filmHead}>
-            <div>
-              <p className={styles.filmLabel}>내 취향 필름</p>
-              <p className={styles.filmCount}>{profile.stats.frameCount}프레임</p>
-            </div>
+        <div className={styles.shortcuts}>
+          <Link to={path.tasteReports()} className={styles.shortcut}>
+            <span className={styles.shortcutArt}>
+              <span className={styles.reportStrip} aria-hidden="true">
+                <ReportTape />
 
-            <Link to={path.film()} className={styles.filmMore}>
-              전체 보기
-              <ChevronRightIcon />
-            </Link>
+                {report ? (
+                  <ReportFourCut cuts={report.fourCut} createdAt={report.createdAt} head={false} />
+                ) : (
+                  <span className={styles.reportBlank} />
+                )}
+              </span>
+            </span>
+
+            <span className={styles.shortcutLabel}>4컷 리포트</span>
+          </Link>
+
+          <div className={styles.shortcut}>
+            <span className={styles.shortcutArt}>
+              <PopcornBucket width={64} kernelFlavors={popcorn} label="팝콘 통" />
+            </span>
+
+            <span className={styles.shortcutLabel}>취향 팝콘</span>
           </div>
+        </div>
 
-          {preview.length > 0 ? (
-            <ul className={styles.filmTrack}>
-              {preview.map((frame) => (
-                <li key={frame.frameId}>
-                  <Link to={path.frameDetail(frame.frameId)} className={styles.filmItem}>
+        {/* 화면 안의 전환이다. 다른 화면으로 가지 않으므로 링크가 아니라 탭이다 */}
+        <div className={styles.tabs} role="tablist" aria-label="내 기록">
+          {TABS.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              role="tab"
+              id={`my-feed-tab-${item.key}`}
+              aria-selected={tab === item.key}
+              aria-controls="my-feed"
+              className={styles.tab}
+              onClick={() => setTab(item.key)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <div
+          id="my-feed"
+          role="tabpanel"
+          aria-labelledby={`my-feed-tab-${tab}`}
+          className={styles.feed}
+        >
+          {feed.status === 'loading' && <p className={styles.feedNote}>불러오는 중이에요</p>}
+
+          {feed.status === 'failed' && (
+            <div className={styles.feedNote}>
+              <p>목록을 불러오지 못했어요</p>
+
+              <Button variant="secondary" onClick={retryFeeds}>
+                다시 시도
+              </Button>
+            </div>
+          )}
+
+          {feed.status === 'ready' && feed.items.length === 0 && (
+            <p className={styles.feedNote}>
+              {tab === 'ratings' ? '아직 평가한 영화가 없어요' : '아직 추천받은 기록이 없어요'}
+            </p>
+          )}
+
+          {/*
+           * 평가 탭. 누르면 7.6과 같은 곳(2.5 평가 수정)으로 간다. 별점은 API-039가
+           * 주는 값이라 포스터 위에 표식으로 얹는다.
+           */}
+          {tab === 'ratings' && ratings.status === 'ready' && ratings.items.length > 0 && (
+            <ul className={styles.grid}>
+              {ratings.items.map((rating) => (
+                <li key={rating.ratingId}>
+                  <Link to={path.movieRating(rating.movie.movieId)} className={styles.cell}>
                     <Poster
-                      width={72}
-                      height={102}
-                      radius={6}
-                      src={frame.movie.posterUrl ?? undefined}
-                      title={frame.movie.title}
-                      seed={frame.movie.movieId}
+                      fluid
+                      width={POSTER_RATIO.width}
+                      height={POSTER_RATIO.height}
+                      radius={0}
+                      src={rating.movie.posterUrl ?? undefined}
+                      title={rating.movie.title}
+                      seed={rating.movie.movieId}
                     />
+
+                    <VisuallyHidden>{rating.movie.title}</VisuallyHidden>
+
+                    <span className={styles.score}>
+                      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                        <path d={STAR_PATH} />
+                      </svg>
+                      {rating.score.toFixed(1)}
+                    </span>
                   </Link>
                 </li>
               ))}
             </ul>
-          ) : (
-            <p className={styles.filmEmpty}>영화를 평가하면 프레임이 쌓여요</p>
           )}
-        </section>
 
-        {/* 수치 두 개. 짧은 정보라 반 폭 카드에 나눠 담는다 */}
-        <div className={styles.statGrid}>
-          <div className={styles.statCard}>
-            <p className={styles.statValue}>{profile.stats.ratingCount}</p>
-            <p className={styles.statLabel}>평가한 영화</p>
-          </div>
+          {/*
+           * 추천 탭. 누르면 7.5와 같은 곳(2.4 영화 상세)으로 간다. 출처와 날짜는
+           * API-048이 주는 값이다(`type` · 세트의 `generatedAt`). 그 밖의 값은 쓰지 않는다.
+           */}
+          {tab === 'recommendations' && history.status === 'ready' && history.items.length > 0 && (
+            <ul className={styles.grid}>
+              {history.items.map(({ item, generatedAt }) => (
+                <li key={item.recommendationItemId}>
+                  <Link to={path.movieDetail(item.movie.movieId)} className={styles.cell}>
+                    <Poster
+                      fluid
+                      width={POSTER_RATIO.width}
+                      height={POSTER_RATIO.height}
+                      radius={0}
+                      src={item.movie.posterUrl ?? undefined}
+                      title={item.movie.title}
+                      seed={item.movie.movieId}
+                    />
 
-          <Link to={path.popcornBucket()} className={styles.statCard} data-link="true">
-            <p className={styles.statValue}>{profile.stats.popcornCount}</p>
-            <p className={styles.statLabel}>팝콘</p>
-            <span className={styles.statChevron} aria-hidden="true">
-              <ChevronRightIcon />
-            </span>
-          </Link>
+                    <VisuallyHidden>{item.movie.title}</VisuallyHidden>
+
+                    <span className={styles.caption}>
+                      <span className={styles.captionSource}>{SOURCE_LABEL[item.type]}</span>
+                      <span className={styles.captionDate}>{formatShortDate(generatedAt)}</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-
-        <nav className={styles.menu} aria-label="MY 메뉴">
-          {MENU.map((item) => (
-            <Link key={item.label} to={item.to} className={styles.menuItem}>
-              <span>{item.label}</span>
-              <ChevronRightIcon />
-            </Link>
-          ))}
-        </nav>
       </div>
+
+      {notice ? (
+        <div className={styles.notice}>
+          <Snackbar actionLabel="확인" onAction={() => setNotice('')}>
+            {notice}
+          </Snackbar>
+        </div>
+      ) : null}
     </>
   );
 }

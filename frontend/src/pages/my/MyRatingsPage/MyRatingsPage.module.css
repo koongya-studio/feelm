@@ -85,10 +85,3 @@
   text-decoration: none;
   white-space: nowrap;
 }
-
-.hint {
-  color: var(--color-ink-hint);
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-  text-align: center;
-}

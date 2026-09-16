@@ -8,24 +8,24 @@
  * - 7.6 ⇢ 7.6-A 한줄평 수정 · 삭제 (시트, components/CommentManageSheet)
  * - 7.7 ⇢ 2.5 평가하기
  *
- * 와이어프레임은 두 화면을 같은 헤더(`평가`)와 같은 탭(`평가 96 | 안 남긴 영화 32`)으로
- * 그렸다. 한 컴포넌트가 두 경로를 맡고 `tab`으로 목록만 바꾼다. 탭은 이동이지만
- * `replace`로 바꿔 끼운다 — 뒤로 가기가 탭 사이를 오가지 않고 7.1로 돌아가야 한다.
+ * 와이어프레임은 두 화면을 같은 헤더(`평가`)와 같은 탭으로 그렸다. 한 컴포넌트가 두 경로를
+ * 맡고 `tab`으로 목록만 바꾼다. 탭은 이동이지만 `replace`로 바꿔 끼운다 — 뒤로 가기가 탭
+ * 사이를 오가지 않고 들어온 화면으로 나가야 한다.
  *
- * | 탭 | API | 수 |
- * | --- | --- | --- |
- * | 평가 | API-039 내 평가 목록 | 받은 목록의 길이 |
- * | 안 남긴 영화 | API-034 `status=WATCHED_UNRATED` | 받은 목록의 길이 |
+ * `[!]` **들어올 입구가 지금 없다.** 7.1이 유일한 입구였는데 업무 -459에서 평가 목록이
+ * 7.1 안의 탭이 됐다(screen-spec-my.md 11장). 화면과 라우트는 그대로 두었다.
  *
- * 평가 수는 원래 API-042 `totalCount`에서 가져왔다(평가와 프레임은 1:1 · API-039 처리
- * 규칙). 필름이 실제 API로 바뀌면서(S15P21E106-392) 목록은 목업, 수는 실제값이 되어
- * 두 값이 어긋나므로 **같은 목업 목록에서 센다.** 평가 API(API-039)가 연동되면 다시
- * API-042 `totalCount`를 쓴다.
+ * | 탭 | API |
+ * | --- | --- |
+ * | 평가 | API-039 내 평가 목록 |
+ * | 안 남긴 영화 | API-034 `status=WATCHED_UNRATED` |
+ *
+ * **탭 이름 옆의 수는 뺐다**(업무 -459). 계약에 총수가 없어 받은 목록을 센 값이었고,
+ * 목록이 한 페이지뿐이라 실제 총수와 어긋났다.
  *
  * `[?]` 7.6 줄 오른쪽의 동그란 버튼이 무엇인지 와이어프레임에 적혀 있지 않다. 채운 것과
  * 빈 것이 섞여 있고 이동표에 `7.6 ⇢ 7.6-A`가 있어 **한줄평 관리**로 보았다. 한줄평이
  * 있는 줄에만 둔다 — 없는 한줄평은 관리할 것이 없다.
- * `[?]` `안 남긴 영화 N`의 N은 계약에 총수가 없어 받은 목록을 센 값이다.
  *
  * 어두운 블록은 없다. 각 줄의 동작은 테두리 버튼이다 — 검정 알약은 화면당 하나인데
  * (`design-concept.md` 2.4) 줄마다 같은 동작이 반복되므로 어느 하나를 주 동작으로
@@ -53,7 +53,6 @@ type Props = {
 
 type Loaded = {
   ratings: MyRatingListItem[];
-  ratingCount: number;
   unrated: WatchRecordListItem[];
   otts: Ott[];
 };
@@ -66,8 +65,8 @@ export default function MyRatingsPage({ tab }: Props) {
   const [managing, setManaging] = useState<MyRatingListItem | null>(null);
 
   /*
-   * 두 탭의 수가 탭 머리에 함께 나오므로 어느 탭이든 둘 다 읽는다. 7.7에서 평가하고
-   * 돌아오면 `평가 N`이 하나 늘고 `안 남긴 영화 N`이 하나 줄어야 한다.
+   * 두 탭이 한 컴포넌트를 공유하고 탭 전환은 `replace`라 다시 읽지 않는다. 어느 탭으로
+   * 들어오든 두 목록을 함께 읽어 둬야 탭을 눌렀을 때 바로 그려진다.
    */
   useEffect(() => {
     let active = true;
@@ -78,7 +77,6 @@ export default function MyRatingsPage({ tab }: Props) {
 
         setData({
           ratings: ratings.items,
-          ratingCount: ratings.items.length,
           unrated: unrated.items,
           otts,
         });
@@ -130,7 +128,7 @@ export default function MyRatingsPage({ tab }: Props) {
             className={styles.tab}
             aria-current={tab === 'rated' ? 'page' : undefined}
           >
-            평가 {data.ratingCount}
+            평가
           </Link>
           <Link
             to={path.unratedMovies()}
@@ -138,7 +136,7 @@ export default function MyRatingsPage({ tab }: Props) {
             className={styles.tab}
             aria-current={tab === 'unrated' ? 'page' : undefined}
           >
-            안 남긴 영화 {data.unrated.length}
+            안 남긴 영화
           </Link>
         </nav>
 
@@ -216,8 +214,6 @@ function RatedList({
           </li>
         ))}
       </ul>
-
-      <p className={styles.hint}>평가를 누르면 수정할 수 있어요</p>
     </>
   );
 }
@@ -264,8 +260,6 @@ function UnratedList({ records, otts }: { records: WatchRecordListItem[]; otts: 
           );
         })}
       </ul>
-
-      <p className={styles.hint}>평가하면 필름에 컷이 추가돼요</p>
     </>
   );
 }

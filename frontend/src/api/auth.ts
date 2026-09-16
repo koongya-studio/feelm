@@ -7,6 +7,14 @@
  * 묶어 두는 것이 이 계층의 목적이다.
  */
 import { request } from './client';
+import {
+  MOCK_ACCESS_TOKEN,
+  endMockSession,
+  getMockProfile,
+  isMockCredential,
+  isMockSession,
+  startMockSession,
+} from './mockAccount';
 import { endSession, refreshAccessToken, startSession } from './session';
 import { getMyProfile } from './users';
 import type {
@@ -15,6 +23,7 @@ import type {
   SignupRequest,
   SignupResult,
 } from '../types/auth';
+import type { MyProfile } from '../types/user';
 
 type LoginResponse = {
   accessToken: string;
@@ -63,6 +72,14 @@ export async function resendVerificationMail(email: string): Promise<void> {
  * Token을 세션에 넣는 것뿐이다.
  */
 export async function login(email: string, password: string): Promise<AuthenticatedUser> {
+  // 개발 서버의 목업 계정은 서버로 보내지 않는다(`mockAccount.ts`)
+  if (isMockCredential(email, password)) {
+    startMockSession();
+    startSession(MOCK_ACCESS_TOKEN);
+
+    return toUser(getMockProfile());
+  }
+
   const response = await request<LoginResponse>('/auth/login', {
     method: 'POST',
     body: { email, password },
@@ -81,6 +98,13 @@ export async function login(email: string, password: string): Promise<Authentica
  * 사용자가 할 수 있는 일이 없다.
  */
 export async function logout(): Promise<void> {
+  if (isMockSession()) {
+    endMockSession();
+    endSession();
+
+    return;
+  }
+
   try {
     await request<void>('/auth/logout', { method: 'POST' });
   } finally {
@@ -148,14 +172,22 @@ export async function changePassword(currentPassword: string, newPassword: strin
  * 거절되면 비로그인 상태다.
  */
 export async function restoreSession(): Promise<AuthenticatedUser | null> {
+  if (isMockSession()) {
+    startSession(MOCK_ACCESS_TOKEN);
+
+    return toUser(getMockProfile());
+  }
+
   const token = await refreshAccessToken();
 
   if (!token) {
     return null;
   }
 
-  const profile = await getMyProfile();
+  return toUser(await getMyProfile());
+}
 
+function toUser(profile: MyProfile): AuthenticatedUser {
   return {
     userId: profile.userId,
     nickname: profile.nickname,

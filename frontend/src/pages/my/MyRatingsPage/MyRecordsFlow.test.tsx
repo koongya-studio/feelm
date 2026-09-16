@@ -163,19 +163,21 @@ async function setScore(score: number) {
   fireEvent.change(slider, { target: { value: String(score) } });
 }
 
-describe('7.1 → 7.5 → 2.4', () => {
+describe('7.5 → 2.4', () => {
   it('추천 기록의 영화를 누르면 그 영화 상세로 간다', async () => {
-    renderApp([ROUTE_PATTERN.my]);
-
-    fireEvent.click(await screen.findByRole('link', { name: '추천 기록' }));
-    expect(location()).toBe('/my/recommendations');
+    /*
+     * **7.1에서 들어오던 사슬이었다.** 사용자 시안(2026-09-16)으로 추천 기록이 7.1 안의
+     * 탭이 되면서 7.1 → 7.5 화살표가 없어졌다. 7.5 화면 자체는 남아 있고 이 사슬
+     * (월 묶음 · 출처 표시 · 2.4로 이동)도 그대로라 화면에서 바로 시작한다.
+     * 7.5에 닿을 길이 앱에 없는 것은 screen-spec-my.md 11장에 적었다.
+     */
+    renderApp([ROUTE_PATTERN.recommendationHistory]);
 
     // 월 제목과 출처 세 가지가 보인다
     expect(await screen.findByRole('heading', { name: '2026년 8월' })).toBeInTheDocument();
     expect(screen.getAllByText('취향 맞춤').length).toBeGreaterThan(0);
     expect(screen.getAllByText('새로운 맛 발견').length).toBeGreaterThan(0);
     expect(screen.getByText('파티 추천')).toBeInTheDocument();
-    expect(screen.getByText('총 7편을 추천받았어요')).toBeInTheDocument();
 
     // 파티 추천 줄(104)은 추천 목업 밖의 영화라 상세가 따로 있어야 이어진다
     const partyRow = screen.getByText('파티 추천').closest('a');
@@ -186,13 +188,12 @@ describe('7.1 → 7.5 → 2.4', () => {
   });
 });
 
-describe('7.1 → 7.6 ⇢ 2.5 → 7.6', () => {
+describe('7.6 ⇢ 2.5 → 7.6', () => {
   it('기존 평가를 고치면 목록에 반영되고 프레임은 늘지 않는다', async () => {
-    renderApp([ROUTE_PATTERN.my]);
+    // 위와 같다 — 7.1 → 7.6 화살표가 없어져 7.6에서 시작한다(시안 2026-09-16)
+    renderApp([ROUTE_PATTERN.myRatings]);
 
-    fireEvent.click(await screen.findByRole('link', { name: '평가' }));
-    expect(location()).toBe('/my/ratings');
-    expect(await findTab('평가 3')).toHaveAttribute('aria-current', 'page');
+    expect(await findTab('평가')).toHaveAttribute('aria-current', 'page');
 
     // 402는 별점 4.0에 한줄평이 있는 기준 평가다
     const row = screen.getByRole('link', { name: /영화 제목 2/ });
@@ -205,7 +206,6 @@ describe('7.1 → 7.6 ⇢ 2.5 → 7.6', () => {
     // 2.6 · 2.7이 아니라 온 곳(7.6)으로 돌아온다
     await waitFor(() => expect(location()).toBe('/my/ratings'));
     expect(await screen.findByRole('link', { name: /영화 제목 2.*2\.5/ })).toBeInTheDocument();
-    expect(await findTab('평가 3')).toBeInTheDocument();
 
     /*
      * 평가가 늘지 않고 점수만 바뀌었다. 필름 프레임 수로 보던 자리인데, 필름이 실제
@@ -226,10 +226,10 @@ describe('7.1 → 7.6 ⇢ 2.5 → 7.6', () => {
 });
 
 describe('7.6 → 7.7 ⇢ 2.5', () => {
-  it('평가 안 남긴 영화를 평가하면 7.7에서 빠지고 평가 수가 는다', async () => {
+  it('평가 안 남긴 영화를 평가하면 7.7에서 빠지고 7.6 맨 위에 선다', async () => {
     const { unmount } = renderApp([ROUTE_PATTERN.myRatings]);
 
-    fireEvent.click(await findTab('안 남긴 영화 3'));
+    fireEvent.click(await findTab('안 남긴 영화'));
     expect(location()).toBe('/my/ratings/unrated');
     expect(await screen.findByText('8. 26 · 넷플릭스에서 시청')).toBeInTheDocument();
 
@@ -249,12 +249,10 @@ describe('7.6 → 7.7 ⇢ 2.5', () => {
     // 7.7로 다시 들어오면 빠져 있다
     renderApp([ROUTE_PATTERN.unratedMovies]);
 
-    expect(await findTab('안 남긴 영화 2')).toBeInTheDocument();
-    expect(await findTab('평가 4')).toBeInTheDocument();
     expect(screen.queryByText('영화 제목 5')).not.toBeInTheDocument();
 
     // 7.6 맨 위에 방금 평가가 있다
-    fireEvent.click(await findTab('평가 4'));
+    fireEvent.click(await findTab('평가'));
     const list = await screen.findAllByRole('listitem');
     expect(list[0]).toHaveTextContent('영화 제목 5');
   });

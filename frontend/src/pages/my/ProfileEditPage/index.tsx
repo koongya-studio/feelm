@@ -1,22 +1,19 @@
 /*
  * 7.2 프로필 편집
  *
- * 와이어프레임에서 가져온 것 — 프로필 이미지 변경, 닉네임(2~10자 · 카운터 · 헬퍼),
- * 읽기 전용 3행(이메일 · 연령대 · 성별), 저장, 미리보기로 나가는 경로.
+ * 화면에 있는 것은 닉네임(2~10자 · 카운터 · 헬퍼), 읽기 전용 3행(이메일 · 연령대 · 성별),
+ * 저장, 미리보기로 나가는 경로뿐이다. **고칠 수 있는 값은 닉네임 하나다.**
  *
- * 배치는 레퍼런스(`10 UI_UX Design Trends`)를 따른다. 와이어프레임은 입력을 세로로
- * 길게 나열하지만, 레퍼런스는 **상단에 큰 프로필 비주얼**을 두고 그 아래를 정보 영역으로
- * 나눈다. 편집 화면에서 가장 먼저 보여야 할 것은 지금 내 프로필이 어떻게 생겼는가다.
+ * **뺀 것**(업무 -459)
+ * - **프로필 이미지.** 계약에 자리가 없어(API-014 · API-015) 늘 자리표시자였고 업로드
+ *   API도 없었다. 상단 비주얼은 그 이미지를 담으려고 있던 자리라 함께 걷어냈다. 이로써
+ *   `screen-spec-my.md` 4장 표의 `7.2 어두운 블록 없음`과도 맞는다
+ * - **한 줄 소개.** 와이어프레임에 없고 레퍼런스 지시로 넣은 값이다. 계약에 자리가 없어
+ *   세션 저장소에만 남았다
+ * - **선호 장르 칩.** 취향은 평가로 쌓이는 것이라(FR-07) 편집할 수 없는 표시였다
  *
- * 와이어프레임에 없고 레퍼런스 지시로 추가한 것 두 가지 (screen-spec-my.md 3.2)
- * - **한 줄 소개.** 7.2-A · 7.2-B가 소개 문구를 보여줘야 하는데 편집할 곳이 없었다
- * - **선호 장르 칩.** 값은 API-040 취향 분석에서 읽어 보여준다. **저장하지 않는다** —
- *   취향은 평가로 쌓이는 것이지 직접 고르는 것이 아니다(FR-07). 고를 수 있게 만들면
- *   서비스의 전제와 어긋나므로 조작할 수 없는 표시로 두고, 어디서 오는 값인지 적었다
- *
- * 저장은 세션 저장소를 거친다. **닉네임을 읽는 화면이 여럿이다** — 2.1 홈 인사말 ·
- * 5.8 파티원 · 7.1 · 7.2-A가 모두 `getMyProfile`을 거치므로 여기서 저장하면 전부
- * 따라온다(mocks/sessionStore.ts의 `profileEdit` 주석).
+ * 저장은 API-015다. **닉네임을 읽는 화면이 여럿이다** — 2.1 홈 인사말 · 5.8 파티원 ·
+ * 7.1 · 7.2-A가 모두 `getMyProfile`을 거치므로 여기서 저장하면 전부 따라온다.
  *
  * 저장 후 7.1로 돌아간다(와이어프레임 이동표 `7.2 ⇢ 7.1`).
  *
@@ -29,36 +26,27 @@
  */
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import Avatar from '../../../components/Avatar';
 import Button from '../../../components/Button';
-import Chip from '../../../components/Chip';
 import ScreenHeader from '../../../components/ScreenHeader';
 import Snackbar from '../../../components/Snackbar';
 import StatusView from '../../../components/StatusView';
 import TextField from '../../../components/TextField';
-import { CameraIcon } from '../../../components/Icon';
-import { getMyTaste } from '../../../api/taste';
 import { ApiError } from '../../../api/apiError';
 import {
   checkNicknameAvailability,
-  getMyIntroduction,
   getMyProfile,
   isValidNickname,
-  saveMyIntroduction,
   updateMyProfile,
 } from '../../../api/users';
 import { path } from '../../../routes/paths';
 import { formatAgeGroup } from '../../../utils/date';
 import styles from './ProfileEditPage.module.css';
-import type { TasteGenre } from '../../../types/taste';
 import type { MyProfile } from '../../../types/user';
 
 /** 와이어프레임 7.2의 헬퍼 문구가 적은 상한 */
 const NICKNAME_MAX = 10;
 /** 저장 막대를 보여주고 7.1로 돌아가기까지의 시간 */
 const SAVED_NOTICE_MS = 700;
-/** 한 줄 소개 상한. 와이어프레임에 없어 히어로에서 두 줄로 끊기는 길이로 잡았다 */
-const INTRODUCTION_MAX = 40;
 
 /** 와이어프레임 7.2의 헬퍼 문구 그대로다 */
 const NICKNAME_HINT = '한글, 영문, 숫자, _ 2~10자';
@@ -98,8 +86,6 @@ export default function ProfileEditPage() {
 
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [nickname, setNickname] = useState('');
-  const [introduction, setIntroduction] = useState('');
-  const [genres, setGenres] = useState<TasteGenre[]>([]);
   const [error, setError] = useState('');
   /** 어느 닉네임에 대한 결과인지 함께 들고 있어야 입력이 바뀐 뒤의 결과를 쓰지 않는다 */
   const [availability, setAvailability] = useState<{
@@ -113,12 +99,11 @@ export default function ProfileEditPage() {
   useEffect(() => {
     let active = true;
 
-    Promise.all([getMyProfile(), getMyIntroduction()])
-      .then(([value, intro]) => {
+    getMyProfile()
+      .then((value) => {
         if (active) {
           setProfile(value);
           setNickname(value.nickname);
-          setIntroduction(intro);
           setFailed(false);
         }
       })
@@ -127,15 +112,6 @@ export default function ProfileEditPage() {
           setFailed(true);
         }
       });
-
-    // 장르는 실패해도 본문을 막지 않는다. 칩만 비워진다
-    getMyTaste()
-      .then((taste) => {
-        if (active) {
-          setGenres(taste.analysis.genres);
-        }
-      })
-      .catch(() => undefined);
 
     return () => {
       active = false;
@@ -228,12 +204,7 @@ export default function ProfileEditPage() {
 
     setError('');
 
-    /*
-     * 닉네임은 API-015로 서버에 저장하고, 한 줄 소개는 계약에 자리가 없어 따로 둔다
-     * (`api/users.ts`). 소개만 바꾸고 저장해도 닉네임 요청은 그대로 나가는데,
-     * API-015는 값이 같으면 중복으로 보지 않는다(처리 규칙).
-     */
-    Promise.all([updateMyProfile({ nickname }), saveMyIntroduction(introduction)])
+    updateMyProfile({ nickname })
       .then(() => {
         // 저장했음을 알리고, 아래 effect가 잠시 뒤 7.1로 돌려보낸다
         setSaved(true);
@@ -275,42 +246,6 @@ export default function ProfileEditPage() {
       <ScreenHeader title="프로필 편집" showBack />
 
       <div className={styles.page}>
-        {/*
-         * 상단 비주얼. 7.2-A · 7.2-B의 히어로와 같은 무채색 면을 쓰되 낮다.
-         *
-         * 처음에는 밝은 벽에 아바타만 크게 두었는데, 그러면 **와이어프레임 배치 그대로**이고
-         * 같은 묶음인 7.2-A · 7.2-B와 혼자 달라 보였다(2026-09-11 되돌림). 레퍼런스
-         * (`10 UI_UX Design Trends`)도 편집 화면 상단에 큰 비주얼을 둔다.
-         *
-         * 미리보기(7.2-A)보다 낮다. 여기는 보는 화면이 아니라 고치는 화면이라 아래
-         * 입력이 접힌 자리 밖으로 밀리면 안 된다.
-         *
-         * 입력한 닉네임이 바로 이름에 반영돼 결과를 보면서 고칠 수 있다(레퍼런스 지시 7).
-         */}
-        <div className={styles.visual}>
-          <div className={styles.avatarSlot}>
-            <div className={styles.avatarWrap}>
-              <Avatar size={104} nickname={nickname || profile.nickname} />
-
-              {/*
-               * 이미지 변경은 파일 선택이 필요하고 업로드 API도 계약에 없다. 자리와 문구만
-               * 두고 동작하지 않음을 분명히 한다.
-               */}
-              <button
-                type="button"
-                className={styles.avatarBadge}
-                disabled
-                aria-label="프로필 이미지 변경"
-              >
-                <CameraIcon />
-              </button>
-            </div>
-
-            <p className={styles.visualName}>{nickname || profile.nickname}</p>
-            <p className={styles.visualHint}>프로필 이미지 변경은 곧 열려요</p>
-          </div>
-        </div>
-
         <section className={styles.group}>
           <h2 className={styles.groupLabel}>기본 정보</h2>
 
@@ -335,33 +270,6 @@ export default function ProfileEditPage() {
                 : undefined)
             }
           />
-
-          <TextField
-            label="한 줄 소개"
-            value={introduction}
-            maxLength={INTRODUCTION_MAX}
-            placeholder="어떤 영화를 좋아하는지 한 줄로 적어 주세요"
-            onChange={(event) => setIntroduction(event.target.value)}
-            trailing={`${[...introduction].length}/${INTRODUCTION_MAX}`}
-            hint="공개 프로필에 보여요"
-          />
-        </section>
-
-        <section className={styles.group}>
-          <h2 className={styles.groupLabel}>내 취향</h2>
-
-          {genres.length > 0 ? (
-            <div className={styles.chips}>
-              {genres.map((genre, index) => (
-                <Chip key={genre.code} variant={index === 0 ? 'solid' : 'outline'}>
-                  {genre.name}
-                </Chip>
-              ))}
-            </div>
-          ) : null}
-
-          {/* 취향은 고르는 것이 아니라 쌓이는 것이다(FR-07). 어디서 오는지 적는다 */}
-          <p className={styles.note}>평가가 쌓이면 자동으로 바뀌어요</p>
         </section>
 
         <section className={styles.group}>
@@ -381,8 +289,6 @@ export default function ProfileEditPage() {
               <dd>{GENDER_LABEL[profile.gender]}</dd>
             </div>
           </dl>
-
-          <p className={styles.note}>이메일과 기본 정보는 설정 &gt; 계정에서 바꿀 수 있어요</p>
         </section>
       </div>
 

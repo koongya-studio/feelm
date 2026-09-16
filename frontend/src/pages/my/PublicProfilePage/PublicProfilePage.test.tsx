@@ -79,14 +79,23 @@ describe('7.2-B 다른 사용자 공개 프로필', () => {
     );
   });
 
-  it('팔로워 대신 프레임 · 팝콘 · 나와의 일치도를 보여준다', async () => {
-    // Feelm에 팔로워 개념이 없다. 레퍼런스의 3열을 서비스에 맞게 바꾼 자리다
+  it('팔로워 대신 프레임 · 팝콘 · 공개 한줄평을 보여준다', async () => {
+    /*
+     * Feelm에 팔로워 개념이 없다. 레퍼런스의 3열을 서비스에 맞게 바꾼 자리다.
+     * 셋 다 API-062가 주는 값이다 — `나와 일치`는 계약(API-063)이 미구현이라 뺐다(업무 -459).
+     */
     await renderProfile();
 
-    expect(screen.getByText('프레임')).toBeInTheDocument();
-    expect(screen.getByText('나와 일치')).toBeInTheDocument();
-    expect(screen.getByText('76%')).toBeInTheDocument();
+    // 3열은 `dl`이다(StatRow). `공개 한줄평`은 아래 카드 제목에도 있어 이 줄 안에서 찾는다
+    const stats = screen.getByText('프레임').closest('dl')!;
+
+    expect([...stats.querySelectorAll('dt')].map((item) => item.textContent)).toEqual([
+      '프레임',
+      '팝콘',
+      '공개 한줄평',
+    ]);
     expect(screen.queryByText(/팔로워|팔로잉/)).not.toBeInTheDocument();
+    expect(screen.queryByText('나와 일치')).not.toBeInTheDocument();
   });
 
   it('차단은 확인을 거쳐 7.8-D로 간다', async () => {
