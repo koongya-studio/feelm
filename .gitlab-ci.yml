@@ -10,6 +10,7 @@ workflow:
 
 include:
   - local: .gitlab/ci/common.yml
+  - local: .gitlab/ci/docs.yml
   - local: .gitlab/ci/backend.yml
   - local: .gitlab/ci/frontend.yml
   - local: .gitlab/ci/pipeline.yml

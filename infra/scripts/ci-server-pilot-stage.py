@@ -17,6 +17,7 @@ runtime = importlib.util.module_from_spec(spec); spec.loader.exec_module(runtime
 FILES = runtime.FILES + (
     'ci-gitlab-job-adapter.py', 'ci-gitlab-custom-executor.py', 'ci-gitlab-server-install.py',
     'ci-gitlab-adapter-update.py',
+    'check-markdown.py', 'ci-docs-mr-boundary.py', 'ci-docs-mr-runner.py',
     'ci-frontend-mr-boundary.py', 'ci-frontend-mr-config.py', 'ci-frontend-mr-runner.py',
     'ci-pipeline-cache-policy.py', 'ci-pipeline-mr-boundary.py',
     'ci-pipeline-mr-config.py', 'ci-pipeline-mr-prepare.py', 'ci-pipeline-mr-runner.py',

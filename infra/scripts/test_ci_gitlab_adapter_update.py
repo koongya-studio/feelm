@@ -63,6 +63,7 @@ class AdapterUpdateTests(unittest.TestCase):
         self.assertIn("systemctl', 'start', SERVICE", source)
         self.assertIn("with OPERATORS.open('rb')", source)
         self.assertIn("'ci352-owner-*.service'", source)
+        self.assertIn("'ci296-owner-*.service'", source)
         self.assertIn("'ci486-owner-*.service'", source)
         self.assertIn("'ci490-infra-*.service'", source)
         self.assertNotIn("rmtree(", source)

@@ -26,6 +26,11 @@ MR 61의 신규 메일 의존성을 포함하는 오프라인 캐시 갱신과 R
 프론트 변경 경로별 Job 생성, 인증된 frontend archive와 고정 Node 실행 정책, 서버 적용 및
 의존성·이미지 갱신 절차를 정의한다.
 
+[문서 MR 검증](DOCS-MR-CHECK.md)은 모든 develop 대상 MR에 최소 검증 Job을 제공하고,
+전체 추적 Markdown의 내부 파일·이미지 링크와 병합 충돌 흔적을 외부 네트워크 없이 검사한다.
+링크 대상 파일의 삭제·이동도 잡기 위해 문서 변경 여부와 관계없이 실행하며, 인증된 Markdown과
+추적 경로 manifest만 문서 전용 격리 실행기에 전달한다.
+
 Pipeline MR 검사는 [GitLab MR 전용 어댑터](GITLAB-MR-ADAPTER.md)의
 `Pipeline MR 실행 경계 (S15P21E106-352)` 절을 따른다. 인증된 `pipeline/spark` archive만
 고정 Python 3.10/Java 21 이미지와 read-only uv 캐시로 전달하며 외부 네트워크 없이

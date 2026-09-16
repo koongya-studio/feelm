@@ -21,6 +21,7 @@ class CiConfigTests(unittest.TestCase):
     def setUpClass(cls):
         cls.root = CI_ROOT.read_text()
         cls.common = (CI_DIR / 'common.yml').read_text()
+        cls.docs = (CI_DIR / 'docs.yml').read_text()
         cls.backend = (CI_DIR / 'backend.yml').read_text()
         cls.frontend = (CI_DIR / 'frontend.yml').read_text()
         cls.consumer = (CI_DIR / 'consumer.yml').read_text()
@@ -41,6 +42,7 @@ workflow:
 
 include:
   - local: .gitlab/ci/common.yml
+  - local: .gitlab/ci/docs.yml
   - local: .gitlab/ci/backend.yml
   - local: .gitlab/ci/frontend.yml
   - local: .gitlab/ci/pipeline.yml
@@ -75,7 +77,7 @@ include:
     def test_job_names_are_unique_across_split_files(self):
         names = []
         for text in (self.common, self.backend, self.frontend, self.pipeline, self.consumer,
-                     self.infra):
+                     self.infra, self.docs):
             names.extend(re.findall(r'(?m)^([.]?[A-Za-z0-9_-]+):$', text))
         duplicates = sorted({name for name in names if names.count(name) > 1})
         self.assertEqual(duplicates, [])
@@ -94,6 +96,19 @@ include:
         self.assertIn('interruptible: false', digest)
         for secret in ('JIRA_API_TOKEN', 'MATTERMOST_LOGIN_ID', 'MATTERMOST_PASSWORD'):
             self.assertNotIn(secret, digest)
+
+    def test_docs_job_is_fixed_isolated_and_runs_for_every_develop_mr(self):
+        block = job_block(self.docs, 'docs-mr-check')
+        for expected in (
+                'stage: verify', 'tags: [e106-mr-isolated]', 'dependencies: []',
+                'GIT_STRATEGY: none', 'interruptible: true', 'timeout: 5m',
+                '$CI_PIPELINE_SOURCE == "merge_request_event"',
+                '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"',
+                '- python3 -B infra/scripts/check-markdown.py', '- "**/*"'):
+            self.assertIn(expected, block)
+        for forbidden in ('image:', 'services:', 'cache:', 'artifacts:', 'before_script:',
+                          'allow_failure:', 'when: manual'):
+            self.assertNotIn(forbidden, block)
 
     def test_mr_jobs_share_only_reviewed_common_triggers(self):
         backend = job_block(self.backend, 'backend-mr-test')

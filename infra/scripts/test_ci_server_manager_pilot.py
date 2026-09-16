@@ -100,7 +100,8 @@ class ServerPilotTests(unittest.TestCase):
         self.assertEqual(stage.REVISION, 'e5588d312bdfe058b03d15b34b1cbfa3a9935093')
 
     def test_upload_includes_frontend_adapter_runtime_closure(self):
-        for name in ('ci-frontend-mr-boundary.py', 'ci-frontend-mr-runner.py',
+        for name in ('check-markdown.py', 'ci-docs-mr-boundary.py', 'ci-docs-mr-runner.py',
+                     'ci-frontend-mr-boundary.py', 'ci-frontend-mr-runner.py',
                      'ci-network-guard.py'):
             self.assertIn(name, stage.FILES)
 
@@ -110,6 +111,8 @@ class ServerPilotTests(unittest.TestCase):
         with tarfile.open(fileobj=io.BytesIO(payload), mode='r') as archive:
             names = set(archive.getnames())
         self.assertIn('scripts/ci-backend-runtime-contract.py', names)
+        self.assertIn('scripts/check-markdown.py', names)
+        self.assertIn('scripts/ci-docs-mr-boundary.py', names)
         self.assertIn('scripts/ci-frontend-mr-boundary.py', names)
         self.assertIn('upload-manifest.json', names)
 

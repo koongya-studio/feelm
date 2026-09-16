@@ -24,6 +24,9 @@ class ServerPilotStageTests(unittest.TestCase):
         stage = load_stage()
         required = {
             "ci-gitlab-adapter-update.py",
+            "check-markdown.py",
+            "ci-docs-mr-boundary.py",
+            "ci-docs-mr-runner.py",
             "ci-frontend-mr-boundary.py",
             "ci-frontend-mr-config.py",
             "ci-frontend-mr-runner.py",
