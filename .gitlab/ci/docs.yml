@@ -1,0 +1,16 @@
+docs-mr-check:
+  stage: verify
+  tags: [e106-mr-isolated]
+  dependencies: []
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - python3 -B infra/scripts/check-markdown.py
+  interruptible: true
+  timeout: 5m
+  rules:
+    # Run for every develop MR so deleting or moving any linked target is checked,
+    # and every MR has at least one pipeline job when service jobs are filtered out.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
+      changes:
+        - "**/*"

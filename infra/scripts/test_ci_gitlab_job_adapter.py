@@ -57,9 +57,10 @@ def response(script=None, job_name='backend-mr-test'):
         'frontend-mr-test': adapter.FRONTEND_EXPECTED_SCRIPT,
         'consumer-mr-test': CONSUMER_SCRIPT,
         'infra-config-test': INFRA_SCRIPT,
+        'docs-mr-check': adapter.DOCS_EXPECTED_SCRIPT,
         **PIPELINE_SCRIPTS,
     }
-    return {
+    value = {
         'id': 55, 'token': 'valid-job-token-123456789',
         'job_info': {'name': job_name, 'stage': 'test', 'project_id': 99},
         'git_info': {'repo_url': 'https://gitlab-ci-token:hidden@lab.ssafy.com/'
@@ -68,6 +69,9 @@ def response(script=None, job_name='backend-mr-test'):
         'steps': [{'name': 'script', 'script': script or policies[job_name]}],
         'services': [], 'artifacts': [], 'cache': [], 'dependencies': [], 'image': {'name': ''},
     }
+    if job_name == adapter.DOCS_JOB_NAME:
+        value['job_info']['stage'] = 'verify'
+    return value
 
 
 def cache_response():
@@ -109,6 +113,8 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(consumer['service'], 'consumer')
         infra = adapter.validate_job_response(response(job_name='infra-config-test'))
         self.assertEqual(infra['service'], 'infra')
+        docs = adapter.validate_job_response(response(job_name='docs-mr-check'))
+        self.assertEqual(docs['service'], 'docs')
 
     def test_consumer_context_archive_and_runner_are_fixed(self):
         self.assertEqual(adapter.CONSUMER_EXPECTED_SCRIPT, CONSUMER_SCRIPT)
@@ -197,6 +203,26 @@ class AdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(adapter.PolicyError, 'fixed isolated'):
             adapter.validate_job_response(response(
                 PIPELINE_SCRIPTS['pipeline-unit-test'], job_name='pipeline-mr-test'))
+
+    def test_docs_archive_contains_all_markdown_and_only_tracked_manifest(self):
+        tracked = ['README.md', 'docs/가이드.md', 'src/main.py']
+        payload = archive([
+            ('source/', b'', 0o755),
+            ('source/README.md', b'[guide](docs/guide.md)\n', 0o644),
+            ('source/docs/가이드.md', b'ok\n', 0o644),
+            ('source/.ci/tracked-paths.json',
+             json.dumps(tracked, ensure_ascii=False).encode(), 0o600),
+        ])
+        result, digest = adapter.normalized_docs_archive(payload)
+        files, _ = adapter.docs_boundary.source_plan(result, digest)
+        self.assertEqual(set(files), {'README.md', 'docs/가이드.md',
+                                      adapter.docs_boundary.MANIFEST})
+        outside = archive([
+            ('source/README.md', b'ok\n', 0o644),
+            ('source/src/main.py', b'print(1)\n', 0o644),
+        ])
+        with self.assertRaisesRegex(adapter.PolicyError, 'out-of-scope'):
+            adapter.normalized_docs_archive(outside)
 
     def test_pipeline_archive_contains_only_nested_spark_project(self):
         self.assertTrue(hasattr(adapter, 'pipeline_boundary'),
@@ -288,6 +314,96 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(pipeline.call_args.args[2], 'spark-other')
         frontend.assert_not_called()
         backend.assert_not_called()
+
+    def test_docs_job_routes_manifest_snapshot_to_docs_runner(self):
+        context = response(job_name='docs-mr-check')
+        source = b'validated-docs-source'
+        digest = hashlib.sha256(source).hexdigest()
+        with patch.object(adapter, 'read_private_config',
+                          return_value=({}, Path('/prepared'))) as private_config, \
+             patch.object(adapter, 'verify_current_job', return_value={'pipeline': {'id': 1}}), \
+             patch.object(adapter, 'verify_merge_request', return_value={'iid': 98}), \
+             patch.object(adapter, 'fetch_merge_request_detail', return_value={'iid': 98}), \
+             patch.object(adapter, 'fetch_docs_source', return_value=(source, digest)) as fetch, \
+             patch.object(adapter.docs_runner, 'start', return_value=0) as docs, \
+             patch.object(adapter.frontend_runner, 'start') as frontend, \
+             patch.object(adapter.safety, 'start') as backend:
+            self.assertEqual(adapter.run_job(context, opener=object()), 0)
+        private_config.assert_called_once_with(adapter.CONFIG, require_prepared=False)
+        fetch.assert_called_once_with(adapter.validate_job_response(context))
+        docs.assert_called_once()
+        frontend.assert_not_called()
+        backend.assert_not_called()
+
+    def test_docs_source_uses_compatible_subprocess_output_arguments(self):
+        context = adapter.validate_job_response(response(job_name='docs-mr-check'))
+
+        def git_result(command, **options):
+            self.assertFalse(options.get('capture_output') and 'stderr' in options)
+            if 'ls-tree' in command:
+                return SimpleNamespace(stdout=b'README.md\0')
+            if 'archive' in command:
+                with tarfile.open(fileobj=options['stdout'], mode='w') as stream:
+                    directory = tarfile.TarInfo('source/')
+                    directory.type = tarfile.DIRTYPE
+                    directory.mode = 0o755
+                    stream.addfile(directory)
+                    data = b'# docs\n'
+                    item = tarfile.TarInfo('source/README.md')
+                    item.mode = 0o644
+                    item.size = len(data)
+                    stream.addfile(item, io.BytesIO(data))
+            return SimpleNamespace(stdout=b'')
+
+        with patch.object(adapter.subprocess, 'run', side_effect=git_result):
+            payload, digest = adapter.fetch_docs_source(context)
+        files, _ = adapter.docs_boundary.source_plan(payload, digest)
+        self.assertEqual(set(files), {'README.md', adapter.docs_boundary.MANIFEST})
+
+    def test_docs_unexpected_failures_report_only_bounded_stage(self):
+        context = response(job_name='docs-mr-check')
+        common = (
+            patch.object(adapter, 'read_private_config',
+                         return_value=({}, Path('/prepared'))),
+            patch.object(adapter, 'verify_current_job', return_value={'pipeline': {'id': 1}}),
+            patch.object(adapter, 'verify_merge_request', return_value={'iid': 98}),
+            patch.object(adapter, 'fetch_merge_request_detail', return_value={'iid': 98}),
+        )
+        with common[0], common[1], common[2], common[3], \
+             patch.object(adapter, 'fetch_docs_source', side_effect=ValueError('secret-value')), \
+             self.assertRaises(adapter.AdapterStageError) as raised:
+            adapter.run_job(context, opener=object())
+        self.assertEqual(raised.exception.stage, 'docs_source_prepare')
+        self.assertEqual(raised.exception.error_type, 'ValueError')
+        self.assertNotIn('secret-value', str(raised.exception))
+
+        source = b'validated-docs-source'
+        digest = hashlib.sha256(source).hexdigest()
+        common = (
+            patch.object(adapter, 'read_private_config',
+                         return_value=({}, Path('/prepared'))),
+            patch.object(adapter, 'verify_current_job', return_value={'pipeline': {'id': 1}}),
+            patch.object(adapter, 'verify_merge_request', return_value={'iid': 98}),
+            patch.object(adapter, 'fetch_merge_request_detail', return_value={'iid': 98}),
+        )
+        with common[0], common[1], common[2], common[3], \
+             patch.object(adapter, 'fetch_docs_source', return_value=(source, digest)), \
+             patch.object(adapter.docs_runner, 'start', side_effect=ValueError('private-path')), \
+             self.assertRaises(adapter.AdapterStageError) as raised:
+            adapter.run_job(context, opener=object())
+        self.assertEqual(raised.exception.stage, 'docs_runner_start')
+        self.assertEqual(raised.exception.error_type, 'ValueError')
+        self.assertNotIn('private-path', str(raised.exception))
+
+        stderr = io.StringIO()
+        with patch.object(adapter.sys, 'argv', ['ci-gitlab-job-adapter.py', 'run']), \
+             patch.object(adapter, 'read_stdin', return_value=context), \
+             patch.object(adapter, 'run_job', side_effect=raised.exception), \
+             patch.object(adapter.sys, 'stderr', stderr):
+            self.assertEqual(adapter.main(), 70)
+        self.assertEqual(
+            stderr.getvalue(),
+            'MR_ADAPTER_STAGE_ERROR: stage=docs_runner_start type=ValueError\n')
 
     def test_archive_strips_gitlab_prefix_and_revalidates(self):
         payload = archive([
@@ -535,6 +651,9 @@ class AdapterTests(unittest.TestCase):
             adapter.stop_owner_unit('ci486-owner-012345abcdef.service')
             self.assertEqual(run.call_args.args[0],
                              ['systemctl', 'stop', 'ci486-owner-012345abcdef.service'])
+            adapter.stop_owner_unit('ci296-owner-012345abcdef.service')
+            self.assertEqual(run.call_args.args[0],
+                             ['systemctl', 'stop', 'ci296-owner-012345abcdef.service'])
         with self.assertRaises(ValueError):
             adapter.stop_owner_unit('ci222-server-012345abcdef.service')
 

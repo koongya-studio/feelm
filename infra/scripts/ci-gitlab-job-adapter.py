@@ -42,6 +42,8 @@ consumer_boundary = load('gitlab_consumer_boundary', 'ci-consumer-mr-boundary.py
 consumer_runner = load('gitlab_consumer_runner', 'ci-consumer-mr-runner.py')
 infra_boundary = load('gitlab_infra_boundary', 'ci-infra-mr-boundary.py')
 infra_runner = load('gitlab_infra_runner', 'ci-infra-mr-runner.py')
+docs_boundary = load('gitlab_docs_boundary', 'ci-docs-mr-boundary.py')
+docs_runner = load('gitlab_docs_runner', 'ci-docs-mr-runner.py')
 CONFIG = Path('/etc/feelm-ci222/gitlab-adapter.json')
 GITLAB_URL = 'https://lab.ssafy.com'
 PROJECT_PATH = 's15-bigdata-dist-sub1/S15P21E106'
@@ -61,6 +63,8 @@ INFRA_JOB_NAME = 'infra-config-test'
 INFRA_EXPECTED_SCRIPT = [
     'python3 -I -B infra/scripts/run-infra-config-tests.py',
 ]
+DOCS_JOB_NAME = 'docs-mr-check'
+DOCS_EXPECTED_SCRIPT = ['python3 -B infra/scripts/check-markdown.py']
 PIPELINE_JOB_GROUPS = {
     'pipeline-unit-test': 'unit',
     'pipeline-spark-als-a-d-test': 'spark-als-a-d',
@@ -118,6 +122,14 @@ class AdapterGitError(Exception):
         self.stage = stage
 
 
+class AdapterStageError(Exception):
+    """Report only a fixed adapter stage and exception type, never exception data."""
+    def __init__(self, stage, error_type):
+        super().__init__(stage, error_type)
+        self.stage = stage
+        self.error_type = error_type
+
+
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         raise urllib.error.HTTPError(req.full_url, code, 'redirect refused', headers, fp)
@@ -172,6 +184,7 @@ def validate_job_response(response):
         FRONTEND_JOB_NAME: (JOB_STAGE, FRONTEND_EXPECTED_SCRIPT, 'frontend', None),
         CONSUMER_JOB_NAME: (JOB_STAGE, CONSUMER_EXPECTED_SCRIPT, 'consumer', None),
         INFRA_JOB_NAME: (JOB_STAGE, INFRA_EXPECTED_SCRIPT, 'infra', None),
+        DOCS_JOB_NAME: ('verify', DOCS_EXPECTED_SCRIPT, 'docs', None),
         CACHE_PREPARE_JOB: ('verify', CACHE_PREPARE_SCRIPT, 'cache', None),
         **{
             name: (JOB_STAGE, PIPELINE_JOB_SCRIPTS[name], 'pipeline', group)
@@ -452,6 +465,112 @@ def normalized_backend_archive(payload):
     return normalized_service_archive(payload, 'backend')
 
 
+def normalized_docs_archive(payload):
+    if not payload or len(payload) > MAX_HTTP_ARCHIVE:
+        raise PolicyError('Repository archive exceeds policy limit')
+    entries = []
+    prefix = None
+    total = 0
+    try:
+        with tarfile.open(fileobj=io.BytesIO(payload), mode='r:*') as source:
+            for entry in source:
+                parts = entry.name.rstrip('/').split('/')
+                if not parts[0]: raise PolicyError('Archive prefix is missing')
+                if prefix is None: prefix = parts[0]
+                if parts[0] != prefix: raise PolicyError('Archive has multiple roots')
+                if len(parts) == 1 and entry.isdir(): continue
+                if len(parts) < 2: raise PolicyError('Archive member is outside its root')
+                name = '/'.join(parts[1:])
+                if not name or not (entry.isdir() or entry.isfile()) or entry.sparse is not None:
+                    raise PolicyError('Unsupported repository archive member')
+                if entry.isfile() and not (name.casefold().endswith('.md')
+                                           or name == docs_boundary.MANIFEST):
+                    raise PolicyError('Repository archive contains out-of-scope documentation source')
+                data = b''
+                if entry.isfile():
+                    total += entry.size
+                    if entry.size < 0 or entry.size > docs_boundary.MAX_SOURCE_FILE or total > docs_boundary.MAX_ARCHIVE:
+                        raise PolicyError('Repository archive expands beyond policy')
+                    stream = source.extractfile(entry)
+                    if stream is None: raise PolicyError('Missing repository archive data')
+                    data = stream.read(docs_boundary.MAX_SOURCE_FILE + 1)
+                    if len(data) != entry.size: raise PolicyError('Truncated repository archive member')
+                entries.append((name, entry.isdir(), data))
+    except tarfile.TarError as exc:
+        raise PolicyError('Invalid repository tar archive') from exc
+    output = io.BytesIO()
+    with tarfile.open(fileobj=output, mode='w') as target:
+        for name, directory, data in entries:
+            item = tarfile.TarInfo(name + ('/' if directory else ''))
+            item.type = tarfile.DIRTYPE if directory else tarfile.REGTYPE
+            item.mode = 0o700 if directory else 0o600
+            item.size = 0 if directory else len(data)
+            target.addfile(item, None if directory else io.BytesIO(data))
+    result = output.getvalue()
+    digest = hashlib.sha256(result).hexdigest()
+    try:
+        docs_boundary.source_plan(result, digest)
+    except ValueError as exc:
+        raise PolicyError(str(exc)) from exc
+    return result, digest
+
+
+def fetch_docs_source(context):
+    """Fetch Markdown content and a full tracked-path manifest for link validation."""
+    with tempfile.TemporaryDirectory(prefix='ci296-git-') as directory:
+        repository = Path(directory) / 'repository.git'
+        environment = git_environment(context['token'], directory)
+        quiet = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL}
+        run_git(['/usr/bin/git', 'init', '--bare', str(repository)], environment,
+                'docs_git_init', **quiet)
+        run_git(['/usr/bin/git', '-C', str(repository), 'fetch', '--no-tags', '--depth=1',
+                 GITLAB_URL + '/' + PROJECT_PATH + '.git', context['sha']], environment,
+                'docs_git_fetch', **quiet)
+        listing = run_git(
+            ['/usr/bin/git', '-C', str(repository), 'ls-tree', '-r', '-z', '--name-only', 'FETCH_HEAD'],
+            environment, 'docs_git_tree', stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL).stdout
+        if len(listing) > 8 * 1024**2:
+            raise PolicyError('Tracked-path manifest exceeds policy limit')
+        try:
+            paths = listing.decode('utf-8').rstrip('\0').split('\0')
+        except UnicodeDecodeError as exc:
+            raise PolicyError('Repository contains invalid path encoding') from exc
+        paths = sorted(path for path in paths if path)
+        try:
+            for path in paths:
+                docs_boundary.relative_parts(path)
+        except ValueError as exc:
+            raise PolicyError(str(exc)) from exc
+        if not paths or paths != sorted(set(paths)):
+            raise PolicyError('Tracked paths are missing or duplicated')
+        markdown = [path for path in paths if path.casefold().endswith('.md')]
+        if not markdown:
+            raise PolicyError('Repository has no Markdown source')
+        archive_path = Path(directory) / 'source.tar'
+        with archive_path.open('xb') as output:
+            run_git(['/usr/bin/git', '-C', str(repository), 'archive', '--format=tar',
+                     '--prefix=source/', 'FETCH_HEAD', '--', *markdown], environment,
+                    'docs_git_archive', stdout=output, stderr=subprocess.DEVNULL)
+        try:
+            manifest = json.dumps(paths, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+            with tarfile.open(archive_path, mode='a') as archive:
+                item = tarfile.TarInfo('source/' + docs_boundary.MANIFEST)
+                item.mode = 0o600
+                item.size = len(manifest)
+                archive.addfile(item, io.BytesIO(manifest))
+        except (OSError, TypeError, ValueError, tarfile.TarError) as exc:
+            raise AdapterStageError('docs_manifest_append', type(exc).__name__) from exc
+        if archive_path.stat().st_size > MAX_HTTP_ARCHIVE:
+            raise PolicyError('Repository archive exceeds policy limit')
+        try:
+            return normalized_docs_archive(archive_path.read_bytes())
+        except PolicyError:
+            raise
+        except Exception as exc:
+            raise AdapterStageError('docs_archive_normalize', type(exc).__name__) from exc
+
+
 def fetch_source(context, service='backend'):
     """Fetch one authenticated, verified commit without exposing the job token."""
     with tempfile.TemporaryDirectory(prefix='ci222-git-') as directory:
@@ -481,7 +600,7 @@ def fetch_source(context, service='backend'):
 
 
 def stop_owner_unit(unit):
-    if not re.fullmatch(r'(?:ci(?:222|352|486)-owner|ci490-infra)-[a-f0-9]{12}\.service', unit):
+    if not re.fullmatch(r'(?:ci(?:222|296|352|486)-owner|ci490-infra)-[a-f0-9]{12}\.service', unit):
         raise ValueError('Refusing unrelated owner unit')
     result = subprocess.run(['systemctl', 'stop', unit], capture_output=True, timeout=120)
     if result.returncode != 0:
@@ -491,7 +610,8 @@ def stop_owner_unit(unit):
 def run_job(response, config_path=CONFIG, opener=None):
     context = validate_job_response(response)
     _, prepared = read_private_config(
-        config_path, require_prepared=context['service'] not in ('frontend', 'consumer', 'infra'))
+        config_path,
+        require_prepared=context['service'] not in ('frontend', 'consumer', 'infra', 'docs'))
     if context['service'] == 'backend':
         runtime.require_same(HERE, prepared / 'scripts')
     opener = opener or urllib.request.build_opener(NoRedirect())
@@ -510,7 +630,15 @@ def run_job(response, config_path=CONFIG, opener=None):
         return 0
     if changes and context['service'] == 'backend':
         prepared = verified_candidate(context, detail['iid'])
-    payload, digest = fetch_source(context, context['service'])
+    if context['service'] == 'docs':
+        try:
+            payload, digest = fetch_docs_source(context)
+        except (PolicyError, AdapterGitError, AdapterStageError):
+            raise
+        except Exception as exc:
+            raise AdapterStageError('docs_source_prepare', type(exc).__name__) from exc
+    else:
+        payload, digest = fetch_source(context, context['service'])
     active = {}
 
     def started(attempt, lease):
@@ -529,6 +657,11 @@ def run_job(response, config_path=CONFIG, opener=None):
     try:
         if context['service'] == 'frontend':
             return frontend_runner.start(payload, digest, started)
+        if context['service'] == 'docs':
+            try:
+                return docs_runner.start(payload, digest, started)
+            except Exception as exc:
+                raise AdapterStageError('docs_runner_start', type(exc).__name__) from exc
         if context['service'] == 'pipeline':
             return pipeline_runner.start(payload, digest, context['pipeline_group'], started)
         if context['service'] == 'consumer':
@@ -554,6 +687,10 @@ def main():
         return 70
     except AdapterGitError as exc:
         print('MR_ADAPTER_GIT_ERROR: stage=' + exc.stage, file=sys.stderr)
+        return 70
+    except AdapterStageError as exc:
+        print('MR_ADAPTER_STAGE_ERROR: stage=' + exc.stage + ' type=' + exc.error_type,
+              file=sys.stderr)
         return 70
     except Exception as exc:
         print('MR_ADAPTER_ERROR: ' + type(exc).__name__, file=sys.stderr); return 70
