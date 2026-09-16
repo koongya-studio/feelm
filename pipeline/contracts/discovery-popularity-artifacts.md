@@ -1,7 +1,9 @@
 # DISCOVERY 그룹 내부 대중성 산출물 계약
 
 `discovery-popularity-artifacts-v1`은 DISCOVERY가 사용자별로 선택한 영화 그룹 안에서 후보를
-고르는 공통 순서다. 이 순서는 모든 사용자에게 같으며 POPULAR fallback과는 별도다.
+고르는 공통 순서다. 이 순서는 모든 사용자에게 같으며 S15P21E106-483의 후보 부족분용
+POPULAR fallback과는 별도다. 번들 생성·로컬 검증은 S15P21E106-415, HDFS 게시와 두 URI의
+운영 활성화·rollback은 S15P21E106-482가 담당한다.
 
 ## 산출 방식
 
