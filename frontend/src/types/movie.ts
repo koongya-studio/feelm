@@ -53,27 +53,41 @@ export type MyRating = {
   visibility: Visibility;
 };
 
-/** API-030 `recommendation`. `recommendationItemId`로 진입했을 때만 있다 */
+/**
+ * API-030 `recommendation`. `recommendationItemId`로 진입했을 때만 있다
+ *
+ * `reason`은 추천을 만든 시점에 저장한 JSON 스냅샷을 그대로 돌려준 값이다(API-030
+ * 처리 규칙). 서버가 형태를 다시 맞춰 주지 않으므로 `summary`가 없을 수 있고,
+ * 화면은 문구가 있을 때만 추천 이유를 그린다.
+ */
 export type MovieRecommendation = {
   recommendationItemId: number;
   type: RecommendationType;
-  reason: { summary: string };
+  reason: { summary?: string | null };
 };
 
-/** API-030 영화 상세 조회 */
+/**
+ * API-030 영화 상세 조회
+ *
+ * **원천 값이 없는 선택 필드는 `null`이다**(API-030 처리 규칙). 목업 시절에는 줄거리 ·
+ * 개봉일 · 상영 시간 · 대표 맛이 항상 있었지만 수집 데이터에는 빠진 값이 있어서,
+ * 화면이 `null`을 그대로 만난다(업무 -475). 장르 · 국가 · 감독 · 배우 · OTT는
+ * 연결이 없으면 빈 배열이다.
+ */
 export type MovieDetail = {
   movieId: number;
   title: string;
-  synopsis: string;
-  releaseDate: string;
-  runtimeMinutes: number;
+  originalTitle: string | null;
+  synopsis: string | null;
+  releaseDate: string | null;
+  runtimeMinutes: number | null;
   genres: MovieCode[];
   countries: MovieCode[];
   directors: MoviePerson[];
   cast: MoviePerson[];
   posterUrl: string | null;
   backdropUrl: string | null;
-  flavorCode: string;
+  flavorCode: string | null;
   averageRating: number;
   ratingCount: number;
   ottProviders: MovieOttProvider[];

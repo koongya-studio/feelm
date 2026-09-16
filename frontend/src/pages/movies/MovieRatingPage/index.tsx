@@ -29,6 +29,11 @@
  * 감상 정보(`6월 2일 · 넷플릭스에서 시청`)는 감상 기록 목록(API-034)에서 읽는다. 2.4-A에서
  * `봤어요`를 고른 기록의 `watchedAt`과 `ott`를 쓰므로 실제로 이동한 OTT가 나온다
  * (업무 -263). 2.4에서 바로 들어와 감상 기록이 없으면 이 줄을 표시하지 않는다.
+ *
+ * 영화 정보는 실제 API-030에서 온다(업무 -475). 평가 저장(API-036 · API-037)은 아직
+ * 목업이라 이 화면은 실제 영화 위에서 목업 평가를 만든다. **목업 목록(7.6 · 7.7)에서
+ * 들어오면 그 `movieId`가 실제 DB에 없어 오류 상태가 된다.** 평가 계열이 연동되면
+ * (S15P21E106-160 · -213 · -214) 두 쪽이 같은 영화를 보게 된다.
  */
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
@@ -48,6 +53,7 @@ import {
 } from '../../../api/watch';
 import { path } from '../../../routes/paths';
 import { formatMonthDay } from '../../../utils/date';
+import { movieMetaLine } from '../../../utils/movie';
 import styles from './MovieRatingPage.module.css';
 import type { MovieDetail } from '../../../types/movie';
 
@@ -147,7 +153,12 @@ export default function MovieRatingPage() {
       movie.movieId,
       // comment가 있으면 visibility가 필수다(API-036). 선택 UI가 없어 기본값 PRIVATE
       trimmed ? { score, comment: trimmed, visibility: 'PRIVATE' } : { score },
-      movie.flavorCode,
+      /*
+       * 대표 맛은 배정되지 않았으면 `null`이다(API-030). 목업 평가는 맛 코드를 요구하므로
+       * 빈 코드로 넘기고, 2.7의 맛 이름은 그 자리에서 빈칸이 된다. 평가가 연동되면
+       * 맛은 서버가 정한다(API-036 응답의 `popcorn`).
+       */
+      movie.flavorCode ?? '',
     );
 
     // 2.6 · 2.7은 추가 전 수치가 있어야 성립하므로 Router state로 넘긴다
@@ -183,12 +194,8 @@ export default function MovieRatingPage() {
   }
 
   const isEditing = movie.myRating !== null;
-  const releaseYear = movie.releaseDate.slice(0, 4);
-  const meta = [
-    releaseYear,
-    ...movie.genres.map((genre) => genre.name),
-    `${movie.runtimeMinutes}분`,
-  ].join(' · ');
+  // 개봉일 · 장르 · 상영 시간은 원천에 없으면 빠진다(API-030). 있는 값만 잇는다
+  const meta = movieMetaLine(movie);
 
   return (
     <>
@@ -207,7 +214,7 @@ export default function MovieRatingPage() {
 
           <div className={styles.movieInfo}>
             <p className={styles.movieTitle}>{movie.title}</p>
-            <p className={styles.movieMeta}>{meta}</p>
+            {meta ? <p className={styles.movieMeta}>{meta}</p> : null}
             {/* 감상 기록이 없으면 이 줄을 표시하지 않는다 */}
             {watchNote ? <p className={styles.movieMeta}>{watchNote}</p> : null}
           </div>
