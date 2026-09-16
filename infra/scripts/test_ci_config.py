@@ -80,6 +80,21 @@ include:
         duplicates = sorted({name for name in names if names.count(name) > 1})
         self.assertEqual(duplicates, [])
 
+    def test_jira_mattermost_digest_is_schedule_only(self):
+        digest = job_block(self.common, 'jira-mattermost-digest')
+        condition = ('$CI_PIPELINE_SOURCE == "schedule" && '
+                     '$CI_COMMIT_BRANCH == "develop" && '
+                     '$CI_COMMIT_REF_PROTECTED == "true" && '
+                     '$JIRA_MATTERMOST_DIGEST == "true"')
+        self.assertIn(condition, digest)
+        self.assertIn('python3 -B -m unittest tests.jira.test_notify_mattermost '
+                      'infra.scripts.test_ci_config -v', digest)
+        self.assertIn('python3 -I -B scripts/jira/notify_mattermost.py', digest)
+        self.assertIn('resource_group: jira-mattermost-digest', digest)
+        self.assertIn('interruptible: false', digest)
+        for secret in ('JIRA_API_TOKEN', 'MATTERMOST_LOGIN_ID', 'MATTERMOST_PASSWORD'):
+            self.assertNotIn(secret, digest)
+
     def test_mr_jobs_share_only_reviewed_common_triggers(self):
         backend = job_block(self.backend, 'backend-mr-test')
         frontend = job_block(self.frontend, 'frontend-mr-test')
