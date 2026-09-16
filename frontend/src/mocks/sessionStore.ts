@@ -17,16 +17,18 @@
  *
  * 예외는 셋이다. 최근 검색어 · 7.7과 8.1의 감상 기록 · 8.1 알림은 와이어프레임이 그린
  * 상태로 시작한다. 모두 사용자가 지우거나 바꾸는 값이라 저장소 안에 있어야 변화가 남는다.
+ *
+ * 실제 API가 된 값은 여기서 빠진다. 차단 목록(API-020 ~ API-022)이 그렇게 나갔고, 알림
+ * 설정은 계약에 자리가 없는 두 키만 남았다(업무 -394).
  */
 import { createSeedNotifications } from './notifications';
 import { createSeedWatchRecords } from './watch';
 import type {
-  NotificationSettingsView,
   NotificationView,
   PartyView,
   PrivacySettingsView,
+  UnspecifiedNotificationSettings,
 } from '../types/unspecified';
-import type { BlockedUser } from '../types/user';
 import type { Rating, RatingUpdateInput, WatchRecord } from '../types/watch';
 
 /**
@@ -85,17 +87,14 @@ type SessionState = {
    * 로컬에 둘 이유가 없다(`api/users.ts`). 한 줄 소개만 계약에 자리가 없어 남는다.
    */
   profileEdit: { introduction: string } | null;
-  /** 7.8-C에서 바꾼 알림 설정. `null`이면 기준 목업(mocks/settings.ts)이다 */
-  notificationSettings: NotificationSettingsView | null;
+  /**
+   * 7.8-C에서 바꾼 알림 설정 중 **계약에 없는 둘**. `null`이면 기준 목업(mocks/settings.ts)이다.
+   *
+   * 계약의 세 키(API-017)는 서버가 들고 있어 여기 없다(업무 -394).
+   */
+  unspecifiedNotificationSettings: UnspecifiedNotificationSettings | null;
   /** 7.8-B에서 바꾼 공개 범위. `null`이면 기준 목업이다 */
   privacySettings: PrivacySettingsView | null;
-  /**
-   * API-020 · API-021로 바뀐 차단 목록 **전체**. `null`이면 기준 목업이다.
-   *
-   * 기준 목업의 사람을 해제할 수 있어야 하므로 추가분만 따로 두지 않고 처음 바뀔 때
-   * 목록 전체를 옮겨 온다.
-   */
-  blockedUsers: BlockedUser[] | null;
   /**
    * 8.1 알림. 와이어프레임 네 건으로 시작한다. 누르면 읽음이 되고 그 상태가 남아야
    * 다시 들어왔을 때 표식이 사라진다(업무 -308).
@@ -121,9 +120,8 @@ function emptyState(): SessionState {
     createdParties: [],
     invitationStatuses: {},
     profileEdit: null,
-    notificationSettings: null,
+    unspecifiedNotificationSettings: null,
     privacySettings: null,
-    blockedUsers: null,
     notifications: createSeedNotifications(),
     seenReportIds: [],
   };
@@ -220,13 +218,15 @@ export function getProfileEdit(): { introduction: string } | null {
 
 // ─────────────────────────────────────────── 설정 (업무 -307)
 
-export function saveNotificationSettings(settings: NotificationSettingsView): void {
-  state.notificationSettings = { ...settings };
+export function saveUnspecifiedNotificationSettings(
+  settings: UnspecifiedNotificationSettings,
+): void {
+  state.unspecifiedNotificationSettings = { ...settings };
 }
 
 /** 바꾼 적 없으면 null. 기준 목업을 쓰라는 뜻이다 */
-export function getNotificationSettings(): NotificationSettingsView | null {
-  return state.notificationSettings;
+export function getUnspecifiedNotificationSettings(): UnspecifiedNotificationSettings | null {
+  return state.unspecifiedNotificationSettings;
 }
 
 export function savePrivacySettings(settings: PrivacySettingsView): void {
@@ -236,15 +236,6 @@ export function savePrivacySettings(settings: PrivacySettingsView): void {
 /** 바꾼 적 없으면 null. 기준 목업을 쓰라는 뜻이다 */
 export function getPrivacySettings(): PrivacySettingsView | null {
   return state.privacySettings;
-}
-
-export function saveBlockedUsers(users: BlockedUser[]): void {
-  state.blockedUsers = [...users];
-}
-
-/** 바꾼 적 없으면 null. 기준 목업을 쓰라는 뜻이다 */
-export function getBlockedUsers(): BlockedUser[] | null {
-  return state.blockedUsers;
 }
 
 // ─────────────────────────────────────────── 알림 · 리포트 (업무 -308)

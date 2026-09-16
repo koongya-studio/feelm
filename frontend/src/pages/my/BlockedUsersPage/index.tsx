@@ -4,12 +4,17 @@
  * 이동표: 7.8 → 7.8-D · 7.2-B ⇢ 7.8-D 사용자 차단 후 차단 사용자 관리
  *
  * 요소는 와이어프레임 그대로다 — 헤더 아래 `N명 차단 중`, 차단의 효과 안내, 사람마다
- * 아바타 · 닉네임 · `차단 해제`. 연동 API는 API-022 목록 · API-021 해제다(목업).
+ * 아바타 · 닉네임 · `차단 해제`. 연동 API는 API-022 목록 · API-021 해제다(업무 -394).
  *
  * - `차단 해제`는 확인 없이 바로 푼다. 와이어프레임에 확인 창이 없고, 되돌리려면 다시
  *   차단하면 된다
+ * - 해제는 멱등이라(API-021) 실패는 네트워크나 세션 문제뿐이다. 그때는 목록에서 지우지
+ *   않고 안내만 한다 — 지워 놓으면 서버에는 남은 차단이 화면에서 사라진다
  * - 닉네임은 누를 수 없다. 차단한 사람의 프로필은 보이지 않는다(API-020). 탈퇴한 사람도
  *   목록에 남아 프로필이 404다(API-022 처리 규칙)
+ *
+ * `[?]` 와이어프레임에 더 보기가 없어 첫 페이지(50명)만 그린다. 더 남아 있으면
+ *       `N명 차단 중`을 감춘다 — 7.5 `총 N편`과 같은 처리다.
  */
 import { useEffect, useState } from 'react';
 import Avatar from '../../../components/Avatar';
@@ -18,10 +23,10 @@ import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import { getBlockedUserList, unblockUser } from '../../../api/settings';
 import styles from './BlockedUsersPage.module.css';
-import type { BlockedUser } from '../../../types/user';
+import type { BlockedUser, BlockedUserList } from '../../../types/user';
 
 export default function BlockedUsersPage() {
-  const [users, setUsers] = useState<BlockedUser[] | null>(null);
+  const [list, setList] = useState<BlockedUserList | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
   /** 해제하는 중인 사람. 같은 버튼을 두 번 누르지 않게 막는다 */
@@ -34,7 +39,7 @@ export default function BlockedUsersPage() {
     getBlockedUserList()
       .then((value) => {
         if (active) {
-          setUsers(value.items);
+          setList(value);
           setFailed(false);
         }
       })
@@ -52,7 +57,11 @@ export default function BlockedUsersPage() {
 
     try {
       await unblockUser(user.userId);
-      setUsers((current) => current?.filter((item) => item.userId !== user.userId) ?? null);
+      setList((current) =>
+        current
+          ? { ...current, items: current.items.filter((item) => item.userId !== user.userId) }
+          : null,
+      );
       setNotice(`${user.nickname} 님의 차단을 해제했어요`);
     } catch {
       setNotice('차단을 해제하지 못했어요. 잠시 후 다시 시도해 주세요');
@@ -80,13 +89,19 @@ export default function BlockedUsersPage() {
     );
   }
 
-  if (!users) {
+  if (!list) {
     return <ScreenHeader title="차단 사용자 관리" showBack />;
   }
 
+  const users = list.items;
+
   return (
     <>
-      <ScreenHeader title="차단 사용자 관리" subtitle={`${users.length}명 차단 중`} showBack />
+      <ScreenHeader
+        title="차단 사용자 관리"
+        subtitle={list.hasNext ? undefined : `${users.length}명 차단 중`}
+        showBack
+      />
 
       <div className={styles.page}>
         <p className={styles.info}>

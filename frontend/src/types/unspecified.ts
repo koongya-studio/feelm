@@ -240,7 +240,15 @@ export type TasteCompareView = {
  * `PARTY_INVITE`(파티 초대 알림) · `REPORT`(리포트 발급 알림)는 계약의 NotificationType에
  * 없다. 와이어프레임대로 그리기로 했다(팀 결정 2026-09-13, 업무 -307).
  */
-export type NotificationSettingsView = NotificationSettings & {
+export type NotificationSettingsView = NotificationSettings & UnspecifiedNotificationSettings;
+
+/**
+ * 7.8-C에서 계약에 자리가 없는 토글 둘.
+ *
+ * 보낼 API가 없어 세션 저장소에만 남는다(`api/settings.ts`, 사용자 결정 2026-09-16).
+ * 계약의 셋과 저장 위치가 달라 타입으로도 갈라 둔다.
+ */
+export type UnspecifiedNotificationSettings = {
   PARTY_INVITE: boolean;
   REPORT: boolean;
 };

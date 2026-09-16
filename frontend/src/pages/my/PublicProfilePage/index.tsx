@@ -19,6 +19,11 @@
  * 공동 파티에서 나가게 된다는 것을 알린다 — API-020이 차단 전에 안내하라고 적었다. 이동은
  * `replace`다. 차단한 사람의 프로필은 404라 뒤로 가기가 여기로 돌아오면 안 된다.
  *
+ * **차단만 실제 API다**(API-020, 업무 -394). 프로필 자체는 API-062가 2차 MVP라 목업이다.
+ * `[!]` 그래서 이 화면에 들어오는 `userId`는 목업 번호이고, 실제 백엔드에는 없는 사람이라
+ *       차단이 `404`로 끝난다. 파티(S15P21E106-393)와 API-062가 열려 실제 번호가 흘러야
+ *       이어진다. 목업 프로필과 같은 번호의 사용자가 서버에 있으면 그대로 동작한다.
+ *
  * `[?]` 신고는 계약이 없다. 안내만 하고 실제 처리는 하지 않는다.
  */
 import { useEffect, useState } from 'react';
@@ -32,6 +37,7 @@ import Section from '../../../components/Section';
 import StatRow from '../../../components/StatRow';
 import StatusView from '../../../components/StatusView';
 import TasteShowcase from '../../../components/TasteShowcase';
+import { isApiError } from '../../../api/apiError';
 import { blockUser } from '../../../api/settings';
 import { getPublicProfile } from '../../../api/users';
 import { path } from '../../../routes/paths';
@@ -107,10 +113,25 @@ export default function PublicProfilePage() {
     try {
       await blockUser(id);
       void navigate(path.blockedUsers(), { replace: true });
-    } catch {
+    } catch (error) {
+      /*
+       * 이미 차단한 사람이면(409 ALREADY_BLOCKED) 바라던 상태이므로 성공과 같이 7.8-D로
+       * 보낸다. 두 탭에서 같은 프로필을 열어 둔 경우에 난다.
+       */
+      if (isApiError(error) && error.code === 'ALREADY_BLOCKED') {
+        void navigate(path.blockedUsers(), { replace: true });
+
+        return;
+      }
+
       setBlocking(false);
       setConfirmingBlock(false);
-      setNotice('차단하지 못했어요. 잠시 후 다시 시도해 주세요');
+      // 계약이 정한 문구가 상황을 더 정확히 말해 준다(없는 사용자 404 · 자기 자신 400)
+      setNotice(
+        isApiError(error) && error.status >= 400 && error.status < 500
+          ? error.message
+          : '차단하지 못했어요. 잠시 후 다시 시도해 주세요',
+      );
     }
   }
 
