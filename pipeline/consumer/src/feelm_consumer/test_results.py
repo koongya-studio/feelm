@@ -16,7 +16,7 @@ def test_results_emit_taste_group_and_empty_discovery_shell() -> None:
         generation_id="generation-1",
     )
 
-    assert [value["candidateVersion"] for value in (vector, candidates)] == [5, 5]
+    assert [value["candidateVersion"] for value in (vector, candidates)] == [6, 6]
     assert [value["generationId"] for value in (vector, candidates)] == ["generation-1", "generation-1"]
     assert vector["factorBackedInputCount"] == 1
     assert candidates["taste"] == [

@@ -7,7 +7,7 @@ from feelm_consumer.discovery import DiscoveryReason
 from feelm_consumer.ranking import RankedMovie
 from feelm_consumer.xai import CandidateReason
 
-CANDIDATE_VERSION = 5
+CANDIDATE_VERSION = 6
 
 
 def utc_now() -> str:
@@ -23,7 +23,7 @@ def build_results(
     candidates: list[RankedMovie],
     discovery_candidates: list[RankedMovie] | None = None,
     reasons: dict[int, CandidateReason],
-    discovery_reasons: dict[int, DiscoveryReason] | None = None,
+    discovery_reasons: dict[int, DiscoveryReason | CandidateReason] | None = None,
     generated_at: str | None = None,
     generation_id: str | None = None,
 ) -> tuple[dict[str, object], dict[str, object]]:

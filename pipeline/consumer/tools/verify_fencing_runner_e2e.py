@@ -83,7 +83,6 @@ def worker(role: str, kafka: str, redis_url: str, dsn: str, topic: str, group: s
             "CONSUMER_MODEL_URI": "/fixture/model-v1",
             "CONSUMER_MAPPING_URI": "/fixture/mapping-v1",
             "CONSUMER_METADATA_URI": "/fixture/metadata-v1",
-            "CONSUMER_MIN_INPUT_COUNT": "0",
             "CONSUMER_KAFKA_POLL_TIMEOUT_SECONDS": "0.2",
         }
     )

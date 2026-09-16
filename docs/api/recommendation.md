@@ -160,20 +160,26 @@
 - 기본 구성은 `TASTE` 2편 + `DISCOVERY` 1편. `DISCOVERY` 후보가 없으면 `TASTE` 3편
 - `TASTE`는 이벤트마다 PostgreSQL의 현재 평가·온보딩 선택을 한 snapshot으로 다시 읽어 결정론적으로
   재계산한다. 같은 영화는 실제 별점이 온보딩 선택보다 우선하고, 온보딩 LIKE/DISLIKE는 DB 별점으로
-  저장하지 않고 ALS Fold-in adapter의 확정값으로만 사용한다. 서로 다른 유효 입력 영화가 기본 10편
-  이상이면 가용한 ALS·콘텐츠 성분으로 후보를 계산한다. 콘텐츠 산출물은 선택 사항이며, 한 성분 이상이
-  점수를 낼 수 있을 때 각 지원 모집단의 백분위를 결합해 `taste` 최대 500편을 게시한다. 두 성분 모두
-  점수를 낼 수 없으면 이벤트는 정상 처리하되 기존 Redis 키를 갱신하지 않는다.
+  저장하지 않고 ALS Fold-in adapter의 확정값으로만 사용한다. 서로 다른 유효 입력 영화 수와 관계없이
+  가용한 ALS·콘텐츠 성분으로 후보를 계산한다. 콘텐츠 산출물은 선택 사항이며, 한 성분 이상이 점수를
+  낼 수 있을 때 각 지원 모집단의 백분위를 결합해 `taste` 최대 500편을 게시한다. 입력이 없거나 두
+  성분 모두 사용자 프로필을 만들 수 없으면 서비스 가능한 영화에 `0.0` 동점 점수를 부여하고
+  `movieId` 오름차순으로 `taste`를 게시한다.
 - `DISCOVERY`는 내부
   8×128 영화 그룹에서 별도로 고른 `discovery` 최대 100편이며, Spring이 두 목록을 합쳐
-  `TASTE 2 + DISCOVERY 1`을 구성한다. 그룹 산출물이 없으면 `discovery`는 빈 배열이고 TASTE로 채운다(FR-10·FR-12)
+  `TASTE 2 + DISCOVERY 1`을 구성한다. 그룹 결과가 없거나 부족하면 TASTE 상위 500편 밖의 개인 후보를
+  우선 사용하고, 그래도 부족하면 TASTE 중복을 허용해 100편을 채운다. 서비스 가능한 고유 후보가
+  100편 미만일 때만 그 수만 게시한다(FR-10·FR-12).
 - DISCOVERY는 저이력·고궁합 그룹을 개인별로 고른 뒤, 그룹 안에서는 모든 사용자에게 같은
-  `max(TMDB 투표 수 백분위, KOBIS 누적 관객 백분위)` 순서로 최대 10편씩 모집한다. 모집된
-  최대 100편에 대해서만 사용자 개인 예측 점수로 최종 순서를 만든다.
+  `max(TMDB 투표 수 백분위, KOBIS 누적 관객 백분위)` 순서로 우선 10편씩 모집한다. 상위 10개
+  그룹만으로 100편을 채우지 못하면 다음 적격 그룹을 같은 방식으로 탐색하고, 그래도 부족하면
+  적합도 순으로 그룹별 11번째 이후 후보를 모집한다. 모집된 최대 100편은 사용자 개인 예측
+  점수로 최종 정렬한다.
 - Consumer는 평가·온보딩·확정 감상·관심없음 영화를 DISCOVERY 후보에서 먼저 제외한다.
   Spring은 최종 노출에서 `LINK_CLICKED`를 포함한 모든 감상 기록과 관심없음을 다시 제외한다
 - 활성 버퍼가 남아 있고 추천 입력(평가·온보딩 선택)이 바뀌지 않으면 같은 `recommendationSetId`와 결과를 반환한다. 입력이 바뀌거나 버퍼가 소진된 상태에서 API-046을 다시 요청하면 새 세트를 생성한다. 관심없음은 입력 변경으로 취급하지 않고 세트 내 교체로 처리한다(API-047)
-- 온보딩을 건너뛰고 평가가 없는 사용자의 별도 POPULAR fallback은 S15P21E106-483에서 다룬다.
+- 온보딩을 건너뛰고 평가가 없는 사용자의 개인 후보 보충 순서 개선과 후보 모집단 밖 POPULAR 확장은
+  S15P21E106-483에서 다룬다.
   `discovery-popularity`는 선택된 그룹 안의 공통 후보 진입 순서이며 fallback 목록이 아니다
 - Python Consumer가 Redis에 갱신한 TASTE 최대 500편과 DISCOVERY 최대 100편을 Spring이 OTT 클릭 등
   최신 행동 신호로 재정렬하고 후보 20편(설정값)을 세트 버퍼로 저장해 3편씩 노출한다
@@ -190,12 +196,14 @@
 - S15P21E106-471에서 Redis Candidate v3 `taste`/`discovery` 그룹화와 `generationId` writer를
   반영했고, S15P21E106-481에서 TASTE 후보별 구조화 `reason`을 추가해 Candidate v4가 됐다.
   S15P21E106-488은 전체 평가 또는 온보딩 이력으로 계산한 저이력 그룹 적합도와 상위 기여 비율을
-  DISCOVERY 전용 `reason`으로 추가해 Candidate v5로 올린다. 현재
-  `develop`에는 Candidate v5 Spring reader와 TASTE 2 + DISCOVERY 1 조립 구현이 없으므로, 위 처리
-  규칙은 Backend가 구현·통합 검증해야 하는 소비 계약이다. 전환은 v4/v5 reader 선반영, Consumer v5
-  전환과 활성 후보 재게시, v5·`generationId` 검증, v4 호환 제거 순서로 진행한다.
+  DISCOVERY 전용 `reason`으로 추가해 Candidate v5로 올렸다. S15P21E106-505는 입력 수 제한을 제거하고
+  DISCOVERY 보충 후보용 `DISCOVERY_PERSONAL_SCORE`를 추가해 Candidate v6로 올린다. 현재 `develop`에는
+  Candidate v6 Spring reader와 TASTE 2 + DISCOVERY 1 조립 구현이 없으므로, 위 처리 규칙은 Backend가
+  구현·통합 검증해야 하는 소비 계약이다. 전환은 v5/v6 reader 선반영, Consumer v6 전환과 활성 후보
+  재게시, v6·`generationId` 검증, v5 호환 제거 순서로 진행한다.
 - S15P21E106-482에서 그룹·그룹 내부 대중성 번들의 HDFS 게시, 두 URI 동시 활성화와 rollback을 검증한다.
-- S15P21E106-483은 후보 부족분용 별도 POPULAR 목록의 정책·산출물·서비스 연동을 담당한다.
+- S15P21E106-483은 개인 후보 보충 순서를 개선하고 후보 모집단 밖까지 확장하는 별도 POPULAR 목록의
+  정책·산출물·서비스 연동을 담당한다.
 
 ### 상태값
 
@@ -203,9 +211,10 @@
 
 ### 미정 사항
 
-- [ ] Candidate v5 Spring reader, 두 목록 조립과 감상 변경 재계산을 구현·통합 검증해야 함
+- [ ] Candidate v6 Spring reader, 두 목록 조립과 감상 변경 재계산을 구현·통합 검증해야 함
 - [ ] TMDB/KOBIS 공개 신호 후보 자격 하한을 합의하고 S15P21E106-482에서 운영 활성화해야 함
-- [ ] 콜드 스타트 전략(온보딩 건너뛴 사용자)
+- [x] 콜드 스타트 임시 전략 — 입력이 없으면 `0.0` 동점 TASTE 게시
+- [ ] 콜드 스타트 POPULAR 순서·후보 모집단 확장 — S15P21E106-483 이후
 - [ ] 추천 이유 factor 타입 목록과 문장 생성 방식(템플릿 vs LLM)
 - [ ] Re-ranking 가중치와 추천 이유 생성 방식
 

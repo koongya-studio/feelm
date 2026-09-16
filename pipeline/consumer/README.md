@@ -146,7 +146,6 @@ Registry 태그, Compose 서비스와 restart policy는 배포 업무에서 설�
 | `CONSUMER_GROUP_URI` | 없음(선택) | 공개 완료된 group-serving-artifacts-v1 버전 경로. ALS와 `mapping_revision`이 같아야 하며 설정한 산출물이 불완전하면 시작을 거부한다 |
 | `CONSUMER_DISCOVERY_POPULARITY_URI` | 없음(선택) | 공개 완료된 discovery-popularity-artifacts-v1 버전 경로. `CONSUMER_GROUP_URI`와 반드시 함께 설정한다 |
 | `CONSUMER_HYBRID_ALPHA` | `0.5` | 고정 ALS 가중치. 0~1 밖이면 시작을 거부한다 |
-| `CONSUMER_MIN_INPUT_COUNT` | `10` | 후보를 계산하기 시작하는 최소 입력 수(평점 + 온보딩 선호). 미만이면 계산·게시를 건너뛴다. `0`이면 제한 없음 |
 
 **`CONSUMER_HYBRID_ALPHA`는 두 성분이 모두 있는 영화에만 적용된다.** 한쪽만 지원하는 영화는
 alpha와 무관하게 자기 성분의 순위를 그대로 받으므로, **`alpha=1`로 둔다고 ALS 전용이 되지 않는다.**
@@ -155,16 +154,21 @@ alpha와 무관하게 자기 성분의 순위를 그대로 받으므로, **`alph
 ## 취향 발견 후보 (S15P21E106-415)
 
 `CONSUMER_GROUP_URI`와 `CONSUMER_DISCOVERY_POPULARITY_URI`를 함께 설정하면 기존 `taste` 최대 500편과 독립적으로
-`discovery` 최대 100편을 게시한다. 실제 별점이 같은 영화의 온보딩 선택보다 우선하며,
-서로 다른 유효 입력 영화가 기본 10편 이상일 때만 두 목록을 계산한다. 온보딩 LIKE/DISLIKE는
+그룹 기반 `discovery`를 먼저 만든다. 그룹 결과가 없거나 부족하면 TASTE 상위 500편 밖의 개인 후보,
+TASTE와 중복되는 개인 후보 순으로 보충해 최대 100편을 게시한다. 서비스 가능한 고유 후보가 100편
+이상이면 그룹 산출물 설정 여부와 관계없이 정확히 100편을 게시한다. 실제 별점이 같은 영화의
+온보딩 선택보다 우선하며,
+서로 다른 유효 입력 영화 수와 관계없이 가용한 성분으로 두 목록을 계산한다. 온보딩 LIKE/DISLIKE는
 ALS fold-in에 각각 `4.271231616529622`, `2.798442509805467`을 쓰고 실제 별점으로 저장하지 않는다.
 
 발견 방향은 실제 별점이 있는 영화가 속한 고정 그룹 대표로 먼저 계산하고, 방향을 만들 수 없을 때
 온보딩의 `LIKE 대표 합 - DISLIKE 대표 합`을 사용한다. 실제 평가와 확정 감상의 합집합에서
 `viewed_g <= 2`와 `viewed_g / max(1,total_mapped_viewed) <= 0.20`을 모두 만족하는 그룹을 궁합순으로
-최대 10개 고른다. 각 그룹은 모든 사용자에게 공통인 TMDB 투표 수·KOBIS 누적 관객 백분위의
-`max` 순서에서 최대 10편을 공급하며 입력·확정 감상·관심없음은 제외한다. 이렇게 모은 최대 100편만
-사용자 개인 예측 점수로 다시 정렬한다. 상세 계약은
+정렬한다. 먼저 상위 10개 그룹을 사용하고 부족하면 다음 적격 그룹까지 탐색한다. 각 그룹은 모든
+사용자에게 공통인 TMDB 투표 수·KOBIS 누적 관객 백분위의
+`max` 순서에서 우선 10편을 공급하며 입력·확정 감상·관심없음은 제외한다. 100편이 모자라면 다음
+적격 그룹을 탐색하고, 모든 적격 그룹을 사용한 뒤에도 부족하면 그룹별 11번째 이후 후보를 공급한다.
+이렇게 모은 최대 100편만 사용자 개인 예측 점수로 다시 정렬한다. 상세 계약은
 [`discovery-popularity-artifacts-v1`](../contracts/discovery-popularity-artifacts.md)을 따른다.
 Spring은 TASTE 2편을 먼저 고르고 양쪽 목록의 중복을 건너뛴 DISCOVERY 1편을 조립한다.
 
@@ -174,10 +178,13 @@ Spring은 TASTE 2편을 먼저 고르고 양쪽 목록의 중복을 건너뛴 DI
 - S15P21E106-471: Candidate v3 `taste`/`discovery` 그룹화와 `generationId` Consumer writer 기준선
 - S15P21E106-481: TASTE 후보별 구조화 `reason`을 추가한 Candidate v4 writer·payload 기준선
 - S15P21E106-488: 전체 평가 또는 온보딩 이력으로 계산한 저이력 그룹 적합도·상위 기여 비율을
-  DISCOVERY 전용 `reason`으로 추가한 현재 Candidate v5 writer·payload 계약. Spring reader·2+1 조립은
+  DISCOVERY 전용 `reason`으로 추가한 Candidate v5 writer·payload 기준선
+- S15P21E106-505: 입력 수 제한 제거, TASTE 500·DISCOVERY 100 후보 게시와 그룹 부족분 보충,
+  `DISCOVERY_PERSONAL_SCORE`를 추가한 현재 Candidate v6 writer·payload 계약. Spring reader·2+1 조립은
   Backend 소비 계약이며 현재 `develop`에는 구현되지 않았다
 - S15P21E106-482: 그룹·대중성 번들의 HDFS 게시, 두 URI 동시 활성화, 재시작·rollback 검증
-- S15P21E106-483: 후보 부족분용 별도 POPULAR fallback. 이 절의 `discovery-popularity`와 다른 산출물
+- S15P21E106-483: 현재 개인 후보 보충 순서를 개선하고 후보 모집단 밖까지 확장하는 별도 POPULAR fallback.
+  이 절의 `discovery-popularity`와 다른 산출물
 
 로컬 대중성 번들은 다음처럼 만든다. `--kobis-population`은 직접 코드 2,176편 전체의 백분위
 모집단이고, `--verified-kobis`만 실제 서비스 영화에 KOBIS 점수를 붙인다.
@@ -306,18 +313,18 @@ Spring이 한다.
 **그래도 후보는 게시한다.** 목록이 없는 것보다는 낫다는 판단이다. 다만 그 상태의 목록은 순위가
 아니다 — 프로필과 겹치는 토큰이 없는 영화가 전부 정확히 0.0이라 공동 1위가 되고(실측: 토큰 4개
 영화를 높게·그 토큰을 포함한 4편을 낮게 평가하면 61,591편), 그 안의 순서는 서비스 영화 ID 순이다.
-이 상태에 들어가면 `content_scores_non_positive`에 최상위 동점 편수를 남긴다. 대부분의 사용자는
-최소 입력 수 기준에서 걸러진다.
+이 상태에 들어가면 `content_scores_non_positive`에 최상위 동점 편수를 남긴다. 입력 수가 적더라도
+후보 계산을 막지 않으므로 이 로그는 낮은 정보량의 결과를 운영에서 구분하는 진단값이다.
 
-입력이 `CONSUMER_MIN_INPUT_COUNT` 미만인 사용자는 계산 자체를 하지 않는다. 입력이 몇 건뿐인
-사용자의 fold-in은 노이즈이고(실측: 평점 40건에서도 평가한 영화 예측 오차 MAE 1.42), 서비스도 같은
-기준 아래에서는 추천을 노출하지 않기 때문이다. **이 기준값은 서비스 노출 기준과 같아야 하므로
-백엔드와 합의한 값으로 운영한다.**
+평가와 온보딩 선호가 한 편뿐이어도 가용한 ALS·콘텐츠 성분으로 후보를 계산·게시한다.
+적은 입력에서 품질이 낮을 수 있지만 이를 접근 제한이나 정상 처리 skip의 근거로 사용하지 않는다.
 
-어떤 성분도 점수를 낼 수 없으면(신규 사용자, 두 산출물 모두에 없는 이력) **아무것도 게시하지 않고**
-`no_publishable_result_skipped`를 남긴 뒤 offset을 커밋한다. 임의의 목록을 게시하면 소비자가 실제
-추천과 구별할 수 없고, 반대로 이를 실패로 처리하면 partition이 멈추고 재시작 뒤 같은 이벤트가
-반복된다. 재시도해도 결과가 달라지지 않는 상태이므로 **정상 skip**으로 다룬다.
+입력이 없거나 어떤 성분도 사용자 프로필을 만들 수 없으면(신규 사용자, 두 산출물 모두에 없는 이력)
+ALS에 매핑된 서비스 영화와 콘텐츠 지원 영화의 합집합을 `score=0.0`, 서비스 영화 ID 오름차순으로
+게시하고 `candidate_tie_fallback`을 남긴다. TASTE `reason`은 `TOP_RATED_SOURCE`, DISCOVERY 보충
+`reason`은 `DISCOVERY_PERSONAL_SCORE`를 사용하며 입력이 없으면 둘 다 `sourceMovieIds`가 빈 배열이다.
+사용자 방향이 없더라도 DISCOVERY는 개인 후보 모집단에서 100편을 보충한다. 서비스 가능한 후보 모집단 자체가 비어 있을 때만
+`no_publishable_result_skipped` 정상 처리한다.
 
 콘텐츠 벡터는 평점이 없어도 만들어지므로, 평점이 하나도 없는 신작도 후보가 된다. 반대로 사용자가
 ALS Factor 없는 영화만 평가했다면 ALS 벡터는 만들어지지 않고 콘텐츠 점수로만 후보를 만든다. 이때
@@ -353,18 +360,24 @@ opaque token으로 교체하며 후보 결과를 읽는 Spring은 이 키에 의
 `reason`은 Consumer가 만든 구조화된 근거(`code`, `sourceMovieIds`, `matchedGenreCodes`)이며 Spring이 영화·장르명을
 조회해 사용자 문구로 변환한다. `SHARED_GENRE`는 고평점 source 영화와 후보의 공통 장르를, `TOP_RATED_SOURCE`는
 공통 장르가 없을 때 가장 높은 평가 source 영화를 뜻한다.
-`candidates.discovery`는 그룹 산출물을 설정하면 `movieId`, `score`, DISCOVERY 전용 `reason`을 포함하고,
-설정하지 않으면 빈 배열이다. 영화 대표 맛을 포함한 표시용 메타데이터는 Spring이 PostgreSQL에서 조회한다.
+`candidates.discovery`는 `movieId`, `score`, DISCOVERY 전용 `reason`을 포함한다. 그룹 산출물을 설정하면
+그룹 후보를 먼저 사용하고, 설정하지 않으면 전부 `DISCOVERY_PERSONAL_SCORE` 개인 후보로 최대 100편을
+보충한다. 영화 대표 맛을 포함한 표시용 메타데이터는 Spring이 PostgreSQL에서 조회한다.
 `DISCOVERY_AGGREGATE_AFFINITY`는 전체 평가 이력으로 만든
 방향을 우선하고 방향을 만들 수 없을 때만 온보딩 전체를 사용한다. `topContributors`는 후보 그룹 적합도에 양의
 기여를 한 입력 중 상위 3개, `contributorCount`는 그런 입력 전체 수, `topContributionCoverage`는 양의 기여
 총합 중 상위 3개 기여 합의 비율이다. 이 비율은 그룹 적합도 근거의 집중도이지 영화 최종 점수의 설명률이 아니다.
 `viewedCountInGroup`, `affinityRank`, `popularityRankInGroup`은 각각 저이력 판정, 적격 그룹 중 궁합 순위,
 제외 후 그룹 내부 대중성 순위를 나타낸다. 공급 그룹 수 같은 전역 진단 값은 Redis에 게시하지 않고 Consumer 로그에만 남긴다.
-두 payload에는 동일한 `candidateVersion=5`(JSON 형식 버전)와 `generationId`(한 번의 생성 결과 식별자)가
-포함된다. Candidate v4의 DISCOVERY 항목에는 `reason`이 없으므로, Backend가 v4/v5를 함께 읽는 전환 reader를
-먼저 반영하고 Consumer v5 전환과 함께 모든 활성 사용자를 재게시한다. v5와 `generationId` 일치를 확인한 뒤
-Backend의 v4 호환을 제거한다. Consumer는 추천 문구나 `CONCENTRATED` 같은 임의 구간값이 아니라 구조화된
+그룹 후보가 100편보다 적으면 다음 적격 그룹을 먼저 탐색하고, 모든 적격 그룹의 최초 10편을 사용한 뒤에도
+부족할 때 그룹별 11번째 이후 후보를 적합도 순으로 사용한다. 그래도 부족하면 개인 점수 후보로 채우며 이때
+`reason.code=DISCOVERY_PERSONAL_SCORE`와 TASTE 근거와 같은 `sourceMovieIds`, `matchedGenreCodes`를 저장한다.
+입력이 없거나 어느 개인 점수 성분도 프로필을 만들 수 없는 `0.0` 동점 fallback은 두 배열 모두
+source와 장르 배열이 비어 있다.
+두 payload에는 동일한 `candidateVersion=6`(JSON 형식·reason code 버전)와 `generationId`(한 번의 생성 결과 식별자)가
+포함된다. Backend가 v5/v6를 함께 읽는 전환 reader를 먼저 반영하고 Consumer v6 전환과 함께 모든 활성 사용자를
+재게시한다. v6와 `generationId` 일치를 확인한 뒤 Backend의 v5 호환을 제거한다. Consumer는 추천 문구나
+`CONCENTRATED` 같은 임의 구간값이 아니라 구조화된
 측정값만 생성한다. Spring은 합의한 coverage 기준보다 낮으면 개별 영화명 대신 전체 이력 기반 문구를 사용한다.
 Spring이 후보 전체의 최종 제외·재정렬을 담당한다. 영화별 OTT 제공 정보와 사용자 OTT 클릭 정보는 PostgreSQL에서 조회한다. 별도 `topn`은 생성하거나 복구 조건에 포함하지 않는다.
 기존 `topn` 키 자동 삭제는 하지 않는다. 배포 전 Spring reader 전환이 필요하다.

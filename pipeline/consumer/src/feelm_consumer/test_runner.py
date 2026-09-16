@@ -8,6 +8,7 @@ import redis
 
 from feelm_consumer import runner
 from feelm_consumer.artifacts import ArtifactError
+from feelm_consumer.postgres import UserSnapshot
 from feelm_consumer.ranking import RankedMovie
 from feelm_consumer.settings import load_settings
 
@@ -318,13 +319,21 @@ def test_mismatched_discovery_catalog_stops_before_external_clients(monkeypatch)
 
 
 def test_user_without_publishable_result_is_committed_and_does_not_pause(monkeypatch, caplog) -> None:
-    """No signal is not a failure: pausing would replay the same event forever."""
+    """An empty candidate population is not a failure worth replaying forever."""
     published: list[object] = []
+    calculated: dict[str, object] = {}
     monkeypatch.setattr(runner, "_expected_version", lambda *_args: 4)
     monkeypatch.setattr(runner, "readonly_snapshot", _null_snapshot)
-    monkeypatch.setattr(runner, "load_profile", lambda *_args: ([], []))
-    monkeypatch.setattr(runner, "load_user_snapshot", lambda *_args: pytest.fail("group-off snapshot expansion"))
-    monkeypatch.setattr(runner, "calculate_user_results", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        runner,
+        "load_user_snapshot",
+        lambda *_args: UserSnapshot([], [], frozenset({8}), frozenset({9})),
+    )
+    monkeypatch.setattr(
+        runner,
+        "calculate_user_results",
+        lambda *_args, **kwargs: calculated.update(kwargs) or None,
+    )
     monkeypatch.setattr(runner, "publish", lambda *_args: published.append(_args))
 
     with caplog.at_level("WARNING"):
@@ -334,6 +343,8 @@ def test_user_without_publishable_result_is_committed_and_does_not_pause(monkeyp
 
     assert processed is True
     assert published == []
+    assert calculated["watched_movie_ids"] == frozenset({8})
+    assert calculated["dismissed_movie_ids"] == frozenset({9})
     assert "no_publishable_result_skipped" in caplog.text
 
 

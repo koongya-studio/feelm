@@ -16,7 +16,7 @@ from feelm_consumer.discovery_popularity import load_discovery_popularity
 from feelm_consumer.discovery_release import validate_discovery_artifacts
 from feelm_consumer.events import EventValidationError, parse_event
 from feelm_consumer.group_artifacts import GroupBundle, load_group_bundle
-from feelm_consumer.postgres import UserSnapshot, load_profile, load_user_snapshot, readonly_snapshot
+from feelm_consumer.postgres import load_user_snapshot, readonly_snapshot
 from feelm_consumer.ranking import RankedMovie
 from feelm_consumer.redis_store import (
     StalePartitionFenceError,
@@ -48,7 +48,6 @@ def process_user(
     groups: GroupBundle | None = None,
     discovery_popularity: tuple[RankedMovie, ...] | None = None,
     hybrid_alpha: float = 0.5,
-    min_input_count: int = 0,
 ) -> bool | None:
     for attempt in range(attempts):
         try:
@@ -56,11 +55,7 @@ def process_user(
                 raise ValueError("partition fence is required")
             expected = _expected_version(store, user_id, partition_fence)
             with readonly_snapshot(connect) as connection:
-                if groups is None:
-                    ratings, onboarding = load_profile(connection, user_id)
-                    snapshot = UserSnapshot(ratings, onboarding, frozenset(), frozenset())
-                else:
-                    snapshot = load_user_snapshot(connection, user_id)
+                snapshot = load_user_snapshot(connection, user_id)
             results = calculate_user_results(
                 bundle,
                 snapshot.ratings,
@@ -71,11 +66,10 @@ def process_user(
                 watched_movie_ids=snapshot.watched_movie_ids,
                 dismissed_movie_ids=snapshot.dismissed_movie_ids,
                 hybrid_alpha=hybrid_alpha,
-                min_input_count=min_input_count,
             )
             if results is None:
-                # Not a failure: this user has no signal in either artifact, so
-                # there is nothing to publish and retrying changes nothing.
+                # Not a failure: the configured artifacts expose no publishable
+                # candidate population, so retrying changes nothing.
                 # Treating it as a failure would pause the partition, leave the
                 # offset uncommitted, and replay the same event after restart.
                 LOG.warning("no_publishable_result_skipped user_id=%s", user_id)
@@ -139,7 +133,7 @@ def run(settings: Settings) -> None:
             release.groups_with_at_least_ten_movies,
         )
     else:
-        LOG.info("group artifacts not configured; discovery candidates are disabled")
+        LOG.info("group artifacts not configured; Discovery uses ranked-candidate fallback")
     store = redis.Redis.from_url(settings.redis_url, decode_responses=True)
     consumer = Consumer(
         {
@@ -235,7 +229,6 @@ def run(settings: Settings) -> None:
                 groups=groups,
                 discovery_popularity=discovery_popularity,
                 hybrid_alpha=settings.hybrid_alpha,
-                min_input_count=settings.min_input_count,
             )
             if processed is None:
                 LOG.warning(
