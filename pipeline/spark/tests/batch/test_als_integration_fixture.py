@@ -37,8 +37,15 @@ def spark():
     session.stop()
 
 
-def test_csv_outputs_manifest_and_split_oracle_are_valid(spark, tmp_path, monkeypatch):
-    prepared, snapshot, inputs = write_prepared_fixture(spark, tmp_path, monkeypatch)
+@pytest.fixture(scope="module")
+def prepared_fixture(spark, tmp_path_factory):
+    root = tmp_path_factory.mktemp("als-integration")
+    with pytest.MonkeyPatch.context() as patch:
+        return write_prepared_fixture(spark, root, patch)
+
+
+def test_csv_outputs_manifest_and_split_oracle_are_valid(spark, prepared_fixture):
+    prepared, snapshot, inputs = prepared_fixture
     assert {path.name for path in prepared.iterdir()} == {
         "ratings",
         "movies",
@@ -64,14 +71,14 @@ def test_csv_outputs_manifest_and_split_oracle_are_valid(spark, tmp_path, monkey
         "validation": 7,
         "test": 7,
     }
-    manifest_bytes = (tmp_path / "manifest.json").read_bytes()
+    manifest_bytes = (prepared.parent / "manifest.json").read_bytes()
     assert snapshot == "sha256:" + hashlib.sha256(manifest_bytes).hexdigest()
     for relative_path, digest in json.loads(manifest_bytes)["files"].items():
-        assert hashlib.sha256((tmp_path / relative_path).read_bytes()).hexdigest() == digest
+        assert hashlib.sha256((prepared.parent / relative_path).read_bytes()).hexdigest() == digest
     manifest = validate_input_snapshot(
         spark,
         input_uri=prepared.as_uri(),
-        manifest_uri=(tmp_path / "manifest.json").as_uri(),
+        manifest_uri=(prepared.parent / "manifest.json").as_uri(),
         expected_snapshot=snapshot,
         inputs=inputs,
     )
@@ -83,9 +90,11 @@ def test_csv_outputs_manifest_and_split_oracle_are_valid(spark, tmp_path, monkey
     }
 
 
-def test_small_real_als_run_saves_reloads_and_attributes_versions(spark, tmp_path, monkeypatch):
-    prepared, snapshot, inputs = write_prepared_fixture(spark, tmp_path / "input", monkeypatch)
-    output = tmp_path / "output"
+def test_small_real_als_run_saves_reloads_and_attributes_versions(
+    spark, prepared_fixture
+):
+    prepared, snapshot, inputs = prepared_fixture
+    output = prepared.parent / "output"
     settings = AlsJobSettings.from_sources(
         environ={},
         argv=[

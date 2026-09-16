@@ -21,6 +21,8 @@ class ParallelTestExecutionPolicyTest {
     private static final String OUTPUT_CAPTURE_LOCK = "@ResourceLock(\"backend-output-capture\")";
     private static final Path JUNIT_CONFIGURATION =
             Path.of("src", "test", "resources", "junit-platform.properties");
+    private static final Path TEST_APPLICATION_CONFIGURATION =
+            Path.of("src", "test", "resources", "application.yml");
 
     @Test
     void parallelConfigurationMatchesRuntimeContract() throws IOException {
@@ -36,6 +38,13 @@ class ParallelTestExecutionPolicyTest {
                         "junit.jupiter.execution.parallel.mode.classes.default", "concurrent")
                 .containsEntry("junit.jupiter.execution.parallel.config.strategy", "fixed")
                 .containsEntry("junit.jupiter.execution.parallel.config.fixed.parallelism", "2");
+    }
+
+    @Test
+    void datasourcePoolMatchesParallelRuntimeContract() throws IOException {
+        String configuration = Files.readString(TEST_APPLICATION_CONFIGURATION);
+
+        assertThat(configuration).contains("maximum-pool-size: 4").contains("minimum-idle: 0");
     }
 
     @Test

@@ -28,7 +28,6 @@ function flavor(code: string, name: string, count: number): PopcornBucketFlavor 
     color: '#fbf1cf',
     popcornCount: count,
     averageScore: 4,
-    isNewFlavor: false,
     discoveredAt: null,
   };
 }
@@ -51,7 +50,6 @@ function frameList(totalCount: number, count = totalCount): FrameList {
 /** 알 수를 일부러 뒤섞어 둔다. 정렬을 하지 않으면 이 순서가 그대로 나온다 */
 const bucket: PopcornBucket = {
   totalCount: 100,
-  newFlavorThreshold: 3,
   flavors: [
     flavor('FLAVOR_CAPER', '기본', 12),
     flavor('FLAVOR_THRILL', '솔티드 카라멜', 28),

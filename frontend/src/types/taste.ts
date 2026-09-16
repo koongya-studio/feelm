@@ -38,14 +38,19 @@ export type PopcornFlavor = {
   sortOrder: number;
 };
 
-/** API-041 팝콘 버킷 조회 `flavors[]` */
+/**
+ * API-041 팝콘 버킷 조회 `flavors[]`
+ *
+ * `isNewFlavor`는 두지 않는다. 계약이 감상량 임계값과 임계값 기반 `isNewFlavor`를 쓰지
+ * 않기로 했고(API-041 처리 규칙) 응답에도 없다.
+ */
 export type PopcornBucketFlavor = {
   flavorCode: string;
   displayName: string;
   color: string;
   popcornCount: number;
   averageScore: number | null;
-  isNewFlavor: boolean;
+  /** 확장 기능 FR-32용 예약 필드. 1차에서는 null 가능 */
   discoveredAt: string | null;
 };
 
@@ -53,8 +58,10 @@ export type PopcornBucketFlavor = {
 export type PopcornBucket = {
   /** 팝콘 알 총 수 */
   totalCount: number;
-  newFlavorThreshold: number;
-  /** 8개 맛을 항상 모두 포함한다 */
+  /**
+   * 계약은 8개 맛을 항상 모두 포함한다고 정하지만, 기준정보가 적재되기 전에는 빈
+   * 배열이 온다(S15P21E106-392). 화면은 비어 있는 경우를 견뎌야 한다.
+   */
   flavors: PopcornBucketFlavor[];
 };
 
@@ -67,7 +74,12 @@ export type FrameSummary = {
     posterUrl: string | null;
   };
   score: number;
-  flavorCode: string;
+  /**
+   * 영화의 대표 맛이다. **대표 맛이 배정되지 않은 영화는 `null`이다** — 백엔드가
+   * `popcorn_flavors`를 LEFT JOIN한다. 계약 예시에는 null이 없어 불일치로 남긴다
+   * (S15P21E106-392).
+   */
+  flavorCode: string | null;
   createdAt: string;
 };
 
@@ -98,12 +110,14 @@ export type FrameDetail = {
     movieId: number;
     title: string;
     posterUrl: string | null;
-    releaseYear: number;
+    /** 개봉일이 없는 영화가 있어 `null`이 온다 */
+    releaseYear: number | null;
     /** 장르명 문자열이다. API-030 상세의 `{ code, name }`과 형태가 다르다 */
     genres: string[];
     directors: string[];
   };
-  flavorCode: string;
+  /** 대표 맛이 배정되지 않은 영화는 `null`이다. `FrameSummary.flavorCode` 참고 */
+  flavorCode: string | null;
   rating: {
     ratingId: number;
     score: number;

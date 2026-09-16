@@ -112,9 +112,10 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### Query Parameters
 
-- `status` (string[], 선택): `LINK_CLICKED`, `WATCHED_UNRATED`, `RATED`, `EXPIRED`
-- `confirmDue` (boolean, 선택): `true`면 `LINK_CLICKED` 중 클릭 2일 경과·7일 미경과 건만
-- `cursor`, `size`
+- `status` (string[], 선택): 반복 지정 가능. `LINK_CLICKED`, `WATCHED_UNRATED`, `RATED`, `EXPIRED`만 허용하며 중복은 제거한다
+- `confirmDue` (boolean, 선택): 정확한 소문자 `true` 또는 `false`. `true`면 `LINK_CLICKED` 중 확인 시각 도달·만료 시각 미도달 건만 조회한다
+- `cursor` (string, 선택): 서버가 직전 응답에서 발급한 불투명 커서
+- `size` (integer, 선택): 기본 20, 최소 1, 최대 50
 
 ### Request Body
 
@@ -146,12 +147,17 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### 오류 응답
 
-- `400 VALIDATION_FAILED` 잘못된 `status`
+- `400 VALIDATION_FAILED` 잘못된 `status`, `confirmDue`, `size`, 손상되거나 조회 조건과 맞지 않는 `cursor`
+- `401 UNAUTHORIZED` 인증이 없거나 활성 사용자가 아님
+- `500 INTERNAL_ERROR` 만료 반영 또는 목록 조회 실패
 
 ### 처리 규칙
 
 - 기본 정렬은 `clickedAt` 내림차순이며, `clickedAt`이 `null`인 기록은 뒤에 배치하고 동일 시각은 `watchRecordId` 내림차순으로 정렬한다 (`ORDER BY clicked_at DESC NULLS LAST, id DESC`)
-- 7일 만료 처리는 서버 배치(매시, 가정)가 수행하며 조회 시점에도 만료 조건을 만족하면 `EXPIRED`로 계산해 응답한다
+- 조회 트랜잭션 안에서 본인의 `LINK_CLICKED AND expires_at <= now` 기록을 먼저 `EXPIRED`로 저장하고 `expiredAt`을 기록한 뒤 목록을 조회한다. `expires_at == now`도 만료다
+- `confirmDue=true`의 정확한 조건은 `status=LINK_CLICKED AND confirm_due_at <= now AND expires_at > now`다. 따라서 확인 시각과 정확히 같으면 대상이고, 만료 시각과 정확히 같으면 대상이 아니다
+- 커서는 사용자와 정규화된 `status`·`confirmDue` 조건에 묶여 다른 사용자나 다른 필터에서 재사용할 수 없다. 다음 페이지에서 `size`를 바꾸는 것은 허용한다
+- 평가는 `ratingId` 조회에만 결합하며 이 API가 평가·한줄평·프레임·팝콘 데이터를 변경하지 않는다
 
 ### 상태값
 
@@ -171,7 +177,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 | 인증 | 회원 |
 | 관련 요구사항 | FR-18 |
 | 화면 | ⑥-3 평가 알림 |
-| 미정 사항 | 있음 |
+| 미정 사항 | 없음 |
 | 비고 | - |
 
 ### 설명
@@ -208,14 +214,22 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### 오류 응답
 
-- `404 RESOURCE_NOT_FOUND` 타인 기록 포함
-- `409 INVALID_WATCH_STATUS` `LINK_CLICKED` 상태가 아님
+- `400 VALIDATION_FAILED` `watchRecordId`가 양의 64비트 정수가 아니거나 `watched`가 JSON boolean이 아님. 문자열·숫자·배열·객체·`null`·누락·깨진 JSON은 허용하지 않는다
+- `401 UNAUTHORIZED` 인증이 없거나 활성 사용자가 아님
+- `404 RESOURCE_NOT_FOUND` 기록이 없거나 다른 사용자의 기록
+- `409 INVALID_WATCH_STATUS` `LINK_CLICKED`가 아니거나 `expires_at <= now`인 기록, 중복 또는 경쟁 상태 전이
+- `415 UNSUPPORTED_MEDIA_TYPE` `Content-Type` 누락 또는 비지원
+- `500 INTERNAL_ERROR` 상태 전이 저장 또는 commit 실패
 
 ### 처리 규칙
 
 - `watched: true` → `WATCHED_UNRATED`, 평가 요청 UI로 이어진다. 평가는 지금 하지 않고 나중에 남겨도 된다
 - `watched: false` → `EXPIRED`. 만료는 추천 신호로 사용하지 않는다
-- 클릭 후 2일이 지나지 않아도 사용자가 응답하면 받아들인다(가정)
+- 클릭 후 2일이 지나지 않아도 사용자가 직접 응답하면 받아들인다. 2일은 앱에서 확인 질문을 노출하는 기준이지 상태 전이 제한이 아니다
+- `expires_at == now`는 만료로 보아 확인을 거절한다
+- 잠금 순서는 OTT 클릭 API와 동일하게 `active user → owned watch record`이며 조건부 update가 정확히 1행이 아니면 경쟁 상태로 거절한다
+- 성공하더라도 Kafka·outbox 이벤트를 새로 만들지 않고 평가·한줄평·프레임·팝콘 데이터를 변경하지 않는다
+- 알 수 없는 JSON 필드는 향후 호환성을 위해 허용한다
 
 ### 상태값
 
@@ -223,7 +237,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### 미정 사항
 
-- [ ] 2일 이전 응답 허용 여부(가정: 허용)
+없음
 
 ## API-036 평가 생성
 

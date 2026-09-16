@@ -97,6 +97,144 @@ def _settings():
     )
 
 
+class _Bundle:
+    mapping_revision = "sha256:" + "a" * 64
+    movie_metadata_revision = "sha256:" + "b" * 64
+    input_snapshot = "snapshot-a"
+    movie_metadata = {10: object(), 20: object()}
+
+
+class _NullSnapshot:
+    def __enter__(self) -> object:
+        return object()
+
+    def __exit__(self, *_exc: object) -> bool:
+        return False
+
+
+def _null_snapshot(_connect: object) -> _NullSnapshot:
+    return _NullSnapshot()
+
+
+class _Supported:
+    @staticmethod
+    def sum() -> int:
+        return 1
+
+
+class _Content:
+    content_version = "content-v1"
+    movie_count = 2
+    vocabulary_size = 4
+    supported = _Supported()
+
+
+CONTENT = _Content()
+
+
+class StoppingConsumer(FakeConsumer):
+    """Leave the poll loop once the scripted messages are consumed."""
+
+    def poll(self, _timeout: float) -> FakeMessage:
+        message = next(self.messages, None)
+        if message is None:
+            raise SystemExit(0)
+        return message
+
+
+def _wire_run(monkeypatch, fake) -> None:
+    monkeypatch.setattr(runner, "Consumer", lambda _config: fake)
+    monkeypatch.setattr(runner, "TopicPartition", FakePartition)
+    monkeypatch.setattr(runner.redis.Redis, "from_url", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(runner, "claim_partition_fence", lambda *_args: ("fence", 1))
+    monkeypatch.setattr(runner.signal, "signal", lambda *_args: None)
+
+
+def test_content_bundle_is_loaded_with_the_model_generation_and_passed_down(monkeypatch) -> None:
+    """The generation arguments must be the model's own, not placeholders."""
+    bundle = _Bundle()
+    seen: dict[str, object] = {}
+    fake = StoppingConsumer([])
+    _wire_run(monkeypatch, fake)
+    monkeypatch.setattr(runner, "load_bundle", lambda *_args: bundle)
+    def fake_load_content(uri, **kwargs):
+        seen.update({"uri": uri, **kwargs})
+        return CONTENT
+
+    monkeypatch.setattr(runner, "load_content", fake_load_content)
+    monkeypatch.setattr(
+        runner,
+        "process_user",
+        lambda *_args, **kwargs: seen.update({"process": kwargs}) or True,
+    )
+    settings = replace(_settings(), content_uri="content/v1", hybrid_alpha=0.25)
+
+    with pytest.raises(SystemExit):
+        runner.run(settings)
+
+    assert seen["uri"] == "content/v1"
+    assert seen["mapping_revision"] == bundle.mapping_revision
+    assert seen["movie_metadata_revision"] == bundle.movie_metadata_revision
+    assert seen["input_snapshot"] == bundle.input_snapshot
+    assert seen["service_movie_ids"] == set(bundle.movie_metadata)
+
+
+def test_content_is_not_loaded_when_it_is_not_configured(monkeypatch) -> None:
+    calls: list[str] = []
+    fake = StoppingConsumer([])
+    _wire_run(monkeypatch, fake)
+    monkeypatch.setattr(runner, "load_bundle", lambda *_args: _Bundle())
+    monkeypatch.setattr(runner, "load_content", lambda *_args, **_kwargs: calls.append("loaded"))
+    monkeypatch.setattr(runner, "process_user", lambda *_args, **_kwargs: True)
+
+    with pytest.raises(SystemExit):
+        runner.run(_settings())
+
+    assert calls == []
+
+
+def test_content_and_alpha_reach_process_user(monkeypatch) -> None:
+    seen: dict[str, object] = {}
+    healthy = FakeMessage(
+        0,
+        10,
+        b'{"eventId":"123e4567-e89b-12d3-a456-426614174000","userId":7,"eventType":"RATING",'
+        b'"occurredAt":"2026-09-13T00:00:00Z","payload":{"action":"CREATE","movieId":1,"score":5}}',
+    )
+    fake = StoppingConsumer([healthy])
+    _wire_run(monkeypatch, fake)
+    monkeypatch.setattr(runner, "load_bundle", lambda *_args: _Bundle())
+    monkeypatch.setattr(runner, "load_content", lambda *_args, **_kwargs: CONTENT)
+    monkeypatch.setattr(
+        runner, "process_user", lambda *_args, **kwargs: seen.update(kwargs) or True
+    )
+
+    with pytest.raises(SystemExit):
+        runner.run(replace(_settings(), content_uri="content/v1", hybrid_alpha=0.25))
+
+    assert seen["content"] is CONTENT
+    assert seen["hybrid_alpha"] == 0.25
+
+
+def test_user_without_publishable_result_is_committed_and_does_not_pause(monkeypatch, caplog) -> None:
+    """No signal is not a failure: pausing would replay the same event forever."""
+    published: list[object] = []
+    monkeypatch.setattr(runner, "_expected_version", lambda *_args: 4)
+    monkeypatch.setattr(runner, "readonly_snapshot", _null_snapshot)
+    monkeypatch.setattr(runner, "load_profile", lambda *_args: ([], []))
+    monkeypatch.setattr(runner, "calculate_user_results", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(runner, "publish", lambda *_args: published.append(_args))
+
+    with caplog.at_level("WARNING"):
+        processed = runner.process_user(
+            object(), lambda: object(), object(), 7, partition_fence=("fence", "token")
+        )
+
+    assert processed is True
+    assert published == []
+    assert "no_publishable_result_skipped" in caplog.text
+
+
 def test_malformed_partition_is_not_committed_and_healthy_partition_continues(monkeypatch) -> None:
     malformed = FakeMessage(0, 10, b"not-json")
     healthy = FakeMessage(

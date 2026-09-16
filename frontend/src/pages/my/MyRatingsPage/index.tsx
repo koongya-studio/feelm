@@ -14,8 +14,13 @@
  *
  * | 탭 | API | 수 |
  * | --- | --- | --- |
- * | 평가 | API-039 내 평가 목록 | API-042 `totalCount`. 평가와 프레임은 1:1이다(API-039 처리 규칙) |
+ * | 평가 | API-039 내 평가 목록 | 받은 목록의 길이 |
  * | 안 남긴 영화 | API-034 `status=WATCHED_UNRATED` | 받은 목록의 길이 |
+ *
+ * 평가 수는 원래 API-042 `totalCount`에서 가져왔다(평가와 프레임은 1:1 · API-039 처리
+ * 규칙). 필름이 실제 API로 바뀌면서(S15P21E106-392) 목록은 목업, 수는 실제값이 되어
+ * 두 값이 어긋나므로 **같은 목업 목록에서 센다.** 평가 API(API-039)가 연동되면 다시
+ * API-042 `totalCount`를 쓴다.
  *
  * `[?]` 7.6 줄 오른쪽의 동그란 버튼이 무엇인지 와이어프레임에 적혀 있지 않다. 채운 것과
  * 빈 것이 섞여 있고 이동표에 `7.6 ⇢ 7.6-A`가 있어 **한줄평 관리**로 보았다. 한줄평이
@@ -35,7 +40,6 @@ import RatingStars from '../../../components/RatingStars';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import { getOtts } from '../../../api/otts';
-import { getMyFrames } from '../../../api/taste';
 import { getMyRatings, getWatchRecords } from '../../../api/watch';
 import { path } from '../../../routes/paths';
 import { formatShortDate } from '../../../utils/date';
@@ -68,18 +72,13 @@ export default function MyRatingsPage({ tab }: Props) {
   useEffect(() => {
     let active = true;
 
-    Promise.all([
-      getMyRatings(),
-      getMyFrames(),
-      getWatchRecords({ status: ['WATCHED_UNRATED'] }),
-      getOtts(),
-    ])
-      .then(([ratings, frames, unrated, otts]) => {
+    Promise.all([getMyRatings(), getWatchRecords({ status: ['WATCHED_UNRATED'] }), getOtts()])
+      .then(([ratings, unrated, otts]) => {
         if (!active) return;
 
         setData({
           ratings: ratings.items,
-          ratingCount: frames.totalCount,
+          ratingCount: ratings.items.length,
           unrated: unrated.items,
           otts,
         });

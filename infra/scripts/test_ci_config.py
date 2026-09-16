@@ -23,6 +23,8 @@ class CiConfigTests(unittest.TestCase):
         cls.common = (CI_DIR / 'common.yml').read_text()
         cls.backend = (CI_DIR / 'backend.yml').read_text()
         cls.frontend = (CI_DIR / 'frontend.yml').read_text()
+        cls.pipeline_path = CI_DIR / 'pipeline.yml'
+        cls.pipeline = cls.pipeline_path.read_text() if cls.pipeline_path.exists() else ''
 
     def test_root_only_declares_stages_and_reviewed_includes(self):
         self.assertEqual(self.root, '''stages:
@@ -39,6 +41,7 @@ include:
   - local: .gitlab/ci/common.yml
   - local: .gitlab/ci/backend.yml
   - local: .gitlab/ci/frontend.yml
+  - local: .gitlab/ci/pipeline.yml
 ''')
 
     def test_new_commits_cancel_only_interruptible_jobs(self):
@@ -67,7 +70,7 @@ include:
 
     def test_job_names_are_unique_across_split_files(self):
         names = []
-        for text in (self.common, self.backend, self.frontend):
+        for text in (self.common, self.backend, self.frontend, self.pipeline):
             names.extend(re.findall(r'(?m)^([.]?[A-Za-z0-9_-]+):$', text))
         duplicates = sorted({name for name in names if names.count(name) > 1})
         self.assertEqual(duplicates, [])
@@ -106,6 +109,49 @@ include:
         self.assertIn('- .gitlab/ci/frontend.yml', frontend)
         self.assertNotIn('- backend/**/*', frontend)
         self.assertNotIn('- .gitlab/ci/backend.yml', frontend)
+
+    def test_pipeline_mr_job_is_isolated_and_path_scoped(self):
+        self.assertTrue(self.pipeline_path.is_file(), 'Missing Pipeline CI include')
+        job = job_block(self.pipeline, 'pipeline-mr-test')
+        for expected in (
+                'stage: test', 'tags: [e106-mr-isolated]', 'dependencies: []',
+                'GIT_STRATEGY: none', 'resource_group: pipeline-mr-isolated',
+                'interruptible: true',
+                '$CI_PIPELINE_SOURCE == "merge_request_event"',
+                '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'):
+            self.assertIn(expected, job)
+        expected_script = [
+            '- cd pipeline/spark',
+            '- uv sync --frozen',
+            '- uv run ruff check .',
+            '- uv run pytest',
+            '- uv run python -m jobs.batch.als_baseline --help',
+            '- uv run python -m jobs.batch.parquet_roundtrip --help',
+        ]
+        scripts = [line.strip() for line in job.splitlines()
+                   if line.strip() in expected_script]
+        self.assertEqual(scripts, expected_script)
+        for path in (
+                'pipeline/spark/**/*.py', 'pipeline/spark/tests/**/*',
+                'pipeline/spark/pyproject.toml', 'pipeline/spark/uv.lock',
+                'pipeline/spark/.python-version', '.gitlab-ci.yml',
+                '.gitlab/ci/common.yml', '.gitlab/ci/pipeline.yml', '.gitattributes',
+                'infra/scripts/ci-pipeline-mr-*.py',
+                'infra/scripts/test_ci_pipeline_mr.py',
+                'infra/scripts/ci-gitlab-job-adapter.py',
+                'infra/scripts/ci-gitlab-custom-executor.py',
+                'infra/scripts/ci-gitlab-server-install.py',
+                'infra/scripts/ci-bounded-output.py',
+                'infra/scripts/systemd/feelm-ci222-gitlab-runner.service',
+                'infra/scripts/test_ci_gitlab_job_adapter.py',
+                'infra/scripts/test_ci_config.py'):
+            self.assertIn('- ' + path, job)
+        for excluded in ('- pipeline/**/*', '- pipeline/docs/**/*',
+                         '- pipeline/consumer/**/*', '- .gitlab/ci/backend.yml',
+                         '- .gitlab/ci/frontend.yml'):
+            self.assertNotIn(excluded, job)
+        for forbidden in ('image:', 'services:', 'cache:', 'artifacts:', 'before_script:'):
+            self.assertNotIn(forbidden, job)
 
     def test_frontend_mr_command_is_fixed_and_has_no_gitlab_runtime_inputs(self):
         block = job_block(self.frontend, 'frontend-mr-test')

@@ -31,6 +31,7 @@ class ErrorCodeTest {
         assertThat(ErrorCode.METHOD_NOT_ALLOWED.getStatus())
                 .isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
         assertThat(ErrorCode.CONFLICT.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+        assertThat(ErrorCode.INVALID_WATCH_STATUS.getStatus()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(ErrorCode.UNSUPPORTED_MEDIA_TYPE.getStatus())
                 .isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
         assertThat(ErrorCode.RATE_LIMITED.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
@@ -81,6 +82,8 @@ class ErrorCodeTest {
                         "RESET_TOKEN_INVALID",
                         "RESET_TOKEN_EXPIRED",
                         "PASSWORD_NOT_SET",
+                        // 감상 도메인 — API-035 (S15P21E106-212)
+                        "INVALID_WATCH_STATUS",
                         // 사용자 도메인 — API-020 차단 (S15P21E106-211)
                         "CANNOT_BLOCK_SELF",
                         "ALREADY_BLOCKED",

@@ -2,6 +2,7 @@ package com.feelm.backend.infrastructure.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -37,7 +38,7 @@ class KafkaEventContractTest {
                         KafkaEventType.RATING,
                         Instant.parse("2026-08-31T07:21:00Z"),
                         1024L,
-                        new RatingEventPayload(RatingAction.CREATE, 550L, 5));
+                        new RatingEventPayload(RatingAction.CREATE, 550L, new BigDecimal("4.5")));
 
         JsonNode json = objectMapper.readTree(objectMapper.writeValueAsString(event));
 
@@ -47,7 +48,7 @@ class KafkaEventContractTest {
         assertThat(json.get("userId").asLong()).isEqualTo(1024L);
         assertThat(json.get("payload").get("action").asText()).isEqualTo("CREATE");
         assertThat(json.get("payload").get("movieId").asLong()).isEqualTo(550L);
-        assertThat(json.get("payload").get("score").asInt()).isEqualTo(5);
+        assertThat(json.get("payload").get("score").decimalValue()).isEqualByComparingTo("4.5");
     }
 
     @Test

@@ -19,6 +19,13 @@ scrape_configs:
           node_name: J15E106A
           node_role: distributed
 
+  - job_name: kafka
+    static_configs:
+      - targets: ["feelm-distributed-node:9308"]
+        labels:
+          cluster: feelm
+          node_name: J15E106A
+
   - job_name: postgres
     static_configs:
       - targets: ["postgres-exporter:9187"]

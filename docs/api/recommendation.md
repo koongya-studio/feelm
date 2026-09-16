@@ -27,7 +27,7 @@
 
 ### 설명
 
-다국어 임베딩 모델로 생성한 영화 벡터의 Cosine Similarity가 높은 영화를 추천한다. `multilingual-e5-base`는 MVP 베이스라인이며 최종 체크포인트는 한국어 영화 데이터 비교 평가 후 확정한다(ADR-0014).
+다국어 임베딩 모델로 생성한 768차원 영화 벡터의 Cosine Similarity가 높은 영화를 추천한다. MVP 저장·검색 계약은 `multilingual-e5-base` 계열의 768차원 벡터이며, 안정적인 모델 식별자와 Revision은 `model_version`으로 관리한다(ADR-0014).
 
 ### 인증 및 권한
 

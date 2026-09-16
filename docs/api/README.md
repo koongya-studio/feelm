@@ -76,7 +76,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-032 | [공개 한줄평 목록](./social.md#api-032-공개-한줄평-목록) | GET | `/movies/{movieId}/reviews` | 소셜 | 1차 MVP | 선택 | FR-26, FR-34, FR-39 |  |
 | API-033 | [OTT 링크 클릭 기록](./watch.md#api-033-ott-링크-클릭-기록) | POST | `/movies/{movieId}/ott-clicks` | 감상 | 1차 MVP | 회원 | FR-17 | O |
 | API-034 | [감상 기록 목록](./watch.md#api-034-감상-기록-목록) | GET | `/watch-records` | 감상 | 1차 MVP | 회원 | FR-18 |  |
-| API-035 | [감상 확인 응답](./watch.md#api-035-감상-확인-응답) | POST | `/watch-records/{watchRecordId}/confirm` | 감상 | 1차 MVP | 회원 | FR-18 | O |
+| API-035 | [감상 확인 응답](./watch.md#api-035-감상-확인-응답) | POST | `/watch-records/{watchRecordId}/confirm` | 감상 | 1차 MVP | 회원 | FR-18 |  |
 | API-036 | [평가 생성](./watch.md#api-036-평가-생성) | POST | `/movies/{movieId}/ratings` | 감상 | 1차 MVP | 회원 | FR-19, FR-26, FR-07, FR-09 | O |
 | API-037 | [평가 수정](./watch.md#api-037-평가-수정) | PUT | `/ratings/{ratingId}` | 감상 | 1차 MVP | 회원 | FR-19, FR-26 |  |
 | API-038 | [평가 삭제](./watch.md#api-038-평가-삭제) | DELETE | `/ratings/{ratingId}` | 감상 | 1차 MVP | 회원 | FR-19, FR-07, FR-09, FR-18 | O |

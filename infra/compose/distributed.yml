@@ -39,7 +39,7 @@ services:
     command: ["hdfs", "namenode"]
 
     healthcheck:
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9870'"]
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/9870 && echo > /dev/tcp/127.0.0.1/8020'"]
       interval: 10s
       timeout: 5s
       retries: 12
@@ -90,6 +90,9 @@ services:
       - "hdfs-datanode-1:${SERVICE_NODE_IP:?SERVICE_NODE_IP is required}"
       - "hdfs-datanode-2:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
 
+    volumes:
+      - ../spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
+
     entrypoint:
       - /opt/spark/bin/spark-class
 
@@ -119,6 +122,9 @@ services:
       - "hdfs-datanode-1:${SERVICE_NODE_IP:?SERVICE_NODE_IP is required}"
       - "hdfs-datanode-2:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
 
+    volumes:
+      - ../spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
+
     entrypoint:
       - /opt/spark/bin/spark-class
 
@@ -135,6 +141,66 @@ services:
       - --memory
       - "4g"
       - spark://spark-master:7077
+
+  spark-history-init:
+    image: apache/hadoop:3.4.3
+    container_name: feelm-spark-history-init
+    network_mode: host
+    profiles:
+      - init
+
+    extra_hosts:
+      - "hdfs-namenode:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+
+    volumes:
+      - ../hadoop/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml:ro
+
+    command:
+      - sh
+      - -c
+      - hdfs dfsadmin -safemode wait && hdfs dfs -mkdir -p /spark-events && hdfs dfs -chmod 1777 /spark-events
+    restart: "no"
+
+    depends_on:
+      hdfs-namenode:
+        condition: service_healthy
+
+  spark-history-server:
+    image: ${SPARK_IMAGE:-feelm-spark-ml:4.1.3-numpy2.2.6}
+    build:
+      context: ../spark
+      dockerfile: Dockerfile
+    container_name: feelm-spark-history-server
+    hostname: spark-history-server
+    restart: unless-stopped
+    network_mode: host
+
+    extra_hosts:
+      - "spark-history-server:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+      - "hdfs-namenode:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+      - "hdfs-datanode-1:${SERVICE_NODE_IP:?SERVICE_NODE_IP is required}"
+      - "hdfs-datanode-2:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+
+    environment:
+      SPARK_LOCAL_IP: ${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}
+      SPARK_HISTORY_OPTS: >-
+        -Dspark.history.fs.logDirectory=hdfs://hdfs-namenode:8020/spark-events
+        -Dspark.history.ui.port=18080
+
+    volumes:
+      - ../hadoop/core-site.xml:/opt/hadoop/etc/hadoop/core-site.xml:ro
+      - ../hadoop/hdfs-site.xml:/opt/hadoop/etc/hadoop/hdfs-site.xml:ro
+      - ../spark/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
+
+    entrypoint:
+      - /opt/spark/bin/spark-class
+
+    command:
+      - org.apache.spark.deploy.history.HistoryServer
+
+    depends_on:
+      hdfs-namenode:
+        condition: service_healthy
 
   kafka:
     image: apache/kafka:4.3.1
@@ -170,6 +236,60 @@ services:
 
     volumes:
       - kafka_data:/tmp/kraft-combined-logs
+
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.9.0
+    container_name: feelm-kafka-exporter
+    restart: unless-stopped
+    network_mode: host
+    read_only: true
+
+    command:
+      - --kafka.server=127.0.0.1:9092
+      - --web.listen-address=${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}:9308
+      - --topic.filter=^feelm[.].+$
+      - --group.filter=^feelm[-.].+$
+      - --refresh.metadata=30s
+      - --topic.workers=10
+      - --no-concurrent.enable
+
+    depends_on:
+      kafka:
+        condition: service_started
+
+    security_opt:
+      - no-new-privileges:true
+
+    cap_drop:
+      - ALL
+
+  kafka-ui:
+    image: ghcr.io/kafbat/kafka-ui:v1.5.0
+    container_name: feelm-kafka-ui
+    restart: unless-stopped
+    network_mode: host
+    read_only: true
+
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+
+    environment:
+      SERVER_ADDRESS: ${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}
+      SERVER_PORT: "8082"
+      DYNAMIC_CONFIG_ENABLED: "false"
+      KAFKA_CLUSTERS_0_NAME: feelm
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: 127.0.0.1:9092
+      KAFKA_CLUSTERS_0_READONLY: "true"
+
+    depends_on:
+      kafka:
+        condition: service_started
+
+    security_opt:
+      - no-new-privileges:true
+
+    cap_drop:
+      - ALL
 
   consumer:
     image: ${CONSUMER_IMAGE:-feelm-foldin-consumer:local}

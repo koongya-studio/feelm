@@ -82,7 +82,7 @@ def test_catalog_populations_cold_truth_and_shortage_counts(spark):
 
 def test_mapping_changes_population_without_removing_cold_positives(spark):
     result = evaluate(
-        ScoredModel(spark),
+        ScoredModel(spark, items=(1, 99)),
         ratings(spark, []),
         ratings(spark, [(1, 1, 5.0), (99, 99, 5.0)]),
         mapping(spark, [99]),
@@ -96,10 +96,10 @@ def test_mapping_changes_population_without_removing_cold_positives(spark):
 
 
 def test_same_users_different_holdout_items_and_labels_leave_candidates_unchanged(spark):
-    model = ScoredModel(spark)
-    known, movie_map = ratings(spark, [(1, 1, 1.0)]), mapping(spark, range(1, 16))
-    a = evaluate(model, known, ratings(spark, [(1, 2, 5.0)]), movie_map)
-    b = evaluate(model, known, ratings(spark, [(1, 15, 3.5)]), movie_map)
+    model = ScoredModel(spark, items=(1, 2, 3))
+    known, movie_map = ratings(spark, [(1, 1, 1.0)]), mapping(spark, (1, 2, 3))
+    a = evaluate(model, known, ratings(spark, [(1, 2, 5.0)]), movie_map, n=2)
+    b = evaluate(model, known, ratings(spark, [(1, 3, 3.5)]), movie_map, n=2)
     for catalog in ("movielens", "service"):
         assert ordered(a.candidates, catalog) == ordered(b.candidates, catalog)
         assert 2 in [r[ITEM] for r in ordered(a.candidates, catalog)]

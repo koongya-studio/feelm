@@ -1,16 +1,21 @@
 /*
- * 설정 목업. 7.8-B 공개 범위 · 7.8-C 알림 설정 · 7.8-D 차단 사용자 관리
+ * 설정 목업. 7.8-B 공개 범위 · 7.8-C 알림 설정
  *
- * 대응 계약은 API-017 · API-018(알림) · API-020 ~ API-022(차단)이다. 백엔드에 구현돼 있지만
- * 이 업무는 목업으로 만들기로 했다(팀 결정 2026-09-13, 업무 -307).
+ * 7.8-C의 알림 설정과 7.8-D의 차단 목록은 실제 API가 됐다(업무 -394). 알림은 계약에
+ * 없는 토글 둘(`PARTY_INVITE` · `REPORT`)의 **시작값**만 여기 남았고, 차단 목록 목업은
+ * 서버가 주는 값과 겹치므로 지웠다.
  *
  * 값은 와이어프레임에 그려진 상태 그대로다. 사용자가 바꾼 값은 세션 저장소가 들고,
  * `src/api/settings.ts`가 둘을 합친다.
  */
 import type { NotificationSettingsView, PrivacySettingsView } from '../types/unspecified';
-import type { BlockedUser } from '../types/user';
 
-/** 와이어프레임 7.8-C — 마케팅만 꺼져 있다. API-017의 기본값(`MARKETING` false)과도 같다 */
+/**
+ * 와이어프레임 7.8-C — 마케팅만 꺼져 있다. API-017의 기본값(`MARKETING` false)과도 같다.
+ *
+ * 계약의 세 키는 서버가 주므로 실제로 쓰이는 것은 `PARTY_INVITE` · `REPORT`뿐이다.
+ * 다섯 개를 다 두는 것은 화면이 그리는 상태를 한곳에서 읽기 위해서다.
+ */
 export const mockNotificationSettings: NotificationSettingsView = {
   RATING: true,
   RECOMMENDATION: true,
@@ -26,12 +31,3 @@ export const mockPrivacySettings: PrivacySettingsView = {
   popcorn: 'PUBLIC',
   review: 'PUBLIC',
 };
-
-/**
- * 와이어프레임 7.8-D의 두 사람. 다른 목업(파티원 · 한줄평 작성자)과 겹치지 않는 번호다.
- * 시각은 정오 기준이다(mocks/frames.ts와 같은 이유).
- */
-export const mockBlockedUsers: BlockedUser[] = [
-  { userId: 5201, nickname: '스포일러왕', blockedAt: '2026-08-30T12:00:00Z' },
-  { userId: 5202, nickname: '밤샘시네필', blockedAt: '2026-08-21T12:00:00Z' },
-];

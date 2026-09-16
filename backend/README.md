@@ -61,7 +61,7 @@ Actuator는 컨테이너 상태 판정을 위한 `/actuator/health`와 Prometheu
 
 ```java
 @Transactional
-public void createRating(long userId, long movieId, int score) {
+public void createRating(long userId, long movieId, BigDecimal score) {
     ratingRepository.save(/* 도메인 데이터 */);
 
     kafkaEventPublisher.publish(

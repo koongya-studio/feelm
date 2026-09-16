@@ -137,6 +137,43 @@ def test_load_bundle_rejects_invalid_factor_or_mapping_contract(
         load_bundle(model_root.as_uri(), mapping.as_uri(), metadata.as_uri())
 
 
+SPARK_ITEM_FACTORS_SCHEMA = pa.schema([
+    pa.field("movielens_movie_id", pa.int32()),
+    # Spark writes the list element as a named, non-nullable field.
+    pa.field("features", pa.list_(pa.field("element", pa.float32(), nullable=False))),
+])
+
+
+def _bundle_paths(tmp_path, factor_schema: pa.Schema) -> tuple[str, str, str]:
+    model_root = tmp_path / "model"
+    model_root.mkdir()
+    _write_table(model_root / "metadata", [{"contract_version": "als-artifacts-v2", "artifact_stage": "SERVING", "model_version": "als-v1", "factor_dimension": 2, "reg_param": 0.1, "input_snapshot": "snapshot-a", "mapping_revision": MAPPING_REVISION, "movie_metadata_revision": METADATA_REVISION}])
+    _write_table(model_root / "item-factors", [{"movielens_movie_id": 1, "features": [1.0, 0.0]}], factor_schema)
+    mapping = tmp_path / "mapping.parquet"
+    _write_table(mapping, [{"service_movie_id": 10, "movielens_movie_id": 1, "mapping_status": "MATCHED", "mapping_revision": MAPPING_REVISION}], MAPPING_SCHEMA)
+    metadata = tmp_path / "metadata.parquet"
+    _write_table(metadata, [{"service_movie_id": 10, "title": "영화", "genre_codes": ["DRAMA"], "representative_flavor_code": None, "input_snapshot": "snapshot-a", "movie_metadata_revision": METADATA_REVISION}])
+    return model_root.as_uri(), mapping.as_uri(), metadata.as_uri()
+
+
+def test_loads_item_factors_written_by_spark(tmp_path) -> None:
+    """Spark's list<element: float not null> is the same contract as list<item: float>."""
+    bundle = load_bundle(*_bundle_paths(tmp_path, SPARK_ITEM_FACTORS_SCHEMA))
+
+    assert bundle.factors[1].tolist() == [1.0, 0.0]
+
+
+def test_rejects_item_factors_whose_element_type_differs(tmp_path) -> None:
+    """The element field name is a writer detail; its type is not."""
+    float64_schema = pa.schema([
+        pa.field("movielens_movie_id", pa.int32()),
+        pa.field("features", pa.list_(pa.field("element", pa.float64(), nullable=False))),
+    ])
+
+    with pytest.raises(ArtifactError, match="item factors has incompatible physical types"):
+        load_bundle(*_bundle_paths(tmp_path, float64_schema))
+
+
 def test_hdfs_uri_is_passed_to_pyarrow_filesystem_without_path_conversion(monkeypatch) -> None:
     seen: dict[str, object] = {}
     filesystem = object()
