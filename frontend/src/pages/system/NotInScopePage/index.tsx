@@ -14,7 +14,7 @@ export default function NotInScopePage() {
       <ScreenHeader title="준비 중인 화면" />
       <section data-screen="not-in-scope">
         <p>{pathname}은 이번 단계 구현 범위가 아닙니다.</p>
-        <Link to={path.home()}>홈으로 이동</Link>
+        <Link to={path.film()}>필름으로 이동</Link>
       </section>
     </>
   );

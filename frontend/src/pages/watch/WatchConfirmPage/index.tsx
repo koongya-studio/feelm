@@ -146,8 +146,8 @@ export default function WatchConfirmPage() {
       return;
     }
 
-    // 보지 않을래요 → 감상 대기 종료. 홈으로 돌아간다
-    void navigate(path.home());
+    // 보지 않을래요 → 감상 대기 종료. 시작 화면인 필름으로 돌아간다
+    void navigate(path.film());
   }
 
   if (failed) {
@@ -160,8 +160,8 @@ export default function WatchConfirmPage() {
         >
           <Button onClick={retry}>다시 시도</Button>
 
-          <Button variant="text" onClick={() => void navigate(path.home())}>
-            홈으로 이동
+          <Button variant="text" onClick={() => void navigate(path.film())}>
+            필름으로 이동
           </Button>
         </StatusView>
       </div>
@@ -177,7 +177,7 @@ export default function WatchConfirmPage() {
           title="감상 기록을 찾을 수 없어요"
           description="주소가 잘못되었거나 이미 정리된 기록이에요"
         >
-          <Button onClick={() => void navigate(path.home())}>홈으로 이동</Button>
+          <Button onClick={() => void navigate(path.film())}>필름으로 이동</Button>
         </StatusView>
       </div>
     );
@@ -207,8 +207,8 @@ export default function WatchConfirmPage() {
             </Button>
           ) : null}
 
-          <Button variant="text" onClick={() => void navigate(path.home())}>
-            홈으로 이동
+          <Button variant="text" onClick={() => void navigate(path.film())}>
+            필름으로 이동
           </Button>
         </StatusView>
       </div>

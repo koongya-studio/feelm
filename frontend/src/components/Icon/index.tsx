@@ -13,20 +13,6 @@
 
 const hidden = { 'aria-hidden': true, focusable: false } as const;
 
-/** 하단 내비 — 홈 */
-export function HomeIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" {...hidden}>
-      <path
-        d="M3 9l7-6 7 6v8h-5v-5H8v5H3V9z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 /** 하단 내비 — 검색 */
 export function SearchIcon() {
   return (
@@ -83,7 +69,7 @@ export function MyIcon() {
   );
 }
 
-/** 홈 헤더 — 알림 */
+/** 3.1 필름 헤더 — 알림 */
 export function BellIcon() {
   return (
     <svg width="16" height="17" viewBox="0 0 16 17" fill="none" {...hidden}>
@@ -254,7 +240,7 @@ export function HeartIcon() {
 
 /**
  * 2.7 필름 추가 완료 — 결과 카드 표식.
- * 홈 헤더의 BellIcon과 모양이 비슷하지만 와이어프레임의 다른 그림이라 따로 둔다.
+ * 필름 헤더의 BellIcon과 모양이 비슷하지만 와이어프레임의 다른 그림이라 따로 둔다.
  */
 export function ResultBellIcon() {
   return (
