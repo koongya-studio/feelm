@@ -11,7 +11,6 @@
  * 화면 밖에서 채워 넣는다(`mocks/trending.ts` 머리말).
  */
 import OttBadge from '../../../../components/OttBadge';
-import { ottBadgeLetter } from '../../../../utils/ott';
 import type { TrendingItem } from '../../../../types/trend';
 import styles from './TrendingRow.module.css';
 
@@ -52,12 +51,7 @@ export default function TrendingRow({ item, ottProviders = [], ottNames = {}, on
 
       <span className={styles.otts}>
         {ottProviders.map((code) => (
-          <OttBadge
-            key={code}
-            letter={ottBadgeLetter(code)}
-            name={ottNames[code] ?? code}
-            size={20}
-          />
+          <OttBadge key={code} code={code} name={ottNames[code] ?? code} size={20} />
         ))}
       </span>
     </button>

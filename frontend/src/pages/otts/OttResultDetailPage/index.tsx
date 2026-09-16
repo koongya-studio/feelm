@@ -29,7 +29,6 @@ import Section from '../../../components/Section';
 import StatusView from '../../../components/StatusView';
 import { getOttRecommendation } from '../../../api/ottRecommendations';
 import { path } from '../../../routes/paths';
-import { ottBadgeLetter } from '../../../utils/ott';
 import styles from './OttResultDetailPage.module.css';
 import type { OttRecommendationItemView } from '../../../types/unspecified';
 
@@ -94,7 +93,7 @@ export default function OttResultDetailPage() {
         {/* 화면에서 유일한 어두운 블록 */}
         <section className={styles.hero}>
           <OttBadge
-            letter={ottBadgeLetter(item.ott.code)}
+            code={item.ott.code}
             name={item.ott.name}
             size={40}
             radius={11}

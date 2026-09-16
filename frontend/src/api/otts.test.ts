@@ -6,7 +6,7 @@
  * 되돌리면 화면이 `ott.ottId`를 `undefined`로 읽으면서도 조용히 렌더되므로 여기서 막는다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getMyOttIds, getOtts, setMyOttIds } from './otts';
+import { getMyOttIds, getOtts, resetOttCacheForTest, setMyOttIds } from './otts';
 import { resetSessionForTest, startSession } from './session';
 
 const fetchMock = vi.fn();
@@ -24,6 +24,8 @@ function call(index = 0) {
 
 beforeEach(() => {
   resetSessionForTest();
+  // 기준정보는 앱 실행 단위로 기억되므로 테스트마다 지운다
+  resetOttCacheForTest();
   fetchMock.mockReset();
   vi.stubGlobal('fetch', fetchMock);
 });
@@ -39,6 +41,29 @@ describe('API-025 OTT 목록 조회', () => {
 
     expect(await getOtts()).toEqual(items);
     expect(call()[0]).toBe('/api/v1/otts');
+  });
+
+  /*
+   * 여러 화면과 배지 기준표가 같은 목록을 읽는다. 앱이 뜰 때 동시에 나가는 요청은
+   * 브라우저 캐시가 채워지기 전이라 그대로 나가므로 이 계층에서 한 번으로 묶는다.
+   */
+  it('같은 앱 실행에서는 한 번만 실제로 부른다', async () => {
+    fetchMock.mockResolvedValue(json(200, { items: [] }));
+
+    await Promise.all([getOtts(), getOtts()]);
+    await getOtts();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('실패하면 기억하지 않아 다시 부를 수 있다', async () => {
+    fetchMock.mockResolvedValueOnce(json(500, { code: 'INTERNAL_ERROR', message: '오류' }));
+    await expect(getOtts()).rejects.toThrow();
+
+    fetchMock.mockResolvedValueOnce(json(200, { items: [] }));
+
+    expect(await getOtts()).toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('공개 API라 토큰을 싣지 않는다', async () => {

@@ -22,7 +22,6 @@ import StatusView from '../../../components/StatusView';
 import { getOttAnalysisBasis } from '../../../api/ottRecommendations';
 import { getOtts } from '../../../api/otts';
 import { path } from '../../../routes/paths';
-import { ottBadgeLetter } from '../../../utils/ott';
 import styles from './OttFinderPage.module.css';
 import type { Ott } from '../../../types/ott';
 import type { OttAnalysisBasis } from '../../../types/unspecified';
@@ -124,13 +123,7 @@ export default function OttFinderPage() {
           <ul className={styles.badges}>
             {otts.map((ott) => (
               <li key={ott.ottId}>
-                <OttBadge
-                  letter={ottBadgeLetter(ott.code)}
-                  name={ott.name}
-                  logoUrl={ott.logoUrl}
-                  size={36}
-                  radius={10}
-                />
+                <OttBadge code={ott.code} name={ott.name} size={36} radius={10} />
               </li>
             ))}
           </ul>
