@@ -281,21 +281,25 @@ export function BlockIcon() {
 }
 
 /*
- * 7.2 프로필 편집 — 프로필 이미지 변경.
+ * 7.1 MY 헤더 — 설정.
  *
- * 와이어프레임 7.2는 아바타 우하단에 원형 뱃지를 두고 그 안에 카메라를 그렸다.
- * 원본 SVG가 아이콘 하나로 분리돼 있지 않아 같은 모양으로 다시 그렸다.
+ * **와이어프레임에 없는 아이콘이다**(사용자 지시 2026-09-16). 7.1 헤더의 `설정` 글자를
+ * 아이콘으로 바꾸면서 그렸다. 다른 아이콘과 같은 선 두께 · 둥근 끝으로 맞췄다.
+ * 톱니를 둘레 모양으로 깎으면 20px에서 뭉개지므로, 테두리 원 밖으로 **굵고 짧은 선 여덟**을
+ * 내어 톱니로 읽히게 한다. 처음에 선을 가늘고 길게 뒀더니 밝기 조절 아이콘으로 보였다.
  */
-export function CameraIcon() {
+export function SettingsIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 18 18" fill="none" {...hidden}>
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" {...hidden}>
+      {/* 톱니 여덟. 굵고 짧게 둬서 햇살이 아니라 톱니로 읽히게 한다 */}
       <path
-        d="M2.4 5.4h2.7l1.2-1.8h4.8l1.2 1.8h2.7a1.2 1.2 0 011.2 1.2v6.6a1.2 1.2 0 01-1.2 1.2H2.4a1.2 1.2 0 01-1.2-1.2V6.6a1.2 1.2 0 011.2-1.2z"
+        d="M10 3.2V1.6M10 16.8v1.6M3.2 10H1.6M16.8 10h1.6M15.2 4.8l1.1-1.1M4.8 15.2l-1.1 1.1M15.2 15.2l1.1 1.1M4.8 4.8L3.7 3.7"
         stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinejoin="round"
+        strokeWidth="2"
+        strokeLinecap="round"
       />
-      <circle cx="9" cy="9.9" r="2.7" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="10" cy="10" r="6" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="10" cy="10" r="2.3" stroke="currentColor" strokeWidth="1.4" />
     </svg>
   );
 }

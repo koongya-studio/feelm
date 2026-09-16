@@ -33,10 +33,6 @@
   line-height: var(--line-height-caption);
 }
 
-.dismissed {
-  color: var(--color-ink-hint);
-}
-
 /*
  * 추천 출처. 와이어프레임대로 테두리만 있는 작은 알약이다. 색으로 출처를 나누지 않는다 —
  * UI는 유채색을 쓰지 않고(`design-concept.md` 2.2), 문구가 이미 구분한다.
@@ -51,11 +47,4 @@
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-caption);
-}
-
-.total {
-  color: var(--color-ink-hint);
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-  text-align: center;
 }

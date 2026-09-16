@@ -18,13 +18,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import ProfileEditPage from './index';
 import { renderWithRouter } from '../../../test/render';
 import { ApiError } from '../../../api/apiError';
-import {
-  checkNicknameAvailability,
-  getMyIntroduction,
-  getMyProfile,
-  saveMyIntroduction,
-  updateMyProfile,
-} from '../../../api/users';
+import { checkNicknameAvailability, getMyProfile, updateMyProfile } from '../../../api/users';
 import { mockMyProfile } from '../../../mocks/user';
 import { resetSessionStore } from '../../../mocks/sessionStore';
 
@@ -39,21 +33,16 @@ vi.mock('../../../api/users', async (importOriginal) => {
     isValidNickname: actual.isValidNickname,
     checkNicknameAvailability: vi.fn(),
     getMyProfile: vi.fn(),
-    getMyIntroduction: vi.fn(),
     updateMyProfile: vi.fn(),
-    saveMyIntroduction: vi.fn(),
   };
 });
 
 const BASE_NICKNAME = mockMyProfile.nickname;
-const BASE_INTRO = '반전 있는 이야기를 좋아해요';
 
 beforeEach(() => {
   resetSessionStore();
   vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
-  vi.mocked(getMyIntroduction).mockReset().mockResolvedValue(BASE_INTRO);
   vi.mocked(updateMyProfile).mockReset().mockResolvedValue(mockMyProfile);
-  vi.mocked(saveMyIntroduction).mockReset().mockResolvedValue(undefined);
   vi.mocked(checkNicknameAvailability)
     .mockReset()
     .mockResolvedValue({ nickname: '난다킹', available: true, reason: null });
@@ -83,17 +72,6 @@ describe('7.2 프로필 편집', () => {
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
 
     await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/my'));
-  });
-
-  it('한 줄 소개는 계약에 없어 따로 저장한다', async () => {
-    await renderEdit();
-
-    fireEvent.change(screen.getByLabelText('한 줄 소개'), {
-      target: { value: '느와르만 봅니다' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-
-    await waitFor(() => expect(saveMyIntroduction).toHaveBeenCalledWith('느와르만 봅니다'));
   });
 
   it('규칙에 맞지 않는 닉네임은 보내지도 이동하지도 않는다', async () => {

@@ -4,8 +4,6 @@
  *
  * 화면은 src/mocks/를 직접 import하지 않고 이 파일만 호출한다.
  */
-import { findMockMovie } from '../mocks/movies';
-import { mockOtts } from '../mocks/otts';
 import { mockRecommendationHistory } from '../mocks/recommendationHistory';
 import { findMockReplacement, mockRecommendationSet } from '../mocks/recommendations';
 import {
@@ -15,11 +13,8 @@ import {
   getDismissedMovieIds,
 } from '../mocks/sessionStore';
 import { isMockError, respond, respondError } from './mockTransport';
-import type {
-  DismissResultView,
-  RecommendationHistoryView,
-  RecommendationSetView,
-} from '../types/unspecified';
+import type { DismissResultView, RecommendationSetView } from '../types/unspecified';
+import type { RecommendationHistory } from '../types/recommendation';
 
 /**
  * API-045 기본 추천 조회 · GET /api/v1/recommendations
@@ -100,18 +95,18 @@ export async function dismissMovie(
  * 2.3에서 관심없음 처리했거나 2.5에서 평가한 영화는 그 결과를 얹는다. 그래야 7.5에서
  * 영화를 눌러 평가하고 돌아왔을 때 상태가 맞는다.
  *
- * `ott`는 계약에 없다(types/unspecified.ts). `cursor` · `size`는 구현하지 않았다 —
- * 목업 세트가 네 개뿐이라 한 페이지로 끝난다.
+ * `cursor` · `size`는 구현하지 않았다 — 목업 세트가 네 개뿐이라 한 페이지로 끝난다.
+ *
+ * 날짜 옆 OTT는 뺐다(업무 -459). API-048 `movie`에 OTT가 없어 목업이 영화의 첫 제공처를
+ * 지어내던 값이다.
  */
-export async function getRecommendationHistory(): Promise<RecommendationHistoryView> {
+export async function getRecommendationHistory(): Promise<RecommendationHistory> {
   const dismissed = getDismissedMovieIds();
 
   const items = mockRecommendationHistory.map((set) => ({
     ...set,
     items: set.items.map((item) => {
       const { movieId } = item.movie;
-      const ottCode = findMockMovie(movieId).ottProviders[0];
-      const ott = mockOtts.find((candidate) => candidate.code === ottCode);
       const watchStatus = findRatingByMovie(movieId)
         ? ('RATED' as const)
         : (findLatestWatchRecordByMovie(movieId)?.status ?? item.watchStatus);
@@ -120,7 +115,6 @@ export async function getRecommendationHistory(): Promise<RecommendationHistoryV
         ...item,
         dismissed: item.dismissed || dismissed.includes(movieId),
         watchStatus,
-        ott: ott ? { code: ott.code, name: ott.name } : null,
       };
     }),
   }));

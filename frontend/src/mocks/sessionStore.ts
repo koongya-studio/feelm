@@ -76,13 +76,6 @@ type SessionState = {
    */
   recentSearchQueries: string[];
   /**
-   * 7.2 프로필 편집이 저장한 **계약에 없는 값**. `null`이면 아직 편집하지 않았다.
-   *
-   * 닉네임 · 생년월일 · 성별 · 공개 범위는 여기 없다. API-015가 실제로 저장하므로
-   * 로컬에 둘 이유가 없다(`api/users.ts`). 한 줄 소개만 계약에 자리가 없어 남는다.
-   */
-  profileEdit: { introduction: string } | null;
-  /**
    * 7.8-C에서 바꾼 알림 설정 중 **계약에 없는 둘**. `null`이면 기준 목업(mocks/settings.ts)이다.
    *
    * 계약의 세 키(API-017)는 서버가 들고 있어 여기 없다(업무 -394).
@@ -112,7 +105,6 @@ function emptyState(): SessionState {
     ratingEdits: {},
     // 와이어프레임 4.1이 최근 검색어 세 개가 있는 상태를 그리므로 그 값으로 시작한다
     recentSearchQueries: ['케이퍼 무비', '크리스토퍼 놀란', 'SF 명작'],
-    profileEdit: null,
     unspecifiedNotificationSettings: null,
     privacySettings: null,
     notifications: createSeedNotifications(),
@@ -168,17 +160,6 @@ export function removeRecentSearchQuery(query: string): void {
 
 export function clearRecentSearchQueries(): void {
   state.recentSearchQueries = [];
-}
-
-// ─────────────────────────────────────────── 프로필 편집
-
-export function saveProfileEdit(update: { introduction: string }): void {
-  state.profileEdit = { ...update };
-}
-
-/** 아직 편집하지 않았으면 null. 기준 목업을 쓰라는 뜻이다 */
-export function getProfileEdit(): { introduction: string } | null {
-  return state.profileEdit;
 }
 
 // ─────────────────────────────────────────── 설정 (업무 -307)

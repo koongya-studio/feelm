@@ -29,24 +29,56 @@ type Props = {
   title: string;
   /** 자리표시자 색조를 고르는 값. 보통 `movieId` */
   seed?: number;
+  /**
+   * 담긴 자리의 폭을 채운다. 높이는 `width` · `height`의 비율로 따라간다(7.1의 3열 격자).
+   *
+   * 격자는 화면 폭에 따라 한 칸의 폭이 달라져 실측 px을 쓸 수 없다. 비율만 고정한다.
+   */
+  fluid?: boolean;
 };
 
-export default function Poster({ width, height, radius = 8, src, title, seed = 0 }: Props) {
+export default function Poster({
+  width,
+  height,
+  radius = 8,
+  src,
+  title,
+  seed = 0,
+  fluid = false,
+}: Props) {
   const [dark, light] = posterTone(seed);
 
   const style = {
     '--poster-width': `${width}px`,
     '--poster-height': `${height}px`,
+    '--poster-ratio': `${width} / ${height}`,
     '--poster-radius': `${radius}px`,
     '--poster-dark': dark,
     '--poster-light': light,
   } as CSSProperties;
 
+  const fit = fluid ? 'true' : undefined;
+
   if (src) {
-    return <img className={styles.poster} style={style} src={src} alt={title} loading="lazy" />;
+    return (
+      <img
+        className={styles.poster}
+        data-fluid={fit}
+        style={style}
+        src={src}
+        alt={title}
+        loading="lazy"
+      />
+    );
   }
 
   return (
-    <span className={styles.poster} data-placeholder="true" style={style} role="presentation" />
+    <span
+      className={styles.poster}
+      data-placeholder="true"
+      data-fluid={fit}
+      style={style}
+      role="presentation"
+    />
   );
 }

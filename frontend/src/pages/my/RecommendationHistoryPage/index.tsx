@@ -3,19 +3,19 @@
  *
  * 이동표: 7.1 → 7.5 추천 기록 · 7.5 ⇢ 2.4 추천 기록의 영화 선택
  *
- * 요소는 와이어프레임 7.5를 따른다 — 월 제목, 영화 줄(포스터 · 제목 · 날짜 · OTT ·
- * 추천 출처), 맨 아래 `총 N편을 추천받았어요`. 연동 API는 API-048 추천 이력 조회다.
+ * 요소는 월 제목과 영화 줄(포스터 · 제목 · 날짜 · 추천 출처)뿐이다. 연동 API는 API-048
+ * 추천 이력 조회다.
  *
  * - **출처 표시는 계약의 `type`이다.** `TASTE` 취향 맞춤 · `DISCOVERY` 새로운 맛 발견 ·
  *   `PARTY` 파티 추천. 와이어프레임의 세 문구가 세 값과 하나씩 맞는다
  * - **월로 묶는다.** 계약은 세트 단위로 주고 세트마다 `generatedAt`이 있다. 같은 달의
  *   세트를 한 제목 아래 모은다
- * - **관심없음 처리한 영화도 남긴다**(API-048 처리 규칙 `dismissed: true`). 와이어프레임에
- *   없는 표시라 날짜 줄 끝에 흐리게 붙인다
+ * - **관심없음 처리한 영화도 목록에 남는다**(API-048 처리 규칙 `dismissed: true`). 표시는
+ *   하지 않는다 — 와이어프레임에 없던 표시다(업무 -459)
  *
- * `[?]` 날짜 옆 OTT는 계약에 없다(types/unspecified.ts). 목업은 영화의 첫 제공처다.
- * `[?]` `총 N편`의 N은 계약에 없다. 마지막 페이지까지 받았을 때 센 값이며, 더 남아
- *       있으면 이 줄을 표시하지 않는다.
+ * 뺀 것(업무 -459) — 날짜 옆 OTT는 API-048 `movie`에 없어 목업이 지어내던 값이고,
+ * `총 N편을 추천받았어요`의 N은 계약에 총수가 없어 받은 목록을 센 값이었다.
+ *
  * `[?]` 헤더 옆의 `· 최신순 · 추천 출처 표시`는 화면 설명으로 보고 옮기지 않았다.
  *
  * 어두운 블록은 없다. 포스터가 이 화면의 콘텐츠이고 나머지는 벽이다.
@@ -31,9 +31,9 @@ import { formatShortDate, formatYearMonth } from '../../../utils/date';
 import styles from './RecommendationHistoryPage.module.css';
 import type { RecommendationType } from '../../../types/enums';
 import type {
-  RecommendationHistoryItemView,
-  RecommendationHistoryView,
-} from '../../../types/unspecified';
+  RecommendationHistory,
+  RecommendationHistoryItem,
+} from '../../../types/recommendation';
 
 /** 와이어프레임 7.5의 출처 문구 */
 const SOURCE_LABEL: Record<RecommendationType, string> = {
@@ -44,11 +44,11 @@ const SOURCE_LABEL: Record<RecommendationType, string> = {
 
 type MonthGroup = {
   label: string;
-  rows: { item: RecommendationHistoryItemView; generatedAt: string }[];
+  rows: { item: RecommendationHistoryItem; generatedAt: string }[];
 };
 
 /** 세트는 최신순으로 오므로 순서대로 훑으며 달이 바뀔 때 새 묶음을 연다 */
-function groupByMonth(history: RecommendationHistoryView): MonthGroup[] {
+function groupByMonth(history: RecommendationHistory): MonthGroup[] {
   const groups: MonthGroup[] = [];
 
   for (const set of history.items) {
@@ -67,7 +67,7 @@ function groupByMonth(history: RecommendationHistoryView): MonthGroup[] {
 }
 
 export default function RecommendationHistoryPage() {
-  const [history, setHistory] = useState<RecommendationHistoryView | null>(null);
+  const [history, setHistory] = useState<RecommendationHistory | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
 
@@ -147,12 +147,7 @@ export default function RecommendationHistoryPage() {
               {group.rows.map(({ item, generatedAt }) => (
                 <li key={item.recommendationItemId}>
                   <MovieRow movie={item.movie} to={path.movieDetail(item.movie.movieId)}>
-                    <span className={styles.meta}>
-                      {[formatShortDate(generatedAt), item.ott?.name].filter(Boolean).join(' · ')}
-                      {item.dismissed ? (
-                        <span className={styles.dismissed}> · 관심없음</span>
-                      ) : null}
-                    </span>
+                    <span className={styles.meta}>{formatShortDate(generatedAt)}</span>
 
                     <span className={styles.source}>{SOURCE_LABEL[item.type]}</span>
                   </MovieRow>
@@ -161,8 +156,6 @@ export default function RecommendationHistoryPage() {
             </ul>
           </section>
         ))}
-
-        {history.hasNext ? null : <p className={styles.total}>총 {total}편을 추천받았어요</p>}
       </div>
     </>
   );

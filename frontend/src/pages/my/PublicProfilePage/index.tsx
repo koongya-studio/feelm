@@ -5,12 +5,16 @@
  * 공개된 취향 키워드 · 필름 · 팝콘 버킷, 공개 한줄평, `나와 취향 비교하기`.
  *
  * 배치는 `Social Profile UI Design (1).jpg`를 따른다. 상단 비주얼을 화면 전체 폭으로
- * 크게 두고, 그 위에 이름과 소개를 얹고, 수치를 3열로 두고, 주요 액션을 넓은 pill로
- * 둔다. 레퍼런스의 인물 사진 자리는 무채색 면이다(`ProfileHero` 주석).
+ * 크게 두고, 그 위에 이름을 얹고, 수치를 3열로 두고, 주요 액션을 넓은 pill로 둔다.
+ * 레퍼런스의 인물 사진 자리는 무채색 면이다(`ProfileHero` 주석).
  *
  * **팔로워 · 팔로잉 · 창작물 수는 쓰지 않는다.** Feelm에 없는 개념이다. 레퍼런스가
- * 그 자리에 둔 3열을 **프레임 · 팝콘 · 나와의 일치도**로 바꿨다. 일치도는 7.2-C가
- * 보여주는 값과 같으므로, 3열 수치가 바로 아래 `나와 취향 비교하기` 버튼의 예고가 된다.
+ * 그 자리에 둔 3열을 **프레임 · 팝콘 · 공개 한줄평**으로 바꿨다. 셋 다 API-062가 주는
+ * 값이다.
+ *
+ * **뺀 것**(업무 -459) — 아바타 · 한 줄 소개는 계약에 자리가 없다. 3열의 `나와 일치`도
+ * 뺐다. API-063이 주기로 한 값이지만 2차 MVP라 미구현이고, 지금 보이던 `76%`는 목업이
+ * 지어낸 수였다. 일치도는 7.2-C가 맡는다.
  *
  * 진입 경로: **5.8 파티원 카드**에서 들어온다. 와이어프레임 이동표에 7.2-B로 들어오는
  * 화살표가 없었고 2026-09-11에 확정했다(screen-spec-my.md 2장 8번).
@@ -180,21 +184,13 @@ export default function PublicProfilePage() {
        * 띄운다(ProfileHero 주석). 제목은 히어로 안의 이름이 h1으로 맡는다.
        */}
       <div className={styles.page}>
-        <ProfileHero
-          nickname={profile.nickname}
-          avatarUrl={profile.avatarUrl}
-          introduction={profile.introduction}
-          onMore={() => setMenuOpen(true)}
-        >
+        <ProfileHero nickname={profile.nickname} onMore={() => setMenuOpen(true)}>
           <StatRow
             onDark
             items={[
               { label: '프레임', value: String(profile.stats.frameCount) },
               { label: '팝콘', value: String(profile.stats.popcornCount) },
-              {
-                label: '나와 일치',
-                value: profile.matchRate === null ? '—' : `${profile.matchRate}%`,
-              },
+              { label: '공개 한줄평', value: String(profile.stats.publicReviewCount) },
             ]}
           />
         </ProfileHero>

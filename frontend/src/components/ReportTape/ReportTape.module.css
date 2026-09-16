@@ -1,0 +1,34 @@
+/*
+ * 빨간 테이프. 끝이 뜯긴 모양은 좌우 톱니 모양으로 자른다. 4컷 위에 걸쳐 붙는다.
+ * 빨강은 붙인 종이의 일부로 본다 — 4컷 인화지와 같은 콘텐츠 빨강이다.
+ *
+ * 기본값은 7.3 목록의 값이다. 다른 자리에 붙일 때는 변수만 바꾼다.
+ */
+.tape {
+  position: absolute;
+  z-index: 1;
+  top: var(--tape-top, -7px);
+  left: 50%;
+  width: var(--tape-width, 36%);
+  height: var(--tape-height, 16px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 60%),
+    var(--color-brand);
+  clip-path: polygon(
+    0 8%,
+    6% 0,
+    94% 4%,
+    100% 0,
+    97% 30%,
+    100% 55%,
+    96% 78%,
+    100% 100%,
+    5% 96%,
+    0 100%,
+    3% 70%,
+    0 45%,
+    4% 24%
+  );
+  opacity: 0.88;
+  transform: translateX(var(--tape-shift, -30%)) rotate(var(--tape-angle, -9deg));
+}

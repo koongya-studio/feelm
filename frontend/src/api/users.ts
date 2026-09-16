@@ -16,9 +16,8 @@ import {
   findMockTasteCompare,
   mockMyPublicProfile,
 } from '../mocks/publicProfiles';
-import { getProfileEdit, saveProfileEdit } from '../mocks/sessionStore';
-import { mockMyIntroduction } from '../mocks/user';
 import { request } from './client';
+import { getMockProfile, isMockSession, saveMockProfile } from './mockAccount';
 import { isBlockedUser } from './settings';
 import { respond, respondError } from './mockTransport';
 import type { PublicProfileView, TasteCompareView } from '../types/unspecified';
@@ -36,6 +35,9 @@ import type {
  * 오류 상태로 처리한다.
  */
 export async function getMyProfile(): Promise<MyProfile> {
+  // 개발 서버의 목업 계정으로 로그인했으면 서버로 보내지 않는다(`mockAccount.ts`)
+  if (isMockSession()) return respond(getMockProfile(), 'users');
+
   return request<MyProfile>('/users/me');
 }
 
@@ -51,6 +53,8 @@ export async function getMyProfile(): Promise<MyProfile> {
  * 화면은 `ApiError`의 메시지를 그대로 보여준다.
  */
 export async function updateMyProfile(update: MyProfileUpdate): Promise<MyProfile> {
+  if (isMockSession()) return respond(saveMockProfile(update), 'users');
+
   return request<MyProfile>('/users/me', { method: 'PATCH', body: update });
 }
 
@@ -107,21 +111,6 @@ export function isValidNickname(nickname: string): boolean {
 }
 
 /**
- * 내 한 줄 소개.
- *
- * **계약에 없는 필드다**(`types/unspecified.ts`). API-014 응답에도 API-015 요청에도
- * 자리가 없어 세션 저장소에만 남는다. 새로고침하면 사라진다.
- */
-export async function getMyIntroduction(): Promise<string> {
-  return respond(getProfileEdit()?.introduction ?? mockMyIntroduction);
-}
-
-/** 한 줄 소개 저장. 계약이 없으므로 서버로 나가지 않는다 */
-export async function saveMyIntroduction(introduction: string): Promise<void> {
-  saveProfileEdit({ introduction });
-}
-
-/**
  * API-062 공개 프로필 조회 · GET /api/v1/users/{publicId}/profile — 본인(7.2-A).
  *
  * **2차 MVP라 아직 없다.** 계약은 본인이 자신을 조회하면 `visibility`와 무관하게
@@ -138,7 +127,6 @@ export async function getMyPublicProfile(): Promise<PublicProfileView> {
     ...mockMyPublicProfile,
     userId: profile.userId,
     nickname: profile.nickname,
-    introduction: getProfileEdit()?.introduction ?? mockMyIntroduction,
     stats: {
       ...mockMyPublicProfile.stats,
       frameCount: profile.stats.frameCount,

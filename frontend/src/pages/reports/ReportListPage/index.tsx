@@ -23,6 +23,7 @@ import { Link } from 'react-router';
 import Button from '../../../components/Button';
 import IconButton from '../../../components/IconButton';
 import ReportFourCut from '../../../components/ReportFourCut';
+import ReportTape from '../../../components/ReportTape';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import { ShareIcon } from '../../../components/Icon';
@@ -182,7 +183,7 @@ function PinnedStrip({ entry, tilt }: { entry: Entry; tilt: 'left' | 'right' }) 
   if (summary.status === 'GENERATING') {
     return (
       <div className={styles.pinned} data-tilt={tilt} data-generating="true">
-        <span className={styles.tape} aria-hidden="true" />
+        <ReportTape />
         <div className={styles.blank}>
           <span className={styles.blankText}>인화 중</span>
         </div>
@@ -200,7 +201,7 @@ function PinnedStrip({ entry, tilt }: { entry: Entry; tilt: 'left' | 'right' }) 
       data-tilt={tilt}
       aria-label={summary.title}
     >
-      <span className={styles.tape} aria-hidden="true" />
+      <ReportTape />
       {detail ? (
         <div className={styles.strip} aria-hidden="true">
           <ReportFourCut cuts={detail.fourCut} createdAt={detail.createdAt} head={false} />

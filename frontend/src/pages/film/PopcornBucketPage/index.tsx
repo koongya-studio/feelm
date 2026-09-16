@@ -36,13 +36,14 @@ import Button from '../../../components/Button';
 import { ChevronLeftIcon } from '../../../components/Icon';
 import IconButton from '../../../components/IconButton';
 import PopcornBucket from '../../../components/PopcornBucket';
+import { kernelFlavors } from '../../../components/PopcornBucket/kernels';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import { getPopcornBucket } from '../../../api/taste';
 import { path } from '../../../routes/paths';
 import styles from './PopcornBucketPage.module.css';
-import type { PopcornBucket as PopcornBucketData, PopcornBucketFlavor } from '../../../types/taste';
+import type { PopcornBucket as PopcornBucketData } from '../../../types/taste';
 
 /** 목업 파티. 파티 목록(5.1)이 범위 밖이라 파티를 고르는 화면이 없다 */
 const FALLBACK_PARTY_ID = 9001;
@@ -55,13 +56,6 @@ const BACK_BUTTON_SIZE = 39;
  * 본문이 길어져 CTA가 하단바 뒤로 밀린다. 통을 줄여 한 화면에 맞춘다.
  */
 const BUCKET_WIDTH = 196;
-
-/** 통 위에 쌓는 알을 맛 분포대로 펼친다. 한 알이 영화 한 편이다 */
-function kernelFlavors(flavors: PopcornBucketFlavor[]): string[] {
-  return flavors.flatMap((flavor) =>
-    Array.from({ length: flavor.popcornCount }, () => flavor.flavorCode),
-  );
-}
 
 export default function PopcornBucketPage() {
   const navigate = useNavigate();
