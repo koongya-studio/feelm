@@ -302,8 +302,10 @@ erDiagram
         bigint id PK
         bigint user_id FK "개인 추천. 파티 추천은 NULL"
         bigint party_id FK "파티 추천. 개인 추천은 NULL"
-        varchar input_version "평가·온보딩 변경 버전. 관심없음은 버전을 바꾸지 않음"
+        varchar input_version "기존 NOT NULL 호환 컬럼. Redis 개인 추천은 redis-candidate 저장"
         varchar model_version "ALS 추천 모델 버전"
+        bigint candidate_version "Redis 후보 버전. 파티 세트 기본값 0"
+        varchar generation_id "Redis 개인 추천 배치 식별자"
         timestamptz generated_at
     }
     RECOMMENDATION_ITEMS {
@@ -311,6 +313,7 @@ erDiagram
         bigint set_id FK
         bigint movie_id FK
         varchar type "TASTE / DISCOVERY / PARTY"
+        varchar flavor_code "후보가 제시한 맛 코드. 없으면 NULL"
         int position
         jsonb reason "추천 이유 스냅샷 (summary, factors)"
         timestamptz exposed_at "노출 시각. NULL이면 미노출 버퍼분"
@@ -334,11 +337,11 @@ erDiagram
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `recommendation_sets` | 추천 세트(이력 단위) | `user_id`·`party_id` 중 하나만 NOT NULL(CHECK). 개인/파티 구분은 이 두 FK로 판단한다. `input_version`과 ALS `model_version`이 같으면 같은 세트를 반환하며 소유자별 부분 유일 인덱스를 둔다 | FR-10, FR-33 · API-045, API-046, API-048, API-058 |
-| `recommendation_items` | 세트의 후보 영화 + 이유 스냅샷 | 유형은 `TASTE`·`DISCOVERY`·`PARTY`. UK(`set_id`, `position`), UK(`set_id`, `movie_id`), `position >= 1`. 후보 20편을 모두 저장하고 `exposed_at`으로 실제 노출분을 구분한다 | FR-12, FR-13 · API-045~048 |
+| `recommendation_sets` | 추천 세트(이력 단위) | `user_id`·`party_id` 중 하나만 NOT NULL(CHECK). Redis 개인 세트는 전역 고유 `generation_id`로 같은 배치를 식별한다. 파티 세트의 후보 버전 기본값은 0이고 generation ID는 NULL이다 | FR-10, FR-33 · API-045, API-046, API-048, API-058 |
+| `recommendation_items` | 세트의 후보 영화 + 이유 스냅샷 | 유형은 `TASTE`·`DISCOVERY`·`PARTY`. nullable `flavor_code`는 Redis 후보 값을 스냅샷한다. UK(`set_id`, `type`, `position`), UK(`set_id`, `movie_id`), `position >= 1`. TASTE·DISCOVERY를 각각 최대 20편 저장하고 `exposed_at`으로 실제 노출분을 구분한다 | FR-12, FR-13 · API-045~048 |
 | `user_movie_dismissals` | 사용자별 영화 관심없음 | UK(`user_id`, `movie_id`). 모든 화면의 모든 영화에 적용한다. `recommendation_item_id`는 선택적 출처이며 아이템 삭제 시 NULL로 전환한다 | FR-36 · API-047 |
 
-> 후보 Top-500은 Redis, Item Factor는 HDFS에 있으며 이 ERD 범위 밖입니다. 추천 세트의 후보 20편(버퍼)은 `recommendation_items`에 **전부 저장**하고, 추천 이력 조회(API-048)는 `exposed_at IS NOT NULL`인 노출분만 반환합니다. Redis의 추천 결과 캐시는 선택적 조회 가속용입니다 (MR !22 합의: PostgreSQL 저장안).
+> 종류별 후보 Top-500은 Redis, Item Factor는 HDFS에 있으며 이 ERD 범위 밖입니다. 추천 세트의 TASTE·DISCOVERY 후보를 각각 최대 20편 `recommendation_items`에 저장하고, 추천 이력 조회(API-048)는 `exposed_at IS NOT NULL`인 노출분만 반환합니다. Redis의 추천 결과 캐시는 선택적 조회 가속용입니다 (MR !22 합의: PostgreSQL 저장안).
 
 ### 2.5 파티
 

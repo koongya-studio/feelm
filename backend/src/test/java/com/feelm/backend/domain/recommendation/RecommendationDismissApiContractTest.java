@@ -455,6 +455,25 @@ class RecommendationDismissApiContractTest extends SharedPostgresContractTest {
                 .andExpect(jsonPath("$.replacement.reason.summary").value("취향과 잘 맞아요"));
     }
 
+    @Test
+    @DisplayName("T14 DISCOVERY 교체 카드는 추천 당시 저장한 맛을 반환한다")
+    void usesStoredDiscoveryFlavorForReplacement() throws Exception {
+        long nextDiscoveryMovie = 104;
+        long nextDiscoveryItem = 3004;
+        movie(nextDiscoveryMovie, "다음 발견 후보");
+        jdbc.update("UPDATE recommendation_items SET exposed_at=now() WHERE id=?", DISCOVERY_ITEM);
+        recommendationItem(nextDiscoveryItem, SET, nextDiscoveryMovie, "DISCOVERY", 4, false);
+        jdbc.update(
+                "UPDATE recommendation_items SET flavor_code='FLAVOR_SNAPSHOT' WHERE id=?",
+                nextDiscoveryItem);
+
+        dismiss(USER, DISCOVERY_MOVIE, itemBody(DISCOVERY_ITEM))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.replacement.recommendationItemId").value(nextDiscoveryItem))
+                .andExpect(jsonPath("$.replacement.type").value("DISCOVERY"))
+                .andExpect(jsonPath("$.replacement.flavorCode").value("FLAVOR_SNAPSHOT"));
+    }
+
     private org.springframework.test.web.servlet.ResultActions dismiss(
             long userId, long movieId, String body) throws Exception {
         return mvc.perform(

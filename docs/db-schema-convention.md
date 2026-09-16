@@ -108,7 +108,8 @@ scale 없는 `numeric`으로 입력값을 그대로 검사한다. 기존 정수 
   - `watch_records` — 사용자·영화별 활성 기록 1개(`EXPIRED`가 아닌 행)
   - `party_invitations` — `PENDING`인 (`party_id`, `invitee_id`) 유일
   - `party_members` — 파티별 `OWNER` 역할 최대 1명
-  - `recommendation_sets` — 개인 세트의 (`user_id`, `input_version`, `model_version`) 유일
+  - `recommendation_sets` — generation ID가 있는 추천 세트의 `generation_id` 전역 유일
+  - `recommendation_items` — (`set_id`, `type`, `position`) 유일. 타입별 버퍼 순번은 1부터 시작
   - `recommendation_sets` — 파티 세트의 (`party_id`, `input_version`, `model_version`) 유일
   - `movie_embeddings` — 영화별 현재 임베딩 한 건을 보장하는 `movie_id` 유일
 - 정규화 값으로 판단하는 유일성은 별도 컬럼을 두지 않고 함수 기반 유일 인덱스를 쓴다.

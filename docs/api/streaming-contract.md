@@ -22,7 +22,7 @@ flowchart LR
     KF -->|"⑤ 조회 · 클릭 등 행동"| SS["Spark Structured Streaming"]
     SS -->|"⑥ 행동 Feature · 인기"| RD
     RD -->|"⑦ Candidate · 행동 Feature · 인기 조회"| BE2["Spring Boot"]
-    PG -->|"⑧ 감상 · 관심없음 제외"| BE2
+    PG -->|"⑧ 영화 존재 · 평가 · 관심없음 확인"| BE2
     BE2 --> FE["React Web App"]
 ```
 
@@ -38,27 +38,27 @@ Python Consumer는 ④에서 `vector`·`candidates`와 version 키를 원자적�
 | TASTE 최대 500편 · DISCOVERY 최대 100편 갱신 | Python Consumer | ADR-0017, S15P21E106-415 |
 | 행동 Feature 집계 | Spark Streaming | ADR-0017 |
 | 전역 인기 영화 윈도우 집계 | Spark Streaming | FR-27, ADR-0017 |
-| **OTT 클릭 기반 재정렬 · 최종 XAI 조립** | **Spring Boot** | TASTE 최대 500편·DISCOVERY 최대 100편과 PostgreSQL 원본을 사용 |
-| **감상 기록 · 관심없음 제외 필터** | **Spring Boot** | 아래 2.1 |
-| TASTE / DISCOVERY 인터리브 정렬 | Spring Boot | 제외 후에 적용해야 구성 비율이 유지됨 |
+| **후보 점수 정렬 · 결정적 동점 셔플** | **Spring Boot** | 추천시스템 점수에 행동 가중치를 다시 적용하지 않음 |
+| **서비스 DB 미존재 · 평가 · 관심없음 제외 필터** | **Spring Boot** | 아래 2.1 |
+| 구조화 추천 근거 원본 저장 | Spring Boot | Consumer의 `reasons[]`를 세트 항목에 스냅샷 |
 | 세트 버퍼 저장 · 노출 | Spring Boot | API-045 처리 규칙, `recommendation_items` |
 | 파티 추천 집계 · OTT 구독 추천 집계 | Spring Boot | ADR-0017. Redis `candidates`를 읽어 요청 시점에 결합(5.1) |
 | 유사 영화 조회 · 취향 분석 집계 | Spring Boot | ADR-0017 |
 
 ### 2.1 제외 필터를 Spring이 담당하는 이유
 
-`API-045`는 "감상 기록이 있는 영화(`LINK_CLICKED` 포함)와 관심없음 영화는 제외한다"를 요구합니다.
-이 데이터는 PostgreSQL이 원본이며 평가 저장과 프레임 생성이 단일 트랜잭션으로 묶여 있습니다(NFR-06).
+Spring은 서비스 DB에 없는 영화, 평가한 영화와 관심없음 영화를 최종 후보에서 제외합니다.
+감상·OTT 클릭 이력은 제외나 재가중에 사용하지 않습니다.
 
 Spark가 미리 제외하려면 제외 목록의 복제본을 상태로 유지해야 하며, 다음 문제가 생깁니다.
 
-- Streaming 지연 중에는 방금 감상·관심없음 처리한 영화가 추천에 그대로 노출된다
+- Streaming 지연 중에는 방금 평가·관심없음 처리한 영화가 추천에 그대로 노출된다
 - 원본과 복제본이 어긋날 때 판정 기준이 필요하다
 - Checkpoint 유실 시 제외 목록이 통째로 사라져 이미 본 영화가 다시 추천된다
 
 제외는 순위를 바꾸지 않고 항목만 덜어내므로, 제외 위치를 옮겨도 추천 품질은 달라지지 않습니다.
-**추천 품질에 기여하는 관심없음의 부정 신호는 `DISMISS` 이벤트로 Spark에 전달**하고,
-**최종 노출 필터만 Spring이 조회 시점에 적용**합니다.
+**추천 품질에 기여하는 관심없음 신호는 추천시스템이 반영**하고,
+**최종 평가·관심없음 노출 필터는 Spring이 조회 시점에 적용**합니다.
 
 ### 2.2 Python Consumer가 PostgreSQL을 직접 조회하는 범위
 
@@ -78,8 +78,8 @@ Fold-in은 사용자의 평가 전체를 입력으로 하며, Python Consumer는
 
 #### 후보 메타데이터의 출처
 
-Consumer 후보에는 영화 표시용 메타데이터를 넣지 않습니다. 대표 맛을 포함해 최종 설명·OTT 재정렬에
-필요한 정보는 Spring이 PostgreSQL 원본에서 조회합니다.
+Consumer 후보에는 영화 표시용 메타데이터를 넣지 않고 구조화된 `reasons[]`만 전달합니다. Spring은 영화
+제목과 장르 등 사용자 표시용 정보를 PostgreSQL 원본에서 조회합니다.
 
 | 데이터 | 출처 | 이유 |
 |---|---|---|
@@ -103,9 +103,9 @@ Consumer 후보에는 영화 표시용 메타데이터를 넣지 않습니다. �
 
 - S15P21E106-415: Consumer의 DISCOVERY 후보 생성과 로컬 정책 검증
 - S15P21E106-471: Redis Candidate v3 `taste`/`discovery` 그룹화와 `generationId` writer 기준선
-- S15P21E106-481: TASTE 후보별 구조화 `reason`을 추가한 Candidate v4 writer·payload 기준선
+- S15P21E106-481: TASTE 후보별 구조화 `reasons[]`를 추가한 Candidate v4 writer·payload 기준선
 - S15P21E106-488: 전체 평가 또는 온보딩 이력으로 계산한 저이력 그룹 적합도·상위 기여 비율을
-  DISCOVERY 전용 `reason`으로 추가한 Candidate v5 writer·payload 기준선
+  DISCOVERY 전용 `reasons[]` 원소로 추가한 Candidate v5 writer·payload 기준선
 - S15P21E106-505: 입력 수 제한 제거, TASTE 500·DISCOVERY 100 후보 게시와 그룹 부족분 보충,
   `DISCOVERY_PERSONAL_SCORE`를 추가한 현재 Candidate v6 writer·payload 계약. Spring reader·조립은
   Backend 소비 계약
@@ -273,9 +273,9 @@ Offset을 커밋합니다. 중간 실패로 재시도되면 같은 DB 상태를 
 1. Spring이 `RATING` 또는 `ONBOARDING`을 발행한다.
 2. Python Consumer가 PostgreSQL을 다시 읽어 User Vector와 후보를 재계산한다.
 3. Python Consumer가 ALS·콘텐츠 지원 범위별 백분위를 결합한 TASTE 최대 500편을 만들고, 그룹 산출물을
-   활성화한 경우 DISCOVERY 최대 100편도 만든다. Spring은 두 후보 전체에 OTT·행동 정보를 결합하고
-   감상·관심없음 제외와 최종 재정렬·2+1 조립을 수행하며, Consumer의 구조화 `reason`을 사용해 최종
-   XAI 문구를 생성한다.
+   활성화한 경우 DISCOVERY 최대 100편도 만든다. Spring은 서비스 DB 미존재·평가·관심없음 후보만
+   제외하고 종류별 점수 정렬과 동점 결정적 셔플 후 타입별 최대 20편을 독립 저장한다. Consumer의
+   구조화 `reasons[]`는 원본 그대로 스냅샷한다.
 4. Python Consumer가 `feelm:user:{userId}:candidate-version`, `feelm:user:{userId}:vector`, `feelm:user:{userId}:candidates`을 Lua 스크립트 한 번으로 원자적으로 기록한다. `candidate-version` String은 성공한 게시마다 증가하는 게시 순번이며, `vector`와 `candidates` JSON은 같은 `candidateVersion`(형식 버전)과 `generationId`(한 번의 생성 결과 식별자)를 가진다.
 
 Consumer group에서 partition을 새로 assign받은 Consumer는 먼저 partition별 fencing key에 새 CSPRNG opaque
@@ -356,16 +356,16 @@ Spring은 개인 추천에서는 후보를 재정렬하고, 파티·OTT에서는
   "taste": [{
     "movieId": 807,
     "score": 4.32,
-    "reason": {
+    "reasons": [{
       "code": "SHARED_GENRE",
       "sourceMovieIds": [550],
       "matchedGenreCodes": ["THRILLER"]
-    }
+    }]
   }],
   "discovery": [{
     "movieId": 912,
     "score": 3.91,
-    "reason": {
+    "reasons": [{
       "code": "DISCOVERY_AGGREGATE_AFFINITY",
       "directionSource": "RATING",
       "contributorCount": 12,
@@ -377,15 +377,15 @@ Spring은 개인 추천에서는 후보를 재정렬하고, 파티·OTT에서는
       "viewedCountInGroup": 0,
       "affinityRank": 2,
       "popularityRankInGroup": 1
-    }
+    }]
   }, {
     "movieId": 913,
     "score": 3.82,
-    "reason": {
+    "reasons": [{
       "code": "DISCOVERY_PERSONAL_SCORE",
       "sourceMovieIds": [550],
       "matchedGenreCodes": ["THRILLER"]
-    }
+    }]
   }],
   "updatedAt": "2026-08-31T07:21:03Z"
 }
@@ -424,7 +424,7 @@ Spring은 개인 추천에서는 후보를 재정렬하고, 파티·OTT에서는
   같은 이유로 상위 500 컷은 동점 무리의 중간을 자를 수 있으며, 그때 탈락 여부도 `movieId`가 정한다.
 - **`score`의 최종 의미와 소비 규칙(파티 집계식, OTT 임계치)은 아직 합의되지 않았다.** 위 정의는
   모델 교체에 영향받지 않는 잠정 기준이며, 합의 시 이 절과 party.md·recommendation.md를 함께 고친다.
-- `candidateVersion`은 Candidate JSON 형식·구성 규칙과 허용 `reason.code` 버전이며 현재 `6`으로
+- `candidateVersion`은 Candidate JSON 형식·구성 규칙과 허용 `reasons[].code` 버전이며 현재 `6`으로
   고정되어 후보 재생성만으로 바꾸지 않는다. `candidate-version` Redis String은 성공한 후보 게시마다
   1씩 증가하는 내부 게시 순번이다. `generationId`는 매 생성 실행마다 새로 발급하는 고유 식별자다.
 - OTT 구독 추천(API-068)은 `taste`와 `discovery`에서 임계치 이상인 영화를 OTT 제공처별로 집계한다.
@@ -456,13 +456,13 @@ Spring은 개인 추천에서는 후보를 재정렬하고, 파티·OTT에서는
 
 **후보 부가 정보와 Spring 처리**
 
-`candidates.taste` 항목은 `movieId`, `score`, `reason`을 포함한다. TASTE `reason.code`는 `SHARED_GENRE` 또는
+`candidates.taste` 항목은 `movieId`, `score`, `reasons`를 포함한다. TASTE `reasons[].code`는 `SHARED_GENRE` 또는
 `TOP_RATED_SOURCE`다. 전자는 `sourceMovieIds`의 고평점 입력 영화와 후보가 공유하는 `matchedGenreCodes`를,
 후자는 공통 장르가 없을 때 가장 높은 평가 입력 영화를 뜻하며 `matchedGenreCodes`는 빈 배열이다.
 
-`candidates.discovery` 항목은 `movieId`, `score`, DISCOVERY 전용 `reason`을 포함한다. 대표 맛 같은 영화
+`candidates.discovery` 항목은 `movieId`, `score`, DISCOVERY 전용 `reasons`를 포함한다. 대표 맛 같은 영화
 표시용 메타데이터는 Candidate에 중복 저장하지 않고 Spring이 PostgreSQL에서 조회한다.
-`reason.code`는 `DISCOVERY_AGGREGATE_AFFINITY`이며 필드는 다음과 같다.
+`reasons[].code`는 `DISCOVERY_AGGREGATE_AFFINITY`이며 필드는 다음과 같다.
 
 | 필드 | 의미 |
 |---|---|
@@ -483,33 +483,35 @@ Spring은 합의한 coverage 기준보다 낮으면 영화명을 열거하지 �
 Consumer는 구조화된 근거만 저장하고, Spring은 영화 제목과 표시명을 조회해 사용자 문구를 만든다.
 
 그룹 후보가 100편보다 적으면 Consumer는 개인 점수 후보로 나머지를 채운다. 이 항목의
-`reason.code`는 `DISCOVERY_PERSONAL_SCORE`이며 `sourceMovieIds`와 `matchedGenreCodes`는 TASTE 근거와
+`reasons[].code`는 `DISCOVERY_PERSONAL_SCORE`이며 `sourceMovieIds`와 `matchedGenreCodes`는 TASTE 근거와
 같은 방식으로 계산한다. 입력이 없거나 어느 개인 점수 성분도 프로필을 만들 수 없는 `0.0` 동점
 fallback은 두 배열 모두 source와 장르 배열을 비워 근거가 없음을 명시한다. 이 코드가 추가된 현재
-계약은 Candidate v6이다.
+계약은 Candidate v6이다. 근거가 없으면 `reasons`는 빈 배열로 전달한다.
 배열 자체가 유형을 나타내므로 항목의 중복 `type` 필드는 두지 않는다. 공급 그룹 수·적격 그룹 수 같은
 DISCOVERY 진단 정보도 Redis 계약에 넣지 않고 Consumer 로그에만 남긴다.
-Spring은 최대 500개 TASTE 전체에 행동 가중치와 감상·관심없음 제외를 적용하고 최종 세트를 만든다.
-Spring은 TASTE 2편을 먼저 고른 뒤 이미 고른 영화와 겹치지 않는 DISCOVERY 1편을 고른다. DISCOVERY가
-부족하면 다음 TASTE로 채운다. 이 Consumer는 별도 POPULAR fallback 목록을 생성하지 않는다.
+Spring은 미존재·평가·관심없음 후보만 제외하고 종류별 점수 정렬 후 TASTE·DISCOVERY를 각각 최대 20편
+독립 저장한다. 동점 후보는 사용자와 generation ID를 seed로 결정적으로 섞는다. TASTE 2:DISCOVERY 1은
+저장 순서가 아니라 화면 조회 시 각 타입 버퍼에서 꺼내는 규칙이다. DISCOVERY가 부족하면 다음 TASTE로
+채운다. 이 Consumer는 별도 POPULAR fallback 목록을 생성하지 않는다.
 Consumer는 DISCOVERY 공급량을 낭비하지 않도록 현재 평가·온보딩·확정 감상·관심없음을 발견 목록에서
 선필터한다. 기존 TASTE 원시 후보의 의미는 바꾸지 않으며 Spring이 조회 시점에 두 목록을 다시 제외한다.
-OTT 제공처는 `movie_ott_providers`·`otts`, 사용자 클릭 정보는 `watch_records`에서 조회한다.
+OTT 제공처는 `movie_ott_providers`·`otts`에서 조회하며, 사용자 클릭 정보는 후보 재정렬에 사용하지 않는다.
 별도 Redis `topn`은 생성하거나 읽지 않는다. 기존 키 자동 삭제는 하지 않는다. 기존 배포가
 `candidates.items` 형식으로 저장한 값은 새 `taste`/`discovery` 형식과 호환되지 않으므로, Spring reader를
 전환하기 전에 Consumer 전체 재구축 또는 사용자별 재게시로 모든 활성 후보를 새 형식으로 갱신해야 한다.
-`candidateVersion=3`은 두 배열 모두 `reason`이 없고, `candidateVersion=4`는 TASTE에만 `reason`이 있다.
+`candidateVersion=3`은 두 배열 모두 `reasons`가 없고, `candidateVersion=4`는 TASTE에만 `reasons`가 있다.
 Candidate v5는 그룹 DISCOVERY 근거를 추가했고, Candidate v6는 개인 점수 보충 근거를 추가했다.
 Candidate v6 전환 시 Backend는 v5와 v6를 함께 읽는 전환 reader를 먼저 반영한다. 이어서 Consumer v6 writer를
 전환하고 모든 활성 후보를 재게시한다. vector와 candidates의 `candidateVersion=6` 및 `generationId` 일치를
 확인한 뒤 Backend의 v5 호환을 제거한다. 최종 reader는 version 6 이외의 payload를 추측해 문구를 만들지 않고
 재시도 후 `503 RECOMMENDATION_UNAVAILABLE`을 반환한다.
 
-S15P21E106-471에서 Candidate v3 그룹화 writer를 반영했고, S15P21E106-481에서 TASTE 구조화 `reason`을
-추가해 Candidate v4가 됐다. S15P21E106-488은 전체 이력 기반 DISCOVERY 전용 `reason`을 추가한 위 Candidate v5
-기준선을 만들었고, S15P21E106-505는 보충 근거를 추가해 Candidate v6가 됐다. 현재 `develop`에는 Spring reader가 없다. 전체 활성 후보 v6 재게시,
-generation 일치 확인과 TASTE 2 + DISCOVERY 1 통합 검증을 같은 전환 절차로 완료하기 전에는 Backend 연동
-완료로 보지 않는다.
+S15P21E106-471에서 Candidate v3 그룹화 writer를 반영했고, S15P21E106-481에서 TASTE 구조화 `reasons[]`를
+추가해 Candidate v4가 됐다. S15P21E106-488은 전체 이력 기반 DISCOVERY 전용 `reasons[]` 원소를 추가한 Candidate v5
+기준선을 만들었고, S15P21E106-505는 보충 근거를 추가해 Candidate v6가 됐다. S15P21E106-164는 기존
+v4 배열 계약을 유지하고, S15P21E106-498에서 v6 배열 계약 대응을 진행한다. 전체 활성 후보 v6 재게시,
+generation 일치 확인과 TASTE 2 + DISCOVERY 1 통합 검증을 같은 전환 절차로 완료하기 전에는 Backend
+연동 완료로 보지 않는다.
 
 **`feelm:model:current`**
 
