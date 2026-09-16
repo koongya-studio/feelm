@@ -14,3 +14,4 @@ include:
   - local: .gitlab/ci/frontend.yml
   - local: .gitlab/ci/pipeline.yml
   - local: .gitlab/ci/consumer.yml
+  - local: .gitlab/ci/infra.yml

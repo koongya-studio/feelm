@@ -36,6 +36,8 @@ class ServerPilotStageTests(unittest.TestCase):
             "ci-consumer-mr-config.py",
             "ci-consumer-mr-prepare.py",
             "ci-consumer-mr-runner.py",
+            "ci-infra-mr-boundary.py",
+            "ci-infra-mr-runner.py",
         }
 
         self.assertEqual(set(), required.difference(stage.FILES))

@@ -22,6 +22,7 @@ FILES = runtime.FILES + (
     'ci-pipeline-mr-config.py', 'ci-pipeline-mr-prepare.py', 'ci-pipeline-mr-runner.py',
     'ci-consumer-mr-boundary.py', 'ci-consumer-mr-config.py',
     'ci-consumer-mr-prepare.py', 'ci-consumer-mr-runner.py',
+    'ci-infra-mr-boundary.py', 'ci-infra-mr-runner.py',
     'ci-dependency-cache.py', 'ci-dependency-cache-context.py', 'ci-dependency-cache-install.py',
     'ci-network-guard.py',
     'systemd/feelm-ci222-gitlab-runner.service',

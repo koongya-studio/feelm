@@ -48,6 +48,7 @@ CONSUMER_SCRIPT = [
     'uv run ruff check .',
     'uv run pytest -v',
 ]
+INFRA_SCRIPT = adapter.INFRA_EXPECTED_SCRIPT
 
 
 def response(script=None, job_name='backend-mr-test'):
@@ -55,6 +56,7 @@ def response(script=None, job_name='backend-mr-test'):
         'backend-mr-test': adapter.EXPECTED_SCRIPT,
         'frontend-mr-test': adapter.FRONTEND_EXPECTED_SCRIPT,
         'consumer-mr-test': CONSUMER_SCRIPT,
+        'infra-config-test': INFRA_SCRIPT,
         **PIPELINE_SCRIPTS,
     }
     return {
@@ -105,6 +107,8 @@ class AdapterTests(unittest.TestCase):
         self.assertEqual(frontend['service'], 'frontend')
         consumer = adapter.validate_job_response(response(job_name='consumer-mr-test'))
         self.assertEqual(consumer['service'], 'consumer')
+        infra = adapter.validate_job_response(response(job_name='infra-config-test'))
+        self.assertEqual(infra['service'], 'infra')
 
     def test_consumer_context_archive_and_runner_are_fixed(self):
         self.assertEqual(adapter.CONSUMER_EXPECTED_SCRIPT, CONSUMER_SCRIPT)
@@ -237,6 +241,26 @@ class AdapterTests(unittest.TestCase):
         private_config.assert_called_once_with(adapter.CONFIG, require_prepared=False)
         fetch.assert_called_once_with(adapter.validate_job_response(context), 'frontend')
         frontend.assert_called_once()
+        backend.assert_not_called()
+
+    def test_infra_job_routes_only_validated_source_to_infra_runner(self):
+        context = response(job_name='infra-config-test')
+        source = b'validated-infra-source'
+        digest = hashlib.sha256(source).hexdigest()
+        with patch.object(adapter, 'read_private_config',
+                          return_value=({}, Path('/prepared'))) as private_config, \
+             patch.object(adapter, 'verify_current_job', return_value={'pipeline': {'id': 1}}), \
+             patch.object(adapter, 'verify_merge_request', return_value={'iid': 98}), \
+             patch.object(adapter, 'fetch_merge_request_detail', return_value={'iid': 98}), \
+             patch.object(adapter, 'dependency_changes') as dependency, \
+             patch.object(adapter, 'fetch_source', return_value=(source, digest)) as fetch, \
+             patch.object(adapter.infra_runner, 'start', return_value=0) as infra, \
+             patch.object(adapter.safety, 'start') as backend:
+            self.assertEqual(adapter.run_job(context, opener=object()), 0)
+        dependency.assert_not_called()
+        private_config.assert_called_once_with(adapter.CONFIG, require_prepared=False)
+        fetch.assert_called_once_with(adapter.validate_job_response(context), 'infra')
+        infra.assert_called_once()
         backend.assert_not_called()
 
     def test_pipeline_job_routes_only_validated_source_to_pipeline_runner(self):
