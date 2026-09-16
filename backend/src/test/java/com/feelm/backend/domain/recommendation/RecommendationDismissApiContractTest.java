@@ -416,7 +416,7 @@ class RecommendationDismissApiContractTest extends SharedPostgresContractTest {
         jdbc.update(
                 "INSERT INTO popcorn_flavors"
                         + "(id,code,display_name,color,sort_order,cluster_id,representative_keywords)"
-                        + " VALUES (1,'FLAVOR_B','핫칠리','#DC9A4E',1,1,'[]'::jsonb)");
+                        + " VALUES (1,'FLAVOR_B','다크초코','#3C2418',1,1,'[]'::jsonb)");
         jdbc.update(
                 "UPDATE movies SET poster_url='https://image.test/poster.jpg',"
                         + " release_date=DATE '1999-10-15', average_rating=4.30,"

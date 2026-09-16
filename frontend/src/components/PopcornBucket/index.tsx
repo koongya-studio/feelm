@@ -48,11 +48,11 @@ import styles from './PopcornBucket.module.css';
  */
 const KERNEL_SPRITE: Record<string, string> = {
   FLAVOR_A: original,
-  FLAVOR_B: caramel,
-  FLAVOR_C: cheese,
-  FLAVOR_D: chocolate,
+  FLAVOR_B: chocolate,
+  FLAVOR_C: caramel,
+  FLAVOR_D: pistachio,
   FLAVOR_E: cookie,
-  FLAVOR_F: pistachio,
+  FLAVOR_F: cheese,
   FLAVOR_G: strawberry,
   FLAVOR_H: blueberry,
 };

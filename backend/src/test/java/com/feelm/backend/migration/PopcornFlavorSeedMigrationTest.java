@@ -24,7 +24,7 @@ class PopcornFlavorSeedMigrationTest {
     @Test
     void seedsTheEightFixed439FlavorIdentities() throws Exception {
         try (var database = previousSchema()) {
-            database.flyway().migrate();
+            seedFlyway(database).migrate();
 
             assertThat(query(database, "SELECT count(*) FROM popcorn_flavors")).isEqualTo("8");
             assertThat(
@@ -48,8 +48,8 @@ class PopcornFlavorSeedMigrationTest {
                                     FROM popcorn_flavors WHERE code='FLAVOR_H'
                                     """))
                     .isEqualTo("치즈믹스:#D9C6EA:5");
-            assertThat(database.flyway().migrate().migrationsExecuted).isZero();
-            assertThat(database.flyway().validateWithResult().validationSuccessful).isTrue();
+            assertThat(seedFlyway(database).migrate().migrationsExecuted).isZero();
+            assertThat(seedFlyway(database).validateWithResult().validationSuccessful).isTrue();
         }
     }
 
@@ -64,7 +64,7 @@ class PopcornFlavorSeedMigrationTest {
                     VALUES (42,'FLAVOR_A','사용자 확정 이름','#010203',99,0,'["보존"]');
                     """);
 
-            database.flyway().migrate();
+            seedFlyway(database).migrate();
 
             assertThat(query(database, "SELECT count(*) FROM popcorn_flavors")).isEqualTo("8");
             assertThat(
@@ -100,7 +100,7 @@ class PopcornFlavorSeedMigrationTest {
                     """
                             + row);
 
-            assertThatThrownBy(() -> database.flyway().migrate())
+            assertThatThrownBy(() -> seedFlyway(database).migrate())
                     .isInstanceOf(FlywayException.class)
                     .hasMessageContaining("Popcorn flavor seed identity conflict");
             assertThat(query(database, "SELECT count(*) FROM popcorn_flavors")).isEqualTo("1");
@@ -129,7 +129,7 @@ class PopcornFlavorSeedMigrationTest {
                       FOR EACH ROW EXECUTE FUNCTION reject_flavor_h();
                     """);
 
-            assertThatThrownBy(() -> database.flyway().migrate())
+            assertThatThrownBy(() -> seedFlyway(database).migrate())
                     .isInstanceOf(FlywayException.class)
                     .hasMessageContaining("injected flavor failure");
             assertThat(query(database, "SELECT count(*) FROM popcorn_flavors")).isEqualTo("0");
@@ -138,7 +138,7 @@ class PopcornFlavorSeedMigrationTest {
                     database,
                     "DROP TRIGGER reject_flavor_seed ON popcorn_flavors; "
                             + "DROP FUNCTION reject_flavor_h()");
-            database.flyway().migrate();
+            seedFlyway(database).migrate();
             assertThat(query(database, "SELECT count(*) FROM popcorn_flavors")).isEqualTo("8");
         }
     }
@@ -151,6 +151,13 @@ class PopcornFlavorSeedMigrationTest {
                 .load()
                 .migrate();
         return database;
+    }
+
+    private static Flyway seedFlyway(MigrationPostgresSupport.MigrationTestDatabase database) {
+        return Flyway.configure()
+                .dataSource(database.getJdbcUrl(), database.getUsername(), database.getPassword())
+                .target(SEED_VERSION)
+                .load();
     }
 
     private static void execute(MigrationPostgresSupport.MigrationTestDatabase database, String sql)
