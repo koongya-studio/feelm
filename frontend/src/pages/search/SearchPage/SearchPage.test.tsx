@@ -1,23 +1,27 @@
 /*
- * 4.1 · 4.2 · 4.4 — 한 화면의 세 상태 전환 (업무 S15P21E106-303)
+ * 4.1 · 4.2 · 4.4 — 한 화면의 세 상태 전환 (업무 S15P21E106-303 · -476)
  *
- * 이 화면은 세 프레임을 상태로 나눠 갖는다. 어느 상태를 보여줄지는 `results`가 `null`인지
- * 빈 배열인지로 갈리는데, 그 둘을 헷갈리면 **검색하지 않은 화면과 결과가 없는 화면이
+ * 이 화면은 세 프레임을 상태로 나눠 갖는다. 어느 상태를 보여줄지는 결과가 `null`인지
+ * 빈 `items`인지로 갈리는데, 그 둘을 헷갈리면 **검색하지 않은 화면과 결과가 없는 화면이
  * 뒤바뀐다.** 눈으로는 둘 다 "목록이 없는 화면"이라 구분되지 않는다.
  *
  * 급상승과 검색은 실패를 다르게 다룬다. 검색이 실패하면 화면을 채우는 안내가 되고,
  * 급상승이 실패하면 그 자리만 인라인으로 빈다. 그 비대칭이 의도된 것임을 고정한다.
+ *
+ * 실제 API로 바뀌면서(-476) 커서 페이지가 생겼다. **건수는 받아 온 `items`가 아니라
+ * `totalCount`**이고, `더 보기`가 실패해도 이미 그린 목록은 남아야 한다.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import SearchPage from './index';
 import { renderWithRouter } from '../../../test/render';
 import { resetSessionStore } from '../../../mocks/sessionStore';
-import type { MovieSearchItem } from '../../../types/search';
+import type { MovieSearchItem, MovieSearchResult } from '../../../types/search';
 import type { TrendingList } from '../../../types/trend';
 
 vi.mock('../../../api/search', () => ({
   searchMovies: vi.fn(),
+  countSearchResults: vi.fn(),
   getFilterOptions: vi.fn(),
   getTrendingMovies: vi.fn(),
 }));
@@ -26,8 +30,17 @@ vi.mock('../../../api/otts', () => ({
   getOtts: vi.fn(),
 }));
 
-const { searchMovies, getFilterOptions, getTrendingMovies } = await import('../../../api/search');
+const { searchMovies, countSearchResults, getFilterOptions, getTrendingMovies } =
+  await import('../../../api/search');
 const { getOtts } = await import('../../../api/otts');
+
+/** API-028 한 장. `totalCount`는 커서 이전 전체 건수라 `items`보다 클 수 있다 */
+function page(
+  items: MovieSearchItem[],
+  overrides: Partial<MovieSearchResult> = {},
+): MovieSearchResult {
+  return { totalCount: items.length, items, nextCursor: null, hasNext: false, ...overrides };
+}
 
 function item(movieId: number, title: string): MovieSearchItem {
   return {
@@ -76,7 +89,8 @@ beforeEach(() => {
   ]);
   vi.mocked(getFilterOptions).mockResolvedValue(filterOptions);
   vi.mocked(getTrendingMovies).mockResolvedValue(trending);
-  vi.mocked(searchMovies).mockResolvedValue({ items: [], nextCursor: null, hasNext: false });
+  vi.mocked(searchMovies).mockResolvedValue(page([]));
+  vi.mocked(countSearchResults).mockResolvedValue(0);
 });
 
 /** 검색어를 넣고 제출한다 */
@@ -96,11 +110,9 @@ describe('4.1 → 4.2 → 4.4 상태 전환', () => {
   });
 
   it('결과가 있으면 목록을 보여준다 (4.2)', async () => {
-    vi.mocked(searchMovies).mockResolvedValue({
-      items: [item(201, '나우 유 씨 미'), item(202, '나우 유 씨 미 2')],
-      nextCursor: null,
-      hasNext: false,
-    });
+    vi.mocked(searchMovies).mockResolvedValue(
+      page([item(201, '나우 유 씨 미'), item(202, '나우 유 씨 미 2')]),
+    );
 
     renderWithRouter(<SearchPage />, { route: '/search' });
     await screen.findByText('웡카와 초콜릿');
@@ -147,11 +159,7 @@ describe('실패를 다르게 다룬다', () => {
     expect(await screen.findByText('검색하지 못했어요')).toBeInTheDocument();
 
     // 다시 시도하면 같은 조건으로 한 번 더 조회한다
-    vi.mocked(searchMovies).mockResolvedValue({
-      items: [item(201, '나우 유 씨 미')],
-      nextCursor: null,
-      hasNext: false,
-    });
+    vi.mocked(searchMovies).mockResolvedValue(page([item(201, '나우 유 씨 미')]));
     fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
 
     expect(await screen.findByText('검색 결과 1건')).toBeInTheDocument();
@@ -187,11 +195,7 @@ describe('4.3 필터 시트', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '드라마' }));
 
-    vi.mocked(searchMovies).mockResolvedValue({
-      items: [item(208, '여름의 끝')],
-      nextCursor: null,
-      hasNext: false,
-    });
+    vi.mocked(searchMovies).mockResolvedValue(page([item(208, '여름의 끝')]));
     fireEvent.click(screen.getByRole('button', { name: /결과 보기/ }));
 
     expect(await screen.findByText('검색 결과 1건')).toBeInTheDocument();
@@ -212,7 +216,68 @@ describe('4.3 필터 시트', () => {
 
     // 검색어도 필터도 없으면 계약이 400을 주므로 애초에 보내지 않는다
     expect(await screen.findByRole('button', { name: '결과 보기' })).toBeInTheDocument();
-    expect(vi.mocked(searchMovies)).not.toHaveBeenCalled();
+    expect(vi.mocked(countSearchResults)).not.toHaveBeenCalled();
+  });
+});
+
+describe('커서 페이지', () => {
+  it('건수는 받아 온 목록이 아니라 totalCount다', async () => {
+    vi.mocked(searchMovies).mockResolvedValue(
+      page([item(201, '나우 유 씨 미')], { totalCount: 24, nextCursor: 'cursor-2', hasNext: true }),
+    );
+
+    renderWithRouter(<SearchPage />, { route: '/search' });
+    await screen.findByText('웡카와 초콜릿');
+
+    search('나우 유');
+
+    expect(await screen.findByText('검색 결과 24건')).toBeInTheDocument();
+  });
+
+  it('더 보기는 같은 조건에 커서를 실어 다음 장을 이어 붙인다', async () => {
+    vi.mocked(searchMovies).mockResolvedValue(
+      page([item(201, '나우 유 씨 미')], { totalCount: 2, nextCursor: 'cursor-2', hasNext: true }),
+    );
+
+    renderWithRouter(<SearchPage />, { route: '/search' });
+    await screen.findByText('웡카와 초콜릿');
+
+    search('나우 유');
+    await screen.findByText('나우 유 씨 미');
+
+    vi.mocked(searchMovies).mockResolvedValue(
+      page([item(202, '나우 유 씨 미 2')], { totalCount: 2 }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
+
+    expect(await screen.findByText('나우 유 씨 미 2')).toBeInTheDocument();
+    // 앞 장은 그대로 남는다
+    expect(screen.getByText('나우 유 씨 미')).toBeInTheDocument();
+    expect(vi.mocked(searchMovies)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ q: '나우 유' }),
+      'cursor-2',
+    );
+    // 다음 장이 없으면 버튼도 사라진다
+    expect(screen.queryByRole('button', { name: '더 보기' })).not.toBeInTheDocument();
+  });
+
+  it('더 보기가 실패해도 이미 그린 목록은 남는다', async () => {
+    vi.mocked(searchMovies).mockResolvedValue(
+      page([item(201, '나우 유 씨 미')], { totalCount: 2, nextCursor: 'cursor-2', hasNext: true }),
+    );
+
+    renderWithRouter(<SearchPage />, { route: '/search' });
+    await screen.findByText('웡카와 초콜릿');
+
+    search('나우 유');
+    await screen.findByText('나우 유 씨 미');
+
+    vi.mocked(searchMovies).mockRejectedValue(new Error('실패'));
+    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
+
+    expect(await screen.findByText('다음 결과를 불러오지 못했어요.')).toBeInTheDocument();
+    expect(screen.getByText('나우 유 씨 미')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
   });
 });
 

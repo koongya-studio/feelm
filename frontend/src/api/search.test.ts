@@ -1,109 +1,188 @@
 /*
- * API-028 영화 검색 목업의 필터 결합 규칙 (업무 S15P21E106-303)
+ * 영화 검색 (업무 S15P21E106-476).
  *
- * 계약이 정한 규칙은 **서로 다른 필터는 AND, 같은 필터의 복수 값은 OR**이다. 목업이
- * 이 규칙을 흉내 내지 않으면 4.3 필터 화면이 거짓말을 하게 되고, 실제 연동에서 결과가
- * 달라진다. 규칙 자체를 고정한다.
+ * 화면에서는 드러나지 않는 것을 고정한다.
+ * - **배열 질의를 같은 이름의 반복으로 싣는 것.** 계약이 그렇게 정했고 인덱스 표기는
+ *   서버가 400으로 거절한다(API-028). 한 값만 실려도 화면은 "필터가 걸렸다"고 보이므로
+ *   눈으로는 틀린 것을 알 수 없다
+ * - **`cursor`는 같은 조건으로만 되돌려 준다.** 조건이 섞인 커서는 400이다
+ * - **`결과 보기 · N편`은 한 장을 가장 작게 받아 `totalCount`만 본다.** `items`의 길이를
+ *   세면 21편부터 20으로 굳는다
+ * - **필터 옵션은 공개 API라 토큰을 싣지 않는다.** 실어도 서버는 200을 주므로 드러나지
+ *   않는다
  *
- * 400 두 가지(검색어·필터가 모두 없음, 연도 범위 역전)도 함께 본다. 화면이 그 조합을
- * 보내지 않도록 막고 있어 눈으로는 확인되지 않는 경로다.
+ * 필터 결합(AND · OR)과 정렬, 400 두 가지는 이제 서버가 판정한다. 목업 시절 이 파일이
+ * 고정하던 규칙이라 backend 쪽 시험으로 옮겨 갔다.
  */
-import { describe, expect, it } from 'vitest';
-import { searchMovies } from './search';
-import { ApiError } from './mockTransport';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { countSearchResults, getFilterOptions, searchMovies } from './search';
+import { ApiError } from './apiError';
+import { resetSessionForTest, startSession } from './session';
+import type { MovieSearchItem, MovieSearchResult } from '../types/search';
 
-describe('API-028 검색어', () => {
-  it('제목으로 찾는다', async () => {
+const fetchMock = vi.fn();
+
+function json(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function requestedUrl(index = 0): string {
+  return (fetchMock.mock.calls[index] as [string, RequestInit])[0];
+}
+
+function requestedHeaders(index = 0): Record<string, string> {
+  const init = (fetchMock.mock.calls[index] as [string, RequestInit])[1];
+
+  return (init.headers ?? {}) as Record<string, string>;
+}
+
+function item(movieId: number): MovieSearchItem {
+  return {
+    movieId,
+    title: '영화 제목',
+    originalTitle: 'Movie Title',
+    posterUrl: null,
+    releaseYear: 2020,
+    genres: ['드라마'],
+    averageRating: 4.1,
+    ottProviders: ['NETFLIX'],
+    watched: false,
+  };
+}
+
+function page(overrides: Partial<MovieSearchResult> = {}): MovieSearchResult {
+  return { totalCount: 1, items: [item(201)], nextCursor: null, hasNext: false, ...overrides };
+}
+
+beforeEach(() => {
+  resetSessionForTest();
+  startSession('token');
+  fetchMock.mockReset();
+  vi.stubGlobal('fetch', fetchMock);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('API-028 영화 검색', () => {
+  it('검색어와 기본 페이지 크기를 싣는다', async () => {
+    fetchMock.mockResolvedValue(json(200, page()));
+
+    await searchMovies({ q: '나우 유' });
+
+    const url = new URL(requestedUrl(), 'http://test');
+
+    expect(url.pathname).toBe('/api/v1/movies/search');
+    expect(url.searchParams.get('q')).toBe('나우 유');
+    expect(url.searchParams.get('size')).toBe('20');
+  });
+
+  it('같은 필터의 복수 값은 같은 이름을 반복해 싣는다', async () => {
+    fetchMock.mockResolvedValue(json(200, page()));
+
+    await searchMovies({ genre: ['DRAMA', 'SF'], country: ['KR'], ott: [1, 2] });
+
+    const params = new URL(requestedUrl(), 'http://test').searchParams;
+
+    expect(params.getAll('genre')).toEqual(['DRAMA', 'SF']);
+    expect(params.getAll('country')).toEqual(['KR']);
+    expect(params.getAll('ott')).toEqual(['1', '2']);
+    // 인덱스 표기는 서버가 400으로 거절한다
+    expect(requestedUrl()).not.toContain('%5B');
+  });
+
+  it('고르지 않은 조건은 질의에 넣지 않는다', async () => {
+    fetchMock.mockResolvedValue(json(200, page()));
+
+    await searchMovies({ q: '나우 유', genre: [], ott: [] });
+
+    const params = new URL(requestedUrl(), 'http://test').searchParams;
+
+    expect(params.has('genre')).toBe(false);
+    expect(params.has('ott')).toBe(false);
+    expect(params.has('cursor')).toBe(false);
+  });
+
+  it('다음 장은 같은 조건에 커서만 더해 부른다', async () => {
+    fetchMock.mockResolvedValue(json(200, page()));
+
+    await searchMovies({ q: '나우 유', genre: ['DRAMA'] }, 'cursor-2');
+
+    const params = new URL(requestedUrl(), 'http://test').searchParams;
+
+    expect(params.get('cursor')).toBe('cursor-2');
+    expect(params.get('q')).toBe('나우 유');
+    expect(params.getAll('genre')).toEqual(['DRAMA']);
+  });
+
+  it('전체 건수와 커서를 그대로 돌려준다', async () => {
+    fetchMock.mockResolvedValue(
+      json(200, page({ totalCount: 24, nextCursor: 'cursor-2', hasNext: true })),
+    );
+
     const result = await searchMovies({ q: '나우 유' });
 
-    expect(result.items.map((movie) => movie.movieId)).toEqual([201, 202, 203, 204]);
+    expect(result.totalCount).toBe(24);
+    expect(result.nextCursor).toBe('cursor-2');
+    expect(result.hasNext).toBe(true);
   });
 
-  it('감독 이름으로도 찾는다', async () => {
-    const result = await searchMovies({ q: '크리스토퍼 놀란' });
+  it('회원 전용이라 토큰 없이 부르면 401이 그대로 올라온다', async () => {
+    resetSessionForTest();
+    fetchMock.mockResolvedValue(json(401, { code: 'UNAUTHORIZED', message: '인증이 필요합니다.' }));
 
-    expect(result.items.map((movie) => movie.title)).toEqual(['달의 뒷면']);
-  });
+    const error = await searchMovies({ q: '나우 유' }).catch((caught: unknown) => caught);
 
-  it('맞는 것이 없으면 빈 목록과 함께 성공한다', async () => {
-    const result = await searchMovies({ q: '인터스텔라22' });
-
-    expect(result.items).toEqual([]);
-  });
-});
-
-describe('API-028 필터 결합', () => {
-  it('같은 필터의 복수 값은 OR로 묶인다', async () => {
-    const drama = await searchMovies({ genre: ['DRAMA'] });
-    const sf = await searchMovies({ genre: ['SF'] });
-    const both = await searchMovies({ genre: ['DRAMA', 'SF'] });
-
-    expect(both.items.length).toBe(drama.items.length + sf.items.length);
-  });
-
-  it('서로 다른 필터는 AND로 묶인다', async () => {
-    const drama = await searchMovies({ genre: ['DRAMA'] });
-    const korean = await searchMovies({ genre: ['DRAMA'], country: ['KR'] });
-
-    expect(korean.items.length).toBeLessThan(drama.items.length);
-    expect(korean.items.every((movie) => movie.genres.includes('드라마'))).toBe(true);
-  });
-
-  it('검색어와 필터도 AND로 묶인다', async () => {
-    const result = await searchMovies({ q: '나우 유', genre: ['DRAMA'] });
-
-    expect(result.items.map((movie) => movie.title)).toEqual(['나우 유 히어 미']);
-  });
-
-  it('OTT는 ottId로 받아 코드로 대조한다', async () => {
-    const result = await searchMovies({ ott: [2] });
-
-    expect(result.items.every((movie) => movie.ottProviders.includes('TVING'))).toBe(true);
-  });
-
-  it('개봉연도는 범위로 거른다', async () => {
-    const result = await searchMovies({ yearFrom: 2020, yearTo: 2029 });
-
-    expect(result.items.every((movie) => movie.releaseYear >= 2020)).toBe(true);
-    expect(result.items.every((movie) => movie.releaseYear <= 2029)).toBe(true);
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(401);
   });
 });
 
-describe('API-028 정렬', () => {
-  it('평점순은 높은 순이다', async () => {
-    const { items } = await searchMovies({ q: '나우 유', sort: 'RATING' });
-    const scores = items.map((movie) => movie.averageRating);
+describe('4.3 결과 보기 개수', () => {
+  it('한 장을 가장 작게 받고 totalCount만 본다', async () => {
+    fetchMock.mockResolvedValue(json(200, page({ totalCount: 24 })));
 
-    expect([...scores].sort((a, b) => b - a)).toEqual(scores);
-  });
+    const count = await countSearchResults({ genre: ['DRAMA'] });
 
-  it('최신순은 개봉연도 내림차순이다', async () => {
-    const { items } = await searchMovies({ q: '나우 유', sort: 'RELEASE_DATE' });
-
-    expect(items.map((movie) => movie.releaseYear)).toEqual([2025, 2019, 2016, 2013]);
+    expect(count).toBe(24);
+    expect(new URL(requestedUrl(), 'http://test').searchParams.get('size')).toBe('1');
   });
 });
 
-describe('API-028 오류', () => {
-  it('검색어와 필터가 모두 없으면 400이다', async () => {
-    await expect(searchMovies({})).rejects.toBeInstanceOf(ApiError);
+describe('API-029 검색 필터 옵션', () => {
+  it('공개 API라 토큰을 싣지 않는다', async () => {
+    fetchMock.mockResolvedValue(
+      json(200, {
+        genres: [{ code: 'DRAMA', name: '드라마' }],
+        countries: [{ code: 'KR', name: '한국' }],
+        yearRange: { min: 1920, max: 2026 },
+        otts: [{ ottId: 1, code: 'NETFLIX', name: '넷플릭스' }],
+      }),
+    );
+
+    const options = await getFilterOptions();
+
+    expect(requestedUrl()).toBe('/api/v1/movies/filter-options');
+    expect(requestedHeaders().Authorization).toBeUndefined();
+    expect(options.genres).toEqual([{ code: 'DRAMA', name: '드라마' }]);
   });
 
-  it('연도 범위가 뒤집히면 400이다', async () => {
-    await expect(searchMovies({ yearFrom: 2020, yearTo: 2010 })).rejects.toMatchObject({
-      status: 400,
-      code: 'VALIDATION_FAILED',
-    });
-  });
-});
+  it('연도가 있는 영화가 없으면 범위가 비어 온다', async () => {
+    fetchMock.mockResolvedValue(
+      json(200, {
+        genres: [],
+        countries: [],
+        yearRange: { min: null, max: null },
+        otts: [],
+      }),
+    );
 
-describe('응답 모양', () => {
-  it('목업 전용 필드를 응답에 섞지 않는다', async () => {
-    const [first] = (await searchMovies({ q: '나우 유' })).items;
+    const options = await getFilterOptions();
 
-    // 계약(API-028 `items[]`)에 없는 필드가 새어 나가면 실제 연동에서 사라진다
-    expect(first).not.toHaveProperty('countryCode');
-    expect(first).not.toHaveProperty('genreCodes');
-    expect(first).not.toHaveProperty('people');
+    expect(options.yearRange).toEqual({ min: null, max: null });
   });
 });

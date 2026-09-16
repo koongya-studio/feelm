@@ -14,6 +14,7 @@ import type { MovieSearchQuery, MovieSearchSort } from '../../../types/search';
  * 범위로 바꾼다.
  *
  * `그 이전`의 시작은 API-029 `yearRange.min`이므로 여기서 정하지 않고 비워 둔다.
+ * 기준정보에 연도가 하나도 없으면 그 값도 `null`이라 시작 없이 끝만 보낸다.
  */
 export const YEAR_BUCKETS = [
   { id: 'ALL', label: '전체', from: undefined, to: undefined },
@@ -75,7 +76,7 @@ export function toggle<T>(values: T[], value: T): T[] {
 export function toSearchQuery(
   keyword: string,
   filter: SearchFilterState,
-  yearMin: number,
+  yearMin: number | null,
 ): MovieSearchQuery {
   const bucket = YEAR_BUCKETS.find((item) => item.id === filter.year) ?? YEAR_BUCKETS[0];
   const query: MovieSearchQuery = { sort: filter.sort };
@@ -86,8 +87,8 @@ export function toSearchQuery(
   if (filter.ott.length) query.ott = filter.ott;
 
   if (bucket.id !== 'ALL') {
-    // `그 이전`은 시작이 없으므로 기준정보의 최솟값을 쓴다
-    query.yearFrom = bucket.from ?? yearMin;
+    // `그 이전`은 시작이 없으므로 기준정보의 최솟값을 쓴다. 그것도 없으면 끝만 보낸다
+    query.yearFrom = bucket.from ?? yearMin ?? undefined;
     query.yearTo = bucket.to;
   }
 
