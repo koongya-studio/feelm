@@ -11,23 +11,31 @@
  * 벗어나면 상태가 `LINK_CLICKED`로 남고 7일 뒤 서버가 `EXPIRED`로 바꾸므로, 그 의도는
  * 기본 동작이 대신한다. 하단 안내 문구도 두 선택지에 맞춰 줄였다.
  *
- * 어느 영화의 어느 OTT 기록인지는 감상 기록 목록(API-034)에서 읽는다. 2.4에서 OTT
- * 링크를 누를 때 남은 기록을 그대로 찾으므로, 실제로 누른 OTT가 문구에 나온다
- * (업무 -263). URL로 직접 들어와 기록이 없으면 오류 상태다 — 이전에는 목업 영화 상세를
- * 대신 보여줬는데, 영화 상세가 실제 API로 바뀌면서(업무 -475) 그 목업 영화가 실제 DB에
- * 없어 어차피 `404`가 된다. 없는 기록에는 없다고 답하는 쪽이 맞다.
+ * **감상 기록도 확인 응답도 실제 API다**(업무 -477, API-034 · API-035). 계약에 단건
+ * 조회가 없어 목록에서 번호로 찾는다(`api/watch.ts`).
  *
- * 계약에 단건 조회 API는 없고 목록만 있어(API-034) 목록에서 번호로 찾는다.
+ * 화면이 가르는 세 가지.
+ * - 기록이 없다 — 주소로 직접 들어왔거나 남의 기록이다. 물어볼 감상이 없다.
+ *   **목업 알림(8.1 · 8.2)이 가리키는 번호도 여기에 해당한다.** 알림이 실제 API가 되면
+ *   서버가 준 번호를 쓰게 되어 사라질 상태다
+ * - 이미 답했다 — `LINK_CLICKED`가 아닌 기록이다. 다시 물으면 서버가 `409`로 거절하므로
+ *   묻지 않고 다음 행동만 준다
+ * - 조회가 실패했다 — 다시 시도할 수 있다
+ *
+ * 와이어프레임의 `이동한 지 2일이 지났어요`는 고정 문구였지만, 기록에 실제 클릭 시각이
+ * 있으므로(API-034 `clickedAt`) 그 시각으로 적는다. 2.4에서 바로 넘어오면 `방금 전`이다.
  */
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import Poster from '../../../components/Poster';
 import StatusView from '../../../components/StatusView';
-import { confirmWatch, getWatchRecords } from '../../../api/watch';
+import { ApiError } from '../../../api/apiError';
+import { confirmWatch, findWatchRecord } from '../../../api/watch';
 import { getOtts } from '../../../api/otts';
 import { path } from '../../../routes/paths';
-import { directionParticle } from '../../../utils/korean';
+import { formatRelativeTime } from '../../../utils/date';
+import { directionParticle, topicParticle } from '../../../utils/korean';
 import styles from './WatchConfirmPage.module.css';
 
 /** 이 화면이 표시하는 값 */
@@ -36,23 +44,31 @@ type ConfirmView = {
   title: string;
   posterUrl: string | null;
   /** 실제로 이동한 OTT의 표시명. 표시명은 계약상 API-025에만 있다 */
-  ottName: string;
+  ottName: string | null;
+  /** OTT 링크를 누른 시각. 클릭 없이 만들어진 기록이면 null */
+  clickedAt: string | null;
+  /** 아직 답하지 않은 기록인가. `LINK_CLICKED`만 물을 수 있다(API-035) */
+  pending: boolean;
+  /** 이미 답한 기록이 평가로 이어질 수 있는가 */
+  watched: boolean;
 };
 
-async function loadConfirmView(watchRecordId: number): Promise<ConfirmView> {
-  const [records, otts] = await Promise.all([getWatchRecords(), getOtts()]);
-  const record = records.items.find((item) => item.watchRecordId === watchRecordId);
+/** 기록을 찾지 못했으면 null. 조회 자체가 실패하면 던진다 */
+async function loadConfirmView(watchRecordId: number): Promise<ConfirmView | null> {
+  const [record, otts] = await Promise.all([findWatchRecord(watchRecordId), getOtts()]);
 
   if (!record) {
-    // 기록 없이 URL로 들어온 경우. 물어볼 감상이 없다
-    throw new Error('감상 기록을 찾지 못했습니다.');
+    return null;
   }
 
   return {
     movieId: record.movie.movieId,
     title: record.movie.title,
     posterUrl: record.movie.posterUrl,
-    ottName: otts.find((ott) => ott.ottId === record.ott.ottId)?.name ?? 'OTT',
+    ottName: otts.find((ott) => ott.ottId === record.ott?.ottId)?.name ?? null,
+    clickedAt: record.clickedAt,
+    pending: record.status === 'LINK_CLICKED',
+    watched: record.status === 'WATCHED_UNRATED' || record.status === 'RATED',
   };
 }
 
@@ -61,9 +77,12 @@ export default function WatchConfirmPage() {
   const navigate = useNavigate();
 
   const [movie, setMovie] = useState<ConfirmView | null>(null);
+  const [missing, setMissing] = useState(false);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  /** 응답을 보내다 실패했다. 기록은 그대로라 다시 고를 수 있다 */
+  const [submitFailed, setSubmitFailed] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -72,6 +91,7 @@ export default function WatchConfirmPage() {
       .then((view) => {
         if (active) {
           setMovie(view);
+          setMissing(view === null);
           setFailed(false);
         }
       })
@@ -86,13 +106,39 @@ export default function WatchConfirmPage() {
     };
   }, [watchRecordId, reloadCount]);
 
+  function retry() {
+    setFailed(false);
+    setSubmitFailed(false);
+    setReloadCount((count) => count + 1);
+  }
+
   async function respond(watched: boolean) {
     if (!movie) {
       return;
     }
 
     setSubmitting(true);
-    await confirmWatch(Number(watchRecordId), watched);
+    setSubmitFailed(false);
+
+    try {
+      await confirmWatch(Number(watchRecordId), watched);
+    } catch (error: unknown) {
+      setSubmitting(false);
+
+      /*
+       * `409 INVALID_WATCH_STATUS`는 그 사이에 기록이 답해졌거나 만료된 것이다. 다시
+       * 물을 수 없으므로 화면을 현재 상태로 되읽어 `이미 답한` 쪽으로 넘긴다.
+       */
+      if (error instanceof ApiError && error.status === 409) {
+        setReloadCount((count) => count + 1);
+
+        return;
+      }
+
+      setSubmitFailed(true);
+
+      return;
+    }
 
     if (watched) {
       void navigate(path.movieRating(movie.movieId));
@@ -110,16 +156,9 @@ export default function WatchConfirmPage() {
         <StatusView
           titleAs="h1"
           title="감상 기록을 불러오지 못했어요"
-          description="주소가 잘못되었거나 잠시 문제가 생겼어요"
+          description="잠시 문제가 생겼어요"
         >
-          <Button
-            onClick={() => {
-              setFailed(false);
-              setReloadCount((count) => count + 1);
-            }}
-          >
-            다시 시도
-          </Button>
+          <Button onClick={retry}>다시 시도</Button>
 
           <Button variant="text" onClick={() => void navigate(path.home())}>
             홈으로 이동
@@ -129,8 +168,51 @@ export default function WatchConfirmPage() {
     );
   }
 
+  if (missing) {
+    // 없는 기록에는 다시 물어도 같은 답이라 재시도를 주지 않는다
+    return (
+      <div className={styles.page}>
+        <StatusView
+          titleAs="h1"
+          title="감상 기록을 찾을 수 없어요"
+          description="주소가 잘못되었거나 이미 정리된 기록이에요"
+        >
+          <Button onClick={() => void navigate(path.home())}>홈으로 이동</Button>
+        </StatusView>
+      </div>
+    );
+  }
+
   if (!movie) {
     return null;
+  }
+
+  if (!movie.pending) {
+    return (
+      <div className={styles.page}>
+        <StatusView
+          variant="empty"
+          titleAs="h1"
+          title="이미 답한 감상이에요"
+          description={
+            movie.watched
+              ? // 영화 제목은 서버 값이라 받침에 맞춰 조사를 고른다
+                `${movie.title}${topicParticle(movie.title)} 감상한 영화로 남아 있어요`
+              : `${movie.title}의 감상 대기가 끝났어요`
+          }
+        >
+          {movie.watched ? (
+            <Button onClick={() => void navigate(path.movieRating(movie.movieId))}>
+              평가하러 가기
+            </Button>
+          ) : null}
+
+          <Button variant="text" onClick={() => void navigate(path.home())}>
+            홈으로 이동
+          </Button>
+        </StatusView>
+      </div>
+    );
   }
 
   return (
@@ -147,10 +229,12 @@ export default function WatchConfirmPage() {
       <div className={styles.movie}>
         <p className={styles.title}>{movie.title}</p>
         {/* OTT 이름이 API-025 값이라 조사를 받침에 맞춰 고른다 (`티빙으로` · `웨이브로`) */}
-        <p className={styles.note}>
-          {movie.ottName}
-          {directionParticle(movie.ottName)} 이동한 지 2일이 지났어요
-        </p>
+        {movie.ottName && movie.clickedAt ? (
+          <p className={styles.note}>
+            {movie.ottName}
+            {directionParticle(movie.ottName)} 이동했어요 · {formatRelativeTime(movie.clickedAt)}
+          </p>
+        ) : null}
       </div>
 
       <h1 className={styles.question}>이 영화, 잘 보셨나요?</h1>
@@ -164,6 +248,12 @@ export default function WatchConfirmPage() {
           보지 않을래요
         </Button>
       </div>
+
+      {submitFailed ? (
+        <p className={styles.error} role="alert">
+          답을 보내지 못했어요. 잠시 후 다시 골라 주세요
+        </p>
+      ) : null}
 
       <p className={styles.hint}>
         봤어요 → 영화 평가 · 보지 않을래요 → 감상 대기 종료

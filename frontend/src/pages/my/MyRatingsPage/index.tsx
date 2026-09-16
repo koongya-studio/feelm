@@ -23,6 +23,10 @@
  * **탭 이름 옆의 수는 뺐다**(업무 -459). 계약에 총수가 없어 받은 목록을 센 값이었고,
  * 목록이 한 페이지뿐이라 실제 총수와 어긋났다.
  *
+ * **7.7은 실제 감상 기록이고 7.6은 목업 평가다**(업무 -477). 두 목록이 다른 곳을 보므로
+ * 여기서 평가해도 7.7에서 빠지지 않는다 — 목업 평가는 서버 기록을 `RATED`로 옮길 수 없다.
+ * 평가 생성(API-036)이 연동되면 서버가 옮겨 준다.
+ *
  * `[?]` 7.6 줄 오른쪽의 동그란 버튼이 무엇인지 와이어프레임에 적혀 있지 않다. 채운 것과
  * 빈 것이 섞여 있고 이동표에 `7.6 ⇢ 7.6-A`가 있어 **한줄평 관리**로 보았다. 한줄평이
  * 있는 줄에만 둔다 — 없는 한줄평은 관리할 것이 없다.
@@ -234,9 +238,11 @@ function UnratedList({ records, otts }: { records: WatchRecordListItem[]; otts: 
     <>
       <ul className={styles.list}>
         {records.map((record) => {
-          const ottName = otts.find((ott) => ott.ottId === record.ott.ottId)?.name;
+          // 클릭 없이 평가로 만들어진 기록에는 OTT도 시각도 없다(API-034)
+          const ottName = otts.find((ott) => ott.ottId === record.ott?.ottId)?.name;
           // 감상을 확인한 기록이라 `watchedAt`이 있다. 없으면 링크를 누른 날로 대신한다
-          const date = formatShortDate(record.watchedAt ?? record.clickedAt);
+          const watchedOn = record.watchedAt ?? record.clickedAt;
+          const date = watchedOn ? formatShortDate(watchedOn) : null;
 
           return (
             <li key={record.watchRecordId}>
@@ -253,7 +259,7 @@ function UnratedList({ records, otts }: { records: WatchRecordListItem[]; otts: 
                 }
               >
                 <span className={styles.meta}>
-                  {ottName ? `${date} · ${ottName}에서 시청` : date}
+                  {date && ottName ? `${date} · ${ottName}에서 시청` : date}
                 </span>
               </MovieRow>
             </li>

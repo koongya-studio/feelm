@@ -8,15 +8,21 @@
  */
 import type { Visibility, WatchStatus } from './enums';
 
-/** API-033 OTT 링크 클릭 기록 */
+/**
+ * API-033 OTT 링크 클릭 기록
+ *
+ * 시각 셋은 **`null`일 수 있다.** 클릭 없이 평가로 만들어진 기록(`WATCHED_UNRATED` ·
+ * `RATED`)은 링크를 눌러도 상태와 시각을 바꾸지 않고 그대로 돌아오기 때문이다
+ * (API-033 처리 규칙).
+ */
 export type WatchRecord = {
   watchRecordId: number;
   movieId: number;
   status: WatchStatus;
-  clickedAt: string;
+  clickedAt: string | null;
   /** 감상 확인을 물어보는 시점 */
-  confirmDueAt: string;
-  expiresAt: string;
+  confirmDueAt: string | null;
+  expiresAt: string | null;
 };
 
 /**
@@ -25,15 +31,18 @@ export type WatchRecord = {
  * API-033 응답(`WatchRecord`)보다 넓다. 어느 OTT로 이동했는지(`ott`), 언제 봤는지
  * (`watchedAt`), 어떤 평가로 이어졌는지(`ratingId`)가 함께 온다. 2.4-A와 2.5가
  * 이 값들을 쓴다.
+ *
+ * **클릭 이력이 없으면 `ott`와 시각 셋이 `null`이다.** 평가가 먼저 만들어 낸 기록이
+ * 그렇다(API-036). 화면은 OTT 이름과 날짜를 그 경우에도 그릴 수 있어야 한다.
  */
 export type WatchRecordListItem = {
   watchRecordId: number;
   movie: { movieId: number; title: string; posterUrl: string | null };
   status: WatchStatus;
-  ott: { ottId: number; code: string };
-  clickedAt: string;
-  confirmDueAt: string;
-  expiresAt: string;
+  ott: { ottId: number; code: string } | null;
+  clickedAt: string | null;
+  confirmDueAt: string | null;
+  expiresAt: string | null;
   watchedAt: string | null;
   ratingId: number | null;
 };
