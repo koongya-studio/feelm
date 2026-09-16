@@ -12,6 +12,8 @@
  *   옮겨 이 화면에 없다(`SettingsFlow.test.tsx`가 잡는다)
  * - 탭을 눌렀을 때 **그 탭의 데이터**가 그려지는지. 평가는 API-039, 안 남긴 영화는
  *   API-034, 추천은 API-048이다. 취향 필름(API-042)을 이 셋인 것처럼 쓰면 여기서 걸린다
+ * - 추천 기록의 **`더 보기`가 직전 응답의 커서로 다음 장을 이어 붙이는지**(업무 -478).
+ *   첫 장만 그려도 화면은 멀쩡해 보이므로 눈으로는 빠진 것을 알 수 없다
  *
  * `api/users` · `api/watch` · `api/recommendations` · `api/otts`를 가로챈다. API-014와
  * OTT 기준정보가 실제 호출이라(업무 -364 · -379) 가로채지 않으면 네트워크를 두드린다.
@@ -213,6 +215,86 @@ describe('7.1 MY 대시보드', () => {
 
     // 평가 포스터는 사라졌다. 두 피드가 섞이지 않는다
     expect(within(feed()).queryByText('평가한 영화 A')).toBeNull();
+  });
+
+  it('추천 기록의 `더 보기`가 직전 커서로 다음 장을 이어 붙인다', async () => {
+    const second: RecommendationHistory = {
+      items: [
+        {
+          recommendationSetId: 2,
+          generatedAt: '2026-08-30T09:00:00Z',
+          items: [
+            {
+              recommendationItemId: 21,
+              type: 'TASTE',
+              movie: { movieId: 603, title: '지난 달 추천', posterUrl: null },
+              reason: { summary: '지난 세트' },
+              dismissed: false,
+              watchStatus: null,
+            },
+          ],
+        },
+      ],
+      nextCursor: null,
+      hasNext: false,
+    };
+
+    vi.mocked(getRecommendationHistory).mockResolvedValue({
+      ...history,
+      nextCursor: 'cursor-2',
+      hasNext: true,
+    });
+
+    await renderDashboard();
+    fireEvent.click(screen.getByRole('tab', { name: '추천 기록' }));
+
+    vi.mocked(getRecommendationHistory).mockResolvedValue(second);
+    fireEvent.click(await within(feed()).findByRole('button', { name: '더 보기' }));
+
+    expect(await within(feed()).findByText('지난 달 추천')).toBeInTheDocument();
+    // 앞 장은 그대로 남는다
+    expect(within(feed()).getByText('추천받은 영화 A')).toBeInTheDocument();
+    expect(getRecommendationHistory).toHaveBeenLastCalledWith('cursor-2');
+    // 마지막 장이므로 버튼이 사라진다
+    expect(within(feed()).queryByRole('button', { name: '더 보기' })).toBeNull();
+  });
+
+  it('다음 장이 실패해도 보던 격자는 그대로 두고 다시 시도만 준다', async () => {
+    vi.mocked(getRecommendationHistory).mockResolvedValue({
+      ...history,
+      nextCursor: 'cursor-2',
+      hasNext: true,
+    });
+
+    await renderDashboard();
+    fireEvent.click(screen.getByRole('tab', { name: '추천 기록' }));
+
+    vi.mocked(getRecommendationHistory).mockRejectedValue(new Error('boom'));
+    fireEvent.click(await within(feed()).findByRole('button', { name: '더 보기' }));
+
+    expect(await within(feed()).findByText('지난 추천을 불러오지 못했어요.')).toBeInTheDocument();
+    expect(within(feed()).getByText('추천받은 영화 A')).toBeInTheDocument();
+    // 피드 전체가 실패 상태로 넘어가지 않는다
+    expect(within(feed()).queryByText('목록을 불러오지 못했어요')).toBeNull();
+  });
+
+  it('나머지 두 탭에는 `더 보기`가 없다', async () => {
+    /*
+     * 평가(API-039)는 목업이고 안 남긴 영화(API-034)는 `getWatchRecords`가 커서를 쓰지
+     * 않는다. 셋을 같은 모양으로 맞추는 것은 업무 -503이다.
+     */
+    vi.mocked(getRecommendationHistory).mockResolvedValue({
+      ...history,
+      nextCursor: 'cursor-2',
+      hasNext: true,
+    });
+
+    await renderDashboard();
+
+    expect(within(feed()).queryByRole('button', { name: '더 보기' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('tab', { name: '안 남긴 영화' }));
+    expect(within(feed()).queryByRole('button', { name: '더 보기' })).toBeNull();
   });
 
   it('취향 필름(API-042)을 부르지 않는다', async () => {

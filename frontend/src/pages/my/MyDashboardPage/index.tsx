@@ -27,6 +27,15 @@
  * 고른 탭은 주소의 `?tab=`에 남는다. 화면 밖에서 특정 탭으로 보내야 하는 자리가 있기
  * 때문이다 — EXT-05 OTT 분석 데이터 부족의 `영화 평가하러 가기`가 `안 남긴 영화`로 온다.
  *
+ * **추천 기록은 실제 호출이다**(업무 S15P21E106-478, API-048). 안 남긴 영화도 실제
+ * 기록이고(API-034, 업무 -477), 평가만 API-039가 백엔드에 없어 목업으로 남는다.
+ * `[!]` 추천 세트를 만드는 API-045가 아직 없어 추천 기록 탭은 당분간 비어 있다.
+ *
+ * **추천 기록 탭에만 `더 보기`가 있다**(업무 -478, 사용자 결정 2026-09-16). 한 장은
+ * 20세트이고 그보다 오래된 이력은 `nextCursor`로 온다 — 버튼이 없으면 첫 장 뒤의 이력에
+ * 닿을 길이 없다. 나머지 두 탭은 계약에 커서가 있어도 `api/watch`의 함수가 아직 목업이라
+ * 첫 장만 그린다. 세 탭을 같은 모양으로 맞추는 것은 평가 목록 연동 때 한다(업무 -503).
+ *
  * **통계 수치는 없다**(사용자 결정 2026-09-16). 프레임 · 평가 · 팝콘 수는 API-014가
  * 주지만 이 화면에 두지 않는다. 다른 자리에도 다시 넣지 않는다.
  *
@@ -226,6 +235,9 @@ export default function MyDashboardPage() {
   const [ratings, setRatings] = useState<Feed<MyRatingListItem>>({ status: 'loading' });
   const [unrated, setUnrated] = useState<Feed<UnratedRow>>({ status: 'loading' });
   const [history, setHistory] = useState<Feed<HistoryRow>>({ status: 'loading' });
+  /** 추천 기록의 다음 장 커서. 더 받을 것이 없으면 `null`이다(API-048 `hasNext`) */
+  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
+  const [moreState, setMoreState] = useState<'idle' | 'loading' | 'failed'>('idle');
   const [feedReload, setFeedReload] = useState(0);
   const [notice, setNotice] = useState('');
 
@@ -298,7 +310,10 @@ export default function MyDashboardPage() {
 
     getRecommendationHistory()
       .then((value) => {
-        if (active) setHistory({ status: 'ready', items: flatten(value.items) });
+        if (!active) return;
+
+        setHistory({ status: 'ready', items: flatten(value.items) });
+        setHistoryCursor(value.hasNext ? value.nextCursor : null);
       })
       .catch(() => {
         if (active) setHistory({ status: 'failed' });
@@ -361,7 +376,34 @@ export default function MyDashboardPage() {
     }
   };
 
+  /*
+   * 추천 기록의 다음 장을 이어 받는다(업무 -478). 실패해도 이미 그린 격자는 두고 버튼만
+   * `다시 시도`로 바꾼다 — 여기서 목록을 비우면 보고 있던 기록이 통째로 사라진다
+   * (4.2 검색이 쓰는 처리와 같다).
+   */
+  function loadMoreHistory() {
+    if (!historyCursor || moreState === 'loading') {
+      return;
+    }
+
+    setMoreState('loading');
+
+    getRecommendationHistory(historyCursor)
+      .then((page) => {
+        setMoreState('idle');
+        setHistoryCursor(page.hasNext ? page.nextCursor : null);
+        setHistory((prev) =>
+          prev.status === 'ready'
+            ? { status: 'ready', items: [...prev.items, ...flatten(page.items)] }
+            : prev,
+        );
+      })
+      .catch(() => setMoreState('failed'));
+  }
+
   function retryFeeds() {
+    setHistoryCursor(null);
+    setMoreState('idle');
     setRatings({ status: 'loading' });
     setUnrated({ status: 'loading' });
     setHistory({ status: 'loading' });
@@ -589,6 +631,26 @@ export default function MyDashboardPage() {
               ))}
             </ul>
           )}
+
+          {/*
+           * 추천 기록만 다음 장을 받는다. 나머지 두 탭은 `api/watch`의 목록 함수가 아직
+           * 커서를 쓰지 않아 첫 장뿐이다(업무 -503에서 셋을 같은 모양으로 맞춘다).
+           */}
+          {tab === 'recommendations' && history.status === 'ready' && historyCursor ? (
+            <div className={styles.more}>
+              <Button
+                variant="secondary"
+                onClick={loadMoreHistory}
+                disabled={moreState === 'loading'}
+              >
+                {moreState === 'failed' ? '다시 시도' : '더 보기'}
+              </Button>
+
+              {moreState === 'failed' ? (
+                <p className={styles.moreError}>지난 추천을 불러오지 못했어요.</p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
 

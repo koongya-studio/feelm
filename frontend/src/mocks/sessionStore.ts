@@ -223,10 +223,6 @@ export function getRatings(): Rating[] {
   return state.ratings;
 }
 
-export function findRatingByMovie(movieId: number): Rating | null {
-  return state.ratings.find((rating) => rating.movieId === movieId) ?? null;
-}
-
 export function findRatingByFrame(frameId: number): Rating | null {
   return state.ratings.find((rating) => rating.frame.frameId === frameId) ?? null;
 }

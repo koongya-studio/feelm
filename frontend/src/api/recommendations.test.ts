@@ -1,0 +1,129 @@
+/*
+ * 추천 이력 조회 (업무 S15P21E106-478).
+ *
+ * 화면에서는 드러나지 않는 것을 고정한다.
+ * - **첫 장에는 `cursor`를 싣지 않는다.** 빈 커서를 보내면 계약이 `400`으로 거절한다
+ * - **다음 장은 직전 응답의 `nextCursor`만 더해 부른다**
+ * - **회원 전용이라 토큰을 싣는다.** 목업 시절에는 인증 없이도 그려졌다
+ * - **서버가 준 `dismissed` · `watchStatus`를 그대로 돌려준다.** 목업 시절에는 세션
+ *   저장소의 관심없음 · 평가를 여기서 덮어썼다. 서버 이력에 다시 얹으면 서버가 아는
+ *   상태와 화면이 어긋난다
+ *
+ * 같은 파일의 API-045 · API-047은 아직 목업이라 이 파일이 다루지 않는다.
+ */
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getRecommendationHistory } from './recommendations';
+import { ApiError } from './apiError';
+import { resetSessionForTest, startSession } from './session';
+import { addDismissedMovie, resetSessionStore } from '../mocks/sessionStore';
+import type { RecommendationHistory, RecommendationHistorySet } from '../types/recommendation';
+
+const fetchMock = vi.fn();
+
+function json(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+function requestedUrl(index = 0): string {
+  return (fetchMock.mock.calls[index] as [string, RequestInit])[0];
+}
+
+function requestedHeaders(index = 0): Record<string, string> {
+  const init = (fetchMock.mock.calls[index] as [string, RequestInit])[1];
+
+  return (init.headers ?? {}) as Record<string, string>;
+}
+
+function set(overrides: Partial<RecommendationHistorySet> = {}): RecommendationHistorySet {
+  return {
+    recommendationSetId: 7001,
+    generatedAt: '2026-09-15T03:00:00Z',
+    items: [
+      {
+        recommendationItemId: 3301,
+        type: 'TASTE',
+        movie: { movieId: 550, title: '파이트 클럽', posterUrl: null },
+        reason: { summary: '스릴러를 높게 평가하셨어요' },
+        dismissed: false,
+        watchStatus: null,
+      },
+    ],
+    ...overrides,
+  };
+}
+
+function page(overrides: Partial<RecommendationHistory> = {}): RecommendationHistory {
+  return { items: [set()], nextCursor: null, hasNext: false, ...overrides };
+}
+
+beforeEach(() => {
+  resetSessionStore();
+  resetSessionForTest();
+  startSession('token');
+  fetchMock.mockReset();
+  vi.stubGlobal('fetch', fetchMock);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+describe('API-048 추천 이력 조회', () => {
+  it('첫 장은 커서 없이 회원 토큰으로 부른다', async () => {
+    fetchMock.mockResolvedValue(json(200, page()));
+
+    await getRecommendationHistory();
+
+    const url = new URL(requestedUrl(), 'http://test');
+
+    expect(url.pathname).toBe('/api/v1/recommendations/history');
+    expect(url.searchParams.has('cursor')).toBe(false);
+    expect(requestedHeaders().Authorization).toBe('Bearer token');
+  });
+
+  it('다음 장은 직전 응답의 커서만 더해 부른다', async () => {
+    fetchMock.mockResolvedValue(json(200, page()));
+
+    await getRecommendationHistory('cursor-2');
+
+    expect(new URL(requestedUrl(), 'http://test').searchParams.get('cursor')).toBe('cursor-2');
+  });
+
+  it('세트와 커서를 그대로 돌려준다', async () => {
+    fetchMock.mockResolvedValue(json(200, page({ nextCursor: 'cursor-2', hasNext: true })));
+
+    const result = await getRecommendationHistory();
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].recommendationSetId).toBe(7001);
+    expect(result.items[0].items[0].movie.title).toBe('파이트 클럽');
+    expect(result.nextCursor).toBe('cursor-2');
+    expect(result.hasNext).toBe(true);
+  });
+
+  it('서버가 준 관심없음과 감상 상태를 덮어쓰지 않는다', async () => {
+    // 세션 저장소에는 목업 추천 카드(2.3-A)에서 처리한 관심없음이 남아 있다
+    addDismissedMovie(550);
+    fetchMock.mockResolvedValue(
+      json(200, page({ items: [set({ items: [{ ...set().items[0], watchStatus: 'RATED' }] })] })),
+    );
+
+    const result = await getRecommendationHistory();
+
+    expect(result.items[0].items[0].dismissed).toBe(false);
+    expect(result.items[0].items[0].watchStatus).toBe('RATED');
+  });
+
+  it('회원 전용이라 토큰 없이 부르면 401이 그대로 올라온다', async () => {
+    resetSessionForTest();
+    fetchMock.mockResolvedValue(json(401, { code: 'UNAUTHORIZED', message: '인증이 필요합니다.' }));
+
+    const error = await getRecommendationHistory().catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(401);
+  });
+});
