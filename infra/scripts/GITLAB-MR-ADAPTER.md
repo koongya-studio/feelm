@@ -36,10 +36,12 @@ Job·프로젝트·테스트 명령을 추가할 때 기존 어댑터를 느슨�
 - MR → develop: 백엔드 관련 경로 변경 시 `backend-mr-test`, 의존성 파일 변경 시
   `backend-cache-prepare`, `e106-mr-isolated`, 취소 가능
 - MR → develop: 프론트엔드 관련 경로 변경 시 `frontend-mr-test`, `e106-mr-isolated`, 취소 가능
-- MR → develop: `pipeline/spark` 실행 코드·테스트·lock 변경 시 `pipeline-unit-test`와
-  세 `pipeline-spark-*-test`, `e106-mr-isolated`, 취소 가능. 각 shard는 고유 resource group과
-  15분 timeout을 사용한다. 서로 다른 shard의 실제 병렬 실행은 둘 이상의 Runner 실행 슬롯이
-  준비된 경우에만 가능하다.
+- MR → develop: `pipeline/spark` 실행 코드·테스트·lock 변경 시 `pipeline-unit-test`는
+  자동 실행하고 세 `pipeline-spark-*-test`는 필수 수동 Job으로 생성한다. 세 수동 Job을
+  모두 실행해 성공하기 전에는 파이프라인이 성공하지 않는다. 모든 Job은
+  `e106-mr-isolated`에서 취소 가능하며, 각 shard는 고유 resource group과 15분 timeout을
+  사용한다. 단일 실행 슬롯에서는 Runner가 비는 시점에 담당자가 세 Spark Job을 시작한다.
+  서로 다른 shard의 실제 병렬 실행은 둘 이상의 Runner 실행 슬롯이 준비된 경우에만 가능하다.
 - develop push: 기존 `backend-test`와 빌드·수동 배포, `e106-shell`
 - `runner-check`: 보호된 develop push에서 공통 CI 연결 설정이나 Runner 설치·서비스·가드
   파일이 바뀌면 자동 실행하고, 그 밖의 변경에는 비차단 수동 Job으로 대기
@@ -76,7 +78,10 @@ GitLab API의 정확한 커밋 archive를 사용한다. MR이 `.gitlab-ci.yml`�
 `.python-version` 및 Pipeline CI 실행기 변경에만 반응한다. `pipeline/docs`와
 `pipeline/consumer`만 변경한 MR에는 생성되지 않는다. 표시되는 CI script는 개발자가 로컬에서
 재현할 명령이며, Custom executor는 이를 직접 실행하지 않고 정확히 일치하는지 확인한 뒤 서버에
-설치된 고정 정책을 실행한다.
+설치된 고정 정책을 실행한다. 빠른 `pipeline-unit-test`는 자동 실행하고, 세 Spark shard는
+`when: manual`, `allow_failure: false`인 필수 수동 Job이다. MR 담당자는 공용 Runner가 비는
+시점에 세 Job을 모두 실행해야 하며, 미실행 또는 실패 상태에서는 파이프라인 성공과 병합이
+차단된다. Job 이름과 script가 그대로이므로 이 실행 정책 변경에는 서버 어댑터 재배포가 필요 없다.
 
 어댑터는 인증된 커밋에서 `pipeline/spark`만 다시 archive하고, 실행 파일·링크·`.env*`·가상환경과
 범위 밖 경로를 거부한다. Python 3.10.12, PySpark 4.1.3, pytest 8.4.2, ruff 0.12.12 및

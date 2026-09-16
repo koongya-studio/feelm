@@ -159,6 +159,16 @@ include:
             for forbidden in ('image:', 'services:', 'cache:', 'artifacts:', 'before_script:'):
                 self.assertNotIn(forbidden, job)
         self.assertEqual(len(resource_groups), len(set(resource_groups)))
+        unit_job = job_block(self.pipeline, 'pipeline-unit-test')
+        self.assertNotIn('when: manual', unit_job)
+        self.assertNotIn('allow_failure:', unit_job)
+        for name in (
+                'pipeline-spark-als-a-d-test',
+                'pipeline-spark-als-e-z-test',
+                'pipeline-spark-other-test'):
+            spark_job = job_block(self.pipeline, name)
+            self.assertIn('when: manual', spark_job, name)
+            self.assertIn('allow_failure: false', spark_job, name)
         for path in (
                 'pipeline/spark/**/*.py', 'pipeline/spark/tests/**/*',
                 'pipeline/spark/pyproject.toml', 'pipeline/spark/uv.lock',

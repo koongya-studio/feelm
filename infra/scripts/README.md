@@ -37,8 +37,10 @@ S15P21E106-424의 테스트 분류기는 전체 `test_*.py`를 빠른 비-Spark 
 Job 이름과 CI script에 고정된 group만 Custom executor가 허용한다. 분류 기준과 로컬 재현
 명령은 [`pipeline/spark/tests/README.md`](../../pipeline/spark/tests/README.md)를 따른다.
 각 계층은 시작 마커와 wall time을, Linux에서는 CPU time·최대 RSS·block I/O도 출력한다.
-Runner 자원 한도와 테스트별 Spark master 값은 변경하지 않으며, 실제 병렬 실행에는 여러
-Runner 실행 슬롯이 필요하다.
+S15P21E106-485부터 unit Job은 자동 실행하고 세 Spark Job은 `allow_failure: false`인 필수
+수동 Job으로 생성한다. 공용 Runner가 비는 시점에 세 Job을 모두 실행해 성공해야 파이프라인을
+통과할 수 있다. Runner 자원 한도와 테스트별 Spark master 값은 변경하지 않으며, 실제 병렬
+실행에는 여러 Runner 실행 슬롯이 필요하다.
 
 [서버 manager 파일럿](SERVER-MANAGER-PILOT.md)은 별도 임시 폴더에서 진행했다.
 자원 제어와 readonly/private sysfs 준비를 보완하여 고정 경계 probe,
