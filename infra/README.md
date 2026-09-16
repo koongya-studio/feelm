@@ -14,6 +14,9 @@ S15P21E106-222의 [Runner 통신 격리 파일럿 스크립트](scripts/README.m
 Kafka·Spark 개발 관제 화면의 2026-09-15 적용 결과와 남은 운영 검증 범위는
 [S15P21E106-444 검증 기록](verification/S15P21E106-444.md)을 참고합니다.
 
+Grafana HTTPS 접근 설정의 로컬 검증 결과와 서버 적용 후 확인할 항목은
+[S15P21E106-350 검증 기록](verification/S15P21E106-350.md)을 참고합니다.
+
 ## Distributed Runtime Baseline
 
 분산 처리 환경은 아래 버전과 실행 방식을 공통 기준으로 사용합니다. 구성요소의 버전을
@@ -1739,6 +1742,38 @@ sudo journalctl -u certbot.service --since '7 days ago' --no-pager
 sudo certbot certificates
 docker logs --tail 50 feelm-nginx
 ```
+
+### Grafana HTTPS 팀 전용 접근
+
+Grafana는 기존 서비스 도메인의 `https://j15e106.p.ssafy.io/grafana/`에서 제공합니다.
+Nginx의 전용 Basic Auth와 Grafana 자체 로그인을 모두 유지하며 Prometheus는 공개하지
+않습니다. Grafana와 Prometheus의 호스트 포트는 계속 루프백에만 바인딩합니다.
+
+서비스 노드에서 Grafana 전용 인증 파일을 준비합니다. Swagger 인증 파일이나 비밀번호를
+재사용하지 않습니다.
+
+```bash
+sudo apt-get update
+sudo apt-get install -y apache2-utils
+sudo install -d -m 700 /etc/feelm
+sudo htpasswd -cB /etc/feelm/grafana.htpasswd e106-grafana
+
+NGINX_GID="$(docker exec feelm-nginx id -g nginx)"
+sudo chown root:"${NGINX_GID}" /etc/feelm/grafana.htpasswd
+sudo chmod 640 /etc/feelm/grafana.htpasswd
+```
+
+비밀번호 입력은 `htpasswd`의 대화형 프롬프트에서 수행하고 명령행, 저장소와 로그에 남기지
+않습니다. 비밀번호 변경 시 `-c` 없이 실행합니다. `infra/.env` 또는 승인된 배포 설정에
+호스트 파일 경로만 추가합니다.
+
+```dotenv
+GRAFANA_HTPASSWD_PATH=/etc/feelm/grafana.htpasswd
+```
+
+Grafana 관리자 비밀번호는 계정 생성과 복구에만 사용합니다. 팀원별 Grafana 계정을 만들고
+Organization role을 `Viewer`로 지정하며 관리자 비밀번호를 공유하지 않습니다. 상세 기동,
+검증 및 장애 시 SSH 터널 복구 절차는 [모니터링 README](monitoring/README.md)를 따릅니다.
 
 ### Swagger 팀 전용 접근
 

@@ -11,6 +11,7 @@ HERE = Path(__file__).resolve().parent
 TESTS = (
     "infra.scripts.test_consumer_distributed_deployment",
     "infra.scripts.test_kafka_monitoring",
+    "infra.scripts.test_grafana_access_policy",
     "infra.scripts.test_node_exporter_monitoring",
     "infra.scripts.test_verify_kafka_monitoring",
     "infra.scripts.test_deploy_distributed_runtime",

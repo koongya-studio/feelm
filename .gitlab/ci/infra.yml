@@ -29,6 +29,7 @@ infra-config-test:
         - infra/scripts/verify-kafka-monitoring.py
         - infra/scripts/test_consumer_distributed_deployment.py
         - infra/scripts/test_kafka_monitoring.py
+        - infra/scripts/test_grafana_access_policy.py
         - infra/scripts/test_node_exporter_monitoring.py
         - infra/scripts/test_pipeline_observability.py
         - infra/scripts/test_verify_kafka_monitoring.py

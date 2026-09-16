@@ -15,6 +15,7 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - /run/feelm-claude-review:/run/feelm-claude-review:ro
       - ${SWAGGER_HTPASSWD_PATH:-/dev/null}:/run/secrets/swagger_htpasswd:ro
+      - ${GRAFANA_HTPASSWD_PATH:-/dev/null}:/run/secrets/grafana_htpasswd:ro
 
     depends_on:
       frontend:
