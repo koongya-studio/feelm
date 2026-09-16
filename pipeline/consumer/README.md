@@ -118,12 +118,128 @@ Registry 태그, Compose 서비스와 restart policy는 배포 업무에서 설�
 | 환경변수 | 기본값 | 설명 |
 | --- | --- | --- |
 | `CONSUMER_CONTENT_URI` | 없음(선택) | 공개 완료된 content-artifacts-v2 버전 경로. `latest` 같은 별칭과 `.<version>.tmp-*` staging 경로는 거부한다 |
+| `CONSUMER_GROUP_URI` | 없음(선택) | 공개 완료된 group-serving-artifacts-v1 버전 경로. ALS와 `mapping_revision`이 같아야 하며 설정한 산출물이 불완전하면 시작을 거부한다 |
+| `CONSUMER_DISCOVERY_POPULARITY_URI` | 없음(선택) | 공개 완료된 discovery-popularity-artifacts-v1 버전 경로. `CONSUMER_GROUP_URI`와 반드시 함께 설정한다 |
 | `CONSUMER_HYBRID_ALPHA` | `0.5` | 고정 ALS 가중치. 0~1 밖이면 시작을 거부한다 |
 | `CONSUMER_MIN_INPUT_COUNT` | `10` | 후보를 계산하기 시작하는 최소 입력 수(평점 + 온보딩 선호). 미만이면 계산·게시를 건너뛴다. `0`이면 제한 없음 |
 
 **`CONSUMER_HYBRID_ALPHA`는 두 성분이 모두 있는 영화에만 적용된다.** 한쪽만 지원하는 영화는
 alpha와 무관하게 자기 성분의 순위를 그대로 받으므로, **`alpha=1`로 둔다고 ALS 전용이 되지 않는다.**
 콘텐츠를 실제로 끄려면 `CONSUMER_CONTENT_URI`를 비운다.
+
+## 취향 발견 후보 (S15P21E106-415)
+
+`CONSUMER_GROUP_URI`와 `CONSUMER_DISCOVERY_POPULARITY_URI`를 함께 설정하면 기존 `taste` 최대 500편과 독립적으로
+`discovery` 최대 100편을 게시한다. 실제 별점이 같은 영화의 온보딩 선택보다 우선하며,
+서로 다른 유효 입력 영화가 기본 10편 이상일 때만 두 목록을 계산한다. 온보딩 LIKE/DISLIKE는
+ALS fold-in에 각각 `4.271231616529622`, `2.798442509805467`을 쓰고 실제 별점으로 저장하지 않는다.
+
+발견 방향은 실제 별점이 있는 영화가 속한 고정 그룹 대표로 먼저 계산하고, 방향을 만들 수 없을 때
+온보딩의 `LIKE 대표 합 - DISLIKE 대표 합`을 사용한다. 실제 평가와 확정 감상의 합집합에서
+`viewed_g <= 2`와 `viewed_g / max(1,total_mapped_viewed) <= 0.20`을 모두 만족하는 그룹을 궁합순으로
+최대 10개 고른다. 각 그룹은 모든 사용자에게 공통인 TMDB 투표 수·KOBIS 누적 관객 백분위의
+`max` 순서에서 최대 10편을 공급하며 입력·확정 감상·관심없음은 제외한다. 이렇게 모은 최대 100편만
+사용자 개인 예측 점수로 다시 정렬한다. 상세 계약은
+[`discovery-popularity-artifacts-v1`](../contracts/discovery-popularity-artifacts.md)을 따른다.
+Spring은 TASTE 2편을 먼저 고르고 양쪽 목록의 중복을 건너뛴 DISCOVERY 1편을 조립한다.
+
+로컬 대중성 번들은 다음처럼 만든다. `--kobis-population`은 직접 코드 2,176편 전체의 백분위
+모집단이고, `--verified-kobis`만 실제 서비스 영화에 KOBIS 점수를 붙인다.
+
+```bash
+cd pipeline/consumer
+export PYTHONPATH=src
+python tools/export_discovery_popularity.py \
+  --catalog <고정-catalog.parquet> \
+  --kobis-population <confirmed-movie-comparison.parquet> \
+  --verified-kobis <검토완료-verified-kobis.parquet> \
+  --mapping-revision sha256:<서비스-매핑-해시> \
+  --popularity-version discovery-popularity-<YYYYMMDD>-v1 \
+  --output-root <로컬-번들-root>
+```
+
+그룹과 대중성 번들은 같은 서비스 ID↔TMDB ID snapshot으로 만들어야 한다. Consumer는 두 번들의
+`mapping_revision`뿐 아니라 전체 ID쌍도 시작 시 비교하고, 하나라도 다르면 Kafka·PostgreSQL·Redis에
+연결하기 전에 종료한다.
+
+### DISCOVERY 번들 생성·HDFS 게시 준비
+
+실제 서비스 mapping export를 받은 뒤 그룹 번들을 먼저 만든다. 개인 연구 catalog의
+`service_movie_id`를 현재 DB ID라고 가정해서는 안 된다.
+
+```bash
+cd pipeline/consumer
+export PYTHONPATH=src
+python tools/export_group_bundle.py \
+  --recipe ../configs/service-v1/group-recipe.v1.json \
+  --trusted-source-root <검토된-연구-root> \
+  --mapping-uri <불변-service-movie-id-map-URI> \
+  --group-version groups-<YYYYMMDD>-v1 \
+  --catalog-version catalog-<YYYYMMDD>-v1 \
+  --output-root <로컬-번들-root>
+```
+
+대중성 번들은 같은 mapping revision으로 생성한다. 두 로컬 버전이 완성되면 하나의 전송 manifest에
+함께 고정하되, HDFS 공개는 각각 no-overwrite rename으로 수행한다. 두 publish 사이에 실패하면 아직
+Consumer 환경변수를 바꾸지 않고 실패한 쪽만 새 staging 경로에 다시 업로드한다.
+
+```bash
+export GROUP_VERSION=groups-<YYYYMMDD>-v1
+export POPULARITY_VERSION=discovery-popularity-<YYYYMMDD>-v1
+export LOCAL_BUNDLE_ROOT=<로컬-번들-root>
+export TRANSFER_MANIFEST=<별도-영속경로>/discovery-upload-manifest.json
+export HDFS_ARTIFACT_ROOT=hdfs://<namenode-authority>/<합의경로>
+export GROUP_STAGE="$HDFS_ARTIFACT_ROOT/groups/.${GROUP_VERSION}.tmp-$(date +%s)"
+export GROUP_FINAL="$HDFS_ARTIFACT_ROOT/groups/$GROUP_VERSION"
+export POPULARITY_STAGE="$HDFS_ARTIFACT_ROOT/discovery-popularity/.${POPULARITY_VERSION}.tmp-$(date +%s)"
+export POPULARITY_FINAL="$HDFS_ARTIFACT_ROOT/discovery-popularity/$POPULARITY_VERSION"
+
+cd pipeline/spark
+uv run python -m jobs.batch.artifact_transfer manifest \
+  --root "$LOCAL_BUNDLE_ROOT" \
+  --artifact "groups=groups/$GROUP_VERSION" \
+  --artifact "discovery-popularity=discovery-popularity/$POPULARITY_VERSION" \
+  --output "$TRANSFER_MANIFEST"
+
+hdfs dfs -test -e "$GROUP_FINAL" && { echo 'group version already exists' >&2; exit 1; }
+hdfs dfs -test -e "$POPULARITY_FINAL" && { echo 'popularity version already exists' >&2; exit 1; }
+hdfs dfs -mkdir -p "$HDFS_ARTIFACT_ROOT/groups" "$HDFS_ARTIFACT_ROOT/discovery-popularity"
+hdfs dfs -D dfs.replication=2 -put "$LOCAL_BUNDLE_ROOT/groups/$GROUP_VERSION" "$GROUP_STAGE"
+hdfs dfs -D dfs.replication=2 -put \
+  "$LOCAL_BUNDLE_ROOT/discovery-popularity/$POPULARITY_VERSION" "$POPULARITY_STAGE"
+hdfs dfs -setrep -w 2 "$GROUP_STAGE" "$POPULARITY_STAGE"
+
+uv run python -m jobs.batch.artifact_transfer publish \
+  --manifest "$TRANSFER_MANIFEST" --artifact groups \
+  --staged-uri "$GROUP_STAGE" --final-uri "$GROUP_FINAL" --spark-master local[2]
+uv run python -m jobs.batch.artifact_transfer publish \
+  --manifest "$TRANSFER_MANIFEST" --artifact discovery-popularity \
+  --staged-uri "$POPULARITY_STAGE" --final-uri "$POPULARITY_FINAL" --spark-master local[2]
+
+cd ../consumer
+PYTHONPATH=src python tools/verify_discovery_artifacts.py \
+  --group-uri "$GROUP_FINAL" \
+  --popularity-uri "$POPULARITY_FINAL"
+```
+
+마지막 검증이 성공한 뒤에만 `CONSUMER_GROUP_URI`와
+`CONSUMER_DISCOVERY_POPULARITY_URI`를 함께 교체한다. 명령은 manifest SHA 재검증과 두 catalog의
+전체 ID쌍 대조까지 수행하며, 실제 Consumer 활성화 전에는 ALS/content도 같은 mapping revision인지
+확인해야 한다.
+
+변경 종류별 재생성 범위는 다음과 같다. 산출물은 기존 버전을 덮어쓰지 않고 항상 새 버전을 만든다.
+
+| 변경 | 그룹 번들 | 대중성 번들 | 비고 |
+| --- | --- | --- | --- |
+| 기존 영화의 TMDB 투표 수 갱신 | 유지 | 재생성 | mapping revision은 유지 가능 |
+| KOBIS 누적 관객·검증 연결 갱신 | 유지 | 재생성 | 전체 KOBIS 모집단 백분위도 다시 계산 |
+| 서비스 영화 추가·삭제 | 재생성 | 재생성 | 새 불변 mapping revision을 두 번들에 동일 적용 |
+| 기존 service ID가 다른 TMDB ID로 재결합 | 활성화 금지 | 활성화 금지 | 먼저 mapping 오류를 해결하고 새 번들 생성 |
+| 그룹 입력 장르·키워드·줄거리 변경 | 재생성 | 필요 시 유지 | 고정 transform으로 재할당하며 재학습은 하지 않음 |
+
+새 서비스 영화의 TMDB ID가 고정 연구 catalog에 없으면 현재 reference exporter만으로는 그룹에 넣을 수
+없다. 이 경우 frozen transform에 현재 영화 metadata를 공급하는 별도 export 경로가 준비될 때까지
+DISCOVERY에서 제외하며, 임의 제목·연도 매핑으로 기존 그룹을 복사하지 않는다.
 
 alpha에 대한 후보 구성은 단조롭지 않다. 실측한 상위 500편의 ALS Factor 보유 편수는
 `alpha=0.0` 474편 → **`alpha=0.5`(기본값) 47편** → `alpha=1.0` 370편으로 **기본값에서 가장 적다.**
@@ -135,16 +251,11 @@ alpha에 대한 후보 구성은 단조롭지 않다. 실측한 상위 500편의
 인식하는 백분위를 구하고, 둘 다 있으면 `alpha × ALS + (1-alpha) × 콘텐츠`로 섞는다. 한쪽만 있으면
 그 백분위를 그대로 쓰고, 둘 다 없으면 후보가 아니다. 정렬은 점수 내림차순·서비스 영화 ID 오름차순이다.
 
-**게시하는 `score`는 이 내부 점수가 아니라 후보 500편 안에서의 동률 인식 백분위다.** 내부 점수의
-척도는 점수원마다 다르다 — 원시 ALS는 사용자마다 범위가 다른 예측 별점이고(실측: 같은 1위 후보가
-어떤 사용자는 1.53, 어떤 사용자는 7.66), 이후 GBT·FM을 붙이면 또 달라진다. 순위로 바꿔 내보내면
-**점수원을 교체해도 Redis 계약과 소비자 코드가 그대로**이고 사용자 간 값 비교도 성립한다. 순서는
-변환 전후가 같다.
-
-**이 변환은 콘텐츠 산출물 설정 여부와 무관하게 모든 경로에 적용한다.** ALS 전용으로 돌든 하이브리드로
-돌든 저장되는 `score`의 의미가 같아야 하기 때문이다. 콘텐츠 설정은 후보 모집단과 순서만 바꾼다.
-
-`score`의 최종 의미와 소비 규칙(파티 집계식, OTT 임계치)은 미합의 상태이며 위 정의는 잠정 기준이다.
+게시하는 `score`는 별점이 아니라 **활성 모델이 만든 사용자 내 상대 순위 점수**다. Consumer는 이를
+후보 집합 백분위로 다시 변환하지 않는다. ALS 전용 경로는 ALS 상대 점수를, 현재 하이브리드 경로는
+위 백분위 혼합 점수를 그대로 게시하므로 계산식과 범위가 서로 다를 수 있다. Redis 계약은 같은 사용자·
+같은 생성 결과의 배열에서 값이 클수록 먼저 추천한다는 순서만 보장한다. 다른 모델의 점수를 한 목록에서
+통합하거나 사용자 간 값을 집계해야 할 때 정규화 방식과 버전 계약을 별도로 확정한다.
 
 한쪽만 지원하는 영화가 평균 없이 자기 순위를 그대로 받으므로, 콘텐츠 전용 영화가 상위 후보의
 다수를 차지한다(실측 사용자 표본에서 상위 500 중 460~496편). 315 규칙 그대로이며 최종 재정렬은
@@ -200,10 +311,13 @@ Redis 출력은 `candidate-version`, `vector`, `candidates` 세 String 키이며
 opaque token으로 교체하며 후보 결과를 읽는 Spring은 이 키에 의존하지 않는다. key가 유실되면 모든 기존 token은
 비교에서 거부되고, 다음 assign은 새 token을 설치한다. Redis의 과거 snapshot 복원처럼 fence key가 이전 값으로
 되돌아가는 장애는 외부의 durable coordinator 없이는 막지 못하며 이 Consumer의 보장 범위 밖이다.
-`candidates.taste`와 향후 `candidates.discovery`의 각 항목은 `movieId`, `score`, `reason`을 포함한다.
+`candidates.taste`의 각 항목은 `movieId`, `score`, `reason`을 포함한다.
 `reason`은 Consumer가 만든 구조화된 근거(`code`, `sourceMovieIds`, `matchedGenreCodes`)이며 Spring이 영화·장르명을
 조회해 사용자 문구로 변환한다. `SHARED_GENRE`는 고평점 source 영화와 후보의 공통 장르를, `TOP_RATED_SOURCE`는
 공통 장르가 없을 때 가장 높은 평가 source 영화를 뜻한다.
+`candidates.discovery`는 그룹 산출물을 설정하면 `movieId`, `score`, nullable `flavorCode`를 포함하고,
+설정하지 않으면 빈 배열이다. DISCOVERY의 `reason`은 후속 업무에서 적용하며, 공급 그룹 수 같은 진단 값은
+Redis에 게시하지 않고 Consumer 로그에만 남긴다.
 두 payload에는 동일한 `candidateVersion`(JSON 형식 버전)과 `generationId`(한 번의 생성 결과 식별자)가
 포함된다. `candidateVersion=3` 또는 더 이른 payload에는 `reason`이 없으므로 Spring reader 전환 전에 모든 활성
 사용자를 재게시해 `candidateVersion=4`로 갱신해야 한다. Consumer는 추천 문구가 아니라 구조화된 `reason`만 생성하며,

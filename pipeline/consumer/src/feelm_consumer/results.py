@@ -21,6 +21,7 @@ def build_results(
     rating_count: int,
     factor_backed_input_count: int,
     candidates: list[RankedMovie],
+    discovery_candidates: list[RankedMovie] | None = None,
     movie_metadata: dict[int, MovieMetadata],
     reasons: dict[int, CandidateReason],
     generated_at: str | None = None,
@@ -49,9 +50,14 @@ def build_results(
             }
             for item in candidates
         ],
-        # DISCOVERY classification belongs to the dedicated discovery work.
-        # Keep the serving shape stable so its producer can populate this list.
-        "discovery": [],
+        "discovery": [
+            {
+                "movieId": item.movie_id,
+                "score": item.score,
+                "flavorCode": movie_metadata[item.movie_id].flavor_code,
+            }
+            for item in discovery_candidates or []
+        ],
         "updatedAt": timestamp,
     }
     return vector_result, candidates_result

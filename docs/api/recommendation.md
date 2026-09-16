@@ -160,13 +160,21 @@
 ### 처리 규칙
 
 - 기본 구성은 `TASTE` 2편 + `DISCOVERY` 1편. `DISCOVERY` 후보가 없으면 `TASTE` 3편
-- `TASTE`는 사용자 평가·온보딩 선호 기반 기본 순위로 생성한다. `DISCOVERY`는 향후 K-Means 영화 군집 기반 선정 정책을 적용한다. 군집 산출물과 정책이 준비되기 전에는 `DISCOVERY`를 만들지 않고 `TASTE`로 채운다(FR-10·FR-12)
+- `TASTE`는 사용자 평가·온보딩 선호 기반 `taste` 최대 500편으로 생성한다. `DISCOVERY`는 내부
+  8×128 영화 그룹에서 별도로 고른 `discovery` 최대 100편이며, Spring이 두 목록을 합쳐
+  `TASTE 2 + DISCOVERY 1`을 구성한다. 그룹 산출물이 없으면 `discovery`는 빈 배열이고 TASTE로 채운다(FR-10·FR-12)
+- DISCOVERY는 저이력·고궁합 그룹을 개인별로 고른 뒤, 그룹 안에서는 모든 사용자에게 같은
+  `max(TMDB 투표 수 백분위, KOBIS 누적 관객 백분위)` 순서로 최대 10편씩 모집한다. 모집된
+  최대 100편에 대해서만 사용자 개인 예측 점수로 최종 순서를 만든다.
 - 감상 기록이 있는 영화(`LINK_CLICKED` 포함, 평가 여부 무관)와 관심없음 영화는 제외한다
 - 활성 버퍼가 남아 있고 추천 입력(평가·온보딩 선택)이 바뀌지 않으면 같은 `recommendationSetId`와 결과를 반환한다. 입력이 바뀌거나 버퍼가 소진된 상태에서 API-046을 다시 요청하면 새 세트를 생성한다. 관심없음은 입력 변경으로 취급하지 않고 세트 내 교체로 처리한다(API-047)
-- 온보딩을 건너뛰고 평가가 없는 사용자는 인기 기반 후보로 `TASTE`를 채운다(가정)
-- Python Consumer가 Redis에 갱신한 raw Candidate 최대 500편을 Spring이 OTT 클릭 등 최신 행동 신호로 재정렬하고 후보 20편(설정값)을 세트 버퍼로 저장해 3편씩 노출한다
+- 온보딩을 건너뛰고 평가가 없는 사용자의 인기 fallback은 별도 후속 업무에서 다룬다
+- Python Consumer가 Redis에 갱신한 TASTE 최대 500편과 DISCOVERY 최대 100편을 Spring이 OTT 클릭 등
+  최신 행동 신호로 재정렬하고 후보 20편(설정값)을 세트 버퍼로 저장해 3편씩 노출한다
 - 버퍼는 PostgreSQL `recommendation_items`에 저장하고 `exposed_at`으로 노출 여부를 구분한다. 강한 신호는 Python Consumer가 Candidate를 같은 사용자 단위 처리에서 갱신하고, 약한 신호는 Spark Streaming이 행동 Feature를 갱신해 Spring의 다음 세트 생성 때 반영한다. 최종 `reason`은 Spring이 실제 사용한 근거로 만든다.
-- Consumer는 `vector`·`candidates`·version 키를 원자 게시한다. Spring은 `candidates` 최대 500개와 부가 정보를 읽어 제외·재정렬하고 최종 세트를 생성한다. 별도 Redis `topn`은 사용하지 않는다. 후보가 없거나 유효하지 않으면 짧은 재시도 후 `503 RECOMMENDATION_UNAVAILABLE`을 반환한다.
+- Consumer는 `vector`·`candidates`·version 키를 원자 게시한다. Spring은 `candidates.taste`와
+  `candidates.discovery`를 읽어 제외·재정렬하고 최종 세트를 생성한다. 별도 Redis `topn`은
+  사용하지 않는다. 후보가 없거나 유효하지 않으면 짧은 재시도 후 `503 RECOMMENDATION_UNAVAILABLE`을 반환한다.
 - 새 세트 생성 시 추천 이력(FR-33)에 시각·유형·이유·후보를 저장한다
 - `reason.factors[].type`: `GENRE`, `DIRECTOR`, `ACTOR`, `COUNTRY`, `ERA`, `SIMILAR_MOVIE`, `NEW_FLAVOR`(가정)
 
@@ -176,7 +184,8 @@
 
 ### 미정 사항
 
-- [ ] K-Means 군집 기반 DISCOVERY 선정 방식·기준값과 저이력·온보딩 사용자 처리
+- [ ] Python Consumer의 DISCOVERY 선정 방식은 구현됨. Spring의 두 목록 소비·감상 변경 재계산과
+  TMDB/KOBIS 공개 신호 후보 자격 하한을 합의하고 운영 활성화해야 함
 - [ ] 콜드 스타트 전략(온보딩 건너뛴 사용자)
 - [ ] 추천 이유 factor 타입 목록과 문장 생성 방식(템플릿 vs LLM)
 - [ ] Re-ranking 가중치와 추천 이유 생성 방식

@@ -19,6 +19,8 @@ def test_content_settings_are_optional() -> None:
     settings = load_settings(dict(BASE))
 
     assert settings.content_uri is None
+    assert settings.group_uri is None
+    assert settings.discovery_popularity_uri is None
     assert settings.hybrid_alpha == 0.5
 
 
@@ -34,6 +36,39 @@ def test_content_uri_and_alpha_are_read() -> None:
 def test_movable_content_uri_is_rejected() -> None:
     with pytest.raises(SettingsError, match="immutable versioned artifact URI"):
         load_settings({**BASE, "CONSUMER_CONTENT_URI": "hdfs://namenode/artifacts/content/latest"})
+
+
+def test_group_uri_is_optional_and_must_be_immutable() -> None:
+    settings = load_settings(
+        {
+            **BASE,
+            "CONSUMER_GROUP_URI": "hdfs://namenode/artifacts/groups/groups-v1",
+            "CONSUMER_DISCOVERY_POPULARITY_URI": "hdfs://namenode/artifacts/discovery-popularity/v1",
+        }
+    )
+
+    assert settings.group_uri == "hdfs://namenode/artifacts/groups/groups-v1"
+    assert settings.discovery_popularity_uri == "hdfs://namenode/artifacts/discovery-popularity/v1"
+    with pytest.raises(SettingsError, match="immutable versioned artifact URI"):
+        load_settings(
+            {
+                **BASE,
+                "CONSUMER_GROUP_URI": "hdfs://namenode/artifacts/groups/latest",
+                "CONSUMER_DISCOVERY_POPULARITY_URI": "hdfs://namenode/artifacts/discovery-popularity/v1",
+            }
+        )
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {"CONSUMER_GROUP_URI": "hdfs://namenode/artifacts/groups/groups-v1"},
+        {"CONSUMER_DISCOVERY_POPULARITY_URI": "hdfs://namenode/artifacts/discovery-popularity/v1"},
+    ],
+)
+def test_group_and_discovery_popularity_must_be_configured_together(values: dict[str, str]) -> None:
+    with pytest.raises(SettingsError, match="must be configured together"):
+        load_settings({**BASE, **values})
 
 
 @pytest.mark.parametrize(

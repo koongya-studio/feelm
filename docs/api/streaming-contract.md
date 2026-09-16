@@ -64,7 +64,9 @@ Spark가 미리 제외하려면 제외 목록의 복제본을 상태로 유지�
 
 Fold-in은 사용자의 평가 전체를 입력으로 하며, Python Consumer는 이를 **읽기 전용 롤**로 PostgreSQL에서 조회합니다.
 
-- 대상: `ratings`(`user_id`, `movie_id`, `score`), `onboarding_preferences`(`user_id`, `movie_id`, `preference`), `movies`(`representative_flavor_id` — `DISCOVERY` 판정용, 아래)
+- 대상: `ratings`(`user_id`, `movie_id`, `score`), `onboarding_preferences`(`user_id`, `movie_id`, `preference`),
+  `watch_records`의 확정 감상 상태, `user_movie_dismissals`. DISCOVERY 그룹은 PostgreSQL의
+  `representative_flavor_id`가 아니라 같은 세대의 immutable `group-serving-artifacts-v1`에서 읽는다
 - 쓰기 권한을 부여하지 않으며 서비스 테이블을 갱신하지 않는다
 - 이벤트의 `movieId`·`score`는 로깅·디버깅용 참고값이며 계산에는 조회 결과를 사용한다
 
@@ -80,11 +82,14 @@ Consumer 후보에는 Fold-in 입력에 없는 nullable `flavorCode`만 들어�
 | 영화 대표 맛(`representative_flavor_code`) | **HDFS immutable movie metadata snapshot** | 후보와 같은 artifact revision으로 읽는다 |
 | 영화별 OTT 제공처·사용자 클릭 | **PostgreSQL** | `movie_ott_providers`·`otts`·`watch_records`가 원본이며 Spring이 재정렬 시 조회한다 |
 
-`TASTE`는 사용자의 평가·온보딩 선호를 Fold-in에 반영한 기본 순위로 생성하며, K-Means 군집을
-유형 판정에 사용하지 않습니다. `DISCOVERY`는 향후 K-Means 영화 군집을 바탕으로 별도 선정 정책을
-적용합니다. 군집 산출물과 선정 기준이 준비되기 전에는 Consumer가 `DISCOVERY`를 생성하지 않고,
-Spring은 해당 슬롯을 `TASTE`로 채웁니다. [취향 API](./taste.md)의 새로운 맛 표시와 `DISCOVERY`
-유형의 관계 및 구체 선정 기준은 군집 산출물과 정책이 확정된 뒤 반영합니다.
+`TASTE`는 사용자의 평가·온보딩 선호를 Fold-in에 반영한 기본 순위 최대 500편이다. `DISCOVERY`는
+공개 팝콘 맛이 아닌 `group-serving-artifacts-v1`의 내부 8×128 영화 그룹으로 만드는 별도 순위다.
+사용자가 평가하거나 확정 감상한 매핑 영화 중 그룹별 이력이 2편 이하이면서 전체 매핑 감상의 20%
+이하인 그룹만 대상으로 한다. 평가 영화가 속한 고정 그룹 대표로 사용자 방향을 만들고, 방향이 없으면
+온보딩의 `LIKE 대표 합 - DISLIKE 대표 합`을 사용한다. 방향과 그룹 대표의 내림차순 내적으로 최대
+10개 공급 그룹을 고르고 현재 개인 점수순으로 그룹마다 최대 10편, 전체 최대 100편을 게시한다.
+`taste`와 `discovery`는 독립 순위이므로 서로 같은 영화가 있을 수 있으며 Spring이 TASTE 2편을
+먼저 예약한 뒤 DISCOVERY의 공통 중복을 건너뛴다.
 
 맛 모델은 버전이나 재학습 없이 고정된 Centroid를 사용합니다(ADR-0015). 신규 영화는 기존 K-Means의
 `predict`로 맛을 배정하고 `movies.representative_flavor_id`에 저장합니다. 배치 스냅샷과 PostgreSQL 집계는
@@ -321,47 +326,46 @@ Spring은 개인 추천에서는 후보를 재정렬하고, 파티·OTT에서는
   "generationId": "550e8400-e29b-41d4-a716-446655440000",
   "taste": [{
     "movieId": 807,
-    "score": 0.91,
+    "score": 4.32,
     "reason": {
       "code": "SHARED_GENRE",
       "sourceMovieIds": [550],
       "matchedGenreCodes": ["THRILLER"]
     }
   }],
-  "discovery": [],
+  "discovery": [{
+    "movieId": 912,
+    "score": 3.91,
+    "flavorCode": null
+  }],
   "updatedAt": "2026-08-31T07:21:03Z"
 }
 ```
 
-- `taste`는 상위 500편(설정값)의 원시 후보다. `discovery`는 발견 추천 담당 Consumer가 채울 예약 배열이며, 이 업무에서는 빈 배열로 저장한다. Spring은 두 배열을 직접 읽으며 항목의 중복 `type` 필드는 두지 않는다.
-- `score`는 사용자 간 절대 비교가 아니라 **같은 사용자 안의 상대 순위**를 의미한다.
-  파티 집계식이 이를 어떻게 정규화할지는 party.md의 미정 사항으로 남는다
-- **`score`는 게시된 후보 집합 안에서의 동률 인식 백분위다**(0 초과 1 미만). 후보를 무엇으로
-  계산했는지와 무관하게 항상 같은 의미다. 후보가 모두 동점이면 전부 같은 값(0.5)을 받는다.
-
-  | 콘텐츠 산출물 | 후보 모집단 | `score` |
-  |---|---|---|
-  | 미설정 | ALS Factor가 있는 서비스 영화 | 후보 집합 내 백분위 |
-  | 설정 | ALS Factor **또는** 콘텐츠 벡터가 있는 서비스 영화 | 후보 집합 내 백분위 |
-
-  설정 여부는 **후보 모집단과 순서**만 바꾸고 점수의 의미는 바꾸지 않는다.
+- `taste`는 TASTE 상위 500편, `discovery`는 최대 10개 그룹×그룹당 최대 10편이다. Spring은 두 배열을
+  직접 읽으며 항목의 중복 `type` 필드는 두지 않는다. 그룹 산출물을 설정하지 않은 회귀 모드에서는
+  `discovery`를 빈 배열로 저장한다.
+- `score`는 별점이나 사용자 간 절대 비교값이 아니라 **같은 사용자·같은 생성 결과 안의 상대 순위
+  점수**다. 값이 클수록 해당 배열 안에서 먼저 추천한다는 순서만 계약으로 보장한다.
+- 계산식과 범위는 현재 고정하지 않는다. Consumer는 활성 모델이 만든 상대 점수를 추가 정규화하지
+  않고 게시하므로 ALS 전용·ALS+콘텐츠·향후 다른 모델의 값 범위가 서로 다를 수 있다. 여러 모델의
+  점수를 한 목록에서 통합하거나 사용자 간 값을 집계해야 할 때 별도 정규화·버전 계약을 확정한다.
 
 - 콘텐츠 산출물이 설정되면 MovieLens에 연결되지 않은 영화(평점이 없어 ALS Factor가 없는 영화)도
   후보에 포함된다. 한 컴포넌트만 지원하는 영화는 그 컴포넌트의 순위를 그대로 받는다(S15P21E106-315 규칙).
-- **게시 값은 모델에 독립적이다.** 점수원이 ALS든 ALS+콘텐츠든 이후의 GBT·FM이든, Consumer는 내부
-  점수를 그대로 내보내지 않고 **게시하는 후보 집합 안에서의 순위**로 바꿔 쓴다. 모델을 바꿔도 이 필드의
-  의미와 범위는 바뀌지 않는다. 내부 점수의 척도는 모델마다 다르고(원시 ALS는 사용자마다 범위가 다른
-  예측 별점이다) 소비자가 그 차이를 알 필요가 없기 때문이다.
-- 따라서 **원시 ALS 예측 점수는 더 이상 이 키로 나가지 않는다.** 예측 별점 값이 필요한 소비자가
-  생기면 `score`를 되돌리지 말고 별도 필드로 합의해 추가한다.
-- 동점은 같은 값을 받고 순서는 내부 점수 순서와 같다. 값이 고르게 퍼지는 정도는 사용자마다
-  다르며, 내부 점수가 전부 같으면 모든 후보가 0.5가 된다.
-- **입력이 기준 미만이거나 취향 신호가 없는 사용자에게는 아무것도 게시하지 않는다.** 평가와 온보딩
-  선호의 합이 설정된 최소 입력 수(기본 10) 미만이거나, 그 이력으로 어떤 성분도 점수를 낼 수 없으면
+- 동점은 같은 값을 받고, 동일 점수 안의 결정론적 순서는 `movieId` 오름차순이다.
+- **입력이 기준 미만이거나 취향 신호가 없는 사용자에게는 아무것도 게시하지 않는다.** 같은 영화는
+  실제 별점이 온보딩보다 우선하도록 병합한 서로 다른 유효 영화 수가 설정된 최소 입력 수(기본 10)
+  미만이거나, 그 이력으로 어떤 성분도 점수를 낼 수 없으면
   세 키를 갱신하지 않고 이벤트만 정상 처리한다. 임의의 목록을 게시하면 소비자가 실제 추천과
   구별할 수 없기 때문이다.
-- 이때 해당 사용자 키는 **없거나 이전 값 그대로**이며 `candidate-version` 게시 순번과 `generationId`도 바뀌지 않는다. 따라서
-  Spring은 `inputVersion`이 올랐는데 마지막으로 확인한 후보 스냅샷의 `generationId`가 그대로인 상태를 **"새 추천이 아직 없음"**
+- 온보딩 LIKE/DISLIKE는 실제 별점 행으로 저장하지 않는다. ALS fold-in adapter에서 각각
+  `4.271231616529622`, `2.798442509805467`을 반올림 없이 사용하며 같은 영화에 실제 별점이 생기면
+  해당 온보딩 입력을 제거한다. 콘텐츠·발견 방향에서는 이를 연속 별점으로 해석하지 않고 LIKE/DISLIKE
+  이진 방향만 사용한다.
+- 이때 해당 사용자 키는 **없거나 이전 값 그대로**이며 `candidate-version` 게시 순번과 `generationId`도
+  바뀌지 않는다. 따라서 Spring은 `inputVersion`이 올랐는데 마지막으로 확인한 후보 스냅샷의
+  `generationId`가 그대로인 상태를 **"새 추천이 아직 없음"**
   으로 다루고 자체 기본 목록을 사용한다. 최소 입력 수는 **서비스가 추천을 노출하기 시작하는 기준과
   같아야 한다.** 이 상태의 최종 처리는 미정 사항 "콜드 스타트 처리 주체"에서 확정한다.
 - **동점은 흔하고 사용자에 따라 정도가 크게 다르다.** 실측 기준 상위 500편에서 서로 다른 점수가
@@ -400,11 +404,18 @@ Spring은 개인 추천에서는 후보를 재정렬하고, 파티·OTT에서는
 
 **후보 부가 정보와 Spring 처리**
 
-`candidates.taste`와 `candidates.discovery` 항목은 `movieId`, `score`, `reason`을 포함한다. `discovery`는 이후 발견 추천 담당 Consumer가 `flavorCode`도 채운다.
+`candidates.taste` 항목은 `movieId`, `score`, `reason`을 포함한다. `candidates.discovery` 항목은 `movieId`,
+`score`, nullable `flavorCode`를 포함하며, 발견 추천 XAI는 별도 후속 업무에서 적용한다.
 `reason.code`는 `SHARED_GENRE` 또는 `TOP_RATED_SOURCE`다. 전자는 `sourceMovieIds`의 고평점 입력 영화와 후보가 공유하는
 `matchedGenreCodes`를, 후자는 공통 장르가 없을 때 가장 높은 평가 입력 영화를 뜻하며 `matchedGenreCodes`는 빈 배열이다.
 Consumer는 구조화된 근거만 저장하고, Spring은 source 영화 제목과 장르 표시명을 조회해 사용자 문구를 만든다.
-Spring은 최대 500개 전체에 행동 가중치와 감상·관심없음 제외를 적용하고 최종 세트를 만든다.
+배열 자체가 유형을 나타내므로 항목의 중복 `type` 필드는 두지 않는다. 공급 그룹 수·적격 그룹 수 같은
+DISCOVERY 진단 정보도 Redis 계약에 넣지 않고 Consumer 로그에만 남긴다.
+Spring은 최대 500개 TASTE 전체에 행동 가중치와 감상·관심없음 제외를 적용하고 최종 세트를 만든다.
+Spring은 TASTE 2편을 먼저 고른 뒤 이미 고른 영화와 겹치지 않는 DISCOVERY 1편을 고른다. DISCOVERY가
+부족하면 다음 TASTE로 채운다. 이 Consumer는 별도 POPULAR fallback 목록을 생성하지 않는다.
+Consumer는 DISCOVERY 공급량을 낭비하지 않도록 현재 평가·온보딩·확정 감상·관심없음을 발견 목록에서
+선필터한다. 기존 TASTE 원시 후보의 의미는 바꾸지 않으며 Spring이 조회 시점에 두 목록을 다시 제외한다.
 OTT 제공처는 `movie_ott_providers`·`otts`, 사용자 클릭 정보는 `watch_records`에서 조회한다.
 별도 Redis `topn`은 생성하거나 읽지 않는다. 기존 키 자동 삭제는 하지 않는다. 기존 배포가
 `candidates.items` 형식으로 저장한 값은 새 `taste`/`discovery` 형식과 호환되지 않으므로, Spring reader를
@@ -499,7 +510,7 @@ URI나 Redis에 저장하지 않고 runtime filesystem 설정으로 제공한다
 - [ ] Kafka 파티션 수와 복제 계수 — 인프라 담당 협의(EC2 2대 구성)
 - [ ] Python Fold-in Consumer와 Spark Streaming의 Consumer Group 이름·배포 환경변수 — 구현 업무에서 확정
 - [ ] 행동 Feature 목록과 Re-ranking 가중치 — Re-ranking 설계에서 확정
-- [ ] K-Means 군집 기반 DISCOVERY 선정 방식·기준값과 저이력·온보딩 사용자 처리 — FR-12, API-041·045
+- [ ] K-Means 내부 그룹 기반 DISCOVERY 선정 방식·기준값과 저이력·온보딩 사용자 처리 — Consumer 구현 완료, Backend 소비·감상 변경 재계산·운영 활성화 검증 대기
 - [ ] `candidates` 후보 수 최대 500편 — 실데이터로 캘리브레이션
 - [ ] 허용 지연 초기값과 Structured Streaming 트리거 주기 — 실측 후 확정
 - [ ] 비활성 사용자 Redis 키 정리 주기

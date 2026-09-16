@@ -12,8 +12,12 @@ from confluent_kafka import Consumer, KafkaException, TopicPartition
 
 from feelm_consumer.artifacts import ArtifactBundle, load_bundle
 from feelm_consumer.content import ContentBundle, load_content
+from feelm_consumer.discovery_popularity import load_discovery_popularity
+from feelm_consumer.discovery_release import validate_discovery_artifacts
 from feelm_consumer.events import EventValidationError, parse_event
-from feelm_consumer.postgres import load_profile, readonly_snapshot
+from feelm_consumer.group_artifacts import GroupBundle, load_group_bundle
+from feelm_consumer.postgres import UserSnapshot, load_profile, load_user_snapshot, readonly_snapshot
+from feelm_consumer.ranking import RankedMovie
 from feelm_consumer.redis_store import (
     StalePartitionFenceError,
     claim_partition_fence,
@@ -41,6 +45,8 @@ def process_user(
     is_still_owned: Callable[[], bool] | None = None,
     partition_fence: tuple[str, str] | None = None,
     content: ContentBundle | None = None,
+    groups: GroupBundle | None = None,
+    discovery_popularity: tuple[RankedMovie, ...] | None = None,
     hybrid_alpha: float = 0.5,
     min_input_count: int = 0,
 ) -> bool | None:
@@ -50,12 +56,20 @@ def process_user(
                 raise ValueError("partition fence is required")
             expected = _expected_version(store, user_id, partition_fence)
             with readonly_snapshot(connect) as connection:
-                ratings, onboarding = load_profile(connection, user_id)
+                if groups is None:
+                    ratings, onboarding = load_profile(connection, user_id)
+                    snapshot = UserSnapshot(ratings, onboarding, frozenset(), frozenset())
+                else:
+                    snapshot = load_user_snapshot(connection, user_id)
             results = calculate_user_results(
                 bundle,
-                ratings,
-                onboarding,
+                snapshot.ratings,
+                snapshot.onboarding,
                 content=content,
+                groups=groups,
+                discovery_popularity=discovery_popularity,
+                watched_movie_ids=snapshot.watched_movie_ids,
+                dismissed_movie_ids=snapshot.dismissed_movie_ids,
                 hybrid_alpha=hybrid_alpha,
                 min_input_count=min_input_count,
             )
@@ -104,6 +118,28 @@ def run(settings: Settings) -> None:
         )
     else:
         LOG.info("content artifacts not configured; publishing ALS-only candidates")
+    groups = None
+    discovery_popularity = None
+    if settings.group_uri is not None:
+        groups = load_group_bundle(settings.group_uri, expected_mapping_revision=bundle.mapping_revision)
+        popularity = load_discovery_popularity(
+            settings.discovery_popularity_uri or "",
+            expected_mapping_revision=bundle.mapping_revision,
+        )
+        release = validate_discovery_artifacts(groups, popularity)
+        discovery_popularity = popularity.candidates
+        LOG.info(
+            "group and Discovery popularity artifacts loaded "
+            "group_version=%s popularity_version=%s movies=%s mapped=%s groups=%s groups_ge_10=%s",
+            groups.group_version,
+            popularity.popularity_version,
+            release.movie_count,
+            release.mapped_movie_count,
+            release.mapped_group_count,
+            release.groups_with_at_least_ten_movies,
+        )
+    else:
+        LOG.info("group artifacts not configured; discovery candidates are disabled")
     store = redis.Redis.from_url(settings.redis_url, decode_responses=True)
     consumer = Consumer(
         {
@@ -196,6 +232,8 @@ def run(settings: Settings) -> None:
                 is_still_owned=lambda: (message.topic(), message.partition()) in owned,
                 partition_fence=fences.get((message.topic(), message.partition())),
                 content=content,
+                groups=groups,
+                discovery_popularity=discovery_popularity,
                 hybrid_alpha=settings.hybrid_alpha,
                 min_input_count=settings.min_input_count,
             )

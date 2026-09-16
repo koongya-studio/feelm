@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Sequence
 
 import numpy as np
 
 from feelm_consumer.artifacts import ArtifactBundle
 from feelm_consumer.content import ContentBundle
+from feelm_consumer.discovery import select_discovery_candidates
+from feelm_consumer.group_artifacts import GroupBundle
 from feelm_consumer.hybrid import build_profile, percentile_scores, score_candidate
 from feelm_consumer.profile import ProfileInput, fold_in, merge_inputs
 from feelm_consumer.ranking import RankedMovie, rank_candidates
@@ -23,6 +26,10 @@ def calculate_user_results(
     candidate_version: int | None = None,
     *,
     content: ContentBundle | None = None,
+    groups: GroupBundle | None = None,
+    discovery_popularity: Sequence[RankedMovie] | None = None,
+    watched_movie_ids: set[int] | frozenset[int] = frozenset(),
+    dismissed_movie_ids: set[int] | frozenset[int] = frozenset(),
     hybrid_alpha: float = 0.5,
     min_input_count: int = 0,
 ) -> tuple[dict[str, object], dict[str, object]] | None:
@@ -34,8 +41,8 @@ def calculate_user_results(
     Without ``content`` the candidate population and their order are the ALS-only
     ones.  With it, a movie is a candidate when either component supports it, so
     content-only service movies and users without any ALS-backed rating still get
-    results.  **Either way the published score means the same thing** (see
-    ``_published_scores``), so a consumer never has to know which one produced it.
+    results.  The published score is the active model's relative ranking value;
+    its formula and range are intentionally not part of the serving contract.
 
     Returns ``None`` when the user is below ``min_input_count`` or when no
     component can score them at all.  Publishing an arbitrary list instead would
@@ -73,58 +80,122 @@ def calculate_user_results(
     if content is None:
         if folded is None:
             return None
-        service_ranked = rank_candidates(folded.vector, service_factors)
-        if len(service_ranked) < CANDIDATE_LIMIT:
-            LOG.warning("foldin_candidate_shortage available=%s requested=500", len(service_ranked))
-        candidates = _published_scores(service_ranked)
-        return build_results(
-            model_version=bundle.model_version,
-            vector=folded.vector.tolist() if folded is not None else [],
-            rating_count=len(ratings),
-            factor_backed_input_count=folded.factor_backed_input_count if folded is not None else 0,
-            candidates=candidates,
-            movie_metadata=bundle.movie_metadata,
-            reasons=build_candidate_reasons(candidates, merged_inputs, bundle.movie_metadata),
+        ranked_population = rank_candidates(folded.vector, service_factors, size=len(service_factors))
+        return _build_ranked_results(
+            bundle,
+            ranked_population,
+            ratings,
+            onboarding,
+            merged_inputs,
+            folded.vector.tolist(),
+            folded.factor_backed_input_count,
+            groups=groups,
+            discovery_popularity=discovery_popularity,
+            watched_movie_ids=watched_movie_ids,
+            dismissed_movie_ids=dismissed_movie_ids,
         )
 
     als_scores: dict[int, float] = {}
     if folded is not None:
         als_scores = {service_id: float(folded.vector @ factor) for service_id, factor in service_factors.items()}
-    content_scores = _content_scores(content, merged_inputs)
+    content_scores = _content_scores(content, ratings, onboarding)
     if not als_scores and not content_scores:
         LOG.warning("hybrid_no_component_available merged_input_count=%s", len(merged_inputs))
         return None
-    ranked = _hybrid_candidates(als_scores, content_scores, hybrid_alpha)
-    if len(ranked) < CANDIDATE_LIMIT:
-        LOG.warning("foldin_candidate_shortage available=%s requested=500", len(ranked))
+    ranked_population = _hybrid_candidates(als_scores, content_scores, hybrid_alpha)
     LOG.info(
         "hybrid_candidates als_supported=%s content_supported=%s published=%s alpha=%s",
         len(als_scores),
         len(content_scores),
-        len(ranked),
+        min(len(ranked_population), CANDIDATE_LIMIT),
         hybrid_alpha,
     )
-    return build_results(
-        model_version=bundle.model_version,
-        vector=folded.vector.tolist() if folded is not None else [],
-        rating_count=len(ratings),
-        factor_backed_input_count=folded.factor_backed_input_count if folded is not None else 0,
-        candidates=ranked,
-        movie_metadata=bundle.movie_metadata,
-        reasons=build_candidate_reasons(ranked, merged_inputs, bundle.movie_metadata),
+    return _build_ranked_results(
+        bundle,
+        ranked_population,
+        ratings,
+        onboarding,
+        merged_inputs,
+        folded.vector.tolist() if folded is not None else [],
+        folded.factor_backed_input_count if folded is not None else 0,
+        groups=groups,
+        discovery_popularity=discovery_popularity,
+        watched_movie_ids=watched_movie_ids,
+        dismissed_movie_ids=dismissed_movie_ids,
     )
 
 
-def _content_scores(content: ContentBundle, merged_inputs: list[ProfileInput]) -> dict[int, float]:
+def _build_ranked_results(
+    bundle: ArtifactBundle,
+    ranked_population: list[RankedMovie],
+    ratings: list[ProfileInput],
+    onboarding: list[ProfileInput],
+    merged_inputs: list[ProfileInput],
+    vector: list[float],
+    factor_backed_input_count: int,
+    *,
+    groups: GroupBundle | None,
+    discovery_popularity: Sequence[RankedMovie] | None,
+    watched_movie_ids: set[int] | frozenset[int],
+    dismissed_movie_ids: set[int] | frozenset[int],
+) -> tuple[dict[str, object], dict[str, object]]:
+    # TASTE stays byte-compatible with the existing producer regardless of the
+    # Discovery feature flag. Spring retains its final known/dismissed filter.
+    taste = ranked_population[:CANDIDATE_LIMIT]
+    if len(taste) < CANDIDATE_LIMIT:
+        LOG.warning("foldin_candidate_shortage available=%s requested=500", len(taste))
+
+    discovery = None
+    if groups is not None and discovery_popularity is not None:
+        selection = select_discovery_candidates(
+            groups,
+            ranked_population,
+            ratings,
+            onboarding,
+            popularity_ranking=discovery_popularity,
+            watched_movie_ids=watched_movie_ids,
+            dismissed_movie_ids=dismissed_movie_ids,
+        )
+        discovery = selection.candidates
+        LOG.info(
+            "discovery_candidates selected=%s supplying_groups=%s eligible_groups=%s "
+            "mapped_viewed=%s direction_source=%s",
+            len(discovery),
+            selection.supplying_group_count,
+            selection.eligible_group_count,
+            selection.mapped_viewed_count,
+            selection.direction_source,
+        )
+    return build_results(
+        model_version=bundle.model_version,
+        vector=vector,
+        rating_count=len(ratings),
+        factor_backed_input_count=factor_backed_input_count,
+        candidates=taste,
+        discovery_candidates=discovery,
+        movie_metadata=bundle.movie_metadata,
+        reasons=build_candidate_reasons(taste, merged_inputs, bundle.movie_metadata),
+    )
+
+
+def _content_scores(
+    content: ContentBundle,
+    ratings: list[ProfileInput],
+    onboarding: list[ProfileInput],
+) -> dict[int, float]:
     """Score every movie with a content vector against the user's content profile."""
     rows: list[int] = []
     values: list[float] = []
-    for item in merged_inputs:
+    for item in ratings:
         row = content.row_index(item.movie_id)
         if row is not None and content.supported[row]:
             rows.append(row)
             values.append(item.score)
     profile, reason = build_profile(content, rows, values)
+    if profile is None:
+        profile = _onboarding_content_direction(content, ratings, onboarding)
+        if profile is not None:
+            reason = "ONBOARDING_DIRECTION"
     if profile is None:
         LOG.warning("content_profile_unavailable reason=%s supported_history=%s", reason, len(rows))
         return {}
@@ -153,6 +224,30 @@ def _content_scores(content: ContentBundle, merged_inputs: list[ProfileInput]) -
     )
 
 
+def _onboarding_content_direction(
+    content: ContentBundle,
+    ratings: list[ProfileInput],
+    onboarding: list[ProfileInput],
+) -> np.ndarray | None:
+    rated_ids = {entry.movie_id for entry in ratings}
+    profile = np.zeros(content.vocabulary_size, dtype=np.float64)
+    supported_count = 0
+    for item in onboarding:
+        if item.movie_id in rated_ids:
+            continue
+        row = content.row_index(item.movie_id)
+        if row is None or not content.supported[row]:
+            continue
+        indices, values = content.nonzeros(row)
+        sign = 1.0 if item.score >= 3.5 else -1.0
+        profile[indices] += sign * values
+        supported_count += 1
+    norm = float(np.linalg.norm(profile))
+    if supported_count == 0 or not np.isfinite(norm) or norm <= 1e-8:
+        return None
+    return profile / norm
+
+
 def _hybrid_candidates(
     als_scores: dict[int, float], content_scores: dict[int, float], hybrid_alpha: float
 ) -> list[RankedMovie]:
@@ -165,22 +260,7 @@ def _hybrid_candidates(
         if scored is not None:
             ranked.append(RankedMovie(service_id, scored.score))
     ranked.sort(key=lambda item: (-item.score, item.movie_id))
-    return _published_scores(ranked[:CANDIDATE_LIMIT])
-
-
-def _published_scores(ranked: list[RankedMovie]) -> list[RankedMovie]:
-    """Re-express the published score as a tie-aware percentile inside the candidate set.
-
-    Every scoring path goes through this, so ``score`` carries one meaning
-    regardless of what produced the candidates: raw ALS is a predicted rating
-    whose range differs per user, the hybrid mix is a percentile blend, and a
-    future GBT or FM would have a different scale again.  Publishing the rank
-    inside the set keeps the value comparable between users and between models,
-    and leaves the order untouched because the transform is monotone.  The final
-    semantics are still to be agreed with the consumers of the value.
-    """
-    percentiles = percentile_scores([item.score for item in ranked])
-    return [RankedMovie(item.movie_id, value) for item, value in zip(ranked, percentiles, strict=True)]
+    return ranked
 
 
 def _percentiles(scores: dict[int, float]) -> dict[int, float]:

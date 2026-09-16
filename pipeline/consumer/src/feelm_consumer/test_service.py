@@ -5,10 +5,13 @@ import numpy as np
 import pytest
 
 from feelm_consumer import results as results_module
+from feelm_consumer import service as service_module
 from feelm_consumer.artifacts import ArtifactBundle, MovieMetadata
 from feelm_consumer.content import ContentBundle
+from feelm_consumer.group_artifacts import GroupAssignment
+from feelm_consumer.postgres import ONBOARDING_LIKE_SCORE
 from feelm_consumer.profile import ProfileInput, fold_in, merge_inputs
-from feelm_consumer.ranking import rank_candidates
+from feelm_consumer.ranking import RankedMovie, rank_candidates
 from feelm_consumer.results import build_results
 from feelm_consumer.service import calculate_user_results
 from feelm_consumer.xai import build_candidate_reasons
@@ -80,34 +83,20 @@ def frozen_clock(monkeypatch):
     monkeypatch.setattr(results_module, "utc_now", lambda: "2026-09-15T00:00:00Z")
 
 
-def test_als_only_keeps_legacy_candidates_but_publishes_the_common_score(frozen_clock) -> None:
-    """Without a content bundle only the score scale changes, nothing else.
-
-    The published score means the same thing in every path (2026-09-15 decision),
-    so the legacy raw ALS value is re-expressed here too.
-    """
+def test_als_only_preserves_legacy_relative_scores(frozen_clock) -> None:
+    """Without a content bundle, publish the active model's relative score unchanged."""
     ratings = [ProfileInput(10, 5.0, "rating")]
 
     actual = calculate_user_results(_bundle(), ratings, [], 7)
     legacy = _legacy_results(_bundle(), ratings, [], 7)
 
     assert actual is not None
-    # Same candidates, same order, same everything except the score values.
-    assert [item["movieId"] for item in actual[1]["taste"]] == [item["movieId"] for item in legacy[1]["taste"]]
     assert {key: value for key, value in actual[0].items() if key != "generationId"} == {
         key: value for key, value in legacy[0].items() if key != "generationId"
     }
-    assert {key: value for key, value in actual[1].items() if key not in {"taste", "generationId"}} == {
-        key: value for key, value in legacy[1].items() if key not in {"taste", "generationId"}
+    assert {key: value for key, value in actual[1].items() if key != "generationId"} == {
+        key: value for key, value in legacy[1].items() if key != "generationId"
     }
-    for published, original in zip(actual[1]["taste"], legacy[1]["taste"], strict=True):
-        assert {key: value for key, value in published.items() if key != "score"} == {
-            key: value for key, value in original.items() if key != "score"
-        }
-    # Raw ALS predictions are unbounded; the published values are percentiles.
-    assert [item["score"] for item in actual[1]["taste"]] == [0.75, 0.25]
-    legacy_scores = [item["score"] for item in legacy[1]["taste"]]
-    assert max(legacy_scores) > 1.0 and legacy_scores != [0.75, 0.25]
 
 
 def test_content_only_movies_become_candidates(frozen_clock) -> None:
@@ -242,6 +231,94 @@ def test_onboarding_preferences_count_towards_the_minimum(frozen_clock) -> None:
     assert calculate_user_results(_bundle(), ratings, onboarding, 7, content=_content(), min_input_count=4) is None
 
 
+def test_minimum_gate_counts_distinct_movies_after_rating_override(frozen_clock) -> None:
+    rating = [ProfileInput(10, 4.5, "rating")]
+    onboarding = [ProfileInput(10, 5.0, "onboarding")]
+    onboarding.extend(ProfileInput(movie_id, 5.0, "onboarding") for movie_id in range(100, 108))
+
+    assert calculate_user_results(_bundle(), rating, onboarding, 7, min_input_count=10) is None
+    onboarding.append(ProfileInput(108, 5.0, "onboarding"))
+    assert calculate_user_results(_bundle(), rating, onboarding, 7, min_input_count=10) is not None
+    onboarding.append(ProfileInput(109, 5.0, "onboarding"))
+    assert calculate_user_results(_bundle(), rating, onboarding, 7, min_input_count=10) is not None
+
+
+def test_onboarding_exact_pseudo_target_reaches_als_fold_in(frozen_clock) -> None:
+    bundle = ArtifactBundle(
+        "als-v1",
+        "snapshot-a",
+        0.1,
+        {1: np.array([1.0])},
+        {10: 1},
+        {10: MovieMetadata("10", (), None)},
+        MAPPING_REVISION,
+        METADATA_REVISION,
+    )
+
+    results = calculate_user_results(
+        bundle,
+        [],
+        [ProfileInput(10, ONBOARDING_LIKE_SCORE, "onboarding")],
+        7,
+        min_input_count=1,
+    )
+
+    assert results is not None
+    assert results[0]["vector"] == pytest.approx([ONBOARDING_LIKE_SCORE / 1.1])
+
+
+def test_real_rating_overrides_onboarding_pseudo_target_in_fold_in(frozen_clock) -> None:
+    bundle = ArtifactBundle(
+        "als-v1",
+        "snapshot-a",
+        0.1,
+        {1: np.array([1.0])},
+        {10: 1},
+        {10: MovieMetadata("10", (), None)},
+        MAPPING_REVISION,
+        METADATA_REVISION,
+    )
+
+    results = calculate_user_results(
+        bundle,
+        [ProfileInput(10, 0.5, "rating")],
+        [ProfileInput(10, ONBOARDING_LIKE_SCORE, "onboarding")],
+        7,
+    )
+
+    assert results is not None
+    assert results[0]["vector"] == pytest.approx([0.5 / 1.1])
+
+
+def test_group_enabled_service_emits_discovery_without_changing_taste(frozen_clock) -> None:
+    class Groups:
+        group_means = np.zeros((1024, 131), dtype=np.float64)
+        group_means[0, 0] = 1.0
+        group_means[1, 0] = 0.5
+
+        @staticmethod
+        def assignment_for(movie_id: int) -> GroupAssignment | None:
+            group_id = {10: 0, 20: 1, 30: 1}.get(movie_id)
+            if group_id is None:
+                return None
+            return GroupAssignment(0, group_id, group_id, True, True, True)
+
+    legacy = calculate_user_results(_bundle(), [ProfileInput(10, 5.0, "rating")], [], 7)
+    grouped = calculate_user_results(
+        _bundle(),
+        [ProfileInput(10, 5.0, "rating")],
+        [],
+        7,
+        groups=Groups(),
+        discovery_popularity=[RankedMovie(20, 1.0), RankedMovie(30, 0.5)],
+    )
+
+    assert legacy is not None and grouped is not None
+    assert grouped[1]["taste"] == legacy[1]["taste"]
+    assert [item["movieId"] for item in grouped[1]["discovery"]] == [20]
+    assert grouped[1]["discovery"][0]["flavorCode"] is None
+
+
 def test_fold_in_failure_with_inputs_is_raised_not_skipped() -> None:
     """A singular solve is a computation failure, not a user without signal."""
     bundle = ArtifactBundle(
@@ -267,16 +344,16 @@ def test_user_without_any_supported_input_publishes_nothing(frozen_clock) -> Non
     assert calculate_user_results(_bundle(), [ProfileInput(30, 5.0, "rating")], [], 7, content=content) is None
 
 
-def test_published_scores_are_percentiles_inside_the_candidate_set(frozen_clock) -> None:
-    """The value must not depend on the scale of whatever model produced it."""
+def test_active_model_scores_are_not_normalized_again(monkeypatch, frozen_clock) -> None:
+    """The serving contract preserves model-relative values without fixing their range."""
     ratings = [ProfileInput(10, 5.0, "rating"), ProfileInput(20, 1.0, "rating")]
+    expected = [RankedMovie(10, 4.32), RankedMovie(20, 3.91), RankedMovie(30, 3.75)]
+    monkeypatch.setattr(service_module, "_hybrid_candidates", lambda *_args: expected)
 
     results = calculate_user_results(_bundle(), ratings, [], 7, content=_content(), hybrid_alpha=0.5)
 
     assert results is not None
-    scores = [item["score"] for item in results[1]["taste"]]
-    # Three candidates with distinct mixing scores spread evenly over the set.
-    assert scores == [5 / 6, 3 / 6, 1 / 6]
+    assert [item["score"] for item in results[1]["taste"]] == [4.32, 3.91, 3.75]
 
 
 def test_published_scores_keep_ties_equal(frozen_clock) -> None:

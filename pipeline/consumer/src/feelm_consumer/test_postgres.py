@@ -1,4 +1,10 @@
-from feelm_consumer.postgres import load_profile, readonly_snapshot
+from feelm_consumer.postgres import (
+    ONBOARDING_DISLIKE_SCORE,
+    ONBOARDING_LIKE_SCORE,
+    load_profile,
+    load_user_snapshot,
+    readonly_snapshot,
+)
 
 
 class FakeCursor:
@@ -11,7 +17,11 @@ class FakeCursor:
     def fetchall(self) -> list[tuple[int, float | str]]:
         if "ratings" in self.query:
             return [(5, 4.5)]
-        return [(4, "LIKE"), (6, "DISLIKE")]
+        if "onboarding_preferences" in self.query:
+            return [(4, "LIKE"), (6, "DISLIKE")]
+        if "watch_records" in self.query:
+            return [(7,), (8,)]  # type: ignore[list-item]
+        return [(9,)]  # type: ignore[list-item]
 
 
 class FakeConnection:
@@ -36,6 +46,19 @@ def test_readonly_snapshot_and_profile_load() -> None:
         ratings, onboarding = load_profile(snapshot, 7)
 
     assert [(item.movie_id, item.score) for item in ratings] == [(5, 4.5)]
-    assert [(item.movie_id, item.score) for item in onboarding] == [(4, 5.0), (6, 1.0)]
+    assert [(item.movie_id, item.score) for item in onboarding] == [
+        (4, ONBOARDING_LIKE_SCORE),
+        (6, ONBOARDING_DISLIKE_SCORE),
+    ]
     assert connection.commands == ["BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY", "COMMIT"]
     assert connection.closed
+
+
+def test_user_snapshot_reads_confirmed_watches_and_dismissals() -> None:
+    connection = FakeConnection()
+
+    snapshot = load_user_snapshot(connection, 7)
+
+    assert snapshot.watched_movie_ids == frozenset({7, 8})
+    assert snapshot.dismissed_movie_ids == frozenset({9})
+    assert snapshot.onboarding[0].score == ONBOARDING_LIKE_SCORE
