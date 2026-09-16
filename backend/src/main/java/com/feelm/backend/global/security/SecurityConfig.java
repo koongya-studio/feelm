@@ -92,12 +92,13 @@ public class SecurityConfig {
         return false;
     }
 
-    /** API-030은 선택 인증이다. 정적 검색·필터 경로는 영화 ID 템플릿에 포함하지 않는다. */
+    /** API-030과 API-031은 선택 인증이다. 정적 검색·필터 경로는 영화 ID 템플릿에 포함하지 않는다. */
     public static boolean isOptionalAuthenticationApi(HttpMethod method, String path) {
         return HttpMethod.GET.equals(method)
                 && !path.equals("/api/v1/movies/search")
                 && !path.equals("/api/v1/movies/filter-options")
-                && PATH_MATCHER.match("/api/v1/movies/{movieId}", path);
+                && (PATH_MATCHER.match("/api/v1/movies/{movieId}", path)
+                        || PATH_MATCHER.match("/api/v1/movies/{movieId}/similar", path));
     }
 
     private final TokenProvider tokenProvider;

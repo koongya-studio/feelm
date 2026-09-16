@@ -57,10 +57,8 @@
       "movieId": 807,
       "title": "세븐",
       "posterUrl": "https://...",
-      "releaseYear": 1995,
       "averageRating": 4.2,
-      "similarity": 0.87,
-      "reason": { "summary": "같은 감독, 스릴러", "factors": [{ "type": "DIRECTOR", "label": "데이비드 핀처" }] }
+      "similarity": 0.87
     }
   ]
 }
