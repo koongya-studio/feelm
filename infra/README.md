@@ -1534,11 +1534,20 @@ URL로 등록합니다. 같은 Key와 값을 환경 범위 `service`, `distribut
 받으며 MR, API 및 Web Pipeline에서는 배포 알림을 보내지 않습니다. URL을 갱신하거나 폐기할
 때는 두 환경 범위의 값을 함께 변경합니다.
 
+모니터링 설정은 애플리케이션 이미지 배포와 달리 보호된 `develop` Push에서
+`deploy-monitoring` Job으로 적용합니다. 이 Job은 `ci-variable-preflight`를 필수 `needs`로
+사용하고 원격 `develop` HEAD를 다시 확인한 뒤 `monitoring.yml`의 Prometheus, Grafana와 세
+exporter만 교체합니다. 같은 `service-and-backend-cache` resource group을 사용해 백엔드·
+프론트엔드 배포 및 캐시 작업과 동시에 Compose를 변경하지 않습니다. 상세 health 기준,
+컨테이너 보존 롤백과 비정상 종료 복구는
+[`infra/monitoring/README.md`](./monitoring/README.md)의 develop 자동 배포 절을 따릅니다.
+
 새 commit이 같은 브랜치에 반영되면 이전 테스트와 이미지 빌드는 자동 취소할 수 있지만,
 배포와 캐시 승격·롤백은 중간 상태 손상을 막기 위해 취소하지 않습니다. `main` 배포 전에는
 main의 보호 브랜치 상태, `e106-shell` Runner의 Protected 설정과 `service` 환경 범위의
-Protected CI/CD Variable을 확인합니다. 이후 추가하는 서비스 자동 배포도 보호된 main Push만
-배포 기준으로 사용하며 develop, MR, API와 Web Pipeline에 배포 Job을 열지 않습니다.
+Protected CI/CD Variable을 확인합니다. 애플리케이션 이미지 자동 배포는 보호된 main Push만
+배포 기준으로 사용하며 develop, MR, API와 Web Pipeline에 배포 Job을 열지 않습니다. 위
+모니터링 Compose Job은 보호된 develop Push에만 열린 명시적 예외입니다.
 
 백엔드 배포 스크립트는 실행 중인 이미지 이름을 먼저 보관하고 후보 이미지를 기동한 뒤 최대 2분
 동안 Docker healthcheck와 컨테이너 내부 Actuator 응답을 확인합니다. 이어서 PostgreSQL과

@@ -27,6 +27,37 @@ ci-variable-preflight:
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
 
+deploy-monitoring:
+  stage: deploy
+  tags: [e106-shell]
+  needs: [ci-variable-preflight]
+  environment:
+    name: service
+  script:
+    - python3 -I -B infra/scripts/ci-deploy-current-commit.py --branch develop
+    - bash infra/scripts/deploy-monitoring.sh
+  resource_group: service-and-backend-cache
+  interruptible: false
+  retry:
+    max: 2
+    when: [runner_system_failure, scheduler_failure]
+  timeout: 15m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - .gitlab-ci.yml
+        - .gitlab/ci/infra.yml
+        - infra/config/required-ci-variables.json
+        - infra/compose/monitoring.yml
+        - infra/monitoring/prometheus/**/*
+        - infra/monitoring/grafana/**/*
+        - infra/scripts/ci-deploy-current-commit.py
+        - infra/scripts/test_ci_deploy_current_commit.py
+        - infra/scripts/deploy-monitoring.sh
+        - infra/scripts/test_deploy_monitoring.py
+        - infra/scripts/verify-monitoring-deployment.py
+        - infra/scripts/test_verify_monitoring_deployment.py
+
 infra-config-test:
   stage: test
   tags: [e106-mr-isolated]
@@ -63,6 +94,12 @@ infra-config-test:
         - infra/scripts/test_notify_deployment.py
         - infra/scripts/ci-required-variable-preflight.py
         - infra/scripts/test_ci_required_variable_preflight.py
+        - infra/scripts/ci-deploy-current-commit.py
+        - infra/scripts/test_ci_deploy_current_commit.py
+        - infra/scripts/deploy-monitoring.sh
+        - infra/scripts/test_deploy_monitoring.py
+        - infra/scripts/verify-monitoring-deployment.py
+        - infra/scripts/test_verify_monitoring_deployment.py
         - infra/scripts/verify-kafka-monitoring.py
         - infra/scripts/test_consumer_distributed_deployment.py
         - infra/scripts/test_kafka_monitoring.py
