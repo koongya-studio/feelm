@@ -21,6 +21,7 @@ import { resetSessionStore } from '../../mocks/sessionStore';
 import { mockMyProfile } from '../../mocks/user';
 import { ROUTE_PATTERN } from '../../routes/paths';
 import { invitation } from '../../test/party';
+import type { WatchRecordListItem } from '../../types/watch';
 
 vi.mock('../../api/users', () => ({
   getMyProfile: vi.fn(),
@@ -49,8 +50,41 @@ vi.mock('../../api/otts', () => ({
   setMyOttIds: vi.fn(),
 }));
 
+/*
+ * 2.4-A가 감상 기록을 찾고 확인 응답을 보낸다. 연동(-477) 뒤에는 실제 호출이라
+ * 가로채지 않으면 기록을 찾지 못해 `감상 기록을 찾을 수 없어요`가 된다.
+ *
+ * **알림은 아직 목업이라 이 어긋남이 실제로 있다.** 8.1의 감상 확인 알림이 가리키는
+ * 번호는 목업 값이라 서버에 없다. 알림이 실제 API가 되면 서버가 준 번호가 온다.
+ * 이 시험이 잡으려는 것은 알림 → 2.4-A → 평가 경로이므로, 그 번호에 기록이 있는
+ * 상태를 서버 대역으로 세운다.
+ */
+vi.mock('../../api/watch', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../api/watch')>()),
+  findWatchRecord: vi.fn(),
+  confirmWatch: vi.fn(),
+}));
+
 const { getOtts, getMyOttIds } = await import('../../api/otts');
 const { declineInvitation, getInvitation } = await import('../../api/parties');
+const { findWatchRecord, confirmWatch } = await import('../../api/watch');
+
+/** 8.1 감상 확인 알림이 가리키는 기록(4004 · 영화 104 · 넷플릭스) */
+function linkClickedRecord(): WatchRecordListItem {
+  const clickedAt = '2026-09-10T12:00:00Z';
+
+  return {
+    watchRecordId: 4004,
+    movie: { movieId: 104, title: '영화 제목 104', posterUrl: null },
+    status: 'LINK_CLICKED',
+    ott: { ottId: mockOtts[0].ottId, code: mockOtts[0].code },
+    clickedAt,
+    confirmDueAt: clickedAt,
+    expiresAt: clickedAt,
+    watchedAt: null,
+    ratingId: null,
+  };
+}
 
 beforeEach(() => {
   resetSessionStore();
@@ -62,6 +96,12 @@ beforeEach(() => {
     .mockResolvedValue({ invitationId: 501, status: 'DECLINED' });
   vi.mocked(getOtts).mockReset().mockResolvedValue(mockOtts);
   vi.mocked(getMyOttIds).mockReset().mockResolvedValue([mockOtts[0].ottId]);
+  vi.mocked(findWatchRecord).mockReset().mockResolvedValue(linkClickedRecord());
+  vi.mocked(confirmWatch).mockReset().mockResolvedValue({
+    watchRecordId: 4004,
+    status: 'WATCHED_UNRATED',
+    watchedAt: '2026-09-12T12:00:00Z',
+  });
 });
 
 function LocationProbe() {
@@ -106,10 +146,7 @@ describe('2.1 → 8.1 → 2.4-A', () => {
     fireEvent.click(row);
     await waitFor(() => expect(location()).toBe('/watch-records/4004/confirm'));
 
-    /*
-     * 2.4-A가 그 기록의 영화(104)를 보여준다. 기록을 못 찾으면 대체 영화(101)로 떨어지는데
-     * 화면은 둘이 똑같이 생겼다 — `봤어요`가 어느 영화의 평가로 가는지로 가른다.
-     */
+    // 2.4-A가 그 기록의 영화(104)를 보여주고, `봤어요`가 그 영화의 평가로 간다
     fireEvent.click(await screen.findByRole('button', { name: '봤어요' }));
     await waitFor(() => expect(location()).toBe('/movies/104/rate'));
     unmount();

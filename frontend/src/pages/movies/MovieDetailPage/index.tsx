@@ -10,8 +10,9 @@
  * 연동 API는 API-030(상세) · API-031(유사) · API-032(공개 한줄평) · API-033(링크 클릭
  * 기록) · API-034(감상 기록)이다.
  *
- * **API-030만 실제 API다**(업무 -475). 나머지 넷은 백엔드가 아직 없어 목업이며, 그래서
- * 이 화면은 실제 영화 위에 목업 유사 영화 · 한줄평 · 감상 상태가 얹힌 상태로 보인다.
+ * **상세(API-030, 업무 -475)와 감상 기록 계열(API-033 · API-034, 업무 -477)이 실제
+ * API다.** 유사 영화와 공개 한줄평은 백엔드가 아직 없어 목업이라, 이 화면은 실제 영화
+ * 위에 목업 유사 영화 · 한줄평이 얹힌 상태로 보인다.
  * 목업으로 남은 목록(2.2 · 7.5 · 4.1 급상승)에서 넘어온 `movieId`는 실제 DB에 없어
  * `404`가 되고, 화면은 `영화를 찾을 수 없어요`를 보여준다. 4.2 검색 결과는 실제 영화라
  * 그대로 열린다(업무 -476). 한계는 `verification/S15P21E106-475.md`에 적었다.
@@ -56,7 +57,7 @@ import StatusView from '../../../components/StatusView';
 import { ChevronLeftIcon } from '../../../components/Icon';
 import { ApiError } from '../../../api/apiError';
 import { getMovieDetail, getMovieReviews, getSimilarMovies } from '../../../api/movies';
-import { getWatchRecords, recordOttClick } from '../../../api/watch';
+import { findLinkClickedRecord, recordOttClick } from '../../../api/watch';
 import { path } from '../../../routes/paths';
 import { movieMetaLine } from '../../../utils/movie';
 import styles from './MovieDetailPage.module.css';
@@ -112,10 +113,20 @@ export default function MovieDetailPage() {
   /*
    * `LINK_CLICKED` 상태에서 2.4-A로 가려면 감상 기록 id가 필요한데 API-030에는 없다.
    * API-034로 이 영화의 최근 기록을 찾는다. 실패하면 알약이 OTT 링크로 되돌아간다.
+   *
+   * 어느 영화의 기록인지 함께 들고 있어야 한다. 주소만 바뀌어 같은 화면이 다시 그려질 때
+   * 앞 영화의 번호로 2.4-A에 보내면 다른 영화의 감상을 묻게 된다.
    */
-  const [watchRecordId, setWatchRecordId] = useState<number | null>(null);
+  const [clickedRecord, setClickedRecord] = useState<{
+    movieId: number;
+    watchRecordId: number;
+  } | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
+  /** 링크 클릭을 기록하는 중. 같은 클릭이 두 번 나가지 않게 막는다 */
+  const [clicking, setClicking] = useState(false);
+  /** 클릭 기록(API-033)이 실패했다. 알약 아래에 알린다 */
+  const [clickFailed, setClickFailed] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -150,11 +161,30 @@ export default function MovieDetailPage() {
       })
       .catch(() => undefined);
 
-    getWatchRecords()
-      .then((list) => {
-        if (active) {
-          const record = list.items.find((item) => item.movie.movieId === id) ?? null;
-          setWatchRecordId(record?.watchRecordId ?? null);
+    return () => {
+      active = false;
+    };
+  }, [id, recommendationItemId, reloadCount]);
+
+  const watchStatus = movie?.myWatchStatus ?? null;
+  const watchRecordId = clickedRecord?.movieId === id ? clickedRecord.watchRecordId : null;
+
+  /*
+   * 감상 기록 번호는 **`LINK_CLICKED`일 때만** 찾는다. 계약에 단건 조회가 없어 목록을
+   * 훑어야 하므로(API-034), 알약이 그 번호를 쓰지 않는 영화에서는 부르지 않는다.
+   * 찾지 못하면 알약은 OTT 링크로 남는다.
+   */
+  useEffect(() => {
+    if (watchStatus !== 'LINK_CLICKED') {
+      return;
+    }
+
+    let active = true;
+
+    findLinkClickedRecord(id)
+      .then((record) => {
+        if (active && record) {
+          setClickedRecord({ movieId: id, watchRecordId: record.watchRecordId });
         }
       })
       .catch(() => undefined);
@@ -162,18 +192,33 @@ export default function MovieDetailPage() {
     return () => {
       active = false;
     };
-  }, [id, recommendationItemId, reloadCount]);
+  }, [id, watchStatus, reloadCount]);
 
   function handleRetry() {
     setFailure(null);
     setReloadCount((count) => count + 1);
   }
 
+  /*
+   * 계약은 "클라이언트는 응답과 무관하게 외부 시청 페이지를 연다"고 적었지만(API-033)
+   * **계약에도 API-025 · API-030에도 시청 페이지 주소가 없다.** 열 곳이 없으므로 기록이
+   * 남은 뒤 2.4-A로 보낸다. 딥링크 계약이 생기면 이동과 기록이 갈라진다.
+   *
+   * 기록에 실패하면 이동하지 않고 알린다. 감상 확인은 기록 번호로 여는 화면이라
+   * 번호 없이 보낼 곳이 없다.
+   */
   async function handleOttClick(ottId: number) {
-    const record = await recordOttClick(id, ottId);
+    setClicking(true);
+    setClickFailed(false);
 
-    // 목업에는 시청 페이지 주소가 없다. 만들어진 감상 기록으로 2.4-A를 확인한다
-    void navigate(path.watchConfirm(record.watchRecordId));
+    try {
+      const record = await recordOttClick(id, ottId);
+
+      void navigate(path.watchConfirm(record.watchRecordId));
+    } catch {
+      setClickFailed(true);
+      setClicking(false);
+    }
   }
 
   if (failure) {
@@ -301,8 +346,16 @@ export default function MovieDetailPage() {
        * (`docs/screens/design-concept.md` 2.4).
        */}
       <div className={styles.action}>
-        <Button onClick={action.run}>{action.label}</Button>
-        {action.hint ? <p className={styles.actionHint}>{action.hint}</p> : null}
+        <Button disabled={clicking} onClick={action.run}>
+          {action.label}
+        </Button>
+        {clickFailed ? (
+          <p className={styles.actionError} role="alert">
+            기록을 남기지 못했어요. 잠시 후 다시 눌러 주세요
+          </p>
+        ) : action.hint ? (
+          <p className={styles.actionHint}>{action.hint}</p>
+        ) : null}
       </div>
 
       <div className={styles.content}>

@@ -30,10 +30,14 @@
  * `봤어요`를 고른 기록의 `watchedAt`과 `ott`를 쓰므로 실제로 이동한 OTT가 나온다
  * (업무 -263). 2.4에서 바로 들어와 감상 기록이 없으면 이 줄을 표시하지 않는다.
  *
- * 영화 정보는 실제 API-030에서 온다(업무 -475). 평가 저장(API-036 · API-037)은 아직
- * 목업이라 이 화면은 실제 영화 위에서 목업 평가를 만든다. **목업 목록(7.6 · 7.7)에서
- * 들어오면 그 `movieId`가 실제 DB에 없어 오류 상태가 된다.** 평가 계열이 연동되면
- * (S15P21E106-160 · -213 · -214) 두 쪽이 같은 영화를 보게 된다.
+ * 영화 정보(API-030, 업무 -475)와 감상 기록(API-034, 업무 -477)은 실제 API에서 온다.
+ * 평가 저장(API-036 · API-037)은 아직 목업이라 이 화면은 실제 영화 위에서 목업 평가를
+ * 만든다. **목업 목록(7.6)에서 들어오면 그 `movieId`가 실제 DB에 없어 오류 상태가 된다.**
+ * 7.7은 이제 서버 기록이라 실제 영화로 이어진다.
+ *
+ * `[!]` **목업 평가는 감상 기록을 `RATED`로 옮기지 못한다**(업무 -477). 여기서 평가해도
+ * 서버 기록은 `WATCHED_UNRATED`에 남아 7.7 목록에서 빠지지 않는다. 평가 생성(API-036)이
+ * 연동되면 서버가 같은 트랜잭션에서 옮긴다.
  */
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
@@ -47,8 +51,8 @@ import { getMovieDetail } from '../../../api/movies';
 import { getOtts } from '../../../api/otts';
 import {
   createRating,
+  findWatchedRecord,
   getCountsBeforeRating,
-  getWatchRecords,
   updateRating,
 } from '../../../api/watch';
 import { path } from '../../../routes/paths';
@@ -95,18 +99,14 @@ export default function MovieRatingPage() {
       });
 
     // 감상 정보 줄에만 쓰이므로 실패하면 그 줄만 표시하지 않는다
-    Promise.all([getWatchRecords(), getOtts()])
-      .then(([records, otts]) => {
-        // 목록은 최근 순이므로 가장 최근에 감상을 확인한 기록을 쓴다
-        const record = records.items.find(
-          (item) => item.movie.movieId === id && item.watchedAt !== null,
-        );
-
+    Promise.all([findWatchedRecord(id), getOtts()])
+      .then(([record, otts]) => {
         if (!active || !record?.watchedAt) {
           return;
         }
 
-        const ottName = otts.find((ott) => ott.ottId === record.ott.ottId)?.name;
+        // 클릭 없이 평가로 만들어진 기록에는 OTT가 없다(API-034). 그때는 날짜만 남는다
+        const ottName = otts.find((ott) => ott.ottId === record.ott?.ottId)?.name;
 
         setWatchNote(
           ottName

@@ -1,19 +1,22 @@
 /*
  * MY 기록 목록 — 이동 경로 (업무 S15P21E106-306)
  *
- * 화면을 하나씩 열면 멀쩡하지만 **이어서 걸으면 끊기는 자리**를 잡는다. 이 업무에서
- * 그런 자리는 전부 세션 저장소를 거친다.
+ * 화면을 하나씩 열면 멀쩡하지만 **이어서 걸으면 끊기는 자리**를 잡는다.
  *
  * - 7.6 ⇢ 2.5: 이미 평가한 영화를 고치면 **프레임이 늘면 안 된다.** 306 전의 2.5는
  *   수정도 새 평가로 저장해 필름이 101프레임이 됐다
- * - 7.7 ⇢ 2.5: 평가하고 돌아오면 7.7에서 빠지고 7.6의 수가 늘어야 한다. 감상 기록을
- *   기준 목업에 두면 `RATED`로 바꿀 곳이 없어 목록에 남는다
+ * - 7.7 ⇢ 2.5: 7.7의 줄에서 평가 화면으로 이어지고, 2.5가 그 기록의 감상 정보를 읽는다
  * - 7.6 ⇢ 7.6-A: 시트에서 고친 한줄평이 목록과 평가 저장소에 함께 남아야 한다
  *
  * 화면은 실제 라우트 패턴으로 함께 건다(PartyFlow.test.tsx와 같은 방식).
  * 실제 호출인 도메인만 가로챈다 — API-014 내 프로필(`api/users`), 연동(-379) 뒤의
  * OTT 기준정보 · 구독(`api/otts`), 연동(-392) 뒤의 필름(`api/taste`), 연동(-475) 뒤의
- * 영화 상세(`api/movies`)다. 나머지는 목업이라 그대로 둔다.
+ * 영화 상세(`api/movies`), 연동(-477) 뒤의 감상 기록(`api/watch`)이다. 나머지는 목업이라
+ * 그대로 둔다.
+ *
+ * `api/watch`도 **일부만** 가로챈다. 평가 계열(`getMyRatings` · `createRating` ·
+ * `updateRating`)은 아직 목업이라 그대로 둬야 평가 흐름이 이어진다. 감상 기록 조회만
+ * 서버 대역으로 세운다.
  *
  * 영화 상세도 **일부만** 가로챈다. 유사 영화와 한줄평은 아직 목업이라 그대로 둔다.
  * 이 파일이 걷는 영화들은 목업 목록(7.5 · 7.6 · 7.7)의 영화라 실제 서버에 없으므로,
@@ -46,6 +49,7 @@ import { mockMyProfile } from '../../../mocks/user';
 import { ROUTE_PATTERN } from '../../../routes/paths';
 import type { MovieDetail } from '../../../types/movie';
 import type { FrameDetail } from '../../../types/taste';
+import type { WatchRecordListItem } from '../../../types/watch';
 
 vi.mock('../../../api/users', () => ({
   getMyProfile: vi.fn(),
@@ -68,9 +72,51 @@ vi.mock('../../../api/movies', async (importOriginal) => ({
   getMovieDetail: vi.fn(),
 }));
 
+vi.mock('../../../api/watch', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../api/watch')>()),
+  getWatchRecords: vi.fn(),
+  findWatchedRecord: vi.fn(),
+}));
+
 const { getOtts, getMyOttIds } = await import('../../../api/otts');
 const { getMyFrames, getFrameDetail } = await import('../../../api/taste');
 const { getMovieDetail } = await import('../../../api/movies');
+const { getWatchRecords, findWatchedRecord } = await import('../../../api/watch');
+
+/**
+ * 서버가 들고 있는 감상 기록(API-034). 7.7이 그리는 `평가 안 남긴 영화` 세 건이다.
+ *
+ * 와이어프레임 7.7의 날짜와 OTT를 옮겼다(`8. 26 · 넷플릭스에서 시청` 등). 이전에는 같은
+ * 값이 목업 세션 저장소에 있었지만, 감상 기록이 실제 API가 되면서(-477) 서버 대역으로
+ * 옮겼다.
+ */
+function watchRecord(
+  watchRecordId: number,
+  movieId: number,
+  ottId: number,
+  day: string,
+): WatchRecordListItem {
+  const movie = findMockMovie(movieId);
+  const at = `2026-08-${day}T12:00:00Z`;
+
+  return {
+    watchRecordId,
+    movie: { movieId, title: movie.title, posterUrl: movie.posterUrl },
+    status: 'WATCHED_UNRATED',
+    ott: { ottId, code: mockOtts.find((ott) => ott.ottId === ottId)?.code ?? '' },
+    clickedAt: at,
+    confirmDueAt: at,
+    expiresAt: at,
+    watchedAt: at,
+    ratingId: null,
+  };
+}
+
+const unratedRecords = [
+  watchRecord(4001, 411, 1, '26'),
+  watchRecord(4002, 412, 2, '20'),
+  watchRecord(4003, 413, 3, '14'),
+];
 
 /** 프레임 상세를 주는 서버 대역. 목업 평가 저장소의 현재 값을 읽는다 */
 function frameDetail(frameId: number): Promise<FrameDetail> {
@@ -123,6 +169,14 @@ beforeEach(() => {
     .mockResolvedValue({ totalCount: 0, items: [], nextCursor: null, hasNext: false });
   vi.mocked(getFrameDetail).mockReset().mockImplementation(frameDetail);
   vi.mocked(getMovieDetail).mockReset().mockImplementation(movieDetail);
+  vi.mocked(getWatchRecords)
+    .mockReset()
+    .mockResolvedValue({ items: unratedRecords, nextCursor: null, hasNext: false });
+  vi.mocked(findWatchedRecord)
+    .mockReset()
+    .mockImplementation((movieId: number) =>
+      Promise.resolve(unratedRecords.find((record) => record.movie.movieId === movieId) ?? null),
+    );
 });
 
 function LocationProbe() {
@@ -226,7 +280,14 @@ describe('7.6 ⇢ 2.5 → 7.6', () => {
 });
 
 describe('7.6 → 7.7 ⇢ 2.5', () => {
-  it('평가 안 남긴 영화를 평가하면 7.7에서 빠지고 7.6 맨 위에 선다', async () => {
+  /*
+   * `[!]` **평가해도 7.7에서 빠지지 않는다**(업무 -477). 7.7은 서버 기록(API-034)이고
+   * 평가는 아직 목업이라, 목업 평가가 서버 기록을 `RATED`로 옮길 길이 없다. 평가 생성
+   * (API-036)이 연동되면 서버가 같은 트랜잭션에서 옮기므로 이 시험은 그때
+   * `7.7에서 빠진다`로 돌아온다. 지금 상태를 시험으로 고정해 두는 것은, 그 자리가
+   * 고쳐졌는지 아닌지를 코드가 말하게 하기 위해서다.
+   */
+  it('7.7에서 평가하면 7.6 맨 위에 서지만 7.7에는 그대로 남는다', async () => {
     const { unmount } = renderApp([ROUTE_PATTERN.myRatings]);
 
     fireEvent.click(await findTab('안 남긴 영화'));
@@ -246,10 +307,10 @@ describe('7.6 → 7.7 ⇢ 2.5', () => {
     await waitFor(() => expect(location()).toBe('/movies/411/rate/result'));
     unmount();
 
-    // 7.7로 다시 들어오면 빠져 있다
     renderApp([ROUTE_PATTERN.unratedMovies]);
 
-    expect(screen.queryByText('영화 제목 5')).not.toBeInTheDocument();
+    // 평가는 목업에 쌓였지만, 서버가 주는 7.7 목록은 그대로다
+    expect(await screen.findByRole('link', { name: '영화 제목 5 평가하기' })).toBeInTheDocument();
 
     // 7.6 맨 위에 방금 평가가 있다
     fireEvent.click(await findTab('평가'));

@@ -6,12 +6,7 @@
  */
 import { mockRecommendationHistory } from '../mocks/recommendationHistory';
 import { findMockReplacement, mockRecommendationSet } from '../mocks/recommendations';
-import {
-  addDismissedMovie,
-  findLatestWatchRecordByMovie,
-  findRatingByMovie,
-  getDismissedMovieIds,
-} from '../mocks/sessionStore';
+import { addDismissedMovie, findRatingByMovie, getDismissedMovieIds } from '../mocks/sessionStore';
 import { isMockError, respond, respondError } from './mockTransport';
 import type { DismissResultView, RecommendationSetView } from '../types/unspecified';
 import type { RecommendationHistory } from '../types/recommendation';
@@ -95,6 +90,9 @@ export async function dismissMovie(
  * 2.3에서 관심없음 처리했거나 2.5에서 평가한 영화는 그 결과를 얹는다. 그래야 7.5에서
  * 영화를 눌러 평가하고 돌아왔을 때 상태가 맞는다.
  *
+ * 감상 기록은 더 이상 얹지 않는다. 기록이 서버로 옮겨 가(API-034, 업무 -477) 목업
+ * 이력과 맞춰 볼 곳이 없어졌다. OTT 링크만 누른 영화는 스냅샷의 상태로 보인다.
+ *
  * `cursor` · `size`는 구현하지 않았다 — 목업 세트가 네 개뿐이라 한 페이지로 끝난다.
  *
  * 날짜 옆 OTT는 뺐다(업무 -459). API-048 `movie`에 OTT가 없어 목업이 영화의 첫 제공처를
@@ -107,9 +105,7 @@ export async function getRecommendationHistory(): Promise<RecommendationHistory>
     ...set,
     items: set.items.map((item) => {
       const { movieId } = item.movie;
-      const watchStatus = findRatingByMovie(movieId)
-        ? ('RATED' as const)
-        : (findLatestWatchRecordByMovie(movieId)?.status ?? item.watchStatus);
+      const watchStatus = findRatingByMovie(movieId) ? ('RATED' as const) : item.watchStatus;
 
       return {
         ...item,

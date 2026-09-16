@@ -15,36 +15,20 @@
  * 여기 담는 것은 **사용자가 이번 세션에 만든 변화**뿐이다. 기준 목업(mocks/의 나머지
  * 파일)은 그대로 두고, `src/api/`가 둘을 합쳐 응답을 만든다.
  *
- * 예외는 셋이다. 최근 검색어 · 7.7과 8.1의 감상 기록 · 8.1 알림은 와이어프레임이 그린
- * 상태로 시작한다. 모두 사용자가 지우거나 바꾸는 값이라 저장소 안에 있어야 변화가 남는다.
+ * 예외는 둘이다. 최근 검색어 · 8.1 알림은 와이어프레임이 그린 상태로 시작한다. 둘 다
+ * 사용자가 지우거나 바꾸는 값이라 저장소 안에 있어야 변화가 남는다.
  *
  * 실제 API가 된 값은 여기서 빠진다. 차단 목록(API-020 ~ API-022)이 그렇게 나갔고, 알림
- * 설정은 계약에 자리가 없는 두 키만 남았다(업무 -394).
+ * 설정은 계약에 자리가 없는 두 키만 남았다(업무 -394). 감상 기록(API-033 ~ API-035)도
+ * 서버로 옮겨 가 이 파일에서 사라졌다(업무 -477).
  */
 import { createSeedNotifications } from './notifications';
-import { createSeedWatchRecords } from './watch';
 import type {
   NotificationView,
   PrivacySettingsView,
   UnspecifiedNotificationSettings,
 } from '../types/unspecified';
-import type { Rating, RatingUpdateInput, WatchRecord } from '../types/watch';
-
-/**
- * 저장소가 보관하는 감상 기록.
- *
- * API-033 응답(`WatchRecord`)에는 없지만 API-034 목록이 함께 내려주는 값
- * (`ott` · `watchedAt` · `ratingId`)을 붙인 것이다. 서버라면 한 행에 들어 있을 값이라
- * 목업도 한 곳에 모아 두고, `src/api/`가 API별 응답 모양으로 잘라 내려준다.
- */
-export type StoredWatchRecord = WatchRecord & {
-  /** 어느 OTT 링크를 눌렀는지 (API-033 요청 본문의 `ottId`) */
-  ottId: number;
-  /** 감상 확인에서 `봤어요`를 고른 시각 (API-035) */
-  watchedAt: string | null;
-  /** 이 기록으로 이어진 평가 (API-036) */
-  ratingId: number | null;
-};
+import type { Rating, RatingUpdateInput } from '../types/watch';
 
 type SessionState = {
   /**
@@ -54,8 +38,6 @@ type SessionState = {
   subscribedOttIds: number[] | null;
   /** API-047로 관심없음 처리한 영화 */
   dismissedMovieIds: number[];
-  /** API-033 · API-034 · API-035 감상 기록 */
-  watchRecords: StoredWatchRecord[];
   /** API-036 평가. 영화당 한 번만 반영된다 */
   ratings: Rating[];
   /**
@@ -99,8 +81,6 @@ function emptyState(): SessionState {
   return {
     subscribedOttIds: null,
     dismissedMovieIds: [],
-    // 7.7이 그리는 `평가 안 남긴 영화`로 시작한다. 이유는 createSeedWatchRecords 주석에 있다
-    watchRecords: createSeedWatchRecords(),
     ratings: [],
     ratingEdits: {},
     // 와이어프레임 4.1이 최근 검색어 세 개가 있는 상태를 그리므로 그 값으로 시작한다
@@ -220,34 +200,6 @@ export function getDismissedMovieIds(): number[] {
 
 export function isDismissed(movieId: number): boolean {
   return state.dismissedMovieIds.includes(movieId);
-}
-
-// ─────────────────────────────────────────── 감상 기록
-
-export function addWatchRecord(record: StoredWatchRecord): void {
-  state.watchRecords.push(record);
-}
-
-/** API-034가 목록으로 내려줄 원본. 정렬은 `src/api/`가 한다 */
-export function getWatchRecords(): StoredWatchRecord[] {
-  return state.watchRecords;
-}
-
-export function findWatchRecord(watchRecordId: number): StoredWatchRecord | null {
-  return state.watchRecords.find((record) => record.watchRecordId === watchRecordId) ?? null;
-}
-
-export function updateWatchRecord(watchRecordId: number, patch: Partial<StoredWatchRecord>): void {
-  const index = state.watchRecords.findIndex((record) => record.watchRecordId === watchRecordId);
-
-  if (index !== -1) {
-    state.watchRecords[index] = { ...state.watchRecords[index], ...patch };
-  }
-}
-
-/** 영화의 가장 최근 감상 기록. 2.4가 감상 상태를 표시할 때 쓴다 */
-export function findLatestWatchRecordByMovie(movieId: number): StoredWatchRecord | null {
-  return [...state.watchRecords].reverse().find((record) => record.movieId === movieId) ?? null;
 }
 
 // ─────────────────────────────────────────── 평가
