@@ -10,8 +10,14 @@
  * 평가 결과와 추가 전 수치는 2.5가 Router state로 넘긴다. 새로 고침이나 URL 직접 접근이면
  * 복원할 수 없으므로 `/film`으로 보낸다(frontend-structure.md 6.3).
  *
+ * 평가 결과는 API-036 실제 응답이다(업무 -491). 프레임은 `frame`으로 만들어졌고 팝콘은
+ * `popcorn`이 말한다. **영화에 대표 맛이 없으면 `popcorn.flavorCode`가 `null`이고 팝콘이
+ * 어느 맛에도 담기지 않는다**(API-041 처리 규칙). 그때는 프레임만 추가됐다고 말하고 맛 ·
+ * 버킷 줄을 그리지 않는다 — `null 맛 +1알` · `99알 → 100알`은 거짓이다.
+ *
  * 맛 이름은 API-044의 `displayName`을 쓰고 장르명을 하드코딩하지 않는다
- * (screen-spec.md 2.7). 8종 표시명은 API-044의 확정 기준정보를 사용한다.
+ * (screen-spec.md 2.7). 응답의 `flavorCode`가 실제 코드이므로 기준정보도 실제 API-044를
+ * 부른다. 기준정보가 비어 있거나 실패하면 맛 이름 없이 `팝콘 +1알`로 적는다.
  *
  * `[?]` API-036 응답의 `popcorn.isNewFlavor`에 대응하는 표시가 와이어프레임에 없어
  * 사용하지 않는다.
@@ -22,7 +28,7 @@ import Button from '../../../components/Button';
 import FilmStrip from '../../../components/FilmStrip';
 import Poster from '../../../components/Poster';
 import { HeartIcon, ResultBellIcon } from '../../../components/Icon';
-import { getMockPopcornFlavors } from '../../../api/taste';
+import { getPopcornFlavors } from '../../../api/taste';
 import { path } from '../../../routes/paths';
 import styles from './RatingResultPage.module.css';
 import type { PopcornFlavor } from '../../../types/taste';
@@ -54,11 +60,8 @@ export default function RatingResultPage() {
   }, [state, navigate]);
 
   useEffect(() => {
-    /*
-     * 이 화면의 맛 집계는 목업이라 기준정보도 목업을 쓴다. 실제 API-044의 맛 코드와
-     * 목업 집계의 코드가 다르기 때문이다(api/taste.ts `getMockPopcornFlavors`).
-     */
-    getMockPopcornFlavors()
+    // 맛 이름에만 쓰이므로 실패하면 이름 없이 그린다
+    getPopcornFlavors()
       .then(setFlavors)
       .catch(() => undefined);
   }, []);
@@ -82,8 +85,11 @@ export default function RatingResultPage() {
   const { rating, counts, posterUrl } = state;
   const frameCount = done ? counts.frameCount + 1 : counts.frameCount;
   const weekly = done ? counts.weeklyFrameDelta + 1 : counts.weeklyFrameDelta;
-  const flavorName =
-    flavors.find((flavor) => flavor.code === rating.popcorn.flavorCode)?.displayName ?? '';
+  // 대표 맛이 없는 영화의 평가는 팝콘을 만들지 않는다(API-036 · API-041)
+  const hasPopcorn = rating.popcorn.flavorCode !== null;
+  const flavorName = flavors.find(
+    (flavor) => flavor.code === rating.popcorn.flavorCode,
+  )?.displayName;
 
   return (
     <div className={styles.page}>
@@ -137,15 +143,21 @@ export default function RatingResultPage() {
               <ResultBellIcon />
             </span>
 
-            <p className={styles.resultTitle}>프레임 1개 · 팝콘 1알이 추가됐어요</p>
+            <p className={styles.resultTitle}>
+              {hasPopcorn ? '프레임 1개 · 팝콘 1알이 추가됐어요' : '프레임 1개가 추가됐어요'}
+            </p>
             <p className={styles.resultText}>영화 프레임이 취향 필름에 추가됐어요</p>
 
-            <div className={styles.resultRow}>
-              <span className={styles.resultFlavor}>{flavorName} 맛 +1알</span>
-              <span className={styles.resultBucket}>
-                팝콘 버킷 {counts.popcornCount}알 → {counts.popcornCount + 1}알
-              </span>
-            </div>
+            {hasPopcorn ? (
+              <div className={styles.resultRow}>
+                <span className={styles.resultFlavor}>
+                  {flavorName ? `${flavorName} 맛 +1알` : '팝콘 +1알'}
+                </span>
+                <span className={styles.resultBucket}>
+                  팝콘 버킷 {counts.popcornCount}알 → {counts.popcornCount + 1}알
+                </span>
+              </div>
+            ) : null}
 
             <div className={styles.resultActions}>
               <Button onClick={() => void navigate(path.recommendations())}>

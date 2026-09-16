@@ -108,3 +108,11 @@
   color: var(--color-ink-hint);
   text-align: center;
 }
+
+/* 저장 실패. 주 동작 바로 위에 두어 무엇이 실패했는지 버튼과 함께 읽힌다 */
+.failure {
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-danger);
+  text-align: center;
+}

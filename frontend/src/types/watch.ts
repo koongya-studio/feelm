@@ -70,7 +70,14 @@ export type RatingInputValue = {
   visibility?: Visibility;
 };
 
-/** API-036 · API-037 응답 */
+/**
+ * API-036 · API-037 응답
+ *
+ * **`popcorn.flavorCode`는 `null`일 수 있다.** 계약 예시는 값이 있는 경우만 그리지만,
+ * 영화에 대표 맛이 배정되지 않았으면(API-030 `flavorCode: null`) 서버가 `flavorCode: null` ·
+ * `flavorCount: 0`으로 돌려준다(업무 -491, `RatingCreateService`). 그 평가는 어느 맛에도
+ * 담기지 않아 팝콘 버킷(API-041) 총수도 늘지 않는다.
+ */
 export type Rating = {
   ratingId: number;
   movieId: number;
@@ -79,7 +86,7 @@ export type Rating = {
   visibility: Visibility;
   /** 최초 저장 시 생성된 프레임. 수정 시에는 기존 값 */
   frame: { frameId: number; createdAt: string };
-  popcorn: { flavorCode: string; isNewFlavor: boolean; flavorCount: number };
+  popcorn: { flavorCode: string | null; isNewFlavor: boolean; flavorCount: number };
   watchStatus: WatchStatus;
   createdAt: string;
 };

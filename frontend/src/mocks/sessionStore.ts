@@ -20,7 +20,8 @@
  *
  * 실제 API가 된 값은 여기서 빠진다. 차단 목록(API-020 ~ API-022)이 그렇게 나갔고, 알림
  * 설정은 계약에 자리가 없는 두 키만 남았다(업무 -394). 감상 기록(API-033 ~ API-035)도
- * 서버로 옮겨 가 이 파일에서 사라졌다(업무 -477).
+ * 서버로 옮겨 가 이 파일에서 사라졌다(업무 -477). 새 평가(API-036)도 서버가 저장하므로
+ * 여기 쌓지 않는다(업무 -491) — 남은 것은 아직 목업인 평가 수정(API-037)의 고친 값뿐이다.
  */
 import { createSeedNotifications } from './notifications';
 import type {
@@ -28,7 +29,7 @@ import type {
   PrivacySettingsView,
   UnspecifiedNotificationSettings,
 } from '../types/unspecified';
-import type { Rating, RatingUpdateInput } from '../types/watch';
+import type { RatingUpdateInput } from '../types/watch';
 
 type SessionState = {
   /**
@@ -38,15 +39,12 @@ type SessionState = {
   subscribedOttIds: number[] | null;
   /** API-047로 관심없음 처리한 영화 */
   dismissedMovieIds: number[];
-  /** API-036 평가. 영화당 한 번만 반영된다 */
-  ratings: Rating[];
   /**
-   * API-037로 고친 **기준 목업 평가**. `ratingId` → 고친 값.
+   * API-037로 고친 평가. `ratingId` → 고친 값.
    *
-   * 기준 평가(mocks/frames.ts `mockMyRatings`)를 `ratings`에 넣으면 안 된다. `ratings`는
-   * 이번 세션에 새로 만든 평가라서 하나마다 프레임 1개와 팝콘 1알로 셈해진다
-   * (api/taste.ts). 수정은 프레임을 만들지 않으므로(API-037 처리 규칙) 따로 둔다.
-   * 이번 세션에 만든 평가를 고치면 `ratings`의 그 항목을 바로 고친다.
+   * 기준 목업 평가(mocks/frames.ts `mockMyRatings`)를 읽는 화면이 이 값을 얹어 보여준다.
+   * 서버 평가(API-036으로 저장한 것)의 번호로도 남지만, 그 평가를 읽는 API-030은 실제
+   * 호출이라 여기 값을 보지 않는다 — API-037이 연동되기 전까지의 한계다(업무 -491).
    */
   ratingEdits: Record<number, RatingUpdateInput>;
   /**
@@ -81,7 +79,6 @@ function emptyState(): SessionState {
   return {
     subscribedOttIds: null,
     dismissedMovieIds: [],
-    ratings: [],
     ratingEdits: {},
     // 와이어프레임 4.1이 최근 검색어 세 개가 있는 상태를 그리므로 그 값으로 시작한다
     recentSearchQueries: ['케이퍼 무비', '크리스토퍼 놀란', 'SF 명작'],
@@ -202,47 +199,9 @@ export function isDismissed(movieId: number): boolean {
   return state.dismissedMovieIds.includes(movieId);
 }
 
-// ─────────────────────────────────────────── 평가
+// ─────────────────────────────────────────── 평가 수정 (API-037 목업)
 
-/**
- * 평가는 영화당 한 번만 반영된다(2.5 안내 문구). 같은 영화를 다시 평가하면 덮어쓴다.
- * 이미 평가한 영화는 2.5가 수정(API-037, `updateSessionRating`)으로 보내므로 덮어쓰는
- * 경우는 실제 흐름에 없다(업무 -306).
- */
-export function saveRating(rating: Rating): void {
-  const index = state.ratings.findIndex((saved) => saved.movieId === rating.movieId);
-
-  if (index === -1) {
-    state.ratings.push(rating);
-  } else {
-    state.ratings[index] = rating;
-  }
-}
-
-export function getRatings(): Rating[] {
-  return state.ratings;
-}
-
-export function findRatingByFrame(frameId: number): Rating | null {
-  return state.ratings.find((rating) => rating.frame.frameId === frameId) ?? null;
-}
-
-/**
- * 평가 수정(API-037). 이번 세션에 만든 평가면 그 항목을 고치고 true를 돌려준다.
- * 기준 목업 평가라 여기 없으면 false다 — 그때는 `saveRatingEdit`을 쓴다.
- */
-export function updateSessionRating(ratingId: number, input: RatingUpdateInput): boolean {
-  const index = state.ratings.findIndex((rating) => rating.ratingId === ratingId);
-
-  if (index === -1) {
-    return false;
-  }
-
-  state.ratings[index] = { ...state.ratings[index], ...input };
-
-  return true;
-}
-
+/** 평가 수정(API-037). 고친 값만 남긴다 — 프레임과 팝콘은 만들지 않는다 */
 export function saveRatingEdit(ratingId: number, input: RatingUpdateInput): void {
   state.ratingEdits = { ...state.ratingEdits, [ratingId]: { ...input } };
 }
