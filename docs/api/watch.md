@@ -275,9 +275,10 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 | `score` | number | O | 0.5~5.0, 0.5점 단위 (`minimum: 0.5`, `maximum: 5`, `multipleOf: 0.5`) |
 | `comment` | string | X | 한줄평, 200자 이하 |
 | `visibility` | string | comment 있으면 O | `PUBLIC` 또는 `PRIVATE` |
+| `spoiler` | boolean | X | 한줄평 스포일러 여부. 생략 시 `false`; `true`는 내용 있는 `comment`에서만 허용 |
 
 ```json
-{ "score": 4.5, "comment": "밤에 보면 안 됨", "visibility": "PUBLIC" }
+{ "score": 4.5, "comment": "밤에 보면 안 됨", "visibility": "PUBLIC", "spoiler": true }
 ```
 
 ### Response
@@ -291,6 +292,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
   "score": 4.5,
   "comment": "밤에 보면 안 됨",
   "visibility": "PUBLIC",
+  "spoiler": true,
   "frame": { "frameId": 77, "createdAt": "2026-08-30T05:21:00Z" },
   "popcorn": { "flavorCode": "FLAVOR_A", "isNewFlavor": true, "flavorCount": 1 },
   "watchStatus": "RATED",
@@ -300,7 +302,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### 오류 응답
 
-- `400 VALIDATION_FAILED` 점수 범위·0.5점 단위 위반, 200자 초과, `comment` 있는데 `visibility` 없음
+- `400 VALIDATION_FAILED` 점수 범위·0.5점 단위 위반, 200자 초과, `comment` 있는데 `visibility` 없음, 내용 없는 `comment`에 `spoiler: true`, `spoiler`의 `null`·boolean 외 값
 - `404 RESOURCE_NOT_FOUND`
 - `409 RATING_ALREADY_EXISTS` 사용자·영화 조합에 평가가 이미 있음. 수정은 API-037
 
@@ -312,6 +314,9 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 - 평가 저장·프레임 생성·감상 기록 `RATED` 전이는 하나의 트랜잭션으로 처리한다(NFR-06)
 - 응답의 `popcorn`은 별도 행이 아니라 `ratings JOIN movies`로 계산한 현재 집계 결과다
 - 감상 기록이 없거나 `LINK_CLICKED`인 영화도 평가할 수 있으며, 이때 감상 기록을 `RATED`로 생성·전이한다 (D-6 결정)
+- `spoiler`를 생략하면 `false`로 저장하고, 명시적 `true`·`false`는 그대로 저장해 응답에도 항상 boolean으로 반환한다. `null`·문자열·숫자·배열·객체는 허용하지 않는다
+- `spoiler: true`는 `comment`가 null·빈 문자열·공백 또는 화면에 보이지 않는 제어·서식 문자만 있는 경우 거절한다. 스포일러 검증을 위해 한줄평 원문을 변경하지 않는다. `spoiler: false`의 기존 한줄평·공개 범위 규칙은 그대로다
+- 스포일러 표시는 한줄평의 공개 범위나 정렬을 바꾸지 않는다. API-032는 원문과 표시값을 반환하며, 타인의 스포일러 한줄평 블러·해제는 FE 로컬 상태다
 - 저장 후 취향 분석(FR-04)과 추천 입력 버전을 갱신하고 추천 캐시를 무효화한다
 - 한줄평은 평가에 종속되므로 별도 리소스가 아니다
 
@@ -324,7 +329,6 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 - `isNewFlavor`는 해당 평가 생성 후 사용자의 같은 대표 맛 평가가 정확히 1건이면 `true`다. 감상량 임계값이나 발견 추천(FR-12) 판정과는 무관하다.
 - [ ] 발견 표시(FR-32, 확장) 응답 필드 예약 여부
-- [ ] S15P21E106-496 후속: 161에서 추가한 `ratings.is_spoiler`의 입력·저장·응답은 현재 API-036 생산 코드가 지원하지 않는다. `RatingCreateRequest` 연동은 평가 생성 후속 작업에서 반영한다
 
 ## API-037 평가 수정
 

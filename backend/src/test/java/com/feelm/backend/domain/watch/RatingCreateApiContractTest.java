@@ -2,6 +2,7 @@ package com.feelm.backend.domain.watch;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -96,6 +97,7 @@ class RatingCreateApiContractTest extends SharedPostgresContractTest {
                         "score",
                         "comment",
                         "visibility",
+                        "spoiler",
                         "frame",
                         "popcorn",
                         "watchStatus",
@@ -104,6 +106,7 @@ class RatingCreateApiContractTest extends SharedPostgresContractTest {
         assertThat(response.path("score").decimalValue()).isEqualByComparingTo("4.5");
         assertThat(response.path("comment").asText()).isEqualTo("좋았어요");
         assertThat(response.path("visibility").asText()).isEqualTo("PUBLIC");
+        assertThat(response.path("spoiler").booleanValue()).isFalse();
         assertThat(response.path("watchStatus").asText()).isEqualTo("RATED");
         assertThat(createdAt).isBetween(before, after);
         assertThat(response.path("frame").path("createdAt").asText())
@@ -124,6 +127,201 @@ class RatingCreateApiContractTest extends SharedPostgresContractTest {
         assertThat(frameRatingId(frameId)).isEqualTo(ratingId);
         assertThat(movieAggregate(movieId)).isEqualTo(new MovieAggregate(1, "4.50"));
         assertEvent(onlyEvent(), userId, movieId, "4.5");
+    }
+
+    @Test
+    @DisplayName("스포일러로 표시한 공개 한줄평은 응답과 DB에 true로 저장한다")
+    void persistsExplicitTrueSpoiler() throws Exception {
+        JsonNode response =
+                create(
+                        movieId,
+                        userId,
+                        "{\"score\":4.5,\"comment\":\"결말 반전\",\"visibility\":\"PUBLIC\",\"spoiler\":true}",
+                        201);
+
+        long ratingId = response.path("ratingId").asLong();
+        assertThat(response.path("spoiler").isBoolean()).isTrue();
+        assertThat(response.path("spoiler").booleanValue()).isTrue();
+        assertThat(ratingSpoiler(ratingId)).isTrue();
+        assertThat(rating(ratingId).comment()).isEqualTo("결말 반전");
+        assertThat(count("watch_records")).isEqualTo(1);
+        assertThat(count("frames")).isEqualTo(1);
+        assertThat(movieAggregate(movieId)).isEqualTo(new MovieAggregate(1, "4.50"));
+        assertEvent(onlyEvent(), userId, movieId, "4.5");
+    }
+
+    @Test
+    @DisplayName("스포일러 필드를 생략하면 false를 응답하고 저장한다")
+    void defaultsOmittedSpoilerToFalse() throws Exception {
+        JsonNode response = create(movieId, userId, validBody(), 201);
+
+        assertThat(response.path("spoiler").isBoolean()).isTrue();
+        assertThat(response.path("spoiler").booleanValue()).isFalse();
+        assertThat(ratingSpoiler(response.path("ratingId").asLong())).isFalse();
+    }
+
+    @Test
+    @DisplayName("명시적으로 spoiler false를 보내면 응답과 DB에 false를 저장한다")
+    void persistsExplicitFalseSpoiler() throws Exception {
+        JsonNode response =
+                create(
+                        movieId,
+                        userId,
+                        "{\"score\":4.5,\"comment\":\"일반 한줄평\",\"visibility\":\"PUBLIC\",\"spoiler\":false}",
+                        201);
+
+        assertThat(response.path("spoiler").isBoolean()).isTrue();
+        assertThat(response.path("spoiler").booleanValue()).isFalse();
+        assertThat(ratingSpoiler(response.path("ratingId").asLong())).isFalse();
+    }
+
+    @Test
+    @DisplayName("한줄평 없는 점수 평가도 기존처럼 생성하고 spoiler false를 반환한다")
+    void acceptsScoreOnlyWithoutSpoiler() throws Exception {
+        JsonNode response = create(movieId, userId, "{\"score\":4.5}", 201);
+
+        assertThat(response.path("spoiler").booleanValue()).isFalse();
+        assertThat(rating(response.path("ratingId").asLong()).comment()).isNull();
+        assertThat(ratingSpoiler(response.path("ratingId").asLong())).isFalse();
+        assertThat(count("frames")).isEqualTo(1);
+        assertThat(count("outbox_events")).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("한줄평 없는 spoiler true는 도메인 쓰기 전에 거절한다")
+    void rejectsTrueWithoutCommentBeforeWrites() throws Exception {
+        assertValidation(request(movieId, userId, "{\"score\":4.5,\"spoiler\":true}"));
+        assertNoWrites();
+        assertThat(movieAggregate(movieId)).isEqualTo(new MovieAggregate(0, "0.00"));
+    }
+
+    @ParameterizedTest(name = "comment={0}")
+    @ValueSource(strings = {"", "\t\n", "\u00A0", "\u3000", "\u0001", "\u0085", "\u200B", "\u0000"})
+    @DisplayName("공백만 있는 한줄평의 spoiler true는 저장하지 않는다")
+    void rejectsTrueWithBlankCommentsBeforeWrites(String comment) throws Exception {
+        String body =
+                "{\"score\":4.5,\"comment\":"
+                        + objectMapper.writeValueAsString(comment)
+                        + ",\"visibility\":\"PUBLIC\",\"spoiler\":true}";
+        assertValidation(request(movieId, userId, body));
+        assertNoWrites();
+    }
+
+    @ParameterizedTest(name = "spoiler={0}")
+    @ValueSource(strings = {"null", "\"true\"", "1", "[]", "{}"})
+    @DisplayName("boolean 이외의 spoiler 값은 저장하지 않는다")
+    void rejectsMalformedSpoilerTypesBeforeWrites(String spoiler) throws Exception {
+        String body =
+                "{\"score\":4.5,\"comment\":\"문구\",\"visibility\":\"PUBLIC\",\"spoiler\":"
+                        + spoiler
+                        + "}";
+        assertValidation(request(movieId, userId, body));
+        assertNoWrites();
+    }
+
+    @Test
+    @DisplayName("스포일러 한줄평에도 공개 범위가 필요하다")
+    void requiresVisibilityForSpoilerComment() throws Exception {
+        assertValidation(
+                request(movieId, userId, "{\"score\":4.5,\"comment\":\"반전\",\"spoiler\":true}"));
+        assertNoWrites();
+    }
+
+    @Test
+    @DisplayName("평가 생성으로 저장한 PUBLIC spoiler는 한줄평 조회에 원문과 true로 나온다")
+    void publicReviewReturnsCreatedSpoiler() throws Exception {
+        JsonNode created =
+                create(
+                        movieId,
+                        userId,
+                        "{\"score\":4.5,\"comment\":\"범인은 원문\",\"visibility\":\"PUBLIC\",\"spoiler\":true}",
+                        201);
+
+        JsonNode items = reviews(userId).path("items");
+        assertThat(items.size()).isEqualTo(1);
+        JsonNode item = items.path(0);
+        assertThat(item.path("ratingId").asLong()).isEqualTo(created.path("ratingId").asLong());
+        assertThat(item.path("comment").asText()).isEqualTo("범인은 원문");
+        assertThat(item.path("spoiler").booleanValue()).isTrue();
+        assertThat(item.path("mine").booleanValue()).isTrue();
+    }
+
+    @Test
+    @DisplayName("PRIVATE spoiler는 작성자에게만 한줄평으로 노출한다")
+    void privateSpoilerVisibleOnlyToAuthor() throws Exception {
+        long otherUserId = insertUser("other-review@feelm.test", "다른 사용자", "ACTIVE");
+        create(
+                movieId,
+                userId,
+                "{\"score\":4.5,\"comment\":\"내 스포일러\",\"visibility\":\"PRIVATE\",\"spoiler\":true}",
+                201);
+
+        JsonNode ownItems = reviews(userId).path("items");
+        assertThat(ownItems.size()).isEqualTo(1);
+        assertThat(ownItems.path(0).path("mine").booleanValue()).isTrue();
+        assertThat(ownItems.path(0).path("spoiler").booleanValue()).isTrue();
+        assertThat(reviews(otherUserId).path("items").size()).isZero();
+    }
+
+    @Test
+    @DisplayName("true 스포일러 생성 중 Outbox 실패 시 모든 저장을 롤백한다")
+    void outboxFailureRollsBackTrueSpoiler() throws Exception {
+        failingInsertTrigger("outbox_events", "test_fail_rating_outbox");
+
+        request(movieId, userId, trueSpoilerBody())
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+
+        assertNoWrites();
+        assertThat(movieAggregate(movieId)).isEqualTo(new MovieAggregate(0, "0.00"));
+    }
+
+    @Test
+    @DisplayName("true 스포일러 생성 중 프레임 실패 시 모든 저장을 롤백한다")
+    void frameFailureRollsBackTrueSpoiler() throws Exception {
+        failingInsertTrigger("frames", "test_fail_rating_frame");
+
+        request(movieId, userId, trueSpoilerBody())
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+
+        assertNoWrites();
+        assertThat(movieAggregate(movieId)).isEqualTo(new MovieAggregate(0, "0.00"));
+    }
+
+    @Test
+    @DisplayName("같은 영화의 true 스포일러 동시 생성은 한 건만 저장한다")
+    void concurrentDuplicateSpoilerCreatesOnce() throws Exception {
+        CountDownLatch start = new CountDownLatch(1);
+        try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+            Future<Integer> first =
+                    executor.submit(() -> concurrentCreate(start, trueSpoilerBody()));
+            Future<Integer> second =
+                    executor.submit(() -> concurrentCreate(start, trueSpoilerBody()));
+            start.countDown();
+
+            assertThat(List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS)))
+                    .containsExactlyInAnyOrder(201, 409);
+        }
+
+        assertThat(count("ratings")).isEqualTo(1);
+        assertThat(count("frames")).isEqualTo(1);
+        assertThat(count("outbox_events")).isEqualTo(1);
+        assertThat(jdbc.sql("SELECT is_spoiler FROM ratings").query(Boolean.class).single())
+                .isTrue();
+        assertThat(movieAggregate(movieId)).isEqualTo(new MovieAggregate(1, "4.50"));
+    }
+
+    @Test
+    @DisplayName("스포일러 표시는 RATING CREATE 이벤트 payload를 변경하지 않는다")
+    void ratingEventUnchangedBySpoiler() throws Exception {
+        create(movieId, userId, trueSpoilerBody(), 201);
+
+        JsonNode payload = objectMapper.readTree(onlyEvent().message()).path("payload");
+        assertThat(payload.properties())
+                .extracting(Map.Entry::getKey)
+                .containsExactlyInAnyOrder("action", "movieId", "score");
+        assertThat(payload.path("score").decimalValue()).isEqualByComparingTo("4.5");
     }
 
     @Test
@@ -154,7 +352,7 @@ class RatingCreateApiContractTest extends SharedPostgresContractTest {
     }
 
     @ParameterizedTest(name = "score={0}")
-    @ValueSource(strings = {"0", "5.5", "4.49"})
+    @ValueSource(strings = {"0", "5.5", "4.49", "4.49999999999999999", "4.50000000000000001"})
     @DisplayName("범위 또는 0.5 단위를 벗어난 점수는 저장하지 않는다")
     void rejectsInvalidScoresWithoutWrites(String score) throws Exception {
         assertValidation(
@@ -290,8 +488,12 @@ class RatingCreateApiContractTest extends SharedPostgresContractTest {
     }
 
     private int concurrentCreate(CountDownLatch start) throws Exception {
+        return concurrentCreate(start, validBody());
+    }
+
+    private int concurrentCreate(CountDownLatch start, String body) throws Exception {
         start.await(5, TimeUnit.SECONDS);
-        return request(movieId, userId, validBody()).andReturn().getResponse().getStatus();
+        return request(movieId, userId, body).andReturn().getResponse().getStatus();
     }
 
     private JsonNode create(long movie, long user, String body, int expectedStatus)
@@ -314,8 +516,14 @@ class RatingCreateApiContractTest extends SharedPostgresContractTest {
     }
 
     private void assertValidation(ResultActions result) throws Exception {
-        result.andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        String body =
+                result.andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                        .andExpect(jsonPath("$.message").value("요청 값이 올바르지 않습니다."))
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        assertThat(body).doesNotContain("Exception", "SQL", "java.", "org.postgresql");
     }
 
     private void assertNoWrites() {
@@ -327,6 +535,23 @@ class RatingCreateApiContractTest extends SharedPostgresContractTest {
 
     private String validBody() {
         return "{\"score\":4.5,\"visibility\":\"PRIVATE\"}";
+    }
+
+    private String trueSpoilerBody() {
+        return "{\"score\":4.5,\"comment\":\"반전\",\"visibility\":\"PUBLIC\",\"spoiler\":true}";
+    }
+
+    private JsonNode reviews(long user) throws Exception {
+        MvcResult result =
+                mockMvc.perform(
+                                get("/api/v1/movies/{movieId}/reviews", movieId)
+                                        .header(
+                                                "Authorization",
+                                                "Bearer " + tokenProvider.createAccessToken(user)))
+                        .andExpect(status().isOk())
+                        .andReturn();
+        return objectMapper.readTree(
+                result.getResponse().getContentAsString(StandardCharsets.UTF_8));
     }
 
     private void assertEvent(EventRow event, long user, long movie, String score) {
@@ -389,6 +614,13 @@ class RatingCreateApiContractTest extends SharedPostgresContractTest {
                                         row.getString("visibility"),
                                         row.getObject("created_at", OffsetDateTime.class)
                                                 .toInstant()))
+                .single();
+    }
+
+    private boolean ratingSpoiler(long id) {
+        return jdbc.sql("SELECT is_spoiler FROM ratings WHERE id=:id")
+                .param("id", id)
+                .query(Boolean.class)
                 .single();
     }
 

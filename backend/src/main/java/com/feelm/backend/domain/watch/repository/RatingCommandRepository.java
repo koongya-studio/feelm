@@ -115,15 +115,16 @@ public class RatingCommandRepository {
             BigDecimal score,
             String comment,
             RatingVisibility visibility,
+            boolean spoiler,
             Instant createdAt) {
         return jdbc.sql(
                         """
                         INSERT INTO ratings(
                             user_id, movie_id, watch_record_id, score,
-                            comment, visibility, created_at, updated_at
+                            comment, visibility, is_spoiler, created_at, updated_at
                         ) VALUES (
                             :userId, :movieId, :watchRecordId, :score,
-                            :comment, :visibility, :createdAt, :createdAt
+                            :comment, :visibility, :spoiler, :createdAt, :createdAt
                         )
                         RETURNING id, created_at
                         """)
@@ -133,6 +134,7 @@ public class RatingCommandRepository {
                 .param("score", score)
                 .param("comment", comment)
                 .param("visibility", visibility == null ? null : visibility.name())
+                .param("spoiler", spoiler)
                 .param("createdAt", offset(createdAt))
                 .query(
                         (row, number) ->
