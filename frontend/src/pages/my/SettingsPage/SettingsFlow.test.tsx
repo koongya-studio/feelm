@@ -2,14 +2,17 @@
  * 설정 — 이동 경로 (업무 S15P21E106-307)
  *
  * 이동표 7.8 · 7.8-A ~ 7.8-D의 화살표를 실제 라우트 패턴으로 건 화면들 위에서 밟는다.
- * 세션 저장소에 쓰는 흐름(공개 범위 · 알림 · 차단)은 **나갔다 돌아와서** 값이 남는지 본다.
+ * 값이 남는 흐름(공개 범위 · 알림 · 차단)은 **나갔다 돌아와서** 값이 남는지 본다.
  * 쓰기만 하고 다시 읽는 쪽을 확인하지 않는 것이 가장 자주 낸 실수다.
  *
  * - `api/users`의 API-014와 `api/taste`의 API-042만 가로챈다 — 실제 호출이다.
  *   7.2-B가 쓰는 공개 프로필 목업은 그대로 둔다
+ * - 알림 설정과 차단도 실제 호출이 됐다(업무 -394). `fetch`를 가로채 **서버 쪽 상태를
+ *   들고 있는 가짜**를 둔다. `api/settings`를 통째로 대신하면 계약의 셋만 나가는지,
+ *   나머지 둘이 세션 저장소에 남는지를 못 보게 된다
  * - 로그아웃은 실제 세션 기능이라 Provider 대신 가짜 `signOut`을 넣어 불렸는지 본다
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import SettingsPage from './index';
@@ -21,12 +24,15 @@ import PasswordChangePage from '../PasswordChangePage';
 import PrivacySettingsPage from '../PrivacySettingsPage';
 import PublicProfilePage from '../PublicProfilePage';
 import WithdrawPage from '../WithdrawPage';
+import { resetSessionForTest, startSession } from '../../../api/session';
 import { getMyProfile } from '../../../api/users';
 import { AuthContext } from '../../../contexts/authContext';
+import { findMockPublicProfile } from '../../../mocks/publicProfiles';
 import { resetSessionStore } from '../../../mocks/sessionStore';
 import { mockMyProfile } from '../../../mocks/user';
 import { ROUTE_PATTERN } from '../../../routes/paths';
 import type { AuthValue } from '../../../contexts/authContext';
+import type { BlockedUser, NotificationSettings } from '../../../types/user';
 
 vi.mock('../../../api/taste', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/taste')>()),
@@ -40,10 +46,106 @@ vi.mock('../../../api/users', async (importOriginal) => ({
 
 const signOut = vi.fn<AuthValue['signOut']>();
 
+/**
+ * 알림 설정(API-017 · API-018)과 차단(API-020 ~ API-022)을 들고 있는 가짜 서버.
+ *
+ * 와이어프레임 7.8-C의 기본값과 7.8-D의 두 사람으로 시작한다. 7.8-D의 기준 목업은
+ * 서버가 주는 값과 겹쳐 지웠으므로(`mocks/settings.ts`, 업무 -394) 그 상태를 여기서 만든다.
+ */
+function createFakeServer() {
+  const notification: NotificationSettings = {
+    RATING: true,
+    RECOMMENDATION: true,
+    MARKETING: false,
+  };
+  const blocks: BlockedUser[] = [
+    { userId: 5201, nickname: '스포일러왕', blockedAt: '2026-08-30T12:00:00Z' },
+    { userId: 5202, nickname: '밤샘시네필', blockedAt: '2026-08-21T12:00:00Z' },
+  ];
+
+  function json(status: number, body?: unknown): Response {
+    return body === undefined
+      ? new Response(null, { status })
+      : new Response(JSON.stringify(body), {
+          status,
+          headers: { 'Content-Type': 'application/json' },
+        });
+  }
+
+  const BLOCK_PATH = /^\/api\/v1\/users\/(\d+)\/block$/;
+
+  return function handle(rawUrl: string, init: RequestInit = {}): Response {
+    const url = new URL(rawUrl, 'http://test');
+    const method = init.method ?? 'GET';
+
+    if (url.pathname === '/api/v1/users/me/notification-settings') {
+      if (method === 'PUT') {
+        // 전체 교체다(API-018). 화면이 보낸 세 키가 그대로 다음 조회에 나온다
+        Object.assign(notification, JSON.parse(init.body as string));
+      }
+
+      return json(200, notification);
+    }
+
+    if (url.pathname === '/api/v1/users/me/blocks') {
+      // 최근에 차단한 사람이 위다(API-022)
+      const items = [...blocks].sort((a, b) => b.blockedAt.localeCompare(a.blockedAt));
+
+      return json(200, { items, nextCursor: null, hasNext: false });
+    }
+
+    const target = BLOCK_PATH.exec(url.pathname);
+
+    if (target) {
+      const userId = Number(target[1]);
+      const index = blocks.findIndex((user) => user.userId === userId);
+
+      if (method === 'DELETE') {
+        // 멱등이다. 차단 관계가 없어도 204다(API-021)
+        if (index !== -1) blocks.splice(index, 1);
+
+        return json(204);
+      }
+
+      if (index !== -1) {
+        return json(409, { code: 'ALREADY_BLOCKED', message: '이미 차단한 사용자입니다.' });
+      }
+
+      const profile = findMockPublicProfile(userId);
+
+      if (!profile) {
+        return json(404, { code: 'RESOURCE_NOT_FOUND', message: '사용자를 찾을 수 없습니다.' });
+      }
+
+      const blockedAt = new Date().toISOString();
+      blocks.push({ userId, nickname: profile.nickname, blockedAt });
+
+      return json(201, { blockedUserId: userId, blockedAt });
+    }
+
+    throw new Error(`가짜 서버가 모르는 요청이다: ${method} ${url.pathname}`);
+  };
+}
+
 beforeEach(() => {
   resetSessionStore();
+  resetSessionForTest();
+  // 회원 API라 토큰이 있어야 나간다. 없으면 공통 클라이언트가 재발급부터 시도한다
+  startSession('token');
+
+  const handle = createFakeServer();
+
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string, init?: RequestInit) => Promise.resolve(handle(url, init))),
+  );
+
   vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
   signOut.mockReset().mockResolvedValue(undefined);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 function LocationProbe() {
