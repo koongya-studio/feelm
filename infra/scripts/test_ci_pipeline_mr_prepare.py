@@ -1,4 +1,5 @@
 import importlib.util
+import hashlib
 from pathlib import Path
 import sys
 import tempfile
@@ -39,7 +40,11 @@ class PipelinePrepareTests(unittest.TestCase):
 
     def test_source_requires_reviewed_manifest_and_lock(self):
         prepare = load_prepare()
-        inputs = prepare.trusted_source(ROOT)
+        project = (ROOT / 'pipeline/spark/pyproject.toml').read_bytes()
+        lock = (ROOT / 'pipeline/spark/uv.lock').read_bytes()
+        with patch.object(prepare, 'PROJECT_SHA256', hashlib.sha256(project).hexdigest()), \
+             patch.object(prepare, 'LOCK_SHA256', hashlib.sha256(lock).hexdigest()):
+            inputs = prepare.trusted_source(ROOT)
         self.assertEqual({'pyproject.toml', 'uv.lock'}, set(inputs))
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -49,6 +54,15 @@ class PipelinePrepareTests(unittest.TestCase):
             (spark / 'uv.lock').write_bytes(b'changed')
             with self.assertRaisesRegex(RuntimeError, 'reviewed revision'):
                 prepare.trusted_source(root)
+
+    def test_reviewed_dependency_hashes_match_embedding_mr(self):
+        prepare = load_prepare()
+        self.assertEqual(
+            '9af26ce74eb1e9ce9de985bc4e686b06f168d120a8346499ed6bfa4b85826150',
+            prepare.PROJECT_SHA256)
+        self.assertEqual(
+            'a61495007822f2456d63aeba01c5b22a0c26eba076aa2a0d79552eb3dc2a6c23',
+            prepare.LOCK_SHA256)
 
     def test_cache_population_is_online_once_then_offline(self):
         prepare = load_prepare()

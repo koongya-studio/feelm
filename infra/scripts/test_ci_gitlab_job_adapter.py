@@ -50,6 +50,59 @@ CONSUMER_SCRIPT = [
 ]
 INFRA_SCRIPT = adapter.INFRA_EXPECTED_SCRIPT
 VARIABLE_CONTRACT_SCRIPT = adapter.CI_VARIABLE_CONTRACT_SCRIPT
+APPROVED_PIPELINE_PROJECT = b'''[project]
+name = "feelm-pipeline-spark"
+version = "0.1.0"
+description = "FEELM PySpark pipeline batch and streaming jobs"
+requires-python = ">=3.10,<3.11"
+dependencies = [
+  "psycopg[binary]==3.2.10",
+  "pyspark[ml]==4.1.3",
+  "torch==2.6.0",
+  "transformers==4.48.3",
+]
+[dependency-groups]
+dev = ["pytest==8.4.2", "ruff==0.12.12"]
+[tool.pytest.ini_options]
+addopts = "-ra"
+pythonpath = ["."]
+testpaths = ["tests"]
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+[tool.uv]
+package = false
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+'''
+APPROVED_PIPELINE_LOCK = b'''version = 1
+revision = 3
+requires-python = "==3.10.*"
+[[package]]
+name = "feelm-pipeline-spark"
+version = "0.1.0"
+source = { virtual = "." }
+[[package]]
+name = "pytest"
+version = "8.4.2"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/aa/pytest.whl", hash = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+]
+[[package]]
+name = "torch"
+version = "2.6.0+cpu"
+source = { registry = "https://download.pytorch.org/whl/cpu" }
+wheels = [
+    { url = "https://download-r2.pytorch.org/whl/cpu/torch.whl", hash = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
+]
+'''
 
 
 def response(script=None, job_name='backend-mr-test'):
@@ -243,9 +296,8 @@ class AdapterTests(unittest.TestCase):
             ('source/pipeline/spark/', b'', 0o755),
             ('source/pipeline/spark/.python-version',
              (spark / '.python-version').read_bytes(), 0o644),
-            ('source/pipeline/spark/pyproject.toml',
-             (spark / 'pyproject.toml').read_bytes(), 0o644),
-            ('source/pipeline/spark/uv.lock', (spark / 'uv.lock').read_bytes(), 0o644),
+            ('source/pipeline/spark/pyproject.toml', APPROVED_PIPELINE_PROJECT, 0o644),
+            ('source/pipeline/spark/uv.lock', APPROVED_PIPELINE_LOCK, 0o644),
             ('source/pipeline/spark/batch/example.py', b'VALUE = 1\n', 0o644),
         ])
         result, digest = adapter.normalized_service_archive(payload, 'pipeline')
