@@ -18,11 +18,14 @@ Grafana가 시각화합니다. 서비스 노드 `J15E106`의 Node Exporter는 Co
 - Nginx는 `/actuator/prometheus`를 프록시하지 않습니다.
 - Grafana 익명 가입과 익명 접근은 비활성화합니다.
 - `GRAFANA_ADMIN_PASSWORD`는 필수 Secret이며 실제 값은 `infra/.env`에만 둡니다.
-- 원격에서 Grafana를 볼 때는 포트를 공개하지 않고 SSH 터널을 사용합니다.
+- 공개 Grafana 경로는 Nginx의 별도 Basic Auth와 Grafana 로그인을 모두 통과해야 합니다.
+- 원격 접근은 HTTPS `/grafana/`를 사용하고, SSH 터널은 공개 경로 장애 시 복구 수단으로만
+  유지합니다. Grafana와 Prometheus의 원본 포트는 공개하지 않습니다.
 
 ## 기동
 
-`infra/.env.example`을 기준으로 개인 `infra/.env`에 `GRAFANA_ADMIN_PASSWORD`를 추가합니다.
+`infra/.env.example`을 기준으로 개인 `infra/.env`에 `GRAFANA_ADMIN_PASSWORD`와
+`GRAFANA_HTPASSWD_PATH`를 추가합니다.
 서비스와 모니터링 파일을 같은 Compose 프로젝트로 실행해야 Prometheus가 서비스 이름으로
 백엔드와 exporter에 접근할 수 있습니다.
 
@@ -109,19 +112,53 @@ docker compose --env-file $env:FEELM_ENV_FILE `
   up -d postgres redis backend prometheus grafana postgres-exporter redis-exporter
 ```
 
-서비스 서버 밖에서 접속할 때는 로컬 포트 포워딩을 사용합니다.
+정상 원격 접속 주소는 다음과 같습니다.
+
+```text
+https://j15e106.p.ssafy.io/grafana/
+```
+
+Nginx Basic Auth 뒤에서도 Grafana 자체 로그인을 유지합니다. 공용 관리자 비밀번호를
+팀원에게 전달하지 말고, Grafana의 Server admin 화면에서 사용자별 계정을 만든 뒤
+Organization role을 `Viewer`로 지정합니다. 사용자 비밀번호와 Basic Auth 원문은 저장소,
+명령행 인자, 로그와 화면 캡처에 남기지 않습니다.
+
+공개 경로 장애 시에는 Grafana의 공개 root URL을 루프백으로 임시 전환한 뒤 SSH 터널을
+복구 수단으로 사용합니다. 정상 설정 파일은 수정하지 않고 현재 셸의 환경변수로만
+덮어쓰며 Grafana 데이터 볼륨은 유지합니다.
+
+```bash
+export GRAFANA_ROOT_URL=http://127.0.0.1:3000/
+export GRAFANA_SERVE_FROM_SUB_PATH=false
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  -f infra/compose/monitoring.yml \
+  up -d --no-deps --force-recreate grafana
+```
+
+이후 로컬 PC에서 아래 터널을 엽니다.
 
 ```bash
 ssh -L 3000:127.0.0.1:3000 <service-host>
 ```
 
-이후 브라우저에서 `http://127.0.0.1:3000`에 접속하고 사용자 `admin`과
-`GRAFANA_ADMIN_PASSWORD` 값으로 로그인합니다. `FEELM / Service Overview` 대시보드는
-provisioning으로 자동 생성됩니다.
+이후 브라우저에서 `http://127.0.0.1:3000`에 접속합니다. 관리자 계정은 사용자 생성과
+복구에만 사용하고 일상 조회는 Viewer 계정으로 수행합니다. `FEELM / Service Overview`
+대시보드는 provisioning으로 자동 생성됩니다.
 `FEELM / Kafka Overview`에서는 exporter 가용성, broker 수, 토픽별 메시지 증가율,
 partition·under-replicated 상태와 Consumer Group·partition별 lag를 확인합니다. 메시지
 증가율은 broker의 현재 offset 증가량으로 계산한 근사치이며 byte 단위 처리량이나 요청
 지연은 포함하지 않습니다.
+
+공개 경로를 복구한 뒤 임시 환경변수를 제거하고 정상 root URL로 Grafana만 재생성합니다.
+
+```bash
+unset GRAFANA_ROOT_URL GRAFANA_SERVE_FROM_SUB_PATH
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  -f infra/compose/monitoring.yml \
+  up -d --no-deps --force-recreate grafana
+```
 
 ## 검증
 
@@ -133,6 +170,30 @@ docker compose --env-file infra/.env \
   -f infra/compose/monitoring.yml \
   config --quiet
 ```
+
+Nginx와 Grafana를 재생성하기 전에 Nginx 설정을 검사합니다. Grafana 데이터 볼륨과
+Prometheus는 삭제하거나 재생성하지 않습니다.
+
+```bash
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  -f infra/compose/monitoring.yml \
+  run --rm --no-deps nginx nginx -t
+docker compose --env-file infra/.env \
+  -f infra/compose/service.yml \
+  -f infra/compose/monitoring.yml \
+  up -d --no-deps --force-recreate grafana nginx
+```
+
+외부 비인증 요청은 `401`, 인증 후 `/grafana/` 요청은 Grafana 로그인 화면으로 연결되어야
+합니다. `/grafana/public/` 정적 파일이 정상 표시되고 브라우저 개발자 도구에서
+`/grafana/api/live/ws` WebSocket 연결이 `101`로 전환되는지 확인합니다. Viewer 계정으로
+대시보드 조회는 가능하지만 사용자·데이터소스·대시보드 편집은 거부되어야 합니다.
+서비스 서버의 공인 주소에서 `3000`과 `9090` 직접 연결이 실패하고, 서비스 서버
+루프백의 Grafana health와 Prometheus readiness는 계속 성공해야 합니다.
+
+Nginx 기본 access log는 Basic Auth의 `Authorization` 헤더나 요청 본문을 기록하지 않습니다.
+인증 실패를 확인할 때 전체 헤더, 쿠키, 비밀번호 또는 환경변수를 출력하지 않습니다.
 
 컨테이너 기동 후 서비스 호스트에서 다음을 확인합니다.
 

@@ -9,6 +9,12 @@
   object-fit: cover;
 }
 
+/* 3:4 세로 사진(7.1). 포스터와 같은 비율 · 같은 모서리다 */
+.avatar[data-shape='portrait'] {
+  height: calc(var(--avatar-size) * 4 / 3);
+  border-radius: var(--radius-poster);
+}
+
 /*
  * 자리표시자. 무채색 두 단계로 대각 그라데이션을 만들고 사람 아이콘을 옅게 얹는다.
  * 테두리는 밝은 면과 어두운 면 양쪽에서 윤곽을 남기기 위한 것이다.

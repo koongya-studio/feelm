@@ -46,11 +46,16 @@ export function conjunctionParticle(word: string): string {
   return hasFinalConsonant(word) ? '과' : '와';
 }
 
+/** 주제 조사 `은` / `는` */
+export function topicParticle(word: string): string {
+  return hasFinalConsonant(word) ? '은' : '는';
+}
+
 /**
  * 방향 · 수단 조사 `으로` / `로`. 받침 ㄹ은 `로`를 쓴다.
  *
- * 2.4-A의 `{OTT 이름}로 이동한 지 2일이 지났어요`에 쓴다. OTT 이름은 API-025가 내려주는
- * 값이라 `티빙으로`처럼 받침에 따라 조사가 달라진다.
+ * 2.4-A의 `{OTT 이름}로 이동했어요`에 쓴다. OTT 이름은 API-025가 내려주는 값이라
+ * `티빙으로`처럼 받침에 따라 조사가 달라진다.
  */
 export function directionParticle(word: string): string {
   const final = finalConsonant(word);

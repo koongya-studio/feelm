@@ -44,7 +44,7 @@ def test_load_bundle_rejects_metadata_from_another_snapshot(tmp_path) -> None:
     metadata = tmp_path / "metadata.parquet"
     _write_table(metadata, [{
         "service_movie_id": 10, "title": "영화", "genre_codes": ["DRAMA"],
-        "representative_flavor_code": "FLAVOR_X", "input_snapshot": "snapshot-b", "movie_metadata_revision": METADATA_REVISION,
+        "representative_flavor_code": "FLAVOR_A", "input_snapshot": "snapshot-b", "movie_metadata_revision": METADATA_REVISION,
     }])
 
     with pytest.raises(ArtifactError, match="invalid metadata snapshot"):

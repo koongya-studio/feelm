@@ -2,20 +2,14 @@
  * 화면 맨 위부터 전체 폭을 차지한다. 화면 좌우 여백 안에서 쓰이므로 음수 마진으로
  * 여백을 되돌리고, 위쪽 여백도 걷어내 상태 표시줄까지 올라간다.
  *
- * 높이는 화면의 절반이 넘는다. 레퍼런스에서 이미지가 첫인상을 만드는 크기다.
- * `svh`를 쓰는 이유는 모바일 브라우저의 주소창이 접힐 때 히어로가 출렁이지 않게
- * 하기 위해서다. 지원하지 않는 브라우저를 위해 `vh`를 먼저 둔다.
+ * **높이는 안에 든 것이 정한다**(업무 -459). 아바타와 한 줄 소개를 빼고 나니 이름과
+ * 수치뿐인데 54svh를 그대로 두었더니 위쪽 3분의 2가 텅 빈 검은 판이 되었다. 최소 높이만
+ * 남겨 상단 줄과 이름이 부딪히지 않게 하고, 나머지는 내용에 맡긴다.
  */
 .hero {
   position: relative;
   display: flex;
-  min-height: 54vh;
-  min-height: 54svh;
-  /*
-   * 높이 상한. 화면이 아주 높으면(태블릿 · 데스크톱) 54%가 그대로 늘어나 이미지 위쪽이
-   * 텅 비고 이름만 아래에 붙는다. 휴대폰에서의 크기를 넘지 않게 잘라 둔다.
-   */
-  max-height: 520px;
+  min-height: 240px;
   flex-direction: column;
   margin: 0 calc(var(--screen-padding-x) * -1);
   border-radius: 0 0 var(--radius-card) var(--radius-card);
@@ -133,30 +127,7 @@
   text-align: center;
 }
 
-/*
- * 소개는 두 줄까지만 보여준다. 한국어는 길어지기 쉽고, 세 줄이 되면 아래 수치가
- * 이미지 밖으로 밀린다.
- */
-.introduction {
-  display: -webkit-box;
-  overflow: hidden;
-  max-width: 30ch;
-  margin-top: calc(var(--space-2) * -1);
-  color: var(--color-on-dark-muted);
-  font-size: var(--font-size-meta);
-  line-height: var(--line-height-meta);
-  text-align: center;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
 .extra {
   width: 100%;
   margin-top: var(--space-1);
-}
-
-/* 아바타는 이미지 위에 뜬 것처럼 테두리를 두른다(레퍼런스의 인물이 놓인 자리다) */
-.content > :first-child {
-  border: 2px solid rgba(255, 255, 255, 0.22);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
 }

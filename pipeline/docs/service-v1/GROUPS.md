@@ -8,6 +8,12 @@
 [공식 서빙 산출물 계약](../../contracts/group-serving-artifacts.md)과
 [`group_artifacts`](../../consumer/src/feelm_consumer/group_artifacts.py) reader가 배포 경계를 정의한다.
 
+S15P21E106-466부터 상위 `taste_id` 0~7은 공개 팝콘 맛 `FLAVOR_A`~`FLAVOR_H`와 순서대로
+대응한다. `group_mapped=true`인 영화만 서비스 DB 대표 맛으로 반영한다. 하위 `child_id`와
+`group_id`는 추천 내부 값이며 공개 API나 대표 맛 FK에 저장하지 않는다. 원 recipe의 7번 source label에
+남은 “장르 근거 부족”은 원본 lineage 설명일 뿐 공개 표시명이 아니다. 장르 미지원 영화 자체는
+`group_mapped=false`로 제외되므로 공개 7번 맛은 액션·모험·SF·판타지·음악 장르 믹스로 설명한다.
+
 ## 1. 가져올 파일과 가져오면 안 되는 설정
 
 `cluster/GKT-K128-hierarchy.pkl` 하나로 신규 영화를 배정할 수 없다. 여기에는 하위 중심과

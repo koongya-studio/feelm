@@ -123,7 +123,7 @@ class MovieDetailContractTest extends SharedPostgresContractTest {
         assertThat(response.path("posterUrl").asText()).isEqualTo("https://example.com/poster.jpg");
         assertThat(response.path("backdropUrl").asText())
                 .isEqualTo("https://example.com/backdrop.jpg");
-        assertThat(response.path("flavorCode").asText()).isEqualTo("FLAVOR_TEST");
+        assertThat(response.path("flavorCode").asText()).isEqualTo("FLAVOR_A");
         assertThat(response.path("averageRating").decimalValue()).isEqualByComparingTo("4.35");
         assertThat(response.path("ratingCount").asInt()).isEqualTo(1280);
         assertJson(

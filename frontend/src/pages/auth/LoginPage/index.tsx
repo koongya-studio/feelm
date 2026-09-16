@@ -17,8 +17,9 @@
  * 와이어프레임의 `아이디 찾기` · `비밀번호 찾기`는 둘 다 0.7로 간다. 0.7이 두 갈래를
  * 탭으로 나눠 갖고 있으므로 어느 탭으로 열지를 함께 넘긴다.
  *
- * `[?]` 소셜 로그인(API-007~009)은 이번 연동 범위가 아니다. 목업으로 로그인한 척하면
- * 세션 없이 홈으로 들어가므로 버튼을 잠가 두었다.
+ * 소셜 로그인은 제공자 동의 화면으로 나갔다가 콜백으로 돌아온다(API-007). 연결된 계정이
+ * 없으면 로그인이 아니라 가입이 남은 것이라 콜백이 0.3-A로 보낸다(S15P21E106-499).
+ * client-id가 설정되지 않은 제공자는 눌러도 `UNSUPPORTED_PROVIDER`라 버튼을 잠근다.
  *
  * **영화 티켓 디자인** (받은 시안, 2026-09-14, S15P21E106-319). 모든 요소가 모서리가 파인
  * 티켓 한 장 위에 선다. 절취선 아래 꼬리표에는 장식 바코드가 찍힌다. 티켓 테두리 · 절취선 ·
@@ -33,8 +34,10 @@ import TextField from '../../../components/TextField';
 import Wordmark from '../../../components/Wordmark';
 import { resendVerificationMail } from '../../../api/auth';
 import { ApiError } from '../../../api/apiError';
+import { failureDescription } from '../../../components/StatusView/failure';
 import { useAuth } from '../../../contexts/authContext';
 import { path } from '../../../routes/paths';
+import { isOAuthConfigured, startOAuth } from '../../../utils/oauth';
 import styles from './LoginPage.module.css';
 import Ticket, { Barcode } from './Ticket';
 
@@ -58,6 +61,9 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { signIn } = useAuth();
 
+  /* 한 곳이라도 열려 있으면 준비 중 안내를 내린다 */
+  const ready = PROVIDERS.some(({ provider }) => isOAuthConfigured(provider));
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
@@ -75,12 +81,13 @@ export default function LoginPage() {
       void navigate(user.onboardingCompleted ? path.home() : path.onboardingTaste());
     } catch (error) {
       const code = error instanceof ApiError ? error.code : '';
-      const fallback =
-        error instanceof ApiError
-          ? error.message
-          : '로그인하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 
-      setFailure({ code, message: MESSAGE[code] ?? fallback });
+      /*
+       * 화면이 정한 코드 밖의 실패는 다른 화면과 같은 기준으로 원인을 말한다(업무 -374).
+       * 서버에 닿지 못한 것과 서버가 처리하지 못한 것을 가르고, 그 밖의 거절은 서버
+       * 문구를 그대로 쓴다.
+       */
+      setFailure({ code, message: MESSAGE[code] ?? failureDescription(error) });
     } finally {
       setPending(false);
     }
@@ -181,12 +188,13 @@ export default function LoginPage() {
               provider={provider}
               label={label}
               appearance="brand"
-              disabled
+              disabled={!isOAuthConfigured(provider)}
+              onClick={() => startOAuth(provider, 'login')}
             />
           ))}
         </div>
 
-        <p className={styles.notice}>소셜 로그인은 준비 중입니다.</p>
+        {ready ? null : <p className={styles.notice}>소셜 로그인은 준비 중입니다.</p>}
       </Ticket>
     </div>
   );

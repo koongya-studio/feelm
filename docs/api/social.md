@@ -124,7 +124,7 @@
   "user": { "userId": 2048, "nickname": "영화광", "visibility": "PUBLIC" },
   "keywords": [{ "code": "DARK_THRILLER_LOVER", "label": "어둠 속 스릴러 애호가" }],
   "stats": { "frameCount": 88, "popcornCount": 88 },
-  "popcorn": { "flavors": [{ "flavorCode": "FLAVOR_X", "popcornCount": 30, "averageScore": 4.5 }] },
+  "popcorn": { "flavors": [{ "flavorCode": "FLAVOR_A", "popcornCount": 30, "averageScore": 4.5 }] },
   "recentFrames": [
     { "frameId": 190, "movie": { "movieId": 550, "title": "파이트 클럽", "posterUrl": "https://..." }, "score": 5, "createdAt": "2026-08-30T05:21:00Z" }
   ],
@@ -191,9 +191,9 @@
 {
   "targetUser": { "userId": 2048, "nickname": "영화광" },
   "similarity": 0.72,
-  "sharedFlavors": ["FLAVOR_X", "FLAVOR_Y"],
+  "sharedFlavors": ["FLAVOR_A", "FLAVOR_B"],
   "flavorComparison": [
-    { "flavorCode": "FLAVOR_X", "mine": { "popcornCount": 12, "averageScore": 4.4 }, "theirs": { "popcornCount": 30, "averageScore": 4.5 } }
+    { "flavorCode": "FLAVOR_A", "mine": { "popcornCount": 12, "averageScore": 4.4 }, "theirs": { "popcornCount": 30, "averageScore": 4.5 } }
   ],
   "commonMovieCount": 9,
   "commonMovies": [{ "movieId": 550, "title": "파이트 클럽", "myScore": 5, "theirScore": 4 }]

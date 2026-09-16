@@ -18,7 +18,11 @@ MAPPING_REVISION = "sha256:" + "a" * 64
 RECIPE_REVISION = "sha256:" + "b" * 64
 
 
-def _write_bundle(root: Path) -> None:
+def _write_bundle(
+    root: Path,
+    *,
+    public_taste_semantics: str = "RECOMMENDATION_INTERNAL_NOT_PUBLIC_POPCORN",
+) -> None:
     root.mkdir()
     genre_ids = np.arange(1, 20, dtype=np.int64)
     keyword_ids = np.arange(100, 6643, dtype=np.int64)
@@ -106,7 +110,7 @@ def _write_bundle(root: Path) -> None:
         "mapped_movie_count": 1,
         "genre_missing_count": 1,
         "genre_missing_policy": "EXCLUDE_FROM_DISCOVERY",
-        "public_taste_semantics": "RECOMMENDATION_INTERNAL_NOT_PUBLIC_POPCORN",
+        "public_taste_semantics": public_taste_semantics,
     }
     (root / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
     (root / "_SUCCESS").write_bytes(b"")
@@ -130,6 +134,16 @@ def test_load_group_bundle_and_lookup_assignment(tmp_path: Path) -> None:
     assert bundle.assignment_for(np.int64(10)).group_mapped is True
     assert bundle.assignment_for(20).group_mapped is False
     assert bundle.assignment_for(999) is None
+    assert bundle.public_taste_semantics == "RECOMMENDATION_INTERNAL_NOT_PUBLIC_POPCORN"
+
+
+def test_load_group_bundle_accepts_public_popcorn_semantics(tmp_path: Path) -> None:
+    root = tmp_path / "bundle"
+    _write_bundle(root, public_taste_semantics="PUBLIC_POPCORN_FLAVOR_V1")
+
+    bundle = load_group_bundle(root.as_uri())
+
+    assert bundle.public_taste_semantics == "PUBLIC_POPCORN_FLAVOR_V1"
 
 
 def test_load_group_bundle_rejects_mapping_revision_mismatch(tmp_path: Path) -> None:

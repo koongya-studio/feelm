@@ -1,0 +1,46 @@
+infra-config-test:
+  stage: test
+  tags: [e106-mr-isolated]
+  dependencies: []
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - python3 -I -B infra/scripts/run-infra-config-tests.py
+  resource_group: infra-config-test
+  interruptible: true
+  timeout: 10m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
+      changes:
+        - .gitlab-ci.yml
+        - .gitlab/ci/common.yml
+        - .gitlab/ci/infra.yml
+        - infra/.env.example
+        - infra/compose/**/*
+        - infra/hadoop/**/*
+        - infra/kafka/**/*
+        - infra/monitoring/**/*
+        - infra/spark/**/*
+        - infra/scripts/deploy-distributed-runtime.py
+        - infra/scripts/deploy-consumer.sh
+        - infra/scripts/rollback-consumer.sh
+        - infra/scripts/verify-consumer-e2e.py
+        - infra/scripts/run-infra-config-tests.py
+        - infra/scripts/verify-kafka-monitoring.py
+        - infra/scripts/test_consumer_distributed_deployment.py
+        - infra/scripts/test_kafka_monitoring.py
+        - infra/scripts/test_grafana_access_policy.py
+        - infra/scripts/test_node_exporter_monitoring.py
+        - infra/scripts/test_pipeline_observability.py
+        - infra/scripts/test_verify_kafka_monitoring.py
+        - infra/scripts/test_deploy_distributed_runtime.py
+        - infra/scripts/test_deploy_consumer.py
+        - infra/scripts/test_verify_consumer_e2e.py
+        - infra/scripts/ci-infra-mr-*.py
+        - infra/scripts/ci-gitlab-job-adapter.py
+        - infra/scripts/ci-gitlab-custom-executor.py
+        - infra/scripts/ci-gitlab-server-install.py
+        - infra/scripts/ci-gitlab-adapter-update.py
+        - infra/scripts/test_ci_infra_mr.py
+        - infra/scripts/test_ci_gitlab_job_adapter.py
+        - infra/scripts/test_ci_config.py

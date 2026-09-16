@@ -15,7 +15,7 @@
  */
 import type { PartyRecommendationSet } from '../types/party';
 
-/** 와이어프레임 5.5의 참여자 셋. `mocks/parties.ts`의 9001 파티원과 맞춘다 */
+/** 와이어프레임 5.5의 참여자 셋. 추천이 목업으로 남아 있어 사용자 번호도 자리표시자다 */
 const MEMBER_IDS = [1024, 2048, 2049];
 
 export const mockPartyRecommendations: Record<number, PartyRecommendationSet> = {

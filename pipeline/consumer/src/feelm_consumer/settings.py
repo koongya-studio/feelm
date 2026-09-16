@@ -34,8 +34,9 @@ class Settings:
     mapping_uri: str
     metadata_uri: str
     content_uri: str | None
+    group_uri: str | None
+    discovery_popularity_uri: str | None
     hybrid_alpha: float
-    min_input_count: int
     retry_attempts: int
     retry_backoff_seconds: float
     kafka_poll_timeout_seconds: float
@@ -64,6 +65,14 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
     content_uri = values.get("CONSUMER_CONTENT_URI", "").strip() or None
     if content_uri is not None:
         validate_immutable_artifact_uri(content_uri, "CONSUMER_CONTENT_URI")
+    group_uri = values.get("CONSUMER_GROUP_URI", "").strip() or None
+    if group_uri is not None:
+        validate_immutable_artifact_uri(group_uri, "CONSUMER_GROUP_URI")
+    discovery_popularity_uri = values.get("CONSUMER_DISCOVERY_POPULARITY_URI", "").strip() or None
+    if discovery_popularity_uri is not None:
+        validate_immutable_artifact_uri(discovery_popularity_uri, "CONSUMER_DISCOVERY_POPULARITY_URI")
+    if (group_uri is None) != (discovery_popularity_uri is None):
+        raise SettingsError("CONSUMER_GROUP_URI and CONSUMER_DISCOVERY_POPULARITY_URI must be configured together")
     def positive_int(name: str, default: int, maximum: int) -> int:
         raw = values.get(name, str(default)).strip()
         try:
@@ -84,16 +93,6 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
             raise SettingsError(f"{name} is outside its allowed range")
         return value
 
-    def bounded_int(name: str, default: int, minimum: int, maximum: int) -> int:
-        raw = values.get(name, str(default)).strip()
-        try:
-            value = int(raw)
-        except ValueError as exc:
-            raise SettingsError(f"{name} must be an integer") from exc
-        if not minimum <= value <= maximum:
-            raise SettingsError(f"{name} is outside its allowed range")
-        return value
-
     def unit_float(name: str, default: float) -> float:
         raw = values.get(name, str(default)).strip()
         try:
@@ -107,14 +106,12 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
     return Settings(
         **result,
         content_uri=content_uri,
+        group_uri=group_uri,
+        discovery_popularity_uri=discovery_popularity_uri,
         # Fixed ALS weight of the hybrid mix.  It only applies to movies that both
         # components support, so it never turns the mix into a single component;
         # clear CONSUMER_CONTENT_URI for that.  See pipeline/consumer/README.md.
         hybrid_alpha=unit_float("CONSUMER_HYBRID_ALPHA", 0.5),
-        # Ratings plus onboarding preferences a user needs before candidates are
-        # computed at all.  Fold-in from a handful of inputs is noise, and the
-        # product does not expose recommendations below this count either.
-        min_input_count=bounded_int("CONSUMER_MIN_INPUT_COUNT", 10, 0, 1000),
         retry_attempts=positive_int("CONSUMER_RETRY_ATTEMPTS", 3, 10),
         retry_backoff_seconds=positive_float("CONSUMER_RETRY_BACKOFF_SECONDS", 0.25, 30.0),
         kafka_poll_timeout_seconds=positive_float("CONSUMER_KAFKA_POLL_TIMEOUT_SECONDS", 1.0, 30.0),

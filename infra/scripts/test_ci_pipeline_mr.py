@@ -149,25 +149,31 @@ class PipelineRunnerTests(unittest.TestCase):
             'uv_lock_sha256': 'd' * 64,
         }
 
-    def test_fixed_policy_is_offline_bounded_and_has_no_host_socket(self):
+    def test_fixed_group_policies_are_offline_bounded_and_select_one_group(self):
         runner = self.runner()
-        command = runner.FIXED_COMMAND
-        for expected in (
-                'uv lock --check --offline', 'uv sync --frozen --offline',
-                'uv run --frozen --offline ruff check .',
-                'python -m ci_test_groups verify',
-                'python -m ci_test_groups unit -vv --durations=20',
-                'python -m ci_test_groups spark-als-a-d -vv --durations=20',
-                'python -m ci_test_groups spark-als-e-z -vv --durations=20',
-                'python -m ci_test_groups spark-other -vv --durations=20',
-                'python -m jobs.batch.als_baseline --help',
-                'python -m jobs.batch.parquet_roundtrip --help'):
-            self.assertIn(expected, command)
-        self.assertEqual(command.count('python -m ci_test_groups '), 5)
-        self.assertIn('cp --recursive --no-preserve=ownership,mode,timestamps', command)
-        self.assertIn('/uv-cache-source/. /uv-cache-work/', command)
-        self.assertNotIn('/work/uv-cache', command)
-        self.assertNotIn('/tmp/uv-cache', command)
+        for group in runner.GROUP_COMMANDS:
+            with self.subTest(group=group):
+                command = runner.fixed_command(group)
+                self.assertIn('uv lock --check --offline', command)
+                self.assertIn('uv sync --frozen --offline', command)
+                self.assertIn('python -m ci_test_groups ' + group, command)
+                for other in runner.GROUP_COMMANDS:
+                    if other != group:
+                        self.assertNotIn('python -m ci_test_groups ' + other, command)
+                self.assertIn('cp --recursive --no-preserve=ownership,mode,timestamps', command)
+                self.assertIn('/uv-cache-source/. /uv-cache-work/', command)
+                self.assertNotIn('/work/uv-cache', command)
+                self.assertNotIn('/tmp/uv-cache', command)
+        unit = runner.fixed_command('unit')
+        self.assertIn('uv run --frozen --offline ruff check .', unit)
+        self.assertIn('python -m ci_test_groups verify', unit)
+        self.assertIn('python -m jobs.batch.als_baseline --help', unit)
+        self.assertIn('python -m jobs.batch.parquet_roundtrip --help', unit)
+        with self.assertRaisesRegex(ValueError, 'group'):
+            runner.fixed_command('unknown')
+
+    def test_isolation_limits_and_cleanup_policy_are_preserved(self):
+        runner = self.runner()
         source = Path(runner.__file__).read_text()
         for expected in (
                 "'--network=none'", "'--read-only'", "'--cap-drop=ALL'",
@@ -188,6 +194,18 @@ class PipelineRunnerTests(unittest.TestCase):
         self.assertIn('timeout=3500', source)
         self.assertIn('RuntimeMaxSec=3600', source)
         self.assertIn('process.wait(3630)', source)
+
+    def test_owner_unit_forwards_only_a_validated_group(self):
+        runner = self.runner()
+        command = runner.unit_command(
+            self.config(), Path('/run/attempt/source'), 'spark-als-e-z',
+            'ci352-owner-0123456789ab.service', 'ci352-pipeline-0123456789ab')
+        self.assertIn('--group=spark-als-e-z', command)
+        self.assertEqual(command.count('--group=spark-als-e-z'), 1)
+        with self.assertRaisesRegex(ValueError, 'group'):
+            runner.unit_command(
+                self.config(), Path('/run/attempt/source'), 'unknown',
+                'ci352-owner-0123456789ab.service', 'ci352-pipeline-0123456789ab')
 
     def test_config_requires_pinned_image_and_dependency_cache_identity(self):
         runner = self.runner()
@@ -244,7 +262,8 @@ class PipelineRunnerTests(unittest.TestCase):
             source = Path(directory)
             (source / 'pipeline' / 'spark').mkdir(parents=True)
             with self.assertRaises(subprocess.TimeoutExpired):
-                runner.workload(config, source, 'ci352-pipeline-0123456789ab')
+                runner.workload(config, source, 'spark-other',
+                                'ci352-pipeline-0123456789ab')
         self.assertEqual(run.call_args_list[-1].args[0][-3:],
                          ['rm', '--force', 'ci352-pipeline-0123456789ab'])
 

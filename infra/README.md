@@ -14,6 +14,9 @@ S15P21E106-222의 [Runner 통신 격리 파일럿 스크립트](scripts/README.m
 Kafka·Spark 개발 관제 화면의 2026-09-15 적용 결과와 남은 운영 검증 범위는
 [S15P21E106-444 검증 기록](verification/S15P21E106-444.md)을 참고합니다.
 
+Grafana HTTPS 접근 설정의 로컬 검증 결과와 서버 적용 후 확인할 항목은
+[S15P21E106-350 검증 기록](verification/S15P21E106-350.md)을 참고합니다.
+
 ## Distributed Runtime Baseline
 
 분산 처리 환경은 아래 버전과 실행 방식을 공통 기준으로 사용합니다. 구성요소의 버전을
@@ -1092,9 +1095,9 @@ docker start feelm-hdfs-datanode-1
 ## Distributed Consumer Deployment
 
 추천 Consumer는 J15E106A 분산 노드에서 `distributed.yml`의 `consumer` profile로 실행한다.
-이미지는 `pipeline/consumer/Dockerfile`로 분산 노드에서 수동 빌드하며 Registry 게시와 자동
-CD는 별도 업무로 다룬다. profile을 지정하지 않은 기존 HDFS·Spark·Kafka 기동에는 Consumer가
-추가되지 않는다.
+로컬·초기 검증 이미지는 `pipeline/consumer/Dockerfile`로 분산 노드에서 수동 빌드한다.
+보호된 `main` 배포는 CI가 게시한 커밋 SHA 이미지를 사용하며 profile을 지정하지 않은 기존
+HDFS·Spark·Kafka 기동에는 Consumer가 추가되지 않는다.
 
 ### Cross-node datastore boundary
 
@@ -1154,8 +1157,9 @@ docker port feelm-redis 6379
 ### Consumer environment
 
 분산 노드의 `infra/.env`에는 다음 값을 추가한다. DSN과 Redis URL의 비밀번호는 URL encoding하고
-실제 값은 저장소, shell history와 로그에 남기지 않는다. 세 HDFS URI는 동일한 immutable
-snapshot revision을 가리켜야 하며 `latest` 별칭을 사용하지 않는다.
+실제 값은 저장소, shell history와 로그에 남기지 않는다. 모델·매핑·메타데이터·콘텐츠 HDFS
+URI는 동일한 immutable snapshot revision을 가리켜야 하며 `latest` 별칭이나 staging 경로를
+사용하지 않는다. 그룹과 DISCOVERY 대중성 URI도 immutable 공개 경로를 사용한다.
 
 ```dotenv
 CONSUMER_IMAGE=feelm-foldin-consumer:local
@@ -1163,10 +1167,25 @@ CONSUMER_KAFKA_TOPIC=feelm.rating.v1
 CONSUMER_KAFKA_GROUP_ID=feelm-foldin-consumer-v1
 CONSUMER_POSTGRES_DSN=postgresql://<user>:<encoded-password>@<SERVICE_NODE_IP>:5432/feelm
 CONSUMER_REDIS_URL=redis://:<encoded-password>@<SERVICE_NODE_IP>:6379/0
-CONSUMER_MODEL_URI=hdfs://hdfs-namenode:9000/<immutable-model-path>
-CONSUMER_MAPPING_URI=hdfs://hdfs-namenode:9000/<immutable-mapping-path>
-CONSUMER_METADATA_URI=hdfs://hdfs-namenode:9000/<immutable-metadata-path>
+CONSUMER_MODEL_URI=hdfs://hdfs-namenode:8020/<immutable-model-path>
+CONSUMER_MAPPING_URI=hdfs://hdfs-namenode:8020/<immutable-mapping-path>
+CONSUMER_METADATA_URI=hdfs://hdfs-namenode:8020/<immutable-metadata-path>
+CONSUMER_CONTENT_URI=hdfs://hdfs-namenode:8020/<immutable-content-path>
+CONSUMER_GROUP_URI=hdfs://hdfs-namenode:8020/<artifact-root>/groups/<group-version>
+CONSUMER_DISCOVERY_POPULARITY_URI=hdfs://hdfs-namenode:8020/<artifact-root>/discovery-popularity/<popularity-version>
+CONSUMER_HYBRID_ALPHA=0.5
 ```
+
+`CONSUMER_CONTENT_URI`를 비우면 기존 ALS 전용 모드로 동작한다. 값을 설정하면 Consumer는
+기동 시 Content bundle의 revision을 ALS·mapping·metadata와 대조하고, 불일치하거나 불완전한
+산출물이면 시작을 거부한다. `CONSUMER_HYBRID_ALPHA`는 ALS 점수 가중치이며 0~1 범위여야 한다.
+평가·온보딩 입력 수에 따른 최소 제한은 두지 않는다.
+
+`CONSUMER_GROUP_URI`와 `CONSUMER_DISCOVERY_POPULARITY_URI`는 함께 설정하거나 함께 비운다.
+값을 설정하면 두 번들의 `mapping_revision`이 서로 같고 현재 ALS mapping revision과도 일치해야
+하며, 불일치하거나 불완전한 산출물이면 Consumer는 시작을 거부한다. 값을 비우면 그룹 기반
+DISCOVERY 대신 개인 점수 후보로 최대 100편을 보충한다. 두 URI를 교체하기 전에는
+`pipeline/consumer/tools/verify_discovery_artifacts.py`로 manifest와 catalog 정합성을 검증한다.
 
 ### Build, deploy and verify
 
@@ -1184,12 +1203,18 @@ NameNode health와 Kafka 시작 순서만 보장하며 원격 PostgreSQL·Redis 
 
 ```bash
 docker compose --env-file infra/.env -f infra/compose/distributed.yml \
-  --profile consumer up -d consumer
+  --profile consumer up -d --no-deps --force-recreate consumer
 docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}}' feelm-foldin-consumer
 docker logs --tail 100 feelm-foldin-consumer
 ```
 
-정상 상태는 프로세스가 `running`이고 설정·산출물·연결 오류가 반복되지 않는 상태다. 실제
+정상 상태는 프로세스가 `running`이고 로그에
+`content artifacts loaded version=<immutable-content-version>`이 기록되며 설정·산출물·연결
+오류가 반복되지 않는 상태다. `content artifacts not configured; publishing ALS-only candidates`가
+기록되면 `CONSUMER_CONTENT_URI`가 컨테이너에 전달되지 않은 ALS 전용 배포다.
+그룹 기반 DISCOVERY 활성화 시에는 `group and Discovery popularity artifacts loaded`가 기록되어야
+한다. `group artifacts not configured; Discovery uses ranked-candidate fallback`이 기록되면 두
+DISCOVERY URI가 컨테이너에 전달되지 않았거나 의도적으로 비활성화된 상태다. 실제
 검증은 백엔드의 평가 또는 온보딩 흐름으로 `feelm.rating.v1` 이벤트를 발행한 뒤 Consumer
 로그의 처리 완료와 Redis의 해당 사용자 `candidate-version`, `vector`, `candidates` 세 키
 갱신을 확인한다. 이벤트 payload, DSN, Redis URL과 비밀번호를 검증 기록에 남기지 않는다.
@@ -1207,6 +1232,112 @@ docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}}' feelm-foldi
 수정한 뒤 `config --quiet`, `up -d consumer`, 로그 확인 순서로 재시도하며 `down -v`를 사용하지
 않는다. 서비스 노드의 bind address를 다시 루프백으로 복구하려면 Consumer를 먼저 중단하고
 두 값을 `127.0.0.1`로 되돌린 뒤 PostgreSQL과 Redis만 재생성한다.
+
+### Consumer automatic deployment
+
+보호된 `main` push에서 Consumer 관련 파일이 바뀌면 `consumer-test`, `consumer-image`,
+`deploy-consumer`를 순서대로 실행한다. 테스트를 통과한 `CI_COMMIT_SHA` 태그를 Docker Hub에
+게시한 뒤 Registry가 반환한 immutable digest를 다음 Job에 전달해 J15E106A의 Consumer
+컨테이너만 교체한다. MR, `develop`, API와 Web Pipeline은
+배포하지 않는다. 오래된 Pipeline은 배포 직전에 원격 `main` HEAD와 commit SHA가 다르면
+중단하며 `distributed-consumer` resource group으로 배포를 직렬화한다.
+
+배포에는 J15E106A에서 실행되는 전용 Shell Runner가 필요하다. GitLab Runner 설정은 다음
+경계를 모두 만족해야 한다.
+
+- 태그는 `e106-distributed`, Run untagged는 끄고 이 프로젝트에 잠근다.
+- Runner를 Protected로 설정해 보호된 ref의 Job만 받는다.
+- Runner 서비스 계정만 분산 노드 Docker daemon을 사용할 수 있게 한다.
+- `/var/lib/feelm-deploy`를 Runner 서비스 계정 전용 mode `0700` 디렉터리로 미리 만든다. 배포
+  스크립트는 검증을 통과한 마지막 이미지 digest만 이 경로에 원자적으로 기록한다.
+- 일반 MR Job과 `e106-mr-isolated` Job은 이 Runner에서 실행하지 않는다.
+- Runner 등록 토큰과 인증정보는 저장소, 셸 기록과 검증 문서에 남기지 않는다.
+
+GitLab `distributed` 환경 범위에 `CONSUMER_COMPOSE_ENV_FILE`을 **File 타입·Protected** 변수로
+등록한다. 값은 분산 노드에서 수동 검증한 `infra/.env`와 같은 전체 dotenv 내용이며 실제 DSN,
+Redis URL, 내부 URI와 Secret을 포함하므로 Job에서 출력하지 않는다. Docker Hub 인증 변수도
+Protected 상태를 유지한다. 배포 Job은 File 변수의 임시 경로를 Compose `--env-file`에 전달하며
+파일 내용을 이미지에 넣거나 서버 저장소에 복사하지 않는다. Registry 로그인은 Job별 임시
+`DOCKER_CONFIG`에만 기록하고 성공·실패와 관계없이 logout 후 파일을 제거한다.
+
+Runner 계정과 그룹을 확인한 뒤 운영자가 한 번만 상태 디렉터리를 준비한다. 예시 이름을 그대로
+실행하지 말고 실제 Runner 서비스 계정을 사용한다.
+
+```bash
+sudo install -d -m 0700 -o <runner-user> -g <runner-group> /var/lib/feelm-deploy
+```
+
+자동 배포를 활성화하기 전에 현재 정상 Consumer를 마지막 검증 완료 이미지로 한 번 명시적으로
+초기화한다. 아래 명령은 현재 컨테이너가 `running`, restart 0이고 단일 Consumer ID가 전체
+파티션을 할당받은 경우에만 기록한다. 이미 다른 이미지가 기록돼 있으면 덮어쓰지 않는다.
+
+```bash
+sudo -u <runner-user> env \
+  COMPOSE_ENV_FILE=/path/to/approved/infra.env \
+  CONSUMER_DEPLOY_STATE_FILE=/var/lib/feelm-deploy/consumer-last-known-good \
+  bash infra/scripts/deploy-consumer.sh --initialize-state
+```
+
+`deploy-consumer.sh`는 전달받은 Registry digest를 매번 pull하고 Compose 설정을 검사한 뒤에만 Consumer를
+재생성한다. 새 프로세스가 `running`, 재시작 횟수 0 상태이고 `feelm-foldin-consumer-v1`의 모든
+`feelm.rating.v1` 파티션이 새 Kafka Consumer ID 하나에 할당돼야 성공한다. 검증 제한 시간은
+기본 2분이며 산출물 로딩 시간 실측이 바뀌면 `CONSUMER_DEPLOY_ATTEMPTS`와
+`CONSUMER_DEPLOY_INTERVAL_SECONDS`를 배포 환경에서 조정한다. Lag는 처리 중 이벤트가 있을 수
+있으므로 배포 성공 조건으로 0을 강제하지 않는다.
+
+후보 Pull·Compose 교체·런타임 검증 또는 이미지 일치 검사가 실패하면 서버 상태 파일의 마지막
+검증 완료 이미지를 사용해 Consumer를 다시 만들고 새 Kafka Consumer ID 할당까지 재검증한다.
+Runner가 교체 중 종료되고 GitLab이 Job을 재시도해도 현재 실패 후보를 롤백 기준으로 쓰지 않는다.
+재시도 시작 시 실제 실행 이미지가 상태 파일의 LKG와 다르면, 오래된 Pipeline 여부를 검사하기
+전에 LKG로 복구한다. 따라서 후보 교체 직후 Runner가 종료되고 새 `main` push가 도착한 경우에도
+stale Job이 실패 후보를 실행 상태로 남기지 않는다.
+상태 파일이 없으면 자동 배포는 컨테이너를 변경하기 전에 실패한다. 복구도 실패하면 Pipeline을
+실패 상태로 유지하고 수동 복구가 필요하다고 출력한다. 원문 컨테이너 로그는 CI로 복사하지 않고
+분산 노드에만 유지한다. 자동·수동
+복구 모두 HDFS·Spark·Kafka 컨테이너와 볼륨을 변경하지 않는다.
+
+분산 노드의 승인된 환경에서 특정 정상 이미지로 직접 복구할 때는 다음처럼 실행한다.
+
+```bash
+COMPOSE_ENV_FILE=/path/to/approved/infra.env \
+  bash infra/scripts/rollback-consumer.sh \
+  <registry>/feelm-foldin-consumer@sha256:<known-good-digest>
+```
+
+배포 후에는 Pipeline 결과와 함께 Kafka Group의 파티션 할당, 실제 평가·온보딩 이벤트 처리 및
+Redis `candidate-version`, `vector`, `candidates` 갱신을 확인한다. 자동 배포 검증은 후보 계산의
+내용 정확도나 기존 사용자 전체 재게시를 대신하지 않는다.
+
+승인된 테스트 사용자는 Fold-in 계산에 충분한 유효 입력을 보유해야 한다. 이벤트 전 현재
+버전을 확인하고 그 숫자를 기록한 뒤, 백엔드의 정상 평가 생성·수정 흐름으로 이벤트를 한 건
+발행한다. 비밀번호와 Redis payload를 출력하지 않는 검증기를 같은 분산 노드에서 실행한다.
+
+```bash
+python3 infra/scripts/verify-consumer-e2e.py \
+  --env-file infra/.env --user-id <approved-test-user-id>
+
+python3 infra/scripts/verify-consumer-e2e.py \
+  --env-file infra/.env --user-id <approved-test-user-id> \
+  --after-version <event-before-version> --timeout-seconds 120
+```
+
+두 번째 명령은 게시 순번이 증가하고 `vector`와 `candidates`가 모두 Candidate v4의 동일
+`generationId`, 모델·시각 메타데이터, 후보 순서와 reason별 불변식을 가질 때만 성공한다. 출력에는
+순번과 taste/discovery 개수만 포함된다. vector 차원과 활성 HDFS revision은 Consumer 시작 검증의
+책임이며 이 Redis 검증기가 대신하지 않는다. 이어서
+Consumer 로그의 `candidate published`, `Kafka event committed`와 Consumer Group의 해당 파티션
+offset·lag를 확인한다. 실제 사용자 ID, generation ID, payload와 내부 주소는 검증 기록에 남기지
+않는다.
+
+재시작·rebalance 검증은 유지보수 창에서만 수행한다. 이벤트 처리 전후의 게시 순번과 Group
+offset을 기록하고 Consumer를 정상 재시작한 뒤 Consumer ID가 바뀌고 전체 파티션이 다시 할당되는지
+확인한다. 같은 사용자의 다음 정상 이벤트로 위 `--after-version` 검증을 반복해 누락이나 오래된
+generation 게시가 없는지 확인한다. 의도적인 poison event나 datastore 차단은 파티션을 pause시킬
+수 있으므로 격리된 테스트 토픽·복구 offset과 담당자 승인이 없는 운영 토픽에는 실행하지 않는다.
+
+현재 `develop`에는 Candidate v4 Spring Redis reader가 없다. 따라서 Consumer CD와 Redis 직접 E2E를
+통과해도 서비스 추천 조회까지 통합 완료된 것으로 간주하지 않는다. reader가 병합된 뒤 taste와
+discovery 계약 호환성 및 같은 generation 조회를 추가 검증해야 한다.
 
 ## Kafka and Spark development UIs (S15P21E106-444)
 
@@ -1611,6 +1742,38 @@ sudo journalctl -u certbot.service --since '7 days ago' --no-pager
 sudo certbot certificates
 docker logs --tail 50 feelm-nginx
 ```
+
+### Grafana HTTPS 팀 전용 접근
+
+Grafana는 기존 서비스 도메인의 `https://j15e106.p.ssafy.io/grafana/`에서 제공합니다.
+Nginx의 전용 Basic Auth와 Grafana 자체 로그인을 모두 유지하며 Prometheus는 공개하지
+않습니다. Grafana와 Prometheus의 호스트 포트는 계속 루프백에만 바인딩합니다.
+
+서비스 노드에서 Grafana 전용 인증 파일을 준비합니다. Swagger 인증 파일이나 비밀번호를
+재사용하지 않습니다.
+
+```bash
+sudo apt-get update
+sudo apt-get install -y apache2-utils
+sudo install -d -m 700 /etc/feelm
+sudo htpasswd -cB /etc/feelm/grafana.htpasswd e106-grafana
+
+NGINX_GID="$(docker exec feelm-nginx id -g nginx)"
+sudo chown root:"${NGINX_GID}" /etc/feelm/grafana.htpasswd
+sudo chmod 640 /etc/feelm/grafana.htpasswd
+```
+
+비밀번호 입력은 `htpasswd`의 대화형 프롬프트에서 수행하고 명령행, 저장소와 로그에 남기지
+않습니다. 비밀번호 변경 시 `-c` 없이 실행합니다. `infra/.env` 또는 승인된 배포 설정에
+호스트 파일 경로만 추가합니다.
+
+```dotenv
+GRAFANA_HTPASSWD_PATH=/etc/feelm/grafana.htpasswd
+```
+
+Grafana 관리자 비밀번호는 계정 생성과 복구에만 사용합니다. 팀원별 Grafana 계정을 만들고
+Organization role을 `Viewer`로 지정하며 관리자 비밀번호를 공유하지 않습니다. 상세 기동,
+검증 및 장애 시 SSH 터널 복구 절차는 [모니터링 README](monitoring/README.md)를 따릅니다.
 
 ### Swagger 팀 전용 접근
 

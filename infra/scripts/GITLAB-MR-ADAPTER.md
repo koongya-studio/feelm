@@ -5,10 +5,12 @@
 
 ## 목적과 제한
 
-`backend-mr-test`, `frontend-mr-test`, `pipeline-mr-test`와 의존성 변경 시 생성되는 `backend-cache-prepare`만
+`backend-mr-test`, `frontend-mr-test`, `docs-mr-check`, Pipeline shard 4종,
+`consumer-mr-test`와 의존성 변경 시 생성되는 `backend-cache-prepare`만
 `e106-mr-isolated` 태그의 별도 Runner에서 받습니다. 이 Runner의
 Custom executor는 GitLab이 생성한 셸 스크립트를 실행하지 않는다. 다음 조건을 모두 다시
-확인한 뒤 현재 커밋에서 Job에 대응하는 `backend`, `frontend` 또는 `pipeline/spark` 디렉터리를
+확인한 뒤 현재 커밋에서 Job에 대응하는 `backend`, `frontend`, 전체 Markdown 또는
+`pipeline/spark`, `pipeline/consumer` 디렉터리를
 검증된 격리 실행기에 전달한다. 백엔드는 환경변수 계약 검사를 위해
 `infra/compose/service.yml` 한 파일을 추가로 전달하며 다른 `infra` 파일은 거부한다.
 프론트 실행 정책과 서버 적용 순서는
@@ -16,7 +18,9 @@ Custom executor는 GitLab이 생성한 셸 스크립트를 실행하지 않는�
 
 - GitLab 주소가 `https://lab.ssafy.com`이고 프로젝트 경로가
   `s15-bigdata-dist-sub1/S15P21E106`이다.
-- 인증된 현재 Job이 고정된 `backend-mr-test`, `frontend-mr-test`, `pipeline-mr-test` 또는
+- 인증된 현재 Job이 고정된 `backend-mr-test`, `frontend-mr-test`, `pipeline-unit-test`,
+  `pipeline-spark-als-a-d-test`, `pipeline-spark-als-e-z-test`,
+  `pipeline-spark-other-test`, `consumer-mr-test`, `docs-mr-check` 또는
   `backend-cache-prepare` 정책과 일치한다.
 - 같은 프로젝트의 열린 MR 하나가 해당 커밋을 가리키며 대상 브랜치가 `develop`이다.
 - CI script가 각 Job의 고정 명령과 일치하고 service, image, cache, dependency, artifact가 없다.
@@ -35,8 +39,17 @@ Job·프로젝트·테스트 명령을 추가할 때 기존 어댑터를 느슨�
 - MR → develop: 백엔드 관련 경로 변경 시 `backend-mr-test`, 의존성 파일 변경 시
   `backend-cache-prepare`, `e106-mr-isolated`, 취소 가능
 - MR → develop: 프론트엔드 관련 경로 변경 시 `frontend-mr-test`, `e106-mr-isolated`, 취소 가능
-- MR → develop: `pipeline/spark` 실행 코드·테스트·lock 변경 시 `pipeline-mr-test`,
-  `e106-mr-isolated`, 취소 가능
+- MR → develop: 모든 변경에서 `docs-mr-check`, `e106-mr-isolated`, 취소 가능. 문서와 전체
+  추적 경로 manifest만 전달해 내부 링크와 링크 대상 삭제·이동을 검사하고 최소 Pipeline
+  Job을 보장한다. 상세 경계는 [문서 MR 검증](DOCS-MR-CHECK.md)을 따른다.
+- MR → develop: `pipeline/spark` 실행 코드·테스트·lock 변경 시 `pipeline-unit-test`는
+  자동 실행하고 세 `pipeline-spark-*-test`는 필수 수동 Job으로 생성한다. 세 수동 Job을
+  모두 실행해 성공하기 전에는 파이프라인이 성공하지 않는다. 모든 Job은
+  `e106-mr-isolated`에서 취소 가능하며, 각 shard는 고유 resource group과 15분 timeout을
+  사용한다. 단일 실행 슬롯에서는 Runner가 비는 시점에 담당자가 세 Spark Job을 시작한다.
+  서로 다른 shard의 실제 병렬 실행은 둘 이상의 Runner 실행 슬롯이 준비된 경우에만 가능하다.
+- MR → develop: `pipeline/consumer` 변경 시 `consumer-mr-test`를 자동 실행한다. Spark Job은
+  생성하지 않으며 고정 Python 3.12/uv 이미지에서 Ruff와 pytest만 실행한다.
 - develop push: 기존 `backend-test`와 빌드·수동 배포, `e106-shell`
 - `runner-check`: 보호된 develop push에서 공통 CI 연결 설정이나 Runner 설치·서비스·가드
   파일이 바뀌면 자동 실행하고, 그 밖의 변경에는 비차단 수동 Job으로 대기
@@ -73,7 +86,10 @@ GitLab API의 정확한 커밋 archive를 사용한다. MR이 `.gitlab-ci.yml`�
 `.python-version` 및 Pipeline CI 실행기 변경에만 반응한다. `pipeline/docs`와
 `pipeline/consumer`만 변경한 MR에는 생성되지 않는다. 표시되는 CI script는 개발자가 로컬에서
 재현할 명령이며, Custom executor는 이를 직접 실행하지 않고 정확히 일치하는지 확인한 뒤 서버에
-설치된 고정 정책을 실행한다.
+설치된 고정 정책을 실행한다. 빠른 `pipeline-unit-test`는 자동 실행하고, 세 Spark shard는
+`when: manual`, `allow_failure: false`인 필수 수동 Job이다. MR 담당자는 공용 Runner가 비는
+시점에 세 Job을 모두 실행해야 하며, 미실행 또는 실패 상태에서는 파이프라인 성공과 병합이
+차단된다. Job 이름과 script가 그대로이므로 이 실행 정책 변경에는 서버 어댑터 재배포가 필요 없다.
 
 어댑터는 인증된 커밋에서 `pipeline/spark`만 다시 archive하고, 실행 파일·링크·`.env*`·가상환경과
 범위 밖 경로를 거부한다. Python 3.10.12, PySpark 4.1.3, pytest 8.4.2, ruff 0.12.12 및
@@ -114,7 +130,16 @@ sudo python3 /usr/local/lib/feelm-ci222/gitlab/ci-pipeline-mr-prepare.py \
 `--network=none --offline` 재검증에 성공해야 최종 root 소유 read-only 캐시와 설정을 설치한다.
 uv가 중복 제거용으로 만든 캐시 내부 링크는 cache root 안의 일반 파일·디렉터리만 가리키는지
 검증한 뒤 실제 항목으로 복제하며, 최종 캐시에는 링크를 남기지 않는다.
-성공 출력의 이미지 ID·캐시 경로·digest를 보존하고 `pipeline-mr-test`를 재시도한다.
+성공 출력의 이미지 ID·캐시 경로·digest를 보존하고 실패한 Pipeline shard Job을 재시도한다.
+
+### Consumer MR 실행 경계 (S15P21E106-486)
+
+`.gitlab/ci/consumer.yml`은 Consumer 코드·테스트·lock·Dockerfile과 검토된 공통 adapter 변경에
+반응한다. 어댑터는 인증된 커밋에서 `pipeline/consumer`만 archive하고, 고정 Python 3.12/uv
+이미지에서 `uv sync --frozen`, Ruff, pytest를 실행한다. 네트워크·host Docker socket·Secret·
+임의 CI 명령은 전달하지 않는다. 세부 정책과 서버 적용 순서는 [Consumer CI policy](CONSUMER-CI.md)를
+따른다. 보호된 `main` push에서는 Dockerfile `test` target이 먼저 성공해야 immutable SHA 태그
+이미지를 게시하며 배포는 수행하지 않는다.
 
 공통 CI·Runner 파일 변경 시 Job이 생성되는 것과 해당 파일이 서버에 적용되는 것은
 별개다. 어댑터는 Job별 archive만 전달하므로, 실행기 변경 자체는 해당 단위 테스트와
@@ -152,8 +177,8 @@ Git 명령은 고정 remote, 비대화형 인증, redirect 차단 환경에서 �
 크기를 제한한다. 초기화·fetch·diff 실패는 단계 이름만 출력하며 Job Token과 원격 응답은
 로그 또는 작업 rootfs에 전달하지 않는다.
 
-실행할 MR Job이 없는 경우의 병합 기준과 검증 결과는
-[291 검증 기록](../verification/S15P21E106-291.md)을 참고한다.
+과거 실행할 MR Job이 없던 상태의 확인 결과는 [291 검증 기록](../verification/S15P21E106-291.md)을
+참고한다. `S15P21E106-296`부터 모든 develop 대상 MR에 `docs-mr-check`가 생성된다.
 
 ### 백엔드 테스트 실행시간 계측 (S15P21E106-412)
 
@@ -197,12 +222,20 @@ task 미귀속 시간도 수집기가 다시 계산해 불일치 값을 거부�
 
 - `ci-gitlab-custom-executor.py`: 비특권 Runner callback. 생성된 셸 파일은 실행하지 않는다.
 - `ci-gitlab-job-adapter.py`: root 정책 검증, GitLab 인증·archive 정규화, 안전 실행기 호출.
+- `check-markdown.py`: 네트워크와 외부 패키지 없이 전체 추적 Markdown의 내부 링크·충돌 흔적 검사.
+- `ci-docs-mr-boundary.py`: Markdown 전체와 추적 경로 manifest만 허용하는 입력 경계.
+- `ci-docs-mr-runner.py`: 설치된 고정 검사기를 비특권·private-network systemd unit에서 실행.
 - backend Job은 설치본과 활성 `prepared_base/scripts`의 런타임 계약 fingerprint가 일치할
   때만 GitLab 조회와 격리 작업을 시작하며, 불일치는 장시간 테스트 전에 거부한다.
 - `ci-pipeline-mr-boundary.py`: `pipeline/spark` 입력과 Python/uv lock 정책 검증.
-- `ci-pipeline-mr-runner.py`: 고정 offline uv 검사와 Spark 테스트의 격리 실행·정리.
+- `ci-pipeline-mr-runner.py`: Job 이름으로 검증된 단일 테스트 group의 고정 offline uv 검사와
+  Spark 테스트 격리 실행·정리.
 - `ci-pipeline-mr-config.py`: 검토된 이미지 digest와 read-only 의존성 캐시 identity 고정.
 - `ci-pipeline-mr-prepare.py`: 고정 CI 이미지, offline uv 캐시와 최초 설정을 준비·재검증.
+- `ci-consumer-mr-boundary.py`: `pipeline/consumer` 입력과 Python/uv lock 및 Dockerfile identity 검증.
+- `ci-consumer-mr-runner.py`: 고정 Consumer 테스트 명령을 제한된 Rootless Docker 컨테이너에서 실행·정리.
+- `ci-consumer-mr-config.py`: 검토된 Consumer CI 이미지 ID를 root 소유 설정에 고정.
+- `ci-consumer-mr-prepare.py`: digest 고정 입력으로 Consumer CI 이미지를 network-none 빌드·전달·검증.
 - `ci-gitlab-server-install.py`: 새 전용 경로만 만드는 token-free 설치기. 기본은 계획 출력이며
   기존 Runner 설정을 수정하거나 Runner를 등록·시작·활성화하지 않는다.
 - `ci-job-safety.py`: 동적 archive의 해시와 파일 정책을 root 소유 lease에 묶는다.

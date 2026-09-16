@@ -1,25 +1,35 @@
 /*
  * 파티 데이터 접근 함수.
- * 대응 명세는 docs/api/party.md이다.
+ * 대응 명세는 docs/api/party.md · docs/api/users.md(API-019)이다.
+ *
+ * 업무 S15P21E106-393에서 파티 생성(API-049) · 목록(API-050) · 초대(API-051) · 받은 초대
+ * 목록(API-052) · 수락(API-053) · 거절(API-054) · 나가기(API-055) · 종료(API-056) ·
+ * 파티원 팝콘(API-057) · 멤버 강퇴(API-069)를 실제 호출로 바꿨다.
+ *
+ * **한 파일에 실제 호출과 목업이 섞여 있다.** 갈리는 기준은 백엔드에 해당 API가 있는지다.
+ * - 위 열 개는 실제로 부른다
+ * - 파티 영화 추천(API-058)은 **백엔드에 아직 없다.** 5.4 · 5.5가 목업으로 남는다
+ * - `getPartyRecommendationReasons` · `getPartyMix`는 계약에 대응이 **없다**(CR-17)
  */
-import { findMockPartyMix, findMockPartyPopcorn } from '../mocks/partyPopcorn';
-import { mockParties } from '../mocks/parties';
-import { mockPartyInvitations } from '../mocks/partyInvitations';
+import { mockPartyMix } from '../mocks/partyPopcorn';
 import {
   mockPartyRecommendationReasons,
   mockPartyRecommendations,
 } from '../mocks/partyRecommendations';
-import { mockMyProfile } from '../mocks/user';
-import {
-  addCreatedParty,
-  getCreatedParties,
-  getInvitationStatus,
-  nextPartyId,
-  setInvitationStatus,
-} from '../mocks/sessionStore';
-import { respond, respondError } from './mockTransport';
-import type { PartyInvitation, PartyPopcorn, PartyRecommendationSet } from '../types/party';
-import type { PartyMixView, PartyView } from '../types/unspecified';
+import { request } from './client';
+import { respond } from './mockTransport';
+import type {
+  Party,
+  PartyInvitation,
+  PartyInvitationList,
+  PartyInvitationState,
+  PartyList,
+  PartyPopcorn,
+  PartyRecommendationSet,
+  PartyState,
+  SentPartyInvitation,
+} from '../types/party';
+import type { PartyMixView } from '../types/unspecified';
 
 /**
  * 파티 정원. **계약이 정한 값이다** — API-049 처리 규칙 `파티는 파티장 포함 최대 4명`,
@@ -27,6 +37,9 @@ import type { PartyMixView, PartyView } from '../types/unspecified';
  *
  * `[!]` 와이어프레임 5.2는 2~6인을 고르게 하고 5.3은 `1/6명 · 최대 6명까지`라고 적었다.
  * 계약을 기준으로 4로 둔다(`screen-spec.md` 2장).
+ *
+ * 서버도 응답의 `maxMembers`로 정원을 내려주므로 파티가 있는 화면은 그 값을 쓴다. 이
+ * 상수는 파티가 아직 없는 5.2 · 5.3이 자리 수를 그릴 때만 쓴다.
  */
 export const PARTY_MAX_MEMBERS = 4;
 
@@ -34,11 +47,33 @@ export const PARTY_MAX_MEMBERS = 4;
 export const PARTY_MIN_MEMBERS = 2;
 
 /**
- * API-050 내 파티 목록 · GET /api/v1/parties
- * 기본은 활성 파티만 반환하며 파티가 없으면 빈 배열이다.
+ * 목록 한 번에 받아 올 최대 개수. 계약의 `size` 상한이다(1~50).
+ *
+ * 활성 파티는 사용자당 최대 10개라(API-049 처리 규칙) 파티 목록은 한 장에 다 들어온다.
+ * 받은 초대에는 상한이 없으므로 첫 장만 읽는다 — 5.6은 초대 하나를 여는 화면이고
+ * 목록을 펼치는 화면(8.1 알림)은 아직 없다.
  */
-export async function getMyParties(): Promise<PartyView[]> {
-  return respond([...getCreatedParties(), ...mockParties], 'parties');
+const PAGE_SIZE = 50;
+
+/**
+ * API-050 내 파티 목록 · GET /api/v1/parties
+ *
+ * 기본은 활성 파티만 반환하며 파티가 없으면 빈 배열이다.
+ *
+ * `[!]` **계약은 `{ items }` 하나인데 구현은 커서 페이지(`items` · `nextCursor` ·
+ * `hasNext`)로 내려준다.** 화면이 쓰는 것은 `items`뿐이라 배열만 돌려준다.
+ */
+export async function getMyParties(): Promise<Party[]> {
+  const page = await request<PartyList>('/parties', { query: { size: PAGE_SIZE } });
+
+  return page.items;
+}
+
+/** 파티 하나. 파티 단건 조회 계약이 없어 목록에서 고른다(5.7 · 5.8이 쓴다) */
+export async function getParty(partyId: number): Promise<Party | null> {
+  const parties = await getMyParties();
+
+  return parties.find((party) => party.partyId === partyId) ?? null;
 }
 
 /**
@@ -47,137 +82,127 @@ export async function getMyParties(): Promise<PartyView[]> {
  * 요청 본문은 `{ name }`뿐이다. 와이어프레임 5.2가 고르게 하는 **인원 수를 받는 필드가
  * 계약에 없다** — 정원은 응답의 `maxMembers`로 서버가 정한다. 화면이 고른 값은 초대할
  * 친구 수를 정하는 데만 쓰고 요청에 넣지 않는다.
+ *
+ * 이름이 비었거나 20자를 넘으면 `400 VALIDATION_FAILED`, 활성 파티가 10개면
+ * `409 ACTIVE_PARTY_LIMIT_REACHED`다.
  */
-export async function createParty(name: string): Promise<PartyView> {
-  const trimmed = name.trim();
+export async function createParty(name: string): Promise<Party> {
+  return request<Party>('/parties', { method: 'POST', body: { name: name.trim() } });
+}
 
-  if (!trimmed || trimmed.length > 20) {
-    return respondError(400, 'VALIDATION_FAILED', '파티 이름은 20자 이하로 입력해 주세요.');
-  }
-
-  const party: PartyView = {
-    partyId: nextPartyId(),
-    name: trimmed,
-    status: 'ACTIVE',
-    members: [{ userId: mockMyProfile.userId, nickname: mockMyProfile.nickname, role: 'OWNER' }],
-    maxMembers: PARTY_MAX_MEMBERS,
-    createdAt: new Date().toISOString(),
-    // 계약에 없음 (types/unspecified.ts). 방금 만든 파티에는 새 팝콘이 없다
-    newPopcornCount: 0,
-  };
-
-  addCreatedParty(party);
-
-  return respond(party, 'parties');
+/**
+ * API-051 파티 초대 · POST /api/v1/parties/{partyId}/invitations
+ *
+ * 닉네임 검색(API-019)으로 찾은 `userId`를 보낸다. 현재 파티원 누구나 부를 수 있다.
+ *
+ * 차단 관계인 대상은 `404 RESOURCE_NOT_FOUND`로 온다 — 계약이 **없는 사람처럼**
+ * 다루기로 했기 때문이다(FR-39). 화면도 차단을 드러내지 않는다.
+ */
+export async function inviteToParty(partyId: number, userId: number): Promise<SentPartyInvitation> {
+  return request<SentPartyInvitation>(`/parties/${partyId}/invitations`, {
+    method: 'POST',
+    body: { userId },
+  });
 }
 
 /**
  * API-052 받은 초대 목록 · GET /api/v1/parties/invitations
  *
- * 이번 세션에 답한 초대는 `PENDING`이 아니므로 목록에서 빠진다.
+ * 기본은 대기 중(`PENDING`)인 초대만이다. 답한 초대는 목록에서 빠진다.
  */
 export async function getMyInvitations(): Promise<PartyInvitation[]> {
-  const pending = mockPartyInvitations.filter(
-    (invitation) => getInvitationStatus(invitation.invitationId) === null,
-  );
+  const page = await request<PartyInvitationList>('/parties/invitations', {
+    query: { size: PAGE_SIZE },
+  });
 
-  return respond(pending, 'parties');
+  return page.items;
 }
 
-/** 초대 하나. 답한 뒤에도 5.6 · 5.7이 그 초대를 계속 보여줘야 해서 목록과 따로 둔다 */
-export async function getInvitation(invitationId: number): Promise<PartyInvitation> {
-  const invitation = mockPartyInvitations.find((item) => item.invitationId === invitationId);
+/**
+ * 초대 하나. **단건 조회 계약이 없다** — API-052의 목록에서 고른다.
+ *
+ * 그래서 이미 답한 초대는 찾을 수 없고 `null`이다. 5.6은 답하면 곧바로 다른 화면으로
+ * 가므로 답한 초대를 다시 읽을 일이 없다.
+ */
+export async function getInvitation(invitationId: number): Promise<PartyInvitation | null> {
+  const invitations = await getMyInvitations();
 
-  if (!invitation) {
-    return respondError(404, 'RESOURCE_NOT_FOUND', '초대를 찾을 수 없습니다.');
-  }
-
-  const answered = getInvitationStatus(invitationId);
-
-  return respond(answered ? { ...invitation, status: answered } : invitation, 'parties');
+  return invitations.find((invitation) => invitation.invitationId === invitationId) ?? null;
 }
 
 /**
  * API-053 초대 수락 · POST /api/v1/parties/invitations/{invitationId}/accept
  *
- * **수락하면 그 파티의 멤버가 되므로 내 파티 목록(API-050)에도 들어간다.** 계약에서는
- * 서버가 두 곳을 함께 바꾸지만 목업은 저장소가 나뉘어 있어 여기서 같이 넣어 준다.
- * 넣지 않으면 5.6에서 수락하고 5.1로 갔을 때 방금 참여한 파티가 없다.
- *
- * 멤버는 파티장과 나로 만든다. API-052가 주는 것은 `memberCount`(수 하나)뿐이라 다른
- * 참여자의 이름을 알 수 없다. 수가 더 크면 이름 없는 자리로 채운다.
+ * 응답은 참여하게 된 파티다(API-049와 같은 본문). 이미 답한 초대는
+ * `409 INVITATION_NOT_PENDING`, 정원이 찼으면 `409 PARTY_FULL`이다.
  */
-export async function acceptInvitation(invitationId: number): Promise<PartyInvitation> {
-  const answered = getInvitationStatus(invitationId);
-
-  if (answered) {
-    return respondError(409, 'INVITATION_ALREADY_ANSWERED', '이미 응답한 초대입니다.');
-  }
-
-  const invitation = mockPartyInvitations.find((item) => item.invitationId === invitationId);
-
-  if (!invitation) {
-    return respondError(404, 'RESOURCE_NOT_FOUND', '초대를 찾을 수 없습니다.');
-  }
-
-  setInvitationStatus(invitationId, 'ACCEPTED');
-
-  const { party } = invitation;
-  const others = Array.from({ length: Math.max(0, party.memberCount - 1) }, (_, index) => ({
-    userId: -(index + 1),
-    nickname: `멤버${index + 2}`,
-    role: 'MEMBER' as const,
-  }));
-
-  addCreatedParty({
-    partyId: party.partyId,
-    name: party.name,
-    status: 'ACTIVE',
-    members: [
-      { userId: party.owner.userId, nickname: party.owner.nickname, role: 'OWNER' },
-      ...others,
-      { userId: mockMyProfile.userId, nickname: mockMyProfile.nickname, role: 'MEMBER' },
-    ],
-    maxMembers: PARTY_MAX_MEMBERS,
-    createdAt: invitation.createdAt,
-    newPopcornCount: 0,
-  });
-
-  return getInvitation(invitationId);
+export async function acceptInvitation(invitationId: number): Promise<Party> {
+  return request<Party>(`/parties/invitations/${invitationId}/accept`, { method: 'POST' });
 }
 
-/** API-054 초대 거절 · POST /api/v1/parties/invitations/{invitationId}/decline */
-export async function declineInvitation(invitationId: number): Promise<PartyInvitation> {
-  const answered = getInvitationStatus(invitationId);
+/**
+ * API-054 초대 거절 · POST /api/v1/parties/invitations/{invitationId}/decline
+ *
+ * 응답은 초대 전체가 아니라 `{ invitationId, status }`뿐이다.
+ */
+export async function declineInvitation(invitationId: number): Promise<PartyInvitationState> {
+  return request<PartyInvitationState>(`/parties/invitations/${invitationId}/decline`, {
+    method: 'POST',
+  });
+}
 
-  if (answered) {
-    return respondError(409, 'INVITATION_ALREADY_ANSWERED', '이미 응답한 초대입니다.');
-  }
+/**
+ * API-055 파티 나가기 · POST /api/v1/parties/{partyId}/leave
+ *
+ * 파티장이 나가도 남은 사람이 있으면 가장 먼저 들어온 멤버가 파티장을 물려받는다.
+ * 마지막 한 명이 나가야 파티가 `CLOSED`가 된다. 어느 쪽인지는 응답의 `status`로 안다.
+ */
+export async function leaveParty(partyId: number): Promise<PartyState> {
+  return request<PartyState>(`/parties/${partyId}/leave`, { method: 'POST' });
+}
 
-  setInvitationStatus(invitationId, 'DECLINED');
+/**
+ * API-056 파티 종료 · DELETE /api/v1/parties/{partyId}
+ *
+ * 파티장만 부를 수 있다(`403 FORBIDDEN`). 대기 중 초대는 모두 무효가 되고 파티는
+ * 삭제되지 않고 `CLOSED`로 남는다.
+ */
+export async function closeParty(partyId: number): Promise<PartyState> {
+  return request<PartyState>(`/parties/${partyId}`, { method: 'DELETE' });
+}
 
-  return getInvitation(invitationId);
+/**
+ * API-069 파티 멤버 강퇴 · DELETE /api/v1/parties/{partyId}/members/{userId}
+ *
+ * 파티장만 부를 수 있고 자기 자신은 대상이 될 수 없다(`400 VALIDATION_FAILED`).
+ * 강퇴는 차단과 무관하며, 내보낸 사람을 다시 초대할 수 있다.
+ */
+export async function kickPartyMember(partyId: number, userId: number): Promise<PartyState> {
+  return request<PartyState>(`/parties/${partyId}/members/${userId}`, { method: 'DELETE' });
+}
+
+/**
+ * API-057 파티원 팝콘 조회 · GET /api/v1/parties/{partyId}/popcorn
+ *
+ * 응답에 파티 이름이 없다. 5.8의 부제는 `getMyParties`에서 이름을 가져온다.
+ * 파티가 없거나 내가 멤버가 아니면 `404 RESOURCE_NOT_FOUND`다.
+ */
+export async function getPartyPopcorn(partyId: number): Promise<PartyPopcorn> {
+  return request<PartyPopcorn>(`/parties/${partyId}/popcorn`);
 }
 
 /**
  * API-058 파티 영화 추천 · GET /api/v1/parties/{partyId}/recommendations
  *
- * 계약은 동기 응답이다. 5.4 `공통 필름 현상 중`은 이 응답을 기다리는 동안 보여 주는
- * 화면이지 별도 계약이 아니다.
+ * **백엔드에 아직 없다.** 5.4 `공통 필름 현상 중`과 5.5가 목업으로 남는 이유다.
+ * 계약은 동기 응답이라 5.4는 이 응답을 기다리는 동안 보여 주는 화면이지 별도 계약이
+ * 아니다.
+ *
+ * 기준 목업은 9001 하나뿐이다. 실제 서버가 만든 파티는 다른 번호를 받으므로 없는
+ * 번호는 기준 목업의 추천을 파티 번호만 갈아 끼워 내려준다. 그러지 않으면 새로 만든
+ * 파티가 언제나 404가 되어 5.3 → 5.4 → 5.5가 끊긴다.
  */
 export async function getPartyRecommendations(partyId: number): Promise<PartyRecommendationSet> {
-  const parties = [...getCreatedParties(), ...mockParties];
-
-  if (!parties.some((party) => party.partyId === partyId)) {
-    return respondError(404, 'RESOURCE_NOT_FOUND', '파티를 찾을 수 없습니다.');
-  }
-
-  /*
-   * 기준 목업은 9001 하나뿐이다. 이 화면에서 만든 파티는 9100부터 번호를 받으므로
-   * 그대로 두면 **방금 만든 파티는 언제나 404**가 되어 5.3 → 5.4 → 5.5가 끊긴다.
-   * 실제 서버는 어떤 파티에도 추천을 준다. 없는 번호는 기준 목업의 추천을 파티 번호만
-   * 갈아 끼워 내려준다.
-   */
   const base = mockPartyRecommendations[partyId] ?? mockPartyRecommendations[9001];
 
   return respond({ ...base, partyId }, 'parties');
@@ -197,32 +222,21 @@ export async function getPartyRecommendationReasons(partyId: number): Promise<st
 }
 
 /**
- * API-057 파티원 팝콘 조회 · GET /api/v1/parties/{partyId}/popcorn
- *
- * 응답에 파티 이름이 없다. 5.8의 부제는 `getMyParties`에서 이름을 가져온다.
- */
-export async function getPartyPopcorn(partyId: number): Promise<PartyPopcorn> {
-  const popcorn = findMockPartyPopcorn(partyId);
-
-  if (!popcorn) {
-    return respondError(404, 'RESOURCE_NOT_FOUND', '파티를 찾을 수 없습니다.');
-  }
-
-  return respond(popcorn, 'parties');
-}
-
-/**
  * 5.9 파티 팝콘 섞기 결과. **계약에 대응 API가 없다(CR-17).**
  *
  * 참여자별 취향 비율과 공통 취향 일치도를 내려주는 필드가 없어 화면이 목업을 직접
  * import하지 않도록 함수만 따로 둔다. 계약이 정해지면 API-057로 합친다.
+ *
+ * `memberIds`를 받는 것은 **목업의 사용자 번호가 실제 파티원과 다르기 때문이다.**
+ * 값 자체가 와이어프레임에서 옮긴 자리표시자라 누구의 값인지는 의미가 없으므로, 실제
+ * 파티원에게 앞에서부터 차례로 붙인다. 그러지 않으면 5.9의 비율과 태그가 모두 빈다.
  */
-export async function getPartyMix(partyId: number): Promise<PartyMixView> {
-  const mix = findMockPartyMix(partyId);
+export async function getPartyMix(partyId: number, memberIds: number[]): Promise<PartyMixView> {
+  const base = mockPartyMix[partyId] ?? mockPartyMix[9001];
+  const members = memberIds.map((userId, index) => ({
+    ...base.members[index % base.members.length],
+    userId,
+  }));
 
-  if (!mix) {
-    return respondError(404, 'RESOURCE_NOT_FOUND', '파티를 찾을 수 없습니다.');
-  }
-
-  return respond(mix, 'parties');
+  return respond({ ...base, partyId, members }, 'parties');
 }

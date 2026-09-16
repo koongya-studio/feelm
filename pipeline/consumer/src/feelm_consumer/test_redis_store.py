@@ -1,3 +1,4 @@
+import json
 import shutil
 import socket
 import subprocess
@@ -86,6 +87,86 @@ def test_real_redis_corrupt_or_partial_version_is_atomically_recovered(real_redi
     )
     assert next_version == 1
     assert current_version(real_redis, 42, fence) == 1
+
+
+def test_real_redis_persists_reason_arrays_with_matching_generation(real_redis: redis.Redis) -> None:
+    fence = claim_partition_fence(real_redis, "group", "topic", 0)
+    generation_id = "generation-1"
+    vector = {"candidateVersion": 6, "generationId": generation_id, "vector": [0.1]}
+    candidates = {
+        "candidateVersion": 6,
+        "generationId": generation_id,
+        "taste": [
+            {
+                "movieId": 7,
+                "score": 0.5,
+                "reasons": [
+                    {
+                        "code": "SHARED_GENRE",
+                        "sourceMovieIds": [3],
+                        "matchedGenreCodes": ["DRAMA"],
+                    }
+                ],
+            }
+        ],
+        "discovery": [
+            {
+                "movieId": 8,
+                "score": 0.4,
+                "reasons": [
+                    {
+                        "code": "DISCOVERY_PERSONAL_SCORE",
+                        "sourceMovieIds": [3],
+                        "matchedGenreCodes": ["DRAMA"],
+                    }
+                ],
+            }
+        ],
+    }
+
+    assert publish(real_redis, 46, 0, vector, candidates, fence) == 1
+    assert current_version(real_redis, 46, fence) == 1
+    saved = json.loads(real_redis.get(user_keys(46)[2]))
+    assert saved["taste"] == [
+        {
+            "movieId": 7,
+            "score": 0.5,
+            "reasons": [
+                {
+                    "code": "SHARED_GENRE",
+                    "sourceMovieIds": [3],
+                    "matchedGenreCodes": ["DRAMA"],
+                }
+            ],
+        }
+    ]
+    assert saved["discovery"] == [
+        {
+            "movieId": 8,
+            "score": 0.4,
+            "reasons": [
+                {
+                    "code": "DISCOVERY_PERSONAL_SCORE",
+                    "sourceMovieIds": [3],
+                    "matchedGenreCodes": ["DRAMA"],
+                }
+            ],
+        }
+    ]
+
+
+def test_real_redis_rejects_mixed_result_payload_generation(real_redis: redis.Redis) -> None:
+    fence = claim_partition_fence(real_redis, "group", "topic", 0)
+    with pytest.raises(redis.ResponseError, match="inconsistent result generation"):
+        publish(
+            real_redis,
+            47,
+            0,
+            {"candidateVersion": 3, "generationId": "generation-a"},
+            {"candidateVersion": 3, "generationId": "generation-b"},
+            fence,
+        )
+    assert real_redis.mget(user_keys(47)) == [None, None, None]
 
 
 def test_new_partition_owner_fences_old_snapshot_before_it_can_publish(

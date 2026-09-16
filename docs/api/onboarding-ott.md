@@ -56,7 +56,7 @@
       "posterUrl": "https://image.tmdb.org/t/p/w500/...",
       "releaseYear": 1999,
       "genres": ["드라마", "스릴러"],
-      "flavorCode": "FLAVOR_X"
+      "flavorCode": "FLAVOR_A"
     }
   ]
 }
@@ -81,7 +81,7 @@
 - 인기도는 서비스 평가 수(`movies.rating_count`) 내림차순, 평균 별점 내림차순, 식별자 오름차순으로 판단한다.
   같은 요청은 항상 같은 순서를 반환한다
 - 대표 맛이 배정되지 않은 영화(`movies.representative_flavor_id`가 비어 있음)는 카드가 되지 않는다.
-  대표 맛 배정은 [ADR-0015](../adr/0015-kmeans-ctfidf-taste-clusters.md)의 파이프라인이 수행한다
+  대표 맛 배정은 [ADR-0020](../adr/0020-fixed-439-popcorn-flavor-geometry.md)의 파이프라인이 수행한다
 - 온보딩을 마친 사용자는 카드를 받지 못한다. 제출만 막으면 카드를 고른 뒤에야 거절당한다
 
 ### 상태값

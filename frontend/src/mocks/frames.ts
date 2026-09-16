@@ -2,9 +2,12 @@
  * 필름(프레임) 목업.
  *
  * **프레임 목록(API-042)과 프레임 상세(API-043)는 실제 API를 부른다**
- * (S15P21E106-392). 여기 남은 값은 평가 API가 없어 목업으로 남은 흐름이 쓴다.
- * - `mockMyRatings`: 7.6 평가 목록(API-039 미구현) · 2.4 영화 상세의 내 평가
- * - `mockFrameList`: 7.6 목록의 기준 평가와 7.2-A 공개 프로필 프레임, 2.6 · 2.7 수치
+ * (S15P21E106-392). 여기 남은 값은 아직 목업인 흐름이 쓴다.
+ * - `mockMyRatings`: 7.6 평가 목록(API-039 미구현) · 목업 영화 상세의 내 평가
+ * - `mockFrameList`: 7.6 목록의 기준 평가와 7.2-A 공개 프로필 프레임
+ *
+ * 2.6 · 2.7의 수치는 더 이상 여기서 세지 않는다. 평가 생성(API-036)이 실제 호출이 되면서
+ * API-014 · API-041의 실제 수치를 쓴다(업무 -491).
  *
  * 프레임은 평가와 1:1이다(API-042 처리 규칙). 영화 기준값은 mocks/movies.ts에서
  * 가져오고 여기에는 프레임에만 있는 값(별점 · 맛 · 생성 시각)을 둔다.
@@ -63,9 +66,9 @@ function summary(
 export const mockFrameList: FrameList = {
   totalCount: 100,
   items: [
-    summary(501, 401, 'FLAVOR_CRIME', '2026-09-06T12:30:00Z'),
-    summary(502, 402, 'FLAVOR_CAPER', '2026-08-24T12:00:00Z'),
-    summary(503, 403, 'FLAVOR_NOIR', '2026-08-18T12:00:00Z'),
+    summary(501, 401, 'FLAVOR_D', '2026-09-06T12:30:00Z'),
+    summary(502, 402, 'FLAVOR_A', '2026-08-24T12:00:00Z'),
+    summary(503, 403, 'FLAVOR_C', '2026-08-18T12:00:00Z'),
   ],
   nextCursor: 'mock-cursor-2',
   hasNext: true,

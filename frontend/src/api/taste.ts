@@ -10,16 +10,13 @@
  * - 취향 분석(API-040)은 백엔드에 있지만 부르는 화면이 홈(2.1) · 7.2로 이번 범위 밖이라
  *   목업으로 남긴다. 연동은 후속 업무다
  * - `getTasteFlow`는 계약에 대응 API가 **없다**(CR-16)
- * - `getMockPopcornFlavors` · `getMyFrameCount` · `getMyPopcornCount`는 **평가 API가 아직
- *   없어 목업으로 남은 흐름**이 쓴다. 아래 목업 구역의 주석을 볼 것
+ * - `getMockPopcornFlavors`는 **집계 자체가 목업으로 남은 화면**이 쓴다. 아래 목업 구역의
+ *   주석을 볼 것
  *
- * 평가(API-035~039)와 감상 기록(API-031~034)이 아직 없으므로 2.5 → 2.6 흐름은 목업이다.
- * 그래서 이 파일이 실제로 돌려주는 프레임과 팝콘은 **평가가 생기기 전까지 항상 비어 있다.**
+ * 평가 생성(API-036)이 실제 호출이 되어(업무 -491) 2.5 → 2.6 흐름이 서버에 프레임과 팝콘을
+ * 만든다. 그래서 이 파일이 돌려주는 프레임 목록과 팝콘 버킷도 평가하는 만큼 채워진다.
  */
-import { mockPopcornBucket } from '../mocks/popcornBucket';
 import { mockPopcornFlavors } from '../mocks/popcornFlavors';
-import { mockFrameList } from '../mocks/frames';
-import { getRatings } from '../mocks/sessionStore';
 import { mockTasteAnalysis, mockTasteFlow } from '../mocks/taste';
 import { request } from './client';
 import { respond } from './mockTransport';
@@ -37,10 +34,8 @@ import type { TasteFlowView } from '../types/unspecified';
  *
  * 공개 API다. 화면은 `code`로 매칭하고 표시명 · 색상을 하드코딩하지 않는다.
  *
- * `[!]` **배포 DB에 8종 기준정보가 아직 없어 `items`가 빈 배열로 온다.** 8개 맛을 항상
- * 반환한다는 API-041 · API-044의 전제가 지금은 성립하지 않는다. 맛 코드는 추천
- * 파이프라인이 정하며(ADR-0015 · S15P21E106-439) 적재 시점이 아직 없다. 화면을 빈
- * 응답에 맞춰 고치지 않고 적재 후 재확인을 후속 업무로 둔다.
+ * S15P21E106-466 migration이 API-044의 A~H 기준정보를 제공한다. 배포 전이나 migration
+ * 실패 시 빈 배열이 올 수 있으므로 호출부는 빈 응답도 안전하게 처리한다.
  */
 export async function getPopcornFlavors(): Promise<PopcornFlavor[]> {
   const { items } = await request<{ items: PopcornFlavor[] }>('/popcorn-flavors', {
@@ -64,7 +59,7 @@ export async function getPopcornBucket(): Promise<PopcornBucket> {
  * API-042 내 필름(프레임 목록) 조회 · GET /api/v1/users/me/frames
  *
  * 계약의 `flavorCode` · `cursor` · `size` 질의 인자는 쓰는 화면이 생기면 추가한다.
- * 3.1 · 7.1 · 7.6은 첫 페이지만 쓴다(기본 20개).
+ * 3.1은 첫 페이지만 쓴다(기본 20개).
  */
 export async function getMyFrames(): Promise<FrameList> {
   return request<FrameList>('/users/me/frames');
@@ -107,26 +102,12 @@ export async function getTasteFlow(): Promise<TasteFlowView> {
 /**
  * 목업 흐름 전용 팝콘 맛 기준정보.
  *
- * 2.6 평가 결과 · 5.8 · 5.9 파티 팝콘 · 7.2-C 취향 비교는 **집계 자체가 목업**이다.
+ * 5.8 · 5.9 파티 팝콘 · 7.2-C 취향 비교는 **집계 자체가 목업**이다.
  * 목업 집계의 맛 코드는 목업 기준정보의 코드라, 실제 API-044의 코드와 맞지 않는다.
  * 그래서 목업으로 남은 화면은 목업 기준정보를 그대로 쓴다(팀 결정 2026-09-16).
- * 각 화면이 실제 API로 바뀔 때 `getPopcornFlavors`로 옮긴다.
+ * 각 화면이 실제 API로 바뀔 때 `getPopcornFlavors`로 옮긴다 — 2.7 평가 결과가 업무 -491에서
+ * 그렇게 옮겨 갔다.
  */
 export async function getMockPopcornFlavors(): Promise<PopcornFlavor[]> {
   return respond(mockPopcornFlavors);
-}
-
-/**
- * 2.6 · 2.7이 쓰는 현재 프레임 수. **목업이다.**
- *
- * 평가 API가 없어 2.5 → 2.6 흐름 전체가 목업이므로 수치도 목업 기준값에서 센다.
- * 실제 API를 부르는 3.1 · 7.1과는 값이 다르다.
- */
-export async function getMyFrameCount(): Promise<number> {
-  return mockFrameList.totalCount + getRatings().length;
-}
-
-/** 2.6 · 2.7이 쓰는 현재 팝콘 알 수. `getMyFrameCount`와 같은 이유로 목업이다 */
-export async function getMyPopcornCount(): Promise<number> {
-  return mockPopcornBucket.totalCount + getRatings().length;
 }

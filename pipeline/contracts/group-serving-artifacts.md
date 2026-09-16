@@ -1,12 +1,12 @@
-# 추천 내부 8×128 그룹 서빙 산출물 계약
+# 공개 맛·추천 내부 8×128 그룹 서빙 산출물 계약
 
-`group-serving-artifacts-v1`은 영화 발견 추천에서만 사용하는 고정 2단계 분류다. 먼저 장르 축으로
+`group-serving-artifacts-v1`은 공개 팝콘 맛과 영화 발견 추천이 함께 사용하는 고정 2단계 분류다. 먼저 장르 축으로
 8개 `taste_id`를 정하고, 각 taste 안에서 장르·키워드·줄거리 축으로 128개 `child_id`를 정한다.
 `group_id = taste_id * 128 + child_id`여서 전체 ID 범위는 0~1023이다.
 
-이 계약의 8개 taste는 **추천 내부 후보 다양화 축**이다. ADR-0015의 사용자 공개 팝콘 맛,
-`movies.representative_flavor_id`, API의 `flavorCode` 의미를 대체하거나 변경하지 않는다. 따라서 이
-산출물을 위해 API·DB migration을 추가하지 않으며, 내부 group ID를 공개 팝콘 ID로 저장하지 않는다.
+상위 `taste_id` 0~7은 ADR-0020의 공개 팝콘 맛이며 각각 `FLAVOR_A`~`FLAVOR_H` 및
+`popcorn_flavors.cluster_id` 0~7과 순서대로 대응한다. `child_id`와 `group_id`는 추천 내부 값으로
+공개 API나 `movies.representative_flavor_id`에 저장하지 않는다.
 
 ## 1. 원본과 안전 변환
 
@@ -89,7 +89,10 @@ center 재정렬, vocabulary 확장이나 estimator `predict`를 수행하지 �
 `metadata.json` 필수 항목은 `contract_version`, `group_version`, `catalog_version`,
 `geometry_version=g913-gkt128-mean-v1`, `mapping_revision`, `group_recipe_revision`, `movie_count`,
 `mapped_movie_count`, `genre_missing_count`, `genre_missing_policy=EXCLUDE_FROM_DISCOVERY`,
-`public_taste_semantics=RECOMMENDATION_INTERNAL_NOT_PUBLIC_POPCORN`이다.
+`public_taste_semantics`다. S15P21E106-466 이후 새 export는 `PUBLIC_POPCORN_FLAVOR_V1`을 사용한다.
+이미 해시가 고정된 S15P21E106-439 기준 bundle의
+`RECOMMENDATION_INTERNAL_NOT_PUBLIC_POPCORN` 값은 파일을 다시 쓰지 않기 위한 legacy lineage로만
+허용하며, 현재 서비스 의미는 이 계약과 ADR-0020의 공개 맛 매핑이 우선한다.
 
 Consumer는 manifest와 모든 파일 해시, 배열 inventory·shape·dtype·유한값, assignment 물리 타입·ID
 유일성·lineage를 검사한다. 함께 읽는 ALS/content bundle은 같은 불변 catalog 세대이므로
@@ -110,7 +113,28 @@ Consumer는 manifest와 모든 파일 해시, 배열 inventory·shape·dtype·�
 발견 추천에 포함할 때만 같은 frozen transform과 center로 새 불변 catalog bundle을 생성한다.
 `compare_live_mapping`은 이 판정을 수행하며 `activation_allowed=false`인 ID 재결합을 배포 게이트로 사용한다.
 
-## 6. 검증 기준
+## 6. 서비스 DB 반영
+
+`assignments.parquet`을 서비스 DB에 반영할 때는 다음 순서를 지킨다.
+
+1. manifest·파일 SHA·schema와 기준 수치(전체 237,817, mapped 207,240, unmapped 30,577)를 검증한다.
+2. `popcorn_flavors`가 정확히 `FLAVOR_A..H ↔ cluster_id 0..7`인지 확인한다.
+3. assignment를 임시 staging table에 넣고 `(service_movie_id, tmdb_id)`를 함께 비교한다. 어느 한 ID가
+   다른 영화와 재결합됐으면 전체 반영을 거부한다.
+4. 정확히 일치하는 행 중 `group_mapped=true`는 `taste_id`와 같은 `cluster_id`의 맛 FK로 갱신하고,
+   `group_mapped=false`는 대표 맛을 `NULL`로 만든다.
+5. DB에만 있는 영화와 bundle에만 있는 영화는 변경하지 않고 각각 집계한다.
+6. staging 적재 뒤 `movies`와 `popcorn_flavors`의 DML을 직렬화하는 잠금을 얻고 검증·반영한다. 잠금 전에
+   진행 중이던 writer는 완료 후 같은 DB 상태에 포함되며, 잠금 뒤 시작한 writer는 반영 transaction 이후에
+   실행된다.
+7. 기본 실행은 rollback-only dry-run이다. 명시적으로 apply한 경우에도 한 transaction으로 처리하고,
+   검증·건수 불일치·SQL 오류가 있으면 전체 rollback한다.
+
+`pipeline/consumer/tools/apply_popcorn_flavors.py`가 이 절차를 수행한다. DSN은 파일이나 명령행에 쓰지
+않고 기본 `CONSUMER_POSTGRES_DSN` 또는 명시적으로 지정한 환경변수에서 읽는다. 같은 bundle 재실행은
+같은 최종 상태를 만들어야 한다.
+
+## 7. 검증 기준
 
 - 원본 237,817행의 `taste_id`, `child_id`, `group_id` 불일치 0건
 - 장르 미지원 30,577행은 `group_mapped=false`
@@ -120,5 +144,7 @@ Consumer는 manifest와 모든 파일 해시, 배열 inventory·shape·dtype·�
 - 실제 HDFS의 고유 검증 경로에 전체 upload, no-overwrite rename, SHA 재대조, Consumer 재로딩
 
 실제 HDFS 검증 경로·실행 시각·클러스터 상태는 비밀이나 내부 authority를 저장소에 넣지 않는 별도 검증
-기록으로 남긴다. 검증 경로 성공은 운영 활성화를 뜻하지 않으며, 운영 URI 연결은 S15P21E106-415 배포에서
-ALS/content와 같은 bundle `mapping_revision`, live mapping의 ID 재결합 없음 및 중복 없음을 확인한 뒤 수행한다.
+기록으로 남긴다. 검증 경로 성공은 운영 활성화를 뜻하지 않는다. Consumer의 DISCOVERY 후보 생성·로컬
+정책 검증은 S15P21E106-415가 담당하고, 실제 HDFS 게시와 운영 URI 연결·재시작·rollback 검증은
+S15P21E106-482에서 ALS/content와 같은 bundle `mapping_revision`, live mapping의 ID 재결합 없음 및 중복
+없음을 확인한 뒤 수행한다.

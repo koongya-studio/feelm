@@ -292,7 +292,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
   "comment": "밤에 보면 안 됨",
   "visibility": "PUBLIC",
   "frame": { "frameId": 77, "createdAt": "2026-08-30T05:21:00Z" },
-  "popcorn": { "flavorCode": "FLAVOR_X", "isNewFlavor": true, "flavorCount": 1 },
+  "popcorn": { "flavorCode": "FLAVOR_A", "isNewFlavor": true, "flavorCount": 1 },
   "watchStatus": "RATED",
   "createdAt": "2026-08-30T05:21:00Z"
 }
@@ -322,7 +322,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### 미정 사항
 
-- [ ] `isNewFlavor` 판정 방식·기준값과 발견 추천과의 관계(FR-06·FR-12)
+- `isNewFlavor`는 해당 평가 생성 후 사용자의 같은 대표 맛 평가가 정확히 1건이면 `true`다. 감상량 임계값이나 발견 추천(FR-12) 판정과는 무관하다.
 - [ ] 발견 표시(FR-32, 확장) 응답 필드 예약 여부
 
 ## API-037 평가 수정

@@ -306,6 +306,11 @@ Vite base가 `/app/`이라 모든 화면이 `/app` 아래에 있고 화면별 �
 - **이미 적용된 마이그레이션 파일은 수정하지 않습니다.** 체크섬 검증에 걸려 다른 사람의
   애플리케이션이 기동에 실패합니다. 잘못된 내용은 새 마이그레이션으로 고칩니다.
 - 병합 순서와 버전 순서가 어긋나 로컬 기동이 실패하면 DB 볼륨을 지우고 다시 만듭니다.
+- `V202609161115__seed_popcorn_flavors.sql`은 439 `taste_id` 0~7을 `FLAVOR_A`~`FLAVOR_H`로
+  초기화한다. 다른 code/cluster 조합이나 9번째 맛이 있으면 조용히 덮어쓰지 않고 migration 전체를
+  실패시킨다. 영화별 대표 맛은 Flyway에 넣지 않고
+  [`apply_popcorn_flavors.py`](../pipeline/consumer/tools/apply_popcorn_flavors.py)의 dry-run 검증 후
+  별도 transaction으로 반영한다.
 
 Spring Boot 4의 Flyway 자동 설정은 `spring-boot-starter-flyway`가 제공하고 PostgreSQL
 지원은 `flyway-database-postgresql` 모듈을 사용합니다. 마이그레이션 자체는

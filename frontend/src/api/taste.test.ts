@@ -5,7 +5,7 @@
  * - 팝콘 맛 기준정보(API-044)는 **공개 API**라 토큰을 싣지 않고, `items` 래퍼를 벗긴다
  * - 프레임 상세(API-043)의 `404`는 계약 코드 그대로 올라가야 화면이 실패 상태로 간다
  *
- * 기준정보가 아직 적재되지 않아 `items`가 비어 오는 상태도 함께 둔다. 빈 배열은 오류가
+ * migration 전·실패 상태에서 `items`가 비어 오는 경우도 방어한다. 빈 배열은 오류가
  * 아니므로 던지지 않는다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -91,9 +91,9 @@ describe('API-041 팝콘 버킷', () => {
       totalCount: 3,
       flavors: [
         {
-          flavorCode: 'FLAVOR_X',
-          displayName: '짭짤한 스릴',
-          color: '#E63946',
+          flavorCode: 'FLAVOR_A',
+          displayName: '오리지널 솔트',
+          color: '#F0D8B4',
           popcornCount: 3,
           averageScore: 4.4,
           discoveredAt: null,
@@ -110,10 +110,10 @@ describe('API-041 팝콘 버킷', () => {
 describe('API-044 팝콘 맛 기준정보', () => {
   it('`items` 래퍼를 벗기고 토큰을 싣지 않는다', async () => {
     const flavor = {
-      code: 'FLAVOR_X',
-      displayName: '짭짤한 스릴',
-      color: '#E63946',
-      representativeKeywords: ['긴장'],
+      code: 'FLAVOR_A',
+      displayName: '오리지널 솔트',
+      color: '#F0D8B4',
+      representativeKeywords: ['다큐멘터리'],
       sortOrder: 1,
     };
     fetchMock.mockResolvedValue(json(200, { items: [flavor] }));
@@ -124,7 +124,7 @@ describe('API-044 팝콘 맛 기준정보', () => {
     expect(headers().Authorization).toBeUndefined();
   });
 
-  // 기준정보가 아직 적재되지 않은 지금의 배포 상태다. 빈 목록은 오류가 아니다
+  // migration 전·실패 상태의 빈 목록도 전송 오류로 바꾸지 않는다
   it('기준정보가 없으면 빈 목록을 돌려준다', async () => {
     fetchMock.mockResolvedValue(json(200, { items: [] }));
 

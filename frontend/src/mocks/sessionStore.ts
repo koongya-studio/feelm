@@ -15,37 +15,21 @@
  * 여기 담는 것은 **사용자가 이번 세션에 만든 변화**뿐이다. 기준 목업(mocks/의 나머지
  * 파일)은 그대로 두고, `src/api/`가 둘을 합쳐 응답을 만든다.
  *
- * 예외는 셋이다. 최근 검색어 · 7.7과 8.1의 감상 기록 · 8.1 알림은 와이어프레임이 그린
- * 상태로 시작한다. 모두 사용자가 지우거나 바꾸는 값이라 저장소 안에 있어야 변화가 남는다.
+ * 예외는 둘이다. 최근 검색어 · 8.1 알림은 와이어프레임이 그린 상태로 시작한다. 둘 다
+ * 사용자가 지우거나 바꾸는 값이라 저장소 안에 있어야 변화가 남는다.
  *
  * 실제 API가 된 값은 여기서 빠진다. 차단 목록(API-020 ~ API-022)이 그렇게 나갔고, 알림
- * 설정은 계약에 자리가 없는 두 키만 남았다(업무 -394).
+ * 설정은 계약에 자리가 없는 두 키만 남았다(업무 -394). 감상 기록(API-033 ~ API-035)도
+ * 서버로 옮겨 가 이 파일에서 사라졌다(업무 -477). 새 평가(API-036)도 서버가 저장하므로
+ * 여기 쌓지 않는다(업무 -491) — 남은 것은 아직 목업인 평가 수정(API-037)의 고친 값뿐이다.
  */
 import { createSeedNotifications } from './notifications';
-import { createSeedWatchRecords } from './watch';
 import type {
   NotificationView,
-  PartyView,
   PrivacySettingsView,
   UnspecifiedNotificationSettings,
 } from '../types/unspecified';
-import type { Rating, RatingUpdateInput, WatchRecord } from '../types/watch';
-
-/**
- * 저장소가 보관하는 감상 기록.
- *
- * API-033 응답(`WatchRecord`)에는 없지만 API-034 목록이 함께 내려주는 값
- * (`ott` · `watchedAt` · `ratingId`)을 붙인 것이다. 서버라면 한 행에 들어 있을 값이라
- * 목업도 한 곳에 모아 두고, `src/api/`가 API별 응답 모양으로 잘라 내려준다.
- */
-export type StoredWatchRecord = WatchRecord & {
-  /** 어느 OTT 링크를 눌렀는지 (API-033 요청 본문의 `ottId`) */
-  ottId: number;
-  /** 감상 확인에서 `봤어요`를 고른 시각 (API-035) */
-  watchedAt: string | null;
-  /** 이 기록으로 이어진 평가 (API-036) */
-  ratingId: number | null;
-};
+import type { RatingUpdateInput } from '../types/watch';
 
 type SessionState = {
   /**
@@ -55,17 +39,12 @@ type SessionState = {
   subscribedOttIds: number[] | null;
   /** API-047로 관심없음 처리한 영화 */
   dismissedMovieIds: number[];
-  /** API-033 · API-034 · API-035 감상 기록 */
-  watchRecords: StoredWatchRecord[];
-  /** API-036 평가. 영화당 한 번만 반영된다 */
-  ratings: Rating[];
   /**
-   * API-037로 고친 **기준 목업 평가**. `ratingId` → 고친 값.
+   * API-037로 고친 평가. `ratingId` → 고친 값.
    *
-   * 기준 평가(mocks/frames.ts `mockMyRatings`)를 `ratings`에 넣으면 안 된다. `ratings`는
-   * 이번 세션에 새로 만든 평가라서 하나마다 프레임 1개와 팝콘 1알로 셈해진다
-   * (api/taste.ts). 수정은 프레임을 만들지 않으므로(API-037 처리 규칙) 따로 둔다.
-   * 이번 세션에 만든 평가를 고치면 `ratings`의 그 항목을 바로 고친다.
+   * 기준 목업 평가(mocks/frames.ts `mockMyRatings`)를 읽는 화면이 이 값을 얹어 보여준다.
+   * 서버 평가(API-036으로 저장한 것)의 번호로도 남지만, 그 평가를 읽는 API-030은 실제
+   * 호출이라 여기 값을 보지 않는다 — API-037이 연동되기 전까지의 한계다(업무 -491).
    */
   ratingEdits: Record<number, RatingUpdateInput>;
   /**
@@ -76,17 +55,6 @@ type SessionState = {
    * 시작해야 하므로(이 파일 머리말) 다른 세션 상태와 같이 메모리에 둔다.
    */
   recentSearchQueries: string[];
-  /** API-049로 만든 파티. 기준 목업(`mocks/parties.ts`) 뒤에 붙는다 */
-  createdParties: PartyView[];
-  /** API-053 · API-054로 답한 초대. `invitationId` → 바뀐 상태 */
-  invitationStatuses: Record<number, 'ACCEPTED' | 'DECLINED'>;
-  /**
-   * 7.2 프로필 편집이 저장한 **계약에 없는 값**. `null`이면 아직 편집하지 않았다.
-   *
-   * 닉네임 · 생년월일 · 성별 · 공개 범위는 여기 없다. API-015가 실제로 저장하므로
-   * 로컬에 둘 이유가 없다(`api/users.ts`). 한 줄 소개만 계약에 자리가 없어 남는다.
-   */
-  profileEdit: { introduction: string } | null;
   /**
    * 7.8-C에서 바꾼 알림 설정 중 **계약에 없는 둘**. `null`이면 기준 목업(mocks/settings.ts)이다.
    *
@@ -111,15 +79,9 @@ function emptyState(): SessionState {
   return {
     subscribedOttIds: null,
     dismissedMovieIds: [],
-    // 7.7이 그리는 `평가 안 남긴 영화`로 시작한다. 이유는 createSeedWatchRecords 주석에 있다
-    watchRecords: createSeedWatchRecords(),
-    ratings: [],
     ratingEdits: {},
     // 와이어프레임 4.1이 최근 검색어 세 개가 있는 상태를 그리므로 그 값으로 시작한다
     recentSearchQueries: ['케이퍼 무비', '크리스토퍼 놀란', 'SF 명작'],
-    createdParties: [],
-    invitationStatuses: {},
-    profileEdit: null,
     unspecifiedNotificationSettings: null,
     privacySettings: null,
     notifications: createSeedNotifications(),
@@ -175,45 +137,6 @@ export function removeRecentSearchQuery(query: string): void {
 
 export function clearRecentSearchQueries(): void {
   state.recentSearchQueries = [];
-}
-
-// ─────────────────────────────────────────── 파티
-
-export function addCreatedParty(party: PartyView): void {
-  state.createdParties = [party, ...state.createdParties];
-}
-
-export function getCreatedParties(): PartyView[] {
-  return state.createdParties;
-}
-
-/**
- * 다음에 만들 파티의 id.
- *
- * 서버가 정하는 값이라 목업이 흉내 낼 뿐이다. 기준 목업이 9001을 쓰고 초대 목업이
- * 9002를 쓰므로 9100부터 센다.
- */
-export function nextPartyId(): number {
-  return 9100 + state.createdParties.length;
-}
-
-export function setInvitationStatus(invitationId: number, status: 'ACCEPTED' | 'DECLINED'): void {
-  state.invitationStatuses = { ...state.invitationStatuses, [invitationId]: status };
-}
-
-export function getInvitationStatus(invitationId: number): 'ACCEPTED' | 'DECLINED' | null {
-  return state.invitationStatuses[invitationId] ?? null;
-}
-
-// ─────────────────────────────────────────── 프로필 편집
-
-export function saveProfileEdit(update: { introduction: string }): void {
-  state.profileEdit = { ...update };
-}
-
-/** 아직 편집하지 않았으면 null. 기준 목업을 쓰라는 뜻이다 */
-export function getProfileEdit(): { introduction: string } | null {
-  return state.profileEdit;
 }
 
 // ─────────────────────────────────────────── 설정 (업무 -307)
@@ -276,79 +199,9 @@ export function isDismissed(movieId: number): boolean {
   return state.dismissedMovieIds.includes(movieId);
 }
 
-// ─────────────────────────────────────────── 감상 기록
+// ─────────────────────────────────────────── 평가 수정 (API-037 목업)
 
-export function addWatchRecord(record: StoredWatchRecord): void {
-  state.watchRecords.push(record);
-}
-
-/** API-034가 목록으로 내려줄 원본. 정렬은 `src/api/`가 한다 */
-export function getWatchRecords(): StoredWatchRecord[] {
-  return state.watchRecords;
-}
-
-export function findWatchRecord(watchRecordId: number): StoredWatchRecord | null {
-  return state.watchRecords.find((record) => record.watchRecordId === watchRecordId) ?? null;
-}
-
-export function updateWatchRecord(watchRecordId: number, patch: Partial<StoredWatchRecord>): void {
-  const index = state.watchRecords.findIndex((record) => record.watchRecordId === watchRecordId);
-
-  if (index !== -1) {
-    state.watchRecords[index] = { ...state.watchRecords[index], ...patch };
-  }
-}
-
-/** 영화의 가장 최근 감상 기록. 2.4가 감상 상태를 표시할 때 쓴다 */
-export function findLatestWatchRecordByMovie(movieId: number): StoredWatchRecord | null {
-  return [...state.watchRecords].reverse().find((record) => record.movieId === movieId) ?? null;
-}
-
-// ─────────────────────────────────────────── 평가
-
-/**
- * 평가는 영화당 한 번만 반영된다(2.5 안내 문구). 같은 영화를 다시 평가하면 덮어쓴다.
- * 이미 평가한 영화는 2.5가 수정(API-037, `updateSessionRating`)으로 보내므로 덮어쓰는
- * 경우는 실제 흐름에 없다(업무 -306).
- */
-export function saveRating(rating: Rating): void {
-  const index = state.ratings.findIndex((saved) => saved.movieId === rating.movieId);
-
-  if (index === -1) {
-    state.ratings.push(rating);
-  } else {
-    state.ratings[index] = rating;
-  }
-}
-
-export function getRatings(): Rating[] {
-  return state.ratings;
-}
-
-export function findRatingByMovie(movieId: number): Rating | null {
-  return state.ratings.find((rating) => rating.movieId === movieId) ?? null;
-}
-
-export function findRatingByFrame(frameId: number): Rating | null {
-  return state.ratings.find((rating) => rating.frame.frameId === frameId) ?? null;
-}
-
-/**
- * 평가 수정(API-037). 이번 세션에 만든 평가면 그 항목을 고치고 true를 돌려준다.
- * 기준 목업 평가라 여기 없으면 false다 — 그때는 `saveRatingEdit`을 쓴다.
- */
-export function updateSessionRating(ratingId: number, input: RatingUpdateInput): boolean {
-  const index = state.ratings.findIndex((rating) => rating.ratingId === ratingId);
-
-  if (index === -1) {
-    return false;
-  }
-
-  state.ratings[index] = { ...state.ratings[index], ...input };
-
-  return true;
-}
-
+/** 평가 수정(API-037). 고친 값만 남긴다 — 프레임과 팝콘은 만들지 않는다 */
 export function saveRatingEdit(ratingId: number, input: RatingUpdateInput): void {
   state.ratingEdits = { ...state.ratingEdits, [ratingId]: { ...input } };
 }

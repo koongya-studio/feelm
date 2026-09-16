@@ -21,8 +21,11 @@ class CiConfigTests(unittest.TestCase):
     def setUpClass(cls):
         cls.root = CI_ROOT.read_text()
         cls.common = (CI_DIR / 'common.yml').read_text()
+        cls.docs = (CI_DIR / 'docs.yml').read_text()
         cls.backend = (CI_DIR / 'backend.yml').read_text()
         cls.frontend = (CI_DIR / 'frontend.yml').read_text()
+        cls.consumer = (CI_DIR / 'consumer.yml').read_text()
+        cls.infra = (CI_DIR / 'infra.yml').read_text()
         cls.pipeline_path = CI_DIR / 'pipeline.yml'
         cls.pipeline = cls.pipeline_path.read_text() if cls.pipeline_path.exists() else ''
 
@@ -39,9 +42,12 @@ workflow:
 
 include:
   - local: .gitlab/ci/common.yml
+  - local: .gitlab/ci/docs.yml
   - local: .gitlab/ci/backend.yml
   - local: .gitlab/ci/frontend.yml
   - local: .gitlab/ci/pipeline.yml
+  - local: .gitlab/ci/consumer.yml
+  - local: .gitlab/ci/infra.yml
 ''')
 
     def test_new_commits_cancel_only_interruptible_jobs(self):
@@ -56,6 +62,8 @@ include:
             (self.backend, 'backend-image'),
             (self.frontend, 'frontend-test'),
             (self.frontend, 'frontend-image'),
+            (self.consumer, 'consumer-test'),
+            (self.consumer, 'consumer-image'),
         )
         for config, name in cancellable:
             self.assertIn('interruptible: true', job_block(config, name), name)
@@ -64,16 +72,46 @@ include:
             (self.backend, '.backend-cache-action'),
             (self.backend, 'deploy-backend'),
             (self.frontend, 'deploy-frontend'),
+            (self.consumer, 'deploy-consumer'),
         )
         for config, name in protected:
             self.assertIn('interruptible: false', job_block(config, name), name)
 
     def test_job_names_are_unique_across_split_files(self):
         names = []
-        for text in (self.common, self.backend, self.frontend, self.pipeline):
+        for text in (self.common, self.backend, self.frontend, self.pipeline, self.consumer,
+                     self.infra, self.docs):
             names.extend(re.findall(r'(?m)^([.]?[A-Za-z0-9_-]+):$', text))
         duplicates = sorted({name for name in names if names.count(name) > 1})
         self.assertEqual(duplicates, [])
+
+    def test_jira_mattermost_digest_is_schedule_only(self):
+        digest = job_block(self.common, 'jira-mattermost-digest')
+        condition = ('$CI_PIPELINE_SOURCE == "schedule" && '
+                     '$CI_COMMIT_BRANCH == "develop" && '
+                     '$CI_COMMIT_REF_PROTECTED == "true" && '
+                     '$JIRA_MATTERMOST_DIGEST == "true"')
+        self.assertIn(condition, digest)
+        self.assertIn('python3 -B -m unittest tests.jira.test_notify_mattermost '
+                      'infra.scripts.test_ci_config -v', digest)
+        self.assertIn('python3 -I -B scripts/jira/notify_mattermost.py', digest)
+        self.assertIn('resource_group: jira-mattermost-digest', digest)
+        self.assertIn('interruptible: false', digest)
+        for secret in ('JIRA_API_TOKEN', 'MATTERMOST_LOGIN_ID', 'MATTERMOST_PASSWORD'):
+            self.assertNotIn(secret, digest)
+
+    def test_docs_job_is_fixed_isolated_and_runs_for_every_develop_mr(self):
+        block = job_block(self.docs, 'docs-mr-check')
+        for expected in (
+                'stage: verify', 'tags: [e106-mr-isolated]', 'dependencies: []',
+                'GIT_STRATEGY: none', 'interruptible: true', 'timeout: 5m',
+                '$CI_PIPELINE_SOURCE == "merge_request_event"',
+                '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"',
+                '- python3 -B infra/scripts/check-markdown.py', '- "**/*"'):
+            self.assertIn(expected, block)
+        for forbidden in ('image:', 'services:', 'cache:', 'artifacts:', 'before_script:',
+                          'allow_failure:', 'when: manual'):
+            self.assertNotIn(forbidden, block)
 
     def test_mr_jobs_share_only_reviewed_common_triggers(self):
         backend = job_block(self.backend, 'backend-mr-test')
@@ -110,27 +148,94 @@ include:
         self.assertNotIn('- backend/**/*', frontend)
         self.assertNotIn('- .gitlab/ci/backend.yml', frontend)
 
-    def test_pipeline_mr_job_is_isolated_and_path_scoped(self):
+    def test_consumer_ci_is_included_and_keeps_service_boundaries(self):
+        consumer = job_block(self.consumer, 'consumer-mr-test')
+        for expected in ('tags: [e106-mr-isolated]', 'dependencies: []',
+                         'GIT_STRATEGY: none', 'resource_group: consumer-mr-test',
+                         '$CI_PIPELINE_SOURCE == "merge_request_event"',
+                         '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"',
+                         '- pipeline/consumer/**/*', '- .gitlab/ci/consumer.yml',
+                         '- infra/scripts/ci-consumer-mr-*.py'):
+            self.assertIn(expected, consumer)
+        self.assertNotIn('- pipeline/spark/**/*', consumer)
+        self.assertNotIn('- backend/**/*', consumer)
+        self.assertNotIn('- frontend/**/*', consumer)
+
+    def test_infra_config_ci_is_isolated_and_path_scoped(self):
+        infra = job_block(self.infra, 'infra-config-test')
+        for expected in (
+                'tags: [e106-mr-isolated]', 'dependencies: []', 'GIT_STRATEGY: none',
+                'resource_group: infra-config-test',
+                '$CI_PIPELINE_SOURCE == "merge_request_event"',
+                '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"',
+                '- infra/compose/**/*', '- infra/monitoring/**/*',
+                '- infra/scripts/test_consumer_distributed_deployment.py'):
+            self.assertIn(expected, infra)
+        for excluded in ('- backend/**/*', '- frontend/**/*', '- pipeline/consumer/**/*',
+                         '- pipeline/spark/**/*'):
+            self.assertNotIn(excluded, infra)
+        self.assertNotIn('- infra/scripts/test_consumer_distributed_deployment.py',
+                         job_block(self.backend, 'backend-mr-test'))
+
+    def test_pipeline_mr_jobs_are_isolated_sharded_and_path_scoped(self):
         self.assertTrue(self.pipeline_path.is_file(), 'Missing Pipeline CI include')
-        job = job_block(self.pipeline, 'pipeline-mr-test')
+        template = job_block(self.pipeline, '.pipeline-mr-test')
         for expected in (
                 'stage: test', 'tags: [e106-mr-isolated]', 'dependencies: []',
-                'GIT_STRATEGY: none', 'resource_group: pipeline-mr-isolated',
-                'interruptible: true',
+                'GIT_STRATEGY: none', 'interruptible: true',
                 '$CI_PIPELINE_SOURCE == "merge_request_event"',
                 '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'):
-            self.assertIn(expected, job)
-        expected_script = [
-            '- cd pipeline/spark',
-            '- uv sync --frozen',
-            '- uv run ruff check .',
-            '- uv run pytest',
-            '- uv run python -m jobs.batch.als_baseline --help',
-            '- uv run python -m jobs.batch.parquet_roundtrip --help',
-        ]
-        scripts = [line.strip() for line in job.splitlines()
-                   if line.strip() in expected_script]
-        self.assertEqual(scripts, expected_script)
+            self.assertIn(expected, template)
+        jobs = {
+            'pipeline-unit-test': [
+                '- cd pipeline/spark',
+                '- uv sync --frozen',
+                '- uv run ruff check .',
+                '- uv run python -m ci_test_groups verify',
+                '- uv run python -m ci_test_groups unit -vv --durations=20',
+                '- uv run python -m jobs.batch.als_baseline --help',
+                '- uv run python -m jobs.batch.parquet_roundtrip --help',
+            ],
+            'pipeline-spark-als-a-d-test': [
+                '- cd pipeline/spark',
+                '- uv sync --frozen',
+                '- uv run python -m ci_test_groups spark-als-a-d -vv --durations=20',
+            ],
+            'pipeline-spark-als-e-z-test': [
+                '- cd pipeline/spark',
+                '- uv sync --frozen',
+                '- uv run python -m ci_test_groups spark-als-e-z -vv --durations=20',
+            ],
+            'pipeline-spark-other-test': [
+                '- cd pipeline/spark',
+                '- uv sync --frozen',
+                '- uv run python -m ci_test_groups spark-other -vv --durations=20',
+            ],
+        }
+        resource_groups = []
+        for name, expected_script in jobs.items():
+            job = job_block(self.pipeline, name)
+            self.assertIn('extends: .pipeline-mr-test', job)
+            self.assertIn('timeout: 15m', job)
+            scripts = [line.strip() for line in job.splitlines()
+                       if line.strip().startswith('- ')]
+            self.assertEqual(scripts, expected_script)
+            match = re.search(r'(?m)^  resource_group: (\S+)$', job)
+            self.assertIsNotNone(match, name)
+            resource_groups.append(match.group(1))
+            for forbidden in ('image:', 'services:', 'cache:', 'artifacts:', 'before_script:'):
+                self.assertNotIn(forbidden, job)
+        self.assertEqual(len(resource_groups), len(set(resource_groups)))
+        unit_job = job_block(self.pipeline, 'pipeline-unit-test')
+        self.assertNotIn('when: manual', unit_job)
+        self.assertNotIn('allow_failure:', unit_job)
+        for name in (
+                'pipeline-spark-als-a-d-test',
+                'pipeline-spark-als-e-z-test',
+                'pipeline-spark-other-test'):
+            spark_job = job_block(self.pipeline, name)
+            self.assertIn('when: manual', spark_job, name)
+            self.assertIn('allow_failure: false', spark_job, name)
         for path in (
                 'pipeline/spark/**/*.py', 'pipeline/spark/tests/**/*',
                 'pipeline/spark/pyproject.toml', 'pipeline/spark/uv.lock',
@@ -145,13 +250,13 @@ include:
                 'infra/scripts/systemd/feelm-ci222-gitlab-runner.service',
                 'infra/scripts/test_ci_gitlab_job_adapter.py',
                 'infra/scripts/test_ci_config.py'):
-            self.assertIn('- ' + path, job)
+            self.assertIn('- ' + path, template)
         for excluded in ('- pipeline/**/*', '- pipeline/docs/**/*',
                          '- pipeline/consumer/**/*', '- .gitlab/ci/backend.yml',
                          '- .gitlab/ci/frontend.yml'):
-            self.assertNotIn(excluded, job)
+            self.assertNotIn(excluded, template)
         for forbidden in ('image:', 'services:', 'cache:', 'artifacts:', 'before_script:'):
-            self.assertNotIn(forbidden, job)
+            self.assertNotIn(forbidden, template)
 
     def test_frontend_mr_command_is_fixed_and_has_no_gitlab_runtime_inputs(self):
         block = job_block(self.frontend, 'frontend-mr-test')
@@ -171,12 +276,15 @@ include:
         backend_deploy = job_block(self.backend, 'deploy-backend')
         frontend_image = job_block(self.frontend, 'frontend-image')
         frontend_deploy = job_block(self.frontend, 'deploy-frontend')
+        consumer_test = job_block(self.consumer, 'consumer-test')
+        consumer_image = job_block(self.consumer, 'consumer-image')
+        consumer_deploy = job_block(self.consumer, 'deploy-consumer')
         main_push = ('$CI_COMMIT_BRANCH == "main" && '
                      '$CI_COMMIT_REF_PROTECTED == "true" && '
                      '$CI_PIPELINE_SOURCE == "push"')
         for block in (datastore, backend_env, backend_test, backend_image, backend_deploy,
                       job_block(self.frontend, 'frontend-test'), frontend_image,
-                      frontend_deploy):
+                      frontend_deploy, consumer_test, consumer_image, consumer_deploy):
             self.assertIn(main_push, block)
             self.assertNotIn('$CI_COMMIT_BRANCH == "develop"', block)
         self.assertIn('job: backend-test', backend_image)
@@ -190,9 +298,14 @@ include:
             self.assertIn('- infra/scripts/deploy-backend.sh', block)
         self.assertIn('needs: [frontend-test]', frontend_image)
         self.assertIn('needs: [frontend-image]', frontend_deploy)
+        self.assertIn('needs: [consumer-test]', consumer_image)
+        self.assertIn('needs: [consumer-image]', consumer_deploy)
         for block in (backend_deploy, frontend_deploy):
             self.assertIn('resource_group: service-and-backend-cache', block)
             self.assertIn('ci-deploy-current-commit.py', block)
+        self.assertIn('resource_group: distributed-consumer', consumer_deploy)
+        self.assertIn('tags: [e106-distributed]', consumer_deploy)
+        self.assertIn('ci-deploy-current-commit.py', consumer_deploy)
         self.assertIn('--init-script gradle/test-timing.gradle', backend_test)
         self.assertIn('action: prepare', backend_env)
         self.assertIn('ci-backend-env-contract.py --require-values', backend_env)
@@ -207,6 +320,9 @@ include:
             (self.frontend, 'frontend-test'),
             (self.frontend, 'frontend-image'),
             (self.frontend, 'deploy-frontend'),
+            (self.consumer, 'consumer-test'),
+            (self.consumer, 'consumer-image'),
+            (self.consumer, 'deploy-consumer'),
         )
         required = ('if: \'$CI_COMMIT_BRANCH == "main" && '
                     '$CI_COMMIT_REF_PROTECTED == "true" && '

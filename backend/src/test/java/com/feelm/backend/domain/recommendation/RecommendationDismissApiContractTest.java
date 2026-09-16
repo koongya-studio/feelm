@@ -416,7 +416,7 @@ class RecommendationDismissApiContractTest extends SharedPostgresContractTest {
         jdbc.update(
                 "INSERT INTO popcorn_flavors"
                         + "(id,code,display_name,color,sort_order,cluster_id,representative_keywords)"
-                        + " VALUES (1,'FLAVOR_Y','달콤','#ffffff',1,1,'[]'::jsonb)");
+                        + " VALUES (1,'FLAVOR_B','다크초코','#3C2418',1,1,'[]'::jsonb)");
         jdbc.update(
                 "UPDATE movies SET poster_url='https://image.test/poster.jpg',"
                         + " release_date=DATE '1999-10-15', average_rating=4.30,"
@@ -451,8 +451,27 @@ class RecommendationDismissApiContractTest extends SharedPostgresContractTest {
                 .andExpect(jsonPath("$.replacement.movie.genres[1]").value("스릴러"))
                 .andExpect(jsonPath("$.replacement.movie.averageRating").value(4.3))
                 .andExpect(jsonPath("$.replacement.movie.ottProviders[0]").value("NETFLIX"))
-                .andExpect(jsonPath("$.replacement.flavorCode").value("FLAVOR_Y"))
+                .andExpect(jsonPath("$.replacement.flavorCode").value("FLAVOR_B"))
                 .andExpect(jsonPath("$.replacement.reason.summary").value("취향과 잘 맞아요"));
+    }
+
+    @Test
+    @DisplayName("T14 DISCOVERY 교체 카드는 추천 당시 저장한 맛을 반환한다")
+    void usesStoredDiscoveryFlavorForReplacement() throws Exception {
+        long nextDiscoveryMovie = 104;
+        long nextDiscoveryItem = 3004;
+        movie(nextDiscoveryMovie, "다음 발견 후보");
+        jdbc.update("UPDATE recommendation_items SET exposed_at=now() WHERE id=?", DISCOVERY_ITEM);
+        recommendationItem(nextDiscoveryItem, SET, nextDiscoveryMovie, "DISCOVERY", 4, false);
+        jdbc.update(
+                "UPDATE recommendation_items SET flavor_code='FLAVOR_SNAPSHOT' WHERE id=?",
+                nextDiscoveryItem);
+
+        dismiss(USER, DISCOVERY_MOVIE, itemBody(DISCOVERY_ITEM))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.replacement.recommendationItemId").value(nextDiscoveryItem))
+                .andExpect(jsonPath("$.replacement.type").value("DISCOVERY"))
+                .andExpect(jsonPath("$.replacement.flavorCode").value("FLAVOR_SNAPSHOT"));
     }
 
     private org.springframework.test.web.servlet.ResultActions dismiss(

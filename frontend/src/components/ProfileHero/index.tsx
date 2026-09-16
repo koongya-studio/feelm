@@ -16,19 +16,18 @@
  * - 헤더를 없애고 비주얼을 화면 맨 위까지 올렸다. 뒤로 가기는 그 위로 띄운다
  * - 높이를 화면의 절반 이상으로 키웠다(상한 520px)
  * - 이름을 한가운데가 아니라 아래쪽 경계에 둔다
+ *
+ * **아바타와 한 줄 소개는 없다**(업무 -459). 계약(API-014 · API-062)에 프로필 이미지도
+ * 소개 문구도 없어 목업이 지어낸 값이었다. 비주얼이 담는 것은 이름과 수치뿐이다.
  */
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router';
-import Avatar from '../Avatar';
 import VisuallyHidden from '../VisuallyHidden';
 import { ChevronLeftIcon, MoreVerticalIcon } from '../Icon';
 import styles from './ProfileHero.module.css';
 
 type Props = {
   nickname: string;
-  avatarUrl: string | null;
-  /** 한 줄 소개. 비어 있으면 자리를 차지하지 않는다 */
-  introduction?: string;
   /**
    * 비주얼 위 가운데에 뜨는 작은 라벨. 7.2-A가 `미리보기`를 표시한다 —
    * 헤더를 없앴으므로 이 화면이 무엇인지 알릴 자리가 필요하다(레퍼런스 지시 3.3).
@@ -46,14 +45,7 @@ type Props = {
   children?: ReactNode;
 };
 
-export default function ProfileHero({
-  nickname,
-  avatarUrl,
-  introduction,
-  eyebrow,
-  onMore,
-  children,
-}: Props) {
+export default function ProfileHero({ nickname, eyebrow, onMore, children }: Props) {
   const navigate = useNavigate();
 
   return (
@@ -77,12 +69,8 @@ export default function ProfileHero({
       </div>
 
       <div className={styles.content}>
-        <Avatar size={104} src={avatarUrl} nickname={nickname} />
-
         {/* 이 화면의 제목이다. 레퍼런스에서도 이름이 가장 큰 글자다 */}
         <h1 className={styles.name}>{nickname}</h1>
-
-        {introduction ? <p className={styles.introduction}>{introduction}</p> : null}
 
         {children ? <div className={styles.extra}>{children}</div> : null}
       </div>

@@ -30,7 +30,6 @@ import StatusView from '../../../components/StatusView';
 import { getFrameDetail } from '../../../api/taste';
 import { path } from '../../../routes/paths';
 import { formatDate } from '../../../utils/date';
-import { ottBadgeLetter } from '../../../utils/ott';
 import styles from './FrameDetailPage.module.css';
 import type { FrameDetail } from '../../../types/taste';
 
@@ -144,7 +143,7 @@ export default function FrameDetailPage() {
               <span className={styles.rowLabel}>시청한 OTT</span>
               <span className={styles.rowValue}>
                 <OttBadge
-                  letter={ottBadgeLetter(watchRecord.ott.code)}
+                  code={watchRecord.ott.code}
                   name={watchRecord.ott.name}
                   size={22}
                   radius={6}

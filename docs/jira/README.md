@@ -3,6 +3,9 @@
 AI와 작성한 짧은 YAML 계획을 검토한 뒤 Jira Cloud REST API로 Epic과 Task를 생성한다.
 기본 실행은 미리보기이며 `--apply`를 명시한 경우에만 Jira를 변경한다.
 
+담당자별 활성 스프린트 업무를 Mattermost에 매일 전송하는 별도 자동화는
+[Jira 작업 현황 Mattermost 일일 알림](./mattermost-daily-digest.md)을 참고한다.
+
 ## 최초 설정
 
 Python 3.11 이상을 사용한다.

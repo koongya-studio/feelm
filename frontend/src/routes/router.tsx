@@ -18,10 +18,12 @@ import OnboardingLayout from '../layouts/OnboardingLayout';
 import AccountFindPage from '../pages/auth/AccountFindPage';
 import EmailSignupPage from '../pages/auth/EmailSignupPage';
 import LoginPage from '../pages/auth/LoginPage';
+import OAuthCallbackPage from '../pages/auth/OAuthCallbackPage';
 import PasswordResetPage from '../pages/auth/PasswordResetPage';
 import SignupCompletePage from '../pages/auth/SignupCompletePage';
 import SignupMethodPage from '../pages/auth/SignupMethodPage';
 import SocialSignupPage from '../pages/auth/SocialSignupPage';
+import SocialSignupProfilePage from '../pages/auth/SocialSignupProfilePage';
 import StartPage from '../pages/auth/StartPage';
 import VerifyEmailCompletePage from '../pages/auth/VerifyEmailCompletePage';
 import VerifyEmailPage from '../pages/auth/VerifyEmailPage';
@@ -31,14 +33,12 @@ import PopcornBucketPage from '../pages/film/PopcornBucketPage';
 import AccountManagePage from '../pages/my/AccountManagePage';
 import BlockedUsersPage from '../pages/my/BlockedUsersPage';
 import MyDashboardPage from '../pages/my/MyDashboardPage';
-import MyRatingsPage from '../pages/my/MyRatingsPage';
 import NotificationSettingsPage from '../pages/my/NotificationSettingsPage';
 import PasswordChangePage from '../pages/my/PasswordChangePage';
 import PrivacySettingsPage from '../pages/my/PrivacySettingsPage';
 import ProfileEditPage from '../pages/my/ProfileEditPage';
 import ProfilePreviewPage from '../pages/my/ProfilePreviewPage';
 import PublicProfilePage from '../pages/my/PublicProfilePage';
-import RecommendationHistoryPage from '../pages/my/RecommendationHistoryPage';
 import SettingsPage from '../pages/my/SettingsPage';
 import WithdrawPage from '../pages/my/WithdrawPage';
 import TasteComparePage from '../pages/my/TasteComparePage';
@@ -83,11 +83,13 @@ export const router = createBrowserRouter(
         { path: ROUTE_PATTERN.authStart, element: <StartPage /> },
         { path: ROUTE_PATTERN.signupMethod, element: <SignupMethodPage /> },
         { path: ROUTE_PATTERN.signupSocial, element: <SocialSignupPage /> },
+        { path: ROUTE_PATTERN.signupSocialProfile, element: <SocialSignupProfilePage /> },
         { path: ROUTE_PATTERN.signupEmail, element: <EmailSignupPage /> },
         { path: ROUTE_PATTERN.signupComplete, element: <SignupCompletePage /> },
         { path: ROUTE_PATTERN.login, element: <LoginPage /> },
         { path: ROUTE_PATTERN.accountFind, element: <AccountFindPage /> },
         { path: ROUTE_PATTERN.passwordReset, element: <PasswordResetPage /> },
+        { path: ROUTE_PATTERN.oauthCallback, element: <OAuthCallbackPage /> },
         { path: ROUTE_PATTERN.verifyEmail, element: <VerifyEmailPage /> },
         { path: ROUTE_PATTERN.verifyEmailComplete, element: <VerifyEmailCompletePage /> },
       ],
@@ -116,11 +118,6 @@ export const router = createBrowserRouter(
 
         // 이번 단계 구현 범위가 아닌 탭. REF-01의 5탭 구성을 검증하기 위해 라우트는 둔다.
         { path: ROUTE_PATTERN.party, element: <PartyListPage /> },
-
-        // MY 기록 목록 (업무 -306). 와이어프레임이 하단 내비를 그리는 탭 화면이다
-        { path: ROUTE_PATTERN.recommendationHistory, element: <RecommendationHistoryPage /> },
-        { path: ROUTE_PATTERN.myRatings, element: <MyRatingsPage tab="rated" /> },
-        { path: ROUTE_PATTERN.unratedMovies, element: <MyRatingsPage tab="unrated" /> },
 
         // 7.3 취향 리포트 목록 (업무 -308). 와이어프레임이 하단 내비를 그렸다
         { path: ROUTE_PATTERN.tasteReports, element: <ReportListPage /> },

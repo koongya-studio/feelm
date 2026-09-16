@@ -40,7 +40,7 @@ describe('PopcornBucket', () => {
   });
 
   it('알 수만큼 그린다', () => {
-    const codes = Array.from({ length: 12 }, () => 'FLAVOR_CAPER');
+    const codes = Array.from({ length: 12 }, () => 'FLAVOR_A');
     const { container } = render(<PopcornBucket kernelFlavors={codes} label="통" />);
 
     // 통 1 + 알 12
@@ -48,7 +48,7 @@ describe('PopcornBucket', () => {
   });
 
   it('모르는 맛 코드가 와도 터지지 않고 기본 맛 그림으로 그린다', () => {
-    const known = render(<PopcornBucket kernelFlavors={['FLAVOR_CAPER']} label="아는 맛" />);
+    const known = render(<PopcornBucket kernelFlavors={['FLAVOR_A']} label="아는 맛" />);
     const knownHref = images(known.container)[1]?.getAttribute('href');
 
     const unknown = render(
@@ -57,12 +57,46 @@ describe('PopcornBucket', () => {
     const unknownHref = images(unknown.container)[1]?.getAttribute('href');
 
     expect(unknownHref).toBeTruthy();
-    // FLAVOR_CAPER가 기본 맛(original)에 짝지어져 있으므로 같은 그림이어야 한다
+    // FLAVOR_A가 기본 맛(original)에 짝지어져 있으므로 같은 그림이어야 한다
     expect(unknownHref).toBe(knownHref);
   });
 
+  it('439의 FLAVOR_A부터 FLAVOR_H까지 서로 다른 3D 알을 사용한다', () => {
+    const codes = Array.from(
+      { length: 8 },
+      (_, index) => `FLAVOR_${String.fromCharCode(65 + index)}`,
+    );
+    const { container } = render(<PopcornBucket kernelFlavors={codes} label="맛 8종" />);
+    const kernelHrefs = images(container)
+      .slice(1)
+      .map((image) => image.getAttribute('href'));
+
+    expect(new Set(kernelHrefs).size).toBe(8);
+  });
+
+  it('확정된 FLAVOR_A부터 FLAVOR_H까지 맛에 맞는 3D 알을 사용한다', () => {
+    const expectedAssets = [
+      'original',
+      'chocolate',
+      'caramel',
+      'pistachio',
+      'cookie',
+      'cheese',
+      'strawberry',
+      'blueberry',
+    ];
+
+    expectedAssets.forEach((asset, index) => {
+      const code = `FLAVOR_${String.fromCharCode(65 + index)}`;
+      const { container } = render(<PopcornBucket kernelFlavors={[code]} label={code} />);
+      const href = images(container)[1]?.getAttribute('href');
+
+      expect(href).toContain(`popcorn-${asset}.png`);
+    });
+  });
+
   it('같은 입력을 다시 그려도 알 자리가 흔들리지 않는다', () => {
-    const codes = ['FLAVOR_CAPER', 'FLAVOR_THRILL', 'FLAVOR_NOIR', 'FLAVOR_CRIME'];
+    const codes = ['FLAVOR_A', 'FLAVOR_B', 'FLAVOR_C', 'FLAVOR_D'];
 
     const first = render(<PopcornBucket kernelFlavors={codes} label="첫 렌더" />);
     const second = render(<PopcornBucket kernelFlavors={codes} label="두 번째 렌더" />);

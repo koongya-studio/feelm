@@ -22,7 +22,6 @@ import { ApiError } from '../../../api/apiError';
 import { getOtts, setMyOttIds } from '../../../api/otts';
 import { useOnboarding } from '../../../contexts/onboardingContext';
 import { path } from '../../../routes/paths';
-import { ottBadgeLetter } from '../../../utils/ott';
 import styles from './OttOnboardingPage.module.css';
 import type { Ott } from '../../../types/ott';
 
@@ -131,9 +130,8 @@ export default function OttOnboardingPage() {
                   onToggle={() => toggle(ott.ottId)}
                   leading={
                     <OttBadge
-                      letter={ottBadgeLetter(ott.code)}
+                      code={ott.code}
                       name={ott.name}
-                      logoUrl={ott.logoUrl}
                       size={38}
                       fontSize={16}
                       radius={10}

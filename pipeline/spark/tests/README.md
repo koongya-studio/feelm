@@ -20,10 +20,13 @@ fail quickly before any JVM startup.
 
 The three `spark-*` groups contain tests that create a local Spark session or
 exercise Spark DataFrames, ML, Parquet/JSON, Hadoop filesystem APIs, or a real
-Spark job boundary. They run in separate Python processes so a JVM and its
-native workers exit before the next group. They are not run concurrently because
-they share driver ports, memory limits, and local temporary storage on one
-isolated Runner.
+Spark job boundary. CI runs the unit group automatically and creates each Spark
+group as a blocking manual Job (`allow_failure: false`) in its own fixed-policy
+container. Start all three Spark Jobs when the shared Runner is available; an
+unstarted or failed Spark Job prevents the pipeline from succeeding. The JVM,
+driver ports, memory limit, and temporary storage remain isolated per Job.
+Different groups can run concurrently when separate isolated Runner slots are
+available. The local commands above remain a serial reproduction sequence.
 
 Every group prints a `CI_TEST_GROUP_METRICS` line with wall time and, on Linux,
 process CPU time, maximum RSS, and block I/O counters. Pytest's slowest-test

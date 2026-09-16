@@ -9,12 +9,12 @@
  * `onSessionEnd`를 구독해 상태를 되돌린다.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { login, logout, restoreSession } from '../api/auth';
+import { login, logout, restoreSession, socialLogin, socialSignup } from '../api/auth';
 import { onSessionEnd } from '../api/session';
 import { AuthContext } from './authContext';
 import type { ReactNode } from 'react';
 import type { AuthStatus, AuthValue } from './authContext';
-import type { AuthenticatedUser } from '../types/auth';
+import type { AuthenticatedUser, SocialProvider, SocialSignupRequest } from '../types/auth';
 
 type State = { status: AuthStatus; user: AuthenticatedUser | null };
 
@@ -52,13 +52,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return user;
   }, []);
 
+  const signInWithSocial = useCallback(
+    async (provider: SocialProvider, code: string, redirectUri: string) => {
+      const result = await socialLogin(provider, code, redirectUri);
+
+      // 가입이 남은 경우에는 아직 세션이 없다. 로그인 상태로 올리면 안 된다
+      if (!result.signupRequired) {
+        setState({ status: 'authenticated', user: result.user });
+      }
+
+      return result;
+    },
+    [],
+  );
+
+  const completeSocialSignup = useCallback(async (request: SocialSignupRequest) => {
+    const user = await socialSignup(request);
+
+    setState({ status: 'authenticated', user });
+
+    return user;
+  }, []);
+
   const signOut = useCallback(async () => {
     await logout();
 
     setState(ANONYMOUS);
   }, []);
 
-  const value = useMemo<AuthValue>(() => ({ ...state, signIn, signOut }), [state, signIn, signOut]);
+  const value = useMemo<AuthValue>(
+    () => ({ ...state, signIn, signInWithSocial, completeSocialSignup, signOut }),
+    [state, signIn, signInWithSocial, completeSocialSignup, signOut],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

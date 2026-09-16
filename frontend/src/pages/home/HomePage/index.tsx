@@ -17,12 +17,19 @@
  * 사라진다. **실패한 섹션만 안내로 바뀌고 나머지는 그대로 보인다**(업무 -264).
  * 데이터가 비어 있을 때의 문구도 여기서 정한다(`screen-spec.md` 2.1 미확정 항목).
  *
+ * 인사말도 한 섹션이다. 프로필(API-014)은 실제 호출이라 백엔드가 없으면 실패하는데,
+ * 처음에는 보여줄 안내가 없다며 조용히 사라지게 두었다. 2026-09-11 QA에서 그 홈을 본
+ * 사용자는 무엇이 잘못됐는지도 무엇을 하면 되는지도 알 수 없었다. 실패한 섹션의 안내는
+ * 제목으로 무엇이 빠졌는지, 보조 문구로 왜 빠졌고 무엇을 하면 되는지를 말한다
+ * (`frontend-structure.md` 7.4 실패 표시 규칙 · 업무 -374).
+ *
  * 로딩 표시는 만들지 않는다. 데이터를 받기 전에는 아무것도 그리지 않는다
  * (팀 결정 2026-09-08). `?mockDelay=800`으로 그 동작을 확인할 수 있다.
  */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import StatusView from '../../../components/StatusView';
+import { failureDescription } from '../../../components/StatusView/failure';
 import Button from '../../../components/Button';
 import ScreenHeader from '../../../components/ScreenHeader';
 import Poster from '../../../components/Poster';
@@ -38,16 +45,12 @@ import { getMyParties } from '../../../api/parties';
 import { getOtts } from '../../../api/otts';
 import { getLatestReadyReport } from '../../../api/reports';
 import { path } from '../../../routes/paths';
-import { ottBadgeLetter } from '../../../utils/ott';
 import styles from './HomePage.module.css';
 import type { MyProfile } from '../../../types/user';
 import type { Ott } from '../../../types/ott';
 import type { TasteAnalysis } from '../../../types/taste';
-import type {
-  AvailableNowMovie,
-  PartyView,
-  RecommendationItemView,
-} from '../../../types/unspecified';
+import type { AvailableNowMovie, RecommendationItemView } from '../../../types/unspecified';
+import type { Party } from '../../../types/party';
 
 /**
  * 와이어프레임은 `액션 · 스릴러`와 하나의 비율 `49%`를 함께 보여준다. 상위 두 장르를
@@ -62,15 +65,14 @@ function summarizeGenres(taste: TasteAnalysis) {
   };
 }
 
-/** 실패했을 때 안내를 보여줄 섹션 */
-type FailedSection = 'recommendation' | 'availableNow' | 'taste' | 'parties';
+/** 실패했을 때 안내를 보여줄 섹션. `profile`은 인사말이다 */
+type FailedSection = 'profile' | 'recommendation' | 'availableNow' | 'taste' | 'parties';
 
-const NOTHING_FAILED: Record<FailedSection, boolean> = {
-  recommendation: false,
-  availableNow: false,
-  taste: false,
-  parties: false,
-};
+/**
+ * 섹션별 실패. 값은 원인이며 보조 문구가 여기서 나온다(`failureDescription`).
+ * `{ error }`로 감싸는 것은 `undefined`를 던진 거절과 실패 없음을 구분하기 위해서다.
+ */
+type Failures = Partial<Record<FailedSection, { error: unknown }>>;
 
 export default function HomePage() {
   const navigate = useNavigate();
@@ -82,9 +84,9 @@ export default function HomePage() {
   const [availableNow, setAvailableNow] = useState<AvailableNowMovie[] | null>(null);
   const [taste, setTaste] = useState<TasteAnalysis | null>(null);
   const [tasteLoaded, setTasteLoaded] = useState(false);
-  const [parties, setParties] = useState<PartyView[] | null>(null);
+  const [parties, setParties] = useState<Party[] | null>(null);
 
-  const [failed, setFailed] = useState(NOTHING_FAILED);
+  const [failures, setFailures] = useState<Failures>({});
   const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
@@ -98,15 +100,15 @@ export default function HomePage() {
             apply(value);
           }
         })
-        .catch(() => {
+        .catch((error: unknown) => {
           if (active && section) {
-            setFailed((previous) => ({ ...previous, [section]: true }));
+            setFailures((previous) => ({ ...previous, [section]: { error } }));
           }
         });
     }
 
-    // 인사와 OTT 기준정보는 실패해도 보여줄 안내가 없다. 인사는 사라지고 배지는 코드를 쓴다
-    load(getMyProfile(), setProfile);
+    load(getMyProfile(), setProfile, 'profile');
+    // OTT 기준정보는 실패해도 안내가 없다. 배지가 이름 대신 코드를 쓰는 것으로 그친다
     load(getOtts(), setOtts);
 
     load(getRecommendations(), (set) => setRecommendations(set.items), 'recommendation');
@@ -143,7 +145,7 @@ export default function HomePage() {
 
   /** 실패한 섹션의 `다시 시도`. 이미 받은 섹션은 그대로 두고 다시 불러온다 */
   function handleRetry() {
-    setFailed(NOTHING_FAILED);
+    setFailures({});
     setReloadCount((count) => count + 1);
   }
 
@@ -174,12 +176,29 @@ export default function HomePage() {
       />
 
       <div className={styles.page}>
+        {/* 이미 받은 인사말이 있으면 다시 불러오다 실패해도 그대로 둔다 */}
+        {failures.profile && !profile ? (
+          <StatusView
+            size="inline"
+            title="프로필을 불러오지 못했어요"
+            description={failureDescription(failures.profile.error)}
+          >
+            <Button variant="text" onClick={handleRetry}>
+              다시 시도
+            </Button>
+          </StatusView>
+        ) : null}
+
         {profile ? (
           <p className={styles.greeting}>{profile.nickname} 님, 오늘은 어떤 영화를 볼까요?</p>
         ) : null}
 
-        {failed.recommendation ? (
-          <StatusView size="inline" title="추천을 잠시 불러오지 못했어요">
+        {failures.recommendation ? (
+          <StatusView
+            size="inline"
+            title="추천을 잠시 불러오지 못했어요"
+            description={failureDescription(failures.recommendation.error)}
+          >
             <Button variant="text" onClick={handleRetry}>
               다시 시도
             </Button>
@@ -212,8 +231,12 @@ export default function HomePage() {
           </section>
         ) : null}
 
-        {failed.availableNow ? (
-          <StatusView size="inline" title="지금 볼 수 있는 영화를 불러오지 못했어요">
+        {failures.availableNow ? (
+          <StatusView
+            size="inline"
+            title="지금 볼 수 있는 영화를 불러오지 못했어요"
+            description={failureDescription(failures.availableNow.error)}
+          >
             <Button variant="text" onClick={handleRetry}>
               다시 시도
             </Button>
@@ -254,7 +277,7 @@ export default function HomePage() {
                       />
                       <span className={styles.availableOtt}>
                         <OttBadge
-                          letter={ottBadgeLetter(movie.ottProvider)}
+                          code={movie.ottProvider}
                           name={ott?.name ?? movie.ottProvider}
                           size={20}
                         />
@@ -268,8 +291,12 @@ export default function HomePage() {
           </section>
         ) : null}
 
-        {failed.taste ? (
-          <StatusView size="inline" title="취향 요약을 불러오지 못했어요">
+        {failures.taste ? (
+          <StatusView
+            size="inline"
+            title="취향 요약을 불러오지 못했어요"
+            description={failureDescription(failures.taste.error)}
+          >
             <Button variant="text" onClick={handleRetry}>
               다시 시도
             </Button>
@@ -332,8 +359,12 @@ export default function HomePage() {
           </Link>
         </section>
 
-        {failed.parties ? (
-          <StatusView size="inline" title="파티 정보를 불러오지 못했어요">
+        {failures.parties ? (
+          <StatusView
+            size="inline"
+            title="파티 정보를 불러오지 못했어요"
+            description={failureDescription(failures.parties.error)}
+          >
             <Button variant="text" onClick={handleRetry}>
               다시 시도
             </Button>
@@ -365,9 +396,13 @@ export default function HomePage() {
 
             <div className={styles.partyBody}>
               <p className={styles.partyName}>참여 중인 파티 · {party.name}</p>
-              <p className={styles.partyMeta}>
-                멤버 {party.members.length}명 · 새 팝콘 {party.newPopcornCount}개
-              </p>
+              {/*
+               * 와이어프레임은 `멤버 4명 · 새 팝콘 2개`지만 **`새 팝콘` 수를 주는 계약이
+               * 없다.** API-050이 내려주는 것은 이름 · 상태 · 멤버 · 정원뿐이다. 실제
+               * 연동(업무 -393)으로 지어낼 자리가 사라져 멤버 수만 적는다
+               * (`types/unspecified.ts`).
+               */}
+              <p className={styles.partyMeta}>멤버 {party.members.length}명</p>
             </div>
 
             <span className={styles.partyChevron}>

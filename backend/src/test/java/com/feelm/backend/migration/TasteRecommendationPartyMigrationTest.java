@@ -249,6 +249,59 @@ class TasteRecommendationPartyMigrationTest {
     }
 
     @Test
+    @DisplayName("개인 추천 세트는 generation ID를 저장하고 같은 배치를 중복 생성할 수 없다")
+    void storesRecommendationCandidateMetadata() throws SQLException {
+        long userId = insertUser("candidate@feelm.test", "후보사용자");
+        long otherUserId = insertUser("candidate-other@feelm.test", "다른후보사용자");
+        long movieId = insertMovie(181003, "후보 영화");
+        long discoveryMovieId = insertMovie(181004, "발견 후보 영화");
+        long setId =
+                insertReturningId(
+                        "INSERT INTO recommendation_sets"
+                                + " (user_id,input_version,model_version,candidate_version,generation_id,generated_at)"
+                                + " VALUES ("
+                                + userId
+                                + ",'input-candidate','als-1',3,'generation-3',now())");
+        execute(
+                "INSERT INTO recommendation_items"
+                        + " (set_id,movie_id,type,flavor_code,position,reason) VALUES ("
+                        + setId
+                        + ","
+                        + movieId
+                        + ",'TASTE','FLAVOR_A',1,'{}'::jsonb)");
+        execute(
+                "INSERT INTO recommendation_items"
+                        + " (set_id,movie_id,type,flavor_code,position,reason) VALUES ("
+                        + setId
+                        + ","
+                        + discoveryMovieId
+                        + ",'DISCOVERY','FLAVOR_B',1,'{}'::jsonb)");
+
+        assertThat(longValue("SELECT candidate_version FROM recommendation_sets WHERE id=" + setId))
+                .isEqualTo(3);
+        assertThat(column("SELECT generation_id FROM recommendation_sets WHERE id=" + setId))
+                .containsExactly("generation-3");
+        assertThat(column("SELECT flavor_code FROM recommendation_items WHERE set_id=" + setId))
+                .containsExactlyInAnyOrder("FLAVOR_A", "FLAVOR_B");
+        assertThatThrownBy(
+                        () ->
+                                execute(
+                                        "INSERT INTO recommendation_sets"
+                                                + " (user_id,input_version,model_version,"
+                                                + " candidate_version,generation_id,generated_at) VALUES ("
+                                                + otherUserId
+                                                + ",'another-input','als-2',9,'generation-3',now())"))
+                .isInstanceOf(SQLException.class)
+                .hasMessageContaining("uix_recommendation_sets_generation");
+        execute(
+                "INSERT INTO recommendation_sets"
+                        + " (user_id,input_version,model_version,candidate_version,generation_id,generated_at)"
+                        + " VALUES ("
+                        + userId
+                        + ",'input-candidate','als-1',3,'generation-4',now())");
+    }
+
+    @Test
     @DisplayName("추천 아이템 삭제 후 관심없음 이력의 출처만 비운다")
     void preservesDismissalWhenRecommendationItemIsDeleted() throws SQLException {
         long userId = insertUser("dismiss@feelm.test", "관심없음사용자");

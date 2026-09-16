@@ -24,6 +24,9 @@ class ServerPilotStageTests(unittest.TestCase):
         stage = load_stage()
         required = {
             "ci-gitlab-adapter-update.py",
+            "check-markdown.py",
+            "ci-docs-mr-boundary.py",
+            "ci-docs-mr-runner.py",
             "ci-frontend-mr-boundary.py",
             "ci-frontend-mr-config.py",
             "ci-frontend-mr-runner.py",
@@ -32,6 +35,12 @@ class ServerPilotStageTests(unittest.TestCase):
             "ci-pipeline-mr-config.py",
             "ci-pipeline-mr-prepare.py",
             "ci-pipeline-mr-runner.py",
+            "ci-consumer-mr-boundary.py",
+            "ci-consumer-mr-config.py",
+            "ci-consumer-mr-prepare.py",
+            "ci-consumer-mr-runner.py",
+            "ci-infra-mr-boundary.py",
+            "ci-infra-mr-runner.py",
         }
 
         self.assertEqual(set(), required.difference(stage.FILES))

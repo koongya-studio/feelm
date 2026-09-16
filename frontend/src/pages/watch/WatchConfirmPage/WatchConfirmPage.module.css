@@ -67,6 +67,14 @@
   padding-top: var(--space-2);
 }
 
+/* 응답을 보내지 못했을 때. 선택지는 그대로 두고 아래에 알린다 */
+.error {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-danger);
+  text-align: center;
+}
+
 .hint {
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);

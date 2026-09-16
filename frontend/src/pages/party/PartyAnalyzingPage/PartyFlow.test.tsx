@@ -1,25 +1,50 @@
 /*
- * 5.3 → 5.4 → 5.5 이어지는 흐름 (업무 S15P21E106-304)
+ * 5.3 → 5.4 → 5.5 이어지는 흐름 (업무 S15P21E106-304 · -393)
  *
- * **화면 하나씩 열어 보면 멀쩡한데 이어서 하면 끊기던 자리다.** 기준 목업의 추천은
- * 파티 9001에만 있고 새로 만든 파티는 9100부터 번호를 받는다. 그래서 5.3에서 파티를
- * 만들고 5.4로 들어가면 추천 조회가 404가 되어 실패 화면에 머물렀다. 화면을 따로
+ * **화면 하나씩 열어 보면 멀쩡한데 이어서 하면 끊기던 자리다.** 파티 추천(API-058)은
+ * 백엔드에 아직 없어 목업으로 남아 있고, 기준 목업의 추천은 9001에만 있다. 서버가 만든
+ * 파티는 다른 번호를 받으므로 그대로 두면 5.4가 언제나 실패 화면에 머문다. 화면을 따로
  * 확인하면 9001로 열게 되니 드러나지 않는다.
  *
  * 이 시험은 **실제로 파티를 만든 다음** 그 번호로 5.4를 열어 5.5까지 가는지 본다.
+ * 파티 생성 · 조회는 실제 API라 가로채고, 추천은 목업 그대로 둔다.
  */
-import { describe, expect, it, beforeEach } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
-import { render } from '@testing-library/react';
 import PartySetupPage from '../PartySetupPage';
 import PartyAnalyzingPage from './index';
 import PartyRecommendationPage from '../PartyRecommendationPage';
 import { ROUTE_PATTERN } from '../../../routes/paths';
-import { resetSessionStore } from '../../../mocks/sessionStore';
+import { createParty, getParty } from '../../../api/parties';
+import { getMyProfile } from '../../../api/users';
+import { mockMyProfile } from '../../../mocks/user';
+import { party } from '../../../test/party';
+
+/** 서버가 만든 파티 번호. 목업 추천(9001)과 다른 번호여야 이 시험이 뜻을 갖는다 */
+const NEW_PARTY_ID = 9137;
+
+vi.mock('../../../api/parties', async () => {
+  const actual =
+    await vi.importActual<typeof import('../../../api/parties')>('../../../api/parties');
+
+  return { ...actual, createParty: vi.fn(), getParty: vi.fn(), inviteToParty: vi.fn() };
+});
+
+vi.mock('../../../api/users', async () => {
+  const actual = await vi.importActual<typeof import('../../../api/users')>('../../../api/users');
+
+  return { ...actual, getMyProfile: vi.fn(), searchUsers: vi.fn() };
+});
 
 beforeEach(() => {
-  resetSessionStore();
+  vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
+  vi.mocked(createParty)
+    .mockReset()
+    .mockResolvedValue(party({ partyId: NEW_PARTY_ID, name: '금요 심야 상영회' }));
+  vi.mocked(getParty)
+    .mockReset()
+    .mockResolvedValue(party({ partyId: NEW_PARTY_ID, name: '금요 심야 상영회' }));
 });
 
 function LocationProbe() {
@@ -60,7 +85,9 @@ describe('파티를 만들고 추천까지', () => {
     ).toBeInTheDocument();
 
     expect(screen.getByText('함께 보기 1위')).toBeInTheDocument();
-    expect(screen.getByTestId('location').textContent).toMatch(/^\/parties\/\d+\/recommendations$/);
+    expect(screen.getByTestId('location').textContent).toBe(
+      `/parties/${NEW_PARTY_ID}/recommendations`,
+    );
   });
 
   it('실패 화면에 머물지 않는다', async () => {

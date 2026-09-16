@@ -7,6 +7,14 @@
  * 묶어 두는 것이 이 계층의 목적이다.
  */
 import { request } from './client';
+import {
+  MOCK_ACCESS_TOKEN,
+  endMockSession,
+  getMockProfile,
+  isMockCredential,
+  isMockSession,
+  startMockSession,
+} from './mockAccount';
 import { endSession, refreshAccessToken, startSession } from './session';
 import { getMyProfile } from './users';
 import type {
@@ -14,12 +22,24 @@ import type {
   EmailVerificationResult,
   SignupRequest,
   SignupResult,
+  SocialLinkResult,
+  SocialLoginResult,
+  SocialProvider,
+  SocialSignupRequest,
 } from '../types/auth';
+import type { MyProfile } from '../types/user';
 
 type LoginResponse = {
   accessToken: string;
   expiresIn: number;
   user: AuthenticatedUser;
+};
+
+/** API-007이 신규 사용자에게 주는 본문. 로그인 응답과 구조가 다르다 */
+type SocialSignupRequiredResponse = {
+  signupRequired: true;
+  signupToken: string;
+  suggestedNickname: string;
 };
 
 /**
@@ -63,6 +83,14 @@ export async function resendVerificationMail(email: string): Promise<void> {
  * Token을 세션에 넣는 것뿐이다.
  */
 export async function login(email: string, password: string): Promise<AuthenticatedUser> {
+  // 개발 서버의 목업 계정은 서버로 보내지 않는다(`mockAccount.ts`)
+  if (isMockCredential(email, password)) {
+    startMockSession();
+    startSession(MOCK_ACCESS_TOKEN);
+
+    return toUser(getMockProfile());
+  }
+
   const response = await request<LoginResponse>('/auth/login', {
     method: 'POST',
     body: { email, password },
@@ -81,6 +109,13 @@ export async function login(email: string, password: string): Promise<Authentica
  * 사용자가 할 수 있는 일이 없다.
  */
 export async function logout(): Promise<void> {
+  if (isMockSession()) {
+    endMockSession();
+    endSession();
+
+    return;
+  }
+
   try {
     await request<void>('/auth/logout', { method: 'POST' });
   } finally {
@@ -148,17 +183,96 @@ export async function changePassword(currentPassword: string, newPassword: strin
  * 거절되면 비로그인 상태다.
  */
 export async function restoreSession(): Promise<AuthenticatedUser | null> {
+  if (isMockSession()) {
+    startSession(MOCK_ACCESS_TOKEN);
+
+    return toUser(getMockProfile());
+  }
+
   const token = await refreshAccessToken();
 
   if (!token) {
     return null;
   }
 
-  const profile = await getMyProfile();
+  return toUser(await getMyProfile());
+}
 
+function toUser(profile: MyProfile): AuthenticatedUser {
   return {
     userId: profile.userId,
     nickname: profile.nickname,
     onboardingCompleted: profile.onboardingCompleted,
   };
+}
+
+/**
+ * API-007 소셜 로그인 · POST /api/v1/auth/oauth/{provider}
+ *
+ * 인가 코드는 **백엔드가 제공자와 교환한다**(API-007 처리 규칙). 프론트는 콜백에서 받은
+ * 코드와 그때 쓴 `redirectUri`를 그대로 넘긴다. `redirectUri`는 백엔드 허용 목록과
+ * 정확히 일치해야 하고 다르면 제공자를 부르지 않고 `VALIDATION_FAILED`로 거절된다.
+ *
+ * 연결된 계정이 있으면 이메일 로그인과 같은 본문·쿠키가 오고, 없으면 `signupToken`이
+ * 온다. 둘 다 200이라 본문으로 가른다.
+ */
+export async function socialLogin(
+  provider: SocialProvider,
+  code: string,
+  redirectUri: string,
+): Promise<SocialLoginResult> {
+  const response = await request<LoginResponse | SocialSignupRequiredResponse>(
+    `/auth/oauth/${provider}`,
+    { method: 'POST', body: { code, redirectUri }, auth: 'none' },
+  );
+
+  if ('signupRequired' in response && response.signupRequired) {
+    return {
+      signupRequired: true,
+      signupToken: response.signupToken,
+      suggestedNickname: response.suggestedNickname,
+    };
+  }
+
+  const login = response as LoginResponse;
+
+  startSession(login.accessToken);
+
+  return { signupRequired: false, user: login.user };
+}
+
+/**
+ * API-008 소셜 회원가입 완료 · POST /api/v1/auth/oauth/signup
+ *
+ * 가입과 동시에 로그인되므로 응답은 로그인과 같다. 이메일 가입(API-001)과 달리 계정이
+ * 곧바로 `ACTIVE`라 이메일 인증을 기다리지 않는다.
+ */
+export async function socialSignup(body: SocialSignupRequest): Promise<AuthenticatedUser> {
+  const response = await request<LoginResponse>('/auth/oauth/signup', {
+    method: 'POST',
+    body,
+    auth: 'none',
+  });
+
+  startSession(response.accessToken);
+
+  return response.user;
+}
+
+/**
+ * API-009 소셜 계정 연결 · POST /api/v1/users/me/oauth/{provider}
+ *
+ * 로그인한 계정에 소셜 로그인 수단을 더한다. **부르는 화면이 아직 없다** — 와이어프레임
+ * 7.8-A에 진입 자리가 없어 업무 -499는 전송 계층까지만 두었다. 연결은 가입과 달리 다른
+ * 콜백 주소를 쓸 수 있으므로 `redirectUri`를 받는다.
+ */
+export async function linkSocialAccount(
+  provider: SocialProvider,
+  code: string,
+  redirectUri: string,
+): Promise<SocialLinkResult> {
+  return request<SocialLinkResult>(`/users/me/oauth/${provider}`, {
+    method: 'POST',
+    body: { code, redirectUri },
+  });
 }

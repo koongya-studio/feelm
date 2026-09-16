@@ -254,7 +254,7 @@
   "cast": [{ "personId": 287, "name": "브래드 피트", "character": "Tyler Durden" }],
   "posterUrl": "https://...",
   "backdropUrl": "https://...",
-  "flavorCode": "FLAVOR_X",
+  "flavorCode": "FLAVOR_A",
   "averageRating": 4.3,
   "ratingCount": 1280,
   "ottProviders": [

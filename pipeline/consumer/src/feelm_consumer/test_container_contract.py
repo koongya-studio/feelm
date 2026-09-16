@@ -39,6 +39,15 @@ def test_runtime_is_non_root_and_execs_consumer_directly() -> None:
     assert "CMD sh " not in dockerfile
 
 
+def test_test_stage_runs_locked_lint_and_tests_before_runtime_publication() -> None:
+    dockerfile = (CONSUMER_ROOT / "Dockerfile").read_text(encoding="utf-8")
+
+    assert "FROM builder AS test" in dockerfile
+    assert "uv sync --locked" in dockerfile
+    assert "uv run ruff check ." in dockerfile
+    assert "uv run pytest -v" in dockerfile
+
+
 def test_build_context_excludes_secrets_and_artifacts() -> None:
     patterns = {
         line.strip()

@@ -3,23 +3,17 @@
  * 대응 명세는 docs/api/recommendation.md이다.
  *
  * 화면은 src/mocks/를 직접 import하지 않고 이 파일만 호출한다.
+ *
+ * 업무 S15P21E106-478에서 추천 이력 조회(API-048)를 실제 호출로 바꿨다. 같은 파일의
+ * 기본 추천 조회(API-045)와 관심없음(API-047)은 목업으로 남는다 — 아래 각 함수에 이유를
+ * 적었다.
  */
-import { findMockMovie } from '../mocks/movies';
-import { mockOtts } from '../mocks/otts';
-import { mockRecommendationHistory } from '../mocks/recommendationHistory';
 import { findMockReplacement, mockRecommendationSet } from '../mocks/recommendations';
-import {
-  addDismissedMovie,
-  findLatestWatchRecordByMovie,
-  findRatingByMovie,
-  getDismissedMovieIds,
-} from '../mocks/sessionStore';
+import { addDismissedMovie, getDismissedMovieIds } from '../mocks/sessionStore';
+import { request } from './client';
 import { isMockError, respond, respondError } from './mockTransport';
-import type {
-  DismissResultView,
-  RecommendationHistoryView,
-  RecommendationSetView,
-} from '../types/unspecified';
+import type { DismissResultView, RecommendationSetView } from '../types/unspecified';
+import type { RecommendationHistory } from '../types/recommendation';
 
 /**
  * API-045 기본 추천 조회 · GET /api/v1/recommendations
@@ -96,36 +90,25 @@ export async function dismissMovie(
 /**
  * API-048 추천 이력 조회 · GET /api/v1/recommendations/history
  *
- * 이력은 생성 시점의 스냅샷이지만 `dismissed`와 `watchStatus`는 지금 상태다. 이번 세션에
- * 2.3에서 관심없음 처리했거나 2.5에서 평가한 영화는 그 결과를 얹는다. 그래야 7.5에서
- * 영화를 눌러 평가하고 돌아왔을 때 상태가 맞는다.
+ * 세트를 최신순으로 준다. 한 장은 **세트 단위**이며 세트 안의 영화는 추천받은 순서다.
+ * `size`를 보내지 않으면 20세트이고(계약 기본값), 그보다 오래된 이력은 `nextCursor`로
+ * 이어 받는다. `cursor`는 **직전 응답의 `nextCursor`를 그대로** 되돌려 줄 때만 쓴다.
  *
- * `ott`는 계약에 없다(types/unspecified.ts). `cursor` · `size`는 구현하지 않았다 —
- * 목업 세트가 네 개뿐이라 한 페이지로 끝난다.
+ * `dismissed`와 `watchStatus`는 **스냅샷이 아니라 지금 상태**다(계약 처리 규칙). 서버가
+ * 관심없음 기록과 최신 감상 기록을 함께 읽어 채우므로 클라이언트가 덧칠하지 않는다.
+ * 목업 시절에는 세션 저장소의 관심없음 · 평가를 여기서 얹었는데, 둘 다 실제 DB에 없는
+ * 목업 영화(2.2 추천 카드)의 것이라 서버 이력과 맞춰 볼 곳이 없다.
+ *
+ * `[!]` **아직 이력이 쌓이지 않는다.** 이력은 API-045가 추천 세트를 만들 때 생기는데
+ * 백엔드에 세트 생성(Candidate v4 소비)이 없어 `recommendation_sets`에 쓰는 곳이 없다.
+ * MY의 `추천 기록` 탭은 계약대로 빈 목록을 보여준다(업무 S15P21E106-164 · -194 대기).
+ *
+ * `[!]` **파티 추천 세트는 오지 않는다.** 계약은 세트의 `user_id` · `party_id`로 개인 ·
+ * 파티를 구분한다고 적지만 구현은 개인 세트만 조회한다. 화면의 `파티 추천` 출처 표시는
+ * 계약에 남은 값이라 지우지 않았고, 실제로는 나타나지 않는다(업무 S15P21E106-501).
  */
-export async function getRecommendationHistory(): Promise<RecommendationHistoryView> {
-  const dismissed = getDismissedMovieIds();
-
-  const items = mockRecommendationHistory.map((set) => ({
-    ...set,
-    items: set.items.map((item) => {
-      const { movieId } = item.movie;
-      const ottCode = findMockMovie(movieId).ottProviders[0];
-      const ott = mockOtts.find((candidate) => candidate.code === ottCode);
-      const watchStatus = findRatingByMovie(movieId)
-        ? ('RATED' as const)
-        : (findLatestWatchRecordByMovie(movieId)?.status ?? item.watchStatus);
-
-      return {
-        ...item,
-        dismissed: item.dismissed || dismissed.includes(movieId),
-        watchStatus,
-        ott: ott ? { code: ott.code, name: ott.name } : null,
-      };
-    }),
-  }));
-
-  return respond({ items, nextCursor: null, hasNext: false }, 'recommendations');
+export async function getRecommendationHistory(cursor?: string): Promise<RecommendationHistory> {
+  return request<RecommendationHistory>('/recommendations/history', { query: { cursor } });
 }
 
 /*

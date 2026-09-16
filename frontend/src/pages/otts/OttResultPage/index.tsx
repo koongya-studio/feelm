@@ -30,7 +30,6 @@ import StatusView from '../../../components/StatusView';
 import { getOttAnalysisBasis, getOttRecommendations } from '../../../api/ottRecommendations';
 import { getMyProfile } from '../../../api/users';
 import { path } from '../../../routes/paths';
-import { ottBadgeLetter } from '../../../utils/ott';
 import styles from './OttResultPage.module.css';
 import type { OttAnalysisBasis, OttRecommendationView } from '../../../types/unspecified';
 
@@ -127,7 +126,7 @@ export default function OttResultPage() {
         <section className={styles.top} aria-label={`1위 ${top.ott.name}`}>
           <div className={styles.topHead}>
             <OttBadge
-              letter={ottBadgeLetter(top.ott.code)}
+              code={top.ott.code}
               name={top.ott.name}
               size={44}
               radius={12}
@@ -156,7 +155,7 @@ export default function OttResultPage() {
               <Link to={path.ottResultDetail(item.ott.ottId)} className={styles.row}>
                 <span className={styles.rank}>{result.items.indexOf(item) + 1}</span>
                 <OttBadge
-                  letter={ottBadgeLetter(item.ott.code)}
+                  code={item.ott.code}
                   name={item.ott.name}
                   size={36}
                   radius={10}

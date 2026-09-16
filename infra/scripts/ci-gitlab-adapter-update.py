@@ -86,7 +86,8 @@ def verify_upload(stage):
 def active_units():
     result = subprocess.run(
         ['systemctl', 'list-units', '--state=running', '--no-legend',
-         'ci222-owner-*.service', 'ci222-server-*.service', 'ci352-owner-*.service'],
+         'ci222-owner-*.service', 'ci222-server-*.service', 'ci352-owner-*.service',
+         'ci296-owner-*.service', 'ci486-owner-*.service', 'ci490-infra-*.service'],
         capture_output=True, text=True, check=True, timeout=30)
     return result.stdout.strip()
 

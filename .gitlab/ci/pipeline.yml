@@ -1,19 +1,10 @@
-pipeline-mr-test:
+.pipeline-mr-test:
   stage: test
   tags: [e106-mr-isolated]
   dependencies: []
   variables:
     GIT_STRATEGY: none
-  script:
-    - cd pipeline/spark
-    - uv sync --frozen
-    - uv run ruff check .
-    - uv run pytest
-    - uv run python -m jobs.batch.als_baseline --help
-    - uv run python -m jobs.batch.parquet_roundtrip --help
-  resource_group: pipeline-mr-isolated
   interruptible: true
-  timeout: 30m
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
       changes:
@@ -35,3 +26,49 @@ pipeline-mr-test:
         - infra/scripts/systemd/feelm-ci222-gitlab-runner.service
         - infra/scripts/test_ci_gitlab_job_adapter.py
         - infra/scripts/test_ci_config.py
+
+pipeline-unit-test:
+  extends: .pipeline-mr-test
+  resource_group: pipeline-unit-test
+  script:
+    - cd pipeline/spark
+    - uv sync --frozen
+    - uv run ruff check .
+    - uv run python -m ci_test_groups verify
+    - uv run python -m ci_test_groups unit -vv --durations=20
+    - uv run python -m jobs.batch.als_baseline --help
+    - uv run python -m jobs.batch.parquet_roundtrip --help
+  timeout: 15m
+
+pipeline-spark-als-a-d-test:
+  extends: .pipeline-mr-test
+  when: manual
+  allow_failure: false
+  resource_group: pipeline-spark-als-a-d-test
+  script:
+    - cd pipeline/spark
+    - uv sync --frozen
+    - uv run python -m ci_test_groups spark-als-a-d -vv --durations=20
+  timeout: 15m
+
+pipeline-spark-als-e-z-test:
+  extends: .pipeline-mr-test
+  when: manual
+  allow_failure: false
+  resource_group: pipeline-spark-als-e-z-test
+  script:
+    - cd pipeline/spark
+    - uv sync --frozen
+    - uv run python -m ci_test_groups spark-als-e-z -vv --durations=20
+  timeout: 15m
+
+pipeline-spark-other-test:
+  extends: .pipeline-mr-test
+  when: manual
+  allow_failure: false
+  resource_group: pipeline-spark-other-test
+  script:
+    - cd pipeline/spark
+    - uv sync --frozen
+    - uv run python -m ci_test_groups spark-other -vv --durations=20
+  timeout: 15m

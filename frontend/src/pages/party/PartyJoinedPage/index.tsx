@@ -14,11 +14,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import StatusView from '../../../components/StatusView';
-import { getMyParties } from '../../../api/parties';
-import { mockMyProfile } from '../../../mocks/user';
+import { getParty } from '../../../api/parties';
+import { getMyProfile } from '../../../api/users';
 import { path } from '../../../routes/paths';
 import { findJoinedMember } from './joinedMember';
-import type { PartyView } from '../../../types/unspecified';
+import type { Party } from '../../../types/party';
 import styles from './PartyJoinedPage.module.css';
 
 export default function PartyJoinedPage() {
@@ -26,24 +26,27 @@ export default function PartyJoinedPage() {
   const { partyId } = useParams();
   const id = Number(partyId);
 
-  const [party, setParty] = useState<PartyView | null>(null);
+  const [party, setParty] = useState<Party | null>(null);
+  const [myUserId, setMyUserId] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let active = true;
 
-    getMyParties()
-      .then((parties) => {
+    // 누가 들어왔는지 고르려면 내가 누구인지 알아야 한다(`findJoinedMember`)
+    Promise.all([getParty(id), getMyProfile()])
+      .then(([found, profile]) => {
         if (!active) return;
 
-        const found = parties.find((item) => item.partyId === id);
-
-        if (found) {
-          setParty(found);
-          setFailed(false);
-        } else {
+        if (!found) {
           setFailed(true);
+
+          return;
         }
+
+        setParty(found);
+        setMyUserId(profile.userId);
+        setFailed(false);
       })
       .catch(() => {
         if (active) setFailed(true);
@@ -66,9 +69,9 @@ export default function PartyJoinedPage() {
     );
   }
 
-  if (!party) return null;
+  if (!party || myUserId === null) return null;
 
-  const joined = findJoinedMember(party.members, mockMyProfile.userId);
+  const joined = findJoinedMember(party.members, myUserId);
   const names = party.members.map((member) => member.nickname).join(' × ');
 
   return (

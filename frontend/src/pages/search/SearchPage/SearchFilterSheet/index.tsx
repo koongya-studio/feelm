@@ -13,7 +13,6 @@
 import { useEffect, useRef } from 'react';
 import Button from '../../../../components/Button';
 import OttBadge from '../../../../components/OttBadge';
-import { ottBadgeLetter } from '../../../../utils/ott';
 import { SORT_OPTIONS, toggle, YEAR_BUCKETS } from '../searchFilter';
 import type { SearchFilterState, YearBucketId } from '../searchFilter';
 import type { FilterOptions } from '../../../../types/search';
@@ -125,7 +124,7 @@ export default function SearchFilterSheet({
                   onClick={() => onChange({ ...value, ott: toggle(value.ott, ott.ottId) })}
                 >
                   <OttBadge
-                    letter={ottBadgeLetter(ott.code)}
+                    code={ott.code}
                     name={ott.name}
                     size={32}
                     labelled={false}

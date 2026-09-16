@@ -96,6 +96,14 @@
   text-align: center;
 }
 
+/* 링크 클릭 기록이 실패했을 때 힌트 자리에 대신 들어간다 */
+.actionError {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-danger);
+  text-align: center;
+}
+
 .content {
   display: flex;
   flex-direction: column;

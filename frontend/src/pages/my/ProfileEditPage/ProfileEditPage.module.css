@@ -8,90 +8,8 @@
 .page {
   display: flex;
   flex-direction: column;
-  padding: 0 var(--screen-padding-x) var(--space-6);
+  padding: var(--space-2) var(--screen-padding-x) var(--space-6);
   gap: var(--space-6);
-}
-
-/* ─────────────────────────── 상단 비주얼 */
-
-/*
- * 상단 비주얼. 7.2-A · 7.2-B의 히어로와 같은 무채색 면을 쓰되 낮다.
- * 화면 좌우 여백 안에서 쓰이므로 음수 마진으로 여백을 되돌려 전체 폭을 채운다.
- */
-.visual {
-  position: relative;
-  display: flex;
-  overflow: hidden;
-  min-height: 30vh;
-  min-height: 30svh;
-  /* 히어로와 같은 이유의 상한(ProfileHero.module.css) */
-  max-height: 300px;
-  justify-content: center;
-  margin: 0 calc(var(--screen-padding-x) * -1);
-  border-radius: var(--radius-card);
-  /* 히어로와 같은 무채색 면(ProfileHero.module.css) */
-  background:
-    radial-gradient(120% 80% at 50% 0%, #2a2b2f 0%, rgba(42, 43, 47, 0) 72%),
-    var(--color-surface-dark);
-  isolation: isolate;
-}
-
-.avatarSlot {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  padding: var(--space-6) var(--screen-padding-x) var(--space-5);
-  gap: var(--space-2);
-}
-
-/* 카메라 뱃지를 아바타 우하단에 걸기 위한 기준점 */
-.avatarWrap {
-  position: relative;
-}
-
-/* 아바타는 이미지 위에 뜬 것처럼 테두리를 두른다 */
-.avatarWrap > :first-child {
-  border: 2px solid rgba(255, 255, 255, 0.22);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
-}
-
-/*
- * 카메라 뱃지. 와이어프레임 7.2가 아바타 우하단에 둔 원형 뱃지다.
- *
- * 업로드 API가 계약에 없어 동작하지 않는다. 비활성이지만 자리는 남겨 무엇이 생길
- * 자리인지 보이게 하고, 아래 문구가 아직 열리지 않았음을 말한다.
- */
-.avatarBadge {
-  position: absolute;
-  right: -2px;
-  bottom: -2px;
-  display: flex;
-  width: 36px;
-  height: 36px;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 2px solid var(--color-surface-dark);
-  border-radius: var(--radius-pill);
-  background: var(--color-on-dark);
-  color: var(--color-surface-dark);
-  opacity: 0.55;
-}
-
-.visualName {
-  color: var(--color-on-dark);
-  font-size: var(--font-size-heading);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: var(--letter-spacing-heading);
-}
-
-.visualHint {
-  color: var(--color-on-dark-hint);
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
 }
 
 /* ─────────────────────────── 정보 묶음 */
@@ -107,18 +25,6 @@
   font-size: var(--font-size-meta);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-meta);
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.note {
-  color: var(--color-ink-muted);
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
 }
 
 /* ─────────────────────────── 읽기 전용 3행 */

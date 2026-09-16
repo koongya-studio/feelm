@@ -19,12 +19,12 @@ import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import { getMyParties } from '../../../api/parties';
 import { path } from '../../../routes/paths';
-import type { PartyView } from '../../../types/unspecified';
+import type { Party } from '../../../types/party';
 import styles from './PartyListPage.module.css';
 
 export default function PartyListPage() {
   const navigate = useNavigate();
-  const [parties, setParties] = useState<PartyView[] | null>(null);
+  const [parties, setParties] = useState<Party[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
 

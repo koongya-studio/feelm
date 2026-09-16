@@ -47,7 +47,7 @@ const frames: FrameList = {
       frameId: 501,
       movie: { movieId: 401, title: '영화 제목 1', posterUrl: null },
       score: 4.5,
-      flavorCode: 'FLAVOR_CRIME',
+      flavorCode: 'FLAVOR_D',
       createdAt: '2026-09-06T12:30:00Z',
     },
   ],
@@ -175,10 +175,18 @@ describe('3.4 → 3.5', () => {
 });
 
 describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
+  /*
+   * 7.1 MY의 취향 리포트 입구는 **지난 반기 리포트를 찾아보러 가는 유일한 길이다**
+   * (사용자 결정 2026-09-16, 업무 -459). 2.1은 최신 한 장으로, 3.1은 상태에 따라 3.3
+   * 발급으로 가므로 목록의 입구로 대신할 수 없다.
+   *
+   * 같은 날 시안으로 배치가 바뀌면서 메뉴 줄이 아니라 **`4컷 리포트` 그림**이 됐다.
+   * 이름만 바뀌었고 목적지는 그대로다.
+   */
   it('MY에서 목록으로 가서 상세를 열고, 저장하면 목록으로 돌아온다', async () => {
     renderApp([ROUTE_PATTERN.my]);
 
-    fireEvent.click(await screen.findByRole('link', { name: '취향 리포트' }));
+    fireEvent.click(await screen.findByRole('link', { name: '4컷 리포트' }));
     expect(location()).toBe('/my/reports');
 
     // 연도마다 반기 4컷을 붙인다. 만드는 중인 반기는 빈 인화지이고 누를 수 없다

@@ -22,7 +22,7 @@ import ScreenHeader from '../../../components/ScreenHeader';
 import Section from '../../../components/Section';
 import StatusView from '../../../components/StatusView';
 import {
-  getMyParties,
+  getParty,
   getPartyMix,
   getPartyRecommendationReasons,
   getPartyRecommendations,
@@ -61,22 +61,22 @@ export default function PartyRecommendationPage() {
         if (active) setFailed(true);
       });
 
-    getMyParties()
-      .then((parties) => {
-        const party = parties.find((item) => item.partyId === id);
+    getParty(id)
+      .then(async (party) => {
+        if (!party) return;
 
-        if (active && party) setMembers(party.members.map((member) => member.nickname));
-      })
-      .catch(() => {
-        // 참여자 이름이 없어도 추천 목록은 보여준다
-      });
+        if (active) setMembers(party.members.map((member) => member.nickname));
 
-    getPartyMix(id)
-      .then((mix) => {
+        // 공통 키워드는 계약 밖 값이다. 자리표시자를 실제 파티원에게 붙인다
+        const mix = await getPartyMix(
+          id,
+          party.members.map((member) => member.userId),
+        );
+
         if (active) setKeywords(mix.tags);
       })
       .catch(() => {
-        // 공통 키워드는 계약 밖 값이다. 없으면 그 줄만 비운다
+        // 참여자 이름과 공통 키워드가 없어도 추천 목록은 보여준다
       });
 
     getPartyRecommendationReasons(id)

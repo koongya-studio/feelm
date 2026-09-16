@@ -132,40 +132,12 @@
 }
 
 /*
- * 빨간 테이프. 끝이 뜯긴 모양은 좌우 톱니 모양으로 자른다. 4컷 위에 걸쳐 붙는다.
- * 빨강은 붙인 종이의 일부로 본다 — 4컷 인화지와 같은 콘텐츠 빨강이다.
+ * 빨간 테이프는 `components/ReportTape`다. 7.1 MY의 바로가기가 같은 모양을 쓰면서
+ * 승격했다(업무 -459). 기본값이 이 화면의 값이라 여기서는 기울기만 바꾼다.
  */
-.tape {
-  position: absolute;
-  z-index: 1;
-  top: -7px;
-  left: 50%;
-  width: 36%;
-  height: 16px;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 60%),
-    var(--color-brand);
-  clip-path: polygon(
-    0 8%,
-    6% 0,
-    94% 4%,
-    100% 0,
-    97% 30%,
-    100% 55%,
-    96% 78%,
-    100% 100%,
-    5% 96%,
-    0 100%,
-    3% 70%,
-    0 45%,
-    4% 24%
-  );
-  opacity: 0.88;
-  transform: translateX(-30%) rotate(-9deg);
-}
-
-.pinned[data-tilt='right'] .tape {
-  transform: translateX(-20%) rotate(11deg);
+.pinned[data-tilt='right'] {
+  --tape-shift: -20%;
+  --tape-angle: 11deg;
 }
 
 .date {

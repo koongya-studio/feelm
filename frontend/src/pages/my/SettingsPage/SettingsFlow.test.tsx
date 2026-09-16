@@ -159,6 +159,8 @@ function renderApp(entries: string[]) {
     status: 'authenticated',
     user: { userId: 1024, nickname: '김난다', onboardingCompleted: true },
     signIn: vi.fn(),
+    signInWithSocial: vi.fn(),
+    completeSocialSignup: vi.fn(),
     signOut,
   };
 
@@ -185,6 +187,18 @@ function renderApp(entries: string[]) {
 
 const location = () => screen.getByTestId('location').textContent;
 const back = () => fireEvent.click(screen.getByRole('button', { name: '뒤로 가기' }));
+
+describe('7.8 → 6.1', () => {
+  it('OTT 관리가 설정 안에 있다', async () => {
+    /*
+     * 7.1 MY 헤더에 있던 줄을 설정 `계정` 묶음으로 옮겼다(사용자 지시 2026-09-16).
+     * **7.8이 6.1의 유일한 입구다.**
+     */
+    renderApp([ROUTE_PATTERN.settings]);
+
+    expect(await screen.findByRole('link', { name: /OTT 관리/ })).toHaveAttribute('href', '/otts');
+  });
+});
 
 describe('7.1 → 7.8 → 7.8-A → 7.8-A-1', () => {
   it('회원 탈퇴 확인에서 계속 이용하기를 누르면 계정 관리로 돌아온다', async () => {

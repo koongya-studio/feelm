@@ -129,11 +129,14 @@ class BackendMrPathRulesTests(unittest.TestCase):
         inputs = (
             'infra/scripts/verify-datastores.sh',
             'infra/scripts/test_deploy_backend.py',
-            'infra/scripts/test_consumer_distributed_deployment.py',
         )
         for path in inputs:
             with self.subTest(path=path):
                 self.assertTrue(matches(path, self.patterns))
+
+    def test_infra_config_contract_is_not_owned_by_backend_job(self):
+        self.assertFalse(matches(
+            'infra/scripts/test_consumer_distributed_deployment.py', self.patterns))
 
     def test_mixed_change_and_document_after_code_still_run(self):
         changes = ('backend/src/main/resources/application.yml', 'backend/README.md')

@@ -130,7 +130,7 @@ erDiagram
         int runtime_minutes "TMDb 미제공 시 NULL 가능"
         varchar poster_url "TMDb 미제공 시 NULL 가능"
         varchar backdrop_url "TMDb 미제공 시 NULL 가능"
-        bigint representative_flavor_id FK "K-Means 대표 맛, 배정 전 NULL. ADR-0015"
+        bigint representative_flavor_id FK "439 대표 맛, 미지원·배정 전 NULL. ADR-0020"
         numeric average_rating "서비스 평가 집계"
         int rating_count
         timestamptz synced_at "TMDb 동기화 시각, 동기화 전 NULL"
@@ -184,12 +184,12 @@ erDiagram
     }
     POPCORN_FLAVORS {
         bigint id PK
-        int cluster_id UK "K-Means 원시 Cluster ID, 공개 API 미노출"
+        int cluster_id UK "439 taste_id 0~7, 공개 API 미노출"
         varchar code UK "불변"
         varchar display_name "변경 가능"
         varchar color "변경 가능"
         int sort_order
-        jsonb representative_keywords "c-TF-IDF 대표 키워드"
+        jsonb representative_keywords "실배정 해석 키워드"
     }
 
     MOVIES ||--o{ MOVIE_GENRES : classified
@@ -212,7 +212,7 @@ erDiagram
 | `people` | 인물(감독·배우) | 검색 대상(FR-14) | API-028, API-030 |
 | `otts` | OTT 기준정보 | 지원 목록 5종(API-025)을 새 Flyway seed로 초기화한다. 기존 식별쌍·ID·참조는 보존하고 이후 콘텐츠 적재는 같은 쌍의 표시 정보를 갱신한다 | FR-03, FR-16 · API-025 |
 | `movie_ott_providers` | 영화별 시청 가능 OTT | TMDb watch provider 동기화 | FR-16 · API-030 |
-| `popcorn_flavors` | 팝콘 맛 8종 기준정보와 군집 매핑 | `cluster_id`와 `code`는 각각 유일하며 고정된 8개 Centroid와 1:1로 대응한다. 표시명·색상은 변경 가능하고 대표 키워드도 함께 보관한다. 원시 `cluster_id`는 공개 API에 노출하지 않는다 | FR-06 · API-044 · ADR-0015 |
+| `popcorn_flavors` | 팝콘 맛 8종 기준정보와 439 상위 맛 매핑 | `cluster_id=taste_id`와 `code=FLAVOR_A..H`는 각각 유일하며 순서대로 1:1 대응한다. 표시명·색상은 변경 가능하고 실배정 해석 키워드도 함께 보관한다. 내부 `cluster_id`는 공개 API에 노출하지 않는다 | FR-06 · API-044 · ADR-0020 |
 
 ### 2.3 온보딩·감상·취향
 
@@ -302,8 +302,10 @@ erDiagram
         bigint id PK
         bigint user_id FK "개인 추천. 파티 추천은 NULL"
         bigint party_id FK "파티 추천. 개인 추천은 NULL"
-        varchar input_version "평가·온보딩 변경 버전. 관심없음은 버전을 바꾸지 않음"
+        varchar input_version "기존 NOT NULL 호환 컬럼. Redis 개인 추천은 redis-candidate 저장"
         varchar model_version "ALS 추천 모델 버전"
+        bigint candidate_version "Redis 후보 버전. 파티 세트 기본값 0"
+        varchar generation_id "Redis 개인 추천 배치 식별자"
         timestamptz generated_at
     }
     RECOMMENDATION_ITEMS {
@@ -311,6 +313,7 @@ erDiagram
         bigint set_id FK
         bigint movie_id FK
         varchar type "TASTE / DISCOVERY / PARTY"
+        varchar flavor_code "후보가 제시한 맛 코드. 없으면 NULL"
         int position
         jsonb reason "추천 이유 스냅샷 (summary, factors)"
         timestamptz exposed_at "노출 시각. NULL이면 미노출 버퍼분"
@@ -334,11 +337,11 @@ erDiagram
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `recommendation_sets` | 추천 세트(이력 단위) | `user_id`·`party_id` 중 하나만 NOT NULL(CHECK). 개인/파티 구분은 이 두 FK로 판단한다. `input_version`과 ALS `model_version`이 같으면 같은 세트를 반환하며 소유자별 부분 유일 인덱스를 둔다 | FR-10, FR-33 · API-045, API-046, API-048, API-058 |
-| `recommendation_items` | 세트의 후보 영화 + 이유 스냅샷 | 유형은 `TASTE`·`DISCOVERY`·`PARTY`. UK(`set_id`, `position`), UK(`set_id`, `movie_id`), `position >= 1`. 후보 20편을 모두 저장하고 `exposed_at`으로 실제 노출분을 구분한다 | FR-12, FR-13 · API-045~048 |
+| `recommendation_sets` | 추천 세트(이력 단위) | `user_id`·`party_id` 중 하나만 NOT NULL(CHECK). Redis 개인 세트는 전역 고유 `generation_id`로 같은 배치를 식별한다. 파티 세트의 후보 버전 기본값은 0이고 generation ID는 NULL이다 | FR-10, FR-33 · API-045, API-046, API-048, API-058 |
+| `recommendation_items` | 세트의 후보 영화 + 이유 스냅샷 | 유형은 `TASTE`·`DISCOVERY`·`PARTY`. nullable `flavor_code`는 Redis 후보 값을 스냅샷한다. UK(`set_id`, `type`, `position`), UK(`set_id`, `movie_id`), `position >= 1`. TASTE·DISCOVERY를 각각 최대 20편 저장하고 `exposed_at`으로 실제 노출분을 구분한다 | FR-12, FR-13 · API-045~048 |
 | `user_movie_dismissals` | 사용자별 영화 관심없음 | UK(`user_id`, `movie_id`). 모든 화면의 모든 영화에 적용한다. `recommendation_item_id`는 선택적 출처이며 아이템 삭제 시 NULL로 전환한다 | FR-36 · API-047 |
 
-> 후보 Top-500은 Redis, Item Factor는 HDFS에 있으며 이 ERD 범위 밖입니다. 추천 세트의 후보 20편(버퍼)은 `recommendation_items`에 **전부 저장**하고, 추천 이력 조회(API-048)는 `exposed_at IS NOT NULL`인 노출분만 반환합니다. Redis의 추천 결과 캐시는 선택적 조회 가속용입니다 (MR !22 합의: PostgreSQL 저장안).
+> 종류별 후보 Top-500은 Redis, Item Factor는 HDFS에 있으며 이 ERD 범위 밖입니다. 추천 세트의 TASTE·DISCOVERY 후보를 각각 최대 20편 `recommendation_items`에 저장하고, 추천 이력 조회(API-048)는 `exposed_at IS NOT NULL`인 노출분만 반환합니다. Redis의 추천 결과 캐시는 선택적 조회 가속용입니다 (MR !22 합의: PostgreSQL 저장안).
 
 ### 2.5 파티
 
@@ -486,21 +489,21 @@ flowchart LR
 | D-2 | Refresh Token 저장소 | PostgreSQL / Redis(TTL) | **Redis** (08-31, ADR-0009) — `refresh_tokens` 테이블 제거 | 인증 API, 회전·폐기, 탈퇴 처리 |
 | D-3 | 사용자당 활성 파티 수 | 1개 제한 / 복수 허용 | **최대 10개, 파티당 최대 4명 유지** (09-10 변경) | API-049·050·053, ⑧ 화면 |
 | D-4 | 취향 분석·추천 이유 계산 위치 | Spring Boot / FastAPI / Python Consumer / Spark Streaming | **취향 집계와 행동 Feature 경량 재정렬·최종 XAI 조립은 Spring, 개인 Fold-in·Candidate·기본 Top-N/XAI는 Python Consumer, 행동 Feature 집계와 전역 인기는 Spark Streaming** (09-01, ADR-0017) | `taste_analyses` 갱신, Kafka 이벤트·Redis 결과 계약 |
-| D-5 | 영화의 대표 맛 규칙 | 장르 규칙 / K-Means / 큐레이션 | **E5 임베딩 K-Means의 최근접 Centroid 하나에 배정** (08-31, ADR-0015) | `movies.representative_flavor_id`, 팝콘 집계 |
+| D-5 | 영화의 대표 맛 규칙 | 장르 규칙 / K-Means / 큐레이션 | **439의 `top_x=L2(concat(g,0×k,0×t))`와 고정 상위 중심의 최근접 taste 하나에 배정** (09-16 개정, ADR-0020) | `movies.representative_flavor_id`, 팝콘 집계 |
 | D-6 | 감상 기록 없이 평가 허용 | 허용 / 불허 | **허용** (08-30) — `ratings.watch_record_id` NULL 허용 | `watch_records` 유일 제약, ⑩·⑪ 화면 |
 | D-7 | 프레임·팝콘 저장 구조 | 별도 테이블 / 평가·영화에서 조회 | **프레임만 별도 유지**, 팝콘 버킷은 평가와 영화 맛을 집계 | 필름·팝콘 조회 |
 | D-8 | 가입 시 나이 저장 형식 | 정수 / 연령대 / 출생연도 | **생년월일(`birth_date`)** (08-31, 08-30 출생연도에서 변경). 성별 3값이며 가입 시 필수 (09-05 `NULL 허용`에서 정정, 플랜 결정 11). 두 값 모두 컬럼은 탈퇴 파기를 위해 NULL을 허용한다(D-9) | `users`, API-001·008 |
 | D-9 | 탈퇴 사용자 데이터 처리 | 즉시 삭제 / 기간 보존 / 익명화 | **계정 영역 확정: 이메일·닉네임 치환 + 즉시 재사용 허용** (09-02, BE-A). `password_hash`·`birth_date`·`gender`, 소셜 연결 수단과 인증 토큰은 삭제한다. 내부·공개 식별자 및 다른 사용자 데이터와의 연결이 남으므로 계정 행 전체가 익명정보라고 전제하지 않는다. 공개 한줄평과 학습 데이터는 각 도메인 담당 결정 대기 | `users.status`, 공개 한줄평, 학습 데이터 |
 | D-10 | 평균 별점 집계 방식 | 반정규화 컬럼 / 조회 시 집계 / MView | **반정규화 컬럼, 차단 미반영** (08-30) | 평가 트랜잭션 범위, API-030 |
 | D-11 | 검색 엔진 | PostgreSQL full-text(`pg_trgm`) / Elasticsearch | **PostgreSQL full-text + `pg_trgm`** (08-31, ADR-0010) | 인덱스 설계 |
-| D-12 | 팝콘 맛 8종 기준정보 | 고정 장르 그룹 / ML 취향 군집 | **고정 K-Means 8군집 + c-TF-IDF 대표 키워드**. `popcorn_flavors.cluster_id`와 맛 코드가 1:1로 대응한다 (ADR-0015) | `popcorn_flavors` 초기 데이터, 온보딩 카드 |
-| D-13 | 신규 영화 맛 배정 | 전체 재학습 / 고정 Centroid 예측 | **재학습·모델 버전 없이 기존 K-Means `predict`로 최근접 Centroid에 배정** (ADR-0015) | `movies.representative_flavor_id`, 신규 영화 분류 파이프라인 |
+| D-12 | 팝콘 맛 8종 기준정보 | 고정 장르 그룹 / ML 취향 군집 | **439 `taste_id 0..7` ↔ `FLAVOR_A..H` 고정 매핑 + 실배정 해석 키워드**. 표시명·색상은 변경 가능하다 (ADR-0020) | `popcorn_flavors` 초기 데이터, 온보딩 카드 |
+| D-13 | 신규 영화 맛 배정 | 전체 재학습 / 고정 중심 거리 | **재학습·estimator predict 없이 439와 같은 고정 131차원 전처리·거리로 배정** (ADR-0020) | `movies.representative_flavor_id`, 신규 영화 분류 파이프라인 |
 
-맞춤은 사용자 평가·온보딩 선호 기반 개인 순위로 생성합니다. 발견은 D-5·D-12의 K-Means
-취향 군집을 바탕으로 별도 선정하며, 군집 산출물과 선정 기준이 준비되기 전에는 발견 슬롯을
+맞춤은 사용자 평가·온보딩 선호 기반 개인 순위로 생성합니다. 발견은 D-5·D-12의 439 고정 그룹을
+바탕으로 별도 선정하며, 선정 기준이 준비되기 전에는 발견 슬롯을
 맞춤으로 채웁니다.
 평점 범위·간격은 FR-19에 따라 0.5~5.0점·0.5점 단위입니다. 물리 스키마에서는 scale 없는
 `numeric`과 범위·배수 CHECK를 사용합니다([물리 규칙](./db-schema-convention.md)).
 
-미결은 D-9의 계정 외 영역(공개 한줄평, 학습 데이터), 팝콘 표시명·색상,
+미결은 D-9의 계정 외 영역(공개 한줄평, 학습 데이터),
 맞춤·발견 판정 방식·기준값 등입니다.

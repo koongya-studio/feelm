@@ -11,7 +11,7 @@
   ],
   "comparisonMode": "SHADOW",
   "personalization": {
-    "minimumCurrentActualRatings": 10,
+    "minimumCurrentActualRatings": 0,
     "originalHistoryLimit": 10,
     "ratingMinimum": 0.5,
     "ratingMaximum": 5.0,

@@ -29,6 +29,17 @@
  * 감상 정보(`6월 2일 · 넷플릭스에서 시청`)는 감상 기록 목록(API-034)에서 읽는다. 2.4-A에서
  * `봤어요`를 고른 기록의 `watchedAt`과 `ott`를 쓰므로 실제로 이동한 OTT가 나온다
  * (업무 -263). 2.4에서 바로 들어와 감상 기록이 없으면 이 줄을 표시하지 않는다.
+ *
+ * 영화 정보(API-030, 업무 -475) · 감상 기록(API-034, 업무 -477) · **평가 생성(API-036,
+ * 업무 -491)**은 실제 API다. 저장하면 서버가 같은 트랜잭션에서 감상 기록을 `RATED`로
+ * 옮기므로 평가한 영화는 7.7 `안 남긴 영화`에서 빠진다. **평가 수정(API-037)은 아직
+ * 목업이라** 고친 값이 서버에 닿지 않는다(api/watch.ts). 목업 목록(7.6)에서 들어오면
+ * 그 `movieId`가 실제 DB에 없어 오류 상태가 된다.
+ *
+ * 저장 실패는 화면에 남기고 이동하지 않는다. 계약이 가르는 것 중 화면이 달리 말하는 것은
+ * `409 RATING_ALREADY_EXISTS` 하나다 — 상세를 읽은 뒤 다른 곳에서 평가가 생긴 경우라,
+ * 알리고 상세를 다시 읽어 수정 모드로 바꾼다. 나머지(`400` 검증 · `404` · 네트워크)는
+ * 서버 문구를 그대로 보여준다.
  */
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
@@ -38,22 +49,38 @@ import RatingInput from '../../../components/RatingInput';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import TextArea from '../../../components/TextArea';
+import { ApiError } from '../../../api/apiError';
 import { getMovieDetail } from '../../../api/movies';
 import { getOtts } from '../../../api/otts';
 import {
   createRating,
+  findWatchedRecord,
   getCountsBeforeRating,
-  getWatchRecords,
   updateRating,
 } from '../../../api/watch';
 import { path } from '../../../routes/paths';
 import { formatMonthDay } from '../../../utils/date';
+import { movieMetaLine } from '../../../utils/movie';
 import styles from './MovieRatingPage.module.css';
 import type { MovieDetail } from '../../../types/movie';
 
 /** 무엇을 평가하는지 확인시키는 작은 포스터. 이 화면의 주인공은 별점이다 */
 const POSTER_WIDTH = 88;
 const POSTER_HEIGHT = 132;
+
+/** 서버 문구 대신 화면이 정하는 경우만 둔다 */
+const MESSAGE: Record<string, string> = {
+  RATING_ALREADY_EXISTS: '이미 평가한 영화예요. 저장된 평가를 불러왔어요',
+  RESOURCE_NOT_FOUND: '영화를 찾을 수 없어요',
+};
+
+function failureMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    return MESSAGE[error.code] ?? error.message;
+  }
+
+  return '평가를 저장하지 못했어요. 잠시 후 다시 시도해 주세요';
+}
 
 export default function MovieRatingPage() {
   const { movieId } = useParams();
@@ -69,6 +96,8 @@ export default function MovieRatingPage() {
   const [score, setScore] = useState(0);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  /** 저장 실패 문구. 다시 저장을 시도하면 지운다 */
+  const [failure, setFailure] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -89,18 +118,14 @@ export default function MovieRatingPage() {
       });
 
     // 감상 정보 줄에만 쓰이므로 실패하면 그 줄만 표시하지 않는다
-    Promise.all([getWatchRecords(), getOtts()])
-      .then(([records, otts]) => {
-        // 목록은 최근 순이므로 가장 최근에 감상을 확인한 기록을 쓴다
-        const record = records.items.find(
-          (item) => item.movie.movieId === id && item.watchedAt !== null,
-        );
-
+    Promise.all([findWatchedRecord(id), getOtts()])
+      .then(([record, otts]) => {
         if (!active || !record?.watchedAt) {
           return;
         }
 
-        const ottName = otts.find((ott) => ott.ottId === record.ott.ottId)?.name;
+        // 클릭 없이 평가로 만들어진 기록에는 OTT가 없다(API-034). 그때는 날짜만 남는다
+        const ottName = otts.find((ott) => ott.ottId === record.ott?.ottId)?.name;
 
         setWatchNote(
           ottName
@@ -121,39 +146,50 @@ export default function MovieRatingPage() {
     }
 
     setSubmitting(true);
+    setFailure(null);
 
     const trimmed = comment.trim();
 
-    /*
-     * 이미 평가한 영화는 수정이다(API-037). 새 평가를 만들면 프레임과 팝콘이 한 번 더
-     * 쌓인다 — 업무 -306 전에는 3.1-A `평가 수정`이 실제로 그렇게 동작했다.
-     * 수정은 프레임을 만들지 않으므로 2.6 · 2.7로 가지 않고 온 곳으로 돌아간다
-     * (7.6 · 3.1-A · 2.4).
-     */
-    if (movie.myRating) {
-      await updateRating(movie.myRating.ratingId, {
-        score,
-        comment: trimmed || null,
-        visibility: movie.myRating.visibility,
+    try {
+      /*
+       * 이미 평가한 영화는 수정이다(API-037). 새 평가를 만들면 서버가 `409`를 주고, 그 전
+       * 목업 시절에는 프레임과 팝콘이 한 번 더 쌓였다(업무 -306 전의 3.1-A `평가 수정`).
+       * 수정은 프레임을 만들지 않으므로 2.6 · 2.7로 가지 않고 온 곳으로 돌아간다
+       * (7.6 · 3.1-A · 2.4).
+       */
+      if (movie.myRating) {
+        await updateRating(movie.myRating.ratingId, {
+          score,
+          comment: trimmed || null,
+          visibility: movie.myRating.visibility,
+        });
+
+        void navigate(-1);
+
+        return;
+      }
+
+      // 추가 전 수치를 먼저 받는다. 여기서 실패하면 저장하지 않으므로 다시 눌러도 `409`가 없다
+      const counts = await getCountsBeforeRating();
+      const rating = await createRating(
+        movie.movieId,
+        // comment가 있으면 visibility가 필수다(API-036). 선택 UI가 없어 기본값 PRIVATE
+        trimmed ? { score, comment: trimmed, visibility: 'PRIVATE' } : { score },
+      );
+
+      // 2.6 · 2.7은 추가 전 수치가 있어야 성립하므로 Router state로 넘긴다
+      void navigate(path.ratingResult(movie.movieId), {
+        state: { rating, counts, movieTitle: movie.title, posterUrl: movie.posterUrl },
       });
+    } catch (error) {
+      setFailure(failureMessage(error));
+      setSubmitting(false);
 
-      void navigate(-1);
-
-      return;
+      // 상세를 읽은 뒤 다른 곳에서 평가가 생겼다. 다시 읽으면 `myRating`이 차서 수정 모드가 된다
+      if (error instanceof ApiError && error.code === 'RATING_ALREADY_EXISTS') {
+        setReloadCount((count) => count + 1);
+      }
     }
-
-    const counts = await getCountsBeforeRating();
-    const rating = await createRating(
-      movie.movieId,
-      // comment가 있으면 visibility가 필수다(API-036). 선택 UI가 없어 기본값 PRIVATE
-      trimmed ? { score, comment: trimmed, visibility: 'PRIVATE' } : { score },
-      movie.flavorCode,
-    );
-
-    // 2.6 · 2.7은 추가 전 수치가 있어야 성립하므로 Router state로 넘긴다
-    void navigate(path.ratingResult(movie.movieId), {
-      state: { rating, counts, movieTitle: movie.title, posterUrl: movie.posterUrl },
-    });
   }
 
   if (failed) {
@@ -183,12 +219,8 @@ export default function MovieRatingPage() {
   }
 
   const isEditing = movie.myRating !== null;
-  const releaseYear = movie.releaseDate.slice(0, 4);
-  const meta = [
-    releaseYear,
-    ...movie.genres.map((genre) => genre.name),
-    `${movie.runtimeMinutes}분`,
-  ].join(' · ');
+  // 개봉일 · 장르 · 상영 시간은 원천에 없으면 빠진다(API-030). 있는 값만 잇는다
+  const meta = movieMetaLine(movie);
 
   return (
     <>
@@ -207,7 +239,7 @@ export default function MovieRatingPage() {
 
           <div className={styles.movieInfo}>
             <p className={styles.movieTitle}>{movie.title}</p>
-            <p className={styles.movieMeta}>{meta}</p>
+            {meta ? <p className={styles.movieMeta}>{meta}</p> : null}
             {/* 감상 기록이 없으면 이 줄을 표시하지 않는다 */}
             {watchNote ? <p className={styles.movieMeta}>{watchNote}</p> : null}
           </div>
@@ -242,8 +274,14 @@ export default function MovieRatingPage() {
         </div>
 
         <div className={styles.actions}>
+          {failure ? (
+            <p className={styles.failure} role="alert">
+              {failure}
+            </p>
+          ) : null}
+
           <Button disabled={score === 0 || submitting} onClick={() => void submit()}>
-            평가 완료
+            {submitting ? '저장하는 중…' : '평가 완료'}
           </Button>
 
           {/* `[?]` 수정일 때의 안내는 와이어프레임에 없다. 원래 문구는 새 평가에만 맞는다 */}

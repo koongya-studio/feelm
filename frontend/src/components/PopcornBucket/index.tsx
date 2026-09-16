@@ -44,19 +44,17 @@ import styles from './PopcornBucket.module.css';
  * 코드로 짝지어야 한다. 코드는 불변이므로(FR-06) 이 대응은 이름이 바뀌어도 살아남는다.
  * 모르는 코드가 오면 기본 맛으로 그린다.
  *
- * `[!]` 새 라인업에는 비스코프 에스프레소 크런치가 없고 피스타치오 화이트초코가 있어,
- * `FLAVOR_DRAMA` 자리에 피스타치오 그림을 넣었다. 맛 이름 · 범례 색은 API-044(지금은 목업)
- * 그대로라 이 한 맛만 그림과 이름 · 색이 다르다. 맛 기준정보가 정해지면 맞춘다.
+ * S15P21E106-466에서 439 taste 순서대로 FLAVOR_A~H를 기존 3D 자산 8종에 연결했다.
  */
 const KERNEL_SPRITE: Record<string, string> = {
-  FLAVOR_CAPER: original,
-  FLAVOR_THRILL: caramel,
-  FLAVOR_NOIR: cheese,
-  FLAVOR_CRIME: chocolate,
-  FLAVOR_ACTION: cookie,
-  FLAVOR_DRAMA: pistachio,
-  FLAVOR_COMEDY: strawberry,
-  FLAVOR_SF: blueberry,
+  FLAVOR_A: original,
+  FLAVOR_B: chocolate,
+  FLAVOR_C: caramel,
+  FLAVOR_D: pistachio,
+  FLAVOR_E: cookie,
+  FLAVOR_F: cheese,
+  FLAVOR_G: strawberry,
+  FLAVOR_H: blueberry,
 };
 
 /* 좌표계. 통 하나가 들어가는 상자다 */

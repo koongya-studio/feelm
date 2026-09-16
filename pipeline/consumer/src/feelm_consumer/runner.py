@@ -12,8 +12,12 @@ from confluent_kafka import Consumer, KafkaException, TopicPartition
 
 from feelm_consumer.artifacts import ArtifactBundle, load_bundle
 from feelm_consumer.content import ContentBundle, load_content
+from feelm_consumer.discovery_popularity import load_discovery_popularity
+from feelm_consumer.discovery_release import validate_discovery_artifacts
 from feelm_consumer.events import EventValidationError, parse_event
-from feelm_consumer.postgres import load_profile, readonly_snapshot
+from feelm_consumer.group_artifacts import GroupBundle, load_group_bundle
+from feelm_consumer.postgres import load_user_snapshot, readonly_snapshot
+from feelm_consumer.ranking import RankedMovie
 from feelm_consumer.redis_store import (
     StalePartitionFenceError,
     claim_partition_fence,
@@ -41,8 +45,9 @@ def process_user(
     is_still_owned: Callable[[], bool] | None = None,
     partition_fence: tuple[str, str] | None = None,
     content: ContentBundle | None = None,
+    groups: GroupBundle | None = None,
+    discovery_popularity: tuple[RankedMovie, ...] | None = None,
     hybrid_alpha: float = 0.5,
-    min_input_count: int = 0,
 ) -> bool | None:
     for attempt in range(attempts):
         try:
@@ -50,35 +55,37 @@ def process_user(
                 raise ValueError("partition fence is required")
             expected = _expected_version(store, user_id, partition_fence)
             with readonly_snapshot(connect) as connection:
-                ratings, onboarding = load_profile(connection, user_id)
+                snapshot = load_user_snapshot(connection, user_id)
             results = calculate_user_results(
                 bundle,
-                ratings,
-                onboarding,
-                expected + 1,
+                snapshot.ratings,
+                snapshot.onboarding,
                 content=content,
+                groups=groups,
+                discovery_popularity=discovery_popularity,
+                watched_movie_ids=snapshot.watched_movie_ids,
+                dismissed_movie_ids=snapshot.dismissed_movie_ids,
                 hybrid_alpha=hybrid_alpha,
-                min_input_count=min_input_count,
             )
             if results is None:
-                # Not a failure: this user has no signal in either artifact, so
-                # there is nothing to publish and retrying changes nothing.
+                # Not a failure: the configured artifacts expose no publishable
+                # candidate population, so retrying changes nothing.
                 # Treating it as a failure would pause the partition, leave the
                 # offset uncommitted, and replay the same event after restart.
-                LOG.warning("no_publishable_result_skipped user_id=%s", user_id)
+                LOG.warning("no_publishable_result_skipped")
                 return True
             if is_still_owned is not None and not is_still_owned():
-                LOG.warning("partition ownership lost before Redis publish user_id=%s", user_id)
+                LOG.warning("partition ownership lost before Redis publish")
                 return False
             publish(store, user_id, expected, *results, partition_fence)
+            LOG.info("candidate published")
             return True
         except StalePartitionFenceError:
-            LOG.info("partition fence lost before Redis publish user_id=%s", user_id)
+            LOG.info("partition fence lost before Redis publish")
             return None
         except (redis.RedisError, psycopg.Error, ValueError) as exc:
-            # Do not log DSNs, Redis URLs, or event payloads.  The user id is an
-            # operational partition key and is sufficient to investigate.
-            LOG.warning("fold-in dependency or data failure user_id=%s code=%s", user_id, type(exc).__name__)
+            # Do not log DSNs, Redis URLs, event payloads, or user identifiers.
+            LOG.warning("fold-in dependency or data failure code=%s", type(exc).__name__)
             if attempt + 1 < attempts:
                 sleep(backoff_seconds * (2**attempt))
     return False
@@ -105,6 +112,28 @@ def run(settings: Settings) -> None:
         )
     else:
         LOG.info("content artifacts not configured; publishing ALS-only candidates")
+    groups = None
+    discovery_popularity = None
+    if settings.group_uri is not None:
+        groups = load_group_bundle(settings.group_uri, expected_mapping_revision=bundle.mapping_revision)
+        popularity = load_discovery_popularity(
+            settings.discovery_popularity_uri or "",
+            expected_mapping_revision=bundle.mapping_revision,
+        )
+        release = validate_discovery_artifacts(groups, popularity)
+        discovery_popularity = popularity.candidates
+        LOG.info(
+            "group and Discovery popularity artifacts loaded "
+            "group_version=%s popularity_version=%s movies=%s mapped=%s groups=%s groups_ge_10=%s",
+            groups.group_version,
+            popularity.popularity_version,
+            release.movie_count,
+            release.mapped_movie_count,
+            release.mapped_group_count,
+            release.groups_with_at_least_ten_movies,
+        )
+    else:
+        LOG.info("group artifacts not configured; Discovery uses ranked-candidate fallback")
     store = redis.Redis.from_url(settings.redis_url, decode_responses=True)
     consumer = Consumer(
         {
@@ -142,6 +171,11 @@ def run(settings: Settings) -> None:
         owned.update((partition.topic, partition.partition) for partition in partitions)
         fences.update(claims)
         client.assign(partitions)
+        LOG.info(
+            "Kafka partitions assigned count=%s partitions=%s",
+            len(partitions),
+            ",".join(f"{partition.topic}:{partition.partition}" for partition in partitions),
+        )
 
     def on_revoke(client: Consumer, partitions: list[TopicPartition]) -> None:
         for partition in partitions:
@@ -149,6 +183,11 @@ def run(settings: Settings) -> None:
             owned.discard((partition.topic, partition.partition))
             fences.pop((partition.topic, partition.partition), None)
         client.unassign()
+        LOG.info(
+            "Kafka partitions revoked count=%s partitions=%s",
+            len(partitions),
+            ",".join(f"{partition.topic}:{partition.partition}" for partition in partitions),
+        )
 
     def pause_for_failure(message: Any, partition: TopicPartition, reason: str) -> None:
         paused[(message.topic(), message.partition())] = 0
@@ -197,8 +236,9 @@ def run(settings: Settings) -> None:
                 is_still_owned=lambda: (message.topic(), message.partition()) in owned,
                 partition_fence=fences.get((message.topic(), message.partition())),
                 content=content,
+                groups=groups,
+                discovery_popularity=discovery_popularity,
                 hybrid_alpha=settings.hybrid_alpha,
-                min_input_count=settings.min_input_count,
             )
             if processed is None:
                 LOG.warning(
@@ -226,6 +266,12 @@ def run(settings: Settings) -> None:
                 continue
             try:
                 consumer.commit(message=message, asynchronous=False)
+                LOG.info(
+                    "Kafka event committed topic=%s partition=%s offset=%s",
+                    message.topic(),
+                    message.partition(),
+                    message.offset(),
+                )
             except KafkaException:
                 # Publishing may already have succeeded.  Never advance this
                 # partition past an unconfirmed commit; replay is intentional.

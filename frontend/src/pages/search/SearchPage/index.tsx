@@ -14,12 +14,21 @@
  * 함께 보여주므로 타이핑 중에도 결과가 보이는 것처럼 읽히지만, 글자마다 조회하면
  * 실제 연동에서 요청이 폭증한다. 계약에 디바운스 규칙이 없어 `[?]`로 남기고 제출
  * 방식으로 뒀다.
+ *
+ * **검색과 필터 옵션은 실제 API다**(업무 -476). 급상승만 목업으로 남는다
+ * (`api/search.ts` 머리말). 검색은 회원 전용이라 로그인하지 않고 들어오면 제출이
+ * `401`로 실패하고 4.2 자리에 오류 상태가 선다.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import Button from '../../../components/Button';
 import StatusView from '../../../components/StatusView';
-import { getFilterOptions, getTrendingMovies, searchMovies } from '../../../api/search';
+import {
+  countSearchResults,
+  getFilterOptions,
+  getTrendingMovies,
+  searchMovies,
+} from '../../../api/search';
 import { getOtts } from '../../../api/otts';
 import { mockSearchMovies } from '../../../mocks/search';
 import {
@@ -33,12 +42,31 @@ import SearchResultRow from './SearchResultRow';
 import TrendingRow from './TrendingRow';
 import { EMPTY_FILTER, isEmptyFilter, toSearchQuery } from './searchFilter';
 import type { SearchFilterState } from './searchFilter';
-import type { FilterOptions, MovieSearchItem } from '../../../types/search';
+import type { FilterOptions, MovieSearchItem, MovieSearchQuery } from '../../../types/search';
 import type { TrendingItem } from '../../../types/trend';
 import styles from './SearchPage.module.css';
 
 /** 와이어프레임 4.1은 급상승을 6위까지 보여준다 */
 const TRENDING_SIZE = 6;
+
+/**
+ * 한 번 제출한 검색과 그 뒤로 이어 받은 결과.
+ *
+ * `query`를 함께 들고 다니는 것은 **커서가 조건에 묶여 있기 때문**이다(API-028 처리
+ * 규칙). `더 보기`는 이 조건 그대로 다음 장을 불러야 하고, 조건이 바뀌면 커서를 버리고
+ * 첫 장부터 다시 받는다.
+ */
+type SearchResultState = {
+  query: MovieSearchQuery;
+  /** cursor · size를 적용하기 전 전체 건수. 받아 온 `items`의 길이가 아니다 */
+  totalCount: number;
+  items: MovieSearchItem[];
+  nextCursor: string | null;
+  hasNext: boolean;
+};
+
+/** `더 보기` 한 번의 상태. 실패해도 이미 받은 목록은 남는다 */
+type MoreState = 'idle' | 'loading' | 'failed';
 
 /**
  * 급상승 행에 붙일 OTT 코드.
@@ -53,20 +81,24 @@ function trendingOttProviders(movieId: number): string[] {
 /** 4.2 결과 · 4.4 결과 없음 */
 function SearchResults({
   failed,
-  items,
+  result,
+  moreState,
   onRetry,
   onReset,
+  onMore,
   onSelect,
   ottNames,
 }: {
   failed: boolean;
-  items: MovieSearchItem[];
+  result: SearchResultState | null;
+  moreState: MoreState;
   onRetry: () => void;
   onReset: () => void;
+  onMore: () => void;
   onSelect: (movieId: number) => void;
   ottNames: Record<string, string>;
 }) {
-  if (failed) {
+  if (failed || !result) {
     return (
       <StatusView title="검색하지 못했어요" description="잠시 후 다시 시도해 주세요.">
         <Button variant="text" onClick={onRetry}>
@@ -76,7 +108,7 @@ function SearchResults({
     );
   }
 
-  if (items.length === 0) {
+  if (result.items.length === 0) {
     return (
       <StatusView
         variant="empty"
@@ -92,10 +124,10 @@ function SearchResults({
 
   return (
     <section className={styles.results}>
-      <h2 className={styles.sectionLabel}>검색 결과 {items.length}건</h2>
+      <h2 className={styles.sectionLabel}>검색 결과 {result.totalCount}건</h2>
 
       <ul className={styles.resultList}>
-        {items.map((movie) => (
+        {result.items.map((movie) => (
           <li key={movie.movieId}>
             <SearchResultRow
               movie={movie}
@@ -105,6 +137,18 @@ function SearchResults({
           </li>
         ))}
       </ul>
+
+      {result.hasNext ? (
+        <div className={styles.more}>
+          <Button variant="secondary" onClick={onMore} disabled={moreState === 'loading'}>
+            {moreState === 'failed' ? '다시 시도' : '더 보기'}
+          </Button>
+
+          {moreState === 'failed' ? (
+            <p className={styles.moreError}>다음 결과를 불러오지 못했어요.</p>
+          ) : null}
+        </div>
+      ) : null}
 
       <p className={styles.hint}>포스터를 누르면 상세페이지로 이동해요</p>
     </section>
@@ -169,15 +213,25 @@ export default function SearchPage() {
   const [trending, setTrending] = useState<TrendingItem[] | null>(null);
   const [trendingFailed, setTrendingFailed] = useState(false);
 
-  /** `null`은 아직 검색하지 않은 상태다. 빈 배열은 검색했는데 결과가 없는 상태(4.4)다 */
-  const [results, setResults] = useState<MovieSearchItem[] | null>(null);
+  /** `null`은 아직 검색하지 않은 상태다. 빈 `items`는 검색했는데 결과가 없는 상태(4.4)다 */
+  const [result, setResult] = useState<SearchResultState | null>(null);
   const [searchFailed, setSearchFailed] = useState(false);
+  const [moreState, setMoreState] = useState<MoreState>('idle');
   /** 시트의 `결과 보기 · N편`에 쓰는 미리 센 개수 */
   const [previewCount, setPreviewCount] = useState<number | null>(null);
 
   const [ottNames, setOttNames] = useState<Record<string, string>>({});
   const [recent, setRecent] = useState<string[]>(() => [...getRecentSearchQueries()]);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * 마지막으로 제출한 검색의 번호.
+   *
+   * 조건을 빠르게 바꾸면 먼저 보낸 요청이 나중에 도착할 수 있다. 번호가 다른 응답을
+   * 버려야 **오래된 결과가 새 검색을 덮어쓰지 않는다.** 목업일 때는 같은 tick에
+   * 끝나서 드러나지 않던 자리다.
+   */
+  const runSeq = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -213,25 +267,37 @@ export default function SearchPage() {
     };
   }, []);
 
-  const yearMin = options?.yearRange.min ?? 0;
+  /** `그 이전` 덩어리의 시작값. 연도가 있는 영화가 없으면 계약도 `null`을 준다 */
+  const yearMin = options?.yearRange.min ?? null;
 
   const run = useCallback(
     (nextKeyword: string, nextFilter: SearchFilterState) => {
       if (!nextKeyword.trim() && isEmptyFilter(nextFilter)) {
         // 검색어도 필터도 없으면 4.1로 돌아간다. 계약도 이 조합을 400으로 거절한다
-        setResults(null);
+        runSeq.current += 1;
+        setResult(null);
         setSearchFailed(false);
+        setMoreState('idle');
 
         return;
       }
 
-      searchMovies(toSearchQuery(nextKeyword, nextFilter, yearMin))
-        .then((value) => {
-          setResults(value.items);
+      const query = toSearchQuery(nextKeyword, nextFilter, yearMin);
+      const seq = (runSeq.current += 1);
+
+      setMoreState('idle');
+
+      searchMovies(query)
+        .then((page) => {
+          if (seq !== runSeq.current) return;
+
+          setResult({ query, ...page });
           setSearchFailed(false);
         })
         .catch(() => {
-          setResults(null);
+          if (seq !== runSeq.current) return;
+
+          setResult(null);
           setSearchFailed(true);
         });
 
@@ -242,6 +308,38 @@ export default function SearchPage() {
     },
     [yearMin],
   );
+
+  /**
+   * 다음 장을 이어 받는다.
+   *
+   * 실패해도 이미 그린 목록은 두고 버튼만 `다시 시도`로 바꾼다. 여기서 목록을 비우면
+   * 사용자가 보고 있던 결과가 통째로 사라진다.
+   */
+  const loadMore = () => {
+    if (!result?.nextCursor || moreState === 'loading') return;
+
+    const { query, nextCursor } = result;
+
+    setMoreState('loading');
+
+    searchMovies(query, nextCursor)
+      .then((page) => {
+        setMoreState('idle');
+        setResult((prev) =>
+          // 그 사이 조건이 바뀌었으면 이어 붙이지 않는다. 다른 조건의 결과가 섞인다
+          prev && prev.query === query
+            ? {
+                ...prev,
+                totalCount: page.totalCount,
+                items: [...prev.items, ...page.items],
+                nextCursor: page.nextCursor,
+                hasNext: page.hasNext,
+              }
+            : prev,
+        );
+      })
+      .catch(() => setMoreState('failed'));
+  };
 
   /*
    * 시트가 열려 있는 동안 조건이 바뀌면 `결과 보기 · N편`을 다시 센다.
@@ -255,13 +353,11 @@ export default function SearchPage() {
 
     let active = true;
     const countable = keyword.trim() || !isEmptyFilter(filter);
-    const request = countable
-      ? searchMovies(toSearchQuery(keyword, filter, yearMin))
-          .then((value) => value.items.length)
-          .catch(() => null)
+    const counted = countable
+      ? countSearchResults(toSearchQuery(keyword, filter, yearMin)).catch(() => null)
       : Promise.resolve(null);
 
-    void request.then((count) => {
+    void counted.then((count) => {
       if (active) setPreviewCount(count);
     });
 
@@ -270,13 +366,15 @@ export default function SearchPage() {
     };
   }, [filterOpen, keyword, filter, yearMin]);
 
-  const searched = results !== null || searchFailed;
+  const searched = result !== null || searchFailed;
 
   const reset = () => {
     setKeyword('');
     setFilter(EMPTY_FILTER);
-    setResults(null);
+    runSeq.current += 1;
+    setResult(null);
     setSearchFailed(false);
+    setMoreState('idle');
     inputRef.current?.focus();
   };
 
@@ -357,9 +455,11 @@ export default function SearchPage() {
         {searched ? (
           <SearchResults
             failed={searchFailed}
-            items={results ?? []}
+            result={result}
+            moreState={moreState}
             onRetry={() => run(keyword, filter)}
             onReset={reset}
+            onMore={loadMore}
             onSelect={openDetail}
             ottNames={ottNames}
           />
