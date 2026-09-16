@@ -76,4 +76,11 @@ services:
 
 volumes:
   prometheus_data:
+    name: compose_prometheus_data
   grafana_data:
+    name: compose_grafana_data
+
+networks:
+  default:
+    name: compose_default
+    external: true

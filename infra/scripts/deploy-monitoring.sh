@@ -54,7 +54,8 @@ if [[ "${mode}" == "--recover" ]]; then
   exit 0
 fi
 
-compose=(docker compose)
+compose_project="feelm-monitoring-${CI_PIPELINE_ID:-manual-$$}"
+compose=(docker compose --project-name "${compose_project}")
 if [[ -n "${COMPOSE_ENV_FILE:-}" ]]; then
   if [[ ! -f "${COMPOSE_ENV_FILE}" ]]; then
     echo "COMPOSE_ENV_FILE does not exist" >&2

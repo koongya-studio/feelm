@@ -169,10 +169,13 @@ docker compose --env-file infra/.env \
 `infra/scripts/deploy-monitoring.sh`를 실행합니다. 변수 계약과 등록 방법은 `infra/README.md`의
 Deployment 절을 따릅니다.
 
-배포 스크립트는 `monitoring.yml`만 같은 Compose 프로젝트로 해석하므로 PostgreSQL, Redis,
-backend, frontend와 Nginx를 Compose 대상으로 선택하지 않습니다. `config --quiet`와 이미지
-pull을 컨테이너 변경 전에 수행하고, 기존 모니터링 컨테이너가 있으면 중지 후 이름 끝에
-`-rollback`을 붙여 보존합니다. 후보는 `--no-deps --force-recreate`로 다음 서비스만 교체합니다.
+배포 스크립트는 배포 Pipeline별 고유 Compose 프로젝트로 `monitoring.yml`만 해석하므로
+PostgreSQL, Redis, backend, frontend와 Nginx 및 `-rollback` 컨테이너를 Compose 대상으로
+선택하지 않습니다. 후보 프로젝트는 기존 `compose_default` 네트워크와
+`compose_prometheus_data`, `compose_grafana_data` 볼륨을 명시적으로 공유합니다.
+`config --quiet`와 이미지 pull을 컨테이너 변경 전에 수행하고, 기존 모니터링 컨테이너가
+있으면 중지 후 이름 끝에 `-rollback`을 붙여 보존합니다. 후보는
+`--no-deps --force-recreate`로 다음 서비스만 교체합니다.
 
 ```text
 prometheus grafana node-exporter postgres-exporter redis-exporter
