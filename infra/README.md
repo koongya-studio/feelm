@@ -1092,9 +1092,9 @@ docker start feelm-hdfs-datanode-1
 ## Distributed Consumer Deployment
 
 추천 Consumer는 J15E106A 분산 노드에서 `distributed.yml`의 `consumer` profile로 실행한다.
-이미지는 `pipeline/consumer/Dockerfile`로 분산 노드에서 수동 빌드하며 Registry 게시와 자동
-CD는 별도 업무로 다룬다. profile을 지정하지 않은 기존 HDFS·Spark·Kafka 기동에는 Consumer가
-추가되지 않는다.
+로컬·초기 검증 이미지는 `pipeline/consumer/Dockerfile`로 분산 노드에서 수동 빌드한다.
+보호된 `main` 배포는 CI가 게시한 커밋 SHA 이미지를 사용하며 profile을 지정하지 않은 기존
+HDFS·Spark·Kafka 기동에는 Consumer가 추가되지 않는다.
 
 ### Cross-node datastore boundary
 
@@ -1217,6 +1217,112 @@ docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}}' feelm-foldi
 수정한 뒤 `config --quiet`, `up -d consumer`, 로그 확인 순서로 재시도하며 `down -v`를 사용하지
 않는다. 서비스 노드의 bind address를 다시 루프백으로 복구하려면 Consumer를 먼저 중단하고
 두 값을 `127.0.0.1`로 되돌린 뒤 PostgreSQL과 Redis만 재생성한다.
+
+### Consumer automatic deployment
+
+보호된 `main` push에서 Consumer 관련 파일이 바뀌면 `consumer-test`, `consumer-image`,
+`deploy-consumer`를 순서대로 실행한다. 테스트를 통과한 `CI_COMMIT_SHA` 태그를 Docker Hub에
+게시한 뒤 Registry가 반환한 immutable digest를 다음 Job에 전달해 J15E106A의 Consumer
+컨테이너만 교체한다. MR, `develop`, API와 Web Pipeline은
+배포하지 않는다. 오래된 Pipeline은 배포 직전에 원격 `main` HEAD와 commit SHA가 다르면
+중단하며 `distributed-consumer` resource group으로 배포를 직렬화한다.
+
+배포에는 J15E106A에서 실행되는 전용 Shell Runner가 필요하다. GitLab Runner 설정은 다음
+경계를 모두 만족해야 한다.
+
+- 태그는 `e106-distributed`, Run untagged는 끄고 이 프로젝트에 잠근다.
+- Runner를 Protected로 설정해 보호된 ref의 Job만 받는다.
+- Runner 서비스 계정만 분산 노드 Docker daemon을 사용할 수 있게 한다.
+- `/var/lib/feelm-deploy`를 Runner 서비스 계정 전용 mode `0700` 디렉터리로 미리 만든다. 배포
+  스크립트는 검증을 통과한 마지막 이미지 digest만 이 경로에 원자적으로 기록한다.
+- 일반 MR Job과 `e106-mr-isolated` Job은 이 Runner에서 실행하지 않는다.
+- Runner 등록 토큰과 인증정보는 저장소, 셸 기록과 검증 문서에 남기지 않는다.
+
+GitLab `distributed` 환경 범위에 `CONSUMER_COMPOSE_ENV_FILE`을 **File 타입·Protected** 변수로
+등록한다. 값은 분산 노드에서 수동 검증한 `infra/.env`와 같은 전체 dotenv 내용이며 실제 DSN,
+Redis URL, 내부 URI와 Secret을 포함하므로 Job에서 출력하지 않는다. Docker Hub 인증 변수도
+Protected 상태를 유지한다. 배포 Job은 File 변수의 임시 경로를 Compose `--env-file`에 전달하며
+파일 내용을 이미지에 넣거나 서버 저장소에 복사하지 않는다. Registry 로그인은 Job별 임시
+`DOCKER_CONFIG`에만 기록하고 성공·실패와 관계없이 logout 후 파일을 제거한다.
+
+Runner 계정과 그룹을 확인한 뒤 운영자가 한 번만 상태 디렉터리를 준비한다. 예시 이름을 그대로
+실행하지 말고 실제 Runner 서비스 계정을 사용한다.
+
+```bash
+sudo install -d -m 0700 -o <runner-user> -g <runner-group> /var/lib/feelm-deploy
+```
+
+자동 배포를 활성화하기 전에 현재 정상 Consumer를 마지막 검증 완료 이미지로 한 번 명시적으로
+초기화한다. 아래 명령은 현재 컨테이너가 `running`, restart 0이고 단일 Consumer ID가 전체
+파티션을 할당받은 경우에만 기록한다. 이미 다른 이미지가 기록돼 있으면 덮어쓰지 않는다.
+
+```bash
+sudo -u <runner-user> env \
+  COMPOSE_ENV_FILE=/path/to/approved/infra.env \
+  CONSUMER_DEPLOY_STATE_FILE=/var/lib/feelm-deploy/consumer-last-known-good \
+  bash infra/scripts/deploy-consumer.sh --initialize-state
+```
+
+`deploy-consumer.sh`는 전달받은 Registry digest를 매번 pull하고 Compose 설정을 검사한 뒤에만 Consumer를
+재생성한다. 새 프로세스가 `running`, 재시작 횟수 0 상태이고 `feelm-foldin-consumer-v1`의 모든
+`feelm.rating.v1` 파티션이 새 Kafka Consumer ID 하나에 할당돼야 성공한다. 검증 제한 시간은
+기본 2분이며 산출물 로딩 시간 실측이 바뀌면 `CONSUMER_DEPLOY_ATTEMPTS`와
+`CONSUMER_DEPLOY_INTERVAL_SECONDS`를 배포 환경에서 조정한다. Lag는 처리 중 이벤트가 있을 수
+있으므로 배포 성공 조건으로 0을 강제하지 않는다.
+
+후보 Pull·Compose 교체·런타임 검증 또는 이미지 일치 검사가 실패하면 서버 상태 파일의 마지막
+검증 완료 이미지를 사용해 Consumer를 다시 만들고 새 Kafka Consumer ID 할당까지 재검증한다.
+Runner가 교체 중 종료되고 GitLab이 Job을 재시도해도 현재 실패 후보를 롤백 기준으로 쓰지 않는다.
+재시도 시작 시 실제 실행 이미지가 상태 파일의 LKG와 다르면, 오래된 Pipeline 여부를 검사하기
+전에 LKG로 복구한다. 따라서 후보 교체 직후 Runner가 종료되고 새 `main` push가 도착한 경우에도
+stale Job이 실패 후보를 실행 상태로 남기지 않는다.
+상태 파일이 없으면 자동 배포는 컨테이너를 변경하기 전에 실패한다. 복구도 실패하면 Pipeline을
+실패 상태로 유지하고 수동 복구가 필요하다고 출력한다. 원문 컨테이너 로그는 CI로 복사하지 않고
+분산 노드에만 유지한다. 자동·수동
+복구 모두 HDFS·Spark·Kafka 컨테이너와 볼륨을 변경하지 않는다.
+
+분산 노드의 승인된 환경에서 특정 정상 이미지로 직접 복구할 때는 다음처럼 실행한다.
+
+```bash
+COMPOSE_ENV_FILE=/path/to/approved/infra.env \
+  bash infra/scripts/rollback-consumer.sh \
+  <registry>/feelm-foldin-consumer@sha256:<known-good-digest>
+```
+
+배포 후에는 Pipeline 결과와 함께 Kafka Group의 파티션 할당, 실제 평가·온보딩 이벤트 처리 및
+Redis `candidate-version`, `vector`, `candidates` 갱신을 확인한다. 자동 배포 검증은 후보 계산의
+내용 정확도나 기존 사용자 전체 재게시를 대신하지 않는다.
+
+승인된 테스트 사용자는 Fold-in 계산에 충분한 유효 입력을 보유해야 한다. 이벤트 전 현재
+버전을 확인하고 그 숫자를 기록한 뒤, 백엔드의 정상 평가 생성·수정 흐름으로 이벤트를 한 건
+발행한다. 비밀번호와 Redis payload를 출력하지 않는 검증기를 같은 분산 노드에서 실행한다.
+
+```bash
+python3 infra/scripts/verify-consumer-e2e.py \
+  --env-file infra/.env --user-id <approved-test-user-id>
+
+python3 infra/scripts/verify-consumer-e2e.py \
+  --env-file infra/.env --user-id <approved-test-user-id> \
+  --after-version <event-before-version> --timeout-seconds 120
+```
+
+두 번째 명령은 게시 순번이 증가하고 `vector`와 `candidates`가 모두 Candidate v4의 동일
+`generationId`, 모델·시각 메타데이터, 후보 순서와 reason별 불변식을 가질 때만 성공한다. 출력에는
+순번과 taste/discovery 개수만 포함된다. vector 차원과 활성 HDFS revision은 Consumer 시작 검증의
+책임이며 이 Redis 검증기가 대신하지 않는다. 이어서
+Consumer 로그의 `candidate published`, `Kafka event committed`와 Consumer Group의 해당 파티션
+offset·lag를 확인한다. 실제 사용자 ID, generation ID, payload와 내부 주소는 검증 기록에 남기지
+않는다.
+
+재시작·rebalance 검증은 유지보수 창에서만 수행한다. 이벤트 처리 전후의 게시 순번과 Group
+offset을 기록하고 Consumer를 정상 재시작한 뒤 Consumer ID가 바뀌고 전체 파티션이 다시 할당되는지
+확인한다. 같은 사용자의 다음 정상 이벤트로 위 `--after-version` 검증을 반복해 누락이나 오래된
+generation 게시가 없는지 확인한다. 의도적인 poison event나 datastore 차단은 파티션을 pause시킬
+수 있으므로 격리된 테스트 토픽·복구 offset과 담당자 승인이 없는 운영 토픽에는 실행하지 않는다.
+
+현재 `develop`에는 Candidate v4 Spring Redis reader가 없다. 따라서 Consumer CD와 Redis 직접 E2E를
+통과해도 서비스 추천 조회까지 통합 완료된 것으로 간주하지 않는다. reader가 병합된 뒤 taste와
+discovery 계약 호환성 및 같은 generation 조회를 추가 검증해야 한다.
 
 ## Kafka and Spark development UIs (S15P21E106-444)
 

@@ -45,7 +45,8 @@ Job 이름과 CI script에 고정된 group만 Custom executor가 허용한다. �
 Consumer MR 검사와 보호된 `main` 이미지 게시 경계는
 [Consumer CI policy](CONSUMER-CI.md)를 따른다. MR에서는 `pipeline/consumer`만 격리 archive해
 고정 이미지로 Ruff와 pytest를 실행한다. `main`에서는 Dockerfile `test` target 성공 후에만
-커밋 SHA 태그 이미지를 게시하며, 배포와 Secret 주입은 별도 업무다.
+커밋 SHA 태그 이미지를 게시하고, S15P21E106-487의 분산 노드 전용 보호 Runner가 해당 SHA를
+배포한다. Secret은 `distributed` 환경 범위의 보호된 File 변수로만 주입한다.
 각 계층은 시작 마커와 wall time을, Linux에서는 CPU time·최대 RSS·block I/O도 출력한다.
 S15P21E106-485부터 unit Job은 자동 실행하고 세 Spark Job은 `allow_failure: false`인 필수
 수동 Job으로 생성한다. 공용 Runner가 비는 시점에 세 Job을 모두 실행해 성공해야 파이프라인을

@@ -39,9 +39,46 @@ Only after it succeeds may `consumer-image` build and push:
 $DOCKERHUB_NAMESPACE/feelm-foldin-consumer:$CI_COMMIT_SHA
 ```
 
-The image Job does not publish `latest` and does not deploy. Server Secret
-injection, selecting this immutable tag in `CONSUMER_IMAGE`, health/lag checks,
-rollback, and Kafka-to-Redis E2E verification belong to S15P21E106-487.
+The image Job does not publish `latest`. It exports the Registry digest returned
+for that SHA tag, and deployment uses the digest rather than resolving the tag
+again. S15P21E106-487 adds `deploy-consumer`
+after this Job: it injects the reviewed environment through a protected File
+variable, selects the immutable digest, verifies process and Kafka group
+state, and restores the previous image when verification fails. The operational
+Kafka-to-Redis check remains an explicit post-deployment action because it needs
+an approved test user and a real rating event.
+
+## Main deployment
+
+`deploy-consumer` runs only for a protected `main` push and uses a protected,
+project-locked Shell Runner on the distributed node with tag
+`e106-distributed`. It serializes deployments with the
+`distributed-consumer` resource group and rejects a stale pipeline immediately
+before changing the container.
+
+The complete Compose dotenv is supplied as the protected, File-type
+`CONSUMER_COMPOSE_ENV_FILE` variable scoped to the `distributed` environment.
+The Job must never print this file. Docker credentials use a Job-specific
+`DOCKER_CONFIG` that is logged out and removed in `after_script`. The host keeps
+the last verified digest in a Runner-only deployment state directory so a
+runner failure and retry cannot redefine an unverified candidate as the rollback
+target. Runner registration, GitLab variable setup,
+the E2E procedure, and rollback commands are documented in `infra/README.md`.
+
+Before enabling the deploy Job, initialize that state exactly once from the
+already verified running Consumer. Automatic deployment deliberately refuses to
+infer a rollback target when the state file is absent:
+
+```bash
+sudo -u <runner-user> env \
+  COMPOSE_ENV_FILE=/path/to/approved/infra.env \
+  CONSUMER_DEPLOY_STATE_FILE=/var/lib/feelm-deploy/consumer-last-known-good \
+  bash infra/scripts/deploy-consumer.sh --initialize-state
+```
+
+Initialization succeeds only when the running container has zero restarts and
+one Consumer ID owns every configured topic partition. Re-running it never
+silently replaces a previously recorded image with a different running image.
 
 ## Server activation
 

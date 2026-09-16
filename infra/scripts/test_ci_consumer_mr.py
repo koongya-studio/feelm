@@ -188,6 +188,9 @@ class ConsumerCiConfigTests(unittest.TestCase):
             'CONSUMER_IMAGE="$DOCKERHUB_NAMESPACE/feelm-foldin-consumer:$CI_COMMIT_SHA"',
             'docker build --pull -t "$CONSUMER_IMAGE" ./pipeline/consumer',
             'docker push "$CONSUMER_IMAGE"',
+            "CONSUMER_IMAGE_DIGEST=",
+            "{{index .RepoDigests 0}}",
+            "dotenv: consumer-image.env",
         ):
             self.assertIn(expected, block)
         self.assertNotIn(":latest", block)
@@ -196,12 +199,72 @@ class ConsumerCiConfigTests(unittest.TestCase):
         block = job_block(self.config, "consumer-test")
         self.assertIn("stage: test", block)
         self.assertIn("tags: [e106-shell]", block)
+        self.assertIn(
+            "python3 -B -m unittest infra.scripts.test_deploy_consumer "
+            "infra.scripts.test_verify_consumer_e2e infra.scripts.test_ci_config -v",
+            block,
+        )
         self.assertIn('CONSUMER_TEST_IMAGE="feelm-foldin-consumer-test:$CI_COMMIT_SHA"', block)
         self.assertIn('docker build --pull --target test -t "$CONSUMER_TEST_IMAGE"', block)
         self.assertIn('docker image rm "$CONSUMER_TEST_IMAGE"', block)
         self.assertIn('$CI_COMMIT_BRANCH == "main"', block)
         self.assertIn('$CI_COMMIT_REF_PROTECTED == "true"', block)
         self.assertIn('$CI_PIPELINE_SOURCE == "push"', block)
+
+    def test_deploy_job_is_protected_distributed_and_rolls_through_script(self):
+        block = job_block(self.config, "deploy-consumer")
+        for expected in (
+            "stage: deploy",
+            "tags: [e106-distributed]",
+            "needs: [consumer-image]",
+            "resource_group: distributed-consumer",
+            "name: distributed",
+            "interruptible: false",
+            "allow_failure: false",
+            "ci-deploy-current-commit.py",
+            'test -n "$CONSUMER_COMPOSE_ENV_FILE"',
+            'test -n "$CONSUMER_IMAGE_DIGEST"',
+            'COMPOSE_ENV_FILE="$CONSUMER_COMPOSE_ENV_FILE" '
+            'bash infra/scripts/deploy-consumer.sh "$CONSUMER_IMAGE_DIGEST"',
+            '$CI_COMMIT_BRANCH == "main"',
+            '$CI_COMMIT_REF_PROTECTED == "true"',
+            '$CI_PIPELINE_SOURCE == "push"',
+        ):
+            self.assertIn(expected, block)
+        for forbidden in (
+            '$CI_COMMIT_BRANCH == "develop"',
+            '$CI_PIPELINE_SOURCE == "web"',
+            '$CI_PIPELINE_SOURCE == "merge_request_event"',
+        ):
+            self.assertNotIn(forbidden, block)
+
+    def test_registry_credentials_are_job_scoped_and_removed(self):
+        for name in ("consumer-image", "deploy-consumer"):
+            block = job_block(self.config, name)
+            self.assertIn('DOCKER_CONFIG: "$CI_PROJECT_DIR/.docker-consumer-$CI_JOB_ID"', block)
+            self.assertIn('install -d -m 0700 "$DOCKER_CONFIG"', block)
+            self.assertIn("after_script:", block)
+            self.assertIn("docker logout", block)
+            self.assertIn('rm -f "$DOCKER_CONFIG/config.json"', block)
+
+    def test_release_chain_watches_consumer_deployment_contract(self):
+        watched = (
+            "- pipeline/consumer/**/*",
+            "- infra/.env.example",
+            "- infra/compose/distributed.yml",
+            "- infra/scripts/deploy-consumer.sh",
+            "- infra/scripts/rollback-consumer.sh",
+            "- infra/scripts/test_deploy_consumer.py",
+            "- infra/scripts/verify-consumer-e2e.py",
+            "- infra/scripts/test_verify_consumer_e2e.py",
+            "- infra/scripts/ci-deploy-current-commit.py",
+            "- infra/scripts/test_ci_config.py",
+        )
+        for name in ("consumer-test", "consumer-image", "deploy-consumer"):
+            block = job_block(self.config, name)
+            self.assertIn("changes:", block)
+            for path in watched:
+                self.assertIn(path, block, name)
 
 
 class ConsumerRunnerTests(unittest.TestCase):

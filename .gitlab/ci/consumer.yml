@@ -33,6 +33,7 @@ consumer-test:
   stage: test
   tags: [e106-shell]
   script:
+    - python3 -B -m unittest infra.scripts.test_deploy_consumer infra.scripts.test_verify_consumer_e2e infra.scripts.test_ci_config -v
     - CONSUMER_TEST_IMAGE="feelm-foldin-consumer-test:$CI_COMMIT_SHA"
     - docker build --pull --target test -t "$CONSUMER_TEST_IMAGE" ./pipeline/consumer
     - docker image rm "$CONSUMER_TEST_IMAGE"
@@ -48,18 +49,42 @@ consumer-test:
         - .gitlab/ci/common.yml
         - .gitlab/ci/consumer.yml
         - .gitattributes
+        - infra/.env.example
+        - infra/compose/distributed.yml
+        - infra/scripts/deploy-consumer.sh
+        - infra/scripts/rollback-consumer.sh
+        - infra/scripts/test_deploy_consumer.py
+        - infra/scripts/verify-consumer-e2e.py
+        - infra/scripts/test_verify_consumer_e2e.py
+        - infra/scripts/ci-deploy-current-commit.py
+        - infra/scripts/test_ci_deploy_current_commit.py
+        - infra/scripts/test_ci_config.py
 
 consumer-image:
   stage: build
   tags: [e106-shell]
   needs: [consumer-test]
+  variables:
+    DOCKER_CONFIG: "$CI_PROJECT_DIR/.docker-consumer-$CI_JOB_ID"
   before_script:
+    - install -d -m 0700 "$DOCKER_CONFIG"
     - printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
   script:
     - CONSUMER_IMAGE="$DOCKERHUB_NAMESPACE/feelm-foldin-consumer:$CI_COMMIT_SHA"
     - docker build --pull -t "$CONSUMER_IMAGE" ./pipeline/consumer
     - docker push "$CONSUMER_IMAGE"
-    - echo "Built Consumer image $CONSUMER_IMAGE"
+    - CONSUMER_IMAGE_DIGEST="$(docker image inspect --format '{{index .RepoDigests 0}}' "$CONSUMER_IMAGE")"
+    - test -n "$CONSUMER_IMAGE_DIGEST" && test "$CONSUMER_IMAGE_DIGEST" != "<no value>"
+    - printf 'CONSUMER_IMAGE_DIGEST=%s\n' "$CONSUMER_IMAGE_DIGEST" > consumer-image.env
+    - echo "Built Consumer image $CONSUMER_IMAGE_DIGEST"
+  after_script:
+    - docker logout >/dev/null 2>&1 || true
+    - rm -f "$DOCKER_CONFIG/config.json"
+    - rmdir "$DOCKER_CONFIG" 2>/dev/null || true
+  artifacts:
+    reports:
+      dotenv: consumer-image.env
+    expire_in: 1 hour
   interruptible: true
   timeout: 45m
   rules:
@@ -72,3 +97,61 @@ consumer-image:
         - .gitlab/ci/common.yml
         - .gitlab/ci/consumer.yml
         - .gitattributes
+        - infra/.env.example
+        - infra/compose/distributed.yml
+        - infra/scripts/deploy-consumer.sh
+        - infra/scripts/rollback-consumer.sh
+        - infra/scripts/test_deploy_consumer.py
+        - infra/scripts/verify-consumer-e2e.py
+        - infra/scripts/test_verify_consumer_e2e.py
+        - infra/scripts/ci-deploy-current-commit.py
+        - infra/scripts/test_ci_deploy_current_commit.py
+        - infra/scripts/test_ci_config.py
+
+deploy-consumer:
+  stage: deploy
+  tags: [e106-distributed]
+  needs: [consumer-image]
+  resource_group: distributed-consumer
+  environment:
+    name: distributed
+  variables:
+    DOCKER_CONFIG: "$CI_PROJECT_DIR/.docker-consumer-$CI_JOB_ID"
+  before_script:
+    - install -d -m 0700 "$DOCKER_CONFIG"
+    - printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
+    - test -n "$CONSUMER_COMPOSE_ENV_FILE"
+    - test -n "$CONSUMER_IMAGE_DIGEST"
+    - COMPOSE_ENV_FILE="$CONSUMER_COMPOSE_ENV_FILE" bash infra/scripts/deploy-consumer.sh "$CONSUMER_IMAGE_DIGEST"
+  after_script:
+    - docker logout >/dev/null 2>&1 || true
+    - rm -f "$DOCKER_CONFIG/config.json"
+    - rmdir "$DOCKER_CONFIG" 2>/dev/null || true
+  interruptible: false
+  retry:
+    max: 2
+    when: [runner_system_failure, scheduler_failure]
+  timeout: 15m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "api" && $CLAUDE_REVIEW_TRIGGER == "comment"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - pipeline/consumer/**/*
+        - .gitlab-ci.yml
+        - .gitlab/ci/common.yml
+        - .gitlab/ci/consumer.yml
+        - .gitattributes
+        - infra/.env.example
+        - infra/compose/distributed.yml
+        - infra/scripts/deploy-consumer.sh
+        - infra/scripts/rollback-consumer.sh
+        - infra/scripts/test_deploy_consumer.py
+        - infra/scripts/verify-consumer-e2e.py
+        - infra/scripts/test_verify_consumer_e2e.py
+        - infra/scripts/ci-deploy-current-commit.py
+        - infra/scripts/test_ci_deploy_current_commit.py
+        - infra/scripts/test_ci_config.py
+  allow_failure: false
