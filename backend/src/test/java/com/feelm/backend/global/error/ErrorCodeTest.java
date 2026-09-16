@@ -84,6 +84,8 @@ class ErrorCodeTest {
                         "PASSWORD_NOT_SET",
                         // 감상 도메인 — API-035 (S15P21E106-212)
                         "INVALID_WATCH_STATUS",
+                        // 감상 도메인 — API-036 (S15P21E106-474)
+                        "RATING_ALREADY_EXISTS",
                         // 사용자 도메인 — API-020 차단 (S15P21E106-211)
                         "CANNOT_BLOCK_SELF",
                         "ALREADY_BLOCKED",
@@ -159,6 +161,12 @@ class ErrorCodeTest {
     @DisplayName("API-047 관심없음 오류 코드는 409로 매핑된다")
     void dismissCodeIsConflict() {
         assertThat(ErrorCode.ALREADY_DISMISSED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    @DisplayName("API-036 중복 평가 오류 코드는 409로 매핑된다")
+    void duplicateRatingCodeIsConflict() {
+        assertThat(ErrorCode.RATING_ALREADY_EXISTS.getStatus()).isEqualTo(HttpStatus.CONFLICT);
     }
 
     @Test
