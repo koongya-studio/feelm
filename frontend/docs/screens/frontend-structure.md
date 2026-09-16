@@ -92,8 +92,8 @@ ADR-0013이 후속 작업으로 남긴 `React 프로젝트 구조·상태 관리
 
 ```text
 App
-├─ AppLayout                        하단 내비 4탭 표시
-│  ├─ /                             HomePage                    2.1
+├─ AppLayout                        하단 내비 3탭 표시
+│  ├─ /                             HomeEntry  → /film          진입점 (화면 아님)
 │  ├─ /recommendations              RecommendationsPage         2.2 · 2.2-A
 │  ├─ /film                         FilmPage                    3.1
 │  ├─ /film/popcorn                 PopcornBucketPage           3.2
@@ -158,12 +158,14 @@ Screen Spec 3.1절에서 미확정으로 남긴 항목입니다. 파티 · MY는
 
 이유는 세 가지입니다.
 
-- 4탭 구성과 색상 규칙을 그대로 검증할 수 있습니다
+- 3탭 구성과 색상 규칙을 그대로 검증할 수 있습니다
 - 탭을 비활성으로 두면 선택 상태 스타일을 확인할 수 없습니다
 - 각 화면이 구현되면 해당 라우트의 요소만 교체하면 됩니다
 
-`S15P21E106-329`에서 REF-01의 5탭을 4탭으로 줄이고 검색을 상단 헤더로 옮겼습니다.
-`/search` 라우트는 그대로 살아 있고 홈 헤더의 검색 아이콘으로 들어갑니다.
+`S15P21E106-329`에서 REF-01의 5탭을 4탭으로 줄이고 검색을 상단 헤더로 옮겼고,
+`S15P21E106-461`에서 홈을 없애 **파티 · 필름 · MY 3탭**이 됐습니다. 앱 진입점 `/`는
+화면을 그리지 않고 `/film`으로 보냅니다(`routes/HomeEntry.tsx`).
+`/search` 라우트는 그대로 살아 있고 **3.1 필름 헤더**의 검색 아이콘으로 들어갑니다.
 
 `NotInScopePage`는 와이어프레임에 없는 화면입니다. 개발 확인용 최소 화면이며 새 디자인
 컨셉이나 요소를 추가하지 않습니다.
@@ -251,8 +253,6 @@ frontend/
    │  │  ├─ TasteOnboardingPage/
    │  │  ├─ OttOnboardingPage/
    │  │  └─ OnboardingCompletePage/
-   │  ├─ home/
-   │  │  └─ HomePage/
    │  ├─ recommendations/
    │  │  └─ RecommendationsPage/
    │  ├─ movies/
@@ -292,23 +292,18 @@ frontend/
 **컴포넌트와 페이지는 폴더 단위**로 둡니다.
 
 ```text
-HomePage/
+FilmPage/
 ├─ index.tsx
-└─ HomePage.module.css
+└─ FilmPage.module.css
 ```
 
 화면 전용 하위 컴포넌트는 그 화면 폴더 안에 둡니다.
 
 ```text
-HomePage/
+MyDashboardPage/
 ├─ index.tsx
-├─ HomePage.module.css
-├─ TodayRecommendationCard/
-│  ├─ index.tsx
-│  └─ TodayRecommendationCard.module.css
-└─ TasteSummarySection/
-   ├─ index.tsx
-   └─ TasteSummarySection.module.css
+├─ MyDashboardPage.module.css
+└─ MyFeedFlow.test.tsx
 ```
 
 두 개 이상의 화면이 쓰게 되면 `src/components/`로 올립니다. 올릴 때 사용 중인 화면에
@@ -321,7 +316,7 @@ HomePage/
 | 컴포넌트 · 페이지 폴더 | PascalCase | `MovieDetailPage/` |
 | 그 외 폴더 | camelCase | `routes/`, `mocks/` |
 | 컴포넌트 파일 | `index.tsx` | |
-| 스타일 파일 | `{컴포넌트명}.module.css` | `HomePage.module.css` |
+| 스타일 파일 | `{컴포넌트명}.module.css` | `FilmPage.module.css` |
 | 타입 · 유틸 파일 | camelCase | `watchStatus.ts` |
 | 타입 이름 | PascalCase | `RecommendationItem` |
 | 열거형 값 | 계약 그대로 UPPER_SNAKE_CASE | `LINK_CLICKED` |

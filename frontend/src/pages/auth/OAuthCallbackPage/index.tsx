@@ -83,7 +83,7 @@ export default function OAuthCallbackPage() {
           return;
         }
 
-        void navigate(result.user.onboardingCompleted ? path.home() : path.onboardingTaste(), {
+        void navigate(result.user.onboardingCompleted ? path.film() : path.onboardingTaste(), {
           replace: true,
         });
       } catch (error) {

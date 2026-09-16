@@ -90,7 +90,7 @@ function renderApp(entry: string) {
           <Route path={ROUTE_PATTERN.onboardingOtt} element={<OttOnboardingPage />} />
           <Route path={ROUTE_PATTERN.onboardingComplete} element={<OnboardingCompletePage />} />
         </Route>
-        <Route path={ROUTE_PATTERN.home} element={<p>홈</p>} />
+        <Route path={ROUTE_PATTERN.film} element={<p>필름</p>} />
       </Routes>
       <LocationProbe />
     </MemoryRouter>,
@@ -191,14 +191,14 @@ describe('1.1 영화 취향 초기 설정', () => {
     expect(submitOnboardingPreferences).toHaveBeenCalledWith([], true);
   });
 
-  it('이미 온보딩을 마쳤으면 홈으로 보낸다', async () => {
+  it('이미 온보딩을 마쳤으면 필름으로 보낸다', async () => {
     vi.mocked(getOnboardingCards).mockRejectedValue(
       new ApiError(409, 'ONBOARDING_ALREADY_COMPLETED', '이미 온보딩을 마쳤습니다.'),
     );
 
     renderApp(ROUTE_PATTERN.onboardingTaste);
 
-    await waitFor(() => expect(location()).toBe(ROUTE_PATTERN.home));
+    await waitFor(() => expect(location()).toBe(ROUTE_PATTERN.film));
     expect(screen.queryByText('영화 카드를 불러오지 못했어요')).not.toBeInTheDocument();
   });
 

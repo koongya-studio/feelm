@@ -43,8 +43,13 @@ export const ROUTE_PATTERN = {
   onboardingOtt: '/onboarding/ott',
   onboardingComplete: '/onboarding/complete',
 
+  /*
+   * 앱 진입점. **화면이 아니다** — 로그인 전이면 0.1, 로그인했으면 `/film`으로 보내기만
+   * 한다(`routes/HomeEntry.tsx`). 홈 화면은 업무 -461에서 없앴다.
+   */
+  entry: '/',
+
   // 탭 화면 (하단 내비 표시)
-  home: '/',
   recommendations: '/recommendations',
   film: '/film',
   popcornBucket: '/film/popcorn',
@@ -78,7 +83,7 @@ export const ROUTE_PATTERN = {
 
   /*
    * 취향 리포트 (업무 -308). 같은 리포트를 두 길로 본다.
-   * - 필름 쪽: 2.1 → 3.3 새 리포트 발급 → 3.4 상세. `/reports` 아래
+   * - 필름 쪽: 3.1 → 3.3 새 리포트 발급 → 3.4 상세. `/reports` 아래
    * - MY 쪽: 7.1 · 3.1 → 7.3 목록 → 7.4 상세. `/my/reports` 아래라 하단 탭이 MY로 남는다
    * 3.5 공유는 3.4 · 7.4 위의 시트라 경로가 없다
    */
@@ -140,7 +145,6 @@ export const path = {
   onboardingOtt: () => ROUTE_PATTERN.onboardingOtt,
   onboardingComplete: () => ROUTE_PATTERN.onboardingComplete,
 
-  home: () => ROUTE_PATTERN.home,
   recommendations: () => ROUTE_PATTERN.recommendations,
   film: () => ROUTE_PATTERN.film,
   popcornBucket: () => ROUTE_PATTERN.popcornBucket,
@@ -206,10 +210,24 @@ export const path = {
  * (업무 -305 코드리뷰 지적. 의도적 누락이라 여기 적어 둔다)
  */
 export const TAB_MATCH = {
-  home: [ROUTE_PATTERN.home, ROUTE_PATTERN.recommendations],
-  search: [ROUTE_PATTERN.search],
-  film: [ROUTE_PATTERN.film, ROUTE_PATTERN.popcornBucket],
+  /*
+   * 왼쪽 탭. 5.1 파티 목록에서 출발하는 흐름이다.
+   */
   party: [ROUTE_PATTERN.party],
+  /*
+   * 가운데 탭이자 **앱의 시작 화면**이다(사용자 결정 2026-09-16, 업무 -461).
+   *
+   * - `recommendations`(2.2) — 추천은 필름을 늘리는 행위라 이 흐름에 속한다.
+   *   상시 진입점은 3.1의 `필름 늘리기` 하나다
+   * - `search`(4.1) — 검색은 탭이 아니라 **필름에서 들어가는 하위 화면**이다.
+   *   진입점은 3.1 헤더의 돋보기 하나이고, 검색에 있는 동안에도 `필름`이 선택된다
+   */
+  film: [
+    ROUTE_PATTERN.film,
+    ROUTE_PATTERN.popcornBucket,
+    ROUTE_PATTERN.recommendations,
+    ROUTE_PATTERN.search,
+  ],
   my: [
     ROUTE_PATTERN.my,
     ROUTE_PATTERN.ottManage,

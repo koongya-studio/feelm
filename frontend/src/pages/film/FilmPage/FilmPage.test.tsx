@@ -141,4 +141,22 @@ describe('FilmPage', () => {
 
     expect(search).toHaveAttribute('href', '/search');
   });
+
+  /*
+   * 3.1 → 2.2 (업무 -461)
+   *
+   * 홈에서 오늘의 추천을 빼면서 **프레임이 쌓인 사용자에게는 여기가 2.2로 가는 유일한
+   * 상시 진입점이 됐다.** 전에는 프레임 0개인 빈 상태에만 있던 길이다. 이 버튼이
+   * 사라지면 추천 화면이 앱에서 고아가 되므로 시험으로 잡는다.
+   */
+  it('프레임이 있어도 필름 늘리기로 추천에 갈 수 있다', async () => {
+    vi.mocked(getMyFrames).mockResolvedValue(frameList(3));
+    vi.mocked(getPopcornBucket).mockResolvedValue(bucket);
+
+    renderWithRouter(<FilmPage />);
+
+    expect(await screen.findByRole('button', { name: '필름 늘리기' })).toBeInTheDocument();
+    // 빈 상태의 길은 프레임이 있으면 나오지 않는다
+    expect(screen.queryByRole('button', { name: '추천 영화 보기' })).not.toBeInTheDocument();
+  });
 });

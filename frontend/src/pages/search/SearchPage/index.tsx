@@ -233,6 +233,16 @@ export default function SearchPage() {
    */
   const runSeq = useRef(0);
 
+  /*
+   * 들어오자마자 입력창에 포커스를 둔다(사용자 지시 2026-09-16, 업무 -461).
+   *
+   * 검색은 3.1 필름 헤더의 돋보기에서만 들어오는 하위 화면이다. 돋보기를 누른 사람은
+   * 이미 검색어를 칠 참이므로 한 번 더 두드리게 하지 않는다.
+   */
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
   useEffect(() => {
     let active = true;
 

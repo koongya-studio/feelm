@@ -21,6 +21,13 @@
  * `IconButton`의 `translucent` 변형과 같은 모양이지만, 검색은 버튼이 아니라 링크라
  * 그 컴포넌트를 쓰지 않고 여기서 그린다.
  */
+/* 검색과 알림이 나란히 선다. 둘 다 44px 터치 영역이라 사이를 좁게 둔다 */
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
 .headerAction {
   position: relative;
   display: flex;

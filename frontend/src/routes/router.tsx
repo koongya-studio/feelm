@@ -105,8 +105,8 @@ export const router = createBrowserRouter(
     {
       element: <AppLayout />,
       children: [
-        // 앱 진입점. 로그인 전이면 0.1 시작 화면으로 보낸다(HomeEntry.tsx)
-        { path: ROUTE_PATTERN.home, element: <HomeEntry /> },
+        // 앱 진입점. 로그인 전이면 0.1, 로그인했으면 3.1 필름으로 보낸다(HomeEntry.tsx)
+        { path: ROUTE_PATTERN.entry, element: <HomeEntry /> },
         { path: ROUTE_PATTERN.recommendations, element: <RecommendationsPage /> },
         { path: ROUTE_PATTERN.film, element: <FilmPage /> },
         { path: ROUTE_PATTERN.popcornBucket, element: <PopcornBucketPage /> },

@@ -3,6 +3,9 @@
  *
  * EXT-01 → EXT-02 → EXT-03 → EXT-04 사슬과 두 갈래(EXT-05 데이터 부족 · 6.1 OTT 관리)를 걷는다.
  *
+ * 사슬의 출발은 **7.8 설정의 `나에게 맞는 OTT 찾기` 배너**다. 홈에 있던 것을 홈을 없애면서
+ * `OTT 관리`(6.1) 옆으로 옮겼다(업무 -461).
+ *
  * - EXT-02는 응답을 기다린 뒤 EXT-03으로 **바꿔 끼운다.** 뒤로 가기가 분석 중으로 돌아오면
  *   분석이 다시 돈다
  * - 구독 여부는 6.1에서 바꾼 값이어야 한다. 목업이 고정값을 들고 있으면 6.1과 어긋난다.
@@ -19,12 +22,14 @@ import OttInsufficientPage from './OttInsufficientPage';
 import OttManagePage from './OttManagePage';
 import OttResultDetailPage from './OttResultDetailPage';
 import OttResultPage from './OttResultPage';
-import HomePage from '../home/HomePage';
+import SettingsPage from '../my/SettingsPage';
+import { AuthContext } from '../../contexts/authContext';
 import { getMyProfile } from '../../api/users';
 import { mockOtts } from '../../mocks/otts';
 import { resetSessionStore } from '../../mocks/sessionStore';
 import { mockMyProfile } from '../../mocks/user';
 import { ROUTE_PATTERN } from '../../routes/paths';
+import type { AuthValue } from '../../contexts/authContext';
 
 vi.mock('../../api/users', () => ({
   getMyProfile: vi.fn(),
@@ -65,35 +70,47 @@ function LocationProbe() {
   );
 }
 
+/** 7.8 설정이 로그아웃에 `useAuth`를 쓴다. 이 시험은 EXT 사슬만 보므로 값만 세운다 */
+const auth: AuthValue = {
+  status: 'authenticated',
+  user: { userId: 1024, nickname: '김난다', onboardingCompleted: true },
+  signIn: vi.fn(),
+  signInWithSocial: vi.fn(),
+  completeSocialSignup: vi.fn(),
+  signOut: vi.fn(),
+};
+
 function renderApp(entries: string[]) {
   return render(
-    <MemoryRouter initialEntries={entries} initialIndex={entries.length - 1}>
-      <Routes>
-        <Route path={ROUTE_PATTERN.home} element={<HomePage />} />
-        <Route path={ROUTE_PATTERN.ottManage} element={<OttManagePage />} />
-        <Route path={ROUTE_PATTERN.ottFinder} element={<OttFinderPage />} />
-        <Route path={ROUTE_PATTERN.ottAnalyzing} element={<OttAnalyzingPage />} />
-        <Route path={ROUTE_PATTERN.ottResult} element={<OttResultPage />} />
-        <Route path={ROUTE_PATTERN.ottInsufficient} element={<OttInsufficientPage />} />
-        <Route path={ROUTE_PATTERN.ottResultDetail} element={<OttResultDetailPage />} />
-        <Route path="*" element={<p>다른 화면</p>} />
-      </Routes>
-      <LocationProbe />
-    </MemoryRouter>,
+    <AuthContext.Provider value={auth}>
+      <MemoryRouter initialEntries={entries} initialIndex={entries.length - 1}>
+        <Routes>
+          <Route path={ROUTE_PATTERN.settings} element={<SettingsPage />} />
+          <Route path={ROUTE_PATTERN.ottManage} element={<OttManagePage />} />
+          <Route path={ROUTE_PATTERN.ottFinder} element={<OttFinderPage />} />
+          <Route path={ROUTE_PATTERN.ottAnalyzing} element={<OttAnalyzingPage />} />
+          <Route path={ROUTE_PATTERN.ottResult} element={<OttResultPage />} />
+          <Route path={ROUTE_PATTERN.ottInsufficient} element={<OttInsufficientPage />} />
+          <Route path={ROUTE_PATTERN.ottResultDetail} element={<OttResultDetailPage />} />
+          <Route path="*" element={<p>다른 화면</p>} />
+        </Routes>
+        <LocationProbe />
+      </MemoryRouter>
+    </AuthContext.Provider>,
   );
 }
 
 const location = () => screen.getByTestId('location').textContent;
 const search = () => screen.getByTestId('search').textContent;
 
-describe('2.1 → EXT-01 → EXT-02 → EXT-03 → EXT-04', () => {
+describe('7.8 → EXT-01 → EXT-02 → EXT-03 → EXT-04', () => {
   /*
    * EXT-02 분석 연출을 기다리는 `waitFor`가 5초까지 쓰는데 vitest의 기본 제한도 5초라,
    * 전체 실행처럼 부하가 있으면 안에서 기다리다 밖에서 끊긴다(develop에서도 같다).
    * 분석을 기다리는 두 테스트의 제한을 늘린다.
    */
   it('분석을 마치면 결과로 바꿔 끼우고, 상세와 비교를 오간다', async () => {
-    renderApp([ROUTE_PATTERN.home]);
+    renderApp([ROUTE_PATTERN.settings]);
 
     fireEvent.click(await screen.findByRole('link', { name: 'OTT 추천받기' }));
     expect(location()).toBe('/otts/recommend');
@@ -130,7 +147,7 @@ describe('2.1 → EXT-01 → EXT-02 → EXT-03 → EXT-04', () => {
   }, 15000);
 
   it('분석 중 화면은 기록에 남지 않는다', async () => {
-    renderApp([ROUTE_PATTERN.home, ROUTE_PATTERN.ottFinder]);
+    renderApp([ROUTE_PATTERN.settings, ROUTE_PATTERN.ottFinder]);
 
     fireEvent.click(await screen.findByRole('button', { name: '내 OTT 취향 분석하기' }));
     await waitFor(() => expect(location()).toBe('/otts/recommend/result'), { timeout: 5000 });
