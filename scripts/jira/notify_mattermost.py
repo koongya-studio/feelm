@@ -249,9 +249,9 @@ def build_message(
     issues: list[dict[str, Any]], jira_base_url: str, today: date | None = None
 ) -> str:
     day = today or date.today()
-    header = f"### Jira 아침 작업 현황 · {day.isoformat()}"
+    header = f"## ☀️ Jira 아침 작업 현황\n> 📅 {day.isoformat()} · 🏃 활성 스프린트"
     if not issues:
-        return f"{header}\n\n활성 스프린트에 완료되지 않은 작업이 없습니다."
+        return f"{header}\n\n✅ 완료되지 않은 작업이 없습니다. 오늘도 좋은 하루 보내세요!"
 
     normalized = [normalize_issue(issue, jira_base_url) for issue in issues]
     assignees: dict[str, dict[str, list[dict[str, str]]]] = {}
@@ -259,21 +259,33 @@ def build_message(
         groups = assignees.setdefault(issue["assignee"], {"진행 중": [], "해야 할 일": []})
         groups[issue["category"]].append(issue)
 
-    lines = [header, "", f"활성 스프린트 미완료 작업: **{len(normalized)}개**"]
+    in_progress = sum(issue["category"] == "진행 중" for issue in normalized)
+    to_do = len(normalized) - in_progress
+    lines = [
+        header,
+        "",
+        (
+            f"**📊 전체 요약** · 총 **{len(normalized)}건** · "
+            f"🚧 진행 중 **{in_progress}건** · 📌 해야 할 일 **{to_do}건** · "
+            f"👥 담당자 **{len(assignees)}명**"
+        ),
+    ]
     for assignee in sorted(assignees, key=lambda name: (name == "미할당", name.casefold())):
-        lines.extend(["", f"#### {assignee}"])
+        assignee_heading = f"⚠️ {assignee}" if assignee == "미할당" else f"👤 {assignee}"
+        lines.extend(["", "---", "", f"### {assignee_heading}"])
         for category in ("진행 중", "해야 할 일"):
             items = assignees[assignee][category]
             if not items:
                 continue
-            lines.append(f"**{category}** ({len(items)})")
+            icon = "🚧" if category == "진행 중" else "📌"
+            lines.append(f"**{icon} {category} · {len(items)}건**")
             for item in items:
-                lines.append(f"- [{item['key']}]({item['url']}) {item['summary']}")
+                lines.append(f"- [**{item['key']}**]({item['url']}) {item['summary']}")
 
     message = "\n".join(lines)
     if len(message) <= MAX_MESSAGE_LENGTH:
         return message
-    suffix = "\n\n주의: 메시지 길이 제한으로 일부 작업이 생략되었습니다. Jira에서 전체 목록을 확인해 주세요."
+    suffix = "\n\n⚠️ 메시지 길이 제한으로 일부 작업이 생략되었습니다. Jira에서 전체 목록을 확인해 주세요."
     return message[: MAX_MESSAGE_LENGTH - len(suffix)].rstrip() + suffix
 
 
