@@ -36,27 +36,42 @@ cache_policy = load('pipeline_cache_policy', 'ci-pipeline-cache-policy.py')
 CONFIG = Path('/etc/feelm-ci222/pipeline-mr.json')
 INSTALLED = Path('/usr/local/lib/feelm-ci222/gitlab/ci-pipeline-mr-runner.py')
 RUNTIME_ROOT = Path('/run')
-FIXED_COMMAND = (
+SETUP_COMMAND = (
     'mkdir -p /uv-cache-work'
     ' && cp --recursive --no-preserve=ownership,mode,timestamps'
     ' /uv-cache-source/. /uv-cache-work/'
     ' && chmod -R u+rwX /uv-cache-work'
     ' && uv lock --check --offline'
     ' && uv sync --frozen --offline'
-    ' && uv run --frozen --offline ruff check .'
-    ' && uv run --frozen --offline python -m ci_test_groups verify'
-    # Run bounded test groups in separate Python processes so each PySpark JVM
-    # exits before the next group starts instead of accumulating native threads.
-    ' && uv run --frozen --offline python -m ci_test_groups unit -vv --durations=20'
-    ' && uv run --frozen --offline python -m ci_test_groups spark-als-a-d'
-    ' -vv --durations=20'
-    ' && uv run --frozen --offline python -m ci_test_groups spark-als-e-z'
-    ' -vv --durations=20'
-    ' && uv run --frozen --offline python -m ci_test_groups spark-other'
-    ' -vv --durations=20'
-    ' && uv run --frozen --offline python -m jobs.batch.als_baseline --help'
-    ' && uv run --frozen --offline python -m jobs.batch.parquet_roundtrip --help'
 )
+GROUP_COMMANDS = {
+    'unit': (
+        'uv run --frozen --offline ruff check .'
+        ' && uv run --frozen --offline python -m ci_test_groups verify'
+        ' && uv run --frozen --offline python -m ci_test_groups unit -vv --durations=20'
+        ' && uv run --frozen --offline python -m jobs.batch.als_baseline --help'
+        ' && uv run --frozen --offline python -m jobs.batch.parquet_roundtrip --help'
+    ),
+    'spark-als-a-d': (
+        'uv run --frozen --offline python -m ci_test_groups spark-als-a-d'
+        ' -vv --durations=20'
+    ),
+    'spark-als-e-z': (
+        'uv run --frozen --offline python -m ci_test_groups spark-als-e-z'
+        ' -vv --durations=20'
+    ),
+    'spark-other': (
+        'uv run --frozen --offline python -m ci_test_groups spark-other'
+        ' -vv --durations=20'
+    ),
+}
+
+
+def fixed_command(group):
+    command = GROUP_COMMANDS.get(group)
+    if command is None:
+        raise ValueError('Unknown Pipeline test group')
+    return SETUP_COMMAND + ' && ' + command
 
 
 def read_config(path=CONFIG):
@@ -147,8 +162,9 @@ def write_container_archive(source, output):
             archive.add(child, arcname=child.name, recursive=True, filter=normalized)
 
 
-def workload(config, source, container):
+def workload(config, source, group, container):
     source = Path(source).resolve(strict=True)
+    command_policy = fixed_command(group)
     if not re.fullmatch(r'ci352-pipeline-[a-f0-9]{12}', container):
         raise ValueError('Invalid Pipeline container identity')
     inspect = subprocess.run(docker_command(config, 'image', 'inspect', config['pipeline_image'],
@@ -173,7 +189,7 @@ def workload(config, source, container):
         '--env', 'UV_CACHE_DIR=/uv-cache-work', '--env', 'UV_LINK_MODE=copy',
         '--env', 'PYSPARK_PYTHON=python',
         '--env', 'SPARK_LOCAL_IP=127.0.0.1', '--env', 'SPARK_LOCAL_DIRS=/work/.spark-local',
-        config['pipeline_image_id'], 'sh', '-c', 'tar -xf - -C /work && ' + FIXED_COMMAND)
+        config['pipeline_image_id'], 'sh', '-c', 'tar -xf - -C /work && ' + command_policy)
     try:
         with tempfile.TemporaryFile() as packed:
             write_container_archive(source, packed)
@@ -183,7 +199,8 @@ def workload(config, source, container):
         cleanup_container(config, container)
 
 
-def unit_command(config, source, unit, container):
+def unit_command(config, source, group, unit, container):
+    fixed_command(group)
     if not re.fullmatch(r'ci352-owner-[a-f0-9]{12}\.service', unit):
         raise ValueError('Invalid Pipeline unit identity')
     return [
@@ -197,7 +214,7 @@ def unit_command(config, source, unit, container):
         '--property=ExecStopPost=/usr/bin/python3 -I -B ' + str(INSTALLED)
         + ' cleanup --container=' + container,
         '/usr/bin/python3', '-I', '-B', str(INSTALLED), 'workload',
-        '--source=' + str(source), '--container=' + container,
+        '--source=' + str(source), '--group=' + group, '--container=' + container,
     ]
 
 
@@ -207,9 +224,10 @@ def stop_unit(unit):
     subprocess.run(['systemctl', 'stop', unit], capture_output=True, timeout=30)
 
 
-def start(payload, digest, on_started=None, config_path=CONFIG):
+def start(payload, digest, group, on_started=None, config_path=CONFIG):
     if pwd is None or not sys.platform.startswith('linux'):
         raise RuntimeError('Pipeline MR execution requires Linux')
+    fixed_command(group)
     config = read_config(config_path)
     files, _ = boundary.source_plan(payload, digest)
     verify_source_identity(config, files)
@@ -233,7 +251,8 @@ def start(payload, digest, on_started=None, config_path=CONFIG):
         attempt.chmod(0o711)
         if on_started is not None:
             on_started(staging, {'owner': unit})
-        process = bounded.CappedProcess(unit_command(config, staging, unit, container), log)
+        process = bounded.CappedProcess(
+            unit_command(config, staging, group, unit, container), log)
         try:
             code = process.wait(3630)
         except (subprocess.TimeoutExpired, RuntimeError) as exc:
@@ -256,7 +275,8 @@ def start(payload, digest, on_started=None, config_path=CONFIG):
         print(output[-bounded.LIMIT:], end='')
         if code:
             return 2
-        print('PIPELINE_MR_TEST_PASSED: fixed offline Spark policy; no artifacts exported')
+        print('PIPELINE_MR_TEST_PASSED: group=' + group
+              + ' fixed offline Spark policy; no artifacts exported')
         return 0
     finally:
         stop_unit(unit)
@@ -270,14 +290,16 @@ def main():
         action = sys.argv[1]
         source = next((arg.split('=', 1)[1] for arg in sys.argv[2:]
                        if arg.startswith('--source=')), None)
+        group = next((arg.split('=', 1)[1] for arg in sys.argv[2:]
+                      if arg.startswith('--group=')), None)
         container = next((arg.split('=', 1)[1] for arg in sys.argv[2:]
                           if arg.startswith('--container=')), None)
-        if container is None or (action == 'workload' and source is None):
+        if container is None or (action == 'workload' and (source is None or group is None)):
             return 64
         config = read_config()
         if action == 'cleanup':
             return cleanup_container(config, container)
-        return workload(config, source, container)
+        return workload(config, source, group, container)
     print('PLAN: validated pipeline/spark archive, fixed offline container, bounded resources/output')
     return 0
 

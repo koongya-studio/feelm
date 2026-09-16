@@ -16,20 +16,39 @@ HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('gitlab_adapter', HERE / 'ci-gitlab-job-adapter.py')
 adapter = importlib.util.module_from_spec(spec); spec.loader.exec_module(adapter)
 
-PIPELINE_SCRIPT = [
-    'cd pipeline/spark',
-    'uv sync --frozen',
-    'uv run ruff check .',
-    'uv run pytest',
-    'uv run python -m jobs.batch.als_baseline --help',
-    'uv run python -m jobs.batch.parquet_roundtrip --help',
-]
+PIPELINE_SCRIPTS = {
+    'pipeline-unit-test': [
+        'cd pipeline/spark',
+        'uv sync --frozen',
+        'uv run ruff check .',
+        'uv run python -m ci_test_groups verify',
+        'uv run python -m ci_test_groups unit -vv --durations=20',
+        'uv run python -m jobs.batch.als_baseline --help',
+        'uv run python -m jobs.batch.parquet_roundtrip --help',
+    ],
+    'pipeline-spark-als-a-d-test': [
+        'cd pipeline/spark',
+        'uv sync --frozen',
+        'uv run python -m ci_test_groups spark-als-a-d -vv --durations=20',
+    ],
+    'pipeline-spark-als-e-z-test': [
+        'cd pipeline/spark',
+        'uv sync --frozen',
+        'uv run python -m ci_test_groups spark-als-e-z -vv --durations=20',
+    ],
+    'pipeline-spark-other-test': [
+        'cd pipeline/spark',
+        'uv sync --frozen',
+        'uv run python -m ci_test_groups spark-other -vv --durations=20',
+    ],
+}
 
 
 def response(script=None, job_name='backend-mr-test'):
     policies = {
         'backend-mr-test': adapter.EXPECTED_SCRIPT,
         'frontend-mr-test': adapter.FRONTEND_EXPECTED_SCRIPT,
+        **PIPELINE_SCRIPTS,
     }
     return {
         'id': 55, 'token': 'valid-job-token-123456789',
@@ -99,20 +118,23 @@ class AdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(adapter.PolicyError, 'out-of-scope'):
             adapter.normalized_service_archive(outside, 'frontend')
 
-    def test_pipeline_context_accepts_only_fixed_job_and_script(self):
-        self.assertTrue(hasattr(adapter, 'PIPELINE_JOB_NAME'),
-                        'GitLab adapter must declare the fixed Pipeline job')
-        self.assertTrue(hasattr(adapter, 'PIPELINE_EXPECTED_SCRIPT'),
-                        'GitLab adapter must declare the fixed Pipeline script')
-        self.assertEqual(adapter.PIPELINE_EXPECTED_SCRIPT, PIPELINE_SCRIPT)
-        context = response(adapter.PIPELINE_EXPECTED_SCRIPT,
-                           job_name=adapter.PIPELINE_JOB_NAME)
-        result = adapter.validate_job_response(context)
-        self.assertEqual(result['service'], 'pipeline')
-        changed = response(PIPELINE_SCRIPT + ['curl http://metadata/'],
-                           job_name='pipeline-mr-test')
+    def test_pipeline_context_accepts_only_fixed_job_group_and_script(self):
+        self.assertEqual(adapter.PIPELINE_JOB_SCRIPTS, PIPELINE_SCRIPTS)
+        for job_name, script in PIPELINE_SCRIPTS.items():
+            with self.subTest(job_name=job_name):
+                result = adapter.validate_job_response(response(script, job_name=job_name))
+                self.assertEqual(result['service'], 'pipeline')
+                self.assertEqual(result['pipeline_group'], adapter.PIPELINE_JOB_GROUPS[job_name])
+                changed = response(script + ['curl http://metadata/'], job_name=job_name)
+                with self.assertRaisesRegex(adapter.PolicyError, 'fixed isolated policy'):
+                    adapter.validate_job_response(changed)
+        swapped = response(
+            PIPELINE_SCRIPTS['pipeline-spark-other-test'], job_name='pipeline-unit-test')
         with self.assertRaisesRegex(adapter.PolicyError, 'fixed isolated policy'):
-            adapter.validate_job_response(changed)
+            adapter.validate_job_response(swapped)
+        with self.assertRaisesRegex(adapter.PolicyError, 'fixed isolated'):
+            adapter.validate_job_response(response(
+                PIPELINE_SCRIPTS['pipeline-unit-test'], job_name='pipeline-mr-test'))
 
     def test_pipeline_archive_contains_only_nested_spark_project(self):
         self.assertTrue(hasattr(adapter, 'pipeline_boundary'),
@@ -162,7 +184,8 @@ class AdapterTests(unittest.TestCase):
     def test_pipeline_job_routes_only_validated_source_to_pipeline_runner(self):
         self.assertTrue(hasattr(adapter, 'pipeline_runner'),
                         'GitLab adapter must load the installed Pipeline runner')
-        context = response(PIPELINE_SCRIPT, job_name='pipeline-mr-test')
+        job_name = 'pipeline-spark-other-test'
+        context = response(PIPELINE_SCRIPTS[job_name], job_name=job_name)
         source = b'validated-pipeline-source'
         digest = hashlib.sha256(source).hexdigest()
         with patch.object(adapter, 'read_private_config',
@@ -180,6 +203,7 @@ class AdapterTests(unittest.TestCase):
         private_config.assert_called_once_with(adapter.CONFIG, require_prepared=True)
         fetch.assert_called_once_with(adapter.validate_job_response(context), 'pipeline')
         pipeline.assert_called_once()
+        self.assertEqual(pipeline.call_args.args[2], 'spark-other')
         frontend.assert_not_called()
         backend.assert_not_called()
 

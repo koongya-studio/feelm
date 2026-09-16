@@ -110,27 +110,55 @@ include:
         self.assertNotIn('- backend/**/*', frontend)
         self.assertNotIn('- .gitlab/ci/backend.yml', frontend)
 
-    def test_pipeline_mr_job_is_isolated_and_path_scoped(self):
+    def test_pipeline_mr_jobs_are_isolated_sharded_and_path_scoped(self):
         self.assertTrue(self.pipeline_path.is_file(), 'Missing Pipeline CI include')
-        job = job_block(self.pipeline, 'pipeline-mr-test')
+        template = job_block(self.pipeline, '.pipeline-mr-test')
         for expected in (
                 'stage: test', 'tags: [e106-mr-isolated]', 'dependencies: []',
-                'GIT_STRATEGY: none', 'resource_group: pipeline-mr-isolated',
-                'interruptible: true',
+                'GIT_STRATEGY: none', 'interruptible: true',
                 '$CI_PIPELINE_SOURCE == "merge_request_event"',
                 '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'):
-            self.assertIn(expected, job)
-        expected_script = [
-            '- cd pipeline/spark',
-            '- uv sync --frozen',
-            '- uv run ruff check .',
-            '- uv run pytest',
-            '- uv run python -m jobs.batch.als_baseline --help',
-            '- uv run python -m jobs.batch.parquet_roundtrip --help',
-        ]
-        scripts = [line.strip() for line in job.splitlines()
-                   if line.strip() in expected_script]
-        self.assertEqual(scripts, expected_script)
+            self.assertIn(expected, template)
+        jobs = {
+            'pipeline-unit-test': [
+                '- cd pipeline/spark',
+                '- uv sync --frozen',
+                '- uv run ruff check .',
+                '- uv run python -m ci_test_groups verify',
+                '- uv run python -m ci_test_groups unit -vv --durations=20',
+                '- uv run python -m jobs.batch.als_baseline --help',
+                '- uv run python -m jobs.batch.parquet_roundtrip --help',
+            ],
+            'pipeline-spark-als-a-d-test': [
+                '- cd pipeline/spark',
+                '- uv sync --frozen',
+                '- uv run python -m ci_test_groups spark-als-a-d -vv --durations=20',
+            ],
+            'pipeline-spark-als-e-z-test': [
+                '- cd pipeline/spark',
+                '- uv sync --frozen',
+                '- uv run python -m ci_test_groups spark-als-e-z -vv --durations=20',
+            ],
+            'pipeline-spark-other-test': [
+                '- cd pipeline/spark',
+                '- uv sync --frozen',
+                '- uv run python -m ci_test_groups spark-other -vv --durations=20',
+            ],
+        }
+        resource_groups = []
+        for name, expected_script in jobs.items():
+            job = job_block(self.pipeline, name)
+            self.assertIn('extends: .pipeline-mr-test', job)
+            self.assertIn('timeout: 15m', job)
+            scripts = [line.strip() for line in job.splitlines()
+                       if line.strip().startswith('- ')]
+            self.assertEqual(scripts, expected_script)
+            match = re.search(r'(?m)^  resource_group: (\S+)$', job)
+            self.assertIsNotNone(match, name)
+            resource_groups.append(match.group(1))
+            for forbidden in ('image:', 'services:', 'cache:', 'artifacts:', 'before_script:'):
+                self.assertNotIn(forbidden, job)
+        self.assertEqual(len(resource_groups), len(set(resource_groups)))
         for path in (
                 'pipeline/spark/**/*.py', 'pipeline/spark/tests/**/*',
                 'pipeline/spark/pyproject.toml', 'pipeline/spark/uv.lock',
@@ -145,13 +173,13 @@ include:
                 'infra/scripts/systemd/feelm-ci222-gitlab-runner.service',
                 'infra/scripts/test_ci_gitlab_job_adapter.py',
                 'infra/scripts/test_ci_config.py'):
-            self.assertIn('- ' + path, job)
+            self.assertIn('- ' + path, template)
         for excluded in ('- pipeline/**/*', '- pipeline/docs/**/*',
                          '- pipeline/consumer/**/*', '- .gitlab/ci/backend.yml',
                          '- .gitlab/ci/frontend.yml'):
-            self.assertNotIn(excluded, job)
+            self.assertNotIn(excluded, template)
         for forbidden in ('image:', 'services:', 'cache:', 'artifacts:', 'before_script:'):
-            self.assertNotIn(forbidden, job)
+            self.assertNotIn(forbidden, template)
 
     def test_frontend_mr_command_is_fixed_and_has_no_gitlab_runtime_inputs(self):
         block = job_block(self.frontend, 'frontend-mr-test')
