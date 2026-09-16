@@ -66,6 +66,8 @@ def source_plan(payload, expected_sha):
     except tarfile.TarError as exc:
         raise ValueError("Invalid infra snapshot") from exc
     required = {".gitlab-ci.yml", ".gitlab/ci/infra.yml",
+                "infra/config/required-ci-variables.json",
+                "infra/scripts/ci-required-variable-preflight.py",
                 "infra/scripts/run-infra-config-tests.py",
                 "infra/scripts/test_ci_infra_mr.py"}
     if not required <= files.keys():

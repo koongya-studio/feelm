@@ -1,3 +1,32 @@
+ci-variable-contract-check:
+  stage: verify
+  tags: [e106-mr-isolated]
+  dependencies: []
+  variables:
+    GIT_STRATEGY: none
+  script:
+    - python3 -I -B infra/scripts/ci-required-variable-preflight.py
+  resource_group: ci-variable-contract-check
+  interruptible: true
+  timeout: 5m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
+
+ci-variable-preflight:
+  stage: verify
+  tags: [e106-shell]
+  needs: []
+  environment:
+    name: service
+    action: prepare
+  script:
+    - python3 -I -B infra/scripts/ci-required-variable-preflight.py --require-values --check-metadata
+  resource_group: ci-variable-preflight
+  interruptible: true
+  timeout: 5m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+
 infra-config-test:
   stage: test
   tags: [e106-mr-isolated]
@@ -19,6 +48,7 @@ infra-config-test:
         - .gitlab/ci/consumer.yml
         - .gitlab/ci/infra.yml
         - infra/.env.example
+        - infra/config/required-ci-variables.json
         - infra/compose/**/*
         - infra/hadoop/**/*
         - infra/kafka/**/*
@@ -31,6 +61,8 @@ infra-config-test:
         - infra/scripts/run-infra-config-tests.py
         - infra/scripts/notify-deployment.py
         - infra/scripts/test_notify_deployment.py
+        - infra/scripts/ci-required-variable-preflight.py
+        - infra/scripts/test_ci_required_variable_preflight.py
         - infra/scripts/verify-kafka-monitoring.py
         - infra/scripts/test_consumer_distributed_deployment.py
         - infra/scripts/test_kafka_monitoring.py
