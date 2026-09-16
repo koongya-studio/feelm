@@ -70,6 +70,15 @@ describe('공통 HTTP 클라이언트', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/movies/search?q=%EC%98%81%ED%99%94');
   });
 
+  it('배열은 같은 이름을 반복해 싣고 빈 배열은 빠진다', async () => {
+    fetchMock.mockResolvedValue(json(200, {}));
+
+    // 계약이 정한 배열 표기다(API-028). 인덱스 표기는 서버가 400으로 거절한다
+    await request('/movies/search', { query: { genre: ['ACTION', 'DRAMA'], ott: [] } });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/v1/movies/search?genre=ACTION&genre=DRAMA');
+  });
+
   it('오류 응답의 code와 message가 ApiError로 전달된다', async () => {
     fetchMock.mockResolvedValue(
       json(409, { code: 'NICKNAME_DUPLICATED', message: '이미 사용 중인 닉네임입니다.' }),

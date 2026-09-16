@@ -135,6 +135,22 @@
   list-style: none;
 }
 
+/* 다음 장 이어 받기. 계약이 커서 페이지를 주므로 첫 20편 뒤가 여기로 이어진다 */
+.more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+}
+
+.moreError {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
+}
+
 /* 목록 아래 안내. 와이어프레임이 목록 끝에 둔 문구다 */
 .hint {
   padding-top: var(--space-2);

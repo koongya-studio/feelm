@@ -26,12 +26,20 @@ export type AuthMode =
 
 export type QueryValue = string | number | boolean | undefined | null;
 
+/**
+ * 질의 한 항목의 값.
+ *
+ * 배열은 같은 이름을 반복해 싣는다(`genre=ACTION&genre=DRAMA`). 계약이 배열 질의를
+ * 그렇게 정했고(API-028), 인덱스·중첩 표기(`genre[0]`)는 서버가 400으로 거절한다.
+ */
+export type QueryEntry = QueryValue | readonly QueryValue[];
+
 export type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   /** JSON 본문. 없으면 `Content-Type`을 붙이지 않는다 */
   body?: unknown;
-  /** 질의 문자열. `undefined`·`null` 값은 보내지 않는다 */
-  query?: Record<string, QueryValue>;
+  /** 질의 문자열. `undefined`·`null` 값과 빈 배열은 보내지 않는다 */
+  query?: Record<string, QueryEntry>;
   /** 기본값은 `required`다. 공개 API는 호출 측이 명시한다 */
   auth?: AuthMode;
 };
@@ -96,16 +104,19 @@ function headers(hasBody: boolean, token: string | null): Record<string, string>
   return result;
 }
 
-function queryString(query: Record<string, QueryValue> | undefined): string {
+function queryString(query: Record<string, QueryEntry> | undefined): string {
   if (!query) {
     return '';
   }
 
   const params = new URLSearchParams();
 
-  for (const [key, value] of Object.entries(query)) {
-    if (value !== undefined && value !== null) {
-      params.set(key, String(value));
+  for (const [key, entry] of Object.entries(query)) {
+    // 배열이면 같은 이름을 값 수만큼 반복한다. 빈 배열은 항목이 없는 것과 같다
+    for (const value of Array.isArray(entry) ? entry : [entry as QueryValue]) {
+      if (value !== undefined && value !== null) {
+        params.append(key, String(value));
+      }
     }
   }
 

@@ -31,6 +31,14 @@ describe('개봉연도 덩어리 → 범위', () => {
 
     expect(query).toMatchObject({ yearFrom: YEAR_MIN, yearTo: 2009 });
   });
+
+  it('기준정보에 연도가 없으면 그 이전은 끝만 보낸다', () => {
+    // API-029는 개봉일이 있는 영화가 하나도 없으면 `yearRange`를 둘 다 `null`로 준다
+    const query = toSearchQuery('', { ...EMPTY_FILTER, year: 'BEFORE' }, null);
+
+    expect(query.yearFrom).toBeUndefined();
+    expect(query.yearTo).toBe(2009);
+  });
 });
 
 describe('빈 값 처리', () => {
