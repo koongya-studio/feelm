@@ -9,6 +9,8 @@ EXPECTED_IMAGE = "${SPARK_IMAGE:-feelm-spark-ml:4.1.3-numpy2.2.6}"
 EXPECTED_BUILD = "context: ../spark\n      dockerfile: Dockerfile"
 EXPECTED_NUMPY_VERSION = "2.2.6"
 EXPECTED_NUMPY_HASH = "fc7b73d02efb0e18c000e9ad8b83480dfcd5dfd11065997ed4c6747470ae8915"
+EXPECTED_REDIS_VERSION = "5.3.1"
+EXPECTED_REDIS_HASH = "dc1909bd24669cc31b5f67a039700b16ec30571096c5f1f0d9d2324bff31af97"
 
 
 class SparkMlRuntimeTests(unittest.TestCase):
@@ -37,6 +39,18 @@ class SparkMlRuntimeTests(unittest.TestCase):
         self.assertIn("--require-hashes", dockerfile)
         self.assertIn("requirements-ml.txt", dockerfile)
         self.assertTrue(dockerfile.rstrip().endswith("USER spark"))
+
+    def test_redis_requirement_is_pinned_in_image_without_changing_pipeline_lock(self):
+        requirement = (SPARK_DIR / "requirements-ml.txt").read_text(encoding="utf-8")
+        dockerfile = (SPARK_DIR / "Dockerfile").read_text(encoding="utf-8")
+        lock = (REPOSITORY_ROOT / "pipeline" / "spark" / "uv.lock").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn(f"redis-{EXPECTED_REDIS_VERSION}-py3-none-any.whl", requirement)
+        self.assertIn(f"--hash=sha256:{EXPECTED_REDIS_HASH}", requirement)
+        self.assertIn(f'redis.__version__ == "{EXPECTED_REDIS_VERSION}"', dockerfile)
+        self.assertNotRegex(lock, r'(?m)^name = "redis"$')
 
     def test_all_spark_roles_build_the_same_local_image(self):
         service = (REPOSITORY_ROOT / "infra" / "compose" / "service.yml").read_text(

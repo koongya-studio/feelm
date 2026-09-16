@@ -69,6 +69,26 @@ uv run python -m jobs.batch.movie_metadata --help
 
 ## 로컬 검증
 
+Candidate를 Redis에 게시한 뒤에는 같은 Kafka 브로커의 `feelm.candidate-updated.v1`에
+Kafka 키 `userId`(UTF-8 십진 문자열), 값 `{"userId": 1024}` 형식의 완료 알림을 보낸다. 브로커 전달 확인 전에는
+원본 평가·온보딩 Offset을 커밋하지 않는다. 재처리 시 알림이 중복될 수 있으므로 수신자는
+현재 Redis `generationId`를 다시 확인해야 한다. 이 알림을 파티별 전체 입력으로 바꾸는
+Spring 소비자는 별도 구현이다.
+
+Kafka의 Topic 자동 생성이 꺼져 있으므로 Consumer 배포 전에 기존 브로커에서 토픽을 만든다.
+로컬은 `feelm-kafka-local`, 분산 환경은 `feelm-kafka` 컨테이너에서 실행한다.
+
+```bash
+docker exec feelm-kafka-local /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 --create --if-not-exists \
+  --topic feelm.candidate-updated.v1 --partitions 3 --replication-factor 1
+
+# 분산 Kafka 컨테이너에서는 같은 토픽을 한 번 생성한다.
+docker exec feelm-kafka /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 --create --if-not-exists \
+  --topic feelm.candidate-updated.v1 --partitions 3 --replication-factor 1
+```
+
 ```bash
 uv run pytest
 uv run ruff check .

@@ -17,7 +17,7 @@ def test_repository_files_are_partitioned_once() -> None:
 
     assert len(grouped) == len(set(grouped))
     assert set(grouped) == ci_test_groups.discover_test_files()
-    assert len(groups["unit"]) == 15
+    assert len(groups["unit"]) == 22
 
 
 def test_unknown_test_defaults_to_serial_spark_group(tmp_path: Path) -> None:

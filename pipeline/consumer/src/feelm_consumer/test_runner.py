@@ -8,6 +8,7 @@ import redis
 
 from feelm_consumer import runner
 from feelm_consumer.artifacts import ArtifactError
+from feelm_consumer.candidate_events import CandidateEventPublishError
 from feelm_consumer.postgres import UserSnapshot
 from feelm_consumer.ranking import RankedMovie
 from feelm_consumer.settings import load_settings
@@ -346,6 +347,53 @@ def test_user_without_publishable_result_is_committed_and_does_not_pause(monkeyp
     assert calculated["watched_movie_ids"] == frozenset({8})
     assert calculated["dismissed_movie_ids"] == frozenset({9})
     assert "no_publishable_result_skipped" in caplog.text
+
+
+def test_candidate_event_follows_redis_publish_and_failure_keeps_input_uncommitted(monkeypatch) -> None:
+    calls: list[str] = []
+    monkeypatch.setattr(runner, "_expected_version", lambda *_args: 0)
+    monkeypatch.setattr(runner, "readonly_snapshot", _null_snapshot)
+    monkeypatch.setattr(runner, "load_user_snapshot", lambda *_args: UserSnapshot([], [], frozenset(), frozenset()))
+    monkeypatch.setattr(
+        runner,
+        "calculate_user_results",
+        lambda *_args, **_kwargs: (
+            {"modelVersion": "als-v1", "generationId": "gen-1"},
+            {"modelVersion": "als-v1", "generationId": "gen-1"},
+        ),
+    )
+    monkeypatch.setattr(runner, "publish", lambda *_args: calls.append("redis"))
+
+    def fail_event(user_id: int) -> None:
+        assert user_id == 7
+        calls.append("kafka")
+        raise CandidateEventPublishError("not acknowledged")
+
+    assert not runner.process_user(
+        object(), lambda: object(), object(), 7,
+        attempts=1, partition_fence=("fence", "token"), candidate_event_publisher=fail_event,
+    )
+    assert calls == ["redis", "kafka"]
+
+
+def test_redis_publish_failure_does_not_emit_candidate_event(monkeypatch) -> None:
+    emitted: list[object] = []
+    monkeypatch.setattr(runner, "_expected_version", lambda *_args: 0)
+    monkeypatch.setattr(runner, "readonly_snapshot", _null_snapshot)
+    monkeypatch.setattr(runner, "load_user_snapshot", lambda *_args: UserSnapshot([], [], frozenset(), frozenset()))
+    monkeypatch.setattr(
+        runner,
+        "calculate_user_results",
+        lambda *_args, **_kwargs: ({"generationId": "gen-1"}, {"generationId": "gen-1"}),
+    )
+    monkeypatch.setattr(runner, "publish", lambda *_args: (_ for _ in ()).throw(redis.RedisError("write failed")))
+
+    assert not runner.process_user(
+        object(), lambda: object(), object(), 7,
+        attempts=1, partition_fence=("fence", "token"),
+        candidate_event_publisher=lambda *_args: emitted.append(_args),
+    )
+    assert emitted == []
 
 
 def test_malformed_partition_is_not_committed_and_healthy_partition_continues(monkeypatch) -> None:

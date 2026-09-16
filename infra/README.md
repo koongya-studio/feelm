@@ -142,7 +142,7 @@ docker compose --env-file infra/.env \
   up -d kafka
 ```
 
-업무 Topic은 자동 생성하지 않습니다. 평점 Topic은 최초 한 번 생성합니다.
+업무 Topic은 자동 생성하지 않습니다. 평점과 Candidate 게시 완료 알림 Topic은 최초 한 번 생성합니다.
 
 ```bash
 docker exec feelm-kafka-local \
@@ -150,6 +150,14 @@ docker exec feelm-kafka-local \
   --bootstrap-server localhost:9092 \
   --create --if-not-exists \
   --topic feelm.rating.v1 \
+  --partitions 3 \
+  --replication-factor 1
+
+docker exec feelm-kafka-local \
+  /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 \
+  --create --if-not-exists \
+  --topic feelm.candidate-updated.v1 \
   --partitions 3 \
   --replication-factor 1
 ```

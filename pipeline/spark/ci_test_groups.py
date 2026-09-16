@@ -32,6 +32,13 @@ UNIT_TEST_FILES = frozenset(
         "tests/common/test_ci_test_groups.py",
         "tests/common/test_settings.py",
         "tests/common/test_spark.py",
+        "tests/streaming/test_party_artifacts.py",
+        "tests/streaming/test_party_factors.py",
+        "tests/streaming/test_party_kafka_stream.py",
+        "tests/streaming/test_party_processor.py",
+        "tests/streaming/test_party_redis_store.py",
+        "tests/streaming/test_party_runtime.py",
+        "tests/streaming/test_party_scoring.py",
     }
 )
 

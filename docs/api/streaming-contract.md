@@ -33,7 +33,8 @@ Python Consumer는 ④에서 `vector`·`candidates`와 version 키를 원자적�
 
 | 항목 | 주체 | 근거 |
 |---|---|---|
-| 이벤트 발행 | Spring Boot | PostgreSQL 저장 성공 후 발행 |
+| 사용자 행동 이벤트 발행 | Spring Boot | PostgreSQL 저장 성공 후 발행 |
+| Candidate 게시 완료 알림 발행 | Python Consumer | Redis 원자 게시와 Kafka 확인 이후 원본 Offset 커밋 |
 | Fold-in · User Vector 계산 | Python Consumer | ADR-0017 |
 | TASTE 최대 500편 · DISCOVERY 최대 100편 갱신 | Python Consumer | ADR-0017, S15P21E106-415 |
 | 행동 Feature 집계 | Spark Streaming | ADR-0017 |
@@ -42,7 +43,8 @@ Python Consumer는 ④에서 `vector`·`candidates`와 version 키를 원자적�
 | **서비스 DB 미존재 · 평가 · 관심없음 제외 필터** | **Spring Boot** | 아래 2.1 |
 | 구조화 추천 근거 원본 저장 | Spring Boot | Consumer의 `reasons[]`를 세트 항목에 스냅샷 |
 | 세트 버퍼 저장 · 노출 | Spring Boot | API-045 처리 규칙, `recommendation_items` |
-| 파티 추천 집계 · OTT 구독 추천 집계 | Spring Boot | ADR-0017. Redis `candidates`를 읽어 요청 시점에 결합(5.1) |
+| 파티 raw Candidate 계산 | Spark Structured Streaming | `feelm.party-refresh.v1` 입력을 계산해 Redis에 게시 |
+| 파티 추천 최종 재정렬 · OTT 구독 추천 집계 | Spring Boot | 파티 raw Candidate와 사용자별 Redis `candidates`를 각각 사용 |
 | 유사 영화 조회 · 취향 분석 집계 | Spring Boot | ADR-0017 |
 
 ### 2.1 제외 필터를 Spring이 담당하는 이유
@@ -163,12 +165,14 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 | `feelm.view.v1` | `VIEW` | 영화 상세 조회 | 행동 Feature · 전역 인기 집계 | 약함 |
 | `feelm.recommendation-click.v1` | `RECOMMENDATION_CLICK` | 추천 카드 클릭 | 행동 Feature 집계 | 약함 |
 | `feelm.ott-click.v1` | `OTT_CLICK` | 보러가기 클릭(API-033) | 행동 Feature 집계 | 약함 |
+| `feelm.candidate-updated.v1` | 토픽 자체가 Candidate 갱신을 표시 | Python Consumer의 Redis Candidate 게시 성공 직후 | Spring이 관련 파티 갱신을 시작할 때 사용할 알림 | 게시 완료 |
+| `feelm.party-refresh.v1` | 토픽 자체가 파티 입력 갱신을 표시 | 파티 구성 또는 개인 Candidate 갱신 후 Spring 발행 | Spark가 파티 raw Candidate를 Redis에 게시 | 강함 |
 
 별점 등록이 감상을 의미하므로 별도의 감상 이벤트는 두지 않습니다. 감상 기록 자체는 Spring이 PostgreSQL에서 직접 사용합니다.
 
 ### 4.2 공통 봉투
 
-모든 이벤트는 같은 봉투 구조를 사용합니다.
+사용자 행동 이벤트는 같은 봉투 구조를 사용합니다. Candidate 게시 완료 알림은 §4.3의 전용 최소 형식을 사용합니다.
 
 ```json
 {
@@ -236,6 +240,34 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 { "movieId": 550, "ottId": 1, "watchRecordId": 5501 }
 ```
 
+**Candidate 게시 완료 알림 — `feelm.candidate-updated.v1`**
+
+```json
+{ "userId": 1024 }
+```
+
+- Kafka 키는 `userId`의 UTF-8 십진 문자열(예: `"1024"`), 값은 위 JSON이다. `null` 값·빈 payload·공통 봉투를 사용하지 않는다.
+- Python Consumer가 `vector`·`candidates`의 원자 게시에 성공한 뒤 발행한다. Kafka 수신 자체가 후보 갱신 알림이며 `occurredAt`을 비교하지 않는다.
+- 알림은 중복되거나 더 새 Candidate 게시 뒤 도착할 수 있다. Spring은 관련 활성 파티를 찾아 현재 Redis 값을 다시 읽고, 파티원별 `vector`·`candidates`를 한 번의 Redis 읽기로 가져와 두 값의 `generationId`·`modelVersion` 일치를 확인한다. 마지막으로 처리한 파티 입력 세대와 같으면 중복 재계산을 건너뛸 수 있다.
+- Spring은 이 최신 전체 입력으로 `feelm.party-refresh.v1` 이벤트를 만든다. 벡터와 후보 목록은 이 알림에 싣지 않는다.
+
+**파티 입력 갱신 — `feelm.party-refresh.v1`**
+
+```json
+{
+  "partyId": 9001,
+  "inputId": "sha256:<party-snapshot-digest>",
+  "members": [
+    {"userId": 1024, "vector": [0.1, 0.2], "candidateMovieIds": [550, 807]}
+  ]
+}
+```
+
+- Kafka 키는 `partyId`의 문자열이다. 멤버는 1~4명, `userId` 오름차순이고 `candidateMovieIds`는 사용자 선호 순서의 중복 없는 최대 600개다. 빈 vector는 허용한다.
+- Spring은 각 파티원의 Redis vector·candidates를 한 번에 읽어 같은 `generationId`·`modelVersion`인지 확인한다. 모든 파티원 모델 버전이 현재 Spark SERVING 모델과 같을 때만 발행한다.
+- `inputId`는 Spring이 `partyId`, 모델 버전, 정렬된 파티원 `userId`·`generationId`에서 결정적으로 만든 식별자다. Spark는 이를 그대로 결과에 돌려주고 자신이 로드한 `modelVersion`도 기록한다. Spring은 결과를 사용할 때 현재 파티 구성·사용자 세대로 `inputId`를 다시 만들고 결과의 모델 버전도 현재 모델과 비교한다.
+- Kafka 이벤트에는 `modelVersion`과 파티원별 `generationId`를 싣지 않는다. 모델 교체 중에는 새 모델의 입력을 이전 Spark 작업에 보내지 않도록 배포 순서를 조정한다.
+
 ### 4.4 멱등 처리와 재처리
 
 Kafka는 장애 상황에서 같은 메시지를 두 번 전달할 수 있습니다(at-least-once). 신호 종류별로 기준이 다릅니다.
@@ -244,14 +276,16 @@ Kafka는 장애 상황에서 같은 메시지를 두 번 전달할 수 있습니
 |---|---|
 | `RATING` · `ONBOARDING` | **자연 멱등.** Python Consumer가 PostgreSQL을 다시 읽어 전체를 재계산하므로 몇 번 처리해도 결과가 같다 |
 | `DISMISS` · `VIEW` · `RECOMMENDATION_CLICK` · `OTT_CLICK` | 누적 집계라 중복 시 값이 부풀어 오른다. `eventId` 기준 중복 제거를 적용한다 |
+| `feelm.candidate-updated.v1` 알림 | 상태 갱신 알림이다. Spring이 현재 Redis 세대와 마지막 처리 세대를 비교해 중복 재계산을 줄일 수 있다 |
 
 - 중복 제거는 Structured Streaming의 watermark 기반 `dropDuplicates(["eventId"])`로 처리한다
 - 중복 판정 창은 설정값(기본 10분). 창을 벗어난 재처리는 약한 신호 Feature가 소폭 부풀 수 있으나 허용한다
 - Python Consumer의 재시작 위치는 전용 Consumer Group Offset으로, Spark의 재시작 위치는 전용 Checkpoint로 각각 보존한다(ADR-0017)
 - Python Consumer가 연속된 같은 `userId`의 `RATING`을 함께 가져오면 `userId`로 묶어 마지막 DB 상태 기준 1회만 계산할 수 있다
 
-Python Consumer는 **Redis `vector`·`candidates` 기록이 모두 성공한 뒤** 원본 `RATING`/`ONBOARDING`
-Offset을 커밋합니다. 중간 실패로 재시도되면 같은 DB 상태를 다시 읽고 같은 사용자 추천 결과를 다시 계산합니다.
+Python Consumer는 **Redis `vector`·`candidates` 기록과 Candidate 게시 완료 알림의 Kafka 전달 확인이 모두 성공한 뒤**
+원본 `RATING`/`ONBOARDING` Offset을 커밋합니다. 중간 실패로 재시도되면 같은 DB 상태를 다시 읽고
+새 `generationId`로 게시할 수 있으므로 완료 알림은 at-least-once로 취급합니다.
 
 ### 4.5 순서 보장
 
@@ -305,14 +339,15 @@ Spring은 `candidates` JSON을 한 번 읽어 해당 버전의 후보 전체를 
 | 키 | 타입 | 쓰기 | 읽기 | TTL |
 |---|---|---|---|---|
 | `feelm:user:{userId}:candidate-version` | String(정수) | Python Consumer | Python Consumer | 없음 |
-| `feelm:user:{userId}:vector` | String(JSON) | Python Consumer | Python Consumer | 없음 |
+| `feelm:user:{userId}:vector` | String(JSON) | Python Consumer | Python Consumer · Spring(파티 입력 생성) | 없음 |
 | `feelm:user:{userId}:candidates` | String(JSON) | Python Consumer | Python Consumer · **Spring** | 없음 |
+| `feelm:party:{partyId}:candidates` | String(JSON) | Spark Structured Streaming | Spring | 없음 |
 | `feelm:consumer-fence:{groupId}:{topic}:{partition}` | String(opaque CSPRNG token) | Python Consumer | Python Consumer | 없음 |
 | `feelm:user:{userId}:behavior` | Hash | Spark | Spark · **Spring** | 키 단위 8일 · 필드는 일자 버킷(5.3) |
 | `feelm:model:current` | String(JSON) | Spark Batch | Python Consumer · Spring | 없음 |
 
-**Spring이 읽는 추천 키는 `candidates` · `behavior` · `model:current`입니다.** `vector`만
-Python Consumer의 내부 상태이며 Spring이 의존하지 않습니다.
+**Spring은 개인 추천에 사용자 `candidates` · `behavior` · `model:current`를 읽습니다.** 파티 입력
+생성 시 사용자 `vector`·`candidates`를 함께 읽고, 파티 결과에는 별도 파티 `candidates`를 읽습니다.
 
 `consumer-fence`는 Consumer group 안에서 Kafka partition마다 assign할 때 새 CSPRNG opaque token으로 교체하는
 fencing key다. Consumer는 결과 게시와 corrupt/partial state 복구 삭제 때 자신이 assign에서 받은 token과
@@ -323,12 +358,13 @@ monotonic coordinator 없이는 구별할 수 없으므로 이 계약의 fencing
 
 | Spring이 읽는 키 | 용도 |
 |---|---|
-| `candidates` | 개인 추천 후보 · **파티 추천 집계**(party.md) · **OTT 구독 추천**(API-068). 파티원별·사용자별 후보 점수를 Spring이 합산·집계 |
+| 사용자 `candidates` | 개인 추천 후보 · 파티 Spark 입력 스냅샷 · **OTT 구독 추천**(API-068) |
+| 파티 `candidates` | Spark가 계산한 파티 raw Candidate. Spring이 제외·부가 신호를 반영해 최종 재정렬 |
 | `behavior` | 새 개인 추천 세트를 만들 때 `candidates`에 적용할 최근 행동 Feature |
 | `model:current` | `modelVersion` 확인과 이력 저장 |
 
-Spring은 개인 추천에서는 후보를 재정렬하고, 파티·OTT에서는 동일 후보의 점수를 집계합니다.
-집계 대상은 §5.2가 정의한 후보 점수이며 모델의 원시 출력값이 아닙니다.
+Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점수를 집계합니다. 파티에서는 Spark가
+별도 게시한 raw Candidate를 현재 `inputId`·모델 버전 확인 후 재정렬합니다.
 
 ### 5.2 값 구조
 
@@ -346,7 +382,7 @@ Spring은 개인 추천에서는 후보를 재정렬하고, 파티·OTT에서는
 }
 ```
 
-**`feelm:user:{userId}:candidates`** — Spring이 파티·OTT 집계에 읽는 후보 점수
+**`feelm:user:{userId}:candidates`** — Spring이 파티 입력·OTT 집계에 읽는 후보 점수
 
 ```json
 {
