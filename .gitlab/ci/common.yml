@@ -74,3 +74,18 @@ runner-check:
     - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
       when: manual
       allow_failure: true
+
+jira-mattermost-digest:
+  stage: verify
+  tags: [e106-shell]
+  needs: []
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+  script:
+    - python3 -B -m unittest tests.jira.test_notify_mattermost infra.scripts.test_ci_config -v
+    - python3 -I -B scripts/jira/notify_mattermost.py
+  resource_group: jira-mattermost-digest
+  interruptible: false
+  timeout: 5m
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $JIRA_MATTERMOST_DIGEST == "true"'
