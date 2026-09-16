@@ -1,27 +1,39 @@
 /*
- * 5.6 파티 초대 수신 — 수락·거절 분기 (업무 S15P21E106-304)
+ * 5.6 파티 초대 수신 — 수락·거절 분기 (업무 S15P21E106-304 · -393)
  *
- * 초대는 한 번만 답할 수 있다(API-053 · API-054). 화면이 두 동작을 모두 같은 자리에
- * 두고 있어, 어느 쪽을 눌렀는지가 저장소에 제대로 남는지가 눈으로는 확인되지 않는다.
- * 수락과 거절이 서로 다른 상태로 남는 것과, 답한 초대가 목록에서 빠지는 것을 고정한다.
+ * 초대는 한 번만 답할 수 있다(API-053 · API-054). 화면이 두 동작을 같은 자리에 두고 있어
+ * 어느 쪽을 눌렀는지가 눈으로는 확인되지 않는다. 수락과 거절이 서로 다른 API를 부르고
+ * 서로 다른 곳으로 가는 것을 고정한다.
+ *
+ * **초대 단건 조회 계약이 없다.** 목록(API-052)에서 번호로 고르므로 이미 답한 초대는
+ * 목록에 없어 찾지 못한 상태가 된다.
  */
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import PartyInvitationPage from './index';
 import { renderWithRouter } from '../../../test/render';
-import { getMyInvitations, getMyParties } from '../../../api/parties';
-import { getInvitationStatus, resetSessionStore } from '../../../mocks/sessionStore';
+import { acceptInvitation, declineInvitation, getInvitation } from '../../../api/parties';
+import { invitation, party } from '../../../test/party';
 
-/** `mocks/partyInvitations.ts`가 담고 있는 초대 */
 const INVITATION_ID = 501;
 
+vi.mock('../../../api/parties', () => ({
+  getInvitation: vi.fn(),
+  acceptInvitation: vi.fn(),
+  declineInvitation: vi.fn(),
+}));
+
 beforeEach(() => {
-  resetSessionStore();
+  vi.mocked(getInvitation).mockReset().mockResolvedValue(invitation());
+  vi.mocked(acceptInvitation).mockReset().mockResolvedValue(party());
+  vi.mocked(declineInvitation)
+    .mockReset()
+    .mockResolvedValue({ invitationId: INVITATION_ID, status: 'DECLINED' });
 });
 
-function render() {
+function render(invitationId: number = INVITATION_ID) {
   return renderWithRouter(<PartyInvitationPage />, {
-    route: `/parties/invitations/${INVITATION_ID}`,
+    route: `/parties/invitations/${invitationId}`,
     path: '/parties/invitations/:invitationId',
   });
 }
@@ -35,75 +47,43 @@ describe('5.6 파티 초대 수신', () => {
     expect(screen.getByText('2인 · 오늘 저녁 같이 볼 영화')).toBeInTheDocument();
   });
 
-  it('수락하면 ACCEPTED로 남고 내 파티로 간다', async () => {
+  it('수락하면 API-053을 부르고 내 파티로 간다', async () => {
     render();
     await screen.findByText('무비버디 님의 파티');
 
     fireEvent.click(screen.getByRole('button', { name: '초대 수락하기' }));
 
-    /*
-     * 이동까지 기다린다. 상태는 `acceptInvitation` 안에서 동기로 바뀌지만 화면 이동은 그
-     * 뒤 promise가 풀린 다음이라, 상태만 기다리면 아직 이동하지 않은 순간에 단정문이
-     * 찍힌다. 로컬에서는 통과하고 CI에서만 터진다(파이프라인 #188361).
-     */
     await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/party'));
-    expect(getInvitationStatus(INVITATION_ID)).toBe('ACCEPTED');
+    expect(acceptInvitation).toHaveBeenCalledWith(INVITATION_ID);
+    expect(declineInvitation).not.toHaveBeenCalled();
   });
 
-  it('수락하면 그 파티가 내 파티 목록에 들어간다', async () => {
-    // 상태만 바꾸고 목록에 넣지 않으면, 수락하고 5.1로 가도 방금 참여한 파티가 없다
-    expect(await getMyParties()).toHaveLength(1);
+  it('거절하면 API-054를 부르고 알림 목록으로 간다', async () => {
+    render();
+    await screen.findByText('무비버디 님의 파티');
+
+    fireEvent.click(screen.getByRole('button', { name: '거절' }));
+
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/notifications'));
+    expect(declineInvitation).toHaveBeenCalledWith(INVITATION_ID);
+    expect(acceptInvitation).not.toHaveBeenCalled();
+  });
+
+  it('이미 답한 초대는 목록에 없어 안내로 바꾼다', async () => {
+    vi.mocked(getInvitation).mockResolvedValue(null);
+
+    render(999);
+
+    expect(await screen.findByText('초대를 확인하지 못했어요')).toBeInTheDocument();
+  });
+
+  it('수락이 거절당하면 안내로 바꾼다', async () => {
+    vi.mocked(acceptInvitation).mockRejectedValue(new Error('PARTY_FULL'));
 
     render();
     await screen.findByText('무비버디 님의 파티');
 
     fireEvent.click(screen.getByRole('button', { name: '초대 수락하기' }));
-    await waitFor(() => expect(getInvitationStatus(INVITATION_ID)).toBe('ACCEPTED'));
-
-    const parties = await getMyParties();
-    expect(parties.map((party) => party.name)).toContain('오늘 저녁 같이 볼 영화');
-
-    // 파티장과 내가 함께 들어간다. 5.7의 `김난다 × 무비버디`와 같은 구성이다
-    const joined = parties.find((party) => party.name === '오늘 저녁 같이 볼 영화');
-    expect(joined?.members.map((member) => member.nickname)).toEqual(['무비버디', '김난다']);
-  });
-
-  it('거절하면 파티 목록이 그대로다', async () => {
-    render();
-    await screen.findByText('무비버디 님의 파티');
-
-    fireEvent.click(screen.getByRole('button', { name: '거절' }));
-    await waitFor(() => expect(getInvitationStatus(INVITATION_ID)).toBe('DECLINED'));
-
-    expect(await getMyParties()).toHaveLength(1);
-  });
-
-  it('거절하면 DECLINED로 남는다', async () => {
-    render();
-    await screen.findByText('무비버디 님의 파티');
-
-    fireEvent.click(screen.getByRole('button', { name: '거절' }));
-
-    await waitFor(() => expect(getInvitationStatus(INVITATION_ID)).toBe('DECLINED'));
-  });
-
-  it('답한 초대는 받은 초대 목록에서 빠진다', async () => {
-    expect(await getMyInvitations()).toHaveLength(1);
-
-    render();
-    await screen.findByText('무비버디 님의 파티');
-
-    fireEvent.click(screen.getByRole('button', { name: '거절' }));
-    await waitFor(() => expect(getInvitationStatus(INVITATION_ID)).toBe('DECLINED'));
-
-    expect(await getMyInvitations()).toHaveLength(0);
-  });
-
-  it('없는 초대는 안내로 바꾼다', async () => {
-    renderWithRouter(<PartyInvitationPage />, {
-      route: '/parties/invitations/999',
-      path: '/parties/invitations/:invitationId',
-    });
 
     expect(await screen.findByText('초대를 확인하지 못했어요')).toBeInTheDocument();
   });

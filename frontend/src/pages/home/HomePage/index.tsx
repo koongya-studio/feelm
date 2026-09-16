@@ -43,11 +43,8 @@ import styles from './HomePage.module.css';
 import type { MyProfile } from '../../../types/user';
 import type { Ott } from '../../../types/ott';
 import type { TasteAnalysis } from '../../../types/taste';
-import type {
-  AvailableNowMovie,
-  PartyView,
-  RecommendationItemView,
-} from '../../../types/unspecified';
+import type { AvailableNowMovie, RecommendationItemView } from '../../../types/unspecified';
+import type { Party } from '../../../types/party';
 
 /**
  * 와이어프레임은 `액션 · 스릴러`와 하나의 비율 `49%`를 함께 보여준다. 상위 두 장르를
@@ -82,7 +79,7 @@ export default function HomePage() {
   const [availableNow, setAvailableNow] = useState<AvailableNowMovie[] | null>(null);
   const [taste, setTaste] = useState<TasteAnalysis | null>(null);
   const [tasteLoaded, setTasteLoaded] = useState(false);
-  const [parties, setParties] = useState<PartyView[] | null>(null);
+  const [parties, setParties] = useState<Party[] | null>(null);
 
   const [failed, setFailed] = useState(NOTHING_FAILED);
   const [reloadCount, setReloadCount] = useState(0);
@@ -365,9 +362,13 @@ export default function HomePage() {
 
             <div className={styles.partyBody}>
               <p className={styles.partyName}>참여 중인 파티 · {party.name}</p>
-              <p className={styles.partyMeta}>
-                멤버 {party.members.length}명 · 새 팝콘 {party.newPopcornCount}개
-              </p>
+              {/*
+               * 와이어프레임은 `멤버 4명 · 새 팝콘 2개`지만 **`새 팝콘` 수를 주는 계약이
+               * 없다.** API-050이 내려주는 것은 이름 · 상태 · 멤버 · 정원뿐이다. 실제
+               * 연동(업무 -393)으로 지어낼 자리가 사라져 멤버 수만 적는다
+               * (`types/unspecified.ts`).
+               */}
+              <p className={styles.partyMeta}>멤버 {party.members.length}명</p>
             </div>
 
             <span className={styles.partyChevron}>

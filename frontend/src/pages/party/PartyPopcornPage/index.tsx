@@ -39,15 +39,22 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import PopcornBucket from '../../../components/PopcornBucket';
+import { ApiError } from '../../../api/apiError';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon } from '../../../components/Icon';
-import { getMyParties, getPartyPopcorn } from '../../../api/parties';
+import {
+  closeParty,
+  getParty,
+  getPartyPopcorn,
+  kickPartyMember,
+  leaveParty,
+} from '../../../api/parties';
 import { getMyProfile } from '../../../api/users';
-import { getMockPopcornFlavors } from '../../../api/taste';
+import { getPopcornFlavors } from '../../../api/taste';
 import { path } from '../../../routes/paths';
 import styles from './PartyPopcornPage.module.css';
-import type { PartyMemberPopcorn, PartyPopcorn } from '../../../types/party';
+import type { Party, PartyMemberPopcorn, PartyPopcorn } from '../../../types/party';
 import type { PopcornFlavor } from '../../../types/taste';
 
 /** 겹치는 맛을 고르는 기준. 와이어프레임 설명 문구가 `상위 3개 맛`으로 적고 있다 */
@@ -66,6 +73,28 @@ function kernelFlavors(member: PartyMemberPopcorn): string[] {
   );
 }
 
+/**
+ * 되돌릴 수 없는 파티 동작. 누르면 곧바로 실행하지 않고 한 번 더 묻는다.
+ *
+ * API-069 처리 규칙이 `클라이언트는 실행 전에 대상 닉네임과 강퇴 사실을 확인시킨다`고
+ * 적고 있고, 나가기 · 종료도 되돌리는 계약이 없어 같은 규칙을 쓴다.
+ */
+type PendingAction =
+  { type: 'leave' } | { type: 'close' } | { type: 'kick'; userId: number; nickname: string };
+
+/** 확인 문구. 무엇이 일어나는지와 돌이킬 수 없다는 것을 함께 적는다 */
+function confirmMessage(action: PendingAction): string {
+  if (action.type === 'leave') {
+    return '파티에서 나갈까요? 파티원 팝콘을 더 볼 수 없어요.';
+  }
+
+  if (action.type === 'close') {
+    return '파티를 종료할까요? 파티원 모두가 나가게 되고 되돌릴 수 없어요.';
+  }
+
+  return `${action.nickname} 님을 파티에서 내보낼까요?`;
+}
+
 /** 알이 가장 많은 맛의 코드 */
 function topFlavorCodes(member: PartyMemberPopcorn, count: number): string[] {
   return [...member.flavors]
@@ -81,12 +110,15 @@ export default function PartyPopcornPage() {
   const id = Number(partyId);
 
   const [popcorn, setPopcorn] = useState<PartyPopcorn | null>(null);
-  const [partyName, setPartyName] = useState('');
+  const [party, setParty] = useState<Party | null>(null);
   const [myUserId, setMyUserId] = useState<number | null>(null);
   const [flavors, setFlavors] = useState<PopcornFlavor[]>([]);
   const [expanded, setExpanded] = useState<number[]>([]);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
+  const [pending, setPending] = useState<PendingAction | null>(null);
+  const [managing, setManaging] = useState(false);
+  const [manageError, setManageError] = useState<string | undefined>();
 
   useEffect(() => {
     let active = true;
@@ -106,11 +138,15 @@ export default function PartyPopcornPage() {
         }
       });
 
-    // 아래 세 가지는 실패해도 본문을 막지 않는다. 이름 · `나` 표시 · 맛 이름만 비워진다
-    getMyParties()
-      .then((parties) => {
+    /*
+     * 아래 세 가지는 실패해도 본문을 막지 않는다. 이름 · 파티 관리 · `나` 표시 · 맛
+     * 이름만 비워진다. 파티 관리는 파티장이 누구인지 알아야 그릴 수 있어 API-050이
+     * 실패하면 나오지 않는다.
+     */
+    getParty(id)
+      .then((value) => {
         if (active) {
-          setPartyName(parties.find((party) => party.partyId === id)?.name ?? '');
+          setParty(value);
         }
       })
       .catch(() => undefined);
@@ -124,19 +160,57 @@ export default function PartyPopcornPage() {
       .catch(() => undefined);
 
     /*
-     * 이 화면의 맛 집계는 목업이라 기준정보도 목업을 쓴다. 실제 API-044의 맛 코드와
-     * 목업 집계의 코드가 다르기 때문이다(api/taste.ts `getMockPopcornFlavors`).
+     * 집계(API-057)와 기준정보(API-044)가 모두 실제 응답이므로 맛 코드가 같은 곳에서
+     * 온다. 기준정보가 비어 오면 맛 이름 자리에 코드가 남는다(`api/taste.ts`).
      */
-    getMockPopcornFlavors().then((value) => {
-      if (active) {
-        setFlavors(value);
-      }
-    });
+    getPopcornFlavors()
+      .then((value) => {
+        if (active) {
+          setFlavors(value);
+        }
+      })
+      .catch(() => undefined);
 
     return () => {
       active = false;
     };
   }, [id, reloadCount]);
+
+  /** 확인을 받은 동작을 실제로 보낸다 */
+  function run(action: PendingAction) {
+    setManaging(true);
+    setManageError(undefined);
+
+    const sent =
+      action.type === 'leave'
+        ? leaveParty(id)
+        : action.type === 'close'
+          ? closeParty(id)
+          : kickPartyMember(id, action.userId);
+
+    sent
+      .then(() => {
+        setPending(null);
+
+        // 나가기 · 종료는 이 파티를 더 볼 수 없다. 강퇴는 남은 파티원을 다시 읽는다
+        if (action.type === 'kick') {
+          setManaging(false);
+          setReloadCount((count) => count + 1);
+
+          return;
+        }
+
+        void navigate(path.party(), { replace: true });
+      })
+      .catch((cause: unknown) => {
+        setManaging(false);
+        setManageError(
+          cause instanceof ApiError
+            ? cause.message
+            : '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.',
+        );
+      });
+  }
 
   function toggle(userId: number) {
     setExpanded((current) =>
@@ -175,6 +249,8 @@ export default function PartyPopcornPage() {
   }
 
   const flavorByCode = new Map(flavors.map((flavor) => [flavor.code, flavor]));
+  // 파티장만 종료(API-056)와 내보내기(API-069)를 부를 수 있다
+  const isOwner = party !== null && myUserId !== null && party.owner.userId === myUserId;
 
   // 파티원 모두의 상위 3개 맛에 들어간 맛
   const shared = popcorn.members.length
@@ -187,7 +263,7 @@ export default function PartyPopcornPage() {
     <>
       <ScreenHeader
         title="파티원 팝콘 한눈에 보기"
-        subtitle={`${partyName} · 멤버 ${popcorn.members.length}명`}
+        subtitle={`${party?.name ?? ''} · 멤버 ${popcorn.members.length}명`}
         showBack
       />
 
@@ -252,6 +328,27 @@ export default function PartyPopcornPage() {
                 </Link>
               )}
 
+              {/*
+               * API-069 멤버 강퇴. 파티장에게만, 자기 자신이 아닌 멤버에게만 보인다.
+               * 계약도 자기 강퇴를 `400 VALIDATION_FAILED`로 막는다(자신은 API-055로 나간다).
+               */}
+              {isOwner && !isMe ? (
+                <button
+                  type="button"
+                  className={styles.kickButton}
+                  disabled={managing}
+                  onClick={() =>
+                    setPending({
+                      type: 'kick',
+                      userId: member.user.userId,
+                      nickname: member.user.nickname,
+                    })
+                  }
+                >
+                  내보내기
+                </button>
+              ) : null}
+
               {isOpen ? (
                 <ul className={styles.flavorList}>
                   {flavors.map((flavor) => (
@@ -290,6 +387,73 @@ export default function PartyPopcornPage() {
         </section>
 
         <Button onClick={() => void navigate(path.partyPopcornMix(id))}>팝콘 섞기 보기</Button>
+
+        {/*
+         * 파티 관리. **와이어프레임 5.1~5.9에 진입점이 없다.**
+         *
+         * 나가기(API-055) · 종료(API-056) · 내보내기(API-069)는 계약에 있는데 누를 자리가
+         * 없어 업무 -304가 미뤄 두었다. 파티 하나의 문맥과 파티원 목록이 함께 있는 화면이
+         * 여기뿐이라 5.8에 두기로 했다(사용자 결정 2026-09-16). 5.1은 목록만 보여준다.
+         *
+         * 셋 다 되돌릴 계약이 없어 누르면 바로 보내지 않고 확인을 한 번 받는다.
+         */}
+        <section className={styles.manageCard}>
+          <h2 className={styles.manageTitle}>파티 관리</h2>
+
+          {pending ? (
+            <div className={styles.confirm} role="alert">
+              <p className={styles.confirmText}>{confirmMessage(pending)}</p>
+
+              <div className={styles.confirmActions}>
+                <button
+                  type="button"
+                  className={styles.confirmYes}
+                  disabled={managing}
+                  onClick={() => run(pending)}
+                >
+                  네, 할게요
+                </button>
+
+                <button
+                  type="button"
+                  className={styles.confirmNo}
+                  disabled={managing}
+                  onClick={() => setPending(null)}
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className={styles.manageActions}>
+              <button
+                type="button"
+                className={styles.manageButton}
+                disabled={managing}
+                onClick={() => setPending({ type: 'leave' })}
+              >
+                파티 나가기
+              </button>
+
+              {isOwner ? (
+                <button
+                  type="button"
+                  className={styles.manageButton}
+                  disabled={managing}
+                  onClick={() => setPending({ type: 'close' })}
+                >
+                  파티 종료하기
+                </button>
+              ) : null}
+            </div>
+          )}
+
+          {manageError ? (
+            <p className={styles.manageError} role="alert">
+              {manageError}
+            </p>
+          ) : null}
+        </section>
       </div>
     </>
   );
