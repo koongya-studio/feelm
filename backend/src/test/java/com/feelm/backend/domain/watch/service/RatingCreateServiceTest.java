@@ -59,7 +59,8 @@ class RatingCreateServiceTest {
     @DisplayName("평점·감상·집계·프레임 저장 후 RATING/CREATE 이벤트를 마지막에 발행한다")
     void createsAllStateBeforePublishingEvent() {
         RatingCreateRequest request =
-                new RatingCreateRequest(new BigDecimal("4.5"), "좋아요", RatingVisibility.PUBLIC);
+                new RatingCreateRequest(
+                        new BigDecimal("4.5"), "좋아요", RatingVisibility.PUBLIC, false);
         when(repository.lockActiveUser(USER_ID)).thenReturn(true);
         when(repository.lockMovie(MOVIE_ID))
                 .thenReturn(Optional.of(new LockedMovie(MOVIE_ID, 7L, "FLAVOR_TEST")));
@@ -72,6 +73,7 @@ class RatingCreateServiceTest {
                         request.score(),
                         request.comment(),
                         request.visibility(),
+                        false,
                         NOW))
                 .thenReturn(new CreatedRating(13L, NOW));
         when(frameWriter.create(13L, USER_ID, MOVIE_ID, NOW))
@@ -97,6 +99,7 @@ class RatingCreateServiceTest {
                         request.score(),
                         request.comment(),
                         request.visibility(),
+                        false,
                         NOW);
         order.verify(repository).refreshMovieRatingAggregate(MOVIE_ID);
         order.verify(frameWriter).create(13L, USER_ID, MOVIE_ID, NOW);
@@ -143,7 +146,53 @@ class RatingCreateServiceTest {
         verifyNoInteractions(frameWriter, eventPublisher);
     }
 
+    @Test
+    @DisplayName("스포일러 값을 저장소와 응답에 전달하고 기존 쓰기 순서를 지킨다")
+    void passesSpoilerThroughExistingWriteOrder() {
+        RatingCreateRequest request =
+                new RatingCreateRequest(new BigDecimal("4.5"), "반전", RatingVisibility.PUBLIC, true);
+        when(repository.lockActiveUser(USER_ID)).thenReturn(true);
+        when(repository.lockMovie(MOVIE_ID))
+                .thenReturn(Optional.of(new LockedMovie(MOVIE_ID, 7L, "FLAVOR_TEST")));
+        when(repository.createRatedWatch(USER_ID, MOVIE_ID, NOW)).thenReturn(11L);
+        when(repository.createRating(
+                        USER_ID,
+                        MOVIE_ID,
+                        11L,
+                        request.score(),
+                        request.comment(),
+                        request.visibility(),
+                        true,
+                        NOW))
+                .thenReturn(new CreatedRating(13L, NOW));
+        when(frameWriter.create(13L, USER_ID, MOVIE_ID, NOW))
+                .thenReturn(new FrameCreation(17L, NOW));
+
+        RatingCreateResponse response = service.create(USER_ID, MOVIE_ID, request);
+
+        assertThat(response.spoiler()).isTrue();
+        InOrder order = inOrder(repository, frameWriter, eventPublisher);
+        order.verify(repository)
+                .createRating(
+                        USER_ID,
+                        MOVIE_ID,
+                        11L,
+                        request.score(),
+                        request.comment(),
+                        request.visibility(),
+                        true,
+                        NOW);
+        order.verify(repository).refreshMovieRatingAggregate(MOVIE_ID);
+        order.verify(frameWriter).create(13L, USER_ID, MOVIE_ID, NOW);
+        order.verify(eventPublisher)
+                .publish(
+                        KafkaEventType.RATING,
+                        USER_ID,
+                        new RatingEventPayload(RatingAction.CREATE, MOVIE_ID, request.score()));
+    }
+
     private static RatingCreateRequest request() {
-        return new RatingCreateRequest(new BigDecimal("4.5"), null, RatingVisibility.PRIVATE);
+        return new RatingCreateRequest(
+                new BigDecimal("4.5"), null, RatingVisibility.PRIVATE, false);
     }
 }
