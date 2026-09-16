@@ -47,7 +47,7 @@ const frames: FrameList = {
       frameId: 501,
       movie: { movieId: 401, title: '영화 제목 1', posterUrl: null },
       score: 4.5,
-      flavorCode: 'FLAVOR_CRIME',
+      flavorCode: 'FLAVOR_D',
       createdAt: '2026-09-06T12:30:00Z',
     },
   ],

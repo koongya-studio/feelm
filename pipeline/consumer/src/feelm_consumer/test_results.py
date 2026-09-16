@@ -11,7 +11,7 @@ def test_results_emit_taste_group_and_empty_discovery_shell() -> None:
         rating_count=2,
         factor_backed_input_count=1,
         candidates=[RankedMovie(7, 4.32)],
-        movie_metadata={7: MovieMetadata("테스트 영화", ("DRAMA",), "FLAVOR_X")},
+        movie_metadata={7: MovieMetadata("테스트 영화", ("DRAMA",), "FLAVOR_A")},
         reasons={7: CandidateReason("SHARED_GENRE", (3,), ("DRAMA",))},
         generated_at="2026-09-13T00:00:00Z",
         generation_id="generation-1",

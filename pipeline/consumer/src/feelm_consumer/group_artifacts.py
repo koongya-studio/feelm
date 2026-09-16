@@ -19,6 +19,14 @@ from feelm_consumer.artifacts import REVISION_PATTERN, ArtifactError
 
 CONTRACT_VERSION = "group-serving-artifacts-v1"
 GEOMETRY_VERSION = "g913-gkt128-mean-v1"
+PUBLIC_TASTE_SEMANTICS = frozenset(
+    {
+        # Existing S15P21E106-439 bundles keep their immutable metadata hash.
+        "RECOMMENDATION_INTERNAL_NOT_PUBLIC_POPCORN",
+        # New exports describe the service binding introduced by S15P21E106-466.
+        "PUBLIC_POPCORN_FLAVOR_V1",
+    }
+)
 EXPECTED_FILES = frozenset({"_SUCCESS", "arrays.npz", "assignments.parquet", "metadata.json"})
 MAX_CONTROL_FILE_BYTES = 1024 * 1024
 MAX_ARRAY_FILE_BYTES = 64 * 1024 * 1024
@@ -51,6 +59,7 @@ class GroupBundle:
     catalog_version: str
     mapping_revision: str
     group_recipe_revision: str
+    public_taste_semantics: str
     genre_ids: np.ndarray
     keyword_ids: np.ndarray
     keyword_idf: np.ndarray
@@ -79,7 +88,7 @@ class GroupBundle:
     def assignment_for(self, service_movie_id: int) -> GroupAssignment | None:
         if (
             isinstance(service_movie_id, bool)
-            or not isinstance(service_movie_id, (int, np.integer))
+            or not isinstance(service_movie_id, int | np.integer)
             or service_movie_id <= 0
         ):
             return None
@@ -114,8 +123,8 @@ def compare_live_mapping(
         if (
             isinstance(service_movie_id, bool)
             or isinstance(tmdb_id, bool)
-            or not isinstance(service_movie_id, (int, np.integer))
-            or not isinstance(tmdb_id, (int, np.integer))
+            or not isinstance(service_movie_id, int | np.integer)
+            or not isinstance(tmdb_id, int | np.integer)
             or int(service_movie_id) <= 0
             or int(tmdb_id) <= 0
         ):
@@ -348,7 +357,7 @@ def load_group_bundle(uri: str, expected_mapping_revision: str | None = None) ->
         or not isinstance(metadata["genre_missing_count"], int)
         or not 0 <= metadata["genre_missing_count"] <= movie_count
         or metadata["genre_missing_policy"] != "EXCLUDE_FROM_DISCOVERY"
-        or metadata["public_taste_semantics"] != "RECOMMENDATION_INTERNAL_NOT_PUBLIC_POPCORN"
+        or metadata["public_taste_semantics"] not in PUBLIC_TASTE_SEMANTICS
     ):
         raise ArtifactError("invalid group artifact metadata")
     if expected_mapping_revision is not None and mapping_revision != expected_mapping_revision:
@@ -415,6 +424,7 @@ def load_group_bundle(uri: str, expected_mapping_revision: str | None = None) ->
         catalog_version=catalog_version,
         mapping_revision=mapping_revision,
         group_recipe_revision=recipe_revision,
+        public_taste_semantics=str(metadata["public_taste_semantics"]),
         genre_ids=genre_ids,
         keyword_ids=keyword_ids,
         keyword_idf=keyword_idf,
@@ -457,7 +467,7 @@ def _ids(value: Iterable[int] | None) -> set[int]:
         return set()
     result: set[int] = set()
     for item in iterator:
-        if isinstance(item, bool) or not isinstance(item, (int, np.integer)) or int(item) <= 0:
+        if isinstance(item, bool) or not isinstance(item, int | np.integer) or int(item) <= 0:
             continue
         result.add(int(item))
     return result

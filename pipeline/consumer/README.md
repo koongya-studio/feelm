@@ -15,8 +15,9 @@ Kafka의 평가·온보딩 이벤트를 받아 최신 사용자 입력으로 ALS
 추천 내부 8×128 그룹은 [그룹 서빙 산출물 계약](../contracts/group-serving-artifacts.md)을 따른다.
 `feelm_consumer.group_artifacts.load_group_bundle`은 로컬·HDFS immutable URI를 같은 방식으로 읽고,
 ALS/content와 `mapping_revision`이 다르거나 manifest·Parquet·배열 검증이 실패하면 시작을 거부한다.
-이 loader를 추천 정책에 연결하는 작업은 S15P21E106-415가 담당한다. 공개 팝콘 맛 ID나 DB 컬럼으로
-group ID를 쓰지 않는다.
+이 loader를 추천 정책에 연결하는 작업은 S15P21E106-415가 담당한다. 상위 `taste_id` 0~7은
+S15P21E106-466에서 공개 팝콘 맛 `FLAVOR_A`~`FLAVOR_H`로 사용한다. 하위 `child_id`와 전체
+`group_id`는 계속 추천 내부 값이며 DB 대표 맛이나 공개 API에 저장하지 않는다.
 
 위 exact revision 비교는 함께 공개된 불변 ALS/content bundle 사이의 세대 검증이다. 현재 PostgreSQL
 live export는 `compare_live_mapping`으로 ID쌍을 비교하며 전체 revision 문자열 일치를 요구하지 않는다.
@@ -33,6 +34,24 @@ python -m pip install -r pipeline/consumer/group-export-requirements.txt
 PYTHONPATH=pipeline/consumer/src \
   python pipeline/consumer/tools/export_group_bundle.py --help
 ```
+
+439 assignment를 서비스 DB에 반영하는 도구는 기본이 rollback-only dry-run이다. 실제 apply는 운영자가
+dry-run 보고서의 ID 재결합 0건과 예상 건수를 확인한 뒤에만 실행한다. URL은 예시처럼 환경변수로 전달하고
+명령행·보고서·저장소에 Secret을 남기지 않는다. 기본 DSN 환경변수는 Consumer와 같은
+`CONSUMER_POSTGRES_DSN`이다. 검증·반영 구간에는 `movies`와 `popcorn_flavors`의 DML을 잠시
+직렬화하므로 영화 동기화와 겹치지 않는 승인된 실행 창을 사용한다.
+
+```bash
+PYTHONPATH=pipeline/consumer/src \
+  python pipeline/consumer/tools/apply_popcorn_flavors.py \
+  --bundle-uri file:///path/to/groups/g913-k128-reference \
+  --expected-mapping-revision sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
+# 승인된 실행 창에서만 같은 명령에 --apply --report /path/to/report.json을 추가한다.
+```
+
+실제 PostgreSQL 실패·동시성 통합 테스트는 격리된 테스트 DB의 DSN을
+`FLAVOR_ASSIGNMENT_TEST_DSN`에 설정한 경우에만 실행된다. 서비스 DB DSN을 테스트에 사용하지 않는다.
 
 movie metadata snapshot은 Spark 프로젝트에서 다음 명령으로 mapping snapshot 뒤에 immutable
 version URI로 공개한다. Consumer에는 해당 URI와 그 revision으로 만든 SERVING model만 함께

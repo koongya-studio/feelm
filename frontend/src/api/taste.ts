@@ -37,10 +37,8 @@ import type { TasteFlowView } from '../types/unspecified';
  *
  * 공개 API다. 화면은 `code`로 매칭하고 표시명 · 색상을 하드코딩하지 않는다.
  *
- * `[!]` **배포 DB에 8종 기준정보가 아직 없어 `items`가 빈 배열로 온다.** 8개 맛을 항상
- * 반환한다는 API-041 · API-044의 전제가 지금은 성립하지 않는다. 맛 코드는 추천
- * 파이프라인이 정하며(ADR-0015 · S15P21E106-439) 적재 시점이 아직 없다. 화면을 빈
- * 응답에 맞춰 고치지 않고 적재 후 재확인을 후속 업무로 둔다.
+ * S15P21E106-466 migration이 API-044의 A~H 기준정보를 제공한다. 배포 전이나 migration
+ * 실패 시 빈 배열이 올 수 있으므로 호출부는 빈 응답도 안전하게 처리한다.
  */
 export async function getPopcornFlavors(): Promise<PopcornFlavor[]> {
   const { items } = await request<{ items: PopcornFlavor[] }>('/popcorn-flavors', {

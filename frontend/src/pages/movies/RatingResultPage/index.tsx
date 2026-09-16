@@ -11,7 +11,7 @@
  * 복원할 수 없으므로 `/film`으로 보낸다(frontend-structure.md 6.3).
  *
  * 맛 이름은 API-044의 `displayName`을 쓰고 장르명을 하드코딩하지 않는다
- * (screen-spec.md 2.7). 8종 표시명 자체는 API-044 미정 사항이다.
+ * (screen-spec.md 2.7). 8종 표시명은 API-044의 확정 기준정보를 사용한다.
  *
  * `[?]` API-036 응답의 `popcorn.isNewFlavor`에 대응하는 표시가 와이어프레임에 없어
  * 사용하지 않는다.

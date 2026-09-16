@@ -92,9 +92,9 @@ export const mockReportDetails: Record<number, ReportDetailView> = {
       imageUrl: characterAmelie,
     },
     flavorChanges: [
-      { flavorCode: 'FLAVOR_THRILL', before: 14, after: 26 },
-      { flavorCode: 'FLAVOR_NOIR', before: 0, after: 4 },
-      { flavorCode: 'FLAVOR_DRAMA', before: 16, after: 10 },
+      { flavorCode: 'FLAVOR_B', before: 14, after: 26 },
+      { flavorCode: 'FLAVOR_C', before: 0, after: 4 },
+      { flavorCode: 'FLAVOR_F', before: 16, after: 10 },
     ],
     createdAt: '2026-07-01T12:00:00Z',
     fourCut: {
@@ -164,7 +164,7 @@ export const mockReportDetails: Record<number, ReportDetailView> = {
       description: '앞에 나서기보다 곁에서 판을 짜는 인물이 나온 영화에 오래 머물렀어요.',
       imageUrl: null,
     },
-    flavorChanges: [{ flavorCode: 'FLAVOR_DRAMA', before: 10, after: 16 }],
+    flavorChanges: [{ flavorCode: 'FLAVOR_F', before: 10, after: 16 }],
     createdAt: '2026-01-01T12:00:00Z',
     fourCut: {
       genre: { name: '드라마', displayName: 'DRAMA', image: { url: null } },
@@ -211,7 +211,7 @@ export const mockReportDetails: Record<number, ReportDetailView> = {
       description: '위기를 농담으로 넘기는 인물이 나온 영화에 높은 별점을 줬어요.',
       imageUrl: null,
     },
-    flavorChanges: [{ flavorCode: 'FLAVOR_COMEDY', before: 2, after: 8 }],
+    flavorChanges: [{ flavorCode: 'FLAVOR_G', before: 2, after: 8 }],
     createdAt: '2025-07-01T12:00:00Z',
     fourCut: {
       genre: { name: '액션', displayName: 'ACTION', image: { url: null } },

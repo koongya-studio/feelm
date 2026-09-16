@@ -140,7 +140,7 @@
         "averageRating": 4.3,
         "ottProviders": ["NETFLIX"]
       },
-      "flavorCode": "FLAVOR_X",
+      "flavorCode": "FLAVOR_A",
       "reason": {
         "summary": "스릴러를 높게 평가하셨어요",
         "factors": [
@@ -309,7 +309,7 @@
     "recommendationItemId": 3305,
     "type": "TASTE",
     "movie": {},
-    "flavorCode": "FLAVOR_Y",
+    "flavorCode": "FLAVOR_B",
     "reason": {}
   }
 }

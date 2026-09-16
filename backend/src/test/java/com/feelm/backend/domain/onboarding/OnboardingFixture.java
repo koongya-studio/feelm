@@ -13,7 +13,7 @@ final class OnboardingFixture {
 
     static final long COMPLETED = 40;
 
-    /** 맛 코드는 ADR-0015의 8개 유형 자리를 채우는 시드 값이다. 배정 자체는 파이프라인이 한다. */
+    /** 맛 코드는 ADR-0020의 8개 유형 자리를 채우는 시드 값이다. 배정 자체는 파이프라인이 한다. */
     static final String[] FLAVOR_CODES = {
         "ACTION_ADVENTURE",
         "FANTASY_SF",

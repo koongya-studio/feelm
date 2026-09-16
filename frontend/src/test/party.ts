@@ -80,14 +80,14 @@ export function memberPopcorn(
 }
 
 export const FLAVOR_CODES = [
-  'FLAVOR_CAPER',
-  'FLAVOR_THRILL',
-  'FLAVOR_NOIR',
-  'FLAVOR_CRIME',
-  'FLAVOR_ACTION',
-  'FLAVOR_DRAMA',
-  'FLAVOR_COMEDY',
-  'FLAVOR_SF',
+  'FLAVOR_A',
+  'FLAVOR_B',
+  'FLAVOR_C',
+  'FLAVOR_D',
+  'FLAVOR_E',
+  'FLAVOR_F',
+  'FLAVOR_G',
+  'FLAVOR_H',
 ];
 
 export function partyPopcorn(members?: PartyMemberPopcorn[]): PartyPopcorn {

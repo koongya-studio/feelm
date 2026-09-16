@@ -16,7 +16,7 @@ const items: RecommendationItemView[] = [
     recommendationItemId: 3301,
     type: 'TASTE',
     movie: findMockMovie(101),
-    flavorCode: 'FLAVOR_CAPER',
+    flavorCode: 'FLAVOR_A',
     reason: {
       // 2.1이 표시하는 문구. 2.2 카드의 `추천 이유:` 자리에도 같은 값을 쓴다
       summary: '좋아한 케이퍼 무비와 가까워요',
@@ -28,7 +28,7 @@ const items: RecommendationItemView[] = [
     recommendationItemId: 3302,
     type: 'TASTE',
     movie: findMockMovie(102),
-    flavorCode: 'FLAVOR_THRILL',
+    flavorCode: 'FLAVOR_B',
     reason: {
       summary: '스릴러를 높게 평가하셨어요',
       factors: [{ type: 'GENRE', label: '스릴러' }],
@@ -39,7 +39,7 @@ const items: RecommendationItemView[] = [
     recommendationItemId: 3303,
     type: 'DISCOVERY',
     movie: findMockMovie(103),
-    flavorCode: 'FLAVOR_NOIR',
+    flavorCode: 'FLAVOR_C',
     reason: {
       summary: '좋아하는 스릴러와 연결되는 첫 느와르 영화예요',
       factors: [{ type: 'NEW_FLAVOR', label: '느와르' }],
@@ -54,7 +54,7 @@ const replacementBuffer: RecommendationItemView[] = [
     recommendationItemId: 3305,
     type: 'TASTE',
     movie: findMockMovie(104),
-    flavorCode: 'FLAVOR_CRIME',
+    flavorCode: 'FLAVOR_D',
     reason: {
       summary: '범죄 드라마를 자주 보셨어요',
       factors: [{ type: 'GENRE', label: '범죄' }],

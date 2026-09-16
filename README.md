@@ -46,10 +46,10 @@ MovieLens 32M 규모의 평점 데이터를 **Hadoop/HDFS와 Spark로 분산 처
 | **프레임(Frame)** | 감상·평가를 완료한 영화 1편의 기록 단위 |
 | **필름(Film)** | 한 사용자의 전체 프레임 모음 및 그 시각화 화면 |
 | **팝콘 버킷** | 사용자의 취향 분포를 팝콘 맛으로 시각화한 화면 |
-| **팝콘 맛** | E5 영화 임베딩을 K-Means로 군집화한 8개 취향 유형 |
+| **팝콘 맛** | S15P21E106-439의 고정 장르 기반 상위 `taste_id` 0~7에 대응하는 8개 취향 유형 |
 | **팝콘 맛 별 양** | 해당 맛의 팝콘 수로 **감상량**을 나타낸다 |
 | **팝콘 맛 선호도** | 해당 맛의 평균 평점으로 **선호도**를 나타내며 감상량과 독립이다 |
-| **새로운 맛** | K-Means 취향 군집 기반으로 판정할 새로운 취향 영역. 구체 판정 방식·기준값은 미정 |
+| **새로운 맛** | 439 고정 그룹 기반으로 판정할 새로운 취향 영역. 구체 판정 방식·기준값은 미정 |
 | **발견** | 새로운 맛의 영화를 감상하고 **평가까지 완료**하는 행위 |
 | **파티(Party)** | 함께 볼 영화를 고르기 위한 모임. 문서와 코드 모두 `Party`로 통일한다 |
 | **후보(Candidate)** | Python Fold-in Consumer가 ALS Item Factor로 생성하는 사용자별 추천 후보 목록. 500편 기준 |
@@ -267,7 +267,7 @@ flowchart TB
     end
 
     subgraph SPARK["Spark Cluster · EC2 2대"]
-        SM["Spark Batch<br/>ALS · E5 · K-Means"]
+        SM["Spark Batch<br/>ALS · E5 · 고정 그룹 산출물"]
         SS["Structured Streaming<br/>행동 Feature<br/>전역 인기 윈도우 집계"]
         W1["Worker 1"]
         W2["Worker 2"]
@@ -305,7 +305,7 @@ flowchart TB
 
 | 컴포넌트 | 역할 |
 | --- | --- |
-| **Spark / PySpark Batch** | 전처리, ALS 학습, E5 임베딩, K-Means 취향 군집, 모델·Item Factor 산출 |
+| **Spark / PySpark Batch** | 전처리, ALS 학습, E5 임베딩, 439 고정 그룹 산출물, 모델·Item Factor 산출 |
 | **Kafka** | 평점·온보딩·관심없음·조회·추천 클릭·OTT 클릭 이벤트 전달 |
 | **Python Fold-in Consumer** | 평가·온보딩 변경 사용자의 User Vector, Candidate Top-500, 기본 Top-N·XAI 갱신 |
 | **Spark Structured Streaming** | 행동 Feature와 전체 사용자 실시간 인기 윈도우 집계 |
@@ -338,8 +338,8 @@ flowchart TB
 ```mermaid
 flowchart LR
     A["MovieLens · TMDb"] --> B["HDFS / Parquet"]
-    B --> C["Spark Batch<br/>ALS · E5 · K-Means"]
-    C --> D["Item Factor · Embedding<br/>Taste Cluster"]
+    B --> C["Spark Batch<br/>ALS · E5 · 고정 그룹"]
+    C --> D["Item Factor · Embedding<br/>Taste Assignment"]
     D --> E["Model Version · Item Factor 갱신"]
     E --> F["Redis"]
     G["평점 · 온보딩"] --> BEE["Spring Boot 이벤트 발행"]
@@ -360,8 +360,8 @@ flowchart LR
 
 | 추천 | 방식 |
 | --- | --- |
-| **취향 맞춤 추천** | K-Means 취향 군집을 기반으로 ALS·콘텐츠 Hybrid를 활용해 선호 가능성이 높은 영화를 추천 |
-| **취향 발견 추천** | K-Means 취향 군집을 기반으로 기존 취향과 연결되면서 새로운 맛인 영화를 추천 |
+| **취향 맞춤 추천** | ALS·콘텐츠 Hybrid를 활용해 선호 가능성이 높은 영화를 추천 |
+| **취향 발견 추천** | 439 고정 그룹을 기반으로 기존 취향과 연결되면서 새로운 맛인 영화를 추천 |
 | **유사 추천** | 영화 상세 화면에서 콘텐츠 특성이 유사한 영화를 추천 |
 | **파티 추천** | 파티원 예상 선호도를 평균·최저 만족도·편차 페널티로 결합해 추천 |
 
@@ -418,7 +418,7 @@ flowchart LR
 | 이벤트 스트림 | Kafka, Python Consumer, Spark Structured Streaming | 확정 |
 | 추천 | ALS, 콘텐츠 기반, Hybrid | 확정 |
 | 콘텐츠 임베딩 | 다국어 임베딩, pgvector (`multilingual-e5-base`는 MVP 베이스라인) | 모델 비교 평가 후 체크포인트 확정 |
-| 취향 유형 | K-Means 8군집, c-TF-IDF | 확정 |
+| 취향 유형 | 439 고정 131차원 기하, 상위 taste 8종 | 확정 |
 | 파티 추천 | Average / Least Misery / 개선식 | 비교 후 확정 |
 | Backend | Spring Boot | 확정 |
 | 추천 갱신·인기 집계·서빙 | Python Consumer, Spark Structured Streaming, Redis, Spring Boot | 확정 |

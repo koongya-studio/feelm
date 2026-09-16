@@ -146,9 +146,9 @@
   "totalCount": 42,
   "flavors": [
     {
-      "flavorCode": "FLAVOR_X",
-      "displayName": "짭짤한 스릴",
-      "color": "#E63946",
+      "flavorCode": "FLAVOR_A",
+      "displayName": "오리지널 솔트",
+      "color": "#FBF1CF",
       "popcornCount": 12,
       "averageScore": 4.4,
       "discoveredAt": "2026-07-01T00:00:00Z"
@@ -225,7 +225,7 @@
       "frameId": 77,
       "movie": { "movieId": 550, "title": "파이트 클럽", "posterUrl": "https://..." },
       "score": 5,
-      "flavorCode": "FLAVOR_X",
+      "flavorCode": "FLAVOR_A",
       "createdAt": "2026-08-30T05:21:00Z"
     }
   ],
@@ -298,7 +298,7 @@
     "genres": ["드라마", "스릴러"],
     "directors": ["데이비드 핀처"]
   },
-  "flavorCode": "FLAVOR_X",
+  "flavorCode": "FLAVOR_A",
   "rating": { "ratingId": 91, "score": 5, "comment": "밤에 보면 안 됨", "visibility": "PUBLIC" },
   "watchRecord": {
     "ott": { "code": "NETFLIX", "name": "넷플릭스" },
@@ -335,12 +335,14 @@
 | 인증 | 공개 |
 | 관련 요구사항 | FR-06 |
 | 화면 | ⑨ 팝콘 버킷 |
-| 미정 사항 | 있음 |
-| 비고 | ADR-0015의 K-Means 8개 취향 유형 |
+| 미정 사항 | 없음 |
+| 비고 | ADR-0020·S15P21E106-439의 고정 상위 맛 8종 |
 
 ### 설명
 
-K-Means로 생성한 8개 팝콘 맛의 안정적인 코드·표시명·색상·대표 키워드를 내려준다. 원시 Cluster ID는 공개하지 않으며 클라이언트는 색상·표시명을 하드코딩하지 않고 이 API를 사용한다.
+S15P21E106-439의 고정 `taste_id` 0~7에 대응하는 8개 팝콘 맛의 코드·표시명·색상·대표
+키워드를 내려준다. 내부 `cluster_id=taste_id`는 공개하지 않으며 클라이언트는 색상·표시명을
+하드코딩하지 않고 이 API를 사용한다.
 
 ### 인증 및 권한
 
@@ -366,10 +368,10 @@ K-Means로 생성한 8개 팝콘 맛의 안정적인 코드·표시명·색상·
 {
   "items": [
     {
-      "code": "FLAVOR_X",
-      "displayName": "짭짤한 스릴",
-      "color": "#E63946",
-      "representativeKeywords": ["긴장", "추적", "반전"],
+      "code": "FLAVOR_A",
+      "displayName": "오리지널 솔트",
+      "color": "#FBF1CF",
+      "representativeKeywords": ["다큐멘터리", "현실 기록", "음악", "역사"],
       "sortOrder": 1
     }
   ]
@@ -383,9 +385,23 @@ K-Means로 생성한 8개 팝콘 맛의 안정적인 코드·표시명·색상·
 ### 처리 규칙
 
 - `code`는 불변, `displayName`·`color`는 변경 가능(FR-06)
-- 고정된 `clusterId`와 불변 `code`를 `popcorn_flavors`에서 1:1로 관리하며 원시 Cluster ID는 응답에 노출하지 않는다(ADR-0015)
-- `representativeKeywords`는 군집별 텍스트의 c-TF-IDF 결과를 사용한다
+- 고정된 `clusterId`와 불변 `code`를 `popcorn_flavors`에서 1:1로 관리하며 내부 Cluster ID는 응답에 노출하지 않는다(ADR-0020)
+- `representativeKeywords`는 439 실배정의 장르 분포와 검토 영화로 확정한 해석 값이다
 - 기준정보이므로 캐시 가능
+
+| 내부 taste_id | code | displayName | color | representativeKeywords |
+|---:|---|---|---|---|
+| 0 | `FLAVOR_A` | 오리지널 솔트 | `#FBF1CF` | 다큐멘터리, 현실 기록, 음악, 역사 |
+| 1 | `FLAVOR_B` | 핫칠리 | `#DC9A4E` | 공포, 괴물, 초자연, 미스터리, SF |
+| 2 | `FLAVOR_C` | 솔티카라멜 | `#F0D07C` | 드라마 코미디, 인물, 관계, 로맨스, 블랙코미디 |
+| 3 | `FLAVOR_D` | 다크초코 | `#5C3020` | 드라마, 인물, 관계, 역사, 전쟁 |
+| 4 | `FLAVOR_E` | 블랙페퍼 | `#F4F1EA` | 스릴러, 범죄, 긴장, 미스터리, 추적 |
+| 5 | `FLAVOR_F` | 갈릭버터 | `#C48C50` | 코미디, 로맨스, 가족, 액션 코미디, 호러 코미디 |
+| 6 | `FLAVOR_G` | 허니버터 | `#ECAABB` | 애니메이션, 가족, 판타지, 모험, 상상 |
+| 7 | `FLAVOR_H` | 치즈믹스 | `#D9C6EA` | 액션, 모험, SF, 판타지, 음악 |
+
+표시명·색상은 기준정보 수정으로 바꿀 수 있지만 `code`와 내부 `taste_id` 순서의 대응은 바꾸지 않는다.
+`taste_id=7`은 서비스에 반영된 영화 기준 장르 믹스이며 장르 근거 부족을 뜻하지 않는다.
 
 ### 상태값
 
@@ -393,4 +409,4 @@ K-Means로 생성한 8개 팝콘 맛의 안정적인 코드·표시명·색상·
 
 ### 미정 사항
 
-- [ ] 8종 표시명·색상과 군집 코드 매핑 검수
+없음
