@@ -58,6 +58,8 @@ consumer-test:
         - infra/scripts/test_verify_consumer_e2e.py
         - infra/scripts/ci-deploy-current-commit.py
         - infra/scripts/test_ci_deploy_current_commit.py
+        - infra/scripts/notify-deployment.py
+        - infra/scripts/test_notify_deployment.py
         - infra/scripts/test_ci_config.py
 
 consumer-image:
@@ -106,6 +108,8 @@ consumer-image:
         - infra/scripts/test_verify_consumer_e2e.py
         - infra/scripts/ci-deploy-current-commit.py
         - infra/scripts/test_ci_deploy_current_commit.py
+        - infra/scripts/notify-deployment.py
+        - infra/scripts/test_notify_deployment.py
         - infra/scripts/test_ci_config.py
 
 deploy-consumer:
@@ -129,6 +133,7 @@ deploy-consumer:
     - docker logout >/dev/null 2>&1 || true
     - rm -f "$DOCKER_CONFIG/config.json"
     - rmdir "$DOCKER_CONFIG" 2>/dev/null || true
+    - /usr/bin/python3 -I -B infra/scripts/notify-deployment.py consumer "$CI_JOB_STATUS"
   interruptible: false
   retry:
     max: 2
@@ -153,5 +158,7 @@ deploy-consumer:
         - infra/scripts/test_verify_consumer_e2e.py
         - infra/scripts/ci-deploy-current-commit.py
         - infra/scripts/test_ci_deploy_current_commit.py
+        - infra/scripts/notify-deployment.py
+        - infra/scripts/test_notify_deployment.py
         - infra/scripts/test_ci_config.py
   allow_failure: false
