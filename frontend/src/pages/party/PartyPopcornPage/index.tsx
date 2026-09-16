@@ -44,7 +44,7 @@ import StatusView from '../../../components/StatusView';
 import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon } from '../../../components/Icon';
 import { getMyParties, getPartyPopcorn } from '../../../api/parties';
 import { getMyProfile } from '../../../api/users';
-import { getPopcornFlavors } from '../../../api/taste';
+import { getMockPopcornFlavors } from '../../../api/taste';
 import { path } from '../../../routes/paths';
 import styles from './PartyPopcornPage.module.css';
 import type { PartyMemberPopcorn, PartyPopcorn } from '../../../types/party';
@@ -123,7 +123,11 @@ export default function PartyPopcornPage() {
       })
       .catch(() => undefined);
 
-    getPopcornFlavors().then((value) => {
+    /*
+     * 이 화면의 맛 집계는 목업이라 기준정보도 목업을 쓴다. 실제 API-044의 맛 코드와
+     * 목업 집계의 코드가 다르기 때문이다(api/taste.ts `getMockPopcornFlavors`).
+     */
+    getMockPopcornFlavors().then((value) => {
       if (active) {
         setFlavors(value);
       }

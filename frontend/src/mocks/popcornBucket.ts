@@ -1,12 +1,11 @@
 /*
  * 팝콘 버킷 목업. API-041 팝콘 버킷 조회
  *
- * 3.1은 헤더의 `팝콘 100알`에 `totalCount`만 쓴다. 맛별 분포는 3.2(업무 -261)에서
- * 쓰이므로 8개 맛을 계약대로 모두 두었다(API-041: 팝콘이 없으면 popcornCount 0,
- * averageScore null).
+ * **3.1 · 3.2의 팝콘 버킷은 실제 API를 부른다**(S15P21E106-392). 여기 남은 값은 평가
+ * API가 없어 목업으로 남은 흐름이 쓴다 — 2.6 · 2.7의 팝콘 알 수, 5.8 · 5.9 파티 팝콘,
+ * 7.2-A · 7.2-C 공개 프로필의 맛 분포다.
  *
  * 표시명 · 색상은 mocks/popcornFlavors.ts와 같은 잠정값이다(API-044 미정 사항).
- * `newFlavorThreshold`도 계약 미정 사항이라 계약 예시의 3을 그대로 썼다.
  *
  * 맛별 알 수는 와이어프레임 3.2의 분포(28 · 21 · 15 · 8 · 10 · 9 · 4 · 5)를 맛
  * 순서대로 옮긴 값이며 합이 100이다. 3.1의 `팝콘 100알`과 3.2의 `본 영화 100편`이
@@ -17,8 +16,6 @@
  */
 import { mockPopcornFlavors } from './popcornFlavors';
 import type { PopcornBucket, PopcornBucketFlavor } from '../types/taste';
-
-const NEW_FLAVOR_THRESHOLD = 3;
 
 /** 맛 코드별 알 수 · 평균 평점. 합계 100 */
 const counts: Record<string, { popcornCount: number; averageScore: number | null }> = {
@@ -41,7 +38,6 @@ const flavors: PopcornBucketFlavor[] = mockPopcornFlavors.map((flavor) => {
     color: flavor.color,
     popcornCount: count.popcornCount,
     averageScore: count.averageScore,
-    isNewFlavor: count.popcornCount < NEW_FLAVOR_THRESHOLD,
     // 확장 기능 FR-32용 예약 필드. 1차에서는 null 가능
     discoveredAt: null,
   };
@@ -49,6 +45,5 @@ const flavors: PopcornBucketFlavor[] = mockPopcornFlavors.map((flavor) => {
 
 export const mockPopcornBucket: PopcornBucket = {
   totalCount: flavors.reduce((sum, flavor) => sum + flavor.popcornCount, 0),
-  newFlavorThreshold: NEW_FLAVOR_THRESHOLD,
   flavors,
 };

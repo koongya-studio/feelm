@@ -42,7 +42,7 @@ import PopcornBucket from '../../../components/PopcornBucket';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import { getPartyMix, getPartyPopcorn } from '../../../api/parties';
-import { getPopcornFlavors } from '../../../api/taste';
+import { getMockPopcornFlavors } from '../../../api/taste';
 import styles from './PartyPopcornMixPage.module.css';
 import type { PartyPopcorn } from '../../../types/party';
 import type { PopcornFlavor } from '../../../types/taste';
@@ -130,8 +130,11 @@ export default function PartyPopcornMixPage() {
         }
       });
 
-    // 맛 기준정보는 실패해도 본문을 막지 않는다. 맛 이름만 코드로 남는다
-    getPopcornFlavors()
+    /*
+     * 이 화면의 맛 집계는 목업이라 기준정보도 목업을 쓴다. 실제 API-044의 맛 코드와
+     * 목업 집계의 코드가 다르기 때문이다(api/taste.ts `getMockPopcornFlavors`).
+     */
+    getMockPopcornFlavors()
       .then((value) => {
         if (active) {
           setFlavors(value);
