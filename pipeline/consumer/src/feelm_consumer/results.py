@@ -5,8 +5,9 @@ from uuid import uuid4
 
 from feelm_consumer.artifacts import MovieMetadata
 from feelm_consumer.ranking import RankedMovie
+from feelm_consumer.xai import CandidateReason
 
-CANDIDATE_VERSION = 3
+CANDIDATE_VERSION = 4
 
 
 def utc_now() -> str:
@@ -21,6 +22,7 @@ def build_results(
     factor_backed_input_count: int,
     candidates: list[RankedMovie],
     movie_metadata: dict[int, MovieMetadata],
+    reasons: dict[int, CandidateReason],
     generated_at: str | None = None,
     generation_id: str | None = None,
 ) -> tuple[dict[str, object], dict[str, object]]:
@@ -43,6 +45,7 @@ def build_results(
             {
                 "movieId": item.movie_id,
                 "score": item.score,
+                "reason": reasons[item.movie_id].payload(),
             }
             for item in candidates
         ],
