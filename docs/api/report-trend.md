@@ -126,7 +126,7 @@
   "topActors": [{ "personId": 287, "name": "브래드 피트", "count": 3 }],
   "topDirectors": [{ "personId": 7467, "name": "데이비드 핀처", "count": 3 }],
   "characterCard": { "name": "타일러 더든", "movieTitle": "파이트 클럽", "description": "...", "imageUrl": "https://..." },
-  "flavorChanges": [{ "flavorCode": "FLAVOR_X", "before": 5, "after": 12 }],
+  "flavorChanges": [{ "flavorCode": "FLAVOR_A", "before": 5, "after": 12 }],
   "createdAt": "2026-07-01T00:00:00Z"
 }
 ```

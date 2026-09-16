@@ -416,7 +416,7 @@ class RecommendationDismissApiContractTest extends SharedPostgresContractTest {
         jdbc.update(
                 "INSERT INTO popcorn_flavors"
                         + "(id,code,display_name,color,sort_order,cluster_id,representative_keywords)"
-                        + " VALUES (1,'FLAVOR_Y','달콤','#ffffff',1,1,'[]'::jsonb)");
+                        + " VALUES (1,'FLAVOR_B','핫칠리','#DC9A4E',1,1,'[]'::jsonb)");
         jdbc.update(
                 "UPDATE movies SET poster_url='https://image.test/poster.jpg',"
                         + " release_date=DATE '1999-10-15', average_rating=4.30,"
@@ -451,7 +451,7 @@ class RecommendationDismissApiContractTest extends SharedPostgresContractTest {
                 .andExpect(jsonPath("$.replacement.movie.genres[1]").value("스릴러"))
                 .andExpect(jsonPath("$.replacement.movie.averageRating").value(4.3))
                 .andExpect(jsonPath("$.replacement.movie.ottProviders[0]").value("NETFLIX"))
-                .andExpect(jsonPath("$.replacement.flavorCode").value("FLAVOR_Y"))
+                .andExpect(jsonPath("$.replacement.flavorCode").value("FLAVOR_B"))
                 .andExpect(jsonPath("$.replacement.reason.summary").value("취향과 잘 맞아요"));
     }
 

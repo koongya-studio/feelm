@@ -292,7 +292,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
   "comment": "밤에 보면 안 됨",
   "visibility": "PUBLIC",
   "frame": { "frameId": 77, "createdAt": "2026-08-30T05:21:00Z" },
-  "popcorn": { "flavorCode": "FLAVOR_X", "isNewFlavor": true, "flavorCount": 1 },
+  "popcorn": { "flavorCode": "FLAVOR_A", "isNewFlavor": true, "flavorCount": 1 },
   "watchStatus": "RATED",
   "createdAt": "2026-08-30T05:21:00Z"
 }

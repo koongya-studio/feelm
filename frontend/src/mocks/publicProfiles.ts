@@ -135,7 +135,7 @@ export const mockTasteCompare: Record<number, TasteCompareView> = {
     },
     other: { userId: 2048, nickname: '무비버디', avatarUrl: null },
     matchRate: 76,
-    sharedFlavorCodes: ['FLAVOR_THRILL', 'FLAVOR_NOIR'],
+    sharedFlavorCodes: ['FLAVOR_B', 'FLAVOR_C'],
     items: [
       { label: '장르', rate: 82 },
       { label: '국가', rate: 74 },

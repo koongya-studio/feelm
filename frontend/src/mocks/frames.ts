@@ -63,9 +63,9 @@ function summary(
 export const mockFrameList: FrameList = {
   totalCount: 100,
   items: [
-    summary(501, 401, 'FLAVOR_CRIME', '2026-09-06T12:30:00Z'),
-    summary(502, 402, 'FLAVOR_CAPER', '2026-08-24T12:00:00Z'),
-    summary(503, 403, 'FLAVOR_NOIR', '2026-08-18T12:00:00Z'),
+    summary(501, 401, 'FLAVOR_D', '2026-09-06T12:30:00Z'),
+    summary(502, 402, 'FLAVOR_A', '2026-08-24T12:00:00Z'),
+    summary(503, 403, 'FLAVOR_C', '2026-08-18T12:00:00Z'),
   ],
   nextCursor: 'mock-cursor-2',
   hasNext: true,

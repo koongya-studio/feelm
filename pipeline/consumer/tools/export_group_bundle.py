@@ -182,7 +182,7 @@ def _source_arrays(recipe: dict[str, Any], root: Path) -> dict[str, np.ndarray]:
     seen_indices: set[int] = set()
     normalized_vocabulary: dict[str, int] = {}
     for token, raw_index in vocabulary.items():
-        if not isinstance(token, str) or isinstance(raw_index, bool) or not isinstance(raw_index, (int, np.integer)):
+        if not isinstance(token, str) or isinstance(raw_index, bool) or not isinstance(raw_index, int | np.integer):
             raise ArtifactError("invalid frozen text vocabulary")
         index = int(raw_index)
         if not 0 <= index < 16000 or index in seen_indices:
@@ -420,7 +420,7 @@ def export_group_bundle(
             "genre_missing_count": counts["genre_missing_count"],
             "sub_unsupported_count": counts["sub_unsupported_count"],
             "genre_missing_policy": "EXCLUDE_FROM_DISCOVERY",
-            "public_taste_semantics": "RECOMMENDATION_INTERNAL_NOT_PUBLIC_POPCORN",
+            "public_taste_semantics": "PUBLIC_POPCORN_FLAVOR_V1",
             "source_files": {
                 key: {"bytes": value["bytes"], "sha256": value["sha256"]}
                 for key, value in recipe["sources"].items()

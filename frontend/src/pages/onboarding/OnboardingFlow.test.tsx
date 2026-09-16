@@ -58,7 +58,7 @@ const CARD = {
   posterUrl: null,
   releaseYear: 1999,
   genres: ['드라마'],
-  flavorCode: 'FLAVOR_X',
+  flavorCode: 'FLAVOR_A',
 };
 
 const NETFLIX = mockOtts[0];

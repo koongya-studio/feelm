@@ -678,7 +678,7 @@
       "user": { "userId": 1024, "nickname": "팝콘러버" },
       "totalCount": 42,
       "flavors": [
-        { "flavorCode": "FLAVOR_X", "popcornCount": 12, "averageScore": 4.4 }
+        { "flavorCode": "FLAVOR_A", "popcornCount": 12, "averageScore": 4.4 }
       ]
     }
   ]

@@ -48,12 +48,9 @@ final class MovieDetailFixture {
                     "movie" + user + "@example.com",
                     "m" + user);
         }
-        jdbc.update(
-                """
-                INSERT INTO popcorn_flavors
-                    (id, code, display_name, color, sort_order, cluster_id, representative_keywords)
-                VALUES (158, 'FLAVOR_TEST', '테스트 맛', '#123456', 1, 0, '[]'::jsonb)
-                """);
+        Long flavorId =
+                jdbc.queryForObject(
+                        "SELECT id FROM popcorn_flavors WHERE code = 'FLAVOR_A'", Long.class);
         jdbc.update(
                 """
                 INSERT INTO movies (id, tmdb_id, title, original_title, synopsis, release_date,
@@ -61,9 +58,10 @@ final class MovieDetailFixture {
                     average_rating, rating_count)
                 VALUES (?, 550, '가상 영화', 'Fixture Movie', '가상 영화 줄거리', DATE '1999-10-15',
                     139, 'https://example.com/poster.jpg', 'https://example.com/backdrop.jpg',
-                    158, 4.35, 1280)
+                    ?, 4.35, 1280)
                 """,
-                MOVIE);
+                MOVIE,
+                flavorId);
         jdbc.update(
                 """
                 INSERT INTO movies (id, tmdb_id, title) VALUES
