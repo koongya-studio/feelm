@@ -185,6 +185,13 @@ EOF
         events = self.events_file.read_text(encoding="utf-8")
         return result, current, events
 
+    def assert_no_compose_build(self, events: str) -> None:
+        for command in events.splitlines():
+            arguments = command.split()
+            if arguments[:2] == ["docker", "compose"]:
+                self.assertNotIn("build", arguments, command)
+                self.assertNotIn("--build", arguments, command)
+
     def test_success_replaces_consumer_after_new_group_assignment(self) -> None:
         result, current, events = self.run_deploy()
 
@@ -194,7 +201,18 @@ EOF
         self.assertIn("Consumer deployment completed", result.stdout)
         self.assertIn("force-recreate consumer", events)
         self.assertIn(f"docker pull {self.candidate}", events)
-        self.assertNotIn("build", events)
+        self.assert_no_compose_build(events)
+
+    def test_compose_build_detection_ignores_runner_checkout_path(self) -> None:
+        checkout = "/home/gitlab-runner/builds/runner/project"
+
+        self.assert_no_compose_build(
+            f"docker compose -f {checkout}/infra/compose/distributed.yml config --quiet\n"
+        )
+        with self.assertRaises(AssertionError):
+            self.assert_no_compose_build(
+                f"docker compose -f {checkout}/infra/compose/distributed.yml build consumer\n"
+            )
 
     def test_initialization_records_only_a_healthy_running_image(self) -> None:
         self.state_file.write_text(self.previous, encoding="utf-8")
