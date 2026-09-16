@@ -98,11 +98,13 @@ def test_als_only_preserves_legacy_taste_scores_and_fills_discovery(frozen_clock
         {
             "movieId": 20,
             "score": 0.0,
-            "reason": {
-                "code": "DISCOVERY_PERSONAL_SCORE",
-                "sourceMovieIds": [10],
-                "matchedGenreCodes": ["DRAMA"],
-            },
+            "reasons": [
+                {
+                    "code": "DISCOVERY_PERSONAL_SCORE",
+                    "sourceMovieIds": [10],
+                    "matchedGenreCodes": ["DRAMA"],
+                }
+            ],
         }
     ]
 
@@ -305,16 +307,18 @@ def test_group_enabled_service_emits_discovery_without_changing_taste(frozen_clo
     assert grouped[1]["taste"] == legacy[1]["taste"]
     assert [item["movieId"] for item in grouped[1]["discovery"]] == [20]
     assert "flavorCode" not in grouped[1]["discovery"][0]
-    assert grouped[1]["discovery"][0]["reason"] == {
-        "code": "DISCOVERY_AGGREGATE_AFFINITY",
-        "directionSource": "RATING",
-        "contributorCount": 1,
-        "topContributors": [{"movieId": 10, "relation": "POSITIVE_ALIGNMENT"}],
-        "topContributionCoverage": 1.0,
-        "viewedCountInGroup": 0,
-        "affinityRank": 1,
-        "popularityRankInGroup": 1,
-    }
+    assert grouped[1]["discovery"][0]["reasons"] == [
+        {
+            "code": "DISCOVERY_AGGREGATE_AFFINITY",
+            "directionSource": "RATING",
+            "contributorCount": 1,
+            "topContributors": [{"movieId": 10, "relation": "POSITIVE_ALIGNMENT"}],
+            "topContributionCoverage": 1.0,
+            "viewedCountInGroup": 0,
+            "affinityRank": 1,
+            "popularityRankInGroup": 1,
+        }
+    ]
 
 
 def test_discovery_fill_preserves_group_results_and_prefers_non_taste_candidates() -> None:
@@ -370,7 +374,7 @@ def test_user_without_any_history_publishes_tied_hybrid_population(frozen_clock,
         (20, 0.0),
         (30, 0.0),
     ]
-    assert all(item["reason"]["sourceMovieIds"] == [] for item in results[1]["taste"])
+    assert all(item["reasons"] == [] for item in results[1]["taste"])
     assert "candidate_tie_fallback" in caplog.text
 
 
@@ -429,8 +433,8 @@ def test_user_without_any_supported_input_publishes_tied_population(frozen_clock
 
     assert results is not None
     assert [(item["movieId"], item["score"]) for item in results[1]["taste"]] == [(10, 0.0), (20, 0.0)]
-    assert all(item["reason"]["sourceMovieIds"] == [] for item in results[1]["taste"])
-    assert all(item["reason"]["sourceMovieIds"] == [] for item in results[1]["discovery"])
+    assert all(item["reasons"] == [] for item in results[1]["taste"])
+    assert all(item["reasons"] == [] for item in results[1]["discovery"])
 
 
 def test_active_model_scores_are_not_normalized_again(monkeypatch, frozen_clock) -> None:
@@ -572,4 +576,7 @@ def test_candidate_top500_is_selected_after_service_publishability_filtering() -
     assert candidate_items[0]["movieId"] == 11_101
     assert candidate_items[-1]["movieId"] == 10_602
     assert len(results) == 2
-    assert all("reason" in item and "rerankFeatures" not in item for item in candidate_items)
+    assert all(
+        "reasons" in item and "reason" not in item and "rerankFeatures" not in item
+        for item in candidate_items
+    )

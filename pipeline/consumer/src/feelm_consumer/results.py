@@ -10,6 +10,16 @@ from feelm_consumer.xai import CandidateReason
 CANDIDATE_VERSION = 6
 
 
+def _reason_payloads(reason: DiscoveryReason | CandidateReason) -> list[dict[str, object]]:
+    if (
+        isinstance(reason, CandidateReason)
+        and not reason.source_movie_ids
+        and not reason.matched_genre_codes
+    ):
+        return []
+    return [reason.payload()]
+
+
 def utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -46,7 +56,7 @@ def build_results(
             {
                 "movieId": item.movie_id,
                 "score": item.score,
-                "reason": reasons[item.movie_id].payload(),
+                "reasons": _reason_payloads(reasons[item.movie_id]),
             }
             for item in candidates
         ],
@@ -54,7 +64,7 @@ def build_results(
             {
                 "movieId": item.movie_id,
                 "score": item.score,
-                "reason": (discovery_reasons or {})[item.movie_id].payload(),
+                "reasons": _reason_payloads((discovery_reasons or {})[item.movie_id]),
             }
             for item in discovery_candidates or []
         ],

@@ -165,8 +165,8 @@ def validate_snapshot(values: list[str | None], after_version: int | None) -> di
     except ValueError as exc:
         raise VerificationError("generationId is not a UUID") from exc
     versions = (vector.get("candidateVersion"), candidates.get("candidateVersion"))
-    if versions != (4, 4) or any(type(item) is not int for item in versions):
-        raise VerificationError("vector and candidates must use candidateVersion 4")
+    if versions != (6, 6) or any(type(item) is not int for item in versions):
+        raise VerificationError("vector and candidates must use candidateVersion 6")
     if (
         not isinstance(vector.get("modelVersion"), str)
         or not vector.get("modelVersion")
@@ -213,34 +213,100 @@ def _validate_candidate_list(items: list[object], *, discovery: bool) -> None:
         if not _finite_number(item.get("score")):
             raise VerificationError("candidate score is invalid")
         ordering.append((-float(item["score"]), movie_id))
-        if discovery:
-            flavor_code = item.get("flavorCode")
-            if flavor_code is not None and (not isinstance(flavor_code, str) or not flavor_code):
-                raise VerificationError("discovery flavorCode is invalid")
-            continue
-        reason = item.get("reason")
-        if not isinstance(reason, dict) or reason.get("code") not in {
-            "SHARED_GENRE",
-            "TOP_RATED_SOURCE",
-        }:
-            raise VerificationError("taste reason is invalid")
-        source_ids = reason.get("sourceMovieIds")
-        genre_codes = reason.get("matchedGenreCodes")
-        if (
-            not isinstance(source_ids, list)
-            or not source_ids
-            or not all(type(source_id) is int and source_id > 0 for source_id in source_ids)
-            or len(set(source_ids)) != len(source_ids)
-            or not isinstance(genre_codes, list)
-            or not all(isinstance(code, str) and code for code in genre_codes)
-        ):
-            raise VerificationError("taste reason fields are invalid")
-        if reason["code"] == "SHARED_GENRE" and not genre_codes:
-            raise VerificationError("SHARED_GENRE requires matched genre codes")
-        if reason["code"] == "TOP_RATED_SOURCE" and genre_codes:
-            raise VerificationError("TOP_RATED_SOURCE must not contain matched genre codes")
+        if "reason" in item:
+            raise VerificationError("candidate must not contain singular reason")
+        reasons = item.get("reasons")
+        if not isinstance(reasons, list):
+            raise VerificationError("candidate reasons must be an array")
+        for reason in reasons:
+            _validate_reason(reason, discovery=discovery)
     if ordering != sorted(ordering):
         raise VerificationError("candidate list order violates score and movieId ordering")
+
+
+def _validate_reason(reason: object, *, discovery: bool) -> None:
+    if not isinstance(reason, dict):
+        raise VerificationError("candidate reasons must contain objects")
+    code = reason.get("code")
+    allowed_codes = (
+        {"DISCOVERY_AGGREGATE_AFFINITY", "DISCOVERY_PERSONAL_SCORE"}
+        if discovery
+        else {"SHARED_GENRE", "TOP_RATED_SOURCE"}
+    )
+    if code not in allowed_codes:
+        raise VerificationError("candidate reason code is invalid for its list")
+    if code == "DISCOVERY_AGGREGATE_AFFINITY":
+        _validate_aggregate_reason(reason)
+        return
+    _validate_source_reason(reason, code=str(code))
+
+
+def _validate_source_reason(reason: dict[str, object], *, code: str) -> None:
+    if set(reason) != {"code", "sourceMovieIds", "matchedGenreCodes"}:
+        raise VerificationError(f"{code} reason fields are invalid")
+    source_ids = reason.get("sourceMovieIds")
+    genre_codes = reason.get("matchedGenreCodes")
+    if (
+        not isinstance(source_ids, list)
+        or not source_ids
+        or not all(type(source_id) is int and source_id > 0 for source_id in source_ids)
+        or len(set(source_ids)) != len(source_ids)
+        or not isinstance(genre_codes, list)
+        or not all(isinstance(genre_code, str) and genre_code for genre_code in genre_codes)
+        or len(set(genre_codes)) != len(genre_codes)
+    ):
+        raise VerificationError(f"{code} reason fields are invalid")
+    if code == "SHARED_GENRE" and not genre_codes:
+        raise VerificationError("SHARED_GENRE requires matched genre codes")
+    if code == "TOP_RATED_SOURCE" and genre_codes:
+        raise VerificationError("TOP_RATED_SOURCE must not contain matched genre codes")
+
+
+def _validate_aggregate_reason(reason: dict[str, object]) -> None:
+    expected_fields = {
+        "code",
+        "directionSource",
+        "contributorCount",
+        "topContributors",
+        "topContributionCoverage",
+        "viewedCountInGroup",
+        "affinityRank",
+        "popularityRankInGroup",
+    }
+    if set(reason) != expected_fields:
+        raise VerificationError("DISCOVERY_AGGREGATE_AFFINITY reason fields are invalid")
+    contributor_count = reason.get("contributorCount")
+    contributors = reason.get("topContributors")
+    coverage = reason.get("topContributionCoverage")
+    if reason.get("directionSource") not in {"RATING", "ONBOARDING"}:
+        raise VerificationError("DISCOVERY_AGGREGATE_AFFINITY directionSource is invalid")
+    if type(contributor_count) is not int or contributor_count < 0:
+        raise VerificationError("DISCOVERY_AGGREGATE_AFFINITY contributorCount is invalid")
+    if not isinstance(contributors, list) or len(contributors) > 3:
+        raise VerificationError("DISCOVERY_AGGREGATE_AFFINITY topContributors is invalid")
+    contributor_ids: list[int] = []
+    for contributor in contributors:
+        if (
+            not isinstance(contributor, dict)
+            or type(contributor.get("movieId")) is not int
+            or contributor["movieId"] <= 0
+            or contributor.get("relation") not in {"POSITIVE_ALIGNMENT", "NEGATIVE_CONTRAST"}
+        ):
+            raise VerificationError("DISCOVERY_AGGREGATE_AFFINITY contributor is invalid")
+        contributor_ids.append(contributor["movieId"])
+    if len(set(contributor_ids)) != len(contributor_ids) or len(contributors) != min(3, contributor_count):
+        raise VerificationError("DISCOVERY_AGGREGATE_AFFINITY contributor counts are inconsistent")
+    if not _finite_number(coverage) or not 0.0 <= float(coverage) <= 1.0:
+        raise VerificationError("DISCOVERY_AGGREGATE_AFFINITY coverage is invalid")
+    if (contributor_count == 0 and coverage != 0.0) or (
+        0 < contributor_count <= 3 and coverage != 1.0
+    ):
+        raise VerificationError("DISCOVERY_AGGREGATE_AFFINITY coverage is inconsistent")
+    if type(reason.get("viewedCountInGroup")) is not int or reason["viewedCountInGroup"] < 0:
+        raise VerificationError("DISCOVERY_AGGREGATE_AFFINITY viewedCountInGroup is invalid")
+    for rank_name in ("affinityRank", "popularityRankInGroup"):
+        if type(reason.get(rank_name)) is not int or reason[rank_name] < 1:
+            raise VerificationError(f"DISCOVERY_AGGREGATE_AFFINITY {rank_name} is invalid")
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -277,7 +343,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     print(
         "Consumer Redis E2E verification passed "
-        f"version={result['version']} candidateVersion=4 "
+        f"version={result['version']} candidateVersion=6 "
         f"taste={result['taste']} discovery={result['discovery']}"
     )
     return 0
