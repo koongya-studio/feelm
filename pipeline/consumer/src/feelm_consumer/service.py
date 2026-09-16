@@ -19,13 +19,16 @@ def calculate_user_results(
     bundle: ArtifactBundle,
     ratings: list[ProfileInput],
     onboarding: list[ProfileInput],
-    candidate_version: int,
+    candidate_version: int | None = None,
     *,
     content: ContentBundle | None = None,
     hybrid_alpha: float = 0.5,
     min_input_count: int = 0,
 ) -> tuple[dict[str, object], dict[str, object]] | None:
     """Score one user's candidates from ALS factors, content vectors, or both.
+
+    ``candidate_version`` is accepted during the Redis sequencing migration but is
+    not serialized: payload versioning is fixed by ``results.CANDIDATE_VERSION``.
 
     Without ``content`` the candidate population and their order are the ALS-only
     ones.  With it, a movie is a candidate when either component supports it, so
@@ -78,7 +81,6 @@ def calculate_user_results(
             rating_count=len(ratings),
             factor_backed_input_count=folded.factor_backed_input_count if folded is not None else 0,
             candidates=_published_scores(service_ranked),
-            candidate_version=candidate_version,
             movie_metadata=bundle.movie_metadata,
         )
 
@@ -105,7 +107,6 @@ def calculate_user_results(
         rating_count=len(ratings),
         factor_backed_input_count=folded.factor_backed_input_count if folded is not None else 0,
         candidates=ranked,
-        candidate_version=candidate_version,
         movie_metadata=bundle.movie_metadata,
     )
 
