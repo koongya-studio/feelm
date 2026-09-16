@@ -177,6 +177,36 @@ include:
         self.assertNotIn('- infra/scripts/test_consumer_distributed_deployment.py',
                          job_block(self.backend, 'backend-mr-test'))
 
+    def test_required_variable_contract_and_runtime_preflight_are_separated(self):
+        contract = job_block(self.infra, 'ci-variable-contract-check')
+        for expected in (
+                'stage: verify', 'tags: [e106-mr-isolated]', 'dependencies: []',
+                'GIT_STRATEGY: none', 'resource_group: ci-variable-contract-check',
+                'interruptible: true', 'timeout: 5m',
+                '$CI_PIPELINE_SOURCE == "merge_request_event"',
+                '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"',
+                'ci-required-variable-preflight.py'):
+            self.assertIn(expected, contract)
+        for forbidden in ('CI_VARIABLE_AUDIT_TOKEN', '--require-values', '--check-metadata',
+                          'environment:', 'tags: [e106-shell]'):
+            self.assertNotIn(forbidden, contract)
+
+        preflight = job_block(self.infra, 'ci-variable-preflight')
+        for expected in (
+                'stage: verify', 'tags: [e106-shell]', 'needs: []',
+                'name: service', 'action: prepare',
+                '--require-values --check-metadata',
+                '$CI_COMMIT_BRANCH == "develop"',
+                '$CI_COMMIT_REF_PROTECTED == "true"',
+                '$CI_PIPELINE_SOURCE == "push"',
+                'resource_group: ci-variable-preflight', 'interruptible: true'):
+            self.assertIn(expected, preflight)
+        for forbidden in ('merge_request_event', 'when: manual', 'allow_failure: true'):
+            self.assertNotIn(forbidden, preflight)
+
+        cache = job_block(self.backend, 'backend-cache-prepare')
+        self.assertIn('needs: [ci-variable-contract-check]', cache)
+
     def test_pipeline_mr_jobs_are_isolated_sharded_and_path_scoped(self):
         self.assertTrue(self.pipeline_path.is_file(), 'Missing Pipeline CI include')
         template = job_block(self.pipeline, '.pipeline-mr-test')

@@ -18,6 +18,7 @@ TESTS = (
     "infra.scripts.test_deploy_consumer",
     "infra.scripts.test_verify_consumer_e2e",
     "infra.scripts.test_notify_deployment",
+    "infra.scripts.test_ci_required_variable_preflight",
     "infra.scripts.test_ci_config",
     "infra.scripts.test_ci_backend_mr_paths",
     "infra.scripts.test_ci_infra_mr",

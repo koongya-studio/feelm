@@ -27,11 +27,15 @@ bounded = load("infra_mr_bounded", "ci-bounded-output.py")
 RUNTIME_ROOT = Path("/run")
 INSTALLED = Path("/usr/local/lib/feelm-ci222/gitlab/ci-infra-mr-runner.py")
 FIXED_COMMAND = "/usr/bin/python3 -I -B infra/scripts/run-infra-config-tests.py"
+CONTRACT_COMMAND = "/usr/bin/python3 -I -B infra/scripts/ci-required-variable-preflight.py"
 
 
-def unit_command(source, unit):
+def unit_command(source, unit, group=None):
     if re.fullmatch(r"ci490-infra-[a-f0-9]{12}[.]service", unit) is None:
         raise ValueError("Invalid infra unit")
+    commands = {None: FIXED_COMMAND, "variable-contract": CONTRACT_COMMAND}
+    if group not in commands:
+        raise ValueError("Invalid infra test group")
     return [
         "systemd-run", "--unit=" + unit, "--service-type=exec", "--wait", "--pipe", "--collect",
         "--property=DynamicUser=yes", "--property=PrivateNetwork=yes",
@@ -40,11 +44,11 @@ def unit_command(source, unit):
         "--property=RestrictSUIDSGID=yes", "--property=MemoryMax=1G",
         "--property=CPUQuota=200%", "--property=TasksMax=256",
         "--property=RuntimeMaxSec=570", "--property=TimeoutStopSec=15",
-        "--working-directory=" + str(source), "/bin/sh", "-c", FIXED_COMMAND,
+        "--working-directory=" + str(source), "/bin/sh", "-c", commands[group],
     ]
 
 
-def start(payload, digest, on_started=None):
+def start(payload, digest, group=None, on_started=None):
     if not sys.platform.startswith("linux"):
         raise RuntimeError("Infra MR execution requires Linux")
     token = uuid.uuid4().hex[:12]
@@ -59,12 +63,12 @@ def start(payload, digest, on_started=None):
         attempt.chmod(0o755)
         if on_started is not None:
             on_started(source, {"owner": unit})
-        process = bounded.CappedProcess(unit_command(source, unit), log)
+        process = bounded.CappedProcess(unit_command(source, unit, group), log)
         code = process.wait(600)
         print(log.read_text(errors="replace")[-bounded.LIMIT:], end="")
         if code:
             return 2
-        print("INFRA_CONFIG_TEST_PASSED: networkless fixed unittest policy")
+        print("INFRA_CONFIG_TEST_PASSED: networkless fixed policy")
         return 0
     finally:
         subprocess.run(["systemctl", "stop", unit], capture_output=True, timeout=30)
