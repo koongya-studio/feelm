@@ -13,7 +13,7 @@
  * | matchRate | 2.1 `취향 일치 92%` · 2.2 `일치 92%` `연결 72%` · 2.3-A `일치 87%` | CR-13 결정 대기 |
  * | runtimeMinutes | 2.1 `케이퍼 · 범죄 · 128분` | API-045 요약에 없음. API-030 상세에는 `runtimeMinutes`가 있음. CR 미등록 |
  * | AvailableNowMovie | 2.1 `내 OTT에서 지금 볼 수 있어요` 4편 | CR-14 결정 대기. 응답 형태 자체가 미정 |
- * | newPopcornCount | 2.1 `멤버 4명 · 새 팝콘 2개` | API-050에 없음. CR 미등록 |
+ * | newPopcornCount | 2.1 `멤버 4명 · 새 팝콘 2개` | API-050에 없음. 실제 연동(S15P21E106-393)으로 채울 값이 사라져 화면에서 뺐다. CR 미등록 |
  * | weeklyFrameDelta | 2.6 `99프레임 · 이번 주 +3` · 2.7 `100프레임 · 이번 주 +4` | 주간 증가 수를 내려주는 필드가 없음. API-014 `stats.frameCount`와 API-042 `totalCount`는 누적 수만 준다. CR 미등록 |
  * | TasteFlowView.flowSentence | 3.1 `스릴러에서 느와르로 넓어지고 있어요` | CR-16 결정 대기. 대응 필드가 없음 |
  * | TasteKeywordView.rationale | 3.1 `계획형 캐릭터 영화 12편에 ★4 이상` 등 4개 | CR-16 결정 대기. API-040 `keywords`는 `code`·`label`만 있음 |
@@ -35,7 +35,6 @@
 import type { OttRecommendationItem } from './ott';
 import type { ReportDetail } from './report';
 import type { NotificationSettings } from './user';
-import type { Party } from './party';
 import type { RecommendedMovie } from './movie';
 import type {
   DismissResult,
@@ -75,11 +74,6 @@ export type AvailableNowMovie = {
   posterUrl: string | null;
   /** 이 영화를 볼 수 있는 구독 중 OTT 코드 하나 */
   ottProvider: string;
-};
-
-/** 파티 요약 + 새 팝콘 수 */
-export type PartyView = Party & {
-  newPopcornCount: number;
 };
 
 /** 2.6 · 2.7의 `이번 주 +N` */

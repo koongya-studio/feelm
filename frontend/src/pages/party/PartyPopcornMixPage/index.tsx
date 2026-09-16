@@ -5,6 +5,7 @@
  * ① 참여자 취향 비교 · ② 팝콘 믹서 · ③ 공통 취향 결과
  *
  * 연동 API는 API-057 파티원 팝콘 조회다. 참여자 이름과 팝콘 집계는 여기서 온다.
+ * 업무 -393에서 실제 호출로 바뀌었다.
  *
  * **① 의 `46%` · `38%`, ③ 의 `72%`, 그리고 태그 4종은 계약에 대응이 없다(CR-17).**
  * 산출 규칙이 없고 API-057의 맛별 집계로도 재현되지 않아 `getPartyMix`로 따로 가져온다.
@@ -42,7 +43,7 @@ import PopcornBucket from '../../../components/PopcornBucket';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import { getPartyMix, getPartyPopcorn } from '../../../api/parties';
-import { getMockPopcornFlavors } from '../../../api/taste';
+import { getPopcornFlavors } from '../../../api/taste';
 import styles from './PartyPopcornMixPage.module.css';
 import type { PartyPopcorn } from '../../../types/party';
 import type { PopcornFlavor } from '../../../types/taste';
@@ -116,8 +117,17 @@ export default function PartyPopcornMixPage() {
   useEffect(() => {
     let active = true;
 
-    Promise.all([getPartyPopcorn(id), getPartyMix(id)])
-      .then(([popcornValue, mixValue]) => {
+    /*
+     * 섞기 값(`getPartyMix`)은 계약이 없는 자리표시자라 누구의 값인지 알 수 없다.
+     * 실제 파티원에게 붙이려면 먼저 API-057로 파티원을 알아야 하므로 이어서 부른다.
+     */
+    getPartyPopcorn(id)
+      .then(async (popcornValue) => {
+        const mixValue = await getPartyMix(
+          id,
+          popcornValue.members.map((member) => member.user.userId),
+        );
+
         if (active) {
           setPopcorn(popcornValue);
           setMix(mixValue);
@@ -131,10 +141,10 @@ export default function PartyPopcornMixPage() {
       });
 
     /*
-     * 이 화면의 맛 집계는 목업이라 기준정보도 목업을 쓴다. 실제 API-044의 맛 코드와
-     * 목업 집계의 코드가 다르기 때문이다(api/taste.ts `getMockPopcornFlavors`).
+     * 집계(API-057)와 기준정보(API-044)가 모두 실제 응답이므로 맛 코드가 같은 곳에서
+     * 온다. 기준정보가 비어 오면 맛 이름 자리가 빈다(`api/taste.ts`).
      */
-    getMockPopcornFlavors()
+    getPopcornFlavors()
       .then((value) => {
         if (active) {
           setFlavors(value);

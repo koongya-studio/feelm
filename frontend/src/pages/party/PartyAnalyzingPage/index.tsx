@@ -7,6 +7,9 @@
  * **분석은 별도 계약이 아니다.** API-058이 동기로 추천을 돌려주므로, 이 화면은 그 응답을
  * 기다리는 동안 보여 주는 전환 화면이다. 응답이 오면 5.5로 대체한다(`replace`).
  *
+ * `[!]` **API-058은 백엔드에 아직 없다.** 파티원 이름은 실제 API-050에서 오지만 추천은
+ * 목업이다(`api/parties.ts`).
+ *
  * 화면이 곧바로 사라지면 깜빡이는 것처럼 보이므로 최소 노출 시간을 둔다. 와이어프레임이
  * `공통 필름 현상 중`이라는 장면을 하나의 프레임으로 그린 이상, 응답이 빨라도 그 장면은
  * 보여야 한다.
@@ -18,7 +21,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import StatusView from '../../../components/StatusView';
-import { getMyParties, getPartyRecommendations } from '../../../api/parties';
+import { getParty, getPartyRecommendations } from '../../../api/parties';
 import { path } from '../../../routes/paths';
 import styles from './PartyAnalyzingPage.module.css';
 
@@ -36,10 +39,8 @@ export default function PartyAnalyzingPage() {
   useEffect(() => {
     let active = true;
 
-    getMyParties()
-      .then((parties) => {
-        const party = parties.find((item) => item.partyId === id);
-
+    getParty(id)
+      .then((party) => {
         if (active && party) {
           setMembers(party.members.map((member) => member.nickname));
         }

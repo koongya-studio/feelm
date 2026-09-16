@@ -12,7 +12,11 @@
  * 거절하면 8.1 알림 목록으로 간다(업무 -308에서 이었다). 수락은 5.1 내 파티다.
  *
  * `[?]` `2인`은 **나까지 세었을 때의 인원**이다. API-052 `memberCount`는 지금 참여 중인
- * 사람 수라 여기에 1을 더한다(`mocks/partyInvitations.ts` 머리말).
+ * 사람 수이므로 여기에 1을 더해야 수락한 뒤의 5.7 `김난다 × 무비버디`와 앞뒤가 맞는다.
+ *
+ * `[!]` **초대 단건 조회 계약이 없다.** API-052 목록에서 번호로 고르므로 이미 답했거나
+ * 파티가 종료된 초대는 목록에 없어 찾지 못한 상태가 된다. 두 경우를 가르는 값이 없어
+ * 안내도 하나다.
  */
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
@@ -38,6 +42,13 @@ export default function PartyInvitationPage() {
     getInvitation(id)
       .then((value) => {
         if (!active) return;
+
+        // 목록에 없는 초대다. 이미 답했거나 파티가 종료된 경우다
+        if (!value) {
+          setFailed(true);
+
+          return;
+        }
 
         setInvitation(value);
         setFailed(false);

@@ -5,7 +5,7 @@
  * 목업을 걷어내고 실제 API를 부르는 첫 도메인이다(업무 S15P21E106-364).
  *
  * **한 파일에 실제 호출과 목업이 섞여 있다.** 갈리는 기준은 계약의 단계다.
- * - API-014 · API-015는 1차 MVP라 실제로 부른다
+ * - API-014 · API-015 · API-016 · API-019는 1차 MVP라 실제로 부른다
  * - API-062 · API-063(공개 프로필 · 취향 비교)은 **2차 MVP라 아직 없다.** MY 화면
  *   업무(-305)가 화면을 먼저 만들었으므로 목업으로 응답한다. 계약이 열리면 이 파일의
  *   두 함수 본문만 `request`로 바꾸면 된다
@@ -22,7 +22,12 @@ import { request } from './client';
 import { isBlockedUser } from './settings';
 import { respond, respondError } from './mockTransport';
 import type { PublicProfileView, TasteCompareView } from '../types/unspecified';
-import type { MyProfile, MyProfileUpdate, NicknameAvailability } from '../types/user';
+import type {
+  MyProfile,
+  MyProfileUpdate,
+  NicknameAvailability,
+  SearchedUserList,
+} from '../types/user';
 
 /**
  * API-014 내 프로필 조회 · GET /api/v1/users/me
@@ -60,6 +65,34 @@ export async function checkNicknameAvailability(nickname: string): Promise<Nickn
     query: { nickname },
     auth: 'none',
   });
+}
+
+/**
+ * API-019 사용자 검색 · GET /api/v1/users/search
+ *
+ * **닉네임 접두 일치**다. 5.3이 파티에 초대할 사람을 고를 때 쓴다.
+ *
+ * 검색어는 정규화(공백 제거 · 소문자) 후 2~10자여야 하고 벗어나면
+ * `400 VALIDATION_FAILED`다. 화면이 먼저 길이를 보고 부르지 않는 편이 낫다
+ * (`isSearchableNickname`).
+ *
+ * 결과에서 빠지는 사람이 있다 — 본인, 차단 관계(양방향), 탈퇴 · 미인증 계정이다.
+ * 차단은 계약이 **없는 사람처럼** 다루기로 했으므로 화면도 그 이유를 드러내지 않는다.
+ * `PRIVATE` 사용자는 그대로 나오고 `visibility`가 함께 온다(API-019 처리 규칙).
+ */
+export async function searchUsers(nickname: string, cursor?: string): Promise<SearchedUserList> {
+  return request<SearchedUserList>('/users/search', { query: { nickname, cursor } });
+}
+
+/**
+ * 검색어로 보낼 수 있는 길이인지. API-019가 정규화 후 2~10자를 요구한다.
+ *
+ * 한 글자만 쳐도 요청이 나가면 매번 `400`을 받는다. 서버 규칙과 같은 정규화를 쓴다.
+ */
+export function isSearchableNickname(keyword: string): boolean {
+  const normalized = keyword.replace(/\s/g, '');
+
+  return normalized.length >= 2 && normalized.length <= 10;
 }
 
 /**

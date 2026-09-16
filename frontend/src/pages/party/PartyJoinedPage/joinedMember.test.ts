@@ -11,7 +11,7 @@ import type { PartyMember } from '../../../types/party';
 const ME = 1024;
 
 function member(userId: number, nickname: string, role: 'OWNER' | 'MEMBER'): PartyMember {
-  return { userId, nickname, role };
+  return { userId, nickname, role, joinedAt: '2026-09-01T00:00:00Z' };
 }
 
 describe('findJoinedMember', () => {

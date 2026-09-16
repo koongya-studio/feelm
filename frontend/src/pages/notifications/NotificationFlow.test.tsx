@@ -20,10 +20,27 @@ import { mockOtts } from '../../mocks/otts';
 import { resetSessionStore } from '../../mocks/sessionStore';
 import { mockMyProfile } from '../../mocks/user';
 import { ROUTE_PATTERN } from '../../routes/paths';
+import { invitation } from '../../test/party';
 
 vi.mock('../../api/users', () => ({
   getMyProfile: vi.fn(),
 }));
+
+/*
+ * 5.6 파티 초대 수신이 API-052 · API-054를 부른다. 연동(-393) 뒤에는 실제 호출이라
+ * 가로채지 않으면 초대를 찾지 못한 상태가 되어 `거절` 버튼이 아예 없다.
+ */
+vi.mock('../../api/parties', async () => {
+  const actual = await vi.importActual<typeof import('../../api/parties')>('../../api/parties');
+
+  return {
+    ...actual,
+    getMyParties: vi.fn().mockResolvedValue([]),
+    getInvitation: vi.fn(),
+    acceptInvitation: vi.fn(),
+    declineInvitation: vi.fn(),
+  };
+});
 
 // 2.4-A 감상 확인이 OTT 기준정보를 부른다. 연동(-379) 뒤에는 실제 호출이다
 vi.mock('../../api/otts', () => ({
@@ -33,10 +50,16 @@ vi.mock('../../api/otts', () => ({
 }));
 
 const { getOtts, getMyOttIds } = await import('../../api/otts');
+const { declineInvitation, getInvitation } = await import('../../api/parties');
 
 beforeEach(() => {
   resetSessionStore();
   vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
+  // 8.1의 파티 초대 알림이 가리키는 번호(501)를 그대로 쓴다
+  vi.mocked(getInvitation).mockReset().mockResolvedValue(invitation());
+  vi.mocked(declineInvitation)
+    .mockReset()
+    .mockResolvedValue({ invitationId: 501, status: 'DECLINED' });
   vi.mocked(getOtts).mockReset().mockResolvedValue(mockOtts);
   vi.mocked(getMyOttIds).mockReset().mockResolvedValue([mockOtts[0].ottId]);
 });
