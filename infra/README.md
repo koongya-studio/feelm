@@ -1521,18 +1521,20 @@ Masked로 관리하고 로그에 출력하지 않습니다.
 `resource_group`으로 직렬화합니다.
 
 각 `deploy-backend`, `deploy-frontend`, `deploy-consumer` Job은 `after_script`에서 실제
-`CI_JOB_STATUS`를 Mattermost 팀 채널로 전송합니다. 알림에는 대상 서비스, 배포 환경,
-commit SHA와 GitLab Job·Pipeline 링크만 포함하며 Secret이나 전체 환경변수를 포함하지
-않습니다. Mattermost 장애가 실제 배포 성공·실패 결과를 덮어쓰지 않도록 알림 실패는 경고로
-기록하고 종료 코드 0을 반환합니다. 따라서 경고가 있으면 Job 링크에서 원인을 확인하고
-채널 수신 여부를 별도로 복구합니다.
+`CI_JOB_STATUS`를 Mattermost 팀 채널로 전송합니다. 기존 Jira 일일 알림과 같은
+`MATTERMOST_BASE_URL`, `MATTERMOST_LOGIN_ID`, `MATTERMOST_PASSWORD` 및 채널 선택 변수를
+사용해 로그인하고 게시 후 로그아웃합니다. 알림에는 대상 서비스, 배포 환경, commit SHA와
+GitLab Job·Pipeline 링크만 포함하며 Secret이나 전체 환경변수를 포함하지 않습니다.
+Mattermost 장애가 실제 배포 성공·실패 결과를 덮어쓰지 않도록 알림 실패는 경고로 기록하고
+종료 코드 0을 반환합니다. 따라서 경고가 있으면 Job 링크에서 원인을 확인하고 채널 수신 여부를
+별도로 복구합니다.
 
-GitLab 프로젝트 CI/CD Variables에 `MATTERMOST_DEPLOY_WEBHOOK_URL`을 실제 Incoming Webhook
-URL로 등록합니다. 같은 Key와 값을 환경 범위 `service`, `distributed`에 각각 한 번씩 등록하고
-두 항목 모두 `Masked and hidden`, `Protected`로 설정합니다. 저장소, MR, Job 로그와
-스크린샷에는 실제 URL을 남기지 않습니다. 보호된 `main` Push의 배포 환경 Job만 이 변수를
-받으며 MR, API 및 Web Pipeline에서는 배포 알림을 보내지 않습니다. URL을 갱신하거나 폐기할
-때는 두 환경 범위의 값을 함께 변경합니다.
+GitLab 프로젝트 CI/CD Variables의 기존 Jira 일일 알림용 Mattermost 설정을 그대로
+사용합니다. `MATTERMOST_PASSWORD`는 `Masked and hidden`, `Protected`를 유지하고 나머지
+Mattermost 변수도 `Protected`로 관리합니다. 환경 범위는 Jira 스케줄 Job과 `service`,
+`distributed` 배포 Job이 함께 받을 수 있도록 `All (default)`를 유지합니다. 저장소, MR,
+Job 로그와 스크린샷에는 계정 비밀번호와 세션 토큰을 남기지 않습니다. 채널을 분리하려면
+계정 자체를 재사용하더라도 배포 전용 채널 변수를 도입하는 별도 업무로 처리합니다.
 
 모니터링 설정은 애플리케이션 이미지 배포와 달리 보호된 `develop` Push에서
 `deploy-monitoring` Job으로 적용합니다. 이 Job은 `ci-variable-preflight`를 필수 `needs`로
