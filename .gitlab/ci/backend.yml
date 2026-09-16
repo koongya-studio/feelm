@@ -13,6 +13,8 @@ datastore-config-check:
         - .gitlab/ci/backend.yml
         - infra/compose/service.yml
         - infra/redis/**/*
+        - infra/scripts/deploy-redis.sh
+        - infra/scripts/test_deploy_redis.py
         - infra/scripts/verify-datastore-config.sh
         - infra/scripts/verify-datastores.sh
         - infra/scripts/deploy-backend.sh
@@ -44,7 +46,6 @@ backend-env-check:
         - backend/.dockerignore
         - backend/.env.example
         - infra/compose/service.yml
-        - infra/redis/**/*
         - infra/scripts/verify-datastore-config.sh
         - infra/scripts/verify-datastores.sh
         - infra/scripts/deploy-backend.sh
@@ -175,7 +176,7 @@ backend-test:
   stage: test
   tags: [e106-shell]
   script:
-    - python3 -B -m unittest infra.scripts.test_ci_config infra.scripts.test_notify_deployment infra.scripts.test_ci_backend_mr_paths infra.scripts.test_ci_backend_develop_paths infra.scripts.test_ci_backend_env_contract infra.scripts.test_ci_deploy_current_commit infra.scripts.test_deploy_backend infra.scripts.test_deploy_frontend -v
+    - python3 -B -m unittest infra.scripts.test_ci_config infra.scripts.test_notify_deployment infra.scripts.test_ci_backend_mr_paths infra.scripts.test_ci_backend_develop_paths infra.scripts.test_ci_backend_env_contract infra.scripts.test_ci_deploy_current_commit infra.scripts.test_deploy_backend infra.scripts.test_deploy_frontend infra.scripts.test_deploy_redis -v
     - cd backend
     - ./gradlew clean test spotlessCheck --no-daemon --init-script gradle/test-timing.gradle
   interruptible: true
@@ -197,7 +198,6 @@ backend-test:
         - backend/.dockerignore
         - backend/.env.example
         - infra/compose/service.yml
-        - infra/redis/**/*
         - infra/scripts/verify-datastore-config.sh
         - infra/scripts/verify-datastores.sh
         - infra/scripts/deploy-backend.sh
@@ -250,7 +250,6 @@ backend-image:
         - backend/.dockerignore
         - backend/.env.example
         - infra/compose/service.yml
-        - infra/redis/**/*
         - infra/scripts/verify-datastore-config.sh
         - infra/scripts/verify-datastores.sh
         - infra/scripts/deploy-backend.sh
@@ -305,7 +304,6 @@ deploy-backend:
         - backend/.dockerignore
         - backend/.env.example
         - infra/compose/service.yml
-        - infra/redis/**/*
         - infra/scripts/verify-datastore-config.sh
         - infra/scripts/verify-datastores.sh
         - infra/scripts/deploy-backend.sh
@@ -321,4 +319,30 @@ deploy-backend:
         - .gitlab/ci/common.yml
         - .gitlab/ci/backend.yml
         - .gitattributes
+  allow_failure: false
+
+deploy-redis:
+  stage: deploy
+  tags: [e106-shell]
+  needs:
+    - job: datastore-config-check
+  resource_group: service-and-backend-cache
+  environment:
+    name: service
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
+    - bash infra/scripts/deploy-redis.sh "$CI_COMMIT_SHA"
+  interruptible: false
+  retry:
+    max: 2
+    when: [runner_system_failure, scheduler_failure]
+  timeout: 15m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - infra/compose/service.yml
+        - infra/redis/**/*
+        - infra/scripts/deploy-redis.sh
+        - infra/scripts/verify-datastore-config.sh
+        - infra/scripts/verify-datastores.sh
   allow_failure: false
