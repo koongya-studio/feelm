@@ -160,15 +160,23 @@
 ### 처리 규칙
 
 - 기본 구성은 `TASTE` 2편 + `DISCOVERY` 1편. `DISCOVERY` 후보가 없으면 `TASTE` 3편
-- `TASTE`는 사용자 평가·온보딩 선호 기반 `taste` 최대 500편으로 생성한다. `DISCOVERY`는 내부
+- `TASTE`는 이벤트마다 PostgreSQL의 현재 평가·온보딩 선택을 한 snapshot으로 다시 읽어 결정론적으로
+  재계산한다. 같은 영화는 실제 별점이 온보딩 선택보다 우선하고, 온보딩 LIKE/DISLIKE는 DB 별점으로
+  저장하지 않고 ALS Fold-in adapter의 확정값으로만 사용한다. 서로 다른 유효 입력 영화가 기본 10편
+  이상이면 가용한 ALS·콘텐츠 성분으로 후보를 계산한다. 콘텐츠 산출물은 선택 사항이며, 한 성분 이상이
+  점수를 낼 수 있을 때 각 지원 모집단의 백분위를 결합해 `taste` 최대 500편을 게시한다. 두 성분 모두
+  점수를 낼 수 없으면 이벤트는 정상 처리하되 기존 Redis 키를 갱신하지 않는다.
+- `DISCOVERY`는 내부
   8×128 영화 그룹에서 별도로 고른 `discovery` 최대 100편이며, Spring이 두 목록을 합쳐
   `TASTE 2 + DISCOVERY 1`을 구성한다. 그룹 산출물이 없으면 `discovery`는 빈 배열이고 TASTE로 채운다(FR-10·FR-12)
 - DISCOVERY는 저이력·고궁합 그룹을 개인별로 고른 뒤, 그룹 안에서는 모든 사용자에게 같은
   `max(TMDB 투표 수 백분위, KOBIS 누적 관객 백분위)` 순서로 최대 10편씩 모집한다. 모집된
   최대 100편에 대해서만 사용자 개인 예측 점수로 최종 순서를 만든다.
-- 감상 기록이 있는 영화(`LINK_CLICKED` 포함, 평가 여부 무관)와 관심없음 영화는 제외한다
+- Consumer는 평가·온보딩·확정 감상·관심없음 영화를 DISCOVERY 후보에서 먼저 제외한다.
+  Spring은 최종 노출에서 `LINK_CLICKED`를 포함한 모든 감상 기록과 관심없음을 다시 제외한다
 - 활성 버퍼가 남아 있고 추천 입력(평가·온보딩 선택)이 바뀌지 않으면 같은 `recommendationSetId`와 결과를 반환한다. 입력이 바뀌거나 버퍼가 소진된 상태에서 API-046을 다시 요청하면 새 세트를 생성한다. 관심없음은 입력 변경으로 취급하지 않고 세트 내 교체로 처리한다(API-047)
-- 온보딩을 건너뛰고 평가가 없는 사용자의 인기 fallback은 별도 후속 업무에서 다룬다
+- 온보딩을 건너뛰고 평가가 없는 사용자의 별도 POPULAR fallback은 S15P21E106-483에서 다룬다.
+  `discovery-popularity`는 선택된 그룹 안의 공통 후보 진입 순서이며 fallback 목록이 아니다
 - Python Consumer가 Redis에 갱신한 TASTE 최대 500편과 DISCOVERY 최대 100편을 Spring이 OTT 클릭 등
   최신 행동 신호로 재정렬하고 후보 20편(설정값)을 세트 버퍼로 저장해 3편씩 노출한다
 - 버퍼는 PostgreSQL `recommendation_items`에 저장하고 `exposed_at`으로 노출 여부를 구분한다. 강한 신호는 Python Consumer가 Candidate를 같은 사용자 단위 처리에서 갱신하고, 약한 신호는 Spark Streaming이 행동 Feature를 갱신해 Spring의 다음 세트 생성 때 반영한다. 최종 `reason`은 Spring이 실제 사용한 근거로 만든다.
@@ -178,14 +186,24 @@
 - 새 세트 생성 시 추천 이력(FR-33)에 시각·유형·이유·후보를 저장한다
 - `reason.factors[].type`: `GENRE`, `DIRECTOR`, `ACTOR`, `COUNTRY`, `ERA`, `SIMILAR_MOVIE`, `NEW_FLAVOR`(가정)
 
+### 구현·연동 상태
+
+- S15P21E106-415에서 DISCOVERY 후보 생성 정책과 Consumer 구현을 완료했다.
+- S15P21E106-471에서 Redis Candidate v3 `taste`/`discovery` 그룹화와 `generationId` writer를
+  반영했고, S15P21E106-481에서 후보별 구조화 `reason`을 추가해 현재 Candidate v4가 됐다. 현재
+  `develop`에는 Candidate v4 Spring reader와 TASTE 2 + DISCOVERY 1 조립 구현이 없으므로, 위 처리
+  규칙은 Backend가 구현·통합 검증해야 하는 소비 계약이다.
+- S15P21E106-482에서 그룹·그룹 내부 대중성 번들의 HDFS 게시, 두 URI 동시 활성화와 rollback을 검증한다.
+- S15P21E106-483은 후보 부족분용 별도 POPULAR 목록의 정책·산출물·서비스 연동을 담당한다.
+
 ### 상태값
 
 - RecommendationType `TASTE`, `DISCOVERY`
 
 ### 미정 사항
 
-- [ ] Python Consumer의 DISCOVERY 선정 방식은 구현됨. Spring의 두 목록 소비·감상 변경 재계산과
-  TMDB/KOBIS 공개 신호 후보 자격 하한을 합의하고 운영 활성화해야 함
+- [ ] Candidate v4 Spring reader, 두 목록 조립과 감상 변경 재계산을 구현·통합 검증해야 함
+- [ ] TMDB/KOBIS 공개 신호 후보 자격 하한을 합의하고 S15P21E106-482에서 운영 활성화해야 함
 - [ ] 콜드 스타트 전략(온보딩 건너뛴 사용자)
 - [ ] 추천 이유 factor 타입 목록과 문장 생성 방식(템플릿 vs LLM)
 - [ ] Re-ranking 가중치와 추천 이유 생성 방식
@@ -250,7 +268,8 @@
 ### 처리 규칙
 
 - 현재 세트에 미노출 후보가 남아 있으면 같은 `recommendationSetId`로 최대 3편을 노출하고, 추가된 항목을 해당 세트의 추천 이력에 누적한다
-- 현재 세트의 버퍼를 모두 소진한 뒤 다시 요청하면 Redis의 raw Candidate 최대 500편과 최신 행동 Feature를 읽어 재정렬하고, 기존 노출분을 제외한 후보로 새 추천 세트를 생성한다
+- 현재 세트의 버퍼를 모두 소진한 뒤 다시 요청하면 Redis의 TASTE 최대 500편·DISCOVERY 최대 100편과
+  최신 행동 Feature를 읽어 재정렬하고, 기존 노출분을 제외한 후보로 새 추천 세트를 생성한다
 - 새 세트를 생성한 경우 응답의 `recommendationSetId`는 새 세트 ID이며, 제공한 항목과 최종 추천 이유는 새 세트의 추천 이력에 저장한다
 
 ### 상태값

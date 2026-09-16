@@ -144,5 +144,7 @@ Consumer는 manifest와 모든 파일 해시, 배열 inventory·shape·dtype·�
 - 실제 HDFS의 고유 검증 경로에 전체 upload, no-overwrite rename, SHA 재대조, Consumer 재로딩
 
 실제 HDFS 검증 경로·실행 시각·클러스터 상태는 비밀이나 내부 authority를 저장소에 넣지 않는 별도 검증
-기록으로 남긴다. 검증 경로 성공은 운영 활성화를 뜻하지 않으며, 운영 URI 연결은 S15P21E106-415 배포에서
-ALS/content와 같은 bundle `mapping_revision`, live mapping의 ID 재결합 없음 및 중복 없음을 확인한 뒤 수행한다.
+기록으로 남긴다. 검증 경로 성공은 운영 활성화를 뜻하지 않는다. Consumer의 DISCOVERY 후보 생성·로컬
+정책 검증은 S15P21E106-415가 담당하고, 실제 HDFS 게시와 운영 URI 연결·재시작·rollback 검증은
+S15P21E106-482에서 ALS/content와 같은 bundle `mapping_revision`, live mapping의 ID 재결합 없음 및 중복
+없음을 확인한 뒤 수행한다.

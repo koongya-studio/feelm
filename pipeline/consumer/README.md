@@ -1,7 +1,13 @@
 # Fold-in Consumer
 
-Kafka의 평가·온보딩 이벤트를 받아 최신 사용자 입력으로 ALS Fold-in을 수행하고 부가 정보가 포함된 Candidate 최대 500개를 갱신한다. Python 3.12의 독립 프로젝트이며 Spark 코드를 import하지 않는다.
+Kafka의 평가·온보딩 이벤트를 받아 최신 사용자 입력으로 ALS Fold-in을 수행하고 TASTE 최대 500편과
+DISCOVERY 최대 100편을 갱신한다. Python 3.12의 독립 프로젝트이며 Spark 코드를 import하지 않는다.
 모델·매핑·영화 메타데이터는 모두 같은 `input_snapshot`을 가리켜야 하며, 하나라도 맞지 않으면 시작을 거부한다.
+
+각 이벤트 처리에서는 이벤트 payload의 과거 별점·선택을 계산값으로 사용하지 않는다. PostgreSQL의
+현재 평가·온보딩을 repeatable-read snapshot으로 다시 읽고, DISCOVERY 산출물을 활성화한 경우
+확정 감상·관심없음도 같은 snapshot에서 읽어 결정론적으로 재계산한다. 같은 PostgreSQL 상태와
+같은 산출물 revision에 대한 이벤트 재전달은 같은 후보를 만든다.
 
 원별점 Fold-in 계산 참고와 검증 fixture는
 [`spark/batch/evaluation/reference.py`](../spark/batch/evaluation/reference.py),
@@ -161,6 +167,15 @@ ALS fold-in에 각각 `4.271231616529622`, `2.798442509805467`을 쓰고 실제 
 사용자 개인 예측 점수로 다시 정렬한다. 상세 계약은
 [`discovery-popularity-artifacts-v1`](../contracts/discovery-popularity-artifacts.md)을 따른다.
 Spring은 TASTE 2편을 먼저 고르고 양쪽 목록의 중복을 건너뛴 DISCOVERY 1편을 조립한다.
+
+### 관련 업무와 활성화 경계
+
+- S15P21E106-415: 이 절의 DISCOVERY 후보 생성과 로컬 정책 검증
+- S15P21E106-471: Candidate v3 `taste`/`discovery` 그룹화와 `generationId` Consumer writer 기준선
+- S15P21E106-481: 후보별 구조화 `reason`을 추가한 현재 Candidate v4 writer·payload 계약. Spring
+  reader·2+1 조립은 Backend 소비 계약이며 현재 `develop`에는 구현되지 않았다
+- S15P21E106-482: 그룹·대중성 번들의 HDFS 게시, 두 URI 동시 활성화, 재시작·rollback 검증
+- S15P21E106-483: 후보 부족분용 별도 POPULAR fallback. 이 절의 `discovery-popularity`와 다른 산출물
 
 로컬 대중성 번들은 다음처럼 만든다. `--kobis-population`은 직접 코드 2,176편 전체의 백분위
 모집단이고, `--verified-kobis`만 실제 서비스 영화에 KOBIS 점수를 붙인다.
@@ -337,7 +352,7 @@ opaque token으로 교체하며 후보 결과를 읽는 Spring은 이 키에 의
 `candidates.discovery`는 그룹 산출물을 설정하면 `movieId`, `score`, nullable `flavorCode`를 포함하고,
 설정하지 않으면 빈 배열이다. DISCOVERY의 `reason`은 후속 업무에서 적용하며, 공급 그룹 수 같은 진단 값은
 Redis에 게시하지 않고 Consumer 로그에만 남긴다.
-두 payload에는 동일한 `candidateVersion`(JSON 형식 버전)과 `generationId`(한 번의 생성 결과 식별자)가
+두 payload에는 동일한 `candidateVersion=4`(JSON 형식 버전)와 `generationId`(한 번의 생성 결과 식별자)가
 포함된다. `candidateVersion=3` 또는 더 이른 payload에는 `reason`이 없으므로 Spring reader 전환 전에 모든 활성
 사용자를 재게시해 `candidateVersion=4`로 갱신해야 한다. Consumer는 추천 문구가 아니라 구조화된 `reason`만 생성하며,
 Spring이 최종 추천의 검증 가능한 근거로 문구를 구성한다.
