@@ -9,6 +9,7 @@ from pathlib import Path
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEPLOY_SCRIPT = SCRIPT_DIR / "deploy-monitoring.sh"
+MONITORING_COMPOSE = SCRIPT_DIR.parent / "compose" / "monitoring.yml"
 CONTAINERS = (
     "feelm-prometheus",
     "feelm-grafana",
@@ -92,6 +93,9 @@ class DeployMonitoringTest(unittest.TestCase):
                 exit
               fi
               if [[ "$args" == *" up -d --no-deps --force-recreate "* ]]; then
+                if [[ "$args" != *" --project-name feelm-monitoring-$CI_PIPELINE_ID "* ]]; then
+                  rm -f "$state"/*-rollback
+                fi
                 for name in feelm-prometheus feelm-grafana feelm-node-exporter feelm-postgres-exporter feelm-redis-exporter; do
                   : >"$state/$name"
                 done
@@ -132,6 +136,7 @@ class DeployMonitoringTest(unittest.TestCase):
             "MONITORING_TEST_VERIFY_COUNT": self.verify_count.as_posix(),
             "MONITORING_HEALTH_ATTEMPTS": "1",
             "MONITORING_HEALTH_INTERVAL_SECONDS": "0",
+            "CI_PIPELINE_ID": "344",
         })
         env.update({key: str(value) for key, value in behavior.items()})
         result = subprocess.run(
@@ -156,8 +161,17 @@ class DeployMonitoringTest(unittest.TestCase):
         self.assertIn("config --quiet", events)
         self.assertIn("pull --quiet prometheus grafana", events)
         self.assertIn("up -d --no-deps --force-recreate", events)
+        self.assertIn("--project-name feelm-monitoring-344", events)
         self.assertNotIn("feelm-backend", events)
         self.assertNotIn(" down ", events)
+
+    def test_candidate_project_reuses_service_network_and_data_volumes(self):
+        compose = MONITORING_COMPOSE.read_text(encoding="utf-8")
+
+        self.assertIn("name: compose_default", compose)
+        self.assertIn("external: true", compose)
+        self.assertIn("name: compose_prometheus_data", compose)
+        self.assertIn("name: compose_grafana_data", compose)
 
     def test_config_or_pull_failure_keeps_existing_containers(self):
         for behavior in ({"FAIL_CONFIG": 1}, {"FAIL_PULL": 1}):
