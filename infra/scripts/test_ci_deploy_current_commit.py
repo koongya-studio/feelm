@@ -15,8 +15,8 @@ SPEC.loader.exec_module(MODULE)
 class DeployCurrentCommitTest(unittest.TestCase):
     commit = "1" * 40
 
-    def run_main(self, *, branch="main", protected="true", source="push",
-                 remote_sha=None, returncode=0):
+    def run_main(self, *, branch="main", expected_branch="main", protected="true",
+                 source="push", remote_sha=None, returncode=0):
         completed = subprocess.CompletedProcess(
             [], returncode, f"{remote_sha or self.commit}\trefs/heads/{branch}\n", ""
         )
@@ -25,7 +25,8 @@ class DeployCurrentCommitTest(unittest.TestCase):
             {"CI_COMMIT_SHA": self.commit, "CI_COMMIT_BRANCH": branch,
              "CI_COMMIT_REF_PROTECTED": protected, "CI_PIPELINE_SOURCE": source},
             clear=True,
-        ), patch.object(MODULE.subprocess, "run", return_value=completed) as run:
+        ), patch.object(MODULE.subprocess, "run", return_value=completed) as run, \
+             patch.object(MODULE.sys, "argv", [str(SCRIPT), "--branch", expected_branch]):
             result = MODULE.main()
         return result, run
 
@@ -52,6 +53,23 @@ class DeployCurrentCommitTest(unittest.TestCase):
 
     def test_rejects_non_main_branch_before_running_git(self):
         result, run = self.run_main(branch="develop")
+
+        self.assertEqual(result, 2)
+        run.assert_not_called()
+
+    def test_accepts_current_develop_branch_head_when_requested(self):
+        result, run = self.run_main(branch="develop", expected_branch="develop")
+
+        self.assertEqual(result, 0)
+        run.assert_called_once_with(
+            ["git", "ls-remote", "--exit-code", "origin", "refs/heads/develop"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    def test_develop_guard_rejects_main_context(self):
+        result, run = self.run_main(branch="main", expected_branch="develop")
 
         self.assertEqual(result, 2)
         run.assert_not_called()

@@ -73,6 +73,7 @@ include:
             (self.backend, 'deploy-backend'),
             (self.frontend, 'deploy-frontend'),
             (self.consumer, 'deploy-consumer'),
+            (self.infra, 'deploy-monitoring'),
         )
         for config, name in protected:
             self.assertIn('interruptible: false', job_block(config, name), name)
@@ -206,6 +207,29 @@ include:
 
         cache = job_block(self.backend, 'backend-cache-prepare')
         self.assertIn('needs: [ci-variable-contract-check]', cache)
+
+    def test_monitoring_deploy_is_protected_current_develop_only(self):
+        deploy = job_block(self.infra, 'deploy-monitoring')
+        for expected in (
+                'stage: deploy', 'tags: [e106-shell]',
+                'needs: [ci-variable-preflight]', 'name: service',
+                'ci-deploy-current-commit.py --branch develop',
+                'bash infra/scripts/deploy-monitoring.sh',
+                'resource_group: service-and-backend-cache',
+                'interruptible: false', 'timeout: 15m',
+                '$CI_COMMIT_BRANCH == "develop"',
+                '$CI_COMMIT_REF_PROTECTED == "true"',
+                '$CI_PIPELINE_SOURCE == "push"',
+                '- infra/compose/monitoring.yml',
+                '- infra/monitoring/prometheus/**/*',
+                '- infra/monitoring/grafana/**/*',
+                '- infra/config/required-ci-variables.json'):
+            self.assertIn(expected, deploy)
+        for forbidden in (
+                '$CI_COMMIT_BRANCH == "main"', 'merge_request_event',
+                'when: manual', 'allow_failure: true', 'docker compose down',
+                '- infra/monitoring/README.md'):
+            self.assertNotIn(forbidden, deploy)
 
     def test_pipeline_mr_jobs_are_isolated_sharded_and_path_scoped(self):
         self.assertTrue(self.pipeline_path.is_file(), 'Missing Pipeline CI include')
