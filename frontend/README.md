@@ -162,6 +162,13 @@ Vite는 `VITE_` 접두사가 붙은 변수만 클라이언트 코드에 노출�
 | 변수 | 쓰이는 곳 | 기본값 |
 | --- | --- | --- |
 | `VITE_API_PROXY_TARGET` | 개발 서버가 `/api`를 넘길 백엔드 주소 (`vite.config.ts`) | `http://localhost:8080` |
+| `VITE_GOOGLE_CLIENT_ID` · `VITE_KAKAO_CLIENT_ID` · `VITE_NAVER_CLIENT_ID` | 소셜 로그인 client-id (`src/utils/oauth.ts`) | 없음 |
+| `VITE_OAUTH_REDIRECT_URI` | 소셜 로그인 콜백 주소 | `{origin}/app/oauth/callback` |
+
+소셜 로그인 client-id는 번들에 들어갑니다. OAuth 공개 클라이언트의 client-id는 공개해도
+되는 값이지만 client-secret은 백엔드만 가지며 이곳에 두지 않습니다. 값이 없는 제공자는
+버튼이 잠깁니다. 콜백 주소는 각 사 개발자 콘솔과 백엔드 허용 목록
+(`OAUTH_ALLOWED_REDIRECT_URIS`)에 등록한 값과 **정확히 같아야** 합니다.
 
 `VITE_API_PROXY_TARGET`은 개발 서버 설정에서만 읽으므로 클라이언트 번들에 들어가지
 않습니다. 값을 바꾸려면 `frontend/.env`에 적습니다. 키 이름은

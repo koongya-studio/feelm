@@ -1,0 +1,43 @@
+/* 성별. 세 선택지가 한 줄에 균등하게 놓인다 */
+.genders {
+  display: flex;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+  margin: 0;
+}
+
+.legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.gender {
+  height: var(--control-height-sm);
+  flex: 1;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-control);
+  background: none;
+  font-family: inherit;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+/*
+ * 선택 상태. 빨강은 면이 아니라 표식이므로 테두리와 글자에만 쓴다
+ * (`design-concept.md` 2.3).
+ */
+.gender[aria-pressed='true'] {
+  border-color: var(--color-brand);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-brand-ink);
+}

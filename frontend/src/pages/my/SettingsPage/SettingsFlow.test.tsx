@@ -159,6 +159,8 @@ function renderApp(entries: string[]) {
     status: 'authenticated',
     user: { userId: 1024, nickname: '김난다', onboardingCompleted: true },
     signIn: vi.fn(),
+    signInWithSocial: vi.fn(),
+    completeSocialSignup: vi.fn(),
     signOut,
   };
 

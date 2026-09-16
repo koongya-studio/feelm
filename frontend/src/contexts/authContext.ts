@@ -6,7 +6,12 @@
  * 아닌 것만 이 파일에 모았다.
  */
 import { createContext, useContext } from 'react';
-import type { AuthenticatedUser } from '../types/auth';
+import type {
+  AuthenticatedUser,
+  SocialLoginResult,
+  SocialProvider,
+  SocialSignupRequest,
+} from '../types/auth';
 
 export type AuthStatus =
   /** 쿠키로 세션을 되살리는 중. 아직 로그인 여부를 모른다 */
@@ -18,6 +23,17 @@ export type AuthValue = {
   user: AuthenticatedUser | null;
   /** 실패하면 `ApiError`를 던진다. 화면이 오류 코드로 문구를 가른다 */
   signIn: (email: string, password: string) => Promise<AuthenticatedUser>;
+  /**
+   * API-007. 연결된 계정이 없으면 로그인하지 않고 `signupRequired`를 그대로 돌려준다.
+   * 그 경우 세션은 생기지 않고 0.3-A가 `signupToken`으로 가입을 마친다.
+   */
+  signInWithSocial: (
+    provider: SocialProvider,
+    code: string,
+    redirectUri: string,
+  ) => Promise<SocialLoginResult>;
+  /** API-008. 가입과 동시에 로그인된다 */
+  completeSocialSignup: (request: SocialSignupRequest) => Promise<AuthenticatedUser>;
   signOut: () => Promise<void>;
 };
 
