@@ -89,8 +89,9 @@ export async function respond<T>(data: T, domain?: MockDomain): Promise<T> {
 
   if (domain && isMockError(domain)) {
     /*
-     * 오류 종류를 문구로 구분하지 않기로 했으므로(팀 결정 2026-09-08) 공통 규약의 5xx
-     * 하나만 쓴다. 화면은 상태 코드를 보지 않고 실패 여부만 본다.
+     * 공통 규약의 5xx 하나만 쓴다. 화면은 네트워크 단절(`NETWORK_ERROR`)과 서버 실패만
+     * 가르므로(`components/StatusView/failure.ts` · 업무 -374) 목업의 실패는 모두 서버
+     * 실패로 보인다. 네트워크 단절은 실제 연동 화면에서 백엔드를 내려 확인한다.
      */
     throw new ApiError(503, 'SERVICE_UNAVAILABLE', '일시적으로 요청을 처리할 수 없습니다.');
   }
