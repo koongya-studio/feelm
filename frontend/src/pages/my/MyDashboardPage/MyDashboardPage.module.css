@@ -292,3 +292,19 @@
   max-width: calc(var(--layout-max-width) - var(--screen-padding-x) * 2);
   margin: 0 auto;
 }
+
+/* 추천 기록 탭의 `더 보기`. 격자가 화면 폭을 꽉 채우므로 버튼만 가운데에 둔다 */
+.more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-5) 0 var(--space-2);
+  gap: var(--space-1);
+}
+
+.moreError {
+  margin: 0;
+  color: var(--color-ink-hint);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
