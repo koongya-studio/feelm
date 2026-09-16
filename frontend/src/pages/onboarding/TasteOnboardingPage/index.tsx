@@ -35,6 +35,18 @@
  *
  * `[?]` 최소 선택 개수는 여전히 미확정이다. 초기 배치 위치는 와이어프레임의 카드 6장
  * 좌표에 네 자리를 더해 쓴다.
+ *
+ * 팀 결정 2026-09-15 (업무 -449) — **이 화면은 카드를 받기 전과 빈 목록에 상태를 둔다.**
+ * `StatusView`는 `로딩 상태는 만들지 않는다`(팀 결정 2026-09-08)를 따르고 있고 다른
+ * 화면은 데이터를 받기 전에 아무것도 그리지 않아도 된다. 이 화면만 다른 이유는 **빈
+ * 화면이 아니라 빈 공간이 남기 때문**이다. 점선 원과 가운데 표식은 카드와 무관하게
+ * 항상 그려지므로, 카드가 없으면 사용자는 `아직 안 왔다`가 아니라 `이 화면은 고장났다`를
+ * 본다. 그래서 카드가 없는 동안에는 배치 영역 자체를 세우지 않는다.
+ *
+ * 빈 목록은 실패가 아니다. 서버는 대표 맛이 배정된 영화로만 카드를 만들고(API-023
+ * 처리 규칙 · ADR-0015), 배정이 아직 없으면 `200 {"items": []}`다. 오류 안내를 세우면
+ * 정상 응답을 결함처럼 보여주므로 `empty`로 두고, 대신 **온보딩을 끝낼 길을 남긴다** —
+ * 고를 카드가 없어도 건너뛰기로 1.2에 갈 수 있어야 한다.
  */
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -113,6 +125,14 @@ const PICKER_WIDTH = 232;
 
 const SELECT_OPTIONS: TasteValue[] = ['LIKE', 'DISLIKE', 'UNWATCHED'];
 
+/**
+ * 카드 요청의 진행 상태.
+ *
+ * `loading`과 `ready`를 가르지 않으면 요청이 끝나기 전과 카드가 0장인 뒤가 같은 화면이
+ * 된다. 둘 다 `cards`가 빈 배열이기 때문이다.
+ */
+type LoadState = 'loading' | 'ready' | 'failed';
+
 type CardState = {
   card: OnboardingCard;
   value: TasteValue;
@@ -143,7 +163,10 @@ export default function TasteOnboardingPage() {
   const skipNextClickRef = useRef(false);
 
   const [cards, setCards] = useState<CardState[]>([]);
-  const [failed, setFailed] = useState(false);
+  /** 카드 요청의 진행 상태. `loading`으로 시작해 화면이 빈 공간을 먼저 그리지 않게 한다 */
+  const [loadState, setLoadState] = useState<LoadState>('loading');
+  /** 서버가 카드를 0장 준 경우. `⊖`로 사용자가 전부 지운 것과 구분한다 */
+  const [emptyList, setEmptyList] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
   const [openCardId, setOpenCardId] = useState<number | null>(null);
   const [draggingId, setDraggingId] = useState<number | null>(null);
@@ -151,6 +174,20 @@ export default function TasteOnboardingPage() {
   const [failure, setFailure] = useState<string | null>(null);
   const [board, setBoard] = useState({ width: 0, height: 0 });
 
+  /*
+   * 배치 영역을 세우는 조건. 카드를 받기 전과 서버가 0장을 준 뒤에는 점선 원과 가운데
+   * 표식만 남으므로 영역 자체를 그리지 않고 안내를 세운다.
+   *
+   * `⊖`로 전부 지워 `cards`가 빈 경우는 여기에 걸리지 않는다. 사용자가 직접 한 일이고
+   * 하단에 건너뛰기가 그대로 있으므로 안내로 덮을 자리가 아니다.
+   */
+  const showBoard = loadState === 'ready' && !emptyList;
+
+  /*
+   * 배치 영역은 카드가 있을 때만 그리므로(`showBoard`) 이 효과도 그때 붙어야 한다.
+   * 빈 deps로 두면 첫 렌더에 `boardRef.current`가 `null`이라 관측이 시작되지 않고,
+   * 카드가 도착해도 `board.width`가 0에 머물러 한 장도 그려지지 않는다.
+   */
   useEffect(() => {
     const element = boardRef.current;
 
@@ -167,7 +204,7 @@ export default function TasteOnboardingPage() {
     return () => {
       observer.disconnect();
     };
-  }, []);
+  }, [showBoard]);
 
   useEffect(() => {
     let active = true;
@@ -178,7 +215,8 @@ export default function TasteOnboardingPage() {
           return;
         }
 
-        setFailed(false);
+        setLoadState('ready');
+        setEmptyList(items.length === 0);
         setCards(
           items.map((card, index) => ({
             card,
@@ -203,7 +241,7 @@ export default function TasteOnboardingPage() {
           return;
         }
 
-        setFailed(true);
+        setLoadState('failed');
       });
 
     return () => {
@@ -392,19 +430,70 @@ export default function TasteOnboardingPage() {
   const savedCount = cards.filter((item) => isSavedValue(item.value)).length;
   const openCard = cards.find((item) => item.card.movieId === openCardId) ?? null;
 
-  if (failed) {
+  const header = <ScreenHeader title="취향 초기 설정" align="center" />;
+  /*
+   * 다시 시도. 상태를 여기서 `loading`으로 되돌린다 — 요청 효과 본문에서 되돌리면
+   * 렌더가 연쇄된다(`react-hooks/set-state-in-effect`). 첫 요청은 초깃값이 이미
+   * `loading`이라 되돌릴 것이 없다.
+   */
+  const retry = (
+    <Button
+      onClick={() => {
+        setLoadState('loading');
+        setReloadCount((count) => count + 1);
+      }}
+    >
+      다시 시도
+    </Button>
+  );
+
+  /* 카드를 받기 전. 빈 공간 대신 무엇을 기다리는지 세운다 */
+  if (loadState === 'loading') {
     return (
       <>
-        <ScreenHeader title="취향 초기 설정" align="center" />
+        {header}
+
+        <StatusView variant="empty" title="영화 카드를 준비하고 있어요" />
+      </>
+    );
+  }
+
+  if (loadState === 'failed') {
+    return (
+      <>
+        {header}
 
         <StatusView title="영화 카드를 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
-          <Button
-            onClick={() => {
-              setFailed(false);
-              setReloadCount((count) => count + 1);
-            }}
-          >
-            다시 시도
+          {retry}
+        </StatusView>
+      </>
+    );
+  }
+
+  /*
+   * 서버가 카드를 0장 줬다. 정상 응답이므로 오류 표식을 붙이지 않고, 고를 카드가 없어도
+   * 온보딩을 끝낼 수 있도록 건너뛰기를 함께 둔다.
+   */
+  if (emptyList) {
+    return (
+      <>
+        {header}
+
+        <StatusView
+          variant="empty"
+          title="지금은 보여드릴 영화가 없어요"
+          description="잠시 후 다시 시도해 주세요"
+        >
+          {retry}
+
+          {failure ? (
+            <p className={styles.failure} role="alert">
+              {failure}
+            </p>
+          ) : null}
+
+          <Button variant="text" disabled={submitting} onClick={() => void submit()}>
+            차차 찾아갈래요 (건너뛰기)
           </Button>
         </StatusView>
       </>
@@ -413,7 +502,7 @@ export default function TasteOnboardingPage() {
 
   return (
     <>
-      <ScreenHeader title="취향 초기 설정" align="center" />
+      {header}
 
       <div className={styles.intro}>
         <p className={styles.guide}>공간 안에 담으면 좋아한 영화, 밖에 두면 안 좋아한 영화예요</p>

@@ -14,7 +14,18 @@
  *   아무 요청도 보내지 않으면 서버는 구독을 고르지 않은 것과 구분하지 못한다
  *
  * 1.1의 카드는 배치 영역의 크기를 재야 그려진다. jsdom의 `ResizeObserver`는 크기를
- * 통보하지 않으므로(`src/test/setup.ts`) 카드 자체가 아니라 **요청과 이동**을 본다.
+ * 통보하지 않으므로(`src/test/setup.ts`) 대부분은 카드 자체가 아니라 **요청과 이동**을
+ * 본다. 카드가 실제로 그려지는지 보는 자리에서만 크기를 통보하는 관측자로 바꾼다
+ * (`withBoardSize`).
+ *
+ * 업무 S15P21E106-449에서 더한 것 — **카드가 없는 동안의 상태**다. 요청 전과 빈 목록이
+ * 둘 다 `cards`가 빈 배열이라 예전에는 같은 화면(점선 원만 남은 배치 영역)이었고,
+ * 그것이 이 업무가 받은 증상이다. 세 가지를 고정한다.
+ * - 받기 전에는 준비 중임을 알린다
+ * - 서버가 0장을 주는 것은 실패가 아니다. 오류가 아니라 빈 목록으로 알리고 건너뛰기를
+ *   남긴다 — 고를 카드가 없어도 온보딩은 끝낼 수 있어야 한다
+ * - 카드가 도착하면 배치 영역이 그때 붙는데, 크기 관측이 함께 붙지 않으면
+ *   `board.width`가 0에 머물러 **한 장도 그려지지 않는다**
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -88,6 +99,40 @@ function renderApp(entry: string) {
 
 const location = () => screen.getByTestId('location').textContent;
 
+/**
+ * 배치 영역의 크기를 통보하는 관측자로 바꾼다.
+ *
+ * 기본 스텁은 아무것도 통보하지 않아 `board.width`가 0에 머문다. 1.1은 그 값이 0이면
+ * 카드를 그리지 않으므로, 카드가 보이는지 보려면 크기가 와야 한다. 와이어프레임의
+ * 배치 영역(412 x 653)을 쓴다.
+ */
+function withBoardSize() {
+  const original = window.ResizeObserver;
+
+  window.ResizeObserver = class {
+    /* `private` 매개변수 속성은 `erasableSyntaxOnly`에서 쓸 수 없어 필드로 둔다 */
+    notify: ResizeObserverCallback;
+
+    constructor(notify: ResizeObserverCallback) {
+      this.notify = notify;
+    }
+
+    observe(target: Element) {
+      this.notify(
+        [{ target, contentRect: { width: 412, height: 653 } } as ResizeObserverEntry],
+        this as unknown as ResizeObserver,
+      );
+    }
+
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+
+  return () => {
+    window.ResizeObserver = original;
+  };
+}
+
 /** 1.1을 건너뛰어 1.2까지 간다. 1.2는 1.1을 거치지 않으면 되돌아간다 */
 async function skipTaste() {
   fireEvent.click(await screen.findByRole('button', { name: '차차 찾아갈래요 (건너뛰기)' }));
@@ -103,6 +148,43 @@ describe('1.1 영화 취향 초기 설정', () => {
 
   it('건너뛰면 고른 값 없이 건너뛰기로 제출하고 1.2로 간다', async () => {
     renderApp(ROUTE_PATTERN.onboardingTaste);
+
+    await skipTaste();
+
+    expect(submitOnboardingPreferences).toHaveBeenCalledWith([], true);
+  });
+
+  it('카드가 도착하면 배치 영역에 그린다', async () => {
+    const restore = withBoardSize();
+
+    try {
+      renderApp(ROUTE_PATTERN.onboardingTaste);
+
+      // 카드의 표면 버튼이다. `⊖`(`제목 목록에서 제거`)와 갈라 보려면 이름을 그대로 쓴다
+      expect(
+        await screen.findByRole('button', { name: `${CARD.title}, 선택 안 함` }),
+      ).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  it('카드를 받기 전에는 준비 중임을 알린다', async () => {
+    vi.mocked(getOnboardingCards).mockReturnValue(new Promise(() => {}));
+
+    renderApp(ROUTE_PATTERN.onboardingTaste);
+
+    expect(await screen.findByText('영화 카드를 준비하고 있어요')).toBeInTheDocument();
+    expect(screen.queryByText('영화 카드를 불러오지 못했어요')).not.toBeInTheDocument();
+  });
+
+  it('서버가 0장을 주면 실패가 아니라 빈 목록으로 알리고 건너뛸 수 있게 한다', async () => {
+    vi.mocked(getOnboardingCards).mockResolvedValue([]);
+
+    renderApp(ROUTE_PATTERN.onboardingTaste);
+
+    expect(await screen.findByText('지금은 보여드릴 영화가 없어요')).toBeInTheDocument();
+    expect(screen.queryByText('영화 카드를 불러오지 못했어요')).not.toBeInTheDocument();
 
     await skipTaste();
 
