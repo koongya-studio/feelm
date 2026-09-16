@@ -333,7 +333,9 @@ partition을 assign할 때 Consumer group·topic·partition별 Redis fencing tok
 확보한 뒤 이전 소유자는 Redis 게시와 corrupt/partial 3키 복구 삭제를 할 수 없으므로, rebalance 중 오래된
 PostgreSQL snapshot이 새 결과를 덮어쓰지 않는다. Redis fence는 **Redis 게시만** 책임진다. Kafka offset
 commit은 Kafka group coordinator의 generation 검증이 책임지며, Consumer는 synchronous commit 실패 시 offset을
-진전시키지 않고 재처리한다. 실제 broker rebalance·generation 거부 E2E는 아직 검증하지 않았다.
+진전시키지 않고 재처리한다. 실제 Redis·Kafka·PostgreSQL을 사용한 격리 rebalance·장애 검증의 절차와
+결과는 [401 fencing 통합 검증](fencing-integration-validation.md)에 기록했다. 이 검증은 실제 모델 점수 계산이나
+운영 배포 검증을 대신하지 않는다.
 
 assign 중 하나라도 Redis fence claim이 실패하면 Consumer는 어떤 partition도 local ownership으로 등록하거나
 assign하지 않고 종료한다. 이미 성공한 claim은 새 token으로 남지만 해당 프로세스는 게시·commit하지 않으며,
