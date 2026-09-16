@@ -249,7 +249,7 @@ def build_message(
     issues: list[dict[str, Any]], jira_base_url: str, today: date | None = None
 ) -> str:
     day = today or date.today()
-    header = f"## ☀️ Jira 아침 작업 현황\n> 📅 {day.isoformat()} · 🏃 활성 스프린트"
+    header = f"## 📋 [JIRA DAILY] 작업 현황\n> 📅 {day.isoformat()} · 🏃 활성 스프린트"
     if not issues:
         return f"{header}\n\n✅ 완료되지 않은 작업이 없습니다. 오늘도 좋은 하루 보내세요!"
 

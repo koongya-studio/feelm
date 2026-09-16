@@ -74,7 +74,7 @@ class NotifyMattermostTest(unittest.TestCase):
 
     def test_empty_message_is_explicit(self):
         message = MODULE.build_message([], "https://jira.example", date(2026, 9, 16))
-        self.assertIn("☀️ Jira 아침 작업 현황", message)
+        self.assertIn("📋 [JIRA DAILY] 작업 현황", message)
         self.assertIn("완료되지 않은 작업이 없습니다", message)
 
     def test_long_message_is_bounded(self):
