@@ -36,6 +36,11 @@ S15P21E106-424의 테스트 분류기는 전체 `test_*.py`를 빠른 비-Spark 
 계층으로 빠짐없이 나눈다. S15P21E106-457부터 네 계층은 독립 GitLab Job에서 실행되며,
 Job 이름과 CI script에 고정된 group만 Custom executor가 허용한다. 분류 기준과 로컬 재현
 명령은 [`pipeline/spark/tests/README.md`](../../pipeline/spark/tests/README.md)를 따른다.
+
+Consumer MR 검사와 보호된 `main` 이미지 게시 경계는
+[Consumer CI policy](CONSUMER-CI.md)를 따른다. MR에서는 `pipeline/consumer`만 격리 archive해
+고정 이미지로 Ruff와 pytest를 실행한다. `main`에서는 Dockerfile `test` target 성공 후에만
+커밋 SHA 태그 이미지를 게시하며, 배포와 Secret 주입은 별도 업무다.
 각 계층은 시작 마커와 wall time을, Linux에서는 CPU time·최대 RSS·block I/O도 출력한다.
 S15P21E106-485부터 unit Job은 자동 실행하고 세 Spark Job은 `allow_failure: false`인 필수
 수동 Job으로 생성한다. 공용 Runner가 비는 시점에 세 Job을 모두 실행해 성공해야 파이프라인을
