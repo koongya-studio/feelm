@@ -1154,8 +1154,9 @@ docker port feelm-redis 6379
 ### Consumer environment
 
 분산 노드의 `infra/.env`에는 다음 값을 추가한다. DSN과 Redis URL의 비밀번호는 URL encoding하고
-실제 값은 저장소, shell history와 로그에 남기지 않는다. 네 HDFS URI는 동일한 immutable
-snapshot revision을 가리켜야 하며 `latest` 별칭이나 staging 경로를 사용하지 않는다.
+실제 값은 저장소, shell history와 로그에 남기지 않는다. 모델·매핑·메타데이터·콘텐츠 HDFS
+URI는 동일한 immutable snapshot revision을 가리켜야 하며 `latest` 별칭이나 staging 경로를
+사용하지 않는다. 그룹과 DISCOVERY 대중성 URI도 immutable 공개 경로를 사용한다.
 
 ```dotenv
 CONSUMER_IMAGE=feelm-foldin-consumer:local
@@ -1167,6 +1168,8 @@ CONSUMER_MODEL_URI=hdfs://hdfs-namenode:8020/<immutable-model-path>
 CONSUMER_MAPPING_URI=hdfs://hdfs-namenode:8020/<immutable-mapping-path>
 CONSUMER_METADATA_URI=hdfs://hdfs-namenode:8020/<immutable-metadata-path>
 CONSUMER_CONTENT_URI=hdfs://hdfs-namenode:8020/<immutable-content-path>
+CONSUMER_GROUP_URI=hdfs://hdfs-namenode:8020/<artifact-root>/groups/<group-version>
+CONSUMER_DISCOVERY_POPULARITY_URI=hdfs://hdfs-namenode:8020/<artifact-root>/discovery-popularity/<popularity-version>
 CONSUMER_HYBRID_ALPHA=0.5
 ```
 
@@ -1174,6 +1177,12 @@ CONSUMER_HYBRID_ALPHA=0.5
 기동 시 Content bundle의 revision을 ALS·mapping·metadata와 대조하고, 불일치하거나 불완전한
 산출물이면 시작을 거부한다. `CONSUMER_HYBRID_ALPHA`는 ALS 점수 가중치이며 0~1 범위여야 한다.
 평가·온보딩 입력 수에 따른 최소 제한은 두지 않는다.
+
+`CONSUMER_GROUP_URI`와 `CONSUMER_DISCOVERY_POPULARITY_URI`는 함께 설정하거나 함께 비운다.
+값을 설정하면 두 번들의 `mapping_revision`이 서로 같고 현재 ALS mapping revision과도 일치해야
+하며, 불일치하거나 불완전한 산출물이면 Consumer는 시작을 거부한다. 값을 비우면 그룹 기반
+DISCOVERY 대신 개인 점수 후보로 최대 100편을 보충한다. 두 URI를 교체하기 전에는
+`pipeline/consumer/tools/verify_discovery_artifacts.py`로 manifest와 catalog 정합성을 검증한다.
 
 ### Build, deploy and verify
 
@@ -1199,7 +1208,10 @@ docker logs --tail 100 feelm-foldin-consumer
 정상 상태는 프로세스가 `running`이고 로그에
 `content artifacts loaded version=<immutable-content-version>`이 기록되며 설정·산출물·연결
 오류가 반복되지 않는 상태다. `content artifacts not configured; publishing ALS-only candidates`가
-기록되면 `CONSUMER_CONTENT_URI`가 컨테이너에 전달되지 않은 ALS 전용 배포다. 실제
+기록되면 `CONSUMER_CONTENT_URI`가 컨테이너에 전달되지 않은 ALS 전용 배포다.
+그룹 기반 DISCOVERY 활성화 시에는 `group and Discovery popularity artifacts loaded`가 기록되어야
+한다. `group artifacts not configured; Discovery uses ranked-candidate fallback`이 기록되면 두
+DISCOVERY URI가 컨테이너에 전달되지 않았거나 의도적으로 비활성화된 상태다. 실제
 검증은 백엔드의 평가 또는 온보딩 흐름으로 `feelm.rating.v1` 이벤트를 발행한 뒤 Consumer
 로그의 처리 완료와 Redis의 해당 사용자 `candidate-version`, `vector`, `candidates` 세 키
 갱신을 확인한다. 이벤트 payload, DSN, Redis URL과 비밀번호를 검증 기록에 남기지 않는다.

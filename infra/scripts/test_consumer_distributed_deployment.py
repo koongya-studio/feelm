@@ -27,6 +27,8 @@ class ConsumerDistributedDeploymentTest(unittest.TestCase):
             "CONSUMER_MAPPING_URI",
             "CONSUMER_METADATA_URI",
             "CONSUMER_CONTENT_URI",
+            "CONSUMER_GROUP_URI",
+            "CONSUMER_DISCOVERY_POPULARITY_URI",
         ):
             self.assertIn(f"{name}: ${{{name}:-}}", compose)
         self.assertIn("CONSUMER_HYBRID_ALPHA: ${CONSUMER_HYBRID_ALPHA:-0.5}", compose)
@@ -51,6 +53,8 @@ class ConsumerDistributedDeploymentTest(unittest.TestCase):
             "CONSUMER_MAPPING_URI",
             "CONSUMER_METADATA_URI",
             "CONSUMER_CONTENT_URI",
+            "CONSUMER_GROUP_URI",
+            "CONSUMER_DISCOVERY_POPULARITY_URI",
             "CONSUMER_HYBRID_ALPHA",
         ):
             self.assertIn(f"{name}=", env_example)
@@ -62,10 +66,14 @@ class ConsumerDistributedDeploymentTest(unittest.TestCase):
         readme = INFRA_README.read_text(encoding="utf-8")
 
         self.assertIn("CONSUMER_CONTENT_URI=hdfs://hdfs-namenode:8020/", readme)
+        self.assertIn("CONSUMER_GROUP_URI=hdfs://hdfs-namenode:8020/", readme)
+        self.assertIn("CONSUMER_DISCOVERY_POPULARITY_URI=hdfs://hdfs-namenode:8020/", readme)
         self.assertIn("CONSUMER_HYBRID_ALPHA=0.5", readme)
         self.assertNotIn("CONSUMER_MIN_INPUT_COUNT", readme)
         self.assertIn("content artifacts loaded version=", readme)
         self.assertIn("content artifacts not configured; publishing ALS-only candidates", readme)
+        self.assertIn("group and Discovery popularity artifacts loaded", readme)
+        self.assertIn("group artifacts not configured; Discovery uses ranked-candidate fallback", readme)
 
     def test_runtime_verification_accepts_only_guarded_remote_bindings(self) -> None:
         verification = RUNTIME_VERIFY.read_text(encoding="utf-8")
