@@ -3,12 +3,19 @@
  *
  * 와이어프레임은 OTT를 서비스명 첫 글자 한 자로 표시했다. **확정 5종에 왓챠와 웨이브가
  * 함께 들어오면서 첫 글자가 겹쳤고**(둘 다 `W`), 첫 글자 규칙만으로는 두 OTT를 구분할
- * 수 없게 됐다. API-025가 로고 URL을 내려주므로 로고를 받은 자리에서는 로고를 쓴다
+ * 수 없게 됐다. API-025가 로고 URL을 내려주므로 로고를 쓴다
  * (팀 결정 2026-09-15, 업무 S15P21E106-379).
  *
- * `logoUrl`은 선택값이다. 아직 연동하지 않은 도메인의 목업은 로고를 모르므로 그대로
- * 글자 배지로 그린다. 로고 주소가 있어도 불러오지 못하면(TMDb 이미지 차단 · 오프라인)
- * 같은 자리에서 글자로 되돌아간다 — 배지가 빈 사각형으로 남지 않게 한다.
+ * **배지는 `code`만 받고 표시는 스스로 정한다**(업무 S15P21E106-441). 로고가 있는 곳은
+ * API-025 하나뿐인데, 화면이 보는 응답에는 로고가 없다 — 영화 상세도 프레임 상세도
+ * 검색도 코드와 이름까지만 준다. 그래서 각 화면이 기준정보와 맞춰 로고를 넘기는 방식은
+ * 화면마다 같은 조회를 반복하게 하고, 한 화면이라도 빠뜨리면 같은 OTT가 어디서는 로고로
+ * 어디서는 글자로 보인다. 기준정보는 앱에서 한 번 받고(`contexts/OttCatalogProvider`)
+ * 배지가 코드로 찾는다.
+ *
+ * 로고로 떨어지지 않는 경우가 셋이다. 기준정보를 아직 못 받았거나(앱이 막 떴을 때),
+ * 조회에 실패했거나, 이미지를 불러오지 못했을 때다. 셋 다 같은 자리에서 글자 배지가
+ * 된다 — 배지가 빈 사각형으로 남지 않게 한다.
  *
  * 크기가 화면마다 다르므로 size로 받는다. 와이어프레임 실측값이다.
  * 1.2 초기 설정 38px · 2.3 카드 메뉴 28px · 2.4 영화 상세 26px
@@ -25,16 +32,16 @@
  * 테두리로 남는다.
  */
 import { useState } from 'react';
+import { useOttCatalog } from '../../contexts/ottCatalogContext';
+import { ottBadgeLetter } from '../../utils/ott';
 import type { CSSProperties } from 'react';
 import styles from './OttBadge.module.css';
 
 type Props = {
-  /** 표시할 한 글자. 예: 넷플릭스 N. `logoUrl`이 없거나 로고를 불러오지 못할 때 쓴다 */
-  letter: string;
+  /** OTT 코드. 예: `NETFLIX`. 로고와 글자를 모두 이 값으로 정한다 */
+  code: string;
   /** OTT 이름. 보조기술에 읽히는 이름이 된다 */
   name: string;
-  /** API-025의 로고 주소. 없으면 글자 배지다 */
-  logoUrl?: string | null;
   /** 한 변의 길이(px) */
   size?: number;
   /** 글자 크기(px). 생략하면 한 변의 절반 */
@@ -50,20 +57,22 @@ type Props = {
 };
 
 export default function OttBadge({
-  letter,
+  code,
   name,
-  logoUrl,
   size = 22,
   fontSize,
   radius,
   variant = 'default',
   labelled = true,
 }: Props) {
+  const catalog = useOttCatalog();
   /*
    * 불러오지 못한 로고 주소. 참·거짓이 아니라 **주소**를 담는다 — 같은 배지가 다른
    * OTT로 다시 쓰일 수 있고, 그때 앞의 실패를 물려받으면 멀쩡한 로고가 글자로 떨어진다.
    */
   const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
+
+  const logoUrl = catalog.find(code)?.logoUrl ?? null;
 
   const style = {
     '--ott-badge-size': `${size}px`,
@@ -71,18 +80,18 @@ export default function OttBadge({
     '--ott-badge-radius': radius === undefined ? 'var(--radius-icon)' : `${radius}px`,
   } as CSSProperties;
 
-  const showLogo = Boolean(logoUrl) && failedLogoUrl !== logoUrl;
+  const showLogo = logoUrl !== null && failedLogoUrl !== logoUrl;
   const content = showLogo ? (
     <img
       className={styles.logo}
-      src={logoUrl ?? undefined}
+      src={logoUrl}
       alt=""
       // 배지 자체가 이름을 읽히므로 이미지는 장식이다
       aria-hidden="true"
-      onError={() => setFailedLogoUrl(logoUrl ?? null)}
+      onError={() => setFailedLogoUrl(logoUrl)}
     />
   ) : (
-    letter
+    ottBadgeLetter(code)
   );
 
   const attributes = {

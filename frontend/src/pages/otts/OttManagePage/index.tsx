@@ -33,7 +33,6 @@ import Switch from '../../../components/Switch';
 import Button from '../../../components/Button';
 import { getMyOttIds, getOtts, setMyOttIds } from '../../../api/otts';
 import { path } from '../../../routes/paths';
-import { ottBadgeLetter } from '../../../utils/ott';
 import type { Ott } from '../../../types/ott';
 import styles from './OttManagePage.module.css';
 
@@ -157,9 +156,8 @@ function OttGroup({
         {otts.map((ott) => (
           <li key={ott.ottId} className={styles.row}>
             <OttBadge
-              letter={ottBadgeLetter(ott.code)}
+              code={ott.code}
               name={ott.name}
-              logoUrl={ott.logoUrl}
               size={38}
               fontSize={16}
               radius={10}

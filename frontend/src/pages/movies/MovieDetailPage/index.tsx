@@ -51,7 +51,6 @@ import { ChevronLeftIcon } from '../../../components/Icon';
 import { getMovieDetail, getMovieReviews, getSimilarMovies } from '../../../api/movies';
 import { getWatchRecords, recordOttClick } from '../../../api/watch';
 import { path } from '../../../routes/paths';
-import { ottBadgeLetter } from '../../../utils/ott';
 import styles from './MovieDetailPage.module.css';
 import type { MovieDetail, MovieOttProvider, SimilarMovie } from '../../../types/movie';
 import type { PublicReview } from '../../../types/watch';
@@ -300,13 +299,7 @@ export default function MovieDetailPage() {
             <ul className={styles.ottList}>
               {movie.ottProviders.map((ott) => (
                 <li key={ott.ottId} className={styles.ottItem}>
-                  <OttBadge
-                    letter={ottBadgeLetter(ott.code)}
-                    name={ott.name}
-                    size={26}
-                    radius={7}
-                    labelled={false}
-                  />
+                  <OttBadge code={ott.code} name={ott.name} size={26} radius={7} labelled={false} />
                   <span className={styles.ottName}>{ott.name}</span>
                   {ott.subscribed ? <span className={styles.ottMine}>구독 중</span> : null}
                 </li>

@@ -11,7 +11,6 @@
  */
 import OttBadge from '../../../../components/OttBadge';
 import Poster from '../../../../components/Poster';
-import { ottBadgeLetter } from '../../../../utils/ott';
 import type { MovieSearchItem } from '../../../../types/search';
 import styles from './SearchResultRow.module.css';
 
@@ -52,12 +51,7 @@ export default function SearchResultRow({ movie, ottNames, onSelect }: Props) {
           <span className={styles.noOtt}>시청 가능한 OTT 없음</span>
         ) : (
           movie.ottProviders.map((code) => (
-            <OttBadge
-              key={code}
-              letter={ottBadgeLetter(code)}
-              name={ottNames[code] ?? code}
-              size={20}
-            />
+            <OttBadge key={code} code={code} name={ottNames[code] ?? code} size={20} />
           ))
         )}
       </span>

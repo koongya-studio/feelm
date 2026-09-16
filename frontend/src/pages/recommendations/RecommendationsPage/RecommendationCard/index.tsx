@@ -19,7 +19,6 @@ import IconButton from '../../../../components/IconButton';
 import OttBadge from '../../../../components/OttBadge';
 import Poster from '../../../../components/Poster';
 import { path } from '../../../../routes/paths';
-import { ottBadgeLetter } from '../../../../utils/ott';
 import styles from './RecommendationCard.module.css';
 import type { MouseEvent } from 'react';
 import type { Ott } from '../../../../types/ott';
@@ -73,7 +72,7 @@ export default function RecommendationCard({ item, otts, menuOpen, onOpenMenu }:
 
           return (
             <li key={code}>
-              <OttBadge letter={ottBadgeLetter(code)} name={ott?.name ?? code} size={22} />
+              <OttBadge code={code} name={ott?.name ?? code} size={22} />
             </li>
           );
         })}

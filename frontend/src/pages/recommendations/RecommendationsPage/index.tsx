@@ -29,7 +29,6 @@ import RecommendationCard from './RecommendationCard';
 import { dismissMovie, getRecommendations } from '../../../api/recommendations';
 import { getOtts } from '../../../api/otts';
 import { path } from '../../../routes/paths';
-import { ottBadgeLetter } from '../../../utils/ott';
 import styles from './RecommendationsPage.module.css';
 import type { MouseEvent } from 'react';
 import type { Ott } from '../../../types/ott';
@@ -238,7 +237,7 @@ export default function RecommendationsPage() {
 
                 return (
                   <li key={code}>
-                    <OttBadge letter={ottBadgeLetter(code)} name={ott?.name ?? code} size={28} />
+                    <OttBadge code={code} name={ott?.name ?? code} size={28} />
                   </li>
                 );
               })}

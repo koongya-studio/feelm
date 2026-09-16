@@ -38,7 +38,6 @@ import { getMyParties } from '../../../api/parties';
 import { getOtts } from '../../../api/otts';
 import { getLatestReadyReport } from '../../../api/reports';
 import { path } from '../../../routes/paths';
-import { ottBadgeLetter } from '../../../utils/ott';
 import styles from './HomePage.module.css';
 import type { MyProfile } from '../../../types/user';
 import type { Ott } from '../../../types/ott';
@@ -251,7 +250,7 @@ export default function HomePage() {
                       />
                       <span className={styles.availableOtt}>
                         <OttBadge
-                          letter={ottBadgeLetter(movie.ottProvider)}
+                          code={movie.ottProvider}
                           name={ott?.name ?? movie.ottProvider}
                           size={20}
                         />

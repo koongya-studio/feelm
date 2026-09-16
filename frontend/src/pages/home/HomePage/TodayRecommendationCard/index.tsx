@@ -20,7 +20,6 @@ import Chip from '../../../../components/Chip';
 import OttBadge from '../../../../components/OttBadge';
 import Poster from '../../../../components/Poster';
 import { path } from '../../../../routes/paths';
-import { ottBadgeLetter } from '../../../../utils/ott';
 import styles from './TodayRecommendationCard.module.css';
 import type { Ott } from '../../../../types/ott';
 import type { RecommendationItemView } from '../../../../types/unspecified';
@@ -75,7 +74,7 @@ export default function TodayRecommendationCard({ item, otts }: Props) {
 
             return (
               <li key={code}>
-                <OttBadge letter={ottBadgeLetter(code)} name={ott?.name ?? code} size={22} />
+                <OttBadge code={code} name={ott?.name ?? code} size={22} />
               </li>
             );
           })}
