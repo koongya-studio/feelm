@@ -44,4 +44,26 @@ class PublicApiPathTest {
         assertThat(SecurityConfig.isPublicApi(HttpMethod.POST, "/api/v1/popcorn-flavors"))
                 .isFalse();
     }
+
+    @Test
+    @DisplayName("T28 공개 한줄평 API는 모든 메서드에서 공개·선택 인증 경로가 아니다")
+    void reviewsRemainsMemberOnlyForEveryMethod() {
+        String path = "/api/v1/movies/161/reviews";
+        for (HttpMethod method :
+                new HttpMethod[] {
+                    HttpMethod.GET,
+                    HttpMethod.POST,
+                    HttpMethod.PUT,
+                    HttpMethod.PATCH,
+                    HttpMethod.DELETE,
+                    HttpMethod.HEAD,
+                    HttpMethod.OPTIONS,
+                    HttpMethod.TRACE
+                }) {
+            assertThat(SecurityConfig.isPublicApi(method, path)).as(method.name()).isFalse();
+            assertThat(SecurityConfig.isOptionalAuthenticationApi(method, path))
+                    .as(method.name())
+                    .isFalse();
+        }
+    }
 }

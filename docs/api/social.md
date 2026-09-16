@@ -4,7 +4,7 @@
 
 | ID | 이름 | Method | Endpoint | 단계 | 인증 |
 |---|---|---|---|---|---|
-| [API-032](#api-032-공개-한줄평-목록) | 공개 한줄평 목록 | GET | `/movies/{movieId}/reviews` | 1차 MVP | 선택 |
+| [API-032](#api-032-공개-한줄평-목록) | 공개 한줄평 목록 | GET | `/movies/{movieId}/reviews` | 1차 MVP | 회원 |
 | [API-062](#api-062-공개-프로필-조회) | 공개 프로필 조회 | GET | `/users/{publicId}/profile` | 2차 MVP | 선택 |
 | [API-063](#api-063-취향-비교) | 취향 비교 | GET | `/users/{publicId}/taste-comparison` | 2차 MVP | 회원 |
 | [API-065](#api-065-사용자-랭킹) | 사용자 랭킹 | GET | `/rankings/users` | 확장 | 선택 |
@@ -17,7 +17,7 @@
 | 항목 | 값 |
 |---|---|
 | 단계 | 1차 MVP |
-| 인증 | 선택 |
+| 인증 | 회원 |
 | 관련 요구사항 | FR-26, FR-34, FR-39 |
 | 화면 | ⑥-2 영화 상세 |
 | 미정 사항 | 없음 |
@@ -25,19 +25,23 @@
 
 ### 설명
 
-영화의 `PUBLIC` 한줄평을 최신순으로 조회한다.
+영화의 한줄평을 `createdAt DESC`, `ratingId DESC` 순으로 조회한다. 타인의 `PUBLIC`과 본인의 `PUBLIC`·`PRIVATE`를 포함한다.
 
 ### 인증 및 권한
 
-- 선택. 비회원 조회 가능. 로그인 시 차단 필터 적용, 본인 한줄평은 `PRIVATE`이어도 `mine: true`로 포함
+- Access Token이 필요한 회원 API다. 토큰이 없거나 잘못됐거나 만료됐으면 `401`이며 비회원으로 강등하지 않는다
+- 조회자는 `ACTIVE` 회원이어야 한다. 작성자도 `ACTIVE`인 한줄평만 노출한다
+- 본인 한줄평은 `PRIVATE`이어도 `mine: true`로 포함하고, 양방향 차단 상대의 한줄평은 제외한다
+- 작성자 프로필이 `PRIVATE`여도 평가가 `PUBLIC`이면 영화별 목록에 포함한다. 작성자 프로필 접근은 별도 공개 범위 정책을 따른다(API-062)
 
 ### Path Parameters
 
-- `movieId`
+- `movieId`: 양의 64비트 정수
 
 ### Query Parameters
 
-- `cursor`, `size`
+- `cursor`: 서버가 직전 응답에서 발급한 불투명 cursor. 영화와 로그인 사용자 범위에 묶이며 빈 문자열은 허용하지 않는다
+- `size`: 기본 20, 1~50
 
 ### Request Body
 
@@ -56,23 +60,32 @@
       "score": 5,
       "comment": "밤에 보면 안 됨",
       "mine": false,
+      "spoiler": true,
       "createdAt": "2026-08-30T05:21:00Z"
     }
   ],
-  "nextCursor": "...",
+  "nextCursor": null,
   "hasNext": false
 }
 ```
 
 ### 오류 응답
 
-- `404 RESOURCE_NOT_FOUND`
+- `400 VALIDATION_FAILED` 잘못된 `movieId`·`size`·`cursor`
+- `401 UNAUTHORIZED` 인증이 없거나 유효하지 않거나 조회자가 `ACTIVE`가 아님
+- `401 TOKEN_EXPIRED` Access Token이 만료됨
+- `404 RESOURCE_NOT_FOUND` 영화가 없음
+- `500 INTERNAL_ERROR`
 
 ### 처리 규칙
 
 - 한줄평은 평가(FR-19)의 선택 항목이므로 별도 생성 API가 없다. 작성·수정·삭제는 API-036/037/038
-- 차단 관계(양방향)의 한줄평은 서버에서 제외한다
-- 한줄평 댓글은 범위 밖
+- `comment IS NULL`이거나 빈 문자열·탭·개행·Unicode 공백뿐인 평가는 제외한다
+- 타인의 `PRIVATE`, 양방향 차단 상대, `ACTIVE`가 아닌 작성자의 한줄평은 서버에서 제외한다
+- `size + 1`행으로 다음 페이지 여부를 판단하며 마지막 페이지의 `nextCursor`는 `null`이다. 페이지 사이에는 현재 커밋된 차단·평가 상태를 다시 적용하며 전체 페이지의 snapshot은 보장하지 않는다
+- `spoiler`는 항상 반환하는 boolean이다. 백엔드는 값과 무관하게 원문 `comment`를 반환한다
+- FE는 `mine=false`이면서 `spoiler=true`인 항목만 기본 블러하고 `평가 보기`로 로컬 해제한다. 별도 reveal API나 서버 저장 상태는 없다
+- 공감·좋아요·싫어요와 한줄평에 대한 댓글 기능은 범위 밖이다
 
 ### 상태값
 
