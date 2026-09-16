@@ -11,6 +11,7 @@ from feelm_consumer.ranking import RankedMovie
 
 MAX_DISCOVERY_GROUPS = 10
 MAX_MOVIES_PER_GROUP = 10
+MAX_DISCOVERY_CANDIDATES = 100
 MAX_VIEWED_PER_GROUP = 2
 MAX_VIEWED_GROUP_SHARE = 0.20
 DIRECTION_EPSILON = 1e-8
@@ -125,12 +126,12 @@ def select_discovery_candidates(
 
     selected: list[RankedMovie] = []
     reasons: dict[int, DiscoveryReason] = {}
-    supplying_groups = 0
-    for affinity_rank, group_id in enumerate(eligible_groups, start=1):
-        group_candidates = movies_by_group[group_id][:MAX_MOVIES_PER_GROUP]
-        if not group_candidates:
-            continue
-        for popularity_rank, candidate in enumerate(group_candidates, start=1):
+    supplying_group_ids: set[int] = set()
+
+    def append_group_slice(group_id: int, affinity_rank: int, start: int, stop: int | None) -> None:
+        for popularity_rank, candidate in enumerate(movies_by_group[group_id][start:stop], start=start + 1):
+            if len(selected) == MAX_DISCOVERY_CANDIDATES:
+                return
             selected.append(candidate)
             reasons[candidate.movie_id] = _build_discovery_reason(
                 bundle,
@@ -141,13 +142,35 @@ def select_discovery_candidates(
                 affinity_rank=affinity_rank,
                 popularity_rank_in_group=popularity_rank,
             )
-        supplying_groups += 1
-        if supplying_groups == MAX_DISCOVERY_GROUPS:
-            break
+            supplying_group_ids.add(group_id)
+
+    # Preserve the original diversity rule first: at most ten movies from each
+    # of the ten best-affinity groups.  If sparse groups leave the list short,
+    # admit the next eligible groups before deepening any one group.  Only after
+    # every eligible group has had that chance do we take the 11th+ movie from
+    # groups in affinity order.
+    for affinity_rank, group_id in enumerate(eligible_groups[:MAX_DISCOVERY_GROUPS], start=1):
+        append_group_slice(group_id, affinity_rank, 0, MAX_MOVIES_PER_GROUP)
+    for affinity_rank, group_id in enumerate(
+        eligible_groups[MAX_DISCOVERY_GROUPS:], start=MAX_DISCOVERY_GROUPS + 1
+    ):
+        append_group_slice(group_id, affinity_rank, 0, MAX_MOVIES_PER_GROUP)
+    if len(selected) < MAX_DISCOVERY_CANDIDATES:
+        for affinity_rank, group_id in enumerate(eligible_groups, start=1):
+            append_group_slice(group_id, affinity_rank, MAX_MOVIES_PER_GROUP, None)
+            if len(selected) == MAX_DISCOVERY_CANDIDATES:
+                break
     # Popularity only decides which movies enter the bounded Discovery pool.
     # The user's predictor orders that fixed pool for the final recommendation.
     selected.sort(key=lambda item: (-item.score, item.movie_id))
-    return DiscoverySelection(selected, reasons, supplying_groups, len(eligible_groups), total_mapped_viewed, source)
+    return DiscoverySelection(
+        selected,
+        reasons,
+        len(supplying_group_ids),
+        len(eligible_groups),
+        total_mapped_viewed,
+        source,
+    )
 
 
 def _user_direction(

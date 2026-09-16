@@ -24,6 +24,12 @@ def test_content_settings_are_optional() -> None:
     assert settings.hybrid_alpha == 0.5
 
 
+def test_legacy_minimum_input_setting_does_not_restore_the_gate() -> None:
+    settings = load_settings({**BASE, "CONSUMER_MIN_INPUT_COUNT": "10"})
+
+    assert not hasattr(settings, "min_input_count")
+
+
 def test_content_uri_and_alpha_are_read() -> None:
     settings = load_settings(
         {**BASE, "CONSUMER_CONTENT_URI": "hdfs://namenode/artifacts/content/content-v1", "CONSUMER_HYBRID_ALPHA": "0.25"}

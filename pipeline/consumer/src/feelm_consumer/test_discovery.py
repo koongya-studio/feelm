@@ -22,7 +22,7 @@ class FakeGroupBundle:
         return GroupAssignment(group_id // 128, group_id % 128, group_id, True, True, True)
 
 
-def test_discovery_limits_ten_groups_and_ten_movies_per_group() -> None:
+def test_discovery_stops_after_primary_ten_groups_when_they_fill_the_limit() -> None:
     assignments = {1: 0}
     ranked: list[RankedMovie] = []
     for group_id in range(1, 13):
@@ -45,6 +45,42 @@ def test_discovery_limits_ten_groups_and_ten_movies_per_group() -> None:
     selected_ids = {item.movie_id for item in selection.candidates}
     assert all(sum(movie_id // 100 == 10 + group_id for movie_id in selected_ids) == 10 for group_id in range(1, 11))
     assert all(movie_id < 2100 for movie_id in selected_ids)
+
+
+def test_discovery_checks_additional_groups_when_primary_groups_are_sparse() -> None:
+    assignments = {1: 0}
+    ranked: list[RankedMovie] = []
+    for group_id in range(1, 13):
+        for offset in range(9):
+            movie_id = 1000 + group_id * 100 + offset
+            assignments[movie_id] = group_id
+            ranked.append(RankedMovie(movie_id, 1.0 - group_id / 100 - offset / 10_000))
+    bundle = FakeGroupBundle(assignments)
+    for group_id in range(1, 13):
+        bundle.group_means[group_id, 0] = 1.0 - group_id / 100
+
+    selection = select_discovery_candidates(
+        bundle, ranked, [ProfileInput(1, 5.0, "rating")], [], popularity_ranking=ranked
+    )
+
+    assert len(selection.candidates) == 100
+    assert selection.supplying_group_count == 12
+    assert any(movie_id // 100 == 21 for movie_id in {item.movie_id for item in selection.candidates})
+
+
+def test_discovery_takes_more_than_ten_from_a_group_after_all_groups_are_used() -> None:
+    assignments = {1: 0, **{movie_id: 1 for movie_id in range(100, 205)}}
+    ranked = [RankedMovie(movie_id, float(300 - movie_id)) for movie_id in range(100, 205)]
+    bundle = FakeGroupBundle(assignments)
+    bundle.group_means[1, 0] = 1.0
+
+    selection = select_discovery_candidates(
+        bundle, ranked, [ProfileInput(1, 5.0, "rating")], [], popularity_ranking=ranked
+    )
+
+    assert len(selection.candidates) == 100
+    assert selection.supplying_group_count == 1
+    assert max(reason.popularity_rank_in_group for reason in selection.reasons.values()) == 100
 
 
 def test_discovery_group_experience_uses_confirmed_viewing_boundary() -> None:
@@ -129,7 +165,7 @@ def test_onboarding_direction_is_binary_and_rating_direction_wins() -> None:
     assert rating_first.direction_source == "RATING"
 
 
-def test_onboarding_dislike_reverses_which_tenth_group_is_supplied() -> None:
+def test_onboarding_dislike_reverses_group_affinity_order_when_fill_uses_all_groups() -> None:
     assignments = {1: 0}
     ranked: list[RankedMovie] = []
     for group_id in range(1, 12):
@@ -156,9 +192,10 @@ def test_onboarding_dislike_reverses_which_tenth_group_is_supplied() -> None:
         popularity_ranking=ranked,
     )
 
-    assert 111 not in {item.movie_id for item in liked.candidates}
-    assert 101 not in {item.movie_id for item in disliked.candidates}
-    assert 111 in {item.movie_id for item in disliked.candidates}
+    assert liked.reasons[101].affinity_rank == 1
+    assert liked.reasons[111].affinity_rank == 11
+    assert disliked.reasons[111].affinity_rank == 1
+    assert disliked.reasons[101].affinity_rank == 11
     assert disliked.reasons[111].top_contributors[0].payload() == {
         "movieId": 1,
         "relation": "NEGATIVE_CONTRAST",
@@ -262,7 +299,7 @@ def test_discovery_reason_marks_low_rating_opposition_as_negative_contrast() -> 
     assert reason.top_contribution_coverage == 1.0
 
 
-def test_popularity_selects_group_pool_then_personal_score_orders_it() -> None:
+def test_popularity_orders_group_pool_then_personal_score_orders_selected_candidates() -> None:
     assignments = {1: 0, **{movie_id: 1 for movie_id in range(10, 22)}}
     bundle = FakeGroupBundle(assignments)
     bundle.group_means[1, 0] = 1.0
@@ -277,6 +314,6 @@ def test_popularity_selects_group_pool_then_personal_score_orders_it() -> None:
         popularity_ranking=popularity,
     )
 
-    # Popularity admits 10..19 and excludes the personally strongest 20..21.
-    # Personal scores then order only the admitted pool.
-    assert [item.movie_id for item in selection.candidates] == list(range(19, 9, -1))
+    # The first pass admits 10..19, then the fill pass admits 20..21 because the
+    # total list is still below 100. Personal score orders the complete pool.
+    assert [item.movie_id for item in selection.candidates] == list(range(21, 9, -1))

@@ -1168,14 +1168,12 @@ CONSUMER_MAPPING_URI=hdfs://hdfs-namenode:8020/<immutable-mapping-path>
 CONSUMER_METADATA_URI=hdfs://hdfs-namenode:8020/<immutable-metadata-path>
 CONSUMER_CONTENT_URI=hdfs://hdfs-namenode:8020/<immutable-content-path>
 CONSUMER_HYBRID_ALPHA=0.5
-CONSUMER_MIN_INPUT_COUNT=10
 ```
 
 `CONSUMER_CONTENT_URI`를 비우면 기존 ALS 전용 모드로 동작한다. 값을 설정하면 Consumer는
 기동 시 Content bundle의 revision을 ALS·mapping·metadata와 대조하고, 불일치하거나 불완전한
 산출물이면 시작을 거부한다. `CONSUMER_HYBRID_ALPHA`는 ALS 점수 가중치이며 0~1 범위여야 한다.
-`CONSUMER_MIN_INPUT_COUNT`는 평점과 온보딩 선호를 합한 최소 입력 수로, 서비스 노출 기준과
-동일한 값으로 운영한다.
+평가·온보딩 입력 수에 따른 최소 제한은 두지 않는다.
 
 ### Build, deploy and verify
 

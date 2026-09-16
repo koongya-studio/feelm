@@ -37,7 +37,6 @@ class Settings:
     group_uri: str | None
     discovery_popularity_uri: str | None
     hybrid_alpha: float
-    min_input_count: int
     retry_attempts: int
     retry_backoff_seconds: float
     kafka_poll_timeout_seconds: float
@@ -94,16 +93,6 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
             raise SettingsError(f"{name} is outside its allowed range")
         return value
 
-    def bounded_int(name: str, default: int, minimum: int, maximum: int) -> int:
-        raw = values.get(name, str(default)).strip()
-        try:
-            value = int(raw)
-        except ValueError as exc:
-            raise SettingsError(f"{name} must be an integer") from exc
-        if not minimum <= value <= maximum:
-            raise SettingsError(f"{name} is outside its allowed range")
-        return value
-
     def unit_float(name: str, default: float) -> float:
         raw = values.get(name, str(default)).strip()
         try:
@@ -123,10 +112,6 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         # components support, so it never turns the mix into a single component;
         # clear CONSUMER_CONTENT_URI for that.  See pipeline/consumer/README.md.
         hybrid_alpha=unit_float("CONSUMER_HYBRID_ALPHA", 0.5),
-        # Ratings plus onboarding preferences a user needs before candidates are
-        # computed at all.  Fold-in from a handful of inputs is noise, and the
-        # product does not expose recommendations below this count either.
-        min_input_count=bounded_int("CONSUMER_MIN_INPUT_COUNT", 10, 0, 1000),
         retry_attempts=positive_int("CONSUMER_RETRY_ATTEMPTS", 3, 10),
         retry_backoff_seconds=positive_float("CONSUMER_RETRY_BACKOFF_SECONDS", 0.25, 30.0),
         kafka_poll_timeout_seconds=positive_float("CONSUMER_KAFKA_POLL_TIMEOUT_SECONDS", 1.0, 30.0),

@@ -82,8 +82,8 @@ def frozen_clock(monkeypatch):
     monkeypatch.setattr(results_module, "utc_now", lambda: "2026-09-15T00:00:00Z")
 
 
-def test_als_only_preserves_legacy_relative_scores(frozen_clock) -> None:
-    """Without a content bundle, publish the active model's relative score unchanged."""
+def test_als_only_preserves_legacy_taste_scores_and_fills_discovery(frozen_clock) -> None:
+    """Without content, TASTE scores stay unchanged and Discovery is still filled."""
     ratings = [ProfileInput(10, 5.0, "rating")]
 
     actual = calculate_user_results(_bundle(), ratings, [], 7)
@@ -93,9 +93,18 @@ def test_als_only_preserves_legacy_relative_scores(frozen_clock) -> None:
     assert {key: value for key, value in actual[0].items() if key != "generationId"} == {
         key: value for key, value in legacy[0].items() if key != "generationId"
     }
-    assert {key: value for key, value in actual[1].items() if key != "generationId"} == {
-        key: value for key, value in legacy[1].items() if key != "generationId"
-    }
+    assert actual[1]["taste"] == legacy[1]["taste"]
+    assert actual[1]["discovery"] == [
+        {
+            "movieId": 20,
+            "score": 0.0,
+            "reason": {
+                "code": "DISCOVERY_PERSONAL_SCORE",
+                "sourceMovieIds": [10],
+                "matchedGenreCodes": ["DRAMA"],
+            },
+        }
+    ]
 
 
 def test_content_only_movies_become_candidates(frozen_clock) -> None:
@@ -211,35 +220,16 @@ def test_low_only_history_without_als_publishes_the_content_list(frozen_clock, c
     assert {item["movieId"] for item in results[1]["taste"]} == {10, 20, 30}
 
 
-def test_users_below_the_minimum_input_count_are_skipped(frozen_clock, caplog) -> None:
-    """Fold-in from a handful of inputs is noise; the product gates on this too."""
-    ratings = [ProfileInput(10, 5.0, "rating"), ProfileInput(20, 4.5, "rating")]
-
-    with caplog.at_level("INFO"):
-        results = calculate_user_results(_bundle(), ratings, [], 7, content=_content(), min_input_count=10)
-
-    assert results is None
-    assert "below_minimum_input_count inputs=2 minimum=10" in caplog.text
-
-
-def test_onboarding_preferences_count_towards_the_minimum(frozen_clock) -> None:
+@pytest.mark.parametrize("input_count", [1, 2, 9])
+def test_one_to_nine_inputs_are_not_gated(input_count: int, frozen_clock) -> None:
     ratings = [ProfileInput(10, 5.0, "rating")]
-    onboarding = [ProfileInput(20, 5.0, "onboarding"), ProfileInput(30, 5.0, "onboarding")]
+    onboarding = [ProfileInput(20, 5.0, "onboarding")] if input_count >= 2 else []
+    onboarding.extend(ProfileInput(100 + index, 5.0, "onboarding") for index in range(input_count - 2))
 
-    assert calculate_user_results(_bundle(), ratings, onboarding, 7, content=_content(), min_input_count=3) is not None
-    assert calculate_user_results(_bundle(), ratings, onboarding, 7, content=_content(), min_input_count=4) is None
+    results = calculate_user_results(_bundle(), ratings, onboarding, 7, content=_content())
 
-
-def test_minimum_gate_counts_distinct_movies_after_rating_override(frozen_clock) -> None:
-    rating = [ProfileInput(10, 4.5, "rating")]
-    onboarding = [ProfileInput(10, 5.0, "onboarding")]
-    onboarding.extend(ProfileInput(movie_id, 5.0, "onboarding") for movie_id in range(100, 108))
-
-    assert calculate_user_results(_bundle(), rating, onboarding, 7, min_input_count=10) is None
-    onboarding.append(ProfileInput(108, 5.0, "onboarding"))
-    assert calculate_user_results(_bundle(), rating, onboarding, 7, min_input_count=10) is not None
-    onboarding.append(ProfileInput(109, 5.0, "onboarding"))
-    assert calculate_user_results(_bundle(), rating, onboarding, 7, min_input_count=10) is not None
+    assert results is not None
+    assert results[0]["ratingCount"] == 1
 
 
 def test_onboarding_exact_pseudo_target_reaches_als_fold_in(frozen_clock) -> None:
@@ -259,7 +249,6 @@ def test_onboarding_exact_pseudo_target_reaches_als_fold_in(frozen_clock) -> Non
         [],
         [ProfileInput(10, ONBOARDING_LIKE_SCORE, "onboarding")],
         7,
-        min_input_count=1,
     )
 
     assert results is not None
@@ -328,6 +317,36 @@ def test_group_enabled_service_emits_discovery_without_changing_taste(frozen_clo
     }
 
 
+def test_discovery_fill_preserves_group_results_and_prefers_non_taste_candidates() -> None:
+    population = [RankedMovie(movie_id, float(300 - movie_id)) for movie_id in range(1, 251)]
+
+    discovery = service_module._fill_discovery_candidates(
+        [RankedMovie(105, 999.0)],
+        population,
+        taste_movie_ids=set(range(1, 101)),
+        excluded_movie_ids={101},
+    )
+
+    assert len(discovery) == 100
+    assert discovery[0].movie_id == 105
+    assert len({candidate.movie_id for candidate in discovery}) == 100
+    assert 101 not in {candidate.movie_id for candidate in discovery}
+    assert all(candidate.movie_id > 100 for candidate in discovery)
+
+
+def test_discovery_fill_allows_taste_overlap_only_after_non_taste_candidates() -> None:
+    population = [RankedMovie(movie_id, float(120 - movie_id)) for movie_id in range(1, 121)]
+
+    discovery = service_module._fill_discovery_candidates(
+        [],
+        population,
+        taste_movie_ids=set(range(1, 101)),
+        excluded_movie_ids=set(),
+    )
+
+    assert [candidate.movie_id for candidate in discovery] == [*range(101, 121), *range(1, 81)]
+
+
 def test_fold_in_failure_with_inputs_is_raised_not_skipped() -> None:
     """A singular solve is a computation failure, not a user without signal."""
     bundle = ArtifactBundle(
@@ -338,19 +357,80 @@ def test_fold_in_failure_with_inputs_is_raised_not_skipped() -> None:
         calculate_user_results(bundle, [ProfileInput(10, 5.0, "rating")], [], 7)
 
 
-def test_user_without_any_history_publishes_nothing(frozen_clock) -> None:
-    assert calculate_user_results(_bundle(), [], [], 7, content=_content(), hybrid_alpha=0.5) is None
+def test_user_without_any_history_publishes_tied_hybrid_population(frozen_clock, caplog) -> None:
+    with caplog.at_level("WARNING"):
+        results = calculate_user_results(_bundle(), [], [], 7, content=_content(), hybrid_alpha=0.5)
+
+    assert results is not None
+    assert results[0]["vector"] == []
+    assert results[0]["ratingCount"] == 0
+    assert results[0]["factorBackedInputCount"] == 0
+    assert [(item["movieId"], item["score"]) for item in results[1]["taste"]] == [
+        (10, 0.0),
+        (20, 0.0),
+        (30, 0.0),
+    ]
+    assert all(item["reason"]["sourceMovieIds"] == [] for item in results[1]["taste"])
+    assert "candidate_tie_fallback" in caplog.text
 
 
-def test_als_only_mode_without_input_publishes_nothing(frozen_clock) -> None:
-    assert calculate_user_results(_bundle(), [], [], 7) is None
+def test_no_history_tie_fallback_is_capped_at_500_by_movie_id(frozen_clock) -> None:
+    vectors = {service_id: ([0], [1.0]) for service_id in range(100, 700)}
+    metadata = {service_id: MovieMetadata(str(service_id), (), None) for service_id in vectors}
+    bundle = ArtifactBundle(
+        "als-v1",
+        "snapshot-a",
+        0.1,
+        {},
+        {},
+        metadata,
+        MAPPING_REVISION,
+        METADATA_REVISION,
+    )
+
+    results = calculate_user_results(bundle, [], [], 7, content=_content(vectors))
+
+    assert results is not None
+    assert [(item["movieId"], item["score"]) for item in results[1]["taste"]] == [
+        (movie_id, 0.0) for movie_id in range(100, 600)
+    ]
+    assert [(item["movieId"], item["score"]) for item in results[1]["discovery"]] == [
+        (movie_id, 0.0) for movie_id in range(600, 700)
+    ]
 
 
-def test_user_without_any_supported_input_publishes_nothing(frozen_clock) -> None:
-    """No ALS factor and no supported content history means no candidates."""
+def test_als_only_mode_without_input_publishes_tied_factor_population(frozen_clock) -> None:
+    results = calculate_user_results(_bundle(), [], [], 7)
+
+    assert results is not None
+    assert [(item["movieId"], item["score"]) for item in results[1]["taste"]] == [(10, 0.0), (20, 0.0)]
+
+
+def test_empty_publishable_population_still_returns_none(frozen_clock) -> None:
+    bundle = ArtifactBundle(
+        "als-v1",
+        "snapshot-a",
+        0.1,
+        {},
+        {},
+        {},
+        MAPPING_REVISION,
+        METADATA_REVISION,
+    )
+
+    assert calculate_user_results(bundle, [], [], 7) is None
+
+
+def test_user_without_any_supported_input_publishes_tied_population(frozen_clock) -> None:
+    """An unsupported profile still gets the service-publishable population."""
     content = _content({10: ([0, 2], [0.6, 0.8]), 20: ([1, 3], [0.6, 0.8]), 30: ([], [])})
 
-    assert calculate_user_results(_bundle(), [ProfileInput(30, 5.0, "rating")], [], 7, content=content) is None
+    results = calculate_user_results(_bundle(), [ProfileInput(30, 5.0, "rating")], [], 7, content=content)
+
+    assert results is not None
+    assert [(item["movieId"], item["score"]) for item in results[1]["taste"]] == [(10, 0.0), (20, 0.0)]
+    assert all(item["reason"]["sourceMovieIds"] == [] for item in results[1]["taste"])
+    assert all(item["reason"]["sourceMovieIds"] == [] for item in results[1]["discovery"])
 
 
 def test_active_model_scores_are_not_normalized_again(monkeypatch, frozen_clock) -> None:

@@ -44,7 +44,17 @@ def build_candidate_reasons(
         key=lambda input_: (-input_.score, input_.movie_id),
     )
     if not sources:
-        raise ValueError("candidate explanation requires source movie metadata")
+        # The Candidate contract requires a reason object.  A user with no usable
+        # signal has no honest source movie, so keep the generic reason shape and
+        # make the absence explicit with an empty source list.
+        return {
+            candidate.movie_id: CandidateReason(
+                code="TOP_RATED_SOURCE",
+                source_movie_ids=(),
+                matched_genre_codes=(),
+            )
+            for candidate in candidates
+        }
 
     reasons: dict[int, CandidateReason] = {}
     for candidate in candidates:
@@ -69,3 +79,20 @@ def build_candidate_reasons(
                 matched_genre_codes=(),
             )
     return reasons
+
+
+def build_personal_discovery_reasons(
+    candidates: list[RankedMovie],
+    inputs: list[ProfileInput],
+    movie_metadata: dict[int, MovieMetadata],
+) -> dict[int, CandidateReason]:
+    """Explain Discovery candidates supplied by the personal-score fallback."""
+    base_reasons = build_candidate_reasons(candidates, inputs, movie_metadata)
+    return {
+        movie_id: CandidateReason(
+            code="DISCOVERY_PERSONAL_SCORE",
+            source_movie_ids=reason.source_movie_ids,
+            matched_genre_codes=reason.matched_genre_codes,
+        )
+        for movie_id, reason in base_reasons.items()
+    }
