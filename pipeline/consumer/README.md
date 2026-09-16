@@ -196,7 +196,10 @@ Redis 출력은 `candidate-version`, `vector`, `candidates` 세 String 키이며
 opaque token으로 교체하며 후보 결과를 읽는 Spring은 이 키에 의존하지 않는다. key가 유실되면 모든 기존 token은
 비교에서 거부되고, 다음 assign은 새 token을 설치한다. Redis의 과거 snapshot 복원처럼 fence key가 이전 값으로
 되돌아가는 장애는 외부의 durable coordinator 없이는 막지 못하며 이 Consumer의 보장 범위 밖이다.
-`candidates.items` 전체에는 `movieId`, `score`, `type`, nullable `flavorCode`만 포함된다.
-Consumer는 추천 문구인 `reason`을 생성하지 않는다. Spring이 최종 추천의 검증 가능한 근거로 문구를 구성한다.
+`candidates.taste`는 `movieId`, `score`를 포함하고, `candidates.discovery`는 현재 빈 배열이다.
+두 payload에는 동일한 `candidateVersion`(JSON 형식 버전)과 `generationId`(한 번의 생성 결과 식별자)가
+포함된다. 새 형식으로 전환할 때 기존 `items` payload가 남아 있으면 Spring reader 전환 전에 해당 사용자를
+재게시해 형식을 갱신해야 한다. Consumer는 추천 문구인 `reason`을 생성하지 않는다.
+Spring이 최종 추천의 검증 가능한 근거로 문구를 구성한다.
 Spring이 후보 전체의 최종 제외·재정렬을 담당한다. 영화별 OTT 제공 정보와 사용자 OTT 클릭 정보는 PostgreSQL에서 조회한다. 별도 `topn`은 생성하거나 복구 조건에 포함하지 않는다.
 기존 `topn` 키 자동 삭제는 하지 않는다. 배포 전 Spring reader 전환이 필요하다.

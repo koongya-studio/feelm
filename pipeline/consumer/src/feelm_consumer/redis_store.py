@@ -24,6 +24,26 @@ if not fence_token or string.len(fence_token) == 0 then
   return {err='invalid partition fence'}
 end
 if redis.call('GET', fence_key) ~= fence_token then return -1 end
+-- Validate the complete result before touching any of the three state keys.
+-- The caller normally creates both payloads together, but keeping this check in
+-- the Lua transaction prevents a future caller from publishing a mixed snapshot.
+local new_vector_ok, new_vector = pcall(cjson.decode, ARGV[3])
+local new_candidates_ok, new_candidates = pcall(cjson.decode, ARGV[4])
+if not new_vector_ok or not new_candidates_ok
+  or type(new_vector) ~= 'table' or type(new_candidates) ~= 'table'
+  or new_vector['candidateVersion'] == nil
+  or new_candidates['candidateVersion'] == nil
+  or new_vector['candidateVersion'] ~= new_candidates['candidateVersion'] then
+  return {err='inconsistent result payload'}
+end
+local new_vector_generation = new_vector['generationId']
+local new_candidates_generation = new_candidates['generationId']
+if new_vector_generation ~= nil or new_candidates_generation ~= nil then
+  if type(new_vector_generation) ~= 'string' or string.len(new_vector_generation) == 0
+    or new_vector_generation ~= new_candidates_generation then
+    return {err='inconsistent result generation'}
+  end
+end
 local version_type = redis.call('TYPE', version_key).ok
 local vector_type = redis.call('TYPE', vector_key).ok
 local candidates_type = redis.call('TYPE', candidates_key).ok
@@ -36,7 +56,15 @@ local candidates_json_ok, candidates_json = pcall(cjson.decode, candidates or ''
 local healthy = current_number and current_number >= 1 and current_number == math.floor(current_number)
   and vector_json_ok and candidates_json_ok
   and type(vector_json) == 'table' and type(candidates_json) == 'table'
-  and vector_json['candidateVersion'] == current_number and candidates_json['candidateVersion'] == current_number
+  and vector_json['candidateVersion'] == candidates_json['candidateVersion']
+  and (
+    (vector_json['generationId'] == nil and candidates_json['generationId'] == nil)
+    or (
+      type(vector_json['generationId']) == 'string'
+      and string.len(vector_json['generationId']) > 0
+      and vector_json['generationId'] == candidates_json['generationId']
+    )
+  )
 if (version_type ~= 'none' or vector_type ~= 'none' or candidates_type ~= 'none') and not healthy then
   -- A version key without both results is never safe to serve.  Do the
   -- cleanup in this script so a concurrent writer cannot observe a half reset.
@@ -77,7 +105,15 @@ local candidates_json_ok, candidates_json = pcall(cjson.decode, candidates or ''
 if number and number >= 1 and number == math.floor(number)
   and vector_json_ok and candidates_json_ok
   and type(vector_json) == 'table' and type(candidates_json) == 'table'
-  and vector_json['candidateVersion'] == number and candidates_json['candidateVersion'] == number then return number end
+  and vector_json['candidateVersion'] == candidates_json['candidateVersion']
+  and (
+    (vector_json['generationId'] == nil and candidates_json['generationId'] == nil)
+    or (
+      type(vector_json['generationId']) == 'string'
+      and string.len(vector_json['generationId']) > 0
+      and vector_json['generationId'] == candidates_json['generationId']
+    )
+  ) then return number end
 redis.call('DEL', version_key, vector_key, candidates_key)
 return 0
 """

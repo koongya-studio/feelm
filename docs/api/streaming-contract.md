@@ -246,7 +246,7 @@ Offset을 커밋합니다. 중간 실패로 재시도되면 같은 DB 상태를 
 2. Python Consumer가 PostgreSQL을 다시 읽어 User Vector와 Candidate Top-500을 재계산한다.
 3. Python Consumer가 ALS 원시 Candidate Top-500을 생성한다. Spring은 후보 전체에 OTT·행동 정보를
    결합하고 감상·관심없음 제외, 최종 재정렬과 XAI 근거를 생성한다.
-4. Python Consumer가 `feelm:user:{userId}:candidate-version`, `feelm:user:{userId}:vector`, `feelm:user:{userId}:candidates`을 Lua 스크립트 한 번으로 같은 `candidateVersion`으로 기록한다.
+4. Python Consumer가 `feelm:user:{userId}:candidate-version`, `feelm:user:{userId}:vector`, `feelm:user:{userId}:candidates`을 Lua 스크립트 한 번으로 원자적으로 기록한다. `candidate-version` String은 성공한 게시마다 증가하는 게시 순번이며, `vector`와 `candidates` JSON은 같은 `candidateVersion`(형식 버전)과 `generationId`(한 번의 생성 결과 식별자)를 가진다.
 
 Consumer group에서 partition을 새로 assign받은 Consumer는 먼저 partition별 fencing key에 새 CSPRNG opaque
 token을 설치한다. 후보 게시 Lua와 corrupt/partial 3키 복구 Lua는 전달된 token이 현재 key와 일치할 때만
@@ -292,7 +292,7 @@ monotonic coordinator 없이는 구별할 수 없으므로 이 계약의 fencing
 
 | Spring이 읽는 키 | 용도 |
 |---|---|
-| `candidates` | 개인 추천의 `candidateVersion` 신선도 확인 · **파티 추천 집계**(party.md) · **OTT 구독 추천**(API-068). 파티원별·사용자별 후보 점수를 Spring이 합산·집계 |
+| `candidates` | 개인 추천 후보 · **파티 추천 집계**(party.md) · **OTT 구독 추천**(API-068). 파티원별·사용자별 후보 점수를 Spring이 합산·집계 |
 | `behavior` | 새 개인 추천 세트를 만들 때 `candidates`에 적용할 최근 행동 Feature |
 | `model:current` | `modelVersion` 확인과 이력 저장 |
 
@@ -317,18 +317,15 @@ Spring은 개인 추천에서는 후보를 재정렬하고, 파티·OTT에서는
 ```json
 {
   "modelVersion": "als-2026-09-05",
-  "candidateVersion": 137,
-  "items": [{
-    "movieId": 807,
-    "score": 0.91,
-    "type": "TASTE",
-    "flavorCode": null
-  }],
+  "candidateVersion": 3,
+  "generationId": "550e8400-e29b-41d4-a716-446655440000",
+  "taste": [{ "movieId": 807, "score": 0.91 }],
+  "discovery": [],
   "updatedAt": "2026-08-31T07:21:03Z"
 }
 ```
 
-- 상위 500편(설정값). 제외 필터를 적용하지 않은 원시 후보다
+- `taste`는 상위 500편(설정값)의 원시 후보다. `discovery`는 발견 추천 담당 Consumer가 채울 예약 배열이며, 이 업무에서는 빈 배열로 저장한다. Spring은 두 배열을 직접 읽으며 항목의 중복 `type` 필드는 두지 않는다.
 - `score`는 사용자 간 절대 비교가 아니라 **같은 사용자 안의 상대 순위**를 의미한다.
   파티 집계식이 이를 어떻게 정규화할지는 party.md의 미정 사항으로 남는다
 - **`score`는 게시된 후보 집합 안에서의 동률 인식 백분위다**(0 초과 1 미만). 후보를 무엇으로
@@ -355,8 +352,8 @@ Spring은 개인 추천에서는 후보를 재정렬하고, 파티·OTT에서는
   선호의 합이 설정된 최소 입력 수(기본 10) 미만이거나, 그 이력으로 어떤 성분도 점수를 낼 수 없으면
   세 키를 갱신하지 않고 이벤트만 정상 처리한다. 임의의 목록을 게시하면 소비자가 실제 추천과
   구별할 수 없기 때문이다.
-- 이때 해당 사용자 키는 **없거나 이전 값 그대로**이며 `candidateVersion`도 오르지 않는다. 따라서
-  Spring은 `inputVersion`이 올랐는데 `candidateVersion`이 그대로인 상태를 **"새 추천이 아직 없음"**
+- 이때 해당 사용자 키는 **없거나 이전 값 그대로**이며 `candidate-version` 게시 순번과 `generationId`도 바뀌지 않는다. 따라서
+  Spring은 `inputVersion`이 올랐는데 마지막으로 확인한 후보 스냅샷의 `generationId`가 그대로인 상태를 **"새 추천이 아직 없음"**
   으로 다루고 자체 기본 목록을 사용한다. 최소 입력 수는 **서비스가 추천을 노출하기 시작하는 기준과
   같아야 한다.** 이 상태의 최종 처리는 미정 사항 "콜드 스타트 처리 주체"에서 확정한다.
 - **동점은 흔하고 사용자에 따라 정도가 크게 다르다.** 실측 기준 상위 500편에서 서로 다른 점수가
@@ -365,11 +362,8 @@ Spring은 개인 추천에서는 후보를 재정렬하고, 파티·OTT에서는
   같은 이유로 상위 500 컷은 동점 무리의 중간을 자를 수 있으며, 그때 탈락 여부도 `movieId`가 정한다.
 - **`score`의 최종 의미와 소비 규칙(파티 집계식, OTT 임계치)은 아직 합의되지 않았다.** 위 정의는
   모델 교체에 영향받지 않는 잠정 기준이며, 합의 시 이 절과 party.md·recommendation.md를 함께 고친다.
-- `candidateVersion`은 party.md의 **Rating Candidate 버전**이다. Python Consumer가 실시간 이벤트나 전체 재구축 요청으로 이 키를 갱신할 때마다
-  1씩 증가하는 단조 증가 정수이며, Spring은 읽기만 한다. party.md의 파티 점수 캐시 키
-  (`partyId` + 파티원 목록 + 파티원별 버전) 구성 요소이며, party.md 미정 사항의
-  "형식과 Redis 키 이름 — Redis 키 설계 문서에서 확정"을 여기서 확정한다
-- OTT 구독 추천(API-068)은 이 `items`에서 임계치 이상인 영화를 OTT 제공처별로 집계한다.
+- `candidateVersion`은 Candidate JSON 형식·구성 규칙 버전이며 현재 `3`으로 고정되어 후보 재생성만으로 바꾸지 않는다. `candidate-version` Redis String은 성공한 후보 게시마다 1씩 증가하는 내부 게시 순번이다. `generationId`는 매 생성 실행마다 새로 발급하는 고유 식별자다.
+- OTT 구독 추천(API-068)은 `taste`와 `discovery`에서 임계치 이상인 영화를 OTT 제공처별로 집계한다.
   임계치 값은 recommendation.md의 미정 사항으로 남는다
 
 **`feelm:user:{userId}:behavior`**
@@ -398,12 +392,14 @@ Spring은 개인 추천에서는 후보를 재정렬하고, 파티·OTT에서는
 
 **후보 부가 정보와 Spring 처리**
 
-모든 `candidates.items` 항목은 `movieId`, `score`, `type`, nullable `flavorCode`를 포함한다.
-현재 Consumer는 `type=TASTE`를 생성하며 `reason`은 포함하지 않는다.
+`candidates.taste` 항목은 `movieId`, `score`를 포함한다. `candidates.discovery` 항목은 이후 발견 추천 담당 Consumer가 `movieId`, `score`, `flavorCode`로 채운다.
+현재 Consumer는 빈 `discovery` 배열을 생성하며 `reason`은 포함하지 않는다.
 최종 추천 문구는 Spring이 실제 사용한 검증 가능한 근거를 바탕으로 구성한다.
 Spring은 최대 500개 전체에 행동 가중치와 감상·관심없음 제외를 적용하고 최종 세트를 만든다.
 OTT 제공처는 `movie_ott_providers`·`otts`, 사용자 클릭 정보는 `watch_records`에서 조회한다.
-별도 Redis `topn`은 생성하거나 읽지 않는다. 기존 키 자동 삭제는 하지 않으며 배포 전 읽는 측 전환이 필요하다.
+별도 Redis `topn`은 생성하거나 읽지 않는다. 기존 키 자동 삭제는 하지 않는다. 기존 배포가
+`candidates.items` 형식으로 저장한 값은 새 `taste`/`discovery` 형식과 호환되지 않으므로, Spring reader를
+전환하기 전에 Consumer 전체 재구축 또는 사용자별 재게시로 모든 활성 후보를 새 형식으로 갱신해야 한다.
 
 **`feelm:model:current`**
 
@@ -445,10 +441,9 @@ URI나 Redis에 저장하지 않고 runtime filesystem 설정으로 제공한다
 - 재학습으로 Item Factor가 바뀌면 기존 User Vector와 후보가 모두 무효가 되므로 필수다
 - 이벤트 유실이나 Redis 데이터 손실이 있어도 하루 한 번 정합이 회복된다
 - 완료 후 `feelm:model:current`를 갱신한다
-- 전체 재구축도 `candidates` 갱신이므로 `candidateVersion`은 사용자별 기존 값에서 이어서 증가시키며
-  `1`로 초기화하지 않는다. 파티 점수 캐시 키가 이 값의 단조 증가에만 의존하기 때문이다
-- 키가 없어 이어갈 기존 값을 읽을 수 없는 경우(신규 사용자, Redis 데이터 손실)의 시작값 결정
-  방식은 미정이다
+- 전체 재구축도 `candidates` 게시이므로 `candidate-version`은 사용자별 기존 값에서 이어서 증가시키며
+  `1`로 초기화하지 않는다. JSON의 `candidateVersion`은 형식 버전 `3`으로 유지하고, 새 게시에는 새 `generationId`를 쓴다
+- `candidate-version` 키가 없어 이어갈 기존 값을 읽을 수 없는 경우(신규 사용자, Redis 데이터 손실)는 `1`부터 시작한다
 
 ## 6. 지연과 장애 처리
 
@@ -496,7 +491,7 @@ URI나 Redis에 저장하지 않고 runtime filesystem 설정으로 제공한다
 - [ ] `candidates` 후보 수 최대 500편 — 실데이터로 캘리브레이션
 - [ ] 허용 지연 초기값과 Structured Streaming 트리거 주기 — 실측 후 확정
 - [ ] 비활성 사용자 Redis 키 정리 주기
-- [x] `candidateVersion` 시작값·부분 유실 처리 — 신규 사용자 또는 Redis 전체 유실은 `1`부터 시작한다. 버전 키만 없는데 결과 키 일부가 남으면 Consumer는 Lua 안에서 불완전한 결과 세 키를 함께 삭제한 뒤 `1`부터 재구축한다.
+- [x] `candidate-version` 시작값·부분 유실 처리 — 신규 사용자 또는 Redis 전체 유실은 게시 순번을 `1`부터 시작한다. 버전 키만 없는데 결과 키 일부가 남으면 Consumer는 Lua 안에서 불완전한 결과 세 키를 함께 삭제한 뒤 `1`부터 재구축한다. JSON의 `candidateVersion`은 별도의 형식 버전이다.
 - [ ] 콜드 스타트 처리 주체(Python 사전 생성 vs Spring 폴백)
 - [ ] 추천 이유 문장 생성 방식(템플릿 vs LLM) — 내부 API 명세에서 이월
 - [x] Kafka 발행 실패 시 재시도·보상 정책 — 폴링 기반 트랜잭셔널 아웃박스 채택(ADR-0018)

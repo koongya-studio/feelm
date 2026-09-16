@@ -1,6 +1,5 @@
 # ruff: noqa: E501
 
-import json
 
 import numpy as np
 import pytest
@@ -70,7 +69,6 @@ def _legacy_results(bundle: ArtifactBundle, ratings, onboarding, candidate_versi
         rating_count=len(ratings),
         factor_backed_input_count=folded.factor_backed_input_count,
         candidates=rank_candidates(folded.vector, service_factors),
-        candidate_version=candidate_version,
         movie_metadata=bundle.movie_metadata,
     )
 
@@ -93,18 +91,20 @@ def test_als_only_keeps_legacy_candidates_but_publishes_the_common_score(frozen_
 
     assert actual is not None
     # Same candidates, same order, same everything except the score values.
-    assert [item["movieId"] for item in actual[1]["items"]] == [item["movieId"] for item in legacy[1]["items"]]
-    assert json.dumps(actual[0], sort_keys=True) == json.dumps(legacy[0], sort_keys=True)
-    assert {key: value for key, value in actual[1].items() if key != "items"} == {
-        key: value for key, value in legacy[1].items() if key != "items"
+    assert [item["movieId"] for item in actual[1]["taste"]] == [item["movieId"] for item in legacy[1]["taste"]]
+    assert {key: value for key, value in actual[0].items() if key != "generationId"} == {
+        key: value for key, value in legacy[0].items() if key != "generationId"
     }
-    for published, original in zip(actual[1]["items"], legacy[1]["items"], strict=True):
+    assert {key: value for key, value in actual[1].items() if key not in {"taste", "generationId"}} == {
+        key: value for key, value in legacy[1].items() if key not in {"taste", "generationId"}
+    }
+    for published, original in zip(actual[1]["taste"], legacy[1]["taste"], strict=True):
         assert {key: value for key, value in published.items() if key != "score"} == {
             key: value for key, value in original.items() if key != "score"
         }
     # Raw ALS predictions are unbounded; the published values are percentiles.
-    assert [item["score"] for item in actual[1]["items"]] == [0.75, 0.25]
-    legacy_scores = [item["score"] for item in legacy[1]["items"]]
+    assert [item["score"] for item in actual[1]["taste"]] == [0.75, 0.25]
+    legacy_scores = [item["score"] for item in legacy[1]["taste"]]
     assert max(legacy_scores) > 1.0 and legacy_scores != [0.75, 0.25]
 
 
@@ -114,14 +114,13 @@ def test_content_only_movies_become_candidates(frozen_clock) -> None:
     results = calculate_user_results(_bundle(), ratings, [], 7, content=_content(), hybrid_alpha=0.5)
 
     assert results is not None
-    items = results[1]["items"]
+    items = results[1]["taste"]
     published = {item["movieId"] for item in items}
     # 30 has no ALS factor at all and still gets scored through its content vector.
     assert published == {10, 20, 30}
     assert all(0.0 <= item["score"] <= 1.0 for item in items)
     ordering = [(-item["score"], item["movieId"]) for item in items]
     assert ordering == sorted(ordering)
-    assert all(item["type"] == "TASTE" for item in items)
 
 
 def test_user_without_als_backed_input_still_gets_content_candidates(frozen_clock, caplog) -> None:
@@ -134,7 +133,7 @@ def test_user_without_als_backed_input_still_gets_content_candidates(frozen_cloc
     assert results is not None
     assert results[0]["vector"] == []
     assert results[0]["factorBackedInputCount"] == 0
-    assert {item["movieId"] for item in results[1]["items"]} == {10, 20, 30}
+    assert {item["movieId"] for item in results[1]["taste"]} == {10, 20, 30}
     assert "foldin_no_factor_backed_input" in caplog.text
 
 
@@ -150,7 +149,7 @@ def test_user_with_als_input_but_no_supported_content_history(frozen_clock, capl
     assert results is not None
     assert "NO_SUPPORTED_HISTORY" in caplog.text
     # Without a content profile only the ALS-supported movies remain.
-    assert {item["movieId"] for item in results[1]["items"]} == {10, 20}
+    assert {item["movieId"] for item in results[1]["taste"]} == {10, 20}
 
 
 REAL_PRIOR_MIDRANK = np.asarray([0.0069, 0.0279, 0.0475, 0.0797, 0.1227, 0.2316, 0.3729, 0.5594, 0.7456, 0.8971])
@@ -185,7 +184,7 @@ def test_low_only_history_still_publishes_content_candidates(frozen_clock, caplo
     assert results is not None
     assert "content_scores_non_positive" in caplog.text
     # The content-only movie 30 is a candidate even though its score is not positive.
-    assert {item["movieId"] for item in results[1]["items"]} == {10, 20, 30}
+    assert {item["movieId"] for item in results[1]["taste"]} == {10, 20, 30}
 
 
 def test_scores_peaking_at_exactly_zero_are_published_with_a_warning(frozen_clock, caplog) -> None:
@@ -206,7 +205,7 @@ def test_scores_peaking_at_exactly_zero_are_published_with_a_warning(frozen_cloc
 
     assert results is not None
     assert "content_scores_non_positive" in caplog.text and "tied_at_max=1" in caplog.text
-    assert {item["movieId"] for item in results[1]["items"]} == {10, 20, 30}
+    assert {item["movieId"] for item in results[1]["taste"]} == {10, 20, 30}
 
 
 def test_low_only_history_without_als_publishes_the_content_list(frozen_clock, caplog) -> None:
@@ -219,7 +218,7 @@ def test_low_only_history_without_als_publishes_the_content_list(frozen_clock, c
     assert results is not None
     assert "content_scores_non_positive" in caplog.text
     assert results[0]["vector"] == []
-    assert {item["movieId"] for item in results[1]["items"]} == {10, 20, 30}
+    assert {item["movieId"] for item in results[1]["taste"]} == {10, 20, 30}
 
 
 def test_users_below_the_minimum_input_count_are_skipped(frozen_clock, caplog) -> None:
@@ -273,7 +272,7 @@ def test_published_scores_are_percentiles_inside_the_candidate_set(frozen_clock)
     results = calculate_user_results(_bundle(), ratings, [], 7, content=_content(), hybrid_alpha=0.5)
 
     assert results is not None
-    scores = [item["score"] for item in results[1]["items"]]
+    scores = [item["score"] for item in results[1]["taste"]]
     # Three candidates with distinct mixing scores spread evenly over the set.
     assert scores == [5 / 6, 3 / 6, 1 / 6]
 
@@ -287,7 +286,7 @@ def test_published_scores_keep_ties_equal(frozen_clock) -> None:
     results = calculate_user_results(bundle, [ProfileInput(10, 5.0, "rating")], [], 7, content=_content(vectors), hybrid_alpha=0.5)
 
     assert results is not None
-    tied = {item["score"] for item in results[1]["items"] if item["movieId"] >= 100}
+    tied = {item["score"] for item in results[1]["taste"] if item["movieId"] >= 100}
     assert len(tied) == 1
 
 
@@ -306,8 +305,8 @@ def test_alpha_weights_the_als_component_not_the_content_one(frozen_clock) -> No
     content_leaning = calculate_user_results(_bundle(), ratings, [], 7, content=content, hybrid_alpha=0.25)
 
     assert als_leaning is not None and content_leaning is not None
-    als_order = {item["movieId"]: index for index, item in enumerate(als_leaning[1]["items"])}
-    content_order = {item["movieId"]: index for index, item in enumerate(content_leaning[1]["items"])}
+    als_order = {item["movieId"]: index for index, item in enumerate(als_leaning[1]["taste"])}
+    content_order = {item["movieId"]: index for index, item in enumerate(content_leaning[1]["taste"])}
     assert als_order[10] < als_order[20]
     assert content_order[20] < content_order[10]
 
@@ -322,7 +321,7 @@ def test_movies_without_any_component_are_not_candidates(frozen_clock) -> None:
     results = calculate_user_results(bundle, [ProfileInput(10, 5.0, "rating")], [], 7, content=_content(vectors), hybrid_alpha=0.5)
 
     assert results is not None
-    assert 40 not in {item["movieId"] for item in results[1]["items"]}
+    assert 40 not in {item["movieId"] for item in results[1]["taste"]}
 
 
 def test_hybrid_publishes_the_top_500_not_an_arbitrary_500(frozen_clock) -> None:
@@ -342,7 +341,7 @@ def test_hybrid_publishes_the_top_500_not_an_arbitrary_500(frozen_clock) -> None
     )
 
     assert results is not None
-    published = [item["movieId"] for item in results[1]["items"]]
+    published = [item["movieId"] for item in results[1]["taste"]]
     assert len(published) == 500
     # The weakest content vectors (100..299) must not make the cut.
     assert min(movie_id for movie_id in published if movie_id >= 100) > 100 + 700 - 500 - 5
@@ -360,7 +359,7 @@ def test_hybrid_candidates_are_limited_to_500_and_tie_broken_by_service_id(froze
     results = calculate_user_results(bundle, [ProfileInput(10, 5.0, "rating")], [], 7, content=content, hybrid_alpha=0.5)
 
     assert results is not None
-    items = results[1]["items"]
+    items = results[1]["taste"]
     assert len(items) == 500
     tied = [item["movieId"] for item in items if item["movieId"] >= 100]
     assert tied == sorted(tied)
@@ -375,7 +374,7 @@ def test_alpha_one_reproduces_the_als_ordering(frozen_clock) -> None:
     results = calculate_user_results(_bundle(), ratings, [], 7, content=_content(), hybrid_alpha=1.0)
 
     assert results is not None
-    items = results[1]["items"]
+    items = results[1]["taste"]
     scores = {item["movieId"]: item["score"] for item in items}
     assert scores[10] > scores[20]
     assert 30 in scores
@@ -400,14 +399,9 @@ def test_candidate_top500_is_selected_after_service_publishability_filtering() -
     )
 
     assert results is not None
-    candidate_items = results[1]["items"]
+    candidate_items = results[1]["taste"]
     assert len(candidate_items) == 500
     assert candidate_items[0]["movieId"] == 11_101
     assert candidate_items[-1]["movieId"] == 10_602
     assert len(results) == 2
-    assert all(
-        item["type"] == "TASTE"
-        and "reason" not in item
-        and "rerankFeatures" not in item
-        for item in candidate_items
-    )
+    assert all("reason" not in item and "rerankFeatures" not in item for item in candidate_items)

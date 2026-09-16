@@ -55,7 +55,6 @@ def process_user(
                 bundle,
                 ratings,
                 onboarding,
-                expected + 1,
                 content=content,
                 hybrid_alpha=hybrid_alpha,
                 min_input_count=min_input_count,
