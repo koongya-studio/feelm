@@ -20,14 +20,27 @@ REQUIRED_FILES = {
     'pipeline/spark/pyproject.toml',
     'pipeline/spark/uv.lock',
 }
-ALLOWED_URL_HOSTS = {'pypi.org', 'files.pythonhosted.org'}
+ALLOWED_REGISTRIES = {
+    'https://pypi.org/simple',
+    'https://download.pytorch.org/whl/cpu',
+}
+ALLOWED_URL_PATHS = {
+    'pypi.org': '/',
+    'files.pythonhosted.org': '/packages/',
+    'download-r2.pytorch.org': '/whl/cpu/',
+}
 EXPECTED_PROJECT = {
     'project': {
         'name': 'feelm-pipeline-spark',
         'version': '0.1.0',
         'description': 'FEELM PySpark pipeline batch and streaming jobs',
         'requires-python': '>=3.10,<3.11',
-        'dependencies': ['pyspark[ml]==4.1.3'],
+        'dependencies': [
+            'psycopg[binary]==3.2.10',
+            'pyspark[ml]==4.1.3',
+            'torch==2.6.0',
+            'transformers==4.48.3',
+        ],
     },
     'dependency-groups': {'dev': ['pytest==8.4.2', 'ruff==0.12.12']},
     'tool.pytest.ini_options': {
@@ -36,6 +49,12 @@ EXPECTED_PROJECT = {
     'tool.ruff': {'line-length': 100, 'target-version': 'py310'},
     'tool.ruff.lint': {'select': ['E', 'F', 'I', 'UP', 'B']},
     'tool.uv': {'package': False},
+    'tool.uv.sources': {'torch': {'index': 'pytorch-cpu'}},
+    'tool.uv.index': [{
+        'name': 'pytorch-cpu',
+        'url': 'https://download.pytorch.org/whl/cpu',
+        'explicit': True,
+    }],
 }
 
 
@@ -65,9 +84,31 @@ def strip_comment(line):
     return line
 
 
+def parse_reviewed_value(raw):
+    normalized = re.sub(r',\s*]', ']', raw)
+    if normalized in ('false', 'true'):
+        return normalized == 'true'
+    if re.fullmatch(r'[0-9]+', normalized):
+        return int(normalized)
+    if normalized.startswith('{') and normalized.endswith('}'):
+        body = normalized[1:-1].strip()
+        values = {}
+        for entry in body.split(',') if body else ():
+            match = re.fullmatch(r'\s*([a-zA-Z0-9_-]+)\s*=\s*("(?:[^"\\]|\\.)*")\s*', entry)
+            if match is None or match.group(1) in values:
+                raise ValueError('Pipeline manifest inline table is outside the reviewed syntax')
+            values[match.group(1)] = json.loads(match.group(2))
+        return values
+    try:
+        return json.loads(normalized)
+    except json.JSONDecodeError as exc:
+        raise ValueError('Pipeline manifest value is outside the reviewed syntax') from exc
+
+
 def parse_reviewed_project(value):
     sections = {}
     section = None
+    current = None
     lines = value.splitlines()
     index = 0
     while index < len(lines):
@@ -75,15 +116,27 @@ def parse_reviewed_project(value):
         index += 1
         if not line:
             continue
-        match = re.fullmatch(r'\[([a-zA-Z0-9_.-]+)\]', line)
+        match = re.fullmatch(r'(\[\[|\[)([a-zA-Z0-9_.-]+)(\]\]|\])', line)
         if match:
-            section = match.group(1)
-            if section in sections or section not in EXPECTED_PROJECT:
+            opening, section, closing = match.groups()
+            is_array = opening == '[['
+            if is_array != (closing == ']]'):
+                raise ValueError('Pipeline manifest contains an invalid section header')
+            expected = EXPECTED_PROJECT.get(section)
+            if expected is None or is_array != isinstance(expected, list):
                 raise ValueError('Pipeline manifest contains an unreviewed or duplicate section')
-            sections[section] = {}
+            if is_array:
+                sections.setdefault(section, [])
+                current = {}
+                sections[section].append(current)
+            else:
+                if section in sections:
+                    raise ValueError('Pipeline manifest contains an unreviewed or duplicate section')
+                current = {}
+                sections[section] = current
             continue
         match = re.fullmatch(r'([a-zA-Z0-9_-]+)\s*=\s*(.*)', line)
-        if section is None or match is None or match.group(1) in sections[section]:
+        if section is None or current is None or match is None or match.group(1) in current:
             raise ValueError('Pipeline manifest contains an invalid or duplicate key')
         key, raw = match.groups()
         balance = raw.count('[') - raw.count(']')
@@ -94,17 +147,7 @@ def parse_reviewed_project(value):
             balance += continuation.count('[') - continuation.count(']')
         if balance != 0:
             raise ValueError('Pipeline manifest contains an unterminated array')
-        normalized = re.sub(r',\s*]', ']', raw)
-        if normalized == 'false':
-            parsed = False
-        elif re.fullmatch(r'[0-9]+', normalized):
-            parsed = int(normalized)
-        else:
-            try:
-                parsed = json.loads(normalized)
-            except json.JSONDecodeError as exc:
-                raise ValueError('Pipeline manifest value is outside the reviewed syntax') from exc
-        sections[section][key] = parsed
+        current[key] = parse_reviewed_value(raw)
     if sections != EXPECTED_PROJECT:
         raise ValueError('Pipeline manifest differs from the reviewed runtime policy')
 
@@ -124,6 +167,7 @@ def validate_project_policy(files):
     source_lines = re.findall(r'(?m)^source = \{ ([^{}]+) \}$', lock)
     allowed_sources = {
         'registry = "https://pypi.org/simple"',
+        'registry = "https://download.pytorch.org/whl/cpu"',
         'virtual = "."',
     }
     if not source_lines or any(source not in allowed_sources for source in source_lines):
@@ -134,11 +178,13 @@ def validate_project_policy(files):
     registries = re.findall(r'registry\s*=\s*"([^"]+)"', lock)
     urls = re.findall(r'\burl\s*=\s*"([^"]+)"', lock)
     hashes = re.findall(r'\bhash\s*=\s*"([^"]+)"', lock)
-    if not registries or any(value != 'https://pypi.org/simple' for value in registries):
+    if not registries or any(value not in ALLOWED_REGISTRIES for value in registries):
         raise ValueError('Pipeline lock uses an unapproved registry source')
     for value in urls:
         parsed = urllib.parse.urlsplit(value)
-        if (parsed.scheme != 'https' or parsed.hostname not in ALLOWED_URL_HOSTS
+        allowed_path = ALLOWED_URL_PATHS.get(parsed.hostname)
+        if (parsed.scheme != 'https' or allowed_path is None
+                or not parsed.path.startswith(allowed_path)
                 or parsed.port is not None or parsed.username is not None
                 or parsed.password is not None or parsed.query or parsed.fragment):
             raise ValueError('Pipeline lock uses an unapproved package source')
