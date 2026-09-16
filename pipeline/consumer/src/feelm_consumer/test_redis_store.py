@@ -92,9 +92,9 @@ def test_real_redis_corrupt_or_partial_version_is_atomically_recovered(real_redi
 def test_real_redis_persists_empty_discovery_group_with_matching_generation(real_redis: redis.Redis) -> None:
     fence = claim_partition_fence(real_redis, "group", "topic", 0)
     generation_id = "generation-1"
-    vector = {"candidateVersion": 4, "generationId": generation_id, "vector": [0.1]}
+    vector = {"candidateVersion": 5, "generationId": generation_id, "vector": [0.1]}
     candidates = {
-        "candidateVersion": 4,
+        "candidateVersion": 5,
         "generationId": generation_id,
         "taste": [
             {

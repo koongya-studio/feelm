@@ -73,7 +73,6 @@ def _legacy_results(bundle: ArtifactBundle, ratings, onboarding, candidate_versi
         rating_count=len(ratings),
         factor_backed_input_count=folded.factor_backed_input_count,
         candidates=rank_candidates(folded.vector, service_factors),
-        movie_metadata=bundle.movie_metadata,
         reasons=build_candidate_reasons(rank_candidates(folded.vector, service_factors), merged_inputs, bundle.movie_metadata),
     )
 
@@ -316,7 +315,17 @@ def test_group_enabled_service_emits_discovery_without_changing_taste(frozen_clo
     assert legacy is not None and grouped is not None
     assert grouped[1]["taste"] == legacy[1]["taste"]
     assert [item["movieId"] for item in grouped[1]["discovery"]] == [20]
-    assert grouped[1]["discovery"][0]["flavorCode"] is None
+    assert "flavorCode" not in grouped[1]["discovery"][0]
+    assert grouped[1]["discovery"][0]["reason"] == {
+        "code": "DISCOVERY_AGGREGATE_AFFINITY",
+        "directionSource": "RATING",
+        "contributorCount": 1,
+        "topContributors": [{"movieId": 10, "relation": "POSITIVE_ALIGNMENT"}],
+        "topContributionCoverage": 1.0,
+        "viewedCountInGroup": 0,
+        "affinityRank": 1,
+        "popularityRankInGroup": 1,
+    }
 
 
 def test_fold_in_failure_with_inputs_is_raised_not_skipped() -> None:

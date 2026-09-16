@@ -159,6 +159,107 @@ def test_onboarding_dislike_reverses_which_tenth_group_is_supplied() -> None:
     assert 111 not in {item.movie_id for item in liked.candidates}
     assert 101 not in {item.movie_id for item in disliked.candidates}
     assert 111 in {item.movie_id for item in disliked.candidates}
+    assert disliked.reasons[111].top_contributors[0].payload() == {
+        "movieId": 1,
+        "relation": "NEGATIVE_CONTRAST",
+    }
+
+
+def test_discovery_reason_uses_all_mixed_onboarding_contributors() -> None:
+    bundle = FakeGroupBundle({1: 0, 2: 1, 3: 2, 20: 3})
+    bundle.group_means[[0, 1, 2, 3], :] = 0.0
+    bundle.group_means[0, 0] = 0.5
+    bundle.group_means[1, 0] = 0.25
+    bundle.group_means[2, 0] = -0.25
+    bundle.group_means[3, 0] = 1.0
+    onboarding = [
+        ProfileInput(1, 4.271231616529622, "onboarding"),
+        ProfileInput(2, 4.271231616529622, "onboarding"),
+        ProfileInput(3, 2.798442509805467, "onboarding"),
+    ]
+
+    selection = select_discovery_candidates(
+        bundle,
+        [RankedMovie(20, 0.9)],
+        [],
+        onboarding,
+        popularity_ranking=[RankedMovie(20, 1.0)],
+    )
+
+    reason = selection.reasons[20]
+    assert reason.direction_source == "ONBOARDING"
+    assert reason.contributor_count == 3
+    assert [contributor.payload() for contributor in reason.top_contributors] == [
+        {"movieId": 1, "relation": "POSITIVE_ALIGNMENT"},
+        {"movieId": 2, "relation": "POSITIVE_ALIGNMENT"},
+        {"movieId": 3, "relation": "NEGATIVE_CONTRAST"},
+    ]
+    assert reason.top_contribution_coverage == 1.0
+
+
+def test_discovery_reason_coverage_uses_all_positive_rating_contributors() -> None:
+    assignments = {movie_id: 0 for movie_id in range(1, 11)}
+    assignments[20] = 1
+    bundle = FakeGroupBundle(assignments)
+    bundle.group_means[1, 0] = 1.0
+    ratings = [ProfileInput(movie_id, 5.0, "rating") for movie_id in range(1, 11)]
+
+    selection = select_discovery_candidates(
+        bundle,
+        [RankedMovie(20, 0.9)],
+        ratings,
+        [],
+        popularity_ranking=[RankedMovie(20, 1.0)],
+    )
+
+    reason = selection.reasons[20]
+    assert reason.direction_source == "RATING"
+    assert reason.contributor_count == 10
+    assert [contributor.movie_id for contributor in reason.top_contributors] == [1, 2, 3]
+    assert reason.top_contribution_coverage == 0.3
+    assert reason.viewed_count_in_group == 0
+    assert reason.affinity_rank == 1
+    assert reason.popularity_rank_in_group == 1
+
+
+def test_discovery_reason_has_zero_coverage_without_positive_contributors() -> None:
+    bundle = FakeGroupBundle({1: 0, 20: 1})
+
+    selection = select_discovery_candidates(
+        bundle,
+        [RankedMovie(20, 0.9)],
+        [ProfileInput(1, 5.0, "rating")],
+        [],
+        popularity_ranking=[RankedMovie(20, 1.0)],
+    )
+
+    reason = selection.reasons[20]
+    assert reason.contributor_count == 0
+    assert reason.top_contributors == ()
+    assert reason.top_contribution_coverage == 0.0
+
+
+def test_discovery_reason_marks_low_rating_opposition_as_negative_contrast() -> None:
+    bundle = FakeGroupBundle({1: 0, 20: 1})
+    bundle.group_means[1, :] = 0.0
+    bundle.group_means[1, 0] = -1.0
+
+    selection = select_discovery_candidates(
+        bundle,
+        [RankedMovie(20, 0.9)],
+        [ProfileInput(1, 0.5, "rating")],
+        [],
+        popularity_ranking=[RankedMovie(20, 1.0)],
+    )
+
+    reason = selection.reasons[20]
+    assert reason.direction_source == "RATING"
+    assert reason.contributor_count == 1
+    assert reason.top_contributors[0].payload() == {
+        "movieId": 1,
+        "relation": "NEGATIVE_CONTRAST",
+    }
+    assert reason.top_contribution_coverage == 1.0
 
 
 def test_popularity_selects_group_pool_then_personal_score_orders_it() -> None:

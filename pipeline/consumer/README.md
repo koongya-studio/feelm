@@ -172,8 +172,10 @@ Spring은 TASTE 2편을 먼저 고르고 양쪽 목록의 중복을 건너뛴 DI
 
 - S15P21E106-415: 이 절의 DISCOVERY 후보 생성과 로컬 정책 검증
 - S15P21E106-471: Candidate v3 `taste`/`discovery` 그룹화와 `generationId` Consumer writer 기준선
-- S15P21E106-481: 후보별 구조화 `reason`을 추가한 현재 Candidate v4 writer·payload 계약. Spring
-  reader·2+1 조립은 Backend 소비 계약이며 현재 `develop`에는 구현되지 않았다
+- S15P21E106-481: TASTE 후보별 구조화 `reason`을 추가한 Candidate v4 writer·payload 기준선
+- S15P21E106-488: 전체 평가 또는 온보딩 이력으로 계산한 저이력 그룹 적합도·상위 기여 비율을
+  DISCOVERY 전용 `reason`으로 추가한 현재 Candidate v5 writer·payload 계약. Spring reader·2+1 조립은
+  Backend 소비 계약이며 현재 `develop`에는 구현되지 않았다
 - S15P21E106-482: 그룹·대중성 번들의 HDFS 게시, 두 URI 동시 활성화, 재시작·rollback 검증
 - S15P21E106-483: 후보 부족분용 별도 POPULAR fallback. 이 절의 `discovery-popularity`와 다른 산출물
 
@@ -351,12 +353,18 @@ opaque token으로 교체하며 후보 결과를 읽는 Spring은 이 키에 의
 `reason`은 Consumer가 만든 구조화된 근거(`code`, `sourceMovieIds`, `matchedGenreCodes`)이며 Spring이 영화·장르명을
 조회해 사용자 문구로 변환한다. `SHARED_GENRE`는 고평점 source 영화와 후보의 공통 장르를, `TOP_RATED_SOURCE`는
 공통 장르가 없을 때 가장 높은 평가 source 영화를 뜻한다.
-`candidates.discovery`는 그룹 산출물을 설정하면 `movieId`, `score`, nullable `flavorCode`를 포함하고,
-설정하지 않으면 빈 배열이다. DISCOVERY의 `reason`은 후속 업무에서 적용하며, 공급 그룹 수 같은 진단 값은
-Redis에 게시하지 않고 Consumer 로그에만 남긴다.
-두 payload에는 동일한 `candidateVersion=4`(JSON 형식 버전)와 `generationId`(한 번의 생성 결과 식별자)가
-포함된다. `candidateVersion=3` 또는 더 이른 payload에는 `reason`이 없으므로 Spring reader 전환 전에 모든 활성
-사용자를 재게시해 `candidateVersion=4`로 갱신해야 한다. Consumer는 추천 문구가 아니라 구조화된 `reason`만 생성하며,
-Spring이 최종 추천의 검증 가능한 근거로 문구를 구성한다.
+`candidates.discovery`는 그룹 산출물을 설정하면 `movieId`, `score`, DISCOVERY 전용 `reason`을 포함하고,
+설정하지 않으면 빈 배열이다. 영화 대표 맛을 포함한 표시용 메타데이터는 Spring이 PostgreSQL에서 조회한다.
+`DISCOVERY_AGGREGATE_AFFINITY`는 전체 평가 이력으로 만든
+방향을 우선하고 방향을 만들 수 없을 때만 온보딩 전체를 사용한다. `topContributors`는 후보 그룹 적합도에 양의
+기여를 한 입력 중 상위 3개, `contributorCount`는 그런 입력 전체 수, `topContributionCoverage`는 양의 기여
+총합 중 상위 3개 기여 합의 비율이다. 이 비율은 그룹 적합도 근거의 집중도이지 영화 최종 점수의 설명률이 아니다.
+`viewedCountInGroup`, `affinityRank`, `popularityRankInGroup`은 각각 저이력 판정, 적격 그룹 중 궁합 순위,
+제외 후 그룹 내부 대중성 순위를 나타낸다. 공급 그룹 수 같은 전역 진단 값은 Redis에 게시하지 않고 Consumer 로그에만 남긴다.
+두 payload에는 동일한 `candidateVersion=5`(JSON 형식 버전)와 `generationId`(한 번의 생성 결과 식별자)가
+포함된다. Candidate v4의 DISCOVERY 항목에는 `reason`이 없으므로, Backend가 v4/v5를 함께 읽는 전환 reader를
+먼저 반영하고 Consumer v5 전환과 함께 모든 활성 사용자를 재게시한다. v5와 `generationId` 일치를 확인한 뒤
+Backend의 v4 호환을 제거한다. Consumer는 추천 문구나 `CONCENTRATED` 같은 임의 구간값이 아니라 구조화된
+측정값만 생성한다. Spring은 합의한 coverage 기준보다 낮으면 개별 영화명 대신 전체 이력 기반 문구를 사용한다.
 Spring이 후보 전체의 최종 제외·재정렬을 담당한다. 영화별 OTT 제공 정보와 사용자 OTT 클릭 정보는 PostgreSQL에서 조회한다. 별도 `topn`은 생성하거나 복구 조건에 포함하지 않는다.
 기존 `topn` 키 자동 삭제는 하지 않는다. 배포 전 Spring reader 전환이 필요하다.

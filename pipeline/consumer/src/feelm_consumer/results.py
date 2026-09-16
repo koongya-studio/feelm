@@ -3,11 +3,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from feelm_consumer.artifacts import MovieMetadata
+from feelm_consumer.discovery import DiscoveryReason
 from feelm_consumer.ranking import RankedMovie
 from feelm_consumer.xai import CandidateReason
 
-CANDIDATE_VERSION = 4
+CANDIDATE_VERSION = 5
 
 
 def utc_now() -> str:
@@ -22,8 +22,8 @@ def build_results(
     factor_backed_input_count: int,
     candidates: list[RankedMovie],
     discovery_candidates: list[RankedMovie] | None = None,
-    movie_metadata: dict[int, MovieMetadata],
     reasons: dict[int, CandidateReason],
+    discovery_reasons: dict[int, DiscoveryReason] | None = None,
     generated_at: str | None = None,
     generation_id: str | None = None,
 ) -> tuple[dict[str, object], dict[str, object]]:
@@ -54,7 +54,7 @@ def build_results(
             {
                 "movieId": item.movie_id,
                 "score": item.score,
-                "flavorCode": movie_metadata[item.movie_id].flavor_code,
+                "reason": (discovery_reasons or {})[item.movie_id].payload(),
             }
             for item in discovery_candidates or []
         ],

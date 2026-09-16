@@ -39,3 +39,20 @@ def test_candidate_reason_keeps_a_top_rated_source_when_genres_do_not_overlap() 
         "sourceMovieIds": [1],
         "matchedGenreCodes": [],
     }
+
+
+def test_candidate_reason_uses_onboarding_source_when_no_rating_source_exists() -> None:
+    metadata = {
+        1: MovieMetadata("onboarding", ("MYSTERY",), None),
+        2: MovieMetadata("discovery", ("MYSTERY", "THRILLER"), None),
+    }
+
+    reasons = build_candidate_reasons(
+        [RankedMovie(2, 0.9)], [ProfileInput(1, 4.271231616529622, "onboarding")], metadata
+    )
+
+    assert reasons[2].payload() == {
+        "code": "SHARED_GENRE",
+        "sourceMovieIds": [1],
+        "matchedGenreCodes": ["MYSTERY"],
+    }
