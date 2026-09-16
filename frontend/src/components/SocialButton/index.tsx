@@ -16,8 +16,13 @@
  */
 import type { ButtonHTMLAttributes } from 'react';
 import styles from './SocialButton.module.css';
+import type { SocialProvider } from '../../types/auth';
 
-export type SocialProvider = 'kakao' | 'naver' | 'google';
+/*
+ * 제공자 값은 계약이 정한 것이라(API-007 경로 파라미터) `types/auth`에 두고 여기서는
+ * 다시 내보내기만 한다. 이 컴포넌트를 쓰는 화면이 이미 이 이름으로 가져다 쓴다.
+ */
+export type { SocialProvider };
 
 /** 와이어프레임 0.2 · 0.6이 쓰는 표식 글자 */
 const MARK: Record<SocialProvider, string> = {

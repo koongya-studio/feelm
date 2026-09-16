@@ -18,10 +18,12 @@ import OnboardingLayout from '../layouts/OnboardingLayout';
 import AccountFindPage from '../pages/auth/AccountFindPage';
 import EmailSignupPage from '../pages/auth/EmailSignupPage';
 import LoginPage from '../pages/auth/LoginPage';
+import OAuthCallbackPage from '../pages/auth/OAuthCallbackPage';
 import PasswordResetPage from '../pages/auth/PasswordResetPage';
 import SignupCompletePage from '../pages/auth/SignupCompletePage';
 import SignupMethodPage from '../pages/auth/SignupMethodPage';
 import SocialSignupPage from '../pages/auth/SocialSignupPage';
+import SocialSignupProfilePage from '../pages/auth/SocialSignupProfilePage';
 import StartPage from '../pages/auth/StartPage';
 import VerifyEmailCompletePage from '../pages/auth/VerifyEmailCompletePage';
 import VerifyEmailPage from '../pages/auth/VerifyEmailPage';
@@ -81,11 +83,13 @@ export const router = createBrowserRouter(
         { path: ROUTE_PATTERN.authStart, element: <StartPage /> },
         { path: ROUTE_PATTERN.signupMethod, element: <SignupMethodPage /> },
         { path: ROUTE_PATTERN.signupSocial, element: <SocialSignupPage /> },
+        { path: ROUTE_PATTERN.signupSocialProfile, element: <SocialSignupProfilePage /> },
         { path: ROUTE_PATTERN.signupEmail, element: <EmailSignupPage /> },
         { path: ROUTE_PATTERN.signupComplete, element: <SignupCompletePage /> },
         { path: ROUTE_PATTERN.login, element: <LoginPage /> },
         { path: ROUTE_PATTERN.accountFind, element: <AccountFindPage /> },
         { path: ROUTE_PATTERN.passwordReset, element: <PasswordResetPage /> },
+        { path: ROUTE_PATTERN.oauthCallback, element: <OAuthCallbackPage /> },
         { path: ROUTE_PATTERN.verifyEmail, element: <VerifyEmailPage /> },
         { path: ROUTE_PATTERN.verifyEmailComplete, element: <VerifyEmailCompletePage /> },
       ],

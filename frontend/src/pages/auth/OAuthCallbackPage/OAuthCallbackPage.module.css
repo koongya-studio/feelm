@@ -1,0 +1,30 @@
+/*
+ * 소셜 로그인 콜백. 대부분 잠깐 스치는 화면이라 0.8 이메일 인증과 같은 전환 구성을
+ * 따른다. 보이는 시간이 긴 것은 실패했을 때뿐이다.
+ */
+.page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--screen-padding-x);
+}
+
+.progress {
+  margin: 0;
+  text-align: center;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  color: var(--color-ink-muted);
+}
+
+.failure {
+  margin: 0;
+  text-align: center;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  color: var(--color-danger);
+}

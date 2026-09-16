@@ -22,6 +22,8 @@ function renderEntry(status: AuthStatus) {
     status,
     user: null,
     signIn: vi.fn(),
+    signInWithSocial: vi.fn(),
+    completeSocialSignup: vi.fn(),
     signOut: vi.fn(),
   };
 

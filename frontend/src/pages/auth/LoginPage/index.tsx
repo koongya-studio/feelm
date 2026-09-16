@@ -17,8 +17,9 @@
  * 와이어프레임의 `아이디 찾기` · `비밀번호 찾기`는 둘 다 0.7로 간다. 0.7이 두 갈래를
  * 탭으로 나눠 갖고 있으므로 어느 탭으로 열지를 함께 넘긴다.
  *
- * `[?]` 소셜 로그인(API-007~009)은 이번 연동 범위가 아니다. 목업으로 로그인한 척하면
- * 세션 없이 홈으로 들어가므로 버튼을 잠가 두었다.
+ * 소셜 로그인은 제공자 동의 화면으로 나갔다가 콜백으로 돌아온다(API-007). 연결된 계정이
+ * 없으면 로그인이 아니라 가입이 남은 것이라 콜백이 0.3-A로 보낸다(S15P21E106-499).
+ * client-id가 설정되지 않은 제공자는 눌러도 `UNSUPPORTED_PROVIDER`라 버튼을 잠근다.
  *
  * **영화 티켓 디자인** (받은 시안, 2026-09-14, S15P21E106-319). 모든 요소가 모서리가 파인
  * 티켓 한 장 위에 선다. 절취선 아래 꼬리표에는 장식 바코드가 찍힌다. 티켓 테두리 · 절취선 ·
@@ -35,6 +36,7 @@ import { resendVerificationMail } from '../../../api/auth';
 import { ApiError } from '../../../api/apiError';
 import { useAuth } from '../../../contexts/authContext';
 import { path } from '../../../routes/paths';
+import { isOAuthConfigured, startOAuth } from '../../../utils/oauth';
 import styles from './LoginPage.module.css';
 import Ticket, { Barcode } from './Ticket';
 
@@ -57,6 +59,9 @@ type Failure = { code: string; message: string };
 export default function LoginPage() {
   const navigate = useNavigate();
   const { signIn } = useAuth();
+
+  /* 한 곳이라도 열려 있으면 준비 중 안내를 내린다 */
+  const ready = PROVIDERS.some(({ provider }) => isOAuthConfigured(provider));
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -181,12 +186,13 @@ export default function LoginPage() {
               provider={provider}
               label={label}
               appearance="brand"
-              disabled
+              disabled={!isOAuthConfigured(provider)}
+              onClick={() => startOAuth(provider, 'login')}
             />
           ))}
         </div>
 
-        <p className={styles.notice}>소셜 로그인은 준비 중입니다.</p>
+        {ready ? null : <p className={styles.notice}>소셜 로그인은 준비 중입니다.</p>}
       </Ticket>
     </div>
   );

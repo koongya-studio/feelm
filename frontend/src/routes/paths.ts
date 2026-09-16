@@ -14,11 +14,25 @@ export const ROUTE_PATTERN = {
   authStart: '/start',
   signupMethod: '/signup',
   signupSocial: '/signup/social',
+  /**
+   * 0.3-A 소셜 가입 정보 입력. 와이어프레임에 없이 새로 만든 화면이다(CR-23).
+   * API-008이 닉네임·생년월일·성별을 필수로 받는데 이동표에는 입력 자리가 없었다
+   * (S15P21E106-499).
+   */
+  signupSocialProfile: '/signup/social/profile',
   signupEmail: '/signup/email',
   signupComplete: '/signup/complete',
   login: '/login',
   accountFind: '/account/find',
   passwordReset: '/account/reset',
+  /**
+   * 소셜 로그인 콜백. 화면 번호가 없는 통과 지점이다.
+   *
+   * 제공자 콘솔과 백엔드 허용 목록에 등록한 주소와 **정확히 같아야** 한다
+   * (`utils/oauth.ts`). 제공자를 경로에 넣지 않고 `state`로 기억하는 것은 콘솔마다
+   * 주소를 따로 등록하지 않기 위해서다.
+   */
+  oauthCallback: '/oauth/callback',
   // 0.8. 인증 메일 링크가 도착하는 곳이라 백엔드 설정값과 같아야 한다(S15P21E106-367)
   verifyEmail: '/verify-email',
   // 0.8-A. 0.8이 인증에 성공하면 넘어온다(팀 결정 2026-09-14, S15P21E106-319)
@@ -112,11 +126,13 @@ export const path = {
   authStart: () => ROUTE_PATTERN.authStart,
   signupMethod: () => ROUTE_PATTERN.signupMethod,
   signupSocial: () => ROUTE_PATTERN.signupSocial,
+  signupSocialProfile: () => ROUTE_PATTERN.signupSocialProfile,
   signupEmail: () => ROUTE_PATTERN.signupEmail,
   signupComplete: () => ROUTE_PATTERN.signupComplete,
   login: () => ROUTE_PATTERN.login,
   accountFind: () => ROUTE_PATTERN.accountFind,
   passwordReset: () => ROUTE_PATTERN.passwordReset,
+  oauthCallback: () => ROUTE_PATTERN.oauthCallback,
   verifyEmail: () => ROUTE_PATTERN.verifyEmail,
   verifyEmailComplete: () => ROUTE_PATTERN.verifyEmailComplete,
 

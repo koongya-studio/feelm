@@ -6,12 +6,15 @@
  * 0.2 → 0.4 이메일로 가입하기
  * 0.2 ⇢ 0.6 이미 계정이 있는 사용자의 로그인
  *
- * 소셜 가입이 0.5로 바로 가는 것은 이동표가 정한 것이다. 0.3 소셜 계정 회원가입은
- * 0.4에서 `소셜 계정으로 가입`을 고를 때 들어가는 화면이라(0.4 ⇢ 0.3) 여기서는
- * 거치지 않는다.
+ * 0.3 소셜 계정 회원가입은 0.4에서 `소셜 계정으로 가입`을 고를 때 들어가는 화면이라
+ * (0.4 ⇢ 0.3) 여기서는 거치지 않는다.
  *
- * `[?]` 실제 OAuth 이동은 이번 범위가 아니다. 목업이라 제공자를 눌러도 곧바로 0.5로
- * 간다.
+ * 이동표는 0.2 → 0.5로 곧장 가지만 실제로는 제공자 동의 화면과 콜백을 거치고, 연결된
+ * 계정이 없으면 0.3-A에서 닉네임·생년월일·성별을 받는다. API-008이 요구하는 값이라
+ * 받을 자리가 필요하다(CR-23, S15P21E106-499).
+ *
+ * 자격 증명이 설정되지 않은 제공자는 버튼을 잠근다. 눌러 봐야 백엔드가
+ * `UNSUPPORTED_PROVIDER`로 답한다.
  */
 import { Link, useNavigate } from 'react-router';
 import Button from '../../../components/Button';
@@ -19,6 +22,7 @@ import SocialButton from '../../../components/SocialButton';
 import type { SocialProvider } from '../../../components/SocialButton';
 import Wordmark from '../../../components/Wordmark';
 import { path } from '../../../routes/paths';
+import { isOAuthConfigured, startOAuth } from '../../../utils/oauth';
 import styles from './SignupMethodPage.module.css';
 
 /** 와이어프레임 0.2의 나열 순서다 */
@@ -48,7 +52,8 @@ export default function SignupMethodPage() {
             key={provider}
             provider={provider}
             label={label}
-            onClick={() => void navigate(path.signupComplete())}
+            disabled={!isOAuthConfigured(provider)}
+            onClick={() => startOAuth(provider, 'signup')}
           />
         ))}
       </div>
