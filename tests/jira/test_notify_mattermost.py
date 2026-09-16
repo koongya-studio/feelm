@@ -65,13 +65,16 @@ class NotifyMattermostTest(unittest.TestCase):
             date(2026, 9, 16),
         )
         self.assertIn("2026-09-16", message)
-        self.assertIn("활성 스프린트 미완료 작업: **3개**", message)
-        self.assertIn("**진행 중** (1)", message)
-        self.assertIn("[TEST-1](https://jira.example/browse/TEST-1) Working", message)
-        self.assertLess(message.index("#### 가나다"), message.index("#### 미할당"))
+        self.assertIn("**📊 전체 요약** · 총 **3건**", message)
+        self.assertIn("🚧 진행 중 **1건**", message)
+        self.assertIn("📌 해야 할 일 **2건**", message)
+        self.assertIn("**🚧 진행 중 · 1건**", message)
+        self.assertIn("[**TEST-1**](https://jira.example/browse/TEST-1) Working", message)
+        self.assertLess(message.index("### 👤 가나다"), message.index("### ⚠️ 미할당"))
 
     def test_empty_message_is_explicit(self):
         message = MODULE.build_message([], "https://jira.example", date(2026, 9, 16))
+        self.assertIn("☀️ Jira 아침 작업 현황", message)
         self.assertIn("완료되지 않은 작업이 없습니다", message)
 
     def test_long_message_is_bounded(self):
