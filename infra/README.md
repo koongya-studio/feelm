@@ -1520,14 +1520,21 @@ Masked로 관리하고 로그에 출력하지 않습니다.
 과거 Pipeline이 최신 배포를 덮어쓰지 않습니다. 배포와 의존성 캐시 작업은 같은
 `resource_group`으로 직렬화합니다.
 
-각 `deploy-backend`, `deploy-frontend`, `deploy-consumer` Job은 `after_script`에서 실제
-`CI_JOB_STATUS`를 Mattermost 팀 채널로 전송합니다. 기존 Jira 일일 알림과 같은
+각 `deploy-backend`, `deploy-frontend`, `deploy-consumer`, `deploy-redis`,
+`deploy-monitoring` Job은 `after_script`에서 실제 `CI_JOB_STATUS`를 Mattermost 팀 채널로
+전송합니다. 기존 Jira 일일 알림과 같은
 `MATTERMOST_BASE_URL`, `MATTERMOST_LOGIN_ID`, `MATTERMOST_PASSWORD` 및 채널 선택 변수를
 사용해 로그인하고 게시 후 로그아웃합니다. 알림에는 대상 서비스, 배포 환경, commit SHA와
 GitLab Job·Pipeline 링크만 포함하며 Secret이나 전체 환경변수를 포함하지 않습니다.
 Mattermost 장애가 실제 배포 성공·실패 결과를 덮어쓰지 않도록 알림 실패는 경고로 기록하고
 종료 코드 0을 반환합니다. 따라서 경고가 있으면 Job 링크에서 원인을 확인하고 채널 수신 여부를
 별도로 복구합니다.
+
+보호된 `develop` Push Pipeline은 마지막 `notify` stage에서 GitLab Jobs API로 실행 결과를
+확인합니다. `verify`, `test`, `build` 단계의 필수 Job이 실패한 경우에만 실패 Job명과 링크를
+Mattermost에 한 건 전송합니다. 성공·취소·허용된 실패에는 추가 알림을 보내지 않으며,
+`deploy-*` 실패는 각 배포 Job의 기존 알림만 사용해 중복을 피합니다. 조회에는 별도 Token을
+추가하지 않고 실행 중인 `CI_JOB_TOKEN`의 Jobs API 읽기 권한을 사용합니다.
 
 GitLab 프로젝트 CI/CD Variables의 기존 Jira 일일 알림용 Mattermost 설정을 그대로
 사용합니다. `MATTERMOST_PASSWORD`는 `Masked and hidden`, `Protected`를 유지하고 나머지
