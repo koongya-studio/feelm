@@ -87,7 +87,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-043 | [프레임 상세 조회](./taste.md#api-043-프레임-상세-조회) | GET | `/frames/{frameId}` | 취향 | 1차 MVP | 회원 | FR-08 |  |
 | API-044 | [팝콘 맛 기준정보 조회](./taste.md#api-044-팝콘-맛-기준정보-조회) | GET | `/popcorn-flavors` | 취향 | 1차 MVP | 공개 | FR-06 | O |
 | API-045 | [기본 추천 조회](./recommendation.md#api-045-기본-추천-조회) | GET | `/recommendations` | 추천 | 1차 MVP | 회원 | FR-10, FR-12, FR-13 | O |
-| API-046 | [추가 영화 추천](./recommendation.md#api-046-추가-영화-추천) | POST | `/recommendations/more` | 추천 | 1차 MVP | 회원 | FR-10 | O |
+| API-046 | [추천 카드 보충](./recommendation.md#api-046-추천-카드-보충) | POST | `/recommendations/replenish` | 추천 | 1차 MVP | 회원 | FR-10 | O |
 | API-047 | [관심없음 표시](./recommendation.md#api-047-관심없음-표시) | POST | `/movies/{movieId}/dismiss` | 추천 | 1차 MVP | 회원 | FR-36 | O |
 | API-048 | [추천 이력 조회](./recommendation.md#api-048-추천-이력-조회) | GET | `/recommendations/history` | 추천 | 1차 MVP | 회원 | FR-33, FR-13 |  |
 | API-049 | [파티 생성](./party.md#api-049-파티-생성) | POST | `/parties` | 파티 | 1차 MVP | 회원 | FR-20 | O |

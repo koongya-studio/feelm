@@ -37,6 +37,7 @@ class ErrorCodeTest {
         assertThat(ErrorCode.RATE_LIMITED.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
         assertThat(ErrorCode.INTERNAL_ERROR.getStatus())
                 .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        assertThat(ErrorCode.RECOMMENDATION_SET_STALE.getStatus()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(ErrorCode.RECOMMENDATION_UNAVAILABLE.getStatus())
                 .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     }
@@ -93,6 +94,8 @@ class ErrorCodeTest {
                         "ONBOARDING_ALREADY_COMPLETED",
                         // 추천 도메인 — API-047 관심없음 (S15P21E106-165)
                         "ALREADY_DISMISSED",
+                        // 추천 도메인 — API-046 추천 카드 보충 (S15P21E106-194)
+                        "RECOMMENDATION_SET_STALE",
                         // 파티 도메인 — API-051·055·056·069
                         "PARTY_CLOSED",
                         "PARTY_FULL",
