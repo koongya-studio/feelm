@@ -45,18 +45,6 @@ public class RecommendationServingRepository {
                 .findFirst();
     }
 
-    public Optional<RecommendationSet> findOwnedSet(long userId, long setId) {
-        return jdbcTemplate
-                .query(
-                        "SELECT id,generated_at FROM recommendation_sets"
-                                + " WHERE id=? AND user_id=? AND party_id IS NULL",
-                        (resultSet, rowNumber) -> mapSet(resultSet),
-                        setId,
-                        userId)
-                .stream()
-                .findFirst();
-    }
-
     public List<ServingItem> findInitialVisibleItems(long userId, long setId) {
         List<ServingItem> discovery = findExposed(userId, setId, "DISCOVERY", DISCOVERY_SIZE);
         int tasteSize = discovery.isEmpty() ? TASTE_SIZE + DISCOVERY_SIZE : TASTE_SIZE;
@@ -93,58 +81,8 @@ public class RecommendationServingRepository {
         return List.copyOf(items);
     }
 
-    public Optional<SourceItem> findOwnedExposedSource(
-            long userId, long setId, long recommendationItemId) {
-        return jdbcTemplate
-                .query(
-                        "SELECT i.id,i.movie_id,i.type FROM recommendation_items i"
-                                + " JOIN recommendation_sets s ON s.id=i.set_id"
-                                + " WHERE i.id=? AND i.set_id=? AND i.exposed_at IS NOT NULL"
-                                + " AND i.type IN ('TASTE','DISCOVERY')"
-                                + " AND s.user_id=? AND s.party_id IS NULL",
-                        (resultSet, rowNumber) ->
-                                new SourceItem(
-                                        resultSet.getLong("id"),
-                                        resultSet.getLong("movie_id"),
-                                        resultSet.getString("type")),
-                        recommendationItemId,
-                        setId,
-                        userId)
-                .stream()
-                .findFirst();
-    }
-
-    public boolean isRemoved(long userId, long movieId) {
-        Boolean removed =
-                jdbcTemplate.queryForObject(
-                        "SELECT EXISTS (SELECT 1 FROM user_movie_dismissals"
-                                + " WHERE user_id=? AND movie_id=?)"
-                                + " OR EXISTS (SELECT 1 FROM ratings"
-                                + " WHERE user_id=? AND movie_id=?)",
-                        Boolean.class,
-                        userId,
-                        movieId,
-                        userId,
-                        movieId);
-        return Boolean.TRUE.equals(removed);
-    }
-
     public Optional<ServingItem> findAndLockNextItem(long userId, long setId, String type) {
         return findUnexposedForUpdate(userId, setId, type, 1).stream().findFirst();
-    }
-
-    public boolean hasUnexposedCandidate(long userId, long setId, String type) {
-        Integer count =
-                jdbcTemplate.queryForObject(
-                        "SELECT count(*) FROM recommendation_items i"
-                                + " WHERE i.set_id=? AND i.type=? AND i.exposed_at IS NULL"
-                                + validCandidateClause(),
-                        Integer.class,
-                        setId,
-                        type,
-                        userId,
-                        userId);
-        return count != null && count > 0;
     }
 
     private List<ServingItem> findExposed(long userId, long setId, String type, int limit) {
@@ -264,8 +202,6 @@ public class RecommendationServingRepository {
     }
 
     public record RecommendationSet(long id, OffsetDateTime generatedAt) {}
-
-    public record SourceItem(long id, long movieId, String type) {}
 
     public record ServingItem(
             long id,

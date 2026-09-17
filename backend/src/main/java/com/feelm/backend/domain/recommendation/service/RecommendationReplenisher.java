@@ -2,17 +2,17 @@ package com.feelm.backend.domain.recommendation.service;
 
 import com.feelm.backend.domain.recommendation.repository.RecommendationServingRepository;
 import com.feelm.backend.domain.recommendation.repository.RecommendationServingRepository.ServingItem;
-import com.feelm.backend.domain.recommendation.repository.RecommendationServingRepository.SourceItem;
-import com.feelm.backend.global.error.BusinessException;
-import com.feelm.backend.global.error.ErrorCode;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
-/** 평가·관심없음 트랜잭션에서도 재사용할 수 있는 현재 추천 세트 한 자리 보충 로직이다. */
+/** API-045 조회 트랜잭션에서 현재 추천 세트의 빈 슬롯을 보충한다. */
 @Component
 @RequiredArgsConstructor
 public class RecommendationReplenisher {
@@ -22,54 +22,53 @@ public class RecommendationReplenisher {
     private final RecommendationServingRepository repository;
     private final Clock clock;
 
-    /** 호출자가 사용자 행 잠금과 트랜잭션을 소유해야 한다. */
-    public ServingItem replenish(long userId, long setId, long recommendationItemId) {
-        SourceItem source =
-                repository
-                        .findOwnedExposedSource(userId, setId, recommendationItemId)
-                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
-        if (!repository.isRemoved(userId, source.movieId())) {
-            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
+    /** 활성 트랜잭션 안에서 현재 세트의 빈 슬롯만 보충한다. 호출자가 사용자 단위 직렬화를 보장한다. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public List<ServingItem> replenishVacancies(
+            long userId, long setId, List<ServingItem> visible) {
+        List<ServingItem> added = new ArrayList<>();
+        long taste = count(visible, "TASTE");
+        long discovery = count(visible, "DISCOVERY");
+
+        while (taste < 2) {
+            ServingItem next = exposeNext(userId, setId, "TASTE");
+            if (next == null) {
+                break;
+            }
+            added.add(next);
+            taste++;
         }
 
-        List<ServingItem> visible = repository.findInitialVisibleItems(userId, setId);
-        if (visible.size() >= TARGET_SIZE
-                || !hasSourceTypeVacancy(userId, setId, visible, source.type())) {
-            return null;
+        if (discovery == 0) {
+            ServingItem next = exposeNext(userId, setId, "DISCOVERY");
+            if (next != null) {
+                added.add(next);
+                discovery++;
+            }
         }
 
-        ServingItem replacement = findReplacement(userId, setId, source.type());
-        if (replacement != null
+        while (visible.size() + added.size() < TARGET_SIZE && discovery == 0) {
+            ServingItem next = exposeNext(userId, setId, "TASTE");
+            if (next == null) {
+                break;
+            }
+            added.add(next);
+        }
+        return List.copyOf(added);
+    }
+
+    private long count(List<ServingItem> items, String type) {
+        return items.stream().filter(item -> type.equals(item.type())).count();
+    }
+
+    private ServingItem exposeNext(long userId, long setId, String type) {
+        ServingItem next = repository.findAndLockNextItem(userId, setId, type).orElse(null);
+        if (next != null
                 && !repository.expose(
-                        List.of(replacement),
+                        List.of(next),
                         OffsetDateTime.now(clock).withOffsetSameInstant(ZoneOffset.UTC))) {
             throw new IllegalStateException("추천 후보 노출 상태가 변경되었습니다.");
         }
-        return replacement;
-    }
-
-    private boolean hasSourceTypeVacancy(
-            long userId, long setId, List<ServingItem> visible, String sourceType) {
-        long taste = visible.stream().filter(item -> "TASTE".equals(item.type())).count();
-        long discovery = visible.stream().filter(item -> "DISCOVERY".equals(item.type())).count();
-        if ("DISCOVERY".equals(sourceType)) {
-            return discovery == 0;
-        }
-        return taste < 2
-                || (discovery == 0
-                        && visible.size() < TARGET_SIZE
-                        && !repository.hasUnexposedCandidate(userId, setId, "DISCOVERY"));
-    }
-
-    private ServingItem findReplacement(long userId, long setId, String sourceType) {
-        if ("TASTE".equals(sourceType)) {
-            return repository.findAndLockNextItem(userId, setId, "TASTE").orElse(null);
-        }
-        ServingItem discovery =
-                repository.findAndLockNextItem(userId, setId, "DISCOVERY").orElse(null);
-        if (discovery != null) {
-            return discovery;
-        }
-        return repository.findAndLockNextItem(userId, setId, "TASTE").orElse(null);
+        return next;
     }
 }
