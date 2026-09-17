@@ -36,7 +36,7 @@ import Button from '../../../components/Button';
 import { ChevronLeftIcon } from '../../../components/Icon';
 import IconButton from '../../../components/IconButton';
 import PopcornBucket from '../../../components/PopcornBucket';
-import { kernelFlavors } from '../../../components/PopcornBucket/kernels';
+import { kernelCounts } from '../../../components/PopcornBucket/kernels';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
@@ -156,7 +156,7 @@ export default function PopcornBucketPage() {
         {/* 팝콘 통. 맛 분포대로 알이 쌓인다 */}
         <div className={styles.bucketArea}>
           <PopcornBucket
-            kernelFlavors={kernelFlavors(bucket.flavors)}
+            flavors={kernelCounts(bucket.flavors)}
             width={BUCKET_WIDTH}
             label={`팝콘 ${total}알`}
           />

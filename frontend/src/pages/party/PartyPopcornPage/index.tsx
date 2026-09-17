@@ -39,6 +39,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import PopcornBucket from '../../../components/PopcornBucket';
+import { kernelCounts } from '../../../components/PopcornBucket/kernels';
 import { ApiError } from '../../../api/apiError';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
@@ -65,13 +66,6 @@ const TOP_FLAVOR_COUNT = 3;
  * 이름·대표 맛이 옆에 붙을 폭을 남기는 값이다.
  */
 const BUCKET_WIDTH = 132;
-
-/** 통 위에 쌓을 알을 맛 분포대로 펼친다. 한 알이 영화 한 편이다 (3.2와 같은 규칙) */
-function kernelFlavors(member: PartyMemberPopcorn): string[] {
-  return member.flavors.flatMap((flavor) =>
-    Array.from({ length: flavor.popcornCount }, () => flavor.flavorCode),
-  );
-}
 
 /**
  * 되돌릴 수 없는 파티 동작. 누르면 곧바로 실행하지 않고 한 번 더 묻는다.
@@ -287,7 +281,7 @@ export default function PartyPopcornPage() {
                 onClick={() => toggle(member.user.userId)}
               >
                 <PopcornBucket
-                  kernelFlavors={kernelFlavors(member)}
+                  flavors={kernelCounts(member.flavors)}
                   width={BUCKET_WIDTH}
                   label={`${member.user.nickname}의 팝콘 ${member.totalCount}알`}
                 />

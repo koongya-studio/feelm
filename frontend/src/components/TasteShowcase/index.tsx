@@ -15,6 +15,7 @@
 import { Link } from 'react-router';
 import Chip from '../Chip';
 import PopcornBucket from '../PopcornBucket';
+import { kernelCounts } from '../PopcornBucket/kernels';
 import Poster from '../Poster';
 import Section from '../Section';
 import { path } from '../../routes/paths';
@@ -49,11 +50,6 @@ export default function TasteShowcase({
   popcornCount,
   frameLinks = false,
 }: Props) {
-  /* 맛 분포대로 알을 펼친다. 한 알이 영화 한 편이다 (3.2 · 5.8과 같은 규칙) */
-  const kernelFlavors = popcorn.flatMap((flavor) =>
-    Array.from({ length: flavor.popcornCount }, () => flavor.flavorCode),
-  );
-
   return (
     <>
       {keywords.length > 0 ? (
@@ -96,7 +92,7 @@ export default function TasteShowcase({
       <Section label="팝콘 버킷">
         <div className={styles.bucket}>
           <PopcornBucket
-            kernelFlavors={kernelFlavors}
+            flavors={kernelCounts(popcorn)}
             width={BUCKET_WIDTH}
             label={`팝콘 ${popcornCount}알`}
           />

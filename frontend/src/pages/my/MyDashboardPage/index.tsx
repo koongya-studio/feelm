@@ -66,7 +66,7 @@ import { Link, useSearchParams } from 'react-router';
 import Avatar from '../../../components/Avatar';
 import Button from '../../../components/Button';
 import PopcornBucket from '../../../components/PopcornBucket';
-import { kernelFlavors } from '../../../components/PopcornBucket/kernels';
+import { kernelCounts } from '../../../components/PopcornBucket/kernels';
 import Poster from '../../../components/Poster';
 import ReportFourCut from '../../../components/ReportFourCut';
 import ReportTape from '../../../components/ReportTape';
@@ -84,6 +84,7 @@ import { getMyRatings, getWatchRecords } from '../../../api/watch';
 import { path } from '../../../routes/paths';
 import { formatShortDate } from '../../../utils/date';
 import styles from './MyDashboardPage.module.css';
+import type { FlavorCount } from '../../../components/PopcornBucket/kernels';
 import type { RecommendationType } from '../../../types/enums';
 import type { RecommendationHistoryItem } from '../../../types/recommendation';
 import type { ReportDetailView } from '../../../types/unspecified';
@@ -186,19 +187,18 @@ function useLatestReport(): ReportDetailView | null {
 /*
  * 바로가기의 팝콘 통.
  *
- * **실제 맛 분포대로 알을 담는다**(API-041, 3.2 취향 팝콘과 같은 함수). 알 하나가 영화
- * 한 편이다. 못 불러오거나 기준정보가 아직 없으면 **빈 통**이다 — 아무 맛이나 쌓으면
- * 없는 취향을 지어내는 것이 된다.
+ * **실제 맛 분포대로 알을 담는다**(API-041, 3.2 취향 팝콘과 같은 함수). 못 불러오거나
+ * 기준정보가 아직 없으면 **빈 통**이다 — 아무 맛이나 쌓으면 없는 취향을 지어내는 것이 된다.
  */
-function useMyPopcorn(): string[] {
-  const [flavors, setFlavors] = useState<string[]>([]);
+function useMyPopcorn(): FlavorCount[] {
+  const [flavors, setFlavors] = useState<FlavorCount[]>([]);
 
   useEffect(() => {
     let active = true;
 
     getPopcornBucket()
       .then((bucket) => {
-        if (active) setFlavors(kernelFlavors(bucket.flavors));
+        if (active) setFlavors(kernelCounts(bucket.flavors));
       })
       .catch(() => undefined);
 
@@ -489,7 +489,7 @@ export default function MyDashboardPage() {
 
           <div className={styles.shortcut}>
             <span className={styles.shortcutArt}>
-              <PopcornBucket width={64} kernelFlavors={popcorn} label="팝콘 통" />
+              <PopcornBucket width={64} flavors={popcorn} label="팝콘 통" />
             </span>
 
             <span className={styles.shortcutLabel}>취향 팝콘</span>
