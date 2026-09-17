@@ -65,8 +65,7 @@ deploy-monitoring:
   needs: []
   script:
     - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
-    - test -n "$HDFS_COMPOSE_ENV_FILE"
-    - HDFS_COMPOSE_ENV_FILE="$HDFS_COMPOSE_ENV_FILE" bash infra/scripts/deploy-hdfs-config.sh "$HDFS_NODE" "$CI_COMMIT_SHA"
+    - bash infra/scripts/deploy-hdfs-config.sh "$HDFS_NODE" "$CI_COMMIT_SHA"
   resource_group: distributed-runtime-hdfs
   interruptible: false
   retry:
@@ -92,6 +91,8 @@ deploy-hdfs-service-config:
     name: service
   variables:
     HDFS_NODE: service
+  after_script:
+    - python3 -I -B infra/scripts/notify-deployment.py hdfs-service-config "$CI_JOB_STATUS"
 
 deploy-hdfs-distributed-config:
   extends: .deploy-hdfs-config
@@ -101,6 +102,8 @@ deploy-hdfs-distributed-config:
     name: distributed
   variables:
     HDFS_NODE: distributed
+  after_script:
+    - python3 -I -B infra/scripts/notify-deployment.py hdfs-distributed-config "$CI_JOB_STATUS"
 
 infra-config-test:
   stage: test

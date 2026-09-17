@@ -26,6 +26,7 @@ class CiConfigTests(unittest.TestCase):
         cls.frontend = (CI_DIR / 'frontend.yml').read_text()
         cls.consumer = (CI_DIR / 'consumer.yml').read_text()
         cls.infra = (CI_DIR / 'infra.yml').read_text()
+        cls.hdfs_deploy = (ROOT / 'infra' / 'scripts' / 'deploy-hdfs-config.sh').read_text()
         cls.pipeline_path = CI_DIR / 'pipeline.yml'
         cls.pipeline = cls.pipeline_path.read_text() if cls.pipeline_path.exists() else ''
 
@@ -250,7 +251,6 @@ include:
         template = job_block(self.infra, '.deploy-hdfs-config')
         for expected in (
                 'stage: deploy', 'ci-deploy-current-commit.py',
-                'test -n "$HDFS_COMPOSE_ENV_FILE"',
                 'deploy-hdfs-config.sh "$HDFS_NODE" "$CI_COMMIT_SHA"',
                 'resource_group: distributed-runtime-hdfs',
                 'interruptible: false', 'timeout: 30m',
@@ -261,8 +261,12 @@ include:
                 '- infra/compose/service.yml', '- infra/compose/distributed.yml',
                 '- infra/hadoop/**/*'):
             self.assertIn(expected, template)
-        for forbidden in ('merge_request_event', 'docker compose down', ' down -v'):
+        for forbidden in ('merge_request_event', 'docker compose down', ' down -v',
+                          'HDFS_COMPOSE_ENV_FILE'):
             self.assertNotIn(forbidden, template)
+        self.assertIn('ENV_FILE="$(mktemp ', self.hdfs_deploy)
+        self.assertIn("trap 'rm -f \"${ENV_FILE}\"' EXIT", self.hdfs_deploy)
+        self.assertNotIn('HDFS_COMPOSE_ENV_FILE', self.hdfs_deploy)
         service = job_block(self.infra, 'deploy-hdfs-service-config')
         distributed = job_block(self.infra, 'deploy-hdfs-distributed-config')
         self.assertIn('tags: [e106-shell]', service)
@@ -418,6 +422,7 @@ include:
         self.assertEqual(
             sorted(deploy_jobs),
             ['deploy-backend', 'deploy-consumer', 'deploy-frontend',
+             'deploy-hdfs-distributed-config', 'deploy-hdfs-service-config',
              'deploy-monitoring', 'deploy-redis'],
         )
         notification_paths = (

@@ -10,14 +10,15 @@
     sudo install -d -o gitlab-runner -g gitlab-runner -m 700 \
       /var/lib/feelm-deploy/runtime-config
 
-GitLab에는 같은 이름의 File 타입 Protected 변수 HDFS_COMPOSE_ENV_FILE을 service와
-distributed 환경 범위에 각각 등록한다. 값은 각 노드에서 검증된 Compose 환경 파일이다.
-Secret 값이나 파일 내용은 Job 로그에 출력하지 않는다.
+Compose 설정값은 GitLab에 이미 등록된 Protected CI/CD Variables를 그대로 사용한다.
+서비스 Job은 `service`, 분산 Job은 `distributed` 환경 범위의 값을 상속한다. 별도 File 변수나
+Runner 로컬 dotenv 파일은 만들지 않는다. Secret 변수는 Masked·Hidden을 유지하고 Job 로그에
+값을 출력하지 않는다. 서비스 범위에는 service Compose의 필수 변수들이, distributed 범위에는
+`SERVICE_NODE_IP`, `DISTRIBUTED_NODE_IP`, `KAFKA_CLUSTER_ID`가 등록되어 있어야 한다.
 
 자동 배포 전에 현재 실행 설정과 일치하는 main SHA를 각 노드에서 한 번 초기화한다.
 
-    sudo -u gitlab-runner env \
-      HDFS_COMPOSE_ENV_FILE=/path/to/approved/infra.env \
+    sudo -u gitlab-runner \
       bash infra/scripts/deploy-hdfs-config.sh --initialize-state service <main-sha>
 
 분산 노드에서는 service 대신 distributed를 사용한다. 초기화는 실행 중인 설정과 지정한

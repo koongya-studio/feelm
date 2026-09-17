@@ -21,9 +21,10 @@ if [[ ! "${REVISION}" =~ ^[0-9a-f]{40}$ ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 RELEASE_ROOT="${RUNTIME_CONFIG_RELEASE_ROOT:-/var/lib/feelm-deploy/runtime-config}"
-ENV_FILE="${HDFS_COMPOSE_ENV_FILE:?HDFS_COMPOSE_ENV_FILE is required}"
+ENV_FILE="$(mktemp "${TMPDIR:-/tmp}/feelm-hdfs-compose.XXXXXX")"
+chmod 600 "${ENV_FILE}"
+trap 'rm -f "${ENV_FILE}"' EXIT
 release_tool=(python3 -I -B "${SCRIPT_DIR}/runtime-config-release.py" --root "${RELEASE_ROOT}")
 
 candidate="$("${release_tool[@]}" install --revision "${REVISION}")"
