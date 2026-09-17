@@ -4,7 +4,7 @@
  * 이동표
  * 5.1 → 5.8 참여 중인 파티방 선택
  * 5.8 → 5.4 함께 볼 영화 추천받기 (파티팝콘 흐름의 입구)
- * 5.8 ⇢ 7.2-B 파티원의 취향 보기
+ * 5.8 ⇢ 7.8-D 사용자 차단 후 차단 사용자 관리
  *
  * **사용자 시안 2026-09-17(업무 -462)이 구성을 바꿨다.** 이전에는 파티원마다 통을 하나씩
  * 세로로 쌓아 한 화면에서 모두 보여주고, 아래에 `서로 겹치는 맛`과 `파티 관리`를 두었다.
@@ -20,6 +20,19 @@
  * - `친구 초대하기`가 생겼다. 계약에는 있는데(API-051) 파티 안에서 초대할 자리가
  *   없었다 — 5.3이 `파티 안에서 다시 초대할 수 있다`고 적어 둔 그 자리다
  *
+ * **업무 -598에서 `취향 보기`를 걷어냈다**(2026-09-18 사용자 결정). 7.2-B 공개 프로필은
+ * API-062가 2차 MVP라 백엔드에 없고 `getPublicProfile`이 목업이다. 목업 저장소에는 고정된
+ * 소수 id만 있어 API-057이 준 실제 파티원 번호로는 늘 404 — 누르면 `프로필을 불러오지
+ * 못했어요`만 떴다(2026-09-17 여정 QA). 파티 여정 한가운데의 실패 화면이라 **API-062가
+ * 열릴 때까지 링크를 감춘다.** 비활성 상태로 남기지 않는다 — 왜 못 누르는지 적을 자리가
+ * 시안에 없고, 계약이 열릴 때 되돌리는 것도 한 줄이다.
+ *
+ * 그 링크가 7.2-B로 가는 **유일한 진입점**이었고, 차단(API-020)을 거는 자리도 7.2-B의
+ * ⋯ 메뉴뿐이었다(7.8-D에는 해제만 있다). 링크만 감추면 차단을 걸 방법이 사라지므로
+ * **차단과 신고를 이 화면의 ⋯ 메뉴로 옮겼다**(사용자 결정 2026-09-18). 대상은 고른
+ * 친구다 — 내보내기가 이미 그렇게 동작한다. 여기 `userId`는 API-057이 준 실제 번호라,
+ * 목업 번호로 404가 나던 7.2-B와 달리 차단이 실제로 걸린다.
+ *
  * 연동 API는 API-057 파티원 팝콘 조회다. 응답에 파티 이름이 없어 헤더의 이름은
  * API-050(`getMyParties`)에서 가져온다.
  *
@@ -29,7 +42,7 @@
  * (`design-concept.md` 2.10) — 통은 30알로 요약해 그리므로 실제 개수는 이 목록에 있다.
  */
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import Avatar from '../../../components/Avatar';
 import Button from '../../../components/Button';
 import ConfirmDialog from '../../../components/ConfirmDialog';
@@ -41,12 +54,7 @@ import { kernelCounts } from '../../../components/PopcornBucket/kernels';
 import ScreenHeader from '../../../components/ScreenHeader';
 import Snackbar from '../../../components/Snackbar';
 import StatusView from '../../../components/StatusView';
-import {
-  ChevronDownIcon,
-  ChevronRightIcon,
-  ChevronUpIcon,
-  MoreVerticalIcon,
-} from '../../../components/Icon';
+import { ChevronDownIcon, ChevronUpIcon, MoreVerticalIcon } from '../../../components/Icon';
 import { ApiError } from '../../../api/apiError';
 import {
   closeParty,
@@ -57,6 +65,7 @@ import {
   leaveParty,
   PARTY_MAX_MEMBERS,
 } from '../../../api/parties';
+import { blockUser } from '../../../api/settings';
 import { getMyProfile } from '../../../api/users';
 import { getPopcornFlavors } from '../../../api/taste';
 import { path } from '../../../routes/paths';
@@ -75,13 +84,17 @@ const AVATAR_SIZE = 30;
 const MENU_TOP = 76;
 
 /**
- * 되돌릴 수 없는 파티 동작. 누르면 곧바로 실행하지 않고 한 번 더 묻는다.
+ * 되돌릴 수 없는 동작. 누르면 곧바로 실행하지 않고 한 번 더 묻는다.
  *
  * API-069 처리 규칙이 `클라이언트는 실행 전에 대상 닉네임과 강퇴 사실을 확인시킨다`고
- * 적고 있고, 나가기 · 종료도 되돌리는 계약이 없어 같은 규칙을 쓴다.
+ * 적고 있고, 나가기 · 종료도 되돌리는 계약이 없어 같은 규칙을 쓴다. 차단은 API-020이
+ * `클라이언트는 차단 전에 공동 파티 탈퇴와 파티장 변경·종료 가능성을 안내한다`고 적었다.
  */
 type PendingAction =
-  { type: 'leave' } | { type: 'close' } | { type: 'kick'; userId: number; nickname: string };
+  | { type: 'leave' }
+  | { type: 'close' }
+  | { type: 'kick'; userId: number; nickname: string }
+  | { type: 'block'; userId: number; nickname: string };
 
 /** 확인 문구. 무엇이 일어나는지와 돌이킬 수 없다는 것을 함께 적는다 */
 function confirmCopy(action: PendingAction): {
@@ -105,10 +118,20 @@ function confirmCopy(action: PendingAction): {
     };
   }
 
+  if (action.type === 'kick') {
+    return {
+      title: `${action.nickname} 님을 내보낼까요?`,
+      description: '다시 초대해야 들어올 수 있어요.',
+      confirmLabel: '내보내기',
+    };
+  }
+
+  // 7.2-B가 쓰던 문구 그대로다. 같은 동작을 두 화면이 다르게 설명할 이유가 없다
   return {
-    title: `${action.nickname} 님을 내보낼까요?`,
-    description: '다시 초대해야 들어올 수 있어요.',
-    confirmLabel: '내보내기',
+    title: `${action.nickname} 님을 차단할까요?`,
+    description:
+      '서로의 프로필·취향 필름·팝콘·한줄평이 보이지 않아요. 함께 있는 파티에서는 나가게 돼요.',
+    confirmLabel: '차단하기',
   };
 }
 
@@ -192,22 +215,32 @@ export default function PartyPopcornPage() {
     };
   }, [id, reloadCount]);
 
+  /** 확인받은 동작을 계약에 맞는 호출로 보낸다 */
+  function call(action: PendingAction): Promise<unknown> {
+    if (action.type === 'leave') {
+      return leaveParty(id);
+    }
+
+    if (action.type === 'close') {
+      return closeParty(id);
+    }
+
+    if (action.type === 'kick') {
+      return kickPartyMember(id, action.userId);
+    }
+
+    return blockUser(action.userId);
+  }
+
   /** 확인을 받은 동작을 실제로 보낸다 */
   function run(action: PendingAction) {
     setManaging(true);
 
-    const sent =
-      action.type === 'leave'
-        ? leaveParty(id)
-        : action.type === 'close'
-          ? closeParty(id)
-          : kickPartyMember(id, action.userId);
-
-    sent
+    call(action)
       .then(() => {
         setPending(null);
 
-        // 나가기 · 종료는 이 파티를 더 볼 수 없다. 강퇴는 남은 파티원을 다시 읽는다
+        // 강퇴만 이 화면에 남는다. 남은 파티원을 다시 읽는다
         if (action.type === 'kick') {
           setManaging(false);
           setPickedUserId(null);
@@ -216,9 +249,31 @@ export default function PartyPopcornPage() {
           return;
         }
 
-        void navigate(path.party(), { replace: true });
+        /*
+         * 차단은 7.8-D로 보낸다(이동표 14번, 7.2-B와 같은 이동). 차단한 사람의 프로필은
+         * 404이고 공동 파티에서도 빠지므로(API-020) 이 화면으로 돌아올 자리가 없다.
+         * 나가기 · 종료는 이 파티를 더 볼 수 없으니 5.1로 돌아간다.
+         */
+        void navigate(action.type === 'block' ? path.blockedUsers() : path.party(), {
+          replace: true,
+        });
       })
       .catch((cause: unknown) => {
+        /*
+         * 이미 차단한 사람이면(409 `ALREADY_BLOCKED`) 바라던 상태이므로 성공과 같이
+         * 7.8-D로 보낸다. 두 탭에서 같은 파티를 열어 둔 경우에 난다(7.2-B와 같은 판정).
+         */
+        if (
+          action.type === 'block' &&
+          cause instanceof ApiError &&
+          cause.code === 'ALREADY_BLOCKED'
+        ) {
+          setPending(null);
+          void navigate(path.blockedUsers(), { replace: true });
+
+          return;
+        }
+
         setManaging(false);
         setPending(null);
         setNotice(
@@ -399,22 +454,6 @@ export default function PartyPopcornPage() {
                 ))}
               </ul>
             ) : null}
-
-            {/*
-             * 7.2-B 다른 사용자 공개 프로필로 들어가는 자리 (업무 -305).
-             *
-             * 와이어프레임 이동표에 7.2-B로 들어오는 화살표가 아예 없었고, 5.8에서
-             * 들어가기로 확정했다(2026-09-11, screen-spec-my.md 2장 8번).
-             *
-             * 내 팝콘에는 두지 않는다. 내 공개 프로필은 7.2-A로 보는 것이고, 여기서
-             * 7.2-B로 들어가면 `다른 사용자` 화면에서 나를 보게 된다.
-             */}
-            {isMine ? null : (
-              <Link to={path.publicProfile(picked.user.userId)} className={styles.profileLink}>
-                {picked.user.nickname} 님의 취향 보기
-                <ChevronRightIcon />
-              </Link>
-            )}
           </section>
         ) : null}
 
@@ -486,6 +525,46 @@ export default function PartyPopcornPage() {
             >
               {picked.user.nickname} 님 내보내기
             </button>
+          ) : null}
+
+          {/*
+           * 차단(API-020)과 신고. 7.2-B의 ⋯ 메뉴에 있던 둘을 업무 -598에서 옮겨 왔다.
+           * 파티장이 아니어도 보인다 — 차단은 파티 권한과 무관하다.
+           *
+           * 내 팝콘을 고른 동안에는 두지 않는다. 계약도 자기 차단을 `400
+           * CANNOT_BLOCK_SELF`로 막는다.
+           */}
+          {picked && !isMine ? (
+            <>
+              <button
+                type="button"
+                className={styles.menuItem}
+                disabled={managing}
+                onClick={() => {
+                  setMenuOpen(false);
+                  setPending({
+                    type: 'block',
+                    userId: picked.user.userId,
+                    nickname: picked.user.nickname,
+                  });
+                }}
+              >
+                {picked.user.nickname} 님 차단하기
+              </button>
+
+              {/* 신고는 계약이 없다. 7.2-B와 같이 안내만 하고 실제 처리는 하지 않는다 */}
+              <button
+                type="button"
+                className={styles.menuItem}
+                data-tone="quiet"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setNotice('신고 내용은 운영팀이 확인해요');
+                }}
+              >
+                신고하기
+              </button>
+            </>
           ) : null}
         </Menu>
       ) : null}
