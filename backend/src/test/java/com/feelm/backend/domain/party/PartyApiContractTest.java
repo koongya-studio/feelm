@@ -102,6 +102,12 @@ class PartyApiContractTest extends SharedPostgresContractTest {
                                 Long.class,
                                 id))
                 .isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM party_refresh_requests WHERE party_id=?",
+                                Long.class,
+                                id))
+                .isEqualTo(1);
     }
 
     @ParameterizedTest
@@ -136,6 +142,10 @@ class PartyApiContractTest extends SharedPostgresContractTest {
             create("{\"name\":\"rollback\"}").andExpect(status().is5xxServerError());
             assertThat(jdbc.queryForObject("SELECT count(*) FROM parties", Long.class)).isZero();
             assertThat(jdbc.queryForObject("SELECT count(*) FROM party_members", Long.class))
+                    .isZero();
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM party_refresh_requests", Long.class))
                     .isZero();
         } finally {
             jdbc.execute("ALTER TABLE party_members DROP CONSTRAINT test_reject_owner");

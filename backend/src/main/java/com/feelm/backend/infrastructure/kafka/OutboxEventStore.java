@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -15,6 +16,26 @@ import org.springframework.transaction.annotation.Transactional;
 class OutboxEventStore {
 
     private final JdbcClient jdbcClient;
+
+    @Transactional
+    long savePartyRefresh(UUID eventId, long partyId, String message, Instant createdAt) {
+        return jdbcClient
+                .sql(
+                        """
+                        INSERT INTO outbox_events(
+                            event_id, event_type, topic, partition_key, message,
+                            status, attempt_count, next_attempt_at
+                        ) VALUES (:eventId, 'PARTY_REFRESH', 'feelm.party-refresh.v1', :partyId,
+                                  CAST(:message AS jsonb), 'PENDING', 0, :nextAttemptAt)
+                        RETURNING id
+                        """)
+                .param("eventId", eventId)
+                .param("partyId", partyId)
+                .param("message", message)
+                .param("nextAttemptAt", toOffsetDateTime(createdAt))
+                .query(Long.class)
+                .single();
+    }
 
     @Transactional
     long save(KafkaEventEnvelope<?> event, String message) {
@@ -45,9 +66,17 @@ class OutboxEventStore {
                         """
                         SELECT id, event_id, event_type, topic, partition_key, message::text,
                                attempt_count, created_at
-                        FROM outbox_events
-                        WHERE status = 'PENDING' AND next_attempt_at <= :now
-                        ORDER BY next_attempt_at, id
+                        FROM outbox_events AS current_event
+                        WHERE current_event.status = 'PENDING'
+                          AND current_event.next_attempt_at <= :now
+                          AND (current_event.event_type <> 'PARTY_REFRESH' OR NOT EXISTS (
+                              SELECT 1 FROM outbox_events AS earlier
+                              WHERE earlier.event_type = 'PARTY_REFRESH'
+                                AND earlier.partition_key = current_event.partition_key
+                                AND earlier.status = 'PENDING'
+                                AND earlier.id < current_event.id
+                          ))
+                        ORDER BY current_event.next_attempt_at, current_event.id
                         LIMIT :batchSize
                         """)
                 .param("now", toOffsetDateTime(now))

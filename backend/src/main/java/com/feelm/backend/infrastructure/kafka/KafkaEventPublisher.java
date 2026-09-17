@@ -23,6 +23,10 @@ public class KafkaEventPublisher {
     /** 호출한 도메인 작업과 같은 트랜잭션에 완성된 이벤트 JSON을 저장한다. */
     @Transactional
     public UUID publish(KafkaEventType eventType, long userId, Object payload) {
+        if (eventType == KafkaEventType.PARTY_REFRESH) {
+            throw new IllegalArgumentException(
+                    "Party refresh requires its dedicated message format");
+        }
         KafkaEventEnvelope<Object> event =
                 new KafkaEventEnvelope<>(
                         eventIdSupplier.get(), eventType, Instant.now(clock), userId, payload);
@@ -33,5 +37,22 @@ public class KafkaEventPublisher {
                     "Kafka event payload cannot be serialized", exception);
         }
         return event.eventId();
+    }
+
+    /** 완성된 파티 입력을 전용 JSON으로 현재 트랜잭션의 아웃박스에 저장한다. */
+    @Transactional
+    public UUID publishPartyRefresh(long partyId, Object payload) {
+        if (partyId <= 0) {
+            throw new IllegalArgumentException("Party ID must be positive");
+        }
+        UUID eventId = eventIdSupplier.get();
+        try {
+            store.savePartyRefresh(
+                    eventId, partyId, objectMapper.writeValueAsString(payload), Instant.now(clock));
+        } catch (JacksonException exception) {
+            throw new IllegalArgumentException(
+                    "Party refresh payload cannot be serialized", exception);
+        }
+        return eventId;
     }
 }

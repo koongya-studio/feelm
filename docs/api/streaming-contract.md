@@ -248,8 +248,8 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 
 - Kafka 키는 `userId`의 UTF-8 십진 문자열(예: `"1024"`), 값은 위 JSON이다. `null` 값·빈 payload·공통 봉투를 사용하지 않는다.
 - Python Consumer가 `vector`·`candidates`의 원자 게시에 성공한 뒤 발행한다. Kafka 수신 자체가 후보 갱신 알림이며 `occurredAt`을 비교하지 않는다.
-- 알림은 중복되거나 더 새 Candidate 게시 뒤 도착할 수 있다. Spring은 관련 활성 파티를 찾아 현재 Redis 값을 다시 읽고, 파티원별 `vector`·`candidates`를 한 번의 Redis 읽기로 가져와 두 값의 `generationId`·`modelVersion` 일치를 확인한다. 마지막으로 처리한 파티 입력 세대와 같으면 중복 재계산을 건너뛸 수 있다.
-- Spring은 이 최신 전체 입력으로 `feelm.party-refresh.v1` 이벤트를 만든다. 벡터와 후보 목록은 이 알림에 싣지 않는다.
+- 알림은 중복되거나 더 새 Candidate 게시 뒤 도착할 수 있다. Spring은 관련 활성 파티별 지속성 있는 refresh 요청을 DB에 저장한 뒤 수신 offset을 확정한다. 대기 중 중복 요청은 파티별로 합친다. 처리 작업자는 현재 Redis 값을 다시 읽고, 파티원별 `vector`·`candidates`를 한 번의 Redis 읽기로 가져와 두 값의 `generationId`·`modelVersion` 일치를 확인한다.
+- Spring은 이 최신 전체 입력으로 `feelm.party-refresh.v1` 이벤트를 만든다. 벡터와 후보 목록은 Candidate 게시 완료 알림에 싣지 않는다. 파티 구성 변경 때도 같은 DB 요청을 저장한다. Redis 장애나 불완전 입력은 요청을 남겨 재시도하며 파티 API를 실패시키지 않는다. 종료된 파티의 요청은 계산 이벤트 없이 정리한다.
 
 **파티 입력 갱신 — `feelm.party-refresh.v1`**
 
@@ -263,10 +263,12 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 }
 ```
 
-- Kafka 키는 `partyId`의 문자열이다. 멤버는 1~4명, `userId` 오름차순이고 `candidateMovieIds`는 사용자 선호 순서의 중복 없는 최대 600개다. 빈 vector는 허용한다.
+- Kafka 키는 `partyId`를 Kafka `LongSerializer`로 직렬화한 8바이트 정수다. 값은 위 전용 JSON이며 공통 사용자 이벤트 봉투를 사용하지 않는다. 멤버는 1~4명, `userId` 오름차순이고 `candidateMovieIds`는 사용자 선호 순서의 중복 없는 최대 600개다. 빈 vector는 허용한다.
 - Spring은 각 파티원의 Redis vector·candidates를 한 번에 읽어 같은 `generationId`·`modelVersion`인지 확인한다. 모든 파티원 모델 버전이 현재 Spark SERVING 모델과 같을 때만 발행한다.
 - `inputId`는 Spring이 `partyId`, 모델 버전, 정렬된 파티원 `userId`·`generationId`에서 결정적으로 만든 식별자다. Spark는 이를 그대로 결과에 돌려주고 자신이 로드한 `modelVersion`도 기록한다. Spring은 결과를 사용할 때 현재 파티 구성·사용자 세대로 `inputId`를 다시 만들고 결과의 모델 버전도 현재 모델과 비교한다.
 - Kafka 이벤트에는 `modelVersion`과 파티원별 `generationId`를 싣지 않는다. 모델 교체 중에는 새 모델의 입력을 이전 Spark 작업에 보내지 않도록 배포 순서를 조정한다.
+- 파티별 대기 요청은 하나로 합치되, 처리 완료 후 같은 `inputId`가 다시 발행될 수 있다. Spark는 해당 파티 Redis 값을 원자적으로 교체하며 Spring은 조회 시 현재 `inputId`와 모델 버전을 다시 비교한다.
+- 파티 refresh 아웃박스는 같은 파티의 앞선 이벤트가 Kafka에 기록되고 `PUBLISHED`로 확정될 때까지 후속 이벤트를 발행하지 않는다. 다른 파티와 사용자 이벤트의 발행은 계속한다. 현재 Spark 파티 작업은 배치 내부 offset 정렬을 하지 않으므로 배포 시 `--max-records-per-trigger 1`로 배치당 입력을 한 건으로 제한한다. Kafka 순서대로 Redis 결과가 게시되는지 연동 검증한다.
 
 ### 4.4 멱등 처리와 재처리
 

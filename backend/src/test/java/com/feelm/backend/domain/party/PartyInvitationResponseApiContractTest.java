@@ -71,6 +71,12 @@ class PartyInvitationResponseApiContractTest extends SharedPostgresContractTest 
 
         assertInvitation(invitation, "ACCEPTED", true);
         assertThat(memberCount(party, 10)).isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM party_refresh_requests WHERE party_id=?",
+                                Long.class,
+                                party))
+                .isEqualTo(1);
     }
 
     @Test
@@ -340,6 +346,12 @@ class PartyInvitationResponseApiContractTest extends SharedPostgresContractTest 
 
             assertInvitation(invitation, "PENDING", false);
             assertThat(memberCount(party, 10)).isZero();
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM party_refresh_requests WHERE party_id=?",
+                                    Long.class,
+                                    party))
+                    .isZero();
         } finally {
             jdbc.execute("ALTER TABLE party_members DROP CONSTRAINT test_reject_member");
         }

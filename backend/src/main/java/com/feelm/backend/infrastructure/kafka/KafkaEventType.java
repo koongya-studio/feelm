@@ -7,7 +7,8 @@ public enum KafkaEventType {
     DISMISS("feelm.dismiss.v1"),
     VIEW("feelm.view.v1"),
     RECOMMENDATION_CLICK("feelm.recommendation-click.v1"),
-    OTT_CLICK("feelm.ott-click.v1");
+    OTT_CLICK("feelm.ott-click.v1"),
+    PARTY_REFRESH("feelm.party-refresh.v1");
 
     private final String topic;
 

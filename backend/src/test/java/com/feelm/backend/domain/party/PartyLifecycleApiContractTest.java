@@ -89,6 +89,12 @@ class PartyLifecycleApiContractTest extends SharedPostgresContractTest {
 
         assertThat(memberIds(party)).containsExactly(10L, 30L);
         assertParty(party, 10, "ACTIVE", null);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM party_refresh_requests WHERE party_id=?",
+                                Long.class,
+                                party))
+                .isEqualTo(1);
     }
 
     @Test
@@ -130,6 +136,7 @@ class PartyLifecycleApiContractTest extends SharedPostgresContractTest {
     @Test
     void lastMemberLeaveClosesPartyAndInvalidatesPendingInvitations() throws Exception {
         long party = party(10, "ACTIVE");
+        jdbc.update("INSERT INTO party_refresh_requests(party_id) VALUES (?)", party);
         invitation(party, 10, 20, "PENDING");
         invitation(party, 10, 30, "PENDING");
 
@@ -145,6 +152,12 @@ class PartyLifecycleApiContractTest extends SharedPostgresContractTest {
         assertInvitation(party, 20, "DECLINED", true);
         assertInvitation(party, 30, "DECLINED", true);
         assertParty(party, 10, "CLOSED", "INSUFFICIENT_MEMBERS");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM party_refresh_requests WHERE party_id=?",
+                                Long.class,
+                                party))
+                .isZero();
     }
 
     @Test
@@ -244,6 +257,7 @@ class PartyLifecycleApiContractTest extends SharedPostgresContractTest {
     void rollsBackLastMemberLeaveWhenInvitationInvalidationFails() throws Exception {
         long party = party(10, "ACTIVE");
         invitation(party, 10, 20, "PENDING");
+        jdbc.update("INSERT INTO party_refresh_requests(party_id) VALUES (?)", party);
         addRejectDeclineConstraint();
         try {
             leave(party, 10).andExpect(status().is5xxServerError());
@@ -251,6 +265,12 @@ class PartyLifecycleApiContractTest extends SharedPostgresContractTest {
             assertOwner(party, 10);
             assertInvitation(party, 20, "PENDING", false);
             assertParty(party, 10, "ACTIVE", null);
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM party_refresh_requests WHERE party_id=?",
+                                    Long.class,
+                                    party))
+                    .isEqualTo(1);
         } finally {
             dropRejectDeclineConstraint();
         }
@@ -260,11 +280,18 @@ class PartyLifecycleApiContractTest extends SharedPostgresContractTest {
     void rollsBackCloseWhenInvitationInvalidationFails() throws Exception {
         long party = party(10, "ACTIVE");
         invitation(party, 10, 20, "PENDING");
+        jdbc.update("INSERT INTO party_refresh_requests(party_id) VALUES (?)", party);
         addRejectDeclineConstraint();
         try {
             close(party, 10).andExpect(status().is5xxServerError());
             assertInvitation(party, 20, "PENDING", false);
             assertParty(party, 10, "ACTIVE", null);
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM party_refresh_requests WHERE party_id=?",
+                                    Long.class,
+                                    party))
+                    .isEqualTo(1);
         } finally {
             dropRejectDeclineConstraint();
         }
