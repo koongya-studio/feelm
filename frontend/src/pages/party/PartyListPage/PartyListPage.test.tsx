@@ -15,19 +15,21 @@ import { fireEvent, screen } from '@testing-library/react';
 import PartyListPage from './index';
 import PartySizePage from '../PartySizePage';
 import { renderWithRouter } from '../../../test/render';
-import { getMyParties } from '../../../api/parties';
-import { party, TEST_PARTY_ID } from '../../../test/party';
+import { getMyInvitations, getMyParties } from '../../../api/parties';
+import { invitation, party, TEST_PARTY_ID } from '../../../test/party';
 
 // 5.2가 같은 모듈에서 정원 상수를 읽으므로 나머지는 실제 것을 남긴다
 vi.mock('../../../api/parties', async () => {
   const actual =
     await vi.importActual<typeof import('../../../api/parties')>('../../../api/parties');
 
-  return { ...actual, getMyParties: vi.fn() };
+  return { ...actual, getMyParties: vi.fn(), getMyInvitations: vi.fn() };
 });
 
 beforeEach(() => {
   vi.mocked(getMyParties).mockReset().mockResolvedValue([party()]);
+  // 초대는 받지 않은 것이 보통 상태다. 필요한 테스트만 채운다
+  vi.mocked(getMyInvitations).mockReset().mockResolvedValue([]);
 });
 
 describe('5.1 파티 시작', () => {
@@ -80,6 +82,41 @@ describe('5.1 파티 시작', () => {
 
     expect(screen.getByText('초대 코드로 참여하기는 준비 중이에요')).toBeInTheDocument();
     expect(screen.getByTestId('location').textContent).toBe('/party');
+  });
+
+  /*
+   * 업무 -595. 초대를 여는 유일한 길이 목업 알림이라 초대받은 사람이 수락할 수 없었다.
+   * 이 구역이 사라지면 그 결함이 그대로 돌아온다.
+   */
+  it('받은 초대를 API-052로 그리고 5.6으로 보낸다', async () => {
+    vi.mocked(getMyInvitations).mockResolvedValue([invitation()]);
+
+    renderWithRouter(<PartyListPage />, { route: '/party' });
+
+    expect(await screen.findByText('무비버디 님의 파티')).toBeInTheDocument();
+    // `2인`은 나까지 센 값이다. API-052 `memberCount`는 1(파티장뿐)이다
+    expect(screen.getByText('2인 · 오늘 저녁 같이 볼 영화')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /무비버디 님의 파티/ }));
+
+    expect(screen.getByTestId('location').textContent).toBe('/parties/invitations/501');
+  });
+
+  it('대기 중 초대가 없으면 구역을 그리지 않는다', async () => {
+    renderWithRouter(<PartyListPage />, { route: '/party' });
+    await screen.findByText('금요 심야 상영회');
+
+    expect(screen.queryByText(/받은 초대/)).not.toBeInTheDocument();
+  });
+
+  // 초대와 파티는 다른 요청이다. 한쪽이 실패해도 다른 쪽은 보여준다
+  it('초대를 받지 못해도 파티 목록은 남는다', async () => {
+    vi.mocked(getMyInvitations).mockRejectedValue(new Error('실패'));
+
+    renderWithRouter(<PartyListPage />, { route: '/party' });
+
+    expect(await screen.findByText('금요 심야 상영회')).toBeInTheDocument();
+    expect(screen.getByText(/받은 초대를 불러오지 못했어요/)).toBeInTheDocument();
   });
 
   it('목록을 받지 못하면 다시 시도할 수 있다', async () => {

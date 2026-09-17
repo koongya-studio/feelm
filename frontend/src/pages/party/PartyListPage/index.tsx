@@ -17,6 +17,22 @@
  * 담기지 않은 것으로 보인다. 파티가 여러 개일 때 어느 것을 담을지는 시안에 없어 목록의
  * 첫 파티를 쓰고, 통의 이름이 그 파티를 말한다. 파티가 없으면 빈 통이다.
  *
+ * **`받은 초대` 구역은 업무 -595에서 넣었다.** 2026-09-17 여정 QA가 찾은 차단 결함이다 —
+ * 초대는 서버에 생기는데(API-051) 받은 사람이 5.6으로 갈 길이 알림 목록 하나뿐이었고,
+ * 그 목록은 전체가 목업이라 실제 초대 번호가 없었다. 초대받은 사람은 수락할 방법이
+ * 없었다. 알림 연동(8.1)을 기다리지 않고 **이미 구현된 API-052를 이 화면에서 부른다**
+ * (팀 결정 2026-09-18, `wireframe-change-requests.md` CR-27).
+ *
+ * - 구역은 참여 중인 파티 **위**에 둔다. 답해야 할 일이 이미 들어간 방보다 급하다
+ * - `2인`은 **나까지 세었을 때의 인원**이다. API-052 `memberCount`는 지금 참여 중인
+ *   사람 수라 1을 더해야 5.6의 카드와 같은 값이 된다
+ * - 대기 중 초대가 없으면 구역을 그리지 않는다. 시안이 통에 준 자리를 빈 안내가
+ *   밀어내고, 초대는 받지 않는 것이 보통 상태다
+ * - API-052는 **대기 중(`PENDING`) 초대만** 준다. 만료·취소·이미 답한 초대는 목록에서
+ *   그냥 빠진다 — 따로 표시할 값이 계약에 없다. 목록이 뜬 뒤에 사라진 초대를 눌렀다면
+ *   5.6이 `초대를 확인하지 못했어요`로 받는다
+ * - 초대를 못 받아 와도 파티 목록은 그대로 둔다. 둘은 다른 요청이다
+ *
  * `[?]` **`초대 코드로 참여하기`는 계약에 없다.** API-051 초대는 닉네임 검색(API-019)으로
  * 찾은 `userId`를 받고, 코드나 링크로 참여하는 경로는 정의되어 있지 않다. 시안이 확정한
  * 자리이므로 버튼은 두고, 누르면 준비 중임을 알린다(`wireframe-change-requests.md` CR-26).
@@ -34,10 +50,10 @@ import PopcornBucket from '../../../components/PopcornBucket';
 import Snackbar from '../../../components/Snackbar';
 import StatusView from '../../../components/StatusView';
 import Wordmark from '../../../components/Wordmark';
-import { getMyParties, getPartyPopcorn } from '../../../api/parties';
+import { getMyInvitations, getMyParties, getPartyPopcorn } from '../../../api/parties';
 import { path } from '../../../routes/paths';
 import { mixedFlavors } from '../../../utils/party';
-import type { Party, PartyPopcorn } from '../../../types/party';
+import type { Party, PartyInvitation, PartyPopcorn } from '../../../types/party';
 import styles from './PartyListPage.module.css';
 
 /** 화면 가운데를 잡는 통. 시안의 크기다 */
@@ -46,10 +62,31 @@ const BUCKET_WIDTH = 188;
 export default function PartyListPage() {
   const navigate = useNavigate();
   const [parties, setParties] = useState<Party[] | null>(null);
+  const [invitations, setInvitations] = useState<PartyInvitation[] | null>(null);
   const [popcorn, setPopcorn] = useState<PartyPopcorn | null>(null);
   const [failed, setFailed] = useState(false);
+  const [invitationsFailed, setInvitationsFailed] = useState(false);
   const [notice, setNotice] = useState('');
   const [reloadCount, setReloadCount] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+
+    getMyInvitations()
+      .then((value) => {
+        if (!active) return;
+
+        setInvitations(value);
+        setInvitationsFailed(false);
+      })
+      .catch(() => {
+        if (active) setInvitationsFailed(true);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [reloadCount]);
 
   useEffect(() => {
     let active = true;
@@ -84,6 +121,7 @@ export default function PartyListPage() {
   }, [reloadCount]);
 
   const hasParties = parties !== null && parties.length > 0;
+  const hasInvitations = invitations !== null && invitations.length > 0;
 
   return (
     <div className={styles.page}>
@@ -108,6 +146,56 @@ export default function PartyListPage() {
             다시 시도
           </Button>
         </StatusView>
+      ) : null}
+
+      {hasInvitations ? (
+        <section className={styles.invitations} aria-labelledby="party-invitations">
+          <h2 className={styles.sectionLabel} id="party-invitations">
+            받은 초대 {invitations.length}
+          </h2>
+
+          <ul className={styles.list}>
+            {invitations.map((invitation) => (
+              <li key={invitation.invitationId}>
+                <button
+                  type="button"
+                  className={styles.row}
+                  onClick={() => void navigate(path.partyInvitation(invitation.invitationId))}
+                >
+                  <span className={styles.body}>
+                    <span className={styles.name}>{invitation.party.owner.nickname} 님의 파티</span>
+                    <span className={styles.members}>
+                      {invitation.party.memberCount + 1}인 · {invitation.party.name}
+                    </span>
+                  </span>
+
+                  <span className={styles.chevron} aria-hidden="true">
+                    ›
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {/* 초대만 못 받아 온 경우다. 파티 목록은 아래에 그대로 둔다 */}
+      {invitationsFailed ? (
+        <p className={styles.invitationsError}>
+          받은 초대를 불러오지 못했어요.{' '}
+          <Button variant="text" onClick={() => setReloadCount((count) => count + 1)}>
+            초대 다시 불러오기
+          </Button>
+        </p>
+      ) : null}
+
+      {/*
+       * 위에 `받은 초대`가 있을 때만 이 줄을 붙인다. 두 목록이 나란히 있으면 아래가
+       * 무엇인지 말해 줘야 하고, 초대가 없으면 목록이 하나뿐이라 시안대로 제목 없이 둔다
+       * (시안은 `참여 중인 방 N개` 머리말을 없앴다 — 업무 -462).
+       */}
+      {hasParties && hasInvitations ? (
+        <h2 className={styles.sectionLabel}>참여 중인 파티</h2>
       ) : null}
 
       {hasParties ? (

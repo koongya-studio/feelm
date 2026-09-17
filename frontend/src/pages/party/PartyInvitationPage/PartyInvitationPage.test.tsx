@@ -58,13 +58,17 @@ describe('5.6 파티 초대 수신', () => {
     expect(declineInvitation).not.toHaveBeenCalled();
   });
 
-  it('거절하면 API-054를 부르고 알림 목록으로 간다', async () => {
+  /*
+   * 거절도 5.1로 간다(업무 -595). 8.1 알림 목록은 전체가 목업이라 그쪽으로 보내면 방금
+   * 거절한 초대가 남아 있는 화면이 나온다. 5.1은 API-052를 다시 읽는다.
+   */
+  it('거절하면 API-054를 부르고 파티 시작으로 간다', async () => {
     render();
     await screen.findByText('무비버디 님의 파티');
 
     fireEvent.click(screen.getByRole('button', { name: '거절' }));
 
-    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/notifications'));
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/party'));
     expect(declineInvitation).toHaveBeenCalledWith(INVITATION_ID);
     expect(acceptInvitation).not.toHaveBeenCalled();
   });
