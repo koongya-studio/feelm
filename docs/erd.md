@@ -373,11 +373,18 @@ erDiagram
         timestamptz created_at
         timestamptz responded_at
     }
+    PARTY_REFRESH_REQUESTS {
+        bigint party_id PK, FK
+        bigint request_version
+        timestamptz next_attempt_at
+        integer attempt_count
+    }
 
     USERS ||--o{ PARTIES : owns
     PARTIES ||--|{ PARTY_MEMBERS : has
     USERS ||--o{ PARTY_MEMBERS : member
     PARTIES ||--o{ PARTY_INVITATIONS : invites
+    PARTIES ||--o| PARTY_REFRESH_REQUESTS : refresh_pending
     USERS ||--o{ PARTY_INVITATIONS : invited
 ```
 
@@ -386,6 +393,7 @@ erDiagram
 | `parties` | 파티 | 이름 필수, 최대 20자. `ACTIVE`이면 종료 사유·시각이 모두 NULL이고 `CLOSED`이면 모두 NOT NULL이다. 오너가 나간 뒤 1명 이상 남으면 최초 가입자에게 승계하고, 마지막 멤버가 나가 0명이 될 때 `INSUFFICIENT_MEMBERS`로 종료한다 | FR-20 · API-049, API-050, API-055, API-056 |
 | `party_members` | 파티 구성원 | 별도 `id`를 사용하고 UK(`party_id`, `user_id`)를 둔다. 활성 파티의 오너도 `OWNER` 역할로 저장한다. 파티별 OWNER는 부분 유일 인덱스로 최대 1명을 보장하고, `ACTIVE` 파티의 OWNER 존재·`parties.owner_id` 일치·최대 4명은 애플리케이션이 보장한다. 멤버가 0명인 `CLOSED` 파티의 `owner_id`는 마지막 오너 이력을 보존한다 | FR-20, FR-21 · API-057 |
 | `party_invitations` | 초대 | 현재 멤버라면 누구나 초대 가능하다. 자기 자신 초대 금지 CHECK와 `PENDING` 중복 부분 유일 인덱스를 두며, 기존 멤버·초대 발신자의 현재 멤버 여부는 애플리케이션에서 검증한다. `PENDING`이면 `responded_at`은 NULL이고 응답 완료 시 NOT NULL이다 | FR-20 · API-051~054 |
+| `party_refresh_requests` | 파티별 미처리 추천 입력 갱신 요청 | `party_id` PK·FK. 활성 구성 변경과 같은 DB 트랜잭션 또는 Candidate 알림 처리에서 저장한다. 같은 파티의 대기 요청은 `request_version` 증가와 함께 합치고, Redis 입력 장애 시 `next_attempt_at`에 재시도한다. 종료 파티는 요청을 정리한다 | S15P21E106-544 |
 
 ### 2.6 리포트 (2차 MVP)
 

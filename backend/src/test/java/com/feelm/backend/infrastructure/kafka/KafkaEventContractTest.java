@@ -3,8 +3,12 @@ package com.feelm.backend.infrastructure.kafka;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.common.serialization.LongSerializer;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -26,6 +30,7 @@ class KafkaEventContractTest {
         assertThat(KafkaEventType.RECOMMENDATION_CLICK.topic())
                 .isEqualTo("feelm.recommendation-click.v1");
         assertThat(KafkaEventType.OTT_CLICK.topic()).isEqualTo("feelm.ott-click.v1");
+        assertThat(KafkaEventType.PARTY_REFRESH.topic()).isEqualTo("feelm.party-refresh.v1");
     }
 
     @Test
@@ -59,5 +64,20 @@ class KafkaEventContractTest {
         JsonNode json = objectMapper.readTree(objectMapper.writeValueAsString(payload));
 
         assertThat(json.has("score")).isFalse();
+    }
+
+    @Test
+    @DisplayName("파티 키는 설정된 LongSerializer가 8바이트로 직렬화한다")
+    void serializesPartyKeyAsEightBytes() {
+        var properties =
+                new KafkaOutboxProperties(
+                        "localhost:9092", 100, Duration.ofSeconds(30), Duration.ofDays(7));
+        var producerFactory = new KafkaEventSupportConfig().kafkaProducerFactory(properties);
+        assertThat(producerFactory.getConfigurationProperties())
+                .containsEntry(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, LongSerializer.class);
+
+        byte[] key = new LongSerializer().serialize(KafkaEventType.PARTY_REFRESH.topic(), 9001L);
+        assertThat(key).hasSize(Long.BYTES);
+        assertThat(ByteBuffer.wrap(key).getLong()).isEqualTo(9001L);
     }
 }

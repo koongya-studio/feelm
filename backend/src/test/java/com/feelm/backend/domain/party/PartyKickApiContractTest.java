@@ -86,6 +86,12 @@ class PartyKickApiContractTest extends SharedPostgresContractTest {
 
         assertThat(memberIds(party)).containsExactlyInAnyOrder(10L, 30L);
         assertParty(party, 10, "ACTIVE", null);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM party_refresh_requests WHERE party_id=?",
+                                Long.class,
+                                party))
+                .isEqualTo(1);
     }
 
     @Test
