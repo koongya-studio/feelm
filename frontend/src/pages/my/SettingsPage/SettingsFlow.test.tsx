@@ -224,17 +224,15 @@ describe('7.1 → 7.8 → 7.8-A → 7.8-A-1', () => {
     await waitFor(() => expect(location()).toBe('/my/settings/account'));
   });
 
-  it('7.8-A의 아이디 찾기와 비밀번호 복구는 0.7로 간다', async () => {
+  /* 같이 있던 `아이디 찾기` 줄은 없앴다(CR-25, 업무 -455) */
+  it('7.8-A의 비밀번호 복구는 0.7로 가고 아이디 찾기 줄은 없다', async () => {
     renderApp([ROUTE_PATTERN.accountManage]);
 
-    expect(await screen.findByRole('link', { name: /아이디 찾기/ })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: /비밀번호 복구/ })).toHaveAttribute(
       'href',
       '/account/find',
     );
-    expect(screen.getByRole('link', { name: /비밀번호 복구/ })).toHaveAttribute(
-      'href',
-      '/account/find',
-    );
+    expect(screen.queryByRole('link', { name: /아이디 찾기/ })).toBeNull();
   });
 
   it('소셜 전용 계정에는 비밀번호 변경이 없다', async () => {
@@ -242,7 +240,7 @@ describe('7.1 → 7.8 → 7.8-A → 7.8-A-1', () => {
     vi.mocked(getMyProfile).mockResolvedValue({ ...mockMyProfile, hasPassword: false });
     renderApp([ROUTE_PATTERN.accountManage]);
 
-    await screen.findByRole('link', { name: /아이디 찾기/ });
+    await screen.findByRole('link', { name: /비밀번호 복구/ });
     expect(screen.queryByRole('link', { name: /비밀번호 변경/ })).toBeNull();
   });
 

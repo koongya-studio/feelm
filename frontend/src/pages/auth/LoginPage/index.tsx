@@ -14,8 +14,10 @@
  * (API-003)이 필요하며, 시도 제한(`RATE_LIMITED`)은 기다리는 것 말고 할 일이 없다.
  * 셋 다 같은 문구를 보여 주면 사용자가 다음에 무엇을 해야 할지 알 수 없다.
  *
- * 와이어프레임의 `아이디 찾기` · `비밀번호 찾기`는 둘 다 0.7로 간다. 0.7이 두 갈래를
- * 탭으로 나눠 갖고 있으므로 어느 탭으로 열지를 함께 넘긴다.
+ * 와이어프레임의 도움말은 `아이디 찾기` · `비밀번호 찾기` · `회원가입` 셋이었지만
+ * **`아이디 찾기`는 뺐다** (CR-25, 팀 결정 2026-09-17, 업무 S15P21E106-455). 아이디가
+ * 곧 이메일이라 찾을 것이 없고 대응 API도 계약에 없다. 0.7은 비밀번호 찾기 하나만
+ * 하므로 탭을 고를 필요도 없어졌다.
  *
  * 소셜 로그인은 제공자 동의 화면으로 나갔다가 콜백으로 돌아온다(API-007). 연결된 계정이
  * 없으면 로그인이 아니라 가입이 남은 것이라 콜백이 0.3-A로 보낸다(S15P21E106-499).
@@ -160,13 +162,7 @@ export default function LoginPage() {
         </form>
 
         <nav className={styles.links} aria-label="계정 도움말">
-          <Link className={styles.link} to={path.accountFind()} state={{ tab: 'id' }}>
-            아이디 찾기
-          </Link>
-          <span className={styles.separator} aria-hidden="true">
-            |
-          </span>
-          <Link className={styles.link} to={path.accountFind()} state={{ tab: 'password' }}>
+          <Link className={styles.link} to={path.accountFind()}>
             비밀번호 찾기
           </Link>
           <span className={styles.separator} aria-hidden="true">
