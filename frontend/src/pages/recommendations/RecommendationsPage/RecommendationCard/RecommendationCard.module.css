@@ -1,4 +1,7 @@
-/* 와이어프레임 2.2 카드 실측값 */
+/*
+ * 와이어프레임 2.2 카드 실측값. 카드는 세로 필름(`FilmReel`)의 한 칸이라 모서리는
+ * 릴이 정한다(업무 -605) — 포스터 자체의 둥근 모서리는 0이다.
+ */
 .card {
   position: relative;
   width: 156px;
@@ -8,7 +11,6 @@
 
 .posterLink {
   display: block;
-  border-radius: 4px;
 }
 
 /*

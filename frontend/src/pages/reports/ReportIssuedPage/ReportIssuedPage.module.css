@@ -91,8 +91,12 @@
   position: relative;
   flex: none;
   align-self: center;
-  width: 420px;
-  height: 630px;
+  /*
+   * 420 × 630이 기준이고 그보다 좁은 화면에서는 폭에 맞춰 줄어든다(업무 -605). 고정 420px은
+   * 380px 뷰포트에서 양옆이 잘렸다. 안쪽 자리는 전부 비율이라 같이 줄어든다.
+   */
+  width: min(420px, 100%);
+  aspect-ratio: 420 / 630;
   margin: calc(var(--space-6) * -1) 0 calc(var(--space-2) * -1);
 }
 

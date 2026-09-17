@@ -102,10 +102,11 @@
 
 /*
  * 프레임 한 칸. 안에 무엇이 오든(버튼 · 자리표시자) 같은 크기와 테두리를 입힌다.
+ * `data-film-label`이 붙은 것만 예외다 — 프레임 사이에 끼우는 이름표라 칸이 아니다.
  *
  * 테두리는 얇은 밝은 선이다. 포스터가 어두울 때 칸 경계가 띠에 묻히는 것을 막는다.
  */
-.track > * {
+.track > :not([data-film-label]) {
   width: var(--film-frame-width);
   height: var(--film-frame-height);
   flex: none;
@@ -114,4 +115,77 @@
   border-radius: 2px;
   overflow: hidden;
   scroll-snap-align: center;
+}
+
+/*
+ * 세로 필름 (1.3 · 2.2, 업무 -605).
+ *
+ * 가로 릴을 90도 돌린 것이다 — 구멍 띠가 좌우에 서고 프레임이 위에서 아래로 쌓인다.
+ * 폭은 프레임 폭 + 구멍 띠 둘 + 여백 둘로 스스로 정해지고, 길이는 프레임 수를 따른다.
+ * 스스로 스크롤하지 않는다(`index.tsx`).
+ *
+ * 띠의 휘어짐과 주황빛 가장자리도 방향을 따라 돈다. 긴 변(좌우)이 4% · 끝(위아래)이 3%다.
+ */
+
+/*
+ * 높이도 내용대로다. 가로 배치(2.2의 `.scrollArea`)에 놓이면 flex의 기본값(stretch)이 릴을
+ * 상자 높이로 늘리는데, 그러면 띠는 상자 높이만큼만 그려지고 프레임은 그 아래로 빠져나간다.
+ */
+.reel[data-orientation='vertical'] {
+  width: max-content;
+  height: max-content;
+  padding: 0 var(--film-band-pad);
+}
+
+.reel[data-orientation='vertical'] .band {
+  background:
+    linear-gradient(
+      90deg,
+      var(--color-film-warm) 0,
+      transparent 4%,
+      transparent 96%,
+      var(--color-film-warm) 100%
+    ),
+    linear-gradient(
+      180deg,
+      var(--color-film-warm) 0,
+      transparent 3%,
+      transparent 97%,
+      var(--color-film-warm) 100%
+    ),
+    var(--color-film);
+  mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0 0 L100 0 Q96 50 100 100 L0 100 Q4 50 0 0 Z" fill="black"/></svg>');
+}
+
+.reel[data-orientation='vertical'] .holes {
+  top: var(--space-3);
+  right: auto;
+  bottom: var(--space-3);
+  left: auto;
+  width: 5px;
+  height: auto;
+  background: repeating-linear-gradient(180deg, var(--color-film-hole) 0 5px, transparent 5px 13px);
+}
+
+/* 위의 규칙이 좌우를 `auto`로 되돌리므로 같은 우선순위로 다시 정한다 */
+.reel[data-orientation='vertical'] .holes[data-edge='left'] {
+  left: calc(var(--film-band-pad) + 4px);
+}
+
+.reel[data-orientation='vertical'] .holes[data-edge='right'] {
+  right: calc(var(--film-band-pad) + 4px);
+}
+
+.reel[data-orientation='vertical'] .track {
+  flex-direction: column;
+  padding: var(--space-3) var(--film-hole-band);
+  overflow: visible;
+  scroll-snap-type: none;
+}
+
+/* 프레임 사이의 이름표. 칸 폭에 맞춰 가운데 선다 */
+.reel[data-orientation='vertical'] .track > [data-film-label] {
+  width: var(--film-frame-width);
+  flex: none;
+  box-sizing: border-box;
 }

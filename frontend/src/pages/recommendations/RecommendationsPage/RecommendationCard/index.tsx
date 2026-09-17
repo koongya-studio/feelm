@@ -47,7 +47,7 @@ export default function RecommendationCard({ item, otts, menuOpen, onOpenMenu }:
         <Poster
           width={156}
           height={220}
-          radius={4}
+          radius={0}
           src={movie.posterUrl ?? undefined}
           title=""
           seed={movie.movieId}

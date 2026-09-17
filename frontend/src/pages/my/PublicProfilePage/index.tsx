@@ -1,16 +1,16 @@
 /*
  * 7.2-B 다른 사용자 공개 프로필
  *
- * 와이어프레임에서 가져온 것 — 이름 · 필름/팝콘 수, ⋯ 메뉴(사용자 차단 · 신고하기),
- * 공개된 취향 키워드 · 필름 · 팝콘 버킷, 공개 한줄평.
+ * 와이어프레임에서 가져온 것 — 이름, ⋯ 메뉴(사용자 차단 · 신고하기), 공개된 취향
+ * 키워드 · 필름 · 팝콘 버킷, 공개 한줄평.
  *
- * 배치는 `Social Profile UI Design (1).jpg`를 따른다. 상단 비주얼을 화면 전체 폭으로
- * 크게 두고, 그 위에 이름을 얹고, 수치를 3열로 둔다. 레퍼런스가 그 아래 둔 넓은 pill은
- * 없다 — 아래 `뺀 것`을 보라. 레퍼런스의 인물 사진 자리는 무채색 면이다(`ProfileHero` 주석).
+ * **2.4 영화 상세와 같은 화면이다**(업무 -605, 사용자 지시 2026-09-18 — "영화 상세페이지
+ * 화면처럼"). 화면은 `ProfileBoard`가 그린다. 그전에는 `Social Profile UI Design (1).jpg`를
+ * 따라 어두운 히어로에 수치 3열을 얹었다(업무 -305). ⋯는 2.4의 뒤로 가기와 같은 유리 버튼으로
+ * 위 오른쪽에 뜬다.
  *
- * **팔로워 · 팔로잉 · 창작물 수는 쓰지 않는다.** Feelm에 없는 개념이다. 레퍼런스가
- * 그 자리에 둔 3열을 **프레임 · 팝콘 · 공개 한줄평**으로 바꿨다. 셋 다 API-062가 주는
- * 값이다.
+ * **팔로워 · 팔로잉 · 창작물 수는 쓰지 않는다.** Feelm에 없는 개념이다. 이름 아래 수치 한 줄은
+ * **프레임 · 팝콘 · 한줄평**이고 셋 다 API-062가 주는 값이다.
  *
  * **뺀 것**(업무 -459) — 아바타 · 한 줄 소개는 계약에 자리가 없다. 3열의 `나와 일치`도
  * 뺐다. API-063이 주기로 한 값이지만 2차 MVP라 미구현이고, 지금 보이던 `76%`는 목업이
@@ -39,12 +39,10 @@ import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import Menu from '../../../components/Menu';
-import ProfileHero from '../../../components/ProfileHero';
-import RatingStars from '../../../components/RatingStars';
-import Section from '../../../components/Section';
-import StatRow from '../../../components/StatRow';
+import IconButton from '../../../components/IconButton';
+import ProfileBoard from '../../../components/ProfileBoard';
 import StatusView from '../../../components/StatusView';
-import TasteShowcase from '../../../components/TasteShowcase';
+import { MoreVerticalIcon } from '../../../components/Icon';
 import { isApiError } from '../../../api/apiError';
 import { blockUser } from '../../../api/settings';
 import { getPublicProfile } from '../../../api/users';
@@ -53,7 +51,11 @@ import styles from './PublicProfilePage.module.css';
 import type { PublicProfileView } from '../../../types/unspecified';
 
 /** ⋯ 메뉴가 열리는 세로 위치(px). 이미지 위에 뜬 ⋯ 버튼 바로 아래다 */
-const MENU_TOP = 76;
+/* ⋯ 버튼 바로 아래. 위 여백(--space-3) + 버튼(39px)이 지난 자리다 */
+const MENU_TOP = 60;
+
+/* 2.4의 뒤로 가기와 같은 값 */
+const TOP_BUTTON_SIZE = 39;
 
 export default function PublicProfilePage() {
   const { userId } = useParams();
@@ -184,57 +186,30 @@ export default function PublicProfilePage() {
       ) : null}
 
       {/*
-       * 헤더가 없다. 히어로가 화면 맨 위를 차지하고 뒤로 가기와 ⋯를 이미지 위에
-       * 띄운다(ProfileHero 주석). 제목은 히어로 안의 이름이 h1으로 맡는다.
+       * **이 화면에는 주 동작이 없다.** 검정 알약 하나가 `나와 취향 비교하기`로
+       * 7.2-C에 가던 자리인데, 비교를 하지 않기로 하면서 그 화면을 지웠다
+       * (사용자 결정 2026-09-17, 업무 -506). 읽는 화면으로 남긴다.
        */}
-      <div className={styles.page}>
-        <ProfileHero nickname={profile.nickname} onMore={() => setMenuOpen(true)}>
-          <StatRow
-            onDark
-            items={[
-              { label: '프레임', value: String(profile.stats.frameCount) },
-              { label: '팝콘', value: String(profile.stats.popcornCount) },
-              { label: '공개 한줄평', value: String(profile.stats.publicReviewCount) },
-            ]}
+      <ProfileBoard
+        profile={profile}
+        reviews
+        topAction={
+          <IconButton
+            label="더 보기"
+            icon={<MoreVerticalIcon />}
+            size={TOP_BUTTON_SIZE}
+            variant="translucent"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen(true)}
           />
-        </ProfileHero>
-
-        <div className={styles.body}>
-          {/*
-           * **이 화면에는 주 동작이 없다.** 검정 알약 하나가 `나와 취향 비교하기`로
-           * 7.2-C에 가던 자리인데, 비교를 하지 않기로 하면서 그 화면을 지웠다
-           * (사용자 결정 2026-09-17, 업무 -506). 읽는 화면으로 남긴다.
-           */}
-          <TasteShowcase
-            keywords={profile.keywords}
-            frames={profile.frames}
-            popcorn={profile.popcorn}
-            popcornCount={profile.stats.popcornCount}
-          />
-
-          {profile.reviews.length > 0 ? (
-            <Section label="공개 한줄평">
-              <ul className={styles.reviews}>
-                {profile.reviews.map((review) => (
-                  <li key={review.ratingId} className={styles.review}>
-                    <p className={styles.reviewComment}>{review.comment}</p>
-                    <p className={styles.reviewMeta}>
-                      <RatingStars score={review.score} size={12} />
-                      <span>{review.movieTitle}</span>
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </Section>
-          ) : null}
-
-          {notice ? (
-            <p className={styles.notice} role="status">
-              {notice}
-            </p>
-          ) : null}
-        </div>
-      </div>
+        }
+      >
+        {notice ? (
+          <p className={styles.notice} role="status">
+            {notice}
+          </p>
+        ) : null}
+      </ProfileBoard>
     </>
   );
 }
