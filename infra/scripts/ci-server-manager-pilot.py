@@ -322,6 +322,34 @@ def verify_unit_stopped(unit):
         raise RuntimeError('Pilot service cgroup remains')
 
 
+def filesystem_usage(root):
+    space = os.statvfs(root)
+    block_size = space.f_frsize or space.f_bsize
+    return {
+        'bytes': {'total': space.f_blocks * block_size,
+                  'used': (space.f_blocks - space.f_bfree) * block_size,
+                  'free': space.f_bfree * block_size,
+                  'available': space.f_bavail * block_size},
+        'inodes': {'total': space.f_files, 'used': space.f_files - space.f_ffree,
+                   'free': space.f_ffree, 'available': space.f_favail},
+    }
+
+
+def persist_filesystem_usage(attempt, peak, samples, sample_errors):
+    final = filesystem_usage(attempt / 'root')
+    if peak is None: peak = final
+    usage = {'schema_version': 2, 'final': final, 'peak': peak,
+             'samples': samples, 'sample_errors': sample_errors}
+    path = attempt / 'filesystem-usage.json'
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, 'w') as output:
+        json.dump(usage, output, sort_keys=True)
+        output.flush(); os.fsync(output.fileno())
+    path.chmod(0o600)
+    print('FILESYSTEM_USAGE=' + json.dumps(usage, sort_keys=True), flush=True)
+    return usage
+
+
 class BackendJobDriver:
     """Real server adapter for the fixed reviewed backend; NOT arbitrary MR input."""
     REQUIRED_CLASSES = frozenset({
@@ -345,6 +373,28 @@ class BackendJobDriver:
             self.owner = safety_lease['owner']
         self.child = None
         self.cleanup_confirmed = False
+        self.filesystem_peak = None
+        self.filesystem_samples = 0
+        self.filesystem_sample_errors = 0
+
+    def sample_filesystem_usage(self):
+        if self.safety_lease is None: return
+        try:
+            current = filesystem_usage(self.attempt / 'root')
+        except OSError:
+            self.filesystem_sample_errors += 1
+            return
+        self.filesystem_samples += 1
+        if self.filesystem_peak is None:
+            self.filesystem_peak = current
+            return
+        for category in ('bytes', 'inodes'):
+            peak = self.filesystem_peak[category]
+            sample = current[category]
+            peak['total'] = max(peak['total'], sample['total'])
+            peak['used'] = max(peak['used'], sample['used'])
+            peak['free'] = min(peak['free'], sample['free'])
+            peak['available'] = min(peak['available'], sample['available'])
 
     def prepare(self, deadline):
         process = bounded_output.CappedProcess(
@@ -362,8 +412,10 @@ class BackendJobDriver:
             service_command(self.unit, self.base, 'internal-launch', self.attempt,
                             self.mode, self.prepared, self.owner), self.attempt / 'execution.log')
         bootstrap_sysfs(self.base, self.attempt, self.unit, self.child)
+        self.sample_filesystem_usage()
 
     def poll(self, deadline):
+        self.sample_filesystem_usage()
         # Fixed fixture only: request timeout after an actual test DB is running.
         if self.mode == 'backend-timeout' and self.workload_ready():
             if self.ready_at is None: self.ready_at = time.monotonic()
@@ -397,6 +449,9 @@ class BackendJobDriver:
         if not self.cleanup_confirmed: raise RuntimeError('Cleanup proof required before reports')
         # Recheck immediately before touching any workload-controlled path.
         verify_unit_stopped(self.unit)
+        if self.safety_lease is not None:
+            persist_filesystem_usage(self.attempt, self.filesystem_peak,
+                                     self.filesystem_samples, self.filesystem_sample_errors)
         if self.mode in ('probe', 'disk-full'):
             # Reviewed fixtures only; not a report policy for general MR jobs.
             contents = (self.attempt / 'execution.log').read_bytes()
