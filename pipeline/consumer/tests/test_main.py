@@ -38,7 +38,9 @@ def test_main_configures_logging_before_loading_and_running() -> None:
 
 
 def test_operational_log_templates_exclude_user_and_generation_identifiers() -> None:
-    source = (Path(__file__).parent / "runner.py").read_text(encoding="utf-8")
+    source = (Path(__file__).resolve().parents[1] / "src" / "feelm_consumer" / "runner.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "user_id=%s" not in source
     assert "generation_id=%s" not in source

@@ -23,6 +23,9 @@ RUN uv sync --locked --no-dev --no-editable \
 
 FROM builder AS test
 
+COPY Dockerfile .dockerignore ./
+COPY tests ./tests
+
 RUN uv sync --locked \
     && uv run ruff check . \
     && uv run pytest -v
