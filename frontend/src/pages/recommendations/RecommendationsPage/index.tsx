@@ -14,10 +14,16 @@
  * 추천 후보가 모두 빠진 경우(관심없음 · 온보딩 `안 좋았어요`)에도 이 화면에 보여줄 것이
  * 없다. 와이어프레임에 그 상태가 없어 2.2-A와 같은 자리에 빈 데이터 안내를 둔다
  * (업무 -264).
+ *
+ * 카드 열은 **3.1과 같은 필름 릴을 세로로 세운 것**이다(`FilmReel`, 업무 -605 — 사용자
+ * 지시 2026-09-18). 그전에는 와이어프레임의 회색 판에 구멍 줄을 직접 그렸는데, 3.1의
+ * 필름이 확정되고 나서 추천 카드가 다른 필름처럼 보였다. 섹션 이름표는 프레임 사이에
+ * 끼운다(`data-film-label`).
  */
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import Button from '../../../components/Button';
+import FilmReel from '../../../components/FilmReel';
 import Menu from '../../../components/Menu';
 import OttBadge from '../../../components/OttBadge';
 import ScreenHeader from '../../../components/ScreenHeader';
@@ -33,6 +39,10 @@ import styles from './RecommendationsPage.module.css';
 import type { MouseEvent } from 'react';
 import type { Ott } from '../../../types/ott';
 import type { RecommendationItemView } from '../../../types/unspecified';
+
+/* 카드 실측값 그대로다(RecommendationCard). 릴의 칸 크기가 되고 릴은 이 폭에 맞춰 선다 */
+const FRAME_WIDTH = 156;
+const FRAME_HEIGHT = 220;
 
 type OpenMenu = {
   item: RecommendationItemView;
@@ -136,7 +146,7 @@ export default function RecommendationsPage() {
   if (failed) {
     return (
       <>
-        <ScreenHeader title="오늘의 추천" align="center" />
+        <ScreenHeader title={<VisuallyHidden>오늘의 추천</VisuallyHidden>} />
 
         {/* 2.2-A 추천을 불러오지 못한 경우 */}
         <StatusView
@@ -157,7 +167,7 @@ export default function RecommendationsPage() {
   if (items && items.length === 0) {
     return (
       <>
-        <ScreenHeader title="오늘의 추천" align="center" />
+        <ScreenHeader title={<VisuallyHidden>오늘의 추천</VisuallyHidden>} />
 
         <StatusView
           variant="empty"
@@ -172,16 +182,28 @@ export default function RecommendationsPage() {
 
   return (
     <>
-      <ScreenHeader title="오늘의 추천" align="center" />
+      {/*
+       * **화면 제목은 보이지 않는다**(사용자 지시 2026-09-18, 업무 -605). 필름이 곧 화면이고
+       * 하단 내비의 `필름`에 표시가 있다. 화면마다 h1이 하나는 있어야 하므로 글자는 남기고
+       * 보이지만 않게 한다(7.1과 같은 처리). 오류 · 빈 상태는 안내가 화면을 채우므로
+       * 헤더 자리만 남기고 제목을 숨긴다.
+       */}
+      <h1>
+        <VisuallyHidden>오늘의 추천</VisuallyHidden>
+      </h1>
 
       <div className={styles.page} ref={rootRef}>
         <div className={styles.scrollArea}>
           {items ? (
-            <div className={styles.strip}>
-              <span className={styles.perforation} data-side="left" aria-hidden="true" />
-              <span className={styles.perforation} data-side="right" aria-hidden="true" />
-
-              <h2 className={styles.sectionPill}>취향 맞춤 추천</h2>
+            <FilmReel
+              orientation="vertical"
+              frameWidth={FRAME_WIDTH}
+              frameHeight={FRAME_HEIGHT}
+              label="오늘의 추천 카드"
+            >
+              <h2 className={styles.sectionPill} data-film-label="">
+                취향 맞춤 추천
+              </h2>
 
               {tasteItems.map((item) => (
                 <RecommendationCard
@@ -193,7 +215,7 @@ export default function RecommendationsPage() {
                 />
               ))}
 
-              <div className={styles.sectionGroup}>
+              <div className={styles.sectionGroup} data-film-label="">
                 <h2 className={styles.sectionPill} data-tone="dark">
                   취향 발견 추천
                 </h2>
@@ -209,7 +231,7 @@ export default function RecommendationsPage() {
                   onOpenMenu={handleOpenMenu}
                 />
               ))}
-            </div>
+            </FilmReel>
           ) : null}
         </div>
 

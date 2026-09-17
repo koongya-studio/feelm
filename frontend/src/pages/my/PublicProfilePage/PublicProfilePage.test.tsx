@@ -62,7 +62,7 @@ async function renderProfile(userId: number = USER_ID) {
     route: `/users/${userId}`,
     path: '/users/:userId',
   });
-  // 화면 제목은 히어로 안의 이름이다. 헤더를 없애고 이미지가 상단을 차지한다(ProfileHero)
+  // 화면 제목은 2.4의 영화 제목처럼 본문 머리의 이름이다(ProfileBoard)
   await screen.findByRole('heading', { name: '무비버디' });
 
   return result;
@@ -79,23 +79,27 @@ describe('7.2-B 다른 사용자 공개 프로필', () => {
     expect(screen.queryByRole('button', { name: '나와 취향 비교하기' })).not.toBeInTheDocument();
   });
 
-  it('팔로워 대신 프레임 · 팝콘 · 공개 한줄평을 보여준다', async () => {
+  it('2.4와 같은 화면이다 — 이름 · 키워드 · 수치 한 줄, 팝콘 · 필름 · 한줄평 구역', async () => {
     /*
-     * Feelm에 팔로워 개념이 없다. 레퍼런스의 3열을 서비스에 맞게 바꾼 자리다.
-     * 셋 다 API-062가 주는 값이다 — `나와 일치`는 계약(API-063)이 미구현이라 뺐다(업무 -459).
+     * 업무 -605. 그전의 수치 3열(`dl`)은 없고 이름 아래 한 줄이다. 팔로워는 Feelm에 없는
+     * 개념이고 `나와 일치`는 계약(API-063)이 미구현이라 없다(업무 -459).
      */
     await renderProfile();
 
-    // 3열은 `dl`이다(StatRow). `공개 한줄평`은 아래 카드 제목에도 있어 이 줄 안에서 찾는다
-    const stats = screen.getByText('프레임').closest('dl')!;
-
-    expect([...stats.querySelectorAll('dt')].map((item) => item.textContent)).toEqual([
-      '프레임',
-      '팝콘',
-      '공개 한줄평',
-    ]);
+    expect(screen.queryByRole('definition')).not.toBeInTheDocument();
     expect(screen.queryByText(/팔로워|팔로잉/)).not.toBeInTheDocument();
     expect(screen.queryByText('나와 일치')).not.toBeInTheDocument();
+
+    expect(screen.getByRole('heading', { name: '취향 팝콘' })).toBeInTheDocument();
+    expect(screen.getByText(/^팝콘 \d+알$/)).toBeInTheDocument();
+
+    // 다른 사람의 프레임이라 상세로 가는 링크가 아니다
+    const films = screen.getByRole('heading', { name: '취향 필름' }).parentElement!;
+    expect(films.querySelectorAll('li').length).toBeGreaterThan(0);
+    expect(within(films).queryByRole('link')).not.toBeInTheDocument();
+
+    expect(screen.getByRole('heading', { name: '공개 한줄평' })).toBeInTheDocument();
+    expect(screen.getByText('스릴러만 먹다가 드라마 맛도 늘었어요.')).toBeInTheDocument();
   });
 
   it('차단은 확인을 거쳐 7.8-D로 간다', async () => {
