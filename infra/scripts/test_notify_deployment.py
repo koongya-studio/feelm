@@ -30,6 +30,13 @@ class NotifyDeploymentTest(unittest.TestCase):
             "CI_PIPELINE_ID": "20",
             "CI_JOB_ID": "10",
             "CI_JOB_TOKEN": "gitlab-job-token",
+            "CI_COMMIT_BRANCH": "develop",
+            "CI_PIPELINE_SOURCE": "push",
+            "CI_COMMIT_TITLE": (
+                "Merge branch 'fix/S15P21E106-517-hdfs-notification-context' "
+                "into 'develop'"
+            ),
+            "CI_COMMIT_AUTHOR": "조은채 <developer@example.com>",
         }
 
     def test_logs_in_posts_success_message_and_logs_out(self):
@@ -50,6 +57,13 @@ class NotifyDeploymentTest(unittest.TestCase):
         self.assertIn("> ✅ 성공 · 📦 backend · 🌐 service", message)
         self.assertIn("**🔎 배포 정보**", message)
         self.assertIn("`abc12345`", message)
+        self.assertIn("- 실행: `develop 병합` (`push`)", message)
+        self.assertIn("- 작업자: `조은채`", message)
+        self.assertIn(
+            "- 원본 브랜치: `fix/S15P21E106-517-hdfs-notification-context`",
+            message,
+        )
+        self.assertIn("- 대상 브랜치: `develop`", message)
         self.assertIn(self.environ["CI_JOB_URL"], message)
         self.assertTrue(request.call_args_list[2].args[0].endswith("/api/v4/users/logout"))
 
@@ -58,7 +72,10 @@ class NotifyDeploymentTest(unittest.TestCase):
         self.assertIn("> ❌ 실패 · 📦 redis · 🌐 service", message)
 
     def test_cli_accepts_every_deployment_job_service(self):
-        for service in ("backend", "frontend", "consumer", "redis", "monitoring"):
+        for service in (
+            "backend", "frontend", "consumer", "redis", "monitoring",
+            "hdfs-service-config", "hdfs-distributed-config",
+        ):
             with self.subTest(service=service):
                 self.assertEqual(MODULE.parse_args([service, "failed"]).service, service)
 
@@ -120,6 +137,12 @@ class NotifyDeploymentTest(unittest.TestCase):
         self.assertIn("## 🚨 [CI] develop Pipeline 실패", message)
         self.assertIn("ci-variable-preflight", message)
         self.assertIn("https://gitlab.example/jobs/1", message)
+        self.assertIn("- 실행: `develop 병합` (`push`)", message)
+        self.assertIn("- 작업자: `조은채`", message)
+        self.assertIn(
+            "- 원본 브랜치: `fix/S15P21E106-517-hdfs-notification-context`",
+            message,
+        )
 
         with patch.object(MODULE, "pipeline_jobs", return_value=[]), \
              patch.object(MODULE, "post_message") as post:
@@ -169,6 +192,20 @@ class NotifyDeploymentTest(unittest.TestCase):
         message = MODULE.build_message("backend", "success", environ)
         self.assertNotIn("@channel", message)
         self.assertNotIn("**boom**", message)
+
+    def test_non_merge_pipeline_reports_branch_and_source_without_source_branch(self):
+        environ = {
+            **self.environ,
+            "CI_COMMIT_BRANCH": "main",
+            "CI_PIPELINE_SOURCE": "web",
+            "CI_COMMIT_TITLE": "Run deployment",
+            "CI_COMMIT_AUTHOR": "Deploy Operator <operator@example.com>",
+        }
+        message = MODULE.build_message("backend", "success", environ)
+        self.assertIn("- 실행: `수동 실행` (`web`)", message)
+        self.assertIn("- 작업자: `Deploy Operator`", message)
+        self.assertIn("- 대상 브랜치: `main`", message)
+        self.assertNotIn("원본 브랜치", message)
 
 
 if __name__ == "__main__":

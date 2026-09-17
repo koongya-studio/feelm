@@ -16,6 +16,16 @@ from urllib.request import Request, urlopen
 
 
 SAFE_VALUE = re.compile(r"[^A-Za-z0-9._/:-]+")
+MERGE_TITLE = re.compile(r"^Merge branch '([^']+)' into '([^']+)'$")
+DEPLOYMENT_SERVICES = (
+    "backend",
+    "frontend",
+    "consumer",
+    "redis",
+    "monitoring",
+    "hdfs-service-config",
+    "hdfs-distributed-config",
+)
 
 
 class DeploymentNotificationError(RuntimeError):
@@ -148,6 +158,42 @@ def safe_value(value: str, fallback: str = "unknown") -> str:
     return normalized or fallback
 
 
+def safe_person(value: str) -> str:
+    name = value.split("<", 1)[0].strip()
+    normalized = re.sub(r"[^\w .:/-]+", "-", name, flags=re.UNICODE).strip("- ")
+    return normalized or "unknown"
+
+
+def pipeline_context(environ: dict[str, str]) -> list[str]:
+    branch = safe_value(environ.get("CI_COMMIT_BRANCH", ""))
+    source = safe_value(environ.get("CI_PIPELINE_SOURCE", ""))
+    title = environ.get("CI_COMMIT_TITLE", "").strip()
+    merge = MERGE_TITLE.fullmatch(title)
+    source_branch = safe_value(merge.group(1)) if merge else None
+    target_branch = safe_value(merge.group(2)) if merge else branch
+
+    if source == "push" and merge:
+        trigger = f"{target_branch} 병합"
+    elif source == "push":
+        trigger = f"{branch} 반영"
+    else:
+        trigger = {
+            "web": "수동 실행",
+            "schedule": "스케줄 실행",
+            "api": "API 실행",
+            "merge_request_event": "MR 파이프라인",
+        }.get(source, source)
+
+    lines = [f"- 실행: `{trigger}` (`{source}`)"]
+    author = environ.get("CI_COMMIT_AUTHOR", "").strip()
+    if author:
+        lines.append(f"- 작업자: `{safe_person(author)}`")
+    if source_branch:
+        lines.append(f"- 원본 브랜치: `{source_branch}`")
+    lines.append(f"- 대상 브랜치: `{target_branch}`")
+    return lines
+
+
 def build_message(service: str, status: str, environ: dict[str, str]) -> str:
     labels = {
         "success": ("✅", "성공"),
@@ -168,6 +214,7 @@ def build_message(service: str, status: str, environ: dict[str, str]) -> str:
         "**🔎 배포 정보**",
         f"- 커밋: `{commit}`",
     ]
+    lines.extend(pipeline_context(environ))
     if job_url.startswith("https://"):
         lines.append(f"- [배포 Job 확인]({job_url})")
     if pipeline_url.startswith("https://"):
@@ -244,6 +291,7 @@ def build_pipeline_failure_message(
     if len(failures) > 10:
         lines.append(f"- 그 외 {len(failures) - 10}개")
     lines.extend(["", "**Pipeline 정보**", f"- 커밋: `{commit}`"])
+    lines.extend(pipeline_context(environ))
     if pipeline_url.startswith("https://"):
         lines.append(f"- [Pipeline 확인]({pipeline_url})")
     return "\n".join(lines)
@@ -304,9 +352,7 @@ def notify(service: str, status: str, environ: dict[str, str]) -> bool:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("service", choices=(
-        "backend", "frontend", "consumer", "redis", "monitoring", "pipeline-failure"
-    ))
+    parser.add_argument("service", choices=(*DEPLOYMENT_SERVICES, "pipeline-failure"))
     parser.add_argument("status", nargs="?")
     return parser.parse_args(argv)
 
