@@ -33,6 +33,17 @@ if [[ "${INITIALIZE}" == true ]]; then
   echo "HDFS deployment state initialized: ${NODE} ${REVISION}"
   exit 0
 fi
+
+if [[ "${NODE}" == "service" ]]; then
+  if ! BACKEND_IMAGE="$(
+    docker inspect feelm-backend --format '{{.Config.Image}}' 2>/dev/null
+  )" || [[ -z "${BACKEND_IMAGE}" ]]; then
+    echo "Running backend image could not be resolved; HDFS deployment refused" >&2
+    exit 1
+  fi
+  export BACKEND_IMAGE
+fi
+
 previous_revision="$("${release_tool[@]}" read --component hdfs --node "${NODE}")"
 previous="${RELEASE_ROOT}/releases/${previous_revision}"
 

@@ -267,6 +267,11 @@ include:
         self.assertIn('ENV_FILE="$(mktemp ', self.hdfs_deploy)
         self.assertIn("trap 'rm -f \"${ENV_FILE}\"' EXIT", self.hdfs_deploy)
         self.assertNotIn('HDFS_COMPOSE_ENV_FILE', self.hdfs_deploy)
+        self.assertIn('if [[ "${NODE}" == "service" ]]', self.hdfs_deploy)
+        self.assertIn("docker inspect feelm-backend --format '{{.Config.Image}}'",
+                      self.hdfs_deploy)
+        self.assertIn('export BACKEND_IMAGE', self.hdfs_deploy)
+        self.assertIn('Running backend image could not be resolved', self.hdfs_deploy)
         service = job_block(self.infra, 'deploy-hdfs-service-config')
         distributed = job_block(self.infra, 'deploy-hdfs-distributed-config')
         self.assertIn('tags: [e106-shell]', service)
