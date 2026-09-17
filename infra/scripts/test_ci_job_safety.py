@@ -1,4 +1,4 @@
-from contextlib import redirect_stdout
+from contextlib import nullcontext, redirect_stdout
 import importlib.util
 import io
 import json
@@ -241,18 +241,24 @@ class SafetyTests(unittest.TestCase):
     def test_backend_diagnostic_publishes_only_bounded_fields(self):
         with tempfile.TemporaryDirectory() as directory:
             attempt = Path(directory)
-            (attempt / 'lifecycle.json').write_text(json.dumps({
-                'outcome': 'test_failure', 'process_exit': 1,
-            }))
+            with patch.object(safety.pilot.os, 'O_NOFOLLOW', 0, create=True):
+                safety.pilot.write_private_json(attempt / 'lifecycle.json', {
+                    'outcome': 'test_failure', 'process_exit': 1,
+                })
             evidence = attempt / 'evidence'; evidence.mkdir()
             (evidence / 'manifest.json').write_text(json.dumps({
                 'summary': {'tests': 5, 'failures': 1, 'errors': 0, 'skipped': 0},
                 'missing_classes': [],
             }))
+            (evidence / 'manifest.json').chmod(0o600)
             output = io.StringIO()
-            trusted = type('Info', (), {'st_uid': 0, 'st_mode': 0o100600,
-                                         'st_nlink': 1, 'st_size': 256})()
-            with patch.object(Path, 'lstat', return_value=trusted), redirect_stdout(output):
+            if os.name == 'nt':
+                trusted = type('Info', (), {'st_uid': 0, 'st_mode': 0o100600,
+                                             'st_nlink': 1, 'st_size': 256})()
+                context = patch.object(Path, 'lstat', return_value=trusted)
+            else:
+                context = nullcontext()
+            with context, redirect_stdout(output):
                 safety.publish_backend_diagnostic(attempt, 'backend', True)
             line = output.getvalue().strip()
             self.assertTrue(line.startswith('BACKEND_TEST_RESULT='))
@@ -260,6 +266,16 @@ class SafetyTests(unittest.TestCase):
             self.assertEqual(result['failure_category'], 'test_failed')
             self.assertNotIn('stdout', result)
             self.assertNotIn('stderr', result)
+
+    @unittest.skipIf(os.name == 'nt', 'POSIX permission validation')
+    def test_backend_diagnostic_rejects_group_readable_lifecycle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            attempt = Path(directory)
+            path = attempt / 'lifecycle.json'
+            path.write_text(json.dumps({'outcome': 'success', 'process_exit': 0}))
+            path.chmod(0o640)
+            with self.assertRaisesRegex(ValueError, 'Untrusted diagnostic evidence'):
+                safety.publish_backend_diagnostic(attempt, 'backend', True)
 
     def test_backend_diagnostic_reports_cleanup_without_lifecycle_file(self):
         with tempfile.TemporaryDirectory() as directory:
