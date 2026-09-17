@@ -49,6 +49,11 @@ Secret 변수는 필요하지 않다. Redis 비밀번호는 기존 Compose 환�
 `releases/bootstrap-<revision>`으로 복사해 rollback 기준점으로 사용한다. Redis 데이터와
 실행 중인 Secret은 이 스냅샷에 포함하지 않는다.
 
+Redis를 재생성한 뒤에는 health 상태가 `healthy`가 될 때까지 기본 5초 간격으로 최대 24회
+대기한 다음 전체 데이터스토어 검증을 수행한다. `unhealthy`는 즉시 실패하며, 후보 설정
+실패 후 rollback Redis에도 같은 대기를 적용한다. 운영상 조정이 필요하면
+`DEPLOY_HEALTH_ATTEMPTS`와 `DEPLOY_HEALTH_INTERVAL_SECONDS`를 사용한다.
+
 로컬 회귀 테스트:
 
     python3 -B -m unittest \\

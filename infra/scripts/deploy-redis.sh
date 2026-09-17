@@ -90,8 +90,40 @@ recreate_redis() {
     "${compose[@]}" up -d --no-deps --force-recreate redis
 }
 
+wait_for_healthy() {
+  local attempts="${DEPLOY_HEALTH_ATTEMPTS:-24}"
+  local interval="${DEPLOY_HEALTH_INTERVAL_SECONDS:-5}"
+  local status="none"
+  local i
+
+  for ((i = 1; i <= attempts; i++)); do
+    status="$(
+      docker inspect \
+        --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' \
+        feelm-redis 2>/dev/null || true
+    )"
+
+    if [[ "${status}" == "healthy" ]]; then
+      return 0
+    fi
+
+    if [[ "${status}" == "unhealthy" ]]; then
+      echo "feelm-redis is unhealthy" >&2
+      return 1
+    fi
+
+    if ((i < attempts)); then
+      echo "feelm-redis is not ready: ${status}; retrying (${i}/${attempts})" >&2
+      sleep "${interval}"
+    fi
+  done
+
+  echo "feelm-redis did not become healthy: ${status}" >&2
+  return 1
+}
+
 verify_runtime() {
-  bash "${RUNTIME_VERIFY_SCRIPT}"
+  wait_for_healthy && bash "${RUNTIME_VERIFY_SCRIPT}"
 }
 
 restore_previous_config() {
