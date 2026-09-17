@@ -178,6 +178,98 @@ class SafetyTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'timing evidence missing'):
                 safety.publish_backend_timing(attempt, 'backend', required=True)
 
+    def test_backend_diagnostic_classifies_success_and_test_failure(self):
+        success = safety.validated_backend_diagnostic(
+            {'outcome': 'success', 'process_exit': 0}, True,
+            {'summary': {'tests': 12, 'failures': 0, 'errors': 0, 'skipped': 0},
+             'missing_classes': []})
+        self.assertEqual(success['failure_category'], 'success')
+        self.assertEqual(success['junit_summary']['tests'], 12)
+
+        failed = safety.validated_backend_diagnostic(
+            {'outcome': 'test_failure', 'process_exit': 1}, True,
+            {'summary': {'tests': 12, 'failures': 1, 'errors': 0, 'skipped': 0},
+             'missing_classes': []})
+        self.assertEqual(failed['failure_category'], 'test_failed')
+
+    def test_backend_diagnostic_classifies_filesystem_exhaustion(self):
+        filesystem = {
+            'schema_version': 2,
+            'peak': {
+                'bytes': {'total': 100, 'used': 100, 'free': 0, 'available': 0},
+                'inodes': {'total': 50, 'used': 49, 'free': 1, 'available': 1},
+            },
+        }
+        result = safety.validated_backend_diagnostic(
+            {'outcome': 'test_failure', 'process_exit': 1}, True, filesystem=filesystem)
+        self.assertEqual(result['failure_category'], 'filesystem_exhausted')
+        self.assertEqual(result['filesystem_min_available'], {'bytes': 0, 'inodes': 1})
+
+    def test_backend_diagnostic_classifies_report_and_cleanup_failures(self):
+        report = safety.validated_backend_diagnostic(
+            {'outcome': 'report_failure', 'process_exit': 0}, True,
+            rejection={'type': 'ValueError', 'errno': None})
+        self.assertEqual(report['failure_category'], 'report_validation_failed')
+        self.assertEqual(report['report_rejection'], {'type': 'ValueError', 'errno': None})
+
+        cleanup = safety.validated_backend_diagnostic(
+            {'outcome': 'cleanup_failure', 'process_exit': 0}, False)
+        self.assertEqual(cleanup['failure_category'], 'cleanup_failed')
+        self.assertFalse(cleanup['cleanup_confirmed'])
+
+        full_filesystem = {
+            'schema_version': 2,
+            'peak': {
+                'bytes': {'total': 100, 'used': 100, 'free': 0, 'available': 0},
+                'inodes': {'total': 50, 'used': 50, 'free': 0, 'available': 0},
+            },
+        }
+        cleanup = safety.validated_backend_diagnostic(
+            {'outcome': 'cleanup_failure', 'process_exit': 0}, False,
+            filesystem=full_filesystem)
+        self.assertEqual(cleanup['failure_category'], 'cleanup_failed')
+
+    def test_backend_diagnostic_rejects_arbitrary_strings(self):
+        with self.assertRaises(ValueError):
+            safety.validated_backend_diagnostic(
+                {'outcome': 'unsafe\nlog', 'process_exit': 1}, True)
+        with self.assertRaises(ValueError):
+            safety.validated_backend_diagnostic(
+                {'outcome': 'report_failure', 'process_exit': 1}, True,
+                rejection={'type': 'ValueError\nsecret', 'errno': None})
+
+    def test_backend_diagnostic_publishes_only_bounded_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            attempt = Path(directory)
+            (attempt / 'lifecycle.json').write_text(json.dumps({
+                'outcome': 'test_failure', 'process_exit': 1,
+            }))
+            evidence = attempt / 'evidence'; evidence.mkdir()
+            (evidence / 'manifest.json').write_text(json.dumps({
+                'summary': {'tests': 5, 'failures': 1, 'errors': 0, 'skipped': 0},
+                'missing_classes': [],
+            }))
+            output = io.StringIO()
+            trusted = type('Info', (), {'st_uid': 0, 'st_mode': 0o100600,
+                                         'st_nlink': 1, 'st_size': 256})()
+            with patch.object(Path, 'lstat', return_value=trusted), redirect_stdout(output):
+                safety.publish_backend_diagnostic(attempt, 'backend', True)
+            line = output.getvalue().strip()
+            self.assertTrue(line.startswith('BACKEND_TEST_RESULT='))
+            result = json.loads(line.removeprefix('BACKEND_TEST_RESULT='))
+            self.assertEqual(result['failure_category'], 'test_failed')
+            self.assertNotIn('stdout', result)
+            self.assertNotIn('stderr', result)
+
+    def test_backend_diagnostic_reports_cleanup_without_lifecycle_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = io.StringIO()
+            with redirect_stdout(output):
+                safety.publish_backend_diagnostic(Path(directory), 'backend', False)
+            result = json.loads(output.getvalue().strip().removeprefix('BACKEND_TEST_RESULT='))
+            self.assertEqual(result['failure_category'], 'cleanup_failed')
+            self.assertFalse(result['cleanup_confirmed'])
+
     def test_child_is_bound_to_owner_without_host_settings(self):
         args = safety.pilot.service_command('ci222-server-0123456789ab.service', Path('/stage'),
                   'internal-launch', Path('/attempt'), 'probe', Path('/prepared'), 'ci222-owner-0123456789ab.service')

@@ -201,16 +201,123 @@ def write_private(path, payload):
         output.write(payload); output.flush(); os.fsync(output.fileno())
 
 
+def private_json(path, maximum):
+    info = path.lstat()
+    if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077
+            or info.st_nlink != 1 or not 0 < info.st_size <= maximum):
+        raise ValueError('Untrusted diagnostic evidence')
+    value = json.loads(path.read_text(encoding='utf-8'))
+    if not isinstance(value, dict): raise ValueError('Invalid diagnostic evidence')
+    return value
+
+
+def bounded_count(value):
+    return type(value) is int and 0 <= value <= 1000000
+
+
+def validated_backend_diagnostic(lifecycle, cleanup_confirmed, manifest=None,
+                                 filesystem=None, rejection=None):
+    outcomes = frozenset({'success', 'test_failure', 'report_failure', 'timeout',
+                          'cancelled', 'infrastructure_failure', 'cleanup_failure'})
+    outcome = lifecycle.get('outcome')
+    process_exit = lifecycle.get('process_exit')
+    if (outcome not in outcomes or (process_exit is not None
+                                    and (type(process_exit) is not int
+                                         or not -255 <= process_exit <= 255))
+            or type(cleanup_confirmed) is not bool):
+        raise ValueError('Invalid backend lifecycle evidence')
+
+    result = {
+        'schema_version': 1,
+        'failure_category': 'success' if outcome == 'success' else 'unknown_failure',
+        'lifecycle_outcome': outcome,
+        'process_exit': process_exit,
+        'cleanup_confirmed': cleanup_confirmed,
+    }
+    if not cleanup_confirmed or outcome == 'cleanup_failure':
+        result['failure_category'] = 'cleanup_failed'
+    elif outcome in ('timeout', 'cancelled'):
+        result['failure_category'] = outcome
+    elif outcome == 'infrastructure_failure':
+        result['failure_category'] = 'runner_infrastructure_failure'
+    elif outcome == 'report_failure' or rejection is not None:
+        result['failure_category'] = 'report_validation_failed'
+    elif outcome == 'test_failure':
+        result['failure_category'] = 'gradle_failed'
+
+    if manifest is not None:
+        summary = manifest.get('summary')
+        missing = manifest.get('missing_classes')
+        if (not isinstance(summary, dict) or set(summary) != {'tests', 'failures', 'errors', 'skipped'}
+                or not all(bounded_count(value) for value in summary.values())
+                or not isinstance(missing, list) or len(missing) > 32
+                or not all(isinstance(name, str) and re.fullmatch(r'[A-Za-z0-9_.$]{1,512}', name)
+                           for name in missing)):
+            raise ValueError('Invalid backend report summary')
+        result['junit_summary'] = summary
+        result['missing_required_classes'] = len(missing)
+        if missing:
+            result['failure_category'] = 'required_suite_missing'
+        elif summary['failures'] or summary['errors'] or summary['skipped']:
+            result['failure_category'] = 'test_failed'
+
+    if filesystem is not None:
+        peak = filesystem.get('peak')
+        if (filesystem.get('schema_version') != 2 or not isinstance(peak, dict)
+                or set(peak) != {'bytes', 'inodes'}):
+            raise ValueError('Invalid filesystem usage evidence')
+        available = {}
+        for name in ('bytes', 'inodes'):
+            values = peak[name]
+            if (not isinstance(values, dict) or set(values) != {'total', 'used', 'free', 'available'}
+                    or not all(type(value) is int and 0 <= value <= 2**63 - 1
+                               for value in values.values())):
+                raise ValueError('Invalid filesystem usage evidence')
+            available[name] = values['available']
+        result['filesystem_min_available'] = available
+        if ((available['bytes'] == 0 or available['inodes'] == 0)
+                and cleanup_confirmed and outcome not in ('success', 'cleanup_failure')):
+            result['failure_category'] = 'filesystem_exhausted'
+
+    if rejection is not None:
+        error_type = rejection.get('type')
+        error_number = rejection.get('errno')
+        if (not isinstance(error_type, str) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9_]{0,127}', error_type)
+                or (error_number is not None
+                    and (type(error_number) is not int or not 0 <= error_number <= 4096))):
+            raise ValueError('Invalid report rejection evidence')
+        result['report_rejection'] = {'type': error_type, 'errno': error_number}
+    return result
+
+
+def publish_backend_diagnostic(attempt, mode, cleanup_confirmed):
+    if mode != 'backend': return
+    try:
+        lifecycle = private_json(attempt / 'lifecycle.json', 64 * 1024)
+    except FileNotFoundError:
+        if cleanup_confirmed: raise
+        lifecycle = {'outcome': 'cleanup_failure', 'process_exit': None}
+    optional = {}
+    for name, relative, maximum in (
+            ('manifest', 'evidence/manifest.json', 512 * 1024),
+            ('filesystem', 'filesystem-usage.json', 64 * 1024),
+            ('rejection', 'report-rejection.json', 4096)):
+        try:
+            optional[name] = private_json(attempt / relative, maximum)
+        except FileNotFoundError:
+            optional[name] = None
+    diagnostic = validated_backend_diagnostic(
+        lifecycle, cleanup_confirmed, optional['manifest'], optional['filesystem'],
+        optional['rejection'])
+    print('BACKEND_TEST_RESULT=' + json.dumps(
+        diagnostic, sort_keys=True, separators=(',', ':')), flush=True)
+
+
 def publish_backend_timing(attempt, mode, required):
     if mode != 'backend': return
     path = attempt / 'evidence/manifest.json'
     try:
-        info = path.lstat()
-        if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077
-                or info.st_nlink != 1 or info.st_size > 512 * 1024):
-            raise ValueError('Untrusted timing evidence')
-        manifest = json.loads(path.read_text(encoding='utf-8'))
-        if not isinstance(manifest, dict): raise ValueError('Invalid timing evidence manifest')
+        manifest = private_json(path, 512 * 1024)
         timing = pilot.job_io.validated_public_timing(manifest.get('timing'))
     except (OSError, ValueError, UnicodeError, json.JSONDecodeError, TypeError):
         if required: raise RuntimeError('Validated backend timing evidence missing')
@@ -250,7 +357,10 @@ def start(base, prepared, mode, source_payload=None, source_sha=None, on_started
         if on_started is not None: on_started(attempt, lease)
         result = subprocess.run(owner_command(base, attempt, lease), timeout=2250)
         proof = attempt / 'cleanup.json'
-        if not proof.is_file() or json.loads(proof.read_text()) != {'id': token, 'clean': True}:
+        cleanup_confirmed = (proof.is_file()
+                             and json.loads(proof.read_text()) == {'id': token, 'clean': True})
+        publish_backend_diagnostic(attempt, mode, cleanup_confirmed)
+        if not cleanup_confirmed:
             raise RuntimeError('Missing cleanup proof; new jobs blocked')
         publish_backend_timing(attempt, mode, required=result.returncode == 0)
         return result.returncode
