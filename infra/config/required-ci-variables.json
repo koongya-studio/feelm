@@ -22,6 +22,16 @@
       "format": "nonempty"
     },
     {
+      "key": "GRAFANA_ALERT_HMAC_SECRET",
+      "environment_scope": "service",
+      "variable_type": "env_var",
+      "protected": true,
+      "masked": true,
+      "hidden": true,
+      "raw": true,
+      "format": "nonempty"
+    },
+    {
       "key": "POSTGRES_DB",
       "environment_scope": "service",
       "variable_type": "env_var",

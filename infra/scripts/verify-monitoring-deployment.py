@@ -37,10 +37,12 @@ def read_json(url: str, label: str, opener: Callable[..., object]) -> object:
 def verify(
     prometheus_url: str = "http://127.0.0.1:9090",
     grafana_url: str = "http://127.0.0.1:3000",
+    relay_url: str = "http://127.0.0.1:9087",
     opener: Callable[..., object] = urlopen,
 ) -> dict[str, int]:
     prometheus = validate_base_url(prometheus_url, "Prometheus")
     grafana = validate_base_url(grafana_url, "Grafana")
+    relay = validate_base_url(relay_url, "Mattermost alert relay")
 
     try:
         with opener(f"{prometheus}/-/ready", timeout=5) as response:
@@ -51,6 +53,12 @@ def verify(
     grafana_health = read_json(f"{grafana}/api/health", "Grafana health", opener)
     if not isinstance(grafana_health, dict) or grafana_health.get("database") != "ok":
         raise VerificationError("Grafana database health가 정상이 아닙니다.")
+
+    relay_health = read_json(
+        f"{relay}/healthz", "Mattermost alert relay health", opener
+    )
+    if not isinstance(relay_health, dict) or relay_health.get("status") != 200:
+        raise VerificationError("Mattermost alert relay health가 정상이 아닙니다.")
 
     expression = 'up{job=~"backend|node|kafka|postgres|redis"}'
     query_url = f"{prometheus}/api/v1/query?{urlencode({'query': expression})}"
@@ -89,6 +97,7 @@ def verify_with_retries(
     interval: float,
     prometheus_url: str,
     grafana_url: str,
+    relay_url: str,
     verifier: Callable[..., dict[str, int]] = verify,
     sleeper: Callable[[float], None] = time.sleep,
 ) -> dict[str, int]:
@@ -97,7 +106,7 @@ def verify_with_retries(
     last_error: VerificationError | None = None
     for attempt in range(1, attempts + 1):
         try:
-            return verifier(prometheus_url, grafana_url)
+            return verifier(prometheus_url, grafana_url, relay_url)
         except VerificationError as error:
             last_error = error
             if attempt < attempts:
@@ -111,6 +120,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--prometheus-url", default="http://127.0.0.1:9090")
     parser.add_argument("--grafana-url", default="http://127.0.0.1:3000")
+    parser.add_argument("--relay-url", default="http://127.0.0.1:9087")
     parser.add_argument("--attempts", type=int, default=24)
     parser.add_argument("--interval", type=float, default=5)
     args = parser.parse_args()
@@ -120,6 +130,7 @@ def main() -> int:
             args.interval,
             args.prometheus_url,
             args.grafana_url,
+            args.relay_url,
         )
     except VerificationError as error:
         print(f"FAIL: {error}")
