@@ -44,7 +44,7 @@ class RedisRecommendationCandidateReaderTest {
                         """
                         {
                           "modelVersion":"als-serving-example",
-                          "candidateVersion":3,
+                          "candidateVersion":6,
                           "generationId":"als-20260916T083000Z-a1b2c3d4",
                           "updatedAt":"2026-09-16T08:30:00Z",
                           "taste":[{
@@ -62,7 +62,25 @@ class RedisRecommendationCandidateReaderTest {
                             }]
                           }],
                           "discovery":[
-                            {"movieId":202,"score":3.91,"flavorCode":"FLAVOR_MYSTERY","reasons":[]}
+                            {"movieId":202,"score":3.91,"reasons":[{
+                              "code":"DISCOVERY_AGGREGATE_AFFINITY",
+                              "directionSource":"RATING",
+                              "contributorCount":12,
+                              "topContributors":[
+                                {"movieId":55,"relation":"POSITIVE_ALIGNMENT"},
+                                {"movieId":77,"relation":"NEGATIVE_CONTRAST"}
+                              ],
+                              "topContributionCoverage":0.43,
+                              "viewedCountInGroup":0,
+                              "affinityRank":2,
+                              "popularityRankInGroup":1
+                            }]},
+                            {"movieId":203,"score":3.82,"reasons":[{
+                              "code":"DISCOVERY_PERSONAL_SCORE",
+                              "sourceMovieIds":[55],
+                              "matchedGenreCodes":["THRILLER"]
+                            }]},
+                            {"movieId":204,"score":3.7,"reasons":[]}
                           ]
                         }
                         """);
@@ -71,12 +89,16 @@ class RedisRecommendationCandidateReaderTest {
 
         verify(values).get("feelm:user:10:candidates");
         assertThat(result.modelVersion()).isEqualTo("als-serving-example");
-        assertThat(result.candidateVersion()).isEqualTo(3);
+        assertThat(result.candidateVersion()).isEqualTo(6);
         assertThat(result.generationId()).isEqualTo("als-20260916T083000Z-a1b2c3d4");
         assertThat(result.updatedAt()).isEqualTo(Instant.parse("2026-09-16T08:30:00Z"));
         assertThat(result.items())
                 .extracting(item -> item.movieId() + ":" + item.type() + ":" + item.flavorCode())
-                .containsExactly("101:TASTE:null", "202:DISCOVERY:FLAVOR_MYSTERY");
+                .containsExactly(
+                        "101:TASTE:null",
+                        "202:DISCOVERY:null",
+                        "203:DISCOVERY:null",
+                        "204:DISCOVERY:null");
         assertThat(
                         result.items()
                                 .get(0)
@@ -88,7 +110,20 @@ class RedisRecommendationCandidateReaderTest {
                 .isEqualTo(55);
         assertThat(result.items().get(0).reason().toString())
                 .contains("\"sharedFeatures\"", "\"tmdbGenreIds\":[878]");
-        assertThat(result.items().get(1).reason().get("reasons")).isEmpty();
+        assertThat(result.items().get(1).reason().get("reasons").get(0).toString())
+                .isEqualTo(
+                        "{\"code\":\"DISCOVERY_AGGREGATE_AFFINITY\","
+                                + "\"directionSource\":\"RATING\",\"contributorCount\":12,"
+                                + "\"topContributors\":[{\"movieId\":55,"
+                                + "\"relation\":\"POSITIVE_ALIGNMENT\"},{\"movieId\":77,"
+                                + "\"relation\":\"NEGATIVE_CONTRAST\"}],"
+                                + "\"topContributionCoverage\":0.43,\"viewedCountInGroup\":0,"
+                                + "\"affinityRank\":2,\"popularityRankInGroup\":1}");
+        assertThat(result.items().get(2).reason().get("reasons").get(0).toString())
+                .isEqualTo(
+                        "{\"code\":\"DISCOVERY_PERSONAL_SCORE\",\"sourceMovieIds\":[55],"
+                                + "\"matchedGenreCodes\":[\"THRILLER\"]}");
+        assertThat(result.items().get(3).reason().get("reasons")).isEmpty();
     }
 
     @ParameterizedTest
@@ -110,51 +145,81 @@ class RedisRecommendationCandidateReaderTest {
     @ValueSource(
             strings = {
                 """
-                {"modelVersion":"als","candidateVersion":3,"generationId":"",
+                {"modelVersion":"als","candidateVersion":6,"generationId":"",
                  "updatedAt":"2026-09-16T08:30:00Z","taste":[{"movieId":1,"score":4}],
                  "discovery":[]}
                 """,
                 """
-                {"modelVersion":"als","candidateVersion":3,"generationId":"g1",
+                {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
                  "updatedAt":"2026-09-16T08:30:00Z","taste":[],"discovery":[]}
                 """,
                 """
-                {"modelVersion":"als","candidateVersion":3,"generationId":"g1",
+                {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
                  "updatedAt":"2026-09-16T08:30:00Z","taste":[{"movieId":0,"score":4}],
                  "discovery":[]}
                 """,
                 """
-                {"modelVersion":"als","candidateVersion":3,"generationId":"g1",
+                {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
                  "updatedAt":"2026-09-16T08:30:00Z","taste":[],
-                 "discovery":[{"movieId":2,"score":3,"flavorCode":null}]}
+                 "discovery":[{"movieId":2,"score":3}]}
                 """,
                 """
-                {"modelVersion":"als","candidateVersion":"3","generationId":"g1",
+                {"modelVersion":"als","candidateVersion":"6","generationId":"g1",
                  "updatedAt":"2026-09-16T08:30:00Z","taste":[{"movieId":1,"score":4}],
                  "discovery":[]}
                 """,
                 """
-                {"modelVersion":"als","candidateVersion":3,"generationId":"g1",
+                {"modelVersion":"als","candidateVersion":5,"generationId":"g1",
+                 "updatedAt":"2026-09-16T08:30:00Z",
+                 "taste":[{"movieId":1,"score":4,"reasons":[]}],"discovery":[]}
+                """,
+                """
+                {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
                  "updatedAt":"2026-09-16T08:30:00Z","taste":[{"movieId":1.5,"score":4}],
                  "discovery":[]}
                 """,
                 """
-                {"modelVersion":"als","candidateVersion":3,"generationId":"g1",
+                {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
                  "updatedAt":"2026-09-16T08:30:00Z","taste":[{"movieId":1,"score":"4"}],
                  "discovery":[]}
                 """,
                 """
-                {"modelVersion":"als","candidateVersion":4,"generationId":"g1",
+                {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
                  "updatedAt":"2026-09-16T08:30:00Z","taste":[{"movieId":1,"score":4}],
                  "discovery":[]}
                 """,
                 """
-                {"modelVersion":"als","candidateVersion":4,"generationId":"g1",
+                {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
                  "updatedAt":"2026-09-16T08:30:00Z","taste":[{
                    "movieId":1,"score":4,"reasons":[{
                      "code":"SHARED_FEATURES_WITH_LIKED_MOVIE","sourceMovieId":2,
                      "sharedFeatures":{"tmdbGenreIds":[],"tmdbDirectorIds":[],"tmdbCastIds":[],"tmdbKeywordIds":[]}
                    }] }],"discovery":[]}
+                """,
+                """
+                {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
+                 "updatedAt":"2026-09-16T08:30:00Z","taste":[],"discovery":[{
+                   "movieId":2,"score":3,"reasons":{
+                     "code":"DISCOVERY_PERSONAL_SCORE","sourceMovieIds":[1],"matchedGenreCodes":[]
+                   }}]}
+                """,
+                """
+                {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
+                 "updatedAt":"2026-09-16T08:30:00Z","taste":[],"discovery":[{
+                   "movieId":2,"score":3,"reasons":[{
+                     "code":"DISCOVERY_AGGREGATE_AFFINITY","directionSource":"RATING",
+                     "contributorCount":1,"topContributors":[{"movieId":1,"relation":"UNKNOWN"}],
+                     "topContributionCoverage":0.5,"viewedCountInGroup":0,
+                     "affinityRank":1,"popularityRankInGroup":1
+                   }]}]}
+                """,
+                """
+                {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
+                 "updatedAt":"2026-09-16T08:30:00Z","taste":[],"discovery":[{
+                   "movieId":2,"score":3,"reasons":[{
+                     "code":"DISCOVERY_PERSONAL_SCORE","sourceMovieIds":[],
+                     "matchedGenreCodes":["THRILLER"]
+                   }]}]}
                 """
             })
     @DisplayName("T3 계약에 맞지 않는 메타데이터와 후보는 전체를 거절한다")
@@ -174,7 +239,7 @@ class RedisRecommendationCandidateReaderTest {
         when(values.get("feelm:user:10:candidates"))
                 .thenReturn(
                         """
-                        {"modelVersion":"als","candidateVersion":3,"generationId":"g1",
+                        {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
                          "updatedAt":"2026-09-16T08:30:00Z","taste":[%s],"discovery":[]}
                         """
                                 .formatted(taste));
@@ -187,14 +252,12 @@ class RedisRecommendationCandidateReaderTest {
         String discovery =
                 IntStream.rangeClosed(1, 101)
                         .mapToObj(
-                                id ->
-                                        "{\"movieId\":%d,\"score\":4.0,\"flavorCode\":\"F\",\"reasons\":[]}"
-                                                .formatted(id))
+                                id -> "{\"movieId\":%d,\"score\":4.0,\"reasons\":[]}".formatted(id))
                         .collect(Collectors.joining(","));
         when(values.get("feelm:user:10:candidates"))
                 .thenReturn(
                         """
-                        {"modelVersion":"als","candidateVersion":3,"generationId":"g1",
+                        {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
                          "updatedAt":"2026-09-16T08:30:00Z","taste":[],"discovery":[%s]}
                         """
                                 .formatted(discovery));
@@ -212,14 +275,12 @@ class RedisRecommendationCandidateReaderTest {
         String discovery =
                 IntStream.rangeClosed(501, 600)
                         .mapToObj(
-                                id ->
-                                        "{\"movieId\":%d,\"score\":4.0,\"flavorCode\":\"F\",\"reasons\":[]}"
-                                                .formatted(id))
+                                id -> "{\"movieId\":%d,\"score\":4.0,\"reasons\":[]}".formatted(id))
                         .collect(Collectors.joining(","));
         when(values.get("feelm:user:10:candidates"))
                 .thenReturn(
                         """
-                        {"modelVersion":"als","candidateVersion":3,"generationId":"g1",
+                        {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
                          "updatedAt":"2026-09-16T08:30:00Z","taste":[%s],"discovery":[%s]}
                         """
                                 .formatted(taste, discovery));
@@ -233,10 +294,10 @@ class RedisRecommendationCandidateReaderTest {
         when(values.get("feelm:user:10:candidates"))
                 .thenReturn(
                         """
-                        {"modelVersion":"als","candidateVersion":3,"generationId":"g1",
+                        {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
                          "updatedAt":"2026-09-16T08:30:00Z",
                          "taste":[{"movieId":101,"score":4.32,"reasons":[]}],
-                         "discovery":[{"movieId":101,"score":3.2,"flavorCode":"FLAVOR_A","reasons":[]}]}
+                         "discovery":[{"movieId":101,"score":3.2,"reasons":[]}]}
                         """);
         assertUnavailable(() -> reader.read(10));
     }

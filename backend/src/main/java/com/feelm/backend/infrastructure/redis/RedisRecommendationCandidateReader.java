@@ -10,7 +10,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -23,19 +22,19 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.ValueDeserializer;
 import tools.jackson.databind.annotation.JsonDeserialize;
 
-/**
- * {@code feelm:user:{userId}:candidates}의 JSON을 읽어 추천 후보 묶음으로 변환한다.
- *
- * <p>이 클래스의 검증은 Redis 값이 합의된 입력 계약을 따르는지 확인하는 역할이다. 사용자에게 이미 처리된 영화인지와 같은 비즈니스 필터링은 {@code
- * RecommendationBufferWriter}에서 수행한다.
- */
+/** Redis의 개인 추천 후보 JSON을 읽고 Candidate v6 계약을 검증한다. */
 @Component
 public class RedisRecommendationCandidateReader implements RecommendationCandidateReader {
 
     private static final int MAX_MODEL_VERSION_LENGTH = 50;
     private static final int MAX_GENERATION_ID_LENGTH = 100;
-    private static final int MAX_FLAVOR_CODE_LENGTH = 30;
+    private static final long SUPPORTED_CANDIDATE_VERSION = 6;
     private static final String SHARED_FEATURES_REASON = "SHARED_FEATURES_WITH_LIKED_MOVIE";
+    private static final String DISCOVERY_AGGREGATE_REASON = "DISCOVERY_AGGREGATE_AFFINITY";
+    private static final String DISCOVERY_PERSONAL_REASON = "DISCOVERY_PERSONAL_SCORE";
+    private static final Set<String> DIRECTION_SOURCES = Set.of("RATING", "ONBOARDING");
+    private static final Set<String> CONTRIBUTOR_RELATIONS =
+            Set.of("POSITIVE_ALIGNMENT", "NEGATIVE_CONTRAST");
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
@@ -89,7 +88,7 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
                 || batch.modelVersion().isBlank()
                 || batch.modelVersion().length() > MAX_MODEL_VERSION_LENGTH
                 || batch.candidateVersion() == null
-                || batch.candidateVersion() < 0
+                || batch.candidateVersion() != SUPPORTED_CANDIDATE_VERSION
                 || batch.generationId() == null
                 || batch.generationId().isBlank()
                 || batch.generationId().length() > MAX_GENERATION_ID_LENGTH
@@ -102,13 +101,12 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
             throw new IllegalArgumentException("Invalid candidate metadata");
         }
 
-        // 같은 영화의 점수나 분류를 Spring이 임의로 선택하지 않도록 후보 묶음 전체를 거부한다.
         Set<Long> movieIds = new HashSet<>();
         for (StoredTasteCandidate item : batch.taste()) {
             if (item == null
                     || item.movieId() <= 0
                     || item.score() == null
-                    || !validReasons(item.reasons())
+                    || !validTasteReasons(item.reasons())
                     || !movieIds.add(item.movieId())) {
                 throw new IllegalArgumentException("Invalid candidate item");
             }
@@ -117,38 +115,127 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
             if (item == null
                     || item.movieId() <= 0
                     || item.score() == null
-                    || item.flavorCode() == null
-                    || item.flavorCode().isBlank()
-                    || item.flavorCode().length() > MAX_FLAVOR_CODE_LENGTH
-                    || !validReasons(item.reasons())
+                    || !validDiscoveryReasons(item.reasons())
                     || !movieIds.add(item.movieId())) {
                 throw new IllegalArgumentException("Invalid candidate item");
             }
         }
     }
 
-    private boolean validReasons(List<StoredReason> reasons) {
-        if (reasons == null) {
+    private boolean validTasteReasons(JsonNode reasons) {
+        if (reasons == null || !reasons.isArray()) {
             return false;
         }
-        for (StoredReason reason : reasons) {
-            if (reason == null
-                    || !SHARED_FEATURES_REASON.equals(reason.code())
-                    || reason.sourceMovieId() <= 0
-                    || reason.sharedFeatures() == null
-                    || !validFeatureIds(reason.sharedFeatures().tmdbGenreIds())
-                    || !validFeatureIds(reason.sharedFeatures().tmdbDirectorIds())
-                    || !validFeatureIds(reason.sharedFeatures().tmdbCastIds())
-                    || !validFeatureIds(reason.sharedFeatures().tmdbKeywordIds())
-                    || reason.sharedFeatures().isEmpty()) {
+        for (JsonNode reason : reasons) {
+            JsonNode sharedFeatures = reason.path("sharedFeatures");
+            if (!reason.isObject()
+                    || !SHARED_FEATURES_REASON.equals(reason.path("code").textValue())
+                    || !positiveLong(reason.path("sourceMovieId"))
+                    || !sharedFeatures.isObject()
+                    || !validPositiveLongArray(sharedFeatures.path("tmdbGenreIds"), false)
+                    || !validPositiveLongArray(sharedFeatures.path("tmdbDirectorIds"), false)
+                    || !validPositiveLongArray(sharedFeatures.path("tmdbCastIds"), false)
+                    || !validPositiveLongArray(sharedFeatures.path("tmdbKeywordIds"), false)
+                    || allFeatureArraysEmpty(sharedFeatures)) {
                 return false;
             }
         }
         return true;
     }
 
-    private boolean validFeatureIds(List<Long> ids) {
-        return ids != null && ids.stream().allMatch(id -> id != null && id > 0);
+    private boolean allFeatureArraysEmpty(JsonNode sharedFeatures) {
+        return sharedFeatures.path("tmdbGenreIds").isEmpty()
+                && sharedFeatures.path("tmdbDirectorIds").isEmpty()
+                && sharedFeatures.path("tmdbCastIds").isEmpty()
+                && sharedFeatures.path("tmdbKeywordIds").isEmpty();
+    }
+
+    private boolean validDiscoveryReasons(JsonNode reasons) {
+        if (reasons == null || !reasons.isArray()) {
+            return false;
+        }
+        for (JsonNode reason : reasons) {
+            if (!reason.isObject()) {
+                return false;
+            }
+            String code = reason.path("code").textValue();
+            if (DISCOVERY_AGGREGATE_REASON.equals(code)) {
+                if (!validAggregateReason(reason)) {
+                    return false;
+                }
+            } else if (DISCOVERY_PERSONAL_REASON.equals(code)) {
+                if (!validPersonalReason(reason)) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean validAggregateReason(JsonNode reason) {
+        JsonNode contributors = reason.path("topContributors");
+        if (!DIRECTION_SOURCES.contains(reason.path("directionSource").textValue())
+                || !nonNegativeLong(reason.path("contributorCount"))
+                || !contributors.isArray()
+                || !decimalBetweenZeroAndOne(reason.path("topContributionCoverage"))
+                || !nonNegativeLong(reason.path("viewedCountInGroup"))
+                || !positiveLong(reason.path("affinityRank"))
+                || !positiveLong(reason.path("popularityRankInGroup"))) {
+            return false;
+        }
+        for (JsonNode contributor : contributors) {
+            if (!contributor.isObject()
+                    || !positiveLong(contributor.path("movieId"))
+                    || !CONTRIBUTOR_RELATIONS.contains(contributor.path("relation").textValue())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean validPersonalReason(JsonNode reason) {
+        return validPositiveLongArray(reason.path("sourceMovieIds"), true)
+                && validTextArray(reason.path("matchedGenreCodes"));
+    }
+
+    private boolean validPositiveLongArray(JsonNode values, boolean requireValue) {
+        if (!values.isArray() || requireValue && values.isEmpty()) {
+            return false;
+        }
+        for (JsonNode value : values) {
+            if (!positiveLong(value)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean validTextArray(JsonNode values) {
+        if (!values.isArray()) {
+            return false;
+        }
+        for (JsonNode value : values) {
+            if (!value.isTextual() || value.textValue().isBlank()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean positiveLong(JsonNode value) {
+        return value.isIntegralNumber() && value.canConvertToLong() && value.longValue() > 0;
+    }
+
+    private boolean nonNegativeLong(JsonNode value) {
+        return value.isIntegralNumber() && value.canConvertToLong() && value.longValue() >= 0;
+    }
+
+    private boolean decimalBetweenZeroAndOne(JsonNode value) {
+        return value.isNumber()
+                && value.decimalValue().compareTo(BigDecimal.ZERO) >= 0
+                && value.decimalValue().compareTo(BigDecimal.ONE) <= 0;
     }
 
     private RecommendationCandidateBatch toBatch(StoredCandidateBatch stored) {
@@ -171,7 +258,7 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
                                                 item.movieId(),
                                                 item.score(),
                                                 "DISCOVERY",
-                                                item.flavorCode(),
+                                                null,
                                                 reason(item.reasons()))));
         return new RecommendationCandidateBatch(
                 stored.modelVersion(),
@@ -181,33 +268,9 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
                 List.copyOf(items));
     }
 
-    private JsonNode reason(List<StoredReason> reasons) {
-        return objectMapper.valueToTree(
-                Map.of(
-                        "reasons",
-                        reasons.stream()
-                                .map(
-                                        reason ->
-                                                Map.of(
-                                                        "code",
-                                                        reason.code(),
-                                                        "sourceMovieId",
-                                                        reason.sourceMovieId(),
-                                                        "sharedFeatures",
-                                                        Map.of(
-                                                                "tmdbGenreIds",
-                                                                reason.sharedFeatures()
-                                                                        .tmdbGenreIds(),
-                                                                "tmdbDirectorIds",
-                                                                reason.sharedFeatures()
-                                                                        .tmdbDirectorIds(),
-                                                                "tmdbCastIds",
-                                                                reason.sharedFeatures()
-                                                                        .tmdbCastIds(),
-                                                                "tmdbKeywordIds",
-                                                                reason.sharedFeatures()
-                                                                        .tmdbKeywordIds())))
-                                .toList()));
+    /** 이유 객체의 코드별 필드를 재조립하지 않고 수신한 배열 그대로 버퍼 저장 계층에 전달한다. */
+    private JsonNode reason(JsonNode reasons) {
+        return objectMapper.createObjectNode().set("reasons", reasons.deepCopy());
     }
 
     private BusinessException unavailable(Exception cause) {
@@ -229,34 +292,12 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
     private record StoredTasteCandidate(
             @JsonDeserialize(using = StrictLongDeserializer.class) long movieId,
             @JsonDeserialize(using = StrictDecimalDeserializer.class) BigDecimal score,
-            List<StoredReason> reasons) {}
+            JsonNode reasons) {}
 
     private record StoredDiscoveryCandidate(
             @JsonDeserialize(using = StrictLongDeserializer.class) long movieId,
             @JsonDeserialize(using = StrictDecimalDeserializer.class) BigDecimal score,
-            String flavorCode,
-            List<StoredReason> reasons) {}
-
-    private record StoredReason(
-            String code,
-            @JsonDeserialize(using = StrictLongDeserializer.class) long sourceMovieId,
-            StoredSharedFeatures sharedFeatures) {}
-
-    private record StoredSharedFeatures(
-            @JsonDeserialize(contentUsing = StrictLongDeserializer.class) List<Long> tmdbGenreIds,
-            @JsonDeserialize(contentUsing = StrictLongDeserializer.class)
-                    List<Long> tmdbDirectorIds,
-            @JsonDeserialize(contentUsing = StrictLongDeserializer.class) List<Long> tmdbCastIds,
-            @JsonDeserialize(contentUsing = StrictLongDeserializer.class)
-                    List<Long> tmdbKeywordIds) {
-
-        private boolean isEmpty() {
-            return tmdbGenreIds.isEmpty()
-                    && tmdbDirectorIds.isEmpty()
-                    && tmdbCastIds.isEmpty()
-                    && tmdbKeywordIds.isEmpty();
-        }
-    }
+            JsonNode reasons) {}
 
     /** Redis 계약의 정수 필드가 문자열이나 소수에서 묵시적으로 변환되는 것을 막는다. */
     private static final class StrictLongDeserializer extends ValueDeserializer<Long> {
