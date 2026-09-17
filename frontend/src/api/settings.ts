@@ -1,123 +1,60 @@
 /*
- * 설정 화면(7.8 ~ 7.8-D) 데이터 접근 함수.
- * 대응 명세는 docs/api/users.md(API-013 · API-017 · API-018 · API-020 ~ API-022)이다.
+ * 설정 데이터 접근 함수.
+ * 대응 명세는 docs/api/users.md다.
  *
- * **알림 설정 · 차단 · 회원 탈퇴는 실제 API다**(업무 S15P21E106-394 · -480). 공개
- * 범위(7.8-B)만 목업으로 남는다 — 대응 계약이 없다. 이 함수도 계약의 경로 · 본문
- * 모양을 지키고 있어 계약이 서면 본문만 바꾸면 된다.
+ * **이 파일에 목업은 없다**(업무 -610). 알림 설정(API-017 · 018) · 차단(API-020 ~ 022) ·
+ * 탈퇴(API-013)는 전부 서버다.
  *
- * 알림 설정은 화면과 계약의 항목 수가 다르다. 7.8-C는 토글이 다섯이고 계약(API-017)은
- * 셋이라, **계약의 셋만 서버로 보내고 나머지 둘은 세션 저장소에 남긴다**(사용자 결정
- * 2026-09-16). 한 줄 소개(api/users.ts)와 같은 처리이며, 새 세션에서는 기준 목업
- * 값으로 돌아간다.
+ * 7.8-C가 그리는 `파티 초대 알림` · `리포트 발급 알림`은 계약(API-017 NotificationType)에
+ * 없다. 한때 세션 저장소에만 남겨 저장된 것처럼 보였는데, 새로고침하면 사라지는 값이라
+ * 설정처럼 보이면 안 된다. 그 둘은 화면에서 준비 중으로 잠근다(`NotificationSettingsPage`).
  *
- * 로그아웃(API-005)은 이미 실제 호출이다(`api/auth.ts`). 화면은 `useAuth().signOut`을 쓴다.
+ * 7.8-B 공개 범위도 같다. 계약에 있는 것은 프로필 `visibility`(API-015, `PUBLIC` · `PRIVATE`)
+ * 하나라 그 값만 `users.updateMyProfile`로 저장하고, 취향 필름 · 팝콘 · 한줄평의 공개 범위는
+ * 준비 중이다(`PrivacySettingsPage`).
  */
-import {
-  getPrivacySettings as getStoredPrivacySettings,
-  getUnspecifiedNotificationSettings,
-  savePrivacySettings,
-  saveUnspecifiedNotificationSettings,
-} from '../mocks/sessionStore';
-import { mockNotificationSettings, mockPrivacySettings } from '../mocks/settings';
 import { request } from './client';
-import { respond } from './mockTransport';
-import type {
-  NotificationSettingsView,
-  PrivacySettingsView,
-  UnspecifiedNotificationSettings,
-} from '../types/unspecified';
 import type { BlockedUserList, BlockResult, NotificationSettings } from '../types/user';
 
 const NOTIFICATION_SETTINGS_PATH = '/users/me/notification-settings';
 
-/**
- * 차단 목록 한 번에 받는 수. 계약의 상한이다(API-022 `size`는 1 ~ 50).
- *
- * `[?]` 7.8-D에는 더 보기가 없다. 상한을 넘게 차단한 사람은 화면에 나오지 않으므로
- * `hasNext`면 `N명 차단 중`을 감춘다 — 받은 목록을 세어 총수인 척하지 않는다.
- */
+/** 차단 목록을 한 번에 받는 상한. 계약의 `size` 최댓값이다 */
 const BLOCK_PAGE_SIZE = 50;
 
-/** 계약에 없는 토글 둘. 서버에 보낼 곳이 없어 세션 저장소가 들고 있다 */
-function unspecifiedNotificationSettings(): UnspecifiedNotificationSettings {
-  return (
-    getUnspecifiedNotificationSettings() ?? {
-      PARTY_INVITE: mockNotificationSettings.PARTY_INVITE,
-      REPORT: mockNotificationSettings.REPORT,
-    }
-  );
-}
-
-/**
- * API-017 알림 설정 조회 · GET /api/v1/users/me/notification-settings
- *
- * 응답은 계약의 세 키뿐이라 화면이 그리는 다섯 개로 채워서 돌려준다.
- */
-export async function getNotificationSettings(): Promise<NotificationSettingsView> {
-  const settings = await request<NotificationSettings>(NOTIFICATION_SETTINGS_PATH);
-
-  return { ...settings, ...unspecifiedNotificationSettings() };
+/** API-017 알림 설정 조회 · GET /api/v1/users/me/notification-settings */
+export async function getNotificationSettings(): Promise<NotificationSettings> {
+  return request<NotificationSettings>(NOTIFICATION_SETTINGS_PATH);
 }
 
 /**
  * API-018 알림 설정 변경 · PUT /api/v1/users/me/notification-settings
  *
- * 전체 교체다. 토글 하나를 바꿔도 계약의 세 값을 모두 보낸다(세 키 누락은 400).
- * 계약에 없는 둘만 바뀌어도 같은 요청이 나간다 — API-018은 멱등이고, 화면이 어느
- * 토글을 눌렀는지 이 함수는 알지 못한다.
- *
- * 세션 저장소에는 **서버가 받아들인 뒤에만** 쓴다. 실패하면 화면이 누르기 전 값으로
- * 되돌리므로 로컬에만 남으면 두 값이 어긋난다.
+ * 전체 교체다. 계약의 세 키를 모두 보낸다.
  */
 export async function updateNotificationSettings(
-  settings: NotificationSettingsView,
-): Promise<NotificationSettingsView> {
-  const { RATING, RECOMMENDATION, MARKETING, PARTY_INVITE, REPORT } = settings;
+  settings: NotificationSettings,
+): Promise<NotificationSettings> {
+  const { RATING, RECOMMENDATION, MARKETING } = settings;
 
-  const saved = await request<NotificationSettings>(NOTIFICATION_SETTINGS_PATH, {
+  return request<NotificationSettings>(NOTIFICATION_SETTINGS_PATH, {
     method: 'PUT',
     body: { RATING, RECOMMENDATION, MARKETING },
   });
-
-  saveUnspecifiedNotificationSettings({ PARTY_INVITE, REPORT });
-
-  return { ...saved, PARTY_INVITE, REPORT };
-}
-
-/**
- * 7.8-B 공개 범위 조회. **대응 API가 없다**(types/unspecified.ts `PrivacySettingsView`).
- * 가장 가까운 것은 API-014의 프로필 `visibility`다.
- */
-export async function getPrivacySettings(): Promise<PrivacySettingsView> {
-  return respond(getStoredPrivacySettings() ?? mockPrivacySettings, 'users');
-}
-
-/** 7.8-B 공개 범위 변경. **대응 API가 없다.** 프로필 항목은 API-015 `visibility`에 가깝다 */
-export async function updatePrivacySettings(
-  settings: PrivacySettingsView,
-): Promise<PrivacySettingsView> {
-  savePrivacySettings(settings);
-
-  return respond(settings, 'users');
 }
 
 /**
  * API-022 차단 목록 조회 · GET /api/v1/users/me/blocks
  *
- * 최근에 차단한 사람이 위다(서버 정렬). 계약의 `cursor`는 쓰지 않는다 — 7.8-D에
- * 더 보기가 없어 첫 페이지만 그린다.
+ * 최근에 차단한 사람이 위다. 7.8-D가 그대로 그린다.
  */
 export async function getBlockedUserList(): Promise<BlockedUserList> {
   return request<BlockedUserList>('/users/me/blocks', { query: { size: BLOCK_PAGE_SIZE } });
 }
 
 /**
- * 차단한 사용자인지.
+ * 이 사람을 차단했는지. 목록을 못 받으면 판정하지 않는다(`false`).
  *
- * **목업 공개 프로필(7.2-B)이 차단한 사람을 감출 때만 쓴다.** 계약이 열리면 서버가
- * 판정하므로(API-062 `isBlockedByMe`, API-020 설명) 이 함수는 사라진다. 목록 조회가
- * 실패하면 감추지 않는다 — 프로필을 못 보는 것보다 낫고, 차단 자체는 서버에 남는다.
+ * 차단 여부 하나를 묻는 API는 없어 목록에서 찾는다.
  */
 export async function isBlockedUser(userId: number): Promise<boolean> {
   try {
@@ -132,20 +69,17 @@ export async function isBlockedUser(userId: number): Promise<boolean> {
 /**
  * API-020 사용자 차단 · POST /api/v1/users/{userId}/block
  *
- * 오류는 계약의 코드 그대로 올라간다 — 자기 자신 400 `CANNOT_BLOCK_SELF` · 없는
- * 사용자 404 `RESOURCE_NOT_FOUND` · 이미 차단 409 `ALREADY_BLOCKED`. 화면이 가른다.
+ * 이미 차단했으면 `409 ALREADY_BLOCKED`, 없는 사람이면 `404`, 자기 자신이면 `400`이다.
+ * 함께 있는 파티에서는 나가게 되므로 부르기 전에 확인을 받는다(API-020 처리 규칙).
  *
- * `[!]` 7.2-B에 들어오는 `userId`는 아직 목업 번호다. 공개 프로필(API-062)과 파티
- * (S15P21E106-393)가 실제 API가 되기 전까지 이 호출은 대부분 404다.
+ * `[!]` 7.2-B 공개 프로필은 아직 목업(API-062 미구현)이라 거기서는 부르지 않는다 —
+ * 목업 번호로 실제 차단을 부르면 늘 404였다(업무 -610).
  */
 export async function blockUser(userId: number): Promise<BlockResult> {
   return request<BlockResult>(`/users/${userId}/block`, { method: 'POST' });
 }
 
-/**
- * API-021 사용자 차단 해제 · DELETE /api/v1/users/{userId}/block
- * 멱등이다. 차단 관계가 없어도 204다(API-021 처리 규칙).
- */
+/** API-021 사용자 차단 해제 · DELETE /api/v1/users/{userId}/block. 본문 없는 204다 */
 export async function unblockUser(userId: number): Promise<void> {
   return request<void>(`/users/${userId}/block`, { method: 'DELETE' });
 }
@@ -153,15 +87,8 @@ export async function unblockUser(userId: number): Promise<void> {
 /**
  * API-013 회원 탈퇴 · DELETE /api/v1/users/me
  *
- * 계약이 본인 확인으로 현재 비밀번호를 받는다. 와이어프레임 7.8-A-1에는 입력이 없어
- * 화면에 한 칸을 더했다(CR-24, 업무 S15P21E106-480). 되돌릴 수 없는 동작이라 계약에서
- * 재인증을 덜어내는 대신 화면을 맞추는 쪽으로 정했다(사용자 결정 2026-09-17).
- *
- * 오류는 계약의 코드 그대로 올라간다 — 비밀번호 불일치 401 `INVALID_CREDENTIALS` ·
- * 값 없음 400 `VALIDATION_FAILED` · 소셜 전용 계정 409 `PASSWORD_NOT_SET`. 화면이 가른다.
- *
- * 성공은 `204`이고 서버가 `refresh_token` 쿠키를 지운다. 메모리의 Access Token은
- * 화면이 `signOut`으로 버린다.
+ * 비밀번호로 본인을 확인한다. 소셜 전용 계정은 `409 PASSWORD_NOT_SET`이라 화면이 먼저
+ * 막는다(`WithdrawPage`).
  */
 export async function withdraw(password: string): Promise<void> {
   return request<void>('/users/me', { method: 'DELETE', body: { password } });

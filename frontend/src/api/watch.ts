@@ -14,17 +14,12 @@
  * 세 편만 보여주므로, 2.5에서 새로 저장한 평가는 서버에 있어도 그 목록에 나타나지 않는다.
  * API-039가 연동되면 사라지는 한계다.
  */
-import { mockFrameList, mockMyRatings } from '../mocks/frames';
-import { findMockMovie } from '../mocks/movies';
-import { withRatingEdit } from '../mocks/sessionStore';
 import { BASE_WEEKLY_FRAME_DELTA } from '../mocks/watch';
 import { getPopcornBucket } from './taste';
 import { getMyProfile } from './users';
 import { request } from './client';
-import { respond } from './mockTransport';
 import type { WatchStatus } from '../types/enums';
 import type {
-  MyRatingList,
   Rating,
   RatingInputValue,
   RatingUpdateInput,
@@ -207,42 +202,12 @@ export async function updateRating(ratingId: number, input: RatingUpdateInput): 
   return request<Rating>(`/ratings/${ratingId}`, { method: 'PUT', body: input });
 }
 
-/**
- * API-039 내 평가 목록 · GET /api/v1/users/me/ratings
- *
- * **목업이다.** 백엔드에 아직 없다(S15P21E106-214).
- *
- * 기준 평가(3.1 프레임과 1:1인 401~403)만 최신순으로 준다. 2.5에서 실제로 저장한 평가
- * (API-036)는 서버에 있지만 이 목업은 알지 못하므로 7.6에 나타나지 않는다(업무 -491).
- *
- * `cursor` · `size`는 구현하지 않았다. 기준 목업은 3편만 두고 `hasNext: true`로 남긴다.
- * 필름(API-042)과 같은 방식이다 — `평가 N`의 N은 필름 프레임 수와 같다(API-039 처리 규칙).
+/*
+ * 내 평가 목록(API-039)은 백엔드에 아직 없다(S15P21E106-214 진행 중). 7.1 MY의 `평가한 영화`는
+ * 평가와 1:1인 **내 필름(API-042, `taste.getMyFrames`)** 으로 그린다 — 실제 저장 결과가 곧바로
+ * 보이고, 고정 목업이 실제 평가를 가리는 일이 없다(업무 -610). API-039가 열리면 그 함수가
+ * 여기에 생기고 7.1이 그리로 옮겨 간다.
  */
-export async function getMyRatings(): Promise<MyRatingList> {
-  const items = mockFrameList.items
-    .map((frame) => {
-      const rating = withRatingEdit(mockMyRatings[frame.movie.movieId]);
-
-      return {
-        ratingId: rating.ratingId,
-        movie: movieSummary(frame.movie.movieId),
-        score: rating.score,
-        comment: rating.comment,
-        visibility: rating.visibility,
-        frameId: frame.frameId,
-        createdAt: frame.createdAt,
-      };
-    })
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.ratingId - a.ratingId);
-
-  return respond({ items, nextCursor: 'mock-cursor-2', hasNext: true }, 'watch');
-}
-
-function movieSummary(movieId: number) {
-  const { title, posterUrl } = findMockMovie(movieId);
-
-  return { movieId, title, posterUrl };
-}
 
 /**
  * 2.6 · 2.7이 표시하는 평가 전 기준 수치.

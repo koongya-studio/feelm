@@ -25,11 +25,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import Button from '../../../components/Button';
+import { path } from '../../../routes/paths';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import { getNotifications, readNotification } from '../../../api/notifications';
-import { path } from '../../../routes/paths';
 import { formatRelativeTime } from '../../../utils/date';
+import { notificationPath } from '../destination';
 import NotificationIcon from './NotificationIcon';
 import styles from './NotificationListPage.module.css';
 import type { NotificationView } from '../../../types/unspecified';
@@ -49,19 +50,6 @@ function inTab(item: NotificationView, tab: TabKey) {
 }
 
 /** 알림이 가리키는 화면. 이동표 8.1의 네 화살표다 */
-function notificationTarget(item: NotificationView): string {
-  switch (item.type) {
-    case 'WATCH_CONFIRM':
-      return path.watchConfirm(item.targetId ?? 0);
-    case 'PARTY_INVITE':
-      return path.partyInvitation(item.targetId ?? 0);
-    case 'RECOMMENDATION':
-      return path.recommendations();
-    case 'FRAME_ADDED':
-      return path.film();
-  }
-}
-
 export default function NotificationListPage() {
   const navigate = useNavigate();
 
@@ -91,10 +79,10 @@ export default function NotificationListPage() {
 
   async function open(item: NotificationView) {
     await readNotification(item.notificationId);
-    void navigate(notificationTarget(item));
+    void navigate(notificationPath(item.destination));
   }
 
-  const header = <ScreenHeader title="알림" showBack />;
+  const header = <ScreenHeader title="알림" showBack fallbackTo={path.my()} />;
 
   if (failed) {
     return (

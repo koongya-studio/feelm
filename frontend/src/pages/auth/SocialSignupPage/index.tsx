@@ -12,6 +12,7 @@
  * 0.3-A → 0.5 (S15P21E106-499).
  */
 import ScreenHeader from '../../../components/ScreenHeader';
+import { path } from '../../../routes/paths';
 import SocialButton from '../../../components/SocialButton';
 import type { SocialProvider } from '../../../components/SocialButton';
 import { isOAuthConfigured, startOAuth } from '../../../utils/oauth';
@@ -27,7 +28,7 @@ const PROVIDERS: { provider: SocialProvider; label: string }[] = [
 export default function SocialSignupPage() {
   return (
     <>
-      <ScreenHeader title="소셜 계정으로 가입" showBack />
+      <ScreenHeader title="소셜 계정으로 가입" showBack fallbackTo={path.signupMethod()} />
 
       <div className={styles.page}>
         {PROVIDERS.map(({ provider, label }) => (

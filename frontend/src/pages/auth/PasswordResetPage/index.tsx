@@ -107,7 +107,7 @@ export default function PasswordResetPage() {
   if (linkFailure) {
     return (
       <>
-        <ScreenHeader title="비밀번호 재설정" showBack />
+        <ScreenHeader title="비밀번호 재설정" showBack fallbackTo={path.login()} />
 
         <div className={styles.page}>
           <p className={styles.lead} role="alert">
@@ -131,7 +131,7 @@ export default function PasswordResetPage() {
   if (saved) {
     return (
       <>
-        <ScreenHeader title="비밀번호 재설정" showBack />
+        <ScreenHeader title="비밀번호 재설정" showBack fallbackTo={path.login()} />
 
         <div className={styles.page}>
           <p className={styles.lead} role="status">
@@ -152,7 +152,7 @@ export default function PasswordResetPage() {
 
   return (
     <>
-      <ScreenHeader title="비밀번호 재설정" showBack />
+      <ScreenHeader title="비밀번호 재설정" showBack fallbackTo={path.login()} />
 
       <form
         className={styles.page}

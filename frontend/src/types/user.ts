@@ -69,8 +69,8 @@ export type NicknameAvailability = {
 /**
  * API-017 · API-018 알림 설정. 세 키가 모두 있어야 한다(API-018 `400 VALIDATION_FAILED`).
  *
- * 7.8-C는 토글 다섯 개를 그리지만 계약은 셋이다. 나머지 둘은 `types/unspecified.ts`의
- * `NotificationSettingsView`가 더한다.
+ * 7.8-C는 토글 다섯 개를 그리지만 계약은 셋이다. 나머지 둘(파티 초대 · 리포트 발급)은
+ * 보낼 곳이 없어 화면에서 준비 중으로 잠근다(업무 -610).
  */
 export type NotificationSettings = {
   /** 감상 확인 알림 */

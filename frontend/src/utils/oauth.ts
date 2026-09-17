@@ -58,6 +58,13 @@ export type OAuthRequest = {
   /** 위조 요청을 거르는 값. 돌아온 `state`와 같아야 한다 */
   state: string;
   redirectUri: string;
+  /**
+   * 로그인이 끝나면 돌아갈 앱 안의 경로 (업무 -610).
+   *
+   * 보호 라우트가 0.6으로 보낼 때 남긴 주소다. 제공자를 다녀오면 라우터 state가 남지
+   * 않으므로 요청과 함께 저장했다가 콜백이 읽는다. 없으면 3.1 필름이다.
+   */
+  returnTo?: string;
 };
 
 /** 자격 증명이 설정되지 않은 제공자는 백엔드도 `UNSUPPORTED_PROVIDER`로 답한다 */
@@ -98,11 +105,15 @@ function createState(): string {
  * 이동과 나누어 둔 것은 주소에 실리는 값이 계약과 각 사 콘솔에 맞아야 하는 부분이라
  * 따로 확인할 수 있어야 하기 때문이다. 실제 이동은 `startOAuth`가 한다.
  */
-export function authorizeUrl(provider: SocialProvider, intent: OAuthIntent): string {
+export function authorizeUrl(
+  provider: SocialProvider,
+  intent: OAuthIntent,
+  returnTo?: string,
+): string {
   const redirectUri = oauthRedirectUri();
   const state = createState();
 
-  saveRequest({ provider, intent, state, redirectUri });
+  saveRequest({ provider, intent, state, redirectUri, ...(returnTo ? { returnTo } : {}) });
 
   const authorize = new URL(AUTHORIZE_URL[provider]);
 
@@ -127,8 +138,8 @@ export function authorizeUrl(provider: SocialProvider, intent: OAuthIntent): str
  * `location.assign`이다. 사용자가 동의를 취소하고 뒤로 오면 원래 화면이어야 하므로
  * 이 이동은 이력에 남긴다.
  */
-export function startOAuth(provider: SocialProvider, intent: OAuthIntent): void {
-  window.location.assign(authorizeUrl(provider, intent));
+export function startOAuth(provider: SocialProvider, intent: OAuthIntent, returnTo?: string): void {
+  window.location.assign(authorizeUrl(provider, intent, returnTo));
 }
 
 function saveRequest(request: OAuthRequest): void {

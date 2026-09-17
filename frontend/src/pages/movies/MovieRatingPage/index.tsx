@@ -57,6 +57,7 @@ import {
   getCountsBeforeRating,
   updateRating,
 } from '../../../api/watch';
+import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
 import { formatMonthDay } from '../../../utils/date';
 import { movieMetaLine } from '../../../utils/movie';
@@ -84,6 +85,8 @@ function failureMessage(error: unknown): string {
 export default function MovieRatingPage() {
   const { movieId } = useParams();
   const navigate = useNavigate();
+  // 2.4 · 7.1 · 3.1-A에서 온다. 바로 들어왔으면 MY로 돌아간다(업무 -610)
+  const back = useBack(path.my());
 
   const id = Number(movieId);
 
@@ -166,7 +169,7 @@ export default function MovieRatingPage() {
           spoiler: trimmed ? spoiler : false,
         });
 
-        void navigate(-1);
+        back();
 
         return;
       }
@@ -197,7 +200,7 @@ export default function MovieRatingPage() {
   if (failed) {
     return (
       <>
-        <ScreenHeader title="평가하기" showBack />
+        <ScreenHeader title="평가하기" showBack fallbackTo={path.search()} />
 
         <StatusView
           title="영화 정보를 불러오지 못했어요"
@@ -226,7 +229,7 @@ export default function MovieRatingPage() {
 
   return (
     <>
-      <ScreenHeader title="평가하기" showBack />
+      <ScreenHeader title="평가하기" showBack fallbackTo={path.search()} />
 
       <div className={styles.page}>
         <div className={styles.movie}>
@@ -305,7 +308,7 @@ export default function MovieRatingPage() {
               : '평가는 영화당 한 번만 반영돼요 · 프레임 1개 + 팝콘 1알'}
           </p>
 
-          <Button variant="text" disabled={submitting} onClick={() => void navigate(-1)}>
+          <Button variant="text" disabled={submitting} onClick={back}>
             나중에 평가하기
           </Button>
         </div>

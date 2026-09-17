@@ -12,7 +12,8 @@
  * 파티가 하나 더 생긴다. 그 자리를 막아 두지 않으면 쉽게 되살아난다.
  */
 import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import PartySetupPage from './index';
 import { renderWithRouter } from '../../../test/render';
 import { createParty, inviteToParty } from '../../../api/parties';
@@ -67,10 +68,11 @@ async function pickBuddy() {
 }
 
 describe('5.3 파티 만들기', () => {
-  it('이름을 넣고 시작하면 파티가 만들어지고 5.4로 간다', async () => {
+  it('이름을 넣고 친구를 초대해 시작하면 파티가 만들어지고 5.4로 간다', async () => {
     renderSetup();
 
     fillName('금요 심야 상영회');
+    await pickBuddy();
     fireEvent.click(screen.getByRole('button', { name: '파티 시작하기' }));
 
     await waitFor(() =>
@@ -84,6 +86,7 @@ describe('5.3 파티 만들기', () => {
   it('이름이 비면 보내지 않고 알린다', async () => {
     renderSetup();
 
+    await pickBuddy();
     fireEvent.click(screen.getByRole('button', { name: '파티 시작하기' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('파티 이름을 입력해 주세요.');
@@ -91,11 +94,63 @@ describe('5.3 파티 만들기', () => {
     expect(createParty).not.toHaveBeenCalled();
   });
 
-  it('정원은 계약이 정한 4명으로 보여준다', () => {
+  it('인원 표시는 5.2에서 고른 정원을 따른다', () => {
+    /*
+     * 2인을 골랐는데 `1/4명`이 나오던 것을 고쳤다(업무 -610). 계약(API-049)에 정원을 보낼
+     * 필드가 없어 서버는 4로 두지만, 이 화면이 말하는 상한은 사용자가 고른 수다.
+     */
+    renderSetup();
+    expect(screen.getByText('1/2명 · 최대 2명까지')).toBeInTheDocument();
+  });
+
+  it('5.2에서 3인을 골랐으면 3명이 상한이다', () => {
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/party/new/setup', state: { size: 3 } }]}>
+        <PartySetupPage />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('1/3명 · 최대 3명까지')).toBeInTheDocument();
+  });
+
+  it('초대한 친구가 없으면 시작할 수 없다', () => {
+    /*
+     * 파티는 나까지 2명부터다(5.2 안내 · `PARTY_MIN_MEMBERS`). 혼자인 파티를 만들면 5.4
+     * 이후가 할 일이 없다(업무 -610).
+     */
     renderSetup();
 
-    // 와이어프레임은 `1/6명 · 최대 6명까지`지만 API-049가 정한 정원은 4다
-    expect(screen.getByText('1/4명 · 최대 4명까지')).toBeInTheDocument();
+    fillName('금요 심야 상영회');
+
+    expect(screen.getByRole('button', { name: '파티 시작하기' })).toBeDisabled();
+    expect(screen.getByText(/1명 이상 초대해야 시작할 수 있어요/)).toBeInTheDocument();
+    expect(createParty).not.toHaveBeenCalled();
+  });
+
+  it('두 번 눌러도 파티는 하나만 만든다', async () => {
+    let resolveParty: (value: ReturnType<typeof party>) => void = () => undefined;
+    vi.mocked(createParty).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveParty = resolve;
+        }),
+    );
+
+    renderSetup();
+    fillName('금요 심야 상영회');
+    await pickBuddy();
+
+    const start = screen.getByRole('button', { name: '파티 시작하기' });
+    fireEvent.click(start);
+    fireEvent.click(start);
+    resolveParty(party());
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location').textContent).toBe(
+        `/parties/${TEST_PARTY_ID}/analyzing`,
+      ),
+    );
+    expect(createParty).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -106,7 +161,7 @@ describe('5.3 친구 초대', () => {
     await pickBuddy();
 
     expect(searchUsers).toHaveBeenCalledWith('무비');
-    expect(await screen.findByText('2/4명 · 최대 4명까지')).toBeInTheDocument();
+    expect(await screen.findByText('2/2명 · 최대 2명까지')).toBeInTheDocument();
   });
 
   it('파티를 만든 뒤에 초대를 보낸다', async () => {

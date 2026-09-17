@@ -18,7 +18,7 @@
  * `[?]` `이 OTT 작품을 더 추천받기`는 2.2로 가지만 2.2가 OTT로 거르지 않는다(API-045에 조건이 없다)
  */
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import MatchRing from '../../../components/MatchRing';
 import MeterRow from '../../../components/MeterRow';
@@ -63,7 +63,7 @@ export default function OttResultDetailPage() {
   if (failed) {
     return (
       <>
-        <ScreenHeader title="OTT 추천 상세" showBack />
+        <ScreenHeader title="OTT 추천 상세" showBack fallbackTo={path.ottResult()} />
         <StatusView
           title="추천 정보를 불러오지 못했어요"
           description="주소가 잘못되었거나 잠시 문제가 생겼어요"
@@ -82,12 +82,12 @@ export default function OttResultDetailPage() {
   }
 
   if (!item) {
-    return <ScreenHeader title="OTT 추천 상세" showBack />;
+    return <ScreenHeader title="OTT 추천 상세" showBack fallbackTo={path.ottResult()} />;
   }
 
   return (
     <>
-      <ScreenHeader title="OTT 추천 상세" showBack />
+      <ScreenHeader title="OTT 추천 상세" showBack fallbackTo={path.ottResult()} />
 
       <div className={styles.page}>
         {/* 화면에서 유일한 어두운 블록 */}
@@ -126,7 +126,11 @@ export default function OttResultDetailPage() {
             <ul className={styles.movies}>
               {item.topMovies.map((movie) => (
                 <li key={movie.movieId}>
-                  <Link to={path.movieDetail(movie.movieId)} className={styles.movie}>
+                  {/*
+                   * 영화는 눌리지 않는다(업무 -610). 이 화면의 추천은 목업이라(API-068 뷰 미연동)
+                   * 목업 영화 번호로 실제 상세를 열면 다른 영화가 나온다.
+                   */}
+                  <span className={styles.movie}>
                     <Poster
                       width={96}
                       height={136}
@@ -136,7 +140,7 @@ export default function OttResultDetailPage() {
                       seed={movie.movieId}
                     />
                     <span className={styles.movieTitle}>{movie.title}</span>
-                  </Link>
+                  </span>
                 </li>
               ))}
             </ul>

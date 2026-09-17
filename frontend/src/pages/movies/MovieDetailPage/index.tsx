@@ -21,6 +21,7 @@ import { ChevronLeftIcon } from '../../../components/Icon';
 import { ApiError } from '../../../api/apiError';
 import { getMovieDetail, getMovieReviews, getSimilarMovies } from '../../../api/movies';
 import { recordOttClick } from '../../../api/watch';
+import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
 import { movieMetaLine } from '../../../utils/movie';
 import styles from './MovieDetailPage.module.css';
@@ -47,6 +48,8 @@ export default function MovieDetailPage() {
   const { movieId } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  // 검색이나 추천에서 들어오는 화면이다. 바로 들어왔으면 검색으로 돌아간다(업무 -610)
+  const back = useBack(path.search());
   const id = Number(movieId);
 
   const routeState = useLocation().state as { recommendationItemId?: number } | null;
@@ -275,7 +278,7 @@ export default function MovieDetailPage() {
             icon={<ChevronLeftIcon />}
             size={BACK_BUTTON_SIZE}
             variant="translucent"
-            onClick={() => void navigate(-1)}
+            onClick={back}
           />
         </div>
         {failure === 'notFound' ? (
@@ -330,7 +333,7 @@ export default function MovieDetailPage() {
           icon={<ChevronLeftIcon />}
           size={BACK_BUTTON_SIZE}
           variant="translucent"
-          onClick={() => void navigate(-1)}
+          onClick={back}
         />
       </div>
 

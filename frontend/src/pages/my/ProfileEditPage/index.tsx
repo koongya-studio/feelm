@@ -221,7 +221,7 @@ export default function ProfileEditPage() {
   if (failed) {
     return (
       <>
-        <ScreenHeader title="프로필 편집" showBack />
+        <ScreenHeader title="프로필 편집" showBack fallbackTo={path.my()} />
 
         <StatusView title="프로필을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
           <Button
@@ -238,12 +238,12 @@ export default function ProfileEditPage() {
   }
 
   if (!profile) {
-    return <ScreenHeader title="프로필 편집" showBack />;
+    return <ScreenHeader title="프로필 편집" showBack fallbackTo={path.my()} />;
   }
 
   return (
     <>
-      <ScreenHeader title="프로필 편집" showBack />
+      <ScreenHeader title="프로필 편집" showBack fallbackTo={path.my()} />
 
       <div className={styles.page}>
         <section className={styles.group}>

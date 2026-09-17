@@ -164,7 +164,8 @@ function TrendingSection({
 }: {
   failed: boolean;
   items: TrendingItem[] | null;
-  onSelect: (movieId: number) => void;
+  /** 제목으로 검색한다. 급상승은 목업(API-064 미구현)이라 상세로 바로 가지 않는다(업무 -610) */
+  onSelect: (title: string) => void;
   ottNames: Record<string, string>;
 }) {
   if (failed) {
@@ -191,7 +192,7 @@ function TrendingSection({
               item={item}
               ottProviders={trendingOttProviders(item.movie.movieId)}
               ottNames={ottNames}
-              onSelect={() => onSelect(item.movie.movieId)}
+              onSelect={() => onSelect(item.movie.title)}
             />
           </li>
         ))}
@@ -477,7 +478,10 @@ export default function SearchPage() {
           <TrendingSection
             failed={trendingFailed}
             items={trending}
-            onSelect={openDetail}
+            onSelect={(title) => {
+              setKeyword(title);
+              run(title, filter);
+            }}
             ottNames={ottNames}
           />
         )}

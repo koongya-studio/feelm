@@ -1,29 +1,23 @@
 /*
- * 1.1 영화 취향 초기 설정 — 배치 카드
+ * 1.1 취향 카드 한 장.
  *
- * 크기 88x124 · radius 11은 확정 영화의 포스터를 식별할 수 있도록 키운 값이고 부모의
- * `CARD_WIDTH`·`CARD_HEIGHT`와 같아야 한다.
+ * 포스터는 **버튼**이다(업무 -610). 드래그(포인터)로 원 안팎에 놓는 것이 기본 조작이고,
+ * 키보드로도 같은 결과를 낼 수 있어야 한다.
+ * - Enter · Space: 원 안(LIKE) ↔ 원 밖(DISLIKE)을 오간다
+ * - 방향키: 카드를 조금씩 옮긴다. 경계를 넘으면 드래그와 같이 판정이 바뀐다
+ * - `aria-pressed`가 LIKE 여부를, 이름이 `제목, 가까이/멀리`를 읽어 준다
  *
- * 상태는 위치 자체로 읽는다. 처음 받은 카드는 원 밖의 흐린 DISLIKE로 시작하고,
- * 점선 안의 LIKE는 선명하게 보인다. 가까이 카드에 별도 빨강 테두리를 두지 않는다.
- *
- * 이전 주석은 폐기된 이전 방향의 hex(`#C7C4BE` · `#3C3A36`)를 적고 있었다.
- *
- * `⊖`는 top -8 right -8, 22px 원, 테두리 1.5px, 안쪽 막대 10x2.
- * 보이는 크기는 그대로 두고 터치 영역만 넓힌다(common-components.md 6.3).
- *
- * 카드 표면은 영화 제목과 판정 상태를 읽어 주는 이미지 역할이며, 선택 동작은 드래그
- * 하나만 제공한다. 보지 않은 영화는 별도의 `⊖` 버튼으로 제외한다.
+ * 포인터 탭은 그대로 아무 일도 하지 않는다 — 카드를 집는 동작과 겹치기 때문이다. 키보드로
+ * 누른 클릭만 `event.detail === 0`으로 가려 토글한다.
  */
 import Poster from '../../../../components/Poster';
 import VisuallyHidden from '../../../../components/VisuallyHidden';
 import styles from './TasteCard.module.css';
-import type { CSSProperties, PointerEvent } from 'react';
+import type { CSSProperties, KeyboardEvent, MouseEvent, PointerEvent } from 'react';
 import type { TasteValue } from '../tasteValue';
 import { tasteValueLabel } from '../tasteValue';
 
 type Props = {
-  /** 자리표시자 색조를 고르는 값 (Poster) */
   movieId: number;
   title: string;
   posterUrl: string | null;
@@ -32,8 +26,22 @@ type Props = {
   y: number;
   dragging: boolean;
   front: boolean;
-  onPointerDown: (event: PointerEvent<HTMLDivElement>) => void;
+  onPointerDown: (event: PointerEvent<HTMLButtonElement>) => void;
+  /** 키보드로 원 안팎을 오간다 */
+  onToggle: () => void;
+  /** 방향키로 옮긴다. 단위는 px */
+  onNudge: (dx: number, dy: number) => void;
   onRemove: () => void;
+};
+
+/** 방향키 한 번에 옮기는 거리(px). 카드 폭의 1/4쯤이라 몇 번이면 경계를 넘는다 */
+const NUDGE_STEP = 24;
+
+const ARROWS: Record<string, [number, number]> = {
+  ArrowLeft: [-NUDGE_STEP, 0],
+  ArrowRight: [NUDGE_STEP, 0],
+  ArrowUp: [0, -NUDGE_STEP],
+  ArrowDown: [0, NUDGE_STEP],
 };
 
 export default function TasteCard({
@@ -46,8 +54,26 @@ export default function TasteCard({
   dragging,
   front,
   onPointerDown,
+  onToggle,
+  onNudge,
   onRemove,
 }: Props) {
+  function handleClick(event: MouseEvent<HTMLButtonElement>) {
+    // 포인터 클릭은 `detail`이 1 이상이다. 키보드(Enter · Space)만 토글한다
+    if (event.detail === 0) {
+      onToggle();
+    }
+  }
+
+  function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    const delta = ARROWS[event.key];
+
+    if (delta) {
+      event.preventDefault();
+      onNudge(delta[0], delta[1]);
+    }
+  }
+
   return (
     <div
       className={styles.card}
@@ -56,11 +82,14 @@ export default function TasteCard({
       data-dragging={dragging}
       data-front={front}
     >
-      <div
+      <button
+        type="button"
         className={styles.surface}
         onPointerDown={onPointerDown}
         onDragStart={(event) => event.preventDefault()}
-        role="img"
+        onClick={handleClick}
+        onKeyDown={handleKeyDown}
+        aria-pressed={value === 'LIKE'}
         aria-label={`${title}, ${tasteValueLabel(value)}`}
       >
         <Poster
@@ -71,7 +100,7 @@ export default function TasteCard({
           title=""
           seed={movieId}
         />
-      </div>
+      </button>
 
       <button type="button" className={styles.remove} onClick={onRemove}>
         <span className={styles.removeBar} aria-hidden="true" />

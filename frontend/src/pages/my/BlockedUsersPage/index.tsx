@@ -18,6 +18,7 @@
  */
 import { useEffect, useState } from 'react';
 import Avatar from '../../../components/Avatar';
+import { path } from '../../../routes/paths';
 import Button from '../../../components/Button';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
@@ -73,7 +74,7 @@ export default function BlockedUsersPage() {
   if (failed) {
     return (
       <>
-        <ScreenHeader title="차단 사용자 관리" showBack />
+        <ScreenHeader title="차단 사용자 관리" showBack fallbackTo={path.settings()} />
 
         <StatusView title="차단 목록을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
           <Button
@@ -90,7 +91,7 @@ export default function BlockedUsersPage() {
   }
 
   if (!list) {
-    return <ScreenHeader title="차단 사용자 관리" showBack />;
+    return <ScreenHeader title="차단 사용자 관리" showBack fallbackTo={path.settings()} />;
   }
 
   const users = list.items;
@@ -101,6 +102,7 @@ export default function BlockedUsersPage() {
         title="차단 사용자 관리"
         subtitle={list.hasNext ? undefined : `${users.length}명 차단 중`}
         showBack
+        fallbackTo={path.settings()}
       />
 
       <div className={styles.page}>

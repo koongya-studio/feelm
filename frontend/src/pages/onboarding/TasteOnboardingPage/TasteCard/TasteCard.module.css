@@ -37,6 +37,12 @@
   cursor: grabbing;
 }
 
+/* 키보드로 고른 카드. 포인터로 집을 때는 나타나지 않는다 */
+.surface:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
 /* 점선 밖에 둔 싫어요 카드. 최초 카드도 이 상태로 시작한다 */
 .card[data-value='DISLIKE'] .surface {
   opacity: 0.4;

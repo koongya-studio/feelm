@@ -64,6 +64,7 @@ import {
   kickPartyMember,
   leaveParty,
   PARTY_MAX_MEMBERS,
+  PARTY_MIN_MEMBERS,
 } from '../../../api/parties';
 import { blockUser } from '../../../api/settings';
 import { getMyProfile } from '../../../api/users';
@@ -312,7 +313,7 @@ export default function PartyPopcornPage() {
   if (failed) {
     return (
       <>
-        <ScreenHeader title="파티원 팝콘" showBack />
+        <ScreenHeader title="파티원 팝콘" showBack fallbackTo={path.party()} />
 
         <StatusView
           title="파티 정보를 불러오지 못했어요"
@@ -334,7 +335,7 @@ export default function PartyPopcornPage() {
   if (!popcorn) {
     return (
       <>
-        <ScreenHeader title="파티원 팝콘" showBack />
+        <ScreenHeader title="파티원 팝콘" showBack fallbackTo={path.party()} />
       </>
     );
   }
@@ -358,6 +359,7 @@ export default function PartyPopcornPage() {
       <ScreenHeader
         title={party?.name ?? '파티원 팝콘'}
         showBack
+        fallbackTo={path.party()}
         action={
           <IconButton
             label="파티 관리"
@@ -475,7 +477,21 @@ export default function PartyPopcornPage() {
             {inviteOpen ? '초대 접기' : '친구 초대하기'}
           </Button>
 
-          <Button variant="brand" onClick={() => void navigate(path.partyAnalyzing(id))}>
+          {/*
+           * 초대를 거절당하거나 파티원이 나가 나 혼자 남으면 추천을 받을 수 없다
+           * (`PARTY_MIN_MEMBERS`, 업무 -610). 5.4 이후는 여러 사람의 팝콘을 섞는 흐름이다.
+           */}
+          {popcorn.members.length < PARTY_MIN_MEMBERS ? (
+            <p className={styles.meta} role="status">
+              파티원이 {PARTY_MIN_MEMBERS}명 이상이어야 함께 볼 영화를 추천받을 수 있어요
+            </p>
+          ) : null}
+
+          <Button
+            variant="brand"
+            disabled={popcorn.members.length < PARTY_MIN_MEMBERS}
+            onClick={() => void navigate(path.partyAnalyzing(id))}
+          >
             함께 볼 영화 추천받기
           </Button>
         </div>

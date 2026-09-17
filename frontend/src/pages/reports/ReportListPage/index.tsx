@@ -82,6 +82,7 @@ export default function ReportListPage() {
       subtitle="차곡차곡 모아둔 나의 영화 취향"
       align="center"
       showBack
+      fallbackTo={path.my()}
       action={
         canShare ? (
           <IconButton

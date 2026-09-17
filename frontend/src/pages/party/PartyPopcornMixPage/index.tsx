@@ -161,7 +161,7 @@ export default function PartyPopcornMixPage() {
       <>
         {/* 오류는 흐름 셸 없이 화면 전체를 덮는다 — 단계를 말할 상태가 아니다. 다만
             헤더는 5.5의 오류와 같이 남겨 뒤로 갈 길을 둔다 */}
-        <ScreenHeader title="파티팝콘" showBack />
+        <ScreenHeader title="파티팝콘" showBack fallbackTo={path.party()} />
 
         <div className={styles.page}>
           <StatusView title="팝콘을 섞지 못했어요" description="잠시 후 다시 시도해 주세요.">

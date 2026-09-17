@@ -131,7 +131,7 @@ beforeEach(() => {
 function LocationProbe() {
   const location = useLocation();
 
-  return <div data-testid="location">{location.pathname}</div>;
+  return <div data-testid="location">{location.pathname + location.search}</div>;
 }
 
 function renderApp(entries: string[]) {
@@ -156,8 +156,13 @@ async function findRow(title: string) {
   return (await screen.findByText(title)).closest('button') as HTMLButtonElement;
 }
 
-describe('3.1 → 8.1 → 2.4-A', () => {
-  it('감상 확인 알림이 그 감상 기록으로 가고, 돌아오면 읽음이다', async () => {
+/*
+ * 알림은 아직 목업이라 번호를 갖지 않는다(업무 -610). 목업 번호(감상 기록 4004 · 초대 501)를
+ * 들고 실제 화면으로 가면 서버에 없어 늘 실패했으므로, 번호 없이 열리는 목록 화면으로만 간다.
+ * 실제 알림 연동(S15P21E106-537)이 상세까지 가는 길을 다시 잇는다.
+ */
+describe('3.1 → 8.1 → 7.1', () => {
+  it('감상 확인 알림은 MY의 안 남긴 영화 탭으로 가고, 돌아오면 읽음이다', async () => {
     const { unmount } = renderApp([ROUTE_PATTERN.film]);
 
     fireEvent.click(await screen.findByRole('link', { name: '알림' }));
@@ -168,15 +173,21 @@ describe('3.1 → 8.1 → 2.4-A', () => {
     expect(row).toHaveTextContent('방금 전');
 
     fireEvent.click(row);
-    await waitFor(() => expect(location()).toBe('/watch-records/4004/confirm'));
-
-    // 2.4-A가 그 기록의 영화(104)를 보여주고, `봤어요`가 그 영화의 평가로 간다
-    fireEvent.click(await screen.findByRole('button', { name: '봤어요' }));
-    await waitFor(() => expect(location()).toBe('/movies/104/rate'));
+    await waitFor(() => expect(location()).toBe('/my?tab=unrated'));
     unmount();
 
     renderApp([ROUTE_PATTERN.notifications]);
     expect(await findRow('영화 잘 보셨나요?')).not.toHaveTextContent('읽지 않음');
+  });
+
+  it('목업 알림은 서버에 없는 번호를 들고 상세 화면으로 가지 않는다', async () => {
+    renderApp([ROUTE_PATTERN.notifications]);
+
+    fireEvent.click(await findRow('영화 잘 보셨나요?'));
+    await waitFor(() => expect(location()).not.toBe('/notifications'));
+
+    expect(location()).not.toMatch(/^\/watch-records\//);
+    expect(findWatchRecord).not.toHaveBeenCalled();
   });
 
   it('탭은 목록만 거른다', async () => {
@@ -204,35 +215,26 @@ describe('3.1 → 8.1 → 2.4-A', () => {
   });
 });
 
-/*
- * 이동표는 `5.6 ⇢ 8.1`이지만 업무 -595에서 목적지를 5.1로 바꿨다. 8.1은 아직 전체가
- * 목업이라 거절한 초대가 그대로 남아 있는 화면으로 돌아가고, 초대를 여는 실제 자리는
- * 5.1의 `받은 초대` 구역이 됐다(CR-27).
- */
-describe('8.1 → 5.6 → 5.1', () => {
-  it('파티 초대 알림에서 초대를 거절하면 파티 시작으로 간다', async () => {
+describe('8.1 → 5.1', () => {
+  it('파티 초대 알림은 받은 초대가 있는 5.1 파티로 가고, 누른 알림은 읽음으로 남는다', async () => {
     const { unmount } = renderApp([ROUTE_PATTERN.notifications]);
 
     fireEvent.click(await findRow('파티 모드 초대'));
-    await waitFor(() => expect(location()).toBe('/parties/invitations/501'));
-
-    fireEvent.click(await screen.findByRole('button', { name: /거절/ }));
-
     await waitFor(() => expect(location()).toBe('/party'));
+    expect(getInvitation).not.toHaveBeenCalled();
     unmount();
 
-    // 누른 알림은 읽음으로 남는다
     renderApp([ROUTE_PATTERN.notifications]);
     expect(await findRow('파티 모드 초대')).not.toHaveTextContent('읽지 않음');
   });
 });
 
-describe('8.2 → 2.4-A', () => {
-  it('잠금화면 알림을 누르면 감상 확인으로 간다', async () => {
+describe('8.2 → 7.1', () => {
+  it('잠금화면 알림을 누르면 MY의 안 남긴 영화 탭으로 간다', async () => {
     renderApp([ROUTE_PATTERN.pushPreview]);
 
     fireEvent.click(await screen.findByRole('button', { name: /영화 잘 보셨나요\?/ }));
 
-    await waitFor(() => expect(location()).toBe('/watch-records/4004/confirm'));
+    await waitFor(() => expect(location()).toBe('/my?tab=unrated'));
   });
 });

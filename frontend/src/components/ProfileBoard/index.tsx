@@ -18,7 +18,7 @@
  * 다른 사람의 프레임으로는 들어갈 수 없다. `한줄평` 구역은 7.2-B만 둔다 — 본인 미리보기의
  * `reviews`는 항상 빈 배열이다(`types/unspecified.ts`).
  */
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import Avatar from '../Avatar';
 import IconButton from '../IconButton';
 import { ChevronLeftIcon } from '../Icon';
@@ -26,6 +26,7 @@ import PopcornBucket from '../PopcornBucket';
 import { kernelCounts } from '../PopcornBucket/kernels';
 import Poster from '../Poster';
 import RatingStars from '../RatingStars';
+import { useBack } from '../../hooks/useBack';
 import { path } from '../../routes/paths';
 import styles from './ProfileBoard.module.css';
 import type { ReactNode } from 'react';
@@ -43,6 +44,8 @@ type Props = {
   reviews?: boolean;
   /** 본문 맨 아래에 붙는 것. 7.2-B의 안내문이다 */
   children?: ReactNode;
+  /** 앱 안의 이전 항목이 없을 때 뒤로 가기가 갈 곳(`useBack`). 7.2-A는 7.2, 7.2-B는 5.1이다 */
+  backTo: string;
 };
 
 /** 2.4와 같은 값 */
@@ -63,8 +66,9 @@ export default function ProfileBoard({
   frameLinks = false,
   reviews = false,
   children,
+  backTo,
 }: Props) {
-  const navigate = useNavigate();
+  const back = useBack(backTo);
 
   const meta = profile.keywords.map((keyword) => keyword.label).join(' · ');
 
@@ -76,7 +80,7 @@ export default function ProfileBoard({
           icon={<ChevronLeftIcon />}
           size={TOP_BUTTON_SIZE}
           variant="translucent"
-          onClick={() => void navigate(-1)}
+          onClick={back}
         />
 
         {topAction ? <div className={styles.topAction}>{topAction}</div> : null}

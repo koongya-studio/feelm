@@ -54,7 +54,7 @@ export default function AccountManagePage() {
   if (failed) {
     return (
       <>
-        <ScreenHeader title="계정 관리" showBack />
+        <ScreenHeader title="계정 관리" showBack fallbackTo={path.settings()} />
 
         <StatusView title="계정 정보를 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
           <Button
@@ -71,12 +71,17 @@ export default function AccountManagePage() {
   }
 
   if (!profile) {
-    return <ScreenHeader title="계정 관리" showBack />;
+    return <ScreenHeader title="계정 관리" showBack fallbackTo={path.settings()} />;
   }
 
   return (
     <>
-      <ScreenHeader title="계정 관리" subtitle={profile.email} showBack />
+      <ScreenHeader
+        title="계정 관리"
+        subtitle={profile.email}
+        showBack
+        fallbackTo={path.settings()}
+      />
 
       <div className={styles.page}>
         <ActionList

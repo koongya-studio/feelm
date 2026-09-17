@@ -20,7 +20,6 @@ import {
 } from './settings';
 import { isApiError } from './apiError';
 import { resetSessionForTest, startSession } from './session';
-import { resetSessionStore } from '../mocks/sessionStore';
 
 const fetchMock = vi.fn();
 
@@ -40,7 +39,6 @@ const SERVER_SETTINGS = { RATING: true, RECOMMENDATION: true, MARKETING: false }
 
 beforeEach(() => {
   resetSessionForTest();
-  resetSessionStore();
   startSession('token');
   fetchMock.mockReset();
   vi.stubGlobal('fetch', fetchMock);
@@ -51,29 +49,20 @@ afterEach(() => {
 });
 
 describe('API-017 알림 설정 조회', () => {
-  it('계약의 셋에 화면이 그리는 둘을 얹어 다섯을 돌려준다', async () => {
+  it('계약의 세 키를 그대로 돌려준다', async () => {
     fetchMock.mockResolvedValue(json(200, SERVER_SETTINGS));
 
-    // 기준 목업의 시작값 — 파티 초대 · 리포트 발급은 켜져 있다(와이어프레임 7.8-C)
-    expect(await getNotificationSettings()).toEqual({
-      ...SERVER_SETTINGS,
-      PARTY_INVITE: true,
-      REPORT: true,
-    });
+    // 7.8-C가 더 그리는 둘(파티 초대 · 리포트 발급)은 계약에 없어 여기서 만들지 않는다(업무 -610)
+    expect(await getNotificationSettings()).toEqual(SERVER_SETTINGS);
     expect(call()[0]).toBe('/api/v1/users/me/notification-settings');
   });
 });
 
 describe('API-018 알림 설정 변경', () => {
-  it('계약의 세 키만 보낸다', async () => {
+  it('계약의 세 키를 모두 보내고 서버가 준 값을 돌려준다', async () => {
     fetchMock.mockResolvedValue(json(200, { ...SERVER_SETTINGS, MARKETING: true }));
 
-    const saved = await updateNotificationSettings({
-      ...SERVER_SETTINGS,
-      MARKETING: true,
-      PARTY_INVITE: false,
-      REPORT: true,
-    });
+    const saved = await updateNotificationSettings({ ...SERVER_SETTINGS, MARKETING: true });
 
     const [url, init] = call();
     expect(url).toBe('/api/v1/users/me/notification-settings');
@@ -83,36 +72,17 @@ describe('API-018 알림 설정 변경', () => {
       RECOMMENDATION: true,
       MARKETING: true,
     });
-    // 응답은 셋뿐이므로 화면이 보낸 둘을 그대로 붙여 돌려준다
-    expect(saved.PARTY_INVITE).toBe(false);
+    expect(saved).toEqual({ ...SERVER_SETTINGS, MARKETING: true });
   });
 
-  it('계약에 없는 둘은 다음 조회에서 되살아난다', async () => {
-    // 같은 Response를 두 번 읽을 수 없어 호출마다 새로 만든다
-    fetchMock.mockImplementation(() => Promise.resolve(json(200, SERVER_SETTINGS)));
-
-    await updateNotificationSettings({
-      ...SERVER_SETTINGS,
-      PARTY_INVITE: false,
-      REPORT: false,
-    });
-
-    const reloaded = await getNotificationSettings();
-    expect(reloaded.PARTY_INVITE).toBe(false);
-    expect(reloaded.REPORT).toBe(false);
-  });
-
-  it('서버가 거절하면 계약에 없는 둘도 저장하지 않는다', async () => {
+  it('서버가 거절하면 그대로 올라온다', async () => {
     fetchMock.mockResolvedValue(
       json(400, { code: 'VALIDATION_FAILED', message: '입력값을 확인해 주세요.' }),
     );
 
     await expect(
-      updateNotificationSettings({ ...SERVER_SETTINGS, PARTY_INVITE: false, REPORT: false }),
+      updateNotificationSettings({ ...SERVER_SETTINGS, MARKETING: true }),
     ).rejects.toThrow();
-
-    fetchMock.mockImplementation(() => Promise.resolve(json(200, SERVER_SETTINGS)));
-    expect((await getNotificationSettings()).PARTY_INVITE).toBe(true);
   });
 });
 

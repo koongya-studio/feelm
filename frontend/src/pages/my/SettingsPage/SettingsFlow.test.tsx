@@ -27,7 +27,6 @@ import WithdrawPage from '../WithdrawPage';
 import { resetSessionForTest, startSession } from '../../../api/session';
 import { getMyProfile } from '../../../api/users';
 import { AuthContext } from '../../../contexts/authContext';
-import { findMockPublicProfile } from '../../../mocks/publicProfiles';
 import { resetSessionStore } from '../../../mocks/sessionStore';
 import { mockMyProfile } from '../../../mocks/user';
 import { ROUTE_PATTERN } from '../../../routes/paths';
@@ -63,6 +62,8 @@ function createFakeServer() {
   };
   /** API-013이 대조하는 계정. `getMyProfile`의 `hasPassword`와 짝을 맞춰 쓴다 */
   const account = { password: 'p@ssw0rd!', hasPassword: true, withdrawn: false };
+  /** API-014 · 015. 7.8-B가 프로필 공개 여부를 여기에 저장한다(업무 -610) */
+  const profile = { ...mockMyProfile };
   const blocks: BlockedUser[] = [
     { userId: 5201, nickname: '스포일러왕', blockedAt: '2026-08-30T12:00:00Z' },
     { userId: 5202, nickname: '밤샘시네필', blockedAt: '2026-08-21T12:00:00Z' },
@@ -90,6 +91,12 @@ function createFakeServer() {
      */
     if (url.pathname === '/api/v1/auth/token/refresh') {
       return json(200, { accessToken: 'refreshed' });
+    }
+
+    if (url.pathname === '/api/v1/users/me' && method === 'PATCH') {
+      Object.assign(profile, JSON.parse(init.body as string));
+
+      return json(200, profile);
     }
 
     if (url.pathname === '/api/v1/users/me' && method === 'DELETE') {
@@ -149,22 +156,14 @@ function createFakeServer() {
         return json(409, { code: 'ALREADY_BLOCKED', message: '이미 차단한 사용자입니다.' });
       }
 
-      const profile = findMockPublicProfile(userId);
-
-      if (!profile) {
-        return json(404, { code: 'RESOURCE_NOT_FOUND', message: '사용자를 찾을 수 없습니다.' });
-      }
-
-      const blockedAt = new Date().toISOString();
-      blocks.push({ userId, nickname: profile.nickname, blockedAt });
-
-      return json(201, { blockedUserId: userId, blockedAt });
+      // 7.2-B가 목업인 동안 여기로 오는 차단은 없다(업무 -610). 오면 서버처럼 404다
+      return json(404, { code: 'RESOURCE_NOT_FOUND', message: '사용자를 찾을 수 없습니다.' });
     }
 
     throw new Error(`가짜 서버가 모르는 요청이다: ${method} ${url.pathname}`);
   }
 
-  return { handle, account };
+  return { handle, account, profile };
 }
 
 beforeEach(() => {
@@ -180,7 +179,9 @@ beforeEach(() => {
     vi.fn((url: string, init?: RequestInit) => Promise.resolve(server.handle(url, init))),
   );
 
-  vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
+  vi.mocked(getMyProfile)
+    .mockReset()
+    .mockImplementation(() => Promise.resolve({ ...server.profile }));
   signOut.mockReset().mockResolvedValue(undefined);
 });
 
@@ -386,32 +387,49 @@ describe('7.8 ⇢ 0.6 로그아웃', () => {
 });
 
 describe('7.8 → 7.8-B · 7.8-C', () => {
-  it('공개 범위를 바꾸고 나갔다 들어와도 그대로다', async () => {
+  it('프로필 공개 여부는 API-015로 저장되어 나갔다 들어와도 그대로다', async () => {
     renderApp([ROUTE_PATTERN.settings]);
 
     fireEvent.click(screen.getByRole('link', { name: /공개 범위 설정/ }));
 
-    const film = await screen.findByRole('radiogroup', { name: '취향 필름 공개' });
-    // 와이어프레임 7.8-B는 취향 필름만 파티원만이다
-    expect(within(film).getByRole('radio', { name: '파티원만' })).toHaveAttribute(
+    const profile = await screen.findByRole('radiogroup', { name: '프로필 공개' });
+    expect(within(profile).getByRole('radio', { name: '전체 공개' })).toHaveAttribute(
       'aria-checked',
       'true',
     );
+    // 계약(API-015)의 단계는 둘이다. `파티원만`은 고를 수 없다
+    expect(within(profile).getByRole('radio', { name: '파티원만' })).toBeDisabled();
 
-    fireEvent.click(within(film).getByRole('radio', { name: '비공개' }));
+    fireEvent.click(within(profile).getByRole('radio', { name: '비공개' }));
+    await waitFor(() => expect(server.profile.visibility).toBe('PRIVATE'));
 
     back();
     await waitFor(() => expect(location()).toBe('/my/settings'));
     fireEvent.click(screen.getByRole('link', { name: /공개 범위 설정/ }));
 
-    const reopened = await screen.findByRole('radiogroup', { name: '취향 필름 공개' });
+    const reopened = await screen.findByRole('radiogroup', { name: '프로필 공개' });
     expect(within(reopened).getByRole('radio', { name: '비공개' })).toHaveAttribute(
       'aria-checked',
       'true',
     );
   });
 
-  it('알림을 끄고 나갔다 들어와도 그대로다', async () => {
+  it('취향 필름 · 팝콘 · 한줄평 공개 범위는 계약이 없어 잠겨 있다', async () => {
+    /*
+     * 한때 세션 저장소에 두어 저장된 것처럼 보였다. 새로고침하면 사라지는 값이라 설정처럼
+     * 보이면 안 된다(업무 -610).
+     */
+    renderApp([ROUTE_PATTERN.privacySettings]);
+
+    const film = await screen.findByRole('radiogroup', { name: /취향 필름 공개/ });
+    for (const radio of within(film).getAllByRole('radio')) {
+      expect(radio).toBeDisabled();
+      expect(radio).toHaveAttribute('aria-checked', 'false');
+    }
+    expect(screen.getByText(/공개 범위는 준비 중이에요/)).toBeInTheDocument();
+  });
+
+  it('계약에 있는 알림은 저장되어 나갔다 들어와도 그대로고, 없는 둘은 잠겨 있다', async () => {
     renderApp([ROUTE_PATTERN.settings]);
 
     fireEvent.click(screen.getByRole('link', { name: /알림 설정/ }));
@@ -423,48 +441,49 @@ describe('7.8 → 7.8-B · 7.8-C', () => {
       'false',
     );
 
-    fireEvent.click(screen.getByRole('switch', { name: '파티 초대 알림' }));
-    expect(screen.getByRole('switch', { name: '파티 초대 알림' })).toHaveAttribute(
-      'aria-checked',
-      'false',
+    // 파티 초대 · 리포트 발급은 계약(API-017)에 없어 켤 수 없다(업무 -610)
+    expect(screen.getByRole('switch', { name: /파티 초대 알림/ })).toBeDisabled();
+    expect(screen.getByRole('switch', { name: /리포트 발급 알림/ })).toBeDisabled();
+
+    fireEvent.click(screen.getByRole('switch', { name: '마케팅 알림' }));
+    await waitFor(() =>
+      expect(screen.getByRole('switch', { name: '마케팅 알림' })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      ),
     );
 
     back();
     await waitFor(() => expect(location()).toBe('/my/settings'));
     fireEvent.click(screen.getByRole('link', { name: /알림 설정/ }));
 
-    expect(await screen.findByRole('switch', { name: '파티 초대 알림' })).toHaveAttribute(
+    expect(await screen.findByRole('switch', { name: '마케팅 알림' })).toHaveAttribute(
       'aria-checked',
-      'false',
+      'true',
     );
   });
 });
 
-describe('7.2-B ⇢ 7.8-D · 7.8 → 7.8-D', () => {
-  it('차단한 사람이 목록에 생기고 프로필이 감춰지며, 해제하면 다시 보인다', async () => {
+describe('7.8 → 7.8-D', () => {
+  it('7.2-B의 차단은 목업 프로필이라 잠겨 있고, 해제는 7.8-D가 실제 API로 한다', async () => {
+    /*
+     * 공개 프로필(API-062)이 백엔드에 없어 7.2-B는 목업이다. 목업 번호로 실제 차단을 부르면
+     * 늘 404였으므로 그 입구를 잠갔다(업무 -610). 7.8-D의 목록과 해제는 실제 API 그대로다.
+     */
     const { unmount } = renderApp(['/users/2048']);
 
     fireEvent.click(await screen.findByRole('button', { name: '더 보기' }));
-    fireEvent.click(screen.getByRole('button', { name: '사용자 차단' }));
-    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '차단' }));
-
-    await waitFor(() => expect(location()).toBe('/my/settings/blocks'));
-    expect(await screen.findByText('3명 차단 중')).toBeInTheDocument();
-    expect(screen.getByText('무비버디')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /사용자 차단/ })).toBeDisabled();
     unmount();
 
-    // 차단한 사람의 프로필은 보이지 않는다(API-020)
-    const profile = renderApp(['/users/2048']);
-    expect(await screen.findByText('프로필을 불러오지 못했어요')).toBeInTheDocument();
-    profile.unmount();
-
-    // 7.8 → 7.8-D에서 해제한다
     renderApp([ROUTE_PATTERN.settings]);
     fireEvent.click(screen.getByRole('link', { name: /차단 사용자 관리/ }));
-    fireEvent.click(await screen.findByRole('button', { name: '무비버디 차단 해제' }));
-
     expect(await screen.findByText('2명 차단 중')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '무비버디 차단 해제' })).toBeNull();
+
+    fireEvent.click(await screen.findByRole('button', { name: '스포일러왕 차단 해제' }));
+
+    expect(await screen.findByText('1명 차단 중')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '스포일러왕 차단 해제' })).toBeNull();
   });
 
   it('기준 목업의 사람도 해제되고 다시 들어와도 빠져 있다', async () => {

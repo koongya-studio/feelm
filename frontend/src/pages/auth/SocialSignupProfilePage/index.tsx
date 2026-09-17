@@ -30,6 +30,7 @@ import { useAuth } from '../../../contexts/authContext';
 import { useNicknameCheck } from '../../../hooks/useNicknameCheck';
 import type { NicknameCheck } from '../../../hooks/useNicknameCheck';
 import { path } from '../../../routes/paths';
+import { markSignupCompleted } from '../../../utils/signupCompletion';
 import styles from './SocialSignupProfilePage.module.css';
 import type { Gender, SocialProvider } from '../../../types/auth';
 
@@ -119,9 +120,10 @@ export default function SocialSignupProfilePage() {
       });
 
       /*
-       * 0.5는 이메일을 받으면 인증 안내를, 없으면 `시작하기`를 보여 준다. 소셜 가입은
-       * 곧바로 `ACTIVE`라 이메일을 넘기지 않는다(API-008 처리 규칙).
+       * 0.5는 가입이 실제로 끝났다는 표시가 있을 때만 그려진다(업무 -610). 소셜 가입은
+       * 곧바로 `ACTIVE`라 인증 안내 없이 `시작하기`를 보여 준다(API-008 처리 규칙).
        */
+      markSignupCompleted({ kind: 'social' });
       void navigate(path.signupComplete(), { replace: true });
     } catch (error) {
       const code = error instanceof ApiError ? error.code : '';
@@ -144,7 +146,7 @@ export default function SocialSignupProfilePage() {
 
   return (
     <>
-      <ScreenHeader title="소셜 계정으로 가입" showBack />
+      <ScreenHeader title="소셜 계정으로 가입" showBack fallbackTo={path.signupSocial()} />
 
       <SignupPaper onSubmit={() => void submit()}>
         <SignupPaperHeading eyebrow="CREATE YOUR FEELM" title="조금만 더 알려 주세요">

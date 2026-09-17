@@ -19,17 +19,13 @@
  * 사용자가 지우거나 바꾸는 값이라 저장소 안에 있어야 변화가 남는다.
  *
  * 실제 API가 된 값은 여기서 빠진다. 차단 목록(API-020 ~ API-022)이 그렇게 나갔고, 알림
- * 설정은 계약에 자리가 없는 두 키만 남았다(업무 -394). 감상 기록(API-033 ~ API-035)도
+ * 설정과 공개 범위는 계약에 없는 값을 저장된 것처럼 두지 않기로 해 빠졌다(업무 -610). 감상 기록(API-033 ~ API-035)도
  * 서버로 옮겨 가 이 파일에서 사라졌다(업무 -477). 새 평가(API-036)도 서버가 저장하므로
- * 여기 쌓지 않는다(업무 -491) — 남은 것은 아직 목업인 평가 수정(API-037)의 고친 값뿐이다.
+ * 여기 쌓지 않는다(업무 -491). 관심없음과 평가 수정의 고친 값도 지웠다(업무 -610) — 추천이
+ * 실제 API가 됐고 내 평가 목록은 프레임(API-042)으로 그린다.
  */
 import { createSeedNotifications } from './notifications';
-import type {
-  NotificationView,
-  PrivacySettingsView,
-  UnspecifiedNotificationSettings,
-} from '../types/unspecified';
-import type { RatingUpdateInput } from '../types/watch';
+import type { NotificationView } from '../types/unspecified';
 
 type SessionState = {
   /**
@@ -37,16 +33,6 @@ type SessionState = {
    * 기준 목업의 구독 정보를 쓴다.
    */
   subscribedOttIds: number[] | null;
-  /** API-047로 관심없음 처리한 영화 */
-  dismissedMovieIds: number[];
-  /**
-   * API-037로 고친 평가. `ratingId` → 고친 값.
-   *
-   * 기준 목업 평가(mocks/frames.ts `mockMyRatings`)를 읽는 화면이 이 값을 얹어 보여준다.
-   * 서버 평가(API-036으로 저장한 것)의 번호로도 남지만, 그 평가를 읽는 API-030은 실제
-   * 호출이라 여기 값을 보지 않는다 — API-037이 연동되기 전까지의 한계다(업무 -491).
-   */
-  ratingEdits: Record<number, RatingUpdateInput>;
   /**
    * 4.1 · 4.2의 최근 검색어. 계약이 없다.
    *
@@ -55,14 +41,6 @@ type SessionState = {
    * 시작해야 하므로(이 파일 머리말) 다른 세션 상태와 같이 메모리에 둔다.
    */
   recentSearchQueries: string[];
-  /**
-   * 7.8-C에서 바꾼 알림 설정 중 **계약에 없는 둘**. `null`이면 기준 목업(mocks/settings.ts)이다.
-   *
-   * 계약의 세 키(API-017)는 서버가 들고 있어 여기 없다(업무 -394).
-   */
-  unspecifiedNotificationSettings: UnspecifiedNotificationSettings | null;
-  /** 7.8-B에서 바꾼 공개 범위. `null`이면 기준 목업이다 */
-  privacySettings: PrivacySettingsView | null;
   /**
    * 8.1 알림. 와이어프레임 네 건으로 시작한다. 누르면 읽음이 되고 그 상태가 남아야
    * 다시 들어왔을 때 표식이 사라진다(업무 -308).
@@ -78,12 +56,8 @@ type SessionState = {
 function emptyState(): SessionState {
   return {
     subscribedOttIds: null,
-    dismissedMovieIds: [],
-    ratingEdits: {},
     // 와이어프레임 4.1이 최근 검색어 세 개가 있는 상태를 그리므로 그 값으로 시작한다
     recentSearchQueries: ['케이퍼 무비', '크리스토퍼 놀란', 'SF 명작'],
-    unspecifiedNotificationSettings: null,
-    privacySettings: null,
     notifications: createSeedNotifications(),
     seenReportIds: [],
   };
@@ -139,28 +113,6 @@ export function clearRecentSearchQueries(): void {
   state.recentSearchQueries = [];
 }
 
-// ─────────────────────────────────────────── 설정 (업무 -307)
-
-export function saveUnspecifiedNotificationSettings(
-  settings: UnspecifiedNotificationSettings,
-): void {
-  state.unspecifiedNotificationSettings = { ...settings };
-}
-
-/** 바꾼 적 없으면 null. 기준 목업을 쓰라는 뜻이다 */
-export function getUnspecifiedNotificationSettings(): UnspecifiedNotificationSettings | null {
-  return state.unspecifiedNotificationSettings;
-}
-
-export function savePrivacySettings(settings: PrivacySettingsView): void {
-  state.privacySettings = { ...settings };
-}
-
-/** 바꾼 적 없으면 null. 기준 목업을 쓰라는 뜻이다 */
-export function getPrivacySettings(): PrivacySettingsView | null {
-  return state.privacySettings;
-}
-
 // ─────────────────────────────────────────── 알림 · 리포트 (업무 -308)
 
 export function getNotifications(): NotificationView[] {
@@ -181,40 +133,4 @@ export function markReportSeen(reportId: number): void {
 
 export function isReportSeen(reportId: number): boolean {
   return state.seenReportIds.includes(reportId);
-}
-
-// ─────────────────────────────────────────── 관심없음
-
-export function addDismissedMovie(movieId: number): void {
-  if (!state.dismissedMovieIds.includes(movieId)) {
-    state.dismissedMovieIds.push(movieId);
-  }
-}
-
-export function getDismissedMovieIds(): number[] {
-  return state.dismissedMovieIds;
-}
-
-export function isDismissed(movieId: number): boolean {
-  return state.dismissedMovieIds.includes(movieId);
-}
-
-// ─────────────────────────────────────────── 평가 수정 (API-037 목업)
-
-/** 평가 수정(API-037). 고친 값만 남긴다 — 프레임과 팝콘은 만들지 않는다 */
-export function saveRatingEdit(ratingId: number, input: RatingUpdateInput): void {
-  state.ratingEdits = { ...state.ratingEdits, [ratingId]: { ...input } };
-}
-
-/**
- * 기준 목업 평가에 고친 값을 얹는다. 고친 적 없으면 그대로 돌려준다.
- *
- * **기준 평가를 읽는 곳은 전부 이 함수를 거친다.** 영화 상세(2.4 · 2.5) · 프레임
- * 목록과 상세(3.1 · 3.1-A) · 내 평가 목록(7.6)이다. 한 곳이라도 빠지면 고친 별점이
- * 그 화면에서만 옛 값으로 보인다.
- */
-export function withRatingEdit<T extends RatingUpdateInput & { ratingId: number }>(rating: T): T {
-  const edit = state.ratingEdits[rating.ratingId];
-
-  return edit ? { ...rating, ...edit } : rating;
 }
