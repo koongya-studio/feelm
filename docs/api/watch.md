@@ -117,6 +117,9 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 - `cursor` (string, 선택): 서버가 직전 응답에서 발급한 불투명 커서
 - `size` (integer, 선택): 기본 20, 최소 1, 최대 50
 
+배열은 `status=LINK_CLICKED&status=RATED`처럼 같은 파라미터 이름을 반복해 전달한다.
+인덱스·중첩 표기(`status[0]`, `status[].name` 등)는 지원하지 않는다.
+
 ### Request Body
 
 없음
@@ -148,6 +151,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 ### 오류 응답
 
 - `400 VALIDATION_FAILED` 잘못된 `status`, `confirmDue`, `size`, 손상되거나 조회 조건과 맞지 않는 `cursor`
+- `400 VALIDATION_FAILED` 인덱스·중첩 파라미터 표기, 또는 허용되지 않는 문자가 든 파라미터 이름. 조건을 무시하고 전체 목록을 반환하지 않는다
 - `401 UNAUTHORIZED` 인증이 없거나 활성 사용자가 아님
 - `500 INTERNAL_ERROR` 만료 반영 또는 목록 조회 실패
 
@@ -194,7 +198,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### Query Parameters
 
-없음
+없음. 인덱스·중첩 표기(`x[0]` 등)를 붙이면 `400 VALIDATION_FAILED`다. 본문이나 `Content-Type`도 함께 잘못된 경우에는 그쪽 오류가 먼저 나간다.
 
 ### Request Body
 
@@ -215,6 +219,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 ### 오류 응답
 
 - `400 VALIDATION_FAILED` `watchRecordId`가 양의 64비트 정수가 아니거나 `watched`가 JSON boolean이 아님. 문자열·숫자·배열·객체·`null`·누락·깨진 JSON은 허용하지 않는다
+- `400 VALIDATION_FAILED` 인덱스·중첩 파라미터 표기, 또는 허용되지 않는 문자가 든 파라미터 이름
 - `401 UNAUTHORIZED` 인증이 없거나 활성 사용자가 아님
 - `404 RESOURCE_NOT_FOUND` 기록이 없거나 다른 사용자의 기록
 - `409 INVALID_WATCH_STATUS` `LINK_CLICKED`가 아니거나 `expires_at <= now`인 기록, 중복 또는 경쟁 상태 전이
@@ -317,7 +322,8 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 - `spoiler`를 생략하면 `false`로 저장하고, 명시적 `true`·`false`는 그대로 저장해 응답에도 항상 boolean으로 반환한다. `null`·문자열·숫자·배열·객체는 허용하지 않는다
 - `spoiler: true`는 `comment`가 null·빈 문자열·공백 또는 화면에 보이지 않는 제어·서식 문자만 있는 경우 거절한다. 스포일러 검증을 위해 한줄평 원문을 변경하지 않는다. `spoiler: false`의 기존 한줄평·공개 범위 규칙은 그대로다
 - 스포일러 표시는 한줄평의 공개 범위나 정렬을 바꾸지 않는다. API-032는 원문과 표시값을 반환하며, 타인의 스포일러 한줄평 블러·해제는 FE 로컬 상태다
-- 저장 후 취향 분석(FR-04)과 추천 입력 버전을 갱신하고 추천 캐시를 무효화한다
+- 저장 후 취향 분석(FR-04)과 추천 입력 버전을 갱신하고 추천 캐시를 무효화한다. 현재 노출 중인 추천 세트 전체는 무효화하지 않으며 갱신된 입력은 다음 세트 생성에 반영한다
+- 194 단계에서는 추천 카드에서 평가한 경우 화면이 보유한 `recommendationItemId`로 API-046을 호출해 빈 자리 1편만 보충한다. 후속 Jira에서는 평가 저장 트랜잭션 안에서 `userId + movieId`로 현재 노출 카드를 찾아 내부 보충 컴포넌트를 직접 호출하도록 전환한다. 이때 추천 화면 밖에서 평가해도 현재 세트의 카드였다면 보충하며, 나머지 유효한 카드는 유지한다
 - 한줄평은 평가에 종속되므로 별도 리소스가 아니다
 
 ### 상태값
@@ -345,7 +351,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### 설명
 
-점수·한줄평·공개 범위를 수정한다. 한줄평을 지우려면 `comment: null`을 보낸다.
+점수·한줄평·공개 범위·스포일러 표시를 전체 교체한다. 한줄평을 지우려면 `comment: null`을 보낸다.
 
 ### 인증 및 권한
 
@@ -361,8 +367,15 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### Request Body
 
+| 필드 | 타입 | 필수 | 설명 |
+|---|---|---|---|
+| `score` | number | O | 0.5~5.0, 0.5점 단위 (`minimum: 0.5`, `maximum: 5`, `multipleOf: 0.5`) |
+| `comment` | string | X | 한줄평, 200자 이하. 생략 또는 `null`은 기존 한줄평 삭제 |
+| `visibility` | string | comment 있으면 O | `PUBLIC` 또는 `PRIVATE` |
+| `spoiler` | boolean | X | 생략 시 `false`. 내용 있는 comment에서만 `true` 가능 |
+
 ```json
-{ "score": 0.5, "comment": null, "visibility": "PRIVATE" }
+{ "score": 0.5, "comment": null, "visibility": "PRIVATE", "spoiler": false }
 ```
 
 ### Response
@@ -371,14 +384,21 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### 오류 응답
 
-- `400 VALIDATION_FAILED`
+- `400 VALIDATION_FAILED` 경로 ID, 점수 범위·0.5점 단위, 200자 초과, comment 있는데 visibility 없음, 내용 없는 comment에 spoiler true, spoiler의 null·boolean 외 값, 잘못된 JSON
+- `401 UNAUTHORIZED` 인증 정보가 없거나 활성 사용자가 아님
 - `404 RESOURCE_NOT_FOUND` 타인 평가 포함
+- `415 UNSUPPORTED_MEDIA_TYPE` Content-Type 누락 또는 비지원
+- `500 INTERNAL_ERROR` 평가 또는 연관 데이터 저장 실패
 
 ### 처리 규칙
 
 - 프레임은 최초 저장 시 한 번만 생성한다. 점수 수정은 팝콘 수를 바꾸지 않지만 평균 평점 집계에는 반영된다
 - 요청 필드와 점수 범위·0.5점 단위 검증은 API-036과 동일하다. 잘못된 값을 자동으로 보정하지 않는다
-- 점수 변경은 맛 선호도(평균 평점)와 취향 분석에 반영된다
+- `spoiler` 생략은 false로 저장하고 응답에도 항상 boolean을 반환한다. 명시적 null·boolean 외 값은 거절한다. true는 화면에 보이는 내용의 comment가 있을 때만 허용하며, 원문은 검증을 위해 바꾸지 않는다
+- 수정 시 평가·프레임 ID와 생성 시각을 유지하고, 영화 평균 별점·평가 수를 실제 평가에서 재계산한다. `RATING UPDATE`(변경 후 점수)를 같은 PostgreSQL 트랜잭션의 아웃박스에 기록한다
+- 이미 저장된 점수·한줄평·공개 범위·스포일러 표시와 완전히 같은 PUT은 수정 시각을 바꾸거나 이벤트를 추가하지 않는다
+- 본인 평가만 수정할 수 있다. 타인 평가와 없는 평가는 모두 404로 처리한다
+- 점수 변경은 평가·영화 평점 집계와 `RATING UPDATE` 아웃박스에 반영된다. 맛 선호도·취향 분석 캐시의 동기 갱신은 400 writer 연동 후 통합 검증한다
 - `PUBLIC` → `PRIVATE`로 바꾸면 한줄평 목록(API-032)에서 즉시 제외된다
 
 ### 상태값
@@ -387,7 +407,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### 미정 사항
 
-- [ ] S15P21E106-213 후속: 161에서 추가한 `ratings.is_spoiler`의 수정·저장·응답은 현재 API-037 생산 코드가 지원하지 않는다. 평가 수정 구현에서 계약과 함께 반영한다
+- [ ] 400 취향 캐시 writer와 연동 후 동기 갱신·원자성을 통합 검증한다
 
 ## API-038 평가 삭제
 
@@ -428,12 +448,18 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### 오류 응답
 
-- `404 RESOURCE_NOT_FOUND`
+- `400 VALIDATION_FAILED` 잘못된 경로 ID
+- `401 UNAUTHORIZED` 인증 정보가 없거나 활성 사용자가 아님
+- `404 RESOURCE_NOT_FOUND` 타인 평가 포함
+- `500 INTERNAL_ERROR` 평가 또는 연관 데이터 삭제 실패
 
 ### 처리 규칙
 
-- 평가·프레임 삭제와 취향 분석 캐시 갱신을 하나의 트랜잭션으로 처리한다
-- 감상 기록은 삭제하지 않고 `WATCHED_UNRATED`로 되돌린다(FR-18). 추천에서는 계속 제외된다
+- 취향 분석 캐시의 동기 갱신·원자성은 400 writer가 연결된 뒤 통합 인수 조건으로 검증한다. 213 범위에서는 평가·프레임·감상·영화 집계·아웃박스의 PostgreSQL 트랜잭션을 처리한다
+- 평가 삭제와 프레임 FK CASCADE, 영화 평균 별점·평가 수 재계산, `RATING DELETE`(점수 없음) 아웃박스 기록은 같은 PostgreSQL 트랜잭션에서 처리한다. 마지막 평가가 삭제되면 평균 별점은 `0.00`, 평가 수는 `0`이다
+- 감상 기록은 삭제하지 않고 `WATCHED_UNRATED`로 되돌리며 `rated_at`만 비운다(FR-18). 기존 감상 시각은 유지하고 추천에서는 계속 제외된다. 평가에 감상 기록 연결이 없었다면 새 감상 기록을 만들지 않는다
+- 본인 평가만 삭제할 수 있다. 타인 평가와 없는 평가는 모두 404로 처리한다
+- 삭제를 재요청하면 404를 반환하되 삭제 상태를 유지하고 이벤트를 추가하지 않는다
 - 삭제 후 같은 영화에 다시 평가하면 새 프레임이 생성되고 팝콘 버킷 집계에 다시 포함된다
 
 ### 상태값
@@ -443,6 +469,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 ### 미정 사항
 
 - [ ] 삭제로 어떤 맛의 팝콘이 0이 되면 `새로운 맛 발견` 표시(FR-32)도 취소할지
+- [ ] 400 취향 캐시 writer와 연동 후 위 캐시 갱신·원자성을 통합 검증한다
 
 ## API-039 내 평가 목록
 

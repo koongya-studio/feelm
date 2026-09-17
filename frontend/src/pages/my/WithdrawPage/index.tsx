@@ -7,15 +7,22 @@
  * `위 내용을 모두 확인했어요` 체크, `계속 이용하기`(주 동작) · `탈퇴하기`,
  * `탈퇴하기를 누르면 한 번 더 확인해요`.
  *
+ * **비밀번호 입력 한 칸은 와이어프레임에 없이 더했다**(CR-24, 업무 S15P21E106-480).
+ * API-013이 본인 확인으로 현재 비밀번호를 받는다. 되돌릴 수 없는 동작이라 계약에서
+ * 재인증을 덜어내지 않고 화면을 계약에 맞췄다(사용자 결정 2026-09-17).
+ *
  * **주 동작은 `계속 이용하기`다.** 와이어프레임도 그쪽을 검정으로 칠했다. 되돌릴 수 없는
- * 쪽을 가장 강한 버튼으로 두지 않는다. `탈퇴하기`는 체크하기 전에는 누를 수 없고,
- * 누르면 확인 창이 한 번 더 뜬다.
+ * 쪽을 가장 강한 버튼으로 두지 않는다. `탈퇴하기`는 체크하고 비밀번호를 적기 전에는
+ * 누를 수 없고, 누르면 확인 창이 한 번 더 뜬다.
  *
  * 사라지는 수치는 API-014 `stats`에서 읽는다(프레임 · 팝콘 · 평가). 와이어프레임의
  * `평가 96개`는 같은 사용자의 100과 어긋나 쓰지 않았다(screen-spec-my.md 3.1).
  *
- * `[?]` API-013은 이메일 계정에 `password`를 요구하지만 와이어프레임에 입력이 없다.
- *       목업은 본문 없이 성공한다(`api/settings.ts`)
+ * **소셜 전용 계정은 아직 탈퇴할 수 없다.** 본인 확인 수단이 정해지지 않아 백엔드가
+ * `409 PASSWORD_NOT_SET`으로 거절한다(API-013, 업무 S15P21E106-435). 7.8-A에서 줄을
+ * 감추지 않고 이 화면까지 들어오게 둔 뒤 여기서 이유를 알린다 — 탈퇴는 요구사항이
+ * 보장하는 경로라(FR-37) 말없이 사라지면 안 된다.
+ *
  * `[?]` 탈퇴한 뒤 어디로 가는지 이동표에 없다. 0.1 시작 화면으로 보낸다
  * `[?]` 확인 창 문구는 와이어프레임에 없다
  */
@@ -23,12 +30,23 @@ import { useEffect, useId, useState } from 'react';
 import { useNavigate } from 'react-router';
 import Button from '../../../components/Button';
 import ConfirmDialog from '../../../components/ConfirmDialog';
+import TextField from '../../../components/TextField';
+import { ApiError } from '../../../api/apiError';
 import { withdraw } from '../../../api/settings';
 import { getMyProfile } from '../../../api/users';
 import { useAuth } from '../../../contexts/authContext';
 import { path } from '../../../routes/paths';
 import styles from './WithdrawPage.module.css';
-import type { MyProfileStats } from '../../../types/user';
+import type { MyProfile } from '../../../types/user';
+
+/** 서버 문구 대신 화면이 정하는 경우만 둔다 */
+const MESSAGE: Record<string, string> = {
+  INVALID_CREDENTIALS: '비밀번호가 올바르지 않아요.',
+  PASSWORD_NOT_SET: '소셜 계정으로 가입해 비밀번호가 없어요. 아직 탈퇴할 수 없어요.',
+};
+
+const SOCIAL_ONLY_NOTICE =
+  '소셜 계정으로 가입해 비밀번호가 없어요. 본인 확인 방법이 준비되면 탈퇴할 수 있어요.';
 
 export default function WithdrawPage() {
   const navigate = useNavigate();
@@ -36,18 +54,19 @@ export default function WithdrawPage() {
   const checkId = useId();
 
   /** 수치를 못 읽어도 탈퇴 안내는 해야 하므로 실패하면 수치 없는 문장으로 쓴다 */
-  const [stats, setStats] = useState<MyProfileStats | null>(null);
+  const [profile, setProfile] = useState<MyProfile | null>(null);
+  const [password, setPassword] = useState('');
   const [acknowledged, setAcknowledged] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
 
     getMyProfile()
-      .then((profile) => {
-        if (active) setStats(profile.stats);
+      .then((value) => {
+        if (active) setProfile(value);
       })
       .catch(() => undefined);
 
@@ -56,16 +75,28 @@ export default function WithdrawPage() {
     };
   }, []);
 
+  /*
+   * 프로필을 못 읽었으면 비밀번호를 받는 쪽으로 둔다. 입력을 감추면 이메일 계정이
+   * 탈퇴할 방법을 잃지만, 두고 보내면 소셜 계정은 서버가 409로 가려 준다.
+   */
+  const socialOnly = profile?.hasPassword === false;
+
   async function handleWithdraw() {
     setWithdrawing(true);
-    setFailed(false);
+    setFailure(null);
 
     try {
-      await withdraw();
-    } catch {
+      await withdraw(password);
+    } catch (error) {
+      const code = error instanceof ApiError ? error.code : '';
+      const fallback =
+        error instanceof ApiError
+          ? error.message
+          : '탈퇴하지 못했어요. 잠시 후 다시 시도해 주세요.';
+
       setWithdrawing(false);
       setConfirming(false);
-      setFailed(true);
+      setFailure(MESSAGE[code] ?? fallback);
 
       return;
     }
@@ -78,6 +109,7 @@ export default function WithdrawPage() {
     }
   }
 
+  const stats = profile?.stats ?? null;
   const losses = stats
     ? [
         `취향 필름 ${stats.frameCount}프레임과 팝콘 ${stats.popcornCount}알이 모두 삭제돼요`,
@@ -111,9 +143,26 @@ export default function WithdrawPage() {
         위 내용을 모두 확인했어요
       </label>
 
-      {failed ? (
+      {socialOnly ? (
+        <p className={styles.notice}>{SOCIAL_ONLY_NOTICE}</p>
+      ) : (
+        <div className={styles.password}>
+          <TextField
+            label="현재 비밀번호"
+            type="password"
+            placeholder="현재 비밀번호"
+            autoComplete="current-password"
+            value={password}
+            disabled={withdrawing}
+            onChange={(event) => setPassword(event.target.value)}
+            hint="본인 확인을 위해 로그인 비밀번호를 적어 주세요"
+          />
+        </div>
+      )}
+
+      {failure ? (
         <p className={styles.error} role="alert">
-          탈퇴하지 못했어요. 잠시 후 다시 시도해 주세요
+          {failure}
         </p>
       ) : null}
 
@@ -125,7 +174,7 @@ export default function WithdrawPage() {
 
         <Button
           variant="secondary"
-          disabled={!acknowledged || withdrawing}
+          disabled={!acknowledged || password === '' || withdrawing || socialOnly}
           onClick={() => setConfirming(true)}
         >
           탈퇴하기

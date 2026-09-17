@@ -64,6 +64,34 @@ class KafkaOutboxRelayTest {
         verify(store).markPublished(2L, NOW);
     }
 
+    @Test
+    @DisplayName("파티 refresh는 partyId Long 키와 전용 JSON을 그대로 전송한다")
+    void sendsPartyRefreshWithLongKey() {
+        OutboxEventStore store = mock(OutboxEventStore.class);
+        KafkaTemplate<Long, String> template = mock(KafkaTemplate.class);
+        String body =
+                "{\"partyId\":9001,\"inputId\":\"sha256:abc\",\"members\":[{\"userId\":1024,"
+                        + "\"vector\":[],\"candidateMovieIds\":[550]}]}";
+        OutboxEvent event =
+                new OutboxEvent(
+                        3L,
+                        UUID.randomUUID(),
+                        KafkaEventType.PARTY_REFRESH,
+                        "feelm.party-refresh.v1",
+                        9001L,
+                        body,
+                        0,
+                        NOW.minusSeconds(1));
+        when(store.findDue(NOW, 100)).thenReturn(List.of(event));
+        when(template.send("feelm.party-refresh.v1", 9001L, body))
+                .thenReturn(CompletableFuture.completedFuture(null));
+
+        relay(store, template).publishPending();
+
+        verify(template).send("feelm.party-refresh.v1", 9001L, body);
+        verify(store).markPublished(3L, NOW);
+    }
+
     private static KafkaOutboxRelay relay(
             OutboxEventStore store, KafkaTemplate<Long, String> template) {
         KafkaOutboxProperties properties =

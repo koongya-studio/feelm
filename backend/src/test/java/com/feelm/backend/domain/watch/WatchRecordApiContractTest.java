@@ -20,6 +20,7 @@ import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.infrastructure.kafka.KafkaEventPublisher;
 import com.feelm.backend.support.SharedPostgresContractTest;
 import com.feelm.backend.support.SharedTestRuntime;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.sql.Array;
 import java.sql.Connection;
@@ -49,6 +50,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -483,6 +485,122 @@ class WatchRecordApiContractTest extends SharedPostgresContractTest {
         }
     }
 
+    @ParameterizedTest
+    @CsvSource({
+        "status[0],RATED",
+        "status[],RATED",
+        "status[0].class,RATED",
+        "status[-1],RATED",
+        "confirmDue[0],true",
+        "cursor[0],x",
+        "size.class,1",
+        "unknown[0],1"
+    })
+    @DisplayName("인덱스·중첩 파라미터 이름은 조건을 무시하지 않고 400으로 거부한다")
+    void rejectsIndexedAndNestedParameterNames(String name, String value) throws Exception {
+        insertDistinctWatch("LINK_CLICKED", Instant.now());
+
+        assertRejectedWithoutList(list(userId, name, value));
+        assertRejectedWithoutList(list(userId, "status", "RATED", name, value));
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "/api/v1/watch-records?status%5B0%5D=RATED",
+                "/api/v1/watch-records?status%5B%5D=RATED",
+                "/api/v1/watch-records?status=RATED&confirmDue%5B0%5D=true"
+            })
+    @DisplayName("실제 URL 디코딩을 거친 인덱스 표기도 400이다")
+    void rejectsIndexedParameterNamesAfterUrlDecoding(String url) throws Exception {
+        insertDistinctWatch("LINK_CLICKED", Instant.now());
+
+        assertRejectedWithoutList(
+                mockMvc.perform(get(URI.create(url)).header("Authorization", bearer(userId))));
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "/api/v1/watch-records?status%00=RATED",
+                "/api/v1/watch-records?status%09=RATED",
+                "/api/v1/watch-records?status=RATED&a%00b=1"
+            })
+    @DisplayName("금지 문자가 든 파라미터 이름은 500이 아니라 400이다")
+    void rejectsForbiddenCharactersInParameterNamesWithoutServerError(String url) throws Exception {
+        insertDistinctWatch("LINK_CLICKED", Instant.now());
+
+        assertRejectedWithoutList(
+                mockMvc.perform(get(URI.create(url)).header("Authorization", bearer(userId))));
+    }
+
+    @Test
+    @DisplayName("계약이 정한 반복 지정은 그대로 동작한다")
+    void keepsRepeatedArrayParametersWorking() throws Exception {
+        long linked = insertDistinctWatch("LINK_CLICKED", Instant.now().minusSeconds(DAY));
+        long rated = insertDistinctWatch("RATED", Instant.now().minusSeconds(2 * DAY));
+        insertDistinctWatch("WATCHED_UNRATED", Instant.now().minusSeconds(3 * DAY));
+
+        JsonNode response =
+                response(
+                        list(userId, "status", "LINK_CLICKED", "status", "RATED")
+                                .andExpect(status().isOk())
+                                .andReturn());
+
+        assertThat(ids(response)).containsExactly(linked, rated);
+    }
+
+    @Test
+    @DisplayName("인증되지 않은 인덱스 표기 요청은 검증보다 먼저 401로 거부한다")
+    void rejectsIndexedParametersOnlyAfterAuthentication() throws Exception {
+        mockMvc.perform(get("/api/v1/watch-records").param("status[0]", "RATED"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("같은 컨트롤러의 확인 요청은 질의 파라미터가 없으면 영향받지 않는다")
+    void confirmIsUnaffectedByParameterNameCheck() throws Exception {
+        long recordId = insertDistinctWatch("LINK_CLICKED", Instant.now());
+
+        confirm(recordId, userId, "{\"watched\":true}")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("WATCHED_UNRATED"));
+
+        assertThat(watch(recordId).status()).isEqualTo("WATCHED_UNRATED");
+    }
+
+    @Test
+    @DisplayName("확인 요청의 인덱스 표기 질의도 400이며 상태를 바꾸지 않는다")
+    void rejectsIndexedParametersOnConfirm() throws Exception {
+        long recordId = insertDistinctWatch("LINK_CLICKED", Instant.now());
+
+        assertValidation(
+                mockMvc.perform(
+                        post(confirmPath(recordId))
+                                .param("x[0]", "1")
+                                .header("Authorization", bearer(userId))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"watched\":true}")));
+
+        assertThat(watch(recordId).status()).isEqualTo("LINK_CLICKED");
+    }
+
+    @Test
+    @DisplayName("확인 요청의 금지 문자 파라미터 이름도 500이 아니라 400이다")
+    void rejectsForbiddenCharactersOnConfirmWithoutServerError() throws Exception {
+        long recordId = insertDistinctWatch("LINK_CLICKED", Instant.now());
+
+        assertValidation(
+                mockMvc.perform(
+                        post(URI.create(confirmPath(recordId) + "?a%00b=1"))
+                                .header("Authorization", bearer(userId))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"watched\":true}")));
+
+        assertThat(watch(recordId).status()).isEqualTo("LINK_CLICKED");
+    }
+
     @Test
     @DisplayName("봤어요는 조기 응답도 허용하고 WATCHED_UNRATED와 watchedAt을 저장한다")
     void confirmsWatchedBeforeDueTime() {
@@ -828,6 +946,12 @@ class WatchRecordApiContractTest extends SharedPostgresContractTest {
 
     private WatchService fixedService(Instant now) {
         return new WatchService(watchRepository, eventPublisher, Clock.fixed(now, ZoneOffset.UTC));
+    }
+
+    /** 거절이 목록을 대신 흘려보내지 않는지까지 본다. 무시하고 200을 주던 결함이 이 API의 문제였다. */
+    private void assertRejectedWithoutList(ResultActions actions) throws Exception {
+        assertValidation(actions);
+        actions.andExpect(jsonPath("$.items").doesNotExist());
     }
 
     private void assertValidation(ResultActions actions) throws Exception {

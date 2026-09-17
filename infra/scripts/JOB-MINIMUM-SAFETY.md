@@ -13,7 +13,7 @@
 - 정리 확인이 끝난 뒤에만 `cleanup.json`을 원자적으로 저장한다. 누락/실패/잔존 cgroup/
   잔존 mount가 있으면 새 작업을 거부한다. 임의 unit 이름이나 운영 서비스는 정리 대상이 아니다.
   재부팅 중 중단도 증명이 없으면 차단하며 자동 복구/재시도하지 않는다.
-- 작업 root 전체를 **새 8 GiB regular image의 ext4**에 넣는다. source/cache/JDK/Docker
+- 작업 root 전체를 **새 24 GiB regular image의 ext4**에 넣는다. source/cache/JDK/Docker
   데이터 및 작업 파일은 이 공간 안에 둔다. image는 `O_EXCL`로 만들고 미리 용량을 예약한다.
   실제 서버 디스크 장치를 포맷하거나 기존 볼륨을 재사용하지 않는다. mount는 private/nodev/nosuid다.
   unmount는 강제/lazy 옵션 없이 수행하고, 정확한 backing image와 loop 연결도 확인한다.
@@ -28,8 +28,14 @@
   작업이 쓴 요약 파일을 실행 종료 코드나 정리 증명으로 믿지 않는다.
 
 정리 증명 후 작업 image는 삭제하고, root 바깥의 제한된 로그·보고서·상태 증빙만 보존한다.
+실행 중에는 supervisor가 커널 `statvfs`의 byte·inode 사용량을 0.1초 polling 주기에 맞춰
+샘플링한다. 실행 unit과 cgroup이 정지된 뒤 image를 해제하기 전에 최종값과 최대 사용량·최소
+가용량을 `filesystem-usage.json`에 기록한다. 작업 경로를 순회하거나 파일 내용을 증빙으로
+복사하지 않으며, 보고서 검증이 실패해도 이 제한된 사용량 증빙은 남긴다.
 삭제된 임시 작업 파일 시스템은 복구할 수 없다. 정리 전 image가 합계 **48 GiB**에 도달하면
-신규 작업을 막으며, 새 8 GiB 예약 후에도 호스트 여유 공간 20 GiB 이상을 요구한다.
+신규 작업을 막으며, 새 24 GiB 예약 후에도 호스트 여유 공간 20 GiB 이상을 요구한다.
+과거 8 GiB와 16 GiB 작업의 root 소유 lease와 정리 증빙은 계속 검증하지만 신규 작업에는
+24 GiB만 할당한다. 8 GiB, 16 GiB와 24 GiB 외의 임의 용량은 허용하지 않는다.
 48 GiB 한도를 조용히 늘리거나 기존 사용자 파일을 자동 삭제하지 않는다.
 
 systemd 동작 근거는 [v255 서비스 문서의 ExecStopPost](https://github.com/systemd/systemd/blob/v255/man/systemd.service.xml),
@@ -44,7 +50,7 @@ revision `9631afd9c616e047abbdd0ad7bf8192231f7f35c`이며 일반 MR 코드는 �
 | 검사 | 결과/증빙 |
 | --- | --- |
 | 첫 probe | 정리 확인 메서드에 fixture 결과 수집 코드가 잘못 들어가 `cleanup_failure`. 외부 owner 종료 훅은 실제 cgroup/mount를 정리. 실패 기록 유지 후 코드 분리 및 회귀 검사 추가 |
-| 8 GiB 용량 상한 | root 내부 `/data`를 채우자 ENOSPC. 호스트 다른 경로로 쓰기를 우회하지 않음. 작업/마운트/loop 정리 성공 |
+| 격리 디스크 용량 상한 | 8 GiB 파일럿에서 root 내부 `/data`를 채우자 ENOSPC. 호스트 다른 경로로 쓰기를 우회하지 않았고 작업/마운트/loop 정리 성공. 일반 MR은 처음 16 GiB로 확대했으나 1,475개 테스트의 HTML 보고서 생성 중 다시 ENOSPC가 발생해 신규 작업을 24 GiB로 확대 |
 | 로그 상한 | 실제 무한 출력 fixture를 중단. `execution.log` **16,777,216 bytes**, 작업 결과는 `infrastructure_failure`/`passed=false`. fixture 검증은 통과 |
 | 보고서 symlink | 작업이 만든 호스트 합성 canary 대상 symlink를 수집기가 **OSError errno 40(ELOOP)**으로 거부. manifest 생성 없음, canary 변경 없음, 정리 성공 |
 | 제어 프로세스 SIGKILL | 합성 Docker 컨테이너 READY 확인 뒤 owner MainPID만 강제 종료. 호출 결과는 signal/KILL 실패이며 성공으로 바꾸지 않음. 종료 훅이 두 작업 cgroup, mount, loop 연결을 정리하고 증명 저장 |

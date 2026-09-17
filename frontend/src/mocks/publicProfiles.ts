@@ -23,7 +23,7 @@ import { mockPopcornFlavors } from './popcornFlavors';
 import { mockFrameList } from './frames';
 import { mockTasteFlow } from './taste';
 import { mockMyProfile } from './user';
-import type { PublicProfileView, TasteCompareView } from '../types/unspecified';
+import type { PublicProfileView } from '../types/unspecified';
 
 /** 공개 프로필이 필름을 몇 개까지 보여주는지. 와이어프레임 7.2-A · 7.2-B가 3개를 그렸다 */
 const PUBLIC_FRAME_COUNT = 3;
@@ -106,45 +106,4 @@ export const mockPublicProfiles: Record<number, PublicProfileView> = {
 
 export function findMockPublicProfile(userId: number): PublicProfileView | null {
   return mockPublicProfiles[userId] ?? null;
-}
-
-/**
- * 취향 비교 (7.2-C).
- *
- * 전체 76% · 장르 82 · 국가 74 · 시대 71 · 감독 68은 와이어프레임 값이다.
- * **API-063에는 이 4줄에 해당하는 값이 없다.** 계약은 맛별 비교를 준다.
- *
- * `겹치는 팝콘 맛`은 와이어프레임이 `범죄·스릴러` · `액션·모험`으로 적었지만, 맛 이름은
- * API-044의 `displayName`을 쓰는 것이 계약이다(screen-spec.md 8.1 #2). 그래서 이름 대신
- * **두 사람 모두 상위 3개에 든 맛 코드**를 둔다. 실제로 두 분포를 비교하면 솔티드
- * 카라멜과 체다 치즈가 겹친다.
- */
-export const mockTasteCompare: Record<number, TasteCompareView> = {
-  2048: {
-    me: {
-      userId: mockMyProfile.userId,
-      nickname: mockMyProfile.nickname,
-      avatarUrl: null,
-    },
-    other: { userId: 2048, nickname: '무비버디', avatarUrl: null },
-    matchRate: 76,
-    sharedFlavorCodes: ['FLAVOR_B', 'FLAVOR_C'],
-    items: [
-      { label: '장르', rate: 82 },
-      { label: '국가', rate: 74 },
-      { label: '시대', rate: 71 },
-      { label: '감독', rate: 68 },
-    ],
-    // 와이어프레임에 없고 레퍼런스 지시로 추가했다. 5.5 파티 추천과 같은 목업 영화를 쓴다
-    recommendations: [
-      { movieId: 201, title: '영화 제목 1', posterUrl: null },
-      { movieId: 202, title: '영화 제목 2', posterUrl: null },
-      { movieId: 203, title: '영화 제목 3', posterUrl: null },
-      { movieId: 204, title: '영화 제목 4', posterUrl: null },
-    ],
-  },
-};
-
-export function findMockTasteCompare(userId: number): TasteCompareView | null {
-  return mockTasteCompare[userId] ?? null;
 }

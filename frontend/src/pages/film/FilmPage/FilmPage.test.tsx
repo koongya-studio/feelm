@@ -5,8 +5,11 @@
  * 실패 상태가 되지만, 팝콘 버킷(API-041)이 실패하면 범례 자리만 빈다. 그 비대칭이
  * 의도된 것임을 고정한다.
  *
- * 범례는 알이 많은 순 네 개이고 0알인 맛은 빠진다. 화면에서 계산하는 값이라
+ * 팝콘 요약은 알이 많은 순 네 개이고 0알인 맛은 빠진다. 화면에서 계산하는 값이라
  * (계약에 정렬 규칙이 없다) 회귀가 나기 쉽다.
+ *
+ * 남은 알 수(`+ 다른 맛 N알`)도 화면 계산이다. **총수에서 보여준 네 맛을 뺀 값이며,
+ * 프레임 수와는 무관하다** — 대표 맛이 없는 영화는 팝콘을 만들지 않아 두 수가 어긋난다.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
@@ -84,37 +87,32 @@ describe('FilmPage', () => {
 
     renderWithRouter(<FilmPage />);
 
-    expect(await screen.findByText('아직 감긴 프레임이 없어요')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '추천 영화 보기' })).toBeInTheDocument();
+    expect(await screen.findByText('아직 필름에 담긴 영화가 없어요')).toBeInTheDocument();
+    expect(screen.getByText('영화를 만나며 취향 필름을 채워보세요')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '추천 영화 둘러보기' })).toBeInTheDocument();
+
+    // 빈 상태에서도 필름은 자리를 지킨다. 채울 칸이 남았다는 것을 보여주는 화면이다
+    expect(screen.getByText('첫 번째 프레임')).toBeInTheDocument();
   });
 
-  it('팝콘 범례를 알이 많은 순 네 개로 두고 0알인 맛은 뺀다', async () => {
+  it('팝콘 요약을 알이 많은 순 네 개로 두고 0알인 맛은 뺀다', async () => {
     vi.mocked(getMyFrames).mockResolvedValue(frameList(3));
     vi.mocked(getPopcornBucket).mockResolvedValue(bucket);
 
     renderWithRouter(<FilmPage />);
 
-    /*
-     * 범례는 `<li>` 안에 `{맛 이름} {알 수}`를 텍스트로 붙인다. 목록을 순서대로 읽어
-     * 비교한다 — 이름 하나만 찾는 것보다 정렬을 직접 확인한다.
-     */
-    const panel = await screen.findByText(/KERNELS/);
-    const bucketPanel = panel.closest('button');
+    const kernels = await screen.findByTestId('popcorn-summary-kernels');
 
-    if (bucketPanel === null) {
-      throw new Error('팝콘 범례 판을 찾지 못했다');
-    }
-
-    await waitFor(() => {
-      expect(bucketPanel.querySelectorAll('li').length).toBeGreaterThan(0);
-    });
-
-    const rows = [...bucketPanel.querySelectorAll('li')].map((li) =>
-      li.textContent?.replace(/\s+/g, ' ').trim(),
+    // 남은 맛 수(`+ 다른 맛 N알`)가 같은 줄에 서 있으므로 맛 칸만 골라 읽는다
+    const rows = [...kernels.querySelectorAll('[data-flavor]')].map((node) =>
+      node.textContent?.replace(/\s+/g, ' ').trim(),
     );
 
     // 34 · 28 · 21 · 12 순. 0알인 세 맛은 빠지고, 5알은 네 개를 넘겨 잘린다
-    expect(rows).toEqual(['체다치즈 34', '다크초코 28', '피스타치오 21', '오리지널 솔트 12']);
+    expect(rows).toEqual(['체다치즈34', '다크초코28', '피스타치오21', '오리지널 솔트12']);
+
+    // 총 100알 중 보여준 95알을 뺀 나머지. 프레임 3개와 무관한 수다
+    expect(screen.getByText('+ 다른 맛 5알')).toBeInTheDocument();
   });
 
   it('팝콘 버킷만 실패하면 화면은 살아 있고 범례 자리만 빈다', async () => {
@@ -128,7 +126,7 @@ describe('FilmPage', () => {
       expect(screen.getByLabelText('검색')).toBeInTheDocument();
     });
     expect(screen.queryByText('취향 필름을 불러오지 못했어요')).not.toBeInTheDocument();
-    expect(screen.queryByText('기본')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('popcorn-summary-kernels')).not.toBeInTheDocument();
   });
 
   it('헤더의 검색 링크가 검색 화면으로 간다', async () => {
@@ -157,6 +155,6 @@ describe('FilmPage', () => {
 
     expect(await screen.findByRole('button', { name: '필름 늘리기' })).toBeInTheDocument();
     // 빈 상태의 길은 프레임이 있으면 나오지 않는다
-    expect(screen.queryByRole('button', { name: '추천 영화 보기' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '추천 영화 둘러보기' })).not.toBeInTheDocument();
   });
 });

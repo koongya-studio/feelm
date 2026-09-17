@@ -7,7 +7,13 @@ COPY requirements-ml.txt /opt/spark/requirements-ml.txt
 RUN python3 -m pip install \
       --no-cache-dir \
       --require-hashes \
+      --extra-index-url https://download.pytorch.org/whl/cpu \
       --requirement /opt/spark/requirements-ml.txt \
-    && python3 -c 'import numpy, redis; assert numpy.__version__ == "2.2.6"; assert redis.__version__ == "5.3.1"'
+    && python3 -c 'import numpy, psycopg, redis, torch, transformers; assert numpy.__version__ == "2.2.6"; assert redis.__version__ == "5.3.1"; assert torch.__version__.endswith("+cpu")'
+
+RUN mkdir -p /opt/spark/.cache/huggingface \
+    && chown -R spark:spark /opt/spark/.cache
+
+ENV HF_HOME=/opt/spark/.cache/huggingface
 
 USER spark

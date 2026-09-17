@@ -15,8 +15,8 @@
  * 그 밖의 실패는 다른 화면과 같은 기준으로 원인을 말한다(업무 -374). 서버에 닿지 못한
  * 것과 서버가 처리하지 못한 것을 가르고, 그 밖의 거절은 서버 문구를 그대로 쓴다.
  *
- * `아이디 찾기`와 `비밀번호 찾기`가 같은 0.7로 가면서 탭만 다르다는 것도 함께 본다.
- * 경로가 같아 눈으로는 구분되지 않는 부분이다.
+ * 도움말 줄도 함께 본다. `비밀번호 찾기`는 0.7로 가고, 같이 있던 `아이디 찾기`는
+ * 없앴다(CR-25, 업무 S15P21E106-455). 지운 링크는 소리 없이 되살아나기 쉽다.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
@@ -189,7 +189,7 @@ describe('0.6 로그인', () => {
     expect(screen.getByRole('button', { name: '카카오 로그인' })).toBeDisabled();
   });
 
-  it('비밀번호 찾기는 계정 찾기 화면으로 간다', () => {
+  it('비밀번호 찾기는 0.7로 간다', () => {
     renderLogin();
 
     follow('비밀번호 찾기');
@@ -197,12 +197,11 @@ describe('0.6 로그인', () => {
     expect(location()).toBe('/account/find');
   });
 
-  it('아이디 찾기도 같은 화면으로 간다', () => {
+  /* 아이디가 곧 이메일이라 찾을 것이 없다(CR-25, 업무 -455) */
+  it('아이디 찾기 링크는 없다', () => {
     renderLogin();
 
-    follow('아이디 찾기');
-
-    expect(location()).toBe('/account/find');
+    expect(screen.queryByRole('link', { name: '아이디 찾기' })).toBeNull();
   });
 
   it('회원가입은 가입 방식 선택으로 간다', () => {

@@ -1,9 +1,9 @@
 /*
- * 7.2-B 다른 사용자 공개 프로필 → 7.2-C 취향 비교 (업무 S15P21E106-305)
+ * 7.2-B 다른 사용자 공개 프로필 (업무 S15P21E106-305)
  *
- * 이동표 `7.2-B → 7.2-C`는 **대상 사용자가 이어져야** 성립한다. 비교 화면으로 가기만
- * 하고 누구와 비교하는지가 빠지면 화면은 열리지만 경로는 끊긴 것이다
- * (screen-spec-my.md 2장 9번).
+ * **이 화면에는 주 동작이 없다.** 검정 알약 하나가 7.2-C 취향 비교로 가던 자리인데,
+ * 비교를 하지 않기로 하면서 그 화면을 지웠다(업무 -506). 읽는 화면으로 남았고
+ * 이동표의 `7.2-B → 7.2-C`도 함께 사라졌다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
@@ -69,14 +69,14 @@ async function renderProfile(userId: number = USER_ID) {
 }
 
 describe('7.2-B 다른 사용자 공개 프로필', () => {
-  it('비교하기를 누르면 그 사용자의 비교 화면으로 간다', async () => {
+  it('취향 비교로 가는 버튼을 두지 않는다', async () => {
+    /*
+     * 7.2-C를 지웠으므로(업무 -506) 이 버튼이 되살아나면 없는 경로로 보내게 된다.
+     * 화면에서 지운 것을 시험으로 고정한다.
+     */
     await renderProfile();
 
-    fireEvent.click(screen.getByRole('button', { name: '나와 취향 비교하기' }));
-
-    await waitFor(() =>
-      expect(screen.getByTestId('location').textContent).toBe(`/users/${USER_ID}/compare`),
-    );
+    expect(screen.queryByRole('button', { name: '나와 취향 비교하기' })).not.toBeInTheDocument();
   });
 
   it('팔로워 대신 프레임 · 팝콘 · 공개 한줄평을 보여준다', async () => {

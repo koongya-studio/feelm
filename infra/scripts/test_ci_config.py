@@ -26,6 +26,7 @@ class CiConfigTests(unittest.TestCase):
         cls.frontend = (CI_DIR / 'frontend.yml').read_text()
         cls.consumer = (CI_DIR / 'consumer.yml').read_text()
         cls.infra = (CI_DIR / 'infra.yml').read_text()
+        cls.hdfs_deploy = (ROOT / 'infra' / 'scripts' / 'deploy-hdfs-config.sh').read_text()
         cls.pipeline_path = CI_DIR / 'pipeline.yml'
         cls.pipeline = cls.pipeline_path.read_text() if cls.pipeline_path.exists() else ''
 
@@ -35,6 +36,7 @@ class CiConfigTests(unittest.TestCase):
   - test
   - build
   - deploy
+  - notify
 
 workflow:
   auto_cancel:
@@ -74,6 +76,7 @@ include:
             (self.frontend, 'deploy-frontend'),
             (self.consumer, 'deploy-consumer'),
             (self.infra, 'deploy-monitoring'),
+            (self.infra, '.deploy-hdfs-config'),
         )
         for config, name in protected:
             self.assertIn('interruptible: false', job_block(config, name), name)
@@ -100,6 +103,19 @@ include:
         self.assertIn('interruptible: false', digest)
         for secret in ('JIRA_API_TOKEN', 'MATTERMOST_LOGIN_ID', 'MATTERMOST_PASSWORD'):
             self.assertNotIn(secret, digest)
+
+    def test_develop_pipeline_notifies_only_after_predeploy_failure(self):
+        notification = job_block(self.common, 'develop-pipeline-failure-notification')
+        for expected in (
+                'stage: notify', 'tags: [e106-shell]',
+                'notify-deployment.py pipeline-failure', 'interruptible: false',
+                'allow_failure: true', 'timeout: 5m',
+                '$CI_COMMIT_BRANCH == "develop"',
+                '$CI_COMMIT_REF_PROTECTED == "true"',
+                '$CI_PIPELINE_SOURCE == "push"', 'when: always'):
+            self.assertIn(expected, notification)
+        for forbidden in ('merge_request_event', '$CI_COMMIT_BRANCH == "main"', 'when: manual'):
+            self.assertNotIn(forbidden, notification)
 
     def test_docs_job_is_fixed_isolated_and_runs_for_every_develop_mr(self):
         block = job_block(self.docs, 'docs-mr-check')
@@ -231,6 +247,41 @@ include:
                 '- infra/monitoring/README.md'):
             self.assertNotIn(forbidden, deploy)
 
+    def test_hdfs_config_deploy_is_manual_protected_main_and_ordered(self):
+        template = job_block(self.infra, '.deploy-hdfs-config')
+        for expected in (
+                'stage: deploy', 'ci-deploy-current-commit.py',
+                'deploy-hdfs-config.sh "$HDFS_NODE" "$CI_COMMIT_SHA"',
+                'resource_group: distributed-runtime-hdfs',
+                'interruptible: false', 'timeout: 30m',
+                '$CI_COMMIT_BRANCH == "main"',
+                '$CI_COMMIT_REF_PROTECTED == "true"',
+                '$CI_PIPELINE_SOURCE == "push"',
+                'when: manual', 'allow_failure: false',
+                '- infra/compose/service.yml', '- infra/compose/distributed.yml',
+                '- infra/hadoop/**/*'):
+            self.assertIn(expected, template)
+        for forbidden in ('merge_request_event', 'docker compose down', ' down -v',
+                          'HDFS_COMPOSE_ENV_FILE'):
+            self.assertNotIn(forbidden, template)
+        self.assertIn('ENV_FILE="$(mktemp ', self.hdfs_deploy)
+        self.assertIn("trap 'rm -f \"${ENV_FILE}\"' EXIT", self.hdfs_deploy)
+        self.assertNotIn('HDFS_COMPOSE_ENV_FILE', self.hdfs_deploy)
+        self.assertIn('if [[ "${NODE}" == "service" ]]', self.hdfs_deploy)
+        self.assertIn("docker inspect feelm-backend --format '{{.Config.Image}}'",
+                      self.hdfs_deploy)
+        self.assertIn('export BACKEND_IMAGE', self.hdfs_deploy)
+        self.assertIn('Running backend image could not be resolved', self.hdfs_deploy)
+        service = job_block(self.infra, 'deploy-hdfs-service-config')
+        distributed = job_block(self.infra, 'deploy-hdfs-distributed-config')
+        self.assertIn('tags: [e106-shell]', service)
+        self.assertIn('name: service', service)
+        self.assertIn('HDFS_NODE: service', service)
+        self.assertIn('tags: [e106-distributed]', distributed)
+        self.assertIn('needs: [deploy-hdfs-service-config]', distributed)
+        self.assertIn('name: distributed', distributed)
+        self.assertIn('HDFS_NODE: distributed', distributed)
+
     def test_pipeline_mr_jobs_are_isolated_sharded_and_path_scoped(self):
         self.assertTrue(self.pipeline_path.is_file(), 'Missing Pipeline CI include')
         template = job_block(self.pipeline, '.pipeline-mr-test')
@@ -360,17 +411,25 @@ include:
         self.assertIn('resource_group: distributed-consumer', consumer_deploy)
         self.assertIn('tags: [e106-distributed]', consumer_deploy)
         self.assertIn('ci-deploy-current-commit.py', consumer_deploy)
-        notifications = (
-            (backend_deploy, 'backend'),
-            (frontend_deploy, 'frontend'),
-            (consumer_deploy, 'consumer'),
+        deploy_configs = (self.backend, self.frontend, self.consumer, self.infra)
+        deploy_jobs = []
+        for config in deploy_configs:
+            for name in re.findall(r'(?m)^(deploy-[A-Za-z0-9_-]+):$', config):
+                deploy_jobs.append(name)
+                block = job_block(config, name)
+                service = name.removeprefix('deploy-')
+                self.assertIn(
+                    'infra/scripts/notify-deployment.py ' + service + ' "$CI_JOB_STATUS"',
+                    block,
+                    name,
+                )
+                self.assertIn('after_script:', block, name)
+        self.assertEqual(
+            sorted(deploy_jobs),
+            ['deploy-backend', 'deploy-consumer', 'deploy-frontend',
+             'deploy-hdfs-distributed-config', 'deploy-hdfs-service-config',
+             'deploy-monitoring', 'deploy-redis'],
         )
-        for block, service in notifications:
-            self.assertIn(
-                'infra/scripts/notify-deployment.py ' + service + ' "$CI_JOB_STATUS"',
-                block,
-            )
-            self.assertIn('after_script:', block)
         notification_paths = (
             backend_env,
             backend_test,

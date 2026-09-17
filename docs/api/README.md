@@ -87,7 +87,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-043 | [프레임 상세 조회](./taste.md#api-043-프레임-상세-조회) | GET | `/frames/{frameId}` | 취향 | 1차 MVP | 회원 | FR-08 |  |
 | API-044 | [팝콘 맛 기준정보 조회](./taste.md#api-044-팝콘-맛-기준정보-조회) | GET | `/popcorn-flavors` | 취향 | 1차 MVP | 공개 | FR-06 | O |
 | API-045 | [기본 추천 조회](./recommendation.md#api-045-기본-추천-조회) | GET | `/recommendations` | 추천 | 1차 MVP | 회원 | FR-10, FR-12, FR-13 | O |
-| API-046 | [추가 영화 추천](./recommendation.md#api-046-추가-영화-추천) | POST | `/recommendations/more` | 추천 | 1차 MVP | 회원 | FR-10 | O |
+| API-046 | [추천 카드 보충](./recommendation.md#api-046-추천-카드-보충) | POST | `/recommendations/replenish` | 추천 | 1차 MVP | 회원 | FR-10 | O |
 | API-047 | [관심없음 표시](./recommendation.md#api-047-관심없음-표시) | POST | `/movies/{movieId}/dismiss` | 추천 | 1차 MVP | 회원 | FR-36 | O |
 | API-048 | [추천 이력 조회](./recommendation.md#api-048-추천-이력-조회) | GET | `/recommendations/history` | 추천 | 1차 MVP | 회원 | FR-33, FR-13 |  |
 | API-049 | [파티 생성](./party.md#api-049-파티-생성) | POST | `/parties` | 파티 | 1차 MVP | 회원 | FR-20 | O |
@@ -109,7 +109,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-065 | [사용자 랭킹](./social.md#api-065-사용자-랭킹) | GET | `/rankings/users` | 소셜 | 확장 | 선택 | FR-28 | O |
 | API-066 | [오늘의 영화](./recommendation.md#api-066-오늘의-영화) | GET | `/recommendations/today` | 추천 | 확장 | 회원 | FR-30 | O |
 | API-067 | [커뮤니티](./social.md#api-067-커뮤니티) | - | `/community (미정)` | 소셜 | 확장 | 회원 | FR-31 | O |
-| API-068 | [OTT 구독 추천](./recommendation.md#api-068-ott-구독-추천) | GET | `/recommendations/otts` | 추천 | 확장 | 회원 | FR-40 | O |
+| API-068 | [OTT 구독 추천](./recommendation.md#api-068-ott-구독-추천) | GET | `/recommendations/otts` | 추천 | 2차 MVP | 회원 | FR-40 | O |
 | API-069 | [파티 멤버 강퇴](./party.md#api-069-파티-멤버-강퇴) | DELETE | `/parties/{partyId}/members/{userId}` | 파티 | 1차 MVP | 회원 | FR-20 |  |
 
 ## 공통 규약

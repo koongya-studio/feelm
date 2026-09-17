@@ -3,11 +3,11 @@
  * 대응 명세는 docs/api/taste.md이다.
  *
  * 업무 S15P21E106-392에서 프레임 목록(API-042) · 프레임 상세(API-043) · 팝콘 버킷(API-041) ·
- * 팝콘 맛 기준정보(API-044)를, 업무 S15P21E106-479에서 취향 분석(API-040)을 실제 API
- * 호출로 바꿨다.
+ * 팝콘 맛 기준정보(API-044)를 실제 API 호출로 바꿨고, 업무 S15P21E106-479에서 취향
+ * 분석(API-040) 클라이언트를 추가했다.
  *
  * **한 파일에 실제 호출과 목업이 섞여 있다.** 갈리는 기준은 백엔드에 해당 API가 있는지다.
- * - 위 다섯 개는 실제로 부른다
+ * - 위 다섯 함수는 실제 API를 부른다. 다만 API-040은 현재 호출하는 화면이 없다
  * - `getTasteFlow`는 계약에 대응 API가 **없다**(CR-16)
  * - `getMockPopcornFlavors`는 **집계 자체가 목업으로 남은 화면**이 쓴다. 아래 목업 구역의
  *   주석을 볼 것
@@ -50,13 +50,14 @@ export async function getPopcornFlavors(): Promise<PopcornFlavor[]> {
 /**
  * API-040 취향 분석·키워드 조회 · GET /api/v1/users/me/taste
  *
- * 2.1 홈의 `내 취향 요약`이 장르 상위 두 개와 키워드 첫 개를 그린다. 7.2 프로필 편집은
- * 업무 -459에서 선호 장르 칩을 걷어내 더는 부르지 않는다.
+ * 업무 -461에서 홈을 없앴고 7.2 프로필 편집도 업무 -459에서 선호 장르 칩을 걷어내,
+ * 현재 이 함수를 호출하는 화면은 없다. API 계약과 후속 화면 연동을 위해 클라이언트와
+ * 단위 테스트는 유지한다.
  *
  * 캐시가 없는 사용자에게도 `200`이다 — `insufficientData: true` · 빈 배열들 ·
- * `analyzedAt: null`이 온다(API-040 처리 규칙). 화면은 이를 실패가 아니라 빈 상태로
- * 다룬다. 응답의 `countries` · `eras` · `directors`는 쓰는 화면이 없어 타입에 두지
- * 않았다(`types/taste.ts`).
+ * `analyzedAt: null`이 온다(API-040 처리 규칙). 후속 화면은 이를 실패가 아닌 빈 상태로
+ * 다뤄야 한다. 응답의 `countries` · `eras` · `directors`는 쓰는 화면이 없어 타입에
+ * 두지 않았다(`types/taste.ts`).
  */
 export async function getMyTaste(): Promise<TasteAnalysis> {
   return request<TasteAnalysis>('/users/me/taste');

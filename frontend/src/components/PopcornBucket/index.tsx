@@ -11,51 +11,26 @@
  *   렌더 조건 — 디자인 3D 뷰어(`Feelm 팝콘 버킷 디자인`)에서 바닥 그림자를 끄고 투명 배경으로
  *   384 × 384px에 구웠다. 원근 카메라 FOV 45°, 앞에서 15° 돌리고 24° 내려다본다. 통이 폭
  *   x 11~372에 꽉 차도록 거리를 맞췄다. 조명은 뷰어 기본(반구광 1 · 방향광 3)이다
- * - 알: `src/assets/popcorn`. **디자인의 팝콘 8종 라인업**(`Feelm 팝콘 8종 라인업`, 2026-09-15, 업무 -322)을
+ * - 알: `src/assets/popcorn`. **디자인의 팝콘 8종 토이 라운드**(2026-09-17, 업무 -577)를
  *   한 알씩 192 × 192px 투명 배경으로 구웠다. 8종이 같은 모양 · 같은 방향이고 재질만 다르다.
- *   라인업의 이름표는 빼고 팝콘만 담았다. 렌더 조건은 통과 같다 — 원근 FOV 45°, 앞에서 15° 돌리고
- *   24° 내려다본다. 알이 긴 변의 88%를 차지하게 가운데에 맞췄다
+ *   렌더 조건은 통과 같다 — 원근 FOV 45°, 앞에서 15° 돌리고 24° 내려다본다. 알이 긴 변의
+ *   88%를 차지하게 가운데에 맞췄다. 레티나용 384px도 함께 받았지만 **넣지 않았다** —
+ *   가장 큰 통(폭 232)에서도 알이 약 49px이라 192px이 DPR 3까지 덮는다
  *
  * 알은 맛 분포대로 통 입구에 쌓인다. **알 더미는 그림이고 데이터를 읽는 채널이
  * 아니다.** 알 수와 맛 이름은 범례가 말한다.
  *
  * 자리와 방향은 index로만 정해진다. 난수를 쓰지 않으므로 다시 그려도 더미가 흔들리지
- * 않는다. 한 맛의 알이 모두 같은 그림이라 index로 좌우를 뒤집고 조금씩 돌려 변화를 준다.
+ * 않는다.
  *
  * 통 스프라이트가 한 장이라 알을 통 앞벽 뒤로 숨길 수 없다. 그래서 더미를 입구 안에서
  * 시작해 위로 쌓는다. 넘칠 듯 담긴 모양이 되고, 앞쪽 테두리에 걸치는 알은 입구에 얹힌
  * 것처럼 읽힌다.
  */
 import bucketSprite from '../../assets/bucket/bucket-film-vertical-icewhite.png';
-import blueberry from '../../assets/popcorn/popcorn-blueberry.png';
-import caramel from '../../assets/popcorn/popcorn-caramel.png';
-import cheese from '../../assets/popcorn/popcorn-cheese.png';
-import chocolate from '../../assets/popcorn/popcorn-chocolate.png';
-import cookie from '../../assets/popcorn/popcorn-cookie.png';
-import original from '../../assets/popcorn/popcorn-original.png';
-import pistachio from '../../assets/popcorn/popcorn-pistachio.png';
-import strawberry from '../../assets/popcorn/popcorn-strawberry.png';
+import { kernelSprite } from './sprites';
 import styles from './PopcornBucket.module.css';
-
-/*
- * 맛 코드 -> 3D 팝콘 스프라이트.
- *
- * 화면은 맛의 표시명과 색을 API-044에서 받지만 그림 파일은 저장소에 있는 것이라
- * 코드로 짝지어야 한다. 코드는 불변이므로(FR-06) 이 대응은 이름이 바뀌어도 살아남는다.
- * 모르는 코드가 오면 기본 맛으로 그린다.
- *
- * S15P21E106-466에서 439 taste 순서대로 FLAVOR_A~H를 기존 3D 자산 8종에 연결했다.
- */
-const KERNEL_SPRITE: Record<string, string> = {
-  FLAVOR_A: original,
-  FLAVOR_B: chocolate,
-  FLAVOR_C: caramel,
-  FLAVOR_D: pistachio,
-  FLAVOR_E: cookie,
-  FLAVOR_F: cheese,
-  FLAVOR_G: strawberry,
-  FLAVOR_H: blueberry,
-};
+import type { FlavorCount } from './kernels';
 
 /* 좌표계. 통 하나가 들어가는 상자다 */
 const VIEW_WIDTH = 200;
@@ -103,8 +78,10 @@ const RIM_RY = 16 * BUCKET_SCALE;
  * 원본 렌더를 보면 팝콘이 통 안쪽까지 담겨 있고 앞쪽 테두리가 아래 알을 가린다.
  * 그 가림을 `clipPath`가 만든다. 클립은 입구 타원과 그 위쪽을 합친 모양이라, 테두리
  * 아래로 내려간 알은 타원 밖에서 잘려 통 뒤로 들어간 것처럼 보인다.
+ *
+ * 알이 커진 만큼(31 → 42) 82에서 76으로 좁혔다. 그대로 두면 바깥 알이 통 밖으로 나온다.
  */
-const PILE_RX = 82 * BUCKET_SCALE;
+const PILE_RX = 76 * BUCKET_SCALE;
 
 /**
  * 더미가 테두리 위로 솟는 높이.
@@ -112,18 +89,36 @@ const PILE_RX = 82 * BUCKET_SCALE;
  * 알을 평면에 늘어놓으면 통 위에 얹힌 판처럼 보인다. 입구를 밑면으로 하는 반구 안에
  * 알을 뿌려 실제로 담긴 더미가 되게 한다.
  */
-const MOUND_HEIGHT = 46;
+const MOUND_HEIGHT = 50;
 
 /** 더미를 통 안으로 내려 담는 깊이. 팝콘이 입구에 걸친 것처럼 보이게 한다 */
-const PILE_SINK = 10 * BUCKET_SCALE;
+const PILE_SINK = 8 * BUCKET_SCALE;
 
 /** 입구 클립의 id. 한 화면에 통이 하나라 고정 문자열로 충분하다 */
 const CLIP_ID = 'bucket-mouth';
 
-/** 알 한 알이 차지하는 정사각형 한 변. 새 스프라이트는 알이 폭의 88%라(이전 92%) 한 칸 키웠다 */
-const KERNEL_SIZE = 31;
+/**
+ * 화면에 보이는 알 수. 맛별 알 수를 이 수로 요약한다(디자인 확정 2026-09-17, 업무 -577).
+ *
+ * 전에는 한 알이 영화 한 편이라 100알까지 쌓였고, 알이 서로를 덮어 팝콘이 자잘한
+ * 알갱이 무더기로 뭉개졌다. **알 더미는 그림이므로** 수를 줄이고 알을 키우는 쪽이 맞다.
+ * 실제 개수는 범례와 `label`이 말한다.
+ */
+const SHOWN_COUNT = 30;
+
+/** 알 한 알이 차지하는 정사각형 한 변 */
+const KERNEL_SIZE = 42;
 /** 앞뒤 거리에 따른 크기 차이. 앞이 크고 뒤가 작아야 더미에 깊이가 생긴다 */
-const DEPTH_SCALE = 0.22;
+const DEPTH_SCALE = 0.3;
+
+/**
+ * 최대 기울기(도). 30°에서 줄였다. 알 그림에 구운 조명 방향이 들어 있어 많이 돌리면
+ * 빛이 제각각이 된다. 같은 이유로 좌우 반전도 하지 않는다.
+ */
+const MAX_TILT = 12;
+
+/** 황금각. 페르마 나선으로 입구 원판에 고르게 점을 찍는다 */
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 /**
  * index만으로 0~1 값을 만든다. 같은 index는 항상 같은 값이라 더미가 고정된다.
@@ -141,10 +136,49 @@ type Kernel = {
   size: number;
   sprite: string;
   angle: number;
-  flip: number;
   /** 앞뒤 자리(-1~1). 그리는 순서를 정할 뿐 화면에 직접 쓰이지는 않는다 */
   depth: number;
 };
+
+/**
+ * 맛별 알 수를 `SHOWN_COUNT`알로 요약한다.
+ *
+ * 비율대로 반올림하되 **한 알이라도 있는 맛은 최소 한 알을 남긴다.** 반올림으로 생긴
+ * 오차는 많은 맛부터 한 알씩 덜거나 더해 합계를 맞춘다.
+ */
+function summarize(flavors: FlavorCount[]): FlavorCount[] {
+  const sorted = flavors.filter((flavor) => flavor.count > 0).sort((a, b) => b.count - a.count);
+
+  if (sorted.length === 0) {
+    return [];
+  }
+
+  const total = sorted.reduce((sum, flavor) => sum + flavor.count, 0);
+  const shown = sorted.map((flavor) => ({
+    code: flavor.code,
+    count: Math.max(1, Math.round((flavor.count / total) * SHOWN_COUNT)),
+  }));
+
+  let over = shown.reduce((sum, flavor) => sum + flavor.count, 0) - SHOWN_COUNT;
+
+  /*
+   * 맛이 `SHOWN_COUNT`보다 많으면 최소 한 알 규칙 때문에 더 줄일 수 없다. 그때는 맛
+   * 수만큼 그린다. 한 바퀴에 한 알 이상 움직이므로 두 바퀴면 더 줄지 않는 자리에 닿는다.
+   */
+  for (let round = 0; over !== 0 && round < shown.length * 2; round += 1) {
+    const target = shown[round % shown.length];
+
+    if (over > 0 && target.count > 1) {
+      target.count -= 1;
+      over -= 1;
+    } else if (over < 0) {
+      target.count += 1;
+      over += 1;
+    }
+  }
+
+  return shown;
+}
 
 /**
  * 알을 통 입구 위 반구 안에 뿌린다.
@@ -155,51 +189,74 @@ type Kernel = {
  *
  * `dz`는 앞뒤다. 화면에서는 테두리 타원을 따라 아래위로 옮기고, 알 크기도 같이 키우고
  * 줄여 원근을 만든다. 뒤쪽 알부터 그려서 앞쪽 알이 그 위를 덮는다.
+ *
+ * **같은 맛이 한 덩이로 모인다**(디자인 확정 2026-09-17). 자리를 난수로 흩뿌리면 맛이
+ * 섞여 무엇이 담겼는지 읽히지 않았다. 원판에 페르마 나선으로 고르게 점을 찍고 각도순으로
+ * 정렬하면 이웃한 점이 이웃한 자리가 되므로, 순서대로 맛을 나눠 주면 덩이가 된다.
+ *
+ * 각도 0이 앞 가운데다(`dx`가 0, `dz`가 +1). **가장 많은 맛이 거기 오게** 그 덩이를
+ * 반으로 갈라 목록의 앞뒤로 나눈다.
  */
-function pileKernels(flavorCodes: string[]): Kernel[] {
-  return flavorCodes
-    .map((code, index) => {
-      // 원판 위 균등 분포. sqrt를 쓰지 않으면 알이 가운데로 몰린다
-      const radius = Math.sqrt(noise(index, 1));
-      const theta = noise(index, 2) * Math.PI * 2;
-      const dx = radius * Math.cos(theta);
-      const dz = radius * Math.sin(theta);
+function pileKernels(flavors: FlavorCount[]): Kernel[] {
+  const shown = summarize(flavors);
+
+  if (shown.length === 0) {
+    return [];
+  }
+
+  const count = shown.reduce((sum, flavor) => sum + flavor.count, 0);
+
+  const points = Array.from({ length: count }, (_, index) => {
+    // sqrt를 쓰지 않으면 점이 가운데로 몰린다
+    const radius = Math.sqrt((index + 0.5) / count) * 0.98;
+    const raw = index * GOLDEN_ANGLE - Math.PI / 2;
+
+    return { radius, theta: ((raw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) };
+  }).sort((a, b) => a.theta - b.theta);
+
+  const codes = shown.flatMap((flavor) => Array.from({ length: flavor.count }, () => flavor.code));
+  // 가장 많은 맛이 목록 앞을 차지한다. 그 절반을 뒤로 돌리면 덩이의 가운데가 각도 0에 온다
+  const half = Math.floor(shown[0].count / 2);
+
+  codes.push(...codes.splice(0, half));
+
+  return points
+    .map((point, index) => {
+      const dx = point.radius * Math.cos(point.theta + Math.PI / 2);
+      const dz = point.radius * Math.sin(point.theta + Math.PI / 2);
 
       /*
        * 더미는 위로 갈수록 좁아진다. 원본 렌더의 팝콘도 반구가 아니라 봉우리에 가깝다.
-       * 지수를 1.6으로 두면 가운데만 솟고 가장자리는 완만해진다.
-       *
-       * 껍질 근처(높이의 70~100%)로 모은다. 부피에 고르게 뿌리면 알 사이가 벌어져
-       * 가운데로 빈 통 안쪽이 비친다.
+       * 높이를 조금 흔들어 알이 한 껍질 위에 줄 서 있는 것처럼 보이지 않게 한다.
        */
-      const peak = MOUND_HEIGHT * (1 - radius ** 1.6);
-      const height = peak * (0.7 + noise(index, 3) * 0.3);
+      const height =
+        MOUND_HEIGHT * (1 - point.radius ** 2) ** 0.9 * (0.85 + noise(index, 3) * 0.15);
 
       return {
         x: RIM_X + dx * PILE_RX,
         // PILE_SINK만큼 통 안으로 내려 담는다. 입구 아래로 간 알은 클립이 잘라 준다
         y: RIM_Y + PILE_SINK + dz * RIM_RY - height,
         size: KERNEL_SIZE * (1 + dz * DEPTH_SCALE),
-        sprite: KERNEL_SPRITE[code] ?? original,
-        angle: (noise(index, 4) * 2 - 1) * 30,
-        flip: noise(index, 5) < 0.5 ? -1 : 1,
-        depth: dz,
+        sprite: kernelSprite(codes[index]),
+        angle: (noise(index, 4) * 2 - 1) * MAX_TILT,
+        // 높이를 섞어야 같은 앞뒤 자리에서 높이 솟은 알이 앞에 온다
+        depth: dz - height * 0.004,
       };
     })
     .sort((a, b) => a.depth - b.depth);
 }
 
 type Props = {
-  /** 통 위에 쌓을 알의 맛 코드. 순서는 상관없다 */
-  kernelFlavors?: string[];
+  /** 통 위에 쌓을 맛과 그 알 수. 순서는 상관없다 */
+  flavors?: FlavorCount[];
   /** 그려지는 폭(px). 높이는 비율로 따라간다 */
   width?: number;
   /** 스크린 리더가 읽을 이름 */
   label: string;
 };
 
-export default function PopcornBucket({ kernelFlavors = [], width = 232, label }: Props) {
-  const kernels = pileKernels(kernelFlavors);
+export default function PopcornBucket({ flavors = [], width = 232, label }: Props) {
+  const kernels = pileKernels(flavors);
 
   return (
     <svg
@@ -241,7 +298,7 @@ export default function PopcornBucket({ kernelFlavors = [], width = 232, label }
             height={kernel.size}
             x={-kernel.size / 2}
             y={-kernel.size / 2}
-            transform={`translate(${kernel.x} ${kernel.y}) rotate(${kernel.angle}) scale(${kernel.flip} 1)`}
+            transform={`translate(${kernel.x} ${kernel.y}) rotate(${kernel.angle})`}
           />
         ))}
       </g>

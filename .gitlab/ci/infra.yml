@@ -36,6 +36,8 @@ deploy-monitoring:
   script:
     - python3 -I -B infra/scripts/ci-deploy-current-commit.py --branch develop
     - bash infra/scripts/deploy-monitoring.sh
+  after_script:
+    - python3 -I -B infra/scripts/notify-deployment.py monitoring "$CI_JOB_STATUS"
   resource_group: service-and-backend-cache
   interruptible: false
   retry:
@@ -57,6 +59,51 @@ deploy-monitoring:
         - infra/scripts/test_deploy_monitoring.py
         - infra/scripts/verify-monitoring-deployment.py
         - infra/scripts/test_verify_monitoring_deployment.py
+
+.deploy-hdfs-config:
+  stage: deploy
+  needs: []
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
+    - bash infra/scripts/deploy-hdfs-config.sh "$HDFS_NODE" "$CI_COMMIT_SHA"
+  resource_group: distributed-runtime-hdfs
+  interruptible: false
+  retry:
+    max: 1
+    when: [runner_system_failure, scheduler_failure]
+  timeout: 30m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - infra/compose/service.yml
+        - infra/compose/distributed.yml
+        - infra/hadoop/**/*
+        - infra/scripts/deploy-distributed-runtime.py
+        - infra/scripts/runtime-config-release.py
+        - infra/scripts/deploy-hdfs-config.sh
+      when: manual
+  allow_failure: false
+
+deploy-hdfs-service-config:
+  extends: .deploy-hdfs-config
+  tags: [e106-shell]
+  environment:
+    name: service
+  variables:
+    HDFS_NODE: service
+  after_script:
+    - python3 -I -B infra/scripts/notify-deployment.py hdfs-service-config "$CI_JOB_STATUS"
+
+deploy-hdfs-distributed-config:
+  extends: .deploy-hdfs-config
+  tags: [e106-distributed]
+  needs: [deploy-hdfs-service-config]
+  environment:
+    name: distributed
+  variables:
+    HDFS_NODE: distributed
+  after_script:
+    - python3 -I -B infra/scripts/notify-deployment.py hdfs-distributed-config "$CI_JOB_STATUS"
 
 infra-config-test:
   stage: test
@@ -86,6 +133,9 @@ infra-config-test:
         - infra/monitoring/**/*
         - infra/spark/**/*
         - infra/scripts/deploy-distributed-runtime.py
+        - infra/scripts/runtime-config-release.py
+        - infra/scripts/deploy-hdfs-config.sh
+        - infra/scripts/test_runtime_config_release.py
         - infra/scripts/deploy-consumer.sh
         - infra/scripts/rollback-consumer.sh
         - infra/scripts/verify-consumer-e2e.py

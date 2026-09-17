@@ -64,7 +64,7 @@ class Response:
 
 class CollectorTests(unittest.TestCase):
     def test_collects_metadata_and_diff_without_executing_source(self):
-        responses = [Response(metadata()), Response([diff()])]
+        responses = [Response(metadata()), Response({"changes": [diff()]})]
         client = collector.GitLabClient("https://gitlab.example/api/v4", 123, "secret",
                                        opener=lambda *_args, **_kwargs: responses.pop(0))
         result = client.collect(7, SHA)
@@ -101,8 +101,26 @@ class CollectorTests(unittest.TestCase):
             collector.build_review_input(metadata(description="가" * collector.MAX_DESCRIPTION_BYTES), [diff()])
         self.assertEqual(raised.exception.code, "MR_METADATA_LIMIT_EXCEEDED")
 
-    def test_rejects_non_increasing_pagination(self):
-        responses = [Response(metadata()), Response([], {"X-Next-Page": "1"})]
+    # **이 인자가 빠지면 큰 파일이 있는 MR은 전부 리뷰를 못 받는다.**
+    #
+    # GitLab은 한 파일의 패치가 약 10KB를 넘으면 `collapsed`로 접어 빈 diff를 주고,
+    # `build_review_input`이 그것을 `INCOMPLETE_DIFF_REJECTED`로 거절한다.
+    # 접힌 파일을 펴는 경로는 `/changes?access_raw_diffs=true` 하나뿐이다(2026-09-17 확인).
+    def test_requests_raw_diffs_so_large_files_are_not_collapsed(self):
+        requested = []
+
+        def opener(request, **_kwargs):
+            requested.append(request.full_url)
+            return Response(metadata()) if len(requested) == 1 else Response({"changes": [diff()]})
+
+        client = collector.GitLabClient("https://gitlab.example/api/v4", 123, "secret", opener=opener)
+        client.collect(7, SHA)
+
+        self.assertIn("/changes?", requested[1])
+        self.assertIn("access_raw_diffs=true", requested[1])
+
+    def test_rejects_changes_payload_that_is_not_a_list(self):
+        responses = [Response(metadata()), Response({"changes": "not-a-list"})]
         client = collector.GitLabClient("https://gitlab.example/api/v4", 123, "secret",
                                        opener=lambda *_args, **_kwargs: responses.pop(0))
         with self.assertRaises(collector.CollectionError) as raised:
@@ -110,7 +128,8 @@ class CollectorTests(unittest.TestCase):
         self.assertEqual(raised.exception.code, "INVALID_GITLAB_RESPONSE")
 
     def test_rejects_more_than_allowed_number_of_files(self):
-        responses = [Response(metadata()), Response([diff()] * (collector.MAX_FILES + 1))]
+        responses = [Response(metadata()),
+                     Response({"changes": [diff()] * (collector.MAX_FILES + 1)})]
         client = collector.GitLabClient("https://gitlab.example/api/v4", 123, "secret",
                                        opener=lambda *_args, **_kwargs: responses.pop(0))
         with self.assertRaises(collector.CollectionError) as raised:

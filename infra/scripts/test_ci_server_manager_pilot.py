@@ -2,10 +2,13 @@ import ast
 import hashlib
 import importlib.util
 import io
+import json
+import os
 from pathlib import Path
 import subprocess
 import tarfile
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -174,10 +177,64 @@ class ServerPilotTests(unittest.TestCase):
                                         safety_lease=lease)
         driver.cleanup_confirmed = True
         with patch.object(pilot, 'verify_unit_stopped'), \
+                 patch.object(pilot, 'persist_filesystem_usage'), \
              patch.object(Path, 'mkdir'), \
              patch.object(pilot.job_io, 'collect_reports', return_value={'summary': {}, 'passed': True}) as collect:
             self.assertTrue(driver.collect(0, 60)['passed'])
             self.assertIsNone(collect.call_args.kwargs['expected_tests'])
+
+    def test_filesystem_usage_survives_report_rejection(self):
+        lease = {'source_sha': 'a' * 64, 'build': 'ci222-server-0123456789ab.service',
+                 'execution': 'ci222-server-abcdef012345.service',
+                 'owner': 'ci222-owner-0123456789ab.service'}
+        values = SimpleNamespace(f_frsize=4096, f_bsize=4096, f_blocks=100,
+                                 f_bfree=4, f_bavail=3, f_files=50,
+                                 f_ffree=2, f_favail=1)
+        with tempfile.TemporaryDirectory() as directory:
+            attempt = Path(directory); (attempt / 'root').mkdir()
+            driver = pilot.BackendJobDriver(Path('/base'), Path('/prepared'), attempt,
+                                            safety_lease=lease)
+            driver.cleanup_confirmed = True
+            with patch.object(pilot, 'verify_unit_stopped'), \
+                 patch.object(pilot.os, 'statvfs', return_value=values, create=True), \
+                 patch.object(pilot.os, 'O_NOFOLLOW', 0, create=True), \
+                 patch.object(pilot.job_io, 'collect_reports', side_effect=ValueError('fixture')):
+                with self.assertRaisesRegex(ValueError, 'fixture'):
+                    driver.collect(1, 60)
+            usage = json.loads((attempt / 'filesystem-usage.json').read_text())
+            self.assertEqual(usage['final']['bytes'], {
+                'total': 409600, 'used': 393216, 'free': 16384, 'available': 12288})
+            self.assertEqual(usage['final']['inodes'], {
+                'total': 50, 'used': 48, 'free': 2, 'available': 1})
+            self.assertEqual(usage['peak'], usage['final'])
+            self.assertEqual(usage['samples'], 0)
+            self.assertEqual(usage['sample_errors'], 0)
+            if os.name != 'nt':
+                self.assertEqual((attempt / 'filesystem-usage.json').stat().st_mode & 0o777, 0o600)
+            self.assertTrue((attempt / 'report-rejection.json').is_file())
+
+    def test_filesystem_peak_tracks_transient_byte_and_inode_usage(self):
+        lease = {'source_sha': 'a' * 64, 'build': 'ci222-server-0123456789ab.service',
+                 'execution': 'ci222-server-abcdef012345.service',
+                 'owner': 'ci222-owner-0123456789ab.service'}
+        driver = pilot.BackendJobDriver(Path('/base'), Path('/prepared'), Path('/attempt'),
+                                        safety_lease=lease)
+        samples = [
+            {'bytes': {'total': 100, 'used': 20, 'free': 80, 'available': 70},
+             'inodes': {'total': 50, 'used': 10, 'free': 40, 'available': 40}},
+            {'bytes': {'total': 100, 'used': 90, 'free': 10, 'available': 5},
+             'inodes': {'total': 50, 'used': 45, 'free': 5, 'available': 4}},
+            {'bytes': {'total': 100, 'used': 30, 'free': 70, 'available': 60},
+             'inodes': {'total': 50, 'used': 15, 'free': 35, 'available': 35}},
+        ]
+        with patch.object(pilot, 'filesystem_usage', side_effect=samples):
+            for unused in samples:
+                driver.sample_filesystem_usage()
+        self.assertEqual(driver.filesystem_samples, 3)
+        self.assertEqual(driver.filesystem_peak['bytes'],
+                         {'total': 100, 'used': 90, 'free': 10, 'available': 5})
+        self.assertEqual(driver.filesystem_peak['inodes'],
+                         {'total': 50, 'used': 45, 'free': 5, 'available': 4})
 
     def test_failed_build_cleanup_still_stops_execution(self):
         driver = pilot.BackendJobDriver(Path('/base'), Path('/prepared'), Path('/attempt'))

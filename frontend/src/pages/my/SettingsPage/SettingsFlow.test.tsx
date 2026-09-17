@@ -46,6 +46,9 @@ vi.mock('../../../api/users', async (importOriginal) => ({
 
 const signOut = vi.fn<AuthValue['signOut']>();
 
+/** `beforeEach`가 새로 만든다. 탈퇴 판정에 쓰는 계정 상태를 시험마다 바꾼다 */
+let server: ReturnType<typeof createFakeServer>;
+
 /**
  * 알림 설정(API-017 · API-018)과 차단(API-020 ~ API-022)을 들고 있는 가짜 서버.
  *
@@ -58,6 +61,8 @@ function createFakeServer() {
     RECOMMENDATION: true,
     MARKETING: false,
   };
+  /** API-013이 대조하는 계정. `getMyProfile`의 `hasPassword`와 짝을 맞춰 쓴다 */
+  const account = { password: 'p@ssw0rd!', hasPassword: true, withdrawn: false };
   const blocks: BlockedUser[] = [
     { userId: 5201, nickname: '스포일러왕', blockedAt: '2026-08-30T12:00:00Z' },
     { userId: 5202, nickname: '밤샘시네필', blockedAt: '2026-08-21T12:00:00Z' },
@@ -74,9 +79,42 @@ function createFakeServer() {
 
   const BLOCK_PATH = /^\/api\/v1\/users\/(\d+)\/block$/;
 
-  return function handle(rawUrl: string, init: RequestInit = {}): Response {
+  function handle(rawUrl: string, init: RequestInit = {}): Response {
     const url = new URL(rawUrl, 'http://test');
     const method = init.method ?? 'GET';
+
+    /*
+     * 비밀번호가 틀리면 API-013은 401이고, 공통 클라이언트는 코드를 가리지 않고 401에
+     * 재발급을 한 번 시도한다(`api/client.ts`). 재발급이 성공해도 같은 비밀번호를 다시
+     * 보내 또 401이 되는 것이 정상 경로라, 가짜 서버도 그 왕복을 그대로 재현한다.
+     */
+    if (url.pathname === '/api/v1/auth/token/refresh') {
+      return json(200, { accessToken: 'refreshed' });
+    }
+
+    if (url.pathname === '/api/v1/users/me' && method === 'DELETE') {
+      const body = JSON.parse(init.body as string) as { password?: string };
+
+      // 판정 순서는 계약 그대로다 — 비밀번호 보유 → 값 유무 → 대조(API-013)
+      if (!account.hasPassword) {
+        return json(409, {
+          code: 'PASSWORD_NOT_SET',
+          message: '비밀번호가 설정되지 않은 계정입니다.',
+        });
+      }
+
+      if (!body.password) {
+        return json(400, { code: 'VALIDATION_FAILED', message: '비밀번호를 입력해 주세요.' });
+      }
+
+      if (body.password !== account.password) {
+        return json(401, { code: 'INVALID_CREDENTIALS', message: '비밀번호가 일치하지 않습니다.' });
+      }
+
+      account.withdrawn = true;
+
+      return json(204);
+    }
 
     if (url.pathname === '/api/v1/users/me/notification-settings') {
       if (method === 'PUT') {
@@ -124,7 +162,9 @@ function createFakeServer() {
     }
 
     throw new Error(`가짜 서버가 모르는 요청이다: ${method} ${url.pathname}`);
-  };
+  }
+
+  return { handle, account };
 }
 
 beforeEach(() => {
@@ -133,11 +173,11 @@ beforeEach(() => {
   // 회원 API라 토큰이 있어야 나간다. 없으면 공통 클라이언트가 재발급부터 시도한다
   startSession('token');
 
-  const handle = createFakeServer();
+  server = createFakeServer();
 
   vi.stubGlobal(
     'fetch',
-    vi.fn((url: string, init?: RequestInit) => Promise.resolve(handle(url, init))),
+    vi.fn((url: string, init?: RequestInit) => Promise.resolve(server.handle(url, init))),
   );
 
   vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
@@ -224,17 +264,15 @@ describe('7.1 → 7.8 → 7.8-A → 7.8-A-1', () => {
     await waitFor(() => expect(location()).toBe('/my/settings/account'));
   });
 
-  it('7.8-A의 아이디 찾기와 비밀번호 복구는 0.7로 간다', async () => {
+  /* 같이 있던 `아이디 찾기` 줄은 없앴다(CR-25, 업무 -455) */
+  it('7.8-A의 비밀번호 복구는 0.7로 가고 아이디 찾기 줄은 없다', async () => {
     renderApp([ROUTE_PATTERN.accountManage]);
 
-    expect(await screen.findByRole('link', { name: /아이디 찾기/ })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: /비밀번호 복구/ })).toHaveAttribute(
       'href',
       '/account/find',
     );
-    expect(screen.getByRole('link', { name: /비밀번호 복구/ })).toHaveAttribute(
-      'href',
-      '/account/find',
-    );
+    expect(screen.queryByRole('link', { name: /아이디 찾기/ })).toBeNull();
   });
 
   it('소셜 전용 계정에는 비밀번호 변경이 없다', async () => {
@@ -242,7 +280,7 @@ describe('7.1 → 7.8 → 7.8-A → 7.8-A-1', () => {
     vi.mocked(getMyProfile).mockResolvedValue({ ...mockMyProfile, hasPassword: false });
     renderApp([ROUTE_PATTERN.accountManage]);
 
-    await screen.findByRole('link', { name: /아이디 찾기/ });
+    await screen.findByRole('link', { name: /비밀번호 복구/ });
     expect(screen.queryByRole('link', { name: /비밀번호 변경/ })).toBeNull();
   });
 
@@ -258,13 +296,29 @@ describe('7.1 → 7.8 → 7.8-A → 7.8-A-1', () => {
 });
 
 describe('7.8-A-1 회원 탈퇴', () => {
-  it('확인 체크 전에는 탈퇴할 수 없고, 한 번 더 확인한 뒤 세션을 끊고 시작 화면으로 간다', async () => {
+  /** 체크 · 비밀번호를 채워 `탈퇴하기`가 열린 상태까지 간다 */
+  async function fillWithdrawForm(password: string) {
+    const withdraw = await screen.findByRole('button', { name: '탈퇴하기' });
+
+    fireEvent.click(screen.getByLabelText('위 내용을 모두 확인했어요'));
+    fireEvent.change(screen.getByLabelText('현재 비밀번호'), { target: { value: password } });
+
+    return withdraw;
+  }
+
+  it('확인 체크와 비밀번호 전에는 탈퇴할 수 없고, 한 번 더 확인한 뒤 세션을 끊고 시작 화면으로 간다', async () => {
     renderApp([ROUTE_PATTERN.settings, ROUTE_PATTERN.withdraw]);
 
     const withdraw = await screen.findByRole('button', { name: '탈퇴하기' });
     expect(withdraw).toBeDisabled();
 
+    // 체크만으로는 열리지 않는다. API-013이 비밀번호를 받는다(CR-24)
     fireEvent.click(screen.getByLabelText('위 내용을 모두 확인했어요'));
+    expect(withdraw).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('현재 비밀번호'), { target: { value: 'p@ssw0rd!' } });
+    expect(withdraw).toBeEnabled();
+
     fireEvent.click(withdraw);
 
     const dialog = screen.getByRole('alertdialog', { name: 'Feelm을 탈퇴할까요?' });
@@ -275,6 +329,34 @@ describe('7.8-A-1 회원 탈퇴', () => {
 
     await waitFor(() => expect(location()).toBe('/start'));
     expect(signOut).toHaveBeenCalledTimes(1);
+    expect(server.account.withdrawn).toBe(true);
+  });
+
+  it('비밀번호가 틀리면 그 사실을 알리고 계정은 그대로 남는다', async () => {
+    renderApp([ROUTE_PATTERN.settings, ROUTE_PATTERN.withdraw]);
+
+    const withdraw = await fillWithdrawForm('wrong-password');
+    fireEvent.click(withdraw);
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '탈퇴' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('비밀번호가 올바르지 않아요.');
+    // 확인 창은 닫히고 화면에 남아 다시 적을 수 있다
+    expect(screen.queryByRole('alertdialog')).toBeNull();
+    expect(location()).toBe('/my/settings/account/withdraw');
+    expect(server.account.withdrawn).toBe(false);
+    expect(signOut).not.toHaveBeenCalled();
+  });
+
+  /* 소셜 전용 계정은 본인 확인 수단이 아직 없다(API-013, 업무 -435) */
+  it('소셜 전용 계정에는 비밀번호 칸 대신 아직 탈퇴할 수 없다는 안내가 있다', async () => {
+    vi.mocked(getMyProfile).mockResolvedValue({ ...mockMyProfile, hasPassword: false });
+    renderApp([ROUTE_PATTERN.settings, ROUTE_PATTERN.withdraw]);
+
+    expect(await screen.findByText(/본인 확인 방법이 준비되면/)).toBeInTheDocument();
+    expect(screen.queryByLabelText('현재 비밀번호')).toBeNull();
+
+    fireEvent.click(screen.getByLabelText('위 내용을 모두 확인했어요'));
+    expect(screen.getByRole('button', { name: '탈퇴하기' })).toBeDisabled();
   });
 
   it('7.8 맨 아래 회원 탈퇴도 같은 확인 화면으로 간다', async () => {

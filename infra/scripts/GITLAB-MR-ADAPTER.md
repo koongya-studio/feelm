@@ -195,6 +195,22 @@ develop의 `backend-test`는 Gradle 로그에서 이 줄을 직접 확인한다.
 외부 Job 로그에 출력한다. 비정상·과대·중복 값은 거부하며 Secret, 테스트 표준 출력 및
 테스트 메서드 이름은 공개하지 않는다.
 
+### 백엔드 실패 진단 요약 (S15P21E106-584)
+
+격리된 `backend-mr-test`는 작업 종료 후 `BACKEND_TEST_RESULT=` JSON 한 줄을 추가로
+출력한다. root supervisor가 정리한 lifecycle, JUnit manifest, 파일시스템 사용량과 보고서
+거부 증빙만 다시 검증하며 다음 제한된 분류 중 하나를 사용한다.
+
+- `success`, `test_failed`, `gradle_failed`, `required_suite_missing`
+- `filesystem_exhausted`, `report_validation_failed`, `cleanup_failed`
+- `timeout`, `cancelled`, `runner_infrastructure_failure`, `unknown_failure`
+
+요약에는 lifecycle outcome과 종료 코드, cleanup 확인 여부, 존재하는 경우 JUnit의
+테스트·실패·오류·skip 건수, 누락된 필수 suite 개수와 peak 시점의 byte·inode 최소 가용량만
+포함한다. 보고서 거부는 허용한 예외 타입과 errno만 표시한다. MR이 만든 stdout/stderr,
+환경 변수, 내부 경로·네트워크 정보, 테스트 메서드 이름과 임의 예외 메시지는 공개하지 않는다.
+원본 실행 로그와 증빙은 기존 root 전용 경계에 유지한다.
+
 측정할 때는 동일 커밋 또는 같은 테스트 집합에서 각 Job을 3회 실행하고, Runner 대기시간은
 제외한 Job 실행시간의 중앙값과 범위를 기록한다. `gradle_seconds`, `slowest_tasks`,
 `slowest_classes`를 함께 비교해 컴파일·테스트·Spotless·개별 통합 테스트 중 후속 최적화

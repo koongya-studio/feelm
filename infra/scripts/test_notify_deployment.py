@@ -25,6 +25,18 @@ class NotifyDeploymentTest(unittest.TestCase):
             "CI_COMMIT_SHORT_SHA": "abc12345",
             "CI_JOB_URL": "https://gitlab.example/jobs/10",
             "CI_PIPELINE_URL": "https://gitlab.example/pipelines/20",
+            "CI_API_V4_URL": "https://gitlab.example/api/v4",
+            "CI_PROJECT_ID": "30",
+            "CI_PIPELINE_ID": "20",
+            "CI_JOB_ID": "10",
+            "CI_JOB_TOKEN": "gitlab-job-token",
+            "CI_COMMIT_BRANCH": "develop",
+            "CI_PIPELINE_SOURCE": "push",
+            "CI_COMMIT_TITLE": (
+                "Merge branch 'fix/S15P21E106-517-hdfs-notification-context' "
+                "into 'develop'"
+            ),
+            "CI_COMMIT_AUTHOR": "조은채 <developer@example.com>",
         }
 
     def test_logs_in_posts_success_message_and_logs_out(self):
@@ -45,12 +57,97 @@ class NotifyDeploymentTest(unittest.TestCase):
         self.assertIn("> ✅ 성공 · 📦 backend · 🌐 service", message)
         self.assertIn("**🔎 배포 정보**", message)
         self.assertIn("`abc12345`", message)
+        self.assertIn("- 실행: `develop 병합` (`push`)", message)
+        self.assertIn("- 작업자: `조은채`", message)
+        self.assertIn(
+            "- 원본 브랜치: `fix/S15P21E106-517-hdfs-notification-context`",
+            message,
+        )
+        self.assertIn("- 대상 브랜치: `develop`", message)
         self.assertIn(self.environ["CI_JOB_URL"], message)
         self.assertTrue(request.call_args_list[2].args[0].endswith("/api/v4/users/logout"))
 
     def test_failure_message_identifies_failed_service(self):
-        message = MODULE.build_message("consumer", "failed", self.environ)
-        self.assertIn("> ❌ 실패 · 📦 consumer · 🌐 service", message)
+        message = MODULE.build_message("redis", "failed", self.environ)
+        self.assertIn("> ❌ 실패 · 📦 redis · 🌐 service", message)
+
+    def test_cli_accepts_every_deployment_job_service(self):
+        for service in (
+            "backend", "frontend", "consumer", "redis", "monitoring",
+            "hdfs-service-config", "hdfs-distributed-config",
+        ):
+            with self.subTest(service=service):
+                self.assertEqual(MODULE.parse_args([service, "failed"]).service, service)
+
+        args = MODULE.parse_args(["pipeline-failure"])
+        self.assertEqual(args.service, "pipeline-failure")
+        self.assertIsNone(args.status)
+
+    def test_pipeline_jobs_uses_job_token_and_paginates(self):
+        responses = [
+            ([{"id": 1, "name": "first"}], {"X-Next-Page": "2"}),
+            ([{"id": 2, "name": "second"}], {"X-Next-Page": ""}),
+        ]
+        with patch.object(MODULE, "api_request", side_effect=responses) as request:
+            jobs = MODULE.pipeline_jobs(self.environ)
+
+        self.assertEqual([job["id"] for job in jobs], [1, 2])
+        self.assertIn("/projects/30/pipelines/20/jobs", request.call_args_list[0].args[0])
+        self.assertIn("page=1", request.call_args_list[0].args[0])
+        self.assertIn("page=2", request.call_args_list[1].args[0])
+        self.assertEqual(
+            request.call_args_list[0].kwargs["headers"],
+            {"JOB-TOKEN": "gitlab-job-token"},
+        )
+
+    def test_pipeline_jobs_rejects_repeated_page(self):
+        with patch.object(
+            MODULE,
+            "api_request",
+            return_value=([], {"X-Next-Page": "1"}),
+        ):
+            with self.assertRaisesRegex(MODULE.DeploymentNotificationError, "repeated"):
+                MODULE.pipeline_jobs(self.environ)
+
+    def test_predeploy_failures_exclude_deploy_current_and_allowed_failure_jobs(self):
+        jobs = [
+            {"id": 1, "name": "runner-check", "stage": "verify", "status": "failed"},
+            {"id": 2, "name": "frontend-test", "stage": "test", "status": "failed"},
+            {"id": 3, "name": "deploy-monitoring", "stage": "deploy", "status": "failed"},
+            {"id": 4, "name": "optional", "stage": "test", "status": "failed",
+             "allow_failure": True},
+            {"id": 5, "name": "canceled", "stage": "test", "status": "canceled"},
+            {"id": 10, "name": "notification", "stage": "notify", "status": "running"},
+        ]
+        failures = MODULE.failed_predeploy_jobs(jobs, "10")
+        self.assertEqual([job["name"] for job in failures], ["frontend-test", "runner-check"])
+
+    def test_pipeline_failure_posts_one_summary_but_success_stays_quiet(self):
+        failures = [{
+            "id": 1,
+            "name": "ci-variable-preflight",
+            "stage": "verify",
+            "status": "failed",
+            "web_url": "https://gitlab.example/jobs/1",
+        }]
+        with patch.object(MODULE, "pipeline_jobs", return_value=failures), \
+             patch.object(MODULE, "post_message", return_value=True) as post:
+            self.assertTrue(MODULE.notify_pipeline_failure(self.environ))
+        message = post.call_args.args[0]
+        self.assertIn("## 🚨 [CI] develop Pipeline 실패", message)
+        self.assertIn("ci-variable-preflight", message)
+        self.assertIn("https://gitlab.example/jobs/1", message)
+        self.assertIn("- 실행: `develop 병합` (`push`)", message)
+        self.assertIn("- 작업자: `조은채`", message)
+        self.assertIn(
+            "- 원본 브랜치: `fix/S15P21E106-517-hdfs-notification-context`",
+            message,
+        )
+
+        with patch.object(MODULE, "pipeline_jobs", return_value=[]), \
+             patch.object(MODULE, "post_message") as post:
+            self.assertFalse(MODULE.notify_pipeline_failure(self.environ))
+        post.assert_not_called()
 
     def test_missing_account_config_warns_without_failing_deployment(self):
         stderr = io.StringIO()
@@ -95,6 +192,20 @@ class NotifyDeploymentTest(unittest.TestCase):
         message = MODULE.build_message("backend", "success", environ)
         self.assertNotIn("@channel", message)
         self.assertNotIn("**boom**", message)
+
+    def test_non_merge_pipeline_reports_branch_and_source_without_source_branch(self):
+        environ = {
+            **self.environ,
+            "CI_COMMIT_BRANCH": "main",
+            "CI_PIPELINE_SOURCE": "web",
+            "CI_COMMIT_TITLE": "Run deployment",
+            "CI_COMMIT_AUTHOR": "Deploy Operator <operator@example.com>",
+        }
+        message = MODULE.build_message("backend", "success", environ)
+        self.assertIn("- 실행: `수동 실행` (`web`)", message)
+        self.assertIn("- 작업자: `Deploy Operator`", message)
+        self.assertIn("- 대상 브랜치: `main`", message)
+        self.assertNotIn("원본 브랜치", message)
 
 
 if __name__ == "__main__":

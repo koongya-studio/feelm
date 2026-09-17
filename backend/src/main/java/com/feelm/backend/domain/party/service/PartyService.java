@@ -19,6 +19,7 @@ import com.feelm.backend.domain.party.entity.PartyStatus;
 import com.feelm.backend.domain.party.repository.PartyInvitationRepository;
 import com.feelm.backend.domain.party.repository.PartyMemberRepository;
 import com.feelm.backend.domain.party.repository.PartyQueryRepository;
+import com.feelm.backend.domain.party.repository.PartyRefreshRequestRepository;
 import com.feelm.backend.domain.party.repository.PartyRepository;
 import com.feelm.backend.domain.user.repository.UserRepository;
 import com.feelm.backend.domain.user.service.UserBlockFilter;
@@ -36,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class PartyService {
     private final PartyRepository partyRepository;
+    private final PartyRefreshRequestRepository refreshRequestRepository;
     private final PartyMemberRepository memberRepository;
     private final PartyInvitationRepository invitationRepository;
     private final PartyQueryRepository queryRepository;
@@ -56,6 +58,7 @@ public class PartyService {
         }
         Party party = partyRepository.save(Party.create(name, owner));
         PartyMember member = memberRepository.save(PartyMember.ownerOf(party));
+        refreshRequestRepository.request(party.getId());
         return PartyResponse.from(party, List.of(Member.from(member)));
     }
 
@@ -246,6 +249,7 @@ public class PartyService {
         Instant respondedAt = Instant.now();
         memberRepository.saveAndFlush(PartyMember.memberOf(party, invitee, respondedAt));
         invitation.accept(respondedAt);
+        refreshRequestRepository.request(partyId);
         List<Member> members =
                 queryRepository.findMembers(List.of(partyId)).stream().map(Member::from).toList();
         return PartyResponse.from(party, members);
@@ -301,6 +305,7 @@ public class PartyService {
             Instant closedAt = Instant.now();
             party.closeForInsufficientMembers(closedAt);
             declinePendingInvitations(partyId, closedAt);
+            refreshRequestRepository.delete(partyId);
         } else if (ownerLeaves) {
             PartyMember successor =
                     memberRepository
@@ -309,6 +314,9 @@ public class PartyService {
                                     () -> new IllegalStateException("Party successor is missing"));
             successor.promoteToOwner();
             party.transferOwnership(successor.getUser());
+        }
+        if (party.getStatus() == PartyStatus.ACTIVE) {
+            refreshRequestRepository.request(partyId);
         }
         return PartyStateResponse.from(party);
     }
@@ -324,6 +332,7 @@ public class PartyService {
         Instant closedAt = Instant.now();
         party.closeByOwner(closedAt);
         declinePendingInvitations(partyId, closedAt);
+        refreshRequestRepository.delete(partyId);
         return PartyStateResponse.from(party);
     }
 
@@ -350,6 +359,7 @@ public class PartyService {
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         memberRepository.delete(target);
         memberRepository.flush();
+        refreshRequestRepository.request(partyId);
 
         return PartyStateResponse.from(party);
     }

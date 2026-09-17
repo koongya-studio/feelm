@@ -3,6 +3,7 @@ stages:
   - test
   - build
   - deploy
+  - notify
 
 workflow:
   auto_cancel:

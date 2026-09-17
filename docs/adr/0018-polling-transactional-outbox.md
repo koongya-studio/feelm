@@ -29,13 +29,15 @@ Consumer는 아래 기준에 따라 중복과 지연 이벤트를 처리한다.
 
 - 도메인 데이터와 완성된 이벤트 JSON을 같은 PostgreSQL 트랜잭션으로 저장한다.
 - 아웃박스는 DB 내부 `bigint` PK와 외부 멱등 기준인 UUID `eventId`를 분리한다.
-- 발행기는 저장된 Topic, 사용자 파티션 키와 JSON을 다시 구성하지 않고 그대로 전송한다.
+- 발행기는 저장된 Topic, Long 파티션 키와 JSON을 다시 구성하지 않고 그대로 전송한다. 사용자 이벤트의 키는 userId, `PARTY_REFRESH`는 partyId다.
 - 상태는 `PENDING`과 `PUBLISHED`만 사용한다. 실패는 `PENDING`을 유지한 채 시도 횟수,
   최근 오류와 다음 시도 시각으로 나타낸다.
 - Kafka 성공 응답을 확인한 뒤에만 `PUBLISHED`로 변경한다. Kafka 응답을 기다리는 동안에는
   DB 트랜잭션을 유지하지 않는다.
-- 한 이벤트의 실패가 다른 이벤트를 막지 않는다. 중복, 일시적 지연과 발생 순서 변경을
-  허용하고 영구 유실 방지를 우선한다.
+- 한 이벤트의 실패가 다른 이벤트를 막지 않는다. 다만 `PARTY_REFRESH`는 같은 파티의 앞선
+  이벤트가 Kafka 성공 응답을 받고 `PUBLISHED`로 기록될 때까지 후속 이벤트의 발행을 보류한다.
+  다른 파티와 사용자 이벤트는 계속 발행한다. 앞선 파티 이벤트가 장기 실패하면 그 파티의
+  후속 계산도 지연된다.
 - 현재는 단일 `fixedDelay` 폴러가 이전 실행의 발행 결과와 DB 갱신을 모두 끝낸 뒤 다음
   실행을 시작한다. 여러 작업자의 선점을 위한 `PROCESSING`과 lease는 두지 않는다.
 - 최종 `FAILED` 상태와 최대 재시도 횟수는 두지 않는다. 별도 알림이 없는 상태에서 재시도를
@@ -82,9 +84,11 @@ Consumer가 중복을 견뎌야 한다.
 ONBOARDING은 기존 계약의 변경 요약만 담고 Python Consumer가 사용자 최신 상태를 다시
 조회한다. VIEW와 클릭처럼 행동 자체가 집계 입력인 신호는 처리에 필요한 값을 담는다.
 
-DB는 공통 봉투의 필수 필드와 JSON 객체 여부, `message.eventId = event_id`,
-`message.eventType = event_type`, `message.userId = partition_key`를 검사한다. 이벤트별 payload
-규칙은 애플리케이션에서 검증한다.
+DB는 사용자 이벤트에 공통 봉투의 필수 필드와 JSON 객체 여부,
+`message.eventId = event_id`, `message.eventType = event_type`,
+`message.userId = partition_key`를 검사한다. `PARTY_REFRESH`는 계약 §4.3의 전용 JSON을
+사용하므로 topic과 `message.partyId = partition_key`, `inputId`·`members`의 존재 및
+필드 집합을 별도 CHECK 분기로 검증한다. 이벤트별 세부 payload 규칙은 애플리케이션에서 검증한다.
 
 ### 테이블 구조
 
@@ -94,8 +98,8 @@ DB는 공통 봉투의 필수 필드와 JSON 객체 여부, `message.eventId = e
 | `event_id` | `uuid` | 불가 | 사건의 외부 식별자이자 Consumer 멱등 기준 |
 | `event_type` | `varchar(30)` | 불가 | 이벤트 종류 |
 | `topic` | `varchar(249)` | 불가 | 저장 당시 결정한 Kafka Topic |
-| `partition_key` | `bigint` | 불가 | Kafka key인 `userId` |
-| `message` | `jsonb` | 불가 | Kafka로 보낼 완성된 공통 봉투와 payload |
+| `partition_key` | `bigint` | 불가 | Kafka key인 `userId` 또는 `PARTY_REFRESH`의 `partyId` |
+| `message` | `jsonb` | 불가 | Kafka로 보낼 완성된 사용자 이벤트 봉투 또는 파티 refresh 전용 JSON |
 | `status` | `varchar(20)` | 불가 | `PENDING` 또는 `PUBLISHED` |
 | `attempt_count` | `integer` | 불가 | 지금까지의 발행 시도 횟수 |
 | `next_attempt_at` | `timestamptz` | 불가 | 다음 발행 가능 시각 |
@@ -105,12 +109,17 @@ DB는 공통 봉투의 필수 필드와 JSON 객체 여부, `message.eventId = e
 | `published_at` | `timestamptz` | 가능 | Kafka 성공 응답 확인 시각 |
 
 `event_id`는 유일해야 하고 `attempt_count`는 0 이상이어야 한다. `status`는 두 허용값만
-저장한다. `message`는 JSON 객체이고 `eventId`, `eventType`, `occurredAt`, `userId`, `payload`를
-가져야 하며 `payload`도 객체여야 한다. 중복 저장한 `eventId`, `eventType`, `userId`는 바깥
-컬럼과 일치해야 한다.
+저장한다. 사용자 이벤트 `message`는 JSON 객체이고 `eventId`, `eventType`, `occurredAt`,
+`userId`, `payload`를 가져야 하며 `payload`도 객체여야 한다. 중복 저장한 `eventId`,
+`eventType`, `userId`는 바깥 컬럼과 일치해야 한다. `PARTY_REFRESH`만 전용 JSON 예외를
+적용하고 아웃박스 `event_id`는 전송 본문 밖에서 보존한다.
 
 폴러는 `status = 'PENDING' AND next_attempt_at <= now()`를 `next_attempt_at, id` 순서로 최대
-100건 조회한다. 이를 위해 `(next_attempt_at, id) WHERE status = 'PENDING'` 부분 인덱스를 둔다.
+100건 조회한다. `PARTY_REFRESH`는 같은 `partition_key`에 더 작은 `id`의 `PENDING` 이벤트가
+있으면 조회 대상에서 제외한다. 이를 위해 `(next_attempt_at, id) WHERE status = 'PENDING'`
+부분 인덱스를 둔다. 같은 파티의 선행 요청 확인에는
+`(partition_key, id) WHERE event_type = 'PARTY_REFRESH' AND status = 'PENDING'`
+부분 인덱스를 사용한다.
 완료 정리는 `PUBLISHED`와 `published_at`만 기준으로 하며 오래된 `PENDING`은 삭제하지 않는다.
 
 ### JSON을 그대로 발행하는 이유
@@ -134,7 +143,7 @@ Producer 내부 재시도는 한 번의 발행 작업 안에서 짧은 네트워
 | `max.block.ms` | `3000` | 메타데이터·버퍼 대기로 호출이 장시간 막히는 상황 제한 |
 | `max.in.flight.requests.per.connection` | `5` | 멱등 Producer 조건을 지키면서 제한된 병렬 전송 허용 |
 | `retries` | 별도 지정하지 않음 | 시도 횟수보다 `delivery.timeout.ms`로 전체 시간을 제한 |
-| key serializer | `LongSerializer` | `userId`를 key로 전달 |
+| key serializer | `LongSerializer` | 사용자 이벤트는 `userId`, 파티 refresh는 `partyId`를 key로 전달 |
 | value serializer | `StringSerializer` | 저장된 JSON을 이중 직렬화하지 않고 전송 |
 
 여러 Kafka 레코드를 하나의 Kafka 트랜잭션으로 묶는 요구가 없고 Kafka 트랜잭션으로
@@ -146,7 +155,12 @@ Producer는 같은 실행 안의 Producer 재시도 중복을 줄일 뿐, Kafka 
 
 Kafka는 같은 Topic·Partition에 Producer가 실제로 기록한 순서를 유지한다. 그러나 앞서 발생한
 아웃박스 이벤트가 실패하고 뒤 이벤트가 성공하면 사건 발생 순서와 Kafka 기록 순서는 달라질
-수 있다. 앞 이벤트가 성공할 때까지 같은 사용자의 이후 이벤트를 막지는 않는다.
+수 있다. 사용자 이벤트는 앞 이벤트가 성공할 때까지 같은 사용자의 이후 이벤트를 막지 않는다.
+`PARTY_REFRESH`는 같은 파티의 앞선 이벤트를 Kafka에 기록하고 아웃박스 `PUBLISHED`로
+확정하기 전에는 후속 이벤트를 발행하지 않는다. 이 규칙은 Kafka 기록 순서까지 보장한다.
+현재 Spark 파티 작업은 배치 내부 offset 정렬을 하지 않으므로 배포 시
+`--max-records-per-trigger 1`로 배치당 입력을 한 건으로 제한한다. 이 설정은 전체 파티
+처리량을 낮추므로 운영 지연을 측정한다. Kafka 순서대로 Redis 결과가 게시되는지는 연동 검증한다.
 
 - RATING·ONBOARDING은 PostgreSQL 최신 상태를 다시 읽으므로 최종 상태보다 중복 계산 비용이
   주된 영향이다.

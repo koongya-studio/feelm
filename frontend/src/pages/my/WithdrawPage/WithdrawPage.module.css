@@ -88,3 +88,22 @@
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
 }
+
+/* 입력은 가운데 정렬한 흐름 안에서 홀로 왼쪽을 본다 — `TextField`가 폭을 다 쓴다 */
+.password {
+  width: 100%;
+  text-align: left;
+}
+
+/* 소셜 전용 계정 안내. 오류가 아니라 아직 열리지 않은 경로라는 설명이다 */
+.notice {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  color: var(--color-ink-body);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  text-align: left;
+}

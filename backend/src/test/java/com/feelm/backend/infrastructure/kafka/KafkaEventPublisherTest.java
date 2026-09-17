@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import com.feelm.backend.domain.party.model.PartyRefreshPayload;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,5 +58,39 @@ class KafkaEventPublisherTest {
         assertThat(message.get("eventId").asText()).isEqualTo(eventId.toString());
         assertThat(message.get("payload").get("movieId").asLong()).isEqualTo(550L);
         assertThat(message.get("payload").get("score").decimalValue()).isEqualByComparingTo("4.5");
+    }
+
+    @Test
+    @DisplayName("파티 refresh는 사용자 이벤트 봉투 없이 전용 JSON을 아웃박스에 저장한다")
+    void storesPartyRefreshBody() throws Exception {
+        OutboxEventStore store = mock(OutboxEventStore.class);
+        UUID eventId = UUID.fromString("0f3c9a1e-6b2d-4f77-9a10-5c2b8e41d0aa");
+        Instant occurredAt = Instant.parse("2026-09-07T00:00:00Z");
+        KafkaEventPublisher publisher =
+                new KafkaEventPublisher(
+                        store,
+                        objectMapper,
+                        Clock.fixed(occurredAt, ZoneOffset.UTC),
+                        () -> eventId);
+
+        publisher.publishPartyRefresh(
+                9001L,
+                new PartyRefreshPayload(
+                        9001L,
+                        "sha256:abc",
+                        List.of(new PartyRefreshPayload.Member(1024L, List.of(), List.of(550L)))));
+
+        ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
+        verify(store)
+                .savePartyRefresh(
+                        org.mockito.ArgumentMatchers.eq(eventId),
+                        org.mockito.ArgumentMatchers.eq(9001L),
+                        message.capture(),
+                        org.mockito.ArgumentMatchers.eq(occurredAt));
+        JsonNode body = objectMapper.readTree(message.getValue());
+        assertThat(body.get("partyId").asLong()).isEqualTo(9001L);
+        assertThat(body.get("members").get(0).get("candidateMovieIds").get(0).asLong())
+                .isEqualTo(550L);
+        assertThat(body.size()).isEqualTo(3);
     }
 }

@@ -126,6 +126,7 @@ class BackendDevelopPathRulesTests(unittest.TestCase):
         redis_inputs = (
             'infra/redis/start.sh',
             'infra/redis/readonly.acl',
+            'infra/redis/deploy-trigger.txt',
             'infra/scripts/deploy-redis.sh',
         )
         for path in redis_inputs:

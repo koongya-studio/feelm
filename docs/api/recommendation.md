@@ -6,11 +6,11 @@
 |---|---|---|---|---|---|
 | [API-031](#api-031-유사-영화-추천) | 유사 영화 추천 | GET | `/movies/{movieId}/similar` | 1차 MVP | 선택 |
 | [API-045](#api-045-기본-추천-조회) | 기본 추천 조회 | GET | `/recommendations` | 1차 MVP | 회원 |
-| [API-046](#api-046-추가-영화-추천) | 추가 영화 추천 | POST | `/recommendations/more` | 1차 MVP | 회원 |
+| [API-046](#api-046-추천-카드-보충) | 추천 카드 보충 | POST | `/recommendations/replenish` | 1차 MVP | 회원 |
 | [API-047](#api-047-관심없음-표시) | 관심없음 표시 | POST | `/movies/{movieId}/dismiss` | 1차 MVP | 회원 |
 | [API-048](#api-048-추천-이력-조회) | 추천 이력 조회 | GET | `/recommendations/history` | 1차 MVP | 회원 |
 | [API-066](#api-066-오늘의-영화) | 오늘의 영화 | GET | `/recommendations/today` | 확장 | 회원 |
-| [API-068](#api-068-ott-구독-추천) | OTT 구독 추천 | GET | `/recommendations/otts` | 확장 | 회원 |
+| [API-068](#api-068-ott-구독-추천) | OTT 구독 추천 | GET | `/recommendations/otts` | 2차 MVP | 회원 |
 
 ## API-031 유사 영화 추천
 
@@ -157,7 +157,10 @@
 
 ### 처리 규칙
 
-- 기본 구성은 `TASTE` 2편 + `DISCOVERY` 1편. `DISCOVERY` 후보가 없으면 `TASTE` 3편
+- 기본 구성은 `TASTE` 2편 + `DISCOVERY` 1편이다. 사용 가능한 `DISCOVERY` 후보가 없으면 `TASTE` 3편으로 구성한다
+- 최초 조회는 선택한 항목의 `exposed_at`을 기록하므로 읽기 API이지만 최초 한 번의 노출 상태 변경을 포함한다. 이후 같은 세트 조회는 이미 노출된 구성을 반환해 멱등이다
+- 이미 노출 중인 유효한 카드는 그대로 유지한다. 관심없음 또는 평가로 카드가 빠진 경우 API-046으로 빈 자리 1편만 보충하며, 전체 3편을 새 묶음으로 교체하거나 추가하지 않는다
+- 이미 노출 이력이 있는 세트에서 보충 후보가 없으면 `items`에 남은 유효 카드 0~2편만 반환할 수 있다. 이 상태에서 새 세트를 만들거나 `503`을 반환하는 정책은 S15P21E106-219가 담당한다
 - `TASTE`는 이벤트마다 PostgreSQL의 현재 평가·온보딩 선택을 한 snapshot으로 다시 읽어 결정론적으로
   재계산한다. 같은 영화는 실제 별점이 온보딩 선택보다 우선하고, 온보딩 LIKE/DISLIKE는 DB 별점으로
   저장하지 않고 ALS Fold-in adapter의 확정값으로만 사용한다. 서로 다른 유효 입력 영화 수와 관계없이
@@ -176,11 +179,11 @@
   적합도 순으로 그룹별 11번째 이후 후보를 모집한다. 모집된 최대 100편은 사용자 개인 예측
   점수로 최종 정렬한다.
 - 서비스 DB에 없는 영화, 평가한 영화와 관심없음 영화는 제외한다. 감상·OTT 클릭 이력은 제외나 재가중에 사용하지 않는다
-- 같은 `generationId`의 버퍼가 있으면 같은 `recommendationSetId`를 반환한다. 새 generation을 받으면 새 세트를 생성하며 관심없음은 세트 내 같은 타입 후보로 교체한다(API-047)
+- 같은 `generationId`의 버퍼가 있으면 같은 `recommendationSetId`를 반환한다. 새 generation이 게시되어도 노출 중인 유효 카드는 즉시 교체하지 않고, 현재 세트를 소진한 뒤 다음 세트를 만들 때 사용한다. 관심없음·평가로 생긴 빈 자리는 현재 세트에서 보충한다(API-046)
 - 온보딩을 건너뛰고 평가가 없는 사용자의 개인 후보 보충 순서 개선과 후보 모집단 밖 POPULAR 확장은
   S15P21E106-483에서 다룬다.
   `discovery-popularity`는 선택된 그룹 안의 공통 후보 진입 순서이며 fallback 목록이 아니다
-- Python Consumer가 Redis에 갱신한 TASTE·DISCOVERY 후보를 Spring이 종류별 점수로 정렬하고 동점을 결정적으로 섞은 뒤 타입별 최대 20편을 독립 버퍼로 저장한다. 조회 시 TASTE 2편과 DISCOVERY 1편을 꺼낸다
+- Python Consumer가 Redis에 갱신한 TASTE·DISCOVERY 후보를 Spring이 종류별 점수로 정렬하고 동점을 결정적으로 섞은 뒤 타입별 최대 20편을 독립 버퍼로 저장한다. 조회 시 TASTE 2편과 DISCOVERY 1편을 꺼내되, 사용 가능한 DISCOVERY가 없으면 다음 TASTE를 사용한다
 - 버퍼는 PostgreSQL `recommendation_items`에 저장하고 `exposed_at`으로 노출 여부를 구분한다. Consumer가 전달한 구조화된 `reasons[]` 원본도 함께 저장하며, 사용자 문구 생성은 별도 단계에서 처리한다.
 - Consumer는 `vector`·`candidates`·version 키를 원자 게시한다. Spring은 `candidates.taste`와
   `candidates.discovery`를 읽어 제외·재정렬하고 최종 세트를 생성한다. 별도 Redis `topn`은
@@ -217,9 +220,9 @@
 - [ ] 추천 이유 factor 타입 목록과 문장 생성 방식(템플릿 vs LLM)
 - [ ] Re-ranking 가중치와 추천 이유 생성 방식
 
-## API-046 추가 영화 추천
+## API-046 추천 카드 보충
 
-`POST` `/api/v1/recommendations/more`
+`POST` `/api/v1/recommendations/replenish`
 
 | 항목 | 값 |
 |---|---|
@@ -232,7 +235,12 @@
 
 ### 설명
 
-현재 세트에 미노출 후보가 남아 있으면 같은 구성 규칙(TASTE 2 + DISCOVERY 1)으로 최대 3편을 추가한다. 버퍼를 모두 소진한 뒤 다시 요청하면 최신 행동 Feature를 반영한 새 추천 세트를 생성해 최대 3편을 제공한다.
+관심없음 또는 평가로 추천 카드 한 자리가 비었을 때 현재 세트의 나머지 카드는 유지하고 빈 자리 1편만 보충한다. 사용자가 임의로 더 많은 카드를 요청하거나 현재 3편을 한꺼번에 바꾸는 기능은 제공하지 않는다.
+
+> **전환 계약:** 194에서는 보충 로직을 Spring 내부 공용 컴포넌트로 분리하되, 평가·관심없음 API와의
+> 트랜잭션 연결 전까지 이 공개 엔드포인트를 유지한다. 후속 Jira에서 API-036~038·047이 저장 트랜잭션
+> 안에서 공용 컴포넌트를 직접 호출하도록 연결한 뒤 이 HTTP 엔드포인트를 제거한다. 별도 내부 HTTP
+> API는 만들지 않는다.
 
 ### 인증 및 권한
 
@@ -249,8 +257,14 @@
 ### Request Body
 
 ```json
-{ "recommendationSetId": 7001 }
+{
+  "recommendationSetId": 7001,
+  "recommendationItemId": 3301
+}
 ```
+
+- `recommendationItemId`는 관심없음 또는 평가로 현재 화면에서 제거된 추천 카드의 항목 ID다
+- 클라이언트는 추천 유형을 보내지 않는다. 서버가 원본 추천 항목에서 `TASTE` 또는 `DISCOVERY`를 판별한다
 
 ### Response
 
@@ -259,27 +273,35 @@
 ```json
 {
   "recommendationSetId": 7001,
-  "addedItems": [],
-  "totalItemCount": 6,
-  "hasMore": true
+  "replacement": {
+    "recommendationItemId": 3305,
+    "type": "TASTE",
+    "movie": {},
+    "flavorCode": "FLAVOR_B",
+    "reason": {}
+  }
 }
 ```
 
-- `addedItems`는 API-045의 `items`와 같은 구조
+- `replacement`는 API-045의 `items` 원소와 같은 구조다
+- 현재 세트에 보충 가능한 후보가 없으면 `replacement: null`을 반환한다. 새 세트 생성은 API-046이 직접 수행하지 않고 추천 버퍼 소진 흐름에서 처리한다
 
 ### 오류 응답
 
 - `404 RESOURCE_NOT_FOUND` 세트 없음 또는 타인 세트
-- `409 RECOMMENDATION_SET_STALE` 입력이 바뀌어 세트가 갱신됨. API-045를 다시 호출
-- `409 NO_MORE_CANDIDATES` 새 추천 세트를 구성할 후보도 없음
+- `409 RECOMMENDATION_SET_STALE` 요청 세트보다 최신 개인 추천 세트가 이미 생성됨. API-045를 다시 호출
 - `503 RECOMMENDATION_UNAVAILABLE`
 
 ### 처리 규칙
 
-- 현재 세트에 미노출 후보가 남아 있으면 같은 `recommendationSetId`로 최대 3편을 노출하고, 추가된 항목을 해당 세트의 추천 이력에 누적한다
-- 현재 세트의 버퍼를 모두 소진한 뒤 다시 요청하면 Redis의 TASTE 최대 500편·DISCOVERY 최대 100편과
-  최신 행동 Feature를 읽어 재정렬하고, 기존 노출분을 제외한 후보로 새 추천 세트를 생성한다
-- 새 세트를 생성한 경우 응답의 `recommendationSetId`는 새 세트 ID이며, 제공한 항목과 최종 추천 이유는 새 세트의 추천 이력에 저장한다
+- `recommendationItemId`가 요청 회원의 현재 세트에 속하고, 실제로 제거된 카드인지 검증한 뒤 원본 유형을 판별한다
+- 원본 유형에 해당하는 화면 슬롯이 실제로 비어 있을 때만 보충한다. 같은 원본 ID를 재전송해도 이미 그 유형의 슬롯이 채워졌다면 후보를 추가로 소비하지 않는다
+- 원본이 `TASTE`이면 현재 세트의 다음 미노출·유효 `TASTE` 후보 1편을 보충한다
+- 원본이 `DISCOVERY`이면 다음 미노출·유효 `DISCOVERY` 후보 1편을 우선 보충한다. 사용 가능한 DISCOVERY가 없으면 다음 TASTE 후보 1편으로 보충해 화면 구성을 TASTE 3편으로 만든다
+- 이미 노출 중인 유효한 카드는 유지한다. 보충된 TASTE는 기존 유효한 TASTE 뒤, DISCOVERY 앞에 배치한다. 예: `A(TASTE), B(TASTE), X(DISCOVERY)`에서 A가 빠지면 `B, C, X`가 된다
+- 보충 후보는 요청 시점에 평가·관심없음 여부를 다시 확인해 제외한다
+- 보충 후보가 없으면 기존 카드를 재배치하거나 다른 유효 카드를 제거하지 않고 `replacement: null`을 반환한다. 이후 버퍼 소진 감지·새 세트 생성은 S15P21E106-219 범위에서 처리한다
+- 보충된 항목은 같은 `recommendationSetId`의 추천 이력에 노출 항목으로 누적한다
 
 ### 상태값
 
@@ -288,6 +310,7 @@
 ### 미정 사항
 
 - [ ] 세트 버퍼 크기(기본 20)와 버퍼 재생성 상한 — 설정값
+- [ ] 후속 Jira에서 평가·관심없음 저장 트랜잭션에 내부 보충 컴포넌트를 연결하고 공개 API-046을 제거
 
 ## API-047 관심없음 표시
 
@@ -304,7 +327,7 @@
 
 ### 설명
 
-영화를 관심없음으로 표시한다. 추천 카드에서 호출한 경우 선택적으로 추천 항목 출처를 기록하고 같은 유형의 새 후보 1편으로 즉시 교체한다. 영화 상세 등 다른 화면에서도 모든 영화에 사용할 수 있다.
+영화를 관심없음으로 표시한다. 추천 카드에서 호출한 경우 선택적으로 추천 항목 출처를 기록한다. 카드 보충은 관심없음 저장이 성공한 뒤 API-046으로 수행한다. 영화 상세 등 다른 화면에서도 모든 영화에 사용할 수 있다.
 
 ### 인증 및 권한
 
@@ -332,18 +355,9 @@
 
 ```json
 {
-  "movieId": 550,
-  "replacement": {
-    "recommendationItemId": 3305,
-    "type": "TASTE",
-    "movie": {},
-    "flavorCode": "FLAVOR_B",
-    "reason": {}
-  }
+  "movieId": 550
 }
 ```
-
-- 교체 후보가 없으면 `replacement: null`
 
 ### 오류 응답
 
@@ -353,10 +367,10 @@
 ### 처리 규칙
 
 - 관심없음은 `user_movie_dismissals`에 사용자·영화별 1건으로 저장하며 평가·팝콘 버킷·프레임에 영향이 없다
-- 추천 외 화면에서 호출하면 `recommendation_item_id`는 NULL이고 교체 후보도 반환하지 않는다
+- 추천 외 화면에서 호출하면 `recommendation_item_id`는 NULL이다
 - `recommendationItemId`를 보냈다면 본인 추천 항목이며 경로의 `movieId`와 일치하는지 검증한다
 - 관심없음 영화는 이후 모든 개인 추천에서 제외한다. 유사 영화 추천(API-031) 제외 여부는 미정
-- 관심없음은 세트가 갱신되지 않도록 현재 세트 내 교체로 처리한다(버퍼의 다음 같은 타입 후보 승격, 추천 서비스 호출 없음). 같은 타입 후보가 소진되면 `replacement: null`을 `200`으로 반환하고 세트와 `inputVersion`은 유지한다
+- 관심없음 저장만으로 현재 세트를 무효화하거나 나머지 카드를 교체하지 않는다. 194 단계에서는 저장 성공 후 API-046에 같은 `recommendationItemId`를 전달한다. 후속 Jira에서는 같은 트랜잭션 안에서 내부 보충 컴포넌트를 호출하도록 전환하며, 전환 완료 전 두 요청 사이 실패 시 API-046을 같은 원본 ID로 재시도할 수 있다
 - 관심없음 영화는 다음 버퍼 생성 시 `excludeMovieIds`에 포함되어 제외된다
 
 ### 상태값
@@ -520,7 +534,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 단계 | 확장 |
+| 단계 | 2차 MVP |
 | 인증 | 회원 |
 | 관련 요구사항 | FR-40 |
 | 화면 | - |
@@ -529,7 +543,7 @@
 
 ### 설명
 
-OTT별로 사용자 취향과 유사한 미감상 영화 수를 집계해 구독 효용이 높은 순으로 OTT를 추천한다. OTT마다 유사도 상위 대표 영화 3편을 함께 내려준다.
+Redis의 사용자별 TASTE 추천 후보 최대 500편에서 OTT별로 시청 가능한 영화 수를 집계해 순위를 제공한다. OTT마다 후보 점수 상위 대표 영화 3편을 함께 내려준다. 취향 입력이 없는 사용자의 후보도 그대로 사용하며 이때의 순위는 취향 일치도나 인기순을 뜻하지 않는다.
 
 ### 인증 및 권한
 
@@ -565,8 +579,7 @@ OTT별로 사용자 취향과 유사한 미감상 영화 수를 집계해 구독
           "movieId": 807,
           "title": "세븐",
           "posterUrl": "https://...",
-          "releaseYear": 1995,
-          "similarity": 0.91
+          "releaseYear": 1995
         }
       ]
     }
@@ -574,9 +587,9 @@ OTT별로 사용자 취향과 유사한 미감상 영화 수를 집계해 구독
 }
 ```
 
-- `matchCount`: 취향 매칭 미감상 영화 수
+- `matchCount`: TASTE 후보 최대 500편 중 해당 OTT에서 볼 수 있는 미감상·미관심없음 영화 수. 전체 OTT 카탈로그의 취향 영화 수가 아니다
 - `subscribed`: 내 구독 OTT(API-026) 여부
-- `insufficientData: true`이면 `items`는 빈 배열
+- 현재 Candidate가 있으면 취향 입력이 0건이어도 `insufficientData: false`다. 이 필드는 후속 콜드 스타트 정책 확장을 위해 유지한다
 
 ### 오류 응답
 
@@ -584,12 +597,13 @@ OTT별로 사용자 취향과 유사한 미감상 영화 수를 집계해 구독
 
 ### 처리 규칙
 
-- 집계 기준은 Python Consumer가 사용자 취향 벡터와 사전 계산된 영화 Factor로 산출해 Redis에 적재한 **사용자별 영화 점수** 하나다. Spring은 이 점수가 임계치 이상이고 감상 기록·관심없음이 없는 영화를 OTT 제공처별로 집계한다(ADR-0017)
-- `items`는 `matchCount` 내림차순으로 정렬한다
+- 집계 기준은 Redis `candidates.taste` 최대 500편 전체다. Spring은 점수 임계치나 별도의 상위 200편 컷을 적용하지 않는다. 취향 입력이 없어 Consumer가 `0.0` 동점 후보를 게시한 경우에도 같은 범위로 집계한다
+- 평가한 영화, 관심없음 영화, 활성 감상 기록(`LINK_CLICKED`, `WATCHED_UNRATED`, `RATED`)이 있는 영화는 제외한다. `EXPIRED` 기록만 있는 영화는 포함한다. `LINK_CLICKED`의 `expiresAt`이 지났지만 아직 상태가 갱신되지 않은 경우도 만료로 보고 포함한다
+- `items`는 `matchCount` 내림차순·`ottId` 오름차순으로 정렬하고, 후보 영화가 0편인 OTT는 생략한다
 - 순위는 절대 편수 기준이며 OTT 카탈로그 크기로 정규화하지 않는다(FR-40)
-- `topMovies`는 같은 점수 기준 상위 3편이며 미감상 필터를 동일하게 적용한다
-- 영화별 OTT 제공 정보는 TMDb watch provider 매핑(API-025 미정 사항) 확정이 선행 조건이다
-- 평가·온보딩 데이터가 기준 미만이면 `insufficientData: true`(가정)
+- `topMovies`는 후보 점수 내림차순·동점 `movieId` 오름차순 상위 3편이며 같은 제외 필터를 적용한다. Redis 점수는 상대 순위만 보장하므로 `similarity`나 취향 일치 확률로 응답하지 않는다
+- `aggregatedAt`은 요청 시점의 UTC 시각이다. 후보가 없거나 Redis를 읽지 못하면 짧게 한 번 재시도한 뒤 `503 RECOMMENDATION_UNAVAILABLE`을 반환한다
+- 영화별 OTT 제공 정보는 API-025의 TMDb watch provider 매핑을 사용한다
 
 ### 상태값
 
@@ -597,8 +611,5 @@ OTT별로 사용자 취향과 유사한 미감상 영화 수를 집계해 구독
 
 ### 미정 사항
 
-- [ ] 추천 점수 임계치 — 설정값, 실데이터로 캘리브레이션
-- [ ] 배치 집계 갱신 주기
-- [ ] 콜드 스타트(평가 부족 사용자) 처리
-- [ ] TMDb watch provider 매핑 확정 선행(API-025)
+- [ ] S15P21E106-483의 검증된 POPULAR 목록이 준비되면 취향 입력이 없는 사용자의 OTT 집계와 화면 문구에 반영
 - [ ] 화면 배치(어느 화면에 노출할지)

@@ -743,6 +743,59 @@ class MovieDetailContractTest extends SharedPostgresContractTest {
         assertRecommendation(response, item, "TASTE");
     }
 
+    @Test
+    @DisplayName("앞선 계약 테스트가 기준정보를 갈아치우고 가도 상세 fixture는 스스로 선다")
+    void seedDoesNotDependOnLeftoverReferenceData() throws Exception {
+        leaveForeignReferenceData();
+
+        fixture.seed();
+
+        JsonNode response = ok(get(PATH, MOVIE));
+        assertThat(response.path("flavorCode").asText()).isEqualTo("FLAVOR_A");
+        assertThat(texts(response, "genres", "code")).containsExactly("DRAMA", "THRILLER");
+        assertThat(texts(response, "ottProviders", "code"))
+                .containsExactly("WAVVE", "DISNEY_PLUS", "TVING", "NETFLIX");
+    }
+
+    /**
+     * 공유 PostgreSQL을 쓰는 다른 계약 테스트가 커밋한 채 끝내는 상태를 그대로 만든다. Flyway seed의 {@code FLAVOR_A}가 사라지고, 이
+     * fixture가 쓰는 장르 식별자와 OTT 코드를 남의 행이 선점하며, 그 행들은 참조까지 달고 있어 지우려 들면 FK가 막는다. 이 테스트도
+     * {@code @Transactional}이라 모두 롤백된다.
+     */
+    private void leaveForeignReferenceData() {
+        long leftover = 1_580_901L;
+        jdbc.execute("TRUNCATE TABLE popcorn_flavors, genres, otts, people, users CASCADE");
+        for (int order = 1; order <= 8; order++) {
+            jdbc.update(
+                    """
+                    INSERT INTO popcorn_flavors (id, code, display_name, color, sort_order,
+                        cluster_id, representative_keywords)
+                    VALUES (?, ?, ?, '#000000', ?, ?, '[]'::jsonb)
+                    """,
+                    order,
+                    "FLAVOR_" + order,
+                    "FLAVOR_" + order,
+                    order,
+                    order - 1);
+        }
+        jdbc.update(
+                """
+                INSERT INTO genres (id, code, name, tmdb_genre_id) VALUES
+                    (1, 'DRAMA', '드라마', 18), (2, 'THRILLER', '스릴러', 53)
+                """);
+        jdbc.update(
+                "INSERT INTO otts (id, code, name, tmdb_provider_id)"
+                        + " VALUES (1, 'NETFLIX', '넷플릭스', 8)");
+        jdbc.update(
+                """
+                INSERT INTO movies (id, tmdb_id, title, representative_flavor_id)
+                VALUES (?, 900, '앞선 테스트가 남긴 영화', 1)
+                """,
+                leftover);
+        jdbc.update("INSERT INTO movie_genres VALUES (?, 1)", leftover);
+        jdbc.update("INSERT INTO movie_ott_providers (movie_id, ott_id) VALUES (?, 1)", leftover);
+    }
+
     private List<String> measure(MockHttpServletRequestBuilder request) throws Exception {
         recorder.start();
         List<String> queries;

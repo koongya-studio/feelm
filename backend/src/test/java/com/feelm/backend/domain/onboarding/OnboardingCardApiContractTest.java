@@ -32,6 +32,10 @@ import tools.jackson.databind.ObjectMapper;
 class OnboardingCardApiContractTest extends SharedPostgresContractTest {
 
     private static final String CARDS_PATH = "/api/v1/onboarding/cards";
+    private static final List<Long> CURATED_MOVIE_IDS =
+            List.of(59738L, 69823L, 72564L, 59664L, 45504L, 123L, 76119L, 88608L, 100L, 58868L);
+    private static final List<Long> CURATED_FLAVOR_IDS =
+            List.of(1L, 2L, 3L, 3L, 4L, 5L, 6L, 7L, 7L, 8L);
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
@@ -45,77 +49,86 @@ class OnboardingCardApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("T1 계약이 정한 필드를 채운 카드를 기본 20장 내려준다")
-    void returnsCardsWithContractFields() throws Exception {
-        seedMovies(5);
-        OnboardingFixture.genre(jdbc, 1, "ACTION", "액션", 28);
-        OnboardingFixture.genre(jdbc, 2, "SF", "SF", 878);
-        OnboardingFixture.movieGenre(jdbc, 101, 1);
-        OnboardingFixture.movieGenre(jdbc, 101, 2);
+    @DisplayName("T1 확정 영화 10편을 기획 순서와 계약 필드대로 내려준다")
+    void returnsCuratedCardsWithContractFields() throws Exception {
+        seedCuratedMovies();
+        OnboardingFixture.genre(jdbc, 1, "DOCUMENTARY", "다큐멘터리", 99);
+        OnboardingFixture.genre(jdbc, 2, "FAMILY", "가족", 10751);
+        OnboardingFixture.movieGenre(jdbc, 59738, 1);
+        OnboardingFixture.movieGenre(jdbc, 59738, 2);
 
+        MvcResult result = request(ACTIVE, "");
+
+        assertThat(movieIdsOf(result)).containsExactlyElementsOf(CURATED_MOVIE_IDS);
         mvc.perform(get(CARDS_PATH).header("Authorization", bearer(ACTIVE)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items.length()").value(20))
-                .andExpect(jsonPath("$.items[0].movieId").value(101))
-                .andExpect(jsonPath("$.items[0].title").value("영화101"))
+                .andExpect(jsonPath("$.items.length()").value(10))
+                .andExpect(jsonPath("$.items[0].movieId").value(59738))
+                .andExpect(jsonPath("$.items[0].title").value("영화59738"))
                 .andExpect(
                         jsonPath("$.items[0].posterUrl")
-                                .value("https://image.example.test/101.jpg"))
+                                .value("https://image.example.test/59738.jpg"))
                 .andExpect(jsonPath("$.items[0].releaseYear").value(1999))
-                .andExpect(jsonPath("$.items[0].genres[0]").value("액션"))
-                .andExpect(jsonPath("$.items[0].genres[1]").value("SF"))
-                .andExpect(jsonPath("$.items[0].flavorCode").value(FLAVOR_CODES[0]));
+                .andExpect(jsonPath("$.items[0].genres[0]").value("다큐멘터리"))
+                .andExpect(jsonPath("$.items[0].genres[1]").value("가족"))
+                .andExpect(jsonPath("$.items[0].flavorCode").value("FLAVOR_A"));
     }
 
     @Test
-    @DisplayName("T2 여덟 개 맛에 카드를 고르게 나눠 담는다")
-    void spreadsCardsAcrossFlavors() throws Exception {
-        seedMovies(5);
+    @DisplayName("T2 확정 목록이 여덟 개 팝콘 맛을 모두 포함한다")
+    void coversAllPopcornFlavors() throws Exception {
+        seedCuratedMovies();
 
-        List<String> flavorCodes = flavorCodesOf(request(ACTIVE, "?size=16"));
+        List<String> flavorCodes = flavorCodesOf(request(ACTIVE, ""));
 
-        assertThat(flavorCodes).hasSize(16);
-        for (String code : FLAVOR_CODES) {
-            assertThat(flavorCodes.stream().filter(code::equals).count()).isEqualTo(2);
-        }
+        assertThat(flavorCodes)
+                .containsExactly(
+                        "FLAVOR_A",
+                        "FLAVOR_B",
+                        "FLAVOR_C",
+                        "FLAVOR_C",
+                        "FLAVOR_D",
+                        "FLAVOR_E",
+                        "FLAVOR_F",
+                        "FLAVOR_G",
+                        "FLAVOR_G",
+                        "FLAVOR_H")
+                .contains(FLAVOR_CODES);
     }
 
     @Test
-    @DisplayName("T3 어떤 맛의 후보가 모자라면 남은 자리를 다른 맛이 채운다")
-    void fillsRemainderWhenFlavorIsShort() throws Exception {
-        OnboardingFixture.movie(jdbc, 101, 1L, 999);
-        for (long flavorId = 2; flavorId <= 8; flavorId++) {
-            for (int index = 1; index <= 5; index++) {
-                OnboardingFixture.movie(jdbc, flavorId * 100 + index, flavorId, 1000 - index);
-            }
-        }
+    @DisplayName("T3 확정 목록 밖의 인기 영화로 카드를 바꾸지 않는다")
+    void excludesUncuratedPopularMovies() throws Exception {
+        seedCuratedMovies();
+        OnboardingFixture.movie(jdbc, 999999, 1L, Integer.MAX_VALUE);
 
-        List<String> flavorCodes = flavorCodesOf(request(ACTIVE, "?size=16"));
-
-        assertThat(flavorCodes).hasSize(16);
-        assertThat(flavorCodes.stream().filter(FLAVOR_CODES[0]::equals).count()).isEqualTo(1);
+        assertThat(movieIdsOf(request(ACTIVE, "")))
+                .containsExactlyElementsOf(CURATED_MOVIE_IDS)
+                .doesNotContain(999999L);
     }
 
     @Test
-    @DisplayName("T4 대표 맛이 배정되지 않은 영화는 카드가 되지 않는다")
-    void excludesMoviesWithoutFlavor() throws Exception {
-        seedMovies(1);
-        OnboardingFixture.movie(jdbc, 900, null, 100000);
+    @DisplayName("T4 확정 영화의 대표 맛이 없으면 다른 영화로 대체하지 않는다")
+    void doesNotReplaceCuratedMovieWithoutFlavor() throws Exception {
+        seedCuratedMoviesExcept(59738L);
+        OnboardingFixture.movie(jdbc, 59738, null, 1000);
+        OnboardingFixture.movie(jdbc, 999999, 1L, Integer.MAX_VALUE);
 
-        List<Long> movieIds = movieIdsOf(request(ACTIVE, ""));
-
-        assertThat(movieIds).hasSize(8).doesNotContain(900L);
+        assertThat(movieIdsOf(request(ACTIVE, "")))
+                .hasSize(9)
+                .doesNotContain(59738L, 999999L)
+                .containsExactlyElementsOf(CURATED_MOVIE_IDS.subList(1, CURATED_MOVIE_IDS.size()));
     }
 
     @Test
-    @DisplayName("T5 size가 허용 범위를 벗어나면 거절한다")
+    @DisplayName("T5 size가 1~10을 벗어나면 거절한다")
     void rejectsSizeOutOfRange() throws Exception {
-        seedMovies(5);
+        seedCuratedMovies();
 
         mvc.perform(get(CARDS_PATH + "?size=0").header("Authorization", bearer(ACTIVE)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
-        mvc.perform(get(CARDS_PATH + "?size=41").header("Authorization", bearer(ACTIVE)))
+        mvc.perform(get(CARDS_PATH + "?size=11").header("Authorization", bearer(ACTIVE)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     }
@@ -123,7 +136,7 @@ class OnboardingCardApiContractTest extends SharedPostgresContractTest {
     @Test
     @DisplayName("T6 이미 온보딩을 마친 사용자는 카드를 받지 못한다")
     void rejectsCompletedUser() throws Exception {
-        seedMovies(5);
+        seedCuratedMovies();
 
         mvc.perform(get(CARDS_PATH).header("Authorization", bearer(COMPLETED)))
                 .andExpect(status().isConflict())
@@ -133,7 +146,7 @@ class OnboardingCardApiContractTest extends SharedPostgresContractTest {
     @Test
     @DisplayName("T7 활성 계정이 아니면 카드를 받지 못한다")
     void rejectsInactiveUser() throws Exception {
-        seedMovies(5);
+        seedCuratedMovies();
 
         mvc.perform(get(CARDS_PATH).header("Authorization", bearer(WITHDRAWN)))
                 .andExpect(status().isUnauthorized())
@@ -141,18 +154,19 @@ class OnboardingCardApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("T8 같은 요청을 반복해도 카드 순서가 같다")
+    @DisplayName("T8 같은 요청을 반복해도 확정 카드 순서가 같다")
     void returnsSameOrderOnRepeat() throws Exception {
-        seedMovies(5);
+        seedCuratedMovies();
 
-        assertThat(movieIdsOf(request(ACTIVE, "?size=24")))
-                .isEqualTo(movieIdsOf(request(ACTIVE, "?size=24")));
+        assertThat(movieIdsOf(request(ACTIVE, "?size=10")))
+                .isEqualTo(movieIdsOf(request(ACTIVE, "?size=10")))
+                .containsExactlyElementsOf(CURATED_MOVIE_IDS);
     }
 
     @Test
     @DisplayName("T9 인증 없이 카드를 받을 수 없다")
     void requiresAuthentication() throws Exception {
-        seedMovies(5);
+        seedCuratedMovies();
 
         mvc.perform(get(CARDS_PATH))
                 .andExpect(status().isUnauthorized())
@@ -162,12 +176,17 @@ class OnboardingCardApiContractTest extends SharedPostgresContractTest {
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }
 
-    /** 맛마다 {@code perFlavor}편을 넣는다. 식별자가 작을수록 평가 수가 많아 인기 순위가 앞선다. */
-    private void seedMovies(int perFlavor) {
-        for (long flavorId = 1; flavorId <= FLAVOR_CODES.length; flavorId++) {
-            for (int index = 1; index <= perFlavor; index++) {
-                OnboardingFixture.movie(jdbc, flavorId * 100 + index, flavorId, 1000 - index);
+    private void seedCuratedMovies() {
+        seedCuratedMoviesExcept(null);
+    }
+
+    private void seedCuratedMoviesExcept(Long excludedMovieId) {
+        for (int index = 0; index < CURATED_MOVIE_IDS.size(); index++) {
+            long movieId = CURATED_MOVIE_IDS.get(index);
+            if (Long.valueOf(movieId).equals(excludedMovieId)) {
+                continue;
             }
+            OnboardingFixture.movie(jdbc, movieId, CURATED_FLAVOR_IDS.get(index), 1000 - index);
         }
     }
 

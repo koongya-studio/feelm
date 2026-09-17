@@ -3,7 +3,12 @@ package com.feelm.backend.domain.movie;
 import java.math.BigDecimal;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-/** 실제 Flyway 스키마에 가상 데이터를 넣는다. 각 테스트의 트랜잭션이 끝나면 모두 롤백된다. */
+/**
+ * 실제 Flyway 스키마에 가상 데이터를 넣는다. 각 테스트의 트랜잭션이 끝나면 모두 롤백된다.
+ *
+ * <p>맛·장르·OTT 같은 기준정보도 Flyway seed나 앞선 테스트가 남긴 것에 기대지 않고 직접 넣는다. 공유 PostgreSQL을 쓰는 다른 계약 테스트가 기준정보를
+ * 커밋하며 갈아치우므로, 그러지 않으면 클래스 실행 순서에 따라 seed가 통째로 실패한다.
+ */
 final class MovieDetailFixture {
 
     static final long MOVIE = 1_580_001L;
@@ -20,6 +25,15 @@ final class MovieDetailFixture {
     static final long COUPANG_PLAY = 5L;
     static final long EXTRA_OTT = 35L;
     static final long RATING = 1_580_201L;
+    static final long FLAVOR = 1_580_301L;
+
+    /**
+     * 같은 PostgreSQL을 공유하는 다른 계약 테스트가 자기 기준정보를 커밋한 채 끝낸다. 남은 행과 겹치지 않도록 이 fixture가 쓰는 뿌리를 비우고 필요한 것만
+     * 다시 넣는다. CASCADE가 movies·people·ratings 같은 참조 표까지 함께 비운다.
+     */
+    private static final String CLEAR_CATALOG =
+            "TRUNCATE TABLE popcorn_flavors, genres, otts, people, users CASCADE";
+
     static final String REASON =
             """
             {"summary":"스릴러 장르를 높게 평가하셨어요",
@@ -34,10 +48,8 @@ final class MovieDetailFixture {
     }
 
     void seed() {
-        // Preserve the fixture's non-sequential IDs; this test transaction rolls back the delete.
-        jdbc.update(
-                "DELETE FROM otts WHERE code IN"
-                        + " ('NETFLIX','DISNEY_PLUS','WATCHA','WAVVE','TVING')");
+        // 클래스 실행 순서에 기대지 않는다. 이 테스트 트랜잭션이 비우기와 넣기를 함께 롤백한다.
+        jdbc.execute(CLEAR_CATALOG);
         for (long user : new long[] {USER, OTHER_USER, OUTSIDER}) {
             jdbc.update(
                     """
@@ -48,9 +60,14 @@ final class MovieDetailFixture {
                     "movie" + user + "@example.com",
                     "m" + user);
         }
-        Long flavorId =
-                jdbc.queryForObject(
-                        "SELECT id FROM popcorn_flavors WHERE code = 'FLAVOR_A'", Long.class);
+        // Flyway seed(V202609161115)의 FLAVOR_A를 그대로 옮겨 온다. 남아 있는지는 묻지 않는다.
+        jdbc.update(
+                """
+                INSERT INTO popcorn_flavors (id, code, display_name, color, sort_order,
+                    cluster_id, representative_keywords)
+                VALUES (?, 'FLAVOR_A', '오리지널 솔트', '#FBF1CF', 1, 0, '[]'::jsonb)
+                """,
+                FLAVOR);
         jdbc.update(
                 """
                 INSERT INTO movies (id, tmdb_id, title, original_title, synopsis, release_date,
@@ -61,7 +78,7 @@ final class MovieDetailFixture {
                     ?, 4.35, 1280)
                 """,
                 MOVIE,
-                flavorId);
+                FLAVOR);
         jdbc.update(
                 """
                 INSERT INTO movies (id, tmdb_id, title) VALUES

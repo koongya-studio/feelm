@@ -22,8 +22,8 @@
  *   `PopcornBucket` 컴포넌트가 나왔다. 파티원 전원의 맛을 합쳐 한 통에 담는다.
  *   섞는다는 말이 그림으로 그대로 보인다
  * - **알 수를 정규화한다.** 네 명이면 300알이 넘어가 알이 서로를 덮어 실루엣이
- *   뭉개지고 `<image>` 요소도 그만큼 늘어난다. 비율을 유지하며 100알로 줄인다.
- *   3.2와 같은 밀도가 된다
+ *   뭉개지고 `<image>` 요소도 그만큼 늘어난다. 비율을 유지하며 줄인다. 업무 -577부터
+ *   그 요약은 `PopcornBucket`이 30알로 하므로 이 화면은 맛별 합계만 넘긴다
  * - **번호 카드 ①②③을 걷어냈다.** 번호는 와이어프레임 표기였고, 테두리 카드 세 개가
  *   쌓이면 화면이 목록이 된다. 홈·취향 필름·영화 상세와 같이 카드 없는 섹션으로 뒀다
  * - 통은 밝은 벽에 그대로 둔다. 시안 2.5장의 어두운 블록 규칙은 **팝콘 8색**(범례·막대)에
@@ -45,6 +45,7 @@ import StatusView from '../../../components/StatusView';
 import { getPartyMix, getPartyPopcorn } from '../../../api/parties';
 import { getPopcornFlavors } from '../../../api/taste';
 import styles from './PartyPopcornMixPage.module.css';
+import type { FlavorCount } from '../../../components/PopcornBucket/kernels';
 import type { PartyPopcorn } from '../../../types/party';
 import type { PopcornFlavor } from '../../../types/taste';
 import type { PartyMixView } from '../../../types/unspecified';
@@ -56,19 +57,13 @@ const LEAD_FLAVOR_COUNT = 2;
 const BUCKET_WIDTH = 196;
 
 /**
- * 통에 담는 알 수. 파티원 전원의 알을 그대로 쌓으면 네 명에 300알이 넘어가
- * 알이 서로를 덮어 실루엣이 뭉개진다. 비율을 유지하며 이 수로 줄인다.
- */
-const MIXED_KERNEL_COUNT = 100;
-
-/**
- * 파티원 전원의 맛을 합쳐 알 한 줄로 펼친다.
+ * 파티원 전원의 맛을 한 통에 합친다.
  *
- * 맛별 합계를 구하고 전체 대비 비율로 `MIXED_KERNEL_COUNT`개를 나눈다. 내림으로
- * 생긴 잔여는 비율이 큰 맛부터 한 알씩 채워 합계를 정확히 맞춘다. 그렇게 하지 않으면
- * 맛이 8종일 때 최대 7알이 비어 통이 덜 찬 것처럼 보인다.
+ * 맛별 합계만 내면 된다. **비율을 유지하며 알 수를 줄이는 일은 통이 한다**(업무 -577).
+ * 전에는 여기서 100알로 나누고 잔여를 채웠는데, `PopcornBucket`이 같은 요약을 다시
+ * 하게 되면서 두 번 나누는 셈이 됐다.
  */
-function mixedKernels(popcorn: PartyPopcorn): string[] {
+function mixedFlavors(popcorn: PartyPopcorn): FlavorCount[] {
   const totals = new Map<string, number>();
 
   for (const member of popcorn.members) {
@@ -77,30 +72,7 @@ function mixedKernels(popcorn: PartyPopcorn): string[] {
     }
   }
 
-  const sum = [...totals.values()].reduce((acc, count) => acc + count, 0);
-
-  if (sum === 0) {
-    return [];
-  }
-
-  const shares = [...totals.entries()].map(([code, count]) => {
-    const exact = (count / sum) * MIXED_KERNEL_COUNT;
-
-    return { code, whole: Math.floor(exact), remainder: exact - Math.floor(exact) };
-  });
-
-  let left = MIXED_KERNEL_COUNT - shares.reduce((acc, item) => acc + item.whole, 0);
-
-  for (const item of [...shares].sort((a, b) => b.remainder - a.remainder)) {
-    if (left <= 0) {
-      break;
-    }
-
-    item.whole += 1;
-    left -= 1;
-  }
-
-  return shares.flatMap((item) => Array.from({ length: item.whole }, () => item.code));
+  return [...totals.entries()].map(([code, count]) => ({ code, count }));
 }
 
 export default function PartyPopcornMixPage() {
@@ -242,7 +214,7 @@ export default function PartyPopcornMixPage() {
          */}
         <section className={styles.mixer}>
           <PopcornBucket
-            kernelFlavors={mixedKernels(popcorn)}
+            flavors={mixedFlavors(popcorn)}
             width={BUCKET_WIDTH}
             label={`파티원 ${popcorn.members.length}명의 팝콘을 섞은 통`}
           />

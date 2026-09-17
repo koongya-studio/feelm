@@ -11,16 +11,12 @@
  *   두 함수 본문만 `request`로 바꾸면 된다
  * - 한 줄 소개는 **계약에 아예 없다**(`types/unspecified.ts`). 세션 저장소에만 남는다
  */
-import {
-  findMockPublicProfile,
-  findMockTasteCompare,
-  mockMyPublicProfile,
-} from '../mocks/publicProfiles';
+import { findMockPublicProfile, mockMyPublicProfile } from '../mocks/publicProfiles';
 import { request } from './client';
 import { getMockProfile, isMockSession, saveMockProfile } from './mockAccount';
 import { isBlockedUser } from './settings';
 import { respond, respondError } from './mockTransport';
-import type { PublicProfileView, TasteCompareView } from '../types/unspecified';
+import type { PublicProfileView } from '../types/unspecified';
 import type {
   MyProfile,
   MyProfileUpdate,
@@ -158,35 +154,4 @@ export async function getPublicProfile(userId: number): Promise<PublicProfileVie
   }
 
   return respond(profile, 'users');
-}
-
-/**
- * API-063 취향 비교 · GET /api/v1/users/{publicId}/taste-comparison
- *
- * **2차 MVP라 아직 없다.** 7.2-C가 쓴다. `publicId` 문제는 위와 같다.
- * 자기 자신과의 비교는 `400 CANNOT_COMPARE_SELF`다.
- *
- * `[!]` **응답 모양이 계약과 다르다.** API-063은 `similarity`(0~1) · `sharedFlavors` ·
- * `flavorComparison`(맛별 내 것 / 상대 것) · `commonMovies`로 내려주는데, 화면은
- * 와이어프레임대로 장르 · 국가 · 시대 · 감독 4줄을 그린다. **계약에는 그 4줄에 해당하는
- * 값이 없다.** 계약이 열릴 때 화면을 맛 기준 비교로 바꿔야 한다(screen-spec-my.md).
- */
-export async function getTasteCompare(userId: number): Promise<TasteCompareView> {
-  const profile = await getMyProfile();
-
-  if (userId === profile.userId) {
-    return respondError(400, 'CANNOT_COMPARE_SELF', '자기 자신과는 비교할 수 없습니다.');
-  }
-
-  const compare = findMockTasteCompare(userId);
-
-  if (!compare) {
-    return respondError(404, 'RESOURCE_NOT_FOUND', '취향 비교 결과를 찾을 수 없습니다.');
-  }
-
-  // 내 닉네임은 실제 프로필에서 온다
-  return respond({
-    ...compare,
-    me: { userId: profile.userId, nickname: profile.nickname, avatarUrl: null },
-  });
 }

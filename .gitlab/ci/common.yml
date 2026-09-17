@@ -89,3 +89,15 @@ jira-mattermost-digest:
   timeout: 5m
   rules:
     - if: '$CI_PIPELINE_SOURCE == "schedule" && $CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $JIRA_MATTERMOST_DIGEST == "true"'
+
+develop-pipeline-failure-notification:
+  stage: notify
+  tags: [e106-shell]
+  script:
+    - python3 -I -B infra/scripts/notify-deployment.py pipeline-failure
+  interruptible: false
+  allow_failure: true
+  timeout: 5m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      when: always

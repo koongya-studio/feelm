@@ -1,26 +1,24 @@
 /*
- * 3.1 취향 필름. 구성은 확정 시안을 따른다
- * (`docs/screens/design-concept.md`).
+ * 3.1 취향 필름. 구성은 사용자 시안 2026-09-17(업무 -458)을 따른다.
  *
- * 카드로 감싸지 않는다. 콘텐츠가 배경 위에 직접 놓이고, 유일한 판은 필름 스트립과
- * 팝콘 범례 둘뿐이다. 필름은 밝은 판, 팝콘은 어두운 판이다.
+ * 카드로 감싸지 않는다. 필름만 면을 가지고, 팝콘 요약과 리포트는 선으로 나뉜 줄이다.
+ * 이전 구성의 통계 카드를 걷어낸 자리이며, 큰 여백을 줄여 콘텐츠와 행동을 붙였다.
+ */
+/*
+ * `flex: 1 0 auto`로 둔다. 화면보다 짧으면 늘어나 `.content`의 `margin-top: auto`가
+ * 행동을 아래로 붙이고, 길어지면 줄지 않아 넘친 높이가 그대로 스크롤 높이가 된다.
+ *
+ * **`flex: 1`(= `1 1 0`)로 두면 안 된다.** 페이지가 본문 높이에 고정돼 넘친 부분이
+ * 스크롤 높이에 잡히지 않고, 작은 기기에서 `필름 늘리기`가 하단 내비 밑으로 들어간다.
  */
 .page {
   display: flex;
-  min-height: 0;
-  flex: 1;
+  flex: 1 0 auto;
   flex-direction: column;
-  gap: var(--space-8);
-  padding: var(--space-3) 0 var(--space-4);
+  gap: var(--space-4);
+  padding: var(--space-2) 0 var(--space-4);
 }
 
-/*
- * 검색. 터치 대상은 44px을 확보하고 보이는 상자만 39px 유리 원으로 둔다.
- * 시안이 300px 폭에서 31px 원을 썼다(375px 환산 39px).
- *
- * `IconButton`의 `translucent` 변형과 같은 모양이지만, 검색은 버튼이 아니라 링크라
- * 그 컴포넌트를 쓰지 않고 여기서 그린다.
- */
 /* 검색과 알림이 나란히 선다. 둘 다 44px 터치 영역이라 사이를 좁게 둔다 */
 .headerActions {
   display: flex;
@@ -53,43 +51,13 @@
   position: relative;
 }
 
-/*
- * 스트립은 화면 폭을 채우고 본문만 좌우 여백을 가진다.
- *
- * `margin-top: auto`로 화면 아래에 붙인다. 필름은 위에 걸리고 이야기는 아래에
- * 쌓는다. 사이의 빈 범이 시안의 숛숨이다. 내용이 길어지면 auto가 사라져
- * 자연스럽게 이어진다.
- */
-.content {
+/* ─────────────────────────── 제목 */
+
+.head {
   display: flex;
   flex-direction: column;
-  margin-top: auto;
-  gap: var(--space-4);
+  gap: var(--space-1);
   padding: 0 var(--screen-padding-x);
-}
-
-/* 필름 판은 화면 가장자리에 붙지 않는다 */
-.stripArea {
-  padding: 0 var(--screen-padding-x);
-}
-
-.frameButton {
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-}
-
-/*
- * 아직 채우지 않은 칸. 점선으로 자리만 남긴다. 프레임과 같은 크기여야 줄이
- * 흔들리지 않는다.
- */
-.emptyFrame {
-  width: 73px;
-  height: 126px;
-  flex: none;
-  border: 1px dashed var(--color-ink-disabled);
-  border-radius: 4px;
 }
 
 /* 자간 넓은 소제목. 제목 위에 얹어 층을 만든다 */
@@ -100,72 +68,273 @@
   color: var(--color-ink-hint);
 }
 
-/* 이 화면이 말하는 한 문장. 두 줄로 끊어 크게 앉힌다 */
-.headline {
-  margin-top: calc(var(--space-2) * -1);
+.title {
   font-size: var(--font-size-title);
   line-height: var(--line-height-title);
   letter-spacing: var(--letter-spacing-title);
   font-weight: var(--font-weight-bold);
 }
 
+.subtitle {
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  color: var(--color-ink-muted);
+}
+
+/* ─────────────────────────── 필름 */
+
 /*
- * 팝콘 범례. 필름 판과 같은 밝은 반투명 재질이다.
- *
- * 검정은 한 화면에 하나만 둔다(`docs/screens/design-concept.md` 2.4). 이 화면에서
- * 그 하나는 `취향 리포트 보기` CTA다. 범례까지 검정으로 두면 무게가 둘로 나뉘고
- * 어느 쪽도 주 동작으로 읽히지 않는다.
- *
- * 팝콘 8색은 밝은 면에서 전원 1.09~2.17:1로 면만으로는 안 보인다. 그래서 알에
- * 테두리를 둔다(`.kernel` 참고). 3.2 팝콘 화면의 3D 알은 여전히 어두운 면 위에
- * 놀린다(`docs/screens/design-concept.md` 2.5).
+ * 릴은 화면 폭을 가득 쓴다. 좌우로 이어지는 물건이라 여백 안에 가두면 짧은 판이 된다.
  */
-.bucket {
+.reelArea {
   display: flex;
   flex-direction: column;
+  gap: var(--space-2);
+}
+
+.reelHint {
+  padding: 0 var(--screen-padding-x);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
+  text-align: center;
+}
+
+/* 프레임 버튼. 크기와 테두리는 릴이 입힌다 */
+.frameButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+/*
+ * 아직 채우지 않은 칸. 필름 안이라 밝은 점선으로 둔다 — 밝은 벽에서 쓰던 잉크색
+ * 점선은 검정 띠 위에서 보이지 않는다.
+ */
+.emptySlot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border-style: dashed !important;
+  border-color: var(--color-film-slot-line) !important;
+  background: var(--color-film-slot);
+}
+
+/* 십자 표시. 아이콘을 하나 더 들이지 않고 선 두 개로 그린다 */
+.emptySlotMark {
+  position: relative;
+  width: 18px;
+  height: 18px;
+}
+
+.emptySlotMark::before,
+.emptySlotMark::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  background: var(--color-film-slot-line);
+  content: '';
+  translate: -50% -50%;
+}
+
+.emptySlotMark::before {
+  width: 18px;
+  height: 1.5px;
+}
+
+.emptySlotMark::after {
+  width: 1.5px;
+  height: 18px;
+}
+
+.emptySlotLabel {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-on-dark-muted);
+}
+
+/* ─────────────────────────── 빈 상태 */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--screen-padding-x) 0;
+  text-align: center;
+}
+
+.emptyTitle {
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  font-weight: var(--font-weight-bold);
+}
+
+.emptyText {
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+/* 안내와 버튼 사이만 벌린다. 버튼은 이 화면 폭을 채운다 */
+.empty > button {
+  margin-top: var(--space-4);
+}
+
+/* ─────────────────────────── 팝콘 요약 · 리포트 · 주 동작 */
+
+.content {
+  display: flex;
+  flex-direction: column;
+  margin-top: auto;
   gap: var(--space-3);
-  padding: var(--space-4);
-  border: 0.5px solid var(--color-line-strong);
-  border-radius: var(--radius-card);
-  background: var(--color-surface-raised);
+  padding: 0 var(--screen-padding-x);
+}
+
+/*
+ * 두 메뉴 줄의 공통 머리. 왼쪽이 이름, 오른쪽이 값과 화살표다.
+ */
+.rowHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.rowTitle {
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  font-weight: var(--font-weight-bold);
   color: var(--color-ink);
+}
+
+.rowValue {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+/* 아직 받지 않은 리포트가 있을 때만. 빨강은 표식이라 글자에만 쓴다 */
+.rowValue[data-tone='new'] {
+  color: var(--color-brand-ink);
+  font-weight: var(--font-weight-bold);
+}
+
+.rowValue svg {
+  width: 14px;
+  height: 14px;
+}
+
+/*
+ * 팝콘 요약. 카드가 아니라 선으로 나뉜 줄이다.
+ */
+.popcorn,
+.report {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border: 0;
+  border-top: 1px solid var(--color-line);
+  background: none;
   cursor: pointer;
   text-align: left;
 }
 
-.bucketLabel {
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-  letter-spacing: var(--letter-spacing-wide);
-  color: var(--color-ink-hint);
-}
-
-.legend {
+/*
+ * 맛 넷을 한 줄에 세운다.
+ *
+ * **세로로 쌓는다.** 알 · 이름 · 개수를 가로로 이으면 375px에서 네 칸이 다 들어가지
+ * 않아 이름이 `오리...`로 잘린다. 잘린 맛 이름은 색 점보다 못하다.
+ */
+.kernels {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
-}
-
-/* 색 · 이름 · 개수 세 가지로 말한다. 색만으로 구분하게 두지 않는다 */
-.legendItem {
-  display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-2);
-  font-size: var(--font-size-meta);
-  line-height: var(--line-height-meta);
-  color: var(--color-ink-body);
+}
+
+.kernel {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
 }
 
 /*
- * 팝콘 알. 파스텔 8색은 밝은 판 위에서 1.09~2.17:1로 면이 배경에 묻힌다.
- * 테두리를 둘러 알의 윤곽을 살린다. `--color-ink-body`는 판 대비 10.48:1,
- * 8색 중 가장 가까운 카라멜 대비 4.84:1로 둘 다 3:1을 넘는다.
+ * 3D 팝콘 그림. 색 면이 아니라 그림이라 밝은 벽 위에서도 8종이 구분된다
+ * (`design-concept.md` 2.5).
  */
-.kernel {
-  width: 11px;
-  height: 11px;
+.kernelSprite {
+  width: 26px;
+  height: 26px;
   flex: none;
-  border: 1px solid var(--color-ink-body);
-  border-radius: var(--radius-pill);
-  box-sizing: border-box;
+  object-fit: contain;
+}
+
+/*
+ * 맛 이름. **두 줄까지 접어 쓴다.**
+ *
+ * 한 줄로 묶으면 375px에서 칸 하나가 58px밖에 안 돼 `오리지널 솔트`가 잘린다.
+ * 이름이 잘리면 맛을 색으로만 구분하게 되는데, 팝콘 8색은 그럴 수 있는 색이 아니다
+ * (`design-concept.md` 2.5).
+ *
+ * **높이는 두 줄로 고정한다.** 이름 길이에 따라 한 줄과 두 줄이 섞이면 아래의 알 수가
+ * 칸마다 다른 높이에 앉아 줄이 어긋난다.
+ */
+.kernelName {
+  display: -webkit-box;
+  max-width: 100%;
+  min-height: calc(var(--font-size-caption) * var(--line-height-caption) * 2);
+  overflow: hidden;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-body);
+  word-break: keep-all;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.kernelCount {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+/* 보여주지 않은 나머지. 맛 칸과 같은 줄에 선다 — 한 줄을 더 쓰면 화면이 넘친다 */
+.kernelRest {
+  flex: none;
+  align-self: center;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
+}
+
+.reportText {
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+.action {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.actionHint {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
+  text-align: center;
 }

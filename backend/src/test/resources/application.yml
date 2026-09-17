@@ -17,6 +17,10 @@ spring:
     open-in-view: false
 
 feelm:
+  party:
+    refresh:
+      consumer-enabled: false
+      worker-enabled: false
   jwt:
     # 테스트 전용 값이며 실제 환경의 Secret과 무관하다.
     secret: feelm-test-signing-key-for-hs256-at-least-32-bytes

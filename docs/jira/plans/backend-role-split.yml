@@ -275,12 +275,12 @@ tasks:
 - id: be-recommendation-dismiss
   sprint: backlog
   summary: '[추천] 관심없음 처리 구현'
-  description: API-047(관심없음)을 합의안(대안 A)대로 구현한다. 버퍼 내 교체, 소진 시 replacement null 응답, 다음 버퍼 제외, 강한 신호 이벤트
-    발행을 포함한다.
+  description: API-047(관심없음)은 제외 상태와 추천 출처를 저장하고, API-046이 원본 추천 유형을 판별해 현재 세트의 빈 자리 1편을 보충한다. DISCOVERY 후보가 없으면 TASTE로 보충하고,
+    전체 세트는 유지한다. 다음 버퍼에서도 관심없음 영화를 제외하며 강한 신호 이벤트를 발행한다.
   epic: be-epic-recsys
   story_points: 5
   done_when:
-  - 관심없음 표시 시 버퍼에서 다음 후보로 교체되고 소진 시 replacement null로 응답한다.
+  - 관심없음 저장 후 API-046이 빈 자리 1편을 보충하고 후보가 없으면 replacement null로 응답한다.
   - 관심없음 영화가 다음 추천 버퍼에서 제외된다.
   - 강한 신호 이벤트가 계약대로 발행된다.
   jira_key: S15P21E106-165

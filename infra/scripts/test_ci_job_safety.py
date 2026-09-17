@@ -103,19 +103,35 @@ class SafetyTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'Wrong owner'):
                     safety.validate_attempt(attempt)
 
-    def test_legacy_fixed_source_lease_remains_readable(self):
+    def test_previous_fixed_source_leases_remain_readable(self):
+        token = '0123456789ab'
+        for disk_bytes in (safety.LEGACY_DISK_BYTES, safety.PREVIOUS_DISK_BYTES):
+            with self.subTest(disk_bytes=disk_bytes), tempfile.TemporaryDirectory() as directory:
+                lease = {'id': token, 'owner': 'ci222-owner-' + token + '.service',
+                         'build': 'ci222-server-' + token + '.service',
+                         'execution': 'ci222-server-' + safety.hashlib.sha256(token.encode()).hexdigest()[:12] + '.service',
+                         'bytes': disk_bytes, 'mode': 'backend', 'prepared': '/prepared'}
+                attempt = Path(directory); (attempt / 'lease.json').write_text(json.dumps(lease))
+                info = type('Info', (), {'st_uid': 0, 'st_mode': 0o100600, 'st_size': 256})()
+                with patch.object(safety.pilot, 'check_base'), patch.object(Path, 'stat', return_value=info), \
+                     patch.object(Path, 'lstat', return_value=info), patch.object(Path, 'is_symlink', return_value=False), \
+                     patch.object(safety.re, 'fullmatch', side_effect=lambda pattern, text: True):
+                    self.assertIsNone(safety.validate_attempt(attempt)['source_sha'])
+
+    def test_unknown_disk_policy_is_rejected(self):
         token = '0123456789ab'
         lease = {'id': token, 'owner': 'ci222-owner-' + token + '.service',
                  'build': 'ci222-server-' + token + '.service',
                  'execution': 'ci222-server-' + safety.hashlib.sha256(token.encode()).hexdigest()[:12] + '.service',
-                 'bytes': safety.DISK_BYTES, 'mode': 'backend', 'prepared': '/prepared'}
+                 'bytes': 12 * 1024**3, 'mode': 'backend', 'prepared': '/prepared'}
         with tempfile.TemporaryDirectory() as directory:
             attempt = Path(directory); (attempt / 'lease.json').write_text(json.dumps(lease))
             info = type('Info', (), {'st_uid': 0, 'st_mode': 0o100600, 'st_size': 256})()
             with patch.object(safety.pilot, 'check_base'), patch.object(Path, 'stat', return_value=info), \
                  patch.object(Path, 'lstat', return_value=info), patch.object(Path, 'is_symlink', return_value=False), \
                  patch.object(safety.re, 'fullmatch', side_effect=lambda pattern, text: True):
-                self.assertIsNone(safety.validate_attempt(attempt)['source_sha'])
+                with self.assertRaisesRegex(ValueError, 'Invalid fixed policy'):
+                    safety.validate_attempt(attempt)
 
     def test_owner_uses_pid1_cleanup_and_hard_timeout(self):
         args = safety.owner_command(Path('/stage'), Path('/attempt'), {'owner': 'ci222-owner-0123456789ab.service'})
@@ -162,6 +178,98 @@ class SafetyTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'timing evidence missing'):
                 safety.publish_backend_timing(attempt, 'backend', required=True)
 
+    def test_backend_diagnostic_classifies_success_and_test_failure(self):
+        success = safety.validated_backend_diagnostic(
+            {'outcome': 'success', 'process_exit': 0}, True,
+            {'summary': {'tests': 12, 'failures': 0, 'errors': 0, 'skipped': 0},
+             'missing_classes': []})
+        self.assertEqual(success['failure_category'], 'success')
+        self.assertEqual(success['junit_summary']['tests'], 12)
+
+        failed = safety.validated_backend_diagnostic(
+            {'outcome': 'test_failure', 'process_exit': 1}, True,
+            {'summary': {'tests': 12, 'failures': 1, 'errors': 0, 'skipped': 0},
+             'missing_classes': []})
+        self.assertEqual(failed['failure_category'], 'test_failed')
+
+    def test_backend_diagnostic_classifies_filesystem_exhaustion(self):
+        filesystem = {
+            'schema_version': 2,
+            'peak': {
+                'bytes': {'total': 100, 'used': 100, 'free': 0, 'available': 0},
+                'inodes': {'total': 50, 'used': 49, 'free': 1, 'available': 1},
+            },
+        }
+        result = safety.validated_backend_diagnostic(
+            {'outcome': 'test_failure', 'process_exit': 1}, True, filesystem=filesystem)
+        self.assertEqual(result['failure_category'], 'filesystem_exhausted')
+        self.assertEqual(result['filesystem_min_available'], {'bytes': 0, 'inodes': 1})
+
+    def test_backend_diagnostic_classifies_report_and_cleanup_failures(self):
+        report = safety.validated_backend_diagnostic(
+            {'outcome': 'report_failure', 'process_exit': 0}, True,
+            rejection={'type': 'ValueError', 'errno': None})
+        self.assertEqual(report['failure_category'], 'report_validation_failed')
+        self.assertEqual(report['report_rejection'], {'type': 'ValueError', 'errno': None})
+
+        cleanup = safety.validated_backend_diagnostic(
+            {'outcome': 'cleanup_failure', 'process_exit': 0}, False)
+        self.assertEqual(cleanup['failure_category'], 'cleanup_failed')
+        self.assertFalse(cleanup['cleanup_confirmed'])
+
+        full_filesystem = {
+            'schema_version': 2,
+            'peak': {
+                'bytes': {'total': 100, 'used': 100, 'free': 0, 'available': 0},
+                'inodes': {'total': 50, 'used': 50, 'free': 0, 'available': 0},
+            },
+        }
+        cleanup = safety.validated_backend_diagnostic(
+            {'outcome': 'cleanup_failure', 'process_exit': 0}, False,
+            filesystem=full_filesystem)
+        self.assertEqual(cleanup['failure_category'], 'cleanup_failed')
+
+    def test_backend_diagnostic_rejects_arbitrary_strings(self):
+        with self.assertRaises(ValueError):
+            safety.validated_backend_diagnostic(
+                {'outcome': 'unsafe\nlog', 'process_exit': 1}, True)
+        with self.assertRaises(ValueError):
+            safety.validated_backend_diagnostic(
+                {'outcome': 'report_failure', 'process_exit': 1}, True,
+                rejection={'type': 'ValueError\nsecret', 'errno': None})
+
+    def test_backend_diagnostic_publishes_only_bounded_fields(self):
+        with tempfile.TemporaryDirectory() as directory:
+            attempt = Path(directory)
+            (attempt / 'lifecycle.json').write_text(json.dumps({
+                'outcome': 'test_failure', 'process_exit': 1,
+            }))
+            evidence = attempt / 'evidence'; evidence.mkdir()
+            (evidence / 'manifest.json').write_text(json.dumps({
+                'summary': {'tests': 5, 'failures': 1, 'errors': 0, 'skipped': 0},
+                'missing_classes': [],
+            }))
+            output = io.StringIO()
+            trusted = type('Info', (), {'st_uid': 0, 'st_mode': 0o100600,
+                                         'st_nlink': 1, 'st_size': 256})()
+            with patch.object(Path, 'lstat', return_value=trusted), redirect_stdout(output):
+                safety.publish_backend_diagnostic(attempt, 'backend', True)
+            line = output.getvalue().strip()
+            self.assertTrue(line.startswith('BACKEND_TEST_RESULT='))
+            result = json.loads(line.removeprefix('BACKEND_TEST_RESULT='))
+            self.assertEqual(result['failure_category'], 'test_failed')
+            self.assertNotIn('stdout', result)
+            self.assertNotIn('stderr', result)
+
+    def test_backend_diagnostic_reports_cleanup_without_lifecycle_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = io.StringIO()
+            with redirect_stdout(output):
+                safety.publish_backend_diagnostic(Path(directory), 'backend', False)
+            result = json.loads(output.getvalue().strip().removeprefix('BACKEND_TEST_RESULT='))
+            self.assertEqual(result['failure_category'], 'cleanup_failed')
+            self.assertFalse(result['cleanup_confirmed'])
+
     def test_child_is_bound_to_owner_without_host_settings(self):
         args = safety.pilot.service_command('ci222-server-0123456789ab.service', Path('/stage'),
                   'internal-launch', Path('/attempt'), 'probe', Path('/prepared'), 'ci222-owner-0123456789ab.service')
@@ -179,6 +287,28 @@ class SafetyTests(unittest.TestCase):
             with self.assertRaises(RuntimeError): safety.cleanup(Path('/attempt'))
             self.assertEqual(stop.call_count, 2); write.assert_not_called()
 
+    def test_cleanup_accepts_legacy_backing_image_size(self):
+        lease = {'id': '0123456789ab', 'build': 'build', 'execution': 'execution',
+                 'bytes': safety.LEGACY_DISK_BYTES}
+        info = type('Info', (), {'st_uid': 0, 'st_mode': 0o100600,
+                                  'st_nlink': 1, 'st_size': safety.LEGACY_DISK_BYTES})()
+        with tempfile.TemporaryDirectory() as directory:
+            attempt = Path(directory); (attempt / 'disk.img').write_bytes(b'fixture')
+            with patch.object(safety, 'validate_attempt', return_value=lease), \
+                 patch.object(safety.pilot, 'stop_unit'), \
+                 patch.object(safety, 'loop_devices', return_value=[]), \
+                 patch.object(Path, 'is_symlink', return_value=False), \
+                 patch.object(Path, 'lstat', return_value=info), \
+                 patch.object(os.path, 'ismount', return_value=False), \
+                 patch.object(safety.os, 'O_DIRECTORY', 0, create=True), \
+                 patch.object(safety.os, 'open', return_value=10), \
+                 patch.object(safety.os, 'fsync'), patch.object(safety.os, 'close'), \
+                 patch.object(safety, 'atomic_json') as write:
+                safety.cleanup(attempt)
+            self.assertFalse((attempt / 'disk.img').exists())
+            write.assert_called_once_with(attempt / 'cleanup.json',
+                                          {'id': lease['id'], 'clean': True})
+
     def test_probe_cleanup_and_collection_are_separate(self):
         with tempfile.TemporaryDirectory() as directory:
             attempt = Path(directory)
@@ -190,10 +320,18 @@ class SafetyTests(unittest.TestCase):
                 self.assertTrue(driver.collect(0, 60)['passed'])
                 self.assertFalse(driver.collect(1, 60)['passed'])
 
-    def test_disk_and_logs_have_independent_limits(self):
-        self.assertEqual(safety.DISK_BYTES, 8 * 1024**3)
+    def test_disk_inode_and_log_limits_are_independent(self):
+        self.assertEqual(safety.LEGACY_DISK_BYTES, 8 * 1024**3)
+        self.assertEqual(safety.PREVIOUS_DISK_BYTES, 16 * 1024**3)
+        self.assertEqual(safety.DISK_BYTES, 24 * 1024**3)
+        self.assertEqual(safety.ALLOWED_DISK_BYTES,
+                         frozenset({safety.LEGACY_DISK_BYTES,
+                                    safety.PREVIOUS_DISK_BYTES,
+                                    safety.DISK_BYTES}))
+        self.assertEqual(safety.FILESYSTEM_INODES, 524288)
         self.assertEqual(bounded.LIMIT, 16 * 1024**2)
         source = (HERE / 'ci-job-safety.py').read_text()
+        self.assertIn("'0', '-N', str(FILESYSTEM_INODES)", source)
         self.assertIn('os.O_CREAT | os.O_EXCL', source)
         self.assertIn("['umount', str(root)]", source)
         self.assertNotIn("'--detach-all'", source)
