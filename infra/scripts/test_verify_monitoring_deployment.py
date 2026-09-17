@@ -43,6 +43,8 @@ def opener_with(series=None, grafana_database="ok"):
             return FakeResponse(b"Prometheus Server is Ready.")
         if parsed.path == "/api/health":
             return FakeResponse({"database": grafana_database})
+        if parsed.path == "/healthz":
+            return FakeResponse({"status": 200})
         if parsed.path == "/api/v1/query":
             query = parse_qs(parsed.query)["query"][0]
             assert query == 'up{job=~"backend|node|kafka|postgres|redis"}'
@@ -90,7 +92,7 @@ class MonitoringDeploymentVerificationTest(unittest.TestCase):
     def test_retry_recovers_after_transient_failures(self):
         calls = []
 
-        def verifier(_prometheus, _grafana):
+        def verifier(_prometheus, _grafana, _relay):
             calls.append(1)
             if len(calls) < 3:
                 raise MODULE.VerificationError("not ready")
@@ -102,6 +104,7 @@ class MonitoringDeploymentVerificationTest(unittest.TestCase):
             0.25,
             "http://127.0.0.1:9090",
             "http://127.0.0.1:3000",
+            "http://127.0.0.1:9087",
             verifier,
             sleeps.append,
         )

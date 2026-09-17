@@ -1,0 +1,508 @@
+{
+  "apiVersion": 1,
+  "contactPoints": [
+    {
+      "orgId": 1,
+      "name": "FEELM Mattermost",
+      "receivers": [
+        {
+          "uid": "feelm_mattermost",
+          "type": "webhook",
+          "disableResolveMessage": false,
+          "settings": {
+            "url": "http://mattermost-alert-relay:8080/alerts",
+            "httpMethod": "POST",
+            "title": "{{ template \"feelm.mattermost.title\" . }}",
+            "message": "{{ template \"feelm.mattermost.text\" . }}",
+            "hmacConfig": {
+              "secret": "$GRAFANA_ALERT_HMAC_SECRET",
+              "header": "X-Grafana-Alerting-Signature",
+              "timestampHeader": "X-Grafana-Alerting-Timestamp"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "templates": [
+    {
+      "orgId": 1,
+      "name": "feelm.mattermost",
+      "template": "{{ define \"feelm.mattermost.title\" }}{{ if eq .Status \"firing\" }}🚨 [ALERT] 서버 장애 감지{{ else }}✅ [RECOVERY] 서버 장애 복구{{ end }}{{ end }}\n{{ define \"feelm.mattermost.text\" }}{{ range .Alerts }}\n> {{ if eq .Status \"firing\" }}❌ 발생{{ else }}✅ 복구{{ end }} · {{ .Annotations.summary }}\n\n{{ .Annotations.description }}\n- 심각도: `{{ .Labels.severity }}`\n- 영역: `{{ .Labels.component }}`\n- [Grafana에서 확인]({{ .GeneratorURL }})\n{{ end }}{{ end }}"
+    }
+  ],
+  "groups": [
+    {
+      "orgId": 1,
+      "name": "FEELM service availability",
+      "folder": "FEELM Alerts",
+      "interval": "1m",
+      "rules": [
+        {
+          "uid": "feelm_backend_target_down",
+          "title": "Backend target down",
+          "condition": "B",
+          "data": [
+            {
+              "refId": "A",
+              "queryType": "",
+              "relativeTimeRange": { "from": 600, "to": 0 },
+              "datasourceUid": "prometheus",
+              "model": {
+                "editorMode": "code",
+                "expr": "up{job=\"backend\"}",
+                "instant": true,
+                "interval": "",
+                "intervalMs": 1000,
+                "legendFormat": "{{instance}}",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "A"
+              }
+            },
+            {
+              "refId": "B",
+              "queryType": "",
+              "relativeTimeRange": { "from": 0, "to": 0 },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": { "params": [1], "type": "lt" },
+                    "operator": { "type": "and" },
+                    "query": { "params": ["A"] },
+                    "reducer": { "params": [], "type": "last" },
+                    "type": "query"
+                  }
+                ],
+                "datasource": { "type": "__expr__", "uid": "__expr__" },
+                "expression": "A",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "B",
+                "type": "threshold"
+              }
+            }
+          ],
+          "noDataState": "Alerting",
+          "execErrState": "Alerting",
+          "for": "2m",
+          "keepFiringFor": "2m",
+          "annotations": {
+            "summary": "Backend Prometheus target이 2분 이상 DOWN입니다.",
+            "description": "백엔드 컨테이너와 /actuator/prometheus 상태를 확인하세요."
+          },
+          "labels": { "component": "backend", "severity": "critical" },
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "FEELM Mattermost",
+            "group_by": ["alertname", "grafana_folder", "component"],
+            "group_wait": "30s",
+            "group_interval": "5m",
+            "repeat_interval": "4h"
+          }
+        },
+        {
+          "uid": "feelm_exporter_target_down",
+          "title": "Exporter target down",
+          "condition": "B",
+          "data": [
+            {
+              "refId": "A",
+              "queryType": "",
+              "relativeTimeRange": { "from": 600, "to": 0 },
+              "datasourceUid": "prometheus",
+              "model": {
+                "editorMode": "code",
+                "expr": "up{job=~\"node|kafka|postgres|redis\"}",
+                "instant": true,
+                "interval": "",
+                "intervalMs": 1000,
+                "legendFormat": "{{job}} {{instance}}",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "A"
+              }
+            },
+            {
+              "refId": "B",
+              "queryType": "",
+              "relativeTimeRange": { "from": 0, "to": 0 },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": { "params": [1], "type": "lt" },
+                    "operator": { "type": "and" },
+                    "query": { "params": ["A"] },
+                    "reducer": { "params": [], "type": "last" },
+                    "type": "query"
+                  }
+                ],
+                "datasource": { "type": "__expr__", "uid": "__expr__" },
+                "expression": "A",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "B",
+                "type": "threshold"
+              }
+            }
+          ],
+          "noDataState": "Alerting",
+          "execErrState": "Alerting",
+          "for": "5m",
+          "keepFiringFor": "2m",
+          "annotations": {
+            "summary": "Exporter target이 5분 이상 DOWN입니다.",
+            "description": "알림의 job과 instance를 기준으로 exporter, 사설망, 방화벽을 순서대로 확인하세요."
+          },
+          "labels": { "component": "monitoring", "severity": "critical" },
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "FEELM Mattermost",
+            "group_by": ["alertname", "grafana_folder", "component"],
+            "group_wait": "30s",
+            "group_interval": "5m",
+            "repeat_interval": "4h"
+          }
+        }
+      ]
+    },
+    {
+      "orgId": 1,
+      "name": "FEELM backend health",
+      "folder": "FEELM Alerts",
+      "interval": "1m",
+      "rules": [
+        {
+          "uid": "feelm_backend_5xx_rate",
+          "title": "Backend 5xx rate high",
+          "condition": "B",
+          "data": [
+            {
+              "refId": "A",
+              "queryType": "",
+              "relativeTimeRange": { "from": 600, "to": 0 },
+              "datasourceUid": "prometheus",
+              "model": {
+                "editorMode": "code",
+                "expr": "(100 * sum(rate(http_server_requests_seconds_count{job=\"backend\",status=~\"5..\"}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{job=\"backend\"}[5m])), 0.001)) or vector(0)",
+                "instant": true,
+                "interval": "",
+                "intervalMs": 1000,
+                "legendFormat": "5xx rate",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "A"
+              }
+            },
+            {
+              "refId": "B",
+              "queryType": "",
+              "relativeTimeRange": { "from": 0, "to": 0 },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": { "params": [5], "type": "gt" },
+                    "operator": { "type": "and" },
+                    "query": { "params": ["A"] },
+                    "reducer": { "params": [], "type": "last" },
+                    "type": "query"
+                  }
+                ],
+                "datasource": { "type": "__expr__", "uid": "__expr__" },
+                "expression": "A",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "B",
+                "type": "threshold"
+              }
+            }
+          ],
+          "noDataState": "OK",
+          "execErrState": "Error",
+          "for": "5m",
+          "keepFiringFor": "2m",
+          "annotations": {
+            "summary": "Backend 5xx 비율이 5분 이상 5%를 초과했습니다.",
+            "description": "최근 배포와 백엔드 오류 로그를 확인하고 요청량이 너무 적은 구간인지 함께 확인하세요."
+          },
+          "labels": { "component": "backend", "severity": "warning" },
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "FEELM Mattermost",
+            "group_by": ["alertname", "grafana_folder", "component"],
+            "group_wait": "30s",
+            "group_interval": "5m",
+            "repeat_interval": "4h"
+          }
+        },
+        {
+          "uid": "feelm_backend_p95_latency",
+          "title": "Backend P95 latency high",
+          "condition": "B",
+          "data": [
+            {
+              "refId": "A",
+              "queryType": "",
+              "relativeTimeRange": { "from": 900, "to": 0 },
+              "datasourceUid": "prometheus",
+              "model": {
+                "editorMode": "code",
+                "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job=\"backend\"}[5m]))) or vector(0)",
+                "instant": true,
+                "interval": "",
+                "intervalMs": 1000,
+                "legendFormat": "P95",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "A"
+              }
+            },
+            {
+              "refId": "B",
+              "queryType": "",
+              "relativeTimeRange": { "from": 0, "to": 0 },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": { "params": [1.5], "type": "gt" },
+                    "operator": { "type": "and" },
+                    "query": { "params": ["A"] },
+                    "reducer": { "params": [], "type": "last" },
+                    "type": "query"
+                  }
+                ],
+                "datasource": { "type": "__expr__", "uid": "__expr__" },
+                "expression": "A",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "B",
+                "type": "threshold"
+              }
+            }
+          ],
+          "noDataState": "OK",
+          "execErrState": "Error",
+          "for": "10m",
+          "keepFiringFor": "2m",
+          "annotations": {
+            "summary": "Backend P95 지연이 10분 이상 1.5초를 초과했습니다.",
+            "description": "느린 API, DB 연결과 호스트 자원 사용량을 함께 확인하세요."
+          },
+          "labels": { "component": "backend", "severity": "warning" },
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "FEELM Mattermost",
+            "group_by": ["alertname", "grafana_folder", "component"],
+            "group_wait": "30s",
+            "group_interval": "5m",
+            "repeat_interval": "4h"
+          }
+        }
+      ]
+    },
+    {
+      "orgId": 1,
+      "name": "FEELM host resources",
+      "folder": "FEELM Alerts",
+      "interval": "1m",
+      "rules": [
+        {
+          "uid": "feelm_host_cpu_high",
+          "title": "Host CPU high",
+          "condition": "B",
+          "data": [
+            {
+              "refId": "A",
+              "queryType": "",
+              "relativeTimeRange": { "from": 900, "to": 0 },
+              "datasourceUid": "prometheus",
+              "model": {
+                "editorMode": "code",
+                "expr": "100 - (avg by (node_name) (rate(node_cpu_seconds_total{job=\"node\",mode=\"idle\"}[5m])) * 100)",
+                "instant": true,
+                "interval": "",
+                "intervalMs": 1000,
+                "legendFormat": "{{node_name}}",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "A"
+              }
+            },
+            {
+              "refId": "B",
+              "queryType": "",
+              "relativeTimeRange": { "from": 0, "to": 0 },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": { "params": [90], "type": "gt" },
+                    "operator": { "type": "and" },
+                    "query": { "params": ["A"] },
+                    "reducer": { "params": [], "type": "last" },
+                    "type": "query"
+                  }
+                ],
+                "datasource": { "type": "__expr__", "uid": "__expr__" },
+                "expression": "A",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "B",
+                "type": "threshold"
+              }
+            }
+          ],
+          "noDataState": "OK",
+          "execErrState": "Error",
+          "for": "10m",
+          "keepFiringFor": "2m",
+          "annotations": {
+            "summary": "호스트 CPU 사용률이 10분 이상 90%를 초과했습니다.",
+            "description": "node_name으로 서버를 식별하고 상위 프로세스와 배치 작업을 확인하세요."
+          },
+          "labels": { "component": "host", "severity": "warning" },
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "FEELM Mattermost",
+            "group_by": ["alertname", "grafana_folder", "component"],
+            "group_wait": "30s",
+            "group_interval": "5m",
+            "repeat_interval": "4h"
+          }
+        },
+        {
+          "uid": "feelm_host_memory_high",
+          "title": "Host memory high",
+          "condition": "B",
+          "data": [
+            {
+              "refId": "A",
+              "queryType": "",
+              "relativeTimeRange": { "from": 900, "to": 0 },
+              "datasourceUid": "prometheus",
+              "model": {
+                "editorMode": "code",
+                "expr": "100 * (1 - max by (node_name) (node_memory_MemAvailable_bytes{job=\"node\"}) / max by (node_name) (node_memory_MemTotal_bytes{job=\"node\"}))",
+                "instant": true,
+                "interval": "",
+                "intervalMs": 1000,
+                "legendFormat": "{{node_name}}",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "A"
+              }
+            },
+            {
+              "refId": "B",
+              "queryType": "",
+              "relativeTimeRange": { "from": 0, "to": 0 },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": { "params": [90], "type": "gt" },
+                    "operator": { "type": "and" },
+                    "query": { "params": ["A"] },
+                    "reducer": { "params": [], "type": "last" },
+                    "type": "query"
+                  }
+                ],
+                "datasource": { "type": "__expr__", "uid": "__expr__" },
+                "expression": "A",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "B",
+                "type": "threshold"
+              }
+            }
+          ],
+          "noDataState": "OK",
+          "execErrState": "Error",
+          "for": "10m",
+          "keepFiringFor": "2m",
+          "annotations": {
+            "summary": "호스트 메모리 사용률이 10분 이상 90%를 초과했습니다.",
+            "description": "node_name으로 서버를 식별하고 OOM, swap과 상위 프로세스를 확인하세요."
+          },
+          "labels": { "component": "host", "severity": "warning" },
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "FEELM Mattermost",
+            "group_by": ["alertname", "grafana_folder", "component"],
+            "group_wait": "30s",
+            "group_interval": "5m",
+            "repeat_interval": "4h"
+          }
+        },
+        {
+          "uid": "feelm_host_filesystem_low",
+          "title": "Host filesystem space low",
+          "condition": "B",
+          "data": [
+            {
+              "refId": "A",
+              "queryType": "",
+              "relativeTimeRange": { "from": 900, "to": 0 },
+              "datasourceUid": "prometheus",
+              "model": {
+                "editorMode": "code",
+                "expr": "100 * max by (node_name, mountpoint) (node_filesystem_avail_bytes{job=\"node\",fstype!~\"tmpfs|overlay|squashfs\"}) / max by (node_name, mountpoint) (node_filesystem_size_bytes{job=\"node\",fstype!~\"tmpfs|overlay|squashfs\"})",
+                "instant": true,
+                "interval": "",
+                "intervalMs": 1000,
+                "legendFormat": "{{node_name}} {{mountpoint}}",
+                "maxDataPoints": 43200,
+                "range": false,
+                "refId": "A"
+              }
+            },
+            {
+              "refId": "B",
+              "queryType": "",
+              "relativeTimeRange": { "from": 0, "to": 0 },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": { "params": [15], "type": "lt" },
+                    "operator": { "type": "and" },
+                    "query": { "params": ["A"] },
+                    "reducer": { "params": [], "type": "last" },
+                    "type": "query"
+                  }
+                ],
+                "datasource": { "type": "__expr__", "uid": "__expr__" },
+                "expression": "A",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "B",
+                "type": "threshold"
+              }
+            }
+          ],
+          "noDataState": "OK",
+          "execErrState": "Error",
+          "for": "10m",
+          "keepFiringFor": "2m",
+          "annotations": {
+            "summary": "호스트 filesystem 여유 공간이 10분 이상 15% 미만입니다.",
+            "description": "node_name과 mountpoint를 확인하고 로그, 이미지, 캐시 정리 순서를 검토하세요."
+          },
+          "labels": { "component": "host", "severity": "critical" },
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "FEELM Mattermost",
+            "group_by": ["alertname", "grafana_folder", "component"],
+            "group_wait": "30s",
+            "group_interval": "5m",
+            "repeat_interval": "4h"
+          }
+        }
+      ]
+    }
+  ]
+}

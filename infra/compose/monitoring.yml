@@ -34,6 +34,7 @@ services:
       GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-https://j15e106.p.ssafy.io/grafana/}
       GF_SERVER_SERVE_FROM_SUB_PATH: ${GRAFANA_SERVE_FROM_SUB_PATH:-true}
+      GRAFANA_ALERT_HMAC_SECRET: ${GRAFANA_ALERT_HMAC_SECRET:?GRAFANA_ALERT_HMAC_SECRET is required}
 
     volumes:
       - grafana_data:/var/lib/grafana
@@ -41,7 +42,48 @@ services:
       - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
 
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_started
+      mattermost-alert-relay:
+        condition: service_healthy
+
+  mattermost-alert-relay:
+    image: python:3.13.7-alpine3.22
+    container_name: feelm-mattermost-alert-relay
+    restart: unless-stopped
+    read_only: true
+    user: "65532:65532"
+
+    ports:
+      - "127.0.0.1:${GRAFANA_ALERT_RELAY_PORT:-9087}:8080"
+
+    environment:
+      GRAFANA_ALERT_HMAC_SECRET: ${GRAFANA_ALERT_HMAC_SECRET:?GRAFANA_ALERT_HMAC_SECRET is required}
+      MATTERMOST_BASE_URL: ${MATTERMOST_BASE_URL:?MATTERMOST_BASE_URL is required}
+      MATTERMOST_LOGIN_ID: ${MATTERMOST_LOGIN_ID:?MATTERMOST_LOGIN_ID is required}
+      MATTERMOST_PASSWORD: ${MATTERMOST_PASSWORD:?MATTERMOST_PASSWORD is required}
+      MATTERMOST_CHANNEL_ID: ${MATTERMOST_CHANNEL_ID:-}
+      MATTERMOST_TEAM_NAME: ${MATTERMOST_TEAM_NAME:-}
+      MATTERMOST_CHANNEL_NAME: ${MATTERMOST_CHANNEL_NAME:-}
+
+    command: ["python", "-I", "-B", "/app/relay.py"]
+
+    volumes:
+      - ../monitoring/mattermost-relay/relay.py:/app/relay.py:ro
+
+    tmpfs:
+      - /tmp:size=1m,mode=1777
+
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=2).read()"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 5s
 
   node-exporter:
     image: prom/node-exporter:v1.11.1
