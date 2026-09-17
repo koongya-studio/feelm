@@ -13,8 +13,10 @@
 Compose 설정값은 GitLab에 이미 등록된 Protected CI/CD Variables를 그대로 사용한다.
 서비스 Job은 `service`, 분산 Job은 `distributed` 환경 범위의 값을 상속한다. 별도 File 변수나
 Runner 로컬 dotenv 파일은 만들지 않는다. Secret 변수는 Masked·Hidden을 유지하고 Job 로그에
-값을 출력하지 않는다. 서비스 범위에는 service Compose의 필수 변수들이, distributed 범위에는
-`SERVICE_NODE_IP`, `DISTRIBUTED_NODE_IP`, `KAFKA_CLUSTER_ID`가 등록되어 있어야 한다.
+값을 출력하지 않는다. 서비스 Job에서 Compose 해석에 필요한 `BACKEND_IMAGE`는 실행 중인
+`feelm-backend` 컨테이너에서 자동으로 읽으므로 CI/CD Variable로 고정하지 않는다. 나머지
+service Compose 필수 변수들은 `service` 범위에, `SERVICE_NODE_IP`, `DISTRIBUTED_NODE_IP`,
+`KAFKA_CLUSTER_ID`는 `distributed` 범위에 등록되어 있어야 한다.
 
 자동 배포 전에 현재 실행 설정과 일치하는 main SHA를 각 노드에서 한 번 초기화한다.
 
