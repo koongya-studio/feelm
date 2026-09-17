@@ -75,25 +75,30 @@ class GitLabClient:
         metadata, _ = self.get(mr_path)
         validate_metadata(metadata, self.project_id, iid, expected_sha)
 
-        changes: list[dict[str, object]] = []
-        page = 1
-        while True:
-            payload, headers = self.get(mr_path + "/diffs", {"per_page": 100, "page": page})
-            if not isinstance(payload, list):
-                raise CollectionError("INVALID_GITLAB_RESPONSE")
-            changes.extend(payload)
-            if len(changes) > MAX_FILES:
-                raise CollectionError("DIFF_FILE_LIMIT_EXCEEDED")
-            next_page = headers.get("X-Next-Page", "")
-            if not next_page:
-                break
-            try:
-                following_page = int(next_page)
-            except (TypeError, ValueError):
-                raise CollectionError("INVALID_GITLAB_RESPONSE") from None
-            if following_page <= page or following_page > MAX_FILES:
-                raise CollectionError("INVALID_GITLAB_RESPONSE")
-            page = following_page
+        # `/changes`를 `access_raw_diffs`와 함께 부른다.
+        #
+        # **`/diffs`로는 큰 파일을 받을 수 없다.** GitLab은 한 파일의 패치가 약 10KB를 넘으면
+        # `collapsed: true`에 빈 `diff`로 내려주고, `/diffs`에는 그것을 펼 인자가 없다.
+        # `build_review_input`이 접힌 파일을 거절하므로 파일 하나만 커도 MR 전체가
+        # `INCOMPLETE_DIFF_REJECTED`가 됐다. lock 파일이 늘 걸리던 것도 같은 이유다.
+        #
+        # 2026-09-17에 MR !346으로 확인했다. 16KB짜리 파일 하나가 있는 MR에서 `/diffs`,
+        # `/diffs?access_raw_diffs=true`, `/diffs?unidiff=true`는 모두 접힌 채로 왔고,
+        # `/changes?access_raw_diffs=true`만 16110바이트 전문을 내려줬다.
+        #
+        # `/changes`는 GitLab 15.7에서 deprecated로 표시됐지만 대체재인 `/diffs`가 이 인자를
+        # 받지 않아 아직 유일한 경로다. `/diffs`가 받게 되면 그쪽으로 옮긴다.
+        #
+        # 페이지가 나뉘지 않는다. 한 번에 다 오므로 응답 자체가 `MAX_RESPONSE_BYTES`에 걸릴 수
+        # 있는데, 그 2MB는 이 파일이 허용하는 총 diff 512KB보다 커서 정상 MR은 닿지 않는다.
+        payload, _ = self.get(mr_path + "/changes", {"access_raw_diffs": "true"})
+        if not isinstance(payload, dict):
+            raise CollectionError("INVALID_GITLAB_RESPONSE")
+        changes = payload.get("changes")
+        if not isinstance(changes, list):
+            raise CollectionError("INVALID_GITLAB_RESPONSE")
+        if len(changes) > MAX_FILES:
+            raise CollectionError("DIFF_FILE_LIMIT_EXCEEDED")
 
         return build_review_input(metadata, changes)
 
@@ -130,6 +135,8 @@ def build_review_input(metadata: dict[str, object], changes: list[dict[str, obje
     for change in changes:
         if not isinstance(change, dict):
             raise CollectionError("INVALID_GITLAB_RESPONSE")
+        # `collect`가 `access_raw_diffs`로 받으므로 `collapsed`는 이제 오지 않아야 한다.
+        # 그래도 검사를 남긴다 — 인자가 먹지 않게 되면 빈 diff를 리뷰하는 대신 여기서 멈춘다.
         if change.get("too_large") or change.get("collapsed"):
             raise CollectionError("INCOMPLETE_DIFF_REJECTED")
         old_path, new_path, diff = change.get("old_path"), change.get("new_path"), change.get("diff")
