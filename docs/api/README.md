@@ -109,7 +109,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-065 | [사용자 랭킹](./social.md#api-065-사용자-랭킹) | GET | `/rankings/users` | 소셜 | 확장 | 선택 | FR-28 | O |
 | API-066 | [오늘의 영화](./recommendation.md#api-066-오늘의-영화) | GET | `/recommendations/today` | 추천 | 확장 | 회원 | FR-30 | O |
 | API-067 | [커뮤니티](./social.md#api-067-커뮤니티) | - | `/community (미정)` | 소셜 | 확장 | 회원 | FR-31 | O |
-| API-068 | [OTT 구독 추천](./recommendation.md#api-068-ott-구독-추천) | GET | `/recommendations/otts` | 추천 | 확장 | 회원 | FR-40 | O |
+| API-068 | [OTT 구독 추천](./recommendation.md#api-068-ott-구독-추천) | GET | `/recommendations/otts` | 추천 | 2차 MVP | 회원 | FR-40 | O |
 | API-069 | [파티 멤버 강퇴](./party.md#api-069-파티-멤버-강퇴) | DELETE | `/parties/{partyId}/members/{userId}` | 파티 | 1차 MVP | 회원 | FR-20 |  |
 
 ## 공통 규약

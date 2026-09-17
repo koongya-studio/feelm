@@ -10,7 +10,7 @@
 | [API-047](#api-047-관심없음-표시) | 관심없음 표시 | POST | `/movies/{movieId}/dismiss` | 1차 MVP | 회원 |
 | [API-048](#api-048-추천-이력-조회) | 추천 이력 조회 | GET | `/recommendations/history` | 1차 MVP | 회원 |
 | [API-066](#api-066-오늘의-영화) | 오늘의 영화 | GET | `/recommendations/today` | 확장 | 회원 |
-| [API-068](#api-068-ott-구독-추천) | OTT 구독 추천 | GET | `/recommendations/otts` | 확장 | 회원 |
+| [API-068](#api-068-ott-구독-추천) | OTT 구독 추천 | GET | `/recommendations/otts` | 2차 MVP | 회원 |
 
 ## API-031 유사 영화 추천
 
@@ -520,7 +520,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 단계 | 확장 |
+| 단계 | 2차 MVP |
 | 인증 | 회원 |
 | 관련 요구사항 | FR-40 |
 | 화면 | - |
