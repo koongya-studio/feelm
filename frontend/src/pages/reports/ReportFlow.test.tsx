@@ -17,7 +17,6 @@ import ReportIssuedPage from './ReportIssuedPage';
 import ReportListPage from './ReportListPage';
 import { getMyProfile } from '../../api/users';
 import { mockPopcornBucket } from '../../mocks/popcornBucket';
-import { mockTasteAnalysis } from '../../mocks/taste';
 import { resetSessionStore } from '../../mocks/sessionStore';
 import { mockMyProfile } from '../../mocks/user';
 import { ROUTE_PATTERN } from '../../routes/paths';
@@ -28,18 +27,16 @@ vi.mock('../../api/users', () => ({
 }));
 
 /*
- * 3.1과 7.1이 부르는 필름 · 팝콘(업무 -392)과 2.1이 부르는 취향 분석(업무 -479)은 실제
- * API다. 가로채지 않으면 화면이 실패 상태로 떨어져 리포트 버튼 자체가 나오지 않는다.
- * 2.1의 `취향 리포트 보기`는 취향 요약 섹션 안에 있어 장르가 하나는 와야 한다.
+ * 3.1과 7.1이 부르는 필름 · 팝콘은 실제 API다(업무 -392). 가로채지 않으면 화면이
+ * 실패 상태로 떨어져 리포트 버튼 자체가 나오지 않는다.
  */
 vi.mock('../../api/taste', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/taste')>()),
   getMyFrames: vi.fn(),
-  getMyTaste: vi.fn(),
   getPopcornBucket: vi.fn(),
 }));
 
-const { getMyFrames, getMyTaste, getPopcornBucket } = await import('../../api/taste');
+const { getMyFrames, getPopcornBucket } = await import('../../api/taste');
 
 /** 3.1의 본문이 나오려면 프레임이 하나는 있어야 한다. 0개면 빈 상태 화면이다 */
 const frames: FrameList = {
@@ -61,7 +58,6 @@ beforeEach(() => {
   resetSessionStore();
   vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
   vi.mocked(getMyFrames).mockReset().mockResolvedValue(frames);
-  vi.mocked(getMyTaste).mockReset().mockResolvedValue(mockTasteAnalysis);
   vi.mocked(getPopcornBucket).mockReset().mockResolvedValue(mockPopcornBucket);
 });
 
@@ -173,8 +169,8 @@ describe('3.4 → 3.5', () => {
 describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
   /*
    * 7.1 MY의 취향 리포트 입구는 **지난 반기 리포트를 찾아보러 가는 유일한 길이다**
-   * (사용자 결정 2026-09-16, 업무 -459). 2.1은 최신 한 장으로, 3.1은 상태에 따라 3.3
-   * 발급으로 가므로 목록의 입구로 대신할 수 없다.
+   * (사용자 결정 2026-09-16, 업무 -459). 홈을 없앤 뒤(업무 -461) 3.1은 상태에 따라
+   * 3.3 발급으로 가므로 목록의 입구로 대신할 수 없다.
    *
    * 같은 날 시안으로 배치가 바뀌면서 메뉴 줄이 아니라 **`4컷 리포트` 그림**이 됐다.
    * 이름만 바뀌었고 목적지는 그대로다.
