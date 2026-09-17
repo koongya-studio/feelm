@@ -149,9 +149,19 @@ def archive(entries):
 class AdapterTests(unittest.TestCase):
     def test_backend_mr_job_disables_runner_dependencies(self):
         config = (HERE.parent.parent / '.gitlab/ci/backend.yml').read_text()
-        job = re.search(r'(?ms)^backend-mr-test:\n(?P<body>.*?)(?=^\S|\Z)', config)
-        self.assertIsNotNone(job)
-        self.assertIn('  dependencies: []\n', job.group('body'))
+        for name in ('backend-mr-test', 'backend-cache-prepare'):
+            with self.subTest(job=name):
+                job = re.search(r'(?ms)^' + re.escape(name) + r':\n(?P<body>.*?)(?=^\S|\Z)', config)
+                self.assertIsNotNone(job)
+                self.assertIn('  dependencies: []\n', job.group('body'))
+
+    def test_cache_prepare_rejects_upstream_dependencies(self):
+        context = cache_response()
+        self.assertEqual(adapter.validate_job_response(context)['job_name'],
+                         adapter.CACHE_PREPARE_JOB)
+        context['dependencies'] = [{'id': 1, 'name': 'ci-variable-contract-check'}]
+        with self.assertRaisesRegex(adapter.PolicyError, 'not supported'):
+            adapter.validate_job_response(context)
 
     def test_context_accepts_only_fixed_job_and_script(self):
         result = adapter.validate_job_response(response())

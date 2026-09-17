@@ -222,7 +222,8 @@ include:
             self.assertNotIn(forbidden, preflight)
 
         cache = job_block(self.backend, 'backend-cache-prepare')
-        self.assertIn('needs: [ci-variable-contract-check]', cache)
+        self.assertIn('needs:\n    - job: ci-variable-contract-check\n      artifacts: false', cache)
+        self.assertIn('dependencies: []', cache)
 
     def test_monitoring_deploy_is_protected_current_develop_only(self):
         deploy = job_block(self.infra, 'deploy-monitoring')
