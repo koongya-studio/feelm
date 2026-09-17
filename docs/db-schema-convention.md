@@ -85,7 +85,7 @@ scale 없는 `numeric`으로 입력값을 그대로 검사한다. 기존 정수 
 
 | 정책 | 대상 | 근거 |
 |---|---|---|
-| CASCADE | `users` → `user_auth_providers`, `email_verification_tokens`, `password_reset_tokens`, `notification_settings`, `user_otts`, `user_blocks`, `onboarding_preferences` | 계정에 종속된 데이터 |
+| CASCADE | `users` → `user_auth_providers`, `email_verification_tokens`, `password_reset_tokens`, `notification_settings`, `notifications`, `user_otts`, `user_blocks`, `onboarding_preferences` | 계정에 종속된 데이터 |
 | CASCADE | `ratings` → `frames` | ERD 3장에 명시된 규칙 |
 | CASCADE | `recommendation_sets` → `recommendation_items` | 세트 없는 아이템은 의미가 없음 |
 | CASCADE | `movies` → `movie_embeddings` | 영화에서 파생된 임베딩은 원본 영화 없이 의미가 없음 |

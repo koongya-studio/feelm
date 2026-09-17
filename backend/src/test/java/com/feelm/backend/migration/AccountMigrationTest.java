@@ -47,9 +47,34 @@ class AccountMigrationTest {
                         "email_verification_tokens",
                         "password_reset_tokens",
                         "notification_settings",
+                        "notifications",
                         "user_blocks",
                         "onboarding_preferences",
                         "user_otts");
+    }
+
+    @Test
+    @DisplayName("인앱 알림 테이블의 유일·검사 제약과 조회 인덱스가 생성된다")
+    void createsNotificationTableWithConstraintsAndIndexes() {
+        assertThat(
+                        column(
+                                "SELECT constraint_name FROM information_schema.table_constraints"
+                                        + " WHERE table_schema='public'"
+                                        + " AND table_name='notifications'"))
+                .contains(
+                        "uk_notifications_type_source",
+                        "ck_notifications_type",
+                        "ck_notifications_target_type",
+                        "ck_notifications_type_target",
+                        "ck_notifications_visibility_window");
+        assertThat(
+                        column(
+                                "SELECT indexname FROM pg_indexes WHERE schemaname='public'"
+                                        + " AND tablename='notifications'"))
+                .contains(
+                        "ix_notifications_user_notified",
+                        "ix_notifications_user_unread",
+                        "ix_notifications_expires_at");
     }
 
     @Test
@@ -73,6 +98,12 @@ class AccountMigrationTest {
                         + userId
                         + ", 'cascade-reset-hash', now() + interval '30 minutes')");
         execute("INSERT INTO notification_settings (user_id) VALUES (" + userId + ")");
+        execute(
+                "INSERT INTO notifications(user_id,type,source_id,target_type,target_id,title,body,"
+                        + "notified_at,expires_at) VALUES ("
+                        + userId
+                        + ", 'PARTY_INVITE', 1, 'PARTY_INVITATION', 1, '제목', '본문', now(),"
+                        + " now() + interval '90 days')");
         execute(
                 "INSERT INTO user_blocks (blocker_id, blocked_id) VALUES ("
                         + userId
@@ -286,7 +317,7 @@ class AccountMigrationTest {
 
     // --- helpers ---------------------------------------------------------
 
-    /** 사용자에 종속된 일곱 테이블의 잔여 행 수. 삭제된 사용자에 남는 행이 없어야 한다. */
+    /** 사용자에 종속된 여덟 테이블의 잔여 행 수. 삭제된 사용자에 남는 행이 없어야 한다. */
     private static long dependentRowCount(long userId) {
         return count(
                 "SELECT (SELECT count(*) FROM user_auth_providers WHERE user_id = "
@@ -296,6 +327,8 @@ class AccountMigrationTest {
                         + ") + (SELECT count(*) FROM password_reset_tokens WHERE user_id = "
                         + userId
                         + ") + (SELECT count(*) FROM notification_settings WHERE user_id = "
+                        + userId
+                        + ") + (SELECT count(*) FROM notifications WHERE user_id = "
                         + userId
                         + ") + (SELECT count(*) FROM user_blocks WHERE blocker_id = "
                         + userId

@@ -57,7 +57,7 @@ A 회의 안건 12건 중 아키텍처·기술 선택에 해당하는 5건입니
 | [ADR-0008](./0008-identifier-type.md) | A-1 | 내부 식별자는 bigint, 공개 URL에는 별도 public_id를 사용한다 | 채택 (2026-08-30) |
 | [ADR-0009](./0009-jwt-auth-httponly-refresh-redis.md) | A-8 | 인증은 JWT Bearer로 하고 Refresh Token은 httpOnly 쿠키로 전달해 Redis에 저장한다 | 채택 (2026-08-31) |
 | [ADR-0010](./0010-search-postgresql-fulltext.md) | A-10 | 영화 검색은 PostgreSQL full-text와 pg_trgm으로 구현한다 | 채택 (2026-08-31) |
-| [ADR-0011](./0011-notification-polling.md) | A-11 | 알림은 1차 MVP에서 폴링으로 전달하고 알림 발송 기능은 2차로 미룬다 | 채택 (2026-08-31) |
+| [ADR-0011](./0011-notification-polling.md) | A-11 | 알림은 1차 MVP에서 폴링으로 전달하고 알림 발송 기능은 2차로 미룬다 | 대체 → ADR-0021 |
 | [ADR-0012](./0012-realtime-recommendation-serving-location.md) | A-12 | 실시간 추천 서빙 계산을 FastAPI 서비스에서 수행한다 | 대체 → ADR-0016 |
 
 ### 확정 기술 변경
@@ -72,6 +72,7 @@ A 회의 안건 12건 중 아키텍처·기술 선택에 해당하는 5건입니
 | [ADR-0018](./0018-polling-transactional-outbox.md) | Kafka 이벤트는 폴링 기반 트랜잭셔널 아웃박스로 발행한다 | 채택 (2026-09-07) |
 | [ADR-0019](./0019-reverse-proxy-client-ip-trust.md) | 클라이언트 IP는 신뢰 목록 안의 프록시가 보낸 X-Real-IP만 채택하고 IP 제한은 프리픽스 단위로 집계한다 | 채택 (2026-09-09) |
 | [ADR-0020](./0020-fixed-439-popcorn-flavor-geometry.md) | 팝콘 8개 취향 유형은 439의 고정 장르 기하를 사용한다 | 채택 (2026-09-16) |
+| [ADR-0021](./0021-in-app-notification-source-of-truth.md) | 2차 알림은 PostgreSQL 인앱 알림을 정본으로 사용하고 도메인 원본과 함께 저장한다 | 채택 (2026-09-17) |
 
 ## 관련 문서
 

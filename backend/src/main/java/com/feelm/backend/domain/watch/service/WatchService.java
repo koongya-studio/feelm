@@ -1,5 +1,6 @@
 package com.feelm.backend.domain.watch.service;
 
+import com.feelm.backend.domain.notification.service.NotificationCommandService;
 import com.feelm.backend.domain.watch.cursor.WatchRecordCursor;
 import com.feelm.backend.domain.watch.dto.request.WatchListCriteria;
 import com.feelm.backend.domain.watch.dto.response.OttClickResponse;
@@ -30,6 +31,7 @@ public class WatchService {
 
     private final WatchRepository repository;
     private final KafkaEventPublisher eventPublisher;
+    private final NotificationCommandService notificationCommandService;
     private final Clock clock;
 
     @Transactional
@@ -66,6 +68,10 @@ public class WatchService {
                 KafkaEventType.OTT_CLICK,
                 userId,
                 new OttClickEventPayload(movieId, ottId, record.watchRecordId()));
+        if (record.status() == WatchStatus.LINK_CLICKED) {
+            notificationCommandService.upsertWatchConfirmation(
+                    userId, record.watchRecordId(), record.confirmDueAt(), record.expiresAt());
+        }
         return new OttClickResult(created, OttClickResponse.from(record));
     }
 
@@ -104,6 +110,7 @@ public class WatchService {
             throw new BusinessException(ErrorCode.INVALID_WATCH_STATUS);
         }
         repository.confirm(watchRecordId, watched, now);
+        notificationCommandService.closeWatchConfirmation(userId, watchRecordId, now);
         return new WatchConfirmResponse(
                 watchRecordId,
                 watched ? WatchStatus.WATCHED_UNRATED : WatchStatus.EXPIRED,

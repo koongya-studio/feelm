@@ -63,6 +63,8 @@ class PartyInvitationApiContractTest extends SharedPostgresContractTest {
 
     @AfterEach
     void shutdownExecutor() throws InterruptedException {
+        jdbc.execute("DROP TRIGGER IF EXISTS test_fail_party_notification ON notifications");
+        jdbc.execute("DROP FUNCTION IF EXISTS test_fail_party_notification()");
         if (executor == null) return;
         executor.shutdownNow();
         assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
@@ -98,6 +100,16 @@ class PartyInvitationApiContractTest extends SharedPostgresContractTest {
         assertThat(response.get("invitationId").asLong()).isPositive();
         assertThat(
                         jdbc.queryForMap(
+                                "SELECT user_id,type,source_id,target_type,target_id,closed_at"
+                                        + " FROM notifications"))
+                .containsEntry("user_id", 20L)
+                .containsEntry("type", "PARTY_INVITE")
+                .containsEntry("source_id", response.get("invitationId").asLong())
+                .containsEntry("target_type", "PARTY_INVITATION")
+                .containsEntry("target_id", response.get("invitationId").asLong())
+                .containsEntry("closed_at", null);
+        assertThat(
+                        jdbc.queryForMap(
                                 "SELECT party_id,inviter_id,invitee_id,status,responded_at"
                                         + " FROM party_invitations"))
                 .containsEntry("party_id", party)
@@ -105,6 +117,30 @@ class PartyInvitationApiContractTest extends SharedPostgresContractTest {
                 .containsEntry("invitee_id", 20L)
                 .containsEntry("status", "PENDING")
                 .containsEntry("responded_at", null);
+    }
+
+    @Test
+    void rollsBackInvitationWhenNotificationWriteFails() throws Exception {
+        long party = party(10, "ACTIVE", CREATED_AT);
+        jdbc.execute(
+                """
+                CREATE FUNCTION test_fail_party_notification() RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN
+                    RAISE EXCEPTION 'forced notification failure';
+                END;
+                $$
+                """);
+        jdbc.execute(
+                """
+                CREATE TRIGGER test_fail_party_notification
+                BEFORE INSERT ON notifications
+                FOR EACH ROW EXECUTE FUNCTION test_fail_party_notification()
+                """);
+
+        invite(party, 20, 10).andExpect(status().is5xxServerError());
+
+        assertThat(invitationCount()).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM notifications", Long.class)).isZero();
     }
 
     @Test
