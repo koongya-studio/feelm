@@ -1,39 +1,44 @@
 /*
  * 3.1 취향 필름 메인
  *
- * 구성은 확정 시안을 따른다(`docs/screens/design-concept.md`). 시안은 이 화면이
- * 한 가지만 말하게 한다. **내 필름이 몇 칸 찼는가.**
+ * 구성은 사용자 시안 2026-09-17(업무 -458)을 따른다. 시안이 이 화면에 요구하는 것은
+ * 하나다. **필름이 화면의 중심이고, 정보와 카드는 그 아래로 물러난다.**
  *
- * 워드마크 · 검색 · 필름 스트립 · 프레임 수 문장 · 팝콘 범례 · 취향 리포트 보기
+ * 워드마크 · 검색 · 알림 / 제목 / 필름 / 팝콘 요약 / 취향 리포트 / 필름 늘리기
  *
- * 연동 API는 API-042(프레임 목록) · API-041(팝콘 버킷)이며 실제로 호출한다
- * (S15P21E106-392). 프레임을 만드는 흐름(2.5 → 2.6)도 평가 생성(API-036)이 실제 호출이
- * 되어(S15P21E106-491) 평가한 만큼 채워진다. 아직 평가가 없으면 아래 빈 상태가 나온다.
+ * 이전 구성에서 바뀐 것
+ * - 필름이 밝은 반투명 판(`FilmStrip` paper)에서 **검정에 주황빛이 도는 반투명 릴**로
+ *   바뀌었다(`FilmReel`). 아이스 화이트 팝콘 버킷의 필름 무늬와 한 세트로 만든 것이다
+ * - 제목이 필름 위로 올라왔다. 필름이 먼저 보이되 무엇의 필름인지 한 줄이 먼저 말한다
+ * - **팝콘 범례를 요약으로 줄였다.** 맛 8종을 다 늘어놓던 것을 대표 몇 알과 총 개수로
+ *   바꿨다. 분포는 3.2가 보여주는 화면이고 여기서는 "얼마나 모였나"만 말한다
+ * - 팝콘을 색 점이 아니라 3D 스프라이트로 그린다. 8색은 밝은 면에서 4종이 판별되지
+ *   않아(`design-concept.md` 2.5) 밝은 벽 위 요약에 색 점을 쓸 수 없다
+ * - **주 버튼이 `필름 늘리기`다.** 이전에는 리포트가 검정 알약이고 필름 늘리기가 글자
+ *   버튼이었다. 시안은 다음 영화를 만나는 것을 이 화면의 주 동작으로 본다
+ * - 리포트는 작은 메뉴 줄로 내렸다
+ * - 주 버튼이 로고와 같은 빨강이다(`Button` brand). 이 화면과 2.4만 쓴다
  *
- * 팀 결정 2026-09-09 (업무 -100)
- * - 와이어프레임 3.1의 `요즘 취향 흐름`(태그 칩)과 `최근 추가된 영화` 목록을 뺐다.
- *   시안에 없고, 한 화면이 세 가지를 동시에 말하면 어느 것도 읽히지 않는다.
- *   두 블록은 다른 화면으로 옮기지 않고 삭제했다
- * - 헤더 제목을 `취향 필름`에서 워드마크로 바꿨다. 홈과 같은 헤더다
- * - 프레임 수는 헤더 우측 카운트가 아니라 본문의 큰 문장이 말한다
- * - 와이어프레임의 `+ 계속 감기는 중` 타일 대신 빈 칸을 점선으로 둔다. 아직 채울
- *   자리가 남았다는 뜻이며, 조작할 수 없는 것은 같다
+ * 연동 API는 API-042(프레임 목록) · API-041(팝콘 버킷)이며 그대로다.
+ * 초기 취향 설정에서 **좋아한다고 고른 영화만** 첫 필름이 된다 — 프레임을 만드는 것은
+ * 서버(API-024)이고 이 화면은 API-042가 준 목록을 그린다.
  *
- * 팝콘 범례는 어두운 판 위에 둔다. 8색은 밝은 면에서 절반이 판별되지 않는다
- * (`docs/screens/design-concept.md` 2.5). 이 판이 3.2로 가는 진입점이다.
+ * **프레임 수와 팝콘 수를 같다고 가정하지 않는다.** 대표 맛이 없는 영화는 팝콘을
+ * 만들지 않으므로(API-036 · API-041) 두 수는 어긋난다. 각자 자기 API의 총수를 쓴다.
  *
  * `[?]` 스트립이 보여줄 프레임 개수와 페이지네이션은 미확정이다. 첫 페이지만 쓴다.
  */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import Button from '../../../components/Button';
-import FilmStrip from '../../../components/FilmStrip';
-import { BellIcon, SearchIcon } from '../../../components/Icon';
+import FilmReel from '../../../components/FilmReel';
+import { BellIcon, ChevronRightIcon, SearchIcon } from '../../../components/Icon';
 import Poster from '../../../components/Poster';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import Wordmark from '../../../components/Wordmark';
+import { kernelSprite } from '../../../components/PopcornBucket/sprites';
 import { getLatestReadyReport } from '../../../api/reports';
 import { getMyFrames, getPopcornBucket } from '../../../api/taste';
 import { path } from '../../../routes/paths';
@@ -41,24 +46,29 @@ import styles from './FilmPage.module.css';
 import type { FrameList, PopcornBucket } from '../../../types/taste';
 
 /*
- * 필름 프레임 한 칸. 포스터보다 세로로 길다.
+ * 필름 프레임 한 칸. 포스터 그대로의 2:3이다.
  *
- * 시안은 300px 폭에서 60×104를 썼고, 375px 기준으로 환산하면 75×130이다.
- * 그 비율을 지키면서 판 안쪽 폭 319px에 네 칸이 딱 들어가는 값이 73×126이다
- * (73×4 + 간격 8×3 = 316). CSS의 `.emptyFrame`이 같은 값을 써야 줄이 흔들리지 않는다.
+ * **프레임 수와 무관하게 고정이다.** 375px 셸의 릴 안쪽 폭(375 − 좌우 12 = 351)에서
+ * 두 칸 반이 보이는 값이라, 오른쪽이 잘린 모습이 "더 있다"를 말해 준다.
+ *
+ * 높이는 375×812에서 이 화면 전체가 스크롤 없이 들어오는 상한이다. 측정해서 맞췄고
+ * (본문 632px), 여기서 더 키우면 `필름 늘리기`가 하단 내비 밑으로 내려간다.
  */
-const FRAME_WIDTH = 73;
-const FRAME_HEIGHT = 126;
+const FRAME_WIDTH = 110;
+const FRAME_HEIGHT = 165;
 
-/** 범례에 올릴 맛 수. 8종을 다 늘어놓으면 판이 표가 된다. 나머지는 3.2에서 본다 */
-const LEGEND_COUNT = 4;
+/** 요약에 올릴 맛 수. 8종을 다 늘어놓으면 요약이 아니라 표가 된다 */
+const SUMMARY_FLAVOR_COUNT = 4;
+
+/** 빈 필름에 남겨 두는 자리. 시안 01이 두 칸을 보여준다 */
+const EMPTY_SLOT_LABELS = ['첫 번째 프레임', '두 번째 프레임'];
 
 export default function FilmPage() {
   const navigate = useNavigate();
 
   const [frames, setFrames] = useState<FrameList | null>(null);
   const [bucket, setBucket] = useState<PopcornBucket | null>(null);
-  /** 아직 3.3에서 받지 않은 새 리포트. 있으면 리포트 버튼이 발급(3.3)으로 간다 */
+  /** 아직 3.3에서 받지 않은 새 리포트. 있으면 리포트 줄이 발급(3.3)으로 간다 */
   const [newReportId, setNewReportId] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
@@ -79,7 +89,7 @@ export default function FilmPage() {
         }
       });
 
-    // 팝콘 범례는 실패하면 그 자리만 비운다. 이 화면의 본문은 필름 목록이다
+    // 팝콘 요약은 실패하면 그 자리만 비운다. 이 화면의 본문은 필름이다
     getPopcornBucket()
       .then((value) => {
         if (active) {
@@ -88,7 +98,7 @@ export default function FilmPage() {
       })
       .catch(() => undefined);
 
-    // 새 리포트를 확인하지 못해도 리포트 버튼은 목록(7.3)으로 가는 원래 동작을 한다
+    // 새 리포트를 확인하지 못해도 리포트 줄은 목록(7.3)으로 가는 원래 동작을 한다
     getLatestReadyReport()
       .then((latest) => {
         if (active) {
@@ -104,7 +114,6 @@ export default function FilmPage() {
 
   /*
    * 헤더 오른쪽. **검색 → 알림 순서다**(사용자 지시 2026-09-16, 업무 -461).
-   * 알림은 홈 헤더에 있던 것이고, 홈을 없애면서 필름으로 왔다.
    *
    * 빈 상태 · 실패 상태에서도 같이 선다. 필름은 앱의 시작 화면이라 프레임이 없다고
    * 검색과 알림으로 가는 길까지 막으면 안 된다.
@@ -140,139 +149,180 @@ export default function FilmPage() {
     );
   }
 
-  // 평가가 하나도 없으면 프레임이 없다. 와이어프레임에 그 상태가 없다
-  if (frames && frames.totalCount === 0) {
-    return (
-      <>
-        <ScreenHeader title={<Wordmark />} action={headerActions} />
-
-        <StatusView
-          variant="empty"
-          title="아직 감긴 프레임이 없어요"
-          description="영화를 평가하면 프레임 1개와 팝콘 1알이 필름에 쌓여요"
-        >
-          <Button onClick={() => void navigate(path.recommendations())}>추천 영화 보기</Button>
-        </StatusView>
-      </>
-    );
-  }
-
   const items = frames?.items ?? [];
+  const totalCount = frames?.totalCount ?? 0;
+  // 받기 전에는 빈 상태로 단정하지 않는다. `0개`로 보이면 없는 정보를 말하는 셈이다
+  const isEmpty = frames !== null && totalCount === 0;
 
-  // 많이 나온 맛부터 보여준다. 0알인 맛은 아직 발견하지 않은 맛이라 뺀다
-  const legend = bucket
+  // 많이 나온 맛부터. 0알인 맛은 아직 발견하지 않은 맛이라 뺀다
+  const flavors = bucket
     ? [...bucket.flavors]
         .filter((flavor) => flavor.popcornCount > 0)
         .sort((a, b) => b.popcornCount - a.popcornCount)
-        .slice(0, LEGEND_COUNT)
     : [];
+  const summaryFlavors = flavors.slice(0, SUMMARY_FLAVOR_COUNT);
+  const restCount = summaryFlavors.reduce(
+    (rest, flavor) => rest - flavor.popcornCount,
+    bucket?.totalCount ?? 0,
+  );
 
   return (
     <>
       <ScreenHeader title={<Wordmark />} action={headerActions} />
 
       <div className={styles.page}>
-        <div className={styles.stripArea}>
-          <FilmStrip orientation="horizontal" tone="paper">
-            {items.map((frame) => (
-              <button
-                key={frame.frameId}
-                type="button"
-                className={styles.frameButton}
-                onClick={() => void navigate(path.frameDetail(frame.frameId))}
-              >
-                <Poster
-                  width={FRAME_WIDTH}
-                  height={FRAME_HEIGHT}
-                  radius={4}
-                  src={frame.movie.posterUrl ?? undefined}
-                  title=""
-                  seed={frame.movie.movieId}
-                />
-                <VisuallyHidden>{frame.movie.title} 프레임 상세</VisuallyHidden>
-              </button>
-            ))}
+        <header className={styles.head}>
+          <p className={styles.eyebrow}>YOUR TASTE ON FILM</p>
+          <h2 className={styles.title}>나의 취향 필름</h2>
 
-            {/* 아직 채울 자리가 남았다는 표시. 조작할 수 없다 */}
-            <span className={styles.emptyFrame} aria-hidden="true" />
-          </FilmStrip>
+          {frames ? (
+            <p className={styles.subtitle}>
+              {isEmpty ? '아직 첫 프레임 전이에요' : `${totalCount}개의 프레임이 감겼어요`}
+            </p>
+          ) : null}
+        </header>
+
+        <div className={styles.reelArea}>
+          <FilmReel
+            frameWidth={FRAME_WIDTH}
+            frameHeight={FRAME_HEIGHT}
+            label={isEmpty ? '아직 비어 있는 취향 필름' : '취향 필름 프레임'}
+          >
+            {isEmpty
+              ? EMPTY_SLOT_LABELS.map((label) => (
+                  <span key={label} className={styles.emptySlot}>
+                    <span className={styles.emptySlotMark} aria-hidden="true" />
+                    <span className={styles.emptySlotLabel}>{label}</span>
+                  </span>
+                ))
+              : items.map((frame) => (
+                  <button
+                    key={frame.frameId}
+                    type="button"
+                    className={styles.frameButton}
+                    onClick={() => void navigate(path.movieDetail(frame.movie.movieId))}
+                  >
+                    <Poster
+                      width={FRAME_WIDTH}
+                      height={FRAME_HEIGHT}
+                      radius={0}
+                      src={frame.movie.posterUrl ?? undefined}
+                      title=""
+                      seed={frame.movie.movieId}
+                    />
+                    <VisuallyHidden>{frame.movie.title} 상세 보기</VisuallyHidden>
+                  </button>
+                ))}
+          </FilmReel>
+
+          {/* 잘린 오른쪽이 이미 "더 있다"를 말하지만, 넘길 수 있다는 것까지는 말해 주지 않는다 */}
+          {!isEmpty && items.length > 1 ? (
+            <p className={styles.reelHint}>{totalCount}개의 프레임을 넘겨보세요</p>
+          ) : null}
         </div>
 
-        <div className={styles.content}>
-          <p className={styles.eyebrow}>MY · FILM</p>
+        {isEmpty ? (
+          <div className={styles.empty}>
+            <h3 className={styles.emptyTitle}>아직 필름에 담긴 영화가 없어요</h3>
+            <p className={styles.emptyText}>영화를 만나며 취향 필름을 채워보세요</p>
 
-          {/* 받기 전에는 그리지 않는다. `0개`로 보이면 없는 정보를 말하는 셈이다 */}
-          {frames ? (
-            <h2 className={styles.headline}>
-              {frames.totalCount}개의 프레임이
-              <br />
-              감겼어요
-            </h2>
-          ) : null}
+            <Button variant="brand" onClick={() => void navigate(path.recommendations())}>
+              추천 영화 둘러보기
+            </Button>
+          </div>
+        ) : (
+          <div className={styles.content}>
+            {/*
+             * 팝콘 요약이자 3.2 진입점. **대표 몇 알과 총 개수만** 말한다.
+             * 맛별 분포를 다 늘어놓는 것은 3.2가 할 일이다(시안 2026-09-17).
+             *
+             * 총수는 API-041의 값이다. 프레임 수와 같다고 가정하지 않는다.
+             */}
+            {bucket && summaryFlavors.length > 0 ? (
+              <button
+                type="button"
+                className={styles.popcorn}
+                /*
+                 * 이름을 직접 준다. 안 주면 맛 이름과 개수가 죽 이어 붙은 한 줄이
+                 * 버튼 이름이 되어 무엇을 하는 버튼인지 들리지 않는다.
+                 */
+                aria-label={`나의 취향 팝콘 ${bucket.totalCount}알 자세히 보기`}
+                onClick={() => void navigate(path.popcornBucket())}
+              >
+                <span className={styles.rowHead}>
+                  <span className={styles.rowTitle}>나의 취향 팝콘</span>
+                  <span className={styles.rowValue}>
+                    {bucket.totalCount}알
+                    <ChevronRightIcon />
+                  </span>
+                </span>
 
-          {/*
-           * 팝콘 범례이자 3.2 진입점. 어두운 판에 담는다. 팝콘 8색은 밝은 면에서
-           * 절반이 판별 불가라, 팝콘이 나오는 자리는 예외 없이 어두운 면 위에 둔다
-           * (`docs/screens/design-concept.md` 2.5).
-           *
-           * 색은 API-044가 내려주는 값을 그대로 쓴다. 화면이 맛 색을 알지 않는다.
-           */}
-          {bucket ? (
+                <span className={styles.kernels} data-testid="popcorn-summary-kernels">
+                  {summaryFlavors.map((flavor) => (
+                    <span
+                      key={flavor.flavorCode}
+                      className={styles.kernel}
+                      data-flavor={flavor.flavorCode}
+                    >
+                      <img
+                        className={styles.kernelSprite}
+                        src={kernelSprite(flavor.flavorCode)}
+                        alt=""
+                      />
+                      <span className={styles.kernelName}>{flavor.displayName}</span>
+                      <span className={styles.kernelCount}>{flavor.popcornCount}</span>
+                    </span>
+                  ))}
+
+                  {restCount > 0 ? (
+                    <span className={styles.kernelRest}>+ 다른 맛 {restCount}알</span>
+                  ) : null}
+                </span>
+              </button>
+            ) : null}
+
+            {/*
+             * 취향 리포트. 작은 메뉴 줄이다.
+             *
+             * 아직 받지 않은 새 리포트가 있으면 3.3 발급으로, 없으면 7.3 목록으로 간다.
+             * 홈과 같은 규칙(`getLatestReadyReport`)이고 이동표에 3.3으로 들어오는
+             * 화살표가 없어 정한 길이다.
+             */}
             <button
               type="button"
-              className={styles.bucket}
-              onClick={() => void navigate(path.popcornBucket())}
+              className={styles.report}
+              /* 팝콘 줄과 같은 이유로 이름을 직접 준다 */
+              aria-label={newReportId !== null ? '새 취향 리포트 받기' : '취향 리포트 보기'}
+              onClick={() =>
+                void navigate(
+                  newReportId !== null ? path.reportIssued(newReportId) : path.tasteReports(),
+                )
+              }
             >
-              <span className={styles.bucketLabel}>{bucket.totalCount} · KERNELS</span>
+              <span className={styles.rowHead}>
+                <span className={styles.rowTitle}>취향 리포트</span>
+                <span className={styles.rowValue} data-tone={newReportId !== null ? 'new' : null}>
+                  {newReportId !== null ? '새 리포트 받기' : '리포트 보기'}
+                  <ChevronRightIcon />
+                </span>
+              </span>
 
-              <ul className={styles.legend}>
-                {legend.map((flavor) => (
-                  <li key={flavor.flavorCode} className={styles.legendItem}>
-                    <span
-                      className={styles.kernel}
-                      style={{ background: flavor.color }}
-                      aria-hidden="true"
-                    />
-                    {flavor.displayName} {flavor.popcornCount}
-                  </li>
-                ))}
-              </ul>
+              <span className={styles.reportText}>지금까지 본 영화로 만든 나만의 취향 분석</span>
             </button>
-          ) : null}
 
-          {/*
-           * 이 화면의 주 동작. 검정 알약은 한 화면에 하나뿐이고 그 하나가 여기다
-           * (`docs/screens/design-concept.md` 2.4).
-           *
-           * **리포트 버튼은 하나다**(사용자 결정 2026-09-15, 업무 -321). 버튼 둘이 붙어 있으면
-           * 차이가 읽히지 않는다.
-           * - 아직 받지 않은 새 리포트가 있으면 `새 취향 리포트 받기` → 3.3 발급. 홈과 같은 규칙
-           *   (`getLatestReadyReport`)이고, 3.3에서 `리포트 보기`를 누르면 받은 것으로 기록된다.
-           *   이동표에 3.3으로 들어오는 화살표가 없어 정한 길이다
-           * - 없으면 `취향 리포트 보기` → 7.3 목록(업무 -308)
-           */}
-          {newReportId !== null ? (
-            <Button onClick={() => void navigate(path.reportIssued(newReportId))}>
-              새 취향 리포트 받기
-            </Button>
-          ) : (
-            <Button onClick={() => void navigate(path.tasteReports())}>취향 리포트 보기</Button>
-          )}
+            {/*
+             * 이 화면의 주 동작. 다음 영화를 만나는 것이 필름을 늘리는 유일한 길이다.
+             * **홈에서 오늘의 추천을 빼면서 이 자리가 2.2로 가는 상시 진입점이 됐다**(업무 -461).
+             */}
+            <div className={styles.action}>
+              <p className={styles.actionHint}>다음 영화를 추천받아요</p>
 
-          {/*
-           * 3.1 → 2.2 추천. **홈에서 오늘의 추천을 빼면서 이 자리로 왔다**(업무 -461).
-           * 추천은 필름을 늘리는 행위라 필름 탭에 속한다는 결정에 따른 것이다.
-           *
-           * 빈 상태(프레임 0개)에만 있던 길을 늘 열어 둔다 — 프레임이 쌓인 뒤에는
-           * 여기가 2.2로 가는 유일한 상시 진입점이다.
-           *
-           * 검정 알약은 위의 리포트 버튼 하나뿐이므로(`design-concept.md` 2.4) 글자
-           * 버튼으로 둔다. 문구는 1.3 온보딩 완료가 쓰는 말과 맞춘다.
-           */}
-          <Button variant="text" onClick={() => void navigate(path.recommendations())}>
-            필름 늘리기
-          </Button>
-        </div>
+              <Button variant="brand" onClick={() => void navigate(path.recommendations())}>
+                필름 늘리기
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

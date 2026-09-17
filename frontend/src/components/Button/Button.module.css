@@ -42,6 +42,31 @@
   opacity: 0.82;
 }
 
+/*
+ * 빨강 알약. 검정과 같은 자리를 쓰되 색만 다르고, 로고와 같은 빨강이다.
+ * **3.1 취향 필름과 2.4 영화 상세만 쓴다**(`tokens.css`의 `--color-action-brand`).
+ */
+.button[data-variant='brand'] {
+  height: var(--control-height);
+  border-radius: var(--radius-pill);
+  background: var(--color-action-brand);
+  color: var(--color-on-action);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  transition: background var(--motion-press) var(--ease-standard);
+}
+
+.button[data-variant='brand']:active:not(:disabled) {
+  background: var(--color-action-brand-pressed);
+}
+
+/* primary와 같은 이유로 면에 opacity를 걸지 않는다 */
+.button[data-variant='brand']:disabled {
+  opacity: 1;
+  background: var(--color-surface);
+  color: var(--color-ink-hint);
+}
+
 .button[data-variant='secondary'] {
   height: var(--control-height);
   box-sizing: border-box;
