@@ -92,6 +92,13 @@ def selected_services(node: str, components: tuple[str, ...]) -> tuple[str, ...]
     )
 
 
+def deployment_batches(node: str, components: tuple[str, ...],
+                       services: tuple[str, ...]) -> tuple[tuple[str, ...], ...]:
+    if components == ("hdfs",) and node == "distributed":
+        return (("hdfs-namenode",), ("hdfs-datanode-2",))
+    return (services,)
+
+
 def load_env_value(path: Path, name: str) -> str | None:
     if not path.is_file():
         return None
@@ -115,6 +122,14 @@ def compose_command(root: Path, env_file: Path, node: str) -> list[str]:
 def resolve_commit(root: Path, revision: str, runner: Runner) -> str:
     if not re.fullmatch(r"[0-9A-Fa-f]{7,40}", revision):
         raise DeploymentError("--expected-commit must be a 7-40 character Git SHA")
+    release_marker = root / ".feelm-release-revision"
+    if release_marker.is_file() and not (root / ".git").exists():
+        actual = release_marker.read_text(encoding="utf-8").strip()
+        if not re.fullmatch(r"[0-9a-f]{40}", actual):
+            raise DeploymentError("Release revision marker is invalid")
+        if not actual.startswith(revision.lower()):
+            raise DeploymentError(f"Release does not match expected commit {revision}")
+        return actual
     expected = runner.run(
         ["git", "-C", str(root), "rev-parse", f"{revision}^{{commit}}"], capture=True
     )
@@ -237,6 +252,18 @@ def wait_for_hdfs(node: str, runner: Runner, attempts: int) -> None:
             time.sleep(5)
     detail = f": {last_error}" if last_error else ""
     raise DeploymentError(f"HDFS did not become ready{detail}")
+
+
+def verify_hdfs_read_write(node: str, runner: Runner) -> None:
+    container = "feelm-hdfs-namenode" if node == "distributed" else "feelm-hdfs-datanode-1"
+    probe = f"/verification/runtime-config/probe-{node}-{os.getpid()}"
+    script = (
+        "set -eu; path=$1; "
+        "trap 'hdfs dfs -rm -f \"$path\" >/dev/null 2>&1 || true' EXIT; "
+        "printf 'feelm-runtime-config-probe' | hdfs dfs -put - \"$path\"; "
+        "test \"$(hdfs dfs -cat \"$path\")\" = 'feelm-runtime-config-probe'"
+    )
+    runner.run(["docker", "exec", container, "sh", "-c", script, "probe", probe])
 
 
 def verify_runtime(node: str, components: tuple[str, ...], env_file: Path,
@@ -368,28 +395,34 @@ def deploy(args: argparse.Namespace, runner: Runner) -> int:
     print(f"Deploying reviewed commit: {commit}")
     print(f"Verified rollback commit: {rollback_commit}")
     try:
-        runner.run(
-            compose_command(root, env_file, args.node)
-            + ["up", "-d", "--no-deps", "--force-recreate", *services],
-            env=environment,
-        )
-        verify_runtime(
-            args.node, components, env_file, services, runner, args.health_attempts
-        )
+        for batch in deployment_batches(args.node, components, services):
+            runner.run(
+                compose_command(root, env_file, args.node)
+                + ["up", "-d", "--no-deps", "--force-recreate", *batch],
+                env=environment,
+            )
+            verify_runtime(
+                args.node, components, env_file, services, runner, args.health_attempts
+            )
+        if "hdfs" in components:
+            verify_hdfs_read_write(args.node, runner)
         if args.spark_image:
             verify_spark_image(services, args.spark_image, runner)
     except DeploymentError as candidate_error:
         print(f"Candidate deployment failed: {candidate_error}", file=sys.stderr)
         print("Restoring services from the previous checkout", file=sys.stderr)
         try:
-            runner.run(
-                compose_command(rollback_root, env_file, args.node)
-                + ["up", "-d", "--no-deps", "--force-recreate", *services],
-                env=rollback_environment,
-            )
-            verify_runtime(
-                args.node, components, env_file, services, runner, args.health_attempts
-            )
+            for batch in deployment_batches(args.node, components, services):
+                runner.run(
+                    compose_command(rollback_root, env_file, args.node)
+                    + ["up", "-d", "--no-deps", "--force-recreate", *batch],
+                    env=rollback_environment,
+                )
+                verify_runtime(
+                    args.node, components, env_file, services, runner, args.health_attempts
+                )
+            if "hdfs" in components:
+                verify_hdfs_read_write(args.node, runner)
             previous_spark_image = rollback_environment.get("SPARK_IMAGE")
             if previous_spark_image:
                 verify_spark_image(services, previous_spark_image, runner)

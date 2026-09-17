@@ -58,6 +58,48 @@ deploy-monitoring:
         - infra/scripts/verify-monitoring-deployment.py
         - infra/scripts/test_verify_monitoring_deployment.py
 
+.deploy-hdfs-config:
+  stage: deploy
+  needs: []
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
+    - test -n "$HDFS_COMPOSE_ENV_FILE"
+    - HDFS_COMPOSE_ENV_FILE="$HDFS_COMPOSE_ENV_FILE" bash infra/scripts/deploy-hdfs-config.sh "$HDFS_NODE" "$CI_COMMIT_SHA"
+  resource_group: distributed-runtime-hdfs
+  interruptible: false
+  retry:
+    max: 1
+    when: [runner_system_failure, scheduler_failure]
+  timeout: 30m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - infra/compose/service.yml
+        - infra/compose/distributed.yml
+        - infra/hadoop/**/*
+        - infra/scripts/deploy-distributed-runtime.py
+        - infra/scripts/runtime-config-release.py
+        - infra/scripts/deploy-hdfs-config.sh
+      when: manual
+  allow_failure: false
+
+deploy-hdfs-service-config:
+  extends: .deploy-hdfs-config
+  tags: [e106-shell]
+  environment:
+    name: service
+  variables:
+    HDFS_NODE: service
+
+deploy-hdfs-distributed-config:
+  extends: .deploy-hdfs-config
+  tags: [e106-distributed]
+  needs: [deploy-hdfs-service-config]
+  environment:
+    name: distributed
+  variables:
+    HDFS_NODE: distributed
+
 infra-config-test:
   stage: test
   tags: [e106-mr-isolated]
@@ -86,6 +128,9 @@ infra-config-test:
         - infra/monitoring/**/*
         - infra/spark/**/*
         - infra/scripts/deploy-distributed-runtime.py
+        - infra/scripts/runtime-config-release.py
+        - infra/scripts/deploy-hdfs-config.sh
+        - infra/scripts/test_runtime_config_release.py
         - infra/scripts/deploy-consumer.sh
         - infra/scripts/rollback-consumer.sh
         - infra/scripts/verify-consumer-e2e.py

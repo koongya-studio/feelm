@@ -63,6 +63,30 @@ class DistributedRuntimeTest(unittest.TestCase):
         self.assertNotIn("down", command)
         self.assertNotIn("-v", command)
 
+    def test_distributed_hdfs_uses_separate_namenode_and_datanode_batches(self):
+        services = ("hdfs-namenode", "hdfs-datanode-2")
+        self.assertEqual(
+            runtime.deployment_batches("distributed", ("hdfs",), services),
+            (("hdfs-namenode",), ("hdfs-datanode-2",)),
+        )
+
+    def test_immutable_release_marker_is_accepted_without_git_checkout(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            revision = "d" * 40
+            (root / ".feelm-release-revision").write_text(revision + "\n")
+            fake = FakeRunner()
+            self.assertEqual(runtime.resolve_commit(root, revision, fake), revision)
+            self.assertEqual(fake.commands, [])
+
+    def test_hdfs_probe_uses_isolated_path_and_cleans_it(self):
+        fake = FakeRunner()
+        runtime.verify_hdfs_read_write("distributed", fake)
+        command = fake.commands[0][0]
+        self.assertEqual(command[:3], ["docker", "exec", "feelm-hdfs-namenode"])
+        self.assertIn("/verification/runtime-config/probe-distributed-", command[-1])
+        self.assertIn("hdfs dfs -rm -f", command[5])
+
     def test_spark_active_workload_is_rejected(self):
         with patch.object(runtime, "read_spark_status", return_value={"activeapps": [{}]}):
             with self.assertRaisesRegex(runtime.DeploymentError, "active applications"):
