@@ -22,7 +22,6 @@
  * | PartyTasteView.tags | 5.9 `케이퍼` `빠른 전개` `반전` `느와르` | CR-17 결정 대기. API-044 `representativeKeywords`나 API-040 `keywords`로 보이나 값이 맞지 않음 |
  * | PartyMixView.commonRate · tags | 5.9 `공통 취향 일치 72%` · `스릴러` `빠른 전개` | CR-17 결정 대기. 산출 규칙이 계약에 없음 |
  * | PublicProfileView | 7.2-A · 7.2-B 공개 프로필 | API-062가 있으나 **2차 MVP**라 미구현. 응답 모양도 다름 |
- * | TasteCompareView | 7.2-C `76%` · 장르 82 · 국가 74 · 시대 71 · 감독 68 | API-063이 있으나 **2차 MVP**라 미구현. **4줄 비교는 계약에 없음** |
  * | NotificationSettingsView.PARTY_INVITE · REPORT | 7.8-C `파티 초대 알림` · `리포트 발급 알림` | API-017 NotificationType에 없음. CR 미등록 |
  * | ReportDetailView | 3.3 · 3.4 · 7.4 국가 · 시대 비율 · 키워드 근거 · 지난 반기 비교 % · 대표 카드 문구 | API-060에 없음. 장르는 편수만, 비교는 맛별 알 수만 줌. CR 미등록 |
  * | ReportFourCutView | 3.3 · 3.4 · 7.4 4컷의 사진 · 누끼 · 영문 이름 · 감독 대표작 | API-060은 이름과 `characterCard.imageUrl`만 줌. CR 미등록 |
@@ -178,36 +177,6 @@ export type PublicProfileView = {
     movieTitle: string;
     comment: string;
     score: number;
-  }[];
-};
-
-/** 7.2-C 항목별 비교 한 줄 */
-export type TasteCompareItem = {
-  /** 장르 · 국가 · 시대 · 감독 */
-  label: string;
-  /** 일치율(%) */
-  rate: number;
-};
-
-/**
- * 7.2-C 사용자 취향 비교.
- *
- * 산출 규칙이 계약에 없다. 와이어프레임의 값(전체 76% · 장르 82 · 국가 74 · 시대 71 ·
- * 감독 68)을 그대로 옮겼다.
- */
-export type TasteCompareView = {
-  me: { userId: number; nickname: string; avatarUrl: string | null };
-  other: { userId: number; nickname: string; avatarUrl: string | null };
-  /** 전체 일치율(%) */
-  matchRate: number;
-  /** 두 사람 모두 상위에 있는 맛의 코드 */
-  sharedFlavorCodes: string[];
-  items: TasteCompareItem[];
-  /** 같이 볼 만한 영화. 레퍼런스 지시로 추가했다 */
-  recommendations: {
-    movieId: number;
-    title: string;
-    posterUrl: string | null;
   }[];
 };
 
