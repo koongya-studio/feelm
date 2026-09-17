@@ -153,3 +153,36 @@
   color: var(--color-ink-muted);
   text-align: center;
 }
+
+/*
+ * 받은 초대 구역 (업무 -595). 파티 줄과 같은 카드를 쓰고 제목만 위에 붙인다.
+ * 두 목록이 다른 모양이면 같은 화면에서 두 종류의 카드를 배우게 된다.
+ */
+.invitations {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* 목록 제목. 섹션 라벨과 같은 크기다(`components/Section`) */
+.sectionLabel {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink-muted);
+}
+
+/* 초대 줄 오른쪽의 `›`. 눌러서 들어가는 줄임을 말한다 */
+.chevron {
+  flex: none;
+  font-size: var(--font-size-body);
+  color: var(--color-ink-muted);
+}
+
+.invitationsError {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}

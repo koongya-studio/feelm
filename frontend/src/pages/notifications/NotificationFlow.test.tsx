@@ -204,16 +204,25 @@ describe('3.1 → 8.1 → 2.4-A', () => {
   });
 });
 
-describe('8.1 → 5.6 ⇢ 8.1', () => {
-  it('파티 초대 알림에서 초대를 거절하면 알림 목록으로 돌아온다', async () => {
-    renderApp([ROUTE_PATTERN.notifications]);
+/*
+ * 이동표는 `5.6 ⇢ 8.1`이지만 업무 -595에서 목적지를 5.1로 바꿨다. 8.1은 아직 전체가
+ * 목업이라 거절한 초대가 그대로 남아 있는 화면으로 돌아가고, 초대를 여는 실제 자리는
+ * 5.1의 `받은 초대` 구역이 됐다(CR-27).
+ */
+describe('8.1 → 5.6 → 5.1', () => {
+  it('파티 초대 알림에서 초대를 거절하면 파티 시작으로 간다', async () => {
+    const { unmount } = renderApp([ROUTE_PATTERN.notifications]);
 
     fireEvent.click(await findRow('파티 모드 초대'));
     await waitFor(() => expect(location()).toBe('/parties/invitations/501'));
 
     fireEvent.click(await screen.findByRole('button', { name: /거절/ }));
 
-    await waitFor(() => expect(location()).toBe('/notifications'));
+    await waitFor(() => expect(location()).toBe('/party'));
+    unmount();
+
+    // 누른 알림은 읽음으로 남는다
+    renderApp([ROUTE_PATTERN.notifications]);
     expect(await findRow('파티 모드 초대')).not.toHaveTextContent('읽지 않음');
   });
 });
