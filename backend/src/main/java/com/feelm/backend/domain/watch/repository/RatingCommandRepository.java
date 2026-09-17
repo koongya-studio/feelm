@@ -59,6 +59,126 @@ public class RatingCommandRepository {
                 .single();
     }
 
+    public Optional<OwnedRating> findOwnedRating(long userId, long ratingId) {
+        return jdbc.sql(
+                        """
+                        SELECT movie_id, watch_record_id
+                        FROM ratings
+                        WHERE id = :ratingId AND user_id = :userId
+                        """)
+                .param("ratingId", ratingId)
+                .param("userId", userId)
+                .query(
+                        (row, number) ->
+                                new OwnedRating(
+                                        row.getLong("movie_id"),
+                                        nullableLong(row, "watch_record_id")))
+                .optional();
+    }
+
+    public Optional<LockedRating> lockOwnedRating(long userId, long ratingId) {
+        return jdbc.sql(
+                        """
+                        SELECT id, movie_id, watch_record_id, score, comment,
+                               visibility, is_spoiler, created_at
+                        FROM ratings
+                        WHERE id = :ratingId AND user_id = :userId
+                        FOR UPDATE
+                        """)
+                .param("ratingId", ratingId)
+                .param("userId", userId)
+                .query(
+                        (row, number) ->
+                                new LockedRating(
+                                        row.getLong("id"),
+                                        row.getLong("movie_id"),
+                                        nullableLong(row, "watch_record_id"),
+                                        row.getBigDecimal("score"),
+                                        row.getString("comment"),
+                                        row.getString("visibility"),
+                                        row.getBoolean("is_spoiler"),
+                                        row.getObject("created_at", OffsetDateTime.class)
+                                                .toInstant()))
+                .optional();
+    }
+
+    public Optional<ExistingFrame> findFrame(long ratingId, long userId, long movieId) {
+        return jdbc.sql(
+                        """
+                        SELECT id, created_at
+                        FROM frames
+                        WHERE rating_id = :ratingId AND user_id = :userId AND movie_id = :movieId
+                        """)
+                .param("ratingId", ratingId)
+                .param("userId", userId)
+                .param("movieId", movieId)
+                .query(
+                        (row, number) ->
+                                new ExistingFrame(
+                                        row.getLong("id"),
+                                        row.getObject("created_at", OffsetDateTime.class)
+                                                .toInstant()))
+                .optional();
+    }
+
+    public void updateRating(
+            long ratingId,
+            long userId,
+            BigDecimal score,
+            String comment,
+            RatingVisibility visibility,
+            boolean spoiler,
+            Instant updatedAt) {
+        int updated =
+                jdbc.sql(
+                                """
+                                UPDATE ratings
+                                SET score = :score, comment = :comment, visibility = :visibility,
+                                    is_spoiler = :spoiler, updated_at = :updatedAt
+                                WHERE id = :ratingId AND user_id = :userId
+                                """)
+                        .param("ratingId", ratingId)
+                        .param("userId", userId)
+                        .param("score", score)
+                        .param("comment", comment)
+                        .param("visibility", visibility == null ? null : visibility.name())
+                        .param("spoiler", spoiler)
+                        .param("updatedAt", offset(updatedAt))
+                        .update();
+        if (updated != 1) {
+            throw new IllegalStateException("수정 대상 평가 상태가 변경되었습니다.");
+        }
+    }
+
+    public void deleteRating(long ratingId, long userId) {
+        int deleted =
+                jdbc.sql("DELETE FROM ratings WHERE id = :ratingId AND user_id = :userId")
+                        .param("ratingId", ratingId)
+                        .param("userId", userId)
+                        .update();
+        if (deleted != 1) {
+            throw new IllegalStateException("삭제 대상 평가 상태가 변경되었습니다.");
+        }
+    }
+
+    public void markWatchUnrated(long watchRecordId, long userId, long movieId) {
+        int updated =
+                jdbc.sql(
+                                """
+                                UPDATE watch_records
+                                SET status = 'WATCHED_UNRATED', rated_at = NULL
+                                WHERE id = :watchRecordId AND user_id = :userId
+                                  AND movie_id = :movieId AND status = 'RATED'
+                                """)
+                        .param("watchRecordId", watchRecordId)
+                        .param("userId", userId)
+                        .param("movieId", movieId)
+                        .update();
+        if (updated != 1) {
+            throw new IllegalStateException("평가에 연결된 감상 기록 상태가 변경되었습니다.");
+        }
+    }
+
     public Optional<ActiveWatchRecord> findActiveWatchForUpdate(long userId, long movieId) {
         return jdbc.sql(
                         """
@@ -154,7 +274,7 @@ public class RatingCommandRepository {
                                     average_rating = aggregate.average_rating
                                 FROM (
                                     SELECT count(*)::int AS rating_count,
-                                           round(avg(score), 2) AS average_rating
+                                           coalesce(round(avg(score), 2), 0) AS average_rating
                                     FROM ratings
                                     WHERE movie_id = :movieId
                                 ) aggregate
@@ -196,4 +316,18 @@ public class RatingCommandRepository {
     public record ActiveWatchRecord(long watchRecordId, WatchStatus status) {}
 
     public record CreatedRating(long ratingId, Instant createdAt) {}
+
+    public record OwnedRating(long movieId, Long watchRecordId) {}
+
+    public record LockedRating(
+            long ratingId,
+            long movieId,
+            Long watchRecordId,
+            BigDecimal score,
+            String comment,
+            String visibility,
+            boolean spoiler,
+            Instant createdAt) {}
+
+    public record ExistingFrame(long frameId, Instant createdAt) {}
 }
