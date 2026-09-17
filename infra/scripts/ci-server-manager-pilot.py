@@ -335,17 +335,21 @@ def filesystem_usage(root):
     }
 
 
+def write_private_json(path, payload, **dump_options):
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, 'w') as output:
+        json.dump(payload, output, **dump_options)
+        output.flush(); os.fsync(output.fileno())
+    path.chmod(0o600)
+
+
 def persist_filesystem_usage(attempt, peak, samples, sample_errors):
     final = filesystem_usage(attempt / 'root')
     if peak is None: peak = final
     usage = {'schema_version': 2, 'final': final, 'peak': peak,
              'samples': samples, 'sample_errors': sample_errors}
     path = attempt / 'filesystem-usage.json'
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-    with os.fdopen(fd, 'w') as output:
-        json.dump(usage, output, sort_keys=True)
-        output.flush(); os.fsync(output.fileno())
-    path.chmod(0o600)
+    write_private_json(path, usage, sort_keys=True)
     print('FILESYSTEM_USAGE=' + json.dumps(usage, sort_keys=True), flush=True)
     return usage
 
@@ -513,7 +517,7 @@ def execute_backend_job(base, prepared, mode='backend', safety_attempt=None, saf
         if canary.read_text() != 'synthetic host canary':
             result['passed'] = False; result['outcome'] = 'host_canary_changed'
             if 'fixture_passed' in result: result['fixture_passed'] = False
-        (attempt / 'lifecycle.json').write_text(json.dumps(result, indent=2))
+        write_private_json(attempt / 'lifecycle.json', result, indent=2)
         print('SERVER_JOB_LIFECYCLE=' + json.dumps(result), flush=True)
         if safety_lease is not None and safety_lease.get('source_sha') is not None:
             print('VALIDATED_MR_SOURCE: dynamic test count; required suites and zero failures/skips enforced', flush=True)

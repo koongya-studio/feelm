@@ -26,6 +26,15 @@ stage = load('ci-server-pilot-stage')
 
 
 class ServerPilotTests(unittest.TestCase):
+    def test_private_json_is_created_with_owner_only_permissions(self):
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(pilot.os, 'O_NOFOLLOW', 0, create=True):
+            path = Path(directory) / 'lifecycle.json'
+            pilot.write_private_json(path, {'outcome': 'success'}, indent=2)
+            self.assertEqual(json.loads(path.read_text()), {'outcome': 'success'})
+            if os.name != 'nt':
+                self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
     def test_default_plan_has_no_side_effect(self):
         with patch('sys.argv', ['pilot', 'plan']), patch.object(pilot, 'check_base') as check:
             self.assertEqual(pilot.main(), 0)
