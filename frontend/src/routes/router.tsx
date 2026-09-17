@@ -41,7 +41,6 @@ import ProfilePreviewPage from '../pages/my/ProfilePreviewPage';
 import PublicProfilePage from '../pages/my/PublicProfilePage';
 import SettingsPage from '../pages/my/SettingsPage';
 import WithdrawPage from '../pages/my/WithdrawPage';
-import TasteComparePage from '../pages/my/TasteComparePage';
 import NotificationListPage from '../pages/notifications/NotificationListPage';
 import PushPreviewPage from '../pages/notifications/PushPreviewPage';
 import OttAnalyzingPage from '../pages/otts/OttAnalyzingPage';
@@ -147,7 +146,6 @@ export const router = createBrowserRouter(
         { path: ROUTE_PATTERN.profileEdit, element: <ProfileEditPage /> },
         { path: ROUTE_PATTERN.profilePreview, element: <ProfilePreviewPage /> },
         { path: ROUTE_PATTERN.publicProfile, element: <PublicProfilePage /> },
-        { path: ROUTE_PATTERN.tasteCompare, element: <TasteComparePage /> },
 
         // 설정 하위 화면 (업무 -307). 와이어프레임에 하단 내비가 없다
         { path: ROUTE_PATTERN.accountManage, element: <AccountManagePage /> },

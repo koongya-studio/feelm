@@ -69,7 +69,6 @@ export const ROUTE_PATTERN = {
    * (팀 결정 2026-09-11, screen-spec-my.md 2장 8번).
    */
   publicProfile: '/users/:userId',
-  tasteCompare: '/users/:userId/compare',
 
   // 설정 (업무 -307). 7.8만 탭 화면이고 나머지는 전체화면이다
   settings: '/my/settings',
@@ -161,7 +160,6 @@ export const path = {
   profileEdit: () => ROUTE_PATTERN.profileEdit,
   profilePreview: () => ROUTE_PATTERN.profilePreview,
   publicProfile: (userId: string | number) => `/users/${userId}`,
-  tasteCompare: (userId: string | number) => `/users/${userId}/compare`,
 
   settings: () => ROUTE_PATTERN.settings,
   accountManage: () => ROUTE_PATTERN.accountManage,
@@ -204,9 +202,9 @@ export const path = {
  * **내 화면만 넣는다.** 그 탭에서 출발해 머무는 동안 탭이 선택된 채로 보여야 하는
  * 경로다. 다른 사람의 화면은 어느 탭에도 속하지 않는다.
  *
- * 그래서 `my`에 `publicProfile`(7.2-B)과 `tasteCompare`(7.2-C)는 **넣지 않는다.**
- * 둘은 5.8 파티원 카드에서 들어오는 남의 프로필이라 MY가 아니라 파티 쪽 흐름이고,
- * 파티에 넣지도 않았다 — 5.8 자체가 전체화면이라 그 아래는 탭 흐름 밖이다.
+ * 그래서 `my`에 `publicProfile`(7.2-B)을 **넣지 않는다.** 5.8 파티원 카드에서
+ * 들어오는 남의 프로필이라 MY가 아니라 파티 쪽 흐름이고, 파티에 넣지도 않았다 —
+ * 5.8 자체가 전체화면이라 그 아래는 탭 흐름 밖이다.
  * (업무 -305 코드리뷰 지적. 의도적 누락이라 여기 적어 둔다)
  */
 export const TAB_MATCH = {
