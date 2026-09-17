@@ -67,6 +67,12 @@ pipeline variable의 `GITLAB_USER_*` 값은
 
 ## 자동 준비와 전환
 
+`backend-cache-prepare`는 `ci-variable-contract-check` 성공을 기다리되 `needs.artifacts: false`와
+`dependencies: []`로 선행 Job artifact 전달을 차단합니다. 격리 어댑터는 비어 있지 않은
+Job `dependencies`를 계속 거부합니다. 이 CI 설정 수정에는 서버 어댑터 재설치가 필요하지
+않습니다. 수정된 YAML을 기능 브랜치에 반영한 뒤 새 MR pipeline을 생성해야 하며, 기존 Job의
+Retry만으로는 pipeline 생성 당시의 YAML이 갱신되지 않습니다.
+
 허용된 의존성 파일을 변경한 develop 대상 MR pipeline에서 `backend-cache-prepare`가 자동으로
 생성됩니다. 성공 로그에서 다음 값을 확인할 수 있습니다.
 
