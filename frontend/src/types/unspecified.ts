@@ -18,9 +18,6 @@
  * | TasteFlowView.flowSentence | 3.1 `스릴러에서 느와르로 넓어지고 있어요` | CR-16 결정 대기. 대응 필드가 없음 |
  * | TasteKeywordView.rationale | 3.1 `계획형 캐릭터 영화 12편에 ★4 이상` 등 4개 | CR-16 결정 대기. API-040 `keywords`는 `code`·`label`만 있음 |
  * | 3.1-A 상영 시간 | 3.1-A `2013 · 케이퍼 · 115분` | API-043 `movie`에 없음. 실제 연동(S15P21E106-392)으로 채울 값이 사라져 화면에서 뺐다. CR 미등록 |
- * | PartyTasteView.tasteShare | 5.9 `액션 · 모험` `46%` · `스릴러 · 범죄` `38%` | CR-17 결정 대기. 무엇의 비율인지 정의가 없고 API-057 집계로 재현되지 않음 |
- * | PartyTasteView.tags | 5.9 `케이퍼` `빠른 전개` `반전` `느와르` | CR-17 결정 대기. API-044 `representativeKeywords`나 API-040 `keywords`로 보이나 값이 맞지 않음 |
- * | PartyMixView.commonRate · tags | 5.9 `공통 취향 일치 72%` · `스릴러` `빠른 전개` | CR-17 결정 대기. 산출 규칙이 계약에 없음 |
  * | PublicProfileView | 7.2-A · 7.2-B 공개 프로필 | API-062가 있으나 **2차 MVP**라 미구현. 응답 모양도 다름 |
  * | NotificationSettingsView.PARTY_INVITE · REPORT | 7.8-C `파티 초대 알림` · `리포트 발급 알림` | API-017 NotificationType에 없음. CR 미등록 |
  * | ReportDetailView | 3.3 · 3.4 · 7.4 국가 · 시대 비율 · 키워드 근거 · 지난 반기 비교 % · 대표 카드 문구 | API-060에 없음. 장르는 편수만, 비교는 맛별 알 수만 줌. CR 미등록 |
@@ -95,31 +92,6 @@ export type TasteFlowView = {
   flowSentence: string;
   /** 와이어프레임은 4개다. API-040 `keywords`는 3~5개 */
   keywords: TasteKeywordView[];
-};
-
-/**
- * 5.9 참여자 한 명의 취향 수치.
- *
- * 5.8의 `대표 맛`과 `겹치는 맛`은 API-057의 맛별 집계로 계산할 수 있어 화면에서
- * 계산한다. 반면 5.9의 `46%` · `38%`는 무엇의 비율인지 정의가 없고 집계로도 재현되지
- * 않아 값 자체를 여기 둔다.
- */
-export type PartyTasteView = {
-  userId: number;
-  /** 대표 취향 비율(%) */
-  tasteShare: number;
-  /** 취향 태그 */
-  tags: string[];
-};
-
-/** 5.9 공통 취향 결과 */
-export type PartyMixView = {
-  partyId: number;
-  members: PartyTasteView[];
-  /** 공통 취향 일치(%) */
-  commonRate: number;
-  /** 공통 취향 태그 */
-  tags: string[];
 };
 
 /*

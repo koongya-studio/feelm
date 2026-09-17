@@ -8,14 +8,9 @@
  *
  * **한 파일에 실제 호출과 목업이 섞여 있다.** 갈리는 기준은 백엔드에 해당 API가 있는지다.
  * - 위 열 개는 실제로 부른다
- * - 파티 영화 추천(API-058)은 **백엔드에 아직 없다.** 5.4 · 5.5가 목업으로 남는다
- * - `getPartyRecommendationReasons` · `getPartyMix`는 계약에 대응이 **없다**(CR-17)
+ * - 파티 영화 추천(API-058)은 **백엔드에 아직 없다.** 5.9 · 5.5가 목업으로 남는다
  */
-import { mockPartyMix } from '../mocks/partyPopcorn';
-import {
-  mockPartyRecommendationReasons,
-  mockPartyRecommendations,
-} from '../mocks/partyRecommendations';
+import { mockPartyRecommendations } from '../mocks/partyRecommendations';
 import { request } from './client';
 import { respond } from './mockTransport';
 import type {
@@ -29,7 +24,6 @@ import type {
   PartyState,
   SentPartyInvitation,
 } from '../types/party';
-import type { PartyMixView } from '../types/unspecified';
 
 /**
  * 파티 정원. **계약이 정한 값이다** — API-049 처리 규칙 `파티는 파티장 포함 최대 4명`,
@@ -194,49 +188,16 @@ export async function getPartyPopcorn(partyId: number): Promise<PartyPopcorn> {
 /**
  * API-058 파티 영화 추천 · GET /api/v1/parties/{partyId}/recommendations
  *
- * **백엔드에 아직 없다.** 5.4 `공통 필름 현상 중`과 5.5가 목업으로 남는 이유다.
- * 계약은 동기 응답이라 5.4는 이 응답을 기다리는 동안 보여 주는 화면이지 별도 계약이
+ * **백엔드에 아직 없다.** 5.9 팝콘 섞기와 5.5 추천 완성이 목업으로 남는 이유다.
+ * 계약은 동기 응답이라 5.9는 이 응답을 기다리는 동안 보여 주는 화면이지 별도 계약이
  * 아니다.
  *
  * 기준 목업은 9001 하나뿐이다. 실제 서버가 만든 파티는 다른 번호를 받으므로 없는
  * 번호는 기준 목업의 추천을 파티 번호만 갈아 끼워 내려준다. 그러지 않으면 새로 만든
- * 파티가 언제나 404가 되어 5.3 → 5.4 → 5.5가 끊긴다.
+ * 파티가 언제나 404가 되어 5.3 → 5.4 → 5.9 → 5.5가 끊긴다.
  */
 export async function getPartyRecommendations(partyId: number): Promise<PartyRecommendationSet> {
   const base = mockPartyRecommendations[partyId] ?? mockPartyRecommendations[9001];
 
   return respond({ ...base, partyId }, 'parties');
-}
-
-/**
- * 5.5의 `왜 같이 추천됐나요?` 문장.
- *
- * **계약에 대응 필드가 없다.** API-058 `reason`은 카드별 `summary` 하나뿐이고, 추천 묶음
- * 전체를 설명하는 문장이 없다. 화면이 목업을 직접 import하지 않도록 함수로 감싼다
- * (`getPartyMix`와 같은 이유).
- */
-export async function getPartyRecommendationReasons(partyId: number): Promise<string[]> {
-  const reasons = mockPartyRecommendationReasons[partyId] ?? mockPartyRecommendationReasons[9001];
-
-  return respond(reasons ?? [], 'parties');
-}
-
-/**
- * 5.9 파티 팝콘 섞기 결과. **계약에 대응 API가 없다(CR-17).**
- *
- * 참여자별 취향 비율과 공통 취향 일치도를 내려주는 필드가 없어 화면이 목업을 직접
- * import하지 않도록 함수만 따로 둔다. 계약이 정해지면 API-057로 합친다.
- *
- * `memberIds`를 받는 것은 **목업의 사용자 번호가 실제 파티원과 다르기 때문이다.**
- * 값 자체가 와이어프레임에서 옮긴 자리표시자라 누구의 값인지는 의미가 없으므로, 실제
- * 파티원에게 앞에서부터 차례로 붙인다. 그러지 않으면 5.9의 비율과 태그가 모두 빈다.
- */
-export async function getPartyMix(partyId: number, memberIds: number[]): Promise<PartyMixView> {
-  const base = mockPartyMix[partyId] ?? mockPartyMix[9001];
-  const members = memberIds.map((userId, index) => ({
-    ...base.members[index % base.members.length],
-    userId,
-  }));
-
-  return respond({ ...base, partyId, members }, 'parties');
 }

@@ -117,7 +117,7 @@ export default function PartyInvitationPage() {
       </div>
 
       <div className={styles.actions}>
-        <Button disabled={submitting} onClick={() => answer(true)}>
+        <Button variant="brand" disabled={submitting} onClick={() => answer(true)}>
           초대 수락하기
         </Button>
 

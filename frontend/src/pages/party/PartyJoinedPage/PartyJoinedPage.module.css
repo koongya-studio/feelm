@@ -27,7 +27,9 @@
   text-align: center;
   font-size: var(--font-size-title);
   line-height: var(--line-height-title);
-  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-title);
+  /* 시안의 큰 제목은 bold(600)보다 굵다. 3.1-A · 3.4가 쓰는 700과 같은 값이다 */
+  font-weight: 700;
   color: var(--color-ink);
 }
 
@@ -70,7 +72,10 @@
   color: var(--color-on-dark-muted);
 }
 
-/* 검정 알약은 `파티 모드 시작하기` 하나다 (`design-concept.md` 2.4) */
+/*
+ * 주 버튼은 브랜드 빨강 면이다 (`design-concept.md` 2.9 — 시안이 파티 화면까지
+ * 넓혔다). 한 화면에 하나뿐인 것은 그대로다.
+ */
 .actions {
   display: flex;
   flex: none;

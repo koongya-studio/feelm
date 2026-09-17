@@ -1,0 +1,173 @@
+/*
+ * 파티팝콘 흐름 셸. 사용자 시안 2026-09-17(업무 -462)의 세 프레임이 공유하는 틀이다.
+ *
+ * 제목과 그림은 가운데에 두고, 파티원 줄과 진행 표시는 위아래 끝을 잡는다. 기다리는
+ * 화면이 스스로 넘어가므로 위아래가 고정되어 있어야 가운데 그림만 바뀐 것으로 읽힌다.
+ */
+.page {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--screen-padding-x) var(--space-6);
+}
+
+/* 파티원 줄. 이름까지 한 줄이고 인원 수가 오른쪽 끝을 잡는다 */
+.members {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.memberList {
+  display: flex;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  gap: var(--space-3);
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.memberList::-webkit-scrollbar {
+  display: none;
+}
+
+.member {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.memberName {
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-ink-body);
+}
+
+.memberCount {
+  margin: 0;
+  margin-left: auto;
+  flex: none;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-muted);
+}
+
+/* 제목 묶음. 시안은 세 프레임 모두 가운데 정렬이다 */
+.titleBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  letter-spacing: var(--letter-spacing-title);
+  /* 시안의 큰 제목은 bold(600)보다 굵다. 3.1-A · 3.4가 쓰는 700과 같은 값이다 */
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  letter-spacing: var(--letter-spacing-body);
+  color: var(--color-ink-muted);
+}
+
+/* 진행 표시. 화면 아래쪽에 붙는다 */
+.progress {
+  display: flex;
+  margin-top: auto;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.note {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+/*
+ * 세 단계를 같은 폭으로 둔다. 점 사이를 잇는 선은 각 단계의 가상 요소가 그리며
+ * 첫 단계 왼쪽과 마지막 단계 오른쪽은 그리지 않는다.
+ */
+.steps {
+  display: flex;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.step::before,
+.step::after {
+  position: absolute;
+  top: 4px;
+  width: 50%;
+  height: 1px;
+  background: var(--color-line-strong);
+  content: '';
+}
+
+.step::before {
+  left: 0;
+}
+
+.step::after {
+  right: 0;
+}
+
+.step:first-child::before,
+.step:last-child::after {
+  content: none;
+}
+
+.dot {
+  position: relative;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--radius-pill);
+  background: var(--color-line-strong);
+}
+
+.stepLabel {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
+}
+
+/*
+ * 지금 단계만 표식을 갖는다. 브랜드 빨강은 면적을 차지하지 않는 표식으로만 쓴다
+ * (`design-concept.md` 2.3) — 점 하나와 글자가 그 범위다.
+ */
+.step[data-current] .dot {
+  background: var(--color-brand);
+}
+
+.step[data-current] .stepLabel {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-brand-ink);
+}
