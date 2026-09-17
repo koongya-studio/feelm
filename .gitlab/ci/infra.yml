@@ -105,6 +105,34 @@ deploy-hdfs-distributed-config:
   after_script:
     - python3 -I -B infra/scripts/notify-deployment.py hdfs-distributed-config "$CI_JOB_STATUS"
 
+deploy-kafka-config:
+  stage: deploy
+  tags: [e106-distributed]
+  needs: []
+  environment:
+    name: distributed
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
+    - bash infra/scripts/deploy-kafka-config.sh "$CI_COMMIT_SHA"
+  after_script:
+    - python3 -I -B infra/scripts/notify-deployment.py kafka-config "$CI_JOB_STATUS"
+  resource_group: distributed-runtime-kafka
+  interruptible: false
+  retry:
+    max: 1
+    when: [runner_system_failure, scheduler_failure]
+  timeout: 20m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - infra/compose/distributed.yml
+        - infra/kafka/**/*
+        - infra/scripts/deploy-distributed-runtime.py
+        - infra/scripts/runtime-config-release.py
+        - infra/scripts/deploy-kafka-config.sh
+      when: manual
+  allow_failure: false
+
 infra-config-test:
   stage: test
   tags: [e106-mr-isolated]
@@ -134,7 +162,7 @@ infra-config-test:
         - infra/spark/**/*
         - infra/scripts/deploy-distributed-runtime.py
         - infra/scripts/runtime-config-release.py
-        - infra/scripts/deploy-hdfs-config.sh
+        - infra/scripts/deploy-*-config.sh
         - infra/scripts/test_runtime_config_release.py
         - infra/scripts/deploy-consumer.sh
         - infra/scripts/rollback-consumer.sh

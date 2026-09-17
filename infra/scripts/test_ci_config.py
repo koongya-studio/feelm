@@ -27,6 +27,7 @@ class CiConfigTests(unittest.TestCase):
         cls.consumer = (CI_DIR / 'consumer.yml').read_text()
         cls.infra = (CI_DIR / 'infra.yml').read_text()
         cls.hdfs_deploy = (ROOT / 'infra' / 'scripts' / 'deploy-hdfs-config.sh').read_text()
+        cls.kafka_deploy = (ROOT / 'infra' / 'scripts' / 'deploy-kafka-config.sh').read_text()
         cls.pipeline_path = CI_DIR / 'pipeline.yml'
         cls.pipeline = cls.pipeline_path.read_text() if cls.pipeline_path.exists() else ''
 
@@ -194,6 +195,14 @@ include:
         self.assertNotIn('- infra/scripts/test_consumer_distributed_deployment.py',
                          job_block(self.backend, 'backend-mr-test'))
 
+    def test_infra_config_changes_stays_within_gitlab_limit(self):
+        infra = job_block(self.infra, 'infra-config-test')
+        changes = re.search(r'(?m)^      changes:\n((?:        - .*\n)+)', infra)
+        self.assertIsNotNone(changes)
+        entries = re.findall(r'(?m)^        - ', changes.group(1))
+        self.assertLessEqual(len(entries), 50)
+        self.assertIn('- infra/scripts/deploy-*-config.sh', changes.group(1))
+
     def test_required_variable_contract_and_runtime_preflight_are_separated(self):
         contract = job_block(self.infra, 'ci-variable-contract-check')
         for expected in (
@@ -281,6 +290,31 @@ include:
         self.assertIn('needs: [deploy-hdfs-service-config]', distributed)
         self.assertIn('name: distributed', distributed)
         self.assertIn('HDFS_NODE: distributed', distributed)
+
+    def test_kafka_config_deploy_is_manual_protected_main_and_isolated(self):
+        deploy = job_block(self.infra, 'deploy-kafka-config')
+        for expected in (
+                'stage: deploy', 'tags: [e106-distributed]', 'needs: []',
+                'name: distributed', 'ci-deploy-current-commit.py',
+                'deploy-kafka-config.sh "$CI_COMMIT_SHA"',
+                'notify-deployment.py kafka-config "$CI_JOB_STATUS"',
+                'resource_group: distributed-runtime-kafka',
+                'interruptible: false', 'timeout: 20m',
+                '$CI_COMMIT_BRANCH == "main"',
+                '$CI_COMMIT_REF_PROTECTED == "true"',
+                '$CI_PIPELINE_SOURCE == "push"',
+                'when: manual', 'allow_failure: false',
+                '- infra/compose/distributed.yml', '- infra/kafka/**/*',
+                '- infra/scripts/deploy-kafka-config.sh'):
+            self.assertIn(expected, deploy)
+        for forbidden in ('merge_request_event', 'docker compose down', ' down -v',
+                          'KAFKA_CLUSTER_ID='):
+            self.assertNotIn(forbidden, deploy)
+        for expected in ('--component kafka --node distributed',
+                         'docker inspect feelm-kafka', 'running_cluster_id',
+                         'KAFKA_CLUSTER_ID is required', '--components kafka'):
+            self.assertIn(expected, self.kafka_deploy)
+        self.assertNotIn('echo "${KAFKA_CLUSTER_ID}', self.kafka_deploy)
 
     def test_pipeline_mr_jobs_are_isolated_sharded_and_path_scoped(self):
         self.assertTrue(self.pipeline_path.is_file(), 'Missing Pipeline CI include')
@@ -428,7 +462,7 @@ include:
             sorted(deploy_jobs),
             ['deploy-backend', 'deploy-consumer', 'deploy-frontend',
              'deploy-hdfs-distributed-config', 'deploy-hdfs-service-config',
-             'deploy-monitoring', 'deploy-redis'],
+             'deploy-kafka-config', 'deploy-monitoring', 'deploy-redis'],
         )
         notification_paths = (
             backend_env,

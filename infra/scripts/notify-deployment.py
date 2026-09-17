@@ -25,6 +25,7 @@ DEPLOYMENT_SERVICES = (
     "monitoring",
     "hdfs-service-config",
     "hdfs-distributed-config",
+    "kafka-config",
 )
 
 

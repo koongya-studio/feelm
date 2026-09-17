@@ -266,15 +266,45 @@ def verify_hdfs_read_write(node: str, runner: Runner) -> None:
     runner.run(["docker", "exec", container, "sh", "-c", script, "probe", probe])
 
 
+def verify_kafka_produce_consume(runner: Runner) -> None:
+    nonce = f"{os.getpid()}.{time.time_ns()}"
+    topic = f"feelm.runtime.config.probe.{nonce}"
+    token = f"runtime-config-probe-{nonce}"
+    script = (
+        "set -eu; topic=$1; token=$2; "
+        "trap '/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 "
+        "--delete --topic \"$topic\" >/dev/null 2>&1 || true' EXIT; "
+        "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 "
+        "--create --topic \"$topic\" --partitions 1 --replication-factor 1 >/dev/null; "
+        "printf '%s\\n' \"$token\" | /opt/kafka/bin/kafka-console-producer.sh "
+        "--bootstrap-server localhost:9092 --topic \"$topic\" >/dev/null; "
+        "actual=$(/opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 "
+        "--topic \"$topic\" --from-beginning --max-messages 1 --timeout-ms 10000 "
+        "2>/dev/null); test \"$actual\" = \"$token\""
+    )
+    runner.run(["docker", "exec", "feelm-kafka", "sh", "-c", script,
+                "probe", topic, token])
+
+
 def verify_runtime(node: str, components: tuple[str, ...], env_file: Path,
                    services: tuple[str, ...], runner: Runner, attempts: int) -> None:
     wait_for_containers(services, runner, attempts)
     if "kafka" in components:
-        runner.run([
-            "docker", "exec", "feelm-kafka",
-            "/opt/kafka/bin/kafka-metadata-quorum.sh",
-            "--bootstrap-server", "localhost:9092", "describe", "--status",
-        ])
+        last_error: DeploymentError | None = None
+        for attempt in range(attempts):
+            try:
+                runner.run([
+                    "docker", "exec", "feelm-kafka",
+                    "/opt/kafka/bin/kafka-metadata-quorum.sh",
+                    "--bootstrap-server", "localhost:9092", "describe", "--status",
+                ])
+                break
+            except DeploymentError as error:
+                last_error = error
+                if attempt + 1 < attempts:
+                    time.sleep(5)
+        else:
+            raise DeploymentError(f"Kafka metadata quorum did not become ready: {last_error}")
     if "hdfs" in components:
         wait_for_hdfs(node, runner, attempts)
     if "spark" in components:
@@ -406,6 +436,8 @@ def deploy(args: argparse.Namespace, runner: Runner) -> int:
             )
         if "hdfs" in components:
             verify_hdfs_read_write(args.node, runner)
+        if "kafka" in components:
+            verify_kafka_produce_consume(runner)
         if args.spark_image:
             verify_spark_image(services, args.spark_image, runner)
     except DeploymentError as candidate_error:
@@ -423,6 +455,8 @@ def deploy(args: argparse.Namespace, runner: Runner) -> int:
                 )
             if "hdfs" in components:
                 verify_hdfs_read_write(args.node, runner)
+            if "kafka" in components:
+                verify_kafka_produce_consume(runner)
             previous_spark_image = rollback_environment.get("SPARK_IMAGE")
             if previous_spark_image:
                 verify_spark_image(services, previous_spark_image, runner)
