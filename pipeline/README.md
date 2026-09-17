@@ -83,6 +83,11 @@ CLI 인자가 같은 목적의 환경변수보다 우선합니다.
 | `RECOMMENDATION_INPUT_URI` | 없음 | 입력 Parquet URI. 입력을 읽는 Job에서 필수 |
 | `RECOMMENDATION_OUTPUT_URI` | 없음 | 출력 Parquet URI. 결과를 저장하는 Job에서 필수 |
 
+영화 dense embedding 생성은 원본 TMDb JSON과 확정된 서비스 영화 ID 매핑을 함께 입력으로
+사용한다. 생성·dry-run·트랜잭션 적재 절차는
+[`spark/batch/embedding/README.md`](spark/batch/embedding/README.md)를 따른다. PostgreSQL
+DSN은 `EMBEDDING_DATABASE_DSN` 환경변수로만 전달하며 저장소·CLI 인자·산출물에 남기지 않는다.
+
 실제 내부 주소나 인증정보는 저장소에 기록하지 않습니다. HDFS URI와 Spark 자원 설정은
 인프라·데이터 업무에서 확정한 값을 실행 환경에서 주입합니다.
 
