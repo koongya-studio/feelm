@@ -2,7 +2,6 @@ package com.feelm.backend.domain.recommendation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -39,7 +38,6 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.annotation.Transactional;
 
 /** API-047: 실제 마이그레이션과 PostgreSQL을 사용하는 관심없음 HTTP 계약 테스트. */
 @SpringBootTest(
@@ -104,16 +102,15 @@ class RecommendationDismissApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("T1 현재 취향 추천을 넘기면 다음 취향 추천으로 교체한다")
-    void dismissesMovieAndReturnsSameTypeReplacement() throws Exception {
+    @DisplayName("T1 추천 카드의 관심없음과 출처를 저장하되 카드를 직접 보충하지 않는다")
+    void dismissesMovieWithoutReplacingCard() throws Exception {
         dismiss(USER, TASTE_MOVIE, itemBody(TASTE_ITEM))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.movieId").value(TASTE_MOVIE))
-                .andExpect(jsonPath("$.replacement.recommendationItemId").value(NEXT_TASTE_ITEM))
-                .andExpect(jsonPath("$.replacement.type").value("TASTE"));
+                .andExpect(jsonPath("$.replacement").doesNotExist());
 
         assertThat(dismissalRows(USER, TASTE_MOVIE)).isEqualTo(1);
-        assertThat(exposedAt(NEXT_TASTE_ITEM)).isNotNull();
+        assertThat(exposedAt(NEXT_TASTE_ITEM)).isNull();
         assertThat(exposedAt(DISCOVERY_ITEM)).isNull();
         assertThat(setInputVersion(SET)).isEqualTo("input-v1");
     }
@@ -125,8 +122,7 @@ class RecommendationDismissApiContractTest extends SharedPostgresContractTest {
 
         dismiss(USER, TASTE_MOVIE, itemBody(TASTE_ITEM))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.movieId").value(TASTE_MOVIE))
-                .andExpect(jsonPath("$.replacement").value(nullValue()));
+                .andExpect(jsonPath("$.movieId").value(TASTE_MOVIE));
 
         assertThat(dismissalRows(USER, TASTE_MOVIE)).isEqualTo(1);
         assertThat(exposedAt(DISCOVERY_ITEM)).isNull();
@@ -138,8 +134,7 @@ class RecommendationDismissApiContractTest extends SharedPostgresContractTest {
     void dismissesWithoutRecommendationSource() throws Exception {
         dismiss(USER, OTHER_MOVIE, "{}")
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.movieId").value(OTHER_MOVIE))
-                .andExpect(jsonPath("$.replacement").value(nullValue()));
+                .andExpect(jsonPath("$.movieId").value(OTHER_MOVIE));
 
         assertThat(dismissalSource(USER, OTHER_MOVIE)).isNull();
         assertThat(dismissEventRows(USER, OTHER_MOVIE)).isEqualTo(1);
@@ -224,15 +219,14 @@ class RecommendationDismissApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("과거 추천 카드의 관심없음은 저장하지만 교체 카드를 꺼내지 않는다")
-    void doesNotReplaceFromPastRecommendationSet() throws Exception {
+    @DisplayName("과거 추천 카드의 관심없음도 출처와 함께 저장한다")
+    void savesDismissalFromPastRecommendationSet() throws Exception {
         long currentSet = 1001;
         recommendationSet(currentSet, USER, OffsetDateTime.now().plusDays(1));
 
         dismiss(USER, TASTE_MOVIE, itemBody(TASTE_ITEM))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.movieId").value(TASTE_MOVIE))
-                .andExpect(jsonPath("$.replacement").value(nullValue()));
+                .andExpect(jsonPath("$.movieId").value(TASTE_MOVIE));
 
         assertThat(dismissalSource(USER, TASTE_MOVIE)).isEqualTo(TASTE_ITEM);
         assertThat(dismissEventRows(USER, TASTE_MOVIE)).isEqualTo(1);
@@ -272,19 +266,6 @@ class RecommendationDismissApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @Transactional
-    @DisplayName("T9 교체할 때 같은 종류에서 아직 보여주지 않은 첫 영화를 선택한다")
-    void selectsFirstUnexposedItemOfSameType() {
-        assertThat(recommendationDismissRepository.lockNextReplacement(USER, SET, "TASTE"))
-                .get()
-                .extracting(
-                        RecommendationDismissRepository.ReplacementItem::id,
-                        RecommendationDismissRepository.ReplacementItem::movieId,
-                        RecommendationDismissRepository.ReplacementItem::type)
-                .containsExactly(NEXT_TASTE_ITEM, NEXT_TASTE_MOVIE, "TASTE");
-    }
-
-    @Test
     @DisplayName("T10 같은 영화를 동시에 요청해도 관심없음과 이벤트는 하나만 저장한다")
     void mapsConcurrentDuplicateToAlreadyDismissed() throws Exception {
         executor = Executors.newFixedThreadPool(2);
@@ -305,62 +286,7 @@ class RecommendationDismissApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("같은 추천 묶음의 서로 다른 두 카드를 동시에 넘겨도 후보를 중복 사용하지 않는다")
-    void doesNotConsumeOneReplacementTwice() throws Exception {
-        long secondReplacementMovie = 104;
-        long secondReplacementItem = 3003;
-        movie(secondReplacementMovie, "두 번째 다음 취향 추천");
-        jdbc.update("UPDATE recommendation_items SET exposed_at=now() WHERE id=?", NEXT_TASTE_ITEM);
-        recommendationItem(3004, SET, OTHER_MOVIE, "TASTE", 4, false);
-        recommendationItem(secondReplacementItem, SET, secondReplacementMovie, "TASTE", 5, false);
-
-        executor = Executors.newFixedThreadPool(2);
-        CountDownLatch ready = new CountDownLatch(2);
-        CountDownLatch start = new CountDownLatch(1);
-        String token = bearer(USER);
-        Future<Integer> first =
-                executor.submit(
-                        () ->
-                                concurrentDismiss(
-                                        TASTE_MOVIE, itemBody(TASTE_ITEM), token, ready, start));
-        Future<Integer> second =
-                executor.submit(
-                        () ->
-                                concurrentDismiss(
-                                        NEXT_TASTE_MOVIE,
-                                        itemBody(NEXT_TASTE_ITEM),
-                                        token,
-                                        ready,
-                                        start));
-        assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
-        start.countDown();
-
-        assertThat(first.get(10, TimeUnit.SECONDS)).isEqualTo(200);
-        assertThat(second.get(10, TimeUnit.SECONDS)).isEqualTo(200);
-        assertThat(exposedAt(3004)).isNotNull();
-        assertThat(exposedAt(secondReplacementItem)).isNotNull();
-        assertThat(dismissalRows(USER, TASTE_MOVIE)).isEqualTo(1);
-        assertThat(dismissalRows(USER, NEXT_TASTE_MOVIE)).isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("이미 관심없음 처리한 버퍼 영화는 교체 카드로 다시 보여주지 않는다")
-    void skipsDismissedMovieWhenSelectingReplacement() throws Exception {
-        jdbc.update(
-                "INSERT INTO user_movie_dismissals(user_id,movie_id) VALUES (?,?)",
-                USER,
-                NEXT_TASTE_MOVIE);
-
-        dismiss(USER, TASTE_MOVIE, itemBody(TASTE_ITEM))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.replacement").value(nullValue()));
-
-        assertThat(exposedAt(NEXT_TASTE_ITEM)).isNull();
-        assertThat(exposedAt(DISCOVERY_ITEM)).isNull();
-    }
-
-    @Test
-    @DisplayName("T11 이벤트 기록에 실패하면 관심없음과 카드 교체를 모두 되돌린다")
+    @DisplayName("T11 이벤트 기록에 실패하면 관심없음 저장을 되돌린다")
     void rollsBackWhenOutboxWriteFails() throws Exception {
         doThrow(new IllegalStateException("forced outbox failure"))
                 .when(kafkaEventPublisherSpy)
@@ -408,70 +334,6 @@ class RecommendationDismissApiContractTest extends SharedPostgresContractTest {
 
         assertThat(recommendationDismissService.dismissedMovieIds(USER))
                 .containsExactly(TASTE_MOVIE);
-    }
-
-    @Test
-    @DisplayName("T14 교체 카드에 영화·장르·OTT·맛·추천 이유를 모두 담는다")
-    void mapsReplacementContract() throws Exception {
-        jdbc.update(
-                "INSERT INTO popcorn_flavors"
-                        + "(id,code,display_name,color,sort_order,cluster_id,representative_keywords)"
-                        + " VALUES (1,'FLAVOR_B','다크초코','#3C2418',1,1,'[]'::jsonb)");
-        jdbc.update(
-                "UPDATE movies SET poster_url='https://image.test/poster.jpg',"
-                        + " release_date=DATE '1999-10-15', average_rating=4.30,"
-                        + " representative_flavor_id=1 WHERE id=?",
-                NEXT_TASTE_MOVIE);
-        jdbc.update(
-                "INSERT INTO genres(id,code,name,tmdb_genre_id)"
-                        + " VALUES (1,'DRAMA','드라마',18),(2,'THRILLER','스릴러',53)");
-        jdbc.update(
-                "INSERT INTO movie_genres(movie_id,genre_id) VALUES (?,1),(?,2)",
-                NEXT_TASTE_MOVIE,
-                NEXT_TASTE_MOVIE);
-        jdbc.update(
-                "INSERT INTO otts(id,code,name,tmdb_provider_id)"
-                        + " VALUES (1,'NETFLIX','넷플릭스',8)");
-        jdbc.update(
-                "INSERT INTO movie_ott_providers(movie_id,ott_id) VALUES (?,1)", NEXT_TASTE_MOVIE);
-        jdbc.update(
-                "UPDATE recommendation_items SET reason="
-                        + "'{\"summary\":\"취향과 잘 맞아요\",\"factors\":[]}'::jsonb WHERE id=?",
-                NEXT_TASTE_ITEM);
-
-        dismiss(USER, TASTE_MOVIE, itemBody(TASTE_ITEM))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.replacement.movie.movieId").value(NEXT_TASTE_MOVIE))
-                .andExpect(jsonPath("$.replacement.movie.title").value("다음 취향 추천"))
-                .andExpect(
-                        jsonPath("$.replacement.movie.posterUrl")
-                                .value("https://image.test/poster.jpg"))
-                .andExpect(jsonPath("$.replacement.movie.releaseYear").value(1999))
-                .andExpect(jsonPath("$.replacement.movie.genres[0]").value("드라마"))
-                .andExpect(jsonPath("$.replacement.movie.genres[1]").value("스릴러"))
-                .andExpect(jsonPath("$.replacement.movie.averageRating").value(4.3))
-                .andExpect(jsonPath("$.replacement.movie.ottProviders[0]").value("NETFLIX"))
-                .andExpect(jsonPath("$.replacement.flavorCode").value("FLAVOR_B"))
-                .andExpect(jsonPath("$.replacement.reason.summary").value("취향과 잘 맞아요"));
-    }
-
-    @Test
-    @DisplayName("T14 DISCOVERY 교체 카드는 추천 당시 저장한 맛을 반환한다")
-    void usesStoredDiscoveryFlavorForReplacement() throws Exception {
-        long nextDiscoveryMovie = 104;
-        long nextDiscoveryItem = 3004;
-        movie(nextDiscoveryMovie, "다음 발견 후보");
-        jdbc.update("UPDATE recommendation_items SET exposed_at=now() WHERE id=?", DISCOVERY_ITEM);
-        recommendationItem(nextDiscoveryItem, SET, nextDiscoveryMovie, "DISCOVERY", 4, false);
-        jdbc.update(
-                "UPDATE recommendation_items SET flavor_code='FLAVOR_SNAPSHOT' WHERE id=?",
-                nextDiscoveryItem);
-
-        dismiss(USER, DISCOVERY_MOVIE, itemBody(DISCOVERY_ITEM))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.replacement.recommendationItemId").value(nextDiscoveryItem))
-                .andExpect(jsonPath("$.replacement.type").value("DISCOVERY"))
-                .andExpect(jsonPath("$.replacement.flavorCode").value("FLAVOR_SNAPSHOT"));
     }
 
     private org.springframework.test.web.servlet.ResultActions dismiss(

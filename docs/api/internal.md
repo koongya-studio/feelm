@@ -18,9 +18,9 @@ FastAPI 서비스가 수행하고, Spring Boot가 이 문서의 내부 API로 �
 
 | 공개 API | 내부 호출 | 비고 |
 |---|---|---|
-| API-045 기본 추천 조회 | `POST /internal/v1/recommendations` | 세트 버퍼 미스·입력 변경 시에만 호출 |
-| API-046 추가 영화 추천 | `POST /internal/v1/recommendations` (`excludeMovieIds`에 기존 노출분 포함) | 버퍼 소진 시에만 호출 |
-| API-047 관심없음 표시 | 내부 호출 없음 | 버퍼의 같은 타입 다음 후보로 교체, 소진 시 `replacement: null`. 해당 영화는 다음 버퍼 생성 시 `excludeMovieIds`로 제외 |
+| API-045 기본 추천 조회 | 내부 호출 없음 | 현재 PostgreSQL 세트 버퍼를 조회하며 세트가 없으면 `503`. 세트 생성은 별도 버퍼 저장 흐름이 담당 |
+| API-046 추천 카드 보충 | 내부 호출 없음 | 194 단계의 공개 전환용 API. PostgreSQL 버퍼에서 한 자리만 보충하며, 후속 Jira에서 평가·관심없음 서비스의 Java 메서드 직접 호출로 전환 후 공개 API 제거 |
+| API-047 관심없음 표시 | 내부 호출 없음 | 관심없음 저장 후 API-046이 원본 추천 항목 유형에 맞춰 보충. 해당 영화는 다음 버퍼 생성 시 제외 |
 | API-058 파티 영화 추천 | `POST /internal/v1/party-recommendations` | |
 | API-040 취향 분석·키워드 | `POST /internal/v1/taste-analysis` | 평가 변경 후 비동기 갱신 |
 | API-031 유사 영화 추천 | `GET /internal/v1/movies/{movieId}/similar` | 배치 사전 계산 결과 조회 |
@@ -63,8 +63,9 @@ FastAPI의 PostgreSQL 접근은 **영화 임베딩(pgvector) 읽기 전용**으�
 
 | 신호 | 예 | 처리 |
 |---|---|---|
-| 강한 신호 | 별점 등록·변경·삭제, 온보딩 변경 | `inputVersion` 증가 + 세트 버퍼 즉시 무효화 → 다음 요청에서 IN-01 재호출 |
-| 관심없음 | 추천 카드 관심없음 | **버전 유지, 세트 유지** — 현재 버퍼의 같은 타입 후보로 교체하고 다음 버퍼 생성 시 `excludeMovieIds`로 제외 (MR !22 합의: 대안 A) |
+| 평가 | 별점 등록·변경·삭제 | `inputVersion` 증가. 현재 노출 중인 나머지 카드는 유지하고, 추천 카드에서 평가했다면 API-046으로 해당 자리만 보충. 갱신된 입력은 다음 세트 생성에 반영 |
+| 온보딩 변경 | 선호 영화 선택 변경 | `inputVersion` 증가 + 세트 버퍼 무효화 → 다음 요청에서 IN-01 재호출 |
+| 관심없음 | 추천 카드 관심없음 | **버전 유지, 세트 유지** — 저장 후 API-046으로 해당 자리만 보충하고 다음 버퍼 생성 시 제외 |
 | 약한 신호 | 영화 상세 조회, OTT 링크 클릭 | 버전 유지. Spark Streaming이 Redis 행동 Feature만 갱신하고, TTL 만료나 다음 버퍼 재생성 때 반영 |
 
 ### 타임아웃·장애 격리 (NFR-05)
@@ -118,7 +119,7 @@ Fold-in으로 사용자 벡터를 갱신하고 후보를 재정렬해 `TASTE`/`D
 
 | 필드 | 설명 |
 |---|---|
-| `size` | 반환할 후보 수. 기본 20 — 설정값 `recommendation.buffer-size`. 구성은 항상 기본 규칙(TASTE 2 + DISCOVERY 1 인터리브, 후보 부족 시 TASTE로 채움) |
+| `size` | 반환할 후보 수. 기본 20 — 설정값 `recommendation.buffer-size`. 기본 노출 구성은 TASTE 2 + DISCOVERY 1이며, 사용 가능한 DISCOVERY가 없으면 TASTE 3으로 채움 |
 | `ratings`·`onboardingPreferences` | Fold-in 입력. Spring이 PostgreSQL에서 조회해 전달 |
 | `excludeMovieIds` | 감상 기록·관심없음·현재 세트. FastAPI는 추가 판단 없이 제외만 한다 |
 | `flavorCounts` | 맛별 팝콘 수 — `DISCOVERY`(임계치 미만 맛) 후보 선정용 |
@@ -149,7 +150,7 @@ Fold-in으로 사용자 벡터를 갱신하고 후보를 재정렬해 `TASTE`/`D
 ```
 
 - 콜드 스타트(평가·온보딩 모두 없음)면 인기 기반 후보로 `TASTE`를 채우고 `reason.summary`에 명시한다 (가정)
-- `items`는 `TASTE` 2편 + `DISCOVERY` 1편이 반복되는 **인터리브 순서**로 정렬해 반환한다. Spring은 응답 전체(20편)를 PostgreSQL `recommendation_items`에 저장하고(`exposed_at` NULL = 미노출, MR !22 합의: PostgreSQL 저장안) API-045·046에서 앞에서부터 3편씩 노출하며, API-047 관심없음은 버퍼의 다음 같은 타입 후보로 교체한다. 같은 타입 후보가 소진되면 `replacement: null`을 반환하며 이때도 내부 API를 호출하지 않는다
+- `items`는 유형별 점수 순 후보를 반환한다. Spring은 TASTE·DISCOVERY를 독립 버퍼로 PostgreSQL `recommendation_items`에 저장한다(`exposed_at` NULL = 미노출, MR !22 합의: PostgreSQL 저장안). API-045는 TASTE 2편 + DISCOVERY 1편을 기본으로 노출하고, 사용 가능한 DISCOVERY가 없으면 TASTE 3편을 노출한다. 관심없음·평가로 카드가 빠지면 API-046이 원본 항목 유형을 판별해 한 자리만 보충한다. DISCOVERY 보충 후보가 없을 때는 TASTE로 보충하며, 어떤 후보도 없으면 기존 카드는 유지하고 S15P21E106-219 소진 흐름에서 새 세트를 생성한다
 - FastAPI 재호출은 **추천 입력 변경(강한 신호) 또는 버퍼 소진 시에만** 일어난다
 - Fold-in·재정렬 시 Redis의 행동 Feature(상세 조회·OTT 클릭 등)를 반영한다
 - ALS 모델에 없는 신작 후보는 제외하지 않고 콘텐츠 점수(장르·감독·배우·키워드·임베딩)만으로 점수화한다
