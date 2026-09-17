@@ -74,7 +74,7 @@ class NotifyDeploymentTest(unittest.TestCase):
     def test_cli_accepts_every_deployment_job_service(self):
         for service in (
             "backend", "frontend", "consumer", "redis", "monitoring",
-            "hdfs-service-config", "hdfs-distributed-config",
+            "hdfs-service-config", "hdfs-distributed-config", "kafka-config",
         ):
             with self.subTest(service=service):
                 self.assertEqual(MODULE.parse_args([service, "failed"]).service, service)
