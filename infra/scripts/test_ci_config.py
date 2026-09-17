@@ -75,6 +75,7 @@ include:
             (self.frontend, 'deploy-frontend'),
             (self.consumer, 'deploy-consumer'),
             (self.infra, 'deploy-monitoring'),
+            (self.infra, '.deploy-hdfs-config'),
         )
         for config, name in protected:
             self.assertIn('interruptible: false', job_block(config, name), name)
@@ -244,6 +245,33 @@ include:
                 'when: manual', 'allow_failure: true', 'docker compose down',
                 '- infra/monitoring/README.md'):
             self.assertNotIn(forbidden, deploy)
+
+    def test_hdfs_config_deploy_is_manual_protected_main_and_ordered(self):
+        template = job_block(self.infra, '.deploy-hdfs-config')
+        for expected in (
+                'stage: deploy', 'ci-deploy-current-commit.py',
+                'test -n "$HDFS_COMPOSE_ENV_FILE"',
+                'deploy-hdfs-config.sh "$HDFS_NODE" "$CI_COMMIT_SHA"',
+                'resource_group: distributed-runtime-hdfs',
+                'interruptible: false', 'timeout: 30m',
+                '$CI_COMMIT_BRANCH == "main"',
+                '$CI_COMMIT_REF_PROTECTED == "true"',
+                '$CI_PIPELINE_SOURCE == "push"',
+                'when: manual', 'allow_failure: false',
+                '- infra/compose/service.yml', '- infra/compose/distributed.yml',
+                '- infra/hadoop/**/*'):
+            self.assertIn(expected, template)
+        for forbidden in ('merge_request_event', 'docker compose down', ' down -v'):
+            self.assertNotIn(forbidden, template)
+        service = job_block(self.infra, 'deploy-hdfs-service-config')
+        distributed = job_block(self.infra, 'deploy-hdfs-distributed-config')
+        self.assertIn('tags: [e106-shell]', service)
+        self.assertIn('name: service', service)
+        self.assertIn('HDFS_NODE: service', service)
+        self.assertIn('tags: [e106-distributed]', distributed)
+        self.assertIn('needs: [deploy-hdfs-service-config]', distributed)
+        self.assertIn('name: distributed', distributed)
+        self.assertIn('HDFS_NODE: distributed', distributed)
 
     def test_pipeline_mr_jobs_are_isolated_sharded_and_path_scoped(self):
         self.assertTrue(self.pipeline_path.is_file(), 'Missing Pipeline CI include')
