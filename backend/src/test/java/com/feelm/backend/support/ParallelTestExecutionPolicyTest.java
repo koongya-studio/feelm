@@ -35,9 +35,10 @@ class ParallelTestExecutionPolicyTest {
                 .containsEntry("junit.jupiter.execution.parallel.enabled", "true")
                 .containsEntry("junit.jupiter.execution.parallel.mode.default", "same_thread")
                 .containsEntry(
-                        "junit.jupiter.execution.parallel.mode.classes.default", "same_thread")
+                        "junit.jupiter.execution.parallel.mode.classes.default", "concurrent")
                 .containsEntry("junit.jupiter.execution.parallel.config.strategy", "fixed")
-                .containsEntry("junit.jupiter.execution.parallel.config.fixed.parallelism", "2");
+                .containsEntry("junit.jupiter.execution.parallel.config.fixed.parallelism", "2")
+                .containsEntry("junit.jupiter.execution.parallel.config.fixed.max-pool-size", "2");
     }
 
     @Test
