@@ -5,9 +5,10 @@
 S15P21E106-290의 `ml-cluster-check.py`는 `spark-submit` client mode Driver와 두 Worker가
 모두 NumPy 2.2.6을 사용하고, 작은 고정 rating 데이터로 ALS 학습·예측이 성공하는지 확인합니다.
 이미지는 저장소 루트의 `infra/spark/Dockerfile`로 두 서버에서 각각 빌드하며 Docker Hub에는
-Push하지 않습니다. NumPy wheel과 hash는 `pipeline/spark/uv.lock`의 Linux x86_64 항목과
-일치합니다. 빌드·적용·롤백 및 전체 제출 명령은 [인프라 운영 문서](../README.md#ml-runtime-image)를
-따릅니다.
+Push하지 않습니다. `requirements-ml.txt`는 `pipeline/spark/uv.lock`에서 생성한 CPU 전용
+PyTorch·Transformers·psycopg 및 NumPy wheel hash를 포함합니다. Dockerfile은 PyTorch 공식 CPU
+index를 추가해 GPU/CUDA wheel을 설치하지 않습니다. 빌드·적용·롤백 및 전체 제출 명령은
+[인프라 운영 문서](../README.md#ml-runtime-image)를 따릅니다.
 
 Docker가 없는 개발 환경에서도 이미지 계약과 세 Spark 역할의 공통 빌드 설정을 검사합니다.
 
