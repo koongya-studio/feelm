@@ -44,6 +44,11 @@ Secret에 포함되지 않는다. 토큰 변경 이력은 Git과 Jira에 남으�
 Secret 변수는 필요하지 않다. Redis 비밀번호는 기존 Compose 환경 파일을 통해서만 전달하고
 배포 스크립트는 값을 출력하지 않는다.
 
+최초 자동 재배포처럼 실행 중인 컨테이너의 bind-mount 원본 경로가 더 이상 존재하지 않으면,
+배포 스크립트는 컨테이너에서 `start.sh`와 `readonly.acl`을
+`releases/bootstrap-<revision>`으로 복사해 rollback 기준점으로 사용한다. Redis 데이터와
+실행 중인 Secret은 이 스냅샷에 포함하지 않는다.
+
 로컬 회귀 테스트:
 
     python3 -B -m unittest \\

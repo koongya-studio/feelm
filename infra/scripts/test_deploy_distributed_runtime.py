@@ -28,7 +28,9 @@ class FakeRunner:
             return "feelm-spark:previous"
         if any("State.Status" in item for item in command):
             return "running healthy"
-        if "dfsadmin" in command:
+        if command[-2:] == ["-safemode", "get"]:
+            return "Safe mode is OFF"
+        if command[-1:] == ["-report"]:
             return "Live datanodes (2):"
         if command[:3] == ["docker", "logs", "--tail"]:
             return "Successfully registered with master spark://172.26.0.121:7077"
@@ -132,7 +134,7 @@ class DistributedRuntimeTest(unittest.TestCase):
         original = fake.run
 
         def without_two_nodes(command, **kwargs):
-            if "dfsadmin" in command:
+            if command[-1:] == ["-report"]:
                 return "Live datanodes (1):"
             return original(command, **kwargs)
 
@@ -155,7 +157,7 @@ class DistributedRuntimeTest(unittest.TestCase):
         report_calls = []
 
         def delayed_report(command, **kwargs):
-            if "dfsadmin" in command:
+            if command[-1:] == ["-report"]:
                 report_calls.append(command)
                 result = next(reports)
                 if isinstance(result, Exception):
@@ -172,6 +174,45 @@ class DistributedRuntimeTest(unittest.TestCase):
 
         self.assertEqual(sleep.call_count, 2)
         self.assertEqual(len(report_calls), 3)
+
+    def test_hdfs_retries_until_namenode_safe_mode_is_off(self):
+        fake = FakeRunner()
+        original = fake.run
+        safe_mode_states = iter(["Safe mode is ON", "Safe mode is OFF"])
+        safe_mode_calls = []
+
+        def delayed_safe_mode(command, **kwargs):
+            if command[-2:] == ["-safemode", "get"]:
+                safe_mode_calls.append(command)
+                return next(safe_mode_states)
+            return original(command, **kwargs)
+
+        fake.run = delayed_safe_mode
+        with patch.object(runtime.time, "sleep") as sleep:
+            runtime.verify_runtime(
+                "distributed", ("hdfs",), Path("ignored"),
+                ("hdfs-namenode", "hdfs-datanode-2"), fake, 2,
+            )
+
+        sleep.assert_called_once_with(5)
+        self.assertEqual(len(safe_mode_calls), 2)
+
+    def test_hdfs_rejects_namenode_that_remains_in_safe_mode(self):
+        fake = FakeRunner()
+        original = fake.run
+
+        def safe_mode_on(command, **kwargs):
+            if command[-2:] == ["-safemode", "get"]:
+                return "Safe mode is ON"
+            return original(command, **kwargs)
+
+        fake.run = safe_mode_on
+        with patch.object(runtime.time, "sleep"):
+            with self.assertRaisesRegex(runtime.DeploymentError, "safe mode is not OFF"):
+                runtime.verify_runtime(
+                    "distributed", ("hdfs",), Path("ignored"),
+                    ("hdfs-namenode", "hdfs-datanode-2"), fake, 2,
+                )
 
     def test_plan_mode_does_not_run_commands(self):
         args = runtime.parser().parse_args([

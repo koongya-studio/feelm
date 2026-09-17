@@ -35,6 +35,34 @@ verify_config_directory() {
   [[ -f "${directory}/start.sh" && -f "${directory}/readonly.acl" ]]
 }
 
+snapshot_running_config() {
+  local snapshot_dir="${RELEASE_ROOT}/releases/bootstrap-${CANDIDATE_REVISION}"
+  local temporary="${snapshot_dir}.tmp.$$"
+
+  if [[ -d "${snapshot_dir}" ]]; then
+    verify_config_directory "${snapshot_dir}" || {
+      echo "Redis bootstrap snapshot is incomplete" >&2
+      return 1
+    }
+    PREVIOUS_CONFIG_DIR="${snapshot_dir}"
+    return 0
+  fi
+
+  umask 077
+  mkdir -p "${RELEASE_ROOT}/releases"
+  mkdir "${temporary}"
+  if ! docker cp feelm-redis:/usr/local/etc/redis/start.sh "${temporary}/start.sh" \
+    || ! docker cp feelm-redis:/usr/local/etc/redis/readonly.acl "${temporary}/readonly.acl" \
+    || ! verify_config_directory "${temporary}"; then
+    rm -rf "${temporary}"
+    echo "Running Redis configuration could not be preserved for rollback" >&2
+    return 1
+  fi
+  chmod 0444 "${temporary}/start.sh" "${temporary}/readonly.acl"
+  mv "${temporary}" "${snapshot_dir}"
+  PREVIOUS_CONFIG_DIR="${snapshot_dir}"
+}
+
 install_candidate() {
   local temporary
 
@@ -92,8 +120,8 @@ fi
 PREVIOUS_CONFIG_DIR="$(dirname "${start_source}")"
 if [[ "$(dirname "${acl_source}")" != "${PREVIOUS_CONFIG_DIR}" ]] \
   || ! verify_config_directory "${PREVIOUS_CONFIG_DIR}"; then
-  echo "Running Redis configuration mounts are inconsistent" >&2
-  exit 1
+  echo "Running Redis configuration mounts are inconsistent; preserving container files" >&2
+  snapshot_running_config
 fi
 
 BACKEND_IMAGE="${BACKEND_IMAGE:-$(

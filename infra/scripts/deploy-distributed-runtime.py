@@ -243,9 +243,20 @@ def wait_for_hdfs(node: str, runner: Runner, attempts: int) -> None:
                 capture=True,
                 combined=True,
             )
-            if "Live datanodes (2):" in report:
-                return
-            last_error = DeploymentError("HDFS does not report two live DataNodes")
+            if "Live datanodes (2):" not in report:
+                last_error = DeploymentError("HDFS does not report two live DataNodes")
+            else:
+                safe_mode = runner.run(
+                    [
+                        "docker", "exec", container, "hdfs", "dfsadmin",
+                        "-safemode", "get",
+                    ],
+                    capture=True,
+                    combined=True,
+                )
+                if "Safe mode is OFF" in safe_mode:
+                    return
+                last_error = DeploymentError("HDFS NameNode safe mode is not OFF")
         except DeploymentError as error:
             last_error = error
         if attempt + 1 < attempts:
