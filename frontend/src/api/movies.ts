@@ -2,15 +2,11 @@
  * 영화 데이터 접근 함수.
  * 대응 명세는 docs/api/movies-search.md · recommendation.md · social.md이다.
  *
- * 영화 상세(API-030)만 실제 API를 부른다(업무 S15P21E106-475). 같은 파일의 유사 영화와
- * 공개 한줄평은 백엔드에 아직 없어 목업으로 남는다 — 각 함수 주석에 사유를 적었다.
+ * 영화 상세(API-030), 유사 영화(API-031), 공개 한줄평(API-032)은 실제 API를 부른다.
  */
-import { findMockSimilarMovies } from '../mocks/similarMovies';
-import { mockReviews } from '../mocks/reviews';
 import { request } from './client';
-import { respond } from './mockTransport';
 import type { MovieDetail, SimilarMovie } from '../types/movie';
-import type { PublicReview } from '../types/watch';
+import type { PublicReviewList } from '../types/watch';
 
 /**
  * API-030 영화 상세 조회 · GET /api/v1/movies/{movieId}
@@ -27,9 +23,8 @@ import type { PublicReview } from '../types/watch';
  * 목록을 따로 불러 `subscribed`를 채우고 정렬했는데, 계약은 정렬까지 마친 목록을
  * 주므로 화면이 받은 순서를 그대로 쓴다.
  *
- * 이번 세션의 평가 · 감상 기록을 얹던 것도 함께 걷어냈다. 평가 API(API-036 · API-037)는
- * 아직 목업이라 2.5에서 남긴 평가가 이 화면에 보이지 않는다. 평가 계열이 연동되면
- * (S15P21E106-160 · -213 · -214) 서버가 같은 값을 준다.
+ * 본인 평가는 상세 응답의 `myRating`을 그대로 사용한다. 화면은 별도 세션 데이터를
+ * 합치지 않으므로 로컬과 배포 모두 현재 인증 사용자의 DB 평가만 보인다.
  */
 export async function getMovieDetail(
   movieId: number,
@@ -44,20 +39,30 @@ export async function getMovieDetail(
 /**
  * API-031 유사 영화 추천 · GET /api/v1/movies/{movieId}/similar
  *
- * **목업이다.** 백엔드 구현이 S15P21E106-216으로 진행 중이라 부를 API가 없다.
- * 실제 영화 상세(API-030)로 들어와도 이 목록은 목업 영화라, 항목을 누르면 실제 DB에
- * 없는 영화로 이동해 상세가 `404`가 된다(업무 -475 검증 기록).
+ * 선택 인증 API다. 현재 계약은 로그인 여부와 관계없이 같은 콘텐츠 임베딩 결과를
+ * 반환하며, 응답 객체의 `items`만 화면에 넘긴다.
  */
 export async function getSimilarMovies(movieId: number): Promise<SimilarMovie[]> {
-  return respond(findMockSimilarMovies(movieId), 'movies');
+  const response = await request<{ baseMovieId: number; items: SimilarMovie[] }>(
+    `/movies/${movieId}/similar`,
+    { auth: 'optional', query: { size: 10 } },
+  );
+  return response.items;
 }
 
 /**
  * API-032 공개 한줄평 목록 · GET /api/v1/movies/{movieId}/reviews
  *
- * **목업이다.** 평가가 있어야 한줄평이 생기는데 평가 API가 아직 없고, 목록 자체도
- * S15P21E106-161로 예정만 되어 있다. 실제 영화에는 목업 한줄평이 없어 빈 목록이다.
+ * 회원 API다. 본인의 비공개 한줄평과 타인의 공개 한줄평을 최신순으로 받으며, 차단 관계와
+ * 작성자 상태는 서버가 거른다. `cursor`는 직전 응답 값을 그대로 보내고 첫 페이지에서는
+ * 생략한다.
  */
-export async function getMovieReviews(movieId: number): Promise<PublicReview[]> {
-  return respond(mockReviews[movieId] ?? [], 'movies');
+export async function getMovieReviews(
+  movieId: number,
+  cursor?: string,
+  size?: number,
+): Promise<PublicReviewList> {
+  return request<PublicReviewList>(`/movies/${movieId}/reviews`, {
+    query: { cursor, size },
+  });
 }

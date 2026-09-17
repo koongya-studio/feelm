@@ -32,14 +32,15 @@ import type { FrameList, FrameSummary } from '../types/taste';
  * 다른 사용자 한줄평(`film_daily`)에도 쓴다. 둘 다 와이어프레임 문구라 그대로 두었다.
  */
 export const mockMyRatings: Record<number, MyRating> = {
-  401: { ratingId: 901, score: 4.5, comment: null, visibility: 'PRIVATE' },
+  401: { ratingId: 901, score: 4.5, comment: null, visibility: 'PRIVATE', spoiler: false },
   402: {
     ratingId: 902,
     score: 4.0,
     comment: '마술 트릭 하나하나가 복선이라 두 번 보게 돼요.',
     visibility: 'PUBLIC',
+    spoiler: false,
   },
-  403: { ratingId: 903, score: 5.0, comment: null, visibility: 'PRIVATE' },
+  403: { ratingId: 903, score: 5.0, comment: null, visibility: 'PRIVATE', spoiler: false },
 };
 
 function summary(

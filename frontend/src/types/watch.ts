@@ -68,6 +68,8 @@ export type RatingInputValue = {
   comment?: string;
   /** `comment`가 있으면 필수 */
   visibility?: Visibility;
+  /** 한줄평의 스포일러 포함 여부. 한줄평이 있을 때만 보낸다. */
+  spoiler?: boolean;
 };
 
 /**
@@ -84,6 +86,7 @@ export type Rating = {
   score: number;
   comment: string | null;
   visibility: Visibility;
+  spoiler: boolean;
   /** 최초 저장 시 생성된 프레임. 수정 시에는 기존 값 */
   frame: { frameId: number; createdAt: string };
   popcorn: { flavorCode: string | null; isNewFlavor: boolean; flavorCount: number };
@@ -99,6 +102,8 @@ export type RatingUpdateInput = {
   score: number;
   comment: string | null;
   visibility: Visibility;
+  /** API-037 선택값. 평가 화면에서는 API-030의 기존 값을 유지해 보낸다. */
+  spoiler?: boolean;
 };
 
 /** API-039 내 평가 목록 `items[]` */
@@ -127,5 +132,14 @@ export type PublicReview = {
   comment: string;
   /** 본인 한줄평이면 true. `PRIVATE`이어도 포함된다 */
   mine: boolean;
+  /** 작성자가 본인이어도 공개 목록에서는 기본 블러 처리한다 */
+  spoiler: boolean;
   createdAt: string;
+};
+
+/** API-032 응답 */
+export type PublicReviewList = {
+  items: PublicReview[];
+  nextCursor: string | null;
+  hasNext: boolean;
 };

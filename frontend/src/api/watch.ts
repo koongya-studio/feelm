@@ -9,14 +9,14 @@
  * 프레임 생성 · 감상 기록 전이를 한 트랜잭션으로 처리하므로(API-036 처리 규칙) 2.5에서
  * 평가한 영화는 7.7 `안 남긴 영화`에서 빠진다.
  *
- * **평가 수정(API-037)과 내 평가 목록(API-039)은 목업으로 남는다.** 백엔드에 아직 없다
- * (S15P21E106-213 · -214). 그래서 7.6 `평가한 영화`는 기준 목업 세 편만 보여주고, 2.5에서
- * 새로 저장한 평가는 서버에 있어도 그 목록에 나타나지 않는다. API-039가 연동되면 사라지는
- * 한계다.
+ * **평가 수정(API-037)은 실제 호출이고 내 평가 목록(API-039)만 목업으로 남는다.**
+ * API-037 백엔드는 S15P21E106-213이 제공한다. 7.6 `평가한 영화`는 여전히 기준 목업
+ * 세 편만 보여주므로, 2.5에서 새로 저장한 평가는 서버에 있어도 그 목록에 나타나지 않는다.
+ * API-039가 연동되면 사라지는 한계다.
  */
 import { mockFrameList, mockMyRatings } from '../mocks/frames';
 import { findMockMovie } from '../mocks/movies';
-import { saveRatingEdit, withRatingEdit } from '../mocks/sessionStore';
+import { withRatingEdit } from '../mocks/sessionStore';
 import { BASE_WEEKLY_FRAME_DELTA } from '../mocks/watch';
 import { getPopcornBucket } from './taste';
 import { getMyProfile } from './users';
@@ -181,8 +181,8 @@ export async function confirmWatch(
  * 서버가 기록을 `RATED`로 만든다(D-6). 화면이 기록 상태를 미리 가릴 필요가 없다.
  *
  * `score`는 0.5~5.0의 0.5 배수여야 한다. 계약은 4.49 같은 값을 반올림하지 않고 거절하므로
- * 화면에서 0.5 단위 값만 만들어 보낸다. `comment`가 있으면 `visibility`가 필수다. 둘 중
- * 하나라도 어긋나면 `400 VALIDATION_FAILED`다.
+ * 화면에서 0.5 단위 값만 만들어 보낸다. `comment`가 있으면 `visibility`가 필수이며
+ * 평가 화면은 사용자가 고른 `spoiler`도 함께 보낸다. 값이 어긋나면 `400 VALIDATION_FAILED`다.
  *
  * 사용자 · 영화 조합마다 평가는 하나다. 이미 있으면 `409 RATING_ALREADY_EXISTS`이고 수정은
  * API-037이다. 2.5는 API-030 `myRating`으로 미리 가르지만, 상세를 읽은 뒤 다른 곳에서
@@ -198,21 +198,13 @@ export async function createRating(movieId: number, input: RatingInputValue): Pr
 /**
  * API-037 평가 수정 · PUT /api/v1/ratings/{ratingId}
  *
- * **목업이다.** 백엔드에 아직 없다(S15P21E106-213).
+ * 실제 API를 호출한다. 프레임과 팝콘을 새로 만들지 않으며 기존 평가를 전체 교체한다.
  *
- * **프레임과 팝콘을 새로 만들지 않는다**(API-037 처리 규칙). 고친 값은 세션 저장소에만 남고
- * (mocks/sessionStore.ts `ratingEdits`), 기준 목업 평가를 읽는 화면(3.1-A · 7.6)이 그 값을
- * 얹어 보여준다. **서버 평가에는 닿지 않는다** — 실제 영화의 `myRating`(API-030)은 고친 뒤
- * 다시 읽어도 옛 값이다.
- *
- * 한줄평을 지우려면 `comment: null`을 보낸다. 점수를 바꾸면 팝콘 버킷의 맛별 평균도
- * 바뀌어야 하지만(API-037) 목업은 반영하지 않는다. 평균을 보여주는 화면(3.2)이 수정
- * 경로에 없다.
+ * 한줄평을 지우려면 `comment: null`을 보낸다. 점수 변경에 따른 팝콘 버킷 집계 갱신도
+ * 서버가 처리한다.
  */
-export async function updateRating(ratingId: number, input: RatingUpdateInput): Promise<void> {
-  saveRatingEdit(ratingId, input);
-
-  return respond(undefined, 'watch');
+export async function updateRating(ratingId: number, input: RatingUpdateInput): Promise<Rating> {
+  return request<Rating>(`/ratings/${ratingId}`, { method: 'PUT', body: input });
 }
 
 /**

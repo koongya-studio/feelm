@@ -65,6 +65,7 @@ const created: Rating = {
   score: 4.5,
   comment: null,
   visibility: 'PRIVATE',
+  spoiler: false,
   frame: { frameId: 77, createdAt: '2026-08-30T05:21:00Z' },
   popcorn: { flavorCode: 'FLAVOR_A', isNewFlavor: true, flavorCount: 1 },
   watchStatus: 'RATED',
@@ -79,7 +80,7 @@ beforeEach(() => {
   vi.mocked(findWatchedRecord).mockReset().mockResolvedValue(null);
   vi.mocked(getCountsBeforeRating).mockReset().mockResolvedValue(counts);
   vi.mocked(createRating).mockReset().mockResolvedValue(created);
-  vi.mocked(updateRating).mockReset().mockResolvedValue(undefined);
+  vi.mocked(updateRating).mockReset().mockResolvedValue(created);
 });
 
 /** 2.6이 받은 Router state를 드러낸다. 2.6 자체는 여기서 그리지 않는다 */
@@ -142,17 +143,26 @@ describe('2.5 평가 저장', () => {
     });
   });
 
-  it('한줄평이 있으면 공개 범위 기본값 PRIVATE을 붙여 보낸다', async () => {
+  it('한줄평이 있으면 공개 범위와 스포일러 여부를 붙여 보낸다', async () => {
     renderPage();
 
-    await rate(3, '  밤에 보면 안 됨  ');
+    const spoiler = await screen.findByRole('checkbox', { name: '스포일러가 포함되어 있어요' });
+    expect(spoiler).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('한줄평'), {
+      target: { value: '  밤에 보면 안 됨  ' },
+    });
+    expect(spoiler).toBeEnabled();
+    fireEvent.click(spoiler);
+    fireEvent.change(screen.getByRole('slider', { name: '별점' }), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: '평가 완료' }));
 
     await waitFor(() => expect(createRating).toHaveBeenCalled());
-    // 앞뒤 공백은 지우고, 선택 UI가 없어 공개 범위는 기본값이다(CR-05)
+    // 앞뒤 공백은 지우고, 공개 범위는 기본값을 쓰되 스포일러 선택은 보존한다
     expect(createRating).toHaveBeenCalledWith(550, {
       score: 3,
       comment: '밤에 보면 안 됨',
       visibility: 'PRIVATE',
+      spoiler: true,
     });
   });
 
@@ -194,7 +204,13 @@ describe('2.5 평가 저장', () => {
       .mockResolvedValueOnce(movie)
       .mockResolvedValue({
         ...movie,
-        myRating: { ratingId: 91, score: 4, comment: null, visibility: 'PRIVATE' },
+        myRating: {
+          ratingId: 91,
+          score: 4,
+          comment: null,
+          visibility: 'PRIVATE',
+          spoiler: false,
+        },
       });
 
     renderPage();
@@ -212,18 +228,28 @@ describe('2.5 평가 저장', () => {
   it('이미 평가한 영화는 API-036을 부르지 않고 수정으로 보낸다', async () => {
     vi.mocked(getMovieDetail).mockResolvedValue({
       ...movie,
-      myRating: { ratingId: 91, score: 4, comment: null, visibility: 'PUBLIC' },
+      myRating: {
+        ratingId: 91,
+        score: 4,
+        comment: '범인이 드러난다',
+        visibility: 'PUBLIC',
+        spoiler: true,
+      },
     });
 
     renderPage();
 
-    await rate(2.5);
+    expect(
+      await screen.findByRole('checkbox', { name: '스포일러가 포함되어 있어요' }),
+    ).toBeChecked();
+    await rate(2.5, '범인이 드러난다');
 
     await waitFor(() =>
       expect(updateRating).toHaveBeenCalledWith(91, {
         score: 2.5,
-        comment: null,
+        comment: '범인이 드러난다',
         visibility: 'PUBLIC',
+        spoiler: true,
       }),
     );
     expect(createRating).not.toHaveBeenCalled();

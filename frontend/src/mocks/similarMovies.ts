@@ -26,10 +26,8 @@ export function findMockSimilarMovies(baseMovieId: number): SimilarMovie[] {
       movieId: movie.movieId,
       title: movie.title,
       posterUrl: movie.posterUrl,
-      releaseYear: movie.releaseYear,
       averageRating: movie.averageRating,
       similarity: item.similarity,
-      reason: { summary: item.summary },
     };
   });
 }
