@@ -132,13 +132,21 @@ export type FrameDetail = {
   };
 };
 
+/**
+ * API-040 취향 분석·키워드 조회
+ *
+ * 분석 캐시가 없는 사용자도 `200`을 받는다. 그때 `insufficientData`가 true이고 배열은
+ * 모두 비어 있으며 `analyzedAt`은 `null`이다(API-040 처리 규칙). 응답의 `countries` ·
+ * `eras` · `directors`는 쓰는 화면이 생길 때 추가한다.
+ */
 export type TasteAnalysis = {
   ratingCount: number;
-  /** 평가가 기준 미만이면 true이고 `keywords`가 빈 배열이다 */
+  /** 캐시가 없거나 평가가 기준 미만이면 true이고 `keywords`가 빈 배열이다 */
   insufficientData: boolean;
   analysis: {
     genres: TasteGenre[];
   };
   keywords: TasteKeyword[];
-  analyzedAt: string;
+  /** 캐시가 없으면 `null`이다 */
+  analyzedAt: string | null;
 };
