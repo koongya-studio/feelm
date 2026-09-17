@@ -117,6 +117,9 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 - `cursor` (string, 선택): 서버가 직전 응답에서 발급한 불투명 커서
 - `size` (integer, 선택): 기본 20, 최소 1, 최대 50
 
+배열은 `status=LINK_CLICKED&status=RATED`처럼 같은 파라미터 이름을 반복해 전달한다.
+인덱스·중첩 표기(`status[0]`, `status[].name` 등)는 지원하지 않는다.
+
 ### Request Body
 
 없음
@@ -148,6 +151,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 ### 오류 응답
 
 - `400 VALIDATION_FAILED` 잘못된 `status`, `confirmDue`, `size`, 손상되거나 조회 조건과 맞지 않는 `cursor`
+- `400 VALIDATION_FAILED` 인덱스·중첩 파라미터 표기, 또는 허용되지 않는 문자가 든 파라미터 이름. 조건을 무시하고 전체 목록을 반환하지 않는다
 - `401 UNAUTHORIZED` 인증이 없거나 활성 사용자가 아님
 - `500 INTERNAL_ERROR` 만료 반영 또는 목록 조회 실패
 
@@ -194,7 +198,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### Query Parameters
 
-없음
+없음. 인덱스·중첩 표기(`x[0]` 등)를 붙이면 `400 VALIDATION_FAILED`다. 본문이나 `Content-Type`도 함께 잘못된 경우에는 그쪽 오류가 먼저 나간다.
 
 ### Request Body
 
@@ -215,6 +219,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 ### 오류 응답
 
 - `400 VALIDATION_FAILED` `watchRecordId`가 양의 64비트 정수가 아니거나 `watched`가 JSON boolean이 아님. 문자열·숫자·배열·객체·`null`·누락·깨진 JSON은 허용하지 않는다
+- `400 VALIDATION_FAILED` 인덱스·중첩 파라미터 표기, 또는 허용되지 않는 문자가 든 파라미터 이름
 - `401 UNAUTHORIZED` 인증이 없거나 활성 사용자가 아님
 - `404 RESOURCE_NOT_FOUND` 기록이 없거나 다른 사용자의 기록
 - `409 INVALID_WATCH_STATUS` `LINK_CLICKED`가 아니거나 `expires_at <= now`인 기록, 중복 또는 경쟁 상태 전이

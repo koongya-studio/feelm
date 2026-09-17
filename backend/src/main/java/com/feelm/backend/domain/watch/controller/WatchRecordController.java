@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.context.request.WebRequest;
 
 @RestController
 @RequestMapping("/api/v1/watch-records")
@@ -65,7 +66,7 @@ public class WatchRecordController {
                                 schema = @Schema(implementation = WatchRecordPageResponse.class))),
         @ApiResponse(
                 responseCode = "400",
-                description = "VALIDATION_FAILED: 잘못된 상태·confirmDue·size·cursor",
+                description = "VALIDATION_FAILED: 잘못된 상태·confirmDue·size·cursor, 인덱스·중첩 파라미터 표기",
                 content =
                         @Content(
                                 mediaType = "application/json",
@@ -88,8 +89,10 @@ public class WatchRecordController {
     @GetMapping
     public CursorPageResponse<WatchRecordItemResponse> getWatchRecords(
             @Parameter(hidden = true) @AuthenticationPrincipal Long userId,
+            @Parameter(hidden = true) WebRequest request,
             @Parameter(
-                            description = "감상 상태. 반복 지정 가능하며 중복은 제거됩니다.",
+                            description =
+                                    "감상 상태. status=A&status=B처럼 이름을 반복해 전달하며 중복은 제거됩니다. 인덱스·중첩 표기는 400입니다.",
                             array =
                                     @ArraySchema(
                                             schema =
@@ -120,6 +123,7 @@ public class WatchRecordController {
                                             defaultValue = "20"))
                     @RequestParam(required = false)
                     String size) {
+        QueryParameterNames.rejectIndexedOrNested(request);
         return watchService.getWatchRecords(
                 userId, WatchListCriteria.from(statuses, confirmDue, cursor, size));
     }
@@ -139,7 +143,7 @@ public class WatchRecordController {
                                 schema = @Schema(implementation = WatchConfirmResponse.class))),
         @ApiResponse(
                 responseCode = "400",
-                description = "VALIDATION_FAILED: 경로 ID 또는 JSON boolean 본문 오류",
+                description = "VALIDATION_FAILED: 경로 ID 또는 JSON boolean 본문 오류, 인덱스·중첩 파라미터 표기",
                 content =
                         @Content(
                                 mediaType = "application/json",
@@ -183,6 +187,7 @@ public class WatchRecordController {
     @PostMapping("/{watchRecordId}/confirm")
     public WatchConfirmResponse confirm(
             @Parameter(hidden = true) @AuthenticationPrincipal Long userId,
+            @Parameter(hidden = true) WebRequest request,
             @Parameter(
                             description = "본인 감상 기록 ID. 양의 64비트 정수",
                             schema = @Schema(type = "integer", format = "int64", minimum = "1"))
@@ -194,7 +199,8 @@ public class WatchRecordController {
                             required = true)
                     @Valid
                     @RequestBody
-                    WatchConfirmRequest request) {
-        return watchService.confirm(userId, watchRecordId, request.watched());
+                    WatchConfirmRequest body) {
+        QueryParameterNames.rejectIndexedOrNested(request);
+        return watchService.confirm(userId, watchRecordId, body.watched());
     }
 }
