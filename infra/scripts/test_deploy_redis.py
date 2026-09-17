@@ -114,6 +114,7 @@ exit 2
         candidate = self.release_root / "releases" / "abcdef1234567890"
         self.assertEqual(self.state.read_text(), self._bash_path(candidate))
         self.assertEqual((candidate / "start.sh").read_bytes(), (ROOT / "infra/redis/start.sh").read_bytes())
+        self.assertFalse((candidate / "deploy-trigger.txt").exists())
         events = self.events.read_text()
         self.assertIn("up -d --no-deps --force-recreate redis", events)
         self.assertNotIn(" down", events)
