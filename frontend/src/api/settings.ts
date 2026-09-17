@@ -2,10 +2,9 @@
  * 설정 화면(7.8 ~ 7.8-D) 데이터 접근 함수.
  * 대응 명세는 docs/api/users.md(API-013 · API-017 · API-018 · API-020 ~ API-022)이다.
  *
- * **알림 설정과 차단은 실제 API다**(업무 S15P21E106-394). 공개 범위(7.8-B)와 회원
- * 탈퇴(API-013)는 목업으로 남는다 — 공개 범위는 대응 계약이 없고, 탈퇴는 백엔드가
- * 요구하는 비밀번호가 화면에 없다(아래 `withdraw`). 두 함수는 계약의 경로 · 본문
- * 모양을 지키고 있어 결정이 서면 본문만 바꾸면 된다.
+ * **알림 설정 · 차단 · 회원 탈퇴는 실제 API다**(업무 S15P21E106-394 · -480). 공개
+ * 범위(7.8-B)만 목업으로 남는다 — 대응 계약이 없다. 이 함수도 계약의 경로 · 본문
+ * 모양을 지키고 있어 계약이 서면 본문만 바꾸면 된다.
  *
  * 알림 설정은 화면과 계약의 항목 수가 다르다. 7.8-C는 토글이 다섯이고 계약(API-017)은
  * 셋이라, **계약의 셋만 서버로 보내고 나머지 둘은 세션 저장소에 남긴다**(사용자 결정
@@ -152,13 +151,18 @@ export async function unblockUser(userId: number): Promise<void> {
 }
 
 /**
- * API-013 회원 탈퇴 · DELETE /api/v1/users/me — **목업이다.**
+ * API-013 회원 탈퇴 · DELETE /api/v1/users/me
  *
- * `[?]` 백엔드에는 구현돼 있다(S15P21E106-198). 다만 계약과 구현이 이메일 계정에
- * `password`를 요구하는데 와이어프레임 7.8-A-1에는 비밀번호 입력이 없어, 지금 연동하면
- * 탈퇴가 항상 실패한다. 화면과 계약 중 어느 쪽을 바꿀지 정한 뒤 연동한다(394 범위 밖).
- * 목업은 본문 없이 성공한다.
+ * 계약이 본인 확인으로 현재 비밀번호를 받는다. 와이어프레임 7.8-A-1에는 입력이 없어
+ * 화면에 한 칸을 더했다(CR-24, 업무 S15P21E106-480). 되돌릴 수 없는 동작이라 계약에서
+ * 재인증을 덜어내는 대신 화면을 맞추는 쪽으로 정했다(사용자 결정 2026-09-17).
+ *
+ * 오류는 계약의 코드 그대로 올라간다 — 비밀번호 불일치 401 `INVALID_CREDENTIALS` ·
+ * 값 없음 400 `VALIDATION_FAILED` · 소셜 전용 계정 409 `PASSWORD_NOT_SET`. 화면이 가른다.
+ *
+ * 성공은 `204`이고 서버가 `refresh_token` 쿠키를 지운다. 메모리의 Access Token은
+ * 화면이 `signOut`으로 버린다.
  */
-export async function withdraw(): Promise<void> {
-  return respond(undefined, 'users');
+export async function withdraw(password: string): Promise<void> {
+  return request<void>('/users/me', { method: 'DELETE', body: { password } });
 }
