@@ -486,7 +486,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### 설명
 
-내가 남긴 평가를 최신순으로 조회한다.
+내가 남긴 평가와 감상 확인 후 아직 평가하지 않은 영화를 조회한다. 필터를 생략한 기존 호출은 내가 남긴 평가만 최신순으로 반환한다. 명시적 `ALL`은 두 종류를 한 페이지에서 전역 정렬한다.
 
 ### 인증 및 권한
 
@@ -498,7 +498,11 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### Query Parameters
 
-- `cursor`, `size`
+- `filter`: 생략 시 평가만(`RATED`), `ALL`(평가+미평가), `COMMENTED`(내용 있는 본인 한줄평), `UNRATED`(감상 확인 후 평가하지 않은 영화)
+- `sort`: 생략 시 `LATEST`; `LATEST`(최신순), `SCORE_DESC`(별점 높은 순), `SCORE_ASC`(별점 낮은 순), `OLDEST`(오래된 순)
+- `cursor`: 서버가 직전 응답에서 발급한 불투명 문자열. 사용자·filter·sort에 귀속되며 size는 바꿀 수 있다.
+- `size`: 기본 20, 1~50
+- 알 수 없는 값, 중복·빈 query 값, 훼손되거나 범위가 다른 cursor는 `400 VALIDATION_FAILED`
 
 ### Request Body
 
@@ -512,13 +516,16 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 {
   "items": [
     {
+      "itemType": "RATED",
       "ratingId": 91,
       "movie": { "movieId": 550, "title": "파이트 클럽", "posterUrl": "https://..." },
       "score": 5,
       "comment": "밤에 보면 안 됨",
       "visibility": "PUBLIC",
+      "spoiler": false,
       "frameId": 77,
-      "createdAt": "2026-08-30T05:21:00Z"
+      "createdAt": "2026-08-30T05:21:00Z",
+      "activityAt": "2026-08-30T05:21:00Z"
     }
   ],
   "nextCursor": "...",
@@ -526,13 +533,41 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 }
 ```
 
+`filter=ALL` 또는 `filter=UNRATED`의 미평가 항목 예시:
+
+```json
+{
+  "itemType": "UNRATED",
+  "ratingId": null,
+  "movie": { "movieId": 551, "title": "인터스텔라", "posterUrl": null },
+  "score": null,
+  "comment": null,
+  "visibility": null,
+  "spoiler": null,
+  "frameId": null,
+  "createdAt": null,
+  "activityAt": "2026-09-17T01:00:00Z"
+}
+```
+
+평가 항목은 `ratingId`, `score`, `spoiler`, `createdAt`이 필수이며 `comment`, `visibility`, `frameId`는 null일 수 있다. 과거 데이터의 프레임이 없어도 평가는 반환하고 `frameId=null`로 표시한다. 미평가 항목에는 평가 전용 값을 꾸며내지 않는다. `activityAt`은 정렬에 사용한 시각으로, 불완전한 과거 감상 기록에서는 null일 수 있다. 평가 항목의 `activityAt`은 `createdAt`과 같다.
+
 ### 오류 응답
 
-- 공통 오류만 해당
+- `400 VALIDATION_FAILED`: 잘못된 filter·sort·size·cursor
+- `401 UNAUTHORIZED`: 인증이 없거나 유효하지 않거나 활성 회원이 아님
+- `401 TOKEN_EXPIRED`: Access Token 만료
+- `500 INTERNAL_ERROR`: 조회 실패
 
 ### 처리 규칙
 
 - 필름(API-042)과 1:1이지만, 평가 목록은 점수·한줄평 관리 관점, 필름은 시각화 관점으로 분리한다
+- 본인의 PUBLIC·PRIVATE 평가를 모두 조회하고 본인 스포일러 한줄평 원문을 반환한다. 타인의 평가·감상 기록은 반환하지 않는다.
+- `COMMENTED`는 null·Unicode 공백만 있는 한줄평을 제외한다. 공개 범위와 스포일러 여부는 이 필터에 영향을 주지 않는다.
+- `UNRATED`는 현재 `WATCHED_UNRATED` 감상 기록만 포함한다. `LINK_CLICKED`·`EXPIRED`는 포함하지 않는다. 같은 영화에 평가가 존재하면 미평가로 중복 노출하지 않는다.
+- `LATEST`·`OLDEST`는 평가의 `created_at`과 미평가 감상의 `watched_at`을 비교한다. `watched_at`이 없으면 남아 있는 `rated_at`, 그마저 없으면 `clicked_at` 순으로 fallback한다. 평가 삭제 시 `rated_at`이 지워지는 직접 평가 이력처럼 시각이 모두 없으면 마지막에 둔다. 동률은 평가 우선·항목 ID 내림차순이다.
+- `SCORE_DESC`·`SCORE_ASC` 모두 평가를 점수순으로 먼저 정렬하고 점수 없는 미평가는 뒤에 둔다. 점수가 같거나 미평가끼리는 `activityAt DESC NULLS LAST`, 평가 우선, 항목 ID 내림차순으로 고정한다.
+- 서버에서 `size+1`개를 조회해 `hasNext`를 정하고, 마지막 페이지의 `nextCursor`는 null이다. 페이지 간 데이터 변경에 대한 고정 snapshot은 보장하지 않는다.
 
 ### 상태값
 
