@@ -16,12 +16,14 @@
  * `한줄평 관리`는 7.6-A 시트를 연다(업무 -306). 한줄평이 없으면 비활성이다.
  * `평가 수정`은 2.5로 가며, 2.5는 이미 평가한 영화를 수정으로 처리한다.
  *
+ * 포스터 틀은 **3.1과 같은 릴**이다(`FilmReel` 세로 · 칸 하나, 업무 -609). 3.1에서 검정 필름의
+ * 프레임을 눌러 들어오는 화면이라 같은 재질이어야 한다. 칸은 3.1보다 크다 — 이 화면의 주인공이다.
  */
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import CommentManageSheet from '../../../components/CommentManageSheet';
-import FilmStrip from '../../../components/FilmStrip';
+import FilmReel from '../../../components/FilmReel';
 import OttBadge from '../../../components/OttBadge';
 import Poster from '../../../components/Poster';
 import RatingStars from '../../../components/RatingStars';
@@ -32,6 +34,10 @@ import { path } from '../../../routes/paths';
 import { formatDate } from '../../../utils/date';
 import styles from './FrameDetailPage.module.css';
 import type { FrameDetail } from '../../../types/taste';
+
+/** 포스터 칸. 와이어프레임 3.1-A 실측값이고 3.1 칸(110 × 165)보다 크다 */
+const FRAME_WIDTH = 150;
+const FRAME_HEIGHT = 210;
 
 export default function FrameDetailPage() {
   const { frameId } = useParams();
@@ -104,16 +110,21 @@ export default function FrameDetailPage() {
 
       <div className={styles.page}>
         <div className={styles.frameArea}>
-          <FilmStrip orientation="horizontal" tone="dark" width={178}>
+          <FilmReel
+            orientation="vertical"
+            frameWidth={FRAME_WIDTH}
+            frameHeight={FRAME_HEIGHT}
+            label="프레임"
+          >
             <Poster
-              width={150}
-              height={210}
-              radius={4}
+              width={FRAME_WIDTH}
+              height={FRAME_HEIGHT}
+              radius={0}
               src={movie.posterUrl ?? undefined}
               title={movie.title}
               seed={movie.movieId}
             />
-          </FilmStrip>
+          </FilmReel>
         </div>
 
         <div className={styles.movie}>

@@ -25,7 +25,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import Button from '../../../components/Button';
-import FilmStrip from '../../../components/FilmStrip';
+import FilmReel from '../../../components/FilmReel';
 import Poster from '../../../components/Poster';
 import { HeartIcon, ResultBellIcon } from '../../../components/Icon';
 import { getPopcornFlavors } from '../../../api/taste';
@@ -36,6 +36,14 @@ import type { Rating } from '../../../types/watch';
 
 /** 2.6 → 2.7 자동 전환 시간(ms). 와이어프레임에 값이 없어 임의로 정했다 */
 const TRANSITION_MS = 1200;
+
+/*
+ * 필름 칸 크기. **3.1과 같은 값이다**(FilmPage) — 방금 감긴 프레임이 곧 3.1에서 보게 될 그
+ * 칸이어야 한다. 필름은 3.1의 릴을 세로로 세운 것이다(`FilmReel`, 업무 -609). 그전의
+ * 밝은 판(`FilmStrip`)은 3.1의 필름이 확정된 뒤 다른 재질로 보였다.
+ */
+const FRAME_WIDTH = 110;
+const FRAME_HEIGHT = 165;
 
 type ResultState = {
   rating: Rating;
@@ -102,14 +110,19 @@ export default function RatingResultPage() {
         </div>
 
         <div className={styles.stripArea}>
-          <FilmStrip width={226}>
+          <FilmReel
+            orientation="vertical"
+            frameWidth={FRAME_WIDTH}
+            frameHeight={FRAME_HEIGHT}
+            label="취향 필름에 감기는 프레임"
+          >
             <span className={styles.emptyFrame} aria-hidden="true" />
 
             <span className={styles.newFrame}>
               <Poster
-                width={166}
-                height={160}
-                radius={4}
+                width={FRAME_WIDTH}
+                height={FRAME_HEIGHT}
+                radius={0}
                 src={posterUrl ?? undefined}
                 title=""
                 seed={rating.movieId}
@@ -122,7 +135,7 @@ export default function RatingResultPage() {
             </span>
 
             <span className={styles.emptyFrame} aria-hidden="true" />
-          </FilmStrip>
+          </FilmReel>
         </div>
 
         {!done ? (

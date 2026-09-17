@@ -66,33 +66,31 @@
 }
 
 /*
- * 아직 채워지지 않은 칸. 3.1의 빈 프레임과 같은 표현이다 — 점선은 아직 채울
- * 자리가 남았다는 뜻이며 조작할 수 없다.
+ * 아직 채워지지 않은 칸. 3.1의 빈 칸과 같은 표현이다(FilmPage `.emptySlot`) — 필름 안이라
+ * 밝은 점선이고, 아직 채울 자리가 남았다는 뜻이며 조작할 수 없다. 크기와 테두리는 릴이 입힌다.
  */
 .emptyFrame {
   display: block;
-  width: 166px;
-  height: 118px;
-  flex: none;
-  border: 1.5px dashed var(--color-line-strong);
-  border-radius: 4px;
+  border-style: dashed !important;
+  border-color: var(--color-film-slot-line) !important;
+  background: var(--color-film-slot);
 }
 
-/* 이번에 추가되는 프레임. 검정 테두리와 그림자로 이 칸만 도드라지게 한다 */
+/*
+ * 이번에 추가되는 프레임. 밝은 테두리를 안쪽에 둘러 이 칸만 도드라지게 한다 — 칸이
+ * `overflow: hidden`이라 바깥 테두리는 잘린다.
+ */
 .newFrame {
   position: relative;
   display: block;
-  flex: none;
-  border-radius: 4px;
-  box-shadow:
-    0 0 0 2px var(--color-ink),
-    var(--shadow-poster);
+  box-shadow: inset 0 0 0 2px var(--color-film-hole);
 }
 
+/* 새 프레임 표식. 칸 안쪽 모서리에 앉는다 */
 .newBadge {
   position: absolute;
-  top: calc(var(--space-2) * -1);
-  right: calc(var(--space-2) * -1);
+  top: var(--space-2);
+  right: var(--space-2);
   display: flex;
   width: 26px;
   height: 26px;
