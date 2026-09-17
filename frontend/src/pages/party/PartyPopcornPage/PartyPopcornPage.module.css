@@ -190,29 +190,6 @@
   color: var(--color-ink-body);
 }
 
-/*
- * 7.2-B 다른 사용자 공개 프로필로 가는 줄 (업무 -305).
- *
- * 보조 동작이라 알약이나 카드로 만들지 않는다. 선 하나로 나눈 별도 줄이다.
- */
-.profileLink {
-  display: flex;
-  width: 100%;
-  min-height: var(--tap-target-min);
-  align-items: center;
-  justify-content: space-between;
-  margin-top: var(--space-2);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--color-line-faint);
-  color: var(--color-ink-muted);
-  font-size: var(--font-size-meta);
-  text-decoration: none;
-}
-
-.profileLink svg {
-  color: var(--color-ink-hint);
-}
-
 /* 친구 초대. `친구 초대하기`를 누르면 이 자리가 열린다 */
 .invite {
   display: flex;
@@ -255,4 +232,10 @@
 .menuItem:disabled {
   color: var(--color-ink-hint);
   cursor: default;
+}
+
+/* 신고하기는 차단보다 덜 쓰이는 동작이라 약하게 둔다(7.2-B와 같은 처리) */
+.menuItem[data-tone='quiet'] {
+  color: var(--color-ink-muted);
+  font-weight: var(--font-weight-medium);
 }
