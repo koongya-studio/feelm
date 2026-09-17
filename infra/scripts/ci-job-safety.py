@@ -19,7 +19,12 @@ import uuid
 HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('safety_pilot', HERE / 'ci-server-manager-pilot.py')
 pilot = importlib.util.module_from_spec(spec); sys.modules[spec.name] = pilot; spec.loader.exec_module(pilot)
-DISK_BYTES = 8 * 1024**3
+LEGACY_DISK_BYTES = 8 * 1024**3
+PREVIOUS_DISK_BYTES = 16 * 1024**3
+DISK_BYTES = 24 * 1024**3
+ALLOWED_DISK_BYTES = frozenset({LEGACY_DISK_BYTES, PREVIOUS_DISK_BYTES, DISK_BYTES})
+# Bound Gradle cache/report fan-out without reducing the 24 GiB data budget.
+FILESYSTEM_INODES = 524288
 POOL_BYTES = 48 * 1024**3
 MODES = ('backend', 'backend-cancel', 'backend-timeout', 'probe', 'cancel', 'disk-full', 'log-full', 'artifact-link')
 
@@ -58,7 +63,8 @@ def validate_attempt(attempt):
     if lease['build'] != 'ci222-server-' + token + '.service': raise ValueError('Wrong build unit')
     if lease['execution'] != 'ci222-server-' + hashlib.sha256(token.encode()).hexdigest()[:12] + '.service':
         raise ValueError('Wrong execution unit')
-    if lease['bytes'] != DISK_BYTES or lease['mode'] not in MODES: raise ValueError('Invalid fixed policy')
+    if lease['bytes'] not in ALLOWED_DISK_BYTES or lease['mode'] not in MODES:
+        raise ValueError('Invalid fixed policy')
     pilot.check_base(Path(lease['prepared']))
     source_sha = lease['source_sha']
     if source_sha is not None:
@@ -109,9 +115,9 @@ def create_disk(attempt, lease):
     finally: os.close(fd)
     # Only our newly created regular file, never a disk device or existing image.
     info = image.lstat()
-    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_size != DISK_BYTES:
+    if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or info.st_size != lease['bytes']:
         raise ValueError('Invalid fresh backing image')
-    pilot.run(['mkfs.ext4', '-q', '-F', '-m', '0', '-N', '131072',
+    pilot.run(['mkfs.ext4', '-q', '-F', '-m', '0', '-N', str(FILESYSTEM_INODES),
                '-E', 'lazy_itable_init=0,lazy_journal_init=0', str(image)], timeout=120)
     pilot.run(['mount', '-o', 'loop,nodev,nosuid', str(image), str(root)])
     pilot.run(['mount', '--make-private', str(root)])
@@ -119,7 +125,8 @@ def create_disk(attempt, lease):
         raise RuntimeError('Dedicated disk mount not established')
     # nspawn must never be handed a view of the host rootfs if mounting failed.
     space = os.statvfs(root)
-    if space.f_blocks * space.f_frsize > DISK_BYTES: raise RuntimeError('Filesystem capacity exceeds policy')
+    if space.f_blocks * space.f_frsize > lease['bytes']:
+        raise RuntimeError('Filesystem capacity exceeds policy')
 
 
 def loop_devices(image):
@@ -154,7 +161,7 @@ def cleanup(attempt):
     image = attempt / 'disk.img'
     info = image.lstat()
     if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077
-            or info.st_nlink != 1 or info.st_size != DISK_BYTES):
+            or info.st_nlink != 1 or info.st_size != lease['bytes']):
         raise RuntimeError('Refusing unexpected backing image cleanup')
     image.unlink()
     parent = os.open(attempt, os.O_RDONLY | os.O_DIRECTORY)
@@ -227,7 +234,7 @@ def start(base, prepared, mode, source_payload=None, source_sha=None, on_started
         if list(Path('/sys/fs/cgroup/system.slice').glob('ci222-server-*.service')):
             raise RuntimeError('Existing pilot cgroup; do not overlap')
         if shutil.disk_usage(base).free < DISK_BYTES + 20 * 1024**3:
-            raise RuntimeError('Need 8 GiB reservation plus 20 GiB free headroom')
+            raise RuntimeError('Need 24 GiB reservation plus 20 GiB free headroom')
         attempt = Path(tempfile.mkdtemp(prefix='run-', dir=base))
         token = uuid.uuid4().hex[:12]
         lease = {'id': token, 'owner': 'ci222-owner-' + token + '.service',
@@ -259,7 +266,7 @@ def main():
     parser.add_argument('--confirm-server-pilot', action='store_true')
     args = parser.parse_args()
     if args.action == 'plan' or (args.action == 'run' and not args.confirm_server_pilot):
-        print('PLAN: fixed source; 8 GiB temporary image; 16 MiB logs; systemd owner cleanup; no Runner changes')
+        print('PLAN: fixed source; 24 GiB temporary image; 16 MiB logs; systemd owner cleanup; no Runner changes')
         return 0
     if args.action == 'run':
         if args.prepared_base is None: parser.error('prepared-base required')

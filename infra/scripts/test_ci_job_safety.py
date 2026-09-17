@@ -103,19 +103,35 @@ class SafetyTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'Wrong owner'):
                     safety.validate_attempt(attempt)
 
-    def test_legacy_fixed_source_lease_remains_readable(self):
+    def test_previous_fixed_source_leases_remain_readable(self):
+        token = '0123456789ab'
+        for disk_bytes in (safety.LEGACY_DISK_BYTES, safety.PREVIOUS_DISK_BYTES):
+            with self.subTest(disk_bytes=disk_bytes), tempfile.TemporaryDirectory() as directory:
+                lease = {'id': token, 'owner': 'ci222-owner-' + token + '.service',
+                         'build': 'ci222-server-' + token + '.service',
+                         'execution': 'ci222-server-' + safety.hashlib.sha256(token.encode()).hexdigest()[:12] + '.service',
+                         'bytes': disk_bytes, 'mode': 'backend', 'prepared': '/prepared'}
+                attempt = Path(directory); (attempt / 'lease.json').write_text(json.dumps(lease))
+                info = type('Info', (), {'st_uid': 0, 'st_mode': 0o100600, 'st_size': 256})()
+                with patch.object(safety.pilot, 'check_base'), patch.object(Path, 'stat', return_value=info), \
+                     patch.object(Path, 'lstat', return_value=info), patch.object(Path, 'is_symlink', return_value=False), \
+                     patch.object(safety.re, 'fullmatch', side_effect=lambda pattern, text: True):
+                    self.assertIsNone(safety.validate_attempt(attempt)['source_sha'])
+
+    def test_unknown_disk_policy_is_rejected(self):
         token = '0123456789ab'
         lease = {'id': token, 'owner': 'ci222-owner-' + token + '.service',
                  'build': 'ci222-server-' + token + '.service',
                  'execution': 'ci222-server-' + safety.hashlib.sha256(token.encode()).hexdigest()[:12] + '.service',
-                 'bytes': safety.DISK_BYTES, 'mode': 'backend', 'prepared': '/prepared'}
+                 'bytes': 12 * 1024**3, 'mode': 'backend', 'prepared': '/prepared'}
         with tempfile.TemporaryDirectory() as directory:
             attempt = Path(directory); (attempt / 'lease.json').write_text(json.dumps(lease))
             info = type('Info', (), {'st_uid': 0, 'st_mode': 0o100600, 'st_size': 256})()
             with patch.object(safety.pilot, 'check_base'), patch.object(Path, 'stat', return_value=info), \
                  patch.object(Path, 'lstat', return_value=info), patch.object(Path, 'is_symlink', return_value=False), \
                  patch.object(safety.re, 'fullmatch', side_effect=lambda pattern, text: True):
-                self.assertIsNone(safety.validate_attempt(attempt)['source_sha'])
+                with self.assertRaisesRegex(ValueError, 'Invalid fixed policy'):
+                    safety.validate_attempt(attempt)
 
     def test_owner_uses_pid1_cleanup_and_hard_timeout(self):
         args = safety.owner_command(Path('/stage'), Path('/attempt'), {'owner': 'ci222-owner-0123456789ab.service'})
@@ -179,6 +195,28 @@ class SafetyTests(unittest.TestCase):
             with self.assertRaises(RuntimeError): safety.cleanup(Path('/attempt'))
             self.assertEqual(stop.call_count, 2); write.assert_not_called()
 
+    def test_cleanup_accepts_legacy_backing_image_size(self):
+        lease = {'id': '0123456789ab', 'build': 'build', 'execution': 'execution',
+                 'bytes': safety.LEGACY_DISK_BYTES}
+        info = type('Info', (), {'st_uid': 0, 'st_mode': 0o100600,
+                                  'st_nlink': 1, 'st_size': safety.LEGACY_DISK_BYTES})()
+        with tempfile.TemporaryDirectory() as directory:
+            attempt = Path(directory); (attempt / 'disk.img').write_bytes(b'fixture')
+            with patch.object(safety, 'validate_attempt', return_value=lease), \
+                 patch.object(safety.pilot, 'stop_unit'), \
+                 patch.object(safety, 'loop_devices', return_value=[]), \
+                 patch.object(Path, 'is_symlink', return_value=False), \
+                 patch.object(Path, 'lstat', return_value=info), \
+                 patch.object(os.path, 'ismount', return_value=False), \
+                 patch.object(safety.os, 'O_DIRECTORY', 0, create=True), \
+                 patch.object(safety.os, 'open', return_value=10), \
+                 patch.object(safety.os, 'fsync'), patch.object(safety.os, 'close'), \
+                 patch.object(safety, 'atomic_json') as write:
+                safety.cleanup(attempt)
+            self.assertFalse((attempt / 'disk.img').exists())
+            write.assert_called_once_with(attempt / 'cleanup.json',
+                                          {'id': lease['id'], 'clean': True})
+
     def test_probe_cleanup_and_collection_are_separate(self):
         with tempfile.TemporaryDirectory() as directory:
             attempt = Path(directory)
@@ -190,10 +228,18 @@ class SafetyTests(unittest.TestCase):
                 self.assertTrue(driver.collect(0, 60)['passed'])
                 self.assertFalse(driver.collect(1, 60)['passed'])
 
-    def test_disk_and_logs_have_independent_limits(self):
-        self.assertEqual(safety.DISK_BYTES, 8 * 1024**3)
+    def test_disk_inode_and_log_limits_are_independent(self):
+        self.assertEqual(safety.LEGACY_DISK_BYTES, 8 * 1024**3)
+        self.assertEqual(safety.PREVIOUS_DISK_BYTES, 16 * 1024**3)
+        self.assertEqual(safety.DISK_BYTES, 24 * 1024**3)
+        self.assertEqual(safety.ALLOWED_DISK_BYTES,
+                         frozenset({safety.LEGACY_DISK_BYTES,
+                                    safety.PREVIOUS_DISK_BYTES,
+                                    safety.DISK_BYTES}))
+        self.assertEqual(safety.FILESYSTEM_INODES, 524288)
         self.assertEqual(bounded.LIMIT, 16 * 1024**2)
         source = (HERE / 'ci-job-safety.py').read_text()
+        self.assertIn("'0', '-N', str(FILESYSTEM_INODES)", source)
         self.assertIn('os.O_CREAT | os.O_EXCL', source)
         self.assertIn("['umount', str(root)]", source)
         self.assertNotIn("'--detach-all'", source)
