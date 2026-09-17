@@ -93,66 +93,12 @@
   transform: translate(-50%, -50%);
 }
 
-/* 카드를 탭하면 열리는 선택 버튼 묶음 */
-.picker {
-  position: absolute;
-  z-index: 3;
-  display: flex;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-2);
-  border: 0.5px solid var(--color-line-strong);
-  border-radius: var(--radius-pill);
-  background: var(--color-bg);
-  box-shadow: var(--shadow-raised);
-  white-space: nowrap;
-}
-
-.pickerOption {
-  display: flex;
-  height: 32px;
-  box-sizing: border-box;
-  align-items: center;
-  padding: 0 var(--space-3);
-  border: 0.5px solid var(--color-line-strong);
-  border-radius: var(--radius-pill);
-  background: var(--color-bg);
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-ink);
-  cursor: pointer;
-}
-
-/* 선택 상태. 잉크 면으로 채워 무엇이 골라졌는지 한눈에 보이게 한다 */
-.pickerOption[data-selected='true'] {
-  border-color: transparent;
-  background: var(--color-action);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-on-action);
-}
-
 .footer {
   display: flex;
   flex: none;
   flex-direction: column;
   gap: var(--space-3);
   margin: 0 var(--screen-padding-x) var(--space-8);
-}
-
-/*
- * 조작 힌트. 한 문장이 길어 두 줄로 흐른다.
- *
- * `word-break: keep-all`이 없으면 한글이 단어 중간에서 끊긴다(`목록에서 제` / `거`).
- * 브라우저 기본값은 한글을 음절 단위로 쪼갤 수 있기 때문이며, 어절 단위로 끊으려면
- * 이 값이 필요하다. 저장소 전체에 이 선언이 한 곳도 없어 다른 화면도 같은 위험이
- * 있지만, 전역에 넣으면 이미 확정된 화면들의 줄바꿈이 함께 바뀌므로 후속 작업으로
- * 남겼다.
- */
-.hint {
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-body);
-  color: var(--color-ink-hint);
-  text-align: center;
-  word-break: keep-all;
 }
 
 /* 제출 실패 안내. 주 동작 바로 위에 선다 */

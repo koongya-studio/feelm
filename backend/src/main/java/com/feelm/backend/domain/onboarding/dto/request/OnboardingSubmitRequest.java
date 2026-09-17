@@ -26,7 +26,7 @@ public record OnboardingSubmitRequest(
                 @JsonDeserialize(using = StrictScalarDeserializers.SkippedDeserializer.class)
                 Boolean skipped) {
 
-    /** 카드 목록(API-023)의 상한과 같다. 한 번의 온보딩에서 선택할 수 있는 카드 수를 넘는 요청을 입력 단계에서 막는다. */
+    /** 한 번의 온보딩 제출 요청이 과도해지는 것을 막는 API-024의 방어 상한이다. */
     private static final int MAX_PREFERENCES = 40;
 
     /** 카드 한 장에 대한 선택. {@code preference}가 {@code LIKE}·{@code DISLIKE}가 아니면 본문 파싱 단계에서 거절된다. */

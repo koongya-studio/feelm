@@ -28,7 +28,7 @@
  *   `board.width`가 0에 머물러 **한 장도 그려지지 않는다**
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { createEvent, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import OnboardingCompletePage from './OnboardingCompletePage';
 import OttOnboardingPage from './OttOnboardingPage';
@@ -135,7 +135,7 @@ function withBoardSize() {
 
 /** 1.1을 건너뛰어 1.2까지 간다. 1.2는 1.1을 거치지 않으면 되돌아간다 */
 async function skipTaste() {
-  fireEvent.click(await screen.findByRole('button', { name: '차차 찾아갈래요 (건너뛰기)' }));
+  fireEvent.click(await screen.findByRole('button', { name: '차차 찾아갈래요' }));
   await waitFor(() => expect(location()).toBe(ROUTE_PATTERN.onboardingOtt));
 }
 
@@ -160,10 +160,124 @@ describe('1.1 영화 취향 초기 설정', () => {
     try {
       renderApp(ROUTE_PATTERN.onboardingTaste);
 
-      // 카드의 표면 버튼이다. `⊖`(`제목 목록에서 제거`)와 갈라 보려면 이름을 그대로 쓴다
+      expect(await screen.findByRole('img', { name: `${CARD.title}, 멀리` })).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  it('실제 포스터를 마우스로 잡아도 브라우저의 이미지 끌기가 카드 드래그를 가로채지 않는다', async () => {
+    const restore = withBoardSize();
+    vi.mocked(getOnboardingCards).mockResolvedValue([
+      { ...CARD, posterUrl: 'https://image.example.test/poster.jpg' },
+    ]);
+
+    try {
+      renderApp(ROUTE_PATTERN.onboardingTaste);
+
+      const card = await screen.findByRole('img', { name: `${CARD.title}, 멀리` });
+      const poster = card.querySelector('img');
+
+      expect(poster).not.toBeNull();
+      const dragStart = createEvent.dragStart(poster as HTMLImageElement);
+      fireEvent(poster as HTMLImageElement, dragStart);
+
+      expect(dragStart.defaultPrevented).toBe(true);
+    } finally {
+      restore();
+    }
+  });
+
+  it('카드를 클릭해도 가까이·멀리·안 봤어요 선택 버튼을 열지 않는다', async () => {
+    const restore = withBoardSize();
+
+    try {
+      renderApp(ROUTE_PATTERN.onboardingTaste);
+
+      const card = await screen.findByRole('img', { name: `${CARD.title}, 멀리` });
+      fireEvent.click(card);
+
       expect(
-        await screen.findByRole('button', { name: `${CARD.title}, 선택 안 함` }),
+        screen.queryByRole('group', { name: `${CARD.title} 취향 선택` }),
+      ).not.toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  it('드래그 중 경계 판정이 바뀌고 마지막으로 집은 카드는 손을 뗀 뒤에도 맨 위다', async () => {
+    const restore = withBoardSize();
+
+    try {
+      renderApp(ROUTE_PATTERN.onboardingTaste);
+
+      const card = await screen.findByRole('img', { name: `${CARD.title}, 멀리` });
+      const board = card.parentElement?.parentElement;
+
+      expect(board).not.toBeNull();
+      Object.defineProperty(card, 'setPointerCapture', { value: vi.fn() });
+
+      fireEvent.pointerDown(card, { pointerId: 1, clientX: 206, clientY: 70 });
+      fireEvent.pointerMove(board as HTMLElement, { pointerId: 1, clientX: 206, clientY: 307 });
+
+      expect(screen.getByRole('img', { name: `${CARD.title}, 가까이` })).toBeInTheDocument();
+
+      fireEvent.pointerMove(board as HTMLElement, { pointerId: 1, clientX: 44, clientY: 70 });
+
+      const dislikedCard = screen.getByRole('img', { name: `${CARD.title}, 멀리` });
+      fireEvent.pointerUp(board as HTMLElement, { pointerId: 1, clientX: 44, clientY: 70 });
+
+      expect(dislikedCard.parentElement).toHaveAttribute('data-front', 'true');
+    } finally {
+      restore();
+    }
+  });
+
+  it('처음부터 흐린 카드는 DISLIKE이고 원 안의 선명한 카드만 LIKE로 바꿔 모두 보낸다', async () => {
+    const restore = withBoardSize();
+    const dislikedCard1 = { ...CARD, movieId: 551, title: '인셉션' };
+    const dislikedCard2 = { ...CARD, movieId: 552, title: '기생충' };
+    vi.mocked(getOnboardingCards).mockResolvedValue([CARD, dislikedCard1, dislikedCard2]);
+    vi.mocked(submitOnboardingPreferences).mockResolvedValue({
+      onboardingCompleted: true,
+      savedCount: 3,
+      skipped: false,
+    });
+
+    try {
+      renderApp(ROUTE_PATTERN.onboardingTaste);
+
+      const liked = await screen.findByRole('img', { name: `${CARD.title}, 멀리` });
+      const board = liked.parentElement?.parentElement;
+
+      expect(board).not.toBeNull();
+      Object.defineProperty(liked, 'setPointerCapture', { value: vi.fn() });
+      expect(
+        screen.getByRole('button', { name: '취향 설정 완료 (좋아요 0개 · 싫어요 3개)' }),
       ).toBeInTheDocument();
+
+      fireEvent.pointerDown(liked, { pointerId: 1, clientX: 206, clientY: 70 });
+      fireEvent.pointerMove(board as HTMLElement, { pointerId: 1, clientX: 206, clientY: 307 });
+      fireEvent.pointerUp(board as HTMLElement, { pointerId: 1, clientX: 206, clientY: 307 });
+
+      expect(screen.getByRole('img', { name: `${CARD.title}, 가까이` })).toBeInTheDocument();
+      expect(screen.getByRole('img', { name: `${dislikedCard1.title}, 멀리` })).toBeInTheDocument();
+      expect(screen.getByRole('img', { name: `${dislikedCard2.title}, 멀리` })).toBeInTheDocument();
+
+      fireEvent.click(
+        screen.getByRole('button', { name: '취향 설정 완료 (좋아요 1개 · 싫어요 2개)' }),
+      );
+
+      await waitFor(() =>
+        expect(submitOnboardingPreferences).toHaveBeenCalledWith(
+          [
+            { movieId: CARD.movieId, preference: 'LIKE' },
+            { movieId: dislikedCard1.movieId, preference: 'DISLIKE' },
+            { movieId: dislikedCard2.movieId, preference: 'DISLIKE' },
+          ],
+          false,
+        ),
+      );
     } finally {
       restore();
     }
