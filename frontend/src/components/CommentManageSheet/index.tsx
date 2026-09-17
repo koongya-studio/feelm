@@ -33,9 +33,13 @@ import type { MyRating } from '../../types/movie';
 /** API-036 `comment` 200자 이하. TextArea도 같은 값으로 입력을 막는다 */
 const COMMENT_MAX_LENGTH = 200;
 
+/** API-043은 아직 spoiler를 주지 않아, 상세 API에서 연 경우에만 기존 값을 보존한다. */
+type ManagedRating = Pick<MyRating, 'ratingId' | 'score' | 'comment' | 'visibility'> &
+  Partial<Pick<MyRating, 'spoiler'>>;
+
 type Props = {
   movie: { movieId: number; title: string; posterUrl: string | null };
-  rating: MyRating;
+  rating: ManagedRating;
   onClose: () => void;
   /** 수정이나 삭제가 저장된 뒤. 부르는 쪽이 값을 다시 읽고 시트를 닫는다 */
   onSaved: () => void;
@@ -76,6 +80,7 @@ export default function CommentManageSheet({ movie, rating, onClose, onSaved }: 
         score: rating.score,
         comment: nextComment,
         visibility: isPublic ? 'PUBLIC' : 'PRIVATE',
+        ...(rating.spoiler === undefined ? {} : { spoiler: rating.spoiler }),
       });
       onSaved();
     } catch {

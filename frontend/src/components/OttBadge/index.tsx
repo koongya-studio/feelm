@@ -56,6 +56,23 @@ type Props = {
   labelled?: boolean;
 };
 
+const TMDB_ORIGINAL_IMAGE_PREFIX = 'https://image.tmdb.org/t/p/original/';
+const TMDB_OTT_LOGO_IMAGE_PREFIX = 'https://image.tmdb.org/t/p/w92/';
+const OFFICIAL_LOGO_URL_BY_CODE: Readonly<Record<string, string>> = {
+  // TMDb의 Watcha provider 로고가 현재 공식 브랜드 아이콘과 다른 이미지로 노출된다.
+  WATCHA: 'https://watcha.com/favicon.ico',
+};
+
+/**
+ * API-025의 저장 형식은 유지하되, 작은 OTT 배지에서 TMDb 원본 이미지를 내려받지 않는다.
+ * 다른 호스트의 로고 URL은 백엔드가 준 값을 그대로 사용한다.
+ */
+function ottLogoImageUrl(logoUrl: string): string {
+  if (!logoUrl.startsWith(TMDB_ORIGINAL_IMAGE_PREFIX)) return logoUrl;
+
+  return `${TMDB_OTT_LOGO_IMAGE_PREFIX}${logoUrl.slice(TMDB_ORIGINAL_IMAGE_PREFIX.length)}`;
+}
+
 export default function OttBadge({
   code,
   name,
@@ -72,7 +89,10 @@ export default function OttBadge({
    */
   const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
 
-  const logoUrl = catalog.find(code)?.logoUrl ?? null;
+  const catalogOtt = catalog.find(code);
+  const catalogLogoUrl =
+    catalogOtt === null ? null : (OFFICIAL_LOGO_URL_BY_CODE[code] ?? catalogOtt.logoUrl);
+  const logoUrl = catalogLogoUrl === null ? null : ottLogoImageUrl(catalogLogoUrl);
 
   const style = {
     '--ott-badge-size': `${size}px`,

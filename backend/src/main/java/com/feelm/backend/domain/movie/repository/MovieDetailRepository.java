@@ -87,7 +87,8 @@ public class MovieDetailRepository {
     public List<MovieCredit> findCredits(long movieId) {
         return query(
                         """
-                        SELECT credits.person_id, p.name, credits.role, credits.character_name
+                        SELECT credits.person_id, p.name, p.profile_url,
+                               credits.role, credits.character_name
                         FROM (
                             SELECT person_id, role, character_name,
                                    row_number() OVER (
@@ -107,9 +108,10 @@ public class MovieDetailRepository {
                         row ->
                                 new MovieCredit(
                                         row.get("person_id", Long.class),
-                                                row.get("name", String.class),
+                                        row.get("name", String.class),
                                         row.get("role", String.class),
-                                                row.get("character_name", String.class)))
+                                        row.get("character_name", String.class),
+                                        row.get("profile_url", String.class)))
                 .toList();
     }
 
@@ -159,7 +161,8 @@ public class MovieDetailRepository {
         Tuple row =
                 query(
                                 """
-                        SELECT r.id AS rating_id, r.score, r.comment, r.visibility, w.status
+                                SELECT r.id AS rating_id, r.score, r.comment, r.visibility,
+                                       r.is_spoiler, w.status
                         FROM (SELECT 1) seed
                         LEFT JOIN ratings r ON r.user_id = :userId AND r.movie_id = :movieId
                         LEFT JOIN watch_records w ON w.user_id = :userId AND w.movie_id = :movieId
@@ -173,9 +176,10 @@ public class MovieDetailRepository {
                         ? null
                         : new MyRatingResponse(
                                 row.get("rating_id", Long.class),
-                                        row.get("score", BigDecimal.class),
+                                row.get("score", BigDecimal.class),
                                 row.get("comment", String.class),
-                                        row.get("visibility", String.class));
+                                row.get("visibility", String.class),
+                                row.get("is_spoiler", Boolean.class));
         return new Personalization(rating, row.get("status", String.class));
     }
 
@@ -225,7 +229,8 @@ public class MovieDetailRepository {
 
     public record MovieAttribute(String kind, String code, String name) {}
 
-    public record MovieCredit(long personId, String name, String role, String character) {}
+    public record MovieCredit(
+            long personId, String name, String role, String character, String profileUrl) {}
 
     public record Personalization(MyRatingResponse rating, String watchStatus) {}
 

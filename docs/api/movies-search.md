@@ -250,8 +250,8 @@
   "runtimeMinutes": 139,
   "genres": [{ "code": "DRAMA", "name": "드라마" }],
   "countries": [{ "code": "US", "name": "미국" }],
-  "directors": [{ "personId": 7467, "name": "데이비드 핀처" }],
-  "cast": [{ "personId": 287, "name": "브래드 피트", "character": "Tyler Durden" }],
+  "directors": [{ "personId": 7467, "name": "데이비드 핀처", "profileUrl": "https://image.tmdb.org/t/p/w185/..." }],
+  "cast": [{ "personId": 287, "name": "브래드 피트", "character": "Tyler Durden", "profileUrl": "https://image.tmdb.org/t/p/w185/..." }],
   "posterUrl": "https://...",
   "backdropUrl": "https://...",
   "flavorCode": "FLAVOR_A",
@@ -260,7 +260,7 @@
   "ottProviders": [
     { "ottId": 1, "code": "NETFLIX", "name": "넷플릭스", "watchUrl": "https://...", "subscribed": true }
   ],
-  "myRating": { "ratingId": 91, "score": 5, "comment": "...", "visibility": "PUBLIC" },
+  "myRating": { "ratingId": 91, "score": 5, "comment": "...", "visibility": "PUBLIC", "spoiler": true },
   "myWatchStatus": "RATED",
   "recommendation": {
     "recommendationItemId": 3301,
@@ -273,7 +273,9 @@
 - 비회원: `myRating`, `myWatchStatus`, `recommendation`은 `null`, `subscribed`는 `false`
 - 응답의 모든 필드를 유지한다. 원제·줄거리·개봉일·상영 시간·이미지 URL·대표 맛처럼
   원천 값이 없는 선택 필드는 `null`이다. 장르·국가·감독·배우·OTT 연결이 없으면 빈 배열이다.
-  배우의 배역명, OTT 시청 URL, 내 한줄평·공개 범위도 값이 없으면 명시적인 `null`이다.
+  배우의 배역명, 인물 프로필 URL, OTT 시청 URL, 내 한줄평·공개 범위도 값이 없으면 명시적인 `null`이다.
+- `myRating.spoiler`는 내 한줄평의 스포일러 포함 여부이며 항상 boolean으로 반환한다.
+  평가 수정 화면은 이 값을 체크박스 초깃값으로 사용한다.
 - 평가가 없으면 `averageRating=0`, `ratingCount=0`이다. 본인 평가가 없으면 `myRating=null`,
   활성 감상 기록이 없거나 만료(`EXPIRED`) 기록만 있으면 `myWatchStatus=null`이다.
 - `recommendation`은 `recommendationItemId`가 조회 영화와 일치하고 열람 권한이 있을 때만 포함한다.
@@ -303,6 +305,8 @@
   순서가 없는 인물은 뒤에 두고, 같은 순서는 `person_id` 오름차순으로 정렬한다.
 - `directors`는 인원 제한 없이 모두 반환하며, `display_order` 오름차순(NULL은 마지막),
   `person_id` 오름차순으로 정렬한다.
+- 인물 `profileUrl`은 기존 `people.profile_url`을 사용한다. TMDb 원본 크기 URL은 상세 화면용
+  `w185` URL로 바꾸어 반환하며, 다른 URL과 `null`은 그대로 유지한다.
 - `averageRating`, `ratingCount`는 전체 사용자 집계값이며 차단 관계 필터를 적용하지 않는다
   (D-10 결정). 차단 필터는 한줄평 목록(API-032)에만 적용한다.
 - AI 영화 요약은 범위에서 제외한다(FR-34)

@@ -30,6 +30,7 @@ export type MovieCode = {
 export type MoviePerson = {
   personId: number;
   name: string;
+  profileUrl: string | null;
   /** 배우일 때만 있다 */
   character?: string;
 };
@@ -51,6 +52,8 @@ export type MyRating = {
   score: number;
   comment: string | null;
   visibility: Visibility;
+  /** 내 한줄평의 스포일러 포함 여부 */
+  spoiler: boolean;
 };
 
 /**
@@ -101,9 +104,7 @@ export type SimilarMovie = {
   movieId: number;
   title: string;
   posterUrl: string | null;
-  releaseYear: number;
   averageRating: number;
   /** 0~1 */
   similarity: number;
-  reason: { summary: string };
 };

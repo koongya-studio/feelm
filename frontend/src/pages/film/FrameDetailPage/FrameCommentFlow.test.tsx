@@ -17,13 +17,21 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import FrameDetailPage from './index';
 import { mockFrameList, mockMyRatings } from '../../../mocks/frames';
 import { findMockMovie } from '../../../mocks/movies';
-import { resetSessionStore, withRatingEdit } from '../../../mocks/sessionStore';
+import { resetSessionStore, saveRatingEdit, withRatingEdit } from '../../../mocks/sessionStore';
 import { ROUTE_PATTERN } from '../../../routes/paths';
 import type { FrameDetail } from '../../../types/taste';
 
 vi.mock('../../../api/taste', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/taste')>()),
   getFrameDetail: vi.fn(),
+}));
+
+vi.mock('../../../api/watch', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../api/watch')>()),
+  updateRating: vi.fn((ratingId, input) => {
+    saveRatingEdit(ratingId, input);
+    return Promise.resolve({});
+  }),
 }));
 
 const { getFrameDetail } = await import('../../../api/taste');
@@ -104,6 +112,7 @@ describe('3.1-A ⇢ 7.6-A', () => {
       score: 4,
       comment: '두 번째 볼 때 더 좋았어요',
       visibility: 'PRIVATE',
+      spoiler: false,
     });
   });
 

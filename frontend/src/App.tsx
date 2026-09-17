@@ -9,7 +9,7 @@ export default function App() {
     <>
       {import.meta.env.DEV ? (
         <div className="preview-badge" role="status">
-          PREVIEW · 목업 데이터
+          LOCAL · API + 로컬 DB
         </div>
       ) : null}
       {/*

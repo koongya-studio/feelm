@@ -137,7 +137,12 @@ public record MovieDetailResponse(
                             requiredMode = Schema.RequiredMode.REQUIRED,
                             description = "감독 이름",
                             example = "데이비드 핀처")
-                    String name) {}
+                    String name,
+            @Schema(
+                            requiredMode = Schema.RequiredMode.REQUIRED,
+                            description = "작은 인물 프로필 이미지 URL. 없으면 null",
+                            nullable = true)
+                    String profileUrl) {}
 
     @Schema(description = "TMDb display_order 기준 상위 10명의 배우 크레딧")
     public record CastResponse(
@@ -156,7 +161,12 @@ public record MovieDetailResponse(
                             description = "배역명. 없으면 null",
                             example = "Tyler Durden",
                             nullable = true)
-                    String character) {}
+                    String character,
+            @Schema(
+                            requiredMode = Schema.RequiredMode.REQUIRED,
+                            description = "작은 인물 프로필 이미지 URL. 없으면 null",
+                            nullable = true)
+                    String profileUrl) {}
 
     @Schema(description = "영화의 OTT 제공처와 현재 사용자의 구독 여부")
     public record MovieOttProviderResponse(
@@ -207,7 +217,12 @@ public record MovieDetailResponse(
                             requiredMode = Schema.RequiredMode.REQUIRED,
                             description = "한줄평 공개 범위(PUBLIC, PRIVATE). 한줄평이 없으면 null 가능",
                             nullable = true)
-                    String visibility) {}
+                    String visibility,
+            @Schema(
+                            requiredMode = Schema.RequiredMode.REQUIRED,
+                            description = "내 한줄평의 스포일러 포함 여부",
+                            example = "true")
+                    boolean spoiler) {}
 
     @Schema(description = "본인 개인 추천 또는 현재 party_members에 속한 파티 추천의 저장된 이유")
     public record MovieRecommendationResponse(

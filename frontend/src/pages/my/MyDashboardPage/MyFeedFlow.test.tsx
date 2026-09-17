@@ -25,7 +25,7 @@ import { getMyProfile } from '../../../api/users';
 import { findMockMovieDetail } from '../../../mocks/movieDetails';
 import { findMockMovie } from '../../../mocks/movies';
 import { mockOtts } from '../../../mocks/otts';
-import { resetSessionStore, withRatingEdit } from '../../../mocks/sessionStore';
+import { resetSessionStore, saveRatingEdit, withRatingEdit } from '../../../mocks/sessionStore';
 import { mockMyProfile } from '../../../mocks/user';
 import { ROUTE_PATTERN } from '../../../routes/paths';
 import type { MovieDetail } from '../../../types/movie';
@@ -55,14 +55,19 @@ vi.mock('../../../api/watch', async (importOriginal) => ({
   getWatchRecords: vi.fn(),
   // 2.5의 감상 정보 줄이 쓴다. 모듈 안에서 부르는 함수라 따로 세워야 대역이 걸린다
   findWatchedRecord: vi.fn(),
-  // 평가 생성(API-036, 업무 -491). 수정(API-037)과 목록(API-039)은 목업이라 그대로 둔다
+  // 평가 생성(API-036)과 수정(API-037)은 실제 호출이므로 화면 흐름에서는 대역을 세운다
   createRating: vi.fn(),
+  updateRating: vi.fn((ratingId, input) => {
+    saveRatingEdit(ratingId, input);
+    return Promise.resolve({});
+  }),
 }));
 
 const { getOtts } = await import('../../../api/otts');
 const { getPopcornBucket, getPopcornFlavors } = await import('../../../api/taste');
 const { getMovieDetail } = await import('../../../api/movies');
-const { getWatchRecords, findWatchedRecord, createRating } = await import('../../../api/watch');
+const { getWatchRecords, findWatchedRecord, createRating, updateRating } =
+  await import('../../../api/watch');
 
 /**
  * 서버가 들고 있는 감상 기록(API-034). `안 남긴 영화` 탭이 그리는 세 건이다.
@@ -129,6 +134,7 @@ beforeEach(() => {
       Promise.resolve(unratedRecords.find((record) => record.movie.movieId === movieId) ?? null),
     );
   vi.mocked(createRating).mockReset();
+  vi.mocked(updateRating).mockClear();
 });
 
 function LocationProbe() {
@@ -203,6 +209,7 @@ describe('MY 피드(안 남긴 영화) ⇢ 2.5', () => {
         score: input.score,
         comment: input.comment ?? null,
         visibility: input.visibility ?? 'PRIVATE',
+        spoiler: false,
         frame: { frameId: 77, createdAt: '2026-08-30T05:21:00Z' },
         popcorn: { flavorCode: 'FLAVOR_A', isNewFlavor: true, flavorCount: 1 },
         watchStatus: 'RATED',
