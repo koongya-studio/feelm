@@ -3,6 +3,7 @@
 보호된 main에서 HDFS 또는 관련 Compose 설정이 변경되면 수동 승인 Job 두 개가 생성된다.
 서비스 노드의 DataNode 1을 먼저 배포하고 검증한 뒤 분산 노드의 NameNode와 DataNode 2를
 순서대로 배포한다. 각 단계에서 두 DataNode의 live 상태와 격리된 HDFS 경로의 쓰기·읽기를
+검증한다. NameNode를 재생성한 뒤에는 Safe Mode가 해제될 때까지 기다린 후 쓰기·읽기를
 검증한다. Compose 명령은 named volume을 삭제하거나 NameNode를 포맷하지 않는다.
 
 서비스·분산 Runner 호스트에 각각 최초 한 번 공통 release 저장소를 준비한다.
