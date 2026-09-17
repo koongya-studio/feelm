@@ -12,7 +12,6 @@ htmlcov
 build
 dist
 *.egg-info
-src/**/test_*.py
 
 *.log
 *.npy
