@@ -58,6 +58,20 @@ printf '%s\\n' "$*" >>"$FAKE_EVENTS"
 if [[ "$1" == "inspect" ]]; then
   if [[ "${*: -1}" == "feelm-backend" ]]; then
     printf '%s\\n' 'registry.example/feelm-backend:current'
+  elif [[ "$*" == *State.Health* && "${*: -1}" == "feelm-redis" ]]; then
+    count=0
+    test -f "$HEALTH_COUNT" && count=$(cat "$HEALTH_COUNT")
+    count=$((count + 1))
+    printf '%s' "$count" >"$HEALTH_COUNT"
+    if [[ "${FORCE_HEALTH_STATUS:-}" == "starting" ]]; then
+      printf '%s\\n' starting
+    elif [[ "${FORCE_HEALTH_STATUS:-}" == "unhealthy" ]]; then
+      printf '%s\\n' unhealthy
+    elif ((count <= ${STARTING_HEALTH_CHECKS:-0})); then
+      printf '%s\\n' starting
+    else
+      printf '%s\\n' healthy
+    fi
   elif [[ "$*" == *start.sh* ]]; then
     if [[ "${MISSING_PREVIOUS:-0}" == "1" && "$(cat "$FAKE_STATE")" == "$PREVIOUS_DIR" ]]; then
       printf '%s/start.sh\\n' "$PREVIOUS_DIR/missing"
@@ -91,6 +105,7 @@ if [[ "$1" == "compose" ]]; then
     exit 1
   fi
   printf '%s' "$REDIS_CONFIG_DIR" >"$FAKE_STATE"
+  printf '0' >"$HEALTH_COUNT"
   exit 0
 fi
 exit 2
@@ -113,6 +128,8 @@ exit 2
                 "RUNTIME_VERIFY_EXIT": "0",
                 "ROLLBACK_VERIFY_EXIT": "0",
                 "RUNTIME_COUNT": self._bash_path(self.temp / "runtime-count"),
+                "HEALTH_COUNT": self._bash_path(self.temp / "health-count"),
+                "DEPLOY_HEALTH_INTERVAL_SECONDS": "0",
             }
         )
         environment.update(overrides)
@@ -143,6 +160,26 @@ exit 2
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.state.read_text(), self._bash_path(self.previous))
         self.assertIn("previous configuration was restored", result.stderr)
+
+    def test_waits_for_candidate_and_rollback_to_become_healthy(self):
+        result = self.run_deploy(RUNTIME_VERIFY_EXIT="1", STARTING_HEALTH_CHECKS="2")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.state.read_text(), self._bash_path(self.previous))
+        health_inspects = [
+            event for event in self.events.read_text().splitlines() if "State.Health" in event
+        ]
+        self.assertEqual(len(health_inspects), 6)
+        self.assertIn("previous configuration was restored", result.stderr)
+
+    def test_health_timeout_fails_before_runtime_verification(self):
+        result = self.run_deploy(
+            FORCE_HEALTH_STATUS="starting",
+            DEPLOY_HEALTH_ATTEMPTS="2",
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse((self.temp / "runtime-count").exists())
+        self.assertIn("did not become healthy: starting", result.stderr)
+        self.assertIn("manual recovery is required", result.stderr)
 
     def test_missing_mount_sources_are_snapshotted_for_rollback(self):
         result = self.run_deploy(MISSING_PREVIOUS="1")
