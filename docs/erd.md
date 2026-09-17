@@ -31,6 +31,7 @@ erDiagram
     USERS ||--o{ RECOMMENDATION_SETS : receives
     USERS ||--o{ PARTY_MEMBERS : joins
     USERS ||--o{ TASTE_REPORTS : owns
+    USERS ||--o{ NOTIFICATIONS : receives
     MOVIES ||--o{ WATCH_RECORDS : target
     MOVIES ||--o{ RATINGS : target
     MOVIES ||--o{ RECOMMENDATION_ITEMS : candidate
@@ -89,6 +90,23 @@ erDiagram
         boolean recommendation_enabled
         boolean marketing_enabled
     }
+    NOTIFICATIONS {
+        bigint id PK
+        bigint user_id FK
+        varchar type "PARTY_INVITE / WATCH_CONFIRM"
+        bigint source_id
+        varchar target_type "PARTY_INVITATION / WATCH_RECORD"
+        bigint target_id
+        varchar title
+        varchar body
+        timestamptz notified_at
+        timestamptz expires_at
+        timestamptz read_at "미확인 상태는 NULL"
+        timestamptz closed_at "원본 업무 진행 중이면 NULL"
+        timestamptz dismissed_at "사용자가 숨기지 않았으면 NULL"
+        timestamptz created_at
+        timestamptz updated_at
+    }
     USER_BLOCKS {
         bigint id PK
         bigint blocker_id FK
@@ -100,6 +118,7 @@ erDiagram
     USERS ||--o{ EMAIL_VERIFICATION_TOKENS : issues
     USERS ||--o{ PASSWORD_RESET_TOKENS : issues
     USERS ||--|| NOTIFICATION_SETTINGS : configures
+    USERS ||--o{ NOTIFICATIONS : receives
     USERS ||--o{ USER_BLOCKS : blocks
     USERS ||--o{ USER_BLOCKS : blocked_by
 ```
@@ -110,7 +129,8 @@ erDiagram
 | `user_auth_providers` | 소셜 로그인 수단 | UK(`provider`, `provider_user_id`). 같은 이메일이어도 기존 계정에 자동 통합하지 않음 | FR-35 · API-007~009 |
 | `email_verification_tokens` | 가입 이메일 인증 | 1회용, 만료 24시간(가정). 해시만 저장 | FR-01 · API-002, API-003 |
 | `password_reset_tokens` | 비밀번호 재설정 | 1회용, 만료 30분(가정). 성공 시 해당 사용자 Refresh Token 전부 폐기 | FR-37 · API-010, API-011 |
-| `notification_settings` | 알림 수신 설정 | 사용자당 1행. 알림 **발송** 기능은 FR 부재 | FR-38 · API-017, API-018 |
+| `notification_settings` | 알림 수신 설정 | 사용자당 1행. 실제 인앱 사건 종류와 독립적인 수신 설정이며 푸시 채널 적용은 S15P21E106-582 범위 | FR-38 · API-017, API-018 |
+| `notifications` | 인앱 알림 정본 | UK(`type`, `source_id`)로 원본 사건의 중복 생성을 막는다. 원본과 같은 트랜잭션에서 생성하고, `notified_at <= now < expires_at`이며 `closed_at IS NULL`, `dismissed_at IS NULL`인 행만 노출한다. 사용자 삭제 시 함께 삭제한다 | FR-41 · API-070~074 · ADR-0021 |
 | `user_blocks` | 사용자 차단 | UK(`blocker_id`, `blocked_id`). 양방향 필터는 조회 시 OR 조건 | FR-39 · API-019~022 |
 
 > Refresh Token은 Redis에 TTL로 저장하며 별도 테이블을 두지 않습니다 (D-2 결정, ADR-0009).
@@ -469,6 +489,8 @@ flowchart LR
 |---|---|---|
 | `/auth/*`, `/users/me`, `/users/nickname-availability` | `users`, `user_auth_providers`, `email_verification_tokens`, `password_reset_tokens` | `frames`, `ratings`(API-014 `stats` 집계), `movies.representative_flavor_id`, `popcorn_flavors`(팝콘 수) |
 | `/users/me/notification-settings` | `notification_settings` | — |
+| `/notifications`, `/notifications/unread-count` | `notifications` | — |
+| `/notifications/{notificationId}/read`, `/notifications/read-all`, `DELETE /notifications/{notificationId}` | `notifications` | — |
 | `/users/search`, `/users/{userId}/block`, `/users/me/blocks` | `users`, `user_blocks` | — |
 | `/onboarding/cards`, `/onboarding/preferences` | `onboarding_preferences` | `movies`, `popcorn_flavors` |
 | `/otts`, `/users/me/otts` | `otts`, `user_otts` | — |

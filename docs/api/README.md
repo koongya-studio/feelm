@@ -16,6 +16,7 @@ FEELM 서비스 REST API 명세입니다. Notion 「설계 > API 명세서」 �
 | [파티](./party.md) | 파티 | 10 |
 | [소셜](./social.md) | 소셜 | 5 |
 | [리포트·트렌드](./report-trend.md) | 리포트, 트렌드 | 4 |
+| [알림](./notifications.md) | 인앱 알림 | 5 |
 
 FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용하지 않습니다. 현재 이벤트·Redis 경계는 [스트리밍 계약](./streaming-contract.md), 이전 계약과 변경 배경은 [폐기된 내부 API 초안](./internal.md)을 참고합니다.
 
@@ -110,6 +111,11 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-067 | [커뮤니티](./social.md#api-067-커뮤니티) | - | `/community (미정)` | 소셜 | 확장 | 회원 | FR-31 | O |
 | API-068 | [OTT 구독 추천](./recommendation.md#api-068-ott-구독-추천) | GET | `/recommendations/otts` | 추천 | 2차 MVP | 회원 | FR-40 | O |
 | API-069 | [파티 멤버 강퇴](./party.md#api-069-파티-멤버-강퇴) | DELETE | `/parties/{partyId}/members/{userId}` | 파티 | 1차 MVP | 회원 | FR-20 |  |
+| API-070 | [인앱 알림 목록](./notifications.md#api-070-인앱-알림-목록) | GET | `/notifications` | 알림 | 2차 MVP | 회원 | FR-41 |  |
+| API-071 | [미확인 알림 개수](./notifications.md#api-071-미확인-알림-개수) | GET | `/notifications/unread-count` | 알림 | 2차 MVP | 회원 | FR-41 |  |
+| API-072 | [알림 읽음 처리](./notifications.md#api-072-알림-읽음-처리) | PATCH | `/notifications/{notificationId}/read` | 알림 | 2차 MVP | 회원 | FR-41 |  |
+| API-073 | [전체 알림 읽음 처리](./notifications.md#api-073-전체-알림-읽음-처리) | PATCH | `/notifications/read-all` | 알림 | 2차 MVP | 회원 | FR-41 |  |
+| API-074 | [알림 숨김](./notifications.md#api-074-알림-숨김) | DELETE | `/notifications/{notificationId}` | 알림 | 2차 MVP | 회원 | FR-41 |  |
 
 ## 공통 규약
 
@@ -245,6 +251,10 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 
 - `RATING`, `RECOMMENDATION`, `MARKETING`
 
+#### InAppNotificationType — 인앱 알림 사건 (FR-41)
+
+- `PARTY_INVITE`, `WATCH_CONFIRM`. 알림 설정 항목과 인앱 사건 종류는 서로 다른 계약이다.
+
 #### PopcornFlavor — 팝콘 맛 (FR-06)
 
 - 8종 코드·표시명·색상은 기준정보를 따르고, 영화는 ADR-0020·S15P21E106-439의 고정 상위 맛 결과로 하나에 배정한다. 코드는 `/popcorn-flavors`(API-044)로 조회한다.
@@ -254,4 +264,4 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 - [ ] Rate limit 정책과 임계치 — 설정값, 운영 전 확정
 - [ ] Python Fold-in Consumer·Spark Streaming 구현의 Kafka Consumer Group과 운영 설정 (ADR-0017, NFR-04)
 
-해소된 항목(2026-08-30~31 결정): 식별자 타입·공개 식별자(ADR-0008), Refresh 전달·저장(ADR-0009), 오류 `code` 규칙(의미 코드), 알림 전달 방식(폴링, ADR-0011). 결정 기록은 [ADR](../adr/README.md)과 [ERD 5장](../erd.md#5-물리-스키마-전-결정-사항)을 참조합니다.
+해소된 항목(2026-08-30~2026-09-17 결정): 식별자 타입·공개 식별자(ADR-0008), Refresh 전달·저장(ADR-0009), 오류 `code` 규칙(의미 코드), 1차 알림 폴링(ADR-0011), 2차 인앱 알림 정본(ADR-0021). 결정 기록은 [ADR](../adr/README.md)과 [ERD 5장](../erd.md#5-물리-스키마-전-결정-사항)을 참조합니다.

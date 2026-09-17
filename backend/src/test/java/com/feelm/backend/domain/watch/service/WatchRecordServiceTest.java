@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.feelm.backend.domain.notification.service.NotificationCommandService;
 import com.feelm.backend.domain.watch.dto.request.WatchListCriteria;
 import com.feelm.backend.domain.watch.model.WatchStatus;
 import com.feelm.backend.domain.watch.repository.WatchRepository;
@@ -40,13 +41,20 @@ class WatchRecordServiceTest {
 
     private WatchRepository repository;
     private KafkaEventPublisher eventPublisher;
+    private NotificationCommandService notificationCommandService;
     private WatchService service;
 
     @BeforeEach
     void setUp() {
         repository = mock(WatchRepository.class);
         eventPublisher = mock(KafkaEventPublisher.class);
-        service = new WatchService(repository, eventPublisher, Clock.fixed(NOW, ZoneOffset.UTC));
+        notificationCommandService = mock(NotificationCommandService.class);
+        service =
+                new WatchService(
+                        repository,
+                        eventPublisher,
+                        notificationCommandService,
+                        Clock.fixed(NOW, ZoneOffset.UTC));
         when(repository.lockActiveUser(USER_ID)).thenReturn(true);
     }
 

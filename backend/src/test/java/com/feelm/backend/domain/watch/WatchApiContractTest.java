@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.feelm.backend.domain.notification.service.NotificationCommandService;
 import com.feelm.backend.domain.watch.repository.WatchRepository;
 import com.feelm.backend.domain.watch.service.WatchService;
 import com.feelm.backend.domain.watch.service.WatchService.OttClickResult;
@@ -72,6 +73,7 @@ class WatchApiContractTest extends SharedPostgresContractTest {
     @Autowired private DataSource dataSource;
     @Autowired private WatchRepository watchRepository;
     @Autowired private KafkaEventPublisher eventPublisher;
+    @Autowired private NotificationCommandService notificationCommandService;
     @Autowired private PlatformTransactionManager transactionManager;
     private long userId;
     private long withdrawnUserId;
@@ -106,6 +108,8 @@ class WatchApiContractTest extends SharedPostgresContractTest {
         jdbc.sql("DROP FUNCTION IF EXISTS test_fail_ott_click_outbox()").update();
         jdbc.sql("DROP TRIGGER IF EXISTS test_fail_watch_insert ON watch_records").update();
         jdbc.sql("DROP FUNCTION IF EXISTS test_fail_watch_insert()").update();
+        jdbc.sql("DROP TRIGGER IF EXISTS test_fail_watch_notification ON notifications").update();
+        jdbc.sql("DROP FUNCTION IF EXISTS test_fail_watch_notification()").update();
         jdbc.sql(
                         "TRUNCATE TABLE outbox_events, ratings, watch_records,"
                                 + " movie_ott_providers, movies, otts, users"
@@ -149,6 +153,53 @@ class WatchApiContractTest extends SharedPostgresContractTest {
         assertThat(stored.expiresAt()).isEqualTo(clickedAt.plusSeconds(7 * DAY));
         assertThat(activeRows(userId, movieId)).isEqualTo(1);
         assertEvent(onlyEvent(), userId, movieId, ottId, watchRecordId);
+        assertThat(
+                        jdbc.sql(
+                                        "SELECT count(*) FROM notifications"
+                                                + " WHERE user_id=:user AND type='WATCH_CONFIRM'"
+                                                + " AND source_id=:record AND target_id=:record"
+                                                + " AND notified_at=:due AND expires_at=:expires")
+                                .param("user", userId)
+                                .param("record", watchRecordId)
+                                .param("due", offset(stored.confirmDueAt()))
+                                .param("expires", offset(stored.expiresAt()))
+                                .query(Long.class)
+                                .single())
+                .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("알림 저장 실패 시 감상 기록과 아웃박스를 함께 롤백한다")
+    void rollsBackWatchAndOutboxWhenNotificationWriteFails() throws Exception {
+        jdbc.sql(
+                        """
+                        CREATE FUNCTION test_fail_watch_notification() RETURNS trigger
+                        LANGUAGE plpgsql AS $$
+                        BEGIN
+                            RAISE EXCEPTION 'forced notification failure';
+                        END;
+                        $$
+                        """)
+                .update();
+        jdbc.sql(
+                        """
+                        CREATE TRIGGER test_fail_watch_notification
+                        BEFORE INSERT ON notifications
+                        FOR EACH ROW EXECUTE FUNCTION test_fail_watch_notification()
+                        """)
+                .update();
+
+        mockMvc.perform(
+                        post(path(movieId))
+                                .header("Authorization", bearer(userId))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"ottId\":" + ottId + "}"))
+                .andExpect(status().is5xxServerError());
+
+        assertThat(watchRows(userId, movieId)).isZero();
+        assertThat(events()).isEmpty();
+        assertThat(jdbc.sql("SELECT count(*) FROM notifications").query(Long.class).single())
+                .isZero();
     }
 
     @Test
@@ -163,6 +214,9 @@ class WatchApiContractTest extends SharedPostgresContractTest {
                 .param("future", offset(Instant.now().plusSeconds(DAY)))
                 .param("id", watchRecordId)
                 .update();
+        jdbc.sql("UPDATE notifications SET read_at=now() WHERE source_id=:record")
+                .param("record", watchRecordId)
+                .update();
 
         JsonNode response = click(movieId, otherOttId, userId, 200);
 
@@ -176,6 +230,25 @@ class WatchApiContractTest extends SharedPostgresContractTest {
         assertThat(watchRows(userId, movieId)).isEqualTo(1);
         List<EventRow> events = events();
         assertThat(events).hasSize(2);
+        assertThat(
+                        jdbc.sql(
+                                        "SELECT count(*) FROM notifications"
+                                                + " WHERE type='WATCH_CONFIRM' AND source_id=:record")
+                                .param("record", watchRecordId)
+                                .query(Long.class)
+                                .single())
+                .isEqualTo(1);
+        assertThat(
+                        jdbc.sql(
+                                        "SELECT count(*) FROM notifications"
+                                                + " WHERE source_id=:record AND read_at IS NULL"
+                                                + " AND notified_at=:due AND expires_at=:expires")
+                                .param("record", watchRecordId)
+                                .param("due", offset(stored.confirmDueAt()))
+                                .param("expires", offset(stored.expiresAt()))
+                                .query(Long.class)
+                                .single())
+                .isEqualTo(1);
         assertThat(events).extracting(EventRow::eventId).doesNotHaveDuplicates();
         assertEvent(events.get(0), userId, movieId, ottId, watchRecordId);
         assertEvent(events.get(1), userId, movieId, otherOttId, watchRecordId);
@@ -879,7 +952,11 @@ class WatchApiContractTest extends SharedPostgresContractTest {
 
     private OttClickResult clickWithFixedClock(Instant now, long requestedOttId) {
         WatchService service =
-                new WatchService(watchRepository, eventPublisher, Clock.fixed(now, ZoneOffset.UTC));
+                new WatchService(
+                        watchRepository,
+                        eventPublisher,
+                        notificationCommandService,
+                        Clock.fixed(now, ZoneOffset.UTC));
         OttClickResult result =
                 new TransactionTemplate(transactionManager)
                         .execute(status -> service.clickOtt(userId, movieId, requestedOttId));

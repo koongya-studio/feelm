@@ -199,16 +199,26 @@ class UserWithdrawalContractTest extends OAuthApiTestSupport {
         block(other.accessToken(), member.userId());
 
         insertOnboardingPreference(member.userId());
+        jdbcTemplate.update(
+                "INSERT INTO notifications(user_id,type,source_id,target_type,target_id,title,body,"
+                        + "notified_at,expires_at) VALUES"
+                        + " (?,'PARTY_INVITE',?,'PARTY_INVITATION',?,'제목','본문',CURRENT_TIMESTAMP,"
+                        + " DATEADD('DAY',90,CURRENT_TIMESTAMP))",
+                member.userId(),
+                member.userId(),
+                member.userId());
 
         assertThat(rowCount("user_otts", member.userId())).isEqualTo(1);
         assertThat(rowCount("onboarding_preferences", member.userId())).isEqualTo(1);
         assertThat(rowCount("notification_settings", member.userId())).isEqualTo(1);
+        assertThat(rowCount("notifications", member.userId())).isEqualTo(1);
         assertThat(blockRowCount(member.userId())).isEqualTo(2);
 
         withdraw(member.accessToken(), member.password()).andExpect(status().isNoContent());
 
         assertThat(rowCount("user_otts", member.userId())).isZero();
         assertThat(rowCount("notification_settings", member.userId())).isZero();
+        assertThat(rowCount("notifications", member.userId())).isZero();
         assertThat(rowCount("onboarding_preferences", member.userId())).isZero();
         assertThat(blockRowCount(member.userId())).isZero();
     }
