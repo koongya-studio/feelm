@@ -13,51 +13,41 @@ import org.springframework.stereotype.Repository;
 /**
  * 온보딩 카드 후보를 읽는다(API-023).
  *
- * <p>{@code movies}에는 Entity가 없고(콘텐츠 도메인이 적재 경로에서 직접 다룬다) 맛 균등 배분에 윈도 함수가 필요해 Native Query를 쓴다(컨벤션
- * 9장). 이 도메인은 {@code movies}·{@code movie_genres}·{@code genres}·{@code popcorn_flavors}를 읽기만 하고 쓰지
- * 않는다.
+ * <p>{@code movies}에는 Entity가 없고 콘텐츠 도메인이 적재 경로에서 직접 다루므로 Native Query를 쓴다(컨벤션 9장). 이 도메인은 {@code
+ * movies}·{@code movie_genres}·{@code genres}·{@code popcorn_flavors}를 읽기만 하고 쓰지 않는다.
  */
 @Repository
 @RequiredArgsConstructor
 public class OnboardingCardRepository {
 
     /**
-     * 맛별 상위 후보를 라운드로빈으로 섞어 카드를 고른다.
+     * 업무 S15P21E106-542에서 확정한 영화 10편을 기획 순서대로 고른다.
      *
-     * <p>LATERAL이 맛마다 상위 {@code size}편만 남기므로 윈도 함수가 도는 대상은 최대 (맛 수 × size)행이다. 전체 {@code movies}에
-     * 윈도를 돌리지 않기 위한 구성이다. {@code flavor_rank}를 먼저 정렬해 1순위를 맛마다 한 장씩 깔고 그다음 순위로 넘어가므로, 한 맛의 후보가 모자라면
-     * 남은 자리를 다른 맛의 다음 순위가 채운다.
-     *
-     * <p>인기도 정렬은 {@code rating_count DESC, average_rating DESC, id ASC}다. 명세가 가정한 MovieLens 평가 수 열이
-     * 아직 {@code movies}에 없어 서비스 평가 수를 쓰며, 같은 요청이 같은 순서를 돌려주도록 {@code id}로 동점을 끊는다. 열이 생기면 이 SQL의
-     * 정렬식만 바꾸면 된다.
-     *
-     * <p>대표 맛이 배정되지 않은 영화({@code representative_flavor_id IS NULL})는 조인에서 빠져 카드가 되지 않는다. 응답의 {@code
-     * flavorCode}가 비워 둘 수 없는 값이기 때문이다.
+     * <p>영화와 대표 맛은 적재 데이터에서 읽으므로 제목·포스터·장르가 갱신되어도 최신 값을 반환한다. 다만 확정 목록에 없는 인기 영화로 자동 대체하지는 않는다. 목록에
+     * 든 영화가 없거나 대표 맛이 배정되지 않았다면 조인에서 빠진다. 잘못된 적재를 다른 영화로 감추면 온보딩 취향 판별 구성이 달라지기 때문이다.
      */
     private static final String SELECT_CARDS =
             """
-            WITH flavor_top AS (
-                SELECT f.code AS flavor_code, f.sort_order AS sort_order, top.id AS movie_id,
-                       top.title AS title, top.poster_url AS poster_url,
-                       cast(extract(year from top.release_date) AS int) AS release_year,
-                       row_number() OVER (
-                           PARTITION BY f.id
-                           ORDER BY top.rating_count DESC, top.average_rating DESC, top.id
-                       ) AS flavor_rank
-                FROM popcorn_flavors f
-                CROSS JOIN LATERAL (
-                    SELECT m.id, m.title, m.poster_url, m.release_date,
-                           m.rating_count, m.average_rating
-                    FROM movies m
-                    WHERE m.representative_flavor_id = f.id
-                    ORDER BY m.rating_count DESC, m.average_rating DESC, m.id
-                    LIMIT :size
-                ) top
+            WITH curated_movies(movie_id, display_order) AS (
+                VALUES
+                    (59738, 1),
+                    (69823, 2),
+                    (72564, 3),
+                    (59664, 4),
+                    (45504, 5),
+                    (123, 6),
+                    (76119, 7),
+                    (88608, 8),
+                    (100, 9),
+                    (58868, 10)
             )
-            SELECT movie_id, title, poster_url, release_year, flavor_code
-            FROM flavor_top
-            ORDER BY flavor_rank, sort_order
+            SELECT m.id AS movie_id, m.title AS title, m.poster_url AS poster_url,
+                   cast(extract(year from m.release_date) AS int) AS release_year,
+                   f.code AS flavor_code
+            FROM curated_movies c
+            JOIN movies m ON m.id = c.movie_id
+            JOIN popcorn_flavors f ON f.id = m.representative_flavor_id
+            ORDER BY c.display_order
             LIMIT :size
             """;
 
@@ -96,7 +86,7 @@ public class OnboardingCardRepository {
     /**
      * 카드로 고른 영화들의 장르 이름을 영화별로 모은다.
      *
-     * <p>카드가 최대 40장이라 {@code in} 절 크기가 입력으로 커지지 않는다. 장르가 없는 영화는 결과에 키가 생기지 않으므로 호출자가 빈 목록으로 다룬다.
+     * <p>카드가 최대 10장이라 {@code in} 절 크기가 입력으로 커지지 않는다. 장르가 없는 영화는 결과에 키가 생기지 않으므로 호출자가 빈 목록으로 다룬다.
      */
     public Map<Long, List<String>> findGenreNames(List<Long> movieIds) {
         if (movieIds.isEmpty()) {

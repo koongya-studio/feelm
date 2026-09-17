@@ -75,17 +75,20 @@ describe('API-023 초기 취향 카드 목록', () => {
 describe('API-024 초기 취향 제출', () => {
   it('고른 값과 `skipped`를 함께 보낸다', async () => {
     fetchMock.mockResolvedValue(
-      json(200, { onboardingCompleted: true, savedCount: 1, skipped: false }),
+      json(200, { onboardingCompleted: true, savedCount: 2, skipped: false }),
     );
 
-    const preferences = [{ movieId: 550, preference: 'LIKE' as const }];
+    const preferences = [
+      { movieId: 550, preference: 'LIKE' as const },
+      { movieId: 551, preference: 'DISLIKE' as const },
+    ];
     const result = await submitOnboardingPreferences(preferences, false);
 
     const [url, init] = call();
     expect(url).toBe('/api/v1/onboarding/preferences');
     expect(init.method).toBe('POST');
     expect(JSON.parse(init.body as string)).toEqual({ preferences, skipped: false });
-    expect(result.savedCount).toBe(1);
+    expect(result.savedCount).toBe(2);
   });
 
   /*

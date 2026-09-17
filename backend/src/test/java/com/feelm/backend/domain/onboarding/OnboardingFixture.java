@@ -13,16 +13,16 @@ final class OnboardingFixture {
 
     static final long COMPLETED = 40;
 
-    /** 맛 코드는 ADR-0020의 8개 유형 자리를 채우는 시드 값이다. 배정 자체는 파이프라인이 한다. */
+    /** 운영 기준정보와 같은 ADR-0020 팝콘 맛 코드다. 배정 자체는 파이프라인이 한다. */
     static final String[] FLAVOR_CODES = {
-        "ACTION_ADVENTURE",
-        "FANTASY_SF",
-        "COMEDY_FAMILY",
-        "ROMANCE",
-        "DRAMA",
-        "THRILL_HORROR",
-        "CRIME_MYSTERY",
-        "CLASSIC_REALITY"
+        "FLAVOR_A",
+        "FLAVOR_B",
+        "FLAVOR_C",
+        "FLAVOR_D",
+        "FLAVOR_E",
+        "FLAVOR_F",
+        "FLAVOR_G",
+        "FLAVOR_H"
     };
 
     private OnboardingFixture() {}

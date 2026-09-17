@@ -1,25 +1,19 @@
 /*
  * 1.1 영화 취향 초기 설정 — 배치 카드
  *
- * 크기 58x82 · radius 8은 와이어프레임 실측값이고 부모의 `CARD_WIDTH`·`CARD_HEIGHT`와
- * 같은 값이어야 한다.
+ * 크기 88x124 · radius 11은 확정 영화의 포스터를 식별할 수 있도록 키운 값이고 부모의
+ * `CARD_WIDTH`·`CARD_HEIGHT`와 같아야 한다.
  *
- * 상태 표시 (팀 결정 2026-09-10, 업무 -98)
- * - 미선택   : Poster 기본 테두리
- * - 가까이    : **빨강 테두리.** 시안 2.2장이 빨강을 쓰는 곳에 `선택 상태`를 명시한다.
- *              1px 테두리는 면이 아니라 표식이므로 2.3장에도 맞다. 이전에는 검정
- *              (`--color-ink`)을 썼는데, 검정은 주 동작 알약 하나에만 쓴다(2.4장)
- * - 멀리      : opacity 0.55 + grayscale(60%). 고르지 않은 쪽으로 물러난다
- * - 안 봤어요 : 와이어프레임에 별도 표현이 없어 미선택과 같은 모습으로 둔다. 상태는
- *              접근 가능한 이름으로 전달한다. (`[?]` 표시 방법 미확정)
+ * 상태는 위치 자체로 읽는다. 처음 받은 카드는 원 밖의 흐린 DISLIKE로 시작하고,
+ * 점선 안의 LIKE는 선명하게 보인다. 가까이 카드에 별도 빨강 테두리를 두지 않는다.
  *
  * 이전 주석은 폐기된 이전 방향의 hex(`#C7C4BE` · `#3C3A36`)를 적고 있었다.
  *
  * `⊖`는 top -8 right -8, 22px 원, 테두리 1.5px, 안쪽 막대 10x2.
  * 보이는 크기는 그대로 두고 터치 영역만 넓힌다(common-components.md 6.3).
  *
- * 카드는 button이므로 키보드로도 선택할 수 있다. 드래그는 포인터 조작이고, 눌렀다가
- * 거의 움직이지 않으면 탭으로 보아 선택 버튼을 연다.
+ * 카드 표면은 영화 제목과 판정 상태를 읽어 주는 이미지 역할이며, 선택 동작은 드래그
+ * 하나만 제공한다. 보지 않은 영화는 별도의 `⊖` 버튼으로 제외한다.
  */
 import Poster from '../../../../components/Poster';
 import VisuallyHidden from '../../../../components/VisuallyHidden';
@@ -37,8 +31,8 @@ type Props = {
   x: number;
   y: number;
   dragging: boolean;
-  onPointerDown: (event: PointerEvent<HTMLButtonElement>) => void;
-  onClick: () => void;
+  front: boolean;
+  onPointerDown: (event: PointerEvent<HTMLDivElement>) => void;
   onRemove: () => void;
 };
 
@@ -50,8 +44,8 @@ export default function TasteCard({
   x,
   y,
   dragging,
+  front,
   onPointerDown,
-  onClick,
   onRemove,
 }: Props) {
   return (
@@ -60,23 +54,24 @@ export default function TasteCard({
       style={{ '--card-x': `${x}px`, '--card-y': `${y}px` } as CSSProperties}
       data-value={value}
       data-dragging={dragging}
+      data-front={front}
     >
-      <button
-        type="button"
+      <div
         className={styles.surface}
         onPointerDown={onPointerDown}
-        onClick={onClick}
+        onDragStart={(event) => event.preventDefault()}
+        role="img"
         aria-label={`${title}, ${tasteValueLabel(value)}`}
       >
         <Poster
-          width={58}
-          height={82}
-          radius={8}
+          width={88}
+          height={124}
+          radius={11}
           src={posterUrl ?? undefined}
           title=""
           seed={movieId}
         />
-      </button>
+      </div>
 
       <button type="button" className={styles.remove} onClick={onRemove}>
         <span className={styles.removeBar} aria-hidden="true" />

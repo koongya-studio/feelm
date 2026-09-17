@@ -19,8 +19,8 @@ type OnboardingCardListResponse = { items: OnboardingCard[] };
 /**
  * API-023 초기 취향 카드 목록 · GET /api/v1/onboarding/cards
  *
- * 회원 전용이다. `size`를 넘기지 않으면 계약 기본값 20장이며, 화면이 한 번에 늘어놓을
- * 수 있는 장수는 화면이 정한다(1.1은 10장).
+ * 회원 전용이다. `size`를 넘기지 않으면 확정 목록 10편 전체를 받는다. 1.1 화면도 같은
+ * 10편을 요청한다.
  *
  * 이미 온보딩을 마친 사용자는 `409 ONBOARDING_ALREADY_COMPLETED`다. 카드를 고른 뒤에야
  * 거절당하지 않도록 제출이 아니라 조회에서 막는다.
@@ -36,8 +36,8 @@ export async function getOnboardingCards(size?: number): Promise<OnboardingCard[
 /**
  * API-024 초기 취향 제출 · POST /api/v1/onboarding/preferences
  *
- * 명시적으로 선택한 값만 보낸다. `안 봤어요`와 제거한 카드는 배열에 넣지 않는다
- * (처리 규칙 — 제외 카드는 저장하지 않는다).
+ * 화면에 남아 있는 카드는 최초 기본값인 `DISLIKE`까지 모두 보낸다. `안 봤어요`로
+ * 제거한 카드만 배열에 넣지 않는다(처리 규칙 — 제외 카드는 저장하지 않는다).
  * `skipped: true`이면 `preferences`는 빈 배열이어야 한다.
  *
  * 두 필드 모두 필수다. 빠뜨리면 `400 VALIDATION_FAILED`이며, 서버가 기본값으로 채워
