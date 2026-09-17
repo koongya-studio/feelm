@@ -1,0 +1,2 @@
+# Update this token only in a reviewed Jira branch to redeploy the current Redis configuration.
+token=S15P21E106-541-initial-release-root-retry
