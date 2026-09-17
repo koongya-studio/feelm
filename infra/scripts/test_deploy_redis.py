@@ -59,17 +59,35 @@ if [[ "$1" == "inspect" ]]; then
   if [[ "${*: -1}" == "feelm-backend" ]]; then
     printf '%s\\n' 'registry.example/feelm-backend:current'
   elif [[ "$*" == *start.sh* ]]; then
-    printf '%s/start.sh\\n' "$(cat "$FAKE_STATE")"
+    if [[ "${MISSING_PREVIOUS:-0}" == "1" && "$(cat "$FAKE_STATE")" == "$PREVIOUS_DIR" ]]; then
+      printf '%s/start.sh\\n' "$PREVIOUS_DIR/missing"
+    else
+      printf '%s/start.sh\\n' "$(cat "$FAKE_STATE")"
+    fi
   elif [[ "$*" == *readonly.acl* ]]; then
-    printf '%s/readonly.acl\\n' "$(cat "$FAKE_STATE")"
+    if [[ "${MISSING_PREVIOUS:-0}" == "1" && "$(cat "$FAKE_STATE")" == "$PREVIOUS_DIR" ]]; then
+      printf '%s/readonly.acl\\n' "$PREVIOUS_DIR/missing"
+    else
+      printf '%s/readonly.acl\\n' "$(cat "$FAKE_STATE")"
+    fi
   fi
   exit 0
 fi
+if [[ "$1" == "cp" ]]; then
+  case "$2" in
+    *start.sh) cp "$PREVIOUS_DIR/start.sh" "$3" ;;
+    *readonly.acl) cp "$PREVIOUS_DIR/readonly.acl" "$3" ;;
+    *) exit 2 ;;
+  esac
+  exit 0
+fi
 if [[ "$1" == "compose" ]]; then
-  if [[ "$REDIS_CONFIG_DIR" != "$PREVIOUS_DIR" && "${FAIL_CANDIDATE_COMPOSE:-0}" == "1" ]]; then
+  if [[ "$REDIS_CONFIG_DIR" == */releases/abcdef1234567890 \
+    && "${FAIL_CANDIDATE_COMPOSE:-0}" == "1" ]]; then
     exit 1
   fi
-  if [[ "$REDIS_CONFIG_DIR" == "$PREVIOUS_DIR" && "${FAIL_ROLLBACK_COMPOSE:-0}" == "1" ]]; then
+  if [[ "$REDIS_CONFIG_DIR" != */releases/abcdef1234567890 \
+    && "${FAIL_ROLLBACK_COMPOSE:-0}" == "1" ]]; then
     exit 1
   fi
   printf '%s' "$REDIS_CONFIG_DIR" >"$FAKE_STATE"
@@ -99,7 +117,7 @@ exit 2
         )
         environment.update(overrides)
         return subprocess.run(
-            [BASH, str(SCRIPT), "abcdef1234567890"],
+            [BASH, self._bash_path(SCRIPT), "abcdef1234567890"],
             cwd=ROOT,
             env=environment,
             text=True,
@@ -126,6 +144,29 @@ exit 2
         self.assertEqual(self.state.read_text(), self._bash_path(self.previous))
         self.assertIn("previous configuration was restored", result.stderr)
 
+    def test_missing_mount_sources_are_snapshotted_for_rollback(self):
+        result = self.run_deploy(MISSING_PREVIOUS="1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        snapshot = self.release_root / "releases" / "bootstrap-abcdef1234567890"
+        self.assertEqual(
+            (snapshot / "start.sh").read_bytes(),
+            (self.previous / "start.sh").read_bytes(),
+        )
+        self.assertEqual(
+            (snapshot / "readonly.acl").read_bytes(),
+            (self.previous / "readonly.acl").read_bytes(),
+        )
+        events = self.events.read_text()
+        self.assertIn("cp feelm-redis:/usr/local/etc/redis/start.sh", events)
+        self.assertIn("cp feelm-redis:/usr/local/etc/redis/readonly.acl", events)
+
+    def test_missing_mount_sources_rollback_to_snapshot(self):
+        result = self.run_deploy(MISSING_PREVIOUS="1", RUNTIME_VERIFY_EXIT="1")
+        self.assertNotEqual(result.returncode, 0)
+        snapshot = self.release_root / "releases" / "bootstrap-abcdef1234567890"
+        self.assertEqual(self.state.read_text(), self._bash_path(snapshot))
+        self.assertIn("previous configuration was restored", result.stderr)
+
     def test_candidate_compose_failure_restores_previous_config(self):
         result = self.run_deploy(FAIL_CANDIDATE_COMPOSE="1")
         self.assertNotEqual(result.returncode, 0)
@@ -147,7 +188,7 @@ exit 2
         environment = os.environ.copy()
         environment["PATH"] = self._bash_path(self.bin) + ":" + environment["PATH"]
         result = subprocess.run(
-            [BASH, str(SCRIPT), "not-a-revision"],
+            [BASH, self._bash_path(SCRIPT), "not-a-revision"],
             cwd=ROOT,
             env=environment,
             text=True,
