@@ -18,7 +18,7 @@ feelm-foldin-consumer = "feelm_consumer.__main__:main"
 dev = ["pytest>=8.3,<9", "ruff>=0.8,<1"]
 
 [tool.pytest.ini_options]
-testpaths = ["src"]
+testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 120

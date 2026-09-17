@@ -161,8 +161,10 @@ def build_message(service: str, status: str, environ: dict[str, str]) -> str:
     pipeline_url = environ.get("CI_PIPELINE_URL", "").strip()
 
     lines = [
-        f"### {icon} {service_label} 배포 {status_label}",
-        f"- 환경: `{environment}`",
+        "## 🚀 [DEPLOY] 배포 결과",
+        f"> {icon} {status_label} · 📦 {service_label} · 🌐 {environment}",
+        "",
+        "**🔎 배포 정보**",
         f"- 커밋: `{commit}`",
     ]
     if job_url.startswith("https://"):

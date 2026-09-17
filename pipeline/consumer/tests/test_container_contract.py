@@ -1,6 +1,6 @@
 from pathlib import Path
 
-CONSUMER_ROOT = Path(__file__).resolve().parents[2]
+CONSUMER_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_dockerfile_pins_runtime_and_locked_install() -> None:
@@ -43,9 +43,16 @@ def test_test_stage_runs_locked_lint_and_tests_before_runtime_publication() -> N
     dockerfile = (CONSUMER_ROOT / "Dockerfile").read_text(encoding="utf-8")
 
     assert "FROM builder AS test" in dockerfile
+    assert "COPY Dockerfile .dockerignore ./" in dockerfile
+    assert "COPY tests ./tests" in dockerfile
     assert "uv sync --locked" in dockerfile
     assert "uv run ruff check ." in dockerfile
     assert "uv run pytest -v" in dockerfile
+
+    runtime_stage = dockerfile.split("FROM python:3.12.14-slim-bookworm@sha256:", maxsplit=2)[-1]
+    assert "COPY tests" not in runtime_stage
+    assert "COPY --from=test" not in runtime_stage
+    assert not list((CONSUMER_ROOT / "src").rglob("test_*.py"))
 
 
 def test_build_context_excludes_secrets_and_artifacts() -> None:
@@ -67,3 +74,4 @@ def test_build_context_excludes_secrets_and_artifacts() -> None:
         "*.pkl",
     }
     assert required <= patterns
+    assert not any(pattern.startswith("tests") or pattern.endswith("test_*.py") for pattern in patterns)

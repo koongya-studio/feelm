@@ -1,15 +1,23 @@
 /*
- * 취향 필름 · 팝콘 (업무 S15P21E106-392).
+ * 취향 필름 · 팝콘 (업무 S15P21E106-392) · 취향 분석 (업무 S15P21E106-479).
  *
- * 화면에서는 드러나지 않는 두 가지를 고정한다.
+ * 화면에서는 드러나지 않는 세 가지를 고정한다.
  * - 팝콘 맛 기준정보(API-044)는 **공개 API**라 토큰을 싣지 않고, `items` 래퍼를 벗긴다
  * - 프레임 상세(API-043)의 `404`는 계약 코드 그대로 올라가야 화면이 실패 상태로 간다
+ * - 취향 분석(API-040)은 캐시가 없는 사용자의 `insufficientData` 응답을 그대로 돌려준다.
+ *   `analyzedAt: null`이 오는 유일한 API라 여기서 못 박는다
  *
  * migration 전·실패 상태에서 `items`가 비어 오는 경우도 방어한다. 빈 배열은 오류가
  * 아니므로 던지지 않는다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getFrameDetail, getMyFrames, getPopcornBucket, getPopcornFlavors } from './taste';
+import {
+  getFrameDetail,
+  getMyFrames,
+  getMyTaste,
+  getPopcornBucket,
+  getPopcornFlavors,
+} from './taste';
 import { resetSessionForTest, startSession } from './session';
 
 const fetchMock = vi.fn();
@@ -38,6 +46,50 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe('API-040 취향 분석·키워드', () => {
+  it('회원 토큰을 싣고 분석 결과를 그대로 돌려준다', async () => {
+    const body = {
+      ratingCount: 42,
+      insufficientData: false,
+      analysis: {
+        genres: [{ code: 'THRILLER', name: '스릴러', count: 12, averageScore: 4.4, share: 0.29 }],
+        countries: [],
+        eras: [],
+        directors: [],
+      },
+      keywords: [{ code: 'DARK_THRILLER_LOVER', label: '어둠 속 스릴러 애호가' }],
+      analyzedAt: '2026-08-30T05:21:00Z',
+    };
+    fetchMock.mockResolvedValue(json(200, body));
+
+    expect(await getMyTaste()).toEqual(body);
+    expect(call()[0]).toBe('/api/v1/users/me/taste');
+    expect(headers().Authorization).toBe('Bearer token');
+  });
+
+  // 평가가 없어 캐시가 없는 사용자. 실패가 아니라 200이며 화면은 빈 상태로 다룬다
+  it('분석 캐시가 없으면 insufficientData 응답을 오류로 바꾸지 않는다', async () => {
+    const body = {
+      ratingCount: 0,
+      insufficientData: true,
+      analysis: { genres: [], countries: [], eras: [], directors: [] },
+      keywords: [],
+      analyzedAt: null,
+    };
+    fetchMock.mockResolvedValue(json(200, body));
+
+    await expect(getMyTaste()).resolves.toEqual(body);
+  });
+
+  it('서버 실패는 상태 코드와 계약 코드를 그대로 올린다', async () => {
+    fetchMock.mockResolvedValue(
+      json(503, { code: 'SERVICE_UNAVAILABLE', message: '일시적으로 요청을 처리할 수 없습니다.' }),
+    );
+
+    await expect(getMyTaste()).rejects.toMatchObject({ status: 503, code: 'SERVICE_UNAVAILABLE' });
+  });
 });
 
 describe('API-042 내 필름(프레임 목록)', () => {

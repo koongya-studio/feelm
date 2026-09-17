@@ -24,11 +24,11 @@ REQUIRED_FILES = {
 }
 REVIEWED_IDENTITIES = {
     "pipeline/consumer/pyproject.toml":
-        "0880635255777590a60963cba7516e05b8bb6a5bb5d43b52f09cc20926b2a20a",
+        "d3ea41e7c800448175677db82593f8b539cbaa5e884066f6906d5ea40201da08",
     "pipeline/consumer/uv.lock":
         "e3e8a80e151b5ee786d09a83e9a717e6c36744c1b5e5a256de88c6b83db961cc",
     "pipeline/consumer/Dockerfile":
-        "1f1f483fa45d60b4fec104408db74d2fe8671af7590bf27f62ed38e75a7bb107",
+        "ec445c0a1a1e0dd218d8686ea05b08c55c16b208f3bcbd0cc5df785e7608f42b",
 }
 
 

@@ -3,21 +3,23 @@
  * 대응 명세는 docs/api/taste.md이다.
  *
  * 업무 S15P21E106-392에서 프레임 목록(API-042) · 프레임 상세(API-043) · 팝콘 버킷(API-041) ·
- * 팝콘 맛 기준정보(API-044)를 실제 API 호출로 바꿨다.
+ * 팝콘 맛 기준정보(API-044)를, 업무 S15P21E106-479에서 취향 분석(API-040)을 실제 API
+ * 호출로 바꿨다.
  *
  * **한 파일에 실제 호출과 목업이 섞여 있다.** 갈리는 기준은 백엔드에 해당 API가 있는지다.
- * - 위 네 개는 실제로 부른다
- * - 취향 분석(API-040)은 백엔드에 있지만 부르는 화면이 홈(2.1) · 7.2로 이번 범위 밖이라
- *   목업으로 남긴다. 연동은 후속 업무다
+ * - 위 다섯 개는 실제로 부른다
  * - `getTasteFlow`는 계약에 대응 API가 **없다**(CR-16)
  * - `getMockPopcornFlavors`는 **집계 자체가 목업으로 남은 화면**이 쓴다. 아래 목업 구역의
  *   주석을 볼 것
  *
  * 평가 생성(API-036)이 실제 호출이 되어(업무 -491) 2.5 → 2.6 흐름이 서버에 프레임과 팝콘을
  * 만든다. 그래서 이 파일이 돌려주는 프레임 목록과 팝콘 버킷도 평가하는 만큼 채워진다.
+ * 취향 분석은 다르다 — 계약은 평가 트랜잭션이 `taste_analyses` 캐시를 갱신한다고 정하지만
+ * (API-040 처리 규칙) 백엔드에는 아직 조회만 있고 캐시를 채우는 쪽이 없다. 그래서 지금은
+ * 평가를 얼마나 해도 모든 사용자가 `insufficientData: true`와 빈 `keywords`를 받는다.
  */
 import { mockPopcornFlavors } from '../mocks/popcornFlavors';
-import { mockTasteAnalysis, mockTasteFlow } from '../mocks/taste';
+import { mockTasteFlow } from '../mocks/taste';
 import { request } from './client';
 import { respond } from './mockTransport';
 import type {
@@ -43,6 +45,21 @@ export async function getPopcornFlavors(): Promise<PopcornFlavor[]> {
   });
 
   return items;
+}
+
+/**
+ * API-040 취향 분석·키워드 조회 · GET /api/v1/users/me/taste
+ *
+ * 2.1 홈의 `내 취향 요약`이 장르 상위 두 개와 키워드 첫 개를 그린다. 7.2 프로필 편집은
+ * 업무 -459에서 선호 장르 칩을 걷어내 더는 부르지 않는다.
+ *
+ * 캐시가 없는 사용자에게도 `200`이다 — `insufficientData: true` · 빈 배열들 ·
+ * `analyzedAt: null`이 온다(API-040 처리 규칙). 화면은 이를 실패가 아니라 빈 상태로
+ * 다룬다. 응답의 `countries` · `eras` · `directors`는 쓰는 화면이 없어 타입에 두지
+ * 않았다(`types/taste.ts`).
+ */
+export async function getMyTaste(): Promise<TasteAnalysis> {
+  return request<TasteAnalysis>('/users/me/taste');
 }
 
 /**
@@ -80,20 +97,12 @@ export async function getFrameDetail(frameId: number): Promise<FrameDetail> {
  * ------------------------------------------------------------------ */
 
 /**
- * API-040 취향 분석·키워드 조회 · GET /api/v1/users/me/taste
- *
- * 백엔드에 구현돼 있지만 부르는 화면(2.1 홈 · 7.2 프로필 편집)이 이번 범위 밖이라
- * 목업으로 둔다. 홈 추천이 실제 API로 바뀔 때 함께 연동한다.
- */
-export async function getMyTaste(): Promise<TasteAnalysis> {
-  return respond(mockTasteAnalysis, 'taste');
-}
-
-/**
  * 3.1 `요즘 취향 흐름` 카드. **계약에 대응 API가 없다(CR-16).**
  *
- * 흐름 문장과 키워드 근거 문장을 내려주는 필드가 없어 화면이 목업을 직접 import하지
- * 않도록 함수만 따로 둔다. 계약이 정해지면 API-040(`getMyTaste`)으로 합친다.
+ * 흐름 문장(`flowSentence`)과 키워드 근거 문장(`rationale`)을 내려주는 필드가 API-040에
+ * 없다 — `keywords`는 `code` · `label`뿐이다. 그래서 `getMyTaste`가 실제 호출로 바뀐
+ * 뒤에도(업무 -479) 이 함수만 목업으로 남는다. 화면이 목업을 직접 import하지 않도록
+ * 함수만 따로 둔 것이며, CR-16이 정해지면 `getMyTaste`로 합친다.
  */
 export async function getTasteFlow(): Promise<TasteFlowView> {
   return respond(mockTasteFlow, 'taste');
