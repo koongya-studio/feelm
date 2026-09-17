@@ -151,6 +151,14 @@ SHA가 모두 일치해야 한다. 외부 Fork, 변경 파일 100개 초과, 파
 전체 diff 512 KiB 초과, GitLab이 생략한 collapsed/too-large diff는 검토하지 않고 실패한다.
 MR 제목은 1 KiB, 설명은 16 KiB로 제한한다.
 
+diff는 `/merge_requests/{iid}/changes`에 `access_raw_diffs=true`를 붙여 받는다.
+**GitLab은 한 파일의 패치가 약 10 KiB를 넘으면 `collapsed`로 접어 빈 diff를 내려주고,
+`/diffs`에는 그것을 펼 인자가 없다.** 파일 하나만 커도 MR 전체가
+`INCOMPLETE_DIFF_REJECTED`로 끝나던 원인이며, lock 파일이 늘 리뷰를 막던 것도 같다
+(업무 `S15P21E106-567`). `/changes`는 GitLab 15.7에서 deprecated지만 이 인자를 받는
+유일한 경로라 `/diffs`가 받게 될 때까지 쓴다. 위의 collapsed 거절은 그대로 두어,
+인자가 먹지 않게 되면 빈 diff를 리뷰하는 대신 실패한다.
+
 필요한 입력은 `CI_API_V4_URL`, `CI_PROJECT_ID`, `REVIEW_MR_IID`, `REVIEW_MR_SHA`와
 `GITLAB_REVIEW_TOKEN`이다. 토큰과 diff는 표준 출력에 기록하지 않으며 성공 시
 `MR_COLLECTION: PASS`, 실패 시 분류된 오류 코드만 출력한다. 전용 토큰은 최소 API 읽기와
