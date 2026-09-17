@@ -41,15 +41,16 @@ class NotifyDeploymentTest(unittest.TestCase):
         self.assertTrue(post.args[0].endswith("/api/v4/posts"))
         self.assertEqual(post.kwargs["payload"]["channel_id"], "channel-id")
         message = post.kwargs["payload"]["message"]
-        self.assertIn("backend 배포 성공", message)
+        self.assertTrue(message.startswith("## 🚀 [DEPLOY] 배포 결과"))
+        self.assertIn("> ✅ 성공 · 📦 backend · 🌐 service", message)
+        self.assertIn("**🔎 배포 정보**", message)
         self.assertIn("`abc12345`", message)
         self.assertIn(self.environ["CI_JOB_URL"], message)
         self.assertTrue(request.call_args_list[2].args[0].endswith("/api/v4/users/logout"))
 
     def test_failure_message_identifies_failed_service(self):
         message = MODULE.build_message("consumer", "failed", self.environ)
-        self.assertIn("consumer 배포 실패", message)
-        self.assertIn("환경: `service`", message)
+        self.assertIn("> ❌ 실패 · 📦 consumer · 🌐 service", message)
 
     def test_missing_account_config_warns_without_failing_deployment(self):
         stderr = io.StringIO()
