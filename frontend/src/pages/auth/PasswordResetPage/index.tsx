@@ -115,11 +115,7 @@ export default function PasswordResetPage() {
           </p>
 
           <div className={styles.actions}>
-            <Button
-              onClick={() =>
-                void navigate(path.accountFind(), { replace: true, state: { tab: 'password' } })
-              }
-            >
+            <Button onClick={() => void navigate(path.accountFind(), { replace: true })}>
               재설정 메일 다시 받기
             </Button>
 
