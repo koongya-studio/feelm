@@ -58,7 +58,7 @@ export default function SettingsPage() {
 
   return (
     <>
-      <ScreenHeader title="설정" showBack />
+      <ScreenHeader title="설정" showBack fallbackTo={path.my()} />
 
       <div className={styles.page}>
         <ActionList

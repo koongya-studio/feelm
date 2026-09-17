@@ -69,7 +69,7 @@ export default function OttResultPage() {
     };
   }, [reloadCount]);
 
-  const header = <ScreenHeader title="OTT 추천 결과" showBack />;
+  const header = <ScreenHeader title="OTT 추천 결과" showBack fallbackTo={path.settings()} />;
 
   if (failed) {
     return (

@@ -7,33 +7,30 @@
  * `전체 공개 · 파티원만 · 비공개` 셋 중 하나, 맨 아래 `비공개 항목은 다른 사용자에게
  * 표시되지 않아요`.
  *
- * **계약과 다르다.** 계약은 프로필 하나의 `visibility`(`PUBLIC` · `PRIVATE`, API-015)뿐이다.
- * 와이어프레임대로 그리기로 했다(팀 결정 2026-09-13). 값은 목업에만 남는다
- * (`types/unspecified.ts` `PrivacySettingsView`).
+ * **계약이 정한 값은 프로필 하나뿐이다**(API-015 `visibility`, `PUBLIC` · `PRIVATE`).
+ * 그 줄만 서버에 저장한다 — 고르는 즉시 `updateMyProfile`로 보내고, 실패하면 고르기 전
+ * 값으로 되돌린다. `파티원만`은 계약에 없는 단계라 프로필 줄에서는 고를 수 없다.
  *
- * 저장 버튼이 없다. 와이어프레임에도 없고, 고르는 즉시 저장한다. 실패하면 고르기 전
- * 값으로 되돌리고 알린다.
+ * 취향 필름 · 팝콘 버킷 · 한줄평의 공개 범위는 **API가 없다.** 한때 세션 저장소에 두어
+ * 저장된 것처럼 보였는데(팀 결정 2026-09-13) 새로고침하면 사라지는 값이라 설정처럼 보이면
+ * 안 된다(업무 -610). 세 줄은 잠그고 준비 중이라고 적는다. 화면 구성은 그대로 두어 계약이
+ * 열리면 값만 잇는다.
  *
  * 고른 칸은 7.6 탭과 같은 모양이다 — 흰 면으로 올린다. 와이어프레임의 검정 칸은 주 버튼과
  * 같은 무게라 한 화면에 넷을 둘 수 없다(`design-concept.md` 2.4).
- *
- * `[?]` 여기서 고른 값이 7.2-A · 7.2-B의 공개 프로필에 반영되지 않는다. 그 목업은
- *       `이미 공개된 상태`를 그린 것이다(mocks/publicProfiles.ts)
  */
 import { useEffect, useId, useState } from 'react';
 import Button from '../../../components/Button';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
-import { getPrivacySettings, updatePrivacySettings } from '../../../api/settings';
+import { failureDescription } from '../../../components/StatusView/failure';
+import { getMyProfile, updateMyProfile } from '../../../api/users';
+import { path } from '../../../routes/paths';
 import styles from './PrivacySettingsPage.module.css';
-import type { PrivacyLevel, PrivacySettingsView } from '../../../types/unspecified';
+import type { Visibility } from '../../../types/enums';
 
-const ITEMS: { key: keyof PrivacySettingsView; label: string }[] = [
-  { key: 'profile', label: '프로필 공개' },
-  { key: 'film', label: '취향 필름 공개' },
-  { key: 'popcorn', label: '팝콘 버킷 공개' },
-  { key: 'review', label: '한줄평 공개' },
-];
+/** 와이어프레임 7.8-B의 세 단계. 계약의 `Visibility`는 `PUBLIC` · `PRIVATE` 둘뿐이다 */
+type PrivacyLevel = Visibility | 'PARTY';
 
 const LEVELS: { value: PrivacyLevel; label: string }[] = [
   { value: 'PUBLIC', label: '전체 공개' },
@@ -41,24 +38,28 @@ const LEVELS: { value: PrivacyLevel; label: string }[] = [
   { value: 'PRIVATE', label: '비공개' },
 ];
 
+/** 계약이 없어 아직 고를 수 없는 세 줄. 와이어프레임의 순서와 문구다 */
+const PENDING_ITEMS = ['취향 필름 공개', '팝콘 버킷 공개', '한줄평 공개'];
+
 export default function PrivacySettingsPage() {
-  const [settings, setSettings] = useState<PrivacySettingsView | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [visibility, setVisibility] = useState<Visibility | null>(null);
+  const [failure, setFailure] = useState<unknown>(null);
   const [reloadCount, setReloadCount] = useState(0);
   const [saveFailed, setSaveFailed] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let active = true;
 
-    getPrivacySettings()
-      .then((value) => {
+    getMyProfile()
+      .then((profile) => {
         if (active) {
-          setSettings(value);
-          setFailed(false);
+          setVisibility(profile.visibility);
+          setFailure(null);
         }
       })
-      .catch(() => {
-        if (active) setFailed(true);
+      .catch((error: unknown) => {
+        if (active) setFailure(error);
       });
 
     return () => {
@@ -66,36 +67,46 @@ export default function PrivacySettingsPage() {
     };
   }, [reloadCount]);
 
-  async function change(key: keyof PrivacySettingsView, level: PrivacyLevel) {
-    if (!settings || settings[key] === level) return;
+  async function changeVisibility(level: PrivacyLevel) {
+    // `PARTY`는 계약에 없다. 잠긴 칸이라 여기까지 오지 않지만 타입으로도 막는다
+    if (visibility === null || level === 'PARTY' || level === visibility || saving) return;
 
-    const previous = settings;
-    const next = { ...settings, [key]: level };
+    const previous = visibility;
 
-    setSettings(next);
+    setVisibility(level);
     setSaveFailed(false);
+    setSaving(true);
 
     try {
-      await updatePrivacySettings(next);
+      const saved = await updateMyProfile({ visibility: level });
+
+      setVisibility(saved.visibility);
     } catch {
-      setSettings(previous);
+      setVisibility(previous);
       setSaveFailed(true);
+    } finally {
+      setSaving(false);
     }
   }
 
   const header = (
-    <ScreenHeader title="공개 범위 설정" subtitle="항목별로 공개 범위를 정할 수 있어요" showBack />
+    <ScreenHeader
+      title="공개 범위 설정"
+      subtitle="항목별로 공개 범위를 정할 수 있어요"
+      showBack
+      fallbackTo={path.settings()}
+    />
   );
 
-  if (failed) {
+  if (failure !== null) {
     return (
       <>
         {header}
 
-        <StatusView title="공개 범위를 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
+        <StatusView title="공개 범위를 불러오지 못했어요" description={failureDescription(failure)}>
           <Button
             onClick={() => {
-              setFailed(false);
+              setFailure(null);
               setReloadCount((count) => count + 1);
             }}
           >
@@ -106,7 +117,8 @@ export default function PrivacySettingsPage() {
     );
   }
 
-  if (!settings) {
+  // 데이터가 오기 전에는 아무것도 그리지 않는다(팀 결정 2026-09-08)
+  if (visibility === null) {
     return header;
   }
 
@@ -115,13 +127,16 @@ export default function PrivacySettingsPage() {
       {header}
 
       <div className={styles.page}>
-        {ITEMS.map((item) => (
-          <LevelGroup
-            key={item.key}
-            label={item.label}
-            value={settings[item.key]}
-            onChange={(level) => void change(item.key, level)}
-          />
+        <LevelGroup
+          label="프로필 공개"
+          value={visibility}
+          // 계약의 단계는 둘이다. `파티원만`은 고를 수 없다
+          disabledLevels={['PARTY']}
+          onChange={(level) => void changeVisibility(level)}
+        />
+
+        {PENDING_ITEMS.map((label) => (
+          <LevelGroup key={label} label={label} value={null} disabled />
         ))}
 
         {saveFailed ? (
@@ -130,6 +145,10 @@ export default function PrivacySettingsPage() {
           </p>
         ) : null}
 
+        <p className={styles.hint}>
+          취향 필름 · 팝콘 버킷 · 한줄평의 공개 범위는 준비 중이에요. 지금은 프로필 공개 여부만
+          저장돼요
+        </p>
         <p className={styles.hint}>비공개 항목은 다른 사용자에게 표시되지 않아요</p>
       </div>
     </>
@@ -139,21 +158,41 @@ export default function PrivacySettingsPage() {
 function LevelGroup({
   label,
   value,
+  disabled = false,
+  disabledLevels = [],
   onChange,
 }: {
   label: string;
-  value: PrivacyLevel;
-  onChange: (level: PrivacyLevel) => void;
+  /** 고른 단계. `null`이면 아직 정할 수 없는 줄이다 */
+  value: PrivacyLevel | null;
+  /** 줄 전체가 잠겼는지 (준비 중) */
+  disabled?: boolean;
+  /** 이 줄에서 고를 수 없는 단계 */
+  disabledLevels?: PrivacyLevel[];
+  onChange?: (level: PrivacyLevel) => void;
 }) {
   const labelId = useId();
+  const noteId = useId();
 
   return (
     <div className={styles.item}>
       <span id={labelId} className={styles.itemLabel}>
         {label}
+        {disabled ? (
+          <span id={noteId} className={styles.hint}>
+            {' '}
+            · 준비 중
+          </span>
+        ) : null}
       </span>
 
-      <div className={styles.levels} role="radiogroup" aria-labelledby={labelId}>
+      <div
+        className={styles.levels}
+        role="radiogroup"
+        aria-labelledby={labelId}
+        aria-describedby={disabled ? noteId : undefined}
+        aria-disabled={disabled || undefined}
+      >
         {LEVELS.map((level) => (
           <button
             key={level.value}
@@ -161,7 +200,8 @@ function LevelGroup({
             role="radio"
             className={styles.level}
             aria-checked={value === level.value}
-            onClick={() => onChange(level.value)}
+            disabled={disabled || disabledLevels.includes(level.value)}
+            onClick={() => onChange?.(level.value)}
           >
             {level.label}
           </button>

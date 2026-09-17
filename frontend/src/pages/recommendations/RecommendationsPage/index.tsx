@@ -7,9 +7,10 @@
  * screen-spec.md 8.1 #3). 와이어프레임은 3 + 2 = 5장이지만 계약이 기준이다.
  * 섹션 이름도 계약을 따라 `취향 발견 추천`이다(FR-12, 8.1 #4).
  *
- * `?mock=error`로 2.2-A를 확인할 수 있다. 계약의 `503 RECOMMENDATION_UNAVAILABLE`이
- * 아니면 이 화면을 볼 방법이 없어 둔 목업 전용 입력이며 api/mockTransport.ts가 읽는다
- * (frontend-structure.md 7.4). 실제 연동 시 제거한다.
+ * **카드는 API-045 실제 응답이다**(업무 -610). 목업 카드가 목업 영화 번호(101~104)로 실제
+ * 영화 상세를 열어 전혀 다른 영화가 나오던 문제를 없앴다. 일치도 `%`는 계약에 없어 그리지
+ * 않는다(CR-13). 관심없음(API-047)의 프론트 연동은 S15P21E106-536이 맡으므로 그전까지
+ * 메뉴의 `관심없음`은 눌리지 않는다 — 목업으로 지운 척하는 것보다 낫다.
  *
  * 추천 후보가 모두 빠진 경우(관심없음 · 온보딩 `안 좋았어요`)에도 이 화면에 보여줄 것이
  * 없다. 와이어프레임에 그 상태가 없어 2.2-A와 같은 자리에 빈 데이터 안내를 둔다
@@ -27,25 +28,24 @@ import FilmReel from '../../../components/FilmReel';
 import Menu from '../../../components/Menu';
 import OttBadge from '../../../components/OttBadge';
 import ScreenHeader from '../../../components/ScreenHeader';
-import Snackbar from '../../../components/Snackbar';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import { BlockIcon, LinkIcon, PlayIcon } from '../../../components/Icon';
 import RecommendationCard from './RecommendationCard';
-import { dismissMovie, getRecommendations } from '../../../api/recommendations';
+import { getRecommendations } from '../../../api/recommendations';
 import { getOtts } from '../../../api/otts';
 import { path } from '../../../routes/paths';
 import styles from './RecommendationsPage.module.css';
 import type { MouseEvent } from 'react';
 import type { Ott } from '../../../types/ott';
-import type { RecommendationItemView } from '../../../types/unspecified';
+import type { RecommendationItem } from '../../../types/recommendation';
 
 /* 카드 실측값 그대로다(RecommendationCard). 릴의 칸 크기가 되고 릴은 이 폭에 맞춰 선다 */
 const FRAME_WIDTH = 156;
 const FRAME_HEIGHT = 220;
 
 type OpenMenu = {
-  item: RecommendationItemView;
+  item: RecommendationItem;
   /** 화면 위쪽에서의 거리(px). 누른 버튼 위치에 맞춘다 */
   top: number;
 };
@@ -53,10 +53,9 @@ type OpenMenu = {
 export default function RecommendationsPage() {
   const rootRef = useRef<HTMLDivElement>(null);
   const [otts, setOtts] = useState<Ott[]>([]);
-  const [items, setItems] = useState<RecommendationItemView[] | null>(null);
+  const [items, setItems] = useState<RecommendationItem[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [openMenu, setOpenMenu] = useState<OpenMenu | null>(null);
-  const [dismissedItems, setDismissedItems] = useState<RecommendationItemView[] | null>(null);
 
   const [reloadCount, setReloadCount] = useState(0);
 
@@ -93,11 +92,10 @@ export default function RecommendationsPage() {
     setItems(null);
     setFailed(false);
     setOpenMenu(null);
-    setDismissedItems(null);
     setReloadCount((count) => count + 1);
   }
 
-  function handleOpenMenu(event: MouseEvent<HTMLButtonElement>, item: RecommendationItemView) {
+  function handleOpenMenu(event: MouseEvent<HTMLButtonElement>, item: RecommendationItem) {
     if (openMenu?.item.recommendationItemId === item.recommendationItemId) {
       setOpenMenu(null);
 
@@ -109,35 +107,6 @@ export default function RecommendationsPage() {
     const rootRect = root?.getBoundingClientRect();
 
     setOpenMenu({ item, top: buttonRect.top - (rootRect?.top ?? 0) });
-  }
-
-  async function handleDismiss(item: RecommendationItemView) {
-    if (!items) {
-      return;
-    }
-
-    const previous = items;
-    const result = await dismissMovie(item.movie.movieId, item.recommendationItemId);
-
-    setItems(
-      previous.flatMap((candidate) => {
-        if (candidate.recommendationItemId !== item.recommendationItemId) {
-          return [candidate];
-        }
-
-        // 교체 후보가 없으면 카드가 사라진다.
-        // `[?]` 이때의 표시는 screen-spec.md 2.3-A 미확정 항목이다.
-        return result.replacement ? [result.replacement] : [];
-      }),
-    );
-    setDismissedItems(previous);
-    setOpenMenu(null);
-  }
-
-  function handleUndo() {
-    // 관심없음 해제 API가 없어 화면 상태로만 되돌린다(CR-15).
-    setItems(dismissedItems);
-    setDismissedItems(null);
   }
 
   const tasteItems = items?.filter((item) => item.type === 'TASTE') ?? [];
@@ -237,14 +206,6 @@ export default function RecommendationsPage() {
 
         <p className={styles.hint}>포스터를 탭하면 상세 화면 · ⋯ 버튼을 탭하면 OTT 메뉴</p>
 
-        {dismissedItems ? (
-          <div className={styles.snackbarArea}>
-            <Snackbar actionLabel="실행 취소" onAction={handleUndo}>
-              <VisuallyHidden>관심없음 처리됨. </VisuallyHidden>이 영화는 이후 추천에서 제외돼요
-            </Snackbar>
-          </div>
-        ) : null}
-
         {/* 2.3 추천 카드 ⋯ 메뉴 */}
         {openMenu ? (
           <Menu
@@ -294,12 +255,11 @@ export default function RecommendationsPage() {
                 <span className={styles.menuItemLabel}>영화 상세 보기</span>
               </Link>
 
-              <button
-                type="button"
-                className={styles.menuItem}
-                data-tone="muted"
-                onClick={() => void handleDismiss(openMenu.item)}
-              >
+              {/*
+               * 관심없음(API-047)은 백엔드에 있지만 프론트 연동은 S15P21E106-536이 맡는다.
+               * 그전까지 눌리지 않는다 — 화면 상태로만 지운 척하면 다음 조회에서 되살아난다.
+               */}
+              <button type="button" className={styles.menuItem} data-tone="muted" disabled>
                 <BlockIcon />
                 <span className={styles.menuItemLabel}>관심없음</span>
               </button>

@@ -74,7 +74,7 @@ export default function FrameDetailPage() {
   if (failed) {
     return (
       <>
-        <ScreenHeader title="프레임 상세" showBack />
+        <ScreenHeader title="프레임 상세" showBack fallbackTo={path.film()} />
 
         <StatusView
           title="프레임을 불러오지 못했어요"
@@ -106,7 +106,12 @@ export default function FrameDetailPage() {
 
   return (
     <>
-      <ScreenHeader title="프레임 상세" subtitle="내 감상 기록 중심" showBack />
+      <ScreenHeader
+        title="프레임 상세"
+        subtitle="내 감상 기록 중심"
+        showBack
+        fallbackTo={path.film()}
+      />
 
       <div className={styles.page}>
         <div className={styles.frameArea}>

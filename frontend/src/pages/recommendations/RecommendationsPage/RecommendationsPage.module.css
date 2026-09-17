@@ -75,24 +75,6 @@
   text-align: center;
 }
 
-/*
- * 와이어프레임 2.3-A의 스낵바는 하단 내비 바로 위에 고정된 영역이다.
- * 카드 목록이 스크롤되는 동안에도 같은 자리에 있어야 하므로 문서 흐름에 두지 않고
- * 하단 내비 높이만큼 띄워 고정한다.
- */
-.snackbarArea {
-  position: fixed;
-  bottom: calc(var(--nav-height) + 14px + env(safe-area-inset-bottom, 0px));
-  left: 50%;
-  z-index: 3;
-  width: 100%;
-  max-width: var(--layout-max-width);
-  box-sizing: border-box;
-  padding: 0 var(--screen-padding-x);
-  transform: translateX(-50%);
-}
-
-/* 2.3 메뉴 안쪽 */
 .menuOttList {
   display: flex;
   margin-bottom: 6px;

@@ -69,7 +69,7 @@ export default function AccountFindPage() {
 
   return (
     <>
-      <ScreenHeader title="비밀번호 찾기" showBack />
+      <ScreenHeader title="비밀번호 찾기" showBack fallbackTo={path.login()} />
 
       <div className={styles.page}>
         {/* 인증번호가 아니라 메일 링크로 바뀌었으므로 안내도 그것을 말한다(CR-21) */}

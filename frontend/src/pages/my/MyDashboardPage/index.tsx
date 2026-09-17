@@ -78,9 +78,9 @@ import { SettingsIcon } from '../../../components/Icon';
 import { getOtts } from '../../../api/otts';
 import { getRecommendationHistory } from '../../../api/recommendations';
 import { getMyReports, getReportDetail } from '../../../api/reports';
-import { getPopcornBucket } from '../../../api/taste';
+import { getMyFrames, getPopcornBucket } from '../../../api/taste';
 import { getMyProfile } from '../../../api/users';
-import { getMyRatings, getWatchRecords } from '../../../api/watch';
+import { getWatchRecords } from '../../../api/watch';
 import { path } from '../../../routes/paths';
 import { formatShortDate } from '../../../utils/date';
 import styles from './MyDashboardPage.module.css';
@@ -89,7 +89,8 @@ import type { RecommendationType } from '../../../types/enums';
 import type { RecommendationHistoryItem } from '../../../types/recommendation';
 import type { ReportDetailView } from '../../../types/unspecified';
 import type { MyProfile } from '../../../types/user';
-import type { MyRatingListItem, WatchRecordListItem } from '../../../types/watch';
+import type { FrameSummary } from '../../../types/taste';
+import type { WatchRecordListItem } from '../../../types/watch';
 
 /** 포스터 비율 2:3. 격자는 칸 폭이 화면에 따라 달라지므로 비율만 고정한다 */
 const POSTER_RATIO = { width: 2, height: 3 };
@@ -232,7 +233,7 @@ export default function MyDashboardPage() {
     ? (requested as TabKey)
     : 'ratings';
 
-  const [ratings, setRatings] = useState<Feed<MyRatingListItem>>({ status: 'loading' });
+  const [ratings, setRatings] = useState<Feed<FrameSummary>>({ status: 'loading' });
   const [unrated, setUnrated] = useState<Feed<UnratedRow>>({ status: 'loading' });
   const [history, setHistory] = useState<Feed<HistoryRow>>({ status: 'loading' });
   /** 추천 기록의 다음 장 커서. 더 받을 것이 없으면 `null`이다(API-048 `hasNext`) */
@@ -275,7 +276,12 @@ export default function MyDashboardPage() {
   useEffect(() => {
     let active = true;
 
-    getMyRatings()
+    /*
+     * 평가와 1:1인 프레임(API-042)이 `평가한 영화`의 원천이다(업무 -610). 내 평가 목록
+     * API-039는 백엔드에 아직 없고, 그전에 쓰던 고정 목업은 방금 저장한 평가를 보여 주지
+     * 못했다. API-039가 열리면 `api/watch`의 함수로 바꾼다.
+     */
+    getMyFrames()
       .then((value) => {
         if (active) setRatings({ status: 'ready', items: value.items });
       })
@@ -543,7 +549,7 @@ export default function MyDashboardPage() {
           {tab === 'ratings' && ratings.status === 'ready' && ratings.items.length > 0 && (
             <ul className={styles.grid}>
               {ratings.items.map((rating) => (
-                <li key={rating.ratingId}>
+                <li key={rating.frameId}>
                   <Link to={path.movieRating(rating.movie.movieId)} className={styles.cell}>
                     <Poster
                       fluid

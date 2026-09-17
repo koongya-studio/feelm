@@ -49,7 +49,7 @@ export default function OttInsufficientPage() {
 
   return (
     <>
-      <ScreenHeader title="나에게 맞는 OTT 찾기" showBack />
+      <ScreenHeader title="나에게 맞는 OTT 찾기" showBack fallbackTo={path.settings()} />
 
       <div className={styles.page}>
         <div className={styles.stage}>

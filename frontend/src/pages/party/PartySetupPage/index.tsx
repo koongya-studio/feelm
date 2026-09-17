@@ -12,7 +12,9 @@
  * 자체를 미뤘고 와이어프레임의 `초대 링크 복사` · `QR로 초대하기`는 계약에 없어 잠가
  * 두었다. 업무 -393에서 그 자리를 검색으로 바꿨다. 링크 · QR 경로는 여전히 계약에 없다.
  *
- * `[!]` `1/6명 · 최대 6명까지`는 계약의 정원(4)과 다르다. 계약을 따라 4로 표시한다.
+ * `[!]` `1/6명 · 최대 6명까지`는 계약의 정원(4)과 다르다. 5.2에서 고른 인원을 상한으로
+ * 보여준다(업무 -610) — 2인을 골랐는데 `1/4명`이 나오던 것을 고쳤다. 정원 자체는 계약에
+ * 보낼 필드가 없어 서버가 4로 정한다(`api/parties.ts`).
  *
  * `[?]` **일부 초대만 실패할 수 있다.** 파티는 이미 만들어진 뒤라 되돌릴 계약이 없고
  * (API-056 종료뿐이다) 다시 누르면 같은 이름의 파티가 하나 더 생긴다. 그래서 실패한
@@ -90,7 +92,18 @@ export default function PartySetupPage() {
     });
   };
 
+  /*
+   * 파티는 나까지 2명부터다(`PARTY_MIN_MEMBERS`, 5.2의 안내와 같은 값). 초대 없이 시작하면
+   * 혼자인 파티가 만들어져 5.4 이후가 할 일이 없다. 버튼을 잠그고 눌러도 막는다(업무 -610).
+   */
+  const needsInvitee = !locked && invitees.length + 1 < PARTY_MIN_MEMBERS;
+
   const start = () => {
+    // 두 번 눌러도 파티가 둘 생기지 않는다
+    if (submitting) {
+      return;
+    }
+
     // 이미 만든 파티가 있다. 다시 만들면 같은 이름의 파티가 하나 더 생긴다
     if (createdPartyId !== null) {
       void navigate(path.partyAnalyzing(createdPartyId), { replace: true });
@@ -100,6 +113,12 @@ export default function PartySetupPage() {
 
     if (!name.trim()) {
       setError('파티 이름을 입력해 주세요.');
+
+      return;
+    }
+
+    if (needsInvitee) {
+      setError(`함께 볼 친구를 ${PARTY_MIN_MEMBERS - 1}명 이상 초대해 주세요.`);
 
       return;
     }
@@ -142,7 +161,7 @@ export default function PartySetupPage() {
 
   return (
     <>
-      <ScreenHeader title="파티 만들기" showBack />
+      <ScreenHeader title="파티 만들기" showBack fallbackTo={path.party()} />
 
       <div className={styles.page}>
         <TextField
@@ -161,7 +180,7 @@ export default function PartySetupPage() {
         <section className={styles.members}>
           <h2 className={styles.label}>현재 참여자</h2>
           <p className={styles.note}>
-            {invitees.length + 1}/{PARTY_MAX_MEMBERS}명 · 최대 {PARTY_MAX_MEMBERS}명까지
+            {invitees.length + 1}/{size}명 · 최대 {size}명까지
           </p>
 
           <ul className={styles.slots}>
@@ -202,7 +221,7 @@ export default function PartySetupPage() {
               invitees.some((item) => item.userId === user.userId) ? '뺀다' : '초대'
             }
             onPick={toggle}
-            note={`초대는 파티를 만든 뒤에 전달돼요 · 최대 ${inviteLimit}명`}
+            note={`초대는 파티를 만든 뒤에 전달돼요 · 최대 ${inviteLimit}명 · ${PARTY_MIN_MEMBERS - 1}명 이상 초대해야 시작할 수 있어요`}
           />
         </section>
 
@@ -214,7 +233,7 @@ export default function PartySetupPage() {
         ) : null}
 
         <div className={styles.actions}>
-          <Button variant="brand" disabled={submitting} onClick={start}>
+          <Button variant="brand" disabled={submitting || needsInvitee} onClick={start}>
             {locked ? '파티로 이동' : '파티 시작하기'}
           </Button>
         </div>

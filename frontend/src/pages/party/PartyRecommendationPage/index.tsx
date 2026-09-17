@@ -95,7 +95,7 @@ export default function PartyRecommendationPage() {
   if (failed) {
     return (
       <>
-        <ScreenHeader title="파티팝콘" showBack />
+        <ScreenHeader title="파티팝콘" showBack fallbackTo={path.party()} />
         <div className={styles.page}>
           <StatusView title="추천을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요.">
             <Button variant="text" onClick={() => void navigate(path.partyAnalyzing(id))}>
@@ -130,11 +130,12 @@ export default function PartyRecommendationPage() {
       <ul className={styles.list}>
         {items.map((item) => (
           <li key={item.recommendationItemId}>
-            <button
-              type="button"
-              className={styles.row}
-              onClick={() => void navigate(path.movieDetail(item.movie.movieId))}
-            >
+            {/*
+             * 카드는 눌리지 않는다(업무 -610). 파티 추천(API-058)이 백엔드에 없어 이 목록은
+             * 목업이고, 목업 영화 번호로 실제 영화 상세(API-030)를 열면 전혀 다른 영화가
+             * 나온다. API-058이 열리면 서버 영화로 바뀌면서 상세 이동이 돌아온다.
+             */}
+            <div className={styles.row} data-static="true">
               <Poster
                 width={POSTER_WIDTH}
                 height={POSTER_HEIGHT}
@@ -151,7 +152,7 @@ export default function PartyRecommendationPage() {
               <span className={styles.chevron} aria-hidden="true">
                 <ChevronRightIcon />
               </span>
-            </button>
+            </div>
           </li>
         ))}
       </ul>

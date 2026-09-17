@@ -41,9 +41,10 @@ describe('OTT 기준정보 Provider', () => {
     renderWithProvider();
 
     await waitFor(() =>
+      // 배지는 TMDB `original`을 배지 크기(w92)로 바꿔 받는다(`OttBadge`)
       expect(screen.getByRole('img', { name: '넷플릭스' }).querySelector('img')).toHaveAttribute(
         'src',
-        NETFLIX.logoUrl,
+        'https://image.tmdb.org/t/p/w92/netflix.png',
       ),
     );
   });

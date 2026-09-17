@@ -12,7 +12,6 @@
  * | `?mockDelay=800` | 모든 목업 응답을 800ms 늦춘다 (최대 5000) |
  * | `?mockError=parties` | 그 도메인 함수만 실패한다. 쉼표로 여러 개 |
  * | `?mockError=all` | 전체 실패 |
- * | `?mock=error` | 2.2-A 확인용 기존 입력. `mockError=recommendations`와 같다 |
  *
  * 지연을 올려도 로딩 표시는 나오지 않는다. 데이터를 받기 전에는 아무것도 그리지 않기로
  * 정했다(팀 결정 2026-09-08). 지연은 그 동작을 확인하고 오류 주입과 함께 쓰기 위한 것이다.
@@ -23,7 +22,6 @@ import { ApiError } from './apiError';
 /** 오류를 주입할 수 있는 도메인. src/api/ 함수가 `respond`에 넘긴다 */
 export type MockDomain =
   | 'recommendations'
-  | 'home'
   | 'taste'
   | 'frames'
   | 'popcorn'
@@ -70,10 +68,6 @@ export function isMockError(domain: MockDomain): boolean {
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean);
-
-  if (query.get('mock') === 'error') {
-    requested.push('recommendations');
-  }
 
   return requested.includes('all') || requested.includes(domain);
 }

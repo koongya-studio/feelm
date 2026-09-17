@@ -45,6 +45,7 @@ import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import { getPopcornBucket } from '../../../api/taste';
+import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
 import styles from './PopcornBucketPage.module.css';
 import type { PopcornBucket as PopcornBucketData } from '../../../types/taste';
@@ -60,6 +61,7 @@ const BUCKET_WIDTH = 196;
 
 export default function PopcornBucketPage() {
   const navigate = useNavigate();
+  const back = useBack(path.film());
 
   const [bucket, setBucket] = useState<PopcornBucketData | null>(null);
   const [failed, setFailed] = useState(false);
@@ -89,7 +91,7 @@ export default function PopcornBucketPage() {
   if (failed) {
     return (
       <>
-        <ScreenHeader title="100알의 취향" showBack />
+        <ScreenHeader title="100알의 취향" showBack fallbackTo={path.film()} />
 
         <StatusView title="팝콘 버킷을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
           <Button
@@ -109,7 +111,7 @@ export default function PopcornBucketPage() {
   if (bucket && bucket.totalCount === 0) {
     return (
       <>
-        <ScreenHeader title="100알의 취향" showBack />
+        <ScreenHeader title="100알의 취향" showBack fallbackTo={path.film()} />
 
         <StatusView
           variant="empty"
@@ -123,7 +125,7 @@ export default function PopcornBucketPage() {
   }
 
   if (!bucket) {
-    return <ScreenHeader title="100알의 취향" showBack />;
+    return <ScreenHeader title="100알의 취향" showBack fallbackTo={path.film()} />;
   }
 
   const total = bucket.totalCount;
@@ -150,7 +152,7 @@ export default function PopcornBucketPage() {
             icon={<ChevronLeftIcon />}
             size={BACK_BUTTON_SIZE}
             variant="translucent"
-            onClick={() => navigate(-1)}
+            onClick={back}
           />
         </div>
 

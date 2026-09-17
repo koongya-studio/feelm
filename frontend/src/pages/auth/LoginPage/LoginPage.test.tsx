@@ -19,7 +19,8 @@
  * 없앴다(CR-25, 업무 S15P21E106-455). 지운 링크는 소리 없이 되살아나기 쉽다.
  */
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import LoginPage from './index';
 import { ApiError, NETWORK_ERROR } from '../../../api/apiError';
 import {
@@ -210,5 +211,66 @@ describe('0.6 로그인', () => {
     follow('회원가입');
 
     expect(location()).toBe('/signup');
+  });
+});
+
+/*
+ * 보호 라우트가 보낸 로그인 (업무 S15P21E106-610). 가려던 주소가 `state.from`에 있고,
+ * 로그인이 끝나면 그리로 돌아간다. 앱 밖 주소는 열린 리다이렉트라 받지 않는다.
+ */
+function FullLocationProbe() {
+  const current = useLocation();
+
+  return <div data-testid="full-location">{current.pathname + current.search}</div>;
+}
+
+function renderLoginFrom(from: unknown) {
+  return render(
+    <AuthProvider>
+      <MemoryRouter initialEntries={[{ pathname: '/login', state: { from } }]}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+        </Routes>
+        <FullLocationProbe />
+      </MemoryRouter>
+    </AuthProvider>,
+  );
+}
+
+describe('보호 라우트에서 온 로그인', () => {
+  it('로그인이 끝나면 가려던 주소로 돌아간다', async () => {
+    vi.mocked(login).mockResolvedValue(ACTIVE_USER);
+    renderLoginFrom('/my?tab=unrated');
+
+    fillCredentials();
+    click('로그인');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('full-location').textContent).toBe('/my?tab=unrated');
+    });
+  });
+
+  it('온보딩을 마치지 않았으면 가려던 주소보다 초기 취향 설정이 먼저다', async () => {
+    vi.mocked(login).mockResolvedValue(NEW_USER);
+    renderLoginFrom('/my');
+
+    fillCredentials();
+    click('로그인');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('full-location').textContent).toBe('/onboarding/taste');
+    });
+  });
+
+  it('앱 밖 주소는 돌아갈 곳으로 쓰지 않는다', async () => {
+    vi.mocked(login).mockResolvedValue(ACTIVE_USER);
+    renderLoginFrom('//evil.example/steal');
+
+    fillCredentials();
+    click('로그인');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('full-location').textContent).toBe('/film');
+    });
   });
 });

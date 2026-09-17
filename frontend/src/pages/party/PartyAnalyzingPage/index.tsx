@@ -90,7 +90,7 @@ export default function PartyAnalyzingPage() {
       <>
         {/* 오류는 흐름 셸 없이 화면 전체를 덮는다 — 단계를 말할 상태가 아니다. 다만
             헤더는 5.5의 오류와 같이 남겨 뒤로 갈 길을 둔다 */}
-        <ScreenHeader title="파티팝콘" showBack />
+        <ScreenHeader title="파티팝콘" showBack fallbackTo={path.party()} />
 
         <div className={styles.page}>
           <StatusView

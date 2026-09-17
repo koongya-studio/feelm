@@ -31,6 +31,11 @@
   cursor: pointer;
 }
 
+/* 목업 추천은 눌리지 않는다(`index.tsx`). 손가락 커서를 두지 않는다 */
+.row[data-static='true'] {
+  cursor: default;
+}
+
 .body {
   display: flex;
   min-width: 0;

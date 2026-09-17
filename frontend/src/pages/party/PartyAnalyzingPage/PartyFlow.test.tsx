@@ -21,13 +21,16 @@ import PartyAnalyzingPage from './index';
 import PartyPopcornMixPage from '../PartyPopcornMixPage';
 import PartyRecommendationPage from '../PartyRecommendationPage';
 import { ROUTE_PATTERN } from '../../../routes/paths';
-import { createParty, getParty, getPartyPopcorn } from '../../../api/parties';
-import { getMyProfile } from '../../../api/users';
+import { createParty, getParty, getPartyPopcorn, inviteToParty } from '../../../api/parties';
+import { getMyProfile, searchUsers } from '../../../api/users';
 import { mockMyProfile } from '../../../mocks/user';
 import { party, partyPopcorn } from '../../../test/party';
 
 /** 서버가 만든 파티 번호. 목업 추천(9001)과 다른 번호여야 이 시험이 뜻을 갖는다 */
 const NEW_PARTY_ID = 9137;
+
+/** 5.3은 친구를 1명 이상 초대해야 시작할 수 있다(업무 -610). 검색으로 찾아 고른다 */
+const BUDDY = { userId: 2048, nickname: '무비버디', visibility: 'PUBLIC' as const };
 
 vi.mock('../../../api/parties', async () => {
   const actual =
@@ -50,6 +53,16 @@ vi.mock('../../../api/users', async () => {
 
 beforeEach(() => {
   vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
+  vi.mocked(searchUsers)
+    .mockReset()
+    .mockResolvedValue({ items: [BUDDY], nextCursor: null, hasNext: false });
+  vi.mocked(inviteToParty).mockReset().mockResolvedValue({
+    invitationId: 501,
+    partyId: NEW_PARTY_ID,
+    invitee: BUDDY,
+    status: 'PENDING',
+    createdAt: '2026-09-10T09:00:00Z',
+  });
   vi.mocked(createParty)
     .mockReset()
     .mockResolvedValue(party({ partyId: NEW_PARTY_ID, name: '금요 심야 상영회' }));
@@ -82,6 +95,12 @@ function renderFlow() {
   );
 }
 
+async function pickBuddy() {
+  fireEvent.change(screen.getByLabelText('닉네임으로 친구 찾기'), { target: { value: '무비' } });
+  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  fireEvent.click(await screen.findByRole('button', { name: /무비버디/ }));
+}
+
 describe('파티를 만들고 추천까지', () => {
   it('새로 만든 파티도 5.4 · 5.9를 지나 5.5에 닿는다', async () => {
     renderFlow();
@@ -89,6 +108,7 @@ describe('파티를 만들고 추천까지', () => {
     fireEvent.change(screen.getByLabelText('파티 이름'), {
       target: { value: '금요 심야 상영회' },
     });
+    await pickBuddy();
     fireEvent.click(screen.getByRole('button', { name: '파티 시작하기' }));
 
     // 5.4 취향 모으기
@@ -119,6 +139,7 @@ describe('파티를 만들고 추천까지', () => {
     renderFlow();
 
     fireEvent.change(screen.getByLabelText('파티 이름'), { target: { value: '테스트 파티' } });
+    await pickBuddy();
     fireEvent.click(screen.getByRole('button', { name: '파티 시작하기' }));
 
     await screen.findByText('우리의 취향을 모아요');

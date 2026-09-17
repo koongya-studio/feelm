@@ -36,6 +36,7 @@ import StatusView from '../../../components/StatusView';
 import { ShareIcon } from '../../../components/Icon';
 import { getReportDetail } from '../../../api/reports';
 import { getMyProfile } from '../../../api/users';
+import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
 import { formatDelta, formatHalf } from '../../../utils/report';
 import ReportShareSheet from './ReportShareSheet';
@@ -49,6 +50,7 @@ type Props = {
 
 export default function ReportDetailPage({ from }: Props) {
   const navigate = useNavigate();
+  const back = useBack(path.tasteReports());
   const { reportId } = useParams();
   const id = Number(reportId);
 
@@ -94,7 +96,7 @@ export default function ReportDetailPage({ from }: Props) {
 
   function save() {
     if (from === 'my') {
-      void navigate(-1);
+      back();
     } else {
       void navigate(path.film());
     }
@@ -103,7 +105,7 @@ export default function ReportDetailPage({ from }: Props) {
   if (failed) {
     return (
       <>
-        <ScreenHeader title="취향 리포트" showBack />
+        <ScreenHeader title="취향 리포트" showBack fallbackTo={path.tasteReports()} />
         <StatusView
           title="리포트를 불러오지 못했어요"
           description="아직 만드는 중이거나 잠시 문제가 생겼어요"
@@ -122,7 +124,7 @@ export default function ReportDetailPage({ from }: Props) {
   }
 
   if (!report) {
-    return <ScreenHeader title="취향 리포트" showBack />;
+    return <ScreenHeader title="취향 리포트" showBack fallbackTo={path.tasteReports()} />;
   }
 
   const title = `${report.period.year} ${formatHalf(report.period)} 취향 리포트`;
@@ -132,6 +134,7 @@ export default function ReportDetailPage({ from }: Props) {
       <ScreenHeader
         title={title}
         showBack
+        fallbackTo={path.tasteReports()}
         action={
           <IconButton label="공유하기" icon={<ShareIcon />} onClick={() => setSharing(true)} />
         }

@@ -14,7 +14,8 @@
  *   비율을 유지하며 힌트까지 들어가는 크기로 맞췄다
  *
  * `[?]` 필름 영역 터치 시 동작(확대 · 애니메이션 · 이동)은 미확정이다. 와이어프레임의
- * `터치할 수 있어요` 힌트는 그대로 두고 동작은 넣지 않았다.
+ * `터치할 수 있어요` 힌트는 **뺐다**(업무 -610) — 동작이 없는데 상호작용을 약속하는 문구였다.
+ * 동작이 정해지면 문구와 함께 되살린다.
  * `[?]` `홈으로 이동` 진입점이 와이어프레임에 없어 `필름 늘리기`만 두었다.
  */
 import { useEffect } from 'react';
@@ -78,8 +79,6 @@ export default function OnboardingCompletePage() {
               />
             ))}
           </FilmReel>
-
-          <p className={styles.hint}>터치할 수 있어요</p>
         </div>
 
         <div className={styles.actions}>

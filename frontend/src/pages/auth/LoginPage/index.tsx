@@ -28,7 +28,7 @@
  * `로그인` 버튼은 브랜드 빨강이고, 소셜 버튼은 각 사 로고를 쓴다.
  */
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import Button from '../../../components/Button';
 import SocialButton from '../../../components/SocialButton';
 import type { SocialProvider } from '../../../components/SocialButton';
@@ -39,6 +39,7 @@ import { ApiError } from '../../../api/apiError';
 import { failureDescription } from '../../../components/StatusView/failure';
 import { useAuth } from '../../../contexts/authContext';
 import { path } from '../../../routes/paths';
+import { isReturnPath } from '../../../routes/returnPath';
 import { isOAuthConfigured, startOAuth } from '../../../utils/oauth';
 import styles from './LoginPage.module.css';
 import Ticket, { Barcode } from './Ticket';
@@ -63,6 +64,14 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { signIn } = useAuth();
 
+  /*
+   * 보호 라우트가 보낸 경우 가려던 주소가 `state.from`에 있다(`RequireAuth`, 업무 -610).
+   * 로그인이 끝나면 그리로 돌아간다. 온보딩을 안 마친 계정은 먼저 1.1로 간다 — 그 화면들이
+   * 온보딩 완료를 전제하기 때문이고, 그 뒤의 경로는 3.1 필름이다.
+   */
+  const { state } = useLocation() as { state: { from?: unknown } | null };
+  const returnTo = isReturnPath(state?.from) ? state.from : null;
+
   /* 한 곳이라도 열려 있으면 준비 중 안내를 내린다 */
   const ready = PROVIDERS.some(({ provider }) => isOAuthConfigured(provider));
 
@@ -80,7 +89,11 @@ export default function LoginPage() {
     try {
       const user = await signIn(email, password);
 
-      void navigate(user.onboardingCompleted ? path.film() : path.onboardingTaste());
+      if (!user.onboardingCompleted) {
+        void navigate(path.onboardingTaste(), { replace: true });
+      } else {
+        void navigate(returnTo ?? path.film(), { replace: true });
+      }
     } catch (error) {
       const code = error instanceof ApiError ? error.code : '';
 
@@ -185,7 +198,7 @@ export default function LoginPage() {
               label={label}
               appearance="brand"
               disabled={!isOAuthConfigured(provider)}
-              onClick={() => startOAuth(provider, 'login')}
+              onClick={() => startOAuth(provider, 'login', returnTo ?? undefined)}
             />
           ))}
         </div>

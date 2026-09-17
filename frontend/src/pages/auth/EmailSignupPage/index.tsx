@@ -39,6 +39,7 @@ import { signup } from '../../../api/auth';
 import { useNicknameCheck } from '../../../hooks/useNicknameCheck';
 import type { NicknameCheck } from '../../../hooks/useNicknameCheck';
 import { path } from '../../../routes/paths';
+import { markSignupCompleted } from '../../../utils/signupCompletion';
 import { isValidPassword, PASSWORD_HINT } from '../password';
 import styles from './EmailSignupPage.module.css';
 import type { Gender } from '../../../types/auth';
@@ -113,8 +114,9 @@ export default function EmailSignupPage() {
     try {
       await signup({ email, password, nickname: nicknameCheck.nickname, birthDate, gender });
 
-      // 0.5가 인증 메일 안내와 재발송에 쓴다
-      void navigate(path.signupComplete(), { state: { email } });
+      // 0.5는 이 표시가 있을 때만 그려지고, 인증 메일 안내와 재발송에 주소를 쓴다(업무 -610)
+      markSignupCompleted({ kind: 'email', email });
+      void navigate(path.signupComplete());
     } catch (error) {
       const code = error instanceof ApiError ? error.code : '';
 
@@ -136,7 +138,7 @@ export default function EmailSignupPage() {
 
   return (
     <>
-      <ScreenHeader title="회원가입" showBack />
+      <ScreenHeader title="회원가입" showBack fallbackTo={path.signupMethod()} />
 
       <SignupPaper onSubmit={() => void submit()}>
         <SignupPaperHeading eyebrow="CREATE YOUR FEELM" title="지금 당신의 필름을 시작하세요">

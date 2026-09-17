@@ -12,10 +12,9 @@
  * 같은 파일의 API-045 · API-047은 아직 목업이라 이 파일이 다루지 않는다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getRecommendationHistory } from './recommendations';
+import { getRecommendationHistory, getRecommendations } from './recommendations';
 import { ApiError } from './apiError';
 import { resetSessionForTest, startSession } from './session';
-import { addDismissedMovie, resetSessionStore } from '../mocks/sessionStore';
 import type { RecommendationHistory, RecommendationHistorySet } from '../types/recommendation';
 
 const fetchMock = vi.fn();
@@ -60,7 +59,6 @@ function page(overrides: Partial<RecommendationHistory> = {}): RecommendationHis
 }
 
 beforeEach(() => {
-  resetSessionStore();
   resetSessionForTest();
   startSession('token');
   fetchMock.mockReset();
@@ -69,6 +67,64 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe('API-045 기본 추천 조회', () => {
+  it('회원 토큰으로 GET /recommendations를 부르고 세트를 그대로 돌려준다', async () => {
+    const body = {
+      recommendationSetId: 7001,
+      generatedAt: '2026-09-18T00:00:00Z',
+      items: [
+        {
+          recommendationItemId: 3301,
+          type: 'TASTE',
+          movie: {
+            movieId: 550,
+            title: '파이트 클럽',
+            posterUrl: null,
+            releaseYear: 1999,
+            genres: ['드라마'],
+            averageRating: 4.3,
+            ottProviders: ['NETFLIX'],
+          },
+          flavorCode: 'FLAVOR_A',
+          reason: { summary: '스릴러를 높게 평가하셨어요', factors: [] },
+        },
+      ],
+    };
+    fetchMock.mockResolvedValueOnce(json(200, body));
+
+    const result = await getRecommendations();
+
+    expect(requestedUrl()).toBe('/api/v1/recommendations');
+    expect(requestedHeaders().Authorization).toBe('Bearer token');
+    expect(result).toEqual(body);
+  });
+
+  it('빈 세트도 그대로 돌려준다 — 목업 카드로 채우지 않는다', async () => {
+    fetchMock.mockResolvedValueOnce(
+      json(200, { recommendationSetId: 1, generatedAt: '2026-09-18T00:00:00Z', items: [] }),
+    );
+
+    const result = await getRecommendations();
+
+    expect(result.items).toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('추천 서비스가 닫혀 있으면 503 코드가 그대로 올라온다', async () => {
+    fetchMock.mockResolvedValueOnce(
+      json(503, {
+        code: 'RECOMMENDATION_UNAVAILABLE',
+        message: '추천 서비스를 일시적으로 사용할 수 없습니다.',
+      }),
+    );
+
+    await expect(getRecommendations()).rejects.toMatchObject({
+      status: 503,
+      code: 'RECOMMENDATION_UNAVAILABLE',
+    });
+  });
 });
 
 describe('API-048 추천 이력 조회', () => {
@@ -106,7 +162,6 @@ describe('API-048 추천 이력 조회', () => {
 
   it('서버가 준 관심없음과 감상 상태를 덮어쓰지 않는다', async () => {
     // 세션 저장소에는 목업 추천 카드(2.3-A)에서 처리한 관심없음이 남아 있다
-    addDismissedMovie(550);
     fetchMock.mockResolvedValue(
       json(200, page({ items: [set({ items: [{ ...set().items[0], watchStatus: 'RATED' }] })] })),
     );

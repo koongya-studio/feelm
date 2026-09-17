@@ -21,6 +21,7 @@ import Button from '../../../components/Button';
 import ProfileBoard from '../../../components/ProfileBoard';
 import StatusView from '../../../components/StatusView';
 import { getMyPublicProfile } from '../../../api/users';
+import { path } from '../../../routes/paths';
 import type { PublicProfileView } from '../../../types/unspecified';
 
 export default function ProfilePreviewPage() {
@@ -70,6 +71,11 @@ export default function ProfilePreviewPage() {
   }
 
   return (
-    <ProfileBoard profile={profile} eyebrow="미리보기 · 다른 사용자에게 이렇게 보여요" frameLinks />
+    <ProfileBoard
+      profile={profile}
+      eyebrow="미리보기 · 다른 사용자에게 이렇게 보여요"
+      frameLinks
+      backTo={path.profileEdit()}
+    />
   );
 }

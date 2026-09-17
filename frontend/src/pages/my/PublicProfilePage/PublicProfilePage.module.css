@@ -23,6 +23,18 @@
 }
 
 /* 신고하기는 차단보다 덜 쓰이는 동작이라 약하게 둔다(와이어프레임도 옅게 그렸다) */
+.menuItem:disabled {
+  color: var(--color-ink-hint);
+  cursor: default;
+}
+
+/* 잠긴 항목 옆의 짧은 사유. 항목이 flex라 글자 사이 공백이 접히므로 여백으로 띄운다 */
+.menuNote {
+  margin-left: 0.3em;
+  color: var(--color-ink-hint);
+  font-weight: var(--font-weight-medium);
+}
+
 .menuItem[data-tone='quiet'] {
   color: var(--color-ink-muted);
   font-weight: var(--font-weight-medium);

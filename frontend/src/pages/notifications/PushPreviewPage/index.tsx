@@ -16,9 +16,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import ScreenHeader from '../../../components/ScreenHeader';
+import { path } from '../../../routes/paths';
 import StatusView from '../../../components/StatusView';
 import { getLatestPushNotification, readNotification } from '../../../api/notifications';
-import { path } from '../../../routes/paths';
+import { notificationPath } from '../destination';
 import styles from './PushPreviewPage.module.css';
 import type { NotificationView } from '../../../types/unspecified';
 
@@ -50,7 +51,7 @@ export default function PushPreviewPage() {
 
   async function open(item: NotificationView) {
     await readNotification(item.notificationId);
-    void navigate(path.watchConfirm(item.targetId ?? 0));
+    void navigate(notificationPath(item.destination));
   }
 
   return (
@@ -59,6 +60,7 @@ export default function PushPreviewPage() {
         title="잠금화면 알림 예시"
         subtitle="실제 푸시 알림은 아직 보내지 않아요"
         showBack
+        fallbackTo={path.my()}
       />
 
       <div className={styles.page}>

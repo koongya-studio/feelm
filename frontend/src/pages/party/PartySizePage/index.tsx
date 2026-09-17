@@ -41,6 +41,7 @@ export default function PartySizePage() {
         title="친구와 같이 볼래요?"
         subtitle="서로의 취향 필름을 합쳐 보세요"
         showBack
+        fallbackTo={path.party()}
       />
 
       <div className={styles.page}>

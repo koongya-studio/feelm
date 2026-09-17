@@ -32,24 +32,6 @@
   overflow-y: auto;
 }
 
-/* 터치할 수 있다는 힌트. 필름 위가 아니라 아래에 둔다 */
-.hint {
-  flex: none;
-  padding: var(--space-1) var(--space-3);
-  border: 0.5px solid var(--color-line-strong);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-raised);
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-ink-body);
-  white-space: nowrap;
-}
-
-/*
- * 주 동작. 검정 알약은 한 화면에 하나이고 그 하나가 `필름 늘리기`다
- * (`docs/screens/design-concept.md` 2.4).
- */
 .actions {
   flex: none;
   padding: 0 var(--screen-padding-x) var(--space-12);
