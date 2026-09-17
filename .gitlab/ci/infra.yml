@@ -36,6 +36,8 @@ deploy-monitoring:
   script:
     - python3 -I -B infra/scripts/ci-deploy-current-commit.py --branch develop
     - bash infra/scripts/deploy-monitoring.sh
+  after_script:
+    - python3 -I -B infra/scripts/notify-deployment.py monitoring "$CI_JOB_STATUS"
   resource_group: service-and-backend-cache
   interruptible: false
   retry:

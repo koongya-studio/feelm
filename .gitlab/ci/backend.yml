@@ -332,6 +332,8 @@ deploy-redis:
   script:
     - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
     - bash infra/scripts/deploy-redis.sh "$CI_COMMIT_SHA"
+  after_script:
+    - /usr/bin/python3 -I -B infra/scripts/notify-deployment.py redis "$CI_JOB_STATUS"
   interruptible: false
   retry:
     max: 2

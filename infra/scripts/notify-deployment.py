@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Send a non-blocking GitLab deployment result with the shared Mattermost account."""
+"""Send non-blocking GitLab deployment and develop failure notifications."""
 
 from __future__ import annotations
 
@@ -65,6 +65,7 @@ def api_request(
     method: str = "GET",
     payload: dict[str, Any] | None = None,
     headers: dict[str, str] | None = None,
+    service: str = "Mattermost",
 ) -> tuple[Any, Any]:
     request_headers = {"Accept": "application/json", **(headers or {})}
     data = None
@@ -77,9 +78,9 @@ def api_request(
             body = response.read()
             return (json.loads(body) if body else None), response.headers
     except HTTPError as error:
-        raise DeploymentNotificationError(f"Mattermost HTTP error: {error.code}") from error
+        raise DeploymentNotificationError(f"{service} HTTP error: {error.code}") from error
     except URLError as error:
-        raise DeploymentNotificationError("Mattermost connection error") from error
+        raise DeploymentNotificationError(f"{service} connection error") from error
 
 
 class MattermostClient:
@@ -174,7 +175,98 @@ def build_message(service: str, status: str, environ: dict[str, str]) -> str:
     return "\n".join(lines)
 
 
-def notify(service: str, status: str, environ: dict[str, str]) -> bool:
+def pipeline_jobs(environ: dict[str, str]) -> list[dict[str, Any]]:
+    api_url = required_env(environ, "CI_API_V4_URL").rstrip("/")
+    parsed = urlsplit(api_url)
+    if parsed.scheme != "https" or not parsed.netloc or parsed.query or parsed.fragment:
+        raise DeploymentNotificationError("CI_API_V4_URL must be an HTTPS URL")
+    project_id = required_env(environ, "CI_PROJECT_ID")
+    pipeline_id = required_env(environ, "CI_PIPELINE_ID")
+    if not project_id.isdigit() or not pipeline_id.isdigit():
+        raise DeploymentNotificationError("GitLab project or pipeline ID is invalid")
+    token = required_env(environ, "CI_JOB_TOKEN")
+    jobs: list[dict[str, Any]] = []
+    page = "1"
+    seen_pages: set[str] = set()
+    while page:
+        if page in seen_pages:
+            raise DeploymentNotificationError("GitLab jobs pagination repeated a page")
+        seen_pages.add(page)
+        response, headers = api_request(
+            f"{api_url}/projects/{project_id}/pipelines/{pipeline_id}/jobs"
+            f"?include_retried=false&per_page=100&page={page}",
+            headers={"JOB-TOKEN": token},
+            service="GitLab",
+        )
+        if not isinstance(response, list) or any(not isinstance(job, dict) for job in response):
+            raise DeploymentNotificationError("GitLab jobs response is invalid")
+        jobs.extend(response)
+        page = str(headers.get("X-Next-Page", "")).strip()
+        if page and not page.isdigit():
+            raise DeploymentNotificationError("GitLab jobs pagination is invalid")
+    return jobs
+
+
+def failed_predeploy_jobs(jobs: list[dict[str, Any]], current_job_id: str) -> list[dict[str, Any]]:
+    failures = []
+    for job in jobs:
+        name = str(job.get("name", ""))
+        if (
+            str(job.get("id", "")) == current_job_id
+            or name.startswith("deploy-")
+            or job.get("allow_failure") is True
+            or job.get("status") != "failed"
+        ):
+            continue
+        failures.append(job)
+    return sorted(failures, key=lambda job: (str(job.get("stage", "")), str(job.get("name", ""))))
+
+
+def build_pipeline_failure_message(
+    failures: list[dict[str, Any]], environ: dict[str, str]
+) -> str:
+    commit = safe_value(environ.get("CI_COMMIT_SHORT_SHA", ""))
+    pipeline_url = environ.get("CI_PIPELINE_URL", "").strip()
+    lines = [
+        "## 🚨 [CI] develop Pipeline 실패",
+        f"> ❌ 실패 · 🧪 배포 이전 단계 · {len(failures)}개 Job",
+        "",
+        "**실패 Job**",
+    ]
+    for job in failures[:10]:
+        name = safe_value(str(job.get("name", "")))
+        stage = safe_value(str(job.get("stage", "")))
+        web_url = str(job.get("web_url", "")).strip()
+        if web_url.startswith("https://"):
+            lines.append(f"- [{name}]({web_url}) · `{stage}`")
+        else:
+            lines.append(f"- `{name}` · `{stage}`")
+    if len(failures) > 10:
+        lines.append(f"- 그 외 {len(failures) - 10}개")
+    lines.extend(["", "**Pipeline 정보**", f"- 커밋: `{commit}`"])
+    if pipeline_url.startswith("https://"):
+        lines.append(f"- [Pipeline 확인]({pipeline_url})")
+    return "\n".join(lines)
+
+
+def notify_pipeline_failure(environ: dict[str, str]) -> bool:
+    try:
+        failures = failed_predeploy_jobs(
+            pipeline_jobs(environ), required_env(environ, "CI_JOB_ID")
+        )
+    except (DeploymentNotificationError, OSError, RuntimeError, ValueError) as error:
+        print(f"경고: develop Pipeline 결과 조회 실패 ({type(error).__name__})", file=sys.stderr)
+        return False
+    if not failures:
+        print("develop Pipeline 배포 이전 실패 없음: Mattermost 알림 생략")
+        return False
+    posted = post_message(build_pipeline_failure_message(failures, environ), environ)
+    if posted:
+        print("Mattermost develop Pipeline 실패 알림 전송 완료")
+    return posted
+
+
+def post_message(message: str, environ: dict[str, str]) -> bool:
     token: str | None = None
     client = None
     posted = False
@@ -182,7 +274,7 @@ def notify(service: str, status: str, environ: dict[str, str]) -> bool:
         client = MattermostClient(load_mattermost_config(environ))
         token = client.login()
         channel_id = client.resolve_channel_id(token)
-        client.post(token, channel_id, build_message(service, status, environ))
+        client.post(token, channel_id, message)
         posted = True
     except (DeploymentNotificationError, OSError, RuntimeError, ValueError) as error:
         print(
@@ -200,19 +292,34 @@ def notify(service: str, status: str, environ: dict[str, str]) -> bool:
                 )
     if not posted:
         return False
-    print(f"Mattermost 배포 알림 전송 완료: {safe_value(service)} {safe_value(status)}")
     return True
+
+
+def notify(service: str, status: str, environ: dict[str, str]) -> bool:
+    posted = post_message(build_message(service, status, environ), environ)
+    if posted:
+        print(f"Mattermost 배포 알림 전송 완료: {safe_value(service)} {safe_value(status)}")
+    return posted
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("service", choices=("backend", "frontend", "consumer"))
-    parser.add_argument("status")
+    parser.add_argument("service", choices=(
+        "backend", "frontend", "consumer", "redis", "monitoring", "pipeline-failure"
+    ))
+    parser.add_argument("status", nargs="?")
     return parser.parse_args(argv)
 
 
 def run(argv: list[str] | None = None, environ: dict[str, str] | None = None) -> int:
     args = parse_args(argv)
+    if args.service == "pipeline-failure":
+        if args.status is not None:
+            raise SystemExit("pipeline-failure does not accept a status")
+        notify_pipeline_failure(environ if environ is not None else os.environ)
+        return 0
+    if args.status is None:
+        raise SystemExit("deployment status is required")
     notify(args.service, args.status, environ if environ is not None else os.environ)
     # A notification outage must never replace the deployment job's real status.
     return 0

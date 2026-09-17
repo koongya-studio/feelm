@@ -35,6 +35,7 @@ class CiConfigTests(unittest.TestCase):
   - test
   - build
   - deploy
+  - notify
 
 workflow:
   auto_cancel:
@@ -100,6 +101,19 @@ include:
         self.assertIn('interruptible: false', digest)
         for secret in ('JIRA_API_TOKEN', 'MATTERMOST_LOGIN_ID', 'MATTERMOST_PASSWORD'):
             self.assertNotIn(secret, digest)
+
+    def test_develop_pipeline_notifies_only_after_predeploy_failure(self):
+        notification = job_block(self.common, 'develop-pipeline-failure-notification')
+        for expected in (
+                'stage: notify', 'tags: [e106-shell]',
+                'notify-deployment.py pipeline-failure', 'interruptible: false',
+                'allow_failure: true', 'timeout: 5m',
+                '$CI_COMMIT_BRANCH == "develop"',
+                '$CI_COMMIT_REF_PROTECTED == "true"',
+                '$CI_PIPELINE_SOURCE == "push"', 'when: always'):
+            self.assertIn(expected, notification)
+        for forbidden in ('merge_request_event', '$CI_COMMIT_BRANCH == "main"', 'when: manual'):
+            self.assertNotIn(forbidden, notification)
 
     def test_docs_job_is_fixed_isolated_and_runs_for_every_develop_mr(self):
         block = job_block(self.docs, 'docs-mr-check')
@@ -360,17 +374,24 @@ include:
         self.assertIn('resource_group: distributed-consumer', consumer_deploy)
         self.assertIn('tags: [e106-distributed]', consumer_deploy)
         self.assertIn('ci-deploy-current-commit.py', consumer_deploy)
-        notifications = (
-            (backend_deploy, 'backend'),
-            (frontend_deploy, 'frontend'),
-            (consumer_deploy, 'consumer'),
+        deploy_configs = (self.backend, self.frontend, self.consumer, self.infra)
+        deploy_jobs = []
+        for config in deploy_configs:
+            for name in re.findall(r'(?m)^(deploy-[A-Za-z0-9_-]+):$', config):
+                deploy_jobs.append(name)
+                block = job_block(config, name)
+                service = name.removeprefix('deploy-')
+                self.assertIn(
+                    'infra/scripts/notify-deployment.py ' + service + ' "$CI_JOB_STATUS"',
+                    block,
+                    name,
+                )
+                self.assertIn('after_script:', block, name)
+        self.assertEqual(
+            sorted(deploy_jobs),
+            ['deploy-backend', 'deploy-consumer', 'deploy-frontend',
+             'deploy-monitoring', 'deploy-redis'],
         )
-        for block, service in notifications:
-            self.assertIn(
-                'infra/scripts/notify-deployment.py ' + service + ' "$CI_JOB_STATUS"',
-                block,
-            )
-            self.assertIn('after_script:', block)
         notification_paths = (
             backend_env,
             backend_test,
