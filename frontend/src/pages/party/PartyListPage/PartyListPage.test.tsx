@@ -1,8 +1,11 @@
 /*
- * 5.1 참여 중인 파티 목록 · 5.2 인원 설정 (업무 S15P21E106-304 · -393)
+ * 5.1 파티 시작 · 5.2 인원 설정 (업무 S15P21E106-304 · -393 · -462)
  *
  * 이동표의 `5.1 → 5.2`와 `5.1 → 5.8`을 고정한다. 파티방을 고르면 5.8 파티원 팝콘으로
  * 가는데, 목록 화면만 봐서는 어디로 가는지 알 수 없다.
+ *
+ * 사용자 시안(업무 -462)이 머리말과 버튼 문구를 바꿨고, `초대 코드로 참여하기`가
+ * 생겼다. 그 버튼은 **계약에 경로가 없어** 누르면 준비 중임을 알린다.
  *
  * 5.2는 **계약이 정한 정원(4)만 고를 수 있어야 한다.** 와이어프레임은 6인까지 그렸으므로
  * 나중에 누군가 와이어프레임을 보고 되돌리기 쉬운 자리다.
@@ -27,12 +30,12 @@ beforeEach(() => {
   vi.mocked(getMyParties).mockReset().mockResolvedValue([party()]);
 });
 
-describe('5.1 참여 중인 파티 목록', () => {
-  it('참여 중인 방 수와 파티원을 보여준다', async () => {
+describe('5.1 파티 시작', () => {
+  it('참여 중인 파티와 파티원을 보여준다', async () => {
     renderWithRouter(<PartyListPage />, { route: '/party' });
 
-    expect(await screen.findByText('참여 중인 방 1개')).toBeInTheDocument();
-    expect(screen.getByText('금요 심야 상영회')).toBeInTheDocument();
+    expect(await screen.findByText('금요 심야 상영회')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '파티팝콘' })).toBeInTheDocument();
     expect(screen.getByText('김난다 × 무비버디')).toBeInTheDocument();
   });
 
@@ -45,21 +48,38 @@ describe('5.1 참여 중인 파티 목록', () => {
     expect(screen.getByTestId('location').textContent).toBe(`/parties/${TEST_PARTY_ID}/popcorn`);
   });
 
-  it('새 파티 만들기는 5.2로 간다', async () => {
+  it('파티 만들기는 5.2로 간다', async () => {
     renderWithRouter(<PartyListPage />, { route: '/party' });
     await screen.findByText('금요 심야 상영회');
 
-    fireEvent.click(screen.getByRole('button', { name: '새 파티 만들기' }));
+    fireEvent.click(screen.getByRole('button', { name: '파티 만들기' }));
 
     expect(screen.getByTestId('location').textContent).toBe('/party/new');
   });
 
-  it('파티가 없으면 빈 상태를 보여준다', async () => {
+  it('파티가 없으면 담기지 않은 통을 두고 만들기를 권한다', async () => {
     vi.mocked(getMyParties).mockResolvedValue([]);
 
     renderWithRouter(<PartyListPage />, { route: '/party' });
 
-    expect(await screen.findByText('참여 중인 파티가 없어요')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('img', { name: '아직 파티원의 팝콘이 담기지 않은 통' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '파티 만들기' })).toBeInTheDocument();
+  });
+
+  /*
+   * 계약에 초대 코드 경로가 없다(API-051은 닉네임 검색으로 받은 `userId`만 받는다).
+   * 시안이 확정한 자리라 버튼은 두지만, 되는 것처럼 보이면 안 된다.
+   */
+  it('초대 코드로 참여하기는 준비 중임을 알린다', async () => {
+    renderWithRouter(<PartyListPage />, { route: '/party' });
+    await screen.findByText('금요 심야 상영회');
+
+    fireEvent.click(screen.getByRole('button', { name: '초대 코드로 참여하기' }));
+
+    expect(screen.getByText('초대 코드로 참여하기는 준비 중이에요')).toBeInTheDocument();
+    expect(screen.getByTestId('location').textContent).toBe('/party');
   });
 
   it('목록을 받지 못하면 다시 시도할 수 있다', async () => {

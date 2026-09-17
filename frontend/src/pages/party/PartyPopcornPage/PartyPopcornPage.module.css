@@ -1,97 +1,159 @@
 /*
- * 5.8 파티원 팝콘 한눈에 보기. 구성은 확정 시안을 따른다
- * (`docs/screens/design-concept.md`).
+ * 5.8 파티원 팝콘. 사용자 시안 2026-09-17(업무 -462)의 순서를 따른다.
  *
- * 이 화면이 말하는 한 가지는 **누구 통에 무엇이 담겼고 어디가 겹치는가**다.
+ * 친구 줄 → 고른 친구의 통 → 버튼 둘이다. 카드로 감싸지 않는다 — 홈 · 취향 필름 ·
+ * 영화 상세와 같이 테두리 없는 섹션이다(`design-concept.md`).
  *
- * 멤버마다 팝콘 통을 그린다. 이전에는 누적 색 막대와 8종 색 스와치로 분포를 보여줬는데,
- * 색표를 읽어야 알 수 있는 구조였다. 통에 알이 맛 분포대로 쌓이면 그림이 그대로 답이 된다.
+ * 통은 밝은 벽에 그대로 놓인다. 2.5장의 어두운 블록 규칙은 **팝콘 8색**(범례·막대)에
+ * 대한 것이고, 3D 렌더는 3.2 · 5.9와 같이 벽에 걸린다.
  *
- * 그래서 어두운 판이 없다. 색 막대·스와치를 쓸 때는 시안 2.5장에 따라 어두운 블록이
- * 필수였지만, 3D 렌더는 3.2·5.9와 같이 밝은 벽에서 읽힌다. 밝은 면에 놀 수 없던 것이
- * 사라지니 판도 사라진다.
- *
- * 카드로 감싸지 않는다. 통이 그 자체로 멤버별 묶음을 만든다.
+ * 하단 내비가 있는 탭 화면이라 스크롤과 아래 여백은 `AppLayout`이 맡는다(업무 -462에서
+ * 전체화면에서 옮겨왔다). 여기서 또 스크롤 상자를 만들면 맛 목록이나 초대 자리를 열었을
+ * 때 안쪽만 스크롤되어 버튼이 내비 밑에 갇힌다. `flex: 1 0 auto`라 내용이 길어지면
+ * 화면이 늘고 짧으면 버튼이 아래를 잡는다.
  */
 .page {
   display: flex;
   flex: 1 0 auto;
   flex-direction: column;
-  gap: var(--space-6);
-  padding: var(--space-4) var(--screen-padding-x) var(--space-8);
-}
-
-.memberCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
+  padding: var(--space-4) var(--screen-padding-x);
 }
 
 /*
- * 통과 이름이 나란히 놀린다. 통이 왼쪽에서 그림을 맡고 이름·대표 맛·알 수가
- * 오른쪽에서 그것을 읽어 준다.
+ * 아래 덩어리들은 줄어들지 않는다. `.page`가 스크롤하는 세로 배치라 기본값
+ * (`flex-shrink: 1`)이면 내용이 길어질 때 친구 줄이 높이 0으로 눌려 사라진다 —
+ * 초대 자리를 열었을 때 그렇게 됐다.
  */
-.memberHead {
+.friendsHead {
   display: flex;
-  width: 100%;
-  align-items: center;
-  gap: var(--space-4);
-  border: 0;
-  background: none;
-  cursor: pointer;
-  text-align: left;
+  flex: none;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
 }
 
-.memberInfo {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.memberName {
-  font-size: var(--font-size-heading);
-  line-height: var(--line-height-heading);
-  letter-spacing: var(--letter-spacing-heading);
+.label {
+  margin: 0;
+  font-size: var(--font-size-meta);
   font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-body);
+}
+
+.count {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-muted);
+}
+
+/*
+ * 친구 칩. 넷이 한 줄에 다 들어가지 않으면 옆으로 넘긴다 — 줄이 두 줄이 되면 아래
+ * 통의 자리가 밀린다. 파티는 최대 4명이라 넘치는 경우가 드물다(FR-20).
+ */
+.friends {
+  display: flex;
+  flex: none;
+  margin: 0;
+  padding: 0;
+  gap: var(--space-2);
+  list-style: none;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.friends::-webkit-scrollbar {
+  display: none;
+}
+
+.friend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  cursor: pointer;
+}
+
+/* 고른 친구만 표식을 갖는다. 빨강은 선 하나까지다(`design-concept.md` 2.3) */
+.friend[data-picked='true'] {
+  border-color: var(--color-brand);
+}
+
+.friendName {
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink);
+  white-space: nowrap;
+}
+
+/* 고른 친구의 통. 이 화면에서 가장 큰 덩어리다 */
+.showcase {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
+  letter-spacing: var(--letter-spacing-title);
+  /* 시안의 큰 제목은 bold(600)보다 굵다. 3.1-A · 3.4가 쓰는 700과 같은 값이다 */
+  font-weight: 700;
   color: var(--color-ink);
 }
 
-.memberMeta {
+.subtitle {
+  margin: 0;
+  padding-bottom: var(--space-2);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  letter-spacing: var(--letter-spacing-body);
+  color: var(--color-ink-muted);
+}
+
+.meta {
+  margin: 0;
   font-size: var(--font-size-meta);
   line-height: var(--line-height-meta);
   color: var(--color-ink-body);
 }
 
-.memberCount {
-  font-size: var(--font-size-meta);
-  line-height: var(--line-height-meta);
-  color: var(--color-ink-muted);
-}
-
-/* 펼치기 힌트. 통을 눌러도 펼쳐지지만 눌러도 되는 자리임을 글자가 말한다 */
-.expandHint {
+/* 펼치기. 통을 눌러 펼치던 것을 별도 줄로 뺐다 — 통은 이제 고른 친구의 그림이다 */
+.expand {
   display: flex;
+  min-height: var(--tap-target-min);
   align-items: center;
   gap: var(--space-1);
-  padding-top: var(--space-1);
+  padding: 0;
+  border: 0;
+  background: none;
   font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
+  cursor: pointer;
+}
+
+.chevron {
+  display: flex;
   color: var(--color-ink-hint);
 }
 
-.memberChevron {
-  display: flex;
-  flex: none;
-}
-
-/* 8종 맛 개수. 두 칸으로 두면 네 명이 있어도 화면이 지나치게 길어지지 않는다 */
+/* 8종 맛 개수. 두 칸으로 두어 목록이 화면을 길게 밀지 않게 한다 */
 .flavorList {
   display: grid;
+  width: 100%;
+  margin: 0;
+  padding: 0;
   gap: var(--space-2) var(--space-3);
   grid-template-columns: 1fr 1fr;
-  padding-left: var(--space-1);
+  list-style: none;
 }
 
 /* 점은 첫 줄에 맞춘다. 이름이 두 줄이 되어도 점이 가운데로 내려가지 않게 한다 */
@@ -128,52 +190,14 @@
   color: var(--color-ink-body);
 }
 
-/* 서로 겹치는 맛. 맛 이름만 쓴다 */
-.sharedCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding-top: var(--space-2);
-}
-
-.sharedTitle {
-  font-size: var(--font-size-heading);
-  line-height: var(--line-height-heading);
-  letter-spacing: var(--letter-spacing-heading);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-ink);
-}
-
-.sharedTags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-/* 선택·강조 상태라 빨강을 표식으로 쓴다. 면적을 차지하지 않게 옅은 배경이다(시안 2.3) */
-.sharedTag {
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-pill);
-  background: var(--color-brand-tint);
-  font-size: var(--font-size-meta);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-brand-ink);
-}
-
-.sharedNote {
-  font-size: var(--font-size-meta);
-  line-height: var(--line-height-meta);
-  color: var(--color-ink-muted);
-}
-
 /*
  * 7.2-B 다른 사용자 공개 프로필로 가는 줄 (업무 -305).
  *
- * 멤버 카드 안쪽의 보조 동작이라 알약이나 카드로 만들지 않는다. 통을 누르는 것(펼치기)과
- * 구분되도록 선 하나로 나눈 별도 줄이다.
+ * 보조 동작이라 알약이나 카드로 만들지 않는다. 선 하나로 나눈 별도 줄이다.
  */
 .profileLink {
   display: flex;
+  width: 100%;
   min-height: var(--tap-target-min);
   align-items: center;
   justify-content: space-between;
@@ -189,120 +213,46 @@
   color: var(--color-ink-hint);
 }
 
-/* 파티장만 보는 멤버 카드 안쪽 동작. 프로필 줄과 같은 결로 둔다 */
-.kickButton {
+/* 친구 초대. `친구 초대하기`를 누르면 이 자리가 열린다 */
+.invite {
   display: flex;
-  width: 100%;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/*
+ * 버튼 둘이 화면 아래를 잡는다. 주 버튼은 브랜드 빨강 면이다
+ * (`design-concept.md` 2.9 — 시안이 파티 화면까지 넓혔다).
+ */
+.actions {
+  display: flex;
+  margin-top: auto;
+  padding-top: var(--space-4);
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* 파티 관리 메뉴. 7.2-B 프로필 메뉴와 같은 사양이다 */
+.menuItem {
+  display: flex;
   min-height: var(--tap-target-min);
   align-items: center;
   padding: 0;
   border: 0;
-  border-top: 1px solid var(--color-line-faint);
-  margin-top: var(--space-2);
-  padding-top: var(--space-2);
   background: none;
-  font-size: var(--font-size-meta);
-  color: var(--color-ink-muted);
-  cursor: pointer;
-}
-
-.kickButton:disabled {
-  color: var(--color-ink-hint);
-  cursor: default;
-}
-
-/*
- * 파티 관리. 되돌릴 수 없는 동작만 모여 있어 본문 맨 아래에 둔다.
- * 검정 알약(`팝콘 섞기 보기`)과 경쟁하지 않도록 글자 버튼이다.
- */
-.manageCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--color-line-faint);
-}
-
-.manageTitle {
-  margin: 0;
-  font-size: var(--font-size-meta);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-meta);
-  color: var(--color-ink-muted);
-}
-
-.manageActions {
-  display: flex;
-  gap: var(--space-4);
-}
-
-.manageButton {
-  min-height: var(--tap-target-min);
-  padding: 0;
-  border: 0;
-  background: none;
-  font-size: var(--font-size-meta);
-  color: var(--color-ink-muted);
-  cursor: pointer;
-}
-
-.manageButton:disabled {
-  color: var(--color-ink-hint);
-  cursor: default;
-}
-
-.confirm {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-card);
-  background: var(--color-surface-raised);
-}
-
-.confirmText {
-  margin: 0;
-  font-size: var(--font-size-meta);
-  line-height: var(--line-height-meta);
   color: var(--color-ink);
-}
-
-.confirmActions {
-  display: flex;
-  gap: var(--space-4);
-}
-
-/* 돌이킬 수 없는 쪽이라 표식 색을 쓴다(시안 2.3) */
-.confirmYes {
-  min-height: var(--tap-target-min);
-  padding: 0;
-  border: 0;
-  background: none;
+  cursor: pointer;
   font-size: var(--font-size-meta);
   font-weight: var(--font-weight-bold);
-  color: var(--color-brand-ink);
-  cursor: pointer;
+  text-align: left;
 }
 
-.confirmNo {
-  min-height: var(--tap-target-min);
-  padding: 0;
-  border: 0;
-  background: none;
-  font-size: var(--font-size-meta);
-  color: var(--color-ink-muted);
-  cursor: pointer;
+.menuItem + .menuItem {
+  border-top: 1px solid var(--color-line-faint);
 }
 
-.confirmYes:disabled,
-.confirmNo:disabled {
+.menuItem:disabled {
   color: var(--color-ink-hint);
   cursor: default;
-}
-
-.manageError {
-  margin: 0;
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-  color: var(--color-brand-ink);
 }

@@ -1,0 +1,362 @@
+/*
+ * 팝콘 기계와 섞는 모션 (업무 -462 · -450).
+ *
+ * 기계 그림 한 장 위에 알을 얹어 장면을 만든다. 자리는 **기계 스프라이트에서 잰
+ * 비율**이라 기계 폭이 바뀌어도 따라온다(663 × 780 기준).
+ *
+ * | 자리 | 비율 |
+ * | --- | --- |
+ * | 버건디 헤더 | y 4~16% |
+ * | 유리 칸 | y 18~61% · 내부 x 27~68% |
+ * | 케틀 | y 32~52% · x 30~67% |
+ * | 배출구 | x 42~53% · y 63~69% |
+ * | 다리 사이 | x 33~63% · y 77~90% |
+ *
+ * 단계는 `data-phase`가 말한다. 각 단계의 움직임만 켜고 나머지는 숨긴다 — 상태를
+ * CSS 한 곳에서 읽으면 화면은 단계 이름만 넘기면 된다.
+ *
+ * 알은 `<span>`에 배경 그림으로 그린다. 한 화면에 마흔 알까지 놓이는데 `<img>`로
+ * 두면 같은 파일을 그만큼 따로 잡는다.
+ */
+.machine {
+  position: relative;
+  display: flex;
+  width: 100%;
+  max-width: 260px;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 auto;
+}
+
+.body {
+  display: block;
+  width: 100%;
+  height: auto;
+  /* 기계는 콘텐츠다. 벽에 걸린 것처럼 옅은 그림자만 둔다 */
+  filter: drop-shadow(0 12px 24px rgba(38, 39, 41, 0.14));
+}
+
+/* 섞는 동안 기계가 떤다. 돌아가는 기계는 가만히 있지 않는다 */
+.machine[data-phase='mixing'] .body {
+  animation: rumble 160ms linear infinite;
+}
+
+@keyframes rumble {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-1.5px);
+  }
+}
+
+/*
+ * 파티원 통. 기계 위에 나란히 놓인다. 헤더(y 4~16%)를 덮지 않게 위로 올렸다 —
+ * 그 자리가 FEELM 로고다.
+ *
+ * 기우는 시차는 `--index`가 정한다. 난수를 쓰지 않으므로 같은 파티는 언제나 같은
+ * 장면이다.
+ */
+.feeders {
+  position: absolute;
+  top: -15%;
+  left: 0;
+  display: flex;
+  width: 100%;
+  justify-content: center;
+  gap: var(--space-2);
+  z-index: 2;
+}
+
+.feeder {
+  transform-origin: 50% 100%;
+}
+
+/* 붓는 단계에서 기계 입구 쪽으로 기울고, 쏟아낸 뒤 물러난다 */
+.machine[data-phase='pouring'] .feeder {
+  animation: pour 1100ms var(--ease-standard) forwards;
+  animation-delay: calc(var(--index) * 90ms);
+}
+
+.machine:not([data-phase='idle']):not([data-phase='pouring']) .feeder {
+  opacity: 0;
+}
+
+@keyframes pour {
+  30% {
+    transform: translateY(4%) rotate(-52deg);
+  }
+
+  70% {
+    transform: translateY(4%) rotate(-58deg);
+  }
+
+  100% {
+    transform: translateY(-6%) rotate(-10deg);
+    opacity: 0;
+  }
+}
+
+/*
+ * 알 한 알. 자리와 움직임은 쓰는 층이 정하고 여기서는 모양만 정한다.
+ *
+ * 크기를 폭의 비율로 두어 기계가 작아지면 알도 같이 줄어든다.
+ */
+.kernel {
+  position: absolute;
+  width: 9%;
+  aspect-ratio: 1;
+  background-image: var(--sprite);
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+/* 붓는 알. 통 자리에서 출발해 케틀 입구로 흘러 들어간다 */
+.feed {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  z-index: 2;
+}
+
+.feed .kernel {
+  top: -12%;
+  left: 45.5%;
+  opacity: 0;
+}
+
+.machine[data-phase='pouring'] .feed {
+  opacity: 1;
+}
+
+.machine[data-phase='pouring'] .feed .kernel {
+  animation: feed 620ms var(--ease-standard) forwards;
+  animation-delay: var(--delay);
+}
+
+/*
+ * 통 자리(`--from`)에서 케틀 입구(가운데 y 26%)로 간다. 가는 동안 굴러 들어간다.
+ * 통이 기우는 쪽과 같은 방향이라 쏟아진 알이 그대로 흘러드는 것으로 보인다.
+ */
+@keyframes feed {
+  0% {
+    transform: translate(var(--from), 0) scale(0.9);
+    opacity: 0;
+  }
+
+  15% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(calc(var(--from) * 0.15), 38%) rotate(180deg) scale(0.75);
+    opacity: 0;
+  }
+}
+
+/*
+ * 유리 칸. 알이 케틀을 **돌면서** 섞인다.
+ *
+ * 궤도 껍데기(`orbit`)가 케틀 가운데를 축으로 돌고, 알은 그 위에서 반대로 돌아
+ * 자기 자신은 바로 선 채로 자리를 옮긴다. 제자리에서 흔들리기만 하면 떠 있는
+ * 것으로 보이고 섞이는 것으로 읽히지 않는다(2026-09-17 사용자 지적).
+ */
+.churn {
+  position: absolute;
+  top: 21%;
+  left: 27%;
+  width: 41%;
+  height: 32%;
+  opacity: 0;
+}
+
+/*
+ * 궤도 링. 축은 유리 칸의 가운데 = 케틀이 선 자리다.
+ *
+ * 반지름을 **링의 크기로** 만든다. 알에 `translateX(%)`를 걸면 그 %가 알 크기
+ * 기준이 되어 반지름이 되지 않는다.
+ */
+.orbit {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--size);
+  height: var(--size);
+  margin: calc(var(--size) / -2) 0 0 calc(var(--size) / -2);
+}
+
+/* 알은 링의 오른쪽 끝에 얹힌다. 링이 돌면 그 원을 따라간다 */
+.orbit .kernel {
+  top: 50%;
+  left: 100%;
+  width: 26px;
+  margin: -13px 0 0 -13px;
+  transform: translateY(var(--lift));
+}
+
+.machine[data-phase='pouring'] .churn,
+.machine[data-phase='mixing'] .churn,
+.machine[data-phase='filling'] .churn {
+  opacity: 1;
+}
+
+/* 붓는 동안에는 알이 하나씩 떨어져 궤도에 올라탄다 */
+.machine[data-phase='pouring'] .orbit {
+  animation: land 420ms var(--ease-standard) backwards;
+  animation-delay: calc(var(--delay) + 240ms);
+}
+
+@keyframes land {
+  from {
+    transform: translateY(-260%) scale(0.7);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/*
+ * 도는 것은 링이다. `--way`가 -1이면 뒤로 돈다.
+ *
+ * 출발 자리(`--from`)에서 한 바퀴 돈다. 알은 반대로 돌아 바로 선 채로 옮겨 다닌다.
+ */
+.machine[data-phase='mixing'] .orbit,
+.machine[data-phase='filling'] .orbit {
+  animation: orbit var(--dur) linear infinite;
+  animation-delay: var(--delay);
+}
+
+@keyframes orbit {
+  from {
+    transform: rotate(var(--from));
+  }
+
+  to {
+    transform: rotate(calc(var(--from) + var(--way) * 360deg));
+  }
+}
+
+/*
+ * 알은 껍데기와 반대로 돌아 바로 선 채로 옮겨 다니고, 뒤쪽을 지날 때 작아진다.
+ * 앞뒤가 생겨 한 판 위에서 도는 것으로 보이지 않는다.
+ */
+.machine[data-phase='mixing'] .orbit .kernel,
+.machine[data-phase='filling'] .orbit .kernel {
+  animation: ride var(--dur) linear infinite;
+  animation-delay: var(--delay);
+}
+
+@keyframes ride {
+  0% {
+    transform: translateY(var(--lift)) rotate(0deg) scale(1);
+  }
+
+  50% {
+    transform: translateY(var(--lift)) rotate(calc(var(--way) * -180deg)) scale(0.82);
+  }
+
+  100% {
+    transform: translateY(var(--lift)) rotate(calc(var(--way) * -360deg)) scale(1);
+  }
+}
+
+/* 담기는 동안에는 유리 칸이 비어 간다. 알이 빠져나가는 것이 보여야 한다 */
+.machine[data-phase='filling'] .orbit {
+  animation:
+    orbit var(--dur) linear infinite,
+    empty 1100ms var(--ease-standard) forwards;
+  animation-delay: var(--delay), calc(var(--delay) * 2);
+}
+
+@keyframes empty {
+  to {
+    opacity: 0;
+  }
+}
+
+/* 배출구. 알이 여기서 아래 통으로 흘러내린다 */
+.chute {
+  position: absolute;
+  top: 62%;
+  left: 42%;
+  width: 11%;
+  height: 34%;
+  opacity: 0;
+  z-index: 2;
+}
+
+.chute .kernel {
+  top: 0;
+  left: -20%;
+  width: 90%;
+  opacity: 0;
+}
+
+.machine[data-phase='filling'] .chute {
+  opacity: 1;
+}
+
+.machine[data-phase='filling'] .chute .kernel {
+  animation: fall 900ms ease-in infinite;
+  animation-delay: var(--delay);
+}
+
+/* 떨어지며 옆으로 조금 흩어진다. 한 줄로 내려오면 흐르는 것으로 보이지 않는다 */
+@keyframes fall {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+    opacity: 0;
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translate(var(--drift), 150%) rotate(220deg);
+    opacity: 0;
+  }
+}
+
+/*
+ * 아래 통. 배출구 밑에 놓여 떨어지는 알을 받는다.
+ *
+ * 기계 받침 앞에 겹쳐 선다. 다리 사이(x 33~63%)가 통보다 좁아 그 안에 넣을 수 없고,
+ * 시안도 통을 받침 앞에 두었다. 음수 여백은 통 입구를 배출구 바로 아래로 끌어올린다.
+ */
+.result {
+  position: relative;
+  margin-top: -36%;
+  z-index: 1;
+}
+
+/*
+ * 움직임을 줄여 달라고 한 사용자에게는 **결과만** 보여준다. 장면이 아니라 결과가
+ * 이 화면이 말하려는 것이다.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .machine .body,
+  .machine .feeder,
+  .machine .orbit,
+  .machine .kernel {
+    animation: none;
+  }
+
+  .machine[data-phase='pouring'] .feed,
+  .machine[data-phase='filling'] .chute {
+    opacity: 0;
+  }
+
+  .machine[data-phase='mixing'] .churn,
+  .machine[data-phase='filling'] .churn {
+    opacity: 1;
+  }
+}

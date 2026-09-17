@@ -1,93 +1,32 @@
 /*
- * 5.5 파티 공통 영화 추천 결과.
- * 참여자 → 공통 키워드 → 추천 목록 → 이유 순으로 쌓인다.
+ * 5.5 추천 완성. 틀은 `PartyFlowShell`이 잡고 이 화면은 섞인 통과 3편을 그린다.
+ *
+ * 카드로 감싸지 않는다. 홈 · 취향 필름 · 영화 상세와 같이 테두리 없는 줄 목록이다
+ * (`design-concept.md`).
  */
-.page {
+.bucket {
   display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: var(--space-5);
-  padding: var(--space-4) var(--screen-padding-x) var(--space-8);
-  overflow-y: auto;
-}
-
-.people {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-/* 참여자 아바타. 겹쳐 놓아 한 무리로 보이게 한다 */
-.avatars {
-  display: flex;
-}
-
-.avatar {
-  display: flex;
-  width: 36px;
-  height: 36px;
-  align-items: center;
   justify-content: center;
-  border: 2px solid var(--color-bg);
-  border-radius: 50%;
-  margin-left: -8px;
-  background: var(--color-surface-sunken);
-  font-size: var(--font-size-meta);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-ink-body);
 }
 
-.avatar:first-child {
-  margin-left: 0;
-}
-
-.names {
-  font-size: var(--font-size-meta);
-  line-height: var(--line-height-meta);
-  color: var(--color-ink-muted);
-}
-
-.keywords {
+.list {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-2);
-}
-
-.results {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.label {
   margin: 0;
-  font-size: var(--font-size-meta);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-meta);
-  color: var(--color-ink-muted);
-}
-
-.list,
-.reasons {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
   padding: 0;
-  margin: 0;
+  flex-direction: column;
+  gap: var(--space-2);
   list-style: none;
 }
 
 .row {
   display: flex;
   width: 100%;
+  padding: var(--space-3);
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) 0;
+  gap: var(--space-4);
   border: 0;
-  background: none;
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
   text-align: left;
   cursor: pointer;
 }
@@ -97,53 +36,39 @@
   min-width: 0;
   flex: 1;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--space-1);
 }
 
 .title {
-  overflow: hidden;
   font-size: var(--font-size-body);
-  font-weight: var(--font-weight-bold);
   line-height: var(--line-height-body);
+  letter-spacing: var(--letter-spacing-body);
+  font-weight: var(--font-weight-bold);
   color: var(--color-ink);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .summary {
-  overflow: hidden;
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-  color: var(--color-ink-muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 일치도. 표식이므로 빨강을 쓴다 (`design-concept.md` 2.3) */
-.fit {
-  flex: none;
-  font-size: var(--font-size-caption);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-brand-ink);
-  white-space: nowrap;
-}
-
-.reason {
-  padding-left: var(--space-4);
   font-size: var(--font-size-meta);
-  line-height: var(--line-height-body);
-  color: var(--color-ink-body);
-  position: relative;
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
 }
 
-.reason::before {
-  content: '·';
-  position: absolute;
-  left: var(--space-1);
+.chevron {
+  display: flex;
+  flex: none;
   color: var(--color-ink-hint);
 }
 
 .actions {
-  margin-top: auto;
-  padding-top: var(--space-4);
+  display: flex;
+  justify-content: center;
+}
+
+/* 오류는 흐름 셸 없이 화면 전체를 덮는다 */
+.page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: var(--space-4) var(--screen-padding-x);
 }

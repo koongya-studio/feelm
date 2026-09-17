@@ -95,7 +95,9 @@ export default function PartyJoinedPage() {
       </div>
 
       <div className={styles.actions}>
-        <Button onClick={() => void navigate(path.partyAnalyzing(id))}>파티 모드 시작하기</Button>
+        <Button variant="brand" onClick={() => void navigate(path.partyAnalyzing(id))}>
+          파티 모드 시작하기
+        </Button>
 
         <Button variant="text" onClick={() => void navigate(path.party())}>
           나중에 할게요

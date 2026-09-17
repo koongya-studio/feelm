@@ -78,7 +78,10 @@ export default function PartySizePage() {
         <p className={styles.progress}>친구들을 등록해 주세요 (0/{friendSlots})</p>
 
         <div className={styles.actions}>
-          <Button onClick={() => void navigate(path.partySetup(), { state: { size } })}>
+          <Button
+            variant="brand"
+            onClick={() => void navigate(path.partySetup(), { state: { size } })}
+          >
             다음
           </Button>
         </div>

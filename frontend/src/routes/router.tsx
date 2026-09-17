@@ -115,8 +115,18 @@ export const router = createBrowserRouter(
         // 7.1 MY 대시보드 (업무 -305). 이전에는 NotInScopePage였다
         { path: ROUTE_PATTERN.my, element: <MyDashboardPage /> },
 
-        // 이번 단계 구현 범위가 아닌 탭. REF-01의 5탭 구성을 검증하기 위해 라우트는 둔다.
         { path: ROUTE_PATTERN.party, element: <PartyListPage /> },
+
+        /*
+         * 파티팝콘 흐름과 파티원 팝콘 (업무 -462). **사용자 시안이 하단 내비를 그렸다.**
+         * 5.4 · 5.9 · 5.5는 스스로 넘어가는 흐름이라 내비가 있으면 중간에 빠져나갈 수
+         * 있고, 시안은 그것을 막지 않았다 — 파티 모드는 탭 안에서 일어나는 일이다.
+         * 시안이 없는 5.2 · 5.3 · 5.6 · 5.7은 전체화면 그대로다.
+         */
+        { path: ROUTE_PATTERN.partyPopcorn, element: <PartyPopcornPage /> },
+        { path: ROUTE_PATTERN.partyPopcornMix, element: <PartyPopcornMixPage /> },
+        { path: ROUTE_PATTERN.partyAnalyzing, element: <PartyAnalyzingPage /> },
+        { path: ROUTE_PATTERN.partyRecommendations, element: <PartyRecommendationPage /> },
 
         // 7.3 취향 리포트 목록 (업무 -308). 와이어프레임이 하단 내비를 그렸다
         { path: ROUTE_PATTERN.tasteReports, element: <ReportListPage /> },
@@ -133,12 +143,8 @@ export const router = createBrowserRouter(
         { path: ROUTE_PATTERN.ratingResult, element: <RatingResultPage /> },
         { path: ROUTE_PATTERN.watchConfirm, element: <WatchConfirmPage /> },
         { path: ROUTE_PATTERN.frameDetail, element: <FrameDetailPage /> },
-        { path: ROUTE_PATTERN.partyPopcorn, element: <PartyPopcornPage /> },
-        { path: ROUTE_PATTERN.partyPopcornMix, element: <PartyPopcornMixPage /> },
         { path: ROUTE_PATTERN.partyNew, element: <PartySizePage /> },
         { path: ROUTE_PATTERN.partySetup, element: <PartySetupPage /> },
-        { path: ROUTE_PATTERN.partyAnalyzing, element: <PartyAnalyzingPage /> },
-        { path: ROUTE_PATTERN.partyRecommendations, element: <PartyRecommendationPage /> },
         { path: ROUTE_PATTERN.partyInvitation, element: <PartyInvitationPage /> },
         { path: ROUTE_PATTERN.partyJoined, element: <PartyJoinedPage /> },
 

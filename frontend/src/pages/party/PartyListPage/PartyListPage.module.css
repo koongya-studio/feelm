@@ -1,5 +1,8 @@
 /*
- * 5.1 참여 중인 파티 목록. 하단 내비가 있는 탭 화면이라 아래 여백은 AppLayout이 만든다.
+ * 5.1 파티 시작. 하단 내비가 있는 탭 화면이라 아래 여백은 AppLayout이 만든다.
+ *
+ * 사용자 시안 2026-09-17(업무 -462)의 순서를 따른다 — 워드마크와 한 줄 카피, 화면
+ * 이름, 통 또는 목록, 그리고 화면 아래를 잡는 버튼 두 개다.
  */
 .page {
   display: flex;
@@ -75,8 +78,78 @@
   white-space: nowrap;
 }
 
-/* 이 화면의 유일한 검정 알약 (`design-concept.md` 2.4) */
+/* 워드마크와 카피. 시안은 둘을 한 줄에 좌우로 벌린다 */
+.brand {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.copy {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-muted);
+  text-align: right;
+}
+
+.titleBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+
+/*
+ * 화면 이름. **브랜드 빨강 글자다.** 큰 글자에는 빨강을 쓸 수 있다
+ * (`design-concept.md` 2.3 — 작은 글자에만 `--color-brand-ink`를 쓴다).
+ */
+.title {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.15;
+  letter-spacing: var(--letter-spacing-title);
+  font-weight: 700;
+  color: var(--color-brand);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  letter-spacing: var(--letter-spacing-body);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-ink-body);
+}
+
+/* 통 자리. 남는 높이를 이 자리가 가져가 목록과 버튼 사이가 비지 않는다 */
+.stage {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+/*
+ * 버튼 두 개가 화면 아래를 잡는다. 주 버튼은 브랜드 빨강 면이다
+ * (`design-concept.md` 2.9 — 시안이 파티 화면까지 넓혔다).
+ */
 .actions {
+  display: flex;
   margin-top: auto;
   padding-top: var(--space-4);
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.hint {
+  margin: 0;
+  padding-bottom: var(--space-1);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+  text-align: center;
 }
