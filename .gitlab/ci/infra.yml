@@ -133,6 +133,260 @@ deploy-kafka-config:
       when: manual
   allow_failure: false
 
+.spark-code-deploy:
+  stage: deploy
+  resource_group: distributed-runtime-spark
+  interruptible: false
+  retry:
+    max: 1
+    when: [runner_system_failure, scheduler_failure]
+  timeout: 30m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes: &spark-code-changes
+        - pipeline/spark/**/*.py
+        - pipeline/spark/pyproject.toml
+        - pipeline/spark/uv.lock
+        - pipeline/spark/.python-version
+        - infra/compose/service.yml
+        - infra/compose/distributed.yml
+        - infra/spark/**/*
+        - infra/scripts/build-spark-code-image.sh
+        - infra/scripts/deploy-spark-code.sh
+        - infra/scripts/spark-code-state.py
+        - infra/scripts/test_spark_code_delivery.py
+        - infra/scripts/test_spark_code_state.py
+        - infra/scripts/deploy-distributed-runtime.py
+        - infra/scripts/runtime-config-release.py
+        - .gitlab/ci/pipeline.yml
+        - .gitlab/ci/infra.yml
+
+spark-code-preflight-service:
+  extends: .spark-code-deploy
+  tags: [e106-shell]
+  needs:
+    - job: spark-code-image
+      artifacts: true
+    - job: spark-code-preflight-distributed
+  environment:
+    name: service
+    action: prepare
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
+    - SPARK_PREFLIGHT_STATUS=candidate_rejected
+    - if bash infra/scripts/deploy-spark-code.sh preflight service "$CI_COMMIT_SHA" "$SPARK_IMAGE_DIGEST"; then true; else code=$?; if [[ "$code" -eq 3 ]]; then SPARK_PREFLIGHT_STATUS=manual_recovery; fi; printf '%s\n' "$SPARK_PREFLIGHT_STATUS" > spark-preflight-status; exit "$code"; fi
+  after_script:
+    - if [[ "$CI_JOB_STATUS" != success ]]; then SPARK_PREFLIGHT_STATUS="$(cat spark-preflight-status 2>/dev/null || printf candidate_rejected)"; python3 -I -B infra/scripts/notify-deployment.py spark-code "$SPARK_PREFLIGHT_STATUS"; fi
+
+spark-code-preflight-distributed:
+  extends: .spark-code-deploy
+  tags: [e106-distributed]
+  needs:
+    - job: spark-code-image
+      artifacts: true
+  environment:
+    name: distributed
+    action: prepare
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
+    - SPARK_PREFLIGHT_STATUS=candidate_rejected
+    - if bash infra/scripts/deploy-spark-code.sh preflight distributed "$CI_COMMIT_SHA" "$SPARK_IMAGE_DIGEST"; then true; else code=$?; if [[ "$code" -eq 3 ]]; then SPARK_PREFLIGHT_STATUS=manual_recovery; fi; printf '%s\n' "$SPARK_PREFLIGHT_STATUS" > spark-preflight-status; exit "$code"; fi
+  after_script:
+    - if [[ "$CI_JOB_STATUS" != success ]]; then SPARK_PREFLIGHT_STATUS="$(cat spark-preflight-status 2>/dev/null || printf candidate_rejected)"; python3 -I -B infra/scripts/notify-deployment.py spark-code "$SPARK_PREFLIGHT_STATUS"; fi
+
+spark-code-apply-distributed:
+  extends: .spark-code-deploy
+  tags: [e106-distributed]
+  needs:
+    - job: spark-code-image
+      artifacts: true
+    - job: spark-code-preflight-service
+    - job: spark-code-preflight-distributed
+  environment:
+    name: distributed
+  script:
+    - SPARK_DISTRIBUTED_RESULT=failed
+    - if /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py && bash infra/scripts/deploy-spark-code.sh apply distributed "$CI_COMMIT_SHA" "$SPARK_IMAGE_DIGEST"; then SPARK_DISTRIBUTED_RESULT=success; fi
+    - printf 'SPARK_DISTRIBUTED_RESULT=%s\n' "$SPARK_DISTRIBUTED_RESULT" > spark-distributed-result.env
+  artifacts:
+    when: always
+    reports:
+      dotenv: spark-distributed-result.env
+
+spark-code-apply-service:
+  extends: .spark-code-deploy
+  tags: [e106-shell]
+  needs:
+    - job: spark-code-image
+      artifacts: true
+    - job: spark-code-apply-distributed
+      artifacts: true
+  environment:
+    name: service
+  script:
+    - SPARK_SERVICE_RESULT=skipped
+    - if [[ "$SPARK_DISTRIBUTED_RESULT" == success ]] && /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py && bash infra/scripts/deploy-spark-code.sh apply service "$CI_COMMIT_SHA" "$SPARK_IMAGE_DIGEST"; then SPARK_SERVICE_RESULT=success; elif [[ "$SPARK_DISTRIBUTED_RESULT" == success ]]; then SPARK_SERVICE_RESULT=failed; fi
+    - printf 'SPARK_SERVICE_RESULT=%s\n' "$SPARK_SERVICE_RESULT" > spark-service-result.env
+  artifacts:
+    when: always
+    reports:
+      dotenv: spark-service-result.env
+
+spark-code-settle-service:
+  extends: .spark-code-deploy
+  tags: [e106-shell]
+  needs:
+    - job: spark-code-image
+      artifacts: true
+    - job: spark-code-apply-distributed
+      artifacts: true
+    - job: spark-code-apply-service
+      artifacts: true
+  environment:
+    name: service
+  script:
+    - SPARK_TRANSACTION_OUTCOME=failed
+    - if [[ "$SPARK_DISTRIBUTED_RESULT" == success && "$SPARK_SERVICE_RESULT" == success ]]; then SPARK_TRANSACTION_OUTCOME=success; fi
+    - SPARK_SERVICE_SETTLE=failed
+    - if bash infra/scripts/deploy-spark-code.sh settle service "$CI_COMMIT_SHA" "$SPARK_IMAGE_DIGEST" "$SPARK_TRANSACTION_OUTCOME"; then if [[ "$SPARK_TRANSACTION_OUTCOME" == success ]]; then SPARK_SERVICE_SETTLE=committed; else SPARK_SERVICE_SETTLE=rolled_back; fi; fi
+    - printf 'SPARK_SERVICE_SETTLE=%s\n' "$SPARK_SERVICE_SETTLE" > spark-service-settle.env
+  artifacts:
+    when: always
+    reports:
+      dotenv: spark-service-settle.env
+
+spark-code-settle-distributed:
+  extends: .spark-code-deploy
+  tags: [e106-distributed]
+  needs:
+    - job: spark-code-image
+      artifacts: true
+    - job: spark-code-apply-distributed
+      artifacts: true
+    - job: spark-code-apply-service
+      artifacts: true
+  environment:
+    name: distributed
+  script:
+    - SPARK_TRANSACTION_OUTCOME=failed
+    - if [[ "$SPARK_DISTRIBUTED_RESULT" == success && "$SPARK_SERVICE_RESULT" == success ]]; then SPARK_TRANSACTION_OUTCOME=success; fi
+    - SPARK_DISTRIBUTED_SETTLE=failed
+    - if bash infra/scripts/deploy-spark-code.sh settle distributed "$CI_COMMIT_SHA" "$SPARK_IMAGE_DIGEST" "$SPARK_TRANSACTION_OUTCOME"; then if [[ "$SPARK_TRANSACTION_OUTCOME" == success ]]; then SPARK_DISTRIBUTED_SETTLE=committed; else SPARK_DISTRIBUTED_SETTLE=rolled_back; fi; fi
+    - printf 'SPARK_DISTRIBUTED_SETTLE=%s\n' "$SPARK_DISTRIBUTED_SETTLE" > spark-distributed-settle.env
+  artifacts:
+    when: always
+    reports:
+      dotenv: spark-distributed-settle.env
+
+spark-code-prepare-resolution-service:
+  extends: .spark-code-deploy
+  tags: [e106-shell]
+  needs:
+    - job: spark-code-image
+      artifacts: true
+    - job: spark-code-settle-service
+      artifacts: true
+    - job: spark-code-settle-distributed
+      artifacts: true
+  environment:
+    name: service
+  script:
+    - SPARK_GLOBAL_SETTLE=failed
+    - if [[ "$SPARK_SERVICE_SETTLE" == committed && "$SPARK_DISTRIBUTED_SETTLE" == committed ]]; then SPARK_GLOBAL_SETTLE=success; fi
+    - SPARK_SERVICE_PREPARATION=manual_recovery
+    - if bash infra/scripts/deploy-spark-code.sh prepare service "$CI_COMMIT_SHA" "$SPARK_IMAGE_DIGEST" "$SPARK_GLOBAL_SETTLE"; then if [[ "$SPARK_GLOBAL_SETTLE" == success ]]; then SPARK_SERVICE_PREPARATION=success; else SPARK_SERVICE_PREPARATION=rolled_back; fi; fi
+    - printf 'SPARK_SERVICE_PREPARATION=%s\n' "$SPARK_SERVICE_PREPARATION" > spark-service-preparation.env
+  artifacts:
+    when: always
+    reports:
+      dotenv: spark-service-preparation.env
+
+spark-code-prepare-resolution-distributed:
+  extends: .spark-code-deploy
+  tags: [e106-distributed]
+  needs:
+    - job: spark-code-image
+      artifacts: true
+    - job: spark-code-settle-service
+      artifacts: true
+    - job: spark-code-settle-distributed
+      artifacts: true
+  environment:
+    name: distributed
+  script:
+    - SPARK_GLOBAL_SETTLE=failed
+    - if [[ "$SPARK_SERVICE_SETTLE" == committed && "$SPARK_DISTRIBUTED_SETTLE" == committed ]]; then SPARK_GLOBAL_SETTLE=success; fi
+    - SPARK_DISTRIBUTED_PREPARATION=manual_recovery
+    - if bash infra/scripts/deploy-spark-code.sh prepare distributed "$CI_COMMIT_SHA" "$SPARK_IMAGE_DIGEST" "$SPARK_GLOBAL_SETTLE"; then if [[ "$SPARK_GLOBAL_SETTLE" == success ]]; then SPARK_DISTRIBUTED_PREPARATION=success; else SPARK_DISTRIBUTED_PREPARATION=rolled_back; fi; fi
+    - printf 'SPARK_DISTRIBUTED_PREPARATION=%s\n' "$SPARK_DISTRIBUTED_PREPARATION" > spark-distributed-preparation.env
+  artifacts:
+    when: always
+    reports:
+      dotenv: spark-distributed-preparation.env
+
+spark-code-resolve-service:
+  extends: .spark-code-deploy
+  tags: [e106-shell]
+  needs:
+    - job: spark-code-image
+      artifacts: true
+    - job: spark-code-prepare-resolution-service
+      artifacts: true
+    - job: spark-code-prepare-resolution-distributed
+      artifacts: true
+  environment:
+    name: service
+  script:
+    - SPARK_GLOBAL_RESOLUTION=failed
+    - if [[ "$SPARK_SERVICE_PREPARATION" == success && "$SPARK_DISTRIBUTED_PREPARATION" == success ]]; then SPARK_GLOBAL_RESOLUTION=success; fi
+    - SPARK_SERVICE_RESOLUTION=manual_recovery
+    - if bash infra/scripts/deploy-spark-code.sh resolve service "$CI_COMMIT_SHA" "$SPARK_IMAGE_DIGEST" "$SPARK_GLOBAL_RESOLUTION"; then if [[ "$SPARK_GLOBAL_RESOLUTION" == success ]]; then SPARK_SERVICE_RESOLUTION=success; else SPARK_SERVICE_RESOLUTION=rolled_back; fi; fi
+    - printf 'SPARK_SERVICE_RESOLUTION=%s\n' "$SPARK_SERVICE_RESOLUTION" > spark-service-resolution.env
+  artifacts:
+    when: always
+    reports:
+      dotenv: spark-service-resolution.env
+
+spark-code-resolve-distributed:
+  extends: .spark-code-deploy
+  tags: [e106-distributed]
+  needs:
+    - job: spark-code-image
+      artifacts: true
+    - job: spark-code-prepare-resolution-service
+      artifacts: true
+    - job: spark-code-prepare-resolution-distributed
+      artifacts: true
+  environment:
+    name: distributed
+  script:
+    - SPARK_GLOBAL_RESOLUTION=failed
+    - if [[ "$SPARK_SERVICE_PREPARATION" == success && "$SPARK_DISTRIBUTED_PREPARATION" == success ]]; then SPARK_GLOBAL_RESOLUTION=success; fi
+    - SPARK_DISTRIBUTED_RESOLUTION=manual_recovery
+    - if bash infra/scripts/deploy-spark-code.sh resolve distributed "$CI_COMMIT_SHA" "$SPARK_IMAGE_DIGEST" "$SPARK_GLOBAL_RESOLUTION"; then if [[ "$SPARK_GLOBAL_RESOLUTION" == success ]]; then SPARK_DISTRIBUTED_RESOLUTION=success; else SPARK_DISTRIBUTED_RESOLUTION=rolled_back; fi; fi
+    - printf 'SPARK_DISTRIBUTED_RESOLUTION=%s\n' "$SPARK_DISTRIBUTED_RESOLUTION" > spark-distributed-resolution.env
+  artifacts:
+    when: always
+    reports:
+      dotenv: spark-distributed-resolution.env
+
+spark-code-notify:
+  extends: .spark-code-deploy
+  tags: [e106-shell]
+  needs:
+    - job: spark-code-resolve-service
+      artifacts: true
+    - job: spark-code-resolve-distributed
+      artifacts: true
+  environment:
+    name: service
+    action: verify
+  script:
+    - SPARK_FINAL_OUTCOME=manual_recovery
+    - if [[ "$SPARK_SERVICE_RESOLUTION" == success && "$SPARK_DISTRIBUTED_RESOLUTION" == success ]]; then SPARK_FINAL_OUTCOME=success; elif [[ "$SPARK_SERVICE_RESOLUTION" == rolled_back && "$SPARK_DISTRIBUTED_RESOLUTION" == rolled_back ]]; then SPARK_FINAL_OUTCOME=auto_rollback; fi
+    - python3 -I -B infra/scripts/notify-deployment.py spark-code "$SPARK_FINAL_OUTCOME"
+    - test "$SPARK_FINAL_OUTCOME" = success
+
 infra-config-test:
   stage: test
   tags: [e106-mr-isolated]
@@ -163,6 +417,7 @@ infra-config-test:
         - infra/scripts/deploy-distributed-runtime.py
         - infra/scripts/runtime-config-release.py
         - infra/scripts/deploy-*-config.sh
+        - infra/scripts/*spark*code*
         - infra/scripts/test_runtime_config_release.py
         - infra/scripts/deploy-consumer.sh
         - infra/scripts/rollback-consumer.sh

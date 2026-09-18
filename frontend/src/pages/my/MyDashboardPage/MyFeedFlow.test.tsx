@@ -9,8 +9,8 @@
  * - 피드(안 남긴 영화) ⇢ 2.5: 평가하면 API-036으로 저장되고, 다시 받은 서버 목록에서 빠진다
  *
  * 실제 호출인 도메인만 가로챈다 — API-014 내 프로필(`api/users`), OTT 기준정보(`api/otts`),
- * 팝콘과 맛 기준정보(`api/taste`), 영화 상세(`api/movies`, 업무 -475), 감상 기록과 평가 생성
- * (`api/watch`, 업무 -477 · -491)이다. 나머지는 목업이라 그대로 둔다. 영화 상세는 목업 평가
+ * 팝콘과 맛 기준정보(`api/taste`), 영화 상세(`api/movies`, 업무 -475), 감상 기록 · 평가 생성 ·
+ * 내 평가 목록(`api/watch`, 업무 -477 · -491 · -611)이다. 나머지는 목업이라 그대로 둔다. 영화 상세는 목업 평가
  * 저장소의 현재 값을 읽는 대역을 세운다 — 2.5가 이미 평가한 영화인지 이 응답으로 판단하기
  * 때문이다.
  */
@@ -20,16 +20,22 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import MyDashboardPage from './index';
 import MovieRatingPage from '../../movies/MovieRatingPage';
 import RatingResultPage from '../../movies/RatingResultPage';
-import { getMyProfile } from '../../../api/users';
-import { mockFrameList, mockMyRatings } from '../../../mocks/frames';
+import { getMyProfile, getMyProfileView } from '../../../api/users';
+import { mockFrameList } from '../../../mocks/frames';
 import { findMockMovieDetail } from '../../../mocks/movieDetails';
 import { findMockMovie } from '../../../mocks/movies';
 import { mockOtts } from '../../../mocks/otts';
 import { resetSessionStore } from '../../../mocks/sessionStore';
+import { mockMyProfileView } from '../../../mocks/publicProfiles';
 import { mockMyProfile } from '../../../mocks/user';
 import { ROUTE_PATTERN } from '../../../routes/paths';
 import type { MovieDetail } from '../../../types/movie';
-import type { RatingUpdateInput, WatchRecordListItem } from '../../../types/watch';
+import type {
+  MyRatedItem,
+  MyRatingList,
+  RatingUpdateInput,
+  WatchRecordListItem,
+} from '../../../types/watch';
 
 /**
  * 서버가 들고 있는 평가 수정 결과의 대역. 화면이 API-037로 보낸 값을 다음 조회가 돌려준다.
@@ -41,14 +47,25 @@ function saveRatingEdit(ratingId: number, input: RatingUpdateInput) {
   ratingEdits.set(ratingId, { ...input });
 }
 
+/** 기준 평가. 영화 상세 대역(`mocks/movieDetails`)의 내 평가다 */
+function myRatingOf(movieId: number) {
+  const rating = findMockMovieDetail(movieId)?.myRating;
+
+  if (!rating) throw new Error(`기준 평가가 없는 영화다: ${movieId}`);
+
+  return rating;
+}
+
 function withRatingEdit<T extends RatingUpdateInput & { ratingId: number }>(rating: T): T {
   const edit = ratingEdits.get(rating.ratingId);
 
   return edit ? { ...rating, ...edit } : rating;
 }
 
+// 7.1은 프로필 전체(`getMyProfileView`)를, 2.6 평가 완료는 수치(`getMyProfile`)를 읽는다
 vi.mock('../../../api/users', () => ({
   getMyProfile: vi.fn(),
+  getMyProfileView: vi.fn(),
 }));
 
 vi.mock('../../../api/otts', () => ({
@@ -59,7 +76,6 @@ vi.mock('../../../api/taste', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/taste')>()),
   getPopcornBucket: vi.fn(),
   getPopcornFlavors: vi.fn(),
-  getMyFrames: vi.fn(),
 }));
 
 vi.mock('../../../api/movies', async (importOriginal) => ({
@@ -70,6 +86,8 @@ vi.mock('../../../api/movies', async (importOriginal) => ({
 vi.mock('../../../api/watch', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/watch')>()),
   getWatchRecords: vi.fn(),
+  // 7.1 `평가한 영화` 탭의 원천이다(API-039, 업무 -611)
+  getMyRatings: vi.fn(),
   // 2.5의 감상 정보 줄이 쓴다. 모듈 안에서 부르는 함수라 따로 세워야 대역이 걸린다
   findWatchedRecord: vi.fn(),
   // 평가 생성(API-036)과 수정(API-037)은 실제 호출이므로 화면 흐름에서는 대역을 세운다
@@ -81,9 +99,9 @@ vi.mock('../../../api/watch', async (importOriginal) => ({
 }));
 
 const { getOtts } = await import('../../../api/otts');
-const { getPopcornBucket, getPopcornFlavors, getMyFrames } = await import('../../../api/taste');
+const { getPopcornBucket, getPopcornFlavors } = await import('../../../api/taste');
 const { getMovieDetail } = await import('../../../api/movies');
-const { getWatchRecords, findWatchedRecord, createRating, updateRating } =
+const { getWatchRecords, getMyRatings, findWatchedRecord, createRating, updateRating } =
   await import('../../../api/watch');
 
 /**
@@ -134,21 +152,44 @@ function movieDetail(movieId: number): Promise<MovieDetail> {
   });
 }
 
-/** 내 필름(API-042)을 주는 서버 대역. 프레임은 평가와 1:1이라 수정된 별점을 그대로 비춘다 */
-function myFrames() {
+/**
+ * 내 평가 목록(API-039)을 주는 서버 대역. 기준 평가 세 편에 화면이 API-037로 고친 값을 얹고,
+ * 화면이 API-036으로 새로 만든 평가를 앞에 붙인다(최신순).
+ */
+function myRatings(): Promise<MyRatingList> {
+  const saved = mockFrameList.items.map((frame): MyRatedItem => {
+    const rating = withRatingEdit(myRatingOf(frame.movie.movieId));
+
+    return {
+      itemType: 'RATED',
+      ratingId: rating.ratingId,
+      movie: frame.movie,
+      score: rating.score,
+      comment: rating.comment,
+      visibility: rating.visibility,
+      spoiler: rating.spoiler,
+      frameId: frame.frameId,
+      createdAt: frame.createdAt,
+      activityAt: frame.createdAt,
+    };
+  });
+
   return Promise.resolve({
-    ...mockFrameList,
-    items: mockFrameList.items.map((frame) => ({
-      ...frame,
-      score: withRatingEdit(mockMyRatings[frame.movie.movieId]).score,
-    })),
+    items: [...createdRatings, ...saved],
+    nextCursor: null,
+    hasNext: false,
   });
 }
+
+/** 화면이 API-036으로 만든 평가. 서버가 저장했다고 보고 다음 조회에 돌려준다 */
+const createdRatings: MyRatedItem[] = [];
 
 beforeEach(() => {
   resetSessionStore();
   ratingEdits.clear();
-  vi.mocked(getMyFrames).mockReset().mockImplementation(myFrames);
+  createdRatings.length = 0;
+  vi.mocked(getMyRatings).mockReset().mockImplementation(myRatings);
+  vi.mocked(getMyProfileView).mockReset().mockResolvedValue(mockMyProfileView);
   vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
   vi.mocked(getOtts).mockReset().mockResolvedValue(mockOtts);
   // 팝콘 통은 그림이라 비어 있어도 화면이 그려진다
@@ -214,9 +255,10 @@ describe('MY 피드(평가) ⇢ 2.5', () => {
     await waitFor(() => expect(location()).toBe('/my'));
     expect(await screen.findByRole('link', { name: /영화 제목 2.*2\.5/ })).toBeInTheDocument();
 
-    const frames = await getMyFrames();
-    expect(frames.items.filter((frame) => frame.movie.movieId === 402)).toEqual([
-      expect.objectContaining({ frameId: 502, score: 2.5 }),
+    // 같은 평가가 고쳐졌을 뿐 새 평가가 생기지 않았다
+    const list = await getMyRatings();
+    expect(list.items.filter((item) => item.movie.movieId === 402)).toEqual([
+      expect.objectContaining({ ratingId: 902, score: 2.5 }),
     ]);
   });
 });
@@ -228,12 +270,27 @@ describe('MY 피드(안 남긴 영화) ⇢ 2.5', () => {
    * 돌아와서 목록을 다시 받는 것**뿐이다. 그 두 자리를 고정한다. 옮기는 판정 자체는
    * 백엔드 시험이 고정한다.
    *
-   * `[!]` 7.6 `평가한 영화`는 아직 목업(API-039 미구현)이라 방금 저장한 평가를 보여주지
-   * 못한다. 그래서 그 탭은 여기서 보지 않는다.
+   * 평가한 영화(API-039)도 서버 목록이라(업무 -611) 돌아와서 다시 받으면 방금 저장한 평가가
+   * 보인다. 그것까지 이어서 본다.
    */
   it('평가하면 API-036으로 저장하고, 다시 받은 안 남긴 영화 목록에서 빠진다', async () => {
-    vi.mocked(createRating).mockImplementation((movieId, input) =>
-      Promise.resolve({
+    vi.mocked(createRating).mockImplementation((movieId, input) => {
+      const movie = findMockMovie(movieId);
+
+      createdRatings.push({
+        itemType: 'RATED',
+        ratingId: 91,
+        movie: { movieId, title: movie.title, posterUrl: movie.posterUrl },
+        score: input.score,
+        comment: null,
+        visibility: null,
+        spoiler: false,
+        frameId: 77,
+        createdAt: '2026-08-30T05:21:00Z',
+        activityAt: '2026-08-30T05:21:00Z',
+      });
+
+      return Promise.resolve({
         ratingId: 91,
         movieId,
         score: input.score,
@@ -244,8 +301,8 @@ describe('MY 피드(안 남긴 영화) ⇢ 2.5', () => {
         popcorn: { flavorCode: 'FLAVOR_A', isNewFlavor: true, flavorCount: 1 },
         watchStatus: 'RATED',
         createdAt: '2026-08-30T05:21:00Z',
-      }),
-    );
+      });
+    });
 
     const { unmount } = renderApp([ROUTE_PATTERN.my]);
 
@@ -277,5 +334,10 @@ describe('MY 피드(안 남긴 영화) ⇢ 2.5', () => {
     await findTab('안 남긴 영화');
     expect(await screen.findByRole('link', { name: /영화 제목 6/ })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /영화 제목 5/ })).not.toBeInTheDocument();
+
+    // 평가한 영화 탭에는 방금 저장한 평가가 맨 앞에 보인다(API-039 다시 받기)
+    fireEvent.click(await findTab('평가한 영화'));
+    const [first] = await screen.findAllByRole('link', { name: /영화 제목/ });
+    expect(first).toHaveAccessibleName(expect.stringMatching(/영화 제목 5.*4\.0/));
   });
 });

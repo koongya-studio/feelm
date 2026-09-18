@@ -1,106 +1,494 @@
 /*
- * 본문만 스크롤하고 저장 버튼은 아래에 고정한다. 와이어프레임 7.2도 저장을 고정으로
- * 두었고, 레퍼런스 지시도 `항상 쉽게 접근할 수 있게`를 요구한다.
+ * 7.2 프로필 편집 (업무 S15P21E106-616). 본문은 `ProfileLayout`이 그리고, 여기는 편집기 ·
+ * 사진 시트 · 자르기 · 묻는 창 · 알림 자리다.
  *
- * 이 화면은 FullScreenLayout 아래에 있어 문서 전체가 스크롤된다. 그래서 footer를
- * `position: sticky`로 두어 스크롤 끝까지 따라오게 한다.
+ * 저장은 빨간 면 + `저장` 글자, 취소는 테두리 + `취소` 글자다. 색만으로 가르지 않는다.
+ * 누르는 것은 모두 44px 이상이다.
  */
 .page {
   display: flex;
   flex-direction: column;
-  padding: var(--space-2) var(--screen-padding-x) var(--space-6);
-  gap: var(--space-6);
+  padding: var(--space-2) var(--screen-padding-x) var(--space-8);
 }
 
-/* ─────────────────────────── 정보 묶음 */
-
-.group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.groupLabel {
-  color: var(--color-ink-muted);
-  font-size: var(--font-size-meta);
+/* 헤더 오른쪽 `완료`. 빨간 글자는 이 화면을 끝내는 표식이다(시안 7.2) */
+.doneButton {
+  min-width: var(--tap-target-min);
+  min-height: var(--tap-target-min);
+  margin-right: calc(var(--space-2) * -1);
+  padding: 0 var(--space-2);
+  border: 0;
+  background: none;
+  color: var(--color-brand-ink);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-body);
   font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-meta);
 }
 
-/* ─────────────────────────── 읽기 전용 3행 */
+/* ─────────────────────────── 편집기 */
 
-.readonly {
-  display: flex;
-  margin: 0;
-  flex-direction: column;
-  padding: 0 var(--space-4);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
-}
-
-.readonlyRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-3) 0;
-  gap: var(--space-4);
-}
-
-.readonlyRow + .readonlyRow {
-  border-top: 1px solid var(--color-line-faint);
-}
-
-.readonlyRow dt {
-  color: var(--color-ink-muted);
-  font-size: var(--font-size-meta);
-}
-
-/* 값이 길면(이메일) 자른다 */
-.readonlyRow dd {
-  overflow: hidden;
-  margin: 0;
-  font-size: var(--font-size-meta);
-  font-weight: var(--font-weight-bold);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* ─────────────────────────── 하단 고정 */
-
-/*
- * 저장 버튼은 아래에 붙어 따라온다. **배경이 벽과 완전히 같아야 상자로 보이지 않는다.**
- *
- * 두 번 틀렸다(2026-09-11).
- * 1. `--color-glass`(반투명 흰색) — 화면 폭(412px) 안에서만 칠해져 흰 상자가 떠 보였다
- * 2. `--color-bg` 단색 그라데이션 — 벽은 위아래로 밝기가 변하는데(`--gradient-page`,
- *    아래로 갈수록 어둡다) 단색은 그 지점보다 밝아서 여전히 밝은 상자로 보였다
- *
- * 답은 **벽과 같은 그림을 그대로 한 겹 더 칠하는 것**이다. `--gradient-page`를
- * `background-attachment: fixed`로 칠하면 뷰포트 기준으로 자리가 고정되므로 뒤에 깔린
- * body 배경과 픽셀이 정확히 일치한다. 경계가 생길 수 없다.
- *
- * `backdrop-filter`는 쓰지 않는다. 예전 7.2 히어로에서 스크롤 중 다시 그려지지 않는
- * 문제를 만든 속성이다(그 히어로는 업무 -605에서 지웠다).
- */
-.footer {
-  position: sticky;
-  bottom: 0;
+.editor {
   display: flex;
   flex-direction: column;
-  padding: var(--space-6) var(--screen-padding-x)
-    calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
-  background-color: var(--color-bg);
-  background-image: var(--gradient-page);
-  background-attachment: fixed;
   gap: var(--space-2);
 }
 
-/* 저장 막대는 고정 버튼 위에 뜬다 */
+.editorHint {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+.editorError {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-brand-ink);
+}
+
+/* 저장 · 취소는 오른쪽 끝에 나란히 */
+.editorActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.cancelButton,
+.saveButton {
+  min-width: 72px;
+  min-height: var(--tap-target-min);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+}
+
+.cancelButton {
+  border: 1px solid var(--color-line-strong);
+  background: none;
+  color: var(--color-ink);
+}
+
+.saveButton {
+  border: 1px solid var(--color-action-brand);
+  background: var(--color-action-brand);
+  color: var(--color-on-action);
+}
+
+.saveButton:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+/* 소개 편집기. 시안 7.2처럼 카드 안에 입력과 버튼이 들어간다 */
+.bioCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-ink-muted);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+}
+
+.bioField {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-bg);
+}
+
+.bioField:focus-within {
+  border-color: var(--color-ink);
+}
+
+.bioInput {
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-ink);
+  font-family: inherit;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  resize: none;
+}
+
+.bioInput:focus {
+  outline: none;
+}
+
+.counter {
+  flex: none;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-body);
+  color: var(--color-ink-hint);
+}
+
+/* 키워드 고르기. 고른 칩은 채운 면과 체크 표시 둘 다로 보인다 */
+.toggleChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.toggleChip {
+  display: inline-flex;
+  min-height: var(--tap-target-min);
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--color-ink-body);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+}
+
+.toggleChip[aria-pressed='true'] {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-on-action);
+}
+
+/* 필름 고르기. 포스터가 버튼이고 오른쪽 위 동그라미에 체크가 선다 */
+.toggleFilms {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  list-style: none;
+}
+
+.toggleFilm {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  cursor: pointer;
+}
+
+.toggleFilm[aria-pressed='false'] {
+  opacity: 0.45;
+}
+
+.toggleMark {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-on-action);
+  border-radius: var(--radius-pill);
+  background: rgba(38, 39, 41, 0.4);
+  color: var(--color-on-action);
+}
+
+.toggleFilm[aria-pressed='true'] .toggleMark {
+  border-color: var(--color-ink);
+  background: var(--color-ink);
+}
+
+/* ─────────────────────────── 사진 */
+
+.fileInput {
+  display: none;
+}
+
+.avatarStatus {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+.avatarStatus[role='alert'] {
+  color: var(--color-brand-ink);
+}
+
+.inlineRetry {
+  min-height: var(--tap-target-min);
+  padding: 0 var(--space-1);
+  border: 0;
+  background: none;
+  color: var(--color-ink);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: var(--font-weight-bold);
+  text-decoration: underline;
+}
+
+/* 사진 메뉴 시트. 화면 폭 안에서 아래에 붙는다(4.3 필터 시트와 같은 층) */
+.sheetLayer {
+  position: fixed;
+  z-index: 20;
+  display: flex;
+  width: 100%;
+  max-width: var(--layout-max-width);
+  align-items: flex-end;
+  margin: 0 auto;
+  inset: 0;
+}
+
+.scrim {
+  position: absolute;
+  border: 0;
+  background: rgba(38, 39, 41, 0.32);
+  cursor: pointer;
+  inset: 0;
+}
+
+.sheet {
+  position: relative;
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--screen-padding-x)
+    calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: var(--color-bg);
+  box-shadow: 0 -8px 24px rgba(38, 39, 41, 0.12);
+}
+
+.sheetTitle {
+  margin: 0;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+.sheetList {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.sheetItem {
+  width: 100%;
+  min-height: 52px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-ink);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-body);
+  text-align: left;
+}
+
+li + li > .sheetItem {
+  border-top: 1px solid var(--color-line-faint);
+}
+
+.sheetItem:disabled {
+  color: var(--color-ink-disabled);
+  cursor: default;
+}
+
+/* 삭제는 글자 자체가 위험을 말한다. 빨강은 덧붙이는 표식이다 */
+.sheetItem[data-tone='danger']:not(:disabled) {
+  color: var(--color-brand-ink);
+}
+
+.sheetCancel {
+  min-height: var(--control-height-sm);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--color-ink);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+
+/* 자르기. 어두운 면 위에 원 하나 — 사진이 주인공이라 주변을 가라앉힌다 */
+.cropLayer {
+  position: fixed;
+  z-index: 25;
+  display: flex;
+  width: 100%;
+  max-width: var(--layout-max-width);
+  box-sizing: border-box;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--screen-padding-x);
+  margin: 0 auto;
+  background: var(--color-surface-dark);
+  color: var(--color-on-action);
+  inset: 0;
+}
+
+.cropTitle {
+  margin: 0;
+  font-size: var(--font-size-heading);
+  font-weight: var(--font-weight-bold);
+}
+
+.cropHint {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  color: rgba(255, 255, 255, 0.72);
+  text-align: center;
+}
+
+.cropStage {
+  position: relative;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: var(--radius-pill);
+  cursor: grab;
+  touch-action: none;
+}
+
+.cropStage:focus-visible {
+  outline: 3px solid var(--color-on-action);
+  outline-offset: 4px;
+}
+
+.cropImage {
+  position: absolute;
+  max-width: none;
+  user-select: none;
+  pointer-events: none;
+}
+
+.cropZoom {
+  display: flex;
+  width: 100%;
+  max-width: 256px;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--font-size-meta);
+}
+
+.cropZoom input {
+  flex: 1;
+  min-height: var(--tap-target-min);
+  accent-color: var(--color-on-action);
+}
+
+.cropError {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  color: var(--color-on-action);
+}
+
+.cropActions {
+  display: grid;
+  width: 100%;
+  gap: var(--space-2);
+  grid-template-columns: 1fr 1fr;
+}
+
+.cropCancel {
+  min-height: var(--control-height);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--color-on-action);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+
+/* ─────────────────────────── 저장하지 않은 변경을 묻는 창 */
+
+.dialogLayer {
+  position: fixed;
+  z-index: 30;
+  display: flex;
+  width: 100%;
+  max-width: var(--layout-max-width);
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  padding: var(--screen-padding-x);
+  margin: 0 auto;
+  background: rgba(38, 39, 41, 0.32);
+  inset: 0;
+}
+
+.dialog {
+  display: flex;
+  width: 100%;
+  max-width: 320px;
+  box-sizing: border-box;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-5);
+  border-radius: var(--radius-card);
+  background: var(--color-bg);
+  box-shadow: var(--shadow-raised);
+}
+
+.dialogTitle {
+  margin: 0;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+.dialogDescription {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+.dialogActions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.dialogKeep {
+  min-height: var(--tap-target-min);
+  border: 0;
+  background: none;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+}
+
+/* ─────────────────────────── 알림 */
+
 .snackbarSlot {
   position: fixed;
   z-index: 10;
   right: var(--screen-padding-x);
-  bottom: calc(var(--space-12) + var(--space-10));
+  bottom: calc(var(--nav-height) + var(--space-6));
   left: var(--screen-padding-x);
   max-width: calc(var(--layout-max-width) - var(--screen-padding-x) * 2);
   margin: 0 auto;

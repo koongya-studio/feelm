@@ -26,6 +26,9 @@ DEPLOYMENT_SERVICES = (
     "hdfs-service-config",
     "hdfs-distributed-config",
     "kafka-config",
+    "spark-service",
+    "spark-distributed",
+    "spark-code",
 )
 
 
@@ -200,6 +203,9 @@ def build_message(service: str, status: str, environ: dict[str, str]) -> str:
         "success": ("✅", "성공"),
         "failed": ("❌", "실패"),
         "canceled": ("⚠️", "취소"),
+        "candidate_rejected": ("⚠️", "후보 거부 · 운영 상태 유지"),
+        "auto_rollback": ("⚠️", "후보 실패 · 자동 복구 완료"),
+        "manual_recovery": ("❌", "복구 실패 · 수동 복구 필요"),
     }
     icon, status_label = labels.get(status, ("ℹ️", safe_value(status)))
     service_label = safe_value(service)

@@ -26,10 +26,16 @@
  * - **다음 장은 스크롤로 이어 받는다.** 마지막 칸 아래의 감시 요소가 보이면 다음 장을
  *   부른다. `IntersectionObserver`가 없는 환경과 실패 뒤에는 버튼으로 잇는다.
  *
+ * **검색 조건은 주소에 남는다**(업무 -634). 4.2 → 2.4 → 뒤로 가기가 4.1로 떨어지지 않게,
+ * 검색어 · 필터 · 정렬을 `?q=` 등으로 적는다. 타이핑마다 기록이 쌓이지 않도록 늘 **바꿔 쓴다**
+ * (`replace`). 상세로 가기 직전의 결과와 스크롤은 `searchSnapshot`에 적어 두었다가, 뒤로 와서
+ * 주소가 같으면 다시 부르지 않고 그대로 되살린다.
+ *
  * **최근 검색어는 제출했거나 결과를 눌렀을 때만 남긴다.** 타이핑마다 남기면 `ㄷ` · `달` ·
  * `달의`가 전부 쌓인다. 같은 말은 다시 저장하지 않고 맨 앞으로 옮긴다(`sessionStore`).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import Button from '../../../components/Button';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
@@ -43,7 +49,15 @@ import {
 } from '../../../mocks/sessionStore';
 import SearchFilterSheet from './SearchFilterSheet';
 import SearchResultGrid, { SearchResultSkeleton } from './SearchResultGrid';
-import { EMPTY_FILTER, isEmptyFilter, SORT_OPTIONS, toSearchQuery } from './searchFilter';
+import {
+  EMPTY_FILTER,
+  fromSearchParams,
+  isEmptyFilter,
+  SORT_OPTIONS,
+  toSearchParams,
+  toSearchQuery,
+} from './searchFilter';
+import { saveSnapshot, takeSnapshot } from './searchSnapshot';
 import type { SearchFilterState } from './searchFilter';
 import type {
   FilterOptions,
@@ -117,17 +131,57 @@ function EmptyResults({
   );
 }
 
+/**
+ * 처음 그릴 상태. 주소에 조건이 있으면 그 조건으로 시작한다.
+ *
+ * - 상세에서 뒤로 왔고 적어 둔 결과가 있으면 그대로 되살린다
+ * - 조건만 있으면(주소로 바로 들어옴 · 적어 둔 것이 없음) 첫 장을 받는 중으로 시작한다
+ * - 조건이 없으면 4.1이다
+ */
+function initialState(params: URLSearchParams) {
+  const { keyword, filter } = fromSearchParams(params);
+  const conditioned = Boolean(keyword.trim()) || !isEmptyFilter(filter);
+  const restored = conditioned ? takeSnapshot<SearchState>(params.toString()) : null;
+
+  if (restored && restored.state.status === 'ready') {
+    return {
+      keyword,
+      filter,
+      search: { ...restored.state, more: 'idle' as const },
+      scrollTop: restored.scrollTop,
+      fetchOnMount: false,
+    };
+  }
+
+  return {
+    keyword,
+    filter,
+    search: conditioned
+      ? ({ status: 'loading', query: toSearchQuery(keyword, filter, null) } as SearchState)
+      : IDLE,
+    scrollTop: 0,
+    fetchOnMount: conditioned,
+  };
+}
+
 export default function SearchPage() {
-  const [keyword, setKeyword] = useState('');
-  const [filter, setFilter] = useState<SearchFilterState>(EMPTY_FILTER);
+  const [params, setParams] = useSearchParams();
+  // 처음 한 번만 계산한다. 이후의 주소는 이 화면이 바꿔 쓰는 결과일 뿐이다
+  const [initial] = useState(() => initialState(params));
+
+  const [keyword, setKeyword] = useState(initial.keyword);
+  const [filter, setFilter] = useState<SearchFilterState>(initial.filter);
   const [filterOpen, setFilterOpen] = useState(false);
   const [options, setOptions] = useState<FilterOptions | null>(null);
-  const [search, setSearch] = useState<SearchState>(IDLE);
+  /** 필터 옵션 요청이 끝났는지(성공 · 실패 모두). `그 이전` 첫 검색이 이것을 기다린다 */
+  const [optionsSettled, setOptionsSettled] = useState(false);
+  const [search, setSearch] = useState<SearchState>(initial.search);
   /** 시트의 `결과 보기 · N편`에 쓰는 미리 센 개수 */
   const [previewCount, setPreviewCount] = useState<number | null>(null);
   const [recent, setRecent] = useState<string[]>(() => [...getRecentSearchQueries()]);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const pageRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   /** 한글 조합 중인지. 상태가 아니라 ref인 것은 렌더와 무관한 입력 단계이기 때문이다 */
   const composing = useRef(false);
@@ -143,18 +197,30 @@ export default function SearchPage() {
    * 이미 검색어를 칠 참이므로 한 번 더 두드리게 하지 않는다.
    */
   useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+    // 뒤로 와서 결과를 되살렸으면 보던 자리로 스크롤한다. 그때는 입력창에 초점을 두지 않는다 —
+    // 초점이 가면 화면이 입력창까지 끌려 올라간다
+    if (initial.scrollTop > 0 && pageRef.current) {
+      pageRef.current.scrollTop = initial.scrollTop;
+
+      return;
+    }
+
+    if (initial.search.status === 'idle') inputRef.current?.focus();
+  }, [initial]);
 
   useEffect(() => {
     let active = true;
 
     getFilterOptions()
       .then((value) => {
-        if (active) setOptions(value);
+        if (!active) return;
+
+        setOptions(value);
+        setOptionsSettled(true);
       })
       .catch(() => {
         // 필터 옵션이 없으면 시트를 열 수 없을 뿐 검색은 된다
+        if (active) setOptionsSettled(true);
       });
 
     return () => {
@@ -180,10 +246,51 @@ export default function SearchPage() {
     }
   };
 
+  /** 첫 장을 받아 상태에 넣는다. 그 사이 새 검색이 나갔으면 이 응답은 버린다 */
+  const fetchFirstPage = useCallback((query: MovieSearchQuery, seq: number) => {
+    searchMovies(query)
+      .then((page) => {
+        if (seq !== runSeq.current) return;
+
+        setSearch({ status: 'ready', query, ...page, more: 'idle' });
+      })
+      .catch(() => {
+        if (seq !== runSeq.current) return;
+
+        setSearch({ status: 'failed', query });
+      });
+  }, []);
+
+  /** 주소의 조건으로 첫 장을 이미 보냈는지. 한 번만 보낸다 */
+  const initialFetched = useRef(false);
+
+  /*
+   * 주소로 들어왔고 되살릴 결과가 없으면 주소의 조건으로 첫 장을 받는다. 상태는 이미
+   * `받는 중`으로 시작했으므로 여기서는 요청만 보낸다.
+   *
+   * `그 이전` 연도는 시작 연도가 필터 옵션(API-029 `yearRange.min`)에 있어 **옵션을 받은 뒤에**
+   * 보낸다. 먼저 보내면 연도 조건이 빠진 채 검색된다(!405 리뷰). 옵션을 못 받으면 계약대로
+   * 시작 없이 끝만 보낸다.
+   */
+  useEffect(() => {
+    if (initialFetched.current || !initial.fetchOnMount) return;
+    if (initial.filter.year === 'BEFORE' && !optionsSettled) return;
+
+    initialFetched.current = true;
+
+    // 기다리는 사이 사용자가 새로 검색했으면 주소의 첫 조건은 이미 지난 것이다
+    if (runSeq.current > 0) return;
+
+    fetchFirstPage(toSearchQuery(initial.keyword, initial.filter, yearMin), (runSeq.current += 1));
+  }, [initial, optionsSettled, yearMin, fetchFirstPage]);
+
   /** 조건으로 첫 장을 받는다. 검색어도 필터도 없으면 4.1로 돌아간다 */
   const run = useCallback(
     (nextKeyword: string, nextFilter: SearchFilterState) => {
       const seq = (runSeq.current += 1);
+
+      // 조건을 주소에 적는다. 늘 바꿔 쓰므로 뒤로 가기 기록이 쌓이지 않는다
+      setParams(toSearchParams(nextKeyword, nextFilter), { replace: true });
 
       if (!nextKeyword.trim() && isEmptyFilter(nextFilter)) {
         // 계약도 이 조합을 400으로 거절한다
@@ -195,20 +302,9 @@ export default function SearchPage() {
       const query = toSearchQuery(nextKeyword, nextFilter, yearMin);
 
       setSearch({ status: 'loading', query });
-
-      searchMovies(query)
-        .then((page) => {
-          if (seq !== runSeq.current) return;
-
-          setSearch({ status: 'ready', query, ...page, more: 'idle' });
-        })
-        .catch(() => {
-          if (seq !== runSeq.current) return;
-
-          setSearch({ status: 'failed', query });
-        });
+      fetchFirstPage(query, seq);
     },
-    [yearMin],
+    [yearMin, setParams, fetchFirstPage],
   );
 
   /** 잠시 기다렸다가 검색한다. 그 사이 또 입력이 오면 처음부터 다시 기다린다 */
@@ -318,13 +414,25 @@ export default function SearchPage() {
     };
   }, [filterOpen, keyword, filter, yearMin]);
 
-  /** X 버튼. 입력과 결과를 함께 비우고 다시 칠 수 있게 초점을 돌려준다 */
+  /**
+   * X 버튼. 검색어를 비우고 다시 칠 수 있게 초점을 돌려준다.
+   *
+   * 필터가 남아 있으면 **필터만으로 다시 찾는다.** 화면만 4.1로 돌리면 주소에는 필터가 남아
+   * 새로고침할 때 방금 지운 결과가 되살아났다(!405 리뷰). 필터도 없으면 4.1이다.
+   */
   const clear = () => {
-    cancelPending();
-    runSeq.current += 1;
     setKeyword('');
-    setSearch(IDLE);
+    runNow('', filter);
     inputRef.current?.focus();
+  };
+
+  /** 상세로 가기 직전. 받아 둔 결과와 스크롤 위치를 적어 두어 뒤로 오면 되살린다 */
+  const leaveToDetail = () => {
+    remember(keyword);
+
+    if (search.status === 'ready') {
+      saveSnapshot(params.toString(), search, pageRef.current?.scrollTop ?? 0);
+    }
   };
 
   const changeFilter = (next: SearchFilterState) => {
@@ -338,7 +446,7 @@ export default function SearchPage() {
 
   return (
     <>
-      <div className={styles.page}>
+      <div className={styles.page} ref={pageRef}>
         <ScreenHeader title="검색" />
 
         <form
@@ -494,7 +602,7 @@ export default function SearchPage() {
               </label>
             </div>
 
-            <SearchResultGrid items={search.items} onSelect={() => remember(keyword)} />
+            <SearchResultGrid items={search.items} onSelect={leaveToDetail} />
 
             {search.more === 'loading' ? (
               <SearchResultSkeleton cells={MORE_SKELETON_CELLS} />

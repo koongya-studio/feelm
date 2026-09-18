@@ -1,4 +1,5 @@
 from datetime import UTC
+from struct import pack
 
 import pytest
 
@@ -9,17 +10,35 @@ from feelm_consumer.settings import SettingsError, load_settings
 def test_parse_event_accepts_matching_utc_key() -> None:
     event = parse_event(
         b'{"eventId":"123e4567-e89b-12d3-a456-426614174000","userId":7,"eventType":"RATING","occurredAt":"2026-09-13T00:00:00Z","payload":{"action":"CREATE","movieId":1,"score":5.0}}',
-        b"7",
+        pack(">q", 7),
     )
     assert event.user_id == 7
     assert event.occurred_at.tzinfo == UTC
+
+
+def test_parse_event_accepts_onboarding_with_long_key() -> None:
+    event = parse_event(
+        b'{"eventId":"e30a81d7-e228-4cd8-a39f-cc1bb9e278f8","userId":7,"eventType":"ONBOARDING","occurredAt":"2026-09-17T14:14:36.563314658Z","payload":{"preferenceCount":7}}',
+        pack(">q", 7),
+    )
+    assert event.user_id == 7
+    assert event.action == "ONBOARDING"
 
 
 def test_parse_event_rejects_mismatched_key() -> None:
     with pytest.raises(EventValidationError):
         parse_event(
             b'{"eventId":"123e4567-e89b-12d3-a456-426614174000","userId":7,"eventType":"RATING","occurredAt":"2026-09-13T00:00:00Z","payload":{"action":"CREATE","movieId":1,"score":5.0}}',
-            b"8",
+            pack(">q", 8),
+        )
+
+
+@pytest.mark.parametrize("key", [None, b"", b"7", b"\x00" * 7, b"\x00" * 9])
+def test_parse_event_rejects_missing_or_non_long_key(key: bytes | None) -> None:
+    with pytest.raises(EventValidationError, match="invalid partition key"):
+        parse_event(
+            b'{"eventId":"123e4567-e89b-12d3-a456-426614174000","userId":7,"eventType":"RATING","occurredAt":"2026-09-13T00:00:00Z","payload":{"action":"CREATE","movieId":1,"score":5.0}}',
+            key,
         )
 
 
@@ -27,7 +46,7 @@ def test_parse_event_rejects_invalid_half_step_score() -> None:
     with pytest.raises(EventValidationError):
         parse_event(
             b'{"eventId":"123e4567-e89b-12d3-a456-426614174000","userId":7,"eventType":"RATING","occurredAt":"2026-09-13T00:00:00Z","payload":{"action":"UPDATE","movieId":1,"score":4.2}}',
-            b"7",
+            pack(">q", 7),
         )
 
 
@@ -35,7 +54,7 @@ def test_parse_event_rejects_empty_onboarding_submission() -> None:
     with pytest.raises(EventValidationError):
         parse_event(
             b'{"eventId":"123e4567-e89b-12d3-a456-426614174000","userId":7,"eventType":"ONBOARDING","occurredAt":"2026-09-13T00:00:00Z","payload":{"preferenceCount":0}}',
-            b"7",
+            pack(">q", 7),
         )
 
 

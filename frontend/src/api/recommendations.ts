@@ -12,6 +12,8 @@
 import { request } from './client';
 import type { RecommendationHistory, RecommendationSet } from '../types/recommendation';
 
+let pendingRecommendationRequest: Promise<RecommendationSet> | null = null;
+
 /**
  * API-045 기본 추천 조회 · GET /api/v1/recommendations
  *
@@ -26,8 +28,27 @@ import type { RecommendationHistory, RecommendationSet } from '../types/recommen
  * 관심없음(API-047)은 백엔드에 있지만 프론트 연동은 S15P21E106-536이 맡는다. 그전까지
  * 2.3 메뉴의 `관심없음`은 눌리지 않는다(`RecommendationsPage`).
  */
-export async function getRecommendations(): Promise<RecommendationSet> {
-  return request<RecommendationSet>('/recommendations');
+export function getRecommendations(): Promise<RecommendationSet> {
+  /*
+   * API-045는 GET이지만 선택한 카드의 노출 시각을 기록한다. React StrictMode가 개발에서
+   * effect를 다시 실행하거나 사용자가 빠르게 같은 화면에 진입해도 진행 중인 요청은 한 번만
+   * 보낸다. 요청이 끝난 뒤에는 캐시하지 않아 다음 진입·재시도가 최신 generation을 확인한다
+   * (S15P21E106-613).
+   */
+  if (!pendingRecommendationRequest) {
+    const current = request<RecommendationSet>('/recommendations');
+    pendingRecommendationRequest = current;
+
+    const clear = () => {
+      if (pendingRecommendationRequest === current) {
+        pendingRecommendationRequest = null;
+      }
+    };
+
+    void current.then(clear, clear);
+  }
+
+  return pendingRecommendationRequest;
 }
 
 /**

@@ -2,6 +2,7 @@
 """Atomically update reviewed MR adapter scripts without changing prepared inputs."""
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -27,6 +28,22 @@ LOCK = Path('/run/lock/feelm-ci271.lock')
 SERVICE = 'feelm-ci222-gitlab-runner.service'
 STAGE_PATTERN = re.compile(r'/var/tmp/ci222-server-[a-z0-9_]+')
 MAX_MANIFEST = 4 * 1024**2
+
+
+def require_prepared_runtime(scripts):
+    """Reject a runtime change before stopping the Runner or replacing files."""
+    config = json.loads(CONFIG.read_text())
+    prepared = Path(config['prepared_base'])
+    spec = importlib.util.spec_from_file_location(
+        'adapter_update_runtime', scripts / 'ci-backend-runtime-contract.py')
+    runtime = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runtime)
+    try:
+        runtime.require_same(scripts, prepared / 'scripts')
+    except RuntimeError as exc:
+        raise ValueError(
+            'Staged and prepared backend runtimes differ; prepare and verify a matching '
+            'stage, then use ci-dependency-cache-install.py --prepared-base') from exc
 
 
 def trusted_tree(root):
@@ -142,6 +159,7 @@ def preflight(stage):
     trusted_file(CONFIG, 4096, private=True)
     trusted_file(SUDOERS, 4096)
     trusted_file(OPERATORS, 4096, private=True)
+    require_prepared_runtime(scripts)
     if active_units():
         raise ValueError('MR test units are still running; keep the existing install')
     return scripts

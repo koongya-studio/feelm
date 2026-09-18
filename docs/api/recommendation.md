@@ -139,10 +139,9 @@
       },
       "flavorCode": "FLAVOR_A",
       "reason": {
-        "summary": "스릴러를 높게 평가하셨어요",
+        "summary": "좋아하신 영화와 스릴러 장르가 같아요.",
         "factors": [
-          { "type": "GENRE", "label": "스릴러" },
-          { "type": "SIMILAR_MOVIE", "label": "세븐", "movieId": 807 }
+          { "type": "GENRE", "label": "스릴러" }
         ]
       }
     }
@@ -183,28 +182,32 @@
   점수로 최종 정렬한다.
 - 서비스 DB에 없는 영화, 평가한 영화와 관심없음 영화는 제외한다. 감상·OTT 클릭 이력은 제외나 재가중에 사용하지 않는다
 - 같은 `generationId`의 버퍼가 있으면 같은 `recommendationSetId`를 반환한다. 새 generation이 게시되어도 노출 중인 유효 카드는 즉시 교체하지 않고, 현재 세트를 소진한 뒤 다음 세트를 만들 때 사용한다. 관심없음·평가로 생긴 빈 자리는 다음 API-045 조회가 현재 세트에서 보충한다
+- 임시 예외(S15P21E106-613): Kafka 갱신 알림 연동 전까지 API-045 조회마다 Redis의 최신 generation을 확인하고, 새 generation이면 즉시 새 추천 세트로 전환한다. S15P21E106-585의 Kafka 알림 기반 갱신이 적용되면 이 예외를 제거하고 위의 기존 세트 유지 규칙으로 복귀한다
 - 온보딩을 건너뛰고 평가가 없는 사용자의 개인 후보 보충 순서 개선과 후보 모집단 밖 POPULAR 확장은
   S15P21E106-483에서 다룬다.
   `discovery-popularity`는 선택된 그룹 안의 공통 후보 진입 순서이며 fallback 목록이 아니다
-- Python Consumer가 Redis에 갱신한 TASTE·DISCOVERY 후보를 Spring이 종류별 점수로 정렬하고 동점을 결정적으로 섞은 뒤 타입별 최대 20편을 독립 버퍼로 저장한다. 조회 시 TASTE 2편과 DISCOVERY 1편을 꺼내되, 사용 가능한 DISCOVERY가 없으면 다음 TASTE를 사용한다
-- 버퍼는 PostgreSQL `recommendation_items`에 저장하고 `exposed_at`으로 노출 여부를 구분한다. Consumer가 전달한 구조화된 `reasons[]` 원본도 함께 저장하며, 사용자 문구 생성은 별도 단계에서 처리한다.
+- Python Consumer가 Redis에 갱신한 TASTE·DISCOVERY 후보를 Spring이 종류별 점수로 정렬하고 동점을 결정적으로 섞는다. TASTE를 최대 20편 저장한 뒤 DISCOVERY에서 이미 저장한 TASTE 영화는 건너뛰고 다음 고유 후보로 최대 20편을 채운다. 조회 시 TASTE 2편과 DISCOVERY 1편을 꺼내되, 사용 가능한 DISCOVERY가 없으면 다음 TASTE를 사용한다
+- 버퍼는 PostgreSQL `recommendation_items`에 저장하고 `exposed_at`으로 노출 여부를 구분한다. `reason` JSON에는 Consumer가 전달한 구조화된 `reasons[]` 원본과 확정된 사용자용 `summary`·`factors`를 함께 저장한다. API에는 `summary`·`factors`만 반환한다. 생성 전 또는 이전 버전의 원본-only 항목은 `새로운 영화를 만나보세요.`와 빈 `factors`를 반환한다.
+- LLM 호출은 버퍼 저장 트랜잭션 뒤에 수행한다. LLM은 확인된 영화·장르 근거에 대해 허용된 표현 유형만 고르고, Spring이 최종 문장을 조립한다. 모델 오류·타임아웃·빈/무효 응답은 확인된 근거의 결정적 문구로 대체한다. 근거가 없거나 필요한 표시명을 조회할 수 없으면 중립 문구를 사용한다. 이유는 첫 노출 전까지만 갱신하며 노출 후에는 같은 스냅샷을 카드·상세·이력에서 재사용한다. 생성 완료 전에 첫 조회가 항목을 노출했다면 그 조회는 중립 문구와 빈 `factors`를 반환하고, 늦게 완료된 생성 결과는 노출된 항목을 갱신하지 않는다. 이후 조회도 같은 중립 스냅샷을 반환한다.
+- 버퍼가 커밋된 뒤 이유 보강의 DB 조회·갱신만 실패하면 이미 저장한 세트를 반환한다. 미노출 이유는 같은 generation 재요청에서 다시 보강한다. 그 전에 첫 조회가 노출하면 위 중립 스냅샷 규칙을 적용한다. 버퍼 저장 자체나 카드 조회 DB 장애는 이 fallback의 대상이 아니다.
+- v6 TASTE 근거는 `SHARED_GENRE` 또는 `TOP_RATED_SOURCE`, DISCOVERY 근거는 `DISCOVERY_AGGREGATE_AFFINITY` 또는 `DISCOVERY_PERSONAL_SCORE`다. `reasons[]`의 첫 항목을 표시명으로 해석할 수 없으면 뒤의 유효한 항목을 순서대로 찾는다. 영화 ID는 서비스 영화 제목으로, 장르 코드는 서비스 표시명으로 변환한다. `SHARED_GENRE`와 장르가 있는 `DISCOVERY_PERSONAL_SCORE`는 확인된 공통 장르만 언급한다. `sourceMovieIds`와 `matchedGenreCodes`는 각각의 목록이라 특정 source 영화와 장르의 짝을 증명하지 못하므로 두 값을 한 문장에 묶지 않는다. `TOP_RATED_SOURCE`는 후보와 source 영화가 비슷하다고 단정하지 않는다. 그룹 근거의 `topContributionCoverage`는 그룹 적합도 근거의 집중도이지 후보 영화 최종 점수 설명률이 아니다. v6에 없는 감독·배우 공통성은 언급하지 않는다.
 - Consumer는 `vector`·`candidates`·version 키를 원자 게시한다. Spring은 `candidates.taste`와
   `candidates.discovery`를 읽어 제외·재정렬하고 최종 세트를 생성한다. 별도 Redis `topn`은
   사용하지 않는다. 후보가 없거나 유효하지 않으면 짧은 재시도 후 `503 RECOMMENDATION_UNAVAILABLE`을 반환한다.
 - 새 세트 생성 시 추천 이력(FR-33)에 시각·유형·이유·후보를 저장한다
-- `reason.factors[].type`: `GENRE`, `DIRECTOR`, `ACTOR`, `COUNTRY`, `ERA`, `SIMILAR_MOVIE`, `NEW_FLAVOR`(가정)
+- 현재 v6 근거에서 확인 가능한 `reason.factors[].type`은 `GENRE`다. 다른 factor 타입은 실제 입력 계약과 표시명 검증이 합의될 때 추가한다.
 
 ### 구현·연동 상태
 
 - S15P21E106-415에서 DISCOVERY 후보 생성 정책과 Consumer 구현을 완료했다.
 - S15P21E106-471에서 Redis Candidate v3 `taste`/`discovery` 그룹화와 `generationId` writer를
-  반영했고, S15P21E106-481에서 TASTE 후보별 구조화 `reasons[]`를 추가해 Candidate v4가 됐다.
+  반영했고, S15P21E106-481에서 TASTE 후보별 구조화 단일 `reason` 객체를 추가해 Candidate v4가 됐다.
   S15P21E106-488은 전체 평가 또는 온보딩 이력으로 계산한 저이력 그룹 적합도와 상위 기여 비율을
-  DISCOVERY 전용 `reasons[]` 원소로 추가해 Candidate v5로 올렸다. S15P21E106-505는 입력 수 제한을 제거하고
-  DISCOVERY 보충 후보용 `DISCOVERY_PERSONAL_SCORE`를 추가해 Candidate v6로 올린다. 현재 `develop`에는
-  Candidate v6 Spring reader와 TASTE 2 + DISCOVERY 1 조립 구현이 없으므로, 위 처리 규칙은 Backend가
-  구현·통합 검증해야 하는 소비 계약이다. S15P21E106-164는 기존 v4 배열 계약을 유지하고,
-  S15P21E106-498에서 v6 배열 계약 대응을 진행한다. 전환은 v5/v6 reader 선반영, Consumer v6 전환과 활성 후보
+  DISCOVERY 전용 단일 `reason` 객체로 추가해 Candidate v5로 올렸다. S15P21E106-505는 입력 수 제한을 제거하고
+  DISCOVERY 보충 후보용 `DISCOVERY_PERSONAL_SCORE`를 추가해 Candidate v6로 올린다. S15P21E106-194에서
+  API-045/046과 TASTE 2 + DISCOVERY 1 노출·보충을 구현했다. Candidate v6 Spring reader는
+  Backend가 추가·통합 검증해야 하는 소비 계약이다. S15P21E106-164는 기존 v4 배열 계약을 유지하고,
+  S15P21E106-498에서 v6 배열 계약 대응과 사용자용 이유 스냅샷 생성을 함께 진행한다. 전환은 v5/v6 reader 선반영, Consumer v6 전환과 활성 후보
   재게시, v6·`generationId` 검증, v5 호환 제거 순서로 진행한다.
 - S15P21E106-482에서 그룹·그룹 내부 대중성 번들의 HDFS 게시, 두 URI 동시 활성화와 rollback을 검증한다.
 - S15P21E106-483은 개인 후보 보충 순서를 개선하고 후보 모집단 밖까지 확장하는 별도 POPULAR 목록의
@@ -216,11 +219,11 @@
 
 ### 미정 사항
 
-- [ ] Candidate v6 Spring reader, 두 목록 조립과 감상 변경 재계산을 구현·통합 검증해야 함
+- [ ] Candidate v6 Spring reader와 기존 두 목록 조립의 연동을 통합 검증해야 함
 - [ ] TMDB/KOBIS 공개 신호 후보 자격 하한을 합의하고 S15P21E106-482에서 운영 활성화해야 함
 - [x] 콜드 스타트 임시 전략 — 입력이 없으면 `0.0` 동점 TASTE 게시
 - [ ] 콜드 스타트 POPULAR 순서·후보 모집단 확장 — S15P21E106-483 이후
-- [ ] 추천 이유 factor 타입 목록과 문장 생성 방식(템플릿 vs LLM)
+- [x] Candidate v6 근거의 사용자 문구 방식 — LLM이 확인된 근거의 허용 표현을 선택하고 Spring이 문장을 조립
 - [ ] Re-ranking 가중치와 추천 이유 생성 방식
 
 ## API-047 관심없음 표시

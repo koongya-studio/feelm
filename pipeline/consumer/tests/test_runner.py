@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from struct import pack
 
 import numpy as np
 import pytest
@@ -21,7 +22,7 @@ class FakePartition:
 
 
 class FakeMessage:
-    def __init__(self, partition: int, offset: int, value: bytes, key: bytes = b"7") -> None:
+    def __init__(self, partition: int, offset: int, value: bytes, key: bytes = pack(">q", 7)) -> None:
         self._partition = partition
         self._offset = offset
         self._value = value

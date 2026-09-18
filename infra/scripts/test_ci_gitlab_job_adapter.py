@@ -1,3 +1,4 @@
+import contextlib
 import hashlib
 import importlib.util
 import io
@@ -555,7 +556,7 @@ class AdapterTests(unittest.TestCase):
             fetch.assert_not_called()
             start.assert_not_called()
 
-    def test_cache_prepare_rejects_pipeline_without_dependency_change(self):
+    def test_cache_prepare_succeeds_without_dependency_change(self):
         context = cache_response()
         with patch.object(adapter, 'read_private_config', return_value=({}, Path('/prepared'))), \
              patch.object(adapter, 'verify_current_job', return_value={'pipeline': {'id': 77}}), \
@@ -563,9 +564,10 @@ class AdapterTests(unittest.TestCase):
              patch.object(adapter, 'fetch_merge_request_detail', return_value={'iid': 98}), \
              patch.object(adapter, 'dependency_changes', return_value=[]), \
              patch.object(adapter, 'prepare_candidate') as prepare, \
-             self.assertRaisesRegex(adapter.PolicyError, 'No approved'):
-            adapter.run_job(context, opener=object())
+             contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(adapter.run_job(context, opener=object()), 0)
         prepare.assert_not_called()
+        self.assertIn('CACHE_PREPARE_SKIPPED=NO_DEPENDENCY_CHANGE', output.getvalue())
 
     def test_cache_status_fetches_and_revalidates_mr_detail(self):
         context = adapter.validate_job_response(cache_response())
@@ -592,13 +594,16 @@ class AdapterTests(unittest.TestCase):
         completed = [SimpleNamespace(stdout=b'') for _ in range(3)]
         completed.append(SimpleNamespace(
             stdout=b'backend/build.gradle\0backend/src/A.java\0'))
+        completed.append(SimpleNamespace(
+            stdout=b"+ implementation 'org.springframework.kafka:spring-kafka'\n"))
         with patch.object(adapter, 'request_json') as api, \
              patch.object(adapter.subprocess, 'run', side_effect=completed) as run:
             self.assertEqual(adapter.dependency_changes(context, mr),
                              ['backend/build.gradle'])
         api.assert_not_called()
         commands = [call.args[0] for call in run.call_args_list]
-        self.assertEqual(commands[-1][-2:], ['refs/review/base', 'refs/review/head'])
+        self.assertEqual(commands[-1][-2:],
+                         ['--', 'backend/build.gradle'])
         self.assertNotIn(context['token'], repr(commands))
         environment = run.call_args_list[1].kwargs['env']
         self.assertEqual(environment['GIT_TERMINAL_PROMPT'], '0')
@@ -629,6 +634,9 @@ class AdapterTests(unittest.TestCase):
             ('dependency_git_init', [failure]),
             ('dependency_fetch', [SimpleNamespace(stdout=b''), failure]),
             ('dependency_diff', [SimpleNamespace(stdout=b'') for _ in range(3)] + [failure]),
+            ('dependency_declaration_diff',
+             [SimpleNamespace(stdout=b'') for _ in range(3)]
+             + [SimpleNamespace(stdout=b'backend/build.gradle\0'), failure]),
         )
         for stage, results in cases:
             with self.subTest(stage=stage), \
@@ -718,8 +726,10 @@ class AdapterTests(unittest.TestCase):
                  'Installed and prepared backend runtimes differ')) as compatible, \
              patch.object(adapter, 'verify_current_job') as current, \
              patch.object(adapter.safety, 'start') as start, \
-             self.assertRaisesRegex(RuntimeError, 'backend runtimes differ'):
+             self.assertRaises(adapter.AdapterStageError) as raised:
             adapter.run_job(context, opener=object())
+        self.assertEqual(raised.exception.stage, 'backend_runtime_contract')
+        self.assertEqual(raised.exception.error_type, 'RuntimeError')
         compatible.assert_called_once_with(adapter.HERE, Path('/prepared/scripts'))
         current.assert_not_called()
         start.assert_not_called()

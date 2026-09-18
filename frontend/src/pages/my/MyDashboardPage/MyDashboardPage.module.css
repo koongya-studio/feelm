@@ -1,9 +1,8 @@
 /*
- * 인스타그램형 프로필 · 피드. 사용자 시안(2026-09-16)을 따른다.
+ * 인스타그램형 프로필 · 피드. 사용자 시안(2026-09-16 · 2026-09-18)을 따른다.
  *
- * 앱 공통 벽 위에 카드 · 테두리 없이 올린다. **화면이 배경을 따로 칠하지
- * 않는다** — 프로필 · 그림 · 탭 · 포스터 사이 여백이 모두 같은 벽이어야 하므로 어떤
- * 영역에도 면을 깔지 않는다(`tokens.css`의 `--gradient-page`가 유일한 배경이다).
+ * **화면이 배경을 따로 칠하지 않는다**(`tokens.css`의 `--gradient-page`가 유일한 배경이다).
+ * 수치 · 바로가기만 옅은 카드이고(업무 -616 시안), 탭 · 포스터 피드는 벽 위에 바로 놓인다.
  *
  * 화면의 주인공은 아래 포스터 피드이므로 **위쪽은 전부 낮게 눌렀다** — 피드의 첫 줄이
  * 첫 화면에 들어와야 한다.
@@ -29,33 +28,7 @@
   text-decoration: none;
 }
 
-/* ─────────────────────────── 프로필 머리 */
-
-/* 프로필은 가운데로 모은다. 아래 세 줄(버튼 · 그림 · 탭)이 모두 2열이라 축이 맞는다 */
-.identity {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.name {
-  max-width: 100%;
-  overflow: hidden;
-  font-size: var(--font-size-heading);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: var(--letter-spacing-heading);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* ─────────────────────────── 프로필 버튼 둘 */
-
-.profileActions {
-  display: grid;
-  gap: var(--space-2);
-  grid-template-columns: 1fr 1fr;
-}
+/* ─────────────────────────── 프로필 버튼 둘 (`ProfileLayout`의 `actions`) */
 
 /*
  * 테두리가 글자에 바싹 붙는다(사용자 지시 2026-09-16) — 높이 32px.
@@ -86,46 +59,61 @@
   content: '';
 }
 
-/* ─────────────────────────── 바로가기 그림 둘 */
+/* ─────────────────────────── 바로가기 카드 둘 */
 
-/* 프로필과 한 덩어리로 붙지 않게 위를 띄운다(사용자 지시 2026-09-16) */
+/*
+ * 그림 · 이름 · 화살표가 한 줄인 카드 두 장(사용자 시안 2026-09-18, 업무 -616). 카드 면과
+ * 테두리는 위 수치 카드(`ProfileLayout`)와 같다.
+ */
 .shortcuts {
   display: grid;
-  padding-top: var(--space-5);
-  gap: var(--space-4);
-  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-/* 그림과 이름이 하나의 누름 영역이다 */
+/* 카드 전체가 하나의 링크다 */
 .shortcut {
   display: flex;
-  flex-direction: column;
+  min-width: 0;
+  min-height: 72px;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
   color: var(--color-ink);
-  text-align: center;
   text-decoration: none;
 }
 
-/* 그림 자리의 높이를 고정해 두 이름이 같은 줄에서 시작하게 한다 */
 .shortcutArt {
   display: flex;
-  height: 68px;
-  align-items: flex-end;
+  height: 56px;
+  flex: none;
+  align-items: center;
   justify-content: center;
 }
 
 .shortcutLabel {
+  min-width: 0;
+  flex: 1;
   font-size: var(--font-size-meta);
   font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-meta);
+}
+
+.shortcutChevron {
+  display: flex;
+  flex: none;
+  color: var(--color-ink-muted);
 }
 
 /*
  * 4컷 인화지. 사용자가 만든 `ReportFourCut`을 7.3 목록처럼 머리 없이 작게 쓴다.
  * 인화지 안의 모든 길이가 폭(`--u`)에 비례하므로 폭 하나만 정하면 된다.
  *
- * **폭은 그림 자리 높이(68px)에서 나온다** — 인화지 비율이 385 : 1116이라 68px 높이면
- * 폭이 23px다. 팝콘 통과 나란히 서는 자리라 높이를 맞춘다.
+ * **폭은 그림 자리 높이(56px)에서 나온다** — 인화지 비율이 385 : 1116이라 56px 높이면
+ * 폭이 19px다. 팝콘 통과 나란히 서는 자리라 높이를 맞춘다.
  *
  * 작은 4컷이라 글자 최소 크기를 끈다(7.3 목록과 같다). 벽에 걸린 사물이라 포스터 ·
  * 팝콘 통과 같은 그림자를 쓴다(design-concept.md). 테이프도 이 안에 들어 있어 같은
@@ -144,7 +132,7 @@
 
   position: relative;
   display: block;
-  width: 23px;
+  width: 19px;
   filter: drop-shadow(0 4px 10px rgba(38, 39, 41, 0.16));
 }
 

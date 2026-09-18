@@ -1,0 +1,32 @@
+ARG SPARK_RUNTIME_IMAGE
+FROM ${SPARK_RUNTIME_IMAGE}
+
+ARG SOURCE_REVISION
+LABEL org.opencontainers.image.revision=$SOURCE_REVISION
+
+USER root
+
+WORKDIR /opt/feelm/pipeline/spark
+
+RUN case "$SOURCE_REVISION" in \
+      ""|*[!0-9a-f]*) echo "SOURCE_REVISION must be a 40-character lowercase Git SHA" >&2; exit 1 ;; \
+    esac \
+    && test "${#SOURCE_REVISION}" -eq 40 \
+    && printf '%s\n' "$SOURCE_REVISION" > /opt/feelm/pipeline/spark/.source-revision \
+    && chown spark:spark /opt/feelm/pipeline/spark/.source-revision
+
+COPY --chown=spark:spark pipeline/spark/common/ ./common/
+COPY --chown=spark:spark pipeline/spark/batch/ ./batch/
+COPY --chown=spark:spark pipeline/spark/jobs/ ./jobs/
+COPY --chown=spark:spark pipeline/spark/streaming/ ./streaming/
+COPY --chown=spark:spark pipeline/spark/als_baseline.py ./als_baseline.py
+COPY --chown=spark:spark pipeline/spark/als_input_manifest.py ./als_input_manifest.py
+COPY --chown=spark:spark pipeline/spark/movie_id_mapping.py ./movie_id_mapping.py
+COPY --chown=spark:spark pipeline/spark/parquet_roundtrip.py ./parquet_roundtrip.py
+COPY --chown=spark:spark pipeline/spark/pyproject.toml ./pyproject.toml
+COPY --chown=spark:spark pipeline/spark/uv.lock ./uv.lock
+COPY --chown=spark:spark pipeline/spark/.python-version ./.python-version
+
+ENV PYTHONPATH=/opt/feelm/pipeline/spark
+
+USER spark

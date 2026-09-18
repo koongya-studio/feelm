@@ -9,7 +9,8 @@
  *   저장소의 관심없음 · 평가를 여기서 덮어썼다. 서버 이력에 다시 얹으면 서버가 아는
  *   상태와 화면이 어긋난다
  *
- * 같은 파일의 API-045 · API-047은 아직 목업이라 이 파일이 다루지 않는다.
+ * API-045는 업무 -610에서 실제 호출로 전환했고, API-047은 별도 프론트 연동 전이라 이
+ * 파일에서 다루지 않는다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getRecommendationHistory, getRecommendations } from './recommendations';
@@ -124,6 +125,38 @@ describe('API-045 기본 추천 조회', () => {
       status: 503,
       code: 'RECOMMENDATION_UNAVAILABLE',
     });
+  });
+
+  it('동시에 시작한 조회는 한 번만 보내고 완료 뒤 다음 조회에서 최신 세트를 확인한다', async () => {
+    const firstBody = {
+      recommendationSetId: 7001,
+      generatedAt: '2026-09-18T00:00:00Z',
+      items: [],
+    };
+    const nextBody = {
+      recommendationSetId: 7002,
+      generatedAt: '2026-09-18T00:01:00Z',
+      items: [],
+    };
+    let resolveFirst: ((response: Response) => void) | undefined;
+
+    fetchMock
+      .mockReturnValueOnce(
+        new Promise<Response>((resolve) => {
+          resolveFirst = resolve;
+        }),
+      )
+      .mockResolvedValueOnce(json(200, nextBody));
+
+    const first = getRecommendations();
+    const duplicate = getRecommendations();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    resolveFirst?.(json(200, firstBody));
+    await expect(Promise.all([first, duplicate])).resolves.toEqual([firstBody, firstBody]);
+
+    await expect(getRecommendations()).resolves.toEqual(nextBody);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
 

@@ -23,6 +23,48 @@ def load_updater():
 
 
 class AdapterUpdateTests(unittest.TestCase):
+    def test_runtime_guard_compares_staged_scripts_with_configured_prepared_stage(self):
+        updater = load_updater()
+        with tempfile.TemporaryDirectory() as temporary:
+            config = Path(temporary) / 'config.json'
+            config.write_text(json.dumps({'prepared_base': '/var/tmp/ci222-server-old'}))
+            scripts = Path('/var/tmp/ci222-server-new/scripts')
+            runtime = Mock()
+            spec = Mock()
+            with patch.object(updater, 'CONFIG', config), patch.object(
+                updater.importlib.util, 'spec_from_file_location', return_value=spec
+            ), patch.object(updater.importlib.util, 'module_from_spec', return_value=runtime):
+                updater.require_prepared_runtime(scripts)
+                runtime.require_same.assert_called_once_with(
+                    scripts, Path('/var/tmp/ci222-server-old/scripts'))
+                runtime.require_same.side_effect = RuntimeError('runtime mismatch')
+                with self.assertRaisesRegex(ValueError, 'ci-dependency-cache-install.py'):
+                    updater.require_prepared_runtime(scripts)
+
+    def test_runtime_mismatch_prevents_copy_smoke_and_runner_stop(self):
+        updater = load_updater()
+        with tempfile.TemporaryDirectory() as temporary:
+            stage = Path(temporary)
+            with patch.object(updater, 'exclusive_lock', return_value=nullcontext()), \
+                 patch.object(updater.sys, 'platform', 'linux'), \
+                 patch.object(updater.os, 'geteuid', return_value=0, create=True), \
+                 patch.object(updater, 'STAGE_PATTERN', Mock(fullmatch=Mock(return_value=True))), \
+                 patch.object(updater, 'verify_upload', return_value=stage), \
+                 patch.object(updater, 'TARGET', stage), \
+                 patch.object(updater, 'trusted_tree'), \
+                 patch.object(updater, 'trusted_file'), \
+                 patch.object(updater, 'require_prepared_runtime', side_effect=ValueError(
+                     'Staged and prepared backend runtimes differ')) as guard, \
+                 patch.object(updater, 'copy_scripts') as copy, \
+                 patch.object(updater, 'adapter_smoke') as smoke, \
+                 patch.object(updater, 'stop_service') as stop:
+                with self.assertRaisesRegex(ValueError, 'runtimes differ'):
+                    updater.update(stage)
+                guard.assert_called_once_with(stage)
+                copy.assert_not_called()
+                smoke.assert_not_called()
+                stop.assert_not_called()
+
     def test_default_is_read_only_plan(self):
         updater = load_updater()
         with patch("sys.argv", ["updater"]), patch.object(updater, "update") as update:

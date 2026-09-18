@@ -44,6 +44,7 @@ infra_boundary = load('gitlab_infra_boundary', 'ci-infra-mr-boundary.py')
 infra_runner = load('gitlab_infra_runner', 'ci-infra-mr-runner.py')
 docs_boundary = load('gitlab_docs_boundary', 'ci-docs-mr-boundary.py')
 docs_runner = load('gitlab_docs_runner', 'ci-docs-mr-runner.py')
+dependency_cache = load('gitlab_dependency_cache', 'ci-dependency-cache.py')
 CONFIG = Path('/etc/feelm-ci222/gitlab-adapter.json')
 GITLAB_URL = 'https://lab.ssafy.com'
 PROJECT_PATH = 's15-bigdata-dist-sub1/S15P21E106'
@@ -98,12 +99,7 @@ PIPELINE_JOB_SCRIPTS = {
 }
 CACHE_PREPARE_JOB = 'backend-cache-prepare'
 CACHE_PREPARE_SCRIPT = ['echo Prepare verified backend dependency cache for this MR revision']
-CACHE_DEPENDENCY_FILES = {
-    'backend/build.gradle', 'backend/build.gradle.kts',
-    'backend/settings.gradle', 'backend/settings.gradle.kts',
-    'backend/gradle.properties', 'backend/gradle/libs.versions.toml',
-    'backend/gradle/wrapper/gradle-wrapper.properties',
-}
+CACHE_DEPENDENCY_FILES = dependency_cache.DEPENDENCY_FILES
 MAX_CONTEXT = 4 * 1024**2
 MAX_HTTP_JSON = 4 * 1024**2
 MAX_HTTP_ARCHIVE = job_io.MAX_ARCHIVE
@@ -357,16 +353,30 @@ def dependency_changes(context, mr):
             ['/usr/bin/git', '-C', str(repository), 'diff', '--name-only', '-z',
              '--no-ext-diff', '--no-renames', 'refs/review/base', 'refs/review/head'],
             environment, 'dependency_diff', capture_output=True).stdout
-    if len(names) > 128 * 1024:
-        raise PolicyError('Merge request diff is missing or too large')
+        if len(names) > 128 * 1024:
+            raise PolicyError('Merge request diff is missing or too large')
+        try:
+            raw_paths = names.decode('utf-8').split('\0') if names else []
+        except UnicodeDecodeError as exc:
+            raise PolicyError('Merge request diff contains an invalid path encoding') from exc
+        paths = sorted(set(path for path in raw_paths if path))
+        if not paths or len(paths) >= 100 or any('\n' in path or '\r' in path for path in paths):
+            raise PolicyError('Merge request diff is missing or too large')
+        dependency_files = [path for path in paths if path in CACHE_DEPENDENCY_FILES]
+        if not dependency_files:
+            return []
+        diff = run_git(
+            ['/usr/bin/git', '-C', str(repository), 'diff', '--unified=0', '--no-ext-diff',
+             '--no-renames', 'refs/review/base', 'refs/review/head', '--', *dependency_files],
+            environment, 'dependency_declaration_diff', capture_output=True).stdout
+    if len(diff) > 512 * 1024:
+        raise PolicyError('Dependency diff is missing or oversized')
     try:
-        raw_paths = names.decode('utf-8').split('\0') if names else []
+        changes, _ = dependency_cache.classify_dependency_changes(
+            paths, diff.decode('utf-8'))
     except UnicodeDecodeError as exc:
-        raise PolicyError('Merge request diff contains an invalid path encoding') from exc
-    paths = sorted(set(path for path in raw_paths if path))
-    if not paths or len(paths) >= 100 or any('\n' in path or '\r' in path for path in paths):
-        raise PolicyError('Merge request diff is missing or too large')
-    return [path for path in paths if path in CACHE_DEPENDENCY_FILES]
+        raise PolicyError('Dependency diff contains an invalid encoding') from exc
+    return changes
 
 
 def verified_candidate(context, mr_iid):
@@ -620,7 +630,10 @@ def run_job(response, config_path=CONFIG, opener=None):
         config_path,
         require_prepared=context['service'] not in ('frontend', 'consumer', 'infra', 'docs'))
     if context['service'] == 'backend':
-        runtime.require_same(HERE, prepared / 'scripts')
+        try:
+            runtime.require_same(HERE, prepared / 'scripts')
+        except (RuntimeError, ValueError, OSError) as exc:
+            raise AdapterStageError('backend_runtime_contract', type(exc).__name__) from exc
     opener = opener or urllib.request.build_opener(NoRedirect())
     try: job = verify_current_job(opener, context)
     except urllib.error.HTTPError as exc: raise AdapterHttpError('current_job', exc.code) from exc
@@ -632,7 +645,8 @@ def run_job(response, config_path=CONFIG, opener=None):
     changes = dependency_changes(context, detail) if context['service'] in ('backend', 'cache') else []
     if context['job_name'] == CACHE_PREPARE_JOB:
         if not changes:
-            raise PolicyError('No approved backend dependency change found')
+            print('CACHE_PREPARE_SKIPPED=NO_DEPENDENCY_CHANGE')
+            return 0
         prepare_candidate(context, job, detail)
         return 0
     if changes and context['service'] == 'backend':

@@ -25,7 +25,7 @@
  * 실제 API가 됐고 내 평가 목록은 프레임(API-042)으로 그린다.
  */
 import { createSeedNotifications } from './notifications';
-import type { NotificationView } from '../types/unspecified';
+import type { NotificationView, ProfileExtrasUpdate } from '../types/unspecified';
 
 type SessionState = {
   /**
@@ -51,6 +51,11 @@ type SessionState = {
    * 3.3을 거쳐 3.4로, 본 리포트면 3.4로 바로 간다(업무 -308).
    */
   seenReportIds: number[];
+  /**
+   * 7.2에서 바꾼 프로필 사진 · 소개 · 공개 항목(업무 -616). **계약에 자리가 없다**
+   * (`types/unspecified.ts` 프로필 머리말). 비어 있는 키는 기준 목업 값을 쓴다는 뜻이다.
+   */
+  profileExtras: ProfileExtrasUpdate;
 };
 
 function emptyState(): SessionState {
@@ -60,6 +65,7 @@ function emptyState(): SessionState {
     recentSearchQueries: ['케이퍼 무비', '크리스토퍼 놀란', 'SF 명작'],
     notifications: createSeedNotifications(),
     seenReportIds: [],
+    profileExtras: {},
   };
 }
 
@@ -111,6 +117,17 @@ export function removeRecentSearchQuery(query: string): void {
 
 export function clearRecentSearchQueries(): void {
   state.recentSearchQueries = [];
+}
+
+// ─────────────────────────────────────────── 프로필 사진 · 소개 · 공개 항목 (업무 -616)
+
+export function getProfileExtras(): ProfileExtrasUpdate {
+  return state.profileExtras;
+}
+
+/** 넘긴 키만 바꾼다. `avatarUrl: null`은 사진을 지운다는 뜻이라 그대로 남긴다 */
+export function saveProfileExtras(update: ProfileExtrasUpdate): void {
+  state.profileExtras = { ...state.profileExtras, ...update };
 }
 
 // ─────────────────────────────────────────── 알림 · 리포트 (업무 -308)

@@ -22,27 +22,26 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { fireEvent, screen, within } from '@testing-library/react';
 import MyDashboardPage from './index';
 import { renderWithRouter } from '../../../test/render';
-import { getMyProfile } from '../../../api/users';
-import { getMyFrames } from '../../../api/taste';
-import { getWatchRecords } from '../../../api/watch';
+import { getMyProfileView } from '../../../api/users';
+import { getMyRatings, getWatchRecords } from '../../../api/watch';
 import { getOtts } from '../../../api/otts';
 import { getRecommendationHistory } from '../../../api/recommendations';
-import { mockMyProfile } from '../../../mocks/user';
-import type { FrameSummary } from '../../../types/taste';
+import { mockMyProfileView } from '../../../mocks/publicProfiles';
+import type { MyRatedItem, MyRatingList } from '../../../types/watch';
 import type { WatchRecordListItem } from '../../../types/watch';
 import type { RecommendationHistory } from '../../../types/recommendation';
 
 vi.mock('../../../api/users', () => ({
-  getMyProfile: vi.fn(),
+  getMyProfileView: vi.fn(),
 }));
 
 vi.mock('../../../api/watch', () => ({
+  getMyRatings: vi.fn(),
   getWatchRecords: vi.fn(),
 }));
 
 vi.mock('../../../api/taste', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/taste')>()),
-  getMyFrames: vi.fn(),
   getPopcornBucket: vi.fn().mockResolvedValue({ totalCount: 0, flavors: [] }),
 }));
 
@@ -54,26 +53,38 @@ vi.mock('../../../api/recommendations', () => ({
   getRecommendationHistory: vi.fn(),
 }));
 
-/**
- * 평가와 1:1인 프레임(API-042). `평가한 영화` 탭의 원천이다(업무 -610) — 내 평가 목록
- * API-039가 백엔드에 없어 그전의 고정 목업은 방금 저장한 평가를 보여 주지 못했다.
- */
-const frames: FrameSummary[] = [
-  {
-    frameId: 501,
-    movie: { movieId: 401, title: '평가한 영화 A', posterUrl: null },
-    score: 4.5,
-    flavorCode: 'FLAVOR_A',
-    createdAt: '2026-09-05T09:00:00Z',
-  },
-  {
-    frameId: 502,
-    movie: { movieId: 402, title: '평가한 영화 B', posterUrl: null },
-    score: 3,
-    flavorCode: null,
-    createdAt: '2026-09-04T09:00:00Z',
-  },
+/** API-039 평가 한 건. `평가한 영화` 탭의 원천이다(업무 -611) */
+function rated(
+  ratingId: number,
+  movieId: number,
+  title: string,
+  score: number,
+  frameId: number | null = ratingId + 400,
+): MyRatedItem {
+  const createdAt = '2026-09-05T09:00:00Z';
+
+  return {
+    itemType: 'RATED',
+    ratingId,
+    movie: { movieId, title, posterUrl: null },
+    score,
+    comment: null,
+    visibility: null,
+    spoiler: false,
+    frameId,
+    createdAt,
+    activityAt: createdAt,
+  };
+}
+
+const ratings: MyRatedItem[] = [
+  rated(91, 401, '평가한 영화 A', 4.5),
+  rated(92, 402, '평가한 영화 B', 3),
 ];
+
+function ratingPage(items: MyRatedItem[], nextCursor: string | null = null): MyRatingList {
+  return { items, nextCursor, hasNext: nextCursor !== null };
+}
 
 /** 본 기록은 있는데 평가가 없는 영화. API-034 `WATCHED_UNRATED` */
 const unrated: WatchRecordListItem[] = [
@@ -120,13 +131,8 @@ const history: RecommendationHistory = {
 };
 
 beforeEach(() => {
-  vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
-  vi.mocked(getMyFrames).mockReset().mockResolvedValue({
-    totalCount: frames.length,
-    items: frames,
-    nextCursor: null,
-    hasNext: false,
-  });
+  vi.mocked(getMyProfileView).mockReset().mockResolvedValue(mockMyProfileView);
+  vi.mocked(getMyRatings).mockReset().mockResolvedValue(ratingPage(ratings));
   vi.mocked(getRecommendationHistory).mockReset().mockResolvedValue(history);
   vi.mocked(getWatchRecords)
     .mockReset()
@@ -150,7 +156,7 @@ describe('7.1 MY 대시보드', () => {
     await renderDashboard();
 
     const destinations = Object.fromEntries(
-      ['설정', '4컷 리포트', '프로필 편집'].map((name) => [
+      ['설정', '4컷 리포트', '취향 팝콘', '프로필 편집'].map((name) => [
         name,
         screen.getByRole('link', { name }).getAttribute('href'),
       ]),
@@ -160,6 +166,8 @@ describe('7.1 MY 대시보드', () => {
       설정: '/my/settings',
       // 취향 리포트 목록이다. 지난 반기 리포트를 찾아보러 가는 유일한 길이다(2장 13번)
       '4컷 리포트': '/my/reports',
+      // 시안이 두 바로가기 카드 모두에 화살표를 그렸다(업무 -616). 3.2 취향 팝콘이다
+      '취향 팝콘': '/film/popcorn',
       // 이동 경로 2 · 3번 사슬의 출발점이다
       '프로필 편집': '/my/profile/edit',
     });
@@ -288,10 +296,10 @@ describe('7.1 MY 대시보드', () => {
     expect(within(feed()).queryByText('목록을 불러오지 못했어요')).toBeNull();
   });
 
-  it('나머지 두 탭에는 `더 보기`가 없다', async () => {
+  it('다음 장이 없는 탭에는 `더 보기`가 없다. 버튼은 탭마다 따로 선다', async () => {
     /*
-     * 평가(API-039)는 목업이고 안 남긴 영화(API-034)는 `getWatchRecords`가 커서를 쓰지
-     * 않는다. 셋을 같은 모양으로 맞추는 것은 업무 -503이다.
+     * 세 탭이 같은 규칙이다(업무 -503) — 그 탭의 `hasNext`가 거짓이면 버튼이 없다. 추천 기록에
+     * 다음 장이 있어도 다른 탭에 버튼이 따라 나오지 않는다.
      */
     vi.mocked(getRecommendationHistory).mockResolvedValue({
       ...history,
@@ -305,29 +313,110 @@ describe('7.1 MY 대시보드', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: '안 남긴 영화' }));
     expect(within(feed()).queryByRole('button', { name: '더 보기' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('tab', { name: '추천 기록' }));
+    expect(within(feed()).getByRole('button', { name: '더 보기' })).toBeInTheDocument();
   });
 
-  it('평가한 영화는 API-042 프레임 목록으로 그린다', async () => {
+  it('안 남긴 영화도 같은 조건에 커서를 실어 다음 장을 이어 붙인다', async () => {
     /*
-     * 내 평가 목록 API-039는 백엔드에 없다. 프레임은 평가와 1:1이라(API-042 처리 규칙) 방금
-     * 저장한 평가가 그대로 보인다(업무 -610). 고정 목업을 쓰던 때는 새 평가가 사라진 것처럼
-     * 보였다.
+     * 업무 -503. 그전에는 이 탭만 첫 장뿐이었다. 커서는 `status=WATCHED_UNRATED` 조건에
+     * 묶이므로(API-034) 다음 장도 같은 조건으로 보낸다. OTT 이름은 첫 장의 기준정보를 쓴다.
+     */
+    vi.mocked(getWatchRecords).mockResolvedValueOnce({
+      items: unrated,
+      nextCursor: 'watch-cursor-2',
+      hasNext: true,
+    });
+
+    await renderDashboard();
+    fireEvent.click(screen.getByRole('tab', { name: '안 남긴 영화' }));
+    await within(feed()).findByRole('link', { name: /안 남긴 영화 A/ });
+
+    vi.mocked(getWatchRecords).mockResolvedValueOnce({
+      items: [
+        {
+          ...unrated[0],
+          watchRecordId: 702,
+          movie: { movieId: 502, title: '안 남긴 영화 B', posterUrl: null },
+        },
+      ],
+      nextCursor: null,
+      hasNext: false,
+    });
+    fireEvent.click(within(feed()).getByRole('button', { name: '더 보기' }));
+
+    const next = await within(feed()).findByRole('link', { name: /안 남긴 영화 B/ });
+    expect(next).toHaveTextContent('넷플릭스');
+    expect(within(feed()).getAllByRole('link')).toHaveLength(2);
+    expect(getWatchRecords).toHaveBeenLastCalledWith({
+      status: ['WATCHED_UNRATED'],
+      cursor: 'watch-cursor-2',
+    });
+    expect(within(feed()).queryByRole('button', { name: '더 보기' })).toBeNull();
+  });
+
+  it('평가한 영화는 API-039 내 평가 목록으로 그린다', async () => {
+    /*
+     * 업무 -611. 그전에는 평가와 1:1인 프레임(API-042)으로 대신 그렸다(업무 -610). 필터 ·
+     * 정렬을 생략해 서버 기본값(평가만 · 최신순)을 받는다.
      */
     await renderDashboard();
 
-    expect(getMyFrames).toHaveBeenCalledTimes(1);
+    expect(getMyRatings).toHaveBeenCalledTimes(1);
+    expect(getMyRatings).toHaveBeenCalledWith();
     expect(
       await within(feed()).findByRole('link', { name: /평가한 영화 A.*4\.5/ }),
     ).toBeInTheDocument();
   });
 
+  it('프레임 없는 과거 평가도 칸으로 나온다', async () => {
+    // 계약이 `frameId: null`인 평가도 돌려준다고 정했다(API-039 응답 설명)
+    vi.mocked(getMyRatings).mockResolvedValue(
+      ratingPage([rated(93, 403, '프레임 없는 평가', 2.5, null), ...ratings]),
+    );
+
+    await renderDashboard();
+
+    const cells = await within(feed()).findAllByRole('link');
+    expect(cells).toHaveLength(3);
+    expect(cells[0]).toHaveTextContent('프레임 없는 평가');
+    expect(cells[0]).toHaveAttribute('href', '/movies/403/rate');
+  });
+
+  it('평가한 영화의 `더 보기`가 직전 커서로 다음 장을 이어 붙이고, 끝나면 사라진다', async () => {
+    vi.mocked(getMyRatings).mockResolvedValueOnce(ratingPage(ratings, 'rating-cursor-2'));
+
+    await renderDashboard();
+    await within(feed()).findByRole('link', { name: /평가한 영화 A/ });
+
+    vi.mocked(getMyRatings).mockResolvedValueOnce(ratingPage([rated(94, 404, '평가한 영화 C', 5)]));
+    fireEvent.click(within(feed()).getByRole('button', { name: '더 보기' }));
+
+    expect(await within(feed()).findByRole('link', { name: /평가한 영화 C/ })).toBeInTheDocument();
+    // 앞 장은 그대로 남는다
+    expect(within(feed()).getAllByRole('link')).toHaveLength(3);
+    // 첫 장과 같은 조건(필터 · 정렬 생략)에 커서만 싣는다. 조건이 바뀐 커서는 400이다
+    expect(getMyRatings).toHaveBeenLastCalledWith({ cursor: 'rating-cursor-2' });
+    expect(within(feed()).queryByRole('button', { name: '더 보기' })).toBeNull();
+  });
+
+  it('평가한 영화의 다음 장이 실패해도 보던 격자는 남는다', async () => {
+    vi.mocked(getMyRatings).mockResolvedValueOnce(ratingPage(ratings, 'rating-cursor-2'));
+
+    await renderDashboard();
+    await within(feed()).findByRole('link', { name: /평가한 영화 A/ });
+
+    vi.mocked(getMyRatings).mockRejectedValueOnce(new Error('boom'));
+    fireEvent.click(within(feed()).getByRole('button', { name: '더 보기' }));
+
+    expect(await within(feed()).findByText('지난 평가를 불러오지 못했어요.')).toBeInTheDocument();
+    expect(within(feed()).getAllByRole('link')).toHaveLength(2);
+    expect(within(feed()).getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
+  });
+
   it('빈 목록과 조회 실패를 구분한다', async () => {
-    vi.mocked(getMyFrames).mockResolvedValue({
-      totalCount: 0,
-      items: [],
-      nextCursor: null,
-      hasNext: false,
-    });
+    vi.mocked(getMyRatings).mockResolvedValue(ratingPage([]));
     vi.mocked(getRecommendationHistory).mockRejectedValue(new Error('boom'));
 
     await renderDashboard();
@@ -343,15 +432,22 @@ describe('7.1 MY 대시보드', () => {
     expect(within(feed()).getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
   });
 
-  it('통계 수치를 어디에도 두지 않는다', async () => {
+  it('프로필 머리는 7.2 · 7.2-A · 7.2-B와 같은 모양이다 — 사진 · 이름 · 소개 · 수치', async () => {
     /*
-     * API-014가 `frameCount` · `ratingCount` · `popcornCount`를 주지만 이 화면에서는
-     * 쓰지 않는다(사용자 결정 2026-09-16). 목업은 셋 다 100이다.
+     * 2026-09-18 시안(업무 -616)이 수치 카드를 다시 넣었다. 네 화면이 같은 `ProfileLayout`을
+     * 쓰므로 여기 보이는 수치는 공개 프로필과 같은 값 · 같은 이름표다.
      */
     await renderDashboard();
 
-    for (const label of ['프레임', '팝콘', '100']) {
-      expect(screen.queryByText(label)).toBeNull();
+    expect(screen.getByRole('heading', { name: '프로필', level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: mockMyProfileView.nickname })).toBeInTheDocument();
+    expect(screen.getByText(mockMyProfileView.bio)).toBeInTheDocument();
+
+    for (const label of ['프레임', '팝콘', '공개 한줄평']) {
+      expect(screen.getByText(label, { selector: 'dt' })).toBeInTheDocument();
     }
+
+    // 7.1은 보기 전용이다. 고치는 연필은 7.2에만 있다
+    expect(screen.queryByRole('button', { name: /수정/ })).toBeNull();
   });
 });

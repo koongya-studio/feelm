@@ -19,6 +19,14 @@ public interface PartyRepository extends JpaRepository<Party, Long> {
     @Query("select p from Party p where p.id = :partyId")
     Optional<Party> findByIdForUpdate(@Param("partyId") long partyId);
 
+    /** Redis 조회 전에 잠금 없이 현재 멤버의 접근 가능 여부를 확인한다. */
+    @Query(
+            "select p from Party p where p.id = :partyId"
+                    + " and exists (select m.id from PartyMember m"
+                    + " where m.party = p and m.user.id = :requesterId)")
+    Optional<Party> findAccessibleById(
+            @Param("partyId") long partyId, @Param("requesterId") long requesterId);
+
     /**
      * 요청자가 멤버인 파티를 오너와 함께 조회하고 파티 행에 비관적 쓰기 잠금을 건다.
      *

@@ -17,7 +17,7 @@
  * | TasteFlowView.flowSentence | 3.1 `스릴러에서 느와르로 넓어지고 있어요` | CR-16 결정 대기. 대응 필드가 없음 |
  * | TasteKeywordView.rationale | 3.1 `계획형 캐릭터 영화 12편에 ★4 이상` 등 4개 | CR-16 결정 대기. API-040 `keywords`는 `code`·`label`만 있음 |
  * | 3.1-A 상영 시간 | 3.1-A `2013 · 케이퍼 · 115분` | API-043 `movie`에 없음. 실제 연동(S15P21E106-392)으로 채울 값이 사라져 화면에서 뺐다. CR 미등록 |
- * | PublicProfileView | 7.2-A · 7.2-B 공개 프로필 | API-062가 있으나 **2차 MVP**라 미구현. 응답 모양도 다름 |
+ * | ProfileView | 7.1 · 7.2 · 7.2-A · 7.2-B 프로필 | API-062가 있으나 **2차 MVP**라 미구현. 응답 모양도 다름. 사진 · 소개 · 항목별 공개 여부는 계약에 아예 없다(업무 -616) |
  * | ReportDetailView | 3.3 · 3.4 · 7.4 국가 · 시대 비율 · 키워드 근거 · 지난 반기 비교 % · 대표 카드 문구 | API-060에 없음. 장르는 편수만, 비교는 맛별 알 수만 줌. CR 미등록 |
  * | ReportFourCutView | 3.3 · 3.4 · 7.4 4컷의 사진 · 누끼 · 영문 이름 · 감독 대표작 | API-060은 이름과 `characterCard.imageUrl`만 줌. CR 미등록 |
  * | NotificationView | 8.1 알림 4종 · 탭 · 읽음 | 인앱 알림 API-070~074의 프론트 연동은 S15P21E106-537. 그전까지 목업이며 번호 없이 목록 화면으로만 간다(-610) |
@@ -66,61 +66,80 @@ export type TasteFlowView = {
 };
 
 /*
- * ─────────────────────────────────────────── MY 공개 프로필 (업무 -305)
+ * ─────────────────────────────────────────── 프로필 (업무 -305 · -616)
  *
- * 7.2-A · 7.2-B · 7.2-C가 쓰는 값이다.
+ * 7.1 MY · 7.2 편집 · 7.2-A 내 공개 프로필 미리보기 · 7.2-B 다른 사용자 공개 프로필이
+ * **한 모양**을 쓴다(업무 -616, 사용자 지시 2026-09-18). 네 화면이 같은 `ProfileLayout`을
+ * 그리고, 화면마다 다른 것은 데이터 가공이 아니라 `mode`와 권한이다.
  *
- * **계약은 있다 — API-062 공개 프로필 조회 · API-063 취향 비교(`docs/api/social.md`).
- * 다만 둘 다 2차 MVP라 아직 없다.** 305는 계약을 찾기 전에 화면 기준으로 만들었고,
- * 그래서 아래 타입은 계약의 응답 모양과 다르다. 계약이 열릴 때 맞춘다.
+ * 본인의 값은 모든 키워드 · 필름을 `isPublic`과 함께 담는다. 공개 프로필(남 · 미리보기)은
+ * 같은 모양에서 `isPublic`인 것만 남긴 것이다(`api/users.ts` `toPublicView`).
  *
- * `[!]` 어긋난 곳
+ * **계약은 일부만 있다 — API-062 공개 프로필 조회(`docs/api/social.md`)는 2차 MVP라 아직
+ * 없고, 아래 셋은 계약에 자리가 아예 없다.**
+ * - `avatarUrl` 프로필 사진과 그 업로드 · 삭제
+ * - `bio` 자기소개
+ * - 키워드 · 필름마다의 `isPublic`
+ * 화면은 목업 저장소(`mocks/sessionStore.ts`)에 쓰고 읽는다. 계약이 생기면 `api/users.ts`의
+ * 함수 본문만 바꾼다.
+ *
+ * `[!]` API-062와 어긋난 곳
  * - API-062는 `user` · `recentFrames` · `popcorn.flavors` · `publicReviewCount` ·
  *   `isBlockedByMe`로 내려준다. 아래는 평평한 모양이다
- * - API-063은 `similarity`(0~1) · `sharedFlavors` · `flavorComparison`(맛별 내 것 /
- *   상대 것) · `commonMovies`를 준다. **장르 · 국가 · 시대 · 감독 4줄에 해당하는 값이
- *   계약에 없다.** 그 4줄은 와이어프레임 7.2-C가 그린 것이다
  * - 경로 파라미터가 `publicId`(`users.public_id`, ADR-0008)다. 내부 숫자 ID를 공개
  *   URL에 노출하지 않는다는 결정이라 라우트도 함께 바꿔야 한다
- *
- * 공개 범위 자체는 1차 계약에 있다(API-014 · API-015의 `visibility`, 7.8-B 공개 범위
- * 설정). 무엇이 공개되는지는 그 설정이 정하고, 이 타입은 **그 결과로 남은 것**만 담는다.
  */
 
-/** 공개 프로필이 보여주는 수치. 팔로워 수 같은 개념은 Feelm에 없다 */
-export type PublicProfileStats = {
+/** 프로필이 보여주는 수치. 팔로워 수 같은 개념은 Feelm에 없다 */
+export type ProfileStats = {
   frameCount: number;
   popcornCount: number;
   /** 공개로 남긴 한줄평 수 */
   publicReviewCount: number;
 };
 
-/** 7.2-A · 7.2-B 공개 프로필 */
-export type PublicProfileView = {
+/** 프로필의 취향 키워드 하나. 공개 프로필에는 `isPublic`인 것만 온다 */
+export type ProfileKeyword = TasteKeywordView & { isPublic: boolean };
+
+/** 프로필의 취향 필름 한 칸. 공개 프로필에는 `isPublic`인 것만 온다 */
+export type ProfileFrame = {
+  frameId: number;
+  movieId: number;
+  title: string;
+  posterUrl: string | null;
+  isPublic: boolean;
+};
+
+/** 7.1 · 7.2 · 7.2-A · 7.2-B 프로필 */
+export type ProfileView = {
   userId: number;
   nickname: string;
-  stats: PublicProfileStats;
-  /** 공개된 취향 키워드 */
-  keywords: TasteKeywordView[];
-  /** 공개된 취향 필름. 최신순 */
-  frames: {
-    frameId: number;
-    movieId: number;
-    title: string;
-    posterUrl: string | null;
-  }[];
-  /** 공개된 팝콘 맛 분포. 코드와 알 수만 담고 색·이름은 API-044에서 온다 */
+  /** 프로필 사진. 없으면 `null`이고 화면은 기본 이미지를 그린다 */
+  avatarUrl: string | null;
+  /** 자기소개. 비어 있을 수 있다 */
+  bio: string;
+  stats: ProfileStats;
+  /** 취향 키워드. 앞쪽이 대표 키워드다 */
+  keywords: ProfileKeyword[];
+  /** 취향 필름. 최신순 */
+  frames: ProfileFrame[];
+  /** 팝콘 맛 분포. 코드와 알 수만 담고 색·이름은 API-044에서 온다 */
   popcorn: { flavorCode: string; popcornCount: number }[];
-  /**
-   * 공개 한줄평. 7.2-A는 **항상 빈 배열**이다 — 본인 미리보기이고 와이어프레임이
-   * `비공개로 설정한 항목(한줄평)은 표시되지 않아요`로 적고 있다
-   */
+  /** 공개 한줄평 */
   reviews: {
     ratingId: number;
     movieTitle: string;
     comment: string;
     score: number;
   }[];
+};
+
+/** 프로필 사진 · 소개 · 공개 항목 변경. 계약에 없다(위 머리말) */
+export type ProfileExtrasUpdate = {
+  avatarUrl?: string | null;
+  bio?: string;
+  publicKeywordCodes?: string[];
+  publicFrameIds?: number[];
 };
 
 /**

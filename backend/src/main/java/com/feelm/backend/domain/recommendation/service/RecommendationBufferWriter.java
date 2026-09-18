@@ -14,8 +14,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,18 +44,26 @@ class RecommendationBufferWriter {
      */
     @Transactional
     public RecommendationBufferResult write(long userId, RecommendationCandidateBatch batch) {
+        return writeIfEligible(userId, batch)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RECOMMENDATION_UNAVAILABLE));
+    }
+
+    /** 적격 후보가 없으면 기존 추천 세트를 유지할 수 있도록 빈 결과를 반환한다. */
+    @Transactional
+    public Optional<RecommendationBufferResult> writeIfEligible(
+            long userId, RecommendationCandidateBatch batch) {
         if (!repository.lockActiveUserIfExists(userId)) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
 
         var existing = repository.findExistingSet(batch.generationId());
         if (existing.isPresent()) {
-            return new RecommendationBufferResult(existing.getAsLong());
+            return Optional.of(new RecommendationBufferResult(existing.getAsLong()));
         }
 
         List<RecommendationBufferItem> items = prepare(userId, batch);
         if (items.isEmpty()) {
-            throw new BusinessException(ErrorCode.RECOMMENDATION_UNAVAILABLE);
+            return Optional.empty();
         }
 
         long setId =
@@ -65,7 +75,7 @@ class RecommendationBufferWriter {
                         batch.generationId(),
                         OffsetDateTime.now(clock).withOffsetSameInstant(ZoneOffset.UTC));
         repository.insertItems(setId, items);
-        return new RecommendationBufferResult(setId);
+        return Optional.of(new RecommendationBufferResult(setId));
     }
 
     private List<RecommendationBufferItem> prepare(
@@ -76,7 +86,13 @@ class RecommendationBufferWriter {
                 rank(batch, userId, eligibleMovieIds, "DISCOVERY");
         List<RecommendationBufferItem> items = new ArrayList<>();
         append(items, taste);
-        append(items, discovery);
+        Set<Long> storedMovieIds =
+                items.stream().map(RecommendationBufferItem::movieId).collect(Collectors.toSet());
+        append(
+                items,
+                discovery.stream()
+                        .filter(candidate -> !storedMovieIds.contains(candidate.movieId()))
+                        .toList());
         return List.copyOf(items);
     }
 

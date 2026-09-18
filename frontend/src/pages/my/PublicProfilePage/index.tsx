@@ -1,73 +1,98 @@
 /*
- * 7.2-B 다른 사용자 공개 프로필
+ * 7.2-B 다른 사용자 공개 프로필 · 7.2-A 내 공개 프로필 미리보기 (업무 S15P21E106-616)
  *
- * 와이어프레임에서 가져온 것 — 이름, ⋯ 메뉴(사용자 차단 · 신고하기), 공개된 취향
- * 키워드 · 필름 · 팝콘 버킷, 공개 한줄평.
+ * **두 화면은 이 하나다.** 사용자 시안 2026-09-18 — 미리보기는 따로 디자인하지 않고, 다른
+ * 사람이 내 프로필을 볼 때의 화면을 그대로 연다.
  *
- * **2.4 영화 상세와 같은 화면이다**(업무 -605, 사용자 지시 2026-09-18 — "영화 상세페이지
- * 화면처럼"). 화면은 `ProfileBoard`가 그린다. 그전에는 `Social Profile UI Design (1).jpg`를
- * 따라 어두운 히어로에 수치 3열을 얹었다(업무 -305). ⋯는 2.4의 뒤로 가기와 같은 유리 버튼으로
- * 위 오른쪽에 뜬다.
+ * - 7.2-B `mode="public"` — 주소의 `userId`로 API-062를 부른다
+ * - 7.2-A `mode="preview"` — 내 프로필을 **7.2-B와 같은 공개 모양으로** 받는다(`api/users.ts`
+ *   `getMyPublicProfile` · `toPublicView`). 응답 모양 · 구역 · 정렬 · 빈 상태가 모두 같다
  *
- * **팔로워 · 팔로잉 · 창작물 수는 쓰지 않는다.** Feelm에 없는 개념이다. 이름 아래 수치 한 줄은
- * **프레임 · 팝콘 · 한줄평**이고 셋 다 API-062가 주는 값이다.
+ * 다른 것은 권한에서 나오는 둘뿐이다.
+ * - 미리보기에는 위에 안내 바(`다른 사용자에게 보이는 내 프로필입니다.` · `편집으로 돌아가기`)가
+ *   붙는다. 그 아래 본문은 남의 프로필과 똑같다
+ * - 남의 프로필에만 ⋯ 메뉴(차단 · 신고)가 있다. 자기 자신에게는 차단 · 신고를 두지 않는다
  *
- * **뺀 것**(업무 -459) — 아바타 · 한 줄 소개는 계약에 자리가 없다. 3열의 `나와 일치`도
- * 뺐다. API-063이 주기로 한 값이지만 2차 MVP라 미구현이고, 지금 보이던 `76%`는 목업이
- * 지어낸 수였다.
+ * 비공개 키워드 · 필름은 API가 이미 빼고 준다. 이 화면은 가려 내지 않는다.
  *
- * **주 동작이 없다**(업무 -506) — 검정 알약 하나가 `나와 취향 비교하기`로 7.2-C에 가던
- * 자리인데, 비교를 하지 않기로 하면서 그 화면을 지웠다. 읽는 화면으로 남긴다
- * (screen-spec-my.md 13장).
- *
- * 진입 경로: **5.8 파티원 카드**에서 들어온다. 와이어프레임 이동표에 7.2-B로 들어오는
- * 화살표가 없었고 2026-09-11에 확정했다(screen-spec-my.md 2장 8번).
+ * 진입 경로: 7.2-B는 5.8 파티원 카드(screen-spec-my.md 2장 8번), 7.2-A는 7.2의
+ * `내 공개 프로필 미리보기`다.
  *
  * **프로필은 목업이다**(API-062는 2차 MVP, 백엔드에 없다). 그래서 ⋯ 메뉴의 `사용자 차단`은
- * **잠겨 있다**(업무 -610). 전에는 여기서 실제 차단(API-020)을 불렀는데, 이 화면에 들어오는
- * `userId`가 목업 번호라 서버에 없는 사람이어서 늘 `404`였다 — 목업 화면이 실제 변경 API를
- * 부르면 안 된다. API-062가 열려 실제 사람이 흐르면 확인 창 → 7.8-D 흐름을 되살린다
- * (이동표 `7.2-B ⇢ 7.8-D`). 차단 해제와 목록은 7.8-D가 실제 API로 한다.
- *
- * `[?]` 신고는 계약이 없다. 안내만 하고 실제 처리는 하지 않는다.
+ * **잠겨 있다**(업무 -610). 이 화면에 들어오는 `userId`가 목업 번호라 서버에 없는 사람이어서
+ * 실제 차단(API-020)을 부르면 늘 `404`였다. API-062가 열려 실제 사람이 흐르면 확인 창 → 7.8-D
+ * 흐름을 되살린다. `[?]` 신고는 계약이 없다. 안내만 하고 실제 처리는 하지 않는다.
  */
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 import Button from '../../../components/Button';
-import Menu from '../../../components/Menu';
 import IconButton from '../../../components/IconButton';
-import ProfileBoard from '../../../components/ProfileBoard';
+import Menu from '../../../components/Menu';
+import ProfileLayout, { ProfileSkeleton } from '../../../components/ProfileLayout';
+import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
-import { MoreVerticalIcon } from '../../../components/Icon';
+import { InfoIcon, MoreVerticalIcon } from '../../../components/Icon';
 import { failureDescription } from '../../../components/StatusView/failure';
-import { getPublicProfile } from '../../../api/users';
+import { ApiError } from '../../../api/apiError';
+import { getMyPublicProfile, getPublicProfile } from '../../../api/users';
+import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
 import styles from './PublicProfilePage.module.css';
-import type { PublicProfileView } from '../../../types/unspecified';
+import type { ProfileView } from '../../../types/unspecified';
 
-/** ⋯ 메뉴가 열리는 세로 위치(px). 이미지 위에 뜬 ⋯ 버튼 바로 아래다 */
-/* ⋯ 버튼 바로 아래. 위 여백(--space-3) + 버튼(39px)이 지난 자리다 */
-const MENU_TOP = 60;
+type Props = {
+  /** `public` 다른 사용자(7.2-B) · `preview` 내 공개 프로필 미리보기(7.2-A) */
+  mode?: 'public' | 'preview';
+};
 
-/* 2.4의 뒤로 가기와 같은 값 */
-const TOP_BUTTON_SIZE = 39;
+/** ⋯ 메뉴가 열리는 세로 위치(px). 헤더 오른쪽 ⋯ 바로 아래다 */
+const MENU_TOP = 96;
 
-export default function PublicProfilePage() {
+/** 불러오지 못한 이유별 안내. 사용자가 할 일이 갈리는 데까지만 나눈다 */
+function failureView(error: unknown): { title: string; description: string; retry: boolean } {
+  if (error instanceof ApiError && error.status === 404) {
+    return {
+      title: '프로필을 볼 수 없어요',
+      description: '탈퇴했거나 프로필을 공개하지 않은 사용자예요',
+      retry: false,
+    };
+  }
+
+  if (error instanceof ApiError && error.status === 403) {
+    return {
+      title: '이 프로필을 볼 권한이 없어요',
+      description: '프로필 주인이 공개 범위를 바꿨을 수 있어요',
+      retry: false,
+    };
+  }
+
+  return {
+    title: '프로필을 불러오지 못했어요',
+    description: failureDescription(error),
+    retry: true,
+  };
+}
+
+export default function PublicProfilePage({ mode = 'public' }: Props) {
   const { userId } = useParams();
+  const isPreview = mode === 'preview';
 
-  const id = Number(userId);
-
-  const [profile, setProfile] = useState<PublicProfileView | null>(null);
+  const [profile, setProfile] = useState<ProfileView | null>(null);
+  const [failure, setFailure] = useState<unknown>(null);
+  const [reloadCount, setReloadCount] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   /** 신고를 고른 뒤의 안내. 계약이 없어 실제 처리는 하지 않는다 */
   const [notice, setNotice] = useState('');
-  const [failure, setFailure] = useState<unknown>(null);
-  const [reloadCount, setReloadCount] = useState(0);
+
+  const backToEdit = useBack(path.profileEdit());
 
   useEffect(() => {
     let active = true;
 
-    getPublicProfile(id)
+    // 미리보기는 내 프로필을 공개 모양으로 한 번에 받는다. 남의 프로필과 모양이 같다
+    const load = isPreview ? getMyPublicProfile() : getPublicProfile(Number(userId));
+
+    load
       .then((value) => {
         if (active) {
           setProfile(value);
@@ -75,39 +100,88 @@ export default function PublicProfilePage() {
         }
       })
       .catch((error: unknown) => {
-        if (active) {
-          setFailure(error);
-        }
+        if (active) setFailure(error);
       });
 
     return () => {
       active = false;
     };
-  }, [id, reloadCount]);
+  }, [isPreview, userId, reloadCount]);
+
+  const header = (
+    <ScreenHeader
+      title="공개 프로필"
+      align="center"
+      showBack
+      fallbackTo={isPreview ? path.profileEdit() : path.party()}
+      action={
+        isPreview ? (
+          // 가운데 제목이 뒤로 가기 폭만큼 치우치지 않도록 오른쪽도 같은 폭을 비운다
+          <span className={styles.headerSpacer} aria-hidden="true" />
+        ) : (
+          <IconButton
+            label="더 보기"
+            icon={<MoreVerticalIcon />}
+            size={36}
+            variant="translucent"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen(true)}
+          />
+        )
+      }
+    />
+  );
 
   if (failure !== null) {
+    const view = failureView(failure);
+
     return (
       <>
-        <StatusView title="프로필을 불러오지 못했어요" description={failureDescription(failure)}>
-          <Button
-            onClick={() => {
-              setFailure(null);
-              setReloadCount((count) => count + 1);
-            }}
-          >
-            다시 시도
-          </Button>
+        {header}
+
+        <StatusView title={view.title} description={view.description}>
+          {view.retry ? (
+            <Button
+              onClick={() => {
+                setFailure(null);
+                setProfile(null);
+                setReloadCount((count) => count + 1);
+              }}
+            >
+              다시 시도
+            </Button>
+          ) : null}
         </StatusView>
       </>
     );
   }
 
-  if (!profile) {
-    return null;
-  }
-
   return (
     <>
+      {header}
+
+      <div className={styles.page}>
+        {isPreview ? (
+          <div className={styles.previewBar} role="note">
+            <span className={styles.previewIcon}>
+              <InfoIcon />
+            </span>
+            <p className={styles.previewText}>다른 사용자에게 보이는 내 프로필입니다.</p>
+            <button type="button" className={styles.previewBack} onClick={backToEdit}>
+              편집으로 돌아가기
+            </button>
+          </div>
+        ) : null}
+
+        {profile ? <ProfileLayout mode={mode} profile={profile} /> : <ProfileSkeleton />}
+
+        {notice ? (
+          <p className={styles.notice} role="status">
+            {notice}
+          </p>
+        ) : null}
+      </div>
+
       {menuOpen ? (
         <Menu label="프로필 메뉴" top={MENU_TOP} onClose={() => setMenuOpen(false)}>
           {/* 프로필이 목업인 동안 잠긴다. 목업 번호로 실제 차단을 부르지 않는다(업무 -610) */}
@@ -129,33 +203,6 @@ export default function PublicProfilePage() {
           </button>
         </Menu>
       ) : null}
-
-      {/*
-       * **이 화면에는 주 동작이 없다.** 검정 알약 하나가 `나와 취향 비교하기`로
-       * 7.2-C에 가던 자리인데, 비교를 하지 않기로 하면서 그 화면을 지웠다
-       * (사용자 결정 2026-09-17, 업무 -506). 읽는 화면으로 남긴다.
-       */}
-      <ProfileBoard
-        profile={profile}
-        reviews
-        backTo={path.party()}
-        topAction={
-          <IconButton
-            label="더 보기"
-            icon={<MoreVerticalIcon />}
-            size={TOP_BUTTON_SIZE}
-            variant="translucent"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen(true)}
-          />
-        }
-      >
-        {notice ? (
-          <p className={styles.notice} role="status">
-            {notice}
-          </p>
-        ) : null}
-      </ProfileBoard>
     </>
   );
 }

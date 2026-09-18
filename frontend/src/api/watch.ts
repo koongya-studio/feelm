@@ -9,10 +9,9 @@
  * 프레임 생성 · 감상 기록 전이를 한 트랜잭션으로 처리하므로(API-036 처리 규칙) 2.5에서
  * 평가한 영화는 7.7 `안 남긴 영화`에서 빠진다.
  *
- * **평가 수정(API-037)은 실제 호출이고 내 평가 목록(API-039)만 목업으로 남는다.**
- * API-037 백엔드는 S15P21E106-213이 제공한다. 7.6 `평가한 영화`는 여전히 기준 목업
- * 세 편만 보여주므로, 2.5에서 새로 저장한 평가는 서버에 있어도 그 목록에 나타나지 않는다.
- * API-039가 연동되면 사라지는 한계다.
+ * 평가 수정(API-037)은 업무 -597에서, 내 평가 목록(API-039)은 업무 -611에서 실제 호출로
+ * 바꿨다. 이 파일에 목업 응답은 없다 — 남은 것은 2.6의 `이번 주 +N` 기준값 하나다
+ * (`getRatingCounts`).
  */
 import { BASE_WEEKLY_FRAME_DELTA } from '../mocks/watch';
 import { getPopcornBucket } from './taste';
@@ -20,6 +19,8 @@ import { getMyProfile } from './users';
 import { request } from './client';
 import type { WatchStatus } from '../types/enums';
 import type {
+  MyRatingList,
+  MyRatingQuery,
   Rating,
   RatingInputValue,
   RatingUpdateInput,
@@ -208,6 +209,22 @@ export async function updateRating(ratingId: number, input: RatingUpdateInput): 
  * 보이고, 고정 목업이 실제 평가를 가리는 일이 없다(업무 -610). API-039가 열리면 그 함수가
  * 여기에 생기고 7.1이 그리로 옮겨 간다.
  */
+
+/**
+ * API-039 내 평가 목록 · GET /api/v1/users/me/ratings
+ *
+ * 7.1 `평가한 영화` 탭이 부른다(업무 -611). `filter`를 생략하면 서버가 평가만(`RATED`)
+ * 최신순으로 준다. 다음 장은 직전 응답의 `nextCursor`를 **같은 `filter` · `sort`로** 되돌려
+ * 준다 — 조건이 바뀐 커서는 `400 VALIDATION_FAILED`다.
+ *
+ * 프레임 없는 과거 평가도 온다(`frameId: null`). 그래서 이 목록의 수는 내 필름(API-042)의
+ * 프레임 수보다 많을 수 있다.
+ */
+export async function getMyRatings(query: MyRatingQuery = {}): Promise<MyRatingList> {
+  const { filter, sort, cursor, size } = query;
+
+  return request<MyRatingList>('/users/me/ratings', { query: { filter, sort, cursor, size } });
+}
 
 /** 2.6 · 2.7이 보여 주는 프레임 · 팝콘 수치 한 벌 */
 export type RatingCounts = {

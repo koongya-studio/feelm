@@ -20,7 +20,6 @@
  * 3.1-A의 내 한줄평은 프레임 상세 화면용 목업이다. 영화 상세의 다른 사용자 한줄평은
  * API-032에서 읽으므로 이 파일과 공유하지 않는다.
  */
-import { mockMyRatings } from './frames';
 import { findMockMovie } from './movies';
 import { mockOtts } from './otts';
 import type { MovieDetail } from '../types/movie';
@@ -109,8 +108,8 @@ const detailExtras: Record<number, DetailExtras> = {
    * 3.1 취향 필름의 프레임 3개(401~403).
    *
    * 3.1과 3.1-A가 2.4로 이동하므로 상세도 있어야 흐름이 이어진다. 프레임은 평가와
-   * 1:1이라 이미 평가한 영화이므로 `myRating`은 mocks/frames.ts의 `mockMyRatings`를
-   * 그대로 쓰고 `myWatchStatus`는 `RATED`다. 101~103은 아직 평가하지 않은 추천 영화라
+   * 1:1이라 이미 평가한 영화이므로 `myRating`이 있고 `myWatchStatus`는 `RATED`다. 별점은
+   * mocks/frames.ts의 프레임 별점과 같다. 402의 한줄평은 와이어프레임 3.1-A 문구 그대로다. 101~103은 아직 평가하지 않은 추천 영화라
    * `myRating: null`을 그대로 둔다.
    *
    * 시놉시스 · 감독 · 출연 이름은 와이어프레임에 없어 102 · 103과 같은 자리표시자다.
@@ -123,7 +122,7 @@ const detailExtras: Record<number, DetailExtras> = {
     ratingCount: 520,
     flavorCode: 'FLAVOR_D',
     ottProviders: ottProviders(['NETFLIX']),
-    myRating: mockMyRatings[401],
+    myRating: { ratingId: 901, score: 4.5, comment: null, visibility: 'PRIVATE', spoiler: false },
     myWatchStatus: 'RATED',
   },
   402: {
@@ -134,7 +133,13 @@ const detailExtras: Record<number, DetailExtras> = {
     ratingCount: 980,
     flavorCode: 'FLAVOR_A',
     ottProviders: ottProviders(['NETFLIX']),
-    myRating: mockMyRatings[402],
+    myRating: {
+      ratingId: 902,
+      score: 4.0,
+      comment: '마술 트릭 하나하나가 복선이라 두 번 보게 돼요.',
+      visibility: 'PUBLIC',
+      spoiler: false,
+    },
     myWatchStatus: 'RATED',
   },
   403: {
@@ -145,7 +150,7 @@ const detailExtras: Record<number, DetailExtras> = {
     ratingCount: 310,
     flavorCode: 'FLAVOR_C',
     ottProviders: ottProviders(['TVING']),
-    myRating: mockMyRatings[403],
+    myRating: { ratingId: 903, score: 5.0, comment: null, visibility: 'PRIVATE', spoiler: false },
     myWatchStatus: 'RATED',
   },
 

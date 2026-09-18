@@ -148,6 +148,13 @@ uv가 중복 제거용으로 만든 캐시 내부 링크는 cache root 안의 �
 기존 서버 적용 절차로 별도 검증해야 한다.
 
 기존 backend `prepared_base`와 cache를 바꾸지 않고 검토된 adapter script만 갱신할 때는
+새 stage의 backend runtime 계약 파일이 현재 `prepared_base/scripts`와 모두 같아야 한다.
+`ci-rootless-backend-check.py` 등 runtime 파일을 변경했다면 adapter-only 갱신을 사용하지 않는다.
+일치하지 않으면 업데이터는 Runner를 중지하기 전에 거부한다. 이 경우 새 stage를 prepare하고
+독립 backend 검증을 통과시킨 뒤 `ci-dependency-cache-install.py --prepared-base`로 설치본과
+prepared stage를 함께 전환한다. 기존 prepared stage의 파일이나 manifest를 직접 고치지 않는다.
+
+adapter-only 갱신에는
 `ci-server-pilot-stage.py`가 만든 새 stage를 사용한다. 업데이터는 업로드 manifest와 root 소유
 불변 파일을 다시 검증하고, 실행 중인 MR unit이 없는 경우에만 Runner를 정지한다. 기존
 `gitlab-adapter.json`, `cache-operators.json`, sudoers와 `prepared_base`는 보존하며 설치 디렉터리만

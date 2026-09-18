@@ -71,10 +71,19 @@ class NotifyDeploymentTest(unittest.TestCase):
         message = MODULE.build_message("redis", "failed", self.environ)
         self.assertIn("> ❌ 실패 · 📦 redis · 🌐 service", message)
 
+    def test_spark_transaction_outcomes_are_distinct(self):
+        rejected = MODULE.build_message("spark-code", "candidate_rejected", self.environ)
+        rolled_back = MODULE.build_message("spark-code", "auto_rollback", self.environ)
+        manual = MODULE.build_message("spark-code", "manual_recovery", self.environ)
+        self.assertIn("후보 거부 · 운영 상태 유지", rejected)
+        self.assertIn("후보 실패 · 자동 복구 완료", rolled_back)
+        self.assertIn("복구 실패 · 수동 복구 필요", manual)
+
     def test_cli_accepts_every_deployment_job_service(self):
         for service in (
             "backend", "frontend", "consumer", "redis", "monitoring",
             "hdfs-service-config", "hdfs-distributed-config", "kafka-config",
+            "spark-service", "spark-distributed", "spark-code",
         ):
             with self.subTest(service=service):
                 self.assertEqual(MODULE.parse_args([service, "failed"]).service, service)

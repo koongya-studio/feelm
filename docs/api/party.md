@@ -713,8 +713,8 @@
 | 인증 | 회원 |
 | 관련 요구사항 | FR-22, FR-13 |
 | 화면 | ⑧-1 파티 필름 |
-| 미정 사항 | 있음 |
-| 비고 | 알고리즘 비교 후 확정 |
+| 미정 사항 | 없음 |
+| 비고 | Spark `party-mean-fit-v2` 결과를 Spring이 최신성 검증·필터링해 제공 |
 
 ### 설명
 
@@ -749,14 +749,7 @@
     {
       "recommendationItemId": 3401,
       "type": "PARTY",
-      "movie": { "movieId": 550, "title": "파이트 클럽", "posterUrl": "https://...", "ottProviders": ["NETFLIX"] },
-      "reason": {
-        "summary": "모두가 좋아하는 스릴러",
-        "memberFit": [
-          { "userId": 1024, "score": 0.91 },
-          { "userId": 2048, "score": 0.78 }
-        ]
-      }
+      "movie": { "movieId": 550, "title": "파이트 클럽", "posterUrl": "https://...", "ottProviders": ["NETFLIX"] }
     }
   ]
 }
@@ -770,19 +763,16 @@
 
 ### 처리 규칙
 
-- Spark Structured Streaming이 파티원별 Candidate 영화 ID 합집합을 재점수화해 파티 raw Candidate를 Redis에 게시한다. Spring이 이를 읽어 제외·부가 신호·최종 노출 순서를 재정렬한다
-- 파티원 중 한 명이라도 감상 기록이 있는 영화는 제외한다(가정)
+- Spark Structured Streaming이 파티원별 Candidate 영화 ID 합집합을 재점수화해 `feelm:party:{partyId}:candidates`에 순위대로 게시한다. Spring은 알고리즘 버전이나 점수를 해석하지 않고 게시된 순서를 유지한다
+- Spring은 현재 파티원 중 한 명이라도 평가, 확정 감상(`WATCHED_UNRATED`·`RATED`), 관심없음 처리한 영화와 서비스 DB에 없는 영화를 제외한다
 - **Rating Candidate 버전**은 파티원 한 명의 Candidate 점수 집합이 몇 번째로 갱신된 것인지 나타내는 값이다. Python Fold-in Consumer가 그 사용자의 평가·온보딩 이벤트를 반영해 Redis의 사용자별 Candidate 점수를 갱신할 때 함께 발급·기록하며, 저장 위치는 해당 사용자 Candidate 키와 같은 Redis 네임스페이스다. Spring은 값을 읽기만 한다(ADR-0017)
 - 파티 입력 `inputId`는 `partyId` + 모델 버전 + 정렬된 파티원·각 Candidate 생성 세대로 결정한다. 파티 인원이나 생성 세대가 바뀌면 새 계산을 요청한다. Spring은 Spark 결과의 `inputId`와 모델 버전이 현재 입력과 같을 때만 결과를 사용한다
-- 검증 지표: Average·Least Misery 대비 최저 만족도 상승, 만족도 편차 감소, 평균 만족도 유지(FR-22)
+- Redis의 점수 통계·`memberFit`·`fallback` 진단 필드는 API-058 판단과 응답에 사용하지 않는다
+- 동일 `partyId`·`inputId`·`modelVersion` 요청은 기존 추천 세트 이력을 재사용한다
 - 결과는 `recommendation_sets.party_id`가 설정된 파티 추천 이력으로 저장한다
 
 ### 상태값
 
 - RecommendationType `PARTY`
 
-### 미정 사항
-
-- [ ] 집계 알고리즘(Average / Least Misery / 개선식) 확정
-- [ ] 감상 영화 제외 기준(한 명이라도 vs 전원)
-- [ ] 파티 추천을 개인 추천 이력에 포함할지
+파티 추천은 개인 추천 이력 API에 포함하지 않는다. 파티 추천 이력의 조회 범위를 확장할 때는 별도 API 계약으로 정의한다.

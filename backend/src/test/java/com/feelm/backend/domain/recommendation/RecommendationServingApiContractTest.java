@@ -2,16 +2,27 @@ package com.feelm.backend.domain.recommendation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.feelm.backend.domain.recommendation.model.RecommendationCandidate;
+import com.feelm.backend.domain.recommendation.model.RecommendationCandidateBatch;
+import com.feelm.backend.domain.recommendation.repository.RecommendationCandidateReader;
 import com.feelm.backend.domain.recommendation.service.RecommendationReplenisher;
+import com.feelm.backend.global.error.BusinessException;
+import com.feelm.backend.global.error.ErrorCode;
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedPostgresContractTest;
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -29,6 +40,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.IllegalTransactionStateException;
 
@@ -52,11 +64,15 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
     @Autowired DataSource dataSource;
     @Autowired TokenProvider tokens;
     @Autowired RecommendationReplenisher replenisher;
+    @MockitoBean RecommendationCandidateReader candidateReader;
 
     private ExecutorService executor;
 
     @BeforeEach
     void fixtures() {
+        reset(candidateReader);
+        when(candidateReader.read(anyLong()))
+                .thenThrow(new BusinessException(ErrorCode.RECOMMENDATION_UNAVAILABLE));
         jdbc.execute(
                 "TRUNCATE TABLE user_movie_dismissals, ratings, watch_records,"
                         + " movie_ott_providers, recommendation_items, recommendation_sets,"
@@ -75,6 +91,60 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
         item(1004, 104, "TASTE", 4, false);
         item(1005, 105, "DISCOVERY", 1, false);
         item(1006, 106, "DISCOVERY", 2, false);
+    }
+
+    @Test
+    @DisplayName("S15P21E106-613 최신 Redis generation을 조회 시 새 세트로 생성해 제공한다")
+    void createsAndServesLatestCandidateGenerationOnRead() throws Exception {
+        candidates(
+                "generation-new",
+                candidate(104, "5.0", "TASTE", null),
+                candidate(105, "4.0", "TASTE", null),
+                candidate(106, "3.0", "DISCOVERY", "FLAVOR_B"));
+
+        String response =
+                getRecommendations(USER)
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+
+        Long newSetId =
+                jdbc.queryForObject(
+                        "SELECT id FROM recommendation_sets WHERE generation_id='generation-new'",
+                        Long.class);
+        assertThat(response).contains("\"recommendationSetId\":" + newSetId);
+    }
+
+    @Test
+    @DisplayName("S15P21E106-613 같은 Redis generation 반복 조회는 같은 세트를 재사용한다")
+    void reusesSetForSameCandidateGenerationOnRepeatedRead() throws Exception {
+        candidates(
+                "generation-same",
+                candidate(101, "5.0", "TASTE", null),
+                candidate(102, "4.0", "TASTE", null),
+                candidate(105, "3.0", "DISCOVERY", "FLAVOR_B"));
+
+        String first =
+                getRecommendations(USER)
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        String second =
+                getRecommendations(USER)
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+
+        assertThat(first).isEqualTo(second);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM recommendation_sets"
+                                        + " WHERE generation_id='generation-same'",
+                                Integer.class))
+                .isEqualTo(1);
     }
 
     @AfterEach
@@ -314,7 +384,8 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
         jdbc.update("INSERT INTO movie_ott_providers(movie_id,ott_id) VALUES (101,1)");
         jdbc.update(
                 "UPDATE recommendation_items SET flavor_code='FLAVOR_SNAPSHOT',"
-                        + " reason='{\"summary\":\"저장된 이유\",\"factors\":[]}'::jsonb"
+                        + " reason='{\"summary\":\"저장된 이유\",\"factors\":[],"
+                        + "\"reasons\":[{\"code\":\"SHARED_GENRE\"}]}'::jsonb"
                         + " WHERE id=1001");
 
         getRecommendations(USER)
@@ -326,7 +397,36 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
                 .andExpect(jsonPath("$.items[0].movie.averageRating").value(4.3))
                 .andExpect(jsonPath("$.items[0].movie.ottProviders[0]").value("NETFLIX"))
                 .andExpect(jsonPath("$.items[0].flavorCode").value("FLAVOR_SNAPSHOT"))
-                .andExpect(jsonPath("$.items[0].reason.summary").value("저장된 이유"));
+                .andExpect(jsonPath("$.items[0].reason.summary").value("저장된 이유"))
+                .andExpect(jsonPath("$.items[0].reason.reasons").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("추천 카드·영화 상세·이력은 저장된 같은 이유를 반환하고 원본 근거를 감춘다")
+    void cardDetailAndHistorySharePublicReasonSnapshot() throws Exception {
+        jdbc.update(
+                "UPDATE recommendation_items SET reason='{\"reasons\":[{\"code\":\"SHARED_GENRE\"}],"
+                        + "\"summary\":\"검증된 이유\",\"factors\":[{\"type\":\"GENRE\",\"label\":\"드라마\"}]}'::jsonb"
+                        + " WHERE id=1001");
+
+        getRecommendations(USER)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].reason.summary").value("검증된 이유"))
+                .andExpect(jsonPath("$.items[0].reason.factors[0].label").value("드라마"))
+                .andExpect(jsonPath("$.items[0].reason.reasons").doesNotExist());
+        mvc.perform(get("/api/v1/recommendations/history").header("Authorization", bearer(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].items[0].reason.summary").value("검증된 이유"))
+                .andExpect(jsonPath("$.items[0].items[0].reason.factors[0].label").value("드라마"))
+                .andExpect(jsonPath("$.items[0].items[0].reason.reasons").doesNotExist());
+        mvc.perform(
+                        get("/api/v1/movies/101")
+                                .param("recommendationItemId", "1001")
+                                .header("Authorization", bearer(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recommendation.reason.summary").value("검증된 이유"))
+                .andExpect(jsonPath("$.recommendation.reason.factors[0].label").value("드라마"))
+                .andExpect(jsonPath("$.recommendation.reason.reasons").doesNotExist());
     }
 
     @Test
@@ -415,6 +515,28 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
 
     private String bearer(long userId) {
         return "Bearer " + tokens.createAccessToken(userId);
+    }
+
+    private void candidates(String generationId, RecommendationCandidate... items) {
+        doReturn(
+                        new RecommendationCandidateBatch(
+                                "als-serving-example",
+                                10L,
+                                generationId,
+                                Instant.parse("2026-09-18T00:00:00Z"),
+                                List.of(items)))
+                .when(candidateReader)
+                .read(USER);
+    }
+
+    private RecommendationCandidate candidate(
+            long movieId, String score, String type, String flavorCode) {
+        return new RecommendationCandidate(
+                movieId,
+                new BigDecimal(score),
+                type,
+                flavorCode,
+                new tools.jackson.databind.ObjectMapper().createObjectNode());
     }
 
     private void user(long id, String nickname) {
