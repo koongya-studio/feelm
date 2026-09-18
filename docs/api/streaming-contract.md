@@ -150,7 +150,7 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 - 시각: ISO 8601 UTC 문자열. 예 `2026-08-31T07:21:00Z`
 - 식별자: 64bit 정수. `movieId`는 **서비스 DB 영화 ID**이며 MovieLens ID는 모델 내부 매핑에만 사용한다(S15P21E106-118)
 - Topic 이름: `feelm.<이벤트>.v1`. 계약이 깨지는 변경만 `v2`를 병행했다가 이전 버전을 제거한다
-- 파티션 키: 사용자 단위 이벤트는 `userId`. 같은 Topic의 같은 Partition 안에서 Kafka에 실제 기록된 순서를 보장한다
+- 파티션 키: 공통 사용자 행동 이벤트(`RATING`·`ONBOARDING`·`DISMISS`·`VIEW`·`RECOMMENDATION_CLICK`·`OTT_CLICK`)는 `userId`를 Kafka `LongSerializer`로 직렬화한 8바이트 big-endian signed long이다. JSON 본문의 `userId`는 숫자로 유지한다. `candidate-updated` 알림의 키 형식은 아래 별도 계약을 따른다. 같은 Topic의 같은 Partition 안에서 Kafka에 실제 기록된 순서를 보장한다
 - Redis 키 이름: `feelm:<대상>:<식별자>:<용도>`
 - Consumer Group: Python Fold-in과 Spark Streaming은 서로 다른 Group을 사용하며 Offset·Checkpoint를 공유하지 않는다
 
