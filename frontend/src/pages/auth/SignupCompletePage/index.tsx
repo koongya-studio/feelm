@@ -6,14 +6,14 @@
  * 0.4 → 0.5 이메일 회원가입 완료
  * 0.5 → 1.1 시작하기
  *
- * 두 경로가 같은 화면으로 들어오는데 계정 상태가 다르다. 소셜 가입은 곧바로 쓸 수 있지만
- * 이메일 가입은 `PENDING_VERIFICATION`이라 인증을 마쳐야 로그인할 수 있다(API-001).
- * 그래서 이메일로 온 경우에는 `시작하기` 대신 인증 안내와 재발송을 보여준다. 그대로
- * 온보딩으로 보내면 세션이 없어 회원 API가 막힌다(screen-spec-auth.md 0.5, CR-19).
+ * 두 경로가 같은 자리로 들어오고 **결과도 같다**. 이메일 가입도 인증번호로 이메일 소유를
+ * 먼저 확인하므로 계정이 곧바로 `ACTIVE`이고 응답이 세션을 함께 내린다(S15P21E106-603).
+ * 인증 메일 안내와 재발송(CR-19)은 그 흐름과 함께 사라졌고, 두 경로 모두 `시작하기`로
+ * 온보딩까지 이어진다.
  *
  * **가입이 실제로 끝났는지는 세션 저장소의 표시로 판단한다**(`utils/signupCompletion`,
- * 업무 -610). 라우터 state만 보던 때는 주소를 직접 쳐서 들어와도 소셜 가입 성공 화면이
- * 나왔다. 표시가 없으면 0.2 가입 방법 선택으로 보낸다. 이메일로 왔는지도 그 표시가 말한다.
+ * 업무 -610). 라우터 state만 보던 때는 주소를 직접 쳐서 들어와도 성공 화면이 나왔다.
+ * 표시가 없으면 0.2 가입 방법 선택으로 보낸다.
  *
  * **봉인된 편지 → 열린 봉투 → 초대장이 올라오는 모션** (팀 결정 2026-09-14, S15P21E106-319).
  * - 첫 장면은 받은 봉인된 빨간 편지 사진이다. 봉인이 한 번 눌린 뒤 사라지며 열린 봉투로
@@ -29,14 +29,12 @@
  *
  * 문구가 그림 안에 있으므로 제목(h1)은 화면에 보이지 않게 두어 보조기술이 읽게 한다.
  */
-import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { Navigate, useNavigate } from 'react-router';
 import sealedArt from '../../../assets/signup/feelm-sealed-envelope.webp';
 import envelopeArt from '../../../assets/signup/feelm-welcome-envelope.webp';
 import Button from '../../../components/Button';
 import VisuallyHidden from '../../../components/VisuallyHidden';
-import { resendVerificationMail } from '../../../api/auth';
 import { path } from '../../../routes/paths';
 import { clearSignupCompletion, readSignupCompletion } from '../../../utils/signupCompletion';
 import styles from './SignupCompletePage.module.css';
@@ -44,10 +42,6 @@ import styles from './SignupCompletePage.module.css';
 export default function SignupCompletePage() {
   const navigate = useNavigate();
   const completion = readSignupCompletion();
-  const email = completion?.kind === 'email' ? completion.email : undefined;
-
-  const [resent, setResent] = useState(false);
-  const [pending, setPending] = useState(false);
 
   // 가입을 마치지 않은 사람에게 성공 화면을 보여 주지 않는다
   if (!completion) {
@@ -58,22 +52,6 @@ export default function SignupCompletePage() {
   const leave = (to: string) => {
     clearSignupCompletion();
     void navigate(to, { replace: true });
-  };
-
-  /* 재발송은 계정 존재 여부를 알려주지 않으므로(API-003) 성공과 실패를 나누지 않는다 */
-  const resend = async () => {
-    if (!email) {
-      return;
-    }
-
-    setPending(true);
-
-    try {
-      await resendVerificationMail(email);
-    } finally {
-      setPending(false);
-      setResent(true);
-    }
   };
 
   return (
@@ -109,35 +87,11 @@ export default function SignupCompletePage() {
           </div>
         </div>
 
-        {email ? (
-          <div className={styles.after}>
-            <p className={styles.lead}>
-              <span className={styles.email}>{email}</span>으로 인증 메일을 보냈어요.
-              <br />
-              메일의 링크를 눌러야 로그인할 수 있어요.
-            </p>
-
-            {resent ? (
-              <p className={styles.notice} role="status">
-                인증 메일을 다시 보냈습니다. 메일함을 확인해 주세요.
-              </p>
-            ) : (
-              <Button variant="text" disabled={pending} onClick={() => void resend()}>
-                메일이 오지 않았나요? 다시 보내기
-              </Button>
-            )}
-          </div>
-        ) : (
-          <p className={`${styles.lead} ${styles.after}`}>첫 취향 필름을 만들어볼까요?</p>
-        )}
+        <p className={`${styles.lead} ${styles.after}`}>첫 취향 필름을 만들어볼까요?</p>
       </div>
 
       <div className={`${styles.actions} ${styles.after}`}>
-        {email ? (
-          <Button onClick={() => leave(path.login())}>로그인하러 가기</Button>
-        ) : (
-          <Button onClick={() => leave(path.onboardingTaste())}>시작하기</Button>
-        )}
+        <Button onClick={() => leave(path.onboardingTaste())}>시작하기</Button>
       </div>
     </div>
   );
