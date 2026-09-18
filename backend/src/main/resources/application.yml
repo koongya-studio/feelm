@@ -116,6 +116,9 @@ feelm:
     # 소셜 가입을 마칠 때까지만 유효한 토큰의 수명(API-007 처리 규칙). 코드 기본값과 같은 값을 여기에
     # 두는 이유는 계약값이 바뀐 사실이 설정 diff로 드러나야 하기 때문이다(S15P21E106-311과 같은 판단).
     signup-token-ttl: 10m
+    # 인증번호 확인(API-079)이 발급하고 가입(API-001)이 쓰는 토큰의 수명이다. 같은 이유로 코드 기본값과
+    # 같은 값을 여기에 둔다.
+    email-verification-token-ttl: 10m
     refresh-cookie:
       name: refresh_token
       path: /api/v1/auth
@@ -197,7 +200,7 @@ feelm:
     verification-url: ${FRONTEND_BASE_URL:http://localhost:5173}/app/verify-email
     # 재설정 링크도 프론트 화면으로 가고 프론트가 API-011을 호출한다. 화면은 0.7-A다.
     password-reset-url: ${FRONTEND_BASE_URL:http://localhost:5173}/app/account/reset
-    # 인증 메일 재발송(API-003)과 재설정 요청(API-010)의 요청 단위 제한이다. 이메일 간격만으로는
+    # 인증번호 발송(API-078)·인증 메일 재발송(API-003)·재설정 요청(API-010)의 요청 단위 제한이다. 이메일 간격만으로는
     # 서로 다른 이메일을 대량으로 넣는 발송 폭탄을 막지 못하므로 IP 단위를 함께 둔다. ip는 창
     # 목록이라 창을 늘리거나 줄여도 코드가 그대로다(S15P21E106-281 결정 D-8).
     #

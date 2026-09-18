@@ -105,6 +105,7 @@ public class AuthRateLimiter {
     private static final String LOGIN_IP_KEY_PREFIX = "auth:login:ip:";
     private static final String PASSWORD_RESET_KEY_PREFIX = "auth:password-reset:";
     private static final String MAIL_IP_KEY_PREFIX = "auth:mail:ip:";
+    private static final String VERIFICATION_CODE_KEY_PREFIX = "auth:email-code-interval:";
 
     /**
      * 시도 횟수를 올리고 만료를 보장한 뒤 올린 횟수를 돌려주는 스크립트. {@code INCR}와 {@code PEXPIRE}를 따로 보내면 그 사이에 연결이 끊겼을 때
@@ -150,6 +151,42 @@ public class AuthRateLimiter {
      */
     public boolean tryAcquireSignupSlot(String clientIp) {
         return tryAcquireMailSendBudget(clientIp);
+    }
+
+    /**
+     * 가입 인증번호 발송(API-078)의 발송 자리를 확보한다. 이메일 간격은 <b>확인만</b> 하고 슬롯은 심지 않는다.
+     *
+     * <p>슬롯 심기를 {@link #recordVerificationCodeInterval}로 분리한 이유는 이 경로가 이미 가입된 이메일을 {@code 409}로
+     * 거절하기 때문이다(API-078 처리 규칙). 거절될 요청이 슬롯을 심으면 슬롯 주인(그 이메일의 소유자)이 아니라 요청자가 남의 발송을 분당 한 건씩 지연시킬 수
+     * 있다. 재발송·재설정은 계정 존재를 응답에 드러내지 않아 이 문제가 없으므로 {@link #tryAcquireMailSendSlot} 그대로 쓴다.
+     *
+     * <p>IP 축은 <b>중복 검사보다 먼저, 시도 시점에</b> 소모한다. 중복 검사 뒤로 미루면 {@code 409}로 끝나는 요청이 예산을 쓰지 않아 이 경로를 통한
+     * 이메일 열거 속도를 묶을 수 없다. 카운터는 재발송·재설정과 공유한다. 셋이 같은 SMTP 쿼터를 쓰기 때문이다(결정 D-2).
+     *
+     * <p>다만 <b>이메일 간격에 먼저 걸린 요청은 IP 예산을 쓰지 않는다</b>. 같은 이메일을 반복하는 요청이 IP 예산을 소모하지 않게 하는 결정 D-3의 순서를
+     * 그대로 둔 결과이며, 간격 슬롯 하나로 그 이메일에 대해 1분의 무료 창을 얻는 성질이 따라온다. 열거는 서로 다른 이메일을 넣어야 하고 그 경로는 IP 축이 그대로
+     * 센다.
+     *
+     * @param clientIp 요청을 보낸 클라이언트 IP
+     * @return 처리해도 되면 {@code true}, 이메일 간격 안이거나 IP 예산을 넘었으면 {@code false}
+     */
+    public boolean tryAcquireVerificationCodeSlot(String email, String clientIp) {
+        if (Boolean.TRUE.equals(redisTemplate.hasKey(verificationCodeKey(email)))) {
+            return false;
+        }
+        return tryAcquireMailSendBudget(clientIp);
+    }
+
+    /**
+     * 가입 인증번호 발송의 이메일 간격 슬롯을 심는다. 중복 검사와 전역 상한 확인을 마친 뒤에 부른다.
+     *
+     * <p>확인({@link #tryAcquireVerificationCodeSlot})과 이 호출 사이에 같은 이메일의 요청이 동시에 들어올 수 있지만, 기록이
+     * {@code SET NX}라 정확히 한 건만 통과한다. 진 요청은 번호를 발급하지 않고 {@code 429}가 된다.
+     *
+     * @return 슬롯을 얻었으면 {@code true}, 그 사이 다른 요청이 먼저 심었으면 {@code false}
+     */
+    public boolean recordVerificationCodeInterval(String email) {
+        return tryAcquireEmailInterval(verificationCodeKey(email));
     }
 
     /**
@@ -315,6 +352,11 @@ public class AuthRateLimiter {
                 + Sha256Hasher.hex(ClientIpBucket.of(clientIp, clientIpPrefixes))
                 + ":"
                 + window.toSeconds();
+    }
+
+    /** 인증번호 발송의 이메일 간격 키. 간격은 경로별로 분리하므로 재발송·재설정과 접두사가 다르다. */
+    private String verificationCodeKey(String email) {
+        return VERIFICATION_CODE_KEY_PREFIX + Sha256Hasher.hex(email);
     }
 
     private String passwordResetKey(String email) {

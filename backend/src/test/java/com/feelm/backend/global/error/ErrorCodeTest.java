@@ -70,6 +70,10 @@ class ErrorCodeTest {
                         "NICKNAME_DUPLICATED",
                         "VERIFICATION_TOKEN_INVALID",
                         "VERIFICATION_TOKEN_EXPIRED",
+                        "VERIFICATION_CODE_MISMATCH",
+                        "VERIFICATION_CODE_EXHAUSTED",
+                        "VERIFICATION_CODE_EXPIRED",
+                        "EMAIL_VERIFICATION_TOKEN_INVALID",
                         "ALREADY_VERIFIED",
                         "INVALID_CREDENTIALS",
                         "EMAIL_NOT_VERIFIED",
@@ -136,6 +140,18 @@ class ErrorCodeTest {
         assertThat(ErrorCode.VERIFICATION_TOKEN_EXPIRED.getStatus()).isEqualTo(HttpStatus.GONE);
         assertThat(ErrorCode.INVALID_CREDENTIALS.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(ErrorCode.EMAIL_NOT_VERIFIED.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    @DisplayName("API-078~076 인증번호 오류 코드는 각 명세의 HTTP 상태로 매핑된다")
+    void verificationCodeCodesMatchSpecifiedStatuses() {
+        assertThat(ErrorCode.VERIFICATION_CODE_MISMATCH.getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.VERIFICATION_CODE_EXHAUSTED.getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.VERIFICATION_CODE_EXPIRED.getStatus()).isEqualTo(HttpStatus.GONE);
+        assertThat(ErrorCode.EMAIL_VERIFICATION_TOKEN_INVALID.getStatus())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test

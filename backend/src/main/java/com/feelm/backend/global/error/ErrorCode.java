@@ -15,6 +15,11 @@ public enum ErrorCode {
     ALREADY_VERIFIED(HttpStatus.CONFLICT, "이미 이메일 인증이 완료된 계정입니다."),
     VERIFICATION_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "유효하지 않은 인증 링크입니다. 인증 메일을 다시 요청해 주세요."),
     VERIFICATION_TOKEN_EXPIRED(HttpStatus.GONE, "인증 링크가 만료되었습니다. 인증 메일을 다시 요청해 주세요."),
+    VERIFICATION_CODE_MISMATCH(HttpStatus.BAD_REQUEST, "인증번호가 올바르지 않습니다."),
+    VERIFICATION_CODE_EXHAUSTED(HttpStatus.BAD_REQUEST, "인증번호 확인 횟수를 초과했습니다. 인증번호를 다시 요청해 주세요."),
+    VERIFICATION_CODE_EXPIRED(HttpStatus.GONE, "인증번호가 만료되었습니다. 인증번호를 다시 요청해 주세요."),
+    EMAIL_VERIFICATION_TOKEN_INVALID(
+            HttpStatus.UNAUTHORIZED, "이메일 인증 정보가 만료되었습니다. 인증번호를 다시 요청해 주세요."),
     UNSUPPORTED_PROVIDER(HttpStatus.BAD_REQUEST, "지원하지 않는 소셜 로그인 제공자입니다."),
     OAUTH_CODE_INVALID(HttpStatus.BAD_REQUEST, "소셜 로그인 인증에 실패했습니다. 다시 시도해 주세요."),
     OAUTH_EMAIL_REQUIRED(HttpStatus.BAD_REQUEST, "소셜 계정의 이메일 제공에 동의해야 가입할 수 있습니다."),

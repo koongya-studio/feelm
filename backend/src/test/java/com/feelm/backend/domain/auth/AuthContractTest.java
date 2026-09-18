@@ -405,6 +405,7 @@ class AuthContractTest {
                                 Duration.ofSeconds(-1),
                                 jwtProperties.refreshTokenTtl(),
                                 jwtProperties.signupTokenTtl(),
+                                jwtProperties.emailVerificationTokenTtl(),
                                 jwtProperties.refreshRotationGrace(),
                                 jwtProperties.refreshCookie()));
         return expiring.createAccessToken(9L);
@@ -419,6 +420,7 @@ class AuthContractTest {
                                 jwtProperties.accessTokenTtl(),
                                 Duration.ofSeconds(-1),
                                 jwtProperties.signupTokenTtl(),
+                                jwtProperties.emailVerificationTokenTtl(),
                                 jwtProperties.refreshRotationGrace(),
                                 jwtProperties.refreshCookie()));
         return expiring.createRefreshToken(15L, UUID.randomUUID().toString());

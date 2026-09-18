@@ -67,6 +67,9 @@ abstract class EmailAuthApiTestSupport {
 
     static final String SIGNUP_PATH = "/api/v1/auth/signup";
     static final String VERIFY_PATH = "/api/v1/auth/email/verify";
+    static final String VERIFICATION_CODE_PATH = "/api/v1/auth/email/verification-code";
+    static final String VERIFICATION_CODE_VERIFY_PATH =
+            "/api/v1/auth/email/verification-code/verify";
     static final String RESEND_PATH = "/api/v1/auth/email/resend";
     static final String LOGIN_PATH = "/api/v1/auth/login";
     static final String LOGOUT_PATH = "/api/v1/auth/logout";
@@ -196,6 +199,11 @@ abstract class EmailAuthApiTestSupport {
         return authMailSender.sends(MailKind.PASSWORD_RESET);
     }
 
+    /** 가입 인증번호 메일(API-078)의 발송 기록과 제어 수단. 번호 원문은 저장소에 해시로만 남아 여기서만 얻을 수 있다. */
+    protected RecordingMailSends verificationCodeMails() {
+        return authMailSender.sends(MailKind.VERIFICATION_CODE);
+    }
+
     /**
      * 제출된 비동기 발송이 모두 끝날 때까지 기다린다.
      *
@@ -273,6 +281,61 @@ abstract class EmailAuthApiTestSupport {
     /** 가입(API-001)을 지정한 IP에서 보낸다. IP 단위 요청 제한을 검증하는 시나리오용(S15P21E106-287 리뷰 B-1). */
     ResultActions signupFrom(String clientIp, String body) throws Exception {
         return postJsonFrom(clientIp, SIGNUP_PATH, body);
+    }
+
+    /** API-078 인증번호 발송. */
+    ResultActions sendVerificationCode(String email) throws Exception {
+        return sendVerificationCodeFrom(nextClientIp(), email);
+    }
+
+    /** API-078를 지정한 IP에서 보낸다. IP 단위 요청 제한을 검증하는 시나리오용. */
+    ResultActions sendVerificationCodeFrom(String clientIp, String email) throws Exception {
+        return postJsonFrom(
+                clientIp, VERIFICATION_CODE_PATH, "{\"email\":\"%s\"}".formatted(email));
+    }
+
+    /** API-079 인증번호 확인. */
+    ResultActions verifyVerificationCode(String email, String code) throws Exception {
+        return postJson(
+                VERIFICATION_CODE_VERIFY_PATH,
+                "{\"email\":\"%s\",\"code\":\"%s\"}".formatted(email, code));
+    }
+
+    /** 발송된 인증번호 원문을 발송 순서대로 모은다. 발송 횟수 검증에도 쓴다. */
+    List<String> verificationCodes() {
+        awaitMailsDispatched();
+        return verificationCodeMails().tokens();
+    }
+
+    /** API-078를 보내고 발송된 번호 원문을 돌려준다. */
+    String requestVerificationCode(String email) throws Exception {
+        sendVerificationCode(email).andExpect(status().isAccepted());
+        List<String> codes = verificationCodes();
+        assertThat(codes).as("인증번호 메일이 발송되지 않았다").isNotEmpty();
+        return codes.getLast();
+    }
+
+    /** API-078·076을 거쳐 가입(API-001)에 쓸 이메일 인증 토큰을 얻는다. */
+    String issueEmailVerificationToken(String email) throws Exception {
+        MvcResult result =
+                verifyVerificationCode(email, requestVerificationCode(email))
+                        .andExpect(status().isOk())
+                        .andReturn();
+        return stringField(result, "emailVerificationToken");
+    }
+
+    /**
+     * 인증번호 발송의 이메일 간격(1분)을 지운다. 같은 이메일로 두 번 발송해야 하는 시나리오는 이 제한 때문에 기다리지 않고는 만들 수 없다.
+     *
+     * <p>키 형식을 테스트가 아는 결합은 {@link #clearPasswordResetInterval}과 같은 이유로 감수한다.
+     */
+    void clearVerificationCodeInterval(String email) {
+        redisTemplate.delete("auth:email-code-interval:" + Sha256Hasher.hex(email));
+    }
+
+    /** 인증번호 저장 키(S15P21E106-602). 원문이 저장되지 않았음을 확인하는 데 쓴다. */
+    String verificationCodeKey(String email) {
+        return "auth:email-code:" + Sha256Hasher.hex(email);
     }
 
     ResultActions verifyEmail(String token) throws Exception {

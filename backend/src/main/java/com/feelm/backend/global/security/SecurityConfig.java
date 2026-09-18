@@ -42,6 +42,9 @@ public class SecurityConfig {
      */
     private static final String[] PUBLIC_PATHS = {
         "/api/v1/auth/signup",
+        // API-078·076 가입 인증번호 발송·확인. 계정을 만들기 전 단계라 공개다.
+        "/api/v1/auth/email/verification-code",
+        "/api/v1/auth/email/verification-code/verify",
         "/api/v1/auth/email/verify",
         "/api/v1/auth/email/resend",
         "/api/v1/auth/login",

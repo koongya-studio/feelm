@@ -120,7 +120,7 @@ class MailDispatcherTest {
                 new MailDispatcher(drainingExecutor(reject), () -> false, clock, budget);
 
         for (int attempt = 0; attempt < 20; attempt++) {
-            dispatcher.dispatch(MailKind.VERIFICATION, attempt, () -> {});
+            dispatcher.dispatch(MailKind.VERIFICATION, (long) attempt, () -> {});
             reject.set(!reject.get());
         }
 

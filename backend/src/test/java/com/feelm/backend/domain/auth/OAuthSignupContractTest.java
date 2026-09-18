@@ -95,6 +95,7 @@ class OAuthSignupContractTest extends OAuthApiTestSupport {
                                 jwtProperties.accessTokenTtl(),
                                 jwtProperties.refreshTokenTtl(),
                                 Duration.ofMinutes(-1),
+                                jwtProperties.emailVerificationTokenTtl(),
                                 jwtProperties.refreshRotationGrace(),
                                 jwtProperties.refreshCookie()));
         String expired =
