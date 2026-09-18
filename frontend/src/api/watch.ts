@@ -209,8 +209,15 @@ export async function updateRating(ratingId: number, input: RatingUpdateInput): 
  * 여기에 생기고 7.1이 그리로 옮겨 간다.
  */
 
+/** 2.6 · 2.7이 보여 주는 프레임 · 팝콘 수치 한 벌 */
+export type RatingCounts = {
+  frameCount: number;
+  popcornCount: number;
+  weeklyFrameDelta: number;
+};
+
 /**
- * 2.6 · 2.7이 표시하는 평가 전 기준 수치.
+ * 2.6 · 2.7이 표시하는 프레임 · 팝콘 수치.
  *
  * 계약에는 이 조합을 한 번에 주는 API가 없다. 프레임 수는 API-014 `stats.frameCount`,
  * 팝콘 알 수는 API-041 `totalCount`에서 온다. 둘 다 실제 호출이라 3.1 · 7.1이 보여주는
@@ -218,10 +225,17 @@ export async function updateRating(ratingId: number, input: RatingUpdateInput): 
  *
  * `이번 주 +N`은 대응 필드가 없어 고정값이다(types/unspecified.ts의 `weeklyFrameDelta`).
  *
- * 2.5가 저장 **전에** 부른다. 실패하면 저장도 하지 않는다 — 2.6 · 2.7이 추가 전 수치
- * 없이는 성립하지 않고, 저장 전에 멈추면 다시 눌러도 `409`가 나지 않는다.
+ * **2.5가 저장 전과 저장 후에 한 번씩 부른다**(업무 -599). 저장 전 값은 2.6이 그리고,
+ * 저장 후 값은 2.7이 그린다. 예전에는 저장 전 값에 화면이 `+1`을 더해 저장 후를 지어냈는데,
+ * 그 전제는 서버 집계가 평가 한 건에 정확히 한 알만 움직일 때만 참이다. 실제로는 대표 맛
+ * 배정 같은 다른 변화가 같은 시간에 팝콘 수를 움직일 수 있고, 그때 화면만 거짓말을 하게 된다.
+ *
+ * 저장 **전** 호출이 실패하면 저장도 하지 않는다 — 2.6 · 2.7이 추가 전 수치 없이는 성립하지
+ * 않고, 저장 전에 멈추면 다시 눌러도 `409`가 나지 않는다. 저장 **후** 호출은 이미 저장이
+ * 끝난 뒤라 실패해도 되돌릴 것이 없고, 2.7이 계약이 정한 증가량(프레임 1개 · 팝콘 1알)으로
+ * 물러서서 그린다.
  */
-export async function getCountsBeforeRating() {
+export async function getRatingCounts(): Promise<RatingCounts> {
   const [profile, bucket] = await Promise.all([getMyProfile(), getPopcornBucket()]);
 
   return {

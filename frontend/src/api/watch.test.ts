@@ -26,7 +26,7 @@ import {
   findLinkClickedRecord,
   findWatchRecord,
   findWatchedRecord,
-  getCountsBeforeRating,
+  getRatingCounts,
   getWatchRecords,
   recordOttClick,
   updateRating,
@@ -341,7 +341,7 @@ describe('API-037 평가 수정', () => {
   });
 });
 
-describe('추가 전 수치', () => {
+describe('프레임 · 팝콘 수치', () => {
   it('프레임 수는 API-014, 팝콘 알 수는 API-041에서 읽는다', async () => {
     fetchMock.mockImplementation((url: string) =>
       Promise.resolve(
@@ -351,7 +351,7 @@ describe('추가 전 수치', () => {
       ),
     );
 
-    const counts = await getCountsBeforeRating();
+    const counts = await getRatingCounts();
 
     const paths = fetchMock.mock.calls.map(
       (call) => new URL(call[0] as string, 'http://test').pathname,

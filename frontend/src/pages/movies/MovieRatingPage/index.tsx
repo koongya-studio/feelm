@@ -51,12 +51,7 @@ import TextArea from '../../../components/TextArea';
 import { ApiError } from '../../../api/apiError';
 import { getMovieDetail } from '../../../api/movies';
 import { getOtts } from '../../../api/otts';
-import {
-  createRating,
-  findWatchedRecord,
-  getCountsBeforeRating,
-  updateRating,
-} from '../../../api/watch';
+import { createRating, findWatchedRecord, getRatingCounts, updateRating } from '../../../api/watch';
 import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
 import { formatMonthDay } from '../../../utils/date';
@@ -175,16 +170,29 @@ export default function MovieRatingPage() {
       }
 
       // 추가 전 수치를 먼저 받는다. 여기서 실패하면 저장하지 않으므로 다시 눌러도 `409`가 없다
-      const counts = await getCountsBeforeRating();
+      const counts = await getRatingCounts();
       const rating = await createRating(
         movie.movieId,
         // comment가 있으면 visibility가 필수다(API-036). 선택 UI가 없어 기본값 PRIVATE
         trimmed ? { score, comment: trimmed, visibility: 'PRIVATE', spoiler } : { score },
       );
 
-      // 2.6 · 2.7은 추가 전 수치가 있어야 성립하므로 Router state로 넘긴다
+      /*
+       * 추가 **후** 수치도 서버에서 읽어 넘긴다(업무 -599). 예전에는 2.7이 추가 전 수치에
+       * `+1`을 더해 지어냈는데, 그 전제는 평가 한 건이 팝콘을 정확히 한 알 움직일 때만
+       * 참이다. 계약은 그렇지만(평가 1건 = 프레임 1개 + 대표 맛이 있으면 팝콘 1알) 팝콘
+       * 집계는 `대표 맛이 있는 영화의 평가`를 세므로, 영화에 대표 맛이 붙는 것만으로도
+       * 과거 평가가 뒤늦게 버킷에 들어온다. 그때 실제 값은 두 알이 늘고 화면만 한 알을
+       * 단언한다.
+       *
+       * 저장은 이미 끝났으므로 이 조회가 실패해도 되돌리지 않는다. 2.7이 계약이 정한
+       * 증가량으로 물러서서 그린다.
+       */
+      const after = await getRatingCounts().catch(() => null);
+
+      // 2.6 · 2.7은 이 수치가 있어야 성립하므로 Router state로 넘긴다
       void navigate(path.ratingResult(movie.movieId), {
-        state: { rating, counts, movieTitle: movie.title, posterUrl: movie.posterUrl },
+        state: { rating, counts, after, movieTitle: movie.title, posterUrl: movie.posterUrl },
       });
     } catch (error) {
       setFailure(failureMessage(error));
