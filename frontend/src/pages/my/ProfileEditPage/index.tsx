@@ -1,61 +1,70 @@
 /*
- * 7.2 프로필 편집
+ * 7.2 프로필 편집 (업무 S15P21E106-616)
  *
- * 화면에 있는 것은 닉네임(2~10자 · 카운터 · 헬퍼), 읽기 전용 3행(이메일 · 연령대 · 성별),
- * 저장, 미리보기로 나가는 경로뿐이다. **고칠 수 있는 값은 닉네임 하나다.**
+ * **프로필 화면 그대로에서 한 항목씩 고친다**(사용자 시안 2026-09-18). 설정 목록처럼 항목명과
+ * 화살표를 늘어놓지 않는다. 화면은 7.1 · 7.2-A · 7.2-B와 같은 `ProfileLayout`(`mode="edit"`)이고,
+ * 고칠 수 있는 자리마다 연필이 붙는다.
  *
- * **뺀 것**(업무 -459)
- * - **프로필 이미지.** 계약에 자리가 없어(API-014 · API-015) 늘 자리표시자였고 업로드
- *   API도 없었다. 상단 비주얼은 그 이미지를 담으려고 있던 자리라 함께 걷어냈다. 이로써
- *   `screen-spec-my.md` 4장 표의 `7.2 어두운 블록 없음`과도 맞는다
- * - **한 줄 소개.** 와이어프레임에 없고 레퍼런스 지시로 넣은 값이다. 계약에 자리가 없어
- *   세션 저장소에만 남았다
- * - **선호 장르 칩.** 취향은 평가로 쌓이는 것이라(FR-07) 편집할 수 없는 표시였다
+ * | 항목 | 편집 | 저장 |
+ * | --- | --- | --- |
+ * | 사진 | 시트 → 촬영 · 앨범 → 자르기 / 기본 이미지 / 삭제 | 계약 없음(목업) |
+ * | 닉네임 | 그 자리의 입력칸. 규칙 · 중복을 확인한다 | API-015 |
+ * | 소개 | 그 자리의 여러 줄 입력. 40자 | 계약 없음(목업) |
+ * | 공개된 취향 키워드 | 칩을 눌러 공개할 것을 고른다 | 계약 없음(목업) |
+ * | 공개된 취향 필름 | 포스터를 눌러 공개할 것을 고른다 | 계약 없음(목업) |
  *
- * 저장은 API-015다. **닉네임을 읽는 화면이 여럿이다** — 2.1 홈 인사말 · 5.8 파티원 ·
- * 7.1 · 7.2-A가 모두 `getMyProfile`을 거치므로 여기서 저장하면 전부 따라온다.
+ * **한 번에 한 항목만 연다.** 고치던 것이 있는데 다른 연필을 누르거나 화면을 떠나려 하면
+ * 저장 · 버리기 · 계속 편집을 묻는다(`UnsavedDialog`). 떠나는 것은 라우터가 막고
+ * (`useBlocker`), 새로고침 · 탭 닫기는 브라우저 확인창이 막는다.
  *
- * 저장 후 7.1로 돌아간다(와이어프레임 이동표 `7.2 ⇢ 7.1`).
+ * 저장은 **항목별**이다. 성공하면 그 구역만 보기로 돌아가고 짧게 알린다. 실패하면 입력값을
+ * 그대로 두고 편집기 아래에 까닭을 적는다. 저장 중에는 그 편집기의 저장 버튼만 잠기고,
+ * 같은 요청이 두 번 나가지 않는다.
  *
- * **닉네임은 입력을 멈추면 서버에 사용 가능한지 물어본다**(API-016, 업무
- * S15P21E106-391). 0.4는 `중복 확인` 버튼으로 묻지만 와이어프레임 7.2에는 그 버튼이
- * 없고 글자수 카운터와 헬퍼만 있다. 버튼을 새로 그리는 대신 입력이 멎은 뒤 한 번
- * 물어 헬퍼 자리에 결과를 적는다 — 보이는 요소는 그대로 두고 값만 채우는 쪽이다.
- * 확인을 통과해도 저장(API-015)이 다시 검사하므로 `409 NICKNAME_DUPLICATED`는 여전히
- * 올 수 있다(API-016 처리 규칙).
+ * 저장한 값은 7.1과 7.2-A가 다시 읽을 때 그대로 보인다(`api/users.ts`).
+ *
+ * **닉네임은 입력을 멈추면 서버에 사용 가능한지 물어본다**(API-016, 업무 -391). 확인을
+ * 통과해도 저장(API-015)이 다시 검사하므로 `409 NICKNAME_DUPLICATED`는 여전히 올 수 있다.
  */
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useBlocker, useNavigate } from 'react-router';
 import Button from '../../../components/Button';
+import ConfirmDialog from '../../../components/ConfirmDialog';
+import ProfileLayout, { ProfileSkeleton } from '../../../components/ProfileLayout';
 import ScreenHeader from '../../../components/ScreenHeader';
 import Snackbar from '../../../components/Snackbar';
 import StatusView from '../../../components/StatusView';
-import TextField from '../../../components/TextField';
+import { failureDescription } from '../../../components/StatusView/failure';
 import { ApiError } from '../../../api/apiError';
 import {
   checkNicknameAvailability,
-  getMyProfile,
+  getMyProfileView,
   isValidNickname,
   updateMyProfile,
+  updateProfileExtras,
 } from '../../../api/users';
+import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
-import { formatAgeGroup } from '../../../utils/date';
+import { avatarFileProblem, readAsDataUrl } from '../../../utils/avatarImage';
+import AvatarCropper from './AvatarCropper';
+import AvatarSheet from './AvatarSheet';
+import {
+  BioEditor,
+  FilmsEditor,
+  KeywordsEditor,
+  NICKNAME_HINT,
+  NicknameEditor,
+} from './ProfileEditors';
+import UnsavedDialog from './UnsavedDialog';
 import styles from './ProfileEditPage.module.css';
-import type { MyProfile } from '../../../types/user';
+import type { EditableKey } from '../../../components/ProfileLayout';
+import type { ProfileExtrasUpdate, ProfileView } from '../../../types/unspecified';
 
-/** 와이어프레임 7.2의 헬퍼 문구가 적은 상한 */
-const NICKNAME_MAX = 10;
-/** 저장 막대를 보여주고 7.1로 돌아가기까지의 시간 */
-const SAVED_NOTICE_MS = 700;
-
-/** 와이어프레임 7.2의 헬퍼 문구 그대로다 */
-const NICKNAME_HINT = '한글, 영문, 숫자, _ 2~10자';
+/** 저장했다는 알림이 떠 있는 시간 */
+const NOTICE_MS = 1800;
 
 /**
- * 입력이 멎었다고 보는 시간(ms).
- *
- * 글자마다 부르면 닉네임 하나에 요청이 열 번 나간다. 0.4처럼 버튼으로 부르는 자리가
- * 없어 이 화면만 시간으로 가른다.
+ * 입력이 멎었다고 보는 시간(ms). 글자마다 부르면 닉네임 하나에 요청이 열 번 나간다.
  */
 const NICKNAME_CHECK_DELAY_MS = 400;
 
@@ -69,48 +78,139 @@ const NICKNAME_MESSAGE: Record<NicknameState, string> = {
   failed: '사용 가능한지 확인하지 못했어요',
 };
 
-/** 결과로 저장을 막는 것은 중복뿐이다. 나머지는 알리기만 하고 서버 판정에 맡긴다 */
-function blocksSave(state: NicknameState | null): boolean {
-  return state === 'duplicated';
+/** 편집기가 들고 있는 초안. 연필을 누를 때 지금 값으로 채운다 */
+type Draft = {
+  nickname: string;
+  bio: string;
+  keywordCodes: string[];
+  frameIds: number[];
+};
+
+function draftOf(profile: ProfileView): Draft {
+  return {
+    nickname: profile.nickname,
+    bio: profile.bio,
+    keywordCodes: profile.keywords.filter((item) => item.isPublic).map((item) => item.code),
+    frameIds: profile.frames.filter((item) => item.isPublic).map((item) => item.frameId),
+  };
 }
 
-/** 성별 표시명. 와이어프레임 7.2가 `여성`으로 적는다 */
-const GENDER_LABEL: Record<MyProfile['gender'], string> = {
-  FEMALE: '여성',
-  MALE: '남성',
-  OTHER: '기타',
-};
+function sameSet<T>(a: T[], b: T[]): boolean {
+  return a.length === b.length && a.every((value) => b.includes(value));
+}
+
+function toggled<T>(values: T[], value: T): T[] {
+  return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
+}
+
+/** 이 항목의 초안이 저장된 값과 다른지 */
+function isDirty(key: EditableKey, draft: Draft, profile: ProfileView): boolean {
+  const saved = draftOf(profile);
+
+  if (key === 'nickname') return draft.nickname !== saved.nickname;
+  if (key === 'bio') return draft.bio !== saved.bio;
+  if (key === 'keywords') return !sameSet(draft.keywordCodes, saved.keywordCodes);
+
+  return !sameSet(draft.frameIds, saved.frameIds);
+}
+
+/** 사진 한 장의 진행. 실패하면 다시 올릴 사진을 들고 있는다 — 기존 사진은 그대로다 */
+type AvatarState =
+  | { status: 'idle' }
+  | { status: 'uploading' }
+  | { status: 'failed'; next: string | null }
+  | { status: 'invalid'; message: string };
+
+/** 연필을 누른 곳 · 떠나려는 곳. 고치던 것이 있으면 여기를 들고 묻는다 */
+type Pending = { kind: 'switch'; key: EditableKey } | { kind: 'leave' };
+
+/**
+ * 닉네임 사용 가능 확인(API-016). 저장된 닉네임 그대로면 묻지 않는다.
+ *
+ * 결과는 어느 닉네임에 대한 것인지와 함께 든다 — 입력이 바뀐 뒤 늦게 온 결과를 쓰지 않는다.
+ */
+function useNicknameCheck(nickname: string, current: string | null, active: boolean) {
+  const [result, setResult] = useState<{ nickname: string; state: NicknameState } | null>(null);
+
+  useEffect(() => {
+    if (!active || current === null || nickname === current) return;
+
+    let live = true;
+    const timer = setTimeout(() => {
+      // 형식이 틀린 값은 부르지 않는다. 서버가 `INVALID_FORMAT`으로 같은 답을 준다
+      if (!isValidNickname(nickname)) {
+        setResult({ nickname, state: 'invalid' });
+
+        return;
+      }
+
+      setResult({ nickname, state: 'checking' });
+
+      checkNicknameAvailability(nickname)
+        .then(({ available, reason }) => {
+          if (!live) return;
+
+          setResult({
+            nickname,
+            state: available ? 'available' : reason === 'INVALID_FORMAT' ? 'invalid' : 'duplicated',
+          });
+        })
+        .catch(() => {
+          if (live) setResult({ nickname, state: 'failed' });
+        });
+    }, NICKNAME_CHECK_DELAY_MS);
+
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [nickname, current, active]);
+
+  return active && nickname !== current && result?.nickname === nickname ? result.state : null;
+}
 
 export default function ProfileEditPage() {
   const navigate = useNavigate();
+  const finish = useBack(path.my());
 
-  const [profile, setProfile] = useState<MyProfile | null>(null);
-  const [nickname, setNickname] = useState('');
-  const [error, setError] = useState('');
-  /** 어느 닉네임에 대한 결과인지 함께 들고 있어야 입력이 바뀐 뒤의 결과를 쓰지 않는다 */
-  const [availability, setAvailability] = useState<{
-    nickname: string;
-    state: NicknameState;
-  } | null>(null);
-  const [saved, setSaved] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [profile, setProfile] = useState<ProfileView | null>(null);
+  const [failure, setFailure] = useState<unknown>(null);
   const [reloadCount, setReloadCount] = useState(0);
+
+  const [editing, setEditing] = useState<EditableKey | null>(null);
+  const [draft, setDraft] = useState<Draft>({
+    nickname: '',
+    bio: '',
+    keywordCodes: [],
+    frameIds: [],
+  });
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [notice, setNotice] = useState('');
+
+  const [avatar, setAvatar] = useState<AvatarState>({ status: 'idle' });
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const albumRef = useRef<HTMLInputElement>(null);
+  /** 저장 요청이 나가 있는지. 상태가 바뀌기 전의 두 번째 누름까지 막으려고 ref로 든다 */
+  const inFlight = useRef(false);
 
   useEffect(() => {
     let active = true;
 
-    getMyProfile()
+    getMyProfileView()
       .then((value) => {
         if (active) {
           setProfile(value);
-          setNickname(value.nickname);
-          setFailed(false);
+          setFailure(null);
         }
       })
-      .catch(() => {
-        if (active) {
-          setFailed(true);
-        }
+      .catch((error: unknown) => {
+        if (active) setFailure(error);
       });
 
     return () => {
@@ -118,115 +218,212 @@ export default function ProfileEditPage() {
     };
   }, [reloadCount]);
 
-  /*
-   * 닉네임 사용 가능 확인(API-016).
-   *
-   * 지금 쓰는 닉네임 그대로면 물을 것이 없다 — 자기 것이라 중복으로 나오지 않지만
-   * 화면을 열자마자 요청이 나가는 것도 이상하다.
-   */
+  // 알림은 잠깐 떴다가 사라진다
   useEffect(() => {
-    if (!profile || nickname === profile.nickname) {
-      return;
-    }
+    if (!notice) return;
 
-    let active = true;
-    const timer = setTimeout(() => {
-      /*
-       * 형식이 틀린 값은 부르지 않는다. 서버가 `INVALID_FORMAT`으로 같은 답을 주므로
-       * 왕복할 이유가 없다(0.4와 같다). 판정을 기다린 뒤에 하는 이유는 두 글자를
-       * 치는 도중에 `2~10자`라고 나무라지 않기 위해서다.
-       */
-      if (!isValidNickname(nickname)) {
-        setAvailability({ nickname, state: 'invalid' });
-
-        return;
-      }
-
-      setAvailability({ nickname, state: 'checking' });
-
-      checkNicknameAvailability(nickname)
-        .then(({ available, reason }) => {
-          if (!active) return;
-
-          setAvailability({
-            nickname,
-            state: available ? 'available' : reason === 'INVALID_FORMAT' ? 'invalid' : 'duplicated',
-          });
-        })
-        .catch(() => {
-          if (active) setAvailability({ nickname, state: 'failed' });
-        });
-    }, NICKNAME_CHECK_DELAY_MS);
-
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [nickname, profile]);
-
-  /*
-   * 저장 막대를 잠깐 보여주고 7.1로 돌아간다(이동표 `7.2 ⇢ 7.1`). 타이머를 effect에
-   * 두는 이유는 사용자가 그 사이에 뒤로 가기를 눌러도 이동이 따라오지 않게 하기
-   * 위해서다. `handleSave` 안에서 `setTimeout`을 걸면 화면을 떠난 뒤에 이동이 실행된다.
-   */
-  useEffect(() => {
-    if (!saved) return;
-
-    const timer = setTimeout(() => void navigate(path.my()), SAVED_NOTICE_MS);
+    const timer = setTimeout(() => setNotice(''), NOTICE_MS);
 
     return () => clearTimeout(timer);
-  }, [saved, navigate]);
+  }, [notice]);
+
+  const dirty = Boolean(profile && editing && isDirty(editing, draft, profile));
+
+  const nicknameState = useNicknameCheck(
+    draft.nickname,
+    profile?.nickname ?? null,
+    editing === 'nickname',
+  );
 
   /*
-   * 확인한 뒤 닉네임을 고쳤으면 그 결과는 지금 값의 것이 아니다(0.4와 같다). 지금 쓰는
-   * 닉네임으로 되돌린 경우도 물어본 적이 없으니 결과가 없다.
+   * 떠나기 전에 묻는다. 경로가 바뀌는 이동만 막는다 — 같은 화면 안의 주소 변화는 떠나는
+   * 것이 아니다. 새로고침 · 탭 닫기는 라우터 밖이라 브라우저 확인창에 맡긴다.
    */
-  const nicknameState =
-    nickname !== profile?.nickname && availability?.nickname === nickname
-      ? availability.state
-      : null;
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      dirty && currentLocation.pathname !== nextLocation.pathname,
+  );
 
-  function handleSave() {
+  useEffect(() => {
+    if (!dirty) return;
+
+    const onBeforeUnload = (event: BeforeUnloadEvent) => event.preventDefault();
+
+    window.addEventListener('beforeunload', onBeforeUnload);
+
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [dirty]);
+
+  const open = (key: EditableKey) => {
     if (!profile) return;
 
-    if (!isValidNickname(nickname)) {
-      setError(NICKNAME_MESSAGE.invalid);
+    setDraft(draftOf(profile));
+    setSaveError('');
+    setEditing(key);
+  };
+
+  const close = () => {
+    setEditing(null);
+    setSaveError('');
+  };
+
+  const requestEdit = (key: EditableKey) => {
+    if (editing && editing !== key && dirty) {
+      setPending({ kind: 'switch', key });
 
       return;
     }
 
-    // 이미 서버가 안 된다고 답한 값이다. 보내 봐야 `409`로 돌아온다
-    if (blocksSave(nicknameState)) {
-      setError(NICKNAME_MESSAGE.duplicated);
+    open(key);
+  };
 
-      return;
+  /** 지금 열린 항목을 저장한다. 성공하면 true — 묻던 창이 다음으로 넘어갈 수 있다 */
+  const save = useCallback(async (): Promise<boolean> => {
+    if (!profile || !editing || inFlight.current) return false;
+
+    if (!isDirty(editing, draft, profile)) {
+      close();
+
+      return true;
     }
 
-    setError('');
+    if (editing === 'nickname') {
+      if (!isValidNickname(draft.nickname)) {
+        setSaveError(NICKNAME_MESSAGE.invalid);
 
-    updateMyProfile({ nickname })
-      .then(() => {
-        // 저장했음을 알리고, 아래 effect가 잠시 뒤 7.1로 돌려보낸다
-        setSaved(true);
-      })
-      .catch((reason: unknown) =>
-        setError(
-          reason instanceof ApiError
-            ? reason.message
-            : '저장하지 못했어요. 잠시 후 다시 시도해 주세요',
-        ),
+        return false;
+      }
+
+      // 이미 서버가 안 된다고 답한 값이다. 보내 봐야 `409`로 돌아온다
+      if (nicknameState === 'duplicated') {
+        setSaveError(NICKNAME_MESSAGE.duplicated);
+
+        return false;
+      }
+    }
+
+    inFlight.current = true;
+    setSaving(true);
+    setSaveError('');
+
+    try {
+      if (editing === 'nickname') {
+        const saved = await updateMyProfile({ nickname: draft.nickname });
+
+        setProfile((prev) => (prev ? { ...prev, nickname: saved.nickname } : prev));
+      } else {
+        const update: ProfileExtrasUpdate =
+          editing === 'bio'
+            ? { bio: draft.bio.trim() }
+            : editing === 'keywords'
+              ? { publicKeywordCodes: draft.keywordCodes }
+              : { publicFrameIds: draft.frameIds };
+
+        setProfile(await updateProfileExtras(update));
+      }
+
+      setEditing(null);
+      setNotice('저장했어요');
+
+      return true;
+    } catch (error: unknown) {
+      setSaveError(
+        error instanceof ApiError && error.status < 500 && error.message
+          ? error.message
+          : `저장하지 못했어요. ${failureDescription(error)}`,
       );
-  }
 
-  if (failed) {
+      return false;
+    } finally {
+      inFlight.current = false;
+      setSaving(false);
+    }
+  }, [profile, editing, draft, nicknameState]);
+
+  /** 지금 묻고 있는 것. 떠나려다 막힌 것이 먼저다 */
+  const asking: Pending | null = blocker.state === 'blocked' ? { kind: 'leave' } : pending;
+
+  /** 묻는 창을 닫고 제자리에 머문다 */
+  const stay = () => {
+    setPending(null);
+    if (blocker.state === 'blocked') blocker.reset();
+  };
+
+  /** 묻는 창에서 고른 다음 걸음 */
+  const proceed = (next: Pending) => {
+    setPending(null);
+
+    if (next.kind === 'switch') {
+      open(next.key);
+
+      return;
+    }
+
+    close();
+    if (blocker.state === 'blocked') blocker.proceed();
+  };
+
+  /** 사진을 올리거나(`data URL`) 기본으로 돌린다(`null`). 실패해도 기존 사진은 그대로다 */
+  const uploadAvatar = async (next: string | null, done: string) => {
+    if (avatar.status === 'uploading') return;
+
+    setAvatar({ status: 'uploading' });
+
+    try {
+      const saved = await updateProfileExtras({ avatarUrl: next });
+
+      // 사진만 바꾼다. 다른 항목을 고치던 중이면 그 초안은 건드리지 않는다
+      setProfile((prev) => (prev ? { ...prev, avatarUrl: saved.avatarUrl } : prev));
+      setAvatar({ status: 'idle' });
+      setNotice(done);
+    } catch {
+      setAvatar({ status: 'failed', next });
+    }
+  };
+
+  const pickFile = async (file: File | undefined) => {
+    if (!file) return;
+
+    const problem = avatarFileProblem(file);
+
+    if (problem) {
+      setAvatar({ status: 'invalid', message: problem });
+
+      return;
+    }
+
+    try {
+      setAvatar({ status: 'idle' });
+      setCropSrc(await readAsDataUrl(file));
+    } catch {
+      setAvatar({ status: 'invalid', message: '사진을 읽지 못했어요. 다른 사진을 골라 주세요' });
+    }
+  };
+
+  const header = (
+    <ScreenHeader
+      title="프로필 편집"
+      showBack
+      fallbackTo={path.my()}
+      action={
+        profile ? (
+          <button type="button" className={styles.doneButton} onClick={finish}>
+            완료
+          </button>
+        ) : null
+      }
+    />
+  );
+
+  if (failure !== null) {
     return (
       <>
-        <ScreenHeader title="프로필 편집" showBack fallbackTo={path.my()} />
+        {header}
 
-        <StatusView title="프로필을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
+        <StatusView title="프로필을 불러오지 못했어요" description={failureDescription(failure)}>
           <Button
             onClick={() => {
-              setFailed(false);
+              setFailure(null);
               setReloadCount((count) => count + 1);
             }}
           >
@@ -237,76 +434,208 @@ export default function ProfileEditPage() {
     );
   }
 
-  if (!profile) {
-    return <ScreenHeader title="프로필 편집" showBack fallbackTo={path.my()} />;
-  }
+  const actions = { saving, onCancel: close, error: saveError };
+
+  const editor = (() => {
+    if (!profile || !editing) return null;
+
+    if (editing === 'nickname') {
+      const blocking = nicknameState === 'duplicated' || nicknameState === 'invalid';
+
+      return (
+        <NicknameEditor
+          {...actions}
+          value={draft.nickname}
+          onChange={(nickname) => {
+            setDraft((prev) => ({ ...prev, nickname }));
+            setSaveError('');
+          }}
+          onSave={() => void save()}
+          hint={nicknameState && !blocking ? NICKNAME_MESSAGE[nicknameState] : undefined}
+          error={saveError || (blocking ? NICKNAME_MESSAGE[nicknameState] : undefined)}
+        />
+      );
+    }
+
+    if (editing === 'bio') {
+      return (
+        <BioEditor
+          {...actions}
+          value={draft.bio}
+          onChange={(bio) => setDraft((prev) => ({ ...prev, bio }))}
+          onSave={() => void save()}
+        />
+      );
+    }
+
+    if (editing === 'keywords') {
+      return (
+        <KeywordsEditor
+          {...actions}
+          keywords={profile.keywords}
+          selected={draft.keywordCodes}
+          onToggle={(code) =>
+            setDraft((prev) => ({ ...prev, keywordCodes: toggled(prev.keywordCodes, code) }))
+          }
+          onSave={() => void save()}
+        />
+      );
+    }
+
+    return (
+      <FilmsEditor
+        {...actions}
+        frames={profile.frames}
+        selected={draft.frameIds}
+        onToggle={(frameId) =>
+          setDraft((prev) => ({ ...prev, frameIds: toggled(prev.frameIds, frameId) }))
+        }
+        onSave={() => void save()}
+      />
+    );
+  })();
+
+  const avatarNote =
+    avatar.status === 'uploading' ? (
+      <p className={styles.avatarStatus} role="status">
+        사진을 올리는 중이에요
+      </p>
+    ) : avatar.status === 'failed' ? (
+      <p className={styles.avatarStatus} role="alert">
+        사진을 올리지 못했어요. 기존 사진은 그대로예요.{' '}
+        <button
+          type="button"
+          className={styles.inlineRetry}
+          onClick={() => void uploadAvatar(avatar.next, '프로필 사진을 바꿨어요')}
+        >
+          다시 시도
+        </button>
+      </p>
+    ) : avatar.status === 'invalid' ? (
+      <p className={styles.avatarStatus} role="alert">
+        {avatar.message}
+      </p>
+    ) : null;
 
   return (
     <>
-      <ScreenHeader title="프로필 편집" showBack fallbackTo={path.my()} />
+      {header}
 
       <div className={styles.page}>
-        <section className={styles.group}>
-          <h2 className={styles.groupLabel}>기본 정보</h2>
-
-          <TextField
-            label="닉네임"
-            value={nickname}
-            maxLength={NICKNAME_MAX}
-            onChange={(event) => {
-              setNickname(event.target.value);
-              setError('');
-            }}
-            trailing={`${[...nickname].length}/${NICKNAME_MAX}`}
-            hint={
-              nicknameState && nicknameState !== 'duplicated' && nicknameState !== 'invalid'
-                ? NICKNAME_MESSAGE[nicknameState]
-                : NICKNAME_HINT
-            }
-            error={
-              error ||
-              (nicknameState === 'duplicated' || nicknameState === 'invalid'
-                ? NICKNAME_MESSAGE[nicknameState]
-                : undefined)
-            }
-          />
-        </section>
-
-        <section className={styles.group}>
-          <h2 className={styles.groupLabel}>계정</h2>
-
-          <dl className={styles.readonly}>
-            <div className={styles.readonlyRow}>
-              <dt>이메일</dt>
-              <dd>{profile.email}</dd>
-            </div>
-            <div className={styles.readonlyRow}>
-              <dt>연령대</dt>
-              <dd>{formatAgeGroup(profile.birthDate)}</dd>
-            </div>
-            <div className={styles.readonlyRow}>
-              <dt>성별</dt>
-              <dd>{GENDER_LABEL[profile.gender]}</dd>
-            </div>
-          </dl>
-        </section>
+        {profile ? (
+          <ProfileLayout
+            mode="edit"
+            profile={profile}
+            editing={editing && editor ? { key: editing, node: editor } : null}
+            onEdit={requestEdit}
+            onAvatar={() => setSheetOpen(true)}
+            avatarBusy={avatar.status === 'uploading'}
+            avatarNote={avatarNote}
+          >
+            <Button variant="secondary" onClick={() => void navigate(path.profilePreview())}>
+              내 공개 프로필 미리보기
+            </Button>
+          </ProfileLayout>
+        ) : (
+          <ProfileSkeleton />
+        )}
       </div>
 
-      <div className={styles.footer}>
-        {/*
-         * 미리보기는 저장된 값을 보여준다. 주 동작(저장)과 구분되도록 보조 버튼이다.
-         * 화면의 검정 알약은 저장 하나다.
-         */}
-        <Button variant="secondary" onClick={() => void navigate(path.profilePreview())}>
-          내 공개 프로필 미리보기
-        </Button>
+      {/* 사진 고르기. 화면에는 보이지 않고 시트의 두 버튼이 연다 */}
+      <input
+        ref={cameraRef}
+        className={styles.fileInput}
+        type="file"
+        accept="image/*"
+        capture="user"
+        tabIndex={-1}
+        aria-hidden="true"
+        onChange={(event) => {
+          void pickFile(event.target.files?.[0]);
+          event.target.value = '';
+        }}
+      />
+      <input
+        ref={albumRef}
+        className={styles.fileInput}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        tabIndex={-1}
+        aria-hidden="true"
+        data-testid="avatar-album-input"
+        onChange={(event) => {
+          void pickFile(event.target.files?.[0]);
+          event.target.value = '';
+        }}
+      />
 
-        <Button onClick={handleSave}>저장</Button>
-      </div>
+      {sheetOpen && profile ? (
+        <AvatarSheet
+          hasPhoto={Boolean(profile.avatarUrl)}
+          onCamera={() => {
+            setSheetOpen(false);
+            cameraRef.current?.click();
+          }}
+          onAlbum={() => {
+            setSheetOpen(false);
+            albumRef.current?.click();
+          }}
+          onDefault={() => {
+            setSheetOpen(false);
+            void uploadAvatar(null, '기본 이미지로 바꿨어요');
+          }}
+          onDelete={() => {
+            setSheetOpen(false);
+            setConfirmDelete(true);
+          }}
+          onClose={() => setSheetOpen(false)}
+        />
+      ) : null}
 
-      {saved ? (
+      {cropSrc ? (
+        <AvatarCropper
+          src={cropSrc}
+          onCancel={() => setCropSrc(null)}
+          onApply={(dataUrl) => {
+            setCropSrc(null);
+            void uploadAvatar(dataUrl, '프로필 사진을 바꿨어요');
+          }}
+        />
+      ) : null}
+
+      {confirmDelete ? (
+        <ConfirmDialog
+          title="현재 사진을 삭제할까요?"
+          description="삭제하면 기본 이미지로 보여요."
+          confirmLabel="삭제"
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={() => {
+            setConfirmDelete(false);
+            void uploadAvatar(null, '프로필 사진을 삭제했어요');
+          }}
+        />
+      ) : null}
+
+      {asking ? (
+        <UnsavedDialog
+          saving={saving}
+          saveLabel={asking.kind === 'leave' ? '저장하고 나가기' : '저장하고 넘어가기'}
+          discardLabel={asking.kind === 'leave' ? '저장하지 않고 나가기' : '저장하지 않기'}
+          onSave={() => {
+            void save().then((ok) => {
+              // 저장이 실패하면 제자리에 머물러 편집기 아래에 까닭을 보여준다
+              if (ok) proceed(asking);
+              else stay();
+            });
+          }}
+          onDiscard={() => proceed(asking)}
+          onKeep={stay}
+        />
+      ) : null}
+
+      {notice ? (
         <div className={styles.snackbarSlot}>
-          <Snackbar>프로필을 저장했어요</Snackbar>
+          <Snackbar>{notice}</Snackbar>
         </div>
       ) : null}
     </>

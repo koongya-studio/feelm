@@ -20,12 +20,13 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import MyDashboardPage from './index';
 import MovieRatingPage from '../../movies/MovieRatingPage';
 import RatingResultPage from '../../movies/RatingResultPage';
-import { getMyProfile } from '../../../api/users';
+import { getMyProfile, getMyProfileView } from '../../../api/users';
 import { mockFrameList } from '../../../mocks/frames';
 import { findMockMovieDetail } from '../../../mocks/movieDetails';
 import { findMockMovie } from '../../../mocks/movies';
 import { mockOtts } from '../../../mocks/otts';
 import { resetSessionStore } from '../../../mocks/sessionStore';
+import { mockMyProfileView } from '../../../mocks/publicProfiles';
 import { mockMyProfile } from '../../../mocks/user';
 import { ROUTE_PATTERN } from '../../../routes/paths';
 import type { MovieDetail } from '../../../types/movie';
@@ -61,8 +62,10 @@ function withRatingEdit<T extends RatingUpdateInput & { ratingId: number }>(rati
   return edit ? { ...rating, ...edit } : rating;
 }
 
+// 7.1은 프로필 전체(`getMyProfileView`)를, 2.6 평가 완료는 수치(`getMyProfile`)를 읽는다
 vi.mock('../../../api/users', () => ({
   getMyProfile: vi.fn(),
+  getMyProfileView: vi.fn(),
 }));
 
 vi.mock('../../../api/otts', () => ({
@@ -186,6 +189,7 @@ beforeEach(() => {
   ratingEdits.clear();
   createdRatings.length = 0;
   vi.mocked(getMyRatings).mockReset().mockImplementation(myRatings);
+  vi.mocked(getMyProfileView).mockReset().mockResolvedValue(mockMyProfileView);
   vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
   vi.mocked(getOtts).mockReset().mockResolvedValue(mockOtts);
   // 팝콘 통은 그림이라 비어 있어도 화면이 그려진다

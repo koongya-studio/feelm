@@ -6,16 +6,17 @@
  *
  * **한 파일에 실제 호출과 목업이 섞여 있다.** 갈리는 기준은 계약의 단계다.
  * - API-014 · API-015 · API-016 · API-019는 1차 MVP라 실제로 부른다
- * - API-062 · API-063(공개 프로필 · 취향 비교)은 **2차 MVP라 아직 없다.** MY 화면
- *   업무(-305)가 화면을 먼저 만들었으므로 목업으로 응답한다. 계약이 열리면 이 파일의
- *   두 함수 본문만 `request`로 바꾸면 된다
- * - 한 줄 소개는 **계약에 아예 없다**(`types/unspecified.ts`). 세션 저장소에만 남는다
+ * - API-062(공개 프로필)는 **2차 MVP라 아직 없다.** MY 화면 업무(-305)가 화면을 먼저
+ *   만들었으므로 목업으로 응답한다. 계약이 열리면 `getPublicProfile` 본문만 `request`로 바꾼다
+ * - 프로필 사진 · 자기소개 · 항목별 공개 여부는 **계약에 아예 없다**(업무 -616,
+ *   `types/unspecified.ts`). 세션 저장소에만 남는다
  */
-import { findMockPublicProfile, mockMyPublicProfile } from '../mocks/publicProfiles';
+import { findMockPublicProfile, mockMyProfileView } from '../mocks/publicProfiles';
+import { getProfileExtras, saveProfileExtras } from '../mocks/sessionStore';
 import { request } from './client';
 import { getMockProfile, isMockSession, saveMockProfile } from './mockAccount';
 import { respond, respondError } from './mockTransport';
-import type { PublicProfileView } from '../types/unspecified';
+import type { ProfileExtrasUpdate, ProfileView } from '../types/unspecified';
 import type {
   MyProfile,
   MyProfileUpdate,
@@ -105,49 +106,113 @@ export function isValidNickname(nickname: string): boolean {
   return /^[가-힣a-zA-Z0-9_]{2,10}$/.test(nickname);
 }
 
-/**
- * API-062 공개 프로필 조회 · GET /api/v1/users/{publicId}/profile — 본인(7.2-A).
- *
- * **2차 MVP라 아직 없다.** 계약은 본인이 자신을 조회하면 `visibility`와 무관하게
- * 200을 준다.
- *
- * `[!]` **응답 모양이 계약과 다르다.** API-062는 `user` · `recentFrames` ·
- * `popcorn.flavors` · `publicReviewCount` · `isBlockedByMe`로 내려주는데, 305는 계약을
- * 찾기 전에 화면 기준으로 만들었다. 계약이 열릴 때 맞춘다(screen-spec-my.md).
- */
-export async function getMyPublicProfile(): Promise<PublicProfileView> {
-  const profile = await getMyProfile();
+/** 공개 프로필이 필름을 몇 개까지 보여주는지. 와이어프레임 7.2-A · 7.2-B가 3개를 그렸다 */
+const PUBLIC_FRAME_COUNT = 3;
 
-  return respond({
-    ...mockMyPublicProfile,
-    userId: profile.userId,
-    nickname: profile.nickname,
-    stats: {
-      ...mockMyPublicProfile.stats,
-      frameCount: profile.stats.frameCount,
-      popcornCount: profile.stats.popcornCount,
+/** 자기소개 상한. 사용자 시안 7.2의 `16/40`이다. 계약이 없어 화면 시안을 따른다 */
+export const BIO_MAX_LENGTH = 40;
+
+/**
+ * 내 프로필 전체(7.1 · 7.2). 모든 키워드 · 필름이 `isPublic`과 함께 온다.
+ *
+ * 닉네임과 프레임 · 팝콘 수는 **실제 API-014**다. 나머지는 목업 기준값(`mockMyProfileView`)에
+ * 이번 세션에 바꾼 사진 · 소개 · 공개 항목을 덮는다 — 그 셋은 계약에 자리가 없다.
+ */
+export async function getMyProfileView(): Promise<ProfileView> {
+  const profile = await getMyProfile();
+  const extras = getProfileExtras();
+  const base = mockMyProfileView;
+
+  return respond(
+    {
+      ...base,
+      userId: profile.userId,
+      nickname: profile.nickname,
+      avatarUrl: extras.avatarUrl === undefined ? base.avatarUrl : extras.avatarUrl,
+      bio: extras.bio ?? base.bio,
+      stats: {
+        ...base.stats,
+        frameCount: profile.stats.frameCount,
+        popcornCount: profile.stats.popcornCount,
+      },
+      keywords: base.keywords.map((keyword) => ({
+        ...keyword,
+        isPublic: extras.publicKeywordCodes?.includes(keyword.code) ?? keyword.isPublic,
+      })),
+      frames: base.frames.map((frame) => ({
+        ...frame,
+        isPublic: extras.publicFrameIds?.includes(frame.frameId) ?? frame.isPublic,
+      })),
     },
-  });
+    'users',
+  );
 }
 
 /**
- * API-062 공개 프로필 조회 — 다른 사용자(7.2-B). **2차 MVP라 아직 없다.**
+ * 누구에게나 보이는 모양으로 줄인다. **7.2-A 미리보기와 7.2-B가 같은 결과를 보게 하는 곳이다.**
+ *
+ * 비공개 키워드 · 필름을 빼고 필름은 앞의 세 편만 남긴다. 계약이 열리면 서버가 이 일을 한다.
+ */
+function toPublicView(profile: ProfileView): ProfileView {
+  return {
+    ...profile,
+    keywords: profile.keywords.filter((keyword) => keyword.isPublic),
+    frames: profile.frames.filter((frame) => frame.isPublic).slice(0, PUBLIC_FRAME_COUNT),
+  };
+}
+
+/**
+ * API-062 공개 프로필 조회 · GET /api/v1/users/{publicId}/profile — 7.2-B와 7.2-A가 함께 쓴다.
+ *
+ * **2차 MVP라 아직 없다.** 계약은 본인이 자신을 조회하면 `visibility`와 무관하게 `200`을
+ * 준다. 목업도 같다 — 목업 사용자에 없는 번호면 내 번호인지 보고, 맞으면 내 프로필을 공개
+ * 모양으로 줄여 준다. 그래서 7.2에서 바꾼 값이 7.2-A에 바로 보인다.
  *
  * `[!]` 계약의 경로 파라미터는 `publicId`(`users.public_id`, ADR-0008)다. **내부 숫자
  * ID를 공개 URL에 노출하지 않는다는 결정**이므로, 계약이 열릴 때 라우트도
  * `/users/:publicId`로 바꿔야 한다. 목업은 아직 숫자 id로 찾는다.
  */
-export async function getPublicProfile(userId: number): Promise<PublicProfileView> {
+export async function getPublicProfile(userId: number): Promise<ProfileView> {
   const profile = findMockPublicProfile(userId);
+
+  if (profile) return respond(toPublicView(profile), 'users');
 
   /*
    * 계약은 없음 · PRIVATE · 차단 관계를 모두 404로 합친다. 차단 관계는 실제 API-062가
    * `isBlockedByMe`로 판정할 일이라, 목업 프로필이 실제 차단 목록(API-022)을 섞어 보지
-   * 않는다(업무 -610) — 7.2-B에서 차단 자체를 잠갔으므로 볼 이유도 없어졌다.
+   * 않는다(업무 -610).
    */
-  if (!profile) {
-    return respondError(404, 'RESOURCE_NOT_FOUND', '프로필을 찾을 수 없습니다.');
+  const mine = await getMyProfileView();
+
+  if (mine.userId === userId) return toPublicView(mine);
+
+  return respondError(404, 'RESOURCE_NOT_FOUND', '프로필을 찾을 수 없습니다.');
+}
+
+/**
+ * 7.2-A 내 공개 프로필 미리보기. **7.2-B와 같은 공개 모양**(`toPublicView`)으로 준다.
+ *
+ * `getPublicProfile(내 번호)`와 결과가 같지만, 그 길은 내 번호를 알려고 API-014를 한 번,
+ * 내 프로필을 만들려고 또 한 번 불러 같은 요청이 두 번 나갔다(!402 리뷰). 여기서는 내 프로필을
+ * 한 번만 받아 줄인다. 계약(API-062)이 열리면 내 `publicId`로 그 API를 부르면 된다.
+ */
+export async function getMyPublicProfile(): Promise<ProfileView> {
+  return toPublicView(await getMyProfileView());
+}
+
+/**
+ * 프로필 사진 · 자기소개 · 공개 키워드 · 공개 필름 저장. **계약이 없다**(업무 -616).
+ *
+ * 7.2는 항목별로 저장하므로 한 번에 한 키만 보낸다. 사진은 화면이 잘라 만든 data URL이고
+ * `null`이면 기본 이미지로 돌아간다. 응답은 저장된 뒤의 내 프로필 전체다.
+ */
+export async function updateProfileExtras(update: ProfileExtrasUpdate): Promise<ProfileView> {
+  if (update.bio !== undefined && [...update.bio].length > BIO_MAX_LENGTH) {
+    return respondError(400, 'VALIDATION_FAILED', `소개는 ${BIO_MAX_LENGTH}자까지 쓸 수 있어요.`);
   }
 
-  return respond(profile, 'users');
+  await respond(undefined, 'users');
+  saveProfileExtras(update);
+
+  return getMyProfileView();
 }

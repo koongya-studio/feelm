@@ -1,0 +1,427 @@
+/*
+ * 프로필 레이아웃 (업무 S15P21E106-616). 사용자 시안 2026-09-18 네 장.
+ *
+ * 앱 공통 벽 위에 가운데 머리(사진 · 이름 · 소개)를 세우고, 그 아래를 옅은 카드로 나눈다.
+ * 카드는 벽보다 한 단 밝은 면 · 얇은 테두리 · 큰 모서리다. 그림자는 두지 않는다.
+ *
+ * 간격은 4px 배수 토큰만 쓴다. 높이를 못 박지 않는다 — 글자가 커져도 줄이 늘어날 뿐
+ * 겹치지 않는다.
+ */
+.layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* ─────────────────────────── 머리 */
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding-bottom: var(--space-2);
+  text-align: center;
+}
+
+/* 이름 한 줄. 편집에서는 오른쪽에 연필이 붙는다 */
+.nameRow,
+.bioRow {
+  display: flex;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+}
+
+/* 연필이 붙어도 이름이 가운데에 오도록, 연필 폭만큼 왼쪽을 비운다 */
+.layout[data-mode='edit'] .nameRow,
+.layout[data-mode='edit'] .bioRow {
+  padding-left: var(--tap-target-min);
+}
+
+.name {
+  min-width: 0;
+  margin: var(--space-2) 0 0;
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-heading);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  color: var(--color-ink);
+}
+
+.layout[data-mode='edit'] .name {
+  margin-top: 0;
+}
+
+.bio {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+.bio[data-empty='true'] {
+  color: var(--color-ink-hint);
+}
+
+/* 이름 · 소개 편집기가 들어서는 자리. 화면 폭을 채운다 */
+.inlineEditor,
+.bioEditor {
+  width: 100%;
+  margin-top: var(--space-2);
+  text-align: left;
+}
+
+/* ─────────────────────────── 사진 (편집) */
+
+/*
+ * 사진 전체가 버튼이다. 아래쪽에 반투명 `사진 변경` 띠, 오른쪽 아래에 빨간 카메라 표식.
+ * 띠와 표식 둘 다 글자 · 모양으로 뜻을 전한다 — 색만으로 구분하지 않는다.
+ */
+.avatarButton {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  cursor: pointer;
+}
+
+.avatarButton:disabled {
+  cursor: progress;
+}
+
+/* 사진과 띠를 원으로 자르는 층 */
+.avatarClip {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+}
+
+/* 원 아래쪽의 띠 */
+.avatarBand {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: var(--space-1) 0 var(--space-3);
+  background: rgba(38, 39, 41, 0.62);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-on-action);
+}
+
+.avatarBadge {
+  position: absolute;
+  right: calc(var(--space-1) * -1);
+  bottom: var(--space-1);
+  display: flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--color-bg);
+  border-radius: var(--radius-pill);
+  background: var(--color-action-brand);
+  color: var(--color-on-action);
+}
+
+.avatarNote {
+  width: 100%;
+  margin-top: var(--space-1);
+}
+
+/* ─────────────────────────── 연필 */
+
+/* 보이는 아이콘은 18px, 누르는 자리는 44px. 모든 구역에서 같은 모양 · 같은 자리다 */
+.editButton {
+  display: inline-flex;
+  width: var(--tap-target-min);
+  height: var(--tap-target-min);
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+.editButton:hover {
+  color: var(--color-ink);
+}
+
+/* ─────────────────────────── 7.1 버튼 줄 */
+
+.actions {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: 1fr 1fr;
+}
+
+/* ─────────────────────────── 수치 */
+
+/* 세 칸을 옅은 세로줄로 나눈다. 편집에서는 카드 없이 줄만 남긴다(시안 7.2) */
+.stats {
+  display: grid;
+  margin: 0;
+  padding: var(--space-4) 0;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.stats[data-plain='true'] {
+  border-color: transparent;
+  background: none;
+}
+
+/* 이름표(dt)가 먼저 오는 목록이라, 숫자를 위로 올리려고 세로를 뒤집는다 */
+.stat {
+  display: flex;
+  min-width: 0;
+  flex-direction: column-reverse;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-1);
+}
+
+.stat + .stat {
+  border-left: 1px solid var(--color-line);
+}
+
+.stat dd {
+  margin: 0;
+  font-size: var(--font-size-heading);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-heading);
+  color: var(--color-ink);
+}
+
+.stat dt {
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+  text-align: center;
+}
+
+/* ─────────────────────────── 구역 카드 */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+}
+
+/* 편집 중인 구역만 테두리를 진하게 한다. 면 색은 바꾸지 않는다 */
+.card[data-editing='true'] {
+  border-color: var(--color-ink-muted);
+}
+
+/* 제목과 연필이 한 줄. 연필은 오른쪽 위 끝에 붙는다 */
+.cardHead {
+  display: flex;
+  min-height: var(--tap-target-min);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: calc(var(--space-2) * -1) calc(var(--space-2) * -1) calc(var(--space-2) * -1) 0;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-body);
+  color: var(--color-ink);
+}
+
+.layout[data-mode='edit'] .cardTitle {
+  color: var(--color-ink-body);
+}
+
+.empty {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+/*
+ * 프로필의 칩은 공용 `Chip`보다 한 단 크다(시안 7.2 · 7.2-A). 카드 하나를 채우는 주인공이라
+ * 3.1의 작은 태그 크기로는 읽히지 않는다. 모양 · 색은 `Chip` 그대로 두고 크기만 키운다.
+ */
+.chips > li > span {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+/* 필름은 3열. 편집에서는 칸을 좁혀 왼쪽에 모은다(시안 7.2) */
+.films {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  list-style: none;
+}
+
+.films[data-compact='true'] {
+  grid-template-columns: repeat(3, minmax(0, 88px));
+}
+
+/* ─────────────────────────── 팝콘 버킷 */
+
+.bucket {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.bucketCount {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  color: var(--color-ink-muted);
+}
+
+/* ─────────────────────────── 공개 한줄평 */
+
+.emptyReviews {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  color: var(--color-ink-hint);
+}
+
+.emptyReviews p {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  color: var(--color-ink-muted);
+}
+
+.reviews {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.review {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) 0;
+}
+
+.review + .review {
+  border-top: 1px solid var(--color-line-faint);
+}
+
+.reviewHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--font-size-meta);
+}
+
+.reviewScore {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+.reviewMovie {
+  color: var(--color-ink-muted);
+}
+
+.reviewComment {
+  margin: 0;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  color: var(--color-ink-body);
+}
+
+/* ─────────────────────────── 받는 중 */
+
+.skeletonAvatar {
+  display: block;
+  width: 88px;
+  height: 88px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
+}
+
+.skeletonLine {
+  display: block;
+  height: var(--space-4);
+  margin-top: var(--space-2);
+  border-radius: var(--radius-icon);
+  background: var(--color-surface-sunken);
+}
+
+.skeletonLine[data-width='name'] {
+  width: 120px;
+}
+
+.skeletonLine[data-width='bio'] {
+  width: 200px;
+}
+
+.skeletonStats {
+  display: block;
+  height: 88px;
+  border-radius: var(--radius-card);
+  background: var(--color-surface-sunken);
+}
+
+.skeletonAvatar,
+.skeletonLine,
+.skeletonStats {
+  animation: pulse 1.2s var(--ease-standard) infinite alternate;
+}
+
+@keyframes pulse {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonAvatar,
+  .skeletonLine,
+  .skeletonStats {
+    animation: none;
+  }
+}

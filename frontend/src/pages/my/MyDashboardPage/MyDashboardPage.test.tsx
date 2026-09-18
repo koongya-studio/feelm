@@ -22,17 +22,17 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { fireEvent, screen, within } from '@testing-library/react';
 import MyDashboardPage from './index';
 import { renderWithRouter } from '../../../test/render';
-import { getMyProfile } from '../../../api/users';
+import { getMyProfileView } from '../../../api/users';
 import { getMyRatings, getWatchRecords } from '../../../api/watch';
 import { getOtts } from '../../../api/otts';
 import { getRecommendationHistory } from '../../../api/recommendations';
-import { mockMyProfile } from '../../../mocks/user';
+import { mockMyProfileView } from '../../../mocks/publicProfiles';
 import type { MyRatedItem, MyRatingList } from '../../../types/watch';
 import type { WatchRecordListItem } from '../../../types/watch';
 import type { RecommendationHistory } from '../../../types/recommendation';
 
 vi.mock('../../../api/users', () => ({
-  getMyProfile: vi.fn(),
+  getMyProfileView: vi.fn(),
 }));
 
 vi.mock('../../../api/watch', () => ({
@@ -131,7 +131,7 @@ const history: RecommendationHistory = {
 };
 
 beforeEach(() => {
-  vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
+  vi.mocked(getMyProfileView).mockReset().mockResolvedValue(mockMyProfileView);
   vi.mocked(getMyRatings).mockReset().mockResolvedValue(ratingPage(ratings));
   vi.mocked(getRecommendationHistory).mockReset().mockResolvedValue(history);
   vi.mocked(getWatchRecords)
@@ -156,7 +156,7 @@ describe('7.1 MY 대시보드', () => {
     await renderDashboard();
 
     const destinations = Object.fromEntries(
-      ['설정', '4컷 리포트', '프로필 편집'].map((name) => [
+      ['설정', '4컷 리포트', '취향 팝콘', '프로필 편집'].map((name) => [
         name,
         screen.getByRole('link', { name }).getAttribute('href'),
       ]),
@@ -166,6 +166,8 @@ describe('7.1 MY 대시보드', () => {
       설정: '/my/settings',
       // 취향 리포트 목록이다. 지난 반기 리포트를 찾아보러 가는 유일한 길이다(2장 13번)
       '4컷 리포트': '/my/reports',
+      // 시안이 두 바로가기 카드 모두에 화살표를 그렸다(업무 -616). 3.2 취향 팝콘이다
+      '취향 팝콘': '/film/popcorn',
       // 이동 경로 2 · 3번 사슬의 출발점이다
       '프로필 편집': '/my/profile/edit',
     });
@@ -430,15 +432,22 @@ describe('7.1 MY 대시보드', () => {
     expect(within(feed()).getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
   });
 
-  it('통계 수치를 어디에도 두지 않는다', async () => {
+  it('프로필 머리는 7.2 · 7.2-A · 7.2-B와 같은 모양이다 — 사진 · 이름 · 소개 · 수치', async () => {
     /*
-     * API-014가 `frameCount` · `ratingCount` · `popcornCount`를 주지만 이 화면에서는
-     * 쓰지 않는다(사용자 결정 2026-09-16). 목업은 셋 다 100이다.
+     * 2026-09-18 시안(업무 -616)이 수치 카드를 다시 넣었다. 네 화면이 같은 `ProfileLayout`을
+     * 쓰므로 여기 보이는 수치는 공개 프로필과 같은 값 · 같은 이름표다.
      */
     await renderDashboard();
 
-    for (const label of ['프레임', '팝콘', '100']) {
-      expect(screen.queryByText(label)).toBeNull();
+    expect(screen.getByRole('heading', { name: '프로필', level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: mockMyProfileView.nickname })).toBeInTheDocument();
+    expect(screen.getByText(mockMyProfileView.bio)).toBeInTheDocument();
+
+    for (const label of ['프레임', '팝콘', '공개 한줄평']) {
+      expect(screen.getByText(label, { selector: 'dt' })).toBeInTheDocument();
     }
+
+    // 7.1은 보기 전용이다. 고치는 연필은 7.2에만 있다
+    expect(screen.queryByRole('button', { name: /수정/ })).toBeNull();
   });
 });

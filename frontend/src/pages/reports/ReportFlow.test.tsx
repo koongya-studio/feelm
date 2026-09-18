@@ -15,15 +15,18 @@ import MyDashboardPage from '../my/MyDashboardPage';
 import ReportDetailPage from './ReportDetailPage';
 import ReportIssuedPage from './ReportIssuedPage';
 import ReportListPage from './ReportListPage';
-import { getMyProfile } from '../../api/users';
+import { getMyProfile, getMyProfileView } from '../../api/users';
 import { mockPopcornBucket } from '../../mocks/popcornBucket';
 import { resetSessionStore } from '../../mocks/sessionStore';
+import { mockMyProfileView } from '../../mocks/publicProfiles';
 import { mockMyProfile } from '../../mocks/user';
 import { ROUTE_PATTERN } from '../../routes/paths';
 import type { FrameList } from '../../types/taste';
 
 vi.mock('../../api/users', () => ({
   getMyProfile: vi.fn(),
+  // 7.1 프로필 머리(업무 -616)
+  getMyProfileView: vi.fn(),
 }));
 
 /*
@@ -57,6 +60,7 @@ const frames: FrameList = {
 beforeEach(() => {
   resetSessionStore();
   vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
+  vi.mocked(getMyProfileView).mockReset().mockResolvedValue(mockMyProfileView);
   vi.mocked(getMyFrames).mockReset().mockResolvedValue(frames);
   vi.mocked(getPopcornBucket).mockReset().mockResolvedValue(mockPopcornBucket);
 });

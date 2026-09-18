@@ -37,7 +37,6 @@ import NotificationSettingsPage from '../pages/my/NotificationSettingsPage';
 import PasswordChangePage from '../pages/my/PasswordChangePage';
 import PrivacySettingsPage from '../pages/my/PrivacySettingsPage';
 import ProfileEditPage from '../pages/my/ProfileEditPage';
-import ProfilePreviewPage from '../pages/my/ProfilePreviewPage';
 import PublicProfilePage from '../pages/my/PublicProfilePage';
 import SettingsPage from '../pages/my/SettingsPage';
 import WithdrawPage from '../pages/my/WithdrawPage';
@@ -161,7 +160,7 @@ export const router = createBrowserRouter(
 
             // MY 프로필 (업무 -305). 7.1만 탭 화면이고 나머지는 전체화면이다
             { path: ROUTE_PATTERN.profileEdit, element: <ProfileEditPage /> },
-            { path: ROUTE_PATTERN.profilePreview, element: <ProfilePreviewPage /> },
+            { path: ROUTE_PATTERN.profilePreview, element: <PublicProfilePage mode="preview" /> },
             { path: ROUTE_PATTERN.publicProfile, element: <PublicProfilePage /> },
 
             // 설정 하위 화면 (업무 -307). 와이어프레임에 하단 내비가 없다
