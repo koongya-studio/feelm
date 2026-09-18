@@ -26,6 +26,9 @@ stage = load('ci-server-pilot-stage')
 
 
 class ServerPilotTests(unittest.TestCase):
+    def test_image_archive_identity_is_shared_with_input_audit(self):
+        self.assertEqual(pilot.IMAGES, pilot.backend.inputs.IMAGE_ARCHIVE_PATH)
+
     def test_private_json_is_created_with_owner_only_permissions(self):
         with tempfile.TemporaryDirectory() as directory, \
              patch.object(pilot.os, 'O_NOFOLLOW', 0, create=True):

@@ -84,7 +84,10 @@ class OfflinePreparationTests(unittest.TestCase):
                                                         'Os': 'linux', 'Architecture': 'amd64'}))
                      for digest in offline.IMAGES.values()]
         with patch.object(offline.pilot.network, 'execute', side_effect=payloads) as execute:
-            self.assertEqual(len(offline.image_inventory(['docker'])), 3)
+            self.assertEqual(len(offline.image_inventory(['docker'])), 4)
+        self.assertEqual(
+            offline.IMAGES['apache/kafka:4.3.1'],
+            'apache/kafka@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837')
         self.assertTrue(all(call.args[1] in ('info', 'ps', 'image') for call in execute.call_args_list))
         payloads[2] = SimpleNamespace(stdout=json.dumps({'RepoDigests': []}))
         with patch.object(offline.pilot.network, 'execute', side_effect=payloads), self.assertRaises(ValueError):

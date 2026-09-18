@@ -9,6 +9,11 @@ spec.loader.exec_module(transfer)
 
 
 class TransferTests(unittest.TestCase):
+    def test_remote_uses_central_reviewed_image_archive_identity(self):
+        self.assertIn(str(transfer.inputs.IMAGE_ARCHIVE_PATH), transfer.REMOTE)
+        self.assertIn(transfer.inputs.IMAGE_ARCHIVE_SHA, transfer.REMOTE)
+        self.assertNotIn('__IMAGE_ARCHIVE_', transfer.REMOTE)
+
     def test_only_selected_regular_paths(self):
         for name in ('cache-manifest.json', 'backend-images.tar', 'gradle-cache/caches/a',
                      'gradle-cache/wrapper/dists/a'):
