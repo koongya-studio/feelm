@@ -25,3 +25,11 @@
   line-height: var(--line-height-meta);
   color: var(--color-danger);
 }
+
+/* 인증번호 발송·확인처럼 오류가 아닌 알림. 인증번호 줄 아래에 선다 */
+.notice {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
+}

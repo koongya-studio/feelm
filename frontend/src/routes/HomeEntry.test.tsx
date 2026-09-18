@@ -23,6 +23,7 @@ function renderEntry(status: AuthStatus) {
     user: null,
     signIn: vi.fn(),
     signInWithSocial: vi.fn(),
+    completeEmailSignup: vi.fn(),
     completeSocialSignup: vi.fn(),
     signOut: vi.fn(),
   };

@@ -34,17 +34,15 @@ vi.mock('../../../api/auth', () => ({
   login: vi.fn(),
   logout: vi.fn(),
   restoreSession: vi.fn(),
-  resendVerificationMail: vi.fn(),
 }));
 
-const { login, resendVerificationMail, restoreSession } = await import('../../../api/auth');
+const { login, restoreSession } = await import('../../../api/auth');
 
 const ACTIVE_USER = { userId: 1, nickname: '팝콘러버', onboardingCompleted: true };
 const NEW_USER = { ...ACTIVE_USER, onboardingCompleted: false };
 
 beforeEach(() => {
   vi.mocked(login).mockReset();
-  vi.mocked(resendVerificationMail).mockReset().mockResolvedValue(undefined);
   // 로그인하지 않은 상태로 화면을 연다
   vi.mocked(restoreSession).mockReset().mockResolvedValue(null);
 });
@@ -147,25 +145,6 @@ describe('0.6 로그인', () => {
       '이메일 또는 비밀번호가 올바르지 않습니다.',
     );
     expect(location()).toBe('/login');
-  });
-
-  it('미인증 계정은 인증 메일을 다시 보낼 수 있다', async () => {
-    rejectWith(403, 'EMAIL_NOT_VERIFIED');
-    renderLogin();
-
-    fillCredentials();
-    click('로그인');
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      '이메일 인증을 마쳐야 로그인할 수 있습니다.',
-    );
-
-    click('인증 메일 다시 보내기');
-
-    await waitFor(() => {
-      expect(resendVerificationMail).toHaveBeenCalledWith('user@example.com');
-    });
-    expect(await screen.findByRole('status')).toHaveTextContent('인증 메일을 다시 보냈습니다.');
   });
 
   it('시도 제한은 기다리라고 안내하고 재발송을 내보내지 않는다', async () => {

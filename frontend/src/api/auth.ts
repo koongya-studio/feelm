@@ -19,9 +19,8 @@ import { endSession, refreshAccessToken, startSession } from './session';
 import { getMyProfile } from './users';
 import type {
   AuthenticatedUser,
-  EmailVerificationResult,
+  EmailVerificationCodeResult,
   SignupRequest,
-  SignupResult,
   SocialLinkResult,
   SocialLoginResult,
   SocialProvider,
@@ -43,37 +42,57 @@ type SocialSignupRequiredResponse = {
 };
 
 /**
- * API-001 이메일 회원가입 · POST /api/v1/auth/signup
+ * API-078 이메일 인증번호 발송 · POST /api/v1/auth/email/verification-code
  *
- * 가입 직후 계정은 `PENDING_VERIFICATION`이다. 인증 메일의 링크로 API-002를 거쳐야
- * 로그인할 수 있으므로 이 호출만으로는 세션이 생기지 않는다.
+ * 계정을 만들기 전에 이메일 소유를 확인하는 첫 단계다. 6자리 번호가 메일로 가고 응답은
+ * 본문 없이 `202`다. **이미 가입된 이메일은 `409 EMAIL_DUPLICATED`로 돌아온다** — 이
+ * 경로는 계정 존재를 숨기지 않는다(팀 결정, API-078 처리 규칙).
  */
-export async function signup(body: SignupRequest): Promise<SignupResult> {
-  return request<SignupResult>('/auth/signup', { method: 'POST', body, auth: 'none' });
-}
-
-/**
- * API-002 이메일 인증 확인 · POST /api/v1/auth/email/verify
- *
- * `token`은 서버가 발급한 불투명 문자열이며 인증 메일 링크로 전달된다. 클라이언트가
- * 해석하지 않는다.
- */
-export async function verifyEmail(token: string): Promise<EmailVerificationResult> {
-  return request<EmailVerificationResult>('/auth/email/verify', {
+export async function sendEmailVerificationCode(email: string): Promise<void> {
+  await request<void>('/auth/email/verification-code', {
     method: 'POST',
-    body: { token },
+    body: { email },
     auth: 'none',
   });
 }
 
 /**
- * API-003 인증 메일 재발송 · POST /api/v1/auth/email/resend
+ * API-079 이메일 인증번호 확인 · POST /api/v1/auth/email/verification-code/verify
  *
- * 계정이 있는지 드러내지 않으려고 본문 없이 `202`로 답한다. 그래서 성공 응답으로
- * 가입 여부를 판단할 수 없다.
+ * 번호가 맞으면 가입(API-001)에 쓰는 단기 토큰을 준다. 실패는 셋으로 갈린다.
+ * 불일치(`VERIFICATION_CODE_MISMATCH`)는 다시 입력하면 되고, 만료(`410
+ * VERIFICATION_CODE_EXPIRED`)와 시도 소진(`VERIFICATION_CODE_EXHAUSTED`)은 번호를
+ * 다시 받아야 한다.
  */
-export async function resendVerificationMail(email: string): Promise<void> {
-  await request<void>('/auth/email/resend', { method: 'POST', body: { email }, auth: 'none' });
+export async function verifyEmailVerificationCode(
+  email: string,
+  code: string,
+): Promise<EmailVerificationCodeResult> {
+  return request<EmailVerificationCodeResult>('/auth/email/verification-code/verify', {
+    method: 'POST',
+    body: { email, code },
+    auth: 'none',
+  });
+}
+
+/**
+ * API-001 이메일 회원가입 · POST /api/v1/auth/signup
+ *
+ * 가입과 동시에 로그인된다. 이메일 소유는 인증번호로 이미 확인했으므로 계정이 곧바로
+ * `ACTIVE`가 되고 응답이 소셜 가입(API-008)과 같은 형태로 Access Token과 refresh 쿠키를
+ * 함께 내린다(S15P21E106-603). 그래서 이 함수도 소셜 가입처럼 세션을 열고 사용자만
+ * 돌려준다.
+ */
+export async function signup(body: SignupRequest): Promise<AuthenticatedUser> {
+  const response = await request<LoginResponse>('/auth/signup', {
+    method: 'POST',
+    body,
+    auth: 'none',
+  });
+
+  startSession(response.accessToken);
+
+  return response.user;
 }
 
 /**
