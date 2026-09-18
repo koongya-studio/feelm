@@ -25,7 +25,7 @@ ci-variable-preflight:
   interruptible: true
   timeout: 5m
   rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
 
 deploy-monitoring:
   stage: deploy
@@ -34,7 +34,7 @@ deploy-monitoring:
   environment:
     name: service
   script:
-    - python3 -I -B infra/scripts/ci-deploy-current-commit.py --branch develop
+    - python3 -I -B infra/scripts/ci-deploy-current-commit.py --branch main
     - bash infra/scripts/deploy-monitoring.sh
   after_script:
     - python3 -I -B infra/scripts/notify-deployment.py monitoring "$CI_JOB_STATUS"
@@ -45,7 +45,7 @@ deploy-monitoring:
     when: [runner_system_failure, scheduler_failure]
   timeout: 15m
   rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
       changes:
         - .gitlab-ci.yml
         - .gitlab/ci/infra.yml
@@ -53,6 +53,7 @@ deploy-monitoring:
         - infra/compose/monitoring.yml
         - infra/monitoring/prometheus/**/*
         - infra/monitoring/grafana/**/*
+        - infra/monitoring/mattermost-relay/**/*
         - infra/scripts/ci-deploy-current-commit.py
         - infra/scripts/test_ci_deploy_current_commit.py
         - infra/scripts/deploy-monitoring.sh

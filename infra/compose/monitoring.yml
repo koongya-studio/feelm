@@ -3,6 +3,8 @@ services:
     image: prom/prometheus:v3.13.0
     container_name: feelm-prometheus
     restart: unless-stopped
+    labels:
+      io.feelm.monitoring.revision: ${MONITORING_DEPLOY_REVISION:-manual}
 
     ports:
       - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
@@ -23,6 +25,8 @@ services:
     image: grafana/grafana:13.1.0
     container_name: feelm-grafana
     restart: unless-stopped
+    labels:
+      io.feelm.monitoring.revision: ${MONITORING_DEPLOY_REVISION:-manual}
 
     ports:
       - "127.0.0.1:${GRAFANA_PORT:-3000}:3000"
@@ -51,6 +55,8 @@ services:
     image: python:3.13.7-alpine3.22
     container_name: feelm-mattermost-alert-relay
     restart: unless-stopped
+    labels:
+      io.feelm.monitoring.revision: ${MONITORING_DEPLOY_REVISION:-manual}
     read_only: true
     user: "65532:65532"
 
@@ -89,6 +95,8 @@ services:
     image: prom/node-exporter:v1.11.1
     container_name: feelm-node-exporter
     restart: unless-stopped
+    labels:
+      io.feelm.monitoring.revision: ${MONITORING_DEPLOY_REVISION:-manual}
     pid: host
 
     command:
@@ -101,6 +109,8 @@ services:
     image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
     container_name: feelm-postgres-exporter
     restart: unless-stopped
+    labels:
+      io.feelm.monitoring.revision: ${MONITORING_DEPLOY_REVISION:-manual}
 
     environment:
       DATA_SOURCE_URI: postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}?sslmode=disable
@@ -111,6 +121,8 @@ services:
     image: oliver006/redis_exporter:v1.91.1
     container_name: feelm-redis-exporter
     restart: unless-stopped
+    labels:
+      io.feelm.monitoring.revision: ${MONITORING_DEPLOY_REVISION:-manual}
 
     environment:
       REDIS_ADDR: redis://redis:6379

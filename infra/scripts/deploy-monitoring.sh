@@ -20,12 +20,26 @@ containers=(
   feelm-postgres-exporter
   feelm-redis-exporter
 )
+deployment_revision="${CI_COMMIT_SHA:-manual}"
+export MONITORING_DEPLOY_REVISION="${deployment_revision}"
 
 verify() {
   "${PYTHON_BIN}" -I -B "${SCRIPT_DIR}/verify-monitoring-deployment.py" \
     --attempts "${MONITORING_HEALTH_ATTEMPTS:-24}" \
     --interval "${MONITORING_HEALTH_INTERVAL_SECONDS:-5}" \
     --relay-url "http://127.0.0.1:${GRAFANA_ALERT_RELAY_PORT:-9087}"
+}
+
+verify_candidate_revision() {
+  local container actual_revision
+  for container in "${containers[@]}"; do
+    actual_revision="$(docker inspect "${container}" \
+      --format '{{ index .Config.Labels "io.feelm.monitoring.revision" }}')"
+    if [[ "${actual_revision}" != "${deployment_revision}" ]]; then
+      echo "Monitoring deployment revision mismatch: ${container}" >&2
+      return 1
+    fi
+  done
 }
 
 container_exists() {
@@ -138,8 +152,8 @@ if ! "${compose[@]}" up -d --no-deps --force-recreate "${services[@]}"; then
   restore_previous "Monitoring candidate deployment command failed"
 fi
 
-if ! verify; then
-  restore_previous "Monitoring candidate health verification failed"
+if ! verify || ! verify_candidate_revision; then
+  restore_previous "Monitoring candidate verification failed"
 fi
 
 cleanup_failed=0
