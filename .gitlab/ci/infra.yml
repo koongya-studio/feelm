@@ -60,7 +60,6 @@ deploy-monitoring:
         - infra/scripts/test_deploy_monitoring.py
         - infra/scripts/verify-monitoring-deployment.py
         - infra/scripts/test_verify_monitoring_deployment.py
-
 .deploy-hdfs-config:
   stage: deploy
   needs: []
@@ -430,17 +429,12 @@ infra-config-test:
         - infra/scripts/test_ci_required_variable_preflight.py
         - infra/scripts/ci-deploy-current-commit.py
         - infra/scripts/test_ci_deploy_current_commit.py
-        - infra/scripts/deploy-monitoring.sh
-        - infra/scripts/test_deploy_monitoring.py
-        - infra/scripts/verify-monitoring-deployment.py
-        - infra/scripts/test_verify_monitoring_deployment.py
-        - infra/scripts/verify-kafka-monitoring.py
+        - infra/scripts/*monitoring*
+        - infra/scripts/*postgresql*
         - infra/scripts/test_consumer_distributed_deployment.py
-        - infra/scripts/test_kafka_monitoring.py
         - infra/scripts/test_grafana_access_policy.py
         - infra/scripts/test_node_exporter_monitoring.py
         - infra/scripts/test_pipeline_observability.py
-        - infra/scripts/test_verify_kafka_monitoring.py
         - infra/scripts/test_deploy_distributed_runtime.py
         - infra/scripts/test_deploy_consumer.py
         - infra/scripts/test_verify_consumer_e2e.py

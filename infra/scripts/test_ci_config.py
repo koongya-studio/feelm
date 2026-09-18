@@ -465,7 +465,8 @@ include:
             sorted(deploy_jobs),
             ['deploy-backend', 'deploy-consumer', 'deploy-frontend',
              'deploy-hdfs-distributed-config', 'deploy-hdfs-service-config',
-             'deploy-kafka-config', 'deploy-monitoring', 'deploy-redis'],
+             'deploy-kafka-config', 'deploy-monitoring', 'deploy-postgresql',
+             'deploy-redis'],
         )
         notification_paths = (
             backend_env,

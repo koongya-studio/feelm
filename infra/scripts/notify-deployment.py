@@ -22,6 +22,7 @@ DEPLOYMENT_SERVICES = (
     "frontend",
     "consumer",
     "redis",
+    "postgresql",
     "monitoring",
     "hdfs-service-config",
     "hdfs-distributed-config",

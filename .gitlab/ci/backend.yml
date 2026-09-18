@@ -351,3 +351,27 @@ deploy-redis:
         - infra/scripts/verify-datastore-config.sh
         - infra/scripts/verify-datastores.sh
   allow_failure: false
+
+deploy-postgresql:
+  stage: deploy
+  tags: [e106-shell]
+  needs: [ci-variable-preflight]
+  resource_group: service-and-backend-cache
+  environment:
+    name: service
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py --branch main
+    - bash infra/scripts/deploy-postgresql.sh "$CI_COMMIT_SHA"
+  after_script:
+    - /usr/bin/python3 -I -B infra/scripts/notify-deployment.py postgresql "$CI_JOB_STATUS"
+  interruptible: false
+  timeout: 30m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - .gitlab/ci/backend.yml
+        - infra/compose/service.yml
+        - infra/scripts/deploy-postgresql.sh
+        - infra/scripts/verify-postgresql-deployment.sh
+      when: manual
+  allow_failure: false
