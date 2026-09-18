@@ -40,10 +40,14 @@ export const SORT_OPTIONS: { value: MovieSearchSort; label: string }[] = [
   { value: 'RATING', label: '평점순' },
 ];
 
-/** 화면이 들고 다니는 필터 상태 */
+/**
+ * 화면이 들고 다니는 필터 상태.
+ *
+ * 계약(API-028)에는 `country`도 있지만 화면은 고르게 하지 않는다(업무 -612 —
+ * `SearchFilterSheet` 머리말). 그래서 여기에도 없다.
+ */
 export type SearchFilterState = {
   genre: string[];
-  country: string[];
   ott: number[];
   year: YearBucketId;
   sort: MovieSearchSort;
@@ -51,7 +55,6 @@ export type SearchFilterState = {
 
 export const EMPTY_FILTER: SearchFilterState = {
   genre: [],
-  country: [],
   ott: [],
   year: 'ALL',
   sort: 'RELEVANCE',
@@ -59,12 +62,7 @@ export const EMPTY_FILTER: SearchFilterState = {
 
 /** 아무것도 고르지 않은 상태인지. 검색어 없이 조회할 수 있는지를 가른다 */
 export function isEmptyFilter(filter: SearchFilterState): boolean {
-  return (
-    filter.genre.length === 0 &&
-    filter.country.length === 0 &&
-    filter.ott.length === 0 &&
-    filter.year === 'ALL'
-  );
+  return filter.genre.length === 0 && filter.ott.length === 0 && filter.year === 'ALL';
 }
 
 /** 값이 있으면 빼고 없으면 넣는다. 같은 필터의 복수 값은 OR로 묶인다(API-028) */
@@ -83,7 +81,6 @@ export function toSearchQuery(
 
   if (keyword.trim()) query.q = keyword.trim();
   if (filter.genre.length) query.genre = filter.genre;
-  if (filter.country.length) query.country = filter.country;
   if (filter.ott.length) query.ott = filter.ott;
 
   if (bucket.id !== 'ALL') {

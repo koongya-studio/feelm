@@ -1,19 +1,17 @@
 /*
- * 영화 검색과 급상승 접근 함수.
- * 대응 명세는 docs/api/movies-search.md · report-trend.md이다.
+ * 영화 검색 접근 함수.
+ * 대응 명세는 docs/api/movies-search.md이다.
  *
  * 업무 S15P21E106-476에서 검색(API-028)과 필터 옵션(API-029)을 실제 호출로 바꿨다.
- * 급상승(API-064)은 **백엔드에 아직 없어** 목업으로 남는다.
+ * 급상승(API-064)은 업무 -612에서 화면과 함께 지웠다 — 백엔드에 없는 계약을 목업으로
+ * 보여 주지 않는다. 실제 구현이 생기면 그때 다시 붙인다.
  *
  * 검색은 `api/movies.ts`에 두지 않고 나눴다. 그 파일은 영화 한 편(상세 · 유사 · 한줄평)을
  * 다루고, 여기는 목록을 만드는 질의를 다룬다.
  */
-import { mockTrending } from '../mocks/trending';
 import { request } from './client';
-import { respond } from './mockTransport';
 import type { QueryEntry } from './client';
 import type { FilterOptions, MovieSearchQuery, MovieSearchResult } from '../types/search';
-import type { TrendingList } from '../types/trend';
 
 /**
  * 한 장에 받아 올 결과 수. 계약의 `size`이며 허용 범위는 1~50, 기본값은 20이다(API-028).
@@ -82,15 +80,4 @@ export async function countSearchResults(query: MovieSearchQuery): Promise<numbe
  */
 export async function getFilterOptions(): Promise<FilterOptions> {
   return request<FilterOptions>('/movies/filter-options', { auth: 'none' });
-}
-
-/**
- * API-064 급상승 영화 · GET /api/v1/movies/trending
- *
- * **목업이다.** 계약은 있지만 백엔드에 해당 컨트롤러도, 구현을 맡은 Jira 업무 항목도
- * 아직 없다(2차 MVP 계약). 실제 호출로 바꿀 수 있게 되면 이 함수만 `request`로
- * 바꾸면 되고, 4.1은 이미 빈 목록과 실패를 모두 다룬다.
- */
-export async function getTrendingMovies(size = 10): Promise<TrendingList> {
-  return respond({ ...mockTrending, items: mockTrending.items.slice(0, size) }, 'movies');
 }
