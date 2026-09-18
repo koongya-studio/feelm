@@ -23,7 +23,7 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class WatchRepository {
 
-    private static final Duration CONFIRM_DELAY = Duration.ofDays(2);
+    private static final Duration CONFIRM_DELAY = Duration.ofHours(24);
     private static final Duration EXPIRATION_DELAY = Duration.ofDays(7);
 
     private final JdbcClient jdbc;

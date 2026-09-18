@@ -21,6 +21,7 @@ repositories {
 ext {
 	jjwtVersion = '0.13.0'
 	springdocVersion = '3.1.1'
+	webPushVersion = '1.3.0'
 }
 
 dependencies {
@@ -36,6 +37,7 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:${springdocVersion}"
 	implementation "io.jsonwebtoken:jjwt-api:${jjwtVersion}"
+	implementation "com.interaso:webpush:${webPushVersion}"
 	compileOnly 'org.projectlombok:lombok'
 	developmentOnly 'org.springframework.boot:spring-boot-devtools'
 	annotationProcessor 'org.projectlombok:lombok'

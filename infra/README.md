@@ -212,6 +212,19 @@ Compose 서비스명인 `postgres`로 변경합니다.
 DB_URL=jdbc:postgresql://postgres:5432/feelm
 ```
 
+### Browser Web Push
+
+Web Push는 기본적으로 꺼져 있다. 운영에서 활성화하려면 한 번 생성한 VAPID 키 쌍을 서비스 노드 `infra/.env`에 넣고 backend 컨테이너를 다시 만든다. 공개키는 API-075로 브라우저에 제공되지만 개인키는 Compose 환경변수로만 주입하며 저장소·로그·프론트 빌드에 넣지 않는다.
+
+```dotenv
+WEB_PUSH_MODE=vapid
+WEB_PUSH_VAPID_PUBLIC_KEY=<base64url uncompressed P-256 public key>
+WEB_PUSH_VAPID_PRIVATE_KEY=<base64url 32-byte private key>
+WEB_PUSH_VAPID_SUBJECT=mailto:<운영 연락처>
+```
+
+키를 교체하면 기존 브라우저 구독과의 호환성을 실제 브라우저에서 확인하고, 필요하면 클라이언트가 새 공개키로 재구독하도록 배포 순서를 잡는다. 발송 결과는 `feelm_web_push_delivery_total{outcome=...}` 메트릭으로 확인한다. endpoint나 구독 키 원문은 로그와 메트릭에 남기지 않는다.
+
 ### Local Startup
 
 PostgreSQL은 기본 `compose/service.yml`에서 `127.0.0.1:5432`에만 바인딩합니다.

@@ -254,6 +254,12 @@ public class PartyService {
         memberRepository.saveAndFlush(PartyMember.memberOf(party, invitee, respondedAt));
         invitation.accept(respondedAt);
         notificationCommandService.closePartyInvitation(userId, invitationId, respondedAt);
+        notificationCommandService.createPartyInvitationAccepted(
+                party.getOwner().getId(),
+                invitationId,
+                partyId,
+                invitee.getNickname(),
+                respondedAt);
         refreshRequestRepository.request(partyId);
         List<Member> members =
                 queryRepository.findMembers(List.of(partyId)).stream().map(Member::from).toList();

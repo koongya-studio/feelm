@@ -29,8 +29,8 @@ public record OttClickResponse(
                         requiredMode = Schema.RequiredMode.REQUIRED)
                 Instant clickedAt,
         @Schema(
-                        description = "감상 확인 가능 시각(UTC, clickedAt + 2일). 클릭 이력이 없으면 null",
-                        example = "2026-09-01T05:21:00Z",
+                        description = "감상 확인 가능 시각(UTC, clickedAt + 24시간). 클릭 이력이 없으면 null",
+                        example = "2026-08-31T05:21:00Z",
                         nullable = true,
                         requiredMode = Schema.RequiredMode.REQUIRED)
                 Instant confirmDueAt,

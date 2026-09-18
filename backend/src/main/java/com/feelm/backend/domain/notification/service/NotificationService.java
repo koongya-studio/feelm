@@ -5,6 +5,7 @@ import com.feelm.backend.domain.notification.dto.response.NotificationItemRespon
 import com.feelm.backend.domain.notification.dto.response.NotificationUnreadCountResponse;
 import com.feelm.backend.domain.notification.repository.NotificationRepository;
 import com.feelm.backend.domain.notification.repository.NotificationRepository.NotificationRow;
+import com.feelm.backend.domain.notification.repository.WebPushDeliveryRepository;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
 import com.feelm.backend.global.response.CursorPageResponse;
@@ -25,6 +26,7 @@ public class NotificationService {
     private static final int MAX_SIZE = 50;
 
     private final NotificationRepository repository;
+    private final WebPushDeliveryRepository deliveryRepository;
     private final Clock clock;
 
     public CursorPageResponse<NotificationItemResponse> list(
@@ -55,23 +57,29 @@ public class NotificationService {
     @Transactional
     public void markRead(long userId, long notificationId) {
         requireActiveUser(userId);
-        if (!repository.markRead(userId, notificationId, now())) {
+        Instant now = now();
+        if (!repository.markRead(userId, notificationId, now)) {
             throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
         }
+        deliveryRepository.cancelForNotification(notificationId, now, "NOTIFICATION_READ");
     }
 
     @Transactional
     public void markAllRead(long userId) {
         requireActiveUser(userId);
-        repository.markAllRead(userId, now());
+        Instant now = now();
+        repository.markAllRead(userId, now);
+        deliveryRepository.cancelReadForUser(userId, now);
     }
 
     @Transactional
     public void dismiss(long userId, long notificationId) {
         requireActiveUser(userId);
-        if (!repository.dismiss(userId, notificationId, now())) {
+        Instant now = now();
+        if (!repository.dismiss(userId, notificationId, now)) {
             throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
         }
+        deliveryRepository.cancelForNotification(notificationId, now, "NOTIFICATION_DISMISSED");
     }
 
     private void requireActiveUser(long userId) {

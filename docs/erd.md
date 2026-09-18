@@ -107,6 +107,37 @@ erDiagram
         timestamptz created_at
         timestamptz updated_at
     }
+    WEB_PUSH_SUBSCRIPTIONS {
+        bigint id PK
+        bigint user_id FK
+        text endpoint "비활성화 시 NULL"
+        char endpoint_fingerprint UK "SHA-256 hex"
+        text p256dh_key "비활성화 시 NULL"
+        text auth_secret "비활성화 시 NULL"
+        timestamptz expiration_at "브라우저 미지정 시 NULL"
+        boolean active
+        bigint capability_version "등록·갱신마다 증가"
+        timestamptz deactivated_at "활성 상태는 NULL"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    WEB_PUSH_DELIVERIES {
+        bigint id PK
+        bigint notification_id FK
+        bigint subscription_id FK "구독 정리 후 NULL 가능"
+        char endpoint_fingerprint
+        varchar status "PENDING / PROCESSING / SENT / FAILED / CANCELED"
+        int attempt_count
+        timestamptz next_attempt_at
+        timestamptz claimed_at "PROCESSING 외 NULL"
+        uuid claim_token "PROCESSING 외 NULL"
+        timestamptz delivered_at "SENT 외 NULL"
+        timestamptz finished_at "최종 상태 외 NULL"
+        int last_http_status "응답 전 NULL"
+        varchar failure_code "성공·미실패 상태 NULL"
+        timestamptz created_at
+        timestamptz updated_at
+    }
     USER_BLOCKS {
         bigint id PK
         bigint blocker_id FK
@@ -119,6 +150,9 @@ erDiagram
     USERS ||--o{ PASSWORD_RESET_TOKENS : issues
     USERS ||--|| NOTIFICATION_SETTINGS : configures
     USERS ||--o{ NOTIFICATIONS : receives
+    USERS ||--o{ WEB_PUSH_SUBSCRIPTIONS : owns
+    NOTIFICATIONS ||--o{ WEB_PUSH_DELIVERIES : dispatches
+    WEB_PUSH_SUBSCRIPTIONS |o--o{ WEB_PUSH_DELIVERIES : targets
     USERS ||--o{ USER_BLOCKS : blocks
     USERS ||--o{ USER_BLOCKS : blocked_by
 ```
@@ -131,6 +165,8 @@ erDiagram
 | `password_reset_tokens` | 비밀번호 재설정 | 1회용, 만료 30분(가정). 성공 시 해당 사용자 Refresh Token 전부 폐기 | FR-37 · API-010, API-011 |
 | `notification_settings` | 알림 수신 설정 | 사용자당 1행. 실제 인앱 사건 종류와 독립적인 수신 설정이며 푸시 채널 적용은 S15P21E106-582 범위 | FR-38 · API-017, API-018 |
 | `notifications` | 인앱 알림 정본 | UK(`type`, `source_id`)로 원본 사건의 중복 생성을 막는다. 원본과 같은 트랜잭션에서 생성하고, `notified_at <= now < expires_at`이며 `closed_at IS NULL`, `dismissed_at IS NULL`인 행만 노출한다. 사용자 삭제 시 함께 삭제한다 | FR-41 · API-070~074 · ADR-0021 |
+| `web_push_subscriptions` | 사용자·브라우저별 Web Push capability | canonical endpoint의 SHA-256 fingerprint가 유일하다. 등록·갱신 때 `capability_version`을 증가시켜 이전 전송 응답이 새 capability를 지우지 못하게 한다. 해제·만료·탈퇴 시 endpoint와 `p256dh`·`auth` 원문을 지우고 fingerprint만 감사용으로 남긴다 | FR-41 · API-075~077 · ADR-0022 |
+| `web_push_deliveries` | 알림별 durable 발송 상태 | UK(`notification_id`, `endpoint_fingerprint`). 실제 전송 직전에 한 행씩 lease하고 claim token으로 stale worker 완료 경합을 막으며 최대 5회 지수 재시도한다. 구독 삭제 후에도 비민감 결과는 보존한다 | FR-41 · ADR-0022 |
 | `user_blocks` | 사용자 차단 | UK(`blocker_id`, `blocked_id`). 양방향 필터는 조회 시 OR 조건 | FR-39 · API-019~022 |
 
 > Refresh Token은 Redis에 TTL로 저장하며 별도 테이블을 두지 않습니다 (D-2 결정, ADR-0009).
@@ -256,7 +292,7 @@ erDiagram
         bigint ott_id FK "클릭한 OTT, NULL 가능"
         varchar status "LINK_CLICKED / WATCHED_UNRATED / RATED / EXPIRED"
         timestamptz clicked_at "OTT 링크 클릭 시각, 감상 기록 없는 평가는 NULL (D-6 결정)"
-        timestamptz confirm_due_at "clicked_at + 2일, 전이 전 NULL 가능"
+        timestamptz confirm_due_at "clicked_at + 24시간, 전이 전 NULL 가능"
         timestamptz expires_at "clicked_at + 7일, 전이 전 NULL 가능"
         timestamptz watched_at "감상 확인 시각, 전이 전 NULL 가능"
         timestamptz rated_at "평가 시각, 전이 전 NULL 가능"
@@ -453,7 +489,7 @@ erDiagram
 
 ```mermaid
 flowchart LR
-    A["OTT 링크 클릭<br/>watch_records: LINK_CLICKED"] -->|2일 후 접속, 감상함| B["WATCHED_UNRATED"]
+    A["OTT 링크 클릭<br/>watch_records: LINK_CLICKED"] -->|24시간 후 접속, 감상함| B["WATCHED_UNRATED"]
     A -->|감상 안 함 또는 7일 미응답| X["EXPIRED"]
     B -->|평가 저장| C["RATED"]
     C -->|ratings + frames<br/>단일 트랜잭션 생성| D["필름 반영·팝콘 버킷 재집계"]
@@ -491,6 +527,8 @@ flowchart LR
 | `/users/me/notification-settings` | `notification_settings` | — |
 | `/notifications`, `/notifications/unread-count` | `notifications` | — |
 | `/notifications/{notificationId}/read`, `/notifications/read-all`, `DELETE /notifications/{notificationId}` | `notifications` | — |
+| `/notifications/push/config` | — | 배포 Web Push 공개 설정 |
+| `/notifications/push/subscriptions*` | `web_push_subscriptions` | `notifications`, `web_push_deliveries` |
 | `/users/search`, `/users/{userId}/block`, `/users/me/blocks` | `users`, `user_blocks` | — |
 | `/onboarding/cards`, `/onboarding/preferences` | `onboarding_preferences` | `movies`, `popcorn_flavors` |
 | `/otts`, `/users/me/otts` | `otts`, `user_otts` | — |
