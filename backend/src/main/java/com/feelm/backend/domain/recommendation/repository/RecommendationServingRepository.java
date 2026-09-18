@@ -45,6 +45,18 @@ public class RecommendationServingRepository {
                 .findFirst();
     }
 
+    public Optional<RecommendationSet> findOwnedSet(long userId, long setId) {
+        return jdbcTemplate
+                .query(
+                        "SELECT id,generated_at FROM recommendation_sets"
+                                + " WHERE id=? AND user_id=? AND party_id IS NULL",
+                        (resultSet, rowNumber) -> mapSet(resultSet),
+                        setId,
+                        userId)
+                .stream()
+                .findFirst();
+    }
+
     public List<ServingItem> findInitialVisibleItems(long userId, long setId) {
         List<ServingItem> discovery = findExposed(userId, setId, "DISCOVERY", DISCOVERY_SIZE);
         int tasteSize = discovery.isEmpty() ? TASTE_SIZE + DISCOVERY_SIZE : TASTE_SIZE;
