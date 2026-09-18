@@ -10,9 +10,12 @@
  *
  * 남은 알 수(`+ 다른 맛 N알`)도 화면 계산이다. **총수에서 보여준 네 맛을 뺀 값이며,
  * 프레임 수와는 무관하다** — 대표 맛이 없는 영화는 팝콘을 만들지 않아 두 수가 어긋난다.
+ *
+ * 필름은 끝까지 넘기면 다음 장을 이어 받는다(업무 S15P21E106-656). 첫 장 20개만 그리던
+ * 동안 `73개의 프레임을 넘겨보세요`라고 말하면서 오래된 53개에 닿을 길이 없었다.
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import FilmPage from './index';
 import { renderWithRouter } from '../../../test/render';
 import type { FrameList, PopcornBucket, PopcornBucketFlavor } from '../../../types/taste';
@@ -35,19 +38,28 @@ function flavor(code: string, name: string, count: number): PopcornBucketFlavor 
   };
 }
 
-function frameList(totalCount: number, count = totalCount): FrameList {
+function frameList(
+  totalCount: number,
+  count = totalCount,
+  { from = 1, nextCursor = null }: { from?: number; nextCursor?: string | null } = {},
+): FrameList {
   return {
     totalCount,
     items: Array.from({ length: count }, (_, index) => ({
-      frameId: index + 1,
-      movie: { movieId: 100 + index, title: `영화 ${index + 1}`, posterUrl: null },
+      frameId: from + index,
+      movie: { movieId: 100 + from + index, title: `영화 ${from + index}`, posterUrl: null },
       score: 4,
       flavorCode: 'FLAVOR_A',
       createdAt: '2026-09-01T00:00:00Z',
     })),
-    nextCursor: null,
-    hasNext: false,
+    nextCursor,
+    hasNext: nextCursor !== null,
   };
+}
+
+/** 필름에 그려진 프레임 수. 프레임 칸은 `영화 N 상세 보기` 버튼이다 */
+function frameCount() {
+  return screen.queryAllByRole('button', { name: /^영화 \d+ 상세 보기$/ }).length;
 }
 
 /** 알 수를 일부러 뒤섞어 둔다. 정렬을 하지 않으면 이 순서가 그대로 나온다 */
@@ -156,5 +168,140 @@ describe('FilmPage', () => {
     expect(await screen.findByRole('button', { name: '필름 늘리기' })).toBeInTheDocument();
     // 빈 상태의 길은 프레임이 있으면 나오지 않는다
     expect(screen.queryByRole('button', { name: '추천 영화 둘러보기' })).not.toBeInTheDocument();
+  });
+});
+
+/*
+ * 다음 장 (업무 -656)
+ *
+ * jsdom에는 `IntersectionObserver`가 없어 다음 장 칸이 버튼이 된다. 스크롤로 잇는 길은
+ * 아래 `자동으로 이어 받기`가 관찰자를 심어 따로 시험한다.
+ */
+describe('FilmPage 다음 장', () => {
+  beforeEach(() => {
+    vi.mocked(getPopcornBucket).mockResolvedValue(bucket);
+  });
+
+  it('끝의 다음 장 칸으로 나머지 프레임을 이어 받아 전부 넘겨 볼 수 있다', async () => {
+    vi.mocked(getMyFrames)
+      .mockResolvedValueOnce(frameList(45, 20, { nextCursor: 'c20' }))
+      .mockResolvedValueOnce(frameList(45, 20, { from: 21, nextCursor: 'c40' }))
+      .mockResolvedValueOnce(frameList(45, 5, { from: 41 }));
+
+    renderWithRouter(<FilmPage />);
+
+    expect(await screen.findByText('45개의 프레임이 감겼어요')).toBeInTheDocument();
+    expect(frameCount()).toBe(20);
+
+    fireEvent.click(screen.getByRole('button', { name: '프레임 더 보기' }));
+    await waitFor(() => expect(frameCount()).toBe(40));
+    expect(getMyFrames).toHaveBeenLastCalledWith('c20');
+
+    fireEvent.click(screen.getByRole('button', { name: '프레임 더 보기' }));
+    await waitFor(() => expect(frameCount()).toBe(45));
+    expect(getMyFrames).toHaveBeenLastCalledWith('c40');
+
+    // 더 받을 것이 없으면 다음 장 칸이 사라진다
+    expect(screen.queryByRole('button', { name: '프레임 더 보기' })).toBeNull();
+    expect(screen.getByRole('button', { name: '영화 45 상세 보기' })).toBeInTheDocument();
+  });
+
+  it('다음 장에 이미 그린 프레임이 섞여 오면 한 번만 그린다', async () => {
+    // 그 사이 새 평가가 생겨 커서 경계가 밀린 경우다. 20번이 다음 장 맨 앞에 다시 온다
+    vi.mocked(getMyFrames)
+      .mockResolvedValueOnce(frameList(25, 20, { nextCursor: 'c20' }))
+      .mockResolvedValueOnce(frameList(25, 6, { from: 20 }));
+
+    renderWithRouter(<FilmPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '프레임 더 보기' }));
+
+    await waitFor(() => expect(frameCount()).toBe(25));
+    expect(screen.getAllByRole('button', { name: '영화 20 상세 보기' })).toHaveLength(1);
+  });
+
+  it('다음 장을 받지 못해도 그린 프레임은 두고 다시 불러올 수 있다', async () => {
+    vi.mocked(getMyFrames)
+      .mockResolvedValueOnce(frameList(30, 20, { nextCursor: 'c20' }))
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce(frameList(30, 10, { from: 21 }));
+
+    renderWithRouter(<FilmPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '프레임 더 보기' }));
+
+    const retry = await screen.findByRole('button', { name: '다시 불러오기' });
+    // 화면 전체가 실패 상태로 넘어가지 않는다
+    expect(frameCount()).toBe(20);
+    expect(screen.queryByText('취향 필름을 불러오지 못했어요')).toBeNull();
+
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(frameCount()).toBe(30));
+    expect(getMyFrames).toHaveBeenLastCalledWith('c20');
+  });
+});
+
+describe('FilmPage 자동으로 이어 받기', () => {
+  /** 심어 둔 관찰자들. 칸이 보인 것처럼 알린다 */
+  let observers: { callback: IntersectionObserverCallback; options?: IntersectionObserverInit }[];
+
+  beforeEach(() => {
+    observers = [];
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(callback: IntersectionObserverCallback, options?: IntersectionObserverInit) {
+          observers.push({ callback, options });
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    vi.mocked(getPopcornBucket).mockResolvedValue(bucket);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  function reveal() {
+    const { callback } = observers[observers.length - 1];
+
+    act(() => {
+      callback([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+    });
+  }
+
+  it('다음 장 칸이 릴 안에서 보일 즈음 다음 장을 부르고, 실패하면 저절로 다시 부르지 않는다', async () => {
+    vi.resetModules();
+    const { default: ObservedFilmPage } = await import('./index');
+    const taste = await import('../../../api/taste');
+
+    vi.mocked(taste.getMyFrames)
+      .mockResolvedValueOnce(frameList(50, 20, { nextCursor: 'c20' }))
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce(frameList(50, 20, { from: 21, nextCursor: 'c40' }));
+
+    renderWithRouter(<ObservedFilmPage />);
+
+    expect(await screen.findByText('프레임을 불러오는 중')).toBeInTheDocument();
+    // 관찰 기준은 화면이 아니라 스스로 가로 스크롤하는 릴의 트랙이다
+    expect(observers[observers.length - 1].options?.root).toBe(
+      screen.getByRole('group', { name: '취향 필름 프레임' }),
+    );
+
+    reveal();
+    expect(await screen.findByRole('button', { name: '다시 불러오기' })).toBeInTheDocument();
+
+    // 실패 뒤에는 관찰자를 다시 걸지 않는다. 끝에 머문 채 요청이 반복되지 않는다
+    const watched = observers.length;
+    await act(async () => {});
+    expect(observers).toHaveLength(watched);
+    expect(taste.getMyFrames).toHaveBeenCalledTimes(2);
+
+    fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
+    await waitFor(() => expect(frameCount()).toBe(40));
   });
 });
