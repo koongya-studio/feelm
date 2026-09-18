@@ -27,14 +27,16 @@
  * 고른 탭은 주소의 `?tab=`에 남는다. 화면 밖에서 특정 탭으로 보내야 하는 자리가 있기
  * 때문이다 — EXT-05 OTT 분석 데이터 부족의 `영화 평가하러 가기`가 `안 남긴 영화`로 온다.
  *
- * **추천 기록은 실제 호출이다**(업무 S15P21E106-478, API-048). 안 남긴 영화도 실제
- * 기록이고(API-034, 업무 -477), 평가만 API-039가 백엔드에 없어 목업으로 남는다.
- * `[!]` 추천 세트를 만드는 API-045가 아직 없어 추천 기록 탭은 당분간 비어 있다.
+ * **세 탭 모두 실제 호출이다.** 추천 기록은 API-048(업무 S15P21E106-478), 안 남긴 영화는
+ * API-034(업무 -477), 평가한 영화는 API-039(업무 -611)다. 평가한 영화는 그전까지 평가와
+ * 1:1인 내 필름(API-042)으로 대신 그렸다(업무 -610). API-039는 **프레임 없는 과거 평가도**
+ * 돌려주므로 필름의 프레임 수보다 많을 수 있다.
  *
- * **추천 기록 탭에만 `더 보기`가 있다**(업무 -478, 사용자 결정 2026-09-16). 한 장은
- * 20세트이고 그보다 오래된 이력은 `nextCursor`로 온다 — 버튼이 없으면 첫 장 뒤의 이력에
- * 닿을 길이 없다. 나머지 두 탭은 계약에 커서가 있어도 `api/watch`의 함수가 아직 목업이라
- * 첫 장만 그린다. 세 탭을 같은 모양으로 맞추는 것은 평가 목록 연동 때 한다(업무 -503).
+ * **세 탭 모두 `더 보기`로 다음 장을 이어 받는다**(업무 -478 · -611 · -503). 한 장은 20건이고
+ * 그보다 오래된 기록은 `nextCursor`로 온다 — 버튼이 없으면 첫 장 뒤의 기록에 닿을 길이 없다.
+ * 무한 스크롤로 하지 않은 것은 피드가 끝나는 자리가 보여야 해서다. 탭이 셋이고 탭마다 끝이
+ * 다르므로, 스크롤만으로 이어 받으면 지금 탭이 끝났는지 알 길이 없다. 셋 다 같은 규칙이다 —
+ * 실패하면 보던 격자는 두고 버튼만 `다시 시도`로 바꾼다.
  *
  * **통계 수치는 없다**(사용자 결정 2026-09-16). 프레임 · 평가 · 팝콘 수는 API-014가
  * 주지만 이 화면에 두지 않는다. 다른 자리에도 다시 넣지 않는다.
@@ -78,9 +80,9 @@ import { SettingsIcon } from '../../../components/Icon';
 import { getOtts } from '../../../api/otts';
 import { getRecommendationHistory } from '../../../api/recommendations';
 import { getMyReports, getReportDetail } from '../../../api/reports';
-import { getMyFrames, getPopcornBucket } from '../../../api/taste';
+import { getPopcornBucket } from '../../../api/taste';
 import { getMyProfile } from '../../../api/users';
-import { getWatchRecords } from '../../../api/watch';
+import { getMyRatings, getWatchRecords } from '../../../api/watch';
 import { path } from '../../../routes/paths';
 import { formatShortDate } from '../../../utils/date';
 import styles from './MyDashboardPage.module.css';
@@ -89,8 +91,8 @@ import type { RecommendationType } from '../../../types/enums';
 import type { RecommendationHistoryItem } from '../../../types/recommendation';
 import type { ReportDetailView } from '../../../types/unspecified';
 import type { MyProfile } from '../../../types/user';
-import type { FrameSummary } from '../../../types/taste';
-import type { WatchRecordListItem } from '../../../types/watch';
+import type { Ott } from '../../../types/ott';
+import type { MyRatedItem, MyRatingList, WatchRecordListItem } from '../../../types/watch';
 
 /** 포스터 비율 2:3. 격자는 칸 폭이 화면에 따라 달라지므로 비율만 고정한다 */
 const POSTER_RATIO = { width: 2, height: 3 };
@@ -124,6 +126,17 @@ const SOURCE_LABEL: Record<RecommendationType, string> = {
  * 시도할 수 있어야 하기 때문이다.
  */
 type Feed<T> = { status: 'loading' } | { status: 'failed' } | { status: 'ready'; items: T[] };
+
+/** `더 보기` 한 번의 상태. 실패해도 이미 받은 목록은 남는다 */
+type MoreState = 'idle' | 'loading' | 'failed';
+
+/**
+ * 평가만 남긴다. 필터를 생략하면 서버가 평가만 주지만(API-039), 응답 모양은 미평가 항목도
+ * 담을 수 있어 타입을 좁혀 둔다 — 격자가 `score`를 믿고 그린다.
+ */
+function ratedItems(list: MyRatingList): MyRatedItem[] {
+  return list.items.filter((item): item is MyRatedItem => item.itemType === 'RATED');
+}
 
 /** 추천 세트를 한 줄씩 편다. 세트의 `generatedAt`이 그 줄의 날짜다 */
 type HistoryRow = { item: RecommendationHistoryItem; generatedAt: string };
@@ -218,6 +231,51 @@ function flatten(
   return sets.flatMap((set) => set.items.map((item) => ({ item, generatedAt: set.generatedAt })));
 }
 
+/** 안 남긴 영화의 조건. 다음 장도 **같은 조건으로** 받아야 커서가 맞는다(API-034) */
+const UNRATED_QUERY = { status: ['WATCHED_UNRATED' as const] };
+
+/** 기록에 OTT 이름과 날짜를 얹는다. 기록은 `ottId`만 주고 이름은 기준정보에 있다 */
+function toUnratedRow(record: WatchRecordListItem, otts: Ott[]): UnratedRow {
+  const watchedOn = record.watchedAt ?? record.clickedAt;
+
+  return {
+    record,
+    ottName: otts.find((ott) => ott.ottId === record.ott?.ottId)?.name,
+    date: watchedOn ? formatShortDate(watchedOn) : undefined,
+  };
+}
+
+/** 받은 장을 이미 그린 격자 뒤에 붙인다. 격자가 없으면(실패 · 읽는 중) 그대로 둔다 */
+function append<T>(items: T[]) {
+  return (prev: Feed<T>): Feed<T> =>
+    prev.status === 'ready' ? { status: 'ready', items: [...prev.items, ...items] } : prev;
+}
+
+/** 다음 장 커서. `hasNext`가 거짓이면 커서가 와도 버린다 */
+function nextCursor(page: { nextCursor: string | null; hasNext: boolean }): string | null {
+  return page.hasNext ? page.nextCursor : null;
+}
+
+/** 탭마다 다음 장 커서. 처음에는 셋 다 없다 */
+const NO_CURSORS: Record<TabKey, string | null> = {
+  ratings: null,
+  unrated: null,
+  recommendations: null,
+};
+
+const IDLE_MORE: Record<TabKey, MoreState> = {
+  ratings: 'idle',
+  unrated: 'idle',
+  recommendations: 'idle',
+};
+
+/** 다음 장을 못 받았을 때 버튼 아래 한 줄 */
+const MORE_ERROR: Record<TabKey, string> = {
+  ratings: '지난 평가를 불러오지 못했어요.',
+  unrated: '지난 기록을 불러오지 못했어요.',
+  recommendations: '지난 추천을 불러오지 못했어요.',
+};
+
 export default function MyDashboardPage() {
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [failed, setFailed] = useState(false);
@@ -233,12 +291,14 @@ export default function MyDashboardPage() {
     ? (requested as TabKey)
     : 'ratings';
 
-  const [ratings, setRatings] = useState<Feed<FrameSummary>>({ status: 'loading' });
+  const [ratings, setRatings] = useState<Feed<MyRatedItem>>({ status: 'loading' });
   const [unrated, setUnrated] = useState<Feed<UnratedRow>>({ status: 'loading' });
   const [history, setHistory] = useState<Feed<HistoryRow>>({ status: 'loading' });
-  /** 추천 기록의 다음 장 커서. 더 받을 것이 없으면 `null`이다(API-048 `hasNext`) */
-  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
-  const [moreState, setMoreState] = useState<'idle' | 'loading' | 'failed'>('idle');
+  /** 탭마다 다음 장 커서. 더 받을 것이 없으면 `null`이다(각 API의 `hasNext`) */
+  const [cursors, setCursors] = useState(NO_CURSORS);
+  const [more, setMore] = useState(IDLE_MORE);
+  /** 안 남긴 영화의 OTT 이름표. 다음 장에도 같은 기준정보를 쓴다 */
+  const [otts, setOtts] = useState<Ott[]>([]);
   const [feedReload, setFeedReload] = useState(0);
   const [notice, setNotice] = useState('');
 
@@ -277,13 +337,15 @@ export default function MyDashboardPage() {
     let active = true;
 
     /*
-     * 평가와 1:1인 프레임(API-042)이 `평가한 영화`의 원천이다(업무 -610). 내 평가 목록
-     * API-039는 백엔드에 아직 없고, 그전에 쓰던 고정 목업은 방금 저장한 평가를 보여 주지
-     * 못했다. API-039가 열리면 `api/watch`의 함수로 바꾼다.
+     * 평가한 영화는 내 평가 목록(API-039)이다(업무 -611). 필터를 생략하면 서버가 평가만
+     * 최신순으로 준다. 2.5에서 방금 저장 · 수정한 평가도 다시 읽을 때 그대로 보인다.
      */
-    getMyFrames()
+    getMyRatings()
       .then((value) => {
-        if (active) setRatings({ status: 'ready', items: value.items });
+        if (!active) return;
+
+        setRatings({ status: 'ready', items: ratedItems(value) });
+        setCursors((prev) => ({ ...prev, ratings: nextCursor(value) }));
       })
       .catch(() => {
         if (active) setRatings({ status: 'failed' });
@@ -293,22 +355,16 @@ export default function MyDashboardPage() {
      * 안 남긴 영화는 감상 기록과 OTT 기준정보를 함께 읽는다. 기록은 `ottId`만 주고
      * 이름은 기준정보에 있다(7.7이 쓰던 방식).
      */
-    Promise.all([getWatchRecords({ status: ['WATCHED_UNRATED'] }), getOtts()])
-      .then(([records, otts]) => {
+    Promise.all([getWatchRecords(UNRATED_QUERY), getOtts()])
+      .then(([records, ottList]) => {
         if (!active) return;
 
+        setOtts(ottList);
         setUnrated({
           status: 'ready',
-          items: records.items.map((record) => {
-            const watchedOn = record.watchedAt ?? record.clickedAt;
-
-            return {
-              record,
-              ottName: otts.find((ott) => ott.ottId === record.ott?.ottId)?.name,
-              date: watchedOn ? formatShortDate(watchedOn) : undefined,
-            };
-          }),
+          items: records.items.map((record) => toUnratedRow(record, ottList)),
         });
+        setCursors((prev) => ({ ...prev, unrated: nextCursor(records) }));
       })
       .catch(() => {
         if (active) setUnrated({ status: 'failed' });
@@ -319,7 +375,7 @@ export default function MyDashboardPage() {
         if (!active) return;
 
         setHistory({ status: 'ready', items: flatten(value.items) });
-        setHistoryCursor(value.hasNext ? value.nextCursor : null);
+        setCursors((prev) => ({ ...prev, recommendations: nextCursor(value) }));
       })
       .catch(() => {
         if (active) setHistory({ status: 'failed' });
@@ -383,33 +439,60 @@ export default function MyDashboardPage() {
   };
 
   /*
-   * 추천 기록의 다음 장을 이어 받는다(업무 -478). 실패해도 이미 그린 격자는 두고 버튼만
-   * `다시 시도`로 바꾼다 — 여기서 목록을 비우면 보고 있던 기록이 통째로 사라진다
+   * 지금 탭의 다음 장을 이어 받는다(업무 -478 · -611 · -503). 셋 다 같은 규칙이다 — 첫 장과
+   * **같은 조건**에 커서만 실어 보내고(조건이 바뀐 커서는 `400`), 실패해도 이미 그린 격자는
+   * 두고 버튼만 `다시 시도`로 바꾼다. 여기서 목록을 비우면 보고 있던 기록이 통째로 사라진다
    * (4.2 검색이 쓰는 처리와 같다).
    */
-  function loadMoreHistory() {
-    if (!historyCursor || moreState === 'loading') {
+  function loadMore() {
+    const current = tab;
+    const cursor = cursors[current];
+
+    if (!cursor || more[current] === 'loading') {
       return;
     }
 
-    setMoreState('loading');
+    setMore((prev) => ({ ...prev, [current]: 'loading' }));
 
-    getRecommendationHistory(historyCursor)
+    const done = (next: string | null) => {
+      setMore((prev) => ({ ...prev, [current]: 'idle' }));
+      setCursors((prev) => ({ ...prev, [current]: next }));
+    };
+    const fail = () => setMore((prev) => ({ ...prev, [current]: 'failed' }));
+
+    if (current === 'ratings') {
+      getMyRatings({ cursor })
+        .then((page) => {
+          done(nextCursor(page));
+          setRatings(append(ratedItems(page)));
+        })
+        .catch(fail);
+
+      return;
+    }
+
+    if (current === 'unrated') {
+      getWatchRecords({ ...UNRATED_QUERY, cursor })
+        .then((page) => {
+          done(nextCursor(page));
+          setUnrated(append(page.items.map((record) => toUnratedRow(record, otts))));
+        })
+        .catch(fail);
+
+      return;
+    }
+
+    getRecommendationHistory(cursor)
       .then((page) => {
-        setMoreState('idle');
-        setHistoryCursor(page.hasNext ? page.nextCursor : null);
-        setHistory((prev) =>
-          prev.status === 'ready'
-            ? { status: 'ready', items: [...prev.items, ...flatten(page.items)] }
-            : prev,
-        );
+        done(nextCursor(page));
+        setHistory(append(flatten(page.items)));
       })
-      .catch(() => setMoreState('failed'));
+      .catch(fail);
   }
 
   function retryFeeds() {
-    setHistoryCursor(null);
-    setMoreState('idle');
+    setCursors(NO_CURSORS);
+    setMore(IDLE_MORE);
     setRatings({ status: 'loading' });
     setUnrated({ status: 'loading' });
     setHistory({ status: 'loading' });
@@ -544,12 +627,13 @@ export default function MyDashboardPage() {
 
           {/*
            * 평가 탭. 누르면 7.6과 같은 곳(2.5 평가 수정)으로 간다. 별점은 API-039가
-           * 주는 값이라 포스터 위에 표식으로 얹는다.
+           * 주는 값이라 포스터 위에 표식으로 얹는다. 키는 평가 번호다 — 프레임 번호는
+           * 과거 평가에서 `null`일 수 있다.
            */}
           {tab === 'ratings' && ratings.status === 'ready' && ratings.items.length > 0 && (
             <ul className={styles.grid}>
               {ratings.items.map((rating) => (
-                <li key={rating.frameId}>
+                <li key={rating.ratingId}>
                   <Link to={path.movieRating(rating.movie.movieId)} className={styles.cell}>
                     <Poster
                       fluid
@@ -638,22 +722,15 @@ export default function MyDashboardPage() {
             </ul>
           )}
 
-          {/*
-           * 추천 기록만 다음 장을 받는다. 나머지 두 탭은 `api/watch`의 목록 함수가 아직
-           * 커서를 쓰지 않아 첫 장뿐이다(업무 -503에서 셋을 같은 모양으로 맞춘다).
-           */}
-          {tab === 'recommendations' && history.status === 'ready' && historyCursor ? (
+          {/* 세 탭이 같은 자리 · 같은 모양으로 다음 장을 받는다(업무 -503) */}
+          {feed.status === 'ready' && cursors[tab] ? (
             <div className={styles.more}>
-              <Button
-                variant="secondary"
-                onClick={loadMoreHistory}
-                disabled={moreState === 'loading'}
-              >
-                {moreState === 'failed' ? '다시 시도' : '더 보기'}
+              <Button variant="secondary" onClick={loadMore} disabled={more[tab] === 'loading'}>
+                {more[tab] === 'failed' ? '다시 시도' : '더 보기'}
               </Button>
 
-              {moreState === 'failed' ? (
-                <p className={styles.moreError}>지난 추천을 불러오지 못했어요.</p>
+              {more[tab] === 'failed' ? (
+                <p className={styles.moreError}>{MORE_ERROR[tab]}</p>
               ) : null}
             </div>
           ) : null}
