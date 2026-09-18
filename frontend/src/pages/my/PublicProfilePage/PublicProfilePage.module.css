@@ -1,3 +1,64 @@
+/*
+ * 7.2-B · 7.2-A 공개 프로필 (업무 S15P21E106-616). 본문은 `ProfileLayout`이 그린다.
+ * 여기는 화면 여백 · 미리보기 안내 바 · ⋯ 메뉴 · 신고 안내뿐이다.
+ */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--screen-padding-x) var(--space-8);
+}
+
+/* 가운데 제목의 균형을 맞추는 빈 자리. 뒤로 가기 버튼과 같은 폭이다 */
+.headerSpacer {
+  display: block;
+  width: var(--tap-target-min);
+}
+
+/*
+ * 미리보기 안내 바. 브랜드 빨강을 **옅은 면과 글자**로만 쓴다 — 무엇이 다른 화면인지
+ * 알리는 표식이다. 아이콘 · 글자 · 버튼 셋이 한 줄이고, 좁으면 버튼이 아래로 내려간다.
+ */
+.previewBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-2);
+  padding: 0 var(--space-1) 0 var(--space-3);
+  border: 1px solid rgba(229, 26, 44, 0.16);
+  border-radius: var(--radius-control);
+  background: var(--color-brand-tint);
+  color: var(--color-brand-ink);
+}
+
+.previewIcon {
+  display: flex;
+  flex: none;
+}
+
+.previewText {
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+/* 글자 버튼이지만 누르는 자리는 44px이다. 밑줄 대신 굵기로 버튼임을 알린다 */
+.previewBack {
+  min-height: var(--tap-target-min);
+  margin-left: auto;
+  padding: 0 var(--space-2);
+  white-space: nowrap;
+  border: 0;
+  background: none;
+  color: var(--color-brand-ink);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+}
+
 /* ─────────────────────────── ⋯ 메뉴 */
 
 /*
@@ -40,8 +101,6 @@
   font-weight: var(--font-weight-medium);
 }
 
-/* ─────────────────────────── 공개 한줄평 */
-
 /* ─────────────────────────── 차단 · 신고 안내 */
 
 /*
@@ -50,9 +109,9 @@
  */
 .notice {
   padding: var(--space-3) var(--space-4);
-  border: 1px dashed var(--color-line-on-dark);
+  border: 1px dashed var(--color-line-strong);
   border-radius: var(--radius-control);
-  color: var(--color-on-dark-muted);
+  color: var(--color-ink-muted);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
 }

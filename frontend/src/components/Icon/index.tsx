@@ -335,3 +335,60 @@ export function FilterIcon() {
     </svg>
   );
 }
+
+/** 7.2 편집 — 항목 수정 (업무 -616). 구역 오른쪽 위에 같은 자리로 선다 */
+export function PencilIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" {...hidden}>
+      <path
+        d="M11.8 3.2l3 3L6.4 14.6l-3.7.7.7-3.7 8.4-8.4zM10.3 4.7l3 3"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** 7.2 편집 — 프로필 사진 변경 (업무 -616) */
+export function CameraIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" {...hidden}>
+      <path
+        d="M2.5 6.2c0-.8.6-1.4 1.4-1.4h1.9l1.2-1.8h4l1.2 1.8h1.9c.8 0 1.4.6 1.4 1.4v7.4c0 .8-.6 1.4-1.4 1.4H3.9c-.8 0-1.4-.6-1.4-1.4V6.2z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <circle cx="9" cy="9.6" r="2.7" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+/** 7.2-A 미리보기 안내 바 (업무 -616) */
+export function InfoIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" {...hidden}>
+      <circle cx="9" cy="9" r="8" fill="currentColor" />
+      <path d="M9 8v5" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="9" cy="5.3" r="1.1" fill="#fff" />
+    </svg>
+  );
+}
+
+/** 7.2-A · 7.2-B 공개 한줄평이 없을 때 (업무 -616) */
+export function SpeechBubbleIcon() {
+  return (
+    <svg width="32" height="30" viewBox="0 0 32 30" fill="none" {...hidden}>
+      <path
+        d="M16 3C8.8 3 3 7.8 3 13.7c0 3.4 1.9 6.4 4.9 8.4L7 27l5.6-3c1.1.3 2.2.4 3.4.4 7.2 0 13-4.8 13-10.7S23.2 3 16 3z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <circle cx="10.5" cy="13.7" r="1.4" fill="currentColor" />
+      <circle cx="16" cy="13.7" r="1.4" fill="currentColor" />
+      <circle cx="21.5" cy="13.7" r="1.4" fill="currentColor" />
+    </svg>
+  );
+}

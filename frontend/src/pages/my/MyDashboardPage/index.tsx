@@ -5,14 +5,17 @@
  * 평가 · 설정. 배치는 가져오지 않았다(screen-spec-my.md 1장). `OTT 관리`는 7.8 설정
  * 안으로 옮겼다(사용자 지시 2026-09-16).
  *
- * 배치는 **사용자 시안**(인스타그램형 프로필 · 피드, 2026-09-16 업무 -459)을 따른다.
+ * 배치는 **사용자 시안**(인스타그램형 프로필 · 피드, 2026-09-16 업무 -459)을 따르고, 위쪽
+ * 프로필은 2026-09-18 시안으로 바꿨다(업무 -616). **프로필 머리 · 수치는 7.2 · 7.2-A · 7.2-B와
+ * 같은 `ProfileLayout`(`mode="view"`)이 그린다** — 네 화면의 프로필이 따로 놀지 않는다.
  *
  * | 자리 | 무엇 |
  * | --- | --- |
- * | 헤더 오른쪽 | `설정` 아이콘 |
- * | 상단 | 3:4 프로필 사진 + 닉네임 |
+ * | 헤더 | `프로필` · 오른쪽 `설정` 아이콘 |
+ * | 상단 | 동그란 프로필 사진 + 닉네임 + 소개 |
  * | 버튼 둘 | `프로필 편집`(→ 7.2) · `프로필 공유` |
- * | 바로가기 | `4컷 리포트`(→ 7.3) · `취향 팝콘`(이동 없음) |
+ * | 수치 | 프레임 · 팝콘 · 공개 한줄평 |
+ * | 바로가기 | `4컷 리포트`(→ 7.3) · `취향 팝콘`(→ 3.2) |
  * | 탭 | `평가한 영화` · `안 남긴 영화` · `추천 기록`. **화면 안에서 아래 피드만 바꾼다** |
  * | 본문 | 고른 탭의 포스터 3열 피드 |
  *
@@ -38,8 +41,8 @@
  * 다르므로, 스크롤만으로 이어 받으면 지금 탭이 끝났는지 알 길이 없다. 셋 다 같은 규칙이다 —
  * 실패하면 보던 격자는 두고 버튼만 `다시 시도`로 바꾼다.
  *
- * **통계 수치는 없다**(사용자 결정 2026-09-16). 프레임 · 평가 · 팝콘 수는 API-014가
- * 주지만 이 화면에 두지 않는다. 다른 자리에도 다시 넣지 않는다.
+ * **수치 카드가 다시 있다**(사용자 시안 2026-09-18, 업무 -616). 2026-09-16에는 뺐지만 새
+ * 시안이 프레임 · 팝콘 · 공개 한줄평 카드를 그렸다. `ProfileLayout`이 그린다.
  *
  * **어두운 블록은 없다.** 4장 규칙은 `화면마다 어두운 블록은 하나다`이고 표는 7.2에
  * `없음`을 적는다 — 최대 하나이지 반드시 하나가 아니다.
@@ -55,9 +58,9 @@
  * `[!]` 계약의 공개 프로필 키는 `publicId`인데 라우트는 `userId`다(9.4). 주소 규칙이
  * 정해지면 공유하는 주소도 같이 바꾼다.
  *
- * **그 밖에 계약에 없는 것은 넣지 않았다** — 한 줄 소개, 해시태그, 포스터 위에
- * 응답이 주지 않는 값. 프로필 이미지는 **자리만 둔다**. API-014 · API-015에 `avatarUrl`이
- * 없고 업로드 API도 없어 늘 기본 아이콘이다. 누르면 무언가 되는 것처럼 만들지 않았다.
+ * **프로필 사진과 소개는 계약에 없다**(업무 -616). 7.2에서 바꿀 수 있지만 값은 목업
+ * 저장소에만 남는다(`api/users.ts` `getMyProfileView`). 해시태그처럼 시안에도 계약에도 없는
+ * 값은 넣지 않았다.
  *
  * **7.5 추천 기록 · 7.6 평가한 영화 · 7.7 안 남긴 영화 화면은 지웠다**(업무 -495).
  * 세 화면이 하던 일을 이 피드가 그대로 한다. 7.6-A 한줄평 관리 시트는 3.1-A 프레임
@@ -65,9 +68,9 @@
  */
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import Avatar from '../../../components/Avatar';
 import Button from '../../../components/Button';
 import PopcornBucket from '../../../components/PopcornBucket';
+import ProfileLayout, { ProfileSkeleton } from '../../../components/ProfileLayout';
 import { kernelCounts } from '../../../components/PopcornBucket/kernels';
 import Poster from '../../../components/Poster';
 import ReportFourCut from '../../../components/ReportFourCut';
@@ -76,12 +79,12 @@ import ScreenHeader from '../../../components/ScreenHeader';
 import Snackbar from '../../../components/Snackbar';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
-import { SettingsIcon } from '../../../components/Icon';
+import { ChevronRightIcon, SettingsIcon } from '../../../components/Icon';
 import { getOtts } from '../../../api/otts';
 import { getRecommendationHistory } from '../../../api/recommendations';
 import { getMyReports, getReportDetail } from '../../../api/reports';
 import { getPopcornBucket } from '../../../api/taste';
-import { getMyProfile } from '../../../api/users';
+import { getMyProfileView } from '../../../api/users';
 import { getMyRatings, getWatchRecords } from '../../../api/watch';
 import { path } from '../../../routes/paths';
 import { formatShortDate } from '../../../utils/date';
@@ -89,8 +92,7 @@ import styles from './MyDashboardPage.module.css';
 import type { FlavorCount } from '../../../components/PopcornBucket/kernels';
 import type { RecommendationType } from '../../../types/enums';
 import type { RecommendationHistoryItem } from '../../../types/recommendation';
-import type { ReportDetailView } from '../../../types/unspecified';
-import type { MyProfile } from '../../../types/user';
+import type { ProfileView, ReportDetailView } from '../../../types/unspecified';
 import type { Ott } from '../../../types/ott';
 import type { MyRatedItem, MyRatingList, WatchRecordListItem } from '../../../types/watch';
 
@@ -277,7 +279,7 @@ const MORE_ERROR: Record<TabKey, string> = {
 };
 
 export default function MyDashboardPage() {
-  const [profile, setProfile] = useState<MyProfile | null>(null);
+  const [profile, setProfile] = useState<ProfileView | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
 
@@ -308,7 +310,7 @@ export default function MyDashboardPage() {
   useEffect(() => {
     let active = true;
 
-    getMyProfile()
+    getMyProfileView()
       .then((value) => {
         if (active) {
           setProfile(value);
@@ -389,7 +391,7 @@ export default function MyDashboardPage() {
   if (failed) {
     return (
       <>
-        <ScreenHeader title={<VisuallyHidden>MY</VisuallyHidden>} />
+        <ScreenHeader title="프로필" />
 
         <StatusView title="프로필을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
           <Button
@@ -406,7 +408,14 @@ export default function MyDashboardPage() {
   }
 
   if (!profile) {
-    return <ScreenHeader title={<VisuallyHidden>MY</VisuallyHidden>} />;
+    return (
+      <>
+        <ScreenHeader title="프로필" />
+        <div className={styles.page}>
+          <ProfileSkeleton />
+        </div>
+      </>
+    );
   }
 
   const feed = tab === 'ratings' ? ratings : tab === 'unrated' ? unrated : history;
@@ -508,12 +517,10 @@ export default function MyDashboardPage() {
        * **`OTT 관리`는 7.8 설정 안으로 옮겼다**(사용자 지시 2026-09-16). 이 화면에서
        * 6.1로 가는 길은 없어졌고 설정 > 계정 > OTT 관리가 유일한 입구다.
        *
-       * **화면 제목 `MY`는 보이지 않는다**(사용자 지시 2026-09-16). 바로 아래 프로필이
-       * 여기가 어디인지 말하고 하단 내비의 `MY`에도 표시가 있다. 화면마다 h1이 하나는
-       * 있어야 하므로 글자는 남기고 보이지만 않게 한다.
+       * 화면 제목은 `프로필`이다(사용자 시안 2026-09-18, 업무 -616).
        */}
       <ScreenHeader
-        title={<VisuallyHidden>MY</VisuallyHidden>}
+        title="프로필"
         action={
           <Link to={path.settings()} className={styles.headerLink}>
             <SettingsIcon />
@@ -524,40 +531,33 @@ export default function MyDashboardPage() {
 
       <div className={styles.page}>
         {/*
-         * 프로필 머리.
-         *
-         * 프로필 사진(3:4)은 **자리만 있다.** API-014 · API-015에 `avatarUrl`이 없고 올리는
-         * API도 없어 늘 기본 아이콘이다(`Avatar`의 자리표시자). 누를 수 없게 두어
-         * 되는 기능처럼 보이지 않게 했다.
-         */}
-        <header className={styles.identity}>
-          <Avatar size={84} shape="portrait" nickname={profile.nickname} />
-
-          <p className={styles.name}>{profile.nickname}</p>
-        </header>
-
-        {/*
-         * 프로필 버튼 둘. `프로필 편집`은 7.2로 가는 기존 입구 그대로이고(이동 경로 2 · 3번
+         * 프로필 머리 · 버튼 둘 · 수치. `프로필 편집`은 7.2로 가는 입구이고(이동 경로 2 · 3번
          * 사슬의 출발점), `프로필 공유`는 기기의 공유 메뉴를 연다.
          */}
-        <div className={styles.profileActions}>
-          <Link to={path.profileEdit()} className={styles.profileAction}>
-            프로필 편집
-          </Link>
+        <ProfileLayout
+          mode="view"
+          profile={profile}
+          actions={
+            <>
+              <Link to={path.profileEdit()} className={styles.profileAction}>
+                프로필 편집
+              </Link>
 
-          <button
-            type="button"
-            className={styles.profileAction}
-            onClick={() => void shareProfile()}
-          >
-            프로필 공유
-          </button>
-        </div>
+              <button
+                type="button"
+                className={styles.profileAction}
+                onClick={() => void shareProfile()}
+              >
+                프로필 공유
+              </button>
+            </>
+          }
+        />
 
         {/*
-         * 바로가기 그림 둘. 상자 · 테두리 없이 그림과 이름만 둔다. 왼쪽은 그림과 글자가
-         * 하나의 링크로 7.3 취향 리포트 목록에 간다. 오른쪽은 이동이 없다 — 7.1의
-         * 팝콘 → 3.2 이동은 9.2에서 뺐다(3.1 안에 같은 입구가 있다).
+         * 바로가기 카드 둘. 그림 · 이름 · 화살표가 한 줄이고 카드 전체가 링크다(시안 7.1).
+         * 왼쪽은 7.3 취향 리포트 목록, 오른쪽은 3.2 취향 팝콘으로 간다 — 시안이 두 카드 모두에
+         * 화살표를 그렸다. 화살표가 있는데 안 눌리면 고장처럼 보인다.
          */}
         <div className={styles.shortcuts}>
           <Link to={path.tasteReports()} className={styles.shortcut}>
@@ -574,15 +574,22 @@ export default function MyDashboardPage() {
             </span>
 
             <span className={styles.shortcutLabel}>4컷 리포트</span>
+            <span className={styles.shortcutChevron}>
+              <ChevronRightIcon />
+            </span>
           </Link>
 
-          <div className={styles.shortcut}>
-            <span className={styles.shortcutArt}>
-              <PopcornBucket width={64} flavors={popcorn} label="팝콘 통" />
+          <Link to={path.popcornBucket()} className={styles.shortcut}>
+            {/* 그림은 장식이다. 링크 이름은 옆의 `취향 팝콘` 글자다 */}
+            <span className={styles.shortcutArt} aria-hidden="true">
+              <PopcornBucket width={52} flavors={popcorn} label="팝콘 통" />
             </span>
 
             <span className={styles.shortcutLabel}>취향 팝콘</span>
-          </div>
+            <span className={styles.shortcutChevron}>
+              <ChevronRightIcon />
+            </span>
+          </Link>
         </div>
 
         {/* 화면 안의 전환이다. 다른 화면으로 가지 않으므로 링크가 아니라 탭이다 */}

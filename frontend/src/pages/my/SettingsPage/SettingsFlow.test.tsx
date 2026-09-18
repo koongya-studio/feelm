@@ -25,9 +25,10 @@ import PrivacySettingsPage from '../PrivacySettingsPage';
 import PublicProfilePage from '../PublicProfilePage';
 import WithdrawPage from '../WithdrawPage';
 import { resetSessionForTest, startSession } from '../../../api/session';
-import { getMyProfile } from '../../../api/users';
+import { getMyProfile, getMyProfileView } from '../../../api/users';
 import { AuthContext } from '../../../contexts/authContext';
 import { resetSessionStore } from '../../../mocks/sessionStore';
+import { mockMyProfileView } from '../../../mocks/publicProfiles';
 import { mockMyProfile } from '../../../mocks/user';
 import { ROUTE_PATTERN } from '../../../routes/paths';
 import type { AuthValue } from '../../../contexts/authContext';
@@ -41,6 +42,8 @@ vi.mock('../../../api/taste', async (importOriginal) => ({
 vi.mock('../../../api/users', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/users')>()),
   getMyProfile: vi.fn(),
+  // 7.1 프로필 머리(업무 -616). 모듈 안에서 부르는 `getMyProfile`은 가로채지 못해 따로 둔다
+  getMyProfileView: vi.fn(),
 }));
 
 const signOut = vi.fn<AuthValue['signOut']>();
@@ -182,6 +185,11 @@ beforeEach(() => {
   vi.mocked(getMyProfile)
     .mockReset()
     .mockImplementation(() => Promise.resolve({ ...server.profile }));
+  vi.mocked(getMyProfileView)
+    .mockReset()
+    .mockImplementation(() =>
+      Promise.resolve({ ...mockMyProfileView, nickname: server.profile.nickname }),
+    );
   signOut.mockReset().mockResolvedValue(undefined);
 });
 
