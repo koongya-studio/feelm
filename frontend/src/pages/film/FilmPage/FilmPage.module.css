@@ -51,6 +51,17 @@
   position: relative;
 }
 
+.notificationDot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid var(--color-bg);
+  border-radius: 50%;
+  background: var(--color-brand);
+}
+
 /* ─────────────────────────── 제목 */
 
 .head {

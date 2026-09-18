@@ -25,7 +25,12 @@ vi.mock('../../../api/taste', () => ({
   getPopcornBucket: vi.fn(),
 }));
 
+vi.mock('../../../api/notifications', () => ({
+  getUnreadNotificationCount: vi.fn(),
+}));
+
 const { getMyFrames, getPopcornBucket } = await import('../../../api/taste');
+const { getUnreadNotificationCount } = await import('../../../api/notifications');
 
 function flavor(code: string, name: string, count: number): PopcornBucketFlavor {
   return {
@@ -80,6 +85,7 @@ const bucket: PopcornBucket = {
 beforeEach(() => {
   vi.mocked(getMyFrames).mockReset();
   vi.mocked(getPopcornBucket).mockReset();
+  vi.mocked(getUnreadNotificationCount).mockReset().mockResolvedValue(0);
 });
 
 describe('FilmPage', () => {
@@ -150,6 +156,19 @@ describe('FilmPage', () => {
     const search = await screen.findByLabelText('검색');
 
     expect(search).toHaveAttribute('href', '/search');
+  });
+
+  it('미확인 알림이 있으면 헤더 링크의 이름과 점으로 알린다', async () => {
+    vi.mocked(getMyFrames).mockResolvedValue(frameList(3));
+    vi.mocked(getPopcornBucket).mockResolvedValue(bucket);
+    vi.mocked(getUnreadNotificationCount).mockResolvedValue(2);
+
+    renderWithRouter(<FilmPage />);
+
+    expect(await screen.findByRole('link', { name: '알림, 읽지 않은 알림 2개' })).toHaveAttribute(
+      'href',
+      '/notifications',
+    );
   });
 
   /*
