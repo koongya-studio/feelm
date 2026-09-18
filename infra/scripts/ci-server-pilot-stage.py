@@ -28,8 +28,8 @@ FILES = runtime.FILES + (
     'ci-network-guard.py',
     'systemd/feelm-ci222-gitlab-runner.service',
 )
-SOURCE_SHA = '388ae26fd74dca6864f5fb469fdf47b2d4a34e42b4989d7f29caf36662b4f875'
-REVISION = 'e5588d312bdfe058b03d15b34b1cbfa3a9935093'
+SOURCE_SHA = '3b0b7c8126edd6d4655b184e08290d300fee868b7f6197747e1fd570d70d8e2f'
+REVISION = '45f49c9f0e66b7af66f99ae9b7805bab96d787cf'
 
 
 def archive_bytes():
