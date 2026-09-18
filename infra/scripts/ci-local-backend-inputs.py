@@ -14,7 +14,9 @@ HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('local_input_prep', HERE / 'ci-backend-offline-prepare.py')
 prep = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(prep)
-IMAGE_ARCHIVE_SHA = 'f1fdc5c9e4e3c96d1d04f4bdab407e1953764199ad2e2a7b007c50c0810990cb'
+IMAGE_ARCHIVE_SHA = '0e8105d4929e11fe0c0e0542d4fe135b5c6f18916096aef7bf1ee3cda2d646df'
+IMAGE_ARCHIVE_PATH = Path(
+    '/home/feelm-ci-test/ci651-backend-images-kafka-20260918/backend-images.tar')
 REQUIRED = {'backend.tar', 'backend-images.tar', 'jdk.tar.gz', 'cache-manifest.json', 'gradle-cache'}
 
 

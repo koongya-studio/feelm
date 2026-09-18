@@ -8,10 +8,14 @@ Docker network 생성/삭제, daemon 시작/중지, 방화벽 변경, 이미지 
 ## 서버에서 제공받은 입력 증빙
 
 - 기록된 실행 폴더의 Gradle 캐시: 413M.
-- `redis:8-alpine`, `pgvector/pgvector:0.8.6-pg17-bookworm`, `testcontainers/ryuk:0.14.0`
+- `apache/kafka:4.3.1`, `redis:8-alpine`, `pgvector/pgvector:0.8.6-pg17-bookworm`,
+  `testcontainers/ryuk:0.14.0`
   이미지와 RepoDigest를 사용자 출력에서 확인했다. digest는 준비 스크립트에 정확히 기록했다.
 - 테스트 Docker 컨테이너 목록은 비어 있었다. 이미지 태그가 바뀌면 새 것을 pull하거나
   암묵적으로 수락하지 않고 digest 검사에서 중단한다. 이미지 ID와 OS/architecture도 기록한다.
+- Kafka 이미지는 backend MR의 실제 Kafka offset 통합 테스트가 요구한다. 저장소에 고정한
+  index digest와 rootless Docker의 `RepoDigests`가 일치해야 하며, 이미지가 없을 때 외부 pull로
+  우회하거나 Testcontainers 대기 시간을 늘리지 않는다.
 - 고정 재현 대상은 이전 수동 테스트의 revision `9631afd9c616e047abbdd0ad7bf8192231f7f35c`,
   archive SHA256 `b045a76f85d8373dec543a58ec1a72e8aacebe288d0856bbfe678db8d5c4d3b1`이다.
   최신 backend 호환성을 자동 주장하지 않는다. 재현 대상을 바꾸려면 별도 검토가 필요하다.
