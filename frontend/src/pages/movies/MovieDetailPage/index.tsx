@@ -25,6 +25,7 @@ import { useAuth } from '../../../contexts/authContext';
 import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
 import { movieMetaLine } from '../../../utils/movie';
+import { ottMovieUrl } from '../../../utils/ott';
 import styles from './MovieDetailPage.module.css';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import type { MovieDetail, SimilarMovie } from '../../../types/movie';
@@ -273,18 +274,19 @@ export default function MovieDetailPage() {
     }
   }
 
-  async function handleOttClick(ottId: number, watchUrl: string | null) {
+  async function handleOttClick(ottId: number, ottCode: string) {
     setClicking(true);
     setClickFailed(false);
     setPopupBlocked(false);
 
-    const opened = watchUrl ? window.open('', '_blank') : null;
+    const destinationUrl = movie ? ottMovieUrl(ottCode, movie.title) : null;
+    const opened = destinationUrl ? window.open('', '_blank') : null;
     if (opened) opened.opener = null;
 
     try {
       const record = await recordOttClick(id, ottId);
-      if (watchUrl) {
-        if (opened) opened.location.replace(watchUrl);
+      if (destinationUrl) {
+        if (opened) opened.location.replace(destinationUrl);
         else setPopupBlocked(true);
         setClicking(false);
         return;
@@ -412,7 +414,7 @@ export default function MovieDetailPage() {
                       disabled={clicking}
                       aria-label={`${ott.name}에서 보기`}
                       data-mine={ott.subscribed ? 'true' : null}
-                      onClick={() => void handleOttClick(ott.ottId, ott.watchUrl)}
+                      onClick={() => void handleOttClick(ott.ottId, ott.code)}
                     >
                       <OttBadge
                         code={ott.code}

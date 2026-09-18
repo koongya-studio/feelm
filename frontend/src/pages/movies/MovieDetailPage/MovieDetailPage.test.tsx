@@ -34,7 +34,8 @@ vi.mock('../../../api/watch', async (importOriginal) => ({
 const { getMovieDetail, getSimilarMovies, getMovieReviews } = await import('../../../api/movies');
 const { recordOttClick } = await import('../../../api/watch');
 
-const WATCH_URL = 'https://ott.example/watch/101';
+const WATCH_URL = 'https://justwatch.example/watch/101';
+const NETFLIX_SEARCH_URL = 'https://www.netflix.com/search?q=%EA%B4%B4%EB%AC%BC';
 
 function movie(overrides: Partial<MovieDetail> = {}): MovieDetail {
   return {
@@ -165,7 +166,7 @@ describe('2.4 OTT 아이콘', () => {
     );
   });
 
-  it('새 탭은 기록을 기다리기 전에 누른 자리에서 열고, 주소는 기록이 끝난 뒤 넣는다', async () => {
+  it('API의 JustWatch 주소 대신 OTT의 영화 제목 검색 주소를 연다', async () => {
     const opened = fakeWindow();
     const open = vi.spyOn(window, 'open').mockReturnValue(opened);
     const pending = deferredRecord();
@@ -186,7 +187,7 @@ describe('2.4 OTT 아이콘', () => {
     pending.resolve(record);
 
     await waitFor(() => {
-      expect(opened.location.replace).toHaveBeenCalledWith(WATCH_URL);
+      expect(opened.location.replace).toHaveBeenCalledWith(NETFLIX_SEARCH_URL);
     });
     // 나간 뒤에도 이 화면은 그대로다. 감상 확인으로 보내지 않는다
     expect(location()).toBe(path.movieDetail(101));
@@ -217,18 +218,33 @@ describe('2.4 OTT 아이콘', () => {
     expect(opened.location.replace).not.toHaveBeenCalled();
   });
 
-  it('시청 주소가 없는 OTT는 새 탭을 열지 않고 2.4-A 감상 확인으로 보낸다', async () => {
-    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+  it('Disney+는 검색어 주소 대신 한국 메인 페이지를 연다', async () => {
+    const opened = fakeWindow();
+    const open = vi.spyOn(window, 'open').mockReturnValue(opened);
     vi.mocked(recordOttClick).mockResolvedValue(record);
+    vi.mocked(getMovieDetail).mockResolvedValue(
+      movie({
+        ottProviders: [
+          {
+            ottId: 5,
+            code: 'DISNEY_PLUS',
+            name: '디즈니플러스',
+            watchUrl: WATCH_URL,
+            subscribed: false,
+          },
+        ],
+      }),
+    );
 
     renderMovie();
-    fireEvent.click(await screen.findByRole('button', { name: '왓챠에서 보기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '디즈니플러스에서 보기' }));
 
     await waitFor(() => {
-      expect(location()).toBe(path.watchConfirm(77));
+      expect(opened.location.replace).toHaveBeenCalledWith('https://www.disneyplus.com/ko-kr');
     });
-    expect(open).not.toHaveBeenCalled();
-    expect(recordOttClick).toHaveBeenCalledWith(101, 2);
+    expect(open).toHaveBeenCalledWith('', '_blank');
+    expect(location()).toBe(path.movieDetail(101));
+    expect(recordOttClick).toHaveBeenCalledWith(101, 5);
   });
 });
 
