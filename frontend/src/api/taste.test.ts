@@ -114,6 +114,16 @@ describe('API-042 내 필름(프레임 목록)', () => {
     expect(call()[0]).toBe('/api/v1/users/me/frames');
     expect(headers().Authorization).toBe('Bearer token');
   });
+
+  it('다음 장은 직전 응답의 커서로 부른다', async () => {
+    fetchMock.mockResolvedValue(
+      json(200, { totalCount: 21, items: [], nextCursor: null, hasNext: false }),
+    );
+
+    await getMyFrames('MjAyNi0wOS0xOA');
+
+    expect(call()[0]).toBe('/api/v1/users/me/frames?cursor=MjAyNi0wOS0xOA');
+  });
 });
 
 describe('API-043 프레임 상세', () => {

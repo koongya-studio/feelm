@@ -76,11 +76,12 @@ export async function getPopcornBucket(): Promise<PopcornBucket> {
 /**
  * API-042 내 필름(프레임 목록) 조회 · GET /api/v1/users/me/frames
  *
- * 계약의 `flavorCode` · `cursor` · `size` 질의 인자는 쓰는 화면이 생기면 추가한다.
- * 3.1은 첫 페이지만 쓴다(기본 20개).
+ * 최신순이고 한 장은 서버 기본값(20개)이다. 첫 장은 커서 없이, 다음 장은 직전 응답의
+ * `nextCursor`로 부른다. 3.1이 필름을 끝까지 넘기면 다음 장을 이어 받는다(업무 -656).
+ * 계약의 `flavorCode` · `size`는 쓰는 화면이 생기면 추가한다.
  */
-export async function getMyFrames(): Promise<FrameList> {
-  return request<FrameList>('/users/me/frames');
+export async function getMyFrames(cursor?: string): Promise<FrameList> {
+  return request<FrameList>('/users/me/frames', { query: { cursor } });
 }
 
 /**

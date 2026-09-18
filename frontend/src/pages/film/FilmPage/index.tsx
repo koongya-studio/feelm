@@ -26,9 +26,12 @@
  * **프레임 수와 팝콘 수를 같다고 가정하지 않는다.** 대표 맛이 없는 영화는 팝콘을
  * 만들지 않으므로(API-036 · API-041) 두 수는 어긋난다. 각자 자기 API의 총수를 쓴다.
  *
- * `[?]` 스트립이 보여줄 프레임 개수와 페이지네이션은 미확정이다. 첫 페이지만 쓴다.
+ * **필름을 끝까지 넘기면 다음 장을 이어 받는다**(업무 -656). API-042는 한 장에 20개를 주고
+ * 나머지는 `nextCursor`로 온다. 첫 장만 그리던 동안 `73개의 프레임을 넘겨보세요`라고 말하면서
+ * 20개만 넘길 수 있었다. 릴 끝에 다음 장 칸을 두고, 그 칸이 보일 즈음 다음 장을 부른다
+ * (4.2 검색과 같은 방식 — `IntersectionObserver`, 실패 뒤와 관찰이 안 되는 환경은 버튼).
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import Button from '../../../components/Button';
 import FilmReel from '../../../components/FilmReel';
@@ -60,6 +63,18 @@ const FRAME_HEIGHT = 165;
 /** 요약에 올릴 맛 수. 8종을 다 늘어놓으면 요약이 아니라 표가 된다 */
 const SUMMARY_FLAVOR_COUNT = 4;
 
+/** 스크롤로 다음 장을 잇는 수단이 있는 환경인지. 없으면 다음 장 칸이 버튼이 된다 */
+const SUPPORTS_OBSERVER = typeof IntersectionObserver !== 'undefined';
+
+/**
+ * 다음 장을 미리 부르는 거리. 다음 장 칸이 릴 오른쪽 끝에서 이만큼 남았을 때 부른다.
+ * 프레임 세 칸쯤이라 넘기는 손이 끝에 닿기 전에 채워진다
+ */
+const PREFETCH_MARGIN = '0px 360px 0px 0px';
+
+/** 다음 장 칸의 상태. `failed`면 자동으로 다시 부르지 않고 버튼으로 잇는다 */
+type MoreState = 'idle' | 'loading' | 'failed';
+
 /** 빈 필름에 남겨 두는 자리. 시안 01이 두 칸을 보여준다 */
 const EMPTY_SLOT_LABELS = ['첫 번째 프레임', '두 번째 프레임'];
 
@@ -67,6 +82,8 @@ export default function FilmPage() {
   const navigate = useNavigate();
 
   const [frames, setFrames] = useState<FrameList | null>(null);
+  const [more, setMore] = useState<MoreState>('idle');
+  const moreRef = useRef<HTMLSpanElement>(null);
   const [bucket, setBucket] = useState<PopcornBucket | null>(null);
   /** 아직 3.3에서 받지 않은 새 리포트. 있으면 리포트 줄이 발급(3.3)으로 간다 */
   const [newReportId, setNewReportId] = useState<number | null>(null);
@@ -80,6 +97,7 @@ export default function FilmPage() {
       .then((list) => {
         if (active) {
           setFrames(list);
+          setMore('idle');
           setFailed(false);
         }
       })
@@ -111,6 +129,59 @@ export default function FilmPage() {
       active = false;
     };
   }, [reloadCount]);
+
+  /**
+   * 다음 장을 이어 받는다.
+   *
+   * 실패해도 이미 그린 프레임은 두고 다음 장 칸만 `다시 불러오기`로 바꾼다. 같은 프레임이
+   * 두 번 오면(그 사이 새 평가로 커서 경계가 밀린 경우) 한 번만 그린다.
+   */
+  const loadMore = useCallback(() => {
+    if (!frames?.hasNext || !frames.nextCursor || more === 'loading') return;
+
+    setMore('loading');
+
+    getMyFrames(frames.nextCursor)
+      .then((page) => {
+        setFrames((prev) => {
+          if (!prev) return prev;
+
+          const seen = new Set(prev.items.map((frame) => frame.frameId));
+
+          return {
+            ...page,
+            items: [...prev.items, ...page.items.filter((frame) => !seen.has(frame.frameId))],
+          };
+        });
+        setMore('idle');
+      })
+      .catch(() => setMore('failed'));
+  }, [frames, more]);
+
+  /*
+   * 다음 장 칸이 릴 안에서 보일 즈음 다음 장을 부른다. 릴은 스스로 가로 스크롤하므로
+   * 관찰 기준은 화면이 아니라 릴의 트랙(칸의 부모)이다.
+   *
+   * 실패한 뒤에는 자동으로 다시 부르지 않는다 — 끝에 머문 채 요청이 끝없이 반복된다.
+   */
+  const canAutoLoad = SUPPORTS_OBSERVER && Boolean(frames?.hasNext) && more === 'idle';
+
+  useEffect(() => {
+    const node = moreRef.current;
+
+    if (!canAutoLoad || !node) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) loadMore();
+      },
+      { root: node.parentElement, rootMargin: PREFETCH_MARGIN },
+    );
+
+    observer.observe(node);
+
+    return () => observer.disconnect();
+  }, [canAutoLoad, loadMore]);
 
   /*
    * 헤더 오른쪽. **검색 → 알림 순서다**(사용자 지시 2026-09-16, 업무 -461).
@@ -213,6 +284,24 @@ export default function FilmPage() {
                     <VisuallyHidden>{frame.movie.title} 상세 보기</VisuallyHidden>
                   </button>
                 ))}
+
+            {/*
+             * 다음 장 칸. 더 받을 프레임이 있을 때만 릴 끝에 선다. 받는 동안은 빈 칸이고,
+             * 실패했거나 스크롤로 이을 수 없는 환경이면 누르는 칸이 된다.
+             */}
+            {!isEmpty && frames?.hasNext ? (
+              <span ref={moreRef} className={styles.moreSlot}>
+                {more === 'failed' || !SUPPORTS_OBSERVER ? (
+                  <button type="button" className={styles.moreButton} onClick={loadMore}>
+                    {more === 'failed' ? '다시 불러오기' : '프레임 더 보기'}
+                  </button>
+                ) : (
+                  <span className={styles.moreLoading} role="status">
+                    프레임을 불러오는 중
+                  </span>
+                )}
+              </span>
+            ) : null}
           </FilmReel>
 
           {/* 잘린 오른쪽이 이미 "더 있다"를 말하지만, 넘길 수 있다는 것까지는 말해 주지 않는다 */}

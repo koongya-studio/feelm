@@ -156,6 +156,36 @@
   color: var(--color-on-dark-muted);
 }
 
+/*
+ * 다음 장 칸(업무 -656). 빈 필름의 자리와 같은 점선 칸이다 — 아직 감기지 않은 필름이
+ * 이어진다는 뜻이고, 받는 동안 글자만 흐리게 둔다.
+ */
+.moreSlot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-style: dashed !important;
+  border-color: var(--color-film-slot-line) !important;
+  background: var(--color-film-slot);
+}
+
+.moreLoading,
+.moreButton {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-on-dark-muted);
+  text-align: center;
+}
+
+.moreButton {
+  width: 100%;
+  height: 100%;
+  padding: 0 var(--space-2);
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
 /* ─────────────────────────── 빈 상태 */
 
 .empty {
