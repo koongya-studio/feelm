@@ -287,7 +287,7 @@ class ReportTablesMigrationTest {
                                     + movieId
                                     + ",4.5,'기존 평가','PUBLIC') RETURNING id");
 
-            assertThat(upgradeDatabase.flyway().migrate().migrationsExecuted).isOne();
+            assertThat(upgradeDatabase.flyway().migrate().migrationsExecuted).isPositive();
             assertThat(
                             longValue(
                                     upgradeDatabase,

@@ -229,6 +229,26 @@ feelm:
           window: 1h
         - limit: ${MAIL_SEND_BUDGET_DAILY_LIMIT:300}
           window: 24h
+  notification:
+    web-push:
+      # disabled는 새 구독과 발송을 막고 config API는 enabled=false로 응답한다. 기존 구독 해제와
+      # 만료 capability 정리는 비활성화 중에도 허용한다.
+      # VAPID 개인키는 환경변수로만 주입하며 로그·응답·메트릭에 넣지 않는다.
+      mode: ${WEB_PUSH_MODE:disabled}
+      public-key: ${WEB_PUSH_VAPID_PUBLIC_KEY:}
+      private-key: ${WEB_PUSH_VAPID_PRIVATE_KEY:}
+      subject: ${WEB_PUSH_VAPID_SUBJECT:}
+      allowed-endpoint-host-suffixes:
+        - fcm.googleapis.com
+        - push.services.mozilla.com
+        - push.apple.com
+      poll-interval: ${WEB_PUSH_POLL_INTERVAL:1s}
+      batch-size: ${WEB_PUSH_BATCH_SIZE:25}
+      maximum-attempts: ${WEB_PUSH_MAXIMUM_ATTEMPTS:5}
+      initial-retry-delay: ${WEB_PUSH_INITIAL_RETRY_DELAY:1m}
+      maximum-retry-delay: ${WEB_PUSH_MAXIMUM_RETRY_DELAY:1h}
+      lease-duration: ${WEB_PUSH_LEASE_DURATION:2m}
+      request-timeout: ${WEB_PUSH_REQUEST_TIMEOUT:15s}
   kafka:
     outbox:
       bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}

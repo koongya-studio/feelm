@@ -213,17 +213,14 @@ class WatchRecordApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("confirmDue는 정확한 2일 도달·7일 미도달 LINK_CLICKED만 반환한다")
-    void confirmDueUsesExactTwoAndSevenDayBoundaries() {
+    @DisplayName("confirmDue는 정확한 24시간 도달·7일 미도달 LINK_CLICKED만 반환한다")
+    void confirmDueUsesExactOneAndSevenDayBoundaries() {
         Instant now = Instant.parse("2026-09-15T01:23:45.123456Z");
         long dueExactly =
                 insertDistinctWatch(
-                        "LINK_CLICKED", now.minusSeconds(2 * DAY), now, now.plusSeconds(DAY));
+                        "LINK_CLICKED", now.minusSeconds(DAY), now, now.plusSeconds(DAY));
         insertDistinctWatch(
-                "LINK_CLICKED",
-                now.minusSeconds(2 * DAY),
-                now.plusNanos(1_000),
-                now.plusSeconds(DAY));
+                "LINK_CLICKED", now.minusSeconds(DAY), now.plusNanos(1_000), now.plusSeconds(DAY));
         long notExpired =
                 insertDistinctWatch(
                         "LINK_CLICKED",
@@ -1035,7 +1032,7 @@ class WatchRecordApiContractTest extends SharedPostgresContractTest {
 
     private long insertWatch(
             long user, long movie, Long ott, String status, Instant clickedAt, Instant expiresAt) {
-        Instant dueAt = clickedAt == null ? null : clickedAt.plusSeconds(2 * DAY);
+        Instant dueAt = clickedAt == null ? null : clickedAt.plusSeconds(DAY);
         return insertWatch(user, movie, ott, status, clickedAt, dueAt, expiresAt);
     }
 

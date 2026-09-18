@@ -17,6 +17,9 @@ spring:
     open-in-view: false
 
 feelm:
+  notification:
+    web-push:
+      mode: disabled
   party:
     refresh:
       consumer-enabled: false

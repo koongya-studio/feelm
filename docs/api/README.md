@@ -16,7 +16,7 @@ FEELM 서비스 REST API 명세입니다. Notion 「설계 > API 명세서」 �
 | [파티](./party.md) | 파티 | 10 |
 | [소셜](./social.md) | 소셜 | 5 |
 | [리포트·트렌드](./report-trend.md) | 리포트, 트렌드 | 4 |
-| [알림](./notifications.md) | 인앱 알림 | 5 |
+| [알림](./notifications.md) | 인앱 알림·브라우저 푸시 | 8 |
 
 FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용하지 않습니다. 현재 이벤트·Redis 경계는 [스트리밍 계약](./streaming-contract.md), 이전 계약과 변경 배경은 [폐기된 내부 API 초안](./internal.md)을 참고합니다.
 
@@ -116,6 +116,9 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-072 | [알림 읽음 처리](./notifications.md#api-072-알림-읽음-처리) | PATCH | `/notifications/{notificationId}/read` | 알림 | 2차 MVP | 회원 | FR-41 |  |
 | API-073 | [전체 알림 읽음 처리](./notifications.md#api-073-전체-알림-읽음-처리) | PATCH | `/notifications/read-all` | 알림 | 2차 MVP | 회원 | FR-41 |  |
 | API-074 | [알림 숨김](./notifications.md#api-074-알림-숨김) | DELETE | `/notifications/{notificationId}` | 알림 | 2차 MVP | 회원 | FR-41 |  |
+| API-075 | [Web Push 공개 설정 조회](./notifications.md#api-075-web-push-공개-설정-조회) | GET | `/notifications/push/config` | 알림 | 2차 MVP | 회원 | FR-41 |  |
+| API-076 | [Web Push 구독 등록·갱신](./notifications.md#api-076-web-push-구독-등록갱신) | PUT | `/notifications/push/subscriptions` | 알림 | 2차 MVP | 회원 | FR-41 |  |
+| API-077 | [Web Push 구독 해제](./notifications.md#api-077-web-push-구독-해제) | DELETE | `/notifications/push/subscriptions/{subscriptionId}` | 알림 | 2차 MVP | 회원 | FR-41 |  |
 
 ## 공통 규약
 
@@ -204,6 +207,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | 429 | `RATE_LIMITED` | 요청 제한 초과 |
 | 500 | `INTERNAL_ERROR` | 서버 오류 |
 | 503 | `RECOMMENDATION_UNAVAILABLE` | 추천 서비스 장애. 핵심 기능은 정상 동작(NFR-05) |
+| 503 | `PUSH_UNAVAILABLE` | Web Push 비활성화 또는 일시적 사용 불가 |
 
 ### 처리 규칙
 
@@ -218,7 +222,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 
 | 값 | 의미 | 전이 |
 |---|---|---|
-| `LINK_CLICKED` | OTT 보러가기 클릭. 감상 확정 아님 | 클릭 2일 후 접속 시 감상 확인 질문 대상 |
+| `LINK_CLICKED` | OTT 보러가기 클릭. 감상 확정 아님 | 클릭 24시간 후 접속 시 감상 확인 질문 대상 |
 | `WATCHED_UNRATED` | 감상 완료(평가 전) | 감상 확인에 '감상함' 응답 |
 | `RATED` | 평가 완료. 프레임이 생성되고 팝콘 버킷 집계에 반영됨 | 평가 저장. 평가 삭제 시 `WATCHED_UNRATED`로 복귀 |
 | `EXPIRED` | 만료. 추천 신호로 사용하지 않음 | '감상하지 않음' 응답 또는 7일 미응답 |
@@ -253,7 +257,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 
 #### InAppNotificationType — 인앱 알림 사건 (FR-41)
 
-- `PARTY_INVITE`, `WATCH_CONFIRM`. 알림 설정 항목과 인앱 사건 종류는 서로 다른 계약이다.
+- `PARTY_INVITE`, `PARTY_INVITE_ACCEPTED`, `WATCH_CONFIRM`. 알림 설정 항목과 인앱 사건 종류는 서로 다른 계약이다.
 
 #### PopcornFlavor — 팝콘 맛 (FR-06)
 

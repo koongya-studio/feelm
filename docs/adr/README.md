@@ -73,6 +73,7 @@ A 회의 안건 12건 중 아키텍처·기술 선택에 해당하는 5건입니
 | [ADR-0019](./0019-reverse-proxy-client-ip-trust.md) | 클라이언트 IP는 신뢰 목록 안의 프록시가 보낸 X-Real-IP만 채택하고 IP 제한은 프리픽스 단위로 집계한다 | 채택 (2026-09-09) |
 | [ADR-0020](./0020-fixed-439-popcorn-flavor-geometry.md) | 팝콘 8개 취향 유형은 439의 고정 장르 기하를 사용한다 | 채택 (2026-09-16) |
 | [ADR-0021](./0021-in-app-notification-source-of-truth.md) | 2차 알림은 PostgreSQL 인앱 알림을 정본으로 사용하고 도메인 원본과 함께 저장한다 | 채택 (2026-09-17) |
+| [ADR-0022](./0022-standard-web-push-vapid-delivery.md) | 브라우저 알림은 표준 Web Push와 VAPID, PostgreSQL durable delivery로 전달한다 | 채택 (2026-09-18) |
 
 ## 관련 문서
 

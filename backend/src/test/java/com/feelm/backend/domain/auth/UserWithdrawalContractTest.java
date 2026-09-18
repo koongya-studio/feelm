@@ -224,6 +224,57 @@ class UserWithdrawalContractTest extends OAuthApiTestSupport {
     }
 
     @Test
+    @DisplayName("S15P21E106-582 탈퇴 시 Web Push capability 원문과 대기 발송을 제거한다")
+    void withdrawalPurgesPushSubscriptionSecrets(CapturedOutput output) throws Exception {
+        Member member = newMember(output);
+        jdbcTemplate.update(
+                "INSERT INTO notifications(user_id,type,source_id,target_type,target_id,title,body,"
+                        + "notified_at,expires_at) VALUES"
+                        + " (?,'PARTY_INVITE',?,'PARTY_INVITATION',?,'제목','본문',CURRENT_TIMESTAMP,"
+                        + " DATEADD('DAY',90,CURRENT_TIMESTAMP))",
+                member.userId(),
+                member.userId(),
+                member.userId());
+        jdbcTemplate.update(
+                "INSERT INTO web_push_subscriptions(user_id,endpoint,endpoint_fingerprint,"
+                        + "p256dh_key,auth_secret,active,capability_version)"
+                        + " VALUES (?,?,?,?,?,true,1)",
+                member.userId(),
+                "https://fcm.googleapis.com/fcm/send/withdrawal",
+                "f".repeat(64),
+                "secret-p256dh",
+                "secret-auth");
+        long subscriptionId =
+                jdbcTemplate.queryForObject(
+                        "SELECT id FROM web_push_subscriptions WHERE endpoint_fingerprint=?",
+                        Long.class,
+                        "f".repeat(64));
+        jdbcTemplate.update(
+                "INSERT INTO web_push_deliveries(notification_id,subscription_id,"
+                        + "endpoint_fingerprint,status,next_attempt_at) VALUES"
+                        + " ((SELECT id FROM notifications WHERE user_id=?),?,?,'PENDING',CURRENT_TIMESTAMP)",
+                member.userId(),
+                subscriptionId,
+                "f".repeat(64));
+
+        withdraw(member.accessToken(), member.password()).andExpect(status().isNoContent());
+
+        assertThat(
+                        jdbcTemplate.queryForMap(
+                                "SELECT active,endpoint,p256dh_key,auth_secret"
+                                        + " FROM web_push_subscriptions WHERE id=?",
+                                subscriptionId))
+                .containsEntry("ACTIVE", false)
+                .containsEntry("ENDPOINT", null)
+                .containsEntry("P256DH_KEY", null)
+                .containsEntry("AUTH_SECRET", null);
+        assertThat(
+                        jdbcTemplate.queryForObject(
+                                "SELECT count(*) FROM web_push_deliveries", Long.class))
+                .isZero();
+    }
+
+    @Test
     @DisplayName("T14 소셜 전용 계정이 password를 생략하면 409 PASSWORD_NOT_SET이다 (플랜 결정 U1)")
     void rejectsSocialOnlyAccount(CapturedOutput output) throws Exception {
         Member member = newMember(output);
