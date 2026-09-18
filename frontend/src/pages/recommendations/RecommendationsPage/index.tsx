@@ -16,6 +16,12 @@
  * 없다. 와이어프레임에 그 상태가 없어 2.2-A와 같은 자리에 빈 데이터 안내를 둔다
  * (업무 -264).
  *
+ * **추천 후보가 아직 없는 것은 장애가 아니다**(업무 -654). 신규 사용자처럼 파이프라인이 후보를
+ * 만들기 전이면 API-045가 `503 RECOMMENDATION_UNAVAILABLE`을 주는데, 이때 2.2-A의
+ * `추천을 잠시 불러오지 못했어요`를 보면 사용자가 고장으로 읽는다. 그 경우만 준비 중 안내로
+ * 바꾸고, 네트워크 단절 · 서버 오류 같은 실제 실패는 와이어프레임 2.2-A 문구를 그대로 둔다
+ * (문구는 사용자 결정 2026-09-18).
+ *
  * 카드 열은 **3.1과 같은 필름 릴을 세로로 세운 것**이다(`FilmReel`, 업무 -605 — 사용자
  * 지시 2026-09-18). 그전에는 와이어프레임의 회색 판에 구멍 줄을 직접 그렸는데, 3.1의
  * 필름이 확정되고 나서 추천 카드가 다른 필름처럼 보였다. 섹션 이름표는 프레임 사이에
@@ -32,6 +38,7 @@ import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import { BlockIcon, LinkIcon, PlayIcon } from '../../../components/Icon';
 import RecommendationCard from './RecommendationCard';
+import { ApiError } from '../../../api/apiError';
 import { getRecommendations } from '../../../api/recommendations';
 import { getOtts } from '../../../api/otts';
 import { path } from '../../../routes/paths';
@@ -44,6 +51,18 @@ import type { RecommendationItem } from '../../../types/recommendation';
 const FRAME_WIDTH = 156;
 const FRAME_HEIGHT = 220;
 
+/**
+ * API-045 실패의 종류. `preparing`은 추천 후보가 아직 없어 서버가 추천을 만들 수 없는 경우다
+ * (`503 RECOMMENDATION_UNAVAILABLE`). 나머지는 모두 `error`다
+ */
+type Failure = 'preparing' | 'error';
+
+function failureOf(error: unknown): Failure {
+  return error instanceof ApiError && error.code === 'RECOMMENDATION_UNAVAILABLE'
+    ? 'preparing'
+    : 'error';
+}
+
 type OpenMenu = {
   item: RecommendationItem;
   /** 화면 위쪽에서의 거리(px). 누른 버튼 위치에 맞춘다 */
@@ -54,7 +73,7 @@ export default function RecommendationsPage() {
   const rootRef = useRef<HTMLDivElement>(null);
   const [otts, setOtts] = useState<Ott[]>([]);
   const [items, setItems] = useState<RecommendationItem[] | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<Failure | null>(null);
   const [openMenu, setOpenMenu] = useState<OpenMenu | null>(null);
 
   const [reloadCount, setReloadCount] = useState(0);
@@ -73,12 +92,12 @@ export default function RecommendationsPage() {
       .then((set) => {
         if (active) {
           setItems(set.items);
-          setFailed(false);
+          setFailure(null);
         }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (active) {
-          setFailed(true);
+          setFailure(failureOf(error));
         }
       });
 
@@ -90,7 +109,7 @@ export default function RecommendationsPage() {
   /** 2.2-A 다시 시도 */
   function handleRetry() {
     setItems(null);
-    setFailed(false);
+    setFailure(null);
     setOpenMenu(null);
     setReloadCount((count) => count + 1);
   }
@@ -112,17 +131,23 @@ export default function RecommendationsPage() {
   const tasteItems = items?.filter((item) => item.type === 'TASTE') ?? [];
   const discoveryItems = items?.filter((item) => item.type === 'DISCOVERY') ?? [];
 
-  if (failed) {
+  if (failure) {
+    const preparing = failure === 'preparing';
+
     return (
       <>
         <ScreenHeader title={<VisuallyHidden>오늘의 추천</VisuallyHidden>} />
 
-        {/* 2.2-A 추천을 불러오지 못한 경우 */}
+        {/* 2.2-A 추천을 불러오지 못한 경우. 후보가 아직 없으면 준비 중으로 안내한다 */}
         <StatusView
-          title="추천을 잠시 불러오지 못했어요"
-          description="검색과 영화 평가는 계속 이용할 수 있어요"
+          title={preparing ? '취향에 맞는 추천을 준비하고 있어요' : '추천을 잠시 불러오지 못했어요'}
+          description={
+            preparing
+              ? '잠시 후 다시 확인해 주세요.\n그동안 영화를 평가하면 추천이 더 정확해져요'
+              : '검색과 영화 평가는 계속 이용할 수 있어요'
+          }
         >
-          <Button onClick={handleRetry}>다시 시도</Button>
+          <Button onClick={handleRetry}>{preparing ? '다시 확인하기' : '다시 시도'}</Button>
           {/* 검색(4.1)은 범위 밖이며 탭에서 안내 화면으로 이동한다 */}
           <Link to={path.search()} className={styles.searchLink}>
             영화 검색하기
