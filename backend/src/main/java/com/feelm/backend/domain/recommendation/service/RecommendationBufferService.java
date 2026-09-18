@@ -3,6 +3,9 @@ package com.feelm.backend.domain.recommendation.service;
 import com.feelm.backend.domain.recommendation.model.RecommendationBufferResult;
 import com.feelm.backend.domain.recommendation.model.RecommendationCandidateBatch;
 import com.feelm.backend.domain.recommendation.repository.RecommendationCandidateReader;
+import com.feelm.backend.global.error.BusinessException;
+import com.feelm.backend.global.error.ErrorCode;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,5 +36,19 @@ public class RecommendationBufferService {
                     exception.getClass().getSimpleName());
         }
         return result;
+    }
+
+    /** Kafka 갱신 알림 연결 전, 조회 요청에서 Redis 후보가 있을 때만 임시로 버퍼를 최신화한다. */
+    public Optional<RecommendationBufferResult> createBufferIfCandidatesAvailable(long userId) {
+        RecommendationCandidateBatch candidates;
+        try {
+            candidates = candidateReader.read(userId);
+        } catch (BusinessException exception) {
+            if (exception.getErrorCode() != ErrorCode.RECOMMENDATION_UNAVAILABLE) {
+                throw exception;
+            }
+            return Optional.empty();
+        }
+        return writer.writeIfEligible(userId, candidates);
     }
 }

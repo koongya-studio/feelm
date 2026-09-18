@@ -3,6 +3,7 @@ package com.feelm.backend.domain.recommendation.service;
 import com.feelm.backend.domain.recommendation.dto.response.RecommendationItemResponse;
 import com.feelm.backend.domain.recommendation.dto.response.RecommendationMovieResponse;
 import com.feelm.backend.domain.recommendation.dto.response.RecommendationResponse;
+import com.feelm.backend.domain.recommendation.model.RecommendationBufferResult;
 import com.feelm.backend.domain.recommendation.repository.RecommendationServingRepository;
 import com.feelm.backend.domain.recommendation.repository.RecommendationServingRepository.RecommendationSet;
 import com.feelm.backend.domain.recommendation.repository.RecommendationServingRepository.ServingItem;
@@ -13,6 +14,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +26,7 @@ public class RecommendationServingService {
     private static final int TARGET_SIZE = 3;
 
     private final RecommendationServingRepository repository;
+    private final RecommendationBufferService bufferService;
     private final RecommendationReplenisher replenisher;
     private final RecommendationReasonPresenter reasonPresenter;
     private final Clock clock;
@@ -31,11 +34,7 @@ public class RecommendationServingService {
     @Transactional
     public RecommendationResponse getRecommendations(long userId) {
         lockActiveUser(userId);
-        RecommendationSet set =
-                repository
-                        .findLatestSet(userId)
-                        .orElseThrow(
-                                () -> new BusinessException(ErrorCode.RECOMMENDATION_UNAVAILABLE));
+        RecommendationSet set = findCurrentSet(userId);
         List<ServingItem> items = repository.findInitialVisibleItems(userId, set.id());
         if (items.isEmpty() && !repository.hasExposedItems(set.id())) {
             items = exposeInitial(userId, set.id());
@@ -44,6 +43,22 @@ public class RecommendationServingService {
             items = repository.findInitialVisibleItems(userId, set.id());
         }
         return new RecommendationResponse(set.id(), set.generatedAt(), map(items));
+    }
+
+    /** S15P21E106-585의 Kafka 알림 기반 갱신이 배포되면 이 요청 시 동기화 경로를 제거한다. */
+    private RecommendationSet findCurrentSet(long userId) {
+        Optional<RecommendationBufferResult> refreshed =
+                bufferService.createBufferIfCandidatesAvailable(userId);
+        if (refreshed.isPresent()) {
+            Optional<RecommendationSet> owned =
+                    repository.findOwnedSet(userId, refreshed.get().recommendationSetId());
+            if (owned.isPresent()) {
+                return owned.get();
+            }
+        }
+        return repository
+                .findLatestSet(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RECOMMENDATION_UNAVAILABLE));
     }
 
     private void lockActiveUser(long userId) {
