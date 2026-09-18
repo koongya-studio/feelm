@@ -10,6 +10,10 @@
  *
  * **담긴 뒤에 5.5로 간다.** 추천(API-058)이 실패하면 보내지 않고 이 화면에서 알린다 —
  * 그러지 않으면 5.5가 빈 화면으로 시작한다.
+ *
+ * `[!]` 이 파일은 **테스트 자체의 제한 시간**을 늘려 둔다(업무 -617). 섞기 연출이 약 4.8초인데
+ * Vitest 기본 제한이 5초라, 전체 실행처럼 러너가 붐비면 그 안에 끝나지 않는다. `findBy` ·
+ * `waitFor`에 준 `timeout`은 그 대기 헬퍼의 제한일 뿐 테스트의 제한을 늘리지 않는다.
  */
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
@@ -18,6 +22,13 @@ import { renderWithRouter } from '../../../test/render';
 import { getParty, getPartyPopcorn, getPartyRecommendations } from '../../../api/parties';
 import { party, partyPopcorn, TEST_PARTY_ID } from '../../../test/party';
 import { mockPartyRecommendations } from '../../../mocks/partyRecommendations';
+
+/*
+ * 연출을 끝까지 기다리는 테스트가 있어 이 파일의 제한 시간을 올린다. `it`마다 제한을 붙이면
+ * Prettier가 본문을 모두 들여써 변경이 커지므로 파일 단위로 한 번 준다. 제한 시간은 상한이라
+ * 연출을 기다리지 않는 테스트가 느려지지는 않는다.
+ */
+vi.setConfig({ testTimeout: 10000 });
 
 vi.mock('../../../api/parties', async () => {
   const actual =
