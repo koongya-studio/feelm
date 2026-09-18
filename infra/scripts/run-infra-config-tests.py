@@ -17,6 +17,8 @@ TESTS = (
     "infra.scripts.test_node_exporter_monitoring",
     "infra.scripts.test_verify_kafka_monitoring",
     "infra.scripts.test_deploy_distributed_runtime",
+    "infra.scripts.test_spark_code_delivery",
+    "infra.scripts.test_spark_code_state",
     "infra.scripts.test_runtime_config_release",
     "infra.scripts.test_deploy_consumer",
     "infra.scripts.test_verify_consumer_e2e",

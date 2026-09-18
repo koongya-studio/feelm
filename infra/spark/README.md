@@ -4,11 +4,89 @@
 
 S15P21E106-290의 `ml-cluster-check.py`는 `spark-submit` client mode Driver와 두 Worker가
 모두 NumPy 2.2.6을 사용하고, 작은 고정 rating 데이터로 ALS 학습·예측이 성공하는지 확인합니다.
-이미지는 저장소 루트의 `infra/spark/Dockerfile`로 두 서버에서 각각 빌드하며 Docker Hub에는
-Push하지 않습니다. `requirements-ml.txt`는 `pipeline/spark/uv.lock`에서 생성한 CPU 전용
+런타임 이미지는 저장소 루트의 `infra/spark/Dockerfile`로 수동 빌드하고 Docker Hub에
+Push합니다. 배포 기준은 가변 태그가 아니라 `runtime-image.env`에 커밋한 OCI index digest이며,
+런타임을 갱신할 때 원격 registry에서 확인한 digest를 MR로 변경합니다. GitLab CI/CD Variable에는
+Docker Hub 인증 정보만 두고 런타임 이미지 참조는 저장하지 않습니다. `requirements-ml.txt`는
+`pipeline/spark/uv.lock`에서 생성한 CPU 전용
 PyTorch·Transformers·psycopg 및 NumPy wheel hash를 포함합니다. Dockerfile은 PyTorch 공식 CPU
 index를 추가해 GPU/CUDA wheel을 설치하지 않습니다. 빌드·적용·롤백 및 전체 제출 명령은
 [인프라 운영 문서](../README.md#ml-runtime-image)를 따릅니다.
+
+현재 고정된 런타임 이미지는 다음 명령으로 원격 manifest와 플랫폼 구성을 확인합니다. 출력의
+최상위 `Digest`가 `runtime-image.env` 값과 같아야 하며, `linux/amd64` 하위 manifest나
+attestation manifest digest를 대신 기록하지 않습니다.
+
+```bash
+docker buildx imagetools inspect choec/feelm-spark-ml:develop-59160470102d
+```
+
+## 작업 코드 이미지 CD
+
+보호된 `main`에서 Spark 코드나 배포 계약이 바뀌면 CI가 고정 runtime digest 위에 실행 코드만
+추가한 `choec/feelm-spark:<commit>` 이미지를 빌드·Push하고 RepoDigest를 두 노드 배포 Job에
+전달합니다. 양 노드는 이미지 label과 `.source-revision`을 먼저 검증합니다. 모두 통과한 경우에만
+분산 노드의 Master·Worker 2, 서비스 노드의 Worker 1 순서로 재생성합니다. 후보 적용 중 하나라도
+실패하면 각 노드의 pending 상태를 이용해 직전 정상 release와 이미지로 복구합니다.
+
+최초 자동 배포 전에는 첫 `main` pipeline의 image Job이 Push한 **작업 코드 image digest**를
+조율된 유휴 시간에 세 컨테이너에 한 번 수동 적용합니다. 이 bootstrap 전에는 기존 runtime image
+digest를 수동 rollback 값으로 따로 확인해 두고, Master의 application·driver가 비어 있는지 확인한
+상태에서 분산 노드 Master·Worker 2, 서비스 노드 Worker 1 순서로 `--no-deps --force-recreate`
+합니다. 세 컨테이너가 모두 실행되고 Worker 두 개가 ALIVE인지 확인한 다음 아래 초기화를 실행합니다.
+runtime base digest는 source revision marker가 없으므로 초기화 입력으로 사용할 수 없습니다.
+
+```bash
+CODE_IMAGE='choec/feelm-spark@sha256:<첫-작업-코드-image-digest>'
+
+# J15E106A에서 먼저 실행
+docker pull "$CODE_IMAGE"
+SPARK_IMAGE="$CODE_IMAGE" docker compose --env-file infra/.env \
+  -f infra/compose/distributed.yml up -d --no-deps --force-recreate \
+  spark-master spark-worker-2
+
+# J15E106에서 이어서 실행
+docker pull "$CODE_IMAGE"
+SPARK_IMAGE="$CODE_IMAGE" docker compose --env-file infra/.env \
+  -f infra/compose/service.yml up -d --no-deps --force-recreate spark-worker-1
+```
+
+한 노드라도 기동·Worker 등록 또는 revision 확인에 실패하면 다음 노드나 초기화로 넘어가지 않고,
+확인해 둔 기존 runtime digest로 같은 서비스만 재생성해 수동 복구합니다.
+
+초기화는 승인 digest의 OCI revision label, 모든 대상 컨테이너의 image digest와
+`.source-revision`, checkout release SHA가 전부 같을 때만 단일 원자 manifest를 기록합니다.
+
+```bash
+# J15E106A
+sudo -u gitlab-runner bash infra/scripts/deploy-spark-code.sh initialize \
+  distributed <현재-main-40자리-SHA> \
+  choec/feelm-spark@sha256:<첫-작업-코드-image-digest>
+
+# J15E106
+sudo -u gitlab-runner bash infra/scripts/deploy-spark-code.sh initialize \
+  service <현재-main-40자리-SHA> \
+  choec/feelm-spark@sha256:<첫-작업-코드-image-digest>
+```
+
+노드별 정상 상태는 release SHA·image digest·source revision을 한 JSON manifest로 원자 교체합니다.
+배포 중 pending은 양 노드 settle과 재검증이 모두 끝날 때까지 유지합니다. 어느 노드의 settle 또는
+재검증이 실패하면 양 노드가 pending의 이전 manifest와 image로 보상 rollback한 뒤 pending을
+정리합니다. 중단된 pipeline의 pending은 다음 preflight가 새 후보를 pull하기 전에 먼저 복구합니다.
+알림은 성공, 후보 거부(운영 상태 유지), 자동 rollback 완료, 수동 복구 필요를 구분합니다.
+
+두 main pipeline의 다단계 배포가 서로 끼어들지 않도록 첫 pipeline에서
+`distributed-runtime-spark` resource group이 생성된 직후 GitLab Resource Groups API로
+`process_mode=oldest_first`를 한 번 설정합니다. 이 설정을 확인하기 전에는 Spark 작업 코드 자동
+배포를 운영 기준으로 사용하지 않습니다. 프로젝트 Maintainer 이상 권한의 access token으로 다음
+요청을 실행하고 응답의 `process_mode`가 `oldest_first`인지 확인합니다.
+
+```bash
+curl --fail-with-body --request PUT \
+  --header "PRIVATE-TOKEN: <GitLab-access-token>" \
+  --data "process_mode=oldest_first" \
+  "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/resource_groups/distributed-runtime-spark"
+```
 
 Docker가 없는 개발 환경에서도 이미지 계약과 세 Spark 역할의 공통 빌드 설정을 검사합니다.
 

@@ -154,7 +154,9 @@ def inspect_image(container: str, runner: Runner) -> str | None:
 def spark_status_url(node: str, env_file: Path) -> str:
     if node == "distributed":
         return "http://127.0.0.1:8080/json/"
-    host = load_env_value(env_file, "DISTRIBUTED_NODE_IP")
+    host = load_env_value(env_file, "DISTRIBUTED_NODE_IP") or os.environ.get(
+        "DISTRIBUTED_NODE_IP"
+    )
     if not host:
         raise DeploymentError("DISTRIBUTED_NODE_IP is missing from the environment file")
     try:
@@ -364,6 +366,60 @@ def verify_spark_image(services: tuple[str, ...], expected: str, runner: Runner)
         )
 
 
+def validate_full_revision(value: str, option: str) -> str:
+    if not re.fullmatch(r"[0-9a-f]{40}", value):
+        raise DeploymentError(f"{option} must be a full lowercase Git SHA")
+    return value
+
+
+def preflight_spark_image(image: str, expected_revision: str, runner: Runner) -> None:
+    if not re.fullmatch(r"[^\s@]+@sha256:[0-9a-f]{64}", image):
+        raise DeploymentError("--spark-image must be an immutable repository@sha256 digest")
+    validate_full_revision(expected_revision, "--spark-revision")
+    runner.run(["docker", "pull", image])
+    label = runner.run(
+        [
+            "docker", "image", "inspect", "--format",
+            '{{index .Config.Labels "org.opencontainers.image.revision"}}', image,
+        ],
+        capture=True,
+    )
+    marker = runner.run(
+        [
+            "docker", "run", "--rm", "--entrypoint", "cat", image,
+            "/opt/feelm/pipeline/spark/.source-revision",
+        ],
+        capture=True,
+    )
+    if label != expected_revision or marker != expected_revision:
+        raise DeploymentError("Spark image revision does not match the expected commit")
+
+
+def verify_spark_revision(services: tuple[str, ...], expected: str, runner: Runner) -> None:
+    validate_full_revision(expected, "Spark revision")
+    mismatches = []
+    for service in services:
+        if not service.startswith("spark-"):
+            continue
+        container = CONTAINERS[service]
+        try:
+            actual = runner.run(
+                [
+                    "docker", "exec", container, "cat",
+                    "/opt/feelm/pipeline/spark/.source-revision",
+                ],
+                capture=True,
+            )
+        except DeploymentError:
+            actual = "missing"
+        if actual != expected:
+            mismatches.append(f"{service}={actual or 'missing'}")
+    if mismatches:
+        raise DeploymentError(
+            f"Running Spark revision does not match {expected}: {', '.join(mismatches)}"
+        )
+
+
 def deploy(args: argparse.Namespace, runner: Runner) -> int:
     root = Path(args.source_root).resolve()
     env_file = Path(args.env_file).resolve()
@@ -373,6 +429,24 @@ def deploy(args: argparse.Namespace, runner: Runner) -> int:
     environment = os.environ.copy()
     if args.spark_image:
         environment["SPARK_IMAGE"] = args.spark_image
+
+    if args.spark_idle_check_only:
+        if args.node != "distributed" or components != ("spark",):
+            raise DeploymentError("--spark-idle-check-only requires distributed Spark")
+        ensure_spark_idle(args.node, env_file)
+        print("Spark idle check completed")
+        return 0
+
+    if args.preflight_only:
+        if components != ("spark",) or not args.spark_image or not args.spark_revision:
+            raise DeploymentError(
+                "--preflight-only requires Spark, --spark-image, and --spark-revision"
+            )
+        if args.node == "distributed" and not args.allow_active_spark_workloads:
+            ensure_spark_idle(args.node, env_file)
+        preflight_spark_image(args.spark_image, args.spark_revision, runner)
+        print(f"Spark image preflight completed for revision {args.spark_revision}")
+        return 0
 
     print(f"Node: {args.node}")
     print(f"Components: {','.join(components)}")
@@ -400,13 +474,29 @@ def deploy(args: argparse.Namespace, runner: Runner) -> int:
         )
     if "spark" in components and not args.spark_image:
         raise DeploymentError("--spark-image is required when deploying Spark")
+    if "spark" in components and not args.spark_revision:
+        raise DeploymentError("--spark-revision is required when deploying Spark")
+    if args.spark_recovery_mode and (
+        not args.rollback_spark_image or not args.rollback_spark_revision
+    ):
+        raise DeploymentError(
+            "--spark-recovery-mode requires rollback Spark image and revision"
+        )
 
     commit = resolve_commit(root, args.expected_commit, runner)
     rollback_commit = resolve_commit(
         rollback_root, args.expected_rollback_commit, runner
     )
-    if args.spark_image:
-        runner.run(["docker", "image", "inspect", args.spark_image])
+    if args.spark_image and args.spark_revision:
+        preflight_spark_image(args.spark_image, args.spark_revision, runner)
+    if args.rollback_spark_image:
+        if not args.rollback_spark_revision:
+            raise DeploymentError(
+                "--rollback-spark-revision is required with --rollback-spark-image"
+            )
+        preflight_spark_image(
+            args.rollback_spark_image, args.rollback_spark_revision, runner
+        )
     previous_images = {
         service: inspect_image(CONTAINERS[service], runner) for service in services
     }
@@ -414,23 +504,21 @@ def deploy(args: argparse.Namespace, runner: Runner) -> int:
         image for service, image in previous_images.items()
         if service.startswith("spark-") and image
     }
-    if len(previous_spark_images) > 1:
+    if len(previous_spark_images) > 1 and not args.spark_recovery_mode:
         raise DeploymentError("Running Spark containers do not use one consistent image")
 
     check_compose(root, env_file, args.node, services, runner, environment)
     rollback_environment = environment.copy()
-    if previous_spark_images:
+    if args.rollback_spark_image:
+        rollback_environment["SPARK_IMAGE"] = args.rollback_spark_image
+    elif previous_spark_images:
         rollback_environment["SPARK_IMAGE"] = previous_spark_images.pop()
     check_compose(
         rollback_root, env_file, args.node, services, runner, rollback_environment
     )
     if "spark" in components:
-        if args.node == "service" and not args.spark_idle_checked_on_master:
-            raise DeploymentError(
-                "Service-node Spark deployment requires "
-                "--spark-idle-checked-on-master after checking the distributed node"
-            )
-        if args.node == "distributed" and not args.allow_active_spark_workloads:
+        if (not args.spark_recovery_mode
+                and not args.allow_active_spark_workloads):
             ensure_spark_idle(args.node, env_file)
 
     print(f"Deploying reviewed commit: {commit}")
@@ -451,6 +539,8 @@ def deploy(args: argparse.Namespace, runner: Runner) -> int:
             verify_kafka_produce_consume(runner)
         if args.spark_image:
             verify_spark_image(services, args.spark_image, runner)
+            if args.spark_revision:
+                verify_spark_revision(services, args.spark_revision, runner)
     except DeploymentError as candidate_error:
         print(f"Candidate deployment failed: {candidate_error}", file=sys.stderr)
         print("Restoring services from the previous checkout", file=sys.stderr)
@@ -471,6 +561,10 @@ def deploy(args: argparse.Namespace, runner: Runner) -> int:
             previous_spark_image = rollback_environment.get("SPARK_IMAGE")
             if previous_spark_image:
                 verify_spark_image(services, previous_spark_image, runner)
+                if args.rollback_spark_revision:
+                    verify_spark_revision(
+                        services, args.rollback_spark_revision, runner
+                    )
         except DeploymentError as rollback_error:
             raise DeploymentError(
                 f"Rollback failed; manual recovery is required: {rollback_error}"
@@ -500,12 +594,17 @@ def parser() -> argparse.ArgumentParser:
         help="Reviewed Git checkout whose Compose configuration will be deployed",
     )
     result.add_argument("--spark-image")
+    result.add_argument("--spark-revision")
+    result.add_argument("--rollback-spark-image")
+    result.add_argument("--rollback-spark-revision")
+    result.add_argument("--preflight-only", action="store_true")
+    result.add_argument("--spark-idle-check-only", action="store_true")
+    result.add_argument("--spark-recovery-mode", action="store_true")
     result.add_argument("--expected-commit")
     result.add_argument("--expected-rollback-commit")
     result.add_argument("--rollback-root")
     result.add_argument("--health-attempts", type=int, default=24)
     result.add_argument("--allow-active-spark-workloads", action="store_true")
-    result.add_argument("--spark-idle-checked-on-master", action="store_true")
     result.add_argument("--confirm-deploy", action="store_true")
     return result
 
