@@ -4,19 +4,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.feelm.backend.domain.recommendation.dto.response.RecommendationResponse;
 import com.feelm.backend.domain.recommendation.model.RecommendationBufferResult;
 import com.feelm.backend.domain.recommendation.model.RecommendationCandidate;
 import com.feelm.backend.domain.recommendation.model.RecommendationCandidateBatch;
 import com.feelm.backend.domain.recommendation.repository.RecommendationBufferRepository;
 import com.feelm.backend.domain.recommendation.repository.RecommendationCandidateReader;
+import com.feelm.backend.domain.recommendation.repository.RecommendationReasonGenerator;
+import com.feelm.backend.domain.recommendation.repository.RecommendationReasonRepository;
 import com.feelm.backend.domain.recommendation.service.RecommendationBufferService;
+import com.feelm.backend.domain.recommendation.service.RecommendationServingService;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
 import com.feelm.backend.support.SharedPostgresContractTest;
@@ -24,20 +31,24 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @SpringBootTest(
         properties = {
@@ -53,14 +64,17 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
 
     @Autowired JdbcTemplate jdbc;
     @Autowired RecommendationBufferService service;
+    @Autowired RecommendationServingService servingService;
+    @MockitoSpyBean RecommendationReasonRepository reasonRepository;
     @MockitoBean RecommendationCandidateReader candidateReader;
+    @MockitoBean RecommendationReasonGenerator reasonGenerator;
     @MockitoSpyBean RecommendationBufferRepository bufferRepository;
 
     private ExecutorService executor;
 
     @BeforeEach
     void setUp() {
-        reset(candidateReader);
+        reset(candidateReader, reasonGenerator, reasonRepository);
         jdbc.execute(
                 "TRUNCATE TABLE outbox_events, user_movie_dismissals, ratings, watch_records,"
                         + " user_otts, movie_ott_providers, recommendation_items,"
@@ -127,6 +141,47 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                 .containsExactly(100L, 101L, 102L);
         assertThat(storedMovieIds(result.recommendationSetId(), "DISCOVERY"))
                 .containsExactly(200L, 201L);
+    }
+
+    @Test
+    @DisplayName("TASTE에 저장한 영화는 DISCOVERY에서 건너뛰고 다음 고유 후보를 채운다")
+    void skipsDiscoveryMoviesAlreadyStoredAsTaste() {
+        movies(100, 101, 102, 200, 201);
+        candidates(
+                candidate(100, "5.0", "TASTE", null),
+                candidate(101, "4.0", "TASTE", null),
+                candidate(102, "3.0", "TASTE", null),
+                candidate(102, "6.0", "DISCOVERY", "FLAVOR_A"),
+                candidate(200, "5.0", "DISCOVERY", "FLAVOR_B"),
+                candidate(100, "4.0", "DISCOVERY", "FLAVOR_C"),
+                candidate(201, "3.0", "DISCOVERY", "FLAVOR_D"));
+
+        long setId = service.createBuffer(USER).recommendationSetId();
+
+        assertThat(storedMovieIds(setId, "TASTE")).containsExactly(100L, 101L, 102L);
+        assertThat(storedMovieIds(setId, "DISCOVERY")).containsExactly(200L, 201L);
+        assertThat(servingService.getRecommendations(USER).items())
+                .extracting(item -> item.movie().movieId())
+                .containsExactly(100L, 101L, 200L);
+    }
+
+    @Test
+    @DisplayName("DISCOVERY가 모두 TASTE와 겹치면 세 번째 TASTE를 노출한다")
+    void fallsBackToTasteWhenAllDiscoveryMoviesOverlap() {
+        movies(100, 101, 102);
+        candidates(
+                candidate(100, "5.0", "TASTE", null),
+                candidate(101, "4.0", "TASTE", null),
+                candidate(102, "3.0", "TASTE", null),
+                candidate(100, "6.0", "DISCOVERY", "FLAVOR_A"),
+                candidate(101, "5.0", "DISCOVERY", "FLAVOR_B"));
+
+        long setId = service.createBuffer(USER).recommendationSetId();
+
+        assertThat(storedMovieIds(setId, "DISCOVERY")).isEmpty();
+        assertThat(servingService.getRecommendations(USER).items())
+                .extracting(item -> item.movie().movieId())
+                .containsExactly(100L, 101L, 102L);
     }
 
     @Test
@@ -197,9 +252,8 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                         "TASTE",
                         null,
                         """
-                        {"reasons":[{"code":"SHARED_FEATURES_WITH_LIKED_MOVIE",\
-                        "sourceMovieId":55,"sharedFeatures":{"tmdbGenreIds":[878],\
-                        "tmdbDirectorIds":[],"tmdbCastIds":[],"tmdbKeywordIds":[]}}]}
+                        {"reasons":[{"code":"SHARED_GENRE",\
+                        "sourceMovieIds":[55],"matchedGenreCodes":["THRILLER"]}]}
                         """),
                 candidate(101, "4.0", "DISCOVERY", "FLAVOR_A"));
 
@@ -223,11 +277,495 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
         assertThat(items).hasSize(2);
         assertThat(items.get(0)).containsEntry("type", "TASTE").containsEntry("flavor_code", null);
         assertThat(items.get(0).get("reason").toString())
-                .contains("SHARED_FEATURES_WITH_LIKED_MOVIE", "sourceMovieId", "878");
+                .contains("SHARED_GENRE", "sourceMovieIds", "THRILLER", "새로운 영화를 만나보세요.");
         assertThat(items.get(1))
                 .containsEntry("type", "DISCOVERY")
                 .containsEntry("flavor_code", "FLAVOR_A");
-        assertThat(items.get(1).get("reason").toString()).isEqualTo("{\"reasons\": []}");
+        assertThat(items.get(1).get("reason").toString())
+                .contains("\"reasons\": []", "새로운 영화를 만나보세요.", "\"factors\": []");
+    }
+
+    @Test
+    @DisplayName("확인된 영화·장르만으로 문구를 만들고 외부 생성은 저장 트랜잭션 밖에서 호출한다")
+    void generatesGroundedReasonOutsideBufferTransaction() {
+        movies(55, 100);
+        jdbc.update(
+                "INSERT INTO genres(code,name,tmdb_genre_id) VALUES ('THRILLER','스릴러',53)"
+                        + " ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name");
+        candidates(
+                candidate(
+                        100,
+                        "5.0",
+                        "TASTE",
+                        null,
+                        """
+                        {"reasons":[{"code":"SHARED_GENRE","sourceMovieIds":[55],
+                        "matchedGenreCodes":["THRILLER"]}]}
+                        """));
+        when(reasonGenerator.selectVariants(anyList()))
+                .thenAnswer(
+                        invocation -> {
+                            assertThat(
+                                            TransactionSynchronizationManager
+                                                    .isActualTransactionActive())
+                                    .isFalse();
+                            List<?> prompts = invocation.getArgument(0);
+                            assertThat(prompts).hasSize(1);
+                            return Map.of(
+                                    ((com.feelm.backend.domain.recommendation.model
+                                                            .RecommendationReasonPrompt)
+                                                    prompts.getFirst())
+                                            .itemId(),
+                                    "SOURCE_GENRE");
+                        });
+
+        long setId = service.createBuffer(USER).recommendationSetId();
+        String reason =
+                jdbc.queryForObject(
+                        "SELECT reason::text FROM recommendation_items WHERE set_id=?",
+                        String.class,
+                        setId);
+        assertThat(reason).contains("SHARED_GENRE", "스릴러", "\"type\": \"GENRE\"");
+        assertThat(reason).doesNotContain("movie-55");
+    }
+
+    @Test
+    @DisplayName("첫 근거의 표시명이 없으면 뒤의 유효한 근거를 사용한다")
+    void usesLaterValidReasonWhenFirstCannotBeResolved() {
+        movies(55, 100);
+        candidates(
+                candidate(
+                        100,
+                        "5.0",
+                        "TASTE",
+                        null,
+                        """
+                        {"reasons":[
+                          {"code":"TOP_RATED_SOURCE","sourceMovieIds":[999999],"matchedGenreCodes":[]},
+                          {"code":"TOP_RATED_SOURCE","sourceMovieIds":[55],"matchedGenreCodes":[]}
+                        ]}
+                        """));
+        when(reasonGenerator.selectVariants(anyList()))
+                .thenAnswer(
+                        invocation -> {
+                            List<
+                                            com.feelm.backend.domain.recommendation.model
+                                                    .RecommendationReasonPrompt>
+                                    prompts = invocation.getArgument(0);
+                            assertThat(prompts).hasSize(1);
+                            assertThat(prompts.getFirst().sourceTitle()).isEqualTo("movie-55");
+                            return Map.of(prompts.getFirst().itemId(), "SOURCE");
+                        });
+
+        long setId = service.createBuffer(USER).recommendationSetId();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT reason->>'summary' FROM recommendation_items WHERE set_id=?",
+                                String.class,
+                                setId))
+                .isEqualTo("좋아하신 영화 'movie-55'을 바탕으로 골랐어요.");
+    }
+
+    @Test
+    @DisplayName("근거 배열의 영화와 장르를 임의로 짝지어 주장하지 않는다")
+    void doesNotPairUnrelatedSourceMovieAndGenre() {
+        movies(55, 56, 100, 101);
+        jdbc.update(
+                "INSERT INTO genres(code,name,tmdb_genre_id) VALUES"
+                        + " ('ACTION','액션',28),('DRAMA','드라마',18)"
+                        + " ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name");
+        jdbc.update(
+                "INSERT INTO movie_genres(movie_id,genre_id)"
+                        + " SELECT 55,id FROM genres WHERE code='DRAMA'");
+        jdbc.update(
+                "INSERT INTO movie_genres(movie_id,genre_id)"
+                        + " SELECT 56,id FROM genres WHERE code='ACTION'");
+        candidates(
+                candidate(
+                        100,
+                        "5.0",
+                        "TASTE",
+                        null,
+                        """
+                        {"reasons":[{"code":"SHARED_GENRE","sourceMovieIds":[55,56],
+                        "matchedGenreCodes":["ACTION","DRAMA"]}]}
+                        """),
+                candidate(
+                        101,
+                        "4.0",
+                        "DISCOVERY",
+                        null,
+                        """
+                        {"reasons":[{"code":"DISCOVERY_PERSONAL_SCORE","sourceMovieIds":[55,56],
+                        "matchedGenreCodes":["ACTION","DRAMA"]}]}
+                        """));
+        when(reasonGenerator.selectVariants(anyList()))
+                .thenAnswer(
+                        invocation -> {
+                            List<
+                                            com.feelm.backend.domain.recommendation.model
+                                                    .RecommendationReasonPrompt>
+                                    prompts = invocation.getArgument(0);
+                            assertThat(prompts).hasSize(2);
+                            assertThat(prompts)
+                                    .allSatisfy(
+                                            prompt -> assertThat(prompt.sourceTitle()).isNull());
+                            return Map.of(
+                                    prompts.get(0).itemId(),
+                                    "SOURCE_GENRE",
+                                    prompts.get(1).itemId(),
+                                    "SOURCE_GENRE");
+                        });
+
+        long setId = service.createBuffer(USER).recommendationSetId();
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT reason->>'summary' FROM recommendation_items"
+                                        + " WHERE set_id=? ORDER BY movie_id",
+                                String.class,
+                                setId))
+                .containsExactly("좋아하신 영화와 액션 장르가 같아요.", "좋아하신 영화와 액션 장르가 같아요.");
+    }
+
+    @Test
+    @DisplayName("생성기 장애가 추천 버퍼 저장을 실패시키지 않는다")
+    void generatorFailureUsesGroundedFallback() {
+        movies(55, 100);
+        jdbc.update(
+                "INSERT INTO genres(code,name,tmdb_genre_id) VALUES ('THRILLER','스릴러',53)"
+                        + " ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name");
+        candidates(
+                candidate(
+                        100,
+                        "5.0",
+                        "TASTE",
+                        null,
+                        """
+                        {"reasons":[{"code":"SHARED_GENRE","sourceMovieIds":[55],
+                        "matchedGenreCodes":["THRILLER"]}]}
+                        """));
+        when(reasonGenerator.selectVariants(anyList()))
+                .thenThrow(new IllegalStateException("timeout"));
+
+        long setId = service.createBuffer(USER).recommendationSetId();
+        String reason =
+                jdbc.queryForObject(
+                        "SELECT reason::text FROM recommendation_items WHERE set_id=?",
+                        String.class,
+                        setId);
+        assertThat(reason).contains("좋아하신 영화와 스릴러 장르가 같아요.");
+    }
+
+    @Test
+    @DisplayName("버퍼 커밋 뒤 이유 조회 DB 오류는 세트 반환을 막지 않고 재요청에서 재시도한다")
+    void reasonReadFailureReturnsCommittedSetAndRetries() {
+        movies(100);
+        candidates(candidate(100, "5.0", "TASTE", null));
+        doThrow(new DataAccessResourceFailureException("temporary read failure"))
+                .when(reasonRepository)
+                .findUnresolved(anyLong());
+
+        long setId = service.createBuffer(USER).recommendationSetId();
+
+        assertThat(rowCount("recommendation_sets")).isEqualTo(1);
+        assertThat(rowCount("recommendation_items")).isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT reason->>'summary' FROM recommendation_items WHERE set_id=?",
+                                String.class,
+                                setId))
+                .isNull();
+        reset(reasonRepository);
+        assertThat(service.createBuffer(USER).recommendationSetId()).isEqualTo(setId);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT reason->>'summary' FROM recommendation_items WHERE set_id=?",
+                                String.class,
+                                setId))
+                .isEqualTo("새로운 영화를 만나보세요.");
+    }
+
+    @Test
+    @DisplayName("버퍼 커밋 뒤 이유 갱신 DB 오류는 세트 반환을 막지 않고 재요청에서 재시도한다")
+    void reasonUpdateFailureReturnsCommittedSetAndRetries() {
+        movies(100, 101);
+        candidates(candidate(100, "5.0", "TASTE", null), candidate(101, "4.0", "TASTE", null));
+        AtomicInteger updates = new AtomicInteger();
+        doAnswer(
+                        invocation -> {
+                            if (updates.getAndIncrement() == 0) {
+                                return invocation.callRealMethod();
+                            }
+                            throw new DataAccessResourceFailureException(
+                                    "temporary update failure");
+                        })
+                .when(reasonRepository)
+                .completeIfUnexposed(anyLong(), anyString(), anyString());
+
+        long setId = service.createBuffer(USER).recommendationSetId();
+
+        assertThat(rowCount("recommendation_sets")).isEqualTo(1);
+        assertThat(rowCount("recommendation_items")).isEqualTo(2);
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT reason->>'summary' FROM recommendation_items"
+                                        + " WHERE set_id=? ORDER BY movie_id",
+                                String.class,
+                                setId))
+                .containsExactly(null, null);
+        reset(reasonRepository);
+        assertThat(service.createBuffer(USER).recommendationSetId()).isEqualTo(setId);
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT reason->>'summary' FROM recommendation_items"
+                                        + " WHERE set_id=? ORDER BY movie_id",
+                                String.class,
+                                setId))
+                .containsExactly("새로운 영화를 만나보세요.", "새로운 영화를 만나보세요.");
+    }
+
+    @Test
+    @DisplayName("모델이 허용되지 않은 근거를 선택해도 검증된 장르 문구만 저장한다")
+    void rejectsUnsupportedGeneratedVariant() {
+        movies(55, 100);
+        jdbc.update(
+                "INSERT INTO genres(code,name,tmdb_genre_id) VALUES ('THRILLER','스릴러',53)"
+                        + " ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name");
+        candidates(
+                candidate(
+                        100,
+                        "5.0",
+                        "TASTE",
+                        null,
+                        """
+                        {"reasons":[{"code":"SHARED_GENRE","sourceMovieIds":[55],
+                        "matchedGenreCodes":["THRILLER"]}]}
+                        """));
+        when(reasonGenerator.selectVariants(anyList()))
+                .thenAnswer(
+                        invocation -> {
+                            List<
+                                            com.feelm.backend.domain.recommendation.model
+                                                    .RecommendationReasonPrompt>
+                                    prompts = invocation.getArgument(0);
+                            return Map.of(prompts.getFirst().itemId(), "SAME_DIRECTOR");
+                        });
+
+        long setId = service.createBuffer(USER).recommendationSetId();
+        String summary =
+                jdbc.queryForObject(
+                        "SELECT reason->>'summary' FROM recommendation_items WHERE set_id=?",
+                        String.class,
+                        setId);
+        assertThat(summary).isEqualTo("좋아하신 영화와 스릴러 장르가 같아요.");
+        assertThat(summary).doesNotContain("감독", "배우");
+    }
+
+    @Test
+    @DisplayName("구조화 근거가 없으면 LLM을 호출하지 않고 중립 문구를 저장한다")
+    void emptyReasonSkipsGenerator() {
+        movies(100);
+        candidates(candidate(100, "5.0", "TASTE", null));
+
+        long setId = service.createBuffer(USER).recommendationSetId();
+
+        verifyNoInteractions(reasonGenerator);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT reason->>'summary' FROM recommendation_items WHERE set_id=?",
+                                String.class,
+                                setId))
+                .isEqualTo("새로운 영화를 만나보세요.");
+    }
+
+    @Test
+    @DisplayName("확인되지 않은 영화와 장르는 생성 입력에서 제외하고 중립 문구를 저장한다")
+    void unknownSourceAndGenreSkipGenerator() {
+        movies(100);
+        candidates(
+                candidate(
+                        100,
+                        "5.0",
+                        "TASTE",
+                        null,
+                        """
+                        {"reasons":[{"code":"SHARED_GENRE","sourceMovieIds":[999999],
+                        "matchedGenreCodes":["UNKNOWN_GENRE"]}]}
+                        """));
+
+        long setId = service.createBuffer(USER).recommendationSetId();
+
+        verifyNoInteractions(reasonGenerator);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT reason->>'summary' FROM recommendation_items WHERE set_id=?",
+                                String.class,
+                                setId))
+                .isEqualTo("새로운 영화를 만나보세요.");
+    }
+
+    @Test
+    @DisplayName("노출된 이유 스냅샷은 뒤늦은 생성 결과로 덮어쓰지 않는다")
+    void exposedReasonSnapshotIsImmutable() {
+        movies(100);
+        candidates(candidate(100, "5.0", "TASTE", null));
+        long setId = service.createBuffer(USER).recommendationSetId();
+        long itemId =
+                jdbc.queryForObject(
+                        "SELECT id FROM recommendation_items WHERE set_id=?", Long.class, setId);
+        jdbc.update("UPDATE recommendation_items SET exposed_at=now() WHERE id=?", itemId);
+
+        assertThat(reasonRepository.completeIfUnexposed(itemId, "변경된 문구", "[]")).isFalse();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT reason->>'summary' FROM recommendation_items WHERE id=?",
+                                String.class,
+                                itemId))
+                .isEqualTo("새로운 영화를 만나보세요.");
+    }
+
+    @Test
+    @DisplayName("이유 생성 대기 중 첫 노출의 중립 스냅샷은 생성 완료 뒤에도 유지한다")
+    void firstExposureWhileGeneratingKeepsNeutralSnapshot() throws Exception {
+        movies(55, 100, 101, 200);
+        jdbc.update(
+                "INSERT INTO genres(code,name,tmdb_genre_id) VALUES ('THRILLER','스릴러',53)"
+                        + " ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name");
+        candidates(
+                candidate(
+                        100,
+                        "5.0",
+                        "TASTE",
+                        null,
+                        """
+                        {"reasons":[{"code":"SHARED_GENRE","sourceMovieIds":[55],
+                        "matchedGenreCodes":["THRILLER"]}]}
+                        """),
+                candidate(101, "4.0", "TASTE", null),
+                candidate(200, "3.0", "DISCOVERY", "FLAVOR_A"));
+        CountDownLatch generationStarted = new CountDownLatch(1);
+        CountDownLatch finishGeneration = new CountDownLatch(1);
+        when(reasonGenerator.selectVariants(anyList()))
+                .thenAnswer(
+                        invocation -> {
+                            generationStarted.countDown();
+                            if (!finishGeneration.await(5, TimeUnit.SECONDS)) {
+                                throw new IllegalStateException("generation was not released");
+                            }
+                            List<
+                                            com.feelm.backend.domain.recommendation.model
+                                                    .RecommendationReasonPrompt>
+                                    prompts = invocation.getArgument(0);
+                            return Map.of(prompts.getFirst().itemId(), "SOURCE_GENRE");
+                        });
+        executor = Executors.newSingleThreadExecutor();
+        Future<Long> creation =
+                executor.submit(() -> service.createBuffer(USER).recommendationSetId());
+
+        try {
+            assertThat(generationStarted.await(5, TimeUnit.SECONDS)).isTrue();
+            RecommendationResponse first = servingService.getRecommendations(USER);
+            assertThat(first.items()).hasSize(3);
+            long itemId =
+                    first.items().stream()
+                            .filter(item -> item.movie().movieId() == 100L)
+                            .findFirst()
+                            .orElseThrow()
+                            .recommendationItemId();
+            assertThat(
+                            first.items().stream()
+                                    .filter(item -> item.recommendationItemId() == itemId)
+                                    .findFirst()
+                                    .orElseThrow()
+                                    .reason()
+                                    .path("summary")
+                                    .textValue())
+                    .isEqualTo("새로운 영화를 만나보세요.");
+            assertThat(
+                            first.items().stream()
+                                    .filter(item -> item.recommendationItemId() == itemId)
+                                    .findFirst()
+                                    .orElseThrow()
+                                    .reason()
+                                    .path("factors")
+                                    .isEmpty())
+                    .isTrue();
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT exposed_at IS NOT NULL FROM recommendation_items WHERE id=?",
+                                    Boolean.class,
+                                    itemId))
+                    .isTrue();
+            finishGeneration.countDown();
+            assertThat(creation.get(5, TimeUnit.SECONDS)).isEqualTo(first.recommendationSetId());
+            RecommendationResponse later = servingService.getRecommendations(USER);
+            assertThat(
+                            later.items().stream()
+                                    .filter(item -> item.recommendationItemId() == itemId)
+                                    .findFirst()
+                                    .orElseThrow()
+                                    .reason())
+                    .isEqualTo(
+                            first.items().stream()
+                                    .filter(item -> item.recommendationItemId() == itemId)
+                                    .findFirst()
+                                    .orElseThrow()
+                                    .reason());
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT reason->>'summary' FROM recommendation_items WHERE id=?",
+                                    String.class,
+                                    itemId))
+                    .isNull();
+        } finally {
+            finishGeneration.countDown();
+        }
+    }
+
+    @Test
+    @DisplayName("v6의 입력 영화·그룹·개인 점수 근거를 과장 없이 문구로 변환한다")
+    void rendersRemainingV6ReasonCodesWithoutUnsupportedClaims() {
+        movies(55, 100, 101, 102);
+        candidates(
+                candidate(
+                        100,
+                        "5.0",
+                        "TASTE",
+                        null,
+                        """
+                        {"reasons":[{"code":"TOP_RATED_SOURCE","sourceMovieIds":[55],
+                        "matchedGenreCodes":[]}]}
+                        """),
+                candidate(
+                        101,
+                        "4.0",
+                        "DISCOVERY",
+                        null,
+                        """
+                        {"reasons":[{"code":"DISCOVERY_AGGREGATE_AFFINITY",
+                        "directionSource":"RATING","topContributors":[{"movieId":55,
+                        "relation":"POSITIVE_ALIGNMENT"}],"topContributionCoverage":0.5}]}
+                        """),
+                candidate(
+                        102,
+                        "3.0",
+                        "DISCOVERY",
+                        null,
+                        """
+                        {"reasons":[{"code":"DISCOVERY_PERSONAL_SCORE",
+                        "sourceMovieIds":[55],"matchedGenreCodes":[]}]}
+                        """));
+
+        long setId = service.createBuffer(USER).recommendationSetId();
+        List<String> summaries =
+                jdbc.queryForList(
+                        "SELECT reason->>'summary' FROM recommendation_items WHERE set_id=?"
+                                + " ORDER BY movie_id",
+                        String.class,
+                        setId);
+        assertThat(summaries)
+                .containsExactly(
+                        "좋아하신 영화들을 바탕으로 골랐어요.", "평가 이력을 바탕으로 발견한 영화예요.", "취향을 바탕으로 새롭게 고른 영화예요.");
     }
 
     @Test

@@ -8,15 +8,18 @@ MR이 백엔드 의존성 선언이나 저장소 설정을 변경하면 `backend
 MR 상세 응답의 기준 SHA와 HEAD SHA를 인증된 Git fetch로 가져와 경로를 비교하며 Job Token이
 허용하지 않는 MR diff API를 호출하지 않습니다. 검증 후 다음 단계를 수행합니다.
 
-1. 정확한 SHA의 `backend` archive를 받아 SHA256을 기록한다.
+1. 정확한 SHA의 `backend`와 백엔드 환경 계약이 참조하는
+   `infra/compose/service.yml` archive를 받아 SHA256을 기록한다.
 2. 기존 전용 계정과 네트워크 guard에서 전체 테스트 및 `spotlessCheck`를 실행해 필요한
    Gradle 의존성을 별도 캐시에 받는다.
 3. 선택된 캐시와 manifest를 새 stage로 복사한다.
 4. 새 stage를 외부 네트워크가 차단된 격리 환경에서 다시 실행한다.
 5. 전체 테스트, `spotlessCheck`, 컨테이너 정리와 증빙 수집이 성공한 후보만 `VERIFIED`로 기록한다.
 
-후보는 MR HEAD SHA별로 분리됩니다. `backend-mr-test`는 MR diff에 의존성 파일이 있으면 자신의
-SHA와 MR IID가 일치하는 `VERIFIED` 후보만 선택하고, 일반 코드 MR은 현재 기본 캐시를 사용합니다.
+후보는 MR HEAD SHA별로 분리됩니다. `backend-mr-test`는 MR diff에 실제 의존성 선언 변경이 있으면
+자신의 SHA와 MR IID가 일치하는 `VERIFIED` 후보만 선택하고, `build.gradle`의 테스트 작업 설정만
+바뀐 MR과 일반 코드 MR은 현재 기본 캐시를 사용합니다. 경로 규칙 때문에 생성된
+`backend-cache-prepare`도 실제 의존성 변경이 없으면 성공으로 종료하고 후보를 만들지 않습니다.
 후보 생성은 전역 `prepared_base`를 바꾸지 않습니다.
 
 MR이 develop에 병합되어 의존성 파일이 변경되면 보호된 push pipeline의
@@ -24,6 +27,8 @@ MR이 develop에 병합되어 의존성 파일이 변경되면 보호된 push pi
 때만 Runner를 중지하고 기본 `prepared_base`를 원자적으로 교체합니다. 재시작 실패 시 이전 설정을
 즉시 복구합니다. `backend-cache-rollback`은 운영자가 현재 stage와 승격 기록을 확인한 경우에만
 이전 stage로 되돌립니다. 후보, 이전 stage와 증빙은 자동 삭제하지 않습니다.
+경로 규칙으로 task-only 변경의 승격 Job이 생성된 경우에도 후보를 요구하지 않고 성공으로
+종료하며 현재 기본 캐시를 유지합니다.
 
 자동 준비, MR 테스트, 자동 승격, rollback과 백엔드 배포는
 `service-and-backend-cache` resource group을 공유합니다. GitLab 직렬화와 호스트 lock을 함께

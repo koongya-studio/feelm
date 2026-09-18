@@ -40,6 +40,13 @@ final class MovieDetailFixture {
              "factors":[{"type":"GENRE","label":"스릴러"},
                         {"type":"DIRECTOR","label":"가상 감독"}]}
             """;
+    private static final String STORED_REASON =
+            """
+            {"reasons":[{"code":"SHARED_GENRE","sourceMovieIds":[42],"matchedGenreCodes":["THRILLER"]}],
+             "summary":"스릴러 장르를 높게 평가하셨어요",
+             "factors":[{"type":"GENRE","label":"스릴러"},
+                        {"type":"DIRECTOR","label":"가상 감독"}]}
+            """;
 
     private final JdbcTemplate jdbc;
 
@@ -250,6 +257,6 @@ final class MovieDetailFixture {
                 setId,
                 movieId,
                 type,
-                REASON);
+                STORED_REASON);
     }
 }

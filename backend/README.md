@@ -114,6 +114,9 @@ Topic 확인 방법은 [인프라 README](../infra/README.md#local-kafka)를 따
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | 비어 있음 | 선택(**Secret**) |
 | `KAKAO_CLIENT_ID` / `KAKAO_CLIENT_SECRET` | 비어 있음 | 선택(**Secret**) |
 | `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` | 비어 있음 | 선택(**Secret**) |
+| `RECOMMENDATION_ACCEPT_V5` | `true` | Candidate v6 재게시 확인 후 `false` |
+| `GMS_KEY` | 비어 있음(결정적 문구 사용) | 선택(**Secret**). GMS Gateway를 통한 Gemini 추천 이유 생성용 |
+| `GEMINI_REASON_MODEL` | `gemini-2.5-flash-lite` | 선택. 추천 이유 표현 선택 모델 |
 
 변수 목록과 용도는 [`.env.example`](./.env.example)에서 관리합니다. 실제 값은 커밋하지
 않는 개인 `.env`에만 둡니다([Secret 및 환경변수 관리 규칙](../docs/secret-environment-variables.md)).

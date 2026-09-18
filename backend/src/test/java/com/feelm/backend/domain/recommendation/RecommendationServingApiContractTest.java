@@ -314,7 +314,8 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
         jdbc.update("INSERT INTO movie_ott_providers(movie_id,ott_id) VALUES (101,1)");
         jdbc.update(
                 "UPDATE recommendation_items SET flavor_code='FLAVOR_SNAPSHOT',"
-                        + " reason='{\"summary\":\"저장된 이유\",\"factors\":[]}'::jsonb"
+                        + " reason='{\"summary\":\"저장된 이유\",\"factors\":[],"
+                        + "\"reasons\":[{\"code\":\"SHARED_GENRE\"}]}'::jsonb"
                         + " WHERE id=1001");
 
         getRecommendations(USER)
@@ -326,7 +327,36 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
                 .andExpect(jsonPath("$.items[0].movie.averageRating").value(4.3))
                 .andExpect(jsonPath("$.items[0].movie.ottProviders[0]").value("NETFLIX"))
                 .andExpect(jsonPath("$.items[0].flavorCode").value("FLAVOR_SNAPSHOT"))
-                .andExpect(jsonPath("$.items[0].reason.summary").value("저장된 이유"));
+                .andExpect(jsonPath("$.items[0].reason.summary").value("저장된 이유"))
+                .andExpect(jsonPath("$.items[0].reason.reasons").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("추천 카드·영화 상세·이력은 저장된 같은 이유를 반환하고 원본 근거를 감춘다")
+    void cardDetailAndHistorySharePublicReasonSnapshot() throws Exception {
+        jdbc.update(
+                "UPDATE recommendation_items SET reason='{\"reasons\":[{\"code\":\"SHARED_GENRE\"}],"
+                        + "\"summary\":\"검증된 이유\",\"factors\":[{\"type\":\"GENRE\",\"label\":\"드라마\"}]}'::jsonb"
+                        + " WHERE id=1001");
+
+        getRecommendations(USER)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].reason.summary").value("검증된 이유"))
+                .andExpect(jsonPath("$.items[0].reason.factors[0].label").value("드라마"))
+                .andExpect(jsonPath("$.items[0].reason.reasons").doesNotExist());
+        mvc.perform(get("/api/v1/recommendations/history").header("Authorization", bearer(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].items[0].reason.summary").value("검증된 이유"))
+                .andExpect(jsonPath("$.items[0].items[0].reason.factors[0].label").value("드라마"))
+                .andExpect(jsonPath("$.items[0].items[0].reason.reasons").doesNotExist());
+        mvc.perform(
+                        get("/api/v1/movies/101")
+                                .param("recommendationItemId", "1001")
+                                .header("Authorization", bearer(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recommendation.reason.summary").value("검증된 이유"))
+                .andExpect(jsonPath("$.recommendation.reason.factors[0].label").value("드라마"))
+                .andExpect(jsonPath("$.recommendation.reason.reasons").doesNotExist());
     }
 
     @Test

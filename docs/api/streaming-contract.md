@@ -98,16 +98,17 @@ Consumer 후보에는 영화 표시용 메타데이터를 넣지 않고 구조�
 그룹을 정렬한다. 먼저 상위 10개 그룹에서 그룹별 10편을 모집하고, 100편이 모자라면 다음 적격
 그룹을 탐색한 뒤 모든 적격 그룹의 최초 10편을 사용해도 부족할 때 그룹별 11번째 이후 후보를
 모집한다. 모집된 전체 최대 100편만 현재 개인 점수로 최종 정렬해 게시한다.
-`taste`와 `discovery`는 독립 순위이므로 서로 같은 영화가 있을 수 있으며 Spring이 TASTE 2편을
-먼저 예약한 뒤 DISCOVERY의 공통 중복을 건너뛴다.
+`taste`와 `discovery`는 독립 순위이므로 서로 같은 영화가 있을 수 있다. Spring은 TASTE를
+최대 20편 먼저 저장하고, DISCOVERY에서 이 영화들을 건너뛴 뒤 다음 고유 후보로 최대 20편을 채운다.
+화면에는 저장된 TASTE 2편과 DISCOVERY 1편을 노출한다.
 
 #### 구현·운영 책임 경계
 
 - S15P21E106-415: Consumer의 DISCOVERY 후보 생성과 로컬 정책 검증
 - S15P21E106-471: Redis Candidate v3 `taste`/`discovery` 그룹화와 `generationId` writer 기준선
-- S15P21E106-481: TASTE 후보별 구조화 `reasons[]`를 추가한 Candidate v4 writer·payload 기준선
+- S15P21E106-481: TASTE 후보별 구조화 단일 `reason` 객체를 추가한 Candidate v4 writer·payload 기준선
 - S15P21E106-488: 전체 평가 또는 온보딩 이력으로 계산한 저이력 그룹 적합도·상위 기여 비율을
-  DISCOVERY 전용 `reasons[]` 원소로 추가한 Candidate v5 writer·payload 기준선
+  DISCOVERY 전용 단일 `reason` 객체로 추가한 Candidate v5 writer·payload 기준선
 - S15P21E106-505: 입력 수 제한 제거, TASTE 500·DISCOVERY 100 후보 게시와 그룹 부족분 보충,
   `DISCOVERY_PERSONAL_SCORE`를 추가한 현재 Candidate v6 writer·payload 계약. Spring reader·조립은
   Backend 소비 계약
@@ -310,7 +311,8 @@ Python Consumer는 **Redis `vector`·`candidates` 기록과 Candidate 게시 완
 2. Python Consumer가 PostgreSQL을 다시 읽어 User Vector와 후보를 재계산한다.
 3. Python Consumer가 ALS·콘텐츠 지원 범위별 백분위를 결합한 TASTE 최대 500편을 만들고, 그룹 산출물을
    활성화한 경우 DISCOVERY 최대 100편도 만든다. Spring은 서비스 DB 미존재·평가·관심없음 후보만
-   제외하고 종류별 점수 정렬과 동점 결정적 셔플 후 타입별 최대 20편을 독립 저장한다. Consumer의
+   제외하고 종류별 점수 정렬과 동점 결정적 셔플 후 TASTE를 최대 20편 저장하고, DISCOVERY는
+   저장된 TASTE와 겹치는 영화를 건너뛰어 다음 고유 후보로 최대 20편 채운다. Consumer의
    구조화 `reasons[]`는 원본 그대로 스냅샷한다.
 4. Python Consumer가 `feelm:user:{userId}:candidate-version`, `feelm:user:{userId}:vector`, `feelm:user:{userId}:candidates`을 Lua 스크립트 한 번으로 원자적으로 기록한다. `candidate-version` String은 성공한 게시마다 증가하는 게시 순번이며, `vector`와 `candidates` JSON은 같은 `candidateVersion`(형식 버전)과 `generationId`(한 번의 생성 결과 식별자)를 가진다.
 
@@ -529,8 +531,9 @@ fallback은 두 배열 모두 source와 장르 배열을 비워 근거가 없음
 계약은 Candidate v6이다. 근거가 없으면 `reasons`는 빈 배열로 전달한다.
 배열 자체가 유형을 나타내므로 항목의 중복 `type` 필드는 두지 않는다. 공급 그룹 수·적격 그룹 수 같은
 DISCOVERY 진단 정보도 Redis 계약에 넣지 않고 Consumer 로그에만 남긴다.
-Spring은 미존재·평가·관심없음 후보만 제외하고 종류별 점수 정렬 후 TASTE·DISCOVERY를 각각 최대 20편
-독립 저장한다. 동점 후보는 사용자와 generation ID를 seed로 결정적으로 섞는다. TASTE 2:DISCOVERY 1은
+Spring은 미존재·평가·관심없음 후보를 제외하고 종류별 점수 정렬 후 TASTE를 최대 20편 저장한다.
+DISCOVERY에서는 저장된 TASTE와 같은 영화를 건너뛰고 다음 고유 후보로 최대 20편을 채운다.
+동점 후보는 사용자와 generation ID를 seed로 결정적으로 섞는다. TASTE 2:DISCOVERY 1은
 저장 순서가 아니라 화면 조회 시 각 타입 버퍼에서 꺼내는 규칙이다. DISCOVERY가 부족하면 다음 TASTE로
 채운다. 이 Consumer는 별도 POPULAR fallback 목록을 생성하지 않는다.
 Consumer는 DISCOVERY 공급량을 낭비하지 않도록 현재 평가·온보딩·확정 감상·관심없음을 발견 목록에서
@@ -539,15 +542,15 @@ OTT 제공처는 `movie_ott_providers`·`otts`에서 조회하며, 사용자 클
 별도 Redis `topn`은 생성하거나 읽지 않는다. 기존 키 자동 삭제는 하지 않는다. 기존 배포가
 `candidates.items` 형식으로 저장한 값은 새 `taste`/`discovery` 형식과 호환되지 않으므로, Spring reader를
 전환하기 전에 Consumer 전체 재구축 또는 사용자별 재게시로 모든 활성 후보를 새 형식으로 갱신해야 한다.
-`candidateVersion=3`은 두 배열 모두 `reasons`가 없고, `candidateVersion=4`는 TASTE에만 `reasons`가 있다.
-Candidate v5는 그룹 DISCOVERY 근거를 추가했고, Candidate v6는 개인 점수 보충 근거를 추가했다.
+`candidateVersion=3`은 두 배열 모두 근거가 없고, `candidateVersion=4`는 TASTE에만 단일 `reason` 객체가 있다.
+Candidate v5는 그룹 DISCOVERY 근거를 추가했고 각 TASTE·DISCOVERY 항목에 단일 `reason` 객체를 저장한다. Candidate v6는 개인 점수 보충 근거를 추가하고 항목별 `reasons[]` 배열을 저장한다. 전환 reader는 v5 단일 객체를 내부 `reasons[]` 스냅샷으로 변환한다.
 Candidate v6 전환 시 Backend는 v5와 v6를 함께 읽는 전환 reader를 먼저 반영한다. 이어서 Consumer v6 writer를
 전환하고 모든 활성 후보를 재게시한다. vector와 candidates의 `candidateVersion=6` 및 `generationId` 일치를
 확인한 뒤 Backend의 v5 호환을 제거한다. 최종 reader는 version 6 이외의 payload를 추측해 문구를 만들지 않고
 재시도 후 `503 RECOMMENDATION_UNAVAILABLE`을 반환한다.
 
-S15P21E106-471에서 Candidate v3 그룹화 writer를 반영했고, S15P21E106-481에서 TASTE 구조화 `reasons[]`를
-추가해 Candidate v4가 됐다. S15P21E106-488은 전체 이력 기반 DISCOVERY 전용 `reasons[]` 원소를 추가한 Candidate v5
+S15P21E106-471에서 Candidate v3 그룹화 writer를 반영했고, S15P21E106-481에서 TASTE 구조화 단일 `reason` 객체를
+추가해 Candidate v4가 됐다. S15P21E106-488은 전체 이력 기반 DISCOVERY 전용 단일 `reason` 객체를 추가한 Candidate v5
 기준선을 만들었고, S15P21E106-505는 보충 근거를 추가해 Candidate v6가 됐다. S15P21E106-164는 기존
 v4 배열 계약을 유지하고, S15P21E106-498에서 v6 배열 계약 대응을 진행한다. 전체 활성 후보 v6 재게시,
 generation 일치 확인과 TASTE 2 + DISCOVERY 1 통합 검증을 같은 전환 절차로 완료하기 전에는 Backend

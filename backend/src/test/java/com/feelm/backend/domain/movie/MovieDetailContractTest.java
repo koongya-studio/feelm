@@ -371,7 +371,7 @@ class MovieDetailContractTest extends SharedPostgresContractTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"TASTE", "DISCOVERY"})
-    @DisplayName("본인 개인 추천은 ID·유형과 JSONB 이유 객체를 그대로 반환한다")
+    @DisplayName("본인 개인 추천은 ID·유형과 사용자용 이유만 반환한다")
     void ownRecommendationPreservesReasonObject(String type) throws Exception {
         long item = fixture.personalRecommendation(USER, MOVIE, type);
         assertRecommendation(ok(recommended(MOVIE, USER, item)), item, type);
@@ -870,6 +870,7 @@ class MovieDetailContractTest extends SharedPostgresContractTest {
         assertThat(recommendation.path("type").asText()).isEqualTo(type);
         assertThat(recommendation.path("reason").isObject()).isTrue();
         assertJson(recommendation.path("reason"), REASON);
+        assertThat(recommendation.path("reason").has("reasons")).isFalse();
     }
 
     private void assertJson(JsonNode actual, String expected) {

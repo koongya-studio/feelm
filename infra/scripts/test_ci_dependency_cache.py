@@ -1,3 +1,4 @@
+import contextlib
 import io
 import importlib.util
 import json
@@ -103,6 +104,42 @@ class ManagerTests(unittest.TestCase):
             changes, declarations = cache.review_dependency_changes(self.context('prepare'), mr)
         self.assertEqual(changes, ['backend/build.gradle'])
         self.assertEqual(declarations, ["+ implementation 'org.springframework.kafka:spring-kafka'"])
+
+    def test_task_only_build_change_is_not_a_dependency_change(self):
+        paths = ['backend/build.gradle']
+        diff = '''+tasks.register('liveTest', Test) {
++    testClassesDirs = sourceSets.test.output.classesDirs
++    classpath = sourceSets.test.runtimeClasspath
++}
+'''
+        self.assertEqual(cache.classify_dependency_changes(paths, diff), ([], []))
+
+    def test_dependency_and_version_changes_require_a_new_cache(self):
+        for diff in (
+                "+ implementation 'org.springframework.kafka:spring-kafka'\n",
+                "+ jjwtVersion = '0.14.0'\n",
+                "+ id 'org.springframework.boot' version '4.2.0'\n"):
+            with self.subTest(diff=diff):
+                changes, declarations = cache.classify_dependency_changes(
+                    ['backend/build.gradle'], diff)
+                self.assertEqual(changes, ['backend/build.gradle'])
+                self.assertEqual(declarations, [diff.strip()])
+
+    def test_non_build_dependency_file_always_requires_a_new_cache(self):
+        changes, declarations = cache.classify_dependency_changes(
+            ['backend/gradle/wrapper/gradle-wrapper.properties'],
+            '+distributionUrl=https://services.gradle.org/distributions/gradle.zip')
+        self.assertEqual(changes, ['backend/gradle/wrapper/gradle-wrapper.properties'])
+        self.assertEqual(declarations, [])
+
+    def test_cache_source_archive_includes_compose_contract(self):
+        completed = [SimpleNamespace(stdout=b''), SimpleNamespace(stdout=b''),
+                     SimpleNamespace(stdout=b'archive')]
+        with patch.object(cache.subprocess, 'run', side_effect=completed) as run:
+            archive, _ = cache.fetch_archive(self.context('prepare'))
+        self.assertEqual(archive, b'archive')
+        self.assertEqual(run.call_args_list[-1].args[0][-2:],
+                         ['backend', 'infra/compose/service.yml'])
 
     def test_current_job_and_root_operator_policy_are_verified(self):
         job = {
@@ -267,8 +304,10 @@ class ManagerTests(unittest.TestCase):
             pilot = SimpleNamespace(check_base=lambda value: self.assertEqual(value, stage))
             write = lambda path, data: path.write_bytes(data)
             with patch.object(cache, 'ADAPTER_CONFIG', adapter), \
-                 patch.object(cache, 'merged_mr', return_value={'iid': 163, 'sha': 'c' * 40}), \
-                 patch.object(cache, 'read_candidate', return_value=(record, candidate)), \
+                  patch.object(cache, 'merged_mr', return_value={'iid': 163, 'sha': 'c' * 40}), \
+                  patch.object(cache, 'review_dependency_changes',
+                               return_value=(['backend/build.gradle'], ['+ implementation x'])), \
+                  patch.object(cache, 'read_candidate', return_value=(record, candidate)), \
                  patch.object(cache, 'load', return_value=pilot), \
                  patch.object(cache, 'write_private', side_effect=write), \
                  patch.object(cache, 'switch_stage') as switch:
@@ -292,8 +331,10 @@ class ManagerTests(unittest.TestCase):
             context = self.context('promote'); context['mr_iid'] = None
             pilot = SimpleNamespace(check_base=lambda _value: None)
             with patch.object(cache, 'ADAPTER_CONFIG', adapter), \
-                 patch.object(cache, 'merged_mr', return_value={'iid': 163, 'sha': 'c' * 40}), \
-                 patch.object(cache, 'read_candidate',
+                  patch.object(cache, 'merged_mr', return_value={'iid': 163, 'sha': 'c' * 40}), \
+                  patch.object(cache, 'review_dependency_changes',
+                               return_value=(['backend/build.gradle'], ['+ implementation x'])), \
+                  patch.object(cache, 'read_candidate',
                               return_value=(root / 'candidate.json', candidate)), \
                  patch.object(cache, 'load', return_value=pilot), \
                  patch.object(cache, 'write_private', side_effect=OSError('disk full')), \
@@ -303,6 +344,17 @@ class ManagerTests(unittest.TestCase):
         self.assertEqual(switch.call_count, 2)
         self.assertEqual(switch.call_args_list[0].args[1], str(stage))
         self.assertEqual(switch.call_args_list[1].args[1], '/previous')
+
+    def test_promote_succeeds_without_candidate_for_task_only_change(self):
+        context = self.context('promote'); context['mr_iid'] = None
+        mr = {'iid': 163, 'sha': 'c' * 40}
+        with patch.object(cache, 'merged_mr', return_value=mr), \
+             patch.object(cache, 'review_dependency_changes', return_value=([], [])), \
+             patch.object(cache, 'read_candidate') as candidate, \
+             contextlib.redirect_stdout(io.StringIO()) as output:
+            cache.promote(context)
+        candidate.assert_not_called()
+        self.assertIn('CACHE_PROMOTION_SKIPPED=NO_DEPENDENCY_CHANGE', output.getvalue())
 
     def test_rollback_keeps_newer_active_stage_unchanged(self):
         context = self.context('rollback')

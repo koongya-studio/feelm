@@ -60,7 +60,28 @@ dependencies {
 }
 
 tasks.named('test') {
-	useJUnitPlatform()
+	useJUnitPlatform {
+		excludeTags 'live'
+	}
+}
+
+tasks.register('liveTest', Test) {
+	group = 'verification'
+	description = 'Runs tests that call live external services'
+	outputs.upToDateWhen { false }
+
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+
+	useJUnitPlatform {
+		includeTags 'live'
+	}
+
+	doFirst {
+		if (!System.getenv('GMS_KEY')?.trim()) {
+			throw new GradleException('GMS_KEY is required for liveTest')
+		}
+	}
 }
 
 spotless {

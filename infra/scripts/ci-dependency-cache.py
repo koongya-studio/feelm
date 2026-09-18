@@ -39,6 +39,14 @@ DEPENDENCY_FILES = {
     'backend/gradle.properties', 'backend/gradle/libs.versions.toml',
     'backend/gradle/wrapper/gradle-wrapper.properties',
 }
+BUILD_DEFINITION_FILES = {'backend/build.gradle', 'backend/build.gradle.kts'}
+DEPENDENCY_DECLARATION = re.compile(
+    r'^[+-]\s*(?:id\s|'
+    r'(?:implementation|api|compileOnly|annotationProcessor|runtimeOnly|developmentOnly|'
+    r'testImplementation|testCompileOnly|testRuntimeOnly|testAnnotationProcessor)\s*(?:\(|(?![=])\s)|'
+    r'classpath\s*(?:\(|["\'])|'
+    r'[A-Za-z][A-Za-z0-9_]*Version\s*=|'
+    r'mavenCentral\s*\(|gradlePluginPortal\s*\(|maven\s*\{)')
 _runtime_spec = importlib.util.spec_from_file_location(
     'ci414_runtime_contract', HERE / 'ci-backend-runtime-contract.py')
 runtime_contract = importlib.util.module_from_spec(_runtime_spec)
@@ -211,6 +219,19 @@ def verify_mr(context, opener=None):
     return mr
 
 
+def classify_dependency_changes(paths, diff):
+    dependency_changes = [path for path in paths if path in DEPENDENCY_FILES]
+    declarations = [
+        line for line in diff.splitlines()
+        if DEPENDENCY_DECLARATION.match(line) and len(line) <= 300
+    ]
+    if len(declarations) > 200:
+        raise PolicyError('Dependency declaration diff is too large')
+    if any(path not in BUILD_DEFINITION_FILES for path in dependency_changes) or declarations:
+        return dependency_changes, declarations
+    return [], []
+
+
 def review_dependency_changes(context, mr):
     base_sha = mr['diff_refs']['base_sha']
     with tempfile.TemporaryDirectory(prefix='ci271-diff-') as directory:
@@ -234,30 +255,18 @@ def review_dependency_changes(context, mr):
         paths = sorted(set(path for path in raw_paths if path))
         if not paths or len(paths) >= 100 or any('\n' in path or '\r' in path for path in paths):
             raise PolicyError('MR diff is missing or too large to approve automatically')
-        dependency_changes = [path for path in paths if path in DEPENDENCY_FILES]
-        if not dependency_changes:
+        dependency_files = [path for path in paths if path in DEPENDENCY_FILES]
+        if not dependency_files:
             raise PolicyError('MR does not change an approved backend dependency file')
         result = subprocess.run(
             ['/usr/bin/git', '-C', str(repository), 'diff', '--unified=0', '--no-ext-diff',
-             '--no-renames', 'refs/review/base', 'refs/review/head', '--', *dependency_changes],
+             '--no-renames', 'refs/review/base', 'refs/review/head', '--', *dependency_files],
             env=environment, capture_output=True, check=True, timeout=60)
         if len(result.stdout) > 512 * 1024:
             raise PolicyError('Dependency diff is missing or oversized')
         diff = result.stdout.decode('utf-8')
 
-    declarations = []
-    declaration = re.compile(
-        r'^[+-]\s*(?:id\s|classpath\s|implementation\s|api\s|compileOnly\s|'
-        r'annotationProcessor\s|runtimeOnly\s|developmentOnly\s|test[A-Za-z]*\s|'
-        r'mavenCentral\s*\(|gradlePluginPortal\s*\(|maven\s*\{)')
-    for line in diff.splitlines():
-        if declaration.match(line) and len(line) <= 300:
-            declarations.append(line)
-            if len(declarations) > 200:
-                raise PolicyError('Dependency declaration diff is too large')
-    if not declarations:
-        raise PolicyError('Dependency files changed without a reviewable declaration diff')
-    return dependency_changes, declarations
+    return classify_dependency_changes(paths, diff)
 
 
 def git_environment(token, home):
@@ -284,7 +293,7 @@ def fetch_archive(context):
                         GITLAB_URL + '/' + PROJECT_PATH + '.git', context['revision']],
                        env=environment, **quiet)
         archive = subprocess.run(['/usr/bin/git', '-C', str(repository), 'archive', '--format=tar',
-                                  'FETCH_HEAD', 'backend'], env=environment,
+                                  'FETCH_HEAD', 'backend', 'infra/compose/service.yml'], env=environment,
                                  capture_output=True, check=True, timeout=60).stdout
     if not archive or len(archive) > 64 * 1024**2:
         raise PolicyError('Backend archive is empty or oversized')
@@ -363,6 +372,9 @@ def prepare(context):
         return
     mr = verify_mr(context)
     changes, declarations = review_dependency_changes(context, mr)
+    if not changes:
+        print('CACHE_PREPARE_SKIPPED=NO_DEPENDENCY_CHANGE')
+        return
     archive, archive_sha = fetch_archive(context)
     ARCHIVES.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chown(ARCHIVES, 1001, 1001)
@@ -492,6 +504,10 @@ def switch_stage(old_config, new_stage):
 def promote(context):
     mr = merged_mr(context)
     candidate_context = dict(context, mr_iid=mr['iid'], revision=mr['sha'])
+    changes, _ = review_dependency_changes(candidate_context, mr)
+    if not changes:
+        print('CACHE_PROMOTION_SKIPPED=NO_DEPENDENCY_CHANGE')
+        return
     path, candidate = read_candidate(candidate_context, 'VERIFIED')
     pilot = load('ci271_server_manager', 'ci-server-manager-pilot.py')
     stage = Path(candidate['stage'])
