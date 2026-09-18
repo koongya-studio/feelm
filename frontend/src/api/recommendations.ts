@@ -55,9 +55,12 @@ export function getRecommendations(): Promise<RecommendationSet> {
  * API-048 추천 이력 조회 · GET /api/v1/recommendations/history
  *
  * 세트 단위 cursor 목록이다. 첫 장은 커서 없이, 다음 장은 직전 응답의 `nextCursor`로
- * 부른다. `dismissed` · `watchStatus`는 서버가 현재 상태로 채워 주므로 화면이 덮어쓰지
- * 않는다.
+ * 부른다. `size`도 **세트 수**다(편 수가 아니다). 생략하면 서버 기본값을 쓴다.
+ * `dismissed` · `watchStatus`는 서버가 현재 상태로 채워 주므로 화면이 덮어쓰지 않는다.
  */
-export async function getRecommendationHistory(cursor?: string): Promise<RecommendationHistory> {
-  return request<RecommendationHistory>('/recommendations/history', { query: { cursor } });
+export async function getRecommendationHistory(
+  cursor?: string,
+  size?: number,
+): Promise<RecommendationHistory> {
+  return request<RecommendationHistory>('/recommendations/history', { query: { cursor, size } });
 }

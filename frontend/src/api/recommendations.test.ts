@@ -181,6 +181,17 @@ describe('API-048 추천 이력 조회', () => {
     expect(new URL(requestedUrl(), 'http://test').searchParams.get('cursor')).toBe('cursor-2');
   });
 
+  it('size는 세트 수로 그대로 싣는다', async () => {
+    fetchMock.mockResolvedValue(json(200, page()));
+
+    await getRecommendationHistory('cursor-2', 6);
+
+    const params = new URL(requestedUrl(), 'http://test').searchParams;
+
+    expect(params.get('cursor')).toBe('cursor-2');
+    expect(params.get('size')).toBe('6');
+  });
+
   it('세트와 커서를 그대로 돌려준다', async () => {
     fetchMock.mockResolvedValue(json(200, page({ nextCursor: 'cursor-2', hasNext: true })));
 
