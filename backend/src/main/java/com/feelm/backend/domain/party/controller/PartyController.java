@@ -5,10 +5,14 @@ import com.feelm.backend.domain.party.dto.request.PartyInvitationCreateRequest;
 import com.feelm.backend.domain.party.dto.response.PartyInvitationResponse;
 import com.feelm.backend.domain.party.dto.response.PartyInvitationStatusResponse;
 import com.feelm.backend.domain.party.dto.response.PartyListItemResponse;
+import com.feelm.backend.domain.party.dto.response.PartyRecommendationResponse;
 import com.feelm.backend.domain.party.dto.response.PartyResponse;
 import com.feelm.backend.domain.party.dto.response.PartyStateResponse;
 import com.feelm.backend.domain.party.dto.response.ReceivedPartyInvitationResponse;
+import com.feelm.backend.domain.party.service.PartyRecommendationService;
 import com.feelm.backend.domain.party.service.PartyService;
+import com.feelm.backend.global.error.BusinessException;
+import com.feelm.backend.global.error.ErrorCode;
 import com.feelm.backend.global.response.CursorPageResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class PartyController {
     private final PartyService partyService;
+    private final PartyRecommendationService partyRecommendationService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -94,5 +99,16 @@ public class PartyController {
             @PathVariable long partyId,
             @PathVariable long userId) {
         return partyService.kick(requesterId, partyId, userId);
+    }
+
+    @GetMapping("/{partyId}/recommendations")
+    public PartyRecommendationResponse recommendations(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable long partyId,
+            @RequestParam(defaultValue = "3") int size) {
+        if (size < 1 || size > 10) {
+            throw new BusinessException(ErrorCode.VALIDATION_FAILED);
+        }
+        return partyRecommendationService.getRecommendations(userId, partyId, size);
     }
 }

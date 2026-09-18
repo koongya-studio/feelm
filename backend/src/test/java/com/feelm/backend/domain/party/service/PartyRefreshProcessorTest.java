@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.feelm.backend.domain.party.entity.Party;
 import com.feelm.backend.domain.party.entity.PartyStatus;
+import com.feelm.backend.domain.party.model.PartyInputId;
 import com.feelm.backend.domain.party.model.PartyInputSnapshot;
 import com.feelm.backend.domain.party.model.PartyRefreshPayload;
 import com.feelm.backend.domain.party.repository.PartyMemberRepository;
@@ -78,17 +79,15 @@ class PartyRefreshProcessorTest {
 
     @Test
     void inputIdDependsOnPartyModelMemberAndGeneration() {
-        String initial = PartyRefreshProcessor.inputId(9001L, snapshot("g1"));
+        String initial = PartyInputId.from(9001L, snapshot("g1"));
 
-        assertThat(PartyRefreshProcessor.inputId(9001L, snapshot("g1"))).isEqualTo(initial);
-        assertThat(PartyRefreshProcessor.inputId(9001L, snapshot("g2"))).isNotEqualTo(initial);
-        assertThat(PartyRefreshProcessor.inputId(9002L, snapshot("g1"))).isNotEqualTo(initial);
-        assertThat(
-                        PartyRefreshProcessor.inputId(
-                                9001L, new PartyInputSnapshot("v2", snapshot("g1").members())))
+        assertThat(PartyInputId.from(9001L, snapshot("g1"))).isEqualTo(initial);
+        assertThat(PartyInputId.from(9001L, snapshot("g2"))).isNotEqualTo(initial);
+        assertThat(PartyInputId.from(9002L, snapshot("g1"))).isNotEqualTo(initial);
+        assertThat(PartyInputId.from(9001L, new PartyInputSnapshot("v2", snapshot("g1").members())))
                 .isNotEqualTo(initial);
         assertThat(
-                        PartyRefreshProcessor.inputId(
+                        PartyInputId.from(
                                 9001L,
                                 new PartyInputSnapshot(
                                         "v1",
