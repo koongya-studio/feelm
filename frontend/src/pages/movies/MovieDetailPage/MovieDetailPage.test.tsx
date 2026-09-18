@@ -9,6 +9,8 @@
  * 상세(API-030) · 유사(API-031) · 한줄평(API-032) · 클릭 기록(API-033)을 전부 가로챈다.
  * 새 탭은 `window.open`을 가로채 가짜 창을 돌려주고, 그 창의 `location.replace`가
  * 언제 어떤 주소로 불리는지 본다.
+ *
+ * 팝콘 맛 칩(업무 -631)은 맛 기준정보(API-044)도 가로채 이름과 대표 키워드를 준다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
@@ -33,6 +35,28 @@ vi.mock('../../../api/watch', async (importOriginal) => ({
 
 const { getMovieDetail, getSimilarMovies, getMovieReviews } = await import('../../../api/movies');
 const { recordOttClick } = await import('../../../api/watch');
+
+vi.mock('../../../api/taste', () => ({ getPopcornFlavors: vi.fn() }));
+
+const { getPopcornFlavors } = await import('../../../api/taste');
+
+/** 맛 기준정보(API-044). 실제 배포값 중 두 맛이다 */
+const FLAVORS = [
+  {
+    code: 'FLAVOR_D',
+    displayName: '피스타치오',
+    color: '#B4B46C',
+    representativeKeywords: ['드라마', '인물', '관계', '역사', '전쟁'],
+    sortOrder: 4,
+  },
+  {
+    code: 'FLAVOR_E',
+    displayName: '쿠키앤크림',
+    color: '#E4D8B4',
+    representativeKeywords: ['스릴러', '범죄', '긴장', '미스터리', '추적'],
+    sortOrder: 5,
+  },
+];
 
 const WATCH_URL = 'https://justwatch.example/watch/101';
 const NETFLIX_SEARCH_URL = 'https://www.netflix.com/search?q=%EA%B4%B4%EB%AC%BC';
@@ -132,6 +156,7 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue({ items: [], nextCursor: null, hasNext: false });
   vi.mocked(recordOttClick).mockReset();
+  vi.mocked(getPopcornFlavors).mockReset().mockResolvedValue(FLAVORS);
   // jsdom의 `scrollTo`는 구현이 없다고 콘솔에 찍는다. 불렸는지만 세면 된다
   vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
 });
@@ -588,5 +613,52 @@ describe('2.4 공개 한줄평과 출연진', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '↑ 맨 위로' }));
     expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+  });
+});
+
+/*
+ * 이 영화의 팝콘 맛 (업무 -631)
+ *
+ * 평가하면 이 맛의 팝콘이 한 알 담기므로 평가 전에 무슨 맛인지 보여 준다. 맛 코드는
+ * API-030, 이름과 설명은 API-044다. 계약에 설명 문장이 없어 대표 키워드를 쓴다.
+ */
+describe('2.4 팝콘 맛', () => {
+  it('영화의 맛을 칩으로 보이고, 누르면 그 맛의 대표 키워드를 펼친다', async () => {
+    vi.mocked(getMovieDetail).mockResolvedValue(movie({ flavorCode: 'FLAVOR_E' }));
+
+    renderMovie();
+
+    const chip = await screen.findByRole('button', { name: '쿠키앤크림 맛' });
+    expect(chip).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('스릴러 · 범죄 · 긴장 · 미스터리 · 추적')).toBeNull();
+
+    fireEvent.click(chip);
+
+    expect(chip).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('스릴러 · 범죄 · 긴장 · 미스터리 · 추적')).toBeInTheDocument();
+
+    fireEvent.click(chip);
+    expect(screen.queryByText('스릴러 · 범죄 · 긴장 · 미스터리 · 추적')).toBeNull();
+  });
+
+  it('맛이 배정되지 않은 영화는 칩을 두지 않는다', async () => {
+    vi.mocked(getMovieDetail).mockResolvedValue(movie({ flavorCode: null }));
+
+    renderMovie();
+
+    expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
+    await waitFor(() => expect(getPopcornFlavors).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: / 맛$/ })).toBeNull();
+  });
+
+  it('맛 기준정보를 받지 못하면 이름을 지어내지 않고 칩을 두지 않는다', async () => {
+    vi.mocked(getMovieDetail).mockResolvedValue(movie({ flavorCode: 'FLAVOR_E' }));
+    vi.mocked(getPopcornFlavors).mockRejectedValue(new Error('boom'));
+
+    renderMovie();
+
+    expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
+    await waitFor(() => expect(getPopcornFlavors).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: / 맛$/ })).toBeNull();
   });
 });

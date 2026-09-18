@@ -177,6 +177,44 @@
   color: var(--color-on-dark-muted);
 }
 
+/*
+ * 이 영화의 팝콘 맛(업무 -631). 어두운 시트 위의 얇은 테두리 알약이다. 맛의 색은
+ * 알 그림이 말하고 칩 자체는 무채색이다 — UI에 유채색을 쓰지 않는다.
+ */
+.flavor {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+.flavorChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px var(--space-3) 3px 5px;
+  border: 0.5px solid var(--color-line-on-dark);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--color-on-dark);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  cursor: pointer;
+}
+
+.flavorSprite {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  object-fit: contain;
+}
+
+.flavorKeywords {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-on-dark-muted);
+}
+
 .average {
   display: flex;
   align-items: center;
