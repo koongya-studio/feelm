@@ -336,7 +336,7 @@ erDiagram
         varchar type "TASTE / DISCOVERY / PARTY"
         varchar flavor_code "후보가 제시한 맛 코드. 없으면 NULL"
         int position
-        jsonb reason "Consumer reasons 원본과 사용자용 summary, factors 스냅샷"
+        jsonb reason "Consumer reasons 원본과 사용자용 summary, factors 스냅샷. PARTY는 빈 객체"
         timestamptz exposed_at "노출 시각. NULL이면 미노출 버퍼분"
     }
     USER_MOVIE_DISMISSALS {
@@ -359,7 +359,7 @@ erDiagram
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
 | `recommendation_sets` | 추천 세트(이력 단위) | `user_id`·`party_id` 중 하나만 NOT NULL(CHECK). Redis 개인 세트는 전역 고유 `generation_id`로 같은 배치를 식별한다. 파티 세트의 후보 버전 기본값은 0이고 generation ID는 NULL이다 | FR-10, FR-33 · API-045, API-048, API-058 |
-| `recommendation_items` | 세트의 후보 영화 + 이유 스냅샷 | 유형은 `TASTE`·`DISCOVERY`·`PARTY`. nullable `flavor_code`는 Redis 후보 값을 스냅샷한다. UK(`set_id`, `type`, `position`), UK(`set_id`, `movie_id`), `position >= 1`. TASTE·DISCOVERY를 각각 최대 20편 저장하고 `exposed_at`으로 실제 노출분을 구분한다 | FR-12, FR-13 · API-045, API-047, API-048 |
+| `recommendation_items` | 세트의 후보 영화 + 이유 스냅샷 | 유형은 `TASTE`·`DISCOVERY`·`PARTY`. nullable `flavor_code`는 Redis 후보 값을 스냅샷하며 PARTY의 `reason`은 빈 객체다. UK(`set_id`, `type`, `position`), UK(`set_id`, `movie_id`), `position >= 1`. TASTE·DISCOVERY를 각각 최대 20편, PARTY를 최대 10편 저장하고 `exposed_at`으로 실제 노출분을 구분한다 | FR-12, FR-13, FR-33 · API-045, API-047, API-048, API-058 |
 | `user_movie_dismissals` | 사용자별 영화 관심없음 | UK(`user_id`, `movie_id`). 모든 화면의 모든 영화에 적용한다. `recommendation_item_id`는 선택적 출처이며 아이템 삭제 시 NULL로 전환한다 | FR-36 · API-047 |
 
 > 종류별 후보 Top-500은 Redis, Item Factor는 HDFS에 있으며 이 ERD 범위 밖입니다. 추천 세트의 TASTE·DISCOVERY 후보를 각각 최대 20편 `recommendation_items`에 저장하고, 추천 이력 조회(API-048)는 `exposed_at IS NOT NULL`인 노출분만 반환합니다. Redis의 추천 결과 캐시는 선택적 조회 가속용입니다 (MR !22 합의: PostgreSQL 저장안).

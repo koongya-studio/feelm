@@ -2,6 +2,7 @@ package com.feelm.backend.domain.party.service;
 
 import com.feelm.backend.domain.party.entity.Party;
 import com.feelm.backend.domain.party.entity.PartyStatus;
+import com.feelm.backend.domain.party.model.PartyInputId;
 import com.feelm.backend.domain.party.model.PartyInputSnapshot;
 import com.feelm.backend.domain.party.model.PartyRefreshPayload;
 import com.feelm.backend.domain.party.repository.PartyMemberRepository;
@@ -9,12 +10,7 @@ import com.feelm.backend.domain.party.repository.PartyRefreshRequestRepository;
 import com.feelm.backend.domain.party.repository.PartyRepository;
 import com.feelm.backend.infrastructure.kafka.KafkaEventPublisher;
 import com.feelm.backend.infrastructure.redis.RedisPartyInputReader;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
-import java.util.HexFormat;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -91,7 +87,7 @@ class PartyRefreshProcessor {
     }
 
     private static PartyRefreshPayload payload(long partyId, PartyInputSnapshot snapshot) {
-        String inputId = inputId(partyId, snapshot);
+        String inputId = PartyInputId.from(partyId, snapshot);
         List<PartyRefreshPayload.Member> members =
                 snapshot.members().stream()
                         .map(
@@ -102,26 +98,5 @@ class PartyRefreshProcessor {
                                                 member.candidateMovieIds()))
                         .toList();
         return new PartyRefreshPayload(partyId, inputId, members);
-    }
-
-    static String inputId(long partyId, PartyInputSnapshot snapshot) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            digest.update(ByteBuffer.allocate(Long.BYTES).putLong(partyId).array());
-            update(digest, snapshot.modelVersion());
-            for (PartyInputSnapshot.Member member : snapshot.members()) {
-                digest.update(ByteBuffer.allocate(Long.BYTES).putLong(member.userId()).array());
-                update(digest, member.generationId());
-            }
-            return "sha256:" + HexFormat.of().formatHex(digest.digest());
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 is unavailable", exception);
-        }
-    }
-
-    private static void update(MessageDigest digest, String value) {
-        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-        digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(bytes.length).array());
-        digest.update(bytes);
     }
 }
