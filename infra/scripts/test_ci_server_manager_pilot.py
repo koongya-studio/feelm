@@ -125,6 +125,11 @@ class ServerPilotTests(unittest.TestCase):
         self.assertEqual(hashes['backend.tar'], stage.SOURCE_SHA)
         with tarfile.open(fileobj=io.BytesIO(payload), mode='r') as archive:
             names = set(archive.getnames())
+            backend_source = archive.extractfile('backend.tar').read()
+        with tarfile.open(fileobj=io.BytesIO(backend_source), mode='r') as source_archive:
+            source_names = set(source_archive.getnames())
+        self.assertIn('backend/build.gradle', source_names)
+        self.assertIn('infra/compose/service.yml', source_names)
         self.assertIn('scripts/ci-backend-runtime-contract.py', names)
         self.assertIn('scripts/check-markdown.py', names)
         self.assertIn('scripts/ci-docs-mr-boundary.py', names)
