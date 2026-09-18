@@ -95,6 +95,7 @@ Topic 확인 방법은 [인프라 README](../infra/README.md#local-kafka)를 따
 | `DB_PASSWORD` | `feelm` | 필수 |
 | `REDIS_HOST` | `localhost` | 필수 |
 | `REDIS_PORT` | `6379` | `6379` |
+| `REDIS_USERNAME` | `default` | `default` |
 | `REDIS_PASSWORD` | **필수(기본값 없음)** | 필수 |
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | **필수(분산 처리 노드 사설 IP:9092)** |
 | `KAFKA_OUTBOX_*` | `.env.example`의 초기값 | 선택(실측 후 조정) |

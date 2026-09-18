@@ -154,4 +154,25 @@ docker exec feelm-redis sh -c \
   'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_readonly DEL feelm:user:0:topn' \
   | grep -q 'no permissions'
 
+docker exec feelm-redis sh -c \
+  'test -n "$REDIS_LOCAL_BACKEND_PASSWORD"' || {
+  echo "REDIS_LOCAL_BACKEND_PASSWORD is not configured" >&2
+  exit 1
+}
+docker exec feelm-redis sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL USERS' \
+  | grep -qx feelm_local_backend
+docker exec feelm-redis sh -c \
+  'redis-cli --no-auth-warning --user feelm_local_backend --pass "$REDIS_LOCAL_BACKEND_PASSWORD" GET feelm:user:0:candidates' \
+  >/dev/null
+docker exec feelm-redis sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_local_backend SET auth:runtime-check value' \
+  | grep -qx OK
+docker exec feelm-redis sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_local_backend SET feelm:user:0:candidates value' \
+  | grep -q 'no permissions'
+docker exec feelm-redis sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_local_backend FLUSHALL' \
+  | grep -q 'no permissions'
+
 echo "Datastore runtime verification passed"

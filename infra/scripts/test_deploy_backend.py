@@ -117,11 +117,14 @@ class DeployBackendTest(unittest.TestCase):
                 exit 0
               fi
               if [[ "$command" == *"ACL USERS"* ]]; then
-                printf 'default\nfeelm_readonly\n'
+                printf 'default\nfeelm_readonly\nfeelm_local_backend\n'
                 exit 0
               fi
               if [[ "$command" == *"ACL DRYRUN"* ]]; then
-                if [[ "$command" == *" SET "* || "$command" == *" DEL "* ]]; then
+                if [[ "$command" == *"feelm_local_backend SET auth:runtime-check"* ]]; then
+                  printf 'OK\n'
+                elif [[ "$command" == *" SET "* || "$command" == *" DEL "* \
+                  || "$command" == *" FLUSHALL"* ]]; then
                   printf 'User feelm_readonly has no permissions to run the command\n'
                 else
                   printf 'OK\n'
@@ -129,6 +132,9 @@ class DeployBackendTest(unittest.TestCase):
                 exit 0
               fi
               if [[ "$command" == *"--user feelm_readonly"* ]]; then
+                exit 0
+              fi
+              if [[ "$command" == *"--user feelm_local_backend"* ]]; then
                 exit 0
               fi
               if [[ "$command" == *"REDISCLI_AUTH"* ]]; then
