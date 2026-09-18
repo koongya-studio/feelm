@@ -22,6 +22,21 @@ acl_file=/tmp/feelm-redis-users.acl
     else
         printf 'user feelm_readonly off resetpass -@all resetkeys resetchannels\n'
     fi
+    if [ -n "${REDIS_LOCAL_BACKEND_PASSWORD:-}" ]; then
+        if [ "$REDIS_LOCAL_BACKEND_PASSWORD" = "$REDIS_PASSWORD" ]; then
+            echo 'Redis local-backend password must differ from other Redis passwords' >&2
+            exit 1
+        fi
+        if [ -n "${REDIS_READONLY_PASSWORD:-}" ] \
+            && [ "$REDIS_LOCAL_BACKEND_PASSWORD" = "$REDIS_READONLY_PASSWORD" ]; then
+            echo 'Redis local-backend password must differ from other Redis passwords' >&2
+            exit 1
+        fi
+        printf 'user feelm_local_backend on #%s ' "$(password_hash "$REDIS_LOCAL_BACKEND_PASSWORD")"
+        cat /usr/local/etc/redis/local-backend.acl
+    else
+        printf 'user feelm_local_backend off resetpass -@all resetkeys resetchannels\n'
+    fi
 } > "$acl_file"
 chown redis:redis "$acl_file"
 

@@ -28,6 +28,10 @@ class DeployRedisTests(unittest.TestCase):
         self.previous.mkdir()
         shutil.copy(ROOT / "infra" / "redis" / "start.sh", self.previous / "start.sh")
         shutil.copy(ROOT / "infra" / "redis" / "readonly.acl", self.previous / "readonly.acl")
+        shutil.copy(
+            ROOT / "infra" / "redis" / "local-backend.acl",
+            self.previous / "local-backend.acl",
+        )
         self.state = self.temp / "state"
         self.state.write_text(self._bash_path(self.previous))
         self.events = self.temp / "events"
@@ -84,6 +88,13 @@ if [[ "$1" == "inspect" ]]; then
     else
       printf '%s/readonly.acl\\n' "$(cat "$FAKE_STATE")"
     fi
+  elif [[ "$*" == *local-backend.acl* ]]; then
+    if [[ ("${MISSING_PREVIOUS:-0}" == "1" || "${LEGACY_PREVIOUS:-0}" == "1") \
+      && "$(cat "$FAKE_STATE")" == "$PREVIOUS_DIR" ]]; then
+      printf '%s/local-backend.acl\\n' "$PREVIOUS_DIR/missing"
+    else
+      printf '%s/local-backend.acl\\n' "$(cat "$FAKE_STATE")"
+    fi
   fi
   exit 0
 fi
@@ -91,6 +102,10 @@ if [[ "$1" == "cp" ]]; then
   case "$2" in
     *start.sh) cp "$PREVIOUS_DIR/start.sh" "$3" ;;
     *readonly.acl) cp "$PREVIOUS_DIR/readonly.acl" "$3" ;;
+    *local-backend.acl)
+      if [[ "${LEGACY_PREVIOUS:-0}" == "1" ]]; then exit 1; fi
+      cp "$PREVIOUS_DIR/local-backend.acl" "$3"
+      ;;
     *) exit 2 ;;
   esac
   exit 0
@@ -149,6 +164,10 @@ exit 2
         candidate = self.release_root / "releases" / "abcdef1234567890"
         self.assertEqual(self.state.read_text(), self._bash_path(candidate))
         self.assertEqual((candidate / "start.sh").read_bytes(), (ROOT / "infra/redis/start.sh").read_bytes())
+        self.assertEqual(
+            (candidate / "local-backend.acl").read_bytes(),
+            (ROOT / "infra/redis/local-backend.acl").read_bytes(),
+        )
         self.assertFalse((candidate / "deploy-trigger.txt").exists())
         events = self.events.read_text()
         self.assertIn("up -d --no-deps --force-recreate redis", events)
@@ -193,9 +212,14 @@ exit 2
             (snapshot / "readonly.acl").read_bytes(),
             (self.previous / "readonly.acl").read_bytes(),
         )
+        self.assertEqual(
+            (snapshot / "local-backend.acl").read_bytes(),
+            (self.previous / "local-backend.acl").read_bytes(),
+        )
         events = self.events.read_text()
         self.assertIn("cp feelm-redis:/usr/local/etc/redis/start.sh", events)
         self.assertIn("cp feelm-redis:/usr/local/etc/redis/readonly.acl", events)
+        self.assertIn("cp feelm-redis:/usr/local/etc/redis/local-backend.acl", events)
 
     def test_missing_mount_sources_rollback_to_snapshot(self):
         result = self.run_deploy(MISSING_PREVIOUS="1", RUNTIME_VERIFY_EXIT="1")
@@ -203,6 +227,19 @@ exit 2
         snapshot = self.release_root / "releases" / "bootstrap-abcdef1234567890"
         self.assertEqual(self.state.read_text(), self._bash_path(snapshot))
         self.assertIn("previous configuration was restored", result.stderr)
+
+    def test_legacy_two_file_config_gets_rollback_compatible_snapshot(self):
+        result = self.run_deploy(LEGACY_PREVIOUS="1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        snapshot = self.release_root / "releases" / "bootstrap-abcdef1234567890"
+        self.assertEqual(
+            (snapshot / "local-backend.acl").read_bytes(),
+            (ROOT / "infra/redis/local-backend.acl").read_bytes(),
+        )
+        self.assertEqual(
+            self.state.read_text(),
+            self._bash_path(self.release_root / "releases" / "abcdef1234567890"),
+        )
 
     def test_candidate_compose_failure_restores_previous_config(self):
         result = self.run_deploy(FAIL_CANDIDATE_COMPOSE="1")

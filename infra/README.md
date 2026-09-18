@@ -406,7 +406,7 @@ redis:8.2.9-alpine@sha256:30abb90e62f14b737010746def3ba99cc79fe19dcdb3d37b41f21f
 - 메모리: Redis `512mb`, 컨테이너 `768m`
 - 축출 정책: 인증 데이터 보호를 위한 `noeviction`; 한도 도달 시 새 쓰기가 실패함
 - 네트워크: 로컬·서비스 서버 모두 `127.0.0.1:6379`, 컨테이너 간에는 기존 `redis:6379`
-- 조회 계정: [Redis 조회 접속 설정](redis/README.md). 선택 비밀번호 미설정 시 비활성화
+- 제한 계정: [Redis ACL 접속 설정](redis/README.md). 각 선택 비밀번호 미설정 시 해당 계정 비활성화
 
 Refresh Token Repository, 추천 Key와 TTL, Spark 적재 및 Redis Cluster·Sentinel
 구성은 이 실행환경 업무의 범위에 포함하지 않습니다.
@@ -417,6 +417,8 @@ Refresh Token Repository, 추천 Key와 TTL, Spark 적재 및 Redis Cluster·Sen
 
 ```dotenv
 REDIS_PASSWORD=<필수 비밀번호>
+REDIS_READONLY_PASSWORD=<조회 계정 비밀번호>
+REDIS_LOCAL_BACKEND_PASSWORD=<로컬 백엔드 계정 비밀번호>
 ```
 
 Spring Boot를 호스트에서 실행할 때는 다음 값을 `backend/.env`에 설정합니다.
@@ -424,6 +426,7 @@ Spring Boot를 호스트에서 실행할 때는 다음 값을 `backend/.env`에 
 ```dotenv
 REDIS_HOST=localhost
 REDIS_PORT=6379
+REDIS_USERNAME=default
 REDIS_PASSWORD=<infra/.env와 같은 값>
 ```
 
@@ -434,7 +437,25 @@ REDIS_PASSWORD=<infra/.env와 같은 값>
 ```dotenv
 REDIS_HOST=redis
 REDIS_PORT=6379
+REDIS_USERNAME=default
 ```
+
+서비스 서버 Redis를 로컬 Spring Boot에서 사용할 때는 서버의
+`REDIS_LOCAL_BACKEND_PASSWORD`를 전달받아 SSH 터널과 제한 계정을 사용합니다.
+
+```bash
+ssh -N -L 16379:127.0.0.1:6379 <SSH_USER>@<SERVICE_SERVER>
+```
+
+```dotenv
+REDIS_HOST=127.0.0.1
+REDIS_PORT=16379
+REDIS_USERNAME=feelm_local_backend
+REDIS_PASSWORD=<전달받은 로컬 백엔드 계정 비밀번호>
+```
+
+이 계정은 `auth:*`를 실제로 변경하므로 공유 개발 서버의 로그인·메일 제한 상태에
+영향을 줍니다. 테스트 계정을 사용하고 `FLUSHALL` 같은 전체 초기화 명령은 허용되지 않습니다.
 
 ### Startup
 

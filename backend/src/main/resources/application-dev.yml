@@ -7,6 +7,7 @@ spring:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT:6379}
+      username: ${REDIS_USERNAME:default}
       password: ${REDIS_PASSWORD}
   mail:
     # dev는 실제로 메일을 보내므로 계정 정보에 기본값을 두지 않는다. 값이 없으면 기동에 실패한다.
