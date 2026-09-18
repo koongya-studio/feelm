@@ -66,11 +66,9 @@ import tools.jackson.databind.ObjectMapper;
 abstract class EmailAuthApiTestSupport {
 
     static final String SIGNUP_PATH = "/api/v1/auth/signup";
-    static final String VERIFY_PATH = "/api/v1/auth/email/verify";
     static final String VERIFICATION_CODE_PATH = "/api/v1/auth/email/verification-code";
     static final String VERIFICATION_CODE_VERIFY_PATH =
             "/api/v1/auth/email/verification-code/verify";
-    static final String RESEND_PATH = "/api/v1/auth/email/resend";
     static final String LOGIN_PATH = "/api/v1/auth/login";
     static final String LOGOUT_PATH = "/api/v1/auth/logout";
     static final String REFRESH_PATH = "/api/v1/auth/token/refresh";
@@ -189,12 +187,7 @@ abstract class EmailAuthApiTestSupport {
                 """);
     }
 
-    /** 인증 메일의 발송 기록과 제어 수단. 종류별로 분리돼 있어 한쪽을 붙잡아도 다른 쪽 발송은 진행된다. */
-    protected RecordingMailSends verificationMails() {
-        return authMailSender.sends(MailKind.VERIFICATION);
-    }
-
-    /** 비밀번호 재설정 메일의 발송 기록과 제어 수단. */
+    /** 비밀번호 재설정 메일의 발송 기록과 제어 수단. 종류별로 분리돼 있어 한쪽을 붙잡아도 다른 쪽 발송은 진행된다. */
     protected RecordingMailSends passwordResetMails() {
         return authMailSender.sends(MailKind.PASSWORD_RESET);
     }
@@ -348,41 +341,9 @@ abstract class EmailAuthApiTestSupport {
         redisTemplate.delete("auth:email-code-interval:" + Sha256Hasher.hex(email));
     }
 
-    /**
-     * 개정 전 미인증 계정 앞으로 인증 메일(API-003)을 보내고 그 토큰 원문을 돌려준다.
-     *
-     * <p>가입이 더 이상 인증 메일을 보내지 않으므로(S15P21E106-603) 링크 인증 경로를 검증하는 테스트는 재발송으로 토큰을 얻는다. 이 헬퍼와 링크 경로는
-     * S15P21E106-604가 함께 없앤다.
-     */
-    String pendingVerificationToken(TestAccount account) throws Exception {
-        clearResendInterval(account.email());
-        resend(account.email()).andExpect(status().isAccepted());
-        List<String> tokens = verificationTokens(null);
-        assertThat(tokens).as("인증 메일이 발송되지 않았다").isNotEmpty();
-        return tokens.getLast();
-    }
-
-    /** 재발송(API-003)의 이메일 간격(1분)을 지운다. 같은 이메일로 두 번 보내야 하는 시나리오에 쓴다. */
-    void clearResendInterval(String email) {
-        redisTemplate.delete("auth:email-resend:" + Sha256Hasher.hex(email));
-    }
-
     /** 인증번호 저장 키(S15P21E106-602). 원문이 저장되지 않았음을 확인하는 데 쓴다. */
     String verificationCodeKey(String email) {
         return "auth:email-code:" + Sha256Hasher.hex(email);
-    }
-
-    ResultActions verifyEmail(String token) throws Exception {
-        return postJson(VERIFY_PATH, "{\"token\":\"%s\"}".formatted(token));
-    }
-
-    ResultActions resend(String email) throws Exception {
-        return postJson(RESEND_PATH, "{\"email\":\"%s\"}".formatted(email));
-    }
-
-    /** 재발송(API-003)을 지정한 IP에서 보낸다. */
-    ResultActions resendFrom(String clientIp, String email) throws Exception {
-        return postJsonFrom(clientIp, RESEND_PATH, "{\"email\":\"%s\"}".formatted(email));
     }
 
     ResultActions login(String email, String password) throws Exception {
@@ -412,19 +373,6 @@ abstract class EmailAuthApiTestSupport {
                 "{\"token\":\"%s\",\"newPassword\":\"%s\"}".formatted(token, newPassword));
     }
 
-    /**
-     * 개정 전 흐름이 남긴 미인증({@code PENDING_VERIFICATION}) 계정을 만들고 userId를 돌려준다.
-     *
-     * <p>새 가입 흐름은 이 상태를 만들지 않으므로(S15P21E106-603) 가입을 마친 계정의 상태만 SQL로 되돌린다. 배포 DB에 남아 있는 행과 같은 상태이며,
-     * 이 상태 자체와 이 헬퍼는 S15P21E106-604가 없앤다.
-     */
-    long signupPending(TestAccount account) throws Exception {
-        long userId = signupActive(account);
-        jdbcTemplate.update(
-                "update users set status = 'PENDING_VERIFICATION' where id = ?", userId);
-        return userId;
-    }
-
     /** 가입을 마친 {@code ACTIVE} 사용자를 만든다. */
     long signupActive(TestAccount account) throws Exception {
         MvcResult result = signup(signupBody(account)).andExpect(status().isCreated()).andReturn();
@@ -434,7 +382,7 @@ abstract class EmailAuthApiTestSupport {
     /**
      * 가입을 마친 {@code ACTIVE} 사용자를 만든다.
      *
-     * <p>{@code output}은 쓰지 않는다. 가입이 인증 메일을 보내던 시절의 시그니처이며 호출 측을 그대로 두기 위해 남겼다.
+     * <p>{@code output}은 쓰지 않는다. 가입이 메일을 보내던 시절의 시그니처이며 호출 측을 그대로 두기 위해 남겼다.
      */
     long signupActive(TestAccount account, CapturedOutput output) throws Exception {
         return signupActive(account);
@@ -447,22 +395,6 @@ abstract class EmailAuthApiTestSupport {
                 .get("user")
                 .get("userId")
                 .asLong();
-    }
-
-    /**
-     * 발송된 인증 토큰 원문을 발송 순서대로 모은다. 발송 횟수 검증에도 쓴다.
-     *
-     * <p>{@code output}은 쓰지 않는다. 3단계가 발송 로그 대신 스파이 빈을 seam으로 제공하면서 이 메서드만 교체했고, 호출 측 시그니처는 그대로 두었다.
-     */
-    List<String> verificationTokens(CapturedOutput output) {
-        awaitMailsDispatched();
-        return verificationMails().tokens();
-    }
-
-    String latestVerificationToken(CapturedOutput output) {
-        List<String> tokens = verificationTokens(output);
-        assertThat(tokens).as("인증 메일 발송 로그에서 인증 토큰을 찾지 못했다").isNotEmpty();
-        return tokens.getLast();
     }
 
     /** 발송된 재설정 토큰 원문을 발송 순서대로 모은다. 발송 횟수 검증에도 쓴다. */
@@ -502,23 +434,6 @@ abstract class EmailAuthApiTestSupport {
                 "update users set created_at = ? where id = ?",
                 utc(Instant.now().minus(age)),
                 userId);
-    }
-
-    /** 인증 토큰을 만료시킨다. 만료(410) 경로는 API로 만들 수 없다. */
-    void expireVerificationTokens(long userId) {
-        jdbcTemplate.update(
-                "update email_verification_tokens set expires_at = ? where user_id = ?",
-                utc(Instant.now().minus(Duration.ofMinutes(1))),
-                userId);
-    }
-
-    /**
-     * 소진 표시만 되돌린다. 유효한 미사용 토큰과 이미 활성화된 계정이 겹치는 상태({@code ALREADY_VERIFIED})는 토큰 원문을 새로 만들 수 없어 API로
-     * 만들 방법이 없다.
-     */
-    void restoreVerificationTokens(long userId) {
-        jdbcTemplate.update(
-                "update email_verification_tokens set used_at = null where user_id = ?", userId);
     }
 
     /** 재설정 토큰을 만료시킨다. 만료(410) 경로는 API로 만들 수 없다. */

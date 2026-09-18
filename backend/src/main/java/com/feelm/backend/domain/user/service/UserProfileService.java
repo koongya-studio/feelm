@@ -39,7 +39,7 @@ public class UserProfileService {
      * API-015 내 프로필 수정. 전달된 필드만 바꾼다.
      *
      * <p>계정 행을 잠그고 읽어 같은 사용자의 동시 수정이 서로의 결과를 덮어쓰지 않게 한다. 잠그는 행이 계정 하나뿐이라 기존 "토큰 → 계정" 잠금 순서
-     * 규약(API-002·011·012)과 충돌하지 않는다.
+     * 규약(API-011·012)과 충돌하지 않는다.
      */
     @Transactional
     public UserProfileResponse updateProfile(long userId, ProfileUpdateRequest request) {

@@ -258,7 +258,9 @@ class WebPushMigrationTest {
                             + "f".repeat(64)
                             + "','PENDING',TIMESTAMPTZ '2026-09-12 00:00:00+00')");
 
-            assertThat(upgradeDatabase.flyway().migrate().migrationsExecuted).isOne();
+            // 이 클래스 뒤에 다른 마이그레이션이 붙으면 실행 수가 늘어난다. 이 테스트가 보는 것은
+            // 기존 데이터를 지키며 업그레이드되는지이지 실행 수가 아니다(S15P21E106-604).
+            assertThat(upgradeDatabase.flyway().migrate().migrationsExecuted).isPositive();
             assertThat(
                             longValue(
                                     upgradeDatabase,

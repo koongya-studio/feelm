@@ -200,16 +200,14 @@ feelm:
     # 기본값을 두지 않는다. 프로파일 없이 뜬 배포가 조용히 log 모드로 흘러가 토큰이 로그에 남는 것을 막기 위해서다.
     mode: ${MAIL_MODE}
     from: ${MAIL_FROM:no-reply@feelm.local}
-    # 링크는 프론트 화면으로 가고 프론트가 API-002를 호출한다.
+    # 재설정 링크는 프론트 화면으로 가고 프론트가 API-011을 호출한다. 화면은 0.7-A다.
     #
     # 경로는 프론트엔드 라우트에서 파생된 값이다. 앱은 Vite base가 /app/이라 모든 화면이 /app
     # 아래에 있고(frontend/vite.config.ts), 화면별 경로는 frontend/src/routes/paths.ts가 가진다.
     # FRONTEND_BASE_URL은 사이트 주소이지 앱 주소가 아니므로 /app을 여기서 붙인다. 프론트 경로가
     # 바뀌면 이 값도 함께 바뀌어야 한다(S15P21E106-367).
-    verification-url: ${FRONTEND_BASE_URL:http://localhost:5173}/app/verify-email
-    # 재설정 링크도 프론트 화면으로 가고 프론트가 API-011을 호출한다. 화면은 0.7-A다.
     password-reset-url: ${FRONTEND_BASE_URL:http://localhost:5173}/app/account/reset
-    # 인증번호 발송(API-078)·인증 메일 재발송(API-003)·재설정 요청(API-010)의 요청 단위 제한이다. 이메일 간격만으로는
+    # 인증번호 발송(API-078)과 재설정 요청(API-010)의 요청 단위 제한이다. 이메일 간격만으로는
     # 서로 다른 이메일을 대량으로 넣는 발송 폭탄을 막지 못하므로 IP 단위를 함께 둔다. ip는 창
     # 목록이라 창을 늘리거나 줄여도 코드가 그대로다(S15P21E106-281 결정 D-8).
     #
@@ -226,7 +224,7 @@ feelm:
       ip:
         - limit: ${MAIL_RATE_LIMIT_IP_LIMIT:30}
           window: ${MAIL_RATE_LIMIT_IP_WINDOW:1h}
-    # 계정 메일 전체(가입 인증·재발송·재설정)의 전역 발송 상한이다. SMTP 계정의 발송 쿼터를 지키는
+    # 계정 메일 전체(인증번호·재설정)의 전역 발송 상한이다. SMTP 계정의 발송 쿼터를 지키는
     # 값이라 시도가 아니라 실제 발송을 세고, 요청 경로가 아니라 발송 스레드에서 소모한다. 그래서 이
     # 상한은 응답(202·201)을 바꾸지 않으며, 상한을 넘긴 메일은 발송하지 않고 버린다. 사용자의
     # 재발송·재요청·재가입이 복구 경로다(S15P21E106-287 결정 D-2·D-5·D-6).

@@ -487,13 +487,13 @@ class PublicReviewContractTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("T26 ACTIVE 작성자만 노출하고 PENDING·WITHDRAWN을 제외한다")
+    @DisplayName("T26 ACTIVE 작성자만 노출하고 WITHDRAWN을 제외한다")
     void appliesApprovedUserStatusPolicy() throws Exception {
         long active = insertUser("active-author", "활성작성자", "ACTIVE");
-        long pending = insertUser("pending-author", "대기작성자", "PENDING_VERIFICATION");
+        long leftAuthor = insertUser("left-author", "떠난작성자", "WITHDRAWN");
         long withdrawn = insertUser("withdrawn-author", "withdrawn-999", "WITHDRAWN");
         long visible = insertRating(active, movieId, "PUBLIC", "활성", false, BASE_TIME);
-        insertRating(pending, movieId, "PUBLIC", "대기", false, BASE_TIME.plusSeconds(1));
+        insertRating(leftAuthor, movieId, "PUBLIC", "떠남", false, BASE_TIME.plusSeconds(1));
         insertRating(withdrawn, movieId, "PUBLIC", "탈퇴", false, BASE_TIME.plusSeconds(2));
 
         JsonNode response = response(reviews(viewerId).andReturn());
@@ -532,9 +532,7 @@ class PublicReviewContractTest extends SharedPostgresContractTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 
-        jdbc.sql("UPDATE users SET status='PENDING_VERIFICATION' WHERE id=:id")
-                .param("id", viewerId)
-                .update();
+        jdbc.sql("UPDATE users SET status='WITHDRAWN' WHERE id=:id").param("id", viewerId).update();
         reviews(viewerId)
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));

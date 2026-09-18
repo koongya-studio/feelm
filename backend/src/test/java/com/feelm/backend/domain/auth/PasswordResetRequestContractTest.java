@@ -44,17 +44,6 @@ class PasswordResetRequestContractTest extends EmailAuthApiTestSupport {
     }
 
     @Test
-    @DisplayName("미인증 계정은 202로 응답하되 메일을 보내지 않는다")
-    void pendingVerificationAccountReturnsAcceptedWithoutMail() throws Exception {
-        TestAccount account = newAccount();
-        signupPending(account);
-
-        requestPasswordReset(account.email()).andExpect(status().isAccepted());
-
-        assertThat(passwordResetTokens()).isEmpty();
-    }
-
-    @Test
     @DisplayName("탈퇴 계정은 202로 응답하되 메일을 보내지 않는다")
     void withdrawnAccountReturnsAcceptedWithoutMail(CapturedOutput output) throws Exception {
         TestAccount account = newAccount();

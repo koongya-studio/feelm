@@ -24,37 +24,34 @@ import org.springframework.mail.javamail.JavaMailSender;
  * <p>제목과 본문을 <b>글자 단위로</b> 고정한다(284 리뷰 A-4). 이 업무의 전제가 "메일 문안 불변"이므로 문안이 바뀌면 테스트가 함께 고쳐지는 편이 낫다.
  * 본문이 바뀌어야 하는 변경이라면 그 변경의 diff에 이 테스트가 함께 드러난다.
  */
-@DisplayName("계정 메일 발송 — 종류별 제목·본문·링크")
+@DisplayName("계정 메일 발송 — 종류별 제목·본문·본문 값")
 @ExtendWith(OutputCaptureExtension.class)
 @ResourceLock("backend-output-capture")
 class AuthMailSenderTest {
 
     private static final AuthMailProperties PROPERTIES =
             new AuthMailProperties(
-                    Mode.LOG,
-                    "no-reply@feelm.local",
-                    "https://feelm.example/verify-email",
-                    "https://feelm.example/reset-password");
+                    Mode.LOG, "no-reply@feelm.local", "https://feelm.example/reset-password");
 
     @Test
-    @DisplayName("인증 메일은 인증 화면 링크와 24시간 안내를 담는다")
-    void smtpSenderSendsVerificationMail() {
+    @DisplayName("인증번호 메일은 링크 없이 번호와 10분 안내를 담는다")
+    void smtpSenderSendsVerificationCodeMail() {
         JavaMailSender mailSender = mock(JavaMailSender.class);
         AuthMailSender sender = new SmtpAuthMailSender(mailSender, PROPERTIES);
 
-        sender.send(MailKind.VERIFICATION, "user@example.com", "raw-token");
+        sender.send(MailKind.VERIFICATION_CODE, "user@example.com", "032815");
 
         SimpleMailMessage message = captureSent(mailSender);
         assertThat(message.getFrom()).isEqualTo("no-reply@feelm.local");
         assertThat(message.getTo()).containsExactly("user@example.com");
-        assertThat(message.getSubject()).isEqualTo("[Feelm] 이메일 인증을 완료해 주세요");
+        assertThat(message.getSubject()).isEqualTo("[Feelm] 이메일 인증번호를 입력해 주세요");
         assertThat(message.getText())
                 .isEqualTo(
                         """
                         Feelm 가입을 확인해 주세요.
 
-                        아래 링크를 열면 이메일 인증이 완료됩니다. 링크는 24시간 동안만 유효합니다.
-                        https://feelm.example/verify-email?token=raw-token
+                        아래 인증번호를 회원가입 화면에 입력하면 이메일 인증이 완료됩니다. 번호는 10분 동안만 유효합니다.
+                        032815
 
                         본인이 요청하지 않았다면 이 메일을 무시해 주세요.""");
     }
@@ -83,9 +80,10 @@ class AuthMailSenderTest {
     @Test
     @DisplayName("두 종류의 제목과 본문은 서로 다르다")
     void mailKindsDoNotShareSubjectOrBody() {
-        assertThat(MailKind.VERIFICATION.subject()).isNotEqualTo(MailKind.PASSWORD_RESET.subject());
-        assertThat(MailKind.VERIFICATION.body("link"))
-                .isNotEqualTo(MailKind.PASSWORD_RESET.body("link"));
+        assertThat(MailKind.VERIFICATION_CODE.subject())
+                .isNotEqualTo(MailKind.PASSWORD_RESET.subject());
+        assertThat(MailKind.VERIFICATION_CODE.body("value"))
+                .isNotEqualTo(MailKind.PASSWORD_RESET.body("value"));
     }
 
     @Test

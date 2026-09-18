@@ -4,7 +4,6 @@ import com.feelm.backend.domain.auth.AuthRateLimiter;
 import com.feelm.backend.domain.auth.EmailVerificationTokenConsumer;
 import com.feelm.backend.domain.auth.RefreshTokenService;
 import com.feelm.backend.domain.auth.dto.request.SignupRequest;
-import com.feelm.backend.domain.auth.repository.EmailVerificationTokenRepository;
 import com.feelm.backend.domain.user.WithdrawnAccount;
 import com.feelm.backend.domain.user.entity.NotificationSettings;
 import com.feelm.backend.domain.user.entity.User;
@@ -14,7 +13,6 @@ import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ConstraintViolations;
 import com.feelm.backend.global.error.ErrorCode;
 import com.feelm.backend.global.security.TokenProvider;
-import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,7 +26,6 @@ public class SignupService {
 
     private final UserRepository userRepository;
     private final NotificationSettingsRepository notificationSettingsRepository;
-    private final EmailVerificationTokenRepository tokenRepository;
     private final EmailVerificationTokenConsumer tokenConsumer;
     private final TokenProvider tokenProvider;
     private final RefreshTokenService refreshTokenService;
@@ -66,7 +63,7 @@ public class SignupService {
         rejectConsumedToken(claims.tokenId());
 
         rejectReservedEmail(email);
-        userRepository.findByEmail(email).ifPresent(this::deleteStalePendingOrReject);
+        rejectDuplicatedEmail(email);
         rejectDuplicatedNickname(request.nickname());
         if (!tokenConsumer.consume(claims.tokenId())) {
             throw new BusinessException(ErrorCode.EMAIL_VERIFICATION_TOKEN_INVALID);
@@ -116,25 +113,15 @@ public class SignupService {
     }
 
     /**
-     * 미인증 상태로 보존 기간이 지난 계정은 지우고 재가입을 허용한다(플랜 결정 3). 인증을 마친 계정과 탈퇴 계정은 대상이 아니다.
+     * 이미 쓰고 있는 이메일이면 거절한다.
      *
-     * <p>새 가입 흐름은 이 상태를 만들지 않는다. 개정 이전 흐름이 배포 DB에 남긴 행이 그 이메일을 영구히 붙들지 않게 하는 분기이며, 잔존 행의 일괄 정리와 이
-     * 분기 자체의 제거는 S15P21E106-604가 한다.
+     * <p>보존 기간이 지난 미인증 계정을 지우고 재가입을 허용하던 분기는 없앴다(S15P21E106-604). 그 상태 자체가 사라졌고 잔존 행은 마이그레이션이 지웠다.
+     * 탈퇴 계정은 이메일이 예약 도메인으로 치환되므로(D-9) 여기에 걸리지 않는다.
      *
-     * <p>계정 삭제는 상태·생성 시각 조건이 붙은 삭제문으로 즉시 실행한다. 조회와 삭제 사이에 다른 요청이 인증을 마쳤으면 조건에 걸려 지워지지 않으므로, 그때는
-     * 재가입을 거절하고 트랜잭션을 되돌려 먼저 지운 의존 행도 복구한다. 삭제문을 즉시 실행하는 것은 삽입이 먼저 나가 이메일 유일 제약을 위반하는 것도 막는다.
+     * <p>이 검사와 삽입 사이에 다른 요청이 끼어들 수 있다. 그 경합은 이메일 유일 제약이 막고 {@link #save}가 같은 오류 코드로 옮긴다.
      */
-    private void deleteStalePendingOrReject(User existing) {
-        Instant now = Instant.now();
-        if (!existing.isStalePendingVerification(now)) {
-            throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
-        }
-        tokenRepository.deleteByUserId(existing.getId());
-        notificationSettingsRepository.deleteByUserId(existing.getId());
-        int deleted =
-                userRepository.deleteIfStalePendingVerification(
-                        existing.getId(), now.minus(User.PENDING_VERIFICATION_RETENTION));
-        if (deleted == 0) {
+    private void rejectDuplicatedEmail(String email) {
+        if (userRepository.findByEmail(email).isPresent()) {
             throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
         }
     }

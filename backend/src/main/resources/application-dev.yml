@@ -29,7 +29,6 @@ feelm:
     mode: ${MAIL_MODE:smtp}
     # Gmail SMTP는 From을 인증 계정으로 강제하므로 별도 값이 없으면 계정 주소를 그대로 쓴다.
     from: ${MAIL_FROM:${MAIL_USERNAME}}
-    # 경로에 /app이 붙는 이유는 application.yml 주석을 따른다.
-    verification-url: ${FRONTEND_BASE_URL}/app/verify-email
-    # 재설정 링크도 기본값을 두지 않는다. 값이 없으면 기동에 실패해야 localhost 링크가 나가지 않는다.
+    # 경로에 /app이 붙는 이유는 application.yml 주석을 따른다. 기본값을 두지 않는다. 값이 없으면
+    # 기동에 실패해야 localhost 링크가 나가지 않는다.
     password-reset-url: ${FRONTEND_BASE_URL}/app/account/reset

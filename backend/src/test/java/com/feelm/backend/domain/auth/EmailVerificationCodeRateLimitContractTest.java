@@ -62,7 +62,7 @@ class EmailVerificationCodeRateLimitContractTest extends EmailAuthApiTestSupport
     void appliesIpAxisBeforeDuplicateCheck() throws Exception {
         String clientIp = nextClientIp();
         TestAccount registered = newAccount();
-        signupPending(registered);
+        signupActive(registered);
         clearVerificationCodeInterval(registered.email());
         clearMailSendRateLimits();
 
@@ -83,7 +83,7 @@ class EmailVerificationCodeRateLimitContractTest extends EmailAuthApiTestSupport
     @DisplayName("409로 끝난 요청은 그 이메일의 간격 슬롯을 심지 않는다")
     void doesNotPlantIntervalOnDuplicate() throws Exception {
         TestAccount registered = newAccount();
-        signupPending(registered);
+        signupActive(registered);
         clearVerificationCodeInterval(registered.email());
 
         sendVerificationCode(registered.email()).andExpect(status().isConflict());

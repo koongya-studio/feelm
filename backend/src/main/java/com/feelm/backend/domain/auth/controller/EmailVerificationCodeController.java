@@ -17,8 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 가입 전 이메일 인증번호 엔드포인트(API-078·076). 계정을 만들기 전에 쓰므로 둘 다 공개 구분이다.
  *
- * <p>이메일 계정 엔드포인트(API-001~005)와 컨트롤러를 나눈 이유는 생애 주기가 다르기 때문이다. 이 경로는 계정이 없는 단계에 있고, 메일 링크 인증
- * (API-002·003)은 S15P21E106-604가 걷어낸다.
+ * <p>이메일 계정 엔드포인트(API-001·004·005)와 컨트롤러를 나눈 이유는 생애 주기가 다르기 때문이다. 이 경로는 계정이 없는 단계에 있고, 메일 링크 인증(옛
+ * API-002·003)은 S15P21E106-604가 걷어냈다.
  */
 @RestController
 @RequestMapping("/api/v1/auth/email/verification-code")

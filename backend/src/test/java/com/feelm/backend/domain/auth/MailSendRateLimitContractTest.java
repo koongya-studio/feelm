@@ -13,13 +13,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.test.web.servlet.MvcResult;
 
 /**
- * 인증 메일 재발송(API-003)과 비밀번호 재설정 요청(API-010)의 IP 단위 요청 제한을 검증한다(S15P21E106-281).
+ * 계정 메일 경로(API-078 인증번호 발송·API-010 비밀번호 재설정 요청)의 IP 단위 요청 제한을 검증한다(S15P21E106-281).
  *
- * <p>가입(API-001)은 이 축에 없다. 인증번호 전환 뒤로 가입이 메일을 보내지 않게 되어 카운터를 분리했다(S15P21E106-603). 인증번호 발송
- * (API-078)이 그 자리를 대신하며 그 경로의 제한은 {@link EmailVerificationCodeRateLimitContractTest}가 본다.
+ * <p>가입(API-001)은 이 축에 없다. 인증번호 전환 뒤로 가입이 메일을 보내지 않게 되어 카운터를 분리했다(S15P21E106-603). 이 클래스의 예시 경로는
+ * 재설정 요청이며, 인증번호 발송 쪽의 성질은 {@link EmailVerificationCodeRateLimitContractTest}가 본다. 링크 인증
+ * 재발송(API-003)은 계약에서 사라졌다(S15P21E106-604).
  *
- * <p>이메일 단위 간격 제한은 {@link EmailResendContractTest}, {@link PasswordResetRequestContractTest}가 이미
- * 검증한다. 여기서는 서로 다른 이메일을 대량으로 넣는 발송 폭탄을 막는 IP 축만 다루므로, 별도로 언급하지 않는 요청은 매번 새 이메일로 보낸다.
+ * <p>이메일 단위 간격 제한은 {@link PasswordResetRequestContractTest}가 이미 검증한다. 여기서는 서로 다른 이메일을 대량으로 넣는 발송
+ * 폭탄을 막는 IP 축만 다루므로, 별도로 언급하지 않는 요청은 매번 새 이메일로 보낸다.
  *
  * <p>한도 값은 테스트 설정({@code src/test/resources/application.yml})에서 읽는다. 반복 횟수를 줄이려고 IP 한도를 작게 두었기
  * 때문이다.
@@ -27,7 +28,7 @@ import org.springframework.test.web.servlet.MvcResult;
  * <p>전역 발송 상한은 여기에 없다. 그 축은 요청이 아니라 실제 발송을 세고 응답을 바꾸지 않으므로 {@link MailSendBudgetContractTest}가
  * 본다(S15P21E106-287). 이 클래스에는 그 사실 자체를 고정하는 테스트 하나만 남긴다.
  */
-@DisplayName("인증·재설정 메일 요청 제한 — API-003·API-010")
+@DisplayName("계정 메일 요청 제한 — API-078·API-010")
 class MailSendRateLimitContractTest extends EmailAuthApiTestSupport {
 
     @Value("${feelm.mail.rate-limit.ip[0].limit}")
@@ -55,7 +56,7 @@ class MailSendRateLimitContractTest extends EmailAuthApiTestSupport {
 
         exhaustIpBudget(clientIp);
 
-        resendFrom(clientIp, newAccount().email())
+        requestPasswordResetFrom(clientIp, newAccount().email())
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
                 .andExpect(jsonPath("$.message").isNotEmpty());
@@ -66,9 +67,11 @@ class MailSendRateLimitContractTest extends EmailAuthApiTestSupport {
     void limitAppliesPerIp() throws Exception {
         String blockedIp = nextClientIp();
         exhaustIpBudget(blockedIp);
-        resendFrom(blockedIp, newAccount().email()).andExpect(status().isTooManyRequests());
+        requestPasswordResetFrom(blockedIp, newAccount().email())
+                .andExpect(status().isTooManyRequests());
 
-        resendFrom(nextClientIp(), newAccount().email()).andExpect(status().isAccepted());
+        requestPasswordResetFrom(nextClientIp(), newAccount().email())
+                .andExpect(status().isAccepted());
     }
 
     /**
@@ -79,11 +82,11 @@ class MailSendRateLimitContractTest extends EmailAuthApiTestSupport {
     @DisplayName("같은 /64 안의 서로 다른 IPv6 주소는 IP 예산을 함께 쓴다")
     void ipLimitSharesBudgetAcrossSameIpv6Prefix() throws Exception {
         for (long sent = 0; sent < ipLimit; sent++) {
-            resendFrom("2001:db8:1::" + (sent + 1), newAccount().email())
+            requestPasswordResetFrom("2001:db8:1::" + (sent + 1), newAccount().email())
                     .andExpect(status().isAccepted());
         }
 
-        resendFrom("2001:db8:1::ffff", newAccount().email())
+        requestPasswordResetFrom("2001:db8:1::ffff", newAccount().email())
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value("RATE_LIMITED"));
     }
@@ -93,26 +96,40 @@ class MailSendRateLimitContractTest extends EmailAuthApiTestSupport {
     @DisplayName("/64가 다른 IPv6 주소는 서로의 IP 예산을 소모하지 않는다")
     void ipLimitSeparatesDifferentIpv6Prefixes() throws Exception {
         for (long sent = 0; sent < ipLimit; sent++) {
-            resendFrom("2001:db8:2::" + (sent + 1), newAccount().email())
+            requestPasswordResetFrom("2001:db8:2::" + (sent + 1), newAccount().email())
                     .andExpect(status().isAccepted());
         }
-        resendFrom("2001:db8:2::ffff", newAccount().email())
+        requestPasswordResetFrom("2001:db8:2::ffff", newAccount().email())
                 .andExpect(status().isTooManyRequests());
 
-        resendFrom("2001:db8:3::1", newAccount().email()).andExpect(status().isAccepted());
+        requestPasswordResetFrom("2001:db8:3::1", newAccount().email())
+                .andExpect(status().isAccepted());
     }
 
     /**
-     * 가입(API-001)은 이제 이 카운터를 쓰지 않는다(S15P21E106-603). 분리는 {@code SignupRateLimitContractTest}가 본다.
+     * 두 경로가 같은 SMTP 쿼터를 쓰므로 한쪽만 막으면 총량을 묶을 수 없다(결정 D-2). <b>한 경로로 예산을 소진하고 다른 경로가 막히는지</b>를 양방향으로
+     * 본다. 한 경로만 반복하면 이름과 달리 공유를 전혀 검증하지 못한다(리뷰 A-F6·B-4).
+     *
+     * <p>가입(API-001)은 이제 이 카운터를 쓰지 않는다(S15P21E106-603). 분리는 {@code SignupRateLimitContractTest}가
+     * 본다.
      */
     @Test
-    @DisplayName("IP 카운터를 API-003과 API-010이 공유한다")
-    void ipCounterIsSharedBetweenResendAndPasswordReset() throws Exception {
-        String clientIp = nextClientIp();
+    @DisplayName("IP 카운터를 API-078과 API-010이 공유한다")
+    void ipCounterIsSharedBetweenVerificationCodeAndPasswordReset() throws Exception {
+        String codeFirstIp = nextClientIp();
+        for (long sent = 0; sent < ipLimit; sent++) {
+            sendVerificationCodeFrom(codeFirstIp, newAccount().email())
+                    .andExpect(status().isAccepted());
+        }
 
-        exhaustIpBudget(clientIp);
+        requestPasswordResetFrom(codeFirstIp, newAccount().email())
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.code").value("RATE_LIMITED"));
 
-        requestPasswordResetFrom(clientIp, newAccount().email())
+        String resetFirstIp = nextClientIp();
+        exhaustIpBudget(resetFirstIp);
+
+        sendVerificationCodeFrom(resetFirstIp, newAccount().email())
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value("RATE_LIMITED"));
     }
@@ -126,7 +143,8 @@ class MailSendRateLimitContractTest extends EmailAuthApiTestSupport {
     void exhaustedSendBudgetDoesNotRejectRequests() throws Exception {
         fillSendBudget();
 
-        resendFrom(nextClientIp(), newAccount().email()).andExpect(status().isAccepted());
+        requestPasswordResetFrom(nextClientIp(), newAccount().email())
+                .andExpect(status().isAccepted());
         requestPasswordResetFrom(nextClientIp(), newAccount().email())
                 .andExpect(status().isAccepted());
     }
@@ -135,13 +153,14 @@ class MailSendRateLimitContractTest extends EmailAuthApiTestSupport {
     @DisplayName("제한 초과 응답은 가입 이메일과 미가입 이메일에서 상태·본문이 같다")
     void rateLimitedResponseDoesNotRevealAccountExistence() throws Exception {
         TestAccount registered = newAccount();
-        signupPending(registered);
+        signupActive(registered);
         String unknownEmail = newAccount().email();
 
-        String resendIp = nextClientIp();
-        exhaustIpBudget(resendIp);
-        MvcResult registeredResend = resendFrom(resendIp, registered.email()).andReturn();
-        MvcResult unknownResend = resendFrom(resendIp, unknownEmail).andReturn();
+        String firstIp = nextClientIp();
+        exhaustIpBudget(firstIp);
+        MvcResult registeredFirst =
+                requestPasswordResetFrom(firstIp, registered.email()).andReturn();
+        MvcResult unknownFirst = requestPasswordResetFrom(firstIp, unknownEmail).andReturn();
 
         String resetIp = nextClientIp();
         exhaustIpBudget(resetIp);
@@ -149,9 +168,9 @@ class MailSendRateLimitContractTest extends EmailAuthApiTestSupport {
                 requestPasswordResetFrom(resetIp, registered.email()).andReturn();
         MvcResult unknownReset = requestPasswordResetFrom(resetIp, unknownEmail).andReturn();
 
-        assertThat(statusOf(registeredResend)).as("제한을 넘은 재발송 요청").isEqualTo(429);
-        assertThat(statusOf(unknownResend)).isEqualTo(statusOf(registeredResend));
-        assertThat(bodyOf(unknownResend)).isEqualTo(bodyOf(registeredResend));
+        assertThat(statusOf(registeredFirst)).as("제한을 넘은 첫 경로 요청").isEqualTo(429);
+        assertThat(statusOf(unknownFirst)).isEqualTo(statusOf(registeredFirst));
+        assertThat(bodyOf(unknownFirst)).isEqualTo(bodyOf(registeredFirst));
 
         assertThat(statusOf(registeredReset)).as("제한을 넘은 재설정 요청").isEqualTo(429);
         assertThat(statusOf(unknownReset)).isEqualTo(statusOf(registeredReset));
@@ -163,16 +182,18 @@ class MailSendRateLimitContractTest extends EmailAuthApiTestSupport {
     void requestRejectedByEmailIntervalKeepsIpBudget() throws Exception {
         String clientIp = nextClientIp();
         String repeatedEmail = newAccount().email();
-        resendFrom(clientIp, repeatedEmail).andExpect(status().isAccepted());
+        requestPasswordResetFrom(clientIp, repeatedEmail).andExpect(status().isAccepted());
 
-        resendFrom(clientIp, repeatedEmail)
+        requestPasswordResetFrom(clientIp, repeatedEmail)
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value("RATE_LIMITED"));
 
         for (long remaining = ipLimit - 1; remaining > 0; remaining--) {
-            resendFrom(clientIp, newAccount().email()).andExpect(status().isAccepted());
+            requestPasswordResetFrom(clientIp, newAccount().email())
+                    .andExpect(status().isAccepted());
         }
-        resendFrom(clientIp, newAccount().email()).andExpect(status().isTooManyRequests());
+        requestPasswordResetFrom(clientIp, newAccount().email())
+                .andExpect(status().isTooManyRequests());
     }
 
     /**
@@ -186,9 +207,9 @@ class MailSendRateLimitContractTest extends EmailAuthApiTestSupport {
         exhaustIpBudget(blockedIp);
         String targetEmail = newAccount().email();
 
-        resendFrom(blockedIp, targetEmail).andExpect(status().isTooManyRequests());
+        requestPasswordResetFrom(blockedIp, targetEmail).andExpect(status().isTooManyRequests());
 
-        resendFrom(nextClientIp(), targetEmail).andExpect(status().isAccepted());
+        requestPasswordResetFrom(nextClientIp(), targetEmail).andExpect(status().isAccepted());
     }
 
     @Test
@@ -196,7 +217,7 @@ class MailSendRateLimitContractTest extends EmailAuthApiTestSupport {
     void limitCountersExpireWithinWindow() throws Exception {
         String clientIp = nextClientIp();
 
-        resendFrom(clientIp, newAccount().email()).andExpect(status().isAccepted());
+        requestPasswordResetFrom(clientIp, newAccount().email()).andExpect(status().isAccepted());
 
         assertThat(redisTemplate.getExpire(mailIpLimitKey(clientIp, ipWindow)))
                 .as("IP 카운터 TTL(초)")
@@ -216,10 +237,10 @@ class MailSendRateLimitContractTest extends EmailAuthApiTestSupport {
         String clientIp = nextClientIp();
         String counterKey = mailIpLimitKey(clientIp, ipWindow);
 
-        resendFrom(clientIp, newAccount().email()).andExpect(status().isAccepted());
+        requestPasswordResetFrom(clientIp, newAccount().email()).andExpect(status().isAccepted());
         Long ttlAfterFirstRequest = redisTemplate.getExpire(counterKey, TimeUnit.MILLISECONDS);
 
-        resendFrom(clientIp, newAccount().email()).andExpect(status().isAccepted());
+        requestPasswordResetFrom(clientIp, newAccount().email()).andExpect(status().isAccepted());
 
         assertThat(redisTemplate.getExpire(counterKey, TimeUnit.MILLISECONDS))
                 .as("두 번째 요청 뒤 IP 카운터 TTL(ms)")
@@ -229,7 +250,8 @@ class MailSendRateLimitContractTest extends EmailAuthApiTestSupport {
     /** 한 IP의 예산을 한도까지 소모한다. 한도 안의 요청은 계정이 없어도 202다(계정 존재 여부를 노출하지 않는다). */
     private void exhaustIpBudget(String clientIp) throws Exception {
         for (long sent = 0; sent < ipLimit; sent++) {
-            resendFrom(clientIp, newAccount().email()).andExpect(status().isAccepted());
+            requestPasswordResetFrom(clientIp, newAccount().email())
+                    .andExpect(status().isAccepted());
         }
     }
 

@@ -62,7 +62,7 @@ class UserBlockApiContractTest extends SharedPostgresContractTest {
         user(20, "target20", "ACTIVE");
         user(30, "target30", "ACTIVE");
         user(40, "target40", "ACTIVE");
-        user(50, "pending50", "PENDING_VERIFICATION");
+        user(50, "left50", "WITHDRAWN");
         user(60, "withdrawn60", "WITHDRAWN");
     }
 
