@@ -474,8 +474,9 @@ class BackendJobDriver:
                                             self.REQUIRED_CLASSES, expected_tests=expected_tests)
         except Exception as exc:
             # Bounded diagnostics, never arbitrary exception text from job data.
-            (self.attempt / 'report-rejection.json').write_text(json.dumps(
-                {'type': type(exc).__name__, 'errno': getattr(exc, 'errno', None)}))
+            write_private_json(self.attempt / 'report-rejection.json',
+                               {'type': type(exc).__name__,
+                                'errno': getattr(exc, 'errno', None)})
             raise
         print('BOUNDED_REPORT_SUMMARY=' + json.dumps(result['summary']), flush=True)
         return result

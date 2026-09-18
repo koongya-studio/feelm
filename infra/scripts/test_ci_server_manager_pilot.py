@@ -112,7 +112,7 @@ class ServerPilotTests(unittest.TestCase):
             with self.assertRaises(ValueError): stage.archive_bytes()
         self.assertNotIn('.gitlab-ci.yml', stage.FILES)
         self.assertNotIn('infra/.env', stage.FILES)
-        self.assertEqual(stage.REVISION, 'e5588d312bdfe058b03d15b34b1cbfa3a9935093')
+        self.assertEqual(stage.REVISION, '45f49c9f0e66b7af66f99ae9b7805bab96d787cf')
 
     def test_upload_includes_frontend_adapter_runtime_closure(self):
         for name in ('check-markdown.py', 'ci-docs-mr-boundary.py', 'ci-docs-mr-runner.py',
@@ -223,7 +223,9 @@ class ServerPilotTests(unittest.TestCase):
             self.assertEqual(usage['sample_errors'], 0)
             if os.name != 'nt':
                 self.assertEqual((attempt / 'filesystem-usage.json').stat().st_mode & 0o777, 0o600)
-            self.assertTrue((attempt / 'report-rejection.json').is_file())
+                self.assertEqual((attempt / 'report-rejection.json').stat().st_mode & 0o777, 0o600)
+            self.assertEqual(json.loads((attempt / 'report-rejection.json').read_text()),
+                             {'type': 'ValueError', 'errno': None})
 
     def test_filesystem_peak_tracks_transient_byte_and_inode_usage(self):
         lease = {'source_sha': 'a' * 64, 'build': 'ci222-server-0123456789ab.service',
