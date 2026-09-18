@@ -5,35 +5,6 @@
   gap: var(--space-3);
 }
 
-/* 7.6 탭(MyRatingsPage.module.css `.tabs`)과 같은 모양이다 */
-.tabs {
-  display: grid;
-  padding: 3px;
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-sunken);
-  grid-template-columns: repeat(3, 1fr);
-}
-
-.tab {
-  min-height: var(--tap-target-min);
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: none;
-  color: var(--color-ink-muted);
-  cursor: pointer;
-  font-family: inherit;
-  font-size: var(--font-size-meta);
-  font-weight: var(--font-weight-medium);
-}
-
-.tab[aria-selected='true'] {
-  background: var(--color-surface-raised);
-  box-shadow: var(--shadow-raised);
-  color: var(--color-ink);
-  font-weight: var(--font-weight-bold);
-}
-
 .list {
   display: flex;
   flex-direction: column;
@@ -43,10 +14,17 @@
   border-top: 1px solid var(--color-line-faint);
 }
 
+.item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .row {
   position: relative;
   display: flex;
-  width: 100%;
+  min-width: 0;
+  flex: 1;
   align-items: flex-start;
   padding: var(--space-3) 0;
   border: 0;
@@ -56,6 +34,42 @@
   font-family: inherit;
   gap: var(--space-3);
   text-align: left;
+}
+
+.readAll,
+.dismiss {
+  border: 0;
+  background: none;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+  font: inherit;
+}
+
+.readAll {
+  min-height: var(--tap-target-min);
+  padding: 0 var(--space-1);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-medium);
+}
+
+.dismiss {
+  min-width: var(--tap-target-min);
+  min-height: var(--tap-target-min);
+  flex: none;
+  padding: 0;
+  font-size: var(--font-size-caption);
+}
+
+.readAll:disabled,
+.dismiss:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.actionError {
+  color: var(--color-brand);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
 }
 
 .icon {
@@ -117,8 +131,19 @@
   white-space: nowrap;
 }
 
-.time {
+.meta {
+  display: flex;
+  flex-wrap: wrap;
   color: var(--color-ink-hint);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
+  column-gap: var(--space-1);
+}
+
+.lifecycle {
+  color: var(--color-ink-muted);
+}
+
+.time {
+  flex: none;
 }

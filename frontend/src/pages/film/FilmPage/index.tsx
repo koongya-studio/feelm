@@ -43,6 +43,7 @@ import VisuallyHidden from '../../../components/VisuallyHidden';
 import Wordmark from '../../../components/Wordmark';
 import { kernelSprite } from '../../../components/PopcornBucket/sprites';
 import { getLatestReadyReport } from '../../../api/reports';
+import { getUnreadNotificationCount } from '../../../api/notifications';
 import { getMyFrames, getPopcornBucket } from '../../../api/taste';
 import { path } from '../../../routes/paths';
 import styles from './FilmPage.module.css';
@@ -87,6 +88,7 @@ export default function FilmPage() {
   const [bucket, setBucket] = useState<PopcornBucket | null>(null);
   /** 아직 3.3에서 받지 않은 새 리포트. 있으면 리포트 줄이 발급(3.3)으로 간다 */
   const [newReportId, setNewReportId] = useState<number | null>(null);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
 
@@ -122,6 +124,13 @@ export default function FilmPage() {
         if (active) {
           setNewReportId(latest?.needsIntro ? latest.reportId : null);
         }
+      })
+      .catch(() => undefined);
+
+    // 배지는 보조 정보라 실패해도 필름 화면은 그대로 둔다.
+    getUnreadNotificationCount()
+      .then((count) => {
+        if (active) setUnreadNotificationCount(count);
       })
       .catch(() => undefined);
 
@@ -195,8 +204,15 @@ export default function FilmPage() {
         <SearchIcon />
       </Link>
 
-      <Link to={path.notifications()} className={styles.headerAction} aria-label="알림">
+      <Link
+        to={path.notifications()}
+        className={styles.headerAction}
+        aria-label={
+          unreadNotificationCount > 0 ? `알림, 읽지 않은 알림 ${unreadNotificationCount}개` : '알림'
+        }
+      >
         <BellIcon />
+        {unreadNotificationCount > 0 ? <span className={styles.notificationDot} /> : null}
       </Link>
     </div>
   );

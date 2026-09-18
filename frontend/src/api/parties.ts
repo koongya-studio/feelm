@@ -44,8 +44,8 @@ export const PARTY_MIN_MEMBERS = 2;
  * 목록 한 번에 받아 올 최대 개수. 계약의 `size` 상한이다(1~50).
  *
  * 활성 파티는 사용자당 최대 10개라(API-049 처리 규칙) 파티 목록은 한 장에 다 들어온다.
- * 받은 초대에는 상한이 없으므로 첫 장만 읽는다 — 5.6은 초대 하나를 여는 화면이고
- * 목록을 펼치는 화면(8.1 알림)은 아직 없다.
+ * 받은 초대에는 상한이 없고 8.1 알림 목록이 전체 대기 초대를 보여 주므로 커서를 끝까지
+ * 따라간다.
  */
 const PAGE_SIZE = 50;
 
@@ -105,11 +105,20 @@ export async function inviteToParty(partyId: number, userId: number): Promise<Se
  * 기본은 대기 중(`PENDING`)인 초대만이다. 답한 초대는 목록에서 빠진다.
  */
 export async function getMyInvitations(): Promise<PartyInvitation[]> {
-  const page = await request<PartyInvitationList>('/parties/invitations', {
-    query: { size: PAGE_SIZE },
-  });
+  const invitations: PartyInvitation[] = [];
+  let cursor: string | undefined;
+  let hasNext: boolean;
 
-  return page.items;
+  do {
+    const page = await request<PartyInvitationList>('/parties/invitations', {
+      query: { cursor, size: PAGE_SIZE },
+    });
+    invitations.push(...page.items);
+    cursor = page.nextCursor ?? undefined;
+    hasNext = page.hasNext && cursor !== undefined;
+  } while (hasNext);
+
+  return invitations;
 }
 
 /**
