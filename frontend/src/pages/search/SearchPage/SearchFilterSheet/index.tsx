@@ -9,11 +9,16 @@
  *
  * `결과 보기 · N편`의 개수는 **고른 조건으로 미리 세어 본 값**이다. 열려 있는 동안
  * 조건을 바꿀 때마다 다시 센다.
+ *
+ * 고르는 것은 **장르 · 개봉연도 · OTT** 셋이다(업무 -612). 국가는 뺐다 — API-029가 실제
+ * 영화와 연결된 나라를 전부 주는데 그 수가 백을 넘어 시트가 국가 목록으로 뒤덮였다.
+ * 정렬도 여기 없다. 결과 머리줄의 정렬 컨트롤이 맡는다 — 한 값을 두 자리에서 고르게 두면
+ * 어느 쪽이 기준인지 헷갈린다.
  */
 import { useEffect, useRef } from 'react';
 import Button from '../../../../components/Button';
 import OttBadge from '../../../../components/OttBadge';
-import { SORT_OPTIONS, toggle, YEAR_BUCKETS } from '../searchFilter';
+import { toggle, YEAR_BUCKETS } from '../searchFilter';
 import type { SearchFilterState, YearBucketId } from '../searchFilter';
 import type { FilterOptions } from '../../../../types/search';
 import styles from './SearchFilterSheet.module.css';
@@ -84,28 +89,17 @@ export default function SearchFilterSheet({
           </fieldset>
 
           <fieldset className={styles.group}>
-            <legend className={styles.legend}>국가</legend>
+            <legend className={styles.legend}>개봉연도</legend>
             <div className={styles.options}>
-              <button
-                type="button"
-                className={styles.option}
-                aria-pressed={value.country.length === 0}
-                onClick={() => onChange({ ...value, country: [] })}
-              >
-                전체
-              </button>
-
-              {options.countries.map((country) => (
+              {YEAR_BUCKETS.map((bucket) => (
                 <button
-                  key={country.code}
+                  key={bucket.id}
                   type="button"
                   className={styles.option}
-                  aria-pressed={value.country.includes(country.code)}
-                  onClick={() =>
-                    onChange({ ...value, country: toggle(value.country, country.code) })
-                  }
+                  aria-pressed={value.year === bucket.id}
+                  onClick={() => onChange({ ...value, year: bucket.id as YearBucketId })}
                 >
-                  {country.name}
+                  {bucket.label}
                 </button>
               ))}
             </div>
@@ -130,40 +124,6 @@ export default function SearchFilterSheet({
                     labelled={false}
                     variant={value.ott.includes(ott.ottId) ? 'selected' : 'unselected'}
                   />
-                </button>
-              ))}
-            </div>
-          </fieldset>
-
-          <fieldset className={styles.group}>
-            <legend className={styles.legend}>개봉연도</legend>
-            <div className={styles.options}>
-              {YEAR_BUCKETS.map((bucket) => (
-                <button
-                  key={bucket.id}
-                  type="button"
-                  className={styles.option}
-                  aria-pressed={value.year === bucket.id}
-                  onClick={() => onChange({ ...value, year: bucket.id as YearBucketId })}
-                >
-                  {bucket.label}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-
-          <fieldset className={styles.group}>
-            <legend className={styles.legend}>정렬 기준</legend>
-            <div className={styles.options}>
-              {SORT_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={styles.option}
-                  aria-pressed={value.sort === option.value}
-                  onClick={() => onChange({ ...value, sort: option.value })}
-                >
-                  {option.label}
                 </button>
               ))}
             </div>

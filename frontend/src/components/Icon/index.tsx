@@ -304,3 +304,34 @@ export function ShareIcon() {
     </svg>
   );
 }
+
+/** 4.1 검색창 — 입력 지우기 (업무 -612). 채운 원 위에 X를 벽 색으로 뚫는다 */
+export function ClearIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" {...hidden}>
+      <circle cx="9" cy="9" r="8" fill="currentColor" />
+      <path
+        d="M6.2 6.2l5.6 5.6M11.8 6.2l-5.6 5.6"
+        stroke="var(--color-surface-raised)"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/** 4.1 검색창 오른쪽 — 필터 (업무 -612). 손잡이 자리는 선을 끊어 원이 위에 놓인 것처럼 보인다 */
+export function FilterIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" {...hidden}>
+      <path
+        d="M3 6h6.3M15.7 6H17M3 14h1.3M9.7 14H17"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <circle cx="12.5" cy="6" r="2.2" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="6.5" cy="14" r="2.2" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
