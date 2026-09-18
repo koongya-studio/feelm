@@ -16,6 +16,19 @@ const REFRESH_URL = '/api/v1/auth/token/refresh';
 /** 재발급이 거절됐다는 뜻의 상태 코드. 이것만 세션을 끝낸다 */
 const UNAUTHORIZED = 401;
 
+/**
+ * 탭 사이의 재발급 잠금 이름.
+ *
+ * 재발급은 회전이라 한 번 쓴 Refresh Token은 폐기된다(API-006). 아래 `inFlight`는 **이 탭
+ * 안에서만** 중복을 막으므로, 같은 쿠키를 공유하는 다른 탭이 동시에 재발급하면 서버가 두
+ * 번째 요청을 재사용으로 보게 된다. 서버에 유예가 생겼지만(S15P21E106-596) 애초에 겹쳐
+ * 보내지 않는 편이 낫다. 잠금을 못 쓰는 브라우저에서는 유예가 받아 낸다.
+ */
+const REFRESH_LOCK = 'feelm:auth:refresh';
+
+/** 잠금을 기다리는 한도(ms). 이 시간을 넘기면 조율을 포기하고 그냥 보낸다 */
+const LOCK_WAIT_LIMIT_MS = 3000;
+
 let accessToken: string | null = null;
 
 /**
@@ -29,7 +42,22 @@ let refreshable = true;
 /** 진행 중인 재발급. 동시에 401을 받은 요청들이 재발급을 중복 호출하지 않게 공유한다 */
 let inFlight: Promise<string | null> | null = null;
 
-const sessionEndListeners = new Set<() => void>();
+/**
+ * 세션이 끝난 이유.
+ *
+ * `expired`는 쓰고 있던 세션이 재발급 거절로 **사용자가 원치 않게** 끊긴 것이고,
+ * `signed-out`은 사용자가 로그아웃한 것이다. 화면이 둘을 같게 다루면 로그아웃 직후에도
+ * "다시 로그인해 주세요"가 뜨거나, 반대로 만료를 조용히 넘겨 사용자가 로그인한 줄 알고
+ * 실패만 보게 된다.
+ *
+ * `unauthenticated`는 **애초에 세션이 없었던** 경우다. 앱이 뜰 때의 복구 재발급은
+ * 비로그인 방문자에게도 나가고(`AuthProvider`), 쿠키가 없으면 서버는 그것도 401로
+ * 거절한다. 이것까지 만료로 다루면 처음 온 사람과 소셜 콜백·이메일 인증 링크가 만료
+ * 안내와 함께 로그인 화면으로 밀려난다(리뷰 A-1·B-1).
+ */
+export type SessionEndReason = 'expired' | 'signed-out' | 'unauthenticated';
+
+const sessionEndListeners = new Set<(reason: SessionEndReason) => void>();
 
 export function getAccessToken(): string | null {
   return accessToken;
@@ -42,12 +70,12 @@ export function startSession(token: string): void {
 }
 
 /** 로그아웃했거나 재발급이 거절당했을 때 */
-export function endSession(): void {
+export function endSession(reason: SessionEndReason): void {
   accessToken = null;
   refreshable = false;
 
   for (const listener of sessionEndListeners) {
-    listener();
+    listener(reason);
   }
 }
 
@@ -61,7 +89,7 @@ export function canRefresh(): boolean {
  * 로그아웃은 화면이 직접 호출하므로 알 수 있지만, 재발급 거절은 아무 API 호출 도중에나
  * 일어난다. 그때 화면이 로그인 상태를 계속 들고 있지 않도록 알린다.
  */
-export function onSessionEnd(listener: () => void): () => void {
+export function onSessionEnd(listener: (reason: SessionEndReason) => void): () => void {
   sessionEndListeners.add(listener);
 
   return () => {
@@ -72,12 +100,57 @@ export function onSessionEnd(listener: () => void): () => void {
 /** 새 Access Token. 세션을 되살리지 못하면 `null`이다 */
 export function refreshAccessToken(): Promise<string | null> {
   if (!inFlight) {
-    inFlight = requestAccessToken().finally(() => {
+    inFlight = withRefreshLock(requestAccessToken).finally(() => {
       inFlight = null;
     });
   }
 
   return inFlight;
+}
+
+/**
+ * 다른 탭의 재발급과 겹치지 않게 한다.
+ *
+ * 잠금을 기다린 탭은 그 사이 갱신된 쿠키로 다시 재발급한다. 회전이 한 번 더 도는 것이지
+ * 실패가 아니다. Access Token은 탭의 메모리에만 있어(ADR-0009) 다른 탭의 결과를 그대로
+ * 받아 쓸 수 없으므로, 여기서 할 수 있는 것은 순서를 세우는 것까지다.
+ */
+async function withRefreshLock(run: () => Promise<string | null>): Promise<string | null> {
+  // 구형 브라우저와 테스트 환경(jsdom)에는 없다. 타입상으로는 항상 있는 것으로 선언돼 있다
+  const locks: LockManager | undefined = navigator.locks;
+
+  if (!locks) {
+    return run();
+  }
+
+  /*
+   * 잠금은 순서를 세우는 편의일 뿐이므로 얻지 못했다고 재발급을 포기하면 안 된다. 잠금을
+   * 쥔 탭이 멈추면(중단점, 절전) 기다리는 쪽이 영영 못 돌아오므로 한도를 두고, 한도를
+   * 넘기거나 잠금 자체가 실패하면 그냥 보낸다. 겹쳐 나가더라도 서버 유예가 받아 낸다.
+   * 잠금 실패를 그대로 던지면 `client`가 기대하는 오류 계약(ApiError)도 깨진다(리뷰 A-6·B-5).
+   */
+  const limit = new AbortController();
+  const timer = setTimeout(() => limit.abort(), LOCK_WAIT_LIMIT_MS);
+
+  // 콜백이 이미 시작했다면 그 안에서 난 오류다. 다시 보내면 재발급이 두 번 나간다
+  let started = false;
+  const guarded = () => {
+    started = true;
+
+    return run();
+  };
+
+  try {
+    return await locks.request(REFRESH_LOCK, { signal: limit.signal }, guarded);
+  } catch (error) {
+    if (started) {
+      throw error;
+    }
+
+    return run();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function requestAccessToken(): Promise<string | null> {
@@ -107,7 +180,12 @@ async function requestAccessToken(): Promise<string | null> {
    * 앱을 열어 둔 모두가 로그아웃된 것처럼 보였다(S15P21E106-373).
    */
   if (response.status === UNAUTHORIZED) {
-    endSession();
+    /*
+     * 쓰고 있던 세션이 끊긴 것과 애초에 없던 것을 가른다. 메모리에 Access Token이 있었다면
+     * 로그인 상태로 쓰던 중이었다는 뜻이고, 없었다면 이 재발급은 앱이 뜰 때의 복구
+     * 시도다(`restoreSession`). 복구 실패는 비로그인일 뿐이라 알릴 만료가 없다.
+     */
+    endSession(accessToken ? 'expired' : 'unauthenticated');
 
     return null;
   }

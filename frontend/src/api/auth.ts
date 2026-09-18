@@ -111,15 +111,19 @@ export async function login(email: string, password: string): Promise<Authentica
 export async function logout(): Promise<void> {
   if (isMockSession()) {
     endMockSession();
-    endSession();
+    endSession('signed-out');
 
     return;
   }
 
   try {
-    await request<void>('/auth/logout', { method: 'POST' });
+    /*
+     * 401이어도 재발급하지 않는다. 끝내려는 세션을 되살릴 이유가 없고, 재발급이 거절되면
+     * 사용자가 누른 로그아웃에 "세션이 만료됐다"는 안내와 이동이 겹친다(리뷰 B-6).
+     */
+    await request<void>('/auth/logout', { method: 'POST', refreshOnUnauthorized: false });
   } finally {
-    endSession();
+    endSession('signed-out');
   }
 }
 

@@ -58,6 +58,21 @@ function renderLogin() {
   );
 }
 
+/**
+ * 세션이 만료돼 끌려온 상태로 연다(업무 -596).
+ *
+ * `renderWithRouter`는 주소만 받으므로 이동에 실린 상태까지 주려면 여기서 감싼다.
+ */
+function renderExpiredLogin() {
+  return render(
+    <MemoryRouter initialEntries={[{ pathname: '/login', state: { sessionExpired: true } }]}>
+      <AuthProvider>
+        <LoginPage />
+      </AuthProvider>
+    </MemoryRouter>,
+  );
+}
+
 function click(name: string) {
   fireEvent.click(screen.getByRole('button', { name }));
 }
@@ -80,6 +95,20 @@ function fillCredentials(email = 'user@example.com') {
 function rejectWith(status: number, code: string) {
   vi.mocked(login).mockRejectedValue(new ApiError(status, code, '서버가 준 문구'));
 }
+
+describe('0.6 로그인 — 세션 만료 안내 (업무 S15P21E106-596)', () => {
+  it('세션이 만료돼 끌려온 경우에는 이유를 알려 준다', () => {
+    renderExpiredLogin();
+
+    expect(screen.getByRole('status')).toHaveTextContent('다시 로그인해 주세요');
+  });
+
+  it('스스로 연 로그인 화면에는 만료 안내가 없다', () => {
+    renderLogin();
+
+    expect(screen.queryByText(/다시 로그인해 주세요/)).toBeNull();
+  });
+});
 
 describe('0.6 로그인', () => {
   it('취향 설정을 마친 사용자는 필름으로 간다', async () => {

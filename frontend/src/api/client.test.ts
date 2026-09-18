@@ -119,6 +119,23 @@ describe('공통 HTTP 클라이언트', () => {
     await expect(request<void>('/auth/logout', { method: 'POST' })).resolves.toBeUndefined();
   });
 
+  /*
+   * 세션을 끝내는 것이 목적인 요청은 401을 만나도 되살리지 않는다. 재발급이 거절되면
+   * 사용자가 누른 로그아웃에 만료 안내와 이동이 겹친다(리뷰 B-6).
+   */
+  it('재발급을 끄면 401에서 다시 보내지 않는다', async () => {
+    startSession('old');
+    fetchMock.mockResolvedValue(json(401, { code: 'TOKEN_EXPIRED', message: '만료' }));
+
+    const error = await request<void>('/auth/logout', {
+      method: 'POST',
+      refreshOnUnauthorized: false,
+    }).catch((caught: unknown) => caught);
+
+    expect((error as ApiError).status).toBe(401);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('401을 받으면 재발급한 토큰으로 한 번 다시 보낸다', async () => {
     startSession('old');
     fetchMock.mockImplementation((url: string, init: RequestInit) => {

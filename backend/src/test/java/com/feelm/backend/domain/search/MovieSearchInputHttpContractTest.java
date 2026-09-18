@@ -348,6 +348,7 @@ class MovieSearchInputHttpContractTest extends SharedPostgresContractTest {
                                                     Duration.ofMinutes(-1),
                                                     jwtProperties.refreshTokenTtl(),
                                                     jwtProperties.signupTokenTtl(),
+                                                    jwtProperties.refreshRotationGrace(),
                                                     jwtProperties.refreshCookie()))
                                     .createAccessToken(MovieSearchFixture.MEMBER_ID);
                     default -> throw new IllegalArgumentException(kind);

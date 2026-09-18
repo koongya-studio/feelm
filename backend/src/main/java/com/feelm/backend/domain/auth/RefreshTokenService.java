@@ -39,9 +39,12 @@ public class RefreshTokenService {
     /**
      * Refresh Token을 회전한다. 쓰인 토큰은 즉시 폐기하고 새 토큰 한 쌍을 발급한다.
      *
-     * <p>서명과 만료가 정상인데 저장소에 없다면 이미 회전으로 폐기된 토큰이 다시 들어온 것이다. 정상 사용자의 재시도일 수도 있으나 탈취된 토큰이 쓰이는 중일 수도
-     * 있으므로, 후자를 가정하고 해당 사용자의 Refresh Token을 모두 폐기한다(API-006 처리 규칙). 정상 사용자는 다시 로그인하면 되지만 공격자도 함께
-     * 끊긴다.
+     * <p>서명과 만료가 정상인데 저장소에 없다면 이미 회전으로 폐기된 토큰이 다시 들어온 것이다. 다만 그 전부가 탈취는 아니다. 재발급 응답을 받지 못한 채 끊긴 요청이
+     * 한 번 더 도착하는 일은 정상 사용에서도 생기고(새로고침·화면 이탈), 이것까지 탈취로 처리하면 사용자의 모든 세션이 한 번에 끊긴다. 그래서 회전 직후의 짧은 유예
+     * 안에 온 중복은 직전 회전이 만든 현재 세션 토큰을 그대로 다시 내려준다(S15P21E106-596).
+     *
+     * <p>유예를 지난 재사용은 탈취로 가정하고 해당 사용자의 Refresh Token을 모두 폐기한다(API-006 처리 규칙). 정상 사용자는 다시 로그인하면 되지만
+     * 공격자도 함께 끊긴다.
      *
      * <p>기존 토큰 소비와 새 토큰 등록을 {@link RefreshTokenRepository#rotate} 한 번으로 처리한다. 확인·삭제·등록을 나누면 같은 토큰을
      * 든 두 요청이 동시에 도착했을 때 재사용 감지가 무력화되거나, 재사용 감지의 전량 폐기 뒤에 새 토큰이 저장될 수 있다.
@@ -52,12 +55,34 @@ public class RefreshTokenService {
         rejectInactiveAccount(userId);
 
         String newTokenId = UUID.randomUUID().toString();
-        if (!refreshTokenRepository.rotate(userId, claims.tokenId(), newTokenId)) {
-            log.warn("폐기된 Refresh Token이 재사용되어 사용자 {}의 모든 토큰을 폐기합니다.", userId);
+        RefreshTokenRepository.Rotation rotation =
+                refreshTokenRepository.rotate(userId, claims.tokenId(), newTokenId);
+
+        if (!rotation.accepted()) {
+            logRejection(rotation.outcome(), userId);
             throw new BusinessException(ErrorCode.REFRESH_TOKEN_INVALID);
         }
+        if (rotation.outcome() == RefreshTokenRepository.Outcome.REPLAYED) {
+            log.info("사용자 {}의 재발급이 유예 안에 중복 도착해 같은 세션 토큰을 다시 발급합니다.", userId);
+        }
 
-        return createTokens(userId, newTokenId);
+        return createTokens(userId, rotation.tokenId());
+    }
+
+    /**
+     * 거절 사유를 구분해 남긴다.
+     *
+     * <p>응답은 모두 {@code REFRESH_TOKEN_INVALID}지만 운영에서 봐야 할 것이 다르다. 재사용은 토큰 하나가 두 번 쓰인 것이고, 세션 없음은 이미
+     * 전량 폐기됐거나 저장소가 비워진 것이며, 폐기된 계보는 로그아웃 뒤 늦게 도착한 중복이다. 앞의 둘만 조사할 일이고 마지막은 정상 사용에서도 나온다. 하나의 문구로
+     * 뭉뚱그리면 장애를 가를 수 없다(S15P21E106-596 완료 조건 1).
+     */
+    private void logRejection(RefreshTokenRepository.Outcome outcome, long userId) {
+        switch (outcome) {
+            case REUSED -> log.warn("유예를 지난 Refresh Token이 재사용되어 사용자 {}의 모든 토큰을 폐기했습니다.", userId);
+            case REVOKED_SESSION ->
+                    log.info("이미 폐기된 세션의 Refresh Token이 뒤늦게 도착해 사용자 {}의 재발급을 거절합니다.", userId);
+            default -> log.warn("사용자 {}의 Refresh Token 저장소에 세션이 없어 재발급을 거절합니다.", userId);
+        }
     }
 
     /**
