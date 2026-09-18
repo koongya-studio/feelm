@@ -228,6 +228,16 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 ```
 
 - `dwellMs`는 선택. 측정하지 않으면 생략한다
+- 영화 상세 API-030에서 유효한 Access Token으로 존재하는 영화를 정상 조회한 회원의 요청만 발행 대상이다. 비회원 조회와 비회원으로 처리되는 무효 토큰·Refresh Token·다른 인증 스킴의 조회, 실패한 조회는 발행하지 않는다. 익명 `userId`나 대체 Kafka 키를 만들지 않는다.
+- Kafka 전달 실패는 기존 Outbox 재시도로 처리한다. 영화 상세 조회 후 `VIEW` Outbox 기록 자체가 실패해도 정상 상세 응답을 유지하며, 기록되지 않은 이벤트는 집계에 포함되지 않는다. 이 예외는 조회 API의 가용성을 위한 결정이며, 559에서 기록 실패를 관측할 방법과 쓰기 트랜잭션 경계를 구현한다.
+
+| 상세 조회 결과 | VIEW Outbox 기록 | 상세 응답 |
+|---|---|---|
+| 회원의 존재하는 영화 정상 조회 | 시도 | `200` |
+| 비회원 또는 비회원으로 처리된 인증의 정상 조회 | 없음 | `200` |
+| 영화 없음·입력 오류 등 조회 실패 | 없음 | 원래 오류 |
+| 회원의 정상 조회 후 VIEW Outbox 기록 실패 | 기록되지 않음 | `200` 유지 |
+| VIEW Outbox 기록 성공 후 Kafka 전달 실패 | `PENDING`으로 재시도 | `200` 유지 |
 
 **`RECOMMENDATION_CLICK`**
 
@@ -348,6 +358,8 @@ Spring은 `candidates` JSON을 한 번 읽어 해당 버전의 후보 전체를 
 | `feelm:party:{partyId}:candidates` | String(JSON) | Spark Structured Streaming | Spring | 없음 |
 | `feelm:consumer-fence:{groupId}:{topic}:{partition}` | String(opaque CSPRNG token) | Python Consumer | Python Consumer | 없음 |
 | `feelm:user:{userId}:behavior` | Hash | Spark | Spark · **Spring** | 키 단위 8일 · 필드는 일자 버킷(5.3) |
+| `feelm:trending:current` | String(JSON) | Spark | **Spring** | 15분 |
+| `feelm:trending:last-good` | String(JSON) | Spark | **Spring** | 2시간 |
 | `feelm:model:current` | String(JSON) | Spark Batch | Python Consumer · Spring | 없음 |
 
 **Spring은 개인 추천에 사용자 `candidates` · `behavior` · `model:current`를 읽습니다.** 파티 입력
@@ -365,6 +377,7 @@ monotonic coordinator 없이는 구별할 수 없으므로 이 계약의 fencing
 | 사용자 `candidates` | 개인 추천 후보 · 파티 Spark 입력 스냅샷 · **OTT 구독 추천**(API-068) |
 | 파티 `candidates` | Spark가 계산한 파티 raw Candidate. Spring이 제외·부가 신호를 반영해 최종 재정렬 |
 | `behavior` | 새 개인 추천 세트를 만들 때 `candidates`에 적용할 최근 행동 Feature |
+| `trending:current` · `trending:last-good` | 급상승 영화 최신·대체 스냅샷(API-064) |
 | `model:current` | `modelVersion` 확인과 이력 저장 |
 
 Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점수를 집계합니다. 파티에서는 Spark가
@@ -568,12 +581,30 @@ generation 일치 확인과 TASTE 2 + DISCOVERY 1 통합 검증을 같은 전환
 }
 ```
 
+**`feelm:trending:current` · `feelm:trending:last-good`** — 두 키에 같은 스냅샷을 게시한다
+
+```json
+{
+  "schemaVersion": 1,
+  "period": {"from": "2026-09-18T11:00:00Z", "to": "2026-09-18T12:00:00Z"},
+  "updatedAt": "2026-09-18T12:00:00Z",
+  "items": [{"movieId": 550, "rank": 1, "rankDelta": null, "trendScore": 1.0}]
+}
+```
+
+- `period`는 UTC 5분 경계 `to`를 끝으로 하는 최근 60분 구간이다. 같은 구간의 고유 조회 회원 수 `C`와 직전 60분 구간의 수 `P`를 비교한다. `C >= 3`이고 `D = C - P > 0`인 영화만 포함한다.
+- `items`는 `D` 내림차순, `C` 내림차순, `movieId` 오름차순의 최대 30편이다. `trendScore`는 `D / max(D)`이고, `rankDelta`는 직전 게시 스냅샷 순위에서 현재 순위를 뺀 값이다. 신규 진입이면 `null`이다.
+- 두 구간의 같은 회원·영화 조회는 구간마다 각각 최대 한 번 센다. 같은 `eventId` 재전달은 §4.4의 watermark 기반 중복 판정 창에서 제거한다. `dwellMs`는 점수에 사용하지 않는다.
+- `items=[]`도 정상 스냅샷이다. 입력 이벤트가 없는 때에도 5분마다 두 키의 값과 TTL을 원자적으로 갱신한다. Spring은 영화 제목·포스터·평가 수·평균 별점을 DB에서 보강하며 순위를 재계산하지 않는다.
+
 ### 5.3 만료와 무효화
 
 | 대상 | 정책 |
 |---|---|
 | `vector` · `candidates` | TTL 없음. 담당 처리기가 이벤트마다 덮어쓴다 |
 | `behavior` | 키 단위 슬라이딩 TTL 8일. 필드는 일자 버킷이며 집계는 최근 7일분만 사용한다(아래) |
+| `trending:current` | 마지막 정상 게시부터 15분 보관. 게시가 멈추면 만료되어 마지막 정상 결과를 읽는다 |
+| `trending:last-good` | 마지막 정상 게시부터 2시간 보관. 만료되거나 Redis 조회가 불가능하면 API-064는 `503 TREND_UNAVAILABLE`을 반환한다 |
 | 모델 재학습 | 배치가 전체 사용자 키를 새 `modelVersion`으로 다시 쓴다. 별도 무효화 명령을 두지 않는다 |
 | 비활성 사용자 | 야간 배치가 재생성 대상에서 제외하고 오래된 키를 정리한다(주기 미정) |
 
@@ -612,15 +643,24 @@ URI나 Redis에 저장하지 않고 runtime filesystem 설정으로 제공한다
 | `DISMISS` | 30초 이내(설정값) |
 | 약한 신호 → `behavior` | 60초 이내(설정값) |
 
-초기값이며 실측 후 조정합니다. Structured Streaming의 트리거 주기가 `behavior` 반영 지연을 좌우합니다.
+위 목표는 초기값이며 실측 후 조정합니다. Structured Streaming의 트리거 주기가 `behavior` 반영 지연을 좌우합니다.
 개인 추천 노출은 현재 세트 버퍼를 유지하고 **다음 세트 생성 시점**에 최신 `behavior`를 읽으므로,
 60초 안에 기존 세트의 순서를 바꾸는 것을 보장하지 않습니다. 이 정책은 행동마다 Python 재정렬을 실행하는 계산량을 피하면서
 새 세트를 만드는 사용자의 최대 100편만 정렬하기 위한 기준입니다.
 
+급상승 결과는 5분마다 Redis에 게시한다(API-064). 이는 Spark가 이벤트를 소비하는
+마이크로배치 주기와 별개이며, 위 `behavior` 반영 목표를 5분으로 늦추지 않는다.
+급상승 `VIEW` 집계의 이벤트 시간 watermark 초기값은 10분이다. Spark가 관측한
+최대 `occurredAt`에서 10분을 뺀 값을 기준으로 지난 구간의 상태를 정리한다.
+마감 전 도착한 늦은 이벤트는 해당 구간의 집계에 반영할 수 있고, 마감된 구간은
+다시 수정하지 않는다. 이는 벽시계 기준으로 발생 후 정확히 10분까지 반영한다는
+보장이 아니다. 이미 게시한 과거 스냅샷은 수정하지 않고 허용된 지연 이벤트는 다음 게시 계산에 반영한다.
+정상 도착한 `VIEW`의 발생부터 결과 게시까지 10분 이내를 초기 운영 목표로 관측한다.
+
 ### 6.2 유효 결과가 없을 때(NFR-05)
 
-[ADR-0017](../adr/0017-python-foldin-spark-trending-split.md)에 따라 Python Consumer나 Streaming 지연·장애 시에도
-**마지막으로 성공한 Redis 결과를 그대로 제공**합니다.
+개인 추천 후보는 [ADR-0017](../adr/0017-python-foldin-spark-trending-split.md)에 따라
+Python Consumer나 Streaming 지연·장애 시에도 **마지막으로 성공한 Redis 결과를 그대로 제공**합니다.
 `generatedAt`이 오래되었다는 이유만으로 오류를 반환하지 않습니다.
 새 세트는 유효한 `candidates` 스냅샷으로만 생성합니다.
 
@@ -631,6 +671,8 @@ URI나 Redis에 저장하지 않고 runtime filesystem 설정으로 제공한다
 - Redis 연결 실패
 
 이때도 영화·검색·평가·필름·팝콘 기능은 정상 동작해야 합니다. 추천 API만 실패합니다.
+급상승 API-064는 별도로 `trending:current`와 `trending:last-good`의 TTL을 적용하며,
+두 결과를 모두 읽을 수 없을 때만 `503 TREND_UNAVAILABLE`을 반환합니다.
 
 ### 6.3 콜드 스타트
 
@@ -655,8 +697,8 @@ POPULAR 기반 순서와 개인 후보 모집단 밖 확장은 S15P21E106-483 �
 - [ ] 추천 이유 문장 생성 방식(템플릿 vs LLM) — 내부 API 명세에서 이월
 - [x] Kafka 발행 실패 시 재시도·보상 정책 — 폴링 기반 트랜잭셔널 아웃박스 채택(ADR-0018)
 - [ ] Python Consumer가 사용할 PostgreSQL 읽기 전용 롤의 계정 발급(접근 대상 테이블은 2.2에서 확정)
-- [ ] 인기 집계 윈도우·중복 처리·최소 사용자 수·점수식·반영 지연
-- [ ] 인기 집계 결과의 Redis 키·값 구조와 장애 시 폴백·오류 기준
+- [x] 인기 집계의 60분 전후 구간·고유 조회자 3명·증가분 점수·5분 게시·10분 watermark·Redis 최신/대체 스냅샷 계약(API-064)
+- [ ] 실데이터에 따른 최소 조회자 수·구간 길이 보정과 정상 도착 `VIEW`의 게시 지연 목표 실측
 - [x] 파티 점수 집계식과 사용자 간 정규화 — `party-mean-fit-v2`, party.md API-058
 - [x] OTT 구독 추천 후보 범위 — API-068은 `taste` 최대 500편 전체를 사용하고 점수 임계치를 두지 않는다
 - [ ] 영화 메타데이터 HDFS 스냅샷의 산출 형식과 배치 시각 — 추천 모듈 환경(S15P21E106-130)에서 확정
