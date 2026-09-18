@@ -158,7 +158,7 @@
 
 - 기본 구성은 `TASTE` 2편 + `DISCOVERY` 1편이다. 사용 가능한 `DISCOVERY` 후보가 없으면 `TASTE` 3편으로 구성한다
 - 조회는 선택한 항목의 `exposed_at`을 기록하는 쓰기 트랜잭션이다. 최초 노출뿐 아니라 평가·관심없음으로 빈 슬롯이 생긴 조회에서도 보충 항목을 노출 상태로 기록한다. 유효 카드 구성이 변하지 않으면 추가 쓰기가 없다
-- 이미 노출 중인 유효한 카드는 그대로 유지한다. 조회 시 현재 평가·관심없음 상태를 다시 확인하고, 보충 후보도 같은 기준으로 다시 검증해 빈 슬롯만 현재 세트의 다음 미노출 후보로 채운다. 전체 3편을 새 묶음으로 교체하지 않는다
+- 같은 추천 세트를 조회하는 동안 이미 노출 중인 유효한 카드는 그대로 유지한다. 조회 시 현재 평가·관심없음 상태를 다시 확인하고, 보충 후보도 같은 기준으로 다시 검증해 빈 슬롯만 현재 세트의 다음 미노출 후보로 채운다. 새 Candidate 알림으로 생성한 세트가 최신이 되면 그 세트의 카드를 노출한다
 - 유효한 TASTE가 2편보다 적으면 다음 미노출·유효 TASTE 후보를 먼저 채운다. DISCOVERY가 없으면 다음 DISCOVERY를 우선 채우고, 후보가 없을 때만 TASTE로 대체해 최대 3편을 반환한다
 - 보충된 TASTE는 기존 유효 TASTE 뒤, DISCOVERY 앞에 배치한다. 예를 들어 `A(TASTE), B(TASTE), X(DISCOVERY)`에서 A가 빠지면 `B, C, X` 순서다
 - 한 번이라도 노출된 항목은 추천 이력 원본이므로 삭제하거나 `exposed_at`을 되돌리지 않는다. 평가·관심없음으로 현재 화면에서 빠졌어도 API-048에는 당시 노출 항목으로 남는다
@@ -181,16 +181,15 @@
   적합도 순으로 그룹별 11번째 이후 후보를 모집한다. 모집된 최대 100편은 사용자 개인 예측
   점수로 최종 정렬한다.
 - 서비스 DB에 없는 영화, 평가한 영화와 관심없음 영화는 제외한다. 감상·OTT 클릭 이력은 제외나 재가중에 사용하지 않는다
-- 같은 `generationId`의 버퍼가 있으면 같은 `recommendationSetId`를 반환한다. 새 generation이 게시되어도 노출 중인 유효 카드는 즉시 교체하지 않고, 현재 세트를 소진한 뒤 다음 세트를 만들 때 사용한다. 관심없음·평가로 생긴 빈 자리는 다음 API-045 조회가 현재 세트에서 보충한다
-- 임시 예외(S15P21E106-613): Kafka 갱신 알림 연동 전까지 API-045 조회마다 Redis의 최신 generation을 확인하고, 새 generation이면 즉시 새 추천 세트로 전환한다. S15P21E106-585의 Kafka 알림 기반 갱신이 적용되면 이 예외를 제거하고 위의 기존 세트 유지 규칙으로 복귀한다
+- 같은 `generationId`의 버퍼가 있으면 같은 `recommendationSetId`를 반환한다. Candidate 게시 완료 알림을 받으면 현재 Redis generation으로 새 버퍼를 생성하고 최신 세트로 즉시 전환한다. API-045는 저장된 최신 세트를 읽으며 조회마다 Redis Candidate를 확인하지 않는다. 이전 세트의 노출·추천 이력은 보존한다. 관심없음·평가로 생긴 빈 자리는 다음 API-045 조회가 현재 최신 세트에서 보충한다
 - 온보딩을 건너뛰고 평가가 없는 사용자의 개인 후보 보충 순서 개선과 후보 모집단 밖 POPULAR 확장은
   S15P21E106-483에서 다룬다.
   `discovery-popularity`는 선택된 그룹 안의 공통 후보 진입 순서이며 fallback 목록이 아니다
 - Python Consumer가 Redis에 갱신한 TASTE·DISCOVERY 후보를 Spring이 종류별 점수로 정렬하고 동점을 결정적으로 섞는다. TASTE를 최대 20편 저장한 뒤 DISCOVERY에서 이미 저장한 TASTE 영화는 건너뛰고 다음 고유 후보로 최대 20편을 채운다. 조회 시 TASTE 2편과 DISCOVERY 1편을 꺼내되, 사용 가능한 DISCOVERY가 없으면 다음 TASTE를 사용한다
-- 버퍼는 PostgreSQL `recommendation_items`에 저장하고 `exposed_at`으로 노출 여부를 구분한다. `reason` JSON에는 Consumer가 전달한 구조화된 `reasons[]` 원본과 확정된 사용자용 `summary`·`factors`를 함께 저장한다. API에는 `summary`·`factors`만 반환한다. 생성 전 또는 이전 버전의 원본-only 항목은 `새로운 영화를 만나보세요.`와 빈 `factors`를 반환한다.
-- LLM 호출은 버퍼 저장 트랜잭션 뒤에 수행한다. LLM은 확인된 영화·장르 근거에 대해 허용된 표현 유형만 고르고, Spring이 최종 문장을 조립한다. 모델 오류·타임아웃·빈/무효 응답은 확인된 근거의 결정적 문구로 대체한다. 근거가 없거나 필요한 표시명을 조회할 수 없으면 중립 문구를 사용한다. 이유는 첫 노출 전까지만 갱신하며 노출 후에는 같은 스냅샷을 카드·상세·이력에서 재사용한다. 생성 완료 전에 첫 조회가 항목을 노출했다면 그 조회는 중립 문구와 빈 `factors`를 반환하고, 늦게 완료된 생성 결과는 노출된 항목을 갱신하지 않는다. 이후 조회도 같은 중립 스냅샷을 반환한다.
-- 버퍼가 커밋된 뒤 이유 보강의 DB 조회·갱신만 실패하면 이미 저장한 세트를 반환한다. 미노출 이유는 같은 generation 재요청에서 다시 보강한다. 그 전에 첫 조회가 노출하면 위 중립 스냅샷 규칙을 적용한다. 버퍼 저장 자체나 카드 조회 DB 장애는 이 fallback의 대상이 아니다.
-- v6 TASTE 근거는 `SHARED_GENRE` 또는 `TOP_RATED_SOURCE`, DISCOVERY 근거는 `DISCOVERY_AGGREGATE_AFFINITY` 또는 `DISCOVERY_PERSONAL_SCORE`다. `reasons[]`의 첫 항목을 표시명으로 해석할 수 없으면 뒤의 유효한 항목을 순서대로 찾는다. 영화 ID는 서비스 영화 제목으로, 장르 코드는 서비스 표시명으로 변환한다. `SHARED_GENRE`와 장르가 있는 `DISCOVERY_PERSONAL_SCORE`는 확인된 공통 장르만 언급한다. `sourceMovieIds`와 `matchedGenreCodes`는 각각의 목록이라 특정 source 영화와 장르의 짝을 증명하지 못하므로 두 값을 한 문장에 묶지 않는다. `TOP_RATED_SOURCE`는 후보와 source 영화가 비슷하다고 단정하지 않는다. 그룹 근거의 `topContributionCoverage`는 그룹 적합도 근거의 집중도이지 후보 영화 최종 점수 설명률이 아니다. v6에 없는 감독·배우 공통성은 언급하지 않는다.
+- 버퍼는 PostgreSQL `recommendation_items`에 저장하고 `exposed_at`으로 노출 여부를 구분한다. `reason` JSON에는 Consumer가 전달한 구조화된 `reasons[]` 원본과 사용자용 `summary`·`factors`를 함께 저장한다. Candidate 알림 경로는 버퍼 커밋 전에 확인된 영화·장르 근거로 첫 노출용 문구를 확정한다. 근거가 없거나 필요한 표시명을 조회할 수 없을 때만 중립 문구를 저장한다. API에는 `summary`·`factors`만 반환하며, 이전 버전의 원본-only 항목에는 `새로운 영화를 만나보세요.`와 빈 `factors`를 반환한다.
+- LLM 호출은 버퍼 저장 트랜잭션 뒤에 수행한다. Candidate 알림 경로에서는 이유 보강을 별도 실행기로 제출하며, Kafka offset 확정은 이 작업을 기다리지 않는다. LLM은 확인된 영화·장르 근거에 대해 허용된 표현 유형만 고르고, Spring이 최종 문장을 조립한다. 모델 오류·타임아웃·빈/무효 응답은 확인된 근거의 결정적 문구로 대체한다. 이유는 첫 노출 전까지만 갱신하며 노출 후에는 같은 스냅샷을 카드·상세·이력에서 재사용한다. 생성 완료 전에 첫 조회가 항목을 노출해도 커밋 때 저장한 근거 문구가 유지된다.
+- 버퍼가 커밋된 뒤 이유 보강의 DB 조회·갱신만 실패하면 이미 저장한 세트를 반환한다. 미노출 이유는 같은 generation 재요청에서 다시 보강한다. 그 전에 첫 조회가 노출해도 커밋 때 저장한 근거 문구가 유지된다. 버퍼 저장 자체나 카드 조회 DB 장애는 이 fallback의 대상이 아니다.
+- v6 TASTE 근거는 `SHARED_GENRE` 또는 `TOP_RATED_SOURCE`, DISCOVERY 근거는 `DISCOVERY_AGGREGATE_AFFINITY` 또는 `DISCOVERY_PERSONAL_SCORE`다. `reasons[]`의 첫 항목을 표시명으로 해석할 수 없으면 뒤의 유효한 항목을 순서대로 찾는다. 영화 ID는 서비스 영화 제목으로, 장르 코드는 서비스 표시명으로 변환한다. `SHARED_GENRE`와 장르가 있는 `DISCOVERY_PERSONAL_SCORE`는 확인된 공통 장르만 언급한다. `sourceMovieIds`와 `matchedGenreCodes`는 각각의 목록이라 특정 source 영화와 장르의 짝을 증명하지 못하므로 두 값을 한 문장에 묶지 않는다. `TOP_RATED_SOURCE`는 확인된 source 영화 제목을 문구에 넣되 후보와 source 영화가 비슷하다고 단정하지 않는다. 표시할 제목이 60자를 넘으면 앞 59자와 줄임표를 사용한다. 그룹 근거의 `topContributionCoverage`는 그룹 적합도 근거의 집중도이지 후보 영화 최종 점수 설명률이 아니다. v6에 없는 감독·배우 공통성은 언급하지 않는다.
 - Consumer는 `vector`·`candidates`·version 키를 원자 게시한다. Spring은 `candidates.taste`와
   `candidates.discovery`를 읽어 제외·재정렬하고 최종 세트를 생성한다. 별도 Redis `topn`은
   사용하지 않는다. 후보가 없거나 유효하지 않으면 짧은 재시도 후 `503 RECOMMENDATION_UNAVAILABLE`을 반환한다.
@@ -311,6 +310,7 @@
 ### 설명
 
 추천받은 세트를 최신순으로 조회한다. 세트마다 추천 시각·유형·이유·당시 후보를 포함한다.
+최신순은 같은 사용자의 버퍼 저장 순서(세트 ID 내림차순)로 판단한다. `generatedAt`은 생성 시각 표시값이며 서버 시계가 역전되어도 최신 세트 판정을 바꾸지 않는다.
 
 ### 인증 및 권한
 

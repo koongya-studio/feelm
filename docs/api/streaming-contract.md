@@ -166,7 +166,7 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 | `feelm.view.v1` | `VIEW` | 영화 상세 조회 | 행동 Feature · 전역 인기 집계 | 약함 |
 | `feelm.recommendation-click.v1` | `RECOMMENDATION_CLICK` | 추천 카드 클릭 | 행동 Feature 집계 | 약함 |
 | `feelm.ott-click.v1` | `OTT_CLICK` | 보러가기 클릭(API-033) | 행동 Feature 집계 | 약함 |
-| `feelm.candidate-updated.v1` | 토픽 자체가 Candidate 갱신을 표시 | Python Consumer의 Redis Candidate 게시 성공 직후 | Spring이 관련 파티 갱신을 시작할 때 사용할 알림 | 게시 완료 |
+| `feelm.candidate-updated.v1` | 토픽 자체가 Candidate 갱신을 표시 | Python Consumer의 Redis Candidate 게시 성공 직후 | Spring이 개인 추천 버퍼를 생성하고 관련 파티 갱신을 시작할 때 사용할 알림 | 게시 완료 |
 | `feelm.party-refresh.v1` | 토픽 자체가 파티 입력 갱신을 표시 | 파티 구성 또는 개인 Candidate 갱신 후 Spring 발행 | Spark가 파티 raw Candidate를 Redis에 게시 | 강함 |
 
 별점 등록이 감상을 의미하므로 별도의 감상 이벤트는 두지 않습니다. 감상 기록 자체는 Spring이 PostgreSQL에서 직접 사용합니다.
@@ -261,6 +261,7 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 
 - Kafka 키는 `userId`의 UTF-8 십진 문자열(예: `"1024"`), 값은 위 JSON이다. `null` 값·빈 payload·공통 봉투를 사용하지 않는다.
 - Python Consumer가 `vector`·`candidates`의 원자 게시에 성공한 뒤 발행한다. Kafka 수신 자체가 후보 갱신 알림이며 `occurredAt`을 비교하지 않는다.
+- Spring의 개인 추천 Consumer는 파티 Consumer와 독립된 group에서 알림을 받는다. 현재 Redis Candidate를 읽어 개인 버퍼를 저장·커밋한 뒤 offset을 확정한다. 알림보다 새 generation이 이미 게시됐으면 현재 Redis generation을 사용하며, 같은 generation의 재전달은 기존 세트를 재사용한다. 새 세트는 API-045의 최신 세트로 즉시 노출된다. 이전 세트의 노출·추천 이력은 보존한다. 유효한 알림의 Redis·DB 장애는 offset을 확정하지 않고 재시도한다. 형식이 잘못된 알림, 비활성·삭제된 사용자, 필터 후 저장 가능한 후보가 없는 경우는 새 세트 없이 offset을 확정한다.
 - 알림은 중복되거나 더 새 Candidate 게시 뒤 도착할 수 있다. Spring은 관련 활성 파티별 지속성 있는 refresh 요청을 DB에 저장한 뒤 수신 offset을 확정한다. 대기 중 중복 요청은 파티별로 합친다. 처리 작업자는 현재 Redis 값을 다시 읽고, 파티원별 `vector`·`candidates`를 한 번의 Redis 읽기로 가져와 두 값의 `generationId`·`modelVersion` 일치를 확인한다.
 - Spring은 이 최신 전체 입력으로 `feelm.party-refresh.v1` 이벤트를 만든다. 벡터와 후보 목록은 Candidate 게시 완료 알림에 싣지 않는다. 파티 구성 변경 때도 같은 DB 요청을 저장한다. Redis 장애나 불완전 입력은 요청을 남겨 재시도하며 파티 API를 실패시키지 않는다. 종료된 파티의 요청은 계산 이벤트 없이 정리한다.
 
@@ -647,7 +648,7 @@ URI나 Redis에 저장하지 않고 runtime filesystem 설정으로 제공한다
 | 약한 신호 → `behavior` | 60초 이내(설정값) |
 
 위 목표는 초기값이며 실측 후 조정합니다. Structured Streaming의 트리거 주기가 `behavior` 반영 지연을 좌우합니다.
-개인 추천 노출은 현재 세트 버퍼를 유지하고 **다음 세트 생성 시점**에 최신 `behavior`를 읽으므로,
+개인 추천 노출은 Candidate 갱신 알림으로 새 세트를 생성할 때 최신 `behavior`를 읽으므로,
 60초 안에 기존 세트의 순서를 바꾸는 것을 보장하지 않습니다. 이 정책은 행동마다 Python 재정렬을 실행하는 계산량을 피하면서
 새 세트를 만드는 사용자의 최대 100편만 정렬하기 위한 기준입니다.
 
