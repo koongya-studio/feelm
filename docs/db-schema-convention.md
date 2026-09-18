@@ -85,7 +85,7 @@ scale 없는 `numeric`으로 입력값을 그대로 검사한다. 기존 정수 
 
 | 정책 | 대상 | 근거 |
 |---|---|---|
-| CASCADE | `users` → `user_auth_providers`, `email_verification_tokens`, `password_reset_tokens`, `notification_settings`, `notifications`, `web_push_subscriptions`, `user_otts`, `user_blocks`, `onboarding_preferences` | 계정에 종속된 데이터 |
+| CASCADE | `users` → `user_auth_providers`, `password_reset_tokens`, `notification_settings`, `notifications`, `web_push_subscriptions`, `user_otts`, `user_blocks`, `onboarding_preferences` | 계정에 종속된 데이터 |
 | CASCADE | `notifications` → `web_push_deliveries` | 알림이 없으면 발송 이력도 의미가 없음 |
 | SET NULL | `web_push_subscriptions` → `web_push_deliveries.subscription_id` | 구독 삭제 후 비민감 발송 결과는 알림 감사용으로 유지 |
 | CASCADE | `ratings` → `frames` | ERD 3장에 명시된 규칙 |

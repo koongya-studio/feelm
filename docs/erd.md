@@ -58,7 +58,7 @@ erDiagram
         date birth_date "생년월일, 탈퇴 시 NULL (D-8·D-9 결정)"
         varchar gender "MALE / FEMALE / OTHER, 탈퇴 시 NULL (D-8·D-9 결정)"
         varchar visibility "PUBLIC / PRIVATE, 기본 PRIVATE"
-        varchar status "ACTIVE / WITHDRAWN. PENDING_VERIFICATION은 개정 전 흐름이 남긴 값"
+        varchar status "ACTIVE / WITHDRAWN"
         boolean onboarding_completed
         timestamptz created_at
         timestamptz withdrawn_at "탈퇴 시각, 탈퇴 전 NULL"
@@ -69,13 +69,6 @@ erDiagram
         varchar provider "GOOGLE / KAKAO / NAVER"
         varchar provider_user_id
         timestamptz linked_at
-    }
-    EMAIL_VERIFICATION_TOKENS {
-        bigint id PK
-        bigint user_id FK
-        varchar token_hash UK
-        timestamptz expires_at
-        timestamptz used_at "사용 시각, 미사용 상태는 NULL"
     }
     PASSWORD_RESET_TOKENS {
         bigint id PK
@@ -146,7 +139,6 @@ erDiagram
     }
 
     USERS ||--o{ USER_AUTH_PROVIDERS : links
-    USERS ||--o{ EMAIL_VERIFICATION_TOKENS : issues
     USERS ||--o{ PASSWORD_RESET_TOKENS : issues
     USERS ||--|| NOTIFICATION_SETTINGS : configures
     USERS ||--o{ NOTIFICATIONS : receives
@@ -161,7 +153,6 @@ erDiagram
 |---|---|---|---|
 | `users` | 서비스 계정 | `nickname`은 정규화 값(공백 제거·소문자)으로 유일. 같은 정규화식에 `text_pattern_ops`를 적용한 일반 인덱스를 따로 두어 사용자 검색(API-019)의 접두 조건이 인덱스를 타게 합니다. 탈퇴 시 `status=WITHDRAWN`으로 전환하고 이메일·닉네임을 치환해 즉시 재사용을 허용하며 생년월일·성별은 삭제합니다(D-9) | FR-01, FR-37, FR-38 · API-001~016, API-019, API-078, API-079 |
 | `user_auth_providers` | 소셜 로그인 수단 | UK(`provider`, `provider_user_id`). 같은 이메일이어도 기존 계정에 자동 통합하지 않음 | FR-35 · API-007~009 |
-| `email_verification_tokens` | 가입 이메일 인증 (**폐기 예정**) | 메일 링크 인증 흐름에서만 쓰던 테이블입니다. 가입 인증이 인증번호로 바뀌면서(S15P21E106-601) 인증번호와 인증 토큰은 Redis에만 두므로 새 흐름은 이 테이블을 읽지도 쓰지도 않습니다. 남은 행 정리와 테이블 제거는 S15P21E106-604에서 처리합니다 | FR-01 · 대체: API-078, API-079 |
 | `password_reset_tokens` | 비밀번호 재설정 | 1회용, 만료 30분(가정). 성공 시 해당 사용자 Refresh Token 전부 폐기 | FR-37 · API-010, API-011 |
 | `notification_settings` | 알림 수신 설정 | 사용자당 1행. 실제 인앱 사건 종류와 독립적인 수신 설정이며 푸시 채널 적용은 S15P21E106-582 범위 | FR-38 · API-017, API-018 |
 | `notifications` | 인앱 알림 정본 | UK(`type`, `source_id`)로 원본 사건의 중복 생성을 막는다. 원본과 같은 트랜잭션에서 생성하고, `notified_at <= now < expires_at`이며 `closed_at IS NULL`, `dismissed_at IS NULL`인 행만 노출한다. 사용자 삭제 시 함께 삭제한다 | FR-41 · API-070~074 · ADR-0021 |

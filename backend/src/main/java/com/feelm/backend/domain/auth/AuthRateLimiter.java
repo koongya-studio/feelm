@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  * 인증·재설정 메일 발송과 로그인 연속 실패를 Redis로 제한한다(플랜 결정 4).
  *
  * <p>메일 요청은 두 축을 함께 본다. 이메일 단위 최소 간격과 IP 단위 창 카운터다(S15P21E106-281 결정 D-1). 이메일 간격만으로는 서로 다른 이메일을
- * 대량으로 넣는 발송 폭탄을 막지 못한다. IP 카운터는 재발송(API-003)과 재설정 요청(API-010)이 공유한다. 두 경로가 같은 SMTP 계정의 발송 쿼터를
+ * 대량으로 넣는 발송 폭탄을 막지 못한다. IP 카운터는 인증번호 발송(API-078)과 재설정 요청(API-010)이 공유한다. 두 경로가 같은 SMTP 계정의 발송 쿼터를
  * 소모하므로 공격자에게는 같은 발송 수단이고, 경로별로 나누면 한쪽을 막아도 다른 쪽으로 같은 양을 더 보낼 수 있기 때문이다(결정 D-2). 이메일 간격은 지금처럼 경로별로
  * 분리한다. 재발송과 재설정은 사용자가 서로 다른 이유로 요청하는 정상 흐름이다.
  *
@@ -101,7 +101,6 @@ import org.springframework.stereotype.Component;
 })
 public class AuthRateLimiter {
 
-    private static final String RESEND_KEY_PREFIX = "auth:email-resend:";
     private static final String LOGIN_FAILURE_KEY_PREFIX = "auth:login-fail:";
     private static final String LOGIN_IP_KEY_PREFIX = "auth:login:ip:";
     private static final String PASSWORD_RESET_KEY_PREFIX = "auth:password-reset:";
@@ -126,18 +125,6 @@ public class AuthRateLimiter {
     private final LoginRateLimitProperties loginRateLimit;
     private final SignupRateLimitProperties signupRateLimit;
     private final ClientIpProperties clientIpPrefixes;
-
-    /**
-     * 인증 메일 재발송(API-003)의 발송 자리를 확보한다.
-     *
-     * <p>자리를 얻어도 메일이 반드시 나가지는 않는다. 전역 발송 상한은 발송 스레드가 따로 본다(S15P21E106-287).
-     *
-     * @param clientIp 요청을 보낸 클라이언트 IP
-     * @return 요청을 처리해도 되면 {@code true}, 두 축 중 하나라도 제한을 넘었으면 {@code false}
-     */
-    public boolean tryAcquireResendSlot(String email, String clientIp) {
-        return tryAcquireMailSendSlot(resendKey(email), clientIp);
-    }
 
     /**
      * 가입(API-001)의 요청 자리를 IP 축으로 확보한다.
@@ -339,10 +326,6 @@ public class AuthRateLimiter {
     private Long increment(String key, Duration window) {
         return redisTemplate.execute(
                 RECORD_ATTEMPT_SCRIPT, List.of(key), Long.toString(window.toMillis()));
-    }
-
-    private String resendKey(String email) {
-        return RESEND_KEY_PREFIX + Sha256Hasher.hex(email);
     }
 
     private String loginFailureKey(String email) {

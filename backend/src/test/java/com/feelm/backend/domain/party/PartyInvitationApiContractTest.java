@@ -202,7 +202,7 @@ class PartyInvitationApiContractTest extends SharedPostgresContractTest {
     @Test
     void hidesInactiveInvitees() throws Exception {
         long party = party(10, "ACTIVE", CREATED_AT);
-        jdbc.update("UPDATE users SET status='PENDING_VERIFICATION' WHERE id=20");
+        jdbc.update("UPDATE users SET status='WITHDRAWN' WHERE id=20");
         jdbc.update(
                 "UPDATE users SET status='WITHDRAWN', withdrawn_at=? WHERE id=30",
                 Timestamp.from(CREATED_AT));

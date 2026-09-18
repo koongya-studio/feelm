@@ -34,9 +34,9 @@ public abstract class OneTimeTokenIssuer<T extends OneTimeTokenEntity> {
     /**
      * 기존 미사용 토큰을 무효화하고 새 토큰을 발급한다.
      *
-     * <p>{@code final}이다. 하위 클래스가 이 메서드를 재정의하면 {@link #invalidateUnused} 호출이 사라져 이전 링크 무효화
-     * (API-003·API-010 처리 규칙)와 종류별 직렬화({@link #beforeInvalidate})가 함께 조용히 없어진다(284 리뷰 B-1). 종류마다
-     * 달라지는 것은 유효기간·엔티티·훅 셋뿐이고 그 셋은 생성자와 {@link #newToken}·{@link #beforeInvalidate}로 이미 열려 있다.
+     * <p>{@code final}이다. 하위 클래스가 이 메서드를 재정의하면 {@link #invalidateUnused} 호출이 사라져 이전 링크 무효화 (API-010
+     * 처리 규칙)와 종류별 직렬화({@link #beforeInvalidate})가 함께 조용히 없어진다(284 리뷰 B-1). 종류마다 달라지는 것은 유효기간·엔티티·훅
+     * 셋뿐이고 그 셋은 생성자와 {@link #newToken}·{@link #beforeInvalidate}로 이미 열려 있다.
      *
      * @return 메일 링크에 실을 토큰 원문
      */
@@ -55,7 +55,7 @@ public abstract class OneTimeTokenIssuer<T extends OneTimeTokenEntity> {
     }
 
     /**
-     * 다시 요청하면 이전 링크는 즉시 쓸 수 없어야 한다. 유효한 링크가 여러 개 떠 있으면 1회용의 의미가 약해진다(API-003·API-010 처리 규칙).
+     * 다시 요청하면 이전 링크는 즉시 쓸 수 없어야 한다. 유효한 링크가 여러 개 떠 있으면 1회용의 의미가 약해진다(API-010 처리 규칙).
      *
      * <p>조회 전에 {@link #beforeInvalidate}를 부른다. 하위 클래스가 사용자 단위 직렬화를 걸 지점이다.
      */

@@ -35,24 +35,6 @@ class AsyncMailDispatchTest extends EmailAuthApiTestSupport {
     }
 
     @Test
-    @DisplayName("재발송 응답은 인증 메일 발송이 끝나기 전에 돌아온다")
-    void resendDoesNotWaitForMailSend() throws Exception {
-        TestAccount account = newAccount();
-        signupPending(account);
-        awaitMailsDispatched();
-        verificationMails().clear();
-
-        verificationMails().blockSends();
-        resend(account.email()).andExpect(status().isAccepted());
-
-        assertThat(verificationMails().tokens()).as("응답 시점에는 발송이 끝나지 않았다").isEmpty();
-
-        verificationMails().releaseSends();
-        awaitMailsDispatched();
-        assertThat(verificationMails().tokens()).hasSize(1);
-    }
-
-    @Test
     @DisplayName("재설정 요청 응답은 재설정 메일 발송이 끝나기 전에 돌아온다")
     void passwordResetRequestDoesNotWaitForMailSend(CapturedOutput output) throws Exception {
         TestAccount account = newAccount();

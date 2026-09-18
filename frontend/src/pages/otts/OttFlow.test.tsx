@@ -76,6 +76,7 @@ const auth: AuthValue = {
   user: { userId: 1024, nickname: '김난다', onboardingCompleted: true },
   signIn: vi.fn(),
   signInWithSocial: vi.fn(),
+  completeEmailSignup: vi.fn(),
   completeSocialSignup: vi.fn(),
   signOut: vi.fn(),
 };

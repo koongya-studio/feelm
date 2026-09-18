@@ -47,8 +47,8 @@ class EmailVerificationCodeContractTest extends EmailAuthApiTestSupport {
     @DisplayName("이미 가입된 이메일은 409 EMAIL_DUPLICATED이고 번호를 보내지 않는다")
     void rejectsDuplicatedEmail() throws Exception {
         TestAccount account = newAccount();
-        signupPending(account);
-        // 가입 자체가 인증번호를 한 번 보냈으므로 기록과 간격 슬롯을 비우고 시작한다.
+        signupActive(account);
+        // 가입 과정이 인증번호를 한 번 보냈으므로 기록과 간격 슬롯을 비우고 시작한다.
         clearVerificationCodeInterval(account.email());
         verificationCodeMails().clear();
 

@@ -7,12 +7,17 @@
 /** 공통 규약 `Gender` */
 export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
 
-/** 계정 상태. 인증을 마쳐야 `ACTIVE`가 되고 그전에는 로그인할 수 없다 */
-export type UserStatus = 'PENDING_VERIFICATION' | 'ACTIVE' | 'WITHDRAWN';
+/** 계정 상태. 가입을 마치면 곧바로 `ACTIVE`다 */
+export type UserStatus = 'ACTIVE' | 'WITHDRAWN';
 
-/** API-001 이메일 회원가입 요청 */
+/**
+ * API-001 이메일 회원가입 요청.
+ *
+ * 이메일은 보내지 않는다. 가입할 주소는 인증번호 확인(API-079)이 발급한
+ * `emailVerificationToken` 안에 있고 서버는 그 값만 믿는다(S15P21E106-603).
+ */
 export type SignupRequest = {
-  email: string;
+  emailVerificationToken: string;
   password: string;
   nickname: string;
   /** 생년월일 `YYYY-MM-DD`. 나이가 아니라 날짜다 */
@@ -20,18 +25,12 @@ export type SignupRequest = {
   gender: Gender;
 };
 
-/** API-001 응답 */
-export type SignupResult = {
-  userId: number;
-  email: string;
-  nickname: string;
-  status: UserStatus;
-};
-
-/** API-002 이메일 인증 확인 응답 */
-export type EmailVerificationResult = {
-  userId: number;
-  status: UserStatus;
+/** API-079 이메일 인증번호 확인 응답 */
+export type EmailVerificationCodeResult = {
+  /** 가입(API-001)에 한 번만 쓸 수 있는 토큰. 클라이언트는 해석하지 않는다 */
+  emailVerificationToken: string;
+  /** 토큰의 총 수명(초) */
+  expiresIn: number;
 };
 
 /** 로그인 직후 화면 분기에 필요한 최소 정보 (API-004 응답의 `user`) */

@@ -4,7 +4,6 @@ import com.feelm.backend.domain.auth.RefreshTokenService;
 import com.feelm.backend.domain.auth.dto.request.OAuthSignupRequest;
 import com.feelm.backend.domain.auth.entity.OAuthProvider;
 import com.feelm.backend.domain.auth.entity.UserAuthProvider;
-import com.feelm.backend.domain.auth.repository.EmailVerificationTokenRepository;
 import com.feelm.backend.domain.auth.repository.UserAuthProviderRepository;
 import com.feelm.backend.domain.user.WithdrawnAccount;
 import com.feelm.backend.domain.user.entity.NotificationSettings;
@@ -38,7 +37,6 @@ public class OAuthSignupService {
     private final UserRepository userRepository;
     private final NotificationSettingsRepository notificationSettingsRepository;
     private final UserAuthProviderRepository authProviderRepository;
-    private final EmailVerificationTokenRepository tokenRepository;
     private final RefreshTokenService refreshTokenService;
 
     @Transactional
@@ -97,24 +95,11 @@ public class OAuthSignupService {
     /**
      * 이메일 계정과의 자동 통합은 하지 않는다(D-1). 이메일은 가입 토큰에서 이미 정규화된 값이다.
      *
-     * <p>미인증 상태로 보존 기간이 지난 이메일 계정은 이메일 가입(API-001)과 같은 규칙으로 지우고 소셜 가입을 허용한다. 그렇지 않으면 이메일 인증을 끝내 마치지
-     * 못한 계정이 그 이메일을 영구히 붙들어, 같은 이메일의 소셜 가입도 항상 거절된다.
+     * <p>미인증 계정을 회수하던 분기는 없앴다(S15P21E106-604). 그 분기는 인증을 끝내 마치지 못한 계정이 이메일을 영구히 붙드는 문제를 풀려던 것인데,
+     * 가입이 인증을 먼저 끝내는 흐름으로 바뀌어 그런 계정이 생기지 않는다.
      */
     private void rejectDuplicatedEmail(String email) {
-        userRepository.findByEmail(email).ifPresent(this::reapStaleOrReject);
-    }
-
-    private void reapStaleOrReject(User existing) {
-        Instant now = Instant.now();
-        if (!existing.isStalePendingVerification(now)) {
-            throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
-        }
-        tokenRepository.deleteByUserId(existing.getId());
-        notificationSettingsRepository.deleteByUserId(existing.getId());
-        int deleted =
-                userRepository.deleteIfStalePendingVerification(
-                        existing.getId(), now.minus(User.PENDING_VERIFICATION_RETENTION));
-        if (deleted == 0) {
+        if (userRepository.findByEmail(email).isPresent()) {
             throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
         }
     }

@@ -69,10 +69,13 @@ class SignupContractTest extends EmailAuthApiTestSupport {
     @Test
     @DisplayName("가입은 메일을 보내지 않는다")
     void doesNotSendVerificationMail() throws Exception {
-        signup(signupBody(newAccount())).andExpect(status().isCreated());
+        String body = signupBody(newAccount());
+        verificationCodeMails().clear();
+
+        signup(body).andExpect(status().isCreated());
         awaitMailsDispatched();
 
-        assertThat(verificationMails().tokens()).as("가입이 보낸 인증 메일").isEmpty();
+        assertThat(verificationCodeMails().tokens()).as("가입이 보낸 메일").isEmpty();
     }
 
     @Test
@@ -369,49 +372,10 @@ class SignupContractTest extends EmailAuthApiTestSupport {
                                 .formatted(FORGED_TOKEN, VALID_PASSWORD, VALID_GENDER)));
     }
 
-    /**
-     * 개정 이전 흐름이 남긴 미인증 계정은 보존 기간이 지났으면 그 이메일을 붙들지 않는다(플랜 결정 3). 잔존 행의 일괄 정리와 이 분기 제거는
-     * S15P21E106-604가 한다.
-     */
+    /** 미인증 계정을 회수하던 분기가 사라졌으므로(S15P21E106-604) 오래된 계정도 예외 없이 거절한다. */
     @Test
-    @DisplayName("미인증 상태로 24시간이 지난 계정의 이메일은 재가입할 수 있다")
-    void stalePendingAccountIsReplaced() throws Exception {
-        TestAccount account = newAccount();
-        long previousUserId = signupPending(account);
-        ageUser(previousUserId, Duration.ofHours(25));
-
-        MvcResult result =
-                signup(signupBody(account.email(), account.password(), newAccount().nickname()))
-                        .andExpect(status().isCreated())
-                        .andReturn();
-
-        assertThat(signupUserId(result)).isNotEqualTo(previousUserId);
-        assertThat(userStatus(signupUserId(result))).isEqualTo("ACTIVE");
-        assertThat(
-                        jdbcTemplate.queryForObject(
-                                "select count(*) from users where email = ?",
-                                Integer.class,
-                                account.email()))
-                .as("이전 미인증 행은 삭제된다")
-                .isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("미인증 상태로 24시간이 지나지 않은 계정의 이메일은 409 EMAIL_DUPLICATED다")
-    void pendingAccountWithinDayReturnsConflict() throws Exception {
-        TestAccount account = newAccount();
-        String token = issueEmailVerificationToken(account.email());
-        long userId = signupPending(account);
-        ageUser(userId, Duration.ofHours(23));
-
-        signup(signupBodyWithToken(token, account.password(), newAccount().nickname()))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("EMAIL_DUPLICATED"));
-    }
-
-    @Test
-    @DisplayName("인증을 마친 계정은 24시간이 지나도 재가입할 수 없다")
-    void activeAccountIsNeverReplacedBySignup() throws Exception {
+    @DisplayName("이미 쓰는 이메일은 오래된 계정이어도 재가입할 수 없다")
+    void existingAccountIsNeverReplacedBySignup() throws Exception {
         TestAccount account = newAccount();
         String token = issueEmailVerificationToken(account.email());
         long userId = signupActive(account);

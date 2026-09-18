@@ -95,16 +95,12 @@ class MailSendBudgetContractTest extends EmailAuthApiTestSupport {
 
     @Test
     @DisplayName("상한을 넘기면 응답은 202 그대로이고 메일만 발송되지 않는다")
-    void exhaustedBudgetKeepsResponseAndSkipsSend(CapturedOutput output) throws Exception {
-        TestAccount account = newAccount();
-        signupPending(account);
-        verificationTokens(output);
-        verificationMails().clear();
+    void exhaustedBudgetKeepsResponseAndSkipsSend() throws Exception {
         fillSendBudget(budgetLimit);
 
-        resendFrom(nextClientIp(), account.email()).andExpect(status().isAccepted());
+        sendVerificationCode(newAccount().email()).andExpect(status().isAccepted());
 
-        assertThat(verificationTokens(output)).as("상한을 넘긴 뒤의 발송").isEmpty();
+        assertThat(verificationCodes()).as("상한을 넘긴 뒤의 발송").isEmpty();
     }
 
     /**

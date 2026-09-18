@@ -173,23 +173,6 @@ class OAuthSignupContractTest extends OAuthApiTestSupport {
     }
 
     @Test
-    @DisplayName("이메일 계정이 미인증 상태로 24시간 지났으면 정리하고 소셜 가입을 허용한다 (API-001과 동일 규칙)")
-    void staleUnverifiedEmailIsReapedAndSignupSucceeds() throws Exception {
-        TestAccount account = newAccount();
-        ageUser(signupPending(account), Duration.ofHours(25));
-
-        fake(OAuthProvider.GOOGLE)
-                .willReturn(
-                        new OAuthUserProfile("provider-user-stale-email", account.email(), "소셜"));
-        MvcResult login =
-                oauthLogin(OAuthProvider.GOOGLE, VALID_CODE, ALLOWED_REDIRECT_URI).andReturn();
-
-        oauthSignup(stringField(login, "signupToken"), "소셜정리")
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.user.nickname").value("소셜정리"));
-    }
-
-    @Test
     @DisplayName("같은 signupToken으로 두 번 가입하면 409 OAUTH_ACCOUNT_ALREADY_LINKED다")
     void reusedSignupTokenIsRejectedAfterLinking() throws Exception {
         OAuthUserProfile profile = newProfile();

@@ -8,6 +8,7 @@
 import { createContext, useContext } from 'react';
 import type {
   AuthenticatedUser,
+  SignupRequest,
   SocialLoginResult,
   SocialProvider,
   SocialSignupRequest,
@@ -32,6 +33,11 @@ export type AuthValue = {
     code: string,
     redirectUri: string,
   ) => Promise<SocialLoginResult>;
+  /**
+   * API-001. 인증번호로 이메일 소유를 먼저 확인했으므로 가입과 동시에 로그인된다
+   * (S15P21E106-603). 소셜 가입과 같은 자리다
+   */
+  completeEmailSignup: (request: SignupRequest) => Promise<AuthenticatedUser>;
   /** API-008. 가입과 동시에 로그인된다 */
   completeSocialSignup: (request: SocialSignupRequest) => Promise<AuthenticatedUser>;
   signOut: () => Promise<void>;

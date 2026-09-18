@@ -12,7 +12,6 @@ import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.infrastructure.mail.MailKind;
 import com.feelm.backend.infrastructure.mail.MailSendBudget;
 import java.security.SecureRandom;
-import java.time.Instant;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -118,17 +117,11 @@ public class EmailVerificationCodeService {
     /**
      * 이미 가입된 이메일은 번호를 보내지 않고 거절한다(API-078 처리 규칙, 팀 결정).
      *
-     * <p>보존 기간이 지난 미인증 계정은 없는 것으로 본다. 그 행은 가입(API-001)이 지우고 새로 만들기 때문이다. 이 개정 이전 흐름이 남긴 행만 해당하며 전환이
-     * 끝나면 사라진다(S15P21E106-604).
+     * <p>미인증 계정을 예외로 두던 분기는 없앴다(S15P21E106-604). 그 상태가 사라졌고 잔존 행은 마이그레이션이 지웠다. 탈퇴 계정은 이메일이 예약 도메인으로
+     * 치환되므로(D-9) 여기에 걸리지 않는다.
      */
     private void rejectDuplicatedEmail(String email) {
-        Instant now = Instant.now();
-        boolean taken =
-                userRepository
-                        .findByEmail(email)
-                        .filter(user -> !user.isStalePendingVerification(now))
-                        .isPresent();
-        if (taken) {
+        if (userRepository.findByEmail(email).isPresent()) {
             throw new BusinessException(ErrorCode.EMAIL_DUPLICATED);
         }
     }
