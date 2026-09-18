@@ -283,7 +283,7 @@ erDiagram
         bigint ott_id FK "클릭한 OTT, NULL 가능"
         varchar status "LINK_CLICKED / WATCHED_UNRATED / RATED / EXPIRED"
         timestamptz clicked_at "OTT 링크 클릭 시각, 감상 기록 없는 평가는 NULL (D-6 결정)"
-        timestamptz confirm_due_at "clicked_at + 24시간, 전이 전 NULL 가능"
+        timestamptz confirm_due_at "clicked_at과 같다. 지연 없이 즉시 확인 대상, 전이 전 NULL 가능"
         timestamptz expires_at "clicked_at + 7일, 전이 전 NULL 가능"
         timestamptz watched_at "감상 확인 시각, 전이 전 NULL 가능"
         timestamptz rated_at "평가 시각, 전이 전 NULL 가능"
@@ -480,7 +480,7 @@ erDiagram
 
 ```mermaid
 flowchart LR
-    A["OTT 링크 클릭<br/>watch_records: LINK_CLICKED"] -->|24시간 후 접속, 감상함| B["WATCHED_UNRATED"]
+    A["OTT 링크 클릭<br/>watch_records: LINK_CLICKED"] -->|접속 후 감상함 응답| B["WATCHED_UNRATED"]
     A -->|감상 안 함 또는 7일 미응답| X["EXPIRED"]
     B -->|평가 저장| C["RATED"]
     C -->|ratings + frames<br/>단일 트랜잭션 생성| D["필름 반영·팝콘 버킷 재집계"]
