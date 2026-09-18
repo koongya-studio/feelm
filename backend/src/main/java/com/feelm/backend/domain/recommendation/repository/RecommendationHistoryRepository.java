@@ -15,12 +15,8 @@ public class RecommendationHistoryRepository {
 
     private final EntityManager entityManager;
 
-    public List<HistorySet> findSets(long userId, Instant cursorTime, long cursorSetId, int limit) {
-        String cursorCondition =
-                cursorTime == null
-                        ? ""
-                        : " AND (s.generated_at < :cursorTime"
-                                + " OR (s.generated_at = :cursorTime AND s.id < :cursorSetId))";
+    public List<HistorySet> findSets(long userId, long cursorSetId, int limit) {
+        String cursorCondition = cursorSetId == 0 ? "" : " AND s.id < :cursorSetId";
         NativeQuery<Tuple> query =
                 query(
                                 """
@@ -33,11 +29,10 @@ public class RecommendationHistoryRepository {
                                   )
                                 """
                                         + cursorCondition
-                                        + " ORDER BY s.generated_at DESC, s.id DESC LIMIT :limit")
+                                        + " ORDER BY s.id DESC LIMIT :limit")
                         .setParameter("userId", userId)
                         .setParameter("limit", limit);
-        if (cursorTime != null) {
-            query.setParameter("cursorTime", cursorTime);
+        if (cursorSetId != 0) {
             query.setParameter("cursorSetId", cursorSetId);
         }
         return query.getResultList().stream()

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -14,6 +15,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.feelm.backend.domain.recommendation.model.RecommendationCandidate;
 import com.feelm.backend.domain.recommendation.model.RecommendationCandidateBatch;
 import com.feelm.backend.domain.recommendation.repository.RecommendationCandidateReader;
+import com.feelm.backend.domain.recommendation.service.PersonalCandidateUpdatedListener;
 import com.feelm.backend.domain.recommendation.service.RecommendationReplenisher;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
@@ -31,6 +33,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,6 +43,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.IllegalTransactionStateException;
@@ -64,6 +68,7 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
     @Autowired DataSource dataSource;
     @Autowired TokenProvider tokens;
     @Autowired RecommendationReplenisher replenisher;
+    @Autowired PersonalCandidateUpdatedListener candidateListener;
     @MockitoBean RecommendationCandidateReader candidateReader;
 
     private ExecutorService executor;
@@ -94,13 +99,14 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("S15P21E106-613 최신 Redis generation을 조회 시 새 세트로 생성해 제공한다")
-    void createsAndServesLatestCandidateGenerationOnRead() throws Exception {
+    @DisplayName("Candidate 알림으로 생성한 최신 세트를 조회한다")
+    void createsAndServesLatestCandidateGenerationOnNotification() throws Exception {
         candidates(
                 "generation-new",
                 candidate(104, "5.0", "TASTE", null),
                 candidate(105, "4.0", "TASTE", null),
                 candidate(106, "3.0", "DISCOVERY", "FLAVOR_B"));
+        candidateListener.onMessage(candidateNotice(), mock(Acknowledgment.class));
 
         String response =
                 getRecommendations(USER)
@@ -117,13 +123,45 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("S15P21E106-613 같은 Redis generation 반복 조회는 같은 세트를 재사용한다")
-    void reusesSetForSameCandidateGenerationOnRepeatedRead() throws Exception {
+    @DisplayName("서버 시각이 역전되어도 뒤에 저장한 세트를 조회하고 이전 노출 이력을 보존한다")
+    void laterCommittedSetWinsWhenGeneratedAtMovesBackwards() throws Exception {
+        getRecommendations(USER).andExpect(status().isOk());
+        jdbc.execute("SELECT setval(pg_get_serial_sequence('recommendation_sets','id'),1000,true)");
+        candidates(
+                "generation-clock-skew",
+                candidate(104, "5.0", "TASTE", null),
+                candidate(105, "4.0", "TASTE", null),
+                candidate(106, "3.0", "DISCOVERY", "FLAVOR_B"));
+        candidateListener.onMessage(candidateNotice(), mock(Acknowledgment.class));
+        Long newSetId =
+                jdbc.queryForObject(
+                        "SELECT id FROM recommendation_sets WHERE generation_id='generation-clock-skew'",
+                        Long.class);
+        jdbc.update(
+                "UPDATE recommendation_sets SET generated_at=? WHERE id=?",
+                OffsetDateTime.parse("2026-09-16T00:00:00Z"),
+                newSetId);
+
+        getRecommendations(USER)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recommendationSetId").value(newSetId))
+                .andExpect(jsonPath("$.items.length()").value(3));
+        mvc.perform(get("/api/v1/recommendations/history").header("Authorization", bearer(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].recommendationSetId").value(newSetId))
+                .andExpect(jsonPath("$.items[1].recommendationSetId").value(SET));
+    }
+
+    @Test
+    @DisplayName("같은 Candidate 알림 재전달은 같은 세트를 재사용한다")
+    void reusesSetForSameCandidateGenerationOnRepeatedNotice() throws Exception {
         candidates(
                 "generation-same",
                 candidate(101, "5.0", "TASTE", null),
                 candidate(102, "4.0", "TASTE", null),
                 candidate(105, "3.0", "DISCOVERY", "FLAVOR_B"));
+        candidateListener.onMessage(candidateNotice(), mock(Acknowledgment.class));
+        candidateListener.onMessage(candidateNotice(), mock(Acknowledgment.class));
 
         String first =
                 getRecommendations(USER)
@@ -619,5 +657,14 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
         return jdbc.queryForList(
                 "SELECT id FROM recommendation_items WHERE exposed_at IS NOT NULL ORDER BY id",
                 Long.class);
+    }
+
+    private ConsumerRecord<String, String> candidateNotice() {
+        return new ConsumerRecord<>(
+                "feelm.candidate-updated.v1",
+                0,
+                1L,
+                Long.toString(USER),
+                "{\"userId\":" + USER + "}");
     }
 }

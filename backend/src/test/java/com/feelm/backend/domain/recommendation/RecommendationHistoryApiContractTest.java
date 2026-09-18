@@ -96,6 +96,29 @@ class RecommendationHistoryApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
+    @DisplayName("생성 시각이 역전되어도 저장 순서로 이력을 페이지 이동한다")
+    void paginatesByStoredOrderAcrossClockSkew() throws Exception {
+        personalSet(1000, USER, "input-1", "2026-09-17T03:00:00Z");
+        personalSet(1001, USER, "input-2", "2026-09-16T03:00:00Z");
+        item(3000, 1000, 100, "TASTE", 1, true, "첫째");
+        item(3001, 1001, 101, "TASTE", 1, true, "둘째");
+
+        MvcResult first =
+                history(USER, null, 1)
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.items[0].recommendationSetId").value(1001))
+                        .andReturn();
+        String cursor =
+                objectMapper
+                        .readTree(first.getResponse().getContentAsString())
+                        .get("nextCursor")
+                        .asText();
+        history(USER, cursor, 1)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].recommendationSetId").value(1000));
+    }
+
+    @Test
     @DisplayName("T3 추천 이유, 관심없음과 현재 감상 상태를 함께 반환한다")
     void returnsReasonDismissedAndWatchStatus() throws Exception {
         personalSet(1000, USER, "input-1", "2026-09-15T03:00:00Z");

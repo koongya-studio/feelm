@@ -3,13 +3,17 @@ package com.feelm.backend.domain.recommendation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
 import com.feelm.backend.domain.recommendation.model.RecommendationCandidate;
 import com.feelm.backend.domain.recommendation.model.RecommendationCandidateBatch;
 import com.feelm.backend.domain.recommendation.repository.RecommendationCandidateReader;
+import com.feelm.backend.domain.recommendation.service.PersonalCandidateUpdatedListener;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
 import com.feelm.backend.global.security.TokenProvider;
@@ -18,6 +22,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,11 +30,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-/** S15P21E106-613의 임시 요청 시 동기화 경로가 기존 세트를 안전하게 대체하는지 검증한다. */
+/** Candidate 알림이 저장 세트를 바꾸고 API 조회는 Redis 후보를 읽지 않는지 검증한다. */
 @SpringBootTest(
         properties = {
             "spring.flyway.enabled=true",
@@ -37,7 +43,7 @@ import org.springframework.test.web.servlet.MvcResult;
             "spring.task.scheduling.enabled=false"
         })
 @AutoConfigureMockMvc
-@DisplayName("S15P21E106-613 조회 시 임시 동기화")
+@DisplayName("S15P21E106-585 Candidate 알림 기반 세트 전환")
 class RecommendationServingSyncAbTest extends SharedPostgresContractTest {
 
     private static final long USER = 10;
@@ -47,6 +53,7 @@ class RecommendationServingSyncAbTest extends SharedPostgresContractTest {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired TokenProvider tokens;
+    @Autowired PersonalCandidateUpdatedListener candidateListener;
     @MockitoBean RecommendationCandidateReader candidateReader;
 
     @BeforeEach
@@ -62,6 +69,7 @@ class RecommendationServingSyncAbTest extends SharedPostgresContractTest {
         user(USER, "user");
         user(OTHER_USER, "other");
         recommendationSet(SET, USER, null);
+        jdbc.execute("SELECT setval(pg_get_serial_sequence('recommendation_sets','id'),1000,true)");
         for (long movieId = 101; movieId <= 106; movieId++) {
             movie(movieId);
         }
@@ -74,14 +82,18 @@ class RecommendationServingSyncAbTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("Redis 후보가 모두 부적격이어도 기존 세트를 계속 제공한다")
-    void servesExistingSetWhenNoCandidateIsEligible() throws Exception {
+    @DisplayName("부적격 후보 알림은 기존 세트를 유지하고 ACK한다")
+    void retainsExistingSetWhenNoCandidateIsEligible() throws Exception {
         jdbc.update("INSERT INTO ratings(user_id,movie_id,score) VALUES (?,104,5)", USER);
         jdbc.update("INSERT INTO ratings(user_id,movie_id,score) VALUES (?,106,5)", USER);
         candidates(
                 "generation-all-ineligible",
                 candidate(104, "5.0", "TASTE"),
                 candidate(106, "3.0", "DISCOVERY"));
+        Acknowledgment ack = mock(Acknowledgment.class);
+
+        candidateListener.onMessage(candidateNotice(), ack);
+        verify(ack).acknowledge();
 
         MvcResult result = getRecommendations(USER);
 
@@ -91,7 +103,7 @@ class RecommendationServingSyncAbTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("새 generation이 오면 임시 정책에 따라 최신 세트로 즉시 전환한다")
+    @DisplayName("새 generation 알림이 오면 최신 세트로 즉시 전환한다")
     void switchesToLatestSetWhenNewGenerationArrives() throws Exception {
         assertThat(getRecommendations(USER).getResponse().getStatus()).isEqualTo(200);
         assertThat(exposedIds()).containsExactly(1001L, 1002L, 1005L);
@@ -100,6 +112,10 @@ class RecommendationServingSyncAbTest extends SharedPostgresContractTest {
                 candidate(103, "5.0", "TASTE"),
                 candidate(104, "4.0", "TASTE"),
                 candidate(106, "3.0", "DISCOVERY"));
+        Acknowledgment ack = mock(Acknowledgment.class);
+        candidateListener.onMessage(candidateNotice(), ack);
+        verify(ack).acknowledge();
+        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1005L);
 
         MvcResult result = getRecommendations(USER);
 
@@ -109,20 +125,45 @@ class RecommendationServingSyncAbTest extends SharedPostgresContractTest {
                 .contains("\"movieId\":103")
                 .contains("\"movieId\":104")
                 .contains("\"movieId\":106");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM recommendation_sets WHERE user_id=?",
+                                Integer.class,
+                                USER))
+                .isEqualTo(2);
     }
 
     @Test
-    @DisplayName("같은 generation의 다른 사용자 세트가 있어도 기존 자기 세트로 대체한다")
-    void fallsBackWhenGenerationIsHeldByAnotherUser() throws Exception {
-        recommendationSet(2000, OTHER_USER, "generation-shared");
-        candidates("generation-shared", candidate(103, "5.0", "TASTE"));
+    @DisplayName("늦은 알림과 같은 generation 재전달은 현재 Redis 세트를 재사용한다")
+    void delayedAndDuplicateNoticesReuseCurrentGeneration() {
+        candidates("generation-current", candidate(103, "5.0", "TASTE"));
+        Acknowledgment first = mock(Acknowledgment.class);
+        Acknowledgment delayed = mock(Acknowledgment.class);
+
+        candidateListener.onMessage(candidateNotice(), first);
+        candidateListener.onMessage(candidateNotice(), delayed);
+
+        verify(first).acknowledge();
+        verify(delayed).acknowledge();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM recommendation_sets"
+                                        + " WHERE generation_id='generation-current'",
+                                Integer.class))
+                .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("조회 요청은 Redis Candidate를 다시 읽지 않는다")
+    void readDoesNotRefreshCandidateGeneration() throws Exception {
+        candidates("generation-unseen", candidate(103, "5.0", "TASTE"));
 
         MvcResult result = getRecommendations(USER);
 
         assertThat(result.getResponse().getStatus()).isEqualTo(200);
         assertThat(result.getResponse().getContentAsString())
-                .doesNotContain("\"recommendationSetId\":2000")
                 .contains("\"recommendationSetId\":" + SET);
+        verify(candidateReader, never()).read(USER);
     }
 
     private MvcResult getRecommendations(long userId) throws Exception {
@@ -132,6 +173,15 @@ class RecommendationServingSyncAbTest extends SharedPostgresContractTest {
                                         "Authorization",
                                         "Bearer " + tokens.createAccessToken(userId)))
                 .andReturn();
+    }
+
+    private ConsumerRecord<String, String> candidateNotice() {
+        return new ConsumerRecord<>(
+                "feelm.candidate-updated.v1",
+                0,
+                1L,
+                Long.toString(USER),
+                "{\"userId\":" + USER + "}");
     }
 
     private void candidates(String generationId, RecommendationCandidate... items) {

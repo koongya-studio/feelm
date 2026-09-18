@@ -5,6 +5,7 @@ import com.feelm.backend.domain.recommendation.model.RecommendationCandidate;
 import com.feelm.backend.domain.recommendation.model.RecommendationCandidateBatch;
 import com.feelm.backend.domain.recommendation.repository.RecommendationBufferRepository;
 import com.feelm.backend.domain.recommendation.repository.RecommendationBufferRepository.RecommendationBufferItem;
+import com.feelm.backend.domain.recommendation.repository.RecommendationCandidateReader;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
 import java.time.Clock;
@@ -14,7 +15,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -35,35 +35,53 @@ class RecommendationBufferWriter {
     private static final String REDIS_CANDIDATE_INPUT_VERSION = "redis-candidate";
 
     private final RecommendationBufferRepository repository;
+    private final RecommendationCandidateReader candidateReader;
+    private final RecommendationReasonService reasonService;
     private final Clock clock;
 
     /**
      * 후보 묶음을 최대 20편의 추천 버퍼로 원자적으로 저장한다.
      *
-     * @throws BusinessException 사용자가 유효하지 않거나 저장할 후보가 없는 경우
+     * @throws BusinessException 사용자가 유효하지 않거나 Redis Candidate를 사용할 수 없는 경우
+     * @throws NoEligibleRecommendationCandidatesException 필터 후 저장할 영화가 없는 경우
      */
     @Transactional
-    public RecommendationBufferResult write(long userId, RecommendationCandidateBatch batch) {
-        return writeIfEligible(userId, batch)
-                .orElseThrow(() -> new BusinessException(ErrorCode.RECOMMENDATION_UNAVAILABLE));
+    public RecommendationBufferResult writeCurrent(long userId) {
+        return writeCurrent(userId, false);
     }
 
-    /** 적격 후보가 없으면 기존 추천 세트를 유지할 수 있도록 빈 결과를 반환한다. */
     @Transactional
-    public Optional<RecommendationBufferResult> writeIfEligible(
-            long userId, RecommendationCandidateBatch batch) {
+    public RecommendationBufferResult writeCurrentFromNotice(long userId) {
+        return writeCurrent(userId, true);
+    }
+
+    private RecommendationBufferResult writeCurrent(long userId, boolean initialReason) {
         if (!repository.lockActiveUserIfExists(userId)) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
         }
+        RecommendationCandidateBatch batch = candidateReader.read(userId);
 
-        var existing = repository.findExistingSet(batch.generationId());
+        var existing = repository.findExistingSet(userId, batch.generationId());
         if (existing.isPresent()) {
-            return Optional.of(new RecommendationBufferResult(existing.getAsLong()));
+            return new RecommendationBufferResult(existing.getAsLong());
         }
 
         List<RecommendationBufferItem> items = prepare(userId, batch);
         if (items.isEmpty()) {
-            return Optional.empty();
+            throw new NoEligibleRecommendationCandidatesException();
+        }
+        if (initialReason) {
+            items =
+                    items.stream()
+                            .map(
+                                    item ->
+                                            new RecommendationBufferItem(
+                                                    item.movieId(),
+                                                    item.type(),
+                                                    item.flavorCode(),
+                                                    reasonService.initialReason(item.reason()),
+                                                    item.position()))
+                            .toList();
         }
 
         long setId =
@@ -75,7 +93,7 @@ class RecommendationBufferWriter {
                         batch.generationId(),
                         OffsetDateTime.now(clock).withOffsetSameInstant(ZoneOffset.UTC));
         repository.insertItems(setId, items);
-        return Optional.of(new RecommendationBufferResult(setId));
+        return new RecommendationBufferResult(setId);
     }
 
     private List<RecommendationBufferItem> prepare(

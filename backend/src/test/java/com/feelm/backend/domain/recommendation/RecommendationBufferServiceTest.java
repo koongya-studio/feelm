@@ -354,7 +354,7 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                                     prompts = invocation.getArgument(0);
                             assertThat(prompts).hasSize(1);
                             assertThat(prompts.getFirst().sourceTitle()).isEqualTo("movie-55");
-                            return Map.of(prompts.getFirst().itemId(), "SOURCE");
+                            return Map.of(prompts.getFirst().itemId(), "HISTORY");
                         });
 
         long setId = service.createBuffer(USER).recommendationSetId();
@@ -363,7 +363,7 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                                 "SELECT reason->>'summary' FROM recommendation_items WHERE set_id=?",
                                 String.class,
                                 setId))
-                .isEqualTo("좋아하신 영화 'movie-55'을 바탕으로 골랐어요.");
+                .isEqualTo("영화 'movie-55'을 좋아하신 기록을 참고해 골랐어요.");
     }
 
     @Test
@@ -765,7 +765,9 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                         setId);
         assertThat(summaries)
                 .containsExactly(
-                        "좋아하신 영화들을 바탕으로 골랐어요.", "평가 이력을 바탕으로 발견한 영화예요.", "취향을 바탕으로 새롭게 고른 영화예요.");
+                        "좋아하신 영화 'movie-55'을 바탕으로 골랐어요.",
+                        "평가 이력을 바탕으로 발견한 영화예요.",
+                        "취향을 바탕으로 새롭게 고른 영화예요.");
     }
 
     @Test
