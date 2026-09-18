@@ -22,12 +22,17 @@
  * `[?]` API-036 응답의 `popcorn.isNewFlavor`에 대응하는 표시가 와이어프레임에 없어
  * 사용하지 않는다.
  *
- * **추가 후 수치도 2.5가 서버에서 읽어 넘긴다**(업무 -599). 예전에는 이 화면이 추가 전
+ * **추가 후 수치는 서버에서 읽은 실측이다**(업무 -599). 예전에는 이 화면이 추가 전
  * 수치에 `+1`을 더해 추가 후를 지어냈다. 계약은 평가 한 건에 프레임 1개 · 팝콘 1알이지만
  * (대표 맛이 없으면 0알), 팝콘 집계는 `대표 맛이 있는 영화의 평가`를 세므로 영화에 대표 맛이
  * 붙기만 해도 과거 평가가 뒤늦게 버킷에 들어온다. 그러면 실제 팝콘은 두 알이 느는데 화면만
  * 한 알을 단언하게 된다(2026-09-17 여정 QA 관측). 그래서 수치도 문구도 **실제 증가량**으로
  * 적는다.
+ *
+ * 그 실측은 **이 화면이 2.6을 띄운 동안 읽는다**(업무 -635). 전에는 2.5가 저장 뒤 재조회까지
+ * 마치고 넘어와 2.6이 늦게 떴다. 2.6은 추가 전 수치만 그리므로 기다릴 이유가 없다. 2.7은
+ * 전환 시간이 지나고 **실측이 도착한 뒤에** 띄운다. 읽은 값은 Router state에 적어 두어,
+ * 뒤로 가기로 다시 열려도 그 뒤의 평가가 섞인 값을 새로 읽지 않는다.
  *
  * 추가 후 수치를 읽지 못했으면(`after`가 `null`) 계약이 정한 증가량으로 물러선다. 응답이
  * 프레임 한 개와 팝콘 한 알(대표 맛이 있을 때)을 보장하므로 그만큼은 언제나 참이고, 같은
@@ -42,6 +47,7 @@ import FilmReel from '../../../components/FilmReel';
 import Poster from '../../../components/Poster';
 import { HeartIcon, ResultBellIcon } from '../../../components/Icon';
 import { getPopcornFlavors } from '../../../api/taste';
+import { getRatingCounts } from '../../../api/watch';
 import { path } from '../../../routes/paths';
 import styles from './RatingResultPage.module.css';
 import type { RatingCounts } from '../../../api/watch';
@@ -63,8 +69,8 @@ type ResultState = {
   rating: Rating;
   /** 저장 전 수치. 2.6이 그린다 */
   counts: RatingCounts;
-  /** 저장 후 실측 수치. 2.5가 읽지 못했으면 `null`이다 */
-  after: RatingCounts | null;
+  /** 저장 후 실측 수치. 아직 읽기 전이면 없고, 읽지 못했으면 `null`이다 */
+  after?: RatingCounts | null;
   movieTitle: string;
   posterUrl: string | null;
 };
@@ -74,8 +80,10 @@ export default function RatingResultPage() {
   const location = useLocation();
   const state = location.state as ResultState | null;
 
-  const [done, setDone] = useState(false);
+  const [elapsed, setElapsed] = useState(false);
   const [flavors, setFlavors] = useState<PopcornFlavor[]>([]);
+  const hasState = state !== null;
+  const measured = state?.after !== undefined;
 
   // Router state가 없으면 수치를 복원할 수 없다
   useEffect(() => {
@@ -92,22 +100,45 @@ export default function RatingResultPage() {
   }, []);
 
   useEffect(() => {
-    if (!state) {
+    if (!state || measured) {
       return;
     }
 
-    const timer = setTimeout(() => setDone(true), TRANSITION_MS);
+    let active = true;
+
+    // 저장은 이미 끝났으므로 읽지 못해도 되돌리지 않는다. 2.7이 계약의 증가량으로 물러선다
+    getRatingCounts()
+      .catch(() => null)
+      .then((after) => {
+        if (active) {
+          void navigate(location.pathname, { replace: true, state: { ...state, after } });
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [state, measured, location.pathname, navigate]);
+
+  // 실측을 적느라 state가 바뀌어도 전환 시간을 다시 재지 않는다
+  useEffect(() => {
+    if (!hasState) {
+      return;
+    }
+
+    const timer = setTimeout(() => setElapsed(true), TRANSITION_MS);
 
     return () => {
       clearTimeout(timer);
     };
-  }, [state]);
+  }, [hasState]);
 
   if (!state) {
     return null;
   }
 
-  const { rating, counts, after, posterUrl } = state;
+  const { rating, counts, after = null, posterUrl } = state;
+  const done = elapsed && measured;
   // 대표 맛이 없는 영화의 평가는 팝콘을 만들지 않는다(API-036 · API-041)
   const hasPopcorn = rating.popcorn.flavorCode !== null;
   /*

@@ -40,7 +40,7 @@
  * 알리고 상세를 다시 읽어 수정 모드로 바꾼다. 나머지(`400` 검증 · `404` · 네트워크)는
  * 서버 문구를 그대로 보여준다.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import Poster from '../../../components/Poster';
@@ -57,6 +57,7 @@ import { path } from '../../../routes/paths';
 import { formatMonthDay } from '../../../utils/date';
 import { movieMetaLine } from '../../../utils/movie';
 import styles from './MovieRatingPage.module.css';
+import type { RatingCounts } from '../../../api/watch';
 import type { MovieDetail } from '../../../types/movie';
 
 /** 무엇을 평가하는지 확인시키는 작은 포스터. 이 화면의 주인공은 별점이다 */
@@ -85,6 +86,13 @@ export default function MovieRatingPage() {
 
   const id = Number(movieId);
 
+  /*
+   * 추가 전 수치를 화면에 들어올 때 미리 받아 둔다(업무 -635). `평가 완료`를 누른 뒤
+   * 수치 조회 · 저장 · 재조회를 차례로 기다리느라 2.6이 늦게 떴다. 별점을 고르는 사이 수치가
+   * 바뀌는 것은 다른 기기의 평가나 대표 맛 배정뿐이고, 그래도 2.7은 저장 후 실측과의 차이로
+   * 적는다. 실패했으면 누를 때 다시 받는다
+   */
+  const countsRequest = useRef<Promise<RatingCounts> | null>(null);
   const [movie, setMovie] = useState<MovieDetail | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
@@ -97,12 +105,29 @@ export default function MovieRatingPage() {
   /** 저장 실패 문구. 다시 저장을 시도하면 지운다 */
   const [failure, setFailure] = useState<string | null>(null);
 
+  /** 실패한 요청은 비워서 다음에 누를 때 새로 받게 한다 */
+  function requestCounts() {
+    const request = getRatingCounts();
+
+    request.catch(() => {
+      if (countsRequest.current === request) {
+        countsRequest.current = null;
+      }
+    });
+
+    return request;
+  }
+
   useEffect(() => {
     let active = true;
 
     getMovieDetail(id)
       .then((detail) => {
         if (active) {
+          // 수정은 프레임을 만들지 않아 수치를 쓰지 않는다
+          if (!detail.myRating && !countsRequest.current) {
+            countsRequest.current = requestCounts();
+          }
           setMovie(detail);
           setFailed(false);
           setScore(detail.myRating?.score ?? 0);
@@ -169,8 +194,9 @@ export default function MovieRatingPage() {
         return;
       }
 
-      // 추가 전 수치를 먼저 받는다. 여기서 실패하면 저장하지 않으므로 다시 눌러도 `409`가 없다
-      const counts = await getRatingCounts();
+      // 추가 전 수치가 있어야 저장한다. 여기서 실패하면 저장하지 않으므로 다시 눌러도 `409`가 없다
+      countsRequest.current ??= requestCounts();
+      const counts = await countsRequest.current;
       const rating = await createRating(
         movie.movieId,
         // comment가 있으면 visibility가 필수다(API-036). 선택 UI가 없어 기본값 PRIVATE
@@ -178,21 +204,11 @@ export default function MovieRatingPage() {
       );
 
       /*
-       * 추가 **후** 수치도 서버에서 읽어 넘긴다(업무 -599). 예전에는 2.7이 추가 전 수치에
-       * `+1`을 더해 지어냈는데, 그 전제는 평가 한 건이 팝콘을 정확히 한 알 움직일 때만
-       * 참이다. 계약은 그렇지만(평가 1건 = 프레임 1개 + 대표 맛이 있으면 팝콘 1알) 팝콘
-       * 집계는 `대표 맛이 있는 영화의 평가`를 세므로, 영화에 대표 맛이 붙는 것만으로도
-       * 과거 평가가 뒤늦게 버킷에 들어온다. 그때 실제 값은 두 알이 늘고 화면만 한 알을
-       * 단언한다.
-       *
-       * 저장은 이미 끝났으므로 이 조회가 실패해도 되돌리지 않는다. 2.7이 계약이 정한
-       * 증가량으로 물러서서 그린다.
+       * 2.6은 추가 전 수치만 그리므로 저장이 끝나면 바로 넘어간다. 추가 **후** 수치는 2.6이
+       * 떠 있는 동안 그 화면이 읽는다(업무 -635). 전에는 여기서 재조회까지 기다렸다
        */
-      const after = await getRatingCounts().catch(() => null);
-
-      // 2.6 · 2.7은 이 수치가 있어야 성립하므로 Router state로 넘긴다
       void navigate(path.ratingResult(movie.movieId), {
-        state: { rating, counts, after, movieTitle: movie.title, posterUrl: movie.posterUrl },
+        state: { rating, counts, movieTitle: movie.title, posterUrl: movie.posterUrl },
       });
     } catch (error) {
       setFailure(failureMessage(error));
