@@ -14,7 +14,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import MovieDetailPage from './index';
 import { renderWithRouter } from '../../../test/render';
+import { AuthContext } from '../../../contexts/authContext';
 import { ROUTE_PATTERN, path } from '../../../routes/paths';
+import type { AuthStatus, AuthValue } from '../../../contexts/authContext';
 import type { MovieDetail } from '../../../types/movie';
 import type { WatchRecord } from '../../../types/watch';
 
@@ -92,11 +94,31 @@ function deferredRecord() {
   return { promise, resolve, reject };
 }
 
-function renderMovie(movieId = 101) {
-  return renderWithRouter(<MovieDetailPage />, {
-    route: path.movieDetail(movieId),
-    path: ROUTE_PATTERN.movieDetail,
-  });
+/*
+ * API-030은 선택 인증이라 세션 복구 전에 부르면 비회원 응답이 굳는다(업무 -600).
+ * 화면이 `status`를 보고 기다리므로 테스트도 인증 상태를 준다.
+ */
+function authValue(status: AuthStatus): AuthValue {
+  return {
+    status,
+    user: null,
+    signIn: vi.fn(),
+    signInWithSocial: vi.fn(),
+    completeSocialSignup: vi.fn(),
+    signOut: vi.fn(),
+  };
+}
+
+function renderMovie(movieId = 101, status: AuthStatus = 'anonymous') {
+  return renderWithRouter(
+    <AuthContext.Provider value={authValue(status)}>
+      <MovieDetailPage />
+    </AuthContext.Provider>,
+    {
+      route: path.movieDetail(movieId),
+      path: ROUTE_PATTERN.movieDetail,
+    },
+  );
 }
 
 const location = () => screen.getByTestId('location').textContent;
@@ -207,6 +229,29 @@ describe('2.4 OTT 아이콘', () => {
     });
     expect(open).not.toHaveBeenCalled();
     expect(recordOttClick).toHaveBeenCalledWith(101, 2);
+  });
+});
+
+describe('2.4 선택 인증', () => {
+  /*
+   * API-030은 비회원에게도 200을 준다. 복구 중에 부르면 `myRating`과 `subscribed`가 빠진
+   * 응답이 굳고, `client.ts`의 재시도는 401에만 돌아 되살릴 수단이 없다(업무 -600).
+   */
+  it('세션을 복구하는 동안에는 상세를 부르지 않는다', async () => {
+    renderMovie(101, 'restoring');
+
+    // 유사 영화·한줄평은 401 재시도로 되살아나므로 복구를 기다리지 않는다
+    await waitFor(() => {
+      expect(getSimilarMovies).toHaveBeenCalled();
+    });
+    expect(getMovieDetail).not.toHaveBeenCalled();
+  });
+
+  it('복구가 끝나면 상세를 부른다', async () => {
+    renderMovie(101, 'authenticated');
+
+    await screen.findByRole('heading', { level: 1, name: '괴물' });
+    expect(getMovieDetail).toHaveBeenCalledWith(101, undefined);
   });
 });
 

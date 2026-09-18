@@ -21,6 +21,7 @@ import { ChevronLeftIcon } from '../../../components/Icon';
 import { ApiError } from '../../../api/apiError';
 import { getMovieDetail, getMovieReviews, getSimilarMovies } from '../../../api/movies';
 import { recordOttClick } from '../../../api/watch';
+import { useAuth } from '../../../contexts/authContext';
 import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
 import { movieMetaLine } from '../../../utils/movie';
@@ -56,6 +57,23 @@ export default function MovieDetailPage() {
   const queryItemId = Number(searchParams.get('recommendationItemId')) || undefined;
   const recommendationItemId = routeState?.recommendationItemId ?? queryItemId;
 
+  /*
+   * API-030은 **선택 인증**이라 토큰 없이 불러도 `200`이다. 그래서 세션 복구가 끝나기 전에
+   * 부르면 비회원 응답이 그대로 굳는다 — `myRating` · `myWatchStatus` · `recommendation`이
+   * `null`이고 모든 OTT의 `subscribed`가 `false`인 화면이다(계약 처리 규칙).
+   *
+   * `client.ts`의 재시도는 `401`일 때만 도는데 비회원 조회는 `200`이라 걸리지 않는다.
+   * `AuthProvider`는 복구를 기다리지 않고 화면을 그리므로 콜드 로드에서 이 경합이 실제로
+   * 일어나고, SPA 이동으로 들어오면 토큰이 메모리에 있어 같은 화면이 다르게 보인다.
+   * 배포본에서 새로고침하면 내 평가와 구독 표시가 사라지는 것이 이 때문이었다(업무 -600).
+   *
+   * 그래서 `restoring` 동안에는 부르지 않는다. 비회원이 확정되면 그대로 비회원 조회다.
+   * 유사 영화(API-031)와 한줄평(API-032)은 `required`라 `401` → 재발급 → 재시도로
+   * 되살아나므로 기다릴 필요가 없다.
+   */
+  const { status: authStatus } = useAuth();
+  const sessionSettled = authStatus !== 'restoring';
+
   const [movie, setMovie] = useState<MovieDetail | null>(null);
   const [similar, setSimilar] = useState<SimilarMovie[]>([]);
   const [reviewPage, setReviewPage] = useState<{
@@ -84,6 +102,9 @@ export default function MovieDetailPage() {
   } | null>(null);
 
   useEffect(() => {
+    // 복구가 끝나기 전에 부르면 비회원 응답이 굳는다(위 주석)
+    if (!sessionSettled) return;
+
     let active = true;
 
     getMovieDetail(id, recommendationItemId)
@@ -98,6 +119,14 @@ export default function MovieDetailPage() {
           setFailure(error instanceof ApiError && error.status === 404 ? 'notFound' : 'error');
         }
       });
+
+    return () => {
+      active = false;
+    };
+  }, [id, recommendationItemId, reloadCount, sessionSettled]);
+
+  useEffect(() => {
+    let active = true;
 
     getSimilarMovies(id)
       .then((items) => {
@@ -120,7 +149,7 @@ export default function MovieDetailPage() {
     return () => {
       active = false;
     };
-  }, [id, recommendationItemId, reloadCount]);
+  }, [id, reloadCount]);
 
   useEffect(() => {
     window.scrollTo(0, 0);
