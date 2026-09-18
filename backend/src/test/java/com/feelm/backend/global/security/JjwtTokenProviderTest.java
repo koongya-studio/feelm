@@ -29,12 +29,18 @@ class JjwtTokenProviderTest {
 
     private static JjwtTokenProvider provider(
             String secret, Duration accessTtl, Duration signupTtl) {
+        return provider(secret, accessTtl, signupTtl, Duration.ofMinutes(10));
+    }
+
+    private static JjwtTokenProvider provider(
+            String secret, Duration accessTtl, Duration signupTtl, Duration emailVerificationTtl) {
         return new JjwtTokenProvider(
                 new JwtProperties(
                         secret,
                         accessTtl,
                         Duration.ofDays(14),
                         signupTtl,
+                        emailVerificationTtl,
                         Duration.ofSeconds(10),
                         new JwtProperties.RefreshCookie(
                                 "refresh_token", "/api/v1/auth", true, "Lax")));
@@ -186,6 +192,70 @@ class JjwtTokenProviderTest {
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
                 .isEqualTo(ErrorCode.UNAUTHORIZED);
+    }
+
+    @Test
+    @DisplayName("발급한 이메일 인증 토큰에서 이메일과 식별자를 되읽는다")
+    void parsesEmailVerificationToken() {
+        String token =
+                provider.createEmailVerificationToken(
+                        new TokenProvider.EmailVerificationTokenClaims(
+                                "signup@example.com", "token-id-1"));
+
+        TokenProvider.EmailVerificationTokenClaims claims =
+                provider.parseEmailVerificationToken(token);
+
+        assertThat(claims.email()).isEqualTo("signup@example.com");
+        assertThat(claims.tokenId()).isEqualTo("token-id-1");
+    }
+
+    @Test
+    @DisplayName("만료된 이메일 인증 토큰은 EMAIL_VERIFICATION_TOKEN_INVALID로 거절한다")
+    void expiredEmailVerificationTokenIsRejected() {
+        JjwtTokenProvider expiring =
+                provider(
+                        SECRET,
+                        Duration.ofMinutes(30),
+                        Duration.ofMinutes(10),
+                        Duration.ofMinutes(-1));
+        String token =
+                expiring.createEmailVerificationToken(
+                        new TokenProvider.EmailVerificationTokenClaims(
+                                "signup@example.com", "token-id-2"));
+
+        assertThatThrownBy(() -> provider.parseEmailVerificationToken(token))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.EMAIL_VERIFICATION_TOKEN_INVALID);
+    }
+
+    /** 한 종류가 다른 자리에서 통하면 소셜 가입 토큰으로 이메일 계정을 만들거나 그 반대가 가능해진다(API-001 처리 규칙). */
+    @Test
+    @DisplayName("소셜 가입 토큰을 이메일 인증 토큰 자리에 쓸 수 없다")
+    void signupTokenIsNotAcceptedAsEmailVerificationToken() {
+        String signupToken =
+                provider.createSignupToken(
+                        new TokenProvider.SignupTokenClaims(
+                                "GOOGLE", "provider-user-5", "social@example.com", "소셜사용자"));
+
+        assertThatThrownBy(() -> provider.parseEmailVerificationToken(signupToken))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.EMAIL_VERIFICATION_TOKEN_INVALID);
+    }
+
+    @Test
+    @DisplayName("이메일 인증 토큰을 소셜 가입 토큰 자리에 쓸 수 없다")
+    void emailVerificationTokenIsNotAcceptedAsSignupToken() {
+        String token =
+                provider.createEmailVerificationToken(
+                        new TokenProvider.EmailVerificationTokenClaims(
+                                "signup@example.com", "token-id-3"));
+
+        assertThatThrownBy(() -> provider.parseSignupToken(token))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.SIGNUP_TOKEN_INVALID);
     }
 
     private static String headerOf(String token) {

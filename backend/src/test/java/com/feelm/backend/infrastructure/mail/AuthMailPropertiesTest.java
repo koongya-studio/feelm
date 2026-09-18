@@ -27,21 +27,21 @@ class AuthMailPropertiesTest {
     @Test
     @DisplayName("인증 링크는 설정된 화면 주소에 token 쿼리를 붙인다")
     void verificationLinkAppendsToken() {
-        assertThat(PROPERTIES.link(MailKind.VERIFICATION, "raw-token"))
+        assertThat(PROPERTIES.content(MailKind.VERIFICATION, "raw-token"))
                 .isEqualTo("https://feelm.example/verify-email?token=raw-token");
     }
 
     @Test
     @DisplayName("재설정 링크는 설정된 화면 주소에 token 쿼리를 붙인다")
     void passwordResetLinkAppendsToken() {
-        assertThat(PROPERTIES.link(MailKind.PASSWORD_RESET, "raw-token"))
+        assertThat(PROPERTIES.content(MailKind.PASSWORD_RESET, "raw-token"))
                 .isEqualTo("https://feelm.example/reset-password?token=raw-token");
     }
 
     @Test
     @DisplayName("두 링크는 서로 다른 화면으로 간다")
     void linksTargetDifferentScreens() {
-        assertThat(PROPERTIES.link(MailKind.PASSWORD_RESET, "raw-token"))
-                .isNotEqualTo(PROPERTIES.link(MailKind.VERIFICATION, "raw-token"));
+        assertThat(PROPERTIES.content(MailKind.PASSWORD_RESET, "raw-token"))
+                .isNotEqualTo(PROPERTIES.content(MailKind.VERIFICATION, "raw-token"));
     }
 }

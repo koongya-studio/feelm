@@ -991,6 +991,7 @@ class PublicReviewContractTest extends SharedPostgresContractTest {
                                 Duration.ofSeconds(-1),
                                 jwtProperties.refreshTokenTtl(),
                                 jwtProperties.signupTokenTtl(),
+                                jwtProperties.emailVerificationTokenTtl(),
                                 jwtProperties.refreshRotationGrace(),
                                 jwtProperties.refreshCookie()));
         return expiring.createAccessToken(viewerId);

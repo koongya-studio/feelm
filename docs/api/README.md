@@ -32,6 +32,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 ### 표기
 
 - **ID**: `API-nnn`. Jira·MR·코드 주석에서 이 ID로 참조합니다. `API-000`은 공통 규약입니다.
+- **채번**: 번호는 순차 증가하며 **재사용하지 않습니다**. 삭제한 API의 번호도 비워 두고 [삭제된 API](#삭제된-api)에 사유를 남깁니다. 같은 번호가 다른 계약을 가리키면 Jira·MR·코드 주석의 과거 참조가 조용히 틀린 곳을 가리키게 됩니다.
 - **단계**: `1차 MVP` → `2차 MVP` → `확장` 순으로 구현합니다.
 - **인증**: `공개` 비회원 호출 가능 / `회원` Access Token 필수 / `선택` 비회원 가능하나 로그인 시 개인화·차단 필터 적용
 - **관련 요구사항**: [요구사항 정의서](../requirements.md)의 FR/NFR ID
@@ -43,9 +44,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 
 | ID | 이름 | Method | Endpoint | 도메인 | 단계 | 인증 | 관련 요구사항 | 미정 |
 |---|---|---|---|---|---|---|---|---|
-| API-001 | [이메일 회원가입](./users.md#api-001-이메일-회원가입) | POST | `/auth/signup` | 사용자 | 1차 MVP | 공개 | FR-01 | O |
-| API-002 | [이메일 인증 확인](./users.md#api-002-이메일-인증-확인) | POST | `/auth/email/verify` | 사용자 | 1차 MVP | 공개 | FR-01 |  |
-| API-003 | [인증 메일 재발송](./users.md#api-003-인증-메일-재발송) | POST | `/auth/email/resend` | 사용자 | 1차 MVP | 공개 | FR-01 |  |
+| API-001 | [이메일 회원가입](./users.md#api-001-이메일-회원가입) | POST | `/auth/signup` | 사용자 | 1차 MVP | 공개 | FR-01 |  |
 | API-004 | [이메일 로그인](./users.md#api-004-이메일-로그인) | POST | `/auth/login` | 사용자 | 1차 MVP | 공개 | FR-01 |  |
 | API-005 | [로그아웃](./users.md#api-005-로그아웃) | POST | `/auth/logout` | 사용자 | 1차 MVP | 회원 | FR-01 |  |
 | API-006 | [토큰 재발급](./users.md#api-006-토큰-재발급) | POST | `/auth/token/refresh` | 사용자 | 1차 MVP | 공개 | FR-01 |  |
@@ -119,6 +118,15 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-075 | [Web Push 공개 설정 조회](./notifications.md#api-075-web-push-공개-설정-조회) | GET | `/notifications/push/config` | 알림 | 2차 MVP | 회원 | FR-41 |  |
 | API-076 | [Web Push 구독 등록·갱신](./notifications.md#api-076-web-push-구독-등록갱신) | PUT | `/notifications/push/subscriptions` | 알림 | 2차 MVP | 회원 | FR-41 |  |
 | API-077 | [Web Push 구독 해제](./notifications.md#api-077-web-push-구독-해제) | DELETE | `/notifications/push/subscriptions/{subscriptionId}` | 알림 | 2차 MVP | 회원 | FR-41 |  |
+| API-078 | [이메일 인증번호 발송](./users.md#api-078-이메일-인증번호-발송) | POST | `/auth/email/verification-code` | 사용자 | 1차 MVP | 공개 | FR-01 |  |
+| API-079 | [이메일 인증번호 확인](./users.md#api-079-이메일-인증번호-확인) | POST | `/auth/email/verification-code/verify` | 사용자 | 1차 MVP | 공개 | FR-01 |  |
+
+### 삭제된 API
+
+| ID | 이름 | 삭제 | 사유 |
+|---|---|---|---|
+| API-002 | 이메일 인증 확인 | S15P21E106-601 | 가입 흐름이 메일 링크 인증에서 인증번호 확인으로 바뀌면서 사라졌습니다. 대체 경로는 API-079입니다 |
+| API-003 | 인증 메일 재발송 | S15P21E106-601 | 같은 개정. 재발송은 인증번호 발송(API-078)을 다시 호출하는 것으로 대신합니다 |
 
 ## 공통 규약
 

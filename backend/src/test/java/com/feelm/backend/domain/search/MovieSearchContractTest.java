@@ -889,6 +889,7 @@ class MovieSearchContractTest extends SharedPostgresContractTest {
                                 Duration.ofMinutes(-1),
                                 jwtProperties.refreshTokenTtl(),
                                 jwtProperties.signupTokenTtl(),
+                                jwtProperties.emailVerificationTokenTtl(),
                                 jwtProperties.refreshRotationGrace(),
                                 jwtProperties.refreshCookie()));
         String expiredToken = expiredTokenProvider.createAccessToken(MovieSearchFixture.MEMBER_ID);

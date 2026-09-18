@@ -9,6 +9,9 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  *
  * <p>{@code signupTokenTtl}은 소셜 가입을 마칠 때까지만 유효한 토큰의 수명이다(API-007 처리 규칙의 10분).
  *
+ * <p>{@code emailVerificationTokenTtl}은 이메일 인증번호 확인(API-079)이 발급하고 이메일 회원가입(API-001)이 쓰는 토큰의
+ * 수명이다(API-079 처리 규칙의 10분).
+ *
  * <p>{@code refreshRotationGrace}는 회전 직후 같은 Refresh Token이 한 번 더 도착해도 탈취로 보지 않는 시간이다(API-006 처리
  * 규칙). 응답을 받지 못한 채 끊긴 재발급이 다시 오는 정상 경우까지 전량 폐기로 처리하지 않기 위한 값이며, 길수록 탈취된 토큰이 통하는 창도 넓어진다.
  *
@@ -21,6 +24,7 @@ public record JwtProperties(
         @DefaultValue("30m") Duration accessTokenTtl,
         @DefaultValue("14d") Duration refreshTokenTtl,
         @DefaultValue("10m") Duration signupTokenTtl,
+        @DefaultValue("10m") Duration emailVerificationTokenTtl,
         @DefaultValue("10s") Duration refreshRotationGrace,
         @DefaultValue RefreshCookie refreshCookie) {
 

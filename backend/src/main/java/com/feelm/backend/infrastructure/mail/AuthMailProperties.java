@@ -28,7 +28,7 @@ public record AuthMailProperties(
     }
 
     /**
-     * 메일 종류에 맞는 링크를 만든다(플랜 결정 7).
+     * 메일 종류에 맞는 본문 값을 만든다(플랜 결정 7). 링크를 쓰는 종류는 화면 주소에 토큰을 붙이고, 인증번호 메일은 번호를 그대로 쓴다.
      *
      * <p>링크는 프론트 화면으로 가고 프론트가 API를 호출한다(인증은 API-002, 재설정은 API-011). 토큰은 Base64URL(패딩 없음) 문자만 쓰므로 별도
      * URL 인코딩이 필요하지 않다.
@@ -40,10 +40,12 @@ public record AuthMailProperties(
      * <p>종류별 분기를 발송 구현이 아니라 여기에 두는 이유는 화면 주소가 설정값이기 때문이다. 종류가 늘면 {@link MailKind}에 값을 추가하고 이 분기에 그
      * 주소를 연결한다. {@code switch}에 default를 두지 않아 값을 추가하면 컴파일이 실패하며 여기를 가리킨다.
      */
-    public String link(MailKind kind, String rawToken) {
+    public String content(MailKind kind, String rawValue) {
         return switch (kind) {
-            case VERIFICATION -> verificationUrl + "?token=" + rawToken;
-            case PASSWORD_RESET -> passwordResetUrl + "?token=" + rawToken;
+            case VERIFICATION -> verificationUrl + "?token=" + rawValue;
+            case PASSWORD_RESET -> passwordResetUrl + "?token=" + rawValue;
+            // 인증번호 메일(API-078)에는 링크가 없다. 번호 자체가 본문에 들어가는 값이다.
+            case VERIFICATION_CODE -> rawValue;
         };
     }
 }
