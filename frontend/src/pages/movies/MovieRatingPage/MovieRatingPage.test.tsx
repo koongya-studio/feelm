@@ -3,8 +3,9 @@
  *
  * 고정하는 것은 세 가지다.
  *
- * - **저장에 성공하면 API-036 응답과 추가 전 수치를 그대로 2.6에 넘긴다.** 2.6 · 2.7은
- *   Router state만 보고 그리므로, 여기서 빠진 값은 그 화면에서 지어낼 수 없다
+ * - **저장에 성공하면 API-036 응답과 추가 전 · 후 수치를 그대로 2.6에 넘긴다.** 2.6 · 2.7은
+ *   Router state만 보고 그리므로, 여기서 빠진 값은 그 화면에서 지어낼 수 없다. 추가 후 수치는
+ *   저장이 끝난 뒤 다시 읽은 실측이다(업무 -599)
  * - **실패하면 화면에 남기고 이동하지 않는다.** 서버 문구를 그대로 쓰고, 다시 누를 수 있다
  * - **`409 RATING_ALREADY_EXISTS`는 수정 모드로 바꾼다.** 상세를 읽은 뒤 다른 곳에서 평가가
  *   생긴 경우다. 알리기만 하면 사용자는 같은 요청을 반복하게 된다
@@ -26,13 +27,13 @@ vi.mock('../../../api/otts', () => ({ getOtts: vi.fn() }));
 vi.mock('../../../api/watch', () => ({
   createRating: vi.fn(),
   findWatchedRecord: vi.fn(),
-  getCountsBeforeRating: vi.fn(),
+  getRatingCounts: vi.fn(),
   updateRating: vi.fn(),
 }));
 
 const { getMovieDetail } = await import('../../../api/movies');
 const { getOtts } = await import('../../../api/otts');
-const { createRating, findWatchedRecord, getCountsBeforeRating, updateRating } =
+const { createRating, findWatchedRecord, getRatingCounts, updateRating } =
   await import('../../../api/watch');
 
 /** 아직 평가하지 않은 실제 영화(API-030) */
@@ -73,12 +74,14 @@ const created: Rating = {
 };
 
 const counts = { frameCount: 12, popcornCount: 7, weeklyFrameDelta: 3 };
+/** 저장 뒤 서버가 실제로 보여 주는 수치. 2.5가 한 번 더 읽는다(업무 -599) */
+const after = { frameCount: 13, popcornCount: 8, weeklyFrameDelta: 3 };
 
 beforeEach(() => {
   vi.mocked(getMovieDetail).mockReset().mockResolvedValue(movie);
   vi.mocked(getOtts).mockReset().mockResolvedValue([]);
   vi.mocked(findWatchedRecord).mockReset().mockResolvedValue(null);
-  vi.mocked(getCountsBeforeRating).mockReset().mockResolvedValue(counts);
+  vi.mocked(getRatingCounts).mockReset().mockResolvedValueOnce(counts).mockResolvedValue(after);
   vi.mocked(createRating).mockReset().mockResolvedValue(created);
   vi.mocked(updateRating).mockReset().mockResolvedValue(created);
 });
@@ -138,9 +141,30 @@ describe('2.5 평가 저장', () => {
     expect(state).toEqual({
       rating: created,
       counts,
+      after,
       movieTitle: '파이트 클럽',
       posterUrl: null,
     });
+    // 저장 전에 한 번, 저장 뒤에 한 번이다
+    expect(getRatingCounts).toHaveBeenCalledTimes(2);
+  });
+
+  it('저장 뒤 수치를 읽지 못해도 이동하고 2.7이 물러서서 그리게 한다', async () => {
+    vi.mocked(getRatingCounts)
+      .mockReset()
+      .mockResolvedValueOnce(counts)
+      .mockRejectedValue(new ApiError(0, 'NETWORK_ERROR', '네트워크에 연결할 수 없습니다.'));
+
+    renderPage();
+
+    await rate(4.5);
+
+    // 저장은 이미 끝났으므로 실패로 되돌리지 않는다
+    await waitFor(() => expect(location()).toBe('/movies/550/rate/result'));
+
+    const state = JSON.parse(screen.getByTestId('result').getAttribute('data-state') ?? '{}');
+    expect(state.after).toBeNull();
+    expect(state.counts).toEqual(counts);
   });
 
   it('한줄평이 있으면 공개 범위와 스포일러 여부를 붙여 보낸다', async () => {
@@ -167,9 +191,9 @@ describe('2.5 평가 저장', () => {
   });
 
   it('추가 전 수치를 받지 못하면 저장하지 않고 알린다', async () => {
-    vi.mocked(getCountsBeforeRating).mockRejectedValue(
-      new ApiError(0, 'NETWORK_ERROR', '네트워크에 연결할 수 없습니다.'),
-    );
+    vi.mocked(getRatingCounts)
+      .mockReset()
+      .mockRejectedValue(new ApiError(0, 'NETWORK_ERROR', '네트워크에 연결할 수 없습니다.'));
 
     renderPage();
 
