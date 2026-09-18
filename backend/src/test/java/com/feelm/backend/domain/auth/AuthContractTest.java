@@ -393,7 +393,6 @@ class AuthContractTest {
                         "auth" + suffix,
                         LocalDate.of(1999, 3, 14),
                         Gender.FEMALE);
-        user.activate();
         return userRepository.saveAndFlush(user).getId();
     }
 

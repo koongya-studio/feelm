@@ -20,18 +20,18 @@ import org.springframework.boot.test.system.CapturedOutput;
 class AsyncMailDispatchTest extends EmailAuthApiTestSupport {
 
     @Test
-    @DisplayName("가입 응답은 인증 메일 발송이 끝나기 전에 돌아온다")
-    void signupDoesNotWaitForMailSend() throws Exception {
+    @DisplayName("인증번호 발송 응답은 메일 발송이 끝나기 전에 돌아온다")
+    void verificationCodeDoesNotWaitForMailSend() throws Exception {
         TestAccount account = newAccount();
 
-        verificationMails().blockSends();
-        signup(signupBody(account)).andExpect(status().isCreated());
+        verificationCodeMails().blockSends();
+        sendVerificationCode(account.email()).andExpect(status().isAccepted());
 
-        assertThat(verificationMails().tokens()).as("응답 시점에는 발송이 끝나지 않았다").isEmpty();
+        assertThat(verificationCodeMails().tokens()).as("응답 시점에는 발송이 끝나지 않았다").isEmpty();
 
-        verificationMails().releaseSends();
+        verificationCodeMails().releaseSends();
         awaitMailsDispatched();
-        assertThat(verificationMails().tokens()).as("발송은 응답 뒤에 끝난다").hasSize(1);
+        assertThat(verificationCodeMails().tokens()).as("발송은 응답 뒤에 끝난다").hasSize(1);
     }
 
     @Test

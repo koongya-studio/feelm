@@ -238,15 +238,24 @@ abstract class EmailAuthApiTestSupport {
         return new TestAccount("user" + suffix + "@example.com", "user" + suffix, VALID_PASSWORD);
     }
 
-    static String signupBody(TestAccount account) {
+    /**
+     * 가입 요청 본문을 만든다. 이메일은 본문이 아니라 토큰에서 읽으므로(API-001) 인증번호 발송·확인(API-078·076)을 먼저 거친다
+     * (S15P21E106-603).
+     */
+    String signupBody(TestAccount account) throws Exception {
         return signupBody(account.email(), account.password(), account.nickname());
     }
 
-    static String signupBody(String email, String password, String nickname) {
+    String signupBody(String email, String password, String nickname) throws Exception {
+        return signupBodyWithToken(issueEmailVerificationToken(email), password, nickname);
+    }
+
+    /** 토큰을 직접 지정해 가입 본문을 만든다. 위조·재사용 토큰 시나리오와 정적 파라미터 목록에 쓴다. */
+    static String signupBodyWithToken(String token, String password, String nickname) {
         return """
-                {"email":"%s","password":"%s","nickname":"%s","birthDate":"%s","gender":"%s"}
+                {"emailVerificationToken":"%s","password":"%s","nickname":"%s",                "birthDate":"%s","gender":"%s"}
                 """
-                .formatted(email, password, nickname, VALID_BIRTH_DATE, VALID_GENDER);
+                .formatted(token, password, nickname, VALID_BIRTH_DATE, VALID_GENDER);
     }
 
     /** 테스트 사이에 IP 단위 발송 제한이 섞이지 않도록 요청마다 다른 IP에서 보낸다. */
@@ -315,8 +324,14 @@ abstract class EmailAuthApiTestSupport {
         return codes.getLast();
     }
 
-    /** API-078·076을 거쳐 가입(API-001)에 쓸 이메일 인증 토큰을 얻는다. */
+    /**
+     * API-078·079를 거쳐 가입(API-001)에 쓸 이메일 인증 토큰을 얻는다.
+     *
+     * <p>같은 이메일로 여러 번 부를 수 있도록 이메일 간격 슬롯을 먼저 지운다. 간격 제한 자체를 검증하는 테스트는 이 헬퍼가 아니라 {@link
+     * #sendVerificationCode}를 직접 쓴다.
+     */
     String issueEmailVerificationToken(String email) throws Exception {
+        clearVerificationCodeInterval(email);
         MvcResult result =
                 verifyVerificationCode(email, requestVerificationCode(email))
                         .andExpect(status().isOk())
@@ -331,6 +346,25 @@ abstract class EmailAuthApiTestSupport {
      */
     void clearVerificationCodeInterval(String email) {
         redisTemplate.delete("auth:email-code-interval:" + Sha256Hasher.hex(email));
+    }
+
+    /**
+     * 개정 전 미인증 계정 앞으로 인증 메일(API-003)을 보내고 그 토큰 원문을 돌려준다.
+     *
+     * <p>가입이 더 이상 인증 메일을 보내지 않으므로(S15P21E106-603) 링크 인증 경로를 검증하는 테스트는 재발송으로 토큰을 얻는다. 이 헬퍼와 링크 경로는
+     * S15P21E106-604가 함께 없앤다.
+     */
+    String pendingVerificationToken(TestAccount account) throws Exception {
+        clearResendInterval(account.email());
+        resend(account.email()).andExpect(status().isAccepted());
+        List<String> tokens = verificationTokens(null);
+        assertThat(tokens).as("인증 메일이 발송되지 않았다").isNotEmpty();
+        return tokens.getLast();
+    }
+
+    /** 재발송(API-003)의 이메일 간격(1분)을 지운다. 같은 이메일로 두 번 보내야 하는 시나리오에 쓴다. */
+    void clearResendInterval(String email) {
+        redisTemplate.delete("auth:email-resend:" + Sha256Hasher.hex(email));
     }
 
     /** 인증번호 저장 키(S15P21E106-602). 원문이 저장되지 않았음을 확인하는 데 쓴다. */
@@ -378,17 +412,41 @@ abstract class EmailAuthApiTestSupport {
                 "{\"token\":\"%s\",\"newPassword\":\"%s\"}".formatted(token, newPassword));
     }
 
-    /** 가입만 마친 {@code PENDING_VERIFICATION} 사용자를 만들고 userId를 돌려준다. */
+    /**
+     * 개정 전 흐름이 남긴 미인증({@code PENDING_VERIFICATION}) 계정을 만들고 userId를 돌려준다.
+     *
+     * <p>새 가입 흐름은 이 상태를 만들지 않으므로(S15P21E106-603) 가입을 마친 계정의 상태만 SQL로 되돌린다. 배포 DB에 남아 있는 행과 같은 상태이며,
+     * 이 상태 자체와 이 헬퍼는 S15P21E106-604가 없앤다.
+     */
     long signupPending(TestAccount account) throws Exception {
-        MvcResult result = signup(signupBody(account)).andExpect(status().isCreated()).andReturn();
-        return longField(result, "userId");
+        long userId = signupActive(account);
+        jdbcTemplate.update(
+                "update users set status = 'PENDING_VERIFICATION' where id = ?", userId);
+        return userId;
     }
 
-    /** 가입과 인증을 모두 마친 {@code ACTIVE} 사용자를 만든다. */
+    /** 가입을 마친 {@code ACTIVE} 사용자를 만든다. */
+    long signupActive(TestAccount account) throws Exception {
+        MvcResult result = signup(signupBody(account)).andExpect(status().isCreated()).andReturn();
+        return signupUserId(result);
+    }
+
+    /**
+     * 가입을 마친 {@code ACTIVE} 사용자를 만든다.
+     *
+     * <p>{@code output}은 쓰지 않는다. 가입이 인증 메일을 보내던 시절의 시그니처이며 호출 측을 그대로 두기 위해 남겼다.
+     */
     long signupActive(TestAccount account, CapturedOutput output) throws Exception {
-        long userId = signupPending(account);
-        verifyEmail(latestVerificationToken(output)).andExpect(status().isOk());
-        return userId;
+        return signupActive(account);
+    }
+
+    /** 가입 응답(API-001)의 사용자 식별자. 응답 본문이 로그인과 같은 형태라 {@code user} 아래에 있다. */
+    long signupUserId(MvcResult result) throws Exception {
+        return objectMapper
+                .readTree(result.getResponse().getContentAsString())
+                .get("user")
+                .get("userId")
+                .asLong();
     }
 
     /**
@@ -499,6 +557,14 @@ abstract class EmailAuthApiTestSupport {
     /** IP 단위 발송 제한 카운터 키(S15P21E106-281 결정 D-7). 해시 입력은 IP 원문이 아니라 집계 버킷이다(S15P21E106-288). */
     String mailIpLimitKey(String clientIp, Duration window) {
         return "auth:mail:ip:"
+                + Sha256Hasher.hex(ClientIpBucket.of(clientIp, clientIpPrefixes))
+                + ":"
+                + window.toSeconds();
+    }
+
+    /** 가입 IP 카운터 키(S15P21E106-603). 메일 축과 접두사가 달라 두 예산이 섞이지 않는다. */
+    String signupIpLimitKey(String clientIp, Duration window) {
+        return "auth:signup:ip:"
                 + Sha256Hasher.hex(ClientIpBucket.of(clientIp, clientIpPrefixes))
                 + ":"
                 + window.toSeconds();

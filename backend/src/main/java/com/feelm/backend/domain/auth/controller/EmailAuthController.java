@@ -7,7 +7,6 @@ import com.feelm.backend.domain.auth.dto.request.LoginRequest;
 import com.feelm.backend.domain.auth.dto.request.SignupRequest;
 import com.feelm.backend.domain.auth.dto.response.EmailVerificationResponse;
 import com.feelm.backend.domain.auth.dto.response.LoginResponse;
-import com.feelm.backend.domain.auth.dto.response.SignupResponse;
 import com.feelm.backend.domain.auth.service.EmailVerificationService;
 import com.feelm.backend.domain.auth.service.LoginService;
 import com.feelm.backend.domain.auth.service.SignupService;
@@ -46,12 +45,24 @@ public class EmailAuthController {
     private final RefreshTokenService refreshTokenService;
     private final RefreshTokenCookieFactory cookieFactory;
 
-    /** API-001 이메일 회원가입. */
+    /**
+     * API-001 이메일 회원가입.
+     *
+     * <p>가입과 동시에 로그인 상태가 되므로 응답은 소셜 회원가입(API-008)과 같은 본문·쿠키다(S15P21E106-603). Refresh Token은 본문이
+     * 아니라 쿠키로만 전달한다.
+     *
+     * <p>클라이언트 IP는 가입 전용 IP 단위 요청 제한에 쓴다({@link com.feelm.backend.domain.auth.AuthRateLimiter}).
+     */
     @PostMapping("/signup")
-    @ResponseStatus(HttpStatus.CREATED)
-    SignupResponse signup(
+    ResponseEntity<LoginResponse> signup(
             @RequestBody @Valid SignupRequest request, HttpServletRequest httpRequest) {
-        return signupService.signup(request, httpRequest.getRemoteAddr());
+        LoginService.LoginResult result =
+                signupService.signup(request, httpRequest.getRemoteAddr());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .header(
+                        HttpHeaders.SET_COOKIE,
+                        cookieFactory.create(result.refreshToken()).toString())
+                .body(LoginResponse.from(result));
     }
 
     /** API-002 이메일 인증 확인. */

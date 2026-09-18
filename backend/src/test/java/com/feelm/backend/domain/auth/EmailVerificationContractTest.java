@@ -14,7 +14,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 /**
@@ -28,10 +27,11 @@ class EmailVerificationContractTest extends EmailAuthApiTestSupport {
 
     @Test
     @DisplayName("유효한 토큰은 200과 함께 계정을 ACTIVE로 전이시킨다")
-    void validTokenActivatesAccount(CapturedOutput output) throws Exception {
-        long userId = signupPending(newAccount());
+    void validTokenActivatesAccount() throws Exception {
+        TestAccount account = newAccount();
+        long userId = signupPending(account);
 
-        verifyEmail(latestVerificationToken(output))
+        verifyEmail(pendingVerificationToken(account))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value(userId))
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
@@ -42,9 +42,10 @@ class EmailVerificationContractTest extends EmailAuthApiTestSupport {
     /** 동시 요청을 한 지점에서 출발시켜 조회와 소진 표시 사이의 틈을 노린다. 토큰 행 잠금이 없으면 두 요청이 모두 미사용 상태를 읽고 함께 성공할 수 있다. */
     @Test
     @DisplayName("같은 토큰으로 동시에 인증해도 한 요청만 성공하고 나머지는 400 VERIFICATION_TOKEN_INVALID다")
-    void concurrentVerificationConsumesTokenOnce(CapturedOutput output) throws Exception {
-        long userId = signupPending(newAccount());
-        String token = latestVerificationToken(output);
+    void concurrentVerificationConsumesTokenOnce() throws Exception {
+        TestAccount account = newAccount();
+        long userId = signupPending(account);
+        String token = pendingVerificationToken(account);
         int attempts = 4;
         CountDownLatch ready = new CountDownLatch(attempts);
         CountDownLatch start = new CountDownLatch(1);
@@ -85,9 +86,10 @@ class EmailVerificationContractTest extends EmailAuthApiTestSupport {
 
     @Test
     @DisplayName("토큰은 1회용이므로 같은 토큰을 다시 쓰면 400 VERIFICATION_TOKEN_INVALID다")
-    void usedTokenIsRejected(CapturedOutput output) throws Exception {
-        signupPending(newAccount());
-        String token = latestVerificationToken(output);
+    void usedTokenIsRejected() throws Exception {
+        TestAccount account = newAccount();
+        signupPending(account);
+        String token = pendingVerificationToken(account);
         verifyEmail(token).andExpect(status().isOk());
 
         verifyEmail(token)
@@ -115,11 +117,13 @@ class EmailVerificationContractTest extends EmailAuthApiTestSupport {
 
     @Test
     @DisplayName("만료된 토큰은 410 VERIFICATION_TOKEN_EXPIRED이며 계정은 미인증으로 남는다")
-    void expiredTokenReturnsGone(CapturedOutput output) throws Exception {
-        long userId = signupPending(newAccount());
+    void expiredTokenReturnsGone() throws Exception {
+        TestAccount account = newAccount();
+        long userId = signupPending(account);
+        String token = pendingVerificationToken(account);
         expireVerificationTokens(userId);
 
-        verifyEmail(latestVerificationToken(output))
+        verifyEmail(token)
                 .andExpect(status().isGone())
                 .andExpect(jsonPath("$.code").value("VERIFICATION_TOKEN_EXPIRED"));
 
@@ -128,9 +132,10 @@ class EmailVerificationContractTest extends EmailAuthApiTestSupport {
 
     @Test
     @DisplayName("이미 활성화된 계정의 유효한 토큰은 409 ALREADY_VERIFIED다")
-    void alreadyVerifiedAccountReturnsConflict(CapturedOutput output) throws Exception {
-        long userId = signupPending(newAccount());
-        String token = latestVerificationToken(output);
+    void alreadyVerifiedAccountReturnsConflict() throws Exception {
+        TestAccount account = newAccount();
+        long userId = signupPending(account);
+        String token = pendingVerificationToken(account);
         verifyEmail(token).andExpect(status().isOk());
         // 활성 계정 + 미사용·미만료 토큰이 겹친 상태는 토큰 원문을 새로 만들 수 없어 API로 구성할 수 없다.
         restoreVerificationTokens(userId);

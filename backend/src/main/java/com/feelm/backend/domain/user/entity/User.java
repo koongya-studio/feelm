@@ -95,14 +95,21 @@ public class User extends BaseTimeEntity {
         this.status = UserStatus.PENDING_VERIFICATION;
     }
 
-    /** 이메일 가입(API-001)으로 계정을 만든다. 이메일 인증을 마칠 때까지 {@code PENDING_VERIFICATION}이다. */
+    /**
+     * 이메일 가입(API-001)으로 계정을 만든다.
+     *
+     * <p>이메일 소유는 가입 전에 인증번호(API-078·076)로 이미 확인했으므로 인증 대기 상태를 거치지 않고 곧바로 {@code ACTIVE}다
+     * (S15P21E106-603). 소셜 가입과 같은 자리다.
+     */
     public static User register(
             String email,
             String passwordHash,
             String nickname,
             LocalDate birthDate,
             Gender gender) {
-        return new User(email, passwordHash, nickname, birthDate, gender);
+        User user = new User(email, passwordHash, nickname, birthDate, gender);
+        user.status = UserStatus.ACTIVE;
+        return user;
     }
 
     /**

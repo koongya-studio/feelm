@@ -48,6 +48,9 @@ class EmailVerificationCodeContractTest extends EmailAuthApiTestSupport {
     void rejectsDuplicatedEmail() throws Exception {
         TestAccount account = newAccount();
         signupPending(account);
+        // 가입 자체가 인증번호를 한 번 보냈으므로 기록과 간격 슬롯을 비우고 시작한다.
+        clearVerificationCodeInterval(account.email());
+        verificationCodeMails().clear();
 
         sendVerificationCode(account.email())
                 .andExpect(status().isConflict())

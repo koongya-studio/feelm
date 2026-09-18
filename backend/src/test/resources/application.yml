@@ -60,6 +60,12 @@ feelm:
     client-ip:
       ipv4-prefix-length: 32
       ipv6-prefix-length: 64
+    # 가입(API-001)의 IP 한도. 메일 축과 카운터가 분리돼 있으므로(S15P21E106-603) 값도 따로 둔다.
+    # 반복 요청 횟수를 줄이려고 작게 둔다.
+    signup:
+      ip:
+        - limit: 3
+          window: 1h
   mail:
     # 테스트는 발송하지 않고 스파이 빈으로 토큰을 얻지만, 모드에 기본값이 없으므로 명시한다.
     mode: log
