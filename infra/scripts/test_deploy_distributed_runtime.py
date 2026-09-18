@@ -164,9 +164,18 @@ class DistributedRuntimeTest(unittest.TestCase):
                 runtime.ensure_spark_idle("distributed", Path("ignored"))
 
     def test_service_node_spark_status_rejects_non_ip_host(self):
-        with patch.object(runtime, "load_env_value", return_value="host.example.com"):
+        with patch.object(runtime, "load_env_value", return_value="host.example.com"), \
+             patch.dict(runtime.os.environ, {}, clear=True):
             with self.assertRaisesRegex(runtime.DeploymentError, "must be an IPv4"):
                 runtime.spark_status_url("service", Path("ignored"))
+
+    def test_service_node_spark_status_uses_runner_environment(self):
+        with patch.object(runtime, "load_env_value", return_value=None), \
+             patch.dict(runtime.os.environ, {"DISTRIBUTED_NODE_IP": "192.0.2.9"}, clear=True):
+            self.assertEqual(
+                runtime.spark_status_url("service", Path("ignored")),
+                "http://192.0.2.9:8080/json/",
+            )
 
     def test_service_worker_registration_uses_local_logs(self):
         fake = FakeRunner()
@@ -298,6 +307,52 @@ class DistributedRuntimeTest(unittest.TestCase):
                 ("spark-master", "spark-worker-2"), "feelm-spark:candidate", fake
             )
 
+    def test_spark_candidate_is_pulled_and_revision_verified_before_compose(self):
+        fake = FakeRunner()
+        revision = "c" * 40
+        original = fake.run
+
+        def image_metadata(command, **kwargs):
+            if command[:3] == ["docker", "image", "inspect"]:
+                fake.commands.append((command, kwargs.get("env")))
+                return revision
+            if command[:4] == ["docker", "run", "--rm", "--entrypoint"]:
+                fake.commands.append((command, kwargs.get("env")))
+                return revision
+            return original(command, **kwargs)
+
+        fake.run = image_metadata
+        runtime.preflight_spark_image("repo/spark@sha256:" + "d" * 64, revision, fake)
+
+        self.assertEqual(fake.commands[0][0][:2], ["docker", "pull"])
+        self.assertTrue(any(command[:3] == ["docker", "image", "inspect"]
+                            for command, _ in fake.commands))
+        self.assertTrue(any(command[:2] == ["docker", "run"]
+                            for command, _ in fake.commands))
+
+    def test_distributed_preflight_checks_idle_before_image_pull(self):
+        revision = "c" * 40
+        image = "repo/spark@sha256:" + "d" * 64
+        args = runtime.parser().parse_args([
+            "--node", "distributed", "--components", "spark",
+            "--spark-image", image, "--spark-revision", revision,
+            "--preflight-only",
+        ])
+        order = []
+        with patch.object(runtime, "ensure_spark_idle",
+                          side_effect=lambda *_: order.append("idle")), \
+             patch.object(runtime, "preflight_spark_image",
+                          side_effect=lambda *_: order.append("image")):
+            self.assertEqual(runtime.deploy(args, FakeRunner()), 0)
+        self.assertEqual(order, ["idle", "image"])
+
+    def test_running_spark_revision_must_match_candidate(self):
+        fake = FakeRunner()
+        with self.assertRaisesRegex(runtime.DeploymentError, "revision does not match"):
+            runtime.verify_spark_revision(
+                ("spark-master", "spark-worker-2"), "c" * 40, fake
+            )
+
     def test_candidate_failure_uses_previous_checkout_and_image(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -315,8 +370,8 @@ class DistributedRuntimeTest(unittest.TestCase):
                 "--env-file", str(env_file),
                 "--expected-commit", "a" * 40,
                 "--expected-rollback-commit", "b" * 40,
-                "--spark-image", "feelm-spark:candidate",
-                "--spark-idle-checked-on-master",
+                "--spark-image", "repo/spark@sha256:" + "d" * 64,
+                "--spark-revision", "a" * 40,
                 "--confirm-deploy",
             ])
             fake = FakeRunner(fail_candidate=True)
@@ -324,6 +379,7 @@ class DistributedRuntimeTest(unittest.TestCase):
                  patch.object(runtime, "check_compose"), \
                  patch.object(runtime, "ensure_spark_idle"), \
                  patch.object(runtime, "verify_runtime"), \
+                 patch.object(runtime, "preflight_spark_image"), \
                  patch.object(runtime, "verify_spark_image"):
                 with self.assertRaisesRegex(runtime.DeploymentError, "previous runtime was restored"):
                     runtime.deploy(args, fake)
@@ -335,6 +391,79 @@ class DistributedRuntimeTest(unittest.TestCase):
             self.assertIn("candidate", candidate_compose)
             self.assertIn("rollback", rollback_compose)
             self.assertEqual(up_commands[1][1]["SPARK_IMAGE"], "feelm-spark:previous")
+
+    def test_spark_recovery_mode_skips_unavailable_master_idle_check(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            candidate = root / "candidate"
+            rollback = root / "rollback"
+            candidate.mkdir()
+            rollback.mkdir()
+            env_file = root / "runtime.env"
+            env_file.write_text("DISTRIBUTED_NODE_IP=192.0.2.2\n", encoding="utf-8")
+            args = runtime.parser().parse_args([
+                "--node", "distributed", "--components", "spark",
+                "--source-root", str(candidate), "--rollback-root", str(rollback),
+                "--env-file", str(env_file), "--expected-commit", "a" * 40,
+                "--expected-rollback-commit", "b" * 40,
+                "--spark-image", "repo/spark@sha256:" + "d" * 64,
+                "--spark-revision", "a" * 40,
+                "--rollback-spark-image", "repo/spark@sha256:" + "e" * 64,
+                "--rollback-spark-revision", "b" * 40,
+                "--spark-recovery-mode", "--confirm-deploy",
+            ])
+            fake = FakeRunner()
+            original = fake.run
+
+            def mixed_running_images(command, **kwargs):
+                if any("Config.Image" in item for item in command):
+                    fake.commands.append((command, kwargs.get("env")))
+                    return (
+                        "repo/spark@sha256:" + "d" * 64
+                        if command[-1] == "feelm-spark-master"
+                        else "repo/spark@sha256:" + "e" * 64
+                    )
+                return original(command, **kwargs)
+
+            fake.run = mixed_running_images
+            with patch.object(runtime, "resolve_commit", side_effect=["a" * 40, "b" * 40]), \
+                 patch.object(runtime, "check_compose"), \
+                 patch.object(runtime, "ensure_spark_idle") as idle, \
+                 patch.object(runtime, "preflight_spark_image"), \
+                 patch.object(runtime, "verify_runtime"), \
+                 patch.object(runtime, "verify_spark_image"), \
+                 patch.object(runtime, "verify_spark_revision"):
+                self.assertEqual(runtime.deploy(args, fake), 0)
+            idle.assert_not_called()
+
+    def test_service_spark_deployment_rechecks_master_idle_before_mutation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            candidate = root / "candidate"
+            rollback = root / "rollback"
+            candidate.mkdir()
+            rollback.mkdir()
+            env_file = root / "runtime.env"
+            env_file.write_text("DISTRIBUTED_NODE_IP=192.0.2.2\n", encoding="utf-8")
+            args = runtime.parser().parse_args([
+                "--node", "service", "--components", "spark",
+                "--source-root", str(candidate), "--rollback-root", str(rollback),
+                "--env-file", str(env_file), "--expected-commit", "a" * 40,
+                "--expected-rollback-commit", "b" * 40,
+                "--spark-image", "repo/spark@sha256:" + "d" * 64,
+                "--spark-revision", "a" * 40,
+                "--rollback-spark-revision", "b" * 40,
+                "--confirm-deploy",
+            ])
+            with patch.object(runtime, "resolve_commit", side_effect=["a" * 40, "b" * 40]), \
+                 patch.object(runtime, "check_compose"), \
+                 patch.object(runtime, "ensure_spark_idle") as idle, \
+                 patch.object(runtime, "preflight_spark_image"), \
+                 patch.object(runtime, "verify_runtime"), \
+                 patch.object(runtime, "verify_spark_image"), \
+                 patch.object(runtime, "verify_spark_revision"):
+                self.assertEqual(runtime.deploy(args, FakeRunner()), 0)
+            idle.assert_called_once_with("service", env_file.resolve())
 
     def test_rollback_failure_requires_manual_recovery(self):
         with tempfile.TemporaryDirectory() as directory:
