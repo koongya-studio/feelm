@@ -306,12 +306,13 @@ class UserWithdrawalContractTest extends OAuthApiTestSupport {
     void rejectsSignupWithReservedEmail() throws Exception {
         TestAccount account = newAccount();
 
-        signup(signupBody("withdrawn-1@feelm.invalid", account.password(), account.nickname()))
+        // 가입은 이메일을 토큰에서만 읽으므로(S15P21E106-603) 예약 도메인은 인증번호 발송(API-078)에서 막힌다.
+        sendVerificationCode("withdrawn-1@feelm.invalid")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
 
         // 대소문자를 바꿔도 같은 판정이어야 한다. 이메일은 소문자로 정규화해 저장한다.
-        signup(signupBody("Withdrawn-1@FEELM.INVALID", account.password(), account.nickname()))
+        sendVerificationCode("Withdrawn-1@FEELM.INVALID")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     }

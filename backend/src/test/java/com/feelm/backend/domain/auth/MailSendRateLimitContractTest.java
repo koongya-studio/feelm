@@ -15,6 +15,9 @@ import org.springframework.test.web.servlet.MvcResult;
 /**
  * 인증 메일 재발송(API-003)과 비밀번호 재설정 요청(API-010)의 IP 단위 요청 제한을 검증한다(S15P21E106-281).
  *
+ * <p>가입(API-001)은 이 축에 없다. 인증번호 전환 뒤로 가입이 메일을 보내지 않게 되어 카운터를 분리했다(S15P21E106-603). 인증번호 발송
+ * (API-078)이 그 자리를 대신하며 그 경로의 제한은 {@link EmailVerificationCodeRateLimitContractTest}가 본다.
+ *
  * <p>이메일 단위 간격 제한은 {@link EmailResendContractTest}, {@link PasswordResetRequestContractTest}가 이미
  * 검증한다. 여기서는 서로 다른 이메일을 대량으로 넣는 발송 폭탄을 막는 IP 축만 다루므로, 별도로 언급하지 않는 요청은 매번 새 이메일로 보낸다.
  *
@@ -100,53 +103,8 @@ class MailSendRateLimitContractTest extends EmailAuthApiTestSupport {
     }
 
     /**
-     * 가입 인증 메일도 전역 발송 상한을 소모하므로(결정 D-5) 이 경로에 요청 제한이 없으면 한 IP의 반복 가입만으로 상한이 말라 정상 사용자의 계정 복구 메일이
-     * 조용히 나가지 않는다(리뷰 B-1).
+     * 가입(API-001)은 이제 이 카운터를 쓰지 않는다(S15P21E106-603). 분리는 {@code SignupRateLimitContractTest}가 본다.
      */
-    @Test
-    @DisplayName("가입도 IP 한도를 넘으면 429 RATE_LIMITED다")
-    void ipLimitAppliesToSignup() throws Exception {
-        String clientIp = nextClientIp();
-
-        exhaustIpBudget(clientIp);
-
-        signupFrom(clientIp, signupBody(newAccount()))
-                .andExpect(status().isTooManyRequests())
-                .andExpect(jsonPath("$.code").value("RATE_LIMITED"));
-    }
-
-    /** 세 경로가 같은 발송 수단을 쓰므로 한 경로만 막으면 총량을 묶을 수 없다(결정 D-2). 가입이 같은 카운터를 소모하는지 본다. */
-    @Test
-    @DisplayName("가입이 IP 카운터를 재발송·재설정과 공유한다")
-    void signupSharesIpCounterWithMailRequests() throws Exception {
-        String clientIp = nextClientIp();
-
-        for (long sent = 0; sent < ipLimit; sent++) {
-            signupFrom(clientIp, signupBody(newAccount())).andExpect(status().isCreated());
-        }
-
-        resendFrom(clientIp, newAccount().email()).andExpect(status().isTooManyRequests());
-        requestPasswordResetFrom(clientIp, newAccount().email())
-                .andExpect(status().isTooManyRequests());
-    }
-
-    /** 제한을 중복 검사보다 먼저 적용해, 429가 이메일·닉네임의 사용 여부를 알아내는 수단이 되지 않게 한다. */
-    @Test
-    @DisplayName("가입 제한 초과 응답은 중복 이메일과 새 이메일에서 같다")
-    void signupRateLimitedResponseDoesNotRevealDuplication() throws Exception {
-        TestAccount registered = newAccount();
-        signupPending(registered);
-        String clientIp = nextClientIp();
-        exhaustIpBudget(clientIp);
-
-        MvcResult duplicated = signupFrom(clientIp, signupBody(registered)).andReturn();
-        MvcResult fresh = signupFrom(clientIp, signupBody(newAccount())).andReturn();
-
-        assertThat(statusOf(duplicated)).as("중복 이메일 가입").isEqualTo(429);
-        assertThat(statusOf(fresh)).isEqualTo(statusOf(duplicated));
-        assertThat(bodyOf(fresh)).isEqualTo(bodyOf(duplicated));
-    }
-
     @Test
     @DisplayName("IP 카운터를 API-003과 API-010이 공유한다")
     void ipCounterIsSharedBetweenResendAndPasswordReset() throws Exception {

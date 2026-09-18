@@ -63,6 +63,8 @@ class EmailVerificationCodeRateLimitContractTest extends EmailAuthApiTestSupport
         String clientIp = nextClientIp();
         TestAccount registered = newAccount();
         signupPending(registered);
+        clearVerificationCodeInterval(registered.email());
+        clearMailSendRateLimits();
 
         for (long sent = 0; sent < ipLimit; sent++) {
             sendVerificationCodeFrom(clientIp, registered.email()).andExpect(status().isConflict());
@@ -82,6 +84,7 @@ class EmailVerificationCodeRateLimitContractTest extends EmailAuthApiTestSupport
     void doesNotPlantIntervalOnDuplicate() throws Exception {
         TestAccount registered = newAccount();
         signupPending(registered);
+        clearVerificationCodeInterval(registered.email());
 
         sendVerificationCode(registered.email()).andExpect(status().isConflict());
 

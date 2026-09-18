@@ -96,6 +96,7 @@ import org.springframework.stereotype.Component;
 @EnableConfigurationProperties({
     MailRateLimitProperties.class,
     LoginRateLimitProperties.class,
+    SignupRateLimitProperties.class,
     ClientIpProperties.class
 })
 public class AuthRateLimiter {
@@ -106,6 +107,7 @@ public class AuthRateLimiter {
     private static final String PASSWORD_RESET_KEY_PREFIX = "auth:password-reset:";
     private static final String MAIL_IP_KEY_PREFIX = "auth:mail:ip:";
     private static final String VERIFICATION_CODE_KEY_PREFIX = "auth:email-code-interval:";
+    private static final String SIGNUP_IP_KEY_PREFIX = "auth:signup:ip:";
 
     /**
      * 시도 횟수를 올리고 만료를 보장한 뒤 올린 횟수를 돌려주는 스크립트. {@code INCR}와 {@code PEXPIRE}를 따로 보내면 그 사이에 연결이 끊겼을 때
@@ -122,6 +124,7 @@ public class AuthRateLimiter {
     private final StringRedisTemplate redisTemplate;
     private final MailRateLimitProperties mailRateLimit;
     private final LoginRateLimitProperties loginRateLimit;
+    private final SignupRateLimitProperties signupRateLimit;
     private final ClientIpProperties clientIpPrefixes;
 
     /**
@@ -137,20 +140,25 @@ public class AuthRateLimiter {
     }
 
     /**
-     * 가입(API-001)의 발송 자리를 IP 축으로 확보한다(리뷰 B-1).
+     * 가입(API-001)의 요청 자리를 IP 축으로 확보한다.
      *
-     * <p>가입 인증 메일도 같은 SMTP 계정의 쿼터를 쓰는데(결정 D-5) 이 경로에는 요청 제한이 없었다. 그대로 두면 한 IP에서 가입을 반복하는 것만으로 전역 발송
-     * 상한이 말라, 정상 사용자의 인증 메일 재발송(API-003)과 비밀번호 재설정(API-010)이 조용히 나가지 않는다. 전역 축을 발송 기준으로 옮기면서 예산에
-     * 유일하게 남은 무방비 입구였다.
+     * <p><b>카운터는 메일 축과 공유하지 않는다</b>(S15P21E106-603, 601 결정 4). 인증번호 전환 전에는 가입이 인증 메일을 보내 같은 SMTP
+     * 쿼터를 소모했으므로 결정 D-2에 따라 메일 축에 합류시켰지만, 지금 이 경로는 메일을 보내지 않는다. 공유를 유지하면 가입 한 건이 같은 예산을
+     * 발송(API-078)과 가입으로 두 번 소모해 공유 NAT 한 버킷의 실질 가입 한도가 절반이 되고, 가입 버스트가 같은 IP의 비밀번호 재설정 메일까지 마르게 한다.
      *
-     * <p>이메일 축은 두지 않는다. 같은 이메일의 반복 가입은 이미 중복 검사가 막고, 간격 슬롯을 심으면 그 이메일의 재가입 경로까지 잠근다. IP 카운터는
-     * 재발송·재설정과 공유한다. 세 경로가 같은 발송 수단을 쓰므로 한 경로만 막으면 총량을 묶을 수 없다는 결정 D-2가 그대로 적용된다.
+     * <p>이메일 축은 두지 않는다. 같은 이메일의 반복 가입은 인증 토큰이 1회용이라는 성질이 막고, 간격 슬롯을 심으면 그 이메일의 재가입 경로까지 잠근다.
      *
      * @param clientIp 요청을 보낸 클라이언트 IP
      * @return 가입을 처리해도 되면 {@code true}, IP 축의 제한을 넘었으면 {@code false}
      */
     public boolean tryAcquireSignupSlot(String clientIp) {
-        return tryAcquireMailSendBudget(clientIp);
+        for (SignupRateLimitProperties.Quota quota : signupRateLimit.ip()) {
+            if (recordAttempt(signupIpKey(clientIp, quota.window()), quota.window())
+                    > quota.limit()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -361,6 +369,14 @@ public class AuthRateLimiter {
 
     private String passwordResetKey(String email) {
         return PASSWORD_RESET_KEY_PREFIX + Sha256Hasher.hex(email);
+    }
+
+    /** 가입 카운터 키. 메일 축과 접두사를 나눠 두 예산이 섞이지 않게 한다(S15P21E106-603). */
+    private String signupIpKey(String clientIp, Duration window) {
+        return SIGNUP_IP_KEY_PREFIX
+                + Sha256Hasher.hex(ClientIpBucket.of(clientIp, clientIpPrefixes))
+                + ":"
+                + window.toSeconds();
     }
 
     private String mailIpKey(String clientIp, Duration window) {

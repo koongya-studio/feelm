@@ -30,7 +30,7 @@ class EmailResendContractTest extends EmailAuthApiTestSupport {
 
         resend(account.email()).andExpect(status().isAccepted()).andExpect(content().string(""));
 
-        assertThat(verificationTokens(output)).as("가입 1건 + 재발송 1건").hasSize(2);
+        assertThat(verificationTokens(output)).as("재발송 1건").hasSize(1);
     }
 
     @Test
@@ -38,6 +38,8 @@ class EmailResendContractTest extends EmailAuthApiTestSupport {
     void resendInvalidatesPreviousToken(CapturedOutput output) throws Exception {
         TestAccount account = newAccount();
         long userId = signupPending(account);
+        resend(account.email()).andExpect(status().isAccepted());
+        clearResendInterval(account.email());
         resend(account.email()).andExpect(status().isAccepted());
 
         List<String> tokens = verificationTokens(output);
@@ -80,7 +82,7 @@ class EmailResendContractTest extends EmailAuthApiTestSupport {
 
         resend(account.email()).andExpect(status().isAccepted());
 
-        assertThat(verificationTokens(output)).as("가입 시 발송한 1건만 남는다").hasSize(1);
+        assertThat(verificationTokens(output)).as("발송하지 않는다").isEmpty();
     }
 
     @Test
@@ -95,7 +97,7 @@ class EmailResendContractTest extends EmailAuthApiTestSupport {
                 .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
                 .andExpect(jsonPath("$.message").isNotEmpty());
 
-        assertThat(verificationTokens(output)).as("제한된 요청은 발송하지 않는다").hasSize(2);
+        assertThat(verificationTokens(output)).as("제한된 요청은 발송하지 않는다").hasSize(1);
     }
 
     @ParameterizedTest(name = "본문 {0}")

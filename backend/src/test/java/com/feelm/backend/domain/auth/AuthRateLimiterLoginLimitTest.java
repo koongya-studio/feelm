@@ -43,6 +43,7 @@ class AuthRateLimiterLoginLimitTest {
                         redisTemplate,
                         new MailRateLimitProperties(Duration.ofMinutes(1), List.of()),
                         new LoginRateLimitProperties(2, Duration.ofSeconds(30), List.of()),
+                        new SignupRateLimitProperties(List.of()),
                         new ClientIpProperties(32, 64));
         when(redisTemplate.<Long>execute(any(RedisScript.class), anyList(), any()))
                 .thenReturn(1L, 2L, 3L);
@@ -73,6 +74,7 @@ class AuthRateLimiterLoginLimitTest {
                         redisTemplate,
                         new MailRateLimitProperties(Duration.ofMinutes(1), List.of()),
                         new LoginRateLimitProperties(5, Duration.ofMinutes(10), List.of()),
+                        new SignupRateLimitProperties(List.of()),
                         new ClientIpProperties(32, 64));
         when(redisTemplate.<Long>execute(any(RedisScript.class), anyList(), any()))
                 .thenReturn(null);
@@ -177,6 +179,7 @@ class AuthRateLimiterLoginLimitTest {
                 redisTemplate,
                 new MailRateLimitProperties(Duration.ofMinutes(1), List.of()),
                 new LoginRateLimitProperties(attemptLimit, Duration.ofMinutes(10), ipQuotas),
+                new SignupRateLimitProperties(List.of()),
                 PREFIXES);
     }
 
