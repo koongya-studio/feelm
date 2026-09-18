@@ -27,3 +27,30 @@ const BADGE_LETTERS: Record<string, string> = {
 export function ottBadgeLetter(code: string): string {
   return BADGE_LETTERS[code] ?? code.charAt(0);
 }
+
+/**
+ * 영화 상세의 OTT 버튼 목적지.
+ *
+ * 현재 API-030에 적재된 `watchUrl`은 JustWatch 링크라 OTT 자체의 검색 결과로 이어지지
+ * 않는다. 상세 콘텐츠 URL은 각 OTT의 공개 API 없이는 안정적으로 만들 수 없으므로,
+ * 영화 제목을 공식 검색 페이지에 전달한다. Disney+는 웹 검색어 URL을 지원하지 않아
+ * 한국 메인 페이지로 보낸다.
+ */
+export function ottMovieUrl(code: string, movieTitle: string): string | null {
+  const query = encodeURIComponent(movieTitle);
+
+  switch (code) {
+    case 'NETFLIX':
+      return `https://www.netflix.com/search?q=${query}`;
+    case 'WATCHA':
+      return `https://watcha.com/ko/search?query=${query}`;
+    case 'WAVVE':
+      return `https://www.wavve.com/search?searchWord=${query}`;
+    case 'TVING':
+      return `https://www.tving.com/search?keyword=${query}`;
+    case 'DISNEY_PLUS':
+      return 'https://www.disneyplus.com/ko-kr';
+    default:
+      return null;
+  }
+}
