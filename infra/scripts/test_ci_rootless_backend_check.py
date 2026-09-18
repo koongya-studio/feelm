@@ -17,8 +17,13 @@ spec.loader.exec_module(pilot)
 def archive_bytes(extra=None):
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode='w') as archive:
+        for name in ['backend/', 'infra/', 'infra/compose/']:
+            info = tarfile.TarInfo(name)
+            info.type = tarfile.DIRTYPE
+            archive.addfile(info)
         for name in ['backend/gradlew', 'backend/build.gradle', 'backend/settings.gradle',
-                     'backend/gradle/wrapper/gradle-wrapper.jar']:
+                     'backend/gradle/wrapper/gradle-wrapper.jar',
+                     'infra/compose/service.yml']:
             info = tarfile.TarInfo(name)
             info.size = 1
             archive.addfile(info, io.BytesIO(b'x'))
@@ -44,10 +49,13 @@ class BackendPilotTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             pilot.extract_snapshot(archive_bytes(), Path(directory))
             self.assertEqual((Path(directory) / 'backend/gradlew').read_bytes(), b'x')
+            self.assertEqual(
+                (Path(directory) / 'infra/compose/service.yml').read_bytes(), b'x')
             self.assertFalse((Path(directory) / '.git').exists())
 
     def test_archive_rejects_escape_links_secrets_local_state_and_duplicates(self):
-        for name in ['../escape', '/backend/a', 'infra/config', 'backend/../escape',
+        for name in ['../escape', '/backend/a', 'infra/config', 'infra/compose/other.yml',
+                     'backend/../escape',
                      'backend/evil\\path', 'backend/.env', 'backend/.env.local',
                      'backend/.git/config', 'backend/build/old.xml', 'backend/gradlew']:
             with self.subTest(name=name), self.assertRaises(ValueError):

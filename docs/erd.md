@@ -336,7 +336,7 @@ erDiagram
         varchar type "TASTE / DISCOVERY / PARTY"
         varchar flavor_code "후보가 제시한 맛 코드. 없으면 NULL"
         int position
-        jsonb reason "추천 이유 스냅샷 (summary, factors)"
+        jsonb reason "Consumer reasons 원본과 사용자용 summary, factors 스냅샷"
         timestamptz exposed_at "노출 시각. NULL이면 미노출 버퍼분"
     }
     USER_MOVIE_DISMISSALS {

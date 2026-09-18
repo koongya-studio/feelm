@@ -35,9 +35,11 @@ def archive_entries(data):
     entries, total, seen = [], 0, set()
     try:
         for item in archive:
-            path = PurePosixPath(item.name)
+            name = item.name[:-1] if item.isdir() and item.name.endswith('/') else item.name
+            path = PurePosixPath(name)
+            allowed_contract = name in ('infra', 'infra/compose', 'infra/compose/service.yml')
             if (path.is_absolute() or '..' in path.parts or '\\' in item.name
-                    or not path.parts or path.parts[0] != 'backend'
+                    or not path.parts or (path.parts[0] != 'backend' and not allowed_contract)
                     or not (item.isdir() or item.isfile()) or path in seen):
                 raise ValueError('Unsafe or duplicate archive entry')
             if any(p in {'.git', '.gradle', 'build', '.ssh', '.docker'} for p in path.parts):

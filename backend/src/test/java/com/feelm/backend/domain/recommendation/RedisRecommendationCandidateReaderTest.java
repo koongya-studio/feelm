@@ -2,6 +2,7 @@ package com.feelm.backend.domain.recommendation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -24,21 +25,34 @@ import tools.jackson.databind.ObjectMapper;
 @DisplayName("Redis 개인 추천 후보 계약")
 class RedisRecommendationCandidateReaderTest {
 
+    private StringRedisTemplate redis;
     private ValueOperations<String, String> values;
     private RedisRecommendationCandidateReader reader;
 
     @BeforeEach
     @SuppressWarnings("unchecked")
     void setUp() {
-        StringRedisTemplate redis = org.mockito.Mockito.mock(StringRedisTemplate.class);
+        redis = org.mockito.Mockito.mock(StringRedisTemplate.class);
         values = org.mockito.Mockito.mock(ValueOperations.class);
         when(redis.opsForValue()).thenReturn(values);
-        reader = new RedisRecommendationCandidateReader(redis, new ObjectMapper(), 500, 100);
+        when(values.get("feelm:user:10:vector"))
+                .thenReturn(
+                        """
+                        {"modelVersion":"als","candidateVersion":6,
+                         "generationId":"g1"}
+                        """);
+        reader = new RedisRecommendationCandidateReader(redis, new ObjectMapper(), 500, 100, true);
     }
 
     @Test
     @DisplayName("T1 taste와 discovery 배열에 종류를 붙여 하나의 후보 묶음으로 읽는다")
     void readsTasteAndDiscoveryFromExactUserKey() {
+        when(values.get("feelm:user:10:vector"))
+                .thenReturn(
+                        """
+                        {"modelVersion":"als-serving-example","candidateVersion":6,
+                         "generationId":"als-20260916T083000Z-a1b2c3d4"}
+                        """);
         when(values.get("feelm:user:10:candidates"))
                 .thenReturn(
                         """
@@ -51,14 +65,9 @@ class RedisRecommendationCandidateReaderTest {
                             "movieId":101,
                             "score":4.32,
                             "reasons":[{
-                              "code":"SHARED_FEATURES_WITH_LIKED_MOVIE",
-                              "sourceMovieId":55,
-                              "sharedFeatures":{
-                                "tmdbGenreIds":[878],
-                                "tmdbDirectorIds":[525],
-                                "tmdbCastIds":[],
-                                "tmdbKeywordIds":[]
-                              }
+                              "code":"SHARED_GENRE",
+                              "sourceMovieIds":[55],
+                              "matchedGenreCodes":["THRILLER"]
                             }]
                           }],
                           "discovery":[
@@ -105,11 +114,12 @@ class RedisRecommendationCandidateReaderTest {
                                 .reason()
                                 .get("reasons")
                                 .get(0)
-                                .get("sourceMovieId")
+                                .get("sourceMovieIds")
+                                .get(0)
                                 .asLong())
                 .isEqualTo(55);
         assertThat(result.items().get(0).reason().toString())
-                .contains("\"sharedFeatures\"", "\"tmdbGenreIds\":[878]");
+                .contains("\"SHARED_GENRE\"", "\"matchedGenreCodes\":[\"THRILLER\"]");
         assertThat(result.items().get(1).reason().get("reasons").get(0).toString())
                 .isEqualTo(
                         "{\"code\":\"DISCOVERY_AGGREGATE_AFFINITY\","
@@ -169,7 +179,7 @@ class RedisRecommendationCandidateReaderTest {
                  "discovery":[]}
                 """,
                 """
-                {"modelVersion":"als","candidateVersion":5,"generationId":"g1",
+                {"modelVersion":"als","candidateVersion":4,"generationId":"g1",
                  "updatedAt":"2026-09-16T08:30:00Z",
                  "taste":[{"movieId":1,"score":4,"reasons":[]}],"discovery":[]}
                 """,
@@ -289,8 +299,8 @@ class RedisRecommendationCandidateReaderTest {
     }
 
     @Test
-    @DisplayName("T4 두 배열에 같은 영화가 들어오면 전체를 거절한다")
-    void rejectsDuplicateMovieIdsAcrossTypes() {
+    @DisplayName("T4 DISCOVERY의 TASTE 중복 보충 후보를 허용한다")
+    void acceptsDuplicateMovieIdsAcrossTypes() {
         when(values.get("feelm:user:10:candidates"))
                 .thenReturn(
                         """
@@ -299,7 +309,164 @@ class RedisRecommendationCandidateReaderTest {
                          "taste":[{"movieId":101,"score":4.32,"reasons":[]}],
                          "discovery":[{"movieId":101,"score":3.2,"reasons":[]}]}
                         """);
+        assertThat(reader.read(10).items()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("전환 기간에는 실제 v5 단일 reason 형식의 TASTE와 DISCOVERY를 읽는다")
+    void readsV5DuringTransition() {
+        when(values.get("feelm:user:10:vector"))
+                .thenReturn(
+                        "{\"modelVersion\":\"als\",\"candidateVersion\":5,\"generationId\":\"g1\"}");
+        when(values.get("feelm:user:10:candidates"))
+                .thenReturn(
+                        """
+                        {"modelVersion":"als","candidateVersion":5,"generationId":"g1",
+                         "updatedAt":"2026-09-16T08:30:00Z",
+                         "taste":[{"movieId":101,"score":4.32,"reason":{
+                           "code":"TOP_RATED_SOURCE","sourceMovieIds":[55],"matchedGenreCodes":[]
+                         }}],"discovery":[{"movieId":202,"score":3.91,"reason":{
+                           "code":"DISCOVERY_AGGREGATE_AFFINITY","directionSource":"RATING",
+                           "contributorCount":1,"topContributors":[{"movieId":55,
+                           "relation":"POSITIVE_ALIGNMENT"}],"topContributionCoverage":0.5,
+                           "viewedCountInGroup":0,"affinityRank":1,"popularityRankInGroup":1
+                         }}]}
+                        """);
+
+        RecommendationCandidateBatch result = reader.read(10);
+        assertThat(result.candidateVersion()).isEqualTo(5);
+        assertThat(result.items()).hasSize(2);
+        assertThat(result.items().get(0).reason().path("reasons").get(0).path("code").textValue())
+                .isEqualTo("TOP_RATED_SOURCE");
+        assertThat(result.items().get(1).reason().path("reasons").get(0).path("code").textValue())
+                .isEqualTo("DISCOVERY_AGGREGATE_AFFINITY");
+        assertThat(result.items().get(1).reason().path("reasons").get(0).path("topContributors"))
+                .hasSize(1);
+    }
+
+    @Test
+    @DisplayName("v5 번호에 v6 배열을 붙인 가짜 전환 후보는 거절한다")
+    void rejectsV6ReasonShapeLabeledV5() {
+        when(values.get("feelm:user:10:vector"))
+                .thenReturn(
+                        "{\"modelVersion\":\"als\",\"candidateVersion\":5,\"generationId\":\"g1\"}");
+        when(values.get("feelm:user:10:candidates"))
+                .thenReturn(
+                        """
+                        {"modelVersion":"als","candidateVersion":5,"generationId":"g1",
+                         "updatedAt":"2026-09-16T08:30:00Z",
+                         "taste":[{"movieId":101,"score":4.32,"reasons":[{
+                           "code":"TOP_RATED_SOURCE","sourceMovieIds":[55],"matchedGenreCodes":[]
+                         }]}],"discovery":[]}
+                        """);
         assertUnavailable(() -> reader.read(10));
+    }
+
+    @Test
+    @DisplayName("v6 번호에 v5 단일 reason을 붙인 후보는 거절한다")
+    void rejectsV5ReasonShapeLabeledV6() {
+        when(values.get("feelm:user:10:candidates"))
+                .thenReturn(
+                        """
+                        {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
+                         "updatedAt":"2026-09-16T08:30:00Z",
+                         "taste":[{"movieId":101,"score":4.32,"reason":{
+                           "code":"TOP_RATED_SOURCE","sourceMovieIds":[55],"matchedGenreCodes":[]
+                         }}],"discovery":[]}
+                        """);
+        assertUnavailable(() -> reader.read(10));
+    }
+
+    @Test
+    @DisplayName("v5 호환 제거 설정 후에는 v5를 거절한다")
+    void rejectsV5AfterTransition() {
+        reader = new RedisRecommendationCandidateReader(redis, new ObjectMapper(), 500, 100, false);
+        when(values.get("feelm:user:10:candidates"))
+                .thenReturn(
+                        """
+                        {"modelVersion":"als","candidateVersion":5,"generationId":"g1",
+                         "updatedAt":"2026-09-16T08:30:00Z",
+                         "taste":[{"movieId":101,"score":4.32,"reason":{
+                           "code":"TOP_RATED_SOURCE","sourceMovieIds":[55],"matchedGenreCodes":[]
+                         }}],"discovery":[]}
+                        """);
+        assertUnavailable(() -> reader.read(10));
+    }
+
+    @Test
+    @DisplayName("후보와 벡터의 generation ID가 다르면 추천 불가로 처리한다")
+    void rejectsGenerationMismatch() {
+        when(values.get("feelm:user:10:vector"))
+                .thenReturn(
+                        "{\"modelVersion\":\"als\",\"candidateVersion\":6,\"generationId\":\"other\"}");
+        when(values.get("feelm:user:10:candidates"))
+                .thenReturn(
+                        """
+                        {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
+                         "updatedAt":"2026-09-16T08:30:00Z",
+                         "taste":[{"movieId":101,"score":4.32,"reasons":[]}],"discovery":[]}
+                        """);
+
+        assertUnavailable(() -> reader.read(10));
+    }
+
+    @Test
+    @DisplayName("vector와 후보가 잠시 어긋나면 다시 읽어 일치하는 generation을 수용한다")
+    void retriesTransientGenerationMismatch() {
+        when(values.get("feelm:user:10:vector"))
+                .thenReturn(
+                        "{\"modelVersion\":\"als\",\"candidateVersion\":6,\"generationId\":\"old\"}",
+                        "{\"modelVersion\":\"als\",\"candidateVersion\":6,\"generationId\":\"g1\"}");
+        when(values.get("feelm:user:10:candidates"))
+                .thenReturn(
+                        """
+                        {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
+                         "updatedAt":"2026-09-16T08:30:00Z",
+                         "taste":[{"movieId":101,"score":4.32,"reasons":[]}],"discovery":[]}
+                        """);
+
+        assertThat(reader.read(10).generationId()).isEqualTo("g1");
+        verify(values, times(2)).get("feelm:user:10:candidates");
+    }
+
+    @Test
+    @DisplayName("v6의 근거 없음 fallback은 빈 source와 장르 배열로도 읽는다")
+    void acceptsEmptyEvidenceArrays() {
+        when(values.get("feelm:user:10:candidates"))
+                .thenReturn(
+                        """
+                        {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
+                         "updatedAt":"2026-09-16T08:30:00Z",
+                         "taste":[{"movieId":101,"score":0,"reasons":[{
+                           "code":"TOP_RATED_SOURCE","sourceMovieIds":[],"matchedGenreCodes":[]
+                         }]}],
+                         "discovery":[{"movieId":102,"score":0,"reasons":[{
+                           "code":"DISCOVERY_PERSONAL_SCORE","sourceMovieIds":[],
+                           "matchedGenreCodes":[]
+                         }]}]}
+                        """);
+
+        assertThat(reader.read(10).items()).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("v6 TOP_RATED_SOURCE의 구조화 근거를 원형대로 보존한다")
+    void preservesTopRatedSourceReason() {
+        when(values.get("feelm:user:10:candidates"))
+                .thenReturn(
+                        """
+                        {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
+                         "updatedAt":"2026-09-16T08:30:00Z",
+                         "taste":[{"movieId":101,"score":4,"reasons":[{
+                           "code":"TOP_RATED_SOURCE","sourceMovieIds":[55],
+                           "matchedGenreCodes":[]
+                         }]}],"discovery":[]}
+                        """);
+
+        assertThat(reader.read(10).items().getFirst().reason().get("reasons").get(0).toString())
+                .isEqualTo(
+                        "{\"code\":\"TOP_RATED_SOURCE\",\"sourceMovieIds\":[55],"
+                                + "\"matchedGenreCodes\":[]}");
     }
 
     private void assertUnavailable(org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {

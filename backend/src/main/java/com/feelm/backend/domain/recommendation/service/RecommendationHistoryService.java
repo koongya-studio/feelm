@@ -14,16 +14,13 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 @Service
 @RequiredArgsConstructor
 public class RecommendationHistoryService {
 
     private final RecommendationHistoryRepository repository;
-    private final ObjectMapper objectMapper;
+    private final RecommendationReasonPresenter reasonPresenter;
 
     public CursorPageResponse<RecommendationHistorySetResponse> getHistory(
             long userId, String encodedCursor, Integer requestedSize) {
@@ -76,16 +73,8 @@ public class RecommendationHistoryService {
                 item.type(),
                 new RecommendationHistoryMovieResponse(
                         item.movieId(), item.title(), item.posterUrl()),
-                reason(item.reason()),
+                reasonPresenter.present(item.reason()),
                 item.dismissed(),
                 item.watchStatus());
-    }
-
-    private JsonNode reason(String reason) {
-        try {
-            return objectMapper.readTree(reason);
-        } catch (JacksonException exception) {
-            throw new IllegalStateException("Stored recommendation reason is invalid", exception);
-        }
     }
 }

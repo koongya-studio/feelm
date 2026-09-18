@@ -95,6 +95,15 @@ springdoc:
     enabled: ${SWAGGER_ENABLED:false}
 
 feelm:
+  recommendation:
+    candidates:
+      # 전환 확인 후 false로 설정해 Candidate v5 호환을 제거한다.
+      accept-v5: ${RECOMMENDATION_ACCEPT_V5:true}
+    reason:
+      gemini:
+        # 키가 없으면 확인된 근거만 사용하는 결정적 fallback을 저장한다.
+        api-key: ${GMS_KEY:}
+        model: ${GEMINI_REASON_MODEL:gemini-2.5-flash-lite}
   jwt:
     # 필수 Secret. 기본값을 두지 않으므로 값이 없으면 기동에 실패한다.
     secret: ${JWT_SECRET}

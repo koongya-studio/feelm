@@ -16,9 +16,6 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -28,7 +25,7 @@ public class RecommendationServingService {
 
     private final RecommendationServingRepository repository;
     private final RecommendationReplenisher replenisher;
-    private final ObjectMapper objectMapper;
+    private final RecommendationReasonPresenter reasonPresenter;
     private final Clock clock;
 
     @Transactional
@@ -85,14 +82,10 @@ public class RecommendationServingService {
                         item.averageRating(),
                         otts.getOrDefault(item.movieId(), List.of()));
         return new RecommendationItemResponse(
-                item.id(), item.type(), movie, item.flavorCode(), reason(item.reason()));
-    }
-
-    private JsonNode reason(String reason) {
-        try {
-            return objectMapper.readTree(reason);
-        } catch (JacksonException exception) {
-            throw new IllegalStateException("Stored recommendation reason is invalid", exception);
-        }
+                item.id(),
+                item.type(),
+                movie,
+                item.flavorCode(),
+                reasonPresenter.present(item.reason()));
     }
 }

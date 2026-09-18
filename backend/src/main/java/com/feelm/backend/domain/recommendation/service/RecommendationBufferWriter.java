@@ -16,6 +16,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -76,7 +77,13 @@ class RecommendationBufferWriter {
                 rank(batch, userId, eligibleMovieIds, "DISCOVERY");
         List<RecommendationBufferItem> items = new ArrayList<>();
         append(items, taste);
-        append(items, discovery);
+        Set<Long> storedMovieIds =
+                items.stream().map(RecommendationBufferItem::movieId).collect(Collectors.toSet());
+        append(
+                items,
+                discovery.stream()
+                        .filter(candidate -> !storedMovieIds.contains(candidate.movieId()))
+                        .toList());
         return List.copyOf(items);
     }
 

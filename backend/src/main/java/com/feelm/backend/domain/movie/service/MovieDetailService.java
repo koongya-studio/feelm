@@ -11,13 +11,13 @@ import com.feelm.backend.domain.movie.repository.MovieDetailRepository.MovieAttr
 import com.feelm.backend.domain.movie.repository.MovieDetailRepository.MovieCredit;
 import com.feelm.backend.domain.movie.repository.MovieDetailRepository.MovieMetadata;
 import com.feelm.backend.domain.movie.repository.MovieDetailRepository.Personalization;
+import com.feelm.backend.domain.recommendation.service.RecommendationReasonPresenter;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.ObjectMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -28,7 +28,7 @@ public class MovieDetailService {
     private static final String TMDB_THUMBNAIL_PROFILE_PREFIX = "https://image.tmdb.org/t/p/w185/";
 
     private final MovieDetailRepository movieDetailRepository;
-    private final ObjectMapper objectMapper;
+    private final RecommendationReasonPresenter reasonPresenter;
 
     @Transactional(readOnly = true)
     public MovieDetailResponse getDetail(long movieId, Long recommendationItemId, Long userId) {
@@ -117,7 +117,7 @@ public class MovieDetailService {
                                 new MovieRecommendationResponse(
                                         snapshot.recommendationItemId(),
                                         snapshot.type(),
-                                        objectMapper.readTree(snapshot.reason())))
+                                        reasonPresenter.present(snapshot.reason())))
                 .orElse(null);
     }
 }
