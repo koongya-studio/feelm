@@ -100,6 +100,10 @@ feelm:
     secret: ${JWT_SECRET}
     access-token-ttl: 30m
     refresh-token-ttl: 14d
+    # 회전 직후 같은 Refresh Token이 한 번 더 도착해도 탈취로 보지 않는 시간(API-006 처리 규칙).
+    # 끊긴 재발급이 다시 오는 정상 경우를 전량 폐기로 처리하지 않기 위한 값이며, 길수록 탈취된
+    # 토큰이 통하는 창도 넓어진다(S15P21E106-596).
+    refresh-rotation-grace: 10s
     # 소셜 가입을 마칠 때까지만 유효한 토큰의 수명(API-007 처리 규칙). 코드 기본값과 같은 값을 여기에
     # 두는 이유는 계약값이 바뀐 사실이 설정 diff로 드러나야 하기 때문이다(S15P21E106-311과 같은 판단).
     signup-token-ttl: 10m

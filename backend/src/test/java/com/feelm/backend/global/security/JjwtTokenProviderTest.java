@@ -35,6 +35,7 @@ class JjwtTokenProviderTest {
                         accessTtl,
                         Duration.ofDays(14),
                         signupTtl,
+                        Duration.ofSeconds(10),
                         new JwtProperties.RefreshCookie(
                                 "refresh_token", "/api/v1/auth", true, "Lax")));
     }

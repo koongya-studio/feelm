@@ -79,7 +79,7 @@ describe('API-030 영화 상세 조회', () => {
   });
 
   it('토큰이 없어도 비회원으로 부른다', async () => {
-    endSession();
+    endSession('signed-out');
     fetchMock.mockResolvedValue(json(200, sparseDetail));
 
     await getMovieDetail(550);
