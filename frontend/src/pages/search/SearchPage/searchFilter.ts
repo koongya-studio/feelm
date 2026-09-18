@@ -91,3 +91,53 @@ export function toSearchQuery(
 
   return query;
 }
+
+/*
+ * 검색 조건을 주소에 남긴다(업무 -634).
+ *
+ * 4.2에서 2.4로 갔다가 뒤로 오면 검색 화면이 새로 그려진다. 조건이 화면 상태에만 있으면
+ * 그때 모두 사라져 4.1로 돌아간 것처럼 보였다. 주소에 두면 뒤로 가기가 같은 조건을 되찾는다.
+ *
+ * 기본값은 적지 않는다 — 조건 없는 4.1의 주소는 `/search` 그대로다.
+ */
+
+const SORT_VALUES = SORT_OPTIONS.map((option) => option.value);
+const YEAR_VALUES = YEAR_BUCKETS.map((bucket) => bucket.id as string);
+
+/** 검색어 · 필터를 주소의 질의로 바꾼다. 빈 값 · 기본값은 넣지 않는다 */
+export function toSearchParams(keyword: string, filter: SearchFilterState): URLSearchParams {
+  const params = new URLSearchParams();
+
+  if (keyword.trim()) params.set('q', keyword.trim());
+  filter.genre.forEach((code) => params.append('genre', code));
+  filter.ott.forEach((ottId) => params.append('ott', String(ottId)));
+  if (filter.year !== EMPTY_FILTER.year) params.set('year', filter.year);
+  if (filter.sort !== EMPTY_FILTER.sort) params.set('sort', filter.sort);
+
+  return params;
+}
+
+/** 주소의 질의를 검색어 · 필터로 되돌린다. 모르는 값은 버리고 기본값을 쓴다 */
+export function fromSearchParams(params: URLSearchParams): {
+  keyword: string;
+  filter: SearchFilterState;
+} {
+  const sort = params.get('sort');
+  const year = params.get('year');
+
+  return {
+    keyword: params.get('q') ?? '',
+    filter: {
+      genre: params.getAll('genre').filter(Boolean),
+      ott: params
+        .getAll('ott')
+        .map(Number)
+        .filter((ottId) => Number.isInteger(ottId) && ottId > 0),
+      year: year && YEAR_VALUES.includes(year) ? (year as YearBucketId) : EMPTY_FILTER.year,
+      sort:
+        sort && (SORT_VALUES as string[]).includes(sort)
+          ? (sort as MovieSearchSort)
+          : EMPTY_FILTER.sort,
+    },
+  };
+}
