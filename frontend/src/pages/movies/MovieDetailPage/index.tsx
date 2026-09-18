@@ -8,6 +8,14 @@
  * 주 동작은 평가 하나다. 기존 평가가 있으면 버튼 위에 내 평가 원문을 보여 주고
  * `내 별점 수정하기`로 이동한다. 별도 `내 감상평` 편집 섹션은 두지 않는다.
  * 공개 목록에서는 작성자가 본인이어도 `spoiler=true`인 항목을 기본 블러한다.
+ *
+ * **이 영화의 팝콘 맛을 메타 줄 아래 칩으로 보인다**(업무 -631, 사용자 결정 2026-09-18).
+ * 평가하면 이 맛의 팝콘이 한 알 담기므로, 평가 전에 무슨 맛인지 알 수 있어야 한다.
+ * 맛 코드는 API-030 `flavorCode`, 이름과 설명은 기준정보 API-044의 `displayName` ·
+ * `representativeKeywords`다 — 계약에 설명 문장이 없어 대표 키워드를 설명으로 쓴다.
+ * 칩을 누르면 키워드가 펼쳐진다. 맛이 배정되지 않은 영화(`flavorCode: null`)와 기준정보를
+ * 받지 못한 경우에는 칩을 두지 않는다. 맛의 색은 색 면이 아니라 3.1과 같은 팝콘 알 그림으로
+ * 보인다 — UI에 유채색을 쓰지 않는다(design-concept.md 3장).
  */
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -19,7 +27,9 @@ import RatingStars from '../../../components/RatingStars';
 import StatusView from '../../../components/StatusView';
 import { ChevronLeftIcon } from '../../../components/Icon';
 import { ApiError } from '../../../api/apiError';
+import { kernelSprite } from '../../../components/PopcornBucket/sprites';
 import { getMovieDetail, getMovieReviews, getSimilarMovies } from '../../../api/movies';
+import { getPopcornFlavors } from '../../../api/taste';
 import { recordOttClick } from '../../../api/watch';
 import { useAuth } from '../../../contexts/authContext';
 import { useBack } from '../../../hooks/useBack';
@@ -29,6 +39,7 @@ import { ottMovieUrl } from '../../../utils/ott';
 import styles from './MovieDetailPage.module.css';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import type { MovieDetail, SimilarMovie } from '../../../types/movie';
+import type { PopcornFlavor } from '../../../types/taste';
 import type { PublicReview, PublicReviewList } from '../../../types/watch';
 
 const BACK_BUTTON_SIZE = 39;
@@ -77,6 +88,10 @@ export default function MovieDetailPage() {
 
   const [movie, setMovie] = useState<MovieDetail | null>(null);
   const [similar, setSimilar] = useState<SimilarMovie[]>([]);
+  /** 팝콘 맛 기준정보(API-044). 받지 못하면 빈 배열이고 맛 칩을 두지 않는다 */
+  const [flavors, setFlavors] = useState<PopcornFlavor[]>([]);
+  /** 키워드를 펼친 영화. 다른 영화로 넘어가면 접힌 채로 시작한다 */
+  const [flavorOpenFor, setFlavorOpenFor] = useState<number | null>(null);
   const [reviewPage, setReviewPage] = useState<{
     movieId: number;
     items: PublicReview[];
@@ -151,6 +166,21 @@ export default function MovieDetailPage() {
       active = false;
     };
   }, [id, reloadCount]);
+
+  useEffect(() => {
+    // 맛 칩에만 쓰이는 공개 기준정보라 영화가 바뀌어도 다시 받지 않는다
+    let active = true;
+
+    getPopcornFlavors()
+      .then((items) => {
+        if (active) setFlavors(items);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -340,6 +370,10 @@ export default function MovieDetailPage() {
   if (!movie) return null;
 
   const meta = movieMetaLine(movie);
+  const flavor = movie.flavorCode
+    ? flavors.find((candidate) => candidate.code === movie.flavorCode)
+    : undefined;
+  const flavorOpen = flavorOpenFor === id;
   const people = [
     ...movie.directors.map((person) => ({ ...person, creditKey: `director:${person.personId}` })),
     ...movie.cast.map((person) => ({ ...person, creditKey: `cast:${person.personId}` })),
@@ -374,6 +408,25 @@ export default function MovieDetailPage() {
         <header className={styles.head}>
           <h1 className={styles.title}>{movie.title}</h1>
           {meta ? <p className={styles.meta}>{meta}</p> : null}
+          {flavor ? (
+            <div className={styles.flavor}>
+              <button
+                type="button"
+                className={styles.flavorChip}
+                aria-expanded={flavorOpen}
+                aria-controls="movie-flavor-keywords"
+                onClick={() => setFlavorOpenFor(flavorOpen ? null : id)}
+              >
+                <img className={styles.flavorSprite} src={kernelSprite(flavor.code)} alt="" />
+                {flavor.displayName} 맛
+              </button>
+              {flavorOpen ? (
+                <p id="movie-flavor-keywords" className={styles.flavorKeywords}>
+                  {flavor.representativeKeywords.join(' · ')}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <p className={styles.average}>
             <RatingStars score={movie.averageRating} size={15} gap={3} />
             <span className={styles.averageValue}>{movie.averageRating.toFixed(1)}</span>

@@ -33,6 +33,10 @@
  * 배열로 온다. 계약은 8개 맛을 항상 준다고 정하므로 화면을 빈 응답에 맞추지 않고,
  * 알이 0개인 기존 빈 상태를 그대로 보여준다(S15P21E106-392).
  * `[?]` 평균 평점 표기 형식은 FR-06이 정하지 않아 `★ 4.4`로 둔다.
+ *
+ * **범례의 맛마다 무엇을 뜻하는지 한 줄을 단다**(업무 -631, 사용자 결정 2026-09-18). 맛 이름만으로는
+ * `오리지널 솔트`가 어떤 영화인지 알 수 없다는 QA 지적이다. 계약에 설명 문장이 없어 기준정보
+ * API-044의 대표 키워드(`representativeKeywords`)를 잇는다. 기준정보를 받지 못하면 그 줄만 없다.
  */
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -44,11 +48,11 @@ import { kernelCounts } from '../../../components/PopcornBucket/kernels';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
-import { getPopcornBucket } from '../../../api/taste';
+import { getPopcornBucket, getPopcornFlavors } from '../../../api/taste';
 import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
 import styles from './PopcornBucketPage.module.css';
-import type { PopcornBucket as PopcornBucketData } from '../../../types/taste';
+import type { PopcornBucket as PopcornBucketData, PopcornFlavor } from '../../../types/taste';
 
 /** 시안의 뒤로 가기 원 지름(px). 300px 폭 시안의 31px을 375px 기준으로 환산했다 */
 const BACK_BUTTON_SIZE = 39;
@@ -64,6 +68,8 @@ export default function PopcornBucketPage() {
   const back = useBack(path.film());
 
   const [bucket, setBucket] = useState<PopcornBucketData | null>(null);
+  /** 맛 설명(대표 키워드). 받지 못하면 빈 배열이고 범례에 설명 줄만 없다 */
+  const [flavorInfo, setFlavorInfo] = useState<PopcornFlavor[]>([]);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
 
@@ -82,6 +88,12 @@ export default function PopcornBucketPage() {
           setFailed(true);
         }
       });
+
+    getPopcornFlavors()
+      .then((items) => {
+        if (active) setFlavorInfo(items);
+      })
+      .catch(() => undefined);
 
     return () => {
       active = false;
@@ -182,21 +194,32 @@ export default function PopcornBucketPage() {
            * 살린다(`.kernel` 참고).
            */}
           <ul className={styles.legend}>
-            {bucket.flavors.map((flavor) => (
-              <li key={flavor.flavorCode} className={styles.legendItem}>
-                <span
-                  className={styles.kernel}
-                  style={{ background: flavor.color }}
-                  aria-hidden="true"
-                />
-                <span className={styles.legendName}>{flavor.displayName}</span>
-                <span className={styles.legendCount}>{flavor.popcornCount}</span>
-                {/* 맛 선호도는 감상량과 구분해 표시한다 (FR-06) */}
-                {flavor.averageScore === null ? null : (
-                  <span className={styles.legendScore}>★ {flavor.averageScore.toFixed(1)}</span>
-                )}
-              </li>
-            ))}
+            {bucket.flavors.map((flavor) => {
+              const keywords = flavorInfo.find(
+                (info) => info.code === flavor.flavorCode,
+              )?.representativeKeywords;
+
+              return (
+                <li key={flavor.flavorCode} className={styles.legendItem}>
+                  <span
+                    className={styles.kernel}
+                    style={{ background: flavor.color }}
+                    aria-hidden="true"
+                  />
+                  <span className={styles.legendText}>
+                    <span className={styles.legendName}>{flavor.displayName}</span>
+                    {keywords?.length ? (
+                      <span className={styles.legendKeywords}>{keywords.join(' · ')}</span>
+                    ) : null}
+                  </span>
+                  <span className={styles.legendCount}>{flavor.popcornCount}</span>
+                  {/* 맛 선호도는 감상량과 구분해 표시한다 (FR-06) */}
+                  {flavor.averageScore === null ? null : (
+                    <span className={styles.legendScore}>★ {flavor.averageScore.toFixed(1)}</span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       </div>

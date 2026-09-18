@@ -84,10 +84,22 @@
   line-height: var(--line-height-meta);
 }
 
-.legendName {
+.legendText {
+  display: flex;
   flex: 1;
   min-width: 0;
+  flex-direction: column;
+}
+
+.legendName {
   color: var(--color-ink-body);
+}
+
+/* 맛이 뜻하는 것(업무 -631). 이름 아래 한 줄이고, 수치보다 흐리다 */
+.legendKeywords {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
 }
 
 .legendCount {
