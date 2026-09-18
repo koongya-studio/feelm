@@ -15,7 +15,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import FrameDetailPage from './index';
-import { mockFrameList, mockMyRatings } from '../../../mocks/frames';
+import { mockFrameList } from '../../../mocks/frames';
+import { findMockMovieDetail } from '../../../mocks/movieDetails';
 import { findMockMovie } from '../../../mocks/movies';
 import { ROUTE_PATTERN } from '../../../routes/paths';
 import type { FrameDetail } from '../../../types/taste';
@@ -29,6 +30,15 @@ const ratingEdits = new Map<number, RatingUpdateInput>();
 
 function saveRatingEdit(ratingId: number, input: RatingUpdateInput) {
   ratingEdits.set(ratingId, { ...input });
+}
+
+/** 기준 평가. 영화 상세 대역(`mocks/movieDetails`)의 내 평가다 */
+function myRatingOf(movieId: number) {
+  const rating = findMockMovieDetail(movieId)?.myRating;
+
+  if (!rating) throw new Error(`기준 평가가 없는 영화다: ${movieId}`);
+
+  return rating;
 }
 
 function withRatingEdit<T extends RatingUpdateInput & { ratingId: number }>(rating: T): T {
@@ -73,7 +83,7 @@ function frameDetail(frameId: number): Promise<FrameDetail> {
       genres: movie.genres,
       directors: [],
     },
-    rating: withRatingEdit(mockMyRatings[frame.movie.movieId]),
+    rating: withRatingEdit(myRatingOf(frame.movie.movieId)),
     watchRecord: { ott: null, clickedAt: null, watchedAt: null, ratedAt: frame.createdAt },
   });
 }
@@ -123,7 +133,7 @@ describe('3.1-A ⇢ 7.6-A', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(await screen.findByText(/두 번째 볼 때 더 좋았어요/)).toBeInTheDocument();
 
-    expect(withRatingEdit(mockMyRatings[402])).toEqual({
+    expect(withRatingEdit(myRatingOf(402))).toEqual({
       ratingId: 902,
       score: 4,
       comment: '두 번째 볼 때 더 좋았어요',
@@ -143,7 +153,7 @@ describe('3.1-A ⇢ 7.6-A', () => {
     // 취소하면 아무것도 지우지 않고 시트로 돌아간다
     fireEvent.click(confirm.getByRole('button', { name: '취소' }));
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
-    expect(withRatingEdit(mockMyRatings[402]).comment).not.toBeNull();
+    expect(withRatingEdit(myRatingOf(402)).comment).not.toBeNull();
 
     fireEvent.click(
       within(screen.getByRole('dialog', { name: '한줄평 관리' })).getByRole('button', {
@@ -155,7 +165,7 @@ describe('3.1-A ⇢ 7.6-A', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
     // 평가는 남는다. 별점도 그대로다
-    expect(withRatingEdit(mockMyRatings[402])).toEqual(
+    expect(withRatingEdit(myRatingOf(402))).toEqual(
       expect.objectContaining({ score: 4, comment: null }),
     );
     // 한줄평이 없으면 관리할 것이 없다

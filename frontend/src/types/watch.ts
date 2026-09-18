@@ -106,16 +106,61 @@ export type RatingUpdateInput = {
   spoiler?: boolean;
 };
 
-/** API-039 내 평가 목록 `items[]` */
-export type MyRatingListItem = {
+/** API-039 `filter`. 생략하면 서버가 `RATED`로 본다 */
+export type MyRatingFilter = 'RATED' | 'ALL' | 'COMMENTED' | 'UNRATED';
+
+/** API-039 `sort`. 생략하면 서버가 `LATEST`로 본다 */
+export type MyRatingSort = 'LATEST' | 'SCORE_DESC' | 'SCORE_ASC' | 'OLDEST';
+
+/**
+ * API-039 질의. `cursor`는 사용자 · `filter` · `sort`에 묶이므로 둘 중 하나가 바뀌면 버리고
+ * 첫 장부터 받는다. `size`는 1~50, 기본 20이다.
+ */
+export type MyRatingQuery = {
+  filter?: MyRatingFilter;
+  sort?: MyRatingSort;
+  cursor?: string;
+  size?: number;
+};
+
+/** API-039 `items[]` 중 평가 */
+export type MyRatedItem = {
+  itemType: 'RATED';
   ratingId: number;
   movie: { movieId: number; title: string; posterUrl: string | null };
   score: number;
   comment: string | null;
-  visibility: Visibility;
-  frameId: number;
+  visibility: Visibility | null;
+  spoiler: boolean;
+  /**
+   * 그 평가의 프레임. **`null`일 수 있다** — 과거 데이터에는 프레임 없이 들어간 평가가 있고,
+   * 계약은 그래도 평가로 돌려준다(API-039 응답 설명)
+   */
+  frameId: number | null;
   createdAt: string;
+  /** 정렬에 쓴 시각. 평가는 `createdAt`과 같다 */
+  activityAt: string | null;
 };
+
+/**
+ * API-039 `items[]` 중 감상 확인 뒤 아직 평가하지 않은 영화(`filter=ALL` · `UNRATED`).
+ * 평가 전용 값은 모두 `null`이다 — 계약이 꾸며 내지 않는다고 정했다.
+ */
+export type MyUnratedItem = {
+  itemType: 'UNRATED';
+  ratingId: null;
+  movie: { movieId: number; title: string; posterUrl: string | null };
+  score: null;
+  comment: null;
+  visibility: null;
+  spoiler: null;
+  frameId: null;
+  createdAt: null;
+  activityAt: string | null;
+};
+
+/** API-039 `items[]`. `itemType`으로 가른다 */
+export type MyRatingListItem = MyRatedItem | MyUnratedItem;
 
 /** API-039 응답 */
 export type MyRatingList = {
