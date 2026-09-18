@@ -23,6 +23,10 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 public class MovieDetailService {
 
+    private static final String TMDB_ORIGINAL_PROFILE_PREFIX =
+            "https://image.tmdb.org/t/p/original/";
+    private static final String TMDB_THUMBNAIL_PROFILE_PREFIX = "https://image.tmdb.org/t/p/w185/";
+
     private final MovieDetailRepository movieDetailRepository;
     private final ObjectMapper objectMapper;
 
@@ -60,7 +64,12 @@ public class MovieDetailService {
                         .toList(),
                 credits.stream()
                         .filter(credit -> credit.role().equals("DIRECTOR"))
-                        .map(credit -> new DirectorResponse(credit.personId(), credit.name()))
+                        .map(
+                                credit ->
+                                        new DirectorResponse(
+                                                credit.personId(),
+                                                credit.name(),
+                                                thumbnailProfileUrl(credit.profileUrl())))
                         .toList(),
                 credits.stream()
                         .filter(credit -> credit.role().equals("ACTOR"))
@@ -69,7 +78,8 @@ public class MovieDetailService {
                                         new CastResponse(
                                                 credit.personId(),
                                                 credit.name(),
-                                                credit.character()))
+                                                credit.character(),
+                                                thumbnailProfileUrl(credit.profileUrl())))
                         .toList(),
                 movie.posterUrl(),
                 movie.backdropUrl(),
@@ -80,6 +90,15 @@ public class MovieDetailService {
                 personalization.rating(),
                 personalization.watchStatus(),
                 getRecommendation(movieId, recommendationItemId, userId));
+    }
+
+    /** 기존 적재 URL을 그대로 활용하되 상세 화면에서는 작은 TMDb 이미지를 내려준다. */
+    private String thumbnailProfileUrl(String profileUrl) {
+        if (profileUrl == null || !profileUrl.startsWith(TMDB_ORIGINAL_PROFILE_PREFIX)) {
+            return profileUrl;
+        }
+        return TMDB_THUMBNAIL_PROFILE_PREFIX
+                + profileUrl.substring(TMDB_ORIGINAL_PROFILE_PREFIX.length());
     }
 
     private MovieRecommendationResponse getRecommendation(

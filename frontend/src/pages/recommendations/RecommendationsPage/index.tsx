@@ -7,35 +7,45 @@
  * screen-spec.md 8.1 #3). 와이어프레임은 3 + 2 = 5장이지만 계약이 기준이다.
  * 섹션 이름도 계약을 따라 `취향 발견 추천`이다(FR-12, 8.1 #4).
  *
- * `?mock=error`로 2.2-A를 확인할 수 있다. 계약의 `503 RECOMMENDATION_UNAVAILABLE`이
- * 아니면 이 화면을 볼 방법이 없어 둔 목업 전용 입력이며 api/mockTransport.ts가 읽는다
- * (frontend-structure.md 7.4). 실제 연동 시 제거한다.
+ * **카드는 API-045 실제 응답이다**(업무 -610). 목업 카드가 목업 영화 번호(101~104)로 실제
+ * 영화 상세를 열어 전혀 다른 영화가 나오던 문제를 없앴다. 일치도 `%`는 계약에 없어 그리지
+ * 않는다(CR-13). 관심없음(API-047)의 프론트 연동은 S15P21E106-536이 맡으므로 그전까지
+ * 메뉴의 `관심없음`은 눌리지 않는다 — 목업으로 지운 척하는 것보다 낫다.
  *
  * 추천 후보가 모두 빠진 경우(관심없음 · 온보딩 `안 좋았어요`)에도 이 화면에 보여줄 것이
  * 없다. 와이어프레임에 그 상태가 없어 2.2-A와 같은 자리에 빈 데이터 안내를 둔다
  * (업무 -264).
+ *
+ * 카드 열은 **3.1과 같은 필름 릴을 세로로 세운 것**이다(`FilmReel`, 업무 -605 — 사용자
+ * 지시 2026-09-18). 그전에는 와이어프레임의 회색 판에 구멍 줄을 직접 그렸는데, 3.1의
+ * 필름이 확정되고 나서 추천 카드가 다른 필름처럼 보였다. 섹션 이름표는 프레임 사이에
+ * 끼운다(`data-film-label`).
  */
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import Button from '../../../components/Button';
+import FilmReel from '../../../components/FilmReel';
 import Menu from '../../../components/Menu';
 import OttBadge from '../../../components/OttBadge';
 import ScreenHeader from '../../../components/ScreenHeader';
-import Snackbar from '../../../components/Snackbar';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import { BlockIcon, LinkIcon, PlayIcon } from '../../../components/Icon';
 import RecommendationCard from './RecommendationCard';
-import { dismissMovie, getRecommendations } from '../../../api/recommendations';
+import { getRecommendations } from '../../../api/recommendations';
 import { getOtts } from '../../../api/otts';
 import { path } from '../../../routes/paths';
 import styles from './RecommendationsPage.module.css';
 import type { MouseEvent } from 'react';
 import type { Ott } from '../../../types/ott';
-import type { RecommendationItemView } from '../../../types/unspecified';
+import type { RecommendationItem } from '../../../types/recommendation';
+
+/* 카드 실측값 그대로다(RecommendationCard). 릴의 칸 크기가 되고 릴은 이 폭에 맞춰 선다 */
+const FRAME_WIDTH = 156;
+const FRAME_HEIGHT = 220;
 
 type OpenMenu = {
-  item: RecommendationItemView;
+  item: RecommendationItem;
   /** 화면 위쪽에서의 거리(px). 누른 버튼 위치에 맞춘다 */
   top: number;
 };
@@ -43,10 +53,9 @@ type OpenMenu = {
 export default function RecommendationsPage() {
   const rootRef = useRef<HTMLDivElement>(null);
   const [otts, setOtts] = useState<Ott[]>([]);
-  const [items, setItems] = useState<RecommendationItemView[] | null>(null);
+  const [items, setItems] = useState<RecommendationItem[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [openMenu, setOpenMenu] = useState<OpenMenu | null>(null);
-  const [dismissedItems, setDismissedItems] = useState<RecommendationItemView[] | null>(null);
 
   const [reloadCount, setReloadCount] = useState(0);
 
@@ -83,11 +92,10 @@ export default function RecommendationsPage() {
     setItems(null);
     setFailed(false);
     setOpenMenu(null);
-    setDismissedItems(null);
     setReloadCount((count) => count + 1);
   }
 
-  function handleOpenMenu(event: MouseEvent<HTMLButtonElement>, item: RecommendationItemView) {
+  function handleOpenMenu(event: MouseEvent<HTMLButtonElement>, item: RecommendationItem) {
     if (openMenu?.item.recommendationItemId === item.recommendationItemId) {
       setOpenMenu(null);
 
@@ -101,42 +109,13 @@ export default function RecommendationsPage() {
     setOpenMenu({ item, top: buttonRect.top - (rootRect?.top ?? 0) });
   }
 
-  async function handleDismiss(item: RecommendationItemView) {
-    if (!items) {
-      return;
-    }
-
-    const previous = items;
-    const result = await dismissMovie(item.movie.movieId, item.recommendationItemId);
-
-    setItems(
-      previous.flatMap((candidate) => {
-        if (candidate.recommendationItemId !== item.recommendationItemId) {
-          return [candidate];
-        }
-
-        // 교체 후보가 없으면 카드가 사라진다.
-        // `[?]` 이때의 표시는 screen-spec.md 2.3-A 미확정 항목이다.
-        return result.replacement ? [result.replacement] : [];
-      }),
-    );
-    setDismissedItems(previous);
-    setOpenMenu(null);
-  }
-
-  function handleUndo() {
-    // 관심없음 해제 API가 없어 화면 상태로만 되돌린다(CR-15).
-    setItems(dismissedItems);
-    setDismissedItems(null);
-  }
-
   const tasteItems = items?.filter((item) => item.type === 'TASTE') ?? [];
   const discoveryItems = items?.filter((item) => item.type === 'DISCOVERY') ?? [];
 
   if (failed) {
     return (
       <>
-        <ScreenHeader title="오늘의 추천" align="center" />
+        <ScreenHeader title={<VisuallyHidden>오늘의 추천</VisuallyHidden>} />
 
         {/* 2.2-A 추천을 불러오지 못한 경우 */}
         <StatusView
@@ -157,7 +136,7 @@ export default function RecommendationsPage() {
   if (items && items.length === 0) {
     return (
       <>
-        <ScreenHeader title="오늘의 추천" align="center" />
+        <ScreenHeader title={<VisuallyHidden>오늘의 추천</VisuallyHidden>} />
 
         <StatusView
           variant="empty"
@@ -172,16 +151,28 @@ export default function RecommendationsPage() {
 
   return (
     <>
-      <ScreenHeader title="오늘의 추천" align="center" />
+      {/*
+       * **화면 제목은 보이지 않는다**(사용자 지시 2026-09-18, 업무 -605). 필름이 곧 화면이고
+       * 하단 내비의 `필름`에 표시가 있다. 화면마다 h1이 하나는 있어야 하므로 글자는 남기고
+       * 보이지만 않게 한다(7.1과 같은 처리). 오류 · 빈 상태는 안내가 화면을 채우므로
+       * 헤더 자리만 남기고 제목을 숨긴다.
+       */}
+      <h1>
+        <VisuallyHidden>오늘의 추천</VisuallyHidden>
+      </h1>
 
       <div className={styles.page} ref={rootRef}>
         <div className={styles.scrollArea}>
           {items ? (
-            <div className={styles.strip}>
-              <span className={styles.perforation} data-side="left" aria-hidden="true" />
-              <span className={styles.perforation} data-side="right" aria-hidden="true" />
-
-              <h2 className={styles.sectionPill}>취향 맞춤 추천</h2>
+            <FilmReel
+              orientation="vertical"
+              frameWidth={FRAME_WIDTH}
+              frameHeight={FRAME_HEIGHT}
+              label="오늘의 추천 카드"
+            >
+              <h2 className={styles.sectionPill} data-film-label="">
+                취향 맞춤 추천
+              </h2>
 
               {tasteItems.map((item) => (
                 <RecommendationCard
@@ -193,7 +184,7 @@ export default function RecommendationsPage() {
                 />
               ))}
 
-              <div className={styles.sectionGroup}>
+              <div className={styles.sectionGroup} data-film-label="">
                 <h2 className={styles.sectionPill} data-tone="dark">
                   취향 발견 추천
                 </h2>
@@ -209,19 +200,11 @@ export default function RecommendationsPage() {
                   onOpenMenu={handleOpenMenu}
                 />
               ))}
-            </div>
+            </FilmReel>
           ) : null}
         </div>
 
         <p className={styles.hint}>포스터를 탭하면 상세 화면 · ⋯ 버튼을 탭하면 OTT 메뉴</p>
-
-        {dismissedItems ? (
-          <div className={styles.snackbarArea}>
-            <Snackbar actionLabel="실행 취소" onAction={handleUndo}>
-              <VisuallyHidden>관심없음 처리됨. </VisuallyHidden>이 영화는 이후 추천에서 제외돼요
-            </Snackbar>
-          </div>
-        ) : null}
 
         {/* 2.3 추천 카드 ⋯ 메뉴 */}
         {openMenu ? (
@@ -272,12 +255,11 @@ export default function RecommendationsPage() {
                 <span className={styles.menuItemLabel}>영화 상세 보기</span>
               </Link>
 
-              <button
-                type="button"
-                className={styles.menuItem}
-                data-tone="muted"
-                onClick={() => void handleDismiss(openMenu.item)}
-              >
+              {/*
+               * 관심없음(API-047)은 백엔드에 있지만 프론트 연동은 S15P21E106-536이 맡는다.
+               * 그전까지 눌리지 않는다 — 화면 상태로만 지운 척하면 다음 조회에서 되살아난다.
+               */}
+              <button type="button" className={styles.menuItem} data-tone="muted" disabled>
                 <BlockIcon />
                 <span className={styles.menuItemLabel}>관심없음</span>
               </button>

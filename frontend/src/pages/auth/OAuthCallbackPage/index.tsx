@@ -25,6 +25,7 @@ import Button from '../../../components/Button';
 import { ApiError } from '../../../api/apiError';
 import { useAuth } from '../../../contexts/authContext';
 import { path } from '../../../routes/paths';
+import { isReturnPath } from '../../../routes/returnPath';
 import { clearOAuthRequest, readOAuthRequest } from '../../../utils/oauth';
 import styles from './OAuthCallbackPage.module.css';
 
@@ -83,7 +84,10 @@ export default function OAuthCallbackPage() {
           return;
         }
 
-        void navigate(result.user.onboardingCompleted ? path.film() : path.onboardingTaste(), {
+        // 보호 라우트에서 왔으면 그 자리로 돌아간다(`RequireAuth`, 업무 -610)
+        const returnTo = isReturnPath(request.returnTo) ? request.returnTo : path.film();
+
+        void navigate(result.user.onboardingCompleted ? returnTo : path.onboardingTaste(), {
           replace: true,
         });
       } catch (error) {

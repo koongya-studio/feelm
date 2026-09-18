@@ -1,14 +1,17 @@
 package com.feelm.backend.domain.recommendation;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.nullValue;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.feelm.backend.domain.recommendation.service.RecommendationReplenisher;
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedPostgresContractTest;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -16,6 +19,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -26,6 +30,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.transaction.IllegalTransactionStateException;
 
 @SpringBootTest(
         properties = {
@@ -34,7 +39,7 @@ import org.springframework.test.web.servlet.MockMvc;
             "spring.task.scheduling.enabled=false"
         })
 @AutoConfigureMockMvc
-@DisplayName("API-045·046 추천 버퍼 노출")
+@DisplayName("API-045 추천 버퍼 노출과 자동 보충")
 class RecommendationServingApiContractTest extends SharedPostgresContractTest {
 
     private static final long USER = 10;
@@ -44,7 +49,9 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
+    @Autowired DataSource dataSource;
     @Autowired TokenProvider tokens;
+    @Autowired RecommendationReplenisher replenisher;
 
     private ExecutorService executor;
 
@@ -72,6 +79,10 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
 
     @AfterEach
     void stopExecutor() throws InterruptedException {
+        jdbc.execute(
+                "DROP TRIGGER IF EXISTS test_fail_recommendation_exposure"
+                        + " ON recommendation_items");
+        jdbc.execute("DROP FUNCTION IF EXISTS test_fail_recommendation_exposure()");
         if (executor == null) {
             return;
         }
@@ -103,6 +114,13 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
                 .andExpect(jsonPath("$.items[2].recommendationItemId").value(1005));
 
         assertThat(exposedIds()).containsExactly(1001L, 1002L, 1005L);
+    }
+
+    @Test
+    @DisplayName("보충 컴포넌트는 활성 트랜잭션 밖에서 호출할 수 없다")
+    void replenisherRequiresExistingTransaction() {
+        assertThatThrownBy(() -> replenisher.replenishVacancies(USER, SET, List.of()))
+                .isInstanceOf(IllegalTransactionStateException.class);
     }
 
     @Test
@@ -153,11 +171,8 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
         getRecommendations(USER).andExpect(status().isOk());
         dismissal(101, 1001);
 
-        replenish(USER, SET, 1001)
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.replacement.recommendationItemId").value(1003));
-
         getRecommendations(USER)
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].recommendationItemId").value(1002))
                 .andExpect(jsonPath("$.items[1].recommendationItemId").value(1003))
                 .andExpect(jsonPath("$.items[2].recommendationItemId").value(1005));
@@ -169,25 +184,18 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
         getRecommendations(USER).andExpect(status().isOk());
         jdbc.update("INSERT INTO ratings(user_id,movie_id,score) VALUES (?,101,5)", USER);
 
-        replenish(USER, SET, 1001)
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.replacement.recommendationItemId").value(1003))
-                .andExpect(jsonPath("$.replacement.type").value("TASTE"));
-
         getRecommendations(USER)
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].recommendationItemId").value(1002))
                 .andExpect(jsonPath("$.items[1].recommendationItemId").value(1003))
                 .andExpect(jsonPath("$.items[2].recommendationItemId").value(1005));
     }
 
     @Test
-    @DisplayName("관심없음이나 평가로 제거되지 않은 카드는 보충 요청할 수 없다")
-    void rejectsSourceThatIsStillVisible() throws Exception {
+    @DisplayName("유효 카드가 이미 세 편이면 다음 후보를 소비하지 않는다")
+    void doesNotConsumeCandidateWhenSlotsAreFull() throws Exception {
         getRecommendations(USER).andExpect(status().isOk());
-
-        replenish(USER, SET, 1001)
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
+        getRecommendations(USER).andExpect(status().isOk());
 
         assertThat(exposedIds()).containsExactly(1001L, 1002L, 1005L);
     }
@@ -199,33 +207,25 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
         jdbc.update("DELETE FROM recommendation_items WHERE id=1006");
         dismissal(105, 1005);
 
-        replenish(USER, SET, 1005)
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.replacement.recommendationItemId").value(1003))
-                .andExpect(jsonPath("$.replacement.type").value("TASTE"));
-
         getRecommendations(USER)
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].recommendationItemId").value(1001))
                 .andExpect(jsonPath("$.items[1].recommendationItemId").value(1002))
                 .andExpect(jsonPath("$.items[2].recommendationItemId").value(1003));
     }
 
     @Test
-    @DisplayName("같은 TASTE 원본을 재전송해도 비어 있는 DISCOVERY 자리를 잠식하지 않는다")
-    void repeatedTasteSourceDoesNotConsumeDiscoverySlot() throws Exception {
+    @DisplayName("조회 사이 두 카드가 빠지면 유형별 빈자리만 한 번에 보충한다")
+    void fillsMultipleVacanciesOnRead() throws Exception {
         getRecommendations(USER).andExpect(status().isOk());
         dismissal(101, 1001);
         dismissal(105, 1005);
 
-        replenish(USER, SET, 1001)
+        getRecommendations(USER)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.replacement.recommendationItemId").value(1003));
-        replenish(USER, SET, 1001)
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.replacement").value(nullValue()));
-        replenish(USER, SET, 1005)
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.replacement.recommendationItemId").value(1006));
+                .andExpect(jsonPath("$.items[0].recommendationItemId").value(1002))
+                .andExpect(jsonPath("$.items[1].recommendationItemId").value(1003))
+                .andExpect(jsonPath("$.items[2].recommendationItemId").value(1006));
 
         assertThat(exposedIds()).containsExactly(1001L, 1002L, 1003L, 1005L, 1006L);
     }
@@ -254,47 +254,49 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("T7 다른 사용자의 추천 세트는 조회할 수 없다")
-    void rejectsForeignSet() throws Exception {
-        replenish(OTHER_USER, SET, 1001)
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("RESOURCE_NOT_FOUND"));
-
-        assertThat(exposedIds()).isEmpty();
+    @DisplayName("T7 공개 카드 보충 API는 제거한다")
+    void removesPublicReplenishEndpoint() throws Exception {
+        mvc.perform(post("/api/v1/recommendations/replenish").header("Authorization", bearer(USER)))
+                .andExpect(status().isNotFound());
     }
 
     @Test
-    @DisplayName("T8 최신 세트가 아닌 추천 세트는 추가 노출할 수 없다")
-    void rejectsStaleSet() throws Exception {
-        recommendationSet(2000, USER, OffsetDateTime.parse("2026-09-17T00:01:00Z"));
-
-        dismissal(101, 1001);
-
-        replenish(USER, SET, 1001)
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("RECOMMENDATION_SET_STALE"));
-
-        assertThat(exposedIds()).isEmpty();
-    }
-
-    @Test
-    @DisplayName("T9 같은 빈 자리에 대한 동시 보충 요청은 후보를 중복 소비하지 않는다")
-    void concurrentReplenishRequestsDoNotDuplicateItems() throws Exception {
+    @DisplayName("T8 같은 사용자의 동시 조회는 빈자리를 중복 보충하지 않는다")
+    void concurrentReadsDoNotDuplicateItems() throws Exception {
         getRecommendations(USER).andExpect(status().isOk());
         dismissal(101, 1001);
         executor = Executors.newFixedThreadPool(2);
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
-        String token = bearer(USER);
-        Future<String> first = executor.submit(() -> concurrentReplenish(token, ready, start));
-        Future<String> second = executor.submit(() -> concurrentReplenish(token, ready, start));
+        Future<String> first = executor.submit(() -> concurrentGet(USER, ready, start));
+        Future<String> second = executor.submit(() -> concurrentGet(USER, ready, start));
         assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
         start.countDown();
 
-        assertThat(List.of(first.get(10, TimeUnit.SECONDS), second.get(10, TimeUnit.SECONDS)))
-                .anySatisfy(body -> assertThat(body).contains("\"replacement\":{"))
-                .anySatisfy(body -> assertThat(body).contains("\"replacement\":null"));
+        assertThat(first.get(10, TimeUnit.SECONDS)).contains("\"recommendationItemId\":1003");
+        assertThat(second.get(10, TimeUnit.SECONDS)).contains("\"recommendationItemId\":1003");
         assertThat(exposedIds()).containsExactly(1001L, 1002L, 1003L, 1005L);
+    }
+
+    @Test
+    @DisplayName("같은 사용자의 추천 조회는 사용자 행 잠금이 풀린 뒤 진행한다")
+    void waitsForUserLockBeforeServingRecommendations() throws Exception {
+        executor = Executors.newSingleThreadExecutor();
+        try (Connection blocker = dataSource.getConnection();
+                PreparedStatement lock =
+                        blocker.prepareStatement(
+                                "SELECT id FROM users WHERE id=? FOR NO KEY UPDATE")) {
+            blocker.setAutoCommit(false);
+            lock.setLong(1, USER);
+            lock.executeQuery();
+
+            Future<String> response = executor.submit(() -> concurrentGetWithoutBarrier(USER));
+            Thread.sleep(300);
+            assertThat(response).isNotDone();
+
+            blocker.commit();
+            assertThat(response.get(10, TimeUnit.SECONDS)).contains("\"recommendationSetId\":1000");
+        }
     }
 
     @Test
@@ -353,13 +355,38 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
         dismissal(101, 1001);
         jdbc.update("DELETE FROM recommendation_items WHERE id IN (1003,1004)");
 
-        replenish(USER, SET, 1001)
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.replacement").value(nullValue()));
-
         assertThat(jdbc.queryForObject("SELECT count(*) FROM recommendation_sets", Integer.class))
                 .isEqualTo(1);
-        getRecommendations(USER).andExpect(jsonPath("$.items.length()").value(2));
+        getRecommendations(USER)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(2));
+    }
+
+    @Test
+    @DisplayName("보충 노출 실패는 기존 관심없음 저장을 유지하고 이번 조회 쓰기만 롤백한다")
+    void exposureFailureDoesNotRollBackDismissal() throws Exception {
+        getRecommendations(USER).andExpect(status().isOk());
+        mvc.perform(
+                        post("/api/v1/movies/101/dismiss")
+                                .header("Authorization", bearer(USER))
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"recommendationItemId\":1001}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.movieId").value(101));
+        failingExposureTrigger();
+
+        getRecommendations(USER)
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM user_movie_dismissals"
+                                        + " WHERE user_id=? AND movie_id=101",
+                                Integer.class,
+                                USER))
+                .isEqualTo(1);
+        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1005L);
     }
 
     private org.springframework.test.web.servlet.ResultActions getRecommendations(long userId)
@@ -367,42 +394,18 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
         return mvc.perform(get("/api/v1/recommendations").header("Authorization", bearer(userId)));
     }
 
-    private org.springframework.test.web.servlet.ResultActions replenish(
-            long userId, long setId, long recommendationItemId) throws Exception {
-        return mvc.perform(
-                post("/api/v1/recommendations/replenish")
-                        .header("Authorization", bearer(userId))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(
-                                "{\"recommendationSetId\":"
-                                        + setId
-                                        + ",\"recommendationItemId\":"
-                                        + recommendationItemId
-                                        + "}"));
-    }
-
-    private String concurrentReplenish(String token, CountDownLatch ready, CountDownLatch start)
+    private String concurrentGet(long userId, CountDownLatch ready, CountDownLatch start)
             throws Exception {
         ready.countDown();
         assertThat(start.await(5, TimeUnit.SECONDS)).isTrue();
-        return mvc.perform(
-                        post("/api/v1/recommendations/replenish")
-                                .header("Authorization", token)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(
-                                        "{\"recommendationSetId\":"
-                                                + SET
-                                                + ",\"recommendationItemId\":1001}"))
+        return getRecommendations(userId)
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
     }
 
-    private String concurrentGet(long userId, CountDownLatch ready, CountDownLatch start)
-            throws Exception {
-        ready.countDown();
-        assertThat(start.await(5, TimeUnit.SECONDS)).isTrue();
+    private String concurrentGetWithoutBarrier(long userId) throws Exception {
         return getRecommendations(userId)
                 .andExpect(status().isOk())
                 .andReturn()
@@ -472,6 +475,22 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
                 USER,
                 movieId,
                 recommendationItemId);
+    }
+
+    private void failingExposureTrigger() {
+        jdbc.execute(
+                """
+                CREATE FUNCTION test_fail_recommendation_exposure() RETURNS trigger AS $$
+                BEGIN RAISE EXCEPTION 'forced exposure failure'; END;
+                $$ LANGUAGE plpgsql
+                """);
+        jdbc.execute(
+                """
+                CREATE TRIGGER test_fail_recommendation_exposure
+                BEFORE UPDATE OF exposed_at ON recommendation_items
+                FOR EACH ROW WHEN (OLD.exposed_at IS NULL AND NEW.exposed_at IS NOT NULL)
+                EXECUTE FUNCTION test_fail_recommendation_exposure()
+                """);
     }
 
     private List<Long> exposedIds() {

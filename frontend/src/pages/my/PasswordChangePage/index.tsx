@@ -84,7 +84,7 @@ export default function PasswordChangePage() {
 
   return (
     <>
-      <ScreenHeader title="비밀번호 변경" showBack />
+      <ScreenHeader title="비밀번호 변경" showBack fallbackTo={path.accountManage()} />
 
       <form
         className={styles.page}

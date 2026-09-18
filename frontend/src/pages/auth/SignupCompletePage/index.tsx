@@ -11,7 +11,9 @@
  * 그래서 이메일로 온 경우에는 `시작하기` 대신 인증 안내와 재발송을 보여준다. 그대로
  * 온보딩으로 보내면 세션이 없어 회원 API가 막힌다(screen-spec-auth.md 0.5, CR-19).
  *
- * 이메일로 왔는지는 0.4가 넘긴 `state.email`로 판단한다.
+ * **가입이 실제로 끝났는지는 세션 저장소의 표시로 판단한다**(`utils/signupCompletion`,
+ * 업무 -610). 라우터 state만 보던 때는 주소를 직접 쳐서 들어와도 소셜 가입 성공 화면이
+ * 나왔다. 표시가 없으면 0.2 가입 방법 선택으로 보낸다. 이메일로 왔는지도 그 표시가 말한다.
  *
  * **봉인된 편지 → 열린 봉투 → 초대장이 올라오는 모션** (팀 결정 2026-09-14, S15P21E106-319).
  * - 첫 장면은 받은 봉인된 빨간 편지 사진이다. 봉인이 한 번 눌린 뒤 사라지며 열린 봉투로
@@ -29,24 +31,34 @@
  */
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+import { Navigate, useNavigate } from 'react-router';
 import sealedArt from '../../../assets/signup/feelm-sealed-envelope.webp';
 import envelopeArt from '../../../assets/signup/feelm-welcome-envelope.webp';
 import Button from '../../../components/Button';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import { resendVerificationMail } from '../../../api/auth';
 import { path } from '../../../routes/paths';
+import { clearSignupCompletion, readSignupCompletion } from '../../../utils/signupCompletion';
 import styles from './SignupCompletePage.module.css';
-
-type State = { email?: string } | null;
 
 export default function SignupCompletePage() {
   const navigate = useNavigate();
-  const { state } = useLocation() as { state: State };
-  const email = state?.email;
+  const completion = readSignupCompletion();
+  const email = completion?.kind === 'email' ? completion.email : undefined;
 
   const [resent, setResent] = useState(false);
   const [pending, setPending] = useState(false);
+
+  // 가입을 마치지 않은 사람에게 성공 화면을 보여 주지 않는다
+  if (!completion) {
+    return <Navigate to={path.signupMethod()} replace />;
+  }
+
+  // 이 화면을 떠나면 표시를 지운다. 뒤로 가기로 다시 성공 화면을 보는 일이 없다
+  const leave = (to: string) => {
+    clearSignupCompletion();
+    void navigate(to, { replace: true });
+  };
 
   /* 재발송은 계정 존재 여부를 알려주지 않으므로(API-003) 성공과 실패를 나누지 않는다 */
   const resend = async () => {
@@ -122,9 +134,9 @@ export default function SignupCompletePage() {
 
       <div className={`${styles.actions} ${styles.after}`}>
         {email ? (
-          <Button onClick={() => void navigate(path.login())}>로그인하러 가기</Button>
+          <Button onClick={() => leave(path.login())}>로그인하러 가기</Button>
         ) : (
-          <Button onClick={() => void navigate(path.onboardingTaste())}>시작하기</Button>
+          <Button onClick={() => leave(path.onboardingTaste())}>시작하기</Button>
         )}
       </div>
     </div>

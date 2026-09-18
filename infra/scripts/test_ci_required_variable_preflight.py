@@ -45,6 +45,7 @@ class RequiredVariablePreflightTest(unittest.TestCase):
             "CI_VARIABLE_AUDIT_TOKEN": self.secret,
             "DISTRIBUTED_NODE_IP": "10.0.0.12",
             "GRAFANA_ADMIN_PASSWORD": self.secret,
+            "GRAFANA_ALERT_HMAC_SECRET": self.secret,
             "POSTGRES_DB": "feelm",
             "POSTGRES_PASSWORD": self.secret,
             "POSTGRES_USER": "feelm",
@@ -63,7 +64,7 @@ class RequiredVariablePreflightTest(unittest.TestCase):
 
     def test_repository_contract_is_value_free_and_valid(self):
         variables = MODULE.load_contract()
-        self.assertEqual(len(variables), 6)
+        self.assertEqual(len(variables), 7)
         self.assertNotIn(self.secret, json.dumps(variables))
         self.assertTrue(all("value" not in entry for entry in variables))
 
@@ -86,6 +87,7 @@ class RequiredVariablePreflightTest(unittest.TestCase):
     def test_missing_and_invalid_values_report_only_keys(self):
         for key, value in (
             ("GRAFANA_ADMIN_PASSWORD", ""),
+            ("GRAFANA_ALERT_HMAC_SECRET", ""),
             ("DISTRIBUTED_NODE_IP", "203.0.113.8"),
             ("POSTGRES_DB", "not valid"),
         ):

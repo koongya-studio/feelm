@@ -18,14 +18,82 @@ Grafana가 시각화합니다. 서비스 노드 `J15E106`의 Node Exporter는 Co
 - Nginx는 `/actuator/prometheus`를 프록시하지 않습니다.
 - Grafana 익명 가입과 익명 접근은 비활성화합니다.
 - `GRAFANA_ADMIN_PASSWORD`는 필수 Secret이며 실제 값은 `infra/.env`에만 둡니다.
+- `GRAFANA_ALERT_HMAC_SECRET`은 Grafana와 내부 알림 릴레이 사이의 서명 Secret이며
+  `infra/.env` 또는 GitLab CI/CD Variables에만 둡니다.
+- 알림 릴레이 health 포트도 `127.0.0.1`에만 바인딩하며 외부에 공개하지 않습니다.
 - 공개 Grafana 경로는 Nginx의 별도 Basic Auth와 Grafana 로그인을 모두 통과해야 합니다.
 - 원격 접근은 HTTPS `/grafana/`를 사용하고, SSH 터널은 공개 경로 장애 시 복구 수단으로만
   유지합니다. Grafana와 Prometheus의 원본 포트는 공개하지 않습니다.
 
+## Mattermost 장애 알림
+
+Grafana는 HMAC-SHA256으로 서명한 일반 Webhook을 Compose 내부의
+`mattermost-alert-relay`에 보냅니다. 릴레이는 기존 `deploy-*` 알림과 같은 Mattermost 계정 및
+채널 설정으로 로그인하고, `/api/v4/posts` 게시 후 로그아웃합니다. Mattermost Incoming
+Webhook 기능은 사용하지 않습니다. 계정 비밀번호는 Grafana에 전달하지 않고 릴레이에만
+주입하며, 서명에는 timestamp를 포함해 5분이 지난 요청을 거부합니다.
+
+서비스 환경의 GitLab CI/CD Variable은 다음 메타데이터로 등록합니다.
+
+| Key | 환경 범위 | 보호 설정 | 값 |
+| --- | --- | --- | --- |
+| `GRAFANA_ALERT_HMAC_SECRET` | `service` | Protected, Masked and hidden, Expand variable reference 비활성화 | 충분히 긴 임의의 Webhook HMAC 서명 키 |
+
+기존 `MATTERMOST_BASE_URL`, `MATTERMOST_LOGIN_ID`, `MATTERMOST_PASSWORD`와 채널 선택 변수는
+deploy 알림과 동일한 값을 사용합니다. `MATTERMOST_PASSWORD`는 상시 릴레이에 주입되므로 개인
+계정 대신 알림 전용 계정을 우선하고, 계정 변경·프로젝트 종료 시 즉시 폐기합니다.
+
+파일 provisioning은 Grafana 기동 시 연락 지점, 메시지 템플릿과 아래 규칙을 함께 적용합니다.
+각 규칙은 짧은 일시 이상을 `for` 동안 보류하고, 복구 뒤 2분 동안 상태를 유지해 flapping을
+줄입니다. 같은 장애는 최초 알림 뒤 4시간에 한 번만 반복하고 복구 시 별도 알림을 보냅니다.
+
+| 규칙 | 초기 임계치 | 지속 시간 | 심각도 |
+| --- | --- | --- | --- |
+| Backend target down | `up < 1` | 2분 | critical |
+| Exporter target down | node, Kafka, PostgreSQL, Redis `up < 1` | 5분 | critical |
+| Backend 5xx 비율 | 5분 비율 5% 초과 | 5분 | warning |
+| Backend P95 지연 | 1.5초 초과 | 10분 | warning |
+| Host CPU | 90% 초과 | 10분 | warning |
+| Host memory | 90% 초과 | 10분 | warning |
+| Host filesystem 여유 | 15% 미만 | 10분 | critical |
+
+임계치 또는 지속 시간을 바꿀 때는
+`grafana/provisioning/alerting/feelm-alerts.json`의 threshold `params`와 `for`를 같은 MR에서
+변경하고, 변경 이유와 관측 기간을 기록합니다. Grafana UI에서 provisioned 규칙을 임시로
+복제하거나 편집하지 않습니다. 알림 정책 트리는 팀이 UI에서 만든 다른 정책을 덮어쓰지 않도록
+provisioning하지 않고, 각 규칙이 `FEELM Mattermost` 연락 지점을 직접 사용합니다.
+
+### 테스트와 복구 확인
+
+1. Grafana의 **Alerting → Contact points → FEELM Mattermost**에서 Test를 실행하고 기존 deploy
+   알림 채널에 `ALERT` 테스트 메시지가 도착하는지 확인합니다. 서명 키나 요청 본문 전체를
+   브라우저 개발자 도구, 캡처 또는 로그에 남기지 않습니다.
+2. 운영 영향이 없는 승인된 점검 시간에 모니터링 exporter 하나만 중지합니다. Redis 서비스
+   자체는 내리지 않고 `docker stop feelm-redis-exporter`만 실행합니다.
+3. Prometheus에서 `up{job="redis"} == 0`을 확인하고 5분 뒤 Mattermost의 장애 알림을 확인합니다.
+4. `docker start feelm-redis-exporter`로 즉시 복구하고 `up{job="redis"} == 1`을 확인합니다.
+5. 상태 유지 2분과 다음 평가 주기가 지난 뒤 같은 채널에 `RECOVERY` 알림이 도착하는지
+   확인합니다. 복구 알림이 없으면 Contact point delivery 상태와 Grafana 로그를 확인하되
+   HMAC 서명 키를 출력하지 않습니다.
+
+### Silence와 장애 확인
+
+계획 점검 중에는 **Alerting → Silences**에서 `alertname` 또는 `component` matcher, 종료 시각과
+사유를 명시해 silence를 만듭니다. 규칙을 pause하거나 provisioning 파일을 임시 변경하지
+않습니다. 점검이 끝나면 exporter와 target이 정상인지 먼저 확인하고 silence를 만료시킵니다.
+
+장애 알림을 받으면 Mattermost의 Grafana 링크에서 firing instance와 label을 확인하고,
+Prometheus의 같은 식으로 실제 값을 확인합니다. target down은 아래 복구 절차를 따르고,
+5xx·지연은 최근 배포와 백엔드 로그를, 호스트 자원은 `node_name`과 `mountpoint`를 기준으로
+확인합니다. 복구 후 Mattermost의 `RECOVERY`까지 확인해야 종료합니다. Grafana 자체 또는
+릴레이 전송 장애로 알림이 오지 않을 수 있으므로 배포 Job의 알림과 Grafana health를 함께
+확인합니다.
+
 ## 기동
 
-`infra/.env.example`을 기준으로 개인 `infra/.env`에 `GRAFANA_ADMIN_PASSWORD`와
-`GRAFANA_HTPASSWD_PATH`를 추가합니다.
+`infra/.env.example`을 기준으로 개인 `infra/.env`에 `GRAFANA_ADMIN_PASSWORD`,
+`GRAFANA_ALERT_HMAC_SECRET`, 기존 Mattermost 계정·채널 변수와 `GRAFANA_HTPASSWD_PATH`를
+추가합니다.
 서비스와 모니터링 파일을 같은 Compose 프로젝트로 실행해야 Prometheus가 서비스 이름으로
 백엔드와 exporter에 접근할 수 있습니다.
 
@@ -33,7 +101,7 @@ Grafana가 시각화합니다. 서비스 노드 `J15E106`의 Node Exporter는 Co
 docker compose --env-file infra/.env \
   -f infra/compose/service.yml \
   -f infra/compose/monitoring.yml \
-  up -d postgres redis backend prometheus grafana node-exporter postgres-exporter redis-exporter
+  up -d postgres redis backend prometheus mattermost-alert-relay grafana node-exporter postgres-exporter redis-exporter
 ```
 
 분산 노드에서는 기존 분산 Compose 파일의 Node Exporter와 Kafka Exporter를 기동합니다.
@@ -109,7 +177,7 @@ $env:FEELM_ENV_FILE = 'C:\path\to\S15P21E106\infra\.env'
 docker compose --env-file $env:FEELM_ENV_FILE `
   -f infra/compose/service.yml `
   -f infra/compose/monitoring.yml `
-  up -d postgres redis backend prometheus grafana postgres-exporter redis-exporter
+  up -d postgres redis backend prometheus mattermost-alert-relay grafana postgres-exporter redis-exporter
 ```
 
 정상 원격 접속 주소는 다음과 같습니다.
@@ -178,11 +246,11 @@ PostgreSQL, Redis, backend, frontend와 Nginx 및 `-rollback` 컨테이너를 Co
 `--no-deps --force-recreate`로 다음 서비스만 교체합니다.
 
 ```text
-prometheus grafana node-exporter postgres-exporter redis-exporter
+prometheus grafana mattermost-alert-relay node-exporter postgres-exporter redis-exporter
 ```
 
-후보 기동 후 Prometheus readiness, Grafana database health와 Prometheus의 필수 scrape target을
-최대 24회, 5초 간격으로 검사합니다. 기대 target은 `backend` 1개, `node` 2개,
+후보 기동 후 Prometheus readiness, Grafana database health, 알림 릴레이 health와 Prometheus의
+필수 scrape target을 최대 24회, 5초 간격으로 검사합니다. 기대 target은 `backend` 1개, `node` 2개,
 `kafka`·`postgres`·`redis` 각 1개이며 모두 `up=1`이어야 합니다. 검증이 성공하면 보존한
 컨테이너만 삭제하고 `prometheus_data`, `grafana_data` 볼륨은 유지합니다. 스크립트는
 `docker compose down`, `down -v`와 `docker volume rm`을 사용하지 않습니다.

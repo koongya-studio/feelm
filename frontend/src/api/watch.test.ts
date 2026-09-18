@@ -26,9 +26,10 @@ import {
   findLinkClickedRecord,
   findWatchRecord,
   findWatchedRecord,
-  getCountsBeforeRating,
+  getRatingCounts,
   getWatchRecords,
   recordOttClick,
+  updateRating,
 } from './watch';
 import { resetSessionForTest, startSession } from './session';
 import type { Rating, WatchRecordListItem } from '../types/watch';
@@ -252,6 +253,7 @@ describe('API-036 평가 생성', () => {
     score: 4.5,
     comment: null,
     visibility: 'PRIVATE',
+    spoiler: false,
     frame: { frameId: 77, createdAt: '2026-08-30T05:21:00Z' },
     popcorn: { flavorCode: 'FLAVOR_A', isNewFlavor: true, flavorCount: 1 },
     watchStatus: 'RATED',
@@ -273,10 +275,20 @@ describe('API-036 평가 생성', () => {
   it('한줄평이 있으면 공개 범위를 함께 싣는다', async () => {
     fetchMock.mockResolvedValue(json(201, { ...created, comment: '밤에 보면 안 됨' }));
 
-    await createRating(550, { score: 4.5, comment: '밤에 보면 안 됨', visibility: 'PRIVATE' });
+    await createRating(550, {
+      score: 4.5,
+      comment: '밤에 보면 안 됨',
+      visibility: 'PRIVATE',
+      spoiler: true,
+    });
 
     expect(requestedInit().body).toBe(
-      JSON.stringify({ score: 4.5, comment: '밤에 보면 안 됨', visibility: 'PRIVATE' }),
+      JSON.stringify({
+        score: 4.5,
+        comment: '밤에 보면 안 됨',
+        visibility: 'PRIVATE',
+        spoiler: true,
+      }),
     );
   });
 
@@ -292,7 +304,44 @@ describe('API-036 평가 생성', () => {
   });
 });
 
-describe('추가 전 수치', () => {
+describe('API-037 평가 수정', () => {
+  it('평가 ID 경로에 전체 교체 본문을 PUT하고 응답을 돌려준다', async () => {
+    const updated: Rating = {
+      ratingId: 91,
+      movieId: 550,
+      score: 3.5,
+      comment: '다시 보니 달랐다',
+      visibility: 'PUBLIC',
+      spoiler: true,
+      frame: { frameId: 77, createdAt: '2026-08-30T05:21:00Z' },
+      popcorn: { flavorCode: 'FLAVOR_A', isNewFlavor: false, flavorCount: 1 },
+      watchStatus: 'RATED',
+      createdAt: '2026-08-30T05:21:00Z',
+    };
+    fetchMock.mockResolvedValue(json(200, updated));
+
+    await expect(
+      updateRating(91, {
+        score: 3.5,
+        comment: '다시 보니 달랐다',
+        visibility: 'PUBLIC',
+        spoiler: true,
+      }),
+    ).resolves.toEqual(updated);
+    expect(requestedUrl().pathname).toBe('/api/v1/ratings/91');
+    expect(requestedInit().method).toBe('PUT');
+    expect(requestedInit().body).toBe(
+      JSON.stringify({
+        score: 3.5,
+        comment: '다시 보니 달랐다',
+        visibility: 'PUBLIC',
+        spoiler: true,
+      }),
+    );
+  });
+});
+
+describe('프레임 · 팝콘 수치', () => {
   it('프레임 수는 API-014, 팝콘 알 수는 API-041에서 읽는다', async () => {
     fetchMock.mockImplementation((url: string) =>
       Promise.resolve(
@@ -302,7 +351,7 @@ describe('추가 전 수치', () => {
       ),
     );
 
-    const counts = await getCountsBeforeRating();
+    const counts = await getRatingCounts();
 
     const paths = fetchMock.mock.calls.map(
       (call) => new URL(call[0] as string, 'http://test').pathname,

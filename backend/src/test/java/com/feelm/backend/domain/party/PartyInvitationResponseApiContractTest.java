@@ -61,6 +61,14 @@ class PartyInvitationResponseApiContractTest extends SharedPostgresContractTest 
     void acceptAddsMemberAndMarksInvitationAccepted() throws Exception {
         long party = party(20, "ACTIVE", CREATED_AT);
         long invitation = invitation(party, 20, 10, "PENDING");
+        jdbc.update(
+                "INSERT INTO notifications(user_id,type,source_id,target_type,target_id,title,body,"
+                        + "notified_at,expires_at) VALUES"
+                        + " (10,'PARTY_INVITE',?,'PARTY_INVITATION',?,'제목','본문',?,?)",
+                invitation,
+                invitation,
+                Timestamp.from(CREATED_AT),
+                Timestamp.from(CREATED_AT.plusSeconds(90L * 86_400)));
 
         accept(invitation, 10)
                 .andExpect(status().isOk())
@@ -73,6 +81,14 @@ class PartyInvitationResponseApiContractTest extends SharedPostgresContractTest 
         assertThat(memberCount(party, 10)).isEqualTo(1);
         assertThat(
                         jdbc.queryForObject(
+                                "SELECT count(*) FROM notifications"
+                                        + " WHERE source_id=? AND closed_at IS NOT NULL"
+                                        + " AND read_at IS NOT NULL",
+                                Long.class,
+                                invitation))
+                .isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
                                 "SELECT count(*) FROM party_refresh_requests WHERE party_id=?",
                                 Long.class,
                                 party))
@@ -83,6 +99,14 @@ class PartyInvitationResponseApiContractTest extends SharedPostgresContractTest 
     void declineOnlyMarksInvitationDeclined() throws Exception {
         long party = party(20, "ACTIVE", CREATED_AT);
         long invitation = invitation(party, 20, 10, "PENDING");
+        jdbc.update(
+                "INSERT INTO notifications(user_id,type,source_id,target_type,target_id,title,body,"
+                        + "notified_at,expires_at) VALUES"
+                        + " (10,'PARTY_INVITE',?,'PARTY_INVITATION',?,'제목','본문',?,?)",
+                invitation,
+                invitation,
+                Timestamp.from(CREATED_AT),
+                Timestamp.from(CREATED_AT.plusSeconds(90L * 86_400)));
 
         decline(invitation, 10)
                 .andExpect(status().isOk())
@@ -91,6 +115,13 @@ class PartyInvitationResponseApiContractTest extends SharedPostgresContractTest 
 
         assertInvitation(invitation, "DECLINED", true);
         assertThat(memberCount(party, 10)).isZero();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM notifications"
+                                        + " WHERE source_id=? AND closed_at IS NOT NULL",
+                                Long.class,
+                                invitation))
+                .isEqualTo(1);
     }
 
     @Test

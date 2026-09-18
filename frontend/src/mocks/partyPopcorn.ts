@@ -13,14 +13,14 @@
  * 무비버디의 분포는 와이어프레임 막대 비율(30.2% · 20.9% · 16.3% · 11.6% · 9.3% ·
  * 5.8% · 3.5% · 2.3%)을 86알로 환산한 값입니다.
  *
- * 나머지 두 명은 와이어프레임에 없어 자리표시자이지만, `서로 겹치는 맛`이 파티원 모두의
- * 상위 3개 맛 교집합이므로 네 명 모두 상위 3개에 같은 맛 두 개가 들어가도록 두었습니다.
- * 그러지 않으면 교집합이 비어 와이어프레임의 태그 2개가 나오지 않습니다.
+ * 나머지 두 명은 와이어프레임에 없어 자리표시자입니다. 네 명 모두 상위 3개 맛에 같은
+ * 맛 두 개가 들어가도록 두었는데, 5.8이 그 교집합을 `서로 겹치는 맛`으로 보여줄 때
+ * 필요한 값이었습니다. 그 영역은 업무 -462에서 빠졌지만 분포 자체는 그대로 둡니다 —
+ * 값을 바꾸면 3.2 · 5.8 · 5.9의 통 그림이 함께 달라집니다.
  */
 import { mockPopcornBucket } from './popcornBucket';
 import { mockPopcornFlavors } from './popcornFlavors';
 import type { PartyMemberFlavor, PartyMemberPopcorn, PartyPopcorn } from '../types/party';
-import type { PartyMixView } from '../types/unspecified';
 
 /** 맛 순서대로 알 수를 붙인다. 평균 평점은 알이 없으면 null이다(API-057) */
 function flavors(countsInOrder: number[], scoresInOrder: (number | null)[]): PartyMemberFlavor[] {
@@ -67,29 +67,4 @@ export const mockPartyPopcorn: Record<number, PartyPopcorn> = {
 
 export function findMockPartyPopcorn(partyId: number): PartyPopcorn | null {
   return mockPartyPopcorn[partyId] ?? null;
-}
-
-/*
- * 5.9 파티 팝콘 섞기 목업. **계약에 대응이 없습니다(CR-17).**
- *
- * `46%` · `38%` · `공통 취향 일치 72%`와 태그 4종은 와이어프레임 값을 그대로 옮긴
- * 것입니다. 산출 규칙이 없고 API-057의 맛별 집계로도 재현되지 않습니다.
- * 나머지 두 명의 값은 와이어프레임에 없어 자리표시자입니다.
- */
-export const mockPartyMix: Record<number, PartyMixView> = {
-  9001: {
-    partyId: 9001,
-    members: [
-      { userId: 1024, tasteShare: 46, tags: ['케이퍼', '빠른 전개'] },
-      { userId: 2048, tasteShare: 38, tags: ['반전', '느와르'] },
-      { userId: 2049, tasteShare: 31, tags: ['성장', '관계'] },
-      { userId: 2050, tasteShare: 27, tags: ['말맛', '소동'] },
-    ],
-    commonRate: 72,
-    tags: ['스릴러', '빠른 전개'],
-  },
-};
-
-export function findMockPartyMix(partyId: number): PartyMixView | null {
-  return mockPartyMix[partyId] ?? null;
 }

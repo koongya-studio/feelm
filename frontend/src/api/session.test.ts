@@ -9,6 +9,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   canRefresh,
+  endSession,
   getAccessToken,
   onSessionEnd,
   refreshAccessToken,
@@ -53,7 +54,32 @@ describe('토큰 재발급', () => {
     await expect(refreshAccessToken()).resolves.toBeNull();
     expect(getAccessToken()).toBeNull();
     expect(canRefresh()).toBe(false);
-    expect(ended).toHaveBeenCalled();
+    expect(ended).toHaveBeenCalledWith('expired');
+  });
+
+  /*
+   * 앱이 뜰 때의 복구 재발급은 비로그인 방문자에게도 나간다(`AuthProvider`). 쿠키가 없으면
+   * 서버는 그것도 401로 거절하므로, 이것을 만료로 다루면 처음 온 사람이 만료 안내와 함께
+   * 로그인 화면으로 밀려난다(리뷰 A-1·B-1).
+   */
+  it('쓰던 세션이 없었다면 만료가 아니라 비로그인으로 알린다', async () => {
+    const ended = vi.fn();
+    onSessionEnd(ended);
+    fetchMock.mockResolvedValue(json(401, { code: 'REFRESH_TOKEN_INVALID', message: '없음' }));
+
+    await expect(refreshAccessToken()).resolves.toBeNull();
+    expect(ended).toHaveBeenCalledWith('unauthenticated');
+    expect(canRefresh()).toBe(false);
+  });
+
+  it('로그아웃으로 끝난 세션은 만료와 구분해서 알린다', () => {
+    startSession('old');
+    const ended = vi.fn();
+    onSessionEnd(ended);
+
+    endSession('signed-out');
+
+    expect(ended).toHaveBeenCalledWith('signed-out');
   });
 
   it.each([500, 502, 503, 504])('%d는 서버 사정이므로 세션을 유지한다', async (status) => {
@@ -81,6 +107,58 @@ describe('토큰 재발급', () => {
 
     await expect(refreshAccessToken()).resolves.toBeNull();
     expect(canRefresh()).toBe(true);
+  });
+
+  /*
+   * 탭 안의 중복은 `inFlight`가 막지만 탭 사이는 막지 못한다. 쿠키를 공유하는 다른 탭이
+   * 동시에 재발급하면 서버가 두 번째를 재사용으로 보기 때문에(API-006) 잠금 안에서 보낸다.
+   */
+  it('재발급은 탭 간 잠금 안에서 보낸다', async () => {
+    const request = vi.fn(
+      async (_name: string, _options: unknown, run: () => Promise<string | null>) => run(),
+    );
+    vi.stubGlobal('navigator', { locks: { request } });
+    fetchMock.mockResolvedValue(json(200, { accessToken: 'locked', expiresIn: 1800 }));
+
+    await expect(refreshAccessToken()).resolves.toBe('locked');
+
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request.mock.calls[0][0]).toBe('feelm:auth:refresh');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  /*
+   * 잠금은 순서를 세우는 편의일 뿐이다. 잠금을 얻지 못했다고 재발급을 포기하거나 오류를
+   * 던지면, 잠금을 쥔 탭이 멈춘 동안 다른 탭이 아무것도 못 한다(리뷰 A-6·B-5).
+   */
+  it('잠금을 얻지 못하면 조율을 포기하고 그냥 보낸다', async () => {
+    const request = vi.fn().mockRejectedValue(new DOMException('aborted', 'AbortError'));
+    vi.stubGlobal('navigator', { locks: { request } });
+    fetchMock.mockResolvedValue(json(200, { accessToken: 'sent-anyway', expiresIn: 1800 }));
+
+    await expect(refreshAccessToken()).resolves.toBe('sent-anyway');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('잠금 안에서 난 오류를 잠금 실패로 오인해 두 번 보내지 않는다', async () => {
+    const request = vi.fn(async (_name: string, _options: unknown, run: () => Promise<unknown>) => {
+      await run();
+
+      throw new Error('잠금이 풀린 뒤 터졌다');
+    });
+    vi.stubGlobal('navigator', { locks: { request } });
+    fetchMock.mockResolvedValue(json(200, { accessToken: 'once', expiresIn: 1800 }));
+
+    await expect(refreshAccessToken()).rejects.toThrow('잠금이 풀린 뒤 터졌다');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('잠금을 못 쓰는 브라우저에서도 재발급한다', async () => {
+    vi.stubGlobal('navigator', {});
+    fetchMock.mockResolvedValue(json(200, { accessToken: 'unlocked', expiresIn: 1800 }));
+
+    await expect(refreshAccessToken()).resolves.toBe('unlocked');
+    expect(getAccessToken()).toBe('unlocked');
   });
 
   it('장애로 실패한 뒤 서버가 돌아오면 다시 재발급된다', async () => {

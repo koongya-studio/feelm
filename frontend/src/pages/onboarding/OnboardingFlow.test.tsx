@@ -160,7 +160,9 @@ describe('1.1 영화 취향 초기 설정', () => {
     try {
       renderApp(ROUTE_PATTERN.onboardingTaste);
 
-      expect(await screen.findByRole('img', { name: `${CARD.title}, 멀리` })).toBeInTheDocument();
+      expect(
+        await screen.findByRole('button', { name: `${CARD.title}, 멀리` }),
+      ).toBeInTheDocument();
     } finally {
       restore();
     }
@@ -175,7 +177,7 @@ describe('1.1 영화 취향 초기 설정', () => {
     try {
       renderApp(ROUTE_PATTERN.onboardingTaste);
 
-      const card = await screen.findByRole('img', { name: `${CARD.title}, 멀리` });
+      const card = await screen.findByRole('button', { name: `${CARD.title}, 멀리` });
       const poster = card.querySelector('img');
 
       expect(poster).not.toBeNull();
@@ -194,7 +196,7 @@ describe('1.1 영화 취향 초기 설정', () => {
     try {
       renderApp(ROUTE_PATTERN.onboardingTaste);
 
-      const card = await screen.findByRole('img', { name: `${CARD.title}, 멀리` });
+      const card = await screen.findByRole('button', { name: `${CARD.title}, 멀리` });
       fireEvent.click(card);
 
       expect(
@@ -211,7 +213,7 @@ describe('1.1 영화 취향 초기 설정', () => {
     try {
       renderApp(ROUTE_PATTERN.onboardingTaste);
 
-      const card = await screen.findByRole('img', { name: `${CARD.title}, 멀리` });
+      const card = await screen.findByRole('button', { name: `${CARD.title}, 멀리` });
       const board = card.parentElement?.parentElement;
 
       expect(board).not.toBeNull();
@@ -220,14 +222,51 @@ describe('1.1 영화 취향 초기 설정', () => {
       fireEvent.pointerDown(card, { pointerId: 1, clientX: 206, clientY: 70 });
       fireEvent.pointerMove(board as HTMLElement, { pointerId: 1, clientX: 206, clientY: 307 });
 
-      expect(screen.getByRole('img', { name: `${CARD.title}, 가까이` })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: `${CARD.title}, 가까이` })).toBeInTheDocument();
 
       fireEvent.pointerMove(board as HTMLElement, { pointerId: 1, clientX: 44, clientY: 70 });
 
-      const dislikedCard = screen.getByRole('img', { name: `${CARD.title}, 멀리` });
+      const dislikedCard = screen.getByRole('button', { name: `${CARD.title}, 멀리` });
       fireEvent.pointerUp(board as HTMLElement, { pointerId: 1, clientX: 44, clientY: 70 });
 
       expect(dislikedCard.parentElement).toHaveAttribute('data-front', 'true');
+    } finally {
+      restore();
+    }
+  });
+
+  it('키보드만으로도 원 안팎을 오가고 방향키로 옮길 수 있다', async () => {
+    /*
+     * 드래그 없이 완료할 수 있어야 한다(업무 -610). Enter(키보드 클릭)는 원 안팎을
+     * 오가고, 방향키는 조금씩 옮기며 경계를 넘으면 드래그와 같이 판정이 바뀐다.
+     */
+    const restore = withBoardSize();
+
+    try {
+      renderApp(ROUTE_PATTERN.onboardingTaste);
+
+      const card = await screen.findByRole('button', { name: `${CARD.title}, 멀리` });
+      expect(card).toHaveAttribute('aria-pressed', 'false');
+
+      // 키보드 클릭은 `detail`이 0이다
+      fireEvent.click(card, { detail: 0 });
+
+      const liked = screen.getByRole('button', { name: `${CARD.title}, 가까이` });
+      expect(liked).toHaveAttribute('aria-pressed', 'true');
+      expect(
+        screen.getByRole('button', { name: '취향 설정 완료 (좋아요 1개 · 싫어요 0개)' }),
+      ).toBeInTheDocument();
+
+      // 다시 누르면 처음 자리(원 밖)로 돌아간다
+      fireEvent.click(liked, { detail: 0 });
+      expect(screen.getByRole('button', { name: `${CARD.title}, 멀리` })).toBeInTheDocument();
+
+      // 방향키로 원 가운데까지 내려오면 가까이가 된다 (처음 자리 y=8 → 원 중심 y≈307)
+      const again = screen.getByRole('button', { name: `${CARD.title}, 멀리` });
+      for (let step = 0; step < 10; step += 1) {
+        fireEvent.keyDown(again, { key: 'ArrowDown' });
+      }
+      expect(screen.getByRole('button', { name: `${CARD.title}, 가까이` })).toBeInTheDocument();
     } finally {
       restore();
     }
@@ -247,7 +286,7 @@ describe('1.1 영화 취향 초기 설정', () => {
     try {
       renderApp(ROUTE_PATTERN.onboardingTaste);
 
-      const liked = await screen.findByRole('img', { name: `${CARD.title}, 멀리` });
+      const liked = await screen.findByRole('button', { name: `${CARD.title}, 멀리` });
       const board = liked.parentElement?.parentElement;
 
       expect(board).not.toBeNull();
@@ -260,9 +299,13 @@ describe('1.1 영화 취향 초기 설정', () => {
       fireEvent.pointerMove(board as HTMLElement, { pointerId: 1, clientX: 206, clientY: 307 });
       fireEvent.pointerUp(board as HTMLElement, { pointerId: 1, clientX: 206, clientY: 307 });
 
-      expect(screen.getByRole('img', { name: `${CARD.title}, 가까이` })).toBeInTheDocument();
-      expect(screen.getByRole('img', { name: `${dislikedCard1.title}, 멀리` })).toBeInTheDocument();
-      expect(screen.getByRole('img', { name: `${dislikedCard2.title}, 멀리` })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: `${CARD.title}, 가까이` })).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: `${dislikedCard1.title}, 멀리` }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: `${dislikedCard2.title}, 멀리` }),
+      ).toBeInTheDocument();
 
       fireEvent.click(
         screen.getByRole('button', { name: '취향 설정 완료 (좋아요 1개 · 싫어요 2개)' }),

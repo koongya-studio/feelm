@@ -4,7 +4,7 @@
  * 구성은 확정 시안을 따른다(`docs/screens/design-concept.md`). 시안은 이 화면이
  * 한 가지만 말하게 한다. **내 취향이 어느 맛으로 기울었는가.**
  *
- * 팝콘 통 · 기울기 문장 · 맛 범례 · 파티 팝콘 진입
+ * 팝콘 통 · 기울기 문장 · 맛 범례
  *
  * 연동 API는 API-041(팝콘 버킷)이다. 맛 이름·색상은 응답이 함께 주는 `displayName`·
  * `color`(기준정보 API-044와 같은 값)를 쓰고 장르명을 하드코딩하지 않는다
@@ -18,6 +18,10 @@
  * - 요약 문장을 본문 제목으로 올렸다. 화면이 말하는 한 문장이다
  * - 범례에서 비율(%)을 뺐다. 계약에 없는 값이고 알 수가 이미 같은 말을 한다.
  *   평균 평점은 FR-06 인수 조건이라 남긴다
+ *
+ * **`파티 팝콘 섞기 보기`를 뺐다**(업무 -462). 5.9는 사용자 시안 2026-09-17에서 파티팝콘
+ * 흐름(5.4 → 5.9 → 5.5)의 가운데 단계가 됐고, 이 화면은 파티를 고르는 자리가 아니라
+ * 목업 파티 번호로 그 흐름에 뛰어들고 있었다. 파티는 5.1에서 고른다.
  *
  * 팝콘 통은 디자인이 만든 3D 통을 구운 스프라이트다. **아이스 화이트 몸통 · 세로 필름 무늬 ·
  * 빨간 로고**다(사용자 결정 2026-09-15, 업무 -322). 블랙 통과 이 화면에 넣어 비교해 골랐다.
@@ -41,12 +45,10 @@ import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import { getPopcornBucket } from '../../../api/taste';
+import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
 import styles from './PopcornBucketPage.module.css';
 import type { PopcornBucket as PopcornBucketData } from '../../../types/taste';
-
-/** 목업 파티. 파티 목록(5.1)이 범위 밖이라 파티를 고르는 화면이 없다 */
-const FALLBACK_PARTY_ID = 9001;
 
 /** 시안의 뒤로 가기 원 지름(px). 300px 폭 시안의 31px을 375px 기준으로 환산했다 */
 const BACK_BUTTON_SIZE = 39;
@@ -59,6 +61,7 @@ const BUCKET_WIDTH = 196;
 
 export default function PopcornBucketPage() {
   const navigate = useNavigate();
+  const back = useBack(path.film());
 
   const [bucket, setBucket] = useState<PopcornBucketData | null>(null);
   const [failed, setFailed] = useState(false);
@@ -88,7 +91,7 @@ export default function PopcornBucketPage() {
   if (failed) {
     return (
       <>
-        <ScreenHeader title="100알의 취향" showBack />
+        <ScreenHeader title="100알의 취향" showBack fallbackTo={path.film()} />
 
         <StatusView title="팝콘 버킷을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
           <Button
@@ -108,7 +111,7 @@ export default function PopcornBucketPage() {
   if (bucket && bucket.totalCount === 0) {
     return (
       <>
-        <ScreenHeader title="100알의 취향" showBack />
+        <ScreenHeader title="100알의 취향" showBack fallbackTo={path.film()} />
 
         <StatusView
           variant="empty"
@@ -122,7 +125,7 @@ export default function PopcornBucketPage() {
   }
 
   if (!bucket) {
-    return <ScreenHeader title="100알의 취향" showBack />;
+    return <ScreenHeader title="100알의 취향" showBack fallbackTo={path.film()} />;
   }
 
   const total = bucket.totalCount;
@@ -149,7 +152,7 @@ export default function PopcornBucketPage() {
             icon={<ChevronLeftIcon />}
             size={BACK_BUTTON_SIZE}
             variant="translucent"
-            onClick={() => navigate(-1)}
+            onClick={back}
           />
         </div>
 
@@ -195,16 +198,6 @@ export default function PopcornBucketPage() {
               </li>
             ))}
           </ul>
-
-          {/*
-           * 이 화면의 주 동작. 검정 알약은 한 화면에 하나뿐이고 그 하나가 여기다
-           * (`docs/screens/design-concept.md` 2.4).
-           *
-           * 와이어프레임에 없는 요소다. 5.9 진입점으로 추가했다 (팀 결정 2026-09-07).
-           */}
-          <Button onClick={() => void navigate(path.partyPopcornMix(FALLBACK_PARTY_ID))}>
-            파티 팝콘 섞기 보기
-          </Button>
         </div>
       </div>
     </>

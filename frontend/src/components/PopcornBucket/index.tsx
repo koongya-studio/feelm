@@ -251,12 +251,39 @@ type Props = {
   flavors?: FlavorCount[];
   /** 그려지는 폭(px). 높이는 비율로 따라간다 */
   width?: number;
+  /**
+   * 더미가 차오른 정도(0~1). 기본은 다 찬 상태다.
+   *
+   * 5.9 팝콘 섞기가 통이 **차오르는** 장면에 쓴다(업무 -462). 알 수를 줄여서는 되지
+   * 않는다 — 더미는 언제나 30알로 요약되므로 개수를 반으로 줘도 같은 그림이다.
+   * 아래쪽 알만 남기는 것도 안 된다. 그 알들은 통 안으로 가라앉은 것이라 앞벽에
+   * 가려 보이지 않는다.
+   *
+   * 그래서 **더미를 통째로 통 안에 가라앉힌다.** 입구 아래로 내려간 알은 클립이
+   * 잘라내므로, 올라오는 만큼만 입구 위로 보인다 — 팝콘이 차오르는 모양이다.
+   */
+  fill?: number;
   /** 스크린 리더가 읽을 이름 */
   label: string;
 };
 
-export default function PopcornBucket({ flavors = [], width = 232, label }: Props) {
-  const kernels = pileKernels(flavors);
+/**
+ * 더미를 `fill`만큼만 올린다. 나머지는 통 안에 가라앉아 클립이 잘라낸다.
+ *
+ * 가라앉히는 거리는 더미 높이에 입구 반지름을 더한 값이다 — `fill`이 0이면 가장
+ * 높은 알까지 입구 아래로 내려가 통이 비어 보인다.
+ */
+function fillLevel(kernels: Kernel[], fill: number): Kernel[] {
+  if (fill >= 1) return kernels;
+  if (fill <= 0) return [];
+
+  const sink = (1 - fill) * (MOUND_HEIGHT + RIM_RY);
+
+  return kernels.map((kernel) => ({ ...kernel, y: kernel.y + sink }));
+}
+
+export default function PopcornBucket({ flavors = [], width = 232, fill = 1, label }: Props) {
+  const kernels = fillLevel(pileKernels(flavors), fill);
 
   return (
     <svg

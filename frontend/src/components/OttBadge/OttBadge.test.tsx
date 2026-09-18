@@ -22,7 +22,14 @@ const NETFLIX: Ott = {
   logoUrl: 'https://image.tmdb.org/t/p/original/netflix.png',
 };
 
-const WATCHA: Ott = { ottId: 3, code: 'WATCHA', name: '왓챠', logoUrl: null };
+const WATCHA: Ott = {
+  ottId: 3,
+  code: 'WATCHA',
+  name: '왓챠',
+  logoUrl: 'https://image.tmdb.org/t/p/original/outdated-watcha.png',
+};
+
+const UNKNOWN: Ott = { ottId: 999, code: 'UNKNOWN', name: '알 수 없음', logoUrl: null };
 
 function catalogOf(...otts: Ott[]): OttCatalog {
   return { find: (code) => otts.find((ott) => ott.code === code) ?? null };
@@ -44,8 +51,30 @@ describe('OTT 식별 배지', () => {
     const badge = screen.getByRole('img', { name: '넷플릭스' });
     const logo = badge.querySelector('img');
 
-    expect(logo).toHaveAttribute('src', NETFLIX.logoUrl);
+    expect(logo).toHaveAttribute('src', 'https://image.tmdb.org/t/p/w92/netflix.png');
     expect(badge).not.toHaveTextContent('N');
+  });
+
+  it('TMDb 이외의 로고 주소는 그대로 사용한다', () => {
+    const selfHostedNetflix = {
+      ...NETFLIX,
+      logoUrl: 'https://cdn.feelm.example/ott/netflix.png',
+    };
+    renderBadge(<OttBadge code="NETFLIX" name="넷플릭스" />, catalogOf(selfHostedNetflix));
+
+    expect(screen.getByRole('img', { name: '넷플릭스' }).querySelector('img')).toHaveAttribute(
+      'src',
+      selfHostedNetflix.logoUrl,
+    );
+  });
+
+  it('왓챠는 TMDb의 잘못된 provider 이미지 대신 공식 아이콘을 사용한다', () => {
+    renderBadge(<OttBadge code="WATCHA" name="왓챠" />, catalogOf(WATCHA));
+
+    expect(screen.getByRole('img', { name: '왓챠' }).querySelector('img')).toHaveAttribute(
+      'src',
+      'https://watcha.com/favicon.ico',
+    );
   });
 
   it('기준정보가 없으면 글자로 그린다', () => {
@@ -59,9 +88,9 @@ describe('OTT 식별 배지', () => {
 
   // 기준정보에는 있지만 로고 주소가 비어 있는 OTT도 계약상 가능하다
   it('기준정보에 로고 주소가 없으면 글자로 그린다', () => {
-    renderBadge(<OttBadge code="WATCHA" name="왓챠" />, catalogOf(WATCHA));
+    renderBadge(<OttBadge code="UNKNOWN" name="알 수 없음" />, catalogOf(UNKNOWN));
 
-    expect(screen.getByRole('img', { name: '왓챠' })).toHaveTextContent('왓');
+    expect(screen.getByRole('img', { name: '알 수 없음' })).toHaveTextContent('U');
   });
 
   it('로고를 불러오지 못하면 같은 자리에서 글자로 떨어진다', () => {

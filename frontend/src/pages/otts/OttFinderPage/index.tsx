@@ -55,7 +55,9 @@ export default function OttFinderPage() {
     };
   }, [reloadCount]);
 
-  const header = <ScreenHeader title="나에게 맞는 OTT 찾기" showBack />;
+  const header = (
+    <ScreenHeader title="나에게 맞는 OTT 찾기" showBack fallbackTo={path.settings()} />
+  );
 
   if (failed) {
     return (

@@ -15,6 +15,8 @@
 
 Access Token은 응답 본문으로 받아 `Authorization: Bearer` 헤더로 전달하고, Refresh Token은 `httpOnly; Secure; SameSite=Lax` 쿠키로 발급한다. Refresh Token은 Redis에 TTL로 저장하고 사용 시 회전(rotation)하며, 재사용이 감지되면 해당 사용자의 Refresh Token을 전부 폐기한다. 수명(Access 30분 / Refresh 14일)은 설정값이다. ERD의 `refresh_tokens` 테이블은 제거한다.
 
+재사용 감지에는 짧은 유예를 둔다(S15P21E106-596). 회전 직후 유예 안에 같은 토큰이 다시 오는 것은 응답을 받지 못한 채 끊긴 요청의 재도착이므로 탈취로 보지 않고 그 세션의 현재 토큰을 다시 내려주며, 유예를 지난 재사용에 대해서만 전량 폐기를 발동한다. 유예 없이 판정하면 한 페이지 로드에서 재발급이 여러 번 나가는 것만으로 사용자의 모든 세션이 끊긴다. 유예 길이와 정확한 판정 규칙은 `docs/api/users.md` API-006 처리 규칙이 정본이다.
+
 ## 고려한 대안
 
 | 대안 | 장점 | 단점 |

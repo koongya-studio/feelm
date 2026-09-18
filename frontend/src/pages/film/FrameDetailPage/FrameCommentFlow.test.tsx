@@ -17,13 +17,37 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import FrameDetailPage from './index';
 import { mockFrameList, mockMyRatings } from '../../../mocks/frames';
 import { findMockMovie } from '../../../mocks/movies';
-import { resetSessionStore, withRatingEdit } from '../../../mocks/sessionStore';
 import { ROUTE_PATTERN } from '../../../routes/paths';
 import type { FrameDetail } from '../../../types/taste';
+import type { RatingUpdateInput } from '../../../types/watch';
+
+/**
+ * 서버가 들고 있는 평가 수정 결과의 대역. 화면이 API-037로 보낸 값을 다음 조회가 돌려준다.
+ * 목업 세션 저장소에서 지웠으므로(업무 -610) 시험이 스스로 든다.
+ */
+const ratingEdits = new Map<number, RatingUpdateInput>();
+
+function saveRatingEdit(ratingId: number, input: RatingUpdateInput) {
+  ratingEdits.set(ratingId, { ...input });
+}
+
+function withRatingEdit<T extends RatingUpdateInput & { ratingId: number }>(rating: T): T {
+  const edit = ratingEdits.get(rating.ratingId);
+
+  return edit ? { ...rating, ...edit } : rating;
+}
 
 vi.mock('../../../api/taste', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/taste')>()),
   getFrameDetail: vi.fn(),
+}));
+
+vi.mock('../../../api/watch', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../api/watch')>()),
+  updateRating: vi.fn((ratingId, input) => {
+    saveRatingEdit(ratingId, input);
+    return Promise.resolve({});
+  }),
 }));
 
 const { getFrameDetail } = await import('../../../api/taste');
@@ -55,7 +79,7 @@ function frameDetail(frameId: number): Promise<FrameDetail> {
 }
 
 beforeEach(() => {
-  resetSessionStore();
+  ratingEdits.clear();
   vi.mocked(getFrameDetail).mockReset().mockImplementation(frameDetail);
 });
 
@@ -104,6 +128,7 @@ describe('3.1-A ⇢ 7.6-A', () => {
       score: 4,
       comment: '두 번째 볼 때 더 좋았어요',
       visibility: 'PRIVATE',
+      spoiler: false,
     });
   });
 

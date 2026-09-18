@@ -34,7 +34,7 @@ export function createSeedNotifications(now: Date = new Date()): NotificationVie
       body: `《${findMockMovie(104).title}》 감상 확인하러 가기`,
       createdAt: ago(0),
       read: false,
-      targetId: 4004,
+      destination: 'unrated',
     },
     {
       notificationId: 7003,
@@ -43,7 +43,7 @@ export function createSeedNotifications(now: Date = new Date()): NotificationVie
       body: '무비버디 님이 파티 모드에 초대했어요',
       createdAt: ago(30 * MINUTE),
       read: false,
-      targetId: 501,
+      destination: 'party',
     },
     {
       notificationId: 7002,
@@ -52,7 +52,7 @@ export function createSeedNotifications(now: Date = new Date()): NotificationVie
       body: '취향 맞춤 2편 · 새로운 맛 1편',
       createdAt: ago(120 * MINUTE),
       read: true,
-      targetId: null,
+      destination: 'recommendations',
     },
     {
       notificationId: 7001,
@@ -61,7 +61,7 @@ export function createSeedNotifications(now: Date = new Date()): NotificationVie
       body: `《${findMockMovie(401).title}》이 취향 필름에 추가됐어요`,
       createdAt: ago(26 * 60 * MINUTE),
       read: true,
-      targetId: null,
+      destination: 'film',
     },
   ];
 }

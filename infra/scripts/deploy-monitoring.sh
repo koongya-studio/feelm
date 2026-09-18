@@ -11,10 +11,11 @@ if [[ "${mode}" != "deploy" && "${mode}" != "--recover" ]]; then
   exit 2
 fi
 
-services=(prometheus grafana node-exporter postgres-exporter redis-exporter)
+services=(prometheus grafana mattermost-alert-relay node-exporter postgres-exporter redis-exporter)
 containers=(
   feelm-prometheus
   feelm-grafana
+  feelm-mattermost-alert-relay
   feelm-node-exporter
   feelm-postgres-exporter
   feelm-redis-exporter
@@ -23,7 +24,8 @@ containers=(
 verify() {
   "${PYTHON_BIN}" -I -B "${SCRIPT_DIR}/verify-monitoring-deployment.py" \
     --attempts "${MONITORING_HEALTH_ATTEMPTS:-24}" \
-    --interval "${MONITORING_HEALTH_INTERVAL_SECONDS:-5}"
+    --interval "${MONITORING_HEALTH_INTERVAL_SECONDS:-5}" \
+    --relay-url "http://127.0.0.1:${GRAFANA_ALERT_RELAY_PORT:-9087}"
 }
 
 container_exists() {

@@ -10,7 +10,7 @@
  *   보내면 계약이 `400 VALIDATION_FAILED`로 막는다
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getMovieDetail } from './movies';
+import { getMovieDetail, getMovieReviews, getSimilarMovies } from './movies';
 import { ApiError } from './apiError';
 import { endSession, resetSessionForTest, startSession } from './session';
 
@@ -79,7 +79,7 @@ describe('API-030 영화 상세 조회', () => {
   });
 
   it('토큰이 없어도 비회원으로 부른다', async () => {
-    endSession();
+    endSession('signed-out');
     fetchMock.mockResolvedValue(json(200, sparseDetail));
 
     await getMovieDetail(550);
@@ -114,5 +114,62 @@ describe('API-030 영화 상세 조회', () => {
       code: 'RESOURCE_NOT_FOUND',
     });
     await expect(getMovieDetail(999)).rejects.toBeInstanceOf(ApiError);
+  });
+});
+
+describe('API-032 공개 한줄평 목록', () => {
+  const page = {
+    items: [
+      {
+        ratingId: 91,
+        user: { userId: 1024, nickname: '팝콘러버' },
+        score: 5,
+        comment: '밤에 보면 안 됨',
+        mine: false,
+        spoiler: true,
+        createdAt: '2026-08-30T05:21:00Z',
+      },
+    ],
+    nextCursor: 'next-page',
+    hasNext: true,
+  };
+
+  it('회원 토큰으로 영화의 첫 페이지를 조회하고 페이지 응답을 그대로 돌려준다', async () => {
+    startSession('token');
+    fetchMock.mockResolvedValue(json(200, page));
+
+    expect(await getMovieReviews(550)).toEqual(page);
+    expect(call()[0]).toBe('/api/v1/movies/550/reviews');
+    expect(call()[1].method).toBe('GET');
+    expect((call()[1].headers as Record<string, string>).Authorization).toBe('Bearer token');
+  });
+
+  it('다음 페이지는 서버가 준 cursor와 요청한 size를 질의로 보낸다', async () => {
+    startSession('token');
+    fetchMock.mockResolvedValue(json(200, { items: [], nextCursor: null, hasNext: false }));
+
+    await getMovieReviews(550, 'next-page', 50);
+
+    expect(call()[0]).toBe('/api/v1/movies/550/reviews?cursor=next-page&size=50');
+  });
+});
+
+describe('API-031 유사 영화 추천', () => {
+  it('실제 API를 선택 인증으로 호출하고 응답의 items를 반환한다', async () => {
+    startSession('token');
+    const items = [
+      {
+        movieId: 807,
+        title: '세븐',
+        posterUrl: null,
+        averageRating: 4.2,
+        similarity: 0.87,
+      },
+    ];
+    fetchMock.mockResolvedValue(json(200, { baseMovieId: 550, items }));
+
+    await expect(getSimilarMovies(550)).resolves.toEqual(items);
+    expect(call()[0]).toBe('/api/v1/movies/550/similar?size=10');
+    expect((call()[1].headers as Record<string, string>).Authorization).toBe('Bearer token');
   });
 });

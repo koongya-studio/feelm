@@ -34,21 +34,21 @@
 /*
  * 포스터 배경. 화면에 고정해 본문만 흐른다.
  *
- * 흐리면 가장자리가 비어 보이므로 조금 키워 둔다. 밝기는 처음부터 살짝 눌러 둔다 —
- * 원본 그대로면 상단의 뒤로 가기 버튼이 밝은 포스터에서 사라진다.
+ * 세로 포스터의 양옆이 잘리지 않도록 화면 폭에 맞춘다. 남는 아래 영역은 배경색과
+ * 그라디언트가 이어 받고, 밝기는 처음부터 살짝 눌러 상단 버튼의 대비를 지킨다.
  */
 .backdrop {
   position: fixed;
-  inset: -6%;
+  inset: 0;
   z-index: 0;
   background-color: #0d0c0f;
   background-image: var(--detail-poster, none);
   background-position: center top;
-  background-size: cover;
-  filter: blur(calc(var(--detail-scroll) * 22px))
+  background-repeat: no-repeat;
+  background-size: 100% auto;
+  filter: blur(calc(1px + var(--detail-scroll) * 21px))
     brightness(calc(0.82 - var(--detail-scroll) * 0.42));
-  transform: scale(calc(1 + var(--detail-scroll) * 0.06));
-  will-change: filter, transform;
+  will-change: filter;
 }
 
 /* 포스터가 없는 영화. 자리표시자를 전면에 늘리지 않고 어두운 면만 남긴다 */
@@ -204,6 +204,19 @@
   color: var(--color-on-dark-muted);
 }
 
+.action {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.myRating {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 0 var(--space-1);
+}
+
 /* ─────────────────────────── 구역 */
 
 .section {
@@ -225,8 +238,7 @@
   color: var(--color-on-dark);
 }
 
-.synopsis,
-.myComment {
+.synopsis {
   font-size: var(--font-size-body);
   line-height: var(--line-height-body);
   letter-spacing: var(--letter-spacing-body);
@@ -249,6 +261,18 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.ottAttribution {
+  align-self: flex-start;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-on-dark-hint);
+  text-decoration: none;
+}
+
+.ottAttribution:hover {
+  text-decoration: underline;
 }
 
 /*
@@ -285,65 +309,6 @@
   font-size: var(--font-size-meta);
   line-height: var(--line-height-meta);
   color: var(--color-brand);
-}
-
-/* ─────────────────────────── 내 감상평 */
-
-.mine {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--font-size-meta);
-  line-height: var(--line-height-meta);
-}
-
-.mineValue {
-  font-weight: var(--font-weight-bold);
-  color: var(--color-on-dark);
-}
-
-/* ─────────────────────────── 출연 · 제작 */
-
-.peopleList {
-  display: flex;
-  gap: var(--space-4);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.peopleList::-webkit-scrollbar {
-  display: none;
-}
-
-.personItem {
-  display: flex;
-  width: 68px;
-  flex: none;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-1);
-  text-align: center;
-}
-
-/* 인물 사진은 계약에 없다. 자리만 원으로 둔다 */
-.personPhoto {
-  width: 56px;
-  height: 56px;
-  border: 0.5px solid var(--color-line-on-dark);
-  border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.personName {
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-  color: var(--color-on-dark);
-}
-
-.personRole {
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-  color: var(--color-on-dark-hint);
 }
 
 /* ─────────────────────────── 관련 영화 */
@@ -394,6 +359,62 @@
   color: var(--color-on-dark-hint);
 }
 
+/* ─────────────────────────── 출연 · 제작 */
+
+.peopleList {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0 calc(var(--screen-padding-x) * -1);
+  padding: 0 var(--screen-padding-x);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  touch-action: pan-x pan-y;
+  cursor: grab;
+  user-select: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.peopleList:active {
+  cursor: grabbing;
+}
+
+.peopleList::-webkit-scrollbar {
+  display: none;
+}
+
+.personItem {
+  display: flex;
+  width: 68px;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  text-align: center;
+}
+
+/* API-030 프로필 이미지가 없을 때도 같은 크기의 빈 원을 유지한다 */
+.personPhoto {
+  width: 56px;
+  height: 56px;
+  border: 0.5px solid var(--color-line-on-dark);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  object-fit: cover;
+}
+
+.personName {
+  display: -webkit-box;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-on-dark);
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 /* ─────────────────────────── 한줄평 */
 
 .reviewList {
@@ -431,4 +452,72 @@
   font-size: var(--font-size-meta);
   line-height: var(--line-height-meta);
   color: var(--color-on-dark-muted);
+}
+
+.reviewSpoiler {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* 실제 한줄평 대신 고정 문구만 흐린다. 문장 길이나 형태가 숨김 상태에서 새지 않는다. */
+.reviewSpoilerPlaceholder {
+  display: block;
+  width: 120px;
+  overflow: hidden;
+  color: var(--color-on-dark-muted);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  white-space: nowrap;
+  user-select: none;
+  filter: blur(3px);
+}
+
+/* 같은 줄의 블러 옆에 일반 텍스트로 둔다. 버튼처럼 보이는 면·테두리는 만들지 않는다. */
+.reviewReveal {
+  flex: 0 0 auto;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--color-brand);
+  font: inherit;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+
+.reviewReveal:hover,
+.reviewReveal:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.reviewBodyRevealed {
+  animation: revealReview 180ms ease-out;
+}
+
+@keyframes revealReview {
+  from {
+    opacity: 0.55;
+    filter: blur(5px);
+  }
+
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+.reviewError {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-brand);
+  text-align: center;
+}
+
+.backToTop {
+  padding: var(--space-2) 0 var(--space-6);
 }

@@ -192,11 +192,11 @@ border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,0.1)
 | --- | --- | --- | --- |
 | `OttBadge` | OTT 식별 배지 (N · T · W · D · C · A) | 1.2, 2.1, 2.2, 2.3, 2.4, 3.1-A | 08 |
 | `MovieCard` | 영화 한 편을 카드로 표시 | 2.1, 2.2, 2.3, 2.4 유사 영화, 3.1 | 09 |
-| `FilmStrip` | 프레임을 필름 모양으로 표시 | 1.3, 2.6, 2.7, 3.1 | 10 |
+| `FilmReel` | 프레임을 필름 릴 모양으로 표시(가로 · 세로) | 1.3, 2.2, 2.6, 2.7, 3.1, 3.1-A | 10 |
 | `PopcornBucket` | 팝콘 알 분포 SVG | 3.2, 5.8, 5.9 | 13 |
 | `FlavorLegend` | 팝콘 맛 8종 범례 | 3.2, 5.8 | 13 |
 
-`MovieCard` · `FilmStrip` · `PopcornBucket` · `FlavorLegend`는 **처음 쓰는 화면 폴더에서
+`MovieCard` · `FilmReel` · `PopcornBucket` · `FlavorLegend`는 **처음 쓰는 화면 폴더에서
 만들고, 두 번째 화면이 필요해질 때 `src/components/`로 올립니다**(3.1절 기준). 표에
 적은 `만들 업무`는 처음 만드는 시점입니다.
 

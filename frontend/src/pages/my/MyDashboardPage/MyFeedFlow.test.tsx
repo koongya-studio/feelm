@@ -20,16 +20,32 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import MyDashboardPage from './index';
 import MovieRatingPage from '../../movies/MovieRatingPage';
 import RatingResultPage from '../../movies/RatingResultPage';
-import { getMyRatings } from '../../../api/watch';
 import { getMyProfile } from '../../../api/users';
+import { mockFrameList, mockMyRatings } from '../../../mocks/frames';
 import { findMockMovieDetail } from '../../../mocks/movieDetails';
 import { findMockMovie } from '../../../mocks/movies';
 import { mockOtts } from '../../../mocks/otts';
-import { resetSessionStore, withRatingEdit } from '../../../mocks/sessionStore';
+import { resetSessionStore } from '../../../mocks/sessionStore';
 import { mockMyProfile } from '../../../mocks/user';
 import { ROUTE_PATTERN } from '../../../routes/paths';
 import type { MovieDetail } from '../../../types/movie';
-import type { WatchRecordListItem } from '../../../types/watch';
+import type { RatingUpdateInput, WatchRecordListItem } from '../../../types/watch';
+
+/**
+ * 서버가 들고 있는 평가 수정 결과의 대역. 화면이 API-037로 보낸 값을 다음 조회가 돌려준다.
+ * 목업 세션 저장소에서 지웠으므로(업무 -610) 시험이 스스로 든다.
+ */
+const ratingEdits = new Map<number, RatingUpdateInput>();
+
+function saveRatingEdit(ratingId: number, input: RatingUpdateInput) {
+  ratingEdits.set(ratingId, { ...input });
+}
+
+function withRatingEdit<T extends RatingUpdateInput & { ratingId: number }>(rating: T): T {
+  const edit = ratingEdits.get(rating.ratingId);
+
+  return edit ? { ...rating, ...edit } : rating;
+}
 
 vi.mock('../../../api/users', () => ({
   getMyProfile: vi.fn(),
@@ -43,6 +59,7 @@ vi.mock('../../../api/taste', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/taste')>()),
   getPopcornBucket: vi.fn(),
   getPopcornFlavors: vi.fn(),
+  getMyFrames: vi.fn(),
 }));
 
 vi.mock('../../../api/movies', async (importOriginal) => ({
@@ -55,14 +72,19 @@ vi.mock('../../../api/watch', async (importOriginal) => ({
   getWatchRecords: vi.fn(),
   // 2.5의 감상 정보 줄이 쓴다. 모듈 안에서 부르는 함수라 따로 세워야 대역이 걸린다
   findWatchedRecord: vi.fn(),
-  // 평가 생성(API-036, 업무 -491). 수정(API-037)과 목록(API-039)은 목업이라 그대로 둔다
+  // 평가 생성(API-036)과 수정(API-037)은 실제 호출이므로 화면 흐름에서는 대역을 세운다
   createRating: vi.fn(),
+  updateRating: vi.fn((ratingId, input) => {
+    saveRatingEdit(ratingId, input);
+    return Promise.resolve({});
+  }),
 }));
 
 const { getOtts } = await import('../../../api/otts');
-const { getPopcornBucket, getPopcornFlavors } = await import('../../../api/taste');
+const { getPopcornBucket, getPopcornFlavors, getMyFrames } = await import('../../../api/taste');
 const { getMovieDetail } = await import('../../../api/movies');
-const { getWatchRecords, findWatchedRecord, createRating } = await import('../../../api/watch');
+const { getWatchRecords, findWatchedRecord, createRating, updateRating } =
+  await import('../../../api/watch');
 
 /**
  * 서버가 들고 있는 감상 기록(API-034). `안 남긴 영화` 탭이 그리는 세 건이다.
@@ -112,8 +134,21 @@ function movieDetail(movieId: number): Promise<MovieDetail> {
   });
 }
 
+/** 내 필름(API-042)을 주는 서버 대역. 프레임은 평가와 1:1이라 수정된 별점을 그대로 비춘다 */
+function myFrames() {
+  return Promise.resolve({
+    ...mockFrameList,
+    items: mockFrameList.items.map((frame) => ({
+      ...frame,
+      score: withRatingEdit(mockMyRatings[frame.movie.movieId]).score,
+    })),
+  });
+}
+
 beforeEach(() => {
   resetSessionStore();
+  ratingEdits.clear();
+  vi.mocked(getMyFrames).mockReset().mockImplementation(myFrames);
   vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
   vi.mocked(getOtts).mockReset().mockResolvedValue(mockOtts);
   // 팝콘 통은 그림이라 비어 있어도 화면이 그려진다
@@ -129,6 +164,7 @@ beforeEach(() => {
       Promise.resolve(unratedRecords.find((record) => record.movie.movieId === movieId) ?? null),
     );
   vi.mocked(createRating).mockReset();
+  vi.mocked(updateRating).mockClear();
 });
 
 function LocationProbe() {
@@ -178,8 +214,8 @@ describe('MY 피드(평가) ⇢ 2.5', () => {
     await waitFor(() => expect(location()).toBe('/my'));
     expect(await screen.findByRole('link', { name: /영화 제목 2.*2\.5/ })).toBeInTheDocument();
 
-    const ratings = await getMyRatings();
-    expect(ratings.items.filter((rating) => rating.movie.movieId === 402)).toEqual([
+    const frames = await getMyFrames();
+    expect(frames.items.filter((frame) => frame.movie.movieId === 402)).toEqual([
       expect.objectContaining({ frameId: 502, score: 2.5 }),
     ]);
   });
@@ -203,6 +239,7 @@ describe('MY 피드(안 남긴 영화) ⇢ 2.5', () => {
         score: input.score,
         comment: input.comment ?? null,
         visibility: input.visibility ?? 'PRIVATE',
+        spoiler: false,
         frame: { frameId: 77, createdAt: '2026-08-30T05:21:00Z' },
         popcorn: { flavorCode: 'FLAVOR_A', isNewFlavor: true, flavorCount: 1 },
         watchStatus: 'RATED',

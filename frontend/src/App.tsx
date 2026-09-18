@@ -1,15 +1,24 @@
+import { useEffect } from 'react';
 import { RouterProvider } from 'react-router';
 import SplashScreen from './components/SplashScreen';
 import { AuthProvider } from './contexts/AuthProvider';
 import { OttCatalogProvider } from './contexts/OttCatalogProvider';
 import { router } from './routes/router';
+import { redirectOnSessionExpiry } from './routes/sessionExpiry';
 
 export default function App() {
+  /*
+    세션 만료는 아무 API 호출 도중에나 일어나므로 특정 화면이 아니라 여기서 받는다.
+    라우터 바깥이라 `useNavigate`를 쓸 수 없어 라우터 인스턴스로 직접 이동한다
+    (`routes/sessionExpiry.ts`, 업무 -596).
+  */
+  useEffect(() => redirectOnSessionExpiry((to, options) => void router.navigate(to, options)), []);
+
   return (
     <>
       {import.meta.env.DEV ? (
         <div className="preview-badge" role="status">
-          PREVIEW · 목업 데이터
+          LOCAL · API + 로컬 DB
         </div>
       ) : null}
       {/*

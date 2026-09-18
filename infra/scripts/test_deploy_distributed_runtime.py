@@ -89,6 +89,75 @@ class DistributedRuntimeTest(unittest.TestCase):
         self.assertIn("/verification/runtime-config/probe-distributed-", command[-1])
         self.assertIn("hdfs dfs -rm -f", command[5])
 
+    def test_kafka_probe_creates_produces_consumes_and_deletes_isolated_topic(self):
+        fake = FakeRunner()
+        runtime.verify_kafka_produce_consume(fake)
+        command = fake.commands[0][0]
+        self.assertEqual(command[:3], ["docker", "exec", "feelm-kafka"])
+        self.assertIn("feelm.runtime.config.probe.", command[-2])
+        self.assertIn("kafka-topics.sh", command[5])
+        self.assertIn("kafka-console-producer.sh", command[5])
+        self.assertIn("kafka-console-consumer.sh", command[5])
+        self.assertIn("--delete", command[5])
+
+    def test_kafka_quorum_retries_until_ready(self):
+        fake = FakeRunner()
+        original = fake.run
+        attempts = iter([runtime.DeploymentError("not ready"), ""])
+
+        def delayed_quorum(command, **kwargs):
+            if any(item.endswith("kafka-metadata-quorum.sh") for item in command):
+                result = next(attempts)
+                if isinstance(result, Exception):
+                    raise result
+                return result
+            return original(command, **kwargs)
+
+        fake.run = delayed_quorum
+        with patch.object(runtime.time, "sleep") as sleep:
+            runtime.verify_runtime(
+                "distributed", ("kafka",), Path("ignored"), ("kafka",), fake, 2
+            )
+        sleep.assert_called_once_with(5)
+
+    def test_kafka_probe_failure_restores_previous_checkout(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            candidate = root / "candidate"
+            rollback = root / "rollback"
+            candidate.mkdir()
+            rollback.mkdir()
+            env_file = root / "runtime.env"
+            env_file.write_text("DISTRIBUTED_NODE_IP=192.0.2.2\n", encoding="utf-8")
+            args = runtime.parser().parse_args([
+                "--node", "distributed",
+                "--components", "kafka",
+                "--source-root", str(candidate),
+                "--rollback-root", str(rollback),
+                "--env-file", str(env_file),
+                "--expected-commit", "a" * 40,
+                "--expected-rollback-commit", "b" * 40,
+                "--confirm-deploy",
+            ])
+            fake = FakeRunner()
+            with patch.object(runtime, "resolve_commit", side_effect=["a" * 40, "b" * 40]), \
+                 patch.object(runtime, "check_compose"), \
+                 patch.object(runtime, "verify_runtime"), \
+                 patch.object(
+                     runtime,
+                     "verify_kafka_produce_consume",
+                     side_effect=[runtime.DeploymentError("probe failed"), None],
+                 ):
+                with self.assertRaisesRegex(runtime.DeploymentError, "previous runtime was restored"):
+                    runtime.deploy(args, fake)
+
+            up_commands = [item for item in fake.commands if "up" in item[0]]
+            self.assertEqual(len(up_commands), 2)
+            candidate_compose = up_commands[0][0][up_commands[0][0].index("-f") + 1]
+            rollback_compose = up_commands[1][0][up_commands[1][0].index("-f") + 1]
+            self.assertIn("candidate", candidate_compose)
+            self.assertIn("rollback", rollback_compose)
+
     def test_spark_active_workload_is_rejected(self):
         with patch.object(runtime, "read_spark_status", return_value={"activeapps": [{}]}):
             with self.assertRaisesRegex(runtime.DeploymentError, "active applications"):

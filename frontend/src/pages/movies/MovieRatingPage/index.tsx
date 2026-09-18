@@ -30,11 +30,10 @@
  * `봤어요`를 고른 기록의 `watchedAt`과 `ott`를 쓰므로 실제로 이동한 OTT가 나온다
  * (업무 -263). 2.4에서 바로 들어와 감상 기록이 없으면 이 줄을 표시하지 않는다.
  *
- * 영화 정보(API-030, 업무 -475) · 감상 기록(API-034, 업무 -477) · **평가 생성(API-036,
- * 업무 -491)**은 실제 API다. 저장하면 서버가 같은 트랜잭션에서 감상 기록을 `RATED`로
- * 옮기므로 평가한 영화는 7.7 `안 남긴 영화`에서 빠진다. **평가 수정(API-037)은 아직
- * 목업이라** 고친 값이 서버에 닿지 않는다(api/watch.ts). 목업 목록(7.6)에서 들어오면
- * 그 `movieId`가 실제 DB에 없어 오류 상태가 된다.
+ * 영화 정보(API-030, 업무 -475) · 감상 기록(API-034, 업무 -477) · 평가 생성(API-036,
+ * 업무 -491) · 평가 수정(API-037, 업무 -213)은 실제 API다. 저장하면 서버가 같은
+ * 트랜잭션에서 감상 기록을 `RATED`로 옮기므로 평가한 영화는 7.7 `안 남긴 영화`에서 빠진다.
+ * 목업 목록(7.6)에서 들어오면 그 `movieId`가 실제 DB에 없어 오류 상태가 될 수 있다.
  *
  * 저장 실패는 화면에 남기고 이동하지 않는다. 계약이 가르는 것 중 화면이 달리 말하는 것은
  * `409 RATING_ALREADY_EXISTS` 하나다 — 상세를 읽은 뒤 다른 곳에서 평가가 생긴 경우라,
@@ -52,12 +51,8 @@ import TextArea from '../../../components/TextArea';
 import { ApiError } from '../../../api/apiError';
 import { getMovieDetail } from '../../../api/movies';
 import { getOtts } from '../../../api/otts';
-import {
-  createRating,
-  findWatchedRecord,
-  getCountsBeforeRating,
-  updateRating,
-} from '../../../api/watch';
+import { createRating, findWatchedRecord, getRatingCounts, updateRating } from '../../../api/watch';
+import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
 import { formatMonthDay } from '../../../utils/date';
 import { movieMetaLine } from '../../../utils/movie';
@@ -85,6 +80,8 @@ function failureMessage(error: unknown): string {
 export default function MovieRatingPage() {
   const { movieId } = useParams();
   const navigate = useNavigate();
+  // 2.4 · 7.1 · 3.1-A에서 온다. 바로 들어왔으면 MY로 돌아간다(업무 -610)
+  const back = useBack(path.my());
 
   const id = Number(movieId);
 
@@ -95,6 +92,7 @@ export default function MovieRatingPage() {
   const [watchNote, setWatchNote] = useState<string | null>(null);
   const [score, setScore] = useState(0);
   const [comment, setComment] = useState('');
+  const [spoiler, setSpoiler] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   /** 저장 실패 문구. 다시 저장을 시도하면 지운다 */
   const [failure, setFailure] = useState<string | null>(null);
@@ -109,6 +107,7 @@ export default function MovieRatingPage() {
           setFailed(false);
           setScore(detail.myRating?.score ?? 0);
           setComment(detail.myRating?.comment ?? '');
+          setSpoiler(detail.myRating?.spoiler ?? false);
         }
       })
       .catch(() => {
@@ -162,24 +161,38 @@ export default function MovieRatingPage() {
           score,
           comment: trimmed || null,
           visibility: movie.myRating.visibility,
+          spoiler: trimmed ? spoiler : false,
         });
 
-        void navigate(-1);
+        back();
 
         return;
       }
 
       // 추가 전 수치를 먼저 받는다. 여기서 실패하면 저장하지 않으므로 다시 눌러도 `409`가 없다
-      const counts = await getCountsBeforeRating();
+      const counts = await getRatingCounts();
       const rating = await createRating(
         movie.movieId,
         // comment가 있으면 visibility가 필수다(API-036). 선택 UI가 없어 기본값 PRIVATE
-        trimmed ? { score, comment: trimmed, visibility: 'PRIVATE' } : { score },
+        trimmed ? { score, comment: trimmed, visibility: 'PRIVATE', spoiler } : { score },
       );
 
-      // 2.6 · 2.7은 추가 전 수치가 있어야 성립하므로 Router state로 넘긴다
+      /*
+       * 추가 **후** 수치도 서버에서 읽어 넘긴다(업무 -599). 예전에는 2.7이 추가 전 수치에
+       * `+1`을 더해 지어냈는데, 그 전제는 평가 한 건이 팝콘을 정확히 한 알 움직일 때만
+       * 참이다. 계약은 그렇지만(평가 1건 = 프레임 1개 + 대표 맛이 있으면 팝콘 1알) 팝콘
+       * 집계는 `대표 맛이 있는 영화의 평가`를 세므로, 영화에 대표 맛이 붙는 것만으로도
+       * 과거 평가가 뒤늦게 버킷에 들어온다. 그때 실제 값은 두 알이 늘고 화면만 한 알을
+       * 단언한다.
+       *
+       * 저장은 이미 끝났으므로 이 조회가 실패해도 되돌리지 않는다. 2.7이 계약이 정한
+       * 증가량으로 물러서서 그린다.
+       */
+      const after = await getRatingCounts().catch(() => null);
+
+      // 2.6 · 2.7은 이 수치가 있어야 성립하므로 Router state로 넘긴다
       void navigate(path.ratingResult(movie.movieId), {
-        state: { rating, counts, movieTitle: movie.title, posterUrl: movie.posterUrl },
+        state: { rating, counts, after, movieTitle: movie.title, posterUrl: movie.posterUrl },
       });
     } catch (error) {
       setFailure(failureMessage(error));
@@ -195,7 +208,7 @@ export default function MovieRatingPage() {
   if (failed) {
     return (
       <>
-        <ScreenHeader title="평가하기" showBack />
+        <ScreenHeader title="평가하기" showBack fallbackTo={path.search()} />
 
         <StatusView
           title="영화 정보를 불러오지 못했어요"
@@ -224,7 +237,7 @@ export default function MovieRatingPage() {
 
   return (
     <>
-      <ScreenHeader title="평가하기" showBack />
+      <ScreenHeader title="평가하기" showBack fallbackTo={path.search()} />
 
       <div className={styles.page}>
         <div className={styles.movie}>
@@ -260,10 +273,22 @@ export default function MovieRatingPage() {
           <TextArea
             label="한줄평"
             value={comment}
-            onChange={setComment}
+            onChange={(value) => {
+              setComment(value);
+              if (!value.trim()) setSpoiler(false);
+            }}
             placeholder="한 줄 감상 남기기 (선택)"
             disabled={submitting}
           />
+          <label className={styles.spoilerControl}>
+            <input
+              type="checkbox"
+              checked={spoiler}
+              onChange={(event) => setSpoiler(event.currentTarget.checked)}
+              disabled={!comment.trim() || submitting}
+            />
+            <span>스포일러가 포함되어 있어요</span>
+          </label>
           {comment.trim() ? (
             <p className={styles.visibilityNote}>
               {isEditing
@@ -291,7 +316,7 @@ export default function MovieRatingPage() {
               : '평가는 영화당 한 번만 반영돼요 · 프레임 1개 + 팝콘 1알'}
           </p>
 
-          <Button variant="text" disabled={submitting} onClick={() => void navigate(-1)}>
+          <Button variant="text" disabled={submitting} onClick={back}>
             나중에 평가하기
           </Button>
         </div>

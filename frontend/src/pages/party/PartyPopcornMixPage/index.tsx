@@ -1,247 +1,214 @@
 /*
- * 5.9 파티 팝콘 섞기
+ * 5.9 팝콘 섞기 (파티팝콘 흐름 2/3)
  *
- * 요소와 순서는 와이어프레임 5.9 그대로다(screen-spec.md 7장 5.9).
- * ① 참여자 취향 비교 · ② 팝콘 믹서 · ③ 공통 취향 결과
+ * 이동표: 5.4 → 5.9 취향 모으기 완료 · 5.9 → 5.5 추천 완성
  *
- * 연동 API는 API-057 파티원 팝콘 조회다. 참여자 이름과 팝콘 집계는 여기서 온다.
- * 업무 -393에서 실제 호출로 바뀌었다.
+ * **사용자 시안 2026-09-17(업무 -462)에서 흐름의 가운데 단계가 됐다.** 이전에는 5.8
+ * 파티원 팝콘과 3.2 팝콘 통에서 따로 들어가 참여자 취향 비교 · 팝콘 믹서 · 공통 취향
+ * 결과 세 덩이를 보여주는 화면이었다.
  *
- * **① 의 `46%` · `38%`, ③ 의 `72%`, 그리고 태그 4종은 계약에 대응이 없다(CR-17).**
- * 산출 규칙이 없고 API-057의 맛별 집계로도 재현되지 않아 `getPartyMix`로 따로 가져온다.
- * 자세한 이유는 types/unspecified.ts에 있다.
+ * **섞는 것은 사용자가 시작한다**(사용자 지시 2026-09-17). `팝콘 섞기`를 누르면 파티원의
+ * 팝콘이 기계로 들어가고, 기계 안에서 섞여, 아래 통에 **하나의 새 팝콘**으로 담긴다.
+ * 스스로 넘어가던 화면을 버튼으로 바꾼 이유는 이 장면이 이 화면의 내용이어서다 —
+ * 지나가는 전환이면 누구도 보지 못한다. 담긴 뒤에 5.5로 간다.
  *
- * ① 의 대표 취향 이름(`액션 · 모험`)은 알이 많은 상위 두 맛의 `displayName`을 이어
- * 만든다. 와이어프레임은 장르명을 쓰지만 계약이 API-044의 표시명을 쓰라고 정하고 있다
- * (screen-spec.md 8.1 #2).
+ * **계약에 없던 수치를 모두 걷어냈다**(사용자 결정 2026-09-17). 참여자별 취향 비율
+ * `46% · 38%`, 공통 취향 일치 `72%`, 태그 4종은 산출 규칙이 계약에 없어 `getPartyMix`
+ * 자리표시자에서 받아 쓰던 값이다(CR-17). 시안에 그 수치가 하나도 없어 화면에서 빼고
+ * 자리표시자 호출도 지웠다. 계약이 정해지면 그때 넣는다.
  *
- * 팀 결정 2026-09-10 (업무 -320)
- * - **② 팝콘 믹서를 실제 팝콘 통으로 채웠다.** 와이어프레임이 `이미지 · SVG · 애니메이션
- *   에셋 영역`이라는 빈 자리로만 표기했고 이전 구현도 그 자리를 그대로 두었다. 업무
- *   -320이 "8맛 3D 팝콘과 버킷 표현을 사용한다"고 정하고, -101에서 그 에셋과
- *   `PopcornBucket` 컴포넌트가 나왔다. 파티원 전원의 맛을 합쳐 한 통에 담는다.
- *   섞는다는 말이 그림으로 그대로 보인다
- * - **알 수를 정규화한다.** 네 명이면 300알이 넘어가 알이 서로를 덮어 실루엣이
- *   뭉개지고 `<image>` 요소도 그만큼 늘어난다. 비율을 유지하며 줄인다. 업무 -577부터
- *   그 요약은 `PopcornBucket`이 30알로 하므로 이 화면은 맛별 합계만 넘긴다
- * - **번호 카드 ①②③을 걷어냈다.** 번호는 와이어프레임 표기였고, 테두리 카드 세 개가
- *   쌓이면 화면이 목록이 된다. 홈·취향 필름·영화 상세와 같이 카드 없는 섹션으로 뒀다
- * - 통은 밝은 벽에 그대로 둔다. 시안 2.5장의 어두운 블록 규칙은 **팝콘 8색**(범례·막대)에
- *   대한 것이고, 3D 렌더는 3.2와 같이 벽에 걸린다
- *
- * **파티원 수 배치 규칙** (팀 결정 2026-09-10, 업무 -320): 참여자 카드는 두 칸 격자에
- * 순서대로 채운다. 파티는 최대 4명이므로(FR-20) 1~2명은 한 줄, 3~4명은 두 줄이 되고
- * 3명이면 마지막 칸이 빈다. 인원에 따라 칸 수를 바꾸지 않는다 — 2명일 때 한 칸씩 크게
- * 두면 같은 화면이 인원마다 다른 리듬을 갖는다. 섞은 통은 인원과 무관하게 하나다.
- * `[?]` 3.2에서 진입한 경우와 5.8에서 진입한 경우의 차이는 미확정이라 같은 화면을 쓴다.
+ * 연동 API는 API-057 파티원 팝콘 조회다. 섞인 통의 맛은 여기서 온다.
+ * 추천(API-058)은 백엔드에 아직 없어 목업으로 떨어진다(`api/parties.ts`).
  */
-import { useEffect, useState } from 'react';
-import { useParams } from 'react-router';
-import Chip from '../../../components/Chip';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
-import PopcornBucket from '../../../components/PopcornBucket';
+import PartyFlowShell from '../../../components/PartyFlowShell';
+import PopcornMachine from '../../../components/PopcornMachine';
+import { kernelCounts } from '../../../components/PopcornBucket/kernels';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
-import { getPartyMix, getPartyPopcorn } from '../../../api/parties';
-import { getPopcornFlavors } from '../../../api/taste';
+import { getParty, getPartyPopcorn, getPartyRecommendations } from '../../../api/parties';
+import { path } from '../../../routes/paths';
+import { mixedFlavors } from '../../../utils/party';
 import styles from './PartyPopcornMixPage.module.css';
-import type { FlavorCount } from '../../../components/PopcornBucket/kernels';
+import type { MachinePhase } from '../../../components/PopcornMachine';
 import type { PartyPopcorn } from '../../../types/party';
-import type { PopcornFlavor } from '../../../types/taste';
-import type { PartyMixView } from '../../../types/unspecified';
-
-/** 대표 취향 이름에 쓰는 맛 개수. 와이어프레임이 두 개를 이어 붙인다 */
-const LEAD_FLAVOR_COUNT = 2;
-
-/** 섞은 통이 그려지는 폭(px). 3.2와 같은 값이라 두 화면의 통이 같은 크기로 보인다 */
-const BUCKET_WIDTH = 196;
 
 /**
- * 파티원 전원의 맛을 한 통에 합친다.
+ * 단계마다 머무는 시간(ms). 합이 섞는 장면의 길이다.
  *
- * 맛별 합계만 내면 된다. **비율을 유지하며 알 수를 줄이는 일은 통이 한다**(업무 -577).
- * 전에는 여기서 100알로 나누고 잔여를 채웠는데, `PopcornBucket`이 같은 요약을 다시
- * 하게 되면서 두 번 나누는 셈이 됐다.
+ * 붓기 → 섞기 → 담기 순으로 빨라진다. 담기고 나면 결과를 한 번 보여준 뒤 5.5로 간다.
  */
-function mixedFlavors(popcorn: PartyPopcorn): FlavorCount[] {
-  const totals = new Map<string, number>();
+const PHASE_MS: Record<Exclude<MachinePhase, 'idle'>, number> = {
+  pouring: 1000,
+  mixing: 1900,
+  filling: 1100,
+  done: 800,
+};
 
-  for (const member of popcorn.members) {
-    for (const flavor of member.flavors) {
-      totals.set(flavor.flavorCode, (totals.get(flavor.flavorCode) ?? 0) + flavor.popcornCount);
-    }
-  }
+/** 단계 순서. `pouring`은 누른 즉시 시작하므로 여기서는 그 다음부터 센다 */
+const AFTER_POURING: Exclude<MachinePhase, 'idle' | 'pouring'>[] = ['mixing', 'filling', 'done'];
 
-  return [...totals.entries()].map(([code, count]) => ({ code, count }));
+/** 단계별 제목. 누르기 전 · 섞는 중 · 담긴 뒤가 다르다 */
+function phaseTitle(phase: MachinePhase): string {
+  if (phase === 'idle') return '취향을 섞어 볼까요?';
+  if (phase === 'done') return '새 팝콘이 완성됐어요';
+
+  return '취향이 섞이는 중';
+}
+
+/** 단계별 부제 */
+function phaseSubtitle(phase: MachinePhase, memberCount: number): string {
+  if (phase === 'idle') return '각자의 팝콘을 기계에 넣어 섞어요';
+  if (phase === 'done') return `${memberCount}명의 취향을 한 통에 담았어요`;
+
+  return '우리에게 어울리는 영화를 찾고 있어요';
+}
+
+/**
+ * 진행 표시 위의 문구. 단계가 말이 되게 바뀐다.
+ *
+ * 기다리는 화면의 유일한 신호가 이 문구라 보조기술도 함께 읽는다
+ * (`PartyFlowShell`이 라이브 영역으로 둔다).
+ */
+function phaseNote(phase: MachinePhase): string {
+  if (phase === 'idle') return '팝콘 섞기를 누르면 시작해요';
+  if (phase === 'done') return '새 팝콘이 한 통에 담겼어요';
+
+  return '팝콘을 섞고 있어요';
 }
 
 export default function PartyPopcornMixPage() {
+  const navigate = useNavigate();
   const { partyId } = useParams();
 
   const id = Number(partyId);
 
   const [popcorn, setPopcorn] = useState<PartyPopcorn | null>(null);
-  const [mix, setMix] = useState<PartyMixView | null>(null);
-  const [flavors, setFlavors] = useState<PopcornFlavor[]>([]);
+  const [names, setNames] = useState<string[]>([]);
+  const [phase, setPhase] = useState<MachinePhase>('idle');
   const [failed, setFailed] = useState(false);
-  const [reloadCount, setReloadCount] = useState(0);
+  const timers = useRef<number[]>([]);
 
   useEffect(() => {
     let active = true;
 
-    /*
-     * 섞기 값(`getPartyMix`)은 계약이 없는 자리표시자라 누구의 값인지 알 수 없다.
-     * 실제 파티원에게 붙이려면 먼저 API-057로 파티원을 알아야 하므로 이어서 부른다.
-     */
-    getPartyPopcorn(id)
-      .then(async (popcornValue) => {
-        const mixValue = await getPartyMix(
-          id,
-          popcornValue.members.map((member) => member.user.userId),
-        );
-
-        if (active) {
-          setPopcorn(popcornValue);
-          setMix(mixValue);
-          setFailed(false);
+    getParty(id)
+      .then((party) => {
+        if (active && party) {
+          setNames(party.members.map((member) => member.nickname));
         }
       })
       .catch(() => {
-        if (active) {
-          setFailed(true);
-        }
+        // 파티 이름 목록을 못 받아도 API-057이 파티원까지 준다
       });
 
-    /*
-     * 집계(API-057)와 기준정보(API-044)가 모두 실제 응답이므로 맛 코드가 같은 곳에서
-     * 온다. 기준정보가 비어 오면 맛 이름 자리가 빈다(`api/taste.ts`).
-     */
-    getPopcornFlavors()
+    getPartyPopcorn(id)
       .then((value) => {
-        if (active) {
-          setFlavors(value);
-        }
+        if (active) setPopcorn(value);
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (active) setFailed(true);
+      });
 
     return () => {
       active = false;
     };
-  }, [id, reloadCount]);
+  }, [id]);
+
+  useEffect(
+    () => () => {
+      // 화면을 떠날 때 남은 단계를 끊는다. mix()가 넣은 것을 지워야 하므로 여기서 읽는다
+      for (const timer of timers.current) {
+        window.clearTimeout(timer);
+      }
+    },
+    [],
+  );
+
+  /**
+   * 섞기 시작. 단계를 차례로 넘기고 마지막에 5.5로 간다.
+   *
+   * 추천(API-058)은 여기서 함께 부른다 — 모션이 도는 동안 받아 두면 5.5가 빈 화면으로
+   * 시작하지 않고, 실패하면 5.5로 보내지 않고 이 화면에서 알린다.
+   */
+  function mix() {
+    setPhase('pouring');
+
+    let at = PHASE_MS.pouring;
+    const scheduled = AFTER_POURING.map((next) => {
+      const timer = window.setTimeout(() => setPhase(next), at);
+
+      at += PHASE_MS[next];
+
+      return timer;
+    });
+
+    const recommended = getPartyRecommendations(id);
+
+    const move = window.setTimeout(() => {
+      recommended
+        .then(() => void navigate(path.partyRecommendations(id), { replace: true }))
+        .catch(() => setFailed(true));
+    }, at);
+
+    timers.current = [...scheduled, move];
+  }
 
   if (failed) {
     return (
       <>
-        <ScreenHeader title="파티 팝콘 섞기" showBack />
+        {/* 오류는 흐름 셸 없이 화면 전체를 덮는다 — 단계를 말할 상태가 아니다. 다만
+            헤더는 5.5의 오류와 같이 남겨 뒤로 갈 길을 둔다 */}
+        <ScreenHeader title="파티팝콘" showBack fallbackTo={path.party()} />
 
-        <StatusView
-          title="파티 정보를 불러오지 못했어요"
-          description="주소가 잘못되었거나 잠시 문제가 생겼어요"
-        >
-          <Button
-            onClick={() => {
-              setFailed(false);
-              setReloadCount((count) => count + 1);
-            }}
-          >
-            다시 시도
-          </Button>
-        </StatusView>
+        <div className={styles.page}>
+          <StatusView title="팝콘을 섞지 못했어요" description="잠시 후 다시 시도해 주세요.">
+            <Button variant="text" onClick={() => void navigate(path.party())}>
+              내 파티로 돌아가기
+            </Button>
+          </StatusView>
+        </div>
       </>
     );
   }
 
-  if (!popcorn || !mix) {
-    return (
-      <>
-        <ScreenHeader title="파티 팝콘 섞기" showBack />
-      </>
-    );
-  }
-
-  const flavorByCode = new Map(flavors.map((flavor) => [flavor.code, flavor]));
+  const shownNames = popcorn ? popcorn.members.map((member) => member.user.nickname) : names;
+  const mixing = phase !== 'idle';
 
   return (
-    <>
-      <ScreenHeader title="파티 팝콘 섞기" showBack />
-
-      <div className={styles.page}>
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>참여자 취향 비교</h2>
-
-          <div className={styles.memberGrid}>
-            {popcorn.members.map((member) => {
-              const view = mix.members.find((item) => item.userId === member.user.userId);
-              const leadName = [...member.flavors]
-                .sort((a, b) => b.popcornCount - a.popcornCount)
-                .slice(0, LEAD_FLAVOR_COUNT)
-                .map((item) => flavorByCode.get(item.flavorCode)?.displayName ?? '')
-                .filter(Boolean)
-                .join(' · ');
-
-              return (
-                <div key={member.user.userId} className={styles.memberCard}>
-                  <div className={styles.memberHead}>
-                    <span className={styles.avatar} aria-hidden="true" />
-                    <span className={styles.memberName}>{member.user.nickname}</span>
-                  </div>
-
-                  <div className={styles.shareRow}>
-                    <span className={styles.shareLabel}>{leadName}</span>
-                    <span className={styles.track}>
-                      <span
-                        className={styles.trackFill}
-                        style={{ width: `${view?.tasteShare ?? 0}%` }}
-                      />
-                    </span>
-                    <span className={styles.shareValue}>{view?.tasteShare ?? 0}%</span>
-                  </div>
-
-                  <div className={styles.tags}>
-                    {(view?.tags ?? []).map((tag) => (
-                      <Chip key={tag}>{tag}</Chip>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/*
-         * 파티원 전원의 맛을 합쳐 한 통에 담는다. 섞는다는 말이 그림으로 보인다.
-         * 통과 알은 -101에서 구운 3D 스프라이트다.
-         */}
-        <section className={styles.mixer}>
-          <PopcornBucket
-            flavors={mixedFlavors(popcorn)}
-            width={BUCKET_WIDTH}
-            label={`파티원 ${popcorn.members.length}명의 팝콘을 섞은 통`}
+    <PartyFlowShell
+      members={shownNames}
+      title={phaseTitle(phase)}
+      subtitle={phaseSubtitle(phase, shownNames.length)}
+      note={phaseNote(phase)}
+      step="mix"
+    >
+      <div className={styles.stage}>
+        {popcorn ? (
+          <PopcornMachine
+            members={popcorn.members.map((member) => ({
+              nickname: member.user.nickname,
+              flavors: kernelCounts(member.flavors),
+            }))}
+            mixed={mixedFlavors(popcorn)}
+            phase={phase}
           />
-          <p className={styles.mixerNote}>
-            파티원 {popcorn.members.length}명의 팝콘을 한 통에 담았어요
-          </p>
-        </section>
-
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>공통 취향 결과</h2>
-
-          {/* ② 에 실제 통이 들어갔으므로 장식용 에셋 상자는 두지 않는다 */}
-          <div className={styles.resultRow}>
-            <p className={styles.resultTitle}>공통 취향 일치 {mix.commonRate}%</p>
-
-            <span className={styles.track}>
-              <span className={styles.trackFill} style={{ width: `${mix.commonRate}%` }} />
-            </span>
-
-            <div className={styles.tags}>
-              {mix.tags.map((tag) => (
-                <Chip key={tag}>{tag}</Chip>
-              ))}
-            </div>
-          </div>
-        </section>
+        ) : null}
       </div>
-    </>
+
+      {/*
+       * 섞는 동안에는 버튼을 두지 않는다. 장면이 도는 중에 같은 버튼이 남아 있으면
+       * 두 번 누를 수 있고, 그러면 단계가 겹쳐 돈다.
+       */}
+      {popcorn && !mixing ? (
+        <div className={styles.actions}>
+          <Button variant="brand" onClick={mix}>
+            팝콘 섞기
+          </Button>
+        </div>
+      ) : null}
+    </PartyFlowShell>
   );
 }

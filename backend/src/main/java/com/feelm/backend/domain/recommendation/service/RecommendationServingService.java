@@ -2,7 +2,6 @@ package com.feelm.backend.domain.recommendation.service;
 
 import com.feelm.backend.domain.recommendation.dto.response.RecommendationItemResponse;
 import com.feelm.backend.domain.recommendation.dto.response.RecommendationMovieResponse;
-import com.feelm.backend.domain.recommendation.dto.response.RecommendationReplenishResponse;
 import com.feelm.backend.domain.recommendation.dto.response.RecommendationResponse;
 import com.feelm.backend.domain.recommendation.repository.RecommendationServingRepository;
 import com.feelm.backend.domain.recommendation.repository.RecommendationServingRepository.RecommendationSet;
@@ -15,7 +14,6 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
@@ -25,6 +23,8 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 @RequiredArgsConstructor
 public class RecommendationServingService {
+
+    private static final int TARGET_SIZE = 3;
 
     private final RecommendationServingRepository repository;
     private final RecommendationReplenisher replenisher;
@@ -42,29 +42,11 @@ public class RecommendationServingService {
         List<ServingItem> items = repository.findInitialVisibleItems(userId, set.id());
         if (items.isEmpty() && !repository.hasExposedItems(set.id())) {
             items = exposeInitial(userId, set.id());
+        } else if (items.size() < TARGET_SIZE) {
+            replenisher.replenishVacancies(userId, set.id(), items);
+            items = repository.findInitialVisibleItems(userId, set.id());
         }
         return new RecommendationResponse(set.id(), set.generatedAt(), map(items));
-    }
-
-    @Transactional
-    public RecommendationReplenishResponse replenish(
-            long userId, long setId, long recommendationItemId) {
-        lockActiveUser(userId);
-        RecommendationSet requested =
-                repository
-                        .findOwnedSet(userId, setId)
-                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
-        RecommendationSet latest =
-                repository
-                        .findLatestSet(userId)
-                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
-        if (latest.id() != requested.id()) {
-            throw new BusinessException(ErrorCode.RECOMMENDATION_SET_STALE);
-        }
-
-        ServingItem replacement = replenisher.replenish(userId, setId, recommendationItemId);
-        return new RecommendationReplenishResponse(
-                setId, replacement == null ? null : map(replacement));
     }
 
     private void lockActiveUser(long userId) {
@@ -89,10 +71,6 @@ public class RecommendationServingService {
         Map<Long, List<String>> genres = repository.findGenreNames(movieIds);
         Map<Long, List<String>> otts = repository.findOttCodes(movieIds);
         return items.stream().map(item -> map(item, genres, otts)).toList();
-    }
-
-    private @NonNull RecommendationItemResponse map(ServingItem item) {
-        return map(List.of(item)).getFirst();
     }
 
     private RecommendationItemResponse map(

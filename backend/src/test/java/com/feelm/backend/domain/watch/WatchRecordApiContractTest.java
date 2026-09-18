@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.feelm.backend.domain.notification.service.NotificationCommandService;
 import com.feelm.backend.domain.watch.dto.request.WatchListCriteria;
 import com.feelm.backend.domain.watch.dto.response.WatchConfirmResponse;
 import com.feelm.backend.domain.watch.dto.response.WatchRecordItemResponse;
@@ -80,6 +81,7 @@ class WatchRecordApiContractTest extends SharedPostgresContractTest {
     @Autowired private DataSource dataSource;
     @Autowired private WatchRepository watchRepository;
     @Autowired private KafkaEventPublisher eventPublisher;
+    @Autowired private NotificationCommandService notificationCommandService;
     @Autowired private PlatformTransactionManager transactionManager;
 
     private long userId;
@@ -623,6 +625,22 @@ class WatchRecordApiContractTest extends SharedPostgresContractTest {
     @DisplayName("안 봤어요는 EXPIRED와 expiredAt을 저장한다")
     void confirmsNotWatched() throws Exception {
         long recordId = insertDistinctWatch("LINK_CLICKED", Instant.now().minusSeconds(DAY));
+        WatchRow beforeConfirm = watch(recordId);
+        jdbc.sql(
+                        """
+                        INSERT INTO notifications(
+                            user_id,type,source_id,target_type,target_id,title,body,
+                            notified_at,expires_at
+                        ) VALUES (
+                            :user,'WATCH_CONFIRM',:record,'WATCH_RECORD',:record,'제목','본문',
+                            :due,:expires
+                        )
+                        """)
+                .param("user", userId)
+                .param("record", recordId)
+                .param("due", offset(beforeConfirm.confirmDueAt()))
+                .param("expires", offset(beforeConfirm.expiresAt()))
+                .update();
         Instant before = Instant.now();
 
         JsonNode response =
@@ -638,6 +656,15 @@ class WatchRecordApiContractTest extends SharedPostgresContractTest {
         assertThat(stored.status()).isEqualTo("EXPIRED");
         assertThat(stored.expiredAt()).isBetween(before, after);
         assertThat(stored.watchedAt()).isNull();
+        assertThat(
+                        jdbc.sql(
+                                        "SELECT count(*) FROM notifications"
+                                                + " WHERE source_id=:record AND closed_at IS NOT NULL"
+                                                + " AND read_at IS NOT NULL")
+                                .param("record", recordId)
+                                .query(Long.class)
+                                .single())
+                .isEqualTo(1);
     }
 
     @Test
@@ -945,7 +972,11 @@ class WatchRecordApiContractTest extends SharedPostgresContractTest {
     }
 
     private WatchService fixedService(Instant now) {
-        return new WatchService(watchRepository, eventPublisher, Clock.fixed(now, ZoneOffset.UTC));
+        return new WatchService(
+                watchRepository,
+                eventPublisher,
+                notificationCommandService,
+                Clock.fixed(now, ZoneOffset.UTC));
     }
 
     /** 거절이 목록을 대신 흘려보내지 않는지까지 본다. 무시하고 200을 주던 결함이 이 API의 문제였다. */

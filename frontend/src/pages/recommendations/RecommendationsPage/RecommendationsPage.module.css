@@ -5,6 +5,8 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
+  /* 헤더가 없다(업무 -605). 헤더가 주던 위 여백만큼 필름을 내려 상태 표시줄에 붙지 않게 한다 */
+  padding-top: var(--space-10);
 }
 
 .scrollArea {
@@ -16,37 +18,19 @@
   scrollbar-width: none;
 }
 
-/* 필름 스트립 모양의 카드 열 */
-.strip {
-  position: relative;
-  display: flex;
-  width: 224px;
-  height: max-content;
-  flex: none;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 0;
-  background: var(--color-surface-sunken);
+/*
+ * 카드 열은 `FilmReel`의 세로 필름이다(업무 -605). 릴이 폭을 스스로 정하고 `.scrollArea`가
+ * 가운데에 놓는다. 위아래 여백만 여기서 준다 — 필름 끝이 헤더와 힌트에 붙지 않게.
+ */
+.scrollArea > [data-testid='film-reel'] {
+  margin: var(--space-2) 0 var(--space-3);
 }
 
-.perforation {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 12px;
-  border-radius: 3px;
-  background: repeating-linear-gradient(180deg, var(--color-bg) 0 8px, transparent 8px 21px);
-}
-
-.perforation[data-side='left'] {
-  left: 5px;
-}
-
-.perforation[data-side='right'] {
-  right: 5px;
-}
-
+/*
+ * 섹션 이름표. 프레임 사이에 끼우는 것이라 칸이 아니다(`data-film-label`). 어두운 띠
+ * 위에 앉으므로 밝은 알약이 그대로 이름표가 되고, `취향 발견`은 검정 알약에 밝은 테두리를
+ * 둘러 띠와 구분한다.
+ */
 .sectionPill {
   width: 156px;
   box-sizing: border-box;
@@ -62,7 +46,7 @@
 }
 
 .sectionPill[data-tone='dark'] {
-  border-color: transparent;
+  border-color: var(--color-film-edge);
   background: var(--color-ink);
   color: var(--color-on-dark);
 }
@@ -77,7 +61,7 @@
 }
 
 .sectionNote {
-  color: var(--color-ink-muted);
+  color: var(--color-on-dark-muted);
   font-size: 9.5px;
   line-height: 1.4;
   text-align: center;
@@ -91,24 +75,6 @@
   text-align: center;
 }
 
-/*
- * 와이어프레임 2.3-A의 스낵바는 하단 내비 바로 위에 고정된 영역이다.
- * 카드 목록이 스크롤되는 동안에도 같은 자리에 있어야 하므로 문서 흐름에 두지 않고
- * 하단 내비 높이만큼 띄워 고정한다.
- */
-.snackbarArea {
-  position: fixed;
-  bottom: calc(var(--nav-height) + 14px + env(safe-area-inset-bottom, 0px));
-  left: 50%;
-  z-index: 3;
-  width: 100%;
-  max-width: var(--layout-max-width);
-  box-sizing: border-box;
-  padding: 0 var(--screen-padding-x);
-  transform: translateX(-50%);
-}
-
-/* 2.3 메뉴 안쪽 */
 .menuOttList {
   display: flex;
   margin-bottom: 6px;

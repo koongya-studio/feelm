@@ -13,7 +13,7 @@
  * 둘이 되어 주 버튼과 경쟁한다(REF-01의 필름 탭 테두리 사양도 같은 이유로 뺐다).
  */
 import type { ReactNode } from 'react';
-import { Link, useLocation } from 'react-router';
+import { Link, matchPath, useLocation } from 'react-router';
 import { FilmIcon, MyIcon, PartyIcon } from '../Icon';
 import { path, TAB_MATCH } from '../../routes/paths';
 import styles from './BottomNav.module.css';
@@ -35,13 +35,15 @@ const TABS: Tab[] = [
 /**
  * 현재 경로가 해당 탭에 속하는지 판정한다. 하위 경로도 상위 탭의 선택 상태를 유지한다.
  *
+ * **패턴으로 맞춘다.** `TAB_MATCH`에 `/parties/:partyId/popcorn`처럼 값이 들어가는
+ * 경로가 생겨(업무 -462) 글자 비교로는 맞지 않는다. `end: false`라 하위 경로도
+ * 같은 탭에 머문다.
+ *
  * 앱 진입점 `/`를 따로 거르지 않는다 — 어느 탭도 `/`를 들고 있지 않고, `/`는 화면을
  * 그리지 않고 `/film`으로 보내기만 한다(`routes/HomeEntry.tsx`).
  */
 function isTabActive(tabKey: keyof typeof TAB_MATCH, pathname: string) {
-  return TAB_MATCH[tabKey].some(
-    (pattern) => pathname === pattern || pathname.startsWith(`${pattern}/`),
-  );
+  return TAB_MATCH[tabKey].some((pattern) => matchPath({ path: pattern, end: false }, pathname));
 }
 
 export default function BottomNav() {

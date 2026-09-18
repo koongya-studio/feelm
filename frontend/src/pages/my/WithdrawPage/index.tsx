@@ -35,6 +35,7 @@ import { ApiError } from '../../../api/apiError';
 import { withdraw } from '../../../api/settings';
 import { getMyProfile } from '../../../api/users';
 import { useAuth } from '../../../contexts/authContext';
+import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
 import styles from './WithdrawPage.module.css';
 import type { MyProfile } from '../../../types/user';
@@ -50,6 +51,7 @@ const SOCIAL_ONLY_NOTICE =
 
 export default function WithdrawPage() {
   const navigate = useNavigate();
+  const back = useBack(path.accountManage());
   const { signOut } = useAuth();
   const checkId = useId();
 
@@ -168,7 +170,7 @@ export default function WithdrawPage() {
 
       <div className={styles.actions}>
         {/* 뒤로 가기다. 7.8 · 7.8-A 어디서 왔든 온 곳으로 돌아간다 */}
-        <Button disabled={withdrawing} onClick={() => void navigate(-1)}>
+        <Button disabled={withdrawing} onClick={back}>
           계속 이용하기
         </Button>
 

@@ -9,22 +9,17 @@
  * 프레임 생성 · 감상 기록 전이를 한 트랜잭션으로 처리하므로(API-036 처리 규칙) 2.5에서
  * 평가한 영화는 7.7 `안 남긴 영화`에서 빠진다.
  *
- * **평가 수정(API-037)과 내 평가 목록(API-039)은 목업으로 남는다.** 백엔드에 아직 없다
- * (S15P21E106-213 · -214). 그래서 7.6 `평가한 영화`는 기준 목업 세 편만 보여주고, 2.5에서
- * 새로 저장한 평가는 서버에 있어도 그 목록에 나타나지 않는다. API-039가 연동되면 사라지는
- * 한계다.
+ * **평가 수정(API-037)은 실제 호출이고 내 평가 목록(API-039)만 목업으로 남는다.**
+ * API-037 백엔드는 S15P21E106-213이 제공한다. 7.6 `평가한 영화`는 여전히 기준 목업
+ * 세 편만 보여주므로, 2.5에서 새로 저장한 평가는 서버에 있어도 그 목록에 나타나지 않는다.
+ * API-039가 연동되면 사라지는 한계다.
  */
-import { mockFrameList, mockMyRatings } from '../mocks/frames';
-import { findMockMovie } from '../mocks/movies';
-import { saveRatingEdit, withRatingEdit } from '../mocks/sessionStore';
 import { BASE_WEEKLY_FRAME_DELTA } from '../mocks/watch';
 import { getPopcornBucket } from './taste';
 import { getMyProfile } from './users';
 import { request } from './client';
-import { respond } from './mockTransport';
 import type { WatchStatus } from '../types/enums';
 import type {
-  MyRatingList,
   Rating,
   RatingInputValue,
   RatingUpdateInput,
@@ -181,8 +176,8 @@ export async function confirmWatch(
  * 서버가 기록을 `RATED`로 만든다(D-6). 화면이 기록 상태를 미리 가릴 필요가 없다.
  *
  * `score`는 0.5~5.0의 0.5 배수여야 한다. 계약은 4.49 같은 값을 반올림하지 않고 거절하므로
- * 화면에서 0.5 단위 값만 만들어 보낸다. `comment`가 있으면 `visibility`가 필수다. 둘 중
- * 하나라도 어긋나면 `400 VALIDATION_FAILED`다.
+ * 화면에서 0.5 단위 값만 만들어 보낸다. `comment`가 있으면 `visibility`가 필수이며
+ * 평가 화면은 사용자가 고른 `spoiler`도 함께 보낸다. 값이 어긋나면 `400 VALIDATION_FAILED`다.
  *
  * 사용자 · 영화 조합마다 평가는 하나다. 이미 있으면 `409 RATING_ALREADY_EXISTS`이고 수정은
  * API-037이다. 2.5는 API-030 `myRating`으로 미리 가르지만, 상세를 읽은 뒤 다른 곳에서
@@ -198,62 +193,31 @@ export async function createRating(movieId: number, input: RatingInputValue): Pr
 /**
  * API-037 평가 수정 · PUT /api/v1/ratings/{ratingId}
  *
- * **목업이다.** 백엔드에 아직 없다(S15P21E106-213).
+ * 실제 API를 호출한다. 프레임과 팝콘을 새로 만들지 않으며 기존 평가를 전체 교체한다.
  *
- * **프레임과 팝콘을 새로 만들지 않는다**(API-037 처리 규칙). 고친 값은 세션 저장소에만 남고
- * (mocks/sessionStore.ts `ratingEdits`), 기준 목업 평가를 읽는 화면(3.1-A · 7.6)이 그 값을
- * 얹어 보여준다. **서버 평가에는 닿지 않는다** — 실제 영화의 `myRating`(API-030)은 고친 뒤
- * 다시 읽어도 옛 값이다.
- *
- * 한줄평을 지우려면 `comment: null`을 보낸다. 점수를 바꾸면 팝콘 버킷의 맛별 평균도
- * 바뀌어야 하지만(API-037) 목업은 반영하지 않는다. 평균을 보여주는 화면(3.2)이 수정
- * 경로에 없다.
+ * 한줄평을 지우려면 `comment: null`을 보낸다. 점수 변경에 따른 팝콘 버킷 집계 갱신도
+ * 서버가 처리한다.
  */
-export async function updateRating(ratingId: number, input: RatingUpdateInput): Promise<void> {
-  saveRatingEdit(ratingId, input);
-
-  return respond(undefined, 'watch');
+export async function updateRating(ratingId: number, input: RatingUpdateInput): Promise<Rating> {
+  return request<Rating>(`/ratings/${ratingId}`, { method: 'PUT', body: input });
 }
+
+/*
+ * 내 평가 목록(API-039)은 백엔드에 아직 없다(S15P21E106-214 진행 중). 7.1 MY의 `평가한 영화`는
+ * 평가와 1:1인 **내 필름(API-042, `taste.getMyFrames`)** 으로 그린다 — 실제 저장 결과가 곧바로
+ * 보이고, 고정 목업이 실제 평가를 가리는 일이 없다(업무 -610). API-039가 열리면 그 함수가
+ * 여기에 생기고 7.1이 그리로 옮겨 간다.
+ */
+
+/** 2.6 · 2.7이 보여 주는 프레임 · 팝콘 수치 한 벌 */
+export type RatingCounts = {
+  frameCount: number;
+  popcornCount: number;
+  weeklyFrameDelta: number;
+};
 
 /**
- * API-039 내 평가 목록 · GET /api/v1/users/me/ratings
- *
- * **목업이다.** 백엔드에 아직 없다(S15P21E106-214).
- *
- * 기준 평가(3.1 프레임과 1:1인 401~403)만 최신순으로 준다. 2.5에서 실제로 저장한 평가
- * (API-036)는 서버에 있지만 이 목업은 알지 못하므로 7.6에 나타나지 않는다(업무 -491).
- *
- * `cursor` · `size`는 구현하지 않았다. 기준 목업은 3편만 두고 `hasNext: true`로 남긴다.
- * 필름(API-042)과 같은 방식이다 — `평가 N`의 N은 필름 프레임 수와 같다(API-039 처리 규칙).
- */
-export async function getMyRatings(): Promise<MyRatingList> {
-  const items = mockFrameList.items
-    .map((frame) => {
-      const rating = withRatingEdit(mockMyRatings[frame.movie.movieId]);
-
-      return {
-        ratingId: rating.ratingId,
-        movie: movieSummary(frame.movie.movieId),
-        score: rating.score,
-        comment: rating.comment,
-        visibility: rating.visibility,
-        frameId: frame.frameId,
-        createdAt: frame.createdAt,
-      };
-    })
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.ratingId - a.ratingId);
-
-  return respond({ items, nextCursor: 'mock-cursor-2', hasNext: true }, 'watch');
-}
-
-function movieSummary(movieId: number) {
-  const { title, posterUrl } = findMockMovie(movieId);
-
-  return { movieId, title, posterUrl };
-}
-
-/**
- * 2.6 · 2.7이 표시하는 평가 전 기준 수치.
+ * 2.6 · 2.7이 표시하는 프레임 · 팝콘 수치.
  *
  * 계약에는 이 조합을 한 번에 주는 API가 없다. 프레임 수는 API-014 `stats.frameCount`,
  * 팝콘 알 수는 API-041 `totalCount`에서 온다. 둘 다 실제 호출이라 3.1 · 7.1이 보여주는
@@ -261,10 +225,17 @@ function movieSummary(movieId: number) {
  *
  * `이번 주 +N`은 대응 필드가 없어 고정값이다(types/unspecified.ts의 `weeklyFrameDelta`).
  *
- * 2.5가 저장 **전에** 부른다. 실패하면 저장도 하지 않는다 — 2.6 · 2.7이 추가 전 수치
- * 없이는 성립하지 않고, 저장 전에 멈추면 다시 눌러도 `409`가 나지 않는다.
+ * **2.5가 저장 전과 저장 후에 한 번씩 부른다**(업무 -599). 저장 전 값은 2.6이 그리고,
+ * 저장 후 값은 2.7이 그린다. 예전에는 저장 전 값에 화면이 `+1`을 더해 저장 후를 지어냈는데,
+ * 그 전제는 서버 집계가 평가 한 건에 정확히 한 알만 움직일 때만 참이다. 실제로는 대표 맛
+ * 배정 같은 다른 변화가 같은 시간에 팝콘 수를 움직일 수 있고, 그때 화면만 거짓말을 하게 된다.
+ *
+ * 저장 **전** 호출이 실패하면 저장도 하지 않는다 — 2.6 · 2.7이 추가 전 수치 없이는 성립하지
+ * 않고, 저장 전에 멈추면 다시 눌러도 `409`가 나지 않는다. 저장 **후** 호출은 이미 저장이
+ * 끝난 뒤라 실패해도 되돌릴 것이 없고, 2.7이 계약이 정한 증가량(프레임 1개 · 팝콘 1알)으로
+ * 물러서서 그린다.
  */
-export async function getCountsBeforeRating() {
+export async function getRatingCounts(): Promise<RatingCounts> {
   const [profile, bucket] = await Promise.all([getMyProfile(), getPopcornBucket()]);
 
   return {

@@ -12,28 +12,20 @@
  * | --- | --- | --- |
  * | matchRate | 2.1 `취향 일치 92%` · 2.2 `일치 92%` `연결 72%` · 2.3-A `일치 87%` | CR-13 결정 대기 |
  * | runtimeMinutes | 2.1 `케이퍼 · 범죄 · 128분` | API-045 요약에 없음. API-030 상세에는 `runtimeMinutes`가 있음. CR 미등록 |
- * | AvailableNowMovie | 2.1 `내 OTT에서 지금 볼 수 있어요` 4편 | CR-14 결정 대기. 응답 형태 자체가 미정 |
  * | newPopcornCount | 2.1 `멤버 4명 · 새 팝콘 2개` | API-050에 없음. 실제 연동(S15P21E106-393)으로 채울 값이 사라져 화면에서 뺐다. CR 미등록 |
  * | weeklyFrameDelta | 2.6 `99프레임 · 이번 주 +3` · 2.7 `100프레임 · 이번 주 +4` | 주간 증가 수를 내려주는 필드가 없음. API-014 `stats.frameCount`와 API-042 `totalCount`는 누적 수만 준다. CR 미등록 |
  * | TasteFlowView.flowSentence | 3.1 `스릴러에서 느와르로 넓어지고 있어요` | CR-16 결정 대기. 대응 필드가 없음 |
  * | TasteKeywordView.rationale | 3.1 `계획형 캐릭터 영화 12편에 ★4 이상` 등 4개 | CR-16 결정 대기. API-040 `keywords`는 `code`·`label`만 있음 |
  * | 3.1-A 상영 시간 | 3.1-A `2013 · 케이퍼 · 115분` | API-043 `movie`에 없음. 실제 연동(S15P21E106-392)으로 채울 값이 사라져 화면에서 뺐다. CR 미등록 |
- * | PartyTasteView.tasteShare | 5.9 `액션 · 모험` `46%` · `스릴러 · 범죄` `38%` | CR-17 결정 대기. 무엇의 비율인지 정의가 없고 API-057 집계로 재현되지 않음 |
- * | PartyTasteView.tags | 5.9 `케이퍼` `빠른 전개` `반전` `느와르` | CR-17 결정 대기. API-044 `representativeKeywords`나 API-040 `keywords`로 보이나 값이 맞지 않음 |
- * | PartyMixView.commonRate · tags | 5.9 `공통 취향 일치 72%` · `스릴러` `빠른 전개` | CR-17 결정 대기. 산출 규칙이 계약에 없음 |
  * | PublicProfileView | 7.2-A · 7.2-B 공개 프로필 | API-062가 있으나 **2차 MVP**라 미구현. 응답 모양도 다름 |
- * | NotificationSettingsView.PARTY_INVITE · REPORT | 7.8-C `파티 초대 알림` · `리포트 발급 알림` | API-017 NotificationType에 없음. CR 미등록 |
  * | ReportDetailView | 3.3 · 3.4 · 7.4 국가 · 시대 비율 · 키워드 근거 · 지난 반기 비교 % · 대표 카드 문구 | API-060에 없음. 장르는 편수만, 비교는 맛별 알 수만 줌. CR 미등록 |
  * | ReportFourCutView | 3.3 · 3.4 · 7.4 4컷의 사진 · 누끼 · 영문 이름 · 감독 대표작 | API-060은 이름과 `characterCard.imageUrl`만 줌. CR 미등록 |
- * | NotificationView | 8.1 알림 4종 · 탭 · 읽음 | 알림 목록 API가 없음. ADR-0011은 API-034 · API-052 폴링. CR 미등록 |
+ * | NotificationView | 8.1 알림 4종 · 탭 · 읽음 | 인앱 알림 API-070~074의 프론트 연동은 S15P21E106-537. 그전까지 목업이며 번호 없이 목록 화면으로만 간다(-610) |
  * | OttRecommendationView | EXT-01 ~ EXT-05 일치도 % · 이유 · 항목별 일치도 · 분석 요약 | API-068은 `matchCount`만 줌. **확장 단계**. CR 미등록 |
- * | PrivacySettingsView | 7.8-B 항목 4개 × `전체 공개 · 파티원만 · 비공개` | 계약은 프로필 `visibility` 하나 · 2단계(API-015). CR 미등록 |
  */
 import type { OttRecommendationItem } from './ott';
 import type { ReportDetail } from './report';
-import type { NotificationSettings } from './user';
 import type { RecommendedMovie } from './movie';
-import type { DismissResult, RecommendationItem, RecommendationSet } from './recommendation';
 
 /** 추천 요약에 없는 상영 시간 */
 export type UnspecifiedMovieFields = {
@@ -41,30 +33,6 @@ export type UnspecifiedMovieFields = {
 };
 
 export type RecommendedMovieView = RecommendedMovie & UnspecifiedMovieFields;
-
-/** 추천 항목 + 일치도 수치 */
-export type RecommendationItemView = Omit<RecommendationItem, 'movie'> & {
-  movie: RecommendedMovieView;
-  /** 일치도 백분율. TASTE는 `일치`, DISCOVERY는 `연결`로 표시한다 */
-  matchRate: number;
-};
-
-export type RecommendationSetView = Omit<RecommendationSet, 'items'> & {
-  items: RecommendationItemView[];
-};
-
-export type DismissResultView = Omit<DismissResult, 'replacement'> & {
-  replacement: RecommendationItemView | null;
-};
-
-/** 2.1 `내 OTT에서 지금 볼 수 있어요` 목록 항목 */
-export type AvailableNowMovie = {
-  movieId: number;
-  title: string;
-  posterUrl: string | null;
-  /** 이 영화를 볼 수 있는 구독 중 OTT 코드 하나 */
-  ottProvider: string;
-};
 
 /** 2.6 · 2.7의 `이번 주 +N` */
 export type WeeklyFrameDelta = {
@@ -95,31 +63,6 @@ export type TasteFlowView = {
   flowSentence: string;
   /** 와이어프레임은 4개다. API-040 `keywords`는 3~5개 */
   keywords: TasteKeywordView[];
-};
-
-/**
- * 5.9 참여자 한 명의 취향 수치.
- *
- * 5.8의 `대표 맛`과 `겹치는 맛`은 API-057의 맛별 집계로 계산할 수 있어 화면에서
- * 계산한다. 반면 5.9의 `46%` · `38%`는 무엇의 비율인지 정의가 없고 집계로도 재현되지
- * 않아 값 자체를 여기 둔다.
- */
-export type PartyTasteView = {
-  userId: number;
-  /** 대표 취향 비율(%) */
-  tasteShare: number;
-  /** 취향 태그 */
-  tags: string[];
-};
-
-/** 5.9 공통 취향 결과 */
-export type PartyMixView = {
-  partyId: number;
-  members: PartyTasteView[];
-  /** 공통 취향 일치(%) */
-  commonRate: number;
-  /** 공통 취향 태그 */
-  tags: string[];
 };
 
 /*
@@ -178,42 +121,6 @@ export type PublicProfileView = {
     comment: string;
     score: number;
   }[];
-};
-
-/**
- * 7.8-C 알림 설정. 계약의 세 키(API-017) + 와이어프레임에만 있는 둘.
- *
- * `PARTY_INVITE`(파티 초대 알림) · `REPORT`(리포트 발급 알림)는 계약의 NotificationType에
- * 없다. 와이어프레임대로 그리기로 했다(팀 결정 2026-09-13, 업무 -307).
- */
-export type NotificationSettingsView = NotificationSettings & UnspecifiedNotificationSettings;
-
-/**
- * 7.8-C에서 계약에 자리가 없는 토글 둘.
- *
- * 보낼 API가 없어 세션 저장소에만 남는다(`api/settings.ts`, 사용자 결정 2026-09-16).
- * 계약의 셋과 저장 위치가 달라 타입으로도 갈라 둔다.
- */
-export type UnspecifiedNotificationSettings = {
-  PARTY_INVITE: boolean;
-  REPORT: boolean;
-};
-
-/** 7.8-B 공개 범위 한 단계. 계약의 `Visibility`는 `PUBLIC` · `PRIVATE` 둘뿐이다 */
-export type PrivacyLevel = 'PUBLIC' | 'PARTY' | 'PRIVATE';
-
-/**
- * 7.8-B 공개 범위 설정. 항목 넷 × 단계 셋.
- *
- * 계약에는 프로필 하나의 `visibility`(API-014 · API-015, `PUBLIC` · `PRIVATE`)만 있다.
- * 항목별 공개 범위와 `파티원만` 단계는 없다. 와이어프레임대로 그리기로 했다
- * (팀 결정 2026-09-13, 업무 -307).
- */
-export type PrivacySettingsView = {
-  profile: PrivacyLevel;
-  film: PrivacyLevel;
-  popcorn: PrivacyLevel;
-  review: PrivacyLevel;
 };
 
 /**
@@ -279,6 +186,8 @@ export type ReportDetailView = ReportDetail & {
  * 와이어프레임 4종을 그대로 둔다(팀 결정 2026-09-13). 누르면 가는 곳은 이동표를 따른다 —
  * 감상 확인 2.4-A · 파티 초대 5.6 · 오늘의 추천 2.2 · 필름 추가 3.1.
  */
+export type NotificationDestination = 'unrated' | 'party' | 'recommendations' | 'film';
+
 export type NotificationView = {
   notificationId: number;
   type: 'WATCH_CONFIRM' | 'PARTY_INVITE' | 'RECOMMENDATION' | 'FRAME_ADDED';
@@ -286,8 +195,15 @@ export type NotificationView = {
   body: string;
   createdAt: string;
   read: boolean;
-  /** 감상 기록 · 초대 번호. 오늘의 추천 · 필름 추가는 목적지가 하나라 없다 */
-  targetId: number | null;
+  /**
+   * 누르면 여는 화면 (업무 -610).
+   *
+   * 목업 알림은 **번호를 갖지 않는다.** 감상 기록 4004 · 초대 501 같은 목업 번호를 들고 실제
+   * 화면(2.4-A · 5.6)으로 가면 서버에 없는 번호라 늘 실패했다. 번호 없이 열리는 목록 화면
+   * 넷 중 하나로만 간다(`pages/notifications/destination.ts`). 실제 알림(API-070)은
+   * `targetType` · `targetId`를 주므로 연동 시 이 필드가 그것으로 바뀐다.
+   */
+  destination: NotificationDestination;
 };
 
 /**

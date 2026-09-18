@@ -255,6 +255,7 @@ public record RatingResponse(Long ratingId, BigDecimal score, String comment) {
 
 - 트랜잭션 경계는 Controller나 Repository가 아니라 유스케이스 Service에 둔다.
 - 조회 Service 또는 조회 메서드는 `@Transactional(readOnly = true)`를 사용한다.
+- 단, API-045 추천 조회는 최초 노출과 빈 슬롯 보충의 `exposed_at`을 원자적으로 기록해야 하므로 일반 조회 원칙의 예외로 쓰기 트랜잭션을 사용한다.
 - 생성·수정·삭제 메서드는 `@Transactional`을 사용한다.
 - 하나의 유스케이스가 여러 Repository를 변경하면 최상위 Service 메서드가 전체
   트랜잭션을 소유한다.

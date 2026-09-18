@@ -190,8 +190,34 @@ class AuthContractTest {
     }
 
     @Test
-    @DisplayName("회전으로 폐기된 Refresh Token을 다시 쓰면 거절하고 해당 사용자의 토큰을 모두 폐기한다")
-    void reusedRefreshTokenRevokesEverySessionOfUser() throws Exception {
+    @DisplayName("회전 직후 유예 안에 같은 Refresh Token이 다시 오면 같은 세션 토큰을 다시 내려준다")
+    void duplicateRefreshWithinGraceReturnsSameSession() throws Exception {
+        long userId = activeUserId();
+        RefreshTokenService.IssuedTokens issued = refreshTokenService.issue(userId);
+        RefreshTokenService.IssuedTokens otherDevice = refreshTokenService.issue(userId);
+
+        MvcResult first =
+                mockMvc.perform(post(REFRESH_PATH).cookie(cookieOf(issued.refreshToken())))
+                        .andExpect(status().isOk())
+                        .andReturn();
+        MvcResult duplicate =
+                mockMvc.perform(post(REFRESH_PATH).cookie(cookieOf(issued.refreshToken())))
+                        .andExpect(status().isOk())
+                        .andReturn();
+
+        assertThat(tokenIdOf(rotatedCookieValue(duplicate)))
+                .isEqualTo(tokenIdOf(rotatedCookieValue(first)));
+        assertThat(isStored(rotatedCookieValue(duplicate))).isTrue();
+        assertThat(isStored(otherDevice.refreshToken())).isTrue();
+        assertThat(tokenProvider.parseAccessToken(accessTokenOf(duplicate))).isEqualTo(userId);
+        assertThat(graceTtlMillis(userId))
+                .isPositive()
+                .isLessThanOrEqualTo(jwtProperties.refreshRotationGrace().toMillis());
+    }
+
+    @Test
+    @DisplayName("유예가 지난 뒤 폐기된 Refresh Token을 다시 쓰면 거절하고 해당 사용자의 토큰을 모두 폐기한다")
+    void reusedRefreshTokenAfterGraceRevokesEverySession() throws Exception {
         long userId = activeUserId();
         RefreshTokenService.IssuedTokens stolen = refreshTokenService.issue(userId);
         RefreshTokenService.IssuedTokens otherDevice = refreshTokenService.issue(userId);
@@ -201,6 +227,7 @@ class AuthContractTest {
                         .andExpect(status().isOk())
                         .andReturn();
         String currentRefreshToken = rotatedCookieValue(rotated);
+        expireGrace(userId);
 
         mockMvc.perform(post(REFRESH_PATH).cookie(cookieOf(stolen.refreshToken())))
                 .andExpect(status().isUnauthorized())
@@ -211,10 +238,108 @@ class AuthContractTest {
         assertThat(isStored(otherDevice.refreshToken())).isFalse();
     }
 
+    /**
+     * 유예 안에 회전이 이어진 뒤 옛 토큰의 중복이 도착하는 경우다.
+     *
+     * <p>한 페이지 로드에서 재발급이 여러 번 나가는 것이 2026-09-17 QA의 관측이었으므로(D-3), 중복이 도착하기 전에 다른 요청이 한 번 더 회전하는 것은
+     * 흔하다. 유예가 한 세대만 덮으면 바로 이 경우에 세션이 전멸한다(리뷰 A-2·B-2).
+     */
     @Test
-    @DisplayName("같은 Refresh Token으로 동시에 회전해도 한 번만 성공한다")
-    void concurrentRotationSucceedsOnlyOnce() throws Exception {
-        RefreshTokenService.IssuedTokens issued = refreshTokenService.issue(activeUserId());
+    @DisplayName("유예 안에 회전이 이어져도 옛 토큰의 중복 도착은 현재 세션을 돌려받는다")
+    void duplicateRefreshFollowsRotationChainWithinGrace() throws Exception {
+        long userId = activeUserId();
+        RefreshTokenService.IssuedTokens issued = refreshTokenService.issue(userId);
+
+        MvcResult first =
+                mockMvc.perform(post(REFRESH_PATH).cookie(cookieOf(issued.refreshToken())))
+                        .andExpect(status().isOk())
+                        .andReturn();
+        MvcResult second =
+                mockMvc.perform(post(REFRESH_PATH).cookie(cookieOf(rotatedCookieValue(first))))
+                        .andExpect(status().isOk())
+                        .andReturn();
+
+        MvcResult late =
+                mockMvc.perform(post(REFRESH_PATH).cookie(cookieOf(issued.refreshToken())))
+                        .andExpect(status().isOk())
+                        .andReturn();
+
+        assertThat(tokenIdOf(rotatedCookieValue(late)))
+                .isEqualTo(tokenIdOf(rotatedCookieValue(second)));
+        assertThat(isStored(rotatedCookieValue(late))).isTrue();
+    }
+
+    /**
+     * 전량 폐기 직후 다시 로그인한 세션은 옛 중복에 끊기지 않아야 한다.
+     *
+     * <p>유예를 토큰마다 따로 저장하면 {@link RefreshTokenService#revokeAll}이 그것을 지울 수 없어, 뒤늦게 도착한 중복 하나가 방금 만든
+     * 새 세션을 재사용으로 몰아 폐기한다(리뷰 B-3).
+     */
+    @Test
+    @DisplayName("전량 폐기 뒤 다시 로그인한 세션은 옛 토큰의 중복 도착에 끊기지 않는다")
+    void revocationClearsGraceSoNewSessionSurvivesLateDuplicate() throws Exception {
+        long userId = activeUserId();
+        RefreshTokenService.IssuedTokens issued = refreshTokenService.issue(userId);
+
+        mockMvc.perform(post(REFRESH_PATH).cookie(cookieOf(issued.refreshToken())))
+                .andExpect(status().isOk());
+        // 비밀번호 변경(API-012)이나 로그아웃 뒤 다시 로그인한 상황이다
+        refreshTokenService.revokeAll(userId);
+        RefreshTokenService.IssuedTokens reLogin = refreshTokenService.issue(userId);
+
+        mockMvc.perform(post(REFRESH_PATH).cookie(cookieOf(issued.refreshToken())))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_INVALID"));
+
+        assertThat(isStored(reLogin.refreshToken())).isTrue();
+    }
+
+    @Test
+    @DisplayName("저장소에 세션이 없으면 폐기할 것 없이 거절한다")
+    void rotationWithoutStoredSessionIsRejected() throws Exception {
+        long userId = activeUserId();
+        RefreshTokenService.IssuedTokens issued = refreshTokenService.issue(userId);
+        refreshTokenRepository.deleteAll(userId);
+
+        RefreshTokenRepository.Rotation rotation =
+                refreshTokenRepository.rotate(
+                        userId, tokenIdOf(issued.refreshToken()), UUID.randomUUID().toString());
+
+        assertThat(rotation.outcome()).isEqualTo(RefreshTokenRepository.Outcome.UNKNOWN_SESSION);
+        assertThat(rotation.accepted()).isFalse();
+
+        mockMvc.perform(post(REFRESH_PATH).cookie(cookieOf(issued.refreshToken())))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_INVALID"));
+    }
+
+    @Test
+    @DisplayName("전량 폐기 뒤에는 유예가 남아 있어도 세션이 되살아나지 않는다")
+    void graceDoesNotResurrectRevokedSession() throws Exception {
+        long userId = activeUserId();
+        RefreshTokenService.IssuedTokens issued = refreshTokenService.issue(userId);
+
+        mockMvc.perform(post(REFRESH_PATH).cookie(cookieOf(issued.refreshToken())))
+                .andExpect(status().isOk());
+        // 비밀번호 변경(API-012)과 탈퇴(API-013)가 하는 일이다
+        refreshTokenService.revokeAll(userId);
+
+        mockMvc.perform(post(REFRESH_PATH).cookie(cookieOf(issued.refreshToken())))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("REFRESH_TOKEN_INVALID"));
+    }
+
+    /**
+     * 중복 도착을 유예가 흡수하므로 동시 회전은 더 이상 한 건만 살아남지 않는다.
+     *
+     * <p>전에는 "성공 1건, 나머지 전량 폐기"를 고정했다(S15P21E106-596 이전). 그것이 QA에서 관측된 세션 전멸의 원인이었으므로 기대값을 "모두 같은
+     * 세션을 받고 그 세션이 살아 있다"로 바꿨다.
+     */
+    @Test
+    @DisplayName("같은 Refresh Token으로 동시에 회전해도 모두 같은 세션을 받고 세션이 살아 있다")
+    void concurrentRotationKeepsSessionAlive() throws Exception {
+        long userId = activeUserId();
+        RefreshTokenService.IssuedTokens issued = refreshTokenService.issue(userId);
         int attempts = 8;
         ExecutorService executor = Executors.newFixedThreadPool(attempts);
         CountDownLatch start = new CountDownLatch(1);
@@ -236,17 +361,13 @@ class AuthContractTest {
         executor.shutdown();
         assertThat(executor.awaitTermination(30, TimeUnit.SECONDS)).isTrue();
 
-        long succeeded = 0;
-        RefreshTokenService.IssuedTokens rotated = null;
+        List<String> tokenIds = new ArrayList<>();
         for (Future<RefreshTokenService.IssuedTokens> result : results) {
-            if (result.get() != null) {
-                succeeded++;
-                rotated = result.get();
-            }
+            assertThat(result.get()).isNotNull();
+            tokenIds.add(tokenIdOf(result.get().refreshToken()));
         }
-        assertThat(succeeded).isEqualTo(1);
-        assertThat(rotated).isNotNull();
-        assertThat(isStored(rotated.refreshToken())).isFalse();
+        assertThat(tokenIds).hasSize(attempts).containsOnly(tokenIds.get(0));
+        assertThat(refreshTokenRepository.exists(userId, tokenIds.get(0))).isTrue();
     }
 
     @Test
@@ -284,6 +405,7 @@ class AuthContractTest {
                                 Duration.ofSeconds(-1),
                                 jwtProperties.refreshTokenTtl(),
                                 jwtProperties.signupTokenTtl(),
+                                jwtProperties.refreshRotationGrace(),
                                 jwtProperties.refreshCookie()));
         return expiring.createAccessToken(9L);
     }
@@ -297,6 +419,7 @@ class AuthContractTest {
                                 jwtProperties.accessTokenTtl(),
                                 Duration.ofSeconds(-1),
                                 jwtProperties.signupTokenTtl(),
+                                jwtProperties.refreshRotationGrace(),
                                 jwtProperties.refreshCookie()));
         return expiring.createRefreshToken(15L, UUID.randomUUID().toString());
     }
@@ -315,6 +438,24 @@ class AuthContractTest {
                 .readTree(result.getResponse().getContentAsString())
                 .get("accessToken")
                 .asText();
+    }
+
+    private String tokenIdOf(String refreshToken) {
+        return tokenProvider.parseRefreshToken(refreshToken).tokenId();
+    }
+
+    /** 유예 Hash는 {@link RedisRefreshTokenRepository}가 만든다. 형식을 바꾸면 이 도우미들도 함께 고친다. */
+    private String graceKey(long userId) {
+        return "auth:refresh:grace:" + userId;
+    }
+
+    private Long graceTtlMillis(long userId) {
+        return redisTemplate.getExpire(graceKey(userId), TimeUnit.MILLISECONDS);
+    }
+
+    /** 유예가 지난 상황을 기다리지 않고 만든다. 유예 길이 자체는 TTL 단정으로 본다. */
+    private void expireGrace(long userId) {
+        redisTemplate.delete(graceKey(userId));
     }
 
     private Cookie cookieOf(String value) {

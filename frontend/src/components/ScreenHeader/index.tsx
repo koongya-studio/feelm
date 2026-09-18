@@ -9,9 +9,14 @@
  * | 3.2 · 5.8 · 5.9 · 2.4 · 2.5 · 3.1-A | 있음 | 없음 |
  *
  * 화면마다 h1을 하나만 두기 위해 제목은 h1으로 렌더한다.
+ *
+ * **뒤로 가기는 `useBack`이다**(업무 -610). 앱 안에서 왔으면 히스토리로, 새 탭 · 외부
+ * 링크로 바로 들어왔으면 화면이 준 `fallbackTo`로 간다. 예전의 `navigate(-1)`은 그런
+ * 경우 앱 밖이나 `about:blank`로 나가 버렸다.
  */
 import type { ReactNode } from 'react';
-import { useNavigate } from 'react-router';
+import { useBack } from '../../hooks/useBack';
+import { path } from '../../routes/paths';
 import { ChevronLeftIcon } from '../Icon';
 import VisuallyHidden from '../VisuallyHidden';
 import styles from './ScreenHeader.module.css';
@@ -23,6 +28,11 @@ type Props = {
   subtitle?: ReactNode;
   /** 뒤로 가기 표시 여부 */
   showBack?: boolean;
+  /**
+   * 이 앱의 이전 항목이 없을 때(새 탭 · 외부 링크) 뒤로 가기가 갈 곳. 화면마다 자기 자리를
+   * 준다 — 상세는 목록으로, 설정 하위는 설정으로, 알림은 MY로. 없으면 3.1 필름이다.
+   */
+  fallbackTo?: string;
   /** 우측 액션 영역 */
   action?: ReactNode;
   /**
@@ -36,16 +46,17 @@ export default function ScreenHeader({
   title,
   subtitle,
   showBack = false,
+  fallbackTo = path.film(),
   action,
   align = 'left',
 }: Props) {
-  const navigate = useNavigate();
+  const back = useBack(fallbackTo);
 
   return (
     <header className={styles.header} data-align={align}>
       <div className={styles.row}>
         {showBack ? (
-          <button type="button" className={styles.back} onClick={() => navigate(-1)}>
+          <button type="button" className={styles.back} onClick={back}>
             <ChevronLeftIcon />
             <VisuallyHidden>뒤로 가기</VisuallyHidden>
           </button>

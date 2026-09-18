@@ -112,6 +112,15 @@ class MovieDetailOpenApiContractTest {
         assertThat(properties.path("directors").path("description").asText()).contains("전체");
         assertThat(properties.path("ottProviders").path("description").asText())
                 .contains("구독", "ottId");
+        assertThat(schemas.path("DirectorResponse").path("properties").has("profileUrl")).isTrue();
+        assertThat(schemas.path("CastResponse").path("properties").has("profileUrl")).isTrue();
+        assertThat(
+                        schemas.path("MyRatingResponse")
+                                .path("properties")
+                                .path("spoiler")
+                                .path("type")
+                                .asText())
+                .isEqualTo("boolean");
         for (String name :
                 List.of(
                         "GenreResponse",

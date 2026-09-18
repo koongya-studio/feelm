@@ -7,11 +7,14 @@
  * 5.4로 간다. **초대는 파티를 만든 다음에만 보낼 수 있다** — API-051이 `partyId`를 경로로
  * 받기 때문이다. 그래서 이 화면은 사람을 고르기만 하고 보내는 것은 마지막 한 번이다.
  *
- * 초대할 사람은 **닉네임 검색(API-019)**으로 고른다. 업무 -304는 검색 화면이 없어 초대
+ * 초대할 사람은 **닉네임 검색(API-019)**으로 고른다. 검색 자리는 5.8도 쓰게 되어
+ * `components/PartyInviteSearch`로 옮겼다(업무 -462). 업무 -304는 검색 화면이 없어 초대
  * 자체를 미뤘고 와이어프레임의 `초대 링크 복사` · `QR로 초대하기`는 계약에 없어 잠가
  * 두었다. 업무 -393에서 그 자리를 검색으로 바꿨다. 링크 · QR 경로는 여전히 계약에 없다.
  *
- * `[!]` `1/6명 · 최대 6명까지`는 계약의 정원(4)과 다르다. 계약을 따라 4로 표시한다.
+ * `[!]` `1/6명 · 최대 6명까지`는 계약의 정원(4)과 다르다. 5.2에서 고른 인원을 상한으로
+ * 보여준다(업무 -610) — 2인을 골랐는데 `1/4명`이 나오던 것을 고쳤다. 정원 자체는 계약에
+ * 보낼 필드가 없어 서버가 4로 정한다(`api/parties.ts`).
  *
  * `[?]` **일부 초대만 실패할 수 있다.** 파티는 이미 만들어진 뒤라 되돌릴 계약이 없고
  * (API-056 종료뿐이다) 다시 누르면 같은 이름의 파티가 하나 더 생긴다. 그래서 실패한
@@ -20,6 +23,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import Button from '../../../components/Button';
+import PartyInviteSearch from '../../../components/PartyInviteSearch';
 import ScreenHeader from '../../../components/ScreenHeader';
 import TextField from '../../../components/TextField';
 import { ApiError } from '../../../api/apiError';
@@ -29,16 +33,13 @@ import {
   PARTY_MAX_MEMBERS,
   PARTY_MIN_MEMBERS,
 } from '../../../api/parties';
-import { getMyProfile, isSearchableNickname, searchUsers } from '../../../api/users';
+import { getMyProfile } from '../../../api/users';
 import { path } from '../../../routes/paths';
 import styles from './PartySetupPage.module.css';
 import type { SearchedUser } from '../../../types/user';
 
 /** API-049 `name` 필수, 20자 이하 */
 const NAME_MAX_LENGTH = 20;
-
-/** API-019 검색어 상한. 닉네임 형식 상한과 같다 */
-const KEYWORD_MAX_LENGTH = 10;
 
 export default function PartySetupPage() {
   const navigate = useNavigate();
@@ -47,9 +48,6 @@ export default function PartySetupPage() {
 
   const [myNickname, setMyNickname] = useState<string | null>(null);
   const [name, setName] = useState('');
-  const [keyword, setKeyword] = useState('');
-  const [results, setResults] = useState<SearchedUser[] | null>(null);
-  const [searchError, setSearchError] = useState<string | undefined>();
   const [invitees, setInvitees] = useState<SearchedUser[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -76,29 +74,6 @@ export default function PartySetupPage() {
   const waitingSlots = Math.max(0, inviteLimit - invitees.length);
   const locked = createdPartyId !== null;
 
-  const search = () => {
-    if (!isSearchableNickname(keyword)) {
-      setSearchError('닉네임을 2자 이상 입력해 주세요.');
-
-      return;
-    }
-
-    setSearchError(undefined);
-
-    searchUsers(keyword.trim())
-      .then((page) => {
-        setResults(page.items);
-      })
-      .catch((cause: unknown) => {
-        setResults(null);
-        setSearchError(
-          cause instanceof ApiError
-            ? cause.message
-            : '검색하지 못했어요. 잠시 후 다시 시도해 주세요.',
-        );
-      });
-  };
-
   const toggle = (user: SearchedUser) => {
     setError(undefined);
 
@@ -117,7 +92,18 @@ export default function PartySetupPage() {
     });
   };
 
+  /*
+   * 파티는 나까지 2명부터다(`PARTY_MIN_MEMBERS`, 5.2의 안내와 같은 값). 초대 없이 시작하면
+   * 혼자인 파티가 만들어져 5.4 이후가 할 일이 없다. 버튼을 잠그고 눌러도 막는다(업무 -610).
+   */
+  const needsInvitee = !locked && invitees.length + 1 < PARTY_MIN_MEMBERS;
+
   const start = () => {
+    // 두 번 눌러도 파티가 둘 생기지 않는다
+    if (submitting) {
+      return;
+    }
+
     // 이미 만든 파티가 있다. 다시 만들면 같은 이름의 파티가 하나 더 생긴다
     if (createdPartyId !== null) {
       void navigate(path.partyAnalyzing(createdPartyId), { replace: true });
@@ -127,6 +113,12 @@ export default function PartySetupPage() {
 
     if (!name.trim()) {
       setError('파티 이름을 입력해 주세요.');
+
+      return;
+    }
+
+    if (needsInvitee) {
+      setError(`함께 볼 친구를 ${PARTY_MIN_MEMBERS - 1}명 이상 초대해 주세요.`);
 
       return;
     }
@@ -169,7 +161,7 @@ export default function PartySetupPage() {
 
   return (
     <>
-      <ScreenHeader title="파티 만들기" showBack />
+      <ScreenHeader title="파티 만들기" showBack fallbackTo={path.party()} />
 
       <div className={styles.page}>
         <TextField
@@ -188,7 +180,7 @@ export default function PartySetupPage() {
         <section className={styles.members}>
           <h2 className={styles.label}>현재 참여자</h2>
           <p className={styles.note}>
-            {invitees.length + 1}/{PARTY_MAX_MEMBERS}명 · 최대 {PARTY_MAX_MEMBERS}명까지
+            {invitees.length + 1}/{size}명 · 최대 {size}명까지
           </p>
 
           <ul className={styles.slots}>
@@ -222,58 +214,15 @@ export default function PartySetupPage() {
         <section className={styles.invite}>
           <h2 className={styles.label}>친구 초대</h2>
 
-          <TextField
-            label="닉네임으로 친구 찾기"
-            placeholder="닉네임을 입력해 주세요"
-            maxLength={KEYWORD_MAX_LENGTH}
-            value={keyword}
-            error={searchError}
-            disabled={locked}
-            action={{ label: '검색', onClick: search, disabled: locked }}
-            onChange={(event) => {
-              setKeyword(event.target.value);
-              setSearchError(undefined);
-            }}
+          <PartyInviteSearch
+            disabled={locked || submitting}
+            isPicked={(user) => invitees.some((item) => item.userId === user.userId)}
+            pickLabel={(user) =>
+              invitees.some((item) => item.userId === user.userId) ? '뺀다' : '초대'
+            }
+            onPick={toggle}
+            note={`초대는 파티를 만든 뒤에 전달돼요 · 최대 ${inviteLimit}명 · ${PARTY_MIN_MEMBERS - 1}명 이상 초대해야 시작할 수 있어요`}
           />
-
-          {results && results.length === 0 ? (
-            <p className={styles.note}>그 닉네임으로 시작하는 친구를 찾지 못했어요.</p>
-          ) : null}
-
-          {results && results.length > 0 ? (
-            <ul className={styles.results}>
-              {results.map((user) => {
-                const picked = invitees.some((item) => item.userId === user.userId);
-
-                return (
-                  <li key={user.userId}>
-                    <button
-                      type="button"
-                      className={styles.result}
-                      data-picked={picked}
-                      aria-pressed={picked}
-                      disabled={submitting || locked}
-                      onClick={() => toggle(user)}
-                    >
-                      <span className={styles.resultName}>{user.nickname}</span>
-
-                      {/*
-                       * `PRIVATE`도 결과에 나온다. 가입 기본값이라 빼면 닉네임 초대가
-                       * 막힌다(API-019 처리 규칙). 대신 공개 범위를 적어 둔다
-                       */}
-                      {user.visibility === 'PRIVATE' ? (
-                        <span className={styles.resultBadge}>비공개 프로필</span>
-                      ) : null}
-
-                      <span className={styles.resultPick}>{picked ? '뺀다' : '초대'}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : null}
-
-          <p className={styles.note}>초대는 파티를 만든 뒤에 전달돼요 · 최대 {inviteLimit}명</p>
         </section>
 
         {failedInvites.length > 0 ? (
@@ -284,7 +233,7 @@ export default function PartySetupPage() {
         ) : null}
 
         <div className={styles.actions}>
-          <Button disabled={submitting} onClick={start}>
+          <Button variant="brand" disabled={submitting || needsInvitee} onClick={start}>
             {locked ? '파티로 이동' : '파티 시작하기'}
           </Button>
         </div>

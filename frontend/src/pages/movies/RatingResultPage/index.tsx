@@ -21,25 +21,50 @@
  *
  * `[?]` API-036 응답의 `popcorn.isNewFlavor`에 대응하는 표시가 와이어프레임에 없어
  * 사용하지 않는다.
+ *
+ * **추가 후 수치도 2.5가 서버에서 읽어 넘긴다**(업무 -599). 예전에는 이 화면이 추가 전
+ * 수치에 `+1`을 더해 추가 후를 지어냈다. 계약은 평가 한 건에 프레임 1개 · 팝콘 1알이지만
+ * (대표 맛이 없으면 0알), 팝콘 집계는 `대표 맛이 있는 영화의 평가`를 세므로 영화에 대표 맛이
+ * 붙기만 해도 과거 평가가 뒤늦게 버킷에 들어온다. 그러면 실제 팝콘은 두 알이 느는데 화면만
+ * 한 알을 단언하게 된다(2026-09-17 여정 QA 관측). 그래서 수치도 문구도 **실제 증가량**으로
+ * 적는다.
+ *
+ * 추가 후 수치를 읽지 못했으면(`after`가 `null`) 계약이 정한 증가량으로 물러선다. 응답이
+ * 프레임 한 개와 팝콘 한 알(대표 맛이 있을 때)을 보장하므로 그만큼은 언제나 참이고, 같은
+ * 이유로 실측 증가량이 그보다 작게 읽혀도 그 아래로는 내려가지 않는다.
+ *
+ * `이번 주 +N`은 대응 필드가 없는 고정값이라 이 업무의 대상이 아니다(업무 -599 설명).
  */
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import Button from '../../../components/Button';
-import FilmStrip from '../../../components/FilmStrip';
+import FilmReel from '../../../components/FilmReel';
 import Poster from '../../../components/Poster';
 import { HeartIcon, ResultBellIcon } from '../../../components/Icon';
 import { getPopcornFlavors } from '../../../api/taste';
 import { path } from '../../../routes/paths';
 import styles from './RatingResultPage.module.css';
+import type { RatingCounts } from '../../../api/watch';
 import type { PopcornFlavor } from '../../../types/taste';
 import type { Rating } from '../../../types/watch';
 
 /** 2.6 → 2.7 자동 전환 시간(ms). 와이어프레임에 값이 없어 임의로 정했다 */
 const TRANSITION_MS = 1200;
 
+/*
+ * 필름 칸 크기. **3.1과 같은 값이다**(FilmPage) — 방금 감긴 프레임이 곧 3.1에서 보게 될 그
+ * 칸이어야 한다. 필름은 3.1의 릴을 세로로 세운 것이다(`FilmReel`, 업무 -609). 그전의
+ * 밝은 판(`FilmStrip`)은 3.1의 필름이 확정된 뒤 다른 재질로 보였다.
+ */
+const FRAME_WIDTH = 110;
+const FRAME_HEIGHT = 165;
+
 type ResultState = {
   rating: Rating;
-  counts: { frameCount: number; popcornCount: number; weeklyFrameDelta: number };
+  /** 저장 전 수치. 2.6이 그린다 */
+  counts: RatingCounts;
+  /** 저장 후 실측 수치. 2.5가 읽지 못했으면 `null`이다 */
+  after: RatingCounts | null;
   movieTitle: string;
   posterUrl: string | null;
 };
@@ -82,11 +107,22 @@ export default function RatingResultPage() {
     return null;
   }
 
-  const { rating, counts, posterUrl } = state;
-  const frameCount = done ? counts.frameCount + 1 : counts.frameCount;
-  const weekly = done ? counts.weeklyFrameDelta + 1 : counts.weeklyFrameDelta;
+  const { rating, counts, after, posterUrl } = state;
   // 대표 맛이 없는 영화의 평가는 팝콘을 만들지 않는다(API-036 · API-041)
   const hasPopcorn = rating.popcorn.flavorCode !== null;
+  /*
+   * 실제 증가량. 저장 후 수치를 읽었으면 서버가 실제로 움직인 만큼이고, 못 읽었으면 응답이
+   * 보장하는 만큼이다. 응답에 프레임이 들어 있고 대표 맛이 있으면 팝콘 한 알이 그 맛에
+   * 담기므로, 그 아래로는 내려가지 않는다.
+   */
+  const frameDelta = Math.max(after ? after.frameCount - counts.frameCount : 1, 1);
+  const popcornDelta = Math.max(
+    after ? after.popcornCount - counts.popcornCount : Number(hasPopcorn),
+    Number(hasPopcorn),
+  );
+  const frameCount = done ? counts.frameCount + frameDelta : counts.frameCount;
+  // `이번 주 +N`은 고정값이라 실측이 없다(업무 -599 범위 밖)
+  const weekly = done ? counts.weeklyFrameDelta + 1 : counts.weeklyFrameDelta;
   const flavorName = flavors.find(
     (flavor) => flavor.code === rating.popcorn.flavorCode,
   )?.displayName;
@@ -102,14 +138,19 @@ export default function RatingResultPage() {
         </div>
 
         <div className={styles.stripArea}>
-          <FilmStrip width={226}>
+          <FilmReel
+            orientation="vertical"
+            frameWidth={FRAME_WIDTH}
+            frameHeight={FRAME_HEIGHT}
+            label="취향 필름에 감기는 프레임"
+          >
             <span className={styles.emptyFrame} aria-hidden="true" />
 
             <span className={styles.newFrame}>
               <Poster
-                width={166}
-                height={160}
-                radius={4}
+                width={FRAME_WIDTH}
+                height={FRAME_HEIGHT}
+                radius={0}
                 src={posterUrl ?? undefined}
                 title=""
                 seed={rating.movieId}
@@ -122,7 +163,7 @@ export default function RatingResultPage() {
             </span>
 
             <span className={styles.emptyFrame} aria-hidden="true" />
-          </FilmStrip>
+          </FilmReel>
         </div>
 
         {!done ? (
@@ -144,17 +185,23 @@ export default function RatingResultPage() {
             </span>
 
             <p className={styles.resultTitle}>
-              {hasPopcorn ? '프레임 1개 · 팝콘 1알이 추가됐어요' : '프레임 1개가 추가됐어요'}
+              {popcornDelta > 0
+                ? `프레임 ${frameDelta}개 · 팝콘 ${popcornDelta}알이 추가됐어요`
+                : `프레임 ${frameDelta}개가 추가됐어요`}
             </p>
             <p className={styles.resultText}>영화 프레임이 취향 필름에 추가됐어요</p>
 
-            {hasPopcorn ? (
+            {/* 버킷이 움직였을 때만 적는다. 맛 줄은 이 평가가 팝콘을 만들었을 때만이다 */}
+            {popcornDelta > 0 ? (
               <div className={styles.resultRow}>
-                <span className={styles.resultFlavor}>
-                  {flavorName ? `${flavorName} 맛 +1알` : '팝콘 +1알'}
-                </span>
+                {/* 이 평가가 담긴 맛은 언제나 한 알이다. 버킷 총합과 다를 수 있다 */}
+                {hasPopcorn ? (
+                  <span className={styles.resultFlavor}>
+                    {flavorName ? `${flavorName} 맛 +1알` : '팝콘 +1알'}
+                  </span>
+                ) : null}
                 <span className={styles.resultBucket}>
-                  팝콘 버킷 {counts.popcornCount}알 → {counts.popcornCount + 1}알
+                  팝콘 버킷 {counts.popcornCount}알 → {counts.popcornCount + popcornDelta}알
                 </span>
               </div>
             ) : null}

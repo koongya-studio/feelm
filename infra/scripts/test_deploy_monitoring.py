@@ -13,6 +13,7 @@ MONITORING_COMPOSE = SCRIPT_DIR.parent / "compose" / "monitoring.yml"
 CONTAINERS = (
     "feelm-prometheus",
     "feelm-grafana",
+    "feelm-mattermost-alert-relay",
     "feelm-node-exporter",
     "feelm-postgres-exporter",
     "feelm-redis-exporter",
@@ -96,7 +97,7 @@ class DeployMonitoringTest(unittest.TestCase):
                 if [[ "$args" != *" --project-name feelm-monitoring-$CI_PIPELINE_ID "* ]]; then
                   rm -f "$state"/*-rollback
                 fi
-                for name in feelm-prometheus feelm-grafana feelm-node-exporter feelm-postgres-exporter feelm-redis-exporter; do
+                for name in feelm-prometheus feelm-grafana feelm-mattermost-alert-relay feelm-node-exporter feelm-postgres-exporter feelm-redis-exporter; do
                   : >"$state/$name"
                 done
                 [[ "${FAIL_UP:-0}" != "1" ]]
@@ -160,6 +161,7 @@ class DeployMonitoringTest(unittest.TestCase):
         self.assertEqual(state, set(CONTAINERS))
         self.assertIn("config --quiet", events)
         self.assertIn("pull --quiet prometheus grafana", events)
+        self.assertIn("mattermost-alert-relay", events)
         self.assertIn("up -d --no-deps --force-recreate", events)
         self.assertIn("--project-name feelm-monitoring-344", events)
         self.assertNotIn("feelm-backend", events)

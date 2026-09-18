@@ -17,8 +17,8 @@
  * 살리되 실제 영화를 특정하는 표현(작품명 · 배역명 · 지명)을 뺐다. 실제 포스터와 인물
  * 이미지의 권리가 확정되지 않은 것도 같은 이유다(PRODUCT.md).
  *
- * 남은 차이 하나 — mocks/reviews.ts의 다른 사용자 한줄평과 3.1-A의 내 한줄평은
- * 와이어프레임 문구를 그대로 두었다. 사용자가 쓴 감상문이라 영화 정보가 아니다.
+ * 3.1-A의 내 한줄평은 프레임 상세 화면용 목업이다. 영화 상세의 다른 사용자 한줄평은
+ * API-032에서 읽으므로 이 파일과 공유하지 않는다.
  */
 import { mockMyRatings } from './frames';
 import { findMockMovie } from './movies';
@@ -70,11 +70,11 @@ const detailExtras: Record<number, DetailExtras> = {
     synopsis:
       '무대 위 마술로 은행을 털고 훔친 돈을 관객에게 뿌리는 4인조가 등장한다. 수사기관이 그들을 쫓지만, 모든 수사가 다음 트릭을 위한 판이었다는 사실이 드러나며 쫓는 자와 속는 자의 게임이 시작된다.',
     countries: [{ code: 'US', name: '미국' }],
-    directors: [{ personId: 9001, name: '감독 A' }],
+    directors: [{ personId: 9001, name: '감독 A', profileUrl: null }],
     cast: [
-      { personId: 9002, name: '배우 A1', character: '배역 A1' },
-      { personId: 9003, name: '배우 A2', character: '배역 A2' },
-      { personId: 9004, name: '배우 A3', character: '배역 A3' },
+      { personId: 9002, name: '배우 A1', character: '배역 A1', profileUrl: null },
+      { personId: 9003, name: '배우 A2', character: '배역 A2', profileUrl: null },
+      { personId: 9004, name: '배우 A3', character: '배역 A3', profileUrl: null },
     ],
     ratingCount: 1280,
     flavorCode: 'FLAVOR_A',
@@ -85,8 +85,8 @@ const detailExtras: Record<number, DetailExtras> = {
   102: {
     synopsis: '한 도시의 연쇄 사건을 추적하는 형사와 기자가 서로 다른 진실에 도달한다.',
     countries: [{ code: 'KR', name: '한국' }],
-    directors: [{ personId: 9011, name: '감독 B' }],
-    cast: [{ personId: 9012, name: '배우 B1' }],
+    directors: [{ personId: 9011, name: '감독 B', profileUrl: null }],
+    cast: [{ personId: 9012, name: '배우 B1', profileUrl: null }],
     ratingCount: 640,
     flavorCode: 'FLAVOR_B',
     ottProviders: ottProviders(['WAVVE']),
@@ -96,8 +96,8 @@ const detailExtras: Record<number, DetailExtras> = {
   103: {
     synopsis: '비 오는 항구 도시에서 서로를 속이는 세 사람의 하루를 담았다.',
     countries: [{ code: 'FR', name: '프랑스' }],
-    directors: [{ personId: 9021, name: '감독 C' }],
-    cast: [{ personId: 9022, name: '배우 C1' }],
+    directors: [{ personId: 9021, name: '감독 C', profileUrl: null }],
+    cast: [{ personId: 9022, name: '배우 C1', profileUrl: null }],
     ratingCount: 410,
     flavorCode: 'FLAVOR_C',
     ottProviders: ottProviders(['TVING', 'WAVVE']),
@@ -118,8 +118,8 @@ const detailExtras: Record<number, DetailExtras> = {
   401: {
     synopsis: '한 조직의 자금을 쫓는 형사와 내부 조력자가 서로를 이용하는 이야기.',
     countries: [{ code: 'KR', name: '한국' }],
-    directors: [{ personId: 9031, name: '감독 D' }],
-    cast: [{ personId: 9032, name: '배우 D1' }],
+    directors: [{ personId: 9031, name: '감독 D', profileUrl: null }],
+    cast: [{ personId: 9032, name: '배우 D1', profileUrl: null }],
     ratingCount: 520,
     flavorCode: 'FLAVOR_D',
     ottProviders: ottProviders(['NETFLIX']),
@@ -129,8 +129,8 @@ const detailExtras: Record<number, DetailExtras> = {
   402: {
     synopsis: '무대 위 마술이 곧 알리바이가 되는 한탕 계획을 담았다.',
     countries: [{ code: 'US', name: '미국' }],
-    directors: [{ personId: 9041, name: '감독 E' }],
-    cast: [{ personId: 9042, name: '배우 E1' }],
+    directors: [{ personId: 9041, name: '감독 E', profileUrl: null }],
+    cast: [{ personId: 9042, name: '배우 E1', profileUrl: null }],
     ratingCount: 980,
     flavorCode: 'FLAVOR_A',
     ottProviders: ottProviders(['NETFLIX']),
@@ -140,8 +140,8 @@ const detailExtras: Record<number, DetailExtras> = {
   403: {
     synopsis: '비 내리는 도시에서 옛 동료를 다시 만난 남자의 하룻밤.',
     countries: [{ code: 'FR', name: '프랑스' }],
-    directors: [{ personId: 9051, name: '감독 F' }],
-    cast: [{ personId: 9052, name: '배우 F1' }],
+    directors: [{ personId: 9051, name: '감독 F', profileUrl: null }],
+    cast: [{ personId: 9052, name: '배우 F1', profileUrl: null }],
     ratingCount: 310,
     flavorCode: 'FLAVOR_C',
     ottProviders: ottProviders(['TVING']),
@@ -158,8 +158,8 @@ const detailExtras: Record<number, DetailExtras> = {
   104: {
     synopsis: '오래 묻어 둔 사건 기록이 다시 열리며 두 형사가 서로를 의심하기 시작한다.',
     countries: [{ code: 'KR', name: '한국' }],
-    directors: [{ personId: 9061, name: '감독 G' }],
-    cast: [{ personId: 9062, name: '배우 G1' }],
+    directors: [{ personId: 9061, name: '감독 G', profileUrl: null }],
+    cast: [{ personId: 9062, name: '배우 G1', profileUrl: null }],
     ratingCount: 640,
     flavorCode: 'FLAVOR_D',
     ottProviders: ottProviders(['NETFLIX']),
@@ -169,8 +169,8 @@ const detailExtras: Record<number, DetailExtras> = {
   411: {
     synopsis: '마지막 상영을 앞둔 동네 극장에 오래된 단골들이 하나둘 모여든다.',
     countries: [{ code: 'KR', name: '한국' }],
-    directors: [{ personId: 9071, name: '감독 H' }],
-    cast: [{ personId: 9072, name: '배우 H1' }],
+    directors: [{ personId: 9071, name: '감독 H', profileUrl: null }],
+    cast: [{ personId: 9072, name: '배우 H1', profileUrl: null }],
     ratingCount: 230,
     flavorCode: 'FLAVOR_F',
     ottProviders: ottProviders(['NETFLIX']),
@@ -180,8 +180,8 @@ const detailExtras: Record<number, DetailExtras> = {
   412: {
     synopsis: '가업을 물려받기 싫은 막내가 사흘 동안 가게를 맡으며 벌어지는 소동.',
     countries: [{ code: 'KR', name: '한국' }],
-    directors: [{ personId: 9081, name: '감독 I' }],
-    cast: [{ personId: 9082, name: '배우 I1' }],
+    directors: [{ personId: 9081, name: '감독 I', profileUrl: null }],
+    cast: [{ personId: 9082, name: '배우 I1', profileUrl: null }],
     ratingCount: 180,
     flavorCode: 'FLAVOR_G',
     ottProviders: ottProviders(['TVING']),
@@ -191,8 +191,8 @@ const detailExtras: Record<number, DetailExtras> = {
   413: {
     synopsis: '바다 밑 연구 기지와 연락이 끊기고, 구조대는 기지의 마지막 기록을 따라 내려간다.',
     countries: [{ code: 'US', name: '미국' }],
-    directors: [{ personId: 9091, name: '감독 J' }],
-    cast: [{ personId: 9092, name: '배우 J1' }],
+    directors: [{ personId: 9091, name: '감독 J', profileUrl: null }],
+    cast: [{ personId: 9092, name: '배우 J1', profileUrl: null }],
     ratingCount: 450,
     flavorCode: 'FLAVOR_H',
     ottProviders: ottProviders(['WAVVE']),

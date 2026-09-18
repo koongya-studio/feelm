@@ -37,13 +37,19 @@ function renderWithProvider() {
 }
 
 describe('OTT 기준정보 Provider', () => {
-  it('받은 기준정보로 배지가 로고를 찾는다', async () => {
+  /*
+   * 기준정보(API-025)는 TMDb 원본 주소를 그대로 들고 있고, 배지는 작게 그리므로
+   * 원본을 내려받지 않고 `w92`로 바꿔 요청한다(`OttBadge`의 `ottLogoImageUrl`).
+   * 그래서 화면이 쓰는 주소는 기준정보의 `logoUrl`과 같지 않다.
+   */
+  it('받은 기준정보로 배지가 로고를 찾고, 배지 크기 이미지로 바꿔 요청한다', async () => {
     renderWithProvider();
 
     await waitFor(() =>
+      // 배지는 TMDB `original`을 배지 크기(w92)로 바꿔 받는다(`OttBadge`)
       expect(screen.getByRole('img', { name: '넷플릭스' }).querySelector('img')).toHaveAttribute(
         'src',
-        NETFLIX.logoUrl,
+        'https://image.tmdb.org/t/p/w92/netflix.png',
       ),
     );
   });

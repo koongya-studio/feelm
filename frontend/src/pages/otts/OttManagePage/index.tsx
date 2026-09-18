@@ -97,7 +97,12 @@ export default function OttManagePage() {
 
   return (
     <>
-      <ScreenHeader title="OTT 관리" subtitle="구독 중인 OTT 기준으로 추천해 드려요" showBack />
+      <ScreenHeader
+        title="OTT 관리"
+        subtitle="구독 중인 OTT 기준으로 추천해 드려요"
+        showBack
+        fallbackTo={path.settings()}
+      />
 
       <div className={styles.page}>
         {failed ? (

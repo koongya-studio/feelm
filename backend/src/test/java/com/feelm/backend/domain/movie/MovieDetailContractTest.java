@@ -139,13 +139,14 @@ class MovieDetailContractTest extends SharedPostgresContractTest {
         assertJson(
                 response.path("directors"),
                 """
-                [{"personId":14,"name":"감독 가"},{"personId":13,"name":"감독 나"}]
+                [{"personId":14,"name":"감독 가","profileUrl":null},
+                 {"personId":13,"name":"감독 나","profileUrl":null}]
                 """);
         assertJson(
                 response.path("cast"),
                 """
-                [{"personId":12,"name":"배우 가","character":"배역 가"},
-                 {"personId":11,"name":"배우 나","character":"배역 나"}]
+                [{"personId":12,"name":"배우 가","character":"배역 가","profileUrl":null},
+                 {"personId":11,"name":"배우 나","character":"배역 나","profileUrl":null}]
                 """);
         assertThat(texts(response, "ottProviders", "code"))
                 .containsExactly("WAVVE", "DISNEY_PLUS", "TVING", "NETFLIX");
@@ -201,7 +202,28 @@ class MovieDetailContractTest extends SharedPostgresContractTest {
         jdbc.update("UPDATE movie_ott_providers SET watch_url = NULL WHERE movie_id = ?", MOVIE);
         JsonNode response = ok(member(MOVIE, USER));
         response.path("cast").forEach(actor -> assertNull(actor, "character"));
+        response.path("cast").forEach(actor -> assertNull(actor, "profileUrl"));
         response.path("ottProviders").forEach(ott -> assertNull(ott, "watchUrl"));
+    }
+
+    @Test
+    @DisplayName("TMDb 인물 원본 이미지는 상세 화면용 작은 크기로 반환한다")
+    void profileImageUsesThumbnailSize() throws Exception {
+        jdbc.update(
+                "UPDATE people SET profile_url = ? WHERE id = ?",
+                "https://image.tmdb.org/t/p/original/profile.jpg",
+                12L);
+        jdbc.update(
+                "UPDATE people SET profile_url = ? WHERE id = ?",
+                "https://profiles.example.test/person.jpg",
+                11L);
+
+        JsonNode response = ok(get(PATH, MOVIE));
+
+        assertThat(response.path("cast").path(0).path("profileUrl").asText())
+                .isEqualTo("https://image.tmdb.org/t/p/w185/profile.jpg");
+        assertThat(response.path("cast").path(1).path("profileUrl").asText())
+                .isEqualTo("https://profiles.example.test/person.jpg");
     }
 
     @ParameterizedTest
@@ -269,6 +291,7 @@ class MovieDetailContractTest extends SharedPostgresContractTest {
     @DisplayName("회원은 자기 평가·활성 감상·구독만 받고 구독 그룹을 먼저 정렬한다")
     void memberGetsOnlyOwnPersonalization() throws Exception {
         fixture.personalize();
+        jdbc.update("UPDATE ratings SET is_spoiler = true WHERE id = ?", RATING);
         fixture.ott(50, "UNRELATED", "다른 제공처");
         fixture.subscribe(USER, 50);
         fixture.provider(OTHER_MOVIE, 50);
@@ -278,6 +301,7 @@ class MovieDetailContractTest extends SharedPostgresContractTest {
                 .isEqualByComparingTo("0.5");
         assertThat(response.path("myRating").path("comment").asText()).isEqualTo("내 비공개 한줄평");
         assertThat(response.path("myRating").path("visibility").asText()).isEqualTo("PRIVATE");
+        assertThat(response.path("myRating").path("spoiler").booleanValue()).isTrue();
         assertThat(response.path("myWatchStatus").asText()).isEqualTo("RATED");
         assertThat(ids(response, "ottProviders", "ottId"))
                 .containsExactly(WAVVE, TVING, DISNEY, NETFLIX);
@@ -304,6 +328,7 @@ class MovieDetailContractTest extends SharedPostgresContractTest {
                 .isEqualByComparingTo(new BigDecimal(score));
         assertNull(response.path("myRating"), "comment");
         assertNull(response.path("myRating"), "visibility");
+        assertThat(response.path("myRating").path("spoiler").booleanValue()).isFalse();
         assertNull(response, "myWatchStatus");
     }
 

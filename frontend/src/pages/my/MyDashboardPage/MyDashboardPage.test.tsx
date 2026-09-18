@@ -23,11 +23,13 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import MyDashboardPage from './index';
 import { renderWithRouter } from '../../../test/render';
 import { getMyProfile } from '../../../api/users';
-import { getMyRatings, getWatchRecords } from '../../../api/watch';
+import { getMyFrames } from '../../../api/taste';
+import { getWatchRecords } from '../../../api/watch';
 import { getOtts } from '../../../api/otts';
 import { getRecommendationHistory } from '../../../api/recommendations';
 import { mockMyProfile } from '../../../mocks/user';
-import type { MyRatingListItem, WatchRecordListItem } from '../../../types/watch';
+import type { FrameSummary } from '../../../types/taste';
+import type { WatchRecordListItem } from '../../../types/watch';
 import type { RecommendationHistory } from '../../../types/recommendation';
 
 vi.mock('../../../api/users', () => ({
@@ -35,8 +37,13 @@ vi.mock('../../../api/users', () => ({
 }));
 
 vi.mock('../../../api/watch', () => ({
-  getMyRatings: vi.fn(),
   getWatchRecords: vi.fn(),
+}));
+
+vi.mock('../../../api/taste', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../api/taste')>()),
+  getMyFrames: vi.fn(),
+  getPopcornBucket: vi.fn().mockResolvedValue({ totalCount: 0, flavors: [] }),
 }));
 
 vi.mock('../../../api/otts', () => ({
@@ -47,23 +54,23 @@ vi.mock('../../../api/recommendations', () => ({
   getRecommendationHistory: vi.fn(),
 }));
 
-const ratings: MyRatingListItem[] = [
+/**
+ * 평가와 1:1인 프레임(API-042). `평가한 영화` 탭의 원천이다(업무 -610) — 내 평가 목록
+ * API-039가 백엔드에 없어 그전의 고정 목업은 방금 저장한 평가를 보여 주지 못했다.
+ */
+const frames: FrameSummary[] = [
   {
-    ratingId: 901,
+    frameId: 501,
     movie: { movieId: 401, title: '평가한 영화 A', posterUrl: null },
     score: 4.5,
-    comment: null,
-    visibility: 'PUBLIC',
-    frameId: 501,
+    flavorCode: 'FLAVOR_A',
     createdAt: '2026-09-05T09:00:00Z',
   },
   {
-    ratingId: 902,
+    frameId: 502,
     movie: { movieId: 402, title: '평가한 영화 B', posterUrl: null },
     score: 3,
-    comment: '좋았어요',
-    visibility: 'PUBLIC',
-    frameId: 502,
+    flavorCode: null,
     createdAt: '2026-09-04T09:00:00Z',
   },
 ];
@@ -114,9 +121,12 @@ const history: RecommendationHistory = {
 
 beforeEach(() => {
   vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
-  vi.mocked(getMyRatings)
-    .mockReset()
-    .mockResolvedValue({ items: ratings, nextCursor: null, hasNext: false });
+  vi.mocked(getMyFrames).mockReset().mockResolvedValue({
+    totalCount: frames.length,
+    items: frames,
+    nextCursor: null,
+    hasNext: false,
+  });
   vi.mocked(getRecommendationHistory).mockReset().mockResolvedValue(history);
   vi.mocked(getWatchRecords)
     .mockReset()
@@ -297,21 +307,27 @@ describe('7.1 MY 대시보드', () => {
     expect(within(feed()).queryByRole('button', { name: '더 보기' })).toBeNull();
   });
 
-  it('취향 필름(API-042)을 부르지 않는다', async () => {
+  it('평가한 영화는 API-042 프레임 목록으로 그린다', async () => {
     /*
-     * 프레임을 평가 · 추천 기록인 것처럼 쓰지 않는다(사용자 결정 2026-09-16).
-     * 필름은 하단 내비 `필름` 탭(3.1)이 보여준다.
+     * 내 평가 목록 API-039는 백엔드에 없다. 프레임은 평가와 1:1이라(API-042 처리 규칙) 방금
+     * 저장한 평가가 그대로 보인다(업무 -610). 고정 목업을 쓰던 때는 새 평가가 사라진 것처럼
+     * 보였다.
      */
-    const taste = await import('../../../api/taste');
-    const spy = vi.spyOn(taste, 'getMyFrames');
-
     await renderDashboard();
 
-    expect(spy).not.toHaveBeenCalled();
+    expect(getMyFrames).toHaveBeenCalledTimes(1);
+    expect(
+      await within(feed()).findByRole('link', { name: /평가한 영화 A.*4\.5/ }),
+    ).toBeInTheDocument();
   });
 
   it('빈 목록과 조회 실패를 구분한다', async () => {
-    vi.mocked(getMyRatings).mockResolvedValue({ items: [], nextCursor: null, hasNext: false });
+    vi.mocked(getMyFrames).mockResolvedValue({
+      totalCount: 0,
+      items: [],
+      nextCursor: null,
+      hasNext: false,
+    });
     vi.mocked(getRecommendationHistory).mockRejectedValue(new Error('boom'));
 
     await renderDashboard();

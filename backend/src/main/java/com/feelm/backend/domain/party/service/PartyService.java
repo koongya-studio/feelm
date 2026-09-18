@@ -4,6 +4,7 @@ import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.mapping;
 import static java.util.stream.Collectors.toList;
 
+import com.feelm.backend.domain.notification.service.NotificationCommandService;
 import com.feelm.backend.domain.party.dto.response.PartyInvitationResponse;
 import com.feelm.backend.domain.party.dto.response.PartyInvitationStatusResponse;
 import com.feelm.backend.domain.party.dto.response.PartyListItemResponse;
@@ -38,6 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PartyService {
     private final PartyRepository partyRepository;
     private final PartyRefreshRequestRepository refreshRequestRepository;
+    private final NotificationCommandService notificationCommandService;
     private final PartyMemberRepository memberRepository;
     private final PartyInvitationRepository invitationRepository;
     private final PartyQueryRepository queryRepository;
@@ -161,6 +163,8 @@ public class PartyService {
         PartyInvitation invitation =
                 invitationRepository.saveAndFlush(
                         PartyInvitation.create(party, requesterId, invitee));
+        notificationCommandService.createPartyInvitation(
+                inviteeId, invitation.getId(), invitation.getCreatedAt());
         return PartyInvitationResponse.from(invitation);
     }
 
@@ -249,6 +253,7 @@ public class PartyService {
         Instant respondedAt = Instant.now();
         memberRepository.saveAndFlush(PartyMember.memberOf(party, invitee, respondedAt));
         invitation.accept(respondedAt);
+        notificationCommandService.closePartyInvitation(userId, invitationId, respondedAt);
         refreshRequestRepository.request(partyId);
         List<Member> members =
                 queryRepository.findMembers(List.of(partyId)).stream().map(Member::from).toList();
@@ -264,7 +269,9 @@ public class PartyService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         PartyInvitation invitation = lockedInvitation(invitationId, userId);
         requirePending(invitation);
-        invitation.decline(Instant.now());
+        Instant respondedAt = Instant.now();
+        invitation.decline(respondedAt);
+        notificationCommandService.closePartyInvitation(userId, invitationId, respondedAt);
         return PartyInvitationStatusResponse.from(invitation);
     }
 
@@ -384,6 +391,13 @@ public class PartyService {
     private void declinePendingInvitations(long partyId, Instant respondedAt) {
         invitationRepository
                 .findAllByPartyIdAndStatus(partyId, PartyInvitation.Status.PENDING)
-                .forEach(invitation -> invitation.decline(respondedAt));
+                .forEach(
+                        invitation -> {
+                            invitation.decline(respondedAt);
+                            notificationCommandService.closePartyInvitation(
+                                    invitation.getInvitee().getId(),
+                                    invitation.getId(),
+                                    respondedAt);
+                        });
     }
 }

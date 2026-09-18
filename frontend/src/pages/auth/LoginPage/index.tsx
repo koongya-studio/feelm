@@ -28,7 +28,7 @@
  * `로그인` 버튼은 브랜드 빨강이고, 소셜 버튼은 각 사 로고를 쓴다.
  */
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import Button from '../../../components/Button';
 import SocialButton from '../../../components/SocialButton';
 import type { SocialProvider } from '../../../components/SocialButton';
@@ -39,6 +39,8 @@ import { ApiError } from '../../../api/apiError';
 import { failureDescription } from '../../../components/StatusView/failure';
 import { useAuth } from '../../../contexts/authContext';
 import { path } from '../../../routes/paths';
+import { isReturnPath } from '../../../routes/returnPath';
+import type { SessionExpiryState } from '../../../routes/sessionExpiry';
 import { isOAuthConfigured, startOAuth } from '../../../utils/oauth';
 import styles from './LoginPage.module.css';
 import Ticket, { Barcode } from './Ticket';
@@ -63,6 +65,23 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { signIn } = useAuth();
 
+  /*
+   * 0.6은 두 경로로 열린다. 보호 라우트가 보낸 경우 가려던 주소가 `state.from`에 있고
+   * (`RequireAuth`, 업무 -610), 재발급이 거절돼 끌려온 경우 `state.sessionExpired`가 선다
+   * (`routes/sessionExpiry.ts`, 업무 -596). 둘은 같은 state에 실리므로 한번에 읽는다.
+   *
+   * 로그인이 끝나면 `from`으로 돌아간다. 온보딩을 안 마친 계정은 먼저 1.1로 간다 — 그
+   * 화면들이 온보딩 완료를 전제하기 때문이고, 그 뒤의 경로는 3.1 필름이다.
+   *
+   * 끌려온 것을 스스로 온 로그인과 구분해 알려 주지 않으면, 사용자는 멀쩡히 쓰던 중에 왜
+   * 로그인 화면인지 알 수 없다. 서버 장애(5xx)는 세션을 끝내지 않으므로 여기로 오지 않는다(업무 -373).
+   */
+  const { state } = useLocation() as {
+    state: ({ from?: unknown } & SessionExpiryState) | null;
+  };
+  const returnTo = isReturnPath(state?.from) ? state.from : null;
+  const sessionExpired = Boolean(state?.sessionExpired);
+
   /* 한 곳이라도 열려 있으면 준비 중 안내를 내린다 */
   const ready = PROVIDERS.some(({ provider }) => isOAuthConfigured(provider));
 
@@ -80,7 +99,11 @@ export default function LoginPage() {
     try {
       const user = await signIn(email, password);
 
-      void navigate(user.onboardingCompleted ? path.film() : path.onboardingTaste());
+      if (!user.onboardingCompleted) {
+        void navigate(path.onboardingTaste(), { replace: true });
+      } else {
+        void navigate(returnTo ?? path.film(), { replace: true });
+      }
     } catch (error) {
       const code = error instanceof ApiError ? error.code : '';
 
@@ -110,6 +133,12 @@ export default function LoginPage() {
         <h1 className={styles.logo}>
           <Wordmark size={40} />
         </h1>
+
+        {sessionExpired ? (
+          <p className={styles.notice} role="status">
+            로그인 유효 시간이 지나 로그아웃됐어요. 다시 로그인해 주세요.
+          </p>
+        ) : null}
 
         <form
           className={styles.form}
@@ -185,7 +214,7 @@ export default function LoginPage() {
               label={label}
               appearance="brand"
               disabled={!isOAuthConfigured(provider)}
-              onClick={() => startOAuth(provider, 'login')}
+              onClick={() => startOAuth(provider, 'login', returnTo ?? undefined)}
             />
           ))}
         </div>

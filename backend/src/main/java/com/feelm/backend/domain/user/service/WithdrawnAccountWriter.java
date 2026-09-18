@@ -3,6 +3,7 @@ package com.feelm.backend.domain.user.service;
 import com.feelm.backend.domain.auth.repository.EmailVerificationTokenRepository;
 import com.feelm.backend.domain.auth.repository.PasswordResetTokenRepository;
 import com.feelm.backend.domain.auth.repository.UserAuthProviderRepository;
+import com.feelm.backend.domain.notification.service.NotificationCommandService;
 import com.feelm.backend.domain.onboarding.repository.OnboardingPreferenceRepository;
 import com.feelm.backend.domain.ott.repository.UserOttRepository;
 import com.feelm.backend.domain.user.entity.User;
@@ -34,6 +35,7 @@ class WithdrawnAccountWriter {
     private final UserOttRepository userOttRepository;
     private final OnboardingPreferenceRepository onboardingPreferenceRepository;
     private final NotificationSettingsRepository notificationSettingsRepository;
+    private final NotificationCommandService notificationCommandService;
 
     /**
      * 자격을 확인하고 계정을 파기한다. 이 트랜잭션이 커밋되면 계정은 되살아나지 않는다.
@@ -76,6 +78,7 @@ class WithdrawnAccountWriter {
         authProviderRepository.deleteByUserId(userId);
         userOttRepository.deleteByUserId(userId);
         notificationSettingsRepository.deleteByUserId(userId);
+        notificationCommandService.deleteByUserId(userId);
         onboardingPreferenceRepository.deleteByUserId(userId);
     }
 

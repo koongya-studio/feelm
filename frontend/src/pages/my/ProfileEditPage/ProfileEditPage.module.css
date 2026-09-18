@@ -79,8 +79,8 @@
  * `background-attachment: fixed`로 칠하면 뷰포트 기준으로 자리가 고정되므로 뒤에 깔린
  * body 배경과 픽셀이 정확히 일치한다. 경계가 생길 수 없다.
  *
- * `backdrop-filter`는 쓰지 않는다. 히어로에서 스크롤 중 다시 그려지지 않는 문제를 만든
- * 것과 같은 속성이다(ProfileHero.module.css).
+ * `backdrop-filter`는 쓰지 않는다. 예전 7.2 히어로에서 스크롤 중 다시 그려지지 않는
+ * 문제를 만든 속성이다(그 히어로는 업무 -605에서 지웠다).
  */
 .footer {
   position: sticky;

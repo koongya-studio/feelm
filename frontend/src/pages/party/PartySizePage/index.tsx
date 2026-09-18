@@ -41,6 +41,7 @@ export default function PartySizePage() {
         title="친구와 같이 볼래요?"
         subtitle="서로의 취향 필름을 합쳐 보세요"
         showBack
+        fallbackTo={path.party()}
       />
 
       <div className={styles.page}>
@@ -78,7 +79,10 @@ export default function PartySizePage() {
         <p className={styles.progress}>친구들을 등록해 주세요 (0/{friendSlots})</p>
 
         <div className={styles.actions}>
-          <Button onClick={() => void navigate(path.partySetup(), { state: { size } })}>
+          <Button
+            variant="brand"
+            onClick={() => void navigate(path.partySetup(), { state: { size } })}
+          >
             다음
           </Button>
         </div>

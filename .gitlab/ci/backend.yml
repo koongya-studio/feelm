@@ -67,7 +67,10 @@ backend-env-check:
 backend-cache-prepare:
   stage: verify
   tags: [e106-mr-isolated]
-  needs: [ci-variable-contract-check]
+  needs:
+    - job: ci-variable-contract-check
+      artifacts: false
+  dependencies: []
   variables:
     GIT_STRATEGY: none
   script:

@@ -1443,8 +1443,9 @@ GitLab에서 관리하고 서버에서 직접 수정하지 않습니다. 현재 
 
 모니터링 배포가 공통으로 사용하는 필수 CI 변수와 기대 메타데이터는
 `infra/config/required-ci-variables.json`에서 값 없이 관리합니다. 현재 `service` 환경 계약은
-`DISTRIBUTED_NODE_IP`, `GRAFANA_ADMIN_PASSWORD`, `POSTGRES_DB`, `POSTGRES_USER`,
-`POSTGRES_PASSWORD`, `REDIS_PASSWORD`를 포함합니다. 비밀번호는 Protected, Masked and hidden,
+`DISTRIBUTED_NODE_IP`, `GRAFANA_ADMIN_PASSWORD`, `GRAFANA_ALERT_HMAC_SECRET`, `POSTGRES_DB`,
+`POSTGRES_USER`, `POSTGRES_PASSWORD`, `REDIS_PASSWORD`를 포함합니다. 비밀번호와 HMAC 서명 키는
+Protected, Masked and hidden,
 변수 확장 비활성화(`raw`)로 등록하고 나머지 변수도 Protected와 `service` 환경 범위를
 유지합니다. 실제 값은 계약 파일, 문서, MR과 Job 로그에 기록하지 않습니다.
 
@@ -1542,6 +1543,13 @@ Mattermost 변수도 `Protected`로 관리합니다. 환경 범위는 Jira 스�
 `distributed` 배포 Job이 함께 받을 수 있도록 `All (default)`를 유지합니다. 저장소, MR,
 Job 로그와 스크린샷에는 계정 비밀번호와 세션 토큰을 남기지 않습니다. 채널을 분리하려면
 계정 자체를 재사용하더라도 배포 전용 채널 변수를 도입하는 별도 업무로 처리합니다.
+
+Grafana 장애 알림도 위 deploy 알림과 같은 Mattermost 계정 및 채널 설정을 사용합니다.
+Grafana는 HMAC으로 서명한 일반 Webhook을 내부 `mattermost-alert-relay`에 보내고, 릴레이가
+기존 deploy 알림과 동일하게 로그인·게시·로그아웃합니다. Mattermost Incoming Webhook은
+필요하지 않습니다. `GRAFANA_ALERT_HMAC_SECRET`은 `service` 환경의 Protected, Masked and
+hidden, raw 변수로 등록하며 저장소와 로그에 남기지 않습니다. 규칙, 반복 억제, 복구 알림과
+점검 절차는 [`infra/monitoring/README.md`](./monitoring/README.md)를 따릅니다.
 
 모니터링 설정은 애플리케이션 이미지 배포와 달리 보호된 `develop` Push에서
 `deploy-monitoring` Job으로 적용합니다. 이 Job은 `ci-variable-preflight`를 필수 `needs`로

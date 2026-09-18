@@ -14,7 +14,6 @@
 import { findMockPublicProfile, mockMyPublicProfile } from '../mocks/publicProfiles';
 import { request } from './client';
 import { getMockProfile, isMockSession, saveMockProfile } from './mockAccount';
-import { isBlockedUser } from './settings';
 import { respond, respondError } from './mockTransport';
 import type { PublicProfileView } from '../types/unspecified';
 import type {
@@ -142,14 +141,11 @@ export async function getPublicProfile(userId: number): Promise<PublicProfileVie
   const profile = findMockPublicProfile(userId);
 
   /*
-   * 차단한 사람의 프로필은 보이지 않는다(API-020 설명). 계약은 없음 · 비공개 · 차단을
-   * 모두 404로 합치므로 같은 응답을 쓴다. 7.2-B에서 차단하면 이 분기로 들어온다(업무 -307).
-   *
-   * 차단 여부는 실제 차단 목록(API-022)에서 온다(업무 -394). 프로필 자체가 목업이라
-   * 남은 판정이며, API-062가 열리면 서버의 `isBlockedByMe`가 대신한다.
+   * 계약은 없음 · PRIVATE · 차단 관계를 모두 404로 합친다. 차단 관계는 실제 API-062가
+   * `isBlockedByMe`로 판정할 일이라, 목업 프로필이 실제 차단 목록(API-022)을 섞어 보지
+   * 않는다(업무 -610) — 7.2-B에서 차단 자체를 잠갔으므로 볼 이유도 없어졌다.
    */
-  if (!profile || (await isBlockedUser(userId))) {
-    // 계약은 없음 · PRIVATE · 차단 관계를 모두 404로 합친다
+  if (!profile) {
     return respondError(404, 'RESOURCE_NOT_FOUND', '프로필을 찾을 수 없습니다.');
   }
 

@@ -53,6 +53,7 @@ import { PersonIcon } from '../../../components/Icon';
 import Button from '../../../components/Button';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
+import VisuallyHidden from '../../../components/VisuallyHidden';
 import TasteCard from './TasteCard';
 import { ApiError } from '../../../api/apiError';
 import { getOnboardingCards, submitOnboardingPreferences } from '../../../api/onboarding';
@@ -127,6 +128,8 @@ type LoadState = 'loading' | 'ready' | 'failed';
 type CardState = {
   card: OnboardingCard;
   value: TasteValue;
+  /** 처음 놓인 자리(`INITIAL_POSITIONS`의 번호). 키보드로 원 밖으로 되돌릴 때 쓴다 */
+  slot: number;
   /** 카드가 움직일 수 있는 가로 거리의 비율 (0~1) */
   xRatio: number;
   /** 카드가 움직일 수 있는 세로 거리의 비율 (0~1) */
@@ -210,6 +213,7 @@ export default function TasteOnboardingPage() {
           items.map((card, index) => ({
             card,
             value: 'DISLIKE' as TasteValue,
+            slot: index % INITIAL_POSITIONS.length,
             ...INITIAL_POSITIONS[index % INITIAL_POSITIONS.length],
           })),
         );
@@ -277,7 +281,7 @@ export default function TasteOnboardingPage() {
     };
   }
 
-  function handlePointerDown(event: PointerEvent<HTMLDivElement>, state: CardState) {
+  function handlePointerDown(event: PointerEvent<HTMLButtonElement>, state: CardState) {
     const element = boardRef.current;
 
     if (!element) {
@@ -345,6 +349,62 @@ export default function TasteOnboardingPage() {
 
     // 위치와 LIKE/DISLIKE는 pointermove에서 함께 갱신한다. 손을 떼기 전에도 경계를
     // 넘나드는 즉시 포스터 투명도와 접근성 라벨이 바뀌어야 하기 때문이다.
+  }
+
+  /**
+   * 키보드로 원 안팎을 오간다(업무 -610). 드래그와 같은 판정 함수를 쓴다.
+   *
+   * 원 안으로 넣을 때는 이미 안에 있는 카드 수만큼 조금씩 비껴 놓아 겹치지 않게 하고,
+   * 밖으로 뺄 때는 처음 놓였던 자리로 돌려보낸다.
+   */
+  function toggleCard(movieId: number) {
+    setCards((previous) => {
+      const target = previous.find((item) => item.card.movieId === movieId);
+
+      if (!target) {
+        return previous;
+      }
+
+      if (target.value === 'LIKE') {
+        const home = INITIAL_POSITIONS[target.slot];
+
+        return previous.map((item) =>
+          item.card.movieId === movieId ? { ...item, ...home, value: 'DISLIKE' } : item,
+        );
+      }
+
+      const insideCount = previous.filter((item) => item.value === 'LIKE').length;
+      const angle = insideCount * 2.4;
+      const spread = Math.min(insideCount, 3) * 14;
+      const next = toRatio(
+        board.width / 2 - CARD_WIDTH / 2 + Math.cos(angle) * spread,
+        board.height * RING_CENTER_Y_RATIO - CARD_HEIGHT / 2 + Math.sin(angle) * spread,
+      );
+
+      return previous.map((item) =>
+        item.card.movieId === movieId
+          ? { ...item, ...next, value: valueFromRatio(next.xRatio, next.yRatio) }
+          : item,
+      );
+    });
+    setFrontCardId(movieId);
+  }
+
+  /** 방향키로 조금 옮긴다. 경계를 넘으면 드래그와 같이 판정이 바뀐다 */
+  function nudgeCard(movieId: number, dx: number, dy: number) {
+    setCards((previous) =>
+      previous.map((item) => {
+        if (item.card.movieId !== movieId) {
+          return item;
+        }
+
+        const position = positionFromRatio(item.xRatio, item.yRatio);
+        const next = toRatio(position.x + dx, position.y + dy);
+
+        return { ...item, ...next, value: valueFromRatio(next.xRatio, next.yRatio) };
+      }),
+    );
+    setFrontCardId(movieId);
   }
 
   function removeCard(movieId: number) {
@@ -464,6 +524,9 @@ export default function TasteOnboardingPage() {
         <p className={styles.guide}>
           카드를 원 안팎으로 드래그해 주세요 · 안 본 영화는 ⊖로 빼주세요
         </p>
+        <VisuallyHidden>
+          <p>키보드로는 카드를 고르고 Enter로 원 안팎을 오가거나 방향키로 옮길 수 있어요</p>
+        </VisuallyHidden>
         <ul className={styles.legend}>
           <li>● 가까이 = 좋아요</li>
           <li>○ 멀리 = 싫어요</li>
@@ -498,6 +561,8 @@ export default function TasteOnboardingPage() {
               dragging={draggingId === item.card.movieId}
               front={frontCardId === item.card.movieId}
               onPointerDown={(event) => handlePointerDown(event, item)}
+              onToggle={() => toggleCard(item.card.movieId)}
+              onNudge={(dx, dy) => nudgeCard(item.card.movieId, dx, dy)}
               onRemove={() => removeCard(item.card.movieId)}
             />
           );

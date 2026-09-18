@@ -1,0 +1,84 @@
+/*
+ * 4.2 검색 결과 격자. 3열 · 열 간격 12px · 행 간격 12px.
+ *
+ * 칸에 배경이나 그림자를 두지 않는다 — 포스터가 시각의 중심이고 벽은 벽 그대로다
+ * (`design-concept.md` 2.1). 간격을 조여 둔 것은 412×915에서 3행이 한 화면에 들어오게
+ * 하기 위해서다 — 포스터가 2:3이라 행 하나가 200px 가까이 된다.
+ */
+.grid {
+  display: grid;
+  padding: 0;
+  margin: 0;
+  gap: var(--space-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  list-style: none;
+}
+
+/* 포스터와 제목이 한 칸이고 칸 전체가 누름 영역이다. 밑줄은 쓰지 않는다 */
+.cell {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+/*
+ * 제목은 두 줄까지. 넘치면 말줄임이다. 모든 칸이 가운데 정렬이라 긴 제목과 짧은
+ * 제목이 섞여도 열이 흔들리지 않는다. 글자가 커져도 포스터 위로 올라가지 않도록
+ * 높이를 고정하지 않고 줄 수로만 자른다.
+ */
+.title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-meta);
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+/* 스켈레톤. 포스터와 같은 2:3 · 같은 모서리다 */
+.skeletonPoster {
+  display: block;
+  width: 100%;
+  border-radius: 12px;
+  aspect-ratio: 2 / 3;
+  background: var(--color-surface-sunken);
+}
+
+/* 제목 자리. 한 줄 높이만큼, 폭은 칸의 반쯤 */
+.skeletonTitle {
+  display: block;
+  width: 60%;
+  height: calc(var(--font-size-meta) * var(--line-height-meta));
+  margin: 0 auto;
+  border-radius: var(--radius-icon);
+  background: var(--color-surface-sunken);
+}
+
+.skeletonPoster,
+.skeletonTitle {
+  animation: pulse 1.2s var(--ease-standard) infinite alternate;
+}
+
+@keyframes pulse {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonPoster,
+  .skeletonTitle {
+    animation: none;
+  }
+}

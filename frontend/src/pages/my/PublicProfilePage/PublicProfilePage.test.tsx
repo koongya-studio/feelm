@@ -6,15 +6,15 @@
  * 이동표의 `7.2-B → 7.2-C`도 함께 사라졌다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import PublicProfilePage from './index';
 import { resetSessionForTest, startSession } from '../../../api/session';
 import { resetSessionStore } from '../../../mocks/sessionStore';
 import { renderWithRouter } from '../../../test/render';
 
 /**
- * 프로필은 목업이지만 차단은 실제 API다(API-020, 업무 -394). 화면을 그릴 때 차단 목록
- * (API-022)도 함께 나가므로 둘 다 가로챈다. 차단한 사람이 없는 상태에서 시작한다.
+ * 프로필은 목업이고 이 화면은 실제 API를 부르지 않는다(업무 -610). 혹시 나가는 요청이 있으면
+ * 여기서 잡힌다 — 그것이 곧 시험 실패다.
  */
 function stubServer() {
   vi.stubGlobal(
@@ -62,7 +62,7 @@ async function renderProfile(userId: number = USER_ID) {
     route: `/users/${userId}`,
     path: '/users/:userId',
   });
-  // 화면 제목은 히어로 안의 이름이다. 헤더를 없애고 이미지가 상단을 차지한다(ProfileHero)
+  // 화면 제목은 2.4의 영화 제목처럼 본문 머리의 이름이다(ProfileBoard)
   await screen.findByRole('heading', { name: '무비버디' });
 
   return result;
@@ -79,106 +79,49 @@ describe('7.2-B 다른 사용자 공개 프로필', () => {
     expect(screen.queryByRole('button', { name: '나와 취향 비교하기' })).not.toBeInTheDocument();
   });
 
-  it('팔로워 대신 프레임 · 팝콘 · 공개 한줄평을 보여준다', async () => {
+  it('2.4와 같은 화면이다 — 이름 · 키워드 · 수치 한 줄, 팝콘 · 필름 · 한줄평 구역', async () => {
     /*
-     * Feelm에 팔로워 개념이 없다. 레퍼런스의 3열을 서비스에 맞게 바꾼 자리다.
-     * 셋 다 API-062가 주는 값이다 — `나와 일치`는 계약(API-063)이 미구현이라 뺐다(업무 -459).
+     * 업무 -605. 그전의 수치 3열(`dl`)은 없고 이름 아래 한 줄이다. 팔로워는 Feelm에 없는
+     * 개념이고 `나와 일치`는 계약(API-063)이 미구현이라 없다(업무 -459).
      */
     await renderProfile();
 
-    // 3열은 `dl`이다(StatRow). `공개 한줄평`은 아래 카드 제목에도 있어 이 줄 안에서 찾는다
-    const stats = screen.getByText('프레임').closest('dl')!;
-
-    expect([...stats.querySelectorAll('dt')].map((item) => item.textContent)).toEqual([
-      '프레임',
-      '팝콘',
-      '공개 한줄평',
-    ]);
+    expect(screen.queryByRole('definition')).not.toBeInTheDocument();
     expect(screen.queryByText(/팔로워|팔로잉/)).not.toBeInTheDocument();
     expect(screen.queryByText('나와 일치')).not.toBeInTheDocument();
+
+    expect(screen.getByRole('heading', { name: '취향 팝콘' })).toBeInTheDocument();
+    expect(screen.getByText(/^팝콘 \d+알$/)).toBeInTheDocument();
+
+    // 다른 사람의 프레임이라 상세로 가는 링크가 아니다
+    const films = screen.getByRole('heading', { name: '취향 필름' }).parentElement!;
+    expect(films.querySelectorAll('li').length).toBeGreaterThan(0);
+    expect(within(films).queryByRole('link')).not.toBeInTheDocument();
+
+    expect(screen.getByRole('heading', { name: '공개 한줄평' })).toBeInTheDocument();
+    expect(screen.getByText('스릴러만 먹다가 드라마 맛도 늘었어요.')).toBeInTheDocument();
   });
 
-  it('차단은 확인을 거쳐 7.8-D로 간다', async () => {
+  it('차단은 준비 중이라 눌리지 않고, 목업 번호로 실제 차단 API를 부르지 않는다', async () => {
     /*
-     * 이동표 `7.2-B ⇢ 7.8-D`. 305에서는 7.8-D가 없어 안내만 했다(업무 -307에서 연결).
-     * 확인 창은 공동 파티에서 나가게 된다는 것을 알려야 한다(API-020 처리 규칙).
-     * 차단 자체는 API-020으로 나간다(업무 -394).
+     * 프로필이 목업(API-062 미구현)인 동안 실제 차단(API-020)을 부르면 서버에 없는 번호라
+     * 늘 404였다(업무 -610). 신고는 계약이 없어 안내만 한다.
      */
     await renderProfile();
 
     fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
-    fireEvent.click(screen.getByRole('button', { name: '사용자 차단' }));
 
-    const dialog = await screen.findByRole('alertdialog', { name: '무비버디 님을 차단할까요?' });
-    expect(dialog).toHaveTextContent('함께 있는 파티에서는 나가게 돼요');
+    const block = screen.getByRole('button', { name: /사용자 차단/ });
+    expect(block).toBeDisabled();
+    expect(block).toHaveTextContent('준비 중');
 
-    fireEvent.click(within(dialog).getByRole('button', { name: '차단' }));
+    fireEvent.click(screen.getByRole('button', { name: '신고하기' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('신고 내용은 운영팀이 확인해요');
 
-    await waitFor(() =>
-      expect(screen.getByTestId('location').textContent).toBe('/my/settings/blocks'),
-    );
-  });
-
-  it('차단이 거절되면 계약이 준 문구를 그대로 보여준다', async () => {
-    /*
-     * 지금 7.2-B에 들어오는 번호는 목업이라 실제 백엔드에는 없는 사람이다. 그때 오는
-     * 404를 `잠시 후 다시 시도해 주세요`로 뭉개면 왜 안 되는지 알 수 없다.
-     */
-    await renderProfile();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() =>
-        Promise.resolve(
-          new Response(
-            JSON.stringify({ code: 'RESOURCE_NOT_FOUND', message: '사용자를 찾을 수 없습니다.' }),
-            { status: 404, headers: { 'Content-Type': 'application/json' } },
-          ),
-        ),
-      ),
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
-    fireEvent.click(screen.getByRole('button', { name: '사용자 차단' }));
-    const dialog = await screen.findByRole('alertdialog');
-    fireEvent.click(within(dialog).getByRole('button', { name: '차단' }));
-
-    expect(await screen.findByText('사용자를 찾을 수 없습니다.')).toBeInTheDocument();
-    expect(screen.getByTestId('location').textContent).toBe(`/users/${USER_ID}`);
-  });
-
-  it('이미 차단한 사람이면 차단된 상태이므로 7.8-D로 간다', async () => {
-    // 두 탭에서 같은 프로필을 열어 둔 경우다. 409는 실패가 아니라 바라던 상태다
-    await renderProfile();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() =>
-        Promise.resolve(
-          new Response(
-            JSON.stringify({ code: 'ALREADY_BLOCKED', message: '이미 차단한 사용자입니다.' }),
-            { status: 409, headers: { 'Content-Type': 'application/json' } },
-          ),
-        ),
-      ),
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
-    fireEvent.click(screen.getByRole('button', { name: '사용자 차단' }));
-    const dialog = await screen.findByRole('alertdialog');
-    fireEvent.click(within(dialog).getByRole('button', { name: '차단' }));
-
-    await waitFor(() =>
-      expect(screen.getByTestId('location').textContent).toBe('/my/settings/blocks'),
-    );
-  });
-
-  it('차단을 취소하면 아무 일도 없다', async () => {
-    await renderProfile();
-
-    fireEvent.click(screen.getByRole('button', { name: '더 보기' }));
-    fireEvent.click(screen.getByRole('button', { name: '사용자 차단' }));
-    fireEvent.click(await screen.findByRole('button', { name: '취소' }));
-
-    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    const posts = vi
+      .mocked(fetch)
+      .mock.calls.filter(([, init]) => (init as RequestInit | undefined)?.method === 'POST');
+    expect(posts).toHaveLength(0);
     expect(screen.getByTestId('location').textContent).toBe(`/users/${USER_ID}`);
   });
 

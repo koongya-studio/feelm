@@ -2,8 +2,11 @@
  * 8.1 앱 내 알림 목록
  *
  * 이동표
- * - 2.1 → 8.1 홈의 알림 아이콘 · 5.6 ⇢ 8.1 초대 거절 후 알림 목록 복귀
+ * - 2.1 → 8.1 홈의 알림 아이콘
  * - 8.1 → 2.4-A 감상 확인 · 5.6 파티 초대 · 2.2 오늘의 추천 · 3.1 취향 필름 추가
+ *
+ * `5.6 ⇢ 8.1`(초대 거절 후 복귀)은 **없앴다**(업무 -595, CR-27). 이 목록이 전체 목업이라
+ * 거절한 초대가 그대로 남아 있는 화면으로 돌아갔다. 5.6은 답한 뒤 5.1로 간다.
  *
  * 요소는 와이어프레임 그대로다 — `알림`, `전체 · 추천 · 이벤트` 탭, 알림 네 건(아이콘 · 제목 ·
  * 한 줄 · 시각).
@@ -22,11 +25,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import Button from '../../../components/Button';
+import { path } from '../../../routes/paths';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import { getNotifications, readNotification } from '../../../api/notifications';
-import { path } from '../../../routes/paths';
 import { formatRelativeTime } from '../../../utils/date';
+import { notificationPath } from '../destination';
 import NotificationIcon from './NotificationIcon';
 import styles from './NotificationListPage.module.css';
 import type { NotificationView } from '../../../types/unspecified';
@@ -46,19 +50,6 @@ function inTab(item: NotificationView, tab: TabKey) {
 }
 
 /** 알림이 가리키는 화면. 이동표 8.1의 네 화살표다 */
-function notificationTarget(item: NotificationView): string {
-  switch (item.type) {
-    case 'WATCH_CONFIRM':
-      return path.watchConfirm(item.targetId ?? 0);
-    case 'PARTY_INVITE':
-      return path.partyInvitation(item.targetId ?? 0);
-    case 'RECOMMENDATION':
-      return path.recommendations();
-    case 'FRAME_ADDED':
-      return path.film();
-  }
-}
-
 export default function NotificationListPage() {
   const navigate = useNavigate();
 
@@ -88,10 +79,10 @@ export default function NotificationListPage() {
 
   async function open(item: NotificationView) {
     await readNotification(item.notificationId);
-    void navigate(notificationTarget(item));
+    void navigate(notificationPath(item.destination));
   }
 
-  const header = <ScreenHeader title="알림" showBack />;
+  const header = <ScreenHeader title="알림" showBack fallbackTo={path.my()} />;
 
   if (failed) {
     return (

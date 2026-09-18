@@ -3,8 +3,9 @@
  *
  * 고정하는 것은 세 가지다.
  *
- * - **저장에 성공하면 API-036 응답과 추가 전 수치를 그대로 2.6에 넘긴다.** 2.6 · 2.7은
- *   Router state만 보고 그리므로, 여기서 빠진 값은 그 화면에서 지어낼 수 없다
+ * - **저장에 성공하면 API-036 응답과 추가 전 · 후 수치를 그대로 2.6에 넘긴다.** 2.6 · 2.7은
+ *   Router state만 보고 그리므로, 여기서 빠진 값은 그 화면에서 지어낼 수 없다. 추가 후 수치는
+ *   저장이 끝난 뒤 다시 읽은 실측이다(업무 -599)
  * - **실패하면 화면에 남기고 이동하지 않는다.** 서버 문구를 그대로 쓰고, 다시 누를 수 있다
  * - **`409 RATING_ALREADY_EXISTS`는 수정 모드로 바꾼다.** 상세를 읽은 뒤 다른 곳에서 평가가
  *   생긴 경우다. 알리기만 하면 사용자는 같은 요청을 반복하게 된다
@@ -26,13 +27,13 @@ vi.mock('../../../api/otts', () => ({ getOtts: vi.fn() }));
 vi.mock('../../../api/watch', () => ({
   createRating: vi.fn(),
   findWatchedRecord: vi.fn(),
-  getCountsBeforeRating: vi.fn(),
+  getRatingCounts: vi.fn(),
   updateRating: vi.fn(),
 }));
 
 const { getMovieDetail } = await import('../../../api/movies');
 const { getOtts } = await import('../../../api/otts');
-const { createRating, findWatchedRecord, getCountsBeforeRating, updateRating } =
+const { createRating, findWatchedRecord, getRatingCounts, updateRating } =
   await import('../../../api/watch');
 
 /** 아직 평가하지 않은 실제 영화(API-030) */
@@ -65,6 +66,7 @@ const created: Rating = {
   score: 4.5,
   comment: null,
   visibility: 'PRIVATE',
+  spoiler: false,
   frame: { frameId: 77, createdAt: '2026-08-30T05:21:00Z' },
   popcorn: { flavorCode: 'FLAVOR_A', isNewFlavor: true, flavorCount: 1 },
   watchStatus: 'RATED',
@@ -72,14 +74,16 @@ const created: Rating = {
 };
 
 const counts = { frameCount: 12, popcornCount: 7, weeklyFrameDelta: 3 };
+/** 저장 뒤 서버가 실제로 보여 주는 수치. 2.5가 한 번 더 읽는다(업무 -599) */
+const after = { frameCount: 13, popcornCount: 8, weeklyFrameDelta: 3 };
 
 beforeEach(() => {
   vi.mocked(getMovieDetail).mockReset().mockResolvedValue(movie);
   vi.mocked(getOtts).mockReset().mockResolvedValue([]);
   vi.mocked(findWatchedRecord).mockReset().mockResolvedValue(null);
-  vi.mocked(getCountsBeforeRating).mockReset().mockResolvedValue(counts);
+  vi.mocked(getRatingCounts).mockReset().mockResolvedValueOnce(counts).mockResolvedValue(after);
   vi.mocked(createRating).mockReset().mockResolvedValue(created);
-  vi.mocked(updateRating).mockReset().mockResolvedValue(undefined);
+  vi.mocked(updateRating).mockReset().mockResolvedValue(created);
 });
 
 /** 2.6이 받은 Router state를 드러낸다. 2.6 자체는 여기서 그리지 않는다 */
@@ -137,29 +141,59 @@ describe('2.5 평가 저장', () => {
     expect(state).toEqual({
       rating: created,
       counts,
+      after,
       movieTitle: '파이트 클럽',
       posterUrl: null,
     });
+    // 저장 전에 한 번, 저장 뒤에 한 번이다
+    expect(getRatingCounts).toHaveBeenCalledTimes(2);
   });
 
-  it('한줄평이 있으면 공개 범위 기본값 PRIVATE을 붙여 보낸다', async () => {
+  it('저장 뒤 수치를 읽지 못해도 이동하고 2.7이 물러서서 그리게 한다', async () => {
+    vi.mocked(getRatingCounts)
+      .mockReset()
+      .mockResolvedValueOnce(counts)
+      .mockRejectedValue(new ApiError(0, 'NETWORK_ERROR', '네트워크에 연결할 수 없습니다.'));
+
     renderPage();
 
-    await rate(3, '  밤에 보면 안 됨  ');
+    await rate(4.5);
+
+    // 저장은 이미 끝났으므로 실패로 되돌리지 않는다
+    await waitFor(() => expect(location()).toBe('/movies/550/rate/result'));
+
+    const state = JSON.parse(screen.getByTestId('result').getAttribute('data-state') ?? '{}');
+    expect(state.after).toBeNull();
+    expect(state.counts).toEqual(counts);
+  });
+
+  it('한줄평이 있으면 공개 범위와 스포일러 여부를 붙여 보낸다', async () => {
+    renderPage();
+
+    const spoiler = await screen.findByRole('checkbox', { name: '스포일러가 포함되어 있어요' });
+    expect(spoiler).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('한줄평'), {
+      target: { value: '  밤에 보면 안 됨  ' },
+    });
+    expect(spoiler).toBeEnabled();
+    fireEvent.click(spoiler);
+    fireEvent.change(screen.getByRole('slider', { name: '별점' }), { target: { value: '3' } });
+    fireEvent.click(screen.getByRole('button', { name: '평가 완료' }));
 
     await waitFor(() => expect(createRating).toHaveBeenCalled());
-    // 앞뒤 공백은 지우고, 선택 UI가 없어 공개 범위는 기본값이다(CR-05)
+    // 앞뒤 공백은 지우고, 공개 범위는 기본값을 쓰되 스포일러 선택은 보존한다
     expect(createRating).toHaveBeenCalledWith(550, {
       score: 3,
       comment: '밤에 보면 안 됨',
       visibility: 'PRIVATE',
+      spoiler: true,
     });
   });
 
   it('추가 전 수치를 받지 못하면 저장하지 않고 알린다', async () => {
-    vi.mocked(getCountsBeforeRating).mockRejectedValue(
-      new ApiError(0, 'NETWORK_ERROR', '네트워크에 연결할 수 없습니다.'),
-    );
+    vi.mocked(getRatingCounts)
+      .mockReset()
+      .mockRejectedValue(new ApiError(0, 'NETWORK_ERROR', '네트워크에 연결할 수 없습니다.'));
 
     renderPage();
 
@@ -194,7 +228,13 @@ describe('2.5 평가 저장', () => {
       .mockResolvedValueOnce(movie)
       .mockResolvedValue({
         ...movie,
-        myRating: { ratingId: 91, score: 4, comment: null, visibility: 'PRIVATE' },
+        myRating: {
+          ratingId: 91,
+          score: 4,
+          comment: null,
+          visibility: 'PRIVATE',
+          spoiler: false,
+        },
       });
 
     renderPage();
@@ -212,18 +252,28 @@ describe('2.5 평가 저장', () => {
   it('이미 평가한 영화는 API-036을 부르지 않고 수정으로 보낸다', async () => {
     vi.mocked(getMovieDetail).mockResolvedValue({
       ...movie,
-      myRating: { ratingId: 91, score: 4, comment: null, visibility: 'PUBLIC' },
+      myRating: {
+        ratingId: 91,
+        score: 4,
+        comment: '범인이 드러난다',
+        visibility: 'PUBLIC',
+        spoiler: true,
+      },
     });
 
     renderPage();
 
-    await rate(2.5);
+    expect(
+      await screen.findByRole('checkbox', { name: '스포일러가 포함되어 있어요' }),
+    ).toBeChecked();
+    await rate(2.5, '범인이 드러난다');
 
     await waitFor(() =>
       expect(updateRating).toHaveBeenCalledWith(91, {
         score: 2.5,
-        comment: null,
+        comment: '범인이 드러난다',
         visibility: 'PUBLIC',
+        spoiler: true,
       }),
     );
     expect(createRating).not.toHaveBeenCalled();

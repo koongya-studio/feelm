@@ -42,6 +42,14 @@ export type RequestOptions = {
   query?: Record<string, QueryEntry>;
   /** 기본값은 `required`다. 공개 API는 호출 측이 명시한다 */
   auth?: AuthMode;
+  /**
+   * 401을 만났을 때 재발급하고 한 번 더 보낼지. 기본값은 `true`다.
+   *
+   * 로그아웃처럼 **세션을 끝내는 것이 목적인** 요청은 `false`로 둔다. 되살릴 이유가 없고,
+   * 재발급이 거절되면 사용자가 시킨 로그아웃에 "세션이 만료됐다"는 안내가 겹친다
+   * (리뷰 B-6).
+   */
+  refreshOnUnauthorized?: boolean;
 };
 
 /**
@@ -51,7 +59,7 @@ export type RequestOptions = {
  * `void`로 선언한다.
  */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, query, auth = 'required' } = options;
+  const { method = 'GET', body, query, auth = 'required', refreshOnUnauthorized = true } = options;
   const url = `${API_BASE}${path}${queryString(query)}`;
 
   const send = (token: string | null) =>
@@ -64,7 +72,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   let response = await send(auth === 'none' ? null : getAccessToken());
 
-  if (response.status === 401 && auth !== 'none') {
+  if (response.status === 401 && auth !== 'none' && refreshOnUnauthorized) {
     /*
      * 본문은 한 번만 읽을 수 있으므로 재시도 여부를 정하기 전에 오류로 만들어 둔다.
      *
