@@ -184,6 +184,23 @@ curl --fail http://127.0.0.1:8081/app/healthz
 docker inspect --format '{{.State.Health.Status}}' feelm-frontend
 ```
 
+## PWA 설치와 서비스 워커
+
+Production Build는 `/app/manifest.webmanifest`와 `/app/service-worker.js`를 함께 제공합니다.
+지원 브라우저가 설치 이벤트를 주면 설정의 `Feelm 앱 설치`에서 설치를 시작합니다. iOS
+Safari는 같은 이벤트가 없으므로 공유 메뉴의 `홈 화면에 추가` 순서를 안내합니다. 이미
+standalone 모드로 실행 중이면 설치 항목을 표시하지 않습니다.
+
+서비스 워커 등록 실패는 React 앱 진입을 막지 않습니다. 현재 서비스 워커는 `fetch`를
+가로채거나 Cache Storage를 만들지 않습니다. 로그인 세션, `/api` 응답과 사용자별 취향
+데이터는 항상 네트워크와 서버를 정본으로 사용합니다. Nginx는 서비스 워커 본문을
+`no-cache`로 제공해 새 배포의 갱신 검사를 막지 않습니다.
+
+브라우저 Web Push 업무 `S15P21E106-583`은 `public/service-worker.js`에 `push`와
+`notificationclick` 이벤트를 추가합니다. 서비스 워커 등록과 설치 상태 관리는 이 업무의
+`src/pwa/`를 재사용하고, 별도 서비스 워커 파일이나 중복 등록을 만들지 않습니다. Web Push를
+추가할 때도 API 및 개인 데이터 비캐시 원칙은 유지합니다.
+
 종료할 때는 실행 중인 터미널에서 `Ctrl+C`를 누릅니다. 운영 이미지는 개발 의존성,
 소스 코드, 로컬 `node_modules/`, `dist/`, `.env*`, 문서와 독립 배포 대상인
 `landing/`을 포함하지 않습니다.
