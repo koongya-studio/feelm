@@ -86,13 +86,8 @@
   gap: var(--film-frame-gap);
   padding: var(--film-hole-band) var(--space-3);
   overflow-x: auto;
-  scrollbar-width: none;
   /* 프레임을 훑을 때 칸 경계에서 멈춘다 */
   scroll-snap-type: x proximity;
-}
-
-.track::-webkit-scrollbar {
-  display: none;
 }
 
 .track:focus-visible {

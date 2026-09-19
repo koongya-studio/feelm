@@ -15,7 +15,6 @@
   flex: 1;
   justify-content: center;
   overflow-y: auto;
-  scrollbar-width: none;
   /* 필름 칸 폭이 이 폭(`cqw`)을 따른다(업무 -672, index.tsx FRAME_WIDTH) */
   container-type: inline-size;
 }
