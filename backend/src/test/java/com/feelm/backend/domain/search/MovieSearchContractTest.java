@@ -1047,6 +1047,54 @@ class MovieSearchContractTest extends SharedPostgresContractTest {
     }
 
     @Test
+    @DisplayName("한두 글자 한글 검색은 제목·원제·감독 후보와 관련도 단계를 유지한다")
+    void shortHangulSearchKeepsCandidatesAndRelevanceTiers() throws Exception {
+        MovieSearchFixture.movie(jdbc, 780, "스", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 781, "스파 영화", null, "2020-01-01", 0);
+        MovieSearchFixture.movie(jdbc, 782, "도시 스파", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 783, "English-SpA 스파", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 784, "감독 작품", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 785, "Original Film", "스파 오리지널", null, 0);
+        MovieSearchFixture.movie(jdbc, 786, "또 다른 작품", null, null, 0);
+        jdbc.update(
+                "INSERT INTO people (id, tmdb_person_id, name) VALUES "
+                        + "(784, 990784, '스'), (786, 990786, '스파 감독')");
+        jdbc.update(
+                "INSERT INTO movie_people (movie_id, person_id, role) VALUES "
+                        + "(784, 784, 'DIRECTOR'), (786, 786, 'DIRECTOR')");
+        jdbc.update("INSERT INTO movie_genres (movie_id, genre_id) VALUES (781, 11), (782, 13)");
+        jdbc.update("INSERT INTO movie_countries (movie_id, country_code) VALUES (781, 'US')");
+        jdbc.update("INSERT INTO movie_ott_providers (movie_id, ott_id) VALUES (781, 21)");
+
+        JsonNode oneSyllable = read(memberRequest().param("q", "스"));
+        assertThat(ids(oneSyllable)).startsWith(780L, 784L, 781L);
+        assertThat(ids(oneSyllable)).contains(101L, 102L, 782L, 783L, 785L, 786L);
+
+        JsonNode twoSyllables = read(memberRequest().param("q", "스파"));
+        assertThat(twoSyllables.path("totalCount").asLong()).isEqualTo(5);
+        assertThat(ids(twoSyllables))
+                .startsWith(781L, 785L)
+                .containsExactlyInAnyOrder(781L, 782L, 783L, 785L, 786L);
+        assertThat(collectPages(1, "RELEVANCE", "스파")).containsExactlyElementsOf(ids(twoSyllables));
+
+        JsonNode filtered =
+                read(
+                        memberRequest()
+                                .param("q", "스파")
+                                .param("genre", "ACTION")
+                                .param("country", "US")
+                                .param("ott", "21")
+                                .param("yearFrom", "2020")
+                                .param("yearTo", "2020"));
+        assertThat(filtered.path("totalCount").asLong()).isEqualTo(1);
+        assertThat(ids(filtered)).containsExactly(781L);
+        assertThat(collectPages(1, "RATING", "스파"))
+                .containsExactlyInAnyOrder(781L, 782L, 783L, 785L, 786L);
+        assertThat(collectPages(1, "RELEASE_DATE", "스파"))
+                .containsExactlyInAnyOrder(781L, 782L, 783L, 785L, 786L);
+    }
+
+    @Test
     @DisplayName("같은 제목의 번호 붙은 속편은 다른 접두·부분 일치 작품보다 먼저 번호순으로 보여준다")
     void ranksNumberedSeriesTogether() throws Exception {
         MovieSearchFixture.movie(jdbc, 680, "나 홀로 집에", "Home Alone", null, 0);
