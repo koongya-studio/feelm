@@ -12,6 +12,7 @@
  */
 import { Link } from 'react-router';
 import Poster from '../../../../components/Poster';
+import PosterCue from '../../../../components/PosterCue';
 import VisuallyHidden from '../../../../components/VisuallyHidden';
 import { path } from '../../../../routes/paths';
 import type { MovieSearchItem } from '../../../../types/search';
@@ -40,15 +41,17 @@ export default function SearchResultGrid({ items, onSelect }: Props) {
             className={styles.cell}
             onClick={() => onSelect?.(movie)}
           >
-            <Poster
-              fluid
-              width={POSTER_RATIO.width}
-              height={POSTER_RATIO.height}
-              radius={POSTER_RADIUS}
-              src={movie.posterUrl ?? undefined}
-              title={movie.title}
-              seed={movie.movieId}
-            />
+            <PosterCue>
+              <Poster
+                fluid
+                width={POSTER_RATIO.width}
+                height={POSTER_RATIO.height}
+                radius={POSTER_RADIUS}
+                src={movie.posterUrl ?? undefined}
+                title={movie.title}
+                seed={movie.movieId}
+              />
+            </PosterCue>
             <span className={styles.title}>{movie.title}</span>
           </Link>
         </li>

@@ -1,3 +1,8 @@
+/*
+ * 버튼은 **벽에서 살짝 떠 있는 면**이다(업무 -697). 글자처럼 읽혀 눌러야 하는지 모르겠다는
+ * 지적(2026-09-19)으로 면 · 윗가장자리 빛 · 아래 그림자를 입혔다. 누르면 1px 가라앉고
+ * 그림자가 안으로 들어간다. 값은 `tokens.css`의 누르는 면 토큰이다.
+ */
 .button {
   display: flex;
   width: 100%;
@@ -6,6 +11,12 @@
   border: 0;
   background: none;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard),
+    opacity var(--motion-press) var(--ease-standard);
 }
 
 .button:disabled {
@@ -15,11 +26,13 @@
 
 /*
  * primary는 예외다. 면에 opacity를 걸면 배경과 섞여 다른 색처럼 보인다.
- * 비활성은 색을 빼고 무채색 면으로 둔다.
+ * 비활성은 색을 빼고 무채색 면으로 두고, 떠 있지 않게 그림자를 걷는다 — 누를 수 없다는 것이
+ * 면의 높이로도 보인다.
  */
 .button[data-variant='primary']:disabled {
   opacity: 1;
   background: var(--color-surface);
+  box-shadow: none;
   color: var(--color-ink-hint);
 }
 
@@ -31,15 +44,16 @@
   height: var(--control-height);
   border-radius: var(--radius-pill);
   background: var(--color-action);
+  box-shadow: var(--shadow-action);
   color: var(--color-on-action);
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-bold);
-  transition: opacity var(--motion-press) var(--ease-standard);
 }
 
-/* 눌렀는지 알 수 있을 만큼만 */
-.button[data-variant='primary']:active:not(:disabled) {
-  opacity: 0.82;
+@media (hover: hover) {
+  .button[data-variant='primary']:hover:not(:disabled) {
+    background: var(--color-action-hover);
+  }
 }
 
 /*
@@ -50,10 +64,10 @@
   height: var(--control-height);
   border-radius: var(--radius-pill);
   background: var(--color-action-brand);
+  box-shadow: var(--shadow-action);
   color: var(--color-on-action);
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-bold);
-  transition: background var(--motion-press) var(--ease-standard);
 }
 
 .button[data-variant='brand']:active:not(:disabled) {
@@ -64,21 +78,67 @@
 .button[data-variant='brand']:disabled {
   opacity: 1;
   background: var(--color-surface);
+  box-shadow: none;
   color: var(--color-ink-hint);
 }
 
+/* 보조 동작. 흰 면이 떠 있고 얇은 테두리가 윤곽을 잡는다. 주 동작의 검정 · 빨강보다 약하다 */
 .button[data-variant='secondary'] {
   height: var(--control-height);
   box-sizing: border-box;
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius-pill);
+  background: var(--gradient-button);
+  box-shadow: var(--shadow-button);
   color: var(--color-ink);
   font-size: var(--font-size-body);
   font-weight: var(--font-weight-bold);
 }
 
+@media (hover: hover) {
+  .button[data-variant='secondary']:hover:not(:disabled) {
+    background: var(--gradient-button-hover);
+    box-shadow: var(--shadow-button-hover);
+  }
+}
+
+.button[data-variant='secondary']:active:not(:disabled) {
+  background: var(--gradient-button-pressed);
+  box-shadow: var(--shadow-button-inset);
+}
+
+.button[data-variant='primary']:active:not(:disabled),
+.button[data-variant='brand']:active:not(:disabled) {
+  box-shadow: var(--shadow-action-pressed);
+}
+
+.button[data-variant='primary']:active:not(:disabled),
+.button[data-variant='brand']:active:not(:disabled),
+.button[data-variant='secondary']:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+/* 글자 버튼. 면이 없는 대신 밑줄로 누를 수 있다는 것을 말한다(공통 글자 행동 규칙) */
 .button[data-variant='text'] {
   padding: var(--space-2) 0;
   color: var(--color-ink-muted);
   font-size: var(--font-size-meta);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.button[data-variant='text']:active:not(:disabled) {
+  opacity: 0.6;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button[data-variant]:active:not(:disabled) {
+    transform: none;
+  }
 }

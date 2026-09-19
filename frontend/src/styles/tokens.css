@@ -217,6 +217,37 @@
   --shadow-raised: 0 6px 20px rgba(38, 39, 41, 0.1);
   --shadow-glass: 0 5px 16px rgba(38, 39, 41, 0.1);
 
+  /* ─────────────────────────── 누르는 면 (업무 -697) */
+  /*
+   * 버튼이 글자처럼 읽혔다(사용자 지적 2026-09-19). 누를 수 있는 것은 **벽에서 살짝 떠 있는
+   * 면**으로 그린다 — 위가 밝은 면 · 윗가장자리 빛 한 줄 · 아래 그림자. 누르면 그림자가 걷히고
+   * 면이 1px 가라앉는다. 고른 선택지는 눌려 들어간 채로 남는다(`--shadow-button-inset`).
+   *
+   * 그림자는 무채색이다. 빨강 알약도 그림자에 빨강을 섞지 않는다 — 색이 벽으로 번진다.
+   */
+  --gradient-button: linear-gradient(180deg, #ffffff 0%, #f1f2f5 100%);
+  --gradient-button-hover: linear-gradient(180deg, #ffffff 0%, #f7f8fa 100%);
+  --gradient-button-pressed: linear-gradient(180deg, #e8e9ed 0%, #eff0f3 100%);
+  --shadow-button:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 1px 2px rgba(38, 39, 41, 0.12),
+    0 3px 8px rgba(38, 39, 41, 0.08);
+  --shadow-button-hover:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 2px 3px rgba(38, 39, 41, 0.12),
+    0 6px 14px rgba(38, 39, 41, 0.1);
+  --shadow-button-inset: inset 0 2px 4px rgba(38, 39, 41, 0.14);
+  /* 검정 · 빨강 알약. 윗가장자리 빛이 면을 둥글게 세우고 아래 그림자가 벽에서 띄운다 */
+  --shadow-action:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -2px 0 rgba(0, 0, 0, 0.14),
+    0 2px 4px rgba(38, 39, 41, 0.2), 0 8px 18px rgba(38, 39, 41, 0.16);
+  --shadow-action-pressed: inset 0 2px 5px rgba(0, 0, 0, 0.28);
+  /* 어두운 면(2.4) 위의 누르는 면 */
+  --gradient-button-on-dark: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0.07) 100%
+  );
+  --shadow-button-on-dark: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 2px 6px rgba(0, 0, 0, 0.45);
+
   /* ─────────────────────────── 타이포 */
   /*
    * 이전 토큰에는 타이포 스케일이 없어 화면에 10~26px이 12종 하드코딩돼 있었다.

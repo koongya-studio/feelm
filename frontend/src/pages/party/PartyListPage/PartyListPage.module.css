@@ -23,7 +23,9 @@
   list-style: none;
 }
 
+/* 떠 있는 면이다(업무 -697) */
 .row {
+  composes: raised from '../../../styles/interaction.module.css';
   display: flex;
   width: 100%;
   align-items: center;
@@ -31,7 +33,6 @@
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
-  background: var(--color-surface-raised);
   text-align: left;
   cursor: pointer;
 }
