@@ -96,9 +96,12 @@ Consumer 후보에는 영화 표시용 메타데이터를 넣지 않고 구조�
 사용자가 평가하거나 확정 감상한 매핑 영화 중 그룹별 이력이 2편 이하이면서 전체 매핑 감상의 20%
 이하인 그룹만 대상으로 한다. 평가 영화가 속한 고정 그룹 대표로 사용자 방향을 만들고, 방향이 없으면
 온보딩의 `LIKE 대표 합 - DISLIKE 대표 합`을 사용한다. 방향과 그룹 대표의 내림차순 내적으로 공급
-그룹을 정렬한다. 먼저 상위 10개 그룹에서 그룹별 10편을 모집하고, 100편이 모자라면 다음 적격
-그룹을 탐색한 뒤 모든 적격 그룹의 최초 10편을 사용해도 부족할 때 그룹별 11번째 이후 후보를
-모집한다. 모집된 전체 최대 100편만 현재 개인 점수로 최종 정렬해 게시한다.
+그룹을 정렬한다. 먼저 상위 10개 그룹에서 그룹별 10편을 모집한다. 100편이 모자라도 다음 적격
+그룹은 추가하지 않고 같은 10개 그룹의 11위 후보를 그룹 적합도 순으로 한 편씩 모집한다. 계속
+부족하면 12위, 13위 순으로 층별 확장한다. 상위 10개 그룹을 모두 소진해도 부족하면 11번째 적격
+그룹을 1위부터 끝까지 모집하고, 계속 부족하면 12번째 이후 그룹을 적합도 순으로 소진한다. 모든
+적격 그룹 후보가 소진된 경우에만 100편 미만을 허용한다. 모집된 후보만 현재 평가·서빙 모델의 개인
+점수로 최종 정렬해 게시한다.
 `taste`와 `discovery`는 독립 순위이므로 서로 같은 영화가 있을 수 있다. Spring은 TASTE를
 최대 20편 먼저 저장하고, DISCOVERY에서 이 영화들을 건너뛴 뒤 다음 고유 후보로 최대 20편을 채운다.
 화면에는 저장된 TASTE 2편과 DISCOVERY 1편을 노출한다.
@@ -110,12 +113,14 @@ Consumer 후보에는 영화 표시용 메타데이터를 넣지 않고 구조�
 - S15P21E106-481: TASTE 후보별 구조화 단일 `reason` 객체를 추가한 Candidate v4 writer·payload 기준선
 - S15P21E106-488: 전체 평가 또는 온보딩 이력으로 계산한 저이력 그룹 적합도·상위 기여 비율을
   DISCOVERY 전용 단일 `reason` 객체로 추가한 Candidate v5 writer·payload 기준선
-- S15P21E106-505: 입력 수 제한 제거, TASTE 500·DISCOVERY 100 후보 게시와 그룹 부족분 보충,
-  `DISCOVERY_PERSONAL_SCORE`를 추가한 현재 Candidate v6 writer·payload 계약. Spring reader·조립은
+- S15P21E106-505: 입력 수 제한 제거, TASTE 500·DISCOVERY 100 후보 게시와 당시 그룹 부족분 보충,
+  `DISCOVERY_PERSONAL_SCORE`를 추가한 Candidate v6 writer·payload 계약. Spring reader·조립은
   Backend 소비 계약
 - S15P21E106-482: 그룹·그룹 내부 대중성 번들의 HDFS 게시, 두 URI 활성화와 rollback 검증
 - S15P21E106-483: 개인 후보 보충 순서를 개선하고 후보 모집단 밖까지 확장하는 별도 POPULAR fallback.
   `discovery-popularity`와 다른 산출물
+- S15P21E106-415 재개선: 상위 10개 그룹의 내부 순위 층별 확장, 소진 후 후순위 적격 그룹 확장과
+  DISCOVERY 개인 후보 보충 제거
 
 맛 배정은 439의 고정 131차원 전처리와 `top_centers`를 사용합니다(ADR-0020). 신규 영화는
 `top_x=L2(concat(g,0×k,0×t))`와 고정 중심의 거리로 배정하며 fit이나 estimator `predict`를 하지
@@ -484,22 +489,13 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
       "affinityRank": 2,
       "popularityRankInGroup": 1
     }]
-  }, {
-    "movieId": 913,
-    "score": 3.82,
-    "reasons": [{
-      "code": "DISCOVERY_PERSONAL_SCORE",
-      "sourceMovieIds": [550],
-      "matchedGenreCodes": ["THRILLER"]
-    }]
   }],
   "updatedAt": "2026-08-31T07:21:03Z"
 }
 ```
 
-- `taste`는 TASTE 상위 500편, `discovery`는 최대 100편이다. 그룹 기반 후보를 먼저 사용하고 부족분은
-  TASTE 상위 500편 밖의 개인 후보, TASTE와 중복되는 개인 후보 순으로 채운다. 서비스 가능한 고유
-  후보가 100편 이상이면 `discovery`는 정확히 100편이다. Spring은 두 배열을 직접 읽으며 항목의 중복
+- `taste`는 TASTE 상위 500편, `discovery`는 적격 그룹 기반 후보 최대 100편이다. 모든 적격 그룹 후보가
+  소진되면 100편 미만을 허용하고 개인화 전체 모집단으로 보충하지 않는다. Spring은 두 배열을 직접 읽으며 항목의 중복
   `type` 필드는 두지 않는다.
 - `score`는 별점이나 사용자 간 절대 비교값이 아니라 **같은 사용자·같은 생성 결과 안의 상대 순위
   점수**다. 값이 클수록 해당 배열 안에서 먼저 추천한다는 순서만 계약으로 보장한다.
@@ -592,11 +588,15 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
 Spring은 합의한 coverage 기준보다 낮으면 영화명을 열거하지 않고 전체 평가·온보딩 이력 기반 문구를 사용한다.
 Consumer는 구조화된 근거만 저장하고, Spring은 영화 제목과 표시명을 조회해 사용자 문구를 만든다.
 
-그룹 후보가 100편보다 적으면 Consumer는 개인 점수 후보로 나머지를 채운다. 이 항목의
-`reasons[].code`는 `DISCOVERY_PERSONAL_SCORE`이며 `sourceMovieIds`와 `matchedGenreCodes`는 TASTE 근거와
-같은 방식으로 계산한다. 입력이 없거나 어느 개인 점수 성분도 프로필을 만들 수 없는 `0.0` 동점
-fallback은 두 배열 모두 source와 장르 배열을 비워 근거가 없음을 명시한다. 이 코드가 추가된 현재
-계약은 Candidate v6이다. 근거가 없으면 `reasons`는 빈 배열로 전달한다.
+그룹 후보가 100편보다 적으면 Consumer는 선택된 상위 10개 그룹의 다음 대중성 순위 층을 순회한다.
+이 그룹들을 모두 소진해도 부족하면 11번째 이후 적격 그룹을 적합도 순으로 하나씩 소진하며, 모든
+적격 그룹 후보가 소진된 경우에만 그 수만 게시한다. 개인 점수 후보로 DISCOVERY를 보충하지 않는다.
+`DISCOVERY_PERSONAL_SCORE`는 Candidate v6 전환 호환을 위해 Spring reader가 과거 payload에서 계속
+허용하지만 현재 Consumer는 생성하지 않는다.
+이 변경은 JSON schema가 아니라 후보 정책 변경이므로 `candidateVersion=6`을 유지한다. 다만 Candidate
+키에는 TTL이 없으므로 새 Consumer 배포 뒤 모든 활성 사용자 후보를 새 `generationId`로 전체 재게시하고,
+새 payload에 개인 점수 보충 항목이 남지 않는지 확인해야 정책 전환이 끝난다. 롤백도 이전 Consumer
+복구 뒤 전체 재게시로 기존 정책 후보를 복원한다.
 배열 자체가 유형을 나타내므로 항목의 중복 `type` 필드는 두지 않는다. 공급 그룹 수·적격 그룹 수 같은
 DISCOVERY 진단 정보도 Redis 계약에 넣지 않고 Consumer 로그에만 남긴다.
 Spring은 미존재·평가·관심없음 후보를 제외하고 종류별 점수 정렬 후 TASTE를 최대 20편 저장한다.

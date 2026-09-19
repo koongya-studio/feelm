@@ -47,7 +47,7 @@ def test_discovery_stops_after_primary_ten_groups_when_they_fill_the_limit() -> 
     assert all(movie_id < 2100 for movie_id in selected_ids)
 
 
-def test_discovery_checks_additional_groups_when_primary_groups_are_sparse() -> None:
+def test_discovery_opens_next_affinity_groups_after_primary_groups_are_exhausted() -> None:
     assignments = {1: 0}
     ranked: list[RankedMovie] = []
     for group_id in range(1, 13):
@@ -65,22 +65,81 @@ def test_discovery_checks_additional_groups_when_primary_groups_are_sparse() -> 
 
     assert len(selection.candidates) == 100
     assert selection.supplying_group_count == 12
-    assert any(movie_id // 100 == 21 for movie_id in {item.movie_id for item in selection.candidates})
+    selected_ids = {item.movie_id for item in selection.candidates}
+    assert all(sum(movie_id // 100 == 10 + group_id for movie_id in selected_ids) == 9 for group_id in range(1, 12))
+    assert sum(movie_id // 100 == 22 for movie_id in selected_ids) == 1
 
 
-def test_discovery_takes_more_than_ten_from_a_group_after_all_groups_are_used() -> None:
-    assignments = {1: 0, **{movie_id: 1 for movie_id in range(100, 205)}}
-    ranked = [RankedMovie(movie_id, float(300 - movie_id)) for movie_id in range(100, 205)]
+def test_discovery_remains_short_only_after_all_eligible_groups_are_exhausted() -> None:
+    assignments = {1: 0}
+    ranked: list[RankedMovie] = []
+    for group_id in range(1, 12):
+        for offset in range(9):
+            movie_id = 1000 + group_id * 100 + offset
+            assignments[movie_id] = group_id
+            ranked.append(RankedMovie(movie_id, 1.0 - group_id / 100 - offset / 10_000))
     bundle = FakeGroupBundle(assignments)
-    bundle.group_means[1, 0] = 1.0
+    for group_id in range(1, 12):
+        bundle.group_means[group_id, 0] = 1.0 - group_id / 100
+
+    selection = select_discovery_candidates(
+        bundle, ranked, [ProfileInput(1, 5.0, "rating")], [], popularity_ranking=ranked
+    )
+
+    assert len(selection.candidates) == 99
+    assert selection.supplying_group_count == 11
+    assert selection.eligible_group_count == 11
+
+
+def test_discovery_deepens_primary_groups_one_popularity_rank_at_a_time() -> None:
+    assignments = {1: 0}
+    ranked: list[RankedMovie] = []
+    for group_id in range(1, 12):
+        group_size = 20 if group_id <= 5 or group_id == 11 else 9
+        for offset in range(group_size):
+            movie_id = 1000 + group_id * 100 + offset
+            assignments[movie_id] = group_id
+            ranked.append(RankedMovie(movie_id, 1.0 - group_id / 100 - offset / 10_000))
+    bundle = FakeGroupBundle(assignments)
+    for group_id in range(1, 12):
+        bundle.group_means[group_id, 0] = 1.0 - group_id / 100
 
     selection = select_discovery_candidates(
         bundle, ranked, [ProfileInput(1, 5.0, "rating")], [], popularity_ranking=ranked
     )
 
     assert len(selection.candidates) == 100
-    assert selection.supplying_group_count == 1
-    assert max(reason.popularity_rank_in_group for reason in selection.reasons.values()) == 100
+    assert selection.supplying_group_count == 10
+    selected_ids = {item.movie_id for item in selection.candidates}
+    assert all(sum(movie_id // 100 == 10 + group_id for movie_id in selected_ids) == 11 for group_id in range(1, 6))
+    assert all(sum(movie_id // 100 == 10 + group_id for movie_id in selected_ids) == 9 for group_id in range(6, 11))
+    assert all(movie_id < 2100 for movie_id in selected_ids)
+    assert max(reason.popularity_rank_in_group for reason in selection.reasons.values()) == 11
+
+
+def test_discovery_caps_mid_layer_by_group_affinity_order() -> None:
+    assignments = {1: 0}
+    ranked: list[RankedMovie] = []
+    for group_id in range(1, 12):
+        group_size = 30 if group_id <= 4 or group_id == 11 else 9
+        for offset in range(group_size):
+            movie_id = 1000 + group_id * 100 + offset
+            assignments[movie_id] = group_id
+            ranked.append(RankedMovie(movie_id, 1.0 - group_id / 100 - offset / 10_000))
+    bundle = FakeGroupBundle(assignments)
+    for group_id in range(1, 12):
+        bundle.group_means[group_id, 0] = 1.0 - group_id / 100
+
+    selection = select_discovery_candidates(
+        bundle, ranked, [ProfileInput(1, 5.0, "rating")], [], popularity_ranking=ranked
+    )
+
+    selected_ids = {item.movie_id for item in selection.candidates}
+    assert len(selected_ids) == 100
+    assert all(sum(movie_id // 100 == 10 + group_id for movie_id in selected_ids) == 12 for group_id in (1, 2))
+    assert all(sum(movie_id // 100 == 10 + group_id for movie_id in selected_ids) == 11 for group_id in (3, 4))
+    assert all(sum(movie_id // 100 == 10 + group_id for movie_id in selected_ids) == 9 for group_id in range(5, 11))
+    assert all(movie_id < 2100 for movie_id in selected_ids)
 
 
 def test_discovery_group_experience_uses_confirmed_viewing_boundary() -> None:
@@ -165,7 +224,7 @@ def test_onboarding_direction_is_binary_and_rating_direction_wins() -> None:
     assert rating_first.direction_source == "RATING"
 
 
-def test_onboarding_dislike_reverses_group_affinity_order_when_fill_uses_all_groups() -> None:
+def test_onboarding_dislike_reverses_affinity_order_across_fallback_groups() -> None:
     assignments = {1: 0}
     ranked: list[RankedMovie] = []
     for group_id in range(1, 12):

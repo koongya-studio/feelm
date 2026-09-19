@@ -146,7 +146,7 @@ norm≤1e−8이면 방향 없음이다. 원본 평균에는 매핑 전 선택 �
 발견 공급·전체 mapped 감상 분모에는 넣지 않는다. 이 영화도 개인 맞춤·실제 감상 제외에는 남는다.
 구체적인 원파일 선택·전처리·동률·신규 영화 배정은 [GROUPS](GROUPS.md)의 고정 계약을 따른다.
 
-## 6. 발견: 최대10개 공급 그룹×최대10편
+## 6. 발견: 최대10개 공급 그룹×최초10편
 
 그룹의 ‘덜 봄’ 자격은 전체 distinct mapped 감상 영화로 계산한다.
 
@@ -160,21 +160,29 @@ AND 그룹에 현재 적격·미노출 후보가 한 편 이상
 group ID ASC 순서로 적격 그룹을 검토한다. 음수라는 이유로 별도 제외하지 않는다.
 
 ```text
-candidates = []; supplying_groups = 0
-for group in ordered_eligible_groups:
-    movies = first_10(group.best_rank_list after all current exclusions)
-    if len(movies) == 0: continue
-    candidates.extend(movies)
-    supplying_groups += 1
-    if supplying_groups == 10: break
+candidates = []
+groups = first_10(nonempty ordered_eligible_groups)
+for group in groups:
+    candidates.extend(first_10(group.best_rank_list after all current exclusions))
+rank = 11
+while len(candidates) < 100:
+    added = false
+    for group in groups:
+        if group has rank:
+            candidates.append(group.best_rank_list[rank])
+            added = true
+            if len(candidates) == 100: break
+    if not added: break
+    rank += 1
 ```
 
 한 그룹이1~9편만 공급해도 공급 그룹1개로 센다. 10개 공급 그룹 이후11번째 그룹에서100편을
-억지로 채우지 않는다. 한 그룹의11번째 영화로 다른 그룹 부족분을 대신하지 않는다.
-따라서 실제 후보는100편보다 적을 수 있다. 그룹이 부족하면 가능한 그룹만 사용한다.
+억지로 채우지 않는다. 대신 선택된 그룹들의11번째 영화를 한 편씩, 이어서12번째 영화를 한 편씩
+대중성 순위 층별로 확장한다. 선택 그룹 후보를 모두 소진하면 실제 후보는100편보다 적을 수 있다.
 
-모은 후보를 현재 GBT로 개인 점수화하고 DESC/ID ASC로 정렬한다. 발견은 그 순서에서1편씩
-소비한다. 그룹 검색 점수·best_rank·GBT점수를 하나의 가중합으로 더하지 않는다.
+모은 후보를 현재 평가·서빙 모델(ALS·FM·GBT 등)의 개인 예측 점수로 DESC/ID ASC 정렬한다.
+발견은 그 순서에서1편씩 소비한다. 그룹 검색 점수·대중성 순위·모델 점수를 하나의 가중합으로
+더하지 않는다.
 `dv2_retrieve.gather`의 quota만10으로 바꾸면 공급 그룹 수가 제한되지 않으므로 별도 중단
 조건이 필요하다. `variant=original`도 GBT 단독이 아닌 기존 router이므로 재사용하지 않는다.
 
