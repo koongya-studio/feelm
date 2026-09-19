@@ -8,7 +8,8 @@ Jira: [387](https://ssafy.atlassian.net/browse/S15P21E106-387). 기준: `origin/
 
 ## 빠르게 읽기
 
-1. [전체 구성](README.md) → [정책](POLICY.md): GBT 기본, 맞춤2+발견1, K별 처리와 후보500 재정렬.
+1. [현재 개발 방향](CURRENT-DIRECTION.md) → [전체 구성](README.md) → [정책](POLICY.md): 0~N 입력,
+   모델 선택 보류, 맞춤2+발견1과 후보500 재정렬.
 2. [ALS와 비교](MODEL-COMPARISON.md) → [과거 연구 결론](RESEARCH-HISTORY.md): 무엇을 확인했고 무엇은 미검증인지.
 3. [데이터 분석](data-analysis/tmdb-kobis-v1-20260913/REPORT.md) → [KOBIS 확대 자료](data-analysis/kobis-expanded-20260913/REPORT.md): 표본·시점·식별 한계.
 4. [모델](MODELS.md)·[고정 그룹](GROUPS.md)·[비슷한 영화](SIMILAR-MOVIES.md) → [계약 이행 목록](CONTRACTS.md).
@@ -32,7 +33,7 @@ Jira: [387](https://ssafy.atlassian.net/browse/S15P21E106-387). 기준: `origin/
 | 1 | 현행 계약과 v1 차이 리뷰 | CONTRACTS의 API·DB·이벤트·score 의미·세트 generation·ID 이행 목록을 해당 담당자와 코드 변경에 반영 |
 | 2 | 입력/카탈로그·후보 자격·버전부터 구현 | 0.5별점, K와 최신 원본 이력 분리, TMDB/KOBIS OR, 결측·미연결 상태, 동일 snapshot |
 | 3 | scorer·배치500·현재 입력 재정렬·세트2+1 | fixture로 빈 입력·미지원·중복·소진·동시성 검증. ALS119/Consumer199의 기존 구현 경계를 확인 |
-| 4 | KOBIS 연결·기존230열 재구성·신규 모델 준비 | 검증 crosswalk·누적 기준·row-lineage·표본 하한을 통과한 후 B1/B2/B3·FM245 학습 |
+| 4 | KOBIS 연결·legacy230/245 재구성·모델별 특징 실험 | 검증 crosswalk·누적 기준·row-lineage 뒤 622 GBT와 623 FM의 제거 실험. 245열은 기준선이지 공통 최종안이 아님 |
 | 5 | 발견8×128·10×10 및 상세 유사 영화 | 고정 그룹/서비스ID export 후 검수. 유사 영화는 pgvector167·API216과 연결하며245 학습과 독립적으로 진행 가능 |
 | 6 | 활성화 전 기술·품질 검수 | ACCEPTANCE/EVALUATION과 새 모델 native/portable parity, 버전 교체·복구 검증. EC2 결과는 별도로 기록 |
 
@@ -46,7 +47,7 @@ Jira: [387](https://ssafy.atlassian.net/browse/S15P21E106-387). 기준: `origin/
 | 기존 FM/GBT230·ALS 모델 및 과거 개발 평가 | 로컬 파일 존재, 선별 근거 인계. 전체 재학습은 이번에 실행하지 않음 |
 | GKT131·8×128 연구 산출물 | 로컬 파일 존재. 서비스 ID export·실제 인덱스·조회 품질은 미검증 |
 | KOBIS72,700 영화·연도 행 | 수집·원문 검산 완료. 확대 자료의 확정 TMDB/서비스 연결은0개 |
-| KOBIS245 GBT/FM·q99·새 보정·row-lineage | NOT_BUILT. 옛230 모델을245 모델로 사용하지 않음 |
+| legacy245 GBT/FM 비교·q99·새 보정·row-lineage | NOT_BUILT. 옛230 모델을245 모델로 사용하지 않음. 현재 승격 profile은 622·623·625에서 별도 결정 |
 | v1 API/DB/Redis/Kafka·EC2/HDFS 인수 | 미실행. 설계 검토 PASS와 구분 |
 | 실제2026 한국 사용자 추천 만족도 | 미검증 |
 

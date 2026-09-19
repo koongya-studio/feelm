@@ -5,6 +5,7 @@
 
 [정책](POLICY.md) → [모델](MODELS.md) → [계약](CONTRACTS.md) → [운영](OPERATIONS.md)의
 동일 버전을 사용한다. 계약의 R-v1-OPS-01~16과 다음 경계를 함께 통과해야 구현 완료다.
+[현재 개발 방향](CURRENT-DIRECTION.md)의 0~N·모델별 특징·로컬 학습/승격 경계를 우선한다.
 그룹 산출물은 [GROUPS의 G01~G07](GROUPS.md)도 통과해야 한다. 원파일 구조 감사는 원237,817편
 전처리·그룹 할당 재현 테스트의 실행을 대신하지 않는다.
 
@@ -13,7 +14,7 @@
 | ID | 입력·조건 | 기대 결과 |
 | --- | --- | --- |
 | P01 실제 별점 | 0.5, 4.5, 5.0 입력; 0, 4.3 입력 | 앞의 세 값은 DB→이벤트→특징까지 정확히 보존. 뒤의 값은400. 예측값은 실제 별점 저장소에 기록하지 않음 |
-| P02 K와 원본 H | 평가9편→10편→1편 삭제; 최신10 중2편 미매핑 | 초기→GBT 가능→초기 경로. H는 먼저10편을 선택하고 미매핑을 과거2편으로 보충하지 않음 |
+| P02 0~N과 legacy K10 | 평가0→1→9→10→11편→1편 삭제; 지원/미지원 혼합 | 새 경로는 N=0만 초기, N≥1은 승격 모델 지원 여부로 판정하고 전체/지원/절단 수 기록. 9→10 전환은 legacy 회귀 결과로만 분리 |
 | P03 온보딩 | LIKE 20편, 실제 별점0편 | K=0. 초기 방향에만 사용. 가짜 별점·GBT 학습 이력·감상량 생성 없음 |
 | P04 TMDB 하한 | 유효 평균에 투표20/21; 평균 결측에 투표100 | KOBIS가 없으면 각각 제외/포함/제외. popularity만 높아도 통과하지 않음 |
 | P05 KOBIS 하한 | 검증된 관객9,999/10,000; 모호한 연결에1,000만 | TMDB가 없으면 각각 제외/포함/제외. 미수집·범위 밖을 관객0으로 바꾸지 않음 |
@@ -35,16 +36,18 @@
 
 | ID | 검수 | 통과 조건 |
 | --- | --- | --- |
-| M01 특징 | 245열 이름/순서/float32·해시 | feature-schema와 일치. 230열 파일을245열 모델로 로드하면 실패 |
+| M01 특징 | legacy245 또는 GBT/FM별 승격 feature profile의 이름/순서/dtype·해시 | 실행 manifest의 모델별 schema와 일치. 230열 파일을245열 모델로 로드하거나 다른 모델 profile을 혼용하면 실패 |
 | M02 원천 결측 | 실제0, 결측, 수집실패, 매핑 모호 | valid/missing_reason으로 구분. 후보 eligibility와 history validity 분리 |
 | M03 반응 | KOBIS m=0/1/2, 일정 관객 값, 후보 결측 | MODELS 수식과 일치. m<2·분산0이면 estimable=0, 공분산/교차0 |
 | M04 갱신 | 같은 사용자에서 새 KOBIS snapshot | 후보 값과 이력 반응을 같은 snapshot으로 다시 계산. q99는 학습 버전 고정 |
 | M05 추론 | Spark native 대 Consumer, 임계치 양옆/동일값 포함 | GBT 절대차≤1e−6. FM은 같은 artifact와 정밀도에서 parity. 실패 시 게시 금지 |
-| M06 ALS 미지원 | 후보 factor 없음 또는 입력 지원0 | supported=false, 점수null. GBT 기본 응답은 유지. ALS 오차 분모에0점 삽입 없음 |
-| M07 실제 모델 | 과거 DV2 original router와 GBT 경로 | 기본 모델 ID는GBT. ALS 지원 여부에 따른 덮어쓰기·자동 혼합 없음 |
+| M06 ALS 미지원 | 후보 factor 없음 또는 입력 지원0 | supported=false, 점수null. 승격된 노출 모델 응답은 유지. ALS 오차 분모에0점 삽입 없음 |
+| M07 실제 모델 | 과거 DV2 original router와 모델별 경로 | 625 이전에는 기본 모델을 활성화하지 않고, 이후에는 검증된 bundle ID를 고정. ALS 지원 여부에 따른 덮어쓰기·자동 혼합 없음 |
 | M08 학습 역할 | 목표 시각·사용자 역할·mask·view | 목표는 이력에서 제외, 엄격한 과거 입력. 역할/행 pin 보존. 원행당4view 및 동일 mask 검증 |
-| M09 모델 준비 | KOBIS 표본·새245열·보정·평가·parity | MODELS 준비 게이트 전부 충족. 부족하면 NOT_READY이며 fixture 성공과 구별 |
+| M09 모델 준비 | KOBIS 표본·legacy245 및 선택된 모델별 profile·보정·평가·parity | MODELS 준비 게이트 전부 충족. 부족하면 NOT_READY이며 fixture 성공과 구별 |
 | M10 비교 | 같은 pool shadow와 모델별 pool 비교 | SAME_POOL/END_TO_END 분리. 지원 목표 분모·UNKNOWN·국적/시기/근거량 함께 보고 |
+| M11 0~N episode | K=0/1/2/3/5/10/20/30/50+와 임의 N, target 전후 이력 | target을 제외한 엄격한 과거만 허용. 전체 평가 수와 모델 지원 이력 수를 분리하고 report bucket은 입력 cap으로 사용하지 않음 |
+| M12 분할·보조 특징 | 사용자 역할·전역 시점 창·ALS/콘텐츠/인기도 lineage | TRAIN/VALIDATION/FINAL_TEST 사용자 비중첩, 시점 창 순서, train/validation OOF, final-test fit 제외를 자동 검사 |
 
 ### 확장 KOBIS 데이터 경계
 
@@ -85,6 +88,11 @@ DB migration·API payload·별점 이벤트 round-trip부터 배치·Consumer·�
 
 모델 평가는 MSE/MAE, 맞춤@2/4/6/10, 발견 첫1·누적2/3/5/10, 낮은 별점 비율,
 지원률·UNKNOWN·대체/부분반환·중복·국적/시기/원천별 구성을 함께 보고한다.
+
+0~N 연구는 [공통 계약](../../contracts/zero-n-learning-evaluation.md)에 따라 후보 Recall·NDCG·
+저평점 노출·다양성·지원률을 주 지표로, MSE/MAE를 관측 평점의 보조 지표로 보고한다. 같은 target의
+중첩 이력 곡선과 실제 저이력 사용자 cohort를 별도 결과로 만들고, 미평가 후보를 음성 정답으로
+바꾸지 않는다.
 최신 외부 수치와 과거 MovieLens 정답을 결합한 개발 결과로2026 한국 사용자의 만족도 우위를
 확정하지 않는다. 데이터 분포 분석, 기존 모델 개발 점수, 새245열 모델의 평가를 한 표의 동일
 실험 결과처럼 합치지 않는다.
