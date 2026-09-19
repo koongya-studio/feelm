@@ -18,6 +18,11 @@
  * 편집(`edit`)은 **그 자리에서 한 항목씩** 한다. 연필을 누르면 `onEdit`가 불리고, 화면이
  * `editing`으로 넘긴 편집기가 그 구역의 보기 자리를 대신한다. 전체가 폼으로 바뀌지 않는다.
  * 무엇을 저장하고 언제 막을지는 화면(7.2)이 정한다.
+ *
+ * **`tone="dark"`는 사진 배경 틀(`ProfileBackdrop`) 위에 얹을 때다**(업무 -697). 7.1 · 7.2-A ·
+ * 7.2-B가 2.4 영화 상세처럼 프로필 사진을 배경으로 깔고 그 위에 정보를 얹는다. 사진이 배경에
+ * 깔려 있으면 가운데 동그라미 사진은 두지 않는다 — 같은 얼굴이 두 번 나온다. 이름은 2.4의
+ * 영화 제목처럼 왼쪽에 크게 서고, 카드는 사진이 비치는 반투명 면이다.
  */
 import Avatar from '../Avatar';
 import Chip from '../Chip';
@@ -53,6 +58,8 @@ type Props = {
   actions?: ReactNode;
   /** 구역 뒤에 붙는 것. 7.1의 바로가기 · 피드, 7.2의 미리보기 버튼이다 */
   children?: ReactNode;
+  /** 놓이는 면. `dark`는 사진 배경 틀 위다 */
+  tone?: 'light' | 'dark';
 };
 
 /** 시안의 사진 크기. 편집은 `사진 변경` 띠가 들어가도록 조금 크다 */
@@ -149,8 +156,11 @@ export default function ProfileLayout({
   avatarNote,
   actions,
   children,
+  tone = 'light',
 }: Props) {
   const isEdit = mode === 'edit';
+  // 사진이 배경에 깔려 있으면 동그라미 사진을 또 두지 않는다
+  const photoBehind = tone === 'dark' && Boolean(profile.avatarUrl);
   const isPublic = mode === 'public' || mode === 'preview';
   const editorFor = (key: EditableKey) => (editing?.key === key ? editing.node : null);
 
@@ -164,7 +174,11 @@ export default function ProfileLayout({
   const filmsEditor = editorFor('films');
 
   return (
-    <div className={styles.layout} data-mode={mode}>
+    <div
+      className={styles.layout}
+      data-mode={mode}
+      data-tone={tone === 'dark' ? 'dark' : undefined}
+    >
       <header className={styles.identity}>
         {isEdit ? (
           <button
@@ -186,7 +200,7 @@ export default function ProfileLayout({
               <CameraIcon />
             </span>
           </button>
-        ) : (
+        ) : photoBehind ? null : (
           avatar
         )}
 
@@ -310,9 +324,13 @@ export default function ProfileLayout({
  * 프로필을 받는 동안. 사진 · 이름 · 소개 · 수치 자리만 같은 크기로 비워 둔다 — 받고 나서
  * 화면이 튀지 않는다.
  */
-export function ProfileSkeleton() {
+export function ProfileSkeleton({ tone = 'light' }: { tone?: 'light' | 'dark' }) {
   return (
-    <div className={styles.layout} aria-busy="true">
+    <div
+      className={styles.layout}
+      aria-busy="true"
+      data-tone={tone === 'dark' ? 'dark' : undefined}
+    >
       <VisuallyHidden>
         <span role="status">프로필을 불러오는 중</span>
       </VisuallyHidden>
