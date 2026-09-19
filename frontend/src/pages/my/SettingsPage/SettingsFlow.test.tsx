@@ -30,6 +30,7 @@ import { AuthContext } from '../../../contexts/authContext';
 import { resetSessionStore } from '../../../mocks/sessionStore';
 import { mockMyProfileView } from '../../../mocks/publicProfiles';
 import { mockMyProfile } from '../../../mocks/user';
+import { forgetWebPush } from '../../../pwa/webPush';
 import { ROUTE_PATTERN } from '../../../routes/paths';
 import type { AuthValue } from '../../../contexts/authContext';
 import type { BlockedUser, NotificationSettings } from '../../../types/user';
@@ -44,6 +45,12 @@ vi.mock('../../../api/users', async (importOriginal) => ({
   getMyProfile: vi.fn(),
   // 7.1 프로필 머리(업무 -616). 모듈 안에서 부르는 `getMyProfile`은 가로채지 못해 따로 둔다
   getMyProfileView: vi.fn(),
+}));
+
+// 탈퇴 뒤 기기 푸시 구독을 지우는지만 본다(업무 -583). 브라우저 구독은 `webPush.test.ts`가 본다
+vi.mock('../../../pwa/webPush', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../pwa/webPush')>()),
+  forgetWebPush: vi.fn(async () => undefined),
 }));
 
 const signOut = vi.fn<AuthValue['signOut']>();
@@ -191,6 +198,7 @@ beforeEach(() => {
       Promise.resolve({ ...mockMyProfileView, nickname: server.profile.nickname }),
     );
   signOut.mockReset().mockResolvedValue(undefined);
+  vi.mocked(forgetWebPush).mockClear();
 });
 
 afterEach(() => {
@@ -340,6 +348,11 @@ describe('7.8-A-1 회원 탈퇴', () => {
     await waitFor(() => expect(location()).toBe('/start'));
     expect(signOut).toHaveBeenCalledTimes(1);
     expect(server.account.withdrawn).toBe(true);
+    // 기기 푸시 구독은 세션을 끊기 전에 지운다. 탈퇴한 계정은 서버 해제를 받지 않는다
+    expect(forgetWebPush).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(forgetWebPush).mock.invocationCallOrder[0]).toBeLessThan(
+      signOut.mock.invocationCallOrder[0],
+    );
   });
 
   it('비밀번호가 틀리면 그 사실을 알리고 계정은 그대로 남는다', async () => {
@@ -355,6 +368,7 @@ describe('7.8-A-1 회원 탈퇴', () => {
     expect(location()).toBe('/my/settings/account/withdraw');
     expect(server.account.withdrawn).toBe(false);
     expect(signOut).not.toHaveBeenCalled();
+    expect(forgetWebPush).not.toHaveBeenCalled();
   });
 
   /* 소셜 전용 계정은 본인 확인 수단이 아직 없다(API-013, 업무 -435) */

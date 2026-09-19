@@ -1,4 +1,4 @@
-/* API-070~074 인앱 알림 접근 함수. 브라우저 푸시(API-075~077)는 별도 업무에서 연결한다. */
+/* API-070~074 인앱 알림 접근 함수. 브라우저 푸시(API-075~077)는 `api/push.ts` · `pwa/webPush.ts`다. */
 import { request } from './client';
 import type {
   NotificationItem,

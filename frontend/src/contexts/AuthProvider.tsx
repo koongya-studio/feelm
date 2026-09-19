@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { login, logout, restoreSession, signup, socialLogin, socialSignup } from '../api/auth';
 import { onSessionEnd } from '../api/session';
+import { forgetWebPush, releaseWebPush, syncWebPush } from '../pwa/webPush';
 import { AuthContext } from './authContext';
 import type { ReactNode } from 'react';
 import type { AuthStatus, AuthValue } from './authContext';
@@ -47,7 +48,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  useEffect(() => onSessionEnd(() => setState(ANONYMOUS)), []);
+  /*
+   * 로그아웃 상태가 되면 이 기기의 푸시 알림도 끈다(업무 -583, 사용자 결정 2026-09-19). 누른
+   * 로그아웃은 `signOut`이 서버 등록까지 지운다. 세션이 만료되거나 앱을 열었을 때 이미 끊겨
+   * 있으면 토큰이 없어 서버 해제(API-077)를 보낼 수 없으므로 기기 등록만 지운다 — 그러면 서버의
+   * 다음 발송이 Push Service에서 만료로 돌아온다.
+   */
+  useEffect(
+    () =>
+      onSessionEnd((reason) => {
+        if (reason !== 'signed-out') void forgetWebPush();
+        setState(ANONYMOUS);
+      }),
+    [],
+  );
+
+  /*
+   * 로그인 상태가 되면 이 기기의 푸시 구독을 서버에 다시 올린다(업무 -583). 구독이 없으면
+   * 아무것도 하지 않는다. 같은 기기에서 계정을 바꿨다면 서버가 새 계정으로 옮긴다.
+   */
+  const userId = state.user?.userId ?? null;
+
+  useEffect(() => {
+    if (userId !== null) void syncWebPush();
+  }, [userId]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const user = await login(email, password);
@@ -93,6 +117,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    // 로그아웃한 기기로 이 계정의 푸시가 오면 안 된다. 인증이 살아 있을 때 먼저 해제한다
+    await releaseWebPush();
     await logout();
 
     setState(ANONYMOUS);
