@@ -16,6 +16,8 @@ import com.feelm.backend.domain.auth.PasswordResetTokenIssuer;
 import com.feelm.backend.domain.auth.RefreshTokenService;
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedPostgresContractTest;
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -81,6 +83,7 @@ class OnboardingSubmitApiContractTest extends SharedPostgresContractTest {
 
     @BeforeEach
     void fixtures() {
+        dropFailingFrameTrigger();
         OnboardingFixture.reset(jdbc);
         OnboardingFixture.flavors(jdbc);
         OnboardingFixture.movie(jdbc, LIKED_MOVIE, 1L, 900);
@@ -103,9 +106,14 @@ class OnboardingSubmitApiContractTest extends SharedPostgresContractTest {
         assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
     }
 
+    @AfterEach
+    void removeFailureTrigger() {
+        dropFailingFrameTrigger();
+    }
+
     @Test
-    @DisplayName("T10 선택을 저장하고 온보딩을 완료 처리한다")
-    void savesPreferencesAndCompletesOnboarding() throws Exception {
+    @DisplayName("T10 선택을 평가·프레임·팝콘·감상 기록으로 저장하고 영화 집계를 갱신한다")
+    void createsRatingsFramesPopcornWatchesAndMovieAggregates() throws Exception {
         submit(ACTIVE, bothChoices())
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.onboardingCompleted").value(true))
@@ -116,6 +124,42 @@ class OnboardingSubmitApiContractTest extends SharedPostgresContractTest {
                 .containsExactly(
                         Map.entry(LIKED_MOVIE, "LIKE"), Map.entry(DISLIKED_MOVIE, "DISLIKE"));
         assertThat(onboardingCompleted(ACTIVE)).isTrue();
+        assertThat(ratingsOf(ACTIVE))
+                .containsExactly(
+                        Map.entry(LIKED_MOVIE, new BigDecimal("4.0")),
+                        Map.entry(DISLIKED_MOVIE, new BigDecimal("2.0")));
+        assertThat(ratedWatchMoviesOf(ACTIVE)).containsExactly(LIKED_MOVIE, DISLIKED_MOVIE);
+        assertThat(frameMoviesOf(ACTIVE)).containsExactly(LIKED_MOVIE, DISLIKED_MOVIE);
+        assertThat(popcornCount(ACTIVE, 1L)).isEqualTo(1);
+        assertThat(popcornCount(ACTIVE, 2L)).isEqualTo(1);
+        assertThat(movieAggregate(LIKED_MOVIE)).isEqualTo(Map.entry(1, new BigDecimal("4.00")));
+        assertThat(movieAggregate(DISLIKED_MOVIE)).isEqualTo(Map.entry(1, new BigDecimal("2.00")));
+    }
+
+    @Test
+    @DisplayName("T25 기존 평가 영화는 덮어쓰지 않고 새 영화만 평가로 만든다")
+    void skipsMovieWithExistingRatingWithoutOverwritingAnything() throws Exception {
+        ExistingRating existing = existingRating(ACTIVE, LIKED_MOVIE, "3.5");
+        ExistingRatingState ratingBefore = ratingState(existing.ratingId());
+        ExistingWatchState watchBefore = watchState(existing.watchId());
+        ExistingFrameState frameBefore = frameState(existing.ratingId());
+
+        submit(ACTIVE, bothChoices())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.savedCount").value(2));
+
+        assertThat(ratingsOf(ACTIVE))
+                .containsExactly(
+                        Map.entry(LIKED_MOVIE, new BigDecimal("3.5")),
+                        Map.entry(DISLIKED_MOVIE, new BigDecimal("2.0")));
+        assertThat(ratingState(existing.ratingId())).isEqualTo(ratingBefore);
+        assertThat(watchState(existing.watchId())).isEqualTo(watchBefore);
+        assertThat(frameState(existing.ratingId())).isEqualTo(frameBefore);
+        assertThat(ratedWatchMoviesOf(ACTIVE)).containsExactly(LIKED_MOVIE, DISLIKED_MOVIE);
+        assertThat(frameMoviesOf(ACTIVE)).containsExactly(LIKED_MOVIE, DISLIKED_MOVIE);
+        assertThat(movieAggregate(LIKED_MOVIE)).isEqualTo(Map.entry(1, new BigDecimal("3.50")));
+        assertThat(popcornCount(ACTIVE, 1L)).isEqualTo(1);
+        assertThat(popcornCount(ACTIVE, 2L)).isEqualTo(1);
     }
 
     @Test
@@ -138,7 +182,7 @@ class OnboardingSubmitApiContractTest extends SharedPostgresContractTest {
 
     @Test
     @DisplayName("T12 건너뛴 제출은 아무것도 저장하지 않고 이벤트도 발행하지 않는다")
-    void skipSavesNothingAndPublishesNoEvent() throws Exception {
+    void skippedSubmissionCreatesNoRatingArtifacts() throws Exception {
         submit(ACTIVE, "{\"preferences\":[],\"skipped\":true}")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.onboardingCompleted").value(true))
@@ -148,6 +192,29 @@ class OnboardingSubmitApiContractTest extends SharedPostgresContractTest {
         assertThat(preferencesOf(ACTIVE)).isEmpty();
         assertThat(onboardingCompleted(ACTIVE)).isTrue();
         assertThat(outboxEvents()).isEmpty();
+        assertThat(ratingsOf(ACTIVE)).isEmpty();
+        assertThat(ratedWatchMoviesOf(ACTIVE)).isEmpty();
+        assertThat(frameMoviesOf(ACTIVE)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("T26 두 번째 프레임 저장 실패는 온보딩의 모든 상태와 집계를 롤백한다")
+    void frameFailureRollsBackAllOnboardingWrites() throws Exception {
+        failFrameInsertFor(DISLIKED_MOVIE);
+
+        submit(ACTIVE, bothChoices())
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+
+        assertThat(preferencesOf(ACTIVE)).isEmpty();
+        assertThat(onboardingCompleted(ACTIVE)).isFalse();
+        assertThat(ratingsOf(ACTIVE)).isEmpty();
+        assertThat(ratedWatchMoviesOf(ACTIVE)).isEmpty();
+        assertThat(frameMoviesOf(ACTIVE)).isEmpty();
+        assertThat(outboxEvents()).isEmpty();
+        assertThat(movieAggregate(LIKED_MOVIE)).isEqualTo(Map.entry(900, new BigDecimal("4.50")));
+        assertThat(movieAggregate(DISLIKED_MOVIE))
+                .isEqualTo(Map.entry(800, new BigDecimal("4.50")));
     }
 
     @Test
@@ -190,14 +257,26 @@ class OnboardingSubmitApiContractTest extends SharedPostgresContractTest {
 
     @Test
     @DisplayName("T16 존재하지 않는 영화를 선택하면 거절하고 완료 처리하지 않는다")
-    void rejectsUnknownMovieId() throws Exception {
-        submit(ACTIVE, "{\"preferences\":[" + choice(999, "LIKE") + "],\"skipped\":false}")
+    void unknownMovieRollsBackAllRatingArtifacts() throws Exception {
+        submit(
+                        ACTIVE,
+                        "{\"preferences\":["
+                                + choice(LIKED_MOVIE, "LIKE")
+                                + ","
+                                + choice(999, "LIKE")
+                                + "],\"skipped\":false}")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
 
         assertThat(preferencesOf(ACTIVE)).isEmpty();
         assertThat(onboardingCompleted(ACTIVE)).isFalse();
         assertThat(outboxEvents()).isEmpty();
+        assertThat(ratingsOf(ACTIVE)).isEmpty();
+        assertThat(ratedWatchMoviesOf(ACTIVE)).isEmpty();
+        assertThat(frameMoviesOf(ACTIVE)).isEmpty();
+        assertThat(movieAggregate(LIKED_MOVIE)).isEqualTo(Map.entry(900, new BigDecimal("4.50")));
+        assertThat(movieAggregate(DISLIKED_MOVIE))
+                .isEqualTo(Map.entry(800, new BigDecimal("4.50")));
     }
 
     @Test
@@ -252,6 +331,9 @@ class OnboardingSubmitApiContractTest extends SharedPostgresContractTest {
         assertThat(preferencesOf(ACTIVE)).hasSize(2);
         assertThat(onboardingCompleted(ACTIVE)).isTrue();
         assertThat(outboxEvents()).hasSize(1);
+        assertThat(ratingsOf(ACTIVE)).hasSize(2);
+        assertThat(ratedWatchMoviesOf(ACTIVE)).hasSize(2);
+        assertThat(frameMoviesOf(ACTIVE)).hasSize(2);
     }
 
     @Test
@@ -417,4 +499,157 @@ class OnboardingSubmitApiContractTest extends SharedPostgresContractTest {
                 "SELECT event_type, topic, partition_key, message::text AS message"
                         + " FROM outbox_events ORDER BY id");
     }
+
+    private List<Map.Entry<Long, BigDecimal>> ratingsOf(long userId) {
+        return jdbc.query(
+                "SELECT movie_id, score FROM ratings WHERE user_id=? ORDER BY movie_id",
+                (row, rowNumber) -> Map.entry(row.getLong("movie_id"), row.getBigDecimal("score")),
+                userId);
+    }
+
+    private List<Long> ratedWatchMoviesOf(long userId) {
+        return jdbc.queryForList(
+                "SELECT movie_id FROM watch_records WHERE user_id=? AND status='RATED'"
+                        + " ORDER BY movie_id",
+                Long.class,
+                userId);
+    }
+
+    private List<Long> frameMoviesOf(long userId) {
+        return jdbc.queryForList(
+                "SELECT movie_id FROM frames WHERE user_id=? ORDER BY movie_id",
+                Long.class,
+                userId);
+    }
+
+    private long popcornCount(long userId, long flavorId) {
+        return jdbc.queryForObject(
+                "SELECT count(*) FROM ratings rating JOIN movies movie"
+                        + " ON movie.id=rating.movie_id WHERE rating.user_id=?"
+                        + " AND movie.representative_flavor_id=?",
+                Long.class,
+                userId,
+                flavorId);
+    }
+
+    private Map.Entry<Integer, BigDecimal> movieAggregate(long movieId) {
+        return jdbc.queryForObject(
+                "SELECT rating_count, average_rating FROM movies WHERE id=?",
+                (row, rowNumber) ->
+                        Map.entry(row.getInt("rating_count"), row.getBigDecimal("average_rating")),
+                movieId);
+    }
+
+    private ExistingRating existingRating(long userId, long movieId, String score) {
+        long watchId =
+                jdbc.queryForObject(
+                        "INSERT INTO watch_records(user_id,movie_id,status,rated_at)"
+                                + " VALUES (?,?,'RATED',TIMESTAMPTZ '2026-09-01 01:00:00Z')"
+                                + " RETURNING id",
+                        Long.class,
+                        userId,
+                        movieId);
+        long ratingId =
+                jdbc.queryForObject(
+                        "INSERT INTO ratings(user_id,movie_id,watch_record_id,score,comment,"
+                                + " visibility,is_spoiler,created_at,updated_at)"
+                                + " VALUES (?,?,?,?,'기존 평가','PUBLIC',true,"
+                                + " TIMESTAMPTZ '2026-09-01 01:00:01Z',"
+                                + " TIMESTAMPTZ '2026-09-01 01:00:02Z') RETURNING id",
+                        Long.class,
+                        userId,
+                        movieId,
+                        watchId,
+                        new BigDecimal(score));
+        long frameId =
+                jdbc.queryForObject(
+                        "INSERT INTO frames(rating_id,user_id,movie_id,created_at)"
+                                + " VALUES (?,?,?,TIMESTAMPTZ '2026-09-01 01:00:03Z') RETURNING id",
+                        Long.class,
+                        ratingId,
+                        userId,
+                        movieId);
+        jdbc.update(
+                "UPDATE movies SET rating_count=1, average_rating=? WHERE id=?",
+                new BigDecimal(score),
+                movieId);
+        return new ExistingRating(ratingId, watchId, frameId);
+    }
+
+    private ExistingRatingState ratingState(long ratingId) {
+        return jdbc.queryForObject(
+                "SELECT score, comment, visibility, is_spoiler, watch_record_id,"
+                        + " created_at, updated_at FROM ratings WHERE id=?",
+                (row, rowNumber) ->
+                        new ExistingRatingState(
+                                row.getBigDecimal("score"),
+                                row.getString("comment"),
+                                row.getString("visibility"),
+                                row.getBoolean("is_spoiler"),
+                                row.getLong("watch_record_id"),
+                                row.getObject("created_at", OffsetDateTime.class).toInstant(),
+                                row.getObject("updated_at", OffsetDateTime.class).toInstant()),
+                ratingId);
+    }
+
+    private ExistingWatchState watchState(long watchId) {
+        return jdbc.queryForObject(
+                "SELECT status, rated_at FROM watch_records WHERE id=?",
+                (row, rowNumber) ->
+                        new ExistingWatchState(
+                                row.getString("status"),
+                                row.getObject("rated_at", OffsetDateTime.class).toInstant()),
+                watchId);
+    }
+
+    private ExistingFrameState frameState(long ratingId) {
+        return jdbc.queryForObject(
+                "SELECT id, created_at FROM frames WHERE rating_id=?",
+                (row, rowNumber) ->
+                        new ExistingFrameState(
+                                row.getLong("id"),
+                                row.getObject("created_at", OffsetDateTime.class).toInstant()),
+                ratingId);
+    }
+
+    private void failFrameInsertFor(long movieId) {
+        jdbc.execute(
+                """
+                CREATE FUNCTION test_fail_onboarding_frame() RETURNS trigger AS $$
+                BEGIN
+                    IF NEW.movie_id = %d THEN
+                        RAISE EXCEPTION 'forced onboarding frame failure';
+                    END IF;
+                    RETURN NEW;
+                END;
+                $$ LANGUAGE plpgsql
+                """
+                        .formatted(movieId));
+        jdbc.execute(
+                """
+                CREATE TRIGGER test_fail_onboarding_frame
+                BEFORE INSERT ON frames
+                FOR EACH ROW EXECUTE FUNCTION test_fail_onboarding_frame()
+                """);
+    }
+
+    private void dropFailingFrameTrigger() {
+        jdbc.execute("DROP TRIGGER IF EXISTS test_fail_onboarding_frame ON frames");
+        jdbc.execute("DROP FUNCTION IF EXISTS test_fail_onboarding_frame()");
+    }
+
+    private record ExistingRating(long ratingId, long watchId, long frameId) {}
+
+    private record ExistingRatingState(
+            BigDecimal score,
+            String comment,
+            String visibility,
+            boolean spoiler,
+            long watchId,
+            java.time.Instant createdAt,
+            java.time.Instant updatedAt) {}
+
+    private record ExistingWatchState(String status, java.time.Instant ratedAt) {}
+
+    private record ExistingFrameState(long frameId, java.time.Instant createdAt) {}
 }
