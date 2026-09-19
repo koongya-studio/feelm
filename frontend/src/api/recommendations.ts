@@ -25,8 +25,7 @@ let pendingRecommendationRequest: Promise<RecommendationSet> | null = null;
  * 일치도 `%`(와이어프레임의 `일치 92%`)는 계약에 없어 그리지 않는다(CR-13). 서버 값이
  * 없는 수치를 화면이 지어내지 않는다.
  *
- * 관심없음(API-047)은 백엔드에 있지만 프론트 연동은 S15P21E106-536이 맡는다. 그전까지
- * 2.3 메뉴의 `관심없음`은 눌리지 않는다(`RecommendationsPage`).
+ * 관심없음(API-047)은 카드 오른쪽 위 버튼이 부른다(업무 -672, `dismissMovie`).
  */
 export function getRecommendations(): Promise<RecommendationSet> {
   /*
@@ -49,6 +48,21 @@ export function getRecommendations(): Promise<RecommendationSet> {
   }
 
   return pendingRecommendationRequest;
+}
+
+/**
+ * API-047 관심없음 표시 · POST /api/v1/movies/{movieId}/dismiss
+ *
+ * 관심없음 영화는 이후 모든 개인 추천에서 빠진다. 추천 카드에서 부를 때만
+ * `recommendationItemId`를 싣는다(선택값). 응답은 `{ movieId }`뿐이고 빈 자리는 다음
+ * API-045 조회가 보충한다(처리 규칙) — 화면이 다시 부른다. 이미 관심없음인 영화는
+ * `409 ALREADY_DISMISSED`다.
+ */
+export async function dismissMovie(movieId: number, recommendationItemId?: number): Promise<void> {
+  await request<{ movieId: number }>(`/movies/${movieId}/dismiss`, {
+    method: 'POST',
+    body: recommendationItemId === undefined ? {} : { recommendationItemId },
+  });
 }
 
 /**

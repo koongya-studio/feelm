@@ -3,13 +3,17 @@
  *
  * 목업 카드가 목업 영화 번호(101~104)로 실제 영화 상세를 열어 전혀 다른 영화가 나오던
  * 문제를 없앴다. 카드는 API-045 응답 그대로이고, 포스터와 `영화 상세 보기`는 그 서버
- * 영화의 번호로 간다. 관심없음(API-047)은 프론트 연동(S15P21E106-536) 전까지 눌리지 않는다.
+ * 영화의 번호로 간다.
+ *
+ * 관심없음(API-047)은 카드 오른쪽 위 버튼이다(업무 S15P21E106-672). ⋯ 메뉴에는 없다. 서버가
+ * 받은 뒤에만 카드를 빼고 API-045를 다시 불러 보충한다. 섹션 이름표와 `안 봄` 배지는 없고,
+ * 취향 발견 카드에만 `새로운 맛` 배지가 있다(같은 업무).
  *
  * 추천 후보가 아직 없는 `503 RECOMMENDATION_UNAVAILABLE`은 장애가 아니라 준비 중으로
  * 안내한다(업무 S15P21E106-654). 그 밖의 실패만 2.2-A 문구를 쓴다.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import RecommendationsPage from './index';
 import { ApiError } from '../../../api/apiError';
 import { renderWithRouter } from '../../../test/render';
@@ -17,13 +21,14 @@ import type { RecommendationSet } from '../../../types/recommendation';
 
 vi.mock('../../../api/recommendations', () => ({
   getRecommendations: vi.fn(),
+  dismissMovie: vi.fn(),
 }));
 
 vi.mock('../../../api/otts', () => ({
   getOtts: vi.fn(),
 }));
 
-const { getRecommendations } = await import('../../../api/recommendations');
+const { dismissMovie, getRecommendations } = await import('../../../api/recommendations');
 const { getOtts } = await import('../../../api/otts');
 
 /** 서버가 준 세트. 영화 번호 550은 목업 어디에도 없는 실제 번호다 */
@@ -66,6 +71,7 @@ const set: RecommendationSet = {
 
 beforeEach(() => {
   vi.mocked(getRecommendations).mockReset().mockResolvedValue(set);
+  vi.mocked(dismissMovie).mockReset().mockResolvedValue(undefined);
   vi.mocked(getOtts)
     .mockReset()
     .mockResolvedValue([{ ottId: 1, code: 'NETFLIX', name: '넷플릭스', logoUrl: null }]);
@@ -81,11 +87,22 @@ describe('2.2 오늘의 추천', () => {
 
     // 일치도 %는 계약에 없어 그리지 않는다(CR-13)
     expect(screen.queryByText(/일치 \d+%/)).toBeNull();
-    expect(screen.getByText('안 봄')).toBeInTheDocument();
-    expect(screen.getByText('새로운 맛')).toBeInTheDocument();
+    // 섹션 이름표와 `안 봄`은 없고, 취향 발견 카드(세븐)에만 `새로운 맛`이 있다(업무 -672)
+    expect(screen.queryByText('취향 맞춤 추천')).toBeNull();
+    expect(screen.queryByText('취향 발견 추천')).toBeNull();
+    expect(screen.queryByText('안 봄')).toBeNull();
+    expect(screen.getAllByText('새로운 맛')).toHaveLength(1);
+    expect(screen.getByRole('link', { name: '세븐 상세 보기' }).parentElement).toHaveTextContent(
+      '새로운 맛',
+    );
+    // 취향 맞춤이 먼저, 취향 발견이 뒤다
+    const titles = screen
+      .getAllByRole('link', { name: / 상세 보기$/ })
+      .map((link) => link.getAttribute('aria-label'));
+    expect(titles).toEqual(['파이트 클럽 상세 보기', '세븐 상세 보기']);
   });
 
-  it('⋯ 메뉴의 영화 상세 보기도 서버 영화로 가고, 관심없음은 아직 눌리지 않는다', async () => {
+  it('⋯ 메뉴의 영화 상세 보기도 서버 영화로 가고, 관심없음은 메뉴에 없다', async () => {
     renderWithRouter(<RecommendationsPage />, { route: '/recommendations' });
 
     fireEvent.click(await screen.findByRole('button', { name: /세븐 OTT 메뉴/ }));
@@ -94,7 +111,9 @@ describe('2.2 오늘의 추천', () => {
       'href',
       '/movies/807',
     );
-    expect(screen.getByRole('button', { name: /관심없음/ })).toBeDisabled();
+    expect(
+      within(screen.getByRole('group', { name: '세븐 OTT 메뉴' })).queryByText('관심없음'),
+    ).toBeNull();
   });
 
   it('빈 세트는 목업으로 채우지 않고 빈 상태를 말한다', async () => {
@@ -141,5 +160,79 @@ describe('2.2-A 추천을 불러오지 못한 경우', () => {
     expect(screen.getByText('검색과 영화 평가는 계속 이용할 수 있어요')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
     expect(screen.queryByText('취향에 맞는 추천을 준비하고 있어요')).toBeNull();
+  });
+});
+
+/*
+ * 관심없음 (업무 -672 · -536)
+ *
+ * 서버가 받은 뒤에만 카드를 뺀다 — 화면에서만 지운 척하면 다음 조회에서 되살아난다.
+ */
+describe('2.2 관심없음', () => {
+  /** 관심없음 뒤 API-045가 보충한 세트. 파이트 클럽이 빠지고 새 카드가 들어왔다 */
+  const refilled: RecommendationSet = {
+    ...set,
+    items: [
+      {
+        ...set.items[0],
+        recommendationItemId: 3303,
+        movie: { ...set.items[0].movie, movieId: 680, title: '펄프 픽션' },
+      },
+      set.items[1],
+    ],
+  };
+
+  it('카드 오른쪽 위 버튼이 API-047을 부르고, 그 카드를 빼 API-045가 보충한 카드로 채운다', async () => {
+    vi.mocked(getRecommendations).mockResolvedValueOnce(set).mockResolvedValueOnce(refilled);
+    renderWithRouter(<RecommendationsPage />, { route: '/recommendations' });
+
+    fireEvent.click(await screen.findByRole('button', { name: '파이트 클럽 관심없음' }));
+
+    expect(dismissMovie).toHaveBeenCalledWith(550, 3301);
+    expect(await screen.findByRole('link', { name: '펄프 픽션 상세 보기' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '파이트 클럽 상세 보기' })).toBeNull();
+    expect(getRecommendations).toHaveBeenCalledTimes(2);
+  });
+
+  it('이미 관심없음인 영화(409)도 처리된 것으로 보고 카드를 뺀다', async () => {
+    vi.mocked(dismissMovie).mockRejectedValue(
+      new ApiError(409, 'ALREADY_DISMISSED', '이미 관심없음 처리한 영화입니다.'),
+    );
+    vi.mocked(getRecommendations).mockResolvedValueOnce(set).mockResolvedValueOnce(refilled);
+    renderWithRouter(<RecommendationsPage />, { route: '/recommendations' });
+
+    fireEvent.click(await screen.findByRole('button', { name: '파이트 클럽 관심없음' }));
+
+    expect(await screen.findByRole('link', { name: '펄프 픽션 상세 보기' })).toBeInTheDocument();
+    expect(screen.queryByText(/관심없음으로 처리하지 못했어요/)).toBeNull();
+  });
+
+  it('보충 조회가 실패해도 뺀 카드는 되살리지 않는다', async () => {
+    vi.mocked(getRecommendations)
+      .mockResolvedValueOnce(set)
+      .mockRejectedValueOnce(new ApiError(0, 'NETWORK_ERROR', '네트워크에 연결할 수 없습니다.'));
+    renderWithRouter(<RecommendationsPage />, { route: '/recommendations' });
+
+    fireEvent.click(await screen.findByRole('button', { name: '파이트 클럽 관심없음' }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole('link', { name: '파이트 클럽 상세 보기' })).toBeNull(),
+    );
+    expect(screen.getByRole('link', { name: '세븐 상세 보기' })).toBeInTheDocument();
+  });
+
+  it('관심없음을 처리하지 못하면 카드를 그대로 두고 알린다', async () => {
+    vi.mocked(dismissMovie).mockRejectedValue(
+      new ApiError(0, 'NETWORK_ERROR', '네트워크에 연결할 수 없습니다.'),
+    );
+    renderWithRouter(<RecommendationsPage />, { route: '/recommendations' });
+
+    fireEvent.click(await screen.findByRole('button', { name: '파이트 클럽 관심없음' }));
+
+    expect(await screen.findByText(/관심없음으로 처리하지 못했어요/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '파이트 클럽 상세 보기' })).toBeInTheDocument();
+    // 다시 누를 수 있다
+    expect(screen.getByRole('button', { name: '파이트 클럽 관심없음' })).toBeEnabled();
+    expect(getRecommendations).toHaveBeenCalledTimes(1);
   });
 });

@@ -4,13 +4,22 @@
  * (frontend-structure.md 3.3 — 라우트로 만들지 않는다).
  *
  * 카드 구성은 계약을 따라 취향 맞춤 2편 + 취향 발견 1편이다(API-045,
- * screen-spec.md 8.1 #3). 와이어프레임은 3 + 2 = 5장이지만 계약이 기준이다.
- * 섹션 이름도 계약을 따라 `취향 발견 추천`이다(FR-12, 8.1 #4).
+ * screen-spec.md 8.1 #3). 와이어프레임은 3 + 2 = 5장이지만 계약이 기준이다. 취향 맞춤을
+ * 먼저, 취향 발견을 뒤에 둔다.
+ *
+ * **`취향 맞춤 추천` · `취향 발견 추천` 이름표는 없다**(사용자 지시 2026-09-18, 업무 -672).
+ * 필름 칸 사이에 끼우던 이름표와 발견 설명 문장을 걷어냈다. 취향 발견 카드인지는 카드의
+ * `새로운 맛` 배지가 말하고, 취향 맞춤 카드의 `안 봄` 배지는 뺐다(`RecommendationCard`).
  *
  * **카드는 API-045 실제 응답이다**(업무 -610). 목업 카드가 목업 영화 번호(101~104)로 실제
  * 영화 상세를 열어 전혀 다른 영화가 나오던 문제를 없앴다. 일치도 `%`는 계약에 없어 그리지
- * 않는다(CR-13). 관심없음(API-047)의 프론트 연동은 S15P21E106-536이 맡으므로 그전까지
- * 메뉴의 `관심없음`은 눌리지 않는다 — 목업으로 지운 척하는 것보다 낫다.
+ * 않는다(CR-13).
+ *
+ * **관심없음은 카드 오른쪽 위 버튼이다**(사용자 지시 2026-09-18, 업무 -672 — -536을 합쳤다).
+ * ⋯ 메뉴에서는 뺐다. 누르면 API-047에 `recommendationItemId`를 실어 보내고, 성공하면 그
+ * 카드를 빼고 API-045를 다시 불러 서버가 보충한 카드로 채운다(API-047 처리 규칙 — 응답은
+ * `{ movieId }`뿐이다). 이미 관심없음인 영화(`409 ALREADY_DISMISSED`)도 처리된 것으로 본다.
+ * 실패하면 카드를 그대로 두고 알린다 — 화면에서만 지운 척하면 다음 조회에서 되살아난다.
  *
  * 추천 후보가 모두 빠진 경우(관심없음 · 온보딩 `안 좋았어요`)에도 이 화면에 보여줄 것이
  * 없다. 와이어프레임에 그 상태가 없어 2.2-A와 같은 자리에 빈 데이터 안내를 둔다
@@ -24,8 +33,7 @@
  *
  * 카드 열은 **3.1과 같은 필름 릴을 세로로 세운 것**이다(`FilmReel`, 업무 -605 — 사용자
  * 지시 2026-09-18). 그전에는 와이어프레임의 회색 판에 구멍 줄을 직접 그렸는데, 3.1의
- * 필름이 확정되고 나서 추천 카드가 다른 필름처럼 보였다. 섹션 이름표는 프레임 사이에
- * 끼운다(`data-film-label`).
+ * 필름이 확정되고 나서 추천 카드가 다른 필름처럼 보였다.
  */
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
@@ -36,10 +44,11 @@ import OttBadge from '../../../components/OttBadge';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
-import { BlockIcon, LinkIcon, PlayIcon } from '../../../components/Icon';
+import { LinkIcon, PlayIcon } from '../../../components/Icon';
+import Snackbar from '../../../components/Snackbar';
 import RecommendationCard from './RecommendationCard';
 import { ApiError } from '../../../api/apiError';
-import { getRecommendations } from '../../../api/recommendations';
+import { dismissMovie, getRecommendations } from '../../../api/recommendations';
 import { getOtts } from '../../../api/otts';
 import { path } from '../../../routes/paths';
 import styles from './RecommendationsPage.module.css';
@@ -47,9 +56,23 @@ import type { MouseEvent } from 'react';
 import type { Ott } from '../../../types/ott';
 import type { RecommendationItem } from '../../../types/recommendation';
 
-/* 카드 실측값 그대로다(RecommendationCard). 릴의 칸 크기가 되고 릴은 이 폭에 맞춰 선다 */
-const FRAME_WIDTH = 156;
-const FRAME_HEIGHT = 220;
+/*
+ * 카드 크기. 릴의 칸 크기가 되고 카드는 그 칸을 채운다(RecommendationCard).
+ *
+ * **필름이 화면 폭을 꽉 채운다**(사용자 지시 2026-09-18, 업무 -672 — "필름이 너무 작다").
+ * 세로 필름은 칸 폭에 구멍 띠 · 여백 34px(12 × 2 + 5 × 2, FilmReel)가 붙는다. 화면 폭은
+ * `.scrollArea`의 컨테이너 폭(`cqw`)이다 — `100vw`는 PC에서 세로 스크롤바 폭까지 넣어
+ * 가로로 넘친다.
+ *
+ * **띠를 휘지 않는다**(`flat`). 세로 필름 띠는 가운데가 폭의 2%만큼 오목하게 휘어 있어
+ * 화면 폭에 맞추면 가운데에서 양옆 벽이 8px쯤 비쳤다(사용자 지적 2026-09-19). 필름을 넓혀
+ * 넘치게 하면 이번에는 구멍 줄이 화면 밖으로 밀려 잘렸다. 곧은 띠라야 테두리가 화면 끝에
+ * 딱 붙고 구멍 줄도 온전하다. 칸 폭 = 화면 폭 − 34.
+ *
+ * 높이는 와이어프레임 카드(156 × 220)와 같은 비율로 폭을 따라간다.
+ */
+const FRAME_WIDTH = 'calc(100cqw - 34px)';
+const FRAME_HEIGHT = 'calc((100cqw - 34px) * 220 / 156)';
 
 /**
  * API-045 실패의 종류. `preparing`은 추천 후보가 아직 없어 서버가 추천을 만들 수 없는 경우다
@@ -73,6 +96,10 @@ export default function RecommendationsPage() {
   const rootRef = useRef<HTMLDivElement>(null);
   const [otts, setOtts] = useState<Ott[]>([]);
   const [items, setItems] = useState<RecommendationItem[] | null>(null);
+  /** 관심없음을 처리 중인 카드. 그동안 그 카드의 버튼은 눌리지 않는다 */
+  const [dismissingId, setDismissingId] = useState<number | null>(null);
+  /** 관심없음을 처리하지 못했으면 하단 막대로 알린다 */
+  const [dismissFailed, setDismissFailed] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [openMenu, setOpenMenu] = useState<OpenMenu | null>(null);
 
@@ -112,6 +139,35 @@ export default function RecommendationsPage() {
     setFailure(null);
     setOpenMenu(null);
     setReloadCount((count) => count + 1);
+  }
+
+  /**
+   * 관심없음(API-047). 서버가 받은 뒤에만 카드를 뺀다. 그다음 API-045를 다시 불러 빈 자리를
+   * 서버가 보충한 카드로 바꾼다 — 다시 부르지 못해도 뺀 카드는 그대로 둔다(저장은 끝났다).
+   */
+  function handleDismiss(item: RecommendationItem) {
+    setDismissingId(item.recommendationItemId);
+    setDismissFailed(false);
+    setOpenMenu(null);
+
+    dismissMovie(item.movie.movieId, item.recommendationItemId)
+      .catch((error: unknown) => {
+        // 이미 관심없음인 영화다. 서버 상태는 이미 원하는 대로다
+        if (!(error instanceof ApiError && error.code === 'ALREADY_DISMISSED')) throw error;
+      })
+      .then(() => {
+        setItems((prev) =>
+          prev
+            ? prev.filter((card) => card.recommendationItemId !== item.recommendationItemId)
+            : prev,
+        );
+
+        return getRecommendations()
+          .then((set) => setItems(set.items))
+          .catch(() => undefined);
+      })
+      .catch(() => setDismissFailed(true))
+      .finally(() => setDismissingId(null));
   }
 
   function handleOpenMenu(event: MouseEvent<HTMLButtonElement>, item: RecommendationItem) {
@@ -191,38 +247,20 @@ export default function RecommendationsPage() {
           {items ? (
             <FilmReel
               orientation="vertical"
+              flat
               frameWidth={FRAME_WIDTH}
               frameHeight={FRAME_HEIGHT}
               label="오늘의 추천 카드"
             >
-              <h2 className={styles.sectionPill} data-film-label="">
-                취향 맞춤 추천
-              </h2>
-
-              {tasteItems.map((item) => (
+              {[...tasteItems, ...discoveryItems].map((item) => (
                 <RecommendationCard
                   key={item.recommendationItemId}
                   item={item}
                   otts={otts}
                   menuOpen={openMenu?.item.recommendationItemId === item.recommendationItemId}
                   onOpenMenu={handleOpenMenu}
-                />
-              ))}
-
-              <div className={styles.sectionGroup} data-film-label="">
-                <h2 className={styles.sectionPill} data-tone="dark">
-                  취향 발견 추천
-                </h2>
-                <p className={styles.sectionNote}>기존 취향과 연결되는 새로운 팝콘 맛이에요</p>
-              </div>
-
-              {discoveryItems.map((item) => (
-                <RecommendationCard
-                  key={item.recommendationItemId}
-                  item={item}
-                  otts={otts}
-                  menuOpen={openMenu?.item.recommendationItemId === item.recommendationItemId}
-                  onOpenMenu={handleOpenMenu}
+                  dismissing={dismissingId === item.recommendationItemId}
+                  onDismiss={handleDismiss}
                 />
               ))}
             </FilmReel>
@@ -279,17 +317,17 @@ export default function RecommendationsPage() {
                 <LinkIcon />
                 <span className={styles.menuItemLabel}>영화 상세 보기</span>
               </Link>
-
-              {/*
-               * 관심없음(API-047)은 백엔드에 있지만 프론트 연동은 S15P21E106-536이 맡는다.
-               * 그전까지 눌리지 않는다 — 화면 상태로만 지운 척하면 다음 조회에서 되살아난다.
-               */}
-              <button type="button" className={styles.menuItem} data-tone="muted" disabled>
-                <BlockIcon />
-                <span className={styles.menuItemLabel}>관심없음</span>
-              </button>
             </div>
           </Menu>
+        ) : null}
+
+        {/* 관심없음을 처리하지 못했을 때. 카드는 그대로 남아 다시 누를 수 있다 */}
+        {dismissFailed ? (
+          <div className={styles.notice}>
+            <Snackbar actionLabel="확인" onAction={() => setDismissFailed(false)}>
+              관심없음으로 처리하지 못했어요. 잠시 후 다시 눌러 주세요
+            </Snackbar>
+          </div>
         ) : null}
       </div>
     </>

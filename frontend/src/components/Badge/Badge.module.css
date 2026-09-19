@@ -1,7 +1,7 @@
 /*
- * 채워진 배지. 잉크 면에 밝은 글자를 얹는다. 빨강은 쓰지 않는다 —
- * 빨강은 면적을 차지하지 않는 표식 전용이다
- * (`docs/screens/design-concept.md` 2.3).
+ * 채워진 배지. 잉크 면에 밝은 글자를 얹는다. 빨강은 기본으로 쓰지 않는다 —
+ * 빨강은 면적을 차지하지 않는 표식 전용이다(`docs/screens/design-concept.md` 2.3).
+ * 예외는 아래 `accent` 하나다.
  */
 .badge {
   display: inline-flex;
@@ -17,6 +17,14 @@
   padding: var(--space-1) var(--space-2);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
+}
+
+/*
+ * 빨간 면. 2.2 `새로운 맛` 배지 하나에만 쓰는 예외다(사용자 지시 2026-09-18, 업무 -672) —
+ * 배지가 작아 면적이 표식 수준이고, 새로운 맛을 여는 추천이라는 것을 먼저 보이게 한다.
+ */
+.badge[data-tone='accent'] {
+  background: var(--color-brand);
 }
 
 .badge[data-size='md'] {
