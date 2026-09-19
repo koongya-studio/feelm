@@ -45,6 +45,8 @@ type Props = {
    * 쓴다(7.1 MY, 업무 -676).
    */
   flush?: boolean;
+  /** 놓이는 면. `dark`는 사진 배경(`ProfileBackdrop`) 위라 글자가 흰색이다(업무 -697) */
+  tone?: 'light' | 'dark';
 };
 
 export default function ScreenHeader({
@@ -55,11 +57,17 @@ export default function ScreenHeader({
   action,
   align = 'left',
   flush = false,
+  tone = 'light',
 }: Props) {
   const back = useBack(fallbackTo);
 
   return (
-    <header className={styles.header} data-align={align} data-flush={flush || undefined}>
+    <header
+      className={styles.header}
+      data-align={align}
+      data-flush={flush || undefined}
+      data-tone={tone === 'dark' ? 'dark' : undefined}
+    >
       <div className={styles.row}>
         {showBack ? (
           <button type="button" className={styles.back} onClick={back}>
