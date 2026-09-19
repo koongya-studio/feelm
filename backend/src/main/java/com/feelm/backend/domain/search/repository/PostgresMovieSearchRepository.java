@@ -135,6 +135,42 @@ public class PostgresMovieSearchRepository implements MovieSearchRepository {
             ),
             """;
 
+    // Lowercasing and Greek sigma folding cannot change a Hangul syllable. For one or two
+    // Hangul characters, raw LIKE finds the same literal candidates without normalizing every
+    // title and person name in the table. Relevance scores still use the normal path.
+    private static final String SHORT_HANGUL_KEYWORD_MATCHES =
+            KEYWORD_MATCHES
+                    .replace(
+                            "movie_search_normalize(m.title) LIKE movie_search_normalize(:pattern)",
+                            "m.title LIKE :pattern")
+                    .replace(
+                            "movie_search_normalize(m.original_title) LIKE movie_search_normalize(:pattern)",
+                            "m.original_title LIKE :pattern")
+                    .replace(
+                            "movie_search_normalize(p.name) LIKE movie_search_normalize(:pattern)",
+                            "p.name LIKE :pattern")
+                    .replace(
+                            "movie_search_normalize(m.title) LIKE movie_search_normalize(:prefixPattern)",
+                            "m.title LIKE :prefixPattern")
+                    .replace(
+                            "movie_search_normalize(m.original_title) LIKE movie_search_normalize(:prefixPattern)",
+                            "m.original_title LIKE :prefixPattern")
+                    .replace(
+                            "movie_search_normalize(m.title) LIKE movie_search_normalize(:seriesPattern)",
+                            "m.title LIKE :seriesPattern")
+                    .replace(
+                            "movie_search_normalize(m.original_title) LIKE movie_search_normalize(:seriesPattern)",
+                            "m.original_title LIKE :seriesPattern")
+                    .replace(
+                            "movie_search_normalize(m.title) = movie_search_normalize(:query)",
+                            "m.title = :query")
+                    .replace(
+                            "movie_search_normalize(m.original_title) = movie_search_normalize(:query)",
+                            "m.original_title = :query")
+                    .replace(
+                            "movie_search_normalize(p.name) = movie_search_normalize(:query)",
+                            "p.name = :query");
+
     private static final String GENRE_FILTER =
             """
              AND EXISTS (SELECT 1 FROM movie_genres mg JOIN genres g ON g.id = mg.genre_id
@@ -191,8 +227,12 @@ public class PostgresMovieSearchRepository implements MovieSearchRepository {
                 appendFilters(sql, parameters, criteria);
                 sql.append("), ");
             }
+            String keywordSql =
+                    criteria.q().matches("[가-힣]{1,2}")
+                            ? SHORT_HANGUL_KEYWORD_MATCHES
+                            : KEYWORD_MATCHES;
             sql.append(
-                    KEYWORD_MATCHES.replace(
+                    keywordSql.replace(
                             "/*ELIGIBLE_JOIN*/",
                             filtered ? "JOIN eligible_movies em ON em.id = m.id" : ""));
             parameters.put("query", criteria.q());
