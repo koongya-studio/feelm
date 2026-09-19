@@ -34,7 +34,7 @@
  * **최근 검색어는 제출했거나 결과를 눌렀을 때만 남긴다.** 타이핑마다 남기면 `ㄷ` · `달` ·
  * `달의`가 전부 쌓인다. 같은 말은 다시 저장하지 않고 맨 앞으로 옮긴다(`sessionStore`).
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import Button from '../../../components/Button';
 import ScreenHeader from '../../../components/ScreenHeader';
@@ -181,6 +181,9 @@ export default function SearchPage() {
   const [recent, setRecent] = useState<string[]>(() => [...getRecentSearchQueries()]);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const filterButtonRef = useRef<HTMLButtonElement>(null);
+  const filterSheetId = useId();
+  const filterStateId = useId();
   const pageRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   /** 한글 조합 중인지. 상태가 아니라 ref인 것은 렌더와 무관한 입력 단계이기 때문이다 */
@@ -498,16 +501,31 @@ export default function SearchPage() {
             ) : null}
           </div>
 
+          {/*
+           * 시트를 여는 버튼이다(업무 -674). 한때 `aria-pressed`만 있어 보조기술이 켜고 끄는
+           * 토글로 읽었다. 지금은 대화상자를 연다는 것 · 열렸는지 · 어느 시트인지를 알리고,
+           * 필터가 걸려 있는지는 설명(`aria-describedby`)으로 따로 읽힌다
+           */}
           <button
+            ref={filterButtonRef}
             type="button"
             className={styles.filterButton}
             aria-label="필터"
             disabled={!options}
-            aria-pressed={filtered}
+            aria-haspopup="dialog"
+            aria-expanded={filterOpen}
+            aria-controls={filterOpen ? filterSheetId : undefined}
+            aria-describedby={filtered ? filterStateId : undefined}
+            data-filtered={filtered || undefined}
             onClick={() => setFilterOpen(true)}
           >
             <FilterIcon />
           </button>
+          {filtered ? (
+            <span id={filterStateId} hidden>
+              필터 적용 중
+            </span>
+          ) : null}
         </form>
 
         <p className={styles.scope}>제목 · 감독 · 배우 통합 검색</p>
@@ -630,6 +648,7 @@ export default function SearchPage() {
 
       {filterOpen && options ? (
         <SearchFilterSheet
+          id={filterSheetId}
           options={options}
           value={filter}
           resultCount={previewCount}
@@ -638,6 +657,8 @@ export default function SearchPage() {
           onClose={() => {
             setFilterOpen(false);
             runNow(keyword, filter);
+            // 닫기 · Escape · 결과 보기 어느 쪽이든 초점을 연 자리로 돌려놓는다(업무 -674)
+            filterButtonRef.current?.focus();
           }}
         />
       ) : null}
