@@ -248,6 +248,33 @@
   gap: var(--space-2);
 }
 
+/* 별점 버튼이 남는 폭을 다 쓰고, 관심없음 아이콘 버튼이 오른쪽에 선다(업무 -664) */
+.actionRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.actionRow > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.dismissNote,
+.dismissError {
+  padding: 0 var(--space-1);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.dismissNote {
+  color: var(--color-on-dark-hint);
+}
+
+.dismissError {
+  color: var(--color-brand);
+}
+
 .myRating {
   display: flex;
   flex-direction: column;

@@ -25,10 +25,11 @@ import OttBadge from '../../../components/OttBadge';
 import Poster from '../../../components/Poster';
 import RatingStars from '../../../components/RatingStars';
 import StatusView from '../../../components/StatusView';
-import { ChevronLeftIcon } from '../../../components/Icon';
+import { BlockIcon, ChevronLeftIcon } from '../../../components/Icon';
 import { ApiError } from '../../../api/apiError';
 import { kernelSprite } from '../../../components/PopcornBucket/sprites';
 import { getMovieDetail, getMovieReviews, getSimilarMovies } from '../../../api/movies';
+import { dismissMovie } from '../../../api/recommendations';
 import { getPopcornFlavors } from '../../../api/taste';
 import { recordOttClick } from '../../../api/watch';
 import { useAuth } from '../../../contexts/authContext';
@@ -43,6 +44,8 @@ import type { PopcornFlavor } from '../../../types/taste';
 import type { PublicReview, PublicReviewList } from '../../../types/watch';
 
 const BACK_BUTTON_SIZE = 39;
+/** 관심없음 버튼. 옆의 별점 버튼(`--control-height`)과 높이를 맞춘다 */
+const DISMISS_BUTTON_SIZE = 52;
 const SIMILAR_POSTER_WIDTH = 96;
 const SIMILAR_POSTER_HEIGHT = 144;
 const BACKDROP_FADE_RATIO = 0.55;
@@ -110,6 +113,14 @@ export default function MovieDetailPage() {
   const [clicking, setClicking] = useState(false);
   const [clickFailed, setClickFailed] = useState(false);
   const [popupBlocked, setPopupBlocked] = useState(false);
+  /**
+   * 관심없음(API-047) 처리 상태. 같은 라우트로 다른 영화에 넘어가도 컴포넌트가 남으므로
+   * 어느 영화의 상태인지 함께 둔다 — 넘어간 영화가 처리된 채로 시작하지 않게.
+   */
+  const [dismissal, setDismissal] = useState<{
+    movieId: number;
+    status: 'pending' | 'done' | 'failed';
+  } | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const peopleDragRef = useRef<{
     pointerId: number;
@@ -225,6 +236,24 @@ export default function MovieDetailPage() {
 
   function isReviewHidden(review: PublicReview) {
     return review.spoiler && !revealedReviews.has(reviewKey(review.ratingId));
+  }
+
+  /*
+   * 관심없음(API-047, 업무 -664). 추천에서 들어온 상세면 그 추천 항목 번호도 보낸다.
+   *
+   * 상세 응답(API-030)에 관심없음 여부가 없어 누르기 전에는 이미 처리된 영화인지 모른다. 그래서
+   * `409 ALREADY_DISMISSED`는 실패가 아니라 처리된 상태로 보인다 — 서버 상태는 이미 원하는
+   * 대로다. 해제는 계약 미정이라 처리된 버튼은 다시 눌리지 않는다.
+   */
+  function handleDismiss() {
+    setDismissal({ movieId: id, status: 'pending' });
+
+    dismissMovie(id, recommendationItemId)
+      .catch((error: unknown) => {
+        if (!(error instanceof ApiError && error.code === 'ALREADY_DISMISSED')) throw error;
+      })
+      .then(() => setDismissal({ movieId: id, status: 'done' }))
+      .catch(() => setDismissal({ movieId: id, status: 'failed' }));
   }
 
   function handleRetry() {
@@ -374,6 +403,7 @@ export default function MovieDetailPage() {
     ? flavors.find((candidate) => candidate.code === movie.flavorCode)
     : undefined;
   const flavorOpen = flavorOpenFor === id;
+  const dismissStatus = dismissal?.movieId === id ? dismissal.status : null;
   const people = [
     ...movie.directors.map((person) => ({ ...person, creditKey: `director:${person.personId}` })),
     ...movie.cast.map((person) => ({ ...person, creditKey: `cast:${person.personId}` })),
@@ -449,9 +479,32 @@ export default function MovieDetailPage() {
               ) : null}
             </div>
           ) : null}
-          <Button variant="brand" onClick={() => void navigate(path.movieRating(id))}>
-            {movie.myRating ? '내 별점 수정하기' : '내 별점 남기기'}
-          </Button>
+          {/*
+           * 관심없음은 별점 버튼 오른쪽의 아이콘 버튼이다(업무 -664). 2.2 추천 카드의 관심없음과
+           * 같은 아이콘이다. 주 동작은 별점이므로 관심없음은 글자 없이 작게 둔다.
+           */}
+          <div className={styles.actionRow}>
+            <Button variant="brand" onClick={() => void navigate(path.movieRating(id))}>
+              {movie.myRating ? '내 별점 수정하기' : '내 별점 남기기'}
+            </Button>
+            <IconButton
+              label={dismissStatus === 'done' ? '관심없음 처리됨' : '관심없음'}
+              icon={<BlockIcon />}
+              size={DISMISS_BUTTON_SIZE}
+              variant={dismissStatus === 'done' ? 'filled' : 'translucent'}
+              disabled={dismissStatus === 'pending' || dismissStatus === 'done'}
+              onClick={handleDismiss}
+            />
+          </div>
+          {dismissStatus === 'done' ? (
+            <p className={styles.dismissNote} role="status">
+              관심없음으로 처리했어요. 이 영화는 앞으로 추천에서 빠져요
+            </p>
+          ) : dismissStatus === 'failed' ? (
+            <p className={styles.dismissError} role="alert">
+              관심없음으로 처리하지 못했어요. 잠시 후 다시 눌러 주세요
+            </p>
+          ) : null}
         </div>
 
         {/* 소제목은 `OTT`다. 한때 `볼 수 있는 곳`이었다(사용자 지시 2026-09-19, 업무 -679) */}
