@@ -132,14 +132,12 @@ export type PartyPopcorn = {
   members: PartyMemberPopcorn[];
 };
 
-/** API-058 파티 영화 추천 `items[].reason.memberFit[]` */
-export type PartyMemberFit = {
-  userId: number;
-  /** 0~1 */
-  score: number;
-};
-
-/** API-058 파티 영화 추천 `items[]` */
+/**
+ * API-058 파티 영화 추천 `items[]`.
+ *
+ * 계약에 추천 이유(`reason`)가 없다. 한때 `reason.summary` · `memberFit[]`을 두고 목업이
+ * 채웠는데, 실제 응답(업무 -705)에 없어 지웠다.
+ */
 export type PartyRecommendationItem = {
   recommendationItemId: number;
   type: 'PARTY';
@@ -148,10 +146,6 @@ export type PartyRecommendationItem = {
     title: string;
     posterUrl: string | null;
     ottProviders: string[];
-  };
-  reason: {
-    summary: string;
-    memberFit: PartyMemberFit[];
   };
 };
 
