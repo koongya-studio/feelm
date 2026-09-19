@@ -96,3 +96,19 @@ describe('3.2 맛 설명', () => {
     expect(screen.queryByText('팝콘 버킷을 불러오지 못했어요')).toBeNull();
   });
 });
+
+/*
+ * 알 수(감상량)와 별점(선호도)의 뜻 (업무 S15P21E106-677, UI/UX 분석 리포트 P1-03).
+ * 구분이 FR-06 주석에만 있어 범례의 두 숫자가 무엇인지 화면에서 알 수 없었다.
+ */
+describe('3.2 알 수와 별점의 뜻', () => {
+  it('핵심 수치를 `팝콘 N알`로 적고 두 숫자의 뜻을 한 줄로 푼다', async () => {
+    renderWithRouter(<PopcornBucketPage />);
+
+    expect(await screen.findByText('팝콘 22알')).toBeInTheDocument();
+    expect(screen.queryByText(/KERNELS/)).toBeNull();
+    expect(screen.getByText(/영화를 평가하면 그 영화의 맛 알이 하나씩 쌓여요/)).toHaveTextContent(
+      '★는 그 맛 영화들에 준 평균 별점이에요',
+    );
+  });
+});
