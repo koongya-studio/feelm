@@ -81,12 +81,21 @@
   transform: translateY(1px);
 }
 
+/* 누를 수 없으면 떠 있지 않다 */
 .button:disabled .box {
   box-shadow: none;
 }
 
 .button:disabled {
   cursor: default;
+}
+
+/*
+ * 흐리게 하는 것은 채우지 않은 단추뿐이다. 채운 단추(`filled`)가 비활성인 것은 **이미 끝난
+ * 동작**이다 — 2.4 관심없음은 처리되면 채워지고 다시 눌리지 않는다. 그것을 흐리면 처리됐다는
+ * 표시가 누를 수 없다는 표시로 읽힌다.
+ */
+.button:disabled:not([data-variant='filled']) {
   opacity: 0.45;
 }
 
