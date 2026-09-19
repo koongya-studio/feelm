@@ -333,7 +333,7 @@ erDiagram
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `onboarding_preferences` | 초기 취향(LIKE/DISLIKE) | UK(`user_id`, `movie_id`). 평가(0.5~5.0점, 0.5점 단위)와 분리 저장하며 프레임을 생성하지 않음 | FR-02 · API-023, API-024 |
+| `onboarding_preferences` | 초기 취향(LIKE/DISLIKE) | UK(`user_id`, `movie_id`). 추천 파이프라인의 원천으로 유지하며, API-024 제출 시 LIKE 4.0점·DISLIKE 2.0점 평가와 감상 기록·프레임을 함께 생성함. 기존 평가 영화는 평가 관련 상태를 덮어쓰지 않음 | FR-02 · API-023, API-024 |
 | `user_otts` | 구독 OTT | 전체 교체(PUT) | FR-03 · API-026, API-027 |
 | `watch_records` | 감상 상태 머신 | 사용자·영화별 **활성 기록**(EXPIRED 아님)은 1개 — 부분 유일 인덱스(D-6 결정). 만료 후 재클릭은 새 행 | FR-17, FR-18 · API-033~035 |
 | `ratings` | 평가 + 한줄평 | UK(`user_id`, `movie_id`). 한줄평은 컬럼(별도 테이블 아님). `is_spoiler`는 NOT NULL·기본 false이며 기존 평가도 false. 삭제 시 프레임도 삭제되고 감상 기록은 `WATCHED_UNRATED`로 복귀 | FR-19, FR-26 · API-032, API-036~039 |
