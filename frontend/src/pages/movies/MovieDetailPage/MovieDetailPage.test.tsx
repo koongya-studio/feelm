@@ -176,7 +176,7 @@ describe('2.4 OTT 아이콘', () => {
 
     renderMovie();
 
-    expect(await screen.findByRole('heading', { name: '볼 수 있는 곳' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'OTT' })).toBeInTheDocument();
     expect(screen.getByText('현재 확인된 OTT 제공처가 없어요')).toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: '시청 정보 제공: JustWatch' }),
