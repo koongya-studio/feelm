@@ -215,11 +215,13 @@ public class PostgresMovieSearchRepository implements MovieSearchRepository {
                 ) compact
                 CROSS JOIN LATERAL (
                     SELECT CASE WHEN char_length(compact.title) = char_length(cfg.compact_query)
-                                THEN (SELECT count(*) FROM generate_series(1, char_length(cfg.compact_query)) pos
-                                      WHERE substr(compact.title, pos, 1) <> substr(cfg.compact_query, pos, 1)) END AS title,
+                                THEN (SELECT count(*) FROM unnest(string_to_array(compact.title, NULL),
+                                            string_to_array(cfg.compact_query, NULL)) chars(candidate_char, query_char)
+                                      WHERE candidate_char <> query_char) END AS title,
                            CASE WHEN char_length(compact.original_title) = char_length(cfg.compact_query)
-                                THEN (SELECT count(*) FROM generate_series(1, char_length(cfg.compact_query)) pos
-                                      WHERE substr(compact.original_title, pos, 1) <> substr(cfg.compact_query, pos, 1)) END AS original_title
+                                THEN (SELECT count(*) FROM unnest(string_to_array(compact.original_title, NULL),
+                                            string_to_array(cfg.compact_query, NULL)) chars(candidate_char, query_char)
+                                      WHERE candidate_char <> query_char) END AS original_title
                 ) edits
                 WHERE cfg.threshold IS NOT NULL
                     AND NOT EXISTS (SELECT 1 FROM literal_matches)
@@ -243,8 +245,9 @@ public class PostgresMovieSearchRepository implements MovieSearchRepository {
                     AND NOT EXISTS (SELECT 1 FROM fulltext_matches)
                     AND cfg.compact_query <% movie_search_normalize(p.name)
                     AND char_length(compact.name) = char_length(cfg.compact_query)
-                    AND (SELECT count(*) FROM generate_series(1, char_length(cfg.compact_query)) pos
-                         WHERE substr(compact.name, pos, 1) <> substr(cfg.compact_query, pos, 1)) = 1
+                    AND (SELECT count(*) FROM unnest(string_to_array(compact.name, NULL),
+                                string_to_array(cfg.compact_query, NULL)) chars(candidate_char, query_char)
+                         WHERE candidate_char <> query_char) = 1
             """;
 
     // Lowercasing and Greek sigma folding cannot change a Hangul syllable. For one or two
