@@ -25,7 +25,7 @@
  * 프레임이 늘어도 칸 크기는 그대로고 가로로 스크롤한다(시안 — 0 · 3 · 12 · 100개).
  * 칸 크기를 화면 폭에 맞춰 줄이면 100개일 때 포스터가 우표만 해진다.
  */
-import type { CSSProperties, ReactNode } from 'react';
+import type { CSSProperties, ReactNode, Ref } from 'react';
 import styles from './FilmReel.module.css';
 
 type Props = {
@@ -50,6 +50,10 @@ type Props = {
   flat?: boolean;
   /** 프레임 칸들. 버튼이든 자리표시자든 이 컴포넌트가 테두리를 입힌다 */
   children: ReactNode;
+  /**
+   * 가로 릴의 스크롤 영역(칸의 부모). 3.1이 넘긴 위치를 읽어 `N / 전체`를 적을 때 쓴다(업무 -680)
+   */
+  trackRef?: Ref<HTMLDivElement>;
 };
 
 /** 숫자는 px로, 문자열은 CSS 길이 그대로 쓴다 */
@@ -64,6 +68,7 @@ export default function FilmReel({
   orientation = 'horizontal',
   flat = false,
   children,
+  trackRef,
 }: Props) {
   const vertical = orientation === 'vertical';
   const style = {
@@ -90,6 +95,7 @@ export default function FilmReel({
        * 세로 필름은 스스로 스크롤하지 않으므로 초점을 받을 이유가 없다.
        */}
       <div
+        ref={trackRef}
         className={styles.track}
         role="group"
         aria-label={label}

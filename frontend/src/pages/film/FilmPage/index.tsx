@@ -71,6 +71,29 @@ const SUPPORTS_OBSERVER = typeof IntersectionObserver !== 'undefined';
  */
 const PREFETCH_MARGIN = '0px 360px 0px 0px';
 
+/**
+ * 릴에서 오른쪽 끝까지 온전히 보이는 프레임이 몇 번째인지(1부터). `N / 전체`의 N이다(업무 -680).
+ *
+ * 왼쪽 끝이 아니라 오른쪽 끝을 센다. 끝까지 넘기면 `전체 / 전체`가 되어 "다 봤다"가 맞게 읽힌다.
+ * 왼쪽 끝을 세면 마지막 칸에 닿아도 `22 / 24`에서 멈춘다. 칸 간격은 첫 두 칸의 위치 차로 잰다 —
+ * 칸 폭 · 간격 · 테두리가 CSS에 있어 여기서 다시 계산하면 어긋난다.
+ */
+function lastVisibleFrame(track: HTMLElement, frameCount: number): number {
+  const [first, second] = track.children as unknown as HTMLElement[];
+
+  if (!first || frameCount <= 1) return Math.min(frameCount, 1);
+
+  const step = second ? second.offsetLeft - first.offsetLeft : first.offsetWidth;
+
+  // 레이아웃이 없는 환경(테스트)은 폭이 0이다. 첫 칸이 보인다고 본다
+  if (step <= 0) return 1;
+
+  const visibleRight = track.scrollLeft + track.clientWidth;
+  const count = Math.floor((visibleRight - first.offsetLeft - first.offsetWidth) / step) + 1;
+
+  return Math.min(Math.max(count, 1), frameCount);
+}
+
 /** 다음 장 칸의 상태. `failed`면 자동으로 다시 부르지 않고 버튼으로 잇는다 */
 type MoreState = 'idle' | 'loading' | 'failed';
 
@@ -83,6 +106,9 @@ export default function FilmPage() {
   const [frames, setFrames] = useState<FrameList | null>(null);
   const [more, setMore] = useState<MoreState>('idle');
   const moreRef = useRef<HTMLSpanElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  /** 오른쪽 끝까지 보이는 프레임 번호. `N / 전체`의 N이다 */
+  const [seenFrame, setSeenFrame] = useState(1);
   const [bucket, setBucket] = useState<PopcornBucket | null>(null);
   /** 아직 3.3에서 받지 않은 새 리포트. 있으면 리포트 줄이 발급(3.3)으로 간다 */
   const [newReportId, setNewReportId] = useState<number | null>(null);
@@ -182,6 +208,37 @@ export default function FilmPage() {
     return () => observer.disconnect();
   }, [canAutoLoad, loadMore]);
 
+  /*
+   * 넘길 때마다 `N / 전체`의 N을 다시 잰다. 한 프레임에 한 번만 잰다 — 스크롤 이벤트는 그보다
+   * 잦다. 다음 장이 붙어 칸이 늘거나 화면 폭이 바뀌어도 다시 잰다.
+   */
+  const loadedFrameCount = frames?.items.length ?? 0;
+
+  useEffect(() => {
+    const track = trackRef.current;
+
+    if (!track) return;
+
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      setSeenFrame(lastVisibleFrame(track, loadedFrameCount));
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+
+    measure();
+    track.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      track.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+    };
+  }, [loadedFrameCount]);
+
   if (failed) {
     return (
       <>
@@ -239,6 +296,7 @@ export default function FilmPage() {
             frameWidth={FRAME_WIDTH}
             frameHeight={FRAME_HEIGHT}
             label={isEmpty ? '아직 비어 있는 취향 필름' : '취향 필름 프레임'}
+            trackRef={trackRef}
           >
             {isEmpty
               ? EMPTY_SLOT_LABELS.map((label) => (
@@ -285,9 +343,31 @@ export default function FilmPage() {
             ) : null}
           </FilmReel>
 
-          {/* 잘린 오른쪽이 이미 "더 있다"를 말하지만, 넘길 수 있다는 것까지는 말해 주지 않는다 */}
+          {/*
+           * 지금 위치와 넘기는 방향(업무 -680, UI/UX 분석 리포트 P1-02). 잘린 오른쪽이 "더 있다"는
+           * 말해 주지만, 옆으로 넘긴다는 것과 몇 번째까지 왔는지는 말해 주지 않았다.
+           *
+           * 끝까지 넘기면 화살표 힌트를 거둔다 — 더 넘길 곳이 없는데 오른쪽을 가리키면 틀린 말이다.
+           * 위치는 넘길 때마다 바뀌므로 읽기 도구에 매번 알리지 않는다(`aria-live` 없음).
+           */}
           {!isEmpty && items.length > 1 ? (
-            <p className={styles.reelHint}>{totalCount}개의 프레임을 넘겨보세요</p>
+            <p className={styles.reelHint}>
+              <span className={styles.reelCounter}>
+                <span aria-hidden="true">
+                  {seenFrame} / {totalCount}
+                </span>
+                <VisuallyHidden>
+                  전체 {totalCount}개 중 {seenFrame}번째 프레임까지 보고 있어요
+                </VisuallyHidden>
+              </span>
+
+              {seenFrame < totalCount ? (
+                <span className={styles.reelSwipe}>
+                  옆으로 넘겨보세요
+                  <ChevronRightIcon />
+                </span>
+              ) : null}
+            </p>
           ) : null}
         </div>
 
