@@ -32,7 +32,7 @@ printf '%s\n' "$url" >>"$CURL_LOG"
 movie_id="$(printf '%s' "$url" | sed -E 's#.*movie/([0-9]+).*#\1#')"
 case "$url" in
   *append_to_response*)
-    printf '{"id":%s,"title":"Movie %s","original_title":"Movie %s","genres":[],"production_countries":[],"credits":{"id":%s,"crew":[],"cast":[]},"watch/providers":{"id":%s,"results":{"KR":{"link":"https://example.invalid/watch","flatrate":[]}}}}' \
+    printf '{"id":%s,"title":"Movie %s","original_title":"Movie %s","genres":[],"production_countries":[],"translations":{"translations":[{"iso_639_1":"ko","iso_3166_1":"KR","data":{"title":"한국 제목"}}]},"alternative_titles":{"titles":[]},"credits":{"id":%s,"crew":[],"cast":[]},"watch/providers":{"id":%s,"results":{"KR":{"link":"https://example.invalid/watch","flatrate":[]}}}}' \
       "$movie_id" "$movie_id" "$movie_id" "$movie_id" "$movie_id" >"$output_file"
     ;;
   */credits*) printf '{"id":%s,"crew":[],"cast":[]}' "$movie_id" >"$output_file" ;;
@@ -64,6 +64,9 @@ jq -e '
   and .postgresql.status == "NOT_RUN"
 ' "$test_dir/output/collection-manifest.json" >/dev/null
 [[ "$(wc -l <"$test_dir/curl.log")" -eq 2 ]]
+grep -q 'append_to_response=.*translations,alternative_titles' "$test_dir/curl.log"
+jq -e '.details.translations.translations[0].data.title == "한국 제목"' \
+  "$test_dir/output/raw-tmdb/2.json" >/dev/null
 [[ "$(wc -l <"$test_dir/output/raw-files.sha256")" -eq 2 ]]
 (
   cd "$test_dir/output"

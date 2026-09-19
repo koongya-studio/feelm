@@ -829,7 +829,7 @@ PostgreSQL 필드 매핑은 현재 Flyway Migration을 기준으로 다음과 �
 | TMDb 원천 | PostgreSQL 대상 | 처리 |
 | --- | --- | --- |
 | `details.id` | `movies.tmdb_id` | 유일 키, 이 값으로 upsert |
-| `details.title`, `original_title`, `overview` | `movies.title`, `original_title`, `synopsis` | 제목이 없으면 원제 사용, 빈 줄거리는 그대로 보존 |
+| `details.title`, `original_title`, `overview` | `movies.title`, `original_title`, `synopsis` | 한국어 제목 우선, 제목이 없으면 원제 사용, 빈 줄거리는 그대로 보존 |
 | `details.release_date`, `runtime` | `movies.release_date`, `runtime_minutes` | 빈 날짜·0분은 `NULL` |
 | `details.poster_path`, `backdrop_path` | `movies.poster_url`, `backdrop_url` | 포스터는 `w500`, 배경은 `w1280` TMDb CDN URL로 변환 |
 | `details.genres[]` | `genres`, `movie_genres` | `genres.tmdb_genre_id`로 기준정보 upsert 후 관계 교체 |
@@ -837,6 +837,44 @@ PostgreSQL 필드 매핑은 현재 Flyway Migration을 기준으로 다음과 �
 | `credits.crew[job=Director]`, `cast[]` | `people`, `movie_people` | `tmdb_person_id` upsert, 역할은 `DIRECTOR`/`ACTOR` |
 | `watch/providers.results.KR.flatrate` | `otts`, `movie_ott_providers` | 현재 승인된 5개 OTT만 동기화하고 다른 offer type은 제외 |
 | DB identity | `movies.id` | 직접 입력하지 않으며 재적재 시 기존 ID 유지 |
+
+영화 제목은 TMDb `ko-KR` 상세 제목에 한글이 있으면 그대로 사용한다. 상세 제목이
+외국어이면 같은 TMDb ID의 고유한 `ko-KR` 번역 제목, 고유한 KR 대체 제목 순서로
+확인된 한글 제목을 선택한다. TMDb에 한국어 제목이 없어도
+[`scripts/data/verified-korean-titles.tsv`](scripts/data/verified-korean-titles.tsv)에
+원제·제작연도·국내 출처로 확인한 제목이 있으면 이를 사용한다. 적재 시 해당 TMDb ID의
+원제와 연도가 보정표와 다르면 그 영화의 적재를 실패 처리해 다른 작품에 제목이 붙지
+않도록 한다. TMDb 후보가 모호해도 보정표에 확인된 제목이 있으면 이를 사용한다.
+보정표에도 없으면 기존 DB에 저장된 한국어 제목을 유지한다. 기존 한국어 제목도
+없으면 TMDb 제목 또는 원제를 사용하며, 원제는 `original_title`에 그대로 둔다.
+보정표에는 현재 확인된 5편만 기록한다.
+
+기존 영화 보정은 외국어 제목인 TMDb ID만 별도 입력으로 준비한다. TMDb 번역·대체
+제목을 다시 확인할 대상은 원본 수집을 `--refresh`한 뒤 적재도 `--refresh`한다.
+보정표의 작품은 기존 원본을 재사용할 수 있다. 전체 서비스 DB에 직접 일괄 적용하지
+않고 소량 dry-run과 격리 DB에서 제목·원제·검색 결과를 먼저 확인한다.
+접속 환경 변수를 설정한 터미널에서 후보 ID는 다음처럼 추출할 수 있다.
+
+```bash
+psql -X -v ON_ERROR_STOP=1 -At -c \
+  "SELECT tmdb_id FROM movies WHERE title !~ '[가-힣]' ORDER BY tmdb_id" \
+  > title-backfill-ids.txt
+bash ./backend/scripts/collect-tmdb-raw.sh \
+  --input title-backfill-ids.txt --output-dir title-backfill-source \
+  --scope korean-title-backfill --refresh
+bash ./backend/scripts/run-tmdb-ingestion.sh \
+  --input title-backfill-ids.txt \
+  --raw-dir title-backfill-source/raw-tmdb \
+  --output-dir title-backfill-load --postgres-mode direct \
+  --ott-mapping backend/scripts/samples/ott-provider-mapping.csv \
+  --limit 5 --dry-run
+```
+
+적재를 진행할 때는 같은 입력으로 `--dry-run`을 빼고 `--refresh`를 넣는다. 5건의
+제목·원제와 관계 데이터를 확인한 뒤 `--limit`을 제거한다. 재적재는 제목 외에도
+줄거리·장르·국가·인물 정보를 최신 TMDb 값으로 갱신하므로 격리 DB에서 변경 범위를
+확인한다. TMDb와 검증된 보정표 모두에 한국어 제목이 없는 영화는 기존 한국어
+제목이 있다면 보존하고, 그렇지 않으면 TMDb 제목을 유지한다.
 
 이미지 파일을 적재하거나 원본 JSON을 변형하지 않는다. `raw-tmdb`에는 TMDb의
 `poster_path`·`backdrop_path`가 그대로 남으므로, 추후 제공 크기를 바꿔도 TMDb 메타데이터를
