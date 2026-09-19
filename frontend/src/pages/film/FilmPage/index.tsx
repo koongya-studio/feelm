@@ -4,7 +4,7 @@
  * 구성은 사용자 시안 2026-09-17(업무 -458)을 따른다. 시안이 이 화면에 요구하는 것은
  * 하나다. **필름이 화면의 중심이고, 정보와 카드는 그 아래로 물러난다.**
  *
- * 워드마크 · 검색 · 알림 / 제목 / 필름 / 팝콘 요약 / 취향 리포트 / 필름 늘리기
+ * 공통 헤더(워드마크 · 검색 · 알림, `AppHeader`) / 제목 / 필름 / 팝콘 요약 / 취향 리포트 / 필름 늘리기
  *
  * 이전 구성에서 바뀐 것
  * - 필름이 밝은 반투명 판(`FilmStrip` paper)에서 **검정에 주황빛이 도는 반투명 릴**로
@@ -32,18 +32,16 @@
  * (4.2 검색과 같은 방식 — `IntersectionObserver`, 실패 뒤와 관찰이 안 되는 환경은 버튼).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
+import AppHeader from '../../../components/AppHeader';
 import Button from '../../../components/Button';
 import FilmReel from '../../../components/FilmReel';
-import { BellIcon, ChevronRightIcon, SearchIcon } from '../../../components/Icon';
+import { ChevronRightIcon } from '../../../components/Icon';
 import Poster from '../../../components/Poster';
-import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
-import Wordmark from '../../../components/Wordmark';
 import { kernelSprite } from '../../../components/PopcornBucket/sprites';
 import { getLatestReadyReport } from '../../../api/reports';
-import { getUnreadNotificationCount } from '../../../api/notifications';
 import { getMyFrames, getPopcornBucket } from '../../../api/taste';
 import { path } from '../../../routes/paths';
 import styles from './FilmPage.module.css';
@@ -88,7 +86,6 @@ export default function FilmPage() {
   const [bucket, setBucket] = useState<PopcornBucket | null>(null);
   /** 아직 3.3에서 받지 않은 새 리포트. 있으면 리포트 줄이 발급(3.3)으로 간다 */
   const [newReportId, setNewReportId] = useState<number | null>(null);
-  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
 
@@ -124,13 +121,6 @@ export default function FilmPage() {
         if (active) {
           setNewReportId(latest?.needsIntro ? latest.reportId : null);
         }
-      })
-      .catch(() => undefined);
-
-    // 배지는 보조 정보라 실패해도 필름 화면은 그대로 둔다.
-    getUnreadNotificationCount()
-      .then((count) => {
-        if (active) setUnreadNotificationCount(count);
       })
       .catch(() => undefined);
 
@@ -192,35 +182,10 @@ export default function FilmPage() {
     return () => observer.disconnect();
   }, [canAutoLoad, loadMore]);
 
-  /*
-   * 헤더 오른쪽. **검색 → 알림 순서다**(사용자 지시 2026-09-16, 업무 -461).
-   *
-   * 빈 상태 · 실패 상태에서도 같이 선다. 필름은 앱의 시작 화면이라 프레임이 없다고
-   * 검색과 알림으로 가는 길까지 막으면 안 된다.
-   */
-  const headerActions = (
-    <div className={styles.headerActions}>
-      <Link to={path.search()} className={styles.headerAction} aria-label="검색">
-        <SearchIcon />
-      </Link>
-
-      <Link
-        to={path.notifications()}
-        className={styles.headerAction}
-        aria-label={
-          unreadNotificationCount > 0 ? `알림, 읽지 않은 알림 ${unreadNotificationCount}개` : '알림'
-        }
-      >
-        <BellIcon />
-        {unreadNotificationCount > 0 ? <span className={styles.notificationDot} /> : null}
-      </Link>
-    </div>
-  );
-
   if (failed) {
     return (
       <>
-        <ScreenHeader title={<Wordmark />} action={headerActions} />
+        <AppHeader />
 
         <StatusView title="취향 필름을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
           <Button
@@ -255,12 +220,12 @@ export default function FilmPage() {
 
   return (
     <>
-      <ScreenHeader title={<Wordmark />} action={headerActions} />
+      <AppHeader />
 
       <div className={styles.page}>
         <header className={styles.head}>
           <p className={styles.eyebrow}>YOUR TASTE ON FILM</p>
-          <h2 className={styles.title}>나의 취향 필름</h2>
+          <h1 className={styles.title}>나의 취향 필름</h1>
 
           {frames ? (
             <p className={styles.subtitle}>

@@ -79,19 +79,12 @@
 }
 
 /* 워드마크와 카피. 시안은 둘을 한 줄에 좌우로 벌린다 */
-.brand {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
+/* 한 줄 카피. 한때 워드마크 오른쪽 두 줄이었고, 공통 헤더(업무 -676)가 그 자리를 가져가 아래로 내려왔다 */
 .copy {
   margin: 0;
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
   color: var(--color-ink-muted);
-  text-align: right;
 }
 
 .titleBlock {
