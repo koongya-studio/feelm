@@ -20,6 +20,7 @@ import { path } from '../../../routes/paths';
 import StatusView from '../../../components/StatusView';
 import { getLatestPushNotification, readNotification } from '../../../api/notifications';
 import { notificationPath } from '../destination';
+import appSymbol from '../../../assets/logo/feelm-symbol.webp';
 import styles from './PushPreviewPage.module.css';
 import type { NotificationItem } from '../../../types/notification';
 
@@ -80,8 +81,9 @@ export default function PushPreviewPage() {
 
             {notification ? (
               <button type="button" className={styles.card} onClick={() => void open(notification)}>
+                {/* 앱 아이콘과 같은 심볼이다(업무 -703). 장식이라 읽지 않는다 */}
                 <span className={styles.appIcon} aria-hidden="true">
-                  f
+                  <img className={styles.appSymbol} src={appSymbol} alt="" />
                 </span>
                 <span className={styles.cardText}>
                   <span className={styles.app}>feelm · 지금</span>

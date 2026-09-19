@@ -30,7 +30,7 @@ async function flush() {
 }
 
 function photo() {
-  return screen.getByAltText('Feelm — YOUR TASTE ON FILM');
+  return screen.getByAltText('Feelm');
 }
 
 function splash() {

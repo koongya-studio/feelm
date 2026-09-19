@@ -12,7 +12,7 @@
  * | 빨강 | 표식 전용. 면적을 차지하지 않고 버튼 배경으로 쓰지 않는다 |
  * | 행동 | 검정 알약. 한 화면에 하나 |
  * | 팝콘 | 어두운 블록 안에서만. 밝은 면에서는 4종이 사라진다 |
- * | 서체 | 로고 Gluten · 그 외 Pretendard |
+ * | 서체 | Pretendard. 로고는 서체가 아니라 그림이다(`assets/logo`) |
  * | 모드 | 라이트 단일. 다크 모드는 만들지 않는다 |
  *
  * **위 표에 예외가 둘 생겼다**(사용자 시안 2026-09-17, 업무 -458). 각각의 사유와
@@ -276,8 +276,6 @@
   --font-sans:
     'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo',
     'Malgun Gothic', sans-serif;
-  /* 로고 전용. 본문에 쓰지 않는다 */
-  --font-display: 'Gluten', var(--font-sans);
   /* 취향 4컷 전용(업무 -321). 영문은 이 서체, 한글은 Pretendard로 넘어간다 */
   --font-report-condensed: 'Anton', var(--font-sans);
   --font-report-serif: 'Playfair Display', Georgia, var(--font-sans);

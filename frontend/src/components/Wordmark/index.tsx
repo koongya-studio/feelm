@@ -1,25 +1,22 @@
 /*
  * Feelm 워드마크.
  *
- * 확정 로고는 **Gluten Bold 700 · 자간 -0.03em**이다
- * (`docs/screens/design-concept.md` 2.6). 이전에는 Kaushan Script 글리프를 path로
- * 박아 둔 SVG였으나, 그 서체는 폐기됐다.
+ * **리디자인한 로고다**(업무 S15P21E106-703, 2026-09-19). 필름 띠가 `F`와 `m`을 감고, 가운데
+ * `ee`가 웃는 얼굴인 손글씨 워드마크다. 디자인이 준 SVG 원본(`assets/logo/feelm-wordmark.svg`,
+ * 1358 × 657) 그대로다. 한때는 서체로 쓴 글자 워드마크였고 그 로고는 폐기했다.
  *
- * SVG가 아니라 텍스트로 그린다. 색은 `currentColor`를 따르므로 밝은 면과 어두운
- * 면 어디에나 올릴 수 있고, 크기를 바꿔도 선명하다. 아웃라인 SVG로 뽑으면 서체
- * 로딩과 무관해지지만, 지금은 Gluten을 번들에 포함하고 있어 텍스트로 충분하다.
+ * 원본은 빨강 한 색이라 **마스크로 칠한다.** 모양은 SVG가, 색은 CSS가 맡는다 — 기본은 브랜드
+ * 빨강이고 `inherit`이면 부모 글자색을 따라 어두운 면에도 올릴 수 있다. `<img>`로 넣으면 색을
+ * 바꿀 수 없다.
  *
- * `aria-label`을 붙여 스크린 리더가 한 단어로 읽게 한다. 자간을 좁혀 두어 글자
- * 단위로 끊어 읽힐 여지를 없앤다.
+ * 그림이라 `role="img"`와 `aria-label`로 한 단어로 읽힌다.
  */
 import styles from './Wordmark.module.css';
 
 type Props = {
   /**
-   * 글자 크기(px). 헤더 기본값은 22px이다.
-   *
-   * 확정 시안이 300px 폭 목업에서 18px을 썼다. 375px 기준으로 환산하면 22.5px이다.
-   * 이전 값 27px은 `--font-size-title`을 그대로 다러 쓴 것이었고 시안보다 컸다.
+   * 크기 기준(px). 한때 글자 크기였던 값을 그대로 받는다 — 워드마크의 높이는 이 값의 1.4배다.
+   * 헤더 기본값 22px이면 높이 약 31px · 폭 약 64px로 이전 글자 워드마크와 폭이 같다.
    *
    * 글자로 주면 CSS 길이다. 취향 4컷처럼 폭에 따라 커지는 자리에서 `calc()`를 넘긴다.
    */
@@ -37,9 +34,8 @@ export default function Wordmark({ size = 22, tone = 'brand' }: Props) {
       className={styles.wordmark}
       style={{ fontSize: size }}
       data-tone={tone}
+      role="img"
       aria-label="Feelm"
-    >
-      Feelm
-    </span>
+    />
   );
 }

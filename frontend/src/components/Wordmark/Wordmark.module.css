@@ -1,25 +1,24 @@
 /*
- * 로고 전용 서체다. 본문에는 쓰지 않는다
- * (`docs/screens/design-concept.md` 2.6).
+ * 워드마크(업무 -703). SVG 원본을 마스크로 쓰고 면을 칠한다 — 모양은 원본, 색은 여기서 정한다.
  *
- * `line-height: 1`로 두어 크기를 준 만큼만 자리를 차지하게 한다. Gluten은
- * 통통해서 기본 행간을 두면 위아래 여백이 크게 생긴다.
+ * 크기는 `font-size`(컴포넌트의 `size`)를 기준으로 높이 1.4em이고 폭은 원본 비율(1358 : 657)을
+ * 따른다. `em`으로 두어야 부모가 준 크기(`calc()` 포함)를 그대로 따라간다.
  */
 .wordmark {
   display: inline-block;
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: inherit;
-  letter-spacing: -0.03em;
-  line-height: 1;
-  color: var(--color-brand);
-  white-space: nowrap;
+  height: 1.4em;
+  flex: none;
+  aspect-ratio: 1358 / 657;
+  background-color: var(--color-brand);
+  vertical-align: middle;
+  -webkit-mask: url('../../assets/logo/feelm-wordmark.svg') center / contain no-repeat;
+  mask: url('../../assets/logo/feelm-wordmark.svg') center / contain no-repeat;
 }
 
 /*
  * 어두운 면이나 사진 위처럼 빨강이 안 읽히는 자리에서는 부모 색을 따르게 한다.
- * 스플래시가 이 경우다.
+ * 취향 4컷이 이 경우다.
  */
 .wordmark[data-tone='inherit'] {
-  color: inherit;
+  background-color: currentColor;
 }
