@@ -367,6 +367,85 @@ describe('4.3 필터 시트', () => {
   });
 });
 
+describe('4.3 필터 시트 접근성 (업무 -674)', () => {
+  const openSheet = async () => {
+    renderWithRouter(<SearchPage />, { route: '/search' });
+    await waitFor(() => expect(screen.getByRole('button', { name: '필터' })).toBeEnabled());
+
+    const opener = screen.getByRole('button', { name: '필터' });
+    fireEvent.click(opener);
+    const dialog = await screen.findByRole('dialog', { name: '검색 필터' });
+
+    return { opener, dialog };
+  };
+
+  it('여는 버튼은 대화상자를 연다고 알리고, 열리면 그 시트를 가리킨다', async () => {
+    renderWithRouter(<SearchPage />, { route: '/search' });
+    await waitFor(() => expect(screen.getByRole('button', { name: '필터' })).toBeEnabled());
+
+    const opener = screen.getByRole('button', { name: '필터' });
+    // 켜고 끄는 토글이 아니다
+    expect(opener).not.toHaveAttribute('aria-pressed');
+    expect(opener).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(opener).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(opener);
+    const dialog = await screen.findByRole('dialog', { name: '검색 필터' });
+
+    expect(opener).toHaveAttribute('aria-expanded', 'true');
+    expect(opener).toHaveAttribute('aria-controls', dialog.id);
+  });
+
+  it('필터가 걸려 있는지는 이름이 아니라 설명으로 따로 읽힌다', async () => {
+    await openSheet();
+    fireEvent.click(screen.getByRole('button', { name: '드라마' }));
+    fireEvent.click(screen.getByRole('button', { name: /결과 보기/ }));
+
+    const opener = screen.getByRole('button', { name: '필터' });
+    await waitFor(() => expect(opener).toHaveAccessibleDescription('필터 적용 중'));
+  });
+
+  it('열린 동안 Tab은 시트 안에서만 돈다', async () => {
+    const { dialog } = await openSheet();
+    const close = screen.getByRole('button', { name: '닫기' });
+    const buttons = [...dialog.querySelectorAll('button')];
+    const last = buttons[buttons.length - 1];
+
+    // 열리면 닫기에 들어와 있다
+    expect(close).toHaveFocus();
+
+    // 처음에서 거꾸로 넘기면 끝으로
+    fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
+    expect(last).toHaveFocus();
+
+    // 끝에서 넘기면 처음으로
+    fireEvent.keyDown(window, { key: 'Tab' });
+    expect(close).toHaveFocus();
+  });
+
+  it('뒤 막은 Tab 순서와 보조기술에서 빠진다', async () => {
+    await openSheet();
+
+    expect(screen.queryByRole('button', { name: '필터 닫기' })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['닫기', () => fireEvent.click(screen.getByRole('button', { name: '닫기' }))],
+    ['Escape', () => fireEvent.keyDown(window, { key: 'Escape' })],
+    ['결과 보기', () => fireEvent.click(screen.getByRole('button', { name: /결과 보기/ }))],
+  ])('%s로 닫으면 초점이 여는 버튼으로 돌아간다', async (_, close) => {
+    const { opener } = await openSheet();
+
+    close();
+
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: '검색 필터' })).not.toBeInTheDocument(),
+    );
+    expect(opener).toHaveFocus();
+    expect(opener).toHaveAttribute('aria-expanded', 'false');
+  });
+});
+
 describe('커서 페이지', () => {
   it('건수는 받아 온 목록이 아니라 totalCount다', async () => {
     vi.mocked(searchMovies).mockResolvedValue(
