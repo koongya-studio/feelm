@@ -23,6 +23,7 @@
 import { useEffect, useRef } from 'react';
 import Button from '../../../../components/Button';
 import OttBadge from '../../../../components/OttBadge';
+import { CheckIcon } from '../../../../components/Icon';
 import { toggle, YEAR_BUCKETS } from '../searchFilter';
 import type { SearchFilterState, YearBucketId } from '../searchFilter';
 import type { FilterOptions } from '../../../../types/search';
@@ -130,6 +131,7 @@ export default function SearchFilterSheet({
                   aria-pressed={value.genre.includes(genre.code)}
                   onClick={() => onChange({ ...value, genre: toggle(value.genre, genre.code) })}
                 >
+                  {value.genre.includes(genre.code) ? <OptionCheck /> : null}
                   {genre.name}
                 </button>
               ))}
@@ -147,6 +149,7 @@ export default function SearchFilterSheet({
                   aria-pressed={value.year === bucket.id}
                   onClick={() => onChange({ ...value, year: bucket.id as YearBucketId })}
                 >
+                  {value.year === bucket.id ? <OptionCheck /> : null}
                   {bucket.label}
                 </button>
               ))}
@@ -160,18 +163,15 @@ export default function SearchFilterSheet({
                 <button
                   key={ott.ottId}
                   type="button"
-                  className={styles.ott}
+                  className={styles.option}
+                  data-kind="ott"
                   aria-pressed={value.ott.includes(ott.ottId)}
                   aria-label={ott.name}
                   onClick={() => onChange({ ...value, ott: toggle(value.ott, ott.ottId) })}
                 >
-                  <OttBadge
-                    code={ott.code}
-                    name={ott.name}
-                    size={32}
-                    labelled={false}
-                    variant={value.ott.includes(ott.ottId) ? 'selected' : 'unselected'}
-                  />
+                  {value.ott.includes(ott.ottId) ? <OptionCheck /> : null}
+                  <OttBadge code={ott.code} name={ott.name} size={24} radius={6} labelled={false} />
+                  {ott.name}
                 </button>
               ))}
             </div>
@@ -189,5 +189,14 @@ export default function SearchFilterSheet({
         </footer>
       </div>
     </div>
+  );
+}
+
+/** 고른 선택지의 체크. 색이 아닌 모양으로도 고른 것을 알린다(업무 -697) */
+function OptionCheck() {
+  return (
+    <span className={styles.check}>
+      <CheckIcon />
+    </span>
   );
 }

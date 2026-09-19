@@ -38,6 +38,7 @@ import Button from '../../../components/Button';
 import FilmReel from '../../../components/FilmReel';
 import { ChevronRightIcon } from '../../../components/Icon';
 import Poster from '../../../components/Poster';
+import PosterCue from '../../../components/PosterCue';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import { kernelSprite } from '../../../components/PopcornBucket/sprites';
@@ -312,14 +313,16 @@ export default function FilmPage() {
                     className={styles.frameButton}
                     onClick={() => void navigate(path.movieDetail(frame.movie.movieId))}
                   >
-                    <Poster
-                      width={FRAME_WIDTH}
-                      height={FRAME_HEIGHT}
-                      radius={0}
-                      src={frame.movie.posterUrl ?? undefined}
-                      title=""
-                      seed={frame.movie.movieId}
-                    />
+                    <PosterCue>
+                      <Poster
+                        width={FRAME_WIDTH}
+                        height={FRAME_HEIGHT}
+                        radius={0}
+                        src={frame.movie.posterUrl ?? undefined}
+                        title=""
+                        seed={frame.movie.movieId}
+                      />
+                    </PosterCue>
                     <VisuallyHidden>{frame.movie.title} 상세 보기</VisuallyHidden>
                   </button>
                 ))}

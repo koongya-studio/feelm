@@ -23,9 +23,16 @@ import Button from '../../../components/Button';
 import IconButton from '../../../components/IconButton';
 import OttBadge from '../../../components/OttBadge';
 import Poster from '../../../components/Poster';
+import PosterCue from '../../../components/PosterCue';
 import RatingStars from '../../../components/RatingStars';
 import StatusView from '../../../components/StatusView';
-import { BlockIcon, ChevronLeftIcon } from '../../../components/Icon';
+import {
+  BlockIcon,
+  CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ExternalLinkIcon,
+} from '../../../components/Icon';
 import { ApiError } from '../../../api/apiError';
 import { kernelSprite } from '../../../components/PopcornBucket/sprites';
 import { getMovieDetail, getMovieReviews, getSimilarMovies } from '../../../api/movies';
@@ -507,32 +514,54 @@ export default function MovieDetailPage() {
           ) : null}
         </div>
 
-        {/* 소제목은 `OTT`다. 한때 `볼 수 있는 곳`이었다(사용자 지시 2026-09-19, 업무 -679) */}
+        {/*
+         * 소제목은 `OTT`다. 한때 `볼 수 있는 곳`이었다(사용자 지시 2026-09-19, 업무 -679).
+         *
+         * **로고만 늘어놓지 않는다**(업무 -697). 로고 줄은 누를 수 있는지 보이지 않아 정보로
+         * 읽혔다. 한 OTT가 한 줄이고 `{이름}에서 보기`를 글자로 적는다. 바깥 사이트로 나가는 줄은
+         * 오른쪽에 바깥 이동 표시를, 앱 안(7.8 감상 확인)으로 가는 줄은 화살표를 둔다. 구독 중인
+         * OTT는 `구독 중` 표식으로 알리고 설명으로도 읽힌다. 접근 가능한 이름은 그대로다.
+         */}
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>OTT</h2>
           {movie.ottProviders.length > 0 ? (
             <>
               <ul className={styles.ottList}>
-                {movie.ottProviders.map((ott) => (
-                  <li key={ott.ottId}>
-                    <button
-                      type="button"
-                      className={styles.ottButton}
-                      disabled={clicking}
-                      aria-label={`${ott.name}에서 보기`}
-                      data-mine={ott.subscribed ? 'true' : null}
-                      onClick={() => void handleOttClick(ott.ottId, ott.code)}
-                    >
-                      <OttBadge
-                        code={ott.code}
-                        name={ott.name}
-                        size={40}
-                        radius={10}
-                        labelled={false}
-                      />
-                    </button>
-                  </li>
-                ))}
+                {movie.ottProviders.map((ott) => {
+                  const external = ottMovieUrl(ott.code, movie.title) !== null;
+                  const mineId = `ott-mine-${ott.ottId}`;
+
+                  return (
+                    <li key={ott.ottId}>
+                      <button
+                        type="button"
+                        className={styles.ottButton}
+                        disabled={clicking}
+                        aria-label={`${ott.name}에서 보기`}
+                        aria-describedby={ott.subscribed ? mineId : undefined}
+                        onClick={() => void handleOttClick(ott.ottId, ott.code)}
+                      >
+                        <OttBadge
+                          code={ott.code}
+                          name={ott.name}
+                          size={32}
+                          radius={8}
+                          labelled={false}
+                        />
+                        <span className={styles.ottLabel}>{ott.name}에서 보기</span>
+                        {ott.subscribed ? (
+                          <span id={mineId} className={styles.ottMine}>
+                            <CheckIcon />
+                            구독 중
+                          </span>
+                        ) : null}
+                        <span className={styles.ottGo} aria-hidden="true">
+                          {external ? <ExternalLinkIcon /> : <ChevronRightIcon />}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
               <a
                 className={styles.ottAttribution}
@@ -609,14 +638,16 @@ export default function MovieDetailPage() {
                     className={styles.similarButton}
                     onClick={() => void navigate(path.movieDetail(item.movieId))}
                   >
-                    <Poster
-                      width={SIMILAR_POSTER_WIDTH}
-                      height={SIMILAR_POSTER_HEIGHT}
-                      radius={10}
-                      src={item.posterUrl ?? undefined}
-                      title={item.title}
-                      seed={item.movieId}
-                    />
+                    <PosterCue>
+                      <Poster
+                        width={SIMILAR_POSTER_WIDTH}
+                        height={SIMILAR_POSTER_HEIGHT}
+                        radius={10}
+                        src={item.posterUrl ?? undefined}
+                        title={item.title}
+                        seed={item.movieId}
+                      />
+                    </PosterCue>
                     <span className={styles.similarTitle}>{item.title}</span>
                   </button>
                 </li>

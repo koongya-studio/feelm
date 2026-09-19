@@ -94,12 +94,22 @@
   height: 10px;
 }
 
-/* 프레임 버튼. 크기와 테두리는 릴이 입힌다 */
+/*
+ * 프레임 버튼. 크기와 테두리는 릴이 입히고, 누름 상태와 오른쪽 아래 이동 단서는 공통
+ * 포스터 규칙을 따른다(업무 -697).
+ *
+ * 초점 링만 필름 구멍 색이다. 검정 띠 위에서 검정 링은 보이지 않는다.
+ */
 .frameButton {
+  composes: posterLink from '../../../styles/interaction.module.css';
   padding: 0;
   border: 0;
   background: none;
-  cursor: pointer;
+}
+
+.frameButton:focus-visible {
+  outline-color: var(--color-film-hole);
+  outline-offset: -2px;
 }
 
 /*
@@ -245,31 +255,55 @@
   color: var(--color-ink-muted);
 }
 
-/* 아직 받지 않은 리포트가 있을 때만. 빨강은 표식이라 글자에만 쓴다 */
+/*
+ * 아직 받지 않은 리포트가 있을 때만. 빨강 점이 `아직 확인하지 않았다`를 말하고, 글자는
+ * 줄 전체가 눌리는 면 안에서 화살표와 함께 선다 — 빨강 글자 혼자 행동을 말하지 않는다.
+ */
 .rowValue[data-tone='new'] {
   color: var(--color-brand-ink);
   font-weight: var(--font-weight-bold);
 }
 
+.rowValue[data-tone='new']::before {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  margin-right: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--color-brand);
+  content: '';
+}
+
+/* 화살표는 줄이 눌린다는 단서라 흐리게 두지 않는다 */
 .rowValue svg {
   width: 14px;
   height: 14px;
+  color: var(--color-ink);
 }
 
 /*
- * 팝콘 요약. 카드가 아니라 선으로 나뉜 줄이다.
+ * 팝콘 요약 · 리포트. 3.2 · 7.3으로 가는 이동 행이다(업무 -697). 한때 위 선 하나로 나뉜
+ * 정보 줄이라 눌러도 되는지 보이지 않았다. 면 · 테두리 · 화살표를 공통 이동 행 규칙에서
+ * 받고, 두 줄이 같은 모양이다. 그림자가 없어 아래 `필름 늘리기`보다 강해지지 않는다.
  */
+.popcorn {
+  composes: navRow from '../../../styles/interaction.module.css';
+}
+
+.report {
+  composes: navRow from '../../../styles/interaction.module.css';
+}
+
 .popcorn,
 .report {
-  display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-3) 0;
-  border: 0;
-  border-top: 1px solid var(--color-line);
-  background: none;
-  cursor: pointer;
-  text-align: left;
+}
+
+/* 맛 넷이 한 줄에 서야 해서 좌우 여백을 한 단계 줄인다. 320px에서 칸이 좁아진다 */
+.popcorn {
+  padding-right: var(--space-3);
+  padding-left: var(--space-3);
 }
 
 /*
@@ -324,6 +358,8 @@
   line-height: var(--line-height-caption);
   color: var(--color-ink-body);
   word-break: keep-all;
+  /* `솔티카라멜`처럼 띄어쓰기 없는 이름이 칸보다 길면 글자 단위로 넘긴다 */
+  overflow-wrap: anywhere;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }

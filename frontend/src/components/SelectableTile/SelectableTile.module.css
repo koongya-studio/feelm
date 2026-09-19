@@ -6,25 +6,58 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-4);
-  border: 1px solid var(--color-line);
+  border: 1px solid var(--color-line-strong);
   border-radius: var(--radius-control);
-  background: var(--color-surface-raised);
+  /* 떠 있는 면(업무 -697). 고르면 눌려 들어간다 */
+  background: var(--gradient-button);
+  box-shadow: var(--shadow-button);
   color: var(--color-ink);
   text-align: left;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   transition:
     border-color var(--motion-fast) var(--ease-standard),
-    background-color var(--motion-fast) var(--ease-standard);
+    background var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard);
+}
+
+/* 누름 상태는 공통 선택지 규칙과 같은 값이다(`interaction.module.css`, 업무 -697) */
+@media (hover: hover) {
+  .tile[data-selected='false']:hover {
+    border-color: var(--color-ink-hint);
+    background: var(--gradient-button-hover);
+    box-shadow: var(--shadow-button-hover);
+  }
+}
+
+.tile:active {
+  box-shadow: var(--shadow-button-inset);
+  transform: translateY(1px);
+}
+
+.tile:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
 }
 
 /*
  * accent 적용 지점 4/4 — 내가 고른 것.
  * 배경은 8% tint까지만 쓴다. 면적이 넓어 accent 원색을 깔면 예산을 넘는다.
+ * 테두리가 굵어지고(안쪽 그림자) 옅은 빨강 면과 채운 체크가 선다 — 색 하나로 알리지 않는다.
  */
 .tile[data-selected='true'] {
   border-color: var(--color-brand);
   background: var(--color-brand-tint);
-  box-shadow: var(--shadow-raised);
+  box-shadow:
+    inset 0 0 0 0.5px var(--color-brand),
+    var(--shadow-button-inset);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile:active {
+    transform: none;
+  }
 }
 
 .leading {

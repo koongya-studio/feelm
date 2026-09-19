@@ -313,7 +313,7 @@ describe('2.4 화면', () => {
       expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
     }
     expect(screen.getByRole('button', { name: '내 별점 남기기' })).toBeInTheDocument();
-    // OTT는 로고 아이콘 하나로만 남는다
+    // OTT는 `{이름}에서 보기` 줄 하나로 남는다(업무 -697)
     expect(screen.getByRole('button', { name: '넷플릭스에서 보기' })).toBeInTheDocument();
   });
 
@@ -746,5 +746,34 @@ describe('MovieDetailPage 관심없음', () => {
     fireEvent.click(button);
     expect(await screen.findByText(/관심없음으로 처리했어요/)).toBeInTheDocument();
     expect(dismissMovie).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('2.4 누를 수 있다는 단서 (업무 -697)', () => {
+  it('OTT는 로고만이 아니라 `{이름}에서 보기`를 글자로 적고, 구독 중인 OTT는 설명으로도 알린다', async () => {
+    renderMovie();
+
+    const netflix = await screen.findByRole('button', { name: '넷플릭스에서 보기' });
+    const watcha = screen.getByRole('button', { name: '왓챠에서 보기' });
+
+    expect(netflix).toHaveTextContent('넷플릭스에서 보기');
+    expect(netflix).toHaveAccessibleDescription('구독 중');
+    expect(watcha).toHaveTextContent('왓챠에서 보기');
+    expect(watcha).not.toHaveAccessibleDescription();
+    expect(screen.getAllByText('구독 중')).toHaveLength(1);
+  });
+
+  it('비슷한 영화 포스터에만 상세로 가는 단서가 있다. 이 영화의 포스터는 읽기만 한다', async () => {
+    vi.mocked(getSimilarMovies).mockResolvedValue([
+      { movieId: 202, title: '기생충', posterUrl: null, averageRating: 4.5, similarity: 0.9 },
+      { movieId: 203, title: '마더', posterUrl: null, averageRating: 4.1, similarity: 0.8 },
+    ]);
+
+    renderMovie();
+
+    const similar = await screen.findByRole('button', { name: /기생충/ });
+
+    expect(screen.getAllByTestId('poster-cue')).toHaveLength(2);
+    expect(similar.querySelector('[data-testid="poster-cue"]')).not.toBeNull();
   });
 });

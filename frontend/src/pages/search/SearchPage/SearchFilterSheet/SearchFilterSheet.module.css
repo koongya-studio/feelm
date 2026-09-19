@@ -91,34 +91,25 @@
 }
 
 /*
- * 선택지. 고른 것은 빨강 테두리와 글자로 표시한다 — 빨강은 면이 아니라 표식이다
- * (`design-concept.md` 2.3).
+ * 선택지. 고른 것은 공통 선택지 규칙대로 빨강 테두리가 굵어지고 옅은 빨강 면과 체크가
+ * 선다(`interaction.module.css` `.choice`, 업무 -697). 한때 빨강 테두리와 글자뿐이라
+ * 색으로만 갈렸다.
  */
 .option {
-  height: var(--control-height-sm);
+  composes: choice from '../../../../styles/interaction.module.css';
   padding: 0 var(--space-4);
-  border: 1px solid var(--color-line-strong);
-  border-radius: var(--radius-pill);
-  background: none;
-  font-family: inherit;
-  font-size: var(--font-size-meta);
-  color: var(--color-ink-muted);
-  cursor: pointer;
 }
 
-.option[aria-pressed='true'] {
-  border-color: var(--color-brand);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-brand-ink);
+/*
+ * OTT도 같은 알약이다. 한때 로고만 늘어놓아 고른 것이 로고 둘레의 얇은 선 하나로만 갈렸다.
+ * 로고 · 이름 · 체크를 한 알약에 둔다.
+ */
+.option[data-kind='ott'] {
+  padding: 0 var(--space-3) 0 var(--space-2);
 }
 
-/* OTT는 글자 대신 배지로 고른다. 선택 상태는 배지 자체가 바뀐다 */
-.ott {
-  padding: 0;
-  border: 0;
-  background: none;
-  cursor: pointer;
-  line-height: 0;
+.check {
+  composes: choiceCheck from '../../../../styles/interaction.module.css';
 }
 
 .footer {

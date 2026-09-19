@@ -385,3 +385,25 @@ describe('FilmPage 필름 위치', () => {
     expect(screen.queryByText('옆으로 넘겨보세요')).toBeNull();
   });
 });
+
+describe('FilmPage 누를 수 있다는 단서 (업무 -697)', () => {
+  it('프레임마다 상세로 가는 단서를 얹고, 팝콘과 리포트 줄은 화살표가 있는 이동 행이다', async () => {
+    vi.mocked(getMyFrames).mockResolvedValue(frameList(3));
+    vi.mocked(getPopcornBucket).mockResolvedValue(bucket);
+
+    renderWithRouter(<FilmPage />);
+
+    await screen.findByRole('button', { name: '영화 1 상세 보기' });
+
+    // 단서는 장식이다. 프레임 버튼의 이름은 그대로다
+    expect(screen.getAllByTestId('poster-cue')).toHaveLength(3);
+    expect(
+      screen.getByRole('button', { name: '영화 1 상세 보기' }).querySelector('[data-testid]'),
+    ).not.toBeNull();
+
+    // 리포트 줄의 이름은 새 리포트가 있는지에 따라 바뀐다
+    for (const name of [/^나의 취향 팝콘/, /취향 리포트/]) {
+      expect(screen.getByRole('button', { name }).querySelector('svg')).not.toBeNull();
+    }
+  });
+});

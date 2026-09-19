@@ -143,7 +143,9 @@
   list-style: none;
 }
 
+/* 떠 있는 면이다(업무 -697). 고르면 검정으로 채워진다 */
 .toggleChip {
+  composes: raised from '../../../styles/interaction.module.css';
   display: inline-flex;
   min-height: var(--tap-target-min);
   align-items: center;
@@ -151,7 +153,6 @@
   padding: 0 var(--space-4);
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius-pill);
-  background: none;
   color: var(--color-ink-body);
   cursor: pointer;
   font-family: inherit;
@@ -162,6 +163,7 @@
 .toggleChip[aria-pressed='true'] {
   border-color: var(--color-ink);
   background: var(--color-ink);
+  box-shadow: var(--shadow-action-pressed);
   color: var(--color-on-action);
 }
 
@@ -315,11 +317,12 @@ li + li > .sheetItem {
   color: var(--color-brand-ink);
 }
 
+/* 떠 있는 면이다(업무 -697) */
 .sheetCancel {
+  composes: raised from '../../../styles/interaction.module.css';
   min-height: var(--control-height-sm);
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius-pill);
-  background: none;
   color: var(--color-ink);
   cursor: pointer;
   font-family: inherit;

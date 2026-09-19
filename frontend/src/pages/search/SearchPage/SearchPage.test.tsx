@@ -228,6 +228,8 @@ describe('4.2 결과 · 4.4 결과 없음 · 오류', () => {
 
     expect(await resultsHeading(2)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '달의 뒷면' })).toHaveAttribute('href', '/movies/201');
+    // 칸마다 상세로 가는 단서가 있다(업무 -697)
+    expect(screen.getAllByTestId('poster-cue')).toHaveLength(2);
     // 연도 · 장르 · 평점 · OTT는 칸에 없다
     expect(screen.queryByText(/2020/)).not.toBeInTheDocument();
     expect(screen.queryByText(/드라마/)).not.toBeInTheDocument();
@@ -341,6 +343,11 @@ describe('4.3 필터 시트', () => {
     expect(screen.queryByText('정렬 기준')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: '드라마' }));
+
+    // 고른 조건은 색만이 아니라 체크로도 보인다(업무 -697). 이름은 그대로다
+    const drama = screen.getByRole('button', { name: '드라마' });
+    expect(drama).toHaveAttribute('aria-pressed', 'true');
+    expect(drama.querySelector('svg')).not.toBeNull();
 
     vi.mocked(searchMovies).mockResolvedValue(page([item(208, '여름의 끝')]));
     fireEvent.click(screen.getByRole('button', { name: /결과 보기/ }));

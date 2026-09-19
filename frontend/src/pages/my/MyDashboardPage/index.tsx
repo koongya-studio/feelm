@@ -75,6 +75,7 @@ import AppHeader from '../../../components/AppHeader';
 import ProfileLayout, { ProfileSkeleton } from '../../../components/ProfileLayout';
 import { kernelCounts } from '../../../components/PopcornBucket/kernels';
 import Poster from '../../../components/Poster';
+import PosterCue from '../../../components/PosterCue';
 import ReportFourCut from '../../../components/ReportFourCut';
 import ReportTape from '../../../components/ReportTape';
 import ScreenHeader from '../../../components/ScreenHeader';
@@ -664,15 +665,17 @@ export default function MyDashboardPage() {
               {ratings.items.map((rating) => (
                 <li key={rating.ratingId}>
                   <Link to={path.movieDetail(rating.movie.movieId)} className={styles.cell}>
-                    <Poster
-                      fluid
-                      width={POSTER_RATIO.width}
-                      height={POSTER_RATIO.height}
-                      radius={0}
-                      src={rating.movie.posterUrl ?? undefined}
-                      title={rating.movie.title}
-                      seed={rating.movie.movieId}
-                    />
+                    <PosterCue>
+                      <Poster
+                        fluid
+                        width={POSTER_RATIO.width}
+                        height={POSTER_RATIO.height}
+                        radius={0}
+                        src={rating.movie.posterUrl ?? undefined}
+                        title={rating.movie.title}
+                        seed={rating.movie.movieId}
+                      />
+                    </PosterCue>
 
                     <VisuallyHidden>{rating.movie.title}</VisuallyHidden>
 
@@ -698,15 +701,17 @@ export default function MyDashboardPage() {
               {unrated.items.map(({ record, ottName, date }) => (
                 <li key={record.watchRecordId}>
                   <Link to={path.movieRating(record.movie.movieId)} className={styles.cell}>
-                    <Poster
-                      fluid
-                      width={POSTER_RATIO.width}
-                      height={POSTER_RATIO.height}
-                      radius={0}
-                      src={record.movie.posterUrl ?? undefined}
-                      title={record.movie.title}
-                      seed={record.movie.movieId}
-                    />
+                    <PosterCue>
+                      <Poster
+                        fluid
+                        width={POSTER_RATIO.width}
+                        height={POSTER_RATIO.height}
+                        radius={0}
+                        src={record.movie.posterUrl ?? undefined}
+                        title={record.movie.title}
+                        seed={record.movie.movieId}
+                      />
+                    </PosterCue>
 
                     <VisuallyHidden>{record.movie.title} 평가하기</VisuallyHidden>
 
@@ -729,15 +734,17 @@ export default function MyDashboardPage() {
               {history.items.map(({ item, generatedAt }) => (
                 <li key={item.recommendationItemId}>
                   <Link to={path.movieDetail(item.movie.movieId)} className={styles.cell}>
-                    <Poster
-                      fluid
-                      width={POSTER_RATIO.width}
-                      height={POSTER_RATIO.height}
-                      radius={0}
-                      src={item.movie.posterUrl ?? undefined}
-                      title={item.movie.title}
-                      seed={item.movie.movieId}
-                    />
+                    <PosterCue>
+                      <Poster
+                        fluid
+                        width={POSTER_RATIO.width}
+                        height={POSTER_RATIO.height}
+                        radius={0}
+                        src={item.movie.posterUrl ?? undefined}
+                        title={item.movie.title}
+                        seed={item.movie.movieId}
+                      />
+                    </PosterCue>
 
                     <VisuallyHidden>{item.movie.title}</VisuallyHidden>
 

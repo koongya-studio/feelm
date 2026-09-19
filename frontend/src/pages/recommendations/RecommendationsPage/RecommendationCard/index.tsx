@@ -21,13 +21,18 @@
  *
  * **관심없음은 ⋯ 메뉴가 아니라 오른쪽 위 버튼이다**(사용자 지시 2026-09-18, 업무 -672).
  * 누르면 화면이 API-047을 부른다(`RecommendationsPage`). 처리하는 동안은 눌리지 않는다.
+ *
+ * **포스터가 상세로 간다는 단서는 추천 이유 상자 끝의 화살표다**(업무 -697). 다른 포스터는
+ * 오른쪽 아래에 화살표를 얹지만(`PosterCue`) 이 카드는 그 자리를 추천 이유가 덮는다. 상자는
+ * 누름을 가로채지 않아(`pointer-events: none`) 상자 위를 눌러도 상세로 간다.
  */
 import { Link } from 'react-router';
 import Badge from '../../../../components/Badge';
 import IconButton from '../../../../components/IconButton';
 import OttBadge from '../../../../components/OttBadge';
-import { BlockIcon } from '../../../../components/Icon';
+import { BlockIcon, ChevronRightIcon } from '../../../../components/Icon';
 import Poster from '../../../../components/Poster';
+import PosterCue from '../../../../components/PosterCue';
 import { path } from '../../../../routes/paths';
 import styles from './RecommendationCard.module.css';
 import type { MouseEvent } from 'react';
@@ -63,15 +68,17 @@ export default function RecommendationCard({
         className={styles.posterLink}
         aria-label={`${movie.title} 상세 보기`}
       >
-        <Poster
-          width={156}
-          height={220}
-          fluid
-          radius={0}
-          src={movie.posterUrl ?? undefined}
-          title=""
-          seed={movie.movieId}
-        />
+        <PosterCue cue={false}>
+          <Poster
+            width={156}
+            height={220}
+            fluid
+            radius={0}
+            src={movie.posterUrl ?? undefined}
+            title=""
+            seed={movie.movieId}
+          />
+        </PosterCue>
       </Link>
 
       <span className={styles.menuButton}>
@@ -117,8 +124,13 @@ export default function RecommendationCard({
       ) : null}
 
       <p className={styles.reason} data-multiline={isDiscovery}>
-        {isDiscovery ? null : <span className={styles.reasonLabel}>추천 이유: </span>}
-        {reason.summary}
+        <span className={styles.reasonText}>
+          {isDiscovery ? null : <span className={styles.reasonLabel}>추천 이유: </span>}
+          {reason.summary}
+        </span>
+        <span className={styles.reasonCue} aria-hidden="true">
+          <ChevronRightIcon />
+        </span>
       </p>
     </div>
   );

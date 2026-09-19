@@ -153,11 +153,33 @@ describe('5.2 새 파티 인원 설정', () => {
     renderWithRouter(<PartySizePage />, { route: '/party/new' });
 
     // 기본값 2인 — 내 자리 하나와 친구 하나
-    expect(screen.getByText('친구들을 등록해 주세요 (0/1)')).toBeInTheDocument();
+    expect(screen.getByText('다음 화면에서 친구 1명을 초대해요')).toBeInTheDocument();
+    expect(screen.getByText('친구 1')).toBeInTheDocument();
+    expect(screen.queryByText('친구 2')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('radio', { name: '4인' }));
 
-    expect(screen.getByText('친구들을 등록해 주세요 (0/3)')).toBeInTheDocument();
+    // 안내 문구와 자리 수가 곧바로 같이 바뀐다
+    expect(screen.getByText('다음 화면에서 친구 3명을 초대해요')).toBeInTheDocument();
     expect(screen.getByText('친구 3')).toBeInTheDocument();
+  });
+
+  it('이 화면에서 친구를 등록하는 것처럼 말하지 않는다', () => {
+    // 실제 초대는 5.3에서 한다 — API-051은 파티가 만들어진 뒤에 부른다(업무 -697)
+    renderWithRouter(<PartySizePage />, { route: '/party/new' });
+
+    expect(screen.queryByText(/등록해 주세요/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  it('고른 인원은 aria-checked와 함께 색이 아닌 체크로도 표시된다', () => {
+    renderWithRouter(<PartySizePage />, { route: '/party/new' });
+
+    fireEvent.click(screen.getByRole('radio', { name: '3인' }));
+
+    const picked = screen.getByRole('radio', { name: '3인' });
+    expect(picked).toHaveAttribute('aria-checked', 'true');
+    expect(picked.querySelector('svg')).not.toBeNull();
+    expect(screen.getByRole('radio', { name: '2인' }).querySelector('svg')).toBeNull();
   });
 });

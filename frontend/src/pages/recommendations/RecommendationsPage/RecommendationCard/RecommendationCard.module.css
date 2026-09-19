@@ -9,8 +9,18 @@
   position: relative;
 }
 
+/*
+ * 누름 상태는 공통 포스터 규칙이다(업무 -697). 칸이 릴 안이라(`FilmReel`이 `overflow: hidden`)
+ * 바깥 초점 링은 잘리므로 안쪽에 필름 구멍 색으로 긋는다 — 3.1 프레임과 같다.
+ */
 .posterLink {
+  composes: posterLink from '../../../../styles/interaction.module.css';
   display: block;
+}
+
+.posterLink:focus-visible {
+  outline-color: var(--color-film-hole);
+  outline-offset: -2px;
 }
 
 /*
@@ -68,23 +78,64 @@
   right: 6px;
   bottom: 6px;
   left: 6px;
-  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   box-sizing: border-box;
-  padding: 5px 8px;
+  padding: 5px 5px 5px 8px;
   border: 1px solid var(--color-line);
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.94);
   color: var(--color-ink-body);
   font-size: 10px;
+  /* 상자 위를 눌러도 아래 포스터 링크가 받는다 */
+  pointer-events: none;
+}
+
+.reasonText {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.reason[data-multiline='true'] {
+.reason[data-multiline='true'] .reasonText {
   line-height: 1.4;
   white-space: normal;
 }
 
 .reasonLabel {
   color: var(--color-ink-muted);
+}
+
+/*
+ * 상세로 가는 단서. 공통 포스터 단서(`PosterCue`)와 같은 동그라미를 상자 안에 작게 둔다.
+ * 포스터에 마우스를 올리면 검정으로 채워진다.
+ */
+.reasonCue {
+  display: flex;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
+  color: var(--color-ink);
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+.reasonCue svg {
+  width: 9px;
+  height: 9px;
+}
+
+@media (hover: hover) {
+  .card:has(.posterLink:hover) .reasonCue {
+    background: var(--color-action);
+    color: var(--color-on-action);
+  }
 }

@@ -43,6 +43,38 @@ div.row {
   cursor: default;
 }
 
+/*
+ * 누를 수 있는 줄의 상태(업무 -697). 목록 테두리 안이라 면만 바뀐다. 첫 줄 · 끝 줄은 목록의
+ * 둥근 모서리를 따른다.
+ */
+.list > li:first-child > .row {
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+}
+
+.list > li:last-child > .row {
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+}
+
+.list > li:only-child > .row {
+  border-radius: var(--radius-card);
+}
+
+@media (hover: hover) {
+  a.row:hover,
+  button.row:hover:not(:disabled) {
+    background: var(--color-surface-raised);
+  }
+}
+
+a.row:active,
+button.row:active:not(:disabled) {
+  background: var(--color-surface);
+}
+
+.row:focus-visible {
+  outline-offset: -2px;
+}
+
 .itemLabel {
   min-width: 0;
   flex: 1;

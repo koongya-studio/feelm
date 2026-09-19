@@ -15,8 +15,12 @@
 }
 
 /* 포스터와 제목이 한 칸이고 칸 전체가 누름 영역이다. 밑줄은 쓰지 않는다 */
+/* 결과 한 칸. 포스터와 제목이 통째로 상세 링크이고 누름 상태는 공통 포스터 규칙이다(업무 -697) */
 .cell {
+  composes: posterLink from '../../../../styles/interaction.module.css';
   display: flex;
+  /* 초점 링이 포스터 모서리를 따라 둥글게 돈다 */
+  border-radius: var(--radius-icon);
   min-width: 0;
   flex-direction: column;
   gap: var(--space-1);

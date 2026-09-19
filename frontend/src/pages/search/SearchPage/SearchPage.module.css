@@ -96,9 +96,15 @@
   justify-content: center;
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius-control);
-  background: var(--color-surface-raised);
+  /* 떠 있는 면(업무 -697). 검색창은 글을 넣는 칸이라 들어가 있고, 이 버튼은 나와 있다 */
+  background: var(--gradient-button);
+  box-shadow: var(--shadow-button);
   color: var(--color-ink);
   cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard);
 }
 
 .filterButton:disabled {
@@ -106,10 +112,33 @@
   cursor: default;
 }
 
-/* 필터가 걸려 있으면 표식으로 알린다 (`design-concept.md` 2.3) */
+/*
+ * 필터가 걸려 있으면 선택 상태로 알린다. 공통 선택지 규칙처럼 빨강 테두리가 굵어지고 옅은
+ * 빨강 면이 깔린다 — 한때 테두리와 아이콘 색만 바뀌어 색으로만 갈렸다(업무 -697).
+ */
 .filterButton[data-filtered] {
   border-color: var(--color-brand);
+  background: var(--color-brand-tint);
+  box-shadow:
+    inset 0 0 0 0.5px var(--color-brand),
+    var(--shadow-button-inset);
   color: var(--color-brand-ink);
+}
+
+@media (hover: hover) {
+  .filterButton:hover:not(:disabled, [data-filtered]) {
+    background: var(--gradient-button-hover);
+    box-shadow: var(--shadow-button-hover);
+  }
+}
+
+.filterButton:active:not(:disabled) {
+  box-shadow: var(--shadow-button-inset);
+  transform: translateY(1px);
+}
+
+.filterButton:disabled {
+  box-shadow: none;
 }
 
 /* 검색창 아래 한 줄. 무엇으로 찾는지 */
@@ -162,12 +191,13 @@
 }
 
 /* 최근 검색어. 누르면 그 말로 다시 찾는다 */
+/* 떠 있는 면이다(업무 -697). 누름 영역은 44px을 지킨다 */
 .recentItem {
-  min-height: 36px;
+  composes: raised from '../../../styles/interaction.module.css';
+  min-height: var(--tap-target-min);
   padding: var(--space-1) var(--space-3);
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius-control);
-  background: none;
   font-family: inherit;
   font-size: var(--font-size-meta);
   color: var(--color-ink-body);
@@ -213,12 +243,13 @@
   align-items: center;
 }
 
+/* 떠 있는 면이다(업무 -697). 누름 영역은 44px을 지킨다 */
 .sortSelect {
-  height: 40px;
+  composes: raised from '../../../styles/interaction.module.css';
+  height: var(--tap-target-min);
   padding: 0 var(--space-8) 0 var(--space-3);
   border: 1px solid var(--color-line-strong);
   border-radius: var(--radius-control);
-  background: none;
   font-family: inherit;
   font-size: var(--font-size-meta);
   color: var(--color-ink);

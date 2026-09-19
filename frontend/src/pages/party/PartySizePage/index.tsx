@@ -14,11 +14,18 @@
  * `[?]` 와이어프레임의 `친구 1` · `친구 2` 자리는 친구를 미리 고르는 것처럼 보이지만,
  * 계약의 초대는 파티를 만든 **뒤에** 하는 일이다(API-051은 `partyId`가 필요하다).
  * 여기서는 자리만 보여주고 실제 초대는 5.3에서 한다.
+ *
+ * **그래서 이 화면은 친구를 받지 않는다고 분명히 말한다**(업무 -697). 한때 `친구들을 등록해
+ * 주세요 (0/N)`이라고 적고 빈 자리를 입력 칸처럼 그려, 여기서 등록해야 하는 것처럼 읽혔다.
+ * 지금은 `다음 화면에서 친구 N명을 초대해요`라고 적고, 자리는 누를 수 없는 동그라미 미리보기다.
+ * 인원 선택 → 안내 → 자리 미리보기 → 다음이 위에서 아래로 이어지고, 버튼을 화면 바닥으로
+ * 밀지 않아 가운데가 비지 않는다.
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import Button from '../../../components/Button';
 import ScreenHeader from '../../../components/ScreenHeader';
+import { CheckIcon, PersonIcon } from '../../../components/Icon';
 import { PARTY_MAX_MEMBERS, PARTY_MIN_MEMBERS } from '../../../api/parties';
 import { path } from '../../../routes/paths';
 import styles from './PartySizePage.module.css';
@@ -55,6 +62,11 @@ export default function PartySizePage() {
               aria-checked={size === option}
               onClick={() => setSize(option)}
             >
+              {size === option ? (
+                <span className={styles.check}>
+                  <CheckIcon />
+                </span>
+              ) : null}
               {option}인
             </button>
           ))}
@@ -64,19 +76,30 @@ export default function PartySizePage() {
           최대 {PARTY_MAX_MEMBERS}명까지 · {PARTY_MIN_MEMBERS}명부터 파티를 시작할 수 있어요
         </p>
 
-        <ul className={styles.slots}>
-          <li className={styles.slot} data-mine="true">
-            내 필름
-          </li>
+        <section className={styles.preview} aria-labelledby="party-size-invite">
+          {/* 인원을 바꾸면 곧바로 바뀐다. 읽기 도구에도 바뀐 수를 알린다 */}
+          <p id="party-size-invite" className={styles.invite} aria-live="polite">
+            다음 화면에서 친구 {friendSlots}명을 초대해요
+          </p>
 
-          {Array.from({ length: friendSlots }, (_, index) => (
-            <li key={index} className={styles.slot}>
-              친구 {index + 1}
+          <ul className={styles.slots}>
+            <li className={styles.slot} data-mine="true">
+              <span className={styles.slotMark} aria-hidden="true">
+                나
+              </span>
+              <span className={styles.slotLabel}>내 필름</span>
             </li>
-          ))}
-        </ul>
 
-        <p className={styles.progress}>친구들을 등록해 주세요 (0/{friendSlots})</p>
+            {Array.from({ length: friendSlots }, (_, index) => (
+              <li key={index} className={styles.slot}>
+                <span className={styles.slotMark} aria-hidden="true">
+                  <PersonIcon />
+                </span>
+                <span className={styles.slotLabel}>친구 {index + 1}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
 
         <div className={styles.actions}>
           <Button
