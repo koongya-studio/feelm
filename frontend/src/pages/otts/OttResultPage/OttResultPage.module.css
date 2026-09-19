@@ -59,20 +59,16 @@
   line-height: var(--line-height-caption);
 }
 
-.topRate {
+/* 일치도 %가 있던 자리다. 계약이 주는 편수(matchCount)를 대신 크게 둔다 (업무 -564) */
+.topMatch {
   font-size: var(--font-size-title);
   font-weight: var(--font-weight-bold);
   letter-spacing: var(--letter-spacing-title);
   line-height: var(--line-height-title);
 }
 
-.topHeadline {
-  margin-top: var(--space-2);
-  font-size: var(--font-size-body);
-  line-height: var(--line-height-body);
-}
-
 .topCount {
+  margin-top: var(--space-2);
   color: var(--color-on-dark-muted);
   font-size: var(--font-size-meta);
   line-height: var(--line-height-meta);
@@ -140,10 +136,6 @@
   font-weight: var(--font-weight-bold);
   gap: var(--space-2);
   line-height: var(--line-height-body);
-}
-
-.rowRate {
-  font-size: var(--font-size-meta);
 }
 
 .rowMeta {

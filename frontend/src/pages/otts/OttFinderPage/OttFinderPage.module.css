@@ -12,13 +12,13 @@
   line-height: var(--line-height-heading);
 }
 
+/* 요약이 `평가` 하나로 줄어(업무 -564) 두 칸 격자 대신 한 줄로 둔다 */
 .basis {
   display: grid;
   padding: var(--space-4);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
   gap: var(--space-4) var(--space-3);
-  grid-template-columns: 1fr 1fr;
 }
 
 .fact {
