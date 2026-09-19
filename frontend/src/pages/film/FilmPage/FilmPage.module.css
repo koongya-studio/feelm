@@ -19,38 +19,6 @@
   padding: var(--space-2) 0 var(--space-4);
 }
 
-/* 검색과 알림이 나란히 선다. 둘 다 44px 터치 영역이라 사이를 좁게 둔다 */
-.headerActions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.headerAction {
-  position: relative;
-  display: flex;
-  width: var(--tap-target-min);
-  height: var(--tap-target-min);
-  align-items: center;
-  justify-content: center;
-  color: var(--color-ink);
-  text-decoration: none;
-}
-
-.headerAction::before {
-  position: absolute;
-  width: 39px;
-  height: 39px;
-  border: 0.5px solid var(--color-glass-line);
-  border-radius: var(--radius-pill);
-  background: var(--color-glass);
-  content: '';
-}
-
-.headerAction > * {
-  position: relative;
-}
-
 /* ─────────────────────────── 제목 */
 
 .head {
@@ -92,12 +60,38 @@
   gap: var(--space-2);
 }
 
+/*
+ * 필름 아래 한 줄. 왼쪽이 지금 위치(`3 / 24`), 오른쪽이 넘기는 방향이다(업무 -680).
+ * 화살표가 오른쪽 끝에 서야 넘길 방향과 같은 쪽을 가리킨다.
+ */
 .reelHint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0;
   padding: 0 var(--screen-padding-x);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
   color: var(--color-ink-hint);
-  text-align: center;
+}
+
+/* 넘길 때 숫자 폭이 흔들리지 않게 고정폭 숫자를 쓴다 */
+.reelCounter {
+  color: var(--color-ink-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.reelSwipe {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+.reelSwipe svg {
+  width: 6px;
+  height: 10px;
 }
 
 /* 프레임 버튼. 크기와 테두리는 릴이 입힌다 */
@@ -154,6 +148,36 @@
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
   color: var(--color-on-dark-muted);
+}
+
+/*
+ * 다음 장 칸(업무 -656). 빈 필름의 자리와 같은 점선 칸이다 — 아직 감기지 않은 필름이
+ * 이어진다는 뜻이고, 받는 동안 글자만 흐리게 둔다.
+ */
+.moreSlot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-style: dashed !important;
+  border-color: var(--color-film-slot-line) !important;
+  background: var(--color-film-slot);
+}
+
+.moreLoading,
+.moreButton {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-on-dark-muted);
+  text-align: center;
+}
+
+.moreButton {
+  width: 100%;
+  height: 100%;
+  padding: 0 var(--space-2);
+  border: 0;
+  background: none;
+  cursor: pointer;
 }
 
 /* ─────────────────────────── 빈 상태 */

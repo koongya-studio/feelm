@@ -9,6 +9,8 @@
  * 상세(API-030) · 유사(API-031) · 한줄평(API-032) · 클릭 기록(API-033)을 전부 가로챈다.
  * 새 탭은 `window.open`을 가로채 가짜 창을 돌려주고, 그 창의 `location.replace`가
  * 언제 어떤 주소로 불리는지 본다.
+ *
+ * 팝콘 맛 칩(업무 -631)은 맛 기준정보(API-044)도 가로채 이름과 대표 키워드를 준다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
@@ -33,6 +35,33 @@ vi.mock('../../../api/watch', async (importOriginal) => ({
 
 const { getMovieDetail, getSimilarMovies, getMovieReviews } = await import('../../../api/movies');
 const { recordOttClick } = await import('../../../api/watch');
+
+vi.mock('../../../api/taste', () => ({ getPopcornFlavors: vi.fn() }));
+
+vi.mock('../../../api/recommendations', () => ({ dismissMovie: vi.fn() }));
+
+const { dismissMovie } = await import('../../../api/recommendations');
+const { ApiError } = await import('../../../api/apiError');
+
+const { getPopcornFlavors } = await import('../../../api/taste');
+
+/** 맛 기준정보(API-044). 실제 배포값 중 두 맛이다 */
+const FLAVORS = [
+  {
+    code: 'FLAVOR_D',
+    displayName: '피스타치오',
+    color: '#B4B46C',
+    representativeKeywords: ['드라마', '인물', '관계', '역사', '전쟁'],
+    sortOrder: 4,
+  },
+  {
+    code: 'FLAVOR_E',
+    displayName: '쿠키앤크림',
+    color: '#E4D8B4',
+    representativeKeywords: ['스릴러', '범죄', '긴장', '미스터리', '추적'],
+    sortOrder: 5,
+  },
+];
 
 const WATCH_URL = 'https://justwatch.example/watch/101';
 const NETFLIX_SEARCH_URL = 'https://www.netflix.com/search?q=%EA%B4%B4%EB%AC%BC';
@@ -105,6 +134,7 @@ function authValue(status: AuthStatus): AuthValue {
     user: null,
     signIn: vi.fn(),
     signInWithSocial: vi.fn(),
+    completeEmailSignup: vi.fn(),
     completeSocialSignup: vi.fn(),
     signOut: vi.fn(),
   };
@@ -131,6 +161,7 @@ beforeEach(() => {
     .mockReset()
     .mockResolvedValue({ items: [], nextCursor: null, hasNext: false });
   vi.mocked(recordOttClick).mockReset();
+  vi.mocked(getPopcornFlavors).mockReset().mockResolvedValue(FLAVORS);
   // jsdom의 `scrollTo`는 구현이 없다고 콘솔에 찍는다. 불렸는지만 세면 된다
   vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
 });
@@ -150,7 +181,7 @@ describe('2.4 OTT 아이콘', () => {
 
     renderMovie();
 
-    expect(await screen.findByRole('heading', { name: '볼 수 있는 곳' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'OTT' })).toBeInTheDocument();
     expect(screen.getByText('현재 확인된 OTT 제공처가 없어요')).toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: '시청 정보 제공: JustWatch' }),
@@ -284,6 +315,19 @@ describe('2.4 화면', () => {
     expect(screen.getByRole('button', { name: '내 별점 남기기' })).toBeInTheDocument();
     // OTT는 로고 아이콘 하나로만 남는다
     expect(screen.getByRole('button', { name: '넷플릭스에서 보기' })).toBeInTheDocument();
+  });
+
+  it('비슷한 영화에 유사도 수치를 적지 않는다', async () => {
+    // `유사도 90%`가 내가 좋아할 확률로 읽혔다(업무 S15P21E106-678, 리포트 P1-07)
+    vi.mocked(getSimilarMovies).mockResolvedValue([
+      { movieId: 202, title: '기생충', posterUrl: null, averageRating: 4.5, similarity: 0.9 },
+    ]);
+
+    renderMovie();
+
+    expect(await screen.findByRole('button', { name: /기생충/ })).toBeInTheDocument();
+    expect(screen.queryByText(/유사도/)).toBeNull();
+    expect(screen.queryByText(/90\s*%/)).toBeNull();
   });
 
   it('관련 영화로 넘어가면 스크롤을 맨 위로 되돌린다', async () => {
@@ -587,5 +631,120 @@ describe('2.4 공개 한줄평과 출연진', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '↑ 맨 위로' }));
     expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+  });
+});
+
+/*
+ * 이 영화의 팝콘 맛 (업무 -631)
+ *
+ * 평가하면 이 맛의 팝콘이 한 알 담기므로 평가 전에 무슨 맛인지 보여 준다. 맛 코드는
+ * API-030, 이름과 설명은 API-044다. 계약에 설명 문장이 없어 대표 키워드를 쓴다.
+ */
+describe('2.4 팝콘 맛', () => {
+  it('영화의 맛을 칩으로 보이고, 누르면 그 맛의 대표 키워드를 펼친다', async () => {
+    vi.mocked(getMovieDetail).mockResolvedValue(movie({ flavorCode: 'FLAVOR_E' }));
+
+    renderMovie();
+
+    const chip = await screen.findByRole('button', { name: '쿠키앤크림 맛' });
+    expect(chip).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('스릴러 · 범죄 · 긴장 · 미스터리 · 추적')).toBeNull();
+
+    fireEvent.click(chip);
+
+    expect(chip).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('스릴러 · 범죄 · 긴장 · 미스터리 · 추적')).toBeInTheDocument();
+
+    fireEvent.click(chip);
+    expect(screen.queryByText('스릴러 · 범죄 · 긴장 · 미스터리 · 추적')).toBeNull();
+  });
+
+  it('맛이 배정되지 않은 영화는 칩을 두지 않는다', async () => {
+    vi.mocked(getMovieDetail).mockResolvedValue(movie({ flavorCode: null }));
+
+    renderMovie();
+
+    expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
+    await waitFor(() => expect(getPopcornFlavors).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: / 맛$/ })).toBeNull();
+  });
+
+  it('맛 기준정보를 받지 못하면 이름을 지어내지 않고 칩을 두지 않는다', async () => {
+    vi.mocked(getMovieDetail).mockResolvedValue(movie({ flavorCode: 'FLAVOR_E' }));
+    vi.mocked(getPopcornFlavors).mockRejectedValue(new Error('boom'));
+
+    renderMovie();
+
+    expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
+    await waitFor(() => expect(getPopcornFlavors).toHaveBeenCalled());
+    expect(screen.queryByRole('button', { name: / 맛$/ })).toBeNull();
+  });
+});
+
+/*
+ * 2.4 관심없음(업무 S15P21E106-664, API-047). 상세 응답에 관심없음 여부가 없어 누르기 전에는
+ * 이미 처리된 영화인지 모른다. 그래서 `409 ALREADY_DISMISSED`는 처리된 상태로 보인다.
+ */
+describe('MovieDetailPage 관심없음', () => {
+  beforeEach(() => {
+    vi.mocked(dismissMovie).mockReset();
+  });
+
+  it('누르면 API-047을 부르고 처리된 상태로 바뀐다', async () => {
+    vi.mocked(dismissMovie).mockResolvedValue();
+
+    renderMovie();
+    fireEvent.click(await screen.findByRole('button', { name: '관심없음' }));
+
+    expect(await screen.findByText(/관심없음으로 처리했어요/)).toBeInTheDocument();
+    expect(dismissMovie).toHaveBeenCalledWith(101, undefined);
+    // 해제는 계약 미정이라 다시 누를 수 없다
+    expect(screen.getByRole('button', { name: '관심없음 처리됨' })).toBeDisabled();
+  });
+
+  it('추천에서 들어온 상세면 추천 항목 번호를 함께 보낸다', async () => {
+    vi.mocked(dismissMovie).mockResolvedValue();
+
+    renderWithRouter(
+      <AuthContext.Provider value={authValue('anonymous')}>
+        <MovieDetailPage />
+      </AuthContext.Provider>,
+      {
+        route: `${path.movieDetail(101)}?recommendationItemId=281`,
+        path: ROUTE_PATTERN.movieDetail,
+      },
+    );
+    fireEvent.click(await screen.findByRole('button', { name: '관심없음' }));
+
+    await waitFor(() => expect(dismissMovie).toHaveBeenCalledWith(101, 281));
+  });
+
+  it('이미 관심없음인 영화(409)는 실패가 아니라 처리된 상태로 보인다', async () => {
+    vi.mocked(dismissMovie).mockRejectedValue(
+      new ApiError(409, 'ALREADY_DISMISSED', '이미 관심없음으로 처리한 영화입니다.'),
+    );
+
+    renderMovie();
+    fireEvent.click(await screen.findByRole('button', { name: '관심없음' }));
+
+    expect(await screen.findByText(/관심없음으로 처리했어요/)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('실패하면 버튼을 그대로 두고 다시 누를 수 있다', async () => {
+    vi.mocked(dismissMovie)
+      .mockRejectedValueOnce(new ApiError(500, 'INTERNAL_ERROR', '서버 오류'))
+      .mockResolvedValueOnce();
+
+    renderMovie();
+    fireEvent.click(await screen.findByRole('button', { name: '관심없음' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('관심없음으로 처리하지 못했어요');
+    const button = screen.getByRole('button', { name: '관심없음' });
+    expect(button).toBeEnabled();
+
+    fireEvent.click(button);
+    expect(await screen.findByText(/관심없음으로 처리했어요/)).toBeInTheDocument();
+    expect(dismissMovie).toHaveBeenCalledTimes(2);
   });
 });

@@ -3,23 +3,32 @@
 상태: **APPROVED — 로컬 구현 기준**. 모델 학습/배포 완료 상태와 구분한다.
 [정책](POLICY.md), [기계 특징 목록](../../configs/service-v1/feature-schema.v1.json), [운영 연결](OPERATIONS.md).
 
+모델 선택·입력 길이·학습 장소는 [현재 개발 방향](CURRENT-DIRECTION.md)이 이 문서의 2026-09-13
+고정10/cap/245열 가정보다 우선한다. RH230·KOBIS245는 재현할 legacy 기준선이며, GBT와 FM의
+최종 특징은 각각 S15P21E106-622·623의 제거 실험 뒤 결정한다.
+
+새 GBT·FM 0~N 학습은 [0~N 학습·평가 계약](../../contracts/zero-n-learning-evaluation.md)을 따른다.
+실행 설정과 새 feature profile은 S15P21E106-622·623의 로컬 실험에서 모델별로 만든다. 아래의 기존
+cap0/1/5/10/30, 보정45·선정45·확인180은 고정 legacy 비교를 재현하는 기록이다. 새 0~N 결과와
+역할·분모를 섞거나 cap10 결과를 임의 N 지원의 증거로 사용하지 않는다.
+
 ## 1. 모델의 역할과 현재 파일
 
 | 모델 | 서비스 역할 | 기존 자료 | v1 새 산출물 |
 | --- | --- | --- | --- |
-| GBT | 기본 노출·후보 배치·재정렬 | GBT120_s339, RH230, 로컬 native 있음 | RH230+KOBIS15=245열로 학습·보정한 bundle 필요 |
-| FM | 공통 요청의 비교 scorer | FM150_s339, RH230, portable 있음 | 같은245열 FM은 별도 학습 후 비교. 그 전230열은 legacy feature 비교임을 표시 |
+| GBT | 노출 후보 모델·후보 배치·재정렬 | GBT120_s339, RH230, 로컬 native 있음 | 622에서 모델별 특징·0~N 성능을 검증한 bundle 후보 |
+| FM | 노출 후보 모델·비교 scorer | FM150_s339, RH230, portable 있음 | legacy245 집계형과 새 희소 history/content FM을 623에서 별도 비교 |
 | ALS | 협업 기준 비교 scorer | 기존 factor·fold-in·보정 자료 있음 | 원 factor를 재사용할 수 있으나 공통 비교용 보정 필요 |
 
-기본 registry는 GBT다. FM/ALS를 구현한다는 것은 같은 후보·사용자 입력으로 점수를 계산해
-비교 결과를 저장할 수 있게 한다는 뜻이다. shadow 오류가 기본 응답을 실패시키지 않아야 한다.
+현재 노출 registry의 모델 가족은 정하지 않았다. GBT/FM/ALS는 같은 후보·사용자 입력으로
+점수를 계산해 비교 결과를 저장할 수 있어야 하며, shadow 오류가 승격된 노출 모델의 응답을 실패시키지 않아야 한다.
 실시간 요청의 사용자가 모델 이름을 임의로 지정하게 하지 않는다. 운영 모델 교체는 새 bundle을
 검증하고 활성 포인터를 바꾸는 절차다. 오차가 낮다는 이유로 자동 전환하지 않는다.
 
 추가 비교 정책은 [ALS 결합 비교군](HYBRID-COMPARISONS.md)과
 [comparison-registry](../../configs/service-v1/comparison-registry.v1.json)를 따른다. ALS+GBT·ALS+FM 각각에 전환과
 shrink100 혼합을 두어 단독3개+결합4개의7개 점수 경로를 남긴다. 새 학습 모델4개를 추가하는
-뜻은 아니다. 각 component의 보정 연속값을 재사용하며 기본 노출의 자동 혼합 금지는 유지한다.
+뜻은 아니다. 각 component의 보정 연속값을 재사용하며 노출 모델의 자동 혼합 금지는 유지한다.
 
 기존230열 GBT를 개발 fixture/재현 기준으로 로드할 수 있지만 그 결과에 `featureVersion=rh230`
 를 붙인다. 새245열 모델이 없으면 `NOT_BUILT`다. 이 문서는 모델 파일의 존재를 대신하지 않는다.
@@ -67,7 +76,7 @@ MovieLens user ID로 대체하지 않는다. ALS도 서비스 사용자는 지�
 RH230에 사용하지 않는 줄거리만 있는 영화도 이 조건을 충족하지 않는다. 원천의 추천 하한은
 여기 적용하지 않는다. 후보 입력 지원도 같은 판정을 쓰고 false이면 MODEL_INPUT_UNAVAILABLE다.
 
-## 3. GBT·FM의 공통245열
+## 3. legacy GBT·FM 공통245열 기준선
 
 ### 기존230열
 
@@ -125,8 +134,9 @@ q99는 학습 역할의 유효 영화별 `log1p(audience)` 99백분위(선형 �
 | x241~242 | 후보 z−zbar, 이 차이×x240 |
 | x243~244 | history_present, response_estimable |
 
-서비스/주 평가 H≤10, 학습은 기존 행 cap0/1/5/10/30을 유지하므로 m≤30이다. KOBIS만 별도로
-최신10으로 자르지 않는다. m<2 또는 지표 분산≤1e−8이면 cov·교차0, estimable0이다.
+legacy 서비스/주 평가 H≤10과 기존 학습 행 cap0/1/5/10/30에서는 m≤30이다. 새 0~N 계약의
+입력 상한으로 사용하지 않는다. 새 실행은 전체 과거 이력과 실제 사용/절단 수를 기록한다.
+m<2 또는 지표 분산≤1e−8이면 cov·교차0, estimable0이다.
 후보가 결측이면 후보 z/valid/초과 플래그와 delta·교차는0이다. m=0이면 평균·분산·별점 평균·
 전체 평균과 차이도 계산용0, history_present0이다. H=0의 학습 행은 유지한다.
 
@@ -168,9 +178,15 @@ raw_ALS = q_iᵀu
 lambda·rank·별점 변환은 factor를 만든 모델 manifest와 일치시킨다. 기존 연구 lambda는0.1이다.
 입력 지원 영화0편, 후보 factor 없음, 비유한 해는 unsupported다. TMDB 투표·KOBIS 관객을
 실제 별점이나 n_supported_history로 넣지 않는다. ALS 영화 factor는 외부 메타데이터가 아닌
-사용자 평점으로 학습한 것이다. v1에서는 ALS 점수도 비교 로그에 남기며 GBT를 덮어쓰지 않는다.
+사용자 평점으로 학습한 것이다. v1에서는 ALS 점수도 비교 로그에 남기며 승격된 노출 모델을 덮어쓰지 않는다.
 
 ## 5. 학습·보정 역할과 실행 범위
+
+이 절의 고정 역할·cap은 기존 B0~B3 실험 lineage에만 적용한다. 새 0~N 실행은 사용자 비중첩
+`TRAIN/VALIDATION/FINAL_TEST`와 전역 시점 창을 함께 고정하고, target보다 엄격히 과거인 전체
+이력 prefix로 episode를 만든다. `totalHistoryCount`와 모델이 실제 사용할 수 있는
+`supportedHistoryCount`를 분리하며, ALS·콘텐츠·인기도 등 학습형 보조 특징은 시점이 맞는
+out-of-fold 값만 허용한다. 실제 cutoff와 사용자 partition seed는 실행 manifest가 고정한다.
 
 현재 요청의 실행은 데이터 분석과 문서 작성이다. 아래는 개발자가 구현할 학습 계약이며 새
 학습을 이미 수행했다는 뜻이 아니다. 기존 `final344_worker.py`는230열·정확한 원행 수를
@@ -204,8 +220,8 @@ history_ml_ids/history_stars/history_timestamps로 저장한다. 별도의 서�
 ## 6. 결측 학습과 새 모델 준비 조건
 
 GBT 준비 비교는 기존 B0, TMDB 결측 증강 B1, KOBIS 영화3열 B2, KOBIS 반응12열까지 B3의
-최대3회 새 GBT 학습으로 분리한다. v1의245열 목표는 B3이다. B1/B2를245열인 것처럼 배포하지 않는다.
-모델 기본 가족을 GBT로 정한 것과 B3 파일이 품질/기술 조건을 통과한 것은 별개다.
+최대3회 새 GBT 학습으로 분리한다. legacy245 비교의 목표는 B3이다. B1/B2를245열인 것처럼 배포하지 않는다.
+과거 GBT 기본안과 B3 파일이 품질/기술 조건을 통과한 것은 별개이며, 현재 모델 선택은 625에서 확정한다.
 각 변형은 [training-recipe](../../configs/service-v1/training-recipe.v1.json)의 이름·열 목록을 따른다. B1은230열,
 B2는233열, B3은245열이다. 없는 채널을 가린 view도 삭제하지 않고 동일 행으로 남겨서 네 view를
 유지한다. FM245는 B3 특징으로 최대1회 비교 학습이며 B1/B2별 추가 FM 탐색은 하지 않는다.
@@ -259,9 +275,12 @@ KOBIS는 연도별 전체72,700행 수집과 원문 검산까지 완료했다. �
 단계별 완료/미완료와 원자료 파일은 [KOBIS-DATA](KOBIS-DATA.md)를 따른다. 수집 검산 PASS는
 위 모델 준비 하한을 충족했다는 뜻이 아니며 B2/B3·FM245 학습/성능 결과는 아직 없다.
 
-학습은 기존 고정 Spark4.1.3·4CPU·12GiB·driver8GiB에서 순차 실행한다.4view 약1,999만 행의
-용량을 사전 점검한다. 프로세스90분 상한, OOM/시간초과는 미완료로 남기고 자동 증설/행 축소/
-재시도를 하지 않는다. 새 학습 실행 코드·split/특징/가중치·메모리 사전 검토를 통과해야 한다.
+학습은 서버의 상시 작업이 아니라 데스크톱과 노트북에서 재현 가능한 단계별 로컬 실행으로 수행한다.
+각 장비의 CPU·메모리·GPU·디스크·Spark 버전을 실행 manifest에 남기고, 작은 표본과 단일 view로
+메모리·시간을 측정한 뒤 전체 history와 필요한 view로 확대한다. HDFS와 분산 실행은 원천 입력,
+중간 산출물 교환, 대규모 ETL 또는 후보 배치가 실제로 병목일 때 별도 작업에서 검증한다.
+4view 약1,999만 행의 용량을 사전 점검한다. 프로세스90분 상한, OOM/시간초과는 미완료로 남기고
+행 축소로 성공을 위장하지 않는다. 새 학습 실행 코드·split/특징/가중치·메모리 사전 검토를 통과해야 한다.
 245개 float32 특징만으로도 확장 행은 약19.6GB다. 단일 NumPy 배열로 모두 적재하지 않고
 최대4,096행씩 특징/view를 생성해 Parquet에 기록한다. Spark 학습 입력은 이 분산 파일이며
 spill/checkpoint 경로와 실제 여유 용량을 사전 검토에 남긴다. 컨테이너12GiB가 전체 행렬의
@@ -291,7 +310,7 @@ spill/checkpoint 경로와 실제 여유 용량을 사전 검토에 남긴다. �
 새 GBT는 공통 보정 B0 대비 NDCG@2 감소0.01·Top2 low 증가2%p·핵심 구간 MSE 악화5%
 한계를 사전에 적용한다. 비열등을 주장하려면95% 구간도 한계 안이어야 한다. 특징3대조의 우위는
 Holm 보정하고 한seed의 결과를 모델군 전체 우위로 확대하지 않는다. 실패/부족이면 새 B3 활성화
-조건을 충족하지 못한 것이다. 사용자 지시 없이 FM/ALS로 기본 가족을 바꾸지 않는다.
+조건을 충족하지 못한 것이다. GBT/FM 어느 쪽도 625의 봉인 평가와 사용자 평가 전에는 노출 가족으로 확정하지 않는다.
 필수 구간은 EVALUATION의 ALL/ALS 목표 factor 두 층(B1~B3), KR/KO_LOW/KO_ONLY(B2~B3),
 KO_RESPONSE(B3)다. 각 구간의 원행·최소 표본과 선정45→확인180 양쪽 통과, bootstrap draw별
 상대 MSE·0분모 처리·CI 끝점 방향까지 EVALUATION의 활성화 절차로 고정한다.
@@ -305,7 +324,8 @@ shadow 실행은 비동기로 하고 실패·미지원·feature 불일치를 비
 
 ## 8. 배포 bundle과 실패
 
-manifest 필수: bundleId, modelId/version, featureVersion/245열 names hash, model file 목록과
+manifest 필수: bundleId, modelId/version, modelType, featureProfileId, featureVersion,
+모델별 dimensions/dtype/orderedNamesHash/transform, model file 목록과
 SHA/bytes, 고정 runtime, training/split/source manifests, TMDB prior, KOBIS q99, calibration
 계수·역할·cap10, GKT preprocess/centers/representatives/assignments 해시, 평가/검토 상태.
 분류가 모델별로 달라지는 것이 아니며, 모든 scorer가 같은 카탈로그/정책을 참조한다.

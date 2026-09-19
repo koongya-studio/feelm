@@ -36,7 +36,7 @@ lifecycle = module('server_job_lifecycle', 'ci-job-lifecycle.py')
 bounded_output = module('server_bounded_output', 'ci-bounded-output.py')
 DOCKER_SHA = '803d433f226db4776e1768fd319fc6c6e4935a456acf84fcc0080818b854bc8f'
 DOCKER_URL = 'https://download.docker.com/linux/static/stable/x86_64/docker-29.7.2.tgz'
-IMAGES = Path('/home/feelm-ci-test/ci222-backend-images-E4nFHV/backend-images.tar')
+IMAGES = backend.inputs.IMAGE_ARCHIVE_PATH
 BASE_PATTERN = r'/var/tmp/ci222-server-[a-z0-9_]+'
 SYSFS_WAIT = '''#!/bin/sh
 set -eu
@@ -474,8 +474,9 @@ class BackendJobDriver:
                                             self.REQUIRED_CLASSES, expected_tests=expected_tests)
         except Exception as exc:
             # Bounded diagnostics, never arbitrary exception text from job data.
-            (self.attempt / 'report-rejection.json').write_text(json.dumps(
-                {'type': type(exc).__name__, 'errno': getattr(exc, 'errno', None)}))
+            write_private_json(self.attempt / 'report-rejection.json',
+                               {'type': type(exc).__name__,
+                                'errno': getattr(exc, 'errno', None)})
             raise
         print('BOUNDED_REPORT_SUMMARY=' + json.dumps(result['summary']), flush=True)
         return result

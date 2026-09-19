@@ -143,9 +143,9 @@ class UserSearchApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("T8 탈퇴·미인증 계정은 결과에서 제외한다")
+    @DisplayName("T8 활성 계정이 아닌 사용자는 결과에서 제외한다")
     void excludesInactiveAccounts() throws Exception {
-        user(20, "moviepending", "PENDING_VERIFICATION", "PUBLIC");
+        user(20, "movieleft", "WITHDRAWN", "PUBLIC");
         user(30, "moviegone", "WITHDRAWN", "PUBLIC");
         user(40, "movielover", "ACTIVE", "PUBLIC");
 
@@ -338,7 +338,7 @@ class UserSearchApiContractTest extends SharedPostgresContractTest {
     @Test
     @DisplayName("T22 활성 계정이 아닌 요청자는 401이다")
     void rejectsInactiveRequester() throws Exception {
-        user(50, "pending50", "PENDING_VERIFICATION", "PUBLIC");
+        user(50, "left50", "WITHDRAWN", "PUBLIC");
         user(60, "withdrawn60", "WITHDRAWN", "PUBLIC");
 
         for (long requester : new long[] {50, 60}) {

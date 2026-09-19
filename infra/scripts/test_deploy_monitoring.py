@@ -61,7 +61,14 @@ class DeployMonitoringTest(unittest.TestCase):
             printf 'docker %s\n' "$*" >>"$MONITORING_TEST_EVENTS"
             state="$MONITORING_TEST_STATE"
             if [[ "$1" == "inspect" ]]; then
-              [[ -e "$state/$2" ]]
+              [[ -e "$state/$2" ]] || exit 1
+              if [[ " $* " == *" --format "* ]]; then
+                if [[ "${FAIL_REVISION:-0}" == "1" ]]; then
+                  printf 'stale-revision\n'
+                else
+                  printf '%s\n' "$MONITORING_DEPLOY_REVISION"
+                fi
+              fi
               exit
             fi
             if [[ "$1" == "stop" ]]; then
@@ -155,7 +162,7 @@ class DeployMonitoringTest(unittest.TestCase):
         return result, state, events
 
     def test_success_replaces_only_monitoring_containers(self):
-        result, state, events = self.run_deploy()
+        result, state, events = self.run_deploy(CI_COMMIT_SHA="1" * 40)
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(state, set(CONTAINERS))
@@ -164,6 +171,7 @@ class DeployMonitoringTest(unittest.TestCase):
         self.assertIn("mattermost-alert-relay", events)
         self.assertIn("up -d --no-deps --force-recreate", events)
         self.assertIn("--project-name feelm-monitoring-344", events)
+        self.assertEqual(events.count("--format"), len(CONTAINERS))
         self.assertNotIn("feelm-backend", events)
         self.assertNotIn(" down ", events)
 
@@ -174,6 +182,7 @@ class DeployMonitoringTest(unittest.TestCase):
         self.assertIn("external: true", compose)
         self.assertIn("name: compose_prometheus_data", compose)
         self.assertIn("name: compose_grafana_data", compose)
+        self.assertEqual(compose.count("io.feelm.monitoring.revision:"), len(CONTAINERS))
 
     def test_config_or_pull_failure_keeps_existing_containers(self):
         for behavior in ({"FAIL_CONFIG": 1}, {"FAIL_PULL": 1}):
@@ -196,6 +205,17 @@ class DeployMonitoringTest(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(state, set(CONTAINERS))
+        self.assertEqual(events.count("verify "), 2)
+
+    def test_revision_mismatch_restores_previous_containers(self):
+        result, state, events = self.run_deploy(
+            CI_COMMIT_SHA="1" * 40,
+            FAIL_REVISION=1,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(state, set(CONTAINERS))
+        self.assertIn("revision mismatch", result.stderr)
         self.assertEqual(events.count("verify "), 2)
 
     def test_rollback_start_failure_requires_manual_recovery(self):

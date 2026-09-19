@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
  * 인증·재설정 메일 발송과 로그인 연속 실패를 Redis로 제한한다(플랜 결정 4).
  *
  * <p>메일 요청은 두 축을 함께 본다. 이메일 단위 최소 간격과 IP 단위 창 카운터다(S15P21E106-281 결정 D-1). 이메일 간격만으로는 서로 다른 이메일을
- * 대량으로 넣는 발송 폭탄을 막지 못한다. IP 카운터는 재발송(API-003)과 재설정 요청(API-010)이 공유한다. 두 경로가 같은 SMTP 계정의 발송 쿼터를
+ * 대량으로 넣는 발송 폭탄을 막지 못한다. IP 카운터는 인증번호 발송(API-078)과 재설정 요청(API-010)이 공유한다. 두 경로가 같은 SMTP 계정의 발송 쿼터를
  * 소모하므로 공격자에게는 같은 발송 수단이고, 경로별로 나누면 한쪽을 막아도 다른 쪽으로 같은 양을 더 보낼 수 있기 때문이다(결정 D-2). 이메일 간격은 지금처럼 경로별로
  * 분리한다. 재발송과 재설정은 사용자가 서로 다른 이유로 요청하는 정상 흐름이다.
  *
@@ -96,15 +96,17 @@ import org.springframework.stereotype.Component;
 @EnableConfigurationProperties({
     MailRateLimitProperties.class,
     LoginRateLimitProperties.class,
+    SignupRateLimitProperties.class,
     ClientIpProperties.class
 })
 public class AuthRateLimiter {
 
-    private static final String RESEND_KEY_PREFIX = "auth:email-resend:";
     private static final String LOGIN_FAILURE_KEY_PREFIX = "auth:login-fail:";
     private static final String LOGIN_IP_KEY_PREFIX = "auth:login:ip:";
     private static final String PASSWORD_RESET_KEY_PREFIX = "auth:password-reset:";
     private static final String MAIL_IP_KEY_PREFIX = "auth:mail:ip:";
+    private static final String VERIFICATION_CODE_KEY_PREFIX = "auth:email-code-interval:";
+    private static final String SIGNUP_IP_KEY_PREFIX = "auth:signup:ip:";
 
     /**
      * 시도 횟수를 올리고 만료를 보장한 뒤 올린 횟수를 돌려주는 스크립트. {@code INCR}와 {@code PEXPIRE}를 따로 보내면 그 사이에 연결이 끊겼을 때
@@ -121,35 +123,65 @@ public class AuthRateLimiter {
     private final StringRedisTemplate redisTemplate;
     private final MailRateLimitProperties mailRateLimit;
     private final LoginRateLimitProperties loginRateLimit;
+    private final SignupRateLimitProperties signupRateLimit;
     private final ClientIpProperties clientIpPrefixes;
 
     /**
-     * 인증 메일 재발송(API-003)의 발송 자리를 확보한다.
+     * 가입(API-001)의 요청 자리를 IP 축으로 확보한다.
      *
-     * <p>자리를 얻어도 메일이 반드시 나가지는 않는다. 전역 발송 상한은 발송 스레드가 따로 본다(S15P21E106-287).
+     * <p><b>카운터는 메일 축과 공유하지 않는다</b>(S15P21E106-603, 601 결정 4). 인증번호 전환 전에는 가입이 인증 메일을 보내 같은 SMTP
+     * 쿼터를 소모했으므로 결정 D-2에 따라 메일 축에 합류시켰지만, 지금 이 경로는 메일을 보내지 않는다. 공유를 유지하면 가입 한 건이 같은 예산을
+     * 발송(API-078)과 가입으로 두 번 소모해 공유 NAT 한 버킷의 실질 가입 한도가 절반이 되고, 가입 버스트가 같은 IP의 비밀번호 재설정 메일까지 마르게 한다.
      *
-     * @param clientIp 요청을 보낸 클라이언트 IP
-     * @return 요청을 처리해도 되면 {@code true}, 두 축 중 하나라도 제한을 넘었으면 {@code false}
-     */
-    public boolean tryAcquireResendSlot(String email, String clientIp) {
-        return tryAcquireMailSendSlot(resendKey(email), clientIp);
-    }
-
-    /**
-     * 가입(API-001)의 발송 자리를 IP 축으로 확보한다(리뷰 B-1).
-     *
-     * <p>가입 인증 메일도 같은 SMTP 계정의 쿼터를 쓰는데(결정 D-5) 이 경로에는 요청 제한이 없었다. 그대로 두면 한 IP에서 가입을 반복하는 것만으로 전역 발송
-     * 상한이 말라, 정상 사용자의 인증 메일 재발송(API-003)과 비밀번호 재설정(API-010)이 조용히 나가지 않는다. 전역 축을 발송 기준으로 옮기면서 예산에
-     * 유일하게 남은 무방비 입구였다.
-     *
-     * <p>이메일 축은 두지 않는다. 같은 이메일의 반복 가입은 이미 중복 검사가 막고, 간격 슬롯을 심으면 그 이메일의 재가입 경로까지 잠근다. IP 카운터는
-     * 재발송·재설정과 공유한다. 세 경로가 같은 발송 수단을 쓰므로 한 경로만 막으면 총량을 묶을 수 없다는 결정 D-2가 그대로 적용된다.
+     * <p>이메일 축은 두지 않는다. 같은 이메일의 반복 가입은 인증 토큰이 1회용이라는 성질이 막고, 간격 슬롯을 심으면 그 이메일의 재가입 경로까지 잠근다.
      *
      * @param clientIp 요청을 보낸 클라이언트 IP
      * @return 가입을 처리해도 되면 {@code true}, IP 축의 제한을 넘었으면 {@code false}
      */
     public boolean tryAcquireSignupSlot(String clientIp) {
+        for (SignupRateLimitProperties.Quota quota : signupRateLimit.ip()) {
+            if (recordAttempt(signupIpKey(clientIp, quota.window()), quota.window())
+                    > quota.limit()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * 가입 인증번호 발송(API-078)의 발송 자리를 확보한다. 이메일 간격은 <b>확인만</b> 하고 슬롯은 심지 않는다.
+     *
+     * <p>슬롯 심기를 {@link #recordVerificationCodeInterval}로 분리한 이유는 이 경로가 이미 가입된 이메일을 {@code 409}로
+     * 거절하기 때문이다(API-078 처리 규칙). 거절될 요청이 슬롯을 심으면 슬롯 주인(그 이메일의 소유자)이 아니라 요청자가 남의 발송을 분당 한 건씩 지연시킬 수
+     * 있다. 재발송·재설정은 계정 존재를 응답에 드러내지 않아 이 문제가 없으므로 {@link #tryAcquireMailSendSlot} 그대로 쓴다.
+     *
+     * <p>IP 축은 <b>중복 검사보다 먼저, 시도 시점에</b> 소모한다. 중복 검사 뒤로 미루면 {@code 409}로 끝나는 요청이 예산을 쓰지 않아 이 경로를 통한
+     * 이메일 열거 속도를 묶을 수 없다. 카운터는 재발송·재설정과 공유한다. 셋이 같은 SMTP 쿼터를 쓰기 때문이다(결정 D-2).
+     *
+     * <p>다만 <b>이메일 간격에 먼저 걸린 요청은 IP 예산을 쓰지 않는다</b>. 같은 이메일을 반복하는 요청이 IP 예산을 소모하지 않게 하는 결정 D-3의 순서를
+     * 그대로 둔 결과이며, 간격 슬롯 하나로 그 이메일에 대해 1분의 무료 창을 얻는 성질이 따라온다. 열거는 서로 다른 이메일을 넣어야 하고 그 경로는 IP 축이 그대로
+     * 센다.
+     *
+     * @param clientIp 요청을 보낸 클라이언트 IP
+     * @return 처리해도 되면 {@code true}, 이메일 간격 안이거나 IP 예산을 넘었으면 {@code false}
+     */
+    public boolean tryAcquireVerificationCodeSlot(String email, String clientIp) {
+        if (Boolean.TRUE.equals(redisTemplate.hasKey(verificationCodeKey(email)))) {
+            return false;
+        }
         return tryAcquireMailSendBudget(clientIp);
+    }
+
+    /**
+     * 가입 인증번호 발송의 이메일 간격 슬롯을 심는다. 중복 검사와 전역 상한 확인을 마친 뒤에 부른다.
+     *
+     * <p>확인({@link #tryAcquireVerificationCodeSlot})과 이 호출 사이에 같은 이메일의 요청이 동시에 들어올 수 있지만, 기록이
+     * {@code SET NX}라 정확히 한 건만 통과한다. 진 요청은 번호를 발급하지 않고 {@code 429}가 된다.
+     *
+     * @return 슬롯을 얻었으면 {@code true}, 그 사이 다른 요청이 먼저 심었으면 {@code false}
+     */
+    public boolean recordVerificationCodeInterval(String email) {
+        return tryAcquireEmailInterval(verificationCodeKey(email));
     }
 
     /**
@@ -296,10 +328,6 @@ public class AuthRateLimiter {
                 RECORD_ATTEMPT_SCRIPT, List.of(key), Long.toString(window.toMillis()));
     }
 
-    private String resendKey(String email) {
-        return RESEND_KEY_PREFIX + Sha256Hasher.hex(email);
-    }
-
     private String loginFailureKey(String email) {
         return LOGIN_FAILURE_KEY_PREFIX + Sha256Hasher.hex(email);
     }
@@ -317,8 +345,21 @@ public class AuthRateLimiter {
                 + window.toSeconds();
     }
 
+    /** 인증번호 발송의 이메일 간격 키. 간격은 경로별로 분리하므로 재발송·재설정과 접두사가 다르다. */
+    private String verificationCodeKey(String email) {
+        return VERIFICATION_CODE_KEY_PREFIX + Sha256Hasher.hex(email);
+    }
+
     private String passwordResetKey(String email) {
         return PASSWORD_RESET_KEY_PREFIX + Sha256Hasher.hex(email);
+    }
+
+    /** 가입 카운터 키. 메일 축과 접두사를 나눠 두 예산이 섞이지 않게 한다(S15P21E106-603). */
+    private String signupIpKey(String clientIp, Duration window) {
+        return SIGNUP_IP_KEY_PREFIX
+                + Sha256Hasher.hex(ClientIpBucket.of(clientIp, clientIpPrefixes))
+                + ":"
+                + window.toSeconds();
     }
 
     private String mailIpKey(String clientIp, Duration window) {

@@ -228,11 +228,11 @@ docker compose --env-file infra/.env \
   up -d --no-deps --force-recreate grafana
 ```
 
-## develop 자동 배포
+## main 자동 배포
 
-모니터링 Compose와 Prometheus·Grafana 설정이 보호된 `develop`에 병합되면
+모니터링 Compose와 Prometheus·Grafana·Mattermost relay 설정이 보호된 `main`에 병합되면
 `deploy-monitoring` Job이 서비스 노드에서 자동 실행됩니다. MR, Web, API Pipeline과 보호되지
-않은 브랜치는 배포하지 않습니다. Job은 먼저 원격 `develop` HEAD와 현재 commit이 같은지
+않은 브랜치는 배포하지 않습니다. Job은 먼저 원격 `main` HEAD와 현재 commit이 같은지
 확인하고, `ci-variable-preflight`의 실제 변수·GitLab 메타데이터 검사를 통과한 경우에만
 `infra/scripts/deploy-monitoring.sh`를 실행합니다. 변수 계약과 등록 방법은 `infra/README.md`의
 Deployment 절을 따릅니다.
@@ -251,7 +251,9 @@ prometheus grafana mattermost-alert-relay node-exporter postgres-exporter redis-
 
 후보 기동 후 Prometheus readiness, Grafana database health, 알림 릴레이 health와 Prometheus의
 필수 scrape target을 최대 24회, 5초 간격으로 검사합니다. 기대 target은 `backend` 1개, `node` 2개,
-`kafka`·`postgres`·`redis` 각 1개이며 모두 `up=1`이어야 합니다. 검증이 성공하면 보존한
+`kafka`·`postgres`·`redis` 각 1개이며 모두 `up=1`이어야 합니다. 또한 각 모니터링 컨테이너의
+`io.feelm.monitoring.revision` 라벨이 현재 `main` Pipeline의 `CI_COMMIT_SHA`와 같은지 검사해
+현재 운영 설정으로 실제 재생성됐음을 확인합니다. 검증이 성공하면 보존한
 컨테이너만 삭제하고 `prometheus_data`, `grafana_data` 볼륨은 유지합니다. 스크립트는
 `docker compose down`, `down -v`와 `docker volume rm`을 사용하지 않습니다.
 

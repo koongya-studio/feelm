@@ -8,6 +8,14 @@
  * 주 동작은 평가 하나다. 기존 평가가 있으면 버튼 위에 내 평가 원문을 보여 주고
  * `내 별점 수정하기`로 이동한다. 별도 `내 감상평` 편집 섹션은 두지 않는다.
  * 공개 목록에서는 작성자가 본인이어도 `spoiler=true`인 항목을 기본 블러한다.
+ *
+ * **이 영화의 팝콘 맛을 메타 줄 아래 칩으로 보인다**(업무 -631, 사용자 결정 2026-09-18).
+ * 평가하면 이 맛의 팝콘이 한 알 담기므로, 평가 전에 무슨 맛인지 알 수 있어야 한다.
+ * 맛 코드는 API-030 `flavorCode`, 이름과 설명은 기준정보 API-044의 `displayName` ·
+ * `representativeKeywords`다 — 계약에 설명 문장이 없어 대표 키워드를 설명으로 쓴다.
+ * 칩을 누르면 키워드가 펼쳐진다. 맛이 배정되지 않은 영화(`flavorCode: null`)와 기준정보를
+ * 받지 못한 경우에는 칩을 두지 않는다. 맛의 색은 색 면이 아니라 3.1과 같은 팝콘 알 그림으로
+ * 보인다 — UI에 유채색을 쓰지 않는다(design-concept.md 3장).
  */
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -17,9 +25,12 @@ import OttBadge from '../../../components/OttBadge';
 import Poster from '../../../components/Poster';
 import RatingStars from '../../../components/RatingStars';
 import StatusView from '../../../components/StatusView';
-import { ChevronLeftIcon } from '../../../components/Icon';
+import { BlockIcon, ChevronLeftIcon } from '../../../components/Icon';
 import { ApiError } from '../../../api/apiError';
+import { kernelSprite } from '../../../components/PopcornBucket/sprites';
 import { getMovieDetail, getMovieReviews, getSimilarMovies } from '../../../api/movies';
+import { dismissMovie } from '../../../api/recommendations';
+import { getPopcornFlavors } from '../../../api/taste';
 import { recordOttClick } from '../../../api/watch';
 import { useAuth } from '../../../contexts/authContext';
 import { useBack } from '../../../hooks/useBack';
@@ -29,9 +40,12 @@ import { ottMovieUrl } from '../../../utils/ott';
 import styles from './MovieDetailPage.module.css';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import type { MovieDetail, SimilarMovie } from '../../../types/movie';
+import type { PopcornFlavor } from '../../../types/taste';
 import type { PublicReview, PublicReviewList } from '../../../types/watch';
 
 const BACK_BUTTON_SIZE = 39;
+/** 관심없음 버튼. 옆의 별점 버튼(`--control-height`)과 높이를 맞춘다 */
+const DISMISS_BUTTON_SIZE = 52;
 const SIMILAR_POSTER_WIDTH = 96;
 const SIMILAR_POSTER_HEIGHT = 144;
 const BACKDROP_FADE_RATIO = 0.55;
@@ -77,6 +91,10 @@ export default function MovieDetailPage() {
 
   const [movie, setMovie] = useState<MovieDetail | null>(null);
   const [similar, setSimilar] = useState<SimilarMovie[]>([]);
+  /** 팝콘 맛 기준정보(API-044). 받지 못하면 빈 배열이고 맛 칩을 두지 않는다 */
+  const [flavors, setFlavors] = useState<PopcornFlavor[]>([]);
+  /** 키워드를 펼친 영화. 다른 영화로 넘어가면 접힌 채로 시작한다 */
+  const [flavorOpenFor, setFlavorOpenFor] = useState<number | null>(null);
   const [reviewPage, setReviewPage] = useState<{
     movieId: number;
     items: PublicReview[];
@@ -95,6 +113,14 @@ export default function MovieDetailPage() {
   const [clicking, setClicking] = useState(false);
   const [clickFailed, setClickFailed] = useState(false);
   const [popupBlocked, setPopupBlocked] = useState(false);
+  /**
+   * 관심없음(API-047) 처리 상태. 같은 라우트로 다른 영화에 넘어가도 컴포넌트가 남으므로
+   * 어느 영화의 상태인지 함께 둔다 — 넘어간 영화가 처리된 채로 시작하지 않게.
+   */
+  const [dismissal, setDismissal] = useState<{
+    movieId: number;
+    status: 'pending' | 'done' | 'failed';
+  } | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const peopleDragRef = useRef<{
     pointerId: number;
@@ -153,6 +179,21 @@ export default function MovieDetailPage() {
   }, [id, reloadCount]);
 
   useEffect(() => {
+    // 맛 칩에만 쓰이는 공개 기준정보라 영화가 바뀌어도 다시 받지 않는다
+    let active = true;
+
+    getPopcornFlavors()
+      .then((items) => {
+        if (active) setFlavors(items);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     window.scrollTo(0, 0);
   }, [id]);
 
@@ -195,6 +236,24 @@ export default function MovieDetailPage() {
 
   function isReviewHidden(review: PublicReview) {
     return review.spoiler && !revealedReviews.has(reviewKey(review.ratingId));
+  }
+
+  /*
+   * 관심없음(API-047, 업무 -664). 추천에서 들어온 상세면 그 추천 항목 번호도 보낸다.
+   *
+   * 상세 응답(API-030)에 관심없음 여부가 없어 누르기 전에는 이미 처리된 영화인지 모른다. 그래서
+   * `409 ALREADY_DISMISSED`는 실패가 아니라 처리된 상태로 보인다 — 서버 상태는 이미 원하는
+   * 대로다. 해제는 계약 미정이라 처리된 버튼은 다시 눌리지 않는다.
+   */
+  function handleDismiss() {
+    setDismissal({ movieId: id, status: 'pending' });
+
+    dismissMovie(id, recommendationItemId)
+      .catch((error: unknown) => {
+        if (!(error instanceof ApiError && error.code === 'ALREADY_DISMISSED')) throw error;
+      })
+      .then(() => setDismissal({ movieId: id, status: 'done' }))
+      .catch(() => setDismissal({ movieId: id, status: 'failed' }));
   }
 
   function handleRetry() {
@@ -340,6 +399,11 @@ export default function MovieDetailPage() {
   if (!movie) return null;
 
   const meta = movieMetaLine(movie);
+  const flavor = movie.flavorCode
+    ? flavors.find((candidate) => candidate.code === movie.flavorCode)
+    : undefined;
+  const flavorOpen = flavorOpenFor === id;
+  const dismissStatus = dismissal?.movieId === id ? dismissal.status : null;
   const people = [
     ...movie.directors.map((person) => ({ ...person, creditKey: `director:${person.personId}` })),
     ...movie.cast.map((person) => ({ ...person, creditKey: `cast:${person.personId}` })),
@@ -374,6 +438,25 @@ export default function MovieDetailPage() {
         <header className={styles.head}>
           <h1 className={styles.title}>{movie.title}</h1>
           {meta ? <p className={styles.meta}>{meta}</p> : null}
+          {flavor ? (
+            <div className={styles.flavor}>
+              <button
+                type="button"
+                className={styles.flavorChip}
+                aria-expanded={flavorOpen}
+                aria-controls="movie-flavor-keywords"
+                onClick={() => setFlavorOpenFor(flavorOpen ? null : id)}
+              >
+                <img className={styles.flavorSprite} src={kernelSprite(flavor.code)} alt="" />
+                {flavor.displayName} 맛
+              </button>
+              {flavorOpen ? (
+                <p id="movie-flavor-keywords" className={styles.flavorKeywords}>
+                  {flavor.representativeKeywords.join(' · ')}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
           <p className={styles.average}>
             <RatingStars score={movie.averageRating} size={15} gap={3} />
             <span className={styles.averageValue}>{movie.averageRating.toFixed(1)}</span>
@@ -396,13 +479,37 @@ export default function MovieDetailPage() {
               ) : null}
             </div>
           ) : null}
-          <Button variant="brand" onClick={() => void navigate(path.movieRating(id))}>
-            {movie.myRating ? '내 별점 수정하기' : '내 별점 남기기'}
-          </Button>
+          {/*
+           * 관심없음은 별점 버튼 오른쪽의 아이콘 버튼이다(업무 -664). 2.2 추천 카드의 관심없음과
+           * 같은 아이콘이다. 주 동작은 별점이므로 관심없음은 글자 없이 작게 둔다.
+           */}
+          <div className={styles.actionRow}>
+            <Button variant="brand" onClick={() => void navigate(path.movieRating(id))}>
+              {movie.myRating ? '내 별점 수정하기' : '내 별점 남기기'}
+            </Button>
+            <IconButton
+              label={dismissStatus === 'done' ? '관심없음 처리됨' : '관심없음'}
+              icon={<BlockIcon />}
+              size={DISMISS_BUTTON_SIZE}
+              variant={dismissStatus === 'done' ? 'filled' : 'translucent'}
+              disabled={dismissStatus === 'pending' || dismissStatus === 'done'}
+              onClick={handleDismiss}
+            />
+          </div>
+          {dismissStatus === 'done' ? (
+            <p className={styles.dismissNote} role="status">
+              관심없음으로 처리했어요. 이 영화는 앞으로 추천에서 빠져요
+            </p>
+          ) : dismissStatus === 'failed' ? (
+            <p className={styles.dismissError} role="alert">
+              관심없음으로 처리하지 못했어요. 잠시 후 다시 눌러 주세요
+            </p>
+          ) : null}
         </div>
 
+        {/* 소제목은 `OTT`다. 한때 `볼 수 있는 곳`이었다(사용자 지시 2026-09-19, 업무 -679) */}
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>볼 수 있는 곳</h2>
+          <h2 className={styles.sectionTitle}>OTT</h2>
           {movie.ottProviders.length > 0 ? (
             <>
               <ul className={styles.ottList}>
@@ -511,9 +618,6 @@ export default function MovieDetailPage() {
                       seed={item.movieId}
                     />
                     <span className={styles.similarTitle}>{item.title}</span>
-                    <span className={styles.similarReason}>
-                      유사도 {Math.round(item.similarity * 100)}%
-                    </span>
                   </button>
                 </li>
               ))}

@@ -60,11 +60,6 @@
   gap: var(--space-2);
   list-style: none;
   overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.friends::-webkit-scrollbar {
-  display: none;
 }
 
 .friend {

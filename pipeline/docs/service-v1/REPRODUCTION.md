@@ -1,5 +1,7 @@
 # 재현 범위와 EC2 준비
 
+현재 개발 방향과 legacy 구분은 [CURRENT-DIRECTION](CURRENT-DIRECTION.md)을 먼저 따른다.
+
 Git만 받아도 설계·원본 설정값·작은 결과표·그림·참고 수식·합성 검증을 확인할 수 있다.
 모델·사용자별 입력·Parquet은 Git에 없으며, 전체 실험 재학습 또는 서비스 실행 패키지는 아니다.
 
@@ -78,14 +80,24 @@ FM/GBT의 신뢰구간과 첫2편 고유 영화 수는 `final344-primary-contras
 미포함 역사 링크는 이 절로 연결하고 `historical_links_redirected`에 원래 대상을 남겼다.
 미포함 그림3곳도 이미지 대신 이 절로 연결하는 일반 안내 링크로 표시한다.
 
-## 로컬에서 미리 준비할 순서
+## 로컬 학습과 서버 승격 준비 순서
 
-1. 실제 artifact 전송·해시 검증, 고정 GKT131→서비스ID export 및 유사 영화 인덱스 fixture 준비.
-2. 전체 KOBIS 자료에서 검증 crosswalk·동일 누적 기준일·학습/선정/확인 교집합 확인.
-3. 원 이력과 목표에서 row-lineage를 재구성하고 원230열 전체 parity 검사. q99/prior와 결측 view 준비.
-4. 새 실행 코드·split·245열·약1,999만 행의 디스크/spill·메모리 검토 후 GBT 최대3회/FM1회 순차 학습.
-5. 새 보정45명·선정45명·기존 확인180명과 사전 안전 기준 검사. 미개방 test라는 표현은 쓰지 않는다.
-6. 모델 bundle을 EC2에 연결한 뒤 별도 실제환경 검수. 데이터 하한 미달이면 모델 활성화 준비를 중단한다.
+학습은 데스크톱·노트북에서 수행하고 두 장비를 분산 클러스터로 묶지 않는다. 서버 Spark/HDFS는
+정규 입력·산출물과 CPU 추론 호환성 검증에 사용한다. 분산 Spark는 대규모 ETL·후보 생성의 실행
+수단이며 GBT/FM 기준 학습의 필수 조건으로 간주하지 않는다.
+
+1. 실제 artifact 전송·해시 검증, 검증된 서비스 ID export 및 유사 영화 인덱스 fixture 준비.
+2. 전체 KOBIS 자료에서 검증 crosswalk·동일 누적 기준일과 0~N snapshot 시점 일치 확인.
+3. 0~N 계약의 사용자 분리와 전역 시점 창으로 TRAIN/VALIDATION/FINAL_TEST 입력을 만든다. 모든
+   실험이 공유할 episode·후보를 동결하고 사용자 활동·N·target 지원량·시점·콘텐츠·결측 분포의
+   정합성 report를 만든 뒤 lineage를 검사한다.
+4. 새 실행 코드와 모델별 특징의 디스크/spill·메모리를 작은 재현→10%→전체 순으로 검토한 뒤
+   GBT/FM을 장비별로 실행한다. legacy245 네 view 약1,999만 행은 비교 후보이며 필수 최종 입력이 아니다.
+5. VALIDATION에서 모델·특징을 고정한 뒤 FINAL_TEST는 한 번만 확인하고, S15P21E106-625에서 목표 사용자 평가를 수행한다.
+6. 선택된 모델 bundle을 EC2에 연결한 뒤 별도 실제환경 검수한다. 데이터 하한 미달이면 활성화 준비를 중단한다.
+
+원230열 parity와 보정45·선정45·확인180은 legacy245 B0~B3를 재현할 때만 별도 수행한다.
+이 고정 집합을 새 0~N 모델의 split이나 승격 기준으로 사용하지 않는다.
 
 Spark reference는4.1.3/Java21, Docker4CPU·12GiB·driver8GiB다. KOBIS 수집 때의
 Python3.12.5/pandas2.2.3/pyarrow23.0.1은 Spark Docker의 pyarrow19.0.1과 별도 환경이다.

@@ -3,6 +3,10 @@
   padding: var(--space-12) var(--screen-padding-x) 0;
 }
 
+.header[data-flush] {
+  padding-top: 0;
+}
+
 .row {
   display: flex;
   min-height: var(--tap-target-min);

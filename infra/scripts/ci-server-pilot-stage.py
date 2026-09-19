@@ -28,13 +28,14 @@ FILES = runtime.FILES + (
     'ci-network-guard.py',
     'systemd/feelm-ci222-gitlab-runner.service',
 )
-SOURCE_SHA = '388ae26fd74dca6864f5fb469fdf47b2d4a34e42b4989d7f29caf36662b4f875'
-REVISION = 'e5588d312bdfe058b03d15b34b1cbfa3a9935093'
+SOURCE_SHA = '306d0d1fd42cea057f9624f94881a563f27db65317ab6c374d7badb0f8b0aa85'
+REVISION = '45f49c9f0e66b7af66f99ae9b7805bab96d787cf'
 
 
 def archive_bytes():
     source = subprocess.run(['git', '-C', str(HERE.parent.parent), 'archive', '--format=tar',
-                             REVISION, 'backend'], capture_output=True, check=True, timeout=30).stdout
+                             REVISION, 'backend', 'infra/compose/service.yml'],
+                            capture_output=True, check=True, timeout=30).stdout
     if hashlib.sha256(source).hexdigest() != SOURCE_SHA:
         raise ValueError('Reviewed backend source hash differs')
     files = {'backend.tar': source}

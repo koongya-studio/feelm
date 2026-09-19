@@ -1,14 +1,9 @@
 package com.feelm.backend.domain.auth.controller;
 
 import com.feelm.backend.domain.auth.RefreshTokenService;
-import com.feelm.backend.domain.auth.dto.request.EmailResendRequest;
-import com.feelm.backend.domain.auth.dto.request.EmailVerificationRequest;
 import com.feelm.backend.domain.auth.dto.request.LoginRequest;
 import com.feelm.backend.domain.auth.dto.request.SignupRequest;
-import com.feelm.backend.domain.auth.dto.response.EmailVerificationResponse;
 import com.feelm.backend.domain.auth.dto.response.LoginResponse;
-import com.feelm.backend.domain.auth.dto.response.SignupResponse;
-import com.feelm.backend.domain.auth.service.EmailVerificationService;
 import com.feelm.backend.domain.auth.service.LoginService;
 import com.feelm.backend.domain.auth.service.SignupService;
 import com.feelm.backend.global.error.BusinessException;
@@ -24,12 +19,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.util.WebUtils;
 
 /**
- * 이메일 계정 엔드포인트(API-001~005).
+ * 이메일 계정 엔드포인트(API-001·004·005).
+ *
+ * <p>메일 링크 인증(옛 API-002·003)은 계약에서 삭제됐다(S15P21E106-601·604). 가입 전 이메일 확인은 인증번호 ({@code
+ * EmailVerificationCodeController})가 맡는다.
  *
  * <p>토큰 수명 관리(API-006)는 {@link com.feelm.backend.domain.auth.AuthController}에 남긴다. 그 컨트롤러는 재발급 실패 시
  * 쿠키를 지우는 예외 처리를 갖고 있어, 자격 증명 오류에 쿠키 삭제 헤더가 실리면 안 되는 이 엔드포인트들과 예외 처리 정책이 다르다.
@@ -41,37 +38,28 @@ import org.springframework.web.util.WebUtils;
 public class EmailAuthController {
 
     private final SignupService signupService;
-    private final EmailVerificationService emailVerificationService;
     private final LoginService loginService;
     private final RefreshTokenService refreshTokenService;
     private final RefreshTokenCookieFactory cookieFactory;
 
-    /** API-001 이메일 회원가입. */
-    @PostMapping("/signup")
-    @ResponseStatus(HttpStatus.CREATED)
-    SignupResponse signup(
-            @RequestBody @Valid SignupRequest request, HttpServletRequest httpRequest) {
-        return signupService.signup(request, httpRequest.getRemoteAddr());
-    }
-
-    /** API-002 이메일 인증 확인. */
-    @PostMapping("/email/verify")
-    EmailVerificationResponse verifyEmail(@RequestBody @Valid EmailVerificationRequest request) {
-        return emailVerificationService.verify(request.token());
-    }
-
     /**
-     * API-003 인증 메일 재발송. 계정 존재 여부를 노출하지 않도록 본문 없이 202로 응답한다.
+     * API-001 이메일 회원가입.
      *
-     * <p>클라이언트 IP는 IP 단위 발송 제한에 쓴다({@link com.feelm.backend.domain.auth.AuthRateLimiter}). {@code
-     * getRemoteAddr()}는 신뢰 경계 안의 프록시가 보낸 {@code X-Real-IP}일 때만 그 값을 돌려준다(S15P21E106-288, {@code
-     * server.tomcat.remoteip.internal-proxies}).
+     * <p>가입과 동시에 로그인 상태가 되므로 응답은 소셜 회원가입(API-008)과 같은 본문·쿠키다(S15P21E106-603). Refresh Token은 본문이
+     * 아니라 쿠키로만 전달한다.
+     *
+     * <p>클라이언트 IP는 가입 전용 IP 단위 요청 제한에 쓴다({@link com.feelm.backend.domain.auth.AuthRateLimiter}).
      */
-    @PostMapping("/email/resend")
-    @ResponseStatus(HttpStatus.ACCEPTED)
-    void resendVerificationMail(
-            @RequestBody @Valid EmailResendRequest request, HttpServletRequest httpRequest) {
-        emailVerificationService.resend(request.email(), httpRequest.getRemoteAddr());
+    @PostMapping("/signup")
+    ResponseEntity<LoginResponse> signup(
+            @RequestBody @Valid SignupRequest request, HttpServletRequest httpRequest) {
+        LoginService.LoginResult result =
+                signupService.signup(request, httpRequest.getRemoteAddr());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .header(
+                        HttpHeaders.SET_COOKIE,
+                        cookieFactory.create(result.refreshToken()).toString())
+                .body(LoginResponse.from(result));
     }
 
     /**

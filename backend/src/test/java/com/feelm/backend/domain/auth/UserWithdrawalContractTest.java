@@ -98,7 +98,7 @@ class UserWithdrawalContractTest extends OAuthApiTestSupport {
     }
 
     @Test
-    @DisplayName("T5 탈퇴한 계정의 Access Token은 잔여 수명 안이라도 다시 탈퇴할 수 없다")
+    @DisplayName("T5 활성 계정이 아니면(탈퇴 계정) 잔여 수명 안의 Access Token으로도 탈퇴할 수 없다")
     void withdrawnAccountCannotWithdrawAgain(CapturedOutput output) throws Exception {
         Member member = newMember(output);
         withdraw(member.accessToken(), member.password()).andExpect(status().isNoContent());
@@ -112,7 +112,7 @@ class UserWithdrawalContractTest extends OAuthApiTestSupport {
     }
 
     @Test
-    @DisplayName("T6 연결된 소셜 수단과 인증·재설정 토큰을 모두 지운다")
+    @DisplayName("T6 연결된 소셜 수단과 재설정 토큰을 모두 지운다")
     void deletesLinkedProvidersAndTokens(CapturedOutput output) throws Exception {
         Member member = newMember(output);
         fake(OAuthProvider.GOOGLE).willReturn(newProfile());
@@ -127,7 +127,6 @@ class UserWithdrawalContractTest extends OAuthApiTestSupport {
 
         assertThat(linkedProviderCount(member.userId())).isZero();
         assertThat(unusedPasswordResetTokenCount(member.userId())).isZero();
-        assertThat(rowCount("email_verification_tokens", member.userId())).isZero();
         assertThat(rowCount("password_reset_tokens", member.userId())).isZero();
     }
 
@@ -164,19 +163,6 @@ class UserWithdrawalContractTest extends OAuthApiTestSupport {
         login(member.email(), member.password())
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
-    }
-
-    @Test
-    @DisplayName("T10 미인증 계정은 탈퇴할 수 없다")
-    void rejectsPendingVerificationAccount() throws Exception {
-        TestAccount account = newAccount();
-        long userId = signupPending(account);
-
-        withdraw(tokenProvider.createAccessToken(userId), account.password())
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
-
-        assertThat(userStatus(userId)).isEqualTo("PENDING_VERIFICATION");
     }
 
     @Test
@@ -306,12 +292,13 @@ class UserWithdrawalContractTest extends OAuthApiTestSupport {
     void rejectsSignupWithReservedEmail() throws Exception {
         TestAccount account = newAccount();
 
-        signup(signupBody("withdrawn-1@feelm.invalid", account.password(), account.nickname()))
+        // 가입은 이메일을 토큰에서만 읽으므로(S15P21E106-603) 예약 도메인은 인증번호 발송(API-078)에서 막힌다.
+        sendVerificationCode("withdrawn-1@feelm.invalid")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
 
         // 대소문자를 바꿔도 같은 판정이어야 한다. 이메일은 소문자로 정규화해 저장한다.
-        signup(signupBody("Withdrawn-1@FEELM.INVALID", account.password(), account.nickname()))
+        sendVerificationCode("Withdrawn-1@FEELM.INVALID")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
     }

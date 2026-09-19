@@ -116,13 +116,13 @@ class TrustedProxyClientIpTest extends ProxyClientIpTestSupport {
         redisTemplate.delete(clientKey);
         redisTemplate.delete(proxyKey);
 
-        assertThat(resend(CLIENT, email).statusCode()).isEqualTo(202);
+        assertThat(sendVerificationCode(CLIENT, email).statusCode()).isEqualTo(202);
 
         assertThat(redisTemplate.opsForValue().get(clientKey)).isEqualTo("1");
         assertThat(redisTemplate.hasKey(proxyKey)).isFalse();
 
         redisTemplate.delete(clientKey);
-        redisTemplate.delete("auth:email-resend:" + Sha256Hasher.hex(email));
+        redisTemplate.delete("auth:email-code-interval:" + Sha256Hasher.hex(email));
     }
 
     private static String nextEmail() {

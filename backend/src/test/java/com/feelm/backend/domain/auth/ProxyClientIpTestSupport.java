@@ -25,7 +25,7 @@ abstract class ProxyClientIpTestSupport {
      */
     static final String INTERNAL_PROXIES = "127.0.0.0/8,::1/128,172.16.0.0/12";
 
-    static final String RESEND_PATH = "/api/v1/auth/email/resend";
+    static final String VERIFICATION_CODE_PATH = "/api/v1/auth/email/verification-code";
 
     /** 애플리케이션이 클라이언트 IP로 읽는 헤더(리뷰 A-7). Nginx가 {@code $remote_addr}로 덮어써 보낸다. */
     static final String REAL_IP = "X-Real-IP";
@@ -39,10 +39,10 @@ abstract class ProxyClientIpTestSupport {
     @Value("${local.server.port}")
     private int port;
 
-    /** 인증 메일 재발송(API-003)을 보낸다. 계정이 없어도 202이며 제한 카운터는 시도 시점에 올라간다(결정 D-4). */
-    HttpResponse<Void> resend(String realIp, String email) throws Exception {
+    /** 인증번호 발송(API-078)을 보낸다. 계정이 없어도 202이며 제한 카운터는 시도 시점에 올라간다(결정 D-4). */
+    HttpResponse<Void> sendVerificationCode(String realIp, String email) throws Exception {
         HttpRequest request =
-                HttpRequest.newBuilder(uri(RESEND_PATH))
+                HttpRequest.newBuilder(uri(VERIFICATION_CODE_PATH))
                         .header("Content-Type", "application/json")
                         .header(REAL_IP, realIp)
                         .POST(

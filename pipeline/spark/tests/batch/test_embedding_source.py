@@ -1,18 +1,40 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
 import pytest
 from pyspark.sql import SparkSession
+from pyspark.sql import functions as F
 
 from batch.embedding.source import (
+    _clean,
     build_embedding_source,
     read_raw_embedding_keywords,
     read_raw_embedding_movies,
 )
 
 REVISION = "sha256:" + "a" * 64
+
+
+def test_tmdb_e5_v1_whitespace_recipe_preserves_internal_spaces(spark) -> None:
+    cases = [
+        ("single", "Movie Title", "Movie Title"),
+        ("double", "Movie  Title", "Movie  Title"),
+        ("tab", "Movie\tTitle", "Movie Title"),
+        ("newline", "Movie\nTitle", "Movie Title"),
+    ]
+    rows = (
+        spark.createDataFrame(cases, "label string, raw string, expected string")
+        .select("label", "expected", _clean(F.col("raw")).alias("cleaned"))
+        .collect()
+    )
+    cleaned = {row.label: row.cleaned for row in rows}
+    assert all(row.cleaned == row.expected for row in rows)
+    assert hashlib.sha256(cleaned["single"].encode()).hexdigest() != hashlib.sha256(
+        cleaned["double"].encode()
+    ).hexdigest()
 
 
 @pytest.fixture(scope="module")

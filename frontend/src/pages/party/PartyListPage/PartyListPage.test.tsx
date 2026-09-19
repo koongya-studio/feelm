@@ -41,6 +41,15 @@ describe('5.1 파티 시작', () => {
     expect(screen.getByText('김난다 × 무비버디')).toBeInTheDocument();
   });
 
+  it('필름 · MY와 같은 공통 헤더로 검색 · 알림에 바로 간다 (업무 -676)', async () => {
+    renderWithRouter(<PartyListPage />, { route: '/party' });
+
+    expect(await screen.findByRole('link', { name: '검색' })).toHaveAttribute('href', '/search');
+    expect(screen.getByRole('link', { name: /^알림/ })).toHaveAttribute('href', '/notifications');
+    // 화면 제목은 여전히 하나다
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+  });
+
   it('파티방을 고르면 5.8 파티원 팝콘으로 간다', async () => {
     renderWithRouter(<PartyListPage />, { route: '/party' });
     await screen.findByText('금요 심야 상영회');
@@ -85,8 +94,8 @@ describe('5.1 파티 시작', () => {
   });
 
   /*
-   * 업무 -595. 초대를 여는 유일한 길이 목업 알림이라 초대받은 사람이 수락할 수 없었다.
-   * 이 구역이 사라지면 그 결함이 그대로 돌아온다.
+   * 업무 -595. 인앱 알림 외에도 파티 탭에서 받은 초대를 다시 찾을 수 있어야 한다.
+   * 이 구역이 사라지면 알림을 숨긴 사용자가 초대를 열 길이 없어진다.
    */
   it('받은 초대를 API-052로 그리고 5.6으로 보낸다', async () => {
     vi.mocked(getMyInvitations).mockResolvedValue([invitation()]);

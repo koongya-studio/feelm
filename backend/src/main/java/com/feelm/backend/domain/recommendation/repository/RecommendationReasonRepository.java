@@ -17,7 +17,8 @@ public class RecommendationReasonRepository {
                 """
                 SELECT id, cast(reason AS text) AS reason
                 FROM recommendation_items
-                WHERE set_id=? AND exposed_at IS NULL AND reason->>'summary' IS NULL
+                WHERE set_id=? AND exposed_at IS NULL
+                  AND (reason->>'summary' IS NULL OR reason->>'_reasonPending' = 'true')
                 ORDER BY id
                 """,
                 (row, ignored) -> new UnresolvedItem(row.getLong("id"), row.getString("reason")),
@@ -45,9 +46,11 @@ public class RecommendationReasonRepository {
         return jdbcTemplate.update(
                         """
                         UPDATE recommendation_items
-                        SET reason = reason || jsonb_build_object('summary', cast(? AS text),
+                        SET reason = (reason - '_reasonPending')
+                                     || jsonb_build_object('summary', cast(? AS text),
                                                                   'factors', cast(? AS jsonb))
-                        WHERE id=? AND exposed_at IS NULL AND reason->>'summary' IS NULL
+                        WHERE id=? AND exposed_at IS NULL
+                          AND (reason->>'summary' IS NULL OR reason->>'_reasonPending' = 'true')
                         """,
                         summary,
                         factorsJson,

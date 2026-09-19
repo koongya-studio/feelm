@@ -338,6 +338,49 @@ services:
     cap_drop:
       - ALL
 
+  party-consumer:
+    image: ${CONSUMER_IMAGE:-feelm-foldin-consumer:local}
+    build:
+      context: ../../pipeline/consumer
+      dockerfile: Dockerfile
+    container_name: feelm-party-consumer
+    command: ["/app/.venv/bin/python", "-m", "feelm_consumer.party_main"]
+    restart: unless-stopped
+    network_mode: host
+    stop_grace_period: 30s
+    profiles:
+      - party-consumer
+
+    extra_hosts:
+      - "hdfs-namenode:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+      - "hdfs-datanode-1:${SERVICE_NODE_IP:?SERVICE_NODE_IP is required}"
+      - "hdfs-datanode-2:${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}"
+
+    environment:
+      PARTY_CONSUMER_KAFKA_BOOTSTRAP_SERVERS: "${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}:9092"
+      PARTY_CONSUMER_KAFKA_TOPIC: ${PARTY_CONSUMER_KAFKA_TOPIC:-feelm.party-refresh.v1}
+      PARTY_CONSUMER_KAFKA_GROUP_ID: ${PARTY_CONSUMER_KAFKA_GROUP_ID:-feelm-party-consumer-v1}
+      PARTY_CONSUMER_REDIS_URL: ${PARTY_CONSUMER_REDIS_URL:-}
+      PARTY_CONSUMER_MODEL_URI: ${PARTY_CONSUMER_MODEL_URI:-}
+      PARTY_CONSUMER_MAPPING_URI: ${PARTY_CONSUMER_MAPPING_URI:-}
+      PARTY_CONSUMER_METADATA_URI: ${PARTY_CONSUMER_METADATA_URI:-}
+      PARTY_CONSUMER_RETRY_ATTEMPTS: ${PARTY_CONSUMER_RETRY_ATTEMPTS:-3}
+      PARTY_CONSUMER_RETRY_BACKOFF_SECONDS: ${PARTY_CONSUMER_RETRY_BACKOFF_SECONDS:-0.25}
+      PARTY_CONSUMER_KAFKA_POLL_TIMEOUT_SECONDS: ${PARTY_CONSUMER_KAFKA_POLL_TIMEOUT_SECONDS:-1.0}
+      PARTY_CONSUMER_MAX_PAUSED_POLLS: ${PARTY_CONSUMER_MAX_PAUSED_POLLS:-30}
+
+    depends_on:
+      hdfs-namenode:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+
+    security_opt:
+      - no-new-privileges:true
+
+    cap_drop:
+      - ALL
+
   node-exporter:
     image: prom/node-exporter:v1.11.1
     container_name: feelm-node-exporter-distributed

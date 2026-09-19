@@ -6,6 +6,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.feelm.backend.domain.search.cursor.MovieSearchCursor;
+import com.feelm.backend.domain.search.cursor.MovieSearchCursorCodec;
+import com.feelm.backend.domain.search.dto.request.MovieSearchCriteria;
+import com.feelm.backend.domain.search.dto.request.MovieSearchSort;
 import com.feelm.backend.global.security.JjwtTokenProvider;
 import com.feelm.backend.global.security.JwtProperties;
 import com.feelm.backend.global.security.TokenProvider;
@@ -14,10 +18,14 @@ import com.feelm.backend.support.SharedRedisContainer;
 import com.feelm.backend.support.SharedRedisState;
 import com.redis.testcontainers.RedisContainer;
 import jakarta.persistence.EntityManagerFactory;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.stream.LongStream;
 import java.util.stream.Stream;
@@ -71,6 +79,7 @@ class MovieSearchContractTest extends SharedPostgresContractTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
+    @Autowired private MovieSearchCursorCodec cursorCodec;
     @Autowired private JdbcTemplate jdbc;
     @Autowired private TokenProvider tokenProvider;
     @Autowired private JwtProperties jwtProperties;
@@ -756,6 +765,410 @@ class MovieSearchContractTest extends SharedPostgresContractTest {
     }
 
     @Test
+    @DisplayName("제목 정확 일치는 더 많은 평가를 받은 인물명 일치보다 앞선다")
+    void ranksExactTitleBeforePopularPerson() throws Exception {
+        MovieSearchFixture.movie(jdbc, 610, "SearchToken", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 611, "Unrelated Film", null, null, 0);
+        jdbc.update("UPDATE movies SET rating_count = 100 WHERE id = 611");
+        jdbc.update(
+                "INSERT INTO people (id, tmdb_person_id, name) VALUES (610, 990610, 'SearchToken')");
+        jdbc.update(
+                "INSERT INTO movie_people (movie_id, person_id, role) VALUES (611, 610, 'ACTOR')");
+
+        assertThat(ids(read(memberRequest().param("q", "SearchToken"))))
+                .containsExactly(610L, 611L);
+    }
+
+    @Test
+    @DisplayName("정확한 감독 이름은 제목 접두 일치보다 앞선다")
+    void ranksExactPersonBeforeTitlePrefix() throws Exception {
+        MovieSearchFixture.movie(jdbc, 640, "Christopher Nolan: a tale", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 641, "Inception", null, null, 0);
+        jdbc.update("UPDATE movies SET rating_count = 100 WHERE id = 640");
+        jdbc.update(
+                "INSERT INTO people (id, tmdb_person_id, name) VALUES (640, 990640, 'Christopher Nolan')");
+        jdbc.update(
+                "INSERT INTO movie_people (movie_id, person_id, role) VALUES (641, 640, 'DIRECTOR')");
+
+        assertThat(ids(read(memberRequest().param("q", "Christopher Nolan"))))
+                .containsExactly(641L, 640L);
+    }
+
+    @Test
+    @DisplayName("정확한 감독의 연출작은 해당 감독이 출연한 영상보다 앞선다")
+    void ranksDirectorWorkBeforeActorAppearance() throws Exception {
+        MovieSearchFixture.movie(jdbc, 650, "Feature Film", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 651, "Making Of", null, null, 0);
+        jdbc.update("UPDATE movies SET rating_count = 100 WHERE id = 651");
+        jdbc.update(
+                "INSERT INTO people (id, tmdb_person_id, name) VALUES (650, 990650, 'Christopher Nolan')");
+        jdbc.update(
+                "INSERT INTO movie_people (movie_id, person_id, role) VALUES "
+                        + "(650, 650, 'DIRECTOR'), (651, 650, 'ACTOR')");
+
+        assertThat(ids(read(memberRequest().param("q", "Christopher Nolan"))))
+                .containsExactly(650L, 651L);
+    }
+
+    @Test
+    @DisplayName("같은 감독의 연출작은 평가 수를 먼저 보고 동률이면 개봉일 순으로 보여준다")
+    void ranksDirectorWorksByRatingsThenReleaseDate() throws Exception {
+        MovieSearchFixture.movie(jdbc, 660, "Recent Feature", null, "2023-07-19", 0);
+        MovieSearchFixture.movie(jdbc, 661, "Older Feature", null, "2014-11-05", 0);
+        jdbc.update(
+                "INSERT INTO people (id, tmdb_person_id, name) VALUES (660, 990660, 'Christopher Nolan')");
+        jdbc.update(
+                "INSERT INTO movie_people (movie_id, person_id, role) VALUES "
+                        + "(660, 660, 'DIRECTOR'), (661, 660, 'DIRECTOR')");
+
+        assertThat(ids(read(memberRequest().param("q", "Christopher Nolan"))))
+                .containsExactly(660L, 661L);
+        assertThat(collectPages(1, "RELEVANCE", "Christopher Nolan")).containsExactly(660L, 661L);
+
+        jdbc.update("UPDATE movies SET rating_count = 1 WHERE id = 661");
+        assertThat(ids(read(memberRequest().param("q", "Christopher Nolan"))))
+                .containsExactly(661L, 660L);
+        assertThat(collectPages(1, "RELEVANCE", "Christopher Nolan")).containsExactly(661L, 660L);
+    }
+
+    @Test
+    @DisplayName("같은 접두 관련도 단계에서는 서비스 평가 수가 많은 영화를 먼저 보여준다")
+    void ranksPopularMoviesWithinSameRelevanceTier() throws Exception {
+        MovieSearchFixture.movie(jdbc, 620, "RankTest alpha", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 621, "RankTest very long extension", null, null, 0);
+        jdbc.update("UPDATE movies SET rating_count = 10 WHERE id = 621");
+
+        assertThat(ids(read(memberRequest().param("q", "RankTest")))).containsExactly(621L, 620L);
+    }
+
+    @Test
+    @DisplayName("같은 관련도 단계에서는 MovieLens ID가 있는 영화를 먼저 보여준다")
+    void ranksMovielensMappedMovieBeforeUnmappedWithinSameTier() throws Exception {
+        MovieSearchFixture.movie(jdbc, 670, "CoverageProbe alpha", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 671, "CoverageProbe beta", null, null, 0);
+        jdbc.update("UPDATE movies SET movielens_id = 990670 WHERE id = 670");
+        jdbc.update("UPDATE movies SET rating_count = 500 WHERE id = 671");
+
+        assertThat(ids(read(memberRequest().param("q", "CoverageProbe"))))
+                .containsExactly(670L, 671L);
+        assertThat(collectPages(1, "RELEVANCE", "CoverageProbe")).containsExactly(670L, 671L);
+    }
+
+    @Test
+    @DisplayName("MovieLens ID가 없는 외국어 정확 제목은 매핑된 한국어 인물 후보보다 앞선다")
+    void keepsExactForeignTitleAheadOfMappedKoreanPersonCandidate() throws Exception {
+        MovieSearchFixture.movie(jdbc, 672, "CoverageExact", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 673, "다른 한국어 제목", null, null, 0);
+        jdbc.update(
+                "INSERT INTO people (id, tmdb_person_id, name) VALUES (672, 990672, 'CoverageExact')");
+        jdbc.update(
+                "INSERT INTO movie_people (movie_id, person_id, role) VALUES (673, 672, 'DIRECTOR')");
+        jdbc.update("UPDATE movies SET movielens_id = 990673 WHERE id = 673");
+
+        assertThat(ids(read(memberRequest().param("q", "CoverageExact"))))
+                .containsExactly(672L, 673L);
+    }
+
+    @Test
+    @DisplayName("두 신호가 같으면 기존 서비스 평가 수가 순서를 정하고 컬럼 값은 바뀌지 않는다")
+    void keepsServiceRatingCountMeaningAndOrdering() throws Exception {
+        MovieSearchFixture.movie(jdbc, 674, "ServiceSignal alpha", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 675, "ServiceSignal beta", null, null, 0);
+        jdbc.update("UPDATE movies SET rating_count = 2, average_rating = 4.25 WHERE id = 674");
+
+        assertThat(ids(read(memberRequest().param("q", "ServiceSignal"))))
+                .containsExactly(674L, 675L);
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT rating_count, average_rating FROM movies WHERE id = 674"))
+                .containsEntry("rating_count", 2)
+                .containsEntry("average_rating", new BigDecimal("4.25"));
+    }
+
+    @Test
+    @DisplayName("같은 단계에서는 한국어 표시 제목이 고평가 수 외국어 제목보다 먼저 나온다")
+    void ranksKoreanDisplayTitleBeforeForeignWithinSameTier() throws Exception {
+        MovieSearchFixture.movie(jdbc, 676, "LocaleProbe 한국어 영화", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 677, "LocaleProbe foreign film", null, null, 0);
+        jdbc.update("UPDATE movies SET rating_count = 500 WHERE id = 677");
+
+        assertThat(ids(read(memberRequest().param("q", "LocaleProbe"))))
+                .containsExactly(676L, 677L);
+        assertThat(collectPages(1, "RELEVANCE", "LocaleProbe")).containsExactly(676L, 677L);
+    }
+
+    @Test
+    @DisplayName("매핑과 한국어 제목 신호는 독립 적용하고 불리한 영화도 모두 반환한다")
+    void combinesDemotionSignalsWithoutDroppingResults() throws Exception {
+        MovieSearchFixture.movie(jdbc, 760, "DemotionProbe 한국어 영화", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 761, "DemotionProbe foreign film", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 762, "DemotionProbe 한국어 작품", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 763, "DemotionProbe foreign sequel", null, null, 0);
+        jdbc.update("UPDATE movies SET movielens_id = 990761, rating_count = 2 WHERE id = 761");
+        jdbc.update("UPDATE movies SET movielens_id = 990762 WHERE id = 762");
+        jdbc.update("UPDATE movies SET rating_count = 500 WHERE id = 763");
+
+        JsonNode result = read(memberRequest().param("q", "DemotionProbe"));
+        assertThat(result.path("totalCount").asLong()).isEqualTo(4);
+        assertThat(ids(result)).containsExactly(762L, 761L, 760L, 763L);
+        assertThat(collectPages(1, "RELEVANCE", "DemotionProbe"))
+                .containsExactly(762L, 761L, 760L, 763L);
+    }
+
+    @Test
+    @DisplayName("같은 단계에서는 아랍 문자 제목을 MovieLens 연결·한국어·평가 수와 관계없이 뒤로 보낸다")
+    void demotesArabicDisplayTitlesWithinSameTier() throws Exception {
+        MovieSearchFixture.movie(jdbc, 766, "ArabicProbe 한국어 العربية", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 767, "ArabicProbe plain", null, null, 0);
+        jdbc.update("UPDATE movies SET movielens_id = 990766, rating_count = 500 WHERE id = 766");
+
+        assertThat(ids(read(memberRequest().param("q", "ArabicProbe"))))
+                .containsExactly(767L, 766L);
+        assertThat(collectPages(1, "RELEVANCE", "ArabicProbe")).containsExactly(767L, 766L);
+    }
+
+    @Test
+    @DisplayName("아랍어 정확 제목은 다른 단계의 한국어 인물 후보보다 앞서고 결과에 남는다")
+    void keepsExactArabicTitleAheadOfKoreanPersonCandidate() throws Exception {
+        MovieSearchFixture.movie(jdbc, 768, "البيت", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 769, "한국어 영화", null, null, 0);
+        jdbc.update("UPDATE movies SET movielens_id = 990769 WHERE id = 769");
+        jdbc.update("INSERT INTO people (id, tmdb_person_id, name) VALUES (768, 990768, 'البيت')");
+        jdbc.update(
+                "INSERT INTO movie_people (movie_id, person_id, role) VALUES (769, 768, 'DIRECTOR')");
+
+        assertThat(ids(read(memberRequest().param("q", "البيت")))).containsExactly(768L, 769L);
+    }
+
+    @Test
+    @DisplayName("cursor 뒤 페이지가 비어도 검색 조건의 전체 건수는 유지한다")
+    void preservesTotalCountOnExhaustedCursor() throws Exception {
+        MovieSearchFixture.movie(jdbc, 770, "TotalProbe", null, null, 0);
+        MovieSearchCriteria criteria =
+                new MovieSearchCriteria(
+                        "TotalProbe",
+                        List.of(),
+                        List.of(),
+                        null,
+                        null,
+                        List.of(),
+                        MovieSearchSort.RELEVANCE,
+                        null,
+                        1);
+        String exhaustedCursor =
+                cursorCodec.encode(
+                        new MovieSearchCursor(
+                                MovieSearchSort.RELEVANCE,
+                                BigDecimal.ZERO,
+                                null,
+                                1L,
+                                cursorCodec.criteriaKey(criteria)));
+
+        JsonNode result =
+                read(memberRequest().param("q", "TotalProbe").param("cursor", exhaustedCursor));
+        assertThat(result.path("totalCount").asLong()).isEqualTo(1);
+        assertThat(ids(result)).isEmpty();
+        assertThat(result.path("hasNext").asBoolean()).isFalse();
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {5, 6})
+    @DisplayName("하향 신호 변경 전 RELEVANCE cursor는 거부한다")
+    void rejectsPriorRelevanceCursors(int previousVersion) throws Exception {
+        String previousCriteriaKey =
+                HexFormat.of()
+                        .formatHex(
+                                MessageDigest.getInstance("SHA-256")
+                                        .digest(
+                                                ("{\"version\":%d,\"query\":\"매트릭스\","
+                                                                + "\"genres\":[],\"countries\":[],"
+                                                                + "\"yearFrom\":null,\"yearTo\":null,"
+                                                                + "\"otts\":[],\"requestedSort\":\"RELEVANCE\","
+                                                                + "\"effectiveSort\":\"RELEVANCE\"}")
+                                                        .formatted(previousVersion)
+                                                        .getBytes(StandardCharsets.UTF_8)));
+        String oldCursor =
+                cursorCodec.encode(
+                        new MovieSearchCursor(
+                                MovieSearchSort.RELEVANCE,
+                                BigDecimal.ONE,
+                                null,
+                                101L,
+                                previousCriteriaKey));
+
+        invalid(memberRequest().param("q", "매트릭스").param("cursor", oldCursor));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"RATING", "RELEASE_DATE"})
+    @DisplayName("키워드 후보 집합 변경 전 다른 정렬의 cursor도 거부한다")
+    void rejectsOldKeywordCursorForOtherSorts(String sortName) throws Exception {
+        MovieSearchSort sort = MovieSearchSort.valueOf(sortName);
+        String previousCriteriaKey =
+                HexFormat.of()
+                        .formatHex(
+                                MessageDigest.getInstance("SHA-256")
+                                        .digest(
+                                                ("{\"version\":3,\"query\":\"매트릭스\","
+                                                                + "\"genres\":[],\"countries\":[],"
+                                                                + "\"yearFrom\":null,\"yearTo\":null,"
+                                                                + "\"otts\":[],\"requestedSort\":\"%s\","
+                                                                + "\"effectiveSort\":\"%s\"}")
+                                                        .formatted(sortName, sortName)
+                                                        .getBytes(StandardCharsets.UTF_8)));
+        String oldCursor =
+                cursorCodec.encode(
+                        new MovieSearchCursor(
+                                sort,
+                                sort == MovieSearchSort.RATING ? BigDecimal.ONE : null,
+                                sort == MovieSearchSort.RELEASE_DATE
+                                        ? LocalDate.of(2000, 1, 1)
+                                        : null,
+                                101L,
+                                previousCriteriaKey));
+
+        invalid(
+                memberRequest()
+                        .param("q", "매트릭스")
+                        .param("sort", sortName)
+                        .param("cursor", oldCursor));
+    }
+
+    @Test
+    @DisplayName("필터 밖 문자 일치는 필터 안 오타 후보 탐색을 막지 않는다")
+    void fallsBackWithinFilteredMovies() throws Exception {
+        MovieSearchFixture.movie(jdbc, 764, "UnitMatrx", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 765, "UnitMatrix", null, null, 0);
+        jdbc.update("INSERT INTO movie_genres (movie_id, genre_id) VALUES (764, 13), (765, 11)");
+
+        JsonNode result = read(memberRequest().param("q", "UnitMatrx").param("genre", "ACTION"));
+        assertThat(result.path("totalCount").asLong()).isEqualTo(1);
+        assertThat(ids(result)).containsExactly(765L);
+    }
+
+    @Test
+    @DisplayName("한두 글자 한글 검색은 제목·원제·감독 후보와 관련도 단계를 유지한다")
+    void shortHangulSearchKeepsCandidatesAndRelevanceTiers() throws Exception {
+        MovieSearchFixture.movie(jdbc, 780, "스", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 781, "스파 영화", null, "2020-01-01", 0);
+        MovieSearchFixture.movie(jdbc, 782, "도시 스파", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 783, "English-SpA 스파", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 784, "감독 작품", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 785, "Original Film", "스파 오리지널", null, 0);
+        MovieSearchFixture.movie(jdbc, 786, "또 다른 작품", null, null, 0);
+        jdbc.update(
+                "INSERT INTO people (id, tmdb_person_id, name) VALUES "
+                        + "(784, 990784, '스'), (786, 990786, '스파 감독')");
+        jdbc.update(
+                "INSERT INTO movie_people (movie_id, person_id, role) VALUES "
+                        + "(784, 784, 'DIRECTOR'), (786, 786, 'DIRECTOR')");
+        jdbc.update("INSERT INTO movie_genres (movie_id, genre_id) VALUES (781, 11), (782, 13)");
+        jdbc.update("INSERT INTO movie_countries (movie_id, country_code) VALUES (781, 'US')");
+        jdbc.update("INSERT INTO movie_ott_providers (movie_id, ott_id) VALUES (781, 21)");
+
+        JsonNode oneSyllable = read(memberRequest().param("q", "스"));
+        assertThat(ids(oneSyllable)).startsWith(780L, 784L, 781L);
+        assertThat(ids(oneSyllable)).contains(101L, 102L, 782L, 783L, 785L, 786L);
+
+        JsonNode twoSyllables = read(memberRequest().param("q", "스파"));
+        assertThat(twoSyllables.path("totalCount").asLong()).isEqualTo(5);
+        assertThat(ids(twoSyllables))
+                .startsWith(781L, 785L)
+                .containsExactlyInAnyOrder(781L, 782L, 783L, 785L, 786L);
+        assertThat(collectPages(1, "RELEVANCE", "스파")).containsExactlyElementsOf(ids(twoSyllables));
+
+        JsonNode filtered =
+                read(
+                        memberRequest()
+                                .param("q", "스파")
+                                .param("genre", "ACTION")
+                                .param("country", "US")
+                                .param("ott", "21")
+                                .param("yearFrom", "2020")
+                                .param("yearTo", "2020"));
+        assertThat(filtered.path("totalCount").asLong()).isEqualTo(1);
+        assertThat(ids(filtered)).containsExactly(781L);
+        assertThat(collectPages(1, "RATING", "스파"))
+                .containsExactlyInAnyOrder(781L, 782L, 783L, 785L, 786L);
+        assertThat(collectPages(1, "RELEASE_DATE", "스파"))
+                .containsExactlyInAnyOrder(781L, 782L, 783L, 785L, 786L);
+    }
+
+    @Test
+    @DisplayName("같은 제목의 번호 붙은 속편은 다른 접두·부분 일치 작품보다 먼저 번호순으로 보여준다")
+    void ranksNumberedSeriesTogether() throws Exception {
+        MovieSearchFixture.movie(jdbc, 680, "나 홀로 집에", "Home Alone", null, 0);
+        MovieSearchFixture.movie(jdbc, 681, "나 홀로 집에 4", "Home Alone 4", null, 0);
+        MovieSearchFixture.movie(jdbc, 682, "나 홀로 집에 3", "Home Alone 3", null, 0);
+        MovieSearchFixture.movie(jdbc, 683, "나 홀로 집에 2: 뉴욕을 헤매다", "Home Alone 2", null, 0);
+        MovieSearchFixture.movie(jdbc, 684, "나 홀로 집에: 크리스마스 소동", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 685, "나 홀로 즐거운 집에", null, null, 0);
+        jdbc.update("UPDATE movies SET rating_count = 100 WHERE id IN (681, 684, 685)");
+
+        assertThat(ids(read(memberRequest().param("q", "나 홀로 집에"))))
+                .startsWith(680L, 683L, 682L, 681L)
+                .contains(684L)
+                .doesNotContain(685L);
+        assertThat(collectPages(1, "RELEVANCE", "나 홀로 집에"))
+                .startsWith(680L, 683L, 682L, 681L)
+                .doesNotHaveDuplicates();
+        assertThat(ids(read(memberRequest().param("q", "Home Alone"))))
+                .startsWith(680L, 683L, 682L, 681L);
+
+        MovieSearchFixture.movie(jdbc, 690, "매트릭스 3: 레볼루션", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 691, "매트릭스 2: 리로디드", null, null, 0);
+        assertThat(ids(read(memberRequest().param("q", "매트릭스"))))
+                .startsWith(101L, 691L, 690L, 102L);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"RELEVANCE", "RELEASE_DATE", "RATING"})
+    @DisplayName("검색어가 제목에 그대로 있는 영화가 있으면 비슷한 단어만 가진 영화는 제외한다")
+    void excludesFuzzyOnlyCandidatesWhenLiteralMatchesExist(String sort) throws Exception {
+        MovieSearchFixture.movie(jdbc, 720, "아이언맨", null, "2008-04-30", 0);
+        MovieSearchFixture.movie(jdbc, 721, "아이언맨 2", null, "2010-04-29", 0);
+        MovieSearchFixture.movie(jdbc, 722, "아이언맨과 헐크", null, "2024-01-01", 0);
+        MovieSearchFixture.movie(jdbc, 723, "아이언 렁", null, "2025-01-01", 0);
+        MovieSearchFixture.movie(jdbc, 724, "아이언 파이터", null, "2026-01-01", 0);
+
+        JsonNode firstPage = read(memberRequest().param("q", "아이언맨").param("sort", sort));
+        assertThat(firstPage.path("totalCount").asLong()).isEqualTo(3);
+        assertThat(ids(firstPage)).containsExactlyInAnyOrder(720L, 721L, 722L);
+        assertThat(collectPages(1, sort, "아이언맨")).containsExactlyInAnyOrder(720L, 721L, 722L);
+    }
+
+    @Test
+    @DisplayName("문자 그대로 맞는 후보가 없으면 유사도 검색으로 오타를 찾는다")
+    void fallsBackToFuzzyMatchesWhenNoLiteralMatchesExist() throws Exception {
+        MovieSearchFixture.movie(jdbc, 730, "UniqueFallbackProbe", null, null, 0);
+
+        assertThat(ids(read(memberRequest().param("q", "UniqueFallbakProbe")))).contains(730L);
+    }
+
+    @Test
+    @DisplayName("문자열 일치가 없으면 전체 단어 일치를 유사도 후보보다 먼저 사용한다")
+    void fallsBackToFullTextBeforeFuzzyMatches() throws Exception {
+        MovieSearchFixture.movie(jdbc, 740, "Drama of Cosmic", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 741, "Cosmic Draam", null, null, 0);
+
+        JsonNode result = read(memberRequest().param("q", "cosmic drama"));
+        assertThat(result.path("totalCount").asLong()).isEqualTo(1);
+        assertThat(ids(result)).containsExactly(740L);
+    }
+
+    @Test
+    @DisplayName("관련도·평가 수·영화 ID 경계를 size=1 cursor로 지나도 중복·누락이 없다")
+    void paginatesPopularityRank() throws Exception {
+        MovieSearchFixture.movie(jdbc, 631, "PageRank AA", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 632, "PageRank BB", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 633, "PageRank CC", null, null, 0);
+        jdbc.update("UPDATE movies SET rating_count = 2 WHERE id IN (631, 632)");
+        jdbc.update("UPDATE movies SET rating_count = 1 WHERE id = 633");
+
+        assertThat(collectPages(1, "RELEVANCE", "PageRank")).containsExactly(632L, 631L, 633L);
+    }
+
+    @Test
     @DisplayName("개봉일 NULL 구간이 여러 페이지에 걸쳐도 ID 경계로 끝까지 조회한다")
     void paginatesMultipleNullReleaseDates() throws Exception {
         MovieSearchFixture.movie(jdbc, 701, "NullDateProbe", null, "2020-01-01", 0);
@@ -889,6 +1302,7 @@ class MovieSearchContractTest extends SharedPostgresContractTest {
                                 Duration.ofMinutes(-1),
                                 jwtProperties.refreshTokenTtl(),
                                 jwtProperties.signupTokenTtl(),
+                                jwtProperties.emailVerificationTokenTtl(),
                                 jwtProperties.refreshRotationGrace(),
                                 jwtProperties.refreshCookie()));
         String expiredToken = expiredTokenProvider.createAccessToken(MovieSearchFixture.MEMBER_ID);

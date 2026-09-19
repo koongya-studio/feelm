@@ -11,7 +11,7 @@
  *
  * | 자리 | 무엇 |
  * | --- | --- |
- * | 헤더 | `프로필` · 오른쪽 `설정` 아이콘 |
+ * | 헤더 | 공통 헤더(워드마크 · 검색 · 알림, 업무 -676) · 그 아래 `프로필` · 오른쪽 `설정` 아이콘 |
  * | 상단 | 동그란 프로필 사진 + 닉네임 + 소개 |
  * | 버튼 둘 | `프로필 편집`(→ 7.2) · `프로필 공유` |
  * | 수치 | 프레임 · 팝콘 · 공개 한줄평 |
@@ -35,7 +35,8 @@
  * 1:1인 내 필름(API-042)으로 대신 그렸다(업무 -610). API-039는 **프레임 없는 과거 평가도**
  * 돌려주므로 필름의 프레임 수보다 많을 수 있다.
  *
- * **세 탭 모두 `더 보기`로 다음 장을 이어 받는다**(업무 -478 · -611 · -503). 한 장은 20건이고
+ * **세 탭 모두 `더 보기`로 다음 장을 이어 받는다**(업무 -478 · -611 · -503). 한 장은 18편이고
+ * (업무 -657 — 3열 격자 여섯 줄. API 기본값 20이면 줄마다 두 칸이 남아 끊겨 보였다)
  * 그보다 오래된 기록은 `nextCursor`로 온다 — 버튼이 없으면 첫 장 뒤의 기록에 닿을 길이 없다.
  * 무한 스크롤로 하지 않은 것은 피드가 끝나는 자리가 보여야 해서다. 탭이 셋이고 탭마다 끝이
  * 다르므로, 스크롤만으로 이어 받으면 지금 탭이 끝났는지 알 길이 없다. 셋 다 같은 규칙이다 —
@@ -70,6 +71,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import Button from '../../../components/Button';
 import PopcornBucket from '../../../components/PopcornBucket';
+import AppHeader from '../../../components/AppHeader';
 import ProfileLayout, { ProfileSkeleton } from '../../../components/ProfileLayout';
 import { kernelCounts } from '../../../components/PopcornBucket/kernels';
 import Poster from '../../../components/Poster';
@@ -233,8 +235,21 @@ function flatten(
   return sets.flatMap((set) => set.items.map((item) => ({ item, generatedAt: set.generatedAt })));
 }
 
+/**
+ * 한 장의 편 수. 격자가 3열이라 3의 배수여야 첫 장과 `더 보기`마다 줄이 꽉 찬다(업무 -657).
+ * API 기본값 20이면 매번 마지막 줄에 두 칸만 남았다. API-039 · API-034 모두 1~50을 받는다
+ */
+const FEED_PAGE_SIZE = 18;
+
+/**
+ * 추천 기록 한 장의 세트 수. API-048의 `size`는 편이 아니라 **세트 단위**다. 세트 하나가
+ * 대개 3편(취향 맞춤 2 + 취향 발견 1)이라 여섯 세트로 다른 탭과 같은 18편을 맞춘다.
+ * 세트에 3편이 다 차지 않으면 줄이 딱 맞지 않을 수 있다
+ */
+const HISTORY_SETS_PER_PAGE = FEED_PAGE_SIZE / 3;
+
 /** 안 남긴 영화의 조건. 다음 장도 **같은 조건으로** 받아야 커서가 맞는다(API-034) */
-const UNRATED_QUERY = { status: ['WATCHED_UNRATED' as const] };
+const UNRATED_QUERY = { status: ['WATCHED_UNRATED' as const], size: FEED_PAGE_SIZE };
 
 /** 기록에 OTT 이름과 날짜를 얹는다. 기록은 `ottId`만 주고 이름은 기준정보에 있다 */
 function toUnratedRow(record: WatchRecordListItem, otts: Ott[]): UnratedRow {
@@ -342,7 +357,7 @@ export default function MyDashboardPage() {
      * 평가한 영화는 내 평가 목록(API-039)이다(업무 -611). 필터를 생략하면 서버가 평가만
      * 최신순으로 준다. 2.5에서 방금 저장 · 수정한 평가도 다시 읽을 때 그대로 보인다.
      */
-    getMyRatings()
+    getMyRatings({ size: FEED_PAGE_SIZE })
       .then((value) => {
         if (!active) return;
 
@@ -372,7 +387,7 @@ export default function MyDashboardPage() {
         if (active) setUnrated({ status: 'failed' });
       });
 
-    getRecommendationHistory()
+    getRecommendationHistory(undefined, HISTORY_SETS_PER_PAGE)
       .then((value) => {
         if (!active) return;
 
@@ -391,7 +406,8 @@ export default function MyDashboardPage() {
   if (failed) {
     return (
       <>
-        <ScreenHeader title="프로필" />
+        <AppHeader />
+        <ScreenHeader title="프로필" flush />
 
         <StatusView title="프로필을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
           <Button
@@ -410,7 +426,8 @@ export default function MyDashboardPage() {
   if (!profile) {
     return (
       <>
-        <ScreenHeader title="프로필" />
+        <AppHeader />
+        <ScreenHeader title="프로필" flush />
         <div className={styles.page}>
           <ProfileSkeleton />
         </div>
@@ -470,7 +487,7 @@ export default function MyDashboardPage() {
     const fail = () => setMore((prev) => ({ ...prev, [current]: 'failed' }));
 
     if (current === 'ratings') {
-      getMyRatings({ cursor })
+      getMyRatings({ cursor, size: FEED_PAGE_SIZE })
         .then((page) => {
           done(nextCursor(page));
           setRatings(append(ratedItems(page)));
@@ -491,7 +508,7 @@ export default function MyDashboardPage() {
       return;
     }
 
-    getRecommendationHistory(cursor)
+    getRecommendationHistory(cursor, HISTORY_SETS_PER_PAGE)
       .then((page) => {
         done(nextCursor(page));
         setHistory(append(flatten(page.items)));
@@ -517,9 +534,13 @@ export default function MyDashboardPage() {
        * **`OTT 관리`는 7.8 설정 안으로 옮겼다**(사용자 지시 2026-09-16). 이 화면에서
        * 6.1로 가는 길은 없어졌고 설정 > 계정 > OTT 관리가 유일한 입구다.
        *
-       * 화면 제목은 `프로필`이다(사용자 시안 2026-09-18, 업무 -616).
+       * 화면 제목은 `프로필`이다(사용자 시안 2026-09-18, 업무 -616). 그 위에 필름 · 파티와 같은
+       * 공통 헤더(워드마크 · 검색 · 알림)가 선다(업무 -676) — 제목 줄은 헤더 아래로 내려와
+       * 위 여백 없이 붙는다(`flush`).
        */}
+      <AppHeader />
       <ScreenHeader
+        flush
         title="프로필"
         action={
           <Link to={path.settings()} className={styles.headerLink}>

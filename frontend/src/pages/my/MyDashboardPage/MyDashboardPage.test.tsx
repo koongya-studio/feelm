@@ -272,7 +272,8 @@ describe('7.1 MY 대시보드', () => {
     expect(await within(feed()).findByText('지난 달 추천')).toBeInTheDocument();
     // 앞 장은 그대로 남는다
     expect(within(feed()).getByText('추천받은 영화 A')).toBeInTheDocument();
-    expect(getRecommendationHistory).toHaveBeenLastCalledWith('cursor-2');
+    // 한 장은 세트 여섯 개다(업무 -657). size는 편이 아니라 세트 단위다
+    expect(getRecommendationHistory).toHaveBeenLastCalledWith('cursor-2', 6);
     // 마지막 장이므로 버튼이 사라진다
     expect(within(feed()).queryByRole('button', { name: '더 보기' })).toBeNull();
   });
@@ -351,6 +352,7 @@ describe('7.1 MY 대시보드', () => {
     expect(within(feed()).getAllByRole('link')).toHaveLength(2);
     expect(getWatchRecords).toHaveBeenLastCalledWith({
       status: ['WATCHED_UNRATED'],
+      size: 18,
       cursor: 'watch-cursor-2',
     });
     expect(within(feed()).queryByRole('button', { name: '더 보기' })).toBeNull();
@@ -359,12 +361,13 @@ describe('7.1 MY 대시보드', () => {
   it('평가한 영화는 API-039 내 평가 목록으로 그린다', async () => {
     /*
      * 업무 -611. 그전에는 평가와 1:1인 프레임(API-042)으로 대신 그렸다(업무 -610). 필터 ·
-     * 정렬을 생략해 서버 기본값(평가만 · 최신순)을 받는다.
+     * 정렬을 생략해 서버 기본값(평가만 · 최신순)을 받는다. 한 장은 3열 격자 여섯 줄인
+     * 18편이다(업무 -657).
      */
     await renderDashboard();
 
     expect(getMyRatings).toHaveBeenCalledTimes(1);
-    expect(getMyRatings).toHaveBeenCalledWith();
+    expect(getMyRatings).toHaveBeenCalledWith({ size: 18 });
     expect(
       await within(feed()).findByRole('link', { name: /평가한 영화 A.*4\.5/ }),
     ).toBeInTheDocument();
@@ -397,7 +400,7 @@ describe('7.1 MY 대시보드', () => {
     // 앞 장은 그대로 남는다
     expect(within(feed()).getAllByRole('link')).toHaveLength(3);
     // 첫 장과 같은 조건(필터 · 정렬 생략)에 커서만 싣는다. 조건이 바뀐 커서는 400이다
-    expect(getMyRatings).toHaveBeenLastCalledWith({ cursor: 'rating-cursor-2' });
+    expect(getMyRatings).toHaveBeenLastCalledWith({ cursor: 'rating-cursor-2', size: 18 });
     expect(within(feed()).queryByRole('button', { name: '더 보기' })).toBeNull();
   });
 
@@ -440,6 +443,9 @@ describe('7.1 MY 대시보드', () => {
     await renderDashboard();
 
     expect(screen.getByRole('heading', { name: '프로필', level: 1 })).toBeInTheDocument();
+    // 필름 · 파티와 같은 공통 헤더로 검색 · 알림에 바로 간다(업무 -676)
+    expect(screen.getByRole('link', { name: '검색' })).toHaveAttribute('href', '/search');
+    expect(screen.getByRole('link', { name: /^알림/ })).toHaveAttribute('href', '/notifications');
     expect(screen.getByRole('heading', { name: mockMyProfileView.nickname })).toBeInTheDocument();
     expect(screen.getByText(mockMyProfileView.bio)).toBeInTheDocument();
 

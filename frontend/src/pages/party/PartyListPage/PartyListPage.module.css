@@ -79,19 +79,12 @@
 }
 
 /* 워드마크와 카피. 시안은 둘을 한 줄에 좌우로 벌린다 */
-.brand {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
+/* 한 줄 카피. 한때 워드마크 오른쪽 두 줄이었고, 공통 헤더(업무 -676)가 그 자리를 가져가 아래로 내려왔다 */
 .copy {
   margin: 0;
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
   color: var(--color-ink-muted);
-  text-align: right;
 }
 
 .titleBlock {
@@ -124,13 +117,25 @@
   color: var(--color-ink-body);
 }
 
-/* 통 자리. 남는 높이를 이 자리가 가져가 목록과 버튼 사이가 비지 않는다 */
+/*
+ * 통 자리. 남는 높이를 이 자리가 가져가 목록과 버튼 사이가 비지 않는다.
+ *
+ * **세로가 짧으면 통이 자리에 맞춰 작아진다**(업무 -682, UI/UX 분석 리포트 P1-04). 한때 자리만
+ * 줄고 통은 제 크기(216px)대로 그려져, 320 × 568에서 64px · 가로 모드에서는 통 전체가 제목 ·
+ * 안내 문구 · 버튼 위로 넘쳐 덮었다. 통의 높이를 자리 높이로 묶는다 — SVG라 그림은 비율을
+ * 지키며 가운데에 줄어든다. 자리는 120px 아래로 줄지 않는다. 그보다 짧은 화면(가로 모드)은
+ * 화면이 스크롤해 버튼까지 닿는다.
+ */
 .stage {
   display: flex;
-  min-height: 0;
+  min-height: 120px;
   flex: 1 1 auto;
   align-items: center;
   justify-content: center;
+}
+
+.stage > svg {
+  max-height: 100%;
 }
 
 /*

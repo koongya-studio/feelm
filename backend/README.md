@@ -83,6 +83,13 @@ payload를 임의로 추가하지 말고 계약과 공통 타입을 먼저 합�
 [ADR-0018](../docs/adr/0018-polling-transactional-outbox.md)을 참고합니다. 로컬 Kafka 기동과
 Topic 확인 방법은 [인프라 README](../infra/README.md#local-kafka)를 따릅니다.
 
+파티 전용 Consumer의 Redis 게시 완료 알림은 `feelm.party-candidate-updated.v1`에서
+`feelm-party-candidate-updated-v1` group으로 소비한다. Backend는 추천 세트를 미리 만들지 않고
+`party_candidate_publications`에 파티별 마지막 source partition·offset과 결과 식별자만 기록한다.
+유효 알림의 DB 트랜잭션이 커밋된 뒤 수신 Offset을 manual ACK하며, 같은 source offset의 중복과
+더 오래된 offset은 상태를 바꾸지 않는다. 정확한 key·payload 계약은
+[스트리밍 계약](../docs/api/streaming-contract.md#43-이벤트별-payload)을 따른다.
+
 ## 실행 프로파일
 
 기본 프로파일은 `local`이며, 배포 개발 환경은 `dev`를 사용합니다. JPA 스키마 자동 변경은
@@ -95,6 +102,7 @@ Topic 확인 방법은 [인프라 README](../infra/README.md#local-kafka)를 따
 | `DB_PASSWORD` | `feelm` | 필수 |
 | `REDIS_HOST` | `localhost` | 필수 |
 | `REDIS_PORT` | `6379` | `6379` |
+| `REDIS_USERNAME` | `default` | `default` |
 | `REDIS_PASSWORD` | **필수(기본값 없음)** | 필수 |
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | **필수(분산 처리 노드 사설 IP:9092)** |
 | `KAFKA_OUTBOX_*` | `.env.example`의 초기값 | 선택(실측 후 조정) |
@@ -197,24 +205,24 @@ Refresh Token은 사용될 때마다 회전하며, 폐기된 토큰이 다시 �
 
 ### 인증 메일 발송
 
-계정 메일은 `MAIL_MODE`로 발송 수단을 고릅니다. 가입 인증 메일(API-001~003)과 비밀번호 재설정 메일
+계정 메일은 `MAIL_MODE`로 발송 수단을 고릅니다. 가입 인증번호 메일(API-078)과 비밀번호 재설정 메일
 (API-010)이 같은 값을 쓰므로 두 메일은 항상 같은 모드로 함께 뜹니다.
 
 | 값 | 동작 | 용도 |
 | --- | --- | --- |
-| `log` | 발송하지 않고 인증·재설정 링크를 로그로 남깁니다 | 로컬 수동 확인 |
+| `log` | 발송하지 않고 인증번호와 재설정 링크를 로그로 남깁니다 | 로컬 수동 확인 |
 | `smtp` | `spring.mail.*` 설정으로 실제 발송합니다 | dev·운영 |
 
-`MAIL_MODE`는 **기본값이 없어** 지정하지 않으면 기동에 실패합니다. `log`는 인증·재설정 링크가 로그에 남으므로
+`MAIL_MODE`는 **기본값이 없어** 지정하지 않으면 기동에 실패합니다. `log`는 인증번호와 재설정 링크가 로그에 남으므로
 로컬·테스트 전용이며, 허용 프로파일(`local`, `test`, 프로파일을 지정하지 않은 테스트 실행의 `default`) 밖에서
 `MAIL_MODE=log`이면 기동에 실패합니다. `smtp`는 `MAIL_USERNAME`과 앱 비밀번호
 `MAIL_PASSWORD`가 필요하며, 값은 개인 `.env` 또는 배포 환경의 Secret으로만 주입합니다.
 
 발송은 **응답 경로에서 분리**되어 전용 스레드 풀(`feelm.mail.async`, 기본 스레드 2개·큐 100칸)에서 처리됩니다.
 계정이 있는 이메일과 없는 이메일의 응답 시간이 SMTP 왕복 때문에 갈리면, 응답이 감춘 계정 존재 여부가 시간으로
-드러나기 때문입니다(API-003·API-010). 그래서 발송 결과는 응답에 영향을 주지 않습니다. 큐가 차면 그 발송은
+드러나기 때문입니다(API-078·API-010). 그래서 발송 결과는 응답에 영향을 주지 않습니다. 큐가 차면 그 발송은
 **버리고** 경고 로그만 남깁니다(호출 스레드가 대신 보내면 응답이 다시 SMTP를 기다리게 됩니다). 유실된 메일은
-사용자의 재발송(API-003)·재요청(API-010)·재가입이 복구 경로입니다.
+사용자의 재요청(API-078·API-010)이 복구 경로입니다.
 
 종료 시에는 진행 중인 발송과 큐에 남은 발송을 `feelm.mail.async.shutdown-await`(기본 10초) 안에 내보내려
 하고, 그 시간이 지나면 남은 발송을 버립니다. 스레드가 2개이므로 그 안에 실제로 나가는 것은 몇 건뿐이고 큐에
@@ -274,21 +282,23 @@ docker exec feelm-redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-au
 값(`MAIL_RATE_LIMIT_IP_WINDOW`, `MAIL_RATE_LIMIT_EMAIL_INTERVAL`)에 단위를 생략하면 **초**로 읽습니다.
 
 Redis에 닿지 못하면 계정 메일은 발송하지 않습니다(fail-closed). 인증 제한과 방향을 맞춘 선택이며, 장애 중
-발송 폭탄을 허용하지 않는 대신 가입 인증 메일까지 함께 멈춥니다. 복구 경로는
-재발송(API-003)·재요청(API-010)·재가입입니다.
+발송 폭탄을 허용하지 않는 대신 가입 인증번호 메일까지 함께 멈춥니다. 복구 경로는
+재요청(API-078·API-010)입니다.
 
 이때 **응답은 두 갈래**입니다. 발송 상한은 발송 스레드에서 보므로 그 확인이 실패해도 응답은 `201`·`202` 그대로이고
 메일만 나가지 않습니다. 반면 IP 단위 요청 제한은 요청 경로에서 판정하고 같은 Redis를 쓰므로, 장애 중에는 그 판정이
-먼저 걸려 가입(API-001)·재발송(API-003)·재설정 요청(API-010)이 `500 INTERNAL_ERROR`로 실패합니다. 즉 Redis
+먼저 걸려 가입(API-001)·인증번호 발송(API-078)·재설정 요청(API-010)이 `500 INTERNAL_ERROR`로 실패합니다. 즉 Redis
 장애 중 사용자에게 실제로 보이는 것은 "메일만 안 오는 상태"가 아니라 **요청 실패**입니다. 가입 경로는
 S15P21E106-287에서 요청 제한이 추가되기 전까지 Redis 없이도 성공했으므로, 이 성질은 그때 함께 생겼습니다.
 
-인증 링크는 `${FRONTEND_BASE_URL}/app/verify-email?token=...`, 비밀번호 재설정 링크는
-`${FRONTEND_BASE_URL}/app/account/reset?token=...` 형식입니다. 두 링크 모두 프론트 화면으로 이동하고
-프론트가 각각 API-002·API-011을 호출합니다. **경로는 프론트엔드 라우트에서 파생된 값입니다.** 앱은
+가입 인증번호 메일에는 링크가 없습니다. 6자리 숫자를 본문에 실어 보내고 사용자가 회원가입 화면에 입력합니다
+(API-078·079, S15P21E106-604). 번호는 Redis에 SHA-256 해시로만 남고 수명은 10분입니다.
+
+비밀번호 재설정 링크는 `${FRONTEND_BASE_URL}/app/account/reset?token=...` 형식입니다. 프론트 화면으로
+이동하고 프론트가 API-011을 호출합니다. **경로는 프론트엔드 라우트에서 파생된 값입니다.** 앱은
 Vite base가 `/app/`이라 모든 화면이 `/app` 아래에 있고 화면별 경로는 `frontend/src/routes/paths.ts`가
-가지므로, 프론트 경로가 바뀌면 `feelm.mail.verification-url`·`password-reset-url`도 함께 바꿔야 합니다. 토큰은 불투명 난수 문자열이며 서버는 해시만 저장합니다.
-수명은 인증 토큰이 24시간, 재설정 토큰이 30분입니다.
+가지므로, 프론트 경로가 바뀌면 `feelm.mail.password-reset-url`도 함께 바꿔야 합니다. 토큰은 불투명 난수
+문자열이며 서버는 해시만 저장합니다. 수명은 30분입니다.
 
 ### 공개 경로 추가
 

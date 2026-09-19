@@ -406,7 +406,7 @@ redis:8.2.9-alpine@sha256:30abb90e62f14b737010746def3ba99cc79fe19dcdb3d37b41f21f
 - 메모리: Redis `512mb`, 컨테이너 `768m`
 - 축출 정책: 인증 데이터 보호를 위한 `noeviction`; 한도 도달 시 새 쓰기가 실패함
 - 네트워크: 로컬·서비스 서버 모두 `127.0.0.1:6379`, 컨테이너 간에는 기존 `redis:6379`
-- 조회 계정: [Redis 조회 접속 설정](redis/README.md). 선택 비밀번호 미설정 시 비활성화
+- 제한 계정: [Redis ACL 접속 설정](redis/README.md). 각 선택 비밀번호 미설정 시 해당 계정 비활성화
 
 Refresh Token Repository, 추천 Key와 TTL, Spark 적재 및 Redis Cluster·Sentinel
 구성은 이 실행환경 업무의 범위에 포함하지 않습니다.
@@ -417,6 +417,8 @@ Refresh Token Repository, 추천 Key와 TTL, Spark 적재 및 Redis Cluster·Sen
 
 ```dotenv
 REDIS_PASSWORD=<필수 비밀번호>
+REDIS_READONLY_PASSWORD=<조회 계정 비밀번호>
+REDIS_LOCAL_BACKEND_PASSWORD=<로컬 백엔드 계정 비밀번호>
 ```
 
 Spring Boot를 호스트에서 실행할 때는 다음 값을 `backend/.env`에 설정합니다.
@@ -424,6 +426,7 @@ Spring Boot를 호스트에서 실행할 때는 다음 값을 `backend/.env`에 
 ```dotenv
 REDIS_HOST=localhost
 REDIS_PORT=6379
+REDIS_USERNAME=default
 REDIS_PASSWORD=<infra/.env와 같은 값>
 ```
 
@@ -434,7 +437,25 @@ REDIS_PASSWORD=<infra/.env와 같은 값>
 ```dotenv
 REDIS_HOST=redis
 REDIS_PORT=6379
+REDIS_USERNAME=default
 ```
+
+서비스 서버 Redis를 로컬 Spring Boot에서 사용할 때는 서버의
+`REDIS_LOCAL_BACKEND_PASSWORD`를 전달받아 SSH 터널과 제한 계정을 사용합니다.
+
+```bash
+ssh -N -L 16379:127.0.0.1:6379 <SSH_USER>@<SERVICE_SERVER>
+```
+
+```dotenv
+REDIS_HOST=127.0.0.1
+REDIS_PORT=16379
+REDIS_USERNAME=feelm_local_backend
+REDIS_PASSWORD=<전달받은 로컬 백엔드 계정 비밀번호>
+```
+
+이 계정은 `auth:*`를 실제로 변경하므로 공유 개발 서버의 로그인·메일 제한 상태에
+영향을 줍니다. 테스트 계정을 사용하고 `FLUSHALL` 같은 전체 초기화 명령은 허용되지 않습니다.
 
 ### Startup
 
@@ -1365,6 +1386,122 @@ generation 게시가 없는지 확인한다. 의도적인 poison event나 datast
 현재 `develop`에는 Candidate v4 Spring Redis reader가 없다. 따라서 Consumer CD와 Redis 직접 E2E를
 통과해도 서비스 추천 조회까지 통합 완료된 것으로 간주하지 않는다. reader가 병합된 뒤 taste와
 discovery 계약 호환성 및 같은 generation 조회를 추가 검증해야 한다.
+
+### Party Consumer cutover and rollback (S15P21E106-566)
+
+파티 Consumer는 개인 Fold-in Consumer와 같은 immutable 이미지 digest를 사용할 수 있지만
+`party-consumer` Compose service, `feelm-party-consumer-v1` Kafka Group,
+`PARTY_CONSUMER_*` 설정으로 독립 실행한다. Redis 파티 결과의 writer는 항상 하나만 실행한다.
+기존 Spark 파티 job과 Python 파티 Consumer를 동시에 실행하지 않는다. 기존 Spark checkpoint는
+롤백에 필요하므로 삭제하거나 새 경로로 바꾸지 않는다.
+
+전환 전에 `infra/.env`에 실제 값을 출력하지 않고 다음 항목을 확인한다.
+
+- `PARTY_CONSUMER_REDIS_URL`은 분산 노드에서 접근 가능한 승인된 Redis 계정이다.
+- `PARTY_CONSUMER_MODEL_URI`, `PARTY_CONSUMER_MAPPING_URI`,
+  `PARTY_CONSUMER_METADATA_URI`는 같은 immutable snapshot revision이다.
+- Redis `feelm:model:current.modelVersion`은 위 SERVING model과 같다.
+- `feelm.party-refresh.v1`과 `feelm.party-candidate-updated.v1`이 존재하고 `partyId` key 기준 partitioning을 사용한다.
+- 기존 Spark 파티 job의 실행 주체와 전용 checkpoint URI를 기록했다.
+- 기존 Spark supervisor의 정확한 service/job 식별자와 stop+disable, status, enable 명령을
+  운영 기록에서 확인했다. 식별할 수 없거나 disable할 수 없으면 전환하지 않는다.
+
+토픽이 없으면 writer 전환 전에 한 번만 생성한다. 파티션 수와 복제 계수는 합의된 운영값을
+사용하며 아래 단일 broker 예시를 다중 broker 운영값으로 그대로 복사하지 않는다. 파티별
+source partition을 완료 상태의 멱등성 기준으로 사용하므로 운영 중 입력 토픽의 partition 수를
+변경하지 않는다.
+
+```bash
+docker exec feelm-kafka /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 --create --if-not-exists \
+  --topic feelm.party-refresh.v1 --partitions 3 --replication-factor 1
+docker exec feelm-kafka /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 --create --if-not-exists \
+  --topic feelm.party-candidate-updated.v1 --partitions 3 --replication-factor 1
+```
+
+Python 배포 전에 Backend의 `party_candidate_publications` Flyway migration과
+`feelm-party-candidate-updated-v1` listener를 먼저 배포한다. 완료 토픽 consumer lag가 일시적으로
+쌓이는 것은 허용하지만 Backend listener 없이 보존 기간을 넘기지 않는다.
+
+Compose와 이미지의 파티 Consumer 모듈을 먼저 검사한다. 이 단계는 기존 writer를 바꾸지 않는다.
+
+```bash
+PARTY_IMAGE="$(docker inspect feelm-foldin-consumer --format '{{.Config.Image}}')"
+test -n "${PARTY_IMAGE}"
+docker compose --env-file infra/.env -f infra/compose/distributed.yml \
+  --profile party-consumer config --quiet
+docker run --rm --entrypoint /app/.venv/bin/python \
+  "${PARTY_IMAGE}" \
+  -c 'import feelm_consumer.party_main'
+```
+
+이 검사는 파티 Consumer 모듈을 이미지에서 import할 수 있는지만 확인하며, 기동 성공 검증은 아래
+Compose 단계에서 수행한다.
+
+승인된 배포 창에서 다음 순서를 지킨다.
+
+1. Spring 파티 refresh worker를 멈추고 신규 발행이 없음을 확인한다.
+2. Spark UI의 마지막 query progress와 Kafka topic end offset을 대조해 기존 Spark writer가 전환
+   시점의 tail까지 처리했는지 확인한다. 불일치하면 Spark를 계속 실행해 drain하고 다시 확인한다.
+3. 기존 Spark supervisor를 정상 stop한 뒤 자동 재시작되지 않도록 disable 또는 replica 0으로
+   고정한다. Spark UI와 모든 실행 노드의 프로세스 목록에서 `feelm-party-candidates` query가 더
+   이상 실행 중이 아님을 확인한다. checkpoint는 보존한다.
+4. `feelm-party-consumer-v1` group이 없거나, 이전 실패 시도에서 만들어졌다면 의도한 tail offset과
+   일치하는지 확인한다. 예상하지 못한 committed offset이 있으면 자동 reset하지 말고 전환을 중단한다.
+5. Backend migration과 완료 알림 listener가 실행 중인지 확인한다. 기존 writer 정지를 확인한 뒤에만
+   파티 Consumer를 시작한다. 신규 입력 group은 `latest`에서 시작한다.
+6. 모든 partition 할당 뒤 Spark query가 여전히 없는지 다시 확인하고, Spring worker를 재개해 현재
+   활성 파티 입력을 다시 발행한다.
+
+```bash
+CONSUMER_IMAGE="${PARTY_IMAGE}" \
+  docker compose --env-file infra/.env -f infra/compose/distributed.yml \
+  --profile party-consumer up -d --no-deps --force-recreate party-consumer
+docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}} restart={{.RestartCount}}' \
+  feelm-party-consumer
+docker exec feelm-kafka /opt/kafka/bin/kafka-consumer-groups.sh \
+  --bootstrap-server localhost:9092 --describe --group feelm-party-consumer-v1
+docker exec feelm-kafka /opt/kafka/bin/kafka-consumer-groups.sh \
+  --bootstrap-server localhost:9092 --describe --group feelm-party-candidate-updated-v1
+```
+
+정상 상태는 컨테이너가 `running`, restart 0이고 topic의 모든 partition이 새 group에 할당된 상태다.
+테스트 파티 입력 한 건을 Spring 정상 흐름으로 발행한 뒤 로그의 `party candidate published`,
+`party Kafka event committed` 순서와 Redis 결과의 `partyId`, `inputId`, `modelVersion`, 1~500개
+candidate를 확인한다. 이어서 Spring API-058이 같은 결과를 읽고, 의도적으로 오래된 `inputId` 또는
+model 결과는 사용하지 않는지 확인한다. 완료 listener group lag가 0이고
+`party_candidate_publications`의 `inputId`, `modelVersion`, source position이 같은지도 확인한다.
+payload, 내부 URI, Redis URL과 Secret은 기록하지 않는다.
+
+기존 `deploy-consumer.sh` 자동 배포는 개인 Fold-in service만 교체하며 파티 service를 암묵적으로
+재시작하지 않는다. 이후 파티 Consumer 이미지를 갱신할 때도 위 preflight와 단일 writer 확인을 거쳐
+승인된 digest를 `CONSUMER_IMAGE`로 명시하고 `party-consumer` service만 재생성한다.
+
+재시작은 같은 group ID를 유지한 채 `docker compose ... restart party-consumer`를 사용한다. 재시작 뒤
+새 Consumer ID가 partition을 다시 할당받고 이전 committed Offset부터 처리하는지 확인한다. 모델을
+교체할 때는 Spring 파티 refresh 발행을 먼저 멈추고 모든 partition의 lag가 0인지 확인한 다음 파티
+Consumer를 중지한다. lag가 남아 있으면 새 모델로 전환하지 않는다. 개인 Candidate 전체를 새 모델로 재게시한 뒤
+`feelm:model:current`와 세 파티 산출물 URI를 같은 버전으로 맞춘 다음 파티 Consumer를 다시 만든다.
+모든 partition 할당 후 현재 활성 파티 입력을 재발행하고 Spring worker를 재개한다. 이전 모델
+프로세스의 Lua 게이트는 새 모델 게시 이후 Redis 결과를 덮어쓰지 못한다.
+
+롤백은 Python writer를 먼저 중지한 다음 기존 Spark job을 보존한 checkpoint와 원래 실행 명령으로
+재기동한다. Python group Offset과 fence key는 삭제하지 않는다. `party_candidate_publications`는
+Python raw Candidate 게시 완료만 나타내는 파생 상태이므로, Python 중지를 확인한 뒤 승인된 DB 절차로
+행을 비워 Spark 롤백 이후의 stale 완료 상태로 오인하지 않게 한다. 파티·추천 세트 원본은 삭제하지 않는다.
+
+```bash
+docker compose --env-file infra/.env -f infra/compose/distributed.yml \
+  --profile party-consumer stop party-consumer
+docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}}' feelm-party-consumer
+```
+
+컨테이너가 중지된 것을 확인한 뒤에만 `pipeline/spark/streaming/party/README.md`의 기존
+`spark-submit` 명령과 동일한 checkpoint URI로 Spark writer를 복구한다. Spark UI에서 query가
+실행 중이고 새 테스트 입력이 Redis에 게시되는지 확인한다. 승인된 supervisor를 다시 enable하는
+경우 같은 Spark query가 이미 수동 실행 중이지 않은지 먼저 확인한다. 롤백 확인 전 Python service를 다시
+시작하지 않으며, Redis/HDFS/Kafka 볼륨이나 파티 결과 키를 삭제하지 않는다.
 
 ## Kafka and Spark development UIs (S15P21E106-444)
 

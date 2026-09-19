@@ -40,6 +40,7 @@ export DB_USERNAME="${POSTGRES_USER}"
 export DB_PASSWORD="${POSTGRES_PASSWORD}"
 export REDIS_PASSWORD="ci-redis-application-placeholder"
 export REDIS_READONLY_PASSWORD="ci-redis-readonly-placeholder"
+export REDIS_LOCAL_BACKEND_PASSWORD="ci-redis-local-backend-placeholder"
 export JWT_SECRET="ci-jwt-placeholder-at-least-32-bytes"
 export CORS_ALLOWED_ORIGINS="http://127.0.0.1"
 export FRONTEND_BASE_URL="http://127.0.0.1"
@@ -56,8 +57,10 @@ docker_cli run -d \
   --network none \
   -e REDIS_PASSWORD="${REDIS_PASSWORD}" \
   -e REDIS_READONLY_PASSWORD="${REDIS_READONLY_PASSWORD}" \
+  -e REDIS_LOCAL_BACKEND_PASSWORD="${REDIS_LOCAL_BACKEND_PASSWORD}" \
   -v "${DOCKER_REDIS_CONFIG_DIR}/start.sh:/usr/local/etc/redis/start.sh:ro" \
   -v "${DOCKER_REDIS_CONFIG_DIR}/readonly.acl:/usr/local/etc/redis/readonly.acl:ro" \
+  -v "${DOCKER_REDIS_CONFIG_DIR}/local-backend.acl:/usr/local/etc/redis/local-backend.acl:ro" \
   "${REDIS_IMAGE}" \
   sh /usr/local/etc/redis/start.sh >/dev/null
 
@@ -103,5 +106,38 @@ docker_cli exec "${CONTAINER_NAME}" sh -c \
 docker_cli exec "${CONTAINER_NAME}" sh -c \
   'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_readonly SET auth:mail:sent:3600 0' \
   | grep -q 'no permissions'
+
+# 로컬 Spring Boot 계정은 인증 키만 변경하고 추천 결과는 읽기만 한다.
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'redis-cli --no-auth-warning --user feelm_local_backend --pass "$REDIS_LOCAL_BACKEND_PASSWORD" SET auth:acl-check value PX 60000 NX' \
+  | grep -qx OK
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'redis-cli --no-auth-warning --user feelm_local_backend --pass "$REDIS_LOCAL_BACKEND_PASSWORD" EVAL "redis.call('"'"'SADD'"'"', KEYS[1], ARGV[1]); redis.call('"'"'HSET'"'"', KEYS[2], ARGV[1], ARGV[2]); redis.call('"'"'PEXPIRE'"'"', KEYS[1], 60000); return redis.call('"'"'SISMEMBER'"'"', KEYS[1], ARGV[1])" 2 auth:acl-check:set auth:acl-check:hash token successor' \
+  | grep -qx 1
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'redis-cli --no-auth-warning --user feelm_local_backend --pass "$REDIS_LOCAL_BACKEND_PASSWORD" MGET feelm:model:current feelm:party:1:candidates' \
+  >/dev/null
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_local_backend SET feelm:user:1:candidates value' \
+  | grep -q 'no permissions'
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_local_backend GET unapproved:key' \
+  | grep -q 'no permissions'
+# EVAL 권한이 키 패턴을 우회해 추천 데이터를 변경하지 못해야 한다.
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'redis-cli --no-auth-warning --user feelm_local_backend --pass "$REDIS_LOCAL_BACKEND_PASSWORD" EVAL "return redis.call('"'"'SET'"'"', '"'"'feelm:user:1:candidates'"'"', '"'"'forbidden'"'"')" 0' \
+  | grep -q 'no permissions'
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_local_backend FLUSHALL' \
+  | grep -q 'no permissions'
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_local_backend CONFIG GET maxmemory' \
+  | grep -q 'no permissions'
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_local_backend ACL USERS' \
+  | grep -q 'no permissions'
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'redis-cli --no-auth-warning --user feelm_local_backend --pass "$REDIS_LOCAL_BACKEND_PASSWORD" DEL auth:acl-check auth:acl-check:set auth:acl-check:hash' \
+  | grep -qx 3
 
 echo "Datastore configuration verification passed"

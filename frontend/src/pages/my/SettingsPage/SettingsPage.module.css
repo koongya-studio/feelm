@@ -17,6 +17,15 @@
   text-underline-offset: 3px;
 }
 
+.installSteps {
+  display: flex;
+  flex-direction: column;
+  padding-left: var(--space-5);
+  margin-top: var(--space-2);
+  gap: var(--space-2);
+  list-style: decimal;
+}
+
 /*
  * 나에게 맞는 OTT 찾기 배너 (EXT-01). 홈에 있던 것을 그대로 옮겼다(업무 -461).
  * 바로 위 `OTT 관리` 줄과 짝이라 목록과 같은 폭으로 선다.

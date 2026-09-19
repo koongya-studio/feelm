@@ -82,14 +82,14 @@ class UserProfileApiContractTest extends UserProfileApiTestSupport {
     }
 
     @Test
-    @DisplayName("이메일 인증을 마치지 않은 계정은 조회할 수 없다")
-    void pendingVerificationAccountCannotReadProfile() throws Exception {
+    @DisplayName("활성 계정이 아니면 조회할 수 없다")
+    void inactiveAccountCannotReadProfile() throws Exception {
         long userId =
                 insertUser(
-                        "pending@example.com",
+                        "inactive@example.com",
                         "$2a$10$hash",
-                        "미인증계정",
-                        "PENDING_VERIFICATION",
+                        "비활성계정",
+                        "WITHDRAWN",
                         "PRIVATE",
                         false);
 

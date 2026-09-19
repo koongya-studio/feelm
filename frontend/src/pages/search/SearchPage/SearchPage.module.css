@@ -107,7 +107,7 @@
 }
 
 /* 필터가 걸려 있으면 표식으로 알린다 (`design-concept.md` 2.3) */
-.filterButton[aria-pressed='true'] {
+.filterButton[data-filtered] {
   border-color: var(--color-brand);
   color: var(--color-brand-ink);
 }

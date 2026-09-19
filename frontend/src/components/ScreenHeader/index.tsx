@@ -4,7 +4,7 @@
  * 레이아웃과 무관하다는 점을 반영해 화면이 직접 필요한 요소를 지정한다.
  *
  * | 화면 | 뒤로 가기 | 우측 액션 |
- * | 3.1 필름 | 없음 | 검색 · 알림 (업무 -461에서 홈이 없어지며 옮겨왔다) |
+ * | 3.1 · 5.1 · 7.1 탭 | 없음 | 공통 헤더 `AppHeader`가 따로 맡는다(업무 -676). 7.1은 그 아래 `flush` 제목 줄 |
  * | 2.2 · 1.1 · 2.6 · 2.7 | 없음 | 없음 |
  * | 3.2 · 5.8 · 5.9 · 2.4 · 2.5 · 3.1-A | 있음 | 없음 |
  *
@@ -40,6 +40,11 @@ type Props = {
    * 왼쪽에 둔다. 기본값은 기존 화면과 같은 왼쪽이다.
    */
   align?: 'left' | 'center';
+  /**
+   * 위 여백(48px) 없이 붙인다. 공통 헤더(`AppHeader`) 아래에 화면 제목 줄을 한 번 더 둘 때
+   * 쓴다(7.1 MY, 업무 -676).
+   */
+  flush?: boolean;
 };
 
 export default function ScreenHeader({
@@ -49,11 +54,12 @@ export default function ScreenHeader({
   fallbackTo = path.film(),
   action,
   align = 'left',
+  flush = false,
 }: Props) {
   const back = useBack(fallbackTo);
 
   return (
-    <header className={styles.header} data-align={align}>
+    <header className={styles.header} data-align={align} data-flush={flush || undefined}>
       <div className={styles.row}>
         {showBack ? (
           <button type="button" className={styles.back} onClick={back}>

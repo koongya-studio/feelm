@@ -393,7 +393,6 @@ class AuthContractTest {
                         "auth" + suffix,
                         LocalDate.of(1999, 3, 14),
                         Gender.FEMALE);
-        user.activate();
         return userRepository.saveAndFlush(user).getId();
     }
 
@@ -405,6 +404,7 @@ class AuthContractTest {
                                 Duration.ofSeconds(-1),
                                 jwtProperties.refreshTokenTtl(),
                                 jwtProperties.signupTokenTtl(),
+                                jwtProperties.emailVerificationTokenTtl(),
                                 jwtProperties.refreshRotationGrace(),
                                 jwtProperties.refreshCookie()));
         return expiring.createAccessToken(9L);
@@ -419,6 +419,7 @@ class AuthContractTest {
                                 jwtProperties.accessTokenTtl(),
                                 Duration.ofSeconds(-1),
                                 jwtProperties.signupTokenTtl(),
+                                jwtProperties.emailVerificationTokenTtl(),
                                 jwtProperties.refreshRotationGrace(),
                                 jwtProperties.refreshCookie()));
         return expiring.createRefreshToken(15L, UUID.randomUUID().toString());

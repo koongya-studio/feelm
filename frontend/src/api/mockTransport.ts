@@ -31,8 +31,7 @@ export type MockDomain =
   | 'otts'
   | 'onboarding'
   | 'watch'
-  | 'reports'
-  | 'notifications';
+  | 'reports';
 
 /*
  * 오류 타입은 `apiError`에 있다. 목업이 사라져도 화면과 HTTP 클라이언트가 계속 쓰므로

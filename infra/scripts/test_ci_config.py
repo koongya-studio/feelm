@@ -222,37 +222,39 @@ include:
                 'stage: verify', 'tags: [e106-shell]', 'needs: []',
                 'name: service', 'action: prepare',
                 '--require-values --check-metadata',
-                '$CI_COMMIT_BRANCH == "develop"',
+                '$CI_COMMIT_BRANCH == "main"',
                 '$CI_COMMIT_REF_PROTECTED == "true"',
                 '$CI_PIPELINE_SOURCE == "push"',
                 'resource_group: ci-variable-preflight', 'interruptible: true'):
             self.assertIn(expected, preflight)
-        for forbidden in ('merge_request_event', 'when: manual', 'allow_failure: true'):
+        for forbidden in ('merge_request_event', '$CI_COMMIT_BRANCH == "develop"',
+                          'when: manual', 'allow_failure: true'):
             self.assertNotIn(forbidden, preflight)
 
         cache = job_block(self.backend, 'backend-cache-prepare')
         self.assertIn('needs:\n    - job: ci-variable-contract-check\n      artifacts: false', cache)
         self.assertIn('dependencies: []', cache)
 
-    def test_monitoring_deploy_is_protected_current_develop_only(self):
+    def test_monitoring_deploy_is_protected_current_main_only(self):
         deploy = job_block(self.infra, 'deploy-monitoring')
         for expected in (
                 'stage: deploy', 'tags: [e106-shell]',
                 'needs: [ci-variable-preflight]', 'name: service',
-                'ci-deploy-current-commit.py --branch develop',
+                'ci-deploy-current-commit.py --branch main',
                 'bash infra/scripts/deploy-monitoring.sh',
                 'resource_group: service-and-backend-cache',
                 'interruptible: false', 'timeout: 15m',
-                '$CI_COMMIT_BRANCH == "develop"',
+                '$CI_COMMIT_BRANCH == "main"',
                 '$CI_COMMIT_REF_PROTECTED == "true"',
                 '$CI_PIPELINE_SOURCE == "push"',
                 '- infra/compose/monitoring.yml',
                 '- infra/monitoring/prometheus/**/*',
                 '- infra/monitoring/grafana/**/*',
+                '- infra/monitoring/mattermost-relay/**/*',
                 '- infra/config/required-ci-variables.json'):
             self.assertIn(expected, deploy)
         for forbidden in (
-                '$CI_COMMIT_BRANCH == "main"', 'merge_request_event',
+                '$CI_COMMIT_BRANCH == "develop"', 'merge_request_event',
                 'when: manual', 'allow_failure: true', 'docker compose down',
                 '- infra/monitoring/README.md'):
             self.assertNotIn(forbidden, deploy)
@@ -463,7 +465,8 @@ include:
             sorted(deploy_jobs),
             ['deploy-backend', 'deploy-consumer', 'deploy-frontend',
              'deploy-hdfs-distributed-config', 'deploy-hdfs-service-config',
-             'deploy-kafka-config', 'deploy-monitoring', 'deploy-redis'],
+             'deploy-kafka-config', 'deploy-monitoring', 'deploy-postgresql',
+             'deploy-redis'],
         )
         notification_paths = (
             backend_env,

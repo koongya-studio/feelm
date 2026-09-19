@@ -25,7 +25,7 @@ class SmtpAuthMailSender implements AuthMailSender {
         message.setFrom(properties.from());
         message.setTo(email);
         message.setSubject(kind.subject());
-        message.setText(kind.body(properties.link(kind, rawToken)));
+        message.setText(kind.body(properties.content(kind, rawToken)));
         mailSender.send(message);
     }
 }

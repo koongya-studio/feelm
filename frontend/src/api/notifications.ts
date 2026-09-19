@@ -1,37 +1,68 @@
-/*
- * 앱 내 알림(8.1 · 8.2) 접근 함수. **계약에 알림 목록 API가 없다.**
- *
- * ADR-0011은 1차 MVP 알림을 받은 초대(API-052)와 감상 확인 대상(API-034)의 폴링으로 정했다.
- * 와이어프레임은 오늘의 추천 · 필름 추가까지 네 종류를 그리므로, 그대로 그리기로 했다
- * (팀 결정 2026-09-13, 업무 -308). 연동할 때는 이 파일이 두 API를 불러 알림으로 바꾸거나,
- * 알림 목록 API가 생기면 그것을 부른다.
- */
-import {
-  getNotifications as getStoredNotifications,
-  markNotificationRead,
-} from '../mocks/sessionStore';
-import { respond } from './mockTransport';
-import type { NotificationView } from '../types/unspecified';
+/* API-070~074 인앱 알림 접근 함수. 브라우저 푸시(API-075~077)는 별도 업무에서 연결한다. */
+import { request } from './client';
+import type {
+  NotificationItem,
+  NotificationList,
+  NotificationUnreadCount,
+} from '../types/notification';
 
-/** 8.1 알림 목록. 최신이 위다 */
-export async function getNotifications(): Promise<NotificationView[]> {
-  const items = [...getStoredNotifications()].sort((a, b) =>
-    b.createdAt.localeCompare(a.createdAt),
-  );
+const NOTIFICATIONS_PATH = '/notifications';
+const PAGE_SIZE = 50;
 
-  return respond(items, 'notifications');
+/** 목록과 잠금화면 예시가 동시에 열려도 진행 중인 전체 목록 요청은 공유한다. */
+let listingRequest: Promise<NotificationItem[]> | null = null;
+
+async function listAllNotifications(): Promise<NotificationItem[]> {
+  const items: NotificationItem[] = [];
+  let cursor: string | undefined;
+  let hasNext: boolean;
+
+  do {
+    const page = await request<NotificationList>(NOTIFICATIONS_PATH, {
+      query: { ...(cursor === undefined ? {} : { cursor }), size: PAGE_SIZE },
+    });
+    items.push(...page.items);
+    cursor = page.nextCursor ?? undefined;
+    hasNext = page.hasNext && cursor !== undefined;
+  } while (hasNext);
+
+  return items;
 }
 
-/** 8.2 잠금화면 예시가 보여줄 한 건 — 가장 최근의 감상 확인 알림 */
-export async function getLatestPushNotification(): Promise<NotificationView | null> {
+/** API-070 인앱 알림 목록. 서버가 최신순으로 준다. */
+export async function getNotifications(): Promise<NotificationItem[]> {
+  listingRequest ??= listAllNotifications().finally(() => {
+    listingRequest = null;
+  });
+
+  return listingRequest;
+}
+
+/** API-071 미확인 알림 개수. */
+export async function getUnreadNotificationCount(): Promise<number> {
+  const result = await request<NotificationUnreadCount>(`${NOTIFICATIONS_PATH}/unread-count`);
+
+  return result.count;
+}
+
+/** 8.2 예시 화면이 보여줄 한 건. 실제 Web Push 수신은 API-075~077 연동에서 구현한다. */
+export async function getLatestPushNotification(): Promise<NotificationItem | null> {
   const items = await getNotifications();
 
   return items.find((item) => item.type === 'WATCH_CONFIRM') ?? null;
 }
 
-/** 알림을 눌렀을 때. 읽음 표식을 지운다 */
+/** API-072 알림 읽음 처리. */
 export async function readNotification(notificationId: number): Promise<void> {
-  markNotificationRead(notificationId);
+  return request<void>(`${NOTIFICATIONS_PATH}/${notificationId}/read`, { method: 'PATCH' });
+}
 
-  return respond(undefined);
+/** API-073 전체 알림 읽음 처리. */
+export async function readAllNotifications(): Promise<void> {
+  return request<void>(`${NOTIFICATIONS_PATH}/read-all`, { method: 'PATCH' });
+}
+
+/** API-074 알림 숨김. 원본 사건은 삭제하지 않고 목록에서만 제외한다. */
+export async function dismissNotification(notificationId: number): Promise<void> {
+  return request<void>(`${NOTIFICATIONS_PATH}/${notificationId}`, { method: 'DELETE' });
 }

@@ -38,20 +38,8 @@ public class RecommendationServingRepository {
                 .query(
                         "SELECT id,generated_at FROM recommendation_sets"
                                 + " WHERE user_id=? AND party_id IS NULL"
-                                + " ORDER BY generated_at DESC,id DESC LIMIT 1",
+                                + " ORDER BY id DESC LIMIT 1",
                         (resultSet, rowNumber) -> mapSet(resultSet),
-                        userId)
-                .stream()
-                .findFirst();
-    }
-
-    public Optional<RecommendationSet> findOwnedSet(long userId, long setId) {
-        return jdbcTemplate
-                .query(
-                        "SELECT id,generated_at FROM recommendation_sets"
-                                + " WHERE id=? AND user_id=? AND party_id IS NULL",
-                        (resultSet, rowNumber) -> mapSet(resultSet),
-                        setId,
                         userId)
                 .stream()
                 .findFirst();

@@ -2,24 +2,22 @@ package com.feelm.backend.domain.auth.dto.request;
 
 import com.feelm.backend.domain.user.NicknamePolicy;
 import com.feelm.backend.domain.user.entity.Gender;
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 
 /**
  * API-001 이메일 회원가입 요청.
  *
+ * <p>가입할 이메일은 요청 본문이 아니라 {@code emailVerificationToken}에서만 읽는다(S15P21E106-603). 본문 값을 믿으면 남의 이메일로
+ * 가입할 수 있고, 소셜 회원가입(API-008)이 {@code signupToken}에서 이메일을 읽는 방식과 같다.
+ *
  * <p>비밀번호·닉네임 규칙은 플랜 결정 1·2, {@code gender} 필수는 결정 11을 따른다. {@code gender}를 문자열이 아닌 enum으로 받아 허용하지
  * 않는 값은 역직렬화 단계에서 걸러진다(결정 17).
  */
 public record SignupRequest(
-        @NotBlank(message = "이메일을 입력해 주세요.")
-                @Email(message = "이메일 형식이 올바르지 않습니다.")
-                @Size(max = 255, message = "이메일은 255자 이하여야 합니다.")
-                String email,
+        @NotBlank(message = "이메일 인증을 먼저 완료해 주세요.") String emailVerificationToken,
         @NotBlank(message = "비밀번호를 입력해 주세요.")
                 @Pattern(
                         regexp = SignupRequest.PASSWORD_PATTERN,
