@@ -6,7 +6,7 @@
  * 남거나 반대로 깜빡이고 지나간다. 둘 다 눈으로는 알아채기 어려운 회귀다.
  *
  * jsdom은 이미지를 실제로 받지 않으므로 `load`/`error`를 직접 발생시킨다.
- * 시간은 가짜 타이머로 밀어 1.2초를 실제로 기다리지 않는다.
+ * 시간은 가짜 타이머로 밀어 최소 시간을 실제로 기다리지 않는다.
  *
  * **서체는 여기서 직접 붙잡아야 한다.** `src/test/setup.ts`의 `document.fonts`
  * 스텁은 이미 로드된 것으로 답하므로(`Promise.resolve()`) 서체 조건이 언제나
@@ -62,10 +62,13 @@ function holdFonts() {
 
 beforeEach(() => {
   vi.useFakeTimers();
+  // 탭마다 한 번만 뜨는 표시(업무 -681)가 앞 테스트에서 넘어오지 않게 한다
+  window.sessionStorage.clear();
 });
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
   Object.defineProperty(document, 'fonts', { configurable: true, value: defaultFonts });
 });
 
@@ -87,7 +90,7 @@ describe('SplashScreen', () => {
     // 사진과 서체가 모두 준비된 상태(두 번째 방문이면 캐시에서 즉시 끝난다)
     fireEvent.load(photo());
     await flush();
-    await advance(1199);
+    await advance(499);
 
     expect(splash()).toHaveAttribute('data-leaving', 'false');
   });
@@ -97,7 +100,7 @@ describe('SplashScreen', () => {
     await flush();
 
     fireEvent.load(photo());
-    await advance(1200);
+    await advance(500);
 
     // 먼저 페이드가 시작되고
     expect(splash()).toHaveAttribute('data-leaving', 'true');
@@ -111,7 +114,7 @@ describe('SplashScreen', () => {
     render(<SplashScreen />);
     await flush();
 
-    await advance(1200);
+    await advance(500);
     expect(splash()).toHaveAttribute('data-leaving', 'false');
 
     fireEvent.load(photo());
@@ -126,7 +129,7 @@ describe('SplashScreen', () => {
     await flush();
 
     fireEvent.load(photo());
-    await advance(1200);
+    await advance(500);
 
     // 사진과 시간은 끝났다. 남은 것은 서체뿐이다
     expect(splash()).toHaveAttribute('data-leaving', 'false');
@@ -144,7 +147,7 @@ describe('SplashScreen', () => {
     await flush();
 
     fireEvent.load(photo());
-    await advance(1200);
+    await advance(500);
     expect(splash()).toHaveAttribute('data-leaving', 'false');
 
     // 서체는 fallback으로 그려진다. 이것 때문에 갇히면 안 된다
@@ -160,9 +163,68 @@ describe('SplashScreen', () => {
     await flush();
 
     fireEvent.error(photo());
-    await advance(1200);
+    await advance(500);
     await advance(1000);
 
     expect(screen.queryByTestId('splash')).not.toBeInTheDocument();
+  });
+});
+
+describe('SplashScreen — 앱 진입 때만 (업무 -681)', () => {
+  it('같은 탭에서 앱을 다시 불러오면(새로 고침) 뜨지 않는다', async () => {
+    const first = render(<SplashScreen />);
+    await flush();
+    expect(splash()).toBeInTheDocument();
+
+    // 새로 고침은 앱 전체가 새로 마운트되는 것이다
+    first.unmount();
+    render(<SplashScreen />);
+    await flush();
+
+    expect(screen.queryByTestId('splash')).not.toBeInTheDocument();
+  });
+
+  it('처음 들어올 때는 걷히기 전에 새로 고침해도 다음부터 뜨지 않는다', async () => {
+    const first = render(<SplashScreen />);
+    await flush();
+    // 아직 걷히지 않았다
+    expect(splash()).toHaveAttribute('data-leaving', 'false');
+
+    first.unmount();
+    render(<SplashScreen />);
+    await flush();
+
+    expect(screen.queryByTestId('splash')).not.toBeInTheDocument();
+  });
+
+  it('새 탭(저장소가 빈 상태)에서는 다시 뜬다', async () => {
+    const first = render(<SplashScreen />);
+    await flush();
+    first.unmount();
+
+    window.sessionStorage.clear();
+    render(<SplashScreen />);
+    await flush();
+
+    expect(splash()).toBeInTheDocument();
+  });
+
+  it('저장소를 쓸 수 없으면 이전처럼 매번 뜬다', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+
+    const first = render(<SplashScreen />);
+    await flush();
+    expect(splash()).toBeInTheDocument();
+
+    first.unmount();
+    render(<SplashScreen />);
+    await flush();
+
+    expect(splash()).toBeInTheDocument();
   });
 });

@@ -16,15 +16,56 @@
  *
  * 사진 로드가 실패해도 준비된 것으로 본다. 배경이 없다고 앱 진입을 막을 수는
  * 없다.
+ *
+ * **앱에 들어올 때만 뜬다**(업무 -681, 사용자 결정 2026-09-19). 한때 어느 화면에서든
+ * 새로 고침하면 다시 떠 1.2초를 기다려야 했다. 새로 고침은 그 화면이 다시 그려지는
+ * 느낌이어야 한다. 그래서 탭마다 한 번만 띄우고(`sessionStorage`), 같은 탭에서 앱을 다시
+ * 불러오면(새로 고침 · 딥링크 · 소셜 로그인 복귀) 건너뛴다. 새 탭 · 새 창은 앱에 새로
+ * 들어오는 것이라 다시 뜬다. 저장소를 쓸 수 없는 환경에서는 이전처럼 매번 뜬다.
  */
 import { useEffect, useRef, useState } from 'react';
 import splashPhoto from '../../assets/splash/feelm-splash.webp';
 import styles from './SplashScreen.module.css';
 
-/** 최소 표시 시간. 브랜드가 한 번 읽히는 길이이자 깜빡임을 막는 하한이다 */
-const MIN_VISIBLE_MS = 1200;
+/**
+ * 최소 표시 시간. 브랜드가 한 번 읽히는 길이이자 깜빡임을 막는 하한이다. 한때 1.2초였는데
+ * 준비가 끝난 뒤에도 기다리게 해 앱이 느리게 느껴졌다(업무 -681, 리포트 P2-01 — 0.5초로 줄임)
+ */
+const MIN_VISIBLE_MS = 500;
+
+/** 이 탭에서 스플래시를 이미 띄웠다는 표시 */
+const SEEN_KEY = 'feelm.splashSeen';
+
+function storage(): Storage | null {
+  try {
+    return typeof window === 'undefined' ? null : window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+function seenInThisTab(): boolean {
+  try {
+    return storage()?.getItem(SEEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markSeen() {
+  try {
+    storage()?.setItem(SEEN_KEY, '1');
+  } catch {
+    // 적지 못하면 다음 새로 고침에도 뜬다. 진입을 막을 일은 아니다
+  }
+}
 
 export default function SplashScreen() {
+  /*
+   * 첫 렌더에서 한 번만 읽는다. 표시는 effect에서 적는다 — 초기값 함수는 StrictMode에서
+   * 두 번 불리므로, 거기서 적으면 두 번째 호출이 자기가 적은 값을 읽고 첫 진입을 건너뛴다
+   */
+  const [skipped] = useState(seenInThisTab);
   const [photoSettled, setPhotoSettled] = useState(false);
   const [fontsSettled, setFontsSettled] = useState(false);
   const [minElapsed, setMinElapsed] = useState(false);
@@ -32,6 +73,10 @@ export default function SplashScreen() {
   const nodeRef = useRef<HTMLDivElement>(null);
 
   const leaving = photoSettled && fontsSettled && minElapsed;
+
+  useEffect(() => {
+    if (!skipped) markSeen();
+  }, [skipped]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setMinElapsed(true), MIN_VISIBLE_MS);
@@ -74,7 +119,7 @@ export default function SplashScreen() {
     return () => window.clearTimeout(timer);
   }, [leaving]);
 
-  if (removed) return null;
+  if (skipped || removed) return null;
 
   return (
     <div ref={nodeRef} className={styles.splash} data-leaving={leaving} data-testid="splash">
