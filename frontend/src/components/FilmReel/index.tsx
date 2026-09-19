@@ -15,9 +15,6 @@
  * 프레임 수만큼 아래로 자라며, 스크롤은 화면이 맡는다. 1.3은 세 칸이라 다 보이고
  * 2.2는 카드 수만큼 길어져 페이지와 함께 넘어간다. 구멍은 좌우 가장자리에 찍힌다.
  *
- * 프레임 사이에 프레임이 아닌 것(2.2의 섹션 이름)을 끼우려면 `data-film-label`을 단다.
- * 그 요소만 칸 크기와 테두리를 받지 않는다.
- *
  * 휘어짐은 **띠에만 건다.** 띠는 `mask-image`로 위아래 모서리를 완만하게 깎고,
  * 프레임은 그 위에 따로 얹는다. 띠까지 포함해 통째로 변형하면 포스터가 같이 휘어
  * 시안이 금지한 왜곡이 생긴다.
@@ -32,10 +29,13 @@ import type { CSSProperties, ReactNode } from 'react';
 import styles from './FilmReel.module.css';
 
 type Props = {
-  /** 프레임 한 칸의 폭(px). 프레임 수와 무관하게 고정이다 */
-  frameWidth: number;
-  /** 프레임 한 칸의 높이(px) */
-  frameHeight: number;
+  /**
+   * 프레임 한 칸의 폭. 숫자면 px이고, 문자열이면 CSS 길이 그대로다 — 2.2처럼 칸을 화면 폭에
+   * 맞춰야 할 때 `calc()`를 넘긴다. 프레임 수와 무관하다
+   */
+  frameWidth: number | string;
+  /** 프레임 한 칸의 높이. `frameWidth`와 같은 규칙이다 */
+  frameHeight: number | string;
   /** 프레임 묶음에 읽히는 이름 */
   label: string;
   /**
@@ -43,21 +43,32 @@ type Props = {
    * 1.3 · 2.2의 세로 필름(화면 흐름을 따라 길어진다)이다.
    */
   orientation?: 'horizontal' | 'vertical';
+  /**
+   * 띠를 휘지 않고 곧게 둔다. 화면 폭을 꽉 채우는 필름(2.2, 업무 -672)용이다 — 휘어진 띠는
+   * 가장자리가 안쪽으로 들어가 화면 끝에 빈틈이 생긴다
+   */
+  flat?: boolean;
   /** 프레임 칸들. 버튼이든 자리표시자든 이 컴포넌트가 테두리를 입힌다 */
   children: ReactNode;
 };
+
+/** 숫자는 px로, 문자열은 CSS 길이 그대로 쓴다 */
+function cssLength(value: number | string): string {
+  return typeof value === 'number' ? `${value}px` : value;
+}
 
 export default function FilmReel({
   frameWidth,
   frameHeight,
   label,
   orientation = 'horizontal',
+  flat = false,
   children,
 }: Props) {
   const vertical = orientation === 'vertical';
   const style = {
-    '--film-frame-width': `${frameWidth}px`,
-    '--film-frame-height': `${frameHeight}px`,
+    '--film-frame-width': cssLength(frameWidth),
+    '--film-frame-height': cssLength(frameHeight),
   } as CSSProperties;
 
   return (
@@ -65,6 +76,7 @@ export default function FilmReel({
       className={styles.reel}
       style={style}
       data-orientation={orientation}
+      data-flat={flat || undefined}
       data-testid="film-reel"
     >
       <span className={styles.band} aria-hidden="true">
