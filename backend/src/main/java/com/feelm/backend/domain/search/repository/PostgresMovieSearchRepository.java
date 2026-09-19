@@ -83,6 +83,7 @@ public class PostgresMovieSearchRepository implements MovieSearchRepository {
                 /*ELIGIBLE_JOIN*/
                 WHERE mp.role IN ('ACTOR', 'DIRECTOR')
                     AND movie_search_normalize(p.name) LIKE movie_search_normalize(:pattern) ESCAPE '!'
+                /*RELAXED_LITERAL_MATCHES*/
             ), fulltext_matches AS MATERIALIZED (
                 SELECT m.id, 1000000000000000::numeric
                     + m.rating_count
@@ -129,10 +130,121 @@ public class PostgresMovieSearchRepository implements MovieSearchRepository {
                     AND NOT EXISTS (SELECT 1 FROM fulltext_matches)
                     AND mp.role IN ('ACTOR', 'DIRECTOR')
                     AND movie_search_normalize(p.name) % movie_search_normalize(:query)
+                /*RELAXED_TYPO_MATCHES*/
             ), matches AS (
                 SELECT id, cast(max(score) AS numeric) AS score
                 FROM keyword_matches GROUP BY id
             ),
+            """;
+
+    private static final String RELAXED_SETTING =
+            """
+            relaxed_setting AS MATERIALIZED (
+                SELECT set_config('pg_trgm.word_similarity_threshold', :wordSimilarityThreshold, true) AS threshold,
+                       regexp_replace(movie_search_normalize(:query), '[[:space:]]+', '', 'g') AS compact_query
+            ),
+            """;
+
+    private static final String RELAXED_LITERAL_MATCHES =
+            """
+                UNION ALL
+                SELECT m.id,
+                    (CASE
+                        WHEN compact.title = cfg.compact_query THEN 5.9
+                        WHEN compact.original_title = cfg.compact_query THEN 5.8
+                        WHEN series.title_number IS NOT NULL THEN 5.7
+                        WHEN series.original_number IS NOT NULL THEN 5.6
+                        WHEN left(compact.title, char_length(cfg.compact_query)) = cfg.compact_query THEN 3.9
+                        ELSE 3.8
+                    END)::numeric * 1000000000000000
+                    + coalesce((20 - series.title_number) * 1000000000000, 0)
+                    + coalesce((20 - series.original_number) * 1000000000000, 0)
+                    + m.rating_count
+                    + least(word_similarity(movie_search_normalize(:query),
+                                            movie_search_normalize(m.title)), 0.999999)::numeric AS score
+                FROM relaxed_setting cfg CROSS JOIN movies m
+                /*ELIGIBLE_JOIN*/
+                CROSS JOIN LATERAL (
+                    SELECT regexp_replace(movie_search_normalize(m.title), '[[:space:]]+', '', 'g') AS title,
+                           regexp_replace(movie_search_normalize(m.original_title), '[[:space:]]+', '', 'g') AS original_title
+                ) compact
+                CROSS JOIN LATERAL (
+                    SELECT CASE WHEN left(compact.title, char_length(cfg.compact_query)) = cfg.compact_query
+                                THEN substring(substring(compact.title FROM char_length(cfg.compact_query) + 1)
+                                               FROM '^([1-9]|1[0-9])([^0-9]|$)')::numeric END AS title_number,
+                           CASE WHEN left(compact.original_title, char_length(cfg.compact_query)) = cfg.compact_query
+                                THEN substring(substring(compact.original_title FROM char_length(cfg.compact_query) + 1)
+                                               FROM '^([1-9]|1[0-9])([^0-9]|$)')::numeric END AS original_number
+                ) series
+                WHERE cfg.threshold IS NOT NULL
+                    AND (cfg.compact_query <% movie_search_normalize(m.title)
+                         OR cfg.compact_query <% movie_search_normalize(m.original_title))
+                    AND (left(compact.title, char_length(cfg.compact_query)) = cfg.compact_query
+                         OR left(compact.original_title, char_length(cfg.compact_query)) = cfg.compact_query)
+                UNION ALL
+                SELECT mp.movie_id,
+                    (CASE WHEN mp.role = 'DIRECTOR' THEN 5.45 ELSE 5.2 END)::numeric
+                    * 1000000000000000 + m.rating_count
+                    + least(word_similarity(movie_search_normalize(:query),
+                                            movie_search_normalize(p.name)), 0.999999)::numeric AS score
+                FROM relaxed_setting cfg CROSS JOIN people p
+                JOIN movie_people mp ON mp.person_id = p.id AND mp.role IN ('ACTOR', 'DIRECTOR')
+                JOIN movies m ON m.id = mp.movie_id
+                /*ELIGIBLE_JOIN*/
+                CROSS JOIN LATERAL (
+                    SELECT regexp_replace(movie_search_normalize(p.name), '[[:space:]]+', '', 'g') AS name
+                ) compact
+                WHERE cfg.threshold IS NOT NULL
+                    AND cfg.compact_query <% movie_search_normalize(p.name)
+                    AND compact.name = cfg.compact_query
+            """;
+
+    private static final String RELAXED_TYPO_MATCHES =
+            """
+                UNION ALL
+                SELECT m.id,
+                    (CASE WHEN edits.title = 1 THEN 1.9 ELSE 1.8 END)::numeric
+                    * 1000000000000000 + m.rating_count
+                    + least(word_similarity(movie_search_normalize(:query),
+                                            movie_search_normalize(m.title)), 0.999999)::numeric AS score
+                FROM relaxed_setting cfg CROSS JOIN movies m
+                /*ELIGIBLE_JOIN*/
+                CROSS JOIN LATERAL (
+                    SELECT regexp_replace(movie_search_normalize(m.title), '[[:space:]]+', '', 'g') AS title,
+                           regexp_replace(movie_search_normalize(m.original_title), '[[:space:]]+', '', 'g') AS original_title
+                ) compact
+                CROSS JOIN LATERAL (
+                    SELECT CASE WHEN char_length(compact.title) = char_length(cfg.compact_query)
+                                THEN (SELECT count(*) FROM generate_series(1, char_length(cfg.compact_query)) pos
+                                      WHERE substr(compact.title, pos, 1) <> substr(cfg.compact_query, pos, 1)) END AS title,
+                           CASE WHEN char_length(compact.original_title) = char_length(cfg.compact_query)
+                                THEN (SELECT count(*) FROM generate_series(1, char_length(cfg.compact_query)) pos
+                                      WHERE substr(compact.original_title, pos, 1) <> substr(cfg.compact_query, pos, 1)) END AS original_title
+                ) edits
+                WHERE cfg.threshold IS NOT NULL
+                    AND NOT EXISTS (SELECT 1 FROM literal_matches)
+                    AND NOT EXISTS (SELECT 1 FROM fulltext_matches)
+                    AND (cfg.compact_query <% movie_search_normalize(m.title)
+                         OR cfg.compact_query <% movie_search_normalize(m.original_title))
+                    AND (edits.title = 1 OR edits.original_title = 1)
+                UNION ALL
+                SELECT mp.movie_id, 900000000000000::numeric + m.rating_count
+                    + least(word_similarity(movie_search_normalize(:query),
+                                            movie_search_normalize(p.name)), 0.999999)::numeric AS score
+                FROM relaxed_setting cfg CROSS JOIN people p
+                JOIN movie_people mp ON mp.person_id = p.id AND mp.role IN ('ACTOR', 'DIRECTOR')
+                JOIN movies m ON m.id = mp.movie_id
+                /*ELIGIBLE_JOIN*/
+                CROSS JOIN LATERAL (
+                    SELECT regexp_replace(movie_search_normalize(p.name), '[[:space:]]+', '', 'g') AS name
+                ) compact
+                WHERE cfg.threshold IS NOT NULL
+                    AND NOT EXISTS (SELECT 1 FROM literal_matches)
+                    AND NOT EXISTS (SELECT 1 FROM fulltext_matches)
+                    AND cfg.compact_query <% movie_search_normalize(p.name)
+                    AND char_length(compact.name) = char_length(cfg.compact_query)
+                    AND (SELECT count(*) FROM generate_series(1, char_length(cfg.compact_query)) pos
+                         WHERE substr(compact.name, pos, 1) <> substr(cfg.compact_query, pos, 1)) = 1
             """;
 
     // Lowercasing and Greek sigma folding cannot change a Hangul syllable. For one or two
@@ -213,6 +325,14 @@ public class PostgresMovieSearchRepository implements MovieSearchRepository {
         Map<String, Object> parameters = new HashMap<>();
         StringBuilder sql = new StringBuilder();
         boolean keyword = criteria.q() != null;
+        long hangulCount =
+                keyword
+                        ? criteria.q()
+                                .codePoints()
+                                .filter(point -> point >= 0xAC00 && point <= 0xD7A3)
+                                .count()
+                        : 0;
+        boolean relaxed = hangulCount >= 3;
         sql.append("WITH ");
         if (keyword) {
             boolean filtered =
@@ -227,14 +347,24 @@ public class PostgresMovieSearchRepository implements MovieSearchRepository {
                 appendFilters(sql, parameters, criteria);
                 sql.append("), ");
             }
+            if (relaxed) {
+                sql.append(RELAXED_SETTING);
+                parameters.put("wordSimilarityThreshold", hangulCount >= 5 ? "0.14" : "0.25");
+            }
             String keywordSql =
                     criteria.q().matches("[가-힣]{1,2}")
                             ? SHORT_HANGUL_KEYWORD_MATCHES
                             : KEYWORD_MATCHES;
             sql.append(
-                    keywordSql.replace(
-                            "/*ELIGIBLE_JOIN*/",
-                            filtered ? "JOIN eligible_movies em ON em.id = m.id" : ""));
+                    keywordSql
+                            .replace(
+                                    "/*RELAXED_LITERAL_MATCHES*/",
+                                    relaxed ? RELAXED_LITERAL_MATCHES : "")
+                            .replace(
+                                    "/*RELAXED_TYPO_MATCHES*/", relaxed ? RELAXED_TYPO_MATCHES : "")
+                            .replace(
+                                    "/*ELIGIBLE_JOIN*/",
+                                    filtered ? "JOIN eligible_movies em ON em.id = m.id" : ""));
             parameters.put("query", criteria.q());
             parameters.put(
                     "pattern",

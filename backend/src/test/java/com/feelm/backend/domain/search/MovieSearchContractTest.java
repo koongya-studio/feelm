@@ -972,8 +972,8 @@ class MovieSearchContractTest extends SharedPostgresContractTest {
     }
 
     @ParameterizedTest
-    @ValueSource(ints = {5, 6})
-    @DisplayName("하향 신호 변경 전 RELEVANCE cursor는 거부한다")
+    @ValueSource(ints = {5, 6, 7})
+    @DisplayName("현재 관련도 단계 변경 전 RELEVANCE cursor는 거부한다")
     void rejectsPriorRelevanceCursors(int previousVersion) throws Exception {
         String previousCriteriaKey =
                 HexFormat.of()
@@ -1000,21 +1000,23 @@ class MovieSearchContractTest extends SharedPostgresContractTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"RATING", "RELEASE_DATE"})
+    @CsvSource({"RATING,3", "RATING,4", "RELEASE_DATE,3", "RELEASE_DATE,4"})
     @DisplayName("키워드 후보 집합 변경 전 다른 정렬의 cursor도 거부한다")
-    void rejectsOldKeywordCursorForOtherSorts(String sortName) throws Exception {
+    void rejectsOldKeywordCursorForOtherSorts(String sortName, int previousVersion)
+            throws Exception {
         MovieSearchSort sort = MovieSearchSort.valueOf(sortName);
         String previousCriteriaKey =
                 HexFormat.of()
                         .formatHex(
                                 MessageDigest.getInstance("SHA-256")
                                         .digest(
-                                                ("{\"version\":3,\"query\":\"매트릭스\","
+                                                ("{\"version\":%d,\"query\":\"매트릭스\","
                                                                 + "\"genres\":[],\"countries\":[],"
                                                                 + "\"yearFrom\":null,\"yearTo\":null,"
                                                                 + "\"otts\":[],\"requestedSort\":\"%s\","
                                                                 + "\"effectiveSort\":\"%s\"}")
-                                                        .formatted(sortName, sortName)
+                                                        .formatted(
+                                                                previousVersion, sortName, sortName)
                                                         .getBytes(StandardCharsets.UTF_8)));
         String oldCursor =
                 cursorCodec.encode(
@@ -1166,6 +1168,155 @@ class MovieSearchContractTest extends SharedPostgresContractTest {
         jdbc.update("UPDATE movies SET rating_count = 1 WHERE id = 633");
 
         assertThat(collectPages(1, "RELEVANCE", "PageRank")).containsExactly(632L, 631L, 633L);
+    }
+
+    @Test
+    @DisplayName("공백 없는 제목 검색은 공백 있는 제목을 찾되 정확 제목을 우선한다")
+    void matchesKoreanTitleWithoutSpaces() throws Exception {
+        MovieSearchFixture.movie(jdbc, 901, "노팅 힐", "Notting Hill", null, 0);
+        MovieSearchFixture.movie(jdbc, 902, "노팅힐", null, null, 0);
+
+        assertThat(ids(read(memberRequest().param("q", "노팅힐")))).containsExactly(902L, 901L);
+        assertThat(ids(read(memberRequest().param("q", "노팅 힐")))).contains(901L);
+    }
+
+    @Test
+    @DisplayName("여러 공백을 생략한 긴 제목을 찾는다")
+    void matchesTitleWithSeveralMissingSpaces() throws Exception {
+        MovieSearchFixture.movie(jdbc, 903, "해리 포터와 마법사의 돌", null, null, 0);
+
+        assertThat(ids(read(memberRequest().param("q", "해리포터와마법사의돌")))).containsExactly(903L);
+    }
+
+    @Test
+    @DisplayName("검색어에 불필요한 공백이 여러 개 있어도 제목과 감독을 찾는다")
+    void matchesQueryWithSeveralExtraSpaces() throws Exception {
+        MovieSearchFixture.movie(jdbc, 920, "스파이더맨", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 921, "우주 모험", null, null, 0);
+        jdbc.update(
+                "INSERT INTO people (id, tmdb_person_id, name) VALUES "
+                        + "(921, 990921, '크리스토퍼 놀란')");
+        jdbc.update(
+                "INSERT INTO movie_people (movie_id, person_id, role) VALUES "
+                        + "(921, 921, 'DIRECTOR')");
+
+        assertThat(ids(read(memberRequest().param("q", "스 파 이 더 맨")))).containsExactly(920L);
+        assertThat(ids(read(memberRequest().param("q", "크 리 스 토 퍼 놀 란")))).containsExactly(921L);
+    }
+
+    @Test
+    @DisplayName("공백 보정 후보는 장르·국가·OTT·연도 필터 안에서 세 정렬에 적용한다")
+    void filtersRelaxedMatchesBeforeFallback() throws Exception {
+        MovieSearchFixture.movie(jdbc, 922, "노팅 힐", null, "2020-01-01", 0);
+        MovieSearchFixture.movie(jdbc, 923, "노팅힐", null, "2020-01-01", 0);
+        jdbc.update("INSERT INTO movie_genres (movie_id, genre_id) VALUES (922, 13), (923, 11)");
+        jdbc.update("INSERT INTO movie_countries (movie_id, country_code) VALUES (922, 'GB')");
+        jdbc.update("INSERT INTO movie_ott_providers (movie_id, ott_id) VALUES (922, 21)");
+
+        assertThat(ids(read(memberRequest().param("q", "노팅힐").param("genre", "DRAMA"))))
+                .containsExactly(922L);
+        assertThat(
+                        ids(
+                                read(
+                                        memberRequest()
+                                                .param("q", "노팅힐")
+                                                .param("genre", "DRAMA")
+                                                .param("country", "GB"))))
+                .containsExactly(922L);
+
+        for (String sort : List.of("RELEVANCE", "RATING", "RELEASE_DATE")) {
+            JsonNode result =
+                    read(
+                            memberRequest()
+                                    .param("q", "노팅힐")
+                                    .param("sort", sort)
+                                    .param("genre", "DRAMA")
+                                    .param("country", "GB")
+                                    .param("ott", "21")
+                                    .param("yearFrom", "2020")
+                                    .param("yearTo", "2020"));
+            assertThat(result.path("totalCount").asLong()).isEqualTo(1);
+            assertThat(ids(result)).containsExactly(922L);
+        }
+    }
+
+    @Test
+    @DisplayName("한 음절 치환 오타를 허용하고 두 음절 이상 다른 제목은 제외한다")
+    void matchesSingleSyllableTypoWithoutNoise() throws Exception {
+        MovieSearchFixture.movie(jdbc, 904, "노팅 힐", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 905, "노해상", null, null, 0);
+
+        assertThat(ids(read(memberRequest().param("q", "노틴힐")))).containsExactly(904L);
+        assertThat(ids(read(memberRequest().param("q", "노팅헐")))).containsExactly(904L);
+    }
+
+    @Test
+    @DisplayName("한국어 원제·감독·배우 이름의 공백 차이와 감독 이름 오타를 찾는다")
+    void matchesRelaxedOriginalTitleAndPeople() throws Exception {
+        MovieSearchFixture.movie(jdbc, 906, "다른 제목", "별빛 여행", null, 0);
+        MovieSearchFixture.movie(jdbc, 907, "우주 영화", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 919, "또 다른 우주 영화", null, null, 0);
+        jdbc.update(
+                "INSERT INTO people (id, tmdb_person_id, name) VALUES "
+                        + "(907, 990907, '크리스토퍼 놀란'), (919, 990919, '김 다정')");
+        jdbc.update(
+                "INSERT INTO movie_people (movie_id, person_id, role) VALUES "
+                        + "(907, 907, 'DIRECTOR'), (919, 919, 'ACTOR')");
+
+        assertThat(ids(read(memberRequest().param("q", "별빛여행")))).containsExactly(906L);
+        assertThat(ids(read(memberRequest().param("q", "크리스토퍼놀란")))).containsExactly(907L);
+        assertThat(ids(read(memberRequest().param("q", "크리스토퍼놀런")))).containsExactly(907L);
+        assertThat(ids(read(memberRequest().param("q", "김다정")))).containsExactly(919L);
+    }
+
+    @Test
+    @DisplayName("공백 보정 결과도 관련도 cursor에서 결과 수와 순서를 유지한다")
+    void paginatesRelaxedMatches() throws Exception {
+        MovieSearchFixture.movie(jdbc, 908, "노팅힐", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 909, "노팅 힐", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 910, "노팅  힐", null, null, 0);
+
+        JsonNode first = read(memberRequest().param("q", "노팅힐").param("size", "1"));
+        assertThat(first.path("totalCount").asLong()).isEqualTo(3);
+        assertThat(collectPages(1, "RELEVANCE", "노팅힐")).containsExactly(908L, 910L, 909L);
+        assertThat(collectPages(1, "RATING", "노팅힐")).containsExactlyInAnyOrder(908L, 909L, 910L);
+        assertThat(collectPages(1, "RELEASE_DATE", "노팅힐"))
+                .containsExactlyInAnyOrder(908L, 909L, 910L);
+    }
+
+    @Test
+    @DisplayName("공백 없는 제목 검색에서도 본편 뒤에 번호순 속편을 보여준다")
+    void matchesNumberedSeriesWithoutSpaces() throws Exception {
+        MovieSearchFixture.movie(jdbc, 912, "나 홀로 집에", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 913, "나 홀로 집에 4", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 914, "나 홀로 집에 3", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 915, "나 홀로 집에 2: 뉴욕을 헤매다", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 916, "나 홀로 즐거운 집에", null, null, 0);
+
+        assertThat(ids(read(memberRequest().param("q", "나홀로집에"))))
+                .startsWith(912L, 915L, 914L, 913L);
+        assertThat(collectPages(1, "RELEVANCE", "나홀로집에"))
+                .startsWith(912L, 915L, 914L, 913L)
+                .doesNotHaveDuplicates();
+    }
+
+    @Test
+    @DisplayName("공백 없는 번호·제목 접두 검색은 부제가 있는 영화도 찾는다")
+    void matchesCompactPrefixWithSubtitle() throws Exception {
+        MovieSearchFixture.movie(jdbc, 917, "나 홀로 집에 2: 뉴욕을 헤매다", null, null, 0);
+        MovieSearchFixture.movie(jdbc, 918, "해리 포터와 마법사의 돌", null, null, 0);
+
+        assertThat(ids(read(memberRequest().param("q", "나홀로집에2")))).containsExactly(917L);
+        assertThat(ids(read(memberRequest().param("q", "해리포터")))).containsExactly(918L);
+    }
+
+    @Test
+    @DisplayName("한두 글자와 영문 검색어는 기존 후보 경로를 유지한다")
+    void doesNotExpandShortOrNonKoreanQueries() throws Exception {
+        MovieSearchFixture.movie(jdbc, 911, "노팅 힐", "Notting Hill", null, 0);
+
+        assertThat(ids(read(memberRequest().param("q", "노틴")))).doesNotContain(911L);
+        assertThat(ids(read(memberRequest().param("q", "Notting Hill")))).containsExactly(911L);
     }
 
     @Test
