@@ -37,6 +37,11 @@
  * **범례의 맛마다 무엇을 뜻하는지 한 줄을 단다**(업무 -631, 사용자 결정 2026-09-18). 맛 이름만으로는
  * `오리지널 솔트`가 어떤 영화인지 알 수 없다는 QA 지적이다. 계약에 설명 문장이 없어 기준정보
  * API-044의 대표 키워드(`representativeKeywords`)를 잇는다. 기준정보를 받지 못하면 그 줄만 없다.
+ *
+ * **알 수와 별점이 무엇인지 제목 아래 한 줄로 적는다**(업무 -677, UI/UX 분석 리포트 P1-03).
+ * 알 수는 감상량, 별점은 선호도인데(FR-06) 그 구분이 주석에만 있었다. -101에서 안내 문구를 뺀
+ * 것은 제목과 같은 말을 되풀이해서였고, 이 줄은 제목이 말하지 않는 두 숫자의 뜻을 말한다.
+ * 핵심 수치의 `73 · KERNELS`도 `팝콘 73알`로 바꿨다(사용자 결정 2026-09-19).
  */
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -178,7 +183,7 @@ export default function PopcornBucketPage() {
         </div>
 
         <div className={styles.content}>
-          <p className={styles.eyebrow}>{total} · KERNELS</p>
+          <p className={styles.total}>팝콘 {total}알</p>
 
           {leaning ? (
             <h2 className={styles.headline}>
@@ -187,6 +192,13 @@ export default function PopcornBucketPage() {
               기울었어요
             </h2>
           ) : null}
+
+          {/* 한 줄에 한 문장씩 — 알 수와 별점을 한 줄씩 푼다(사용자 지시 2026-09-19) */}
+          <p className={styles.meaning}>
+            영화를 평가하면 그 영화의 맛 알이 하나씩 쌓여요.
+            <br />
+            ★는 그 맛 영화들에 준 평균 별점이에요
+          </p>
 
           {/*
            * 맛 범례. 색 · 이름 · 알 수 · 평균 평점으로 말한다. 팝콘 8색은 밝은 면에서
