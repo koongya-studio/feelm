@@ -270,7 +270,7 @@
 
 /* ─────────────────────────── 알림 막대 */
 
-/* 하단 내비 알약 위에 뜬다. 막대는 `components/Snackbar`이고 자리만 여기서 잡는다 */
+/* 하단 내비 바 위에 뜬다. 막대는 `components/Snackbar`이고 자리만 여기서 잡는다 */
 .notice {
   position: fixed;
   z-index: 2;
