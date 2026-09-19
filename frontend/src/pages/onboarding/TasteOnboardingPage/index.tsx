@@ -98,6 +98,12 @@ const WIREFRAME_BOARD = { width: 412, height: 653 };
 /** `⊖`가 카드 밖으로 나가는 크기. 카드를 영역 안에 가둘 때 쓴다 */
 const REMOVE_OVERHANG = 8;
 
+/**
+ * 카드가 화면 좌우 끝에 붙지 않게 두는 여백(업무 -389). 배치 영역은 화면 폭을 다 쓰므로,
+ * 없으면 오른쪽 끝 카드의 `⊖`가 화면 가장자리에 닿아 320 · 344px 폭에서 잘려 보였다.
+ */
+const EDGE_INSET = 8;
+
 const INITIAL_POSITIONS = [
   { x: 162, y: 8 },
   { x: 256, y: 58 },
@@ -245,11 +251,12 @@ export default function TasteOnboardingPage() {
   /** 비율 좌표를 현재 화면에서 카드가 실제로 놓일 왼쪽 위 좌표로 바꾼다. */
   function positionFromRatio(xRatio: number, yRatio: number) {
     const minY = REMOVE_OVERHANG;
-    const maxX = Math.max(0, board.width - CARD_WIDTH - REMOVE_OVERHANG);
+    const minX = EDGE_INSET;
+    const maxX = Math.max(minX, board.width - CARD_WIDTH - REMOVE_OVERHANG - EDGE_INSET);
     const maxY = Math.max(minY, board.height - CARD_HEIGHT);
 
     return {
-      x: xRatio * maxX,
+      x: minX + xRatio * (maxX - minX),
       y: minY + yRatio * (maxY - minY),
     };
   }
@@ -272,11 +279,12 @@ export default function TasteOnboardingPage() {
    */
   function toRatio(x: number, y: number) {
     const minY = REMOVE_OVERHANG;
-    const maxX = Math.max(0, board.width - CARD_WIDTH - REMOVE_OVERHANG);
+    const minX = EDGE_INSET;
+    const maxX = Math.max(minX, board.width - CARD_WIDTH - REMOVE_OVERHANG - EDGE_INSET);
     const maxY = Math.max(minY, board.height - CARD_HEIGHT);
 
     return {
-      xRatio: maxX === 0 ? 0 : Math.min(Math.max(x, 0), maxX) / maxX,
+      xRatio: maxX === minX ? 0 : (Math.min(Math.max(x, minX), maxX) - minX) / (maxX - minX),
       yRatio: maxY === minY ? 0 : (Math.min(Math.max(y, minY), maxY) - minY) / (maxY - minY),
     };
   }
@@ -521,8 +529,10 @@ export default function TasteOnboardingPage() {
       {header}
 
       <div className={styles.intro}>
+        {/* `⊖로`는 한 덩어리다. 어절 단위 줄바꿈(-389)이 기호 뒤를 끊어 `로`만 다음 줄로 넘겼다 */}
         <p className={styles.guide}>
-          카드를 원 안팎으로 드래그해 주세요 · 안 본 영화는 ⊖로 빼주세요
+          카드를 원 안팎으로 드래그해 주세요 · 안 본 영화는{' '}
+          <span className={styles.nowrap}>⊖로 빼주세요</span>
         </p>
         <VisuallyHidden>
           <p>키보드로는 카드를 고르고 Enter로 원 안팎을 오가거나 방향키로 옮길 수 있어요</p>

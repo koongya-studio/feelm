@@ -78,6 +78,16 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/*
+ * 좁은 휴대폰(갤럭시 폴드 커버 344px · 320px)에서는 한 줄에 하나씩 세운다(업무 -389). 두 칸이면
+ * 그림 · 화살표를 빼고 이름에 남는 폭이 한 글자도 안 돼 `취/향/팝/콘`처럼 세로로 섰다.
+ */
+@media (max-width: 359px) {
+  .shortcuts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* 카드 전체가 하나의 링크다. 사진 배경 위의 유리 판이다(업무 -697) */
 .shortcut {
   display: flex;

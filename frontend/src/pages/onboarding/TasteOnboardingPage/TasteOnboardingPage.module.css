@@ -21,6 +21,11 @@
   color: var(--color-ink-body);
 }
 
+/* 기호와 조사를 한 줄에 묶는다 */
+.nowrap {
+  white-space: nowrap;
+}
+
 .legend {
   display: flex;
   justify-content: center;
