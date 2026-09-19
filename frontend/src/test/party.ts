@@ -13,6 +13,7 @@ import type {
   PartyMember,
   PartyMemberPopcorn,
   PartyPopcorn,
+  PartyRecommendationSet,
 } from '../types/party';
 import type { PopcornFlavor } from '../types/taste';
 
@@ -109,4 +110,25 @@ export function flavors(): PopcornFlavor[] {
     representativeKeywords: [],
     sortOrder: index + 1,
   }));
+}
+
+/** API-058 파티 영화 추천. 시안대로 세 편이다 */
+export function partyRecommendations(partyId = TEST_PARTY_ID): PartyRecommendationSet {
+  const titles = ['파이트 클럽', '펄프 픽션', '포레스트 검프'];
+
+  return {
+    recommendationSetId: 7101,
+    partyId,
+    generatedAt: '2026-09-19T09:00:00Z',
+    items: titles.map((title, index) => ({
+      recommendationItemId: 3401 + index,
+      type: 'PARTY',
+      movie: {
+        movieId: 550 + index,
+        title,
+        posterUrl: null,
+        ottProviders: ['NETFLIX'],
+      },
+    })),
+  };
 }

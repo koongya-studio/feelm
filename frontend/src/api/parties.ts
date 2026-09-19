@@ -6,13 +6,9 @@
  * 목록(API-052) · 수락(API-053) · 거절(API-054) · 나가기(API-055) · 종료(API-056) ·
  * 파티원 팝콘(API-057) · 멤버 강퇴(API-069)를 실제 호출로 바꿨다.
  *
- * **한 파일에 실제 호출과 목업이 섞여 있다.** 갈리는 기준은 백엔드에 해당 API가 있는지다.
- * - 위 열 개는 실제로 부른다
- * - 파티 영화 추천(API-058)은 **백엔드에 아직 없다.** 5.9 · 5.5가 목업으로 남는다
+ * 파티 영화 추천(API-058)도 업무 -705에서 실제 호출로 바꿨다. **이 파일에 목업은 없다.**
  */
-import { mockPartyRecommendations } from '../mocks/partyRecommendations';
 import { request } from './client';
-import { respond } from './mockTransport';
 import type {
   Party,
   PartyInvitation,
@@ -197,16 +193,13 @@ export async function getPartyPopcorn(partyId: number): Promise<PartyPopcorn> {
 /**
  * API-058 파티 영화 추천 · GET /api/v1/parties/{partyId}/recommendations
  *
- * **백엔드에 아직 없다.** 5.9 팝콘 섞기와 5.5 추천 완성이 목업으로 남는 이유다.
- * 계약은 동기 응답이라 5.9는 이 응답을 기다리는 동안 보여 주는 화면이지 별도 계약이
- * 아니다.
+ * 개수(`size`)는 계약 기본값 3을 쓴다. 5.5 시안이 세 편이다.
  *
- * 기준 목업은 9001 하나뿐이다. 실제 서버가 만든 파티는 다른 번호를 받으므로 없는
- * 번호는 기준 목업의 추천을 파티 번호만 갈아 끼워 내려준다. 그러지 않으면 새로 만든
- * 파티가 언제나 404가 되어 5.3 → 5.4 → 5.9 → 5.5가 끊긴다.
+ * 파티원만 부를 수 있다. 오류는 `404 RESOURCE_NOT_FOUND`(없는 파티 · 파티원 아님) ·
+ * `409 PARTY_CLOSED` · `503 RECOMMENDATION_UNAVAILABLE`(파티원 취향이 아직 준비 안 됨)이다.
+ * 같은 파티원 · 같은 취향이면 서버가 이전 추천 세트를 다시 쓴다 — 5.9가 미리 부르고 5.5가
+ * 다시 불러도 같은 세 편이다.
  */
 export async function getPartyRecommendations(partyId: number): Promise<PartyRecommendationSet> {
-  const base = mockPartyRecommendations[partyId] ?? mockPartyRecommendations[9001];
-
-  return respond({ ...base, partyId }, 'parties');
+  return request<PartyRecommendationSet>(`/parties/${partyId}/recommendations`);
 }
