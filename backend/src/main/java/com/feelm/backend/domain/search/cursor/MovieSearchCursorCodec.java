@@ -66,7 +66,7 @@ public class MovieSearchCursorCodec {
                 new CursorConditions(
                         criteria.q() == null
                                 ? 3
-                                : criteria.sort() == MovieSearchSort.RELEVANCE ? 7 : 4,
+                                : criteria.sort() == MovieSearchSort.RELEVANCE ? 8 : 5,
                         criteria.q(),
                         criteria.genre().stream().sorted().toList(),
                         criteria.country().stream().sorted().toList(),
