@@ -95,6 +95,10 @@ springdoc:
     enabled: ${SWAGGER_ENABLED:false}
 
 feelm:
+  report:
+    generation:
+      # 반기 마감 스냅샷 생성 배치. 테스트는 설정을 두지 않아 스케줄러를 등록하지 않는다.
+      enabled: ${REPORT_GENERATION_ENABLED:true}
   recommendation:
     candidates:
       # 전환 확인 후 false로 설정해 Candidate v5 호환을 제거한다.

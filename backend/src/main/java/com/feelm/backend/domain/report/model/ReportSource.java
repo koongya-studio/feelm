@@ -1,0 +1,30 @@
+package com.feelm.backend.domain.report.model;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+
+public final class ReportSource {
+
+    private ReportSource() {}
+
+    public record Frame(
+            long frameId,
+            long userId,
+            long movieId,
+            BigDecimal score,
+            Instant createdAt,
+            Integer releaseYear,
+            String flavorCode,
+            String flavorName) {}
+
+    public record Genre(long frameId, String code, String name) {}
+
+    public record Country(long frameId, String code) {}
+
+    public record Person(long frameId, long personId, String name, String profileUrl, Role role) {}
+
+    public enum Role {
+        DIRECTOR,
+        ACTOR
+    }
+}
