@@ -137,6 +137,30 @@ describe('API-052 받은 초대 목록', () => {
     expect(invitations[0].party.owner.nickname).toBe('무비버디');
   });
 
+  it('대기 초대가 여러 페이지면 커서를 끝까지 따라가 모두 돌려준다', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        json(200, {
+          items: [invitation()],
+          nextCursor: 'invitation-cursor-2',
+          hasNext: true,
+        }),
+      )
+      .mockResolvedValueOnce(
+        json(200, {
+          items: [invitation({ invitationId: 502 })],
+          nextCursor: null,
+          hasNext: false,
+        }),
+      );
+
+    const invitations = await getMyInvitations();
+
+    expect(call(0)[0]).toBe('/api/v1/parties/invitations?size=50');
+    expect(call(1)[0]).toBe('/api/v1/parties/invitations?cursor=invitation-cursor-2&size=50');
+    expect(invitations.map((item) => item.invitationId)).toEqual([501, 502]);
+  });
+
   it('단건 조회 계약이 없어 목록에서 고른다', async () => {
     fetchMock.mockResolvedValue(
       json(200, { items: [invitation()], nextCursor: null, hasNext: false }),

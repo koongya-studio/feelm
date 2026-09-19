@@ -9,10 +9,13 @@
  * 신규와 기존을 가르는 것은 초기 취향 설정을 마쳤는지다. 목업 프로필이 아니라 로그인
  * 응답의 `onboardingCompleted`로 판단한다(API-004 처리 규칙).
  *
- * 실패는 세 가지를 구분한다. 자격 증명이 틀린 것(`INVALID_CREDENTIALS`)은 다시 입력하면
- * 되고, 미인증 계정(`EMAIL_NOT_VERIFIED`)은 입력을 고쳐도 소용이 없어 인증 메일 재발송
- * (API-003)이 필요하며, 시도 제한(`RATE_LIMITED`)은 기다리는 것 말고 할 일이 없다.
- * 셋 다 같은 문구를 보여 주면 사용자가 다음에 무엇을 해야 할지 알 수 없다.
+ * 실패는 둘을 구분한다. 자격 증명이 틀린 것(`INVALID_CREDENTIALS`)은 다시 입력하면 되고,
+ * 시도 제한(`RATE_LIMITED`)은 기다리는 것 말고 할 일이 없다. 둘 다 같은 문구를 보여 주면
+ * 사용자가 다음에 무엇을 해야 할지 알 수 없다.
+ *
+ * **미인증 계정 분기는 없앴다**(S15P21E106-601 · -637). 가입이 인증번호로 이메일 소유를
+ * 먼저 확인하게 되면서 계정은 만들어지는 순간 `ACTIVE`이고, API-004도 `403
+ * EMAIL_NOT_VERIFIED` 대신 `ACTIVE`가 아닌 계정을 모두 `401 INVALID_CREDENTIALS`로 묶는다.
  *
  * 와이어프레임의 도움말은 `아이디 찾기` · `비밀번호 찾기` · `회원가입` 셋이었지만
  * **`아이디 찾기`는 뺐다** (CR-25, 팀 결정 2026-09-17, 업무 S15P21E106-455). 아이디가
@@ -34,7 +37,6 @@ import SocialButton from '../../../components/SocialButton';
 import type { SocialProvider } from '../../../components/SocialButton';
 import TextField from '../../../components/TextField';
 import Wordmark from '../../../components/Wordmark';
-import { resendVerificationMail } from '../../../api/auth';
 import { ApiError } from '../../../api/apiError';
 import { failureDescription } from '../../../components/StatusView/failure';
 import { useAuth } from '../../../contexts/authContext';
@@ -55,7 +57,6 @@ const PROVIDERS: { provider: SocialProvider; label: string }[] = [
 /** 서버 문구를 그대로 쓰지 않고 화면이 정하는 경우만 둔다 */
 const MESSAGE: Record<string, string> = {
   INVALID_CREDENTIALS: '이메일 또는 비밀번호가 올바르지 않습니다.',
-  EMAIL_NOT_VERIFIED: '이메일 인증을 마쳐야 로그인할 수 있습니다.',
   RATE_LIMITED: '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해 주세요.',
 };
 
@@ -89,12 +90,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
-  const [resent, setResent] = useState(false);
 
   const submit = async () => {
     setPending(true);
     setFailure(null);
-    setResent(false);
 
     try {
       const user = await signIn(email, password);
@@ -115,15 +114,6 @@ export default function LoginPage() {
       setFailure({ code, message: MESSAGE[code] ?? failureDescription(error) });
     } finally {
       setPending(false);
-    }
-  };
-
-  /* 재발송은 계정 존재 여부를 알려 주지 않으므로(API-003) 성공 여부를 나누지 않는다 */
-  const resend = async () => {
-    try {
-      await resendVerificationMail(email);
-    } finally {
-      setResent(true);
     }
   };
 
@@ -168,18 +158,6 @@ export default function LoginPage() {
           {failure ? (
             <p className={styles.failure} role="alert">
               {failure.message}
-            </p>
-          ) : null}
-
-          {failure?.code === 'EMAIL_NOT_VERIFIED' && !resent ? (
-            <Button type="button" variant="text" onClick={() => void resend()}>
-              인증 메일 다시 보내기
-            </Button>
-          ) : null}
-
-          {resent ? (
-            <p className={styles.notice} role="status">
-              인증 메일을 다시 보냈습니다. 메일함을 확인해 주세요.
             </p>
           ) : null}
 

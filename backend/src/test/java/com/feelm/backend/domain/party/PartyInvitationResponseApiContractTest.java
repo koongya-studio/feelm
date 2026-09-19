@@ -52,6 +52,8 @@ class PartyInvitationResponseApiContractTest extends SharedPostgresContractTest 
 
     @AfterEach
     void shutdownExecutor() throws InterruptedException {
+        jdbc.execute("DROP TRIGGER IF EXISTS test_fail_accept_notification ON notifications");
+        jdbc.execute("DROP FUNCTION IF EXISTS test_fail_accept_notification()");
         if (executor == null) return;
         executor.shutdownNow();
         assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
@@ -61,6 +63,12 @@ class PartyInvitationResponseApiContractTest extends SharedPostgresContractTest 
     void acceptAddsMemberAndMarksInvitationAccepted() throws Exception {
         long party = party(20, "ACTIVE", CREATED_AT);
         long invitation = invitation(party, 20, 10, "PENDING");
+        jdbc.update(
+                "INSERT INTO web_push_subscriptions(user_id,endpoint,endpoint_fingerprint,"
+                        + "p256dh_key,auth_secret,capability_version) VALUES"
+                        + " (20,'https://fcm.googleapis.com/fcm/send/party-owner',?,"
+                        + "'key','auth',1)",
+                "a".repeat(64));
         jdbc.update(
                 "INSERT INTO notifications(user_id,type,source_id,target_type,target_id,title,body,"
                         + "notified_at,expires_at) VALUES"
@@ -82,11 +90,34 @@ class PartyInvitationResponseApiContractTest extends SharedPostgresContractTest 
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT count(*) FROM notifications"
-                                        + " WHERE source_id=? AND closed_at IS NOT NULL"
+                                        + " WHERE type='PARTY_INVITE' AND source_id=?"
+                                        + " AND closed_at IS NOT NULL"
                                         + " AND read_at IS NOT NULL",
                                 Long.class,
                                 invitation))
                 .isEqualTo(1);
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT user_id,target_type,target_id,title,body,closed_at"
+                                        + " FROM notifications"
+                                        + " WHERE type='PARTY_INVITE_ACCEPTED' AND source_id=?",
+                                invitation))
+                .containsEntry("user_id", 20L)
+                .containsEntry("target_type", "PARTY")
+                .containsEntry("target_id", party)
+                .containsEntry("title", "파티 모드 초대 수락")
+                .containsEntry("body", "response10 님이 파티 모드에 참여했어요.")
+                .containsEntry("closed_at", null);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM web_push_deliveries delivery"
+                                        + " JOIN notifications notification"
+                                        + " ON notification.id=delivery.notification_id"
+                                        + " WHERE notification.type='PARTY_INVITE_ACCEPTED'"
+                                        + " AND notification.source_id=? AND delivery.status='PENDING'",
+                                Long.class,
+                                invitation))
+                .isOne();
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT count(*) FROM party_refresh_requests WHERE party_id=?",
@@ -386,6 +417,57 @@ class PartyInvitationResponseApiContractTest extends SharedPostgresContractTest 
         } finally {
             jdbc.execute("ALTER TABLE party_members DROP CONSTRAINT test_reject_member");
         }
+    }
+
+    @Test
+    void rollsBackAcceptanceWhenOwnerNotificationWriteFails() throws Exception {
+        long party = party(20, "ACTIVE", CREATED_AT);
+        long invitation = invitation(party, 20, 10, "PENDING");
+        jdbc.update(
+                "INSERT INTO notifications(user_id,type,source_id,target_type,target_id,title,body,"
+                        + "notified_at,expires_at) VALUES"
+                        + " (10,'PARTY_INVITE',?,'PARTY_INVITATION',?,'제목','본문',?,?)",
+                invitation,
+                invitation,
+                Timestamp.from(CREATED_AT),
+                Timestamp.from(CREATED_AT.plusSeconds(90L * 86_400)));
+        jdbc.execute(
+                """
+                CREATE FUNCTION test_fail_accept_notification() RETURNS trigger LANGUAGE plpgsql AS $$
+                BEGIN
+                    IF NEW.type = 'PARTY_INVITE_ACCEPTED' THEN
+                        RAISE EXCEPTION 'forced acceptance notification failure';
+                    END IF;
+                    RETURN NEW;
+                END;
+                $$
+                """);
+        jdbc.execute(
+                """
+                CREATE TRIGGER test_fail_accept_notification
+                BEFORE INSERT ON notifications
+                FOR EACH ROW EXECUTE FUNCTION test_fail_accept_notification()
+                """);
+
+        accept(invitation, 10).andExpect(status().is5xxServerError());
+
+        assertInvitation(invitation, "PENDING", false);
+        assertThat(memberCount(party, 10)).isZero();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM notifications"
+                                        + " WHERE type='PARTY_INVITE' AND source_id=?"
+                                        + " AND closed_at IS NULL AND read_at IS NULL",
+                                Long.class,
+                                invitation))
+                .isOne();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM notifications"
+                                        + " WHERE type='PARTY_INVITE_ACCEPTED' AND source_id=?",
+                                Long.class,
+                                invitation))
+                .isZero();
     }
 
     private List<ResponseResult> concurrentResponses(

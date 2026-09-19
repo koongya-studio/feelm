@@ -109,18 +109,6 @@ class LoginContractTest extends EmailAuthApiTestSupport {
     }
 
     @Test
-    @DisplayName("미인증 계정은 403 EMAIL_NOT_VERIFIED로 구분해 응답한다")
-    void pendingAccountReturnsEmailNotVerified() throws Exception {
-        TestAccount account = newAccount();
-        signupPending(account);
-
-        login(account.email(), account.password())
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("EMAIL_NOT_VERIFIED"))
-                .andExpect(jsonPath("$.message").isNotEmpty());
-    }
-
-    @Test
     @DisplayName("연속 5회 실패하면 이후 요청은 비밀번호가 맞아도 429 RATE_LIMITED다")
     void sixthAttemptAfterFiveFailuresIsRateLimited(CapturedOutput output) throws Exception {
         TestAccount account = newAccount();

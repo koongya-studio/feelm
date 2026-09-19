@@ -9,11 +9,10 @@
  *   저장소의 관심없음 · 평가를 여기서 덮어썼다. 서버 이력에 다시 얹으면 서버가 아는
  *   상태와 화면이 어긋난다
  *
- * API-045는 업무 -610에서 실제 호출로 전환했고, API-047은 별도 프론트 연동 전이라 이
- * 파일에서 다루지 않는다.
+ * API-045는 업무 -610에서 실제 호출로 전환했고, API-047 관심없음은 업무 -672에서 연동했다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getRecommendationHistory, getRecommendations } from './recommendations';
+import { dismissMovie, getRecommendationHistory, getRecommendations } from './recommendations';
 import { ApiError } from './apiError';
 import { resetSessionForTest, startSession } from './session';
 import type { RecommendationHistory, RecommendationHistorySet } from '../types/recommendation';
@@ -181,6 +180,17 @@ describe('API-048 추천 이력 조회', () => {
     expect(new URL(requestedUrl(), 'http://test').searchParams.get('cursor')).toBe('cursor-2');
   });
 
+  it('size는 세트 수로 그대로 싣는다', async () => {
+    fetchMock.mockResolvedValue(json(200, page()));
+
+    await getRecommendationHistory('cursor-2', 6);
+
+    const params = new URL(requestedUrl(), 'http://test').searchParams;
+
+    expect(params.get('cursor')).toBe('cursor-2');
+    expect(params.get('size')).toBe('6');
+  });
+
   it('세트와 커서를 그대로 돌려준다', async () => {
     fetchMock.mockResolvedValue(json(200, page({ nextCursor: 'cursor-2', hasNext: true })));
 
@@ -213,5 +223,43 @@ describe('API-048 추천 이력 조회', () => {
 
     expect(error).toBeInstanceOf(ApiError);
     expect((error as ApiError).status).toBe(401);
+  });
+});
+
+describe('API-047 관심없음 표시', () => {
+  function requestedBody(index = 0): unknown {
+    const init = (fetchMock.mock.calls[index] as [string, RequestInit])[1];
+
+    return JSON.parse(String(init.body));
+  }
+
+  it('추천 카드에서는 추천 항목 번호를 실어 POST한다', async () => {
+    fetchMock.mockResolvedValue(json(200, { movieId: 550 }));
+
+    await dismissMovie(550, 3301);
+
+    expect(requestedUrl()).toBe('/api/v1/movies/550/dismiss');
+    expect((fetchMock.mock.calls[0] as [string, RequestInit])[1].method).toBe('POST');
+    expect(requestedBody()).toEqual({ recommendationItemId: 3301 });
+    expect(requestedHeaders().Authorization).toBe('Bearer token');
+  });
+
+  it('추천 밖에서는 빈 본문으로 보낸다', async () => {
+    fetchMock.mockResolvedValue(json(200, { movieId: 550 }));
+
+    await dismissMovie(550);
+
+    expect(requestedBody()).toEqual({});
+  });
+
+  it('이미 관심없음이면 409 코드가 그대로 올라온다', async () => {
+    fetchMock.mockResolvedValue(
+      json(409, { code: 'ALREADY_DISMISSED', message: '이미 관심없음 처리한 영화입니다.' }),
+    );
+
+    await expect(dismissMovie(550, 3301)).rejects.toMatchObject({
+      status: 409,
+      code: 'ALREADY_DISMISSED',
+    });
   });
 });

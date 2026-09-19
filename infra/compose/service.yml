@@ -70,6 +70,7 @@ services:
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
       REDIS_READONLY_PASSWORD: ${REDIS_READONLY_PASSWORD:-}
+      REDIS_LOCAL_BACKEND_PASSWORD: ${REDIS_LOCAL_BACKEND_PASSWORD:-}
 
     command: ["sh", "/usr/local/etc/redis/start.sh"]
 
@@ -77,6 +78,7 @@ services:
       - redis_data:/data
       - ${REDIS_CONFIG_DIR:-../redis}/start.sh:/usr/local/etc/redis/start.sh:ro
       - ${REDIS_CONFIG_DIR:-../redis}/readonly.acl:/usr/local/etc/redis/readonly.acl:ro
+      - ${REDIS_CONFIG_DIR:-../redis}/local-backend.acl:/usr/local/etc/redis/local-backend.acl:ro
 
     mem_limit: 768m
 
@@ -104,6 +106,8 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
       REDIS_HOST: ${REDIS_HOST:-redis}
       REDIS_PORT: ${REDIS_PORT:-6379}
+      # 서버 백엔드는 기존 전체 권한 계정을 유지한다. 제한 계정은 호스트에서 실행하는 로컬 프로파일 전용이다.
+      REDIS_USERNAME: default
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
       KAFKA_BOOTSTRAP_SERVERS: "${DISTRIBUTED_NODE_IP:?DISTRIBUTED_NODE_IP is required}:9092"
       KAFKA_OUTBOX_POLL_INTERVAL: ${KAFKA_OUTBOX_POLL_INTERVAL:-500ms}
@@ -125,6 +129,17 @@ services:
       MAIL_RATE_LIMIT_IP_WINDOW: ${MAIL_RATE_LIMIT_IP_WINDOW:-1h}
       MAIL_SEND_BUDGET_HOURLY_LIMIT: ${MAIL_SEND_BUDGET_HOURLY_LIMIT:-100}
       MAIL_SEND_BUDGET_DAILY_LIMIT: ${MAIL_SEND_BUDGET_DAILY_LIMIT:-300}
+      WEB_PUSH_MODE: ${WEB_PUSH_MODE:-disabled}
+      WEB_PUSH_VAPID_PUBLIC_KEY: ${WEB_PUSH_VAPID_PUBLIC_KEY:-}
+      WEB_PUSH_VAPID_PRIVATE_KEY: ${WEB_PUSH_VAPID_PRIVATE_KEY:-}
+      WEB_PUSH_VAPID_SUBJECT: ${WEB_PUSH_VAPID_SUBJECT:-}
+      WEB_PUSH_POLL_INTERVAL: ${WEB_PUSH_POLL_INTERVAL:-1s}
+      WEB_PUSH_BATCH_SIZE: ${WEB_PUSH_BATCH_SIZE:-25}
+      WEB_PUSH_MAXIMUM_ATTEMPTS: ${WEB_PUSH_MAXIMUM_ATTEMPTS:-5}
+      WEB_PUSH_INITIAL_RETRY_DELAY: ${WEB_PUSH_INITIAL_RETRY_DELAY:-1m}
+      WEB_PUSH_MAXIMUM_RETRY_DELAY: ${WEB_PUSH_MAXIMUM_RETRY_DELAY:-1h}
+      WEB_PUSH_LEASE_DURATION: ${WEB_PUSH_LEASE_DURATION:-2m}
+      WEB_PUSH_REQUEST_TIMEOUT: ${WEB_PUSH_REQUEST_TIMEOUT:-15s}
 
     depends_on:
       postgres:

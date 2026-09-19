@@ -83,6 +83,13 @@ payload를 임의로 추가하지 말고 계약과 공통 타입을 먼저 합�
 [ADR-0018](../docs/adr/0018-polling-transactional-outbox.md)을 참고합니다. 로컬 Kafka 기동과
 Topic 확인 방법은 [인프라 README](../infra/README.md#local-kafka)를 따릅니다.
 
+파티 전용 Consumer의 Redis 게시 완료 알림은 `feelm.party-candidate-updated.v1`에서
+`feelm-party-candidate-updated-v1` group으로 소비한다. Backend는 추천 세트를 미리 만들지 않고
+`party_candidate_publications`에 파티별 마지막 source partition·offset과 결과 식별자만 기록한다.
+유효 알림의 DB 트랜잭션이 커밋된 뒤 수신 Offset을 manual ACK하며, 같은 source offset의 중복과
+더 오래된 offset은 상태를 바꾸지 않는다. 정확한 key·payload 계약은
+[스트리밍 계약](../docs/api/streaming-contract.md#43-이벤트별-payload)을 따른다.
+
 ## 실행 프로파일
 
 기본 프로파일은 `local`이며, 배포 개발 환경은 `dev`를 사용합니다. JPA 스키마 자동 변경은
@@ -95,12 +102,14 @@ Topic 확인 방법은 [인프라 README](../infra/README.md#local-kafka)를 따
 | `DB_PASSWORD` | `feelm` | 필수 |
 | `REDIS_HOST` | `localhost` | 필수 |
 | `REDIS_PORT` | `6379` | `6379` |
+| `REDIS_USERNAME` | `default` | `default` |
 | `REDIS_PASSWORD` | **필수(기본값 없음)** | 필수 |
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | **필수(분산 처리 노드 사설 IP:9092)** |
 | `KAFKA_OUTBOX_*` | `.env.example`의 초기값 | 선택(실측 후 조정) |
 | `JWT_SECRET` | **필수(기본값 없음)** | 필수 |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | 필수 |
 | `SWAGGER_ENABLED` | `false` | `false`(팀 접근 보호 구성 후 명시적으로 활성화) |
+| `REPORT_GENERATION_ENABLED` | `true` | 반기 취향 리포트 집계를 수행하는 단일 실행 노드에서만 `true` |
 | `FRONTEND_BASE_URL` | `http://localhost:5173` | 필수 |
 | `MAIL_MODE` | `log`(`.env`에서 지정, 기본값 없음) | `smtp` |
 | `MAIL_HOST` | `smtp.gmail.com` | 선택(비우면 `smtp.gmail.com`) |
@@ -197,24 +206,24 @@ Refresh Token은 사용될 때마다 회전하며, 폐기된 토큰이 다시 �
 
 ### 인증 메일 발송
 
-계정 메일은 `MAIL_MODE`로 발송 수단을 고릅니다. 가입 인증 메일(API-001~003)과 비밀번호 재설정 메일
+계정 메일은 `MAIL_MODE`로 발송 수단을 고릅니다. 가입 인증번호 메일(API-078)과 비밀번호 재설정 메일
 (API-010)이 같은 값을 쓰므로 두 메일은 항상 같은 모드로 함께 뜹니다.
 
 | 값 | 동작 | 용도 |
 | --- | --- | --- |
-| `log` | 발송하지 않고 인증·재설정 링크를 로그로 남깁니다 | 로컬 수동 확인 |
+| `log` | 발송하지 않고 인증번호와 재설정 링크를 로그로 남깁니다 | 로컬 수동 확인 |
 | `smtp` | `spring.mail.*` 설정으로 실제 발송합니다 | dev·운영 |
 
-`MAIL_MODE`는 **기본값이 없어** 지정하지 않으면 기동에 실패합니다. `log`는 인증·재설정 링크가 로그에 남으므로
+`MAIL_MODE`는 **기본값이 없어** 지정하지 않으면 기동에 실패합니다. `log`는 인증번호와 재설정 링크가 로그에 남으므로
 로컬·테스트 전용이며, 허용 프로파일(`local`, `test`, 프로파일을 지정하지 않은 테스트 실행의 `default`) 밖에서
 `MAIL_MODE=log`이면 기동에 실패합니다. `smtp`는 `MAIL_USERNAME`과 앱 비밀번호
 `MAIL_PASSWORD`가 필요하며, 값은 개인 `.env` 또는 배포 환경의 Secret으로만 주입합니다.
 
 발송은 **응답 경로에서 분리**되어 전용 스레드 풀(`feelm.mail.async`, 기본 스레드 2개·큐 100칸)에서 처리됩니다.
 계정이 있는 이메일과 없는 이메일의 응답 시간이 SMTP 왕복 때문에 갈리면, 응답이 감춘 계정 존재 여부가 시간으로
-드러나기 때문입니다(API-003·API-010). 그래서 발송 결과는 응답에 영향을 주지 않습니다. 큐가 차면 그 발송은
+드러나기 때문입니다(API-078·API-010). 그래서 발송 결과는 응답에 영향을 주지 않습니다. 큐가 차면 그 발송은
 **버리고** 경고 로그만 남깁니다(호출 스레드가 대신 보내면 응답이 다시 SMTP를 기다리게 됩니다). 유실된 메일은
-사용자의 재발송(API-003)·재요청(API-010)·재가입이 복구 경로입니다.
+사용자의 재요청(API-078·API-010)이 복구 경로입니다.
 
 종료 시에는 진행 중인 발송과 큐에 남은 발송을 `feelm.mail.async.shutdown-await`(기본 10초) 안에 내보내려
 하고, 그 시간이 지나면 남은 발송을 버립니다. 스레드가 2개이므로 그 안에 실제로 나가는 것은 몇 건뿐이고 큐에
@@ -274,21 +283,23 @@ docker exec feelm-redis sh -c 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-au
 값(`MAIL_RATE_LIMIT_IP_WINDOW`, `MAIL_RATE_LIMIT_EMAIL_INTERVAL`)에 단위를 생략하면 **초**로 읽습니다.
 
 Redis에 닿지 못하면 계정 메일은 발송하지 않습니다(fail-closed). 인증 제한과 방향을 맞춘 선택이며, 장애 중
-발송 폭탄을 허용하지 않는 대신 가입 인증 메일까지 함께 멈춥니다. 복구 경로는
-재발송(API-003)·재요청(API-010)·재가입입니다.
+발송 폭탄을 허용하지 않는 대신 가입 인증번호 메일까지 함께 멈춥니다. 복구 경로는
+재요청(API-078·API-010)입니다.
 
 이때 **응답은 두 갈래**입니다. 발송 상한은 발송 스레드에서 보므로 그 확인이 실패해도 응답은 `201`·`202` 그대로이고
 메일만 나가지 않습니다. 반면 IP 단위 요청 제한은 요청 경로에서 판정하고 같은 Redis를 쓰므로, 장애 중에는 그 판정이
-먼저 걸려 가입(API-001)·재발송(API-003)·재설정 요청(API-010)이 `500 INTERNAL_ERROR`로 실패합니다. 즉 Redis
+먼저 걸려 가입(API-001)·인증번호 발송(API-078)·재설정 요청(API-010)이 `500 INTERNAL_ERROR`로 실패합니다. 즉 Redis
 장애 중 사용자에게 실제로 보이는 것은 "메일만 안 오는 상태"가 아니라 **요청 실패**입니다. 가입 경로는
 S15P21E106-287에서 요청 제한이 추가되기 전까지 Redis 없이도 성공했으므로, 이 성질은 그때 함께 생겼습니다.
 
-인증 링크는 `${FRONTEND_BASE_URL}/app/verify-email?token=...`, 비밀번호 재설정 링크는
-`${FRONTEND_BASE_URL}/app/account/reset?token=...` 형식입니다. 두 링크 모두 프론트 화면으로 이동하고
-프론트가 각각 API-002·API-011을 호출합니다. **경로는 프론트엔드 라우트에서 파생된 값입니다.** 앱은
+가입 인증번호 메일에는 링크가 없습니다. 6자리 숫자를 본문에 실어 보내고 사용자가 회원가입 화면에 입력합니다
+(API-078·079, S15P21E106-604). 번호는 Redis에 SHA-256 해시로만 남고 수명은 10분입니다.
+
+비밀번호 재설정 링크는 `${FRONTEND_BASE_URL}/app/account/reset?token=...` 형식입니다. 프론트 화면으로
+이동하고 프론트가 API-011을 호출합니다. **경로는 프론트엔드 라우트에서 파생된 값입니다.** 앱은
 Vite base가 `/app/`이라 모든 화면이 `/app` 아래에 있고 화면별 경로는 `frontend/src/routes/paths.ts`가
-가지므로, 프론트 경로가 바뀌면 `feelm.mail.verification-url`·`password-reset-url`도 함께 바꿔야 합니다. 토큰은 불투명 난수 문자열이며 서버는 해시만 저장합니다.
-수명은 인증 토큰이 24시간, 재설정 토큰이 30분입니다.
+가지므로, 프론트 경로가 바뀌면 `feelm.mail.password-reset-url`도 함께 바꿔야 합니다. 토큰은 불투명 난수
+문자열이며 서버는 해시만 저장합니다. 수명은 30분입니다.
 
 ### 공개 경로 추가
 
@@ -818,7 +829,7 @@ PostgreSQL 필드 매핑은 현재 Flyway Migration을 기준으로 다음과 �
 | TMDb 원천 | PostgreSQL 대상 | 처리 |
 | --- | --- | --- |
 | `details.id` | `movies.tmdb_id` | 유일 키, 이 값으로 upsert |
-| `details.title`, `original_title`, `overview` | `movies.title`, `original_title`, `synopsis` | 제목이 없으면 원제 사용, 빈 줄거리는 그대로 보존 |
+| `details.title`, `original_title`, `overview` | `movies.title`, `original_title`, `synopsis` | 한국어 제목 우선, 제목이 없으면 원제 사용, 빈 줄거리는 그대로 보존 |
 | `details.release_date`, `runtime` | `movies.release_date`, `runtime_minutes` | 빈 날짜·0분은 `NULL` |
 | `details.poster_path`, `backdrop_path` | `movies.poster_url`, `backdrop_url` | 포스터는 `w500`, 배경은 `w1280` TMDb CDN URL로 변환 |
 | `details.genres[]` | `genres`, `movie_genres` | `genres.tmdb_genre_id`로 기준정보 upsert 후 관계 교체 |
@@ -826,6 +837,44 @@ PostgreSQL 필드 매핑은 현재 Flyway Migration을 기준으로 다음과 �
 | `credits.crew[job=Director]`, `cast[]` | `people`, `movie_people` | `tmdb_person_id` upsert, 역할은 `DIRECTOR`/`ACTOR` |
 | `watch/providers.results.KR.flatrate` | `otts`, `movie_ott_providers` | 현재 승인된 5개 OTT만 동기화하고 다른 offer type은 제외 |
 | DB identity | `movies.id` | 직접 입력하지 않으며 재적재 시 기존 ID 유지 |
+
+영화 제목은 TMDb `ko-KR` 상세 제목에 한글이 있으면 그대로 사용한다. 상세 제목이
+외국어이면 같은 TMDb ID의 고유한 `ko-KR` 번역 제목, 고유한 KR 대체 제목 순서로
+확인된 한글 제목을 선택한다. TMDb에 한국어 제목이 없어도
+[`scripts/data/verified-korean-titles.tsv`](scripts/data/verified-korean-titles.tsv)에
+원제·제작연도·국내 출처로 확인한 제목이 있으면 이를 사용한다. 적재 시 해당 TMDb ID의
+원제와 연도가 보정표와 다르면 그 영화의 적재를 실패 처리해 다른 작품에 제목이 붙지
+않도록 한다. TMDb 후보가 모호해도 보정표에 확인된 제목이 있으면 이를 사용한다.
+보정표에도 없으면 기존 DB에 저장된 한국어 제목을 유지한다. 기존 한국어 제목도
+없으면 TMDb 제목 또는 원제를 사용하며, 원제는 `original_title`에 그대로 둔다.
+보정표에는 현재 확인된 5편만 기록한다.
+
+기존 영화 보정은 외국어 제목인 TMDb ID만 별도 입력으로 준비한다. TMDb 번역·대체
+제목을 다시 확인할 대상은 원본 수집을 `--refresh`한 뒤 적재도 `--refresh`한다.
+보정표의 작품은 기존 원본을 재사용할 수 있다. 전체 서비스 DB에 직접 일괄 적용하지
+않고 소량 dry-run과 격리 DB에서 제목·원제·검색 결과를 먼저 확인한다.
+접속 환경 변수를 설정한 터미널에서 후보 ID는 다음처럼 추출할 수 있다.
+
+```bash
+psql -X -v ON_ERROR_STOP=1 -At -c \
+  "SELECT tmdb_id FROM movies WHERE title !~ '[가-힣]' ORDER BY tmdb_id" \
+  > title-backfill-ids.txt
+bash ./backend/scripts/collect-tmdb-raw.sh \
+  --input title-backfill-ids.txt --output-dir title-backfill-source \
+  --scope korean-title-backfill --refresh
+bash ./backend/scripts/run-tmdb-ingestion.sh \
+  --input title-backfill-ids.txt \
+  --raw-dir title-backfill-source/raw-tmdb \
+  --output-dir title-backfill-load --postgres-mode direct \
+  --ott-mapping backend/scripts/samples/ott-provider-mapping.csv \
+  --limit 5 --dry-run
+```
+
+적재를 진행할 때는 같은 입력으로 `--dry-run`을 빼고 `--refresh`를 넣는다. 5건의
+제목·원제와 관계 데이터를 확인한 뒤 `--limit`을 제거한다. 재적재는 제목 외에도
+줄거리·장르·국가·인물 정보를 최신 TMDb 값으로 갱신하므로 격리 DB에서 변경 범위를
+확인한다. TMDb와 검증된 보정표 모두에 한국어 제목이 없는 영화는 기존 한국어
+제목이 있다면 보존하고, 그렇지 않으면 TMDb 제목을 유지한다.
 
 이미지 파일을 적재하거나 원본 JSON을 변형하지 않는다. `raw-tmdb`에는 TMDb의
 `poster_path`·`backdrop_path`가 그대로 남으므로, 추후 제공 크기를 바꿔도 TMDb 메타데이터를

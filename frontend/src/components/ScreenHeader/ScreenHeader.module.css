@@ -3,6 +3,10 @@
   padding: var(--space-12) var(--screen-padding-x) 0;
 }
 
+.header[data-flush] {
+  padding-top: 0;
+}
+
 .row {
   display: flex;
   min-height: var(--tap-target-min);
@@ -48,4 +52,15 @@
 .header[data-align='center'] .title,
 .header[data-align='center'] .subtitle {
   text-align: center;
+}
+
+/* 사진 배경 위(업무 -697). 제목 · 뒤로 가기 · 오른쪽 동작이 흰 글자다 */
+.header[data-tone='dark'] .title,
+.header[data-tone='dark'] .back,
+.header[data-tone='dark'] .action {
+  color: var(--color-on-dark);
+}
+
+.header[data-tone='dark'] .subtitle {
+  color: var(--color-on-dark-muted);
 }

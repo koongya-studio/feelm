@@ -3,12 +3,14 @@
  *
  * | 용도 | 서체 | 근거 |
  * | --- | --- | --- |
- * | 로고 | Gluten Bold 700 | 확정 워드마크. **로고에만** 쓴다 |
  * | 취향 4컷의 큰 이름 | Anton 400 · Playfair Display 700 이탤릭 · 900 | 사용자 시안(2026-09-15, 업무 -321). **4컷 안에만** 쓴다 |
  * | 7.3 취향 4컷 목록의 연도 손글씨 | Caveat 700 | 사용자 시안(2026-09-15, 업무 -446). **연도 숫자에만** 쓴다 |
  * | 그 외 전부 | Pretendard | 중립적이라 로고가 돋보인다 |
  *
- * 둘 다 SIL OFL이라 임베딩과 상용에 제약이 없다.
+ * 로고는 서체가 아니라 그림이다(`assets/logo`, 업무 -703). 한때 서체로 쓴 글자였고
+ * 그 로고를 폐기하며 서체도 받지 않는다.
+ *
+ * 모두 SIL OFL이라 임베딩과 상용에 제약이 없다.
  *
  * 이전에는 `global.css`가 `IBM Plex Sans KR`을 지정만 하고 로드하지 않아, 실제
  * 화면은 시스템 기본 서체(Windows에서 맑은 고딕)로 그려지고 있었다. 그 선언을
@@ -18,14 +20,11 @@
  * 화면에 실제로 나온 글자가 속한 구간만 내려받는다. 전체를 받으면 무겁다.
  * Variable이라 400·500·600을 파일 하나로 처리한다.
  *
- * Gluten은 로고 한 단어에만 쓰므로 700 하나만 받는다.
- *
  * 4컷 서체는 영문 이름만 그리므로 **라틴 글자 파일만** 받는다. 한글 이름은 글리프가 없어
  * Pretendard로 넘어간다. 파일은 그 글자가 화면에 나올 때만 내려받는다.
  */
 
 @import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
-@import '@fontsource/gluten/700.css';
 @import '@fontsource/anton/latin-400.css';
 @import '@fontsource/playfair-display/latin-700-italic.css';
 @import '@fontsource/playfair-display/latin-900.css';

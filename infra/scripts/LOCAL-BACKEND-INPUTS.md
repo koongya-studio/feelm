@@ -23,7 +23,7 @@
 | 이름 | 검사 내용 |
 | --- | --- |
 | backend.tar | 고정 revision의 SHA, 경로·링크·크기 제한 |
-| backend-images.tar | 이전 서버 전송본 SHA f1fdc5c9e4e3c96d1d04f4bdab407e1953764199ad2e2a7b007c50c0810990cb |
+| backend-images.tar | Redis, pgvector, Ryuk, Kafka archive SHA `0e8105d4929e11fe0c0e0542d4fe135b5c6f18916096aef7bf1ee3cda2d646df` |
 | cache-manifest.json | 별도로 확인한 SHA, 소스 revision/SHA, cache 항목 |
 | gradle-cache/ | caches 및 wrapper/dists의 기록된 파일·SHA·크기 일치; 링크·추가 설정·lock 거부 |
 | jdk.tar.gz | 별도로 승인한 Linux x86_64 JDK21 배포본의 SHA 및 크기 |
@@ -39,7 +39,17 @@ JDK 해시 일치만으로 Java 21 런타임 호환성을 주장하지 않는다
 
 - Gradle 캐시: `/home/feelm-ci-test/backend-checks/ee737a8331104a619b767a40ae996129/home/.gradle`
 - 준비 당시 manifest: `/home/feelm-ci-test/offline-inputs/9627ce2a9b774f11a71743bcfb8aec93/manifest.json`
-- 이미지: `/home/feelm-ci-test/ci222-backend-images-E4nFHV/backend-images.tar`
+- 이미지: `/home/feelm-ci-test/ci651-backend-images-kafka-20260918/backend-images.tar`
+
+Kafka 통합 테스트를 받는 bundle은 `apache/kafka:4.3.1`을 포함해야 한다. 기존 파일을
+제자리에서 덮어쓰지 않고 새 전용 디렉터리에 네 이미지를 함께 `docker image save`한 뒤,
+archive SHA와 각 이미지 ID를 검증한다. 새 archive 검증과 backend 전체 테스트가 성공하기
+전에는 `ci-server-manager-pilot.py`의 고정 경로나 이전 bundle을 교체하지 않는다.
+
+2026-09-18 서버에서 네 이미지의 `RepoDigests`, image ID와 `linux/amd64`를 확인한 뒤 새
+archive를 만들었다. 파일은 `feelm-ci-test:feelm-ci-test`, mode `0600`, 438,666,240 bytes이며,
+OCI `index.json`에 네 고정 digest와 태그가 모두 기록되어 있다. 이전
+`ci222-backend-images-E4nFHV` bundle은 롤백 증빙으로 유지한다.
 
 서버의 전체 home, `.env`, `.docker/config.json`, Runner 설정이나 운영 볼륨은 복사하지 않는다.
 캐시 원본 전체를 무조건 옮기지 않고 manifest에 기록된 파일만 복사해야 한다.

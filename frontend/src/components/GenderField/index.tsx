@@ -6,8 +6,10 @@
  * 업무 S15P21E106-499).
  *
  * `select`가 아니라 버튼 세 개인 것은 와이어프레임이 그렇게 그려 둔 것이다. 선택 상태는
- * `aria-pressed`로 알린다.
+ * `aria-pressed`로 알리고, 화면에서는 공통 선택지 규칙대로 테두리 · 옅은 면 · 체크로
+ * 보인다(업무 -697).
  */
+import { CheckIcon } from '../Icon';
 import styles from './GenderField.module.css';
 import type { Gender } from '../../types/auth';
 
@@ -37,6 +39,11 @@ export default function GenderField({ value, onSelect }: Props) {
           aria-pressed={value === option.value}
           onClick={() => onSelect(option.value, option.label)}
         >
+          {value === option.value ? (
+            <span className={styles.check}>
+              <CheckIcon />
+            </span>
+          ) : null}
           {option.label}
         </button>
       ))}

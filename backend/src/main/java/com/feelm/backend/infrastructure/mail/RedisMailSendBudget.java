@@ -155,6 +155,10 @@ public class RedisMailSendBudget implements MailSendBudget {
      *
      * <p>이 확인은 요청 경로에서 <b>계정 존재 여부와 무관하게 모든 요청에</b> 걸어야 한다. 계정이 있는 요청에만 걸면 Redis 왕복 한 번이 응답 시간 차가
      * 되어 S15P21E106-282가 없앤 신호가 되살아난다.
+     *
+     * <p>자리가 없으면 여기서도 <b>창마다 한 번</b> 경고를 남긴다({@link #tryConsume()}과 같은 표시 키). 모든 요청 경로가 이 확인을 먼저 하게
+     * 되면서(S15P21E106-603으로 가입 경로가 발송을 멈춘 뒤) 상한이 마른 구간에서는 발송 스레드까지 가는 요청이 없어, 이 자리에 경고가 없으면 예산이 마른
+     * 사실이 어디에도 남지 않는다. 마른 상태는 정상 사용자의 메일이 조용히 사라지는 상태라 인지 수단이 필요하다(결정 D-8).
      */
     @Override
     public boolean hasCapacity() {
@@ -164,10 +168,14 @@ public class RedisMailSendBudget implements MailSendBudget {
         }
         List<String> counts = redisTemplate.opsForValue().multiGet(counterKeys(windows));
         if (counts == null || counts.size() != windows.size()) {
+            // 값을 받지 못하면 자리가 없는 것으로 본다. 이 경로에 로그를 두지 않는 이유는 요청마다 남아
+            // 창당 한 번이라는 규칙(결정 D-8)이 깨지기 때문이다. 같은 장애에서 요청 단위 제한이
+            // fail-closed로 먼저 걸려 500과 그쪽 기록이 남는다(리뷰 A-F5).
             return false;
         }
         for (int index = 0; index < windows.size(); index++) {
             if (count(counts.get(index)) >= windows.get(index).limit()) {
+                warnExhausted(windows.get(index));
                 return false;
             }
         }

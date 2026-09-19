@@ -40,6 +40,35 @@ class ConsumerDistributedDeploymentTest(unittest.TestCase):
         self.assertIn('${POSTGRES_BIND_ADDRESS:-127.0.0.1}:5432:5432', compose)
         self.assertIn('${REDIS_BIND_ADDRESS:-127.0.0.1}:6379:6379', compose)
 
+    def test_party_consumer_is_an_independent_process_and_group(self) -> None:
+        compose = DISTRIBUTED_COMPOSE.read_text(encoding="utf-8")
+
+        self.assertIn("  party-consumer:\n", compose)
+        self.assertIn("container_name: feelm-party-consumer", compose)
+        self.assertIn(
+            'command: ["/app/.venv/bin/python", "-m", "feelm_consumer.party_main"]',
+            compose,
+        )
+        self.assertIn("- party-consumer", compose)
+        self.assertIn(
+            "PARTY_CONSUMER_KAFKA_GROUP_ID: ${PARTY_CONSUMER_KAFKA_GROUP_ID:-feelm-party-consumer-v1}",
+            compose,
+        )
+        self.assertEqual(compose.count("container_name: feelm-foldin-consumer"), 1)
+
+    def test_party_completion_topic_and_backend_group_are_deployment_prerequisites(self) -> None:
+        readme = INFRA_README.read_text(encoding="utf-8")
+
+        self.assertIn("--topic feelm.party-candidate-updated.v1", readme)
+        self.assertIn("party_candidate_publications", readme)
+        self.assertIn("--group feelm-party-candidate-updated-v1", readme)
+        self.assertIn("운영 중 입력 토픽의 partition 수를", readme)
+        self.assertIn("Python raw Candidate 게시 완료만 나타내는 파생 상태", readme)
+        self.assertLess(
+            readme.index("--topic feelm.party-candidate-updated.v1"),
+            readme.index("--profile party-consumer up"),
+        )
+
     def test_environment_example_documents_cross_node_contract(self) -> None:
         env_example = ENV_EXAMPLE.read_text(encoding="utf-8")
 
@@ -56,6 +85,12 @@ class ConsumerDistributedDeploymentTest(unittest.TestCase):
             "CONSUMER_GROUP_URI",
             "CONSUMER_DISCOVERY_POPULARITY_URI",
             "CONSUMER_HYBRID_ALPHA",
+            "PARTY_CONSUMER_KAFKA_TOPIC",
+            "PARTY_CONSUMER_KAFKA_GROUP_ID",
+            "PARTY_CONSUMER_REDIS_URL",
+            "PARTY_CONSUMER_MODEL_URI",
+            "PARTY_CONSUMER_MAPPING_URI",
+            "PARTY_CONSUMER_METADATA_URI",
         ):
             self.assertIn(f"{name}=", env_example)
 

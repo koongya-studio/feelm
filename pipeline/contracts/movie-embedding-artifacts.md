@@ -20,6 +20,12 @@
 `tmdb-e5-v1`, `input_snapshot_sha256`을 기록한다. 입력 snapshot 해시는 `movie_id` 오름차순으로
 각 행의 `movie_id:tmdb_id:input_text_sha256\n`을 이어 SHA-256 계산한다.
 
+`tmdb-e5-v1`의 필드 정제는 null을 빈 문자열로 취급하고, 연속된 탭·CR·LF를 일반 공백
+한 칸으로 바꾼 뒤 필드 양끝의 일반 공백을 제거한다. 필드 내부의 연속 일반 공백과 NBSP는
+유지한다. 이 규칙으로 만든 `source_text`의 SHA-256이 `input_text_sha256`이다. 기존
+불변 산출물과 DB `model_version`에 연결된 입력 레시피이므로 공백 정제 규칙을 바꾸려면
+새 텍스트 템플릿 버전과 새 불변 산출물 버전을 정해야 한다.
+
 `manifest` JSON은 `contract_version=movie-embeddings-v1`, 위 metadata 필드와 `files`를
 담는다. `files`는 `embeddings/`와 `metadata/` 아래 보이는 일반 파일의 상대 경로에서 파일
 SHA-256으로 가는 매핑이다. 읽는 쪽은 실제 파일 집합·해시와 metadata·행 수·입력 snapshot

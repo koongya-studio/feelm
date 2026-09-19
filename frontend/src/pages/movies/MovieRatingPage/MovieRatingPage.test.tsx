@@ -3,9 +3,9 @@
  *
  * 고정하는 것은 세 가지다.
  *
- * - **저장에 성공하면 API-036 응답과 추가 전 · 후 수치를 그대로 2.6에 넘긴다.** 2.6 · 2.7은
- *   Router state만 보고 그리므로, 여기서 빠진 값은 그 화면에서 지어낼 수 없다. 추가 후 수치는
- *   저장이 끝난 뒤 다시 읽은 실측이다(업무 -599)
+ * - **저장에 성공하면 API-036 응답과 추가 전 수치를 그대로 2.6에 넘긴다.** 2.6 · 2.7은
+ *   Router state만 보고 그리므로, 여기서 빠진 값은 그 화면에서 지어낼 수 없다. 추가 전 수치는
+ *   화면에 들어올 때 받아 두고, 추가 후 수치는 2.6이 읽으므로 기다리지 않는다(업무 -635)
  * - **실패하면 화면에 남기고 이동하지 않는다.** 서버 문구를 그대로 쓰고, 다시 누를 수 있다
  * - **`409 RATING_ALREADY_EXISTS`는 수정 모드로 바꾼다.** 상세를 읽은 뒤 다른 곳에서 평가가
  *   생긴 경우다. 알리기만 하면 사용자는 같은 요청을 반복하게 된다
@@ -74,14 +74,12 @@ const created: Rating = {
 };
 
 const counts = { frameCount: 12, popcornCount: 7, weeklyFrameDelta: 3 };
-/** 저장 뒤 서버가 실제로 보여 주는 수치. 2.5가 한 번 더 읽는다(업무 -599) */
-const after = { frameCount: 13, popcornCount: 8, weeklyFrameDelta: 3 };
 
 beforeEach(() => {
   vi.mocked(getMovieDetail).mockReset().mockResolvedValue(movie);
   vi.mocked(getOtts).mockReset().mockResolvedValue([]);
   vi.mocked(findWatchedRecord).mockReset().mockResolvedValue(null);
-  vi.mocked(getRatingCounts).mockReset().mockResolvedValueOnce(counts).mockResolvedValue(after);
+  vi.mocked(getRatingCounts).mockReset().mockResolvedValue(counts);
   vi.mocked(createRating).mockReset().mockResolvedValue(created);
   vi.mocked(updateRating).mockReset().mockResolvedValue(created);
 });
@@ -132,6 +130,8 @@ describe('2.5 평가 저장', () => {
   it('점수만 매기면 API-036에 점수만 보내고 응답과 추가 전 수치를 2.6에 넘긴다', async () => {
     renderPage();
 
+    // 새 평가의 제목은 `평가하기`다. 수정일 때만 `평가 수정`이다(업무 S15P21E106-638)
+    expect(await screen.findByRole('heading', { level: 1, name: '평가하기' })).toBeInTheDocument();
     await rate(4.5);
 
     await waitFor(() => expect(location()).toBe('/movies/550/rate/result'));
@@ -141,29 +141,39 @@ describe('2.5 평가 저장', () => {
     expect(state).toEqual({
       rating: created,
       counts,
-      after,
       movieTitle: '파이트 클럽',
       posterUrl: null,
     });
-    // 저장 전에 한 번, 저장 뒤에 한 번이다
-    expect(getRatingCounts).toHaveBeenCalledTimes(2);
   });
 
-  it('저장 뒤 수치를 읽지 못해도 이동하고 2.7이 물러서서 그리게 한다', async () => {
+  it('추가 전 수치는 화면에 들어올 때 받아 두고 저장 뒤에는 다시 읽지 않는다', async () => {
+    renderPage();
+
+    await screen.findByRole('slider', { name: '별점' });
+    // 누르기 전에 이미 받았다
+    expect(getRatingCounts).toHaveBeenCalledTimes(1);
+
+    await rate(4.5);
+
+    await waitFor(() => expect(location()).toBe('/movies/550/rate/result'));
+    // 추가 후 수치는 2.6이 읽는다. 2.5는 그것을 기다리지 않는다
+    expect(getRatingCounts).toHaveBeenCalledTimes(1);
+  });
+
+  it('미리 받지 못한 추가 전 수치는 누를 때 다시 받아 저장한다', async () => {
     vi.mocked(getRatingCounts)
       .mockReset()
-      .mockResolvedValueOnce(counts)
-      .mockRejectedValue(new ApiError(0, 'NETWORK_ERROR', '네트워크에 연결할 수 없습니다.'));
+      .mockRejectedValueOnce(new ApiError(0, 'NETWORK_ERROR', '네트워크에 연결할 수 없습니다.'))
+      .mockResolvedValue(counts);
 
     renderPage();
 
     await rate(4.5);
 
-    // 저장은 이미 끝났으므로 실패로 되돌리지 않는다
     await waitFor(() => expect(location()).toBe('/movies/550/rate/result'));
+    expect(getRatingCounts).toHaveBeenCalledTimes(2);
 
     const state = JSON.parse(screen.getByTestId('result').getAttribute('data-state') ?? '{}');
-    expect(state.after).toBeNull();
     expect(state.counts).toEqual(counts);
   });
 
@@ -266,6 +276,8 @@ describe('2.5 평가 저장', () => {
     expect(
       await screen.findByRole('checkbox', { name: '스포일러가 포함되어 있어요' }),
     ).toBeChecked();
+    // 새 평가와 구분되게 제목이 `평가 수정`이다(업무 S15P21E106-638)
+    expect(screen.getByRole('heading', { level: 1, name: '평가 수정' })).toBeInTheDocument();
     await rate(2.5, '범인이 드러난다');
 
     await waitFor(() =>
@@ -277,5 +289,7 @@ describe('2.5 평가 저장', () => {
       }),
     );
     expect(createRating).not.toHaveBeenCalled();
+    // 수정은 프레임을 만들지 않으므로 수치를 받지 않는다
+    expect(getRatingCounts).not.toHaveBeenCalled();
   });
 });

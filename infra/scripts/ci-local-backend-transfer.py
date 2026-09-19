@@ -26,7 +26,7 @@ import hashlib, io, json, os, stat, sys, tarfile
 from pathlib import Path, PurePosixPath
 cache = Path('/home/feelm-ci-test/backend-checks/ee737a8331104a619b767a40ae996129/home/.gradle')
 manifest = Path('/home/feelm-ci-test/offline-inputs/9627ce2a9b774f11a71743bcfb8aec93/manifest.json')
-image = Path('/home/feelm-ci-test/ci222-backend-images-E4nFHV/backend-images.tar')
+image = Path('__IMAGE_ARCHIVE_PATH__')
 def open_regular(path):
     for part in (path, *path.parents):
         if part.is_symlink(): raise ValueError('Linked source refused')
@@ -70,9 +70,11 @@ with tarfile.open(fileobj=sys.stdout.buffer, mode='w|') as archive:
     for name, metadata in sorted(entries.items()):
         add_file(archive, 'gradle-cache/' + name, cache / name, metadata['sha256'], metadata['size'])
     add_file(archive, 'backend-images.tar', image,
-        'f1fdc5c9e4e3c96d1d04f4bdab407e1953764199ad2e2a7b007c50c0810990cb', 2*1024**3)
+        '__IMAGE_ARCHIVE_SHA__', 2*1024**3)
 print('REMOTE_SELECTED_EXPORT_COMPLETE', file=sys.stderr, flush=True)
 '''
+REMOTE = REMOTE.replace('__IMAGE_ARCHIVE_PATH__', str(inputs.IMAGE_ARCHIVE_PATH))
+REMOTE = REMOTE.replace('__IMAGE_ARCHIVE_SHA__', inputs.IMAGE_ARCHIVE_SHA)
 
 
 def safe_member(member):

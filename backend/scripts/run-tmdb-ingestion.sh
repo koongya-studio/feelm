@@ -6,6 +6,7 @@ readonly TMDB_API_BASE="${TMDB_API_BASE:-https://api.themoviedb.org/3}"
 readonly TMDB_IMAGE_BASE="${TMDB_IMAGE_BASE:-https://image.tmdb.org/t/p/original}"
 readonly TMDB_POSTER_IMAGE_BASE="${TMDB_POSTER_IMAGE_BASE:-https://image.tmdb.org/t/p/w500}"
 readonly TMDB_BACKDROP_IMAGE_BASE="${TMDB_BACKDROP_IMAGE_BASE:-https://image.tmdb.org/t/p/w1280}"
+readonly KOREAN_TITLE_OVERRIDES="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/data/verified-korean-titles.tsv"
 
 usage() {
   cat <<'USAGE'
@@ -215,6 +216,33 @@ if [[ "$validate_only" == 'true' ]]; then
 fi
 
 require_command jq
+[[ -r "$KOREAN_TITLE_OVERRIDES" && -f "$KOREAN_TITLE_OVERRIDES" ]] \
+  || fail 'verified Korean title catalog is not readable'
+if ! awk -F '\t' '
+  NR == 1 { if ($0 != "tmdb_id\toriginal_title\trelease_year\tkorean_title\tsource_url") exit 1; next }
+  NF != 5 { exit 1 }
+  END { if (NR < 2) exit 1 }
+' "$KOREAN_TITLE_OVERRIDES"; then
+  fail 'verified Korean title catalog has an invalid header or row shape'
+fi
+declare -A verified_korean_titles=()
+declare -A verified_original_titles=()
+declare -A verified_release_years=()
+while IFS=$'\t' read -r override_id override_original override_year override_title override_source; do
+  [[ "$override_id" =~ ^[1-9][0-9]*$ && "$override_id" -le 2147483647 ]] \
+    || fail 'verified Korean title catalog has an invalid TMDb ID'
+  [[ -n "$override_original" && "$override_year" =~ ^[12][0-9]{3}$ ]] \
+    || fail "verified Korean title catalog has an invalid identity: $override_id"
+  [[ "$override_source" == https://* ]] \
+    && jq -ne --arg title "$override_title" '$title | test("[가-힣]")' >/dev/null \
+    || fail "verified Korean title catalog has an invalid title or source: $override_id"
+  [[ -z "${verified_korean_titles[$override_id]:-}" ]] \
+    || fail "verified Korean title catalog has a duplicate TMDb ID: $override_id"
+  verified_korean_titles[$override_id]="$override_title"
+  verified_original_titles[$override_id]="$override_original"
+  verified_release_years[$override_id]="$override_year"
+done < <(tail -n +2 "$KOREAN_TITLE_OVERRIDES")
+
 if [[ -z "$raw_dir" ]]; then
   require_command curl
   [[ -n "${TMDB_TOKEN:-}" ]] || fail 'TMDB_TOKEN environment variable is required'
@@ -444,7 +472,7 @@ while IFS= read -r tmdb_id; do
     credits="$work_dir/$tmdb_id-credits.json"
     providers="$work_dir/$tmdb_id-providers.json"
     status=''
-    status="$(tmdb_get "movie/$tmdb_id?language=ko-KR" "$detail")" \
+    status="$(tmdb_get "movie/$tmdb_id?language=ko-KR&append_to_response=translations,alternative_titles" "$detail")" \
       || { printf '%s\tTMDB_DETAIL_HTTP_%s\n' "$tmdb_id" "$status" >>"$failures_tsv"; failed=$((failed + 1)); continue; }
     status="$(tmdb_get "movie/$tmdb_id/credits?language=ko-KR" "$credits")" \
       || { printf '%s\tTMDB_CREDITS_HTTP_%s\n' "$tmdb_id" "$status" >>"$failures_tsv"; failed=$((failed + 1)); continue; }
@@ -469,14 +497,42 @@ while IFS= read -r tmdb_id; do
     fi
   fi
 
+  verified_title="${verified_korean_titles[$tmdb_id]:-}"
+  if [[ -n "$verified_title" ]]; then
+    raw_identity="$(jq -r '[.details.original_title // "", ((.details.release_date // "")[0:4])] | @tsv' "$raw_file")" \
+      || { printf '%s\tTITLE_OVERRIDE_IDENTITY_INVALID\n' "$tmdb_id" >>"$failures_tsv"; failed=$((failed + 1)); continue; }
+    expected_identity="${verified_original_titles[$tmdb_id]}"$'\t'"${verified_release_years[$tmdb_id]}"
+    if [[ "$raw_identity" != "$expected_identity" ]]; then
+      printf '%s\tTITLE_OVERRIDE_IDENTITY_MISMATCH\n' "$tmdb_id" >>"$failures_tsv"
+      failed=$((failed + 1))
+      continue
+    fi
+  fi
+
   payload="$work_dir/$tmdb_id-payload.json"
   # Keep the complete provider response in raw-tmdb, but synchronize only KR subscription offers.
   # results.KR.link is a regional TMDb/JustWatch page, not a provider-specific deep link.
   if ! jq \
       --arg poster_image_base "$TMDB_POSTER_IMAGE_BASE" \
-      --arg backdrop_image_base "$TMDB_BACKDROP_IMAGE_BASE" '
+      --arg backdrop_image_base "$TMDB_BACKDROP_IMAGE_BASE" \
+      --arg verified_title "$verified_title" '
       .details as $d | .credits as $c | .providers as $p |
-      (($d.title // "") | if length > 0 then . else ($d.original_title // "") end) as $title |
+      ($d.title // "") as $localized_title |
+      (if ($localized_title | length) > 0 then $localized_title
+       else ($d.original_title // "") end) as $fallback_title |
+      ([$d.translations.translations[]? |
+        select(.iso_639_1 == "ko" and .iso_3166_1 == "KR") |
+        .data.title | select(type == "string" and test("[가-힣]"))] | unique) as $translated_titles |
+      ([$d.alternative_titles.titles[]? |
+        select(.iso_3166_1 == "KR") |
+        .title | select(type == "string" and test("[가-힣]"))] | unique) as $kr_titles |
+      (if ($localized_title | test("[가-힣]")) then $localized_title
+       elif ($translated_titles | length) == 1 then $translated_titles[0]
+       elif ($translated_titles | length) > 1 then
+         (if ($verified_title | length) > 0 then $verified_title else $fallback_title end)
+       elif ($kr_titles | length) == 1 then $kr_titles[0]
+       elif ($verified_title | length) > 0 then $verified_title
+       else $fallback_title end) as $title |
       if ($title | length) == 0 then error("missing title") else
       {
         tmdb_id: ($d.id | tonumber), title: $title,
@@ -544,7 +600,11 @@ WITH upserted AS (
     data->>'backdrop_url'
   FROM _tmdb_payload
   ON CONFLICT (tmdb_id) DO UPDATE SET
-    title = EXCLUDED.title,
+    title = CASE
+      WHEN EXCLUDED.title !~ '[가-힣]' AND movies.title ~ '[가-힣]'
+        THEN movies.title
+      ELSE EXCLUDED.title
+    END,
     original_title = EXCLUDED.original_title,
     synopsis = EXCLUDED.synopsis,
     release_date = EXCLUDED.release_date,

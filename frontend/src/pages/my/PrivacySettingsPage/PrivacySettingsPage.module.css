@@ -40,6 +40,12 @@
   font-weight: var(--font-weight-medium);
 }
 
+@media (hover: hover) {
+  .level[aria-checked='false']:hover {
+    color: var(--color-ink);
+  }
+}
+
 .level[aria-checked='true'] {
   background: var(--color-surface-raised);
   box-shadow: var(--shadow-raised);

@@ -11,6 +11,7 @@ import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -29,9 +30,9 @@ public class NotificationRepository {
                 .isPresent();
     }
 
-    public void createPartyInvitation(
+    public long createPartyInvitation(
             long userId, long invitationId, Instant notifiedAt, Instant expiresAt) {
-        jdbc.sql(
+        return jdbc.sql(
                         """
                         INSERT INTO notifications(
                             user_id, type, source_id, target_type, target_id,
@@ -41,18 +42,52 @@ public class NotificationRepository {
                             :invitationId, '파티 모드 초대', '새로운 파티 초대가 도착했어요.',
                             :notifiedAt, :expiresAt
                         )
-                        ON CONFLICT (type, source_id) DO NOTHING
+                        ON CONFLICT (type, source_id) DO UPDATE SET
+                            updated_at = notifications.updated_at
+                        RETURNING id
                         """)
                 .param("userId", userId)
                 .param("invitationId", invitationId)
                 .param("notifiedAt", offset(notifiedAt))
                 .param("expiresAt", offset(expiresAt))
-                .update();
+                .query(Long.class)
+                .single();
     }
 
-    public void upsertWatchConfirmation(
+    public long createPartyInvitationAccepted(
+            long ownerId,
+            long invitationId,
+            long partyId,
+            String inviteeNickname,
+            Instant notifiedAt,
+            Instant expiresAt) {
+        return jdbc.sql(
+                        """
+                        INSERT INTO notifications(
+                            user_id, type, source_id, target_type, target_id,
+                            title, body, notified_at, expires_at
+                        ) VALUES (
+                            :ownerId, 'PARTY_INVITE_ACCEPTED', :invitationId, 'PARTY',
+                            :partyId, '파티 모드 초대 수락', :body,
+                            :notifiedAt, :expiresAt
+                        )
+                        ON CONFLICT (type, source_id) DO UPDATE SET
+                            updated_at = notifications.updated_at
+                        RETURNING id
+                        """)
+                .param("ownerId", ownerId)
+                .param("invitationId", invitationId)
+                .param("partyId", partyId)
+                .param("body", inviteeNickname + " 님이 파티 모드에 참여했어요.")
+                .param("notifiedAt", offset(notifiedAt))
+                .param("expiresAt", offset(expiresAt))
+                .query(Long.class)
+                .single();
+    }
+
+    public long upsertWatchConfirmation(
             long userId, long watchRecordId, Instant notifiedAt, Instant expiresAt) {
-        jdbc.sql(
+        return jdbc.sql(
                         """
                         INSERT INTO notifications(
                             user_id, type, source_id, target_type, target_id,
@@ -73,12 +108,14 @@ public class NotificationRepository {
                             read_at = NULL,
                             closed_at = NULL,
                             updated_at = now()
+                        RETURNING id
                         """)
                 .param("userId", userId)
                 .param("watchRecordId", watchRecordId)
                 .param("notifiedAt", offset(notifiedAt))
                 .param("expiresAt", offset(expiresAt))
-                .update();
+                .query(Long.class)
+                .single();
     }
 
     public List<NotificationRow> findPage(
@@ -187,20 +224,23 @@ public class NotificationRepository {
                 == 1;
     }
 
-    public void close(long userId, NotificationType type, long sourceId, Instant closedAt) {
-        jdbc.sql(
+    public Optional<Long> close(
+            long userId, NotificationType type, long sourceId, Instant closedAt) {
+        return jdbc.sql(
                         """
                         UPDATE notifications
                         SET read_at = COALESCE(read_at, :closedAt),
                             closed_at = COALESCE(closed_at, :closedAt),
                             updated_at = now()
                         WHERE user_id = :userId AND type = :type AND source_id = :sourceId
+                        RETURNING id
                         """)
                 .param("closedAt", offset(closedAt))
                 .param("userId", userId)
                 .param("type", type.name())
                 .param("sourceId", sourceId)
-                .update();
+                .query(Long.class)
+                .optional();
     }
 
     public void deleteByUserId(long userId) {

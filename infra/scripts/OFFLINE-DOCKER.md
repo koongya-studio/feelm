@@ -104,7 +104,7 @@ OFFLINE_LOOPBACK_PORT: PASS, PROBE_CLEANUP: PASS, OFFLINE_PORT_EXIT=0이다.
 ## 임시 포트 통과 후 전체 backend 실행
 
 운영자 출력에서 namespace identity, OFFLINE_LOOPBACK_PORT, cleanup 모두 PASS와 종료 0을
-확인했다. Redis/pgvector/Ryuk 3개 이미지도 원본 digest 검사 후 파일로 이전하고 image ID가
+확인했다. Redis/pgvector/Ryuk/Kafka 4개 이미지도 원본 digest 검사 후 파일로 이전하고 image ID가
 일치했다. 준비 입력은 `offline-inputs/9627ce2a9b774f11a71743bcfb8aec93`, 캐시 2986파일,
 406181461 bytes이며 준비 종료 0이다. 위 증빙은 운영자가 제공한 결과다.
 

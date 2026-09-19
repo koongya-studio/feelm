@@ -5,7 +5,8 @@
  * 옮겼다. **그 화면들이 걷던 사슬을 피드 위에서 그대로 걷는다.** 306에서 만든
  * `MyRecordsFlow.test.tsx`가 잡던 자리이고, 화면이 사라졌을 뿐 확인할 것은 같다.
  *
- * - 피드(평가) ⇢ 2.5: 이미 평가한 영화를 고치면 **평가가 늘면 안 된다**
+ * - 피드(평가) ⇢ 2.4 → 2.5: 이미 평가한 영화를 고치면 **평가가 늘면 안 된다**. 피드는 2.4 영화
+ *   상세로 가고, 수정은 2.4의 `내 별점 수정하기`로 들어간다(업무 -638)
  * - 피드(안 남긴 영화) ⇢ 2.5: 평가하면 API-036으로 저장되고, 다시 받은 서버 목록에서 빠진다
  *
  * 실제 호출인 도메인만 가로챈다 — API-014 내 프로필(`api/users`), OTT 기준정보(`api/otts`),
@@ -18,6 +19,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import MyDashboardPage from './index';
+import MovieDetailPage from '../../movies/MovieDetailPage';
 import MovieRatingPage from '../../movies/MovieRatingPage';
 import RatingResultPage from '../../movies/RatingResultPage';
 import { getMyProfile, getMyProfileView } from '../../../api/users';
@@ -28,6 +30,7 @@ import { mockOtts } from '../../../mocks/otts';
 import { resetSessionStore } from '../../../mocks/sessionStore';
 import { mockMyProfileView } from '../../../mocks/publicProfiles';
 import { mockMyProfile } from '../../../mocks/user';
+import { AuthContext } from '../../../contexts/authContext';
 import { ROUTE_PATTERN } from '../../../routes/paths';
 import type { MovieDetail } from '../../../types/movie';
 import type {
@@ -81,6 +84,9 @@ vi.mock('../../../api/taste', async (importOriginal) => ({
 vi.mock('../../../api/movies', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/movies')>()),
   getMovieDetail: vi.fn(),
+  // 2.4의 비슷한 영화 · 한줄평. 이 흐름에서 보는 것이 아니라 비워 둔다
+  getSimilarMovies: vi.fn(() => Promise.resolve([])),
+  getMovieReviews: vi.fn(() => Promise.resolve({ items: [], nextCursor: null, hasNext: false })),
 }));
 
 vi.mock('../../../api/watch', async (importOriginal) => ({
@@ -214,11 +220,30 @@ function LocationProbe() {
   return <div data-testid="location">{location.pathname}</div>;
 }
 
+/** 2.4가 세션 복구를 기다린다. 이 흐름은 로그인한 사용자다 */
+const auth = {
+  status: 'authenticated',
+  user: null,
+  signIn: vi.fn(),
+  signInWithSocial: vi.fn(),
+  completeEmailSignup: vi.fn(),
+  completeSocialSignup: vi.fn(),
+  signOut: vi.fn(),
+} as const;
+
 function renderApp(entries: string[]) {
   return render(
     <MemoryRouter initialEntries={entries} initialIndex={entries.length - 1}>
       <Routes>
         <Route path={ROUTE_PATTERN.my} element={<MyDashboardPage />} />
+        <Route
+          path={ROUTE_PATTERN.movieDetail}
+          element={
+            <AuthContext.Provider value={auth}>
+              <MovieDetailPage />
+            </AuthContext.Provider>
+          }
+        />
         <Route path={ROUTE_PATTERN.movieRating} element={<MovieRatingPage />} />
         <Route path={ROUTE_PATTERN.ratingResult} element={<RatingResultPage />} />
       </Routes>
@@ -239,19 +264,25 @@ async function setScore(score: number) {
   fireEvent.change(slider, { target: { value: String(score) } });
 }
 
-describe('MY 피드(평가) ⇢ 2.5', () => {
+describe('MY 피드(평가) ⇢ 2.4 → 2.5', () => {
   it('기존 평가를 고치면 피드에 반영되고 평가가 늘지 않는다', async () => {
     renderApp([ROUTE_PATTERN.my]);
 
-    // 402는 별점 4.0에 한줄평이 있는 기준 평가다
+    // 402는 별점 4.0에 한줄평이 있는 기준 평가다. 피드는 2.4 영화 상세로 간다(업무 -638)
     const cell = await screen.findByRole('link', { name: /영화 제목 2/ });
-    expect(cell).toHaveAttribute('href', '/movies/402/rate');
+    expect(cell).toHaveAttribute('href', '/movies/402');
     fireEvent.click(cell);
+
+    // 평가 수정은 2.4의 `내 별점 수정하기`로 이어진다
+    fireEvent.click(await screen.findByRole('button', { name: '내 별점 수정하기' }));
+    await waitFor(() => expect(location()).toBe('/movies/402/rate'));
 
     await setScore(2.5);
     fireEvent.click(screen.getByRole('button', { name: '평가 완료' }));
 
-    // 수정이라 2.6이 아니라 온 곳(MY)으로 돌아온다
+    // 수정이라 2.6이 아니라 온 곳(2.4)으로 돌아오고, 2.4에서 뒤로 가면 MY다
+    await waitFor(() => expect(location()).toBe('/movies/402'));
+    fireEvent.click(await screen.findByRole('button', { name: '뒤로 가기' }));
     await waitFor(() => expect(location()).toBe('/my'));
     expect(await screen.findByRole('link', { name: /영화 제목 2.*2\.5/ })).toBeInTheDocument();
 

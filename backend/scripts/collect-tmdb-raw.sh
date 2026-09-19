@@ -195,7 +195,7 @@ collect_one() {
     combined="$work_dir/$tmdb_id-combined.json"
     status=''
     status="$(tmdb_get \
-      "movie/$tmdb_id?language=ko-KR&append_to_response=credits,watch%2Fproviders" \
+      "movie/$tmdb_id?language=ko-KR&append_to_response=credits,watch%2Fproviders,translations,alternative_titles" \
       "$combined" "$tmdb_id-combined")" \
       || { printf '%s\tFAILED\tTMDB_COMBINED_HTTP_%s\n' "$tmdb_id" "$status" >"$status_dir/$tmdb_id.tsv"; return 0; }
 

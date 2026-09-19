@@ -3,15 +3,19 @@ package com.feelm.backend.domain.onboarding.service;
 import com.feelm.backend.domain.onboarding.dto.request.OnboardingSubmitRequest;
 import com.feelm.backend.domain.onboarding.dto.response.OnboardingSubmitResponse;
 import com.feelm.backend.domain.onboarding.entity.OnboardingPreference;
+import com.feelm.backend.domain.onboarding.entity.PreferenceChoice;
 import com.feelm.backend.domain.onboarding.repository.OnboardingPreferenceRepository;
 import com.feelm.backend.domain.user.entity.User;
 import com.feelm.backend.domain.user.repository.UserRepository;
+import com.feelm.backend.domain.watch.service.OnboardingRatingWriter;
+import com.feelm.backend.domain.watch.service.OnboardingRatingWriter.RatingChoice;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ConstraintViolations;
 import com.feelm.backend.global.error.ErrorCode;
 import com.feelm.backend.infrastructure.kafka.KafkaEventPublisher;
 import com.feelm.backend.infrastructure.kafka.KafkaEventType;
 import com.feelm.backend.infrastructure.kafka.OnboardingEventPayload;
+import java.math.BigDecimal;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -30,6 +34,7 @@ public class OnboardingSubmitService {
 
     private final OnboardingPreferenceRepository onboardingPreferenceRepository;
     private final UserRepository userRepository;
+    private final OnboardingRatingWriter onboardingRatingWriter;
     private final KafkaEventPublisher kafkaEventPublisher;
 
     /**
@@ -53,6 +58,14 @@ public class OnboardingSubmitService {
         if (user.isOnboardingCompleted()) {
             throw new BusinessException(ErrorCode.ONBOARDING_ALREADY_COMPLETED);
         }
+        onboardingRatingWriter.createMissing(
+                userId,
+                choices.stream()
+                        .map(
+                                choice ->
+                                        new RatingChoice(
+                                                choice.movieId(), scoreOf(choice.preference())))
+                        .toList());
         try {
             // 카드를 받은 뒤 영화가 사라지면 FK 제약이 최종 판정을 내린다. 제약 위반이 여기까지 올라오도록 저장 시점에 flush 한다.
             onboardingPreferenceRepository.saveAllAndFlush(
@@ -72,5 +85,12 @@ public class OnboardingSubmitService {
                     KafkaEventType.ONBOARDING, userId, new OnboardingEventPayload(choices.size()));
         }
         return new OnboardingSubmitResponse(true, choices.size(), request.skipped());
+    }
+
+    private static BigDecimal scoreOf(PreferenceChoice preference) {
+        return switch (preference) {
+            case LIKE -> new BigDecimal("4.0");
+            case DISLIKE -> new BigDecimal("2.0");
+        };
     }
 }

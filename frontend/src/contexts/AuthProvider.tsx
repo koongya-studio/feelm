@@ -9,12 +9,17 @@
  * `onSessionEnd`를 구독해 상태를 되돌린다.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { login, logout, restoreSession, socialLogin, socialSignup } from '../api/auth';
+import { login, logout, restoreSession, signup, socialLogin, socialSignup } from '../api/auth';
 import { onSessionEnd } from '../api/session';
 import { AuthContext } from './authContext';
 import type { ReactNode } from 'react';
 import type { AuthStatus, AuthValue } from './authContext';
-import type { AuthenticatedUser, SocialProvider, SocialSignupRequest } from '../types/auth';
+import type {
+  AuthenticatedUser,
+  SignupRequest,
+  SocialProvider,
+  SocialSignupRequest,
+} from '../types/auth';
 
 type State = { status: AuthStatus; user: AuthenticatedUser | null };
 
@@ -66,6 +71,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  /*
+   * 가입 응답이 세션을 함께 내리므로(API-001) 여기까지 올려야 화면이 로그인 상태가 된다.
+   * `api/auth`가 Access Token을 보관해도 라우트 보호는 이 Context의 상태를 보기 때문에,
+   * 올리지 않으면 가입 직후 온보딩으로 갈 때 로그인 화면으로 튕긴다.
+   */
+  const completeEmailSignup = useCallback(async (request: SignupRequest) => {
+    const user = await signup(request);
+
+    setState({ status: 'authenticated', user });
+
+    return user;
+  }, []);
+
   const completeSocialSignup = useCallback(async (request: SocialSignupRequest) => {
     const user = await socialSignup(request);
 
@@ -81,8 +99,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthValue>(
-    () => ({ ...state, signIn, signInWithSocial, completeSocialSignup, signOut }),
-    [state, signIn, signInWithSocial, completeSocialSignup, signOut],
+    () => ({
+      ...state,
+      signIn,
+      signInWithSocial,
+      completeEmailSignup,
+      completeSocialSignup,
+      signOut,
+    }),
+    [state, signIn, signInWithSocial, completeEmailSignup, completeSocialSignup, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -20,14 +20,15 @@ import { path } from '../../../routes/paths';
 import StatusView from '../../../components/StatusView';
 import { getLatestPushNotification, readNotification } from '../../../api/notifications';
 import { notificationPath } from '../destination';
+import appSymbol from '../../../assets/logo/feelm-symbol.webp';
 import styles from './PushPreviewPage.module.css';
-import type { NotificationView } from '../../../types/unspecified';
+import type { NotificationItem } from '../../../types/notification';
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
 
 export default function PushPreviewPage() {
   const navigate = useNavigate();
-  const [notification, setNotification] = useState<NotificationView | null | undefined>(undefined);
+  const [notification, setNotification] = useState<NotificationItem | null | undefined>(undefined);
 
   useEffect(() => {
     let active = true;
@@ -49,9 +50,16 @@ export default function PushPreviewPage() {
   const date = `${now.getMonth() + 1}월 ${now.getDate()}일 ${WEEKDAYS[now.getDay()]}요일`;
   const time = `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
 
-  async function open(item: NotificationView) {
-    await readNotification(item.notificationId);
-    void navigate(notificationPath(item.destination));
+  async function open(item: NotificationItem) {
+    try {
+      if (item.readAt === null) {
+        await readNotification(item.notificationId);
+      }
+    } catch {
+      // 예시 카드가 가리키는 화면 진입은 읽음 요청 실패와 별개로 유지한다.
+    }
+
+    void navigate(notificationPath(item));
   }
 
   return (
@@ -73,8 +81,9 @@ export default function PushPreviewPage() {
 
             {notification ? (
               <button type="button" className={styles.card} onClick={() => void open(notification)}>
+                {/* 앱 아이콘과 같은 심볼이다(업무 -703). 장식이라 읽지 않는다 */}
                 <span className={styles.appIcon} aria-hidden="true">
-                  f
+                  <img className={styles.appSymbol} src={appSymbol} alt="" />
                 </span>
                 <span className={styles.cardText}>
                   <span className={styles.app}>feelm · 지금</span>

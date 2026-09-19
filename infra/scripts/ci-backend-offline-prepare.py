@@ -23,6 +23,7 @@ ARCHIVE_SHA = '3e151aef092a1db51f1295f6f9c27e7a68141a7ced838503e67b1eaf21e82ceb'
 RUNS = Path('/home/feelm-ci-test/backend-checks')
 OUTPUT = Path('/home/feelm-ci-test/offline-inputs')
 IMAGES = {
+    'apache/kafka:4.3.1': 'apache/kafka@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837',
     'redis:8-alpine': 'redis@sha256:becdda6c7f4b3fb42e42fd7f120bbf5c54c4caaaf16f26da24e4563d2c1f0576',
     'pgvector/pgvector:0.8.6-pg17-bookworm': 'pgvector/pgvector@sha256:cf134a767f474095eeba57e0117be8e568e011a63f33fbf252f14c9b760f8e6f',
     'testcontainers/ryuk:0.14.0': 'testcontainers/ryuk@sha256:7c1a8a9a47c780ed0f983770a662f80deb115d95cce3e2daa3d12115b8cd28f0',

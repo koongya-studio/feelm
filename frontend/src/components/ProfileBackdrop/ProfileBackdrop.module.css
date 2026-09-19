@@ -1,0 +1,129 @@
+/*
+ * 프로필 사진 배경 틀. 값은 2.4 영화 상세(`MovieDetailPage.module.css`)와 같다 — 두 화면이
+ * 같은 층으로 읽혀야 한다(업무 -697). 경사 값이 왜 그 수인지는 그 파일에 적혀 있다.
+ *
+ * `--profile-scroll`은 스크롤할 때마다 0~1로 채워 넣는다(`useScrollFade`).
+ *
+ * **안쪽 층(사진 · 막 · 머리 · 본문)의 z-index를 이 틀 안에 가둔다**(`isolation`). 가두지 않으면
+ * 화면 전체를 덮는 고정 막과 본문이 틀 밖과 순서를 다퉈, z-index가 없는 하단 내비를 덮고
+ * 7.2 ⋯ 메뉴의 바깥 누름 막 위로 올라온다 — 내비가 사라지고 메뉴 바깥을 눌러도 닫히지 않았다.
+ */
+.page {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  background: #0d0c0f;
+  color: var(--color-on-dark);
+
+  --profile-scroll: 0;
+}
+
+/*
+ * 사진 배경. 화면에 고정해 본문만 흐른다. 얼굴이 위쪽에 오도록 위를 기준으로 화면 폭에 맞춘다.
+ * 밝기는 처음부터 살짝 눌러 상단 버튼의 대비를 지킨다.
+ */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-color: #0d0c0f;
+  background-image: var(--profile-photo, none);
+  background-position: center top;
+  background-repeat: no-repeat;
+  background-size: 100% auto;
+  filter: blur(calc(1px + var(--profile-scroll) * 21px))
+    brightness(calc(0.82 - var(--profile-scroll) * 0.42));
+  will-change: filter;
+}
+
+/* 사진이 없는 사람. 자리표시자를 전면에 늘리지 않고 어두운 면만 남긴다 */
+.page[data-photo='none'] .backdrop {
+  background-image: radial-gradient(90% 60% at 50% 0%, #2a2630 0%, #0d0c0f 70%);
+}
+
+/*
+ * 화면에 고정된 어두운 층. **2.4와 달리 아래 끝을 다 덮지 않는다**(업무 -697). 카드가 유리라
+ * 뒤에 흐려진 사진이 비쳐야 한다(사용자 지시 2026-09-19 "글래스모피즘"). 대신 사진이 스크롤에
+ * 따라 0.4 밝기까지 눌리고 크게 흐려지므로(`.backdrop`) 흰 글자는 어두운 면 위에 남는다.
+ */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    180deg,
+    rgba(13, 12, 15, 0) 0%,
+    rgba(13, 12, 15, 0.12) 30%,
+    rgba(13, 12, 15, 0.5) 58%,
+    rgba(13, 12, 15, 0.62) 100%
+  );
+}
+
+/*
+ * 머리. 기본은 내용과 함께 올라간다. `data-sticky`면 위에 붙어 따라오고, 스크롤한 만큼 짙어지는
+ * 띠를 깔아 글자가 그 밑으로 지나가게 한다. 맨 위에서는 띠가 투명이라 사진이 그대로 보인다.
+ *
+ * 띠는 머리 높이의 대부분을 진하게 덮고 끝에서만 풀린다. 2.4처럼 위에서부터 서서히 풀리면
+ * 제목 줄 뒤가 비쳐, 밑을 지나는 이름 · 버튼과 제목이 겹쳐 읽힌다.
+ */
+.top {
+  position: relative;
+  z-index: 3;
+}
+
+.top[data-sticky] {
+  position: sticky;
+  top: 0;
+}
+
+.top[data-sticky]::before {
+  position: absolute;
+  inset: 0 0 -16px;
+  background: linear-gradient(180deg, #0d0c0f 0%, #0d0c0f 80%, rgba(13, 12, 15, 0) 100%);
+  content: '';
+  /* 내리기 시작하면 금방 다 짙어진다. 반쯤 비친 채로 머물면 밑을 지나는 글자가 제목과 겹친다 */
+  opacity: min(1, calc(var(--profile-scroll) * 3));
+  pointer-events: none;
+}
+
+.top > * {
+  position: relative;
+}
+
+/* 사진이 선명하게 보이는 구간. 글자를 올리지 않는다 */
+.stage {
+  position: relative;
+  z-index: 2;
+  height: 34vh;
+  min-height: 180px;
+  flex: none;
+}
+
+/* 사진이 없으면 볼 것이 없으므로 짧게 둔다. 대신 본문이 사진 자리(동그라미)를 보인다 */
+.page[data-photo='none'] .stage {
+  height: var(--space-4);
+  min-height: 0;
+}
+
+/*
+ * 본문. 자기 배경을 스스로 들고 다닌다 — 고정된 `.scrim`의 투명한 윗구간을 지날 때도 글자가
+ * 어두운 면 위에 있어야 한다. 위 72px 경사는 본문이 카드처럼 잘려 보이지 않게 한다.
+ *
+ * 끝까지 반투명이다. 불투명하게 닫으면 유리 카드 뒤가 검정뿐이라 유리로 보이지 않는다.
+ */
+.sheet {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  background: linear-gradient(
+    180deg,
+    rgba(13, 12, 15, 0) 0,
+    rgba(13, 12, 15, 0.55) 48px,
+    rgba(13, 12, 15, 0.5) 120px,
+    rgba(13, 12, 15, 0.35) 380px
+  );
+}

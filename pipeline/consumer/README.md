@@ -104,6 +104,41 @@ CI에서는 develop 대상 MR에 `consumer-mr-test`가 자동 실행되고 `pipe
 uv run feelm-foldin-consumer
 ```
 
+## 파티 추천 전용 Consumer (S15P21E106-566)
+
+같은 이미지에서 `feelm_consumer.party_main` 모듈을 실행하지만 개인 Fold-in과는 별도 프로세스,
+Kafka Group, 환경변수 prefix로 실행한다. `feelm.party-refresh.v1`의 8바이트 Long Kafka key가
+payload의 `partyId`와 같은지 검증하고 기존 `party-mean-fit-v2` 정책으로 최대 500편을 계산한다.
+Spark 코드를 import하지 않으며 기존 Spark 구현은 parity와 롤백 기준선으로만 남긴다.
+
+파티 Consumer는 시작할 때 개인 Consumer와 같은 `als-artifacts-v2` SERVING model, mapping,
+movie metadata 고정 URI 세 개를 `load_bundle`로 검증한다. Redis 게시 Lua는 partition assign 때
+발급한 전용 fence와 `feelm:model:current.modelVersion`을 함께 확인하고
+`feelm:party:{partyId}:candidates` JSON 하나를 교체한다. 게시 성공 뒤
+`feelm.party-candidate-updated.v1`에 같은 `partyId`, `inputId`, 50자 이하 `modelVersion`,
+`generatedAt`과 원본 partition·offset을 발행한다. `modelVersion`은 산출물의 소문자 영숫자·점·밑줄·하이픈
+형식을 검증하고, `generatedAt`은 원본 Kafka record timestamp를 UTC로 정규화해 재처리에도 고정한다.
+broker ACK까지 확인된 뒤에만 입력 Kafka record의
+Offset을 동기 커밋한다. poison record나 영구 실패 partition은 pause하고 다른 partition은 계속 처리한다.
+
+새 `feelm-party-consumer-v1` group이 처음 할당될 때는 `latest`에서 시작한다. 전환 중 Spring
+발행을 멈추고 기존 Spark writer가 당시 topic tail까지 처리한 것을 확인한 뒤 시작하며, 할당 후
+현재 활성 파티 입력을 다시 발행해 기준 상태를 만든다. 이미 commit된 group은 기존 Offset을
+그대로 재개한다. 모델 교체 전에는 발행을 멈추고 모든 partition lag가 0인지 확인한다.
+
+```bash
+uv run python -m feelm_consumer.party_main
+```
+
+필수 설정은 `PARTY_CONSUMER_KAFKA_BOOTSTRAP_SERVERS`,
+`PARTY_CONSUMER_KAFKA_GROUP_ID`, `PARTY_CONSUMER_REDIS_URL`,
+`PARTY_CONSUMER_MODEL_URI`, `PARTY_CONSUMER_MAPPING_URI`,
+`PARTY_CONSUMER_METADATA_URI`다. topic 기본값은 `feelm.party-refresh.v1`, group 기본값은
+`feelm-party-consumer-v1`이다. 실제 Redis URL과 내부 URI는 `.env` 또는 승인된 배포 Secret으로만
+주입한다. model version은 현재 Spring reader·DB 계약에 맞게 50자 이하여야 한다. 더 긴
+`als-artifacts-v2` 식별자를 서비스에 쓰려면 공통 계약을 별도 업무에서 먼저 확장한다. 운영 전환과
+롤백 순서는 `infra/README.md`의 파티 Consumer 절을 따른다.
+
 ## 컨테이너 빌드와 실행
 
 저장소 루트에서 Consumer 전용 build context를 사용한다. Python 런타임과 `uv` 버전,

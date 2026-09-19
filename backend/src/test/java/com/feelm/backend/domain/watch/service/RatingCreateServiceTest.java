@@ -52,7 +52,10 @@ class RatingCreateServiceTest {
         eventPublisher = mock(KafkaEventPublisher.class);
         service =
                 new RatingCreateService(
-                        repository, frameWriter, eventPublisher, Clock.fixed(NOW, ZoneOffset.UTC));
+                        repository,
+                        new RatingStateWriter(repository, frameWriter),
+                        eventPublisher,
+                        Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test

@@ -31,10 +31,7 @@ public class RecommendationHistoryService {
         RecommendationHistoryCursor cursor = RecommendationHistoryCursor.decode(encodedCursor);
         List<HistorySet> sets =
                 repository.findSets(
-                        userId,
-                        cursor == null ? null : cursor.generatedAt(),
-                        cursor == null ? 0 : cursor.recommendationSetId(),
-                        size + 1);
+                        userId, cursor == null ? 0 : cursor.recommendationSetId(), size + 1);
         boolean hasNext = sets.size() > size;
         List<HistorySet> page = hasNext ? sets.subList(0, size) : sets;
         if (page.isEmpty()) {

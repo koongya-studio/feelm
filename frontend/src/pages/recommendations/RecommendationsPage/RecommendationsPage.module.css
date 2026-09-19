@@ -15,56 +15,17 @@
   flex: 1;
   justify-content: center;
   overflow-y: auto;
-  scrollbar-width: none;
+  /* 필름 칸 폭이 이 폭(`cqw`)을 따른다(업무 -672, index.tsx FRAME_WIDTH) */
+  container-type: inline-size;
 }
 
 /*
- * 카드 열은 `FilmReel`의 세로 필름이다(업무 -605). 릴이 폭을 스스로 정하고 `.scrollArea`가
- * 가운데에 놓는다. 위아래 여백만 여기서 준다 — 필름 끝이 헤더와 힌트에 붙지 않게.
+ * 카드 열은 `FilmReel`의 세로 필름이다(업무 -605). 칸 폭이 화면 폭을 따라 릴이 화면 양 끝에
+ * 닿는다(업무 -672). 가로 flex에서 줄어들지 않게 `flex: none`으로 둔다. 위아래 여백만 여기서 준다 — 필름 끝이 헤더와 힌트에 붙지 않게.
  */
 .scrollArea > [data-testid='film-reel'] {
+  flex: none;
   margin: var(--space-2) 0 var(--space-3);
-}
-
-/*
- * 섹션 이름표. 프레임 사이에 끼우는 것이라 칸이 아니다(`data-film-label`). 어두운 띠
- * 위에 앉으므로 밝은 알약이 그대로 이름표가 되고, `취향 발견`은 검정 알약에 밝은 테두리를
- * 둘러 띠와 구분한다.
- */
-.sectionPill {
-  width: 156px;
-  box-sizing: border-box;
-  flex: none;
-  padding: 4px 0;
-  border: 1px solid var(--color-line-strong);
-  border-radius: var(--radius-pill);
-  background: var(--color-bg);
-  color: var(--color-ink);
-  font-size: 11px;
-  font-weight: 700;
-  text-align: center;
-}
-
-.sectionPill[data-tone='dark'] {
-  border-color: var(--color-film-edge);
-  background: var(--color-ink);
-  color: var(--color-on-dark);
-}
-
-.sectionGroup {
-  display: flex;
-  width: 156px;
-  flex: none;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.sectionNote {
-  color: var(--color-on-dark-muted);
-  font-size: 9.5px;
-  line-height: 1.4;
-  text-align: center;
 }
 
 .hint {
@@ -118,10 +79,6 @@
   cursor: pointer;
 }
 
-.menuItem[data-tone='muted'] {
-  color: var(--color-ink-hint);
-}
-
 .menuItem:disabled {
   cursor: default;
   opacity: 0.45;
@@ -132,11 +89,6 @@
   font-size: 11px;
   text-decoration: underline;
   text-underline-offset: 2px;
-}
-
-.menuItem[data-tone='muted'] .menuItemLabel {
-  color: var(--color-ink-muted);
-  text-decoration: none;
 }
 
 /* 2.2-A · 빈 데이터 안내의 보조 동작. 이동이라 Button이 아니라 링크다 */
@@ -152,4 +104,15 @@
   font-size: 15px;
   font-weight: 600;
   text-decoration: none;
+}
+
+/* 관심없음 실패 알림(업무 -672). 하단 내비 위에 뜬다 — MY 화면의 알림과 같은 자리다 */
+.notice {
+  position: fixed;
+  z-index: 2;
+  right: var(--screen-padding-x);
+  bottom: calc(var(--nav-height) + var(--space-6) + env(safe-area-inset-bottom, 0px));
+  left: var(--screen-padding-x);
+  max-width: calc(var(--layout-max-width) - var(--screen-padding-x) * 2);
+  margin: 0 auto;
 }

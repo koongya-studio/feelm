@@ -1,6 +1,5 @@
 package com.feelm.backend.domain.user.service;
 
-import com.feelm.backend.domain.auth.repository.EmailVerificationTokenRepository;
 import com.feelm.backend.domain.auth.repository.PasswordResetTokenRepository;
 import com.feelm.backend.domain.auth.repository.UserAuthProviderRepository;
 import com.feelm.backend.domain.notification.service.NotificationCommandService;
@@ -30,7 +29,6 @@ class WithdrawnAccountWriter {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserAuthProviderRepository authProviderRepository;
-    private final EmailVerificationTokenRepository verificationTokenRepository;
     private final PasswordResetTokenRepository resetTokenRepository;
     private final UserOttRepository userOttRepository;
     private final OnboardingPreferenceRepository onboardingPreferenceRepository;
@@ -83,15 +81,15 @@ class WithdrawnAccountWriter {
     }
 
     /**
-     * 남은 인증 토큰을 지운다(D-9). 계정이 이미 {@code WITHDRAWN}으로 커밋된 뒤에만 불린다.
+     * 남은 재설정 토큰을 지운다(D-9). 계정이 이미 {@code WITHDRAWN}으로 커밋된 뒤에만 불린다.
      *
      * <p>계정 잠금을 들고 있지 않아 {@link UserRepository#findByIdForUpdate}의 잠금 순서와 무관하다. 이 단계가 실패해도 토큰은 이미
-     * 무력하다 — 재설정(API-011)은 활성 계정만 통과시키고({@code RESET_TOKEN_INVALID}), 이메일 인증(API-002)은 {@code
-     * PENDING_VERIFICATION}이 아닌 계정을 거절한다. 그래서 정리를 뒤로 미룰 수 있다.
+     * 무력하다 — 재설정(API-011)은 활성 계정만 통과시킨다({@code RESET_TOKEN_INVALID}). 그래서 정리를 뒤로 미룰 수 있다.
+     *
+     * <p>인증 토큰 삭제는 함께 사라졌다(S15P21E106-604). 메일 링크 인증이 없어지면서 그 테이블도 없앴다.
      */
     @Transactional
     void deleteAuthTokens(long userId) {
-        verificationTokenRepository.deleteByUserId(userId);
         resetTokenRepository.deleteByUserId(userId);
     }
 }

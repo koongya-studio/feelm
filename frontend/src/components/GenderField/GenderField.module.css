@@ -19,25 +19,19 @@
   white-space: nowrap;
 }
 
+/*
+ * 선택지 하나. 모양과 상태는 공통 선택지 규칙이다(`interaction.module.css` `.choice`,
+ * 업무 -697). 고른 것은 빨강 테두리가 굵어지고 옅은 빨강 면과 체크가 선다 — 한때 빨강
+ * 테두리와 글자뿐이라 색으로만 갈렸다. 모서리만 입력 칸과 같은 둥근 네모다.
+ */
 .gender {
-  height: var(--control-height-sm);
+  composes: choice from '../../styles/interaction.module.css';
   flex: 1;
-  border: 1px solid var(--color-line-strong);
+  padding: 0 var(--space-1);
   border-radius: var(--radius-control);
-  background: none;
-  font-family: inherit;
-  font-size: var(--font-size-meta);
   line-height: var(--line-height-meta);
-  color: var(--color-ink-muted);
-  cursor: pointer;
 }
 
-/*
- * 선택 상태. 빨강은 면이 아니라 표식이므로 테두리와 글자에만 쓴다
- * (`design-concept.md` 2.3).
- */
-.gender[aria-pressed='true'] {
-  border-color: var(--color-brand);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-brand-ink);
+.check {
+  composes: choiceCheck from '../../styles/interaction.module.css';
 }

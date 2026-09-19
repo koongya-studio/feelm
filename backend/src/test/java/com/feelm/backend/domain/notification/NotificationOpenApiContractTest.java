@@ -18,7 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** 어노테이션 존재가 아니라 실제 springdoc JSON으로 API-070~074 계약을 고정한다. */
+/** 어노테이션 존재가 아니라 실제 springdoc JSON으로 알림 API 계약을 고정한다. */
 @SpringBootTest(
         properties = {
             "springdoc.api-docs.enabled=true",
@@ -64,7 +64,8 @@ class NotificationOpenApiContractTest {
                         "readAt",
                         "notifiedAt");
         assertThat(values(item.path("properties").path("type").path("enum")))
-                .containsExactlyInAnyOrder("PARTY_INVITE", "WATCH_CONFIRM");
+                .containsExactlyInAnyOrder(
+                        "PARTY_INVITE", "PARTY_INVITE_ACCEPTED", "WATCH_CONFIRM");
 
         JsonNode count = paths.path("/api/v1/notifications/unread-count").path("get");
         assertBearer(count);
@@ -83,12 +84,58 @@ class NotificationOpenApiContractTest {
         assertThat(dismiss.path("responses").has("204")).isTrue();
     }
 
+    @Test
+    void documentsWebPushApisAndValidation() throws Exception {
+        JsonNode document = document();
+        JsonNode paths = document.path("paths");
+        JsonNode config = paths.path("/api/v1/notifications/push/config").path("get");
+        JsonNode register = paths.path("/api/v1/notifications/push/subscriptions").path("put");
+        JsonNode unregister =
+                paths.path("/api/v1/notifications/push/subscriptions/{subscriptionId}")
+                        .path("delete");
+
+        assertThat(config.isMissingNode()).isFalse();
+        assertThat(register.isMissingNode()).isFalse();
+        assertThat(unregister.isMissingNode()).isFalse();
+        assertBearer(config);
+        assertBearer(register);
+        assertBearer(unregister);
+        assertThat(config.path("responses").propertyNames()).contains("200", "401");
+        assertThat(register.path("responses").propertyNames()).contains("200", "400", "401", "503");
+        assertThat(unregister.path("responses").propertyNames()).contains("204", "401", "404");
+        JsonNode configResponse = schema(document, "WebPushConfigResponse");
+        assertThat(configResponse.path("properties").propertyNames())
+                .containsExactlyInAnyOrder("enabled", "publicKey");
+        JsonNode subscriptionResponse = schema(document, "WebPushSubscriptionResponse");
+        assertThat(subscriptionResponse.path("properties").propertyNames())
+                .containsExactly("subscriptionId");
+        assertThat(schema(document, "ErrorResponse").path("properties").propertyNames())
+                .contains("code", "message");
+        JsonNode requestSchema = schema(document, "WebPushSubscriptionRequest");
+        assertThat(requestSchema.path("properties").propertyNames())
+                .contains("endpoint", "expirationTime", "keys");
+        assertThat(requestSchema.path("required").toString()).contains("endpoint", "keys");
+        assertThat(requestSchema.path("properties").path("endpoint").path("maxLength").asInt())
+                .isEqualTo(2048);
+        assertThat(requestSchema.path("properties").path("expirationTime").path("minimum").asLong())
+                .isEqualTo(1L);
+        JsonNode keys = referencedSchema(document, requestSchema.path("properties").path("keys"));
+        assertThat(keys.path("required").toString()).contains("p256dh", "auth");
+        assertThat(keys.path("properties").path("p256dh").path("maxLength").asInt()).isEqualTo(256);
+        assertThat(keys.path("properties").path("auth").path("maxLength").asInt()).isEqualTo(128);
+    }
+
     private void assertBearer(JsonNode operation) throws Exception {
         assertThat(operation.path("security")).isEqualTo(json.readTree("[{\"bearerAuth\":[]}]"));
     }
 
     private JsonNode schema(JsonNode document, String name) {
         return document.path("components").path("schemas").path(name);
+    }
+
+    private JsonNode referencedSchema(JsonNode document, JsonNode reference) {
+        String path = reference.path("$ref").asText();
+        return schema(document, path.substring(path.lastIndexOf('/') + 1));
     }
 
     private List<String> values(JsonNode array) {

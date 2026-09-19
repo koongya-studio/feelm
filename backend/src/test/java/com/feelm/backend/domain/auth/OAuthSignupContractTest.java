@@ -95,6 +95,7 @@ class OAuthSignupContractTest extends OAuthApiTestSupport {
                                 jwtProperties.accessTokenTtl(),
                                 jwtProperties.refreshTokenTtl(),
                                 Duration.ofMinutes(-1),
+                                jwtProperties.emailVerificationTokenTtl(),
                                 jwtProperties.refreshRotationGrace(),
                                 jwtProperties.refreshCookie()));
         String expired =
@@ -169,23 +170,6 @@ class OAuthSignupContractTest extends OAuthApiTestSupport {
                 .andExpect(jsonPath("$.code").value("EMAIL_DUPLICATED"));
 
         assertThat(linkedProviderCount(emailUserId)).as("거절된 가입이 기존 계정에 소셜 수단을 연결하면 안 된다").isZero();
-    }
-
-    @Test
-    @DisplayName("이메일 계정이 미인증 상태로 24시간 지났으면 정리하고 소셜 가입을 허용한다 (API-001과 동일 규칙)")
-    void staleUnverifiedEmailIsReapedAndSignupSucceeds() throws Exception {
-        TestAccount account = newAccount();
-        ageUser(signupPending(account), Duration.ofHours(25));
-
-        fake(OAuthProvider.GOOGLE)
-                .willReturn(
-                        new OAuthUserProfile("provider-user-stale-email", account.email(), "소셜"));
-        MvcResult login =
-                oauthLogin(OAuthProvider.GOOGLE, VALID_CODE, ALLOWED_REDIRECT_URI).andReturn();
-
-        oauthSignup(stringField(login, "signupToken"), "소셜정리")
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.user.nickname").value("소셜정리"));
     }
 
     @Test

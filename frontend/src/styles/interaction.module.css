@@ -1,0 +1,309 @@
+/*
+ * 누를 수 있는 요소의 공통 규칙(업무 -697). 방향은 `docs/screens/design-concept.md` 2.12다.
+ *
+ * 포스터 · 팝콘 요약 · 리포트 · OTT 로고가 정보처럼 보여 눌러도 되는지 알 수 없었다.
+ * 누르는 것과 읽기만 하는 것이 **기본 상태에서** 갈리도록 성격별로 한 벌씩 둔다.
+ * 각 화면은 `composes`로 가져다 쓰고 자리 · 크기만 자기 모듈에 적는다.
+ *
+ * | 성격 | 기본 단서 | 누름 |
+ * | --- | --- | --- |
+ * | 주 동작 | 떠 있는 검정 · 허용된 빨강 알약(`Button`) | 가라앉는다 |
+ * | 보조 동작 | 떠 있는 흰 알약(`Button` secondary) | 가라앉는다 |
+ * | 이동 행 `.navRow` | 떠 있는 흰 면 + 얇은 테두리 + 오른쪽 화살표 | 가라앉는다 |
+ * | 포스터 `.posterLink` | 포스터 모서리의 작은 화살표(`PosterCue`) | 0.98로 줄어든다 |
+ * | 선택지 `.choice` | 떠 있는 흰 알약 | 가라앉는다. 고른 것은 눌려 들어간 채 남는다 |
+ * | 글자 행동 `.textAction` | 밑줄 | 흐려진다 |
+ * | 그 밖의 버튼 `.raised` | 떠 있는 흰 면 + 그림자 | 가라앉는다 |
+ *
+ * **모든 선택자는 `:where()`로 감싼다.** 공통 규칙의 우선순위를 낮춰 두면 쓰는 쪽이 자기
+ * 모듈에서 한 단계 높은 선택자(`.frameButton:focus-visible`)로 덮을 수 있고, 모듈이 읽히는
+ * 순서가 결과를 바꾸지 않는다. 대신 쓰는 쪽은 상태가 바꾸는 속성(면 · 테두리 · 글자색)을
+ * 자기 기본 규칙에 다시 적지 않는다 — 같은 우선순위가 되어 순서 싸움이 난다.
+ *
+ * 공통으로 지키는 것
+ * - 마우스를 올린 상태는 올릴 수 있는 기기에서만 그린다(`hover: hover`). 터치 기기에서는
+ *   누른 뒤 그 상태가 남아 선택된 것처럼 보인다
+ * - 전환은 motion 토큰만 쓴다. 동작 줄이기 설정이면 토큰이 0이 되어 즉시 바뀐다
+ *   (`tokens.css`). 줄어드는 누름 효과도 그때는 거둔다
+ * - 초점 링은 검정 바깥선이다. 선택 상태의 빨강 테두리와 겹쳐도 서로 다른 상태로 읽힌다
+ * - 누름 영역은 최소 44px(`--tap-target-min`)이다
+ */
+
+/* ─────────────────────────── 포스터 */
+
+/*
+ * 상세로 가는 포스터. 링크 · 버튼 자체에 붙인다. 밝아지는 것은 포스터 칸(`.posterBox`)뿐이라
+ * 아래 제목 글자는 그대로다.
+ *
+ * 배치(`display`)는 정하지 않는다. 칸마다 블록 · 세로 flex가 달라 쓰는 쪽이 정한다.
+ */
+:where(.posterLink) {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:where(.posterBox) {
+  position: relative;
+  display: block;
+  transition:
+    filter var(--motion-fast) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  :where(.posterLink):hover :where(.posterBox) {
+    filter: brightness(1.07);
+  }
+
+  :where(.posterLink):hover :where(.posterCue) {
+    background: var(--color-action);
+    color: var(--color-on-action);
+  }
+}
+
+:where(.posterLink):active :where(.posterBox) {
+  transform: scale(0.98);
+}
+
+/*
+ * 초점 링은 포스터 바깥에 둔다. 칸 사이가 좁은 격자(7.1)에서는 옆 칸이 링을 덮으므로
+ * 초점을 받은 칸을 위로 올린다.
+ */
+:where(.posterLink):focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+/*
+ * 이동 단서. 포스터 오른쪽 아래의 작은 유리 동그라미에 화살표 하나다. 포스터를 가리지
+ * 않을 만큼 작게 두고, 마우스를 올리면 검정으로 채워진다.
+ */
+:where(.posterCue) {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  display: flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border: 0.5px solid var(--color-glass-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-glass);
+  color: var(--color-ink);
+  pointer-events: none;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+:where(.posterCue) svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ─────────────────────────── 이동 행 */
+
+/*
+ * 다른 화면으로 가는 정보 줄. 떠 있는 면 · 테두리 · 오른쪽 화살표로 줄 전체가 눌린다는 것을
+ * 보인다. 면은 `tokens.css`의 누르는 면이다. 주 동작의 검정 · 빨강 알약보다 그림자가 옅어
+ * 더 강해지지 않는다.
+ */
+:where(.navRow) {
+  display: flex;
+  min-height: var(--tap-target-min);
+  box-sizing: border-box;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--gradient-button);
+  box-shadow: var(--shadow-button);
+  color: var(--color-ink);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  :where(.navRow):hover {
+    border-color: var(--color-line-strong);
+    background: var(--gradient-button-hover);
+    box-shadow: var(--shadow-button-hover);
+  }
+}
+
+:where(.navRow):active {
+  background: var(--gradient-button-pressed);
+  box-shadow: var(--shadow-button-inset);
+  transform: translateY(1px);
+}
+
+:where(.navRow):focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+/* ─────────────────────────── 선택지 */
+
+/*
+ * 고르는 알약(인원 · 필터 · 성별). 고르지 않은 것은 **떠 있는 흰 알약**이라 누르는 것으로
+ * 읽힌다 — 테두리만 있던 알약은 글자처럼 보였다(사용자 지적 2026-09-19).
+ *
+ * 고른 것은 **눌려 들어간 채로 남는다**. 그림자가 안으로 들어가고, 빨강 테두리가 굵어지고,
+ * 옅은 빨강 면이 깔리고, 체크가 선다(`.choiceCheck`). 색만으로 알리지 않는다.
+ *
+ * 굵어진 테두리는 안쪽 그림자로 더한다. 테두리 폭을 바꾸면 알약 크기가 변해 줄이 흔들린다.
+ */
+:where(.choice) {
+  display: inline-flex;
+  min-height: var(--tap-target-min);
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--gradient-button);
+  box-shadow: var(--shadow-button);
+  color: var(--color-ink-body);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-meta);
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  /* 고른 것은 올려도 고른 모양 그대로다 */
+  :where(.choice):hover:not(:disabled, [aria-pressed='true'], [aria-checked='true']) {
+    border-color: var(--color-ink-hint);
+    background: var(--gradient-button-hover);
+    box-shadow: var(--shadow-button-hover);
+    color: var(--color-ink);
+  }
+}
+
+:where(.choice):active:not(:disabled) {
+  background: var(--gradient-button-pressed);
+  box-shadow: var(--shadow-button-inset);
+  transform: translateY(1px);
+}
+
+:where(.choice):focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+/* 누를 수 없는 선택지는 떠 있지 않다. 면과 그림자를 걷고 점선으로 둔다 */
+:where(.choice):disabled {
+  border-style: dashed;
+  background: none;
+  box-shadow: none;
+  color: var(--color-ink-disabled);
+  cursor: default;
+}
+
+:where(.choice)[aria-pressed='true'],
+:where(.choice)[aria-checked='true'] {
+  border-color: var(--color-brand);
+  background: var(--color-brand-tint);
+  box-shadow:
+    inset 0 0 0 0.5px var(--color-brand),
+    var(--shadow-button-inset);
+  color: var(--color-ink);
+  font-weight: var(--font-weight-bold);
+}
+
+:where(.choiceCheck) {
+  display: flex;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  color: var(--color-brand-ink);
+}
+
+:where(.choiceCheck) svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ─────────────────────────── 떠 있는 면 */
+
+/*
+ * 공통 `Button`을 쓰지 않는 테두리 버튼 · 카드(칩 · 목록 카드 · 소셜 로그인 …)가 받는 면이다.
+ * 모양(모서리 · 크기 · 테두리)은 쓰는 쪽이 정하고, 면 · 그림자 · 누름만 여기서 준다.
+ * 쓰는 쪽은 자기 규칙에 `background`를 다시 적지 않는다.
+ */
+:where(.raised) {
+  background: var(--gradient-button);
+  box-shadow: var(--shadow-button);
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  :where(.raised):hover:not(:disabled) {
+    background: var(--gradient-button-hover);
+    box-shadow: var(--shadow-button-hover);
+  }
+}
+
+:where(.raised):active:not(:disabled) {
+  background: var(--gradient-button-pressed);
+  box-shadow: var(--shadow-button-inset);
+  transform: translateY(1px);
+}
+
+:where(.raised):disabled {
+  box-shadow: none;
+}
+
+/* ─────────────────────────── 글자 행동 */
+
+/* 면 없는 글자 버튼 · 링크. 빨강 글자만으로 행동을 말하지 않도록 밑줄을 늘 긋는다 */
+:where(.textAction) {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: opacity var(--motion-fast) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  :where(.textAction):hover {
+    text-decoration-thickness: 2px;
+  }
+}
+
+:where(.textAction):active {
+  opacity: 0.6;
+}
+
+/* 동작 줄이기 설정이면 크기가 바뀌는 누름 효과를 거둔다. 면 · 밝기 변화는 남긴다 */
+@media (prefers-reduced-motion: reduce) {
+  :where(.posterLink):active :where(.posterBox),
+  :where(.navRow):active,
+  :where(.choice):active:not(:disabled),
+  :where(.raised):active:not(:disabled) {
+    transform: none;
+  }
+}

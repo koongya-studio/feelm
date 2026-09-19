@@ -12,7 +12,7 @@
  * | 빨강 | 표식 전용. 면적을 차지하지 않고 버튼 배경으로 쓰지 않는다 |
  * | 행동 | 검정 알약. 한 화면에 하나 |
  * | 팝콘 | 어두운 블록 안에서만. 밝은 면에서는 4종이 사라진다 |
- * | 서체 | 로고 Gluten · 그 외 Pretendard |
+ * | 서체 | Pretendard. 로고는 서체가 아니라 그림이다(`assets/logo`) |
  * | 모드 | 라이트 단일. 다크 모드는 만들지 않는다 |
  *
  * **위 표에 예외가 둘 생겼다**(사용자 시안 2026-09-17, 업무 -458). 각각의 사유와
@@ -45,6 +45,8 @@
   --color-surface-sunken: #d6d7dd;
   /* 벽 위에 뜨는 면. 반투명이라 배경이 비친다 */
   --color-surface-raised: rgba(255, 255, 255, 0.72);
+  /* 불투명한 흰 면. 뒤가 비치면 안 되는 하단 내비 바(업무 -688) */
+  --color-surface-solid: #ffffff;
 
   /*
    * 배경 그라디언트. 스플래시 이미지의 빛 방향을 따른다. 왼쪽 위가 밝고
@@ -203,7 +205,7 @@
   /* ─────────────────────────── 유리 */
   /*
    * `backdrop-filter`는 모바일 웹에서 비용이 크다. 스크롤 콘텐츠 위에 겹쳐서
-   * 효과가 실제로 보이는 곳 — 하단 알약과 상단 아이콘 버튼에만 쓴다.
+   * 효과가 실제로 보이는 곳 — 상단 아이콘 버튼에만 쓴다. 하단 내비는 불투명한 바다(업무 -688).
    */
   --color-glass: rgba(255, 255, 255, 0.82);
   --color-glass-line: rgba(38, 39, 41, 0.1);
@@ -215,6 +217,57 @@
   --shadow-raised: 0 6px 20px rgba(38, 39, 41, 0.1);
   --shadow-glass: 0 5px 16px rgba(38, 39, 41, 0.1);
 
+  /* ─────────────────────────── 누르는 면 (업무 -697) */
+  /*
+   * 버튼이 글자처럼 읽혔다(사용자 지적 2026-09-19). 누를 수 있는 것은 **벽에서 살짝 떠 있는
+   * 면**으로 그린다 — 위가 밝은 면 · 윗가장자리 빛 한 줄 · 아래 그림자. 누르면 그림자가 걷히고
+   * 면이 1px 가라앉는다. 고른 선택지는 눌려 들어간 채로 남는다(`--shadow-button-inset`).
+   *
+   * 그림자는 무채색이다. 빨강 알약도 그림자에 빨강을 섞지 않는다 — 색이 벽으로 번진다.
+   */
+  --gradient-button: linear-gradient(180deg, #ffffff 0%, #f1f2f5 100%);
+  --gradient-button-hover: linear-gradient(180deg, #ffffff 0%, #f7f8fa 100%);
+  --gradient-button-pressed: linear-gradient(180deg, #e8e9ed 0%, #eff0f3 100%);
+  --shadow-button:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 1px 2px rgba(38, 39, 41, 0.12),
+    0 3px 8px rgba(38, 39, 41, 0.08);
+  --shadow-button-hover:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 2px 3px rgba(38, 39, 41, 0.12),
+    0 6px 14px rgba(38, 39, 41, 0.1);
+  --shadow-button-inset: inset 0 2px 4px rgba(38, 39, 41, 0.14);
+  /* 검정 · 빨강 알약. 윗가장자리 빛이 면을 둥글게 세우고 아래 그림자가 벽에서 띄운다 */
+  --shadow-action:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -2px 0 rgba(0, 0, 0, 0.14),
+    0 2px 4px rgba(38, 39, 41, 0.2), 0 8px 18px rgba(38, 39, 41, 0.16);
+  --shadow-action-pressed: inset 0 2px 5px rgba(0, 0, 0, 0.28);
+  /* 어두운 면(2.4) 위의 누르는 면 */
+  --gradient-button-on-dark: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0.07) 100%
+  );
+  --shadow-button-on-dark: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 2px 6px rgba(0, 0, 0, 0.45);
+
+  /* ─────────────────────────── 사진 위 유리 (업무 -697) */
+  /*
+   * 프로필 사진 배경(7.1 · 7.2) 위의 카드 · 박스. **서리 낀 유리**다(사용자 지시 2026-09-19).
+   * 뒤의 흐려진 사진이 옅게 비치고, 흰빛 테두리와 윗가장자리 빛이 판의 두께를 만든다.
+   *
+   * 흐림은 `backdrop-filter`다. 모바일에서 비싸므로(위 `유리` 항목) **사진 배경 화면의 카드에만**
+   * 쓴다. 다른 화면으로 넓히지 않는다.
+   */
+  --glass-dark-fill: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0.06) 100%
+  );
+  --glass-dark-fill-pressed: rgba(255, 255, 255, 0.04);
+  --glass-dark-line: rgba(255, 255, 255, 0.2);
+  --blur-glass-dark: blur(18px) saturate(150%);
+  --shadow-glass-dark:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22), inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+    0 10px 30px rgba(0, 0, 0, 0.35);
+
   /* ─────────────────────────── 타이포 */
   /*
    * 이전 토큰에는 타이포 스케일이 없어 화면에 10~26px이 12종 하드코딩돼 있었다.
@@ -223,8 +276,6 @@
   --font-sans:
     'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo',
     'Malgun Gothic', sans-serif;
-  /* 로고 전용. 본문에 쓰지 않는다 */
-  --font-display: 'Gluten', var(--font-sans);
   /* 취향 4컷 전용(업무 -321). 영문은 이 서체, 한글은 Pretendard로 넘어간다 */
   --font-report-condensed: 'Anton', var(--font-sans);
   --font-report-serif: 'Playfair Display', Georgia, var(--font-sans);

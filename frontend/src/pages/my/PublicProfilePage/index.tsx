@@ -28,6 +28,7 @@ import { useParams } from 'react-router';
 import Button from '../../../components/Button';
 import IconButton from '../../../components/IconButton';
 import Menu from '../../../components/Menu';
+import ProfileBackdrop from '../../../components/ProfileBackdrop';
 import ProfileLayout, { ProfileSkeleton } from '../../../components/ProfileLayout';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
@@ -108,8 +109,12 @@ export default function PublicProfilePage({ mode = 'public' }: Props) {
     };
   }, [isPreview, userId, reloadCount]);
 
-  const header = (
+  /*
+   * 헤더. 사진 배경 위라 흰 글자다(`tone`). 실패 화면만 밝은 벽이다.
+   */
+  const header = (tone: 'light' | 'dark') => (
     <ScreenHeader
+      tone={tone}
       title="공개 프로필"
       align="center"
       showBack
@@ -137,7 +142,7 @@ export default function PublicProfilePage({ mode = 'public' }: Props) {
 
     return (
       <>
-        {header}
+        {header('light')}
 
         <StatusView title={view.title} description={view.description}>
           {view.retry ? (
@@ -156,31 +161,43 @@ export default function PublicProfilePage({ mode = 'public' }: Props) {
     );
   }
 
+  /*
+   * **프로필 사진이 화면 전체 배경이다**(사용자 지시 2026-09-19, 업무 -697). 2.4 영화 상세와 같은
+   * 층 구성(`ProfileBackdrop`)이다.
+   *
+   * **받기 전에도 같은 틀을 쓴다.** 사진을 모르므로 사진 없는 어두운 배경에 자리만 비워 두고,
+   * 받으면 사진이 깔린다. 받는 순간 밝은 벽을 어두운 틀로 바꿔 끼우면 화면이 번쩍이고, 안내 바와
+   * ⋯ 버튼이 새로 만들어져 그 사이 누른 것이 사라진다.
+   */
   return (
     <>
-      {header}
+      <ProfileBackdrop photoUrl={profile?.avatarUrl ?? null} top={header('dark')} stickyTop>
+        <div className={styles.page}>
+          {isPreview ? (
+            <div className={styles.previewBar} role="note">
+              <span className={styles.previewIcon}>
+                <InfoIcon />
+              </span>
+              <p className={styles.previewText}>다른 사용자에게 보이는 내 프로필입니다.</p>
+              <button type="button" className={styles.previewBack} onClick={backToEdit}>
+                편집으로 돌아가기
+              </button>
+            </div>
+          ) : null}
 
-      <div className={styles.page}>
-        {isPreview ? (
-          <div className={styles.previewBar} role="note">
-            <span className={styles.previewIcon}>
-              <InfoIcon />
-            </span>
-            <p className={styles.previewText}>다른 사용자에게 보이는 내 프로필입니다.</p>
-            <button type="button" className={styles.previewBack} onClick={backToEdit}>
-              편집으로 돌아가기
-            </button>
-          </div>
-        ) : null}
+          {profile ? (
+            <ProfileLayout mode={mode} profile={profile} tone="dark" />
+          ) : (
+            <ProfileSkeleton tone="dark" />
+          )}
 
-        {profile ? <ProfileLayout mode={mode} profile={profile} /> : <ProfileSkeleton />}
-
-        {notice ? (
-          <p className={styles.notice} role="status">
-            {notice}
-          </p>
-        ) : null}
-      </div>
+          {notice ? (
+            <p className={styles.notice} role="status">
+              {notice}
+            </p>
+          ) : null}
+        </div>
+      </ProfileBackdrop>
 
       {menuOpen ? (
         <Menu label="프로필 메뉴" top={MENU_TOP} onClose={() => setMenuOpen(false)}>

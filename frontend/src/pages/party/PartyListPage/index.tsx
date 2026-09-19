@@ -49,7 +49,7 @@ import Button from '../../../components/Button';
 import PopcornBucket from '../../../components/PopcornBucket';
 import Snackbar from '../../../components/Snackbar';
 import StatusView from '../../../components/StatusView';
-import Wordmark from '../../../components/Wordmark';
+import AppHeader from '../../../components/AppHeader';
 import { getMyInvitations, getMyParties, getPartyPopcorn } from '../../../api/parties';
 import { path } from '../../../routes/paths';
 import { mixedFlavors } from '../../../utils/party';
@@ -124,141 +124,143 @@ export default function PartyListPage() {
   const hasInvitations = invitations !== null && invitations.length > 0;
 
   return (
-    <div className={styles.page}>
-      <div className={styles.brand}>
-        <Wordmark />
+    <>
+      {/* 필름 · MY와 같은 헤더다(업무 -676). 카피는 헤더 오른쪽에서 그 아래 한 줄로 내려왔다 */}
+      <AppHeader />
 
-        <p className={styles.copy}>
-          좋은 영화는,
-          <br />
-          함께 볼 때 더 특별하니까
-        </p>
-      </div>
+      <div className={styles.page}>
+        <p className={styles.copy}>좋은 영화는, 함께 볼 때 더 특별하니까</p>
 
-      <div className={styles.titleBlock}>
-        <h1 className={styles.title}>파티팝콘</h1>
-        <p className={styles.subtitle}>같이 볼 영화, 함께 골라요</p>
-      </div>
+        <div className={styles.titleBlock}>
+          <h1 className={styles.title}>파티팝콘</h1>
+          <p className={styles.subtitle}>같이 볼 영화, 함께 골라요</p>
+        </div>
 
-      {failed ? (
-        <StatusView title="파티 목록을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요.">
-          <Button variant="text" onClick={() => setReloadCount((count) => count + 1)}>
-            다시 시도
-          </Button>
-        </StatusView>
-      ) : null}
+        {failed ? (
+          <StatusView
+            title="파티 목록을 불러오지 못했어요"
+            description="잠시 후 다시 시도해 주세요."
+          >
+            <Button variant="text" onClick={() => setReloadCount((count) => count + 1)}>
+              다시 시도
+            </Button>
+          </StatusView>
+        ) : null}
 
-      {hasInvitations ? (
-        <section className={styles.invitations} aria-labelledby="party-invitations">
-          <h2 className={styles.sectionLabel} id="party-invitations">
-            받은 초대 {invitations.length}
-          </h2>
+        {hasInvitations ? (
+          <section className={styles.invitations} aria-labelledby="party-invitations">
+            <h2 className={styles.sectionLabel} id="party-invitations">
+              받은 초대 {invitations.length}
+            </h2>
 
+            <ul className={styles.list}>
+              {invitations.map((invitation) => (
+                <li key={invitation.invitationId}>
+                  <button
+                    type="button"
+                    className={styles.row}
+                    onClick={() => void navigate(path.partyInvitation(invitation.invitationId))}
+                  >
+                    <span className={styles.body}>
+                      <span className={styles.name}>
+                        {invitation.party.owner.nickname} 님의 파티
+                      </span>
+                      <span className={styles.members}>
+                        {invitation.party.memberCount + 1}인 · {invitation.party.name}
+                      </span>
+                    </span>
+
+                    <span className={styles.chevron} aria-hidden="true">
+                      ›
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {/* 초대만 못 받아 온 경우다. 파티 목록은 아래에 그대로 둔다 */}
+        {invitationsFailed ? (
+          <p className={styles.invitationsError}>
+            받은 초대를 불러오지 못했어요.{' '}
+            <Button variant="text" onClick={() => setReloadCount((count) => count + 1)}>
+              초대 다시 불러오기
+            </Button>
+          </p>
+        ) : null}
+
+        {/*
+         * 위에 `받은 초대`가 있을 때만 이 줄을 붙인다. 두 목록이 나란히 있으면 아래가
+         * 무엇인지 말해 줘야 하고, 초대가 없으면 목록이 하나뿐이라 시안대로 제목 없이 둔다
+         * (시안은 `참여 중인 방 N개` 머리말을 없앴다 — 업무 -462).
+         */}
+        {hasParties && hasInvitations ? (
+          <h2 className={styles.sectionLabel}>참여 중인 파티</h2>
+        ) : null}
+
+        {hasParties ? (
           <ul className={styles.list}>
-            {invitations.map((invitation) => (
-              <li key={invitation.invitationId}>
+            {parties.map((party) => (
+              <li key={party.partyId}>
                 <button
                   type="button"
                   className={styles.row}
-                  onClick={() => void navigate(path.partyInvitation(invitation.invitationId))}
+                  onClick={() => void navigate(path.partyPopcorn(party.partyId))}
                 >
-                  <span className={styles.body}>
-                    <span className={styles.name}>{invitation.party.owner.nickname} 님의 파티</span>
-                    <span className={styles.members}>
-                      {invitation.party.memberCount + 1}인 · {invitation.party.name}
-                    </span>
+                  <span className={styles.count} aria-hidden="true">
+                    {party.members.length}
                   </span>
 
-                  <span className={styles.chevron} aria-hidden="true">
-                    ›
+                  <span className={styles.body}>
+                    <span className={styles.name}>{party.name}</span>
+                    <span className={styles.members}>
+                      {party.members.map((member) => member.nickname).join(' × ')}
+                    </span>
                   </span>
                 </button>
               </li>
             ))}
           </ul>
-        </section>
-      ) : null}
+        ) : null}
 
-      {/* 초대만 못 받아 온 경우다. 파티 목록은 아래에 그대로 둔다 */}
-      {invitationsFailed ? (
-        <p className={styles.invitationsError}>
-          받은 초대를 불러오지 못했어요.{' '}
-          <Button variant="text" onClick={() => setReloadCount((count) => count + 1)}>
-            초대 다시 불러오기
-          </Button>
-        </p>
-      ) : null}
+        {parties !== null ? (
+          <div className={styles.stage}>
+            <PopcornBucket
+              flavors={popcorn ? mixedFlavors(popcorn) : []}
+              width={BUCKET_WIDTH}
+              label={
+                hasParties && parties[0]
+                  ? `${parties[0].name}의 팝콘`
+                  : '아직 파티원의 팝콘이 담기지 않은 통'
+              }
+            />
+          </div>
+        ) : null}
 
-      {/*
-       * 위에 `받은 초대`가 있을 때만 이 줄을 붙인다. 두 목록이 나란히 있으면 아래가
-       * 무엇인지 말해 줘야 하고, 초대가 없으면 목록이 하나뿐이라 시안대로 제목 없이 둔다
-       * (시안은 `참여 중인 방 N개` 머리말을 없앴다 — 업무 -462).
-       */}
-      {hasParties && hasInvitations ? (
-        <h2 className={styles.sectionLabel}>참여 중인 파티</h2>
-      ) : null}
+        {parties !== null ? (
+          <div className={styles.actions}>
+            <p className={styles.hint}>친구와 취향을 모아 영화를 추천받아요</p>
 
-      {hasParties ? (
-        <ul className={styles.list}>
-          {parties.map((party) => (
-            <li key={party.partyId}>
-              <button
-                type="button"
-                className={styles.row}
-                onClick={() => void navigate(path.partyPopcorn(party.partyId))}
-              >
-                <span className={styles.count} aria-hidden="true">
-                  {party.members.length}
-                </span>
+            <Button variant="brand" onClick={() => void navigate(path.partyNew())}>
+              파티 만들기
+            </Button>
 
-                <span className={styles.body}>
-                  <span className={styles.name}>{party.name}</span>
-                  <span className={styles.members}>
-                    {party.members.map((member) => member.nickname).join(' × ')}
-                  </span>
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+            <Button
+              variant="secondary"
+              onClick={() => setNotice('초대 코드로 참여하기는 준비 중이에요')}
+            >
+              초대 코드로 참여하기
+            </Button>
+          </div>
+        ) : null}
 
-      {parties !== null ? (
-        <div className={styles.stage}>
-          <PopcornBucket
-            flavors={popcorn ? mixedFlavors(popcorn) : []}
-            width={BUCKET_WIDTH}
-            label={
-              hasParties && parties[0]
-                ? `${parties[0].name}의 팝콘`
-                : '아직 파티원의 팝콘이 담기지 않은 통'
-            }
-          />
-        </div>
-      ) : null}
-
-      {parties !== null ? (
-        <div className={styles.actions}>
-          <p className={styles.hint}>친구와 취향을 모아 영화를 추천받아요</p>
-
-          <Button variant="brand" onClick={() => void navigate(path.partyNew())}>
-            파티 만들기
-          </Button>
-
-          <Button
-            variant="secondary"
-            onClick={() => setNotice('초대 코드로 참여하기는 준비 중이에요')}
-          >
-            초대 코드로 참여하기
-          </Button>
-        </div>
-      ) : null}
-
-      {notice ? (
-        <Snackbar actionLabel="확인" onAction={() => setNotice('')}>
-          {notice}
-        </Snackbar>
-      ) : null}
-    </div>
+        {notice ? (
+          <Snackbar actionLabel="확인" onAction={() => setNotice('')}>
+            {notice}
+          </Snackbar>
+        ) : null}
+      </div>
+    </>
   );
 }

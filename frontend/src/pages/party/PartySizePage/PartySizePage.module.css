@@ -1,5 +1,8 @@
 /*
- * 5.2 새 파티 인원 설정. 인원 선택이 위, 자리 미리보기가 가운데, 주 동작이 아래다.
+ * 5.2 새 파티 인원 설정. 인원 선택 → 안내 → 자리 미리보기 → 다음이 위에서 아래로 이어진다.
+ *
+ * `다음`을 화면 바닥에 붙이지 않는다(업무 -697). 바닥에 붙이면 미리보기와 버튼 사이가 크게
+ * 비어 흐름이 끊겼다. 버튼은 미리보기 바로 아래에 서고, 남는 높이는 그 아래에 남긴다.
  */
 .page {
   display: flex;
@@ -16,63 +19,108 @@
   gap: var(--space-2);
 }
 
+/*
+ * 인원 알약. 고른 것은 공통 선택지 규칙대로 빨강 테두리 · 옅은 빨강 면 · 체크 세 가지로
+ * 알린다(`interaction.module.css` `.choice`). 빨강 글자 하나로 알리던 것을 바꿨다.
+ */
 .size {
-  height: var(--control-height-sm);
+  composes: choice from '../../../styles/interaction.module.css';
   flex: 1;
-  border: 1px solid var(--color-line-strong);
-  border-radius: var(--radius-pill);
-  background: none;
-  font-family: inherit;
-  font-size: var(--font-size-meta);
-  color: var(--color-ink-muted);
-  cursor: pointer;
 }
 
-/* 고른 인원. 빨강은 표식으로만 쓴다 (`design-concept.md` 2.3) */
-.size[aria-checked='true'] {
-  border-color: var(--color-brand);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-brand-ink);
+.check {
+  composes: choiceCheck from '../../../styles/interaction.module.css';
 }
 
-.note,
-.progress {
+.note {
   text-align: center;
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
   color: var(--color-ink-hint);
 }
 
-/* 참여 자리 미리보기. 내 자리와 빈 친구 자리를 세로로 쌓는다 */
-.slots {
+/* 안내와 자리 미리보기를 한 덩어리로 묶는다. 입력 칸이 아니라 설명이라 면은 옅고 테두리가 없다 */
+.preview {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  padding: var(--space-5) var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+}
+
+.invite {
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+  text-align: center;
+  word-break: keep-all;
+}
+
+/*
+ * 자리 미리보기. 누를 수 없는 동그라미를 가로로 늘어놓는다 — 한때 가로로 긴 점선 칸이라
+ * 입력 칸처럼 보였다. 4인이어도 320px에서 한 줄에 들어가고, 글자를 키워 넘치면 다음 줄로 간다.
+ */
+.slots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-4);
   padding: 0;
-  margin: var(--space-4) 0 var(--space-2);
+  margin: 0;
   list-style: none;
 }
 
 .slot {
   display: flex;
-  height: 56px;
+  min-width: 48px;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* 빈 친구 자리. 점선 동그라미에 흐린 사람 모양이다 */
+.slotMark {
+  display: flex;
+  width: 48px;
+  height: 48px;
+  box-sizing: border-box;
   align-items: center;
   justify-content: center;
   border: 1px dashed var(--color-line-strong);
-  border-radius: var(--radius-card);
-  font-size: var(--font-size-meta);
-  color: var(--color-ink-hint);
+  border-radius: var(--radius-pill);
+  color: var(--color-ink-disabled);
+}
+
+.slotMark svg {
+  width: 20px;
+  height: 22px;
 }
 
 /* 내 자리는 이미 찬 자리이므로 점선이 아니다 */
-.slot[data-mine='true'] {
-  border-style: solid;
-  background: var(--color-surface-raised);
+.slot[data-mine='true'] .slotMark {
+  border: 0;
+  background: var(--color-ink);
+  color: var(--color-on-action);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+}
+
+.slotLabel {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
+  white-space: nowrap;
+}
+
+.slot[data-mine='true'] .slotLabel {
   font-weight: var(--font-weight-bold);
   color: var(--color-ink);
 }
 
 .actions {
-  margin-top: auto;
-  padding-top: var(--space-6);
+  padding-top: var(--space-5);
 }

@@ -1,5 +1,8 @@
 # Party refresh streaming boundary
 
+> S15P21E106-566 이후 운영 writer는 `pipeline/consumer`의 전용 Python Consumer다.
+> 이 Spark 구현과 checkpoint는 전환 검증 및 롤백 기준선으로 보존하며 동시에 실행하지 않는다.
+
 `kafka_stream.start_party_refresh_stream` consumes
 `feelm.party-refresh.v1` and writes one complete value to
 `feelm:party:{partyId}:candidates`.
@@ -41,7 +44,7 @@ ID in Redis and writes its loaded model version. Spring must compare both with
 the current party/member snapshot before serving a result. Delayed events are
 therefore rejected even if they overwrite the Redis key.
 
-`jobs/streaming/party_candidates.py` is the production entrypoint. It loads the
+`jobs/streaming/party_candidates.py` is the legacy production entrypoint retained for rollback. It loads the
 published ALS version and `service-movie-id-map` Parquet, rejects a mapping
 revision mismatch or a non-`SERVING` model, verifies Redis with `PING`, and only
 then starts Kafka consumption. During a model rollout, the producer must stop

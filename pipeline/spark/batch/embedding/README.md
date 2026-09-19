@@ -6,6 +6,11 @@ worker마다 한 번만 로드하며, 원본 영화 전체나 임베딩 전체�
 산출물 스키마·manifest·재적재 계약은
 [`pipeline/contracts/movie-embedding-artifacts.md`](../../../contracts/movie-embedding-artifacts.md)를 따른다.
 
+현재 `tmdb-e5-v1` 입력 레시피는 필드 양끝의 일반 공백을 제거하고 탭·줄바꿈을 일반
+공백 한 칸으로 바꾸지만, 필드 내부의 연속 일반 공백은 유지한다. 이 입력으로 만든
+기존 임베딩과 SHA-256을 보존하기 위해 정제 규칙을 변경하지 않는다. 영향 측정과
+유지 결정은 [S15P21E106-518 검증 기록](../../../docs/e5-whitespace-518-verification.md)에 있다.
+
 `query: ` 접두사는 모델 카드가 대칭 의미 유사도에서 권장하는 방식이다. `--model-revision`에는
 40자리 소문자 Hugging Face commit SHA를 반드시 입력한다. Spark 이미지의 `HF_HOME`은 쓰기 가능한
 `/opt/spark/.cache/huggingface`로 지정되어 있으며, 운영 환경이 외부 다운로드를 막으면 해당

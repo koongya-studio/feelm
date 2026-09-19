@@ -139,7 +139,7 @@ class WatchApiContractTest extends SharedPostgresContractTest {
         assertThat(response.path("status").asText()).isEqualTo("LINK_CLICKED");
         assertThat(clickedAt).isBetween(before, after);
         assertThat(response.path("confirmDueAt").asText())
-                .isEqualTo(clickedAt.plusSeconds(2 * DAY).toString());
+                .isEqualTo(clickedAt.plusSeconds(DAY).toString());
         assertThat(response.path("expiresAt").asText())
                 .isEqualTo(clickedAt.plusSeconds(7 * DAY).toString());
 
@@ -149,7 +149,7 @@ class WatchApiContractTest extends SharedPostgresContractTest {
         assertThat(stored.ottId()).isEqualTo(ottId);
         assertThat(stored.status()).isEqualTo("LINK_CLICKED");
         assertThat(stored.clickedAt()).isEqualTo(clickedAt);
-        assertThat(stored.confirmDueAt()).isEqualTo(clickedAt.plusSeconds(2 * DAY));
+        assertThat(stored.confirmDueAt()).isEqualTo(clickedAt.plusSeconds(DAY));
         assertThat(stored.expiresAt()).isEqualTo(clickedAt.plusSeconds(7 * DAY));
         assertThat(activeRows(userId, movieId)).isEqualTo(1);
         assertEvent(onlyEvent(), userId, movieId, ottId, watchRecordId);
@@ -225,7 +225,7 @@ class WatchApiContractTest extends SharedPostgresContractTest {
         WatchRow stored = watch(watchRecordId);
         assertThat(stored.ottId()).isEqualTo(otherOttId);
         assertThat(stored.clickedAt()).isEqualTo(refreshedAt);
-        assertThat(stored.confirmDueAt()).isEqualTo(refreshedAt.plusSeconds(2 * DAY));
+        assertThat(stored.confirmDueAt()).isEqualTo(refreshedAt.plusSeconds(DAY));
         assertThat(stored.expiresAt()).isEqualTo(refreshedAt.plusSeconds(7 * DAY));
         assertThat(watchRows(userId, movieId)).isEqualTo(1);
         List<EventRow> events = events();
@@ -1119,7 +1119,7 @@ class WatchApiContractTest extends SharedPostgresContractTest {
 
     private long insertWatch(
             long movie, long user, Long ott, String watchStatus, Instant clickedAt) {
-        Instant dueAt = clickedAt == null ? null : clickedAt.plusSeconds(2 * DAY);
+        Instant dueAt = clickedAt == null ? null : clickedAt.plusSeconds(DAY);
         Instant expiresAt = clickedAt == null ? null : clickedAt.plusSeconds(7 * DAY);
         Instant watchedAt =
                 watchStatus.equals("WATCHED_UNRATED") || watchStatus.equals("RATED")
@@ -1203,6 +1203,7 @@ class WatchApiContractTest extends SharedPostgresContractTest {
                                 Duration.ofSeconds(-1),
                                 jwtProperties.refreshTokenTtl(),
                                 jwtProperties.signupTokenTtl(),
+                                jwtProperties.emailVerificationTokenTtl(),
                                 jwtProperties.refreshRotationGrace(),
                                 jwtProperties.refreshCookie()));
         return expiring.createAccessToken(userId);

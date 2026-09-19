@@ -13,6 +13,7 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 
 /** 구조화 근거를 확인된 표시명으로 해석하고 사용자용 문구를 저장한다. */
 @Service
@@ -25,6 +26,19 @@ public class RecommendationReasonService {
     private final RecommendationReasonGenerator generator;
     private final RecommendationReasonSnapshotWriter writer;
     private final ObjectMapper objectMapper;
+
+    /** 알림 경로의 버퍼 커밋 전에 확인된 근거만으로 첫 노출용 문구를 저장한다. */
+    ObjectNode initialReason(JsonNode storedReason) {
+        RecommendationReasonPrompt prompt = resolve(0L, storedReason.toString());
+        ReasonSnapshot snapshot = render(prompt, null);
+        ObjectNode initial = ((ObjectNode) storedReason).deepCopy();
+        initial.put("summary", snapshot.summary());
+        initial.set("factors", objectMapper.readTree(snapshot.factorsJson()));
+        if (prompt.code() != null) {
+            initial.put("_reasonPending", true);
+        }
+        return initial;
+    }
 
     /** LLM 호출은 버퍼 저장 및 스냅샷 갱신 트랜잭션 밖에서 수행된다. */
     public void completeUnexposed(long setId) {
@@ -141,11 +155,13 @@ public class RecommendationReasonService {
                     summary = "좋아하신 영화와 " + prompt.genreName() + " 장르가 같아요.";
                     factors.addObject().put("type", "GENRE").put("label", prompt.genreName());
                 }
-                case "TOP_RATED_SOURCE" ->
-                        summary =
-                                "SOURCE".equals(variant) && prompt.sourceTitle().length() <= 60
-                                        ? "좋아하신 영화 '" + prompt.sourceTitle() + "'을 바탕으로 골랐어요."
-                                        : "좋아하신 영화들을 바탕으로 골랐어요.";
+                case "TOP_RATED_SOURCE" -> {
+                    String title = sourceTitleForSummary(prompt.sourceTitle());
+                    summary =
+                            "HISTORY".equals(variant)
+                                    ? "영화 '" + title + "'을 좋아하신 기록을 참고해 골랐어요."
+                                    : "좋아하신 영화 '" + title + "'을 바탕으로 골랐어요.";
+                }
                 case "DISCOVERY_PERSONAL_SCORE" -> {
                     if (prompt.genreName() != null) {
                         summary = "좋아하신 영화와 " + prompt.genreName() + " 장르가 같아요.";
@@ -167,5 +183,12 @@ public class RecommendationReasonService {
             factors = objectMapper.createArrayNode();
         }
         return new ReasonSnapshot(prompt.itemId(), summary, factors.toString());
+    }
+
+    private String sourceTitleForSummary(String title) {
+        if (title.codePointCount(0, title.length()) <= 60) {
+            return title;
+        }
+        return title.substring(0, title.offsetByCodePoints(0, 59)) + "…";
     }
 }

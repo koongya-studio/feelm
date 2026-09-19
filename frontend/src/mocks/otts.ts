@@ -3,8 +3,7 @@
  *
  * **화면은 더 이상 이 목록을 보지 않는다.** `api/otts.ts`가 API-025를 실제로 부르므로
  * (업무 S15P21E106-379) 여기 남은 것은 아직 연동하지 않은 도메인의 목업이 OTT 이름을
- * 찾을 때 쓰는 기준표다 — 감상 기록(`mocks/watch.ts`) · 추천(`api/recommendations.ts`) ·
- * OTT 구독 추천(`mocks/ottRecommendations.ts`).
+ * 찾을 때 쓰는 기준표다 — 감상 기록(`mocks/watch.ts`) · 추천(`api/recommendations.ts`).
  *
  * 지원 OTT는 다섯 개로 확정됐다(API-025 처리 규칙 · 업무 S15P21E106-155).
  * 와이어프레임 1.2를 근거로 담아 두었던 쿠팡플레이 · 애플 TV+는 목록에 없고, 대신

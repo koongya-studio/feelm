@@ -22,18 +22,29 @@
  * `[?]` API-036 응답의 `popcorn.isNewFlavor`에 대응하는 표시가 와이어프레임에 없어
  * 사용하지 않는다.
  *
- * **추가 후 수치도 2.5가 서버에서 읽어 넘긴다**(업무 -599). 예전에는 이 화면이 추가 전
+ * **추가 후 수치는 서버에서 읽은 실측이다**(업무 -599). 예전에는 이 화면이 추가 전
  * 수치에 `+1`을 더해 추가 후를 지어냈다. 계약은 평가 한 건에 프레임 1개 · 팝콘 1알이지만
  * (대표 맛이 없으면 0알), 팝콘 집계는 `대표 맛이 있는 영화의 평가`를 세므로 영화에 대표 맛이
  * 붙기만 해도 과거 평가가 뒤늦게 버킷에 들어온다. 그러면 실제 팝콘은 두 알이 느는데 화면만
  * 한 알을 단언하게 된다(2026-09-17 여정 QA 관측). 그래서 수치도 문구도 **실제 증가량**으로
  * 적는다.
  *
+ * 그 실측은 **이 화면이 2.6을 띄운 동안 읽는다**(업무 -635). 전에는 2.5가 저장 뒤 재조회까지
+ * 마치고 넘어와 2.6이 늦게 떴다. 2.6은 추가 전 수치만 그리므로 기다릴 이유가 없다. 2.7은
+ * 전환 시간이 지나고 **실측이 도착한 뒤에** 띄운다. 읽은 값은 Router state에 적어 두어,
+ * 뒤로 가기로 다시 열려도 그 뒤의 평가가 섞인 값을 새로 읽지 않는다.
+ *
  * 추가 후 수치를 읽지 못했으면(`after`가 `null`) 계약이 정한 증가량으로 물러선다. 응답이
  * 프레임 한 개와 팝콘 한 알(대표 맛이 있을 때)을 보장하므로 그만큼은 언제나 참이고, 같은
  * 이유로 실측 증가량이 그보다 작게 읽혀도 그 아래로는 내려가지 않는다.
  *
  * `이번 주 +N`은 대응 필드가 없는 고정값이라 이 업무의 대상이 아니다(업무 -599 설명).
+ *
+ * **새 프레임은 내 필름의 기존 프레임에 이어 붙어 보인다**(업무 -633). 전에는 Router state의
+ * 포스터 한 장만 그려 방금 평가한 영화가 필름의 전부처럼 보였다. 2.6이 떠 있는 동안 내 필름
+ * (API-042)을 읽어 새 프레임 아래에 기존 프레임을 최신순으로 잇는다 — 3.1 릴이 최신 프레임을
+ * 맨 앞에 두는 순서와 같다. 목록은 이미 저장된 새 프레임을 포함하므로 그것과 그 뒤에 생긴
+ * 프레임(뒤로 가기로 다시 연 경우)은 뺀다. 읽지 못하면 새 프레임 한 장과 빈 칸으로 그린다.
  */
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
@@ -41,11 +52,12 @@ import Button from '../../../components/Button';
 import FilmReel from '../../../components/FilmReel';
 import Poster from '../../../components/Poster';
 import { HeartIcon, ResultBellIcon } from '../../../components/Icon';
-import { getPopcornFlavors } from '../../../api/taste';
+import { getMyFrames, getPopcornFlavors } from '../../../api/taste';
+import { getRatingCounts } from '../../../api/watch';
 import { path } from '../../../routes/paths';
 import styles from './RatingResultPage.module.css';
 import type { RatingCounts } from '../../../api/watch';
-import type { PopcornFlavor } from '../../../types/taste';
+import type { FrameSummary, PopcornFlavor } from '../../../types/taste';
 import type { Rating } from '../../../types/watch';
 
 /** 2.6 → 2.7 자동 전환 시간(ms). 와이어프레임에 값이 없어 임의로 정했다 */
@@ -59,12 +71,15 @@ const TRANSITION_MS = 1200;
 const FRAME_WIDTH = 110;
 const FRAME_HEIGHT = 165;
 
+/** 새 프레임 아래에 잇는 기존 프레임 수. 화면에 보이는 것은 한두 칸이고 나머지는 잘린다 */
+const PREVIOUS_FRAME_LIMIT = 3;
+
 type ResultState = {
   rating: Rating;
   /** 저장 전 수치. 2.6이 그린다 */
   counts: RatingCounts;
-  /** 저장 후 실측 수치. 2.5가 읽지 못했으면 `null`이다 */
-  after: RatingCounts | null;
+  /** 저장 후 실측 수치. 아직 읽기 전이면 없고, 읽지 못했으면 `null`이다 */
+  after?: RatingCounts | null;
   movieTitle: string;
   posterUrl: string | null;
 };
@@ -74,8 +89,12 @@ export default function RatingResultPage() {
   const location = useLocation();
   const state = location.state as ResultState | null;
 
-  const [done, setDone] = useState(false);
+  const [elapsed, setElapsed] = useState(false);
   const [flavors, setFlavors] = useState<PopcornFlavor[]>([]);
+  /** 새 프레임 앞서 쌓인 내 필름 프레임. 읽기 전이거나 못 읽었으면 빈 배열이다 */
+  const [previousFrames, setPreviousFrames] = useState<FrameSummary[]>([]);
+  const hasState = state !== null;
+  const measured = state?.after !== undefined;
 
   // Router state가 없으면 수치를 복원할 수 없다
   useEffect(() => {
@@ -91,23 +110,78 @@ export default function RatingResultPage() {
       .catch(() => undefined);
   }, []);
 
+  // 실측을 적으며 state가 다시 만들어져도 다시 읽지 않도록 값으로 의존한다
+  const newFrameId = state?.rating.frame.frameId;
+  const newFrameCreatedAt = state?.rating.frame.createdAt;
+
   useEffect(() => {
-    if (!state) {
+    if (newFrameId === undefined || newFrameCreatedAt === undefined) {
       return;
     }
 
-    const timer = setTimeout(() => setDone(true), TRANSITION_MS);
+    let active = true;
+    const createdAt = Date.parse(newFrameCreatedAt);
+
+    // 기존 프레임은 보여 주기만 하므로 실패하면 새 프레임 한 장으로 그린다
+    getMyFrames()
+      .then((list) => {
+        if (active) {
+          setPreviousFrames(
+            list.items
+              .filter(
+                (frame) => frame.frameId !== newFrameId && Date.parse(frame.createdAt) <= createdAt,
+              )
+              .slice(0, PREVIOUS_FRAME_LIMIT),
+          );
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, [newFrameId, newFrameCreatedAt]);
+
+  useEffect(() => {
+    if (!state || measured) {
+      return;
+    }
+
+    let active = true;
+
+    // 저장은 이미 끝났으므로 읽지 못해도 되돌리지 않는다. 2.7이 계약의 증가량으로 물러선다
+    getRatingCounts()
+      .catch(() => null)
+      .then((after) => {
+        if (active) {
+          void navigate(location.pathname, { replace: true, state: { ...state, after } });
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [state, measured, location.pathname, navigate]);
+
+  // 실측을 적느라 state가 바뀌어도 전환 시간을 다시 재지 않는다
+  useEffect(() => {
+    if (!hasState) {
+      return;
+    }
+
+    const timer = setTimeout(() => setElapsed(true), TRANSITION_MS);
 
     return () => {
       clearTimeout(timer);
     };
-  }, [state]);
+  }, [hasState]);
 
   if (!state) {
     return null;
   }
 
-  const { rating, counts, after, posterUrl } = state;
+  const { rating, counts, after = null, posterUrl } = state;
+  const done = elapsed && measured;
   // 대표 맛이 없는 영화의 평가는 팝콘을 만들지 않는다(API-036 · API-041)
   const hasPopcorn = rating.popcorn.flavorCode !== null;
   /*
@@ -162,7 +236,22 @@ export default function RatingResultPage() {
               ) : null}
             </span>
 
-            <span className={styles.emptyFrame} aria-hidden="true" />
+            {previousFrames.length > 0 ? (
+              previousFrames.map((frame) => (
+                <span key={frame.frameId} className={styles.previousFrame}>
+                  <Poster
+                    width={FRAME_WIDTH}
+                    height={FRAME_HEIGHT}
+                    radius={0}
+                    src={frame.movie.posterUrl ?? undefined}
+                    title={frame.movie.title}
+                    seed={frame.movie.movieId}
+                  />
+                </span>
+              ))
+            ) : (
+              <span className={styles.emptyFrame} aria-hidden="true" />
+            )}
           </FilmReel>
         </div>
 

@@ -7,6 +7,10 @@
  * md : padding 4px 10px · 11.5px/700 (2.1 오늘의 추천 대표 카드)
  *
  * 조작할 수 없는 표시 요소다. 취향 키워드와 태그는 Chip을 쓴다.
+ *
+ * tone
+ * default : 잉크 면
+ * accent  : 빨간 면 — 2.2 `새로운 맛`(업무 -672, 사용자 지시 2026-09-18)
  */
 import type { ReactNode } from 'react';
 import styles from './Badge.module.css';
@@ -14,11 +18,12 @@ import styles from './Badge.module.css';
 type Props = {
   children: ReactNode;
   size?: 'sm' | 'md';
+  tone?: 'default' | 'accent';
 };
 
-export default function Badge({ children, size = 'sm' }: Props) {
+export default function Badge({ children, size = 'sm', tone = 'default' }: Props) {
   return (
-    <span className={styles.badge} data-size={size}>
+    <span className={styles.badge} data-size={size} data-tone={tone}>
       {children}
     </span>
   );

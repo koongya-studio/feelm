@@ -127,6 +127,41 @@ SQL
 }
 group="${1:-all}"
 
+if [[ "$group" == all || "$group" == titles ]]; then
+  printf 'ingestion regression: Korean display title and original title\n'
+  printf '2\n' >"$test_dir/ids.txt"
+  jq '.details.title = "Foreign Title" | .details.original_title = "Original Title"
+    | .details.translations = {translations:[{iso_639_1:"ko",iso_3166_1:"KR",data:{title:"한국 번역 제목"}}]}
+    | .details.alternative_titles = {titles:[]}' \
+    "$test_dir/good.json" >"$test_dir/title-translation.json"
+  cp "$test_dir/title-translation.json" "$test_dir/raw/2.json"
+  run_ingestion "$test_dir/title-translation" --raw-dir "$test_dir/raw" >/dev/null
+  [[ "$(db -qAt -c "SELECT title || '|' || original_title FROM movies WHERE tmdb_id=2")" == '한국 번역 제목|Original Title' ]]
+
+  jq 'del(.details.translations)
+    | .details.alternative_titles = {titles:[{iso_3166_1:"KR",title:"한국 대체 제목"}]}' \
+    "$test_dir/title-translation.json" >"$test_dir/raw/2.json"
+  run_ingestion "$test_dir/title-alternative" --raw-dir "$test_dir/raw" >/dev/null
+  [[ "$(db -qAt -c 'SELECT title FROM movies WHERE tmdb_id=2')" == '한국 대체 제목' ]]
+
+  jq '.details.alternative_titles.titles = [
+      {iso_3166_1:"KR",title:"첫 번째 제목"},
+      {iso_3166_1:"KR",title:"두 번째 제목"}]' \
+    "$test_dir/raw/2.json" >"$test_dir/title-ambiguous.json"
+  cp "$test_dir/title-ambiguous.json" "$test_dir/raw/2.json"
+  run_ingestion "$test_dir/title-ambiguous" --raw-dir "$test_dir/raw" >/dev/null
+  [[ "$(db -qAt -c "SELECT title || '|' || original_title FROM movies WHERE tmdb_id=2")" == '한국 대체 제목|Original Title' ]]
+
+  db -q -c "UPDATE movies SET title='Foreign Title' WHERE tmdb_id=2" >/dev/null
+  run_ingestion "$test_dir/title-ambiguous" --raw-dir "$test_dir/raw" --refresh >/dev/null
+  [[ "$(db -qAt -c 'SELECT title FROM movies WHERE tmdb_id=2')" == 'Foreign Title' ]]
+
+  cp "$test_dir/title-translation.json" "$RESPONSE_FILE"
+  run_ingestion "$test_dir/title-api" >/dev/null
+  [[ "$(db -qAt -c 'SELECT title FROM movies WHERE tmdb_id=2')" == '한국 번역 제목' ]]
+  grep -q 'append_to_response=translations,alternative_titles' "$CURL_LOG"
+fi
+
 if [[ "$group" == all || "$group" == ott ]]; then
   printf 'ingestion regression: approved OTT SQL and repeat\n'
   [[ "$(db -qAt -c "SELECT count(*) FROM otts WHERE (code,tmdb_provider_id) IN (('DISNEY_PLUS',337),('WATCHA',97),('WAVVE',356),('TVING',1883))")" == 4 ]]

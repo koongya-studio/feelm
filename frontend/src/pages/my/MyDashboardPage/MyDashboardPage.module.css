@@ -24,7 +24,7 @@
   align-items: center;
   justify-content: center;
   margin-right: calc(var(--space-3) * -1);
-  color: var(--color-ink);
+  color: var(--color-on-dark);
   text-decoration: none;
 }
 
@@ -35,6 +35,10 @@
  * **터치 영역은 44px을 지킨다.** 보이는 테두리만 줄이고 눌리는 자리는 `::after`로 넓힌다
  * (헤더의 뒤로 가기 버튼이 쓰는 방법). 규칙은 `tokens.css`의 `--tap-target-min`이다.
  */
+/*
+ * 사진 배경 위의 유리 버튼이다(업무 -697). 수치 카드 · 바로가기 카드와 같은 판이고, 누르면
+ * 유리가 눌려 들어간다.
+ */
 .profileAction {
   position: relative;
   display: inline-flex;
@@ -42,10 +46,13 @@
   align-items: center;
   justify-content: center;
   padding: 0 var(--space-3);
-  border: 1px solid var(--color-line-strong);
   border-radius: var(--radius-pill);
-  background: none;
-  color: var(--color-ink);
+  border: 1px solid var(--glass-dark-line);
+  background: var(--glass-dark-fill);
+  box-shadow: var(--shadow-glass-dark);
+  backdrop-filter: var(--blur-glass-dark);
+  -webkit-backdrop-filter: var(--blur-glass-dark);
+  color: var(--color-on-dark);
   cursor: pointer;
   font-family: inherit;
   font-size: var(--font-size-meta);
@@ -71,7 +78,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-/* 카드 전체가 하나의 링크다 */
+/* 카드 전체가 하나의 링크다. 사진 배경 위의 유리 판이다(업무 -697) */
 .shortcut {
   display: flex;
   min-width: 0;
@@ -79,10 +86,13 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
-  border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
-  background: var(--color-surface-raised);
-  color: var(--color-ink);
+  border: 1px solid var(--glass-dark-line);
+  background: var(--glass-dark-fill);
+  box-shadow: var(--shadow-glass-dark);
+  backdrop-filter: var(--blur-glass-dark);
+  -webkit-backdrop-filter: var(--blur-glass-dark);
+  color: var(--color-on-dark);
   text-decoration: none;
 }
 
@@ -105,7 +115,7 @@
 .shortcutChevron {
   display: flex;
   flex: none;
-  color: var(--color-ink-muted);
+  color: var(--color-on-dark-muted);
 }
 
 /*
@@ -164,7 +174,7 @@
   border: 0;
   border-bottom: 2px solid transparent;
   background: none;
-  color: var(--color-ink-hint);
+  color: var(--color-on-dark-hint);
   cursor: pointer;
   font-family: inherit;
   font-size: var(--font-size-meta);
@@ -172,8 +182,15 @@
 }
 
 .tab[aria-selected='true'] {
-  border-bottom-color: var(--color-ink);
-  color: var(--color-ink);
+  border-bottom-color: var(--color-on-dark);
+  color: var(--color-on-dark);
+}
+
+/* 고르지 않은 탭에 올리면 글자가 짙어진다(업무 -697). 고른 탭은 밑줄이 따로 말한다 */
+@media (hover: hover) {
+  .tab[aria-selected='false']:hover {
+    color: var(--color-on-dark-muted);
+  }
 }
 
 /* ─────────────────────────── 포스터 피드 */
@@ -189,7 +206,7 @@
   flex-direction: column;
   align-items: center;
   padding: var(--space-10) 0;
-  color: var(--color-ink-muted);
+  color: var(--color-on-dark-muted);
   font-size: var(--font-size-meta);
   gap: var(--space-4);
   text-align: center;
@@ -206,11 +223,15 @@
   grid-template-columns: repeat(3, 1fr);
 }
 
-/* 포스터 아래 글자까지 한 칸이 통째로 누름 영역이다. 밑줄은 쓰지 않는다 */
+/*
+ * 포스터 아래 글자까지 한 칸이 통째로 누름 영역이다. 밑줄은 쓰지 않는다.
+ * 누름 상태와 오른쪽 아래 이동 단서는 공통 포스터 규칙이다(업무 -697).
+ */
 .cell {
+  composes: posterLink from '../../../styles/interaction.module.css';
   position: relative;
   display: block;
-  color: var(--color-ink);
+  color: var(--color-on-dark);
   line-height: 0;
   text-decoration: none;
 }
@@ -256,7 +277,7 @@
 
 .captionSource {
   overflow: hidden;
-  color: var(--color-ink);
+  color: var(--color-on-dark);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
   text-overflow: ellipsis;
@@ -264,13 +285,13 @@
 }
 
 .captionDate {
-  color: var(--color-ink-muted);
+  color: var(--color-on-dark-muted);
   font-size: var(--font-size-caption);
 }
 
 /* ─────────────────────────── 알림 막대 */
 
-/* 하단 내비 알약 위에 뜬다. 막대는 `components/Snackbar`이고 자리만 여기서 잡는다 */
+/* 하단 내비 바 위에 뜬다. 막대는 `components/Snackbar`이고 자리만 여기서 잡는다 */
 .notice {
   position: fixed;
   z-index: 2;
@@ -292,7 +313,30 @@
 
 .moreError {
   margin: 0;
-  color: var(--color-ink-hint);
+  color: var(--color-on-dark-muted);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
+}
+
+/* ─────────────────────────── 유리 버튼 · 카드의 누름 (업무 -697) */
+
+@media (hover: hover) {
+  .profileAction:hover,
+  .shortcut:hover {
+    border-color: rgba(255, 255, 255, 0.32);
+  }
+}
+
+.profileAction:active,
+.shortcut:active {
+  background: var(--glass-dark-fill-pressed);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+/* 어두운 면이라 초점 링은 흰 선이다 */
+.cell:focus-visible,
+.tab:focus-visible,
+.profileAction:focus-visible,
+.shortcut:focus-visible {
+  outline-color: var(--color-on-dark);
 }

@@ -100,10 +100,10 @@ public class MailDispatcher {
      * <p>제출에 성공해도 발송이 보장되지는 않는다. 전역 발송 상한을 넘으면 풀의 스레드가 이 메일을 버린다(S15P21E106-287).
      *
      * @param kind 메일 종류. 실패·유실 로그의 문구와 복구 경로를 정한다
-     * @param userId 로그에 남길 사용자 식별자
+     * @param userId 로그에 남길 사용자 식별자. 계정을 만들기 전에 보내는 메일(API-078)은 {@code null}이다
      * @param send 실제 발송. 풀의 스레드에서 실행된다
      */
-    public void dispatch(MailKind kind, long userId, Runnable send) {
+    public void dispatch(MailKind kind, Long userId, Runnable send) {
         pending.incrementAndGet();
         try {
             executor.execute(() -> run(kind, userId, send));
@@ -133,7 +133,7 @@ public class MailDispatcher {
      *
      * <p>발송이 실패하면 확보한 자리를 되돌린다(리뷰 B-4). 이 상한이 지키는 것은 SMTP 계정의 쿼터이고 실패한 발송은 쿼터를 쓰지 않는다.
      */
-    private void run(MailKind kind, long userId, Runnable send) {
+    private void run(MailKind kind, Long userId, Runnable send) {
         try {
             if (!consumeBudget(kind, userId)) {
                 return;
@@ -143,9 +143,9 @@ public class MailDispatcher {
             } catch (RuntimeException exception) {
                 releaseBudget();
                 log.error(
-                        "{} 발송에 실패했습니다. 사용자 {}는 {}으로 복구할 수 있습니다. 원인: {}",
+                        "{} 발송에 실패했습니다. {}는 {}으로 복구할 수 있습니다. 원인: {}",
                         kind.label(),
-                        userId,
+                        subject(userId),
                         kind.recovery(),
                         summarize(exception));
             }
@@ -159,14 +159,14 @@ public class MailDispatcher {
      *
      * <p>발송 실패와 다른 문구를 쓰는 이유는 복구 방법이 다르기 때문이다. 발송 실패는 SMTP 쪽을 보게 하고, 이 줄은 Redis 쪽을 보게 한다.
      */
-    private boolean consumeBudget(MailKind kind, long userId) {
+    private boolean consumeBudget(MailKind kind, Long userId) {
         try {
             return budget.tryConsume();
         } catch (RuntimeException budgetFailure) {
             log.error(
-                    "{} 발송 상한을 확인하지 못해 보내지 않았습니다. 사용자 {}는 {}으로 복구할 수 있습니다. 원인: {}",
+                    "{} 발송 상한을 확인하지 못해 보내지 않았습니다. {}는 {}으로 복구할 수 있습니다. 원인: {}",
                     kind.label(),
-                    userId,
+                    subject(userId),
                     kind.recovery(),
                     summarize(budgetFailure));
             return false;
@@ -187,6 +187,16 @@ public class MailDispatcher {
     }
 
     /**
+     * 로그에 남길 발송 대상. 계정이 있으면 사용자 식별자를, 계정을 만들기 전에 보내는 메일(API-078)은 주체를 밝히지 않고 요청자로 적는다.
+     *
+     * <p>이메일은 남기지 않는다({@code docs/backend-convention.md} 12장). 계정이 없는 발송은 로그로 대상을 특정할 수 없으며, 그 경로의
+     * 복구는 사용자의 재요청이라 식별자가 없어도 안내가 성립한다.
+     */
+    private String subject(Long userId) {
+        return userId == null ? "요청자" : "사용자 " + userId;
+    }
+
+    /**
      * 발송을 넘기지 못한 사실을 기록한다.
      *
      * <p>거절은 한 구간에서 {@link #SATURATION_WARN_INTERVAL}<b>마다 한 번</b>만 남긴다. 거절마다 남기면 부하가 이어지는 동안 같은 줄이
@@ -196,12 +206,12 @@ public class MailDispatcher {
      * <p>종료 중의 거절은 큐가 찬 것이 아니다. 컨텍스트가 닫히면 실행기가 먼저 제출을 거절하기 시작하므로, 그 구간의 유실을 포화로 적으면 재배포마다 원인이 뒤바뀐
      * 로그가 남는다(리뷰 F3). 거절이 아닌 제출 실패는 드물고 원인이 코드·설정 쪽이므로 창에 넣지 않고 매번 ERROR로 남긴다.
      */
-    private void reportDropped(MailKind kind, long userId, RuntimeException submissionFailure) {
+    private void reportDropped(MailKind kind, Long userId, RuntimeException submissionFailure) {
         if (!(submissionFailure instanceof RejectedExecutionException)) {
             log.error(
-                    "{} 발송을 발송 스레드에 넘기지 못했습니다. 사용자 {}는 {}으로 복구할 수 있습니다. 원인: {}",
+                    "{} 발송을 발송 스레드에 넘기지 못했습니다. {}는 {}으로 복구할 수 있습니다. 원인: {}",
                     kind.label(),
-                    userId,
+                    subject(userId),
                     kind.recovery(),
                     summarize(submissionFailure));
             return;
@@ -215,19 +225,18 @@ public class MailDispatcher {
         }
         if (isShuttingDown()) {
             log.warn(
-                    "애플리케이션이 종료 중이어서 {} 발송을 보내지 못했습니다. 사용자 {}는 {}으로 복구할 수 있습니다."
-                            + " 이 구간 누적 유실 {}건.",
+                    "애플리케이션이 종료 중이어서 {} 발송을 보내지 못했습니다. {}는 {}으로 복구할 수 있습니다." + " 이 구간 누적 유실 {}건.",
                     kind.label(),
-                    userId,
+                    subject(userId),
                     kind.recovery(),
                     lostInWindow);
             return;
         }
         log.warn(
-                "메일 발송 큐가 가득 차 {} 발송을 버렸습니다. 사용자 {}는 {}으로 복구할 수 있습니다."
+                "메일 발송 큐가 가득 차 {} 발송을 버렸습니다. {}는 {}으로 복구할 수 있습니다."
                         + " 이 구간 누적 유실 {}건. 포화가 이어지면 같은 경고를 {}마다 한 번만 남깁니다.",
                 kind.label(),
-                userId,
+                subject(userId),
                 kind.recovery(),
                 lostInWindow,
                 SATURATION_WARN_INTERVAL);

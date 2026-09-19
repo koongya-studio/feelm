@@ -9,7 +9,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.boot.convert.DurationUnit;
 
 /**
- * 인증 메일 재발송(API-003)과 비밀번호 재설정 요청(API-010)의 <b>요청 단위</b> 발송 제한 값이다(S15P21E106-281 결정 D-8).
+ * 인증번호 발송(API-078)과 비밀번호 재설정 요청(API-010)의 <b>요청 단위</b> 발송 제한 값이다(S15P21E106-281 결정 D-8).
  *
  * <p>접두사는 {@code feelm.mail.rate-limit}이다. 발송 제한은 메일 발송 정책이라 {@code feelm.mail} 블록에 두었고, 값을 읽는 쪽이
  * 인증 도메인의 {@link AuthRateLimiter} 하나뿐이라 record는 도메인에 둔다.

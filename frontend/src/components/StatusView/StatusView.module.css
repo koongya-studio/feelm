@@ -80,6 +80,8 @@
   color: var(--color-ink-muted);
   font-size: var(--font-size-meta);
   line-height: var(--line-height-body);
+  /* 두 문장짜리 안내는 문장 끝에서 나눈다. 폭으로 끊기면 한 글자가 다음 줄로 떨어진다(2.2-A 준비 중) */
+  white-space: pre-line;
 }
 
 .area[data-size='inline'] .description {

@@ -442,6 +442,7 @@
 - 사용자당 참여 가능한 활성 파티는 최대 10개이며, 수락할 파티의 정원은 파티장 포함 최대 4명이다.
 - 파티 생성과 여러 초대 수락이 동시에 실행되어도 사용자별 활성 파티가 10개를 넘지 않도록 사용자 행을 먼저 잠근다. 사용자와 파티를 함께 잠글 때의 순서는 사용자 → 파티다.
 - 수락 시 인원이 바뀌므로 파티 추천 캐시(API-058)를 무효화한다
+- 수락과 같은 트랜잭션에서 현재 파티장에게 `PARTY_INVITE_ACCEPTED` 인앱 알림을 생성한다. 알림은 해당 파티로 이동하며 Web Push 발송 대상이다(API-070, ADR-0021)
 - 수락 후 파티원 전원에게 파티 정보가 갱신된다(폴링 가정)
 
 ### 상태값
@@ -714,7 +715,7 @@
 | 관련 요구사항 | FR-22, FR-13 |
 | 화면 | ⑧-1 파티 필름 |
 | 미정 사항 | 없음 |
-| 비고 | Spark `party-mean-fit-v2` 결과를 Spring이 최신성 검증·필터링해 제공 |
+| 비고 | 파티 전용 Python Consumer의 `party-mean-fit-v2` 결과를 Spring이 최신성 검증·필터링해 제공 |
 
 ### 설명
 
@@ -763,10 +764,10 @@
 
 ### 처리 규칙
 
-- Spark Structured Streaming이 파티원별 Candidate 영화 ID 합집합을 재점수화해 `feelm:party:{partyId}:candidates`에 순위대로 게시한다. Spring은 알고리즘 버전이나 점수를 해석하지 않고 게시된 순서를 유지한다
+- 파티 전용 Python Consumer가 파티원별 Candidate 영화 ID 합집합을 재점수화해 `feelm:party:{partyId}:candidates`에 순위대로 게시한다. Spring은 알고리즘 버전이나 점수를 해석하지 않고 게시된 순서를 유지한다
 - Spring은 현재 파티원 중 한 명이라도 평가, 확정 감상(`WATCHED_UNRATED`·`RATED`), 관심없음 처리한 영화와 서비스 DB에 없는 영화를 제외한다
 - **Rating Candidate 버전**은 파티원 한 명의 Candidate 점수 집합이 몇 번째로 갱신된 것인지 나타내는 값이다. Python Fold-in Consumer가 그 사용자의 평가·온보딩 이벤트를 반영해 Redis의 사용자별 Candidate 점수를 갱신할 때 함께 발급·기록하며, 저장 위치는 해당 사용자 Candidate 키와 같은 Redis 네임스페이스다. Spring은 값을 읽기만 한다(ADR-0017)
-- 파티 입력 `inputId`는 `partyId` + 모델 버전 + 정렬된 파티원·각 Candidate 생성 세대로 결정한다. 파티 인원이나 생성 세대가 바뀌면 새 계산을 요청한다. Spring은 Spark 결과의 `inputId`와 모델 버전이 현재 입력과 같을 때만 결과를 사용한다
+- 파티 입력 `inputId`는 `partyId` + 모델 버전 + 정렬된 파티원·각 Candidate 생성 세대로 결정한다. 파티 인원이나 생성 세대가 바뀌면 새 계산을 요청한다. Spring은 파티 Consumer 결과의 `inputId`와 모델 버전이 현재 입력과 같을 때만 결과를 사용한다
 - Redis의 점수 통계·`memberFit`·`fallback` 진단 필드는 API-058 판단과 응답에 사용하지 않는다
 - 동일 `partyId`·`inputId`·`modelVersion` 요청은 기존 추천 세트 이력을 재사용한다
 - 결과는 `recommendation_sets.party_id`가 설정된 파티 추천 이력으로 저장한다

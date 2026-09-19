@@ -39,6 +39,8 @@ class ErrorCodeTest {
                 .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(ErrorCode.RECOMMENDATION_UNAVAILABLE.getStatus())
                 .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(ErrorCode.PUSH_UNAVAILABLE.getStatus())
+                .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     }
 
     @Test
@@ -59,17 +61,18 @@ class ErrorCodeTest {
                         "RATE_LIMITED",
                         "INTERNAL_ERROR",
                         "RECOMMENDATION_UNAVAILABLE",
+                        "PUSH_UNAVAILABLE",
                         // 인증 도메인 — API-006 토큰 재발급 전용
                         "REFRESH_TOKEN_INVALID",
                         "REFRESH_TOKEN_EXPIRED",
                         // 계정 도메인 — API-001~004 (S15P21E106-149)
                         "EMAIL_DUPLICATED",
                         "NICKNAME_DUPLICATED",
-                        "VERIFICATION_TOKEN_INVALID",
-                        "VERIFICATION_TOKEN_EXPIRED",
-                        "ALREADY_VERIFIED",
+                        "VERIFICATION_CODE_MISMATCH",
+                        "VERIFICATION_CODE_EXHAUSTED",
+                        "VERIFICATION_CODE_EXPIRED",
+                        "EMAIL_VERIFICATION_TOKEN_INVALID",
                         "INVALID_CREDENTIALS",
-                        "EMAIL_NOT_VERIFIED",
                         // 계정 도메인 — API-007~009 소셜 로그인·연결 (S15P21E106-150)
                         "UNSUPPORTED_PROVIDER",
                         "OAUTH_CODE_INVALID",
@@ -123,16 +126,23 @@ class ErrorCodeTest {
     }
 
     @Test
-    @DisplayName("API-001~004 계정 오류 코드는 각 명세의 HTTP 상태로 매핑된다")
+    @DisplayName("API-001·004 계정 오류 코드는 각 명세의 HTTP 상태로 매핑된다")
     void emailAccountCodesMatchSpecifiedStatuses() {
         assertThat(ErrorCode.EMAIL_DUPLICATED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(ErrorCode.NICKNAME_DUPLICATED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
-        assertThat(ErrorCode.ALREADY_VERIFIED.getStatus()).isEqualTo(HttpStatus.CONFLICT);
-        assertThat(ErrorCode.VERIFICATION_TOKEN_INVALID.getStatus())
-                .isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(ErrorCode.VERIFICATION_TOKEN_EXPIRED.getStatus()).isEqualTo(HttpStatus.GONE);
         assertThat(ErrorCode.INVALID_CREDENTIALS.getStatus()).isEqualTo(HttpStatus.UNAUTHORIZED);
-        assertThat(ErrorCode.EMAIL_NOT_VERIFIED.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    @DisplayName("API-078~076 인증번호 오류 코드는 각 명세의 HTTP 상태로 매핑된다")
+    void verificationCodeCodesMatchSpecifiedStatuses() {
+        assertThat(ErrorCode.VERIFICATION_CODE_MISMATCH.getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.VERIFICATION_CODE_EXHAUSTED.getStatus())
+                .isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.VERIFICATION_CODE_EXPIRED.getStatus()).isEqualTo(HttpStatus.GONE);
+        assertThat(ErrorCode.EMAIL_VERIFICATION_TOKEN_INVALID.getStatus())
+                .isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test

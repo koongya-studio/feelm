@@ -2,11 +2,9 @@ package com.feelm.backend.domain.user.repository;
 
 import com.feelm.backend.domain.user.entity.User;
 import jakarta.persistence.LockModeType;
-import java.time.Instant;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -36,8 +34,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
      * <p>호출자는 넷이다.
      *
      * <ul>
-     *   <li>이메일 인증(API-002, {@code EmailVerificationService.verify}) — 상태를 활성으로 바꾸는 동안
-     *       재가입(API-001)의 미인증 계정 삭제가 끼어들지 않게 한다.
      *   <li>비밀번호 재설정(API-011, {@code PasswordResetService.reset}) — 토큰을 소진하고 비밀번호를 바꾸는 동안 같은 계정의 다른
      *       변경이 끼어들지 않게 한다.
      *   <li>비밀번호 변경(API-012, {@code PasswordChangeService.change}) — 같은 사용자의 동시 변경 요청이 서로의 결과를 덮어쓰지
@@ -74,16 +70,4 @@ public interface UserRepository extends JpaRepository<User, Long> {
             "select new com.feelm.backend.domain.user.repository.PasswordCredentials("
                     + "u.status, u.passwordHash) from User u where u.id = :id")
     Optional<PasswordCredentials> findPasswordCredentialsById(@Param("id") Long id);
-
-    /**
-     * 보존 기간이 지난 미인증 계정을 지운다. 상태와 생성 시각을 삭제문의 조건에 넣어, 조회 뒤 삭제 전에 다른 요청이 인증을 마쳤으면 지우지 않는다.
-     *
-     * @return 지운 행 수. {@code 0}이면 그 사이에 계정이 활성화된 것이므로 호출자가 재가입을 거절한다
-     */
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query(
-            "delete from User u where u.id = :id"
-                    + " and u.status = com.feelm.backend.domain.user.entity.UserStatus.PENDING_VERIFICATION"
-                    + " and u.createdAt <= :cutoff")
-    int deleteIfStalePendingVerification(@Param("id") Long id, @Param("cutoff") Instant cutoff);
 }

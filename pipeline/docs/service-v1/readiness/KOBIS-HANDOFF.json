@@ -1,0 +1,85 @@
+{
+  "schema_version": 2,
+  "jira": "S15P21E106-621",
+  "created_at_date": "2026-09-18",
+  "source_repository": {
+    "name": "FEELM",
+    "url": "https://github.com/itcksgud/FEELM.git",
+    "branch": "main",
+    "revision": "e81e84ee3a115af3ab54515a3b6762ecb81a6766",
+    "origin_state": "PUSHED_TO_ORIGIN_MAIN",
+    "preferred_transfer_method": "GITHUB_CLONE",
+    "fallback_transfer_method": "GIT_BUNDLE",
+    "revision_role": "ARTIFACT_SOURCE_BASELINE",
+    "origin_main_verified_at_handoff_update": "fd638b5552d8908415e285b64489c5de4eff4c63",
+    "laptop_revision_rule": "origin/main synced and artifact baseline revision is an ancestor of HEAD"
+  },
+  "dataset": {
+    "name": "KOBIS direct-code movie audience rollup",
+    "primary_file": "outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/confirmed-movie-comparison.parquet",
+    "row_count": 2176,
+    "entity_key": "kobis_movie_code",
+    "audience_field": "last_observed_cumulative_admissions",
+    "period_field": "last_observed_period_end",
+    "collection_range": "2004-01-01..2026-09-12",
+    "rollup_rule": "For each directly observed KOBIS movie code, select the cumulative admissions from its latest observed period; do not sum or max annual observations.",
+    "confirmed_cross_source_ids": 0,
+    "tmdb_linkage_status": "PROPOSAL_ONLY_NOT_SERVICE_VERIFIED",
+    "service_status": "USABLE_AS_KOBIS_POPULATION_INPUT_ONLY; SERVICE_ACTIVATION_BLOCKED_PENDING_VERIFIED_CROSSWALK"
+  },
+  "transfer_layout": {
+    "destination_root": "C:\\higher\\data\\feelm-research",
+    "relative_paths_preserved": true
+  },
+  "files": [
+    {
+      "path": "outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/confirmed-movie-comparison.parquet",
+      "bytes": 253672,
+      "sha256": "96aa2b6377c3f450e5021ae7cf43829550ee27187108493693a9d06ddae61f46",
+      "role": "PRIMARY_MACHINE_READABLE_DATA"
+    },
+    {
+      "path": "outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/confirmed-movie-comparison.csv",
+      "bytes": 974554,
+      "sha256": "38ec5d5e2d03a553fc463576541fccdb0200d7f6217ab519183a8cdc5be088d9",
+      "role": "HUMAN_REVIEW_EQUIVALENT"
+    },
+    {
+      "path": "outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/manifest.json",
+      "bytes": 3770,
+      "sha256": "4311b71dfb6b28a83e8be402992dceec4fa955ab336bcc126ba2e5eab60e00f9",
+      "role": "PROVENANCE_OR_INDEPENDENT_REVIEW"
+    },
+    {
+      "path": "outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/summary.json",
+      "bytes": 23738,
+      "sha256": "72a3bfae8443851dc3cdb7c245531479f64f2a8855baffe83b5c6619f7fa2276",
+      "role": "PROVENANCE_OR_INDEPENDENT_REVIEW"
+    },
+    {
+      "path": "outputs/recommendation-evidence/kobis-expanded-20260913/linked-v2/REPORT.md",
+      "bytes": 2237,
+      "sha256": "b85d1c1d32dd50137fb506cd4f69c385f09faed94dca6380f8c3b54eaa4a8569",
+      "role": "PROVENANCE_OR_INDEPENDENT_REVIEW"
+    },
+    {
+      "path": "outputs/recommendation-evidence/kobis-expanded-20260913/result-link-v2-review.json",
+      "bytes": 4914,
+      "sha256": "58e4acc7682018170b70d8490dda205ff1480126fc1cd57f98f108c7f2a3e398",
+      "role": "PROVENANCE_OR_INDEPENDENT_REVIEW"
+    }
+  ],
+  "summary": {
+    "file_count": 6,
+    "total_bytes": 1262885,
+    "all_files_verified_on_desktop": true,
+    "primary_parquet_rows_verified": 2176
+  },
+  "optional_rebuild_source": {
+    "path": "outputs/recommendation-evidence/kobis-expanded-20260913/annual-observations.parquet",
+    "rows": 72700,
+    "included_in_minimum_handoff": false,
+    "reason": "Upstream observation archive is required only to rebuild or re-audit the 2,176-row movie rollup from scratch."
+  },
+  "blocking_requirement": "verified-kobis-service-crosswalk"
+}

@@ -2,52 +2,57 @@
  * EXT-01 OTT 취향 분석 시작
  *
  * 이동표
- * - 2.1 → EXT-01 홈 배너 · OTT 추천받기 · 6.1 ⇢ EXT-01 OTT 관리에서 진입
- * - EXT-01 → EXT-02 내 OTT 취향 분석하기 · EXT-01 ⇢ EXT-05 평가 데이터가 부족한 경우
+ * - 7.8 → EXT-01 OTT 추천받기. 홈을 없애면서 배너가 7.8로 왔다(업무 -461) — 유일한 입구다
+ * - EXT-01 → EXT-02 내 OTT 취향 분석하기
  *
- * 요소는 와이어프레임 그대로다 — `지금까지 감상한 영화와 별점을 바탕으로 분석해요`, 요약 넷
- * (본 영화 · 평가 · 선호 장르 · 자주 본 배우), OTT 배지 여섯과 `OTT 서비스 6개를 분석해요`,
- * `내 OTT 취향 분석하기`, `구독 여부가 아니라 콘텐츠 취향을 기준으로 분석해요`.
+ * 요소는 와이어프레임에서 **하나 줄었다.** 요약 넷(본 영화 · 평가 · 선호 장르 · 자주 본 배우)
+ * 가운데 `평가`만 남는다(업무 -563 · 지시서 CR-28). 나머지 셋은 대응 API가 없고, `본 영화`는
+ * API-014 `stats`의 `frameCount`가 `ratingCount`와 1:1이라 같은 수를 두 번 적는 셈이 된다.
  *
- * API-068은 **확장 단계**라 목업이다. 요약은 계약에 없다(`OttAnalysisBasis`).
- * 평가가 기준보다 적으면 분석 버튼이 EXT-05로 간다. 목업에서 그 경우를 보려면
- * `?mock=ott-insufficient`를 붙인다(`api/ottRecommendations.ts`).
+ * `지금까지 감상한 영화와 별점을 바탕으로 분석해요`, OTT 배지와 `OTT 서비스 N개를 분석해요`,
+ * `내 OTT 취향 분석하기`, `구독 여부가 아니라 콘텐츠 취향을 기준으로 분석해요`는 그대로다.
+ *
+ * **평가 수로 EXT-05를 미리 가르지 않는다.** 기준 평가 수가 계약에 없다. 분석 가능 여부는
+ * API-068의 응답이 정하므로 EXT-02가 결과를 받고 나눈다(업무 -563).
  */
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
 import Button from '../../../components/Button';
 import OttBadge from '../../../components/OttBadge';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
-import { getOttAnalysisBasis } from '../../../api/ottRecommendations';
+import { failureDescription } from '../../../components/StatusView/failure';
 import { getOtts } from '../../../api/otts';
+import { getMyProfile } from '../../../api/users';
 import { path } from '../../../routes/paths';
 import styles from './OttFinderPage.module.css';
 import type { Ott } from '../../../types/ott';
-import type { OttAnalysisBasis } from '../../../types/unspecified';
 
 export default function OttFinderPage() {
   const navigate = useNavigate();
-  const { search } = useLocation();
 
-  const [basis, setBasis] = useState<OttAnalysisBasis | null>(null);
+  const [ratingCount, setRatingCount] = useState<number | null>(null);
   const [otts, setOtts] = useState<Ott[]>([]);
+  const [failure, setFailure] = useState<unknown>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
     let active = true;
 
-    Promise.all([getOttAnalysisBasis(), getOtts()])
-      .then(([value, list]) => {
+    Promise.all([getMyProfile(), getOtts()])
+      .then(([profile, list]) => {
         if (!active) return;
 
-        setBasis(value);
+        setRatingCount(profile.stats.ratingCount);
         setOtts(list);
         setFailed(false);
       })
-      .catch(() => {
-        if (active) setFailed(true);
+      .catch((error: unknown) => {
+        if (!active) return;
+
+        setFailure(error);
+        setFailed(true);
       });
 
     return () => {
@@ -63,7 +68,7 @@ export default function OttFinderPage() {
     return (
       <>
         {header}
-        <StatusView title="분석 정보를 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
+        <StatusView title="분석 정보를 불러오지 못했어요" description={failureDescription(failure)}>
           <Button
             onClick={() => {
               setFailed(false);
@@ -77,18 +82,8 @@ export default function OttFinderPage() {
     );
   }
 
-  if (!basis) {
+  if (ratingCount === null) {
     return header;
-  }
-
-  function start() {
-    if (!basis) return;
-
-    // 목업 확인용 질의를 다음 화면에도 넘긴다
-    const next =
-      basis.ratingCount < basis.requiredRatingCount ? path.ottInsufficient() : path.ottAnalyzing();
-
-    void navigate(`${next}${search}`);
   }
 
   return (
@@ -104,20 +99,8 @@ export default function OttFinderPage() {
 
         <dl className={styles.basis}>
           <div className={styles.fact}>
-            <dt>본 영화</dt>
-            <dd>{basis.watchedCount}편</dd>
-          </div>
-          <div className={styles.fact}>
             <dt>평가</dt>
-            <dd>{basis.ratingCount}개</dd>
-          </div>
-          <div className={styles.fact}>
-            <dt>선호 장르</dt>
-            <dd>{basis.favoriteGenres}</dd>
-          </div>
-          <div className={styles.fact}>
-            <dt>자주 본 배우</dt>
-            <dd>{basis.frequentActor}</dd>
+            <dd>{ratingCount}개</dd>
           </div>
         </dl>
 
@@ -133,7 +116,7 @@ export default function OttFinderPage() {
         </div>
 
         <div className={styles.actions}>
-          <Button onClick={start}>내 OTT 취향 분석하기</Button>
+          <Button onClick={() => void navigate(path.ottAnalyzing())}>내 OTT 취향 분석하기</Button>
           <p className={styles.caption}>구독 여부가 아니라 콘텐츠 취향을 기준으로 분석해요</p>
         </div>
       </div>

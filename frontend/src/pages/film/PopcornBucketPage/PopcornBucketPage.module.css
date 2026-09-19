@@ -43,11 +43,10 @@
   gap: var(--space-4);
 }
 
-/* 자간 넓은 소제목. 제목 위에 얹어 층을 만든다 */
-.eyebrow {
+/* 핵심 수치 `팝콘 N알`. 제목 위에 작게 얹는다(업무 -677 — 한때 `N · KERNELS`였다) */
+.total {
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
-  letter-spacing: var(--letter-spacing-wide);
   color: var(--color-ink-hint);
 }
 
@@ -58,6 +57,14 @@
   line-height: var(--line-height-title);
   letter-spacing: var(--letter-spacing-title);
   font-weight: var(--font-weight-bold);
+}
+
+/* 알 수(감상량)와 별점(선호도)의 뜻. 제목 아래에서 범례 숫자를 풀어 준다(업무 -677) */
+.meaning {
+  margin-top: calc(var(--space-2) * -1);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
 }
 
 /*
@@ -84,10 +91,22 @@
   line-height: var(--line-height-meta);
 }
 
-.legendName {
+.legendText {
+  display: flex;
   flex: 1;
   min-width: 0;
+  flex-direction: column;
+}
+
+.legendName {
   color: var(--color-ink-body);
+}
+
+/* 맛이 뜻하는 것(업무 -631). 이름 아래 한 줄이고, 수치보다 흐리다 */
+.legendKeywords {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
 }
 
 .legendCount {

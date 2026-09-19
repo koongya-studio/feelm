@@ -49,6 +49,27 @@ public interface TokenProvider {
      */
     SignupTokenClaims parseSignupToken(String token);
 
+    /**
+     * 이메일 인증 토큰을 발급한다(API-079). 아직 계정이 없어 사용자 식별자 대신 확인을 마친 이메일을 담는다.
+     *
+     * <p>소셜 가입 토큰과 종류를 구분해 서로의 자리에 쓸 수 없게 한다. 한 종류가 다른 자리에서 통하면 소셜 가입 토큰으로 이메일 계정을 만들거나 그 반대가
+     * 가능해진다.
+     *
+     * <p>{@code tokenId}(jti)는 가입(API-001)이 1회용을 강제하는 데 쓴다. 발급 측은 값만 실어 보내고 사용 여부는 소비 측이 기록한다.
+     */
+    String createEmailVerificationToken(EmailVerificationTokenClaims claims);
+
+    /**
+     * 이메일 인증 토큰을 검증하고 담긴 값을 반환한다.
+     *
+     * @throws BusinessException 서명 불일치·형식 오류·만료 모두 {@code EMAIL_VERIFICATION_TOKEN_INVALID}.
+     *     명세(API-001)가 세 경우를 같은 코드로 응답한다
+     */
+    EmailVerificationTokenClaims parseEmailVerificationToken(String token);
+
+    /** 이메일 인증 토큰의 발급 시점 기준 총 수명을 초 단위로 반환한다(API-079 응답의 {@code expiresIn}). */
+    long emailVerificationTokenTtlSeconds();
+
     /** Refresh Token에서 폐기 판단에 필요한 값만 추린 결과다. */
     record RefreshTokenClaims(long userId, String tokenId) {}
 
@@ -62,4 +83,11 @@ public interface TokenProvider {
      */
     record SignupTokenClaims(
             String provider, String providerUserId, String email, String nickname) {}
+
+    /**
+     * 이메일 가입을 마치는 데 필요한 값이다.
+     *
+     * <p>{@code email}은 인증번호 확인을 마친 주소이고, {@code tokenId}는 재사용을 막는 식별자(jti)다.
+     */
+    record EmailVerificationTokenClaims(String email, String tokenId) {}
 }

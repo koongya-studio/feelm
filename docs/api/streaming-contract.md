@@ -43,7 +43,8 @@ Python Consumer는 ④에서 `vector`·`candidates`와 version 키를 원자적�
 | **서비스 DB 미존재 · 평가 · 관심없음 제외 필터** | **Spring Boot** | 아래 2.1 |
 | 구조화 추천 근거 원본 저장 | Spring Boot | Consumer의 `reasons[]`를 세트 항목에 스냅샷 |
 | 세트 버퍼 저장 · 노출 | Spring Boot | API-045 처리 규칙, `recommendation_items` |
-| 파티 raw Candidate 계산 | Spark Structured Streaming | `feelm.party-refresh.v1` 입력을 계산해 Redis에 게시 |
+| 파티 raw Candidate 계산 | 파티 전용 Python Consumer | `feelm.party-refresh.v1` 입력을 계산해 Redis에 게시 |
+| 파티 raw Candidate 게시 완료 상태 기록 | 파티 전용 Python Consumer → Spring Boot | Redis 게시 뒤 완료 알림을 발행하고 Spring이 DB에 파티별 최신 위치 기록 |
 | 파티 추천 최종 재정렬 · OTT 구독 추천 집계 | Spring Boot | 파티 raw Candidate와 사용자별 Redis `candidates`를 각각 사용 |
 | 유사 영화 조회 · 취향 분석 집계 | Spring Boot | ADR-0017 |
 
@@ -166,8 +167,9 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 | `feelm.view.v1` | `VIEW` | 영화 상세 조회 | 행동 Feature · 전역 인기 집계 | 약함 |
 | `feelm.recommendation-click.v1` | `RECOMMENDATION_CLICK` | 추천 카드 클릭 | 행동 Feature 집계 | 약함 |
 | `feelm.ott-click.v1` | `OTT_CLICK` | 보러가기 클릭(API-033) | 행동 Feature 집계 | 약함 |
-| `feelm.candidate-updated.v1` | 토픽 자체가 Candidate 갱신을 표시 | Python Consumer의 Redis Candidate 게시 성공 직후 | Spring이 관련 파티 갱신을 시작할 때 사용할 알림 | 게시 완료 |
-| `feelm.party-refresh.v1` | 토픽 자체가 파티 입력 갱신을 표시 | 파티 구성 또는 개인 Candidate 갱신 후 Spring 발행 | Spark가 파티 raw Candidate를 Redis에 게시 | 강함 |
+| `feelm.candidate-updated.v1` | 토픽 자체가 Candidate 갱신을 표시 | Python Consumer의 Redis Candidate 게시 성공 직후 | Spring이 개인 추천 버퍼를 생성하고 관련 파티 갱신을 시작할 때 사용할 알림 | 게시 완료 |
+| `feelm.party-refresh.v1` | 토픽 자체가 파티 입력 갱신을 표시 | 파티 구성 또는 개인 Candidate 갱신 후 Spring 발행 | 파티 전용 Python Consumer가 raw Candidate를 Redis에 게시 | 강함 |
+| `feelm.party-candidate-updated.v1` | 토픽 자체가 파티 raw Candidate 게시 완료를 표시 | 파티 Consumer의 Redis 게시 성공 직후 | Spring이 추천 세트와 분리된 최신 게시 상태를 DB에 기록 | 게시 완료 |
 
 별점 등록이 감상을 의미하므로 별도의 감상 이벤트는 두지 않습니다. 감상 기록 자체는 Spring이 PostgreSQL에서 직접 사용합니다.
 
@@ -212,6 +214,8 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 ```
 
 - 개별 선택 내용은 싣지 않는다. Python Consumer가 `onboarding_preferences`를 조회한다
+- 온보딩 선택이 실제 별점 행이 된 뒤(S15P21E106-647) 같은 제출을 `RATING` 이벤트로도 보낼지는 그 업무에서
+  정한다. 한 번의 제출이 Fold-in에 두 번 들어가지 않아야 한다(S15P21E106-649)
 
 **`DISMISS`**
 
@@ -228,6 +232,16 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 ```
 
 - `dwellMs`는 선택. 측정하지 않으면 생략한다
+- 영화 상세 API-030에서 유효한 Access Token으로 존재하는 영화를 정상 조회한 회원의 요청만 발행 대상이다. 비회원 조회와 비회원으로 처리되는 무효 토큰·Refresh Token·다른 인증 스킴의 조회, 실패한 조회는 발행하지 않는다. 익명 `userId`나 대체 Kafka 키를 만들지 않는다.
+- Kafka 전달 실패는 기존 Outbox 재시도로 처리한다. 영화 상세 조회 후 `VIEW` Outbox 기록 자체가 실패해도 정상 상세 응답을 유지하며, 기록되지 않은 이벤트는 집계에 포함되지 않는다. 이 예외는 조회 API의 가용성을 위한 결정이며, 559에서 기록 실패를 관측할 방법과 쓰기 트랜잭션 경계를 구현한다.
+
+| 상세 조회 결과 | VIEW Outbox 기록 | 상세 응답 |
+|---|---|---|
+| 회원의 존재하는 영화 정상 조회 | 시도 | `200` |
+| 비회원 또는 비회원으로 처리된 인증의 정상 조회 | 없음 | `200` |
+| 영화 없음·입력 오류 등 조회 실패 | 없음 | 원래 오류 |
+| 회원의 정상 조회 후 VIEW Outbox 기록 실패 | 기록되지 않음 | `200` 유지 |
+| VIEW Outbox 기록 성공 후 Kafka 전달 실패 | `PENDING`으로 재시도 | `200` 유지 |
 
 **`RECOMMENDATION_CLICK`**
 
@@ -249,6 +263,7 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 
 - Kafka 키는 `userId`의 UTF-8 십진 문자열(예: `"1024"`), 값은 위 JSON이다. `null` 값·빈 payload·공통 봉투를 사용하지 않는다.
 - Python Consumer가 `vector`·`candidates`의 원자 게시에 성공한 뒤 발행한다. Kafka 수신 자체가 후보 갱신 알림이며 `occurredAt`을 비교하지 않는다.
+- Spring의 개인 추천 Consumer는 파티 Consumer와 독립된 group에서 알림을 받는다. 현재 Redis Candidate를 읽어 개인 버퍼를 저장·커밋한 뒤 offset을 확정한다. 알림보다 새 generation이 이미 게시됐으면 현재 Redis generation을 사용하며, 같은 generation의 재전달은 기존 세트를 재사용한다. 새 세트는 API-045의 최신 세트로 즉시 노출된다. 이전 세트의 노출·추천 이력은 보존한다. 유효한 알림의 Redis·DB 장애는 offset을 확정하지 않고 재시도한다. 형식이 잘못된 알림, 비활성·삭제된 사용자, 필터 후 저장 가능한 후보가 없는 경우는 새 세트 없이 offset을 확정한다.
 - 알림은 중복되거나 더 새 Candidate 게시 뒤 도착할 수 있다. Spring은 관련 활성 파티별 지속성 있는 refresh 요청을 DB에 저장한 뒤 수신 offset을 확정한다. 대기 중 중복 요청은 파티별로 합친다. 처리 작업자는 현재 Redis 값을 다시 읽고, 파티원별 `vector`·`candidates`를 한 번의 Redis 읽기로 가져와 두 값의 `generationId`·`modelVersion` 일치를 확인한다.
 - Spring은 이 최신 전체 입력으로 `feelm.party-refresh.v1` 이벤트를 만든다. 벡터와 후보 목록은 Candidate 게시 완료 알림에 싣지 않는다. 파티 구성 변경 때도 같은 DB 요청을 저장한다. Redis 장애나 불완전 입력은 요청을 남겨 재시도하며 파티 API를 실패시키지 않는다. 종료된 파티의 요청은 계산 이벤트 없이 정리한다.
 
@@ -265,11 +280,30 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 ```
 
 - Kafka 키는 `partyId`를 Kafka `LongSerializer`로 직렬화한 8바이트 정수다. 값은 위 전용 JSON이며 공통 사용자 이벤트 봉투를 사용하지 않는다. 멤버는 1~4명, `userId` 오름차순이고 `candidateMovieIds`는 사용자 선호 순서의 중복 없는 최대 600개다. 빈 vector는 허용한다.
-- Spring은 각 파티원의 Redis vector·candidates를 한 번에 읽어 같은 `generationId`·`modelVersion`인지 확인한다. 모든 파티원 모델 버전이 현재 Spark SERVING 모델과 같을 때만 발행한다.
-- `inputId`는 Spring이 `partyId`, 모델 버전, 정렬된 파티원 `userId`·`generationId`에서 결정적으로 만든 식별자다. Spark는 이를 그대로 결과에 돌려주고 자신이 로드한 `modelVersion`도 기록한다. Spring은 결과를 사용할 때 현재 파티 구성·사용자 세대로 `inputId`를 다시 만들고 결과의 모델 버전도 현재 모델과 비교한다.
-- Kafka 이벤트에는 `modelVersion`과 파티원별 `generationId`를 싣지 않는다. 모델 교체 중에는 새 모델의 입력을 이전 Spark 작업에 보내지 않도록 배포 순서를 조정한다.
-- 파티별 대기 요청은 하나로 합치되, 처리 완료 후 같은 `inputId`가 다시 발행될 수 있다. Spark는 해당 파티 Redis 값을 원자적으로 교체하며 Spring은 조회 시 현재 `inputId`와 모델 버전을 다시 비교한다.
-- 파티 refresh 아웃박스는 같은 파티의 앞선 이벤트가 Kafka에 기록되고 `PUBLISHED`로 확정될 때까지 후속 이벤트를 발행하지 않는다. 다른 파티와 사용자 이벤트의 발행은 계속한다. 현재 Spark 파티 작업은 배치 내부 offset 정렬을 하지 않으므로 배포 시 `--max-records-per-trigger 1`로 배치당 입력을 한 건으로 제한한다. Kafka 순서대로 Redis 결과가 게시되는지 연동 검증한다.
+- Spring은 각 파티원의 Redis vector·candidates를 한 번에 읽어 같은 `generationId`·`modelVersion`인지 확인한다. 모든 파티원 모델 버전이 현재 SERVING 모델과 같을 때만 발행한다.
+- `inputId`는 Spring이 `partyId`, 모델 버전, 정렬된 파티원 `userId`·`generationId`에서 결정적으로 만든 식별자다. 파티 Consumer는 이를 그대로 결과에 돌려주고 자신이 로드한 `modelVersion`도 기록한다. Spring은 결과를 사용할 때 현재 파티 구성·사용자 세대로 `inputId`를 다시 만들고 결과의 모델 버전도 현재 모델과 비교한다.
+- Kafka 이벤트에는 `modelVersion`과 파티원별 `generationId`를 싣지 않는다. 파티 Consumer는 게시 Lua 안에서 자신이 로드한 버전과 Redis `feelm:model:current.modelVersion`이 같은지 확인한다. 모델 교체로 달라졌다면 기존 파티 결과와 Offset을 유지하고 현재 산출물로 재시작한다.
+- 파티별 대기 요청은 하나로 합치되, 처리 완료 후 같은 `inputId`가 다시 발행될 수 있다. 파티 Consumer는 해당 파티 Redis 값을 원자적으로 교체하며 Spring은 조회 시 현재 `inputId`와 모델 버전을 다시 비교한다.
+- 파티 refresh 아웃박스는 같은 파티의 앞선 이벤트가 Kafka에 기록되고 `PUBLISHED`로 확정될 때까지 후속 이벤트를 발행하지 않는다. 다른 파티와 사용자 이벤트의 발행은 계속한다. `partyId` Kafka 키로 같은 파티의 순서를 한 partition에 고정하고, 파티 Consumer는 Redis 게시와 아래 완료 알림의 broker ACK가 모두 성공한 뒤 해당 record의 Offset만 동기 커밋한다.
+
+**파티 raw Candidate 게시 완료 알림 — `feelm.party-candidate-updated.v1`**
+
+```json
+{
+  "partyId": 9001,
+  "inputId": "sha256:<party-snapshot-digest>",
+  "modelVersion": "als-2026-09-18",
+  "generatedAt": "2026-09-18T12:00:00Z",
+  "sourcePartition": 1,
+  "sourceOffset": 1234
+}
+```
+
+- Kafka 키는 `partyId`를 `LongSerializer`로 직렬화한 8바이트 정수이며 값은 공통 봉투가 아닌 위 direct JSON이다.
+- `inputId`, `modelVersion`, `generatedAt`은 방금 Redis에 원자 게시한 값과 같다. `generatedAt`은 원본 Kafka record timestamp를 UTC로 정규화한 값이라 같은 source record를 재처리해도 바뀌지 않는다. Backend DB 계약에 맞춰 `modelVersion`은 1~50자이며 산출물 계약의 소문자 영숫자·점·밑줄·하이픈 형식을 따른다.
+- `sourcePartition`과 `sourceOffset`은 처리한 `feelm.party-refresh.v1` record의 위치다. 같은 파티는 고정된 source partition에서 더 큰 offset만 최신 완료 상태를 갱신한다. 입력 토픽의 partition 수를 운영 중 변경하지 않는다.
+- 이 알림은 **raw Candidate의 Redis 게시 완료**만 뜻한다. 추천 세트 생성 완료가 아니며 API-058은 기존처럼 요청 시 Redis 최신성을 검증하고 추천 세트를 생성한다.
+- Spring은 유효한 알림을 `party_candidate_publications`에 파티별 1행으로 멱등 upsert하고 DB 트랜잭션 성공 뒤 수신 Offset을 ACK한다. 삭제된 파티의 지연 알림과 형식이 잘못된 알림은 상태를 만들지 않고 폐기한다.
 
 ### 4.4 멱등 처리와 재처리
 
@@ -280,6 +314,7 @@ Kafka는 장애 상황에서 같은 메시지를 두 번 전달할 수 있습니
 | `RATING` · `ONBOARDING` | **자연 멱등.** Python Consumer가 PostgreSQL을 다시 읽어 전체를 재계산하므로 몇 번 처리해도 결과가 같다 |
 | `DISMISS` · `VIEW` · `RECOMMENDATION_CLICK` · `OTT_CLICK` | 누적 집계라 중복 시 값이 부풀어 오른다. `eventId` 기준 중복 제거를 적용한다 |
 | `feelm.candidate-updated.v1` 알림 | 상태 갱신 알림이다. Spring이 현재 Redis 세대와 마지막 처리 세대를 비교해 중복 재계산을 줄일 수 있다 |
+| `feelm.party-candidate-updated.v1` 알림 | 같은 source partition·offset의 중복은 같은 완료 상태다. 더 작은 offset은 파티별 최신 게시 상태를 덮지 않는다 |
 
 - 중복 제거는 Structured Streaming의 watermark 기반 `dropDuplicates(["eventId"])`로 처리한다
 - 중복 판정 창은 설정값(기본 10분). 창을 벗어난 재처리는 약한 신호 Feature가 소폭 부풀 수 있으나 허용한다
@@ -289,6 +324,10 @@ Kafka는 장애 상황에서 같은 메시지를 두 번 전달할 수 있습니
 Python Consumer는 **Redis `vector`·`candidates` 기록과 Candidate 게시 완료 알림의 Kafka 전달 확인이 모두 성공한 뒤**
 원본 `RATING`/`ONBOARDING` Offset을 커밋합니다. 중간 실패로 재시도되면 같은 DB 상태를 다시 읽고
 새 `generationId`로 게시할 수 있으므로 완료 알림은 at-least-once로 취급합니다.
+
+파티 Consumer도 **Redis 파티 `candidates` 기록과 파티 게시 완료 알림의 Kafka 전달 확인이 모두 성공한 뒤**
+원본 `party-refresh` Offset을 커밋합니다. Redis 게시 뒤 알림 또는 입력 commit이 실패하면 같은 source
+position의 알림이 다시 발행될 수 있으며 Spring의 완료 상태 upsert가 이를 멱등 처리합니다.
 
 ### 4.5 순서 보장
 
@@ -345,29 +384,33 @@ Spring은 `candidates` JSON을 한 번 읽어 해당 버전의 후보 전체를 
 | `feelm:user:{userId}:candidate-version` | String(정수) | Python Consumer | Python Consumer | 없음 |
 | `feelm:user:{userId}:vector` | String(JSON) | Python Consumer | Python Consumer · Spring(파티 입력 생성) | 없음 |
 | `feelm:user:{userId}:candidates` | String(JSON) | Python Consumer | Python Consumer · **Spring** | 없음 |
-| `feelm:party:{partyId}:candidates` | String(JSON) | Spark Structured Streaming | Spring | 없음 |
+| `feelm:party:{partyId}:candidates` | String(JSON) | 파티 전용 Python Consumer | Spring | 없음 |
 | `feelm:consumer-fence:{groupId}:{topic}:{partition}` | String(opaque CSPRNG token) | Python Consumer | Python Consumer | 없음 |
+| `feelm:party-consumer-fence:{groupId}:{topic}:{partition}` | String(opaque CSPRNG token) | 파티 전용 Python Consumer | 파티 전용 Python Consumer | 없음 |
 | `feelm:user:{userId}:behavior` | Hash | Spark | Spark · **Spring** | 키 단위 8일 · 필드는 일자 버킷(5.3) |
+| `feelm:trending:current` | String(JSON) | Spark | **Spring** | 15분 |
+| `feelm:trending:last-good` | String(JSON) | Spark | **Spring** | 2시간 |
 | `feelm:model:current` | String(JSON) | Spark Batch | Python Consumer · Spring | 없음 |
 
 **Spring은 개인 추천에 사용자 `candidates` · `behavior` · `model:current`를 읽습니다.** 파티 입력
 생성 시 사용자 `vector`·`candidates`를 함께 읽고, 파티 결과에는 별도 파티 `candidates`를 읽습니다.
 
-`consumer-fence`는 Consumer group 안에서 Kafka partition마다 assign할 때 새 CSPRNG opaque token으로 교체하는
-fencing key다. Consumer는 결과 게시와 corrupt/partial state 복구 삭제 때 자신이 assign에서 받은 token과
-Redis의 현재 token이 Lua 안에서 같은지 검증한다. Spring은 후보 결과만 읽으며 이 내부 key를 읽지 않는다.
+두 `consumer-fence` 계열 키는 각 Consumer group 안에서 Kafka partition마다 assign할 때 새 CSPRNG opaque token으로 교체하는
+fencing key다. 개인 Consumer는 결과 게시와 corrupt/partial state 복구 삭제 때, 파티 Consumer는 결과 게시 때
+자신이 assign에서 받은 token과 Redis의 현재 token이 Lua 안에서 같은지 검증한다. Spring은 후보 결과만 읽으며 이 내부 key를 읽지 않는다.
 fence key가 delete되거나 Redis가 빈 상태로 재시작하면 이전 token은 즉시 거부되고 다음 assign의 token도
 이전 token과 재사용되지 않는다. 다만 Redis가 fence key를 포함한 **과거 값으로 복원**되는 장애는 durable
 monotonic coordinator 없이는 구별할 수 없으므로 이 계약의 fencing 보장 범위 밖이다.
 
 | Spring이 읽는 키 | 용도 |
 |---|---|
-| 사용자 `candidates` | 개인 추천 후보 · 파티 Spark 입력 스냅샷 · **OTT 구독 추천**(API-068) |
-| 파티 `candidates` | Spark가 계산한 파티 raw Candidate. Spring이 제외·부가 신호를 반영해 최종 재정렬 |
+| 사용자 `candidates` | 개인 추천 후보 · 파티 Consumer 입력 스냅샷 · **OTT 구독 추천**(API-068) |
+| 파티 `candidates` | 파티 Consumer가 계산한 raw Candidate. Spring이 제외·부가 신호를 반영해 최종 재정렬 |
 | `behavior` | 새 개인 추천 세트를 만들 때 `candidates`에 적용할 최근 행동 Feature |
+| `trending:current` · `trending:last-good` | 급상승 영화 최신·대체 스냅샷(API-064) |
 | `model:current` | `modelVersion` 확인과 이력 저장 |
 
-Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점수를 집계합니다. 파티에서는 Spark가
+Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점수를 집계합니다. 파티에서는 전용 Consumer가
 별도 게시한 raw Candidate를 현재 `inputId`·모델 버전 확인 후 재정렬합니다.
 
 ### 5.2 값 구조
@@ -448,10 +491,11 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
   ALS·콘텐츠 성분으로 후보를 게시한다. 입력이 없거나 그 이력으로 어떤 성분도 사용자 프로필을 만들지
   못하면 ALS에 매핑된 서비스 영화와 콘텐츠 지원 영화의 합집합에 모두 `0.0`을 부여하고 `movieId`
   오름차순으로 TASTE를 게시한다. 후보 모집단 자체가 비어 있을 때만 세 키를 갱신하지 않는다.
-- 온보딩 LIKE/DISLIKE는 실제 별점 행으로 저장하지 않는다. ALS fold-in adapter에서 각각
-  `4.271231616529622`, `2.798442509805467`을 반올림 없이 사용하며 같은 영화에 실제 별점이 생기면
-  해당 온보딩 입력을 제거한다. 콘텐츠·발견 방향에서는 이를 연속 별점으로 해석하지 않고 LIKE/DISLIKE
-  이진 방향만 사용한다.
+- 온보딩 LIKE/DISLIKE를 **실제 별점 행으로 저장한다**(팀 결정 2026-09-18, S15P21E106-647). LIKE는
+  `4.0`, DISLIKE는 `2.0`이며 `onboarding_preferences` 행도 그대로 남는다. 같은 영화에 실제 별점이
+  생기면 해당 온보딩 입력을 제거하는 규칙은 그대로이므로, 전환 뒤 온보딩 입력은 사실상 모두 저장된
+  별점으로 대체된다. ALS fold-in adapter의 `4.271231616529622` · `2.798442509805467`을 계속 쓸
+  자리가 남는지와 콘텐츠·발견 방향의 이진 LIKE/DISLIKE 해석은 **S15P21E106-649에서 확인해 확정한다**.
 - 후보 모집단 자체가 비어 게시를 생략할 때 해당 사용자 키는 **없거나 이전 값 그대로**이며
   `candidate-version` 게시 순번과 `generationId`도 바뀌지 않는다. 따라서 Spring은 `inputVersion`이
   올랐는데 마지막으로 확인한 후보 스냅샷의
@@ -568,12 +612,30 @@ generation 일치 확인과 TASTE 2 + DISCOVERY 1 통합 검증을 같은 전환
 }
 ```
 
+**`feelm:trending:current` · `feelm:trending:last-good`** — 두 키에 같은 스냅샷을 게시한다
+
+```json
+{
+  "schemaVersion": 1,
+  "period": {"from": "2026-09-18T11:00:00Z", "to": "2026-09-18T12:00:00Z"},
+  "updatedAt": "2026-09-18T12:00:00Z",
+  "items": [{"movieId": 550, "rank": 1, "rankDelta": null, "trendScore": 1.0}]
+}
+```
+
+- `period`는 UTC 5분 경계 `to`를 끝으로 하는 최근 60분 구간이다. 같은 구간의 고유 조회 회원 수 `C`와 직전 60분 구간의 수 `P`를 비교한다. `C >= 3`이고 `D = C - P > 0`인 영화만 포함한다.
+- `items`는 `D` 내림차순, `C` 내림차순, `movieId` 오름차순의 최대 30편이다. `trendScore`는 `D / max(D)`이고, `rankDelta`는 직전 게시 스냅샷 순위에서 현재 순위를 뺀 값이다. 신규 진입이면 `null`이다.
+- 두 구간의 같은 회원·영화 조회는 구간마다 각각 최대 한 번 센다. 같은 `eventId` 재전달은 §4.4의 watermark 기반 중복 판정 창에서 제거한다. `dwellMs`는 점수에 사용하지 않는다.
+- `items=[]`도 정상 스냅샷이다. 입력 이벤트가 없는 때에도 5분마다 두 키의 값과 TTL을 원자적으로 갱신한다. Spring은 영화 제목·포스터·평가 수·평균 별점을 DB에서 보강하며 순위를 재계산하지 않는다.
+
 ### 5.3 만료와 무효화
 
 | 대상 | 정책 |
 |---|---|
 | `vector` · `candidates` | TTL 없음. 담당 처리기가 이벤트마다 덮어쓴다 |
 | `behavior` | 키 단위 슬라이딩 TTL 8일. 필드는 일자 버킷이며 집계는 최근 7일분만 사용한다(아래) |
+| `trending:current` | 마지막 정상 게시부터 15분 보관. 게시가 멈추면 만료되어 마지막 정상 결과를 읽는다 |
+| `trending:last-good` | 마지막 정상 게시부터 2시간 보관. 만료되거나 Redis 조회가 불가능하면 API-064는 `503 TREND_UNAVAILABLE`을 반환한다 |
 | 모델 재학습 | 배치가 전체 사용자 키를 새 `modelVersion`으로 다시 쓴다. 별도 무효화 명령을 두지 않는다 |
 | 비활성 사용자 | 야간 배치가 재생성 대상에서 제외하고 오래된 키를 정리한다(주기 미정) |
 
@@ -612,15 +674,24 @@ URI나 Redis에 저장하지 않고 runtime filesystem 설정으로 제공한다
 | `DISMISS` | 30초 이내(설정값) |
 | 약한 신호 → `behavior` | 60초 이내(설정값) |
 
-초기값이며 실측 후 조정합니다. Structured Streaming의 트리거 주기가 `behavior` 반영 지연을 좌우합니다.
-개인 추천 노출은 현재 세트 버퍼를 유지하고 **다음 세트 생성 시점**에 최신 `behavior`를 읽으므로,
+위 목표는 초기값이며 실측 후 조정합니다. Structured Streaming의 트리거 주기가 `behavior` 반영 지연을 좌우합니다.
+개인 추천 노출은 Candidate 갱신 알림으로 새 세트를 생성할 때 최신 `behavior`를 읽으므로,
 60초 안에 기존 세트의 순서를 바꾸는 것을 보장하지 않습니다. 이 정책은 행동마다 Python 재정렬을 실행하는 계산량을 피하면서
 새 세트를 만드는 사용자의 최대 100편만 정렬하기 위한 기준입니다.
 
+급상승 결과는 5분마다 Redis에 게시한다(API-064). 이는 Spark가 이벤트를 소비하는
+마이크로배치 주기와 별개이며, 위 `behavior` 반영 목표를 5분으로 늦추지 않는다.
+급상승 `VIEW` 집계의 이벤트 시간 watermark 초기값은 10분이다. Spark가 관측한
+최대 `occurredAt`에서 10분을 뺀 값을 기준으로 지난 구간의 상태를 정리한다.
+마감 전 도착한 늦은 이벤트는 해당 구간의 집계에 반영할 수 있고, 마감된 구간은
+다시 수정하지 않는다. 이는 벽시계 기준으로 발생 후 정확히 10분까지 반영한다는
+보장이 아니다. 이미 게시한 과거 스냅샷은 수정하지 않고 허용된 지연 이벤트는 다음 게시 계산에 반영한다.
+정상 도착한 `VIEW`의 발생부터 결과 게시까지 10분 이내를 초기 운영 목표로 관측한다.
+
 ### 6.2 유효 결과가 없을 때(NFR-05)
 
-[ADR-0017](../adr/0017-python-foldin-spark-trending-split.md)에 따라 Python Consumer나 Streaming 지연·장애 시에도
-**마지막으로 성공한 Redis 결과를 그대로 제공**합니다.
+개인 추천 후보는 [ADR-0017](../adr/0017-python-foldin-spark-trending-split.md)에 따라
+Python Consumer나 Streaming 지연·장애 시에도 **마지막으로 성공한 Redis 결과를 그대로 제공**합니다.
 `generatedAt`이 오래되었다는 이유만으로 오류를 반환하지 않습니다.
 새 세트는 유효한 `candidates` 스냅샷으로만 생성합니다.
 
@@ -631,6 +702,8 @@ URI나 Redis에 저장하지 않고 runtime filesystem 설정으로 제공한다
 - Redis 연결 실패
 
 이때도 영화·검색·평가·필름·팝콘 기능은 정상 동작해야 합니다. 추천 API만 실패합니다.
+급상승 API-064는 별도로 `trending:current`와 `trending:last-good`의 TTL을 적용하며,
+두 결과를 모두 읽을 수 없을 때만 `503 TREND_UNAVAILABLE`을 반환합니다.
 
 ### 6.3 콜드 스타트
 
@@ -655,8 +728,9 @@ POPULAR 기반 순서와 개인 후보 모집단 밖 확장은 S15P21E106-483 �
 - [ ] 추천 이유 문장 생성 방식(템플릿 vs LLM) — 내부 API 명세에서 이월
 - [x] Kafka 발행 실패 시 재시도·보상 정책 — 폴링 기반 트랜잭셔널 아웃박스 채택(ADR-0018)
 - [ ] Python Consumer가 사용할 PostgreSQL 읽기 전용 롤의 계정 발급(접근 대상 테이블은 2.2에서 확정)
-- [ ] 인기 집계 윈도우·중복 처리·최소 사용자 수·점수식·반영 지연
-- [ ] 인기 집계 결과의 Redis 키·값 구조와 장애 시 폴백·오류 기준
+- [x] 인기 집계의 60분 전후 구간·고유 조회자 3명·증가분 점수·5분 게시·10분 watermark·Redis 최신/대체 스냅샷 계약(API-064)
+- [ ] 실데이터에 따른 최소 조회자 수·구간 길이 보정과 정상 도착 `VIEW`의 게시 지연 목표 실측
 - [x] 파티 점수 집계식과 사용자 간 정규화 — `party-mean-fit-v2`, party.md API-058
 - [x] OTT 구독 추천 후보 범위 — API-068은 `taste` 최대 500편 전체를 사용하고 점수 임계치를 두지 않는다
 - [ ] 영화 메타데이터 HDFS 스냅샷의 산출 형식과 배치 시각 — 추천 모듈 환경(S15P21E106-130)에서 확정
+- [ ] 온보딩 선택을 실제 별점으로 저장한 뒤 fold-in 상수와 이진 방향 해석을 유지할지 — S15P21E106-649

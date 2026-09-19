@@ -20,10 +20,8 @@
  * | ProfileView | 7.1 · 7.2 · 7.2-A · 7.2-B 프로필 | API-062가 있으나 **2차 MVP**라 미구현. 응답 모양도 다름. 사진 · 소개 · 항목별 공개 여부는 계약에 아예 없다(업무 -616) |
  * | ReportDetailView | 3.3 · 3.4 · 7.4 국가 · 시대 비율 · 키워드 근거 · 지난 반기 비교 % · 대표 카드 문구 | API-060에 없음. 장르는 편수만, 비교는 맛별 알 수만 줌. CR 미등록 |
  * | ReportFourCutView | 3.3 · 3.4 · 7.4 4컷의 사진 · 누끼 · 영문 이름 · 감독 대표작 | API-060은 이름과 `characterCard.imageUrl`만 줌. CR 미등록 |
- * | NotificationView | 8.1 알림 4종 · 탭 · 읽음 | 인앱 알림 API-070~074의 프론트 연동은 S15P21E106-537. 그전까지 목업이며 번호 없이 목록 화면으로만 간다(-610) |
- * | OttRecommendationView | EXT-01 ~ EXT-05 일치도 % · 이유 · 항목별 일치도 · 분석 요약 | API-068은 `matchCount`만 줌. **확장 단계**. CR 미등록 |
+ * | ~~OttRecommendationView~~ | EXT-01 ~ EXT-05 일치도 % · 이유 · 항목별 일치도 · 분석 요약 | **해소.** 화면에서 뺐다 — CR-28 · 업무 -563 |
  */
-import type { OttRecommendationItem } from './ott';
 import type { ReportDetail } from './report';
 import type { RecommendedMovie } from './movie';
 
@@ -197,63 +195,4 @@ export type ReportDetailView = ReportDetail & {
   comparisons: { label: string; delta: number; isNew: boolean }[];
   /** 3.3 발급 화면의 요약 세 줄 */
   highlights: string[];
-};
-
-/**
- * 8.1 알림 한 건. **계약에 알림 목록이 없다**(ADR-0011은 폴링).
- *
- * 와이어프레임 4종을 그대로 둔다(팀 결정 2026-09-13). 누르면 가는 곳은 이동표를 따른다 —
- * 감상 확인 2.4-A · 파티 초대 5.6 · 오늘의 추천 2.2 · 필름 추가 3.1.
- */
-export type NotificationDestination = 'unrated' | 'party' | 'recommendations' | 'film';
-
-export type NotificationView = {
-  notificationId: number;
-  type: 'WATCH_CONFIRM' | 'PARTY_INVITE' | 'RECOMMENDATION' | 'FRAME_ADDED';
-  title: string;
-  body: string;
-  createdAt: string;
-  read: boolean;
-  /**
-   * 누르면 여는 화면 (업무 -610).
-   *
-   * 목업 알림은 **번호를 갖지 않는다.** 감상 기록 4004 · 초대 501 같은 목업 번호를 들고 실제
-   * 화면(2.4-A · 5.6)으로 가면 서버에 없는 번호라 늘 실패했다. 번호 없이 열리는 목록 화면
-   * 넷 중 하나로만 간다(`pages/notifications/destination.ts`). 실제 알림(API-070)은
-   * `targetType` · `targetId`를 주므로 연동 시 이 필드가 그것으로 바뀐다.
-   */
-  destination: NotificationDestination;
-};
-
-/**
- * EXT-03 · EXT-04 OTT 한 곳. API-068 항목 + 와이어프레임에만 있는 값.
- *
- * 팀 결정 2026-09-13(업무 -308): 와이어프레임대로 그린다. 계약은 `matchCount`(편수)로만
- * 순위를 매긴다. 일치도 % · 장르 요약 · 이유 · 항목별 일치도는 산출 규칙이 없다.
- */
-export type OttRecommendationItemView = OttRecommendationItem & {
-  /** 콘텐츠 취향 일치도(%) */
-  matchRate: number;
-  /** `액션 · 스릴러` */
-  genreSummary: string;
-  /** EXT-03 1위 카드의 한 줄 */
-  headline: string;
-  reasons: string[];
-  itemRates: { label: string; rate: number }[];
-};
-
-/** EXT-01 분석 요약 · EXT-05 진행도. 계약에 없다 */
-export type OttAnalysisBasis = {
-  watchedCount: number;
-  ratingCount: number;
-  favoriteGenres: string;
-  frequentActor: string;
-  /** 분석에 필요한 최소 평가 수. 와이어프레임 EXT-05의 10 */
-  requiredRatingCount: number;
-};
-
-export type OttRecommendationView = {
-  insufficientData: boolean;
-  aggregatedAt: string;
-  items: OttRecommendationItemView[];
 };

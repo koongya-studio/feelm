@@ -86,13 +86,8 @@
   gap: var(--film-frame-gap);
   padding: var(--film-hole-band) var(--space-3);
   overflow-x: auto;
-  scrollbar-width: none;
   /* 프레임을 훑을 때 칸 경계에서 멈춘다 */
   scroll-snap-type: x proximity;
-}
-
-.track::-webkit-scrollbar {
-  display: none;
 }
 
 .track:focus-visible {
@@ -102,11 +97,10 @@
 
 /*
  * 프레임 한 칸. 안에 무엇이 오든(버튼 · 자리표시자) 같은 크기와 테두리를 입힌다.
- * `data-film-label`이 붙은 것만 예외다 — 프레임 사이에 끼우는 이름표라 칸이 아니다.
  *
  * 테두리는 얇은 밝은 선이다. 포스터가 어두울 때 칸 경계가 띠에 묻히는 것을 막는다.
  */
-.track > :not([data-film-label]) {
+.track > * {
   width: var(--film-frame-width);
   height: var(--film-frame-height);
   flex: none;
@@ -157,6 +151,11 @@
   mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0 0 L100 0 Q96 50 100 100 L0 100 Q4 50 0 0 Z" fill="black"/></svg>');
 }
 
+/* 곧은 띠(`flat`). 화면 폭을 꽉 채우는 필름은 휘면 가장자리에 빈틈이 생긴다(2.2, 업무 -672) */
+.reel[data-flat] .band {
+  mask-image: none;
+}
+
 .reel[data-orientation='vertical'] .holes {
   top: var(--space-3);
   right: auto;
@@ -181,11 +180,4 @@
   padding: var(--space-3) var(--film-hole-band);
   overflow: visible;
   scroll-snap-type: none;
-}
-
-/* 프레임 사이의 이름표. 칸 폭에 맞춰 가운데 선다 */
-.reel[data-orientation='vertical'] .track > [data-film-label] {
-  width: var(--film-frame-width);
-  flex: none;
-  box-sizing: border-box;
 }

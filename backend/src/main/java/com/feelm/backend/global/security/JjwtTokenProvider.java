@@ -27,6 +27,7 @@ public class JjwtTokenProvider implements TokenProvider {
     private static final String TOKEN_TYPE_ACCESS = "access";
     private static final String TOKEN_TYPE_REFRESH = "refresh";
     private static final String TOKEN_TYPE_SIGNUP = "signup";
+    private static final String TOKEN_TYPE_EMAIL_VERIFICATION = "email-verification";
 
     private static final String CLAIM_PROVIDER = "provider";
     private static final String CLAIM_EMAIL = "email";
@@ -45,12 +46,14 @@ public class JjwtTokenProvider implements TokenProvider {
     private final Duration accessTokenTtl;
     private final Duration refreshTokenTtl;
     private final Duration signupTokenTtl;
+    private final Duration emailVerificationTokenTtl;
 
     public JjwtTokenProvider(JwtProperties properties) {
         this.key = toKey(properties.secret());
         this.accessTokenTtl = properties.accessTokenTtl();
         this.refreshTokenTtl = properties.refreshTokenTtl();
         this.signupTokenTtl = properties.signupTokenTtl();
+        this.emailVerificationTokenTtl = properties.emailVerificationTokenTtl();
     }
 
     /**
@@ -135,6 +138,45 @@ public class JjwtTokenProvider implements TokenProvider {
                 providerUserId,
                 claims.get(CLAIM_EMAIL, String.class),
                 claims.get(CLAIM_NICKNAME, String.class));
+    }
+
+    /**
+     * 이메일 인증 토큰을 발급한다(API-079).
+     *
+     * <p>계정이 없는 시점이라 {@code subject}에 사용자 식별자 대신 확인을 마친 이메일을 담는다. 소셜 가입 토큰이 제공자 식별자를 담는 것과 같은 자리다.
+     */
+    @Override
+    public String createEmailVerificationToken(EmailVerificationTokenClaims claims) {
+        Instant now = Instant.now();
+        return Jwts.builder()
+                .subject(claims.email())
+                .id(claims.tokenId())
+                .claim(CLAIM_TOKEN_TYPE, TOKEN_TYPE_EMAIL_VERIFICATION)
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(now.plus(emailVerificationTokenTtl)))
+                .signWith(key, SIGNATURE_ALGORITHM)
+                .compact();
+    }
+
+    @Override
+    public EmailVerificationTokenClaims parseEmailVerificationToken(String token) {
+        Claims claims =
+                parse(
+                        token,
+                        ErrorCode.EMAIL_VERIFICATION_TOKEN_INVALID,
+                        ErrorCode.EMAIL_VERIFICATION_TOKEN_INVALID,
+                        TOKEN_TYPE_EMAIL_VERIFICATION);
+        String email = claims.getSubject();
+        String tokenId = claims.getId();
+        if (email == null || email.isBlank() || tokenId == null || tokenId.isBlank()) {
+            throw new BusinessException(ErrorCode.EMAIL_VERIFICATION_TOKEN_INVALID);
+        }
+        return new EmailVerificationTokenClaims(email, tokenId);
+    }
+
+    @Override
+    public long emailVerificationTokenTtlSeconds() {
+        return emailVerificationTokenTtl.toSeconds();
     }
 
     @Override

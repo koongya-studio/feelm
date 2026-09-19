@@ -28,12 +28,13 @@ public class RecommendationBufferRepository {
                 .isEmpty();
     }
 
-    public OptionalLong findExistingSet(String generationId) {
+    public OptionalLong findExistingSet(long userId, String generationId) {
         return jdbcTemplate
                 .queryForList(
                         "SELECT id FROM recommendation_sets"
-                                + " WHERE party_id IS NULL AND generation_id=?",
+                                + " WHERE party_id IS NULL AND user_id=? AND generation_id=?",
                         Long.class,
+                        userId,
                         generationId)
                 .stream()
                 .mapToLong(Long::longValue)

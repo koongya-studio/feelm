@@ -41,6 +41,15 @@ describe('5.1 파티 시작', () => {
     expect(screen.getByText('김난다 × 무비버디')).toBeInTheDocument();
   });
 
+  it('필름 · MY와 같은 공통 헤더로 검색 · 알림에 바로 간다 (업무 -676)', async () => {
+    renderWithRouter(<PartyListPage />, { route: '/party' });
+
+    expect(await screen.findByRole('link', { name: '검색' })).toHaveAttribute('href', '/search');
+    expect(screen.getByRole('link', { name: /^알림/ })).toHaveAttribute('href', '/notifications');
+    // 화면 제목은 여전히 하나다
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+  });
+
   it('파티방을 고르면 5.8 파티원 팝콘으로 간다', async () => {
     renderWithRouter(<PartyListPage />, { route: '/party' });
     await screen.findByText('금요 심야 상영회');
@@ -85,8 +94,8 @@ describe('5.1 파티 시작', () => {
   });
 
   /*
-   * 업무 -595. 초대를 여는 유일한 길이 목업 알림이라 초대받은 사람이 수락할 수 없었다.
-   * 이 구역이 사라지면 그 결함이 그대로 돌아온다.
+   * 업무 -595. 인앱 알림 외에도 파티 탭에서 받은 초대를 다시 찾을 수 있어야 한다.
+   * 이 구역이 사라지면 알림을 숨긴 사용자가 초대를 열 길이 없어진다.
    */
   it('받은 초대를 API-052로 그리고 5.6으로 보낸다', async () => {
     vi.mocked(getMyInvitations).mockResolvedValue([invitation()]);
@@ -144,11 +153,33 @@ describe('5.2 새 파티 인원 설정', () => {
     renderWithRouter(<PartySizePage />, { route: '/party/new' });
 
     // 기본값 2인 — 내 자리 하나와 친구 하나
-    expect(screen.getByText('친구들을 등록해 주세요 (0/1)')).toBeInTheDocument();
+    expect(screen.getByText('다음 화면에서 친구 1명을 초대해요')).toBeInTheDocument();
+    expect(screen.getByText('친구 1')).toBeInTheDocument();
+    expect(screen.queryByText('친구 2')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('radio', { name: '4인' }));
 
-    expect(screen.getByText('친구들을 등록해 주세요 (0/3)')).toBeInTheDocument();
+    // 안내 문구와 자리 수가 곧바로 같이 바뀐다
+    expect(screen.getByText('다음 화면에서 친구 3명을 초대해요')).toBeInTheDocument();
     expect(screen.getByText('친구 3')).toBeInTheDocument();
+  });
+
+  it('이 화면에서 친구를 등록하는 것처럼 말하지 않는다', () => {
+    // 실제 초대는 5.3에서 한다 — API-051은 파티가 만들어진 뒤에 부른다(업무 -697)
+    renderWithRouter(<PartySizePage />, { route: '/party/new' });
+
+    expect(screen.queryByText(/등록해 주세요/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  });
+
+  it('고른 인원은 aria-checked와 함께 색이 아닌 체크로도 표시된다', () => {
+    renderWithRouter(<PartySizePage />, { route: '/party/new' });
+
+    fireEvent.click(screen.getByRole('radio', { name: '3인' }));
+
+    const picked = screen.getByRole('radio', { name: '3인' });
+    expect(picked).toHaveAttribute('aria-checked', 'true');
+    expect(picked.querySelector('svg')).not.toBeNull();
+    expect(screen.getByRole('radio', { name: '2인' }).querySelector('svg')).toBeNull();
   });
 });

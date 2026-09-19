@@ -30,8 +30,10 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import ActionList from '../../../components/ActionList';
+import ConfirmDialog from '../../../components/ConfirmDialog';
 import ScreenHeader from '../../../components/ScreenHeader';
 import { useAuth } from '../../../contexts/authContext';
+import { usePwaInstall } from '../../../pwa/installContext';
 import { path } from '../../../routes/paths';
 import styles from './SettingsPage.module.css';
 
@@ -41,7 +43,9 @@ const APP_VERSION = 'v 1.0.0';
 export default function SettingsPage() {
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const { availability: installAvailability, install } = usePwaInstall();
   const [signingOut, setSigningOut] = useState(false);
+  const [showIosInstallGuide, setShowIosInstallGuide] = useState(false);
 
   async function handleSignOut() {
     if (signingOut) return;
@@ -54,6 +58,15 @@ export default function SettingsPage() {
     } finally {
       void navigate(path.login(), { replace: true });
     }
+  }
+
+  function handleInstall() {
+    if (installAvailability === 'ios') {
+      setShowIosInstallGuide(true);
+      return;
+    }
+
+    void install();
   }
 
   return (
@@ -80,8 +93,8 @@ export default function SettingsPage() {
          * 목록 한 줄로 두지 않고 배너로 둔 것은 **설명을 살리기 위해서다.** `ActionList`는
          * 이름과 화살표만 그려 `감상 기록을 분석해…` 한 줄이 들어갈 자리가 없다.
          *
-         * API-068은 확장 단계라 들어가는 화면은 목업으로 동작한다. 배너 자체는 데이터를
-         * 부르지 않는다. 이 화면의 **하나뿐인 어두운 블록**이다.
+         * 배너 자체는 데이터를 부르지 않는다. 들어가는 화면(EXT-01 ~ EXT-05)은 업무 -564에서
+         * API-068에 연동했다. 이 화면의 **하나뿐인 어두운 블록**이다.
          */}
         <section className={styles.banner}>
           <h2 className={styles.bannerTitle}>나에게 맞는 OTT 찾기</h2>
@@ -102,6 +115,9 @@ export default function SettingsPage() {
         <ActionList
           label="기타"
           items={[
+            ...(installAvailability === 'prompt' || installAvailability === 'ios'
+              ? [{ label: 'Feelm 앱 설치', onClick: handleInstall }]
+              : []),
             { label: '차단 사용자 관리', to: path.blockedUsers() },
             { label: '버전 정보', value: APP_VERSION },
             { label: '로그아웃', onClick: () => void handleSignOut() },
@@ -112,6 +128,23 @@ export default function SettingsPage() {
           회원 탈퇴
         </Link>
       </div>
+
+      {showIosInstallGuide ? (
+        <ConfirmDialog
+          title="Feelm을 홈 화면에 추가해 주세요"
+          description={
+            <ol className={styles.installSteps}>
+              <li>Safari 아래쪽의 공유 버튼을 눌러요.</li>
+              <li>메뉴에서 ‘홈 화면에 추가’를 선택해요.</li>
+              <li>오른쪽 위의 ‘추가’를 누르면 앱처럼 열 수 있어요.</li>
+            </ol>
+          }
+          confirmLabel="확인"
+          cancelLabel="나중에"
+          onConfirm={() => setShowIosInstallGuide(false)}
+          onCancel={() => setShowIosInstallGuide(false)}
+        />
+      ) : null}
     </>
   );
 }

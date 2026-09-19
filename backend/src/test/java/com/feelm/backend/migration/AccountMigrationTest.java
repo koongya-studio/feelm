@@ -44,7 +44,6 @@ class AccountMigrationTest {
                                         + " WHERE table_schema = 'public'"))
                 .contains(
                         "user_auth_providers",
-                        "email_verification_tokens",
                         "password_reset_tokens",
                         "notification_settings",
                         "notifications",
@@ -89,10 +88,6 @@ class AccountMigrationTest {
                 "INSERT INTO user_auth_providers (user_id, provider, provider_user_id) VALUES ("
                         + userId
                         + ", 'GOOGLE', 'cascade-google-1')");
-        execute(
-                "INSERT INTO email_verification_tokens (user_id, token_hash, expires_at) VALUES ("
-                        + userId
-                        + ", 'cascade-verify-hash', now() + interval '24 hours')");
         execute(
                 "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES ("
                         + userId
@@ -317,12 +312,10 @@ class AccountMigrationTest {
 
     // --- helpers ---------------------------------------------------------
 
-    /** 사용자에 종속된 여덟 테이블의 잔여 행 수. 삭제된 사용자에 남는 행이 없어야 한다. */
+    /** 사용자에 종속된 일곱 테이블의 잔여 행 수. 삭제된 사용자에 남는 행이 없어야 한다. */
     private static long dependentRowCount(long userId) {
         return count(
                 "SELECT (SELECT count(*) FROM user_auth_providers WHERE user_id = "
-                        + userId
-                        + ") + (SELECT count(*) FROM email_verification_tokens WHERE user_id = "
                         + userId
                         + ") + (SELECT count(*) FROM password_reset_tokens WHERE user_id = "
                         + userId

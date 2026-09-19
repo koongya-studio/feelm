@@ -1,11 +1,8 @@
 package com.feelm.backend.domain.recommendation.service;
 
 import com.feelm.backend.domain.recommendation.model.RecommendationBufferResult;
-import com.feelm.backend.domain.recommendation.model.RecommendationCandidateBatch;
-import com.feelm.backend.domain.recommendation.repository.RecommendationCandidateReader;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
-import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,14 +16,18 @@ public class RecommendationBufferService {
 
     private static final Logger log = LoggerFactory.getLogger(RecommendationBufferService.class);
 
-    private final RecommendationCandidateReader candidateReader;
     private final RecommendationBufferWriter writer;
     private final RecommendationReasonService reasonService;
+    private final RecommendationReasonDispatcher reasonDispatcher;
 
     /** 사용자의 최신 Redis 후보로 추천 버퍼를 생성하거나 동일 버전의 기존 버퍼를 반환한다. */
     public RecommendationBufferResult createBuffer(long userId) {
-        RecommendationCandidateBatch candidates = candidateReader.read(userId);
-        RecommendationBufferResult result = writer.write(userId, candidates);
+        RecommendationBufferResult result;
+        try {
+            result = writer.writeCurrent(userId);
+        } catch (NoEligibleRecommendationCandidatesException exception) {
+            throw new BusinessException(ErrorCode.RECOMMENDATION_UNAVAILABLE);
+        }
         try {
             reasonService.completeUnexposed(result.recommendationSetId());
         } catch (DataAccessException exception) {
@@ -38,17 +39,10 @@ public class RecommendationBufferService {
         return result;
     }
 
-    /** Kafka 갱신 알림 연결 전, 조회 요청에서 Redis 후보가 있을 때만 임시로 버퍼를 최신화한다. */
-    public Optional<RecommendationBufferResult> createBufferIfCandidatesAvailable(long userId) {
-        RecommendationCandidateBatch candidates;
-        try {
-            candidates = candidateReader.read(userId);
-        } catch (BusinessException exception) {
-            if (exception.getErrorCode() != ErrorCode.RECOMMENDATION_UNAVAILABLE) {
-                throw exception;
-            }
-            return Optional.empty();
-        }
-        return writer.writeIfEligible(userId, candidates);
+    /** 알림 경로는 버퍼 커밋 뒤 이유 보강을 별도로 제출해 Kafka ACK를 기다리게 하지 않는다. */
+    public RecommendationBufferResult createBufferFromNotice(long userId) {
+        RecommendationBufferResult result = writer.writeCurrentFromNotice(userId);
+        reasonDispatcher.submit(result.recommendationSetId());
+        return result;
     }
 }

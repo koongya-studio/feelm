@@ -9,12 +9,13 @@ public enum ErrorCode {
     REFRESH_TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "유효하지 않은 인증 정보입니다. 다시 로그인해 주세요."),
     REFRESH_TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, "로그인이 만료되었습니다. 다시 로그인해 주세요."),
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "이메일 또는 비밀번호가 올바르지 않습니다."),
-    EMAIL_NOT_VERIFIED(HttpStatus.FORBIDDEN, "이메일 인증이 필요합니다. 인증 메일을 확인해 주세요."),
     EMAIL_DUPLICATED(HttpStatus.CONFLICT, "이미 가입된 이메일입니다."),
     NICKNAME_DUPLICATED(HttpStatus.CONFLICT, "이미 사용 중인 닉네임입니다."),
-    ALREADY_VERIFIED(HttpStatus.CONFLICT, "이미 이메일 인증이 완료된 계정입니다."),
-    VERIFICATION_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "유효하지 않은 인증 링크입니다. 인증 메일을 다시 요청해 주세요."),
-    VERIFICATION_TOKEN_EXPIRED(HttpStatus.GONE, "인증 링크가 만료되었습니다. 인증 메일을 다시 요청해 주세요."),
+    VERIFICATION_CODE_MISMATCH(HttpStatus.BAD_REQUEST, "인증번호가 올바르지 않습니다."),
+    VERIFICATION_CODE_EXHAUSTED(HttpStatus.BAD_REQUEST, "인증번호 확인 횟수를 초과했습니다. 인증번호를 다시 요청해 주세요."),
+    VERIFICATION_CODE_EXPIRED(HttpStatus.GONE, "인증번호가 만료되었습니다. 인증번호를 다시 요청해 주세요."),
+    EMAIL_VERIFICATION_TOKEN_INVALID(
+            HttpStatus.UNAUTHORIZED, "이메일 인증 정보가 만료되었습니다. 인증번호를 다시 요청해 주세요."),
     UNSUPPORTED_PROVIDER(HttpStatus.BAD_REQUEST, "지원하지 않는 소셜 로그인 제공자입니다."),
     OAUTH_CODE_INVALID(HttpStatus.BAD_REQUEST, "소셜 로그인 인증에 실패했습니다. 다시 시도해 주세요."),
     OAUTH_EMAIL_REQUIRED(HttpStatus.BAD_REQUEST, "소셜 계정의 이메일 제공에 동의해야 가입할 수 있습니다."),
@@ -44,7 +45,8 @@ public enum ErrorCode {
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "지원하지 않는 Content-Type입니다."),
     RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "요청 횟수 제한을 초과했습니다."),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 오류가 발생했습니다."),
-    RECOMMENDATION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "추천 서비스를 일시적으로 사용할 수 없습니다.");
+    RECOMMENDATION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "추천 서비스를 일시적으로 사용할 수 없습니다."),
+    PUSH_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "브라우저 푸시를 일시적으로 사용할 수 없습니다.");
 
     private final HttpStatus status;
     private final String message;

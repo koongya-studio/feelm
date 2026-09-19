@@ -120,7 +120,7 @@ class MailDispatcherTest {
                 new MailDispatcher(drainingExecutor(reject), () -> false, clock, budget);
 
         for (int attempt = 0; attempt < 20; attempt++) {
-            dispatcher.dispatch(MailKind.VERIFICATION, attempt, () -> {});
+            dispatcher.dispatch(MailKind.VERIFICATION_CODE, (long) attempt, () -> {});
             reject.set(!reject.get());
         }
 
@@ -131,7 +131,7 @@ class MailDispatcherTest {
 
         clock.advance(MailDispatcher.SATURATION_WARN_INTERVAL);
         reject.set(false);
-        dispatcher.dispatch(MailKind.VERIFICATION, 99L, () -> {});
+        dispatcher.dispatch(MailKind.VERIFICATION_CODE, 99L, () -> {});
 
         assertThat(output).as("구간이 끝나면 유실 총량을 한 줄로 남긴다").contains("그동안 발송 10건을 버렸습니다");
     }
@@ -160,10 +160,10 @@ class MailDispatcherTest {
                 };
         MailDispatcher dispatcher = new MailDispatcher(broken, () -> false, clock, budget);
 
-        assertThatCode(() -> dispatcher.dispatch(MailKind.VERIFICATION, 8L, () -> {}))
+        assertThatCode(() -> dispatcher.dispatch(MailKind.VERIFICATION_CODE, 8L, () -> {}))
                 .doesNotThrowAnyException();
 
-        assertThat(output).contains("발송 스레드에 넘기지 못했습니다", "사용자 8", "재발송(API-003)");
+        assertThat(output).contains("발송 스레드에 넘기지 못했습니다", "사용자 8", "인증번호 재요청(API-078)");
         assertThat(output).doesNotContain(SATURATION_LOG);
         assertThat(dispatcher.isIdle()).isTrue();
     }
@@ -205,13 +205,13 @@ class MailDispatcherTest {
         String longMessage = "x".repeat(5000) + " 550 5.1.1 <user@example.com> not found";
 
         dispatcher.dispatch(
-                MailKind.VERIFICATION,
+                MailKind.VERIFICATION_CODE,
                 43L,
                 () -> {
                     throw new MailSendException(longMessage);
                 });
 
-        assertThat(output).contains("인증 메일 발송에 실패했습니다", "…(이하 생략)");
+        assertThat(output).contains("인증번호 메일 발송에 실패했습니다", "…(이하 생략)");
         assertThat(output.toString()).as("상한을 넘긴 꼬리는 로그에 남지 않는다").doesNotContain("x".repeat(1100));
         assertThat(output).doesNotContain("user@example.com");
     }
@@ -228,7 +228,10 @@ class MailDispatcherTest {
         budget.refuse();
         AtomicBoolean sent = new AtomicBoolean();
 
-        assertThatCode(() -> dispatcher.dispatch(MailKind.VERIFICATION, 11L, () -> sent.set(true)))
+        assertThatCode(
+                        () ->
+                                dispatcher.dispatch(
+                                        MailKind.VERIFICATION_CODE, 11L, () -> sent.set(true)))
                 .doesNotThrowAnyException();
 
         assertThat(sent).as("상한을 넘긴 메일은 발송하지 않는다").isFalse();
@@ -245,7 +248,7 @@ class MailDispatcherTest {
         MailDispatcher dispatcher =
                 new MailDispatcher(rejectingExecutor(), () -> false, clock, budget);
 
-        dispatcher.dispatch(MailKind.VERIFICATION, 12L, () -> {});
+        dispatcher.dispatch(MailKind.VERIFICATION_CODE, 12L, () -> {});
 
         assertThat(budget.consumed()).as("제출되지 못한 발송의 예산 소모").isZero();
     }
@@ -281,7 +284,7 @@ class MailDispatcherTest {
                 new MailDispatcher(new SyncTaskExecutor(), () -> false, clock, budget);
 
         dispatcher.dispatch(
-                MailKind.VERIFICATION,
+                MailKind.VERIFICATION_CODE,
                 44L,
                 () -> {
                     throw new MailSendException("Failed messages");
@@ -297,7 +300,7 @@ class MailDispatcherTest {
         MailDispatcher dispatcher =
                 new MailDispatcher(new SyncTaskExecutor(), () -> false, clock, budget);
 
-        dispatcher.dispatch(MailKind.VERIFICATION, 45L, () -> {});
+        dispatcher.dispatch(MailKind.VERIFICATION_CODE, 45L, () -> {});
 
         assertThat(budget.consumed()).isEqualTo(1);
         assertThat(budget.released()).isZero();
@@ -313,7 +316,7 @@ class MailDispatcherTest {
             List<String> senderThreads,
             CountDownLatch gate) {
         dispatcher.dispatch(
-                MailKind.VERIFICATION,
+                MailKind.VERIFICATION_CODE,
                 userId,
                 () -> {
                     senderThreads.add(Thread.currentThread().getName());

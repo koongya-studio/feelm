@@ -19,29 +19,19 @@ class AuthMailPropertiesTest {
 
     private static final AuthMailProperties PROPERTIES =
             new AuthMailProperties(
-                    Mode.LOG,
-                    "no-reply@feelm.local",
-                    "https://feelm.example/verify-email",
-                    "https://feelm.example/reset-password");
-
-    @Test
-    @DisplayName("인증 링크는 설정된 화면 주소에 token 쿼리를 붙인다")
-    void verificationLinkAppendsToken() {
-        assertThat(PROPERTIES.link(MailKind.VERIFICATION, "raw-token"))
-                .isEqualTo("https://feelm.example/verify-email?token=raw-token");
-    }
+                    Mode.LOG, "no-reply@feelm.local", "https://feelm.example/reset-password");
 
     @Test
     @DisplayName("재설정 링크는 설정된 화면 주소에 token 쿼리를 붙인다")
     void passwordResetLinkAppendsToken() {
-        assertThat(PROPERTIES.link(MailKind.PASSWORD_RESET, "raw-token"))
+        assertThat(PROPERTIES.content(MailKind.PASSWORD_RESET, "raw-token"))
                 .isEqualTo("https://feelm.example/reset-password?token=raw-token");
     }
 
+    /** 인증번호 메일에는 링크가 없다. 번호 자체가 본문에 들어가는 값이다(S15P21E106-602·604). */
     @Test
-    @DisplayName("두 링크는 서로 다른 화면으로 간다")
-    void linksTargetDifferentScreens() {
-        assertThat(PROPERTIES.link(MailKind.PASSWORD_RESET, "raw-token"))
-                .isNotEqualTo(PROPERTIES.link(MailKind.VERIFICATION, "raw-token"));
+    @DisplayName("인증번호 메일은 값을 그대로 쓴다")
+    void verificationCodeUsesRawValue() {
+        assertThat(PROPERTIES.content(MailKind.VERIFICATION_CODE, "032815")).isEqualTo("032815");
     }
 }

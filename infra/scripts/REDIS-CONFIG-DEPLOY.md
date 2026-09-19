@@ -3,7 +3,8 @@
 보호된 main push에서 infra/redis 아래 파일이 변경되면 deploy-redis Job이 실행된다.
 Job은 설정을 먼저 검증한 뒤 Redis만 --no-deps --force-recreate로 재생성한다.
 redis_data 볼륨은 삭제하지 않는다. 기동 후 인증, 미인증 거부, 읽기 전용 계정의
-읽기 허용·쓰기 거부를 검증하고, 실패하면 배포 직전 설정으로 Redis를 다시 생성한다.
+읽기 허용·쓰기 거부와 로컬 백엔드 계정의 제한된 읽기·쓰기를 검증하고, 실패하면 배포
+직전 설정으로 Redis를 다시 생성한다.
 
 서비스 Runner 호스트에는 최초 한 번 다음 디렉터리를 준비한다.
 
@@ -26,7 +27,7 @@ redis_data 볼륨은 삭제하지 않는다. 기동 후 인증, 미인증 거부
 
 트리거 파일은 `infra/redis/**/*` 변경 규칙에 포함되어 보호된 main push에서
 `datastore-config-check`와 `deploy-redis`를 다시 실행한다. `deploy-redis.sh`는
-`start.sh`와 `readonly.acl`만 release에 복사하므로 트리거 파일은 Redis 컨테이너 설정이나
+`start.sh`, `readonly.acl`, `local-backend.acl`만 release에 복사하므로 트리거 파일은 Redis 컨테이너 설정이나
 Secret에 포함되지 않는다. 토큰 변경 이력은 Git과 Jira에 남으며, 같은 값으로 빈 커밋을
 만들거나 main에 직접 Push하지 않는다.
 
@@ -45,7 +46,7 @@ Secret 변수는 필요하지 않다. Redis 비밀번호는 기존 Compose 환�
 배포 스크립트는 값을 출력하지 않는다.
 
 최초 자동 재배포처럼 실행 중인 컨테이너의 bind-mount 원본 경로가 더 이상 존재하지 않으면,
-배포 스크립트는 컨테이너에서 `start.sh`와 `readonly.acl`을
+배포 스크립트는 컨테이너에서 `start.sh`, `readonly.acl`, `local-backend.acl`을
 `releases/bootstrap-<revision>`으로 복사해 rollback 기준점으로 사용한다. Redis 데이터와
 실행 중인 Secret은 이 스냅샷에 포함하지 않는다.
 

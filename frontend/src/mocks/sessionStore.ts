@@ -15,17 +15,17 @@
  * 여기 담는 것은 **사용자가 이번 세션에 만든 변화**뿐이다. 기준 목업(mocks/의 나머지
  * 파일)은 그대로 두고, `src/api/`가 둘을 합쳐 응답을 만든다.
  *
- * 예외는 둘이다. 최근 검색어 · 8.1 알림은 와이어프레임이 그린 상태로 시작한다. 둘 다
- * 사용자가 지우거나 바꾸는 값이라 저장소 안에 있어야 변화가 남는다.
+ * 예외는 최근 검색어다. 와이어프레임이 그린 상태로 시작하며 사용자가 지우는 값이라
+ * 저장소 안에 있어야 변화가 남는다.
  *
  * 실제 API가 된 값은 여기서 빠진다. 차단 목록(API-020 ~ API-022)이 그렇게 나갔고, 알림
- * 설정과 공개 범위는 계약에 없는 값을 저장된 것처럼 두지 않기로 해 빠졌다(업무 -610). 감상 기록(API-033 ~ API-035)도
- * 서버로 옮겨 가 이 파일에서 사라졌다(업무 -477). 새 평가(API-036)도 서버가 저장하므로
+ * 설정과 공개 범위는 계약에 없는 값을 저장된 것처럼 두지 않기로 해 빠졌다(업무 -610).
+ * 인앱 알림 읽음도 API-070~074가 서버에 저장하므로 빠졌다(업무 -537). 감상 기록(API-033 ~
+ * API-035)도 서버로 옮겨 가 이 파일에서 사라졌다(업무 -477). 새 평가(API-036)도 서버가 저장하므로
  * 여기 쌓지 않는다(업무 -491). 관심없음과 평가 수정의 고친 값도 지웠다(업무 -610) — 추천이
  * 실제 API가 됐고 내 평가 목록은 프레임(API-042)으로 그린다.
  */
-import { createSeedNotifications } from './notifications';
-import type { NotificationView, ProfileExtrasUpdate } from '../types/unspecified';
+import type { ProfileExtrasUpdate } from '../types/unspecified';
 
 type SessionState = {
   /**
@@ -41,11 +41,6 @@ type SessionState = {
    * 시작해야 하므로(이 파일 머리말) 다른 세션 상태와 같이 메모리에 둔다.
    */
   recentSearchQueries: string[];
-  /**
-   * 8.1 알림. 와이어프레임 네 건으로 시작한다. 누르면 읽음이 되고 그 상태가 남아야
-   * 다시 들어왔을 때 표식이 사라진다(업무 -308).
-   */
-  notifications: NotificationView[];
   /**
    * 3.3 새 리포트 발급 화면을 이미 본 리포트. 2.1 `취향 리포트 보기`가 안 본 리포트면
    * 3.3을 거쳐 3.4로, 본 리포트면 3.4로 바로 간다(업무 -308).
@@ -63,7 +58,6 @@ function emptyState(): SessionState {
     subscribedOttIds: null,
     // 와이어프레임 4.1이 최근 검색어 세 개가 있는 상태를 그리므로 그 값으로 시작한다
     recentSearchQueries: ['케이퍼 무비', '크리스토퍼 놀란', 'SF 명작'],
-    notifications: createSeedNotifications(),
     seenReportIds: [],
     profileExtras: {},
   };
@@ -130,17 +124,7 @@ export function saveProfileExtras(update: ProfileExtrasUpdate): void {
   state.profileExtras = { ...state.profileExtras, ...update };
 }
 
-// ─────────────────────────────────────────── 알림 · 리포트 (업무 -308)
-
-export function getNotifications(): NotificationView[] {
-  return state.notifications;
-}
-
-export function markNotificationRead(notificationId: number): void {
-  state.notifications = state.notifications.map((item) =>
-    item.notificationId === notificationId ? { ...item, read: true } : item,
-  );
-}
+// ─────────────────────────────────────────── 리포트 (업무 -308)
 
 export function markReportSeen(reportId: number): void {
   if (!state.seenReportIds.includes(reportId)) {

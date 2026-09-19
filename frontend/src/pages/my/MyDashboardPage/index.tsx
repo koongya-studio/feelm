@@ -11,7 +11,7 @@
  *
  * | 자리 | 무엇 |
  * | --- | --- |
- * | 헤더 | `프로필` · 오른쪽 `설정` 아이콘 |
+ * | 헤더 | 공통 헤더(워드마크 · 검색 · 알림, 업무 -676) · 그 아래 `프로필` · 오른쪽 `설정` 아이콘 |
  * | 상단 | 동그란 프로필 사진 + 닉네임 + 소개 |
  * | 버튼 둘 | `프로필 편집`(→ 7.2) · `프로필 공유` |
  * | 수치 | 프레임 · 팝콘 · 공개 한줄평 |
@@ -35,7 +35,8 @@
  * 1:1인 내 필름(API-042)으로 대신 그렸다(업무 -610). API-039는 **프레임 없는 과거 평가도**
  * 돌려주므로 필름의 프레임 수보다 많을 수 있다.
  *
- * **세 탭 모두 `더 보기`로 다음 장을 이어 받는다**(업무 -478 · -611 · -503). 한 장은 20건이고
+ * **세 탭 모두 `더 보기`로 다음 장을 이어 받는다**(업무 -478 · -611 · -503). 한 장은 18편이고
+ * (업무 -657 — 3열 격자 여섯 줄. API 기본값 20이면 줄마다 두 칸이 남아 끊겨 보였다)
  * 그보다 오래된 기록은 `nextCursor`로 온다 — 버튼이 없으면 첫 장 뒤의 기록에 닿을 길이 없다.
  * 무한 스크롤로 하지 않은 것은 피드가 끝나는 자리가 보여야 해서다. 탭이 셋이고 탭마다 끝이
  * 다르므로, 스크롤만으로 이어 받으면 지금 탭이 끝났는지 알 길이 없다. 셋 다 같은 규칙이다 —
@@ -70,9 +71,12 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import Button from '../../../components/Button';
 import PopcornBucket from '../../../components/PopcornBucket';
+import AppHeader from '../../../components/AppHeader';
+import ProfileBackdrop from '../../../components/ProfileBackdrop';
 import ProfileLayout, { ProfileSkeleton } from '../../../components/ProfileLayout';
 import { kernelCounts } from '../../../components/PopcornBucket/kernels';
 import Poster from '../../../components/Poster';
+import PosterCue from '../../../components/PosterCue';
 import ReportFourCut from '../../../components/ReportFourCut';
 import ReportTape from '../../../components/ReportTape';
 import ScreenHeader from '../../../components/ScreenHeader';
@@ -233,8 +237,21 @@ function flatten(
   return sets.flatMap((set) => set.items.map((item) => ({ item, generatedAt: set.generatedAt })));
 }
 
+/**
+ * 한 장의 편 수. 격자가 3열이라 3의 배수여야 첫 장과 `더 보기`마다 줄이 꽉 찬다(업무 -657).
+ * API 기본값 20이면 매번 마지막 줄에 두 칸만 남았다. API-039 · API-034 모두 1~50을 받는다
+ */
+const FEED_PAGE_SIZE = 18;
+
+/**
+ * 추천 기록 한 장의 세트 수. API-048의 `size`는 편이 아니라 **세트 단위**다. 세트 하나가
+ * 대개 3편(취향 맞춤 2 + 취향 발견 1)이라 여섯 세트로 다른 탭과 같은 18편을 맞춘다.
+ * 세트에 3편이 다 차지 않으면 줄이 딱 맞지 않을 수 있다
+ */
+const HISTORY_SETS_PER_PAGE = FEED_PAGE_SIZE / 3;
+
 /** 안 남긴 영화의 조건. 다음 장도 **같은 조건으로** 받아야 커서가 맞는다(API-034) */
-const UNRATED_QUERY = { status: ['WATCHED_UNRATED' as const] };
+const UNRATED_QUERY = { status: ['WATCHED_UNRATED' as const], size: FEED_PAGE_SIZE };
 
 /** 기록에 OTT 이름과 날짜를 얹는다. 기록은 `ottId`만 주고 이름은 기준정보에 있다 */
 function toUnratedRow(record: WatchRecordListItem, otts: Ott[]): UnratedRow {
@@ -342,7 +359,7 @@ export default function MyDashboardPage() {
      * 평가한 영화는 내 평가 목록(API-039)이다(업무 -611). 필터를 생략하면 서버가 평가만
      * 최신순으로 준다. 2.5에서 방금 저장 · 수정한 평가도 다시 읽을 때 그대로 보인다.
      */
-    getMyRatings()
+    getMyRatings({ size: FEED_PAGE_SIZE })
       .then((value) => {
         if (!active) return;
 
@@ -372,7 +389,7 @@ export default function MyDashboardPage() {
         if (active) setUnrated({ status: 'failed' });
       });
 
-    getRecommendationHistory()
+    getRecommendationHistory(undefined, HISTORY_SETS_PER_PAGE)
       .then((value) => {
         if (!active) return;
 
@@ -391,7 +408,8 @@ export default function MyDashboardPage() {
   if (failed) {
     return (
       <>
-        <ScreenHeader title="프로필" />
+        <AppHeader />
+        <ScreenHeader title="프로필" flush />
 
         <StatusView title="프로필을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
           <Button
@@ -407,14 +425,23 @@ export default function MyDashboardPage() {
     );
   }
 
+  // 받는 동안도 사진 배경 틀이다. 사진을 모르므로 사진 없는 어두운 배경에 자리만 비워 둔다 —
+  // 받는 순간 밝은 벽에서 어두운 화면으로 바뀌면 번쩍인다
   if (!profile) {
     return (
-      <>
-        <ScreenHeader title="프로필" />
+      <ProfileBackdrop
+        photoUrl={null}
+        top={
+          <>
+            <AppHeader />
+            <ScreenHeader title="프로필" flush tone="dark" />
+          </>
+        }
+      >
         <div className={styles.page}>
-          <ProfileSkeleton />
+          <ProfileSkeleton tone="dark" />
         </div>
-      </>
+      </ProfileBackdrop>
     );
   }
 
@@ -470,7 +497,7 @@ export default function MyDashboardPage() {
     const fail = () => setMore((prev) => ({ ...prev, [current]: 'failed' }));
 
     if (current === 'ratings') {
-      getMyRatings({ cursor })
+      getMyRatings({ cursor, size: FEED_PAGE_SIZE })
         .then((page) => {
           done(nextCursor(page));
           setRatings(append(ratedItems(page)));
@@ -491,7 +518,7 @@ export default function MyDashboardPage() {
       return;
     }
 
-    getRecommendationHistory(cursor)
+    getRecommendationHistory(cursor, HISTORY_SETS_PER_PAGE)
       .then((page) => {
         done(nextCursor(page));
         setHistory(append(flatten(page.items)));
@@ -517,232 +544,262 @@ export default function MyDashboardPage() {
        * **`OTT 관리`는 7.8 설정 안으로 옮겼다**(사용자 지시 2026-09-16). 이 화면에서
        * 6.1로 가는 길은 없어졌고 설정 > 계정 > OTT 관리가 유일한 입구다.
        *
-       * 화면 제목은 `프로필`이다(사용자 시안 2026-09-18, 업무 -616).
+       * 화면 제목은 `프로필`이다(사용자 시안 2026-09-18, 업무 -616). 그 위에 필름 · 파티와 같은
+       * 공통 헤더(워드마크 · 검색 · 알림)가 선다(업무 -676) — 제목 줄은 헤더 아래로 내려와
+       * 위 여백 없이 붙는다(`flush`).
+       *
+       * **프로필 사진이 화면 전체 배경이다**(사용자 지시 2026-09-19, 업무 -697). 2.4 영화 상세와
+       * 같은 층 구성(`ProfileBackdrop`)이라 사진이 위에 선명하게 보이고, 내리면 흐려지며 어두운
+       * 본문이 그 위를 덮는다. 헤더는 위에 붙어 따라온다.
        */}
-      <ScreenHeader
-        title="프로필"
-        action={
-          <Link to={path.settings()} className={styles.headerLink}>
-            <SettingsIcon />
-            <VisuallyHidden>설정</VisuallyHidden>
-          </Link>
+      <ProfileBackdrop
+        photoUrl={profile.avatarUrl}
+        top={
+          <>
+            <AppHeader />
+            <ScreenHeader
+              flush
+              tone="dark"
+              title="프로필"
+              action={
+                <Link to={path.settings()} className={styles.headerLink}>
+                  <SettingsIcon />
+                  <VisuallyHidden>설정</VisuallyHidden>
+                </Link>
+              }
+            />
+          </>
         }
-      />
+      >
+        <div className={styles.page}>
+          {/*
+           * 프로필 머리 · 버튼 둘 · 수치. `프로필 편집`은 7.2로 가는 입구이고(이동 경로 2 · 3번
+           * 사슬의 출발점), `프로필 공유`는 기기의 공유 메뉴를 연다.
+           */}
+          <ProfileLayout
+            mode="view"
+            tone="dark"
+            profile={profile}
+            actions={
+              <>
+                <Link to={path.profileEdit()} className={styles.profileAction}>
+                  프로필 편집
+                </Link>
 
-      <div className={styles.page}>
-        {/*
-         * 프로필 머리 · 버튼 둘 · 수치. `프로필 편집`은 7.2로 가는 입구이고(이동 경로 2 · 3번
-         * 사슬의 출발점), `프로필 공유`는 기기의 공유 메뉴를 연다.
-         */}
-        <ProfileLayout
-          mode="view"
-          profile={profile}
-          actions={
-            <>
-              <Link to={path.profileEdit()} className={styles.profileAction}>
-                프로필 편집
-              </Link>
+                <button
+                  type="button"
+                  className={styles.profileAction}
+                  onClick={() => void shareProfile()}
+                >
+                  프로필 공유
+                </button>
+              </>
+            }
+          />
 
-              <button
-                type="button"
-                className={styles.profileAction}
-                onClick={() => void shareProfile()}
-              >
-                프로필 공유
-              </button>
-            </>
-          }
-        />
+          {/*
+           * 바로가기 카드 둘. 그림 · 이름 · 화살표가 한 줄이고 카드 전체가 링크다(시안 7.1).
+           * 왼쪽은 7.3 취향 리포트 목록, 오른쪽은 3.2 취향 팝콘으로 간다 — 시안이 두 카드 모두에
+           * 화살표를 그렸다. 화살표가 있는데 안 눌리면 고장처럼 보인다.
+           */}
+          <div className={styles.shortcuts}>
+            <Link to={path.tasteReports()} className={styles.shortcut}>
+              <span className={styles.shortcutArt}>
+                <span className={styles.reportStrip} aria-hidden="true">
+                  <ReportTape />
 
-        {/*
-         * 바로가기 카드 둘. 그림 · 이름 · 화살표가 한 줄이고 카드 전체가 링크다(시안 7.1).
-         * 왼쪽은 7.3 취향 리포트 목록, 오른쪽은 3.2 취향 팝콘으로 간다 — 시안이 두 카드 모두에
-         * 화살표를 그렸다. 화살표가 있는데 안 눌리면 고장처럼 보인다.
-         */}
-        <div className={styles.shortcuts}>
-          <Link to={path.tasteReports()} className={styles.shortcut}>
-            <span className={styles.shortcutArt}>
-              <span className={styles.reportStrip} aria-hidden="true">
-                <ReportTape />
-
-                {report ? (
-                  <ReportFourCut cuts={report.fourCut} createdAt={report.createdAt} head={false} />
-                ) : (
-                  <span className={styles.reportBlank} />
-                )}
+                  {report ? (
+                    <ReportFourCut
+                      cuts={report.fourCut}
+                      createdAt={report.createdAt}
+                      head={false}
+                    />
+                  ) : (
+                    <span className={styles.reportBlank} />
+                  )}
+                </span>
               </span>
-            </span>
 
-            <span className={styles.shortcutLabel}>4컷 리포트</span>
-            <span className={styles.shortcutChevron}>
-              <ChevronRightIcon />
-            </span>
-          </Link>
+              <span className={styles.shortcutLabel}>4컷 리포트</span>
+              <span className={styles.shortcutChevron}>
+                <ChevronRightIcon />
+              </span>
+            </Link>
 
-          <Link to={path.popcornBucket()} className={styles.shortcut}>
-            {/* 그림은 장식이다. 링크 이름은 옆의 `취향 팝콘` 글자다 */}
-            <span className={styles.shortcutArt} aria-hidden="true">
-              <PopcornBucket width={52} flavors={popcorn} label="팝콘 통" />
-            </span>
+            <Link to={path.popcornBucket()} className={styles.shortcut}>
+              {/* 그림은 장식이다. 링크 이름은 옆의 `취향 팝콘` 글자다 */}
+              <span className={styles.shortcutArt} aria-hidden="true">
+                <PopcornBucket width={52} flavors={popcorn} label="팝콘 통" />
+              </span>
 
-            <span className={styles.shortcutLabel}>취향 팝콘</span>
-            <span className={styles.shortcutChevron}>
-              <ChevronRightIcon />
-            </span>
-          </Link>
+              <span className={styles.shortcutLabel}>취향 팝콘</span>
+              <span className={styles.shortcutChevron}>
+                <ChevronRightIcon />
+              </span>
+            </Link>
+          </div>
+
+          {/* 화면 안의 전환이다. 다른 화면으로 가지 않으므로 링크가 아니라 탭이다 */}
+          <div className={styles.tabs} role="tablist" aria-label="내 기록">
+            {TABS.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                role="tab"
+                id={`my-feed-tab-${item.key}`}
+                aria-selected={tab === item.key}
+                aria-controls="my-feed"
+                className={styles.tab}
+                onClick={() => setParams({ tab: item.key }, { replace: true })}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+
+          <div
+            id="my-feed"
+            role="tabpanel"
+            aria-labelledby={`my-feed-tab-${tab}`}
+            className={styles.feed}
+          >
+            {feed.status === 'loading' && <p className={styles.feedNote}>불러오는 중이에요</p>}
+
+            {feed.status === 'failed' && (
+              <div className={styles.feedNote}>
+                <p>목록을 불러오지 못했어요</p>
+
+                <Button variant="secondary" onClick={retryFeeds}>
+                  다시 시도
+                </Button>
+              </div>
+            )}
+
+            {feed.status === 'ready' && feed.items.length === 0 && (
+              <p className={styles.feedNote}>{EMPTY_TEXT[tab]}</p>
+            )}
+
+            {/*
+             * 평가 탭. 누르면 2.4 영화 상세로 간다(업무 -638). 목록에서 영화를 고르면 상세가
+             * 열리는 것이 자연스럽고, 평가 수정은 2.4의 `내 별점 수정하기`로 이어진다 — 한때
+             * 2.5 평가 수정으로 바로 갔다(QA 2026-09-18). 별점은 API-039가 주는 값이라 포스터
+             * 위에 표식으로 얹는다. 키는 평가 번호다 — 프레임 번호는 과거 평가에서 `null`일 수 있다.
+             */}
+            {tab === 'ratings' && ratings.status === 'ready' && ratings.items.length > 0 && (
+              <ul className={styles.grid}>
+                {ratings.items.map((rating) => (
+                  <li key={rating.ratingId}>
+                    <Link to={path.movieDetail(rating.movie.movieId)} className={styles.cell}>
+                      <PosterCue>
+                        <Poster
+                          fluid
+                          width={POSTER_RATIO.width}
+                          height={POSTER_RATIO.height}
+                          radius={0}
+                          src={rating.movie.posterUrl ?? undefined}
+                          title={rating.movie.title}
+                          seed={rating.movie.movieId}
+                        />
+                      </PosterCue>
+
+                      <VisuallyHidden>{rating.movie.title}</VisuallyHidden>
+
+                      <span className={styles.score}>
+                        <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                          <path d={STAR_PATH} />
+                        </svg>
+                        {rating.score.toFixed(1)}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/*
+             * 안 남긴 영화 탭. 본 기록은 있는데 평가가 없는 영화다(API-034
+             * `WATCHED_UNRATED`). 누르면 2.5 평가하기로 간다 — 7.7이 하던 이동 그대로다.
+             * 날짜와 OTT는 기록이 주는 값이고, 클릭 이력이 없으면 둘 다 없다(업무 -477).
+             */}
+            {tab === 'unrated' && unrated.status === 'ready' && unrated.items.length > 0 && (
+              <ul className={styles.grid}>
+                {unrated.items.map(({ record, ottName, date }) => (
+                  <li key={record.watchRecordId}>
+                    <Link to={path.movieRating(record.movie.movieId)} className={styles.cell}>
+                      <PosterCue>
+                        <Poster
+                          fluid
+                          width={POSTER_RATIO.width}
+                          height={POSTER_RATIO.height}
+                          radius={0}
+                          src={record.movie.posterUrl ?? undefined}
+                          title={record.movie.title}
+                          seed={record.movie.movieId}
+                        />
+                      </PosterCue>
+
+                      <VisuallyHidden>{record.movie.title} 평가하기</VisuallyHidden>
+
+                      <span className={styles.caption}>
+                        <span className={styles.captionSource}>{ottName ?? '감상 기록'}</span>
+                        {date ? <span className={styles.captionDate}>{date}</span> : null}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/*
+             * 추천 탭. 누르면 7.5와 같은 곳(2.4 영화 상세)으로 간다. 출처와 날짜는
+             * API-048이 주는 값이다(`type` · 세트의 `generatedAt`). 그 밖의 값은 쓰지 않는다.
+             */}
+            {tab === 'recommendations' &&
+              history.status === 'ready' &&
+              history.items.length > 0 && (
+                <ul className={styles.grid}>
+                  {history.items.map(({ item, generatedAt }) => (
+                    <li key={item.recommendationItemId}>
+                      <Link to={path.movieDetail(item.movie.movieId)} className={styles.cell}>
+                        <PosterCue>
+                          <Poster
+                            fluid
+                            width={POSTER_RATIO.width}
+                            height={POSTER_RATIO.height}
+                            radius={0}
+                            src={item.movie.posterUrl ?? undefined}
+                            title={item.movie.title}
+                            seed={item.movie.movieId}
+                          />
+                        </PosterCue>
+
+                        <VisuallyHidden>{item.movie.title}</VisuallyHidden>
+
+                        <span className={styles.caption}>
+                          <span className={styles.captionSource}>{SOURCE_LABEL[item.type]}</span>
+                          <span className={styles.captionDate}>{formatShortDate(generatedAt)}</span>
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+            {/* 세 탭이 같은 자리 · 같은 모양으로 다음 장을 받는다(업무 -503) */}
+            {feed.status === 'ready' && cursors[tab] ? (
+              <div className={styles.more}>
+                <Button variant="secondary" onClick={loadMore} disabled={more[tab] === 'loading'}>
+                  {more[tab] === 'failed' ? '다시 시도' : '더 보기'}
+                </Button>
+
+                {more[tab] === 'failed' ? (
+                  <p className={styles.moreError}>{MORE_ERROR[tab]}</p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
-
-        {/* 화면 안의 전환이다. 다른 화면으로 가지 않으므로 링크가 아니라 탭이다 */}
-        <div className={styles.tabs} role="tablist" aria-label="내 기록">
-          {TABS.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              role="tab"
-              id={`my-feed-tab-${item.key}`}
-              aria-selected={tab === item.key}
-              aria-controls="my-feed"
-              className={styles.tab}
-              onClick={() => setParams({ tab: item.key }, { replace: true })}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-
-        <div
-          id="my-feed"
-          role="tabpanel"
-          aria-labelledby={`my-feed-tab-${tab}`}
-          className={styles.feed}
-        >
-          {feed.status === 'loading' && <p className={styles.feedNote}>불러오는 중이에요</p>}
-
-          {feed.status === 'failed' && (
-            <div className={styles.feedNote}>
-              <p>목록을 불러오지 못했어요</p>
-
-              <Button variant="secondary" onClick={retryFeeds}>
-                다시 시도
-              </Button>
-            </div>
-          )}
-
-          {feed.status === 'ready' && feed.items.length === 0 && (
-            <p className={styles.feedNote}>{EMPTY_TEXT[tab]}</p>
-          )}
-
-          {/*
-           * 평가 탭. 누르면 7.6과 같은 곳(2.5 평가 수정)으로 간다. 별점은 API-039가
-           * 주는 값이라 포스터 위에 표식으로 얹는다. 키는 평가 번호다 — 프레임 번호는
-           * 과거 평가에서 `null`일 수 있다.
-           */}
-          {tab === 'ratings' && ratings.status === 'ready' && ratings.items.length > 0 && (
-            <ul className={styles.grid}>
-              {ratings.items.map((rating) => (
-                <li key={rating.ratingId}>
-                  <Link to={path.movieRating(rating.movie.movieId)} className={styles.cell}>
-                    <Poster
-                      fluid
-                      width={POSTER_RATIO.width}
-                      height={POSTER_RATIO.height}
-                      radius={0}
-                      src={rating.movie.posterUrl ?? undefined}
-                      title={rating.movie.title}
-                      seed={rating.movie.movieId}
-                    />
-
-                    <VisuallyHidden>{rating.movie.title}</VisuallyHidden>
-
-                    <span className={styles.score}>
-                      <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                        <path d={STAR_PATH} />
-                      </svg>
-                      {rating.score.toFixed(1)}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {/*
-           * 안 남긴 영화 탭. 본 기록은 있는데 평가가 없는 영화다(API-034
-           * `WATCHED_UNRATED`). 누르면 2.5 평가하기로 간다 — 7.7이 하던 이동 그대로다.
-           * 날짜와 OTT는 기록이 주는 값이고, 클릭 이력이 없으면 둘 다 없다(업무 -477).
-           */}
-          {tab === 'unrated' && unrated.status === 'ready' && unrated.items.length > 0 && (
-            <ul className={styles.grid}>
-              {unrated.items.map(({ record, ottName, date }) => (
-                <li key={record.watchRecordId}>
-                  <Link to={path.movieRating(record.movie.movieId)} className={styles.cell}>
-                    <Poster
-                      fluid
-                      width={POSTER_RATIO.width}
-                      height={POSTER_RATIO.height}
-                      radius={0}
-                      src={record.movie.posterUrl ?? undefined}
-                      title={record.movie.title}
-                      seed={record.movie.movieId}
-                    />
-
-                    <VisuallyHidden>{record.movie.title} 평가하기</VisuallyHidden>
-
-                    <span className={styles.caption}>
-                      <span className={styles.captionSource}>{ottName ?? '감상 기록'}</span>
-                      {date ? <span className={styles.captionDate}>{date}</span> : null}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {/*
-           * 추천 탭. 누르면 7.5와 같은 곳(2.4 영화 상세)으로 간다. 출처와 날짜는
-           * API-048이 주는 값이다(`type` · 세트의 `generatedAt`). 그 밖의 값은 쓰지 않는다.
-           */}
-          {tab === 'recommendations' && history.status === 'ready' && history.items.length > 0 && (
-            <ul className={styles.grid}>
-              {history.items.map(({ item, generatedAt }) => (
-                <li key={item.recommendationItemId}>
-                  <Link to={path.movieDetail(item.movie.movieId)} className={styles.cell}>
-                    <Poster
-                      fluid
-                      width={POSTER_RATIO.width}
-                      height={POSTER_RATIO.height}
-                      radius={0}
-                      src={item.movie.posterUrl ?? undefined}
-                      title={item.movie.title}
-                      seed={item.movie.movieId}
-                    />
-
-                    <VisuallyHidden>{item.movie.title}</VisuallyHidden>
-
-                    <span className={styles.caption}>
-                      <span className={styles.captionSource}>{SOURCE_LABEL[item.type]}</span>
-                      <span className={styles.captionDate}>{formatShortDate(generatedAt)}</span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          {/* 세 탭이 같은 자리 · 같은 모양으로 다음 장을 받는다(업무 -503) */}
-          {feed.status === 'ready' && cursors[tab] ? (
-            <div className={styles.more}>
-              <Button variant="secondary" onClick={loadMore} disabled={more[tab] === 'loading'}>
-                {more[tab] === 'failed' ? '다시 시도' : '더 보기'}
-              </Button>
-
-              {more[tab] === 'failed' ? (
-                <p className={styles.moreError}>{MORE_ERROR[tab]}</p>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      </div>
+      </ProfileBackdrop>
 
       {notice ? (
         <div className={styles.notice}>

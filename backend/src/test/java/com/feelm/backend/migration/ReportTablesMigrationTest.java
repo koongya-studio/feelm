@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 class ReportTablesMigrationTest {
 
     private static final String PREVIOUS_VERSION = "202609181000";
+
     private static final MigrationPostgresSupport.MigrationTestDatabase DATABASE =
             MigrationPostgresSupport.database("report_tables");
 
@@ -287,7 +288,7 @@ class ReportTablesMigrationTest {
                                     + movieId
                                     + ",4.5,'기존 평가','PUBLIC') RETURNING id");
 
-            assertThat(upgradeDatabase.flyway().migrate().migrationsExecuted).isOne();
+            assertThat(upgradeDatabase.flyway().migrate().migrationsExecuted).isPositive();
             assertThat(
                             longValue(
                                     upgradeDatabase,
@@ -305,7 +306,9 @@ class ReportTablesMigrationTest {
                     .isEqualTo("4.5");
             assertThat(longValue(upgradeDatabase, "SELECT count(*) FROM taste_reports")).isZero();
             assertThat(longValue(upgradeDatabase, "SELECT count(*) FROM report_images")).isZero();
-            assertThat(upgradeDatabase.flyway().migrate().migrationsExecuted).isZero();
+            assertThat(upgradeDatabase.flyway().migrate().migrationsExecuted)
+                    .as("재적용해도 추가로 실행되는 마이그레이션은 없다")
+                    .isZero();
             assertThat(upgradeDatabase.flyway().validateWithResult().validationSuccessful).isTrue();
         }
     }
