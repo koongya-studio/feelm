@@ -457,6 +457,14 @@ erDiagram
         jsonb content "장르·배우·감독·캐릭터 카드·변화 요약"
         timestamptz created_at
     }
+    TASTE_REPORT_GENERATION_RUNS {
+        bigint id PK
+        smallint year "UK year+half"
+        varchar half "H1 / H2"
+        timestamptz snapshot_at
+        integer prepared_count "0 이상"
+        timestamptz completed_at
+    }
     REPORT_IMAGES {
         bigint id PK
         bigint report_id FK
@@ -472,6 +480,7 @@ erDiagram
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
 | `taste_reports` | 반기 취향 리포트 | UK(`user_id`, `year`, `half`). 생성 시점 스냅샷 | FR-23 · API-059, API-060 |
+| `taste_report_generation_runs` | 반기 마감 준비의 정상 완료 기록 | UK(`year`, `half`). 대상 0명도 `prepared_count=0`으로 기록하며 리포트 생성과 같은 트랜잭션에서 저장 | FR-23 · S15P21E106-555 |
 | `report_images` | 이미지 카드 | 파일은 S3 호환 스토리지, DB에는 키만. 다운로드 URL은 요청 시 서명 발급 | FR-24, NFR-07 · API-061 |
 
 ---
