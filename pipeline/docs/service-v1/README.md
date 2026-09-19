@@ -21,6 +21,11 @@ Jira: [S15P21E106-387](https://ssafy.atlassian.net/browse/S15P21E106-387).
 
 먼저 [팀 인계 안내](HANDOFF.md)에서 구현 순서·현재 준비 상태·자료 위치를 확인한다.
 [ALS·FM·GBT 비교](MODEL-COMPARISON.md), [재현·EC2 준비](REPRODUCTION.md), [게시 검증](VERIFICATION.md)을 함께 제공한다.
+[621 실험 사전점검](readiness/S15P21E106-621-READINESS.md),
+[621 기계 판독 readiness manifest](readiness/READINESS-MANIFEST.json),
+[노트북 인계](readiness/LAPTOP-HANDOFF.md),
+[노트북 시작 프롬프트](readiness/LAPTOP-BOOTSTRAP-PROMPT.md)는 본 학습 전에 코드·자료·장비·서버/HDFS의
+현재 상태를 다시 판정하는 실행 인계다.
 
 ## 읽는 순서
 
