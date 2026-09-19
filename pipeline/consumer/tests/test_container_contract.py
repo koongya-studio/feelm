@@ -39,6 +39,18 @@ def test_runtime_is_non_root_and_execs_consumer_directly() -> None:
     assert "CMD sh " not in dockerfile
 
 
+def test_same_image_exposes_independent_party_consumer_module() -> None:
+    pyproject = (CONSUMER_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    party_main = (CONSUMER_ROOT / "src/feelm_consumer/party_main.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'feelm-foldin-consumer = "feelm_consumer.__main__:main"' in pyproject
+    assert 'feelm-party-consumer = "feelm_consumer.party_main:main"' not in pyproject
+    assert 'if __name__ == "__main__":' in party_main
+    assert "    main()" in party_main
+
+
 def test_test_stage_runs_locked_lint_and_tests_before_runtime_publication() -> None:
     dockerfile = (CONSUMER_ROOT / "Dockerfile").read_text(encoding="utf-8")
 

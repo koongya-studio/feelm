@@ -83,6 +83,13 @@ payload를 임의로 추가하지 말고 계약과 공통 타입을 먼저 합�
 [ADR-0018](../docs/adr/0018-polling-transactional-outbox.md)을 참고합니다. 로컬 Kafka 기동과
 Topic 확인 방법은 [인프라 README](../infra/README.md#local-kafka)를 따릅니다.
 
+파티 전용 Consumer의 Redis 게시 완료 알림은 `feelm.party-candidate-updated.v1`에서
+`feelm-party-candidate-updated-v1` group으로 소비한다. Backend는 추천 세트를 미리 만들지 않고
+`party_candidate_publications`에 파티별 마지막 source partition·offset과 결과 식별자만 기록한다.
+유효 알림의 DB 트랜잭션이 커밋된 뒤 수신 Offset을 manual ACK하며, 같은 source offset의 중복과
+더 오래된 offset은 상태를 바꾸지 않는다. 정확한 key·payload 계약은
+[스트리밍 계약](../docs/api/streaming-contract.md#43-이벤트별-payload)을 따른다.
+
 ## 실행 프로파일
 
 기본 프로파일은 `local`이며, 배포 개발 환경은 `dev`를 사용합니다. JPA 스키마 자동 변경은
