@@ -10,19 +10,23 @@
  *
  * 실측은 2.6이 떠 있는 동안 이 화면이 읽는다(업무 -635). 2.5는 그것을 기다리지 않고 넘어오므로
  * 2.7은 전환 시간과 실측 도착을 **둘 다** 기다린다.
+ *
+ * 2.6의 필름 릴은 새 프레임 아래에 내 필름(API-042)의 기존 프레임을 잇는다(업무 -633).
+ * 읽지 못해도 새 프레임 한 장은 그린다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import RatingResultPage from './index';
 import { ROUTE_PATTERN } from '../../../routes/paths';
 import type { RatingCounts } from '../../../api/watch';
+import type { FrameList, FrameSummary } from '../../../types/taste';
 import type { Rating } from '../../../types/watch';
 
-vi.mock('../../../api/taste', () => ({ getPopcornFlavors: vi.fn() }));
+vi.mock('../../../api/taste', () => ({ getMyFrames: vi.fn(), getPopcornFlavors: vi.fn() }));
 vi.mock('../../../api/watch', () => ({ getRatingCounts: vi.fn() }));
 
-const { getPopcornFlavors } = await import('../../../api/taste');
+const { getMyFrames, getPopcornFlavors } = await import('../../../api/taste');
 const { getRatingCounts } = await import('../../../api/watch');
 
 /** 2.6 → 2.7 자동 전환 시간(ms). 화면의 상수와 같다 */
@@ -43,9 +47,31 @@ const rating: Rating = {
 
 const counts: RatingCounts = { frameCount: 2, popcornCount: 11, weeklyFrameDelta: 3 };
 
+function frame(frameId: number, createdAt: string): FrameSummary {
+  return {
+    frameId,
+    movie: { movieId: 100 + frameId, title: `영화 ${frameId}`, posterUrl: `/p/${frameId}.jpg` },
+    score: 4,
+    flavorCode: 'FLAVOR_A',
+    createdAt,
+  };
+}
+
+function frameList(items: FrameSummary[]): FrameList {
+  return { totalCount: items.length, items, nextCursor: null, hasNext: false };
+}
+
+/** 릴에 그려진 포스터 주소를 위에서부터 읽는다. 새 프레임은 `/p/new.jpg`다 */
+function reelPosters() {
+  return Array.from(screen.getByTestId('film-reel').querySelectorAll('img')).map((img) =>
+    img.getAttribute('src'),
+  );
+}
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.mocked(getRatingCounts).mockReset();
+  vi.mocked(getMyFrames).mockReset().mockResolvedValue(frameList([]));
   vi.mocked(getPopcornFlavors)
     .mockReset()
     .mockResolvedValue([
@@ -67,13 +93,14 @@ function renderResult(state: {
   rating: Rating;
   counts: RatingCounts;
   after?: RatingCounts | null;
+  posterUrl?: string | null;
 }) {
   render(
     <MemoryRouter
       initialEntries={[
         {
           pathname: '/movies/550/rate/result',
-          state: { ...state, movieTitle: '영화', posterUrl: null },
+          state: { movieTitle: '영화', posterUrl: null, ...state },
         },
       ]}
     >
@@ -211,5 +238,59 @@ describe('2.6에서 추가 후 수치 읽기', () => {
     await finish();
 
     expect(getRatingCounts).not.toHaveBeenCalled();
+  });
+});
+
+describe('2.6 필름 릴', () => {
+  it('새 프레임 아래에 내 필름의 기존 프레임을 최신순으로 잇는다', async () => {
+    // API-042는 방금 저장된 새 프레임(77)을 맨 앞에 담아 준다
+    vi.mocked(getMyFrames).mockResolvedValue(
+      frameList([
+        frame(77, '2026-09-17T13:59:03Z'),
+        frame(60, '2026-09-10T00:00:00Z'),
+        frame(41, '2026-09-01T00:00:00Z'),
+      ]),
+    );
+
+    renderResult({ rating, counts, after: null, posterUrl: '/p/new.jpg' });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    // 새 프레임은 한 번만, 맨 앞에 선다
+    expect(reelPosters()).toEqual(['/p/new.jpg', '/p/60.jpg', '/p/41.jpg']);
+    const reel = within(screen.getByTestId('film-reel'));
+    expect(reel.getByAltText('영화 60')).toBeInTheDocument();
+  });
+
+  it('새 프레임보다 나중에 생긴 프레임은 잇지 않는다', async () => {
+    // 뒤로 가기로 2.6이 다시 열렸을 때 그 사이 다른 영화를 평가한 경우다
+    vi.mocked(getMyFrames).mockResolvedValue(
+      frameList([
+        frame(90, '2026-09-18T09:00:00Z'),
+        frame(77, '2026-09-17T13:59:03Z'),
+        frame(60, '2026-09-10T00:00:00Z'),
+      ]),
+    );
+
+    renderResult({ rating, counts, after: null, posterUrl: '/p/new.jpg' });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(reelPosters()).toEqual(['/p/new.jpg', '/p/60.jpg']);
+  });
+
+  it('내 필름을 읽지 못해도 새 프레임 한 장은 그리고 2.7로 넘어간다', async () => {
+    vi.mocked(getMyFrames).mockRejectedValue(new Error('network'));
+
+    renderResult({ rating, counts, after: null, posterUrl: '/p/new.jpg' });
+
+    await finish();
+
+    expect(reelPosters()).toEqual(['/p/new.jpg']);
+    expect(screen.getByText('프레임 1개 · 팝콘 1알이 추가됐어요')).toBeInTheDocument();
   });
 });
