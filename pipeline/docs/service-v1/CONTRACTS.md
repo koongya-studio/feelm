@@ -3,6 +3,10 @@
 상태: **APPROVED — 사용자 확정 제품 결정을 반영한 로컬 구현 기준.**<br>
 팀 공통계약의 승인·코드 수정·DB migration 실행·배포는 아직 하지 않았다. 작성 2026-09-13.
 
+0~N 모델 입력·모델별 특징·로컬 학습/승격 경계는 [현재 개발 방향](CURRENT-DIRECTION.md)과
+[0~N 계약](../../contracts/zero-n-learning-evaluation.md)을 우선한다. 이 문서의 K10·최신10·245열
+문구는 legacy 계약 재현에만 사용한다.
+
 [POLICY](POLICY.md)는 추천 규칙, [MODELS](MODELS.md)는 모델·특징·학습 준비, [OPERATIONS](OPERATIONS.md)는 실행 순서를 정의한다.
 [KOBIS 데이터](KOBIS-DATA.md)는 확장 수집의 관측 단위·신원 검토·서비스에 사용할 누적값의 조건을 정의한다.
 [상세 유사 영화](SIMILAR-MOVIES.md)는 API-031의 별도 콘텐츠 검색·공용 캐시·상세 탐색 계약이다.
@@ -25,7 +29,7 @@
 | Python Consumer | `pipeline/consumer/`는 현재 README만 있음 | 특징 생성·pool500 재정렬·발견10×10·비교adapter·원자적 게시·작업 재시도 |
 | Pipeline 설정 | `settings.py`는 읽기/검증 코드, `configs/`는 값 기록 | 서비스 v1 설정 파일과 독립 실행 단위별 validator. 기존 settings.py 이동 금지 |
 | Artifact 목록 | `pipeline/artifacts/`는 JSON 출처/해시 목록 | 모델/특징/군집/데이터/후보 manifest. LOCAL_ONLY와 서버배포가능 상태 구분 |
-| 공통 ADR | ADR0002/0015/0017 | GBT기본, 배치후보→최신500 재정렬,8×128 내부검색으로 승격할 차이 기록 |
+| legacy 공통 ADR | ADR0002/0015/0017 | 당시 GBT 기본안, 배치후보→최신500 재정렬,8×128 내부검색에서 현재 계약으로 바뀐 차이 기록 |
 
 팀 최신 ADR0017은 강한 입력마다 Python이 Candidate500까지 재생성한다. 이번 배치 후보 구조와 같다고
 표현하지 않는다. 기존3편UI를 유지하되, 20편버퍼·중간Top100·ALS전용score 의미는 이행 대상이다.
@@ -79,13 +83,15 @@ GBT/FM/ALS adapter는 MODELS의 공통 인터페이스와 같은 후보를 사�
 추가한 ALS+GBT·ALS+FM은 [별도 비교 registry](../../configs/service-v1/comparison-registry.v1.json)의 shadow 정책이다.
 단독 `modelKind`와 합성 `comparisonPolicyId`를 구분하고, 두 component의 모델/특징/보정
 버전·ALS 학습 count 출처를 [결합 비교 행](HYBRID-COMPARISONS.md)에 함께 기록한다.
-공개 rankingMode enum·기본 GBT 활성 포인터·DB/API 반환 계약은 이 확장으로 바꾸지 않는다.
+공개 rankingMode enum·승격된 모델의 활성 포인터·DB/API 반환 계약은 이 비교 확장으로 바꾸지 않는다.
 
 그룹별 목록은 적격 영화의 전체 순서를 보관한다. 사전에 Top10만 잘라 저장한 뒤 감상을 제외하는 방식은 쓰지 않는다.
 사용자 제외를 적용한 현재 목록에서 source별 rank를 다시 세고 처음10편을 선택한다.
 
 `T_VALID`, `K_VALID`처럼 실제로 읽은 값이 유효한지와 `T_CANDIDATE_PASS`, `K_CANDIDATE_PASS`는 별도다.
-추천 하한에 못 미치는 영화도 사용자 평가 이력 특징으로 사용할 수 있다. 선택한 최신 원본10편을 후보 하한으로 먼저 거르지 않는다.
+추천 하한에 못 미치는 영화도 사용자 평가 이력 특징으로 사용할 수 있다. legacy 비교는 선택한
+최신 원본10편을 후보 하한으로 먼저 거르지 않았고, 현재 0~N 경로는 목표시각 이전 전체 이력과
+모델별 실제 지원 수를 기록한다.
 KOBIS 미매칭·수집 실패·범위 불일치는 유효 관객 0과 다르다. 서비스 `movies.average_rating/rating_count`를 TMDB 필드로 덮어쓰지 않는다.
 
 ### KOBIS 원행에서 서비스 스냅샷까지
@@ -163,8 +169,9 @@ Redis 유실 뒤 옛 숫자 1을 재사용해서 과거 파티 캐시를 현재 
 ```
 
 배치 점수를 저장하더라도 디버깅값이며 최신 재정렬 점수로 사용하지 않는다. 후보는 최대 500개의 고유한 정상 service ID여야 한다.
-정기/targeted Producer 모두 K≥10·모델/이력 지원 조건이면 GBT, K<10이면 초기 콘텐츠/대중 정책으로
-전체 적격 카탈로그를 정렬해500편을 만든다. 콜드 사용자에게 GBT 후보 생성만 강제하지 않는다.
+정기/targeted Producer 모두 N=0이면 초기 콘텐츠/대중 정책, N≥1이며 승격 모델·이력이 지원되면
+해당 GBT 또는 FM으로 전체 적격 카탈로그를 정렬해500편을 만든다. 모델 미준비·미지원은 초기
+경로와 이유를 기록한다. 과거 K10 분기는 legacy 회귀 비교로만 유지한다.
 
 일별 일반 pool은 세션 노출을 영구 제외하지 않는다. `triggerReason=POOL_EXHAUSTED`인 targeted job만
 현재 session의 실제 노출·다른 활성 예약 스냅샷을 전체 카탈로그 검색에 적용해 다음500을 만든다.
@@ -370,7 +377,7 @@ JSON 직렬화 검증을 같은 변경에 포함한다. BigDecimal 4.49를 4.5�
 | --- | --- | --- | --- |
 | R-v1-OPS-01 실제별점보존 | API036/037/038 | ratings/RatingEventPayload·Backend | T-v1-01:0.5,4.5,5.0 DB→Outbox→JSON보존;4.49/5.5거부;DELETEscore생략 |
 | R-v1-OPS-02 배치500+최신재정렬 | API045/046 | pool/ranking·Batch/Consumer | T-v1-02:후보500전부현재특징으로점수화;101~500위영화가재정렬1위로승격가능;API내전체카탈로그추론없음 |
-| R-v1-OPS-03 콜드사용자 | 최초추천/강한입력 | sharedpool/USER_POOL_BUILD | T-v1-03:K0/9/10 임시경로;K<10 targeted가전체적격을초기콘텐츠/대중으로정렬하고GBT를강제하지않음;완료후새pool재정렬 |
+| R-v1-OPS-03 0~N사용자 | 최초추천/강한입력 | sharedpool/USER_POOL_BUILD | T-v1-03:N0은초기경로;N1/9/10/50+는승격모델지원여부로판정;모델미지원targeted는초기콘텐츠/대중으로정렬;전체/지원/절단이력수와새pool재정렬검증 |
 | R-v1-OPS-04 입력역전방지 | 평가/온보딩/감상/추천필터변경 | inputVersion/RECOMMENDATION_INPUT_CHANGED | T-v1-04:확정감상만추가삭제해도버전/그룹분자분모갱신;필터변경갱신;평점+파생감상한트랜잭션1회;관심없음/노출/클릭만은불변;늦은job게시거부 |
 | R-v1-OPS-05 발견10×10 | API045/046 | 그룹순위/discoveryTrace·Consumer | T-v1-05:0공급은skip,1편공급도1그룹;최대10그룹/그룹10편;11번째그룹/영화로보충안함 |
 | R-v1-OPS-06 대중근거하한 | 후보배치/이력특징 | sourcevalidity/eligibility | T-v1-06:TMDBvotes20/21,KOBIS9999/10000경계;양쪽fail후보제외;같은영화의실제이력/H선정은유지 |

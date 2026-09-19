@@ -9,3 +9,4 @@
 - [콘텐츠 산출물 계약](./content-artifacts.md): 315 콘텐츠 벡터의 오프라인 평가용 v1과 서빙용 v2, TMDb 정규화 스냅샷
 - [추천 내부 8×128 그룹 서빙 산출물](./group-serving-artifacts.md): 고정 분류 geometry, 영화 assignment, 안전 번들·HDFS 공개와 Consumer 시작 조건
 - [DISCOVERY 그룹 내부 대중성 산출물](./discovery-popularity-artifacts.md): TMDB 투표 수·KOBIS 관객 백분위 max 순위와 Consumer 적용 순서
+- [GBT·FM 0~N 학습·평가 계약](./zero-n-learning-evaluation.md): episode, 사용자·시점 분할, 특징 lineage, 후보 정답과 지표 분모
