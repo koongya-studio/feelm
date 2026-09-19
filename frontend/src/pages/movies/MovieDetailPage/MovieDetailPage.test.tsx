@@ -38,6 +38,11 @@ const { recordOttClick } = await import('../../../api/watch');
 
 vi.mock('../../../api/taste', () => ({ getPopcornFlavors: vi.fn() }));
 
+vi.mock('../../../api/recommendations', () => ({ dismissMovie: vi.fn() }));
+
+const { dismissMovie } = await import('../../../api/recommendations');
+const { ApiError } = await import('../../../api/apiError');
+
 const { getPopcornFlavors } = await import('../../../api/taste');
 
 /** 맛 기준정보(API-044). 실제 배포값 중 두 맛이다 */
@@ -673,5 +678,73 @@ describe('2.4 팝콘 맛', () => {
     expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
     await waitFor(() => expect(getPopcornFlavors).toHaveBeenCalled());
     expect(screen.queryByRole('button', { name: / 맛$/ })).toBeNull();
+  });
+});
+
+/*
+ * 2.4 관심없음(업무 S15P21E106-664, API-047). 상세 응답에 관심없음 여부가 없어 누르기 전에는
+ * 이미 처리된 영화인지 모른다. 그래서 `409 ALREADY_DISMISSED`는 처리된 상태로 보인다.
+ */
+describe('MovieDetailPage 관심없음', () => {
+  beforeEach(() => {
+    vi.mocked(dismissMovie).mockReset();
+  });
+
+  it('누르면 API-047을 부르고 처리된 상태로 바뀐다', async () => {
+    vi.mocked(dismissMovie).mockResolvedValue();
+
+    renderMovie();
+    fireEvent.click(await screen.findByRole('button', { name: '관심없음' }));
+
+    expect(await screen.findByText(/관심없음으로 처리했어요/)).toBeInTheDocument();
+    expect(dismissMovie).toHaveBeenCalledWith(101, undefined);
+    // 해제는 계약 미정이라 다시 누를 수 없다
+    expect(screen.getByRole('button', { name: '관심없음 처리됨' })).toBeDisabled();
+  });
+
+  it('추천에서 들어온 상세면 추천 항목 번호를 함께 보낸다', async () => {
+    vi.mocked(dismissMovie).mockResolvedValue();
+
+    renderWithRouter(
+      <AuthContext.Provider value={authValue('anonymous')}>
+        <MovieDetailPage />
+      </AuthContext.Provider>,
+      {
+        route: `${path.movieDetail(101)}?recommendationItemId=281`,
+        path: ROUTE_PATTERN.movieDetail,
+      },
+    );
+    fireEvent.click(await screen.findByRole('button', { name: '관심없음' }));
+
+    await waitFor(() => expect(dismissMovie).toHaveBeenCalledWith(101, 281));
+  });
+
+  it('이미 관심없음인 영화(409)는 실패가 아니라 처리된 상태로 보인다', async () => {
+    vi.mocked(dismissMovie).mockRejectedValue(
+      new ApiError(409, 'ALREADY_DISMISSED', '이미 관심없음으로 처리한 영화입니다.'),
+    );
+
+    renderMovie();
+    fireEvent.click(await screen.findByRole('button', { name: '관심없음' }));
+
+    expect(await screen.findByText(/관심없음으로 처리했어요/)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('실패하면 버튼을 그대로 두고 다시 누를 수 있다', async () => {
+    vi.mocked(dismissMovie)
+      .mockRejectedValueOnce(new ApiError(500, 'INTERNAL_ERROR', '서버 오류'))
+      .mockResolvedValueOnce();
+
+    renderMovie();
+    fireEvent.click(await screen.findByRole('button', { name: '관심없음' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('관심없음으로 처리하지 못했어요');
+    const button = screen.getByRole('button', { name: '관심없음' });
+    expect(button).toBeEnabled();
+
+    fireEvent.click(button);
+    expect(await screen.findByText(/관심없음으로 처리했어요/)).toBeInTheDocument();
+    expect(dismissMovie).toHaveBeenCalledTimes(2);
   });
 });
