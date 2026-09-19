@@ -654,15 +654,16 @@ export default function MyDashboardPage() {
           )}
 
           {/*
-           * 평가 탭. 누르면 7.6과 같은 곳(2.5 평가 수정)으로 간다. 별점은 API-039가
-           * 주는 값이라 포스터 위에 표식으로 얹는다. 키는 평가 번호다 — 프레임 번호는
-           * 과거 평가에서 `null`일 수 있다.
+           * 평가 탭. 누르면 2.4 영화 상세로 간다(업무 -638). 목록에서 영화를 고르면 상세가
+           * 열리는 것이 자연스럽고, 평가 수정은 2.4의 `내 별점 수정하기`로 이어진다 — 한때
+           * 2.5 평가 수정으로 바로 갔다(QA 2026-09-18). 별점은 API-039가 주는 값이라 포스터
+           * 위에 표식으로 얹는다. 키는 평가 번호다 — 프레임 번호는 과거 평가에서 `null`일 수 있다.
            */}
           {tab === 'ratings' && ratings.status === 'ready' && ratings.items.length > 0 && (
             <ul className={styles.grid}>
               {ratings.items.map((rating) => (
                 <li key={rating.ratingId}>
-                  <Link to={path.movieRating(rating.movie.movieId)} className={styles.cell}>
+                  <Link to={path.movieDetail(rating.movie.movieId)} className={styles.cell}>
                     <Poster
                       fluid
                       width={POSTER_RATIO.width}

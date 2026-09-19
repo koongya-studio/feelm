@@ -190,8 +190,8 @@ describe('7.1 MY 대시보드', () => {
     const cells = await within(feed()).findAllByRole('link');
 
     expect(cells).toHaveLength(2);
-    // 7.6과 같은 곳으로 간다 — 2.5 평가 수정이다
-    expect(cells[0]).toHaveAttribute('href', '/movies/401/rate');
+    // 2.4 영화 상세로 간다(업무 -638). 평가 수정은 2.4의 `내 별점 수정하기`로 이어진다
+    expect(cells[0]).toHaveAttribute('href', '/movies/401');
     expect(cells[0]).toHaveTextContent('평가한 영화 A');
     expect(cells[0]).toHaveTextContent('4.5');
     expect(cells[1]).toHaveTextContent('3.0');
@@ -384,7 +384,7 @@ describe('7.1 MY 대시보드', () => {
     const cells = await within(feed()).findAllByRole('link');
     expect(cells).toHaveLength(3);
     expect(cells[0]).toHaveTextContent('프레임 없는 평가');
-    expect(cells[0]).toHaveAttribute('href', '/movies/403/rate');
+    expect(cells[0]).toHaveAttribute('href', '/movies/403');
   });
 
   it('평가한 영화의 `더 보기`가 직전 커서로 다음 장을 이어 붙이고, 끝나면 사라진다', async () => {
