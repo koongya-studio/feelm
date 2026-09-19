@@ -39,6 +39,12 @@
  * 이유로 실측 증가량이 그보다 작게 읽혀도 그 아래로는 내려가지 않는다.
  *
  * `이번 주 +N`은 대응 필드가 없는 고정값이라 이 업무의 대상이 아니다(업무 -599 설명).
+ *
+ * **새 프레임은 내 필름의 기존 프레임에 이어 붙어 보인다**(업무 -633). 전에는 Router state의
+ * 포스터 한 장만 그려 방금 평가한 영화가 필름의 전부처럼 보였다. 2.6이 떠 있는 동안 내 필름
+ * (API-042)을 읽어 새 프레임 아래에 기존 프레임을 최신순으로 잇는다 — 3.1 릴이 최신 프레임을
+ * 맨 앞에 두는 순서와 같다. 목록은 이미 저장된 새 프레임을 포함하므로 그것과 그 뒤에 생긴
+ * 프레임(뒤로 가기로 다시 연 경우)은 뺀다. 읽지 못하면 새 프레임 한 장과 빈 칸으로 그린다.
  */
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
@@ -46,12 +52,12 @@ import Button from '../../../components/Button';
 import FilmReel from '../../../components/FilmReel';
 import Poster from '../../../components/Poster';
 import { HeartIcon, ResultBellIcon } from '../../../components/Icon';
-import { getPopcornFlavors } from '../../../api/taste';
+import { getMyFrames, getPopcornFlavors } from '../../../api/taste';
 import { getRatingCounts } from '../../../api/watch';
 import { path } from '../../../routes/paths';
 import styles from './RatingResultPage.module.css';
 import type { RatingCounts } from '../../../api/watch';
-import type { PopcornFlavor } from '../../../types/taste';
+import type { FrameSummary, PopcornFlavor } from '../../../types/taste';
 import type { Rating } from '../../../types/watch';
 
 /** 2.6 → 2.7 자동 전환 시간(ms). 와이어프레임에 값이 없어 임의로 정했다 */
@@ -64,6 +70,9 @@ const TRANSITION_MS = 1200;
  */
 const FRAME_WIDTH = 110;
 const FRAME_HEIGHT = 165;
+
+/** 새 프레임 아래에 잇는 기존 프레임 수. 화면에 보이는 것은 한두 칸이고 나머지는 잘린다 */
+const PREVIOUS_FRAME_LIMIT = 3;
 
 type ResultState = {
   rating: Rating;
@@ -82,6 +91,8 @@ export default function RatingResultPage() {
 
   const [elapsed, setElapsed] = useState(false);
   const [flavors, setFlavors] = useState<PopcornFlavor[]>([]);
+  /** 새 프레임 앞서 쌓인 내 필름 프레임. 읽기 전이거나 못 읽었으면 빈 배열이다 */
+  const [previousFrames, setPreviousFrames] = useState<FrameSummary[]>([]);
   const hasState = state !== null;
   const measured = state?.after !== undefined;
 
@@ -98,6 +109,38 @@ export default function RatingResultPage() {
       .then(setFlavors)
       .catch(() => undefined);
   }, []);
+
+  // 실측을 적으며 state가 다시 만들어져도 다시 읽지 않도록 값으로 의존한다
+  const newFrameId = state?.rating.frame.frameId;
+  const newFrameCreatedAt = state?.rating.frame.createdAt;
+
+  useEffect(() => {
+    if (newFrameId === undefined || newFrameCreatedAt === undefined) {
+      return;
+    }
+
+    let active = true;
+    const createdAt = Date.parse(newFrameCreatedAt);
+
+    // 기존 프레임은 보여 주기만 하므로 실패하면 새 프레임 한 장으로 그린다
+    getMyFrames()
+      .then((list) => {
+        if (active) {
+          setPreviousFrames(
+            list.items
+              .filter(
+                (frame) => frame.frameId !== newFrameId && Date.parse(frame.createdAt) <= createdAt,
+              )
+              .slice(0, PREVIOUS_FRAME_LIMIT),
+          );
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, [newFrameId, newFrameCreatedAt]);
 
   useEffect(() => {
     if (!state || measured) {
@@ -193,7 +236,22 @@ export default function RatingResultPage() {
               ) : null}
             </span>
 
-            <span className={styles.emptyFrame} aria-hidden="true" />
+            {previousFrames.length > 0 ? (
+              previousFrames.map((frame) => (
+                <span key={frame.frameId} className={styles.previousFrame}>
+                  <Poster
+                    width={FRAME_WIDTH}
+                    height={FRAME_HEIGHT}
+                    radius={0}
+                    src={frame.movie.posterUrl ?? undefined}
+                    title={frame.movie.title}
+                    seed={frame.movie.movieId}
+                  />
+                </span>
+              ))
+            ) : (
+              <span className={styles.emptyFrame} aria-hidden="true" />
+            )}
           </FilmReel>
         </div>
 
