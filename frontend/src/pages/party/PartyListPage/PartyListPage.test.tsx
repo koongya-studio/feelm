@@ -41,6 +41,15 @@ describe('5.1 파티 시작', () => {
     expect(screen.getByText('김난다 × 무비버디')).toBeInTheDocument();
   });
 
+  it('필름 · MY와 같은 공통 헤더로 검색 · 알림에 바로 간다 (업무 -676)', async () => {
+    renderWithRouter(<PartyListPage />, { route: '/party' });
+
+    expect(await screen.findByRole('link', { name: '검색' })).toHaveAttribute('href', '/search');
+    expect(screen.getByRole('link', { name: /^알림/ })).toHaveAttribute('href', '/notifications');
+    // 화면 제목은 여전히 하나다
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+  });
+
   it('파티방을 고르면 5.8 파티원 팝콘으로 간다', async () => {
     renderWithRouter(<PartyListPage />, { route: '/party' });
     await screen.findByText('금요 심야 상영회');

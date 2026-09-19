@@ -443,6 +443,9 @@ describe('7.1 MY 대시보드', () => {
     await renderDashboard();
 
     expect(screen.getByRole('heading', { name: '프로필', level: 1 })).toBeInTheDocument();
+    // 필름 · 파티와 같은 공통 헤더로 검색 · 알림에 바로 간다(업무 -676)
+    expect(screen.getByRole('link', { name: '검색' })).toHaveAttribute('href', '/search');
+    expect(screen.getByRole('link', { name: /^알림/ })).toHaveAttribute('href', '/notifications');
     expect(screen.getByRole('heading', { name: mockMyProfileView.nickname })).toBeInTheDocument();
     expect(screen.getByText(mockMyProfileView.bio)).toBeInTheDocument();
 

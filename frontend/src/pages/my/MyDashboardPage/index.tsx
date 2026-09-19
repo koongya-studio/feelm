@@ -11,7 +11,7 @@
  *
  * | 자리 | 무엇 |
  * | --- | --- |
- * | 헤더 | `프로필` · 오른쪽 `설정` 아이콘 |
+ * | 헤더 | 공통 헤더(워드마크 · 검색 · 알림, 업무 -676) · 그 아래 `프로필` · 오른쪽 `설정` 아이콘 |
  * | 상단 | 동그란 프로필 사진 + 닉네임 + 소개 |
  * | 버튼 둘 | `프로필 편집`(→ 7.2) · `프로필 공유` |
  * | 수치 | 프레임 · 팝콘 · 공개 한줄평 |
@@ -71,6 +71,7 @@ import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import Button from '../../../components/Button';
 import PopcornBucket from '../../../components/PopcornBucket';
+import AppHeader from '../../../components/AppHeader';
 import ProfileLayout, { ProfileSkeleton } from '../../../components/ProfileLayout';
 import { kernelCounts } from '../../../components/PopcornBucket/kernels';
 import Poster from '../../../components/Poster';
@@ -405,7 +406,8 @@ export default function MyDashboardPage() {
   if (failed) {
     return (
       <>
-        <ScreenHeader title="프로필" />
+        <AppHeader />
+        <ScreenHeader title="프로필" flush />
 
         <StatusView title="프로필을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
           <Button
@@ -424,7 +426,8 @@ export default function MyDashboardPage() {
   if (!profile) {
     return (
       <>
-        <ScreenHeader title="프로필" />
+        <AppHeader />
+        <ScreenHeader title="프로필" flush />
         <div className={styles.page}>
           <ProfileSkeleton />
         </div>
@@ -531,9 +534,13 @@ export default function MyDashboardPage() {
        * **`OTT 관리`는 7.8 설정 안으로 옮겼다**(사용자 지시 2026-09-16). 이 화면에서
        * 6.1로 가는 길은 없어졌고 설정 > 계정 > OTT 관리가 유일한 입구다.
        *
-       * 화면 제목은 `프로필`이다(사용자 시안 2026-09-18, 업무 -616).
+       * 화면 제목은 `프로필`이다(사용자 시안 2026-09-18, 업무 -616). 그 위에 필름 · 파티와 같은
+       * 공통 헤더(워드마크 · 검색 · 알림)가 선다(업무 -676) — 제목 줄은 헤더 아래로 내려와
+       * 위 여백 없이 붙는다(`flush`).
        */}
+      <AppHeader />
       <ScreenHeader
+        flush
         title="프로필"
         action={
           <Link to={path.settings()} className={styles.headerLink}>

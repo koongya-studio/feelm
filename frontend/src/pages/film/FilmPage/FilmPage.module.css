@@ -19,49 +19,6 @@
   padding: var(--space-2) 0 var(--space-4);
 }
 
-/* 검색과 알림이 나란히 선다. 둘 다 44px 터치 영역이라 사이를 좁게 둔다 */
-.headerActions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.headerAction {
-  position: relative;
-  display: flex;
-  width: var(--tap-target-min);
-  height: var(--tap-target-min);
-  align-items: center;
-  justify-content: center;
-  color: var(--color-ink);
-  text-decoration: none;
-}
-
-.headerAction::before {
-  position: absolute;
-  width: 39px;
-  height: 39px;
-  border: 0.5px solid var(--color-glass-line);
-  border-radius: var(--radius-pill);
-  background: var(--color-glass);
-  content: '';
-}
-
-.headerAction > * {
-  position: relative;
-}
-
-.notificationDot {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 8px;
-  height: 8px;
-  border: 1.5px solid var(--color-bg);
-  border-radius: 50%;
-  background: var(--color-brand);
-}
-
 /* ─────────────────────────── 제목 */
 
 .head {
