@@ -1,0 +1,294 @@
+{
+  "schema_version": 1,
+  "jira": "S15P21E106-621",
+  "checked_at": "2026-09-19T11:33:14+09:00",
+  "overall_status": "GO_LOCAL_EXPERIMENT",
+  "team_contract": {
+    "repository": "S15P21E106",
+    "develop_revision": "bec8dc4813fd5853f53d32d9b5cec6ae35cab9f3",
+    "zero_n_contract_path": "pipeline/contracts/zero-n-learning-evaluation.md",
+    "zero_n_contract_sha256": "974b03945a86c5db93605a52f57d32755213a492288a1fbd4abda3652678f5ba",
+    "status": "GO",
+    "evidence": "S15P21E106-620 is merged into origin/develop"
+  },
+  "research_code": {
+    "repository": "https://github.com/itcksgud/FEELM.git",
+    "branch": "main",
+    "revision": "fd638b5552d8908415e285b64489c5de4eff4c63",
+    "artifact_baseline_revision": "e81e84ee3a115af3ab54515a3b6762ecb81a6766",
+    "artifact_baseline_is_ancestor": true,
+    "status": "GO"
+  },
+  "data": [
+    {
+      "id": "movielens-32m-archive",
+      "location_template": "${MOVIELENS_ROOT}/ml-32m.zip",
+      "availability": "LOCAL_ONLY",
+      "status": "GO_SOURCE",
+      "bytes": 238950008,
+      "sha256": "e4a68655d7386b8f95f2f2424b2ff975dfdd15ffd59e0d864a14dca43e99d6ee",
+      "ratings_rows": 32000204,
+      "movies_rows": 87585,
+      "links_rows": 87585,
+      "tags_rows": 2000072,
+      "rating_time_utc": "1995-01-09T11:46:44Z..2023-10-13T02:29:07Z",
+      "ratings_schema": "userId:int64,movieId:int64,rating:double,timestamp:int64",
+      "license_gate": "RESEARCH_ONLY_WITH_ATTRIBUTION; COMMERCIAL_USE_REQUIRES_GROUPLENS_PERMISSION",
+      "persona_limit": "All included users rated at least 20 movies; this is weak offline evidence for FEELM low-history users"
+    },
+    {
+      "id": "legacy-text339-catalog",
+      "location_template": "${FEELM_DATA_ROOT}/outputs/recommendation-evidence/text339/catalog.parquet",
+      "availability": "LOCAL_ONLY",
+      "status": "GO_LEGACY_ONLY",
+      "bytes": 728100,
+      "sha256": "0bde668e0e26f5f82b5c41d90d62c7569fd350bf2a2fd4b59bb4402f438c5947",
+      "rows": 85517,
+      "schema": "movie_id:int64,blocked:bool,released_at_origin:bool,train_count:int64,reference_count:int64,support:string",
+      "use": "Legacy catalog and support reference; not a new 0-N training input"
+    },
+    {
+      "id": "tmdb-vnext-training-snapshot",
+      "availability": "FROZEN_EXISTING_ONLY",
+      "status": "GO_EXISTING_SNAPSHOT",
+      "legacy_input_manifest": "${FEELM_DATA_ROOT}/outputs/recommendation-evidence/presentation-data-20260913/tmdb-input-manifest.json",
+      "legacy_manifest_status": "PREPARED_NOT_COLLECTED",
+      "planned_unique_tmdb_ids": 239028,
+      "decision": "Do not collect additional TMDB data for this experiment series; use only already-present frozen fields and report missing coverage"
+    },
+    {
+      "id": "legacy-rec047-evaluation",
+      "location_template": "${FEELM_DATA_ROOT}/outputs/recommendation-evidence/rec-ev-047/evaluation",
+      "availability": "LOCAL_ONLY",
+      "status": "GO_LEGACY_DIAGNOSTIC_ONLY",
+      "episodes_rows": 74369,
+      "episodes_sha256": "e8e5334f270de418c681562ab72e827e6303a9c948be8b2123f39f5ad355ec3e",
+      "train_rows": 6261195,
+      "train_sha256": "d1be8718e431be729af718b104e0ba814e45437dbe6ef6a3ee6231e08234ba4f",
+      "warning": "K=0 rows are about 82.3 percent; do not reuse as the new experiment population"
+    },
+    {
+      "id": "kobis-direct-code-rollup",
+      "manifest": "KOBIS-HANDOFF.json",
+      "availability": "TRANSFER_KIT_LOCAL_ONLY",
+      "status": "GO_SOURCE",
+      "rows": 2176,
+      "unique_kobis_movie_codes": 2176,
+      "files": 6,
+      "total_bytes": 1262885,
+      "hash_failures": 0,
+      "service_crosswalk_confirmed_rows": 0,
+      "offline_experiment_use": "GO_WEAK_FEATURE_AND_ABLATION",
+      "unmatched_policy": "MISSING_BUCKET",
+      "service_activation": "DEFERRED_UNTIL_VERIFIED_CROSSWALK"
+    },
+    {
+      "id": "service-kobis-crosswalk",
+      "availability": "NOT_BUILT",
+      "status": "NOT_REQUIRED_FOR_LOCAL_OFFLINE_EXPERIMENT",
+      "required_keys": "service_movie_id<->tmdb_id<->kobis_movie_code",
+      "follow_up": "Required before service activation or Discovery integration; unmatched KOBIS rows remain missing in local experiments"
+    },
+    {
+      "id": "new-zero-n-split-episodes-candidates",
+      "availability": "LOCAL_RUN_ONLY",
+      "status": "GO_SAMPLE_WITH_DISTRIBUTION_SHIFT",
+      "run_id": "ml32m-zero-n-readiness-v1",
+      "transfer_path": "data/zero-n-readiness/ml32m-zero-n-readiness-v1",
+      "seed": 621,
+      "users": {
+        "TRAIN": 200,
+        "VALIDATION": 200,
+        "FINAL_TEST": 200
+      },
+      "episode_rows": 4773,
+      "episode_sha256": "2f918fb6d813c65256ac62149948f3ed81aa7f7ce8bb939682b017d60c70f545",
+      "candidate_rows": 60000,
+      "candidate_sha256": "fd7a6ddf4501a2289ada2d72fec8c129d72267c9e9da71553c59b5d8bf2670f3",
+      "distribution_report_sha256": "c2cbeda4c8698c3422f9703f993e7f743e1d86671b7ce1c251ef5f9f4e256946",
+      "contract_verification": "PASS",
+      "distribution_status": "DISTRIBUTION_SHIFT",
+      "insufficient_role_n_cells": 0
+    },
+    {
+      "id": "service-v1-legacy-artifacts",
+      "manifest": "pipeline/artifacts/service-v1.json",
+      "manifest_sha256": "1a9ba0cd0101f6d065227c37ee642a3fc75c2c69b34c0da8fa6dacff351c2343",
+      "artifact_files": 48,
+      "availability": "LOCAL_ONLY",
+      "status": "GO_LEGACY_ONLY",
+      "snapshot_verification": "PASS: published=119,source=104,external=48 at E106 revision 8889887",
+      "current_develop_verification": "BLOCKED: config.v1.json publication hash mismatch"
+    },
+    {
+      "id": "new-zero-n-split-episodes-candidates-10pct",
+      "availability": "LOCAL_RUN_ONLY",
+      "status": "GO_WITH_DISTRIBUTION_SHIFT",
+      "run_id": "ml32m-zero-n-readiness-10pct-v2",
+      "seed": 621,
+      "users": {
+        "TRAIN": 15000,
+        "VALIDATION": 3000,
+        "FINAL_TEST": 2000
+      },
+      "episode_rows": 161057,
+      "episode_sha256": "58d0d3f81d324823704b11523e89ade5bddbe9c86a84085f2b9ba5c6a38e826f",
+      "candidate_rows": 2000000,
+      "candidate_sha256": "d1fa052649a8bca9132a3ddd52b544626bfdd807106a398eb8d0f2220a808cae",
+      "distribution_report_sha256": "1a2c8c2872cea9b3972edce5f9bb2f7e560ee0611081817fbece4b653398b7c9",
+      "contract_verification": "PASS",
+      "distribution_status": "DISTRIBUTION_SHIFT",
+      "insufficient_role_n_cells": 0
+    }
+  ],
+  "distribution_gate": {
+    "status": "DISTRIBUTION_SHIFT",
+    "shared_sample_required": true,
+    "n_buckets": [
+      "0",
+      "1",
+      "2",
+      "3-4",
+      "5-9",
+      "10-19",
+      "20-29",
+      "30-49",
+      "50+"
+    ],
+    "target_train_support_buckets": [
+      "0",
+      "1-9",
+      "10-49",
+      "50+"
+    ],
+    "numeric_metrics": [
+      "TRAIN_FIXED_BIN_SHARE",
+      "QUANTILES",
+      "PSI"
+    ],
+    "categorical_metrics": [
+      "SHARE",
+      "MAX_PERCENTAGE_POINT_DIFFERENCE",
+      "JENSEN_SHANNON_DISTANCE_BASE2"
+    ],
+    "preregistered_warning_thresholds": {
+      "psi": 0.1,
+      "max_percentage_point_difference": 0.05,
+      "jensen_shannon_distance_base2": 0.1,
+      "minimum_users_per_required_role_n_cell": 100
+    },
+    "blocking_rules": [
+      "construction rule or digest mismatch",
+      "required role or N cell below minimum sample",
+      "target leakage or post-prediction event in history",
+      "FINAL_TEST used to tune bins, samples, weights or thresholds"
+    ],
+    "shift_rule": "Natural temporal drift above a warning threshold is DISTRIBUTION_SHIFT and is reported separately; it is not silently resampled away"
+  },
+  "devices": {
+    "desktop": {
+      "status": "GO_LOCAL_EXPERIMENT",
+      "os": "Windows 11 Home 10.0.26200",
+      "cpu": "AMD Ryzen 5 7500F",
+      "physical_cores": 6,
+      "logical_processors": 12,
+      "ram_bytes": 34359738368,
+      "gpu": "NVIDIA GeForce RTX 4060 Ti",
+      "vram_mib": 8188,
+      "nvidia_driver": "595.79",
+      "disk_free_bytes": 111287984128,
+      "runtime": {
+        "git": "2.47.1.windows.1",
+        "python": "3.12.10",
+        "java": "21.0.12.1",
+        "docker_client": "27.5.1",
+        "docker_server": "27.5.1"
+      },
+      "resource_gate": {
+        "run_id": "ml32m-zero-n-readiness-10pct-v2",
+        "population_fraction_of_200948_users": 0.09952823616059876,
+        "users": {
+          "TRAIN": 15000,
+          "VALIDATION": 3000,
+          "FINAL_TEST": 2000
+        },
+        "wall_time_seconds": 125.471,
+        "peak_working_set_bytes": 2174685184,
+        "output_bytes": 388727592,
+        "observed_disk_delta_bytes": 432422912,
+        "contract_verification": "PASS",
+        "distribution_status": "DISTRIBUTION_SHIFT",
+        "status": "PASS"
+      }
+    },
+    "laptop": {
+      "status": "GO_LOCAL_FROM_PROVIDED_HARDWARE",
+      "provided_hardware": "Intel Core Ultra 9 185H; about 64 GiB RAM; NVIDIA RTX 4070 Laptop",
+      "basis": "Provided Core Ultra 9 185H, about 64 GiB RAM and RTX 4070 Laptop exceed the measured desktop readiness workload",
+      "first_run_record": "Record free disk, Git/Python/Java/Docker/NVIDIA runtime and observed resource usage; this is not a pre-start blocker"
+    }
+  },
+  "infrastructure": {
+    "server": {
+      "status": "NOT_REQUIRED_FOR_LOCAL_TRAINING",
+      "checked_from_this_pc": false,
+      "reason": "No SSH config or e106 alias is present",
+      "follow_up": "Recheck before publishing or activating the selected model in the service environment"
+    },
+    "hdfs_spark": {
+      "status": "NOT_REQUIRED_FOR_LOCAL_TRAINING",
+      "checked_from_this_pc": false,
+      "last_historical_evidence_date": "2026-09-11",
+      "required_current_evidence": [
+        "Worker2 ALIVE",
+        "DataNode2 live",
+        "replication=2",
+        "safe mode off",
+        "capacity",
+        "approved-path permissions and FSCK"
+      ],
+      "follow_up": "Recheck before publishing or activating the selected model in the service environment"
+    }
+  },
+  "transfer_kit": {
+    "payload_file_count_excluding_manifest_and_checksum": 20,
+    "payload_bytes_excluding_manifest_and_checksum": 267633473,
+    "sha256_entries": 21,
+    "sha256_failures": 0,
+    "bundle_verified": true,
+    "movielens_archive_included": "data/movielens/ml-32m.zip"
+  },
+  "blocking_items": [],
+  "deferred_follow_up": [
+    "Build and verify service_movie_id<->tmdb_id<->kobis_movie_code mapping before service activation or Discovery integration",
+    "Run current server/HDFS read-only checks before publishing or activating the selected model"
+  ],
+  "resource_measurement_attempts": [
+    {
+      "run_id": "ml32m-zero-n-readiness-10pct-v1",
+      "status": "REJECTED_INPUT_POPULATION",
+      "requested_users": {
+        "TRAIN": 14000,
+        "VALIDATION": 3000,
+        "FINAL_TEST": 3000
+      },
+      "eligible_final_test_users": 2080,
+      "wall_time_seconds": 105.393,
+      "peak_working_set_bytes": 1572667392,
+      "reason": "FINAL_TEST temporal window did not have 3000 eligible positive-target users; no output was reused"
+    },
+    {
+      "run_id": "ml32m-zero-n-readiness-10pct-v2",
+      "status": "PASS",
+      "requested_users": {
+        "TRAIN": 15000,
+        "VALIDATION": 3000,
+        "FINAL_TEST": 2000
+      },
+      "wall_time_seconds": 125.471,
+      "peak_working_set_bytes": 2174685184,
+      "output_bytes": 388727592,
+      "observed_disk_delta_bytes": 432422912
+    }
+  ]
+}
