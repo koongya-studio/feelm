@@ -45,11 +45,6 @@
   display: flex;
   overflow-x: auto;
   gap: var(--space-3);
-  scrollbar-width: none;
-}
-
-.movies::-webkit-scrollbar {
-  display: none;
 }
 
 .movie {

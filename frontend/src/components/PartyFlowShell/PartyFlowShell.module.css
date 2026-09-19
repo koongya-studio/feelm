@@ -28,11 +28,6 @@
   gap: var(--space-3);
   list-style: none;
   overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.memberList::-webkit-scrollbar {
-  display: none;
 }
 
 .member {
