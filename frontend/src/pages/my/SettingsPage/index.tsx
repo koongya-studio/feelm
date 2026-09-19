@@ -30,8 +30,10 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import ActionList from '../../../components/ActionList';
+import ConfirmDialog from '../../../components/ConfirmDialog';
 import ScreenHeader from '../../../components/ScreenHeader';
 import { useAuth } from '../../../contexts/authContext';
+import { usePwaInstall } from '../../../pwa/installContext';
 import { path } from '../../../routes/paths';
 import styles from './SettingsPage.module.css';
 
@@ -41,7 +43,9 @@ const APP_VERSION = 'v 1.0.0';
 export default function SettingsPage() {
   const navigate = useNavigate();
   const { signOut } = useAuth();
+  const { availability: installAvailability, install } = usePwaInstall();
   const [signingOut, setSigningOut] = useState(false);
+  const [showIosInstallGuide, setShowIosInstallGuide] = useState(false);
 
   async function handleSignOut() {
     if (signingOut) return;
@@ -54,6 +58,15 @@ export default function SettingsPage() {
     } finally {
       void navigate(path.login(), { replace: true });
     }
+  }
+
+  function handleInstall() {
+    if (installAvailability === 'ios') {
+      setShowIosInstallGuide(true);
+      return;
+    }
+
+    void install();
   }
 
   return (
@@ -102,6 +115,9 @@ export default function SettingsPage() {
         <ActionList
           label="기타"
           items={[
+            ...(installAvailability === 'prompt' || installAvailability === 'ios'
+              ? [{ label: 'Feelm 앱 설치', onClick: handleInstall }]
+              : []),
             { label: '차단 사용자 관리', to: path.blockedUsers() },
             { label: '버전 정보', value: APP_VERSION },
             { label: '로그아웃', onClick: () => void handleSignOut() },
@@ -112,6 +128,23 @@ export default function SettingsPage() {
           회원 탈퇴
         </Link>
       </div>
+
+      {showIosInstallGuide ? (
+        <ConfirmDialog
+          title="Feelm을 홈 화면에 추가해 주세요"
+          description={
+            <ol className={styles.installSteps}>
+              <li>Safari 아래쪽의 공유 버튼을 눌러요.</li>
+              <li>메뉴에서 ‘홈 화면에 추가’를 선택해요.</li>
+              <li>오른쪽 위의 ‘추가’를 누르면 앱처럼 열 수 있어요.</li>
+            </ol>
+          }
+          confirmLabel="확인"
+          cancelLabel="나중에"
+          onConfirm={() => setShowIosInstallGuide(false)}
+          onCancel={() => setShowIosInstallGuide(false)}
+        />
+      ) : null}
     </>
   );
 }

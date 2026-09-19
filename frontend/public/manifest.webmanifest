@@ -2,6 +2,7 @@
   "name": "Feelm",
   "short_name": "Feelm",
   "description": "영화 취향을 필름과 팝콘으로 쌓아 가는 서비스",
+  "id": ".",
   "lang": "ko",
   "start_url": ".",
   "scope": ".",
