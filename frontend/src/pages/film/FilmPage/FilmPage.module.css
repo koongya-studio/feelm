@@ -60,12 +60,38 @@
   gap: var(--space-2);
 }
 
+/*
+ * 필름 아래 한 줄. 왼쪽이 지금 위치(`3 / 24`), 오른쪽이 넘기는 방향이다(업무 -680).
+ * 화살표가 오른쪽 끝에 서야 넘길 방향과 같은 쪽을 가리킨다.
+ */
 .reelHint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0;
   padding: 0 var(--screen-padding-x);
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
   color: var(--color-ink-hint);
-  text-align: center;
+}
+
+/* 넘길 때 숫자 폭이 흔들리지 않게 고정폭 숫자를 쓴다 */
+.reelCounter {
+  color: var(--color-ink-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.reelSwipe {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+.reelSwipe svg {
+  width: 6px;
+  height: 10px;
 }
 
 /* 프레임 버튼. 크기와 테두리는 릴이 입힌다 */

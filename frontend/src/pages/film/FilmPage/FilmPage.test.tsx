@@ -324,3 +324,64 @@ describe('FilmPage 자동으로 이어 받기', () => {
     await waitFor(() => expect(frameCount()).toBe(40));
   });
 });
+
+/*
+ * 지금 위치와 넘기는 방향(업무 S15P21E106-680). 리포트 P1-02가 짚은 것은 가로로 넘긴다는 것과
+ * 몇 번째까지 왔는지가 보이지 않는다는 점이었다. jsdom은 레이아웃이 없어 칸 위치를 직접 준다 —
+ * 375px 셸의 릴 안쪽 351px, 칸 110px, 간격 4px, 왼쪽 여백 12px.
+ */
+describe('FilmPage 필름 위치', () => {
+  beforeEach(() => {
+    vi.mocked(getPopcornBucket).mockResolvedValue(bucket);
+  });
+
+  function layOut(track: HTMLElement) {
+    Object.defineProperty(track, 'clientWidth', { configurable: true, value: 351 });
+    [...track.children].forEach((child, index) => {
+      Object.defineProperty(child, 'offsetLeft', { configurable: true, value: 12 + index * 114 });
+      Object.defineProperty(child, 'offsetWidth', { configurable: true, value: 110 });
+    });
+  }
+
+  it('온전히 보이는 마지막 칸을 `N / 전체`로 적고, 끝까지 넘기면 화살표 힌트를 거둔다', async () => {
+    vi.mocked(getMyFrames).mockResolvedValue(frameList(5));
+
+    renderWithRouter(<FilmPage />);
+
+    const track = await screen.findByRole('group', { name: '취향 필름 프레임' });
+    layOut(track);
+
+    // 처음에는 세 칸이 온전히 보인다. 넷째 칸은 잘려 있다
+    track.scrollLeft = 0;
+    fireEvent.scroll(track);
+    await waitFor(() => expect(screen.getByText('3 / 5')).toBeInTheDocument());
+    expect(screen.getByText('전체 5개 중 3번째 프레임까지 보고 있어요')).toBeInTheDocument();
+    expect(screen.getByText('옆으로 넘겨보세요')).toBeInTheDocument();
+
+    // 끝까지 넘기면 다 본 것이다. 더 넘길 곳이 없으므로 오른쪽을 가리키지 않는다
+    track.scrollLeft = 243;
+    fireEvent.scroll(track);
+    await waitFor(() => expect(screen.getByText('5 / 5')).toBeInTheDocument());
+    expect(screen.queryByText('옆으로 넘겨보세요')).toBeNull();
+  });
+
+  it('분모는 받아 온 칸 수가 아니라 전체 프레임 수다', async () => {
+    // 첫 장 20개만 받았어도 73개 중 어디인지를 말한다
+    vi.mocked(getMyFrames).mockResolvedValue(frameList(73, 20, { nextCursor: 'c20' }));
+
+    renderWithRouter(<FilmPage />);
+
+    expect(await screen.findByText('1 / 73')).toBeInTheDocument();
+    expect(screen.getByText('옆으로 넘겨보세요')).toBeInTheDocument();
+  });
+
+  it('프레임이 한 개면 넘길 것이 없으므로 위치도 힌트도 적지 않는다', async () => {
+    vi.mocked(getMyFrames).mockResolvedValue(frameList(1));
+
+    renderWithRouter(<FilmPage />);
+
+    expect(await screen.findByRole('button', { name: '영화 1 상세 보기' })).toBeInTheDocument();
+    expect(screen.queryByText(/ \/ 1$/)).toBeNull();
+    expect(screen.queryByText('옆으로 넘겨보세요')).toBeNull();
+  });
+});
