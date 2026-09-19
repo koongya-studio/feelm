@@ -1261,8 +1261,8 @@ docker logs --tail 100 feelm-foldin-consumer
 오류가 반복되지 않는 상태다. `content artifacts not configured; publishing ALS-only candidates`가
 기록되면 `CONSUMER_CONTENT_URI`가 컨테이너에 전달되지 않은 ALS 전용 배포다.
 그룹 기반 DISCOVERY 활성화 시에는 `group and Discovery popularity artifacts loaded`가 기록되어야
-한다. `group artifacts not configured; Discovery uses ranked-candidate fallback`이 기록되면 두
-DISCOVERY URI가 컨테이너에 전달되지 않았거나 의도적으로 비활성화된 상태다. 실제
+한다. `group artifacts not configured; Discovery remains empty`가 기록되면 두 DISCOVERY URI가
+컨테이너에 전달되지 않았거나 의도적으로 비활성화돼 발견 후보를 게시하지 않는 상태다. 실제
 검증은 백엔드의 평가 또는 온보딩 흐름으로 `feelm.rating.v1` 이벤트를 발행한 뒤 Consumer
 로그의 처리 완료와 Redis의 해당 사용자 `candidate-version`, `vector`, `candidates` 세 키
 갱신을 확인한다. 이벤트 payload, DSN, Redis URL과 비밀번호를 검증 기록에 남기지 않는다.
@@ -1355,6 +1355,13 @@ COMPOSE_ENV_FILE=/path/to/approved/infra.env \
 배포 후에는 Pipeline 결과와 함께 Kafka Group의 파티션 할당, 실제 평가·온보딩 이벤트 처리 및
 Redis `candidate-version`, `vector`, `candidates` 갱신을 확인한다. 자동 배포 검증은 후보 계산의
 내용 정확도나 기존 사용자 전체 재게시를 대신하지 않는다.
+
+S15P21E106-415 재개선의 DISCOVERY 정책 전환은 Candidate JSON schema를 바꾸지 않아
+`candidateVersion=6`을 유지하지만 Redis 키에 TTL이 없으므로 Consumer 교체만으로 완료되지 않는다.
+새 Consumer 배포 뒤 §5.4의 전체 사용자 추천 재구축을 실행하고, 활성 사용자 후보가 새
+`generationId`로 재게시되며 새 payload에 `DISCOVERY_PERSONAL_SCORE` 보충 항목이 남지 않는지 확인한
+후 정책 전환을 완료한다. 롤백할 때도 이전 Consumer 이미지를 복구한 뒤 같은 전체 재구축으로 모든
+활성 후보를 이전 정책으로 다시 게시한다. 전체 재구축 전에는 신·구 정책 후보가 혼재한 상태다.
 
 승인된 테스트 사용자는 Fold-in 계산에 충분한 유효 입력을 보유해야 한다. 이벤트 전 현재
 버전을 확인하고 그 숫자를 기록한 뒤, 백엔드의 정상 평가 생성·수정 흐름으로 이벤트를 한 건

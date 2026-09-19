@@ -82,8 +82,8 @@ def frozen_clock(monkeypatch):
     monkeypatch.setattr(results_module, "utc_now", lambda: "2026-09-15T00:00:00Z")
 
 
-def test_als_only_preserves_legacy_taste_scores_and_fills_discovery(frozen_clock) -> None:
-    """Without content, TASTE scores stay unchanged and Discovery is still filled."""
+def test_als_only_preserves_legacy_taste_scores_without_group_discovery(frozen_clock) -> None:
+    """Without group artifacts, TASTE stays unchanged and Discovery stays empty."""
     ratings = [ProfileInput(10, 5.0, "rating")]
 
     actual = calculate_user_results(_bundle(), ratings, [], 7)
@@ -94,19 +94,7 @@ def test_als_only_preserves_legacy_taste_scores_and_fills_discovery(frozen_clock
         key: value for key, value in legacy[0].items() if key != "generationId"
     }
     assert actual[1]["taste"] == legacy[1]["taste"]
-    assert actual[1]["discovery"] == [
-        {
-            "movieId": 20,
-            "score": 0.0,
-            "reasons": [
-                {
-                    "code": "DISCOVERY_PERSONAL_SCORE",
-                    "sourceMovieIds": [10],
-                    "matchedGenreCodes": ["DRAMA"],
-                }
-            ],
-        }
-    ]
+    assert actual[1]["discovery"] == []
 
 
 def test_content_only_movies_become_candidates(frozen_clock) -> None:
@@ -321,36 +309,6 @@ def test_group_enabled_service_emits_discovery_without_changing_taste(frozen_clo
     ]
 
 
-def test_discovery_fill_preserves_group_results_and_prefers_non_taste_candidates() -> None:
-    population = [RankedMovie(movie_id, float(300 - movie_id)) for movie_id in range(1, 251)]
-
-    discovery = service_module._fill_discovery_candidates(
-        [RankedMovie(105, 999.0)],
-        population,
-        taste_movie_ids=set(range(1, 101)),
-        excluded_movie_ids={101},
-    )
-
-    assert len(discovery) == 100
-    assert discovery[0].movie_id == 105
-    assert len({candidate.movie_id for candidate in discovery}) == 100
-    assert 101 not in {candidate.movie_id for candidate in discovery}
-    assert all(candidate.movie_id > 100 for candidate in discovery)
-
-
-def test_discovery_fill_allows_taste_overlap_only_after_non_taste_candidates() -> None:
-    population = [RankedMovie(movie_id, float(120 - movie_id)) for movie_id in range(1, 121)]
-
-    discovery = service_module._fill_discovery_candidates(
-        [],
-        population,
-        taste_movie_ids=set(range(1, 101)),
-        excluded_movie_ids=set(),
-    )
-
-    assert [candidate.movie_id for candidate in discovery] == [*range(101, 121), *range(1, 81)]
-
-
 def test_fold_in_failure_with_inputs_is_raised_not_skipped() -> None:
     """A singular solve is a computation failure, not a user without signal."""
     bundle = ArtifactBundle(
@@ -398,9 +356,7 @@ def test_no_history_tie_fallback_is_capped_at_500_by_movie_id(frozen_clock) -> N
     assert [(item["movieId"], item["score"]) for item in results[1]["taste"]] == [
         (movie_id, 0.0) for movie_id in range(100, 600)
     ]
-    assert [(item["movieId"], item["score"]) for item in results[1]["discovery"]] == [
-        (movie_id, 0.0) for movie_id in range(600, 700)
-    ]
+    assert results[1]["discovery"] == []
 
 
 def test_als_only_mode_without_input_publishes_tied_factor_population(frozen_clock) -> None:

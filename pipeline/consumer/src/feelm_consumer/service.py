@@ -13,11 +13,10 @@ from feelm_consumer.hybrid import build_profile, percentile_scores, score_candid
 from feelm_consumer.profile import ProfileInput, fold_in, merge_inputs
 from feelm_consumer.ranking import RankedMovie, rank_candidates
 from feelm_consumer.results import build_results
-from feelm_consumer.xai import build_candidate_reasons, build_personal_discovery_reasons
+from feelm_consumer.xai import build_candidate_reasons
 
 LOG = logging.getLogger(__name__)
 CANDIDATE_LIMIT = 500
-DISCOVERY_LIMIT = 100
 
 
 def calculate_user_results(
@@ -207,32 +206,6 @@ def _build_ranked_results(
             selection.mapped_viewed_count,
             selection.direction_source,
         )
-    group_selected_count = len(discovery)
-    discovery = _fill_discovery_candidates(
-        discovery,
-        ranked_population,
-        taste_movie_ids={candidate.movie_id for candidate in taste},
-        excluded_movie_ids={entry.movie_id for entry in merged_inputs}
-        | set(watched_movie_ids)
-        | set(dismissed_movie_ids),
-    )
-    fallback_candidates = [
-        candidate for candidate in discovery if candidate.movie_id not in discovery_reasons
-    ]
-    discovery_reasons.update(
-        build_personal_discovery_reasons(
-            fallback_candidates,
-            explanation_inputs,
-            bundle.movie_metadata,
-        )
-    )
-    if len(discovery) > group_selected_count:
-        LOG.info(
-            "discovery_fallback_candidates group_selected=%s filled=%s requested=%s",
-            group_selected_count,
-            len(discovery),
-            DISCOVERY_LIMIT,
-        )
     return build_results(
         model_version=bundle.model_version,
         vector=vector,
@@ -338,37 +311,6 @@ def _tie_fallback_candidates(
         supported_rows = np.flatnonzero(content.supported)
         service_ids.update(content.service_movie_ids[supported_rows].tolist())
     return [RankedMovie(int(service_id), 0.0) for service_id in sorted(service_ids)]
-
-
-def _fill_discovery_candidates(
-    selected: list[RankedMovie],
-    ranked_population: list[RankedMovie],
-    *,
-    taste_movie_ids: set[int],
-    excluded_movie_ids: set[int],
-) -> list[RankedMovie]:
-    """Fill Discovery to 100, preferring candidates outside the TASTE window."""
-    result: list[RankedMovie] = []
-    seen: set[int] = set()
-    for candidate in selected:
-        if candidate.movie_id in seen or candidate.movie_id in excluded_movie_ids:
-            continue
-        result.append(candidate)
-        seen.add(candidate.movie_id)
-        if len(result) == DISCOVERY_LIMIT:
-            return result
-
-    for allow_taste_overlap in (False, True):
-        for candidate in ranked_population:
-            if candidate.movie_id in seen or candidate.movie_id in excluded_movie_ids:
-                continue
-            if not allow_taste_overlap and candidate.movie_id in taste_movie_ids:
-                continue
-            result.append(candidate)
-            seen.add(candidate.movie_id)
-            if len(result) == DISCOVERY_LIMIT:
-                return result
-    return result
 
 
 def _percentiles(scores: dict[int, float]) -> dict[int, float]:
