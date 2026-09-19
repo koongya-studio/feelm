@@ -5,19 +5,13 @@ import java.util.List;
 
 public record PopcornFlavorListResponse(List<Item> items) {
 
-    public record Item(
-            String code,
-            String displayName,
-            String color,
-            List<String> representativeKeywords,
-            int sortOrder) {
+    public record Item(String code, String displayName, String color, int sortOrder) {
 
         public static Item from(PopcornFlavor flavor) {
             return new Item(
                     flavor.getCode(),
                     flavor.getDisplayName(),
                     flavor.getColor(),
-                    List.copyOf(flavor.getRepresentativeKeywords()),
                     flavor.getSortOrder());
         }
     }

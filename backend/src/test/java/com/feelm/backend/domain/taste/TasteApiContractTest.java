@@ -81,9 +81,10 @@ class TasteApiContractTest {
                 .andExpect(jsonPath("$.items[0].code").value("FLAVOR_A"))
                 .andExpect(jsonPath("$.items[0].displayName").value("첫 번째 맛"))
                 .andExpect(jsonPath("$.items[0].color").value("#111111"))
-                .andExpect(jsonPath("$.items[0].representativeKeywords[0]").value("긴장"))
-                .andExpect(jsonPath("$.items[0].representativeKeywords[1]").value("반전"))
                 .andExpect(jsonPath("$.items[0].sortOrder").value(1))
+                // 필드 이름만 막으면 다른 이름으로 되살아나도 통과하므로 키 집합을 고정한다
+                .andExpect(jsonPath("$.items[0].*", hasSize(4)))
+                .andExpect(jsonPath("$.items[0].representativeKeywords").doesNotExist())
                 .andExpect(jsonPath("$.items[0].clusterId").doesNotExist());
     }
 
