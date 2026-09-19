@@ -312,6 +312,19 @@ describe('2.4 화면', () => {
     expect(screen.getByRole('button', { name: '넷플릭스에서 보기' })).toBeInTheDocument();
   });
 
+  it('비슷한 영화에 유사도 수치를 적지 않는다', async () => {
+    // `유사도 90%`가 내가 좋아할 확률로 읽혔다(업무 S15P21E106-678, 리포트 P1-07)
+    vi.mocked(getSimilarMovies).mockResolvedValue([
+      { movieId: 202, title: '기생충', posterUrl: null, averageRating: 4.5, similarity: 0.9 },
+    ]);
+
+    renderMovie();
+
+    expect(await screen.findByRole('button', { name: /기생충/ })).toBeInTheDocument();
+    expect(screen.queryByText(/유사도/)).toBeNull();
+    expect(screen.queryByText(/90\s*%/)).toBeNull();
+  });
+
   it('관련 영화로 넘어가면 스크롤을 맨 위로 되돌린다', async () => {
     vi.mocked(getSimilarMovies).mockResolvedValue([
       {

@@ -565,9 +565,6 @@ export default function MovieDetailPage() {
                       seed={item.movieId}
                     />
                     <span className={styles.similarTitle}>{item.title}</span>
-                    <span className={styles.similarReason}>
-                      유사도 {Math.round(item.similarity * 100)}%
-                    </span>
                   </button>
                 </li>
               ))}
