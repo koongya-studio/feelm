@@ -389,11 +389,34 @@ Spring은 `candidates` JSON을 한 번 읽어 해당 버전의 후보 전체를 
 | `feelm:party-consumer-fence:{groupId}:{topic}:{partition}` | String(opaque CSPRNG token) | 파티 전용 Python Consumer | 파티 전용 Python Consumer | 없음 |
 | `feelm:user:{userId}:behavior` | Hash | Spark | Spark · **Spring** | 키 단위 8일 · 필드는 일자 버킷(5.3) |
 | `feelm:trending:current` | String(JSON) | Spark | **Spring** | 15분 |
-| `feelm:trending:last-good` | String(JSON) | Spark | **Spring** | 2시간 |
+| `feelm:trending:last-good` | String(JSON) | Spark | **Spring** | 없음 |
+| `feelm:trending:bucket:{yyyyMMddTHHmmZ}:movies` | Set(서비스 movieId) | Spark | Spark | 마지막 쓰기 후 150분 |
+| `feelm:trending:bucket:{yyyyMMddTHHmmZ}:movie:{movieId}:users` | Set(회원 userId) | Spark | Spark | 마지막 쓰기 후 150분 |
+| `feelm:trending:bucket:{yyyyMMddTHHmmZ}:expected-movies` | Set(서비스 movieId) | Spark | Spark | 마지막 쓰기 후 150분 |
+| `feelm:trending:bucket:{yyyyMMddTHHmmZ}:movie:{movieId}:expected-count` | String(고유 회원 수) | Spark | Spark | 마지막 쓰기 후 150분 |
+| `feelm:trending:bucket:{yyyyMMddTHHmmZ}:movie:{movieId}:viewer-digest` | String(정렬된 회원 ID 집합의 SHA-256) | Spark | Spark | 마지막 쓰기 후 150분 |
+| `feelm:trending:bucket:active-hour:{yyyyMMddTHHZ}` | Set(활성 5분 시각) | Spark | Spark | 마지막 쓰기 후 4시간 |
+| `feelm:trending:bucket:committed-hour:{yyyyMMddTHHZ}` | Set(기록 완료된 5분 시각) | Spark | Spark | 마지막 쓰기 후 4시간 |
 | `feelm:model:current` | String(JSON) | Spark Batch | Python Consumer · Spring | 없음 |
 
 **Spring은 개인 추천에 사용자 `candidates` · `behavior` · `model:current`를 읽습니다.** 파티 입력
 생성 시 사용자 `vector`·`candidates`를 함께 읽고, 파티 결과에는 별도 파티 `candidates`를 읽습니다.
+
+급상승 `bucket` 키는 고유 조회자 계산을 위한 내부 임시 상태다. 회원 ID 집합은 Spark
+급상승 작업만 읽고 쓰며 API 응답·로그에는 넣지 않는다. 탈퇴 전 발생한 정상 `VIEW`는
+버킷이 만료될 때까지 집계에 포함하고, 탈퇴 이후 새 `VIEW`는 발행하지 않는다.
+Redis 실행 계정의 키 접근 제한과 AOF/RDB·백업 보존 기간은 인프라 담당자와 적용·확인한다.
+Redis 키의 150분 TTL은 별도 백업 파일의 삭제 시한을 뜻하지 않는다.
+`expected-movies`·`expected-count`·`viewer-digest`·`active-hour`·`committed-hour`는
+버킷 손상을 확인하는 중복 메타데이터다. `viewer-digest`는 회원 ID를 숫자순으로 정렬해
+쉼표로 연결한 ASCII 문자열의 SHA-256이며 API·로그에 노출하지 않는다. 같은 수의 회원이
+다른 회원으로 바뀐 경우도 감지한다. `committed-hour`는 버킷의 인덱스·회원 집합·기대 수와
+활성 원소가 함께 유실되어도 해당 시각에 기록이 있었음을 확인한다. Spark는 버킷을 쓰기
+전에 기존 메타데이터와 집합 크기·지문을 검증하고,
+게시 전에는 최근 120분의 영화 인덱스·회원 집합을 다시 검증한다. 불일치가 있으면
+새 B를 게시하지 않고 작업을 실패시킨다. API는 마지막 유효 B를 계속 제공한다.
+Redis의 버킷과 검증 메타데이터가 함께 이전 상태로 되돌아가는 전체 롤백은 이 검사만으로
+탐지할 수 없다. 체크포인트와 Redis의 독립적인 복구 검증은 별도 운영 과제로 남긴다.
 
 두 `consumer-fence` 계열 키는 각 Consumer group 안에서 Kafka partition마다 assign할 때 새 CSPRNG opaque token으로 교체하는
 fencing key다. 개인 Consumer는 결과 게시와 corrupt/partial state 복구 삭제 때, 파티 Consumer는 결과 게시 때
@@ -612,7 +635,7 @@ generation 일치 확인과 TASTE 2 + DISCOVERY 1 통합 검증을 같은 전환
 }
 ```
 
-**`feelm:trending:current` · `feelm:trending:last-good`** — 두 키에 같은 스냅샷을 게시한다
+**`feelm:trending:current` · `feelm:trending:last-good`** — 비어 있지 않은 유효 B만 두 키에 같은 스냅샷으로 게시한다
 
 ```json
 {
@@ -626,7 +649,8 @@ generation 일치 확인과 TASTE 2 + DISCOVERY 1 통합 검증을 같은 전환
 - `period`는 UTC 5분 경계 `to`를 끝으로 하는 최근 60분 구간이다. 같은 구간의 고유 조회 회원 수 `C`와 직전 60분 구간의 수 `P`를 비교한다. `C >= 3`이고 `D = C - P > 0`인 영화만 포함한다.
 - `items`는 `D` 내림차순, `C` 내림차순, `movieId` 오름차순의 최대 30편이다. `trendScore`는 `D / max(D)`이고, `rankDelta`는 직전 게시 스냅샷 순위에서 현재 순위를 뺀 값이다. 신규 진입이면 `null`이다.
 - 두 구간의 같은 회원·영화 조회는 구간마다 각각 최대 한 번 센다. 같은 `eventId` 재전달은 §4.4의 watermark 기반 중복 판정 창에서 제거한다. `dwellMs`는 점수에 사용하지 않는다.
-- `items=[]`도 정상 스냅샷이다. 입력 이벤트가 없는 때에도 5분마다 두 키의 값과 TTL을 원자적으로 갱신한다. Spring은 영화 제목·포스터·평가 수·평균 별점을 DB에서 보강하며 순위를 재계산하지 않는다.
+- 후보가 없는 경계에서는 두 키를 갱신하지 않는다. `last-good`은 첫 유효 B부터 새 유효 B가 게시될 때까지 유지한다. Spring은 영화 제목·포스터·평가 수·평균 별점을 DB에서 보강하며 순위를 재계산하지 않는다. 첫 B 이전에는 [API-064의 초기 A](./report-trend.md#api-064-급상승-영화)를 사용한다.
+- Spark는 재시작 직후와 UTC 5분 경계마다 해당 시점에 Kafka에서 사용 가능한 입력을 버킷에 반영한 뒤 게시한다. 입력 처리나 버킷 기록에 실패하면 새 B를 게시하지 않고 마지막 정상 B를 유지한다. 입력 처리 중 다음 경계를 넘으면 새 경계의 입력 처리 완료를 다시 확인하고 최신 경계만 게시한다. 현재 UTC 5분 경계의 최근 120분 밖에 있는 VIEW는 만료된 버킷을 되살리지 않고 건너뛴다. 이미 게시한 과거 경계는 수정하지 않는다.
 
 ### 5.3 만료와 무효화
 
@@ -635,7 +659,7 @@ generation 일치 확인과 TASTE 2 + DISCOVERY 1 통합 검증을 같은 전환
 | `vector` · `candidates` | TTL 없음. 담당 처리기가 이벤트마다 덮어쓴다 |
 | `behavior` | 키 단위 슬라이딩 TTL 8일. 필드는 일자 버킷이며 집계는 최근 7일분만 사용한다(아래) |
 | `trending:current` | 마지막 정상 게시부터 15분 보관. 게시가 멈추면 만료되어 마지막 정상 결과를 읽는다 |
-| `trending:last-good` | 마지막 정상 게시부터 2시간 보관. 만료되거나 Redis 조회가 불가능하면 API-064는 `503 TREND_UNAVAILABLE`을 반환한다 |
+| `trending:last-good` | TTL 없음. 마지막 유효 B를 새 유효 B가 게시될 때까지 유지한다. Redis 자체 유실 후 B가 없음을 확인하면 초기 A를 사용한다 |
 | 모델 재학습 | 배치가 전체 사용자 키를 새 `modelVersion`으로 다시 쓴다. 별도 무효화 명령을 두지 않는다 |
 | 비활성 사용자 | 야간 배치가 재생성 대상에서 제외하고 오래된 키를 정리한다(주기 미정) |
 
@@ -679,7 +703,7 @@ URI나 Redis에 저장하지 않고 runtime filesystem 설정으로 제공한다
 60초 안에 기존 세트의 순서를 바꾸는 것을 보장하지 않습니다. 이 정책은 행동마다 Python 재정렬을 실행하는 계산량을 피하면서
 새 세트를 만드는 사용자의 최대 100편만 정렬하기 위한 기준입니다.
 
-급상승 결과는 5분마다 Redis에 게시한다(API-064). 이는 Spark가 이벤트를 소비하는
+급상승 후보는 UTC 5분 경계마다 확인하고, 비어 있지 않은 유효 결과만 Redis에 게시한다(API-064). 이는 Spark가 이벤트를 소비하는
 마이크로배치 주기와 별개이며, 위 `behavior` 반영 목표를 5분으로 늦추지 않는다.
 급상승 `VIEW` 집계의 이벤트 시간 watermark 초기값은 10분이다. Spark가 관측한
 최대 `occurredAt`에서 10분을 뺀 값을 기준으로 지난 구간의 상태를 정리한다.
@@ -702,8 +726,11 @@ Python Consumer나 Streaming 지연·장애 시에도 **마지막으로 성공�
 - Redis 연결 실패
 
 이때도 영화·검색·평가·필름·팝콘 기능은 정상 동작해야 합니다. 추천 API만 실패합니다.
-급상승 API-064는 별도로 `trending:current`와 `trending:last-good`의 TTL을 적용하며,
-두 결과를 모두 읽을 수 없을 때만 `503 TREND_UNAVAILABLE`을 반환합니다.
+급상승 API-064는 `trending:current`에 15분 TTL을 적용하고,
+`trending:last-good`에는 TTL을 두지 않습니다. 첫 유효한 B 전에는 API-064의 고정
+초기 순서 A를 제공하고, B 이후 빈 집계는 마지막 B를 지우지 않습니다. Redis 조회
+장애로 최신 또는 마지막 정상 급상승 결과(B)를 조회할 수 없고 초기 고정 목록(A)으로
+안전하게 대체할 수도 없을 때 `503 TREND_UNAVAILABLE`을 반환합니다.
 
 ### 6.3 콜드 스타트
 
