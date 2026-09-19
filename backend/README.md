@@ -109,6 +109,7 @@ Topic 확인 방법은 [인프라 README](../infra/README.md#local-kafka)를 따
 | `JWT_SECRET` | **필수(기본값 없음)** | 필수 |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:5173` | 필수 |
 | `SWAGGER_ENABLED` | `false` | `false`(팀 접근 보호 구성 후 명시적으로 활성화) |
+| `REPORT_GENERATION_ENABLED` | `true` | 반기 취향 리포트 집계를 수행하는 단일 실행 노드에서만 `true` |
 | `FRONTEND_BASE_URL` | `http://localhost:5173` | 필수 |
 | `MAIL_MODE` | `log`(`.env`에서 지정, 기본값 없음) | `smtp` |
 | `MAIL_HOST` | `smtp.gmail.com` | 선택(비우면 `smtp.gmail.com`) |
