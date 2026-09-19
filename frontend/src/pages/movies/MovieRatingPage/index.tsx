@@ -253,7 +253,16 @@ export default function MovieRatingPage() {
 
   return (
     <>
-      <ScreenHeader title="평가하기" showBack fallbackTo={path.search()} />
+      {/*
+       * 이미 평가한 영화면 제목이 `평가 수정`이다(업무 -638). 7.1 `평가한 영화` → 2.4
+       * `내 별점 수정하기`로 오는 길이 생겨, 새 평가와 같은 제목이면 무엇을 하는 화면인지 흐렸다.
+       * 불러오기 실패 화면은 어느 쪽인지 모르므로 `평가하기` 그대로다.
+       */}
+      <ScreenHeader
+        title={isEditing ? '평가 수정' : '평가하기'}
+        showBack
+        fallbackTo={path.search()}
+      />
 
       <div className={styles.page}>
         <div className={styles.movie}>

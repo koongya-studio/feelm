@@ -130,6 +130,8 @@ describe('2.5 평가 저장', () => {
   it('점수만 매기면 API-036에 점수만 보내고 응답과 추가 전 수치를 2.6에 넘긴다', async () => {
     renderPage();
 
+    // 새 평가의 제목은 `평가하기`다. 수정일 때만 `평가 수정`이다(업무 S15P21E106-638)
+    expect(await screen.findByRole('heading', { level: 1, name: '평가하기' })).toBeInTheDocument();
     await rate(4.5);
 
     await waitFor(() => expect(location()).toBe('/movies/550/rate/result'));
@@ -274,6 +276,8 @@ describe('2.5 평가 저장', () => {
     expect(
       await screen.findByRole('checkbox', { name: '스포일러가 포함되어 있어요' }),
     ).toBeChecked();
+    // 새 평가와 구분되게 제목이 `평가 수정`이다(업무 S15P21E106-638)
+    expect(screen.getByRole('heading', { level: 1, name: '평가 수정' })).toBeInTheDocument();
     await rate(2.5, '범인이 드러난다');
 
     await waitFor(() =>
