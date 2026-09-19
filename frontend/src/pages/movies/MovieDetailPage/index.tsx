@@ -454,8 +454,9 @@ export default function MovieDetailPage() {
           </Button>
         </div>
 
+        {/* 소제목은 `OTT`다. 한때 `볼 수 있는 곳`이었다(사용자 지시 2026-09-19, 업무 -679) */}
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>볼 수 있는 곳</h2>
+          <h2 className={styles.sectionTitle}>OTT</h2>
           {movie.ottProviders.length > 0 ? (
             <>
               <ul className={styles.ottList}>
