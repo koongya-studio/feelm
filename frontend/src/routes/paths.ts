@@ -92,7 +92,7 @@ export const ROUTE_PATTERN = {
   pushPreview: '/notifications/push-preview',
 
   /*
-   * 나에게 맞는 OTT 찾기 (업무 -308). EXT-01 ~ EXT-05. API-068은 확장 단계라 목업이다.
+   * 나에게 맞는 OTT 찾기 (업무 -308). EXT-01 ~ EXT-05. API-068에 연동했다(업무 -564).
    * `analyzing` · `result` · `insufficient`는 고정 경로라 `:ottId`보다 먼저 맞는다
    */
   ottFinder: '/otts/recommend',

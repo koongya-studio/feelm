@@ -24,21 +24,28 @@
   text-align: center;
 }
 
-/* Section이 이미 테두리 상자라 안에서 다시 두르지 않는다 */
-.reasons {
-  display: flex;
-  flex-direction: column;
-  color: var(--color-ink-body);
-  font-size: var(--font-size-meta);
-  gap: var(--space-2);
-  line-height: var(--line-height-meta);
-  list-style: disc inside;
+/* 일치도 링이 있던 자리다. 계약이 주는 편수(matchCount)를 대신 크게 둔다 (업무 -564) */
+.heroMatch {
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-title);
+  line-height: var(--line-height-title);
 }
 
-.meters {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+.heroMeta {
+  color: var(--color-on-dark-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  text-align: center;
+}
+
+.criteria {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-sunken);
+  color: var(--color-ink-body);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
 }
 
 .movies {

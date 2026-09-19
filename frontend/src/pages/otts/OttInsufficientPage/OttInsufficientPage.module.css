@@ -28,52 +28,6 @@
   line-height: var(--line-height-body);
 }
 
-.progress {
-  display: flex;
-  flex-direction: column;
-  padding: var(--space-4);
-  margin-top: var(--space-4);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
-  gap: var(--space-2);
-}
-
-.progressHead {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  color: var(--color-ink-muted);
-  font-size: var(--font-size-meta);
-}
-
-.count {
-  color: var(--color-ink);
-  font-size: var(--font-size-title);
-  font-weight: var(--font-weight-bold);
-}
-
-.total {
-  color: var(--color-ink-hint);
-  font-size: var(--font-size-body);
-}
-
-.track {
-  position: relative;
-  height: 8px;
-  overflow: hidden;
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-sunken);
-}
-
-/* 진행은 빨강을 쓰는 자리다(`design-concept.md` 2.2) */
-.fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: var(--progress);
-  border-radius: var(--radius-pill);
-  background: var(--color-brand);
-}
-
 .actions {
   display: flex;
   flex-direction: column;

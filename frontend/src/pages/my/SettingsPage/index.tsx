@@ -93,8 +93,8 @@ export default function SettingsPage() {
          * 목록 한 줄로 두지 않고 배너로 둔 것은 **설명을 살리기 위해서다.** `ActionList`는
          * 이름과 화살표만 그려 `감상 기록을 분석해…` 한 줄이 들어갈 자리가 없다.
          *
-         * API-068은 확장 단계라 들어가는 화면은 목업으로 동작한다. 배너 자체는 데이터를
-         * 부르지 않는다. 이 화면의 **하나뿐인 어두운 블록**이다.
+         * 배너 자체는 데이터를 부르지 않는다. 들어가는 화면(EXT-01 ~ EXT-05)은 업무 -564에서
+         * API-068에 연동했다. 이 화면의 **하나뿐인 어두운 블록**이다.
          */}
         <section className={styles.banner}>
           <h2 className={styles.bannerTitle}>나에게 맞는 OTT 찾기</h2>
