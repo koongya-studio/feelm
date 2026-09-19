@@ -15,7 +15,9 @@
  * (`api/settings.ts`). 실패하면 누르기 전 값으로 되돌리고 알린다. 저장이 도는 동안 같은
  * 토글을 다시 눌러도 요청이 겹치지 않는다.
  *
- * `[?]` 알림을 실제로 보내는 채널이 요구사항에 없다(API-017 미정 사항). 설정만 저장한다.
+ * 맨 위 `이 기기로 푸시 받기`는 브라우저 Web Push 구독이다(업무 -583, `WebPushSection`).
+ * 종류 토글과 달리 계정이 아니라 이 기기에 매인다. 푸시로 오는 알림은 파티 초대 · 초대 수락
+ * 둘이다(API-075~077 발송 규칙). 감상 확인은 앱 안 알림 목록으로만 온다.
  */
 import { useEffect, useId, useState } from 'react';
 import Button from '../../../components/Button';
@@ -26,6 +28,7 @@ import Switch from '../../../components/Switch';
 import { getNotificationSettings, updateNotificationSettings } from '../../../api/settings';
 import { path } from '../../../routes/paths';
 import styles from './NotificationSettingsPage.module.css';
+import WebPushSection from './WebPushSection';
 import type { NotificationSettings } from '../../../types/user';
 
 /** 와이어프레임 7.8-C의 순서와 문구. 계약에 없는 둘은 `key`가 없다 */
@@ -114,6 +117,8 @@ export default function NotificationSettingsPage() {
       {header}
 
       <div className={styles.page}>
+        <WebPushSection />
+
         <ul className={styles.list}>
           {ITEMS.map((item) =>
             item.key ? (
@@ -140,7 +145,7 @@ export default function NotificationSettingsPage() {
           </p>
         ) : null}
 
-        <p className={styles.hint}>파티 초대 · 리포트 발급 알림은 준비 중이에요</p>
+        <p className={styles.hint}>파티 초대 · 리포트 발급 알림 설정은 준비 중이에요</p>
         <p className={styles.hint}>감상 확인 알림은 OTT 이동 2일 후에 도착해요</p>
       </div>
     </>
