@@ -97,6 +97,8 @@
   position: relative;
   z-index: 2;
   height: 34vh;
+  /* 주소창이 떠 있을 때의 화면으로 잰다. 2.4 `.stage`와 같은 이유다(업무 -389) */
+  height: 34svh;
   min-height: 180px;
   flex: none;
 }
