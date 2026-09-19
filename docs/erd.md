@@ -432,6 +432,7 @@ erDiagram
     USERS ||--o{ PARTY_MEMBERS : member
     PARTIES ||--o{ PARTY_INVITATIONS : invites
     PARTIES ||--o| PARTY_REFRESH_REQUESTS : refresh_pending
+    PARTIES ||--o| PARTY_CANDIDATE_PUBLICATIONS : candidate_published
     USERS ||--o{ PARTY_INVITATIONS : invited
 ```
 
@@ -441,6 +442,7 @@ erDiagram
 | `party_members` | 파티 구성원 | 별도 `id`를 사용하고 UK(`party_id`, `user_id`)를 둔다. 활성 파티의 오너도 `OWNER` 역할로 저장한다. 파티별 OWNER는 부분 유일 인덱스로 최대 1명을 보장하고, `ACTIVE` 파티의 OWNER 존재·`parties.owner_id` 일치·최대 4명은 애플리케이션이 보장한다. 멤버가 0명인 `CLOSED` 파티의 `owner_id`는 마지막 오너 이력을 보존한다 | FR-20, FR-21 · API-057 |
 | `party_invitations` | 초대 | 현재 멤버라면 누구나 초대 가능하다. 자기 자신 초대 금지 CHECK와 `PENDING` 중복 부분 유일 인덱스를 두며, 기존 멤버·초대 발신자의 현재 멤버 여부는 애플리케이션에서 검증한다. `PENDING`이면 `responded_at`은 NULL이고 응답 완료 시 NOT NULL이다 | FR-20 · API-051~054 |
 | `party_refresh_requests` | 파티별 미처리 추천 입력 갱신 요청 | `party_id` PK·FK. 활성 구성 변경과 같은 DB 트랜잭션 또는 Candidate 알림 처리에서 저장한다. 같은 파티의 대기 요청은 `request_version` 증가와 함께 합치고, Redis 입력 장애 시 `next_attempt_at`에 재시도한다. 종료 파티는 요청을 정리한다 | S15P21E106-544 |
+| `party_candidate_publications` | 파티 raw Candidate의 마지막 Redis 게시 완료 상태 | `party_id` PK·FK. `input_id`, 최대 50자 `model_version`, 생성 시각과 원본 `party-refresh` partition·offset을 저장한다. 같은 source partition의 더 큰 offset만 갱신하며 추천 세트 생성 여부와 분리한다. 파티 삭제 시 CASCADE한다 | S15P21E106-566 |
 
 ### 2.6 리포트 (2차 MVP)
 

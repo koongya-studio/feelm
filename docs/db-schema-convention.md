@@ -90,6 +90,7 @@ scale 없는 `numeric`으로 입력값을 그대로 검사한다. 기존 정수 
 | SET NULL | `web_push_subscriptions` → `web_push_deliveries.subscription_id` | 구독 삭제 후 비민감 발송 결과는 알림 감사용으로 유지 |
 | CASCADE | `ratings` → `frames` | ERD 3장에 명시된 규칙 |
 | CASCADE | `recommendation_sets` → `recommendation_items` | 세트 없는 아이템은 의미가 없음 |
+| CASCADE | `parties` → `party_candidate_publications` | 삭제된 파티의 게시 완료 상태는 의미가 없음 |
 | CASCADE | `movies` → `movie_embeddings` | 영화에서 파생된 임베딩은 원본 영화 없이 의미가 없음 |
 | CASCADE | `parties` → `party_members`, `party_invitations` | 파티에 종속 |
 | CASCADE | `taste_reports` → `report_images` | 리포트에 종속 |
