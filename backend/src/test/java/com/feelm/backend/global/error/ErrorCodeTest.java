@@ -106,7 +106,9 @@ class ErrorCodeTest {
                         "ACTIVE_PARTY_LIMIT_REACHED",
                         "ALREADY_MEMBER",
                         "INVITATION_PENDING",
-                        "INVITATION_NOT_PENDING");
+                        "INVITATION_NOT_PENDING",
+                        // 리포트 도메인 — API-060·080 (S15P21E106-556)
+                        "REPORT_GENERATING");
     }
 
     @Test

@@ -40,6 +40,26 @@ public record ReportPeriod(int year, ReportHalf half) {
         return cutoff(year, half);
     }
 
+    public Instant publicationAt() {
+        return half == ReportHalf.H1
+                ? LocalDateTime.of(year, 7, 1, 0, 0).atZone(KOREA).toInstant()
+                : LocalDateTime.of(year + 1, 1, 1, 0, 0).atZone(KOREA).toInstant();
+    }
+
+    public Instant nextPublicationAt() {
+        return half == ReportHalf.H1
+                ? LocalDateTime.of(year + 1, 1, 1, 0, 0).atZone(KOREA).toInstant()
+                : LocalDateTime.of(year + 1, 7, 1, 0, 0).atZone(KOREA).toInstant();
+    }
+
+    public static ReportPeriod latestReleasedAt(Instant instant) {
+        ZonedDateTime koreaTime = instant.atZone(KOREA);
+        int year = koreaTime.getYear();
+        return koreaTime.getMonthValue() >= 7
+                ? new ReportPeriod(year, ReportHalf.H1)
+                : new ReportPeriod(year - 1, ReportHalf.H2);
+    }
+
     public boolean acceptsFinalSnapshotAt(Instant snapshotAt) {
         Instant cutoffAt = cutoffExclusive();
         return !snapshotAt.isBefore(cutoffAt)
