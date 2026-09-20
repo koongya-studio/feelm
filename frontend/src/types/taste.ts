@@ -34,7 +34,8 @@ export type PopcornFlavor = {
   code: string;
   displayName: string;
   color: string;
-  representativeKeywords: string[];
+  /** 이 맛이 어떤 영화인지 한 문장. 계약에 생기기 전이면 없다 */
+  description?: string;
   sortOrder: number;
 };
 
