@@ -86,8 +86,18 @@
   gap: var(--film-frame-gap);
   padding: var(--film-hole-band) var(--space-3);
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+  cursor: grab;
+  user-select: none;
+  -webkit-overflow-scrolling: touch;
   /* 프레임을 훑을 때 칸 경계에서 멈춘다 */
   scroll-snap-type: x proximity;
+}
+
+.track[data-dragging='true'] {
+  cursor: grabbing;
+  scroll-snap-type: none;
 }
 
 .track:focus-visible {
@@ -179,5 +189,7 @@
   flex-direction: column;
   padding: var(--space-3) var(--film-hole-band);
   overflow: visible;
+  cursor: auto;
+  user-select: auto;
   scroll-snap-type: none;
 }
