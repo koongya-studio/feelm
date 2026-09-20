@@ -336,7 +336,7 @@ include:
     def test_spark_history_deploy_is_protected_and_serialized_with_spark(self):
         deploy = job_block(self.infra, 'deploy-spark-history')
         for expected in (
-                'stage: deploy', 'tags: [e106-distributed]', 'needs: []',
+                'stage: deploy', 'tags: [e106-distributed]', '- job: spark-code-notify', '- job: spark-code-image',
                 'name: distributed', 'ci-deploy-current-commit.py',
                 'bash infra/scripts/deploy-spark-history.sh',
                 'notify-deployment.py spark-history "$CI_JOB_STATUS"',

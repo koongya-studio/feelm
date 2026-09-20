@@ -58,6 +58,7 @@ mkdir -p -- "$output_directory"
 temporary_output=$(mktemp "${OUTPUT_FILE}.XXXXXX")
 trap 'rm -f -- "$temporary_output"' EXIT
 printf 'SPARK_IMAGE_DIGEST=%s\n' "$SPARK_IMAGE_DIGEST" > "$temporary_output"
+printf 'SPARK_RUNTIME_IMAGE=%s\n' "$SPARK_RUNTIME_IMAGE" >> "$temporary_output"
 chmod 0600 "$temporary_output"
 mv -f -- "$temporary_output" "$OUTPUT_FILE"
 trap - EXIT

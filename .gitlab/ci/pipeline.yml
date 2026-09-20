@@ -77,7 +77,7 @@ spark-code-test:
   stage: test
   tags: [e106-shell]
   script:
-    - python3 -B -m unittest infra.scripts.test_spark_code_delivery infra.scripts.test_spark_code_state infra.spark.test_spark_ml_runtime infra.scripts.test_deploy_distributed_runtime infra.scripts.test_runtime_config_release infra.scripts.test_notify_deployment -v
+    - python3 -B -m unittest infra.scripts.test_spark_runtime_delivery infra.scripts.test_spark_code_delivery infra.scripts.test_spark_code_state infra.spark.test_spark_ml_runtime infra.scripts.test_deploy_distributed_runtime infra.scripts.test_runtime_config_release infra.scripts.test_notify_deployment -v
     - cd pipeline/spark
     - uv sync --frozen
     - uv run ruff check .
@@ -92,6 +92,7 @@ spark-code-test:
         - pipeline/spark/pyproject.toml
         - pipeline/spark/uv.lock
         - pipeline/spark/.python-version
+        - infra/spark/**/*
         - infra/spark/Dockerfile
         - infra/spark/Dockerfile.code
         - infra/spark/Dockerfile.code.dockerignore
@@ -100,6 +101,10 @@ spark-code-test:
         - infra/compose/service.yml
         - infra/compose/distributed.yml
         - infra/scripts/build-spark-code-image.sh
+        - infra/scripts/build-spark-runtime-image.sh
+        - infra/scripts/test_spark_runtime_delivery.py
+        - infra/spark/Dockerfile.dockerignore
+        - infra/spark/runtime-smoke.py
         - infra/scripts/deploy-spark-code.sh
         - infra/scripts/spark-code-state.py
         - infra/scripts/deploy-distributed-runtime.py
@@ -122,8 +127,9 @@ spark-code-image:
     - install -d -m 0700 "$DOCKER_CONFIG"
     - printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
   script:
-    - test "$(grep -c '^SPARK_RUNTIME_IMAGE=' infra/spark/runtime-image.env)" -eq 1
-    - SPARK_RUNTIME_IMAGE="$(sed -n 's/^SPARK_RUNTIME_IMAGE=//p' infra/spark/runtime-image.env)"
+    - bash infra/scripts/build-spark-runtime-image.sh "$DOCKERHUB_NAMESPACE/feelm-spark-ml:$CI_COMMIT_SHA-$CI_JOB_ID" spark-runtime-image.env
+    - test "$(grep -c '^SPARK_RUNTIME_IMAGE=' spark-runtime-image.env)" -eq 1
+    - SPARK_RUNTIME_IMAGE="$(sed -n 's/^SPARK_RUNTIME_IMAGE=//p' spark-runtime-image.env)"
     - SPARK_CODE_IMAGE="$DOCKERHUB_NAMESPACE/feelm-spark:$CI_COMMIT_SHA"
     - bash infra/scripts/build-spark-code-image.sh "$SPARK_RUNTIME_IMAGE" "$SPARK_CODE_IMAGE" "$CI_COMMIT_SHA" spark-code-image.env
   after_script:
@@ -135,7 +141,7 @@ spark-code-image:
       dotenv: spark-code-image.env
     expire_in: 1 day
   interruptible: true
-  timeout: 30m
+  timeout: 60m
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
       changes:
@@ -143,6 +149,7 @@ spark-code-image:
         - pipeline/spark/pyproject.toml
         - pipeline/spark/uv.lock
         - pipeline/spark/.python-version
+        - infra/spark/**/*
         - infra/spark/Dockerfile
         - infra/spark/Dockerfile.code
         - infra/spark/Dockerfile.code.dockerignore
@@ -151,6 +158,10 @@ spark-code-image:
         - infra/compose/service.yml
         - infra/compose/distributed.yml
         - infra/scripts/build-spark-code-image.sh
+        - infra/scripts/build-spark-runtime-image.sh
+        - infra/scripts/test_spark_runtime_delivery.py
+        - infra/spark/Dockerfile.dockerignore
+        - infra/spark/runtime-smoke.py
         - infra/scripts/deploy-spark-code.sh
         - infra/scripts/spark-code-state.py
         - infra/scripts/deploy-distributed-runtime.py

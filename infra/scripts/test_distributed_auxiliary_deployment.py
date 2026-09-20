@@ -115,6 +115,13 @@ class DistributedAuxiliaryDeploymentFlowTest(unittest.TestCase):
             set -eu
             printf 'docker %s\n' "$*" >>"$AUX_TEST_EVENTS"
             state="$AUX_TEST_STATE"
+            if [[ "$1" == "pull" ]]; then exit 0; fi
+            if [[ "$1" == "image" ]]; then
+              if [[ "${FAIL_RUNTIME_LABEL:-0}" == "1" ]]; then printf '<no value>\n'; exit 0; fi
+              printf '%s%s\n' 'registry.invalid/runtime@sha256:' \
+                'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+              exit 0
+            fi
             if [[ "$1" == "inspect" ]]; then
               if [[ " $* " == *" feelm-spark-master --format "* ]]; then
                 printf '%s%s\n' 'registry.invalid/spark@sha256:' \
@@ -122,7 +129,9 @@ class DistributedAuxiliaryDeploymentFlowTest(unittest.TestCase):
                 exit 0
               fi
               if [[ " $* " == *" --format "* ]]; then
-                if [[ "${FAIL_REVISION:-0}" == "1" ]]; then
+                if [[ "$*" == *'.Config.Image'* ]]; then
+                  printf '%s\n' "${SPARK_IMAGE}"
+                elif [[ "${FAIL_REVISION:-0}" == "1" ]]; then
                   printf '%s\n' 'stale-revision'
                 elif [[ "$2" == "feelm-spark-history-server" ]]; then
                   printf '%s\n' "$SPARK_HISTORY_DEPLOY_REVISION"
@@ -222,6 +231,34 @@ class DistributedAuxiliaryDeploymentFlowTest(unittest.TestCase):
         events = self.events.read_text(encoding="utf-8") if self.events.exists() else ""
         state = {path.name for path in self.state_dir.iterdir()}
         return result, state, events
+
+    def test_history_rejects_missing_runtime_label_before_stopping_previous(self):
+        result, state, events = self.run_script(
+            "deploy-spark-history.sh", ("feelm-spark-history-server",), FAIL_RUNTIME_LABEL=1
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(state, {"feelm-spark-history-server"})
+        self.assertNotIn("docker stop", events)
+
+    def test_history_pulls_runtime_digest_and_verifies_candidate_image(self):
+        runtime = "registry.invalid/runtime@sha256:" + "b" * 64
+        result, state, events = self.run_script(
+            "deploy-spark-history.sh", ("feelm-spark-history-server",),
+            SPARK_RUNTIME_IMAGE=runtime
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(state, {"feelm-spark-history-server"})
+        self.assertLess(events.index("docker pull " + runtime), events.index("docker stop"))
+        self.assertIn("docker inspect feelm-spark-history-server --format {{.Config.Image}}", events)
+
+    def test_history_rejects_pipeline_runtime_mismatch_before_stopping_previous(self):
+        result, state, events = self.run_script(
+            "deploy-spark-history.sh", ("feelm-spark-history-server",),
+            SPARK_RUNTIME_IMAGE="registry.invalid/runtime@sha256:" + "c" * 64
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(state, {"feelm-spark-history-server"})
+        self.assertNotIn("docker stop", events)
 
     def test_observability_success_replaces_only_three_auxiliary_containers(self):
         result, state, events = self.run_script(

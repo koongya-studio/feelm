@@ -24,10 +24,11 @@ verify() {
 }
 
 verify_candidate_revision() {
-  local actual_revision
+  local actual_revision actual_image
   actual_revision="$(docker inspect "${container}" \
     --format '{{ index .Config.Labels "io.feelm.spark-history.revision" }}')"
-  if [[ "${actual_revision}" != "${deployment_revision}" ]]; then
+  actual_image="$(docker inspect "${container}" --format '{{.Config.Image}}')"
+  if [[ "${actual_revision}" != "${deployment_revision}" || "${actual_image}" != "${SPARK_IMAGE}" ]]; then
     echo "Spark History deployment revision mismatch" >&2
     return 1
   fi
@@ -59,12 +60,22 @@ if container_exists "${container}-rollback"; then
   exit 1
 fi
 
-if ! SPARK_IMAGE="$(docker inspect feelm-spark-master --format '{{.Config.Image}}')" \
-  || [[ -z "${SPARK_IMAGE}" ]]; then
-  echo "Running Spark image could not be resolved; History deployment refused" >&2
+master_image="$(docker inspect feelm-spark-master --format '{{.Config.Image}}')"
+if [[ ! "${master_image}" =~ ^[^[:space:]@]+@sha256:[0-9a-f]{64}$ ]]; then
+  echo "Running Spark image must be an immutable digest" >&2
+  exit 1
+fi
+SPARK_IMAGE="$(docker image inspect "${master_image}" --format '{{index .Config.Labels "io.feelm.spark.runtime-image"}}')"
+if [[ ! "${SPARK_IMAGE}" =~ ^[^[:space:]@]+@sha256:[0-9a-f]{64}$ ]]; then
+  echo "Running Spark code image has no valid runtime digest label; deploy new code image first" >&2
+  exit 1
+fi
+if [[ -n "${SPARK_RUNTIME_IMAGE:-}" && "${SPARK_IMAGE}" != "${SPARK_RUNTIME_IMAGE}" ]]; then
+  echo "Running Spark runtime differs from the pipeline runtime digest" >&2
   exit 1
 fi
 export SPARK_IMAGE
+docker pull "${SPARK_IMAGE}"
 
 compose=(docker compose --project-name "feelm-spark-history-${CI_PIPELINE_ID:-manual-$$}")
 if [[ -n "${COMPOSE_ENV_FILE:-}" ]]; then
