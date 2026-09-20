@@ -11,8 +11,10 @@ if [[ "${mode}" != "deploy" && "${mode}" != "--recover" ]]; then
   exit 2
 fi
 
-services=(prometheus grafana mattermost-alert-relay node-exporter postgres-exporter redis-exporter)
+services=(loki alloy prometheus grafana mattermost-alert-relay node-exporter postgres-exporter redis-exporter)
 containers=(
+  feelm-loki
+  feelm-alloy
   feelm-prometheus
   feelm-grafana
   feelm-mattermost-alert-relay
@@ -24,10 +26,19 @@ deployment_revision="${CI_COMMIT_SHA:-manual}"
 export MONITORING_DEPLOY_REVISION="${deployment_revision}"
 
 verify() {
-  "${PYTHON_BIN}" -I -B "${SCRIPT_DIR}/verify-monitoring-deployment.py" \
-    --attempts "${MONITORING_HEALTH_ATTEMPTS:-24}" \
-    --interval "${MONITORING_HEALTH_INTERVAL_SECONDS:-5}" \
+  local log_pipeline_mode="${1:-full}"
+  local args=(
+    "${PYTHON_BIN}" -I -B "${SCRIPT_DIR}/verify-monitoring-deployment.py"
+    --attempts "${MONITORING_HEALTH_ATTEMPTS:-24}"
+    --interval "${MONITORING_HEALTH_INTERVAL_SECONDS:-5}"
+    --loki-url "http://127.0.0.1:${LOKI_PORT:-3100}"
+    --alloy-url "http://127.0.0.1:${ALLOY_PORT:-12345}"
     --relay-url "http://127.0.0.1:${GRAFANA_ALERT_RELAY_PORT:-9087}"
+  )
+  if [[ "${log_pipeline_mode}" == "legacy" ]]; then
+    args+=(--skip-log-pipeline)
+  fi
+  "${args[@]}"
 }
 
 verify_candidate_revision() {
@@ -57,12 +68,22 @@ if [[ "${mode}" == "--recover" ]]; then
     echo "No monitoring rollback containers are available" >&2
     exit 1
   fi
+  recovery_log_pipeline="full"
+  if ! container_exists "feelm-loki-rollback" && ! container_exists "feelm-alloy-rollback"; then
+    recovery_log_pipeline="legacy"
+  elif ! container_exists "feelm-loki-rollback" || ! container_exists "feelm-alloy-rollback"; then
+    echo "Incomplete Loki/Alloy rollback pair; manual recovery is required" >&2
+    exit 1
+  fi
+  if [[ "${recovery_log_pipeline}" == "legacy" ]]; then
+    docker rm -f feelm-loki feelm-alloy >/dev/null 2>&1 || true
+  fi
   for container in "${recoverable[@]}"; do
     docker rm -f "${container}" >/dev/null 2>&1 || true
     docker rename "${container}-rollback" "${container}"
   done
   docker start "${recoverable[@]}" >/dev/null
-  if ! verify; then
+  if ! verify "${recovery_log_pipeline}"; then
     echo "Recovered monitoring containers did not pass verification" >&2
     exit 1
   fi
@@ -88,6 +109,14 @@ for container in "${containers[@]}"; do
     exit 1
   fi
 done
+
+previous_log_pipeline="full"
+if ! container_exists "feelm-loki" && ! container_exists "feelm-alloy"; then
+  previous_log_pipeline="legacy"
+elif ! container_exists "feelm-loki" || ! container_exists "feelm-alloy"; then
+  echo "Incomplete Loki/Alloy container pair; manual recovery is required" >&2
+  exit 1
+fi
 
 "${compose[@]}" config --quiet
 "${compose[@]}" pull --quiet "${services[@]}"
@@ -136,7 +165,7 @@ restore_previous() {
   if ((${#renamed[@]})) && ! docker start "${renamed[@]}" >/dev/null; then
     restore_failed=1
   fi
-  if ((restore_failed == 0)) && ((${#renamed[@]})) && verify; then
+  if ((restore_failed == 0)) && ((${#renamed[@]})) && verify "${previous_log_pipeline}"; then
     echo "Candidate deployment failed; previous monitoring containers were restored" >&2
     return 1
   fi

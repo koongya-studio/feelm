@@ -1,4 +1,62 @@
 services:
+  loki:
+    image: grafana/loki:3.7.0
+    container_name: feelm-loki
+    restart: unless-stopped
+    read_only: true
+    labels:
+      io.feelm.monitoring.revision: ${MONITORING_DEPLOY_REVISION:-manual}
+
+    ports:
+      - "127.0.0.1:${LOKI_PORT:-3100}:3100"
+
+    command: ["-config.file=/etc/loki/config.yml"]
+
+    volumes:
+      - ../monitoring/loki/config.yml:/etc/loki/config.yml:ro
+      - loki_data:/loki
+
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
+  alloy:
+    image: grafana/alloy:v1.19.2
+    container_name: feelm-alloy
+    restart: unless-stopped
+    read_only: true
+    labels:
+      io.feelm.monitoring.revision: ${MONITORING_DEPLOY_REVISION:-manual}
+
+    ports:
+      - "127.0.0.1:${ALLOY_PORT:-12345}:12345"
+
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - --disable-reporting
+      - /etc/alloy/config.alloy
+
+    volumes:
+      - ../monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy_data:/var/lib/alloy/data
+
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
+    depends_on:
+      loki:
+        condition: service_started
+
   prometheus:
     image: prom/prometheus:v3.13.0
     container_name: feelm-prometheus
@@ -46,6 +104,8 @@ services:
       - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
 
     depends_on:
+      loki:
+        condition: service_started
       prometheus:
         condition: service_started
       mattermost-alert-relay:
@@ -129,6 +189,10 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
 
 volumes:
+  loki_data:
+    name: compose_loki_data
+  alloy_data:
+    name: compose_alloy_data
   prometheus_data:
     name: compose_prometheus_data
   grafana_data:

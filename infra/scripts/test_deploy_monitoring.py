@@ -11,6 +11,8 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 DEPLOY_SCRIPT = SCRIPT_DIR / "deploy-monitoring.sh"
 MONITORING_COMPOSE = SCRIPT_DIR.parent / "compose" / "monitoring.yml"
 CONTAINERS = (
+    "feelm-loki",
+    "feelm-alloy",
     "feelm-prometheus",
     "feelm-grafana",
     "feelm-mattermost-alert-relay",
@@ -85,9 +87,11 @@ class DeployMonitoringTest(unittest.TestCase):
               exit
             fi
             if [[ "$1" == "rm" ]]; then
-              target="${!#}"
-              [[ "${FAIL_CLEANUP:-0}" != "1" || "$target" != *-rollback ]]
-              rm -f "$state/$target"
+              for target in "${@:2}"; do
+                [[ "$target" == -* ]] && continue
+                [[ "${FAIL_CLEANUP:-0}" != "1" || "$target" != *-rollback ]]
+                rm -f "$state/$target"
+              done
               exit
             fi
             if [[ "$1" == "compose" ]]; then
@@ -104,7 +108,7 @@ class DeployMonitoringTest(unittest.TestCase):
                 if [[ "$args" != *" --project-name feelm-monitoring-$CI_PIPELINE_ID "* ]]; then
                   rm -f "$state"/*-rollback
                 fi
-                for name in feelm-prometheus feelm-grafana feelm-mattermost-alert-relay feelm-node-exporter feelm-postgres-exporter feelm-redis-exporter; do
+                for name in feelm-loki feelm-alloy feelm-prometheus feelm-grafana feelm-mattermost-alert-relay feelm-node-exporter feelm-postgres-exporter feelm-redis-exporter; do
                   : >"$state/$name"
                 done
                 [[ "${FAIL_UP:-0}" != "1" ]]
@@ -129,12 +133,29 @@ class DeployMonitoringTest(unittest.TestCase):
             """,
         )
 
-    def run_deploy(self, *, previous=True, stale_backup=False, recover=False, **behavior):
+    def run_deploy(
+        self,
+        *,
+        previous=True,
+        legacy_previous=False,
+        partial_log_pipeline=False,
+        stale_backup=False,
+        legacy_stale_backup=False,
+        recover=False,
+        **behavior,
+    ):
         if previous:
-            for name in CONTAINERS:
+            previous_containers = CONTAINERS[2:] if legacy_previous else CONTAINERS
+            for name in previous_containers:
                 (self.state_dir / name).touch()
+        if partial_log_pipeline:
+            (self.state_dir / CONTAINERS[0]).touch()
         if stale_backup:
-            (self.state_dir / f"{CONTAINERS[0]}-rollback").touch()
+            for name in CONTAINERS:
+                (self.state_dir / f"{name}-rollback").touch()
+        if legacy_stale_backup:
+            for name in CONTAINERS[2:]:
+                (self.state_dir / f"{name}-rollback").touch()
         env = os.environ.copy()
         env.update({
             "PATH": f"{self.bin_dir.as_posix()}:{env['PATH']}",
@@ -167,7 +188,7 @@ class DeployMonitoringTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(state, set(CONTAINERS))
         self.assertIn("config --quiet", events)
-        self.assertIn("pull --quiet prometheus grafana", events)
+        self.assertIn("pull --quiet loki alloy prometheus grafana", events)
         self.assertIn("mattermost-alert-relay", events)
         self.assertIn("up -d --no-deps --force-recreate", events)
         self.assertIn("--project-name feelm-monitoring-344", events)
@@ -182,6 +203,8 @@ class DeployMonitoringTest(unittest.TestCase):
         self.assertIn("external: true", compose)
         self.assertIn("name: compose_prometheus_data", compose)
         self.assertIn("name: compose_grafana_data", compose)
+        self.assertIn("name: compose_loki_data", compose)
+        self.assertIn("name: compose_alloy_data", compose)
         self.assertEqual(compose.count("io.feelm.monitoring.revision:"), len(CONTAINERS))
 
     def test_config_or_pull_failure_keeps_existing_containers(self):
@@ -206,6 +229,29 @@ class DeployMonitoringTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(state, set(CONTAINERS))
         self.assertEqual(events.count("verify "), 2)
+
+    def test_first_log_pipeline_failure_restores_legacy_monitoring(self):
+        result, state, events = self.run_deploy(
+            legacy_previous=True,
+            FAIL_VERIFY_ONCE=1,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(state, set(CONTAINERS[2:]))
+        self.assertIn("previous monitoring containers were restored", result.stderr)
+        self.assertIn("--skip-log-pipeline", events)
+
+    def test_incomplete_log_pipeline_stops_before_compose(self):
+        result, state, events = self.run_deploy(
+            previous=True,
+            legacy_previous=True,
+            partial_log_pipeline=True,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(state, {CONTAINERS[0], *CONTAINERS[2:]})
+        self.assertIn("Incomplete Loki/Alloy container pair", result.stderr)
+        self.assertNotIn("docker compose", events)
 
     def test_revision_mismatch_restores_previous_containers(self):
         result, state, events = self.run_deploy(
@@ -254,6 +300,18 @@ class DeployMonitoringTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(state, set(CONTAINERS))
         self.assertIn("Previous monitoring containers recovered", result.stdout)
+        self.assertNotIn("docker compose", events)
+
+    def test_explicit_first_rollout_recovery_removes_log_candidates(self):
+        result, state, events = self.run_deploy(
+            legacy_stale_backup=True,
+            recover=True,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(state, set(CONTAINERS[2:]))
+        self.assertIn("docker rm -f feelm-loki feelm-alloy", events)
+        self.assertIn("--skip-log-pipeline", events)
         self.assertNotIn("docker compose", events)
 
     def test_missing_environment_file_fails_before_docker(self):
