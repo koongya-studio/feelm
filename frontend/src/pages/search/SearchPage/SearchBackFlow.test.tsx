@@ -21,9 +21,11 @@ vi.mock('../../../api/search', () => ({
   searchMovies: vi.fn(),
   countSearchResults: vi.fn(),
   getFilterOptions: vi.fn(),
+  getTopRatedMovies: vi.fn(),
 }));
 
-const { searchMovies, countSearchResults, getFilterOptions } = await import('../../../api/search');
+const { searchMovies, countSearchResults, getFilterOptions, getTopRatedMovies } =
+  await import('../../../api/search');
 
 function item(movieId: number, title: string): MovieSearchItem {
   return {
@@ -104,6 +106,8 @@ beforeEach(() => {
     otts: [],
   });
   vi.mocked(countSearchResults).mockResolvedValue(0);
+  // 검색 전 목록(업무 -714)은 이 흐름과 무관하다. 없는 상태로 둔다
+  vi.mocked(getTopRatedMovies).mockResolvedValue([]);
 });
 
 afterEach(() => {

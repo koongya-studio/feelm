@@ -18,16 +18,18 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import SearchPage from './index';
 import { renderWithRouter } from '../../../test/render';
-import { clearRecentSearchQueries, resetSessionStore } from '../../../mocks/sessionStore';
+import { resetSessionStore } from '../../../mocks/sessionStore';
 import type { MovieSearchItem, MovieSearchResult } from '../../../types/search';
 
 vi.mock('../../../api/search', () => ({
   searchMovies: vi.fn(),
   countSearchResults: vi.fn(),
   getFilterOptions: vi.fn(),
+  getTopRatedMovies: vi.fn(),
 }));
 
-const { searchMovies, countSearchResults, getFilterOptions } = await import('../../../api/search');
+const { searchMovies, countSearchResults, getFilterOptions, getTopRatedMovies } =
+  await import('../../../api/search');
 
 /** 디바운스(280ms)가 지나가고도 남을 시간. "요청이 나가지 않는다"를 단정할 때 기다린다 */
 const SETTLE_MS = 400;
@@ -72,6 +74,8 @@ beforeEach(() => {
   vi.mocked(getFilterOptions).mockResolvedValue(filterOptions);
   vi.mocked(searchMovies).mockResolvedValue(page([]));
   vi.mocked(countSearchResults).mockResolvedValue(0);
+  // 검색 전 목록은 시험마다 따로 켠다. 기본은 없음이라 빈 상태 단정이 흐려지지 않는다
+  vi.mocked(getTopRatedMovies).mockResolvedValue([]);
 });
 
 const input = () => screen.getByRole('searchbox', { name: '영화 검색' });
@@ -92,8 +96,14 @@ const resultsHeading = (count: number) =>
   screen.findByRole('heading', { name: `검색 결과 ${count}` });
 
 describe('4.1 검색 전', () => {
-  it('최근 검색어가 있으면 그것만 보여준다. 급상승은 없다', () => {
+  it('검색한 적이 있으면 그것만 보여준다. 급상승은 없다', async () => {
+    vi.mocked(searchMovies).mockResolvedValue(page([item(201, '달의 뒷면')]));
+
     renderWithRouter(<SearchPage />, { route: '/search' });
+
+    submit('달');
+    await resultsHeading(1);
+    fireEvent.click(screen.getByRole('button', { name: '검색어 지우기' }));
 
     expect(screen.getByRole('heading', { name: '검색' })).toBeInTheDocument();
     expect(screen.getByText('최근 검색어')).toBeInTheDocument();
@@ -101,13 +111,17 @@ describe('4.1 검색 전', () => {
     expect(screen.queryByText(/급상승/)).not.toBeInTheDocument();
   });
 
-  it('최근 검색어가 없으면 안내 한 줄이다', () => {
-    clearRecentSearchQueries();
-
+  /*
+   * 업무 -641. 한때 와이어프레임 4.1이 그린 `케이퍼 무비` · `크리스토퍼 놀란` · `SF 명작`이
+   * 초기값이라, 검색한 적 없는 새 세션에도 최근 검색어로 보였다.
+   */
+  it('새 세션에는 최근 검색어가 없고 안내 한 줄이다', () => {
     renderWithRouter(<SearchPage />, { route: '/search' });
 
     expect(screen.getByText('영화 제목, 감독, 배우 이름으로 검색해 보세요')).toBeInTheDocument();
     expect(screen.queryByText('최근 검색어')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '케이퍼 무비' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '전체 삭제' })).not.toBeInTheDocument();
   });
 });
 
@@ -129,7 +143,7 @@ describe('타이핑에 따라 검색한다', () => {
     await settle();
 
     expect(vi.mocked(searchMovies)).not.toHaveBeenCalled();
-    expect(screen.getByText('최근 검색어')).toBeInTheDocument();
+    expect(screen.getByText('영화 제목, 감독, 배우 이름으로 검색해 보세요')).toBeInTheDocument();
   });
 
   it('앞뒤 공백은 떼고 보낸다', async () => {
@@ -509,21 +523,97 @@ describe('커서 페이지', () => {
   });
 });
 
+/*
+ * 검색 전 평점 높은 영화 (업무 S15P21E106-714)
+ *
+ * 사용자 피드백 2026-09-20 "검색하기 전에도 영화가 나열되면 좋겠다". 급상승(API-064)이
+ * 비워 둔 자리를 검색 API로 채운 것이라, **곁들이는 목록**이라는 점이 시험할 것이다 —
+ * 실패하거나 비면 화면 전체가 실패 상태가 되지 않고 그 자리만 없다.
+ */
+describe('4.1 검색 전 평점 높은 영화', () => {
+  it('검색 전에 평점 높은 영화를 깐다', async () => {
+    vi.mocked(getTopRatedMovies).mockResolvedValue([item(301, '높은 평점 영화')]);
+
+    renderWithRouter(<SearchPage />, { route: '/search' });
+
+    expect(await screen.findByText('평점 높은 영화')).toBeInTheDocument();
+    expect(screen.getByText('높은 평점 영화')).toBeInTheDocument();
+    // 조회수 기반 급상승이 아니므로 그 말을 쓰지 않는다
+    expect(screen.queryByText(/급상승|인기/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('영화 제목, 감독, 배우 이름으로 검색해 보세요'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('칸을 누르면 2.4 영화 상세로 간다', async () => {
+    vi.mocked(getTopRatedMovies).mockResolvedValue([item(301, '높은 평점 영화')]);
+
+    renderWithRouter(<SearchPage />, { route: '/search' });
+
+    const link = await screen.findByRole('link', { name: /높은 평점 영화/ });
+    expect(link).toHaveAttribute('href', '/movies/301');
+  });
+
+  it('받지 못하면 그 자리만 없고 안내 한 줄로 돌아간다', async () => {
+    renderWithRouter(<SearchPage />, { route: '/search' });
+
+    expect(
+      await screen.findByText('영화 제목, 감독, 배우 이름으로 검색해 보세요'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('평점 높은 영화')).not.toBeInTheDocument();
+    expect(screen.queryByText('검색 결과를 불러오지 못했어요')).not.toBeInTheDocument();
+  });
+
+  it('검색을 시작하면 목록이 사라진다', async () => {
+    vi.mocked(getTopRatedMovies).mockResolvedValue([item(301, '높은 평점 영화')]);
+    vi.mocked(searchMovies).mockResolvedValue(page([item(201, '달의 뒷면')]));
+
+    renderWithRouter(<SearchPage />, { route: '/search' });
+
+    expect(await screen.findByText('평점 높은 영화')).toBeInTheDocument();
+
+    submit('달');
+    await resultsHeading(1);
+
+    expect(screen.queryByText('평점 높은 영화')).not.toBeInTheDocument();
+  });
+
+  it('최근 검색어가 있으면 그것이 먼저고 목록은 그 아래다', async () => {
+    vi.mocked(getTopRatedMovies).mockResolvedValue([item(301, '높은 평점 영화')]);
+    vi.mocked(searchMovies).mockResolvedValue(page([item(201, '달의 뒷면')]));
+
+    renderWithRouter(<SearchPage />, { route: '/search' });
+
+    submit('달');
+    await resultsHeading(1);
+    fireEvent.click(screen.getByRole('button', { name: '검색어 지우기' }));
+
+    const labels = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+    expect(labels).toEqual(['최근 검색어', '평점 높은 영화']);
+  });
+});
+
 describe('최근 검색어', () => {
   it('제출하면 앞으로 들어가고, 같은 말은 다시 쌓이지 않고 맨 앞으로 온다', async () => {
     vi.mocked(searchMovies).mockResolvedValue(page([item(201, '달의 뒷면')]));
 
     renderWithRouter(<SearchPage />, { route: '/search' });
 
-    submit('크리스토퍼 놀란');
+    for (const keyword of ['SF 명작', '케이퍼 무비', '크리스토퍼 놀란']) {
+      submit(keyword);
+      await resultsHeading(1);
+    }
+
+    // 이미 있는 말을 다시 제출해도 늘지 않고 맨 앞으로만 온다
+    submit('SF 명작');
     await resultsHeading(1);
     fireEvent.click(screen.getByRole('button', { name: '검색어 지우기' }));
 
     const chips = screen.getAllByRole('button', { name: /크리스토퍼 놀란|케이퍼 무비|SF 명작/ });
     expect(chips.map((chip) => chip.textContent)).toEqual([
+      'SF 명작',
       '크리스토퍼 놀란',
       '케이퍼 무비',
-      'SF 명작',
     ]);
   });
 
@@ -537,8 +627,14 @@ describe('최근 검색어', () => {
     expect(screen.queryByRole('button', { name: '달' })).not.toBeInTheDocument();
   });
 
-  it('전체 삭제하면 목록이 사라지고 안내로 바뀐다', () => {
+  it('전체 삭제하면 목록이 사라지고 안내로 바뀐다', async () => {
+    vi.mocked(searchMovies).mockResolvedValue(page([item(201, '달의 뒷면')]));
+
     renderWithRouter(<SearchPage />, { route: '/search' });
+
+    submit('달');
+    await resultsHeading(1);
+    fireEvent.click(screen.getByRole('button', { name: '검색어 지우기' }));
 
     fireEvent.click(screen.getByRole('button', { name: '전체 삭제' }));
 
