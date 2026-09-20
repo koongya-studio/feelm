@@ -44,6 +44,8 @@
 | `featureVersion` | 불변 문자열 | 특징 의미·순서·전처리·결측 처리. RH230와KOBIS245는 별도 |
 | `catalogVersion` | 불변 문자열 | 영화·원천·적격성·매핑 snapshot 식별 |
 | `policyVersion` | 불변 문자열 | 후보하한/순위/군집검색/K/H/출력규칙 식별 |
+| `routingPolicyId`, `routingPolicyVersion`, `routingPolicyDigest` | 불변 문자열, 양의 정수, SHA-256 | 아래 canonical policy·evidence JSON을 식별. 변경 시 새 bundle |
+| `policyEvidenceResultId`, `policyDecisionId` | 620 결과 ID, 625 결정 ID | 검증된 evidence lineage와 최종 적용 결정을 연결. 둘 중 하나라도 없으면 활성화 금지 |
 | `bundleId` | UUID | 위 버전·고정 군집·원천/특징 해시를 결합한 완성 묶음 |
 | `poolVersion`, `rankingVersion` | UUID | 불변 결과 식별자. UUID의 대소로 최신 여부를 비교하지 않음 |
 | `jobId`, `desiredJobToken` | UUID | 논리 작업·현재 원하는 작업. pool/ranking 종류별 독립 상태. 같은 작업 재시도는 같은ID 사용 |
@@ -53,6 +55,19 @@
 
 MovieLens 사용자를 서비스 사용자에 매핑하지 않는다. 영화는 실제 DB의 `tmdb_id` export를 기준으로 연결한다.
 KOBIS 코드는 검증된 매핑과 상태를 별도 보관한다. 제목이 비슷하다는 이유로 자동 확정하지 않는다.
+
+`routingPolicyDigest`는 RFC 8785 JSON Canonicalization Scheme으로 정규화한 다음 필드의 UTF-8 bytes에
+SHA-256을 적용한다.
+
+```text
+contractVersion, routingPolicyId, routingPolicyVersion, routingMode,
+thresholdRules, arms, blendComponentsAndWeights, calibrationVersions,
+policyEvidenceResultId, policyDecisionId
+```
+
+배열의 의미 순서는 policy artifact에 고정하고 set 의미인 ID 목록은 오름차순으로 정렬한다. 위 필드
+하나라도 바뀌면 digest와 `bundleId`를 새로 발급한다. bundle 검증기는 manifest의 canonical policy로
+digest를 다시 계산하고 wrapper·job·payload·pointer의 digest 및 evidence/decision ID와 모두 대조한다.
 
 KOBIS 원행의 신원과 서비스 영화의 신원을 별도 검증한다. 공식 화면에서 직접 확인한 KOBIS 코드도
 그 자체로 TMDB·serviceMovieId·MovieLens ID를 확정하지 않는다. 서비스 DB의 `serviceMovieId↔tmdb_id`
@@ -67,14 +82,14 @@ export와 검토를 통과한 TMDB↔KOBIS crosswalk를 함께 사용해야 서�
 
 | 산출물 | 필수 내용 |
 | --- | --- |
-| `bundle-manifest.json` | contractVersion, bundleId, model/feature/catalog/policyVersion, source snapshot 목록, 각 artifact URI/bytes/hash, 완료시각 |
+| `bundle-manifest.json` | contractVersion, bundleId, model/feature/catalog/policyVersion, routingPolicyId·version·digest와 canonical policy artifact, policyEvidenceResultId, policyDecisionId, source snapshot 목록, 각 artifact URI/bytes/hash, 완료시각 |
 | 영화 특징 | serviceMovieId·TMDB ID, 특징배열·원천validity·후보eligibility, 특징순서와차원, 누락상태 |
 | T/K source | TMDB 평균/투표/원천시각, KOBIS 관객/대상기간/누적범위/매핑상태, raw validity와candidate source pass 별도 |
 | 군집 | 고정8맛 매핑·하위128중심·전처리·그룹대표·할당해시, 원본영화ID, 그룹별영화목록 |
 | 그룹순위 | 그룹ID·serviceMovieId·source별rank·최종후보rank와동률규칙, 적격출처만기여 |
 | 공용 pool | 같은bundle의배치T/K초기후보 최대500, source lineage |
 | 모델 manifest | modelKind(GBT/FM/ALS), profile, readiness, native artifact, Python추론artifact, calibrator, feature schema, native-serving parity 증거 |
-| 개인 pool | 최대500고유serviceMovieId, bundleId, poolVersion, builtFromInputVersion, jobId, 생성시각, 후보선정근거/rankingMode, excludedSessionId·excludedExposureRevision·excludedExposureHash |
+| 개인 pool | 최대500고유serviceMovieId, bundleId, routing policy identity/evidence, poolVersion, builtFromInputVersion, jobId, 생성시각, 후보선정근거/rankingMode, excludedSessionId·excludedExposureRevision·excludedExposureHash |
 | 소진제외스냅샷 | session의실제노출+다른활성예약serviceID를정렬/고유화한목록,sessionId,exposureRevision,hash,불변URI |
 
 모델 profile은 `legacy-rh230`와 `service-v1-kobis245`를 구분한다. v1의 245차원 학습 artifact가 없으면
@@ -138,13 +153,13 @@ KOBIS 게시에는 원행 무결성과 별도로 검토된 service/TMDB↔KOBIS 
 | 새 키 | 값 / 작성자 |
 | --- | --- |
 | `feelm:rec:v1:bundle:active` | 활성bundleId / 배치게시자 |
-| `feelm:rec:v1:bundle:{bundleId}` | 완성manifest/모델준비상태/공용후보참조 / 배치게시자 |
+| `feelm:rec:v1:bundle:{bundleId}` | 완성manifest/모델준비상태/공용후보참조/routingPolicyId·version·digest·625 evidence / 배치게시자 |
 | `feelm:rec:v1:user:{id}:pool:{poolVersion}` | 불변개인pool / 배치후보게시자 |
-| `feelm:rec:v1:user:{id}:pool:active` | bundleId,poolVersion,builtFromInputVersion / CAS게시자 |
+| `feelm:rec:v1:user:{id}:pool:active` | bundleId,routingPolicyDigest,poolVersion,builtFromInputVersion / CAS게시자 |
 | `feelm:rec:v1:user:{id}:ranking:{rankingVersion}` | 불변재정렬결과 / Consumer |
-| `feelm:rec:v1:user:{id}:ranking:active` | bundleId,poolVersion,rankingVersion,rankingInputVersion,sessionId / Consumer |
-| `feelm:rec:v1:user:{id}:desired-job:pool` | jobId,desiredJobToken,expectedBasePoolVersion,targetInputVersion,bundleId,제외scope / 작업조율기 |
-| `feelm:rec:v1:user:{id}:desired-job:ranking` | jobId,desiredJobToken,expectedRankingVersion,targetInputVersion,expectedPoolVersion,bundleId,sessionId / 작업조율기 |
+| `feelm:rec:v1:user:{id}:ranking:active` | bundleId,routingPolicyDigest,poolVersion,rankingVersion,rankingInputVersion,sessionId / Consumer |
+| `feelm:rec:v1:user:{id}:desired-job:pool` | jobId,desiredJobToken,expectedBasePoolVersion,targetInputVersion,bundleId,routingPolicyDigest,제외scope / 작업조율기 |
+| `feelm:rec:v1:user:{id}:desired-job:ranking` | jobId,desiredJobToken,expectedRankingVersion,targetInputVersion,expectedPoolVersion,bundleId,routingPolicyDigest,sessionId / 작업조율기 |
 
 `poolVersion`/`rankingVersion`은 새 v1에서 순서가 없는 UUID다. 기존 숫자 candidateVersion의 크기 비교를 복사하지 않는다.
 입력 최신성은 DBinputVersion과 동등 비교한다. pool은 해당 종류의 desiredJobToken과 expectedBasePoolVersion,
@@ -158,6 +173,11 @@ Redis 유실 뒤 옛 숫자 1을 재사용해서 과거 파티 캐시를 현재 
   "contractVersion": "feelm-recommendation-v1",
   "poolVersion": "<uuid>",
   "bundleId": "<uuid>",
+  "routingPolicyId": "<policy-id>",
+  "routingPolicyVersion": 1,
+  "routingPolicyDigest": "<sha256>",
+  "policyEvidenceResultId": "<result-id>",
+  "policyDecisionId": "S15P21E106-625:<decision-id>",
   "builtFromInputVersion": 17,
   "jobId": "<uuid>",
   "provisionalPool": false,
@@ -169,9 +189,14 @@ Redis 유실 뒤 옛 숫자 1을 재사용해서 과거 파티 캐시를 현재 
 ```
 
 배치 점수를 저장하더라도 디버깅값이며 최신 재정렬 점수로 사용하지 않는다. 후보는 최대 500개의 고유한 정상 service ID여야 한다.
-정기/targeted Producer 모두 N=0이면 초기 콘텐츠/대중 정책, N≥1이며 승격 모델·이력이 지원되면
-해당 GBT 또는 FM으로 전체 적격 카탈로그를 정렬해500편을 만든다. 모델 미준비·미지원은 초기
-경로와 이유를 기록한다. 과거 K10 분기는 legacy 회귀 비교로만 유지한다.
+정기/targeted Producer 모두 현재 N에 대해 봉인 평가로 승인된 routing policy를 사용한다. 검증된
+전환점 미만은 초기 콘텐츠/대중성 또는 승인된 blend로, 전환점 이상이면서 승격 모델·이력이 지원되면
+해당 GBT 또는 FM으로 전체 적격 카탈로그를 정렬해500편을 만든다. 모델 미준비·미지원이나 검증되지
+않은 K 구간은 초기 경로와 이유를 기록한다. 과거 K10 분기는 legacy 회귀 비교로만 유지한다.
+
+routing policy는 bundle의 불변 일부다. threshold, blend component/weight 또는 evidence가 바뀌면 새
+`routingPolicyVersion`·digest와 새 `bundleId`를 발급한다. 625 decision/evidence가 없거나 627의
+job·payload·pointer·CAS 결속이 구현되지 않은 policy는 활성화하지 않고 초기 경로를 유지한다.
 
 일별 일반 pool은 세션 노출을 영구 제외하지 않는다. `triggerReason=POOL_EXHAUSTED`인 targeted job만
 현재 session의 실제 노출·다른 활성 예약 스냅샷을 전체 카탈로그 검색에 적용해 다음500을 만든다.
@@ -188,6 +213,11 @@ session 한정 pool은3개가 모두존재해야하며, 검증되지않은hash/�
   "sessionId": "<uuid>",
   "poolVersion": "<uuid>",
   "bundleId": "<uuid>",
+  "routingPolicyId": "<policy-id>",
+  "routingPolicyVersion": 1,
+  "routingPolicyDigest": "<sha256>",
+  "policyEvidenceResultId": "<result-id>",
+  "policyDecisionId": "S15P21E106-625:<decision-id>",
   "rankingInputVersion": 18,
   "builtFromInputVersion": 17,
   "candidateRefreshPending": true,
@@ -196,6 +226,7 @@ session 한정 pool은3개가 모두존재해야하며, 검증되지않은hash/�
   "modelProfile": "service-v1-kobis245",
   "modelReadiness": "READY",
   "rankingMode": "MODEL_GBT",
+  "blendPolicyDigest": null,
   "personalizedItems": [],
   "discoveryItems": [],
   "discoveryTrace": { "supplyGroups": 10, "candidateCount": 100 }
@@ -203,7 +234,9 @@ session 한정 pool은3개가 모두존재해야하며, 검증되지않은hash/�
 ```
 
 위 빈 배열은 구조 예시이며 실행 결과가 아니다. `READY`는 유효 artifact·parity·평가 게이트를 통과한 경우에만 기록한다.
-`rankingMode`는 MODEL_GBT/MODEL_FM/MODEL_ALS/INITIAL_CONTENT/INITIAL_PUBLIC을 구분하며 fallback을 모델 추론이라고 표시하지 않는다.
+`rankingMode`는 MODEL_GBT/MODEL_FM/MODEL_ALS/MODEL_BLEND/INITIAL_CONTENT/INITIAL_PUBLIC을 구분하며
+fallback을 모델 추론이라고 표시하지 않는다. `MODEL_BLEND`는 bundle의 immutable component·weight
+policy digest와 같은 `blendPolicyDigest`를 필수로 기록하고, 다른 mode에서는 null이다.
 FM/ALS는 기본적으로 shadow 비교 결과에만 사용하며 공개 응답 모델을 자동으로 바꾸지 않는다.
 
 `personalizedItems`는 정렬한 전체≤500, `discoveryItems`는 이번10×10 공급에서 정렬한 전체≤100이다.
@@ -217,12 +250,14 @@ ranking은 현재sessionId도 일치해야한다. 새 탐색은 inputVersion이�
 
 게시 순서는 불변 payload 저장→재읽기 검증→예상 active pointer/job token을 조건으로 단일 pointer 교체다.
 동일 inputVersion이라도 다른 job이 먼저 게시했다면 expectedBasePoolVersion이 달라져 이전 job은 실패한다.
-ranking 게시에는 별도로 desired-job:ranking의 token과 expectedRankingVersion, 현재 pool/input/bundle/session을 비교한다.
+ranking 게시에는 별도로 desired-job:ranking의 token과 expectedRankingVersion, 현재
+pool/input/bundle/routingPolicyDigest/session을 비교한다.
 같은 inputVersion·poolVersion에서 시작한 두 ranking 작업도 기존 활성 ranking이 바뀌면 이전 작업 게시를 거부한다.
 pool과 ranking의 desired token은 서로 덮어쓰지 않는다. pool 완료가 다음 ranking을 요청할 때도 ranking 상태만 바꾼다.
 소진 재공급은 현재 active session과 excludedSessionId, exposureRevision/hash도 함께 비교한다.
 그사이 실제 노출·다른 활성 예약이 바뀌면 작업을 supersede하고 새 제외 스냅샷으로 재생성한다.
 동일 입력의 일반500을 반복 생성해 POOL_EXHAUSTED가 영구 반복되는 동작은 허용하지 않는다.
+policy 변경은 기존 desired job을 supersede하며 구 `routingPolicyDigest`의 pool/ranking pointer 교체를 거부한다.
 입력·계정 상태는 게시 직전과 Spring 세트 생성 시 다시 확인한다. DB와 Redis가 하나의 트랜잭션이라고 가정하지 않는다.
 입력 검사 뒤 다시 평가가 바뀌더라도 Spring의 최종 버전 검사가 이전 결과 노출을 막아야 한다.
 
@@ -243,8 +278,8 @@ RATING/ONBOARDING은 기존 이벤트 topic과 Outbox를 유지한다. payload�
 
 | jobType | payload 핵심 | 완료 후 |
 | --- | --- | --- |
-| USER_POOL_BUILD | userId,jobId,targetInputVersion,bundleId,desiredJobToken,expectedBasePoolVersion,triggerReason,excludedSessionId,excludedExposureRevision,excludedExposureHash,exclusionSnapshotUri | 현재입력경로와해당제외scope로Spark후보생성. CAS게시후USER_RERANK |
-| USER_RERANK | userId,sessionId,jobId,desiredJobToken,expectedRankingVersion,targetInputVersion,bundleId,expectedPoolVersion,triggerReason | ranking종류별CAS상태와최신입력/session을대조해500전부/발견10×10재정렬 |
+| USER_POOL_BUILD | userId,jobId,targetInputVersion,bundleId,routingPolicyDigest,desiredJobToken,expectedBasePoolVersion,triggerReason,excludedSessionId,excludedExposureRevision,excludedExposureHash,exclusionSnapshotUri | 현재입력경로와해당제외scope로Spark후보생성. CAS게시후USER_RERANK |
+| USER_RERANK | userId,sessionId,jobId,desiredJobToken,expectedRankingVersion,targetInputVersion,bundleId,routingPolicyDigest,expectedPoolVersion,triggerReason | ranking종류별CAS상태와최신입력/session을대조해500전부/발견10×10재정렬 |
 | USER_PURGE | userId,jobId,계정상태변경참조 | 사용자pool/ranking desiredjob둘다무효화,캐시·pool비활성화,배치/백필제외 |
 
 작업 조율기는 기존 실행 단위의 제어 코드로 구현할 수 있으며 새 별도 서비스 배포를 전제로 하지 않는다.
@@ -377,16 +412,16 @@ JSON 직렬화 검증을 같은 변경에 포함한다. BigDecimal 4.49를 4.5�
 | --- | --- | --- | --- |
 | R-v1-OPS-01 실제별점보존 | API036/037/038 | ratings/RatingEventPayload·Backend | T-v1-01:0.5,4.5,5.0 DB→Outbox→JSON보존;4.49/5.5거부;DELETEscore생략 |
 | R-v1-OPS-02 배치500+최신재정렬 | API045/046 | pool/ranking·Batch/Consumer | T-v1-02:후보500전부현재특징으로점수화;101~500위영화가재정렬1위로승격가능;API내전체카탈로그추론없음 |
-| R-v1-OPS-03 0~N사용자 | 최초추천/강한입력 | sharedpool/USER_POOL_BUILD | T-v1-03:N0은초기경로;N1/9/10/50+는승격모델지원여부로판정;모델미지원targeted는초기콘텐츠/대중으로정렬;전체/지원/절단이력수와새pool재정렬검증 |
+| R-v1-OPS-03 0~N사용자 | 최초추천/강한입력 | sharedpool/USER_POOL_BUILD | T-v1-03:N0/1/9/10/50+입력지원;노출은승인된K정책의전환점·blend·모델지원으로판정;정책미검증/전환점미만/모델미지원targeted는초기콘텐츠/대중으로정렬;전체/제공/지원/절단이력수와canonical policy/evidence digest·CAS·새pool재정렬검증 |
 | R-v1-OPS-04 입력역전방지 | 평가/온보딩/감상/추천필터변경 | inputVersion/RECOMMENDATION_INPUT_CHANGED | T-v1-04:확정감상만추가삭제해도버전/그룹분자분모갱신;필터변경갱신;평점+파생감상한트랜잭션1회;관심없음/노출/클릭만은불변;늦은job게시거부 |
-| R-v1-OPS-05 발견10×10 | API045/046 | 그룹순위/discoveryTrace·Consumer | T-v1-05:0공급은skip,1편공급도1그룹;최대10그룹/그룹10편;11번째그룹/영화로보충안함 |
+| R-v1-OPS-05 발견10×10+부족분확장 | API045/046 | 그룹순위/discoveryTrace·Consumer | T-v1-05:0공급은skip,1편공급도1그룹;최초상위10개비어있지않은그룹에서그룹당10편할당후같은그룹11위이후를층별확장;그래도부족하면11번째이후적격그룹을순차소진;전체적격후보소진시에만100편미만 |
 | R-v1-OPS-06 대중근거하한 | 후보배치/이력특징 | sourcevalidity/eligibility | T-v1-06:TMDBvotes20/21,KOBIS9999/10000경계;양쪽fail후보제외;같은영화의실제이력/H선정은유지 |
 | R-v1-OPS-07 2+1·fallback | API045/046/047 | ranking전체목록/세트/라운드 | T-v1-07:Consumer P≤500/D≤100 전체게시;P2→D1 라운드탐욕조립에서교차중복뒤P21+/D11+를사용해재료손실없음;그뒤30슬롯예약;발견재공급1회후명시대체 |
 | R-v1-OPS-08 동시성·멱등 | API046 | recommendation_rounds/userstates | T-v1-08:동일requestId동시2요청은1라운드소비;서로다른요청은중복영화없음;입력변경후옛세트409 |
 | R-v1-OPS-09 세트소진·migration | API046 | bigintinput/generation/개인UK | T-v1-09:동일input/model의새세트성공;generation만증가;비숫자legacy원문/Party이력보존;LEGACY활성화금지;inputbigint음수거부;model128보존 |
-| R-v1-OPS-10 job/CAS | USER_POOL_BUILD/RERANK | 종류별token/expectedPool·RankingVersion | T-v1-10:pool·ranking동시접수서로token덮지않음;동일input/pool두ranking중기대active버전/token맞는결과만게시;재시도동일UUID |
+| R-v1-OPS-10 job/CAS | USER_POOL_BUILD/RERANK | 종류별token/expectedPool·RankingVersion | T-v1-10:pool·ranking동시접수서로token덮지않음;동일input/pool두ranking중기대active버전/token/policyDigest맞는결과만게시;evidence만바뀐구job거부;재시도동일UUID |
 | R-v1-OPS-11 부분실패복구 | 장애/Redis유실 | 기능event/jobevent/activepointer/offset | T-v1-11:원본이벤트는내구job등록후배치완료전ack;부분등록재시도멱등;joboffset은게시/후속요청완료후ack;payload만쓴종료미노출;token유실옛worker부활금지 |
-| R-v1-OPS-12 bundle정합 | 모델/배치전환 | manifest·전체모듈 | T-v1-12:230/245불일치와모델미준비거부;native-serving예측일치;구job의새bundle게시차단 |
+| R-v1-OPS-12 bundle정합 | 모델/배치전환 | manifest·전체모듈 | T-v1-12:230/245불일치와모델미준비거부;canonical policy/evidence digest 재계산과 manifest-wrapper 일치;native-serving예측일치;구job의새bundle게시차단 |
 | R-v1-OPS-13 삭제·백필 | API013/카탈로그변경 | 계정/제외/백필 | T-v1-13:탈퇴뒤늦은job재생성불가;삭제/부적격최종제외;기존영화ID와고정그룹기준보존 |
 | R-v1-OPS-14 기존소비자보존 | 개인API/Party/OTT | 기존키·새v1키 | T-v1-14:구키불변;v1활성포인터선택일관;score의미불일치소비거부;rollback경로 |
 | R-v1-OPS-15 추천session | API045/046/startRecommendationSession | session/userstate/requestid | T-v1-15:최초session생성;입력변경·소진시동일session노출보존;명시새탐색만교체;동일requestId동일session;expectedSession경합409;옛미소비예약만해제 |

@@ -28,7 +28,7 @@ ALS+GBT·ALS+FM의 전환/혼합도 [결합 비교 명세](HYBRID-COMPARISONS.md
 | PostgreSQL | 실제 사용자 입력·계정 상태·추천 이력의 원본 | 외부 원천값을 서비스 사용자의 별점으로 저장 |
 | Redis | 완성된 후보·순위 묶음의 캐시와 활성 포인터 | 유일한 입력 버전 원본, UUID의 크기 비교 |
 
-T는 TMDB, K는 KOBIS 출처다. 개인화 전환의 `K=10편`과 혼동하지 않도록 코드에서는
+T는 TMDB, K는 KOBIS 출처다. legacy 개인화 전환의 `K=10편`이나 새 policy의 이력 K와 혼동하지 않도록 코드에서는
 `personalization_min_ratings`와 `kobis_*`처럼 서로 다른 이름을 사용한다.
 
 ## 2. 고정 운영값
@@ -36,7 +36,7 @@ T는 TMDB, K는 KOBIS 출처다. 개인화 전환의 `K=10편`과 혼동하지 �
 | 항목 | v1 값 |
 | --- | --- |
 | 실제 별점 | 0.5~5.0, 0.5단위 보존 |
-| 개인화 전환 / 모델 입력 | 목표: N=0 초기 경로, N≥1 승인 모델 지원 시 개인화 / 0~N 이력 의미와 사용·절단 수 보존. K10·최신10은 legacy |
+| 개인화 전환 / 모델 입력 | 목표: 0~N 입력 지원, 검증된 K policy 미만은 초기/승인 blend·이상은 승인 모델 / 전체·제공·지원·절단 수 보존. K10·최신10은 legacy |
 | legacy 최신10 이력 정렬 | 과거 회귀 비교에서 rating_updated_at DESC, service_movie_id ASC로 원본10편을 선택. 현재 0~N 학습·추론은 목표시각 이전 전체 이력과 실제 사용 수를 기록 |
 | 맞춤 배치 후보 / 실시간 점수화 | 최대500 / 중간 Top100 절단 없이 현재 후보 전부 |
 | 발견 구조 | 공개8맛 × 맛당128 하위그룹=총1,024 |
@@ -59,9 +59,11 @@ T는 TMDB, K는 KOBIS 출처다. 개인화 전환의 `K=10편`과 혼동하지 �
 2. 고정 전처리·8맛/하위그룹 중심과 할당을 로드한다. 목록 변경만으로 중심을 다시 학습하지 않는다.
 3. raw source validity와 추천 후보 eligibility를 별도 계산하고 T/K 그룹별 순위 및 공용 초기 후보 최대500을 만든다.
 4. 모델 manifest의 모델 종류·profile ID·특징 개수/순서·transform·보정·원천 버전을 검사한다. legacy245와 RH230 또는 GBT/FM별 승격 profile을 섞지 않는다.
-5. 사용자 상태에 맞는 POLICY 경로로 전체 적격 카탈로그를 정렬해 pool500을 만든다. N=0은 초기
-   콘텐츠/대중 경로, N≥1은 승격된 0~N 모델과 이력이 지원될 때 개인화한다. 생성 당시 입력 버전,
-   전체/지원/절단 이력 수와 rankingMode를 기록한다.
+5. 사용자 상태와 승인된 K policy에 맞는 경로로 전체 적격 카탈로그를 정렬해 pool500을 만든다.
+   검증된 전환점 미만은 초기 콘텐츠/대중성 또는 승인된 blend, 이상은 승격된 0~N 모델과 이력이
+   지원될 때 개인화한다. 생성 당시 policy version, 입력 버전, 전체/제공/지원/절단 이력 수와
+   rankingMode를 기록한다. policy는 bundle의 불변 일부이며 625 evidence와 627의 job·payload·pointer·
+   CAS 결속이 없으면 활성화하지 않는다.
 6. 모든 산출물의 ID·중복·유한값·용량·해시와 매핑 검토 근거, 선언한 cutoff/누적범위를 검증한 뒤 하나의 bundle로 공개한다. 후보·이력 특징은 같은 정규화 source를 읽어야 한다. 일부 파일만 성공한 버전은 게시하지 않는다.
 7. Consumer가 같은 bundle의 후보와 특징을 읽어 최초 순위를 만든다. Spring은 현재 입력 버전과 맞는 결과만 세트로 사용한다.
 
@@ -112,8 +114,8 @@ ALS 비교 모드라면 Factor가 있는 입력의 Fold-in을 다시 계산하�
 
 | 상황 | 즉시 사용할 경로 | 비동기 후속 |
 | --- | --- | --- |
-| 개인 pool 없음, N=0 또는 모델 미지원 | 같은 bundle의 배치 공용 T/K500에서 초기 콘텐츠/대중 경로 | 현재 사용자에 대한 targeted pool 준비 |
-| 개인 pool 없음, N≥1, 승인 모델 준비됨 | 같은 공용500에 현재 모델 특징·점수 적용, provisional 표시 | 현재 입력 기반 개인 pool 준비 |
+| 개인 pool 없음, 전환점 미만·정책 미검증·모델 미지원 | 같은 bundle의 배치 공용 T/K500에서 초기 콘텐츠/대중 또는 승인 blend | 현재 사용자에 대한 targeted pool 준비 |
+| 개인 pool 없음, 전환점 이상·승인 모델 준비됨 | 같은 공용500에 현재 모델 특징·점수 적용, provisional 표시 | 현재 입력 기반 개인 pool 준비 |
 | 기존 pool은 있지만 입력이 새로 바뀜 | 기존 membership500을 최신 입력으로 재정렬 | 최신 입력에 맞춘 pool 재생성 |
 | 맞춤 pool 소진 | 공용/이전순위도 현재 제외를 적용해 가능한 경우만 제공 | POOL_EXHAUSTED 작업이 현재session의노출·활성예약을전체카탈로그검색에서제외해다음500 생성 |
 | 맞는 bundle의 pool도 공용 pool도 없음 | 추천 준비/이용불가 상태 | bundle/pool 복구. API 요청 안에서 전체 영화 계산 금지 |
@@ -121,15 +123,17 @@ ALS 비교 모드라면 Factor가 있는 입력의 Fold-in을 다시 계산하�
 targeted 작업은 정기 배치와 **같은 후보 Producer 코드**를 사용자 범위만 줄여 실행한다.
 N=0 또는 모델/이력 미지원 targeted 작업도 전체 적격 카탈로그를 초기 콘텐츠 방향 또는 T/K
 대중 순서로 정렬해500편을 만든다. 단지 targeted job이라는 이유로 모델 경로를 강제하지 않는다.
-각 요청은 불변 `jobId`, `desiredJobToken`, `expectedBasePoolVersion`, 대상 입력 버전을 가진다.
+각 요청은 불변 `jobId`, `desiredJobToken`, `expectedBasePoolVersion`, 대상 입력 버전,
+`bundleId`와 `routingPolicyDigest`를 가진다.
 재시도는 같은 ID를 재사용한다. 같은 입력 버전에서 재빌드가 겹쳐도 최신 token과 기대 pool이 맞는 작업만 게시한다.
 입력이 더 바뀌었으면 오래된 결과를 폐기하고 최신 입력 작업을 준비한다. 새 pool 게시 후 Consumer 재정렬을 다시 요청한다.
-재시도 도중 입력이나 bundle이 달라졌다면 같은 불변 version에 새 내용을 쓰지 않는다. 기존 작업을 대체된 상태로 끝내고
+재시도 도중 입력·bundle·routing policy가 달라졌다면 같은 불변 version에 새 내용을 쓰지 않는다. 기존 작업을 대체된 상태로 끝내고
 새 입력을 대상으로 새 job/version을 만든다. 단순 전송 재시도와 새 입력의 재계산은 서로 다른 작업이다.
 
 pool 생성과 ranking 재정렬은 동시에 진행할 수 있으므로 원하는 작업 상태도 `desired-job:pool`과
 `desired-job:ranking`으로 나눈다. ranking 작업은 자신의 desiredJobToken, expectedRankingVersion,
 대상 pool/input/bundle/session을 비교해 게시한다. 같은 입력·pool의 두 재정렬도 나중에 끝난 오래된 작업이 최신 ranking을 덮어쓰지 못한다.
+대상 `routingPolicyDigest`도 함께 비교하며 policy 변경은 진행 중인 구 작업을 supersede한다.
 pool 게시 뒤 새 ranking 요청은 ranking 상태만 갱신하며 진행 중인 pool 작업 token을 덮어쓰지 않는다.
 
 ### 소진 때 같은500편을 반복하지 않기
@@ -147,7 +151,10 @@ job/pool은 `excludedSessionId`, `excludedExposureRevision`, `excludedExposureHa
 명시 새 탐색에서는 이전 session 한정 pool을 비활성화하고 공용500을 임시 사용하면서 새 job을 요청한다.
 이전 session의 제외 목록을 새 session의 영구 제외로 이어 붙이지 않는다. 감상·관심없음 제외는 항상 유지한다.
 
-발견 공급에서는0개인 그룹만 건너뛴다. “최대100”을 맞추려고11개째 공급 그룹을 방문하지 않는다.
+발견 공급에서는0개인 그룹만 건너뛴다. 최초 상위10개 비어 있지 않은 적격 그룹에서 그룹당10편까지
+할당한 뒤 부족분은 같은 그룹의11위 이후를 층별로 채운다. 그 그룹들을 모두 소진해도100편보다
+적으면11번째 이후 비어 있지 않은 적격 그룹을 순서대로 소진하며, 모든 적격 후보가 소진된 경우에만
+100편 미만을 허용한다.
 게시된 발견≤100의 순서를 소비해도 발견 슬롯을 채우지 못하면, 미노출·미예약·미감상 조건으로 같은10×10 정책의 다음 공급을 한 번 준비한다.
 그래도 발견을 못 채우면 POLICY에 따라 맞춤으로 대체하고 `actualType=PERSONALIZED`,
 `fallbackReason=DISCOVERY_EXHAUSTED`를 기록한다. 대체 영화를 발견이라고 표시하지 않는다.
