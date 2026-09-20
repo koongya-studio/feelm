@@ -249,7 +249,7 @@ class TasteRecommendationPartyMigrationTest {
     }
 
     @Test
-    @DisplayName("개인 추천 세트는 generation ID를 저장하고 같은 배치를 중복 생성할 수 없다")
+    @DisplayName("개인 추천 세트는 generation ID를 저장하고 같은 generation·회차를 중복 생성할 수 없다")
     void storesRecommendationCandidateMetadata() throws SQLException {
         long userId = insertUser("candidate@feelm.test", "후보사용자");
         long otherUserId = insertUser("candidate-other@feelm.test", "다른후보사용자");
@@ -292,7 +292,19 @@ class TasteRecommendationPartyMigrationTest {
                                                 + otherUserId
                                                 + ",'another-input','als-2',9,'generation-3',now())"))
                 .isInstanceOf(SQLException.class)
-                .hasMessageContaining("uix_recommendation_sets_generation");
+                .hasMessageContaining("uix_recommendation_sets_generation_batch");
+        // 회차를 구분하면 같은 generation이라도 batch_no가 다르면 저장할 수 있다(S15P21E106-219).
+        execute(
+                "INSERT INTO recommendation_sets"
+                        + " (user_id,input_version,model_version,"
+                        + " candidate_version,generation_id,batch_no,generated_at) VALUES ("
+                        + userId
+                        + ",'input-candidate','als-1',3,'generation-3',1,now())");
+        assertThat(
+                        longValue(
+                                "SELECT count(*) FROM recommendation_sets"
+                                        + " WHERE generation_id='generation-3'"))
+                .isEqualTo(2);
         execute(
                 "INSERT INTO recommendation_sets"
                         + " (user_id,input_version,model_version,candidate_version,generation_id,generated_at)"

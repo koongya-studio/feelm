@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.feelm.backend.domain.recommendation.model.RecommendationCandidateBatch;
 import com.feelm.backend.domain.recommendation.repository.RecommendationBufferRepository;
 import com.feelm.backend.domain.recommendation.repository.RecommendationCandidateReader;
+import com.feelm.backend.domain.recommendation.repository.RecommendationServingRepository;
 import com.feelm.backend.global.error.BusinessException;
 import java.time.Clock;
 import java.time.Instant;
@@ -25,9 +26,15 @@ class RecommendationBufferWriterOrderTest {
             mock(RecommendationCandidateReader.class);
     private final RecommendationReasonService reasonService =
             mock(RecommendationReasonService.class);
+    private final RecommendationServingRepository servingRepository =
+            mock(RecommendationServingRepository.class);
     private final RecommendationBufferWriter writer =
             new RecommendationBufferWriter(
-                    repository, candidateReader, reasonService, Clock.systemUTC());
+                    repository,
+                    servingRepository,
+                    candidateReader,
+                    reasonService,
+                    Clock.systemUTC());
 
     @Test
     void locksUserBeforeReadingRedisAndReusesOwnGeneration() {
@@ -48,6 +55,45 @@ class RecommendationBufferWriterOrderTest {
         order.verify(repository).lockActiveUserIfExists(1024L);
         order.verify(candidateReader).read(1024L);
         order.verify(repository).findExistingSet(1024L, "generation");
+    }
+
+    @Test
+    void nextBatchNeverReadsRedisWhileHoldingTheUserLock() {
+        RecommendationCandidateBatch batch =
+                new RecommendationCandidateBatch(
+                        "model",
+                        6L,
+                        "generation",
+                        Instant.parse("2026-09-18T00:00:00Z"),
+                        List.of());
+        when(repository.lockActiveUserIfExists(1024L)).thenReturn(true);
+        when(repository.findLatestSetId(1024L)).thenReturn(OptionalLong.of(77L));
+        when(servingRepository.hasValidItems(1024L, 77L)).thenReturn(false);
+
+        assertThatThrownBy(() -> writer.writeNextBatch(1024L, 77L, batch))
+                .isInstanceOf(NoEligibleRecommendationCandidatesException.class);
+
+        verify(candidateReader, never()).read(1024L);
+    }
+
+    @Test
+    void nextBatchStopsWhenTheSetIsNoLongerExhausted() {
+        RecommendationCandidateBatch batch =
+                new RecommendationCandidateBatch(
+                        "model",
+                        6L,
+                        "generation",
+                        Instant.parse("2026-09-18T00:00:00Z"),
+                        List.of());
+        when(repository.lockActiveUserIfExists(1024L)).thenReturn(true);
+        when(repository.findLatestSetId(1024L)).thenReturn(OptionalLong.of(77L));
+        when(servingRepository.hasValidItems(1024L, 77L)).thenReturn(true);
+
+        var result = writer.writeNextBatch(1024L, 77L, batch);
+
+        assertThat(result.recommendationSetId()).isEqualTo(77L);
+        assertThat(result.created()).isFalse();
+        verify(repository, never()).findLatestBatchNo(1024L, "generation");
     }
 
     @Test
