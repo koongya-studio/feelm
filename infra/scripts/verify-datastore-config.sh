@@ -124,9 +124,13 @@ docker_cli exec "${CONTAINER_NAME}" sh -c \
   'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_local_backend GET unapproved:key' \
   | grep -q 'no permissions'
 # EVAL 권한이 키 패턴을 우회해 추천 데이터를 변경하지 못해야 한다.
+# Redis Lua ACL 오류는 ACL DRYRUN과 달리 "No permissions"로 시작한다.
 docker_cli exec "${CONTAINER_NAME}" sh -c \
   'redis-cli --no-auth-warning --user feelm_local_backend --pass "$REDIS_LOCAL_BACKEND_PASSWORD" EVAL "return redis.call('"'"'SET'"'"', '"'"'feelm:user:1:candidates'"'"', '"'"'forbidden'"'"')" 0' \
-  | grep -q 'no permissions'
+  | grep -qi 'no permissions'
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning EXISTS feelm:user:1:candidates' \
+  | grep -qx 0
 docker_cli exec "${CONTAINER_NAME}" sh -c \
   'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_local_backend FLUSHALL' \
   | grep -q 'no permissions'
