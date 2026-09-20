@@ -91,6 +91,7 @@ import { getPopcornBucket } from '../../../api/taste';
 import { getMyProfileView } from '../../../api/users';
 import { getMyRatings, getWatchRecords } from '../../../api/watch';
 import { path } from '../../../routes/paths';
+import { appUrl } from '../../../utils/appUrl';
 import { formatShortDate } from '../../../utils/date';
 import styles from './MyDashboardPage.module.css';
 import type { FlavorCount } from '../../../components/PopcornBucket/kernels';
@@ -451,9 +452,13 @@ export default function MyDashboardPage() {
    * 7.2-B 공개 프로필 주소를 기기의 공유 메뉴에 넘긴다. 공유 API가 계약에 없으므로
    * 서버를 부르지 않는다. 공유 메뉴가 없는 브라우저에서는 주소를 복사하고, 그것도
    * 막혀 있으면 알린다 — 되는 것처럼 보이고 아무 일도 없는 상태를 만들지 않는다.
+   *
+   * **주소는 `appUrl`로 만든다**(업무 -716 다음의 -717). `path.*`는 라우터 안에서 쓰는
+   * 경로라 앱이 놓인 자리(`/app`)가 빠져 있다. `location.origin`에 그대로 붙이면 받는
+   * 사람이 404를 본다.
    */
   const shareProfile = async () => {
-    const url = `${window.location.origin}${path.publicProfile(profile.userId)}`;
+    const url = appUrl(path.publicProfile(profile.userId));
     const title = `${profile.nickname}님의 Feelm 프로필`;
 
     if (typeof navigator.share === 'function') {
