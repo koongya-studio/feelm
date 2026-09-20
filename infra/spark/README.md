@@ -4,30 +4,50 @@
 
 S15P21E106-290의 `ml-cluster-check.py`는 `spark-submit` client mode Driver와 두 Worker가
 모두 NumPy 2.2.6을 사용하고, 작은 고정 rating 데이터로 ALS 학습·예측이 성공하는지 확인합니다.
-런타임 이미지는 저장소 루트의 `infra/spark/Dockerfile`로 수동 빌드하고 Docker Hub에
-Push합니다. 배포 기준은 가변 태그가 아니라 `runtime-image.env`에 커밋한 OCI index digest이며,
-런타임을 갱신할 때 원격 registry에서 확인한 digest를 MR로 변경합니다. GitLab CI/CD Variable에는
-Docker Hub 인증 정보만 두고 런타임 이미지 참조는 저장하지 않습니다. `requirements-ml.txt`는
+보호된 `main` push에서 Dockerfile·requirements 또는 Spark 코드·배포 계약이 변경되면
+`spark-code-image` Job이 런타임 빌드 → 컨테이너 테스트 → Docker Hub Push → digest 확정 →
+코드 이미지 빌드 순으로 실행합니다. `linux/amd64` 런타임은 `<commit>-<job-id>` 태그로 빌드하고,
+후속 단계에는 태그 대신 registry에서 다시 pull하여 검증한 RepoDigest만 전달합니다.
+코드만 변경되어도 현재 Dockerfile·requirements로 빌드하며 Docker layer cache를 재사용합니다.
+따라서 예전 `runtime-image.env` digest로 되돌아가지 않습니다. 이 파일은 이전 수동 배포의
+참고 기록으로만 남기며 자동 빌드 입력으로 사용하지 않습니다. 기존 Docker Hub 인증 변수를
+재사용하고 새 Secret은 추가하지 않습니다. `requirements-ml.txt`는
 `pipeline/spark/uv.lock`에서 생성한 CPU 전용
 PyTorch·Transformers·psycopg 및 NumPy wheel hash를 포함합니다. Dockerfile은 PyTorch 공식 CPU
 index를 추가해 GPU/CUDA wheel을 설치하지 않습니다. 빌드·적용·롤백 및 전체 제출 명령은
 [인프라 운영 문서](../README.md#ml-runtime-image)를 따릅니다.
 
-현재 고정된 런타임 이미지는 다음 명령으로 원격 manifest와 플랫폼 구성을 확인합니다. 출력의
-최상위 `Digest`가 `runtime-image.env` 값과 같아야 하며, `linux/amd64` 하위 manifest나
-attestation manifest digest를 대신 기록하지 않습니다.
+Push 전 검증은 `pip check`, 비 root 사용자, NumPy·psycopg·Redis·CPU PyTorch·Transformers
+import, Python executor의 NumPy 로딩과 local[2] ALS 학습·예측입니다. 테스트 컨테이너는
+외부 네트워크를 차단합니다. 실패하면 Push·코드 빌드·서버 배포를 진행하지 않습니다.
+실제 두 서버 executor·HDFS 통합 검증은 아래 `ml-cluster-check.py` 절차를 따릅니다.
+
+실행 중인 코드 이미지의 기반 런타임 digest는 다음으로 확인합니다.
 
 ```bash
-docker buildx imagetools inspect choec/feelm-spark-ml:develop-59160470102d
+CODE_IMAGE=$(docker inspect feelm-spark-master --format '{{.Config.Image}}')
+docker image inspect "$CODE_IMAGE" --format '{{index .Config.Labels "io.feelm.spark.runtime-image"}}'
 ```
 
 ## 작업 코드 이미지 CD
 
-보호된 `main`에서 Spark 코드나 배포 계약이 바뀌면 CI가 고정 runtime digest 위에 실행 코드만
+보호된 `main`에서 Spark 코드나 배포 계약이 바뀌면 CI가 위에서 검증한 runtime digest 위에 실행 코드만
 추가한 `choec/feelm-spark:<commit>` 이미지를 빌드·Push하고 RepoDigest를 두 노드 배포 Job에
 전달합니다. 양 노드는 이미지 label과 `.source-revision`을 먼저 검증합니다. 모두 통과한 경우에만
 분산 노드의 Master·Worker 2, 서비스 노드의 Worker 1 순서로 재생성합니다. 후보 적용 중 하나라도
 실패하면 각 노드의 pending 상태를 이용해 직전 정상 release와 이미지로 복구합니다.
+
+`spark-code-image.env` artifact에는 코드 digest와 `SPARK_RUNTIME_IMAGE`가 함께 기록됩니다.
+`deploy-spark-history`는 두 노드 배포의 `spark-code-notify` 성공을 기다린 뒤 Master 코드
+이미지의 `io.feelm.spark.runtime-image` label을 읽습니다. CI artifact와 일치하는 런타임 digest를
+직접 History Server 이미지로 사용하며, 기동 후 digest·revision·History API를 확인합니다.
+History 전용 변경은 현재 Master의 label을 사용합니다. label이 없는 과거 코드 이미지에서는
+변경 전에 중단하므로, 이 기능의 첫 main 배포에서 새 코드 이미지를 먼저 적용해야 합니다.
+
+History 실패는 기존 History 컨테이너로 복구하며 이미 성공한 Master·Worker 배포를 되돌리지는
+않습니다. 이 경우 pipeline은 실패 상태이고 두 런타임이 다를 수 있습니다. History 오류를
+해결한 뒤 해당 Job을 재시도하여 일치시킵니다. Spark 전체 rollback을 별도로 수행했다면
+History 배포도 다시 실행하여 복구된 코드 이미지의 기반 런타임에 맞춥니다.
 
 최초 자동 배포 전에는 첫 `main` pipeline의 image Job이 Push한 **작업 코드 image digest**를
 조율된 유휴 시간에 세 컨테이너에 한 번 수동 적용합니다. 이 bootstrap 전에는 기존 runtime image

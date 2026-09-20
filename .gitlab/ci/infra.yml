@@ -108,7 +108,13 @@ deploy-distributed-observability:
 deploy-spark-history:
   stage: deploy
   tags: [e106-distributed]
-  needs: []
+  needs:
+    - job: spark-code-notify
+      optional: true
+      artifacts: false
+    - job: spark-code-image
+      optional: true
+      artifacts: true
   environment:
     name: distributed
   script:
@@ -133,6 +139,25 @@ deploy-spark-history:
         - infra/scripts/verify-spark-history.py
         - infra/scripts/test_distributed_auxiliary_deployment.py
         - infra/scripts/test_verify_spark_history.py
+        - pipeline/spark/**/*.py
+        - pipeline/spark/pyproject.toml
+        - pipeline/spark/uv.lock
+        - pipeline/spark/.python-version
+        - infra/compose/service.yml
+        - infra/spark/**/*
+        - infra/scripts/build-spark-code-image.sh
+        - infra/scripts/build-spark-runtime-image.sh
+        - infra/scripts/test_spark_runtime_delivery.py
+        - infra/scripts/deploy-spark-code.sh
+        - infra/scripts/spark-code-state.py
+        - infra/scripts/test_spark_code_delivery.py
+        - infra/scripts/test_spark_code_state.py
+        - infra/scripts/deploy-distributed-runtime.py
+        - infra/scripts/runtime-config-release.py
+        - .gitlab/ci/pipeline.yml
+        - infra/scripts/ci-deploy-current-commit.py
+        - infra/scripts/test_deploy_distributed_runtime.py
+        - infra/scripts/test_runtime_config_release.py
 
 .deploy-hdfs-config:
   stage: deploy
@@ -226,6 +251,8 @@ deploy-kafka-config:
         - infra/compose/distributed.yml
         - infra/spark/**/*
         - infra/scripts/build-spark-code-image.sh
+        - infra/scripts/build-spark-runtime-image.sh
+        - infra/scripts/test_spark_runtime_delivery.py
         - infra/scripts/deploy-spark-code.sh
         - infra/scripts/spark-code-state.py
         - infra/scripts/test_spark_code_delivery.py
@@ -234,6 +261,9 @@ deploy-kafka-config:
         - infra/scripts/runtime-config-release.py
         - .gitlab/ci/pipeline.yml
         - .gitlab/ci/infra.yml
+        - infra/scripts/ci-deploy-current-commit.py
+        - infra/scripts/test_deploy_distributed_runtime.py
+        - infra/scripts/test_runtime_config_release.py
 
 spark-code-preflight-service:
   extends: .spark-code-deploy
@@ -492,7 +522,7 @@ infra-config-test:
         - infra/scripts/deploy-distributed-runtime.py
         - infra/scripts/runtime-config-release.py
         - infra/scripts/deploy-*-config.sh
-        - infra/scripts/*spark*code*
+        - infra/scripts/*spark*{code,runtime}*
         - infra/scripts/test_runtime_config_release.py
         - infra/scripts/deploy-consumer.sh
         - infra/scripts/rollback-consumer.sh
