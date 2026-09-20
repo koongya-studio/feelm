@@ -65,8 +65,7 @@ import tools.jackson.databind.node.ObjectNode;
         properties = {
             "spring.flyway.enabled=true",
             "spring.jpa.hibernate.ddl-auto=none",
-            "spring.jpa.properties.hibernate.generate_statistics=true",
-            "feelm.auth.mock.enabled=false"
+            "spring.jpa.properties.hibernate.generate_statistics=true"
         })
 @AutoConfigureMockMvc
 @Transactional

@@ -32,8 +32,7 @@ import org.springframework.test.web.servlet.MockMvc;
         properties = {
             "spring.flyway.enabled=true",
             "spring.jpa.hibernate.ddl-auto=none",
-            "spring.task.scheduling.enabled=false",
-            "feelm.auth.mock.enabled=false"
+            "spring.task.scheduling.enabled=false"
         })
 @AutoConfigureMockMvc
 @DisplayName("API-031 유사 영화 조회")
