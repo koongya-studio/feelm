@@ -9,8 +9,12 @@
  * **한 파일에 실제 호출과 목업이 섞여 있다.** 갈리는 기준은 백엔드에 해당 API가 있는지다.
  * - 위 다섯 함수는 실제 API를 부른다. 다만 API-040은 현재 호출하는 화면이 없다
  * - `getTasteFlow`는 계약에 대응 API가 **없다**(CR-16)
- * - `getMockPopcornFlavors`는 **집계 자체가 목업으로 남은 화면**이 쓴다. 아래 목업 구역의
- *   주석을 볼 것
+ *
+ * 팝콘 맛 기준정보의 목업 함수(`getMockPopcornFlavors`)는 업무 S15P21E106-707에서 지웠다.
+ * 목업 집계를 쓰던 5.8 파티원 팝콘은 실제 `getPopcornFlavors`(API-044)로 옮겨 갔고, 5.9
+ * 팝콘 섞기는 맛 코드만 쓴다(그림은 `PopcornBucket/sprites.ts`가 코드로 짝짓는다). 7.2-C
+ * 취향 비교는 업무 S15P21E106-506에서 화면 자체가 없어졌다. 목업 데이터
+ * (`mocks/popcornFlavors`)는 다른 목업 집계가 맛을 채우는 데 계속 쓰므로 남는다.
  *
  * 평가 생성(API-036)이 실제 호출이 되어(업무 -491) 2.5 → 2.6 흐름이 서버에 프레임과 팝콘을
  * 만든다. 그래서 이 파일이 돌려주는 프레임 목록과 팝콘 버킷도 평가하는 만큼 채워진다.
@@ -18,7 +22,6 @@
  * (API-040 처리 규칙) 백엔드에는 아직 조회만 있고 캐시를 채우는 쪽이 없다. 그래서 지금은
  * 평가를 얼마나 해도 모든 사용자가 `insufficientData: true`와 빈 `keywords`를 받는다.
  */
-import { mockPopcornFlavors } from '../mocks/popcornFlavors';
 import { mockTasteFlow } from '../mocks/taste';
 import { request } from './client';
 import { respond } from './mockTransport';
@@ -108,17 +111,4 @@ export async function getFrameDetail(frameId: number): Promise<FrameDetail> {
  */
 export async function getTasteFlow(): Promise<TasteFlowView> {
   return respond(mockTasteFlow, 'taste');
-}
-
-/**
- * 목업 흐름 전용 팝콘 맛 기준정보.
- *
- * 5.8 · 5.9 파티 팝콘 · 7.2-C 취향 비교는 **집계 자체가 목업**이다.
- * 목업 집계의 맛 코드는 목업 기준정보의 코드라, 실제 API-044의 코드와 맞지 않는다.
- * 그래서 목업으로 남은 화면은 목업 기준정보를 그대로 쓴다(팀 결정 2026-09-16).
- * 각 화면이 실제 API로 바뀔 때 `getPopcornFlavors`로 옮긴다 — 2.7 평가 결과가 업무 -491에서
- * 그렇게 옮겨 갔다.
- */
-export async function getMockPopcornFlavors(): Promise<PopcornFlavor[]> {
-  return respond(mockPopcornFlavors);
 }

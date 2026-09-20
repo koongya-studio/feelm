@@ -47,9 +47,10 @@
 | 함수 | 원래 쓰던 곳 | 상태 |
 | --- | --- | --- |
 | `taste.getTasteFlow` | 3.1 `요즘 취향 흐름` 문장 · 키워드 근거(CR-16, `TasteFlowView`) | 화면에서 빠졌다. `mocks/taste.ts`는 리포트 · 공개 프로필 목업이 키워드를 빌려 써 남아 있다 |
-| `taste.getMockPopcornFlavors` | 5.8 · 5.9 파티 팝콘의 맛 기준정보 | 5.8은 실제 `getPopcornFlavors`(API-044)를 쓰고, 5.9는 맛 코드만 쓴다. 업무 S15P21E106-707이 이 함수를 옮기려던 업무다 |
 
-둘 다 지울 대상입니다. 지우는 일은 이 표를 만드는 업무 밖이라 따로 합니다.
+`taste.getMockPopcornFlavors`는 업무 S15P21E106-707에서 지웠습니다. 5.8 파티원 팝콘은 실제 `getPopcornFlavors`(API-044)를 쓰고 5.9 팝콘 섞기는 맛 코드만 써서, 옮길 화면이 남아 있지 않았습니다.
+
+`taste.getTasteFlow`도 지울 대상입니다. 지우는 일은 이 표를 만드는 업무 밖이라 따로 합니다.
 
 ## 4. 함수별 상태
 
@@ -143,7 +144,6 @@
 | `getFrameDetail` | 실제 | API-043 |
 | `getPopcornFlavors` | 실제 | API-044 |
 | `getTasteFlow` | **목업** · 쓰는 곳 없음 | 3장 |
-| `getMockPopcornFlavors` | **목업** · 쓰는 곳 없음 | 3장 |
 
 ### `recommendations.ts`
 
