@@ -13,6 +13,9 @@ pending을 확정합니다. 하나라도 실패하면 양 노드에서 이전 ma
 최초 bootstrap과 수동 복구는 [`infra/spark/README.md`](../spark/README.md#작업-코드-이미지-cd)를
 따릅니다.
 
+분산 노드의 Kafka Exporter·Kafka UI·Node Exporter와 Spark History Server CD 및 실패 복구는
+[`DISTRIBUTED-AUXILIARY-CD.md`](DISTRIBUTED-AUXILIARY-CD.md)를 따릅니다.
+
 백엔드 의존성 변경으로 격리 Runner의 Gradle 캐시가 부족할 때는
 [S15P21E106-271 캐시 자동화](DEPENDENCY-CACHE-AUTOMATION.md)를 사용한다. MR의 변경을 표시하는
 고정 Custom executor가 MR SHA별 후보를 자동 준비·검증하고, 각 MR 테스트는 자신의 후보만

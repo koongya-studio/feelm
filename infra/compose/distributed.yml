@@ -173,6 +173,8 @@ services:
     container_name: feelm-spark-history-server
     hostname: spark-history-server
     restart: unless-stopped
+    labels:
+      io.feelm.spark-history.revision: ${SPARK_HISTORY_DEPLOY_REVISION:-manual}
     network_mode: host
 
     extra_hosts:
@@ -241,6 +243,8 @@ services:
     image: danielqsj/kafka-exporter:v1.9.0
     container_name: feelm-kafka-exporter
     restart: unless-stopped
+    labels:
+      io.feelm.distributed-observability.revision: ${OBSERVABILITY_DEPLOY_REVISION:-manual}
     network_mode: host
     read_only: true
 
@@ -267,6 +271,8 @@ services:
     image: ghcr.io/kafbat/kafka-ui:v1.5.0
     container_name: feelm-kafka-ui
     restart: unless-stopped
+    labels:
+      io.feelm.distributed-observability.revision: ${OBSERVABILITY_DEPLOY_REVISION:-manual}
     network_mode: host
     read_only: true
 
@@ -385,6 +391,8 @@ services:
     image: prom/node-exporter:v1.11.1
     container_name: feelm-node-exporter-distributed
     restart: unless-stopped
+    labels:
+      io.feelm.distributed-observability.revision: ${OBSERVABILITY_DEPLOY_REVISION:-manual}
     pid: host
     read_only: true
 

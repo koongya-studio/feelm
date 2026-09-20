@@ -202,6 +202,9 @@ include:
         entries = re.findall(r'(?m)^        - ', changes.group(1))
         self.assertLessEqual(len(entries), 50)
         self.assertIn('- infra/scripts/deploy-*-config.sh', changes.group(1))
+        self.assertIn('- infra/scripts/*distributed*auxiliary*', changes.group(1))
+        self.assertIn('- infra/scripts/*distributed*observability*', changes.group(1))
+        self.assertIn('- infra/scripts/*spark-history*', changes.group(1))
 
     def test_required_variable_contract_and_runtime_preflight_are_separated(self):
         contract = job_block(self.infra, 'ci-variable-contract-check')
@@ -257,6 +260,49 @@ include:
                 '$CI_COMMIT_BRANCH == "develop"', 'merge_request_event',
                 'when: manual', 'allow_failure: true', 'docker compose down',
                 '- infra/monitoring/README.md'):
+            self.assertNotIn(forbidden, deploy)
+
+    def test_distributed_observability_deploy_is_protected_and_isolated(self):
+        deploy = job_block(self.infra, 'deploy-distributed-observability')
+        for expected in (
+                'stage: deploy', 'tags: [e106-distributed]', 'needs: []',
+                'name: distributed', 'ci-deploy-current-commit.py',
+                'bash infra/scripts/deploy-distributed-observability.sh',
+                'notify-deployment.py distributed-observability "$CI_JOB_STATUS"',
+                'resource_group: distributed-runtime-kafka',
+                'interruptible: false', 'timeout: 15m',
+                '$CI_COMMIT_BRANCH == "main"',
+                '$CI_COMMIT_REF_PROTECTED == "true"',
+                '$CI_PIPELINE_SOURCE == "push"',
+                '- infra/compose/distributed.yml',
+                '- infra/scripts/deploy-distributed-observability.sh',
+                '- infra/scripts/verify-distributed-observability.py'):
+            self.assertIn(expected, deploy)
+        for forbidden in (
+                'merge_request_event', 'when: manual', 'allow_failure: true',
+                'docker compose down', 'deploy-spark-history.sh'):
+            self.assertNotIn(forbidden, deploy)
+
+    def test_spark_history_deploy_is_protected_and_serialized_with_spark(self):
+        deploy = job_block(self.infra, 'deploy-spark-history')
+        for expected in (
+                'stage: deploy', 'tags: [e106-distributed]', 'needs: []',
+                'name: distributed', 'ci-deploy-current-commit.py',
+                'bash infra/scripts/deploy-spark-history.sh',
+                'notify-deployment.py spark-history "$CI_JOB_STATUS"',
+                'resource_group: distributed-runtime-spark',
+                'interruptible: false', 'timeout: 20m',
+                '$CI_COMMIT_BRANCH == "main"',
+                '$CI_COMMIT_REF_PROTECTED == "true"',
+                '$CI_PIPELINE_SOURCE == "push"',
+                '- infra/compose/distributed.yml', '- infra/hadoop/**/*',
+                '- infra/spark/spark-defaults.conf',
+                '- infra/scripts/deploy-spark-history.sh',
+                '- infra/scripts/verify-spark-history.py'):
+            self.assertIn(expected, deploy)
+        for forbidden in (
+                'merge_request_event', 'when: manual', 'allow_failure: true',
+                'docker compose down', 'deploy-distributed-observability.sh'):
             self.assertNotIn(forbidden, deploy)
 
     def test_hdfs_config_deploy_is_manual_protected_main_and_ordered(self):
@@ -463,10 +509,11 @@ include:
                 self.assertIn('after_script:', block, name)
         self.assertEqual(
             sorted(deploy_jobs),
-            ['deploy-backend', 'deploy-consumer', 'deploy-frontend',
+            ['deploy-backend', 'deploy-consumer', 'deploy-distributed-observability',
+             'deploy-frontend',
              'deploy-hdfs-distributed-config', 'deploy-hdfs-service-config',
              'deploy-kafka-config', 'deploy-monitoring', 'deploy-postgresql',
-             'deploy-redis'],
+             'deploy-redis', 'deploy-spark-history'],
         )
         notification_paths = (
             backend_env,
