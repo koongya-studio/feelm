@@ -1,5 +1,9 @@
 # Runner 통신 격리 파일럿 (S15P21E106-222)
 
+Kafka 업무 Topic의 별도 멱등 Job과 로컬 실행 방법은
+[`KAFKA-TOPICS.md`](KAFKA-TOPICS.md)를 따른다. 기존 Topic의 파티션·복제 설정이 다르면
+자동 변경 없이 실패하며 Topic과 메시지를 삭제하지 않는다.
+
 분산 런타임의 수동 배포 진입점은 `deploy-distributed.sh`와 `deploy-service.sh`입니다.
 두 스크립트는 공통 `deploy-distributed-runtime.py`를 각각 분산 노드와 서비스 노드 역할로
 호출합니다. 기본 실행은 계획 출력이며, 실제 적용 조건·순서·검증·복구 방법은

@@ -204,6 +204,26 @@ deploy-hdfs-distributed-config:
   after_script:
     - python3 -I -B infra/scripts/notify-deployment.py hdfs-distributed-config "$CI_JOB_STATUS"
 
+provision-kafka-topics:
+  stage: deploy
+  tags: [e106-distributed]
+  needs: []
+  dependencies: []
+  environment:
+    name: distributed
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
+    - bash infra/scripts/ensure-kafka-topics.sh
+  resource_group: distributed-runtime-kafka
+  interruptible: false
+  timeout: 15m
+  allow_failure: false
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - .gitlab/ci/infra.yml
+        - infra/scripts/ensure-kafka-topics.sh
+
 deploy-kafka-config:
   stage: deploy
   tags: [e106-distributed]
@@ -528,6 +548,7 @@ infra-config-test:
         - infra/scripts/rollback-consumer.sh
         - infra/scripts/verify-consumer-e2e.py
         - infra/scripts/run-infra-config-tests.py
+        - infra/scripts/*kafka*topic*
         - infra/scripts/notify-deployment.py
         - infra/scripts/test_notify_deployment.py
         - infra/scripts/ci-required-variable-preflight.py
@@ -542,7 +563,6 @@ infra-config-test:
         - infra/scripts/*bootstrap-reconcile*
         - infra/scripts/test_consumer_distributed_deployment.py
         - infra/scripts/test_grafana_access_policy.py
-        - infra/scripts/test_node_exporter_monitoring.py
         - infra/scripts/test_pipeline_observability.py
         - infra/scripts/test_deploy_distributed_runtime.py
         - infra/scripts/test_deploy_consumer.py
