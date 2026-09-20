@@ -7,7 +7,6 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -149,13 +148,7 @@ class PopcornFlavorMetadataMigrationTest {
     }
 
     private static MigrationPostgresSupport.MigrationTestDatabase previousSchema() {
-        var database = MigrationPostgresSupport.database("flavor_metadata");
-        Flyway.configure()
-                .dataSource(database.getJdbcUrl(), database.getUsername(), database.getPassword())
-                .target(PREVIOUS_VERSION)
-                .load()
-                .migrate();
-        return database;
+        return MigrationPostgresSupport.databaseAtVersion("flavor_metadata", PREVIOUS_VERSION);
     }
 
     private static String identityAndInterpretationSnapshot(
