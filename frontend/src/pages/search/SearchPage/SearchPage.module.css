@@ -159,6 +159,7 @@
 }
 
 .recent,
+.topRated,
 .results {
   display: flex;
   flex: none;

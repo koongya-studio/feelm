@@ -12,8 +12,11 @@
  *
  * **업무 -612에서 다시 짰다.** 바뀐 것은 다음과 같다.
  *
- * - **급상승(API-064)은 없다.** 백엔드에 없는 계약을 목업으로 보여 주던 자리였다. 검색 전
- *   화면은 최근 검색어뿐이고, 그것도 없으면 짧은 안내 한 줄이다.
+ * - **급상승(API-064)은 없다.** 백엔드에 없는 계약을 목업으로 보여 주던 자리였다. 대신 검색
+ *   전 화면에 **평점 높은 영화**를 깐다(업무 -714, 사용자 피드백 2026-09-20 "검색하기 전에도
+ *   영화가 나열되면 좋겠다"). 검색어 없이 연도 하한과 `sort=RATING`으로 받은 목록이며
+ *   (`api/search.ts` `getTopRatedMovies`), 조회수 기반 급상승이 아니므로 그렇게 부르지 않는다.
+ *   최근 검색어가 있으면 그것이 위에 오고, 둘 다 없을 때만 짧은 안내 한 줄이다.
  * - **타이핑하면 검색한다.** 공백을 뺀 한 글자부터다. 연속 입력은 `DEBOUNCE_MS`로 묶고,
  *   한글 조합 중(`compositionstart` ~ `compositionend`)에는 보내지 않는다 — 조합 중의
  *   자모(`ㄷ` → `다` → `달`)마다 요청이 나가면 결과가 세 번 깜빡인다. 키보드의 검색
@@ -41,7 +44,12 @@ import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import { ChevronDownIcon, ClearIcon, FilterIcon, SearchIcon } from '../../../components/Icon';
-import { countSearchResults, getFilterOptions, searchMovies } from '../../../api/search';
+import {
+  countSearchResults,
+  getFilterOptions,
+  getTopRatedMovies,
+  searchMovies,
+} from '../../../api/search';
 import {
   addRecentSearchQuery,
   clearRecentSearchQueries,
@@ -179,6 +187,8 @@ export default function SearchPage() {
   /** 시트의 `결과 보기 · N편`에 쓰는 미리 센 개수 */
   const [previewCount, setPreviewCount] = useState<number | null>(null);
   const [recent, setRecent] = useState<string[]>(() => [...getRecentSearchQueries()]);
+  /** 검색 전에 까는 평점 높은 영화(업무 -714). 실패 · 빈 응답이면 빈 배열이고 그 자리만 없다 */
+  const [topRated, setTopRated] = useState<MovieSearchItem[]>([]);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
@@ -210,6 +220,24 @@ export default function SearchPage() {
 
     if (initial.search.status === 'idle') inputRef.current?.focus();
   }, [initial]);
+
+  /*
+   * 검색 전에 깔 평점 높은 영화를 한 번 받는다(업무 -714).
+   *
+   * 검색 상태와 무관하게 한 번만 부른다 — 결과를 보다가 검색어를 지우고 돌아와도 다시
+   * 부르지 않는다. 실패는 `getTopRatedMovies`가 빈 배열로 삼키므로 여기서 다루지 않는다.
+   */
+  useEffect(() => {
+    let active = true;
+
+    getTopRatedMovies().then((items) => {
+      if (active) setTopRated(items);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -564,9 +592,18 @@ export default function SearchPage() {
                 ))}
               </div>
             </section>
-          ) : (
-            <p className={styles.guide}>영화 제목, 감독, 배우 이름으로 검색해 보세요</p>
-          )
+          ) : null
+        ) : null}
+
+        {search.status === 'idle' && topRated.length > 0 ? (
+          <section className={styles.topRated}>
+            <h2 className={styles.sectionLabel}>평점 높은 영화</h2>
+            <SearchResultGrid items={topRated} />
+          </section>
+        ) : null}
+
+        {search.status === 'idle' && recent.length === 0 && topRated.length === 0 ? (
+          <p className={styles.guide}>영화 제목, 감독, 배우 이름으로 검색해 보세요</p>
         ) : null}
 
         {search.status === 'loading' ? <SearchResultSkeleton /> : null}
