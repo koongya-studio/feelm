@@ -25,8 +25,25 @@
  * 프레임이 늘어도 칸 크기는 그대로고 가로로 스크롤한다(시안 — 0 · 3 · 12 · 100개).
  * 칸 크기를 화면 폭에 맞춰 줄이면 100개일 때 포스터가 우표만 해진다.
  */
-import type { CSSProperties, ReactNode, Ref } from 'react';
+import { useRef } from 'react';
+import type {
+  CSSProperties,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+  Ref,
+} from 'react';
 import styles from './FilmReel.module.css';
+
+/** 눌렀다 놓는 클릭과 잡아 끄는 동작을 가르는 최소 이동 거리 */
+const DRAG_THRESHOLD = 4;
+
+type DragState = {
+  pointerId: number;
+  startX: number;
+  startScrollLeft: number;
+  moved: boolean;
+};
 
 type Props = {
   /**
@@ -71,10 +88,70 @@ export default function FilmReel({
   trackRef,
 }: Props) {
   const vertical = orientation === 'vertical';
+  const dragRef = useRef<DragState | null>(null);
+  const suppressClickRef = useRef(false);
   const style = {
     '--film-frame-width': cssLength(frameWidth),
     '--film-frame-height': cssLength(frameHeight),
   } as CSSProperties;
+
+  function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (vertical || event.pointerType !== 'mouse' || event.button !== 0) return;
+
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startScrollLeft: event.currentTarget.scrollLeft,
+      moved: false,
+    };
+  }
+
+  function handlePointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    const distance = event.clientX - drag.startX;
+    if (Math.abs(distance) >= DRAG_THRESHOLD && !drag.moved) {
+      drag.moved = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+      event.currentTarget.dataset.dragging = 'true';
+    }
+    if (!drag.moved) return;
+
+    event.currentTarget.scrollLeft = drag.startScrollLeft - distance;
+    event.preventDefault();
+  }
+
+  function finishDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    suppressClickRef.current = drag.moved;
+    if (drag.moved) {
+      // 브라우저가 드래그 뒤 click을 만들지 않는 경우 다음 실제 클릭까지 막지 않는다.
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 0);
+    }
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    delete event.currentTarget.dataset.dragging;
+    dragRef.current = null;
+  }
+
+  function cancelDrag(event: ReactPointerEvent<HTMLDivElement>) {
+    finishDrag(event);
+    suppressClickRef.current = false;
+  }
+
+  function handleClickCapture(event: ReactMouseEvent<HTMLDivElement>) {
+    if (!suppressClickRef.current) return;
+
+    suppressClickRef.current = false;
+    event.preventDefault();
+    event.stopPropagation();
+  }
 
   return (
     <div
@@ -100,6 +177,14 @@ export default function FilmReel({
         role="group"
         aria-label={label}
         tabIndex={vertical ? undefined : 0}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={finishDrag}
+        onPointerCancel={cancelDrag}
+        onClickCapture={handleClickCapture}
+        onDragStart={(event) => {
+          if (!vertical) event.preventDefault();
+        }}
       >
         {children}
       </div>
