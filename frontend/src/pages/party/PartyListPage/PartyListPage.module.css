@@ -79,26 +79,15 @@
   white-space: nowrap;
 }
 
-/* 워드마크와 카피. 시안은 둘을 한 줄에 좌우로 벌린다 */
-/* 한 줄 카피. 한때 워드마크 오른쪽 두 줄이었고, 공통 헤더(업무 -676)가 그 자리를 가져가 아래로 내려왔다 */
-.copy {
-  margin: 0;
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-  color: var(--color-ink-muted);
-}
-
 .titleBlock {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  text-align: center;
+  gap: var(--space-1);
 }
 
 /*
- * 화면 이름. **브랜드 빨강 글자다.** 큰 글자에는 빨강을 쓸 수 있다
- * (`design-concept.md` 2.3 — 작은 글자에만 `--color-brand-ink`를 쓴다).
+ * 화면 이름. 한때 브랜드 빨강이었고 시안이 검정으로 돌렸다(사용자 시안 2026-09-20).
+ * 화면에서 빨강을 쓰는 자리는 아래 강조 카드의 주 버튼 하나로 모았다.
  */
 .title {
   margin: 0;
@@ -106,7 +95,7 @@
   line-height: 1.15;
   letter-spacing: var(--letter-spacing-title);
   font-weight: 700;
-  color: var(--color-brand);
+  color: var(--color-ink);
 }
 
 .subtitle {
@@ -147,8 +136,12 @@
   display: flex;
   margin-top: auto;
   padding-top: var(--space-4);
-  flex-direction: column;
   gap: var(--space-2);
+}
+
+.actions > * {
+  min-width: 0;
+  flex: 1;
 }
 
 .hint {
@@ -166,6 +159,7 @@
  */
 .invitations {
   display: flex;
+  flex: none;
   flex-direction: column;
   gap: var(--space-2);
 }
@@ -191,4 +185,306 @@
   font-size: var(--font-size-meta);
   line-height: var(--line-height-meta);
   color: var(--color-ink-muted);
+}
+
+/* ─────────────────────────── 받은 초대 (사용자 시안 2026-09-20) */
+
+.inviteCard {
+  composes: raised from '../../../styles/interaction.module.css';
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  text-align: left;
+  cursor: pointer;
+}
+
+.inviteText {
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+/* ─────────────────────────── 얼굴 자리 */
+
+/*
+ * 사진이 없어 닉네임 첫 글자를 쓴다(`index.tsx`의 `Initials`). 서로 조금씩 겹쳐 한 무리로
+ * 읽히게 한다 — 이름을 같이 쓰는 `labelled`에서는 겹치지 않는다.
+ */
+.initials {
+  display: flex;
+  flex: none;
+  align-items: center;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.initials[data-labelled='true'] {
+  gap: var(--space-3);
+}
+
+.initial {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.initials[data-labelled='false'] .initial + .initial {
+  margin-left: -8px;
+}
+
+.initialMark {
+  display: flex;
+  width: 32px;
+  height: 32px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--color-bg);
+  border-radius: 50%;
+  background: var(--color-surface-sunken);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink-body);
+}
+
+.initialMark[data-rest='true'] {
+  color: var(--color-ink-muted);
+}
+
+.initialName {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-on-dark-muted);
+}
+
+.initials[data-tone='dark'] .initialMark {
+  border-color: var(--color-surface-dark);
+  background: var(--color-line-on-dark);
+  color: var(--color-on-dark);
+}
+
+/* ─────────────────────────── 대표 파티 강조 카드 */
+
+/*
+ * 검정 카드다. 화면에서 유일하게 어두운 면이라 여기 담긴 파티가 지금 볼 것임을 말한다
+ * (사용자 시안 2026-09-20). 통이 오른쪽에 겹쳐 앉으므로 기준점을 만든다.
+ */
+.hero {
+  position: relative;
+  display: flex;
+  /* 스크롤하는 화면이라 줄어들면 안 된다 — 줄어들면 칩과 버튼이 잘린다 */
+  flex: none;
+  flex-direction: column;
+
+  /*
+   * 통이 오른쪽에서 안쪽으로 들어온 만큼. 통 옆에 서는 줄은 이만큼 비워 두고 끝낸다 —
+   * 진행바가 통 밑으로 지나가면 어디까지 찼는지 읽히지 않는다.
+   */
+  --hero-bucket-gutter: 104px;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-dark);
+  color: var(--color-on-dark);
+  overflow: hidden;
+}
+
+.heroHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+  font-weight: var(--font-weight-bold);
+}
+
+/* `진행 중`. 시안의 초록 점은 무채색으로 둔다 — UI에 유채색을 쓰지 않는다 */
+.heroBadge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-line-on-dark);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  font-weight: var(--font-weight-bold);
+}
+
+.heroDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-on-dark);
+}
+
+/* 파티원 줄과 진행바는 통 옆에서 끝난다 */
+.hero .initials,
+.progress {
+  padding-right: var(--hero-bucket-gutter);
+}
+
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.progressLabel {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-on-dark-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.progressTrack {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-line-on-dark);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-on-dark);
+}
+
+.common {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.commonLabel {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  font-weight: var(--font-weight-bold);
+}
+
+/*
+ * 공통 취향 칩. **시안은 칩마다 다른 파스텔 색이지만 무채색으로 둔다** — UI 요소에 유채색을
+ * 쓰지 않는 규칙이다(`design-concept.md` 2.3). 맛끼리 색으로 나누는 자리는 팝콘 알이다.
+ */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.chip {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-line-on-dark);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  font-weight: var(--font-weight-medium);
+}
+
+/* 이 화면의 주 동작. 어두운 면 위의 빨강 면이다 */
+.heroAction {
+  display: flex;
+  min-height: var(--control-height);
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-action-brand);
+  color: var(--color-on-dark);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+
+.heroAction:active {
+  background: var(--color-action-brand-pressed);
+}
+
+.heroAction svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* 통은 카드의 그림이다. 글자 뒤로 비켜 앉는다 */
+.heroBucket {
+  position: absolute;
+  top: var(--space-10);
+  right: calc(var(--space-3) * -1);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.hero > *:not(.heroBucket) {
+  position: relative;
+  z-index: 1;
+}
+
+/* ─────────────────────────── 참여 중인 파티 */
+
+.joined {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/*
+ * 가로로 넘겨 보는 카드 줄(시안). 한 화면에 한 장 반이 보여 옆에 더 있다는 것이 보인다.
+ * 화면 양 끝까지 흐르도록 좌우 여백을 음수로 열고 안쪽 패딩으로 되돌린다.
+ */
+.cardRow {
+  display: flex;
+  gap: var(--space-2);
+  padding: 0 var(--screen-padding-x);
+  margin: 0 calc(var(--screen-padding-x) * -1);
+  list-style: none;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+}
+
+.cardRow > li {
+  width: 62%;
+  flex: none;
+  scroll-snap-align: start;
+}
+
+.partyCard {
+  composes: raised from '../../../styles/interaction.module.css';
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  text-align: left;
+  cursor: pointer;
+}
+
+.partyCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
 }
