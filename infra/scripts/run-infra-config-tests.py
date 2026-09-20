@@ -33,6 +33,7 @@ TESTS = (
     "infra.scripts.test_distributed_auxiliary_deployment",
     "infra.scripts.test_verify_distributed_observability",
     "infra.scripts.test_verify_spark_history",
+    "infra.scripts.test_bootstrap_reconcile",
     "infra.scripts.test_ci_config",
     "infra.scripts.test_ci_backend_mr_paths",
     "infra.scripts.test_ci_infra_mr",

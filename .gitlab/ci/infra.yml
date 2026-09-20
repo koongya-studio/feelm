@@ -27,6 +27,21 @@ ci-variable-preflight:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
 
+infra-bootstrap-reconcile:
+  stage: deploy
+  trigger:
+    include:
+      - local: .gitlab/ci/infra-bootstrap.yml
+    strategy: mirror
+    forward:
+      pipeline_variables: true
+  resource_group: infra-bootstrap-reconcile
+  interruptible: false
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "web" && $INFRA_RECOVERY_RUN == "true"'
+      when: manual
+  allow_failure: false
+
 deploy-monitoring:
   stage: deploy
   tags: [e106-shell]
@@ -466,6 +481,7 @@ infra-config-test:
         - .gitlab/ci/frontend.yml
         - .gitlab/ci/consumer.yml
         - .gitlab/ci/infra.yml
+        - .gitlab/ci/infra-bootstrap.yml
         - infra/.env.example
         - infra/config/required-ci-variables.json
         - infra/compose/**/*
@@ -493,6 +509,7 @@ infra-config-test:
         - infra/scripts/*distributed*auxiliary*
         - infra/scripts/*distributed*observability*
         - infra/scripts/*spark-history*
+        - infra/scripts/*bootstrap-reconcile*
         - infra/scripts/test_consumer_distributed_deployment.py
         - infra/scripts/test_grafana_access_policy.py
         - infra/scripts/test_node_exporter_monitoring.py

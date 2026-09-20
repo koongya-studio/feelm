@@ -1,0 +1,206 @@
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "parent_pipeline" && $CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $INFRA_RECOVERY_RUN == "true"'
+    - when: never
+
+stages:
+  - preflight
+  - postgresql
+  - redis
+  - hdfs
+  - kafka
+  - kafka-topics
+  - spark
+  - backend
+  - consumer
+  - frontend
+  - auxiliary
+  - verify
+
+.bootstrap-common:
+  interruptible: false
+  retry:
+    max: 1
+    when: [runner_system_failure, scheduler_failure]
+  timeout: 30m
+
+.bootstrap-service:
+  extends: .bootstrap-common
+  tags: [e106-shell]
+  environment:
+    name: service
+  resource_group: service-and-backend-cache
+
+.bootstrap-distributed:
+  extends: .bootstrap-common
+  tags: [e106-distributed]
+  environment:
+    name: distributed
+
+.docker-login:
+  before_script:
+    - printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+  after_script:
+    - docker logout >/dev/null 2>&1 || true
+
+bootstrap-preflight-service:
+  extends: .bootstrap-service
+  stage: preflight
+  environment:
+    name: service
+    action: prepare
+  script:
+    - bash infra/scripts/bootstrap-reconcile-step.sh preflight service
+
+bootstrap-preflight-distributed:
+  extends: .bootstrap-distributed
+  stage: preflight
+  environment:
+    name: distributed
+    action: prepare
+  resource_group: distributed-runtime-hdfs
+  script:
+    - bash infra/scripts/bootstrap-reconcile-step.sh preflight distributed
+
+bootstrap-postgresql:
+  extends: [.bootstrap-service, .docker-login]
+  stage: postgresql
+  needs: [bootstrap-preflight-service, bootstrap-preflight-distributed]
+  script:
+    - bash infra/scripts/bootstrap-reconcile-step.sh postgresql service
+
+bootstrap-redis:
+  extends: .bootstrap-service
+  stage: redis
+  needs: [bootstrap-postgresql]
+  script:
+    - bash infra/scripts/bootstrap-reconcile-step.sh redis service
+
+bootstrap-hdfs-distributed:
+  extends: .bootstrap-distributed
+  stage: hdfs
+  needs: [bootstrap-redis]
+  resource_group: distributed-runtime-hdfs
+  script:
+    - bash infra/scripts/bootstrap-reconcile-step.sh hdfs distributed
+
+bootstrap-hdfs-service:
+  extends: .bootstrap-service
+  stage: hdfs
+  needs: [bootstrap-hdfs-distributed]
+  script:
+    - bash infra/scripts/bootstrap-reconcile-step.sh hdfs service
+
+bootstrap-hdfs-finalize-distributed:
+  extends: .bootstrap-distributed
+  stage: hdfs
+  needs: [bootstrap-hdfs-service]
+  resource_group: distributed-runtime-hdfs
+  script:
+    - bash infra/scripts/bootstrap-reconcile-step.sh hdfs-finalize distributed
+
+bootstrap-kafka:
+  extends: .bootstrap-distributed
+  stage: kafka
+  needs: [bootstrap-hdfs-finalize-distributed]
+  resource_group: distributed-runtime-kafka
+  script:
+    - bash infra/scripts/bootstrap-reconcile-step.sh kafka distributed
+
+bootstrap-kafka-topics:
+  extends: .bootstrap-distributed
+  stage: kafka-topics
+  needs: [bootstrap-kafka]
+  resource_group: distributed-runtime-kafka
+  script:
+    - bash infra/scripts/bootstrap-reconcile-step.sh kafka-topics distributed
+
+bootstrap-spark-distributed:
+  extends: [.bootstrap-distributed, .docker-login]
+  stage: spark
+  needs: [bootstrap-kafka-topics]
+  resource_group: distributed-runtime-spark
+  script:
+    - bash infra/scripts/bootstrap-reconcile-step.sh spark distributed
+
+bootstrap-spark-service:
+  extends: [.bootstrap-service, .docker-login]
+  stage: spark
+  needs: [bootstrap-spark-distributed]
+  script:
+    - bash infra/scripts/bootstrap-reconcile-step.sh spark service
+
+bootstrap-spark-finalize-distributed:
+  extends: [.bootstrap-distributed, .docker-login]
+  stage: spark
+  needs: [bootstrap-spark-service]
+  resource_group: distributed-runtime-spark
+  script:
+    - bash infra/scripts/bootstrap-reconcile-step.sh spark-finalize distributed
+
+bootstrap-backend:
+  extends: [.bootstrap-service, .docker-login]
+  stage: backend
+  needs: [bootstrap-spark-finalize-distributed]
+  script:
+    - bash infra/scripts/bootstrap-reconcile-step.sh backend service
+
+bootstrap-consumer:
+  extends: [.bootstrap-distributed, .docker-login]
+  stage: consumer
+  needs: [bootstrap-backend]
+  resource_group: distributed-consumer
+  variables:
+    DOCKER_CONFIG: "$CI_PROJECT_DIR/.docker-bootstrap-$CI_JOB_ID"
+  before_script:
+    - install -d -m 0700 "$DOCKER_CONFIG"
+    - printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+  after_script:
+    - docker logout >/dev/null 2>&1 || true
+    - rm -f "$DOCKER_CONFIG/config.json"
+    - rmdir "$DOCKER_CONFIG" 2>/dev/null || true
+  script:
+    - bash infra/scripts/bootstrap-reconcile-step.sh consumer distributed
+
+bootstrap-frontend-nginx:
+  extends: [.bootstrap-service, .docker-login]
+  stage: frontend
+  needs: [bootstrap-consumer]
+  script:
+    - bash infra/scripts/bootstrap-reconcile-step.sh frontend-nginx service
+
+bootstrap-monitoring:
+  extends: .bootstrap-service
+  stage: auxiliary
+  needs: [bootstrap-frontend-nginx]
+  script:
+    - bash infra/scripts/bootstrap-reconcile-step.sh monitoring service
+
+bootstrap-distributed-auxiliary:
+  extends: .bootstrap-distributed
+  stage: auxiliary
+  needs: [bootstrap-frontend-nginx]
+  resource_group: distributed-runtime-spark
+  script:
+    - bash infra/scripts/bootstrap-reconcile-step.sh auxiliary distributed
+
+bootstrap-verify-service:
+  extends: .bootstrap-service
+  stage: verify
+  needs: [bootstrap-monitoring, bootstrap-distributed-auxiliary]
+  environment:
+    name: service
+    action: verify
+  script:
+    - bash infra/scripts/bootstrap-reconcile-step.sh verify service
+
+bootstrap-verify-distributed:
+  extends: .bootstrap-distributed
+  stage: verify
+  needs: [bootstrap-monitoring, bootstrap-distributed-auxiliary]
+  environment:
+    name: distributed
+    action: verify
+  resource_group: distributed-runtime-hdfs
+  script:
+    - bash infra/scripts/bootstrap-reconcile-step.sh verify distributed
