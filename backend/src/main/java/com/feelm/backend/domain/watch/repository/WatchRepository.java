@@ -218,10 +218,10 @@ public class WatchRepository {
         return jdbc.sql(
                         """
                         UPDATE watch_records
-                        SET status = 'EXPIRED', expired_at = :now
+                        SET status = 'EXPIRED', watched_at = NULL, expired_at = :now
                         WHERE id = :watchRecordId
-                          AND status = 'LINK_CLICKED'
-                          AND expires_at > :now
+                          AND ((status = 'LINK_CLICKED' AND expires_at > :now)
+                               OR status = 'WATCHED_UNRATED')
                         """)
                 .param("watchRecordId", watchRecordId)
                 .param("now", offset(now))

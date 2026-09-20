@@ -2,6 +2,7 @@ package com.feelm.backend.domain.watch;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -665,6 +666,102 @@ class WatchRecordApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
+    @DisplayName("평가 삭제 후 미평가 감상은 클릭 기한이 지나도 취소되고 미평가 목록에서 빠진다")
+    void cancelsUnratedWatchAfterClickExpiry() throws Exception {
+        long ratingId =
+                response(
+                                mockMvc.perform(
+                                                post("/api/v1/movies/{movieId}/ratings", movieId)
+                                                        .header("Authorization", bearer(userId))
+                                                        .contentType(MediaType.APPLICATION_JSON)
+                                                        .content(
+                                                                "{\"score\":4.0,\"visibility\":\"PRIVATE\"}"))
+                                        .andExpect(status().isCreated())
+                                        .andReturn())
+                        .path("ratingId")
+                        .asLong();
+        long recordId = rating(ratingId).watchRecordId();
+        assertThat(watch(recordId).status()).isEqualTo("RATED");
+        Instant clickedAt = Instant.now().minusSeconds(8 * DAY).truncatedTo(ChronoUnit.MICROS);
+        Instant watchedAt = clickedAt.plusSeconds(DAY);
+        jdbc.sql(
+                        "UPDATE watch_records SET clicked_at=:clickedAt, confirm_due_at=:dueAt,"
+                                + " expires_at=:expiresAt, watched_at=:watchedAt WHERE id=:id")
+                .param("clickedAt", offset(clickedAt))
+                .param("dueAt", offset(clickedAt.plusSeconds(DAY)))
+                .param("expiresAt", offset(clickedAt.plusSeconds(7 * DAY)))
+                .param("watchedAt", offset(watchedAt))
+                .param("id", recordId)
+                .update();
+        mockMvc.perform(
+                        delete("/api/v1/ratings/{ratingId}", ratingId)
+                                .header("Authorization", bearer(userId)))
+                .andExpect(status().isNoContent());
+        assertThat(watch(recordId).status()).isEqualTo("WATCHED_UNRATED");
+        assertThat(watch(recordId).watchedAt()).isEqualTo(watchedAt);
+        assertThat(
+                        response(
+                                        mockMvc.perform(
+                                                        get("/api/v1/users/me/ratings")
+                                                                .header(
+                                                                        "Authorization",
+                                                                        bearer(userId))
+                                                                .param("filter", "UNRATED"))
+                                                .andExpect(status().isOk())
+                                                .andReturn())
+                                .path("items")
+                                .get(0)
+                                .path("movie")
+                                .path("movieId")
+                                .asLong())
+                .isEqualTo(movieId);
+        Instant before = Instant.now();
+
+        JsonNode cancelled =
+                response(
+                        confirm(recordId, userId, "{\"watched\":false}")
+                                .andExpect(status().isOk())
+                                .andReturn());
+
+        Instant after = Instant.now();
+        assertThat(cancelled.path("status").asText()).isEqualTo("EXPIRED");
+        assertThat(cancelled.path("watchedAt").isNull()).isTrue();
+        WatchRow stored = watch(recordId);
+        assertThat(stored.status()).isEqualTo("EXPIRED");
+        assertThat(stored.watchedAt()).isNull();
+        assertThat(stored.expiredAt()).isBetween(before, after);
+        assertThat(ids(response(list(userId, "status", "WATCHED_UNRATED").andReturn()))).isEmpty();
+        assertThat(
+                        response(
+                                        mockMvc.perform(
+                                                        get("/api/v1/users/me/ratings")
+                                                                .header(
+                                                                        "Authorization",
+                                                                        bearer(userId))
+                                                                .param("filter", "UNRATED"))
+                                                .andExpect(status().isOk())
+                                                .andReturn())
+                                .path("items")
+                                .size())
+                .isZero();
+        confirm(recordId, userId, "{\"watched\":false}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_WATCH_STATUS"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"RATED", "EXPIRED"})
+    @DisplayName("평가가 남았거나 이미 만료된 감상은 취소할 수 없다")
+    void rejectsRatedAndExpiredCancellation(String currentStatus) throws Exception {
+        long recordId = insertDistinctWatch(currentStatus, Instant.now().minusSeconds(DAY));
+
+        confirm(recordId, userId, "{\"watched\":false}")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_WATCH_STATUS"));
+        assertThat(watch(recordId).status()).isEqualTo(currentStatus);
+    }
+
+    @Test
     @DisplayName("타인 기록과 미존재 기록은 같은 404로 숨긴다")
     void hidesOtherUsersRecordsAsNotFound() throws Exception {
         long otherMovie = insertMovie(992_001, "타인 확인 영화");
@@ -869,7 +966,7 @@ class WatchRecordApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("동일 기록 동시 confirm은 실제 사용자 행 잠금 대기 후 하나만 성공한다")
+    @DisplayName("동일 기록 동시 confirm은 실제 사용자 행 잠금 대기 후 안 봤어요로 수렴한다")
     void concurrentConfirmSerializesWithoutLostUpdate() throws Exception {
         long recordId = insertDistinctWatch("LINK_CLICKED", Instant.now());
 
@@ -879,10 +976,19 @@ class WatchRecordApiContractTest extends SharedPostgresContractTest {
                         () -> concurrentConfirm(recordId, false));
 
         assertObservedLockWait(concurrent);
-        assertThat(concurrent.responses())
-                .extracting(ConcurrentResponse::status)
-                .containsExactlyInAnyOrder(200, 409);
-        assertThat(watch(recordId).status()).isIn("WATCHED_UNRATED", "EXPIRED");
+        ConcurrentResponse watchedResponse = concurrent.responses().get(0);
+        ConcurrentResponse cancelledResponse = concurrent.responses().get(1);
+        assertThat(watchedResponse.status()).isIn(200, 409);
+        if (watchedResponse.status() == 200) {
+            assertThat(watchedResponse.body().path("status").asText()).isEqualTo("WATCHED_UNRATED");
+        } else {
+            assertThat(watchedResponse.body().path("code").asText())
+                    .isEqualTo("INVALID_WATCH_STATUS");
+        }
+        assertThat(cancelledResponse.status()).isEqualTo(200);
+        assertThat(cancelledResponse.body().path("status").asText()).isEqualTo("EXPIRED");
+        assertThat(watch(recordId).status()).isEqualTo("EXPIRED");
+        assertThat(watch(recordId).watchedAt()).isNull();
         assertThat(count("outbox_events")).isZero();
     }
 

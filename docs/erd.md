@@ -494,6 +494,7 @@ erDiagram
 flowchart LR
     A["OTT 링크 클릭<br/>watch_records: LINK_CLICKED"] -->|접속 후 감상함 응답| B["WATCHED_UNRATED"]
     A -->|감상 안 함 또는 7일 미응답| X["EXPIRED"]
+    B -->|감상 취소| X
     B -->|평가 저장| C["RATED"]
     C -->|ratings + frames<br/>단일 트랜잭션 생성| D["필름 반영·팝콘 버킷 재집계"]
     C -->|평가 삭제| B
@@ -502,6 +503,7 @@ flowchart LR
 
 - `ratings` 저장·`frames` 생성·`watch_records.status=RATED` 전이는 **하나의 트랜잭션**으로 처리합니다(NFR-06).
 - `ratings` 삭제 시 `frames`는 CASCADE 삭제되고 `watch_records`는 `WATCHED_UNRATED`로 되돌립니다(FR-18).
+- 실수로 평가한 영화를 보지 않은 것으로 되돌릴 때는 평가 삭제 후 감상 취소(`WATCHED_UNRATED` → `EXPIRED`)를 수행합니다. 감상 시각은 비우고 만료 시각을 기록하며, `EXPIRED` 행은 이력으로 보존합니다(S15P21E106-721).
 - 팝콘 버킷은 별도 행을 생성하지 않고 `ratings JOIN movies`를 맛별로 집계합니다.
 - `movies.average_rating`·`rating_count`와 `taste_analyses`는 평가 변경 시 갱신되는 파생 데이터입니다.
 

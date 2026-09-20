@@ -132,8 +132,9 @@ public class WatchRecordController {
     @Operation(
             summary = "감상 확인 응답",
             description =
-                    "본인의 만료 전 LINK_CLICKED 기록을 확인합니다. 24시간 이전에도 응답할 수 있으며, 봤어요는 "
-                            + "WATCHED_UNRATED, 안 봤어요는 EXPIRED로 전이합니다.")
+                    "본인의 만료 전 LINK_CLICKED 기록에 응답합니다. 24시간 이전에도 응답할 수 있으며, "
+                            + "봤어요는 WATCHED_UNRATED, 안 봤어요는 EXPIRED로 전이합니다. "
+                            + "평가 삭제 후 WATCHED_UNRATED 기록은 클릭 기한이 지나도 안 봤어요로 취소할 수 있습니다.")
     @ApiResponses({
         @ApiResponse(
                 responseCode = "200",
@@ -165,7 +166,7 @@ public class WatchRecordController {
                                 schema = @Schema(implementation = ErrorResponse.class))),
         @ApiResponse(
                 responseCode = "409",
-                description = "INVALID_WATCH_STATUS: 이미 확인했거나 만료된 기록 또는 경쟁 전이",
+                description = "INVALID_WATCH_STATUS: 요청에 허용되지 않는 상태, 클릭 응답 기한 경과 또는 경쟁 전이",
                 content =
                         @Content(
                                 mediaType = "application/json",
