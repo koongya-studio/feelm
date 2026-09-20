@@ -40,12 +40,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * 지우는 {@code birth_date}·{@code gender}에는 마이그레이션에만 있는 상태 기반 CHECK 제약이 걸려 있어(V202609021650,
  * V202609051000) Entity로 만든 H2 스키마로는 둘 다 확인할 수 없다. 내 구독 OTT 계약 테스트가 같은 방식을 쓴다.
  */
-@SpringBootTest(
-        properties = {
-            "spring.flyway.enabled=true",
-            "spring.jpa.hibernate.ddl-auto=none",
-            "feelm.auth.mock.enabled=false"
-        })
+@SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 @AutoConfigureMockMvc
 @DisplayName("회원 탈퇴 동시성 — API-013")
 class UserWithdrawalConcurrencyTest extends SharedPostgresContractTest {
@@ -59,8 +54,8 @@ class UserWithdrawalConcurrencyTest extends SharedPostgresContractTest {
      *
      * <p>{@code @SpringBootTest}의 속성 집합을 {@code MovieFilterOptionsContractTest}와 똑같이 맞춘 이유는 Spring
      * Context를 공유하기 위해서다. 속성이 하나라도 다르면 컨텍스트가 따로 만들어지고 커넥션 풀도 따로 생기는데, 공유 PostgreSQL 한 대에 풀이 쌓이면
-     * 클라이언트 한도를 넘겨 무관한 테스트의 컨텍스트 생성이 실패한다. {@code feelm.auth.mock.enabled=false}는 이 테스트가 실제 토큰을 쓰므로
-     * 동작에 영향이 없다.
+     * 클라이언트 한도를 넘겨 무관한 테스트의 컨텍스트 생성이 실패한다. 인증 mock 비활성화는 공유 PostgreSQL 지원 클래스가 모든 하위 테스트에 공통으로
+     * 적용한다.
      */
     @ServiceConnection static final RedisContainer REDIS = SharedRedisContainer.instance();
 
