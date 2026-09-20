@@ -203,6 +203,23 @@ export async function updateRating(ratingId: number, input: RatingUpdateInput): 
   return request<Rating>(`/ratings/${ratingId}`, { method: 'PUT', body: input });
 }
 
+/**
+ * API-038 평가 삭제 · DELETE /api/v1/ratings/{ratingId}
+ *
+ * 평가와 **연결된 프레임이 함께 지워지고** 팝콘 버킷 집계에서도 빠진다. 영화 평균 별점과
+ * 평가 수도 서버가 같은 트랜잭션에서 다시 계산한다(API-038 처리 규칙).
+ *
+ * **감상 기록은 지우지 않는다.** `RATED`에서 `WATCHED_UNRATED`로 되돌아가 `rated_at`만
+ * 비워지므로, 지운 영화는 7.1의 `안 남긴 영화`로 간다 — 본 것은 맞고 평가만 없는 상태다.
+ * 감상까지 무르는 것은 API-035(`confirmWatch(id, false)`)이고 이 함수와는 별개 요청이다.
+ *
+ * 없는 평가와 남의 평가는 모두 `404 RESOURCE_NOT_FOUND`다. 지운 평가를 다시 지워도 404이므로
+ * 부르는 쪽은 404를 "이미 지워졌다"로 읽어도 된다.
+ */
+export async function deleteRating(ratingId: number): Promise<void> {
+  await request<void>(`/ratings/${ratingId}`, { method: 'DELETE' });
+}
+
 /*
  * 내 평가 목록(API-039)은 백엔드에 아직 없다(S15P21E106-214 진행 중). 7.1 MY의 `평가한 영화`는
  * 평가와 1:1인 **내 필름(API-042, `taste.getMyFrames`)** 으로 그린다 — 실제 저장 결과가 곧바로

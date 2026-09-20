@@ -14,8 +14,13 @@
  * 요소와 문구는 와이어프레임 2.5를 따른다(screen-spec.md 6장 2.5).
  * 별점은 0.5점 단위 0.5~5.0이며 계약도 같은 규칙이다(FR-19, API-036 `multipleOf: 0.5`).
  *
- * 계약 기준으로 확정한 것(screen-spec.md 8.1 #11): `보지 않은 영화로 처리`는 제외한다.
- * API-035는 감상 확인 화면 전용이고 평가 화면에서 감상 상태를 되돌리는 계약이 없다.
+ * **수정에서는 평가를 지울 수 있다**(업무 -724, API-038). 평가와 프레임이 함께 사라지고 팝콘도
+ * 한 알 빠진다. 감상 기록은 남아 `WATCHED_UNRATED`로 되돌아가므로 그 영화는 7.1의 `안 남긴 영화`로
+ * 간다 — 본 것은 맞고 평가만 없는 상태다.
+ *
+ * `보지 않은 영화로 처리`는 여전히 두지 않는다. 계약은 열렸지만(업무 -721이 API-035에
+ * `WATCHED_UNRATED → EXPIRED`를 더했다) **필름에서 빼는 일은 하지 않기로 했다**
+ * (사용자 결정 2026-09-20). 감상까지 무르려면 삭제 뒤 API-035를 한 번 더 불러야 한다.
  *
  * 한줄평 공개 범위 선택 UI는 와이어프레임에 없어 만들지 않는다(CR-05). 대신 공통 규약의
  * 기본값인 `PRIVATE`을 붙여 보내고, 그 사실을 화면에 안내한다(팀 결정 2026-09-07).
@@ -44,6 +49,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
+import ConfirmDialog from '../../../components/ConfirmDialog';
 import Poster from '../../../components/Poster';
 import RatingInput from '../../../components/RatingInput';
 import ScreenHeader from '../../../components/ScreenHeader';
@@ -52,7 +58,13 @@ import TextArea from '../../../components/TextArea';
 import { ApiError } from '../../../api/apiError';
 import { getMovieDetail } from '../../../api/movies';
 import { getOtts } from '../../../api/otts';
-import { createRating, findWatchedRecord, getRatingCounts, updateRating } from '../../../api/watch';
+import {
+  createRating,
+  deleteRating,
+  findWatchedRecord,
+  getRatingCounts,
+  updateRating,
+} from '../../../api/watch';
 import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
 import { formatMonthDay } from '../../../utils/date';
@@ -103,6 +115,9 @@ export default function MovieRatingPage() {
   const [comment, setComment] = useState('');
   const [spoiler, setSpoiler] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  /** 삭제 확인 창이 떠 있는지. 되돌릴 수 없는 동작이라 한 번 묻는다(업무 -724) */
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   /** 저장 실패 문구. 다시 저장을 시도하면 지운다 */
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -164,6 +179,39 @@ export default function MovieRatingPage() {
       active = false;
     };
   }, [id, reloadCount]);
+
+  /**
+   * 평가 삭제(API-038, 업무 -724).
+   *
+   * **평가와 프레임이 함께 사라진다.** 감상 기록은 남아 `안 남긴 영화`로 옮겨 간다 — 본 것은
+   * 맞고 평가만 없는 상태다. 지운 뒤에는 저장했을 때와 같이 온 곳으로 돌아간다.
+   *
+   * 404는 오류로 남기지 않는다. 다른 곳에서 이미 지운 평가라는 뜻이라, 사용자가 바라던
+   * 결과가 이미 이루어져 있다(API-038 처리 규칙).
+   */
+  async function remove() {
+    if (!movie?.myRating) return;
+
+    setDeleting(true);
+    setFailure(null);
+
+    try {
+      await deleteRating(movie.myRating.ratingId);
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 404) {
+        setFailure(failureMessage(error));
+        setDeleting(false);
+        setConfirming(false);
+
+        return;
+      }
+    }
+
+    // 창을 먼저 닫는다. 돌아갈 곳이 없어 화면에 남더라도 확인 창이 떠 있으면 안 된다
+    setConfirming(false);
+    setDeleting(false);
+    back();
+  }
 
   async function submit() {
     if (!movie || score === 0) {
@@ -346,14 +394,37 @@ export default function MovieRatingPage() {
            * **수정에는 `나중에 평가하기`를 두지 않는다**(업무 -716, 사용자 지적 2026-09-20).
            * 이미 평가한 사람에게 나중에 평가하라는 말은 앞뒤가 맞지 않는다. 되돌아가는 길은
            * 머리말의 뒤로 가기가 그대로 맡는다.
+           *
+           * 그 자리에 **평가 삭제**가 선다(업무 -724). 새 평가에는 지울 것이 없으므로 수정일
+           * 때만이다. 글자 행동이라 `평가 완료`와 무게가 겹치지 않는다.
            */}
-          {isEditing ? null : (
+          {isEditing ? (
+            <Button
+              variant="text"
+              disabled={submitting || deleting}
+              onClick={() => setConfirming(true)}
+            >
+              평가 삭제
+            </Button>
+          ) : (
             <Button variant="text" disabled={submitting} onClick={back}>
               나중에 평가하기
             </Button>
           )}
         </div>
       </div>
+
+      {/* 되돌릴 수 없다. 무엇까지 사라지는지 그 자리에서 말한다 */}
+      {confirming ? (
+        <ConfirmDialog
+          title="평가를 삭제할까요?"
+          description="이 영화의 별점과 한줄평이 사라지고 필름의 프레임과 팝콘 한 알도 함께 빠져요. 되돌릴 수 없어요."
+          confirmLabel="삭제"
+          busy={deleting}
+          onConfirm={() => void remove()}
+          onCancel={() => setConfirming(false)}
+        />
+      ) : null}
     </>
   );
 }
