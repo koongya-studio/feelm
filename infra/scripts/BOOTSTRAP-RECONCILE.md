@@ -60,7 +60,9 @@ bash infra/scripts/ensure-kafka-topics.sh
 
 `docs/api/streaming-contract.md`의 8개 고유 Topic(`rating`, `dismiss`, `view`,
 `recommendation-click`, `ott-click`, `candidate-updated`, `party-refresh`,
-`party-candidate-updated`)을 `--if-not-exists`로 보장하고 각 Topic의 partition 수를 검증한다.
+`party-candidate-updated`)을 `--if-not-exists`로 보장하고 각 Topic의 partition 수와
+각 partition의 복제 수를 검증한다. 별도 자동 Job·재실행 방법과 실패 처리 규칙은
+[`KAFKA-TOPICS.md`](KAFKA-TOPICS.md)를 따른다.
 기존 Topic을 삭제하거나 partition 수를 줄이지 않는다. 기존 설정이 기대값과 다르면 자동
 변경하지 않고 실패한다.
 

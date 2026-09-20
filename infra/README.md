@@ -142,25 +142,14 @@ docker compose --env-file infra/.env \
   up -d kafka
 ```
 
-업무 Topic은 자동 생성하지 않습니다. 평점과 Candidate 게시 완료 알림 Topic은 최초 한 번 생성합니다.
+업무 Topic은 Broker의 자동 생성 기능 대신 별도 멱등 스크립트로 생성·검증합니다.
 
 ```bash
-docker exec feelm-kafka-local \
-  /opt/kafka/bin/kafka-topics.sh \
-  --bootstrap-server localhost:9092 \
-  --create --if-not-exists \
-  --topic feelm.rating.v1 \
-  --partitions 3 \
-  --replication-factor 1
-
-docker exec feelm-kafka-local \
-  /opt/kafka/bin/kafka-topics.sh \
-  --bootstrap-server localhost:9092 \
-  --create --if-not-exists \
-  --topic feelm.candidate-updated.v1 \
-  --partitions 3 \
-  --replication-factor 1
+KAFKA_CONTAINER=feelm-kafka-local bash infra/scripts/ensure-kafka-topics.sh
 ```
+
+8개 업무 Topic 목록과 CI Job 실행 방법은 [Kafka Topic 프로비저닝](scripts/KAFKA-TOPICS.md)을
+참고합니다. 기존 Topic의 파티션·복제 설정이 다르면 자동 변경 없이 실패합니다.
 
 Spring Boot local 프로파일의 기본 Kafka 주소가 `localhost:9092`이므로 별도 환경변수 없이
 연결됩니다.
