@@ -82,6 +82,7 @@ class NotifyDeploymentTest(unittest.TestCase):
     def test_cli_accepts_every_deployment_job_service(self):
         for service in (
             "backend", "frontend", "consumer", "redis", "postgresql", "monitoring",
+            "distributed-observability", "spark-history",
             "hdfs-service-config", "hdfs-distributed-config", "kafka-config",
             "spark-service", "spark-distributed", "spark-code",
         ):
