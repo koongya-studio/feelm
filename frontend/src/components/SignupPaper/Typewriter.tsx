@@ -31,13 +31,20 @@ function keyFor(char: string | null): string | null {
 type Props = {
   /** 방금 친 글자. 없으면 `null`이고 아무 키도 눌리지 않는다 */
   typed: string | null;
+  /**
+   * 키를 감출지(업무 -718). 폰 키보드가 올라오면 참이다.
+   *
+   * **롤러는 남는다.** 종이가 나오는 느낌을 만드는 것은 롤러이고, OS 키보드와 겹치는 것은
+   * 키 부분이다. 롤러를 남기면 그 아래 자리에 OS 키보드가 들어서면서 타자기를 대신한다.
+   */
+  hidden?: boolean;
 };
 
-export default function Typewriter({ typed }: Props) {
+export default function Typewriter({ typed, hidden = false }: Props) {
   const pressed = keyFor(typed);
 
   return (
-    <div className={styles.typewriter} aria-hidden="true">
+    <div className={styles.typewriter} data-hidden={hidden} aria-hidden="true">
       <div className={styles.roller} />
 
       <div className={styles.body}>
