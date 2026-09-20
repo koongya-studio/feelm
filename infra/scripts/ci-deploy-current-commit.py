@@ -12,11 +12,13 @@ import argparse
 
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 DEPLOY_BRANCHES = ("main", "develop")
+PIPELINE_SOURCES = ("push", "parent_pipeline")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--branch", choices=DEPLOY_BRANCHES, default="main")
+    parser.add_argument("--pipeline-source", choices=PIPELINE_SOURCES, default="push")
     args = parser.parse_args()
     commit_sha = os.environ.get("CI_COMMIT_SHA", "")
     branch = os.environ.get("CI_COMMIT_BRANCH", "")
@@ -26,8 +28,12 @@ def main() -> int:
     if not SHA_PATTERN.fullmatch(commit_sha):
         print("CI_COMMIT_SHA must be a full commit SHA", file=sys.stderr)
         return 2
-    if branch != args.branch or protected != "true" or source != "push":
-        print(f"Deployment requires a protected {args.branch} push pipeline", file=sys.stderr)
+    if branch != args.branch or protected != "true" or source != args.pipeline_source:
+        print(
+            f"Deployment requires a protected {args.branch} "
+            f"{args.pipeline_source} pipeline",
+            file=sys.stderr,
+        )
         return 2
 
     result = subprocess.run(
