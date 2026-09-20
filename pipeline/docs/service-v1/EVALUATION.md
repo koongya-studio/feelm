@@ -4,12 +4,14 @@
 
 이것은 새 모델/정책을 구현한 뒤 사용할 평가 지표 명세다. 이번 작업에서 새 학습·추천 성능
 평가를 실행하지 않았다. 새 0~N 평가는 [0~N 학습·평가 계약](../../contracts/zero-n-learning-evaluation.md)의
-사용자 분리와 전역 시점 창을 사용하며, 아래 지표를 잘 만들기 위해 관측 사용자를 다시 뽑지 않는다.
+사용자 분리와 선언한 시점 정책을 사용한다. K의 정보량 효과는 사용자별 anchor의 통제된 prefix로,
+전역 시간 이동은 별도 스트레스 테스트로 평가한다. 아래 지표를 잘 만들기 위해 관측 사용자를 다시
+뽑지 않는다.
 
 새 GBT·FM 0~N 학습은 [0~N 학습·평가 계약](../../contracts/zero-n-learning-evaluation.md)을 따른다.
 구체적인 seed·분할 날짜·모델 파라미터는 S15P21E106-622·623의 로컬 실험 설정에 기록한다. [MODELS](MODELS.md)의
-원행·사용자 역할·보정45/선정45/확인180은 legacy 기준선으로만 보존하며 새 사용자·전역 시점
-분할의 final-test와 같은 결과로 부르지 않는다.
+원행·사용자 역할·보정45/선정45/확인180은 legacy 기준선으로만 보존하며 새 사용자 분할의
+final-test와 같은 결과로 부르지 않는다.
 상세 유사 영화의 검색 검수는 [SIMILAR-MOVIES §7](SIMILAR-MOVIES.md)의 별도 기준이다.
 개인별점 평가 역할45/45/180이나 맞춤2+발견1의 분모를 영화 간 유사 검색에 적용하지 않는다.
 
@@ -66,7 +68,7 @@ low는 실제 별점≤2.0이며 각 사용자의 해당 k슬롯에서 low 수/k
 순위 비교를 새로 명명하고, 각자의 전체 순위와 같은 표의 직접 차이로 섞지 않는다.
 
 실제 정책 재생에서는 맞춤 첫2·누적4/6/10, 발견 첫1·누적2/3/5/10과 각2+1 응답을 기록한다.
-UNKNOWN이 있는 출력의 NDCG는 산출하지 않는다. 대신 관측 슬롯 수/전체 슬롯 수,
+평가할 Top-k 슬롯에 UNKNOWN이 있는 출력의 NDCG@k는 산출하지 않는다. 대신 관측 슬롯 수/전체 슬롯 수,
 관측된 슬롯만의 low·평균(조건부 기술통계), 전체 UNKNOWN 비율을 같이 표시한다.
 발견 대체는 actualType=PERSONALIZED로 집계하며 발견 만족도에 넣지 않는다.
 
@@ -166,20 +168,28 @@ model_input_supported 비율, pool 밖 누락과 소진, batch/특징/추론/정
 집계한다. 각 구간에서 전체 실제 평가 수와 모델 지원 이력 수를 따로 보고한다. K=0은 개인화
 모델 실패를 숨기지 않고 별도 초기 경로의 후보 Recall·지원률·부족 사유와 함께 기록한다.
 
-모든 기준선·GBT·FM·feature ablation은 학습 전에 같은 역할별 episode와 후보를 동결하고
-[0~N 계약의 분포 정합성 게이트](../../contracts/zero-n-learning-evaluation.md#21-모든-실험의-분포-정합성-게이트)를
-적용한다. 사용자 평가량·N·긍정/부정 비율, target 별점·TRAIN 지원량·개봉연도, 콘텐츠 범주,
-TMDB/KOBIS 결측과 후보·모델 지원률을 TRAIN/VALIDATION/FINAL_TEST 사이에서 비교한다. 통제 가능한
-표본 차이는 final-test를 열기 전에 줄이고, 시간 이동으로 남은 차이는 temporal-shift 층과
-`DISTRIBUTION_SHIFT` 상태로 별도 보고한다. 분포가 다른 표본의 평균 차이를 모델 개선으로 단정하지 않는다.
+같은 성능 주장을 만드는 기준선·GBT·FM·feature ablation 비교군은 학습 전에 역할별 episode와 후보를
+동결하고 [0~N 계약의 입력 동결과 분포 진단](../../contracts/zero-n-learning-evaluation.md#21-비교군-단위-입력-동결과-분포-진단)을
+적용한다. 통제된 prefix, 실제 저이력 cohort, 전역 시간 이동처럼 추정 질문이 다르면 versioned input과
+report를 분리한다. 자연스러운 drift나 작은 보조 cell은 각각 `DISTRIBUTION_SHIFT`,
+`INSUFFICIENT_SAMPLE`로 남기되 전체 실행 실패와 구분한다. 분포가 다른 표본의 평균 차이를 모델
+개선으로 단정하지 않는다.
 
 같은 사용자·미래 target·후보 집합에서 이력 prefix만 늘리는 `NESTED_HISTORY`는 정보량 증가에
 따른 곡선이다. 서로 다른 실제 사용자를 이력량별로 나눈 `LOW_HISTORY_COHORT`는 모집단 차이를
 포함하므로 같은 사용자의 향상으로 해석하지 않는다. 두 결과는 표와 bootstrap 단위를 분리한다.
+임의 N 입력 지원은 기능 테스트로, 사전 선언한 정확한 K grid의 품질은 통계 실험으로 각각 기록한다.
+실제 저이력 표본 부족은 cohort의 외적 타당성을 제한하지만 nested 정보량 결과까지 무효화하지 않는다.
 
-후보 Recall·NDCG·저평점 노출·다양성·지원률이 주 지표이고 MSE·MAE는 실제 별점이 있는 지원
-후보의 보조 지표다. 미평가 표본은 `UNKNOWN_SAMPLED`이며 음성 정답으로 바꾸지 않는다. 모집단,
+정책 비교는 대중성/콘텐츠 fallback, 전 K 모델, 사전 선언한 K 이상 hard switch와 K별 blend를 같은
+후보에서 평가한다. 임의 N 지원만으로 모델 노출을 승인하지 않으며, TRAIN 내부에서 고정한 임계값과
+weight를 분리된 VALIDATION에서 확인하기 전에는 `VALIDATION_REQUIRED`로 남긴다.
+
+후보 Recall·`OBSERVED_HIT@K`·`OBSERVED_RECALL@K`·NDCG·저평점 노출·다양성·지원률이 주 지표이고 MSE·MAE는
+실제 별점이 있는 지원 후보의 보조 지표다. 미평가 표본은 `UNKNOWN_SAMPLED`이며 음성 정답으로
+바꾸지 않는다. 모집단,
 제외, seed, 표본 확률과 importance weight를 결과 manifest에 남긴다.
 
-MovieLens 결과는 목표 사용자와 분포가 다른 약한 오프라인 근거다. 모델 선택은 분할된 final-test를
-봉인한 채 수행하고, 서비스 만족도 결론은 S15P21E106-625의 실사용자 평가를 통과해야 한다.
+MovieLens 결과는 목표 사용자와 분포가 다른 약한 오프라인 근거다. 모델 선택·확인 환경에서는
+final-test episode·label·분포를 물리적으로 제외하고 seal metadata만 유지한다. 봉인은
+S15P21E106-625에서 한 번 열며, 서비스 만족도 결론은 실사용자 평가를 통과해야 한다.
