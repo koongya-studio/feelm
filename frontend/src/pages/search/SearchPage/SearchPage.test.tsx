@@ -126,14 +126,54 @@ describe('4.1 검색 전', () => {
 });
 
 describe('타이핑에 따라 검색한다', () => {
-  it.each(['ㄱ', '달', 'A', '1'])('한 글자 "%s"로도 검색한다', async (keyword) => {
+  /*
+   * 업무 -640. 한때는 한 글자부터 저절로 보냈다. 237,817편 격리 DB에서 `스`는 1.7~2.6초이고
+   * 후보가 너무 많아 목록으로서 뜻이 없다.
+   *
+   * 임계는 세 글자로 올렸다가 두 글자로 내렸다(사용자 결정 2026-09-20). 한글은 `괴물` ·
+   * `곡성` · `마더`처럼 두 글자짜리 제목이 실제로 있어서, 세 글자 기준이면 그 영화들은
+   * 반드시 제출해야 찾혔다.
+   */
+  it.each(['ㄱ', '달', 'A', '1'])('한 글자 "%s"로는 저절로 보내지 않는다', async (keyword) => {
     renderWithRouter(<SearchPage />, { route: '/search' });
 
     type(keyword);
+    await settle();
+
+    expect(vi.mocked(searchMovies)).not.toHaveBeenCalled();
+  });
+
+  it('두 글자부터 저절로 보낸다 — 두 글자 제목을 위해서다', async () => {
+    renderWithRouter(<SearchPage />, { route: '/search' });
+
+    type('괴물');
 
     await waitFor(() =>
-      expect(vi.mocked(searchMovies)).toHaveBeenCalledWith(expect.objectContaining({ q: keyword })),
+      expect(vi.mocked(searchMovies)).toHaveBeenCalledWith(expect.objectContaining({ q: '괴물' })),
     );
+  });
+
+  it('한 글자라도 제출하면 곧바로 보낸다', () => {
+    renderWithRouter(<SearchPage />, { route: '/search' });
+
+    submit('달');
+
+    expect(vi.mocked(searchMovies)).toHaveBeenCalledWith(expect.objectContaining({ q: '달' }));
+  });
+
+  it('두 글자를 지워 한 글자가 되면 결과를 지우고 검색 전 화면으로 돌아간다', async () => {
+    vi.mocked(searchMovies).mockResolvedValue(page([item(201, '괴물')]));
+
+    renderWithRouter(<SearchPage />, { route: '/search' });
+
+    type('괴물');
+    await resultsHeading(1);
+
+    type('괴');
+    await settle();
+
+    // 입력과 어긋난 옛 결과를 아래 두지 않는다
+    expect(screen.queryByRole('heading', { name: /검색 결과/ })).not.toBeInTheDocument();
   });
 
   it('공백만 치면 검색하지 않고 4.1에 머문다', async () => {
@@ -146,13 +186,15 @@ describe('타이핑에 따라 검색한다', () => {
     expect(screen.getByText('영화 제목, 감독, 배우 이름으로 검색해 보세요')).toBeInTheDocument();
   });
 
-  it('앞뒤 공백은 떼고 보낸다', async () => {
+  it('앞뒤 공백은 떼고 보낸다. 글자 수도 공백을 뺀 뒤에 센다', async () => {
     renderWithRouter(<SearchPage />, { route: '/search' });
 
-    type('  달  ');
+    type('  달의 뒷  ');
 
     await waitFor(() =>
-      expect(vi.mocked(searchMovies)).toHaveBeenCalledWith(expect.objectContaining({ q: '달' })),
+      expect(vi.mocked(searchMovies)).toHaveBeenCalledWith(
+        expect.objectContaining({ q: '달의 뒷' }),
+      ),
     );
   });
 
@@ -171,17 +213,19 @@ describe('타이핑에 따라 검색한다', () => {
     renderWithRouter(<SearchPage />, { route: '/search' });
 
     fireEvent.compositionStart(input());
-    type('ㄷ');
-    type('다');
+    type('달의 ㄷ');
+    type('달의 뒤');
     await settle();
 
     expect(vi.mocked(searchMovies)).not.toHaveBeenCalled();
 
-    type('달');
+    type('달의 뒷');
     fireEvent.compositionEnd(input());
 
     await waitFor(() =>
-      expect(vi.mocked(searchMovies)).toHaveBeenCalledWith(expect.objectContaining({ q: '달' })),
+      expect(vi.mocked(searchMovies)).toHaveBeenCalledWith(
+        expect.objectContaining({ q: '달의 뒷' }),
+      ),
     );
     expect(vi.mocked(searchMovies)).toHaveBeenCalledTimes(1);
   });
@@ -189,9 +233,37 @@ describe('타이핑에 따라 검색한다', () => {
   it('키보드의 검색 버튼은 기다리지 않고 바로 보낸다', () => {
     renderWithRouter(<SearchPage />, { route: '/search' });
 
-    submit('달');
+    submit('달의 뒷');
 
     expect(vi.mocked(searchMovies)).toHaveBeenCalledTimes(1);
+  });
+
+  /*
+   * 업무 -640의 본체다. 위 시험은 **새 요청을 보낸 뒤** 옛 응답이 오는 경우이고, 이것은
+   * 아직 보내기 전(디바운스를 기다리는 동안) 옛 응답이 오는 경우다. 번호를 `run`에서만
+   * 올리면 이 응답은 유효한 것으로 통과해 이미 `스파이더맨`이 된 입력 아래 `스파이더`
+   * 결과가 앉는다. 재현에 적힌 1.7~2.6초짜리 짧은 질의가 정확히 이 모양으로 돌아온다.
+   */
+  it('보내기 전에 도착한 옛 응답도 입력이 바뀌었으면 버린다', async () => {
+    let resolveFirst: (value: MovieSearchResult) => void = () => {};
+    vi.mocked(searchMovies).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        }),
+    );
+
+    renderWithRouter(<SearchPage />, { route: '/search' });
+
+    type('스파이더');
+    await waitFor(() => expect(vi.mocked(searchMovies)).toHaveBeenCalledTimes(1));
+
+    // 아직 다음 요청은 나가지 않았다. 기다리는 사이에 옛 응답이 도착한다
+    type('스파이더맨');
+    resolveFirst(page([item(1, '스파이더맨: 옛 결과')]));
+    await settle();
+
+    expect(screen.queryByText('스파이더맨: 옛 결과')).not.toBeInTheDocument();
   });
 
   it('늦게 온 옛 응답은 새 결과를 덮지 않는다', async () => {
@@ -620,11 +692,11 @@ describe('최근 검색어', () => {
   it('타이핑만으로는 남기지 않는다', async () => {
     renderWithRouter(<SearchPage />, { route: '/search' });
 
-    type('달');
+    type('달의 뒷');
     await waitFor(() => expect(vi.mocked(searchMovies)).toHaveBeenCalled());
     fireEvent.click(screen.getByRole('button', { name: '검색어 지우기' }));
 
-    expect(screen.queryByRole('button', { name: '달' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '달의 뒷' })).not.toBeInTheDocument();
   });
 
   it('전체 삭제하면 목록이 사라지고 안내로 바뀐다', async () => {
