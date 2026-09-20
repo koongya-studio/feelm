@@ -52,6 +52,28 @@ public class RecommendationServingRepository {
         return ordered(taste, discovery);
     }
 
+    /**
+     * 세트에 서빙할 수 있는 유효 카드가 하나라도 남아 있는지 확인한다.
+     *
+     * <p>노출 여부를 가리지 않고 {@link #selectItems}와 같은 조인·술어를 쓴다. 판정과 서빙이 다른 기준을 쓰면 노출 쿼리가 집지 못하는 후보를 "남아
+     * 있다"고 세어 빈 응답이 고착된다(S15P21E106-219).
+     *
+     * <p>이 값이 거짓인 것이 소진의 정의다. 소진 시점에는 노출된 유효 카드도 0편이므로 다음 회차를 만들어도 화면에서 사라지는 카드가 없다.
+     */
+    public boolean hasValidItems(long userId, long setId) {
+        Integer count =
+                jdbcTemplate.queryForObject(
+                        "SELECT count(*) FROM recommendation_items i"
+                                + " JOIN movies m ON m.id=i.movie_id"
+                                + " WHERE i.set_id=? AND i.type IN ('TASTE','DISCOVERY')"
+                                + validCandidateClause(),
+                        Integer.class,
+                        setId,
+                        userId,
+                        userId);
+        return count != null && count > 0;
+    }
+
     public boolean hasExposedItems(long setId) {
         Integer count =
                 jdbcTemplate.queryForObject(
@@ -68,9 +90,7 @@ public class RecommendationServingRepository {
                 findUnexposedForUpdate(userId, setId, "DISCOVERY", DISCOVERY_SIZE);
         int tasteSize = discovery.isEmpty() ? TASTE_SIZE + DISCOVERY_SIZE : TASTE_SIZE;
         List<ServingItem> taste = findUnexposedForUpdate(userId, setId, "TASTE", tasteSize);
-        if (taste.size() != tasteSize) {
-            return List.of();
-        }
+        // 목표 구성을 못 채워도 확보한 만큼 노출한다. 부족분은 보충·소진 흐름이 이어받는다(S15P21E106-219).
         return ordered(taste, discovery);
     }
 

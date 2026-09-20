@@ -8,16 +8,18 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.feelm.backend.domain.recommendation.model.RecommendationBufferResult;
+import com.feelm.backend.domain.recommendation.repository.RecommendationCandidateReader;
 import org.junit.jupiter.api.Test;
 
 class RecommendationBufferNoticeTest {
     @Test
     void submitsReasonCompletionOnlyAfterBufferWriterReturns() {
         RecommendationBufferWriter writer = mock(RecommendationBufferWriter.class);
+        RecommendationCandidateReader candidateReader = mock(RecommendationCandidateReader.class);
         RecommendationReasonService reasons = mock(RecommendationReasonService.class);
         RecommendationReasonDispatcher dispatcher = mock(RecommendationReasonDispatcher.class);
         RecommendationBufferService service =
-                new RecommendationBufferService(writer, reasons, dispatcher);
+                new RecommendationBufferService(writer, candidateReader, reasons, dispatcher);
         when(writer.writeCurrentFromNotice(1024L)).thenReturn(new RecommendationBufferResult(42L));
 
         assertThat(service.createBufferFromNotice(1024L).recommendationSetId()).isEqualTo(42L);

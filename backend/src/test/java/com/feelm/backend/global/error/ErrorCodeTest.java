@@ -39,6 +39,8 @@ class ErrorCodeTest {
                 .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(ErrorCode.RECOMMENDATION_UNAVAILABLE.getStatus())
                 .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(ErrorCode.RECOMMENDATION_PREPARING.getStatus())
+                .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(ErrorCode.PUSH_UNAVAILABLE.getStatus())
                 .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     }
@@ -61,6 +63,8 @@ class ErrorCodeTest {
                         "RATE_LIMITED",
                         "INTERNAL_ERROR",
                         "RECOMMENDATION_UNAVAILABLE",
+                        // 추천 도메인 — API-045 버퍼 소진 후 재생성 준비 (S15P21E106-219)
+                        "RECOMMENDATION_PREPARING",
                         "PUSH_UNAVAILABLE",
                         // 인증 도메인 — API-006 토큰 재발급 전용
                         "REFRESH_TOKEN_INVALID",
