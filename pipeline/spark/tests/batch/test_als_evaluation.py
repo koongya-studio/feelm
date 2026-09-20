@@ -12,7 +12,6 @@ from tests.fixtures.als_evaluation import (
     USER,
     ScoredModel,
     mapping,
-    ordered,
     ratings,
 )
 from tests.fixtures.als_evaluation import spark as spark_fixture
@@ -31,6 +30,14 @@ def evaluate(model, known, holdout, movie_map, stage="validation", n=10):
         positive_rating_threshold=4.0,
         model_version="fixture-v1",
     )
+
+
+def collected_candidates(frame):
+    rows = frame.orderBy("catalog", USER, "rank").collect()
+    grouped = {}
+    for row in rows:
+        grouped.setdefault((row.catalog, row[USER]), []).append(row)
+    return grouped
 
 
 def test_catalog_populations_cold_truth_and_shortage_counts(spark):
@@ -100,9 +107,11 @@ def test_same_users_different_holdout_items_and_labels_leave_candidates_unchange
     known, movie_map = ratings(spark, [(1, 1, 1.0)]), mapping(spark, (1, 2, 3))
     a = evaluate(model, known, ratings(spark, [(1, 2, 5.0)]), movie_map, n=2)
     b = evaluate(model, known, ratings(spark, [(1, 3, 3.5)]), movie_map, n=2)
+    a_candidates = collected_candidates(a.candidates)
+    b_candidates = collected_candidates(b.candidates)
     for catalog in ("movielens", "service"):
-        assert ordered(a.candidates, catalog) == ordered(b.candidates, catalog)
-        assert 2 in [r[ITEM] for r in ordered(a.candidates, catalog)]
+        assert a_candidates[catalog, 1] == b_candidates[catalog, 1]
+        assert 2 in [r[ITEM] for r in a_candidates[catalog, 1]]
         assert a.summary[catalog]["recall_at_10"] == 1
         assert b.summary[catalog]["recall_at_10"] is None
 
@@ -152,8 +161,9 @@ def test_test_stage_uses_new_factors_and_excludes_validation_history(spark):
     assert old.summary["movielens"]["cold_items"] == 1
     assert new.summary["movielens"]["cold_users"] == 0
     assert new.summary["movielens"]["cold_items"] == 0
+    candidates_by_population = collected_candidates(new.candidates)
     for catalog in ("movielens", "service"):
-        assert [r[ITEM] for r in ordered(new.candidates, catalog, user=2)] == [1, 3]
+        assert [r[ITEM] for r in candidates_by_population[catalog, 2]] == [1, 3]
     assert new.metadata["stage"] == "test"
 
 
@@ -195,15 +205,16 @@ def test_actual_als_training_candidates_and_metrics_match_independent_oracle(spa
     predictions = model.transform(ratings(spark, [(1, 3, 5.0), (1, 4, 5.0)])).collect()
     expected = sorted(predictions, key=lambda r: (-r.prediction, r[ITEM]))
     hit_rank = next(i for i, r in enumerate(expected, 1) if r[ITEM] == 3)
+    candidates_by_population = collected_candidates(result.candidates)
     for catalog in ("movielens", "service"):
-        actual = ordered(result.candidates, catalog)
+        actual = candidates_by_population[catalog, 1]
         assert [r[ITEM] for r in actual] == [r[ITEM] for r in expected]
         assert [r.score for r in actual] == pytest.approx([r.prediction for r in expected])
         assert result.summary[catalog]["recall_at_10"] == pytest.approx(0.5)
         assert result.summary[catalog]["ndcg_at_10"] == pytest.approx(
             1 / math.log2(hit_rank + 1) / 2
         )
-        assert ordered(result.candidates, catalog, user=99) == []
+        assert candidates_by_population.get((catalog, 99), []) == []
     assert model.getColdStartStrategy() == strategy
     assert train.count() == 8
     assert set(result.per_user.columns) >= {USER, "catalog", "recall_at_10", "ndcg_at_10"}
