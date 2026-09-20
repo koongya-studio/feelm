@@ -3,12 +3,13 @@
 Spring Boot, 두 호스트, PostgreSQL, Redis와 Kafka의 메트릭을 Prometheus가 수집하고
 Grafana가 시각화합니다. 서비스 노드 `J15E106`의 Node Exporter는 Compose 내부에서
 수집하고, 분산 노드 `J15E106A`는 사설 IP에만 게시한 Node Exporter와 Kafka Exporter를
-중앙 Prometheus가 수집합니다. Spark, HDFS와 브라우저 RUM 메트릭은 이 구성에 포함하지
-않습니다.
+중앙 Prometheus가 수집합니다. Grafana Alloy는 서비스 노드의 backend, frontend, nginx
+컨테이너 로그를 마스킹한 뒤 Loki에 전송하며 Grafana Explore와 Alerting에서 조회합니다.
+분산 노드 로그, Spark·HDFS 로그와 브라우저 RUM 메트릭은 이 구성에 포함하지 않습니다.
 
 ## 보안 경계
 
-- Prometheus와 Grafana 호스트 포트는 `127.0.0.1`에만 바인딩합니다.
+- Prometheus, Grafana, Loki와 Alloy 호스트 포트는 `127.0.0.1`에만 바인딩합니다.
 - 분산 노드의 Node Exporter `9100/tcp`는 `DISTRIBUTED_NODE_IP`에만 바인딩합니다.
 - 분산 노드의 Kafka Exporter `9308/tcp`도 `DISTRIBUTED_NODE_IP`에만 바인딩하며 Kafka
   broker에는 같은 호스트의 `127.0.0.1:9092`로만 접속합니다.
@@ -21,6 +22,13 @@ Grafana가 시각화합니다. 서비스 노드 `J15E106`의 Node Exporter는 Co
 - `GRAFANA_ALERT_HMAC_SECRET`은 Grafana와 내부 알림 릴레이 사이의 서명 Secret이며
   `infra/.env` 또는 GitLab CI/CD Variables에만 둡니다.
 - 알림 릴레이 health 포트도 `127.0.0.1`에만 바인딩하며 외부에 공개하지 않습니다.
+- Alloy는 Docker 컨테이너를 발견하고 로그를 읽기 위해 Docker socket을 마운트합니다. 이
+  socket은 호스트 제어 권한으로 이어질 수 있으므로 Alloy 이미지를 고정하고 외부 포트를
+  공개하지 않으며, 설정 변경은 인프라 리뷰를 거칩니다.
+- 저장 전 Alloy에서 credential, JWT와 email 패턴을 마스킹합니다. 패턴 기반 마스킹이 모든
+  민감정보를 보장하지 않으므로 애플리케이션은 요청 본문, 인증 헤더와 Secret을 로그에 남기지
+  않습니다.
+- Loki 로그는 로컬 영속 볼륨에 7일간 보존하며 볼륨 사용량을 운영 점검에 포함합니다.
 - 공개 Grafana 경로는 Nginx의 별도 Basic Auth와 Grafana 로그인을 모두 통과해야 합니다.
 - 원격 접근은 HTTPS `/grafana/`를 사용하고, SSH 터널은 공개 경로 장애 시 복구 수단으로만
   유지합니다. Grafana와 Prometheus의 원본 포트는 공개하지 않습니다.
@@ -56,12 +64,31 @@ deploy 알림과 동일한 값을 사용합니다. `MATTERMOST_PASSWORD`는 상�
 | Host CPU | 90% 초과 | 10분 | warning |
 | Host memory | 90% 초과 | 10분 | warning |
 | Host filesystem 여유 | 15% 미만 | 10분 | critical |
+| 서비스 치명적 오류 로그 | 5분 내 FATAL, OOM 또는 미처리 예외 1건 이상 | 1분 | critical |
+| 서비스 오류 로그 급증 | 5분 내 ERROR·예외 10건 초과 | 2분 | warning |
 
 임계치 또는 지속 시간을 바꿀 때는
 `grafana/provisioning/alerting/feelm-alerts.json`의 threshold `params`와 `for`를 같은 MR에서
 변경하고, 변경 이유와 관측 기간을 기록합니다. Grafana UI에서 provisioned 규칙을 임시로
 복제하거나 편집하지 않습니다. 알림 정책 트리는 팀이 UI에서 만든 다른 정책을 덮어쓰지 않도록
 provisioning하지 않고, 각 규칙이 `FEELM Mattermost` 연락 지점을 직접 사용합니다.
+로그 알림은 환경·서비스·감지 건수와 최근 15분 Grafana Explore 링크만 전송하며 원문 로그와
+스택 트레이스는 Mattermost 메시지에 포함하지 않습니다.
+
+### 로그 알림 테스트와 복구 확인
+
+1. Grafana **Explore**에서 Loki를 선택하고
+   `{environment="production", service="backend"}`를 조회해 로그 수집과 라벨을 확인합니다.
+2. 운영 데이터나 실제 개인정보를 쓰지 않는 합성 환경에서 `ERROR synthetic-alert-test` 로그를
+   5분 동안 11건 이상 발생시키고 2분 뒤 Mattermost의 오류 급증 알림을 확인합니다.
+3. 알림에 환경, 서비스, 감지 건수와 Explore 링크만 있고 원문 로그가 없는지 확인합니다.
+   합성 로그에 `password=test-secret`, 이메일과 테스트 JWT를 포함해 Loki 저장 결과가 각각
+   `[REDACTED_CREDENTIAL]`, `[REDACTED_EMAIL]`, `[REDACTED_JWT]`인지 확인합니다.
+4. 오류 발생을 중단하고 5분 집계 구간, `keepFiringFor` 2분과 다음 평가 주기가 지난 뒤
+   `RECOVERY` 알림을 확인합니다.
+5. Loki 또는 Alloy가 준비되지 않으면 해당 컨테이너만 확인하며 `loki_data`나 `alloy_data`
+   볼륨을 삭제하지 않습니다. Docker socket 권한을 넓히거나 공개 TCP daemon으로 우회하지
+   않습니다.
 
 ### 테스트와 복구 확인
 
@@ -101,7 +128,7 @@ Prometheus의 같은 식으로 실제 값을 확인합니다. target down은 아
 docker compose --env-file infra/.env \
   -f infra/compose/service.yml \
   -f infra/compose/monitoring.yml \
-  up -d postgres redis backend prometheus mattermost-alert-relay grafana node-exporter postgres-exporter redis-exporter
+  up -d postgres redis backend loki alloy prometheus mattermost-alert-relay grafana node-exporter postgres-exporter redis-exporter
 ```
 
 분산 노드에서는 기존 분산 Compose 파일의 Node Exporter와 Kafka Exporter를 기동합니다.
@@ -177,7 +204,7 @@ $env:FEELM_ENV_FILE = 'C:\path\to\S15P21E106\infra\.env'
 docker compose --env-file $env:FEELM_ENV_FILE `
   -f infra/compose/service.yml `
   -f infra/compose/monitoring.yml `
-  up -d postgres redis backend prometheus mattermost-alert-relay grafana postgres-exporter redis-exporter
+  up -d postgres redis backend loki alloy prometheus mattermost-alert-relay grafana postgres-exporter redis-exporter
 ```
 
 정상 원격 접속 주소는 다음과 같습니다.
@@ -230,7 +257,7 @@ docker compose --env-file infra/.env \
 
 ## main 자동 배포
 
-모니터링 Compose와 Prometheus·Grafana·Mattermost relay 설정이 보호된 `main`에 병합되면
+모니터링 Compose와 Loki·Alloy·Prometheus·Grafana·Mattermost relay 설정이 보호된 `main`에 병합되면
 `deploy-monitoring` Job이 서비스 노드에서 자동 실행됩니다. MR, Web, API Pipeline과 보호되지
 않은 브랜치는 배포하지 않습니다. Job은 먼저 원격 `main` HEAD와 현재 commit이 같은지
 확인하고, `ci-variable-preflight`의 실제 변수·GitLab 메타데이터 검사를 통과한 경우에만
@@ -240,27 +267,32 @@ Deployment 절을 따릅니다.
 배포 스크립트는 배포 Pipeline별 고유 Compose 프로젝트로 `monitoring.yml`만 해석하므로
 PostgreSQL, Redis, backend, frontend와 Nginx 및 `-rollback` 컨테이너를 Compose 대상으로
 선택하지 않습니다. 후보 프로젝트는 기존 `compose_default` 네트워크와
-`compose_prometheus_data`, `compose_grafana_data` 볼륨을 명시적으로 공유합니다.
+`compose_loki_data`, `compose_alloy_data`, `compose_prometheus_data`, `compose_grafana_data`
+볼륨을 명시적으로 공유합니다.
 `config --quiet`와 이미지 pull을 컨테이너 변경 전에 수행하고, 기존 모니터링 컨테이너가
 있으면 중지 후 이름 끝에 `-rollback`을 붙여 보존합니다. 후보는
 `--no-deps --force-recreate`로 다음 서비스만 교체합니다.
 
 ```text
-prometheus grafana mattermost-alert-relay node-exporter postgres-exporter redis-exporter
+loki alloy prometheus grafana mattermost-alert-relay node-exporter postgres-exporter redis-exporter
 ```
 
-후보 기동 후 Prometheus readiness, Grafana database health, 알림 릴레이 health와 Prometheus의
-필수 scrape target을 최대 24회, 5초 간격으로 검사합니다. 기대 target은 `backend` 1개, `node` 2개,
+후보 기동 후 Loki와 Alloy readiness, Prometheus readiness, Grafana database health, 알림 릴레이
+health와 Prometheus의 필수 scrape target을 최대 24회, 5초 간격으로 검사합니다. 기대 target은 `backend` 1개, `node` 2개,
 `kafka`·`postgres`·`redis` 각 1개이며 모두 `up=1`이어야 합니다. 또한 각 모니터링 컨테이너의
 `io.feelm.monitoring.revision` 라벨이 현재 `main` Pipeline의 `CI_COMMIT_SHA`와 같은지 검사해
 현재 운영 설정으로 실제 재생성됐음을 확인합니다. 검증이 성공하면 보존한
-컨테이너만 삭제하고 `prometheus_data`, `grafana_data` 볼륨은 유지합니다. 스크립트는
+컨테이너만 삭제하고 Loki·Alloy·Prometheus·Grafana 데이터 볼륨은 유지합니다. 스크립트는
 `docker compose down`, `down -v`와 `docker volume rm`을 사용하지 않습니다.
 
 Compose 적용 또는 health 검증이 실패하면 후보 컨테이너만 제거하고 보존한 컨테이너를 원래
 이름으로 복구한 뒤 같은 health 검사를 다시 수행합니다. 첫 자동 배포처럼 기존 컨테이너가
 없었다면 실패한 후보만 제거합니다. 복구 검증도 실패하면 Job은 수동 복구 필요 상태로
 종료하며 Pipeline 성공으로 처리하지 않습니다.
+Loki·Alloy 최초 도입 배포가 실패하면 두 서비스가 없던 이전 모니터링 구성으로 복구한 뒤
+기존 Prometheus·Grafana·릴레이 상태만 검증합니다. 이후 배포에서는 Loki와 Alloy가 모두
+복구 검증 대상이며 둘 중 하나만 존재하는 불완전 상태에서는 컨테이너를 변경하기 전에
+중단합니다.
 
 Job 또는 호스트가 컨테이너 보존 이후 비정상 종료되면 다음 배포는 `-rollback` 컨테이너를
 발견하고 실제 변경 전에 중단합니다. 서비스 노드에서 실행 중인 모니터링 컨테이너와 보존
@@ -307,8 +339,8 @@ docker compose --env-file infra/.env \
 합니다. `/grafana/public/` 정적 파일이 정상 표시되고 브라우저 개발자 도구에서
 `/grafana/api/live/ws` WebSocket 연결이 `101`로 전환되는지 확인합니다. Viewer 계정으로
 대시보드 조회는 가능하지만 사용자·데이터소스·대시보드 편집은 거부되어야 합니다.
-서비스 서버의 공인 주소에서 `3000`과 `9090` 직접 연결이 실패하고, 서비스 서버
-루프백의 Grafana health와 Prometheus readiness는 계속 성공해야 합니다.
+서비스 서버의 공인 주소에서 `3000`, `9090`, `3100`, `12345` 직접 연결이 실패하고, 서비스 서버
+루프백의 Grafana health, Loki·Alloy·Prometheus readiness는 계속 성공해야 합니다.
 
 Nginx 기본 access log는 Basic Auth의 `Authorization` 헤더나 요청 본문을 기록하지 않습니다.
 인증 실패를 확인할 때 전체 헤더, 쿠키, 비밀번호 또는 환경변수를 출력하지 않습니다.
@@ -319,6 +351,8 @@ Nginx 기본 access log는 Basic Auth의 `Authorization` 헤더나 요청 본문
 docker exec feelm-backend curl --fail --silent http://localhost:8080/actuator/prometheus
 curl --fail http://127.0.0.1:9090/-/ready
 curl --fail http://127.0.0.1:3000/api/health
+curl --fail http://127.0.0.1:3100/ready
+curl --fail http://127.0.0.1:12345/-/ready
 curl --fail 'http://127.0.0.1:9090/api/v1/query?query=up'
 ```
 

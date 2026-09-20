@@ -51,6 +51,8 @@ deploy-monitoring:
         - .gitlab/ci/infra.yml
         - infra/config/required-ci-variables.json
         - infra/compose/monitoring.yml
+        - infra/monitoring/loki/**/*
+        - infra/monitoring/alloy/**/*
         - infra/monitoring/prometheus/**/*
         - infra/monitoring/grafana/**/*
         - infra/monitoring/mattermost-relay/**/*

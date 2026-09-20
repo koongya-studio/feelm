@@ -251,6 +251,8 @@ include:
                 '$CI_COMMIT_REF_PROTECTED == "true"',
                 '$CI_PIPELINE_SOURCE == "push"',
                 '- infra/compose/monitoring.yml',
+                '- infra/monitoring/loki/**/*',
+                '- infra/monitoring/alloy/**/*',
                 '- infra/monitoring/prometheus/**/*',
                 '- infra/monitoring/grafana/**/*',
                 '- infra/monitoring/mattermost-relay/**/*',

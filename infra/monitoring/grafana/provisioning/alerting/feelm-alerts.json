@@ -28,7 +28,7 @@
     {
       "orgId": 1,
       "name": "feelm.mattermost",
-      "template": "{{ define \"feelm.mattermost.title\" }}{{ if eq .Status \"firing\" }}🚨 [ALERT] 서버 장애 감지{{ else }}✅ [RECOVERY] 서버 장애 복구{{ end }}{{ end }}\n{{ define \"feelm.mattermost.text\" }}{{ range .Alerts }}\n> {{ if eq .Status \"firing\" }}❌ 발생{{ else }}✅ 복구{{ end }} · {{ .Annotations.summary }}\n\n{{ .Annotations.description }}\n- 심각도: `{{ .Labels.severity }}`\n- 영역: `{{ .Labels.component }}`\n- [Grafana에서 확인]({{ .GeneratorURL }})\n{{ end }}{{ end }}"
+      "template": "{{ define \"feelm.mattermost.title\" }}{{ if eq .Status \"firing\" }}🚨 [ALERT] {{ if eq .CommonLabels.category \"logs\" }}오류 로그 감지{{ else }}서버 장애 감지{{ end }}{{ else }}✅ [RECOVERY] {{ if eq .CommonLabels.category \"logs\" }}오류 로그 정상화{{ else }}서버 장애 복구{{ end }}{{ end }}{{ end }}\n{{ define \"feelm.mattermost.text\" }}{{ range .Alerts }}\n> {{ if eq .Status \"firing\" }}❌ 발생{{ else }}✅ 복구{{ end }} · {{ .Annotations.summary }}\n\n{{ .Annotations.description }}\n- 심각도: `{{ .Labels.severity }}`\n- 영역: `{{ .Labels.component }}`{{ if .Labels.environment }}\n- 환경: `{{ .Labels.environment }}`{{ end }}{{ if .Labels.service }}\n- 서비스: `{{ .Labels.service }}`{{ end }}{{ if .Annotations.explore_url }}\n- [Grafana Explore에서 로그 확인]({{ .Annotations.explore_url }}){{ else }}\n- [Grafana에서 확인]({{ .GeneratorURL }}){{ end }}\n{{ end }}{{ end }}"
     }
   ],
   "groups": [
@@ -497,6 +497,142 @@
           "notification_settings": {
             "receiver": "FEELM Mattermost",
             "group_by": ["alertname", "grafana_folder", "component"],
+            "group_wait": "30s",
+            "group_interval": "5m",
+            "repeat_interval": "4h"
+          }
+        }
+      ]
+    },
+    {
+      "orgId": 1,
+      "name": "FEELM service error logs",
+      "folder": "FEELM Alerts",
+      "interval": "1m",
+      "rules": [
+        {
+          "uid": "feelm_critical_log_detected",
+          "title": "Critical service log detected",
+          "condition": "B",
+          "data": [
+            {
+              "refId": "A",
+              "queryType": "instant",
+              "relativeTimeRange": { "from": 600, "to": 0 },
+              "datasourceUid": "loki",
+              "model": {
+                "datasource": { "type": "loki", "uid": "loki" },
+                "editorMode": "code",
+                "expr": "sum by (environment, service) (count_over_time({environment=\"production\", service=~\"backend|frontend|nginx\"} |~ \"(?i)(FATAL|OutOfMemoryError|Unhandled exception)\" [5m])) or on() vector(0)",
+                "instant": true,
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "queryType": "instant",
+                "refId": "A"
+              }
+            },
+            {
+              "refId": "B",
+              "queryType": "",
+              "relativeTimeRange": { "from": 0, "to": 0 },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": { "params": [0], "type": "gt" },
+                    "operator": { "type": "and" },
+                    "query": { "params": ["A"] },
+                    "reducer": { "params": [], "type": "last" },
+                    "type": "query"
+                  }
+                ],
+                "datasource": { "type": "__expr__", "uid": "__expr__" },
+                "expression": "A",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "B",
+                "type": "threshold"
+              }
+            }
+          ],
+          "noDataState": "OK",
+          "execErrState": "Error",
+          "for": "1m",
+          "keepFiringFor": "2m",
+          "annotations": {
+            "summary": "{{ $labels.service }} 서비스에서 치명적 오류 로그가 감지되었습니다.",
+            "description": "최근 5분 감지 건수: {{ $values.A.Value }}건. 원본 로그는 Mattermost에 포함하지 않으며 Explore에서 확인하세요.",
+            "explore_url": "https://j15e106.p.ssafy.io/grafana/explore?schemaVersion=1&panes=%7B%22logs%22%3A%7B%22datasource%22%3A%22loki%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22expr%22%3A%22%7Benvironment%3D%5C%22production%5C%22%2Cservice%3D~%5C%22backend%7Cfrontend%7Cnginx%5C%22%7D%20%7C~%20%60(%3Fi)(ERROR%7CException%7CFATAL%7COutOfMemoryError)%60%22%2C%22queryType%22%3A%22range%22%2C%22datasource%22%3A%7B%22uid%22%3A%22loki%22%2C%22type%22%3A%22loki%22%7D%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-15m%22%2C%22to%22%3A%22now%22%7D%7D%7D&orgId=1"
+          },
+          "labels": { "category": "logs", "component": "service-logs", "severity": "critical" },
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "FEELM Mattermost",
+            "group_by": ["alertname", "grafana_folder", "component", "environment", "service"],
+            "group_wait": "30s",
+            "group_interval": "5m",
+            "repeat_interval": "4h"
+          }
+        },
+        {
+          "uid": "feelm_error_log_spike",
+          "title": "Service error log spike",
+          "condition": "B",
+          "data": [
+            {
+              "refId": "A",
+              "queryType": "instant",
+              "relativeTimeRange": { "from": 600, "to": 0 },
+              "datasourceUid": "loki",
+              "model": {
+                "datasource": { "type": "loki", "uid": "loki" },
+                "editorMode": "code",
+                "expr": "sum by (environment, service) (count_over_time({environment=\"production\", service=~\"backend|frontend|nginx\"} |~ \"(?i)(ERROR|Exception|FATAL|OutOfMemoryError)\" [5m])) or on() vector(0)",
+                "instant": true,
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "queryType": "instant",
+                "refId": "A"
+              }
+            },
+            {
+              "refId": "B",
+              "queryType": "",
+              "relativeTimeRange": { "from": 0, "to": 0 },
+              "datasourceUid": "__expr__",
+              "model": {
+                "conditions": [
+                  {
+                    "evaluator": { "params": [10], "type": "gt" },
+                    "operator": { "type": "and" },
+                    "query": { "params": ["A"] },
+                    "reducer": { "params": [], "type": "last" },
+                    "type": "query"
+                  }
+                ],
+                "datasource": { "type": "__expr__", "uid": "__expr__" },
+                "expression": "A",
+                "intervalMs": 1000,
+                "maxDataPoints": 43200,
+                "refId": "B",
+                "type": "threshold"
+              }
+            }
+          ],
+          "noDataState": "OK",
+          "execErrState": "Error",
+          "for": "2m",
+          "keepFiringFor": "2m",
+          "annotations": {
+            "summary": "{{ $labels.service }} 서비스의 오류 로그가 급증했습니다.",
+            "description": "최근 5분 감지 건수: {{ $values.A.Value }}건(기준: 10건 초과). 최근 배포와 요청 흐름을 함께 확인하세요.",
+            "explore_url": "https://j15e106.p.ssafy.io/grafana/explore?schemaVersion=1&panes=%7B%22logs%22%3A%7B%22datasource%22%3A%22loki%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22expr%22%3A%22%7Benvironment%3D%5C%22production%5C%22%2Cservice%3D~%5C%22backend%7Cfrontend%7Cnginx%5C%22%7D%20%7C~%20%60(%3Fi)(ERROR%7CException%7CFATAL%7COutOfMemoryError)%60%22%2C%22queryType%22%3A%22range%22%2C%22datasource%22%3A%7B%22uid%22%3A%22loki%22%2C%22type%22%3A%22loki%22%7D%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-15m%22%2C%22to%22%3A%22now%22%7D%7D%7D&orgId=1"
+          },
+          "labels": { "category": "logs", "component": "service-logs", "severity": "warning" },
+          "isPaused": false,
+          "notification_settings": {
+            "receiver": "FEELM Mattermost",
+            "group_by": ["alertname", "grafana_folder", "component", "environment", "service"],
             "group_wait": "30s",
             "group_interval": "5m",
             "repeat_interval": "4h"
