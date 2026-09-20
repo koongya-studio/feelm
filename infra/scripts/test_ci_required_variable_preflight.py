@@ -36,7 +36,7 @@ class RequiredVariablePreflightTest(unittest.TestCase):
 
     def environment(self):
         environment = {
-            "CI_COMMIT_BRANCH": "develop",
+            "CI_COMMIT_BRANCH": "main",
             "CI_COMMIT_REF_PROTECTED": "true",
             "CI_PIPELINE_SOURCE": "push",
             "CI_ENVIRONMENT_NAME": "service",
@@ -102,7 +102,9 @@ class RequiredVariablePreflightTest(unittest.TestCase):
 
     def test_rejects_untrusted_or_debug_context(self):
         scenarios = (
-            {"CI_COMMIT_BRANCH": "main"},
+            {"CI_COMMIT_BRANCH": "develop"},
+            {"CI_COMMIT_BRANCH": "feature/example"},
+            {"CI_PIPELINE_SOURCE": "web"},
             {"CI_COMMIT_REF_PROTECTED": "false"},
             {"CI_PIPELINE_SOURCE": "merge_request_event"},
             {"CI_ENVIRONMENT_NAME": "distributed"},
@@ -113,7 +115,7 @@ class RequiredVariablePreflightTest(unittest.TestCase):
                 environment = self.environment()
                 environment.update(update)
                 with self.assertRaises(MODULE.PreflightError):
-                    MODULE.require_protected_develop(environment)
+                    MODULE.require_protected_main(environment)
 
     def test_live_metadata_matches_without_exposing_values(self):
         MODULE.validate_live_metadata(self.variables(), self.environment(), self.opener)
@@ -148,6 +150,14 @@ class RequiredVariablePreflightTest(unittest.TestCase):
             self.assertEqual(MODULE.main(), 1)
         rendered = " ".join(str(call) for call in output.call_args_list)
         self.assertIn("REDIS_PASSWORD", rendered)
+        self.assertNotIn(self.secret, rendered)
+
+    def test_main_runtime_values_accept_protected_main_push(self):
+        with patch.dict(os.environ, self.environment(), clear=True), patch.object(
+            MODULE.sys, "argv", [str(SCRIPT), "--require-values"]
+        ), patch("builtins.print") as output:
+            self.assertEqual(MODULE.main(), 0)
+        rendered = " ".join(str(call) for call in output.call_args_list)
         self.assertNotIn(self.secret, rendered)
 
 
