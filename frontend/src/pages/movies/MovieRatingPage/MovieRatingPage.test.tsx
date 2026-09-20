@@ -132,6 +132,8 @@ describe('2.5 평가 저장', () => {
 
     // 새 평가의 제목은 `평가하기`다. 수정일 때만 `평가 수정`이다(업무 S15P21E106-638)
     expect(await screen.findByRole('heading', { level: 1, name: '평가하기' })).toBeInTheDocument();
+    // 평가하러 왔다가 미루는 길은 새 평가에 남는다(업무 S15P21E106-716)
+    expect(screen.getByRole('button', { name: '나중에 평가하기' })).toBeInTheDocument();
     await rate(4.5);
 
     await waitFor(() => expect(location()).toBe('/movies/550/rate/result'));
@@ -278,6 +280,8 @@ describe('2.5 평가 저장', () => {
     ).toBeChecked();
     // 새 평가와 구분되게 제목이 `평가 수정`이다(업무 S15P21E106-638)
     expect(screen.getByRole('heading', { level: 1, name: '평가 수정' })).toBeInTheDocument();
+    // 이미 평가한 사람에게 `나중에 평가하기`는 말이 맞지 않는다(업무 S15P21E106-716)
+    expect(screen.queryByRole('button', { name: '나중에 평가하기' })).not.toBeInTheDocument();
     await rate(2.5, '범인이 드러난다');
 
     await waitFor(() =>
