@@ -24,6 +24,8 @@ DEPLOYMENT_SERVICES = (
     "redis",
     "postgresql",
     "monitoring",
+    "distributed-observability",
+    "spark-history",
     "hdfs-service-config",
     "hdfs-distributed-config",
     "kafka-config",

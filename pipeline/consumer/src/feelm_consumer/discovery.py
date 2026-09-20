@@ -9,8 +9,8 @@ from feelm_consumer.group_artifacts import GroupBundle
 from feelm_consumer.profile import ProfileInput, merge_inputs
 from feelm_consumer.ranking import RankedMovie
 
-MAX_DISCOVERY_GROUPS = 10
-MAX_MOVIES_PER_GROUP = 10
+PRIMARY_DISCOVERY_GROUPS = 10
+INITIAL_MOVIES_PER_GROUP = 10
 MAX_DISCOVERY_CANDIDATES = 100
 MAX_VIEWED_PER_GROUP = 2
 MAX_VIEWED_GROUP_SHARE = 0.20
@@ -81,7 +81,7 @@ def select_discovery_candidates(
     watched_movie_ids: set[int] | frozenset[int] = frozenset(),
     dismissed_movie_ids: set[int] | frozenset[int] = frozenset(),
 ) -> DiscoverySelection:
-    """Select at most ten movies from each of at most ten low-history groups.
+    """Select up to 100 movies while prioritizing the ten best low-history groups.
 
     The serving artifact intentionally exposes stable group representatives rather
     than every source movie vector.  User direction is therefore built from the
@@ -128,37 +128,54 @@ def select_discovery_candidates(
     reasons: dict[int, DiscoveryReason] = {}
     supplying_group_ids: set[int] = set()
 
-    def append_group_slice(group_id: int, affinity_rank: int, start: int, stop: int | None) -> None:
-        for popularity_rank, candidate in enumerate(movies_by_group[group_id][start:stop], start=start + 1):
-            if len(selected) == MAX_DISCOVERY_CANDIDATES:
-                return
-            selected.append(candidate)
-            reasons[candidate.movie_id] = _build_discovery_reason(
-                bundle,
-                group_id,
-                source,
-                direction_contributors,
-                viewed_count_in_group=int(viewed_counts[group_id]),
-                affinity_rank=affinity_rank,
-                popularity_rank_in_group=popularity_rank,
-            )
-            supplying_group_ids.add(group_id)
+    def append_candidate(group_id: int, affinity_rank: int, popularity_index: int) -> None:
+        candidate = movies_by_group[group_id][popularity_index]
+        selected.append(candidate)
+        reasons[candidate.movie_id] = _build_discovery_reason(
+            bundle,
+            group_id,
+            source,
+            direction_contributors,
+            viewed_count_in_group=int(viewed_counts[group_id]),
+            affinity_rank=affinity_rank,
+            popularity_rank_in_group=popularity_index + 1,
+        )
+        supplying_group_ids.add(group_id)
 
-    # Preserve the original diversity rule first: at most ten movies from each
-    # of the ten best-affinity groups.  If sparse groups leave the list short,
-    # admit the next eligible groups before deepening any one group.  Only after
-    # every eligible group has had that chance do we take the 11th+ movie from
-    # groups in affinity order.
-    for affinity_rank, group_id in enumerate(eligible_groups[:MAX_DISCOVERY_GROUPS], start=1):
-        append_group_slice(group_id, affinity_rank, 0, MAX_MOVIES_PER_GROUP)
-    for affinity_rank, group_id in enumerate(
-        eligible_groups[MAX_DISCOVERY_GROUPS:], start=MAX_DISCOVERY_GROUPS + 1
-    ):
-        append_group_slice(group_id, affinity_rank, 0, MAX_MOVIES_PER_GROUP)
-    if len(selected) < MAX_DISCOVERY_CANDIDATES:
-        for affinity_rank, group_id in enumerate(eligible_groups, start=1):
-            append_group_slice(group_id, affinity_rank, MAX_MOVIES_PER_GROUP, None)
+    primary_groups = eligible_groups[:PRIMARY_DISCOVERY_GROUPS]
+    for affinity_rank, group_id in enumerate(primary_groups, start=1):
+        for popularity_index in range(min(INITIAL_MOVIES_PER_GROUP, len(movies_by_group[group_id]))):
+            append_candidate(group_id, affinity_rank, popularity_index)
+
+    # The first pass preserves the 10 groups x 10 movies diversity target. Sparse
+    # primary groups are filled first from their deeper ranks: one 11th-ranked movie
+    # per group, then one 12th-ranked movie per group, and so on.
+    popularity_index = INITIAL_MOVIES_PER_GROUP
+    while len(selected) < MAX_DISCOVERY_CANDIDATES:
+        appended = False
+        for affinity_rank, group_id in enumerate(primary_groups, start=1):
+            if popularity_index >= len(movies_by_group[group_id]):
+                continue
+            append_candidate(group_id, affinity_rank, popularity_index)
+            appended = True
             if len(selected) == MAX_DISCOVERY_CANDIDATES:
+                break
+        if not appended:
+            break
+        popularity_index += 1
+
+    # Only after every candidate in the primary groups is exhausted, widen the
+    # discovery scope one affinity-ranked group at a time. Each additional group
+    # starts at its most popular movie and is exhausted before the next group is
+    # opened. The pool remains below 100 only when all eligible groups are exhausted.
+    for affinity_rank, group_id in enumerate(
+        eligible_groups[PRIMARY_DISCOVERY_GROUPS:], start=PRIMARY_DISCOVERY_GROUPS + 1
+    ):
+        if len(selected) >= MAX_DISCOVERY_CANDIDATES:
+            break
+        for popularity_index in range(len(movies_by_group[group_id])):
+            append_candidate(group_id, affinity_rank, popularity_index)
+            if len(selected) >= MAX_DISCOVERY_CANDIDATES:
                 break
     # Popularity only decides which movies enter the bounded Discovery pool.
     # The user's predictor orders that fixed pool for the final recommendation.

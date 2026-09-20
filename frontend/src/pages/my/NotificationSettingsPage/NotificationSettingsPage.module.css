@@ -44,3 +44,20 @@
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
 }
+
+/*
+ * 이 기기 푸시(업무 -583). 알림 종류 목록과 다른 층이라 상자를 따로 둔다. 줄 안에 이름과
+ * 상태 설명을 두 줄로 쌓는다.
+ */
+.push {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.pushText {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-1);
+}

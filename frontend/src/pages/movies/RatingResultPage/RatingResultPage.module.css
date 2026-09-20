@@ -198,12 +198,17 @@
   text-align: center;
 }
 
+/*
+ * 맛과 버킷은 각각 한 덩어리로 두고, 한 줄에 다 안 들어가면 버킷을 다음 줄로 내린다
+ * (업무 -389). 줄바꿈을 막은 채 한 줄에 세우면 320px 폭에서 `101알`이 카드 밖으로 샜다.
+ */
 .resultRow {
   display: flex;
+  flex-wrap: wrap;
   align-self: stretch;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-2);
+  gap: var(--space-1) var(--space-2);
   padding: var(--space-3) var(--space-4);
   border: 0.5px solid var(--color-line);
   border-radius: var(--radius-control);

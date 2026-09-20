@@ -1,0 +1,69 @@
+logging {
+  level  = "info"
+  format = "logfmt"
+}
+
+discovery.docker "service_node" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "30s"
+}
+
+discovery.relabel "service_node" {
+  targets = discovery.docker.service_node.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/feelm-(backend|frontend|nginx)"
+    action        = "keep"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    replacement   = "$1"
+    target_label  = "container"
+  }
+
+  rule {
+    replacement  = "production"
+    target_label = "environment"
+  }
+}
+
+loki.source.docker "service_node" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.relabel.service_node.output
+  labels        = { "node" = "J15E106" }
+  forward_to    = [loki.process.sanitize.receiver]
+  refresh_interval = "30s"
+}
+
+loki.process "sanitize" {
+  stage.replace {
+    expression = "((?i:authorization|bearer|token|password|passwd|secret|api[_-]?key)[=:\"'\\s]+[^,;}&\\s]+)"
+    replace    = "[REDACTED_CREDENTIAL]"
+  }
+
+  stage.replace {
+    expression = "((?i:email)[=:\"'\\s]+[A-Za-z0-9._%+\\-]+@[A-Za-z0-9.\\-]+\\.[A-Za-z]{2,})"
+    replace    = "[REDACTED_EMAIL]"
+  }
+
+  stage.replace {
+    expression = "([A-Za-z0-9_\\-]{12,}\\.[A-Za-z0-9_\\-]{12,}\\.[A-Za-z0-9_\\-]{12,})"
+    replace    = "[REDACTED_JWT]"
+  }
+
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

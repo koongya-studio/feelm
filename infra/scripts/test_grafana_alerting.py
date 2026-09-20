@@ -29,6 +29,8 @@ class GrafanaAlertingProvisioningTest(unittest.TestCase):
             "feelm_host_cpu_high",
             "feelm_host_memory_high",
             "feelm_host_filesystem_low",
+            "feelm_critical_log_detected",
+            "feelm_error_log_spike",
         }
         self.assertEqual({rule["uid"] for rule in self.rules}, expected)
 
@@ -45,6 +47,8 @@ class GrafanaAlertingProvisioningTest(unittest.TestCase):
             "node_cpu_seconds_total",
             "node_memory_MemAvailable_bytes",
             "node_filesystem_avail_bytes",
+            "count_over_time",
+            'environment=\"production\"',
         ):
             self.assertIn(metric, expressions)
 
@@ -82,6 +86,9 @@ class GrafanaAlertingProvisioningTest(unittest.TestCase):
         )
         self.assertNotIn("hooks/", ALERTING.read_text(encoding="utf-8"))
         self.assertEqual(self.payload["templates"][0]["name"], "feelm.mattermost")
+        template = self.payload["templates"][0]["template"]
+        self.assertIn("오류 로그 감지", template)
+        self.assertIn("Grafana Explore에서 로그 확인", template)
 
     def test_relay_signing_secret_is_required_and_protected(self) -> None:
         compose = (ROOT / "infra/compose/monitoring.yml").read_text(encoding="utf-8")

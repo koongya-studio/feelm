@@ -183,10 +183,12 @@ lambda·rank·별점 변환은 factor를 만든 모델 manifest와 일치시킨�
 ## 5. 학습·보정 역할과 실행 범위
 
 이 절의 고정 역할·cap은 기존 B0~B3 실험 lineage에만 적용한다. 새 0~N 실행은 사용자 비중첩
-`TRAIN/VALIDATION/FINAL_TEST`와 전역 시점 창을 함께 고정하고, target보다 엄격히 과거인 전체
-이력 prefix로 episode를 만든다. `totalHistoryCount`와 모델이 실제 사용할 수 있는
-`supportedHistoryCount`를 분리하며, ALS·콘텐츠·인기도 등 학습형 보조 특징은 시점이 맞는
-out-of-fold 값만 허용한다. 실제 cutoff와 사용자 partition seed는 실행 manifest가 고정한다.
+`TRAIN/VALIDATION/FINAL_TEST`와 실행별 시점 정책을 고정하고, target보다 엄격히 과거인 이력
+prefix로 episode를 만든다. `totalHistoryCount`, 실제 제공한 `providedHistoryCount`, 모델이 사용할
+수 있는 `supportedHistoryCount`를 분리하며 숨긴 suffix 통계는 모델 입력에 넣지 않는다. target
+label·모델 출력에서 학습한 보조 특징은 시점이 맞는 out-of-fold 값만 허용하고, 엄격한 과거 TRAIN
+event만 집계한 인기도 등은 source digest·cutoff·제외 규칙을 고정한 `TRAIN_AS_OF`를 허용한다.
+실제 anchor/window와 사용자 partition seed는 실행 manifest가 고정한다.
 
 현재 요청의 실행은 데이터 분석과 문서 작성이다. 아래는 개발자가 구현할 학습 계약이며 새
 학습을 이미 수행했다는 뜻이 아니다. 기존 `final344_worker.py`는230열·정확한 원행 수를

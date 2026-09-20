@@ -96,9 +96,12 @@ Consumer 후보에는 영화 표시용 메타데이터를 넣지 않고 구조�
 사용자가 평가하거나 확정 감상한 매핑 영화 중 그룹별 이력이 2편 이하이면서 전체 매핑 감상의 20%
 이하인 그룹만 대상으로 한다. 평가 영화가 속한 고정 그룹 대표로 사용자 방향을 만들고, 방향이 없으면
 온보딩의 `LIKE 대표 합 - DISLIKE 대표 합`을 사용한다. 방향과 그룹 대표의 내림차순 내적으로 공급
-그룹을 정렬한다. 먼저 상위 10개 그룹에서 그룹별 10편을 모집하고, 100편이 모자라면 다음 적격
-그룹을 탐색한 뒤 모든 적격 그룹의 최초 10편을 사용해도 부족할 때 그룹별 11번째 이후 후보를
-모집한다. 모집된 전체 최대 100편만 현재 개인 점수로 최종 정렬해 게시한다.
+그룹을 정렬한다. 먼저 상위 10개 그룹에서 그룹별 10편을 모집한다. 100편이 모자라도 다음 적격
+그룹은 추가하지 않고 같은 10개 그룹의 11위 후보를 그룹 적합도 순으로 한 편씩 모집한다. 계속
+부족하면 12위, 13위 순으로 층별 확장한다. 상위 10개 그룹을 모두 소진해도 부족하면 11번째 적격
+그룹을 1위부터 끝까지 모집하고, 계속 부족하면 12번째 이후 그룹을 적합도 순으로 소진한다. 모든
+적격 그룹 후보가 소진된 경우에만 100편 미만을 허용한다. 모집된 후보만 현재 평가·서빙 모델의 개인
+점수로 최종 정렬해 게시한다.
 `taste`와 `discovery`는 독립 순위이므로 서로 같은 영화가 있을 수 있다. Spring은 TASTE를
 최대 20편 먼저 저장하고, DISCOVERY에서 이 영화들을 건너뛴 뒤 다음 고유 후보로 최대 20편을 채운다.
 화면에는 저장된 TASTE 2편과 DISCOVERY 1편을 노출한다.
@@ -110,12 +113,14 @@ Consumer 후보에는 영화 표시용 메타데이터를 넣지 않고 구조�
 - S15P21E106-481: TASTE 후보별 구조화 단일 `reason` 객체를 추가한 Candidate v4 writer·payload 기준선
 - S15P21E106-488: 전체 평가 또는 온보딩 이력으로 계산한 저이력 그룹 적합도·상위 기여 비율을
   DISCOVERY 전용 단일 `reason` 객체로 추가한 Candidate v5 writer·payload 기준선
-- S15P21E106-505: 입력 수 제한 제거, TASTE 500·DISCOVERY 100 후보 게시와 그룹 부족분 보충,
-  `DISCOVERY_PERSONAL_SCORE`를 추가한 현재 Candidate v6 writer·payload 계약. Spring reader·조립은
+- S15P21E106-505: 입력 수 제한 제거, TASTE 500·DISCOVERY 100 후보 게시와 당시 그룹 부족분 보충,
+  `DISCOVERY_PERSONAL_SCORE`를 추가한 Candidate v6 writer·payload 계약. Spring reader·조립은
   Backend 소비 계약
 - S15P21E106-482: 그룹·그룹 내부 대중성 번들의 HDFS 게시, 두 URI 활성화와 rollback 검증
 - S15P21E106-483: 개인 후보 보충 순서를 개선하고 후보 모집단 밖까지 확장하는 별도 POPULAR fallback.
   `discovery-popularity`와 다른 산출물
+- S15P21E106-415 재개선: 상위 10개 그룹의 내부 순위 층별 확장, 소진 후 후순위 적격 그룹 확장과
+  DISCOVERY 개인 후보 보충 제거
 
 맛 배정은 439의 고정 131차원 전처리와 `top_centers`를 사용합니다(ADR-0020). 신규 영화는
 `top_x=L2(concat(g,0×k,0×t))`와 고정 중심의 거리로 배정하며 fit이나 estimator `predict`를 하지
@@ -389,11 +394,34 @@ Spring은 `candidates` JSON을 한 번 읽어 해당 버전의 후보 전체를 
 | `feelm:party-consumer-fence:{groupId}:{topic}:{partition}` | String(opaque CSPRNG token) | 파티 전용 Python Consumer | 파티 전용 Python Consumer | 없음 |
 | `feelm:user:{userId}:behavior` | Hash | Spark | Spark · **Spring** | 키 단위 8일 · 필드는 일자 버킷(5.3) |
 | `feelm:trending:current` | String(JSON) | Spark | **Spring** | 15분 |
-| `feelm:trending:last-good` | String(JSON) | Spark | **Spring** | 2시간 |
+| `feelm:trending:last-good` | String(JSON) | Spark | **Spring** | 없음 |
+| `feelm:trending:bucket:{yyyyMMddTHHmmZ}:movies` | Set(서비스 movieId) | Spark | Spark | 마지막 쓰기 후 150분 |
+| `feelm:trending:bucket:{yyyyMMddTHHmmZ}:movie:{movieId}:users` | Set(회원 userId) | Spark | Spark | 마지막 쓰기 후 150분 |
+| `feelm:trending:bucket:{yyyyMMddTHHmmZ}:expected-movies` | Set(서비스 movieId) | Spark | Spark | 마지막 쓰기 후 150분 |
+| `feelm:trending:bucket:{yyyyMMddTHHmmZ}:movie:{movieId}:expected-count` | String(고유 회원 수) | Spark | Spark | 마지막 쓰기 후 150분 |
+| `feelm:trending:bucket:{yyyyMMddTHHmmZ}:movie:{movieId}:viewer-digest` | String(정렬된 회원 ID 집합의 SHA-256) | Spark | Spark | 마지막 쓰기 후 150분 |
+| `feelm:trending:bucket:active-hour:{yyyyMMddTHHZ}` | Set(활성 5분 시각) | Spark | Spark | 마지막 쓰기 후 4시간 |
+| `feelm:trending:bucket:committed-hour:{yyyyMMddTHHZ}` | Set(기록 완료된 5분 시각) | Spark | Spark | 마지막 쓰기 후 4시간 |
 | `feelm:model:current` | String(JSON) | Spark Batch | Python Consumer · Spring | 없음 |
 
 **Spring은 개인 추천에 사용자 `candidates` · `behavior` · `model:current`를 읽습니다.** 파티 입력
 생성 시 사용자 `vector`·`candidates`를 함께 읽고, 파티 결과에는 별도 파티 `candidates`를 읽습니다.
+
+급상승 `bucket` 키는 고유 조회자 계산을 위한 내부 임시 상태다. 회원 ID 집합은 Spark
+급상승 작업만 읽고 쓰며 API 응답·로그에는 넣지 않는다. 탈퇴 전 발생한 정상 `VIEW`는
+버킷이 만료될 때까지 집계에 포함하고, 탈퇴 이후 새 `VIEW`는 발행하지 않는다.
+Redis 실행 계정의 키 접근 제한과 AOF/RDB·백업 보존 기간은 인프라 담당자와 적용·확인한다.
+Redis 키의 150분 TTL은 별도 백업 파일의 삭제 시한을 뜻하지 않는다.
+`expected-movies`·`expected-count`·`viewer-digest`·`active-hour`·`committed-hour`는
+버킷 손상을 확인하는 중복 메타데이터다. `viewer-digest`는 회원 ID를 숫자순으로 정렬해
+쉼표로 연결한 ASCII 문자열의 SHA-256이며 API·로그에 노출하지 않는다. 같은 수의 회원이
+다른 회원으로 바뀐 경우도 감지한다. `committed-hour`는 버킷의 인덱스·회원 집합·기대 수와
+활성 원소가 함께 유실되어도 해당 시각에 기록이 있었음을 확인한다. Spark는 버킷을 쓰기
+전에 기존 메타데이터와 집합 크기·지문을 검증하고,
+게시 전에는 최근 120분의 영화 인덱스·회원 집합을 다시 검증한다. 불일치가 있으면
+새 B를 게시하지 않고 작업을 실패시킨다. API는 마지막 유효 B를 계속 제공한다.
+Redis의 버킷과 검증 메타데이터가 함께 이전 상태로 되돌아가는 전체 롤백은 이 검사만으로
+탐지할 수 없다. 체크포인트와 Redis의 독립적인 복구 검증은 별도 운영 과제로 남긴다.
 
 두 `consumer-fence` 계열 키는 각 Consumer group 안에서 Kafka partition마다 assign할 때 새 CSPRNG opaque token으로 교체하는
 fencing key다. 개인 Consumer는 결과 게시와 corrupt/partial state 복구 삭제 때, 파티 Consumer는 결과 게시 때
@@ -461,22 +489,13 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
       "affinityRank": 2,
       "popularityRankInGroup": 1
     }]
-  }, {
-    "movieId": 913,
-    "score": 3.82,
-    "reasons": [{
-      "code": "DISCOVERY_PERSONAL_SCORE",
-      "sourceMovieIds": [550],
-      "matchedGenreCodes": ["THRILLER"]
-    }]
   }],
   "updatedAt": "2026-08-31T07:21:03Z"
 }
 ```
 
-- `taste`는 TASTE 상위 500편, `discovery`는 최대 100편이다. 그룹 기반 후보를 먼저 사용하고 부족분은
-  TASTE 상위 500편 밖의 개인 후보, TASTE와 중복되는 개인 후보 순으로 채운다. 서비스 가능한 고유
-  후보가 100편 이상이면 `discovery`는 정확히 100편이다. Spring은 두 배열을 직접 읽으며 항목의 중복
+- `taste`는 TASTE 상위 500편, `discovery`는 적격 그룹 기반 후보 최대 100편이다. 모든 적격 그룹 후보가
+  소진되면 100편 미만을 허용하고 개인화 전체 모집단으로 보충하지 않는다. Spring은 두 배열을 직접 읽으며 항목의 중복
   `type` 필드는 두지 않는다.
 - `score`는 별점이나 사용자 간 절대 비교값이 아니라 **같은 사용자·같은 생성 결과 안의 상대 순위
   점수**다. 값이 클수록 해당 배열 안에서 먼저 추천한다는 순서만 계약으로 보장한다.
@@ -569,11 +588,15 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
 Spring은 합의한 coverage 기준보다 낮으면 영화명을 열거하지 않고 전체 평가·온보딩 이력 기반 문구를 사용한다.
 Consumer는 구조화된 근거만 저장하고, Spring은 영화 제목과 표시명을 조회해 사용자 문구를 만든다.
 
-그룹 후보가 100편보다 적으면 Consumer는 개인 점수 후보로 나머지를 채운다. 이 항목의
-`reasons[].code`는 `DISCOVERY_PERSONAL_SCORE`이며 `sourceMovieIds`와 `matchedGenreCodes`는 TASTE 근거와
-같은 방식으로 계산한다. 입력이 없거나 어느 개인 점수 성분도 프로필을 만들 수 없는 `0.0` 동점
-fallback은 두 배열 모두 source와 장르 배열을 비워 근거가 없음을 명시한다. 이 코드가 추가된 현재
-계약은 Candidate v6이다. 근거가 없으면 `reasons`는 빈 배열로 전달한다.
+그룹 후보가 100편보다 적으면 Consumer는 선택된 상위 10개 그룹의 다음 대중성 순위 층을 순회한다.
+이 그룹들을 모두 소진해도 부족하면 11번째 이후 적격 그룹을 적합도 순으로 하나씩 소진하며, 모든
+적격 그룹 후보가 소진된 경우에만 그 수만 게시한다. 개인 점수 후보로 DISCOVERY를 보충하지 않는다.
+`DISCOVERY_PERSONAL_SCORE`는 Candidate v6 전환 호환을 위해 Spring reader가 과거 payload에서 계속
+허용하지만 현재 Consumer는 생성하지 않는다.
+이 변경은 JSON schema가 아니라 후보 정책 변경이므로 `candidateVersion=6`을 유지한다. 다만 Candidate
+키에는 TTL이 없으므로 새 Consumer 배포 뒤 모든 활성 사용자 후보를 새 `generationId`로 전체 재게시하고,
+새 payload에 개인 점수 보충 항목이 남지 않는지 확인해야 정책 전환이 끝난다. 롤백도 이전 Consumer
+복구 뒤 전체 재게시로 기존 정책 후보를 복원한다.
 배열 자체가 유형을 나타내므로 항목의 중복 `type` 필드는 두지 않는다. 공급 그룹 수·적격 그룹 수 같은
 DISCOVERY 진단 정보도 Redis 계약에 넣지 않고 Consumer 로그에만 남긴다.
 Spring은 미존재·평가·관심없음 후보를 제외하고 종류별 점수 정렬 후 TASTE를 최대 20편 저장한다.
@@ -612,7 +635,7 @@ generation 일치 확인과 TASTE 2 + DISCOVERY 1 통합 검증을 같은 전환
 }
 ```
 
-**`feelm:trending:current` · `feelm:trending:last-good`** — 두 키에 같은 스냅샷을 게시한다
+**`feelm:trending:current` · `feelm:trending:last-good`** — 비어 있지 않은 유효 B만 두 키에 같은 스냅샷으로 게시한다
 
 ```json
 {
@@ -626,7 +649,8 @@ generation 일치 확인과 TASTE 2 + DISCOVERY 1 통합 검증을 같은 전환
 - `period`는 UTC 5분 경계 `to`를 끝으로 하는 최근 60분 구간이다. 같은 구간의 고유 조회 회원 수 `C`와 직전 60분 구간의 수 `P`를 비교한다. `C >= 3`이고 `D = C - P > 0`인 영화만 포함한다.
 - `items`는 `D` 내림차순, `C` 내림차순, `movieId` 오름차순의 최대 30편이다. `trendScore`는 `D / max(D)`이고, `rankDelta`는 직전 게시 스냅샷 순위에서 현재 순위를 뺀 값이다. 신규 진입이면 `null`이다.
 - 두 구간의 같은 회원·영화 조회는 구간마다 각각 최대 한 번 센다. 같은 `eventId` 재전달은 §4.4의 watermark 기반 중복 판정 창에서 제거한다. `dwellMs`는 점수에 사용하지 않는다.
-- `items=[]`도 정상 스냅샷이다. 입력 이벤트가 없는 때에도 5분마다 두 키의 값과 TTL을 원자적으로 갱신한다. Spring은 영화 제목·포스터·평가 수·평균 별점을 DB에서 보강하며 순위를 재계산하지 않는다.
+- 후보가 없는 경계에서는 두 키를 갱신하지 않는다. `last-good`은 첫 유효 B부터 새 유효 B가 게시될 때까지 유지한다. Spring은 영화 제목·포스터·평가 수·평균 별점을 DB에서 보강하며 순위를 재계산하지 않는다. 첫 B 이전에는 [API-064의 초기 A](./report-trend.md#api-064-급상승-영화)를 사용한다.
+- Spark는 재시작 직후와 UTC 5분 경계마다 해당 시점에 Kafka에서 사용 가능한 입력을 버킷에 반영한 뒤 게시한다. 입력 처리나 버킷 기록에 실패하면 새 B를 게시하지 않고 마지막 정상 B를 유지한다. 입력 처리 중 다음 경계를 넘으면 새 경계의 입력 처리 완료를 다시 확인하고 최신 경계만 게시한다. 현재 UTC 5분 경계의 최근 120분 밖에 있는 VIEW는 만료된 버킷을 되살리지 않고 건너뛴다. 이미 게시한 과거 경계는 수정하지 않는다.
 
 ### 5.3 만료와 무효화
 
@@ -635,7 +659,7 @@ generation 일치 확인과 TASTE 2 + DISCOVERY 1 통합 검증을 같은 전환
 | `vector` · `candidates` | TTL 없음. 담당 처리기가 이벤트마다 덮어쓴다 |
 | `behavior` | 키 단위 슬라이딩 TTL 8일. 필드는 일자 버킷이며 집계는 최근 7일분만 사용한다(아래) |
 | `trending:current` | 마지막 정상 게시부터 15분 보관. 게시가 멈추면 만료되어 마지막 정상 결과를 읽는다 |
-| `trending:last-good` | 마지막 정상 게시부터 2시간 보관. 만료되거나 Redis 조회가 불가능하면 API-064는 `503 TREND_UNAVAILABLE`을 반환한다 |
+| `trending:last-good` | TTL 없음. 마지막 유효 B를 새 유효 B가 게시될 때까지 유지한다. Redis 자체 유실 후 B가 없음을 확인하면 초기 A를 사용한다 |
 | 모델 재학습 | 배치가 전체 사용자 키를 새 `modelVersion`으로 다시 쓴다. 별도 무효화 명령을 두지 않는다 |
 | 비활성 사용자 | 야간 배치가 재생성 대상에서 제외하고 오래된 키를 정리한다(주기 미정) |
 
@@ -679,7 +703,7 @@ URI나 Redis에 저장하지 않고 runtime filesystem 설정으로 제공한다
 60초 안에 기존 세트의 순서를 바꾸는 것을 보장하지 않습니다. 이 정책은 행동마다 Python 재정렬을 실행하는 계산량을 피하면서
 새 세트를 만드는 사용자의 최대 100편만 정렬하기 위한 기준입니다.
 
-급상승 결과는 5분마다 Redis에 게시한다(API-064). 이는 Spark가 이벤트를 소비하는
+급상승 후보는 UTC 5분 경계마다 확인하고, 비어 있지 않은 유효 결과만 Redis에 게시한다(API-064). 이는 Spark가 이벤트를 소비하는
 마이크로배치 주기와 별개이며, 위 `behavior` 반영 목표를 5분으로 늦추지 않는다.
 급상승 `VIEW` 집계의 이벤트 시간 watermark 초기값은 10분이다. Spark가 관측한
 최대 `occurredAt`에서 10분을 뺀 값을 기준으로 지난 구간의 상태를 정리한다.
@@ -702,8 +726,11 @@ Python Consumer나 Streaming 지연·장애 시에도 **마지막으로 성공�
 - Redis 연결 실패
 
 이때도 영화·검색·평가·필름·팝콘 기능은 정상 동작해야 합니다. 추천 API만 실패합니다.
-급상승 API-064는 별도로 `trending:current`와 `trending:last-good`의 TTL을 적용하며,
-두 결과를 모두 읽을 수 없을 때만 `503 TREND_UNAVAILABLE`을 반환합니다.
+급상승 API-064는 `trending:current`에 15분 TTL을 적용하고,
+`trending:last-good`에는 TTL을 두지 않습니다. 첫 유효한 B 전에는 API-064의 고정
+초기 순서 A를 제공하고, B 이후 빈 집계는 마지막 B를 지우지 않습니다. Redis 조회
+장애로 최신 또는 마지막 정상 급상승 결과(B)를 조회할 수 없고 초기 고정 목록(A)으로
+안전하게 대체할 수도 없을 때 `503 TREND_UNAVAILABLE`을 반환합니다.
 
 ### 6.3 콜드 스타트
 

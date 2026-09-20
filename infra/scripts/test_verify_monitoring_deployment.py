@@ -33,14 +33,18 @@ def healthy_series():
     return result
 
 
-def opener_with(series=None, grafana_database="ok"):
+def opener_with(series=None, grafana_database="ok", loki_ready=True, alloy_ready=True):
     target_series = healthy_series() if series is None else series
 
     def open_url(url, timeout):
         assert timeout == 5
         parsed = urlsplit(url)
-        if parsed.path == "/-/ready":
+        if parsed.path == "/-/ready" and parsed.port == 9090:
             return FakeResponse(b"Prometheus Server is Ready.")
+        if parsed.path == "/-/ready" and parsed.port == 12345:
+            return FakeResponse(b"Alloy is ready." if alloy_ready else b"not ready")
+        if parsed.path == "/ready" and parsed.port == 3100:
+            return FakeResponse(b"ready" if loki_ready else b"not ready")
         if parsed.path == "/api/health":
             return FakeResponse({"database": grafana_database})
         if parsed.path == "/healthz":
@@ -80,6 +84,20 @@ class MonitoringDeploymentVerificationTest(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.VerificationError, "Grafana database"):
             MODULE.verify(opener=opener_with(grafana_database="fail"))
 
+    def test_loki_or_alloy_readiness_failure_is_rejected(self):
+        with self.assertRaisesRegex(MODULE.VerificationError, "Loki readiness"):
+            MODULE.verify(opener=opener_with(loki_ready=False))
+        with self.assertRaisesRegex(MODULE.VerificationError, "Alloy readiness"):
+            MODULE.verify(opener=opener_with(alloy_ready=False))
+
+        self.assertEqual(
+            MODULE.verify(
+                require_log_pipeline=False,
+                opener=opener_with(loki_ready=False, alloy_ready=False),
+            ),
+            MODULE.EXPECTED_TARGETS,
+        )
+
     def test_only_loopback_http_urls_are_accepted(self):
         for value in (
             "https://127.0.0.1:9090",
@@ -92,7 +110,7 @@ class MonitoringDeploymentVerificationTest(unittest.TestCase):
     def test_retry_recovers_after_transient_failures(self):
         calls = []
 
-        def verifier(_prometheus, _grafana, _relay):
+        def verifier(_prometheus, _grafana, _relay, _loki, _alloy, _required):
             calls.append(1)
             if len(calls) < 3:
                 raise MODULE.VerificationError("not ready")
@@ -105,6 +123,9 @@ class MonitoringDeploymentVerificationTest(unittest.TestCase):
             "http://127.0.0.1:9090",
             "http://127.0.0.1:3000",
             "http://127.0.0.1:9087",
+            "http://127.0.0.1:3100",
+            "http://127.0.0.1:12345",
+            True,
             verifier,
             sleeps.append,
         )

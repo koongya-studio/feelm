@@ -88,12 +88,14 @@ FM/GBT의 신뢰구간과 첫2편 고유 영화 수는 `final344-primary-contras
 
 1. 실제 artifact 전송·해시 검증, 검증된 서비스 ID export 및 유사 영화 인덱스 fixture 준비.
 2. 전체 KOBIS 자료에서 검증 crosswalk·동일 누적 기준일과 0~N snapshot 시점 일치 확인.
-3. 0~N 계약의 사용자 분리와 전역 시점 창으로 TRAIN/VALIDATION/FINAL_TEST 입력을 만든다. 모든
-   실험이 공유할 episode·후보를 동결하고 사용자 활동·N·target 지원량·시점·콘텐츠·결측 분포의
-   정합성 report를 만든 뒤 lineage를 검사한다.
-4. 새 실행 코드와 모델별 특징의 디스크/spill·메모리를 작은 재현→10%→전체 순으로 검토한 뒤
-   GBT/FM을 장비별로 실행한다. legacy245 네 view 약1,999만 행은 비교 후보이며 필수 최종 입력이 아니다.
-5. VALIDATION에서 모델·특징을 고정한 뒤 FINAL_TEST는 한 번만 확인하고, S15P21E106-625에서 목표 사용자 평가를 수행한다.
+3. 0~N 계약의 사용자 분리와 선언한 `timePolicy`로 입력을 만든다. 같은 paired comparison family만
+   episode·후보를 함께 동결하고, 통제 prefix·실제 저이력·시간 이동 질문은 versioned input과 분포
+   report를 분리한다. 선택 환경에는 FINAL_TEST 원본을 넣지 않고 seal ID·digest만 둔다.
+4. 새 실행 코드와 모델별 특징은 작은 재현에서 계약·자원 사용량을 확인한 뒤, 사전 표본 수 또는
+   사용자 단위 CI 정밀도를 충족하는 표본으로 확장한다. 10%와 전체 실행은 자원·정밀도상 필요할 때만
+   수행한다. legacy245 네 view 약1,999만 행은 비교 후보이며 필수 최종 입력이 아니다.
+5. TRAIN 내부에서 모델·특징·정책 후보를 고정하고 분리된 VALIDATION confirmation을 마친 뒤,
+   FINAL_TEST는 S15P21E106-625에서 한 번만 열어 목표 사용자 평가를 수행한다.
 6. 선택된 모델 bundle을 EC2에 연결한 뒤 별도 실제환경 검수한다. 데이터 하한 미달이면 활성화 준비를 중단한다.
 
 원230열 parity와 보정45·선정45·확인180은 legacy245 B0~B3를 재현할 때만 별도 수행한다.

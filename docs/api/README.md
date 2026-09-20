@@ -215,8 +215,9 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | 429 | `RATE_LIMITED` | 요청 제한 초과 |
 | 500 | `INTERNAL_ERROR` | 서버 오류 |
 | 503 | `RECOMMENDATION_UNAVAILABLE` | 추천 서비스 장애. 핵심 기능은 정상 동작(NFR-05) |
+| 503 | `RECOMMENDATION_PREPARING` | 추천을 준비 중이라 보여줄 카드가 없음. 장애가 아니며 재시도로 회복될 수 있음(API-045) |
 | 503 | `PUSH_UNAVAILABLE` | Web Push 비활성화 또는 일시적 사용 불가 |
-| 503 | `TREND_UNAVAILABLE` | 급상승 영화 최신·마지막 정상 결과 모두 조회 불가(API-064) |
+| 503 | `TREND_UNAVAILABLE` | Redis 조회 장애로 최신 또는 마지막 정상 급상승 결과(B)를 조회할 수 없음(API-064) |
 
 ### 처리 규칙
 

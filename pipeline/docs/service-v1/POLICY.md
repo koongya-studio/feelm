@@ -2,8 +2,9 @@
 
 상태: **APPROVED — 로컬 구현 기준**. [전체 문서](README.md).
 이 문서의 `K<10`/`K≥10` 분기는 2026-09-13 legacy 운영안이다. 새 개인화 진입 조건은
-[현재 개발 방향](CURRENT-DIRECTION.md)의 `N=0`/`N>=1`이며, 모델별 실제 지원 여부와 승격 상태를
-함께 확인한다. 발견10×10과 상세10편은 모델 입력10편 제한과 관계없다.
+[현재 개발 방향](CURRENT-DIRECTION.md)의 검증된 K policy이며, 모델별 실제 지원 여부와 승격 상태를
+함께 확인한다. 0~N 입력 지원 자체를 모든 K의 노출 승인으로 해석하지 않는다. 발견10×10과
+상세10편은 모델 입력10편 제한과 관계없다.
 현재 0~N 학습·평가는 [공통 계약](../../contracts/zero-n-learning-evaluation.md),
 저장·게시·API는 [CONTRACTS.md](CONTRACTS.md)를 따른다. 실행 설정은 S15P21E106-622·623의
 로컬 실험에 둔다. 게시 해시를 보존하는
@@ -22,10 +23,11 @@
 | 클릭·OTT 이동 | 행동 로그·별도 분석 | 자동 감상 완료/별점으로 만들지 않음 |
 
 K는 삭제되지 않은 현재 실제 별점이 있는 서로 다른 서비스 영화 수다. 새 경로는 예측 시점보다
-엄격히 이전인 전체 이력을 모델별 특징에 반영하고 `totalHistoryCount`, `supportedHistoryCount`,
-절단 수를 기록한다. 인기가 낮다는 이유로 이력 선택에서 빼지 않는다. 모델이 사용할 수 있는
-이력이0이면 초기 경로로 처리하고 사유를 기록한다. `rating_updated_at DESC` 최신10 선택은
-legacy 재현에서만 사용하며 누락분을 오래된 영화로 채우지 않는다.
+엄격히 이전인 전체 이력을 모델별 특징에 반영하고 `totalHistoryCount`, `providedHistoryCount`,
+`supportedHistoryCount`, 절단 수를 기록한다. 인기가 낮다는 이유로 이력 선택에서 빼지 않는다.
+모델이 사용할 수 있는 이력이 없거나 현재 K의 routing policy가 검증되지 않았으면 초기 경로로
+처리하고 사유를 기록한다. `rating_updated_at DESC` 최신10 선택은 legacy 재현에서만 사용하며
+누락분을 오래된 영화로 채우지 않는다.
 
 별점 수신은 decimal 또는 손실 없는0.5 단위 정수 표현으로 처리한다. `Integer score=4`로
 4.5를 전달할 수 없다. API·이벤트·DB·Python 간 실제 별점 parity가 필수다.
@@ -90,8 +92,9 @@ best_rank ASC, service ID ASC로 합치고 ID 중복을 제거한다. 양쪽에 
 
 1. Spark 배치는 해당 사용자의 최신 원본 H와 활성 bundle을 읽는다.
 2. legacy 경로는 K≥10이며 GBT 유효 이력이 있을 때 전체 적격 카탈로그를 partition별로 GBT
-   점수화한다. 새 경로는 N≥1이고 승인된 0~N 모델이 이력을 지원할 때 같은 후보 계약으로 점수화하며,
-   점수 DESC/ID ASC의 Top500을 만든다. 그 외에는7절의 초기 콘텐츠/대중 순위로 Top500을 만든다.
+   점수화한다. 새 경로는 현재 N에서 승인된 routing policy가 모델 또는 blend를 선택하고 해당 모델이
+   이력을 지원할 때 같은 후보 계약으로 점수화하며, 점수 DESC/ID ASC의 Top500을 만든다. 검증된
+   전환점 미만이나 정책·모델 미준비 구간은7절의 초기 콘텐츠/대중 순위로 Top500을 만든다.
    배치 시점의 감상·관심없음은 제외한다. 일시 세션 노출은 사용자별 영구 후보에서 삭제하지 않는다.
    다만 소진 재공급(reason=POOL_EXHAUSTED)은 현재 세션 노출·다른 활성 예약을 제외한
    전체 적격 카탈로그에서 다음500편을 만든다. 같은 입력으로 같은500편만 반복하지 않는다.
@@ -146,7 +149,7 @@ norm≤1e−8이면 방향 없음이다. 원본 평균에는 매핑 전 선택 �
 발견 공급·전체 mapped 감상 분모에는 넣지 않는다. 이 영화도 개인 맞춤·실제 감상 제외에는 남는다.
 구체적인 원파일 선택·전처리·동률·신규 영화 배정은 [GROUPS](GROUPS.md)의 고정 계약을 따른다.
 
-## 6. 발견: 최대10개 공급 그룹×최대10편
+## 6. 발견: 상위10개 그룹×최초10편 후 부족분 확장
 
 그룹의 ‘덜 봄’ 자격은 전체 distinct mapped 감상 영화로 계산한다.
 
@@ -160,21 +163,35 @@ AND 그룹에 현재 적격·미노출 후보가 한 편 이상
 group ID ASC 순서로 적격 그룹을 검토한다. 음수라는 이유로 별도 제외하지 않는다.
 
 ```text
-candidates = []; supplying_groups = 0
-for group in ordered_eligible_groups:
-    movies = first_10(group.best_rank_list after all current exclusions)
-    if len(movies) == 0: continue
-    candidates.extend(movies)
-    supplying_groups += 1
-    if supplying_groups == 10: break
+candidates = []
+groups = first_10(nonempty ordered_eligible_groups)
+for group in groups:
+    candidates.extend(first_10(group.best_rank_list after all current exclusions))
+rank = 11
+while len(candidates) < 100:
+    added = false
+    for group in groups:
+        if group has rank:
+            candidates.append(group.best_rank_list[rank])
+            added = true
+            if len(candidates) == 100: break
+    if not added: break
+    rank += 1
+for group in ordered_eligible_groups after groups:
+    for movie in group.best_rank_list after all current exclusions:
+        candidates.append(movie)
+        if len(candidates) == 100: break
+    if len(candidates) == 100: break
 ```
 
-한 그룹이1~9편만 공급해도 공급 그룹1개로 센다. 10개 공급 그룹 이후11번째 그룹에서100편을
-억지로 채우지 않는다. 한 그룹의11번째 영화로 다른 그룹 부족분을 대신하지 않는다.
-따라서 실제 후보는100편보다 적을 수 있다. 그룹이 부족하면 가능한 그룹만 사용한다.
+한 그룹이1~9편만 공급해도 공급 그룹1개로 센다. 선택된 상위10개 그룹에서는11번째 영화를 한
+편씩, 이어서12번째 영화를 한 편씩 대중성 순위 층별로 먼저 확장한다. 이 그룹들을 모두 소진해도
+100편보다 적으면11번째 적격 그룹을1위부터 끝까지 사용하고, 계속 부족하면12번째 이후 그룹도
+적합도 순으로 같은 방식으로 소진한다. 모든 적격 그룹 후보가 소진된 경우에만100편 미만을 허용한다.
 
-모은 후보를 현재 GBT로 개인 점수화하고 DESC/ID ASC로 정렬한다. 발견은 그 순서에서1편씩
-소비한다. 그룹 검색 점수·best_rank·GBT점수를 하나의 가중합으로 더하지 않는다.
+모은 후보를 현재 평가·서빙 모델(ALS·FM·GBT 등)의 개인 예측 점수로 DESC/ID ASC 정렬한다.
+발견은 그 순서에서1편씩 소비한다. 그룹 검색 점수·대중성 순위·모델 점수를 하나의 가중합으로
+더하지 않는다.
 `dv2_retrieve.gather`의 quota만10으로 바꾸면 공급 그룹 수가 제한되지 않으므로 별도 중단
 조건이 필요하다. `variant=original`도 GBT 단독이 아닌 기존 router이므로 재사용하지 않는다.
 
@@ -182,22 +199,25 @@ for group in ordered_eligible_groups:
 규칙을 다시 적용한다. 그룹 경험량은 실제 감상만으로 계산한다. 버퍼 간 전체 점수 단조감소나
 매번 다른10개 그룹을 보장하는 정책은 아니다.
 
-## 7. 초기·legacy K10 경로와 방향 없음
+## 7. 초기·검증된 K 정책·legacy K10 경로
 
-개인화 전환 K10은 legacy 운영 기본값이다. 새 경로의 전환점은 N=0/1이다. 실제 별점으로 콘텐츠 방향을 먼저 시도하고, 없으면
+개인화 전환 K10은 legacy 운영 기본값이다. 새 경로의 전환점이나 blend는 사전 후보를 같은 조건에서
+평가하고 봉인 평가로 승인한 값만 사용한다. 검증 전에는 N=1을 자동 전환점으로 두지 않는다. 실제
+별점으로 콘텐츠 방향을 먼저 시도하고, 없으면
 `L2(sum(LIKE x)−sum(DISLIKE x))` 온보딩 방향을 사용한다. 같은 영화의 최신 신호 하나만 쓰고,
 실제 별점이 있는 영화의 온보딩 신호는 제외한다. 온보딩은 실제 별점으로 환산해 GBT/ALS에 넣지 않는다.
 
 | 상태 | 맞춤 슬롯 | 발견 슬롯 |
 | --- | --- | --- |
-| N=0, 방향 있음 | 공유/개인 pool 안에서 콘텐츠 내적 DESC, 동률 best_rank/ID | 덜 본 그룹10×10 후보를 콘텐츠 내적 DESC로 정렬 |
-| N=0, 방향 없음 | 전역 T/K best_rank | 그룹 방향을 꾸며내지 않고 맞춤 초기 후보로 대체, 사유 표시 |
-| N≥1, 승인된 0~N 모델 지원, 방향 있음 | 승격된 GBT 또는 FM | 그룹 후보도 같은 모델로 재정렬 |
-| N≥1, 승인된 0~N 모델 지원, 방향 없음 | 승격된 GBT 또는 FM | 발견 불가로 맞춤 대체, 사유 표시 |
-| N≥1, 모델 미준비·이력 미지원 | 가능한 초기 콘텐츠/대중 경로 | 방향 있으면 초기 발견, 없으면 대체; 개인화 모델 성공으로 표시하지 않음 |
+| 현재 K가 검증된 모델 전환점 미만, 방향 있음 | 콘텐츠·대중성 또는 승인된 blend | 덜 본 그룹10×10 후보를 같은 승인 정책으로 정렬 |
+| 현재 K가 검증된 모델 전환점 미만, 방향 없음 | 전역 T/K best_rank | 그룹 방향을 꾸며내지 않고 맞춤 초기 후보로 대체, 사유 표시 |
+| 현재 K가 검증된 모델 전환점 이상, 승격 모델 지원, 방향 있음 | 승격된 GBT 또는 FM | 그룹 후보도 같은 승인 정책으로 재정렬 |
+| 현재 K가 검증된 모델 전환점 이상, 승격 모델 지원, 방향 없음 | 승격된 GBT 또는 FM | 발견 불가로 맞춤 대체, 사유 표시 |
+| 정책 미검증·모델 미준비·이력 미지원 | 가능한 초기 콘텐츠/대중 경로 | 방향 있으면 초기 발견, 없으면 대체; 개인화 모델 성공으로 표시하지 않음 |
 
-과거 K=9/10 전환 결과는 legacy 회귀 비교에만 남긴다. 새 경로는 10편 도달을 개인화 성공 조건으로
-사용하지 않으며, 평가 추가·수정·삭제 후에도 현재 N과 모델 지원 상태로 다시 판정한다.
+과거 K=9/10 전환 결과는 legacy 회귀 비교에만 남긴다. 새 경로는 10편 도달을 근거 없는 개인화 성공
+조건으로 사용하지 않으며, 평가 추가·수정·삭제 후에도 현재 N, 승인된 policy version과 모델 지원
+상태로 다시 판정한다.
 
 초기 콘텐츠 순위는 `mode=INITIAL_CONTENT`, 대중 순위는 `INITIAL_PUBLIC`로 기록한다.
 모델 개인화라고 표시하지 않고 예상 별점도 null이다. 모델 오류 시에도 초기 순위를 같은 모델

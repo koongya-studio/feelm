@@ -12,10 +12,16 @@
  * **이 영화의 팝콘 맛을 메타 줄 아래 칩으로 보인다**(업무 -631, 사용자 결정 2026-09-18).
  * 평가하면 이 맛의 팝콘이 한 알 담기므로, 평가 전에 무슨 맛인지 알 수 있어야 한다.
  * 맛 코드는 API-030 `flavorCode`, 이름과 설명은 기준정보 API-044의 `displayName` ·
- * `representativeKeywords`다 — 계약에 설명 문장이 없어 대표 키워드를 설명으로 쓴다.
- * 칩을 누르면 키워드가 펼쳐진다. 맛이 배정되지 않은 영화(`flavorCode: null`)와 기준정보를
- * 받지 못한 경우에는 칩을 두지 않는다. 맛의 색은 색 면이 아니라 3.1과 같은 팝콘 알 그림으로
- * 보인다 — UI에 유채색을 쓰지 않는다(design-concept.md 3장).
+ * `description`이다. 맛이 배정되지 않은 영화(`flavorCode: null`)와 기준정보를 받지 못한
+ * 경우에는 칩을 두지 않는다. 맛의 색은 색 면이 아니라 3.1과 같은 팝콘 알 그림으로 보인다 —
+ * UI에 유채색을 쓰지 않는다(design-concept.md 3장).
+ *
+ * **설명은 칩 아래 한 줄이고 칩은 눌리지 않는다**(업무 -713). -631에서는 칩을 누르면 대표
+ * 키워드가 설명으로 펼쳐졌는데, 업무 -473이 API-044에서 그 필드를 뺐고 대신 맛마다 한 문장을
+ * 기준정보에 두기로 했다(사용자 결정 2026-09-20). 문장이 짧아 접어 둘 이유가 없어 바로 보이며,
+ * 펼칠 것이 없어진 칩은 읽기 전용 표시로 되돌렸다 — 눌러도 아무 일이 없는 버튼은 두지 않는다
+ * (업무 -697 어포던스 규칙: 떠 있는 것은 누를 수 있는 것이다). `description`이 없으면 그 줄만
+ * 없다 — 백엔드가 필드를 주기 전에도 화면이 깨지지 않는다.
  */
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
@@ -101,7 +107,6 @@ export default function MovieDetailPage() {
   /** 팝콘 맛 기준정보(API-044). 받지 못하면 빈 배열이고 맛 칩을 두지 않는다 */
   const [flavors, setFlavors] = useState<PopcornFlavor[]>([]);
   /** 키워드를 펼친 영화. 다른 영화로 넘어가면 접힌 채로 시작한다 */
-  const [flavorOpenFor, setFlavorOpenFor] = useState<number | null>(null);
   const [reviewPage, setReviewPage] = useState<{
     movieId: number;
     items: PublicReview[];
@@ -409,7 +414,6 @@ export default function MovieDetailPage() {
   const flavor = movie.flavorCode
     ? flavors.find((candidate) => candidate.code === movie.flavorCode)
     : undefined;
-  const flavorOpen = flavorOpenFor === id;
   const dismissStatus = dismissal?.movieId === id ? dismissal.status : null;
   const people = [
     ...movie.directors.map((person) => ({ ...person, creditKey: `director:${person.personId}` })),
@@ -447,20 +451,12 @@ export default function MovieDetailPage() {
           {meta ? <p className={styles.meta}>{meta}</p> : null}
           {flavor ? (
             <div className={styles.flavor}>
-              <button
-                type="button"
-                className={styles.flavorChip}
-                aria-expanded={flavorOpen}
-                aria-controls="movie-flavor-keywords"
-                onClick={() => setFlavorOpenFor(flavorOpen ? null : id)}
-              >
+              <span className={styles.flavorChip}>
                 <img className={styles.flavorSprite} src={kernelSprite(flavor.code)} alt="" />
                 {flavor.displayName} 맛
-              </button>
-              {flavorOpen ? (
-                <p id="movie-flavor-keywords" className={styles.flavorKeywords}>
-                  {flavor.representativeKeywords.join(' · ')}
-                </p>
+              </span>
+              {flavor.description ? (
+                <p className={styles.flavorDescription}>{flavor.description}</p>
               ) : null}
             </div>
           ) : null}

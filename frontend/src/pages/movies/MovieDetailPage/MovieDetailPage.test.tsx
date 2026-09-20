@@ -51,14 +51,14 @@ const FLAVORS = [
     code: 'FLAVOR_D',
     displayName: '피스타치오',
     color: '#B4B46C',
-    representativeKeywords: ['드라마', '인물', '관계', '역사', '전쟁'],
+    description: '사람과 시대를 깊게 들여다봐요',
     sortOrder: 4,
   },
   {
     code: 'FLAVOR_E',
     displayName: '쿠키앤크림',
     color: '#E4D8B4',
-    representativeKeywords: ['스릴러', '범죄', '긴장', '미스터리', '추적'],
+    description: '쫓고 쫓기는 긴장감을 즐겨요',
     sortOrder: 5,
   },
 ];
@@ -635,28 +635,38 @@ describe('2.4 공개 한줄평과 출연진', () => {
 });
 
 /*
- * 이 영화의 팝콘 맛 (업무 -631)
+ * 이 영화의 팝콘 맛 (업무 -631, 업무 -713에서 설명 문장으로 교체)
  *
  * 평가하면 이 맛의 팝콘이 한 알 담기므로 평가 전에 무슨 맛인지 보여 준다. 맛 코드는
- * API-030, 이름과 설명은 API-044다. 계약에 설명 문장이 없어 대표 키워드를 쓴다.
+ * API-030, 이름과 설명은 API-044다. -631에서는 칩을 누르면 대표 키워드가 펼쳐졌는데 업무
+ * -473이 그 필드를 뺐다. 설명이 문장 한 줄이 되어 칩 아래에 바로 보이므로 펼칠 이유가
+ * 없어졌고, 칩은 읽기 전용 표시다.
  */
 describe('2.4 팝콘 맛', () => {
-  it('영화의 맛을 칩으로 보이고, 누르면 그 맛의 대표 키워드를 펼친다', async () => {
+  it('영화의 맛을 칩으로 보이고 그 아래에 설명 한 줄을 적는다', async () => {
     vi.mocked(getMovieDetail).mockResolvedValue(movie({ flavorCode: 'FLAVOR_E' }));
 
     renderMovie();
 
-    const chip = await screen.findByRole('button', { name: '쿠키앤크림 맛' });
-    expect(chip).toHaveAttribute('aria-expanded', 'false');
+    expect(await screen.findByText('쿠키앤크림 맛')).toBeInTheDocument();
+    expect(screen.getByText('쫓고 쫓기는 긴장감을 즐겨요')).toBeInTheDocument();
+
+    // 펼칠 것이 없다 — 버튼으로 두지 않는다(업무 -713)
+    expect(screen.queryByRole('button', { name: /쿠키앤크림/ })).toBeNull();
+    // 계약에서 빠진 대표 키워드다
     expect(screen.queryByText('스릴러 · 범죄 · 긴장 · 미스터리 · 추적')).toBeNull();
+  });
 
-    fireEvent.click(chip);
+  it('설명이 없는 맛은 칩만 두고 줄을 비우지 않는다', async () => {
+    vi.mocked(getMovieDetail).mockResolvedValue(movie({ flavorCode: 'FLAVOR_E' }));
+    vi.mocked(getPopcornFlavors).mockResolvedValue([
+      { code: 'FLAVOR_E', displayName: '쿠키앤크림', color: '#E4D8B4', sortOrder: 5 },
+    ]);
 
-    expect(chip).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText('스릴러 · 범죄 · 긴장 · 미스터리 · 추적')).toBeInTheDocument();
+    renderMovie();
 
-    fireEvent.click(chip);
-    expect(screen.queryByText('스릴러 · 범죄 · 긴장 · 미스터리 · 추적')).toBeNull();
+    expect(await screen.findByText('쿠키앤크림 맛')).toBeInTheDocument();
+    expect(screen.queryByText('쫓고 쫓기는 긴장감을 즐겨요')).toBeNull();
   });
 
   it('맛이 배정되지 않은 영화는 칩을 두지 않는다', async () => {
@@ -666,7 +676,7 @@ describe('2.4 팝콘 맛', () => {
 
     expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
     await waitFor(() => expect(getPopcornFlavors).toHaveBeenCalled());
-    expect(screen.queryByRole('button', { name: / 맛$/ })).toBeNull();
+    expect(screen.queryByText(/ 맛$/)).toBeNull();
   });
 
   it('맛 기준정보를 받지 못하면 이름을 지어내지 않고 칩을 두지 않는다', async () => {
@@ -677,7 +687,7 @@ describe('2.4 팝콘 맛', () => {
 
     expect(await screen.findByRole('heading', { level: 1 })).toBeInTheDocument();
     await waitFor(() => expect(getPopcornFlavors).toHaveBeenCalled());
-    expect(screen.queryByRole('button', { name: / 맛$/ })).toBeNull();
+    expect(screen.queryByText(/ 맛$/)).toBeNull();
   });
 });
 

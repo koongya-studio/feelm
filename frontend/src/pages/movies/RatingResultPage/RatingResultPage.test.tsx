@@ -79,7 +79,6 @@ beforeEach(() => {
         code: 'FLAVOR_A',
         displayName: '오리지널 솔트',
         color: '#F5E6C8',
-        representativeKeywords: [],
         sortOrder: 1,
       },
     ]);

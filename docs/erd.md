@@ -354,6 +354,7 @@ erDiagram
         varchar model_version "ALS 추천 모델 버전"
         bigint candidate_version "Redis 후보 버전. 파티 세트 기본값 0"
         varchar generation_id "Redis 개인 추천 배치 식별자"
+        int batch_no "같은 generation의 회차. 알림으로 만든 첫 회차 0"
         timestamptz generated_at
     }
     RECOMMENDATION_ITEMS {
@@ -385,7 +386,7 @@ erDiagram
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `recommendation_sets` | 추천 세트(이력 단위) | `user_id`·`party_id` 중 하나만 NOT NULL(CHECK). Redis 개인 세트는 전역 고유 `generation_id`로 같은 배치를 식별한다. 파티 세트의 후보 버전 기본값은 0이고 generation ID는 NULL이다 | FR-10, FR-33 · API-045, API-048, API-058 |
+| `recommendation_sets` | 추천 세트(이력 단위) | `user_id`·`party_id` 중 하나만 NOT NULL(CHECK). Redis 개인 세트는 `generation_id`로 같은 배치를 식별하고, 소진 후 만든 회차는 `batch_no`로 구분한다. UK(`generation_id`, `batch_no`)는 사용자와 무관한 전역 고유이며 첫 회차는 0이다. `batch_no >= 0`(CHECK `ck_recommendation_sets_batch_no`). 파티 세트의 후보 버전 기본값은 0이고 generation ID는 NULL이다 | FR-10, FR-33 · API-045, API-048, API-058 |
 | `recommendation_items` | 세트의 후보 영화 + 이유 스냅샷 | 유형은 `TASTE`·`DISCOVERY`·`PARTY`. nullable `flavor_code`는 Redis 후보 값을 스냅샷하며 PARTY의 `reason`은 빈 객체다. UK(`set_id`, `type`, `position`), UK(`set_id`, `movie_id`), `position >= 1`. TASTE·DISCOVERY를 각각 최대 20편, PARTY를 최대 10편 저장하고 `exposed_at`으로 실제 노출분을 구분한다 | FR-12, FR-13, FR-33 · API-045, API-047, API-048, API-058 |
 | `user_movie_dismissals` | 사용자별 영화 관심없음 | UK(`user_id`, `movie_id`). 모든 화면의 모든 영화에 적용한다. `recommendation_item_id`는 선택적 출처이며 아이템 삭제 시 NULL로 전환한다 | FR-36 · API-047 |
 

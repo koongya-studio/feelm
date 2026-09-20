@@ -16,21 +16,30 @@
  * **계약에 없던 값을 모두 걷어냈다**(사용자 결정 2026-09-17).
  * - 상단 공통 키워드 칩. 대응 필드가 API-058에 없어 `getPartyMix`(CR-17) 자리표시자를
  *   실제 파티원에게 붙여 쓰고 있었다
- * - 카드마다 붙던 `일치 94%`. 계약이 주는 것은 `reason.memberFit[]` — **사용자별**
- *   점수이고, 화면이 쓰던 하나의 값은 그 평균이라 계약에 없었다
- * - `왜 같이 추천됐나요?` 문장. API-058 `reason`은 카드별 `summary` 하나뿐이다
+ * - 카드마다 붙던 `일치 94%`. 화면이 쓰던 하나의 값은 목업의 사용자별 점수 평균이었다
+ * - `왜 같이 추천됐나요?` 문장
  *
  * 시안에 이 셋이 하나도 없어 화면에서 빼고 자리표시자 호출도 지웠다. 계약이 정해지면
- * 그때 넣는다. 카드의 한 줄 이유는 `reason.summary` 그대로이므로 남는다.
+ * 그때 넣는다.
+ *
+ * **실제 API-058에 연결했다**(업무 -705). 실제 응답에는 `reason` 자체가 없어 카드의 한 줄
+ * 이유(`reason.summary`)도 걷어냈다 — 목업만 채우던 값이다. 카드는 서버 영화이므로 다시
+ * 영화 상세(2.4)로 간다.
+ *
+ * 추천을 못 받은 까닭을 가른다. 가를 수 있어야 사용자가 다음에 할 일을 안다.
+ * - `404` 없는 파티이거나 파티원이 아니다 · `409 PARTY_CLOSED` 끝난 파티다 → 내 파티로
+ * - `503 RECOMMENDATION_UNAVAILABLE` 파티원 취향이 아직 준비되지 않았다 → 다시 추천받기
+ * - 추천이 0편 → 다시 추천받기. 파티원이 이미 평가 · 감상 · 관심없음 처리한 영화는 서버가 뺀다
  */
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import PartyFlowShell from '../../../components/PartyFlowShell';
 import PopcornBucket from '../../../components/PopcornBucket';
 import Poster from '../../../components/Poster';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
+import { ApiError } from '../../../api/apiError';
 import { ChevronRightIcon } from '../../../components/Icon';
 import { getParty, getPartyPopcorn, getPartyRecommendations } from '../../../api/parties';
 import { path } from '../../../routes/paths';
@@ -38,12 +47,37 @@ import { mixedFlavors } from '../../../utils/party';
 import type { PartyPopcorn, PartyRecommendationItem } from '../../../types/party';
 import styles from './PartyRecommendationPage.module.css';
 
-/** 목록의 포스터 크기. 시안은 제목과 이유 두 줄에 맞춘 정사각에 가까운 판이다 */
+/** 목록의 포스터 크기. 시안 그대로다 */
 const POSTER_WIDTH = 56;
 const POSTER_HEIGHT = 80;
 
 /** 결과 머리의 섞인 통. 5.9의 통보다 작다 — 여기서 주인공은 3편이다 */
 const BUCKET_WIDTH = 132;
+
+/** 추천을 못 받은 까닭. `null`은 까닭을 모르는 실패(네트워크 · 서버 오류)다 */
+type Failure = 'gone' | 'closed' | 'unavailable' | 'empty' | null;
+
+const FAILURE_COPY: Record<Exclude<Failure, null>, { title: string; description: string }> = {
+  gone: { title: '파티를 찾을 수 없어요', description: '파티가 없어졌거나 파티원이 아니에요.' },
+  closed: { title: '끝난 파티예요', description: '끝난 파티는 추천을 받을 수 없어요.' },
+  unavailable: {
+    title: '아직 추천을 준비하고 있어요',
+    description: '파티원의 취향을 모으는 중이에요. 잠시 후 다시 추천받아 주세요.',
+  },
+  empty: {
+    title: '지금은 함께 볼 영화를 찾지 못했어요',
+    description: '잠시 후 다시 추천받아 주세요.',
+  },
+};
+
+function failureOf(error: unknown): Failure {
+  if (!(error instanceof ApiError)) return null;
+  if (error.status === 404) return 'gone';
+  if (error.code === 'PARTY_CLOSED') return 'closed';
+  if (error.code === 'RECOMMENDATION_UNAVAILABLE') return 'unavailable';
+
+  return null;
+}
 
 export default function PartyRecommendationPage() {
   const navigate = useNavigate();
@@ -54,6 +88,7 @@ export default function PartyRecommendationPage() {
   const [members, setMembers] = useState<string[]>([]);
   const [popcorn, setPopcorn] = useState<PartyPopcorn | null>(null);
   const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<Failure>(null);
 
   useEffect(() => {
     let active = true;
@@ -63,10 +98,14 @@ export default function PartyRecommendationPage() {
         if (!active) return;
 
         setItems(set.items);
-        setFailed(false);
+        setFailure(set.items.length === 0 ? 'empty' : null);
+        setFailed(set.items.length === 0);
       })
-      .catch(() => {
-        if (active) setFailed(true);
+      .catch((error: unknown) => {
+        if (!active) return;
+
+        setFailure(failureOf(error));
+        setFailed(true);
       });
 
     getParty(id)
@@ -93,14 +132,26 @@ export default function PartyRecommendationPage() {
   }, [id]);
 
   if (failed) {
+    const copy = failure
+      ? FAILURE_COPY[failure]
+      : { title: '추천을 불러오지 못했어요', description: '잠시 후 다시 시도해 주세요.' };
+    // 없는 파티 · 끝난 파티는 다시 추천받아도 같다. 내 파티로 돌려보낸다
+    const leave = failure === 'gone' || failure === 'closed';
+
     return (
       <>
         <ScreenHeader title="파티팝콘" showBack fallbackTo={path.party()} />
         <div className={styles.page}>
-          <StatusView title="추천을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요.">
-            <Button variant="text" onClick={() => void navigate(path.partyAnalyzing(id))}>
-              다시 추천받기
-            </Button>
+          <StatusView title={copy.title} description={copy.description}>
+            {leave ? (
+              <Button variant="text" onClick={() => void navigate(path.party())}>
+                내 파티로 돌아가기
+              </Button>
+            ) : (
+              <Button variant="text" onClick={() => void navigate(path.partyAnalyzing(id))}>
+                다시 추천받기
+              </Button>
+            )}
           </StatusView>
         </div>
       </>
@@ -130,12 +181,8 @@ export default function PartyRecommendationPage() {
       <ul className={styles.list}>
         {items.map((item) => (
           <li key={item.recommendationItemId}>
-            {/*
-             * 카드는 눌리지 않는다(업무 -610). 파티 추천(API-058)이 백엔드에 없어 이 목록은
-             * 목업이고, 목업 영화 번호로 실제 영화 상세(API-030)를 열면 전혀 다른 영화가
-             * 나온다. API-058이 열리면 서버 영화로 바뀌면서 상세 이동이 돌아온다.
-             */}
-            <div className={styles.row} data-static="true">
+            {/* 서버 영화라 상세(2.4)로 간다. 목업이던 동안(업무 -610)에는 막아 두었다 */}
+            <Link to={path.movieDetail(item.movie.movieId)} className={styles.row}>
               <Poster
                 width={POSTER_WIDTH}
                 height={POSTER_HEIGHT}
@@ -144,15 +191,12 @@ export default function PartyRecommendationPage() {
                 src={item.movie.posterUrl ?? undefined}
               />
 
-              <span className={styles.body}>
-                <span className={styles.title}>{item.movie.title}</span>
-                <span className={styles.summary}>{item.reason.summary}</span>
-              </span>
+              <span className={styles.title}>{item.movie.title}</span>
 
               <span className={styles.chevron} aria-hidden="true">
                 <ChevronRightIcon />
               </span>
-            </div>
+            </Link>
           </li>
         ))}
       </ul>

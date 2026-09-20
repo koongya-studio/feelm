@@ -6,6 +6,7 @@ import com.feelm.backend.domain.recommendation.model.RecommendationCandidateBatc
 import com.feelm.backend.domain.recommendation.repository.RecommendationBufferRepository;
 import com.feelm.backend.domain.recommendation.repository.RecommendationBufferRepository.RecommendationBufferItem;
 import com.feelm.backend.domain.recommendation.repository.RecommendationCandidateReader;
+import com.feelm.backend.domain.recommendation.repository.RecommendationServingRepository;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
 import java.time.Clock;
@@ -15,6 +16,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -35,6 +38,7 @@ class RecommendationBufferWriter {
     private static final String REDIS_CANDIDATE_INPUT_VERSION = "redis-candidate";
 
     private final RecommendationBufferRepository repository;
+    private final RecommendationServingRepository servingRepository;
     private final RecommendationCandidateReader candidateReader;
     private final RecommendationReasonService reasonService;
     private final Clock clock;
@@ -55,6 +59,65 @@ class RecommendationBufferWriter {
         return writeCurrent(userId, true);
     }
 
+    /**
+     * 소진된 세트 뒤에 같은 generation의 다음 회차를 저장한다.
+     *
+     * <p>후보는 호출자가 잠금 밖에서 읽어 넘긴다. 사용자 행 잠금을 쥔 채 Redis를 기다리면 같은 사용자의 Candidate 알림 처리가 그 잠금에서 막힌다.
+     *
+     * <p>잠금을 잡은 뒤 두 가지를 다시 확인한다. 서빙 대상이 여전히 {@code exhaustedSetId}인지(먼저 도착한 요청이 이미 회차를 만들었는가)와 그
+     * 세트가 여전히 소진 상태인지(판정 뒤 평가 철회 등으로 카드가 되살아났는가). 어느 쪽이든 회차를 만들지 않고 기존 세트를 돌려준다.
+     *
+     * @throws NoEligibleRecommendationCandidatesException 이전 회차와 사용자 상태를 제외하고 남은 후보가 없는 경우
+     */
+    @Transactional
+    public RecommendationBufferResult writeNextBatch(
+            long userId, long exhaustedSetId, RecommendationCandidateBatch batch) {
+        // 같은 사용자의 조회·알림 경로를 이 잠금 하나로 직렬화한다. 비활성 계정은 여기서 끝낸다.
+        if (!repository.lockActiveUserIfExists(userId)) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
+        OptionalLong latestSetId = repository.findLatestSetId(userId);
+        // 소진이 아니라 아직 버퍼가 없는 상태다. 회차를 이어 만들 대상이 없다.
+        if (latestSetId.isEmpty()) {
+            throw new BusinessException(ErrorCode.RECOMMENDATION_UNAVAILABLE);
+        }
+        // 다른 요청이 이미 새로운 버퍼를 만든 경우
+        if (latestSetId.getAsLong() != exhaustedSetId) {
+            return new RecommendationBufferResult(latestSetId.getAsLong(), false);
+        }
+        // 판정이 낡은 경우. 소진 판정 뒤 평가 철회로 카드가 되살아났으면 회차를 만들지 않는다.
+        // 만들면 다음 조회가 새 회차를 집어 되살아난 카드가 영구 유실된다.
+        if (servingRepository.hasValidItems(userId, exhaustedSetId)) {
+            return new RecommendationBufferResult(exhaustedSetId, false);
+        }
+
+        // 같은 generation에 회차가 있으면 그다음 번호, Redis가 새 generation으로 바뀌었으면 첫 회차(0)다.
+        OptionalInt latestBatchNo = repository.findLatestBatchNo(userId, batch.generationId());
+        int nextBatchNo = latestBatchNo.isPresent() ? latestBatchNo.getAsInt() + 1 : 0;
+        // 이전 회차가 저장한 영화를 빼야 "같은 20편"이 아니라 "다음 20편"이 된다.
+        Set<Long> storedMovieIds =
+                latestBatchNo.isPresent()
+                        ? repository.findStoredMovieIdsInGeneration(userId, batch.generationId())
+                        : Set.of();
+
+        List<RecommendationBufferItem> items = prepare(userId, batch, storedMovieIds);
+        // 평가·관심없음·이전 회차를 빼고 남은 후보가 없다. 호출자가 503으로 바꾼다.
+        if (items.isEmpty()) {
+            throw new NoEligibleRecommendationCandidatesException();
+        }
+        long setId =
+                repository.insertSet(
+                        userId,
+                        REDIS_CANDIDATE_INPUT_VERSION,
+                        batch.modelVersion(),
+                        batch.candidateVersion(),
+                        batch.generationId(),
+                        nextBatchNo,
+                        OffsetDateTime.now(clock).withOffsetSameInstant(ZoneOffset.UTC));
+        repository.insertItems(setId, withInitialReason(items));
+        return new RecommendationBufferResult(setId);
+    }
+
     private RecommendationBufferResult writeCurrent(long userId, boolean initialReason) {
         if (!repository.lockActiveUserIfExists(userId)) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED);
@@ -63,25 +126,15 @@ class RecommendationBufferWriter {
 
         var existing = repository.findExistingSet(userId, batch.generationId());
         if (existing.isPresent()) {
-            return new RecommendationBufferResult(existing.getAsLong());
+            return new RecommendationBufferResult(existing.getAsLong(), false);
         }
 
-        List<RecommendationBufferItem> items = prepare(userId, batch);
+        List<RecommendationBufferItem> items = prepare(userId, batch, Set.of());
         if (items.isEmpty()) {
             throw new NoEligibleRecommendationCandidatesException();
         }
         if (initialReason) {
-            items =
-                    items.stream()
-                            .map(
-                                    item ->
-                                            new RecommendationBufferItem(
-                                                    item.movieId(),
-                                                    item.type(),
-                                                    item.flavorCode(),
-                                                    reasonService.initialReason(item.reason()),
-                                                    item.position()))
-                            .toList();
+            items = withInitialReason(items);
         }
 
         long setId =
@@ -91,17 +144,33 @@ class RecommendationBufferWriter {
                         batch.modelVersion(),
                         batch.candidateVersion(),
                         batch.generationId(),
+                        0,
                         OffsetDateTime.now(clock).withOffsetSameInstant(ZoneOffset.UTC));
         repository.insertItems(setId, items);
         return new RecommendationBufferResult(setId);
     }
 
+    /** 첫 노출 전에 확인된 근거만으로 문구를 확정한다. 이유 보강이 늦거나 실패해도 중립 문구로 고착되지 않는다. */
+    private List<RecommendationBufferItem> withInitialReason(List<RecommendationBufferItem> items) {
+        return items.stream()
+                .map(
+                        item ->
+                                new RecommendationBufferItem(
+                                        item.movieId(),
+                                        item.type(),
+                                        item.flavorCode(),
+                                        reasonService.initialReason(item.reason()),
+                                        item.position()))
+                .toList();
+    }
+
     private List<RecommendationBufferItem> prepare(
-            long userId, RecommendationCandidateBatch batch) {
+            long userId, RecommendationCandidateBatch batch, Set<Long> excludedMovieIds) {
         Set<Long> eligibleMovieIds = repository.findEligibleMovieIds(userId, batch.items());
-        List<RecommendationCandidate> taste = rank(batch, userId, eligibleMovieIds, "TASTE");
+        List<RecommendationCandidate> taste =
+                rank(batch, userId, eligibleMovieIds, excludedMovieIds, "TASTE");
         List<RecommendationCandidate> discovery =
-                rank(batch, userId, eligibleMovieIds, "DISCOVERY");
+                rank(batch, userId, eligibleMovieIds, excludedMovieIds, "DISCOVERY");
         List<RecommendationBufferItem> items = new ArrayList<>();
         append(items, taste);
         Set<Long> storedMovieIds =
@@ -132,12 +201,16 @@ class RecommendationBufferWriter {
             RecommendationCandidateBatch batch,
             long userId,
             Set<Long> eligibleMovieIds,
+            Set<Long> excludedMovieIds,
             String type) {
         List<RecommendationCandidate> ranked =
                 new ArrayList<>(
                         batch.items().stream()
                                 .filter(candidate -> candidate.type().equals(type))
                                 .filter(candidate -> eligibleMovieIds.contains(candidate.movieId()))
+                                .filter(
+                                        candidate ->
+                                                !excludedMovieIds.contains(candidate.movieId()))
                                 .sorted(
                                         Comparator.comparing(RecommendationCandidate::score)
                                                 .reversed())

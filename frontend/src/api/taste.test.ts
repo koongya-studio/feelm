@@ -175,7 +175,6 @@ describe('API-044 팝콘 맛 기준정보', () => {
       code: 'FLAVOR_A',
       displayName: '오리지널 솔트',
       color: '#F0D8B4',
-      representativeKeywords: ['다큐멘터리'],
       sortOrder: 1,
     };
     fetchMock.mockResolvedValue(json(200, { items: [flavor] }));

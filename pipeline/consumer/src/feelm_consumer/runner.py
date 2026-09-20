@@ -137,7 +137,7 @@ def run(settings: Settings) -> None:
             release.groups_with_at_least_ten_movies,
         )
     else:
-        LOG.info("group artifacts not configured; Discovery uses ranked-candidate fallback")
+        LOG.info("group artifacts not configured; Discovery remains empty")
     store = redis.Redis.from_url(settings.redis_url, decode_responses=True)
     consumer = Consumer(
         {

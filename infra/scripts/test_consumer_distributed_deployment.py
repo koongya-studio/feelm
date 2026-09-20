@@ -108,7 +108,7 @@ class ConsumerDistributedDeploymentTest(unittest.TestCase):
         self.assertIn("content artifacts loaded version=", readme)
         self.assertIn("content artifacts not configured; publishing ALS-only candidates", readme)
         self.assertIn("group and Discovery popularity artifacts loaded", readme)
-        self.assertIn("group artifacts not configured; Discovery uses ranked-candidate fallback", readme)
+        self.assertIn("group artifacts not configured; Discovery remains empty", readme)
 
     def test_runtime_verification_accepts_only_guarded_remote_bindings(self) -> None:
         verification = RUNTIME_VERIFY.read_text(encoding="utf-8")

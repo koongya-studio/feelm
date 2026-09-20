@@ -63,6 +63,9 @@ Nginx·Compose 및 인증서 운영 절차는 [인프라 문서](../infra/README
 
 화면 설계 문서는 [`docs/screens/`](./docs/screens/README.md)에 있습니다.
 
+`src/api` 함수별로 실제 API를 부르는지, 목업이면 왜 남았고 무엇을 기다리는지는
+[`docs/screens/api-status.md`](./docs/screens/api-status.md)에 있습니다(업무 S15P21E106-395).
+
 ## 실행 방법
 
 Node 20.19 이상이 필요합니다. 패키지 매니저는 npm을 사용하며 `package-lock.json`을

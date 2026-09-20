@@ -109,9 +109,14 @@
  *
  * 화면 높이에 맞춰 둔다 — 고정 px로 두면 작은 기기에서 제목이 접히고 큰 기기에서는
  * 포스터만 한참 보인다.
+ *
+ * 높이는 주소창이 **떠 있을 때**의 화면(`svh`)으로 잰다(업무 -389). `vh`는 주소창이 접힌
+ * 큰 화면이라, 갤럭시 · 아이폰 브라우저에서 처음 열면 포스터 구간이 보이는 화면보다 길어
+ * 제목이 첫 화면 밖으로 밀렸다. `svh`를 모르는 브라우저는 윗줄 `vh`를 쓴다.
  */
 .stage {
   height: 46vh;
+  height: 46svh;
   min-height: 240px;
   flex: none;
 }
@@ -195,19 +200,16 @@
   padding: 3px var(--space-3) 3px 5px;
   border: 0.5px solid var(--color-line-on-dark);
   border-radius: var(--radius-pill);
-  /* 어두운 면 위에서 떠 있는 알약이다(업무 -697) */
-  background: var(--gradient-button-on-dark);
-  box-shadow: var(--shadow-button-on-dark);
+  /* 누를 수 없는 표시다 — 떠 있게 두지 않는다(업무 -707, 어포던스 규칙은 -697) */
   color: var(--color-on-dark);
   font-size: var(--font-size-meta);
   line-height: var(--line-height-meta);
-  cursor: pointer;
-  transition: transform var(--motion-press) var(--ease-standard);
 }
 
-.flavorChip:active {
-  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
-  transform: translateY(1px);
+.flavorDescription {
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-on-dark-muted);
 }
 
 .flavorSprite {
@@ -215,12 +217,6 @@
   height: 20px;
   flex: none;
   object-fit: contain;
-}
-
-.flavorKeywords {
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-  color: var(--color-on-dark-muted);
 }
 
 .average {

@@ -6,6 +6,7 @@
  * 상태이고, 트랙은 면이다(`design-concept.md` 2.3).
  *
  * 이름은 `label`(보조기술용 문자열)이나 `labelledBy`(화면에 보이는 글자의 id) 중 하나로 준다.
+ * 스위치 아래 설명 글이 있으면 `describedBy`로 그 id를 잇는다(7.8-C 푸시 줄).
  */
 import styles from './Switch.module.css';
 
@@ -14,10 +15,18 @@ type Props = {
   onChange: (next: boolean) => void;
   label?: string;
   labelledBy?: string;
+  describedBy?: string;
   disabled?: boolean;
 };
 
-export default function Switch({ checked, onChange, label, labelledBy, disabled = false }: Props) {
+export default function Switch({
+  checked,
+  onChange,
+  label,
+  labelledBy,
+  describedBy,
+  disabled = false,
+}: Props) {
   return (
     <button
       type="button"
@@ -26,6 +35,7 @@ export default function Switch({ checked, onChange, label, labelledBy, disabled 
       aria-checked={checked}
       aria-label={label}
       aria-labelledby={labelledBy}
+      aria-describedby={describedBy}
       disabled={disabled}
       onClick={() => onChange(!checked)}
     >

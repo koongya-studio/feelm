@@ -18,44 +18,29 @@
   list-style: none;
 }
 
+/*
+ * 영화 상세로 가는 이동 행(업무 -705). 면 · 테두리 · 누름은 공통 규칙(`navRow`)이 정하고
+ * 여기서는 자리만 적는다. 목업이던 동안에는 눌리지 않는 판이었다(업무 -610).
+ */
 .row {
-  display: flex;
+  composes: navRow from '../../../styles/interaction.module.css';
+
   width: 100%;
   padding: var(--space-3);
   align-items: center;
   gap: var(--space-4);
-  border: 0;
   border-radius: var(--radius-card);
-  background: var(--color-surface-raised);
-  text-align: left;
-  cursor: pointer;
-}
-
-/* 목업 추천은 눌리지 않는다(`index.tsx`). 손가락 커서를 두지 않는다 */
-.row[data-static='true'] {
-  cursor: default;
-}
-
-.body {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: var(--space-1);
+  text-decoration: none;
 }
 
 .title {
+  min-width: 0;
+  flex: 1;
   font-size: var(--font-size-body);
   line-height: var(--line-height-body);
   letter-spacing: var(--letter-spacing-body);
   font-weight: var(--font-weight-bold);
   color: var(--color-ink);
-}
-
-.summary {
-  font-size: var(--font-size-meta);
-  line-height: var(--line-height-meta);
-  color: var(--color-ink-muted);
 }
 
 .chevron {

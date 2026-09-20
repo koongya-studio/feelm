@@ -51,6 +51,8 @@ deploy-monitoring:
         - .gitlab/ci/infra.yml
         - infra/config/required-ci-variables.json
         - infra/compose/monitoring.yml
+        - infra/monitoring/loki/**/*
+        - infra/monitoring/alloy/**/*
         - infra/monitoring/prometheus/**/*
         - infra/monitoring/grafana/**/*
         - infra/monitoring/mattermost-relay/**/*
@@ -60,6 +62,63 @@ deploy-monitoring:
         - infra/scripts/test_deploy_monitoring.py
         - infra/scripts/verify-monitoring-deployment.py
         - infra/scripts/test_verify_monitoring_deployment.py
+
+deploy-distributed-observability:
+  stage: deploy
+  tags: [e106-distributed]
+  needs: []
+  environment:
+    name: distributed
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
+    - bash infra/scripts/deploy-distributed-observability.sh
+  after_script:
+    - python3 -I -B infra/scripts/notify-deployment.py distributed-observability "$CI_JOB_STATUS"
+  resource_group: distributed-runtime-kafka
+  interruptible: false
+  retry:
+    max: 1
+    when: [runner_system_failure, scheduler_failure]
+  timeout: 15m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - .gitlab/ci/infra.yml
+        - infra/compose/distributed.yml
+        - infra/scripts/deploy-distributed-observability.sh
+        - infra/scripts/verify-distributed-observability.py
+        - infra/scripts/test_distributed_auxiliary_deployment.py
+        - infra/scripts/test_verify_distributed_observability.py
+
+deploy-spark-history:
+  stage: deploy
+  tags: [e106-distributed]
+  needs: []
+  environment:
+    name: distributed
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
+    - bash infra/scripts/deploy-spark-history.sh
+  after_script:
+    - python3 -I -B infra/scripts/notify-deployment.py spark-history "$CI_JOB_STATUS"
+  resource_group: distributed-runtime-spark
+  interruptible: false
+  retry:
+    max: 1
+    when: [runner_system_failure, scheduler_failure]
+  timeout: 20m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - .gitlab/ci/infra.yml
+        - infra/compose/distributed.yml
+        - infra/hadoop/**/*
+        - infra/spark/spark-defaults.conf
+        - infra/scripts/deploy-spark-history.sh
+        - infra/scripts/verify-spark-history.py
+        - infra/scripts/test_distributed_auxiliary_deployment.py
+        - infra/scripts/test_verify_spark_history.py
+
 .deploy-hdfs-config:
   stage: deploy
   needs: []
@@ -431,6 +490,9 @@ infra-config-test:
         - infra/scripts/test_ci_deploy_current_commit.py
         - infra/scripts/*monitoring*
         - infra/scripts/*postgresql*
+        - infra/scripts/*distributed*auxiliary*
+        - infra/scripts/*distributed*observability*
+        - infra/scripts/*spark-history*
         - infra/scripts/test_consumer_distributed_deployment.py
         - infra/scripts/test_grafana_access_policy.py
         - infra/scripts/test_node_exporter_monitoring.py

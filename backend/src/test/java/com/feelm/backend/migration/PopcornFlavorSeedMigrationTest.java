@@ -144,13 +144,7 @@ class PopcornFlavorSeedMigrationTest {
     }
 
     private static MigrationPostgresSupport.MigrationTestDatabase previousSchema() {
-        var database = MigrationPostgresSupport.database("flavor_seed");
-        Flyway.configure()
-                .dataSource(database.getJdbcUrl(), database.getUsername(), database.getPassword())
-                .target("202609151537")
-                .load()
-                .migrate();
-        return database;
+        return MigrationPostgresSupport.databaseAtVersion("flavor_seed", "202609151537");
     }
 
     private static Flyway seedFlyway(MigrationPostgresSupport.MigrationTestDatabase database) {

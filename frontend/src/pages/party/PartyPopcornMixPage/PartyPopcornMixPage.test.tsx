@@ -20,8 +20,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import PartyPopcornMixPage from './index';
 import { renderWithRouter } from '../../../test/render';
 import { getParty, getPartyPopcorn, getPartyRecommendations } from '../../../api/parties';
-import { party, partyPopcorn, TEST_PARTY_ID } from '../../../test/party';
-import { mockPartyRecommendations } from '../../../mocks/partyRecommendations';
+import { party, partyPopcorn, partyRecommendations, TEST_PARTY_ID } from '../../../test/party';
 
 /*
  * 연출을 끝까지 기다리는 테스트가 있어 이 파일의 제한 시간을 올린다. `it`마다 제한을 붙이면
@@ -45,7 +44,7 @@ vi.mock('../../../api/parties', async () => {
 beforeEach(() => {
   vi.mocked(getParty).mockReset().mockResolvedValue(party());
   vi.mocked(getPartyPopcorn).mockReset().mockResolvedValue(partyPopcorn());
-  vi.mocked(getPartyRecommendations).mockReset().mockResolvedValue(mockPartyRecommendations[9001]);
+  vi.mocked(getPartyRecommendations).mockReset().mockResolvedValue(partyRecommendations());
 });
 
 function renderMix() {

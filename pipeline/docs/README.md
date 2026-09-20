@@ -26,6 +26,8 @@ Jira: [S15P21E106-295](https://ssafy.atlassian.net/browse/S15P21E106-295)
 7. [이번 인계 검증](verification.md): 실행한 테스트·독립 검토와 미검증 범위.
 8. [ALS 산출물 HDFS 실환경 검증](als-artifact-hdfs-verification.md): 실제 HDFS
    저장·재로딩, 실패·재시도, 복제 수와 정리 결과.
+9. [TMDB·KOBIS proxy 오차 분석](tmdb-kobis-proxy-error-analysis.md): KOBIS 관객과 TMDB 평가
+   수·평균평점의 관계, 시간 순서 밖 오차 범위와 한국 평점 부재로 인한 해석 경계.
 
 이 자료는 **확정된 연구 근거의 인계**다. 공식 API·모델 계약과 서비스 정책을
 새로 확정하지 않는다. 팝콘 외부 표현 8개와 실제 별점 0.5 단위는 유지한다.

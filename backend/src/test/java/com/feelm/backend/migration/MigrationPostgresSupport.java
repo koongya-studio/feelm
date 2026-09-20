@@ -4,6 +4,8 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
@@ -23,19 +25,66 @@ final class MigrationPostgresSupport {
     private static final String PASSWORD = "feelm";
     private static final Pattern LABEL = Pattern.compile("[a-z][a-z0-9_]{0,30}");
     private static final AtomicInteger DATABASE_SEQUENCE = new AtomicInteger();
+    private static final Map<String, MigrationTestDatabase> TEMPLATES = new HashMap<>();
 
     private static final PostgreSQLContainer<?> POSTGRES = startPostgres();
 
     private MigrationPostgresSupport() {}
 
     static MigrationTestDatabase database(String label) {
+        return database(label, null);
+    }
+
+    /** 이전 버전의 fixture만 재사용하며 각 호출자는 독립된 DB에서 대상 migration을 실행한다. */
+    static synchronized MigrationTestDatabase databaseAtVersion(String label, String version) {
+        if (!LABEL.matcher(label).matches() || !version.matches("[0-9]{1,20}")) {
+            throw new IllegalArgumentException("Invalid migration fixture label or version");
+        }
+        MigrationTestDatabase template = TEMPLATES.get(version);
+        if (template == null) {
+            template = database("template");
+            try {
+                Flyway.configure()
+                        .dataSource(template.getJdbcUrl(), USERNAME, PASSWORD)
+                        .target(version)
+                        .load()
+                        .migrate();
+                // Flyway의 연결이 닫힌 뒤 봉인한다. 복제 원본은 어떤 테스트에도 반환하지 않는다.
+                try (Connection connection = adminConnection();
+                        Statement statement = connection.createStatement()) {
+                    statement.execute(
+                            "ALTER DATABASE "
+                                    + statement.enquoteIdentifier(template.databaseName, true)
+                                    + " ALLOW_CONNECTIONS false");
+                }
+                TEMPLATES.put(version, template);
+            } catch (RuntimeException | SQLException exception) {
+                try {
+                    template.close();
+                } catch (RuntimeException cleanupFailure) {
+                    exception.addSuppressed(cleanupFailure);
+                }
+                throw new IllegalStateException("Failed to prepare migration fixture", exception);
+            }
+        }
+        return database(label, template.databaseName);
+    }
+
+    private static MigrationTestDatabase database(String label, String templateName) {
         if (!LABEL.matcher(label).matches()) {
             throw new IllegalArgumentException("Invalid migration test database label: " + label);
         }
         String databaseName = "feelm_" + label + "_" + DATABASE_SEQUENCE.incrementAndGet();
         try (Connection connection = adminConnection();
                 Statement statement = connection.createStatement()) {
-            statement.execute("CREATE DATABASE " + statement.enquoteIdentifier(databaseName, true));
+            String templateClause =
+                    templateName == null
+                            ? ""
+                            : " TEMPLATE " + statement.enquoteIdentifier(templateName, true);
+            statement.execute(
+                    "CREATE DATABASE "
+                            + statement.enquoteIdentifier(databaseName, true)
+                            + templateClause);
         } catch (SQLException exception) {
             throw new IllegalStateException("Failed to create migration test database", exception);
         }
