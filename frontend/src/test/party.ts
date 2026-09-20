@@ -107,7 +107,6 @@ export function flavors(): PopcornFlavor[] {
     code,
     displayName: `맛${index + 1}`,
     color: '#fbf1cf',
-    representativeKeywords: [],
     sortOrder: index + 1,
   }));
 }

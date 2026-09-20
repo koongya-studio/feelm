@@ -34,9 +34,11 @@
  * 알이 0개인 기존 빈 상태를 그대로 보여준다(S15P21E106-392).
  * `[?]` 평균 평점 표기 형식은 FR-06이 정하지 않아 `★ 4.4`로 둔다.
  *
- * **범례의 맛마다 무엇을 뜻하는지 한 줄을 단다**(업무 -631, 사용자 결정 2026-09-18). 맛 이름만으로는
- * `오리지널 솔트`가 어떤 영화인지 알 수 없다는 QA 지적이다. 계약에 설명 문장이 없어 기준정보
- * API-044의 대표 키워드(`representativeKeywords`)를 잇는다. 기준정보를 받지 못하면 그 줄만 없다.
+ * **범례의 맛마다 무엇을 뜻하는지 한 줄을 단다**(업무 -631, 업무 -713에서 문장으로 교체).
+ * 맛 이름만으로는 `오리지널 솔트`가 어떤 영화인지 알 수 없다는 QA 지적이다. -631은 기준정보
+ * API-044의 대표 키워드를 이어 붙였는데 업무 -473이 그 필드를 뺐고(맛 8종을 439의 상위
+ * taste_id 축으로 정하면서 키워드를 뽑을 근거가 사라졌다), 대신 맛마다 한 문장(`description`)을
+ * 기준정보에 두기로 했다(사용자 결정 2026-09-20). 기준정보를 받지 못하면 그 줄만 없다.
  *
  * **알 수와 별점이 무엇인지 제목 아래 한 줄로 적는다**(업무 -677, UI/UX 분석 리포트 P1-03).
  * 알 수는 감상량, 별점은 선호도인데(FR-06) 그 구분이 주석에만 있었다. -101에서 안내 문구를 뺀
@@ -73,7 +75,7 @@ export default function PopcornBucketPage() {
   const back = useBack(path.film());
 
   const [bucket, setBucket] = useState<PopcornBucketData | null>(null);
-  /** 맛 설명(대표 키워드). 받지 못하면 빈 배열이고 범례에 설명 줄만 없다 */
+  /** 맛 설명. 받지 못하면 빈 배열이고 범례에 설명 줄만 없다 */
   const [flavorInfo, setFlavorInfo] = useState<PopcornFlavor[]>([]);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
@@ -207,9 +209,9 @@ export default function PopcornBucketPage() {
            */}
           <ul className={styles.legend}>
             {bucket.flavors.map((flavor) => {
-              const keywords = flavorInfo.find(
+              const description = flavorInfo.find(
                 (info) => info.code === flavor.flavorCode,
-              )?.representativeKeywords;
+              )?.description;
 
               return (
                 <li key={flavor.flavorCode} className={styles.legendItem}>
@@ -220,8 +222,8 @@ export default function PopcornBucketPage() {
                   />
                   <span className={styles.legendText}>
                     <span className={styles.legendName}>{flavor.displayName}</span>
-                    {keywords?.length ? (
-                      <span className={styles.legendKeywords}>{keywords.join(' · ')}</span>
+                    {description ? (
+                      <span className={styles.legendDescription}>{description}</span>
                     ) : null}
                   </span>
                   <span className={styles.legendCount}>{flavor.popcornCount}</span>
