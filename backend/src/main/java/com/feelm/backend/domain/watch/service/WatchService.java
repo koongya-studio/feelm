@@ -104,9 +104,12 @@ public class WatchService {
                 repository
                         .findOwnedForUpdate(watchRecordId, userId)
                         .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
-        if (record.status() != WatchStatus.LINK_CLICKED
-                || record.expiresAt() == null
-                || !record.expiresAt().isAfter(now)) {
+        boolean clickedInTime =
+                record.status() == WatchStatus.LINK_CLICKED
+                        && record.expiresAt() != null
+                        && record.expiresAt().isAfter(now);
+        boolean cancelUnrated = !watched && record.status() == WatchStatus.WATCHED_UNRATED;
+        if (!clickedInTime && !cancelUnrated) {
             throw new BusinessException(ErrorCode.INVALID_WATCH_STATUS);
         }
         repository.confirm(watchRecordId, watched, now);

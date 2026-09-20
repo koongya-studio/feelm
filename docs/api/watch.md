@@ -222,16 +222,18 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 - `400 VALIDATION_FAILED` 인덱스·중첩 파라미터 표기, 또는 허용되지 않는 문자가 든 파라미터 이름
 - `401 UNAUTHORIZED` 인증이 없거나 활성 사용자가 아님
 - `404 RESOURCE_NOT_FOUND` 기록이 없거나 다른 사용자의 기록
-- `409 INVALID_WATCH_STATUS` `LINK_CLICKED`가 아니거나 `expires_at <= now`인 기록, 중복 또는 경쟁 상태 전이
+- `409 INVALID_WATCH_STATUS` 허용되지 않은 상태 전이, `LINK_CLICKED`의 `expires_at <= now`, 중복 또는 경쟁 상태 전이
 - `415 UNSUPPORTED_MEDIA_TYPE` `Content-Type` 누락 또는 비지원
 - `500 INTERNAL_ERROR` 상태 전이 저장 또는 commit 실패
 
 ### 처리 규칙
 
-- `watched: true` → `WATCHED_UNRATED`, 평가 요청 UI로 이어진다. 평가는 지금 하지 않고 나중에 남겨도 된다
-- `watched: false` → `EXPIRED`. 만료는 추천 신호로 사용하지 않는다
+- `LINK_CLICKED`에서 `watched: true` → `WATCHED_UNRATED`, 평가 요청 UI로 이어진다. 평가는 지금 하지 않고 나중에 남겨도 된다
+- `LINK_CLICKED`에서 `watched: false` → `EXPIRED`. 만료는 추천 신호로 사용하지 않는다
+- `WATCHED_UNRATED`에서 `watched: false` → `EXPIRED`로 감상 확정을 취소한다. `watched_at`을 비우고 `expired_at`을 기록하며 응답 `watchedAt`은 `null`이다. 클릭의 `expires_at`이 지나도 취소할 수 있다. 평가가 아직 있는 `RATED` 상태라면 API-038로 평가를 먼저 삭제해야 한다
+- API-038 삭제와 API-035 취소는 별개의 요청·트랜잭션이다. 삭제 후 취소 요청이 실패하면 기록이 `WATCHED_UNRATED`로 남으므로 클라이언트는 취소를 재시도하거나 실패를 안내해야 한다
 - 확인 질문 노출에 지연을 두지 않는다. `confirm_due_at`은 `clicked_at`과 같아 클릭 직후부터 노출 대상이다(팀 결정 2026-09-18, S15P21E106-667). `confirm_due_at`은 노출 기준이지 상태 전이 제한이 아니므로 사용자가 먼저 응답해도 받아들인다
-- `expires_at == now`는 만료로 보아 확인을 거절한다
+- `LINK_CLICKED`에서 `expires_at == now`는 만료로 보아 확인을 거절한다
 - 잠금 순서는 OTT 클릭 API와 동일하게 `active user → owned watch record`이며 조건부 update가 정확히 1행이 아니면 경쟁 상태로 거절한다
 - 성공하더라도 Kafka·outbox 이벤트를 새로 만들지 않고 평가·한줄평·프레임·팝콘 데이터를 변경하지 않는다
 - 알 수 없는 JSON 필드는 향후 호환성을 위해 허용한다
@@ -239,6 +241,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 ### 상태값
 
 - WatchStatus `LINK_CLICKED` → `WATCHED_UNRATED` 또는 `EXPIRED`
+- WatchStatus `WATCHED_UNRATED` → `EXPIRED` (`watched: false`만 허용)
 
 ### 미정 사항
 
