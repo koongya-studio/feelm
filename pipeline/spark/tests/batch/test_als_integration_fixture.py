@@ -44,8 +44,21 @@ def prepared_fixture(spark, tmp_path_factory):
         return write_prepared_fixture(spark, root, patch)
 
 
-def test_csv_outputs_manifest_and_split_oracle_are_valid(spark, prepared_fixture):
+@pytest.fixture(scope="module")
+def validated_prepared_fixture(spark, prepared_fixture):
     prepared, snapshot, inputs = prepared_fixture
+    manifest = validate_input_snapshot(
+        spark,
+        input_uri=prepared.as_uri(),
+        manifest_uri=(prepared.parent / "manifest.json").as_uri(),
+        expected_snapshot=snapshot,
+        inputs=inputs,
+    )
+    return prepared, snapshot, inputs, manifest
+
+
+def test_csv_outputs_manifest_and_split_oracle_are_valid(spark, validated_prepared_fixture):
+    prepared, snapshot, inputs, manifest = validated_prepared_fixture
     assert {path.name for path in prepared.iterdir()} == {
         "ratings",
         "movies",
@@ -75,13 +88,6 @@ def test_csv_outputs_manifest_and_split_oracle_are_valid(spark, prepared_fixture
     assert snapshot == "sha256:" + hashlib.sha256(manifest_bytes).hexdigest()
     for relative_path, digest in json.loads(manifest_bytes)["files"].items():
         assert hashlib.sha256((prepared.parent / relative_path).read_bytes()).hexdigest() == digest
-    manifest = validate_input_snapshot(
-        spark,
-        input_uri=prepared.as_uri(),
-        manifest_uri=(prepared.parent / "manifest.json").as_uri(),
-        expected_snapshot=snapshot,
-        inputs=inputs,
-    )
     assert set(manifest["sources"]) == {
         "ratings",
         "movies",
@@ -91,9 +97,9 @@ def test_csv_outputs_manifest_and_split_oracle_are_valid(spark, prepared_fixture
 
 
 def test_small_real_als_run_saves_reloads_and_attributes_versions(
-    spark, prepared_fixture
+    spark, validated_prepared_fixture, monkeypatch
 ):
-    prepared, snapshot, inputs = prepared_fixture
+    prepared, snapshot, inputs, _ = validated_prepared_fixture
     output = prepared.parent / "output"
     settings = AlsJobSettings.from_sources(
         environ={},
@@ -125,13 +131,15 @@ def test_small_real_als_run_saves_reloads_and_attributes_versions(
     baseline = importlib.import_module("batch.train.baseline")
     run_report = importlib.import_module("batch.train.run_report")
 
-    validate_input_snapshot(
-        spark,
-        input_uri=prepared.as_uri(),
-        manifest_uri=(prepared.parent / "manifest.json").as_uri(),
-        expected_snapshot=snapshot,
-        inputs=inputs,
-    )
+    loaded_artifacts = []
+    original_load = baseline.load_als_artifacts
+
+    def capture_load(*args, **kwargs):
+        loaded = original_load(*args, **kwargs)
+        loaded_artifacts.append(loaded)
+        return loaded
+
+    monkeypatch.setattr(baseline, "load_als_artifacts", capture_load)
 
     result = baseline.run_baseline(spark, inputs, settings)
     report_uri = run_report.run_report_uri(output.as_uri(), "fixture-run")
@@ -145,9 +153,11 @@ def test_small_real_als_run_saves_reloads_and_attributes_versions(
     assert report["final_evaluation"]["model_version"] != result.serving_model_version
     assert report["final_evaluation"]["test"]["movielens"]["evaluated_users"] > 0
     assert report["status"] == "SUCCEEDED"
-    serving = baseline.load_als_artifacts(
-        spark, output.as_uri(), result.serving_model_version
-    ).metadata
+    serving = next(
+        loaded.metadata
+        for loaded in reversed(loaded_artifacts)
+        if loaded.metadata.model_version == result.serving_model_version
+    )
     assert serving.mapping_revision == inputs.mapping_revision
     assert serving.movie_metadata_revision == "sha256:" + "b" * 64
 
