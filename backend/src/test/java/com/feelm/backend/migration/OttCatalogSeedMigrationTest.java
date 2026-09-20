@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
-import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -246,13 +245,7 @@ class OttCatalogSeedMigrationTest {
     }
 
     private static MigrationPostgresSupport.MigrationTestDatabase previousSchema() {
-        var database = MigrationPostgresSupport.database("ott_seed");
-        Flyway.configure()
-                .dataSource(database.getJdbcUrl(), database.getUsername(), database.getPassword())
-                .target("202609140120")
-                .load()
-                .migrate();
-        return database;
+        return MigrationPostgresSupport.databaseAtVersion("ott_seed", "202609140120");
     }
 
     private static void references(
