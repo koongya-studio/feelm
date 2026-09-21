@@ -77,6 +77,27 @@ provisioning하지 않고, 각 규칙이 `FEELM Mattermost` 연락 지점을 직
 
 ### 로그 알림 테스트와 복구 확인
 
+Alloy 저장 경로는 `/var/lib/feelm-alloy-data`이며 기존 `compose_alloy_data` 볼륨을
+`nocopy`로 연결합니다. 이미지의 `/var/lib/alloy`는 `473:473`, `0770`이므로
+`cap_drop: [ALL]`인 root 프로세스도 통과할 수 없습니다. 볼륨 소유권만 변경한 뒤
+기존 `/var/lib/alloy/data` 경로를 계속 사용하면 문제가 해결되지 않습니다.
+
+`deploy-monitoring.sh`는 이미지 pull 후, 기존 컨테이너 중지 전에 같은 Alloy 이미지로
+볼륨 최상위 소유권을 `0:0`으로 맞추고 소유자에게만 읽기·쓰기·실행 권한을 추가합니다.
+초기화 컨테이너만 `CHOWN`, `FOWNER` capability를 가지며 네트워크, Secret, Docker socket,
+호스트 bind mount는 연결하지 않습니다. 하위 파일을 재귀적으로 변경하거나 삭제하지 않습니다.
+이어 capability가 없는 런타임 조건에서 임시 디렉터리 생성·삭제를 검사합니다.
+실패하면 기존 컨테이너를 중지하지 않습니다. 런타임의 read-only rootfs,
+`cap_drop: [ALL]`, `no-new-privileges`는 유지됩니다.
+
+변경본 배포 후 아래 readiness와 Grafana Explore 조회를 모두 확인합니다.
+배포 성공 전에는 로그 수집 복구로 판단하지 않습니다.
+
+```bash
+curl --max-time 5 --fail --show-error http://127.0.0.1:12345/-/ready
+curl --max-time 5 --fail --show-error http://127.0.0.1:3100/ready
+```
+
 1. Grafana **Explore**에서 Loki를 선택하고
    `{environment="production", service="backend"}`를 조회해 로그 수집과 라벨을 확인합니다.
 2. 운영 데이터나 실제 개인정보를 쓰지 않는 합성 환경에서 `ERROR synthetic-alert-test` 로그를
