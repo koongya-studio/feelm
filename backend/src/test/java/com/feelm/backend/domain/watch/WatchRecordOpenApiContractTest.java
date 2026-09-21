@@ -136,7 +136,7 @@ class WatchRecordOpenApiContractTest {
 
         assertThat(operation.path("summary").asText()).isEqualTo("감상 확인 응답");
         assertThat(operation.path("description").asText())
-                .contains("24시간 이전", "WATCHED_UNRATED", "EXPIRED");
+                .contains("클릭 직후", "WATCHED_UNRATED", "EXPIRED");
         assertBearer(operation);
         Map<String, JsonNode> parameters = parameters(operation);
         assertThat(parameters.keySet()).containsExactly("watchRecordId");
