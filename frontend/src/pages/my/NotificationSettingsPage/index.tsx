@@ -4,7 +4,8 @@
  * 이동표: 7.8 → 7.8-C · 뒤로 가기
  *
  * 요소는 와이어프레임 그대로다 — 토글 다섯(감상 확인 · 추천 · 파티 초대 · 리포트 발급 ·
- * 마케팅), 맨 아래 `감상 확인 알림은 OTT 이동 2일 후에 도착해요`.
+ * 마케팅), 맨 아래 감상 확인 알림이 오는 시점. 와이어프레임의 `OTT 이동 2일 후`는 계약과 달라
+ * 계약(클릭 즉시)을 따른다 — 문구와 값은 `utils/watchConfirm.ts` 한 곳이다(업무 -766).
  *
  * 계약(API-017 · API-018)은 `RATING` · `RECOMMENDATION` · `MARKETING` 셋이다. 파티 초대 ·
  * 리포트 발급은 계약에 없다. 한때 세션 저장소에만 남겨 저장된 것처럼 보였는데, 새로고침하면
@@ -27,6 +28,7 @@ import { failureDescription } from '../../../components/StatusView/failure';
 import Switch from '../../../components/Switch';
 import { getNotificationSettings, updateNotificationSettings } from '../../../api/settings';
 import { path } from '../../../routes/paths';
+import { watchConfirmTiming } from '../../../utils/watchConfirm';
 import styles from './NotificationSettingsPage.module.css';
 import WebPushSection from './WebPushSection';
 import type { NotificationSettings } from '../../../types/user';
@@ -146,7 +148,7 @@ export default function NotificationSettingsPage() {
         ) : null}
 
         <p className={styles.hint}>파티 초대 · 리포트 발급 알림 설정은 준비 중이에요</p>
-        <p className={styles.hint}>감상 확인 알림은 OTT 이동 2일 후에 도착해요</p>
+        <p className={styles.hint}>{watchConfirmTiming()}</p>
       </div>
     </>
   );
