@@ -19,7 +19,8 @@ import ProfileEditPage from './index';
 import MyDashboardPage from '../MyDashboardPage';
 import PublicProfilePage from '../PublicProfilePage';
 import { resetSessionForTest, startSession } from '../../../api/session';
-import { resetSessionStore, saveProfileExtras } from '../../../mocks/sessionStore';
+import { resetSessionStore } from '../../../mocks/sessionStore';
+import { saveAvatar } from '../../../api/avatarStore';
 import { mockMyProfile } from '../../../mocks/user';
 import { ROUTE_PATTERN } from '../../../routes/paths';
 import type { MyProfile } from '../../../types/user';
@@ -89,6 +90,8 @@ beforeEach(() => {
   patches = [];
   checks = [];
   resetSessionStore();
+  // 사진은 기기 저장소에 남는다(업무 -740). 시험마다 비우고 시작한다
+  localStorage.clear();
   resetSessionForTest();
   startSession('token');
   stubServer();
@@ -440,7 +443,7 @@ describe('7.2 프로필 사진', () => {
   });
 
   it('현재 사진을 지우면 한 번 더 묻고 기본 이미지로 돌아간다', async () => {
-    saveProfileExtras({ avatarUrl: 'data:image/jpeg;base64,AAAA' });
+    saveAvatar(me.userId, 'data:image/jpeg;base64,AAAA');
     await renderEdit();
 
     expect(screen.getByRole('img', { name: `${me.nickname}의 프로필 이미지` })).toBeInTheDocument();
