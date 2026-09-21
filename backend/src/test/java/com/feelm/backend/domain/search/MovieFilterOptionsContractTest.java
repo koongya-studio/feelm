@@ -30,12 +30,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /** API-029의 실제 보안 체인·서비스·바인딩 SQL을 격리 PostgreSQL에서 검증한다. */
-@SpringBootTest(
-        properties = {
-            "spring.flyway.enabled=true",
-            "spring.jpa.hibernate.ddl-auto=none",
-            "feelm.auth.mock.enabled=false"
-        })
+@SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 @AutoConfigureMockMvc
 @Transactional
 class MovieFilterOptionsContractTest extends SharedPostgresContractTest {

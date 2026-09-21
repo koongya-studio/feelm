@@ -45,10 +45,16 @@ def evaluate_ranking(
     recommendations = candidates.filter(F.col("catalog") == catalog).join(
         target_users, USER, "inner"
     )
-    if recommendations.filter(_finite_score_filter(recommendations)).limit(1).count():
+    recommendation_summary = recommendations.agg(
+        F.count(F.lit(1)).alias("recommendation_count"),
+        F.max(
+            F.when(_finite_score_filter(recommendations), F.lit(1)).otherwise(F.lit(0))
+        ).alias("has_invalid_score"),
+    ).first()
+    if recommendation_summary["has_invalid_score"]:
         raise ValueError("recommendation score must be finite and non-null")
 
-    recommendation_count = recommendations.count()
+    recommendation_count = recommendation_summary["recommendation_count"]
     dedup_window = Window.partitionBy(USER, ITEM).orderBy(F.col("score").desc())
     deduplicated = (
         recommendations.withColumn("_duplicate_rank", F.row_number().over(dedup_window))
@@ -57,7 +63,6 @@ def evaluate_ranking(
     )
     rank_window = Window.partitionBy(USER).orderBy(F.col("score").desc(), F.col(ITEM).asc())
     ranked = deduplicated.withColumn("rank", F.row_number().over(rank_window))
-    deduplicated_count = ranked.count()
 
     positives = (
         holdout_ratings.filter(F.col("rating") >= positive_rating_threshold)
@@ -97,26 +102,35 @@ def evaluate_ranking(
         scored = scored.persist()
 
     try:
-        population = target_users.agg(F.count(F.lit(1)).alias("target_users")).first()
-        positive_summary = positive_counts.agg(
-            F.count(F.lit(1)).alias("evaluated_users"),
-            F.coalesce(F.sum("positive_count"), F.lit(0)).alias("positive_items"),
-        ).first()
-        if materialize_per_user:
-            scored.count()
-        averages = scored.agg(
-            F.avg("recall_at_10").alias("recall_at_10"),
-            F.avg("ndcg_at_10").alias("ndcg_at_10"),
-        ).first()
-        evaluated_users = positive_summary["evaluated_users"]
+        summary_row = (
+            ranked.agg(F.count(F.lit(1)).alias("deduplicated_count"))
+            .crossJoin(
+                target_users.join(positive_counts, USER, "left").agg(
+                    F.count(F.lit(1)).alias("target_users"),
+                    F.count("positive_count").alias("evaluated_users"),
+                    F.coalesce(F.sum("positive_count"), F.lit(0)).alias(
+                        "positive_items"
+                    ),
+                )
+            )
+            .crossJoin(
+                scored.agg(
+                    F.avg("recall_at_10").alias("recall_at_10"),
+                    F.avg("ndcg_at_10").alias("ndcg_at_10"),
+                )
+            )
+            .first()
+        )
+        evaluated_users = summary_row["evaluated_users"]
         summary = {
-            "target_users": population["target_users"],
+            "target_users": summary_row["target_users"],
             "evaluated_users": evaluated_users,
-            "users_without_positives": population["target_users"] - evaluated_users,
-            "positive_items": positive_summary["positive_items"],
-            "recall_at_10": averages["recall_at_10"],
-            "ndcg_at_10": averages["ndcg_at_10"],
-            "duplicate_recommendations_removed": recommendation_count - deduplicated_count,
+            "users_without_positives": summary_row["target_users"] - evaluated_users,
+            "positive_items": summary_row["positive_items"],
+            "recall_at_10": summary_row["recall_at_10"],
+            "ndcg_at_10": summary_row["ndcg_at_10"],
+            "duplicate_recommendations_removed": recommendation_count
+            - summary_row["deduplicated_count"],
         }
         return RankingEvaluation(per_user=scored, summary=summary)
     except Exception:

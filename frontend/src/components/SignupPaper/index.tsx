@@ -8,10 +8,17 @@
  * 0.4 이메일 회원가입이 쓰던 것을 0.3-A 소셜 가입 정보 입력도 쓰게 되어 공통으로
  * 올렸다(frontend-structure.md 5.1, 업무 S15P21E106-499). 줄 번호와 무엇을 입력받을지는
  * 화면마다 다르므로 여기서는 종이·줄·타자기만 맡고 필드는 화면이 넣는다.
+ *
+ * **폰 키보드가 올라오면 타자기 키를 감춘다**(업무 -718, 사용자 결정 2026-09-20). 입력 칸을
+ * 누르면 OS 키보드가 화면 아래를 덮어 타자기와 겹쳤다 — 키보드가 두 개로 보였다. 입력
+ * 중에는 진짜 키보드가 타자기 역할을 하므로 둘 다 있을 이유가 없고, 키보드가 닫히면 다시
+ * 나온다. **롤러는 남겨 종이가 나오는 연출을 잇는다** — 둘 다 치우면 종이가 허공에 뜬다.
+ * 키보드가 뜨지 않는 환경(PC)에서는 아무것도 바뀌지 않는다(`hooks/useOnScreenKeyboard`).
  */
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import Typewriter from './Typewriter';
+import { useOnScreenKeyboard } from '../../hooks/useOnScreenKeyboard';
 import { PaperContext, useSignupPaper } from './paperContext';
 import styles from './SignupPaper.module.css';
 
@@ -35,6 +42,7 @@ export default function SignupPaper({ onSubmit, children }: Props) {
 
   const [fed, setFed] = useState(1);
   const [typed, setTyped] = useState<string | null>(null);
+  const keyboard = useOnScreenKeyboard();
 
   /* 나온 줄은 다시 들어가지 않는다 */
   const feed = (line: number) => setFed((current) => Math.max(current, line));
@@ -88,7 +96,19 @@ export default function SignupPaper({ onSubmit, children }: Props) {
 
   return (
     <PaperContext.Provider value={{ fed, feed, type }}>
-      <div ref={scrollerRef} className={styles.page}>
+      {/*
+       * 키보드가 덮은 만큼 아래 자리를 줄인다(업무 -718).
+       *
+       * 종이는 `::before`의 남는 자리에 밀려 아래에 붙어 있다. 키보드가 올라오면 그 자리가
+       * 키보드 뒤로 들어가는데, **스크롤로는 못 올린다** — 내용이 짧을 때는 넘치는 높이가
+       * 없어 스크롤할 여지가 아예 없다(재 보니 `scrollHeight`와 `clientHeight`가 720으로
+       * 같았다). 그래서 아래 여백으로 자리를 줄여 종이가 키보드 위에 서게 한다.
+       */}
+      <div
+        ref={scrollerRef}
+        className={styles.page}
+        style={{ paddingBottom: keyboard.inset || undefined }}
+      >
         <form
           ref={paperRef}
           className={styles.paper}
@@ -98,7 +118,7 @@ export default function SignupPaper({ onSubmit, children }: Props) {
           {children}
         </form>
 
-        <Typewriter typed={typed} />
+        <Typewriter typed={typed} hidden={keyboard.open} />
       </div>
     </PaperContext.Provider>
   );

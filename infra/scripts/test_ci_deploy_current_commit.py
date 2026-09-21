@@ -16,7 +16,7 @@ class DeployCurrentCommitTest(unittest.TestCase):
     commit = "1" * 40
 
     def run_main(self, *, branch="main", expected_branch="main", protected="true",
-                 source="push", remote_sha=None, returncode=0):
+                 source="push", expected_source="push", remote_sha=None, returncode=0):
         completed = subprocess.CompletedProcess(
             [], returncode, f"{remote_sha or self.commit}\trefs/heads/{branch}\n", ""
         )
@@ -26,13 +26,24 @@ class DeployCurrentCommitTest(unittest.TestCase):
              "CI_COMMIT_REF_PROTECTED": protected, "CI_PIPELINE_SOURCE": source},
             clear=True,
         ), patch.object(MODULE.subprocess, "run", return_value=completed) as run, \
-             patch.object(MODULE.sys, "argv", [str(SCRIPT), "--branch", expected_branch]):
+             patch.object(
+                 MODULE.sys,
+                 "argv",
+                 [str(SCRIPT), "--branch", expected_branch,
+                  "--pipeline-source", expected_source],
+             ):
             result = MODULE.main()
         return result, run
 
     def test_accepts_current_branch_head(self):
         result, run = self.run_main()
 
+        self.assertEqual(result, 0)
+
+    def test_accepts_protected_child_pipeline_when_explicitly_requested(self):
+        result, run = self.run_main(
+            source="parent_pipeline", expected_source="parent_pipeline"
+        )
         self.assertEqual(result, 0)
         run.assert_called_once_with(
             ["git", "ls-remote", "--exit-code", "origin", "refs/heads/main"],

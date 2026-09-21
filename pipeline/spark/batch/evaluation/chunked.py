@@ -16,7 +16,12 @@ from batch.evaluation.candidates import (
     generate_materialized_candidates,
 )
 from batch.evaluation.metrics import evaluate_ranking
-from batch.evaluation.offline import POLICY_VERSION, K, _count, _shortage_counts
+from batch.evaluation.offline import (
+    POLICY_VERSION,
+    K,
+    _diagnostic_counts,
+    _shortage_counts,
+)
 
 
 @dataclass(frozen=True)
@@ -90,27 +95,25 @@ def evaluate_offline_chunked(
     factor_users = model.userFactors.select(F.col("id").cast("int").alias(USER)).distinct()
     factor_items = model.itemFactors.select(F.col("id").cast("int").alias(ITEM)).distinct()
     holdout_pairs = holdout_ratings.select(USER, ITEM).distinct()
-    cold_pairs = (
-        holdout_pairs.join(factor_users.withColumn("_warm_user", F.lit(1)), USER, "left")
-        .join(factor_items.withColumn("_warm_item", F.lit(1)), ITEM, "left")
-        .filter(F.col("_warm_user").isNull() | F.col("_warm_item").isNull())
-        .select(USER, ITEM)
-    )
     positives = (
         holdout_ratings.filter(F.col("rating") >= positive_rating_threshold)
         .select(USER, ITEM)
         .distinct()
     )
+    diagnostics = _diagnostic_counts(
+        holdout_pairs, positives, factor_users, factor_items, matched_items
+    )
     common = {
-        "target_users": _count(users),
-        "cold_users": _count(users.join(factor_users, USER, "left_anti")),
-        "cold_items": _count(
-            holdout_pairs.select(ITEM).distinct().join(factor_items, ITEM, "left_anti")
-        ),
-        "cold_ratings": _count(cold_pairs),
-        "cold_positive_items": _count(positives.join(cold_pairs, [USER, ITEM], "inner")),
+        name: diagnostics[name]
+        for name in (
+            "target_users",
+            "cold_users",
+            "cold_items",
+            "cold_ratings",
+            "cold_positive_items",
+        )
     }
-    mapping_excluded = _count(positives.join(matched_items, ITEM, "left_anti"))
+    mapping_excluded = diagnostics["mapping_excluded_positive_items"]
     totals = {catalog: _empty_totals() for catalog in ("movielens", "service")}
 
     assignments.persist()
@@ -149,7 +152,6 @@ def evaluate_offline_chunked(
             per_user_caches = []
             chunk_stage = "candidates"
             try:
-                chunk_users.count()
                 chunk_holdout = holdout_ratings.join(chunk_users, USER, "inner")
                 warm_chunk_users = chunk_users.join(factor_users, USER, "inner").persist()
                 warm_user_count = warm_chunk_users.count()

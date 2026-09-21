@@ -26,6 +26,7 @@ class CiConfigTests(unittest.TestCase):
         cls.frontend = (CI_DIR / 'frontend.yml').read_text()
         cls.consumer = (CI_DIR / 'consumer.yml').read_text()
         cls.infra = (CI_DIR / 'infra.yml').read_text()
+        cls.infra_bootstrap = (CI_DIR / 'infra-bootstrap.yml').read_text()
         cls.hdfs_deploy = (ROOT / 'infra' / 'scripts' / 'deploy-hdfs-config.sh').read_text()
         cls.kafka_deploy = (ROOT / 'infra' / 'scripts' / 'deploy-kafka-config.sh').read_text()
         cls.pipeline_path = CI_DIR / 'pipeline.yml'
@@ -85,7 +86,7 @@ include:
     def test_job_names_are_unique_across_split_files(self):
         names = []
         for text in (self.common, self.backend, self.frontend, self.pipeline, self.consumer,
-                     self.infra, self.docs):
+                     self.infra, self.infra_bootstrap, self.docs):
             names.extend(re.findall(r'(?m)^([.]?[A-Za-z0-9_-]+):$', text))
         duplicates = sorted({name for name in names if names.count(name) > 1})
         self.assertEqual(duplicates, [])
@@ -187,7 +188,9 @@ include:
                 '$CI_PIPELINE_SOURCE == "merge_request_event"',
                 '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"',
                 '- infra/compose/**/*', '- infra/monitoring/**/*',
-                '- infra/scripts/test_consumer_distributed_deployment.py'):
+                '- infra/scripts/test_consumer_distributed_deployment.py',
+                '- .gitlab/ci/infra-bootstrap.yml',
+                '- infra/scripts/*bootstrap-reconcile*'):
             self.assertIn(expected, infra)
         for excluded in ('- backend/**/*', '- frontend/**/*', '- pipeline/consumer/**/*',
                          '- pipeline/spark/**/*'):
@@ -205,6 +208,51 @@ include:
         self.assertIn('- infra/scripts/*distributed*auxiliary*', changes.group(1))
         self.assertIn('- infra/scripts/*distributed*observability*', changes.group(1))
         self.assertIn('- infra/scripts/*spark-history*', changes.group(1))
+
+    def test_bootstrap_reconcile_is_a_protected_manual_child_pipeline(self):
+        trigger = job_block(self.infra, 'infra-bootstrap-reconcile')
+        for expected in (
+                'stage: deploy', 'local: .gitlab/ci/infra-bootstrap.yml',
+                'strategy: mirror', 'pipeline_variables: true',
+                'resource_group: infra-bootstrap-reconcile',
+                'interruptible: false', '$CI_COMMIT_BRANCH == "main"',
+                '$CI_COMMIT_REF_PROTECTED == "true"',
+                '$CI_PIPELINE_SOURCE == "web"',
+                '$INFRA_RECOVERY_RUN == "true"',
+                'when: manual', 'allow_failure: false'):
+            self.assertIn(expected, trigger)
+        for forbidden in ('strategy: depend', '$CI_PIPELINE_SOURCE == "push"'):
+            self.assertNotIn(forbidden, trigger)
+
+        workflow = job_block(self.infra_bootstrap, 'workflow')
+        self.assertIn('$CI_PIPELINE_SOURCE == "parent_pipeline"', workflow)
+        self.assertIn('$CI_COMMIT_REF_PROTECTED == "true"', workflow)
+        self.assertIn('$INFRA_RECOVERY_RUN == "true"', workflow)
+        self.assertIn('- when: never', workflow)
+
+        chain = (
+            ('bootstrap-postgresql', 'bootstrap-preflight-service, bootstrap-preflight-distributed'),
+            ('bootstrap-redis', 'bootstrap-postgresql'),
+            ('bootstrap-hdfs-distributed', 'bootstrap-redis'),
+            ('bootstrap-hdfs-service', 'bootstrap-hdfs-distributed'),
+            ('bootstrap-hdfs-finalize-distributed', 'bootstrap-hdfs-service'),
+            ('bootstrap-kafka', 'bootstrap-hdfs-finalize-distributed'),
+            ('bootstrap-kafka-topics', 'bootstrap-kafka'),
+            ('bootstrap-spark-distributed', 'bootstrap-kafka-topics'),
+            ('bootstrap-spark-service', 'bootstrap-spark-distributed'),
+            ('bootstrap-spark-finalize-distributed', 'bootstrap-spark-service'),
+            ('bootstrap-backend', 'bootstrap-spark-finalize-distributed'),
+            ('bootstrap-consumer', 'bootstrap-backend'),
+            ('bootstrap-frontend-nginx', 'bootstrap-consumer'),
+        )
+        for name, predecessor in chain:
+            self.assertIn(f'needs: [{predecessor}]', job_block(self.infra_bootstrap, name), name)
+        for required_job in (
+                'bootstrap-monitoring', 'bootstrap-distributed-auxiliary',
+                'bootstrap-verify-service', 'bootstrap-verify-distributed'):
+            job_block(self.infra_bootstrap, required_job)
+        step = (ROOT / 'infra' / 'scripts' / 'bootstrap-reconcile-step.sh').read_text()
+        self.assertIn('--branch main --pipeline-source parent_pipeline', step)
 
     def test_required_variable_contract_and_runtime_preflight_are_separated(self):
         contract = job_block(self.infra, 'ci-variable-contract-check')
@@ -288,7 +336,7 @@ include:
     def test_spark_history_deploy_is_protected_and_serialized_with_spark(self):
         deploy = job_block(self.infra, 'deploy-spark-history')
         for expected in (
-                'stage: deploy', 'tags: [e106-distributed]', 'needs: []',
+                'stage: deploy', 'tags: [e106-distributed]', '- job: spark-code-notify', '- job: spark-code-image',
                 'name: distributed', 'ci-deploy-current-commit.py',
                 'bash infra/scripts/deploy-spark-history.sh',
                 'notify-deployment.py spark-history "$CI_JOB_STATUS"',

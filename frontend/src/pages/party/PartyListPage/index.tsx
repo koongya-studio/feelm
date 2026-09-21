@@ -49,15 +49,61 @@ import Button from '../../../components/Button';
 import PopcornBucket from '../../../components/PopcornBucket';
 import Snackbar from '../../../components/Snackbar';
 import StatusView from '../../../components/StatusView';
+import VisuallyHidden from '../../../components/VisuallyHidden';
 import AppHeader from '../../../components/AppHeader';
+import { PlayIcon } from '../../../components/Icon';
 import { getMyInvitations, getMyParties, getPartyPopcorn } from '../../../api/parties';
+import { getPopcornFlavors } from '../../../api/taste';
 import { path } from '../../../routes/paths';
 import { mixedFlavors } from '../../../utils/party';
 import type { Party, PartyInvitation, PartyPopcorn } from '../../../types/party';
 import styles from './PartyListPage.module.css';
 
-/** 화면 가운데를 잡는 통. 시안의 크기다 */
-const BUCKET_WIDTH = 188;
+/** 강조 카드 오른쪽의 통. 시안의 크기다 */
+const BUCKET_WIDTH = 128;
+
+/** `우리의 공통 취향`에 세우는 맛 수. 셋을 넘으면 칩이 두 줄이 된다(시안) */
+const COMMON_FLAVOR_COUNT = 3;
+
+/**
+ * 얼굴 자리.
+ *
+ * **프로필 사진이 계약에 없다** — 파티가 주는 것은 `userId`와 닉네임뿐이다(API-050 · API-052).
+ * 시안의 얼굴 자리에 닉네임 첫 글자를 넣는다. 지어낸 사진을 두는 것보다 낫다.
+ */
+function Initials({
+  names,
+  rest = 0,
+  tone,
+  labelled = false,
+}: {
+  names: string[];
+  rest?: number;
+  tone?: 'dark';
+  labelled?: boolean;
+}) {
+  return (
+    <ul className={styles.initials} data-tone={tone ?? null} data-labelled={labelled}>
+      {names.map((name) => (
+        <li key={name} className={styles.initial}>
+          <span className={styles.initialMark} aria-hidden="true">
+            {[...name][0] ?? '?'}
+          </span>
+          {labelled ? <span className={styles.initialName}>{name}</span> : null}
+          {labelled ? null : <VisuallyHidden>{name}</VisuallyHidden>}
+        </li>
+      ))}
+
+      {rest > 0 ? (
+        <li className={styles.initial}>
+          <span className={styles.initialMark} data-rest="true">
+            +{rest}
+          </span>
+        </li>
+      ) : null}
+    </ul>
+  );
+}
 
 export default function PartyListPage() {
   const navigate = useNavigate();
@@ -67,7 +113,26 @@ export default function PartyListPage() {
   const [failed, setFailed] = useState(false);
   const [invitationsFailed, setInvitationsFailed] = useState(false);
   const [notice, setNotice] = useState('');
+  /** 맛 코드 → 이름. 파티 팝콘(API-057)은 코드만 주므로 이름표가 따로 필요하다 */
+  const [flavorNames, setFlavorNames] = useState<Map<string, string>>(new Map());
   const [reloadCount, setReloadCount] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+
+    // 이름표를 못 받아도 화면은 그대로 선다. 칩만 서지 않는다
+    getPopcornFlavors()
+      .then((flavors) => {
+        if (active) setFlavorNames(new Map(flavors.map((f) => [f.code, f.displayName])));
+      })
+      .catch(() => {
+        // 그대로 둔다
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -123,14 +188,32 @@ export default function PartyListPage() {
   const hasParties = parties !== null && parties.length > 0;
   const hasInvitations = invitations !== null && invitations.length > 0;
 
+  /*
+   * 대표 파티 한 방과 나머지. **대표는 아래 줄에서 뺀다** — 같은 파티 이름이 화면에 두 번
+   * 서면 어느 것을 눌러야 하는지 알 수 없다. 통에 담는 팝콘도 이 파티의 것이다.
+   */
+  const firstParty = parties?.[0] ?? null;
+  const restParties = parties?.slice(1) ?? [];
+  /*
+   * 섞은 맛 가운데 많은 셋. 시안의 `우리의 공통 취향` 칩이다.
+   *
+   * **이름을 못 받은 맛은 뺀다.** 파티 팝콘(API-057)은 코드만 주므로 이름표(API-044)가
+   * 없으면 `FLAVOR_A`가 그대로 화면에 남는다. 이름이 없으면 칩이 없는 편이 낫다.
+   */
+  const commonFlavors = popcorn
+    ? [...mixedFlavors(popcorn)]
+        .sort((a, b) => b.count - a.count)
+        .map((entry) => flavorNames.get(entry.code))
+        .filter((name): name is string => Boolean(name))
+        .slice(0, COMMON_FLAVOR_COUNT)
+    : [];
+
   return (
     <>
-      {/* 필름 · MY와 같은 헤더다(업무 -676). 카피는 헤더 오른쪽에서 그 아래 한 줄로 내려왔다 */}
+      {/* 필름 · MY와 같은 헤더다(업무 -676) */}
       <AppHeader />
 
       <div className={styles.page}>
-        <p className={styles.copy}>좋은 영화는, 함께 볼 때 더 특별하니까</p>
-
         <div className={styles.titleBlock}>
           <h1 className={styles.title}>파티팝콘</h1>
           <p className={styles.subtitle}>같이 볼 영화, 함께 골라요</p>
@@ -158,17 +241,24 @@ export default function PartyListPage() {
                 <li key={invitation.invitationId}>
                   <button
                     type="button"
-                    className={styles.row}
+                    className={styles.inviteCard}
                     onClick={() => void navigate(path.partyInvitation(invitation.invitationId))}
                   >
                     <span className={styles.body}>
-                      <span className={styles.name}>
-                        {invitation.party.owner.nickname} 님의 파티
-                      </span>
-                      <span className={styles.members}>
-                        {invitation.party.memberCount + 1}인 · {invitation.party.name}
+                      <span className={styles.name}>{invitation.party.name}</span>
+                      <span className={styles.inviteText}>
+                        {invitation.party.owner.nickname}님의 파티에 초대받았어요!
                       </span>
                     </span>
+
+                    {/*
+                     * 얼굴 자리. 프로필 사진은 계약에 없어(API-052) 닉네임 첫 글자를 쓴다.
+                     * `+N`은 나 말고 이미 들어가 있는 사람 수다.
+                     */}
+                    <Initials
+                      names={[invitation.party.owner.nickname]}
+                      rest={Math.max(invitation.party.memberCount - 1, 0)}
+                    />
 
                     <span className={styles.chevron} aria-hidden="true">
                       ›
@@ -191,57 +281,127 @@ export default function PartyListPage() {
         ) : null}
 
         {/*
-         * 위에 `받은 초대`가 있을 때만 이 줄을 붙인다. 두 목록이 나란히 있으면 아래가
-         * 무엇인지 말해 줘야 하고, 초대가 없으면 목록이 하나뿐이라 시안대로 제목 없이 둔다
-         * (시안은 `참여 중인 방 N개` 머리말을 없앴다 — 업무 -462).
+         * 대표 파티 한 방(사용자 시안 2026-09-20). 목록의 첫 파티이며 통도 이 파티의
+         * 팝콘이다 — 통이 이 카드 안으로 들어오면서 같은 파티를 두 번 말하지 않게 됐다.
+         *
+         * 누르면 지금까지와 같은 곳(5.8 파티원 팝콘)으로 간다.
          */}
-        {hasParties && hasInvitations ? (
-          <h2 className={styles.sectionLabel}>참여 중인 파티</h2>
+        {firstParty ? (
+          <section className={styles.hero}>
+            <div className={styles.heroHead}>
+              <h2 className={styles.heroTitle}>{firstParty.name}</h2>
+
+              <span className={styles.heroBadge}>
+                <span className={styles.heroDot} aria-hidden="true" />
+                진행 중
+              </span>
+            </div>
+
+            <Initials
+              names={firstParty.members.map((member) => member.nickname)}
+              tone="dark"
+              labelled
+            />
+
+            <div className={styles.progress}>
+              <p className={styles.progressLabel}>
+                {firstParty.members.length} / {firstParty.maxMembers}명 참여
+              </p>
+
+              <div
+                className={styles.progressTrack}
+                role="progressbar"
+                aria-valuenow={firstParty.members.length}
+                aria-valuemin={0}
+                aria-valuemax={firstParty.maxMembers}
+              >
+                <div
+                  className={styles.progressFill}
+                  style={{
+                    width: `${(firstParty.members.length / firstParty.maxMembers) * 100}%`,
+                  }}
+                />
+              </div>
+            </div>
+
+            {commonFlavors.length > 0 ? (
+              <div className={styles.common}>
+                <p className={styles.commonLabel}>우리의 공통 취향</p>
+
+                <ul className={styles.chips}>
+                  {commonFlavors.map((name) => (
+                    <li key={name} className={styles.chip}>
+                      {name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            <button
+              type="button"
+              className={styles.heroAction}
+              onClick={() => void navigate(path.partyPopcorn(firstParty.partyId))}
+            >
+              <PlayIcon />
+              파티 팝콘 보기
+            </button>
+
+            {/* 통은 이 카드의 그림이다. 담긴 것은 이 파티의 팝콘이다(API-057) */}
+            <div className={styles.heroBucket} aria-hidden="true">
+              <PopcornBucket
+                flavors={popcorn ? mixedFlavors(popcorn) : []}
+                width={BUCKET_WIDTH}
+                label=""
+              />
+            </div>
+          </section>
         ) : null}
 
-        {hasParties ? (
-          <ul className={styles.list}>
-            {parties.map((party) => (
-              <li key={party.partyId}>
-                <button
-                  type="button"
-                  className={styles.row}
-                  onClick={() => void navigate(path.partyPopcorn(party.partyId))}
-                >
-                  <span className={styles.count} aria-hidden="true">
-                    {party.members.length}
-                  </span>
+        {restParties.length > 0 ? (
+          <section className={styles.joined}>
+            <h2 className={styles.sectionLabel}>참여 중인 파티 {parties?.length}</h2>
 
-                  <span className={styles.body}>
-                    <span className={styles.name}>{party.name}</span>
-                    <span className={styles.members}>
-                      {party.members.map((member) => member.nickname).join(' × ')}
+            <ul className={styles.cardRow}>
+              {restParties.map((party) => (
+                <li key={party.partyId}>
+                  <button
+                    type="button"
+                    className={styles.partyCard}
+                    onClick={() => void navigate(path.partyPopcorn(party.partyId))}
+                  >
+                    <span className={styles.partyCardHead}>
+                      <span className={styles.name}>{party.name}</span>
+                      <span className={styles.chevron} aria-hidden="true">
+                        ›
+                      </span>
                     </span>
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
+
+                    <span className={styles.members}>
+                      {party.members.length} / {party.maxMembers}명
+                    </span>
+
+                    <Initials names={party.members.map((member) => member.nickname)} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : null}
 
-        {parties !== null ? (
+        {/* 파티가 없으면 통이 화면 가운데를 잡는다. 시안의 강조 카드가 설 자리다 */}
+        {parties !== null && !hasParties ? (
           <div className={styles.stage}>
             <PopcornBucket
-              flavors={popcorn ? mixedFlavors(popcorn) : []}
+              flavors={[]}
               width={BUCKET_WIDTH}
-              label={
-                hasParties && parties[0]
-                  ? `${parties[0].name}의 팝콘`
-                  : '아직 파티원의 팝콘이 담기지 않은 통'
-              }
+              label="아직 파티원의 팝콘이 담기지 않은 통"
             />
           </div>
         ) : null}
 
         {parties !== null ? (
           <div className={styles.actions}>
-            <p className={styles.hint}>친구와 취향을 모아 영화를 추천받아요</p>
-
             <Button variant="brand" onClick={() => void navigate(path.partyNew())}>
               파티 만들기
             </Button>

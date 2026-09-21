@@ -56,12 +56,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /** 실제 보안 필터·Flyway·PostgreSQL로 API-030을 검증한다. 대역 Controller/Repository를 등록하지 않는다. */
-@SpringBootTest(
-        properties = {
-            "spring.flyway.enabled=true",
-            "spring.jpa.hibernate.ddl-auto=none",
-            "feelm.auth.mock.enabled=false"
-        })
+@SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 @Import(MovieDetailQueryRecorder.Configuration.class)
 @Transactional

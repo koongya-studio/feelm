@@ -2,6 +2,7 @@ package com.feelm.backend.support;
 
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -12,6 +13,7 @@ import org.testcontainers.utility.DockerImageName;
  * 테스트 클래스는 ApplicationContext도 재사용할 수 있다. 컨테이너 정리는 JVM 종료 시 Testcontainers의 Ryuk에 맡긴다.
  */
 @SharedTestRuntime
+@TestPropertySource(properties = "feelm.auth.mock.enabled=false")
 public abstract class SharedPostgresContractTest {
 
     private static final PostgreSQLContainer<?> POSTGRES = startPostgres();

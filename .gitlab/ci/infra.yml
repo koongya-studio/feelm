@@ -27,6 +27,21 @@ ci-variable-preflight:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
 
+infra-bootstrap-reconcile:
+  stage: deploy
+  trigger:
+    include:
+      - local: .gitlab/ci/infra-bootstrap.yml
+    strategy: mirror
+    forward:
+      pipeline_variables: true
+  resource_group: infra-bootstrap-reconcile
+  interruptible: false
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "web" && $INFRA_RECOVERY_RUN == "true"'
+      when: manual
+  allow_failure: false
+
 deploy-monitoring:
   stage: deploy
   tags: [e106-shell]
@@ -93,7 +108,13 @@ deploy-distributed-observability:
 deploy-spark-history:
   stage: deploy
   tags: [e106-distributed]
-  needs: []
+  needs:
+    - job: spark-code-notify
+      optional: true
+      artifacts: false
+    - job: spark-code-image
+      optional: true
+      artifacts: true
   environment:
     name: distributed
   script:
@@ -118,6 +139,25 @@ deploy-spark-history:
         - infra/scripts/verify-spark-history.py
         - infra/scripts/test_distributed_auxiliary_deployment.py
         - infra/scripts/test_verify_spark_history.py
+        - pipeline/spark/**/*.py
+        - pipeline/spark/pyproject.toml
+        - pipeline/spark/uv.lock
+        - pipeline/spark/.python-version
+        - infra/compose/service.yml
+        - infra/spark/**/*
+        - infra/scripts/build-spark-code-image.sh
+        - infra/scripts/build-spark-runtime-image.sh
+        - infra/scripts/test_spark_runtime_delivery.py
+        - infra/scripts/deploy-spark-code.sh
+        - infra/scripts/spark-code-state.py
+        - infra/scripts/test_spark_code_delivery.py
+        - infra/scripts/test_spark_code_state.py
+        - infra/scripts/deploy-distributed-runtime.py
+        - infra/scripts/runtime-config-release.py
+        - .gitlab/ci/pipeline.yml
+        - infra/scripts/ci-deploy-current-commit.py
+        - infra/scripts/test_deploy_distributed_runtime.py
+        - infra/scripts/test_runtime_config_release.py
 
 .deploy-hdfs-config:
   stage: deploy
@@ -163,6 +203,26 @@ deploy-hdfs-distributed-config:
     HDFS_NODE: distributed
   after_script:
     - python3 -I -B infra/scripts/notify-deployment.py hdfs-distributed-config "$CI_JOB_STATUS"
+
+provision-kafka-topics:
+  stage: deploy
+  tags: [e106-distributed]
+  needs: []
+  dependencies: []
+  environment:
+    name: distributed
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py
+    - bash infra/scripts/ensure-kafka-topics.sh
+  resource_group: distributed-runtime-kafka
+  interruptible: false
+  timeout: 15m
+  allow_failure: false
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
+      changes:
+        - .gitlab/ci/infra.yml
+        - infra/scripts/ensure-kafka-topics.sh
 
 deploy-kafka-config:
   stage: deploy
@@ -211,6 +271,8 @@ deploy-kafka-config:
         - infra/compose/distributed.yml
         - infra/spark/**/*
         - infra/scripts/build-spark-code-image.sh
+        - infra/scripts/build-spark-runtime-image.sh
+        - infra/scripts/test_spark_runtime_delivery.py
         - infra/scripts/deploy-spark-code.sh
         - infra/scripts/spark-code-state.py
         - infra/scripts/test_spark_code_delivery.py
@@ -219,6 +281,9 @@ deploy-kafka-config:
         - infra/scripts/runtime-config-release.py
         - .gitlab/ci/pipeline.yml
         - .gitlab/ci/infra.yml
+        - infra/scripts/ci-deploy-current-commit.py
+        - infra/scripts/test_deploy_distributed_runtime.py
+        - infra/scripts/test_runtime_config_release.py
 
 spark-code-preflight-service:
   extends: .spark-code-deploy
@@ -466,6 +531,7 @@ infra-config-test:
         - .gitlab/ci/frontend.yml
         - .gitlab/ci/consumer.yml
         - .gitlab/ci/infra.yml
+        - .gitlab/ci/infra-bootstrap.yml
         - infra/.env.example
         - infra/config/required-ci-variables.json
         - infra/compose/**/*
@@ -476,12 +542,13 @@ infra-config-test:
         - infra/scripts/deploy-distributed-runtime.py
         - infra/scripts/runtime-config-release.py
         - infra/scripts/deploy-*-config.sh
-        - infra/scripts/*spark*code*
+        - infra/scripts/*spark*{code,runtime}*
         - infra/scripts/test_runtime_config_release.py
         - infra/scripts/deploy-consumer.sh
         - infra/scripts/rollback-consumer.sh
         - infra/scripts/verify-consumer-e2e.py
         - infra/scripts/run-infra-config-tests.py
+        - infra/scripts/*kafka*topic*
         - infra/scripts/notify-deployment.py
         - infra/scripts/test_notify_deployment.py
         - infra/scripts/ci-required-variable-preflight.py
@@ -493,9 +560,9 @@ infra-config-test:
         - infra/scripts/*distributed*auxiliary*
         - infra/scripts/*distributed*observability*
         - infra/scripts/*spark-history*
+        - infra/scripts/*bootstrap-reconcile*
         - infra/scripts/test_consumer_distributed_deployment.py
         - infra/scripts/test_grafana_access_policy.py
-        - infra/scripts/test_node_exporter_monitoring.py
         - infra/scripts/test_pipeline_observability.py
         - infra/scripts/test_deploy_distributed_runtime.py
         - infra/scripts/test_deploy_consumer.py

@@ -142,25 +142,14 @@ docker compose --env-file infra/.env \
   up -d kafka
 ```
 
-업무 Topic은 자동 생성하지 않습니다. 평점과 Candidate 게시 완료 알림 Topic은 최초 한 번 생성합니다.
+업무 Topic은 Broker의 자동 생성 기능 대신 별도 멱등 스크립트로 생성·검증합니다.
 
 ```bash
-docker exec feelm-kafka-local \
-  /opt/kafka/bin/kafka-topics.sh \
-  --bootstrap-server localhost:9092 \
-  --create --if-not-exists \
-  --topic feelm.rating.v1 \
-  --partitions 3 \
-  --replication-factor 1
-
-docker exec feelm-kafka-local \
-  /opt/kafka/bin/kafka-topics.sh \
-  --bootstrap-server localhost:9092 \
-  --create --if-not-exists \
-  --topic feelm.candidate-updated.v1 \
-  --partitions 3 \
-  --replication-factor 1
+KAFKA_CONTAINER=feelm-kafka-local bash infra/scripts/ensure-kafka-topics.sh
 ```
+
+8개 업무 Topic 목록과 CI Job 실행 방법은 [Kafka Topic 프로비저닝](scripts/KAFKA-TOPICS.md)을
+참고합니다. 기존 Topic의 파티션·복제 설정이 다르면 자동 변경 없이 실패합니다.
 
 Spring Boot local 프로파일의 기본 Kafka 주소가 `localhost:9092`이므로 별도 환경변수 없이
 연결됩니다.
@@ -685,10 +674,13 @@ Master·Worker 실행 명령은 변경하지 않습니다.
 NumPy가 없었고, Worker 1도 같은 이미지 ID를 사용하며 Python 패키지 수동 설치 흔적이 없어
 동일한 상태로 판단했습니다.
 
-ML runtime 이미지는 의존성이 바뀔 때 수동 빌드해 Docker Hub에 Push하고
-`infra/spark/runtime-image.env`에서 OCI index digest를 버전 관리합니다. Spark 작업 코드는
-보호된 `main` 파이프라인이 runtime digest를 기반으로 별도 이미지를 빌드하고, 세 Spark
-컨테이너에 동일한 작업 코드 image digest와 source revision을 배포합니다. 최초 상태 초기화와
+ML runtime 이미지는 보호된 `main` push의 Spark 이미지 Job에서 자동 빌드합니다.
+Dockerfile·requirements 변경과 코드 변경 모두 현재 런타임을 Docker cache로 빌드하고,
+컨테이너 ML·ALS 테스트가 성공한 경우에만 Push합니다. 확정된 RepoDigest로 코드 이미지를
+빌드하고, 세 Spark 컨테이너에 동일한 코드 image digest와 source revision을 배포합니다.
+History Server는 코드 배포 성공 후 같은 기반 런타임 digest로 배포합니다.
+`infra/spark/runtime-image.env`는 이전 수동 배포 참고값이며 자동 빌드에서는 읽지 않습니다.
+최초 상태 초기화와
 자동 배포·보상 rollback 절차는 [Spark 운영 문서](spark/README.md#작업-코드-이미지-cd)를 따릅니다.
 
 수동 runtime 빌드만으로 실행 중인 컨테이너가 교체되지는 않습니다. runtime 자체를 검증할 때는

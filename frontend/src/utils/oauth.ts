@@ -13,6 +13,8 @@
  * 다르면 제공자나 백엔드가 거절한다. 그래서 기본값은 앱 주소에서 계산하고, 등록한 값이
  * 다르면 `VITE_OAUTH_REDIRECT_URI`로 덮어쓴다.
  */
+import { path } from '../routes/paths';
+import { appUrl } from './appUrl';
 import type { SocialProvider } from '../types/auth';
 
 /** 제공자의 동의 화면 */
@@ -75,8 +77,9 @@ export function isOAuthConfigured(provider: SocialProvider): boolean {
 /**
  * 콜백 주소.
  *
- * `BASE_URL`은 앱이 놓인 자리(`/app/`)다. 개발과 배포의 호스트가 달라도 같은 규칙으로
- * 만들어지므로 환경마다 다른 값을 코드에 두지 않는다.
+ * 앱이 놓인 자리(`/app/`)는 `appUrl`이 붙인다(업무 -717). 개발과 배포의 호스트가 달라도
+ * 같은 규칙으로 만들어지므로 환경마다 다른 값을 코드에 두지 않는다. 앱 밖으로 나가는
+ * 주소를 만드는 자리는 모두 이 함수를 쓴다.
  */
 export function oauthRedirectUri(): string {
   const configured = import.meta.env.VITE_OAUTH_REDIRECT_URI;
@@ -85,7 +88,7 @@ export function oauthRedirectUri(): string {
     return configured;
   }
 
-  return new URL(`${import.meta.env.BASE_URL}oauth/callback`, window.location.origin).toString();
+  return appUrl(path.oauthCallback());
 }
 
 /** 난수 `state`. 브라우저가 주는 것을 쓰고, 없으면 덜 좋은 값이라도 만든다 */

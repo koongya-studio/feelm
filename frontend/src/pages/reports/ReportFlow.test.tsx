@@ -23,6 +23,13 @@ import { mockMyProfile } from '../../mocks/user';
 import { ROUTE_PATTERN } from '../../routes/paths';
 import type { FrameList } from '../../types/taste';
 
+/*
+ * 이 파일은 필름·MY·리포트 화면을 한 흐름으로 렌더하고 비동기 이동을 실제 순서로 기다린다.
+ * 가짜 타이머로 화면 사이의 Promise와 이벤트 순서를 바꾸지 않고, 전체 실행 부하만 견디도록
+ * 이 흐름 파일에 한해 Vitest의 기본 5초 상한을 늘린다.
+ */
+vi.setConfig({ testTimeout: 15000 });
+
 vi.mock('../../api/users', () => ({
   getMyProfile: vi.fn(),
   // 7.1 프로필 머리(업무 -616)

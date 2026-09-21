@@ -47,8 +47,7 @@ import tools.jackson.databind.node.ObjectNode;
         properties = {
             "spring.flyway.enabled=true",
             "spring.jpa.hibernate.ddl-auto=none",
-            "spring.jpa.properties.hibernate.generate_statistics=true",
-            "feelm.auth.mock.enabled=false"
+            "spring.jpa.properties.hibernate.generate_statistics=true"
         })
 @DisplayName("API-028 영화 검색 — 실제 HTTP 입력 경계")
 class MovieSearchInputHttpContractTest extends SharedPostgresContractTest {

@@ -92,14 +92,14 @@ def load_contract(path: Path = DEFAULT_CONTRACT) -> list[dict[str, object]]:
     return validated
 
 
-def require_protected_develop(environment: dict[str, str]) -> None:
+def require_protected_main(environment: dict[str, str]) -> None:
     if not (
-        environment.get("CI_COMMIT_BRANCH") == "develop"
+        environment.get("CI_COMMIT_BRANCH") == "main"
         and environment.get("CI_COMMIT_REF_PROTECTED") == "true"
         and environment.get("CI_PIPELINE_SOURCE") == "push"
         and environment.get("CI_ENVIRONMENT_NAME") == "service"
     ):
-        raise PreflightError("실제 변수 검사는 보호된 develop push의 service 환경에서만 실행합니다.")
+        raise PreflightError("실제 변수 검사는 보호된 main push의 service 환경에서만 실행합니다.")
     if environment.get("CI_DEBUG_TRACE", "").lower() == "true":
         raise PreflightError("CI_DEBUG_TRACE가 활성화된 상태에서는 Secret 검사를 실행하지 않습니다.")
 
@@ -220,7 +220,7 @@ def main() -> int:
         variables = scoped_variables(load_contract(args.contract), args.scope)
         if args.require_values or args.check_metadata:
             environment = dict(os.environ)
-            require_protected_develop(environment)
+            require_protected_main(environment)
             if args.require_values:
                 validate_injected_values(variables, environment)
             if args.check_metadata:

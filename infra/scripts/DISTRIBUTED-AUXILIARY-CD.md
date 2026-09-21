@@ -37,16 +37,23 @@ Spark History 배포는 Spark 코드 배포와 같은 `distributed-runtime-spark
 - Kafka UI의 `/actuator/health` 응답
 - 세 컨테이너의 배포 revision 라벨이 현재 `CI_COMMIT_SHA`와 일치하는지
 
-Spark History 배포는 실행 중인 `feelm-spark-master`의 이미지 이름을 읽어 같은 이미지를
-사용한다. HDFS 초기화 컨테이너가 `/spark-events`를 만들고 권한을 `1777`로 맞춘 뒤에만
+Spark History 배포는 같은 pipeline의 Spark 코드 배포가 있으면 양 노드의 성공 확정을 기다린다.
+실행 중인 `feelm-spark-master` 코드 이미지의 `io.feelm.spark.runtime-image` label에서 기반
+런타임 digest를 읽고, 전달된 CI runtime digest와 일치하는지 확인한 뒤 pull한다. label 누락,
+가변 태그 또는 불일치는 기존 컨테이너를 중단하기 전에 거부한다. 새 label이 없는 이전 코드
+이미지에서는 먼저 새 코드 배포를 완료해야 한다. HDFS 초기화 컨테이너가 `/spark-events`를 만들고 권한을 `1777`로 맞춘 뒤에만
 기존 History Server를 보존하고 후보를 기동한다. 이후 HDFS 디렉터리·권한, History Server
-API와 배포 revision 라벨을 검증한다.
+API와 배포 revision 라벨 및 런타임 image digest를 검증한다.
 
 ## 실패와 수동 복구
 
 후보 기동 또는 검증이 실패하면 후보만 제거하고 `-rollback` 컨테이너를 원래 이름으로
 복원한다. 최초 배포라 보존본이 없으면 실패한 후보만 제거한다. 복구 검증도 실패하거나
 이전 실행에서 `-rollback` 컨테이너가 남았다면 자동 배포를 반복하지 않는다.
+
+History의 rollback은 이미 성공한 Spark 코드 배포를 되돌리지 않는다. 실패 pipeline에서
+History와 Master 기반 런타임이 다르면 원인을 해결하고 History Job을 재시도한다.
+전체 Spark 코드를 별도로 rollback한 경우에도 History를 다시 배포해 기반 digest를 맞춘다.
 
 운영자가 실행 중인 컨테이너와 보존본을 확인한 뒤 대상별 복구 명령을 사용한다.
 

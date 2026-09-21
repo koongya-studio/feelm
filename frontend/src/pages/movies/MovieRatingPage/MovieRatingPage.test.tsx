@@ -26,6 +26,7 @@ vi.mock('../../../api/movies', () => ({ getMovieDetail: vi.fn() }));
 vi.mock('../../../api/otts', () => ({ getOtts: vi.fn() }));
 vi.mock('../../../api/watch', () => ({
   createRating: vi.fn(),
+  deleteRating: vi.fn(),
   findWatchedRecord: vi.fn(),
   getRatingCounts: vi.fn(),
   updateRating: vi.fn(),
@@ -33,7 +34,7 @@ vi.mock('../../../api/watch', () => ({
 
 const { getMovieDetail } = await import('../../../api/movies');
 const { getOtts } = await import('../../../api/otts');
-const { createRating, findWatchedRecord, getRatingCounts, updateRating } =
+const { createRating, deleteRating, findWatchedRecord, getRatingCounts, updateRating } =
   await import('../../../api/watch');
 
 /** 아직 평가하지 않은 실제 영화(API-030) */
@@ -82,6 +83,7 @@ beforeEach(() => {
   vi.mocked(getRatingCounts).mockReset().mockResolvedValue(counts);
   vi.mocked(createRating).mockReset().mockResolvedValue(created);
   vi.mocked(updateRating).mockReset().mockResolvedValue(created);
+  vi.mocked(deleteRating).mockReset().mockResolvedValue(undefined);
 });
 
 /** 2.6이 받은 Router state를 드러낸다. 2.6 자체는 여기서 그리지 않는다 */
@@ -132,6 +134,8 @@ describe('2.5 평가 저장', () => {
 
     // 새 평가의 제목은 `평가하기`다. 수정일 때만 `평가 수정`이다(업무 S15P21E106-638)
     expect(await screen.findByRole('heading', { level: 1, name: '평가하기' })).toBeInTheDocument();
+    // 평가하러 왔다가 미루는 길은 새 평가에 남는다(업무 S15P21E106-716)
+    expect(screen.getByRole('button', { name: '나중에 평가하기' })).toBeInTheDocument();
     await rate(4.5);
 
     await waitFor(() => expect(location()).toBe('/movies/550/rate/result'));
@@ -278,6 +282,8 @@ describe('2.5 평가 저장', () => {
     ).toBeChecked();
     // 새 평가와 구분되게 제목이 `평가 수정`이다(업무 S15P21E106-638)
     expect(screen.getByRole('heading', { level: 1, name: '평가 수정' })).toBeInTheDocument();
+    // 이미 평가한 사람에게 `나중에 평가하기`는 말이 맞지 않는다(업무 S15P21E106-716)
+    expect(screen.queryByRole('button', { name: '나중에 평가하기' })).not.toBeInTheDocument();
     await rate(2.5, '범인이 드러난다');
 
     await waitFor(() =>
@@ -291,5 +297,98 @@ describe('2.5 평가 저장', () => {
     expect(createRating).not.toHaveBeenCalled();
     // 수정은 프레임을 만들지 않으므로 수치를 받지 않는다
     expect(getRatingCounts).not.toHaveBeenCalled();
+  });
+});
+
+/*
+ * 평가 삭제 (업무 S15P21E106-724)
+ *
+ * **수정일 때만 지울 수 있다.** 아직 없는 평가를 지울 수는 없다.
+ *
+ * 되돌릴 수 없는 동작이라 확인 창을 한 번 거치고, 지운 뒤에는 저장했을 때와 같이 온 곳으로
+ * 돌아간다. 404는 오류가 아니다 — 다른 곳에서 이미 지웠다는 뜻이라 사용자가 바라던 결과가
+ * 이미 이루어져 있다(API-038 처리 규칙).
+ */
+describe('2.5 평가 삭제', () => {
+  /** 이미 평가한 영화로 들어온다 */
+  function ratedMovie() {
+    vi.mocked(getMovieDetail).mockResolvedValue({
+      ...movie,
+      myRating: {
+        ratingId: 91,
+        score: 4,
+        comment: null,
+        visibility: 'PRIVATE',
+        spoiler: false,
+      },
+    });
+  }
+
+  it('새 평가에는 삭제가 없다', async () => {
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: '나중에 평가하기' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '평가 삭제' })).not.toBeInTheDocument();
+  });
+
+  it('확인 창을 거쳐 API-038로 지우고 온 곳으로 돌아간다', async () => {
+    ratedMovie();
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: '평가 삭제' }));
+
+    // 무엇까지 사라지는지 그 자리에서 말한다
+    expect(await screen.findByRole('alertdialog')).toHaveTextContent('평가를 삭제할까요?');
+    expect(screen.getByText(/프레임과 팝콘 한 알도 함께 빠져요/)).toBeInTheDocument();
+    expect(deleteRating).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: '삭제' }));
+
+    await waitFor(() => expect(deleteRating).toHaveBeenCalledWith(91));
+    expect(updateRating).not.toHaveBeenCalled();
+  });
+
+  it('확인 창에서 취소하면 지우지 않는다', async () => {
+    ratedMovie();
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: '평가 삭제' }));
+    fireEvent.click(await screen.findByRole('button', { name: '취소' }));
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(deleteRating).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: '평가 삭제' })).toBeInTheDocument();
+  });
+
+  /* 다른 곳에서 이미 지운 평가다. 사용자가 바라던 결과가 이미 이루어져 있다 */
+  it('이미 지워진 평가(404)는 오류로 남기지 않는다', async () => {
+    ratedMovie();
+    vi.mocked(deleteRating).mockRejectedValue(
+      new ApiError(404, 'RESOURCE_NOT_FOUND', '평가를 찾을 수 없어요'),
+    );
+
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: '평가 삭제' }));
+    fireEvent.click(await screen.findByRole('button', { name: '삭제' }));
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
+    expect(screen.queryByText('평가를 찾을 수 없어요')).not.toBeInTheDocument();
+  });
+
+  it('지우지 못하면 화면에 남아 실패를 알린다', async () => {
+    ratedMovie();
+    vi.mocked(deleteRating).mockRejectedValue(
+      new ApiError(500, 'INTERNAL_ERROR', '잠시 후 다시 시도해 주세요'),
+    );
+
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: '평가 삭제' }));
+    fireEvent.click(await screen.findByRole('button', { name: '삭제' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('잠시 후 다시 시도해 주세요');
+    // 화면에 남아 다시 누를 수 있다
+    expect(screen.getByRole('button', { name: '평가 삭제' })).toBeInTheDocument();
   });
 });

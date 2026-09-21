@@ -44,7 +44,8 @@ class ReportTablesMigrationTest {
                         "half:character varying:2:NO",
                         "status:character varying:10:NO",
                         "content:jsonb:-:NO",
-                        "created_at:timestamp with time zone:-:NO");
+                        "created_at:timestamp with time zone:-:NO",
+                        "issued_at:timestamp with time zone:-:YES");
         assertThat(columns(DATABASE, "report_images"))
                 .containsExactly(
                         "id:bigint:-:NO",

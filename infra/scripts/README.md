@@ -1,5 +1,9 @@
 # Runner 통신 격리 파일럿 (S15P21E106-222)
 
+Kafka 업무 Topic의 별도 멱등 Job과 로컬 실행 방법은
+[`KAFKA-TOPICS.md`](KAFKA-TOPICS.md)를 따른다. 기존 Topic의 파티션·복제 설정이 다르면
+자동 변경 없이 실패하며 Topic과 메시지를 삭제하지 않는다.
+
 분산 런타임의 수동 배포 진입점은 `deploy-distributed.sh`와 `deploy-service.sh`입니다.
 두 스크립트는 공통 `deploy-distributed-runtime.py`를 각각 분산 노드와 서비스 노드 역할로
 호출합니다. 기본 실행은 계획 출력이며, 실제 적용 조건·순서·검증·복구 방법은
@@ -15,6 +19,11 @@ pending을 확정합니다. 하나라도 실패하면 양 노드에서 이전 ma
 
 분산 노드의 Kafka Exporter·Kafka UI·Node Exporter와 Spark History Server CD 및 실패 복구는
 [`DISTRIBUTED-AUXILIARY-CD.md`](DISTRIBUTED-AUXILIARY-CD.md)를 따릅니다.
+
+컨테이너 삭제 또는 서버 교체 후 전체 인프라를 정해진 순서로 복구하는 보호된 수동 Pipeline은
+[`BOOTSTRAP-RECONCILE.md`](BOOTSTRAP-RECONCILE.md)를 따릅니다. 일반 재배포 `reconcile`과
+빈 영속 상태를 최초 구성하는 `bootstrap`을 분리하며 기존 DB·Redis·HDFS·Kafka 볼륨은
+삭제하지 않습니다.
 
 백엔드 의존성 변경으로 격리 Runner의 Gradle 캐시가 부족할 때는
 [S15P21E106-271 캐시 자동화](DEPENDENCY-CACHE-AUTOMATION.md)를 사용한다. MR의 변경을 표시하는

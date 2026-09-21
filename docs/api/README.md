@@ -15,7 +15,7 @@ FEELM 서비스 REST API 명세입니다. Notion 「설계 > API 명세서」 �
 | [추천](./recommendation.md) | 추천 | 7 |
 | [파티](./party.md) | 파티 | 10 |
 | [소셜](./social.md) | 소셜 | 5 |
-| [리포트·트렌드](./report-trend.md) | 리포트, 트렌드 | 4 |
+| [리포트·트렌드](./report-trend.md) | 리포트, 트렌드 | 5 |
 | [알림](./notifications.md) | 인앱 알림·브라우저 푸시 | 8 |
 
 FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용하지 않습니다. 현재 이벤트·Redis 경계는 [스트리밍 계약](./streaming-contract.md), 이전 계약과 변경 배경은 [폐기된 내부 API 초안](./internal.md)을 참고합니다.
@@ -99,7 +99,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-056 | [파티 종료](./party.md#api-056-파티-종료) | DELETE | `/parties/{partyId}` | 파티 | 1차 MVP | 회원 | FR-20 |  |
 | API-057 | [파티원 팝콘 조회](./party.md#api-057-파티원-팝콘-조회) | GET | `/parties/{partyId}/popcorn` | 파티 | 1차 MVP | 회원 | FR-21 | O |
 | API-058 | [파티 영화 추천](./party.md#api-058-파티-영화-추천) | GET | `/parties/{partyId}/recommendations` | 파티 | 1차 MVP | 회원 | FR-22, FR-13 | O |
-| API-059 | [내 리포트 목록](./report-trend.md#api-059-내-리포트-목록) | GET | `/users/me/reports` | 리포트 | 2차 MVP | 회원 | FR-23 | O |
+| API-059 | [내 리포트 목록](./report-trend.md#api-059-내-리포트-목록) | GET | `/users/me/reports` | 리포트 | 2차 MVP | 회원 | FR-23 |  |
 | API-060 | [리포트 상세 조회](./report-trend.md#api-060-리포트-상세-조회) | GET | `/reports/{reportId}` | 리포트 | 2차 MVP | 회원 | FR-23 | O |
 | API-061 | [리포트 이미지 카드 생성](./report-trend.md#api-061-리포트-이미지-카드-생성) | POST | `/reports/{reportId}/image` | 리포트 | 2차 MVP | 회원 | FR-24, NFR-07 | O |
 | API-062 | [공개 프로필 조회](./social.md#api-062-공개-프로필-조회) | GET | `/users/{publicId}/profile` | 소셜 | 2차 MVP | 선택 | FR-25, FR-39, NFR-07 |  |
@@ -120,6 +120,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-077 | [Web Push 구독 해제](./notifications.md#api-077-web-push-구독-해제) | DELETE | `/notifications/push/subscriptions/{subscriptionId}` | 알림 | 2차 MVP | 회원 | FR-41 |  |
 | API-078 | [이메일 인증번호 발송](./users.md#api-078-이메일-인증번호-발송) | POST | `/auth/email/verification-code` | 사용자 | 1차 MVP | 공개 | FR-01 |  |
 | API-079 | [이메일 인증번호 확인](./users.md#api-079-이메일-인증번호-확인) | POST | `/auth/email/verification-code/verify` | 사용자 | 1차 MVP | 공개 | FR-01 |  |
+| API-080 | [리포트 첫 발급 기록](./report-trend.md#api-080-리포트-첫-발급-기록) | POST | `/reports/{reportId}/issue` | 리포트 | 2차 MVP | 회원 | FR-23 |  |
 
 ### 삭제된 API
 

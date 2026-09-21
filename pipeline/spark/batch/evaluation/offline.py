@@ -22,8 +22,40 @@ class OfflineEvaluation:
     metadata: dict[str, str | int | float | None]
 
 
-def _count(frame: DataFrame) -> int:
-    return frame.count()
+def _diagnostic_counts(
+    holdout_pairs: DataFrame,
+    positives: DataFrame,
+    factor_users: DataFrame,
+    factor_items: DataFrame,
+    matched_items: DataFrame,
+) -> dict[str, int]:
+    """Collect all holdout population diagnostics in one Spark action."""
+    diagnostics = (
+        holdout_pairs.join(
+            factor_users.withColumn("_warm_user", F.lit(True)), USER, "left"
+        )
+        .join(factor_items.withColumn("_warm_item", F.lit(True)), ITEM, "left")
+        .join(positives.withColumn("_positive", F.lit(True)), [USER, ITEM], "left")
+        .join(matched_items.withColumn("_matched", F.lit(True)), ITEM, "left")
+    )
+    cold = F.col("_warm_user").isNull() | F.col("_warm_item").isNull()
+    row = diagnostics.agg(
+        F.countDistinct(USER).alias("target_users"),
+        F.countDistinct(F.when(F.col("_warm_user").isNull(), F.col(USER))).alias(
+            "cold_users"
+        ),
+        F.countDistinct(F.when(F.col("_warm_item").isNull(), F.col(ITEM))).alias(
+            "cold_items"
+        ),
+        F.sum(F.when(cold, 1).otherwise(0)).alias("cold_ratings"),
+        F.sum(F.when(cold & F.col("_positive"), 1).otherwise(0)).alias(
+            "cold_positive_items"
+        ),
+        F.sum(
+            F.when(F.col("_positive") & F.col("_matched").isNull(), 1).otherwise(0)
+        ).alias("mapping_excluded_positive_items"),
+    ).first()
+    return {name: int(row[name] or 0) for name in row.asDict()}
 
 
 def _shortage_counts(
@@ -39,18 +71,27 @@ def _shortage_counts(
     all_counts = users.join(counts, USER, "left").fillna({"candidate_count": 0})
     evaluated_counts = eligible_users.join(counts, USER, "left").fillna({"candidate_count": 0})
 
-    def shortages(frame: DataFrame) -> tuple[int, int, int]:
-        row = frame.agg(
+    def shortages(frame: DataFrame, population: str) -> DataFrame:
+        return frame.agg(
             F.sum(F.when(F.col("candidate_count") == 0, 1).otherwise(0)).alias("zero"),
             F.sum(F.when(F.col("candidate_count") < K, 1).otherwise(0)).alias("under_k"),
             F.sum(
                 F.when(F.col("candidate_count") < candidate_size, 1).otherwise(0)
             ).alias("under_n"),
-        ).first()
-        return tuple(int(row[name] or 0) for name in ("zero", "under_k", "under_n"))
+        ).withColumn("population", F.lit(population))
 
-    zero, under_k, under_n = shortages(all_counts)
-    eval_zero, eval_under_k, eval_under_n = shortages(evaluated_counts)
+    rows = {
+        row["population"]: row
+        for row in shortages(all_counts, "all")
+        .unionByName(shortages(evaluated_counts, "evaluated"))
+        .collect()
+    }
+    zero, under_k, under_n = (
+        int(rows["all"][name] or 0) for name in ("zero", "under_k", "under_n")
+    )
+    eval_zero, eval_under_k, eval_under_n = (
+        int(rows["evaluated"][name] or 0) for name in ("zero", "under_k", "under_n")
+    )
     return {
         "zero_candidate_users": zero,
         "fewer_than_k_users": under_k,
@@ -101,21 +142,14 @@ def evaluate_offline(
     factor_users = model.userFactors.select(F.col("id").cast("int").alias(USER)).distinct()
     factor_items = model.itemFactors.select(F.col("id").cast("int").alias(ITEM)).distinct()
     holdout_pairs = holdout_ratings.select(USER, ITEM).distinct()
-    cold_pairs = (
-        holdout_pairs.join(factor_users.withColumn("_warm_user", F.lit(1)), USER, "left")
-        .join(factor_items.withColumn("_warm_item", F.lit(1)), ITEM, "left")
-        .filter(F.col("_warm_user").isNull() | F.col("_warm_item").isNull())
-        .select(USER, ITEM)
-    )
-    cold_users = _count(users.join(factor_users, USER, "left_anti"))
-    cold_items = _count(holdout_pairs.select(ITEM).distinct().join(factor_items, ITEM, "left_anti"))
-    cold_ratings = _count(cold_pairs)
     positives = (
         holdout_ratings.filter(F.col("rating") >= positive_rating_threshold)
         .select(USER, ITEM)
         .distinct()
     )
-    cold_positive_items = _count(positives.join(cold_pairs, [USER, ITEM], "inner"))
+    diagnostics = _diagnostic_counts(
+        holdout_pairs, positives, factor_users, factor_items, matched_items
+    )
 
     summaries = {}
     per_user_frames = []
@@ -133,13 +167,13 @@ def evaluate_offline(
         )
         mapping_excluded = 0
         if catalog == "service":
-            mapping_excluded = _count(positives.join(matched_items, ITEM, "left_anti"))
+            mapping_excluded = diagnostics["mapping_excluded_positive_items"]
         summaries[catalog] = {
             **evaluation.summary,
-            "cold_users": cold_users,
-            "cold_items": cold_items,
-            "cold_ratings": cold_ratings,
-            "cold_positive_items": cold_positive_items,
+            "cold_users": diagnostics["cold_users"],
+            "cold_items": diagnostics["cold_items"],
+            "cold_ratings": diagnostics["cold_ratings"],
+            "cold_positive_items": diagnostics["cold_positive_items"],
             "mapping_excluded_positive_items": mapping_excluded,
             **_shortage_counts(candidates, users, eligible_users, catalog, candidate_size),
         }
