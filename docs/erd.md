@@ -374,6 +374,13 @@ erDiagram
         bigint recommendation_item_id FK
         timestamptz created_at
     }
+    USER_MOVIE_EXPOSURES {
+        bigint user_id PK,FK
+        bigint movie_id PK,FK
+        bigint recommendation_item_id FK "이 영화의 가장 최신 노출 항목"
+        bigint set_id FK "그 항목이 속한 세트. 이력 최신순 정렬 키"
+        timestamptz exposed_at "최신 노출 시각"
+    }
 
     USERS ||--o{ RECOMMENDATION_SETS : receives
     PARTIES ||--o{ RECOMMENDATION_SETS : receives
@@ -382,6 +389,10 @@ erDiagram
     USERS ||--o{ USER_MOVIE_DISMISSALS : dismisses
     MOVIES ||--o{ USER_MOVIE_DISMISSALS : dismissed
     RECOMMENDATION_ITEMS o|--o| USER_MOVIE_DISMISSALS : optional_source
+    USERS ||--o{ USER_MOVIE_EXPOSURES : was_shown
+    MOVIES ||--o{ USER_MOVIE_EXPOSURES : shown
+    RECOMMENDATION_ITEMS ||--o| USER_MOVIE_EXPOSURES : latest_exposure
+    RECOMMENDATION_SETS ||--o{ USER_MOVIE_EXPOSURES : latest_set
 ```
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
@@ -389,8 +400,9 @@ erDiagram
 | `recommendation_sets` | 추천 세트(이력 단위) | `user_id`·`party_id` 중 하나만 NOT NULL(CHECK). Redis 개인 세트는 `generation_id`로 같은 배치를 식별하고, 소진 후 만든 회차는 `batch_no`로 구분한다. UK(`generation_id`, `batch_no`)는 사용자와 무관한 전역 고유이며 첫 회차는 0이다. `batch_no >= 0`(CHECK `ck_recommendation_sets_batch_no`). 파티 세트의 후보 버전 기본값은 0이고 generation ID는 NULL이다 | FR-10, FR-33 · API-045, API-048, API-058 |
 | `recommendation_items` | 세트의 후보 영화 + 이유 스냅샷 | 유형은 `TASTE`·`DISCOVERY`·`PARTY`. nullable `flavor_code`는 Redis 후보 값을 스냅샷하며 PARTY의 `reason`은 빈 객체다. UK(`set_id`, `type`, `position`), UK(`set_id`, `movie_id`), `position >= 1`. TASTE·DISCOVERY를 각각 최대 20편, PARTY를 최대 10편 저장하고 `exposed_at`으로 실제 노출분을 구분한다 | FR-12, FR-13, FR-33 · API-045, API-047, API-048, API-058 |
 | `user_movie_dismissals` | 사용자별 영화 관심없음 | UK(`user_id`, `movie_id`). 모든 화면의 모든 영화에 적용한다. `recommendation_item_id`는 선택적 출처이며 아이템 삭제 시 NULL로 전환한다 | FR-36 · API-047 |
+| `user_movie_exposures` | 사용자별 영화의 **가장 최신 노출** (추천 이력 정본) | PK(`user_id`, `movie_id`)이므로 같은 영화의 재노출은 행을 늘리지 않고 `recommendation_item_id`·`set_id`·`exposed_at`을 최신으로 갱신한다. 행 수는 노출 횟수가 아니라 그 사용자가 본 고유 영화 수다. `recommendation_items.exposed_at`을 찍는 `expose()`가 같은 트랜잭션에서 upsert하며, 더 오래된 세트(`set_id`가 작은 쪽)의 노출은 승자를 덮어쓰지 못한다. `type`·`reason`·`position`은 복사하지 않고 항목을 가리킨다. 개인 세트만 대상이며 파티 노출은 넣지 않는다. 아이템·세트 삭제 시 함께 삭제(CASCADE)되며 이전 노출로 자동 복원되지 않으므로, 항목·세트를 삭제했으면 마이그레이션 `V202609211000`의 멱등 백필 INSERT를 다시 실행해 원본 기준 승자를 복원한다 | FR-33 · API-045(쓰기), API-048(읽기) |
 
-> 종류별 후보 Top-500은 Redis, Item Factor는 HDFS에 있으며 이 ERD 범위 밖입니다. 추천 세트의 TASTE·DISCOVERY 후보를 각각 최대 20편 `recommendation_items`에 저장하고, 추천 이력 조회(API-048)는 `exposed_at IS NOT NULL`인 노출분만 반환합니다. Redis의 추천 결과 캐시는 선택적 조회 가속용입니다 (MR !22 합의: PostgreSQL 저장안).
+> 종류별 후보 Top-500은 Redis, Item Factor는 HDFS에 있으며 이 ERD 범위 밖입니다. 추천 세트의 TASTE·DISCOVERY 후보를 각각 최대 20편 `recommendation_items`에 저장하고 `exposed_at`으로 노출분을 구분합니다. 추천 이력 조회(API-048)는 노출 시점에 정리해 둔 `user_movie_exposures`를 읽으며, 같은 영화는 가장 최신 노출 1건만 나옵니다(S15P21E106-671). Redis의 추천 결과 캐시는 선택적 조회 가속용입니다 (MR !22 합의: PostgreSQL 저장안).
 
 ### 2.5 파티
 
@@ -546,7 +558,7 @@ flowchart LR
 | `/users/me/taste` | `taste_analyses` | `ratings` |
 | `/users/me/popcorn`, `/popcorn-flavors` | `popcorn_flavors`, `ratings` | `movies.representative_flavor_id` |
 | `/users/me/frames`, `/frames/{frameId}` | `frames` | `ratings`, `movies`, `watch_records` |
-| `/recommendations*`, `/movies/{movieId}/dismiss` | `recommendation_sets`, `recommendation_items`, `user_movie_dismissals` | `movies`, `popcorn_flavors` |
+| `/recommendations*`, `/movies/{movieId}/dismiss` | `recommendation_sets`, `recommendation_items`, `user_movie_exposures`, `user_movie_dismissals` | `movies`, `popcorn_flavors` |
 | `/parties*` | `parties`, `party_members`, `party_invitations` | `users`, `ratings`, `movies` |
 | `/users/me/reports`, `/reports/*` | `taste_reports`, `report_images` | — |
 | `/users/{userId}/profile`, `/users/{userId}/taste-comparison` | `users` | `frames`, `ratings`, `movies`, `user_blocks` |
