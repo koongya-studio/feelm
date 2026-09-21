@@ -167,6 +167,9 @@ describe('7.8 → EXT-01 → EXT-02 → EXT-03 → EXT-04', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '내 OTT 취향 분석하기' }));
     expect(location()).toBe('/otts/recommend/analyzing');
+    expect(
+      screen.getByRole('heading', { name: '내 취향과 OTT 콘텐츠를비교하고 있어요' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('필름을 감는 중이에요 · 잠시만요')).toBeInTheDocument();
 
     await waitFor(() => expect(location()).toBe('/otts/recommend/result'), { timeout: 5000 });
@@ -205,6 +208,66 @@ describe('7.8 → EXT-01 → EXT-02 → EXT-03 → EXT-04', () => {
     fireEvent.click(screen.getByRole('button', { name: '뒤로 가기' }));
     await waitFor(() => expect(location()).toBe('/otts/recommend'));
   }, 15000);
+});
+
+describe('K=0 비개인화 표시와 첫 평가 전환', () => {
+  const profileWithRatingCount = (ratingCount: number) => ({
+    ...mockMyProfile,
+    stats: { ...mockMyProfile.stats, ratingCount },
+  });
+
+  it('평가가 없으면 현재 후보 집계로 표시하고 취향 일치나 인기순을 주장하지 않는다', async () => {
+    vi.mocked(getMyProfile).mockResolvedValue(profileWithRatingCount(0));
+    const { unmount } = renderApp([ROUTE_PATTERN.settings]);
+
+    expect(
+      await screen.findByText('OTT마다 지금 볼 수 있는 작품을 찾아보세요'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/취향 일치도/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('link', { name: 'OTT 추천받기' }));
+    expect(
+      await screen.findByText(
+        (_, element) =>
+          element?.tagName === 'P' &&
+          element.textContent === '아직 취향을 알아가는 중이에요먼저 OTT별 작품을 둘러보세요',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'OTT별 작품 둘러보기' })).toBeInTheDocument();
+    expect(screen.getByText(/영화를 평가하면 내 취향에 맞춘 결과로 바뀌어요/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'OTT별 작품 둘러보기' }));
+    expect(location()).toBe('/otts/recommend/analyzing');
+    expect(
+      screen.getByRole('heading', { name: 'OTT별로 볼 수 있는 작품을찾고 있어요' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('볼 수 있는 작품을 확인하는 중')).toBeInTheDocument();
+    unmount();
+
+    renderApp([ROUTE_PATTERN.ottResult]);
+    expect(
+      await screen.findByRole('heading', { name: '아직 취향을 알아가는 중이에요' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/볼 수 있는 작품 수 기준/)).toBeInTheDocument();
+    expect(screen.getByText(/인기순이나 가격과 무관해요/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('link', { name: '상세 보기' }));
+    expect(await screen.findByText('지금 볼 수 있는 미감상 영화 · 미구독')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '이 OTT에서 볼 수 있는 영화' })).toBeInTheDocument();
+    expect(screen.getByText(/영화를 평가하면 내 취향에 맞춘 결과로 바뀌어요/)).toBeInTheDocument();
+  });
+
+  it('첫 평가가 생기면 같은 API-068 결과를 개인 추천 상태로 표시한다', async () => {
+    vi.mocked(getMyProfile).mockResolvedValue(profileWithRatingCount(1));
+    renderApp([ROUTE_PATTERN.ottResult]);
+
+    expect(
+      await screen.findByRole('heading', { name: '김난다 님에게 가장 잘 맞는 OTT예요' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('평가 1개를 분석했어요')).toBeInTheDocument();
+    expect(screen.getByText('김난다 님이 좋아할 만한 작품이 가장 많아요')).toBeInTheDocument();
+    expect(screen.queryByText(/비개인화/)).not.toBeInTheDocument();
+  });
 });
 
 describe('6.1 ⇢ EXT-01 · EXT-03 ⇢ 6.1', () => {
@@ -256,7 +319,7 @@ describe('EXT-03 결과에서 빠진 OTT', () => {
     await waitFor(() => expect(getOtts).toHaveBeenCalled());
 
     expect(screen.getByText('티빙')).toBeInTheDocument();
-    expect(screen.getByText('콘텐츠 취향 일치도 기준 · 가격과 무관해요')).toBeInTheDocument();
+    expect(screen.getByText('콘텐츠 취향 기준 · 가격과 무관해요')).toBeInTheDocument();
     expect(screen.queryByText(/순위에서 뺐어요/)).not.toBeInTheDocument();
   });
 
