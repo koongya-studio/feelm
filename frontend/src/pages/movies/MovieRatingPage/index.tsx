@@ -234,7 +234,13 @@ export default function MovieRatingPage() {
         await updateRating(movie.myRating.ratingId, {
           score,
           comment: trimmed || null,
-          visibility: movie.myRating.visibility,
+          /*
+           * 한줄평이 없던 평가는 서버가 주는 `visibility`가 **`null`** 이다(API-030 처리 규칙).
+           * 그 값을 그대로 실어 한줄평을 새로 붙이면 `comment`가 있는데 `visibility`가 없어
+           * 계약상 `400`이다(API-037, 업무 -763). 2.5에는 공개 범위 선택 UI가 없으므로 생성
+           * 경로와 같은 기본값 `PRIVATE`로 채운다(CR-05). 이미 값이 있던 평가는 그대로 둔다.
+           */
+          visibility: movie.myRating.visibility ?? 'PRIVATE',
           spoiler: trimmed ? spoiler : false,
         });
 

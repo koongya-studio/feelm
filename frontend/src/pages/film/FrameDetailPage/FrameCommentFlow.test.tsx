@@ -38,7 +38,8 @@ function myRatingOf(movieId: number) {
 
   if (!rating) throw new Error(`기준 평가가 없는 영화다: ${movieId}`);
 
-  return rating;
+  // API-030의 `visibility`는 한줄평이 없으면 `null`이지만(업무 -763) API-043은 값을 준다
+  return { ...rating, visibility: rating.visibility ?? 'PRIVATE' };
 }
 
 function withRatingEdit<T extends RatingUpdateInput & { ratingId: number }>(rating: T): T {

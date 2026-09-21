@@ -101,7 +101,11 @@ export type Rating = {
 export type RatingUpdateInput = {
   score: number;
   comment: string | null;
-  visibility: Visibility;
+  /**
+   * `comment`가 있으면 값이 있어야 한다(API-037). 한줄평이 없는 평가는 `null`이며,
+   * 한줄평을 새로 붙이는 화면은 기본값을 채워 보낸다(업무 -763).
+   */
+  visibility: Visibility | null;
   /** API-037 선택값. 평가 화면에서는 API-030의 기존 값을 유지해 보낸다. */
   spoiler?: boolean;
 };

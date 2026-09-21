@@ -51,7 +51,8 @@ export type MyRating = {
   /** 0.5~5.0, 0.5점 단위 */
   score: number;
   comment: string | null;
-  visibility: Visibility;
+  /** 한줄평이 없는 평가는 `null`이다(API-030 처리 규칙, 업무 -763) */
+  visibility: Visibility | null;
   /** 내 한줄평의 스포일러 포함 여부 */
   spoiler: boolean;
 };
