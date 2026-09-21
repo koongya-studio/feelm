@@ -1219,7 +1219,8 @@ CONSUMER_HYBRID_ALPHA=0.5
 `CONSUMER_CONTENT_URI`를 비우면 기존 ALS 전용 모드로 동작한다. 값을 설정하면 Consumer는
 기동 시 Content bundle의 revision을 ALS·mapping·metadata와 대조하고, 불일치하거나 불완전한
 산출물이면 시작을 거부한다. `CONSUMER_HYBRID_ALPHA`는 ALS 점수 가중치이며 0~1 범위여야 한다.
-평가·온보딩 입력 수에 따른 최소 제한은 두지 않는다.
+`ratings` 입력 수에 따른 최소 제한은 두지 않는다. 온보딩으로 생성된 4.0·2.0 평가도
+같은 `ratings` 입력으로 세며, Consumer는 `onboarding_preferences`를 직접 조회하지 않는다.
 
 `CONSUMER_GROUP_URI`와 `CONSUMER_DISCOVERY_POPULARITY_URI`는 함께 설정하거나 함께 비운다.
 값을 설정하면 두 번들의 `mapping_revision`이 서로 같고 현재 ALS mapping revision과도 일치해야

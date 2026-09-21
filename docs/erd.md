@@ -333,7 +333,7 @@ erDiagram
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `onboarding_preferences` | 초기 취향(LIKE/DISLIKE) | UK(`user_id`, `movie_id`). 추천 파이프라인의 원천으로 유지하며, API-024 제출 시 LIKE 4.0점·DISLIKE 2.0점 평가와 감상 기록·프레임을 함께 생성함. 기존 평가 영화는 평가 관련 상태를 덮어쓰지 않음 | FR-02 · API-023, API-024 |
+| `onboarding_preferences` | 초기 취향(LIKE/DISLIKE) 화면·감사 기록 | UK(`user_id`, `movie_id`). API-024 제출 시 LIKE 4.0점·DISLIKE 2.0점 평가와 감상 기록·프레임을 함께 생성함. 추천 계산 원천은 생성된 `ratings`이며 Consumer는 이 테이블을 직접 읽지 않음. 기존 평가 영화는 평가 관련 상태를 덮어쓰지 않음 | FR-02 · API-023, API-024 |
 | `user_otts` | 구독 OTT | 전체 교체(PUT) | FR-03 · API-026, API-027 |
 | `watch_records` | 감상 상태 머신 | 사용자·영화별 **활성 기록**(EXPIRED 아님)은 1개 — 부분 유일 인덱스(D-6 결정). 만료 후 재클릭은 새 행 | FR-17, FR-18 · API-033~035 |
 | `ratings` | 평가 + 한줄평 | UK(`user_id`, `movie_id`). 한줄평은 컬럼(별도 테이블 아님). `is_spoiler`는 NOT NULL·기본 false이며 기존 평가도 false. 삭제 시 프레임도 삭제되고 감상 기록은 `WATCHED_UNRATED`로 복귀 | FR-19, FR-26 · API-032, API-036~039 |
@@ -575,7 +575,8 @@ flowchart LR
 | D-12 | 팝콘 맛 8종 기준정보 | 고정 장르 그룹 / ML 취향 군집 | **439 `taste_id 0..7` ↔ `FLAVOR_A..H` 고정 매핑 + 실배정 해석 키워드**. 표시명·색상은 변경 가능하다 (ADR-0020) | `popcorn_flavors` 초기 데이터, 온보딩 카드 |
 | D-13 | 신규 영화 맛 배정 | 전체 재학습 / 고정 중심 거리 | **재학습·estimator predict 없이 439와 같은 고정 131차원 전처리·거리로 배정** (ADR-0020) | `movies.representative_flavor_id`, 신규 영화 분류 파이프라인 |
 
-맞춤은 사용자 평가·온보딩 선호 기반 개인 순위로 생성합니다. 발견은 D-5·D-12의 439 고정 그룹을
+맞춤은 사용자 평가 기반 개인 순위로 생성하며, 온보딩 선호도 LIKE 4.0점·DISLIKE 2.0점 평가로
+변환된 뒤 같은 평가 원천을 사용합니다. 발견은 D-5·D-12의 439 고정 그룹을
 바탕으로 별도 선정하며, 선정 기준이 준비되기 전에는 발견 슬롯을
 맞춤으로 채웁니다.
 평점 범위·간격은 FR-19에 따라 0.5~5.0점·0.5점 단위입니다. 물리 스키마에서는 scale 없는

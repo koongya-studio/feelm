@@ -11,6 +11,7 @@ from feelm_consumer import runner
 from feelm_consumer.artifacts import ArtifactError
 from feelm_consumer.candidate_events import CandidateEventPublishError
 from feelm_consumer.postgres import UserSnapshot
+from feelm_consumer.profile import ProfileInput
 from feelm_consumer.ranking import RankedMovie
 from feelm_consumer.settings import load_settings
 
@@ -248,6 +249,58 @@ def test_content_and_alpha_reach_process_user(monkeypatch) -> None:
     assert seen["hybrid_alpha"] == 0.25
 
 
+@pytest.mark.parametrize("delivery_count", [1, 2])
+def test_onboarding_event_reads_snapshot_and_calculates_once_per_delivery(
+    monkeypatch, delivery_count: int
+) -> None:
+    snapshots: list[int] = []
+    calculations: list[list[ProfileInput]] = []
+    publishes: list[int] = []
+    notifications: list[int] = []
+    onboarding = FakeMessage(
+        0,
+        10,
+        b'{"eventId":"e30a81d7-e228-4cd8-a39f-cc1bb9e278f8","userId":7,"eventType":"ONBOARDING",'
+        b'"occurredAt":"2026-09-17T14:14:36Z","payload":{"preferenceCount":2,'
+        b'"ratings":[{"movieId":999,"score":0.5}]}}',
+    )
+    fake = StoppingConsumer([onboarding] * delivery_count)
+    _wire_run(monkeypatch, fake)
+    monkeypatch.setattr(runner, "load_bundle", lambda *_args: _Bundle())
+    monkeypatch.setattr(runner, "_expected_version", lambda *_args: 0)
+    monkeypatch.setattr(runner, "readonly_snapshot", _null_snapshot)
+
+    ratings = [ProfileInput(10, 4.0, "rating"), ProfileInput(20, 2.0, "rating")]
+
+    def load_snapshot(_connection, user_id: int) -> UserSnapshot:
+        snapshots.append(user_id)
+        return UserSnapshot(ratings, frozenset(), frozenset())
+
+    def calculate(_bundle, loaded_ratings, **_kwargs):
+        calculations.append(loaded_ratings)
+        generation = f"generation-{len(calculations)}"
+        return ({"generationId": generation}, {"generationId": generation})
+
+    monkeypatch.setattr(runner, "load_user_snapshot", load_snapshot)
+    monkeypatch.setattr(runner, "calculate_user_results", calculate)
+    monkeypatch.setattr(runner, "publish", lambda *_args: publishes.append(1))
+    monkeypatch.setattr(runner, "Producer", lambda _config: object())
+    monkeypatch.setattr(
+        runner,
+        "publish_candidate_updated",
+        lambda _producer, user_id: notifications.append(user_id),
+    )
+
+    with pytest.raises(SystemExit):
+        runner.run(_settings())
+
+    assert snapshots == [7] * delivery_count
+    assert calculations == [ratings] * delivery_count
+    assert publishes == [1] * delivery_count
+    assert notifications == [7] * delivery_count
+    assert fake.committed == [onboarding] * delivery_count
+
+
 def test_group_bundle_is_generation_checked_and_passed_down(monkeypatch) -> None:
     seen: dict[str, object] = {}
     healthy = FakeMessage(
@@ -329,7 +382,7 @@ def test_user_without_publishable_result_is_committed_and_does_not_pause(monkeyp
     monkeypatch.setattr(
         runner,
         "load_user_snapshot",
-        lambda *_args: UserSnapshot([], [], frozenset({8}), frozenset({9})),
+        lambda *_args: UserSnapshot([], frozenset({8}), frozenset({9})),
     )
     monkeypatch.setattr(
         runner,
@@ -354,7 +407,7 @@ def test_candidate_event_follows_redis_publish_and_failure_keeps_input_uncommitt
     calls: list[str] = []
     monkeypatch.setattr(runner, "_expected_version", lambda *_args: 0)
     monkeypatch.setattr(runner, "readonly_snapshot", _null_snapshot)
-    monkeypatch.setattr(runner, "load_user_snapshot", lambda *_args: UserSnapshot([], [], frozenset(), frozenset()))
+    monkeypatch.setattr(runner, "load_user_snapshot", lambda *_args: UserSnapshot([], frozenset(), frozenset()))
     monkeypatch.setattr(
         runner,
         "calculate_user_results",
@@ -381,7 +434,7 @@ def test_redis_publish_failure_does_not_emit_candidate_event(monkeypatch) -> Non
     emitted: list[object] = []
     monkeypatch.setattr(runner, "_expected_version", lambda *_args: 0)
     monkeypatch.setattr(runner, "readonly_snapshot", _null_snapshot)
-    monkeypatch.setattr(runner, "load_user_snapshot", lambda *_args: UserSnapshot([], [], frozenset(), frozenset()))
+    monkeypatch.setattr(runner, "load_user_snapshot", lambda *_args: UserSnapshot([], frozenset(), frozenset()))
     monkeypatch.setattr(
         runner,
         "calculate_user_results",

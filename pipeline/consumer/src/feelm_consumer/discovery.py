@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from feelm_consumer.group_artifacts import GroupBundle
-from feelm_consumer.profile import ProfileInput, merge_inputs
+from feelm_consumer.profile import ProfileInput
 from feelm_consumer.ranking import RankedMovie
 
 PRIMARY_DISCOVERY_GROUPS = 10
@@ -75,7 +75,6 @@ def select_discovery_candidates(
     bundle: GroupBundle,
     ranked_population: list[RankedMovie],
     ratings: list[ProfileInput],
-    onboarding: list[ProfileInput],
     *,
     popularity_ranking: Sequence[RankedMovie],
     watched_movie_ids: set[int] | frozenset[int] = frozenset(),
@@ -87,7 +86,8 @@ def select_discovery_candidates(
     than every source movie vector.  User direction is therefore built from the
     representative of each mapped input movie's group in the same 131-D space.
     """
-    direction, source, direction_contributors = _user_direction(bundle, ratings, onboarding)
+    direction, direction_contributors = _rating_direction(bundle, ratings)
+    source = "RATING" if direction is not None else None
     viewed_ids = {entry.movie_id for entry in ratings} | set(watched_movie_ids)
     mapped_viewed_groups = [
         group_id for movie_id in viewed_ids if (group_id := _mapped_group(bundle, movie_id)) is not None
@@ -97,7 +97,7 @@ def select_discovery_candidates(
     if direction is None:
         return DiscoverySelection([], {}, 0, 0, total_mapped_viewed, None)
 
-    excluded = {entry.movie_id for entry in merge_inputs(ratings, onboarding)}
+    excluded = {entry.movie_id for entry in ratings}
     excluded.update(watched_movie_ids)
     excluded.update(dismissed_movie_ids)
     personal_scores = {candidate.movie_id: candidate for candidate in ranked_population}
@@ -188,35 +188,6 @@ def select_discovery_candidates(
         total_mapped_viewed,
         source,
     )
-
-
-def _user_direction(
-    bundle: GroupBundle,
-    ratings: list[ProfileInput],
-    onboarding: list[ProfileInput],
-) -> tuple[np.ndarray | None, str | None, tuple[DirectionContributor, ...]]:
-    rating_direction, rating_contributors = _rating_direction(bundle, ratings)
-    if rating_direction is not None:
-        return rating_direction, "RATING", rating_contributors
-
-    rated_ids = {entry.movie_id for entry in ratings}
-    onboarding_vectors: list[np.ndarray] = []
-    contributors: list[DirectionContributor] = []
-    for entry in onboarding:
-        if entry.movie_id in rated_ids:
-            continue
-        group_id = _mapped_group(bundle, entry.movie_id)
-        if group_id is None:
-            continue
-        weight = 1.0 if entry.score >= RATING_PRIOR_MEAN else -1.0
-        onboarding_vectors.append(bundle.group_means[group_id] * weight)
-        contributors.append(DirectionContributor(entry.movie_id, group_id, weight))
-    if not onboarding_vectors:
-        return None, None, ()
-    direction = _normalized_direction(np.sum(np.asarray(onboarding_vectors), axis=0))
-    if direction is None:
-        return None, None, ()
-    return direction, "ONBOARDING", tuple(contributors)
 
 
 def _rating_direction(

@@ -61,7 +61,6 @@ def process_user(
             results = calculate_user_results(
                 bundle,
                 snapshot.ratings,
-                snapshot.onboarding,
                 content=content,
                 groups=groups,
                 discovery_popularity=discovery_popularity,

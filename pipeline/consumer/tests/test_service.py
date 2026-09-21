@@ -9,8 +9,7 @@ from feelm_consumer import service as service_module
 from feelm_consumer.artifacts import ArtifactBundle, MovieMetadata
 from feelm_consumer.content import ContentBundle
 from feelm_consumer.group_artifacts import GroupAssignment
-from feelm_consumer.postgres import ONBOARDING_LIKE_SCORE
-from feelm_consumer.profile import ProfileInput, fold_in, merge_inputs
+from feelm_consumer.profile import ProfileInput, fold_in
 from feelm_consumer.ranking import RankedMovie, rank_candidates
 from feelm_consumer.results import build_results
 from feelm_consumer.service import calculate_user_results
@@ -52,13 +51,12 @@ def _content(vectors=CONTENT_VECTORS) -> ContentBundle:
     )
 
 
-def _legacy_results(bundle: ArtifactBundle, ratings, onboarding, candidate_version: int):
+def _legacy_results(bundle: ArtifactBundle, ratings, candidate_version: int):
     """The ALS-only composition exactly as it was before the hybrid path existed."""
     inverse_mapping = {movielens_id: service_id for service_id, movielens_id in bundle.service_to_movielens.items()}
-    merged_inputs = merge_inputs(ratings, onboarding)
     factor_inputs = [
         ProfileInput(bundle.service_to_movielens[item.movie_id], item.score, item.source)
-        for item in merged_inputs
+        for item in ratings
         if item.movie_id in bundle.service_to_movielens
     ]
     folded = fold_in(bundle.factors, factor_inputs, bundle.reg_param)
@@ -73,7 +71,7 @@ def _legacy_results(bundle: ArtifactBundle, ratings, onboarding, candidate_versi
         rating_count=len(ratings),
         factor_backed_input_count=folded.factor_backed_input_count,
         candidates=rank_candidates(folded.vector, service_factors),
-        reasons=build_candidate_reasons(rank_candidates(folded.vector, service_factors), merged_inputs, bundle.movie_metadata),
+        reasons=build_candidate_reasons(rank_candidates(folded.vector, service_factors), ratings, bundle.movie_metadata),
     )
 
 
@@ -86,8 +84,8 @@ def test_als_only_preserves_legacy_taste_scores_without_group_discovery(frozen_c
     """Without group artifacts, TASTE stays unchanged and Discovery stays empty."""
     ratings = [ProfileInput(10, 5.0, "rating")]
 
-    actual = calculate_user_results(_bundle(), ratings, [], 7)
-    legacy = _legacy_results(_bundle(), ratings, [], 7)
+    actual = calculate_user_results(_bundle(), ratings, 7)
+    legacy = _legacy_results(_bundle(), ratings, 7)
 
     assert actual is not None
     assert {key: value for key, value in actual[0].items() if key != "generationId"} == {
@@ -100,7 +98,7 @@ def test_als_only_preserves_legacy_taste_scores_without_group_discovery(frozen_c
 def test_content_only_movies_become_candidates(frozen_clock) -> None:
     ratings = [ProfileInput(10, 5.0, "rating"), ProfileInput(20, 1.0, "rating")]
 
-    results = calculate_user_results(_bundle(), ratings, [], 7, content=_content(), hybrid_alpha=0.5)
+    results = calculate_user_results(_bundle(), ratings, 7, content=_content(), hybrid_alpha=0.5)
 
     assert results is not None
     items = results[1]["taste"]
@@ -117,7 +115,7 @@ def test_user_without_als_backed_input_still_gets_content_candidates(frozen_cloc
     ratings = [ProfileInput(30, 5.0, "rating")]
 
     with caplog.at_level("WARNING"):
-        results = calculate_user_results(_bundle(), ratings, [], 7, content=_content(), hybrid_alpha=0.5)
+        results = calculate_user_results(_bundle(), ratings, 7, content=_content(), hybrid_alpha=0.5)
 
     assert results is not None
     assert results[0]["vector"] == []
@@ -132,7 +130,7 @@ def test_user_with_als_input_but_no_supported_content_history(frozen_clock, capl
 
     with caplog.at_level("WARNING"):
         results = calculate_user_results(
-            _bundle(), [ProfileInput(10, 5.0, "rating")], [], 7, content=content, hybrid_alpha=0.5
+            _bundle(), [ProfileInput(10, 5.0, "rating")], 7, content=content, hybrid_alpha=0.5
         )
 
     assert results is not None
@@ -168,7 +166,7 @@ def test_low_only_history_still_publishes_content_candidates(frozen_clock, caplo
     ratings = [ProfileInput(10, 3.5, "rating"), ProfileInput(20, 2.0, "rating")]
 
     with caplog.at_level("WARNING"):
-        results = calculate_user_results(_bundle(), ratings, [], 7, content=_real_prior_content(), hybrid_alpha=0.5)
+        results = calculate_user_results(_bundle(), ratings, 7, content=_real_prior_content(), hybrid_alpha=0.5)
 
     assert results is not None
     assert "content_scores_non_positive" in caplog.text
@@ -189,7 +187,7 @@ def test_scores_peaking_at_exactly_zero_are_published_with_a_warning(frozen_cloc
 
     with caplog.at_level("WARNING"):
         results = calculate_user_results(
-            _bundle(), ratings, [], 7, content=_real_prior_content(vectors), hybrid_alpha=0.5
+            _bundle(), ratings, 7, content=_real_prior_content(vectors), hybrid_alpha=0.5
         )
 
     assert results is not None
@@ -201,7 +199,7 @@ def test_low_only_history_without_als_publishes_the_content_list(frozen_clock, c
     """Rating one content-only movie low still yields a list, not silence."""
     with caplog.at_level("WARNING"):
         results = calculate_user_results(
-            _bundle(), [ProfileInput(30, 3.5, "rating")], [], 7, content=_real_prior_content(), hybrid_alpha=0.5
+            _bundle(), [ProfileInput(30, 3.5, "rating")], 7, content=_real_prior_content(), hybrid_alpha=0.5
         )
 
     assert results is not None
@@ -213,59 +211,326 @@ def test_low_only_history_without_als_publishes_the_content_list(frozen_clock, c
 @pytest.mark.parametrize("input_count", [1, 2, 9])
 def test_one_to_nine_inputs_are_not_gated(input_count: int, frozen_clock) -> None:
     ratings = [ProfileInput(10, 5.0, "rating")]
-    onboarding = [ProfileInput(20, 5.0, "onboarding")] if input_count >= 2 else []
-    onboarding.extend(ProfileInput(100 + index, 5.0, "onboarding") for index in range(input_count - 2))
+    ratings.extend(ProfileInput(100 + index, 5.0, "rating") for index in range(input_count - 1))
 
-    results = calculate_user_results(_bundle(), ratings, onboarding, 7, content=_content())
+    results = calculate_user_results(_bundle(), ratings, 7, content=_content())
 
     assert results is not None
-    assert results[0]["ratingCount"] == 1
+    assert results[0]["ratingCount"] == input_count
 
 
-def test_onboarding_exact_pseudo_target_reaches_als_fold_in(frozen_clock) -> None:
+def test_onboarding_derived_ratings_reach_fold_in_once(frozen_clock) -> None:
     bundle = ArtifactBundle(
         "als-v1",
         "snapshot-a",
         0.1,
-        {1: np.array([1.0])},
-        {10: 1},
-        {10: MovieMetadata("10", (), None)},
+        {1: np.array([1.0]), 2: np.array([2.0])},
+        {10: 1, 20: 2},
+        {10: MovieMetadata("10", (), None), 20: MovieMetadata("20", (), None)},
         MAPPING_REVISION,
         METADATA_REVISION,
     )
 
     results = calculate_user_results(
         bundle,
-        [],
-        [ProfileInput(10, ONBOARDING_LIKE_SCORE, "onboarding")],
+        [ProfileInput(10, 4.0, "rating"), ProfileInput(20, 2.0, "rating")],
         7,
     )
 
     assert results is not None
-    assert results[0]["vector"] == pytest.approx([ONBOARDING_LIKE_SCORE / 1.1])
+    assert results[0]["factorBackedInputCount"] == 2
+    assert results[0]["ratingCount"] == 2
+    assert results[0]["vector"] == pytest.approx([8.0 / 5.2])
 
 
-def test_real_rating_overrides_onboarding_pseudo_target_in_fold_in(frozen_clock) -> None:
-    bundle = ArtifactBundle(
-        "als-v1",
-        "snapshot-a",
-        0.1,
-        {1: np.array([1.0])},
-        {10: 1},
-        {10: MovieMetadata("10", (), None)},
-        MAPPING_REVISION,
-        METADATA_REVISION,
-    )
+def test_backfilled_onboarding_profile_matches_rating_only_candidates(frozen_clock) -> None:
+    class Groups:
+        group_means = np.zeros((1024, 131), dtype=np.float64)
+        group_means[0, 0] = 1.0
+        group_means[1, 0] = -1.0
+        group_means[2, 0] = 0.5
 
-    results = calculate_user_results(
-        bundle,
-        [ProfileInput(10, 0.5, "rating")],
-        [ProfileInput(10, ONBOARDING_LIKE_SCORE, "onboarding")],
+        @staticmethod
+        def assignment_for(movie_id: int) -> GroupAssignment | None:
+            group_id = {10: 0, 20: 1, 30: 2}.get(movie_id)
+            if group_id is None:
+                return None
+            return GroupAssignment(0, group_id, group_id, True, True, True)
+
+    ratings = [ProfileInput(10, 4.0, "rating"), ProfileInput(20, 2.0, "rating")]
+    actual = calculate_user_results(
+        _bundle(),
+        ratings,
         7,
+        content=_content(),
+        groups=Groups(),
+        discovery_popularity=[RankedMovie(30, 1.0)],
     )
 
-    assert results is not None
-    assert results[0]["vector"] == pytest.approx([0.5 / 1.1])
+    assert actual is not None
+    for payload in actual:
+        payload.pop("generationId")
+    # Captured from origin/develop before removing merge_inputs and the
+    # onboarding content/Discovery fallbacks. Real ratings won the two movie-ID
+    # conflicts, so the rating-only payload must remain equivalent apart from
+    # the per-run generationId.
+    assert actual == (
+        {
+            "modelVersion": "als-v1",
+            "candidateVersion": 6,
+            "vector": [3.3333333333333335, 1.6666666666666667],
+            "ratingCount": 2,
+            "factorBackedInputCount": 2,
+            "updatedAt": "2026-09-15T00:00:00Z",
+        },
+        {
+            "modelVersion": "als-v1",
+            "candidateVersion": 6,
+            "taste": [
+                {
+                    "movieId": 10,
+                    "score": 0.7916666666666667,
+                    "reasons": [
+                        {
+                            "code": "SHARED_GENRE",
+                            "sourceMovieIds": [10, 20],
+                            "matchedGenreCodes": ["DRAMA"],
+                        }
+                    ],
+                },
+                {
+                    "movieId": 30,
+                    "score": 0.5,
+                    "reasons": [
+                        {
+                            "code": "SHARED_GENRE",
+                            "sourceMovieIds": [10, 20],
+                            "matchedGenreCodes": ["DRAMA"],
+                        }
+                    ],
+                },
+                {
+                    "movieId": 20,
+                    "score": 0.20833333333333331,
+                    "reasons": [
+                        {
+                            "code": "SHARED_GENRE",
+                            "sourceMovieIds": [10, 20],
+                            "matchedGenreCodes": ["DRAMA"],
+                        }
+                    ],
+                },
+            ],
+            "discovery": [
+                {
+                    "movieId": 30,
+                    "score": 0.5,
+                    "reasons": [
+                        {
+                            "code": "DISCOVERY_AGGREGATE_AFFINITY",
+                            "directionSource": "RATING",
+                            "contributorCount": 2,
+                            "topContributors": [
+                                {"movieId": 20, "relation": "NEGATIVE_CONTRAST"},
+                                {"movieId": 10, "relation": "POSITIVE_ALIGNMENT"},
+                            ],
+                            "topContributionCoverage": 1.0,
+                            "viewedCountInGroup": 0,
+                            "affinityRank": 1,
+                            "popularityRankInGroup": 1,
+                        }
+                    ],
+                }
+            ],
+            "updatedAt": "2026-09-15T00:00:00Z",
+        },
+    )
+
+
+@pytest.mark.parametrize(
+    ("ratings", "expected"),
+    [
+        (
+            [],
+            (
+                {
+                    "modelVersion": "als-v1",
+                    "candidateVersion": 6,
+                    "vector": [],
+                    "ratingCount": 0,
+                    "factorBackedInputCount": 0,
+                    "updatedAt": "2026-09-15T00:00:00Z",
+                },
+                {
+                    "modelVersion": "als-v1",
+                    "candidateVersion": 6,
+                    "taste": [
+                        {"movieId": 10, "score": 0.0, "reasons": []},
+                        {"movieId": 20, "score": 0.0, "reasons": []},
+                        {"movieId": 30, "score": 0.0, "reasons": []},
+                    ],
+                    "discovery": [],
+                    "updatedAt": "2026-09-15T00:00:00Z",
+                },
+            ),
+        ),
+        (
+            [ProfileInput(10, 4.0, "rating")],
+            (
+                {
+                    "modelVersion": "als-v1",
+                    "candidateVersion": 6,
+                    "vector": [3.6363636363636362, 0.0],
+                    "ratingCount": 1,
+                    "factorBackedInputCount": 1,
+                    "updatedAt": "2026-09-15T00:00:00Z",
+                },
+                {
+                    "modelVersion": "als-v1",
+                    "candidateVersion": 6,
+                    "taste": [
+                        {
+                            "movieId": 10,
+                            "score": 0.7916666666666667,
+                            "reasons": [
+                                {
+                                    "code": "SHARED_GENRE",
+                                    "sourceMovieIds": [10],
+                                    "matchedGenreCodes": ["DRAMA"],
+                                }
+                            ],
+                        },
+                        {
+                            "movieId": 30,
+                            "score": 0.5,
+                            "reasons": [
+                                {
+                                    "code": "SHARED_GENRE",
+                                    "sourceMovieIds": [10],
+                                    "matchedGenreCodes": ["DRAMA"],
+                                }
+                            ],
+                        },
+                        {
+                            "movieId": 20,
+                            "score": 0.20833333333333331,
+                            "reasons": [
+                                {
+                                    "code": "SHARED_GENRE",
+                                    "sourceMovieIds": [10],
+                                    "matchedGenreCodes": ["DRAMA"],
+                                }
+                            ],
+                        },
+                    ],
+                    "discovery": [
+                        {
+                            "movieId": 30,
+                            "score": 0.5,
+                            "reasons": [
+                                {
+                                    "code": "DISCOVERY_AGGREGATE_AFFINITY",
+                                    "directionSource": "RATING",
+                                    "contributorCount": 1,
+                                    "topContributors": [
+                                        {"movieId": 10, "relation": "POSITIVE_ALIGNMENT"}
+                                    ],
+                                    "topContributionCoverage": 1.0,
+                                    "viewedCountInGroup": 0,
+                                    "affinityRank": 1,
+                                    "popularityRankInGroup": 1,
+                                }
+                            ],
+                        }
+                    ],
+                    "updatedAt": "2026-09-15T00:00:00Z",
+                },
+            ),
+        ),
+        (
+            [ProfileInput(10, 4.0, "rating"), ProfileInput(30, 2.0, "rating")],
+            (
+                {
+                    "modelVersion": "als-v1",
+                    "candidateVersion": 6,
+                    "vector": [3.6363636363636362, 0.0],
+                    "ratingCount": 2,
+                    "factorBackedInputCount": 1,
+                    "updatedAt": "2026-09-15T00:00:00Z",
+                },
+                {
+                    "modelVersion": "als-v1",
+                    "candidateVersion": 6,
+                    "taste": [
+                        {
+                            "movieId": 10,
+                            "score": 0.7916666666666667,
+                            "reasons": [
+                                {
+                                    "code": "SHARED_GENRE",
+                                    "sourceMovieIds": [10, 30],
+                                    "matchedGenreCodes": ["DRAMA"],
+                                }
+                            ],
+                        },
+                        {
+                            "movieId": 20,
+                            "score": 0.375,
+                            "reasons": [
+                                {
+                                    "code": "SHARED_GENRE",
+                                    "sourceMovieIds": [10, 30],
+                                    "matchedGenreCodes": ["DRAMA"],
+                                }
+                            ],
+                        },
+                        {
+                            "movieId": 30,
+                            "score": 0.16666666666666666,
+                            "reasons": [
+                                {
+                                    "code": "SHARED_GENRE",
+                                    "sourceMovieIds": [10, 30],
+                                    "matchedGenreCodes": ["DRAMA"],
+                                }
+                            ],
+                        },
+                    ],
+                    "discovery": [],
+                    "updatedAt": "2026-09-15T00:00:00Z",
+                },
+            ),
+        ),
+    ],
+    ids=["no-ratings", "one-rating", "includes-unmapped-rating"],
+)
+def test_rating_only_transition_boundaries_match_pre_649_golden(frozen_clock, ratings, expected) -> None:
+    class Groups:
+        group_means = np.zeros((1024, 131), dtype=np.float64)
+        group_means[0, 0] = 1.0
+        group_means[1, 0] = -1.0
+        group_means[2, 0] = 0.5
+
+        @staticmethod
+        def assignment_for(movie_id: int) -> GroupAssignment | None:
+            group_id = {10: 0, 20: 1, 30: 2}.get(movie_id)
+            if group_id is None:
+                return None
+            return GroupAssignment(0, group_id, group_id, True, True, True)
+
+    actual = calculate_user_results(
+        _bundle(),
+        ratings,
+        7,
+        content=_content(),
+        groups=Groups(),
+        discovery_popularity=[RankedMovie(30, 1.0)],
+    )
+
+    assert actual is not None
+    for payload in actual:
+        payload.pop("generationId")
+    assert actual == expected
 
 
 def test_group_enabled_service_emits_discovery_without_changing_taste(frozen_clock) -> None:
@@ -281,11 +546,10 @@ def test_group_enabled_service_emits_discovery_without_changing_taste(frozen_clo
                 return None
             return GroupAssignment(0, group_id, group_id, True, True, True)
 
-    legacy = calculate_user_results(_bundle(), [ProfileInput(10, 5.0, "rating")], [], 7)
+    legacy = calculate_user_results(_bundle(), [ProfileInput(10, 5.0, "rating")], 7)
     grouped = calculate_user_results(
         _bundle(),
         [ProfileInput(10, 5.0, "rating")],
-        [],
         7,
         groups=Groups(),
         discovery_popularity=[RankedMovie(20, 1.0), RankedMovie(30, 0.5)],
@@ -316,12 +580,12 @@ def test_fold_in_failure_with_inputs_is_raised_not_skipped() -> None:
     )
 
     with pytest.raises(ValueError, match="fold-in failed despite factor-backed input"):
-        calculate_user_results(bundle, [ProfileInput(10, 5.0, "rating")], [], 7)
+        calculate_user_results(bundle, [ProfileInput(10, 5.0, "rating")], 7)
 
 
 def test_user_without_any_history_publishes_tied_hybrid_population(frozen_clock, caplog) -> None:
     with caplog.at_level("WARNING"):
-        results = calculate_user_results(_bundle(), [], [], 7, content=_content(), hybrid_alpha=0.5)
+        results = calculate_user_results(_bundle(), [], 7, content=_content(), hybrid_alpha=0.5)
 
     assert results is not None
     assert results[0]["vector"] == []
@@ -350,7 +614,7 @@ def test_no_history_tie_fallback_is_capped_at_500_by_movie_id(frozen_clock) -> N
         METADATA_REVISION,
     )
 
-    results = calculate_user_results(bundle, [], [], 7, content=_content(vectors))
+    results = calculate_user_results(bundle, [], 7, content=_content(vectors))
 
     assert results is not None
     assert [(item["movieId"], item["score"]) for item in results[1]["taste"]] == [
@@ -360,7 +624,7 @@ def test_no_history_tie_fallback_is_capped_at_500_by_movie_id(frozen_clock) -> N
 
 
 def test_als_only_mode_without_input_publishes_tied_factor_population(frozen_clock) -> None:
-    results = calculate_user_results(_bundle(), [], [], 7)
+    results = calculate_user_results(_bundle(), [], 7)
 
     assert results is not None
     assert [(item["movieId"], item["score"]) for item in results[1]["taste"]] == [(10, 0.0), (20, 0.0)]
@@ -378,14 +642,14 @@ def test_empty_publishable_population_still_returns_none(frozen_clock) -> None:
         METADATA_REVISION,
     )
 
-    assert calculate_user_results(bundle, [], [], 7) is None
+    assert calculate_user_results(bundle, [], 7) is None
 
 
 def test_user_without_any_supported_input_publishes_tied_population(frozen_clock) -> None:
     """An unsupported profile still gets the service-publishable population."""
     content = _content({10: ([0, 2], [0.6, 0.8]), 20: ([1, 3], [0.6, 0.8]), 30: ([], [])})
 
-    results = calculate_user_results(_bundle(), [ProfileInput(30, 5.0, "rating")], [], 7, content=content)
+    results = calculate_user_results(_bundle(), [ProfileInput(30, 5.0, "rating")], 7, content=content)
 
     assert results is not None
     assert [(item["movieId"], item["score"]) for item in results[1]["taste"]] == [(10, 0.0), (20, 0.0)]
@@ -399,7 +663,7 @@ def test_active_model_scores_are_not_normalized_again(monkeypatch, frozen_clock)
     expected = [RankedMovie(10, 4.32), RankedMovie(20, 3.91), RankedMovie(30, 3.75)]
     monkeypatch.setattr(service_module, "_hybrid_candidates", lambda *_args: expected)
 
-    results = calculate_user_results(_bundle(), ratings, [], 7, content=_content(), hybrid_alpha=0.5)
+    results = calculate_user_results(_bundle(), ratings, 7, content=_content(), hybrid_alpha=0.5)
 
     assert results is not None
     assert [item["score"] for item in results[1]["taste"]] == [4.32, 3.91, 3.75]
@@ -411,7 +675,7 @@ def test_published_scores_keep_ties_equal(frozen_clock) -> None:
     metadata = {**METADATA, **{service_id: MovieMetadata(str(service_id), (), None) for service_id in range(100, 104)}}
     bundle = ArtifactBundle("als-v1", "snapshot-a", 0.1, dict(FACTORS), dict(MAPPING), metadata, MAPPING_REVISION, METADATA_REVISION)
 
-    results = calculate_user_results(bundle, [ProfileInput(10, 5.0, "rating")], [], 7, content=_content(vectors), hybrid_alpha=0.5)
+    results = calculate_user_results(bundle, [ProfileInput(10, 5.0, "rating")], 7, content=_content(vectors), hybrid_alpha=0.5)
 
     assert results is not None
     tied = {item["score"] for item in results[1]["taste"] if item["movieId"] >= 100}
@@ -429,8 +693,8 @@ def test_alpha_weights_the_als_component_not_the_content_one(frozen_clock) -> No
     ratings = [ProfileInput(10, 5.0, "rating")]
     content = _content({10: ([0, 2], [0.6, 0.8]), 20: ([0, 2], [1.2, 1.6]), 30: ([0, 1], [0.6, 0.8])})
 
-    als_leaning = calculate_user_results(_bundle(), ratings, [], 7, content=content, hybrid_alpha=0.75)
-    content_leaning = calculate_user_results(_bundle(), ratings, [], 7, content=content, hybrid_alpha=0.25)
+    als_leaning = calculate_user_results(_bundle(), ratings, 7, content=content, hybrid_alpha=0.75)
+    content_leaning = calculate_user_results(_bundle(), ratings, 7, content=content, hybrid_alpha=0.25)
 
     assert als_leaning is not None and content_leaning is not None
     als_order = {item["movieId"]: index for index, item in enumerate(als_leaning[1]["taste"])}
@@ -446,7 +710,7 @@ def test_movies_without_any_component_are_not_candidates(frozen_clock) -> None:
     metadata = {**METADATA, 40: MovieMetadata("40", (), None)}
     bundle = ArtifactBundle("als-v1", "snapshot-a", 0.1, dict(FACTORS), dict(MAPPING), metadata, MAPPING_REVISION, METADATA_REVISION)
 
-    results = calculate_user_results(bundle, [ProfileInput(10, 5.0, "rating")], [], 7, content=_content(vectors), hybrid_alpha=0.5)
+    results = calculate_user_results(bundle, [ProfileInput(10, 5.0, "rating")], 7, content=_content(vectors), hybrid_alpha=0.5)
 
     assert results is not None
     assert 40 not in {item["movieId"] for item in results[1]["taste"]}
@@ -465,7 +729,7 @@ def test_hybrid_publishes_the_top_500_not_an_arbitrary_500(frozen_clock) -> None
     bundle = ArtifactBundle("als-v1", "snapshot-a", 0.1, dict(FACTORS), dict(MAPPING), metadata, MAPPING_REVISION, METADATA_REVISION)
 
     results = calculate_user_results(
-        bundle, [ProfileInput(10, 5.0, "rating")], [], 7, content=_content(vectors), hybrid_alpha=0.5
+        bundle, [ProfileInput(10, 5.0, "rating")], 7, content=_content(vectors), hybrid_alpha=0.5
     )
 
     assert results is not None
@@ -484,7 +748,7 @@ def test_hybrid_candidates_are_limited_to_500_and_tie_broken_by_service_id(froze
     metadata = {**METADATA, **{service_id: MovieMetadata(str(service_id), (), None) for service_id in range(100, 700)}}
     bundle = ArtifactBundle("als-v1", "snapshot-a", 0.1, dict(FACTORS), dict(MAPPING), metadata, MAPPING_REVISION, METADATA_REVISION)
 
-    results = calculate_user_results(bundle, [ProfileInput(10, 5.0, "rating")], [], 7, content=content, hybrid_alpha=0.5)
+    results = calculate_user_results(bundle, [ProfileInput(10, 5.0, "rating")], 7, content=content, hybrid_alpha=0.5)
 
     assert results is not None
     items = results[1]["taste"]
@@ -499,7 +763,7 @@ def test_alpha_one_reproduces_the_als_ordering(frozen_clock) -> None:
     """alpha=1 keeps ALS ranking among ALS-supported movies; content-only movies stay."""
     ratings = [ProfileInput(10, 5.0, "rating")]
 
-    results = calculate_user_results(_bundle(), ratings, [], 7, content=_content(), hybrid_alpha=1.0)
+    results = calculate_user_results(_bundle(), ratings, 7, content=_content(), hybrid_alpha=1.0)
 
     assert results is not None
     items = results[1]["taste"]
@@ -522,7 +786,6 @@ def test_candidate_top500_is_selected_after_service_publishability_filtering() -
     results = calculate_user_results(
         bundle,
         [ProfileInput(10_601, 5.0, "rating")],
-        [],
         1,
     )
 

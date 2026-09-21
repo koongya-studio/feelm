@@ -5,9 +5,40 @@ DISCOVERY 최대 100편을 갱신한다. Python 3.12의 독립 프로젝트이�
 모델·매핑·영화 메타데이터는 모두 같은 `input_snapshot`을 가리켜야 하며, 하나라도 맞지 않으면 시작을 거부한다.
 
 각 이벤트 처리에서는 이벤트 payload의 과거 별점·선택을 계산값으로 사용하지 않는다. PostgreSQL의
-현재 평가·온보딩을 repeatable-read snapshot으로 다시 읽고, DISCOVERY 산출물을 활성화한 경우
+현재 평가를 repeatable-read snapshot으로 다시 읽고, DISCOVERY 산출물을 활성화한 경우
 확정 감상·관심없음도 같은 snapshot에서 읽어 결정론적으로 재계산한다. 같은 PostgreSQL 상태와
 같은 산출물 revision에 대한 이벤트 재전달은 같은 후보를 만든다.
+
+온보딩 LIKE·DISLIKE는 Backend가 각각 `4.0`·`2.0` 평가 행으로 저장한다. Consumer는
+`onboarding_preferences`를 계산 입력으로 조회하지 않으며, ONBOARDING 이벤트를 최신 평가를 다시 읽는
+재계산 신호로만 사용한다. S15P21E106-648 소급 migration 적용과 **설명되지 않은 미보정 행 0건**을
+확인하기 전에는 이 입력 전환 버전을 운영에 배포하지 않는다. migration 뒤 사용자가 평가를 삭제하면
+온보딩 행만 남는 것이 정상이며, 이 행을 다시 평가로 만들지 않는다.
+
+### S15P21E106-649 운영 전환 게이트
+
+649 배포 담당자는 다음 순서를 수동 배포 게이트로 실행한다. 출력에 실제 사용자 ID·DB 접속 정보·Redis
+payload를 남기지 않고, 건수와 성공 여부만 GitLab 배포 job artifact와 MR 배포 체크리스트에 보관한다.
+S15P21E106-648 migration 확인과 S15P21E106-735 전체 사용자 Candidate 재게시는 이 운영
+배포·전환을 완료하기 위한 게이트이며, S15P21E106-649 병합 선행 조건이 아니다.
+
+1. `backend/scripts/ONBOARDING-BACKFILL-OPERATIONS.md`의 사후 점검 명령을 승인된 운영 DB에서 실행해
+   Flyway `202609192100`의 `success=true`를 확인한다. 1번 보정 대상에 남은 행은 migration 이후 정상
+   평가 삭제인지 삭제 이력과 현재 `WATCHED_UNRATED`·rating 없음·frame 없음 상태로 대조한다. 확인된
+   삭제 행은 재생성하지 않고 근거만 남기며, 설명되지 않은 미보정 행이 0건이어야 한다. 하나라도 남으면
+   배포를 중단한다.
+2. 새 Consumer 이미지를 배포하되 아직 전환 완료로 표시하지 않는다. Candidate 키에는 TTL이 없어 기존
+   결과가 자동 교체되지 않는다.
+3. S15P21E106-735에서 `docs/api/streaming-contract.md` §5.4의 승인된 전체 사용자 추천 재구축
+   절차로 모든 활성 사용자를
+   rating-only Consumer에 한 번씩 처리한다. 대상·성공·실패·재시도 건수와 배포 전후 게시 순번을 기록하고,
+   모든 대상에 새 `generationId`가 게시될 때까지 실패 건만 재시도한다.
+4. 실패 0건, 대상 수와 성공 수 일치, 새 Candidate의 `directionSource=ONBOARDING` 0건을 확인해야 전환을
+   완료한다. 저장소에는 아직 전체 재구축 실행기가 없으므로 승인된 실행 수단과 실제 증거가 준비되지
+   않으면 이 게이트는 열린 상태이며 운영 배포를 완료할 수 없다.
+5. 중간 실패 시 새 Consumer로의 트래픽 전환을 중단한다. 이미 전환했다면 마지막 정상 이미지로 복구한 뒤
+   같은 전체 재구축을 실행해 모든 활성 사용자를 이전 정책으로 재게시하고 대상·성공·실패 건수를 다시
+   대조한다. 부분 재게시 상태에서는 신·구 후보가 섞이므로 성공으로 간주하지 않는다.
 
 원별점 Fold-in 계산 참고와 검증 fixture는
 [`spark/batch/evaluation/reference.py`](../spark/batch/evaluation/reference.py),
@@ -210,13 +241,11 @@ alpha와 무관하게 자기 성분의 순위를 그대로 받으므로, **`alph
 
 `CONSUMER_GROUP_URI`와 `CONSUMER_DISCOVERY_POPULARITY_URI`를 함께 설정하면 기존 `taste` 최대 500편과 독립적으로
 그룹 기반 `discovery`를 최대 100편 만든다. 그룹 결과가 없거나 모든 적격 그룹 후보를 소진하면 빈 배열
-또는 100편 미만을 게시하며 전체 개인화 모집단으로 보충하지 않는다. 실제 별점이 같은 영화의
-온보딩 선택보다 우선하며,
-서로 다른 유효 입력 영화 수와 관계없이 가용한 성분으로 두 목록을 계산한다. 온보딩 LIKE/DISLIKE는
-ALS fold-in에 각각 `4.271231616529622`, `2.798442509805467`을 쓰고 실제 별점으로 저장하지 않는다.
+또는 100편 미만을 게시하며 전체 개인화 모집단으로 보충하지 않는다. 서로 다른 유효 평가 영화 수와
+관계없이 가용한 성분으로 두 목록을 계산한다. 온보딩 유래 평가도 저장된 `4.0`·`2.0`을 그대로 사용한다.
 
-발견 방향은 실제 별점이 있는 영화가 속한 고정 그룹 대표로 먼저 계산하고, 방향을 만들 수 없을 때
-온보딩의 `LIKE 대표 합 - DISLIKE 대표 합`을 사용한다. 실제 평가와 확정 감상의 합집합에서
+발견 방향은 평가가 있는 영화가 속한 고정 그룹 대표로 계산한다. 평가 방향을 만들 수 없으면 DISCOVERY를
+게시하지 않는다. 평가와 확정 감상의 합집합에서
 `viewed_g <= 2`와 `viewed_g / max(1,total_mapped_viewed) <= 0.20`을 모두 만족하는 그룹을 궁합순으로
 정렬한다. 상위 10개 그룹을 우선 공급 그룹으로 사용한다. 각 그룹은 모든
 사용자에게 공통인 TMDB 투표 수·KOBIS 누적 관객 백분위의
@@ -235,8 +264,9 @@ Spring은 TASTE 2편을 먼저 고르고 양쪽 목록의 중복을 건너뛴 DI
 - S15P21E106-415: 이 절의 DISCOVERY 후보 생성과 로컬 정책 검증
 - S15P21E106-471: Candidate v3 `taste`/`discovery` 그룹화와 `generationId` Consumer writer 기준선
 - S15P21E106-481: TASTE 후보별 구조화 `reasons[]`를 추가한 Candidate v4 writer·payload 기준선
-- S15P21E106-488: 전체 평가 또는 온보딩 이력으로 계산한 저이력 그룹 적합도·상위 기여 비율을
-  DISCOVERY 전용 `reasons[]`로 추가한 Candidate v5 writer·payload 기준선
+- S15P21E106-488: 당시 전체 평가 또는 온보딩 이력으로 계산한 저이력 그룹 적합도·상위 기여 비율을
+  DISCOVERY 전용 `reasons[]`로 추가했다. S15P21E106-649부터 온보딩 선택은 4.0·2.0 평가로 변환된
+  `ratings` 입력으로만 같은 계산에 참여한다.
 - S15P21E106-505: 입력 수 제한 제거, TASTE 500·DISCOVERY 100 후보 게시와 당시 그룹 부족분 보충,
   `DISCOVERY_PERSONAL_SCORE`를 추가한 Candidate v6 writer·payload 계약. Spring reader·2+1 조립은
   Backend 소비 계약이며 현재 `develop`에 구현돼 있다
@@ -376,7 +406,7 @@ Spring이 한다.
 이 상태에 들어가면 `content_scores_non_positive`에 최상위 동점 편수를 남긴다. 입력 수가 적더라도
 후보 계산을 막지 않으므로 이 로그는 낮은 정보량의 결과를 운영에서 구분하는 진단값이다.
 
-평가와 온보딩 선호가 한 편뿐이어도 가용한 ALS·콘텐츠 성분으로 후보를 계산·게시한다.
+평가가 한 편뿐이어도 가용한 ALS·콘텐츠 성분으로 후보를 계산·게시한다.
 적은 입력에서 품질이 낮을 수 있지만 이를 접근 제한이나 정상 처리 skip의 근거로 사용하지 않는다.
 
 입력이 없거나 어떤 성분도 사용자 프로필을 만들 수 없으면(신규 사용자, 두 산출물 모두에 없는 이력)
@@ -423,8 +453,7 @@ opaque token으로 교체하며 후보 결과를 읽는 Spring은 이 키에 의
 `candidates.discovery`는 `movieId`, `score`, DISCOVERY 전용 `reasons` 객체 배열을 포함한다. 그룹 산출물을 설정하면
 그룹 후보만 사용하고, 설정하지 않으면 빈 배열을 게시한다. 영화 대표 맛을 포함한 표시용 메타데이터는
 Spring이 PostgreSQL에서 조회한다.
-`DISCOVERY_AGGREGATE_AFFINITY`는 전체 평가 이력으로 만든
-방향을 우선하고 방향을 만들 수 없을 때만 온보딩 전체를 사용한다. `topContributors`는 후보 그룹 적합도에 양의
+`DISCOVERY_AGGREGATE_AFFINITY`는 전체 평가 이력으로 만든 방향만 사용한다. `topContributors`는 후보 그룹 적합도에 양의
 기여를 한 입력 중 상위 3개, `contributorCount`는 그런 입력 전체 수, `topContributionCoverage`는 양의 기여
 총합 중 상위 3개 기여 합의 비율이다. 이 비율은 그룹 적합도 근거의 집중도이지 영화 최종 점수의 설명률이 아니다.
 `viewedCountInGroup`, `affinityRank`, `popularityRankInGroup`은 각각 저이력 판정, 적격 그룹 중 궁합 순위,

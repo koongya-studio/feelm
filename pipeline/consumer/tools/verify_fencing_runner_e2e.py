@@ -41,13 +41,13 @@ def worker(role: str, kafka: str, redis_url: str, dsn: str, topic: str, group: s
         (directory / f"{role}-assigned").touch(exist_ok=True)
         return fence
 
-    def calculate(bundle, ratings, onboarding, **kwargs):
+    def calculate(bundle, ratings, **kwargs):
         if role == "old":
             (directory / "old-snapshot").write_text(str(ratings[0].score), encoding="utf-8")
             await_condition(lambda: (directory / "release-old").exists(), 120, "old release")
         else:
             (directory / "new-snapshot").write_text(str(ratings[0].score), encoding="utf-8")
-        return score_from_snapshot(bundle, ratings, onboarding, **kwargs)
+        return score_from_snapshot(bundle, ratings, **kwargs)
 
     def publish(*args):
         try:
