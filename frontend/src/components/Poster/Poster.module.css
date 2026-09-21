@@ -39,3 +39,27 @@
     radial-gradient(120% 96% at 50% 44%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.3) 100%),
     linear-gradient(148deg, var(--poster-dark) 0%, var(--poster-light) 52%, var(--poster-dark) 100%);
 }
+
+/*
+ * 자리표시자에 적는 제목(업무 -770). 면이 어두운 무채색이라 밝은 글자다. 긴 제목은 세 줄에서
+ * 자른다 — 칸이 작아 그 이상은 글이 칸을 덮는다.
+ */
+.poster[data-placeholder='true']:has(.caption) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2);
+}
+
+.caption {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  color: var(--color-on-dark);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-meta);
+  text-align: center;
+  word-break: keep-all;
+}
