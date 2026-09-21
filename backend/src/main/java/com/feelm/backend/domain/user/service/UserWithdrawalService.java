@@ -3,6 +3,7 @@ package com.feelm.backend.domain.user.service;
 import com.feelm.backend.domain.auth.RefreshTokenService;
 import com.feelm.backend.domain.auth.entity.OAuthProvider;
 import com.feelm.backend.domain.auth.service.SocialReauthenticator;
+import com.feelm.backend.domain.party.service.PartyWithdrawalService;
 import com.feelm.backend.domain.user.dto.request.AccountWithdrawalRequest;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
@@ -30,9 +31,10 @@ public class UserWithdrawalService {
     private final UserBlockService userBlockService;
     private final RefreshTokenService refreshTokenService;
     private final SocialReauthenticator socialReauthenticator;
+    private final PartyWithdrawalService partyWithdrawalService;
 
     /**
-     * 계정을 파기하고 뒷정리를 한다. 이 메서드에는 트랜잭션이 없다 — 아래 네 단계가 각각 독립이어야 하기 때문이다.
+     * 계정을 파기하고 뒷정리를 한다. 이 메서드에는 트랜잭션이 없다 — 아래 다섯 단계가 각각 독립이어야 하기 때문이다.
      *
      * <p><b>0단계</b>는 소셜 경로일 때만 있다. 인가 코드를 제공자와 교환해 식별자를 얻는 외부 HTTP 호출이라 트랜잭션을 열기 전에 끝낸다(컨벤션 8장).
      * 여기서 얻은 식별자를 계정과 대조하는 일은 1단계가 잠금 안에서 한다. 이 단계에서 실패하면 계정은 아무것도 바뀌지 않는다.
@@ -48,7 +50,11 @@ public class UserWithdrawalService {
      * 저장소가 세워 둔 <b>토큰 → 계정</b> 잠금 순서를 거슬러 교착한다(리뷰 A-F1·B-F1). 차단은 {@link UserBlockService}가 쓰기 메서드를
      * 최상위 트랜잭션에서만 부르도록 못 박아 두었다 — 벌크 삭제가 영속성 컨텍스트를 비워 상위 트랜잭션의 엔티티를 detach 하기 때문이다.
      *
-     * <p>3단계가 실패하면 고아 행이 남는다. 계정은 이미 {@code WITHDRAWN}이라 로그인·재설정·인증 어느 경로로도 쓰이지 않고 재가입도 막지 않으므로,
+     * <p><b>4단계</b>는 참여 중인 파티에서 탈퇴자를 떼어 낸다(S15P21E106-436). 파티 도메인의 진입점 하나만 부르며, 그 안에서 파티마다 따로
+     * 트랜잭션이 열린다. 계정 잠금을 쥔 1단계에 넣지 않은 이유는 계정 행을 잠근 채 파티 행까지 잠그면 잠금 범위가 계정 하나에서 그 사람이 속한 모든 파티로 번지기
+     * 때문이다. 순서가 3단계 뒤인 것은 차단 정리가 파티 합류 규칙(FR-39)과 얽혀 있어 먼저 끝내 두는 편이 읽기 쉬워서다.
+     *
+     * <p>3·4단계가 실패하면 고아 행이 남는다. 계정은 이미 {@code WITHDRAWN}이라 로그인·재설정·인증 어느 경로로도 쓰이지 않고 재가입도 막지 않으므로,
      * 원자성보다 교착을 피하는 쪽을 택했다.
      */
     public void withdraw(long userId, AccountWithdrawalRequest request) {
@@ -57,6 +63,7 @@ public class UserWithdrawalService {
         refreshTokenService.revokeAll(userId);
         writer.deleteAuthTokens(userId);
         userBlockService.deleteAllForWithdrawal(userId);
+        partyWithdrawalService.leaveAllForWithdrawal(userId);
     }
 
     /**

@@ -301,7 +301,13 @@ public class PartyService {
         return !userBlockFilter.blockedAmong(inviteeId, memberIds).isEmpty();
     }
 
-    /** 현재 파티에서 나가고, 필요하면 오너를 승계하거나 마지막 멤버가 나간 파티를 종료한다. */
+    /**
+     * 현재 파티에서 나가고, 필요하면 오너를 승계하거나 마지막 멤버가 나간 파티를 종료한다.
+     *
+     * <p>판정은 <b>파티 상태와 멤버십</b>만 본다. 요청자의 계정 상태는 보지 않으며, 이는 회원 탈퇴(API-013)가 이 경로를 재사용하기 위한 전제다 — 탈퇴
+     * 정리는 계정이 이미 {@code WITHDRAWN}으로 커밋된 뒤에 돌기 때문이다({@link PartyWithdrawalService}). 여기에 계정 상태 검사를
+     * 더하려면 그 경로를 함께 고쳐야 한다.
+     */
     @Transactional
     public PartyStateResponse leave(long userId, long partyId) {
         Party party = findAccessiblePartyForUpdate(partyId, userId);
