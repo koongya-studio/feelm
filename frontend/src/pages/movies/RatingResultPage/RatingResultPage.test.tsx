@@ -15,7 +15,7 @@
  * 읽지 못해도 새 프레임 한 장은 그린다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import RatingResultPage from './index';
 import { ROUTE_PATTERN } from '../../../routes/paths';
@@ -93,6 +93,7 @@ function renderResult(state: {
   counts: RatingCounts;
   after?: RatingCounts | null;
   posterUrl?: string | null;
+  movieTitle?: string;
 }) {
   render(
     <MemoryRouter
@@ -291,5 +292,59 @@ describe('2.6 필름 릴', () => {
 
     expect(reelPosters()).toEqual(['/p/new.jpg']);
     expect(screen.getByText('프레임 1개 · 팝콘 1알이 추가됐어요')).toBeInTheDocument();
+  });
+});
+
+/*
+ * 업무 -770. 2026-09-21 배포본 점검에서 새 프레임이 빈 회색 칸으로 남아 무엇이 추가됐는지
+ * 화면만으로는 알 수 없었다.
+ */
+describe('2.6 · 2.7 새 프레임은 무엇이 추가됐는지 보인다', () => {
+  it('포스터를 지연 없이 곧바로 받는다 — 1.2초짜리 장면이 빈 칸으로 지나가지 않게', () => {
+    vi.mocked(getMyFrames).mockResolvedValue(frameList([]));
+    renderResult({ rating, counts, after: null, posterUrl: '/p/new.jpg', movieTitle: '기생충' });
+
+    const poster = within(screen.getByTestId('film-reel')).getByAltText('기생충');
+
+    expect(poster).toHaveAttribute('src', '/p/new.jpg');
+    expect(poster).toHaveAttribute('loading', 'eager');
+  });
+
+  it('포스터가 없는 영화는 빈 칸 대신 제목을 적는다', () => {
+    vi.mocked(getMyFrames).mockResolvedValue(frameList([]));
+    renderResult({ rating, counts, after: null, posterUrl: null, movieTitle: '기생충' });
+
+    expect(within(screen.getByTestId('film-reel')).getByText('기생충')).toBeInTheDocument();
+  });
+
+  it('포스터를 받지 못하면 깨진 이미지 대신 제목을 적는다', () => {
+    vi.mocked(getMyFrames).mockResolvedValue(frameList([]));
+    renderResult({ rating, counts, after: null, posterUrl: '/p/broken.jpg', movieTitle: '기생충' });
+
+    const reel = within(screen.getByTestId('film-reel'));
+    fireEvent.error(reel.getByAltText('기생충'));
+
+    expect(reel.queryByAltText('기생충')).toBeNull();
+    expect(reel.getByText('기생충')).toBeInTheDocument();
+    // 이미지가 `alt`로 알리던 제목을 보조기술이 계속 읽는다. 장식으로 숨기지 않는다
+    expect(reel.getByText('기생충').parentElement).not.toHaveAttribute('role', 'presentation');
+  });
+
+  it('포스터 없는 기존 프레임도 제목을 적는다', async () => {
+    vi.mocked(getMyFrames).mockResolvedValue(
+      frameList([
+        {
+          ...frame(60, '2026-09-10T00:00:00Z'),
+          movie: { movieId: 160, title: '괴물', posterUrl: null },
+        },
+      ]),
+    );
+    renderResult({ rating, counts, after: null, posterUrl: '/p/new.jpg' });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+
+    expect(within(screen.getByTestId('film-reel')).getByText('괴물')).toBeInTheDocument();
   });
 });
