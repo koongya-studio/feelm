@@ -12,6 +12,7 @@ import {
   isOAuthConfigured,
   oauthRedirectUri,
   readOAuthRequest,
+  toSocialProvider,
 } from './oauth';
 
 beforeEach(() => {
@@ -78,5 +79,22 @@ describe('콜백 확인', () => {
     clearOAuthRequest();
 
     expect(readOAuthRequest(state)).toBeNull();
+  });
+});
+
+describe('회원 탈퇴 본인 확인(업무 -754)', () => {
+  it('탈퇴 목적도 같은 콜백 주소로 요청을 남긴다. 콜백이 목적을 보고 갈라 보낸다', () => {
+    const url = new URL(authorizeUrl('google', 'withdraw'));
+    const request = readOAuthRequest(url.searchParams.get('state'));
+
+    expect(request?.intent).toBe('withdraw');
+    // 계정 연결(API-009)과 같은 허용 목록 값을 쓴다(업무 -435 결정 D5)
+    expect(url.searchParams.get('redirect_uri')).toBe(oauthRedirectUri());
+  });
+
+  it('API-014 linkedProviders(대문자)를 앱의 제공자로 바꾸고 모르는 이름은 버린다', () => {
+    expect(toSocialProvider('GOOGLE')).toBe('google');
+    expect(toSocialProvider('kakao')).toBe('kakao');
+    expect(toSocialProvider('APPLE')).toBeNull();
   });
 });

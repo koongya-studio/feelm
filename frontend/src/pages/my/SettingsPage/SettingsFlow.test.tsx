@@ -12,6 +12,7 @@
  *   나머지 둘이 세션 저장소에 남는지를 못 보게 된다
  * - 로그아웃은 실제 세션 기능이라 Provider 대신 가짜 `signOut`을 넣어 불렸는지 본다
  */
+import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
@@ -47,6 +48,18 @@ vi.mock('../../../api/users', async (importOriginal) => ({
   getMyProfileView: vi.fn(),
 }));
 
+/*
+ * 소셜 본인 확인은 제공자 사이트로 나가는 전체 이동이라 가로챈다(업무 -754). 설정 여부는
+ * 빌드 변수(client-id)에 달려 있어 시험마다 정한다.
+ */
+vi.mock('../../../utils/oauth', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../utils/oauth')>()),
+  startOAuth: vi.fn(),
+  isOAuthConfigured: vi.fn(() => true),
+}));
+
+const { startOAuth, isOAuthConfigured } = await import('../../../utils/oauth');
+
 // 탈퇴 뒤 기기 푸시 구독을 지우는지만 본다(업무 -583). 브라우저 구독은 `webPush.test.ts`가 본다
 vi.mock('../../../pwa/webPush', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../pwa/webPush')>()),
@@ -72,6 +85,11 @@ function createFakeServer() {
   };
   /** API-013이 대조하는 계정. `getMyProfile`의 `hasPassword`와 짝을 맞춰 쓴다 */
   const account = { password: 'p@ssw0rd!', hasPassword: true, withdrawn: false };
+  /**
+   * 소셜 재인증에서 이 계정에 연결된 것으로 볼 인가 코드와, 받은 코드 전부. 같은 코드가 두 번
+   * 오면 두 번 적힌다 — 화면이 1회용 코드를 다시 보냈는지 여기서 본다
+   */
+  const social = { linkedCode: 'code-linked', received: [] as string[] };
   /** API-014 · 015. 7.8-B가 프로필 공개 여부를 여기에 저장한다(업무 -610) */
   const profile = { ...mockMyProfile };
   const blocks: BlockedUser[] = [
@@ -110,7 +128,39 @@ function createFakeServer() {
     }
 
     if (url.pathname === '/api/v1/users/me' && method === 'DELETE') {
-      const body = JSON.parse(init.body as string) as { password?: string };
+      const body = JSON.parse(init.body as string) as {
+        password?: string;
+        provider?: string;
+        code?: string;
+        redirectUri?: string;
+      };
+
+      // 소셜 재인증 경로. `provider`가 있으면 비밀번호는 읽지 않는다(API-013, 업무 -435)
+      if (body.provider) {
+        if (!body.code || !body.redirectUri) {
+          return json(400, { code: 'VALIDATION_FAILED', message: '요청이 올바르지 않습니다.' });
+        }
+
+        // 인가 코드는 1회용이다. 같은 코드가 두 번 오면 제공자 교환이 실패한다
+        const reused = social.received.includes(body.code);
+
+        social.received.push(body.code);
+
+        if (reused) {
+          return json(400, {
+            code: 'OAUTH_CODE_INVALID',
+            message: '인가 코드가 유효하지 않습니다.',
+          });
+        }
+
+        if (body.code !== social.linkedCode) {
+          return json(401, { code: 'INVALID_CREDENTIALS', message: '본인 확인에 실패했습니다.' });
+        }
+
+        account.withdrawn = true;
+
+        return json(204);
+      }
 
       // 판정 순서는 계약 그대로다 — 비밀번호 보유 → 값 유무 → 대조(API-013)
       if (!account.hasPassword) {
@@ -173,7 +223,7 @@ function createFakeServer() {
     throw new Error(`가짜 서버가 모르는 요청이다: ${method} ${url.pathname}`);
   }
 
-  return { handle, account, profile };
+  return { handle, account, social, profile };
 }
 
 beforeEach(() => {
@@ -199,6 +249,8 @@ beforeEach(() => {
     );
   signOut.mockReset().mockResolvedValue(undefined);
   vi.mocked(forgetWebPush).mockClear();
+  vi.mocked(startOAuth).mockReset();
+  vi.mocked(isOAuthConfigured).mockReset().mockReturnValue(true);
 });
 
 afterEach(() => {
@@ -211,7 +263,14 @@ function LocationProbe() {
   return <div data-testid="location">{location.pathname}</div>;
 }
 
-function renderApp(entries: string[]) {
+/**
+ * 항목은 주소이거나, 라우터 state를 함께 실은 이동이다(소셜 본인 확인에서 돌아온 7.8-A-1).
+ * `strict`면 StrictMode로 감싸 효과를 두 번 돌린다 — 1회용 코드를 두 번 보내지 않는지 본다.
+ */
+function renderApp(
+  entries: (string | { pathname: string; state: unknown })[],
+  { strict = false }: { strict?: boolean } = {},
+) {
   const auth: AuthValue = {
     status: 'authenticated',
     user: { userId: 1024, nickname: '김난다', onboardingCompleted: true },
@@ -222,7 +281,7 @@ function renderApp(entries: string[]) {
     signOut,
   };
 
-  return render(
+  const tree = (
     <AuthContext.Provider value={auth}>
       <MemoryRouter initialEntries={entries} initialIndex={entries.length - 1}>
         <Routes>
@@ -239,8 +298,10 @@ function renderApp(entries: string[]) {
         </Routes>
         <LocationProbe />
       </MemoryRouter>
-    </AuthContext.Provider>,
+    </AuthContext.Provider>
   );
+
+  return render(strict ? <StrictMode>{tree}</StrictMode> : tree);
 }
 
 const location = () => screen.getByTestId('location').textContent;
@@ -371,14 +432,93 @@ describe('7.8-A-1 회원 탈퇴', () => {
     expect(forgetWebPush).not.toHaveBeenCalled();
   });
 
-  /* 소셜 전용 계정은 본인 확인 수단이 아직 없다(API-013, 업무 -435) */
-  it('소셜 전용 계정에는 비밀번호 칸 대신 아직 탈퇴할 수 없다는 안내가 있다', async () => {
-    vi.mocked(getMyProfile).mockResolvedValue({ ...mockMyProfile, hasPassword: false });
+  /*
+   * 소셜 전용 계정은 연결된 제공자로 본인을 확인한다(API-013 소셜 재인증, 업무 -435 · -754).
+   * 제공자 로그인은 다른 사이트로 나갔다 `/oauth/callback`으로 돌아오는 전체 이동이라, 콜백이
+   * 인가 코드를 라우터 state(`reauth`)로 넘긴 7.8-A-1부터 이어 본다.
+   */
+  const socialOnly = { ...mockMyProfile, hasPassword: false, linkedProviders: ['GOOGLE'] };
+  const returned = (reauth: unknown) => ({ pathname: ROUTE_PATTERN.withdraw, state: { reauth } });
+  const REDIRECT = 'http://localhost:5173/app/oauth/callback';
+
+  it('소셜 전용 계정은 비밀번호 칸 대신 제공자 안내가 서고, 확인하면 제공자 로그인으로 나간다', async () => {
+    vi.mocked(getMyProfile).mockResolvedValue(socialOnly);
     renderApp([ROUTE_PATTERN.settings, ROUTE_PATTERN.withdraw]);
 
-    expect(await screen.findByText(/본인 확인 방법이 준비되면/)).toBeInTheDocument();
+    expect(await screen.findByText(/구글 계정으로 가입해 비밀번호가 없어요/)).toBeInTheDocument();
     expect(screen.queryByLabelText('현재 비밀번호')).toBeNull();
 
+    const withdraw = screen.getByRole('button', { name: '탈퇴하기' });
+    expect(withdraw).toBeDisabled();
+
+    fireEvent.click(screen.getByLabelText('위 내용을 모두 확인했어요'));
+    fireEvent.click(withdraw);
+
+    const dialog = screen.getByRole('alertdialog', { name: 'Feelm을 탈퇴할까요?' });
+    expect(dialog).toHaveTextContent('구글에서 본인을 확인하면');
+    fireEvent.click(within(dialog).getByRole('button', { name: '탈퇴' }));
+
+    expect(startOAuth).toHaveBeenCalledWith('google', 'withdraw');
+    // 탈퇴 요청은 제공자에서 코드를 받아 온 뒤에야 나간다
+    expect(server.account.withdrawn).toBe(false);
+  });
+
+  it('본인 확인에서 코드를 들고 돌아오면 확인 상태를 되살려 한 번만 탈퇴하고 시작 화면으로 간다', async () => {
+    vi.mocked(getMyProfile).mockResolvedValue(socialOnly);
+    // StrictMode는 효과를 두 번 돌린다. 그래도 1회용 코드는 한 번만 나가야 한다
+    renderApp(
+      [
+        ROUTE_PATTERN.settings,
+        returned({ provider: 'google', code: 'code-linked', redirectUri: REDIRECT }),
+      ],
+      { strict: true },
+    );
+
+    await waitFor(() => expect(location()).toBe(ROUTE_PATTERN.authStart));
+    expect(server.account.withdrawn).toBe(true);
+    expect(server.social.received).toEqual(['code-linked']);
+    expect(signOut).toHaveBeenCalledTimes(1);
+    expect(forgetWebPush).toHaveBeenCalledTimes(1);
+  });
+
+  it('연결되지 않은 소셜 계정으로 확인하면 그렇게 알리고, 같은 코드를 다시 보내지 않는다', async () => {
+    vi.mocked(getMyProfile).mockResolvedValue(socialOnly);
+    renderApp([
+      ROUTE_PATTERN.settings,
+      returned({ provider: 'google', code: 'someone-else', redirectUri: REDIRECT }),
+    ]);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '지금 로그인한 계정과 연결된 소셜 계정이 아니에요',
+    );
+    // 401이어도 재발급 뒤 같은 코드를 다시 보내지 않는다 — 두 번째는 OAUTH_CODE_INVALID가 된다
+    expect(server.social.received).toEqual(['someone-else']);
+    expect(server.account.withdrawn).toBe(false);
+    expect(signOut).not.toHaveBeenCalled();
+
+    // 확인 체크는 되살아나 있어 바로 다시 시도할 수 있다
+    expect(screen.getByLabelText('위 내용을 모두 확인했어요')).toBeChecked();
+    expect(screen.getByRole('button', { name: '탈퇴하기' })).toBeEnabled();
+  });
+
+  it('제공자 동의 화면에서 취소하고 돌아오면 탈퇴하지 않았다고 알린다', async () => {
+    vi.mocked(getMyProfile).mockResolvedValue(socialOnly);
+    renderApp([ROUTE_PATTERN.settings, returned({ cancelled: true })]);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '본인 확인을 취소해 탈퇴하지 않았어요',
+    );
+    expect(server.social.received).toEqual([]);
+    expect(location()).toBe('/my/settings/account/withdraw');
+  });
+
+  it('이 앱이 제공자 인가를 시작할 수 없으면 탈퇴하기를 열지 않고 이유를 알린다', async () => {
+    // 배포에 소셜 client-id가 아직 없을 때(업무 -531 · -532)
+    vi.mocked(isOAuthConfigured).mockReturnValue(false);
+    vi.mocked(getMyProfile).mockResolvedValue(socialOnly);
+    renderApp([ROUTE_PATTERN.settings, ROUTE_PATTERN.withdraw]);
+
+    expect(await screen.findByText(/지금은 확인을 쓸 수 없어요/)).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('위 내용을 모두 확인했어요'));
     expect(screen.getByRole('button', { name: '탈퇴하기' })).toBeDisabled();
   });

@@ -18,6 +18,10 @@
  *
  * 실패해도 이 주소에 머무르지 않는다. 주소에 인가 코드가 남은 화면이라 새로고침하면
  * 반드시 실패하기 때문이다. 안내는 여기서 보여 주고 돌아가는 길만 준다.
+ *
+ * **회원 탈퇴의 본인 확인(`intent: 'withdraw'`)은 로그인하지 않는다**(업무 -754). 코드를
+ * 7.8-A-1에 넘기고 그 화면이 API-013을 부른다. 취소하거나 코드가 없어도 로그인 화면이
+ * 아니라 7.8-A-1로 돌아가 거기서 알린다 — 사용자는 로그인한 채 탈퇴 도중이었다.
  */
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
@@ -27,6 +31,7 @@ import { useAuth } from '../../../contexts/authContext';
 import { path } from '../../../routes/paths';
 import { isReturnPath } from '../../../routes/returnPath';
 import { clearOAuthRequest, readOAuthRequest } from '../../../utils/oauth';
+import type { WithdrawReauth } from '../../my/WithdrawPage/reauth';
 import styles from './OAuthCallbackPage.module.css';
 
 /** 서버 문구 대신 화면이 정하는 경우만 둔다 */
@@ -52,15 +57,33 @@ export default function OAuthCallbackPage() {
   // 제공자가 동의를 받지 못하면 코드 대신 `error`를 붙여 보낸다
   const cancelled = Boolean(params.get('error'));
   const request = readOAuthRequest(params.get('state'));
+  const reauth = request?.intent === 'withdraw';
 
   const [failure, setFailure] = useState<string | null>(
-    cancelled ? CANCELLED : !request || !code ? BROKEN_REQUEST : null,
+    reauth ? null : cancelled ? CANCELLED : !request || !code ? BROKEN_REQUEST : null,
   );
 
   const handled = useRef(false);
 
+  // 탈퇴 본인 확인은 결과가 어떻든 7.8-A-1로 돌려보낸다. 코드를 쓰는 곳은 그 화면이다
   useEffect(() => {
-    if (handled.current || !request || !code || cancelled) {
+    if (handled.current || !request || !reauth) {
+      return;
+    }
+
+    handled.current = true;
+    clearOAuthRequest();
+
+    const state: WithdrawReauth =
+      code && !cancelled
+        ? { provider: request.provider, code, redirectUri: request.redirectUri }
+        : { cancelled: true };
+
+    void navigate(path.withdraw(), { replace: true, state: { reauth: state } });
+  }, [cancelled, code, navigate, reauth, request]);
+
+  useEffect(() => {
+    if (handled.current || !request || !code || cancelled || reauth) {
       return;
     }
 
@@ -102,7 +125,7 @@ export default function OAuthCallbackPage() {
     };
 
     void run();
-  }, [cancelled, code, navigate, request, signInWithSocial]);
+  }, [cancelled, code, navigate, reauth, request, signInWithSocial]);
 
   return (
     <div className={styles.page}>
