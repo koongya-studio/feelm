@@ -40,6 +40,7 @@ class DeployConsumerTest(unittest.TestCase):
         self.env_file = self.root / "infra.env"
         self.env_file.write_text(
             "CONSUMER_KAFKA_TOPIC=feelm.rating.v1\n"
+            "CONSUMER_DISMISS_KAFKA_TOPIC=feelm.dismiss.v1\n"
             "CONSUMER_KAFKA_GROUP_ID=feelm-foldin-consumer-v1\n"
             "PARTY_CONSUMER_KAFKA_TOPIC=feelm.party-refresh.v1\n"
             "PARTY_CONSUMER_KAFKA_GROUP_ID=feelm-party-consumer-v1\n",
@@ -128,18 +129,29 @@ class DeployConsumerTest(unittest.TestCase):
 
             if [[ "$1 $2" == "exec feelm-kafka" ]]; then
               id="$(cat "$DEPLOY_TEST_GROUP" 2>/dev/null || true)"
+              image="$(cat "$DEPLOY_TEST_STATE" 2>/dev/null || true)"
               group="${!#}"
               if [[ "${FAIL_ASSIGNMENT:-0}" == "1" || "$group" == "feelm-party-consumer-v1" && "${FAIL_PARTY_ASSIGNMENT:-0}" == "1" || -z "$id" ]]; then
                 id='-'
               fi
               if [[ "$group" == "feelm-party-consumer-v1" ]]; then
                 topic="feelm.party-refresh.v1"
+                extra_row=""
               else
                 topic="feelm.rating.v1"
+                extra_row=""
+                if [[ "$image" == "$DEPLOY_TEST_CANDIDATE" ]]; then
+                  dismiss_id="$id"
+                  if [[ "${FAIL_DISMISS_ASSIGNMENT:-0}" == "1" ]]; then
+                    dismiss_id='-'
+                  fi
+                  extra_row="$group feelm.dismiss.v1 0 1 1 0 $dismiss_id /host client"
+                fi
               fi
               cat <<EOF
 GROUP TOPIC PARTITION CURRENT-OFFSET LOG-END-OFFSET LAG CONSUMER-ID HOST CLIENT-ID
 $group $topic 0 1 1 0 $id /host client
+$extra_row
 EOF
               exit 0
             fi
@@ -304,6 +316,13 @@ EOF
         self.assertEqual(current, self.previous)
         self.assertIn("runtime verification failed", result.stderr)
 
+    def test_missing_dismiss_kafka_assignment_restores_previous_image(self) -> None:
+        result, current, _ = self.run_deploy(FAIL_DISMISS_ASSIGNMENT=1)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(current, self.previous)
+        self.assertIn("runtime verification failed", result.stderr)
+
     def test_missing_party_kafka_assignment_restores_previous_image(self) -> None:
         result, current, events = self.run_deploy(FAIL_PARTY_ASSIGNMENT=1)
 
@@ -341,6 +360,19 @@ EOF
         self.assertEqual(self.state_file.read_text(encoding="utf-8"), self.previous)
         self.assertEqual(self.deploy_state_file.read_text(encoding="utf-8").strip(), self.previous)
         self.assertIn("Consumer rollback completed", result.stdout)
+
+    def test_direct_rollback_can_require_dismiss_assignment_for_capable_target(self) -> None:
+        self.state_file.write_text(self.candidate, encoding="utf-8")
+        self.group_file.write_text("candidate-id", encoding="utf-8")
+
+        result = self._run(
+            ROLLBACK_SCRIPT,
+            self.previous,
+            CONSUMER_REQUIRE_DISMISS_ASSIGNMENT="true",
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("runtime verification failed", result.stderr)
 
     def test_retry_uses_persisted_last_known_good_not_current_failed_candidate(self) -> None:
         self.state_file.write_text(self.candidate, encoding="utf-8")

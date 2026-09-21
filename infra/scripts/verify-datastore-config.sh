@@ -107,6 +107,21 @@ docker_cli exec "${CONTAINER_NAME}" sh -c \
   'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_readonly SET auth:mail:sent:3600 0' \
   | grep -q 'no permissions'
 
+# 급상승 스냅샷(API-064, S15P21E106-561). Spring이 읽는 두 키만 열고, 회원 ID가 들어 있는
+# 집계 버킷 키는 조회 계정에도 열지 않는다(스트리밍 계약 5.1).
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_readonly GET feelm:trending:current' \
+  | grep -qx OK
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_readonly GET feelm:trending:last-good' \
+  | grep -qx OK
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_readonly SET feelm:trending:current value' \
+  | grep -q 'no permissions'
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_readonly GET feelm:trending:bucket:20260918T1200Z:movie:550:users' \
+  | grep -q 'no permissions'
+
 # 로컬 Spring Boot 계정은 인증 키만 변경하고 추천 결과는 읽기만 한다.
 docker_cli exec "${CONTAINER_NAME}" sh -c \
   'redis-cli --no-auth-warning --user feelm_local_backend --pass "$REDIS_LOCAL_BACKEND_PASSWORD" SET auth:acl-check value PX 60000 NX' \
@@ -117,6 +132,16 @@ docker_cli exec "${CONTAINER_NAME}" sh -c \
 docker_cli exec "${CONTAINER_NAME}" sh -c \
   'redis-cli --no-auth-warning --user feelm_local_backend --pass "$REDIS_LOCAL_BACKEND_PASSWORD" MGET feelm:model:current feelm:party:1:candidates' \
   >/dev/null
+# 로컬 백엔드도 급상승은 스냅샷 두 키만 읽고 쓰지 못하며, 집계 버킷 키에는 접근할 수 없다.
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'redis-cli --no-auth-warning --user feelm_local_backend --pass "$REDIS_LOCAL_BACKEND_PASSWORD" MGET feelm:trending:current feelm:trending:last-good' \
+  >/dev/null
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_local_backend SET feelm:trending:current value' \
+  | grep -q 'no permissions'
+docker_cli exec "${CONTAINER_NAME}" sh -c \
+  'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_local_backend SISMEMBER feelm:trending:bucket:20260918T1200Z:movie:550:users 1' \
+  | grep -q 'no permissions'
 docker_cli exec "${CONTAINER_NAME}" sh -c \
   'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli --no-auth-warning ACL DRYRUN feelm_local_backend SET feelm:user:1:candidates value' \
   | grep -q 'no permissions'

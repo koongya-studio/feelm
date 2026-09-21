@@ -162,7 +162,7 @@ Kafka는 같은 Topic·Partition에 Producer가 실제로 기록한 순서를 �
 `--max-records-per-trigger 1`로 배치당 입력을 한 건으로 제한한다. 이 설정은 전체 파티
 처리량을 낮추므로 운영 지연을 측정한다. Kafka 순서대로 Redis 결과가 게시되는지는 연동 검증한다.
 
-- RATING·ONBOARDING은 PostgreSQL 최신 상태를 다시 읽으므로 최종 상태보다 중복 계산 비용이
+- RATING·ONBOARDING과 Python 추천 Consumer의 DISMISS 처리는 PostgreSQL 최신 상태를 다시 읽으므로 최종 상태보다 중복 계산 비용이
   주된 영향이다.
 - VIEW·클릭 등 시간 기반 집계는 `occurredAt`을 사용한다.
 - 장기 지연된 약한 신호가 Spark watermark 밖으로 밀릴 수 있으며, Consumer는 이벤트 시간과
@@ -170,8 +170,8 @@ Kafka는 같은 Topic·Partition에 Producer가 실제로 기록한 순서를 �
 
 중복 처리도 신호에 따라 책임이 다르다.
 
-- `RATING`·`ONBOARDING`은 매번 PostgreSQL의 최신 전체 상태로 다시 계산하므로 자연 멱등이다.
-- `DISMISS`·`VIEW`·`RECOMMENDATION_CLICK`·`OTT_CLICK`은 누적값이 부풀 수 있어 Consumer가
+- `RATING`·`ONBOARDING`과 Python 추천 Consumer의 `DISMISS`는 매번 PostgreSQL의 최신 전체 상태로 다시 계산하므로 자연 멱등이다.
+- Spark 행동 집계의 `DISMISS`·`VIEW`·`RECOMMENDATION_CLICK`·`OTT_CLICK`은 누적값이 부풀 수 있어 Consumer가
   `eventId`로 중복 제거한다.
 - 현재 계약의 중복 판정 창을 벗어난 재발행은 약한 신호를 소폭 부풀릴 수 있다. 이 위험은
   아웃박스의 영구 유실 방지를 우선하기 위해 감수하며 운영 지표를 바탕으로 판정 창을 조정한다.

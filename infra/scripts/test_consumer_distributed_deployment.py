@@ -20,6 +20,10 @@ class ConsumerDistributedDeploymentTest(unittest.TestCase):
         self.assertIn("stop_grace_period: 30s", compose)
         self.assertIn("restart: unless-stopped", compose)
         self.assertIn('CONSUMER_KAFKA_BOOTSTRAP_SERVERS: "${DISTRIBUTED_NODE_IP:', compose)
+        self.assertIn(
+            "CONSUMER_DISMISS_KAFKA_TOPIC: ${CONSUMER_DISMISS_KAFKA_TOPIC:-feelm.dismiss.v1}",
+            compose,
+        )
         for name in (
             "CONSUMER_POSTGRES_DSN",
             "CONSUMER_REDIS_URL",
@@ -32,6 +36,11 @@ class ConsumerDistributedDeploymentTest(unittest.TestCase):
         ):
             self.assertIn(f"{name}: ${{{name}:-}}", compose)
         self.assertIn("CONSUMER_HYBRID_ALPHA: ${CONSUMER_HYBRID_ALPHA:-0.5}", compose)
+        self.assertIn("CONSUMER_DISMISS_SCORE: ${CONSUMER_DISMISS_SCORE:-1.0}", compose)
+        self.assertIn(
+            "CONSUMER_DISMISS_INPUT_VERSION: ${CONSUMER_DISMISS_INPUT_VERSION:-dismiss-virtual-rating-v1}",
+            compose,
+        )
         self.assertNotIn("CONSUMER_MIN_INPUT_COUNT", compose)
 
     def test_datastores_remain_loopback_by_default(self) -> None:
@@ -85,6 +94,9 @@ class ConsumerDistributedDeploymentTest(unittest.TestCase):
             "CONSUMER_GROUP_URI",
             "CONSUMER_DISCOVERY_POPULARITY_URI",
             "CONSUMER_HYBRID_ALPHA",
+            "CONSUMER_DISMISS_KAFKA_TOPIC",
+            "CONSUMER_DISMISS_SCORE",
+            "CONSUMER_DISMISS_INPUT_VERSION",
             "PARTY_CONSUMER_KAFKA_TOPIC",
             "PARTY_CONSUMER_KAFKA_GROUP_ID",
             "PARTY_CONSUMER_REDIS_URL",
@@ -95,6 +107,8 @@ class ConsumerDistributedDeploymentTest(unittest.TestCase):
             self.assertIn(f"{name}=", env_example)
 
         self.assertIn("CONSUMER_HYBRID_ALPHA=0.5", env_example)
+        self.assertIn("CONSUMER_DISMISS_SCORE=1.0", env_example)
+        self.assertIn("CONSUMER_DISMISS_INPUT_VERSION=dismiss-virtual-rating-v1", env_example)
         self.assertNotIn("CONSUMER_MIN_INPUT_COUNT", env_example)
 
     def test_runbook_documents_hybrid_activation_and_verification(self) -> None:

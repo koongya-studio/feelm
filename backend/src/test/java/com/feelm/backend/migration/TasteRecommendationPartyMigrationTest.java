@@ -45,7 +45,8 @@ class TasteRecommendationPartyMigrationTest {
                         "party_invitations",
                         "recommendation_sets",
                         "recommendation_items",
-                        "user_movie_dismissals");
+                        "user_movie_dismissals",
+                        "user_movie_exposures");
         assertThat(columnsOf("popcorn_flavors")).contains("cluster_id", "representative_keywords");
         assertThat(columnsOf("movies")).doesNotContain("taste_model_version");
     }

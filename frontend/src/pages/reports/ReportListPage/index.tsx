@@ -17,7 +17,11 @@
  *
  * `[!]` API-059 목록에는 4컷 값이 없다. 반기마다 API-060 상세를 한 번씩 더 부른다. 반기가 쌓이면
  * 호출이 늘어나므로 목록에 4컷 요약을 넣을지 정해야 한다(후속).
- * `[?]` 공유가 무엇을 공유하는지 시안에 없다. 기기 공유 메뉴가 있을 때만 이 화면 주소를 넘긴다.
+ * `[?]` 공유가 무엇을 공유하는지 시안에 없다. 이 화면 주소를 넘긴다 — 휴대폰은 기기의 공유
+ * 메뉴, 데스크톱은 복사다(`utils/share.ts`, 업무 -767). 한때 공유 메뉴가 없는 브라우저에서는
+ * 버튼을 숨겼고, 데스크톱 Chrome처럼 메뉴가 있다고 답하고 열지 못하는 곳에서는 눌러도 아무
+ * 일이 없었다. **인화된 4컷이 없으면 버튼을 잠근다** — 누르기 전에 공유할 것이 없음이 보인다.
+ * 인화 중인 반기만 있어도 잠긴다.
  */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
@@ -26,11 +30,13 @@ import IconButton from '../../../components/IconButton';
 import ReportFourCut from '../../../components/ReportFourCut';
 import ReportTape from '../../../components/ReportTape';
 import ScreenHeader from '../../../components/ScreenHeader';
+import Snackbar from '../../../components/Snackbar';
 import StatusView from '../../../components/StatusView';
 import { ShareIcon } from '../../../components/Icon';
 import { getMyReports, getReportDetail } from '../../../api/reports';
 import { path } from '../../../routes/paths';
 import { formatHalf, formatPrintDate } from '../../../utils/report';
+import { shareLink } from '../../../utils/share';
 import styles from './ReportListPage.module.css';
 import type { ReportDetail, ReportPeriod, ReportSummary } from '../../../types/report';
 
@@ -100,7 +106,24 @@ export default function ReportListPage() {
     };
   }, [reloadCount]);
 
-  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+  const [notice, setNotice] = useState('');
+  /** 공유할 4컷이 있는지. 인화가 끝난 반기가 하나라도 있어야 한다 */
+  const canShare = Boolean(entries?.some(({ summary }) => summary?.status === 'READY'));
+
+  async function share() {
+    const result = await shareLink({ title: TITLE, url: window.location.href });
+
+    if (result === 'copied') setNotice('취향 4컷 주소를 복사했어요');
+    if (result === 'failed') setNotice('이 브라우저에서는 공유할 수 없어요');
+  }
+
+  const snackbar = notice ? (
+    <div className={styles.notice}>
+      <Snackbar actionLabel="확인" onAction={() => setNotice('')}>
+        {notice}
+      </Snackbar>
+    </div>
+  ) : null;
 
   const header = (
     <ScreenHeader
@@ -110,17 +133,12 @@ export default function ReportListPage() {
       showBack
       fallbackTo={path.my()}
       action={
-        canShare ? (
-          <IconButton
-            label="공유하기"
-            icon={<ShareIcon />}
-            onClick={() =>
-              void navigator
-                .share({ title: TITLE, url: window.location.href })
-                .catch(() => undefined)
-            }
-          />
-        ) : undefined
+        <IconButton
+          label="공유하기"
+          icon={<ShareIcon />}
+          disabled={!canShare}
+          onClick={() => void share()}
+        />
       }
     />
   );
@@ -183,6 +201,8 @@ export default function ReportListPage() {
           </section>
         ))}
       </div>
+
+      {snackbar}
     </div>
   );
 }

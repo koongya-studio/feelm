@@ -2,7 +2,7 @@
  * 5.3 파티 만들기 및 친구 초대 (업무 S15P21E106-304 · -393)
  *
  * `파티 시작하기`가 API-049를 부르고, 고른 친구에게 API-051을 보낸 뒤 그 응답의
- * `partyId`로 5.4에 간다. **초대는 파티를 만든 다음에만 보낼 수 있다.** 화면만 봐서는
+ * `partyId`로 5.9에 간다. **초대는 파티를 만든 다음에만 보낼 수 있다.** 화면만 봐서는
  * 순서를 알 수 없으므로 여기서 고정한다.
  *
  * 이름 검증도 함께 본다. API-049가 `name` 필수 · 20자 이하를 요구하는데, 빈 이름으로
@@ -68,7 +68,7 @@ async function pickBuddy() {
 }
 
 describe('5.3 파티 만들기', () => {
-  it('이름을 넣고 친구를 초대해 시작하면 파티가 만들어지고 5.4로 간다', async () => {
+  it('이름을 넣고 친구를 초대해 시작하면 파티가 만들어지고 5.9로 간다', async () => {
     renderSetup();
 
     fillName('금요 심야 상영회');
@@ -77,7 +77,7 @@ describe('5.3 파티 만들기', () => {
 
     await waitFor(() =>
       expect(screen.getByTestId('location').textContent).toBe(
-        `/parties/${TEST_PARTY_ID}/analyzing`,
+        `/parties/${TEST_PARTY_ID}/popcorn/mix`,
       ),
     );
     expect(createParty).toHaveBeenCalledWith('금요 심야 상영회');
@@ -115,7 +115,7 @@ describe('5.3 파티 만들기', () => {
 
   it('초대한 친구가 없으면 시작할 수 없다', () => {
     /*
-     * 파티는 나까지 2명부터다(5.2 안내 · `PARTY_MIN_MEMBERS`). 혼자인 파티를 만들면 5.4
+     * 파티는 나까지 2명부터다(5.2 안내 · `PARTY_MIN_MEMBERS`). 혼자인 파티를 만들면 5.9
      * 이후가 할 일이 없다(업무 -610).
      */
     renderSetup();
@@ -147,7 +147,7 @@ describe('5.3 파티 만들기', () => {
 
     await waitFor(() =>
       expect(screen.getByTestId('location').textContent).toBe(
-        `/parties/${TEST_PARTY_ID}/analyzing`,
+        `/parties/${TEST_PARTY_ID}/popcorn/mix`,
       ),
     );
     expect(createParty).toHaveBeenCalledTimes(1);
@@ -176,6 +176,21 @@ describe('5.3 친구 초대', () => {
     expect(vi.mocked(createParty).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(inviteToParty).mock.invocationCallOrder[0],
     );
+  });
+
+  // 업무 -771. 한때 `검색` 버튼만 먹고 Enter는 아무 일도 하지 않았다
+  it('Enter로도 검색한다. 한글 조합을 끝내는 Enter는 검색이 아니다', async () => {
+    renderSetup();
+
+    const field = screen.getByLabelText('닉네임으로 친구 찾기');
+    fireEvent.change(field, { target: { value: '무비' } });
+
+    fireEvent.keyDown(field, { key: 'Enter', isComposing: true });
+    expect(searchUsers).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(searchUsers).toHaveBeenCalledWith('무비');
+    expect(await screen.findByRole('button', { name: /무비버디/ })).toBeInTheDocument();
   });
 
   it('두 글자가 안 되면 검색하지 않는다', async () => {
@@ -207,7 +222,7 @@ describe('5.3 친구 초대', () => {
 
     await waitFor(() =>
       expect(screen.getByTestId('location').textContent).toBe(
-        `/parties/${TEST_PARTY_ID}/analyzing`,
+        `/parties/${TEST_PARTY_ID}/popcorn/mix`,
       ),
     );
     expect(createParty).toHaveBeenCalledTimes(1);

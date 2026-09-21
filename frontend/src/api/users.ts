@@ -13,6 +13,7 @@
  */
 import { findMockPublicProfile, mockMyProfileView } from '../mocks/publicProfiles';
 import { getProfileExtras, saveProfileExtras } from '../mocks/sessionStore';
+import { loadAvatar, saveAvatar } from './avatarStore';
 import { request } from './client';
 import { getMockProfile, isMockSession, saveMockProfile } from './mockAccount';
 import { respond, respondError } from './mockTransport';
@@ -116,36 +117,37 @@ export const BIO_MAX_LENGTH = 40;
  * 내 프로필 전체(7.1 · 7.2). 모든 키워드 · 필름이 `isPublic`과 함께 온다.
  *
  * 닉네임과 프레임 · 팝콘 수는 **실제 API-014**다. 나머지는 목업 기준값(`mockMyProfileView`)에
- * 이번 세션에 바꾼 사진 · 소개 · 공개 항목을 덮는다 — 그 셋은 계약에 자리가 없다.
+ * 바꾼 사진 · 소개 · 공개 항목을 덮는다 — 그 셋은 계약에 자리가 없다. 사진은 이 기기의
+ * 저장소(`avatarStore.ts`)에서, 소개 · 공개 항목은 이번 세션의 목업 저장소에서 온다.
  */
 export async function getMyProfileView(): Promise<ProfileView> {
-  const profile = await getMyProfile();
+  return respond(toProfileView(await getMyProfile()), 'users');
+}
+
+function toProfileView(profile: MyProfile): ProfileView {
   const extras = getProfileExtras();
   const base = mockMyProfileView;
 
-  return respond(
-    {
-      ...base,
-      userId: profile.userId,
-      nickname: profile.nickname,
-      avatarUrl: extras.avatarUrl === undefined ? base.avatarUrl : extras.avatarUrl,
-      bio: extras.bio ?? base.bio,
-      stats: {
-        ...base.stats,
-        frameCount: profile.stats.frameCount,
-        popcornCount: profile.stats.popcornCount,
-      },
-      keywords: base.keywords.map((keyword) => ({
-        ...keyword,
-        isPublic: extras.publicKeywordCodes?.includes(keyword.code) ?? keyword.isPublic,
-      })),
-      frames: base.frames.map((frame) => ({
-        ...frame,
-        isPublic: extras.publicFrameIds?.includes(frame.frameId) ?? frame.isPublic,
-      })),
+  return {
+    ...base,
+    userId: profile.userId,
+    nickname: profile.nickname,
+    avatarUrl: loadAvatar(profile.userId) ?? base.avatarUrl,
+    bio: extras.bio ?? base.bio,
+    stats: {
+      ...base.stats,
+      frameCount: profile.stats.frameCount,
+      popcornCount: profile.stats.popcornCount,
     },
-    'users',
-  );
+    keywords: base.keywords.map((keyword) => ({
+      ...keyword,
+      isPublic: extras.publicKeywordCodes?.includes(keyword.code) ?? keyword.isPublic,
+    })),
+    frames: base.frames.map((frame) => ({
+      ...frame,
+      isPublic: extras.publicFrameIds?.includes(frame.frameId) ?? frame.isPublic,
+    })),
+  };
 }
 
 /**
@@ -205,14 +207,22 @@ export async function getMyPublicProfile(): Promise<ProfileView> {
  *
  * 7.2는 항목별로 저장하므로 한 번에 한 키만 보낸다. 사진은 화면이 잘라 만든 data URL이고
  * `null`이면 기본 이미지로 돌아간다. 응답은 저장된 뒤의 내 프로필 전체다.
+ *
+ * 사진은 이 기기에 계정별로 남는다(`avatarStore.ts`, 업무 -740). 저장하지 못하면 던져서 7.2가
+ * 기존 사진을 두고 `다시 시도`를 준다. 소개 · 공개 항목은 아직 세션 메모리라 새로고침하면 처음
+ * 값으로 돌아간다.
  */
 export async function updateProfileExtras(update: ProfileExtrasUpdate): Promise<ProfileView> {
   if (update.bio !== undefined && [...update.bio].length > BIO_MAX_LENGTH) {
     return respondError(400, 'VALIDATION_FAILED', `소개는 ${BIO_MAX_LENGTH}자까지 쓸 수 있어요.`);
   }
 
-  await respond(undefined, 'users');
-  saveProfileExtras(update);
+  const profile = await getMyProfile();
+  const { avatarUrl, ...rest } = update;
 
-  return getMyProfileView();
+  if (avatarUrl !== undefined) saveAvatar(profile.userId, avatarUrl);
+
+  saveProfileExtras(rest);
+
+  return respond(toProfileView(profile), 'users');
 }

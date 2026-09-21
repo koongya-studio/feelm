@@ -73,7 +73,10 @@ class RecommendationServingReader {
         List<ServingItem> items = repository.findAndLockInitialItems(userId, setId);
         if (!items.isEmpty()) {
             if (!repository.expose(
-                    items, OffsetDateTime.now(clock).withOffsetSameInstant(ZoneOffset.UTC))) {
+                    userId,
+                    setId,
+                    items,
+                    OffsetDateTime.now(clock).withOffsetSameInstant(ZoneOffset.UTC))) {
                 throw new IllegalStateException("추천 후보 노출 상태가 변경되었습니다.");
             }
         }

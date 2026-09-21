@@ -1,12 +1,15 @@
 # Fold-in Consumer
 
-Kafka의 평가·온보딩 이벤트를 받아 최신 사용자 입력으로 ALS Fold-in을 수행하고 TASTE 최대 500편과
+Kafka의 평가·온보딩·관심없음 이벤트를 받아 최신 사용자 입력으로 ALS Fold-in을 수행하고 TASTE 최대 500편과
 DISCOVERY 최대 100편을 갱신한다. Python 3.12의 독립 프로젝트이며 Spark 코드를 import하지 않는다.
 모델·매핑·영화 메타데이터는 모두 같은 `input_snapshot`을 가리켜야 하며, 하나라도 맞지 않으면 시작을 거부한다.
 
 각 이벤트 처리에서는 이벤트 payload의 과거 별점·선택을 계산값으로 사용하지 않는다. PostgreSQL의
-현재 평가를 repeatable-read snapshot으로 다시 읽고, DISCOVERY 산출물을 활성화한 경우
-확정 감상·관심없음도 같은 snapshot에서 읽어 결정론적으로 재계산한다. 같은 PostgreSQL 상태와
+현재 평가·관심없음을 repeatable-read snapshot으로 다시 읽고, DISCOVERY 산출물을 활성화한 경우
+확정 감상도 같은 snapshot에서 읽어 결정론적으로 재계산한다. 실제 평가가 없는 관심없음은 계산 시점에만
+기본 `1.0`점의 DISMISS 기반 가상 평점 입력으로 합성하고, 같은 영화의 실제 평가는 `RATING`으로
+우선한다. 가상 평점 입력을
+`ratings`에 저장하지 않으며 관심없음 영화 자체를 제외하는 Spring 동작은 유지한다. 같은 PostgreSQL 상태와
 같은 산출물 revision에 대한 이벤트 재전달은 같은 후보를 만든다.
 
 온보딩 LIKE·DISLIKE는 Backend가 각각 `4.0`·`2.0` 평가 행으로 저장한다. Consumer는
@@ -102,7 +105,7 @@ uv run python -m jobs.batch.movie_metadata --help
 
 Candidate를 Redis에 게시한 뒤에는 같은 Kafka 브로커의 `feelm.candidate-updated.v1`에
 Kafka 키 `userId`(UTF-8 십진 문자열), 값 `{"userId": 1024}` 형식의 완료 알림을 보낸다. 브로커 전달 확인 전에는
-원본 평가·온보딩 Offset을 커밋하지 않는다. 재처리 시 알림이 중복될 수 있으므로 수신자는
+원본 평가·온보딩·관심없음 Offset을 커밋하지 않는다. 재처리 시 알림이 중복될 수 있으므로 수신자는
 현재 Redis `generationId`를 다시 확인해야 한다. 이 알림을 파티별 전체 입력으로 바꾸는
 Spring 소비자는 별도 구현이다.
 
@@ -228,6 +231,9 @@ Registry 태그, Compose 서비스와 restart policy는 배포 업무에서 설�
 
 | 환경변수 | 기본값 | 설명 |
 | --- | --- | --- |
+| `CONSUMER_DISMISS_KAFKA_TOPIC` | `feelm.dismiss.v1` | 관심없음을 현재 DB snapshot 재계산 신호로 받는 Topic |
+| `CONSUMER_DISMISS_SCORE` | `1.0` | 실제 평가가 없는 관심없음에만 적용하는 0.5~5.0 반점 단위 임시 입력값 |
+| `CONSUMER_DISMISS_INPUT_VERSION` | `dismiss-virtual-rating-v1` | DISMISS 기반 가상 평점 정책의 로그·배포 추적 버전. Candidate v6 JSON에는 추가하지 않는다 |
 | `CONSUMER_CONTENT_URI` | 없음(선택) | 공개 완료된 content-artifacts-v2 버전 경로. `latest` 같은 별칭과 `.<version>.tmp-*` staging 경로는 거부한다 |
 | `CONSUMER_GROUP_URI` | 없음(선택) | 공개 완료된 group-serving-artifacts-v1 버전 경로. ALS와 `mapping_revision`이 같아야 하며 설정한 산출물이 불완전하면 시작을 거부한다 |
 | `CONSUMER_DISCOVERY_POPULARITY_URI` | 없음(선택) | 공개 완료된 discovery-popularity-artifacts-v1 버전 경로. `CONSUMER_GROUP_URI`와 반드시 함께 설정한다 |

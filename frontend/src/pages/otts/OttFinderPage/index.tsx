@@ -9,8 +9,8 @@
  * 가운데 `평가`만 남는다(업무 -563 · 지시서 CR-28). 나머지 셋은 대응 API가 없고, `본 영화`는
  * API-014 `stats`의 `frameCount`가 `ratingCount`와 1:1이라 같은 수를 두 번 적는 셈이 된다.
  *
- * `지금까지 감상한 영화와 별점을 바탕으로 분석해요`, OTT 배지와 `OTT 서비스 N개를 분석해요`,
- * `내 OTT 취향 분석하기`, `구독 여부가 아니라 콘텐츠 취향을 기준으로 분석해요`는 그대로다.
+ * API-014의 평가 수가 0이면 개인화 분석을 주장하지 않고 현재 후보를 OTT별 작품 수로
+ * 모은다고 안내한다. 첫 평가 뒤에는 기존 개인 추천 문구로 전환한다.
  *
  * **평가 수로 EXT-05를 미리 가르지 않는다.** 기준 평가 수가 계약에 없다. 분석 가능 여부는
  * API-068의 응답이 정하므로 EXT-02가 결과를 받고 나눈다(업무 -563).
@@ -86,15 +86,17 @@ export default function OttFinderPage() {
     return header;
   }
 
+  const personalized = ratingCount > 0;
+
   return (
     <>
       {header}
 
       <div className={styles.page}>
         <p className={styles.lead}>
-          지금까지 감상한 영화와 별점을
+          {personalized ? '지금까지 감상한 영화와 별점을' : '아직 취향을 알아가는 중이에요'}
           <br />
-          바탕으로 분석해요
+          {personalized ? '바탕으로 분석해요' : '먼저 OTT별 작품을 둘러보세요'}
         </p>
 
         <dl className={styles.basis}>
@@ -116,8 +118,14 @@ export default function OttFinderPage() {
         </div>
 
         <div className={styles.actions}>
-          <Button onClick={() => void navigate(path.ottAnalyzing())}>내 OTT 취향 분석하기</Button>
-          <p className={styles.caption}>구독 여부가 아니라 콘텐츠 취향을 기준으로 분석해요</p>
+          <Button onClick={() => void navigate(path.ottAnalyzing(), { state: { personalized } })}>
+            {personalized ? '내 OTT 취향 분석하기' : 'OTT별 작품 둘러보기'}
+          </Button>
+          <p className={styles.caption}>
+            {personalized
+              ? '구독 여부가 아니라 콘텐츠 취향을 기준으로 분석해요'
+              : '영화를 평가하면 내 취향에 맞춘 결과로 바뀌어요'}
+          </p>
         </div>
       </div>
     </>

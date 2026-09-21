@@ -57,15 +57,16 @@ public class SecurityConfig {
     /**
      * GET만 공개인 조회 API. 메서드를 함께 묶어 같은 경로에 쓰기 계열이 생겨도 자동으로 열리지 않게 한다(리뷰 B-3).
      *
-     * <p>API-044 팝콘 맛 기준정보, API-016 닉네임 사용 가능 확인, API-025 OTT 목록, API-029 검색 필터 옵션이 여기에 속한다. 닉네임
-     * 확인은 회원 구분인 {@code /api/v1/users/me} 계열과 접두사를 공유하므로 와일드카드 없이 정확 경로만 적는다. OTT도 같은 이유로 구독 설정
-     * 경로({@code /api/v1/users/me/otts})와 분리된 정확 경로만 연다.
+     * <p>API-044 팝콘 맛 기준정보, API-016 닉네임 사용 가능 확인, API-025 OTT 목록, API-029 검색 필터 옵션, API-064 급상승 영화가
+     * 여기에 속한다. 닉네임 확인은 회원 구분인 {@code /api/v1/users/me} 계열과 접두사를 공유하므로 와일드카드 없이 정확 경로만 적는다. OTT도 같은
+     * 이유로 구독 설정 경로({@code /api/v1/users/me/otts})와 분리된 정확 경로만 연다.
      */
     private static final String[] PUBLIC_GET_PATHS = {
         "/api/v1/popcorn-flavors",
         "/api/v1/users/nickname-availability",
         "/api/v1/otts",
-        "/api/v1/movies/filter-options"
+        "/api/v1/movies/filter-options",
+        "/api/v1/movies/trending"
     };
 
     /** Nginx가 별도 접근 제어하는 Swagger 문서 경로. 일반 API 공개 목록과 분리한다. */
@@ -93,11 +94,12 @@ public class SecurityConfig {
         return false;
     }
 
-    /** API-030과 API-031은 선택 인증이다. 정적 검색·필터 경로는 영화 ID 템플릿에 포함하지 않는다. */
+    /** API-030과 API-031은 선택 인증이다. 정적 검색·필터·급상승 경로는 영화 ID 템플릿에 포함하지 않는다. */
     public static boolean isOptionalAuthenticationApi(HttpMethod method, String path) {
         return HttpMethod.GET.equals(method)
                 && !path.equals("/api/v1/movies/search")
                 && !path.equals("/api/v1/movies/filter-options")
+                && !path.equals("/api/v1/movies/trending")
                 && (PATH_MATCHER.match("/api/v1/movies/{movieId}", path)
                         || PATH_MATCHER.match("/api/v1/movies/{movieId}/similar", path));
     }

@@ -281,6 +281,15 @@ describe('0.4 이메일 회원가입', () => {
       expect(screen.getByTestId('location').textContent).toBe('/signup/complete');
     });
   });
+
+  it('소셜 계정으로 가입은 0.2 가입 방식 선택으로 돌아간다', () => {
+    // 소셜 버튼만 다시 늘어놓던 0.3을 지웠다(CR-29, 업무 -765)
+    renderSignup();
+
+    fireEvent.click(screen.getByRole('button', { name: '소셜 계정으로 가입' }));
+
+    expect(screen.getByTestId('location').textContent).toBe('/signup');
+  });
 });
 
 /*

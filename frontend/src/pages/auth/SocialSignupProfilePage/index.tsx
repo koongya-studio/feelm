@@ -30,6 +30,7 @@ import { useAuth } from '../../../contexts/authContext';
 import { useNicknameCheck } from '../../../hooks/useNicknameCheck';
 import type { NicknameCheck } from '../../../hooks/useNicknameCheck';
 import { path } from '../../../routes/paths';
+import { SOCIAL_PROVIDER_LABEL } from '../../../utils/oauth';
 import { markSignupCompleted } from '../../../utils/signupCompletion';
 import styles from './SocialSignupProfilePage.module.css';
 import type { Gender, SocialProvider } from '../../../types/auth';
@@ -48,12 +49,6 @@ const MESSAGE: Record<string, string> = {
     '이미 같은 이메일로 가입된 계정이 있어요. 이메일로 로그인한 뒤 소셜 계정을 연결해 주세요.',
   NICKNAME_DUPLICATED: '이미 사용 중인 닉네임이에요.',
   OAUTH_ACCOUNT_ALREADY_LINKED: '이 소셜 계정은 이미 다른 계정에 연결돼 있어요.',
-};
-
-const PROVIDER_LABEL: Record<SocialProvider, string> = {
-  google: '구글',
-  kakao: '카카오',
-  naver: '네이버',
 };
 
 /** 종이의 줄 순서. 닉네임 줄(1)은 처음부터 나와 있다 */
@@ -146,12 +141,12 @@ export default function SocialSignupProfilePage() {
 
   return (
     <>
-      <ScreenHeader title="소셜 계정으로 가입" showBack fallbackTo={path.signupSocial()} />
+      <ScreenHeader title="소셜 계정으로 가입" showBack fallbackTo={path.signupMethod()} />
 
       <SignupPaper onSubmit={() => void submit()}>
         <SignupPaperHeading eyebrow="CREATE YOUR FEELM" title="조금만 더 알려 주세요">
           <p className={styles.lead}>
-            {provider ? `${PROVIDER_LABEL[provider]} 계정으로 가입해요. ` : ''}
+            {provider ? `${SOCIAL_PROVIDER_LABEL[provider]} 계정으로 가입해요. ` : ''}
             이메일과 비밀번호는 필요하지 않아요.
           </p>
         </SignupPaperHeading>

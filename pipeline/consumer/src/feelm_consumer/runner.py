@@ -17,7 +17,7 @@ from feelm_consumer.discovery_popularity import load_discovery_popularity
 from feelm_consumer.discovery_release import validate_discovery_artifacts
 from feelm_consumer.events import EventValidationError, parse_event
 from feelm_consumer.group_artifacts import GroupBundle, load_group_bundle
-from feelm_consumer.postgres import load_user_snapshot, readonly_snapshot
+from feelm_consumer.postgres import load_user_snapshot, merge_profile_inputs, readonly_snapshot
 from feelm_consumer.ranking import RankedMovie
 from feelm_consumer.redis_store import (
     StalePartitionFenceError,
@@ -49,6 +49,8 @@ def process_user(
     groups: GroupBundle | None = None,
     discovery_popularity: tuple[RankedMovie, ...] | None = None,
     hybrid_alpha: float = 0.5,
+    dismiss_score: float = 1.0,
+    dismiss_input_version: str = "dismiss-virtual-rating-v1",
     candidate_event_publisher: Callable[[int], None] | None = None,
 ) -> bool | None:
     for attempt in range(attempts):
@@ -58,9 +60,16 @@ def process_user(
             expected = _expected_version(store, user_id, partition_fence)
             with readonly_snapshot(connect) as connection:
                 snapshot = load_user_snapshot(connection, user_id)
+            profile_inputs = merge_profile_inputs(snapshot, dismiss_score)
+            LOG.info(
+                "profile_inputs_loaded policy_version=%s rating_count=%s dismissal_count=%s",
+                dismiss_input_version,
+                len(snapshot.ratings),
+                len(profile_inputs) - len(snapshot.ratings),
+            )
             results = calculate_user_results(
                 bundle,
-                snapshot.ratings,
+                profile_inputs,
                 content=content,
                 groups=groups,
                 discovery_popularity=discovery_popularity,
@@ -221,7 +230,11 @@ def run(settings: Settings) -> None:
         consumer.pause([partition])
 
     try:
-        consumer.subscribe([settings.kafka_topic], on_assign=on_assign, on_revoke=on_revoke)
+        consumer.subscribe(
+            [settings.kafka_topic, settings.dismiss_kafka_topic],
+            on_assign=on_assign,
+            on_revoke=on_revoke,
+        )
         while not stopping:
             if assignment_failed:
                 raise RuntimeError("partition fence claim failed; Consumer restart required")
@@ -259,6 +272,8 @@ def run(settings: Settings) -> None:
                 groups=groups,
                 discovery_popularity=discovery_popularity,
                 hybrid_alpha=settings.hybrid_alpha,
+                dismiss_score=settings.dismiss_score,
+                dismiss_input_version=settings.dismiss_input_version,
                 candidate_event_publisher=send_candidate_event,
             )
             if processed is None:

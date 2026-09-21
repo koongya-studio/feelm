@@ -1,4 +1,4 @@
-/* EXT-02. 5.4 파티 분석 중(PartyAnalyzingPage.module.css)과 같은 한 덩어리 구성이다 */
+/* EXT-02. 가운데 한 덩어리로 모은 구성이다 */
 .page {
   display: flex;
   min-height: 100dvh;

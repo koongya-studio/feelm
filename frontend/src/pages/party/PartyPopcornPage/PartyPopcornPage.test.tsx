@@ -12,8 +12,8 @@
  * 옮겼다(사용자 결정 2026-09-18). 링크가 **없다는 것**과 차단이 **고른 친구**를 대상으로
  * 한다는 것은 화면을 열어 보는 것만으로는 알 수 없다.
  *
- * **파티팝콘 흐름의 입구.** `함께 볼 영화 추천받기`가 5.4로 간다. 5.9로 바로 가지
- * 않는다 — 모으기 · 섞기 · 추천은 순서가 있는 한 흐름이다(업무 -462).
+ * **파티팝콘 흐름의 입구.** `함께 볼 영화 추천받기`가 5.9로 간다. 모으기와 섞기가 그 한
+ * 화면에서 이어지고 저절로 5.5까지 간다(업무 -773). 한때 5.4가 따로 있어 장면이 끊겼다.
  *
  * **파티 관리.** 나가기(API-055) · 종료(API-056) · 내보내기(API-069)도 와이어프레임에
  * 자리가 없어 5.8에 두기로 했다(사용자 결정 2026-09-16). 시안이 헤더 `···` 메뉴로
@@ -220,12 +220,14 @@ describe('5.8 파티원 팝콘 — 공개 프로필과 차단', () => {
 });
 
 describe('5.8 파티팝콘 흐름 입구', () => {
-  it('함께 볼 영화 추천받기는 5.4 취향 모으기로 간다', async () => {
+  it('함께 볼 영화 추천받기는 5.9 모으기 · 섞기로 간다', async () => {
     await renderPopcorn();
 
     fireEvent.click(screen.getByRole('button', { name: '함께 볼 영화 추천받기' }));
 
-    expect(screen.getByTestId('location').textContent).toBe(`/parties/${TEST_PARTY_ID}/analyzing`);
+    expect(screen.getByTestId('location').textContent).toBe(
+      `/parties/${TEST_PARTY_ID}/popcorn/mix`,
+    );
   });
 });
 

@@ -23,7 +23,9 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class WatchRepository {
 
-    private static final Duration CONFIRM_DELAY = Duration.ofHours(24);
+    /** 감상 확인은 지연 없이 클릭 즉시 묻는다(팀 결정 2026-09-18). 되돌릴 때를 위해 값 하나로 모아 둔다. */
+    private static final Duration CONFIRM_DELAY = Duration.ZERO;
+
     private static final Duration EXPIRATION_DELAY = Duration.ofDays(7);
 
     private final JdbcClient jdbc;

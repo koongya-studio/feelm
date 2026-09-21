@@ -26,14 +26,21 @@
  * 없으면 로그인이 아니라 가입이 남은 것이라 콜백이 0.3-A로 보낸다(S15P21E106-499).
  * client-id가 설정되지 않은 제공자는 눌러도 `UNSUPPORTED_PROVIDER`라 버튼을 잠근다.
  *
+ * **이미 로그인한 사람은 앱으로 보낸다**(업무 -771, 2026-09-21 배포본 점검). 전에는 로그인한
+ * 채로 `/login`에 들어와도 로그인 화면이 그대로 떴다. 로그인 뒤 가는 곳과 같은 규칙이다 —
+ * 온보딩을 안 마쳤으면 1.1, 아니면 가려던 주소나 3.1. 세션을 되살리는 중(`restoring`)에는
+ * 판단하지 않고 화면을 그대로 둔다. 이 화면에서 방금 로그인한 경우는 `submit`이 보내므로
+ * 여기서 한 번 더 보내지 않는다(`signingIn`).
+ *
  * **영화 티켓 디자인** (받은 시안, 2026-09-14, S15P21E106-319). 모든 요소가 모서리가 파인
  * 티켓 한 장 위에 선다. 절취선 아래 꼬리표에는 장식 바코드가 찍힌다. 티켓 테두리 · 절취선 ·
  * `로그인` 버튼은 브랜드 빨강이고, 소셜 버튼은 각 사 로고를 쓴다.
  */
 import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router';
 import Button from '../../../components/Button';
 import SocialButton from '../../../components/SocialButton';
+import SocialNotice from '../../../components/SocialNotice';
 import type { SocialProvider } from '../../../components/SocialButton';
 import TextField from '../../../components/TextField';
 import Wordmark from '../../../components/Wordmark';
@@ -64,7 +71,7 @@ type Failure = { code: string; message: string };
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { status, user, signIn } = useAuth();
 
   /*
    * 0.6은 두 경로로 열린다. 보호 라우트가 보낸 경우 가려던 주소가 `state.from`에 있고
@@ -83,16 +90,16 @@ export default function LoginPage() {
   const returnTo = isReturnPath(state?.from) ? state.from : null;
   const sessionExpired = Boolean(state?.sessionExpired);
 
-  /* 한 곳이라도 열려 있으면 준비 중 안내를 내린다 */
-  const ready = PROVIDERS.some(({ provider }) => isOAuthConfigured(provider));
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
+  /** 이 화면에서 로그인을 시작했는지. 그때의 이동은 `submit`이 맡는다 */
+  const [signingIn, setSigningIn] = useState(false);
 
   const submit = async () => {
     setPending(true);
+    setSigningIn(true);
     setFailure(null);
 
     try {
@@ -112,10 +119,20 @@ export default function LoginPage() {
        * 문구를 그대로 쓴다.
        */
       setFailure({ code, message: MESSAGE[code] ?? failureDescription(error) });
+      setSigningIn(false);
     } finally {
       setPending(false);
     }
   };
+
+  if (status === 'authenticated' && user && !signingIn) {
+    return (
+      <Navigate
+        to={user.onboardingCompleted ? (returnTo ?? path.film()) : path.onboardingTaste()}
+        replace
+      />
+    );
+  }
 
   return (
     <div className={styles.page}>
@@ -197,7 +214,7 @@ export default function LoginPage() {
           ))}
         </div>
 
-        {ready ? null : <p className={styles.notice}>소셜 로그인은 준비 중입니다.</p>}
+        <SocialNotice action="로그인" />
       </Ticket>
     </div>
   );

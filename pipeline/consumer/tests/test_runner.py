@@ -23,14 +23,22 @@ class FakePartition:
 
 
 class FakeMessage:
-    def __init__(self, partition: int, offset: int, value: bytes, key: bytes = pack(">q", 7)) -> None:
+    def __init__(
+        self,
+        partition: int,
+        offset: int,
+        value: bytes,
+        key: bytes = pack(">q", 7),
+        topic: str = "feelm.rating.v1",
+    ) -> None:
         self._partition = partition
         self._offset = offset
         self._value = value
         self._key = key
+        self._topic = topic
 
     def topic(self) -> str:
-        return "feelm.rating.v1"
+        return self._topic
 
     def partition(self) -> int:
         return self._partition
@@ -57,13 +65,19 @@ class FakeConsumer:
         self.unassigned = False
         self.closed = False
         self.callbacks: dict[str, object] = {}
+        self.subscribed_topics: list[str] = []
 
-    def subscribe(self, _topics: list[str], **callbacks: object) -> None:
+    def subscribe(self, topics: list[str], **callbacks: object) -> None:
+        self.subscribed_topics = topics
         self.callbacks = callbacks
         on_assign = callbacks["on_assign"]
         on_assign(  # type: ignore[operator]
             self,
-            [FakePartition("feelm.rating.v1", 0), FakePartition("feelm.rating.v1", 1)],
+            [
+                FakePartition("feelm.rating.v1", 0),
+                FakePartition("feelm.rating.v1", 1),
+                FakePartition("feelm.dismiss.v1", 0),
+            ],
         )
 
     def assign(self, partitions: list[FakePartition]) -> None:
@@ -247,6 +261,7 @@ def test_content_and_alpha_reach_process_user(monkeypatch) -> None:
 
     assert seen["content"] is CONTENT
     assert seen["hybrid_alpha"] == 0.25
+    assert fake.subscribed_topics == ["feelm.rating.v1", "feelm.dismiss.v1"]
 
 
 @pytest.mark.parametrize("delivery_count", [1, 2])
@@ -299,6 +314,91 @@ def test_onboarding_event_reads_snapshot_and_calculates_once_per_delivery(
     assert publishes == [1] * delivery_count
     assert notifications == [7] * delivery_count
     assert fake.committed == [onboarding] * delivery_count
+
+
+def test_dismiss_event_triggers_only_its_user_and_commits_source_record(monkeypatch) -> None:
+    processed: list[int] = []
+    dismiss = FakeMessage(
+        0,
+        20,
+        b'{"eventId":"123e4567-e89b-12d3-a456-426614174000","userId":7,"eventType":"DISMISS",'
+        b'"occurredAt":"2026-09-21T00:00:00Z","payload":{"movieId":20}}',
+        topic="feelm.dismiss.v1",
+    )
+    fake = StoppingConsumer([dismiss])
+    _wire_run(monkeypatch, fake)
+    monkeypatch.setattr(runner, "load_bundle", lambda *_args: _Bundle())
+    monkeypatch.setattr(
+        runner,
+        "process_user",
+        lambda _store, _connect, _bundle, user_id, **_kwargs: processed.append(user_id) or True,
+    )
+
+    with pytest.raises(SystemExit):
+        runner.run(_settings())
+
+    assert processed == [7]
+    assert fake.committed == [dismiss]
+
+
+def test_cross_topic_replays_converge_to_each_current_snapshot(monkeypatch) -> None:
+    dismiss = FakeMessage(
+        0,
+        20,
+        b'{"eventId":"123e4567-e89b-12d3-a456-426614174000","userId":7,"eventType":"DISMISS",'
+        b'"occurredAt":"2026-09-21T00:00:00Z","payload":{"movieId":20}}',
+        topic="feelm.dismiss.v1",
+    )
+    rating = FakeMessage(
+        0,
+        21,
+        b'{"eventId":"223e4567-e89b-12d3-a456-426614174000","userId":7,"eventType":"RATING",'
+        b'"occurredAt":"2026-09-20T00:00:00Z","payload":{"action":"CREATE",'
+        b'"movieId":20,"score":1.0}}',
+    )
+    stale_dismiss = FakeMessage(
+        0,
+        22,
+        b'{"eventId":"323e4567-e89b-12d3-a456-426614174000","userId":7,"eventType":"DISMISS",'
+        b'"occurredAt":"2026-09-19T00:00:00Z","payload":{"movieId":20}}',
+        topic="feelm.dismiss.v1",
+    )
+    fake = StoppingConsumer([dismiss, rating, stale_dismiss, rating])
+    _wire_run(monkeypatch, fake)
+    monkeypatch.setattr(runner, "load_bundle", lambda *_args: _Bundle())
+    monkeypatch.setattr(runner, "_expected_version", lambda *_args: 0)
+    monkeypatch.setattr(runner, "readonly_snapshot", _null_snapshot)
+    snapshots = iter(
+        [
+            UserSnapshot([], frozenset(), frozenset({20})),
+            UserSnapshot([ProfileInput(20, 1.0, "RATING")], frozenset(), frozenset({20})),
+            UserSnapshot([], frozenset(), frozenset()),
+            UserSnapshot([], frozenset(), frozenset()),
+        ]
+    )
+    calculated: list[list[tuple[int, float, str]]] = []
+    monkeypatch.setattr(runner, "load_user_snapshot", lambda *_args: next(snapshots))
+
+    def calculate(_bundle, inputs, **_kwargs):
+        calculated.append([(item.movie_id, item.score, item.source) for item in inputs])
+        generation = f"generation-{len(calculated)}"
+        return ({"generationId": generation}, {"generationId": generation})
+
+    monkeypatch.setattr(runner, "calculate_user_results", calculate)
+    monkeypatch.setattr(runner, "publish", lambda *_args: None)
+    monkeypatch.setattr(runner, "Producer", lambda _config: object())
+    monkeypatch.setattr(runner, "publish_candidate_updated", lambda *_args: None)
+
+    with pytest.raises(SystemExit):
+        runner.run(_settings())
+
+    assert calculated == [
+        [(20, 1.0, "DISMISS")],
+        [(20, 1.0, "RATING")],
+        [],
+        [],
+    ]
+    assert fake.committed == [dismiss, rating, stale_dismiss, rating]
 
 
 def test_group_bundle_is_generation_checked_and_passed_down(monkeypatch) -> None:
@@ -403,6 +503,45 @@ def test_user_without_publishable_result_is_committed_and_does_not_pause(monkeyp
     assert "no_publishable_result_skipped" in caplog.text
 
 
+def test_process_user_recalculates_from_real_ratings_and_virtual_dismissals(monkeypatch, caplog) -> None:
+    calculated: list[ProfileInput] = []
+    monkeypatch.setattr(runner, "_expected_version", lambda *_args: 0)
+    monkeypatch.setattr(runner, "readonly_snapshot", _null_snapshot)
+    monkeypatch.setattr(
+        runner,
+        "load_user_snapshot",
+        lambda *_args: UserSnapshot(
+            [ProfileInput(10, 1.0, "RATING")],
+            frozenset(),
+            frozenset({10, 20}),
+        ),
+    )
+
+    def calculate(_bundle, inputs, **_kwargs):
+        calculated.extend(inputs)
+        return ({"generationId": "gen-1"}, {"generationId": "gen-1"})
+
+    monkeypatch.setattr(runner, "calculate_user_results", calculate)
+    monkeypatch.setattr(runner, "publish", lambda *_args: None)
+
+    with caplog.at_level("INFO"):
+        assert runner.process_user(
+            object(),
+            lambda: object(),
+            object(),
+            7,
+            partition_fence=("fence", "token"),
+            dismiss_score=1.0,
+            dismiss_input_version="dismiss-v1",
+        )
+
+    assert [(item.movie_id, item.score, item.source) for item in calculated] == [
+        (10, 1.0, "RATING"),
+        (20, 1.0, "DISMISS"),
+    ]
+    assert "policy_version=dismiss-v1 rating_count=1 dismissal_count=1" in caplog.text
+
+
 def test_candidate_event_follows_redis_publish_and_failure_keeps_input_uncommitted(monkeypatch) -> None:
     calls: list[str] = []
     monkeypatch.setattr(runner, "_expected_version", lambda *_args: 0)
@@ -450,8 +589,18 @@ def test_redis_publish_failure_does_not_emit_candidate_event(monkeypatch) -> Non
     assert emitted == []
 
 
-def test_malformed_partition_is_not_committed_and_healthy_partition_continues(monkeypatch) -> None:
-    malformed = FakeMessage(0, 10, b"not-json")
+@pytest.mark.parametrize(
+    "malformed_value",
+    [
+        b"not-json",
+        b'{"eventId":"123e4567-e89b-12d3-a456-426614174000","userId":7,'
+        b'"eventType":{},"occurredAt":"2026-09-21T00:00:00Z","payload":{}}',
+    ],
+)
+def test_malformed_partition_is_not_committed_and_healthy_partition_continues(
+    monkeypatch, malformed_value: bytes
+) -> None:
+    malformed = FakeMessage(0, 10, malformed_value)
     healthy = FakeMessage(
         1,
         11,

@@ -98,7 +98,7 @@ export default function SettingsPage() {
          */}
         <section className={styles.banner}>
           <h2 className={styles.bannerTitle}>나에게 맞는 OTT 찾기</h2>
-          <p className={styles.bannerText}>감상 기록을 분석해 OTT별 취향 일치도를 알려드려요</p>
+          <p className={styles.bannerText}>OTT마다 지금 볼 수 있는 작품을 찾아보세요</p>
           <Link to={path.ottFinder()} className={styles.bannerButton}>
             OTT 추천받기
           </Link>

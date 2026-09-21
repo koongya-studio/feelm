@@ -298,6 +298,39 @@ describe('2.5 평가 저장', () => {
     // 수정은 프레임을 만들지 않으므로 수치를 받지 않는다
     expect(getRatingCounts).not.toHaveBeenCalled();
   });
+
+  /*
+   * 별점만 저장한 평가는 `visibility`가 `null`로 온다(API-030 처리 규칙). 그 값을 그대로
+   * 실어 보내면 `comment`가 있는데 `visibility`가 없어 서버가 `400`으로 거절했다
+   * (업무 S15P21E106-763의 차단 결함). 공개 범위를 고르는 UI가 2.5에 없으므로 생성 경로와
+   * 같은 기본값 `PRIVATE`로 채운다.
+   */
+  it('한줄평이 없던 평가에 한줄평을 붙이면 공개 범위를 PRIVATE로 채워 보낸다', async () => {
+    vi.mocked(getMovieDetail).mockResolvedValue({
+      ...movie,
+      myRating: {
+        ratingId: 91,
+        score: 4,
+        comment: null,
+        visibility: null,
+        spoiler: false,
+      },
+    });
+
+    renderPage();
+
+    await screen.findByRole('heading', { level: 1, name: '평가 수정' });
+    await rate(4, '한 번 더 보고 싶다');
+
+    await waitFor(() =>
+      expect(updateRating).toHaveBeenCalledWith(91, {
+        score: 4,
+        comment: '한 번 더 보고 싶다',
+        visibility: 'PRIVATE',
+        spoiler: false,
+      }),
+    );
+  });
 });
 
 /*

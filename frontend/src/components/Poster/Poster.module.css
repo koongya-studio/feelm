@@ -33,9 +33,37 @@
  *
  * **위아래 끝을 어둡게 둔다.** 2.4 상세의 412x340 백드롭처럼 포스터 위에 뒤로 가기
  * 버튼이나 배지가 겹치는 자리가 있어, 위쪽이 밝으면 그 요소들이 읽히지 않는다.
+ *
+ * **이미지를 받는 동안에도 같은 면을 깐다**(업무 -771). 그래서 자리표시자만이 아니라 모든
+ * 포스터에 건다. 전에는 `img`에 배경이 없어 포스터가 뜨기 전까지 테두리만 있는 빈 칸으로
+ * 몇 초씩 남았다. 이미지가 도착하면 그 위를 덮는다.
  */
-.poster[data-placeholder='true'] {
+.poster {
   background:
     radial-gradient(120% 96% at 50% 44%, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.3) 100%),
     linear-gradient(148deg, var(--poster-dark) 0%, var(--poster-light) 52%, var(--poster-dark) 100%);
+}
+
+/*
+ * 자리표시자에 적는 제목(업무 -770). 면이 어두운 무채색이라 밝은 글자다. 긴 제목은 세 줄에서
+ * 자른다 — 칸이 작아 그 이상은 글이 칸을 덮는다.
+ */
+.poster[data-placeholder='true']:has(.caption) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2);
+}
+
+.caption {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  color: var(--color-on-dark);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-meta);
+  text-align: center;
+  word-break: keep-all;
 }

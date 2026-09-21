@@ -12,9 +12,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+@Slf4j
 @Repository
 @RequiredArgsConstructor
 public class RecommendationServingRepository {
@@ -169,7 +171,16 @@ public class RecommendationServingRepository {
                 resultSet.getBigDecimal("average_rating"));
     }
 
-    public boolean expose(List<ServingItem> items, OffsetDateTime exposedAt) {
+    /**
+     * 항목을 노출 상태로 기록하고 같은 트랜잭션에서 추천 이력을 갱신한다.
+     *
+     * <p>{@code user_movie_exposures} upsert를 여기 두는 이유는 이 메서드가 <b>개인 세트</b>의 {@code exposed_at}을 찍는
+     * 유일한 지점이기 때문이다(파티는 {@code PartyRecommendationRepository.expose()}가 따로 찍고, {@code user_id}가 없어
+     * 개인 이력 대상이 아니다). 두 쓰기가 같은 트랜잭션에서 커밋되므로 원본과 이력이 어긋나는 창이 없다. 호출자가 사용자 행 잠금을 쥐고 있어 같은 사용자의 동시 노출도
+     * 직렬화된다.
+     */
+    public boolean expose(
+            long userId, long setId, List<ServingItem> items, OffsetDateTime exposedAt) {
         int[][] results =
                 jdbcTemplate.batchUpdate(
                         "UPDATE recommendation_items SET exposed_at=?"
@@ -180,11 +191,62 @@ public class RecommendationServingRepository {
                             statement.setObject(1, exposedAt);
                             statement.setLong(2, item.id());
                         });
-        return java.util.Arrays.stream(results).flatMapToInt(java.util.Arrays::stream).count()
-                        == items.size()
-                && java.util.Arrays.stream(results)
-                        .flatMapToInt(java.util.Arrays::stream)
-                        .allMatch(updated -> updated == 1);
+        boolean exposed =
+                java.util.Arrays.stream(results).flatMapToInt(java.util.Arrays::stream).count()
+                                == items.size()
+                        && java.util.Arrays.stream(results)
+                                .flatMapToInt(java.util.Arrays::stream)
+                                .allMatch(updated -> updated == 1);
+        if (exposed) {
+            recordExposureHistory(userId, setId, items, exposedAt);
+        }
+        return exposed;
+    }
+
+    /**
+     * 같은 영화의 재노출은 행을 늘리지 않고 최신 노출로 갱신한다. 이력의 중복 제거가 여기서 끝난다.
+     *
+     * <p>{@code WHERE ... set_id < EXCLUDED.set_id} 가드는 더 오래된 세트의 노출이 최신 승자를 덮어쓰지 못하게 한다. 현재 서빙은 항상
+     * 최신 세트만 노출하므로 평상시에는 걸리지 않지만, 이 가드가 있어야 "이력의 승자는 언제나 최대 set_id"가 호출 순서와 무관하게 참이 된다. 운영에서 가드에
+     * 걸리는 것은 시퀀스 되감기 같은 이상 신호라 경고를 남긴다.
+     *
+     * <p>테스트 픽스처 {@code RecommendationHistoryApiContractTest.recordExposure()}와 마이그레이션 {@code
+     * V202609211000}의 백필이 이 문장을 복제한다. 가드나 컬럼을 바꾸면 셋을 함께 바꾼다.
+     */
+    private void recordExposureHistory(
+            long userId, long setId, List<ServingItem> items, OffsetDateTime exposedAt) {
+        int[][] results =
+                jdbcTemplate.batchUpdate(
+                        """
+                INSERT INTO user_movie_exposures
+                    (user_id, movie_id, recommendation_item_id, set_id, exposed_at)
+                VALUES (?,?,?,?,?)
+                ON CONFLICT (user_id, movie_id) DO UPDATE SET
+                    recommendation_item_id = EXCLUDED.recommendation_item_id,
+                    set_id = EXCLUDED.set_id,
+                    exposed_at = EXCLUDED.exposed_at
+                WHERE user_movie_exposures.set_id < EXCLUDED.set_id
+                """,
+                        items,
+                        items.size(),
+                        (statement, item) -> {
+                            statement.setLong(1, userId);
+                            statement.setLong(2, item.movieId());
+                            statement.setLong(3, item.id());
+                            statement.setLong(4, setId);
+                            statement.setObject(5, exposedAt);
+                        });
+        long recorded =
+                java.util.Arrays.stream(results).flatMapToInt(java.util.Arrays::stream).sum();
+        if (recorded < items.size()) {
+            log.warn(
+                    "Exposure history guard rejected {} of {} rows for user {} set {}:"
+                            + " an older set was exposed after a newer one",
+                    items.size() - recorded,
+                    items.size(),
+                    userId,
+                    setId);
+        }
     }
 
     public Map<Long, List<String>> findGenreNames(List<Long> movieIds) {

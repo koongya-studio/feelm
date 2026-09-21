@@ -25,7 +25,13 @@
   max-width: 260px;
   flex-direction: column;
   align-items: center;
-  margin: 0 auto;
+  /*
+   * 위쪽은 파티원 통이 설 자리다(`.feeders`는 기계 상자 위 15%에 뜬다). 자리를 비워 두지
+   * 않으면 세로가 짧은 화면에서 통이 제목 · 부제를 덮었다(업무 -773). 알의 자리가 모두 기계
+   * 상자 기준 비율이라 상자 안에 여백을 두지 않고 바깥 여백으로 비운다. 값은 기계 높이
+   * (폭 × 780 / 663)의 15%다 — 여백의 %는 부모 폭을 따르므로 기계 폭을 직접 셈한다.
+   */
+  margin: calc(min(100%, 260px) * 780 / 663 * 0.15) auto 0;
 }
 
 .body {
@@ -72,6 +78,22 @@
 
 .feeder {
   transform-origin: 50% 100%;
+}
+
+/*
+ * 모으기. 파티원 통이 위에서 차례로 내려와 기계 위에 모인다(업무 -773). 한때 5.4라는 따로
+ * 된 화면이 큰 통 두 개를 보여 준 뒤 이 화면으로 넘어와 장면이 끊겼다.
+ */
+.machine[data-phase='idle'] .feeder {
+  animation: gather 560ms var(--ease-standard) backwards;
+  animation-delay: calc(var(--index) * 140ms);
+}
+
+@keyframes gather {
+  from {
+    opacity: 0;
+    transform: translateY(-28px);
+  }
 }
 
 /* 붓는 단계에서 기계 입구 쪽으로 기울고, 쏟아낸 뒤 물러난다 */

@@ -51,8 +51,27 @@ function clientId(provider: SocialProvider): string {
 /** 진행 중인 요청을 두는 자리. 탭을 닫으면 사라지고 다른 탭과 섞이지 않는다 */
 const STORAGE_KEY = 'feelm.oauth';
 
-/** 콜백에서 이어 갈 곳. 로그인으로 시작했는지 가입으로 시작했는지에 따라 다르다 */
-export type OAuthIntent = 'login' | 'signup';
+/** 화면에 쓰는 제공자 이름 */
+export const SOCIAL_PROVIDER_LABEL: Record<SocialProvider, string> = {
+  google: '구글',
+  kakao: '카카오',
+  naver: '네이버',
+};
+
+/**
+ * 콜백에서 이어 갈 곳. 로그인으로 시작했는지 가입으로 시작했는지에 따라 다르다.
+ *
+ * `withdraw`는 7.8-A-1 회원 탈퇴의 본인 확인이다(업무 -754). 콜백은 이 코드로 로그인하지
+ * 않고 탈퇴 화면에 넘긴다 — 코드는 1회용이라 쓰는 곳이 한 곳이어야 한다.
+ */
+export type OAuthIntent = 'login' | 'signup' | 'withdraw';
+
+/** 이미 연결된 제공자 이름(API-014 `linkedProviders`, 대문자로 온다)을 앱의 제공자로 바꾼다 */
+export function toSocialProvider(name: string): SocialProvider | null {
+  const lower = name.toLowerCase();
+
+  return Object.hasOwn(AUTHORIZE_URL, lower) ? (lower as SocialProvider) : null;
+}
 
 export type OAuthRequest = {
   provider: SocialProvider;
@@ -72,6 +91,11 @@ export type OAuthRequest = {
 /** 자격 증명이 설정되지 않은 제공자는 백엔드도 `UNSUPPORTED_PROVIDER`로 답한다 */
 export function isOAuthConfigured(provider: SocialProvider): boolean {
   return clientId(provider) !== '';
+}
+
+/** 제공자가 하나라도 열려 있는지. 소셜 준비 중 안내의 기준이다(`components/SocialNotice`) */
+export function isAnySocialConfigured(): boolean {
+  return (Object.keys(AUTHORIZE_URL) as SocialProvider[]).some(isOAuthConfigured);
 }
 
 /**

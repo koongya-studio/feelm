@@ -8,7 +8,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.feelm.backend.domain.auth.entity.OAuthProvider;
+import com.feelm.backend.global.error.BusinessException;
+import com.feelm.backend.global.error.ErrorCode;
 import com.feelm.backend.global.security.TokenProvider;
+import com.feelm.backend.infrastructure.oauth.FakeOAuthClient;
+import com.feelm.backend.infrastructure.oauth.OAuthUserProfile;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -26,7 +30,8 @@ import org.springframework.test.web.servlet.ResultActions;
  * 수 있고, 소셜 연결 수단 삭제까지 보려면 {@link OAuthApiTestSupport}의 provider 대역이 필요하다. 비밀번호 변경(API-012)의 계약 테스트가
  * 같은 이유로 이 골격을 쓴다.
  *
- * <p>이번 범위는 이메일 계정 경로뿐이다. 소셜 전용 계정은 {@code PASSWORD_NOT_SET}으로 거절되는 것까지만 고정한다(플랜 결정 U1).
+ * <p>본인 확인 수단이 둘이라 경로도 둘이다. 비밀번호(이메일 계정)와 연결된 소셜 계정의 재인가 코드(S15P21E106-435)이며, 어느 쪽인지는 요청 본문의
+ * {@code provider} 유무가 고른다.
  */
 @DisplayName("회원 탈퇴 — API-013")
 class UserWithdrawalContractTest extends OAuthApiTestSupport {
@@ -261,13 +266,13 @@ class UserWithdrawalContractTest extends OAuthApiTestSupport {
     }
 
     @Test
-    @DisplayName("T14 소셜 전용 계정이 password를 생략하면 409 PASSWORD_NOT_SET이다 (플랜 결정 U1)")
+    @DisplayName("T14 비밀번호가 없는 계정이 비밀번호 경로로 오면 409 PASSWORD_NOT_SET이다")
     void rejectsSocialOnlyAccount(CapturedOutput output) throws Exception {
         Member member = newMember(output);
         clearPassword(member.userId());
 
         // 소셜 전용 클라이언트는 보낼 비밀번호가 없다. 값 검증이 계정 판정보다 앞서면 이 요청은 400이 되어
-        // 계약이 약속한 409에 영영 닿지 못한다(리뷰 A-F7·B-F6).
+        // 계약이 약속한 409에 영영 닿지 못한다(리뷰 A-F7·B-F6). 이 계정도 소셜 재인증 경로로는 탈퇴할 수 있다(T18).
         withdrawWithBody(member.accessToken(), "{}")
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("PASSWORD_NOT_SET"));
@@ -315,7 +320,247 @@ class UserWithdrawalContractTest extends OAuthApiTestSupport {
         mockMvc.perform(post(REFRESH_PATH).cookie(cookie)).andExpect(status().isUnauthorized());
     }
 
+    @Test
+    @DisplayName("T18 소셜 전용 계정이 연결된 제공자로 재인증하면 204이고 연결까지 사라진다 (S15P21E106-435)")
+    void withdrawsSocialOnlyAccount() throws Exception {
+        SocialMember member = newSocialMember(OAuthProvider.GOOGLE);
+
+        // 재인증은 가입 때와 같은 provider 사용자로 돌아와야 통과한다.
+        fake(OAuthProvider.GOOGLE).willReturn(member.profile());
+        MvcResult result =
+                withdrawWithSocial(member.accessToken(), "google", VALID_CODE)
+                        .andExpect(status().isNoContent())
+                        .andReturn();
+
+        assertThat(userStatus(member.userId())).isEqualTo("WITHDRAWN");
+        assertThat(withdrawnAt(member.userId())).isNotNull();
+        assertThat(linkedProviderCount(member.userId())).isZero();
+        assertThat(result.getResponse().getHeader(HttpHeaders.SET_COOKIE))
+                .contains(COOKIE_NAME + "=")
+                .contains("Max-Age=0");
+
+        // 교환은 요청이 보낸 값 그대로 제공자에게 전달돼야 한다.
+        assertThat(fake(OAuthProvider.GOOGLE).calls())
+                .last()
+                .isEqualTo(new FakeOAuthClient.Call(VALID_CODE, ALLOWED_LINK_REDIRECT_URI));
+    }
+
+    @Test
+    @DisplayName("T19 교환된 제공자 식별자가 그 계정의 연결과 다르면 401 INVALID_CREDENTIALS다")
+    void rejectsMismatchedProviderUser() throws Exception {
+        SocialMember member = newSocialMember(OAuthProvider.GOOGLE);
+
+        // 같은 제공자의 다른 사람이 인가 코드를 들고 온 상황이다.
+        fake(OAuthProvider.GOOGLE).willReturn(newProfile());
+        withdrawWithSocial(member.accessToken(), "google", VALID_CODE)
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+
+        assertThat(userStatus(member.userId())).isEqualTo("ACTIVE");
+        assertThat(linkedProviderCount(member.userId())).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("T20 연결하지 않은 제공자로 재인증하면 401 INVALID_CREDENTIALS다")
+    void rejectsUnlinkedProvider() throws Exception {
+        SocialMember member = newSocialMember(OAuthProvider.GOOGLE);
+
+        // KAKAO 쪽 인가는 성공하지만 이 계정에 연결된 수단이 아니다.
+        fake(OAuthProvider.KAKAO).willReturn(newProfile());
+        withdrawWithSocial(member.accessToken(), "kakao", VALID_CODE)
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+
+        assertThat(userStatus(member.userId())).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    @DisplayName("T21 목록에 없는 provider면 제공자를 부르지 않고 400 UNSUPPORTED_PROVIDER다")
+    void rejectsUnsupportedProvider() throws Exception {
+        SocialMember member = newSocialMember(OAuthProvider.GOOGLE);
+        oauthClients.reset();
+
+        withdrawWithSocial(member.accessToken(), "twitter", VALID_CODE)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_PROVIDER"));
+
+        assertThat(fake(OAuthProvider.GOOGLE).calls()).isEmpty();
+        assertThat(userStatus(member.userId())).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    @DisplayName("T22 허용 목록 밖 redirectUri면 제공자를 부르지 않고 400 VALIDATION_FAILED다 (D-4)")
+    void rejectsRedirectUriOutsideAllowlist() throws Exception {
+        SocialMember member = newSocialMember(OAuthProvider.GOOGLE);
+        oauthClients.reset();
+
+        withdrawWithBody(
+                        member.accessToken(),
+                        socialWithdrawalBody("google", VALID_CODE, "https://evil.example/callback"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+
+        // 주소를 아예 빼도 같은 판정이다. 허용 목록은 완전 일치만 통과시킨다.
+        withdrawWithBody(
+                        member.accessToken(),
+                        "{\"provider\":\"google\",\"code\":\"%s\"}".formatted(VALID_CODE))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+
+        assertThat(fake(OAuthProvider.GOOGLE).calls()).isEmpty();
+        assertThat(userStatus(member.userId())).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    @DisplayName("T23 provider는 있고 인가 코드가 비면 제공자를 부르지 않고 400 VALIDATION_FAILED다")
+    void rejectsBlankSocialCode() throws Exception {
+        SocialMember member = newSocialMember(OAuthProvider.GOOGLE);
+        oauthClients.reset();
+
+        withdrawWithSocial(member.accessToken(), "google", "")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+
+        assertThat(fake(OAuthProvider.GOOGLE).calls()).isEmpty();
+        assertThat(userStatus(member.userId())).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    @DisplayName("T24 제공자 응답 오류는 502 OAUTH_PROVIDER_ERROR이고 계정은 그대로다")
+    void rejectsProviderErrorOnWithdrawal() throws Exception {
+        SocialMember member = newSocialMember(OAuthProvider.GOOGLE);
+
+        fake(OAuthProvider.GOOGLE).willFail(new BusinessException(ErrorCode.OAUTH_PROVIDER_ERROR));
+        withdrawWithSocial(member.accessToken(), "google", VALID_CODE)
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.code").value("OAUTH_PROVIDER_ERROR"));
+
+        assertThat(userStatus(member.userId())).isEqualTo("ACTIVE");
+        assertThat(linkedProviderCount(member.userId())).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("T25 비밀번호가 있는 계정도 연결된 소셜로 재인증해 탈퇴할 수 있다 (결정 D2)")
+    void allowsSocialReauthOnPasswordAccount(CapturedOutput output) throws Exception {
+        Member member = newMember(output);
+        OAuthUserProfile profile = newProfile();
+        fake(OAuthProvider.GOOGLE).willReturn(profile);
+        oauthLink(OAuthProvider.GOOGLE, member.accessToken(), VALID_CODE, ALLOWED_LINK_REDIRECT_URI)
+                .andExpect(status().isCreated());
+
+        fake(OAuthProvider.GOOGLE).willReturn(profile);
+        withdrawWithSocial(member.accessToken(), "google", VALID_CODE)
+                .andExpect(status().isNoContent());
+
+        assertThat(userStatus(member.userId())).isEqualTo("WITHDRAWN");
+    }
+
+    @Test
+    @DisplayName("T19b 연결은 있지만 다른 사용자의 것이면 401 INVALID_CREDENTIALS다 (리뷰 A-2)")
+    void rejectsProviderAccountOwnedByAnotherUser() throws Exception {
+        SocialMember member = newSocialMember(OAuthProvider.GOOGLE);
+        SocialMember other = newSocialMember(OAuthProvider.GOOGLE);
+
+        // 연결 행 자체는 존재하므로 조회가 빈 결과로 끝나지 않는다. 소유자 비교가 없으면 여기서 통과해 버린다.
+        fake(OAuthProvider.GOOGLE).willReturn(other.profile());
+        withdrawWithSocial(member.accessToken(), "google", VALID_CODE)
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+
+        assertThat(userStatus(member.userId())).isEqualTo("ACTIVE");
+        assertThat(userStatus(other.userId())).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    @DisplayName("T20b 식별자가 같아도 provider가 다르면 401 INVALID_CREDENTIALS다 (리뷰 B-2)")
+    void rejectsSameIdentifierFromAnotherProvider() throws Exception {
+        SocialMember member = newSocialMember(OAuthProvider.GOOGLE);
+
+        // 제공자 식별자는 제공자 안에서만 유일하다. 대조에서 provider를 빼면 이 요청이 통과한다.
+        fake(OAuthProvider.KAKAO)
+                .willReturn(
+                        new OAuthUserProfile(
+                                member.profile().providerUserId(),
+                                "other@example.com",
+                                "otherNick"));
+        withdrawWithSocial(member.accessToken(), "kakao", VALID_CODE)
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("INVALID_CREDENTIALS"));
+
+        assertThat(userStatus(member.userId())).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    @DisplayName("T24b 코드 교환 실패는 400 OAUTH_CODE_INVALID다")
+    void rejectsInvalidAuthorizationCode() throws Exception {
+        SocialMember member = newSocialMember(OAuthProvider.GOOGLE);
+
+        fake(OAuthProvider.GOOGLE).willFail(new BusinessException(ErrorCode.OAUTH_CODE_INVALID));
+        withdrawWithSocial(member.accessToken(), "google", VALID_CODE)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("OAUTH_CODE_INVALID"));
+
+        assertThat(userStatus(member.userId())).isEqualTo("ACTIVE");
+    }
+
+    @Test
+    @DisplayName("T26 탈퇴한 계정의 소셜 요청은 교환을 거친 뒤 401 UNAUTHORIZED다 (리뷰 A-3)")
+    void withdrawnAccountCannotWithdrawAgainThroughSocialPath() throws Exception {
+        SocialMember member = newSocialMember(OAuthProvider.GOOGLE);
+        fake(OAuthProvider.GOOGLE).willReturn(member.profile());
+        withdrawWithSocial(member.accessToken(), "google", VALID_CODE)
+                .andExpect(status().isNoContent());
+        String withdrawnAt = withdrawnAt(member.userId());
+
+        // 계정 판정은 잠금을 쥔 단계에서만 하므로 교환은 한 번 더 일어나고, 그 뒤 계정 상태에서 막힌다.
+        fake(OAuthProvider.GOOGLE).willReturn(member.profile());
+        withdrawWithSocial(member.accessToken(), "google", VALID_CODE)
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+
+        assertThat(withdrawnAt(member.userId())).isEqualTo(withdrawnAt);
+    }
+
+    @Test
+    @DisplayName("T27 provider가 비어 있으면 비밀번호 경로로 본다 (리뷰 B-3)")
+    void blankProviderFallsBackToPasswordPath(CapturedOutput output) throws Exception {
+        Member member = newMember(output);
+        oauthClients.reset();
+
+        withdrawWithBody(
+                        member.accessToken(),
+                        "{\"provider\":\"\",\"password\":\"%s\"}".formatted(member.password()))
+                .andExpect(status().isNoContent());
+
+        assertThat(userStatus(member.userId())).isEqualTo("WITHDRAWN");
+        assertThat(fake(OAuthProvider.GOOGLE).calls()).isEmpty();
+    }
+
     // ----- 보조 -----
+
+    private ResultActions withdrawWithSocial(String accessToken, String provider, String code)
+            throws Exception {
+        return withdrawWithBody(
+                accessToken, socialWithdrawalBody(provider, code, ALLOWED_LINK_REDIRECT_URI));
+    }
+
+    /** 재인증은 연결(API-009)과 같은 콜백 주소를 그대로 쓴다(결정 D5). 설정의 허용 목록을 건드리지 않기 위해서다. */
+    private static String socialWithdrawalBody(String provider, String code, String redirectUri) {
+        return "{\"provider\":\"%s\",\"code\":\"%s\",\"redirectUri\":\"%s\"}"
+                .formatted(provider, code, redirectUri);
+    }
+
+    /** 비밀번호가 없는 계정. 가입 경로(API-007 → API-008)를 그대로 거쳐 만든다. */
+    private SocialMember newSocialMember(OAuthProvider provider) throws Exception {
+        OAuthUserProfile profile = newProfile();
+        MvcResult signup = socialSignup(provider, profile);
+        long userId = userIdOf(signup);
+
+        assertThat(passwordHash(userId)).isNull();
+        return new SocialMember(userId, profile, stringField(signup, "accessToken"));
+    }
+
+    private record SocialMember(long userId, OAuthUserProfile profile, String accessToken) {}
 
     private ResultActions withdraw(String accessToken, String password) throws Exception {
         return mockMvc.perform(

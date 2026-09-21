@@ -156,8 +156,8 @@ export async function findWatchedRecord(movieId: number): Promise<WatchRecordLis
  *
  * `watched: true` → `WATCHED_UNRATED`, `false` → `EXPIRED`.
  *
- * 클릭 후 2일이 지나지 않아도 받아들인다. 2일은 확인 질문을 노출하는 기준이지 상태 전이
- * 제한이 아니다(API-035 처리 규칙). 이미 답했거나 만료된 기록은 `409 INVALID_WATCH_STATUS`다.
+ * 확인 시각(`confirmDueAt`) 전이어도 받아들인다. 그 시각은 확인 질문을 노출하는 기준이지
+ * 상태 전이 제한이 아니다(API-035 처리 규칙). 계약은 클릭 즉시라 둘이 같다(업무 -667). 이미 답했거나 만료된 기록은 `409 INVALID_WATCH_STATUS`다.
  */
 export async function confirmWatch(
   watchRecordId: number,

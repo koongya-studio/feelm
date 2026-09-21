@@ -45,6 +45,15 @@
  * (API-042)을 읽어 새 프레임 아래에 기존 프레임을 최신순으로 잇는다 — 3.1 릴이 최신 프레임을
  * 맨 앞에 두는 순서와 같다. 목록은 이미 저장된 새 프레임을 포함하므로 그것과 그 뒤에 생긴
  * 프레임(뒤로 가기로 다시 연 경우)은 뺀다. 읽지 못하면 새 프레임 한 장과 빈 칸으로 그린다.
+ *
+ * **새 프레임은 무엇이 추가됐는지 말해야 한다**(업무 -770, 2026-09-21 배포본 점검). 포스터가
+ * 빈 회색 칸으로 남아 화면만으로는 어떤 영화가 감겼는지 알 수 없었다. 두 가지를 고쳤다.
+ * - 포스터는 **곧바로 받는다**(`loading="eager"`). 지연 로딩은 요청을 레이아웃 뒤로 미뤄
+ *   1.2초짜리 2.6이 빈 칸으로 지나갈 수 있다
+ * - 포스터가 없거나 받지 못한 영화는 자리표시자에 **제목을 적는다**(`caption`). 필름의
+ *   기존 프레임도 같다
+ *
+ * 맨 위의 점선 칸은 비어 있는 것이 맞다. 다음 평가가 감길 자리다.
  */
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
@@ -180,7 +189,7 @@ export default function RatingResultPage() {
     return null;
   }
 
-  const { rating, counts, after = null, posterUrl } = state;
+  const { rating, counts, after = null, posterUrl, movieTitle } = state;
   const done = elapsed && measured;
   // 대표 맛이 없는 영화의 평가는 팝콘을 만들지 않는다(API-036 · API-041)
   const hasPopcorn = rating.popcorn.flavorCode !== null;
@@ -226,8 +235,10 @@ export default function RatingResultPage() {
                 height={FRAME_HEIGHT}
                 radius={0}
                 src={posterUrl ?? undefined}
-                title=""
+                title={movieTitle}
                 seed={rating.movieId}
+                loading="eager"
+                caption={movieTitle}
               />
               {!done ? (
                 <span className={styles.newBadge} aria-hidden="true">
@@ -246,6 +257,8 @@ export default function RatingResultPage() {
                     src={frame.movie.posterUrl ?? undefined}
                     title={frame.movie.title}
                     seed={frame.movie.movieId}
+                    loading="eager"
+                    caption={frame.movie.title}
                   />
                 </span>
               ))

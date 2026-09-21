@@ -61,7 +61,7 @@ def load_profile(connection: Connection, user_id: int) -> list[ProfileInput]:
         value = float(score)
         if not 0.5 <= value <= 5.0 or value * 2 != round(value * 2):
             raise ValueError("invalid rating score from PostgreSQL")
-        ratings.append(ProfileInput(movie_id, value, "rating"))
+        ratings.append(ProfileInput(movie_id, value, "RATING"))
     return ratings
 
 
@@ -81,6 +81,16 @@ def load_user_snapshot(connection: Connection, user_id: int) -> UserSnapshot:
     )
     dismissed = _positive_movie_ids(cursor.fetchall(), "dismissal")
     return UserSnapshot(ratings, frozenset(watched), frozenset(dismissed))
+
+
+def merge_profile_inputs(snapshot: UserSnapshot, dismissal_score: float) -> list[ProfileInput]:
+    """Add current dismissals as virtual negatives without overriding real ratings."""
+    rated_movie_ids = {item.movie_id for item in snapshot.ratings}
+    dismissals = [
+        ProfileInput(movie_id, dismissal_score, "DISMISS")
+        for movie_id in sorted(snapshot.dismissed_movie_ids - rated_movie_ids)
+    ]
+    return [*snapshot.ratings, *dismissals]
 
 
 def _positive_movie_ids(rows: list[tuple[int, ...]], label: str) -> set[int]:

@@ -460,11 +460,21 @@ export default function MovieDetailPage() {
               ) : null}
             </div>
           ) : null}
-          <p className={styles.average}>
-            <RatingStars score={movie.averageRating} size={15} gap={3} />
-            <span className={styles.averageValue}>{movie.averageRating.toFixed(1)}</span>
-            <span className={styles.averageCount}>사용자 평점 · {movie.ratingCount}명</span>
-          </p>
+          {/*
+           * 평가가 없으면 계약이 `averageRating=0`을 준다(API-030). 그대로 그리면 빈 별과
+           * `0.0`이 0점을 받은 영화처럼 읽힌다(업무 -771, 2026-09-21 배포본 점검)
+           */}
+          {movie.ratingCount > 0 ? (
+            <p className={styles.average}>
+              <RatingStars score={movie.averageRating} size={15} gap={3} />
+              <span className={styles.averageValue}>{movie.averageRating.toFixed(1)}</span>
+              <span className={styles.averageCount}>사용자 평점 · {movie.ratingCount}명</span>
+            </p>
+          ) : (
+            <p className={styles.average}>
+              <span className={styles.averageCount}>아직 사용자 평점이 없어요</span>
+            </p>
+          )}
           {movie.recommendation?.reason.summary ? (
             <p className={styles.reason}>{movie.recommendation.reason.summary}</p>
           ) : null}

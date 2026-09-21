@@ -206,6 +206,15 @@
 }
 
 /* 최근 검색어가 없을 때의 안내 한 줄 */
+/* 한 글자 입력 안내(업무 -769). 통합 검색 한 줄 바로 아래에 붙는다 */
+.shortNotice {
+  flex: none;
+  padding: 0 var(--screen-padding-x) var(--space-4);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-hint);
+}
+
 .guide {
   padding: var(--space-6) var(--screen-padding-x);
   text-align: center;

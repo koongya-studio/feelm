@@ -1,22 +1,24 @@
 /*
- * 5.9 팝콘 섞기 (업무 S15P21E106-462)
+ * 5.9 팝콘 모으기 · 섞기 (업무 S15P21E106-462 · -773)
  *
  * 세 가지를 고정한다.
  *
- * **섞는 것은 사용자가 시작한다**(사용자 지시 2026-09-17). 누르기 전에는 장면이 돌지
- * 않고, 누르면 파티원의 팝콘이 기계로 들어가 새 팝콘 한 통이 담긴다.
+ * **누르지 않아도 모으기에서 섞기로 이어진다**(사용자 결정 2026-09-21, 업무 -773). 한때
+ * 5.4가 따로 된 화면이라 장면이 끊겼고, 5.9에는 `팝콘 섞기` 버튼이 있어 누를 곳이 많았다.
+ * 이제 파티원 통이 기계 위로 모이고, 그대로 붓고 섞고 담긴다.
  *
- * **버튼은 섞는 동안 사라진다.** 남아 있으면 두 번 눌려 단계가 겹쳐 돈다.
+ * **담긴 뒤에 5.5로 간다.** 추천(API-058)은 화면을 열자마자 받아 두고, 받지 못하면 장면을
+ * 끝까지 보여 준 뒤 5.5로 보내지 않고 이 화면에서 알린다 — 섞기 실패가 아니라 추천 실패로.
  *
- * **담긴 뒤에 5.5로 간다.** 추천(API-058)이 실패하면 보내지 않고 이 화면에서 알린다 —
- * 그러지 않으면 5.5가 빈 화면으로 시작한다.
+ * **추천만 다시 묻는다.** 팝콘은 이미 섞였으므로 다시 시도는 장면을 되풀이하지 않는다.
  *
- * `[!]` 이 파일은 **테스트 자체의 제한 시간**을 늘려 둔다(업무 -617). 섞기 연출이 약 4.8초인데
- * Vitest 기본 제한이 5초라, 전체 실행처럼 러너가 붐비면 그 안에 끝나지 않는다. `findBy` ·
- * `waitFor`에 준 `timeout`은 그 대기 헬퍼의 제한일 뿐 테스트의 제한을 늘리지 않는다.
+ * `[!]` 이 파일은 **테스트 자체의 제한 시간**을 늘려 둔다(업무 -617). 모으기 · 섞기 연출이 약
+ * 6초인데 Vitest 기본 제한이 5초라, 전체 실행처럼 러너가 붐비면 그 안에 끝나지 않는다.
+ * `findBy` · `waitFor`에 준 `timeout`은 그 대기 헬퍼의 제한일 뿐 테스트의 제한을 늘리지 않는다.
  */
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { ApiError } from '../../../api/apiError';
 import PartyPopcornMixPage from './index';
 import { renderWithRouter } from '../../../test/render';
 import { getParty, getPartyPopcorn, getPartyRecommendations } from '../../../api/parties';
@@ -27,7 +29,7 @@ import { party, partyPopcorn, partyRecommendations, TEST_PARTY_ID } from '../../
  * Prettier가 본문을 모두 들여써 변경이 커지므로 파일 단위로 한 번 준다. 제한 시간은 상한이라
  * 연출을 기다리지 않는 테스트가 느려지지는 않는다.
  */
-vi.setConfig({ testTimeout: 10000 });
+vi.setConfig({ testTimeout: 12000 });
 
 vi.mock('../../../api/parties', async () => {
   const actual =
@@ -54,25 +56,26 @@ function renderMix() {
   });
 }
 
-describe('5.9 팝콘 섞기', () => {
-  it('누르기 전에는 섞지 않는다', async () => {
+describe('5.9 팝콘 모으기 · 섞기', () => {
+  it('파티원 통이 기계 위로 모이는 것으로 시작하고, 섞기 버튼은 없다', async () => {
     renderMix();
 
-    expect(await screen.findByText('취향을 섞어 볼까요?')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '팝콘 섞기' })).toBeInTheDocument();
-    // 통은 아직 비어 있다
+    expect(await screen.findByText('우리의 취향을 모아요')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: '아직 비어 있는 통' })).toBeInTheDocument();
-    expect(getPartyRecommendations).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: '팝콘 섞기' })).not.toBeInTheDocument();
+    // 진행 표시는 모으기에 있다
+    expect(screen.getByText('모으기').closest('li')).toHaveAttribute('aria-current', 'step');
+    // 추천은 장면이 도는 동안 받아 둔다
+    expect(getPartyRecommendations).toHaveBeenCalledWith(TEST_PARTY_ID);
   });
 
-  it('누르면 섞는 장면이 돌고 새 팝콘이 한 통에 담긴다', async () => {
+  it('누르지 않아도 섞는 장면으로 이어져 새 팝콘이 한 통에 담긴다', async () => {
     renderMix();
 
-    fireEvent.click(await screen.findByRole('button', { name: '팝콘 섞기' }));
-
-    expect(screen.getByText('취향이 섞이는 중')).toBeInTheDocument();
-    // 같은 버튼이 남아 있으면 단계가 겹쳐 돈다
-    expect(screen.queryByRole('button', { name: '팝콘 섞기' })).not.toBeInTheDocument();
+    expect(
+      await screen.findByText('취향이 섞이는 중', undefined, { timeout: 4000 }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('섞기').closest('li')).toHaveAttribute('aria-current', 'step');
 
     expect(
       await screen.findByRole('img', { name: '파티원의 팝콘을 섞은 통' }, { timeout: 8000 }),
@@ -82,38 +85,76 @@ describe('5.9 팝콘 섞기', () => {
   it('섞은 뒤 5.5 추천 완성으로 간다', async () => {
     renderMix();
 
-    fireEvent.click(await screen.findByRole('button', { name: '팝콘 섞기' }));
-
     await waitFor(
       () =>
         expect(screen.getByTestId('location').textContent).toBe(
           `/parties/${TEST_PARTY_ID}/recommendations`,
         ),
-      { timeout: 8000 },
+      { timeout: 10000 },
     );
   });
 
-  it('추천을 받지 못하면 5.5로 보내지 않고 알린다', async () => {
-    vi.mocked(getPartyRecommendations).mockRejectedValue(new Error('실패'));
+  it('추천이 준비 중이면 장면을 끝낸 뒤 추천 실패로 알리고, 추천만 다시 묻는다', async () => {
+    vi.mocked(getPartyRecommendations).mockRejectedValue(
+      new ApiError(503, 'RECOMMENDATION_UNAVAILABLE', '추천을 준비하고 있습니다.'),
+    );
 
     renderMix();
 
-    fireEvent.click(await screen.findByRole('button', { name: '팝콘 섞기' }));
-
     expect(
-      await screen.findByText('팝콘을 섞지 못했어요', undefined, { timeout: 8000 }),
+      await screen.findByText('함께 볼 영화를 아직 고르지 못했어요', undefined, { timeout: 10000 }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText('추천을 준비하고 있어요. 잠시 후 다시 시도해 주세요.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('팝콘을 섞지 못했어요')).not.toBeInTheDocument();
     expect(screen.getByTestId('location').textContent).toBe(
       `/parties/${TEST_PARTY_ID}/popcorn/mix`,
     );
+
+    // 이번에는 준비됐다. 장면을 되풀이하지 않고 5.5로 간다
+    vi.mocked(getPartyRecommendations).mockResolvedValue(partyRecommendations());
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location').textContent).toBe(
+        `/parties/${TEST_PARTY_ID}/recommendations`,
+      ),
+    );
+    expect(screen.queryByText('취향이 섞이는 중')).not.toBeInTheDocument();
   });
 
-  it('파티원의 팝콘을 받지 못하면 섞을 수 없다', async () => {
+  it('다시 시도의 응답이 오기 전에 떠나면, 늦게 온 성공이 5.5로 끌고 가지 않는다', async () => {
+    vi.mocked(getPartyRecommendations).mockRejectedValue(
+      new ApiError(503, 'RECOMMENDATION_UNAVAILABLE', '추천을 준비하고 있습니다.'),
+    );
+
+    renderMix();
+
+    await screen.findByText('함께 볼 영화를 아직 고르지 못했어요', undefined, { timeout: 10000 });
+
+    // 다시 시도는 아직 응답이 없다. 그 사이에 내 파티로 돌아간다
+    let answer: (value: ReturnType<typeof partyRecommendations>) => void = () => undefined;
+    vi.mocked(getPartyRecommendations).mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    fireEvent.click(screen.getByRole('button', { name: '내 파티로 돌아가기' }));
+    expect(screen.getByTestId('location').textContent).toBe('/party');
+
+    answer(partyRecommendations());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(screen.getByTestId('location').textContent).toBe('/party');
+  });
+
+  it('파티원의 팝콘을 받지 못하면 모을 수 없다고 알린다', async () => {
     vi.mocked(getPartyPopcorn).mockRejectedValue(new Error('실패'));
 
     renderMix();
 
-    expect(await screen.findByText('팝콘을 섞지 못했어요')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '팝콘 섞기' })).not.toBeInTheDocument();
+    expect(await screen.findByText('파티원의 팝콘을 모으지 못했어요')).toBeInTheDocument();
   });
 });
