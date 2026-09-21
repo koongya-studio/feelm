@@ -31,7 +31,11 @@ compose=(
   --env-file "${COMPOSE_ENV_FILE}"
   -f "${PROJECT_ROOT}/infra/compose/distributed.yml"
   --profile consumer
+  --profile party-consumer
 )
+
+services=(consumer party-consumer)
+containers=(feelm-foldin-consumer feelm-party-consumer)
 
 env_value() {
   local name="$1"
@@ -55,6 +59,8 @@ env_value() {
 
 KAFKA_TOPIC="$(env_value CONSUMER_KAFKA_TOPIC feelm.rating.v1)"
 KAFKA_GROUP_ID="$(env_value CONSUMER_KAFKA_GROUP_ID feelm-foldin-consumer-v1)"
+PARTY_KAFKA_TOPIC="$(env_value PARTY_CONSUMER_KAFKA_TOPIC feelm.party-refresh.v1)"
+PARTY_KAFKA_GROUP_ID="$(env_value PARTY_CONSUMER_KAFKA_GROUP_ID feelm-party-consumer-v1)"
 
 validate_image_ref() {
   local image="$1"
@@ -85,22 +91,25 @@ verify_current_commit() {
 }
 
 describe_group() {
+  local group_id="$1"
   docker exec feelm-kafka \
     /opt/kafka/bin/kafka-consumer-groups.sh \
     --bootstrap-server 127.0.0.1:9092 \
     --describe \
-    --group "${KAFKA_GROUP_ID}" 2>/dev/null || true
+    --group "${group_id}" 2>/dev/null || true
 }
 
 group_consumer_ids() {
-  awk -v topic="${KAFKA_TOPIC}" '
+  local topic="$1"
+  awk -v topic="${topic}" '
     $2 == topic && $7 != "-" { ids[$7] = 1 }
     END { for (id in ids) print id }
   '
 }
 
 group_is_fully_assigned() {
-  awk -v topic="${KAFKA_TOPIC}" '
+  local topic="$1"
+  awk -v topic="${topic}" '
     $2 == topic {
       rows += 1
       if ($7 == "-") unassigned += 1
@@ -115,28 +124,50 @@ group_is_fully_assigned() {
 }
 
 wait_for_candidate() {
-  local previous_ids="$1"
+  local previous_foldin_ids="$1"
+  local previous_party_ids="$2"
   local attempts="${CONSUMER_DEPLOY_ATTEMPTS:-24}"
   local interval="${CONSUMER_DEPLOY_INTERVAL_SECONDS:-5}"
-  local state description current_ids
+  local index container topic group_id previous_ids state description current_ids all_ready
 
   for ((i = 1; i <= attempts; i++)); do
-    state="$(
-      docker inspect --format '{{.State.Status}} {{.RestartCount}}' \
-        feelm-foldin-consumer 2>/dev/null || true
-    )"
-    if [[ "${state}" =~ ^(exited|dead)[[:space:]] ]] || [[ "${state}" =~ ^running[[:space:]][1-9] ]]; then
-      return 1
-    fi
-
-    if [[ "${state}" == "running 0" ]]; then
-      description="$(describe_group)"
-      if group_is_fully_assigned <<<"${description}"; then
-        current_ids="$(group_consumer_ids <<<"${description}")"
-        if [[ -z "${previous_ids}" ]] || ! grep -Fqx -f <(printf '%s\n' "${previous_ids}") <<<"${current_ids}"; then
-          return 0
-        fi
+    all_ready=true
+    for index in "${!containers[@]}"; do
+      container="${containers[index]}"
+      if ((index == 0)); then
+        topic="${KAFKA_TOPIC}"
+        group_id="${KAFKA_GROUP_ID}"
+        previous_ids="${previous_foldin_ids}"
+      else
+        topic="${PARTY_KAFKA_TOPIC}"
+        group_id="${PARTY_KAFKA_GROUP_ID}"
+        previous_ids="${previous_party_ids}"
       fi
+      state="$(
+        docker inspect --format '{{.State.Status}} {{.RestartCount}}' \
+          "${container}" 2>/dev/null || true
+      )"
+      if [[ "${state}" =~ ^(exited|dead)[[:space:]] ]] \
+        || [[ "${state}" =~ ^running[[:space:]][1-9] ]]; then
+        return 1
+      fi
+      if [[ "${state}" != "running 0" ]]; then
+        all_ready=false
+        continue
+      fi
+      description="$(describe_group "${group_id}")"
+      if ! group_is_fully_assigned "${topic}" <<<"${description}"; then
+        all_ready=false
+        continue
+      fi
+      current_ids="$(group_consumer_ids "${topic}" <<<"${description}")"
+      if [[ -n "${previous_ids}" ]] \
+        && grep -Fqx -f <(printf '%s\n' "${previous_ids}") <<<"${current_ids}"; then
+        all_ready=false
+      fi
+    done
+    if [[ "${all_ready}" == true ]]; then
+      return 0
     fi
 
     if ((i < attempts)); then
@@ -147,10 +178,14 @@ wait_for_candidate() {
   return 1
 }
 
-running_before="$(
+foldin_running_before="$(
   docker inspect --format '{{.Config.Image}}' feelm-foldin-consumer 2>/dev/null || true
 )"
-previous_ids="$(describe_group | group_consumer_ids)"
+party_running_before="$(
+  docker inspect --format '{{.Config.Image}}' feelm-party-consumer 2>/dev/null || true
+)"
+previous_foldin_ids="$(describe_group "${KAFKA_GROUP_ID}" | group_consumer_ids "${KAFKA_TOPIC}")"
+previous_party_ids="$(describe_group "${PARTY_KAFKA_GROUP_ID}" | group_consumer_ids "${PARTY_KAFKA_TOPIC}")"
 previous_image=""
 
 if [[ -f "${DEPLOY_STATE_FILE}" ]]; then
@@ -159,14 +194,11 @@ if [[ -f "${DEPLOY_STATE_FILE}" ]]; then
     echo "Consumer deployment state is invalid" >&2
     exit 1
   fi
-elif [[ "${INITIALIZE_ONLY}" == true && -n "${running_before}" ]]; then
-  running_state="$(
-    docker inspect --format '{{.State.Status}} {{.RestartCount}}' \
-      feelm-foldin-consumer 2>/dev/null || true
-  )"
-  running_group="$(describe_group)"
-  if [[ "${running_state}" == "running 0" ]] && group_is_fully_assigned <<<"${running_group}"; then
-    previous_image="${running_before}"
+elif [[ "${INITIALIZE_ONLY}" == true \
+  && -n "${foldin_running_before}" \
+  && "${foldin_running_before}" == "${party_running_before}" ]]; then
+  if wait_for_candidate "" ""; then
+    previous_image="${foldin_running_before}"
     if ! write_last_known_good "${previous_image}"; then
       echo "Could not initialize the last-known-good Consumer image" >&2
       exit 1
@@ -179,17 +211,13 @@ if [[ "${INITIALIZE_ONLY}" == true ]]; then
     echo "A healthy, fully assigned running Consumer is required to initialize deployment state" >&2
     exit 1
   fi
-  if [[ "${running_before}" != "${previous_image}" ]]; then
-    echo "Running Consumer image does not match the initialized deployment state" >&2
+  if [[ "${foldin_running_before}" != "${previous_image}" \
+    || "${party_running_before}" != "${previous_image}" ]]; then
+    echo "Running Consumer images do not match the initialized deployment state" >&2
     exit 1
   fi
-  running_state="$(
-    docker inspect --format '{{.State.Status}} {{.RestartCount}}' \
-      feelm-foldin-consumer 2>/dev/null || true
-  )"
-  running_group="$(describe_group)"
-  if [[ "${running_state}" != "running 0" ]] || ! group_is_fully_assigned <<<"${running_group}"; then
-    echo "A healthy, fully assigned running Consumer is required to initialize deployment state" >&2
+  if ! wait_for_candidate "" ""; then
+    echo "Two healthy, fully assigned running Consumers are required to initialize deployment state" >&2
     exit 1
   fi
   echo "Consumer deployment state initialized: ${previous_image}"
@@ -201,16 +229,19 @@ if [[ -z "${previous_image}" ]]; then
   exit 1
 fi
 
-if [[ "${running_before}" != "${previous_image}" ]]; then
-  echo "Running Consumer differs from the last-known-good image; reconciling before deployment" >&2
+if [[ "${foldin_running_before}" != "${previous_image}" \
+  || "${party_running_before}" != "${previous_image}" ]]; then
+  echo "Running Consumers differ from the last-known-good image; reconciling before deployment" >&2
   if ! COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE}" \
     CONSUMER_DEPLOY_STATE_FILE="${DEPLOY_STATE_FILE}" \
     bash "${SCRIPT_DIR}/rollback-consumer.sh" "${previous_image}"; then
     echo "Consumer reconciliation failed; manual recovery is required" >&2
     exit 1
   fi
-  running_before="${previous_image}"
-  previous_ids="$(describe_group | group_consumer_ids)"
+  foldin_running_before="${previous_image}"
+  party_running_before="${previous_image}"
+  previous_foldin_ids="$(describe_group "${KAFKA_GROUP_ID}" | group_consumer_ids "${KAFKA_TOPIC}")"
+  previous_party_ids="$(describe_group "${PARTY_KAFKA_GROUP_ID}" | group_consumer_ids "${PARTY_KAFKA_TOPIC}")"
 fi
 
 echo "Previous Consumer image: ${previous_image:-none}"
@@ -239,7 +270,7 @@ restore_previous_image() {
 
   if [[ -z "${previous_image}" ]]; then
     echo "No previous Consumer image is available for rollback" >&2
-    docker stop feelm-foldin-consumer >/dev/null 2>&1 || true
+    docker stop "${containers[@]}" >/dev/null 2>&1 || true
     return 1
   fi
 
@@ -261,18 +292,20 @@ if ! verify_current_commit; then
 fi
 
 if ! CONSUMER_IMAGE="${CANDIDATE_IMAGE}" \
-  "${compose[@]}" up -d --no-deps --force-recreate consumer; then
+  "${compose[@]}" up -d --no-deps --force-recreate "${services[@]}"; then
   restore_previous_image "Candidate Consumer deployment command failed"
 fi
 
-if ! wait_for_candidate "${previous_ids}"; then
+if ! wait_for_candidate "${previous_foldin_ids}" "${previous_party_ids}"; then
   restore_previous_image "Candidate Consumer runtime verification failed"
 fi
 
-running_image="$(docker inspect --format '{{.Config.Image}}' feelm-foldin-consumer)"
-if [[ "${running_image}" != "${CANDIDATE_IMAGE}" ]]; then
-  restore_previous_image "Running Consumer image does not match candidate image"
-fi
+for container in "${containers[@]}"; do
+  running_image="$(docker inspect --format '{{.Config.Image}}' "${container}")"
+  if [[ "${running_image}" != "${CANDIDATE_IMAGE}" ]]; then
+    restore_previous_image "Running Consumer image does not match candidate image: ${container}"
+  fi
+done
 
 if ! verify_current_commit; then
   restore_previous_image "Candidate deployment became stale during runtime verification"
