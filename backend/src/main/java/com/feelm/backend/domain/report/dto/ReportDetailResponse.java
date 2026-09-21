@@ -4,6 +4,7 @@ import com.feelm.backend.domain.report.model.ReportContent.Comparison;
 import com.feelm.backend.domain.report.model.ReportContent.FlavorChange;
 import com.feelm.backend.domain.report.model.ReportContent.FourCut;
 import com.feelm.backend.domain.report.model.ReportContent.GenreRank;
+import com.feelm.backend.domain.report.model.ReportContent.Keyword;
 import com.feelm.backend.domain.report.model.ReportContent.PersonRank;
 import com.feelm.backend.domain.report.model.ReportContent.Share;
 import com.feelm.backend.domain.report.model.ReportContent.Summary;
@@ -25,6 +26,6 @@ public record ReportDetailResponse(
         List<Share> genreShares,
         List<Share> countryShares,
         List<Share> eraShares,
-        List<Object> keywords,
+        List<Keyword> keywords,
         List<Comparison> comparisons,
         List<String> highlights) {}

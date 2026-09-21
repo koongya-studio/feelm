@@ -160,7 +160,7 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
 
     await waitFor(() => expect(location()).toBe('/reports/301/new'));
     expect(await screen.findByText('2026년 상반기 취향 필름을 인화했어요')).toBeInTheDocument();
-    expect(screen.getByText('지난 반기보다 스릴러 취향이 12% 증가했어요')).toBeInTheDocument();
+    expect(screen.getByText('지난 반기보다 다크초코 취향이 12% 증가했어요')).toBeInTheDocument();
 
     // 인화 연출은 건너뛸 수 있고, 건너뛰면 버튼이 사라진다
     fireEvent.click(screen.getByRole('button', { name: '건너뛰기' }));
@@ -189,8 +189,18 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
     expect(screen.getAllByText('웨스 앤더슨')).toHaveLength(2);
     expect(screen.getByText('+4% 신규')).toBeInTheDocument();
     expect(screen.getByText('−6%')).toBeInTheDocument();
-    // 취향 키워드는 계약이 빈 배열을 주는 후속 범위다(API-060)
-    expect(screen.queryByText('취향 키워드')).toBeNull();
+    // 이번 반기에 처음 나온 맛은 이름 옆에도 표시한다. 계약은 `isNew`만 주고 문구는 화면이 만든다
+    expect(screen.getByText('블루베리 (새로운 맛)')).toBeInTheDocument();
+    expect(screen.getByText('다크초코')).toBeInTheDocument();
+  });
+
+  it('취향 키워드는 근거와 함께 그리고, 비면 칸째 숨긴다', async () => {
+    renderApp(['/reports/301']);
+
+    expect(await screen.findByText('취향 키워드')).toBeInTheDocument();
+    expect(screen.getByText('웨스 앤더슨 몰아보기')).toBeInTheDocument();
+    expect(screen.getByText('이번 반기에 블루베리 프레임 4개 추가')).toBeInTheDocument();
+    expect(screen.getByText('이번 반기 평균 ★4.3')).toBeInTheDocument();
   });
 
   it('캐릭터가 없는 리포트는 설명을 숨기고 4컷의 04 칸만 준비 중으로 둔다', async () => {
