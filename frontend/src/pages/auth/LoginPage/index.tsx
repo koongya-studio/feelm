@@ -34,6 +34,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import Button from '../../../components/Button';
 import SocialButton from '../../../components/SocialButton';
+import SocialNotice from '../../../components/SocialNotice';
 import type { SocialProvider } from '../../../components/SocialButton';
 import TextField from '../../../components/TextField';
 import Wordmark from '../../../components/Wordmark';
@@ -82,9 +83,6 @@ export default function LoginPage() {
   };
   const returnTo = isReturnPath(state?.from) ? state.from : null;
   const sessionExpired = Boolean(state?.sessionExpired);
-
-  /* 한 곳이라도 열려 있으면 준비 중 안내를 내린다 */
-  const ready = PROVIDERS.some(({ provider }) => isOAuthConfigured(provider));
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -197,7 +195,7 @@ export default function LoginPage() {
           ))}
         </div>
 
-        {ready ? null : <p className={styles.notice}>소셜 로그인은 준비 중입니다.</p>}
+        <SocialNotice action="로그인" />
       </Ticket>
     </div>
   );

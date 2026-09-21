@@ -141,7 +141,7 @@ export default function SocialSignupProfilePage() {
 
   return (
     <>
-      <ScreenHeader title="소셜 계정으로 가입" showBack fallbackTo={path.signupSocial()} />
+      <ScreenHeader title="소셜 계정으로 가입" showBack fallbackTo={path.signupMethod()} />
 
       <SignupPaper onSubmit={() => void submit()}>
         <SignupPaperHeading eyebrow="CREATE YOUR FEELM" title="조금만 더 알려 주세요">

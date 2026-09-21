@@ -13,7 +13,6 @@ export const ROUTE_PATTERN = {
   // 인증 (하단 내비 없음). 0.1 ~ 0.8-A
   authStart: '/start',
   signupMethod: '/signup',
-  signupSocial: '/signup/social',
   /**
    * 0.3-A 소셜 가입 정보 입력. 와이어프레임에 없이 새로 만든 화면이다(CR-23).
    * API-008이 닉네임·생년월일·성별을 필수로 받는데 이동표에는 입력 자리가 없었다
@@ -125,7 +124,6 @@ export const ROUTE_PATTERN = {
 export const path = {
   authStart: () => ROUTE_PATTERN.authStart,
   signupMethod: () => ROUTE_PATTERN.signupMethod,
-  signupSocial: () => ROUTE_PATTERN.signupSocial,
   signupSocialProfile: () => ROUTE_PATTERN.signupSocialProfile,
   signupEmail: () => ROUTE_PATTERN.signupEmail,
   signupComplete: () => ROUTE_PATTERN.signupComplete,

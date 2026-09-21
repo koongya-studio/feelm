@@ -1,0 +1,8 @@
+/* 오류가 아닌 알림이다. 옅은 글자로 버튼 아래에 둔다 */
+.notice {
+  margin: 0;
+  text-align: center;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
+}
