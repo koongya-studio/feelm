@@ -35,7 +35,7 @@ public class UserWithdrawalController {
     @DeleteMapping
     ResponseEntity<Void> withdraw(
             @AuthenticationPrincipal Long userId, @RequestBody AccountWithdrawalRequest request) {
-        userWithdrawalService.withdraw(userId, request.password());
+        userWithdrawalService.withdraw(userId, request);
         return ResponseEntity.noContent()
                 .header(HttpHeaders.SET_COOKIE, cookieFactory.expire().toString())
                 .build();
