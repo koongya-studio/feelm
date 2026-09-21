@@ -9,6 +9,17 @@ import org.hibernate.Session;
 import org.hibernate.query.NativeQuery;
 import org.springframework.stereotype.Repository;
 
+/**
+ * API-048 추천 이력을 읽는다.
+ *
+ * <p>정본은 {@code user_movie_exposures}다. {@code (user_id, movie_id)}가 기본키라 같은 영화의 재노출이 행을 늘리지 않으므로,
+ * 읽는 쪽은 중복을 따로 걸러낼 필요가 없다(S15P21E106-671). 노출 시점에 한 번 정리하는 값을 조회 때마다 다시 계산하지 않는다.
+ *
+ * <p>그래서 두 질의 모두 사용자 이력 전체가 아니라 요청한 페이지만큼만 읽는다. 비용이 이력 길이에 비례해 자라지 않는다.
+ *
+ * <p>{@code recommendation_items}는 {@code type}·{@code reason}·{@code position}을 가져오려고만 조인한다. 이력 표는
+ * 그 값들을 복사하지 않고 항목을 가리키기만 해서 같은 값이 두 군데 생기지 않는다.
+ */
 @Repository
 @RequiredArgsConstructor
 public class RecommendationHistoryRepository {
@@ -16,20 +27,23 @@ public class RecommendationHistoryRepository {
     private final EntityManager entityManager;
 
     public List<HistorySet> findSets(long userId, long cursorSetId, int limit) {
-        String cursorCondition = cursorSetId == 0 ? "" : " AND s.id < :cursorSetId";
+        String cursorCondition = cursorSetId == 0 ? "" : " AND e.set_id < :cursorSetId";
         NativeQuery<Tuple> query =
                 query(
                                 """
                                 SELECT s.id, s.generated_at
-                                FROM recommendation_sets s
-                                WHERE s.user_id = :userId
-                                  AND EXISTS (
-                                      SELECT 1 FROM recommendation_items i
-                                      WHERE i.set_id = s.id AND i.exposed_at IS NOT NULL
-                                  )
+                                FROM (
+                                    SELECT DISTINCT e.set_id
+                                    FROM user_movie_exposures e
+                                    WHERE e.user_id = :userId
                                 """
                                         + cursorCondition
-                                        + " ORDER BY s.id DESC LIMIT :limit")
+                                        + """
+                                    ORDER BY e.set_id DESC
+                                    LIMIT :limit
+                                ) p
+                                JOIN recommendation_sets s ON s.id = p.set_id
+                                ORDER BY s.id DESC""")
                         .setParameter("userId", userId)
                         .setParameter("limit", limit);
         if (cursorSetId != 0) {
@@ -57,7 +71,8 @@ public class RecommendationHistoryRepository {
                                    WHERE d.user_id = :userId AND d.movie_id = i.movie_id
                                ) AS dismissed,
                                CASE WHEN r.id IS NOT NULL THEN 'RATED' ELSE w.status END AS watch_status
-                        FROM recommendation_items i
+                        FROM user_movie_exposures e
+                        JOIN recommendation_items i ON i.id = e.recommendation_item_id
                         JOIN movies m ON m.id = i.movie_id
                         LEFT JOIN ratings r ON r.user_id = :userId AND r.movie_id = i.movie_id
                         LEFT JOIN LATERAL (
@@ -67,7 +82,7 @@ public class RecommendationHistoryRepository {
                             ORDER BY (wr.status <> 'EXPIRED') DESC, wr.id DESC
                             LIMIT 1
                         ) w ON true
-                        WHERE i.set_id IN (:setIds) AND i.exposed_at IS NOT NULL
+                        WHERE e.user_id = :userId AND e.set_id IN (:setIds)
                         ORDER BY i.set_id, i.position, i.id
                         """)
                 .setParameter("userId", userId)
