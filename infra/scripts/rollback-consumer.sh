@@ -24,7 +24,11 @@ compose=(
   --env-file "${COMPOSE_ENV_FILE}"
   -f "${PROJECT_ROOT}/infra/compose/distributed.yml"
   --profile consumer
+  --profile party-consumer
 )
+
+services=(consumer party-consumer)
+containers=(feelm-foldin-consumer feelm-party-consumer)
 
 env_value() {
   local name="$1"
@@ -48,6 +52,8 @@ env_value() {
 
 KAFKA_TOPIC="$(env_value CONSUMER_KAFKA_TOPIC feelm.rating.v1)"
 KAFKA_GROUP_ID="$(env_value CONSUMER_KAFKA_GROUP_ID feelm-foldin-consumer-v1)"
+PARTY_KAFKA_TOPIC="$(env_value PARTY_CONSUMER_KAFKA_TOPIC feelm.party-refresh.v1)"
+PARTY_KAFKA_GROUP_ID="$(env_value PARTY_CONSUMER_KAFKA_GROUP_ID feelm-party-consumer-v1)"
 
 validate_image_ref() {
   local image="$1"
@@ -75,22 +81,25 @@ if ! validate_image_ref "${TARGET_IMAGE}"; then
 fi
 
 describe_group() {
+  local group_id="$1"
   docker exec feelm-kafka \
     /opt/kafka/bin/kafka-consumer-groups.sh \
     --bootstrap-server 127.0.0.1:9092 \
     --describe \
-    --group "${KAFKA_GROUP_ID}" 2>/dev/null || true
+    --group "${group_id}" 2>/dev/null || true
 }
 
 group_consumer_ids() {
-  awk -v topic="${KAFKA_TOPIC}" '
+  local topic="$1"
+  awk -v topic="${topic}" '
     $2 == topic && $7 != "-" { ids[$7] = 1 }
     END { for (id in ids) print id }
   '
 }
 
 group_is_fully_assigned() {
-  awk -v topic="${KAFKA_TOPIC}" '
+  local topic="$1"
+  awk -v topic="${topic}" '
     $2 == topic {
       rows += 1
       if ($7 == "-") unassigned += 1
@@ -105,28 +114,48 @@ group_is_fully_assigned() {
 }
 
 wait_for_rollback() {
-  local replaced_ids="$1"
+  local replaced_foldin_ids="$1"
+  local replaced_party_ids="$2"
   local attempts="${CONSUMER_DEPLOY_ATTEMPTS:-24}"
   local interval="${CONSUMER_DEPLOY_INTERVAL_SECONDS:-5}"
-  local state description current_ids
+  local index container topic group_id replaced_ids state description current_ids all_ready
 
   for ((i = 1; i <= attempts; i++)); do
-    state="$(
-      docker inspect --format '{{.State.Status}} {{.RestartCount}}' \
-        feelm-foldin-consumer 2>/dev/null || true
-    )"
-    if [[ "${state}" =~ ^(exited|dead)[[:space:]] ]] || [[ "${state}" =~ ^running[[:space:]][1-9] ]]; then
-      return 1
-    fi
-
-    if [[ "${state}" == "running 0" ]]; then
-      description="$(describe_group)"
-      if group_is_fully_assigned <<<"${description}"; then
-        current_ids="$(group_consumer_ids <<<"${description}")"
-        if [[ -z "${replaced_ids}" ]] || ! grep -Fqx -f <(printf '%s\n' "${replaced_ids}") <<<"${current_ids}"; then
-          return 0
-        fi
+    all_ready=true
+    for index in "${!containers[@]}"; do
+      container="${containers[index]}"
+      if ((index == 0)); then
+        topic="${KAFKA_TOPIC}"
+        group_id="${KAFKA_GROUP_ID}"
+        replaced_ids="${replaced_foldin_ids}"
+      else
+        topic="${PARTY_KAFKA_TOPIC}"
+        group_id="${PARTY_KAFKA_GROUP_ID}"
+        replaced_ids="${replaced_party_ids}"
       fi
+      state="$(docker inspect --format '{{.State.Status}} {{.RestartCount}}' \
+        "${container}" 2>/dev/null || true)"
+      if [[ "${state}" =~ ^(exited|dead)[[:space:]] ]] \
+        || [[ "${state}" =~ ^running[[:space:]][1-9] ]]; then
+        return 1
+      fi
+      if [[ "${state}" != "running 0" ]]; then
+        all_ready=false
+        continue
+      fi
+      description="$(describe_group "${group_id}")"
+      if ! group_is_fully_assigned "${topic}" <<<"${description}"; then
+        all_ready=false
+        continue
+      fi
+      current_ids="$(group_consumer_ids "${topic}" <<<"${description}")"
+      if [[ -n "${replaced_ids}" ]] \
+        && grep -Fqx -f <(printf '%s\n' "${replaced_ids}") <<<"${current_ids}"; then
+        all_ready=false
+      fi
+    done
+    if [[ "${all_ready}" == true ]]; then
+      return 0
     fi
 
     if ((i < attempts)); then
@@ -137,7 +166,8 @@ wait_for_rollback() {
   return 1
 }
 
-replaced_ids="$(describe_group | group_consumer_ids)"
+replaced_foldin_ids="$(describe_group "${KAFKA_GROUP_ID}" | group_consumer_ids "${KAFKA_TOPIC}")"
+replaced_party_ids="$(describe_group "${PARTY_KAFKA_GROUP_ID}" | group_consumer_ids "${PARTY_KAFKA_TOPIC}")"
 
 echo "Rolling back Consumer to ${TARGET_IMAGE}"
 
@@ -147,19 +177,21 @@ fi
 
 CONSUMER_IMAGE="${TARGET_IMAGE}" "${compose[@]}" config --quiet
 CONSUMER_IMAGE="${TARGET_IMAGE}" \
-  "${compose[@]}" up -d --no-deps --force-recreate consumer
+  "${compose[@]}" up -d --no-deps --force-recreate "${services[@]}"
 
-if ! wait_for_rollback "${replaced_ids}"; then
+if ! wait_for_rollback "${replaced_foldin_ids}" "${replaced_party_ids}"; then
   echo "Consumer rollback runtime verification failed" >&2
   echo "Consumer logs remain on the distributed host and are not copied to CI" >&2
   exit 1
 fi
 
-running_image="$(docker inspect --format '{{.Config.Image}}' feelm-foldin-consumer)"
-if [[ "${running_image}" != "${TARGET_IMAGE}" ]]; then
-  echo "Running Consumer image does not match rollback target" >&2
-  exit 1
-fi
+for container in "${containers[@]}"; do
+  running_image="$(docker inspect --format '{{.Config.Image}}' "${container}")"
+  if [[ "${running_image}" != "${TARGET_IMAGE}" ]]; then
+    echo "Running Consumer image does not match rollback target: ${container}" >&2
+    exit 1
+  fi
+done
 
 write_last_known_good "${TARGET_IMAGE}"
 

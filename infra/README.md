@@ -1278,7 +1278,8 @@ docker inspect --format '{{.State.Status}} exit={{.State.ExitCode}}' feelm-foldi
 보호된 `main` push에서 Consumer 관련 파일이 바뀌면 `consumer-test`, `consumer-image`,
 `deploy-consumer`를 순서대로 실행한다. 테스트를 통과한 `CI_COMMIT_SHA` 태그를 Docker Hub에
 게시한 뒤 Registry가 반환한 immutable digest를 다음 Job에 전달해 J15E106A의 Consumer
-컨테이너만 교체한다. MR, `develop`, API와 Web Pipeline은
+이미지를 사용하는 `feelm-foldin-consumer`와 `feelm-party-consumer`를 함께 교체한다.
+MR, `develop`, API와 Web Pipeline은
 배포하지 않는다. 오래된 Pipeline은 배포 직전에 원격 `main` HEAD와 commit SHA가 다르면
 중단하며 `distributed-consumer` resource group으로 배포를 직렬화한다.
 
@@ -1307,9 +1308,10 @@ Runner 계정과 그룹을 확인한 뒤 운영자가 한 번만 상태 디렉�
 sudo install -d -m 0700 -o <runner-user> -g <runner-group> /var/lib/feelm-deploy
 ```
 
-자동 배포를 활성화하기 전에 현재 정상 Consumer를 마지막 검증 완료 이미지로 한 번 명시적으로
-초기화한다. 아래 명령은 현재 컨테이너가 `running`, restart 0이고 단일 Consumer ID가 전체
-파티션을 할당받은 경우에만 기록한다. 이미 다른 이미지가 기록돼 있으면 덮어쓰지 않는다.
+자동 배포를 활성화하기 전에 파티 Consumer 전환 절차를 완료하고, 현재 정상인 두 Consumer를
+마지막 검증 완료 이미지로 한 번 명시적으로 초기화한다. 아래 명령은 두 컨테이너가 같은 이미지로
+`running`, restart 0이고 각 Kafka Group의 단일 Consumer ID가 전체 파티션을 할당받은 경우에만
+기록한다. 이미 다른 이미지가 기록돼 있으면 덮어쓰지 않는다.
 
 ```bash
 sudo -u <runner-user> env \
@@ -1318,15 +1320,17 @@ sudo -u <runner-user> env \
   bash infra/scripts/deploy-consumer.sh --initialize-state
 ```
 
-`deploy-consumer.sh`는 전달받은 Registry digest를 매번 pull하고 Compose 설정을 검사한 뒤에만 Consumer를
-재생성한다. 새 프로세스가 `running`, 재시작 횟수 0 상태이고 `feelm-foldin-consumer-v1`의 모든
-`feelm.rating.v1` 파티션이 새 Kafka Consumer ID 하나에 할당돼야 성공한다. 검증 제한 시간은
+`deploy-consumer.sh`는 전달받은 Registry digest를 매번 pull하고 Compose 설정을 검사한 뒤에만
+Fold-in과 Party Consumer를 함께 재생성한다. 두 새 프로세스가 `running`, 재시작 횟수 0 상태이고
+`feelm-foldin-consumer-v1`의 모든 `feelm.rating.v1` 파티션과 `feelm-party-consumer-v1`의 모든
+`feelm.party-refresh.v1` 파티션이 각각 새 Kafka Consumer ID 하나에 할당돼야 성공한다. 검증 제한 시간은
 기본 2분이며 산출물 로딩 시간 실측이 바뀌면 `CONSUMER_DEPLOY_ATTEMPTS`와
 `CONSUMER_DEPLOY_INTERVAL_SECONDS`를 배포 환경에서 조정한다. Lag는 처리 중 이벤트가 있을 수
 있으므로 배포 성공 조건으로 0을 강제하지 않는다.
 
 후보 Pull·Compose 교체·런타임 검증 또는 이미지 일치 검사가 실패하면 서버 상태 파일의 마지막
-검증 완료 이미지를 사용해 Consumer를 다시 만들고 새 Kafka Consumer ID 할당까지 재검증한다.
+검증 완료 이미지를 사용해 두 Consumer를 다시 만들고 각 Kafka Group의 새 Consumer ID 할당까지
+재검증한다.
 Runner가 교체 중 종료되고 GitLab이 Job을 재시도해도 현재 실패 후보를 롤백 기준으로 쓰지 않는다.
 재시도 시작 시 실제 실행 이미지가 상태 파일의 LKG와 다르면, 오래된 Pipeline 여부를 검사하기
 전에 LKG로 복구한다. 따라서 후보 교체 직후 Runner가 종료되고 새 `main` push가 도착한 경우에도
@@ -1473,9 +1477,10 @@ model 결과는 사용하지 않는지 확인한다. 완료 listener group lag�
 `party_candidate_publications`의 `inputId`, `modelVersion`, source position이 같은지도 확인한다.
 payload, 내부 URI, Redis URL과 Secret은 기록하지 않는다.
 
-기존 `deploy-consumer.sh` 자동 배포는 개인 Fold-in service만 교체하며 파티 service를 암묵적으로
-재시작하지 않는다. 이후 파티 Consumer 이미지를 갱신할 때도 위 preflight와 단일 writer 확인을 거쳐
-승인된 digest를 `CONSUMER_IMAGE`로 명시하고 `party-consumer` service만 재생성한다.
+파티 전환이 완료된 환경에서 `deploy-consumer.sh` 자동 배포는 Fold-in과 Party service를 같은
+immutable digest로 함께 교체하고, 둘 중 하나라도 기동·할당 검증에 실패하면 두 service를 직전 정상
+이미지로 복구한다. 모델 전환처럼 파티 입력을 drain하거나 writer 종류를 바꿔야 하는 작업은 자동
+배포로 수행하지 않고 위 preflight와 단일 writer 확인 절차를 먼저 따른다.
 
 재시작은 같은 group ID를 유지한 채 `docker compose ... restart party-consumer`를 사용한다. 재시작 뒤
 새 Consumer ID가 partition을 다시 할당받고 이전 committed Offset부터 처리하는지 확인한다. 모델을
