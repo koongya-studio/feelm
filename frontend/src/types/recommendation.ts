@@ -60,9 +60,3 @@ export type RecommendationHistory = {
   nextCursor: string | null;
   hasNext: boolean;
 };
-
-/** API-047 응답. 교체 후보가 없으면 `replacement`가 null이다 */
-export type DismissResult = {
-  movieId: number;
-  replacement: RecommendationItem | null;
-};
