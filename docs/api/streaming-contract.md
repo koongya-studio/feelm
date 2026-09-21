@@ -73,8 +73,8 @@ Fold-in은 사용자의 평가 전체를 입력으로 하며, Python Consumer는
   `representative_flavor_id`가 아니라 같은 세대의 immutable `group-serving-artifacts-v1`에서 읽는다
 - 쓰기 권한을 부여하지 않으며 서비스 테이블을 갱신하지 않는다
 - 이벤트의 `movieId`·`score`는 로깅·디버깅용 참고값이며 계산에는 조회 결과를 사용한다
-- 평가·온보딩 이벤트마다 현재 평가를 repeatable-read snapshot으로 다시 읽는다. DISCOVERY
-  산출물을 활성화한 경우 확정 감상·관심없음도 같은 snapshot에서 읽는다. 재전달된 이벤트도 같은
+- 평가·온보딩·관심없음 이벤트마다 현재 평가와 관심없음을 repeatable-read snapshot으로 다시 읽는다.
+  DISCOVERY 산출물을 활성화한 경우 확정 감상도 같은 snapshot에서 읽는다. 재전달된 이벤트도 같은
   PostgreSQL 상태와 같은 산출물 revision이면 같은 결과를 계산하며, 이벤트 payload의 과거 값으로
   현재 상태를 덮어쓰지 않는다
 
@@ -233,6 +233,12 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 ```
 
 - 노출 제외 용도가 아니라 **점수 감점 신호**다. 제외는 Spring이 `user_movie_dismissals`로 처리한다
+- Python Consumer는 payload의 영화를 계산 입력으로 직접 쓰지 않고 PostgreSQL의 현재 `ratings`와
+  `user_movie_dismissals`를 같은 repeatable-read snapshot에서 다시 읽는다. 실제 평가가 없는 관심없음만
+  설정된 `1.0`점의 DISMISS 기반 가상 평점 입력(`source=DISMISS`)으로 합성하며 같은 영화의 실제
+  `RATING`을 우선한다
+- 가상 평점의 점수와 입력 정책 버전은 Consumer 설정으로 관리한다. Candidate v6 Redis JSON에는 새 필드를
+  추가하지 않아 Spring·Frontend 소비 계약을 바꾸지 않는다
 
 **`VIEW`**
 
@@ -320,8 +326,8 @@ Kafka는 장애 상황에서 같은 메시지를 두 번 전달할 수 있습니
 
 | 신호 | 멱등 방식 |
 |---|---|
-| `RATING` · `ONBOARDING` | **자연 멱등.** Python Consumer가 PostgreSQL을 다시 읽어 전체를 재계산하므로 몇 번 처리해도 결과가 같다 |
-| `DISMISS` · `VIEW` · `RECOMMENDATION_CLICK` · `OTT_CLICK` | 누적 집계라 중복 시 값이 부풀어 오른다. `eventId` 기준 중복 제거를 적용한다 |
+| `RATING` · `ONBOARDING` · Python Consumer의 `DISMISS` | **자연 멱등.** Python Consumer가 PostgreSQL을 다시 읽어 전체를 재계산하므로 몇 번 처리해도 현재 상태로 수렴한다 |
+| Spark 행동 집계의 `DISMISS` · `VIEW` · `RECOMMENDATION_CLICK` · `OTT_CLICK` | 누적 집계라 중복 시 값이 부풀어 오른다. `eventId` 기준 중복 제거를 적용한다 |
 | `feelm.candidate-updated.v1` 알림 | 상태 갱신 알림이다. Spring이 현재 Redis 세대와 마지막 처리 세대를 비교해 중복 재계산을 줄일 수 있다 |
 | `feelm.party-candidate-updated.v1` 알림 | 같은 source partition·offset의 중복은 같은 완료 상태다. 더 작은 offset은 파티별 최신 게시 상태를 덮지 않는다 |
 
@@ -331,7 +337,7 @@ Kafka는 장애 상황에서 같은 메시지를 두 번 전달할 수 있습니
 - Python Consumer가 연속된 같은 `userId`의 `RATING`을 함께 가져오면 `userId`로 묶어 마지막 DB 상태 기준 1회만 계산할 수 있다
 
 Python Consumer는 **Redis `vector`·`candidates` 기록과 Candidate 게시 완료 알림의 Kafka 전달 확인이 모두 성공한 뒤**
-원본 `RATING`/`ONBOARDING` Offset을 커밋합니다. 중간 실패로 재시도되면 같은 DB 상태를 다시 읽고
+원본 `RATING`/`ONBOARDING`/`DISMISS` Offset을 커밋합니다. 중간 실패로 재시도되면 같은 DB 상태를 다시 읽고
 새 `generationId`로 게시할 수 있으므로 완료 알림은 at-least-once로 취급합니다.
 
 파티 Consumer도 **Redis 파티 `candidates` 기록과 파티 게시 완료 알림의 Kafka 전달 확인이 모두 성공한 뒤**
@@ -355,8 +361,8 @@ position의 알림이 다시 발행될 수 있으며 Spring의 완료 상태 ups
 
 강한 신호의 최종 경로는 다음 순서로 고정합니다.
 
-1. Spring이 `RATING` 또는 `ONBOARDING`을 발행한다.
-2. Python Consumer가 PostgreSQL을 다시 읽어 User Vector와 후보를 재계산한다.
+1. Spring이 `RATING`, `ONBOARDING` 또는 `DISMISS`를 발행한다.
+2. Python Consumer가 PostgreSQL의 현재 평가·관심없음을 한 snapshot으로 다시 읽어 User Vector와 후보를 재계산한다.
 3. Python Consumer가 ALS·콘텐츠 지원 범위별 백분위를 결합한 TASTE 최대 500편을 만들고, 그룹 산출물을
    활성화한 경우 DISCOVERY 최대 100편도 만든다. Spring은 서비스 DB 미존재·평가·관심없음 후보만
    제외하고 종류별 점수 정렬과 동점 결정적 셔플 후 TASTE를 최대 20편 저장하고, DISCOVERY는
@@ -460,6 +466,12 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
   "updatedAt": "2026-08-31T07:21:03Z"
 }
 ```
+
+- `ratingCount`는 PostgreSQL에 저장된 실제 `RATING` 입력 수다. DISMISS 기반 가상 평점 입력은
+  포함하지 않는다.
+- `factorBackedInputCount`는 ALS Item Factor가 있어 실제 Fold-in 계산에 참여한 `RATING`과
+  DISMISS 기반 가상 평점 입력의 합이다. 따라서 실제 평가보다 factor-backed 관심없음 입력이 추가되면
+  `factorBackedInputCount`가 `ratingCount`보다 클 수 있다.
 
 **`feelm:user:{userId}:candidates`** — Spring이 파티 입력·OTT 집계에 읽는 후보 점수
 
@@ -710,8 +722,8 @@ URI나 Redis에 저장하지 않고 runtime filesystem 설정으로 제공한다
 
 | 신호 | 발행부터 Redis 반영까지 목표 |
 |---|---|
-| `RATING` · `ONBOARDING` → Candidate | 10초 이내(설정값) |
-| `DISMISS` | 30초 이내(설정값) |
+| `RATING` · `ONBOARDING` · `DISMISS` → Candidate | 10초 이내(설정값) |
+| `DISMISS` → `behavior` | 30초 이내(설정값) |
 | 약한 신호 → `behavior` | 60초 이내(설정값) |
 
 위 목표는 초기값이며 실측 후 조정합니다. Structured Streaming의 트리거 주기가 `behavior` 반영 지연을 좌우합니다.

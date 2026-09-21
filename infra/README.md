@@ -1204,6 +1204,7 @@ URI는 동일한 immutable snapshot revision을 가리켜야 하며 `latest` 별
 ```dotenv
 CONSUMER_IMAGE=feelm-foldin-consumer:local
 CONSUMER_KAFKA_TOPIC=feelm.rating.v1
+CONSUMER_DISMISS_KAFKA_TOPIC=feelm.dismiss.v1
 CONSUMER_KAFKA_GROUP_ID=feelm-foldin-consumer-v1
 CONSUMER_POSTGRES_DSN=postgresql://<user>:<encoded-password>@<SERVICE_NODE_IP>:5432/feelm
 CONSUMER_REDIS_URL=redis://:<encoded-password>@<SERVICE_NODE_IP>:6379/0
@@ -1214,6 +1215,8 @@ CONSUMER_CONTENT_URI=hdfs://hdfs-namenode:8020/<immutable-content-path>
 CONSUMER_GROUP_URI=hdfs://hdfs-namenode:8020/<artifact-root>/groups/<group-version>
 CONSUMER_DISCOVERY_POPULARITY_URI=hdfs://hdfs-namenode:8020/<artifact-root>/discovery-popularity/<popularity-version>
 CONSUMER_HYBRID_ALPHA=0.5
+CONSUMER_DISMISS_SCORE=1.0
+CONSUMER_DISMISS_INPUT_VERSION=dismiss-virtual-rating-v1
 ```
 
 `CONSUMER_CONTENT_URI`를 비우면 기존 ALS 전용 모드로 동작한다. 값을 설정하면 Consumer는
@@ -1221,6 +1224,10 @@ CONSUMER_HYBRID_ALPHA=0.5
 산출물이면 시작을 거부한다. `CONSUMER_HYBRID_ALPHA`는 ALS 점수 가중치이며 0~1 범위여야 한다.
 `ratings` 입력 수에 따른 최소 제한은 두지 않는다. 온보딩으로 생성된 4.0·2.0 평가도
 같은 `ratings` 입력으로 세며, Consumer는 `onboarding_preferences`를 직접 조회하지 않는다.
+`feelm.dismiss.v1`은 payload를 계산값으로 쓰지 않고 현재 DB 상태를 다시 읽는 신호다. 실제 평가가 없는
+관심없음만 `CONSUMER_DISMISS_SCORE`의 DISMISS 기반 가상 평점 입력으로 계산하고, 정책 식별자는
+`CONSUMER_DISMISS_INPUT_VERSION`으로 로그와 배포 기록에서 추적한다. 두 값은 Candidate v6 Redis 형식을
+바꾸지 않으므로 Spring·Frontend 배포를 요구하지 않는다.
 
 `CONSUMER_GROUP_URI`와 `CONSUMER_DISCOVERY_POPULARITY_URI`는 함께 설정하거나 함께 비운다.
 값을 설정하면 두 번들의 `mapping_revision`이 서로 같고 현재 ALS mapping revision과도 일치해야
@@ -1323,8 +1330,9 @@ sudo -u <runner-user> env \
 
 `deploy-consumer.sh`는 전달받은 Registry digest를 매번 pull하고 Compose 설정을 검사한 뒤에만
 Fold-in과 Party Consumer를 함께 재생성한다. 두 새 프로세스가 `running`, 재시작 횟수 0 상태이고
-`feelm-foldin-consumer-v1`의 모든 `feelm.rating.v1` 파티션과 `feelm-party-consumer-v1`의 모든
-`feelm.party-refresh.v1` 파티션이 각각 새 Kafka Consumer ID 하나에 할당돼야 성공한다. 검증 제한 시간은
+`feelm-foldin-consumer-v1`의 모든 `feelm.rating.v1`·`feelm.dismiss.v1` 파티션과
+`feelm-party-consumer-v1`의 모든 `feelm.party-refresh.v1` 파티션이 각각 새 Kafka Consumer ID 하나에
+할당돼야 성공한다. 검증 제한 시간은
 기본 2분이며 산출물 로딩 시간 실측이 바뀌면 `CONSUMER_DEPLOY_ATTEMPTS`와
 `CONSUMER_DEPLOY_INTERVAL_SECONDS`를 배포 환경에서 조정한다. Lag는 처리 중 이벤트가 있을 수
 있으므로 배포 성공 조건으로 0을 강제하지 않는다.
@@ -1340,6 +1348,10 @@ stale Job이 실패 후보를 실행 상태로 남기지 않는다.
 실패 상태로 유지하고 수동 복구가 필요하다고 출력한다. 원문 컨테이너 로그는 CI로 복사하지 않고
 분산 노드에만 유지한다. 자동·수동
 복구 모두 HDFS·Spark·Kafka 컨테이너와 볼륨을 변경하지 않는다.
+
+Rollback은 750 이전의 rating-only 정상 이미지도 복구할 수 있도록 기본적으로 rating Topic assignment를
+기준으로 검증한다. DISMISS 구독을 지원하는 이미지로 직접 rollback하면서 두 Topic을 모두 엄격히
+검증하려면 `CONSUMER_REQUIRE_DISMISS_ASSIGNMENT=true`를 함께 지정한다.
 
 분산 노드의 승인된 환경에서 특정 정상 이미지로 직접 복구할 때는 다음처럼 실행한다.
 

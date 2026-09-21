@@ -51,6 +51,8 @@ env_value() {
 }
 
 KAFKA_TOPIC="$(env_value CONSUMER_KAFKA_TOPIC feelm.rating.v1)"
+DISMISS_KAFKA_TOPIC="$(env_value CONSUMER_DISMISS_KAFKA_TOPIC feelm.dismiss.v1)"
+REQUIRE_DISMISS_ASSIGNMENT="${CONSUMER_REQUIRE_DISMISS_ASSIGNMENT:-false}"
 KAFKA_GROUP_ID="$(env_value CONSUMER_KAFKA_GROUP_ID feelm-foldin-consumer-v1)"
 PARTY_KAFKA_TOPIC="$(env_value PARTY_CONSUMER_KAFKA_TOPIC feelm.party-refresh.v1)"
 PARTY_KAFKA_GROUP_ID="$(env_value PARTY_CONSUMER_KAFKA_GROUP_ID feelm-party-consumer-v1)"
@@ -145,6 +147,12 @@ wait_for_rollback() {
       fi
       description="$(describe_group "${group_id}")"
       if ! group_is_fully_assigned "${topic}" <<<"${description}"; then
+        all_ready=false
+        continue
+      fi
+      if [[ "${REQUIRE_DISMISS_ASSIGNMENT}" == true ]] \
+        && ((index == 0)) \
+        && ! group_is_fully_assigned "${DISMISS_KAFKA_TOPIC}" <<<"${description}"; then
         all_ready=false
         continue
       fi

@@ -58,6 +58,7 @@ env_value() {
 }
 
 KAFKA_TOPIC="$(env_value CONSUMER_KAFKA_TOPIC feelm.rating.v1)"
+DISMISS_KAFKA_TOPIC="$(env_value CONSUMER_DISMISS_KAFKA_TOPIC feelm.dismiss.v1)"
 KAFKA_GROUP_ID="$(env_value CONSUMER_KAFKA_GROUP_ID feelm-foldin-consumer-v1)"
 PARTY_KAFKA_TOPIC="$(env_value PARTY_CONSUMER_KAFKA_TOPIC feelm.party-refresh.v1)"
 PARTY_KAFKA_GROUP_ID="$(env_value PARTY_CONSUMER_KAFKA_GROUP_ID feelm-party-consumer-v1)"
@@ -126,6 +127,7 @@ group_is_fully_assigned() {
 wait_for_candidate() {
   local previous_foldin_ids="$1"
   local previous_party_ids="$2"
+  local require_dismiss_assignment="${3:-false}"
   local attempts="${CONSUMER_DEPLOY_ATTEMPTS:-24}"
   local interval="${CONSUMER_DEPLOY_INTERVAL_SECONDS:-5}"
   local index container topic group_id previous_ids state description current_ids all_ready
@@ -157,6 +159,12 @@ wait_for_candidate() {
       fi
       description="$(describe_group "${group_id}")"
       if ! group_is_fully_assigned "${topic}" <<<"${description}"; then
+        all_ready=false
+        continue
+      fi
+      if [[ "${require_dismiss_assignment}" == true ]] \
+        && ((index == 0)) \
+        && ! group_is_fully_assigned "${DISMISS_KAFKA_TOPIC}" <<<"${description}"; then
         all_ready=false
         continue
       fi
@@ -296,7 +304,7 @@ if ! CONSUMER_IMAGE="${CANDIDATE_IMAGE}" \
   restore_previous_image "Candidate Consumer deployment command failed"
 fi
 
-if ! wait_for_candidate "${previous_foldin_ids}" "${previous_party_ids}"; then
+if ! wait_for_candidate "${previous_foldin_ids}" "${previous_party_ids}" true; then
   restore_previous_image "Candidate Consumer runtime verification failed"
 fi
 

@@ -22,6 +22,41 @@ def test_content_settings_are_optional() -> None:
     assert settings.group_uri is None
     assert settings.discovery_popularity_uri is None
     assert settings.hybrid_alpha == 0.5
+    assert settings.dismiss_kafka_topic == "feelm.dismiss.v1"
+    assert settings.dismiss_score == 1.0
+    assert settings.dismiss_input_version == "dismiss-virtual-rating-v1"
+
+
+def test_dismiss_policy_settings_are_versioned_and_configurable() -> None:
+    settings = load_settings(
+        {
+            **BASE,
+            "CONSUMER_DISMISS_KAFKA_TOPIC": "custom.dismiss.v1",
+            "CONSUMER_DISMISS_SCORE": "1.5",
+            "CONSUMER_DISMISS_INPUT_VERSION": "dismiss-v2",
+        }
+    )
+
+    assert settings.dismiss_kafka_topic == "custom.dismiss.v1"
+    assert settings.dismiss_score == 1.5
+    assert settings.dismiss_input_version == "dismiss-v2"
+
+
+@pytest.mark.parametrize("score", ["0", "0.7", "5.5", "nan", "inf", "낮게"])
+def test_invalid_dismiss_score_is_rejected(score: str) -> None:
+    with pytest.raises(SettingsError, match="CONSUMER_DISMISS_SCORE"):
+        load_settings({**BASE, "CONSUMER_DISMISS_SCORE": score})
+
+
+@pytest.mark.parametrize("version", ["", "UPPERCASE", "space version", "../unsafe"])
+def test_invalid_dismiss_input_version_is_rejected(version: str) -> None:
+    with pytest.raises(SettingsError, match="CONSUMER_DISMISS_INPUT_VERSION"):
+        load_settings({**BASE, "CONSUMER_DISMISS_INPUT_VERSION": version})
+
+
+def test_rating_and_dismiss_topics_must_be_distinct() -> None:
+    with pytest.raises(SettingsError, match="must be different"):
+        load_settings({**BASE, "CONSUMER_DISMISS_KAFKA_TOPIC": "feelm.rating.v1"})
 
 
 def test_legacy_minimum_input_setting_does_not_restore_the_gate() -> None:
