@@ -130,6 +130,9 @@ class ReportGenerationIntegrationTest extends SharedPostgresContractTest {
                 .isEqualByComparingTo("4.5");
         assertThat(content.path("summary").path("newFlavorCount").asInt()).isEqualTo(1);
         assertThat(content.path("topGenres").get(0).path("code").asText()).isEqualTo("R555_DRAMA");
+        assertThat(content.path("fourCut").path("genre").path("name").asText()).isEqualTo("드라마");
+        assertThat(content.path("fourCut").path("genre").path("displayName").asText())
+                .isEqualTo("R555_DRAMA");
         assertThat(content.path("topDirectors").get(0).path("personId").asLong())
                 .isEqualTo(personId(1));
         assertThat(content.path("topActors").get(0).path("personId").asLong())

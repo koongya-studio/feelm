@@ -1,5 +1,6 @@
 package com.feelm.backend.domain.report;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -90,6 +91,7 @@ class ReportReadApiContractTest extends ReportApiContractSupport {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.summary.ratingCount").value(3))
                 .andExpect(jsonPath("$.fourCut.genre.name").value("로맨스"))
+                .andExpect(jsonPath("$.fourCut.genre.displayName").value("ROMANCE"))
                 .andExpect(jsonPath("$.genreShares[0].share").value(67))
                 .andExpect(jsonPath("$.topDirectors[0].count").value(2))
                 .andExpect(jsonPath("$.comparisons[0].delta").value(12))
@@ -108,6 +110,38 @@ class ReportReadApiContractTest extends ReportApiContractSupport {
                 .andExpect(jsonPath("$.code").value("REPORT_GENERATING"));
         mockMvc.perform(get("/api/v1/reports/{id}", 5_560_101))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void detailFillsMissingStoredGenreDisplayName() throws Exception {
+        users();
+        long reportId = 5_560_105;
+        report(reportId, OWNER, 2030, "H1", "READY");
+        jdbc.update(
+                """
+                UPDATE taste_reports
+                SET content = jsonb_set(
+                    jsonb_set(content, '{topGenres,0,code}', '"TMDB_10749"'::jsonb),
+                    '{fourCut,genre,displayName}', 'null'::jsonb)
+                WHERE id = ?
+                """,
+                reportId);
+
+        mockMvc.perform(
+                        get("/api/v1/reports/{id}", reportId)
+                                .header("Authorization", bearer(OWNER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.topGenres[0].code").value("TMDB_10749"))
+                .andExpect(jsonPath("$.fourCut.genre.name").value("로맨스"))
+                .andExpect(jsonPath("$.fourCut.genre.displayName").value("ROMANCE"));
+
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT content #>> '{fourCut,genre,displayName}'"
+                                        + " FROM taste_reports WHERE id = ?",
+                                String.class,
+                                reportId))
+                .isNull();
     }
 
     @Test

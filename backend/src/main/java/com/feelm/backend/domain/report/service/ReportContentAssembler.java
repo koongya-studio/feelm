@@ -36,6 +36,27 @@ import org.springframework.stereotype.Component;
 public class ReportContentAssembler {
 
     private static final int DISPLAY_LIMIT = 3;
+    private static final Map<String, String> TMDB_GENRE_DISPLAY_NAMES =
+            Map.ofEntries(
+                    Map.entry("28", "ACTION"),
+                    Map.entry("12", "ADVENTURE"),
+                    Map.entry("16", "ANIMATION"),
+                    Map.entry("35", "COMEDY"),
+                    Map.entry("80", "CRIME"),
+                    Map.entry("99", "DOCUMENTARY"),
+                    Map.entry("18", "DRAMA"),
+                    Map.entry("10751", "FAMILY"),
+                    Map.entry("14", "FANTASY"),
+                    Map.entry("36", "HISTORY"),
+                    Map.entry("27", "HORROR"),
+                    Map.entry("10402", "MUSIC"),
+                    Map.entry("9648", "MYSTERY"),
+                    Map.entry("10749", "ROMANCE"),
+                    Map.entry("878", "SCIENCE FICTION"),
+                    Map.entry("10770", "TV MOVIE"),
+                    Map.entry("53", "THRILLER"),
+                    Map.entry("10752", "WAR"),
+                    Map.entry("37", "WESTERN"));
 
     public ReportContent assemble(
             ReportPeriod period,
@@ -341,7 +362,10 @@ public class ReportContentAssembler {
         GenreCard genre =
                 genres.isEmpty()
                         ? null
-                        : new GenreCard(genres.getFirst().name(), null, new ImageRef(null));
+                        : new GenreCard(
+                                genres.getFirst().name(),
+                                genreDisplayName(genres.getFirst().code()),
+                                new ImageRef(null));
         DirectorCard director =
                 directors.isEmpty()
                         ? null
@@ -358,6 +382,16 @@ public class ReportContentAssembler {
                                 null,
                                 new ImageRef(actors.getFirst().profileUrl()));
         return new FourCut(genre, director, actor, null);
+    }
+
+    static String genreDisplayName(String code) {
+        if (code == null || code.isBlank()) {
+            return null;
+        }
+        if (code.startsWith("TMDB_")) {
+            return TMDB_GENRE_DISPLAY_NAMES.get(code.substring("TMDB_".length()));
+        }
+        return code;
     }
 
     private static List<String> highlights(
