@@ -29,10 +29,12 @@ import ScreenHeader from '../../../components/ScreenHeader';
 import Section from '../../../components/Section';
 import StatusView from '../../../components/StatusView';
 import { getOttRecommendation } from '../../../api/ottRecommendations';
+import { getMyProfile } from '../../../api/users';
 import { ottFailureView } from '../failure';
 import { path } from '../../../routes/paths';
 import styles from './OttResultDetailPage.module.css';
 import type { OttRecommendationItem } from '../../../types/ott';
+import type { MyProfile } from '../../../types/user';
 
 export default function OttResultDetailPage() {
   const navigate = useNavigate();
@@ -40,6 +42,7 @@ export default function OttResultDetailPage() {
   const id = Number(ottId);
 
   const [item, setItem] = useState<OttRecommendationItem | null>(null);
+  const [profile, setProfile] = useState<MyProfile | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
@@ -60,6 +63,12 @@ export default function OttResultDetailPage() {
         setFailure(error);
         setFailed(true);
       });
+
+    getMyProfile()
+      .then((value) => {
+        if (active) setProfile(value);
+      })
+      .catch(() => undefined);
 
     return () => {
       active = false;
@@ -92,6 +101,9 @@ export default function OttResultDetailPage() {
     return header;
   }
 
+  const personalized = (profile?.stats.ratingCount ?? 0) > 0;
+  const kZero = profile?.stats.ratingCount === 0;
+
   return (
     <>
       {header}
@@ -109,12 +121,15 @@ export default function OttResultDetailPage() {
           <h1 className={styles.heroTitle}>{item.ott.name}</h1>
           <p className={styles.heroMatch}>{item.matchCount}편</p>
           <p className={styles.heroMeta}>
-            좋아할 만한 미감상 영화 · {item.subscribed ? '구독 중' : '미구독'}
+            {personalized ? '좋아할 만한' : '지금 볼 수 있는'} 미감상 영화 ·{' '}
+            {item.subscribed ? '구독 중' : '미구독'}
           </p>
         </section>
 
         {item.topMovies.length > 0 ? (
-          <Section label="이 OTT에서 좋아할 만한 영화">
+          <Section
+            label={personalized ? '이 OTT에서 좋아할 만한 영화' : '이 OTT에서 볼 수 있는 영화'}
+          >
             <ul className={styles.movies}>
               {item.topMovies.map((movie) => (
                 <li key={movie.movieId}>
@@ -136,8 +151,12 @@ export default function OttResultDetailPage() {
         ) : null}
 
         <p className={styles.criteria}>
-          평가한 영화와 비슷한 작품 중 아직 보지 않은 영화가 이 OTT에 몇 편 있는지 센 값이에요. 취향
-          일치 확률이 아니에요.
+          {personalized
+            ? '평가한 영화와 비슷한 작품 중 아직 보지 않은 영화가 이 OTT에 몇 편 있는지 센 값이에요.'
+            : kZero
+              ? '아직 평가한 영화가 없어 지금 볼 수 있는 작품을 보여드려요. 영화를 평가하면 내 취향에 맞춘 결과로 바뀌어요.'
+              : '현재 후보 중 이 OTT에서 볼 수 있는 영화가 몇 편인지 센 값이에요.'}{' '}
+          취향 일치 확률이나 인기순이 아니에요.
         </p>
 
         <div className={styles.actions}>
