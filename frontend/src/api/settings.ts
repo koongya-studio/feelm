@@ -14,6 +14,7 @@
  * 준비 중이다(`PrivacySettingsPage`).
  */
 import { request } from './client';
+import type { SocialProvider } from '../types/auth';
 import type { BlockedUserList, BlockResult, NotificationSettings } from '../types/user';
 
 const NOTIFICATION_SETTINGS_PATH = '/users/me/notification-settings';
@@ -85,11 +86,31 @@ export async function unblockUser(userId: number): Promise<void> {
 }
 
 /**
+ * API-013 회원 탈퇴의 본인 확인. 본문이 둘 중 어느 쪽인지로 경로가 갈린다(업무 -435).
+ *
+ * - 비밀번호 경로: 현재 비밀번호
+ * - 소셜 재인증 경로: 연결된 제공자에서 새로 받은 인가 코드와 그때 쓴 `redirectUri`. 서버가
+ *   코드를 교환해 이 계정에 연결된 제공자 계정인지 대조한다
+ */
+export type WithdrawProof =
+  { password: string } | { provider: SocialProvider; code: string; redirectUri: string };
+
+/**
  * API-013 회원 탈퇴 · DELETE /api/v1/users/me
  *
- * 비밀번호로 본인을 확인한다. 소셜 전용 계정은 `409 PASSWORD_NOT_SET`이라 화면이 먼저
- * 막는다(`WithdrawPage`).
+ * 비밀번호가 없는 계정(소셜 전용)은 비밀번호 경로로 보내면 `409 PASSWORD_NOT_SET`이다.
+ * 화면이 API-014 `hasPassword`로 미리 소셜 재인증 경로를 고른다(`WithdrawPage`, 업무 -754).
+ *
+ * **소셜 재인증 경로는 401에 다시 보내지 않는다.** 공통 클라이언트는 401이면 재발급한 뒤 같은
+ * 요청을 한 번 더 보내는데(`client.ts`), 인가 코드는 1회용이다. 연결되지 않은 계정이라
+ * `401 INVALID_CREDENTIALS`를 받은 요청을 다시 보내면 같은 코드가 두 번 나가고, 두 번째는
+ * `OAUTH_CODE_INVALID`가 되어 사용자는 엉뚱한 안내를 본다. 제공자에서 돌아온 직후라 세션은
+ * 막 복구된 새 토큰이므로 재발급할 일도 없다.
  */
-export async function withdraw(password: string): Promise<void> {
-  return request<void>('/users/me', { method: 'DELETE', body: { password } });
+export async function withdraw(proof: WithdrawProof): Promise<void> {
+  return request<void>('/users/me', {
+    method: 'DELETE',
+    body: proof,
+    refreshOnUnauthorized: !('code' in proof),
+  });
 }

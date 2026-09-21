@@ -139,3 +139,45 @@ describe('소셜 로그인 콜백', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('이메일 제공에 동의');
   });
 });
+
+/*
+ * 회원 탈퇴의 본인 확인(업무 -754). 같은 콜백 주소로 돌아오지만 로그인하지 않고 7.8-A-1로
+ * 넘긴다 — 인가 코드는 1회용이라 여기서 로그인에 쓰면 탈퇴에 쓸 수 없다.
+ */
+describe('회원 탈퇴 본인 확인 콜백', () => {
+  function storeWithdrawRequest() {
+    window.sessionStorage.setItem(
+      'feelm.oauth',
+      JSON.stringify({ ...REQUEST, intent: 'withdraw' }),
+    );
+  }
+
+  it('로그인하지 않고 코드를 들고 7.8-A-1로 돌아간다', async () => {
+    storeWithdrawRequest();
+
+    renderCallback(`?code=auth-code&state=${STATE}`);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/my/settings/account/withdraw{"reauth":{"provider":"google","code":"auth-code","redirectUri":"http://localhost:3000/oauth/callback"}}',
+      ),
+    );
+    expect(signInWithSocial).not.toHaveBeenCalled();
+    // 같은 요청으로 다시 들어오지 못하게 지운다
+    expect(window.sessionStorage.getItem('feelm.oauth')).toBeNull();
+  });
+
+  it('동의를 취소해도 로그인 화면이 아니라 7.8-A-1로 돌아가 거기서 알린다', async () => {
+    storeWithdrawRequest();
+
+    renderCallback(`?error=access_denied&state=${STATE}`);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/my/settings/account/withdraw{"reauth":{"cancelled":true}}',
+      ),
+    );
+    expect(screen.queryByRole('button', { name: '로그인 화면으로' })).toBeNull();
+    expect(signInWithSocial).not.toHaveBeenCalled();
+  });
+});

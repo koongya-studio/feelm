@@ -97,7 +97,7 @@
 | `getBlockedUserList` | 실제 | API-022 |
 | `isBlockedUser` | 조합 | API-022 목록에서 찾는다 |
 | `blockUser` · `unblockUser` | 실제 | API-020 · 021 |
-| `withdraw` | 실제 | API-013 |
+| `withdraw` | 실제 | API-013. 비밀번호 경로와 소셜 재인증 경로(업무 -754) |
 
 ### `onboarding.ts` · `otts.ts` · `ottRecommendations.ts`
 
