@@ -138,6 +138,11 @@ class SparkCodeBuildContractTest(unittest.TestCase):
             preflight.index("--preflight-only"),
         )
         self.assertNotIn("--spark-idle-check-only", preflight)
+        verify_running = script[
+            script.index("verify_running()") : script.index("deploy_runtime()")
+        ]
+        self.assertIn("return 1", verify_running)
+        self.assertNotIn("exit 1", verify_running)
         self.assertIn("approved_revision", script)
         self.assertNotIn("--allow-legacy-spark-image", script)
         self.assertNotIn(

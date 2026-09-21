@@ -151,6 +151,20 @@ def inspect_image(container: str, runner: Runner) -> str | None:
         return None
 
 
+def ensure_service_backend_image(
+    node: str, environment: dict[str, str], runner: Runner
+) -> None:
+    if node != "service" or environment.get("BACKEND_IMAGE"):
+        return
+    backend_image = inspect_image("feelm-backend", runner)
+    if not backend_image:
+        raise DeploymentError(
+            "BACKEND_IMAGE is missing and the running feelm-backend image "
+            "could not be determined"
+        )
+    environment["BACKEND_IMAGE"] = backend_image
+
+
 def spark_status_url(node: str, env_file: Path) -> str:
     if node == "distributed":
         return "http://127.0.0.1:8080/json/"
@@ -482,6 +496,8 @@ def deploy(args: argparse.Namespace, runner: Runner) -> int:
         raise DeploymentError(
             "--spark-recovery-mode requires rollback Spark image and revision"
         )
+
+    ensure_service_backend_image(args.node, environment, runner)
 
     commit = resolve_commit(root, args.expected_commit, runner)
     rollback_commit = resolve_commit(
