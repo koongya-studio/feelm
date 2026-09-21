@@ -18,7 +18,7 @@
  *   (`api/search.ts` `getTopRatedMovies`), 조회수 기반 급상승이 아니므로 그렇게 부르지 않는다.
  *   최근 검색어가 있으면 그것이 위에 오고, 둘 다 없을 때만 짧은 안내 한 줄이다.
  * - **타이핑하면 검색한다.** 공백을 뺀 **두 글자부터**다(`AUTO_SEARCH_MIN_LENGTH`, 업무 -640).
- *   한 글자는 제출해야 나간다. 연속 입력은 `DEBOUNCE_MS`로 묶고,
+ *   한 글자는 제출해야 나가고, 기다리면 그렇다고 알린다(업무 -769). 연속 입력은 `DEBOUNCE_MS`로 묶고,
  *   한글 조합 중(`compositionstart` ~ `compositionend`)에는 보내지 않는다 — 조합 중의
  *   자모(`ㄷ` → `다` → `달`)마다 요청이 나가면 결과가 세 번 깜빡인다. 키보드의 검색
  *   버튼(제출)은 기다리지 않고 바로 보낸다.
@@ -378,9 +378,11 @@ export default function SearchPage() {
    * 지금 돌아와도 무시되게 한다. 이것이 없으면 `스파` 응답이 2초 뒤 도착해 이미
    * `스파이더맨`이 된 입력 아래에 `스파` 결과가 앉는다.
    *
-   * 세 글자가 안 되면 보내지 않는다. 그때 옛 결과를 그대로 두면 입력과 목록이 어긋나므로
-   * 검색 전 화면으로 되돌린다. 빈 입력은 예외다 — 필터가 남아 있으면 필터만으로 찾는
-   * 기존 동작(`run`)을 그대로 탄다.
+   * 두 글자가 안 되면 검색어를 보내지 않는다. 그때 옛 결과를 그대로 두면 입력과 목록이
+   * 어긋나므로 **검색어가 없는 것처럼** 되돌린다 — 필터가 없으면 검색 전 화면, 있으면 필터만의
+   * 결과다. 빈 입력과 같은 길(`run`)을 타므로 주소에서도 `q`가 빠진다(업무 -769). 한때 화면만
+   * 되돌리고 주소에는 `?q=사`를 남겨, 새로고침하면 보지 못한 `사` 결과가 떴다. 왜 아무 일이
+   * 없는지는 `shortNotice`가 말한다.
    */
   const schedule = (nextKeyword: string) => {
     cancelPending();
@@ -395,8 +397,7 @@ export default function SearchPage() {
     }
 
     if (trimmed.length < AUTO_SEARCH_MIN_LENGTH) {
-      setParams(toSearchParams(nextKeyword, filter), { replace: true });
-      setSearch(IDLE);
+      run('', filter);
 
       return;
     }
@@ -517,6 +518,16 @@ export default function SearchPage() {
     inputRef.current?.focus();
   };
 
+  /**
+   * 한 글자를 쳐 놓고 기다리는 중인지(업무 -769). 저절로는 보내지 않으므로 화면이 그대로인
+   * 까닭을 알린다. 그 글자로 이미 검색했으면(제출) 결과가 답이라 알리지 않는다.
+   */
+  const typedKeyword = keyword.trim();
+  const shortNotice =
+    typedKeyword.length > 0 &&
+    typedKeyword.length < AUTO_SEARCH_MIN_LENGTH &&
+    (search.status === 'idle' || search.query.q !== typedKeyword);
+
   /** 상세로 가기 직전. 받아 둔 결과와 스크롤 위치를 적어 두어 뒤로 오면 되살린다 */
   const leaveToDetail = () => {
     remember(keyword);
@@ -617,6 +628,12 @@ export default function SearchPage() {
         </form>
 
         <p className={styles.scope}>제목 · 감독 · 배우 통합 검색</p>
+
+        {shortNotice ? (
+          <p className={styles.shortNotice} role="status">
+            두 글자부터 찾아요. 한 글자로 찾으려면 검색을 눌러 주세요
+          </p>
+        ) : null}
 
         {search.status === 'idle' ? (
           recent.length > 0 ? (
