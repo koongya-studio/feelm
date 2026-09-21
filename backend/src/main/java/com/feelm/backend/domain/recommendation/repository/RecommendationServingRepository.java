@@ -35,16 +35,109 @@ public class RecommendationServingRepository {
                 .isEmpty();
     }
 
-    public Optional<RecommendationSet> findLatestSet(long userId) {
+    /**
+     * 서빙 대상 세트를 고른다.
+     *
+     * <p>최신 generation 안에서 아직 소진되지 않은 가장 낮은 {@code batch_no}를 쓴다. 프리페치로 다음 회차를 미리 만들어도 현재 회차에 남은 유효
+     * 카드를 건너뛰지 않기 위해서다(S15P21E106-708). generation을 먼저 고르므로 새 generation이 도착하면 이전 generation에 유효
+     * 카드가 남아 있어도 즉시 전환하는 기존 규칙(API-045)은 그대로다.
+     *
+     * <p>단, 이미 노출이 시작된 회차보다 뒤로는 가지 않는다. 지나간 회차의 카드가 평가 철회 등으로 되살아나도 그 회차로 되돌아가지 않는다. 되돌아가면 같은
+     * generation에서 이미 보여준 영화를 다시 보여주게 되어, 다음 회차가 이전 회차의 영화를 제외한다는 규칙(S15P21E106-219)과 어긋난다.
+     *
+     * <p>최신 generation의 모든 회차가 소진됐으면 가장 최근 세트를 돌려준다. 소진 흐름(S15P21E106-219)이 그 세트를 기준으로 다음 회차를 만든다.
+     *
+     * <p>{@code generation_id}가 NULL인 레거시 세트(Candidate 메타데이터 도입 전 데이터)도 같은 폴백을 탄다. 회차 개념이 없어 전부
+     * {@code batch_no=0}이고, 이들을 한 generation으로 묶으면 가장 오래된 세트를 고르게 되어 교체 전 동작과 정반대가 된다.
+     */
+    public Optional<RecommendationSet> findCurrentSet(long userId) {
+        Optional<RecommendationSet> servable = findLowestServableSet(userId);
+        return servable.isPresent() ? servable : findLatestSet(userId);
+    }
+
+    private Optional<RecommendationSet> findLowestServableSet(long userId) {
         return jdbcTemplate
                 .query(
-                        "SELECT id,generated_at FROM recommendation_sets"
-                                + " WHERE user_id=? AND party_id IS NULL"
-                                + " ORDER BY id DESC LIMIT 1",
+                        // latest: 최신 generation. generation_id가 NULL인 레거시 세트는 회차 개념이 없고
+                        // NULL IS NOT DISTINCT FROM NULL이 참이라 서로 묶여 버리므로, 이 경로를 비워
+                        // findLatestSet(=교체 전 동작)으로 넘긴다.
+                        // progress: 그 generation에서 노출이 시작된 가장 높은 회차. 여기보다 뒤로 가지 않는다.
+                        """
+                        WITH latest AS (
+                            SELECT generation_id FROM recommendation_sets
+                            WHERE user_id=? AND party_id IS NULL
+                            ORDER BY id DESC LIMIT 1
+                        ), progress AS (
+                            SELECT coalesce(max(s.batch_no),0) AS batch_no
+                            FROM recommendation_sets s, latest
+                            WHERE s.user_id=? AND s.party_id IS NULL
+                              AND s.generation_id = latest.generation_id
+                              AND EXISTS (
+                                SELECT 1 FROM recommendation_items i
+                                WHERE i.set_id=s.id AND i.exposed_at IS NOT NULL
+                                  AND i.type IN ('TASTE','DISCOVERY')
+                              )
+                        )
+                        SELECT s.id,s.generated_at,s.generation_id,s.batch_no
+                        FROM recommendation_sets s, latest, progress
+                        WHERE s.user_id=? AND s.party_id IS NULL
+                          AND s.generation_id = latest.generation_id
+                          AND s.batch_no >= progress.batch_no
+                          AND EXISTS (
+                            SELECT 1 FROM recommendation_items i
+                            JOIN movies m ON m.id=i.movie_id
+                            WHERE i.set_id=s.id AND i.type IN ('TASTE','DISCOVERY')
+                        """
+                                + validCandidateClause()
+                                + """
+                          )
+                        ORDER BY s.batch_no,s.id LIMIT 1
+                        """,
+                        (resultSet, rowNumber) -> mapSet(resultSet),
+                        userId,
+                        userId,
+                        userId,
+                        userId,
+                        userId)
+                .stream()
+                .findFirst();
+    }
+
+    private Optional<RecommendationSet> findLatestSet(long userId) {
+        return jdbcTemplate
+                .query(
+                        selectSet("s.user_id=? AND s.party_id IS NULL ORDER BY s.id DESC LIMIT 1"),
                         (resultSet, rowNumber) -> mapSet(resultSet),
                         userId)
                 .stream()
                 .findFirst();
+    }
+
+    /**
+     * 현재 세트에 아직 노출하지 않은 유효 후보 수다. 프리페치 판단에 쓴다(S15P21E106-708).
+     *
+     * <p>{@link #hasValidItems}와 같은 조인·술어를 쓰되 미노출 항목만 센다. 이미 노출된 카드는 다음 회차가 대체할 대상이 아니라 화면에 남는 카드라서
+     * 남은 버퍼 깊이로 볼 수 없다.
+     */
+    public int countUnexposedValidItems(long userId, long setId) {
+        Integer count =
+                jdbcTemplate.queryForObject(
+                        "SELECT count(*) FROM recommendation_items i"
+                                + " JOIN movies m ON m.id=i.movie_id"
+                                + " WHERE i.set_id=? AND i.type IN ('TASTE','DISCOVERY')"
+                                + " AND i.exposed_at IS NULL"
+                                + validCandidateClause(),
+                        Integer.class,
+                        setId,
+                        userId,
+                        userId);
+        return count == null ? 0 : count;
+    }
+
+    private String selectSet(String where) {
+        return "SELECT s.id,s.generated_at,s.generation_id,s.batch_no"
+                + " FROM recommendation_sets s WHERE "
+                + where;
     }
 
     public List<ServingItem> findInitialVisibleItems(long userId, long setId) {
@@ -154,7 +247,10 @@ public class RecommendationServingRepository {
 
     private RecommendationSet mapSet(ResultSet resultSet) throws SQLException {
         return new RecommendationSet(
-                resultSet.getLong("id"), resultSet.getObject("generated_at", OffsetDateTime.class));
+                resultSet.getLong("id"),
+                resultSet.getObject("generated_at", OffsetDateTime.class),
+                resultSet.getString("generation_id"),
+                resultSet.getInt("batch_no"));
     }
 
     private ServingItem mapItem(ResultSet resultSet, int rowNumber) throws SQLException {
@@ -206,9 +302,13 @@ public class RecommendationServingRepository {
     /**
      * 같은 영화의 재노출은 행을 늘리지 않고 최신 노출로 갱신한다. 이력의 중복 제거가 여기서 끝난다.
      *
-     * <p>{@code WHERE ... set_id < EXCLUDED.set_id} 가드는 더 오래된 세트의 노출이 최신 승자를 덮어쓰지 못하게 한다. 현재 서빙은 항상
-     * 최신 세트만 노출하므로 평상시에는 걸리지 않지만, 이 가드가 있어야 "이력의 승자는 언제나 최대 set_id"가 호출 순서와 무관하게 참이 된다. 운영에서 가드에
+     * <p>{@code WHERE ... set_id < EXCLUDED.set_id} 가드는 더 오래된 세트의 노출이 최신 승자를 덮어쓰지 못하게 한다. 서빙 세트 ID는
+     * 시간에 대해 비감소이므로 평상시에는 걸리지 않지만, 이 가드가 있어야 "이력의 승자는 언제나 최대 set_id"가 호출 순서와 무관하게 참이 된다. 운영에서 가드에
      * 걸리는 것은 시퀀스 되감기 같은 이상 신호라 경고를 남긴다.
+     *
+     * <p>S15P21E106-708 이후 서빙이 "항상 최신 세트"는 아니다. 프리페치가 만든 회차가 있으면 더 낮은 {@code batch_no}를 계속 노출한다.
+     * 그래도 비감소는 유지된다 — 같은 generation 안에서는 {@link #findCurrentSet}의 진행 하한이 역행을 막고, generation 전환은 항상
+     * 더 큰 ID로 간다.
      *
      * <p>테스트 픽스처 {@code RecommendationHistoryApiContractTest.recordExposure()}와 마이그레이션 {@code
      * V202609211000}의 백필이 이 문장을 복제한다. 가드나 컬럼을 바꾸면 셋을 함께 바꾼다.
@@ -283,7 +383,8 @@ public class RecommendationServingRepository {
         return grouped;
     }
 
-    public record RecommendationSet(long id, OffsetDateTime generatedAt) {}
+    public record RecommendationSet(
+            long id, OffsetDateTime generatedAt, String generationId, int batchNo) {}
 
     public record ServingItem(
             long id,
