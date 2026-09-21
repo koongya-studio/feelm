@@ -93,6 +93,11 @@ export function isOAuthConfigured(provider: SocialProvider): boolean {
   return clientId(provider) !== '';
 }
 
+/** 제공자가 하나라도 열려 있는지. 소셜 준비 중 안내의 기준이다(`components/SocialNotice`) */
+export function isAnySocialConfigured(): boolean {
+  return (Object.keys(AUTHORIZE_URL) as SocialProvider[]).some(isOAuthConfigured);
+}
+
 /**
  * 콜백 주소.
  *

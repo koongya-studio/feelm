@@ -3,7 +3,7 @@
  *
  * 이동표
  * 0.4 → 0.5 이메일 회원가입 완료
- * 0.4 ⇢ 0.3 소셜 계정으로 가입 선택
+ * 0.4 ⇢ 0.2 소셜 계정으로 가입 선택 (0.3을 지워 0.2로 바꿨다, CR-29)
  *
  * 입력은 닉네임 · 생년월일 · 성별 · 이메일(+ 인증번호) · 비밀번호다
  * (screen-spec-auth.md 0.4, CR-20).
@@ -259,10 +259,15 @@ export default function EmailSignupPage() {
       <SignupPaper onSubmit={() => void submit()}>
         <SignupPaperHeading eyebrow="CREATE YOUR FEELM" title="지금 당신의 필름을 시작하세요">
           {/* 입력이 아니라 이동이라 줄을 기다리지 않고 제목 아래에 늘 보인다 */}
+          {/*
+           * 0.2 가입 방식 선택으로 돌아간다. 한때 소셜 버튼만 다시 늘어놓은 0.3이 따로 있었는데
+           * 0.2와 하는 일이 같아 지웠다(CR-29, 업무 -765). 0.2에서 이메일로 들어왔으면 이 화면을
+           * 바꿔 끼워 같은 화면이 이력에 두 번 쌓이지 않는다.
+           */}
           <button
             type="button"
             className={styles.social}
-            onClick={() => void navigate(path.signupSocial())}
+            onClick={() => void navigate(path.signupMethod(), { replace: true })}
           >
             소셜 계정으로 가입
           </button>
