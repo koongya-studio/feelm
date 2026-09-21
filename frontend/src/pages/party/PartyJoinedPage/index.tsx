@@ -1,7 +1,7 @@
 /*
  * 5.7 파티 초대 수락 완료
  *
- * 이동표: 5.7 → 5.4 파티 모드 시작하기 · 5.7 ⇢ 5.1 나중에 할게요
+ * 이동표: 5.7 → 5.9 파티 모드 시작하기 · 5.7 ⇢ 5.1 나중에 할게요
  *
  * **이 화면은 초대한 사람이 본다.** 와이어프레임이 5.9 옆에 그렇게 적어 두었다
  * (`5.6은 초대받은 사용자 관점, 5.7은 초대한 사용자에게 보이는 상태`). 그래서 문구가
@@ -95,7 +95,7 @@ export default function PartyJoinedPage() {
       </div>
 
       <div className={styles.actions}>
-        <Button variant="brand" onClick={() => void navigate(path.partyAnalyzing(id))}>
+        <Button variant="brand" onClick={() => void navigate(path.partyPopcornMix(id))}>
           파티 모드 시작하기
         </Button>
 

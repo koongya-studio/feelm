@@ -112,7 +112,6 @@ export const ROUTE_PATTERN = {
   // 파티 만들기와 초대 (5.2 ~ 5.7)
   partyNew: '/party/new',
   partySetup: '/party/new/setup',
-  partyAnalyzing: '/parties/:partyId/analyzing',
   partyRecommendations: '/parties/:partyId/recommendations',
   partyInvitation: '/parties/invitations/:invitationId',
   partyJoined: '/parties/:partyId/joined',
@@ -182,7 +181,6 @@ export const path = {
 
   partyNew: () => ROUTE_PATTERN.partyNew,
   partySetup: () => ROUTE_PATTERN.partySetup,
-  partyAnalyzing: (partyId: string | number) => `/parties/${partyId}/analyzing`,
   partyRecommendations: (partyId: string | number) => `/parties/${partyId}/recommendations`,
   partyInvitation: (invitationId: string | number) => `/parties/invitations/${invitationId}`,
   partyJoined: (partyId: string | number) => `/parties/${partyId}/joined`,
@@ -202,7 +200,7 @@ export const TAB_MATCH = {
   /*
    * 왼쪽 탭. 5.1 파티 시작에서 출발하는 흐름이다.
    *
-   * 5.8 파티원 팝콘과 파티팝콘 흐름(5.4 → 5.9 → 5.5)이 여기 있다. **사용자 시안
+   * 5.8 파티원 팝콘과 파티팝콘 흐름(5.9 → 5.5)이 여기 있다. **사용자 시안
    * 2026-09-17(업무 -462)이 네 화면 모두에 하단 내비를 그렸다.** 시안이 없는
    * 5.2 · 5.3 · 5.6 · 5.7은 전체화면이라 탭 흐름 밖이다.
    */
@@ -210,7 +208,6 @@ export const TAB_MATCH = {
     ROUTE_PATTERN.party,
     ROUTE_PATTERN.partyPopcorn,
     ROUTE_PATTERN.partyPopcornMix,
-    ROUTE_PATTERN.partyAnalyzing,
     ROUTE_PATTERN.partyRecommendations,
   ],
   /*

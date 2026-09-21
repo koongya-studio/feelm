@@ -51,7 +51,6 @@ import RatingResultPage from '../pages/movies/RatingResultPage';
 import OnboardingCompletePage from '../pages/onboarding/OnboardingCompletePage';
 import OttOnboardingPage from '../pages/onboarding/OttOnboardingPage';
 import TasteOnboardingPage from '../pages/onboarding/TasteOnboardingPage';
-import PartyAnalyzingPage from '../pages/party/PartyAnalyzingPage';
 import PartyInvitationPage from '../pages/party/PartyInvitationPage';
 import PartyJoinedPage from '../pages/party/PartyJoinedPage';
 import PartyListPage from '../pages/party/PartyListPage';
@@ -123,13 +122,12 @@ export const router = createBrowserRouter(
 
             /*
              * 파티팝콘 흐름과 파티원 팝콘 (업무 -462). **사용자 시안이 하단 내비를 그렸다.**
-             * 5.4 · 5.9 · 5.5는 스스로 넘어가는 흐름이라 내비가 있으면 중간에 빠져나갈 수
+             * 5.9 · 5.5는 스스로 넘어가는 흐름이라 내비가 있으면 중간에 빠져나갈 수
              * 있고, 시안은 그것을 막지 않았다 — 파티 모드는 탭 안에서 일어나는 일이다.
              * 시안이 없는 5.2 · 5.3 · 5.6 · 5.7은 전체화면 그대로다.
              */
             { path: ROUTE_PATTERN.partyPopcorn, element: <PartyPopcornPage /> },
             { path: ROUTE_PATTERN.partyPopcornMix, element: <PartyPopcornMixPage /> },
-            { path: ROUTE_PATTERN.partyAnalyzing, element: <PartyAnalyzingPage /> },
             { path: ROUTE_PATTERN.partyRecommendations, element: <PartyRecommendationPage /> },
 
             // 7.3 취향 리포트 목록 (업무 -308). 와이어프레임이 하단 내비를 그렸다

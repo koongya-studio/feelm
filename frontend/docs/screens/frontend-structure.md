@@ -81,8 +81,7 @@ ADR-0013이 후속 작업으로 남긴 `React 프로젝트 구조·상태 관리
 | `/film/popcorn` | 3.2 100알의 취향 | App | 탭 `필름` 유지 |
 | `/frames/:frameId` | 3.1-A 프레임 상세 | FullScreen | |
 | `/parties/:partyId/popcorn` | 5.8 파티원 팝콘 | App | 탭 `파티` 유지 (업무 -462) |
-| `/parties/:partyId/analyzing` | 5.4 취향 모으기 | App | 파티팝콘 흐름 1/3 |
-| `/parties/:partyId/popcorn/mix` | 5.9 팝콘 섞기 | App | 파티팝콘 흐름 2/3 |
+| `/parties/:partyId/popcorn/mix` | 5.9 팝콘 모으기 · 섞기 | App | 파티팝콘 흐름 1 · 2/3. 5.4가 합쳐졌다(업무 -773) |
 | `/parties/:partyId/recommendations` | 5.5 추천 완성 | App | 파티팝콘 흐름 3/3 |
 | `/search` `/party` `/my` | 범위 밖 | App | 각 탭. 아래 3.5 참조 |
 | `*` | 없는 경로 | FullScreen | 아래 3.6 참조 |

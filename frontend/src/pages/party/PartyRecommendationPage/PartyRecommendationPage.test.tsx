@@ -62,7 +62,7 @@ describe('5.5 추천 완성', () => {
 
     expect(await screen.findByText('지금은 함께 볼 영화를 찾지 못했어요')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '다시 추천받기' }));
-    expect(location()).toBe(`/parties/${TEST_PARTY_ID}/analyzing`);
+    expect(location()).toBe(`/parties/${TEST_PARTY_ID}/popcorn/mix`);
   });
 
   it.each([

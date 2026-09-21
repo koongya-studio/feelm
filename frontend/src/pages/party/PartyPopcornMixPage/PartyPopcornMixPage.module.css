@@ -1,20 +1,18 @@
 /*
- * 5.9 팝콘 섞기. 틀은 `PartyFlowShell`이 잡고 이 화면은 기계와 버튼만 놓는다.
+ * 5.9 팝콘 모으기 · 섞기. 틀은 `PartyFlowShell`이 잡고 이 화면은 기계만 놓는다.
  *
  * 기계와 통은 밝은 벽에 그대로 놓인다. 2.5장의 어두운 블록 규칙은 **팝콘 8색**
  * (범례·막대)에 대한 것이고, 3D 렌더는 3.2 · 5.8과 같이 벽에 걸린다.
  */
+/*
+ * 기계보다 작아지지 않는다(`flex-shrink: 0`). 한때 화면이 짧으면 칸이 기계보다 줄어 기계가
+ * 위아래로 넘쳤고 파티원 통이 제목 위로 올라갔다(업무 -773). 모자라면 본문이 스크롤한다.
+ */
 .stage {
   display: flex;
-  min-height: 0;
-  flex: 1 1 auto;
+  flex: 1 0 auto;
   align-items: center;
   justify-content: center;
-}
-
-.actions {
-  display: flex;
-  flex-direction: column;
 }
 
 /* 오류는 흐름 셸 없이 화면 전체를 덮는다 — 단계를 말할 상태가 아니다 */
