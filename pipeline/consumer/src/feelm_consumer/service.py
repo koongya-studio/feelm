@@ -170,14 +170,15 @@ def _build_ranked_results(
     if len(taste) < CANDIDATE_LIMIT:
         LOG.warning("foldin_candidate_shortage available=%s requested=500", len(taste))
 
-    explanation_inputs = ratings if reason_inputs is None else reason_inputs
+    actual_ratings = [item for item in ratings if item.source.casefold() == "rating"]
+    explanation_inputs = actual_ratings if reason_inputs is None else reason_inputs
     discovery: list[RankedMovie] = []
     discovery_reasons = {}
     if groups is not None and discovery_popularity is not None:
         selection = select_discovery_candidates(
             groups,
             ranked_population,
-            ratings,
+            actual_ratings,
             popularity_ranking=discovery_popularity,
             watched_movie_ids=watched_movie_ids,
             dismissed_movie_ids=dismissed_movie_ids,
@@ -196,7 +197,7 @@ def _build_ranked_results(
     return build_results(
         model_version=bundle.model_version,
         vector=vector,
-        rating_count=len(ratings),
+        rating_count=len(actual_ratings),
         factor_backed_input_count=factor_backed_input_count,
         candidates=taste,
         discovery_candidates=discovery,

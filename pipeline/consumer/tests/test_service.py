@@ -95,6 +95,45 @@ def test_als_only_preserves_legacy_taste_scores_without_group_discovery(frozen_c
     assert actual[1]["discovery"] == []
 
 
+def test_dismissal_changes_candidates_without_becoming_positive_reason(frozen_clock) -> None:
+    bundle = ArtifactBundle(
+        "als-v1",
+        "snapshot-a",
+        0.1,
+        {1: np.array([1.0, 0.0]), 2: np.array([0.0, 1.0]), 3: np.array([0.0, 2.0])},
+        {10: 1, 20: 2, 40: 3},
+        {
+            10: MovieMetadata("10", ("DRAMA",), None),
+            20: MovieMetadata("20", ("ACTION",), None),
+            40: MovieMetadata("40", ("ACTION",), None),
+        },
+        MAPPING_REVISION,
+        METADATA_REVISION,
+    )
+    ratings_only = calculate_user_results(
+        bundle,
+        [ProfileInput(10, 5.0, "RATING")],
+        7,
+    )
+    with_dismissal = calculate_user_results(
+        bundle,
+        [ProfileInput(10, 5.0, "RATING"), ProfileInput(20, 1.0, "DISMISS")],
+        7,
+        dismissed_movie_ids={20},
+    )
+
+    assert ratings_only is not None and with_dismissal is not None
+    assert with_dismissal[0]["ratingCount"] == 1
+    assert with_dismissal[0]["factorBackedInputCount"] == 2
+    assert with_dismissal[0]["vector"] != ratings_only[0]["vector"]
+    assert with_dismissal[1]["taste"] != ratings_only[1]["taste"]
+    assert all(
+        20 not in reason.get("sourceMovieIds", [])
+        for item in with_dismissal[1]["taste"]
+        for reason in item["reasons"]
+    )
+
+
 def test_content_only_movies_become_candidates(frozen_clock) -> None:
     ratings = [ProfileInput(10, 5.0, "rating"), ProfileInput(20, 1.0, "rating")]
 

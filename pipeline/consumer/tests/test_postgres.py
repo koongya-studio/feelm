@@ -1,4 +1,11 @@
-from feelm_consumer.postgres import load_profile, load_user_snapshot, readonly_snapshot
+from feelm_consumer.postgres import (
+    UserSnapshot,
+    load_profile,
+    load_user_snapshot,
+    merge_profile_inputs,
+    readonly_snapshot,
+)
+from feelm_consumer.profile import ProfileInput
 
 
 class FakeCursor:
@@ -52,5 +59,20 @@ def test_user_snapshot_reads_confirmed_watches_and_dismissals() -> None:
 
     assert snapshot.watched_movie_ids == frozenset({7, 8})
     assert snapshot.dismissed_movie_ids == frozenset({9})
-    assert [(item.movie_id, item.score, item.source) for item in snapshot.ratings] == [(5, 4.5, "rating")]
+    assert [(item.movie_id, item.score, item.source) for item in snapshot.ratings] == [(5, 4.5, "RATING")]
     assert all("onboarding_preferences" not in query for query in connection.cursor_value.queries)
+
+
+def test_profile_inputs_keep_real_rating_and_add_only_unrated_dismissals() -> None:
+    snapshot = UserSnapshot(
+        [ProfileInput(5, 1.0, "RATING")],
+        frozenset(),
+        frozenset({5, 9}),
+    )
+
+    inputs = merge_profile_inputs(snapshot, 1.0)
+
+    assert [(item.movie_id, item.score, item.source) for item in inputs] == [
+        (5, 1.0, "RATING"),
+        (9, 1.0, "DISMISS"),
+    ]

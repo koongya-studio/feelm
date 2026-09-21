@@ -12,7 +12,7 @@ class EventValidationError(ValueError):
 
 
 @dataclass(frozen=True)
-class RatingEvent:
+class RecalculationEvent:
     event_id: UUID
     user_id: int
     action: str
@@ -20,23 +20,31 @@ class RatingEvent:
     occurred_at: datetime
 
 
-def parse_event(raw: bytes, key: bytes | None) -> RatingEvent:
+def parse_event(raw: bytes, key: bytes | None) -> RecalculationEvent:
     try:
         payload = json.loads(raw.decode("utf-8"))
         event_id = UUID(str(payload["eventId"]))
         user_id = payload["userId"]
         event_type = payload["eventType"]
         body = payload["payload"]
-        action = body["action"] if event_type == "RATING" else "ONBOARDING"
+        if not isinstance(body, dict):
+            raise TypeError("payload must be an object")
+        action = body["action"] if event_type == "RATING" else event_type
         occurred_at = datetime.fromisoformat(str(payload["occurredAt"]).replace("Z", "+00:00"))
     except (KeyError, TypeError, UnicodeDecodeError, ValueError, json.JSONDecodeError) as exc:
-        raise EventValidationError("invalid rating event") from exc
+        raise EventValidationError("invalid recommendation recalculation event") from exc
     if key is None or len(key) != 8:
         raise EventValidationError("invalid partition key")
     decoded_key = struct.unpack(">q", key)[0]
     if isinstance(user_id, bool) or not isinstance(user_id, int) or not 0 < user_id < 2**63:
         raise EventValidationError("invalid userId")
-    if action not in {"CREATE", "UPDATE", "DELETE", "ONBOARDING"} or event_type not in {"RATING", "ONBOARDING"}:
+    if not isinstance(event_type, str) or not isinstance(action, str):
+        raise EventValidationError("invalid event type or action")
+    if action not in {"CREATE", "UPDATE", "DELETE", "ONBOARDING", "DISMISS"} or event_type not in {
+        "RATING",
+        "ONBOARDING",
+        "DISMISS",
+    }:
         raise EventValidationError("invalid event type or action")
     if event_type == "RATING":
         movie_id = body.get("movieId")
@@ -53,12 +61,23 @@ def parse_event(raw: bytes, key: bytes | None) -> RatingEvent:
             or float(score) * 2 != round(float(score) * 2)
         ):
             raise EventValidationError("invalid score")
-    else:
+    elif event_type == "ONBOARDING":
         count = body.get("preferenceCount")
         if isinstance(count, bool) or not isinstance(count, int) or count <= 0:
             raise EventValidationError("invalid preferenceCount")
+    else:
+        movie_id = body.get("movieId")
+        if isinstance(movie_id, bool) or not isinstance(movie_id, int) or not 0 < movie_id < 2**63:
+            raise EventValidationError("invalid movieId")
+        recommendation_item_id = body.get("recommendationItemId")
+        if recommendation_item_id is not None and (
+            isinstance(recommendation_item_id, bool)
+            or not isinstance(recommendation_item_id, int)
+            or not 0 < recommendation_item_id < 2**63
+        ):
+            raise EventValidationError("invalid recommendationItemId")
     if occurred_at.tzinfo is None or occurred_at.utcoffset() != UTC.utcoffset(occurred_at):
         raise EventValidationError("occurredAt must be UTC")
     if decoded_key != user_id:
         raise EventValidationError("partition key does not match userId")
-    return RatingEvent(event_id, user_id, action, event_type, occurred_at)
+    return RecalculationEvent(event_id, user_id, action, event_type, occurred_at)

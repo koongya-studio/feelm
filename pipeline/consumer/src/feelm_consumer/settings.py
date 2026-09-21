@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from math import isfinite
 from os import environ
@@ -27,6 +28,7 @@ def validate_immutable_artifact_uri(value: str, setting_name: str) -> str:
 class Settings:
     kafka_bootstrap_servers: str
     kafka_topic: str
+    dismiss_kafka_topic: str
     kafka_group_id: str
     postgres_dsn: str
     redis_url: str
@@ -37,6 +39,8 @@ class Settings:
     group_uri: str | None
     discovery_popularity_uri: str | None
     hybrid_alpha: float
+    dismiss_score: float
+    dismiss_input_version: str
     retry_attempts: int
     retry_backoff_seconds: float
     kafka_poll_timeout_seconds: float
@@ -56,9 +60,16 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
     }
     result = {field: values.get(name, "").strip() for field, name in required.items()}
     result["kafka_topic"] = values.get("CONSUMER_KAFKA_TOPIC", "feelm.rating.v1").strip()
+    result["dismiss_kafka_topic"] = values.get(
+        "CONSUMER_DISMISS_KAFKA_TOPIC", "feelm.dismiss.v1"
+    ).strip()
     missing = [name for field, name in required.items() if not result[field]]
     if missing:
         raise SettingsError("missing required Consumer settings: " + ", ".join(missing))
+    if not result["kafka_topic"] or not result["dismiss_kafka_topic"]:
+        raise SettingsError("Consumer Kafka topics must not be empty")
+    if result["kafka_topic"] == result["dismiss_kafka_topic"]:
+        raise SettingsError("Consumer rating and dismiss Kafka topics must be different")
     for field in ("model_uri", "mapping_uri", "metadata_uri"):
         validate_immutable_artifact_uri(result[field], required[field])
     # Optional: without it the Consumer keeps its ALS-only behaviour.
@@ -103,6 +114,22 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
             raise SettingsError(f"{name} must be between 0 and 1")
         return value
 
+    try:
+        dismiss_score = float(values.get("CONSUMER_DISMISS_SCORE", "1.0").strip())
+    except ValueError as exc:
+        raise SettingsError("CONSUMER_DISMISS_SCORE must be a number") from exc
+    if (
+        not isfinite(dismiss_score)
+        or not 0.5 <= dismiss_score <= 5.0
+        or dismiss_score * 2 != round(dismiss_score * 2)
+    ):
+        raise SettingsError("CONSUMER_DISMISS_SCORE must be a half-step rating between 0.5 and 5.0")
+    dismiss_input_version = values.get(
+        "CONSUMER_DISMISS_INPUT_VERSION", "dismiss-virtual-rating-v1"
+    ).strip()
+    if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,63}", dismiss_input_version):
+        raise SettingsError("CONSUMER_DISMISS_INPUT_VERSION must be a safe version identifier")
+
     return Settings(
         **result,
         content_uri=content_uri,
@@ -112,6 +139,8 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         # components support, so it never turns the mix into a single component;
         # clear CONSUMER_CONTENT_URI for that.  See pipeline/consumer/README.md.
         hybrid_alpha=unit_float("CONSUMER_HYBRID_ALPHA", 0.5),
+        dismiss_score=dismiss_score,
+        dismiss_input_version=dismiss_input_version,
         retry_attempts=positive_int("CONSUMER_RETRY_ATTEMPTS", 3, 10),
         retry_backoff_seconds=positive_float("CONSUMER_RETRY_BACKOFF_SECONDS", 0.25, 30.0),
         kafka_poll_timeout_seconds=positive_float("CONSUMER_KAFKA_POLL_TIMEOUT_SECONDS", 1.0, 30.0),

@@ -25,6 +25,61 @@ def test_parse_event_accepts_onboarding_with_long_key() -> None:
     assert event.action == "ONBOARDING"
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b'{"movieId":550}',
+        b'{"movieId":550,"recommendationItemId":3301}',
+    ],
+)
+def test_parse_event_accepts_dismiss_as_recalculation_signal(payload: bytes) -> None:
+    event = parse_event(
+        b'{"eventId":"123e4567-e89b-12d3-a456-426614174000","userId":7,'
+        b'"eventType":"DISMISS","occurredAt":"2026-09-21T00:00:00Z","payload":'
+        + payload
+        + b"}",
+        pack(">q", 7),
+    )
+
+    assert event.user_id == 7
+    assert event.action == "DISMISS"
+    assert event.event_type == "DISMISS"
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b'{"movieId":0}',
+        b'{"movieId":550,"recommendationItemId":0}',
+        b'{"movieId":550,"recommendationItemId":true}',
+    ],
+)
+def test_parse_event_rejects_invalid_dismiss_payload(payload: bytes) -> None:
+    with pytest.raises(EventValidationError):
+        parse_event(
+            b'{"eventId":"123e4567-e89b-12d3-a456-426614174000","userId":7,'
+            b'"eventType":"DISMISS","occurredAt":"2026-09-21T00:00:00Z","payload":'
+            + payload
+            + b"}",
+            pack(">q", 7),
+        )
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        b'{"eventId":"123e4567-e89b-12d3-a456-426614174000","userId":7,'
+        b'"eventType":{},"occurredAt":"2026-09-21T00:00:00Z","payload":{}}',
+        b'{"eventId":"123e4567-e89b-12d3-a456-426614174000","userId":7,'
+        b'"eventType":"RATING","occurredAt":"2026-09-21T00:00:00Z",'
+        b'"payload":{"action":[],"movieId":550,"score":1.0}}',
+    ],
+)
+def test_parse_event_rejects_unhashable_contract_fields(raw: bytes) -> None:
+    with pytest.raises(EventValidationError):
+        parse_event(raw, pack(">q", 7))
+
+
 def test_parse_event_rejects_mismatched_key() -> None:
     with pytest.raises(EventValidationError):
         parse_event(
