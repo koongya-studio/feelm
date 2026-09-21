@@ -1466,9 +1466,10 @@ Compose 단계에서 수행한다.
 4. `feelm-party-consumer-v1` group이 없거나, 이전 실패 시도에서 만들어졌다면 의도한 tail offset과
    일치하는지 확인한다. 예상하지 못한 committed offset이 있으면 자동 reset하지 말고 전환을 중단한다.
 5. Backend migration과 완료 알림 listener가 실행 중인지 확인한다. 기존 writer 정지를 확인한 뒤에만
-   파티 Consumer를 시작한다. 신규 입력 group은 `latest`에서 시작한다.
-6. 모든 partition 할당 뒤 Spark query가 여전히 없는지 다시 확인하고, Spring worker를 재개해 현재
-   활성 파티 입력을 다시 발행한다.
+   파티 Consumer를 시작한다. 신규 입력 group은 `earliest`에서 시작해 기동 전에 쌓인 이벤트까지
+   처리하고, 이미 commit된 group은 기존 Offset을 그대로 재개한다.
+6. 모든 partition의 lag가 0이 되고 Spark query가 여전히 없는지 다시 확인한 뒤 Spring worker를
+   재개한다.
 
 ```bash
 CONSUMER_IMAGE="${PARTY_IMAGE}" \
