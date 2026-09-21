@@ -171,7 +171,7 @@ def prepare_postgres(dsn: str, user_id: int) -> None:
         connection.execute("INSERT INTO ratings (user_id, movie_id, score) VALUES (%s, 1, 1.0)", (user_id,))
 
 
-def score_from_snapshot(_bundle, ratings, _onboarding, **_kwargs):
+def score_from_snapshot(_bundle, ratings, **_kwargs):
     score = ratings[0].score
     generation = f"score-{score}"
     return (
@@ -227,12 +227,12 @@ def real_kafka_rebalance_check(
         new_fence.append(claim_partition_fence(store, group, topic, 0))
         client.assign(partitions)
 
-    def delayed_calculate(bundle, ratings, onboarding, **kwargs):
+    def delayed_calculate(bundle, ratings, **kwargs):
         snapshot_scores.append(ratings[0].score)
         snapshot_read.set()
         if not release_old.wait(45):
             raise AssertionError("old snapshot barrier timed out")
-        return score_from_snapshot(bundle, ratings, onboarding, **kwargs)
+        return score_from_snapshot(bundle, ratings, **kwargs)
 
     try:
         old.subscribe([topic], on_assign=old_assigned)

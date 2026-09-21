@@ -7,16 +7,12 @@ from typing import Protocol
 
 from feelm_consumer.profile import ProfileInput
 
-ONBOARDING_LIKE_SCORE = 4.271231616529622
-ONBOARDING_DISLIKE_SCORE = 2.798442509805467
-
 
 @dataclass(frozen=True)
 class UserSnapshot:
     """Immutable profile and exclusion inputs read in one PostgreSQL snapshot."""
 
     ratings: list[ProfileInput]
-    onboarding: list[ProfileInput]
     watched_movie_ids: frozenset[int]
     dismissed_movie_ids: frozenset[int]
 
@@ -52,7 +48,7 @@ def readonly_snapshot(connect: Callable[[], Connection]):
         connection.close()
 
 
-def load_profile(connection: Connection, user_id: int) -> tuple[list[ProfileInput], list[ProfileInput]]:
+def load_profile(connection: Connection, user_id: int) -> list[ProfileInput]:
     cursor = connection.cursor()
     cursor.execute(
         "SELECT movie_id, score FROM ratings WHERE user_id = %s ORDER BY movie_id",
@@ -66,24 +62,12 @@ def load_profile(connection: Connection, user_id: int) -> tuple[list[ProfileInpu
         if not 0.5 <= value <= 5.0 or value * 2 != round(value * 2):
             raise ValueError("invalid rating score from PostgreSQL")
         ratings.append(ProfileInput(movie_id, value, "rating"))
-    cursor.execute(
-        "SELECT movie_id, preference FROM onboarding_preferences WHERE user_id = %s ORDER BY movie_id",
-        (user_id,),
-    )
-    onboarding = []
-    for movie_id, preference in cursor.fetchall():
-        if isinstance(movie_id, bool) or not isinstance(movie_id, int) or movie_id <= 0:
-            raise ValueError("invalid onboarding movie_id from PostgreSQL")
-        if preference not in {"LIKE", "DISLIKE"}:
-            raise ValueError("invalid onboarding preference from PostgreSQL")
-        score = ONBOARDING_LIKE_SCORE if preference == "LIKE" else ONBOARDING_DISLIKE_SCORE
-        onboarding.append(ProfileInput(movie_id, score, "onboarding"))
-    return ratings, onboarding
+    return ratings
 
 
 def load_user_snapshot(connection: Connection, user_id: int) -> UserSnapshot:
     """Read profile, confirmed watches, and dismissals from one repeatable snapshot."""
-    ratings, onboarding = load_profile(connection, user_id)
+    ratings = load_profile(connection, user_id)
     cursor = connection.cursor()
     cursor.execute(
         "SELECT DISTINCT movie_id FROM watch_records "
@@ -96,7 +80,7 @@ def load_user_snapshot(connection: Connection, user_id: int) -> UserSnapshot:
         (user_id,),
     )
     dismissed = _positive_movie_ids(cursor.fetchall(), "dismissal")
-    return UserSnapshot(ratings, onboarding, frozenset(watched), frozenset(dismissed))
+    return UserSnapshot(ratings, frozenset(watched), frozenset(dismissed))
 
 
 def _positive_movie_ids(rows: list[tuple[int, ...]], label: str) -> set[int]:

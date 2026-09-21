@@ -20,7 +20,11 @@ Fold-in까지 Spark Streaming으로 수행하면 사용자 단위 계산을 위�
 
 Kafka 이후의 실시간 처리를 계산 특성에 따라 두 실행 단위로 분리한다.
 
-1. **Python Fold-in Consumer**는 `RATING`·`ONBOARDING` 이벤트를 소비한다. PostgreSQL에서 해당 사용자의 최신 평가·온보딩 값을 읽어 User Vector와 raw Candidate Top-500을 재계산하고 Redis에 기록한다.
+1. **Python Fold-in Consumer**는 `RATING`·`ONBOARDING` 이벤트를 사용자 추천 재계산 신호로
+   소비한다. PostgreSQL에서 해당 사용자의 최신 `ratings`를 읽어 User Vector와 raw
+   TASTE·DISCOVERY Candidate를 재계산하고 Redis에 기록한다. 온보딩 LIKE/DISLIKE는
+   Backend가 각각 4.0·2.0 평가로 저장하며, Consumer는 `onboarding_preferences`나 이벤트
+   payload를 계산 입력으로 사용하지 않는다.
 2. **Spark Structured Streaming**은 여러 사용자의 `VIEW` 이벤트를 영화별로 집계해 실시간 인기 결과를 Redis에 기록한다.
 3. **Spring Boot**는 후보 최대 500편을 PostgreSQL의 OTT 제공처·사용자 클릭 원본과 결합해 재정렬하고, 감상·관심없음 제외·최종 설명·세트 구성을 적용한다.
 

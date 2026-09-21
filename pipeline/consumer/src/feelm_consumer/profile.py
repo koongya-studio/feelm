@@ -18,15 +18,6 @@ class FoldInResult:
     factor_backed_input_count: int
 
 
-def merge_inputs(
-    ratings: list[ProfileInput], onboarding: list[ProfileInput]
-) -> list[ProfileInput]:
-    """Use a real rating over an onboarding choice for the same movie."""
-    merged = {entry.movie_id: entry for entry in onboarding}
-    merged.update({entry.movie_id: entry for entry in ratings})
-    return [merged[movie_id] for movie_id in sorted(merged)]
-
-
 def fold_in(
     item_factors: dict[int, np.ndarray], inputs: list[ProfileInput], reg_param: float
 ) -> FoldInResult | None:

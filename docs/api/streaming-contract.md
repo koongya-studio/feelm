@@ -67,12 +67,13 @@ Spark가 미리 제외하려면 제외 목록의 복제본을 상태로 유지�
 
 Fold-in은 사용자의 평가 전체를 입력으로 하며, Python Consumer는 이를 **읽기 전용 롤**로 PostgreSQL에서 조회합니다.
 
-- 대상: `ratings`(`user_id`, `movie_id`, `score`), `onboarding_preferences`(`user_id`, `movie_id`, `preference`),
-  `watch_records`의 확정 감상 상태, `user_movie_dismissals`. DISCOVERY 그룹은 PostgreSQL의
+- 대상: `ratings`(`user_id`, `movie_id`, `score`), `watch_records`의 확정 감상 상태,
+  `user_movie_dismissals`. `onboarding_preferences`는 화면·감사 기록으로 유지하지만 Consumer 계산 입력으로
+  조회하지 않는다. DISCOVERY 그룹은 PostgreSQL의
   `representative_flavor_id`가 아니라 같은 세대의 immutable `group-serving-artifacts-v1`에서 읽는다
 - 쓰기 권한을 부여하지 않으며 서비스 테이블을 갱신하지 않는다
 - 이벤트의 `movieId`·`score`는 로깅·디버깅용 참고값이며 계산에는 조회 결과를 사용한다
-- 평가·온보딩 이벤트마다 현재 평가·온보딩을 repeatable-read snapshot으로 다시 읽는다. DISCOVERY
+- 평가·온보딩 이벤트마다 현재 평가를 repeatable-read snapshot으로 다시 읽는다. DISCOVERY
   산출물을 활성화한 경우 확정 감상·관심없음도 같은 snapshot에서 읽는다. 재전달된 이벤트도 같은
   PostgreSQL 상태와 같은 산출물 revision이면 같은 결과를 계산하며, 이벤트 payload의 과거 값으로
   현재 상태를 덮어쓰지 않는다
@@ -89,13 +90,14 @@ Consumer 후보에는 영화 표시용 메타데이터를 넣지 않고 구조�
 | 영화 대표 맛(`representative_flavor_code`) | **HDFS immutable movie metadata snapshot** | 후보와 같은 artifact revision으로 읽는다 |
 | 영화별 OTT 제공처·사용자 클릭 | **PostgreSQL** | `movie_ott_providers`·`otts`·`watch_records`가 원본이며 Spring이 재정렬 시 조회한다 |
 
-`TASTE`는 사용자의 평가·온보딩 선호를 Fold-in에 반영한 기본 순위 최대 500편이다. `DISCOVERY`는
+`TASTE`는 사용자의 평가를 Fold-in에 반영한 기본 순위 최대 500편이다. 온보딩 LIKE·DISLIKE도 각각
+`4.0`·`2.0` 평가 행으로 저장되므로 같은 입력을 사용한다. `DISCOVERY`는
 `group-serving-artifacts-v1`의 고정 8×128 영화 그룹으로 만드는 별도 순위다. 상위 `taste_id` 0~7은
 `FLAVOR_A`~`FLAVOR_H`와 대응하지만, 저이력·신규성 판정과 후보 선발은 내부 `child_id`·`group_id`
 기준이며 공개 팝콘 수를 사용하지 않는다.
 사용자가 평가하거나 확정 감상한 매핑 영화 중 그룹별 이력이 2편 이하이면서 전체 매핑 감상의 20%
-이하인 그룹만 대상으로 한다. 평가 영화가 속한 고정 그룹 대표로 사용자 방향을 만들고, 방향이 없으면
-온보딩의 `LIKE 대표 합 - DISLIKE 대표 합`을 사용한다. 방향과 그룹 대표의 내림차순 내적으로 공급
+이하인 그룹만 대상으로 한다. 평가 영화가 속한 고정 그룹 대표로 사용자 방향을 만들며, 평가 방향을
+만들 수 없으면 DISCOVERY를 게시하지 않는다. 방향과 그룹 대표의 내림차순 내적으로 공급
 그룹을 정렬한다. 먼저 상위 10개 그룹에서 그룹별 10편을 모집한다. 100편이 모자라도 다음 적격
 그룹은 추가하지 않고 같은 10개 그룹의 11위 후보를 그룹 적합도 순으로 한 편씩 모집한다. 계속
 부족하면 12위, 13위 순으로 층별 확장한다. 상위 10개 그룹을 모두 소진해도 부족하면 11번째 적격
@@ -111,8 +113,9 @@ Consumer 후보에는 영화 표시용 메타데이터를 넣지 않고 구조�
 - S15P21E106-415: Consumer의 DISCOVERY 후보 생성과 로컬 정책 검증
 - S15P21E106-471: Redis Candidate v3 `taste`/`discovery` 그룹화와 `generationId` writer 기준선
 - S15P21E106-481: TASTE 후보별 구조화 단일 `reason` 객체를 추가한 Candidate v4 writer·payload 기준선
-- S15P21E106-488: 전체 평가 또는 온보딩 이력으로 계산한 저이력 그룹 적합도·상위 기여 비율을
-  DISCOVERY 전용 단일 `reason` 객체로 추가한 Candidate v5 writer·payload 기준선
+- S15P21E106-488: 당시 전체 평가 또는 온보딩 이력으로 계산한 저이력 그룹 적합도·상위 기여 비율을
+  DISCOVERY 전용 단일 `reason` 객체로 추가했다. S15P21E106-649부터 온보딩 선택은 4.0·2.0 평가로
+  변환된 `ratings` 입력으로만 같은 계산에 참여한다.
 - S15P21E106-505: 입력 수 제한 제거, TASTE 500·DISCOVERY 100 후보 게시와 당시 그룹 부족분 보충,
   `DISCOVERY_PERSONAL_SCORE`를 추가한 Candidate v6 writer·payload 계약. Spring reader·조립은
   Backend 소비 계약
@@ -218,9 +221,10 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 { "preferenceCount": 12 }
 ```
 
-- 개별 선택 내용은 싣지 않는다. Python Consumer가 `onboarding_preferences`를 조회한다
-- 온보딩 선택이 실제 별점 행이 된 뒤(S15P21E106-647) 같은 제출을 `RATING` 이벤트로도 보낼지는 그 업무에서
-  정한다. 한 번의 제출이 Fold-in에 두 번 들어가지 않아야 한다(S15P21E106-649)
+- 개별 선택 내용은 싣지 않는다. Backend는 같은 트랜잭션에서 LIKE `4.0`·DISLIKE `2.0` 평가를 저장하고,
+  Python Consumer는 이 이벤트를 사용자별 최신 `ratings`를 다시 읽는 재계산 신호로만 사용한다
+- 한 번의 제출에는 `ONBOARDING` 이벤트 한 건만 발행하고 선택별 `RATING` 이벤트는 추가 발행하지 않는다.
+  payload에 계약 외 필드가 추가돼도 Consumer 계산 입력으로 사용하지 않는다(S15P21E106-649)
 
 **`DISMISS`**
 
@@ -506,15 +510,27 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
 - 콘텐츠 산출물이 설정되면 MovieLens에 연결되지 않은 영화(평점이 없어 ALS Factor가 없는 영화)도
   후보에 포함된다. 한 컴포넌트만 지원하는 영화는 그 컴포넌트의 순위를 그대로 받는다(S15P21E106-315 규칙).
 - 동점은 같은 값을 받고, 동일 점수 안의 결정론적 순서는 `movieId` 오름차순이다.
-- **유효 입력 수로 후보 계산을 제한하지 않는다.** 서로 다른 평가·온보딩 입력이 1편뿐이어도 가용한
+- **유효 입력 수로 후보 계산을 제한하지 않는다.** 서로 다른 평가 입력이 1편뿐이어도 가용한
   ALS·콘텐츠 성분으로 후보를 게시한다. 입력이 없거나 그 이력으로 어떤 성분도 사용자 프로필을 만들지
   못하면 ALS에 매핑된 서비스 영화와 콘텐츠 지원 영화의 합집합에 모두 `0.0`을 부여하고 `movieId`
   오름차순으로 TASTE를 게시한다. 후보 모집단 자체가 비어 있을 때만 세 키를 갱신하지 않는다.
 - 온보딩 LIKE/DISLIKE를 **실제 별점 행으로 저장한다**(팀 결정 2026-09-18, S15P21E106-647). LIKE는
-  `4.0`, DISLIKE는 `2.0`이며 `onboarding_preferences` 행도 그대로 남는다. 같은 영화에 실제 별점이
-  생기면 해당 온보딩 입력을 제거하는 규칙은 그대로이므로, 전환 뒤 온보딩 입력은 사실상 모두 저장된
-  별점으로 대체된다. ALS fold-in adapter의 `4.271231616529622` · `2.798442509805467`을 계속 쓸
-  자리가 남는지와 콘텐츠·발견 방향의 이진 LIKE/DISLIKE 해석은 **S15P21E106-649에서 확인해 확정한다**.
+  `4.0`, DISLIKE는 `2.0`이며 `onboarding_preferences` 행도 화면·감사 기록으로 남는다. Consumer는
+  S15P21E106-649부터 `ratings`만 Fold-in·콘텐츠·DISCOVERY 계산 입력으로 사용한다. 과거 ALS adapter의
+  온보딩 보정 상수와 이진 LIKE/DISLIKE 방향 fallback은 제거했다. S15P21E106-648 소급 migration이
+  적용되지 않은 환경에는 이 Consumer를 배포하지 않으며, 전환 전 설명되지 않은 미보정 행이 0건인지
+  확인한다. migration 뒤 사용자가 평가를 삭제해 `WATCHED_UNRATED`로 돌아가고 rating·frame이 함께
+  사라진 행은 정상 현재 상태이므로 미보정으로 세거나 평가를 복원하지 않는다. 운영 증거에는 raw 조회
+  건수, 확인된 사후 삭제 건수와 근거, 설명되지 않은 잔여 건수를 각각 남긴다. 이
+  S15P21E106-648 migration 확인은 S15P21E106-649 병합 선행 조건이 아니라 신규 Consumer의
+  **운영 배포·전환 게이트**다.
+- Candidate 키에는 TTL이 없으므로 migration과 Consumer 교체만으로 기존 활성 사용자의 결과가 바뀌지
+  않는다. 배포 담당자는 §5.4의 승인된 전체 사용자 추천 재구축으로 모든 활성 사용자를 새 Consumer에
+  처리하고 대상·성공·실패·재시도 건수, 새 `generationId` 게시, `directionSource=ONBOARDING` 잔존 0건을
+  확인해야 전환을 완료한다. 실패 시 전환을 중단하며, 이미 교체한 경우 이전 Consumer를 복구한 뒤 같은
+  전체 재구축으로 이전 정책 결과를 복원한다. 저장소에 전체 재구축 실행기가 마련되기 전에는 승인된 실행
+  수단과 실제 환경 증거가 별도 배포 게이트다. 이 전체 사용자 Candidate 재게시는
+  S15P21E106-735가 담당하며 S15P21E106-649 병합 선행 조건이 아니라 운영 배포·전환 게이트다.
 - 후보 모집단 자체가 비어 게시를 생략할 때 해당 사용자 키는 **없거나 이전 값 그대로**이며
   `candidate-version` 게시 순번과 `generationId`도 바뀌지 않는다. 따라서 Spring은 `inputVersion`이
   올랐는데 마지막으로 확인한 후보 스냅샷의
@@ -572,7 +588,7 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
 
 | 필드 | 의미 |
 |---|---|
-| `directionSource` | 전체 평가로 방향을 만들었으면 `RATING`, 평가 방향을 만들 수 없어 전체 온보딩을 사용했으면 `ONBOARDING` |
+| `directionSource` | 전체 평가로 만든 방향이므로 `RATING`. 온보딩 유래 4.0·2.0 평가도 같은 평가 입력이다 |
 | `contributorCount` | 후보 그룹 적합도에 양의 기여를 한 입력 영화 전체 수 |
 | `topContributors` | 양의 기여도 내림차순, 동점 `movieId` 오름차순 상위 3개. `relation`은 `POSITIVE_ALIGNMENT` 또는 `NEGATIVE_CONTRAST` |
 | `topContributionCoverage` | 전체 양의 기여 합 중 `topContributors` 기여 합의 비율. 양의 기여가 없으면 `0.0` |
@@ -581,11 +597,11 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
 | `popularityRankInGroup` | 입력·감상·관심없음 제외와 개인 점수 지원 여부를 반영한 그룹 내부 대중성 순위(1부터 시작) |
 
 평가 입력 `i`의 기여도는 같은 동적 평점 기준점의 가중치 `w_i`와
-`dot(후보 그룹 대표, 입력 영화 그룹 대표)`의 곱이다. 온보딩 fallback은 LIKE `+1`, DISLIKE `-1`을
-`w_i`로 쓴다. 전체 signed 기여는 그룹 적합도 계산에 모두 반영하지만 `topContributors`와 coverage 분모에는
+`dot(후보 그룹 대표, 입력 영화 그룹 대표)`의 곱이다. 전체 signed 기여는 그룹 적합도 계산에
+모두 반영하지만 `topContributors`와 coverage 분모에는
 양의 기여만 포함한다. 따라서 coverage는 그룹 적합도 근거가 소수 입력에 집중됐는지를 나타내며 후보 영화의
 최종 개인 점수 전체에 대한 설명률이 아니다. Consumer는 `CONCENTRATED` 같은 임의 구간값을 만들지 않는다.
-Spring은 합의한 coverage 기준보다 낮으면 영화명을 열거하지 않고 전체 평가·온보딩 이력 기반 문구를 사용한다.
+Spring은 합의한 coverage 기준보다 낮으면 영화명을 열거하지 않고 전체 평가 이력 기반 문구를 사용한다.
 Consumer는 구조화된 근거만 저장하고, Spring은 영화 제목과 표시명을 조회해 사용자 문구를 만든다.
 
 그룹 후보가 100편보다 적으면 Consumer는 선택된 상위 10개 그룹의 다음 대중성 순위 층을 순회한다.
@@ -604,7 +620,7 @@ DISCOVERY에서는 저장된 TASTE와 같은 영화를 건너뛰고 다음 고�
 동점 후보는 사용자와 generation ID를 seed로 결정적으로 섞는다. TASTE 2:DISCOVERY 1은
 저장 순서가 아니라 화면 조회 시 각 타입 버퍼에서 꺼내는 규칙이다. DISCOVERY가 부족하면 다음 TASTE로
 채운다. 이 Consumer는 별도 POPULAR fallback 목록을 생성하지 않는다.
-Consumer는 DISCOVERY 공급량을 낭비하지 않도록 현재 평가·온보딩·확정 감상·관심없음을 발견 목록에서
+Consumer는 DISCOVERY 공급량을 낭비하지 않도록 현재 평가·확정 감상·관심없음을 발견 목록에서
 선필터한다. 기존 TASTE 원시 후보의 의미는 바꾸지 않으며 Spring이 조회 시점에 두 목록을 다시 제외한다.
 OTT 제공처는 `movie_ott_providers`·`otts`에서 조회하며, 사용자 클릭 정보는 후보 재정렬에 사용하지 않는다.
 별도 Redis `topn`은 생성하거나 읽지 않는다. 기존 키 자동 삭제는 하지 않는다. 기존 배포가
@@ -734,7 +750,7 @@ Python Consumer나 Streaming 지연·장애 시에도 **마지막으로 성공�
 
 ### 6.3 콜드 스타트
 
-온보딩과 평가가 모두 없는 사용자는 Fold-in 입력이 없어 벡터를 만들 수 없습니다.
+평가가 없는 사용자는 Fold-in 입력이 없어 벡터를 만들 수 없습니다.
 현재 Python Consumer는 서비스 가능한 영화에 `0.0` 동점 점수를 부여해 `TASTE`를 게시합니다.
 POPULAR 기반 순서와 개인 후보 모집단 밖 확장은 S15P21E106-483 이후 단계에서 개선합니다.
 
@@ -745,7 +761,7 @@ POPULAR 기반 순서와 개인 후보 모집단 밖 확장은 S15P21E106-483 �
 - [ ] Kafka 파티션 수와 복제 계수 — 인프라 담당 협의(EC2 2대 구성)
 - [ ] Python Fold-in Consumer와 Spark Streaming의 Consumer Group 이름·배포 환경변수 — 구현 업무에서 확정
 - [ ] 행동 Feature 목록과 Re-ranking 가중치 — Re-ranking 설계에서 확정
-- [ ] 439 고정 8×128 그룹 기반 DISCOVERY 선정 방식·기준값과 저이력·온보딩 사용자 처리 — Consumer 구현 완료, Backend 소비·감상 변경 재계산·운영 활성화 검증 대기
+- [ ] 439 고정 8×128 그룹 기반 DISCOVERY 선정 방식·기준값과 저이력 사용자 처리 — Consumer 구현 완료, Backend 소비·감상 변경 재계산·운영 활성화 검증 대기
 - [ ] `candidates.taste` 후보 수 최대 500편 — 실데이터로 캘리브레이션. `discovery`는 정책상 최대 100편
 - [ ] 허용 지연 초기값과 Structured Streaming 트리거 주기 — 실측 후 확정
 - [ ] 비활성 사용자 Redis 키 정리 주기
@@ -760,4 +776,4 @@ POPULAR 기반 순서와 개인 후보 모집단 밖 확장은 S15P21E106-483 �
 - [x] 파티 점수 집계식과 사용자 간 정규화 — `party-mean-fit-v2`, party.md API-058
 - [x] OTT 구독 추천 후보 범위 — API-068은 `taste` 최대 500편 전체를 사용하고 점수 임계치를 두지 않는다
 - [ ] 영화 메타데이터 HDFS 스냅샷의 산출 형식과 배치 시각 — 추천 모듈 환경(S15P21E106-130)에서 확정
-- [ ] 온보딩 선택을 실제 별점으로 저장한 뒤 fold-in 상수와 이진 방향 해석을 유지할지 — S15P21E106-649
+- [x] 온보딩 선택의 Fold-in 입력 — S15P21E106-649에서 실제 `ratings`로 단일화하고 보정 상수·이진 방향 fallback 제거

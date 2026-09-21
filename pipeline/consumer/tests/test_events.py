@@ -18,7 +18,7 @@ def test_parse_event_accepts_matching_utc_key() -> None:
 
 def test_parse_event_accepts_onboarding_with_long_key() -> None:
     event = parse_event(
-        b'{"eventId":"e30a81d7-e228-4cd8-a39f-cc1bb9e278f8","userId":7,"eventType":"ONBOARDING","occurredAt":"2026-09-17T14:14:36.563314658Z","payload":{"preferenceCount":7}}',
+        b'{"eventId":"e30a81d7-e228-4cd8-a39f-cc1bb9e278f8","userId":7,"eventType":"ONBOARDING","occurredAt":"2026-09-17T14:14:36.563314658Z","payload":{"preferenceCount":7,"ratings":[{"movieId":1,"score":4.0}]}}',
         pack(">q", 7),
     )
     assert event.user_id == 7

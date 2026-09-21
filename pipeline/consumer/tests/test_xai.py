@@ -41,14 +41,14 @@ def test_candidate_reason_keeps_a_top_rated_source_when_genres_do_not_overlap() 
     }
 
 
-def test_candidate_reason_uses_onboarding_source_when_no_rating_source_exists() -> None:
+def test_candidate_reason_uses_onboarding_derived_rating_source() -> None:
     metadata = {
         1: MovieMetadata("onboarding", ("MYSTERY",), None),
         2: MovieMetadata("discovery", ("MYSTERY", "THRILLER"), None),
     }
 
     reasons = build_candidate_reasons(
-        [RankedMovie(2, 0.9)], [ProfileInput(1, 4.271231616529622, "onboarding")], metadata
+        [RankedMovie(2, 0.9)], [ProfileInput(1, 4.0, "rating")], metadata
     )
 
     assert reasons[2].payload() == {
