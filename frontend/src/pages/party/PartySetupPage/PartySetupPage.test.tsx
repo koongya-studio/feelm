@@ -178,6 +178,21 @@ describe('5.3 친구 초대', () => {
     );
   });
 
+  // 업무 -771. 한때 `검색` 버튼만 먹고 Enter는 아무 일도 하지 않았다
+  it('Enter로도 검색한다. 한글 조합을 끝내는 Enter는 검색이 아니다', async () => {
+    renderSetup();
+
+    const field = screen.getByLabelText('닉네임으로 친구 찾기');
+    fireEvent.change(field, { target: { value: '무비' } });
+
+    fireEvent.keyDown(field, { key: 'Enter', isComposing: true });
+    expect(searchUsers).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(field, { key: 'Enter' });
+    expect(searchUsers).toHaveBeenCalledWith('무비');
+    expect(await screen.findByRole('button', { name: /무비버디/ })).toBeInTheDocument();
+  });
+
   it('두 글자가 안 되면 검색하지 않는다', async () => {
     renderSetup();
 

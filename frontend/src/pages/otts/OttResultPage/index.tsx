@@ -19,6 +19,11 @@
  *   분석 근거 줄은 빠진다 — 결과 자체는 API-068이 주므로 화면을 막지 않는다
  * - 구독 여부는 응답의 `subscribed`다. 6.1에서 바꾼 값을 서버가 그대로 안다
  *
+ * **추천이 0편인 OTT는 계약이 목록에서 뺀다**(API-068 처리 규칙). EXT-01은 `OTT 서비스 N개를
+ * 분석해요`라고 전부를 세는데 결과는 그보다 적게 나와, 한때 한두 곳이 말없이 사라졌다(업무 -771,
+ * 2026-09-21 배포본 점검). 같은 기준정보(API-025)와 맞대어 빠진 OTT를 목록 아래에 적는다.
+ * 기준정보를 못 받으면 빠진 것을 알 수 없으므로 적지 않는다.
+ *
  * `[?]` `현재 구독 중인 OTT와 비교하기`가 무엇을 하는지 적혀 있지 않다. 이동표의 `EXT-03 ⇢ 6.1`은
  *       `OTT 관리로 이동`이 맡으므로, 이 버튼은 **구독 중인 OTT만 남겨 보는 전환**으로 두었다
  * `[?]` `추천 기준 알아보기`가 가는 화면이 없다. 기준 문장을 펼쳐 보여준다
@@ -30,12 +35,13 @@ import OttBadge from '../../../components/OttBadge';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import { getOttRecommendations } from '../../../api/ottRecommendations';
+import { getOtts } from '../../../api/otts';
 import { getMyProfile } from '../../../api/users';
 import { ottFailureView } from '../failure';
 import { path } from '../../../routes/paths';
 import styles from './OttResultPage.module.css';
 import type { MyProfile } from '../../../types/user';
-import type { OttRecommendation } from '../../../types/ott';
+import type { Ott, OttRecommendation } from '../../../types/ott';
 
 export default function OttResultPage() {
   const [result, setResult] = useState<OttRecommendation | null>(null);
@@ -45,6 +51,8 @@ export default function OttResultPage() {
   const [reloadCount, setReloadCount] = useState(0);
   const [subscribedOnly, setSubscribedOnly] = useState(false);
   const [criteriaOpen, setCriteriaOpen] = useState(false);
+  /** EXT-01이 센 분석 대상. 결과에서 빠진 OTT를 가려내는 데만 쓴다 */
+  const [catalog, setCatalog] = useState<Ott[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -62,6 +70,13 @@ export default function OttResultPage() {
         setFailure(error);
         setFailed(true);
       });
+
+    // 빠진 OTT를 적는 데만 쓰인다. 실패하면 그 줄만 없다
+    getOtts()
+      .then((list) => {
+        if (active) setCatalog(list);
+      })
+      .catch(() => undefined);
 
     // 인사말과 분석 근거에만 쓰인다. 실패해도 결과는 보여준다
     getMyProfile()
@@ -118,6 +133,9 @@ export default function OttResultPage() {
   const [top, ...rest] = result.items;
   const others = subscribedOnly ? rest.filter((item) => item.subscribed) : rest;
   const who = profile ? `${profile.nickname} 님` : '나';
+  const omitted = catalog.filter(
+    (ott) => !result.items.some((item) => item.ott.ottId === ott.ottId),
+  );
 
   return (
     <>
@@ -181,6 +199,12 @@ export default function OttResultPage() {
 
         {subscribedOnly && others.length === 0 ? (
           <p className={styles.caption}>1위 말고 구독 중인 OTT가 없어요</p>
+        ) : null}
+
+        {omitted.length > 0 ? (
+          <p className={styles.caption}>
+            {omitted.map((ott) => ott.name).join(' · ')}에는 아직 추천할 영화가 없어 순위에서 뺐어요
+          </p>
         ) : null}
 
         <p className={styles.caption}>콘텐츠 취향 일치도 기준 · 가격과 무관해요</p>

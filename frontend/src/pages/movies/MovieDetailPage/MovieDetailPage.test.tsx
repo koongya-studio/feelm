@@ -317,6 +317,29 @@ describe('2.4 화면', () => {
     expect(screen.getByRole('button', { name: '넷플릭스에서 보기' })).toBeInTheDocument();
   });
 
+  /*
+   * 업무 -771. 평가가 없으면 계약이 `averageRating=0`을 준다(API-030). 한때 빈 별과
+   * `0.0`을 그대로 그려 0점을 받은 영화처럼 읽혔다.
+   */
+  it('평가가 없는 영화는 0.0점이 아니라 아직 평점이 없다고 적는다', async () => {
+    vi.mocked(getMovieDetail).mockResolvedValue(movie({ averageRating: 0, ratingCount: 0 }));
+
+    renderMovie();
+    await screen.findByRole('heading', { level: 1, name: '괴물' });
+
+    expect(screen.getByText('아직 사용자 평점이 없어요')).toBeInTheDocument();
+    expect(screen.queryByText('0.0')).not.toBeInTheDocument();
+    expect(screen.queryByText(/별점 0\.0점/)).not.toBeInTheDocument();
+  });
+
+  it('평가가 있으면 평균과 인원을 적는다', async () => {
+    renderMovie();
+    await screen.findByRole('heading', { level: 1, name: '괴물' });
+
+    expect(screen.getByText('4.2')).toBeInTheDocument();
+    expect(screen.getByText('사용자 평점 · 10명')).toBeInTheDocument();
+  });
+
   it('비슷한 영화에 유사도 수치를 적지 않는다', async () => {
     // `유사도 90%`가 내가 좋아할 확률로 읽혔다(업무 S15P21E106-678, 리포트 P1-07)
     vi.mocked(getSimilarMovies).mockResolvedValue([
