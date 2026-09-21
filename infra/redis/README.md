@@ -14,10 +14,12 @@
   재기동 시 사라진다. AOF·볼륨·메모리 한도·축출 정책은 기존 설정을 유지한다.
 - 서버에도 `127.0.0.1:6379`만 게시한다. 기존 로컬 오버레이와 동일한 포트라 병합 시 중복되지 않는다.
 
-현재 초안은 추천 계약의 `vector`, `candidates`, `candidate-version`, `behavior`, `model:current`만
-읽는다. Redis Insight가 String 값을 표시할 때 사용하는 `GETRANGE`를 포함해 읽기 명령을
-개별 허용하며 쓰기·삭제·관리·스크립트·Pub/Sub 명령은 허용하지 않는다.
-로그인 키의 값과 추천 계약 밖의 키는 조회할 수 없다.
+현재 초안은 추천 계약의 `vector`, `candidates`, `candidate-version`, `behavior`, `model:current`와
+급상승 스냅샷 `feelm:trending:current`·`feelm:trending:last-good`(API-064)만 읽는다.
+급상승 집계 버킷(`feelm:trending:bucket:*`)은 회원 ID 집합을 담고 Spring도 읽지 않으므로
+열지 않는다(스트리밍 계약 5.1). Redis Insight가 String 값을 표시할 때 사용하는 `GETRANGE`를
+포함해 읽기 명령을 개별 허용하며 쓰기·삭제·관리·스크립트·Pub/Sub 명령은 허용하지 않는다.
+로그인 키의 값과 위 목록 밖의 키는 조회할 수 없다.
 
 Redis Insight 연결에 필요한 서버 상태 조회 `INFO`와 키 목록 조회 `SCAN`은 허용한다. Redis의 `SCAN`은
 ACL 키 패턴으로 결과를 걸러주지 않으므로 로그인 키 이름과 키에 포함된 사용자 ID도 목록에
@@ -25,8 +27,8 @@ ACL 키 패턴으로 결과를 걸러주지 않으므로 로그인 키 이름과
 Redis Insight 화면의 검색 필터는 보안 경계가 아니다. 운영 전환 시 목록 권한을 다시 검토한다.
 
 `feelm_local_backend`는 Spring Boot가 사용하는 `auth:*` 키에만 읽기·쓰기를 허용하고,
-개인·파티 추천 후보와 vector, 모델 포인터 등 `local-backend.acl`에 열거한 키는 읽기만
-허용한다. Refresh Token 회전과 메일 제한에 필요한 String·Set·Hash·TTL·Lua 명령만
+개인·파티 추천 후보와 vector, 모델 포인터, 급상승 스냅샷 두 키 등 `local-backend.acl`에
+열거한 키는 읽기만 허용한다. Refresh Token 회전과 메일 제한에 필요한 String·Set·Hash·TTL·Lua 명령만
 개별 허용한다. 임의 키, 추천 키 쓰기, `SCAN`, `INFO`, `KEYS`, Pub/Sub 및 Redis 관리
 명령은 허용하지 않는다. 백엔드의 Redis 키 또는 명령 계약이 바뀌면 같은 작업에서 ACL과
 회귀 테스트를 함께 갱신해야 한다.
@@ -61,6 +63,8 @@ Redis 설정이 자동 적용되지 않는다. 포트는 `127.0.0.1:6379`, 상�
 - 로그인 키 조회, 추천 키 변경·삭제, `FLUSHALL`, `CONFIG`, `ACL`, `EVAL` 거부.
 - 로컬 백엔드 계정으로 `auth:*` 읽기·쓰기와 Lua 실행, 승인된 추천 키 조회 성공.
 - 로컬 백엔드 계정으로 추천 키 쓰기, 임의 키 접근, `FLUSHALL`, `CONFIG`, `ACL` 거부.
+- 조회·로컬 백엔드 계정으로 급상승 스냅샷 두 키 조회 성공, 같은 키 쓰기와
+  집계 버킷 키 접근 거부(`verify-datastore-config.sh`가 확인한다).
 - 확정된 키 목록 노출 정책과 Redis Insight의 실제 동작 일치.
 - 재시작·컨테이너 재생성 후 데이터 및 계정 유지.
 - 실제 추천 데이터가 아직 없으면 분리된 테스트 Redis에서 더미 데이터로 검증한다.
