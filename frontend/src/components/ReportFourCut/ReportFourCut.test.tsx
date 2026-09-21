@@ -7,9 +7,9 @@
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import ReportFourCut from '.';
-import type { ReportFourCutView } from '../../types/unspecified';
+import type { ReportFourCut as ReportFourCutData } from '../../types/report';
 
-const cuts: ReportFourCutView = {
+const cuts: ReportFourCutData = {
   genre: {
     name: '로맨스',
     displayName: 'ROMANCE',
@@ -69,12 +69,24 @@ describe('ReportFourCut', () => {
 
     expect(cut('genre')).toHaveAttribute('data-mode', 'cutout');
     expect(cut('director')).toHaveAttribute('data-mode', 'photo');
+    // 계약이 사진을 주지 않는 칸은 다른 사진으로 채우지 않는다
     expect(cut('actor')).toHaveAttribute('data-mode', 'none');
     expect(cut('actor').querySelector('img')).toBeNull();
     expect(cut('character').querySelector('img')).toHaveStyle({
       '--image-x': '30%',
       '--image-y': '20%',
     });
+  });
+
+  it('계약이 카드를 주지 않은 칸은 번호 라벨과 준비 중만 남는다', () => {
+    // 04 캐릭터는 선정 기준이 정해질 때까지 늘 null이다(백엔드 답 2026-09-21, 업무 -618)
+    render(<ReportFourCut cuts={{ ...cuts, character: null }} createdAt="2026-09-01T12:00:00Z" />);
+
+    expect(screen.getAllByRole('listitem')).toHaveLength(4);
+    expect(screen.getByText('04 캐릭터')).toBeInTheDocument();
+    expect(screen.getByText('준비 중')).toBeInTheDocument();
+    expect(screen.queryByText('묵묵한 조력자')).toBeNull();
+    expect(cut('character').querySelector('img')).toBeNull();
   });
 
   it('사진을 못 불러오면 다음 사진으로, 끝내 없으면 칸을 남기고 이름만 그린다', () => {

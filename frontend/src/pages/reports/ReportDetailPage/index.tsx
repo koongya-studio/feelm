@@ -11,8 +11,10 @@
  * 요소 — 4컷(한 칸에 장르 · 감독 · 배우 · 캐릭터 하나씩), `상세 리포트`(장르 · 국가 · 시대 비율, 감독 · 배우 `N편 감상`, 캐릭터
  * 문단), `취향 키워드`와 근거, `지난 반기와 비교`, `저장` · `공유하기`.
  *
- * 계약(API-060)에 없는 값 — 국가 · 시대 비율, 키워드 근거, 비교 % — 도 와이어프레임대로
- * 그린다(팀 결정 2026-09-13). `types/unspecified.ts` `ReportDetailView`.
+ * 국가 · 시대 비율, 지난 반기 비교 %, 4컷은 2026-09-21 확정된 API-060 계약에서 온다(업무 -558).
+ * 취향 키워드는 계약이 빈 배열을 주는 후속 범위라 값이 있을 때만 그린다. **캐릭터 설명도
+ * 마찬가지다** — 선정 기준이 업무 -618에서 정해질 때까지 `characterCard`가 null로 오므로
+ * 그 칸을 숨긴다(백엔드 답 2026-09-21).
  *
  * - 어두운 블록은 맨 위 4컷의 인화지다(`components/ReportFourCut`)
  * - `지난 반기와 비교`의 빼기는 흐리게 쓴다. 색으로 늘고 준 것을 가르지 않는다
@@ -41,7 +43,7 @@ import { path } from '../../../routes/paths';
 import { formatDelta, formatHalf } from '../../../utils/report';
 import ReportShareSheet from './ReportShareSheet';
 import styles from './ReportDetailPage.module.css';
-import type { ReportDetailView, ReportShare } from '../../../types/unspecified';
+import type { ReportDetail, ReportShare } from '../../../types/report';
 
 type Props = {
   /** `film` 3.4(2.1 · 3.3에서 옴) · `my` 7.4(7.3에서 옴) */
@@ -54,7 +56,7 @@ export default function ReportDetailPage({ from }: Props) {
   const { reportId } = useParams();
   const id = Number(reportId);
 
-  const [report, setReport] = useState<ReportDetailView | null>(null);
+  const [report, setReport] = useState<ReportDetail | null>(null);
   const [nickname, setNickname] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
@@ -155,10 +157,12 @@ export default function ReportDetailPage({ from }: Props) {
             <PeopleGroup label="감독" people={report.topDirectors} />
             <PeopleGroup label="배우" people={report.topActors} />
 
-            <div className={styles.group}>
-              <h3 className={styles.groupLabel}>캐릭터</h3>
-              <p className={styles.paragraph}>{report.characterCard.description}</p>
-            </div>
+            {report.characterCard ? (
+              <div className={styles.group}>
+                <h3 className={styles.groupLabel}>캐릭터</h3>
+                <p className={styles.paragraph}>{report.characterCard.description}</p>
+              </div>
+            ) : null}
           </div>
         </Section>
 
@@ -210,6 +214,9 @@ export default function ReportDetailPage({ from }: Props) {
 }
 
 function ShareGroup({ label, shares }: { label: string; shares: ReportShare[] }) {
+  // 메타데이터가 없는 반기는 배열이 비어 온다. 제목만 남기지 않는다
+  if (shares.length === 0) return null;
+
   return (
     <div className={styles.group}>
       <h3 className={styles.groupLabel}>{label}</h3>
@@ -227,6 +234,8 @@ function PeopleGroup({
   label: string;
   people: { name: string; count: number }[];
 }) {
+  if (people.length === 0) return null;
+
   return (
     <div className={styles.group}>
       <h3 className={styles.groupLabel}>{label}</h3>

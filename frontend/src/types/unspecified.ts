@@ -18,11 +18,10 @@
  * | TasteKeywordView.rationale | 3.1 `계획형 캐릭터 영화 12편에 ★4 이상` 등 4개 | CR-16 결정 대기. API-040 `keywords`는 `code`·`label`만 있음 |
  * | 3.1-A 상영 시간 | 3.1-A `2013 · 케이퍼 · 115분` | API-043 `movie`에 없음. 실제 연동(S15P21E106-392)으로 채울 값이 사라져 화면에서 뺐다. CR 미등록 |
  * | ProfileView | 7.1 · 7.2 · 7.2-A · 7.2-B 프로필 | API-062가 있으나 **2차 MVP**라 미구현. 응답 모양도 다름. 사진 · 소개 · 항목별 공개 여부는 계약에 아예 없다(업무 -616) |
- * | ReportDetailView | 3.3 · 3.4 · 7.4 국가 · 시대 비율 · 키워드 근거 · 지난 반기 비교 % · 대표 카드 문구 | API-060에 없음. 장르는 편수만, 비교는 맛별 알 수만 줌. CR 미등록 |
- * | ReportFourCutView | 3.3 · 3.4 · 7.4 4컷의 사진 · 누끼 · 영문 이름 · 감독 대표작 | API-060은 이름과 `characterCard.imageUrl`만 줌. CR 미등록 |
+ * | ~~ReportDetailView~~ | 3.3 · 3.4 · 7.4 국가 · 시대 비율 · 지난 반기 비교 % · 발급 요약 | **해소.** 2026-09-21 API-060 계약으로 들어와 `types/report.ts`로 옮겼다 — 업무 -558 |
+ * | ~~ReportFourCutView~~ | 3.3 · 3.4 · 7.4 4컷의 사진 · 누끼 · 큰 글자 표기 · 감독 대표작 | **해소.** 자리는 계약에 들어왔다(`fourCut`). 계약이 주는 사진만 쓰고, 없는 칸은 이름만 그린다 — 업무 -558 |
  * | ~~OttRecommendationView~~ | EXT-01 ~ EXT-05 일치도 % · 이유 · 항목별 일치도 · 분석 요약 | **해소.** 화면에서 뺐다 — CR-28 · 업무 -563 |
  */
-import type { ReportDetail } from './report';
 import type { RecommendedMovie } from './movie';
 
 /** 추천 요약에 없는 상영 시간 */
@@ -138,61 +137,4 @@ export type ProfileExtrasUpdate = {
   bio?: string;
   publicKeywordCodes?: string[];
   publicFrameIds?: number[];
-};
-
-/**
- * 4컷 한 칸의 사진. **사진은 계약에 거의 없다** — API-060은 `characterCard.imageUrl` 하나뿐이다.
- *
- * - `url` 원본 사진. 칸을 채우도록 잘린다
- * - `cutoutUrl` 배경을 지운 인물 PNG. 있으면 인물과 큰 글자를 나눠 겹친다. **화면이 누끼를
- *   만들지 않는다** — 없으면 원본 사진에 어두운 그라데이션을 깐다
- * - `position` 자를 때 남길 자리(0~100%). 기본은 가운데
- * - `zoom` 1보다 크면 `position`을 중심으로 더 당겨 자른다
- */
-export type ReportCutImage = {
-  url: string | null;
-  cutoutUrl?: string | null;
-  position?: { x: number; y: number };
-  zoom?: number;
-};
-
-/**
- * 4컷 한 칸의 이름. `name`은 계약의 이름(한글)이고 `displayName`은 크게 쓰는 영문 이름이다.
- * `displayName`이 없으면 한글 이름을 크게 쓴다. 영문 이름은 계약에 없다.
- */
-export type ReportCutName = { name: string; displayName?: string | null };
-
-/**
- * 3.3 · 3.4 · 7.4 취향 4컷(사용자 시안 2026-09-15, 업무 -321).
- *
- * 이름은 API-060의 1위(`topGenres[0]` · `topDirectors[0]` · `topActors[0]` · `characterCard`)다.
- * 사진 · 영문 이름 · 감독 대표작(`director.work`)이 계약에 없다. CR 미등록.
- */
-export type ReportFourCutView = {
-  genre: ReportCutName & { image: ReportCutImage };
-  director: ReportCutName & { image: ReportCutImage; work: ReportCutImage | null };
-  actor: ReportCutName & { image: ReportCutImage };
-  character: ReportCutName & { image: ReportCutImage };
-};
-
-/** 3.4 · 7.4 비율 한 줄. `share`는 0~100 */
-export type ReportShare = { label: string; share: number };
-
-/**
- * 3.3 · 3.4 · 7.4 취향 리포트 상세. API-060 + 와이어프레임에만 있는 값.
- *
- * 팀 결정 2026-09-13(업무 -308): 와이어프레임대로 그린다. API-060은 장르를 **편수**로만 주고
- * 국가 · 시대 · 키워드 · 지난 반기와의 비교 %가 없다. 비교는 맛별 알 수(`flavorChanges`)뿐이다.
- */
-export type ReportDetailView = ReportDetail & {
-  /** 3.3 · 3.4 · 7.4 4컷의 네 칸 */
-  fourCut: ReportFourCutView;
-  genreShares: ReportShare[];
-  countryShares: ReportShare[];
-  eraShares: ReportShare[];
-  keywords: TasteKeywordView[];
-  /** 지난 반기와 비교. `isNew`면 `+4% 신규`처럼 적는다 */
-  comparisons: { label: string; delta: number; isNew: boolean }[];
-  /** 3.3 발급 화면의 요약 세 줄 */
-  highlights: string[];
 };
