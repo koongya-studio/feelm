@@ -139,6 +139,16 @@ export const path = {
   film: () => ROUTE_PATTERN.film,
   popcornBucket: () => ROUTE_PATTERN.popcornBucket,
   search: () => ROUTE_PATTERN.search,
+  /**
+   * 검색어를 들고 4.1로 간다. 데스크톱 상단 바의 통합 검색이 쓴다(업무 -782).
+   *
+   * 질의 이름 `q`는 4.1이 주소를 읽는 규칙(`SearchPage/searchFilter.ts`)과 같아야 한다.
+   * 다르면 검색어를 들고 들어가도 빈 화면이 열린다.
+   */
+  searchWith: (keyword: string) =>
+    keyword.trim()
+      ? `${ROUTE_PATTERN.search}?q=${encodeURIComponent(keyword.trim())}`
+      : ROUTE_PATTERN.search,
   party: () => ROUTE_PATTERN.party,
   my: () => ROUTE_PATTERN.my,
   /**
@@ -224,6 +234,37 @@ export const TAB_MATCH = {
     ROUTE_PATTERN.recommendations,
     ROUTE_PATTERN.search,
   ],
+  my: [
+    ROUTE_PATTERN.my,
+    ROUTE_PATTERN.ottManage,
+    ROUTE_PATTERN.profileEdit,
+    ROUTE_PATTERN.profilePreview,
+  ],
+} as const;
+
+/*
+ * 데스크톱 좌측 내비의 선택 판정 (업무 -782).
+ *
+ * **`TAB_MATCH`와 따로 둔다.** 하단 내비는 폭이 412px이라 셋으로 줄였고(업무 -461) 검색과
+ * 추천을 `film`에 접어 넣었다. 세로로 긴 좌측 내비에는 그 제약이 없어 사용자 시안이 다섯을
+ * 그렸다(2026-09-21 첨부 시안 5종). 같은 표를 둘이 쓰면 한쪽을 고칠 때 다른 쪽이 조용히
+ * 바뀌므로 표를 나눈다 — 하단 내비의 3탭 계약은 그대로다.
+ *
+ * 순서가 화면에 나오는 순서다. 시안의 위에서 아래 순서를 그대로 쓴다.
+ */
+export const DESKTOP_NAV_MATCH = {
+  /** 3.1 취향 필름과 3.2 팝콘 버킷. 앱의 시작 화면이라 맨 위다 */
+  film: [ROUTE_PATTERN.film, ROUTE_PATTERN.popcornBucket],
+  /** 2.2 오늘의 추천. 하단 내비에서는 필름에 접혀 있으나 여기서는 제 자리를 갖는다 */
+  recommendations: [ROUTE_PATTERN.recommendations],
+  party: [
+    ROUTE_PATTERN.party,
+    ROUTE_PATTERN.partyPopcorn,
+    ROUTE_PATTERN.partyPopcornMix,
+    ROUTE_PATTERN.partyRecommendations,
+  ],
+  /** 4.1 검색. 상단 바의 통합 검색과 진입점이 둘이지만 선택 표시는 이 항목 하나다 */
+  search: [ROUTE_PATTERN.search],
   my: [
     ROUTE_PATTERN.my,
     ROUTE_PATTERN.ottManage,

@@ -10,10 +10,16 @@
  * `프로필`)이 맡는다 — 세 탭이 모두 `Feelm`을 h1로 두면 화면을 구분하지 못한다.
  *
  * 읽지 않은 알림 수는 헤더가 스스로 받는다. 배지는 보조 정보라 실패하면 점 없이 둔다.
+ *
+ * **1024px 이상에서는 그리지 않는다**(업무 -782). 데스크톱 셸이 워드마크를 좌측 띠로, 검색과
+ * 알림을 상단 바로 올려 같은 셋을 이미 내놓는다. 둘 다 그리면 한 화면에 검색 진입점이 둘이고
+ * 읽지 않은 알림 수를 두 번 받으러 간다. 화면들이 이 헤더를 직접 그리므로(`FilmPage` 등)
+ * 감추는 판단도 여기서 한다 — 그래야 화면 다섯이 각자 조건을 달지 않는다.
  */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { getUnreadNotificationCount } from '../../api/notifications';
+import { useShellSize } from '../../hooks/useShellSize';
 import { path } from '../../routes/paths';
 import { BellIcon, SearchIcon } from '../Icon';
 import Wordmark from '../Wordmark';
@@ -21,8 +27,11 @@ import styles from './AppHeader.module.css';
 
 export default function AppHeader() {
   const [unread, setUnread] = useState(0);
+  const desktop = useShellSize() !== 'mobile';
 
   useEffect(() => {
+    if (desktop) return;
+
     let active = true;
 
     getUnreadNotificationCount()
@@ -34,7 +43,9 @@ export default function AppHeader() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [desktop]);
+
+  if (desktop) return null;
 
   return (
     <header className={styles.header}>

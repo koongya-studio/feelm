@@ -392,3 +392,24 @@ export function SpeechBubbleIcon() {
     </svg>
   );
 }
+
+/*
+ * 데스크톱 좌측 내비 — 추천 영화 (업무 -782).
+ *
+ * 와이어프레임에 없던 아이콘이다. 하단 내비가 셋으로 줄면서 추천이 필름 안으로 접혔고
+ * (업무 -461), 좌측 내비가 추천을 다시 꺼내면서 자리 아이콘이 필요해졌다. 2026-09-21 시안의
+ * 나침반을 위 아이콘들과 같은 선 두께(1.5)로 옮긴 것이다. 기존 아이콘은 하나도 바꾸지 않았다.
+ */
+export function CompassIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" {...hidden}>
+      <circle cx="10" cy="10" r="8" stroke="currentColor" strokeWidth="1.5" />
+      <path
+        d="M13.2 6.8l-1.7 4.7-4.7 1.7 1.7-4.7 4.7-1.7Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
