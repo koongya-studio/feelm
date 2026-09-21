@@ -4,14 +4,14 @@
  * 이동표
  * 5.9 → 5.5 팝콘 섞기 완료
  * 5.5 ⇢ 2.4 추천 영화 선택
- * 5.5 ⇢ 5.4 다른 영화 추천받기
+ * 5.5 ⇢ 5.9 다른 영화 추천받기
  *
  * **사용자 시안 2026-09-17(업무 -462)에서 흐름의 마지막 단계가 됐다.** 들어오는 곳이
  * 5.4에서 5.9로 바뀌었고, 섞인 통이 결과의 머리에 놓인다 — 세 사람의 팝콘을 한 통에
  * 담은 결과가 이 3편이라는 말을 그림이 먼저 한다.
  *
- * `다른 영화 추천받기`가 5.4로 되돌아가는 것은 이동표가 정한 것이다. 결과만 갈아
- * 끼우지 않고 모으기 · 섞기 장면을 다시 보여준다.
+ * `다른 영화 추천받기`가 모으기로 되돌아가는 것은 이동표가 정한 것이다(한때 5.4, 업무
+ * -773부터 5.9). 결과만 갈아 끼우지 않고 모으기 · 섞기 장면을 다시 보여준다.
  *
  * **계약에 없던 값을 모두 걷어냈다**(사용자 결정 2026-09-17).
  * - 상단 공통 키워드 칩. 대응 필드가 API-058에 없어 `getPartyMix`(CR-17) 자리표시자를
@@ -148,7 +148,7 @@ export default function PartyRecommendationPage() {
                 내 파티로 돌아가기
               </Button>
             ) : (
-              <Button variant="text" onClick={() => void navigate(path.partyAnalyzing(id))}>
+              <Button variant="text" onClick={() => void navigate(path.partyPopcornMix(id))}>
                 다시 추천받기
               </Button>
             )}
@@ -202,7 +202,7 @@ export default function PartyRecommendationPage() {
       </ul>
 
       <div className={styles.actions}>
-        <Button variant="text" onClick={() => void navigate(path.partyAnalyzing(id))}>
+        <Button variant="text" onClick={() => void navigate(path.partyPopcornMix(id))}>
           다른 영화 추천받기
         </Button>
       </div>

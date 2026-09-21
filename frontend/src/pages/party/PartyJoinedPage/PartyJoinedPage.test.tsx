@@ -1,7 +1,7 @@
 /*
  * 5.7 파티 초대 수락 완료 (업무 S15P21E106-304 · -393)
  *
- * 이동표의 `5.7 → 5.4`와 `5.7 ⇢ 5.1`을 고정하고, 수락자 추정이 실제 화면 문구까지
+ * 이동표의 `5.7 → 5.9`와 `5.7 ⇢ 5.1`을 고정하고, 수락자 추정이 실제 화면 문구까지
  * 이어지는지 본다. 규칙 자체는 `joinedMember.test.ts`가 따로 본다.
  *
  * 누가 수락했는지 고르려면 **내가 누구인지** 알아야 한다(API-014). 내 번호를 받지 못하면
@@ -44,13 +44,15 @@ describe('5.7 파티 초대 수락 완료', () => {
     expect(screen.getByText('김난다 × 무비버디')).toBeInTheDocument();
   });
 
-  it('파티 모드 시작하기는 5.4로 간다', async () => {
+  it('파티 모드 시작하기는 5.9로 간다', async () => {
     render();
     await screen.findByText('무비버디 님이 초대를 수락했어요!');
 
     fireEvent.click(screen.getByRole('button', { name: '파티 모드 시작하기' }));
 
-    expect(screen.getByTestId('location').textContent).toBe(`/parties/${TEST_PARTY_ID}/analyzing`);
+    expect(screen.getByTestId('location').textContent).toBe(
+      `/parties/${TEST_PARTY_ID}/popcorn/mix`,
+    );
   });
 
   it('나중에 할게요는 5.1로 간다', async () => {

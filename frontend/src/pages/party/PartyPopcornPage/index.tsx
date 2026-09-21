@@ -3,7 +3,7 @@
  *
  * 이동표
  * 5.1 → 5.8 참여 중인 파티방 선택
- * 5.8 → 5.4 함께 볼 영화 추천받기 (파티팝콘 흐름의 입구)
+ * 5.8 → 5.9 함께 볼 영화 추천받기 (파티팝콘 흐름의 입구)
  * 5.8 ⇢ 7.8-D 사용자 차단 후 차단 사용자 관리
  *
  * **사용자 시안 2026-09-17(업무 -462)이 구성을 바꿨다.** 이전에는 파티원마다 통을 하나씩
@@ -479,7 +479,7 @@ export default function PartyPopcornPage() {
 
           {/*
            * 초대를 거절당하거나 파티원이 나가 나 혼자 남으면 추천을 받을 수 없다
-           * (`PARTY_MIN_MEMBERS`, 업무 -610). 5.4 이후는 여러 사람의 팝콘을 섞는 흐름이다.
+           * (`PARTY_MIN_MEMBERS`, 업무 -610). 5.9 이후는 여러 사람의 팝콘을 섞는 흐름이다.
            */}
           {popcorn.members.length < PARTY_MIN_MEMBERS ? (
             <p className={styles.meta} role="status">
@@ -490,7 +490,7 @@ export default function PartyPopcornPage() {
           <Button
             variant="brand"
             disabled={popcorn.members.length < PARTY_MIN_MEMBERS}
-            onClick={() => void navigate(path.partyAnalyzing(id))}
+            onClick={() => void navigate(path.partyPopcornMix(id))}
           >
             함께 볼 영화 추천받기
           </Button>

@@ -1,10 +1,10 @@
 /*
  * 5.3 파티 만들기 및 친구 초대
  *
- * 이동표: 5.2 → 5.3 인원 및 친구 설정 완료 · 5.3 → 5.4 파티 시작하기
+ * 이동표: 5.2 → 5.3 인원 및 친구 설정 완료 · 5.3 → 5.9 파티 시작하기
  *
  * `파티 시작하기`를 누르면 API-049로 파티를 만들고, 고른 친구에게 API-051 초대를 보낸 뒤
- * 5.4로 간다. **초대는 파티를 만든 다음에만 보낼 수 있다** — API-051이 `partyId`를 경로로
+ * 5.9로 간다. **초대는 파티를 만든 다음에만 보낼 수 있다** — API-051이 `partyId`를 경로로
  * 받기 때문이다. 그래서 이 화면은 사람을 고르기만 하고 보내는 것은 마지막 한 번이다.
  *
  * 초대할 사람은 **닉네임 검색(API-019)**으로 고른다. 검색 자리는 5.8도 쓰게 되어
@@ -94,7 +94,7 @@ export default function PartySetupPage() {
 
   /*
    * 파티는 나까지 2명부터다(`PARTY_MIN_MEMBERS`, 5.2의 안내와 같은 값). 초대 없이 시작하면
-   * 혼자인 파티가 만들어져 5.4 이후가 할 일이 없다. 버튼을 잠그고 눌러도 막는다(업무 -610).
+   * 혼자인 파티가 만들어져 5.9 이후가 할 일이 없다. 버튼을 잠그고 눌러도 막는다(업무 -610).
    */
   const needsInvitee = !locked && invitees.length + 1 < PARTY_MIN_MEMBERS;
 
@@ -106,7 +106,7 @@ export default function PartySetupPage() {
 
     // 이미 만든 파티가 있다. 다시 만들면 같은 이름의 파티가 하나 더 생긴다
     if (createdPartyId !== null) {
-      void navigate(path.partyAnalyzing(createdPartyId), { replace: true });
+      void navigate(path.partyPopcornMix(createdPartyId), { replace: true });
 
       return;
     }
@@ -147,7 +147,7 @@ export default function PartySetupPage() {
           return;
         }
 
-        void navigate(path.partyAnalyzing(party.partyId), { replace: true });
+        void navigate(path.partyPopcornMix(party.partyId), { replace: true });
       })
       .catch((cause: unknown) => {
         setSubmitting(false);
