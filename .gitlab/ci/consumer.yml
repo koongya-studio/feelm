@@ -162,3 +162,23 @@ deploy-consumer:
         - infra/scripts/test_notify_deployment.py
         - infra/scripts/test_ci_config.py
   allow_failure: false
+
+redeploy-current-main-consumer:
+  stage: deploy
+  tags: [e106-distributed]
+  needs: []
+  resource_group: distributed-consumer
+  environment:
+    name: distributed
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py --branch main --pipeline-source web
+    - test -n "$CONSUMER_COMPOSE_ENV_FILE"
+    - COMPOSE_ENV_FILE="$CONSUMER_COMPOSE_ENV_FILE" bash infra/scripts/redeploy-current-main.sh consumer
+  after_script:
+    - /usr/bin/python3 -I -B infra/scripts/notify-deployment.py consumer "$CI_JOB_STATUS"
+  interruptible: false
+  timeout: 15m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "web"'
+      when: manual
+  allow_failure: false

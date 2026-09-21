@@ -375,3 +375,42 @@ deploy-postgresql:
         - infra/scripts/verify-postgresql-deployment.sh
       when: manual
   allow_failure: false
+
+redeploy-current-main-backend:
+  stage: deploy
+  tags: [e106-shell]
+  needs: []
+  resource_group: service-and-backend-cache
+  environment:
+    name: service
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py --branch main --pipeline-source web
+    - /usr/bin/python3 -I -B infra/scripts/ci-backend-env-contract.py --require-values
+    - bash infra/scripts/redeploy-current-main.sh backend
+  after_script:
+    - /usr/bin/python3 -I -B infra/scripts/notify-deployment.py backend "$CI_JOB_STATUS"
+  interruptible: false
+  timeout: 15m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "web"'
+      when: manual
+  allow_failure: false
+
+redeploy-current-main-redis:
+  stage: deploy
+  tags: [e106-shell]
+  needs: []
+  resource_group: service-and-backend-cache
+  environment:
+    name: service
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py --branch main --pipeline-source web
+    - bash infra/scripts/redeploy-current-main.sh redis
+  after_script:
+    - /usr/bin/python3 -I -B infra/scripts/notify-deployment.py redis "$CI_JOB_STATUS"
+  interruptible: false
+  timeout: 15m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "web"'
+      when: manual
+  allow_failure: false
