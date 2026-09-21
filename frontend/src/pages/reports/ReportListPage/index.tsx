@@ -11,11 +11,12 @@
  *   한 해 안에서는 **최근 반기가 왼쪽**이다(시안). 4컷 아래에 인화한 날짜를 적는다
  * - 4컷은 3.4 · 7.4 상세와 같은 `ReportFourCut`을 머리 없이 작게 쓴다. 누르면 7.4로 간다
  * - 4컷마다 조금씩 기울이고 윗변에 빨간 테이프를 붙인다
- * - `GENERATING`(아직 끝나지 않은 반기)은 누를 수 없다(API-060이 409다). 빈 인화지에 `인화 중`을 적는다
+ * - `GENERATING`(아직 끝나지 않은 반기)은 누를 수 없다(API-060이 409다). 빈 인화지에 `인화 중`을 적는다.
+ *   계약은 이 반기를 `items`가 아니라 `current`로만 알려 주므로(API-059) 목록 앞에 따로 붙인다
  * - 4컷 한 장을 못 불러오면 그 자리만 빈 인화지로 두고 상세로는 갈 수 있게 한다
  *
  * `[!]` API-059 목록에는 4컷 값이 없다. 반기마다 API-060 상세를 한 번씩 더 부른다. 반기가 쌓이면
- * 호출이 늘어나므로 연동 때 목록에 4컷 요약을 넣을지 정해야 한다.
+ * 호출이 늘어나므로 목록에 4컷 요약을 넣을지 정해야 한다(후속).
  * `[?]` 공유가 무엇을 공유하는지 시안에 없다. 기기 공유 메뉴가 있을 때만 이 화면 주소를 넘긴다.
  */
 import { useEffect, useState } from 'react';
@@ -31,16 +32,27 @@ import { getMyReports, getReportDetail } from '../../../api/reports';
 import { path } from '../../../routes/paths';
 import { formatHalf, formatPrintDate } from '../../../utils/report';
 import styles from './ReportListPage.module.css';
-import type { ReportSummary } from '../../../types/report';
-import type { ReportDetailView } from '../../../types/unspecified';
+import type { ReportDetail, ReportPeriod, ReportSummary } from '../../../types/report';
 
 const TITLE = '취향 4컷';
 
-/** 반기 한 장. 상세를 못 불러왔으면 `detail`이 null이다 */
-type Entry = { summary: ReportSummary; detail: ReportDetailView | null };
+/**
+ * 반기 한 장.
+ *
+ * `summary`는 목록에 공개된 반기만 있다(API-059 `items`). 인화 중인 반기는 `current`에서만
+ * 오므로 반기와 상태만 안다. 상세를 못 불러왔으면 `detail`이 null이다.
+ */
+type Entry = {
+  reportId: number;
+  period: ReportPeriod;
+  summary: ReportSummary | null;
+  detail: ReportDetail | null;
+};
 
 export default function ReportListPage() {
   const [entries, setEntries] = useState<Entry[] | null>(null);
+  /** 최신 반기를 아직 만들고 있는지(API-059 `preparing`) */
+  const [preparing, setPreparing] = useState(false);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
 
@@ -48,17 +60,31 @@ export default function ReportListPage() {
     let active = true;
 
     getMyReports()
-      .then(({ items }) =>
-        Promise.all(
-          items.map(async (summary) => ({
+      .then(async ({ items, current, preparing: inProgress }) => {
+        if (active) setPreparing(inProgress);
+
+        const opened = await Promise.all(
+          items.map(async (summary): Promise<Entry> => ({
+            reportId: summary.reportId,
+            period: summary.period,
             summary,
             detail:
               summary.status === 'READY'
                 ? await getReportDetail(summary.reportId).catch(() => null)
                 : null,
           })),
-        ),
-      )
+        );
+
+        // 인화 중인 반기는 목록에 없다. 가장 최근 반기이므로 맨 앞에 둔다
+        if (current?.status === 'GENERATING') {
+          return [
+            { reportId: current.reportId, period: current.period, summary: null, detail: null },
+            ...opened,
+          ];
+        }
+
+        return opened;
+      })
       .then((value) => {
         if (active) {
           setEntries(value);
@@ -127,8 +153,10 @@ export default function ReportListPage() {
         {header}
         <StatusView
           variant="empty"
-          title="아직 인화된 취향 4컷이 없어요"
-          description="반기마다 한 번 취향 4컷을 인화해 드려요"
+          title={preparing ? '취향 4컷을 인화하는 중이에요' : '아직 인화된 취향 4컷이 없어요'}
+          description={
+            preparing ? '반기 집계가 끝나면 알려 드려요' : '반기마다 한 번 취향 4컷을 인화해 드려요'
+          }
         />
       </>
     );
@@ -147,7 +175,7 @@ export default function ReportListPage() {
 
             <ul className={styles.board}>
               {halves.map((entry, index) => (
-                <li key={entry.summary.reportId} className={styles.slot}>
+                <li key={entry.reportId} className={styles.slot}>
                   <PinnedStrip entry={entry} tilt={index % 2 === 0 ? 'left' : 'right'} />
                 </li>
               ))}
@@ -164,24 +192,22 @@ export default function ReportListPage() {
  * API-059는 반기를 최신순 한 줄로 주므로 화면에서 다시 묶는다.
  */
 function groupByYear(entries: Entry[]) {
-  const years = [...new Set(entries.map(({ summary }) => summary.period.year))].sort(
-    (a, b) => b - a,
-  );
+  const years = [...new Set(entries.map(({ period }) => period.year))].sort((a, b) => b - a);
 
   return years.map((year) => ({
     year,
     halves: entries
-      .filter(({ summary }) => summary.period.year === year)
-      .sort((a, b) => b.summary.period.half.localeCompare(a.summary.period.half)),
+      .filter(({ period }) => period.year === year)
+      .sort((a, b) => b.period.half.localeCompare(a.period.half)),
   }));
 }
 
 /** 테이프로 붙인 4컷 한 장과 그 아래 날짜 */
 function PinnedStrip({ entry, tilt }: { entry: Entry; tilt: 'left' | 'right' }) {
-  const { summary, detail } = entry;
-  const half = `${summary.period.year} ${formatHalf(summary.period)}`;
+  const { summary, detail, period } = entry;
+  const half = `${period.year} ${formatHalf(period)}`;
 
-  if (summary.status === 'GENERATING') {
+  if (!summary || summary.status === 'GENERATING') {
     return (
       <div className={styles.pinned} data-tilt={tilt} data-generating="true">
         <ReportTape />

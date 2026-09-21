@@ -97,7 +97,8 @@ import styles from './MyDashboardPage.module.css';
 import type { FlavorCount } from '../../../components/PopcornBucket/kernels';
 import type { RecommendationType } from '../../../types/enums';
 import type { RecommendationHistoryItem } from '../../../types/recommendation';
-import type { ProfileView, ReportDetailView } from '../../../types/unspecified';
+import type { ReportDetail } from '../../../types/report';
+import type { ProfileView } from '../../../types/unspecified';
 import type { Ott } from '../../../types/ott';
 import type { MyRatedItem, MyRatingList, WatchRecordListItem } from '../../../types/watch';
 
@@ -179,8 +180,8 @@ const STAR_PATH =
  * 위에 **빨간 테이프**를 붙인다. 7.3이 인화지를 벽에 붙여 둔 모양 그대로다
  * (`components/ReportTape`, 사용자 지시 2026-09-16).
  */
-function useLatestReport(): ReportDetailView | null {
-  const [detail, setDetail] = useState<ReportDetailView | null>(null);
+function useLatestReport(): ReportDetail | null {
+  const [detail, setDetail] = useState<ReportDetail | null>(null);
 
   useEffect(() => {
     let active = true;

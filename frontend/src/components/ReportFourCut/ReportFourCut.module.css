@@ -194,6 +194,19 @@
   pointer-events: none;
 }
 
+/* 아직 그릴 값이 없는 칸. 이름 자리에 한 줄만 옅게 쓴다 */
+.pending {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: calc(var(--u) * 13);
+  letter-spacing: 0.02em;
+}
+
 /* ─────────────────────────── 큰 이름 */
 
 .nameArea {

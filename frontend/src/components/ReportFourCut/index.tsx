@@ -17,6 +17,8 @@
  * 4컷과 3.4 상세의 큰 4컷이 같은 모양이다.
  *
  * - 이름이 길면 최대 두 줄 안에서 글자만 작아진다(`useFitText`)
+ * - 계약이 카드를 주지 않은 칸은 `준비 중`만 적는다(`PendingCut`). 04 캐릭터는 선정 기준이
+ *   정해질 때까지 늘 이 모양이다(백엔드 답 2026-09-21, 기준은 업무 -618)
  * - 사진 한 칸은 `url`(원본) · `cutoutUrl`(누끼)로 세 가지 모양이 된다(`useCutImage`)
  *   - 누끼 — 단색 바탕 위에 인물을 올리고 글자와 겹친다
  *   - 원본 — 원래 배경을 두고 글자 쪽에 어두운 그라데이션을 깐다
@@ -30,10 +32,10 @@ import Wordmark from '../Wordmark';
 import { formatPrintDate } from '../../utils/report';
 import { useFitText } from './useFitText';
 import styles from './ReportFourCut.module.css';
-import type { ReportCutImage, ReportCutName, ReportFourCutView } from '../../types/unspecified';
+import type { ReportCutImage, ReportCutName, ReportFourCut } from '../../types/report';
 
 type Props = {
-  cuts: ReportFourCutView;
+  cuts: ReportFourCut;
   /** 머리의 `{owner}의 취향 4컷`. 프로필을 못 불러왔으면 `나의 취향 4컷` */
   owner?: string | null;
   /** 리포트를 만든 시각(API-060 `createdAt`) */
@@ -60,10 +62,18 @@ export default function ReportFourCut({ cuts, owner, createdAt, head = true }: P
         ) : null}
 
         <ol className={styles.cuts}>
-          <GenreCut {...cuts.genre} />
-          <DirectorCut {...cuts.director} />
-          <ActorCut {...cuts.actor} />
-          <CharacterCut {...cuts.character} />
+          {cuts.genre ? <GenreCut {...cuts.genre} /> : <PendingCut kind="genre" label="장르" />}
+          {cuts.director ? (
+            <DirectorCut {...cuts.director} />
+          ) : (
+            <PendingCut kind="director" label="감독" />
+          )}
+          {cuts.actor ? <ActorCut {...cuts.actor} /> : <PendingCut kind="actor" label="배우" />}
+          {cuts.character ? (
+            <CharacterCut {...cuts.character} />
+          ) : (
+            <PendingCut kind="character" label="캐릭터" />
+          )}
         </ol>
 
         <figcaption className={styles.foot}>
@@ -83,7 +93,7 @@ function GenreCut({ name, displayName, image }: CutProps) {
   const photo = useCutImage(image);
 
   return (
-    <Cut kind="genre" index={1} label="장르" name={name} displayName={displayName} photo={photo}>
+    <Cut kind="genre" label="장르" name={name} displayName={displayName} photo={photo}>
       <FitName text={displayName || name} maxLines={2} stretch={1.9} className={styles.genreName}>
         {displayName || name}
       </FitName>
@@ -104,7 +114,6 @@ function DirectorCut({
   return (
     <Cut
       kind="director"
-      index={2}
       label="감독"
       name={name}
       displayName={displayName}
@@ -137,7 +146,7 @@ function ActorCut({ name, displayName, image }: CutProps) {
   const lead = words.join(' ');
 
   return (
-    <Cut kind="actor" index={3} label="배우" name={name} displayName={displayName} photo={photo}>
+    <Cut kind="actor" label="배우" name={name} displayName={displayName} photo={photo}>
       {/* 두 단어를 서로 다른 크기로 한 줄씩 쓴다. 줄 수가 아니라 상자 폭 · 높이로만 맞춘다 */}
       <FitName text={text} maxLines={3} className={styles.actorName}>
         {lead ? <span className={styles.actorLead}>{lead}</span> : null}
@@ -154,14 +163,7 @@ function CharacterCut({ name, displayName, image }: CutProps) {
   const photo = useCutImage(image);
 
   return (
-    <Cut
-      kind="character"
-      index={4}
-      label="캐릭터"
-      name={name}
-      displayName={displayName}
-      photo={photo}
-    >
+    <Cut kind="character" label="캐릭터" name={name} displayName={displayName} photo={photo}>
       <FitName text={displayName || name} maxLines={2} className={styles.characterName}>
         <span className={styles.underlined}>
           {displayName || name}
@@ -172,11 +174,40 @@ function CharacterCut({ name, displayName, image }: CutProps) {
   );
 }
 
+/**
+ * 계약이 카드를 주지 않은 칸. 칸 크기와 번호 라벨은 그대로 두고 안만 비운다 — 4컷 레이아웃은
+ * 확정된 것이라 칸을 빼지 않는다(백엔드 답 2026-09-21).
+ *
+ * 04 캐릭터는 선정 기준이 업무 -618에서 정해질 때까지 늘 여기로 오고, 나머지 칸은 그 반기에
+ * 셀 수 있는 장르 · 인물이 없을 때만 온다.
+ */
+function PendingCut({ kind, label }: { kind: CutKind; label: string }) {
+  return (
+    <li className={styles.cut} data-cut={kind} data-mode="none">
+      <span className={styles.pending}>준비 중</span>
+      <CutLabel kind={kind} label={label} />
+    </li>
+  );
+}
+
+/** 칸 왼쪽 위의 `01 장르`. 번호는 칸 종류가 정한다 */
+function CutLabel({ kind, label }: { kind: CutKind; label: string }) {
+  return (
+    <span className={styles.label}>
+      {String(CUT_INDEX[kind]).padStart(2, '0')} {label}
+    </span>
+  );
+}
+
 // ─────────────────────────── 칸의 뼈대
 
+type CutKind = 'genre' | 'director' | 'actor' | 'character';
+
+/** 인화지에 찍는 칸 번호 */
+const CUT_INDEX: Record<CutKind, number> = { genre: 1, director: 2, actor: 3, character: 4 };
+
 type CutFrameProps = ReportCutName & {
-  kind: 'genre' | 'director' | 'actor' | 'character';
-  index: number;
+  kind: CutKind;
   label: string;
   photo: CutImageState;
   /** 사진과 이름 사이에 놓는 장식. 감독 칸의 대표작 */
@@ -191,7 +222,7 @@ type CutFrameProps = ReportCutName & {
  * 영문 이름이 있으면 큰 글자는 장식이라 읽지 않고, 아래의 한글 이름을 읽는다. 영문 이름이
  * 없으면 한글 이름이 곧 큰 글자라 아래에 한 번 더 쓰지 않는다.
  */
-function Cut({ kind, index, label, name, displayName, photo, extra, children }: CutFrameProps) {
+function Cut({ kind, label, name, displayName, photo, extra, children }: CutFrameProps) {
   const hasDisplayName = Boolean(displayName) && displayName !== name;
 
   return (
@@ -214,9 +245,7 @@ function Cut({ kind, index, label, name, displayName, photo, extra, children }: 
         </span>
       ) : null}
 
-      <span className={styles.label}>
-        {String(index).padStart(2, '0')} {label}
-      </span>
+      <CutLabel kind={kind} label={label} />
       {hasDisplayName ? <span className={styles.caption}>{name}</span> : null}
     </li>
   );
@@ -253,6 +282,9 @@ type CutImageState = {
 /**
  * 누끼 → 원본 → 없음 순으로 쓸 수 있는 사진을 고른다. 못 불러온 주소는 기억해 두고 다음
  * 것으로 넘어간다. 주소가 바뀌면 기억한 실패와 달라져 저절로 다시 시도한다.
+ *
+ * 계약이 사진을 주지 않는 칸은 이름만 그린다. 다른 사진으로 대신 채우지 않는다 — 리포트에
+ * 뽑힌 장르 · 인물과 다른 사진이 그 이름 아래 붙는다(사용자 결정 2026-09-21).
  */
 function useCutImage(image: ReportCutImage): CutImageState {
   const [failed, setFailed] = useState<string[]>([]);

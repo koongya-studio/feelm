@@ -45,11 +45,6 @@ type SessionState = {
    */
   recentSearchQueries: string[];
   /**
-   * 3.3 새 리포트 발급 화면을 이미 본 리포트. 2.1 `취향 리포트 보기`가 안 본 리포트면
-   * 3.3을 거쳐 3.4로, 본 리포트면 3.4로 바로 간다(업무 -308).
-   */
-  seenReportIds: number[];
-  /**
    * 7.2에서 바꾼 프로필 사진 · 소개 · 공개 항목(업무 -616). **계약에 자리가 없다**
    * (`types/unspecified.ts` 프로필 머리말). 비어 있는 키는 기준 목업 값을 쓴다는 뜻이다.
    */
@@ -61,7 +56,6 @@ function emptyState(): SessionState {
     subscribedOttIds: null,
     // 검색한 적이 없으면 최근 검색어도 없다(업무 -641)
     recentSearchQueries: [],
-    seenReportIds: [],
     profileExtras: {},
   };
 }
@@ -125,16 +119,4 @@ export function getProfileExtras(): ProfileExtrasUpdate {
 /** 넘긴 키만 바꾼다. `avatarUrl: null`은 사진을 지운다는 뜻이라 그대로 남긴다 */
 export function saveProfileExtras(update: ProfileExtrasUpdate): void {
   state.profileExtras = { ...state.profileExtras, ...update };
-}
-
-// ─────────────────────────────────────────── 리포트 (업무 -308)
-
-export function markReportSeen(reportId: number): void {
-  if (!state.seenReportIds.includes(reportId)) {
-    state.seenReportIds = [...state.seenReportIds, reportId];
-  }
-}
-
-export function isReportSeen(reportId: number): boolean {
-  return state.seenReportIds.includes(reportId);
 }
