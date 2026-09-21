@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +24,13 @@ public class RecommendationHistoryService {
     private final RecommendationHistoryRepository repository;
     private final RecommendationReasonPresenter reasonPresenter;
 
+    /**
+     * 세트 목록과 항목을 한 스냅샷에서 읽는다.
+     *
+     * <p>두 질의 사이에 API-045 조회가 어떤 영화의 최신 노출을 다른 세트로 옮기면(`user_movie_exposures` upsert), 첫 질의가 고른 세트에
+     * 남는 항목이 없어 빈 {@code items[]}가 내려갈 수 있다. REPEATABLE READ는 첫 문장의 스냅샷을 고정해 두 질의가 같은 상태를 보게 한다.
+     */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public CursorPageResponse<RecommendationHistorySetResponse> getHistory(
             long userId, String encodedCursor, Integer requestedSize) {
         int size = requestedSize == null ? 20 : requestedSize;

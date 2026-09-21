@@ -65,6 +65,8 @@ public class RecommendationReplenisher {
         ServingItem next = repository.findAndLockNextItem(userId, setId, type).orElse(null);
         if (next != null
                 && !repository.expose(
+                        userId,
+                        setId,
                         List.of(next),
                         OffsetDateTime.now(clock).withOffsetSameInstant(ZoneOffset.UTC))) {
             throw new IllegalStateException("추천 후보 노출 상태가 변경되었습니다.");

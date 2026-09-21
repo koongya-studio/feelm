@@ -79,9 +79,9 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
         when(candidateReader.read(anyLong()))
                 .thenThrow(new BusinessException(ErrorCode.RECOMMENDATION_UNAVAILABLE));
         jdbc.execute(
-                "TRUNCATE TABLE user_movie_dismissals, ratings, watch_records,"
-                        + " movie_ott_providers, recommendation_items, recommendation_sets,"
-                        + " movies, users, genres, otts, popcorn_flavors"
+                "TRUNCATE TABLE user_movie_exposures, user_movie_dismissals, ratings,"
+                        + " watch_records, movie_ott_providers, recommendation_items,"
+                        + " recommendation_sets, movies, users, genres, otts, popcorn_flavors"
                         + " RESTART IDENTITY CASCADE");
         flavor(FLAVOR, "FLAVOR_B");
         user(USER, "user");
@@ -284,6 +284,8 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
                 .andExpect(jsonPath("$.items[0].recommendationItemId").value(1002))
                 .andExpect(jsonPath("$.items[1].recommendationItemId").value(1003))
                 .andExpect(jsonPath("$.items[2].recommendationItemId").value(1005));
+        // 보충 경로(Replenisher)의 upsert도 원본과 어긋나지 않아야 한다.
+        assertExposureHistoryMatchesItems();
     }
 
     @Test
@@ -320,6 +322,7 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
                 .andExpect(jsonPath("$.items[0].recommendationItemId").value(1001))
                 .andExpect(jsonPath("$.items[1].recommendationItemId").value(1002))
                 .andExpect(jsonPath("$.items[2].recommendationItemId").value(1003));
+        assertExposureHistoryMatchesItems();
     }
 
     @Test
@@ -336,6 +339,7 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
                 .andExpect(jsonPath("$.items[2].recommendationItemId").value(1006));
 
         assertThat(exposedIds()).containsExactly(1001L, 1002L, 1003L, 1005L, 1006L);
+        assertExposureHistoryMatchesItems();
     }
 
     @Test
@@ -575,6 +579,94 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
                 type,
                 flavorCode,
                 new tools.jackson.databind.ObjectMapper().createObjectNode());
+    }
+
+    @Test
+    @DisplayName("T18 카드를 처음 노출하면 같은 트랜잭션에서 추천 이력이 적재된다")
+    void recordsExposureHistoryWhenCardsAreFirstShown() throws Exception {
+        getRecommendations(USER).andExpect(status().isOk());
+
+        assertThat(exposureHistory(USER))
+                .as("노출한 카드 수만큼 이력이 쌓인다")
+                .hasSize(3)
+                .allSatisfy(row -> assertThat(row.get("set_id")).isEqualTo(SET));
+        assertExposureHistoryMatchesItems();
+    }
+
+    @Test
+    @DisplayName("T19 같은 영화를 새 세트에서 다시 노출하면 이력 행이 늘지 않고 최신 세트로 옮겨간다")
+    void movesExposureHistoryToNewerSetOnReexposure() throws Exception {
+        getRecommendations(USER).andExpect(status().isOk());
+        List<Long> firstMovies = exposedMovieIds(USER);
+        assertThat(firstMovies).hasSize(3);
+
+        // 픽스처가 세트 id를 1000으로 박아 두므로 시퀀스를 올려야 새 세트가 실제로 "더 최신"이 된다.
+        // 계약상 최신 판정 기준이 세트 ID 내림차순이라 id가 작으면 새로 만들어도 최신이 아니다.
+        jdbc.execute("SELECT setval(pg_get_serial_sequence('recommendation_sets','id'),1000,true)");
+        // 같은 영화들로 새 generation 세트를 만들어 최신 세트로 전환시킨다.
+        candidates(
+                "generation-reexpose",
+                candidate(firstMovies.get(0), "5.0", "TASTE", null),
+                candidate(firstMovies.get(1), "4.0", "TASTE", null),
+                candidate(firstMovies.get(2), "3.0", "DISCOVERY", "FLAVOR_B"));
+        candidateListener.onMessage(candidateNotice(), mock(Acknowledgment.class));
+        getRecommendations(USER).andExpect(status().isOk());
+
+        Long newSetId =
+                jdbc.queryForObject(
+                        "SELECT id FROM recommendation_sets"
+                                + " WHERE generation_id='generation-reexpose'",
+                        Long.class);
+        assertThat(exposureHistory(USER))
+                .as("재노출은 이력 행을 늘리지 않는다")
+                .hasSize(3)
+                .allSatisfy(row -> assertThat(row.get("set_id")).isEqualTo(newSetId));
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM recommendation_items"
+                                        + " WHERE exposed_at IS NOT NULL",
+                                Integer.class))
+                .as("원본 노출 기록은 두 세트 모두에 보존된다")
+                .isEqualTo(6);
+        assertExposureHistoryMatchesItems();
+    }
+
+    private List<java.util.Map<String, Object>> exposureHistory(long userId) {
+        return jdbc.queryForList(
+                "SELECT movie_id, recommendation_item_id, set_id FROM user_movie_exposures"
+                        + " WHERE user_id=? ORDER BY movie_id",
+                userId);
+    }
+
+    private List<Long> exposedMovieIds(long userId) {
+        return jdbc.queryForList(
+                "SELECT movie_id FROM user_movie_exposures WHERE user_id=? ORDER BY movie_id",
+                Long.class,
+                userId);
+    }
+
+    /**
+     * 이력 표가 원본({@code recommendation_items.exposed_at})과 어긋나지 않는지 확인한다.
+     *
+     * <p>비교 질의는 이력 표를 두기 전 조회 시점에 계산하던 것과 같다. 노출 경로 어딘가가 upsert를 빠뜨리면 여기서 걸린다.
+     */
+    private void assertExposureHistoryMatchesItems() {
+        assertThat(
+                        jdbc.queryForList(
+                                """
+                                SELECT DISTINCT ON (s.user_id, i.movie_id)
+                                       s.user_id, i.movie_id,
+                                       i.id AS recommendation_item_id, i.set_id
+                                FROM recommendation_items i
+                                JOIN recommendation_sets s ON s.id = i.set_id
+                                WHERE s.user_id IS NOT NULL AND i.exposed_at IS NOT NULL
+                                ORDER BY s.user_id, i.movie_id, i.set_id DESC
+                                """))
+                .as("이력 표는 영화별 최신 노출과 정확히 일치해야 한다")
+                .containsExactlyInAnyOrderElementsOf(
+                        jdbc.queryForList(
+                                "SELECT user_id, movie_id, recommendation_item_id, set_id"
+                                        + " FROM user_movie_exposures"));
     }
 
     private void user(long id, String nickname) {
