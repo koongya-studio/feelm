@@ -35,6 +35,11 @@ public class SecurityConfig {
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
+    /** API-062 공개 프로필 경로. 선택 인증 판정과 {@code me} 제외가 같은 템플릿을 본다. */
+    private static final String PUBLIC_PROFILE_TEMPLATE = "/api/v1/users/{publicId}/profile";
+
+    private static final String PUBLIC_PROFILE_VARIABLE = "publicId";
+
     /**
      * 인증 없이 호출할 수 있는 경로. 도메인별 공개 API는 여기에 추가한다.
      *
@@ -94,14 +99,41 @@ public class SecurityConfig {
         return false;
     }
 
-    /** API-030과 API-031은 선택 인증이다. 정적 검색·필터·급상승 경로는 영화 ID 템플릿에 포함하지 않는다. */
+    /** API-030·031 영화 상세와 API-062 공개 프로필이 선택 인증이다. 정적 검색·필터·급상승 경로는 영화 ID 템플릿에 포함하지 않는다. */
     public static boolean isOptionalAuthenticationApi(HttpMethod method, String path) {
-        return HttpMethod.GET.equals(method)
-                && !path.equals("/api/v1/movies/search")
+        if (!HttpMethod.GET.equals(method)) {
+            return false;
+        }
+        return isOptionalMovieApi(path) || isPublicProfileApi(path);
+    }
+
+    private static boolean isOptionalMovieApi(String path) {
+        return !path.equals("/api/v1/movies/search")
                 && !path.equals("/api/v1/movies/filter-options")
                 && !path.equals("/api/v1/movies/trending")
                 && (PATH_MATCHER.match("/api/v1/movies/{movieId}", path)
                         || PATH_MATCHER.match("/api/v1/movies/{movieId}/similar", path));
+    }
+
+    /**
+     * API-062 공개 프로필만 연다.
+     *
+     * <p>{@code {publicId}} 자리는 회원 전용 {@code /api/v1/users/me} 계열과 접두사를 공유한다. 지금은 {@code
+     * /api/v1/users/me/profile} 핸들러가 없지만, 나중에 생기더라도 이 목록이 조용히 열어 주지 않아야 한다.
+     *
+     * <p><b>제외 판정은 원본 경로 문자열이 아니라 매칭이 뽑아낸 경로 변수로 한다.</b> {@link AntPathMatcher}는 빈 세그먼트를 버리고 토큰을
+     * 맞추므로, 접두사 검사와 매칭이 서로 다른 경로를 보게 된다. {@code /api/v1/users//me/profile}은 템플릿에 맞으면서 {@code
+     * "/api/v1/users/me/"}로 시작하지는 않아, 접두사로 걸러 내면 그대로 열린다(리뷰 B-1).
+     */
+    private static boolean isPublicProfileApi(String path) {
+        if (!PATH_MATCHER.match(PUBLIC_PROFILE_TEMPLATE, path)) {
+            return false;
+        }
+        String publicId =
+                PATH_MATCHER
+                        .extractUriTemplateVariables(PUBLIC_PROFILE_TEMPLATE, path)
+                        .get(PUBLIC_PROFILE_VARIABLE);
+        return !"me".equalsIgnoreCase(publicId);
     }
 
     private final TokenProvider tokenProvider;

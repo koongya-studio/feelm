@@ -44,6 +44,16 @@ public class FrameQueryService {
         return new FrameListResponse(totalCount, items, nextCursor, hasNext);
     }
 
+    /**
+     * 공개 프로필(API-062)이 보여 주는 최근 필름. 목록 API(API-042)의 첫 페이지와 같은 질의를 커서 없이 읽는다.
+     *
+     * <p>호출자가 자기 필름만 보는 API-042와 달리 다른 사용자의 id가 들어온다. 접근 판정(공개 범위·차단)은 호출한 도메인이 이미 마쳤다고 보고 여기서 다시
+     * 하지 않는다.
+     */
+    public FrameListResponse getRecentFrames(long userId, int limit) {
+        return getMyFrames(userId, null, null, limit);
+    }
+
     public FrameDetailResponse getFrameDetail(long userId, long frameId) {
         FrameDetailRow row =
                 frameQueryRepository
