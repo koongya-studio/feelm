@@ -120,17 +120,26 @@ export const reportDetails: Record<number, ReportDetail> = {
       { label: '2020년대', share: 34 },
       { label: '그 이전', share: 28 },
     ],
-    // 이번 구현 범위에서는 계약이 빈 배열을 준다. 화면은 이 칸을 숨긴다
-    keywords: [],
+    keywords: [
+      { code: 'DIRECTOR_BINGE', label: '웨스 앤더슨 몰아보기', rationale: '웨스 앤더슨 영화 3편' },
+      {
+        code: 'FLAVOR_EXPLORER',
+        label: '블루베리 탐험가',
+        rationale: '이번 반기에 블루베리 프레임 4개 추가',
+      },
+      { code: 'GENRE_DEVOTEE', label: '로맨스 편식', rationale: '로맨스가 49%' },
+      { code: 'GENEROUS_RATER', label: '후한 평가자', rationale: '이번 반기 평균 ★4.3' },
+    ],
+    // `(새로운 맛)` 접미사는 계약이 아니라 화면이 `isNew`로 붙인다
     comparisons: [
-      { label: '범죄·스릴러', delta: 12, isNew: false },
-      { label: '느와르 (새로운 맛)', delta: 4, isNew: true },
-      { label: '드라마', delta: -6, isNew: false },
+      { label: '다크초코', delta: 12, isNew: false },
+      { label: '블루베리', delta: 4, isNew: true },
+      { label: '스트로베리', delta: -6, isNew: false },
     ],
     highlights: [
-      '지난 반기보다 스릴러 취향이 12% 증가했어요',
+      '지난 반기보다 다크초코 취향이 12% 증가했어요',
       '새롭게 발견한 감독 4명',
-      '새로 넓어진 팝콘 맛: 느와르',
+      '새로 넓어진 팝콘 맛: 블루베리',
     ],
   },
   202: {
@@ -168,10 +177,11 @@ export const reportDetails: Record<number, ReportDetail> = {
       { label: '2020년대', share: 30 },
       { label: '그 이전', share: 26 },
     ],
+    // 임계값을 넘긴 규칙이 없으면 빈 배열로 온다. 화면은 이 칸을 숨긴다
     keywords: [],
     comparisons: [
-      { label: '드라마', delta: 6, isNew: false },
-      { label: '액션', delta: -3, isNew: false },
+      { label: '솔티카라멜', delta: 6, isNew: false },
+      { label: '체다치즈', delta: -3, isNew: false },
     ],
     highlights: ['지난 반기보다 드라마 취향이 6% 증가했어요', '새롭게 발견한 감독 2명'],
   },

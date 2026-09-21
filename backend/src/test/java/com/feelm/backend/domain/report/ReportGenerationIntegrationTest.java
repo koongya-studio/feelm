@@ -140,13 +140,33 @@ class ReportGenerationIntegrationTest extends SharedPostgresContractTest {
         assertThat(content.path("countryShares").get(0).path("label").asText()).isEqualTo("한국");
         assertThat(content.path("countryShares").get(0).path("share").asInt()).isEqualTo(67);
         assertThat(content.path("eraShares").get(0).path("label").asText()).isEqualTo("2010년대");
-        assertThat(content.path("comparisons").get(0).path("label").asText()).isEqualTo("드라마");
-        assertThat(content.path("comparisons").get(0).path("delta").asInt()).isEqualTo(67);
-        assertThat(content.path("comparisons").get(0).path("isNew").asBoolean()).isTrue();
+        // 비교 축은 팝콘 맛이다(업무 -774). 이번 반기는 느와르 2편·달콤 1편(3편), 직전 반기는
+        // 느와르 1편(1편)이라 느와르 100%→67%, 달콤 0%→33%다. 달콤은 이번 반기 전 프레임에
+        // 없어 신규다. 두 증감 폭이 같아 배열 순서는 표시명으로 찾는다.
+        JsonNode sweet = comparisonOf(content, "달콤");
+        assertThat(sweet.path("delta").asInt()).isEqualTo(33);
+        assertThat(sweet.path("isNew").asBoolean()).isTrue();
+        JsonNode noir = comparisonOf(content, "느와르");
+        assertThat(noir.path("delta").asInt()).isEqualTo(-33);
+        assertThat(noir.path("isNew").asBoolean()).isFalse();
         assertThat(content.path("fourCut").path("director").path("image").path("url").asText())
                 .isEqualTo("https://images.test/director-1.jpg");
         assertThat(content.path("characterCard").isNull()).isTrue();
-        assertThat(content.path("keywords").isEmpty()).isTrue();
+        // 취향 키워드는 임계값을 넘긴 규칙만 순서대로 최대 넷이다(업무 -774). 이 픽스처는
+        // 감독·배우 3편 이상과 새 감독 3명을 못 넘겨 사람 규칙이 빠지고, 맛 둘(신규 달콤 ·
+        // 느와르 67%)과 장르 둘(드라마 67% · 드라마 평균 ★4.8)로 넷이 차서 평가 습관까지
+        // 가지 않는다.
+        assertThat(content.path("keywords")).hasSize(4);
+        assertThat(keywordOf(content, "FLAVOR_EXPLORER").path("label").asText())
+                .isEqualTo("달콤 탐험가");
+        assertThat(keywordOf(content, "FLAVOR_EXPLORER").path("rationale").asText())
+                .isEqualTo("이번 반기에 달콤 프레임 1개 추가");
+        assertThat(keywordOf(content, "FLAVOR_DEVOTEE").path("rationale").asText())
+                .isEqualTo("느와르가 67%");
+        assertThat(keywordOf(content, "GENRE_DEVOTEE").path("rationale").asText())
+                .isEqualTo("드라마가 67%");
+        assertThat(keywordOf(content, "GENRE_FAVORITE").path("rationale").asText())
+                .isEqualTo("드라마 2편 평균 ★4.8");
     }
 
     @Test
@@ -465,6 +485,24 @@ class ReportGenerationIntegrationTest extends SharedPostgresContractTest {
                         String.class,
                         USER);
         return objectMapper.readTree(content);
+    }
+
+    private JsonNode keywordOf(JsonNode content, String code) {
+        for (JsonNode keyword : content.path("keywords")) {
+            if (code.equals(keyword.path("code").asText())) {
+                return keyword;
+            }
+        }
+        throw new AssertionError("키워드에 " + code + "가 없다: " + content.path("keywords"));
+    }
+
+    private JsonNode comparisonOf(JsonNode content, String label) {
+        for (JsonNode comparison : content.path("comparisons")) {
+            if (label.equals(comparison.path("label").asText())) {
+                return comparison;
+            }
+        }
+        throw new AssertionError("비교 목록에 " + label + "이(가) 없다: " + content.path("comparisons"));
     }
 
     private String reportStatus() {

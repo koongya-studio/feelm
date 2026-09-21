@@ -15,7 +15,7 @@ public record ReportContent(
         List<Share> genreShares,
         List<Share> countryShares,
         List<Share> eraShares,
-        List<Object> keywords,
+        List<Keyword> keywords,
         List<Comparison> comparisons,
         List<String> highlights,
         Generation generation) {
@@ -38,6 +38,12 @@ public record ReportContent(
     public record DirectorCard(String name, String displayName, ImageRef image, Object work) {}
 
     public record PersonCard(String name, String displayName, ImageRef image) {}
+
+    /**
+     * 3.4 · 7.4 `취향 키워드` 한 개. `rationale`은 그 반기 집계에서 나온 수치를 그대로 적은 근거 문장이다. 성격 · 전개 태그는 기준정보가 없어 쓰지
+     * 않는다(업무 -774).
+     */
+    public record Keyword(String code, String label, String rationale) {}
 
     public record Share(String label, int share) {}
 

@@ -95,7 +95,9 @@ class ReportReadApiContractTest extends ReportApiContractSupport {
                 .andExpect(jsonPath("$.genreShares[0].share").value(67))
                 .andExpect(jsonPath("$.topDirectors[0].count").value(2))
                 .andExpect(jsonPath("$.comparisons[0].delta").value(12))
-                .andExpect(jsonPath("$.highlights[0]").value("로맨스 취향이 12%p 늘었어요"))
+                .andExpect(jsonPath("$.keywords[0].code").value("GENRE_FAVORITE"))
+                .andExpect(jsonPath("$.keywords[0].rationale").value("로맨스 2편 평균 ★4.0"))
+                .andExpect(jsonPath("$.highlights[0]").value("다크초코 취향이 12%p 늘었어요"))
                 .andExpect(jsonPath("$.generation").doesNotExist());
 
         for (long id : new long[] {5_560_102, 5_560_199}) {

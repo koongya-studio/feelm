@@ -80,7 +80,7 @@ describe('API-060 리포트 상세', () => {
     expect(call()[0]).toBe('/api/v1/reports/301');
     expect(detail.fourCut.director?.name).toBe('웨스 앤더슨');
     expect(detail.countryShares).toEqual(reportDetails[301].countryShares);
-    expect(detail.comparisons[1]).toEqual({ label: '느와르 (새로운 맛)', delta: 4, isNew: true });
+    expect(detail.comparisons[1]).toEqual({ label: '블루베리', delta: 4, isNew: true });
   });
 
   it('만드는 중이면 계약 코드가 그대로 올라간다', async () => {

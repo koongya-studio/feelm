@@ -40,7 +40,7 @@ import { getReportDetail } from '../../../api/reports';
 import { getMyProfile } from '../../../api/users';
 import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
-import { formatDelta, formatHalf } from '../../../utils/report';
+import { formatComparisonLabel, formatDelta, formatHalf } from '../../../utils/report';
 import ReportShareSheet from './ReportShareSheet';
 import styles from './ReportDetailPage.module.css';
 import type { ReportDetail, ReportShare } from '../../../types/report';
@@ -184,7 +184,7 @@ export default function ReportDetailPage({ from }: Props) {
             <ul className={styles.card}>
               {report.comparisons.map((item) => (
                 <li key={item.label} className={styles.compare}>
-                  <span>{item.label}</span>
+                  <span>{formatComparisonLabel(item.label, item.isNew)}</span>
                   <span className={styles.delta} data-negative={item.delta < 0}>
                     {formatDelta(item.delta, item.isNew)}
                   </span>

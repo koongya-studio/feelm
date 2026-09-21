@@ -45,3 +45,14 @@ export function formatDelta(delta: number, isNew: boolean): string {
 
   return isNew ? `${text} 신규` : text;
 }
+
+/**
+ * 지난 반기와 비교 한 줄의 이름. 이번 반기에 처음 나온 맛이면 `느와르 (새로운 맛)`으로 적는다
+ * (와이어프레임 3.4).
+ *
+ * 계약은 이름과 `isNew` 플래그를 따로 주므로(API-060) 이 문구는 화면에서 만든다. 서버가 보낸
+ * 이름에 UI 문구를 섞어 두면 공유 이미지나 다른 화면이 그 문구까지 물려받는다.
+ */
+export function formatComparisonLabel(label: string, isNew: boolean): string {
+  return isNew ? `${label} (새로운 맛)` : label;
+}

@@ -48,9 +48,10 @@ abstract class ReportApiContractSupport extends SharedPostgresContractTest {
               "genreShares": [{"label": "로맨스", "share": 67}],
               "countryShares": [{"label": "한국", "share": 33}],
               "eraShares": [{"label": "2020년대", "share": 67}],
-              "keywords": [],
-              "comparisons": [{"label": "로맨스", "delta": 12, "isNew": false}],
-              "highlights": ["로맨스 취향이 12%p 늘었어요"],
+              "keywords": [{"code": "GENRE_FAVORITE", "label": "로맨스 편애",
+                "rationale": "로맨스 2편 평균 ★4.0"}],
+              "comparisons": [{"label": "다크초코", "delta": 12, "isNew": false}],
+              "highlights": ["다크초코 취향이 12%p 늘었어요"],
               "generation": {"contentVersion": 1, "snapshotAt": "2030-06-30T14:51:00Z",
                 "cutoffAt": "2030-06-30T14:50:00Z", "finalSnapshot": true}
             }
