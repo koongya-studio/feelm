@@ -33,6 +33,13 @@ import { ROUTE_PATTERN } from '../../routes/paths';
 import type { AuthValue } from '../../contexts/authContext';
 import type { OttRecommendation } from '../../types/ott';
 
+/*
+ * EXT-02는 제품 코드의 1.6초 분석 연출과 API 응답을 함께 기다린다. 가짜 타이머로 바꾸면
+ * 둘의 실제 결합 순서를 검증하지 못하므로 실제 시간을 유지하고, 전체 실행 부하를 견디도록
+ * 이 흐름 파일에만 테스트 상한을 늘린다. `waitFor`의 제한은 테스트 자체의 상한이 아니다.
+ */
+vi.setConfig({ testTimeout: 15000 });
+
 vi.mock('../../api/users', () => ({
   getMyProfile: vi.fn(),
 }));
@@ -149,11 +156,6 @@ const location = () => screen.getByTestId('location').textContent;
 const search = () => screen.getByTestId('search').textContent;
 
 describe('7.8 → EXT-01 → EXT-02 → EXT-03 → EXT-04', () => {
-  /*
-   * EXT-02 분석 연출을 기다리는 `waitFor`가 5초까지 쓰는데 vitest의 기본 제한도 5초라,
-   * 전체 실행처럼 부하가 있으면 안에서 기다리다 밖에서 끊긴다(develop에서도 같다).
-   * 분석을 기다리는 테스트의 제한을 늘린다.
-   */
   it('분석을 마치면 결과로 바꿔 끼우고, 상세와 비교를 오간다', async () => {
     renderApp([ROUTE_PATTERN.settings]);
 
