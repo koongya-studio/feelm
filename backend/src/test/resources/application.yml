@@ -17,6 +17,11 @@ spring:
     open-in-view: false
 
 feelm:
+  recommendation:
+    buffer:
+      # 프리페치는 응답과 분리된 배경 작업이라 테스트가 끝난 뒤에도 DB를 읽는다. 다음 테스트의
+      # TRUNCATE와 겹치면 교착이 난다. 기본은 끄고, 프리페치를 검증하는 테스트만 값을 지정해 켠다.
+      prefetch-threshold: -1
   notification:
     web-push:
       mode: disabled

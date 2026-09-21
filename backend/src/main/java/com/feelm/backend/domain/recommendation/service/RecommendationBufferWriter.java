@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.Random;
@@ -41,6 +42,7 @@ class RecommendationBufferWriter {
     private final RecommendationServingRepository servingRepository;
     private final RecommendationCandidateReader candidateReader;
     private final RecommendationReasonService reasonService;
+    private final RecommendationPrefetchProperties prefetchProperties;
     private final Clock clock;
 
     /**
@@ -92,7 +94,66 @@ class RecommendationBufferWriter {
         }
 
         // 같은 generation에 회차가 있으면 그다음 번호, Redis가 새 generation으로 바뀌었으면 첫 회차(0)다.
-        OptionalInt latestBatchNo = repository.findLatestBatchNo(userId, batch.generationId());
+        return appendBatch(
+                userId, batch, repository.findLatestBatchNo(userId, batch.generationId()));
+    }
+
+    /**
+     * 카드가 남아 있는 동안 같은 generation의 다음 회차를 미리 만든다(S15P21E106-708).
+     *
+     * <p>{@link #writeNextBatch}와 달리 현재 세트는 아직 서빙 중이다. 그래서 소진 여부가 아니라 "미노출 유효 후보가 임계값 이하인지"를 잠금 안에서
+     * 다시 확인한다.
+     *
+     * <p>잠금 전에 다른 요청이 더 새로운 세트를 만들었으면 아무것도 하지 않는다. 최신 세트 ID 비교 하나로 앞선 프리페치가 만든 다음 회차와 알림이 만든 새
+     * generation 첫 회차를 모두 거른다.
+     *
+     * <p>Redis가 새 generation으로 넘어갔으면 만들지 않는다. 새 generation의 첫 회차는 알림 경로가 소유하며, 백그라운드 작업이
+     * generation을 갈아치우면 서빙이 즉시 전환해 사용자의 남은 카드가 세션 중간에 사라진다. 소진 경로는 내놓을 카드가 없으므로 그 경우에도 새
+     * generation을 만든다.
+     *
+     * @return 만든 회차. 위 조건에 걸려 만들지 않았으면 비어 있다
+     * @throws NoEligibleRecommendationCandidatesException 이전 회차와 사용자 상태를 제외하고 남은 후보가 없는 경우
+     */
+    @Transactional
+    public Optional<RecommendationBufferResult> writePrefetchBatch(
+            long userId,
+            long currentSetId,
+            String currentGenerationId,
+            RecommendationCandidateBatch batch) {
+        if (!repository.lockActiveUserIfExists(userId)) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
+        OptionalLong latestSetId = repository.findLatestSetId(userId);
+        if (latestSetId.isEmpty() || latestSetId.getAsLong() != currentSetId) {
+            return Optional.empty();
+        }
+        // generation_id가 NULL인 레거시 세트는 이어 만들 generation이 없다.
+        if (currentGenerationId == null || !currentGenerationId.equals(batch.generationId())) {
+            return Optional.empty();
+        }
+        // 판정이 낡은 경우. 평가 철회 등으로 미노출 유효 후보가 다시 늘었으면 만들지 않는다.
+        if (!prefetchProperties.needsPrefetch(
+                servingRepository.countUnexposedValidItems(userId, currentSetId))) {
+            return Optional.empty();
+        }
+        // 위 두 확인이 "현재 세트가 최신이고 그 세트의 generation이 currentGenerationId"임을 보장하므로
+        // 이 분기는 도달하지 않는다. 프리페치가 새 generation의 첫 회차를 만들지 않는 것은 위의
+        // generation 비교가 하는 일이지 이 방어가 하는 일이 아니다.
+        OptionalInt latestBatchNo = repository.findLatestBatchNo(userId, currentGenerationId);
+        if (latestBatchNo.isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(appendBatch(userId, batch, latestBatchNo));
+    }
+
+    /**
+     * 같은 generation의 다음 회차를 저장한다. 소진·프리페치가 같은 구성 규칙을 쓰도록 한곳에 둔다.
+     *
+     * <p>{@code latestBatchNo}가 비어 첫 회차(0)를 만드는 경로는 소진 전용이다. Redis가 새 generation으로 넘어간 상태에서 소진되면 그
+     * generation의 첫 회차를 만들어야 하기 때문이다. 프리페치는 그 경우 호출 전에 끊는다.
+     */
+    private RecommendationBufferResult appendBatch(
+            long userId, RecommendationCandidateBatch batch, OptionalInt latestBatchNo) {
         int nextBatchNo = latestBatchNo.isPresent() ? latestBatchNo.getAsInt() + 1 : 0;
         // 이전 회차가 저장한 영화를 빼야 "같은 20편"이 아니라 "다음 20편"이 된다.
         Set<Long> storedMovieIds =
@@ -101,7 +162,7 @@ class RecommendationBufferWriter {
                         : Set.of();
 
         List<RecommendationBufferItem> items = prepare(userId, batch, storedMovieIds);
-        // 평가·관심없음·이전 회차를 빼고 남은 후보가 없다. 호출자가 503으로 바꾼다.
+        // 평가·관심없음·이전 회차를 빼고 남은 후보가 없다. 호출자가 503으로 바꾸거나 프리페치를 포기한다.
         if (items.isEmpty()) {
             throw new NoEligibleRecommendationCandidatesException();
         }

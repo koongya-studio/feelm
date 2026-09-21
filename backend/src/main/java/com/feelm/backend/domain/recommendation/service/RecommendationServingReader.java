@@ -22,9 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>소진 후 재생성은 이 트랜잭션 밖에서 일어나야 하므로(사용자 행 잠금을 쥔 채 Redis를 기다리지 않는다) 읽기만 여기에 둔다.
  *
- * <p>소진은 "보여줄 유효 카드가 0편"으로 엄격하게 정의한다. 이것이 조회를 읽기·재생성·재읽기 세 트랜잭션으로 나눠도 노출된 카드가 유실되지 않는 근거다. 남은 카드가
- * 있는 채로 다음 회차를 만들면 {@code findLatestSet}이 새 회차를 집는 순간 그 카드가 화면에서 사라진다. 판정이 낡는 경우(예: 판정 뒤 평가 철회로 카드가
- * 되살아남)는 재생성 트랜잭션이 잠금 안에서 다시 확인해 흡수한다.
+ * <p>소진은 "보여줄 유효 카드가 0편"으로 엄격하게 정의한다. 이것이 조회를 읽기·재생성·재읽기 세 트랜잭션으로 나눠도 노출된 카드가 유실되지 않는 근거다. 판정이 낡는
+ * 경우(예: 판정 뒤 평가 철회로 카드가 되살아남)는 재생성 트랜잭션이 잠금 안에서 다시 확인해 흡수한다.
+ *
+ * <p>프리페치로 다음 회차가 미리 생기더라도 {@link RecommendationServingRepository#findCurrentSet}이 미소진 최저 회차를 고르므로
+ * 남은 카드가 화면에서 사라지지 않는다(S15P21E106-708).
  */
 @Component
 @RequiredArgsConstructor
@@ -54,12 +56,14 @@ class RecommendationServingReader {
         return new ServingSnapshot(
                 new RecommendationResponse(set.id(), set.generatedAt(), map(items)),
                 set.id(),
-                exhausted);
+                set.generationId(),
+                exhausted,
+                repository.countUnexposedValidItems(userId, set.id()));
     }
 
     private RecommendationSet findCurrentSet(long userId) {
         return repository
-                .findLatestSet(userId)
+                .findCurrentSet(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RECOMMENDATION_UNAVAILABLE));
     }
 
@@ -109,6 +113,16 @@ class RecommendationServingReader {
                 reasonPresenter.present(item.reason()));
     }
 
-    /** 현재 세트의 응답과 소진 여부다. {@code exhausted}는 노출 여부와 무관하게 유효 카드가 한 편도 없는 상태다. */
-    record ServingSnapshot(RecommendationResponse response, long setId, boolean exhausted) {}
+    /**
+     * 현재 세트의 응답과 소진 여부다. {@code exhausted}는 노출 여부와 무관하게 유효 카드가 한 편도 없는 상태다.
+     *
+     * <p>{@code unexposedValidCount}는 아직 노출하지 않은 유효 후보 수이며 프리페치 판단에 쓴다. {@code generationId}는 프리페치가
+     * 같은 generation을 이어 만드는지 확인하는 데 쓴다(S15P21E106-708).
+     */
+    record ServingSnapshot(
+            RecommendationResponse response,
+            long setId,
+            String generationId,
+            boolean exhausted,
+            int unexposedValidCount) {}
 }

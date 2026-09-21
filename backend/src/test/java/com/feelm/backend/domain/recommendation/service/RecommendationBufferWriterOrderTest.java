@@ -34,6 +34,7 @@ class RecommendationBufferWriterOrderTest {
                     servingRepository,
                     candidateReader,
                     reasonService,
+                    new RecommendationPrefetchProperties(5),
                     Clock.systemUTC());
 
     @Test
