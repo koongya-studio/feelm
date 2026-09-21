@@ -172,11 +172,34 @@ describe('7.1 MY 대시보드', () => {
       '프로필 편집': '/my/profile/edit',
     });
 
-    // 공유는 이동이 아니라 기기의 공유 메뉴를 여는 버튼이다(계약에 공유 API가 없다)
+    // 공유는 이동이 아니라 주소를 공유하는 버튼이다(계약에 공유 API가 없다)
     expect(screen.getByRole('button', { name: '프로필 공유' })).toBeInTheDocument();
 
     // OTT 관리는 설정 안으로 옮겼다(사용자 지시 2026-09-16)
     expect(screen.queryByRole('link', { name: 'OTT 관리' })).toBeNull();
+  });
+
+  /*
+   * 업무 -767. 2026-09-21 배포본 점검에서 데스크톱의 `프로필 공유`가 아무 반응이 없었다.
+   * 데스크톱 Chrome에도 `navigator.share`가 있어 그것만 믿고 불렀다.
+   */
+  it('데스크톱에서 프로필 공유는 공개 프로필 주소를 복사하고 알린다', async () => {
+    const share = vi.fn(() => new Promise<void>(() => undefined));
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+
+    try {
+      await renderDashboard();
+      fireEvent.click(screen.getByRole('button', { name: '프로필 공유' }));
+
+      expect(await screen.findByRole('status')).toHaveTextContent('프로필 주소를 복사했어요');
+      expect(share).not.toHaveBeenCalled();
+      expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/\/users\/\d+$/));
+    } finally {
+      Reflect.deleteProperty(navigator, 'share');
+      Reflect.deleteProperty(navigator, 'clipboard');
+    }
   });
 
   it('처음에는 평가한 영화 탭이고, 평가 포스터가 별점과 함께 깔린다', async () => {

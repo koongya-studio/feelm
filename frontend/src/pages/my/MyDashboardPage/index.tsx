@@ -92,6 +92,7 @@ import { getMyProfileView } from '../../../api/users';
 import { getMyRatings, getWatchRecords } from '../../../api/watch';
 import { path } from '../../../routes/paths';
 import { appUrl } from '../../../utils/appUrl';
+import { shareLink } from '../../../utils/share';
 import { formatShortDate } from '../../../utils/date';
 import styles from './MyDashboardPage.module.css';
 import type { FlavorCount } from '../../../components/PopcornBucket/kernels';
@@ -450,34 +451,22 @@ export default function MyDashboardPage() {
   const feed = tab === 'ratings' ? ratings : tab === 'unrated' ? unrated : history;
 
   /*
-   * 7.2-B 공개 프로필 주소를 기기의 공유 메뉴에 넘긴다. 공유 API가 계약에 없으므로
-   * 서버를 부르지 않는다. 공유 메뉴가 없는 브라우저에서는 주소를 복사하고, 그것도
-   * 막혀 있으면 알린다 — 되는 것처럼 보이고 아무 일도 없는 상태를 만들지 않는다.
+   * 7.2-B 공개 프로필 주소를 공유한다. 공유 API가 계약에 없으므로 서버를 부르지 않는다.
+   * 휴대폰은 기기의 공유 메뉴, 데스크톱은 주소 복사다(`utils/share.ts`, 업무 -767 — 한때
+   * 데스크톱 Chrome의 `navigator.share`를 믿어 아무 반응이 없었다).
    *
    * **주소는 `appUrl`로 만든다**(업무 -716 다음의 -717). `path.*`는 라우터 안에서 쓰는
    * 경로라 앱이 놓인 자리(`/app`)가 빠져 있다. `location.origin`에 그대로 붙이면 받는
    * 사람이 404를 본다.
    */
   const shareProfile = async () => {
-    const url = appUrl(path.publicProfile(profile.userId));
-    const title = `${profile.nickname}님의 Feelm 프로필`;
+    const result = await shareLink({
+      title: `${profile.nickname}님의 Feelm 프로필`,
+      url: appUrl(path.publicProfile(profile.userId)),
+    });
 
-    if (typeof navigator.share === 'function') {
-      try {
-        await navigator.share({ title, url });
-      } catch {
-        // 공유 메뉴를 닫은 경우도 여기로 온다. 알리지 않는다
-      }
-
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(url);
-      setNotice('프로필 주소를 복사했어요');
-    } catch {
-      setNotice('이 브라우저에서는 공유할 수 없어요');
-    }
+    if (result === 'copied') setNotice('프로필 주소를 복사했어요');
+    if (result === 'failed') setNotice('이 브라우저에서는 공유할 수 없어요');
   };
 
   /*

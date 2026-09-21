@@ -248,9 +248,13 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
 });
 
 describe('3.4 → 3.5', () => {
-  it('공유 메뉴를 열고, 마치면 시트를 닫는다', async () => {
+  it('휴대폰에서는 공유 메뉴를 열고, 마치면 시트를 닫는다', async () => {
     const share = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+    // 기기의 공유 메뉴는 손가락이 주 입력인 기기에서만 연다(업무 -767, `utils/share.ts`)
+    const coarse = vi
+      .spyOn(window, 'matchMedia')
+      .mockImplementation((query: string) => ({ matches: true, media: query }) as MediaQueryList);
 
     try {
       renderApp(['/reports/301']);
@@ -268,18 +272,20 @@ describe('3.4 → 3.5', () => {
       );
     } finally {
       Reflect.deleteProperty(navigator, 'share');
+      coarse.mockRestore();
     }
   });
 
-  it('공유 메뉴가 없는 브라우저면 알리고, 이미지는 API-061로 만든다', async () => {
+  it('공유도 복사도 못 하는 브라우저면 알리고, 이미지는 API-061로 만든다', async () => {
     renderApp(['/reports/301']);
     const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
     fireEvent.click(headerShare);
 
     const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
     fireEvent.click(sheet.getByRole('button', { name: '공유하기' }));
-    expect(sheet.getByRole('status')).toHaveTextContent(
-      '이 브라우저에서는 공유 메뉴를 열 수 없어요',
+    // jsdom에는 클립보드가 없다. 조용히 끝내지 않고 알린다
+    await waitFor(() =>
+      expect(sheet.getByRole('status')).toHaveTextContent('이 브라우저에서는 공유할 수 없어요'),
     );
 
     fireEvent.click(sheet.getByRole('button', { name: '이미지로 저장' }));
@@ -364,6 +370,45 @@ describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
     renderApp([ROUTE_PATTERN.tasteReports]);
 
     expect(await screen.findByText('아직 인화된 취향 4컷이 없어요')).toBeInTheDocument();
+  });
+
+  /*
+   * 업무 -767. 한때 7.3의 `공유하기`는 공유 메뉴가 없는 브라우저에서 숨었고, 데스크톱 Chrome처럼
+   * 메뉴가 있다고 답하는 곳에서는 눌러도 아무 일이 없었다.
+   */
+  it('인화된 4컷이 없으면 공유 버튼이 잠겨 있다', async () => {
+    serveList({ items: [], current: null, preparing: true });
+    renderApp([ROUTE_PATTERN.tasteReports]);
+
+    await screen.findByText('취향 4컷을 인화하는 중이에요');
+    expect(screen.getByRole('button', { name: '공유하기' })).toBeDisabled();
+  });
+
+  // 인화 중인 반기는 목록에 한 장으로 그려지지만 공유할 4컷은 아니다(!539 리뷰)
+  it('인화 중인 반기만 있어도 공유 버튼이 잠겨 있다', async () => {
+    serveList({ items: [], current: reportList.current, preparing: false });
+    renderApp([ROUTE_PATTERN.tasteReports]);
+
+    expect(await screen.findByText('인화 중')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '공유하기' })).toBeDisabled();
+  });
+
+  it('데스크톱에서 공유하면 주소를 복사하고 알린다', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+
+    try {
+      serveList(reportList);
+      renderApp([ROUTE_PATTERN.tasteReports]);
+
+      await screen.findByRole('heading', { name: '2025' });
+      fireEvent.click(screen.getByRole('button', { name: '공유하기' }));
+
+      expect(await screen.findByRole('status')).toHaveTextContent('취향 4컷 주소를 복사했어요');
+      expect(writeText).toHaveBeenCalledWith(window.location.href);
+    } finally {
+      Reflect.deleteProperty(navigator, 'clipboard');
+    }
   });
 
   it('만드는 중인 리포트를 주소로 열면 안내한다', async () => {
