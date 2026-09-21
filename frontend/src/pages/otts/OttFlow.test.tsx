@@ -228,6 +228,49 @@ describe('6.1 ⇢ EXT-01 · EXT-03 ⇢ 6.1', () => {
   });
 });
 
+/*
+ * 업무 -771. EXT-01은 `OTT 서비스 5개를 분석해요`라고 하는데 계약은 추천 0편인 OTT를 결과에서
+ * 뺀다(API-068). 한때 빠진 OTT를 말없이 지나가 분석 대상과 결과 수가 어긋나 보였다.
+ */
+describe('EXT-03 결과에서 빠진 OTT', () => {
+  it('추천 0편이라 빠진 OTT를 목록 아래에 적는다', async () => {
+    renderApp([ROUTE_PATTERN.ottResult]);
+
+    await screen.findByRole('region', { name: '1위 넷플릭스' });
+    const omitted = mockOtts
+      .filter((ott) => ott !== NETFLIX && ott !== TVING)
+      .map((ott) => ott.name)
+      .join(' · ');
+
+    expect(
+      await screen.findByText(`${omitted}에는 아직 추천할 영화가 없어 순위에서 뺐어요`),
+    ).toBeInTheDocument();
+  });
+
+  // 기준정보를 못 받으면 빠진 것을 알 수 없다. 그 줄만 없고 결과는 그대로다(!542 리뷰)
+  it('기준정보를 받지 못하면 빠진 OTT 줄만 없고 결과는 그대로 보인다', async () => {
+    vi.mocked(getOtts).mockRejectedValue(new Error('network'));
+    renderApp([ROUTE_PATTERN.ottResult]);
+
+    expect(await screen.findByRole('region', { name: '1위 넷플릭스' })).toBeInTheDocument();
+    await waitFor(() => expect(getOtts).toHaveBeenCalled());
+
+    expect(screen.getByText('티빙')).toBeInTheDocument();
+    expect(screen.getByText('콘텐츠 취향 일치도 기준 · 가격과 무관해요')).toBeInTheDocument();
+    expect(screen.queryByText(/순위에서 뺐어요/)).not.toBeInTheDocument();
+  });
+
+  it('모든 OTT가 결과에 있으면 적지 않는다', async () => {
+    vi.mocked(getOtts).mockResolvedValue([NETFLIX, TVING]);
+    renderApp([ROUTE_PATTERN.ottResult]);
+
+    await screen.findByRole('region', { name: '1위 넷플릭스' });
+    await waitFor(() => expect(getOtts).toHaveBeenCalled());
+
+    expect(screen.queryByText(/순위에서 뺐어요/)).not.toBeInTheDocument();
+  });
+});
+
 describe('EXT-02 ⇢ EXT-05', () => {
   /*
    * 계약은 현재 Candidate가 있으면 취향 입력이 0건이어도 `insufficientData: false`를 준다.

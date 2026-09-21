@@ -245,6 +245,45 @@ function renderLoginFrom(from: unknown) {
   );
 }
 
+/*
+ * 업무 -771. 한때 로그인한 채로 `/login`에 들어와도 로그인 화면이 그대로 떴다. 로그인 뒤와
+ * 같은 규칙으로 앱에 보낸다.
+ */
+describe('이미 로그인한 사람이 연 로그인 화면', () => {
+  it('취향 설정을 마쳤으면 필름으로 보낸다', async () => {
+    vi.mocked(restoreSession).mockResolvedValue(ACTIVE_USER);
+    renderLogin();
+
+    await waitFor(() => expect(location()).toBe('/film'));
+  });
+
+  it('취향 설정을 마치지 않았으면 초기 취향 설정으로 보낸다', async () => {
+    vi.mocked(restoreSession).mockResolvedValue(NEW_USER);
+    renderLogin();
+
+    await waitFor(() => expect(location()).toBe('/onboarding/taste'));
+  });
+
+  it('가려던 주소가 있으면 그리로 보낸다', async () => {
+    vi.mocked(restoreSession).mockResolvedValue(ACTIVE_USER);
+    renderLoginFrom('/my?tab=unrated');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('full-location').textContent).toBe('/my?tab=unrated');
+    });
+  });
+
+  // 로그인 직후와 같은 우선순위다 — 가려던 화면들이 온보딩 완료를 전제한다(!542 리뷰)
+  it('취향 설정을 마치지 않았으면 가려던 주소보다 초기 취향 설정이 먼저다', async () => {
+    vi.mocked(restoreSession).mockResolvedValue(NEW_USER);
+    renderLoginFrom('/my?tab=unrated');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('full-location').textContent).toBe('/onboarding/taste');
+    });
+  });
+});
+
 describe('보호 라우트에서 온 로그인', () => {
   it('로그인이 끝나면 가려던 주소로 돌아간다', async () => {
     vi.mocked(login).mockResolvedValue(ACTIVE_USER);

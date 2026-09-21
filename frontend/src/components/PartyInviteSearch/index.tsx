@@ -11,6 +11,10 @@
  * 검색 결과에는 **`PRIVATE` 사용자도 나온다.** 가입 기본값이 `PRIVATE`라 빼면 닉네임
  * 초대가 사실상 막힌다(API-019 처리 규칙). `visibility`로 노출 수위를 정하라는 계약에
  * 따라 `비공개 프로필`만 덧붙이고 다른 정보는 보여주지 않는다.
+ *
+ * **Enter로도 검색한다**(업무 -771). 한때 `검색` 버튼만 먹었다. 폼으로 감싸지 않는 것은 5.3이
+ * 파티 만들기 전체를 담는 화면이라 제출이 섞일 수 있어서다 — 입력칸의 키만 받는다. 한글 조합을
+ * 끝내는 Enter(`isComposing`)는 검색이 아니다. 조합 중인 글자가 빠진 채 나간다.
  */
 import { useState } from 'react';
 import type { ReactNode } from 'react';
@@ -79,6 +83,13 @@ export default function PartyInviteSearch({
         error={error}
         disabled={disabled}
         action={{ label: '검색', onClick: search, disabled }}
+        enterKeyHint="search"
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            search();
+          }
+        }}
         onChange={(event) => {
           setKeyword(event.target.value);
           setError(undefined);
