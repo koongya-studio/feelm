@@ -108,7 +108,8 @@ public class WatchRecordController {
                     List<String> statuses,
             @Parameter(
                             description =
-                                    "true이면 확인 시각(24시간)에 도달했고 만료 시각(7일) 전인 LINK_CLICKED 기록만 조회",
+                                    "true이면 확인 시각(clickedAt과 같다)에 도달했고 만료 시각(7일) 전인"
+                                            + " LINK_CLICKED 기록만 조회",
                             schema = @Schema(type = "boolean", defaultValue = "false"))
                     @RequestParam(required = false)
                     String confirmDue,
@@ -132,7 +133,7 @@ public class WatchRecordController {
     @Operation(
             summary = "감상 확인 응답",
             description =
-                    "본인의 만료 전 LINK_CLICKED 기록에 응답합니다. 24시간 이전에도 응답할 수 있으며, "
+                    "본인의 만료 전 LINK_CLICKED 기록에 응답합니다. 클릭 직후부터 응답할 수 있으며, "
                             + "봤어요는 WATCHED_UNRATED, 안 봤어요는 EXPIRED로 전이합니다. "
                             + "평가 삭제 후 WATCHED_UNRATED 기록은 클릭 기한이 지나도 안 봤어요로 취소할 수 있습니다.")
     @ApiResponses({

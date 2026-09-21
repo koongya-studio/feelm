@@ -2,6 +2,7 @@ package com.feelm.backend.domain.watch;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -138,8 +139,7 @@ class WatchApiContractTest extends SharedPostgresContractTest {
         assertThat(response.path("movieId").asLong()).isEqualTo(movieId);
         assertThat(response.path("status").asText()).isEqualTo("LINK_CLICKED");
         assertThat(clickedAt).isBetween(before, after);
-        assertThat(response.path("confirmDueAt").asText())
-                .isEqualTo(clickedAt.plusSeconds(DAY).toString());
+        assertThat(response.path("confirmDueAt").asText()).isEqualTo(clickedAt.toString());
         assertThat(response.path("expiresAt").asText())
                 .isEqualTo(clickedAt.plusSeconds(7 * DAY).toString());
 
@@ -149,7 +149,7 @@ class WatchApiContractTest extends SharedPostgresContractTest {
         assertThat(stored.ottId()).isEqualTo(ottId);
         assertThat(stored.status()).isEqualTo("LINK_CLICKED");
         assertThat(stored.clickedAt()).isEqualTo(clickedAt);
-        assertThat(stored.confirmDueAt()).isEqualTo(clickedAt.plusSeconds(DAY));
+        assertThat(stored.confirmDueAt()).isEqualTo(clickedAt);
         assertThat(stored.expiresAt()).isEqualTo(clickedAt.plusSeconds(7 * DAY));
         assertThat(activeRows(userId, movieId)).isEqualTo(1);
         assertEvent(onlyEvent(), userId, movieId, ottId, watchRecordId);
@@ -162,6 +162,40 @@ class WatchApiContractTest extends SharedPostgresContractTest {
                                 .param("user", userId)
                                 .param("record", watchRecordId)
                                 .param("due", offset(stored.confirmDueAt()))
+                                .param("expires", offset(stored.expiresAt()))
+                                .query(Long.class)
+                                .single())
+                .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("클릭 직후 감상 확인 목록과 인앱 알림에 지연 없이 노출된다")
+    void clickIsImmediatelyConfirmDueAndNotified() throws Exception {
+        long watchRecordId = click(movieId, ottId, userId, 201).path("watchRecordId").asLong();
+
+        JsonNode dueList =
+                objectMapper.readTree(
+                        mockMvc.perform(
+                                        get("/api/v1/watch-records")
+                                                .header("Authorization", bearer(userId))
+                                                .param("confirmDue", "true"))
+                                .andExpect(status().isOk())
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString(StandardCharsets.UTF_8));
+        List<Long> dueIds = new ArrayList<>();
+        dueList.path("items").forEach(item -> dueIds.add(item.path("watchRecordId").asLong()));
+
+        assertThat(dueIds).containsExactly(watchRecordId);
+        WatchRow stored = watch(watchRecordId);
+        assertThat(stored.confirmDueAt()).isEqualTo(stored.clickedAt());
+        assertThat(
+                        jdbc.sql(
+                                        "SELECT count(*) FROM notifications"
+                                                + " WHERE type='WATCH_CONFIRM' AND source_id=:record"
+                                                + " AND notified_at=:clicked AND expires_at=:expires")
+                                .param("record", watchRecordId)
+                                .param("clicked", offset(stored.clickedAt()))
                                 .param("expires", offset(stored.expiresAt()))
                                 .query(Long.class)
                                 .single())
@@ -225,7 +259,7 @@ class WatchApiContractTest extends SharedPostgresContractTest {
         WatchRow stored = watch(watchRecordId);
         assertThat(stored.ottId()).isEqualTo(otherOttId);
         assertThat(stored.clickedAt()).isEqualTo(refreshedAt);
-        assertThat(stored.confirmDueAt()).isEqualTo(refreshedAt.plusSeconds(DAY));
+        assertThat(stored.confirmDueAt()).isEqualTo(refreshedAt);
         assertThat(stored.expiresAt()).isEqualTo(refreshedAt.plusSeconds(7 * DAY));
         assertThat(watchRows(userId, movieId)).isEqualTo(1);
         List<EventRow> events = events();

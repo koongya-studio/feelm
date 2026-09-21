@@ -214,8 +214,8 @@ class WatchRecordApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("confirmDue는 정확한 24시간 도달·7일 미도달 LINK_CLICKED만 반환한다")
-    void confirmDueUsesExactOneAndSevenDayBoundaries() {
+    @DisplayName("confirmDue는 확인 시각 도달·7일 미도달 LINK_CLICKED만 반환한다")
+    void confirmDueUsesExactConfirmAndSevenDayBoundaries() {
         Instant now = Instant.parse("2026-09-15T01:23:45.123456Z");
         long dueExactly =
                 insertDistinctWatch(

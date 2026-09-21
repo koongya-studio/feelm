@@ -30,7 +30,7 @@ public record WatchRecordItemResponse(
                         requiredMode = Schema.RequiredMode.REQUIRED)
                 Instant clickedAt,
         @Schema(
-                        description = "감상 확인 노출 시각(UTC, clickedAt + 24시간)",
+                        description = "감상 확인 노출 시각(UTC, clickedAt과 같다)",
                         nullable = true,
                         requiredMode = Schema.RequiredMode.REQUIRED)
                 Instant confirmDueAt,
