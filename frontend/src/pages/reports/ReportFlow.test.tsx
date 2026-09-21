@@ -4,8 +4,10 @@
  * 같은 리포트를 두 길로 본다. 필름 쪽(3.1 → 3.3 → 3.4 ⇢ 3.1)과 MY 쪽(7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3)이다.
  * 둘 다 같은 상세 화면을 쓰므로 **`저장`이 어디로 돌아가는지**가 갈리는 자리다.
  *
- * 3.3은 들어오는 화살표가 없어 규칙을 정했다 — 안 본 리포트가 있으면 3.1의 버튼이 3.3으로
- * 간다. 홈을 없애면서(업무 -461) 그 출발점이 2.1에서 3.1로 옮겨왔다.
+ * 3.3은 들어오는 화살표가 없어 규칙을 정했다 — 아직 뽑지 않은 리포트가 있으면 3.1의 버튼이
+ * 3.3으로 간다. 홈을 없애면서(업무 -461) 그 출발점이 2.1에서 3.1로 옮겨왔다.
+ *
+ * 목록 · 상세 · 첫 발급은 실제 API다(업무 -558). 응답은 `test/reports.ts`에서 온다.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -21,6 +23,14 @@ import { resetSessionStore } from '../../mocks/sessionStore';
 import { mockMyProfileView } from '../../mocks/publicProfiles';
 import { mockMyProfile } from '../../mocks/user';
 import { ROUTE_PATTERN } from '../../routes/paths';
+import {
+  reportDetails,
+  reportList,
+  reportListAfterIssue,
+  reportListBeforeIssue,
+} from '../../test/reports';
+import { ApiError } from '../../api/apiError';
+import type { ReportList } from '../../types/report';
 import type { FrameList } from '../../types/taste';
 
 /*
@@ -48,6 +58,27 @@ vi.mock('../../api/taste', async (importOriginal) => ({
 
 const { getMyFrames, getPopcornBucket } = await import('../../api/taste');
 
+/*
+ * 리포트는 실제 API다(API-059 · 060 · 080). 화면 흐름만 보는 파일이므로 HTTP 대신 도메인
+ * 함수를 가로챈다. 계약 경로 · 본문과 `getLatestReadyReport`의 발급 판정은
+ * `api/reports.test.ts`가 응답으로 고정한다.
+ */
+vi.mock('../../api/reports', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../api/reports')>()),
+  getLatestReadyReport: vi.fn(),
+  getMyReports: vi.fn(),
+  getReportDetail: vi.fn(),
+  issueReport: vi.fn(),
+}));
+
+const { getLatestReadyReport, getMyReports, getReportDetail, issueReport } =
+  await import('../../api/reports');
+
+/** 7.3 목록이 읽는 API-059 응답을 바꿔 끼운다 */
+function serveList(list: ReportList) {
+  vi.mocked(getMyReports).mockResolvedValue(list);
+}
+
 /** 3.1의 본문이 나오려면 프레임이 하나는 있어야 한다. 0개면 빈 상태 화면이다 */
 const frames: FrameList = {
   totalCount: 1,
@@ -70,6 +101,31 @@ beforeEach(() => {
   vi.mocked(getMyProfileView).mockReset().mockResolvedValue(mockMyProfileView);
   vi.mocked(getMyFrames).mockReset().mockResolvedValue(frames);
   vi.mocked(getPopcornBucket).mockReset().mockResolvedValue(mockPopcornBucket);
+
+  vi.mocked(getMyReports).mockReset();
+  serveList(reportListBeforeIssue);
+  /*
+   * 3.1의 버튼은 `getLatestReadyReport`가 가른다. 이 시험은 두 상태를 직접 세우고, 발급
+   * 시각으로 상태를 가르는 규칙 자체는 `api/reports.test.ts`가 고정한다.
+   */
+  vi.mocked(getLatestReadyReport)
+    .mockReset()
+    .mockResolvedValue({ reportId: 301, needsIntro: true });
+  vi.mocked(issueReport)
+    .mockReset()
+    .mockImplementation((reportId: number) =>
+      Promise.resolve({ reportId, issuedAt: '2026-07-01T00:00:14Z' }),
+    );
+  vi.mocked(getReportDetail)
+    .mockReset()
+    .mockImplementation((reportId: number) => {
+      const detail = reportDetails[reportId];
+
+      // 아직 만드는 중인 반기는 상세가 409다(API-060)
+      return detail
+        ? Promise.resolve(detail)
+        : Promise.reject(new ApiError(409, 'REPORT_GENERATING', '리포트를 만드는 중입니다.'));
+    });
 });
 
 function LocationProbe() {
@@ -122,7 +178,7 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
     expect(location()).toBe('/film');
   });
 
-  it('상세에는 계약 밖의 값까지 와이어프레임대로 나온다', async () => {
+  it('상세에 국가 비율과 지난 반기 비교가 나오고, 키워드 칸은 숨는다', async () => {
     renderApp(['/reports/301']);
 
     expect(await screen.findByRole('progressbar', { name: '한국' })).toHaveAttribute(
@@ -131,10 +187,64 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
     );
     // 4컷의 감독 칸과 감독 목록에 한 번씩
     expect(screen.getAllByText('웨스 앤더슨')).toHaveLength(2);
-    expect(screen.getByText('계획형 캐릭터 영화 12편에 ★4 이상')).toBeInTheDocument();
     expect(screen.getByText('+4% 신규')).toBeInTheDocument();
     expect(screen.getByText('−6%')).toBeInTheDocument();
+    // 취향 키워드는 계약이 빈 배열을 주는 후속 범위다(API-060)
+    expect(screen.queryByText('취향 키워드')).toBeNull();
   });
+
+  it('캐릭터가 없는 리포트는 설명을 숨기고 4컷의 04 칸만 준비 중으로 둔다', async () => {
+    // 선정 기준이 정해질 때까지 characterCard · fourCut.character가 null로 온다(업무 -618)
+    renderApp(['/reports/301']);
+
+    expect(await screen.findByText('04 캐릭터')).toBeInTheDocument();
+    expect(screen.getByText('준비 중')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '캐릭터' })).toBeNull();
+    // 나머지 칸과 상세는 그대로 그린다
+    expect(screen.getByText('01 장르')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '감독' })).toBeInTheDocument();
+  });
+
+  /*
+   * API-080 실패는 성공으로 처리하지 않는다(계약 처리 규칙). 3.3에 머물러 문구를 보이고
+   * 같은 버튼이 `다시 시도`가 된다. 오류마다 문구가 다르다.
+   */
+  it.each([
+    [
+      '아직 만드는 중',
+      new ApiError(409, 'REPORT_GENERATING', '리포트를 만드는 중입니다.'),
+      '리포트를 아직 만드는 중이에요. 잠시 후 다시 시도해 주세요.',
+    ],
+    [
+      '발급 창이 지남',
+      new ApiError(409, 'CONFLICT', '발급할 수 없습니다.'),
+      '지금은 이 리포트를 뽑을 수 없어요. 취향 4컷 목록에서 확인해 주세요.',
+    ],
+    [
+      '네트워크 오류',
+      new ApiError(0, 'NETWORK_ERROR', '네트워크 오류'),
+      '발급을 기록하지 못했어요. 잠시 후 다시 시도해 주세요.',
+    ],
+  ])(
+    '발급 기록이 실패하면(%s) 넘어가지 않고 안내와 다시 시도를 보인다',
+    async (_, error, message) => {
+      vi.mocked(issueReport).mockRejectedValueOnce(error);
+      renderApp(['/reports/301/new']);
+
+      fireEvent.click(await screen.findByRole('button', { name: '리포트 보기' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(message);
+      expect(location()).toBe('/reports/301/new');
+
+      // 같은 자리에서 다시 누르면 이번엔 기록되어 3.4로 간다
+      const retry = screen.getByRole('button', { name: '다시 시도' });
+      expect(retry).toBeEnabled();
+      fireEvent.click(retry);
+
+      await waitFor(() => expect(location()).toBe('/reports/301'));
+      expect(issueReport).toHaveBeenCalledTimes(2);
+    },
+  );
 });
 
 describe('3.4 → 3.5', () => {
@@ -187,6 +297,8 @@ describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
    * 이름만 바뀌었고 목적지는 그대로다.
    */
   it('MY에서 목록으로 가서 상세를 열고, 저장하면 목록으로 돌아온다', async () => {
+    // 인화 중인 반기는 `items`가 아니라 `current`로 온다(API-059)
+    serveList(reportList);
     renderApp([ROUTE_PATTERN.my]);
 
     fireEvent.click(await screen.findByRole('link', { name: '4컷 리포트' }));
@@ -218,8 +330,12 @@ describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '리포트 보기' }));
     await waitFor(() => expect(location()).toBe('/reports/301'));
+    expect(issueReport).toHaveBeenCalledWith(301);
     first.unmount();
 
+    // 발급을 기록한 뒤에는 `current.issuedAt`이 차서 3.1이 목록으로 보낸다
+    serveList(reportListAfterIssue);
+    vi.mocked(getLatestReadyReport).mockResolvedValue(null);
     renderApp([ROUTE_PATTERN.film]);
 
     fireEvent.click(await screen.findByRole('button', { name: '취향 리포트 보기' }));
@@ -232,6 +348,22 @@ describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
 
     await screen.findByRole('heading', { name: '2025 상반기 취향 리포트' });
     expect(screen.queryByText('지난 반기와 비교')).toBeNull();
+  });
+
+  it('최신 반기를 준비하는 중이고 공개된 리포트가 없으면 인화 중이라고 알린다', async () => {
+    // API-059 `preparing`. 첫 반기라 목록이 비어 있다
+    serveList({ items: [], current: null, preparing: true });
+    renderApp([ROUTE_PATTERN.tasteReports]);
+
+    expect(await screen.findByText('취향 4컷을 인화하는 중이에요')).toBeInTheDocument();
+    expect(screen.getByText('반기 집계가 끝나면 알려 드려요')).toBeInTheDocument();
+  });
+
+  it('준비 중도 아니고 리포트도 없으면 반기마다 인화한다고 알린다', async () => {
+    serveList({ items: [], current: null, preparing: false });
+    renderApp([ROUTE_PATTERN.tasteReports]);
+
+    expect(await screen.findByText('아직 인화된 취향 4컷이 없어요')).toBeInTheDocument();
   });
 
   it('만드는 중인 리포트를 주소로 열면 안내한다', async () => {

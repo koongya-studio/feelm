@@ -10,7 +10,7 @@ from feelm_consumer.content import ContentBundle
 from feelm_consumer.discovery import select_discovery_candidates
 from feelm_consumer.group_artifacts import GroupBundle
 from feelm_consumer.hybrid import build_profile, percentile_scores, score_candidate
-from feelm_consumer.profile import ProfileInput, fold_in, merge_inputs
+from feelm_consumer.profile import ProfileInput, fold_in
 from feelm_consumer.ranking import RankedMovie, rank_candidates
 from feelm_consumer.results import build_results
 from feelm_consumer.xai import build_candidate_reasons
@@ -22,7 +22,6 @@ CANDIDATE_LIMIT = 500
 def calculate_user_results(
     bundle: ArtifactBundle,
     ratings: list[ProfileInput],
-    onboarding: list[ProfileInput],
     candidate_version: int | None = None,
     *,
     content: ContentBundle | None = None,
@@ -49,13 +48,12 @@ def calculate_user_results(
     with no usable signal.
     """
     inverse_mapping = {movielens_id: service_id for service_id, movielens_id in bundle.service_to_movielens.items()}
-    merged_inputs = merge_inputs(ratings, onboarding)
     factor_inputs = [
         ProfileInput(bundle.service_to_movielens[item.movie_id], item.score, item.source)
-        for item in merged_inputs
+        for item in ratings
         if item.movie_id in bundle.service_to_movielens
     ]
-    unmapped_input_count = len(merged_inputs) - len(factor_inputs)
+    unmapped_input_count = len(ratings) - len(factor_inputs)
     if unmapped_input_count:
         LOG.warning("foldin_input_not_in_publishable_mapping count=%s", unmapped_input_count)
     folded = fold_in(bundle.factors, factor_inputs, bundle.reg_param)
@@ -65,7 +63,7 @@ def calculate_user_results(
         # signal", so it must stay loud instead of being skipped silently.
         raise ValueError("fold-in failed despite factor-backed input")
     if folded is None:
-        LOG.warning("foldin_no_factor_backed_input merged_input_count=%s", len(merged_inputs))
+        LOG.warning("foldin_no_factor_backed_input rating_count=%s", len(ratings))
     # The candidate limit applies to the service-publishable population, not to
     # every ALS factor.  Artifact factors intentionally include unmapped items.
     service_factors = {
@@ -86,8 +84,6 @@ def calculate_user_results(
                 bundle,
                 ranked_population,
                 ratings,
-                onboarding,
-                merged_inputs,
                 [],
                 0,
                 groups=groups,
@@ -101,8 +97,6 @@ def calculate_user_results(
             bundle,
             ranked_population,
             ratings,
-            onboarding,
-            merged_inputs,
             folded.vector.tolist(),
             folded.factor_backed_input_count,
             groups=groups,
@@ -114,12 +108,12 @@ def calculate_user_results(
     als_scores: dict[int, float] = {}
     if folded is not None:
         als_scores = {service_id: float(folded.vector @ factor) for service_id, factor in service_factors.items()}
-    content_scores = _content_scores(content, ratings, onboarding)
+    content_scores = _content_scores(content, ratings)
     if not als_scores and not content_scores:
         ranked_population = _tie_fallback_candidates(service_factors, content)
         LOG.warning(
-            "candidate_tie_fallback reason=no_component_profile merged_input_count=%s candidates=%s",
-            len(merged_inputs),
+            "candidate_tie_fallback reason=no_component_profile rating_count=%s candidates=%s",
+            len(ratings),
             len(ranked_population),
         )
         if not ranked_population:
@@ -128,8 +122,6 @@ def calculate_user_results(
             bundle,
             ranked_population,
             ratings,
-            onboarding,
-            merged_inputs,
             [],
             0,
             groups=groups,
@@ -150,8 +142,6 @@ def calculate_user_results(
         bundle,
         ranked_population,
         ratings,
-        onboarding,
-        merged_inputs,
         folded.vector.tolist() if folded is not None else [],
         folded.factor_backed_input_count if folded is not None else 0,
         groups=groups,
@@ -165,8 +155,6 @@ def _build_ranked_results(
     bundle: ArtifactBundle,
     ranked_population: list[RankedMovie],
     ratings: list[ProfileInput],
-    onboarding: list[ProfileInput],
-    merged_inputs: list[ProfileInput],
     vector: list[float],
     factor_backed_input_count: int,
     *,
@@ -182,7 +170,7 @@ def _build_ranked_results(
     if len(taste) < CANDIDATE_LIMIT:
         LOG.warning("foldin_candidate_shortage available=%s requested=500", len(taste))
 
-    explanation_inputs = merged_inputs if reason_inputs is None else reason_inputs
+    explanation_inputs = ratings if reason_inputs is None else reason_inputs
     discovery: list[RankedMovie] = []
     discovery_reasons = {}
     if groups is not None and discovery_popularity is not None:
@@ -190,7 +178,6 @@ def _build_ranked_results(
             groups,
             ranked_population,
             ratings,
-            onboarding,
             popularity_ranking=discovery_popularity,
             watched_movie_ids=watched_movie_ids,
             dismissed_movie_ids=dismissed_movie_ids,
@@ -221,7 +208,6 @@ def _build_ranked_results(
 def _content_scores(
     content: ContentBundle,
     ratings: list[ProfileInput],
-    onboarding: list[ProfileInput],
 ) -> dict[int, float]:
     """Score every movie with a content vector against the user's content profile."""
     rows: list[int] = []
@@ -232,10 +218,6 @@ def _content_scores(
             rows.append(row)
             values.append(item.score)
     profile, reason = build_profile(content, rows, values)
-    if profile is None:
-        profile = _onboarding_content_direction(content, ratings, onboarding)
-        if profile is not None:
-            reason = "ONBOARDING_DIRECTION"
     if profile is None:
         LOG.warning("content_profile_unavailable reason=%s supported_history=%s", reason, len(rows))
         return {}
@@ -261,30 +243,6 @@ def _content_scores(
             strict=True,
         )
     )
-
-
-def _onboarding_content_direction(
-    content: ContentBundle,
-    ratings: list[ProfileInput],
-    onboarding: list[ProfileInput],
-) -> np.ndarray | None:
-    rated_ids = {entry.movie_id for entry in ratings}
-    profile = np.zeros(content.vocabulary_size, dtype=np.float64)
-    supported_count = 0
-    for item in onboarding:
-        if item.movie_id in rated_ids:
-            continue
-        row = content.row_index(item.movie_id)
-        if row is None or not content.supported[row]:
-            continue
-        indices, values = content.nonzeros(row)
-        sign = 1.0 if item.score >= 3.5 else -1.0
-        profile[indices] += sign * values
-        supported_count += 1
-    norm = float(np.linalg.norm(profile))
-    if supported_count == 0 or not np.isfinite(norm) or norm <= 1e-8:
-        return None
-    return profile / norm
 
 
 def _hybrid_candidates(

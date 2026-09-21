@@ -274,7 +274,18 @@
 }
 
 .actions {
+  display: flex;
+  flex-direction: column;
   margin-top: auto;
+  gap: var(--space-3);
+}
+
+/* 발급을 기록하지 못했을 때. 버건디 벽 위라 옅은 글자로 둔다 */
+.failure {
+  color: var(--color-on-dark-muted);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  text-align: center;
 }
 
 /* 버건디 벽 위의 주 동작. 검정 알약은 어두운 벽에 묻혀 흰 알약으로 뒤집는다 */

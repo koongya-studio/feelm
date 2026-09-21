@@ -65,6 +65,45 @@ class DistributedRuntimeTest(unittest.TestCase):
         self.assertNotIn("down", command)
         self.assertNotIn("-v", command)
 
+    def test_service_compose_uses_running_backend_image_when_not_explicit(self):
+        environment = {}
+        fake = FakeRunner()
+
+        runtime.ensure_service_backend_image("service", environment, fake)
+
+        self.assertEqual(environment["BACKEND_IMAGE"], "feelm-spark:previous")
+        self.assertTrue(any(
+            command[-1] == "feelm-backend" for command, _ in fake.commands
+        ))
+
+    def test_service_compose_preserves_explicit_backend_image(self):
+        environment = {"BACKEND_IMAGE": "registry/backend:explicit"}
+        fake = FakeRunner()
+
+        runtime.ensure_service_backend_image("service", environment, fake)
+
+        self.assertEqual(environment["BACKEND_IMAGE"], "registry/backend:explicit")
+        self.assertEqual(fake.commands, [])
+
+    def test_service_compose_rejects_missing_running_backend_image(self):
+        environment = {}
+        fake = FakeRunner()
+        fake.run = lambda *args, **kwargs: (_ for _ in ()).throw(
+            runtime.DeploymentError("missing")
+        )
+
+        with self.assertRaisesRegex(runtime.DeploymentError, "BACKEND_IMAGE is missing"):
+            runtime.ensure_service_backend_image("service", environment, fake)
+
+    def test_distributed_compose_does_not_resolve_backend_image(self):
+        environment = {}
+        fake = FakeRunner()
+
+        runtime.ensure_service_backend_image("distributed", environment, fake)
+
+        self.assertEqual(environment, {})
+        self.assertEqual(fake.commands, [])
+
     def test_distributed_hdfs_uses_separate_namenode_and_datanode_batches(self):
         services = ("hdfs-namenode", "hdfs-datanode-2")
         self.assertEqual(

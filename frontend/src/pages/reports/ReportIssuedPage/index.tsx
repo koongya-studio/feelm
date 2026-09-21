@@ -6,10 +6,12 @@
  * 요소는 와이어프레임 그대로다 — `반기 취향 리포트` · `2026년 상반기 취향 필름을 인화했어요`,
  * 인화기에서 나오는 4컷(한 칸에 하나씩), 요약 세 줄, `리포트 보기`.
  *
- * **들어오는 화살표가 이동표에 없다.** 2.1 `취향 리포트 보기`가 아직 이 화면을 보지 않은
- * 리포트면 여기를 거치게 했다(`api/reports.ts` `getLatestReadyReport`, 업무 -308).
- * `리포트 보기`를 누르면 본 것으로 남기고 3.4로 **바꿔 끼운다** — 뒤로 가기가 이 장면으로
- * 돌아오면 같은 발급을 두 번 보게 된다.
+ * **들어오는 화살표가 이동표에 없다.** 2.1 `취향 리포트 보기`가 아직 발급되지 않은 리포트면
+ * 여기를 거치게 했다(`api/reports.ts` `getLatestReadyReport`, 업무 -308).
+ * `리포트 보기`를 누르면 **API-080으로 첫 발급을 기록한 뒤** 3.4로 **바꿔 끼운다** — 뒤로 가기가
+ * 이 장면으로 돌아오면 같은 발급을 두 번 보게 된다. 기록에 실패하면 넘어가지 않고 그 자리에서
+ * 다시 시도한다(계약 처리 규칙). 재요청은 처음 기록한 시각을 그대로 주므로 여러 번 눌러도
+ * 발급 시각이 밀리지 않는다.
  *
  * **버건디 벽 위의 4컷 인화기** (팀 결정 2026-09-14 · 사용자 시안 2026-09-15, S15P21E106-321).
  * - 인화기는 받은 사진(`4컷리포트_기계.png`)을 그대로 쓴다. 4컷 인화지가 아래 롤러 밑에서
@@ -29,25 +31,29 @@ import printerArt from '../../../assets/reports/report-printer.webp';
 import Button from '../../../components/Button';
 import ReportFourCut from '../../../components/ReportFourCut';
 import StatusView from '../../../components/StatusView';
-import { getReportDetail, markReportIntroSeen } from '../../../api/reports';
+import { getReportDetail, issueReport } from '../../../api/reports';
+import { isApiError } from '../../../api/apiError';
 import { getMyProfile } from '../../../api/users';
 import { path } from '../../../routes/paths';
 import { formatHalf } from '../../../utils/report';
 import { useReportWall } from './useReportWall';
 import styles from './ReportIssuedPage.module.css';
-import type { ReportDetailView } from '../../../types/unspecified';
+import type { ReportDetail } from '../../../types/report';
 
 export default function ReportIssuedPage() {
   const navigate = useNavigate();
   const { reportId } = useParams();
   const id = Number(reportId);
 
-  const [report, setReport] = useState<ReportDetailView | null>(null);
+  const [report, setReport] = useState<ReportDetail | null>(null);
   const [nickname, setNickname] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
   /** 인화지가 나오는 중인지. 움직임 줄이기면 처음부터 다 나온 모습이다 */
   const [printing, setPrinting] = useState(() => !prefersReducedMotion());
+  /** 발급을 기록하는 동안 버튼을 잠근다 */
+  const [issuing, setIssuing] = useState(false);
+  const [issueFailure, setIssueFailure] = useState<string | null>(null);
 
   // 불러오지 못한 상태는 인화기가 없어 공통 벽이다
   useReportWall(!failed);
@@ -87,7 +93,18 @@ export default function ReportIssuedPage() {
   }, []);
 
   async function openReport() {
-    await markReportIntroSeen(id);
+    setIssuing(true);
+    setIssueFailure(null);
+
+    try {
+      await issueReport(id);
+    } catch (error) {
+      setIssuing(false);
+      setIssueFailure(issueMessage(error));
+
+      return;
+    }
+
     void navigate(path.report(id), { replace: true });
   }
 
@@ -168,10 +185,32 @@ export default function ReportIssuedPage() {
       </ul>
 
       <div className={styles.actions}>
-        <Button onClick={() => void openReport()}>리포트 보기</Button>
+        {issueFailure ? (
+          <p className={styles.failure} role="alert">
+            {issueFailure}
+          </p>
+        ) : null}
+        <Button disabled={issuing} onClick={() => void openReport()}>
+          {issueFailure ? '다시 시도' : '리포트 보기'}
+        </Button>
       </div>
     </div>
   );
+}
+
+/** API-080 실패 안내. 계약의 오류는 404 · 409 둘뿐이라 나머지는 한 문구로 묶는다 */
+function issueMessage(error: unknown): string {
+  if (isApiError(error)) {
+    if (error.code === 'REPORT_GENERATING') {
+      return '리포트를 아직 만드는 중이에요. 잠시 후 다시 시도해 주세요.';
+    }
+
+    if (error.status === 409) {
+      return '지금은 이 리포트를 뽑을 수 없어요. 취향 4컷 목록에서 확인해 주세요.';
+    }
+  }
+
+  return '발급을 기록하지 못했어요. 잠시 후 다시 시도해 주세요.';
 }
 
 function prefersReducedMotion(): boolean {

@@ -76,9 +76,9 @@ verify_running() {
     status="$(docker inspect "${container}" --format '{{.State.Status}}')"
     image="$(docker inspect "${container}" --format '{{.Config.Image}}')"
     revision="$(docker exec "${container}" cat /opt/feelm/pipeline/spark/.source-revision)"
-    [[ "${status}" == "running" ]] || { echo "Spark container is not running: ${container}" >&2; exit 1; }
-    [[ "${image}" == "${expected_image}" ]] || { echo "Spark image mismatch: ${container}" >&2; exit 1; }
-    [[ "${revision}" == "${expected_revision}" ]] || { echo "Spark revision mismatch: ${container}" >&2; exit 1; }
+    [[ "${status}" == "running" ]] || { echo "Spark container is not running: ${container}" >&2; return 1; }
+    [[ "${image}" == "${expected_image}" ]] || { echo "Spark image mismatch: ${container}" >&2; return 1; }
+    [[ "${revision}" == "${expected_revision}" ]] || { echo "Spark revision mismatch: ${container}" >&2; return 1; }
   done < <(containers_for_node)
 }
 

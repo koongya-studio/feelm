@@ -13,6 +13,7 @@ import com.feelm.backend.global.error.ErrorCode;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -82,7 +83,7 @@ public class ReportReadService {
                 content.characterCard(),
                 content.flavorChanges(),
                 row.createdAt(),
-                content.fourCut(),
+                fourCutWithGenreDisplayName(content),
                 content.genreShares(),
                 content.countryShares(),
                 content.eraShares(),
@@ -147,5 +148,34 @@ public class ReportReadService {
         } catch (JacksonException exception) {
             throw new IllegalStateException("Stored report content is invalid", exception);
         }
+    }
+
+    private ReportContent.FourCut fourCutWithGenreDisplayName(ReportContent content) {
+        ReportContent.FourCut fourCut = content.fourCut();
+        if (fourCut == null
+                || fourCut.genre() == null
+                || content.topGenres() == null
+                || content.topGenres().isEmpty()) {
+            return fourCut;
+        }
+
+        ReportContent.GenreCard genre = fourCut.genre();
+        if (genre.displayName() != null && !genre.displayName().isBlank()) {
+            return fourCut;
+        }
+
+        ReportContent.GenreRank representative = content.topGenres().getFirst();
+        if (!Objects.equals(genre.name(), representative.name())) {
+            return fourCut;
+        }
+        String displayName = ReportContentAssembler.genreDisplayName(representative.code());
+        if (displayName == null) {
+            return fourCut;
+        }
+        return new ReportContent.FourCut(
+                new ReportContent.GenreCard(genre.name(), displayName, genre.image()),
+                fourCut.director(),
+                fourCut.actor(),
+                fourCut.character());
     }
 }

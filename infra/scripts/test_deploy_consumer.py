@@ -36,10 +36,13 @@ class DeployConsumerTest(unittest.TestCase):
         self.deploy_state_file = self.root / "consumer-last-known-good"
         self.group_file = self.root / "consumer-id"
         self.events_file = self.root / "events"
+        self.composed_file = self.root / "composed"
         self.env_file = self.root / "infra.env"
         self.env_file.write_text(
             "CONSUMER_KAFKA_TOPIC=feelm.rating.v1\n"
-            "CONSUMER_KAFKA_GROUP_ID=feelm-foldin-consumer-v1\n",
+            "CONSUMER_KAFKA_GROUP_ID=feelm-foldin-consumer-v1\n"
+            "PARTY_CONSUMER_KAFKA_TOPIC=feelm.party-refresh.v1\n"
+            "PARTY_CONSUMER_KAFKA_GROUP_ID=feelm-party-consumer-v1\n",
             encoding="utf-8",
         )
         self._write_fake_docker()
@@ -62,13 +65,19 @@ class DeployConsumerTest(unittest.TestCase):
 
             if [[ "$1" == "inspect" ]]; then
               if [[ "$2" == "--format" && "$3" == *Config.Image* ]]; then
+                if [[ "$4" == "feelm-party-consumer" && "${MISSING_PARTY_BEFORE_UP:-0}" == "1" && ! -e "$DEPLOY_TEST_COMPOSED" ]]; then
+                  exit 1
+                fi
                 [[ -s "$DEPLOY_TEST_STATE" ]] || exit 1
                 cat "$DEPLOY_TEST_STATE"
                 exit 0
               fi
               if [[ "$2" == "--format" && "$3" == *State.Status* ]]; then
                 image="$(cat "$DEPLOY_TEST_STATE" 2>/dev/null || true)"
-                if [[ "$image" == "$DEPLOY_TEST_CANDIDATE" && "${FAIL_CANDIDATE_RUNTIME:-0}" == "1" ]]; then
+                container="$4"
+                if [[ "$image" == "$DEPLOY_TEST_CANDIDATE" && "$container" == "feelm-party-consumer" && "${FAIL_PARTY_RUNTIME:-0}" == "1" ]]; then
+                  printf 'exited 1\n'
+                elif [[ "$image" == "$DEPLOY_TEST_CANDIDATE" && "${FAIL_CANDIDATE_RUNTIME:-0}" == "1" ]]; then
                   printf 'exited 1\n'
                 elif [[ "$image" == "$DEPLOY_TEST_PREVIOUS" && "${FAIL_ROLLBACK_RUNTIME:-0}" == "1" ]]; then
                   printf 'exited 1\n'
@@ -108,6 +117,7 @@ class DeployConsumerTest(unittest.TestCase):
                 exit 1
               fi
               printf '%s' "$image" >"$DEPLOY_TEST_STATE"
+              : >"$DEPLOY_TEST_COMPOSED"
               if [[ "$image" == "$DEPLOY_TEST_CANDIDATE" ]]; then
                 printf 'candidate-id' >"$DEPLOY_TEST_GROUP"
               else
@@ -118,12 +128,18 @@ class DeployConsumerTest(unittest.TestCase):
 
             if [[ "$1 $2" == "exec feelm-kafka" ]]; then
               id="$(cat "$DEPLOY_TEST_GROUP" 2>/dev/null || true)"
-              if [[ "${FAIL_ASSIGNMENT:-0}" == "1" || -z "$id" ]]; then
+              group="${!#}"
+              if [[ "${FAIL_ASSIGNMENT:-0}" == "1" || "$group" == "feelm-party-consumer-v1" && "${FAIL_PARTY_ASSIGNMENT:-0}" == "1" || -z "$id" ]]; then
                 id='-'
+              fi
+              if [[ "$group" == "feelm-party-consumer-v1" ]]; then
+                topic="feelm.party-refresh.v1"
+              else
+                topic="feelm.rating.v1"
               fi
               cat <<EOF
 GROUP TOPIC PARTITION CURRENT-OFFSET LOG-END-OFFSET LAG CONSUMER-ID HOST CLIENT-ID
-feelm-foldin-consumer-v1 feelm.rating.v1 0 1 1 0 $id /host client
+$group $topic 0 1 1 0 $id /host client
 EOF
               exit 0
             fi
@@ -152,6 +168,7 @@ EOF
                 "DEPLOY_TEST_STATE": self._bash_path(self.state_file),
                 "DEPLOY_TEST_GROUP": self._bash_path(self.group_file),
                 "DEPLOY_TEST_EVENTS": self._bash_path(self.events_file),
+                "DEPLOY_TEST_COMPOSED": self._bash_path(self.composed_file),
                 "DEPLOY_TEST_CANDIDATE": self.candidate,
                 "DEPLOY_TEST_PREVIOUS": self.previous,
             }
@@ -199,9 +216,24 @@ EOF
         self.assertEqual(current, self.candidate)
         self.assertEqual(self.deploy_state_file.read_text(encoding="utf-8").strip(), self.candidate)
         self.assertIn("Consumer deployment completed", result.stdout)
-        self.assertIn("force-recreate consumer", events)
+        self.assertIn("force-recreate consumer party-consumer", events)
+        self.assertIn("--profile consumer --profile party-consumer", events)
+        self.assertIn("docker inspect --format {{.State.Status}} {{.RestartCount}} feelm-party-consumer", events)
+        self.assertIn("--group feelm-party-consumer-v1", events)
         self.assertIn(f"docker pull {self.candidate}", events)
         self.assert_no_compose_build(events)
+
+    def test_missing_party_consumer_is_reconciled_before_candidate_deployment(self) -> None:
+        result, current, events = self.run_deploy(MISSING_PARTY_BEFORE_UP=1)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(current, self.candidate)
+        self.assertEqual(events.count("force-recreate consumer party-consumer"), 2)
+        self.assertLess(
+            events.index("force-recreate consumer party-consumer"),
+            events.index(f"docker pull {self.candidate}"),
+        )
+        self.assertIn("reconciling before deployment", result.stderr)
 
     def test_compose_build_detection_ignores_runner_checkout_path(self) -> None:
         checkout = "/home/gitlab-runner/builds/runner/project"
@@ -257,11 +289,27 @@ EOF
         self.assertEqual(self.deploy_state_file.read_text(encoding="utf-8").strip(), self.previous)
         self.assertIn("runtime verification failed", result.stderr)
 
+    def test_party_runtime_failure_restores_both_consumers(self) -> None:
+        result, current, events = self.run_deploy(FAIL_PARTY_RUNTIME=1)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(current, self.previous)
+        self.assertGreaterEqual(events.count("force-recreate consumer party-consumer"), 2)
+        self.assertIn("runtime verification failed", result.stderr)
+
     def test_missing_kafka_assignment_restores_previous_image(self) -> None:
         result, current, _ = self.run_deploy(FAIL_ASSIGNMENT=1)
 
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(current, self.previous)
+        self.assertIn("runtime verification failed", result.stderr)
+
+    def test_missing_party_kafka_assignment_restores_previous_image(self) -> None:
+        result, current, events = self.run_deploy(FAIL_PARTY_ASSIGNMENT=1)
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(current, self.previous)
+        self.assertGreaterEqual(events.count("force-recreate consumer party-consumer"), 2)
         self.assertIn("runtime verification failed", result.stderr)
 
     def test_deploy_without_initialized_state_fails_before_mutation(self) -> None:
@@ -317,7 +365,7 @@ EOF
         self.assertEqual(self.state_file.read_text(encoding="utf-8"), self.previous)
         self.assertEqual(self.deploy_state_file.read_text(encoding="utf-8").strip(), self.previous)
         events = self.events_file.read_text(encoding="utf-8")
-        rollback_mutation = events.index("force-recreate consumer")
+        rollback_mutation = events.index("force-recreate consumer party-consumer")
         candidate_pull = events.index(f"docker pull {self.candidate}")
         self.assertLess(rollback_mutation, candidate_pull)
         self.assertIn("reconciling before deployment", result.stderr)
@@ -331,7 +379,7 @@ EOF
 
     def test_ci_commit_guard_wraps_the_compose_mutation(self) -> None:
         source = DEPLOY_SCRIPT.read_text(encoding="utf-8")
-        mutation = source.index('"${compose[@]}" up -d --no-deps --force-recreate consumer')
+        mutation = source.index('"${compose[@]}" up -d --no-deps --force-recreate "${services[@]}"')
         guards = [index for index in range(len(source)) if source.startswith("verify_current_commit", index)]
 
         self.assertGreaterEqual(len(guards), 3)

@@ -95,6 +95,10 @@ sudo -u gitlab-runner bash infra/scripts/deploy-spark-code.sh initialize \
 정리합니다. 중단된 pipeline의 pending은 다음 preflight가 새 후보를 pull하기 전에 먼저 복구합니다.
 알림은 성공, 후보 거부(운영 상태 유지), 자동 rollback 완료, 수동 복구 필요를 구분합니다.
 
+서비스 노드의 Compose 파일을 해석할 때 `BACKEND_IMAGE`가 호출 환경에 없으면 실행 중인
+`feelm-backend` 컨테이너의 이미지로 보완합니다. 두 방법 모두로 값을 확인할 수 없으면 Spark
+컨테이너를 변경하기 전에 배포를 중단합니다.
+
 두 main pipeline의 다단계 배포가 서로 끼어들지 않도록 첫 pipeline에서
 `distributed-runtime-spark` resource group이 생성된 직후 GitLab Resource Groups API로
 `process_mode=oldest_first`를 한 번 설정합니다. 이 설정을 확인하기 전에는 Spark 작업 코드 자동

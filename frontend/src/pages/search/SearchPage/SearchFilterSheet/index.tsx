@@ -19,6 +19,10 @@
  * 들어오고, 열린 동안 Tab · Shift+Tab은 시트 안에서만 돈다. 뒤 막(scrim)은 손가락으로 누르는
  * 자리라 Tab 순서와 보조기술에서 뺀다 — 같은 일을 `닫기`가 한다. 닫은 뒤 초점을 여는 버튼으로
  * 되돌리는 일은 여는 쪽(SearchPage)이 맡는다.
+ *
+ * **고르고 풀어도 칩 폭이 그대로다**(업무 -739). 고르면 체크가 서고 글자가 굵어지는데, 그만큼
+ * 칩이 넓어지면 뒤 칩들이 다음 줄로 밀려 줄 배치가 통째로 바뀌었다. 폭은 늘 고른 모양으로
+ * 잡아 두고, 고르지 않은 칩은 체크 자리를 양옆 여백으로 나눠 가진다(`.option`).
  */
 import { useEffect, useRef } from 'react';
 import Button from '../../../../components/Button';
@@ -132,7 +136,7 @@ export default function SearchFilterSheet({
                   onClick={() => onChange({ ...value, genre: toggle(value.genre, genre.code) })}
                 >
                   {value.genre.includes(genre.code) ? <OptionCheck /> : null}
-                  {genre.name}
+                  <OptionLabel text={genre.name} />
                 </button>
               ))}
             </div>
@@ -150,7 +154,7 @@ export default function SearchFilterSheet({
                   onClick={() => onChange({ ...value, year: bucket.id as YearBucketId })}
                 >
                   {value.year === bucket.id ? <OptionCheck /> : null}
-                  {bucket.label}
+                  <OptionLabel text={bucket.label} />
                 </button>
               ))}
             </div>
@@ -171,7 +175,7 @@ export default function SearchFilterSheet({
                 >
                   {value.ott.includes(ott.ottId) ? <OptionCheck /> : null}
                   <OttBadge code={ott.code} name={ott.name} size={24} radius={6} labelled={false} />
-                  {ott.name}
+                  <OptionLabel text={ott.name} />
                 </button>
               ))}
             </div>
@@ -189,6 +193,18 @@ export default function SearchFilterSheet({
         </footer>
       </div>
     </div>
+  );
+}
+
+/**
+ * 선택지 이름. 고르면 굵어지는 글자의 폭을 미리 잡아 둔다 — 굵은 글자를 보이지 않게 한 겹 더
+ * 깔아(`data-label`) 고르기 전후로 폭이 같다(업무 -739).
+ */
+function OptionLabel({ text }: { text: string }) {
+  return (
+    <span className={styles.label} data-label={text}>
+      {text}
+    </span>
   );
 }
 
