@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import errno
 import json
+import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
+from pathlib import Path
+from threading import Barrier
 
 import pytest
 
@@ -25,6 +30,17 @@ def _write(tmp_path):
         prior=[0.1] * 10,
         features=[{"tmdb_id": 10, "indices": [0, 1], "values": [0.5, 0.5]}],
     )
+
+
+def _claim_empty_target(root, writer_ready, target_claimed, writer_waiting):
+    import batch.content.artifacts as artifacts
+
+    parent = Path(root) / "content-artifacts"
+    assert writer_ready.wait(timeout=10)
+    with artifacts._publication_lock(parent):
+        (parent / "content-v1").mkdir()
+        target_claimed.set()
+        assert writer_waiting.wait(timeout=10)
 
 
 def test_artifact_roundtrip_and_exact_lineage(tmp_path):
@@ -168,7 +184,43 @@ def test_staging_reader_rejects_and_rename_failure_leaves_no_public_bundle(tmp_p
     assert not list((tmp_path / "rename" / "content-artifacts").glob(".content-v1.stage-*"))
 
 
-def test_same_version_race_keeps_one_complete_winner_and_allows_a_new_version(tmp_path):
+@pytest.mark.parametrize("collision_errno", [errno.EEXIST, errno.ENOTEMPTY])
+def test_rename_collision_errnos_are_normalized_without_deleting_winner(
+    tmp_path, monkeypatch, collision_errno
+):
+    import batch.content.artifacts as artifacts
+
+    target = tmp_path / "content-artifacts" / "content-v1"
+
+    def collide_with_winner(source, destination):
+        assert Path(source).is_dir()
+        assert Path(destination) == target
+        target.mkdir()
+        (target / "winner").write_text("preserve", encoding="utf-8")
+        raise OSError(collision_errno, "rename collision")
+
+    monkeypatch.setattr(artifacts.os, "rename", collide_with_winner)
+    with pytest.raises(FileExistsError, match="content artifact already exists"):
+        _write(tmp_path)
+    assert (target / "winner").read_text(encoding="utf-8") == "preserve"
+    assert not list(target.parent.glob(".content-v1.stage-*"))
+
+
+def test_same_version_race_keeps_one_complete_winner_and_allows_a_new_version(
+    tmp_path, monkeypatch
+):
+    import batch.content.artifacts as artifacts
+
+    original_lock = artifacts._publication_lock
+    publication_barrier = Barrier(2)
+
+    @contextmanager
+    def synchronized_lock(parent):
+        publication_barrier.wait(timeout=10)
+        with original_lock(parent):
+            yield
+
+    monkeypatch.setattr(artifacts, "_publication_lock", synchronized_lock)
     with ThreadPoolExecutor(max_workers=2) as executor:
         futures = [executor.submit(_write, tmp_path) for _ in range(2)]
         outcomes = []
@@ -181,6 +233,13 @@ def test_same_version_race_keeps_one_complete_winner_and_allows_a_new_version(tm
     assert len(outcomes) == 1
     assert len(failures) == 1
     assert outcomes[0].name == "content-v1"
+    assert load_content_artifact(outcomes[0])["manifest"]["version"] == "content-v1"
+    assert (outcomes[0] / "features.json").is_file()
+    assert (outcomes[0] / "manifest.json").is_file()
+    assert (outcomes[0] / "_SUCCESS").is_file()
+    assert not list(outcomes[0].parent.glob(".content-v1.stage-*"))
+
+    monkeypatch.setattr(artifacts, "_publication_lock", original_lock)
     with pytest.raises(FileExistsError):
         _write(tmp_path)
     location = write_content_artifact(
@@ -193,3 +252,82 @@ def test_same_version_race_keeps_one_complete_winner_and_allows_a_new_version(tm
         features=[{"tmdb_id": 10, "indices": [0], "values": [1.0]}],
     )
     assert location.name == "content-v2"
+
+
+def test_cross_process_empty_target_claim_is_preserved(tmp_path, monkeypatch):
+    import batch.content.artifacts as artifacts
+
+    context = multiprocessing.get_context("spawn")
+    writer_ready = context.Event()
+    target_claimed = context.Event()
+    writer_waiting = context.Event()
+    original_lock = artifacts._publication_lock
+
+    @contextmanager
+    def coordinated_lock(parent):
+        writer_ready.set()
+        assert target_claimed.wait(timeout=10)
+        writer_waiting.set()
+        with original_lock(parent):
+            yield
+
+    monkeypatch.setattr(artifacts, "_publication_lock", coordinated_lock)
+    process = context.Process(
+        target=_claim_empty_target,
+        args=(tmp_path, writer_ready, target_claimed, writer_waiting),
+    )
+    try:
+        process.start()
+        with pytest.raises(FileExistsError, match="content artifact already exists"):
+            _write(tmp_path)
+        process.join(timeout=20)
+        assert process.exitcode == 0
+        target = tmp_path / "content-artifacts" / "content-v1"
+        assert target.is_dir()
+        assert not list(target.iterdir())
+        assert not list(target.parent.glob(".content-v1.stage-*"))
+    finally:
+        if process.is_alive():
+            process.terminate()
+            process.join(timeout=10)
+
+
+def test_marker_failure_rolls_back_before_waiting_writer_retries(tmp_path, monkeypatch):
+    import batch.content.artifacts as artifacts
+
+    original_lock = artifacts._publication_lock
+    original_touch = artifacts.Path.touch
+    publication_barrier = Barrier(2)
+    marker_failures = 1
+
+    @contextmanager
+    def synchronized_lock(parent):
+        publication_barrier.wait(timeout=10)
+        with original_lock(parent):
+            yield
+
+    def fail_first_marker(path, *, exist_ok=False):
+        nonlocal marker_failures
+        if path.name == "_SUCCESS" and marker_failures:
+            marker_failures -= 1
+            raise OSError("marker failure")
+        return original_touch(path, exist_ok=exist_ok)
+
+    monkeypatch.setattr(artifacts, "_publication_lock", synchronized_lock)
+    monkeypatch.setattr(artifacts.Path, "touch", fail_first_marker)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(_write, tmp_path) for _ in range(2)]
+        outcomes = []
+        failures = []
+        for future in futures:
+            try:
+                outcomes.append(future.result())
+            except OSError as error:
+                failures.append(error)
+    assert len(outcomes) == 1
+    assert len(failures) == 1
+    assert str(failures[0]) == "marker failure"
+    location = outcomes[0]
+    assert load_content_artifact(location)["manifest"]["version"] == "content-v1"
+    assert (location / "_SUCCESS").is_file()
+    assert not list(location.parent.glob(".content-v1.stage-*"))

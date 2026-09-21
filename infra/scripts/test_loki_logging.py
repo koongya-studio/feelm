@@ -32,6 +32,20 @@ class LokiLoggingProvisioningTest(unittest.TestCase):
         self.assertIn("retention_enabled: true", config)
         self.assertIn("retention_period: 168h", config)
 
+    def test_alloy_storage_avoids_image_private_parent_without_relaxing_runtime(self):
+        compose = COMPOSE.read_text(encoding="utf-8")
+        alloy = compose.split("  alloy:\n", 1)[1].split("  prometheus:\n", 1)[0]
+        self.assertNotIn("/var/lib/alloy", alloy)
+        self.assertIn("--storage.path=/var/lib/feelm-alloy-data", alloy)
+        self.assertIn("target: /var/lib/feelm-alloy-data", alloy)
+        self.assertIn("source: alloy_data", alloy)
+        self.assertIn("nocopy: true", alloy)
+        self.assertIn('user: "0:0"', alloy)
+        self.assertIn("cap_drop: [ALL]", alloy)
+        self.assertNotIn("cap_add:", alloy)
+        self.assertIn("read_only: true", alloy)
+        self.assertIn("no-new-privileges:true", alloy)
+
     def test_alloy_collects_only_service_logs_and_redacts_before_write(self) -> None:
         config = ALLOY.read_text(encoding="utf-8")
         self.assertIn('regex         = "/feelm-(backend|frontend|nginx)"', config)

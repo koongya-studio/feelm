@@ -7,10 +7,13 @@ no-overwrite semantics testable without smuggling an HDFS URI into reports.
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import os
 import shutil
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from uuid import uuid4
 
@@ -43,7 +46,7 @@ def write_content_artifact(
     # future HDFS adapter can use ``content_artifact_uri`` directly; this
     # writer intentionally remains local-only.
     target = Path(content_artifact_uri(str(output_uri), version))
-    if target.exists():
+    if (target / SUCCESS).is_file():
         raise FileExistsError(f"content artifact already exists: {target}")
     _validate_features(features, vocabulary, prior)
     stage = target.parent / f".{version}.stage-{uuid4().hex}"
@@ -66,22 +69,70 @@ def write_content_artifact(
         # Staging is deliberately not public.  Its self-validation must not
         # weaken the reader's completion-marker gate.
         _load_content_artifact(stage, expected_version=version, require_success=False)
-        # os.rename is no-overwrite on a single local filesystem.  Recheck is
-        # retained for clear error reporting on races.
-        if target.exists():
-            raise FileExistsError(f"content artifact already exists: {target}")
-        os.rename(stage, target)
-        published = True
-        # A public reader rejects the short interval between rename and this
-        # final mutation.  Staging is never marked complete, so it cannot be
-        # mistaken for a published bundle by a concurrent reader.
-        (target / SUCCESS).touch(exist_ok=False)
+        # Serialize the final no-overwrite decision across local processes.
+        # POSIX rename may otherwise replace an empty destination directory.
+        with _publication_lock(target.parent):
+            if os.path.lexists(target):
+                raise FileExistsError(f"content artifact already exists: {target}")
+            try:
+                os.rename(stage, target)
+            except OSError as error:
+                if error.errno in {errno.EEXIST, errno.ENOTEMPTY} and os.path.lexists(target):
+                    raise FileExistsError(
+                        f"content artifact already exists: {target}"
+                    ) from error
+                raise
+            published = True
+            # A public reader rejects the short interval between rename and
+            # this final mutation. Staging is never marked complete, so it
+            # cannot be mistaken for a published bundle by a concurrent reader.
+            try:
+                (target / SUCCESS).touch(exist_ok=False)
+            except Exception:
+                shutil.rmtree(target, ignore_errors=True)
+                if not target.exists():
+                    published = False
+                raise
         return target
     except Exception:
         cleanup = target if published else stage
         if cleanup.exists():
             shutil.rmtree(cleanup, ignore_errors=True)
         raise
+
+
+@contextmanager
+def _publication_lock(parent: Path) -> Iterator[None]:
+    """Serialize final local publication across threads and processes."""
+    if os.name == "nt":
+        import msvcrt
+
+        lock_path = parent / ".content-artifact.publish.lock"
+        with lock_path.open("a+b") as lock_file:
+            lock_file.seek(0, os.SEEK_END)
+            if lock_file.tell() == 0:
+                lock_file.write(b"\0")
+                lock_file.flush()
+            lock_file.seek(0)
+            msvcrt.locking(lock_file.fileno(), msvcrt.LK_LOCK, 1)
+            try:
+                yield
+            finally:
+                lock_file.seek(0)
+                msvcrt.locking(lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+        return
+
+    import fcntl
+
+    flags = os.O_RDONLY
+    if hasattr(os, "O_DIRECTORY"):
+        flags |= os.O_DIRECTORY
+    parent_fd = os.open(parent, flags)
+    try:
+        fcntl.flock(parent_fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        os.close(parent_fd)
 
 
 def load_content_artifact(

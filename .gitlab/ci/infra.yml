@@ -78,6 +78,60 @@ deploy-monitoring:
         - infra/scripts/verify-monitoring-deployment.py
         - infra/scripts/test_verify_monitoring_deployment.py
 
+redeploy-current-main-monitoring:
+  stage: deploy
+  tags: [e106-shell]
+  needs: []
+  environment:
+    name: service
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py --branch main --pipeline-source web
+    - bash infra/scripts/redeploy-current-main.sh monitoring
+  after_script:
+    - /usr/bin/python3 -I -B infra/scripts/notify-deployment.py monitoring "$CI_JOB_STATUS"
+  resource_group: service-and-backend-cache
+  interruptible: false
+  timeout: 20m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "web"'
+      when: manual
+  allow_failure: false
+
+redeploy-current-main-spark-distributed:
+  stage: deploy
+  tags: [e106-distributed]
+  needs: []
+  environment:
+    name: distributed
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py --branch main --pipeline-source web
+    - bash infra/scripts/deploy-spark-code.sh redeploy distributed
+  resource_group: distributed-runtime-spark
+  interruptible: false
+  timeout: 20m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "web"'
+      when: manual
+  allow_failure: false
+
+redeploy-current-main-spark-service:
+  stage: deploy
+  tags: [e106-shell]
+  needs: [redeploy-current-main-spark-distributed]
+  environment:
+    name: service
+  script:
+    - /usr/bin/python3 -I -B infra/scripts/ci-deploy-current-commit.py --branch main --pipeline-source web
+    - bash infra/scripts/deploy-spark-code.sh redeploy service
+  after_script:
+    - /usr/bin/python3 -I -B infra/scripts/notify-deployment.py spark-code "$CI_JOB_STATUS"
+  resource_group: distributed-runtime-spark
+  interruptible: false
+  timeout: 20m
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "web"'
+  allow_failure: false
+
 deploy-distributed-observability:
   stage: deploy
   tags: [e106-distributed]

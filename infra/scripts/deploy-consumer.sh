@@ -79,7 +79,8 @@ write_last_known_good() {
 
 verify_current_commit() {
   if [[ -n "${CI_COMMIT_SHA:-}" ]]; then
-    /usr/bin/python3 -I -B "${SCRIPT_DIR}/ci-deploy-current-commit.py"
+    /usr/bin/python3 -I -B "${SCRIPT_DIR}/ci-deploy-current-commit.py" \
+      --pipeline-source "${DEPLOY_PIPELINE_SOURCE:-push}"
   fi
 }
 

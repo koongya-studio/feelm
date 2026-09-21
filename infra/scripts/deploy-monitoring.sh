@@ -101,6 +101,13 @@ if [[ -n "${COMPOSE_ENV_FILE:-}" ]]; then
   compose+=(--env-file "${COMPOSE_ENV_FILE}")
 fi
 compose+=(-f "${PROJECT_ROOT}/infra/compose/monitoring.yml")
+if [[ -n "${MONITORING_IMAGE_OVERRIDE_FILE:-}" ]]; then
+  [[ -f "${MONITORING_IMAGE_OVERRIDE_FILE}" ]] || {
+    echo "MONITORING_IMAGE_OVERRIDE_FILE does not exist" >&2
+    exit 2
+  }
+  compose+=(-f "${MONITORING_IMAGE_OVERRIDE_FILE}")
+fi
 
 for container in "${containers[@]}"; do
   if container_exists "${container}-rollback"; then
@@ -120,6 +127,29 @@ fi
 
 "${compose[@]}" config --quiet
 "${compose[@]}" pull --quiet "${services[@]}"
+
+# The image's /var/lib/alloy is owned by 473:473 with mode 0770. Root
+# without DAC_OVERRIDE cannot traverse it. Use the Compose storage path and
+# repair only the volume root, including volumes from the failed first rollout.
+# Helpers have no network, secrets, Docker socket or host bind mounts.
+alloy_image="$("${compose[@]}" config --format json | "${PYTHON_BIN}" -I -c \
+  'import json, sys; print(json.load(sys.stdin)["services"]["alloy"]["image"])')"
+alloy_storage_mount="type=volume,src=compose_alloy_data,dst=/var/lib/feelm-alloy-data,volume-nocopy"
+if ! docker run --rm --network none --read-only --user 0:0 \
+  --cap-drop ALL --cap-add CHOWN --cap-add FOWNER \
+  --security-opt no-new-privileges:true \
+  --mount "${alloy_storage_mount}" --entrypoint /bin/sh "${alloy_image}" \
+  -ec 'chown 0:0 /var/lib/feelm-alloy-data; chmod u+rwx /var/lib/feelm-alloy-data'; then
+  echo "Alloy storage initialization failed; existing containers were not stopped" >&2
+  exit 1
+fi
+if ! docker run --rm --network none --read-only --user 0:0 \
+  --cap-drop ALL --security-opt no-new-privileges:true \
+  --mount "${alloy_storage_mount}" --entrypoint /bin/sh "${alloy_image}" \
+  -ec 'probe=$(mktemp -d /var/lib/feelm-alloy-data/.write-check.XXXXXX); rmdir "$probe"'; then
+  echo "Alloy storage write check failed; existing containers were not stopped" >&2
+  exit 1
+fi
 
 existing=()
 for container in "${containers[@]}"; do

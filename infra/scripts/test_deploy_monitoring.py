@@ -62,6 +62,14 @@ class DeployMonitoringTest(unittest.TestCase):
             set -eu
             printf 'docker %s\n' "$*" >>"$MONITORING_TEST_EVENTS"
             state="$MONITORING_TEST_STATE"
+            if [[ "$1" == "run" ]]; then
+              if [[ " $* " == *" --cap-add CHOWN "* ]]; then
+                [[ "${FAIL_STORAGE_INIT:-0}" != "1" ]]
+              else
+                [[ "${FAIL_STORAGE_WRITE:-0}" != "1" ]]
+              fi
+              exit
+            fi
             if [[ "$1" == "inspect" ]]; then
               [[ -e "$state/$2" ]] || exit 1
               if [[ " $* " == *" --format "* ]]; then
@@ -96,6 +104,10 @@ class DeployMonitoringTest(unittest.TestCase):
             fi
             if [[ "$1" == "compose" ]]; then
               args=" $* "
+              if [[ "$args" == *" config --format json "* ]]; then
+                printf '{"services":{"alloy":{"image":"grafana/alloy:v1.19.2"}}}\n'
+                exit
+              fi
               if [[ "$args" == *" config --quiet "* ]]; then
                 [[ "${FAIL_CONFIG:-0}" != "1" ]]
                 exit
@@ -123,6 +135,11 @@ class DeployMonitoringTest(unittest.TestCase):
             r"""
             #!/usr/bin/env bash
             set -eu
+            if [[ " $* " == *" -c "* ]]; then
+              cat >/dev/null
+              printf 'grafana/alloy:v1.19.2\n'
+              exit
+            fi
             printf 'verify %s\n' "$*" >>"$MONITORING_TEST_EVENTS"
             count="$(cat "$MONITORING_TEST_VERIFY_COUNT" 2>/dev/null || printf 0)"
             count="$((count + 1))"
@@ -192,7 +209,11 @@ class DeployMonitoringTest(unittest.TestCase):
         self.assertIn("mattermost-alert-relay", events)
         self.assertIn("up -d --no-deps --force-recreate", events)
         self.assertIn("--project-name feelm-monitoring-344", events)
-        self.assertEqual(events.count("--format"), len(CONTAINERS))
+        revision_checks = [
+            line for line in events.splitlines()
+            if line.startswith("docker inspect ") and "--format" in line
+        ]
+        self.assertEqual(len(revision_checks), len(CONTAINERS))
         self.assertNotIn("feelm-backend", events)
         self.assertNotIn(" down ", events)
 
@@ -214,6 +235,38 @@ class DeployMonitoringTest(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(state, set(CONTAINERS))
                 self.assertNotIn("docker stop", events)
+
+    def test_storage_checks_precede_stopping_existing_containers(self):
+        result, _, events = self.run_deploy()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        helpers = [line for line in events.splitlines() if line.startswith("docker run ")]
+        self.assertEqual(len(helpers), 2)
+        for helper in helpers:
+            self.assertIn("--network none --read-only --user 0:0", helper)
+            self.assertIn("--cap-drop ALL", helper)
+            self.assertIn("--security-opt no-new-privileges:true", helper)
+            self.assertIn("src=compose_alloy_data,dst=/var/lib/feelm-alloy-data,volume-nocopy", helper)
+            self.assertNotIn("docker.sock", helper)
+            self.assertNotIn("--env", helper)
+            self.assertNotIn("--privileged", helper)
+            self.assertNotIn("chown -R", helper)
+        self.assertIn("--cap-add CHOWN --cap-add FOWNER", helpers[0])
+        self.assertNotIn("--cap-add", helpers[1])
+        self.assertIn("mktemp -d", helpers[1])
+        self.assertLess(events.index(helpers[1]), events.index("docker stop"))
+
+    def test_storage_failure_preserves_existing_containers(self):
+        for behavior in ({"FAIL_STORAGE_INIT": 1}, {"FAIL_STORAGE_WRITE": 1}):
+            with self.subTest(behavior=behavior):
+                self.events_file.unlink(missing_ok=True)
+                result, state, events = self.run_deploy(**behavior)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(state, set(CONTAINERS))
+                self.assertIn("existing containers were not stopped", result.stderr)
+                self.assertNotIn("docker stop", events)
+                self.assertNotIn("docker rename", events)
+                self.assertNotIn(" up -d ", events)
+                self.assertNotIn("verify ", events)
 
     def test_compose_failure_restores_previous_containers(self):
         result, state, events = self.run_deploy(FAIL_UP=1)

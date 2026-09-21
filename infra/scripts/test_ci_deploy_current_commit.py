@@ -52,6 +52,11 @@ class DeployCurrentCommitTest(unittest.TestCase):
             text=True,
         )
 
+    def test_accepts_protected_web_pipeline_when_explicitly_requested(self):
+        result, run = self.run_main(source="web", expected_source="web")
+        self.assertEqual(result, 0)
+        run.assert_called_once()
+
     def test_rejects_outdated_commit(self):
         result, _ = self.run_main(remote_sha="2" * 40)
 
