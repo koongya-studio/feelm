@@ -616,6 +616,46 @@ include:
             self.assertIn('$CI_PIPELINE_SOURCE == "merge_request_event"', block)
             self.assertIn('$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"', block)
 
+    def test_current_main_redeploy_jobs_are_manual_protected_and_serialized(self):
+        jobs = (
+            (self.backend, 'redeploy-current-main-backend', 'e106-shell',
+             'service-and-backend-cache', 'backend'),
+            (self.frontend, 'redeploy-current-main-frontend', 'e106-shell',
+             'service-and-backend-cache', 'frontend'),
+            (self.consumer, 'redeploy-current-main-consumer', 'e106-distributed',
+             'distributed-consumer', 'consumer'),
+            (self.backend, 'redeploy-current-main-redis', 'e106-shell',
+             'service-and-backend-cache', 'redis'),
+            (self.infra, 'redeploy-current-main-monitoring', 'e106-shell',
+             'service-and-backend-cache', 'monitoring'),
+        )
+        protected_web = ('$CI_COMMIT_BRANCH == "main" && '
+                         '$CI_COMMIT_REF_PROTECTED == "true" && '
+                         '$CI_PIPELINE_SOURCE == "web"')
+        for config, name, runner, resource_group, component in jobs:
+            block = job_block(config, name)
+            for expected in (
+                    'stage: deploy', f'tags: [{runner}]', 'needs: []',
+                    f'resource_group: {resource_group}', protected_web,
+                    'when: manual', 'allow_failure: false', 'interruptible: false',
+                    '--branch main --pipeline-source web',
+                    f'redeploy-current-main.sh {component}'):
+                self.assertIn(expected, block, name)
+            for forbidden in ('changes:', '$CI_PIPELINE_SOURCE == "push"',
+                              'merge_request_event'):
+                self.assertNotIn(forbidden, block, name)
+
+        distributed = job_block(self.infra, 'redeploy-current-main-spark-distributed')
+        service = job_block(self.infra, 'redeploy-current-main-spark-service')
+        self.assertIn('when: manual', distributed)
+        self.assertIn('deploy-spark-code.sh redeploy distributed', distributed)
+        self.assertIn('needs: [redeploy-current-main-spark-distributed]', service)
+        self.assertIn('deploy-spark-code.sh redeploy service', service)
+        self.assertNotIn('when: manual', service)
+        for block in (distributed, service):
+            self.assertIn(protected_web, block)
+            self.assertIn('resource_group: distributed-runtime-spark', block)
+
 
 if __name__ == '__main__':
     unittest.main()

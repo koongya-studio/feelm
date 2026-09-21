@@ -2,7 +2,7 @@
 
 set -Eeuo pipefail
 
-ACTION="${1:?Usage: deploy-spark-code.sh <preflight|initialize|apply|settle|prepare|resolve> ...}"
+ACTION="${1:?Usage: deploy-spark-code.sh <preflight|initialize|redeploy|apply|settle|prepare|resolve> ...}"
 NODE="${2:?node is required}"
 if [[ "${NODE}" != "service" && "${NODE}" != "distributed" ]]; then
   echo "Spark deployment node must be service or distributed" >&2
@@ -127,6 +127,22 @@ ensure_previous_state() {
 }
 
 case "${ACTION}" in
+  redeploy)
+    [[ ! -f "${pending}" ]] || {
+      echo "Pending Spark transaction must be resolved before redeploy" >&2
+      exit 1
+    }
+    revision="$(state_field manifest revision)"
+    image="$(state_field manifest image)"
+    source_revision="$(state_field manifest source_revision)"
+    release="${RELEASE_ROOT}/releases/${revision}"
+    [[ -d "${release}" ]] || { echo "Spark last-known-good release is missing" >&2; exit 1; }
+    verify_running "${image}" "${source_revision}"
+    deploy_runtime "${release}" "${release}" "${revision}" "${revision}" \
+      "${image}" "${source_revision}" "${source_revision}"
+    verify_running "${image}" "${source_revision}"
+    echo "Spark current main environment reapplied: ${NODE}"
+    ;;
   preflight)
     REVISION="${3:?revision is required}"
     IMAGE="${4:?image is required}"

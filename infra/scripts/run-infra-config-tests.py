@@ -27,6 +27,7 @@ TESTS = (
     "infra.scripts.test_notify_deployment",
     "infra.scripts.test_ci_required_variable_preflight",
     "infra.scripts.test_ci_deploy_current_commit",
+    "infra.scripts.test_redeploy_current_main",
     "infra.scripts.test_deploy_monitoring",
     "infra.scripts.test_verify_monitoring_deployment",
     "infra.scripts.test_postgresql_cd_config",

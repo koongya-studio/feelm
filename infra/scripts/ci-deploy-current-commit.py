@@ -12,7 +12,7 @@ import argparse
 
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 DEPLOY_BRANCHES = ("main", "develop")
-PIPELINE_SOURCES = ("push", "parent_pipeline")
+PIPELINE_SOURCES = ("push", "parent_pipeline", "web")
 
 
 def main() -> int:

@@ -1718,8 +1718,32 @@ exporter만 교체합니다. 같은 `service-and-backend-cache` resource group�
 배포와 캐시 승격·롤백은 중간 상태 손상을 막기 위해 취소하지 않습니다. `main` 배포 전에는
 main의 보호 브랜치 상태, `e106-shell` Runner의 Protected 설정과 `service` 환경 범위의
 Protected CI/CD Variable을 확인합니다. 애플리케이션 이미지 자동 배포는 보호된 main Push만
-배포 기준으로 사용하며 develop, MR, API와 Web Pipeline에 배포 Job을 열지 않습니다. 위
+배포 기준으로 사용하며 develop, MR, API Pipeline에는 배포 Job을 열지 않습니다. Web
+Pipeline에는 아래 환경변수 재배포용 보호 수동 Job만 노출합니다. 위
 모니터링 Compose Job은 보호된 develop Push에만 열린 명시적 예외입니다.
+
+### Current main 환경변수 재배포
+
+CI/CD Variable 또는 Secret만 바뀌었을 때는 GitLab에서 보호된 `main`의 Web Pipeline을
+만든 뒤 필요한 `redeploy-current-main-*` 수동 Job을 실행합니다. Backend, Frontend/Nginx,
+Consumer, Redis와 Monitoring은 각각 독립 Job이며, Spark는
+`redeploy-current-main-spark-distributed`를 누르면 분산 노드를 먼저 처리한 뒤 서비스 노드가
+이어집니다. 각 Job은 실행 직전에 원격 `main` HEAD와 보호 ref를 다시 확인하고 기존 자동
+배포와 같은 resource group을 사용합니다.
+
+재배포 스크립트는 실행 중이며 정상인 컨테이너의 로컬 이미지에서 immutable RepoDigest를
+확정한 후 같은 이미지를 사용해 컨테이너를 강제 재생성합니다. digest를 찾지 못하거나 기존
+컨테이너가 비정상이면 변경 전에 실패합니다. Monitoring도 각 컨테이너의 digest를 Compose
+override에 고정합니다. Spark는 양 노드의 마지막 정상 manifest와 release를 사용하며 pending
+transaction이 있으면 먼저 복구해야 합니다. 이 과정에서 Secret 값이나 환경변수 값은 상태
+파일, artifact 또는 로그에 기록하지 않습니다.
+
+프론트엔드의 `VITE_*`처럼 번들 빌드 시점에 들어가는 값은 이 Job으로 바뀌지 않습니다. 해당
+값을 변경했다면 프론트엔드 이미지를 다시 빌드하는 정상 main 배포를 사용합니다. 환경변수
+오류로 재생성이 실패하면 이미지 자체는 같아도 이전 Secret이 자동 복원되지는 않으므로,
+CI/CD Variable을 직전 정상값으로 되돌린 뒤 같은 Job을 다시 실행합니다. 서버 적용 전에는
+`service`와 `distributed` 환경이 GitLab에서 Protected로 설정되어 있고 관련 Runner가
+Protected인지 확인합니다.
 
 백엔드 배포 스크립트는 실행 중인 이미지 이름을 먼저 보관하고 후보 이미지를 기동한 뒤 최대 2분
 동안 Docker healthcheck와 컨테이너 내부 Actuator 응답을 확인합니다. 이어서 PostgreSQL과

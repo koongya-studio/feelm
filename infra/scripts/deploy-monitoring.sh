@@ -101,6 +101,13 @@ if [[ -n "${COMPOSE_ENV_FILE:-}" ]]; then
   compose+=(--env-file "${COMPOSE_ENV_FILE}")
 fi
 compose+=(-f "${PROJECT_ROOT}/infra/compose/monitoring.yml")
+if [[ -n "${MONITORING_IMAGE_OVERRIDE_FILE:-}" ]]; then
+  [[ -f "${MONITORING_IMAGE_OVERRIDE_FILE}" ]] || {
+    echo "MONITORING_IMAGE_OVERRIDE_FILE does not exist" >&2
+    exit 2
+  }
+  compose+=(-f "${MONITORING_IMAGE_OVERRIDE_FILE}")
+fi
 
 for container in "${containers[@]}"; do
   if container_exists "${container}-rollback"; then
