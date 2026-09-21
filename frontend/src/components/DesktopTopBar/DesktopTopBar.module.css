@@ -1,0 +1,113 @@
+/*
+ * 상단 바 (업무 -782).
+ *
+ * 좌측 띠 오른쪽 전체를 가로지르고 본문 위에 고정으로 남는다. 자리를 비우는 일은
+ * `AppLayout`이 단을 나누며 맡으므로 여기서는 높이만 지킨다.
+ *
+ * 배경을 칠하지 않는다 — 벽 그라디언트가 그대로 비친다. 아래 구분선도 두지 않는다.
+ * 시안의 상단 줄은 면이 아니라 입력 하나가 떠 있는 빈 자리다.
+ */
+.bar {
+  display: flex;
+  height: var(--desktop-topbar-height);
+  align-items: center;
+  padding: 0 var(--desktop-gutter);
+  gap: var(--desktop-gutter);
+  flex-shrink: 0;
+}
+
+/*
+ * 검색 입력. 남는 폭을 모두 가져가되 시안처럼 끝까지 늘어나지는 않는다 — 1440px에서
+ * 입력이 1000px을 넘으면 글자가 왼쪽 끝에 한 줌 붙어 있는 모양이 된다.
+ */
+.search {
+  position: relative;
+  display: flex;
+  max-width: var(--desktop-main-max-width);
+  flex: 1;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: var(--space-4);
+  display: flex;
+  color: var(--color-ink-hint);
+  pointer-events: none;
+}
+
+/*
+ * 벽에서 살짝 들어간 면이다. 누르는 면(`--gradient-button`)과 반대로 그린다 — 입력은
+ * 누르는 것이 아니라 담는 것이라 그림자가 안쪽으로 진다(업무 -697의 규칙).
+ */
+.input {
+  width: 100%;
+  height: var(--control-height);
+  padding: 0 var(--space-5) 0 calc(var(--space-4) + 20px + var(--space-3));
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-button-inset);
+  color: var(--color-ink);
+  font: inherit;
+  outline: none;
+}
+
+.input::placeholder {
+  color: var(--color-ink-hint);
+}
+
+.input:focus-visible {
+  border-color: var(--color-line-strong);
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+/* 검색 입력의 기본 지우기 단추는 그리지 않는다. 모양이 브라우저마다 다르다 */
+.input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.action {
+  position: relative;
+  display: flex;
+  width: var(--tap-target-min);
+  height: var(--tap-target-min);
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  color: var(--color-ink-body);
+  text-decoration: none;
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  .action:hover {
+    background-color: var(--color-line-faint);
+  }
+}
+
+/* 읽지 않은 알림 표식. 수를 적지 않고 점만 둔다(`AppHeader`와 같은 규칙) */
+.dot {
+  position: absolute;
+  top: 10px;
+  right: 11px;
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--color-bg);
+  border-radius: var(--radius-pill);
+  background: var(--color-brand);
+}
+
+.profile {
+  display: flex;
+  border-radius: var(--radius-pill);
+  text-decoration: none;
+}

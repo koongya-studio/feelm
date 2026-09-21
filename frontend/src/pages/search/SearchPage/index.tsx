@@ -41,7 +41,7 @@
  * `달의`가 전부 쌓인다. 같은 말은 다시 저장하지 않고 맨 앞으로 옮긴다(`sessionStore`).
  */
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { useLocation, useNavigationType, useSearchParams } from 'react-router';
 import Button from '../../../components/Button';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
@@ -207,6 +207,8 @@ function initialState(params: URLSearchParams) {
 
 export default function SearchPage() {
   const [params, setParams] = useSearchParams();
+  const location = useLocation();
+  const navigationType = useNavigationType();
   // 처음 한 번만 계산한다. 이후의 주소는 이 화면이 바꿔 쓰는 결과일 뿐이다
   const [initial] = useState(() => initialState(params));
 
@@ -370,6 +372,35 @@ export default function SearchPage() {
     },
     [yearMin, setParams, fetchFirstPage],
   );
+
+  /*
+   * 바깥에서 보낸 검색어로 다시 검색한다 (업무 -782).
+   *
+   * 데스크톱 상단 바의 통합 검색은 이미 이 화면에 있어도 주소만 바꾼다. 화면이 새로 그려지지
+   * 않으니 시작 조건을 읽는 자리(`initial`)가 다시 돌지 않아, 주소는 `?q=봉준호`가 됐는데
+   * 결과는 그대로였다. 좌측 내비의 `검색`을 조건이 있는 채로 다시 누르는 경우도 같다.
+   *
+   * **주소 문자열을 비교하지 않고 이동 종류로 가른다.** 이 화면이 스스로 적는 주소는 늘
+   * `replace`이고(`run`), 바깥에서 오는 이동은 `push`다. 한때 "내가 마지막으로 적은 주소"를
+   * 기억해 두고 견주었는데, 두 번 잇따라 적으면(두 글자 → 한 글자) 기억은 마지막 것만 남고
+   * 효과는 그 사이의 주소를 보게 되어 지운 검색어로 다시 검색됐다.
+   *
+   * 처음 들어온 그 이동은 건너뛴다 — 그 조건은 위의 첫 장 받기가 이미 처리했다.
+   *
+   * 입력과 필터도 주소에 맞춘다. 주소만 바꾸고 입력을 두면 입력과 목록이 어긋난다.
+   */
+  const entryKey = useRef(location.key);
+
+  useEffect(() => {
+    if (location.key === entryKey.current || navigationType !== 'PUSH') return;
+
+    const next = fromSearchParams(new URLSearchParams(location.search));
+
+    setKeyword(next.keyword);
+    setFilter(next.filter);
+    cancelPending();
+    run(next.keyword, next.filter);
+  }, [location.key, location.search, navigationType, run]);
 
   /**
    * 타이핑에 따른 검색(업무 -640).

@@ -1,10 +1,15 @@
-/* 화면 폭 안에서 가운데에 뜬다. 뒤에 시트가 있어도 그 위다 */
+/*
+ * 화면 폭 안에서 가운데에 뜬다. 뒤에 시트가 있어도 그 위다.
+ *
+ * 덮는 폭은 덮개 토큰이 정한다(`styles/tokens.css`의 `덮개`). 1024px 이상에서 412px로
+ * 묶어 두면 화면 한가운데 띠만 어두워지고 그 바깥은 밝은 채로 남는다(업무 -782).
+ */
 .layer {
   position: fixed;
   z-index: 30;
   display: flex;
   width: 100%;
-  max-width: var(--layout-max-width);
+  max-width: var(--overlay-max-width);
   box-sizing: border-box;
   align-items: center;
   justify-content: center;

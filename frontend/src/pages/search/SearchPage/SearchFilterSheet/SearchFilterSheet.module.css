@@ -10,8 +10,13 @@
   z-index: 20;
   display: flex;
   width: 100%;
-  max-width: var(--layout-max-width);
-  align-items: flex-end;
+  /*
+   * 폭과 붙는 자리는 덮개 토큰이 정한다(`styles/tokens.css`의 `덮개`). 휴대폰에서는
+   * 412px 폭 아래에, 1024px 이상에서는 화면 전체를 덮고 가운데에 뜬다(업무 -782).
+   */
+  max-width: var(--overlay-max-width);
+  align-items: var(--overlay-place);
+  justify-content: center;
   inset: 0;
   margin: 0 auto;
 }
@@ -30,7 +35,8 @@
   max-height: 88%;
   width: 100%;
   flex-direction: column;
-  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  max-width: var(--overlay-sheet-max-width);
+  border-radius: var(--overlay-sheet-radius);
   background: var(--color-bg);
   box-shadow: 0 -8px 24px rgba(38, 39, 41, 0.12);
 }

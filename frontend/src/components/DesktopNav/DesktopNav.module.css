@@ -1,0 +1,158 @@
+/*
+ * 좌측 고정 내비의 띠 (업무 -782).
+ *
+ * 화면 왼쪽에 붙어 스스로 스크롤하지 않는다. 항목이 다섯이라 어떤 화면 높이에서도 넘치지
+ * 않고, 계정 행은 `margin-top: auto`로 바닥에 붙는다.
+ *
+ * **흰 불투명 면이다.** 하단 내비와 같은 이유다(업무 -688) — 본문이 이 띠 옆을 지나가므로
+ * 반투명이면 글자 뒤로 포스터가 스쳐 지나간다. 오른쪽 구분선 하나로 본문과 나뉜다.
+ */
+.rail {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  width: var(--desktop-nav-width);
+  height: 100%;
+  flex-direction: column;
+  flex-shrink: 0;
+  padding: var(--space-6) var(--space-4) var(--space-4);
+  border-right: 1px solid var(--color-line);
+  background: var(--color-surface-solid);
+  gap: var(--space-6);
+}
+
+/* 로고는 항목이 아니다. 눌러도 선택 표시가 생기지 않고 시작 화면으로만 보낸다 */
+.brand {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-2);
+  text-decoration: none;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/*
+ * 한 항목. 아이콘과 라벨이 한 줄이고 높이는 48px이다 — 터치 최소 44px을 넘기므로 태블릿
+ * 가로에서도 그대로 쓸 수 있다.
+ *
+ * 선택 표시는 **왼쪽 빨강 바 + 아주 옅은 빨강 면**이다. 면은 이미 선택 상태용으로 있는
+ * `--color-brand-tint`(불투명도 0.08)라 빨강이 면적을 갖지 않는다는 규칙을 깨지 않는다.
+ * 바는 `::before`로 둔다 — `border-left`로 두면 선택될 때마다 라벨이 3px씩 밀린다.
+ */
+.item {
+  position: relative;
+  display: flex;
+  height: 48px;
+  align-items: center;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-control);
+  color: var(--color-ink-muted);
+  gap: var(--space-3);
+  text-decoration: none;
+  transition:
+    color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  .item:hover {
+    background-color: var(--color-line-faint);
+    color: var(--color-ink-body);
+  }
+}
+
+.item[data-active='true'] {
+  background-color: var(--color-brand-tint);
+  color: var(--color-brand);
+}
+
+.item[data-active='true']::before {
+  position: absolute;
+  top: 50%;
+  left: calc(var(--space-3) * -1);
+  width: 3px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: var(--color-brand);
+  content: '';
+  transform: translateY(-50%);
+}
+
+.icon {
+  display: flex;
+  width: 20px;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/*
+ * 라벨은 15px(`body`)이다. 하단 내비의 13px보다 크다 — 좌측 띠는 라벨이 아이콘 옆에 한 줄로
+ * 놓여 세로 자리를 다투지 않는다.
+ */
+.label {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-body);
+}
+
+.item[data-active='true'] .label {
+  color: var(--color-brand-ink);
+  font-weight: var(--font-weight-bold);
+}
+
+/* 설정과 계정 행. 위 항목들과 떨어져 바닥에 붙는다 */
+.foot {
+  display: flex;
+  margin-top: auto;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--color-line);
+  border-radius: 0;
+  color: var(--color-ink);
+  gap: var(--space-3);
+  text-decoration: none;
+}
+
+.accountText {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+/* 닉네임과 이메일은 띠 폭 안에서 줄바꿈하지 않고 말줄임한다 */
+.accountName,
+.accountEmail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountName {
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-meta);
+}
+
+.accountEmail {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.accountChevron {
+  display: flex;
+  color: var(--color-ink-hint);
+  flex-shrink: 0;
+}
