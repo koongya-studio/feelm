@@ -4,14 +4,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.feelm.backend.infrastructure.mail.AuthMailProperties.Mode;
+import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.api.parallel.ResourceLock;
 import org.mockito.ArgumentCaptor;
-import org.springframework.boot.test.system.CapturedOutput;
-import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 
@@ -25,8 +26,6 @@ import org.springframework.mail.javamail.JavaMailSender;
  * 본문이 바뀌어야 하는 변경이라면 그 변경의 diff에 이 테스트가 함께 드러난다.
  */
 @DisplayName("계정 메일 발송 — 종류별 제목·본문·본문 값")
-@ExtendWith(OutputCaptureExtension.class)
-@ResourceLock("backend-output-capture")
 class AuthMailSenderTest {
 
     private static final AuthMailProperties PROPERTIES =
@@ -88,15 +87,29 @@ class AuthMailSenderTest {
 
     @Test
     @DisplayName("log 모드는 종류를 밝히고 그 종류의 링크만 남긴다")
-    void loggingSenderLogsKindSpecificLink(CapturedOutput output) {
+    void loggingSenderLogsKindSpecificLink() {
+        Logger logger = (Logger) LoggerFactory.getLogger(LoggingAuthMailSender.class);
+        ListAppender<ILoggingEvent> logs = new ListAppender<>();
+        logs.start();
+        logger.addAppender(logs);
         AuthMailSender sender = new LoggingAuthMailSender(PROPERTIES);
 
-        sender.send(MailKind.PASSWORD_RESET, "user@example.com", "raw-token");
+        try {
+            sender.send(MailKind.PASSWORD_RESET, "user@example.com", "raw-token");
+        } finally {
+            logger.detachAppender(logs);
+            logs.stop();
+        }
 
-        assertThat(output)
-                .contains("비밀번호 재설정 메일")
-                .contains("https://feelm.example/reset-password?token=raw-token")
-                .doesNotContain("user@example.com");
+        List<String> messages = logs.list.stream().map(ILoggingEvent::getFormattedMessage).toList();
+        assertThat(messages)
+                .anySatisfy(
+                        message ->
+                                assertThat(message)
+                                        .contains("비밀번호 재설정 메일")
+                                        .contains(
+                                                "https://feelm.example/reset-password?token=raw-token"))
+                .allSatisfy(message -> assertThat(message).doesNotContain("user@example.com"));
     }
 
     private static SimpleMailMessage captureSent(JavaMailSender mailSender) {
