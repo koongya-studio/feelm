@@ -108,7 +108,16 @@ class ErrorCodeTest {
                         "INVITATION_PENDING",
                         "INVITATION_NOT_PENDING",
                         // 리포트 도메인 — API-060·080 (S15P21E106-556)
-                        "REPORT_GENERATING");
+                        "REPORT_GENERATING",
+                        // 트렌드 도메인 — API-064 급상승 영화 (S15P21E106-561)
+                        "TREND_UNAVAILABLE");
+    }
+
+    @Test
+    @DisplayName("API-064 급상승 조회 불가 오류 코드는 503으로 매핑된다")
+    void trendCodeIsServiceUnavailable() {
+        assertThat(ErrorCode.TREND_UNAVAILABLE.getStatus())
+                .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     }
 
     @Test
