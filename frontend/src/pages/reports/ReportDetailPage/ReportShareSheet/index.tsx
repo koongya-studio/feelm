@@ -6,17 +6,21 @@
  * 와이어프레임은 3.4 위에 올라온 시트로 그렸다. 3.4 · 7.4가 같은 화면이라 그 폴더 안에 둔다.
  * 요소 — `공유하기`, `이미지로 저장`, 안내 두 줄.
  *
- * - `공유하기`는 기기의 공유 메뉴(Web Share API)를 연다. 지원하지 않는 브라우저면 알린다
+ * - `공유하기`는 이 화면 주소를 공유한다. 휴대폰은 기기의 공유 메뉴, 데스크톱은 복사다
+ *   (`utils/share.ts`, 업무 -767). 한때 제목 글자만 공유 메뉴에 넘겼고, 데스크톱 Chrome에서는
+ *   메뉴가 있다고 답하고 열지 못해 아무 일이 없었다
  * - `이미지로 저장`은 API-061로 이미지 카드를 만든다. 계약은 서명된 짧은 주소를 주고
  *   클라이언트가 내려받는 방식이다. **목업에는 실제 이미지가 없어** 만든 뒤 안내만 한다
  * - 공유를 마치거나 취소하면 시트를 닫는다(`3.5 ⇢ 3.4`)
  *
  * `[?]` 공유할 내용이 이미지인지 주소인지 정해지지 않았다. 와이어프레임 안내는 `공유 이미지`라고
- * 적었지만 이미지 파일 공유는 브라우저마다 지원이 다르다. 지금은 제목 글자만 넘긴다.
+ * 적었지만 이미지 파일 공유는 브라우저마다 지원이 다르다. 지금은 제목과 주소를 넘긴다 — 이미지는
+ * S15P21E106-731에서 API-061과 함께 정한다.
  */
 import { useEffect, useId, useRef, useState } from 'react';
 import Button from '../../../../components/Button';
 import { createReportImage } from '../../../../api/reports';
+import { shareLink } from '../../../../utils/share';
 import styles from './ReportShareSheet.module.css';
 
 type Props = {
@@ -46,21 +50,21 @@ export default function ReportShareSheet({ reportId, title, onClose }: Props) {
   }, [busy, onClose]);
 
   async function share() {
-    if (typeof navigator.share !== 'function') {
-      setNotice('이 브라우저에서는 공유 메뉴를 열 수 없어요');
+    setBusy(true);
+    setNotice('');
+
+    const result = await shareLink({ title, url: window.location.href });
+
+    // 공유 메뉴로 보냈으면 마친 것이다. 닫은 것(취소)은 시트를 그대로 둔다
+    if (result === 'shared') {
+      onClose();
 
       return;
     }
 
-    setBusy(true);
-
-    try {
-      await navigator.share({ title, text: `Feelm ${title}` });
-      onClose();
-    } catch {
-      // 사용자가 공유 메뉴를 닫은 경우도 여기로 온다. 시트는 그대로 둔다
-      setBusy(false);
-    }
+    setBusy(false);
+    if (result === 'copied') setNotice('리포트 주소를 복사했어요');
+    if (result === 'failed') setNotice('이 브라우저에서는 공유할 수 없어요');
   }
 
   async function saveImage() {

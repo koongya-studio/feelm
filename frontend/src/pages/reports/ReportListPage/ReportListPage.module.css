@@ -182,3 +182,14 @@
   color: var(--color-ink-hint);
   letter-spacing: 0;
 }
+
+/* 공유 결과(업무 -767). 7.1 MY의 안내와 같은 자리 — 하단 탭 위에 뜬다 */
+.notice {
+  position: fixed;
+  z-index: 2;
+  right: var(--screen-padding-x);
+  bottom: calc(var(--nav-height) + var(--space-6) + env(safe-area-inset-bottom, 0px));
+  left: var(--screen-padding-x);
+  max-width: calc(var(--layout-max-width) - var(--screen-padding-x) * 2);
+  margin: 0 auto;
+}
