@@ -176,6 +176,68 @@ describe('타이핑에 따라 검색한다', () => {
     expect(screen.queryByRole('heading', { name: /검색 결과/ })).not.toBeInTheDocument();
   });
 
+  /*
+   * 업무 -769. 한때 한 글자를 치면 안내 없이 검색 전 화면으로 돌아갔고, 주소에는 `?q=괴`가
+   * 남아 새로고침하면 보지 못한 결과가 떴다. 화면이 왜 그대로인지 알리고, 주소는 화면대로
+   * 검색어가 없는 상태로 둔다.
+   */
+  describe('한 글자를 쳐 놓고 기다리면', () => {
+    const notice = /두 글자부터 찾아요/;
+    const location = () => screen.getByTestId('location').textContent;
+
+    it('두 글자부터 찾는다고 알리고 주소에 검색어를 남기지 않는다', async () => {
+      vi.mocked(searchMovies).mockResolvedValue(page([item(201, '괴물')]));
+
+      renderWithRouter(<SearchPage />, { route: '/search' });
+
+      type('괴물');
+      await resultsHeading(1);
+      expect(location()).toBe('/search?q=%EA%B4%B4%EB%AC%BC');
+
+      type('괴');
+
+      expect(screen.getByRole('status')).toHaveTextContent(notice);
+      expect(location()).toBe('/search');
+    });
+
+    it('필터가 걸려 있으면 필터만의 결과를 두고 주소에도 필터만 남긴다', async () => {
+      vi.mocked(searchMovies).mockResolvedValue(page([item(201, '괴물')]));
+
+      renderWithRouter(<SearchPage />, { route: '/search?genre=DRAMA' });
+      await resultsHeading(1);
+
+      type('괴');
+      await settle();
+
+      expect(screen.getByText(notice)).toBeInTheDocument();
+      expect(location()).toBe('/search?genre=DRAMA');
+      expect(vi.mocked(searchMovies)).toHaveBeenLastCalledWith(
+        expect.not.objectContaining({ q: expect.anything() }),
+      );
+    });
+
+    it('제출해서 찾았으면 결과가 답이라 알리지 않는다', async () => {
+      vi.mocked(searchMovies).mockResolvedValue(page([item(201, '괴물')]));
+
+      renderWithRouter(<SearchPage />, { route: '/search' });
+
+      submit('괴');
+      await resultsHeading(1);
+
+      expect(screen.queryByText(notice)).not.toBeInTheDocument();
+      expect(location()).toBe('/search?q=%EA%B4%B4');
+    });
+
+    it('지우면 안내도 내린다', () => {
+      renderWithRouter(<SearchPage />, { route: '/search' });
+
+      type('괴');
+      type('');
+
+      expect(screen.queryByText(notice)).not.toBeInTheDocument();
+    });
+  });
+
   it('공백만 치면 검색하지 않고 4.1에 머문다', async () => {
     renderWithRouter(<SearchPage />, { route: '/search' });
 
