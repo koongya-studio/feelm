@@ -142,7 +142,7 @@ def wire_run(monkeypatch, fake: FakeConsumer) -> None:
     monkeypatch.setattr(party_runner.signal, "signal", lambda *_args: None)
 
 
-def test_new_group_starts_at_latest_before_current_inputs_are_republished(monkeypatch) -> None:
+def test_new_group_consumes_existing_refresh_events_from_earliest(monkeypatch) -> None:
     configs: list[dict[str, object]] = []
     fake = StoppingConsumer([])
     monkeypatch.setattr(
@@ -159,7 +159,7 @@ def test_new_group_starts_at_latest_before_current_inputs_are_republished(monkey
     with pytest.raises(SystemExit):
         party_runner.run(settings())
 
-    assert configs[0]["auto.offset.reset"] == "latest"
+    assert configs[0]["auto.offset.reset"] == "earliest"
 
 
 def test_artifacts_are_validated_before_redis_or_kafka_clients(monkeypatch) -> None:
