@@ -2,6 +2,8 @@
  * 3.1 취향 필름의 우측 보조 패널 (업무 S15P21E106-783).
  *
  * 2026-09-21 시안이 이 자리에 카드 셋을 둔다 — **나의 취향 팝콘 · 취향 리포트 · 이어보기**다.
+ * 팝콘 카드는 7.1 MY의 `팝콘 분포도`와 같은 표라 공용으로 옮겼다(`components/PopcornFlavorPanel`,
+ * 업무 -786). 이 화면이 그리는 모양과 가는 곳은 그대로다.
  * 앞의 둘은 모바일 본문에 줄로 있던 것을 카드로 옮긴 것이고(넓은 폭에서는 본문에서 뺀다,
  * `FilmPage`), 셋째만 새로 만든다.
  *
@@ -19,8 +21,8 @@ import { Link } from 'react-router';
 import AsidePanel from '../../../../components/AsidePanel';
 import Badge from '../../../../components/Badge';
 import FilmReel from '../../../../components/FilmReel';
+import PopcornFlavorPanel from '../../../../components/PopcornFlavorPanel';
 import Poster from '../../../../components/Poster';
-import { kernelSprite } from '../../../../components/PopcornBucket/sprites';
 import { getWatchRecords } from '../../../../api/watch';
 import { formatMonthDay } from '../../../../utils/date';
 import { path } from '../../../../routes/paths';
@@ -61,60 +63,17 @@ export default function FilmAside({ bucket, frames, newReportId }: Props) {
     };
   }, []);
 
-  // 많이 나온 맛부터. 0알인 맛은 아직 발견하지 않은 맛이라 뺀다
-  const flavors = bucket
-    ? [...bucket.flavors]
-        .filter((flavor) => flavor.popcornCount > 0)
-        .sort((a, b) => b.popcornCount - a.popcornCount)
-    : [];
   const reportFrames = frames.slice(0, REPORT_FRAME_COUNT);
 
   return (
     <>
-      {flavors.length > 0 && bucket ? (
-        <AsidePanel
+      {bucket ? (
+        <PopcornFlavorPanel
           title="나의 취향 팝콘"
+          bucket={bucket}
           to={path.popcornBucket()}
           linkLabel={`나의 취향 팝콘 ${bucket.totalCount}알 자세히 보기`}
-          tone="dark"
-        >
-          <table className={styles.flavorTable}>
-            <thead>
-              <tr>
-                <th scope="col" className={styles.flavorNameHead}>
-                  맛
-                </th>
-                <th scope="col">감상량</th>
-                <th scope="col">선호도</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {flavors.map((flavor) => (
-                <tr key={flavor.flavorCode}>
-                  <th scope="row" className={styles.flavorName}>
-                    <img className={styles.kernel} src={kernelSprite(flavor.flavorCode)} alt="" />
-                    {flavor.displayName}
-                  </th>
-
-                  {/*
-                   * 감상량은 팝콘 알 수의 비율, 선호도는 그 맛 영화들의 평균 별점이다(FR-06,
-                   * 3.2가 같은 구분을 쓴다). **선호도는 별점 그대로 적는다**(사용자 결정
-                   * 2026-09-22) — 시안은 백분율로 그리지만 계약이 주는 값은 5점 만점 별점이고,
-                   * 백분율로 환산하면 같은 값이 화면마다 다른 수로 보인다.
-                   */}
-                  <td className={styles.flavorShare}>
-                    {Math.round((flavor.popcornCount / bucket.totalCount) * 100)}%
-                  </td>
-
-                  <td className={styles.flavorScore}>
-                    {flavor.averageScore === null ? '—' : `★ ${flavor.averageScore.toFixed(1)}`}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </AsidePanel>
+        />
       ) : null}
 
       <AsidePanel
