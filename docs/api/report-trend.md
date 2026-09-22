@@ -68,6 +68,16 @@
 }
 ```
 
+### 서명 URL 다운로드
+
+`GET` `/api/v1/report-images/{imageId}/download?expires={epochSeconds}&signature={signature}`
+
+- JWT 인증은 요구하지 않는다. URL 자체가 10분 동안만 유효한 다운로드 capability다
+- `expires`는 UTC Unix epoch seconds다
+- `signature`는 UTF-8 문자열 `{imageId}\n{expires}`를 리포트 이미지 전용 Secret으로 HMAC-SHA256 서명한 Base64URL(no padding) 값이다
+- 서명이 올바르지 않거나 만료됐으면 `403 FORBIDDEN`, 이미지 메타데이터 또는 파일이 없으면 `404 RESOURCE_NOT_FOUND`를 반환한다
+- 성공 응답은 PNG 바이트이며 `Content-Type: image/png`, `Content-Disposition: attachment`와 `Cache-Control: private, no-store`를 사용한다
+
 ### 오류 응답
 
 - 공통 오류만 해당
@@ -334,8 +344,8 @@ Path parameter `reportId`: 양의 정수. 요청 본문 없음.
 | 인증 | 회원 |
 | 관련 요구사항 | FR-24, NFR-07 |
 | 화면 | ⑦-1 리포트 상세 |
-| 미정 사항 | 있음 |
-| 비고 | 다운로드 URL 유효시간 미정 |
+| 미정 사항 | 외부 이미지의 저장·공유 허용 범위 |
+| 비고 | 다운로드 URL 유효시간 10분 |
 
 ### 설명
 
@@ -365,7 +375,7 @@ Path parameter `reportId`: 양의 정수. 요청 본문 없음.
 {
   "imageId": 811,
   "format": "PNG",
-  "downloadUrl": "https://storage.example.com/...?X-Amz-Expires=600&...",
+  "downloadUrl": "https://j15e106.p.ssafy.io/api/v1/report-images/811/download?expires=1788067860&signature=...",
   "expiresAt": "2026-08-30T05:31:00Z"
 }
 ```
@@ -379,8 +389,14 @@ Path parameter `reportId`: 양의 정수. 요청 본문 없음.
 ### 처리 규칙
 
 - 파일 형식은 PNG만. PDF는 제공하지 않는다
-- 저장된 PNG는 비공개 버킷에 두고 서명된 단기 URL로만 접근한다. URL 없이는 접근 불가(NFR-07)
-- 이미 생성된 이미지가 있으면 재렌더링하지 않고 새 서명 URL만 발급한다(가정)
+- 서버는 Java2D headless 렌더링으로 PNG를 생성한다
+- PNG는 서비스 노드의 `/srv/feelm/data/report-images`에 저장하고 Backend 컨테이너에는 `/data/report-images`로 읽기·쓰기 bind mount한다(ADR-0023)
+- DB에는 서버가 생성한 상대 `storage_key`만 저장한다. 클라이언트가 보낸 파일명이나 경로를 저장 키로 사용하지 않는다
+- 리포트 이미지 디렉터리는 Nginx 정적 공개 경로로 노출하지 않는다. API-061이 본인 리포트인지 확인한 뒤 발급하는 서명 URL로만 접근한다(NFR-07)
+- 다운로드 URL은 발급 시점부터 10분 동안 유효하다. 다운로드 엔드포인트는 JWT 없이 접근할 수 있지만 만료 시각과 애플리케이션 서명을 검증하고, 실패하거나 만료되면 파일을 반환하지 않는다
+- 다운로드 서명에는 리포트 이미지 식별자와 만료 시각을 포함하고 전용 Secret으로 HMAC-SHA256 서명한다. JWT Secret을 재사용하지 않으며 비교는 constant-time으로 수행한다
+- 다운로드 응답은 `Content-Type: image/png`와 `Cache-Control: private, no-store`를 사용한다
+- 이미 생성된 이미지와 파일이 모두 있으면 재렌더링하지 않고 새 서명 URL만 발급한다. DB 행만 있고 파일이 없으면 원본 리포트로 다시 렌더링해 복구한다
 - 생성 대상은 상세 화면 전체나 인화기 배경이 아닌 취향 리포트 4컷 PNG다. 공유 이미지에는 닉네임·계정 식별자 등 개인정보를 넣지 않는다. 앱 안의 4컷에 닉네임이 보이더라도 공유·저장용 PNG는 별도로 안전하게 렌더링한다
 - 클라이언트의 `저장`/`이미지로 저장`은 URL 발급 성공 메시지만 보여주는 것이 아니라 PNG 파일을 실제로 내려받는다. 스토리지 또는 다운로드 중계 경로는 프론트가 이미지 바이트를 읽어 공유할 수 있도록 접근·CORS 정책을 맞춘다
 - 공유는 클라이언트가 PNG 파일을 기기 공유 시트로 전달하는 방식이며 서버 측 SNS 연동은 없다. 카카오톡·인스타그램 노출은 설치 앱·기기·브라우저 지원에 좌우되므로 특정 앱의 표시/게시 완료를 API가 보장하지 않는다. 이미지 파일 공유가 불가능하면 다운로드 후 해당 앱에서 직접 공유할 수 있게 안내한다
@@ -391,9 +407,6 @@ Path parameter `reportId`: 양의 정수. 요청 본문 없음.
 
 ### 미정 사항
 
-- [ ] 다운로드 URL 유효시간(운영 보안 정책)
-- [ ] 스토리지: S3 vs MinIO
-- [ ] 이미지 렌더링 방식(서버 headless 렌더 vs 클라이언트 canvas 후 업로드)
 - [ ] 4컷에 쓰는 영화·인물 사진의 외부 저장/소셜 공유 허용 범위와 미허용 시 대체 이미지 정책
 
 ## API-064 급상승 영화

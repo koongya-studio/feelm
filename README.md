@@ -321,7 +321,7 @@ flowchart TB
 - 실시간 처리는 **Python Fold-in Consumer + Spark Structured Streaming**으로 책임을 분리했다(ADR-0017).
   Kafka 이벤트·Redis 키 계약은 [스트리밍 계약](./docs/api/streaming-contract.md)을 따르며 Re-ranking 가중치와 파티·OTT 점수식은 구현 전에 확정한다.
 - 물리 스키마·마이그레이션은 [논리 ERD](./docs/erd.md)를 기준으로 구현 전에 작성한다.
-- 리포트 기능의 결과 이미지는 S3 호환 객체 스토리지에 저장하며 로컬·자체 호스팅은 MinIO를 사용할 수 있다.
+- 리포트 기능의 결과 이미지는 서비스 노드의 비공개 호스트 디렉터리에 저장하고, 애플리케이션이 발급·검증하는 10분 유효 서명 URL로만 제공한다(ADR-0023).
 
 ### Spark 자원 계획
 
@@ -428,7 +428,7 @@ flowchart LR
 | Cache | Redis | 확정 |
 | Frontend | React, Vite | 확정 |
 | 영화 정보 | TMDb API | 확정 |
-| 객체 스토리지 | S3 호환 스토리지 / MinIO | 리포트 기능 시점 |
+| 리포트 이미지 저장소 | 서비스 노드 호스트 bind mount | 확정 (ADR-0023) |
 | Infra | AWS EC2 2대 | 확정 |
 | 협업 | GitLab, Jira, Notion | 확정 |
 
