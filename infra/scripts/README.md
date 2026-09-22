@@ -1,5 +1,34 @@
 # Runner 통신 격리 파일럿 (S15P21E106-222)
 
+## 전체 서비스 배포 후 Smoke Test
+
+`full-service-smoke.py`는 서비스 노드에서 공개 HTTPS, Frontend, Backend와 데이터
+저장소를 확인한 뒤 분산 노드의 Kafka·Consumer Group·HDFS, Spark Worker 2대 및
+Prometheus 필수 target을 순서대로 검사합니다. 실패해도 독립적인 후속 검사를 계속해
+장애 범위를 남기며, JSON 결과의 `first_failure`와 `recovery`에 최초 복구 대상과 명령을
+기록합니다. 자동 롤백은 실행하지 않습니다.
+
+실행 계정에는 로컬 Docker 접근 권한과 분산 노드에 대한 비대화형 SSH 접근 권한이
+필요합니다. 테스트는 실행별 Kafka Topic·Consumer Group, Redis Key와 HDFS 파일을
+사용하며 Topic, Key와 파일은 검사 종료 시 정리합니다. 실제 서비스 Consumer Group
+조회는 읽기 전용입니다.
+
+```bash
+python3 -I -B infra/scripts/full-service-smoke.py \
+  --public-url https://j15e106.p.ssafy.io \
+  --distributed-host <user@분산-노드> \
+  --spark-master-url http://<분산-노드-사설-IP>:8080 \
+  --prometheus-url http://127.0.0.1:9090 \
+  --report /tmp/feelm-smoke-report.json
+```
+
+종료 코드 `0`은 전체 성공, `1`은 하나 이상의 실패를 뜻합니다. 보고서는 단계별 상태,
+소요 시간과 제한된 오류 정보만 저장합니다. 단위 테스트는 다음과 같이 실행합니다.
+
+```bash
+python3 -I -B infra/scripts/test_full_service_smoke.py
+```
+
 Kafka 업무 Topic의 별도 멱등 Job과 로컬 실행 방법은
 [`KAFKA-TOPICS.md`](KAFKA-TOPICS.md)를 따른다. 기존 Topic의 파티션·복제 설정이 다르면
 자동 변경 없이 실패하며 Topic과 메시지를 삭제하지 않는다.
