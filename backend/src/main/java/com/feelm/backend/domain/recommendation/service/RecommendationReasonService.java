@@ -40,7 +40,7 @@ public class RecommendationReasonService {
         return initial;
     }
 
-    /** LLM 호출은 버퍼 저장 및 스냅샷 갱신 트랜잭션 밖에서 수행된다. */
+    /** LLM 호출은 버퍼 저장 트랜잭션 밖에서 수행되고, 문구 확정은 항목마다 별도 커밋한다(S15P21E106-804). 트랜잭션 안에서 호출하지 않는다. */
     public void completeUnexposed(long setId) {
         List<RecommendationReasonRepository.UnresolvedItem> unresolved =
                 repository.findUnresolved(setId);

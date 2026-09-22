@@ -258,6 +258,16 @@ public record RatingResponse(Long ratingId, BigDecimal score, String comment) {
 - 단, API-045 추천 조회는 최초 노출과 빈 슬롯 보충의 `exposed_at`과 추천 이력(`user_movie_exposures`)을 원자적으로 기록해야 하므로 일반 조회 원칙의 예외로 쓰기 트랜잭션을 사용한다.
 - 한 조회가 여러 질의를 잇고 그 사이에 다른 요청의 쓰기가 끼면 결과가 어긋나는 경우(예: API-048 이력의 세트 목록과 항목 조회)에는 `readOnly = true`에 `isolation = REPEATABLE_READ`를 더해 첫 문장의 스냅샷을 고정한다.
 - 생성·수정·삭제 메서드는 `@Transactional`을 사용한다.
+- 단, 추천 이유 보강의 문구 확정(`RecommendationReasonSnapshotWriter`)은 사용자 행 잠금 없이 `recommendation_items`를 갱신하므로,
+  같은 세트를 `FOR UPDATE`로 잠그는 API-045 조회와 반대 순서로 여러 행을 잠그지 않도록 항목마다 별도 커밋한다(S15P21E106-804).
+  각 UPDATE가 독립·멱등이어서 세트 단위 원자성이 필요 없다.
+- `movies`를 FK로 참조하는 여러 행을 한 트랜잭션에서 INSERT·UPDATE할 때는 `movie_id` 오름차순으로 실행한다. 온보딩
+  제출(`OnboardingRatingWriter.createMissing`)이 평가할 영화들을 `movie_id` 오름차순 `FOR UPDATE`로 잠그므로, FK 검사가
+  거는 `KEY SHARE`도 같은 방향이어야 다른 사용자 간 교착이 나지 않는다(S15P21E106-804). `RecommendationServingRepository
+  .recordExposureHistory`, `RecommendationBufferRepository.insertItems`, `PartyRecommendationRepository.insertItems`가
+  이 규칙을 따른다. **한 트랜잭션에서 이런 다중 행 쓰기를 호출을 나눠 여러 번 하면 호출마다 정렬해도 소용없다** — 잠금 순서는
+  호출 순서로 결정되므로, 노출할 항목을 다 모은 뒤 한 트랜잭션당 한 번만 호출해야 한다(`RecommendationReplenisher`가
+  빈 슬롯을 순차로 노출하되 이력 기록은 모아서 한 번에 하는 이유).
 - 하나의 유스케이스가 여러 Repository를 변경하면 최상위 Service 메서드가 전체
   트랜잭션을 소유한다.
 - 평가·감상·프레임·팝콘처럼 여러 도메인에 걸친 단일 트랜잭션은 역할 분배 문서에서

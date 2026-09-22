@@ -7,6 +7,7 @@ import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -91,9 +92,14 @@ public class PartyRecommendationRepository {
         return id;
     }
 
+    /** 저장 순서는 {@code position}이 정하므로 INSERT 순서는 자유다. 반환 id도 movie_id 오름차순이다. */
     public List<Long> insertItems(long setId, List<NewItem> items) {
-        List<Long> ids = new ArrayList<>(items.size());
-        for (NewItem item : items) {
+        // FK 검사가 movies 행에 KEY SHARE를 행 순서대로 건다. 온보딩(API-024)의 id 오름차순 FOR UPDATE와 같은 방향으로
+        // 맞춰 다른 사용자 간 교착을 막는다(S15P21E106-804).
+        List<NewItem> byMovieId =
+                items.stream().sorted(Comparator.comparingLong(NewItem::movieId)).toList();
+        List<Long> ids = new ArrayList<>(byMovieId.size());
+        for (NewItem item : byMovieId) {
             Long id =
                     jdbcTemplate.queryForObject(
                             "INSERT INTO recommendation_items"
