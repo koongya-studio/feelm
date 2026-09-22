@@ -19,6 +19,7 @@ Epic [S15P21E106-266] `[FE] Feelm 와이어프레임 기반 프론트엔드 초�
 | [`screen-spec-my.md`](./screen-spec-my.md) | 에픽 `S15P21E106-301`의 MY 화면(7.1 ~ 7.8-D) |
 | [`api-status.md`](./api-status.md) | `src/api` 함수별 연동 상태와 목업으로 남은 이유 · 선행 백엔드 업무(업무 `S15P21E106-395`) |
 | [`screen-spec-report-notification-ott.md`](./screen-spec-report-notification-ott.md) | 에픽 `S15P21E106-301`의 취향 리포트 · 알림 · OTT 찾기 화면(3.3 ~ 3.5, 7.3 · 7.4, 8.1 · 8.2, EXT-01 ~ EXT-05) |
+| [`character-card-assets.md`](./character-card-assets.md) | 취향 4컷 04 칸 캐릭터 카드 16종의 이미지 규격 · 생성 프롬프트 · 검수 기준(업무 `S15P21E106-781`) |
 | `frontend/docs/FEELM-UI-Mockup.html` | 이전 UI 목업. 기준 자료가 아닙니다 |
 | `frontend/docs/images/` | 위 목업의 화면 캡처 29장과 [`manifest.json`](../images/manifest.json) |
 | `frontend/landing/` | 독립 배포하는 정적 랜딩 페이지. 이번 에픽 범위가 아닙니다 |
