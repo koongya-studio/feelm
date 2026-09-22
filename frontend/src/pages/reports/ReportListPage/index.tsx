@@ -251,7 +251,12 @@ function PinnedStrip({ entry, tilt }: { entry: Entry; tilt: 'left' | 'right' }) 
       <ReportTape />
       {detail ? (
         <div className={styles.strip} aria-hidden="true">
-          <ReportFourCut cuts={detail.fourCut} createdAt={detail.createdAt} head={false} />
+          <ReportFourCut
+            cuts={detail.fourCut}
+            createdAt={detail.createdAt}
+            head={false}
+            characterCode={detail.characterCard?.code}
+          />
         </div>
       ) : (
         <div className={styles.blank} aria-hidden="true">

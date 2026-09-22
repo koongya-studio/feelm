@@ -172,7 +172,12 @@ export default function ReportIssuedPage() {
                 }
               }}
             >
-              <ReportFourCut cuts={report.fourCut} owner={nickname} createdAt={report.createdAt} />
+              <ReportFourCut
+                cuts={report.fourCut}
+                owner={nickname}
+                createdAt={report.createdAt}
+                characterCode={report.characterCard?.code}
+              />
             </div>
           </div>
         </div>
