@@ -1,0 +1,249 @@
+<!doctype html>
+<!--
+  뷰포트 측정 페이지 (업무 S15P21E106-806, 임시).
+
+  아이폰 사파리의 떠 있는 하단 주소창이 앱 하단 내비를 가리는 문제를 고치려면, 사파리가 그
+  주소창을 어떤 값으로 알려 주는지 실기기에서 재야 한다. 크롬 에뮬레이션으로는 재현되지 않는다.
+
+  뷰포트 메타는 앱(index.html)과 똑같이 둔다. 앱 번들과 무관한 정적 파일이며 어디에서도
+  링크하지 않는다. 원인을 확인하고 고친 뒤 이 파일은 지운다.
+-->
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta name="robots" content="noindex" />
+    <title>Viewport Probe</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+
+      body {
+        margin: 0;
+        font:
+          14px/1.5 -apple-system,
+          system-ui,
+          sans-serif;
+        color: #262729;
+        background: #eff0f3;
+      }
+
+      main {
+        padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 16px;
+      }
+
+      h1 {
+        margin: 0 0 4px;
+        font-size: 18px;
+      }
+
+      p {
+        margin: 0 0 12px;
+        color: #5c5d63;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+        font-variant-numeric: tabular-nums;
+      }
+
+      td {
+        padding: 5px 8px;
+        border-bottom: 1px solid #e6e7ec;
+      }
+
+      td:last-child {
+        text-align: right;
+        font-weight: 600;
+      }
+
+      .mode {
+        display: flex;
+        gap: 8px;
+        margin: 12px 0;
+      }
+
+      .mode button {
+        flex: 1;
+        min-height: 44px;
+        border: 1px solid #262729;
+        border-radius: 12px;
+        background: #fff;
+        font: inherit;
+      }
+
+      .mode button[aria-pressed='true'] {
+        background: #262729;
+        color: #fff;
+      }
+
+      /* 문서를 스크롤하게 만드는 여분. 사파리는 문서가 스크롤돼야 주소창을 줄인다 */
+      .spacer {
+        height: 150vh;
+      }
+
+      body[data-mode='fixed'] .spacer {
+        display: none;
+      }
+
+      body[data-mode='fixed'] {
+        overflow: hidden;
+      }
+
+      /* 높이 단위를 재는 보이지 않는 막대들 */
+      .probe {
+        position: fixed;
+        top: 0;
+        left: -10px;
+        width: 1px;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      /*
+       * 바닥 눈금자. 화면 맨 아래(bottom: 0)에서 위로 10px마다 선을 긋고 번호를 붙인다.
+       * 스크린샷에서 주소창 바로 위로 보이는 첫 번호가 곧 가려진 높이(px)다.
+       */
+      .ruler {
+        position: fixed;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        height: 160px;
+        background: repeating-linear-gradient(to top, #fde68a 0 10px, #bfdbfe 10px 20px);
+        pointer-events: none;
+      }
+
+      .tick {
+        position: absolute;
+        left: 4px;
+        font-size: 10px;
+        line-height: 10px;
+        font-weight: 700;
+      }
+
+      .tick:nth-child(even) {
+        left: auto;
+        right: 4px;
+      }
+
+      /* 앱 하단 내비와 같은 방식(바닥 + safe area)으로 놓은 막대 */
+      .navlike {
+        position: fixed;
+        right: 24%;
+        bottom: 0;
+        left: 24%;
+        height: calc(56px + env(safe-area-inset-bottom, 0px));
+        box-sizing: border-box;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        border: 2px solid #c41425;
+        background: rgb(255 255 255 / 70%);
+        font-size: 11px;
+        text-align: center;
+      }
+
+      .navlike span {
+        display: block;
+        padding-top: 18px;
+      }
+    </style>
+  </head>
+  <body data-mode="fixed">
+    <main>
+      <h1>뷰포트 측정</h1>
+      <p>이 화면을 그대로 캡처해 주세요. 아래 버튼으로 모드를 바꿔 한 장씩 더 캡처해 주세요.</p>
+
+      <div class="mode">
+        <button type="button" data-set="fixed" aria-pressed="true">앱처럼(스크롤 없음)</button>
+        <button type="button" data-set="scroll" aria-pressed="false">문서 스크롤</button>
+      </div>
+
+      <table>
+        <tbody id="rows"></tbody>
+      </table>
+
+      <div class="spacer"></div>
+    </main>
+
+    <div class="probe" id="p-vh" style="height: 100vh"></div>
+    <div class="probe" id="p-svh" style="height: 100svh"></div>
+    <div class="probe" id="p-lvh" style="height: 100lvh"></div>
+    <div class="probe" id="p-dvh" style="height: 100dvh"></div>
+    <div
+      class="probe"
+      id="p-safe"
+      style="
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      "
+    ></div>
+
+    <div class="ruler" aria-hidden="true" id="ruler"></div>
+    <div class="navlike"><span>앱 하단 내비 자리</span></div>
+
+    <script>
+      const ruler = document.getElementById('ruler');
+
+      for (let px = 0; px < 160; px += 10) {
+        const tick = document.createElement('span');
+
+        tick.className = 'tick';
+        tick.style.bottom = `${px}px`;
+        tick.textContent = String(px);
+        ruler.appendChild(tick);
+      }
+
+      const height = (id) => Math.round(document.getElementById(id).getBoundingClientRect().height);
+
+      function render() {
+        const vv = window.visualViewport;
+        const safe = getComputedStyle(document.getElementById('p-safe'));
+        const rows = [
+          ['기기', navigator.userAgent.match(/(iPhone|iPad|Android)[^;)]*/)?.[0] ?? '-'],
+          ['Safari 버전', navigator.userAgent.match(/Version\/([\d.]+)/)?.[1] ?? '-'],
+          ['홈 화면 앱', navigator.standalone ? '예' : '아니오'],
+          ['screen', `${screen.width} × ${screen.height}`],
+          ['innerHeight', window.innerHeight],
+          ['outerHeight', window.outerHeight],
+          ['documentElement.clientHeight', document.documentElement.clientHeight],
+          ['visualViewport.height', vv ? Math.round(vv.height) : '-'],
+          ['visualViewport.offsetTop', vv ? Math.round(vv.offsetTop) : '-'],
+          ['100vh', height('p-vh')],
+          ['100svh', height('p-svh')],
+          ['100lvh', height('p-lvh')],
+          ['100dvh', height('p-dvh')],
+          ['safe-area-inset-top', parseFloat(safe.paddingTop)],
+          ['safe-area-inset-bottom', parseFloat(safe.paddingBottom)],
+          ['scrollY', Math.round(window.scrollY)],
+        ];
+
+        document.getElementById('rows').innerHTML = rows
+          .map(([name, value]) => `<tr><td>${name}</td><td>${value}</td></tr>`)
+          .join('');
+      }
+
+      document.querySelectorAll('[data-set]').forEach((button) => {
+        button.addEventListener('click', () => {
+          document.body.dataset.mode = button.dataset.set;
+          document.querySelectorAll('[data-set]').forEach((other) => {
+            other.setAttribute('aria-pressed', String(other === button));
+          });
+          window.scrollTo(0, 0);
+          render();
+        });
+      });
+
+      window.addEventListener('resize', render);
+      window.addEventListener('scroll', render, { passive: true });
+      window.visualViewport?.addEventListener('resize', render);
+      window.visualViewport?.addEventListener('scroll', render);
+      render();
+    </script>
+  </body>
+</html>
