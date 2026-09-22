@@ -86,3 +86,106 @@
     animation: none;
   }
 }
+
+/* ─────────────────────────── 데스크톱 시안 (업무 -784) */
+
+/*
+ * 넓은 화면의 격자. **열 수를 고정하지 않는다** — 중앙 단은 1024px에서 넓고 1280px에서는
+ * 우측 패널이 열려 좁아진다(업무 -783 확인 기록). 한 칸의 최소 폭만 정하고 좁아지면 줄을
+ * 바꾼다. 150px은 카드 안의 `2019 · 드라마` 한 줄이 꺾이지 않는 폭이다.
+ */
+.grid[data-variant='desktop'] {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-3);
+}
+
+/*
+ * **칸이 자기 내용만큼 넓어지지 않게 막는다.** 격자 항목의 자동 최소 크기는 내용의
+ * min-content이라, `2021 · 다큐멘터리`처럼 줄바꿈하지 않는 줄이나 OTT 배지 석 장이 들어간
+ * 칸이 `1fr`을 넘겨 열 폭이 제각각이 됐다(2026-09-22 브라우저 확인). 0으로 두면 모든 열이
+ * 같은 폭이고, 넘치는 줄은 칸 안에서 말줄임된다.
+ */
+.grid[data-variant='desktop'] > li {
+  min-width: 0;
+}
+
+/*
+ * 한 칸이 흰 카드가 된다(시안). 안쪽 여백이 생기고 포스터가 카드 안에 앉는다.
+ *
+ * **폭을 100%로 못 박는다.** 고르는 단추일 때 칸은 `button`이고, 단추는 칸을 채우지 않고
+ * 자기 내용만큼만 넓어져 카드마다 폭이 달랐다(2026-09-22 브라우저 확인). 링크(`a`)일 때는
+ * 지금까지도 칸을 채웠다.
+ */
+.grid[data-variant='desktop'] .cell {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  align-items: stretch;
+  padding: var(--space-2);
+  border: 2px solid transparent;
+  border-radius: var(--radius-card);
+  /* 시안의 카드는 흰 면이다. `--color-surface`는 벽보다 조금 밝은 회색이라 카드로 읽히지 않는다 */
+  background: var(--color-surface-solid);
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
+/* 고른 칸(시안). 이 화면에서 빨강을 쓰는 자리는 여기와 상세 버튼뿐이다 */
+.grid[data-variant='desktop'] .cell[data-selected='true'] {
+  border-color: var(--color-action-brand);
+}
+
+/* 카드 안의 제목은 왼쪽 정렬 한 줄이다. 가운데 정렬은 412px 격자의 규칙이다 */
+.grid[data-variant='desktop'] .title {
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  margin-top: var(--space-2);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  text-align: left;
+}
+
+/* `2019 · 드라마`. 한 줄이며 넘치면 자른다 */
+.meta {
+  overflow: hidden;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * 평점 줄. **평가가 없어도 줄을 지우지 않는다** — 지우면 카드 높이가 갈려 격자가
+ * 들쭉날쭉해진다(업무 -783에서 같은 것을 겪었다).
+ */
+.rating {
+  display: flex;
+  min-height: calc(var(--font-size-meta) * var(--line-height-meta));
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 별은 콘텐츠의 색이다. UI 요소가 아니라 값의 표시라 유채색을 쓴다 */
+.star {
+  color: var(--color-action-brand);
+}
+
+/*
+ * OTT 배지 줄. 볼 수 있는 곳이 없으면 비어 있지만 자리는 지킨다 — 같은 이유로 높이를
+ * 배지 한 변으로 고정한다.
+ */
+.otts {
+  display: flex;
+  min-height: 22px;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: auto;
+  padding-top: var(--space-1);
+}

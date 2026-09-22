@@ -53,11 +53,17 @@ import {
   getTopRatedMovies,
   searchMovies,
 } from '../../../api/search';
+import { getMovieDetail, getSimilarMovies } from '../../../api/movies';
+import { getOtts } from '../../../api/otts';
+import { useShellSize } from '../../../hooks/useShellSize';
 import {
   addRecentSearchQuery,
   clearRecentSearchQueries,
   getRecentSearchQueries,
 } from '../../../mocks/sessionStore';
+import DesktopAside from '../../../components/DesktopAside';
+import SearchAside from './SearchAside';
+import SearchFilterChips from './SearchFilterChips';
 import SearchFilterSheet from './SearchFilterSheet';
 import SearchResultGrid, { SearchResultSkeleton } from './SearchResultGrid';
 import {
@@ -70,6 +76,8 @@ import {
 } from './searchFilter';
 import { saveSnapshot, takeSnapshot } from './searchSnapshot';
 import type { SearchFilterState } from './searchFilter';
+import type { MovieDetail, SimilarMovie } from '../../../types/movie';
+import type { Ott } from '../../../types/ott';
 import type {
   FilterOptions,
   MovieSearchItem,
@@ -225,6 +233,50 @@ export default function SearchPage() {
   /** 검색 전에 까는 평점 높은 영화(업무 -714). 실패 · 빈 응답이면 빈 배열이고 그 자리만 없다 */
   const [topRated, setTopRated] = useState<MovieSearchItem[]>([]);
 
+  /*
+   * ─────────────────────────── 데스크톱 시안 (업무 -784)
+   *
+   * `wide`(1280px 이상)에서만 우측 보조 패널 자리가 있다(업무 -782). 그 폭에서는 결과 칸이
+   * 고르는 단추가 되고 상세로는 패널의 버튼으로 간다. 자리가 없는 폭에서는 지금까지처럼
+   * 칸이 곧 상세 링크다(사용자 결정 2026-09-22).
+   */
+  const shell = useShellSize();
+  const desktop = shell !== 'mobile';
+  const wide = shell === 'wide';
+  /**
+   * 명시적으로 고른 영화의 번호. `null`이면 아직 고르지 않았다는 뜻이고, 그때 패널은
+   * **결과의 첫 영화**를 말한다(시안 — 첫 칸에 테두리가 있다)
+   */
+  const [pickedId, setPickedId] = useState<number | null>(null);
+  /** `✕`로 패널을 닫았는지. 새 검색이 나가면 풀린다 */
+  const [pickDismissed, setPickDismissed] = useState(false);
+  /**
+   * 받아 둔 영화 상세(API-030). **어느 영화의 것인지 응답 자신이 들고 있다**(`movieId`) —
+   * 고른 영화가 바뀌는 순간 초기화하지 않고, 그릴 때 번호를 견줘 지난 응답을 걸러낸다
+   */
+  const [pickedDetail, setPickedDetail] = useState<MovieDetail | null>(null);
+  /** 받아 둔 유사 작품(API-031). 응답에 기준 영화가 없어 번호를 함께 적어 둔다 */
+  const [pickedSimilar, setPickedSimilar] = useState<{
+    movieId: number;
+    items: SimilarMovie[];
+  } | null>(null);
+  /** OTT 기준정보(API-025). 검색 응답은 코드만 주므로 이름표가 따로 필요하다 */
+  const [otts, setOtts] = useState<Ott[]>([]);
+
+  /*
+   * 패널이 말하는 영화. **상태가 아니라 결과에서 끌어낸다** — 새 검색 결과가 오면 고른
+   * 번호가 그 안에 없으므로 저절로 첫 영화로 돌아간다. 따로 맞추는 효과를 두면 결과가 바뀔
+   * 때마다 한 박자 늦게 따라오고, 효과 안에서 상태를 또 바꾸게 된다.
+   *
+   * 넓은 화면이 아니면 아무것도 고르지 않는다 — 패널 자리가 없으니 상세를 부를 이유도 없다.
+   */
+  const results = search.status === 'ready' ? search.items : [];
+  const pickedItem =
+    !wide || pickDismissed
+      ? null
+      : (results.find((movie) => movie.movieId === pickedId) ?? results[0] ?? null);
+  const pickedMovieId = pickedItem?.movieId ?? null;
+
   const inputRef = useRef<HTMLInputElement>(null);
   const filterButtonRef = useRef<HTMLButtonElement>(null);
   const filterSheetId = useId();
@@ -273,6 +325,61 @@ export default function SearchPage() {
       active = false;
     };
   }, []);
+
+  /*
+   * OTT 기준정보(API-025). 넓은 화면의 카드와 패널이 배지 이름에 쓴다. 못 받으면 배지가
+   * 코드로 떨어질 뿐이라 화면을 막지 않는다. 좁은 화면은 배지를 그리지 않지만, 폭이 바뀌면
+   * 그때 필요해지므로 한 번만 부른다 — `getOtts`가 응답을 모듈 안에 재사용한다.
+   */
+  useEffect(() => {
+    let active = true;
+
+    getOtts()
+      .then((value) => {
+        if (active) setOtts(value);
+      })
+      .catch(() => {
+        // 그대로 둔다
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  /*
+   * 고른 영화의 상세(API-030)와 유사 작품(API-031).
+   *
+   * 검색 응답(API-028)에는 줄거리 · 감독 · 출연진이 없어 따로 부른다. 받는 동안에도 패널은
+   * 검색 결과가 준 것으로 이미 서 있으므로 빈 화면이 보이지 않는다. 둘 중 하나를 못 받으면
+   * 그 구역만 없다 — 패널 전체를 오류로 덮지 않는다.
+   */
+  useEffect(() => {
+    if (pickedMovieId === null) return;
+
+    let active = true;
+    const movieId = pickedMovieId;
+
+    getMovieDetail(movieId)
+      .then((value) => {
+        if (active) setPickedDetail(value);
+      })
+      .catch(() => {
+        // 그대로 둔다. 검색 결과가 준 것만으로 패널이 선다
+      });
+
+    getSimilarMovies(movieId)
+      .then((items) => {
+        if (active) setPickedSimilar({ movieId, items });
+      })
+      .catch(() => {
+        // 그대로 둔다
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [pickedMovieId]);
 
   useEffect(() => {
     let active = true;
@@ -354,6 +461,10 @@ export default function SearchPage() {
   const run = useCallback(
     (nextKeyword: string, nextFilter: SearchFilterState) => {
       const seq = (runSeq.current += 1);
+
+      // 새 검색이면 고르기를 되돌린다. 닫아 둔 패널도 다시 열린다(업무 -784)
+      setPickedId(null);
+      setPickDismissed(false);
 
       // 조건을 주소에 적는다. 늘 바꿔 쓰므로 뒤로 가기 기록이 쌓이지 않는다
       setParams(toSearchParams(nextKeyword, nextFilter), { replace: true });
@@ -576,11 +687,18 @@ export default function SearchPage() {
   const changeSort = (sort: MovieSearchSort) => changeFilter({ ...filter, sort });
 
   const filtered = !isEmptyFilter(filter);
+  /** 걸려 있는 필터 수. 넓은 화면의 필터 단추가 배지로 적는다(시안) */
+  const activeFilterCount =
+    filter.genre.length + filter.ott.length + (filter.year === EMPTY_FILTER.year ? 0 : 1);
 
   return (
     <>
-      <div className={styles.page} ref={pageRef}>
-        <ScreenHeader title="검색" />
+      <div className={desktop ? styles.desktopPage : styles.page} ref={pageRef}>
+        {/*
+         * 넓은 화면에서는 시안대로 큰 제목이 선다. 좁은 화면의 화면 헤더는 그대로다 —
+         * 데스크톱 셸은 상단 바가 검색 · 알림 · 프로필을 이미 맡는다(업무 -782).
+         */}
+        {desktop ? <h1 className={styles.desktopTitle}>검색</h1> : <ScreenHeader title="검색" />}
 
         <form
           className={styles.searchBar}
@@ -647,9 +765,20 @@ export default function SearchPage() {
             aria-controls={filterOpen ? filterSheetId : undefined}
             aria-describedby={filtered ? filterStateId : undefined}
             data-filtered={filtered || undefined}
+            data-variant={desktop ? 'desktop' : undefined}
             onClick={() => setFilterOpen(true)}
           >
             <FilterIcon />
+
+            {/* 시안은 넓은 화면에서 `필터`와 걸린 개수를 함께 적는다 */}
+            {desktop ? (
+              <>
+                <span className={styles.filterLabel}>필터</span>
+                {activeFilterCount > 0 ? (
+                  <span className={styles.filterCount}>{activeFilterCount}</span>
+                ) : null}
+              </>
+            ) : null}
           </button>
           {filtered ? (
             <span id={filterStateId} hidden>
@@ -666,7 +795,7 @@ export default function SearchPage() {
           </p>
         ) : null}
 
-        {search.status === 'idle' ? (
+        {desktop || search.status === 'idle' ? (
           recent.length > 0 ? (
             <section className={styles.recent}>
               <div className={styles.recentHead}>
@@ -703,10 +832,27 @@ export default function SearchPage() {
           ) : null
         ) : null}
 
+        {/*
+         * 걸려 있는 필터 칩(시안). 넓은 화면에서만 둔다 — 412px은 필터 단추의 표식과
+         * 시트가 그 말을 한다
+         */}
+        {desktop ? (
+          <SearchFilterChips
+            filter={filter}
+            options={options}
+            onChange={changeFilter}
+            onReset={() => changeFilter(EMPTY_FILTER)}
+          />
+        ) : null}
+
         {search.status === 'idle' && topRated.length > 0 ? (
           <section className={styles.topRated}>
             <h2 className={styles.sectionLabel}>평점 높은 영화</h2>
-            <SearchResultGrid items={topRated} />
+            <SearchResultGrid
+              items={topRated}
+              variant={desktop ? 'desktop' : 'compact'}
+              otts={otts}
+            />
           </section>
         ) : null}
 
@@ -714,7 +860,9 @@ export default function SearchPage() {
           <p className={styles.guide}>영화 제목, 감독, 배우 이름으로 검색해 보세요</p>
         ) : null}
 
-        {search.status === 'loading' ? <SearchResultSkeleton /> : null}
+        {search.status === 'loading' ? (
+          <SearchResultSkeleton variant={desktop ? 'desktop' : 'compact'} />
+        ) : null}
 
         {search.status === 'failed' ? (
           <StatusView
@@ -765,10 +913,31 @@ export default function SearchPage() {
               </label>
             </div>
 
-            <SearchResultGrid items={search.items} onSelect={leaveToDetail} />
+            <SearchResultGrid
+              items={search.items}
+              onSelect={leaveToDetail}
+              variant={desktop ? 'desktop' : 'compact'}
+              otts={otts}
+              selectedId={pickedMovieId}
+              /*
+               * 우측 패널 자리가 있는 폭에서만 고르는 단추가 된다. 그보다 좁으면 칸이
+               * 지금까지처럼 곧 상세 링크다(사용자 결정 2026-09-22)
+               */
+              onPick={
+                wide
+                  ? (movie) => {
+                      setPickedId(movie.movieId);
+                      setPickDismissed(false);
+                    }
+                  : undefined
+              }
+            />
 
             {search.more === 'loading' ? (
-              <SearchResultSkeleton cells={MORE_SKELETON_CELLS} />
+              <SearchResultSkeleton
+                cells={MORE_SKELETON_CELLS}
+                variant={desktop ? 'desktop' : 'compact'}
+              />
             ) : null}
 
             {search.hasNext &&
@@ -790,6 +959,25 @@ export default function SearchPage() {
           </section>
         ) : null}
       </div>
+
+      {/*
+       * 우측 보조 패널. 1280px 이상에서만 자리가 있다(업무 -782).
+       *
+       * 아직 아무 결과도 없으면 고른 영화가 없으므로 그리지 않는다 — `AppLayout`이 빈 단을
+       * 접는다. `✕`로 닫아도 마찬가지다.
+       */}
+      {pickedItem ? (
+        <DesktopAside>
+          <SearchAside
+            item={pickedItem}
+            detail={pickedDetail?.movieId === pickedItem.movieId ? pickedDetail : null}
+            similar={pickedSimilar?.movieId === pickedItem.movieId ? pickedSimilar.items : []}
+            otts={otts}
+            onClose={() => setPickDismissed(true)}
+            onLeaveToDetail={leaveToDetail}
+          />
+        </DesktopAside>
+      ) : null}
 
       {filterOpen && options ? (
         <SearchFilterSheet

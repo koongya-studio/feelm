@@ -295,3 +295,102 @@
 .sentinel {
   height: 1px;
 }
+
+/* ─────────────────────────── 데스크톱 시안 (업무 -784) */
+
+/*
+ * 1024px 이상에서 `index.tsx`가 `.page` 대신 이 클래스를 붙인다. 미디어 쿼리가 아니라
+ * 그리는 것 자체가 갈리므로 여기에는 `@media`가 없다(업무 -782의 셸과 같은 규칙).
+ *
+ * 좁은 화면의 구역들은 좌우 여백을 `--screen-padding-x`로 스스로 넣는다. 데스크톱 단은
+ * 그 여백을 페이지가 한 번만 주므로 아래에서 되돌린다 — 구역마다 클래스를 새로 만들면
+ * 같은 줄이 두 벌이 된다.
+ */
+.desktopPage {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-4) var(--space-8);
+  overflow-y: auto;
+}
+
+.desktopTitle {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.15;
+  letter-spacing: var(--letter-spacing-title);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.desktopPage .searchBar,
+.desktopPage .scope,
+.desktopPage .shortNotice,
+.desktopPage .recent,
+.desktopPage .topRated,
+.desktopPage .results,
+.desktopPage .guide {
+  padding-right: 0;
+  padding-left: 0;
+}
+
+.desktopPage .searchBar,
+.desktopPage .scope,
+.desktopPage .shortNotice {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+/* 검색창이 시안만큼 커진다. 데스크톱 단은 한 줄이 길어 글자도 한 단계 크다 */
+.desktopPage .field {
+  height: var(--control-height);
+}
+
+.desktopPage .input {
+  font-size: var(--font-size-body);
+}
+
+/* 필터 단추가 `필터 2`가 된다(시안). 정사각형 대신 글자만큼 늘어난다 */
+.filterButton[data-variant='desktop'] {
+  width: auto;
+  height: var(--control-height);
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+}
+
+.filterLabel {
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+
+/* 걸린 개수. 표식이므로 빨강 면이다(`design-concept.md` 2.3) */
+.filterCount {
+  display: flex;
+  min-width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-pill);
+  background: var(--color-action-brand);
+  color: var(--color-on-dark);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * 최근 검색어는 넓은 화면에서 **결과가 있어도 남는다**(시안). 좁은 화면은 검색 전에만
+ * 보였는데, 데스크톱 단은 세로가 길어 검색줄 아래 한 줄을 내어 줄 수 있다.
+ */
+.desktopPage .recentList {
+  align-items: center;
+}
+
+/* 결과 머리줄의 제목이 한 단계 크다(시안) */
+.desktopPage .resultsTitle {
+  font-size: 22px;
+}

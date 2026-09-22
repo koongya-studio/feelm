@@ -1,0 +1,179 @@
+/*
+ * 4.2 검색 — 고른 영화의 우측 보조 패널 (업무 S15P21E106-784).
+ *
+ * 카드의 흰 면 · 제목 줄 · 닫기는 `components/AsidePanel`이 그린다. 여기 있는 것은
+ * 카드 안쪽뿐이다. 1280px 이상에서만 그려지므로 `@media`가 없다(업무 -782의 규칙).
+ */
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.head {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.headText {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+.meta {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-muted);
+}
+
+.rating {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 별은 콘텐츠의 색이다. UI 요소가 아니라 값의 표시라 유채색을 쓴다 */
+.star {
+  color: var(--color-action-brand);
+}
+
+.otts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  padding: 0;
+  margin-top: var(--space-1);
+  margin-bottom: 0;
+  list-style: none;
+}
+
+/* 이 패널의 주 동작. 시안의 빨간 면이다 */
+.detailButton {
+  display: flex;
+  min-height: var(--control-height);
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-action-brand);
+  color: var(--color-on-dark);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  text-decoration: none;
+}
+
+.detailButton:hover {
+  background: var(--color-action-brand-pressed);
+}
+
+.detailButton svg {
+  width: 14px;
+  height: 14px;
+}
+
+/*
+ * 줄거리. 계약의 값이 아주 길 수 있어 여섯 줄에서 자른다 — 패널이 줄거리 하나로
+ * 스크롤 두 화면이 되면 아래 카드가 보이지 않는다.
+ */
+.synopsis {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-body);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-line);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink-muted);
+}
+
+.people {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-ink);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.chip {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-ink-body);
+}
+
+/* ─────────────────────────── 유사한 작품 */
+
+.similar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.similarCell {
+  display: flex;
+  text-decoration: none;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.similarTitle {
+  width: 100%;
+  overflow: hidden;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-body);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
