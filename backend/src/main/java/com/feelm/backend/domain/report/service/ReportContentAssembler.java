@@ -1,6 +1,10 @@
 package com.feelm.backend.domain.report.service;
 
+import com.feelm.backend.domain.report.model.CharacterAxisMedians;
+import com.feelm.backend.domain.report.model.CharacterAxisMetrics;
 import com.feelm.backend.domain.report.model.ReportContent;
+import com.feelm.backend.domain.report.model.ReportContent.CharacterCardContent;
+import com.feelm.backend.domain.report.model.ReportContent.CharacterCutCard;
 import com.feelm.backend.domain.report.model.ReportContent.Comparison;
 import com.feelm.backend.domain.report.model.ReportContent.DirectorCard;
 import com.feelm.backend.domain.report.model.ReportContent.FlavorChange;
@@ -96,7 +100,8 @@ public class ReportContentAssembler {
             List<ReportSource.Genre> genres,
             List<ReportSource.Country> countries,
             List<ReportSource.Person> people,
-            boolean previousReportExists) {
+            boolean previousReportExists,
+            CharacterAxisMedians characterAxisMedians) {
         Set<Long> currentIds = frameIds(frames, period.startInclusive(), effectiveEnd);
         Set<Long> previousIds =
                 frameIds(frames, period.previous().startInclusive(), period.startInclusive());
@@ -173,7 +178,18 @@ public class ReportContentAssembler {
                                 .count();
 
         Summary summary = new Summary(currentTotal, newFlavors.size(), averageScore(currentFrames));
-        FourCut fourCut = fourCut(currentGenres, currentDirectors, currentActors);
+
+        /*
+         * 캐릭터 카드. 판정은 그 반기 대상자 전체의 중앙값 스냅샷 기준 상대 판정이라 조립기가 아니라
+         * `CharacterCardSelector`가 한다(업무 -779). 프레임이 3편 이상이면 리포트가 생기고 카드도
+         * 늘 함께 생긴다 — 16종이 모든 조합을 덮어 후보 없음이 없다(API-060).
+         */
+        CharacterAxisMetrics axisMetrics =
+                CharacterCardSelector.metrics(frames, period.startInclusive(), effectiveEnd);
+        CharacterCardContent characterCard =
+                CharacterCardSelector.select(axisMetrics, characterAxisMedians, currentTotal);
+        FourCut fourCut =
+                fourCut(currentGenres, currentDirectors, currentActors, characterCard.name());
         List<String> highlights =
                 highlights(comparisons, newDirectorCount, new ArrayList<>(newFlavors.values()));
         List<Keyword> keywords =
@@ -195,7 +211,7 @@ public class ReportContentAssembler {
                 topGenres,
                 topActors,
                 topDirectors,
-                null,
+                characterCard,
                 flavorChanges,
                 fourCut,
                 genreShares,
@@ -204,6 +220,7 @@ public class ReportContentAssembler {
                 keywords,
                 comparisons,
                 highlights,
+                characterAxisMedians,
                 new Generation(1, snapshotAcquiredAt, period.cutoffExclusive(), finalSnapshot));
     }
 
@@ -434,7 +451,10 @@ public class ReportContentAssembler {
     }
 
     private static FourCut fourCut(
-            List<GenreStat> genres, List<PersonStat> directors, List<PersonStat> actors) {
+            List<GenreStat> genres,
+            List<PersonStat> directors,
+            List<PersonStat> actors,
+            String characterName) {
         GenreCard genre =
                 genres.isEmpty()
                         ? null
@@ -457,7 +477,7 @@ public class ReportContentAssembler {
                                 actors.getFirst().name(),
                                 null,
                                 new ImageRef(actors.getFirst().profileUrl()));
-        return new FourCut(genre, director, actor, null);
+        return new FourCut(genre, director, actor, new CharacterCutCard(characterName, null));
     }
 
     static String genreDisplayName(String code) {

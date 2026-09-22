@@ -151,7 +151,21 @@ class ReportGenerationIntegrationTest extends SharedPostgresContractTest {
         assertThat(noir.path("isNew").asBoolean()).isFalse();
         assertThat(content.path("fourCut").path("director").path("image").path("url").asText())
                 .isEqualTo("https://images.test/director-1.jpg");
-        assertThat(content.path("characterCard").isNull()).isTrue();
+        /*
+         * 캐릭터 카드는 프레임 3편 이상이면 늘 함께 생긴다 — 16종이 모든 조합을 덮어 후보 없음이
+         * 없다(API-060, 업무 -779). 이 사용자는 3편이라 소량 표본이다.
+         */
+        assertThat(content.path("characterCard").path("code").asText()).hasSize(4);
+        assertThat(content.path("characterCard").path("name").asText()).isNotBlank();
+        assertThat(content.path("characterCard").path("tagline").asText()).isNotBlank();
+        assertThat(content.path("characterCard").path("axes")).hasSize(4);
+        assertThat(content.path("characterCard").path("basis").path("frameCount").asInt())
+                .isEqualTo(3);
+        assertThat(content.path("characterCard").path("basis").path("lowSample").asBoolean())
+                .isTrue();
+        assertThat(content.path("fourCut").path("character").path("name").asText())
+                .isEqualTo(content.path("characterCard").path("name").asText());
+        assertThat(content.path("fourCut").path("character").has("image")).isFalse();
         // 취향 키워드는 임계값을 넘긴 규칙만 순서대로 최대 넷이다(업무 -774). 이 픽스처는
         // 감독·배우 3편 이상과 새 감독 3명을 못 넘겨 사람 규칙이 빠지고, 맛 둘(신규 달콤 ·
         // 느와르 67%)과 장르 둘(드라마 67% · 드라마 평균 ★4.8)로 넷이 차서 평가 습관까지
@@ -296,6 +310,68 @@ class ReportGenerationIntegrationTest extends SharedPostgresContractTest {
                 .doesNotContain(PERIOD);
         assertThat(reportCount()).isOne();
         assertThat(periodReportCount()).isEqualTo(2);
+    }
+
+    /*
+     * 캐릭터 카드 판정이 대상자 전체의 중앙값 기준 상대 판정이라(API-060, 업무 -779) 같은 반기의
+     * 모든 리포트가 같은 스냅샷을 써야 한다. 지표가 서로 다른 셋을 한 번에 준비해 확인한다.
+     */
+    @Test
+    @DisplayName("대상자 전원이 같은 중앙값 스냅샷을 쓴다")
+    void allSubjectsShareOneMedianSnapshot() throws Exception {
+        insertUser();
+        insertFrames(1, 3, "2026-01-10T00:00:00Z");
+        insertUser(USER + 1, "report-779-second@test.local", "report779-second");
+        insertFrames(USER + 1, 11, 22, "2026-02-10T00:00:00Z");
+        insertUser(USER + 2, "report-779-third@test.local", "report779-third");
+        insertFrames(USER + 2, 31, 38, "2026-03-10T00:00:00Z");
+
+        preparationService.prepare(PERIOD, PERIOD.cutoffExclusive(), true);
+
+        JsonNode first = reportContent(USER).path("characterAxisMedians");
+        JsonNode second = reportContent(USER + 1).path("characterAxisMedians");
+        JsonNode third = reportContent(USER + 2).path("characterAxisMedians");
+
+        assertThat(first.isMissingNode()).isFalse();
+        assertThat(second).isEqualTo(first);
+        assertThat(third).isEqualTo(first);
+        // 대상자 셋은 30명 미만이라 고정 임계값으로 떨어진다
+        assertThat(first.path("subjectCount").asInt()).isEqualTo(3);
+        assertThat(first.path("fixedThreshold").asBoolean()).isTrue();
+
+        // 편수 3 · 12 · 8을 고정 임계값 10편으로 가르면 S · V · S다
+        assertThat(reportContent(USER).path("characterCard").path("code").asText()).endsWith("S");
+        assertThat(reportContent(USER + 1).path("characterCard").path("code").asText())
+                .endsWith("V");
+        assertThat(reportContent(USER + 2).path("characterCard").path("code").asText())
+                .endsWith("S");
+    }
+
+    @Test
+    @DisplayName("프레임 10편 이상이면 소량 표본이 아니다")
+    void marksNormalSampleFromTenFrames() throws Exception {
+        insertUser();
+        insertFrames(1, 10, "2026-01-10T00:00:00Z");
+
+        preparationService.prepare(PERIOD, PERIOD.cutoffExclusive(), true);
+
+        JsonNode basis = reportContent().path("characterCard").path("basis");
+        assertThat(basis.path("frameCount").asInt()).isEqualTo(10);
+        assertThat(basis.path("lowSample").asBoolean()).isFalse();
+    }
+
+    @Test
+    @DisplayName("프레임 3편 미만이면 리포트도 카드도 없다")
+    void skipsUsersBelowThreeFrames() throws Exception {
+        insertUser();
+        insertFrames(1, 2, "2026-01-10T00:00:00Z");
+
+        assertThat(
+                        preparationService
+                                .prepare(PERIOD, PERIOD.cutoffExclusive(), true)
+                                .preparedCount())
+                .isZero();
+        assertThat(reportCount()).isZero();
     }
 
     private void insertUser() {
@@ -476,6 +552,15 @@ class ReportGenerationIntegrationTest extends SharedPostgresContractTest {
             Thread.sleep(50);
         }
         return false;
+    }
+
+    private JsonNode reportContent(long userId) throws Exception {
+        String content =
+                jdbc.queryForObject(
+                        "SELECT content::text FROM taste_reports WHERE user_id = ? AND year = 2026 AND half = 'H1'",
+                        String.class,
+                        userId);
+        return objectMapper.readTree(content);
     }
 
     private JsonNode reportContent() throws Exception {
