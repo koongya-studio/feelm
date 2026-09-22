@@ -8,9 +8,26 @@
  * 카드가 16종으로 고정이라 04 칸만 이 방식이다. 01 장르 · 02 감독 · 03 배우는 실존 인물 ·
  * 실제 스틸이라 계약이 주는 사진을 쓴다(API-060 미정 사항).
  *
- * 그림 16장은 업무 -781에서 만든다. **아직 없는 코드는 null이고 칸은 이름만 그린다** —
- * 에셋이 늦어도 화면은 동작하고, 파일이 도착하면 아래 import와 표만 채우면 된다.
+ * 그림 16장은 업무 -781에서 만들어 `src/assets/reports/character/<code>.webp`에 넣었다.
+ * **계약 밖의 코드는 여전히 null이고 칸은 이름만 그린다** — 모르는 값이 와도 화면은 동작한다.
  */
+
+import ELHV from '../../assets/reports/character/ELHV.webp';
+import ELHS from '../../assets/reports/character/ELHS.webp';
+import ELMV from '../../assets/reports/character/ELMV.webp';
+import ELMS from '../../assets/reports/character/ELMS.webp';
+import EDHV from '../../assets/reports/character/EDHV.webp';
+import EDHS from '../../assets/reports/character/EDHS.webp';
+import EDMV from '../../assets/reports/character/EDMV.webp';
+import EDMS from '../../assets/reports/character/EDMS.webp';
+import RLHV from '../../assets/reports/character/RLHV.webp';
+import RLHS from '../../assets/reports/character/RLHS.webp';
+import RLMV from '../../assets/reports/character/RLMV.webp';
+import RLMS from '../../assets/reports/character/RLMS.webp';
+import RDHV from '../../assets/reports/character/RDHV.webp';
+import RDHS from '../../assets/reports/character/RDHS.webp';
+import RDMV from '../../assets/reports/character/RDMV.webp';
+import RDMS from '../../assets/reports/character/RDMS.webp';
 
 /** 16종 전체. 축 순서는 탐험·정착 -> 빛·그림자 -> 가슴·머리 -> 다작·정독이다 */
 export const CHARACTER_CARD_CODES = [
@@ -35,19 +52,37 @@ export const CHARACTER_CARD_CODES = [
 export type CharacterCardCode = (typeof CHARACTER_CARD_CODES)[number];
 
 /**
- * 코드별 그림. 업무 -781이 `src/assets/reports/character/<code>.webp`를 추가하면서 채운다.
- * 표에 없는 코드는 그림이 없는 것으로 다룬다.
+ * 코드별 그림. 16종이 모두 채워져 있다(업무 -781). 표에 없는 코드는 그림이 없는 것으로 다룬다.
+ *
+ * 순서는 `CHARACTER_CARD_CODES`와 같게 둔다 — 축 조합을 눈으로 따라가며 빠진 칸을 찾는다.
  */
-const CARD_IMAGE: Partial<Record<CharacterCardCode, string>> = {};
+const CARD_IMAGE: Record<CharacterCardCode, string> = {
+  ELHV,
+  ELHS,
+  ELMV,
+  ELMS,
+  EDHV,
+  EDHS,
+  EDMV,
+  EDMS,
+  RLHV,
+  RLHS,
+  RLMV,
+  RLMS,
+  RDHV,
+  RDHS,
+  RDMV,
+  RDMS,
+};
 
 /** 코드가 16종에 있는지. 계약 밖의 값이 와도 화면이 깨지지 않게 먼저 걸러낸다 */
 export function isCharacterCardCode(code: unknown): code is CharacterCardCode {
   return typeof code === 'string' && (CHARACTER_CARD_CODES as readonly string[]).includes(code);
 }
 
-/** 카드 코드의 04 칸 그림. 모르는 코드나 아직 없는 그림은 null이다 */
+/** 카드 코드의 04 칸 그림. 계약 밖의 코드는 null이다 */
 export function characterCardImage(code: string | null | undefined): string | null {
-  return isCharacterCardCode(code) ? (CARD_IMAGE[code] ?? null) : null;
+  return isCharacterCardCode(code) ? CARD_IMAGE[code] : null;
 }
 
 /**
