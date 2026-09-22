@@ -63,8 +63,11 @@ export const SOCIAL_PROVIDER_LABEL: Record<SocialProvider, string> = {
  *
  * `withdraw`는 7.8-A-1 회원 탈퇴의 본인 확인이다(업무 -754). 콜백은 이 코드로 로그인하지
  * 않고 탈퇴 화면에 넘긴다 — 코드는 1회용이라 쓰는 곳이 한 곳이어야 한다.
+ *
+ * `link`는 7.8-A 계정 관리의 소셜 계정 연결이다(업무 -799, API-009). 같은 이유로 콜백은
+ * 로그인하지 않고 7.8-A에 넘기며, 그 화면이 연결을 부른다.
  */
-export type OAuthIntent = 'login' | 'signup' | 'withdraw';
+export type OAuthIntent = 'login' | 'signup' | 'withdraw' | 'link';
 
 /** 이미 연결된 제공자 이름(API-014 `linkedProviders`, 대문자로 온다)을 앱의 제공자로 바꾼다 */
 export function toSocialProvider(name: string): SocialProvider | null {
