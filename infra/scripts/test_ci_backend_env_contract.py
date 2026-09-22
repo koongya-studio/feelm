@@ -28,6 +28,21 @@ class BackendEnvironmentContractScriptTest(unittest.TestCase):
     def test_repository_contract_matches_compose(self):
         MODULE.validate_compose(MODULE.load_contract(), MODULE.backend_environment())
 
+    def test_compose_requires_all_oauth_deployment_inputs(self):
+        compose = MODULE.backend_environment()
+        oauth_inputs = (
+            "OAUTH_ALLOWED_REDIRECT_URIS",
+            "GOOGLE_CLIENT_ID",
+            "GOOGLE_CLIENT_SECRET",
+            "KAKAO_CLIENT_ID",
+            "KAKAO_CLIENT_SECRET",
+            "NAVER_CLIENT_ID",
+            "NAVER_CLIENT_SECRET",
+        )
+        for key in oauth_inputs:
+            with self.subTest(key=key):
+                self.assertEqual(compose[key], f"${{{key}:?{key} is required}}")
+
     def test_rejects_literal_or_misplaced_reviewed_defaults(self):
         scenarios = (
             ({"REDIS_HOST": "@compose-default"}, {"REDIS_HOST": "literal"}),

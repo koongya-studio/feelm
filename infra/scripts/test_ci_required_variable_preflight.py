@@ -46,6 +46,13 @@ class RequiredVariablePreflightTest(unittest.TestCase):
             "DISTRIBUTED_NODE_IP": "10.0.0.12",
             "GRAFANA_ADMIN_PASSWORD": self.secret,
             "GRAFANA_ALERT_HMAC_SECRET": self.secret,
+            "GOOGLE_CLIENT_ID": "google-client-id",
+            "GOOGLE_CLIENT_SECRET": self.secret,
+            "KAKAO_CLIENT_ID": "kakao-client-id",
+            "KAKAO_CLIENT_SECRET": self.secret,
+            "NAVER_CLIENT_ID": "naver-client-id",
+            "NAVER_CLIENT_SECRET": self.secret,
+            "OAUTH_ALLOWED_REDIRECT_URIS": "https://service.example/app/oauth/callback",
             "POSTGRES_DB": "feelm",
             "POSTGRES_PASSWORD": self.secret,
             "POSTGRES_USER": "feelm",
@@ -64,9 +71,22 @@ class RequiredVariablePreflightTest(unittest.TestCase):
 
     def test_repository_contract_is_value_free_and_valid(self):
         variables = MODULE.load_contract()
-        self.assertEqual(len(variables), 7)
+        self.assertEqual(len(variables), 14)
         self.assertNotIn(self.secret, json.dumps(variables))
         self.assertTrue(all("value" not in entry for entry in variables))
+
+        by_key = {entry["key"]: entry for entry in variables}
+        for key in ("GOOGLE_CLIENT_SECRET", "KAKAO_CLIENT_SECRET", "NAVER_CLIENT_SECRET"):
+            self.assertTrue(by_key[key]["masked"])
+            self.assertTrue(by_key[key]["hidden"])
+        for key in (
+            "GOOGLE_CLIENT_ID",
+            "KAKAO_CLIENT_ID",
+            "NAVER_CLIENT_ID",
+            "OAUTH_ALLOWED_REDIRECT_URIS",
+        ):
+            self.assertFalse(by_key[key]["masked"])
+            self.assertFalse(by_key[key]["hidden"])
 
     def test_contract_rejects_value_field_and_duplicate(self):
         entry = dict(self.variables()[0])
