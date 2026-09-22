@@ -15,6 +15,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.source.ConfigurationPropertySources;
+import org.springframework.boot.env.YamlPropertySourceLoader;
+import org.springframework.core.env.PropertySource;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.util.unit.DataSize;
 
 class BackendEnvironmentContractTest {
 
@@ -79,6 +85,20 @@ class BackendEnvironmentContractTest {
 
         assertThat(defaulted).containsAll(notInjected);
         assertThat(composeEnvironment().keySet()).doesNotContainAnyElementsOf(notInjected);
+    }
+
+    @Test
+    void bindsMultipartLimitsFromOperationalConfiguration() throws IOException {
+        Path applicationConfig = project.resolve("src/main/resources/application.yml");
+        List<PropertySource<?>> loaded =
+                new YamlPropertySourceLoader()
+                        .load("operational-application", new FileSystemResource(applicationConfig));
+        Binder binder = new Binder(ConfigurationPropertySources.from(loaded));
+
+        assertThat(binder.bind("spring.servlet.multipart.max-file-size", DataSize.class).get())
+                .isEqualTo(DataSize.ofMegabytes(10));
+        assertThat(binder.bind("spring.servlet.multipart.max-request-size", DataSize.class).get())
+                .isEqualTo(DataSize.ofMegabytes(11));
     }
 
     @Test
