@@ -22,6 +22,9 @@
  * **회원 탈퇴의 본인 확인(`intent: 'withdraw'`)은 로그인하지 않는다**(업무 -754). 코드를
  * 7.8-A-1에 넘기고 그 화면이 API-013을 부른다. 취소하거나 코드가 없어도 로그인 화면이
  * 아니라 7.8-A-1로 돌아가 거기서 알린다 — 사용자는 로그인한 채 탈퇴 도중이었다.
+ *
+ * **소셜 계정 연결(`intent: 'link'`)도 같다**(업무 -799). 코드를 7.8-A 계정 관리에 넘기고
+ * 그 화면이 API-009를 부른다. 취소도 7.8-A로 돌아가 거기서 알린다.
  */
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
@@ -31,6 +34,7 @@ import { useAuth } from '../../../contexts/authContext';
 import { path } from '../../../routes/paths';
 import { isReturnPath } from '../../../routes/returnPath';
 import { clearOAuthRequest, readOAuthRequest } from '../../../utils/oauth';
+import type { SocialLinkReturn } from '../../my/AccountManagePage/linkReturn';
 import type { WithdrawReauth } from '../../my/WithdrawPage/reauth';
 import styles from './OAuthCallbackPage.module.css';
 
@@ -58,9 +62,12 @@ export default function OAuthCallbackPage() {
   const cancelled = Boolean(params.get('error'));
   const request = readOAuthRequest(params.get('state'));
   const reauth = request?.intent === 'withdraw';
+  const linking = request?.intent === 'link';
+  /** 로그인하지 않고 코드를 다른 화면에 넘기는 경우 */
+  const handoff = reauth || linking;
 
   const [failure, setFailure] = useState<string | null>(
-    reauth ? null : cancelled ? CANCELLED : !request || !code ? BROKEN_REQUEST : null,
+    handoff ? null : cancelled ? CANCELLED : !request || !code ? BROKEN_REQUEST : null,
   );
 
   const handled = useRef(false);
@@ -82,8 +89,25 @@ export default function OAuthCallbackPage() {
     void navigate(path.withdraw(), { replace: true, state: { reauth: state } });
   }, [cancelled, code, navigate, reauth, request]);
 
+  // 소셜 계정 연결도 결과가 어떻든 7.8-A로 돌려보낸다(업무 -799). API-009는 그 화면이 부른다
   useEffect(() => {
-    if (handled.current || !request || !code || cancelled || reauth) {
+    if (handled.current || !request || !linking) {
+      return;
+    }
+
+    handled.current = true;
+    clearOAuthRequest();
+
+    const state: SocialLinkReturn =
+      code && !cancelled
+        ? { provider: request.provider, code, redirectUri: request.redirectUri }
+        : { provider: request.provider, cancelled: true };
+
+    void navigate(path.accountManage(), { replace: true, state: { link: state } });
+  }, [cancelled, code, linking, navigate, request]);
+
+  useEffect(() => {
+    if (handled.current || !request || !code || cancelled || handoff) {
       return;
     }
 
@@ -125,7 +149,7 @@ export default function OAuthCallbackPage() {
     };
 
     void run();
-  }, [cancelled, code, navigate, reauth, request, signInWithSocial]);
+  }, [cancelled, code, handoff, navigate, request, signInWithSocial]);
 
   return (
     <div className={styles.page}>

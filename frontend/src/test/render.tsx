@@ -43,11 +43,19 @@ type Options = {
    * 형태의 화면이 생기며 추가했다.
    */
   path?: string;
+  /**
+   * 시작 주소에 실어 둘 라우터 state. 다른 화면(소셜 콜백)이 `navigate(..., { state })`로
+   * 넘긴 값을 받는 화면에 쓴다(업무 -799).
+   */
+  state?: unknown;
 };
 
-export function renderWithRouter(ui: ReactElement, { route = '/', path }: Options = {}) {
+export function renderWithRouter(ui: ReactElement, { route = '/', path, state }: Options = {}) {
   return render(
-    <MemoryRouter initialEntries={[route]} useTransitions={false}>
+    <MemoryRouter
+      initialEntries={[state === undefined ? route : { pathname: route, state }]}
+      useTransitions={false}
+    >
       {path ? (
         <Routes>
           <Route path={path} element={ui} />

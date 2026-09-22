@@ -181,3 +181,36 @@ describe('회원 탈퇴 본인 확인 콜백', () => {
     expect(signInWithSocial).not.toHaveBeenCalled();
   });
 });
+
+/*
+ * 업무 -799. 7.8-A 계정 관리의 소셜 계정 연결(API-009)은 탈퇴 본인 확인과 같은 방식이다 —
+ * 콜백은 로그인하지 않고 코드를 그 화면에 넘긴다.
+ */
+describe('소셜 계정 연결(intent=link)', () => {
+  beforeEach(() => {
+    window.sessionStorage.setItem('feelm.oauth', JSON.stringify({ ...REQUEST, intent: 'link' }));
+  });
+
+  it('로그인하지 않고 코드를 들고 7.8-A로 돌아간다', async () => {
+    renderCallback(`?code=auth-code&state=${STATE}`);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/my/settings/account{"link":{"provider":"google","code":"auth-code","redirectUri":"http://localhost:3000/oauth/callback"}}',
+      ),
+    );
+    expect(signInWithSocial).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem('feelm.oauth')).toBeNull();
+  });
+
+  it('동의를 취소해도 7.8-A로 돌아가 거기서 알린다', async () => {
+    renderCallback(`?error=access_denied&state=${STATE}`);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/my/settings/account{"link":{"provider":"google","cancelled":true}}',
+      ),
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+});

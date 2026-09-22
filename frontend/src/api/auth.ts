@@ -285,9 +285,10 @@ export async function socialSignup(body: SocialSignupRequest): Promise<Authentic
 /**
  * API-009 소셜 계정 연결 · POST /api/v1/users/me/oauth/{provider}
  *
- * 로그인한 계정에 소셜 로그인 수단을 더한다. **부르는 화면이 아직 없다** — 와이어프레임
- * 7.8-A에 진입 자리가 없어 업무 -499는 전송 계층까지만 두었다. 연결은 가입과 달리 다른
- * 콜백 주소를 쓸 수 있으므로 `redirectUri`를 받는다.
+ * 로그인한 계정에 소셜 로그인 수단을 더한다. 7.8-A 계정 관리의 `소셜 계정` 묶음이 부른다
+ * (업무 -799). 와이어프레임 7.8-A에 진입 자리가 없어 업무 -499는 전송 계층까지만 두었다가
+ * 그 업무에서 화면을 붙였다. 연결은 가입과 달리 다른 콜백 주소를 쓸 수 있으므로
+ * `redirectUri`를 받는다 — 지금 화면은 로그인과 같은 `oauthRedirectUri()`를 쓴다.
  */
 export async function linkSocialAccount(
   provider: SocialProvider,
