@@ -2,10 +2,10 @@
  * 04 캐릭터 칸 — 코드로 저장소 그림을 찾는지 (업무 S15P21E106-780)
  *
  * 카드가 고정 16종이라 이 칸만 계약이 사진을 주지 않고 화면이 `characterCard.code`로
- * 짝짓는다(업무 -618). 그림 16장은 업무 -781이 넣으므로 **지금은 표가 비어 있다.** 표가
- * 비어도 칸이 동작하는지, 그리고 파일이 들어오면 붙는지를 둘 다 본다.
+ * 짝짓는다(업무 -618). 그림 16장은 업무 -781이 넣었으므로 **표가 다 찼다.** 16종이 모두
+ * 붙는지, 그리고 계약 밖의 값이 와도 칸이 깨지지 않는지를 둘 다 본다.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import {
   CHARACTER_AXIS_POLES,
@@ -59,9 +59,15 @@ describe('캐릭터 카드 기준정보', () => {
     expect(isCharacterCardCode(4)).toBe(false);
   });
 
-  it('그림이 없는 코드와 모르는 코드는 모두 null이다', () => {
-    // 표가 채워지기 전이라 16종 전부 null이다(업무 -781)
-    CHARACTER_CARD_CODES.forEach((code) => expect(characterCardImage(code)).toBeNull());
+  it('16종 모두 그림이 있고 서로 다른 파일이다', () => {
+    // 표가 다 찼다(업무 -781). 한 칸이라도 비면 그 카드만 이름으로 나오므로 전부 본다
+    const images = CHARACTER_CARD_CODES.map((code) => characterCardImage(code));
+
+    images.forEach((image) => expect(image).toBeTruthy());
+    expect(new Set(images).size).toBe(16);
+  });
+
+  it('계약 밖의 코드는 null이다', () => {
     expect(characterCardImage('XXXX')).toBeNull();
     expect(characterCardImage(null)).toBeNull();
     expect(characterCardImage(undefined)).toBeNull();
@@ -69,37 +75,28 @@ describe('캐릭터 카드 기준정보', () => {
 });
 
 describe('04 캐릭터 칸', () => {
-  it('그림이 없으면 칸을 남기고 이름만 그린다', async () => {
+  it('코드로 찾은 파일 하나만 붙인다', async () => {
     const character = await renderFourCut('RDMV');
 
-    expect(character).toHaveAttribute('data-mode', 'none');
-    expect(character.querySelector('img')).toBeNull();
+    expect(character).toHaveAttribute('data-mode', 'photo');
+    expect(character.querySelectorAll('img')).toHaveLength(1);
+    expect(character.querySelector('img')).toHaveAttribute('src', characterCardImage('RDMV'));
     expect(screen.getByText('04 캐릭터')).toBeInTheDocument();
     expect(screen.getByText('안락의자 탐정')).toBeInTheDocument();
   });
 
-  it('코드가 없어도, 계약 밖의 코드가 와도 칸이 깨지지 않는다', async () => {
+  it('코드가 없어도, 계약 밖의 코드가 와도 칸을 남기고 이름만 그린다', async () => {
     const character = await renderFourCut(null);
 
     expect(character).toHaveAttribute('data-mode', 'none');
+    expect(character.querySelector('img')).toBeNull();
     expect(screen.getByText('안락의자 탐정')).toBeInTheDocument();
   });
 
-  it('그림이 들어오면 그 코드의 파일을 붙인다', async () => {
-    // 업무 -781이 표를 채웠을 때의 모양. 코드로 찾은 파일 하나만 붙는다
-    vi.resetModules();
-    vi.doMock('./characterCards', async () => ({
-      ...(await vi.importActual<typeof import('./characterCards')>('./characterCards')),
-      characterCardImage: (code: string | null | undefined) =>
-        code === 'RDMV' ? '/character/RDMV.webp' : null,
-    }));
+  it('모르는 코드도 같은 자리에서 걸러진다', async () => {
+    const character = await renderFourCut('XXXX');
 
-    const character = await renderFourCut('RDMV');
-
-    expect(character).toHaveAttribute('data-mode', 'photo');
-    expect(character.querySelector('img')).toHaveAttribute('src', '/character/RDMV.webp');
-
-    vi.doUnmock('./characterCards');
-    vi.resetModules();
+    expect(character).toHaveAttribute('data-mode', 'none');
+    expect(character.querySelector('img')).toBeNull();
   });
 });
