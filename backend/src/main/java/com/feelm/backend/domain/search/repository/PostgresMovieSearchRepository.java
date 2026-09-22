@@ -301,6 +301,10 @@ public class PostgresMovieSearchRepository implements MovieSearchRepository {
              AND EXISTS (SELECT 1 FROM movie_ott_providers mo
                          WHERE mo.movie_id = m.id AND mo.ott_id IN (:otts))
             """;
+    private static final String SEARCH_HOME_RELEASED_FILTER =
+            """
+             AND m.release_date <= :releasedThrough
+            """;
     private static final String WATCHED =
             """
             EXISTS (SELECT 1 FROM watch_records wr
@@ -324,10 +328,14 @@ public class PostgresMovieSearchRepository implements MovieSearchRepository {
 
     @Override
     public MovieSearchQueryResult search(
-            MovieSearchCriteria criteria, MovieSearchCursor cursor, Long userId) {
+            MovieSearchCriteria criteria,
+            MovieSearchCursor cursor,
+            Long userId,
+            LocalDate releasedThrough) {
         Map<String, Object> parameters = new HashMap<>();
         StringBuilder sql = new StringBuilder();
         boolean keyword = criteria.q() != null;
+        boolean searchHomeTopRated = releasedThrough != null;
         long hangulCount =
                 keyword
                         ? criteria.q()
@@ -382,7 +390,7 @@ public class PostgresMovieSearchRepository implements MovieSearchRepository {
                     criteria.q().replace("!", "!!").replace("%", "!%").replace("_", "!_") + " %");
         }
         sql.append("ranked AS (SELECT m.id, m.title, m.original_title, m.poster_url, ")
-                .append("m.release_date, m.average_rating, ");
+                .append("m.release_date, m.average_rating, m.rating_count, ");
         if (criteria.sort() == MovieSearchSort.RELEASE_DATE) {
             sql.append("cast(NULL AS numeric)");
         } else if (criteria.sort() == MovieSearchSort.RELEVANCE && keyword) {
@@ -403,6 +411,10 @@ public class PostgresMovieSearchRepository implements MovieSearchRepository {
         }
         sql.append("WHERE true ");
         appendFilters(sql, parameters, criteria);
+        if (searchHomeTopRated) {
+            sql.append(SEARCH_HOME_RELEASED_FILTER);
+            parameters.put("releasedThrough", releasedThrough);
+        }
         sql.append(") ");
         String rankedSql = sql.toString();
         Map<String, Object> countParameters = cursor == null ? Map.of() : new HashMap<>(parameters);
@@ -412,11 +424,14 @@ public class PostgresMovieSearchRepository implements MovieSearchRepository {
         if (userId != null) {
             parameters.put("userId", userId);
         }
-        appendCursor(sql, parameters, criteria.sort(), cursor);
-        sql.append(
-                criteria.sort() == MovieSearchSort.RELEASE_DATE
-                        ? " ORDER BY r.release_date DESC NULLS LAST, r.id DESC"
-                        : " ORDER BY r.sort_value DESC, r.id DESC");
+        appendCursor(sql, parameters, criteria.sort(), searchHomeTopRated, cursor);
+        if (criteria.sort() == MovieSearchSort.RELEASE_DATE) {
+            sql.append(" ORDER BY r.release_date DESC NULLS LAST, r.id DESC");
+        } else if (searchHomeTopRated) {
+            sql.append(" ORDER BY r.sort_value DESC, r.rating_count DESC, r.id DESC");
+        } else {
+            sql.append(" ORDER BY r.sort_value DESC, r.id DESC");
+        }
 
         var query = entityManager.createNativeQuery(sql.toString(), Tuple.class);
         parameters.forEach(query::setParameter);
@@ -470,12 +485,22 @@ public class PostgresMovieSearchRepository implements MovieSearchRepository {
             StringBuilder sql,
             Map<String, Object> parameters,
             MovieSearchSort sort,
+            boolean searchHomeTopRated,
             MovieSearchCursor cursor) {
         if (cursor == null) {
             return;
         }
         parameters.put("lastId", cursor.movieId());
-        if (sort != MovieSearchSort.RELEASE_DATE) {
+        if (searchHomeTopRated) {
+            sql.append(
+                    """
+                     AND (r.sort_value, r.rating_count, r.id) <
+                         (:lastValue,
+                          (SELECT anchor.rating_count FROM movies anchor WHERE anchor.id = :lastId),
+                          :lastId)
+                    """);
+            parameters.put("lastValue", cursor.sortValue());
+        } else if (sort != MovieSearchSort.RELEASE_DATE) {
             sql.append(
                     " AND (r.sort_value < :lastValue OR (r.sort_value = :lastValue AND r.id < :lastId)) ");
             parameters.put("lastValue", cursor.sortValue());

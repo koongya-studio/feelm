@@ -129,6 +129,21 @@
 - 공백만 있는 `q`는 미입력으로 처리한다. `q` 없이 필터만 사용하고 `sort=RELEVANCE`인
   경우(정렬 생략 포함), `averageRating` 내림차순 → `movieId` 내림차순으로 정렬한다.
   다음 cursor 페이지에도 동일한 순서를 적용한다.
+- 검색 홈의 `평점 높은 영화`는 최초 페이지에서 `q`, `genre`, `country`, `ott`, `yearTo`가
+  없고, `yearFrom`이 `Asia/Seoul` 기준 현재 연도보다 1 작으며 `sort=RATING`인 요청으로
+  식별한다. `cursor`와 `size`는 식별에 영향을 주지 않는다. `yearFrom=1900` 같은 임의
+  시작 연도나 다른 필터가 추가된 요청은 일반 검색이며 아래 특례를 적용하지 않는다.
+- 검색 홈의 `평점 높은 영화`는 최초 요청의 `Asia/Seoul` 날짜를 개봉 기준일로 고정한다.
+  `release_date`가 기준일 이하인 영화만 포함하므로 오늘·과거 개봉작은 포함하고 미래
+  개봉작과 `release_date IS NULL`인 영화는 제외한다. 최소 평가 수 하한은 두지 않는다.
+  정렬은 `averageRating` 내림차순 → 서비스 `rating_count` 내림차순 → `movieId`
+  내림차순이며 cursor 경계에도 세 값을 같은 순서로 적용한다.
+- 검색 홈 cursor에는 최초 개봉 기준일이 포함되며 후속 페이지의 필터와 `totalCount`도 이
+  날짜를 재사용한다. 한국 자정이나 연도 경계를 지나도 같은 cursor 흐름에서는 새로 오늘이
+  된 영화가 중간에 들어오지 않는다. 이 기준일과 검색조건·정렬 의미가 연결된 cursor만
+  허용하며, 기준일 고정 전 발급한 검색 홈 cursor는 `400 VALIDATION_FAILED`이므로 첫
+  페이지부터 다시 조회한다. 영화·평점 등 데이터 자체가 바뀐 경우의 비보장은 위 공통
+  cursor 연속성 규칙을 따른다.
 - `watched`는 요청한 로그인 사용자의 해당 영화 감상 기록을 기준으로 계산한다.
   `WATCHED_UNRATED` 또는 `RATED` 상태의 기록이 있으면 `true`이며,
   `LINK_CLICKED`·`EXPIRED` 기록만 있거나 기록이 없으면 `false`이다.

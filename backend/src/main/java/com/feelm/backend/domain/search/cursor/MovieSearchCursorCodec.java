@@ -58,23 +58,39 @@ public class MovieSearchCursorCodec {
 
     /** 페이지 크기·사용자 ID·현재 위치는 제외하고 검색 결과와 순서를 결정하는 조건만 식별한다. */
     public String criteriaKey(MovieSearchCriteria criteria) {
+        return criteriaKey(criteria, null);
+    }
+
+    public String criteriaKey(MovieSearchCriteria criteria, LocalDate releasedThrough) {
         MovieSearchSort effectiveSort =
                 criteria.sort() == MovieSearchSort.RELEVANCE && criteria.q() == null
                         ? MovieSearchSort.RATING
                         : criteria.sort();
-        CursorConditions conditions =
-                new CursorConditions(
-                        criteria.q() == null
-                                ? 3
-                                : criteria.sort() == MovieSearchSort.RELEVANCE ? 8 : 5,
-                        criteria.q(),
-                        criteria.genre().stream().sorted().toList(),
-                        criteria.country().stream().sorted().toList(),
-                        criteria.yearFrom(),
-                        criteria.yearTo(),
-                        criteria.ott().stream().sorted().toList(),
-                        criteria.sort(),
-                        effectiveSort);
+        Object conditions =
+                releasedThrough == null
+                        ? new CursorConditions(
+                                criteria.q() == null
+                                        ? 3
+                                        : criteria.sort() == MovieSearchSort.RELEVANCE ? 8 : 5,
+                                criteria.q(),
+                                criteria.genre().stream().sorted().toList(),
+                                criteria.country().stream().sorted().toList(),
+                                criteria.yearFrom(),
+                                criteria.yearTo(),
+                                criteria.ott().stream().sorted().toList(),
+                                criteria.sort(),
+                                effectiveSort)
+                        : new SearchHomeCursorConditions(
+                                5,
+                                criteria.q(),
+                                criteria.genre().stream().sorted().toList(),
+                                criteria.country().stream().sorted().toList(),
+                                criteria.yearFrom(),
+                                criteria.yearTo(),
+                                criteria.ott().stream().sorted().toList(),
+                                criteria.sort(),
+                                effectiveSort,
+                                releasedThrough);
         try {
             // JSON으로 값의 경계를 보존한다. 구분자를 포함한 입력이 다른 조건과 충돌하지 않는다.
             return HexFormat.of()
@@ -119,7 +135,10 @@ public class MovieSearchCursorCodec {
                 || cursor.sortValue().scale() > MAX_NUMERIC_SCALE
                 || (long) cursor.sortValue().precision() - cursor.sortValue().scale()
                         > MAX_NUMERIC_INTEGER_DIGITS
-                || cursor.releaseDate() != null
+                || (cursor.releaseDate() != null
+                        && (cursor.sort() != MovieSearchSort.RATING
+                                || cursor.releaseDate().isBefore(MIN_RELEASE_DATE)
+                                || cursor.releaseDate().isAfter(MAX_RELEASE_DATE)))
                 || (cursor.sort() == MovieSearchSort.RATING
                         && cursor.sortValue().compareTo(BigDecimal.valueOf(5)) > 0)) {
             throw new BusinessException(ErrorCode.VALIDATION_FAILED);
@@ -137,4 +156,16 @@ public class MovieSearchCursorCodec {
             List<Long> otts,
             MovieSearchSort requestedSort,
             MovieSearchSort effectiveSort) {}
+
+    private record SearchHomeCursorConditions(
+            int version,
+            String query,
+            List<String> genres,
+            List<String> countries,
+            Integer yearFrom,
+            Integer yearTo,
+            List<Long> otts,
+            MovieSearchSort requestedSort,
+            MovieSearchSort effectiveSort,
+            LocalDate releasedThrough) {}
 }
