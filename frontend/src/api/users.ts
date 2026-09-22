@@ -4,14 +4,14 @@
  *
  * 목업을 걷어내고 실제 API를 부르는 첫 도메인이다(업무 S15P21E106-364).
  *
- * **한 파일에 실제 호출과 목업이 섞여 있다.** 갈리는 기준은 계약의 단계다.
- * - API-014 · API-015 · API-016 · API-019는 1차 MVP라 실제로 부른다
- * - API-062(공개 프로필)는 **2차 MVP라 아직 없다.** MY 화면 업무(-305)가 화면을 먼저
- *   만들었으므로 목업으로 응답한다. 계약이 열리면 `getPublicProfile` 본문만 `request`로 바꾼다
+ * **한 파일에 실제 호출과 목업이 섞여 있다.**
+ * - API-014 · API-015 · API-016 · API-019 · API-062는 실제로 부른다. 공개 프로필(API-062)은
+ *   업무 -810에서 목업을 걷어냈다
  * - 프로필 사진 · 자기소개 · 항목별 공개 여부는 **계약에 아예 없다**(업무 -616,
- *   `types/unspecified.ts`). 세션 저장소에만 남는다
+ *   `types/unspecified.ts`). 세션 저장소에만 남는다. 내 프로필의 키워드 · 필름 목록도 목업
+ *   기준값에서 온다 — 내 `publicId`를 알 길이 없어 내 공개 프로필을 부를 수 없다
  */
-import { findMockPublicProfile, mockMyProfileView } from '../mocks/publicProfiles';
+import { mockMyProfileView } from '../mocks/publicProfiles';
 import { getProfileExtras, saveProfileExtras } from '../mocks/sessionStore';
 import { loadAvatar, saveAvatar } from './avatarStore';
 import { request } from './client';
@@ -22,6 +22,7 @@ import type {
   MyProfile,
   MyProfileUpdate,
   NicknameAvailability,
+  PublicProfile,
   SearchedUserList,
 } from '../types/user';
 
@@ -153,7 +154,8 @@ function toProfileView(profile: MyProfile): ProfileView {
 /**
  * 누구에게나 보이는 모양으로 줄인다. **7.2-A 미리보기와 7.2-B가 같은 결과를 보게 하는 곳이다.**
  *
- * 비공개 키워드 · 필름을 빼고 필름은 앞의 세 편만 남긴다. 계약이 열리면 서버가 이 일을 한다.
+ * 비공개 키워드 · 필름을 빼고 필름은 앞의 세 편만 남긴다. 남의 프로필은 서버(API-062)가
+ * 이미 공개된 것만 주지만, 필름 개수는 같은 규칙으로 맞춘다.
  */
 function toPublicView(profile: ProfileView): ProfileView {
   return {
@@ -164,39 +166,65 @@ function toPublicView(profile: ProfileView): ProfileView {
 }
 
 /**
- * API-062 공개 프로필 조회 · GET /api/v1/users/{publicId}/profile — 7.2-B와 7.2-A가 함께 쓴다.
+ * API-062 공개 프로필 조회 · GET /api/v1/users/{publicId}/profile — 7.2-B가 부른다(업무 -810).
  *
- * **2차 MVP라 아직 없다.** 계약은 본인이 자신을 조회하면 `visibility`와 무관하게 `200`을
- * 준다. 목업도 같다 — 목업 사용자에 없는 번호면 내 번호인지 보고, 맞으면 내 프로필을 공개
- * 모양으로 줄여 준다. 그래서 7.2에서 바꾼 값이 7.2-A에 바로 보인다.
+ * **인증은 선택이다.** 로그인했으면 토큰을 실어 차단 관계를 가리게 하고, 아니면 비회원으로
+ * 부른다. 없는 사용자 · 비공개(`PRIVATE`) · 차단 관계는 모두 `404`로 합쳐 온다. 본인이 자기
+ * `publicId`로 부르면 공개 범위와 무관하게 `200`이다.
  *
- * `[!]` 계약의 경로 파라미터는 `publicId`(`users.public_id`, ADR-0008)다. **내부 숫자
- * ID를 공개 URL에 노출하지 않는다는 결정**이므로, 계약이 열릴 때 라우트도
- * `/users/:publicId`로 바꿔야 한다. 목업은 아직 숫자 id로 찾는다.
+ * 경로의 `publicId`는 `users.public_id`(UUID, ADR-0008)다. 내부 숫자 ID는 공개 주소에 쓰지
+ * 않는다. UUID가 아닌 값은 서버가 없는 사용자와 같게 `404`로 답한다.
+ *
+ * 응답은 네 프로필 화면이 함께 쓰는 모양(`ProfileView`)으로 바꿔 돌려준다(`toPublicProfileView`).
  */
-export async function getPublicProfile(userId: number): Promise<ProfileView> {
-  const profile = findMockPublicProfile(userId);
+export async function getPublicProfile(publicId: string): Promise<ProfileView> {
+  const response = await request<PublicProfile>(`/users/${encodeURIComponent(publicId)}/profile`, {
+    auth: 'optional',
+  });
 
-  if (profile) return respond(toPublicView(profile), 'users');
+  return toPublicProfileView(response);
+}
 
-  /*
-   * 계약은 없음 · PRIVATE · 차단 관계를 모두 404로 합친다. 차단 관계는 실제 API-062가
-   * `isBlockedByMe`로 판정할 일이라, 목업 프로필이 실제 차단 목록(API-022)을 섞어 보지
-   * 않는다(업무 -610).
-   */
-  const mine = await getMyProfileView();
-
-  if (mine.userId === userId) return toPublicView(mine);
-
-  return respondError(404, 'RESOURCE_NOT_FOUND', '프로필을 찾을 수 없습니다.');
+/**
+ * API-062 응답을 프로필 화면의 모양으로 바꾼다.
+ *
+ * - 소개(`bio`)는 계약에 없어 빈 문자열이다. 화면은 빈 소개를 그리지 않는다
+ * - 서버가 공개된 것만 주므로 키워드 · 필름은 모두 `isPublic`이다
+ * - 한줄평은 개수만 오므로 목록은 `null`이다 — `공개한 한줄평이 없어요`와 구분한다
+ */
+function toPublicProfileView(response: PublicProfile): ProfileView {
+  return toPublicView({
+    userId: response.user.userId,
+    nickname: response.user.nickname,
+    avatarUrl: response.user.avatarUrl,
+    bio: '',
+    stats: {
+      frameCount: response.stats.frameCount,
+      popcornCount: response.stats.popcornCount,
+      publicReviewCount: response.publicReviewCount,
+    },
+    keywords: response.keywords.map((keyword) => ({ ...keyword, isPublic: true })),
+    frames: response.recentFrames.map((frame) => ({
+      frameId: frame.frameId,
+      movieId: frame.movie.movieId,
+      title: frame.movie.title,
+      posterUrl: frame.movie.posterUrl,
+      isPublic: true,
+    })),
+    popcorn: response.popcorn.flavors.map(({ flavorCode, popcornCount }) => ({
+      flavorCode,
+      popcornCount,
+    })),
+    reviews: null,
+  });
 }
 
 /**
  * 7.2-A 내 공개 프로필 미리보기. **7.2-B와 같은 공개 모양**(`toPublicView`)으로 준다.
  *
- * `getPublicProfile(내 번호)`와 결과가 같지만, 그 길은 내 번호를 알려고 API-014를 한 번,
- * 내 프로필을 만들려고 또 한 번 불러 같은 요청이 두 번 나갔다(!402 리뷰). 여기서는 내 프로필을
- * 한 번만 받아 줄인다. 계약(API-062)이 열리면 내 `publicId`로 그 API를 부르면 된다.
+ * 내 프로필(API-014 + 목업 기준값)을 한 번 받아 줄인다. 본래는 내 `publicId`로 API-062를
+ * 부르면 되지만, `publicId`를 알려 주는 API가 아직 없다(업무 -810). 생기면 이 본문을
+ * `getPublicProfile(내 publicId)`로 바꾼다.
  */
 export async function getMyPublicProfile(): Promise<ProfileView> {
   return toPublicView(await getMyProfileView());

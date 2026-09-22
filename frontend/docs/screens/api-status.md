@@ -24,14 +24,14 @@
   API-038 평가 삭제는 업무 -724에서, 리포트 목록 · 상세 · 첫 발급(API-059 · 060 · 080)은 업무
   -558에서 붙였습니다
 - **목업으로 남은 것은 백엔드에 API가 없거나, 계약에 필드가 없는 것뿐입니다**(2장)
-- **쓰는 화면이 없는 목업 함수가 하나 남았습니다**(3장). `getMockPopcornFlavors`는 업무 -707에서 지웠습니다
+- **쓰는 화면이 없는 목업 함수는 남지 않았습니다**(3장). `getMockPopcornFlavors`는 업무 -707, `getTasteFlow`는 업무 -810에서 지웠습니다
 
 ## 2. 목업으로 남은 것
 
 | 화면 | 함수 | 남은 이유 | 선행 백엔드 업무 | 프론트 연동 업무 |
 | --- | --- | --- | --- | --- |
 | 7.4 리포트 공유 이미지 · 3.5 이미지로 저장 | `reports.createReportImage` | API-061 백엔드 미구현 | S15P21E106-557 · 인프라 S15P21E106-549(스토리지) | S15P21E106-731 |
-| 7.2-B 다른 사용자 공개 프로필 | `users.getPublicProfile` | API-062 백엔드 미구현(2차 MVP) | S15P21E106-551 | S15P21E106-553 |
+| 7.2-B로 들어가는 링크(5.8 `취향 보기` · 7.1 `프로필 공유`) | — | 7.2-B는 실제 API-062를 부르지만(업무 -810) 주소를 여는 `publicId`를 주는 API가 없다(API-014 · API-057 응답에 없음). 링크는 감춰 두었고 7.1 공유는 숫자 ID 주소라 받는 사람에게 404다 | API-014 · API-057에 `publicId` 추가(업무 없음) | 없음 |
 | 7.1 · 7.2 · 7.2-A 프로필 사진 | `users.getMyProfileView` · `updateProfileExtras` · `api/avatarStore.ts` | 계약에 필드도 업로드 API도 이미지 저장소도 없다(업무 -616). 이 기기의 `localStorage`에 계정별로 둬서 앱을 다시 열어도 남지만(업무 -740), **다른 기기와 다른 사람(공개 프로필 · 파티)에게는 보이지 않는다** | 사진 업로드 · 삭제 API, API-014 · 062 `avatarUrl`, 이미지 저장소 | 없음. 서버가 생기면 `avatarStore.ts`를 지운다 |
 | 7.1 · 7.2 · 7.2-A 자기소개 · 공개 키워드 · 공개 필름 | `users.getMyProfileView` · `updateProfileExtras` · `getMyPublicProfile` | 계약에 필드가 없다. API-015는 닉네임 · 생년월일 · 성별 · 공개 범위만 받는다(업무 -616). 세션 메모리라 새로고침하면 처음 값으로 돌아간다 | 없음. 계약부터 정해야 한다 | 없음 |
 | 2.6 · 2.7 `이번 주 +N` | `watch.getRatingCounts`의 `weeklyFrameDelta` | 대응 필드가 없어 고정값(`types/unspecified.ts`). 프레임 · 팝콘 수는 실제(API-014 · 041) | 없음 | 없음 |
@@ -46,13 +46,11 @@
 
 ## 3. 쓰는 화면이 없는 목업 함수
 
-| 함수 | 원래 쓰던 곳 | 상태 |
-| --- | --- | --- |
-| `taste.getTasteFlow` | 3.1 `요즘 취향 흐름` 문장 · 키워드 근거(CR-16, `TasteFlowView`) | 화면에서 빠졌다. `mocks/taste.ts`는 공개 프로필 목업이 키워드를 빌려 써 남아 있다(리포트 목업은 업무 -558에서 지웠다) |
+남은 것이 없습니다.
 
 `taste.getMockPopcornFlavors`는 업무 S15P21E106-707에서 지웠습니다. 5.8 파티원 팝콘은 실제 `getPopcornFlavors`(API-044)를 쓰고 5.9 팝콘 섞기는 맛 코드만 써서, 옮길 화면이 남아 있지 않았습니다.
 
-`taste.getTasteFlow`도 지울 대상입니다. 지우는 일은 이 표를 만드는 업무 밖이라 따로 합니다.
+`taste.getTasteFlow`(3.1 `요즘 취향 흐름`, CR-16)는 업무 S15P21E106-810에서 `mocks/taste.ts` · `TasteFlowView`와 함께 지웠습니다. 그 카드는 화면에서 이미 빠져 있었습니다.
 
 ## 4. 함수별 상태
 
@@ -85,8 +83,8 @@
 | `checkNicknameAvailability` | 실제 | API-016 |
 | `searchUsers` | 실제 | API-019 |
 | `getMyProfileView` | 조합 + 기기 + **목업** | 닉네임 · 수치는 API-014, 사진은 이 기기의 저장소, 소개 · 공개 항목은 목업(2장) |
-| `getMyPublicProfile` | 조합 + **목업** | `getMyProfileView`를 공개용으로 거른다 |
-| `getPublicProfile` | **목업** | API-062 없음(2장) |
+| `getMyPublicProfile` | 조합 + **목업** | `getMyProfileView`를 공개용으로 거른다. 내 `publicId`를 알 길이 없어 API-062를 부르지 못한다 |
+| `getPublicProfile` | 실제 | API-062(업무 -810). 응답을 `ProfileView`로 바꾼다. 한줄평 목록은 계약에 없어 `null` |
 | `updateProfileExtras` | 기기 + **목업** | 계약 없음(2장). 사진은 기기 저장소에 계정별로, 나머지는 세션 메모리에 둔다 |
 
 ### `settings.ts` — 알림 설정 · 차단 · 탈퇴
@@ -145,7 +143,6 @@
 | `getMyFrames` | 실제 | API-042 |
 | `getFrameDetail` | 실제 | API-043 |
 | `getPopcornFlavors` | 실제 | API-044 |
-| `getTasteFlow` | **목업** · 쓰는 곳 없음 | 3장 |
 
 ### `recommendations.ts`
 

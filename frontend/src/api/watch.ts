@@ -259,13 +259,6 @@ export async function deleteRating(ratingId: number): Promise<void> {
   await request<void>(`/ratings/${ratingId}`, { method: 'DELETE' });
 }
 
-/*
- * 내 평가 목록(API-039)은 백엔드에 아직 없다(S15P21E106-214 진행 중). 7.1 MY의 `평가한 영화`는
- * 평가와 1:1인 **내 필름(API-042, `taste.getMyFrames`)** 으로 그린다 — 실제 저장 결과가 곧바로
- * 보이고, 고정 목업이 실제 평가를 가리는 일이 없다(업무 -610). API-039가 열리면 그 함수가
- * 여기에 생기고 7.1이 그리로 옮겨 간다.
- */
-
 /**
  * API-039 내 평가 목록 · GET /api/v1/users/me/ratings
  *
