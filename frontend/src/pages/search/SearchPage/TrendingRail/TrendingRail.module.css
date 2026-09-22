@@ -1,0 +1,78 @@
+/*
+ * 4.1 급상승 한 줄. 화면 가장자리까지 넘겨 볼 수 있게 좌우 여백을 음수로 밀고 안쪽
+ * 여백으로 되돌린다 — 2.4 유사 영화 줄과 같은 수법이다.
+ */
+.rail {
+  display: flex;
+  gap: var(--space-3);
+  margin: 0 calc(var(--screen-padding-x) * -1);
+  padding: 0 var(--screen-padding-x);
+  overflow-x: auto;
+  list-style: none;
+  scrollbar-width: none;
+}
+
+.rail::-webkit-scrollbar {
+  display: none;
+}
+
+/* 한 칸. 포스터 · 제목 · 변동이 통째로 상세 링크이고 누름 상태는 공통 포스터 규칙이다 */
+.cell {
+  composes: posterLink from '../../../../styles/interaction.module.css';
+  display: flex;
+  width: 96px;
+  flex-direction: column;
+  gap: var(--space-1);
+  border-radius: var(--radius-icon);
+  color: var(--color-ink);
+  text-decoration: none;
+}
+
+.posterWrap {
+  position: relative;
+  display: block;
+}
+
+/*
+ * 순위 배지. 포스터 왼쪽 위에 어두운 면 + 흰 숫자. 유채색을 쓰지 않는다.
+ * `PosterCue`의 화살표는 오른쪽 아래라 서로 겹치지 않는다.
+ */
+.rank {
+  position: absolute;
+  top: 0;
+  left: 0;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-icon) 0 var(--radius-icon) 0;
+  background: var(--color-surface-dark);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  line-height: 24px;
+  color: var(--color-on-dark);
+  text-align: center;
+  pointer-events: none;
+}
+
+.title {
+  margin-top: var(--space-1);
+  overflow: hidden;
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-meta);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 순위 변동. 없어도 줄은 남겨 칸 높이가 갈리지 않는다 */
+.delta {
+  min-height: calc(var(--font-size-caption) * var(--line-height-caption));
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-hint);
+}
+
+.delta[data-new='true'] {
+  color: var(--color-ink-muted);
+  letter-spacing: 0.04em;
+}

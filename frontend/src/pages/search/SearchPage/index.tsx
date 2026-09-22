@@ -12,11 +12,14 @@
  *
  * **업무 -612에서 다시 짰다.** 바뀐 것은 다음과 같다.
  *
- * - **급상승(API-064)은 없다.** 백엔드에 없는 계약을 목업으로 보여 주던 자리였다. 대신 검색
- *   전 화면에 **평점 높은 영화**를 깐다(업무 -714, 사용자 피드백 2026-09-20 "검색하기 전에도
- *   영화가 나열되면 좋겠다"). 검색어 없이 연도 하한과 `sort=RATING`으로 받은 목록이며
- *   (`api/search.ts` `getTopRatedMovies`), 조회수 기반 급상승이 아니므로 그렇게 부르지 않는다.
- *   최근 검색어가 있으면 그것이 위에 오고, 둘 다 없을 때만 짧은 안내 한 줄이다.
+ * - **급상승(API-064)은 한때 없었다.** 백엔드에 없는 계약을 목업으로 보여 주던 자리라 -612에서
+ *   지웠고, 대신 검색 전 화면에 **평점 높은 영화**를 깔았다(업무 -714, 사용자 피드백
+ *   2026-09-20 "검색하기 전에도 영화가 나열되면 좋겠다"). 검색어 없이 연도 하한과
+ *   `sort=RATING`으로 받은 목록이며(`api/search.ts` `getTopRatedMovies`), 조회수 기반
+ *   급상승이 아니므로 그렇게 부르지 않는다. **백엔드가 API-064를 구현한 뒤(-561) 업무 -798에서
+ *   급상승이 돌아왔다** — 검색 전 화면의 최근 검색어 아래, 평점 높은 영화 위에 옆으로
+ *   넘기는 한 줄(`TrendingRail`)이다. 평점 높은 영화는 피드백으로 생긴 목록이라 급상승이
+ *   대체하지 않고 그 아래에 남는다. 셋 다 없을 때만 짧은 안내 한 줄이다.
  * - **타이핑하면 검색한다.** 공백을 뺀 **두 글자부터**다(`AUTO_SEARCH_MIN_LENGTH`, 업무 -640).
  *   한 글자는 제출해야 나가고, 기다리면 그렇다고 알린다(업무 -769). 연속 입력은 `DEBOUNCE_MS`로 묶고,
  *   한글 조합 중(`compositionstart` ~ `compositionend`)에는 보내지 않는다 — 조합 중의
@@ -51,6 +54,7 @@ import {
   countSearchResults,
   getFilterOptions,
   getTopRatedMovies,
+  getTrendingMovies,
   searchMovies,
 } from '../../../api/search';
 import { getMovieDetail, getSimilarMovies } from '../../../api/movies';
@@ -66,6 +70,7 @@ import SearchAside from './SearchAside';
 import SearchFilterChips from './SearchFilterChips';
 import SearchFilterSheet from './SearchFilterSheet';
 import SearchResultGrid, { SearchResultSkeleton } from './SearchResultGrid';
+import TrendingRail from './TrendingRail';
 import {
   EMPTY_FILTER,
   fromSearchParams,
@@ -83,6 +88,7 @@ import type {
   MovieSearchItem,
   MovieSearchQuery,
   MovieSearchSort,
+  TrendingMovies,
 } from '../../../types/search';
 import styles from './SearchPage.module.css';
 
@@ -232,6 +238,8 @@ export default function SearchPage() {
   const [recent, setRecent] = useState<string[]>(() => [...getRecentSearchQueries()]);
   /** 검색 전에 까는 평점 높은 영화(업무 -714). 실패 · 빈 응답이면 빈 배열이고 그 자리만 없다 */
   const [topRated, setTopRated] = useState<MovieSearchItem[]>([]);
+  /** 검색 전에 까는 급상승(업무 -798). 실패 · 빈 응답이면 `null`이고 그 자리만 없다 */
+  const [trending, setTrending] = useState<TrendingMovies | null>(null);
 
   /*
    * ─────────────────────────── 데스크톱 시안 (업무 -784)
@@ -319,6 +327,23 @@ export default function SearchPage() {
 
     getTopRatedMovies().then((items) => {
       if (active) setTopRated(items);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  /*
+   * 급상승(API-064)도 한 번만 받는다(업무 -798). 5분마다 게시되는 집계지만 검색 화면에 머무는
+   * 동안 갱신하지는 않는다 — 검색하다 돌아왔을 때 순서가 바뀌어 있으면 방금 본 것을 잃는다.
+   * 실패는 `getTrendingMovies`가 `null`로 삼킨다. 빈 목록도 `null`로 두어 조건이 하나다.
+   */
+  useEffect(() => {
+    let active = true;
+
+    getTrendingMovies().then((result) => {
+      if (active) setTrending(result && result.items.length > 0 ? result : null);
     });
 
     return () => {
@@ -845,6 +870,13 @@ export default function SearchPage() {
           />
         ) : null}
 
+        {search.status === 'idle' && trending ? (
+          <section className={styles.trending}>
+            <h2 className={styles.sectionLabel}>급상승</h2>
+            <TrendingRail items={trending.items} source={trending.source} />
+          </section>
+        ) : null}
+
         {search.status === 'idle' && topRated.length > 0 ? (
           <section className={styles.topRated}>
             <h2 className={styles.sectionLabel}>평점 높은 영화</h2>
@@ -856,7 +888,7 @@ export default function SearchPage() {
           </section>
         ) : null}
 
-        {search.status === 'idle' && recent.length === 0 && topRated.length === 0 ? (
+        {search.status === 'idle' && recent.length === 0 && !trending && topRated.length === 0 ? (
           <p className={styles.guide}>영화 제목, 감독, 배우 이름으로 검색해 보세요</p>
         ) : null}
 

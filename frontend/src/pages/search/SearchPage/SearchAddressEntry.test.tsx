@@ -15,6 +15,7 @@ import DesktopTopBar from '../../../components/DesktopTopBar';
 
 vi.mock('../../../api/search', () => ({
   getTopRatedMovies: vi.fn(),
+  getTrendingMovies: vi.fn(),
   searchMovies: vi.fn(),
   countSearchResults: vi.fn(),
   getFilterOptions: vi.fn(),
@@ -30,6 +31,7 @@ const { getUnreadNotificationCount } = await import('../../../api/notifications'
 beforeEach(() => {
   vi.mocked(getUnreadNotificationCount).mockReset().mockResolvedValue(0);
   vi.mocked(search.getTopRatedMovies).mockReset().mockResolvedValue([]);
+  vi.mocked(search.getTrendingMovies).mockReset().mockResolvedValue(null);
   vi.mocked(search.countSearchResults).mockReset().mockResolvedValue(0);
   vi.mocked(search.getFilterOptions).mockReset().mockRejectedValue(new Error('옵션 없음'));
   vi.mocked(search.searchMovies)

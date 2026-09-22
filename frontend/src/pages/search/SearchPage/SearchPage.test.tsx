@@ -19,16 +19,22 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import SearchPage from './index';
 import { renderWithRouter } from '../../../test/render';
 import { resetSessionStore } from '../../../mocks/sessionStore';
-import type { MovieSearchItem, MovieSearchResult } from '../../../types/search';
+import type {
+  MovieSearchItem,
+  MovieSearchResult,
+  TrendingMovieItem,
+  TrendingMovies,
+} from '../../../types/search';
 
 vi.mock('../../../api/search', () => ({
   searchMovies: vi.fn(),
   countSearchResults: vi.fn(),
   getFilterOptions: vi.fn(),
   getTopRatedMovies: vi.fn(),
+  getTrendingMovies: vi.fn(),
 }));
 
-const { searchMovies, countSearchResults, getFilterOptions, getTopRatedMovies } =
+const { searchMovies, countSearchResults, getFilterOptions, getTopRatedMovies, getTrendingMovies } =
   await import('../../../api/search');
 
 /** 디바운스(280ms)가 지나가고도 남을 시간. "요청이 나가지 않는다"를 단정할 때 기다린다 */
@@ -76,6 +82,7 @@ beforeEach(() => {
   vi.mocked(countSearchResults).mockResolvedValue(0);
   // 검색 전 목록은 시험마다 따로 켠다. 기본은 없음이라 빈 상태 단정이 흐려지지 않는다
   vi.mocked(getTopRatedMovies).mockResolvedValue([]);
+  vi.mocked(getTrendingMovies).mockResolvedValue(null);
 });
 
 const input = () => screen.getByRole('searchbox', { name: '영화 검색' });
@@ -96,7 +103,7 @@ const resultsHeading = (count: number) =>
   screen.findByRole('heading', { name: `검색 결과 ${count}` });
 
 describe('4.1 검색 전', () => {
-  it('검색한 적이 있으면 그것만 보여준다. 급상승은 없다', async () => {
+  it('검색한 적이 있으면 그것만 보여준다. 급상승을 못 받았으면 그 자리도 없다', async () => {
     vi.mocked(searchMovies).mockResolvedValue(page([item(201, '달의 뒷면')]));
 
     renderWithRouter(<SearchPage />, { route: '/search' });
@@ -774,5 +781,129 @@ describe('최근 검색어', () => {
 
     expect(screen.queryByText('최근 검색어')).not.toBeInTheDocument();
     expect(screen.getByText('영화 제목, 감독, 배우 이름으로 검색해 보세요')).toBeInTheDocument();
+  });
+});
+
+/*
+ * 업무 -798. 백엔드가 API-064를 구현해(-561) -612에서 지웠던 급상승이 돌아왔다. 최근 검색어
+ * 아래 · 평점 높은 영화 위의 옆으로 넘기는 한 줄이다.
+ */
+describe('4.1 검색 전 급상승', () => {
+  function trendingItem(
+    rank: number,
+    title: string,
+    rankDelta: number | null = null,
+  ): TrendingMovieItem {
+    return {
+      rank,
+      rankDelta,
+      movie: { movieId: 400 + rank, title, posterUrl: null },
+      ratingCount: 10,
+      averageScore: 4.2,
+      trendScore: 0.5,
+    };
+  }
+
+  function trending(
+    items: TrendingMovieItem[],
+    overrides: Partial<TrendingMovies> = {},
+  ): TrendingMovies {
+    return {
+      source: 'VIEW',
+      period: { from: '2026-09-22T00:00:00Z', to: '2026-09-22T00:05:00Z' },
+      updatedAt: '2026-09-22T00:05:00Z',
+      stale: false,
+      items,
+      ...overrides,
+    };
+  }
+
+  it('검색 전에 급상승을 순위 · 순위 변동과 함께 깐다. 칸은 상세 링크다 (4.1 → 2.4)', async () => {
+    vi.mocked(getTrendingMovies).mockResolvedValue(
+      trending([trendingItem(1, '오디세이', 4), trendingItem(2, '타짜', null)]),
+    );
+
+    renderWithRouter(<SearchPage />, { route: '/search' });
+
+    expect(await screen.findByText('급상승')).toBeInTheDocument();
+
+    const first = screen.getByRole('link', { name: '1위 오디세이 · ↑4' });
+    expect(first).toHaveAttribute('href', '/movies/401');
+    // 신규 진입(`rankDelta: null`)은 집계 결과에서만 NEW다
+    expect(screen.getByRole('link', { name: '2위 타짜 · NEW' })).toHaveAttribute(
+      'href',
+      '/movies/402',
+    );
+    expect(
+      screen.queryByText('영화 제목, 감독, 배우 이름으로 검색해 보세요'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('초기 고정 목록(source=DEFAULT)에서는 순위 변동을 그리지 않는다', async () => {
+    vi.mocked(getTrendingMovies).mockResolvedValue(
+      trending([trendingItem(1, '오디세이', null)], {
+        source: 'DEFAULT',
+        period: null,
+        updatedAt: null,
+      }),
+    );
+
+    renderWithRouter(<SearchPage />, { route: '/search' });
+
+    expect(await screen.findByRole('link', { name: '1위 오디세이' })).toBeInTheDocument();
+    expect(screen.queryByText('NEW')).not.toBeInTheDocument();
+  });
+
+  it('급상승이 평점 높은 영화 위에 온다. 둘은 서로를 대체하지 않는다', async () => {
+    vi.mocked(getTrendingMovies).mockResolvedValue(trending([trendingItem(1, '오디세이', 2)]));
+    vi.mocked(getTopRatedMovies).mockResolvedValue([item(301, '높은 평점 영화')]);
+
+    renderWithRouter(<SearchPage />, { route: '/search' });
+
+    const trendingLabel = await screen.findByText('급상승');
+    const topRatedLabel = await screen.findByText('평점 높은 영화');
+
+    expect(
+      trendingLabel.compareDocumentPosition(topRatedLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getByText('높은 평점 영화')).toBeInTheDocument();
+  });
+
+  it('못 받으면(503 포함) 그 자리만 없고 평점 높은 영화는 그대로다', async () => {
+    vi.mocked(getTrendingMovies).mockResolvedValue(null);
+    vi.mocked(getTopRatedMovies).mockResolvedValue([item(301, '높은 평점 영화')]);
+
+    renderWithRouter(<SearchPage />, { route: '/search' });
+
+    expect(await screen.findByText('평점 높은 영화')).toBeInTheDocument();
+    expect(screen.queryByText('급상승')).not.toBeInTheDocument();
+  });
+
+  it('빈 목록이면 안내 한 줄로 돌아간다', async () => {
+    vi.mocked(getTrendingMovies).mockResolvedValue(trending([]));
+
+    renderWithRouter(<SearchPage />, { route: '/search' });
+
+    expect(
+      await screen.findByText('영화 제목, 감독, 배우 이름으로 검색해 보세요'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('급상승')).not.toBeInTheDocument();
+  });
+
+  it('검색을 시작하면 급상승이 사라지고, 지우면 다시 부르지 않고 돌아온다', async () => {
+    vi.mocked(getTrendingMovies).mockResolvedValue(trending([trendingItem(1, '오디세이', 2)]));
+    vi.mocked(searchMovies).mockResolvedValue(page([item(201, '달의 뒷면')]));
+
+    renderWithRouter(<SearchPage />, { route: '/search' });
+
+    expect(await screen.findByText('급상승')).toBeInTheDocument();
+
+    submit('달');
+    await resultsHeading(1);
+    expect(screen.queryByText('급상승')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '검색어 지우기' }));
+    expect(screen.getByText('급상승')).toBeInTheDocument();
+    expect(vi.mocked(getTrendingMovies)).toHaveBeenCalledTimes(1);
   });
 });
