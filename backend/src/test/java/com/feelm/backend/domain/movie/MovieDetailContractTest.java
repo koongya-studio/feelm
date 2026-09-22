@@ -22,10 +22,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.feelm.backend.domain.movie.service.MovieViewEventWriter;
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedPostgresContractTest;
 import com.feelm.backend.support.SharedRedisContainer;
 import com.feelm.backend.support.SharedRedisState;
+import com.feelm.backend.support.SharedTestRuntime;
 import com.redis.testcontainers.RedisContainer;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -49,6 +51,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,6 +63,7 @@ import tools.jackson.databind.ObjectMapper;
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 @Import(MovieDetailQueryRecorder.Configuration.class)
 @Transactional
+@SharedTestRuntime
 @DisplayName("API-030 영화 상세 — PostgreSQL 계약")
 class MovieDetailContractTest extends SharedPostgresContractTest {
 
@@ -73,6 +77,7 @@ class MovieDetailContractTest extends SharedPostgresContractTest {
     @Autowired private TokenProvider tokenProvider;
     @Autowired private MovieDetailQueryRecorder recorder;
     @Autowired private StringRedisTemplate redisTemplate;
+    @MockitoBean private MovieViewEventWriter viewEventWriter;
     private MovieDetailFixture fixture;
 
     @BeforeEach
