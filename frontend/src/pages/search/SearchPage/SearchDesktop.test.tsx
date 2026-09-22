@@ -21,7 +21,12 @@ import SearchPage from './index';
 import AppLayout from '../../../layouts/AppLayout';
 import { AuthContext } from '../../../contexts/authContext';
 import { resetViewport, setViewportWidth } from '../../../test/viewport';
-import { getFilterOptions, getTopRatedMovies, searchMovies } from '../../../api/search';
+import {
+  getFilterOptions,
+  getTopRatedMovies,
+  getTrendingMovies,
+  searchMovies,
+} from '../../../api/search';
 import { getMovieDetail, getSimilarMovies } from '../../../api/movies';
 import { getOtts } from '../../../api/otts';
 import { getUnreadNotificationCount } from '../../../api/notifications';
@@ -39,6 +44,7 @@ vi.mock('../../../api/search', async () => {
     countSearchResults: vi.fn(),
     getFilterOptions: vi.fn(),
     getTopRatedMovies: vi.fn(),
+    getTrendingMovies: vi.fn(),
   };
 });
 
@@ -154,6 +160,7 @@ beforeEach(() => {
     .mockResolvedValue({ totalCount: 24, items, nextCursor: null, hasNext: false });
   vi.mocked(getFilterOptions).mockReset().mockResolvedValue(filterOptions);
   vi.mocked(getTopRatedMovies).mockReset().mockResolvedValue([]);
+  vi.mocked(getTrendingMovies).mockReset().mockResolvedValue(null);
   vi.mocked(getMovieDetail).mockReset().mockResolvedValue(detail);
   vi.mocked(getSimilarMovies).mockReset().mockResolvedValue(similar);
   vi.mocked(getOtts)
