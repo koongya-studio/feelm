@@ -77,6 +77,10 @@ let server: ReturnType<typeof createFakeServer>;
  * 와이어프레임 7.8-C의 기본값과 7.8-D의 두 사람으로 시작한다. 7.8-D의 기준 목업은
  * 서버가 주는 값과 겹쳐 지웠으므로(`mocks/settings.ts`, 업무 -394) 그 상태를 여기서 만든다.
  */
+/** 7.2-B로 여는 무비버디의 공개 식별자와 내부 번호(업무 -810) */
+const BUDDY_PUBLIC_ID = '1b4e28ba-2fa1-11d2-883f-0016d3cca427';
+const BUDDY_ID = 2048;
+
 function createFakeServer() {
   const notification: NotificationSettings = {
     RATING: true,
@@ -192,6 +196,19 @@ function createFakeServer() {
       return json(200, notification);
     }
 
+    // 7.2-B 공개 프로필(API-062). 무비버디 한 명만 안다(업무 -810)
+    if (url.pathname === `/api/v1/users/${BUDDY_PUBLIC_ID}/profile`) {
+      return json(200, {
+        user: { userId: BUDDY_ID, nickname: '무비버디', avatarUrl: null, visibility: 'PUBLIC' },
+        keywords: [],
+        stats: { frameCount: 3, popcornCount: 3 },
+        popcorn: { flavors: [] },
+        recentFrames: [],
+        publicReviewCount: 0,
+        isBlockedByMe: false,
+      });
+    }
+
     if (url.pathname === '/api/v1/users/me/blocks') {
       // 최근에 차단한 사람이 위다(API-022)
       const items = [...blocks].sort((a, b) => b.blockedAt.localeCompare(a.blockedAt));
@@ -216,8 +233,15 @@ function createFakeServer() {
         return json(409, { code: 'ALREADY_BLOCKED', message: '이미 차단한 사용자입니다.' });
       }
 
-      // 7.2-B가 목업인 동안 여기로 오는 차단은 없다(업무 -610). 오면 서버처럼 404다
-      return json(404, { code: 'RESOURCE_NOT_FOUND', message: '사용자를 찾을 수 없습니다.' });
+      // 7.2-B에서 오는 차단(업무 -810). 이 가짜 서버가 아는 사람은 무비버디뿐이다
+      if (userId !== BUDDY_ID) {
+        return json(404, { code: 'RESOURCE_NOT_FOUND', message: '사용자를 찾을 수 없습니다.' });
+      }
+
+      const blockedAt = '2026-09-23T00:00:00Z';
+      blocks.push({ userId, nickname: '무비버디', blockedAt });
+
+      return json(201, { blockedUserId: userId, blockedAt });
     }
 
     throw new Error(`가짜 서버가 모르는 요청이다: ${method} ${url.pathname}`);
@@ -628,24 +652,26 @@ describe('7.8 → 7.8-B · 7.8-C', () => {
 });
 
 describe('7.8 → 7.8-D', () => {
-  it('7.2-B의 차단은 목업 프로필이라 잠겨 있고, 해제는 7.8-D가 실제 API로 한다', async () => {
+  it('7.2-B에서 차단하면 7.8-D에 들어가고, 해제는 7.8-D가 실제 API로 한다', async () => {
     /*
-     * 공개 프로필(API-062)이 백엔드에 없어 7.2-B는 목업이다. 목업 번호로 실제 차단을 부르면
-     * 늘 404였으므로 그 입구를 잠갔다(업무 -610). 7.8-D의 목록과 해제는 실제 API 그대로다.
+     * 7.2-B가 실제 API-062를 부르게 되어(업무 -810) 목업이던 동안 잠갔던 차단(업무 -610)을
+     * 되살렸다. 차단은 확인 창 → API-020 → 7.8-D(`replace`)다.
      */
-    const { unmount } = renderApp(['/users/2048']);
+    renderApp([`/users/${BUDDY_PUBLIC_ID}`]);
 
     fireEvent.click(await screen.findByRole('button', { name: '더 보기' }));
-    expect(screen.getByRole('button', { name: /사용자 차단/ })).toBeDisabled();
-    unmount();
+    fireEvent.click(screen.getByRole('button', { name: '사용자 차단' }));
+    fireEvent.click(
+      within(await screen.findByRole('alertdialog')).getByRole('button', { name: '차단' }),
+    );
 
-    renderApp([ROUTE_PATTERN.settings]);
-    fireEvent.click(screen.getByRole('link', { name: /차단 사용자 관리/ }));
-    expect(await screen.findByText('2명 차단 중')).toBeInTheDocument();
+    await waitFor(() => expect(location()).toBe(ROUTE_PATTERN.blockedUsers));
+    expect(await screen.findByText('3명 차단 중')).toBeInTheDocument();
+    expect(screen.getByText('무비버디')).toBeInTheDocument();
 
     fireEvent.click(await screen.findByRole('button', { name: '스포일러왕 차단 해제' }));
 
-    expect(await screen.findByText('1명 차단 중')).toBeInTheDocument();
+    expect(await screen.findByText('2명 차단 중')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '스포일러왕 차단 해제' })).toBeNull();
   });
 

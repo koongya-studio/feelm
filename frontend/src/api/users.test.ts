@@ -1,12 +1,12 @@
 /*
- * 사용자 검색 (업무 S15P21E106-393).
+ * 사용자 검색 (업무 S15P21E106-393) · 공개 프로필 (업무 -810).
  *
  * 5.3이 초대할 사람을 고르는 유일한 길이다. 화면에서는 드러나지 않는 두 가지를 고정한다.
  * - `items` 래퍼를 벗기지 않는다. 검색은 이어 받을 수 있어야 해서 `nextCursor`가 필요하다
  * - **길이 검증을 화면이 먼저 한다.** 한 글자만 쳐도 요청이 나가면 매번 `400`이다
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { isSearchableNickname, searchUsers } from './users';
+import { getPublicProfile, isSearchableNickname, searchUsers } from './users';
 import { resetSessionForTest, startSession } from './session';
 
 const fetchMock = vi.fn();
@@ -74,5 +74,79 @@ describe('isSearchableNickname', () => {
     expect(isSearchableNickname('무비')).toBe(true);
     expect(isSearchableNickname('무 비')).toBe(true);
     expect(isSearchableNickname('12345678901')).toBe(false);
+  });
+});
+
+/*
+ * 업무 -810. API-062 응답은 네 프로필 화면이 함께 쓰는 모양으로 바뀌어 나간다. 화면만 보면
+ * 매핑이 틀려도 비슷해 보이므로 규칙을 여기서 고정한다.
+ */
+describe('API-062 공개 프로필', () => {
+  const response = {
+    user: { userId: 2048, nickname: '영화광', avatarUrl: '/media/a.jpg', visibility: 'PUBLIC' },
+    keywords: [{ code: 'DARK_THRILLER_LOVER', label: '어둠 속 스릴러 애호가' }],
+    stats: { frameCount: 88, popcornCount: 88 },
+    popcorn: { flavors: [{ flavorCode: 'FLAVOR_A', popcornCount: 30, averageScore: 4.5 }] },
+    recentFrames: [1, 2, 3, 4].map((index) => ({
+      frameId: 190 + index,
+      movie: { movieId: 550 + index, title: `영화 ${index}`, posterUrl: null },
+      score: 5,
+      createdAt: '2026-08-30T05:21:00Z',
+    })),
+    publicReviewCount: 21,
+    isBlockedByMe: false,
+  };
+
+  it('publicId를 경로에 넣고, 로그인했으면 토큰을 싣는다', async () => {
+    fetchMock.mockResolvedValue(json(200, response));
+
+    await getPublicProfile('1b4e28ba-2fa1');
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/v1/users/1b4e28ba-2fa1/profile');
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer token');
+  });
+
+  it('비회원이면 토큰 없이 부른다(선택 인증)', async () => {
+    resetSessionForTest();
+    fetchMock.mockResolvedValue(json(200, response));
+
+    await getPublicProfile('1b4e28ba-2fa1');
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Record<string, string>).Authorization).toBeUndefined();
+  });
+
+  it('화면 모양으로 바꾼다 — 필름은 앞의 세 편, 소개는 비고, 한줄평 목록은 없음(null)', async () => {
+    fetchMock.mockResolvedValue(json(200, response));
+
+    const view = await getPublicProfile('1b4e28ba-2fa1');
+
+    expect(view).toMatchObject({
+      userId: 2048,
+      nickname: '영화광',
+      avatarUrl: '/media/a.jpg',
+      bio: '',
+      stats: { frameCount: 88, popcornCount: 88, publicReviewCount: 21 },
+      keywords: [{ code: 'DARK_THRILLER_LOVER', label: '어둠 속 스릴러 애호가', isPublic: true }],
+      popcorn: [{ flavorCode: 'FLAVOR_A', popcornCount: 30 }],
+      reviews: null,
+    });
+    expect(view.frames.map((frame) => frame.frameId)).toEqual([191, 192, 193]);
+    expect(view.frames[0]).toEqual({
+      frameId: 191,
+      movieId: 551,
+      title: '영화 1',
+      posterUrl: null,
+      isPublic: true,
+    });
+  });
+
+  it('없음 · 비공개 · 차단 관계는 404로 올라간다', async () => {
+    fetchMock.mockResolvedValue(
+      json(404, { code: 'RESOURCE_NOT_FOUND', message: '프로필을 찾을 수 없습니다.' }),
+    );
+
+    await expect(getPublicProfile('nope')).rejects.toMatchObject({ status: 404 });
   });
 });

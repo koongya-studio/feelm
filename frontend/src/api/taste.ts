@@ -6,9 +6,9 @@
  * 팝콘 맛 기준정보(API-044)를 실제 API 호출로 바꿨고, 업무 S15P21E106-479에서 취향
  * 분석(API-040) 클라이언트를 추가했다.
  *
- * **한 파일에 실제 호출과 목업이 섞여 있다.** 갈리는 기준은 백엔드에 해당 API가 있는지다.
- * - 위 다섯 함수는 실제 API를 부른다. 다만 API-040은 현재 호출하는 화면이 없다
- * - `getTasteFlow`는 계약에 대응 API가 **없다**(CR-16)
+ * **이 파일에 목업은 없다.** 위 다섯 함수는 실제 API를 부른다. 다만 API-040은 현재 호출하는
+ * 화면이 없다. 3.1 `요즘 취향 흐름`의 목업 함수(`getTasteFlow`)는 그 카드가 화면에서 빠진 뒤
+ * 부르는 곳 없이 남아 있어 업무 -810에서 지웠다(CR-16은 결정 대기).
  *
  * 팝콘 맛 기준정보의 목업 함수(`getMockPopcornFlavors`)는 업무 S15P21E106-707에서 지웠다.
  * 목업 집계를 쓰던 5.8 파티원 팝콘은 실제 `getPopcornFlavors`(API-044)로 옮겨 갔고, 5.9
@@ -22,9 +22,7 @@
  * (API-040 처리 규칙) 백엔드에는 아직 조회만 있고 캐시를 채우는 쪽이 없다. 그래서 지금은
  * 평가를 얼마나 해도 모든 사용자가 `insufficientData: true`와 빈 `keywords`를 받는다.
  */
-import { mockTasteFlow } from '../mocks/taste';
 import { request } from './client';
-import { respond } from './mockTransport';
 import type {
   FrameDetail,
   FrameList,
@@ -32,7 +30,6 @@ import type {
   PopcornFlavor,
   TasteAnalysis,
 } from '../types/taste';
-import type { TasteFlowView } from '../types/unspecified';
 
 /**
  * API-044 팝콘 맛 기준정보 조회 · GET /api/v1/popcorn-flavors
@@ -95,20 +92,4 @@ export async function getMyFrames(cursor?: string): Promise<FrameList> {
  */
 export async function getFrameDetail(frameId: number): Promise<FrameDetail> {
   return request<FrameDetail>(`/frames/${frameId}`);
-}
-
-/* ------------------------------------------------------------------ *
- * 여기부터 목업. 대응 API가 없거나 이번 범위 밖인 것만 남는다.
- * ------------------------------------------------------------------ */
-
-/**
- * 3.1 `요즘 취향 흐름` 카드. **계약에 대응 API가 없다(CR-16).**
- *
- * 흐름 문장(`flowSentence`)과 키워드 근거 문장(`rationale`)을 내려주는 필드가 API-040에
- * 없다 — `keywords`는 `code` · `label`뿐이다. 그래서 `getMyTaste`가 실제 호출로 바뀐
- * 뒤에도(업무 -479) 이 함수만 목업으로 남는다. 화면이 목업을 직접 import하지 않도록
- * 함수만 따로 둔 것이며, CR-16이 정해지면 `getMyTaste`로 합친다.
- */
-export async function getTasteFlow(): Promise<TasteFlowView> {
-  return respond(mockTasteFlow, 'taste');
 }

@@ -293,7 +293,16 @@ export default function ProfileLayout({
 
       {isPublic ? (
         <Card title="공개 한줄평">
-          {profile.reviews.length === 0 ? (
+          {/*
+           * 목록을 받을 수 없으면(`null`, API-062는 개수만 준다 · 업무 -810) `없어요`라고 쓰지
+           * 않는다. 위 수치가 한줄평이 있다고 말하는데 아래에서 없다고 하면 서로 어긋난다
+           */}
+          {profile.reviews === null ? (
+            <div className={styles.emptyReviews}>
+              <SpeechBubbleIcon />
+              <p>한줄평 목록은 아직 볼 수 없어요</p>
+            </div>
+          ) : profile.reviews.length === 0 ? (
             <div className={styles.emptyReviews}>
               <SpeechBubbleIcon />
               <p>아직 공개한 한줄평이 없어요</p>

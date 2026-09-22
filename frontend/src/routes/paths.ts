@@ -63,7 +63,7 @@ export const ROUTE_PATTERN = {
    * 와이어프레임 이동표에 진입 화살표가 없었다. **5.8 파티원 카드에서 들어온다**
    * (팀 결정 2026-09-11, screen-spec-my.md 2장 8번).
    */
-  publicProfile: '/users/:userId',
+  publicProfile: '/users/:publicId',
 
   // 설정 (업무 -307). 7.8만 탭 화면이고 나머지는 전체화면이다
   settings: '/my/settings',
@@ -160,7 +160,8 @@ export const path = {
 
   profileEdit: () => ROUTE_PATTERN.profileEdit,
   profilePreview: () => ROUTE_PATTERN.profilePreview,
-  publicProfile: (userId: string | number) => `/users/${userId}`,
+  /** 공개 주소의 사용자 식별자는 `publicId`(UUID)다. 내부 숫자 ID를 넣지 않는다(ADR-0008) */
+  publicProfile: (publicId: string) => `/users/${publicId}`,
 
   settings: () => ROUTE_PATTERN.settings,
   accountManage: () => ROUTE_PATTERN.accountManage,

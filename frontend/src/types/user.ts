@@ -118,3 +118,37 @@ export type SearchedUserList = {
   nextCursor: string | null;
   hasNext: boolean;
 };
+
+/**
+ * API-062 공개 프로필 조회 응답 (업무 S15P21E106-810).
+ *
+ * 경로의 식별자는 `publicId`(UUID, ADR-0008)지만 본문의 `user.userId`는 내부 숫자 ID다. 차단
+ * (API-020)이 이 값을 그대로 쓴다.
+ *
+ * `isBlockedByMe`는 계약에 있지만 **200 응답에서는 늘 `false`다** — 차단 관계는 어느 방향이든
+ * 404로 감춘다(백엔드 `PublicProfileResponse` 주석). 화면은 이 값으로 아무것도 가르지 않는다.
+ *
+ * 한줄평은 **개수(`publicReviewCount`)만 온다.** 사용자별 공개 한줄평 목록 API는 계약에 없다.
+ */
+export type PublicProfile = {
+  user: {
+    userId: number;
+    nickname: string;
+    /** 등록한 사진이 없으면 `null` */
+    avatarUrl: string | null;
+    visibility: Visibility;
+  };
+  keywords: { code: string; label: string }[];
+  stats: { frameCount: number; popcornCount: number };
+  popcorn: {
+    flavors: { flavorCode: string; popcornCount: number; averageScore: number | null }[];
+  };
+  recentFrames: {
+    frameId: number;
+    movie: { movieId: number; title: string; posterUrl: string | null };
+    score: number;
+    createdAt: string;
+  }[];
+  publicReviewCount: number;
+  isBlockedByMe: boolean;
+};

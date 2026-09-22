@@ -4,7 +4,7 @@
  * **두 화면은 이 하나다.** 사용자 시안 2026-09-18 — 미리보기는 따로 디자인하지 않고, 다른
  * 사람이 내 프로필을 볼 때의 화면을 그대로 연다.
  *
- * - 7.2-B `mode="public"` — 주소의 `userId`로 API-062를 부른다
+ * - 7.2-B `mode="public"` — 주소의 `publicId`(UUID)로 API-062를 부른다(업무 -810)
  * - 7.2-A `mode="preview"` — 내 프로필을 **7.2-B와 같은 공개 모양으로** 받는다(`api/users.ts`
  *   `getMyPublicProfile` · `toPublicView`). 응답 모양 · 구역 · 정렬 · 빈 상태가 모두 같다
  *
@@ -18,14 +18,21 @@
  * 진입 경로: 7.2-B는 5.8 파티원 카드(screen-spec-my.md 2장 8번), 7.2-A는 7.2의
  * `내 공개 프로필 미리보기`다.
  *
- * **프로필은 목업이다**(API-062는 2차 MVP, 백엔드에 없다). 그래서 ⋯ 메뉴의 `사용자 차단`은
- * **잠겨 있다**(업무 -610). 이 화면에 들어오는 `userId`가 목업 번호라 서버에 없는 사람이어서
- * 실제 차단(API-020)을 부르면 늘 `404`였다. API-062가 열려 실제 사람이 흐르면 확인 창 → 7.8-D
- * 흐름을 되살린다. `[?]` 신고는 계약이 없다. 안내만 하고 실제 처리는 하지 않는다.
+ * **7.2-B는 실제 API-062다**(업무 -810). 목업이던 동안 잠가 두었던 ⋯ 메뉴의 `사용자 차단`을
+ * 되살렸다(업무 -610에서 잠금). 확인 창을 거쳐 API-062 본문의 숫자 `user.userId`로 차단하고
+ * 7.8-D로 간다(이동표 `7.2-B ⇢ 7.8-D`). 확인 창은 공동 파티에서 나가게 된다는 것을 알린다 —
+ * API-020이 차단 전에 안내하라고 적었다. 이동은 `replace`다. 차단한 사람의 프로필은 404라
+ * 뒤로 가기가 여기로 돌아오면 안 된다. `[?]` 신고는 계약이 없다. 안내만 하고 실제 처리는
+ * 하지 않는다.
+ *
+ * `[!]` 이 화면으로 들어오는 링크는 아직 없다. 주소는 `publicId`로 여는데 그 값을 알려 주는
+ * API가 없다(API-014 · API-057 응답에 없음). 5.8 `취향 보기`와 7.1 `프로필 공유`는 그 값이
+ * 오면 연결한다.
  */
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
+import ConfirmDialog from '../../../components/ConfirmDialog';
 import IconButton from '../../../components/IconButton';
 import Menu from '../../../components/Menu';
 import ProfileBackdrop from '../../../components/ProfileBackdrop';
@@ -35,6 +42,7 @@ import StatusView from '../../../components/StatusView';
 import { InfoIcon, MoreVerticalIcon } from '../../../components/Icon';
 import { failureDescription } from '../../../components/StatusView/failure';
 import { ApiError } from '../../../api/apiError';
+import { blockUser } from '../../../api/settings';
 import { getMyPublicProfile, getPublicProfile } from '../../../api/users';
 import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
@@ -75,15 +83,18 @@ function failureView(error: unknown): { title: string; description: string; retr
 }
 
 export default function PublicProfilePage({ mode = 'public' }: Props) {
-  const { userId } = useParams();
+  const navigate = useNavigate();
+  const { publicId = '' } = useParams();
   const isPreview = mode === 'preview';
 
   const [profile, setProfile] = useState<ProfileView | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
   const [reloadCount, setReloadCount] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
-  /** 신고를 고른 뒤의 안내. 계약이 없어 실제 처리는 하지 않는다 */
+  /** 신고를 고른 뒤 · 차단에 실패한 뒤의 안내 */
   const [notice, setNotice] = useState('');
+  const [confirmingBlock, setConfirmingBlock] = useState(false);
+  const [blocking, setBlocking] = useState(false);
 
   const backToEdit = useBack(path.profileEdit());
 
@@ -91,7 +102,7 @@ export default function PublicProfilePage({ mode = 'public' }: Props) {
     let active = true;
 
     // 미리보기는 내 프로필을 공개 모양으로 한 번에 받는다. 남의 프로필과 모양이 같다
-    const load = isPreview ? getMyPublicProfile() : getPublicProfile(Number(userId));
+    const load = isPreview ? getMyPublicProfile() : getPublicProfile(publicId);
 
     load
       .then((value) => {
@@ -107,7 +118,36 @@ export default function PublicProfilePage({ mode = 'public' }: Props) {
     return () => {
       active = false;
     };
-  }, [isPreview, userId, reloadCount]);
+  }, [isPreview, publicId, reloadCount]);
+
+  /** API-020으로 차단하고 7.8-D로 간다. 차단 대상은 API-062 본문의 숫자 ID다 */
+  async function handleBlock(userId: number) {
+    setBlocking(true);
+
+    try {
+      await blockUser(userId);
+      void navigate(path.blockedUsers(), { replace: true });
+    } catch (error) {
+      /*
+       * 이미 차단한 사람이면(409 ALREADY_BLOCKED) 바라던 상태이므로 성공과 같이 7.8-D로
+       * 보낸다. 두 탭에서 같은 프로필을 열어 둔 경우에 난다.
+       */
+      if (error instanceof ApiError && error.code === 'ALREADY_BLOCKED') {
+        void navigate(path.blockedUsers(), { replace: true });
+
+        return;
+      }
+
+      setBlocking(false);
+      setConfirmingBlock(false);
+      // 계약이 정한 문구가 상황을 더 정확히 말해 준다(없는 사용자 404 · 자기 자신 400)
+      setNotice(
+        error instanceof ApiError && error.status >= 400 && error.status < 500
+          ? error.message
+          : '차단하지 못했어요. 잠시 후 다시 시도해 주세요',
+      );
+    }
+  }
 
   /*
    * 헤더. 사진 배경 위라 흰 글자다(`tone`). 실패 화면만 밝은 벽이다.
@@ -201,10 +241,16 @@ export default function PublicProfilePage({ mode = 'public' }: Props) {
 
       {menuOpen ? (
         <Menu label="프로필 메뉴" top={MENU_TOP} onClose={() => setMenuOpen(false)}>
-          {/* 프로필이 목업인 동안 잠긴다. 목업 번호로 실제 차단을 부르지 않는다(업무 -610) */}
-          <button type="button" className={styles.menuItem} disabled>
+          <button
+            type="button"
+            className={styles.menuItem}
+            disabled={!profile}
+            onClick={() => {
+              setMenuOpen(false);
+              setConfirmingBlock(true);
+            }}
+          >
             사용자 차단
-            <span className={styles.menuNote}>· 준비 중</span>
           </button>
 
           <button
@@ -219,6 +265,17 @@ export default function PublicProfilePage({ mode = 'public' }: Props) {
             신고하기
           </button>
         </Menu>
+      ) : null}
+
+      {confirmingBlock && profile ? (
+        <ConfirmDialog
+          title={`${profile.nickname} 님을 차단할까요?`}
+          description="서로의 프로필·취향 필름·팝콘·한줄평이 보이지 않아요. 함께 있는 파티에서는 나가게 돼요"
+          confirmLabel="차단"
+          busy={blocking}
+          onConfirm={() => void handleBlock(profile.userId)}
+          onCancel={() => setConfirmingBlock(false)}
+        />
       ) : null}
     </>
   );

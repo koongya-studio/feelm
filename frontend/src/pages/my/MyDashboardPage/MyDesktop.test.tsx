@@ -80,8 +80,8 @@ const profile: ProfileView = {
   bio: '좋아하는 영화를 곁에 두고',
   stats: { frameCount: 73, popcornCount: 58, publicReviewCount: 4 },
   keywords: [
-    { code: 'K1', label: '몰입되는', rationale: '', isPublic: true },
-    { code: 'K2', label: '숨은 키워드', rationale: '', isPublic: false },
+    { code: 'K1', label: '몰입되는', isPublic: true },
+    { code: 'K2', label: '숨은 키워드', isPublic: false },
   ],
   frames: [],
   popcorn: [],
