@@ -19,19 +19,31 @@ import com.feelm.backend.global.error.ErrorCode;
 import java.time.Clock;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/** 파티 잠금 이후 최신성을 다시 확인하고 추천 세트·아이템을 원자적으로 저장한다. */
+/**
+ * 파티 잠금 이후 최신성을 다시 확인하고 추천 세트·아이템을 원자적으로 저장한다.
+ *
+ * <p>노출 커서는 항목의 {@code exposed_at}이다. 한 요청이 노출한 항목은 같은 시각을 받으므로 "가장 최근 시각과 같은 항목"이 현재 묶음이고, 세트가 파티
+ * 단위라 커서는 파티원 사이에 공유된다. 일반 조회는 그 묶음을 그대로 돌려주고, 다시 받기만 미노출 후보로 새 묶음을 만든다. 묶음 조회·노출 기록·{@code
+ * hasNext} 계산은 모두 파티 행 잠금 안에서 수행해 동시 다시 받기가 직렬화된다.
+ *
+ * <p>전제: 격리 수준은 기본 READ COMMITTED다. 잠금을 얻은 뒤의 문장이 직전 트랜잭션의 커밋(노출)을 봐야 다음 묶음을 고를 수 있다. REPEATABLE
+ * READ로 올리면 잠금 대기 전에 잡힌 스냅샷이 유지되어 동시 다시 받기가 같은 묶음을 응답한다(계약 테스트 T12가 실패한다).
+ */
 @Component
 @RequiredArgsConstructor
 class PartyRecommendationWriter {
-    private static final int STORED_CANDIDATE_LIMIT = 10;
+    /** 세트당 저장하는 후보 수. Redis 스냅샷(최대 500)에서 이만큼 저장해 다시 받기로 소진한다. */
+    private static final int STORED_CANDIDATE_LIMIT = 50;
 
     private final PartyRepository partyRepository;
     private final PartyMemberRepository memberRepository;
@@ -45,7 +57,8 @@ class PartyRecommendationWriter {
             List<Long> expectedMemberIds,
             PartyInputSnapshot input,
             PartyCandidateSnapshot candidates,
-            int size) {
+            int size,
+            boolean refresh) {
         Party party =
                 partyRepository
                         .findAccessibleByIdForUpdate(partyId, userId)
@@ -63,13 +76,46 @@ class PartyRecommendationWriter {
                 recommendationRepository
                         .findExistingSet(partyId, candidates.inputId(), candidates.modelVersion())
                         .orElseGet(() -> createSet(partyId, currentMemberIds, candidates));
-        List<StoredItem> items =
-                recommendationRepository.findItems(set.id(), currentMemberIds, size);
-        if (items.isEmpty()) {
-            throw new BusinessException(ErrorCode.RECOMMENDATION_UNAVAILABLE);
+        List<StoredItem> items = serve(set.id(), currentMemberIds, size, refresh);
+        boolean hasNext = recommendationRepository.hasUnexposedEligible(set.id(), currentMemberIds);
+        return response(partyId, set, items, hasNext);
+    }
+
+    /**
+     * 노출 이력이 없는 세트는 첫 묶음을 만들고, 다시 받기는 미노출 유효 후보로 다음 묶음을 만든다. 그 밖의 조회와 후보를 다 쓴 다시 받기는 현재 묶음을 저장된 그대로
+     * 돌려준다.
+     */
+    private List<StoredItem> serve(long setId, List<Long> memberIds, int size, boolean refresh) {
+        Optional<OffsetDateTime> bundleExposedAt =
+                recommendationRepository.findLatestExposedAt(setId);
+        if (refresh || bundleExposedAt.isEmpty()) {
+            List<StoredItem> next =
+                    recommendationRepository.findUnexposedEligible(setId, memberIds, size);
+            if (!next.isEmpty()) {
+                recommendationRepository.expose(next, nextExposureTime(bundleExposedAt));
+                return next;
+            }
+            if (bundleExposedAt.isEmpty()) {
+                // 노출한 적 없는 세트에 유효 후보가 하나도 없다. 새로 만든 세트는 유효 후보만 저장하므로 기존 세트만 해당한다.
+                throw new BusinessException(ErrorCode.RECOMMENDATION_UNAVAILABLE);
+            }
         }
-        recommendationRepository.expose(items, now());
-        return response(partyId, set, items);
+        return recommendationRepository.findCurrentBundle(setId, size);
+    }
+
+    /**
+     * 새 묶음의 노출 시각. 묶음 구분이 시각 순서에 의존하므로 현재 묶음 시각보다 크지 않으면(고정 Clock, 같은 마이크로초) 1µs를 더한다. PostgreSQL이
+     * 마이크로초까지 저장하므로 비교 전에 같은 정밀도로 맞춘다.
+     */
+    private OffsetDateTime nextExposureTime(Optional<OffsetDateTime> currentBundleExposedAt) {
+        OffsetDateTime now = now().truncatedTo(ChronoUnit.MICROS);
+        if (currentBundleExposedAt.isPresent() && !now.isAfter(currentBundleExposedAt.get())) {
+            return currentBundleExposedAt
+                    .get()
+                    .withOffsetSameInstant(ZoneOffset.UTC)
+                    .plus(1, ChronoUnit.MICROS);
+        }
+        return now;
     }
 
     private void verifyCurrent(
@@ -111,13 +157,14 @@ class PartyRecommendationWriter {
     }
 
     private PartyRecommendationResponse response(
-            long partyId, RecommendationSet set, List<StoredItem> items) {
+            long partyId, RecommendationSet set, List<StoredItem> items, boolean hasNext) {
         List<Long> movieIds = items.stream().map(StoredItem::movieId).toList();
         Map<Long, List<String>> genres = recommendationRepository.findGenreNames(movieIds);
         Map<Long, List<String>> otts = recommendationRepository.findOttCodes(movieIds);
         List<PartyRecommendationItemResponse> responses =
                 items.stream().map(item -> response(item, genres, otts)).toList();
-        return new PartyRecommendationResponse(set.id(), partyId, set.generatedAt(), responses);
+        return new PartyRecommendationResponse(
+                set.id(), partyId, set.generatedAt(), responses, hasNext);
     }
 
     private PartyRecommendationItemResponse response(

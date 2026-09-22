@@ -71,11 +71,14 @@ class PartyRecommendationApiContractTest extends SharedPostgresContractTest {
                 .andExpect(jsonPath("$.items[0].type").value("PARTY"))
                 .andExpect(jsonPath("$.items[0].movie.movieId").value(101))
                 .andExpect(jsonPath("$.items[0].movie.ottProviders[0]").value("NETFLIX"))
-                .andExpect(jsonPath("$.items[0].reason").doesNotExist());
+                .andExpect(jsonPath("$.items[0].reason").doesNotExist())
+                .andExpect(jsonPath("$.hasNext").value(true));
 
+        // 일반 조회는 노출한 묶음을 그대로 돌려준다. size를 늘려도 보충하지 않는다(S15P21E106-792).
         request(10, partyId, 4)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items.length()").value(4));
+                .andExpect(jsonPath("$.items.length()").value(3))
+                .andExpect(jsonPath("$.hasNext").value(true));
         org.assertj.core.api.Assertions.assertThat(count("recommendation_sets")).isEqualTo(1);
         org.assertj.core.api.Assertions.assertThat(count("recommendation_items")).isEqualTo(4);
     }
