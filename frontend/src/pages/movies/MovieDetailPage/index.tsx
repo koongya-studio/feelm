@@ -24,7 +24,7 @@
  * 없다 — 백엔드가 필드를 주기 전에도 화면이 깨지지 않는다.
  */
 import { useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import Button from '../../../components/Button';
 import IconButton from '../../../components/IconButton';
 import OttBadge from '../../../components/OttBadge';
@@ -271,6 +271,7 @@ export default function MovieDetailPage() {
 
   function handlePeoplePointerDown(event: ReactPointerEvent<HTMLUListElement>) {
     if (event.pointerType !== 'mouse' || event.button !== 0) return;
+    if (event.target instanceof Element && event.target.closest('a')) return;
 
     peopleDragRef.current = {
       pointerId: event.pointerId,
@@ -278,7 +279,6 @@ export default function MovieDetailPage() {
       scrollLeft: event.currentTarget.scrollLeft,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
-    event.preventDefault();
   }
 
   function handlePeoplePointerMove(event: ReactPointerEvent<HTMLUListElement>) {
@@ -616,7 +616,9 @@ export default function MovieDetailPage() {
                   ) : (
                     <span className={styles.personPhoto} aria-hidden="true" />
                   )}
-                  <span className={styles.personName}>{person.name}</span>
+                  <Link className={styles.personName} to={path.searchWith(person.name)}>
+                    {person.name}
+                  </Link>
                 </li>
               ))}
             </ul>
