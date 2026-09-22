@@ -25,7 +25,11 @@ public class PartyRecommendationService {
     private final RedisPartyCandidateReader candidateReader;
     private final PartyRecommendationWriter writer;
 
-    public PartyRecommendationResponse getRecommendations(long userId, long partyId, int size) {
+    /**
+     * @param refresh {@code true}면 아직 노출하지 않은 후보로 다음 묶음을 만든다(다시 받기). {@code false}면 현재 묶음을 그대로 돌려준다
+     */
+    public PartyRecommendationResponse getRecommendations(
+            long userId, long partyId, int size, boolean refresh) {
         Party party =
                 partyRepository
                         .findAccessibleById(partyId, userId)
@@ -43,6 +47,7 @@ public class PartyRecommendationService {
         } catch (IllegalStateException exception) {
             throw new BusinessException(ErrorCode.RECOMMENDATION_UNAVAILABLE);
         }
-        return writer.write(userId, partyId, memberIds, currentInput, candidateSnapshot, size);
+        return writer.write(
+                userId, partyId, memberIds, currentInput, candidateSnapshot, size, refresh);
     }
 }
