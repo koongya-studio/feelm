@@ -196,16 +196,21 @@ describe('4.2 검색 데스크톱 시안', () => {
 
     const aside = await screen.findByRole('complementary', { name: '보조 정보' });
 
-    await waitFor(() =>
-      expect(within(aside).getByRole('heading', { name: '기생충' })).toBeInTheDocument(),
-    );
-    expect(within(aside).getByText(detail.synopsis!)).toBeInTheDocument();
+    /*
+     * **제목이 섰다고 패널이 다 찬 것은 아니다**(업무 S15P21E106-797).
+     *
+     * 제목은 검색 결과가 그대로 주지만 줄거리 · 감독 · 출연 · 장르는 상세(API-030)가, 유사한
+     * 작품은 API-031이 따로 채운다. 제목만 기다리고 나머지를 바로 읽으면 두 응답 사이가 잡혀
+     * 전체 실행에서 간헐적으로 깨진다. 늦게 오는 쪽을 기다린다.
+     */
+    expect(await within(aside).findByText(detail.synopsis!)).toBeInTheDocument();
+    expect(within(aside).getByRole('heading', { name: '기생충' })).toBeInTheDocument();
     expect(within(aside).getByText('봉준호')).toBeInTheDocument();
     expect(within(aside).getByText('송강호')).toBeInTheDocument();
     // 시안의 `연관 키워드` 자리는 계약이 주는 장르 · 제작 국가다
     expect(within(aside).getByRole('heading', { name: '장르 · 제작 국가' })).toBeInTheDocument();
     expect(within(aside).getByText('한국')).toBeInTheDocument();
-    expect(within(aside).getByRole('heading', { name: '유사한 작품' })).toBeInTheDocument();
+    expect(await within(aside).findByRole('heading', { name: '유사한 작품' })).toBeInTheDocument();
   });
 
   it('다른 카드를 고르면 패널이 그 영화로 바뀐다', async () => {

@@ -111,7 +111,20 @@ function renderFlow(start: string = ROUTE_PATTERN.profileEdit) {
     { initialEntries: [ROUTE_PATTERN.my, start], initialIndex: 1 },
   );
 
-  render(<RouterProvider router={router} />);
+  /*
+   * **주소 갱신을 전환에 맡기지 않는다**(업무 S15P21E106-797).
+   *
+   * 데이터 라우터는 주소 상태를 `React.startTransition` 안에서 바꾼다(react-router 8
+   * `components.js`의 `setState`). 전환은 시간을 쪼개 그리므로, 기계가 바쁘면 React가
+   * 5ms마다 양보하며 한 번 그리는 데 macrotask를 수없이 쓴다. 전체 실행에서 일꾼이
+   * 밀리면 그 사이가 벌어져 **이동이 5초를 넘도록 커밋되지 않는 일**이 있었다. 깨진 순간의
+   * 화면에는 편집 화면이 그대로 있었다 — 무언가가 막은 것이 아니라 아직 그리지 못한 것이다.
+   *
+   * `test/render.tsx`가 `MemoryRouter`에 건 것과 같은 조치다(업무 -789). 이 파일은
+   * `useBlocker` 때문에 데이터 라우터를 직접 만들어 그 도우미를 쓰지 않으므로 여기에 따로 건다.
+   * 화면이 하는 일은 그대로이고 주소 갱신의 커밋 시점만 보통 갱신과 같아진다.
+   */
+  render(<RouterProvider router={router} useTransitions={false} />);
 
   return router;
 }

@@ -195,6 +195,12 @@ describe('FilmPage', () => {
  *
  * jsdom에는 `IntersectionObserver`가 없어 다음 장 칸이 버튼이 된다. 스크롤로 잇는 길은
  * 아래 `자동으로 이어 받기`가 관찰자를 심어 따로 시험한다.
+ *
+ * **한 장을 몇 칸으로 두는지는 이어 받기와 무관하다**(업무 -797). 실제 계약의 한 장은 20개지만,
+ * 이 시험이 보는 것은 커서를 들고 다음 장을 붙이는 것 · 겹친 프레임을 한 번만 그리는 것 ·
+ * 실패해도 그린 것을 두는 것이다. 20칸을 그리면 칸마다 접근성 이름을 다시 계산하는
+ * `frameCount()`가 기다릴 때마다 무거워져, 이 파일이 전체 실행에서 가장 오래 기다리는 곳이
+ * 됐다(부하 아래 2.1초). 그래서 장을 몇 칸으로 두되 단정문은 그대로 둔다.
  */
 describe('FilmPage 다음 장', () => {
   beforeEach(() => {
@@ -203,47 +209,47 @@ describe('FilmPage 다음 장', () => {
 
   it('끝의 다음 장 칸으로 나머지 프레임을 이어 받아 전부 넘겨 볼 수 있다', async () => {
     vi.mocked(getMyFrames)
-      .mockResolvedValueOnce(frameList(45, 20, { nextCursor: 'c20' }))
-      .mockResolvedValueOnce(frameList(45, 20, { from: 21, nextCursor: 'c40' }))
-      .mockResolvedValueOnce(frameList(45, 5, { from: 41 }));
+      .mockResolvedValueOnce(frameList(7, 3, { nextCursor: 'c3' }))
+      .mockResolvedValueOnce(frameList(7, 3, { from: 4, nextCursor: 'c6' }))
+      .mockResolvedValueOnce(frameList(7, 1, { from: 7 }));
 
     renderWithRouter(<FilmPage />);
 
-    expect(await screen.findByText('45개의 프레임이 감겼어요')).toBeInTheDocument();
-    expect(frameCount()).toBe(20);
+    expect(await screen.findByText('7개의 프레임이 감겼어요')).toBeInTheDocument();
+    expect(frameCount()).toBe(3);
 
     fireEvent.click(screen.getByRole('button', { name: '프레임 더 보기' }));
-    await waitFor(() => expect(frameCount()).toBe(40));
-    expect(getMyFrames).toHaveBeenLastCalledWith('c20');
+    await waitFor(() => expect(frameCount()).toBe(6));
+    expect(getMyFrames).toHaveBeenLastCalledWith('c3');
 
     fireEvent.click(screen.getByRole('button', { name: '프레임 더 보기' }));
-    await waitFor(() => expect(frameCount()).toBe(45));
-    expect(getMyFrames).toHaveBeenLastCalledWith('c40');
+    await waitFor(() => expect(frameCount()).toBe(7));
+    expect(getMyFrames).toHaveBeenLastCalledWith('c6');
 
     // 더 받을 것이 없으면 다음 장 칸이 사라진다
     expect(screen.queryByRole('button', { name: '프레임 더 보기' })).toBeNull();
-    expect(screen.getByRole('button', { name: '영화 45 상세 보기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '영화 7 상세 보기' })).toBeInTheDocument();
   });
 
   it('다음 장에 이미 그린 프레임이 섞여 오면 한 번만 그린다', async () => {
-    // 그 사이 새 평가가 생겨 커서 경계가 밀린 경우다. 20번이 다음 장 맨 앞에 다시 온다
+    // 그 사이 새 평가가 생겨 커서 경계가 밀린 경우다. 4번이 다음 장 맨 앞에 다시 온다
     vi.mocked(getMyFrames)
-      .mockResolvedValueOnce(frameList(25, 20, { nextCursor: 'c20' }))
-      .mockResolvedValueOnce(frameList(25, 6, { from: 20 }));
+      .mockResolvedValueOnce(frameList(7, 4, { nextCursor: 'c4' }))
+      .mockResolvedValueOnce(frameList(7, 4, { from: 4 }));
 
     renderWithRouter(<FilmPage />);
 
     fireEvent.click(await screen.findByRole('button', { name: '프레임 더 보기' }));
 
-    await waitFor(() => expect(frameCount()).toBe(25));
-    expect(screen.getAllByRole('button', { name: '영화 20 상세 보기' })).toHaveLength(1);
+    await waitFor(() => expect(frameCount()).toBe(7));
+    expect(screen.getAllByRole('button', { name: '영화 4 상세 보기' })).toHaveLength(1);
   });
 
   it('다음 장을 받지 못해도 그린 프레임은 두고 다시 불러올 수 있다', async () => {
     vi.mocked(getMyFrames)
-      .mockResolvedValueOnce(frameList(30, 20, { nextCursor: 'c20' }))
+      .mockResolvedValueOnce(frameList(6, 3, { nextCursor: 'c3' }))
       .mockRejectedValueOnce(new Error('boom'))
-      .mockResolvedValueOnce(frameList(30, 10, { from: 21 }));
+      .mockResolvedValueOnce(frameList(6, 3, { from: 4 }));
 
     renderWithRouter(<FilmPage />);
 
@@ -251,13 +257,13 @@ describe('FilmPage 다음 장', () => {
 
     const retry = await screen.findByRole('button', { name: '다시 불러오기' });
     // 화면 전체가 실패 상태로 넘어가지 않는다
-    expect(frameCount()).toBe(20);
+    expect(frameCount()).toBe(3);
     expect(screen.queryByText('취향 필름을 불러오지 못했어요')).toBeNull();
 
     fireEvent.click(retry);
 
-    await waitFor(() => expect(frameCount()).toBe(30));
-    expect(getMyFrames).toHaveBeenLastCalledWith('c20');
+    await waitFor(() => expect(frameCount()).toBe(6));
+    expect(getMyFrames).toHaveBeenLastCalledWith('c3');
   });
 });
 
@@ -309,9 +315,9 @@ describe('FilmPage 자동으로 이어 받기', () => {
     const taste = await import('../../../api/taste');
 
     vi.mocked(taste.getMyFrames)
-      .mockResolvedValueOnce(frameList(50, 20, { nextCursor: 'c20' }))
+      .mockResolvedValueOnce(frameList(10, 5, { nextCursor: 'c5' }))
       .mockRejectedValueOnce(new Error('boom'))
-      .mockResolvedValueOnce(frameList(50, 20, { from: 21, nextCursor: 'c40' }));
+      .mockResolvedValueOnce(frameList(10, 5, { from: 6, nextCursor: 'c10' }));
 
     renderWithRouter(<ObservedFilmPage />);
 
@@ -331,7 +337,7 @@ describe('FilmPage 자동으로 이어 받기', () => {
     expect(taste.getMyFrames).toHaveBeenCalledTimes(2);
 
     fireEvent.click(screen.getByRole('button', { name: '다시 불러오기' }));
-    await waitFor(() => expect(frameCount()).toBe(40));
+    await waitFor(() => expect(frameCount()).toBe(10));
   });
 });
 
