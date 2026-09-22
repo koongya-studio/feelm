@@ -2,9 +2,12 @@ from pathlib import Path
 import re
 import unittest
 
+from infra.scripts.test_ci_config import FRONTEND_OAUTH_BUILD_INPUTS
+
 
 ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_CI = ROOT / '.gitlab' / 'ci' / 'frontend.yml'
+FRONTEND_DOCKERFILE = ROOT / 'frontend' / 'Dockerfile'
 
 
 def job_block(text, name):
@@ -165,6 +168,16 @@ class FrontendPathRulesTests(unittest.TestCase):
             'python3 -B -m unittest infra.scripts.test_ci_frontend_paths -v',
             self.blocks['frontend-test'],
         )
+
+    def test_frontend_dockerfile_declares_every_oauth_build_arg(self):
+        # frontend-image가 넘기는 --build-arg는 Dockerfile이 같은 이름으로 ARG를
+        # 선언해야 빌드에 전달된다. 무시되면 경고 없이 빈 값이 박힌다.
+        dockerfile = FRONTEND_DOCKERFILE.read_text()
+        build_index = dockerfile.index('RUN npm run build')
+        for key in FRONTEND_OAUTH_BUILD_INPUTS:
+            with self.subTest(key=key):
+                self.assertIn(f'ARG {key}=', dockerfile[:build_index])
+        self.assertNotIn('CLIENT_SECRET', dockerfile)
 
 
 if __name__ == '__main__':
