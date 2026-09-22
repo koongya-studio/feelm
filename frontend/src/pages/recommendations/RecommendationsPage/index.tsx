@@ -31,6 +31,19 @@
  * 바꾸고, 네트워크 단절 · 서버 오류 같은 실제 실패는 와이어프레임 2.2-A 문구를 그대로 둔다
  * (문구는 사용자 결정 2026-09-18).
  *
+ * ─────────────────────────── 데스크톱 시안 (업무 -783)
+ *
+ * 1024px 이상에서는 2026-09-21 시안의 배치를 쓴다. **모바일 화면은 한 줄도 바뀌지 않는다** —
+ * 폭에 따라 그리는 것 자체가 갈린다(`hooks/useShellSize`).
+ *
+ * - 숨겨 두었던 화면 제목이 드러난다. `오늘의 추천`과 오늘 날짜가 한 줄이다
+ * - 카드가 **취향 맞춤 · 취향 발견 두 필름**으로 나뉘어 나란히 선다(`RecommendationGroup`).
+ *   묶음 이름표를 되살린 것은 좌우로 놓인 두 필름이 이름 없이는 구분되지 않기 때문이고,
+ *   412px에서 이름표를 뺀 결정(업무 -672)은 그대로다
+ * - 오른쪽에 추천 기준 · 최근 본 영화가 붙는다(`RecommendationsAside`)
+ * - **아래 `포스터를 탭하면 ⋯` 안내를 넓은 화면에서 뺀다**(사용자 결정 2026-09-22). 시안에
+ *   없고, 마우스로 누르는 화면에서 `탭`이라고 말하는 줄이기도 하다
+ *
  * 카드 열은 **3.1과 같은 필름 릴을 세로로 세운 것**이다(`FilmReel`, 업무 -605 — 사용자
  * 지시 2026-09-18). 그전에는 와이어프레임의 회색 판에 구멍 줄을 직접 그렸는데, 3.1의
  * 필름이 확정되고 나서 추천 카드가 다른 필름처럼 보였다.
@@ -38,6 +51,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import Button from '../../../components/Button';
+import DesktopAside from '../../../components/DesktopAside';
 import FilmReel from '../../../components/FilmReel';
 import Menu from '../../../components/Menu';
 import OttBadge from '../../../components/OttBadge';
@@ -47,9 +61,13 @@ import VisuallyHidden from '../../../components/VisuallyHidden';
 import { LinkIcon, PlayIcon } from '../../../components/Icon';
 import Snackbar from '../../../components/Snackbar';
 import RecommendationCard from './RecommendationCard';
+import RecommendationGroup from './RecommendationGroup';
+import RecommendationsAside from './RecommendationsAside';
 import { ApiError } from '../../../api/apiError';
 import { dismissMovie, getRecommendations } from '../../../api/recommendations';
 import { getOtts } from '../../../api/otts';
+import { useShellSize } from '../../../hooks/useShellSize';
+import { formatMonthDayWeekday } from '../../../utils/date';
 import { path } from '../../../routes/paths';
 import styles from './RecommendationsPage.module.css';
 import type { MouseEvent } from 'react';
@@ -80,6 +98,9 @@ const FRAME_HEIGHT = 'calc((100cqw - 34px) * 220 / 156)';
  */
 type Failure = 'preparing' | 'error';
 
+/** ⋯ 메뉴의 폭(px). `components/Menu`의 실측값이며 누른 버튼에 맞출 때 쓴다 */
+const MENU_WIDTH = 148;
+
 function failureOf(error: unknown): Failure {
   return error instanceof ApiError && error.code === 'RECOMMENDATION_UNAVAILABLE'
     ? 'preparing'
@@ -90,12 +111,21 @@ type OpenMenu = {
   item: RecommendationItem;
   /** 화면 위쪽에서의 거리(px). 누른 버튼 위치에 맞춘다 */
   top: number;
+  /**
+   * 왼쪽에서의 거리(px). 넓은 화면에서만 있다 — 412px에서는 카드와 화면의 오른쪽 끝이
+   * 같아 메뉴가 오른쪽에 붙는 것으로 충분하지만, 좌우로 갈린 두 묶음에서는 누른 카드
+   * 쪽에 열려야 한다(업무 -783)
+   */
+  left?: number;
 };
 
 export default function RecommendationsPage() {
   const rootRef = useRef<HTMLDivElement>(null);
+  const desktop = useShellSize() !== 'mobile';
   const [otts, setOtts] = useState<Ott[]>([]);
   const [items, setItems] = useState<RecommendationItem[] | null>(null);
+  /** 이 추천을 만든 시각(API-045 `generatedAt`). 넓은 화면의 날짜 줄이 쓴다 */
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   /** 관심없음을 처리 중인 카드. 그동안 그 카드의 버튼은 눌리지 않는다 */
   const [dismissingId, setDismissingId] = useState<number | null>(null);
   /** 관심없음을 처리하지 못했으면 하단 막대로 알린다 */
@@ -119,6 +149,7 @@ export default function RecommendationsPage() {
       .then((set) => {
         if (active) {
           setItems(set.items);
+          setGeneratedAt(set.generatedAt);
           setFailure(null);
         }
       })
@@ -163,7 +194,10 @@ export default function RecommendationsPage() {
         );
 
         return getRecommendations()
-          .then((set) => setItems(set.items))
+          .then((set) => {
+            setItems(set.items);
+            setGeneratedAt(set.generatedAt);
+          })
           .catch(() => undefined);
       })
       .catch(() => setDismissFailed(true))
@@ -180,8 +214,18 @@ export default function RecommendationsPage() {
     const root = rootRef.current;
     const buttonRect = event.currentTarget.getBoundingClientRect();
     const rootRect = root?.getBoundingClientRect();
+    const top = buttonRect.top - (rootRect?.top ?? 0);
 
-    setOpenMenu({ item, top: buttonRect.top - (rootRect?.top ?? 0) });
+    if (!desktop) {
+      setOpenMenu({ item, top });
+
+      return;
+    }
+
+    // 누른 버튼의 오른쪽 끝에 메뉴의 오른쪽 끝을 맞춘다
+    const left = Math.max(buttonRect.right - (rootRect?.left ?? 0) - MENU_WIDTH, 0);
+
+    setOpenMenu({ item, top, left });
   }
 
   const tasteItems = items?.filter((item) => item.type === 'TASTE') ?? [];
@@ -238,36 +282,89 @@ export default function RecommendationsPage() {
        * 보이지만 않게 한다(7.1과 같은 처리). 오류 · 빈 상태는 안내가 화면을 채우므로
        * 헤더 자리만 남기고 제목을 숨긴다.
        */}
-      <h1>
-        <VisuallyHidden>오늘의 추천</VisuallyHidden>
-      </h1>
+      {desktop ? null : (
+        <h1>
+          <VisuallyHidden>오늘의 추천</VisuallyHidden>
+        </h1>
+      )}
 
-      <div className={styles.page} ref={rootRef}>
-        <div className={styles.scrollArea}>
-          {items ? (
-            <FilmReel
-              orientation="vertical"
-              flat
-              frameWidth={FRAME_WIDTH}
-              frameHeight={FRAME_HEIGHT}
-              label="오늘의 추천 카드"
-            >
-              {[...tasteItems, ...discoveryItems].map((item) => (
-                <RecommendationCard
-                  key={item.recommendationItemId}
-                  item={item}
-                  otts={otts}
-                  menuOpen={openMenu?.item.recommendationItemId === item.recommendationItemId}
-                  onOpenMenu={handleOpenMenu}
-                  dismissing={dismissingId === item.recommendationItemId}
-                  onDismiss={handleDismiss}
-                />
-              ))}
-            </FilmReel>
-          ) : null}
-        </div>
+      <div className={desktop ? styles.desktopPage : styles.page} ref={rootRef}>
+        {desktop ? (
+          <>
+            <header className={styles.desktopHead}>
+              <div className={styles.desktopHeading}>
+                <p className={styles.eyebrow}>TODAY&rsquo;S RECOMMENDATION</p>
+                <h1 className={styles.desktopTitle}>오늘의 추천</h1>
+                <p className={styles.desktopSubtitle}>
+                  지금, 당신의 취향에 딱 맞는 영화를 골랐어요
+                </p>
+              </div>
 
-        <p className={styles.hint}>포스터를 탭하면 상세 화면 · ⋯ 버튼을 탭하면 OTT 메뉴</p>
+              {generatedAt ? (
+                <p className={styles.date}>
+                  <span className={styles.dateValue}>{formatMonthDayWeekday(generatedAt)}</span>
+                  <span className={styles.dateNote}>오늘도 좋은 영화와 함께해요</span>
+                </p>
+              ) : null}
+            </header>
+
+            <div className={styles.groups}>
+              {/*
+               * 묶음 설명은 고정 문구다. 시안은 그 자리에 첫 카드의 추천 이유를 적었지만,
+               * 그 문장은 카드 안에 이미 있고 카드가 바뀌면 묶음 이름 아래 설명까지 흔들린다.
+               */}
+              <RecommendationGroup
+                title="취향 맞춤 추천"
+                description="좋아한 영화와 가장 가까운 편이에요"
+                items={tasteItems}
+                otts={otts}
+                openMenuId={openMenu?.item.recommendationItemId ?? null}
+                onOpenMenu={handleOpenMenu}
+                dismissingId={dismissingId}
+                onDismiss={handleDismiss}
+              />
+
+              <RecommendationGroup
+                title="취향 발견 추천"
+                description="기존 취향과 연결되는 새로운 맛이에요"
+                items={discoveryItems}
+                otts={otts}
+                openMenuId={openMenu?.item.recommendationItemId ?? null}
+                onOpenMenu={handleOpenMenu}
+                dismissingId={dismissingId}
+                onDismiss={handleDismiss}
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className={styles.scrollArea}>
+              {items ? (
+                <FilmReel
+                  orientation="vertical"
+                  flat
+                  frameWidth={FRAME_WIDTH}
+                  frameHeight={FRAME_HEIGHT}
+                  label="오늘의 추천 카드"
+                >
+                  {[...tasteItems, ...discoveryItems].map((item) => (
+                    <RecommendationCard
+                      key={item.recommendationItemId}
+                      item={item}
+                      otts={otts}
+                      menuOpen={openMenu?.item.recommendationItemId === item.recommendationItemId}
+                      onOpenMenu={handleOpenMenu}
+                      dismissing={dismissingId === item.recommendationItemId}
+                      onDismiss={handleDismiss}
+                    />
+                  ))}
+                </FilmReel>
+              ) : null}
+            </div>
+
+            <p className={styles.hint}>포스터를 탭하면 상세 화면 · ⋯ 버튼을 탭하면 OTT 메뉴</p>
+          </>
+        )}
 
         {/* 2.3 추천 카드 ⋯ 메뉴 */}
         {openMenu ? (
@@ -275,6 +372,7 @@ export default function RecommendationsPage() {
             label={`${openMenu.item.movie.title} OTT 메뉴`}
             title="OTT · 바로보기"
             top={openMenu.top}
+            left={openMenu.left}
             onClose={() => setOpenMenu(null)}
           >
             <ul className={styles.menuOttList}>
@@ -330,6 +428,13 @@ export default function RecommendationsPage() {
           </div>
         ) : null}
       </div>
+
+      {/* 우측 보조 패널. 1280px 이상에서만 자리가 있다(업무 -782) */}
+      {desktop ? (
+        <DesktopAside>
+          <RecommendationsAside items={items ?? []} />
+        </DesktopAside>
+      ) : null}
     </>
   );
 }

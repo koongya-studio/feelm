@@ -193,3 +193,39 @@
   user-select: auto;
   scroll-snap-type: none;
 }
+
+/*
+ * 내용 크기 칸 (`fit="content"`, 업무 -783).
+ *
+ * 2.2의 데스크톱 시안은 한 필름 안에 큰 카드 한 장과 작은 카드 두 장을 넣는다. 칸 크기가
+ * 모두 같은 기본 모드로는 그릴 수 없어, 칸이 안에 든 것만큼 커지는 모드를 둔다. 띠 · 구멍 ·
+ * 가장자리 빛은 그대로라 같은 필름으로 읽힌다.
+ *
+ * 릴은 놓인 자리를 가득 채운다. 기본 세로 필름은 칸 폭이 정해져 있어 `max-content`로 충분하지만,
+ * 여기서는 칸이 릴 폭을 따르므로 릴이 먼저 폭을 가져야 한다.
+ */
+.reel[data-fit='content'] {
+  width: 100%;
+}
+
+.reel[data-fit='content'] .track {
+  align-items: stretch;
+}
+
+.reel[data-fit='content'] .track > * {
+  width: auto;
+  min-width: 0;
+  height: auto;
+  flex: 1 1 auto;
+}
+
+/*
+ * 검은 띠 (`tone="plain"`, 업무 -783). 2026-09-21 PC 웹 시안의 필름이다.
+ *
+ * 주황빛 가장자리를 걷어 낸다. 이 필름이 감싸는 것은 포스터가 아니라 흰 카드라, 따뜻한
+ * 빛이 카드의 흰색과 부딪쳐 띠가 갈색으로 읽힌다.
+ */
+.reel[data-tone='plain'] .band {
+  background: var(--color-film-plain);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.14);
+}

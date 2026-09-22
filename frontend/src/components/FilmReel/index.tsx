@@ -48,11 +48,13 @@ type DragState = {
 type Props = {
   /**
    * 프레임 한 칸의 폭. 숫자면 px이고, 문자열이면 CSS 길이 그대로다 — 2.2처럼 칸을 화면 폭에
-   * 맞춰야 할 때 `calc()`를 넘긴다. 프레임 수와 무관하다
+   * 맞춰야 할 때 `calc()`를 넘긴다. 프레임 수와 무관하다.
+   *
+   * `fit="content"`면 쓰이지 않는다. 그때는 칸 크기를 안에 든 것이 정한다
    */
-  frameWidth: number | string;
+  frameWidth?: number | string;
   /** 프레임 한 칸의 높이. `frameWidth`와 같은 규칙이다 */
-  frameHeight: number | string;
+  frameHeight?: number | string;
   /** 프레임 묶음에 읽히는 이름 */
   label: string;
   /**
@@ -68,6 +70,22 @@ type Props = {
   /** 프레임 칸들. 버튼이든 자리표시자든 이 컴포넌트가 테두리를 입힌다 */
   children: ReactNode;
   /**
+   * 칸 크기를 무엇이 정하는지 (업무 -783).
+   *
+   * 기본 `frame`은 모든 칸이 `frameWidth` · `frameHeight`로 같다 — 포스터를 담는 필름이다.
+   * `content`는 칸이 안에 든 것만큼 커지고 띠가 그만큼 길어진다. 2.2의 데스크톱 시안처럼
+   * 큰 카드 한 장과 작은 카드 두 장이 한 필름 안에 서로 다른 높이로 들어갈 때 쓴다.
+   */
+  fit?: 'frame' | 'content';
+  /**
+   * 띠의 색조 (업무 -783).
+   *
+   * 기본 `warm`은 가장자리에 주황빛이 도는 2026-09-17 모바일 시안의 필름이다. `plain`은
+   * 주황빛이 없는 검정으로, 2026-09-21 PC 웹 시안의 필름이다 — 흰 카드를 감싸는 자리라
+   * 따뜻한 빛이 카드의 흰색과 부딪친다.
+   */
+  tone?: 'warm' | 'plain';
+  /**
    * 가로 릴의 스크롤 영역(칸의 부모). 3.1이 넘긴 위치를 읽어 `N / 전체`를 적을 때 쓴다(업무 -680)
    */
   trackRef?: Ref<HTMLDivElement>;
@@ -79,11 +97,13 @@ function cssLength(value: number | string): string {
 }
 
 export default function FilmReel({
-  frameWidth,
-  frameHeight,
+  frameWidth = 'auto',
+  frameHeight = 'auto',
   label,
   orientation = 'horizontal',
   flat = false,
+  fit = 'frame',
+  tone = 'warm',
   children,
   trackRef,
 }: Props) {
@@ -159,6 +179,8 @@ export default function FilmReel({
       style={style}
       data-orientation={orientation}
       data-flat={flat || undefined}
+      data-fit={fit}
+      data-tone={tone}
       data-testid="film-reel"
     >
       <span className={styles.band} aria-hidden="true">

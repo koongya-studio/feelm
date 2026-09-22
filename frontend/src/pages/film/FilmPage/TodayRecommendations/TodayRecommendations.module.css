@@ -1,0 +1,66 @@
+/* 3.1의 `오늘의 추천` (업무 -783). 2026-09-21 시안에서 잰 값이다 */
+.section {
+  margin-top: var(--space-8);
+  padding: 0 var(--screen-padding-x);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--space-4);
+  gap: var(--space-4);
+}
+
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-title);
+}
+
+/* 2.2로 가는 줄. 시안의 알약 모양 그대로다 */
+.more {
+  display: inline-flex;
+  height: 38px;
+  align-items: center;
+  margin-left: auto;
+  padding: 0 var(--space-3) 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-solid);
+  box-shadow: var(--shadow-raised);
+  color: var(--color-ink-body);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  gap: var(--space-1);
+  text-decoration: none;
+}
+
+.more:hover {
+  color: var(--color-ink);
+}
+
+/*
+ * 카드는 나란히 서고 폭을 똑같이 나눈다. **들어갈 폭이 없으면 줄을 바꾼다.**
+ *
+ * 한 줄에 몰아넣으면 1280px처럼 중앙 단이 좁을 때 한 장이 200px도 되지 않아 카드가 서로
+ * 겹쳐 그려졌다(2026-09-22 브라우저 확인). 카드 하나가 제 모양을 갖는 최소 폭을 정해 두고
+ * 그보다 좁으면 아래로 내린다 — 1440px에서는 석 장이 한 줄, 1280px에서는 두 줄이다.
+ *
+ * 카드 수는 서버가 정하므로(API-045) 열 수도 줄 수도 고정하지 않는다.
+ */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: var(--space-4);
+  list-style: none;
+}
+
+.cards > li {
+  display: flex;
+  min-width: 0;
+}
+
+.cards > li > * {
+  flex: 1;
+}

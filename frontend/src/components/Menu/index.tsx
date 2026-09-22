@@ -8,6 +8,11 @@
  *
  * 세로 위치는 어느 카드의 메뉴인지에 따라 달라지므로 `top`으로 받는다.
  *
+ * 가로 위치는 기본이 화면 오른쪽 끝이다. 412px 폭에서는 카드도 화면도 오른쪽 끝이 같아
+ * 누른 `⋯` 바로 아래에 열렸다. **넓은 화면에서는 그 둘이 갈라지므로 `left`를 받는다**
+ * (업무 -783) — 왼쪽 묶음의 카드를 눌렀는데 메뉴가 화면 오른쪽 끝에 열리면 무엇을 눌러
+ * 열린 메뉴인지 알 수 없다. 값을 주지 않으면 지금까지처럼 오른쪽 끝이다.
+ *
  * 접근성(frontend-structure.md 10장)
  * - 열릴 때 초점을 메뉴 안으로 옮긴다
  * - Esc로 닫는다
@@ -31,6 +36,8 @@ type Props = {
   title?: ReactNode;
   /** 화면 위쪽에서의 거리(px) */
   top: number;
+  /** 왼쪽에서의 거리(px). 생략하면 오른쪽 끝에 붙는다 */
+  left?: number;
   onClose: () => void;
   children: ReactNode;
 };
@@ -45,7 +52,7 @@ const FOCUSABLE = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(', ');
 
-export default function Menu({ label, title, top, onClose, children }: Props) {
+export default function Menu({ label, title, top, left, onClose, children }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -116,7 +123,11 @@ export default function Menu({ label, title, top, onClose, children }: Props) {
       <div
         ref={containerRef}
         className={styles.menu}
-        style={{ top: `${top}px` }}
+        style={
+          left === undefined
+            ? { top: `${top}px` }
+            : { top: `${top}px`, left: `${left}px`, right: 'auto' }
+        }
         aria-label={label}
         role="group"
         tabIndex={-1}
