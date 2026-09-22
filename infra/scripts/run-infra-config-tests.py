@@ -39,6 +39,7 @@ TESTS = (
     "infra.scripts.test_ensure_kafka_topics",
     "infra.scripts.test_ci_config",
     "infra.scripts.test_avatar_infra_config",
+    "infra.scripts.test_datastore_config_placeholders",
     "infra.scripts.test_ci_backend_mr_paths",
     "infra.scripts.test_ci_infra_mr",
     "infra.scripts.test_ci_gitlab_job_adapter.AdapterTests."
