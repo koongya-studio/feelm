@@ -70,6 +70,9 @@ public class User extends BaseTimeEntity {
     @Column(name = "withdrawn_at")
     private Instant withdrawnAt;
 
+    @Column(name = "avatar_storage_key", length = 40)
+    private String avatarStorageKey;
+
     private User(
             String email,
             String passwordHash,
@@ -151,6 +154,18 @@ public class User extends BaseTimeEntity {
         this.visibility = visibility;
     }
 
+    public String replaceAvatar(String storageKey) {
+        String previous = this.avatarStorageKey;
+        this.avatarStorageKey = storageKey;
+        return previous;
+    }
+
+    public String removeAvatar() {
+        String previous = this.avatarStorageKey;
+        this.avatarStorageKey = null;
+        return previous;
+    }
+
     /**
      * 초기 취향 제출(API-024)로 온보딩을 완료 처리한다. 건너뛴 제출도 완료다.
      *
@@ -182,6 +197,7 @@ public class User extends BaseTimeEntity {
         this.birthDate = null;
         this.gender = null;
         this.visibility = Visibility.PRIVATE;
+        this.avatarStorageKey = null;
         this.status = UserStatus.WITHDRAWN;
         this.withdrawnAt = now;
     }

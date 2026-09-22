@@ -69,10 +69,13 @@ abstract class UserProfileApiTestSupport {
                     visibility varchar(10) NOT NULL,
                     status varchar(30) NOT NULL,
                     onboarding_completed boolean NOT NULL,
+                    avatar_storage_key varchar(40),
                     created_at timestamp with time zone NOT NULL,
                     withdrawn_at timestamp with time zone
                 )
                 """);
+        jdbcTemplate.execute(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_storage_key varchar(40)");
         jdbcTemplate.execute(
                 """
                 CREATE TABLE IF NOT EXISTS user_auth_providers (

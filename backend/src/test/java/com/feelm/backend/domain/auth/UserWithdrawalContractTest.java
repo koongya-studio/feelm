@@ -11,9 +11,12 @@ import com.feelm.backend.domain.auth.entity.OAuthProvider;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
 import com.feelm.backend.global.security.TokenProvider;
+import com.feelm.backend.infrastructure.avatar.AvatarStorageProperties;
 import com.feelm.backend.infrastructure.oauth.FakeOAuthClient;
 import com.feelm.backend.infrastructure.oauth.OAuthUserProfile;
 import jakarta.servlet.http.Cookie;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,6 +43,8 @@ class UserWithdrawalContractTest extends OAuthApiTestSupport {
 
     /** 미인증 계정처럼 로그인으로는 토큰을 받을 수 없는 상태를 만들 때만 쓴다. */
     @Autowired private TokenProvider tokenProvider;
+
+    @Autowired private AvatarStorageProperties avatarStorageProperties;
 
     @Test
     @DisplayName("T1 비밀번호가 맞으면 204와 Refresh 쿠키 삭제로 응답하고 계정이 WITHDRAWN이 된다")
@@ -77,6 +82,25 @@ class UserWithdrawalContractTest extends OAuthApiTestSupport {
         assertThat(stringColumn(member.userId(), "birth_date")).isNull();
         assertThat(stringColumn(member.userId(), "gender")).isNull();
         assertThat(stringColumn(member.userId(), "visibility")).isEqualTo("PRIVATE");
+    }
+
+    @Test
+    @DisplayName("프로필 사진 연결을 커밋한 뒤 저장된 파일을 제거한다")
+    void deletesAvatarAfterWithdrawal(CapturedOutput output) throws Exception {
+        Member member = newMember(output);
+        String storageKey = "0b649505-0917-41d9-a41f-0d4402ec63d5.jpg";
+        Path stored = avatarStorageProperties.storagePath().resolve(storageKey);
+        Files.createDirectories(stored.getParent());
+        Files.write(stored, new byte[] {1, 2, 3});
+        jdbcTemplate.update(
+                "UPDATE users SET avatar_storage_key = ? WHERE id = ?",
+                storageKey,
+                member.userId());
+
+        withdraw(member.accessToken(), member.password()).andExpect(status().isNoContent());
+
+        assertThat(stringColumn(member.userId(), "avatar_storage_key")).isNull();
+        assertThat(Files.exists(stored)).isFalse();
     }
 
     @Test

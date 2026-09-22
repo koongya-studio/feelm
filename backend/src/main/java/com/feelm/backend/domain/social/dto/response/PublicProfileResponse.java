@@ -32,7 +32,7 @@ public record PublicProfileResponse(
      * <p>경로 식별자는 {@code publicId}지만(ADR-0008) 본문의 {@code userId}는 내부 숫자 ID다. 차단(API-020)과 신고가 이 값을
      * 그대로 쓰므로 계약이 본문에는 숫자 ID를 둔다.
      */
-    public record Profile(long userId, String nickname, Visibility visibility) {}
+    public record Profile(long userId, String nickname, String avatarUrl, Visibility visibility) {}
 
     /** 공개된 취향 키워드. 취향 분석(API-040)이 만든 값을 그대로 보여 준다. */
     public record Keyword(String code, String label) {}

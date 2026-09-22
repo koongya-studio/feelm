@@ -9,6 +9,7 @@ import com.feelm.backend.domain.taste.dto.response.TasteAnalysisResponse;
 import com.feelm.backend.domain.taste.service.FrameQueryService;
 import com.feelm.backend.domain.taste.service.TasteQueryService;
 import com.feelm.backend.domain.user.entity.Visibility;
+import com.feelm.backend.domain.user.service.AvatarStorage;
 import com.feelm.backend.domain.user.service.UserBlockFilter;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
@@ -43,6 +44,7 @@ public class PublicProfileService {
     private final UserBlockFilter blockFilter;
     private final TasteQueryService tasteQueryService;
     private final FrameQueryService frameQueryService;
+    private final AvatarStorage avatarStorage;
 
     /**
      * 공개 범위·차단 판정과 본문 집계를 같은 스냅샷에서 읽는다.
@@ -96,7 +98,11 @@ public class PublicProfileService {
         PopcornBucketResponse popcorn = tasteQueryService.getPopcornBucket(userId);
         TasteAnalysisResponse taste = tasteQueryService.getTasteAnalysis(userId);
         return new PublicProfileResponse(
-                new PublicProfileResponse.Profile(userId, target.nickname(), target.visibility()),
+                new PublicProfileResponse.Profile(
+                        userId,
+                        target.nickname(),
+                        avatarStorage.publicUrl(target.avatarStorageKey()),
+                        target.visibility()),
                 keywords(taste),
                 new PublicProfileResponse.Stats(frames.totalCount(), popcorn.totalCount()),
                 new PublicProfileResponse.Popcorn(flavors(popcorn)),

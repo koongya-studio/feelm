@@ -28,6 +28,7 @@ public class UserProfileService {
     private final UserAuthProviderRepository authProviderRepository;
     private final UserActivityCountRepository activityCountRepository;
     private final TasteQueryService tasteQueryService;
+    private final AvatarStorage avatarStorage;
 
     /** API-014 내 프로필 조회. */
     @Transactional(readOnly = true)
@@ -103,6 +104,7 @@ public class UserProfileService {
         long popcornCount = tasteQueryService.getPopcornBucket(user.getId()).totalCount();
         return UserProfileResponse.of(
                 user,
+                avatarStorage.publicUrl(user.getAvatarStorageKey()),
                 linkedProviders(user.getId()),
                 new UserProfileResponse.Stats(
                         counts.frameCount(), popcornCount, counts.ratingCount()));

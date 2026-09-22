@@ -46,6 +46,7 @@ class UserProfileServiceTest {
     @Mock private UserAuthProviderRepository authProviderRepository;
     @Mock private UserActivityCountRepository activityCountRepository;
     @Mock private TasteQueryService tasteQueryService;
+    @Mock private AvatarStorage avatarStorage;
 
     @InjectMocks private UserProfileService userProfileService;
 

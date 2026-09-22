@@ -17,6 +17,9 @@ spring:
     open-in-view: false
 
 feelm:
+  avatar:
+    storage-path: ${java.io.tmpdir}/feelm/avatars
+    public-url-prefix: /media/avatars
   recommendation:
     buffer:
       # 프리페치는 응답과 분리된 배경 작업이라 테스트가 끝난 뒤에도 DB를 읽는다. 다음 테스트의

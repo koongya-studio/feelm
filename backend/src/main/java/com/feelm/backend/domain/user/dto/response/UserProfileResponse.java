@@ -16,6 +16,7 @@ public record UserProfileResponse(
         long userId,
         String email,
         String nickname,
+        String avatarUrl,
         LocalDate birthDate,
         Gender gender,
         Visibility visibility,
@@ -25,11 +26,13 @@ public record UserProfileResponse(
         Stats stats,
         Instant createdAt) {
 
-    public static UserProfileResponse of(User user, List<String> linkedProviders, Stats stats) {
+    public static UserProfileResponse of(
+            User user, String avatarUrl, List<String> linkedProviders, Stats stats) {
         return new UserProfileResponse(
                 user.getId(),
                 user.getEmail(),
                 user.getNickname(),
+                avatarUrl,
                 user.getBirthDate(),
                 user.getGender(),
                 user.getVisibility(),

@@ -127,6 +127,23 @@ sudo chown -R "$USER:$USER" <repo>/.git
 - `compose/local.yml`
   - 로컬 Kafka 포트를 추가하고 PostgreSQL·Redis의 공통 루프백 바인딩을 유지하는 오버레이
 
+### 프로필 사진 로컬 저장소
+
+서비스 노드는 기본적으로 `/srv/feelm/data/avatars`를 Backend의 `/data/avatars`에 읽기·쓰기로,
+Nginx의 `/var/www/avatars`에 읽기 전용으로 bind mount합니다. 배포 전에 한 번만 디렉터리를
+준비하고 Compose 해석 결과를 확인합니다.
+
+```bash
+sudo install -d -m 0755 /srv/feelm/data/avatars
+docker compose --env-file infra/.env -f infra/compose/service.yml config
+```
+
+다른 디스크나 경로를 쓰려면 `infra/.env`의 `AVATAR_HOST_PATH`를 절대 경로로 바꿉니다.
+사진은 DB나 Docker named volume이 아닌 이 호스트 디렉터리에 남으므로 배포 checkout 교체와
+컨테이너 재생성에는 유지되지만 EC2 인스턴스·루트 볼륨 손실에는 복구되지 않습니다. 운영 중에는
+`df -h "$AVATAR_HOST_PATH"`로 용량을 감시하고 별도 백업 정책을 적용합니다. Nginx는
+`/media/avatars/{uuid}.jpg`를 공개하며 1일 캐시를 설정합니다.
+
 ### Local Kafka
 
 Windows에서 실행하는 Spring Boot가 `localhost:9092`로 Kafka에 연결할 수 있도록 로컬
