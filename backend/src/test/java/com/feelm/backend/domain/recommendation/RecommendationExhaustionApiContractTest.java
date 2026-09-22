@@ -80,7 +80,7 @@ class RecommendationExhaustionApiContractTest extends SharedPostgresContractTest
                         + " RESTART IDENTITY CASCADE");
         flavor(FLAVOR, "FLAVOR_B");
         user(USER, "exhaustion");
-        for (long movieId = 201; movieId <= 210; movieId++) {
+        for (long movieId = 201; movieId <= 220; movieId++) {
             movie(movieId);
         }
         recommendationSet(SET, GENERATION, 0);
@@ -110,13 +110,16 @@ class RecommendationExhaustionApiContractTest extends SharedPostgresContractTest
                 GENERATION,
                 candidate(206, "5.0", "TASTE"),
                 candidate(207, "4.0", "TASTE"),
-                candidate(208, "3.0", "DISCOVERY"));
+                candidate(209, "3.0", "TASTE"),
+                candidate(208, "5.0", "DISCOVERY"),
+                candidate(210, "4.0", "DISCOVERY"),
+                candidate(211, "3.0", "DISCOVERY"));
         long nextSetId = nextSetId();
 
         getRecommendations()
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.recommendationSetId").value(nextSetId))
-                .andExpect(jsonPath("$.items.length()").value(3));
+                .andExpect(jsonPath("$.items.length()").value(6));
 
         assertThat(batchNoOf(nextSetId)).isEqualTo(1);
     }
@@ -347,7 +350,10 @@ class RecommendationExhaustionApiContractTest extends SharedPostgresContractTest
                 GENERATION,
                 sharedGenreCandidate(206, "5.0", "TASTE"),
                 sharedGenreCandidate(207, "4.0", "TASTE"),
-                sharedGenreCandidate(208, "3.0", "DISCOVERY"));
+                sharedGenreCandidate(209, "3.0", "TASTE"),
+                sharedGenreCandidate(208, "5.0", "DISCOVERY"),
+                sharedGenreCandidate(210, "4.0", "DISCOVERY"),
+                sharedGenreCandidate(211, "3.0", "DISCOVERY"));
 
         getRecommendations()
                 .andExpect(status().isOk())
@@ -382,13 +388,19 @@ class RecommendationExhaustionApiContractTest extends SharedPostgresContractTest
     }
 
     private ResultActions getRecommendations() throws Exception {
-        return mvc.perform(get("/api/v1/recommendations").header("Authorization", bearer()));
+        return mvc.perform(
+                get("/api/v1/recommendations")
+                        .param("size", "6")
+                        .header("Authorization", bearer()));
     }
 
     private String concurrentGet(CountDownLatch ready, CountDownLatch start) throws Exception {
         ready.countDown();
         assertThat(start.await(5, TimeUnit.SECONDS)).isTrue();
-        return mvc.perform(get("/api/v1/recommendations").header("Authorization", bearer()))
+        return mvc.perform(
+                        get("/api/v1/recommendations")
+                                .param("size", "6")
+                                .header("Authorization", bearer()))
                 .andReturn()
                 .getResponse()
                 .getContentAsString();

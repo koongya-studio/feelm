@@ -95,14 +95,14 @@ FastAPI의 PostgreSQL 접근은 **영화 임베딩(pgvector) 읽기 전용**으�
 
 `POST /internal/v1/recommendations`
 
-Fold-in으로 사용자 벡터를 갱신하고 후보를 재정렬해 `TASTE`/`DISCOVERY` 구성으로 반환한다. 후보를 **한 번에 20편(설정값)** 반환하고 Spring이 세트 버퍼로 저장해 3편씩 노출하는 구조라, 추가 추천·관심없음 교체 시 매번 호출하지 않는다.
+Fold-in으로 사용자 벡터를 갱신하고 후보를 재정렬해 `TASTE`/`DISCOVERY` 구성으로 반환한다. Spring이 유형별 최대 50편을 세트 버퍼로 저장해 6편씩 노출하는 구조라, 추가 추천·관심없음 교체 시 매번 호출하지 않는다.
 
 **Request**
 
 ```json
 {
   "userId": 1024,
-  "size": 20,
+  "size": 50,
   "ratings": [
     { "movieId": 550, "score": 5 },
     { "movieId": 680, "score": 2 }
@@ -118,7 +118,7 @@ Fold-in으로 사용자 벡터를 갱신하고 후보를 재정렬해 `TASTE`/`D
 
 | 필드 | 설명 |
 |---|---|
-| `size` | 반환할 후보 수. 기본 20 — 설정값 `recommendation.buffer-size`. 기본 노출 구성은 TASTE 2 + DISCOVERY 1이며, 사용 가능한 DISCOVERY가 없으면 TASTE 3으로 채움 |
+| `size` | 반환할 후보 수. 기본 50 — 설정값 `recommendation.buffer-size`. 외부 API 노출 구성은 모바일 TASTE 2 + DISCOVERY 1, PC TASTE 3 + DISCOVERY 3이며, 사용 가능한 DISCOVERY가 부족하면 빈 슬롯마다 TASTE로 채움 |
 | `ratings`·`onboardingPreferences` | Fold-in 입력. Spring이 PostgreSQL에서 조회해 전달 |
 | `excludeMovieIds` | 감상 기록·관심없음·현재 세트. FastAPI는 추가 판단 없이 제외만 한다 |
 | `flavorCounts` | 맛별 팝콘 수 — `DISCOVERY`(임계치 미만 맛) 후보 선정용 |
@@ -149,7 +149,7 @@ Fold-in으로 사용자 벡터를 갱신하고 후보를 재정렬해 `TASTE`/`D
 ```
 
 - 콜드 스타트(평가·온보딩 모두 없음)면 인기 기반 후보로 `TASTE`를 채우고 `reason.summary`에 명시한다 (가정)
-- `items`는 유형별 점수 순 후보를 반환한다. Spring은 TASTE·DISCOVERY를 독립 버퍼로 PostgreSQL `recommendation_items`에 저장한다(`exposed_at` NULL = 미노출, MR !22 합의: PostgreSQL 저장안). API-045는 현재 평가·관심없음 상태를 다시 확인해 TASTE 2편 + DISCOVERY 1편을 기본으로 노출하고, 사용 가능한 DISCOVERY가 없으면 TASTE 3편을 노출한다. 어떤 보충 후보도 없으면 기존 유효 카드만 반환하고 S15P21E106-219 소진 흐름에서 새 세트를 생성한다
+- `items`는 유형별 점수 순 후보를 반환한다. Spring은 TASTE·DISCOVERY를 유형별 최대 50편의 독립 버퍼로 PostgreSQL `recommendation_items`에 저장한다(`exposed_at` NULL = 미노출, MR !22 합의: PostgreSQL 저장안). API-045는 현재 평가·관심없음 상태를 다시 확인해 모바일은 TASTE 2편 + DISCOVERY 1편, PC는 TASTE 3편 + DISCOVERY 3편을 노출하고, 사용 가능한 DISCOVERY가 부족하면 빈 슬롯마다 TASTE로 대체한다. 어떤 보충 후보도 없으면 기존 유효 카드만 반환하고 S15P21E106-219 소진 흐름에서 새 세트를 생성한다
 - FastAPI 재호출은 **추천 입력 변경(강한 신호) 또는 버퍼 소진 시에만** 일어난다
 - Fold-in·재정렬 시 Redis의 행동 Feature(상세 조회·OTT 클릭 등)를 반영한다
 - ALS 모델에 없는 신작 후보는 제외하지 않고 콘텐츠 점수(장르·감독·배우·키워드·임베딩)만으로 점수화한다

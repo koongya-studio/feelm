@@ -35,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 class RecommendationBufferWriter {
 
-    private static final int BUFFER_SIZE = 20;
+    private static final int BUFFER_SIZE = 50;
     private static final String REDIS_CANDIDATE_INPUT_VERSION = "redis-candidate";
 
     private final RecommendationBufferRepository repository;
@@ -46,7 +46,7 @@ class RecommendationBufferWriter {
     private final Clock clock;
 
     /**
-     * 후보 묶음을 최대 20편의 추천 버퍼로 원자적으로 저장한다.
+     * 후보 묶음을 유형별 최대 50편의 추천 버퍼로 원자적으로 저장한다.
      *
      * @throws BusinessException 사용자가 유효하지 않거나 Redis Candidate를 사용할 수 없는 경우
      * @throws NoEligibleRecommendationCandidatesException 필터 후 저장할 영화가 없는 경우
@@ -155,7 +155,7 @@ class RecommendationBufferWriter {
     private RecommendationBufferResult appendBatch(
             long userId, RecommendationCandidateBatch batch, OptionalInt latestBatchNo) {
         int nextBatchNo = latestBatchNo.isPresent() ? latestBatchNo.getAsInt() + 1 : 0;
-        // 이전 회차가 저장한 영화를 빼야 "같은 20편"이 아니라 "다음 20편"이 된다.
+        // 이전 회차가 저장한 영화를 빼야 "같은 50편"이 아니라 "다음 50편"이 된다.
         Set<Long> storedMovieIds =
                 latestBatchNo.isPresent()
                         ? repository.findStoredMovieIdsInGeneration(userId, batch.generationId())

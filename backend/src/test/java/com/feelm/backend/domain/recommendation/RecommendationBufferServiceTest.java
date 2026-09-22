@@ -206,10 +206,10 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("T7 종류별 후보를 최대 20편씩, 부족하면 있는 만큼만 저장한다")
-    void storesAtMostTwentyPerTypeWithoutPadding() {
+    @DisplayName("T7 종류별 후보를 최대 50편씩, 부족하면 있는 만큼만 저장한다")
+    void storesAtMostFiftyCandidatesPerType() {
         List<RecommendationCandidate> many = new ArrayList<>();
-        for (long movieId = 1; movieId <= 25; movieId++) {
+        for (long movieId = 1; movieId <= 55; movieId++) {
             movie(movieId);
             many.add(candidate(movieId, Integer.toString(100 - (int) movieId), "TASTE", null));
             long discoveryMovieId = movieId + 100;
@@ -225,14 +225,14 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
 
         RecommendationBufferResult first = service.createBuffer(USER);
 
-        assertThat(storedMovieIds(first.recommendationSetId(), "TASTE")).hasSize(20);
-        assertThat(storedMovieIds(first.recommendationSetId(), "DISCOVERY")).hasSize(20);
+        assertThat(storedMovieIds(first.recommendationSetId(), "TASTE")).hasSize(50);
+        assertThat(storedMovieIds(first.recommendationSetId(), "DISCOVERY")).hasSize(50);
         assertThat(storedPositions(first.recommendationSetId(), "TASTE"))
                 .containsExactlyElementsOf(
-                        java.util.stream.IntStream.rangeClosed(1, 20).boxed().toList());
+                        java.util.stream.IntStream.rangeClosed(1, 50).boxed().toList());
         assertThat(storedPositions(first.recommendationSetId(), "DISCOVERY"))
                 .containsExactlyElementsOf(
-                        java.util.stream.IntStream.rangeClosed(1, 20).boxed().toList());
+                        java.util.stream.IntStream.rangeClosed(1, 50).boxed().toList());
 
         candidates(4L, candidate(24, "5.0", "TASTE", null), candidate(25, "4.0", "TASTE", null));
         RecommendationBufferResult second = service.createBuffer(USER);

@@ -264,7 +264,7 @@ alpha와 무관하게 자기 성분의 순위를 그대로 받으므로, **`alph
 [`discovery-popularity-artifacts-v1`](../contracts/discovery-popularity-artifacts.md)을 따른다.
 후보는 현재 모델이 점수를 낼 수 있는 서비스 게시 가능 모집단으로 한정하지만, 그 모집단의 전체
 개인화 순위를 DISCOVERY 부족분 보충에 사용하지 않는다.
-Spring은 TASTE 2편을 먼저 고르고 양쪽 목록의 중복을 건너뛴 DISCOVERY 1편을 조립한다.
+Spring은 모바일 기본 요청에서 TASTE 2편과 DISCOVERY 1편, PC 요청에서 TASTE 3편과 DISCOVERY 3편을 조립한다. DISCOVERY가 부족하면 빈 슬롯마다 다음 TASTE로 채운다.
 
 ### 관련 업무와 활성화 경계
 
@@ -275,7 +275,7 @@ Spring은 TASTE 2편을 먼저 고르고 양쪽 목록의 중복을 건너뛴 DI
   DISCOVERY 전용 `reasons[]`로 추가했다. S15P21E106-649부터 온보딩 선택은 4.0·2.0 평가로 변환된
   `ratings` 입력으로만 같은 계산에 참여한다.
 - S15P21E106-505: 입력 수 제한 제거, TASTE 500·DISCOVERY 100 후보 게시와 당시 그룹 부족분 보충,
-  `DISCOVERY_PERSONAL_SCORE`를 추가한 Candidate v6 writer·payload 계약. Spring reader·2+1 조립은
+  `DISCOVERY_PERSONAL_SCORE`를 추가한 Candidate v6 writer·payload 계약. Spring reader의 화면별 2+1·3+3 조립은
   Backend 소비 계약이며 현재 `develop`에 구현돼 있다
 - S15P21E106-482: 그룹·대중성 번들의 HDFS 게시, 두 URI 동시 활성화, 재시작·rollback 검증
 - S15P21E106-415 재개선: 상위 10개 그룹의 내부 순위 층별 확장, 소진 후 후순위 적격 그룹 확장과
