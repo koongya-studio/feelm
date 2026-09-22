@@ -1,0 +1,467 @@
+/*
+ * 5.1 파티팝콘 데스크톱 본문 (업무 S15P21E106-785).
+ *
+ * 이 파일에는 `@media`가 없다. 1024px 이상에서만 이 컴포넌트가 그려지므로 클래스가
+ * 붙었다는 것이 이미 데스크톱이라는 뜻이다(업무 -782의 셸과 같은 규칙).
+ *
+ * 다만 **중앙 단의 폭은 한 값이 아니다** — 1024px에서는 우측 패널이 없어 넓고, 1280px에서는
+ * 패널이 열려 632px로 줄어든다(업무 -783 확인 기록). 그래서 카드 줄은 열 수를 고정하지 않고
+ * 한 장의 최소 폭만 정한다. 좁아지면 줄이 바뀐다.
+ */
+.page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-6) var(--space-4) var(--space-8);
+}
+
+/* ─────────────────────────── 제목 줄 */
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.heading {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* `PARTY POPCORN`. 2.2 데스크톱 시안과 같은 눈썹 줄이다(업무 -783) */
+.eyebrow {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.12em;
+  color: var(--color-ink-muted);
+}
+
+.title {
+  margin: 0;
+  font-size: 40px;
+  line-height: 1.15;
+  letter-spacing: var(--letter-spacing-title);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  letter-spacing: var(--letter-spacing-body);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-ink-body);
+}
+
+/*
+ * 버튼 둘은 제목 오른쪽이다(시안). 중앙 단이 좁으면 `.head`가 줄을 바꾸므로 여기서
+ * 버튼이 잘리지 않는다. 글자는 꺾이지 않게 둔다 — `초대 코드로 참여하기`가 두 줄이 되면
+ * 두 버튼의 높이가 갈린다.
+ */
+.headActions {
+  display: flex;
+  flex: none;
+  gap: var(--space-2);
+}
+
+/* 아이콘과 글자 사이. `Button`은 간격을 두지 않는다 */
+.headActions button,
+.inviteActions button {
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+/* ─────────────────────────── 구역 */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+/* ─────────────────────────── 받은 초대 */
+
+/*
+ * 시안은 두 열이다. 중앙 단이 좁아지면 한 열로 내려간다 — **한 장의 최소 폭은 360px이다.**
+ * 그보다 좁으면 타일(104) 옆에 남는 글 칸이 220px 아래로 줄어 방장 이름이 `서연…`으로
+ * 잘리고 버튼 둘이 서로 밀린다(1280px에서 실제로 그랬다, 2026-09-22 브라우저 확인).
+ */
+.inviteGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: var(--space-3);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.inviteCard {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+/*
+ * 포스터 자리의 장식 타일. **초대에 영화가 없다**(`index.tsx` 머리말) — 가짜 포스터 대신
+ * 빈 통을 앉힌 면이다. 비율은 시안의 포스터와 같은 2:3이다.
+ */
+.inviteTile {
+  display: flex;
+  width: 104px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-card);
+  background: var(--color-surface-sunken);
+  overflow: hidden;
+}
+
+.inviteBody {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.inviteHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* 방장 얼굴 자리. 사진이 계약에 없어 닉네임 첫 글자다 */
+.inviteMark {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-surface-sunken);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink-body);
+}
+
+.inviteWho {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.inviteName {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inviteTime {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-muted);
+}
+
+.inviteCount {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-muted);
+  white-space: nowrap;
+}
+
+.inviteCount svg {
+  width: 16px;
+  height: 13px;
+}
+
+/* 시안의 한마디 자리. 초대에 메시지가 없어 파티 이름을 적는다 */
+.invitePartyName {
+  margin: 0;
+  /* 두 줄까지 보이고 그 아래는 자른다. 파티 이름은 20자까지라 대개 한 줄이다 */
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-body);
+}
+
+/* 버튼 둘은 카드 바닥에 붙는다. 글 길이가 달라도 같은 높이에 선다(업무 -783) */
+.inviteActions {
+  display: flex;
+  margin-top: auto;
+  padding-top: var(--space-2);
+  gap: var(--space-2);
+}
+
+.inviteActions > * {
+  min-width: 0;
+  flex: 1;
+}
+
+/* ─────────────────────────── 참여 중인 파티 */
+
+.partyGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-3);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+/* 카드와 `파티로 이동`이 한 칸이다. 카드가 남는 높이를 가져가 버튼 줄이 맞는다 */
+.partyGrid > li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.partyGrid > li > button:last-child {
+  width: 100%;
+  gap: var(--space-1);
+}
+
+/*
+ * 파티 카드. 누르면 **고른 파티가 바뀐다**(우측 패널이 따라간다).
+ *
+ * `composes`로 떠 있는 면을 물려받지 않는다 — 고른 카드는 어두운 면이고 그림자 규칙이
+ * 다르다. 대신 테두리와 배경만 상태에 따라 바꾼다.
+ */
+.partyCard {
+  display: flex;
+  width: 100%;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/*
+ * 고른 파티. 시안에서 이 카드만 검정 면에 빨간 테두리다 — 오른쪽 패널이 말하는 파티가
+ * 어느 것인지 한눈에 보인다.
+ */
+.partyCard[data-selected='true'] {
+  border-color: var(--color-action-brand);
+  background: var(--color-surface-dark);
+  color: var(--color-on-dark);
+}
+
+.partyHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.partyName {
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.partyCard[data-selected='true'] .partyName {
+  color: var(--color-on-dark);
+}
+
+/*
+ * `모집 중` · `진행 중`. **시안의 노랑 · 파랑 점은 무채색으로 둔다** — UI에 유채색을 쓰지
+ * 않는다(`design-concept.md` 2.3). 412px의 강조 카드와 같은 결정이다.
+ */
+.partyBadge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink-body);
+  white-space: nowrap;
+}
+
+.partyDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-ink-body);
+}
+
+.partyCard[data-selected='true'] .partyBadge {
+  background: var(--color-line-on-dark);
+  color: var(--color-on-dark);
+}
+
+.partyCard[data-selected='true'] .partyDot {
+  background: var(--color-on-dark);
+}
+
+.partyLead {
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-on-dark);
+  text-align: center;
+}
+
+/* 통은 카드의 그림이다. 남는 높이를 가져가 카드 아래를 채운다 */
+.partyBucket {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+}
+
+.partyBucket svg {
+  max-height: 100%;
+}
+
+/*
+ * 고르지 않은 카드의 공통 취향 칩. 남는 높이를 이 자리가 가져가 카드마다 `N / M명` 줄이
+ * 같은 높이에 선다.
+ */
+.partyFlavors {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: var(--space-2);
+}
+
+.partyChip {
+  height: fit-content;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-ink-body);
+}
+
+.partyCount {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  margin-top: auto;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.partyCount svg {
+  width: 16px;
+  height: 13px;
+}
+
+.partyCard[data-selected='true'] /*
+ * 고르지 않은 카드의 공통 취향 칩. 남는 높이를 이 자리가 가져가 카드마다 `N / M명` 줄이
+ * 같은 높이에 선다.
+ */
+.partyFlavors {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: var(--space-2);
+}
+
+.partyChip {
+  height: fit-content;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-ink-body);
+}
+
+.partyCount {
+  color: var(--color-on-dark-muted);
+}
+
+/* ─────────────────────────── 파티도 초대도 없을 때 */
+
+.empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-8) 0;
+  text-align: center;
+}
+
+.emptyTitle {
+  margin: var(--space-4) 0 0;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+.emptyText {
+  margin: 0;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}

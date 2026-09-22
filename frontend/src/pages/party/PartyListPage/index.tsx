@@ -42,6 +42,21 @@
  * `[?]` 와이어프레임은 파티마다 `케이퍼 · 스릴러` 같은 **공통 장르**를 보여주는데
  * API-050 응답에는 없다(이름 · 상태 · 멤버 · 정원뿐). 없는 값을 지어내지 않고 같은
  * 자리에 멤버 이름을 둔다.
+ *
+ * ─────────────────────────── 데스크톱 시안 (업무 -785)
+ *
+ * 1024px 이상에서는 2026-09-21 PC 시안의 배치를 쓴다(`PartyDesktop` · `PartyAside`).
+ * **412px 이하 화면은 아래 그대로다** — 폭에 따라 그리는 것 자체가 갈린다
+ * (`hooks/useShellSize`, 업무 -782).
+ *
+ * - 제목 줄 오른쪽에 `파티 만들기` · `초대 코드로 참여하기`가 선다
+ * - `받은 초대`가 카드가 되고 카드에서 **바로 수락**할 수 있다(API-053). 5.6은 그대로 있다
+ * - `참여 중인 파티`가 격자가 되고, **카드를 누르면 고른 파티가 바뀐다.** 파티 화면으로
+ *   가는 것은 카드 아래의 `파티로 이동`이다
+ * - 오른쪽에 고른 파티의 멤버 · 공통 취향 · 인원 현황과 `새로운 파티를 만들어보세요`가 붙는다
+ *
+ * 시안에 있으나 계약에 없는 값들을 무엇으로 바꿨는지는 `PartyDesktop`의 머리말과
+ * `frontend/verification/S15P21E106-785.md`에 있다.
  */
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -51,9 +66,18 @@ import Snackbar from '../../../components/Snackbar';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import AppHeader from '../../../components/AppHeader';
+import DesktopAside from '../../../components/DesktopAside';
 import { PlayIcon } from '../../../components/Icon';
-import { getMyInvitations, getMyParties, getPartyPopcorn } from '../../../api/parties';
+import PartyAside from './PartyAside';
+import PartyDesktop from './PartyDesktop';
+import {
+  acceptInvitation,
+  getMyInvitations,
+  getMyParties,
+  getPartyPopcorn,
+} from '../../../api/parties';
 import { getPopcornFlavors } from '../../../api/taste';
+import { useShellSize } from '../../../hooks/useShellSize';
 import { path } from '../../../routes/paths';
 import { mixedFlavors } from '../../../utils/party';
 import type { Party, PartyInvitation, PartyPopcorn } from '../../../types/party';
@@ -107,9 +131,23 @@ function Initials({
 
 export default function PartyListPage() {
   const navigate = useNavigate();
+  const desktop = useShellSize() !== 'mobile';
   const [parties, setParties] = useState<Party[] | null>(null);
   const [invitations, setInvitations] = useState<PartyInvitation[] | null>(null);
-  const [popcorn, setPopcorn] = useState<PartyPopcorn | null>(null);
+  /**
+   * 파티별 팝콘(API-057). 412px에서는 첫 파티 하나뿐이고, 데스크톱에서는 카드마다 통이
+   * 설 수 있어 목록 전체를 받는다(업무 -785). 못 받은 파티는 그냥 없다 — 빈 통이 된다
+   */
+  const [popcorns, setPopcorns] = useState<Map<number, PartyPopcorn>>(new Map());
+  /**
+   * 우측 패널이 말하는 파티. 데스크톱에서만 쓴다.
+   *
+   * `null`이면 아직 목록을 못 받았거나 파티가 없다는 뜻이다. 목록을 받으면 첫 파티로
+   * 맞추고, 고른 파티가 목록에서 사라지면(나가기 · 종료) 다시 첫 파티로 돌아간다.
+   */
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  /** 초대 카드에서 수락을 보내는 중인 초대(API-053). 데스크톱에서만 쓴다 */
+  const [acceptingId, setAcceptingId] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
   const [invitationsFailed, setInvitationsFailed] = useState(false);
   const [notice, setNotice] = useState('');
@@ -162,19 +200,37 @@ export default function PartyListPage() {
 
         setParties(value);
         setFailed(false);
+        /*
+         * 고른 파티를 목록에 맞춘다. 이미 고른 파티가 목록에 남아 있으면 그대로 두고
+         * (다시 읽어도 오른쪽 패널이 다른 파티로 튀지 않는다), 없으면 첫 파티로 돌아간다.
+         */
+        setSelectedId((current) =>
+          current !== null && value.some((party) => party.partyId === current)
+            ? current
+            : (value[0]?.partyId ?? null),
+        );
 
-        const first = value[0];
+        /*
+         * 통을 못 채워도 목록은 보여준다. 빈 통으로 남는다.
+         *
+         * 412px은 강조 카드 하나뿐이라 첫 파티만 부르고, 데스크톱은 카드마다 통이 설 수
+         * 있어 목록 전체를 나란히 부른다. 활성 파티는 사용자당 최대 10개다(API-049).
+         */
+        const targets = desktop ? value : value.slice(0, 1);
 
-        if (!first) return;
+        await Promise.all(
+          targets.map(async (party) => {
+            try {
+              const popcorn = await getPartyPopcorn(party.partyId);
 
-        // 통을 못 채워도 목록은 보여준다. 빈 통으로 남는다
-        try {
-          const firstPopcorn = await getPartyPopcorn(first.partyId);
-
-          if (active) setPopcorn(firstPopcorn);
-        } catch {
-          // 그대로 둔다
-        }
+              if (active) {
+                setPopcorns((prev) => new Map(prev).set(party.partyId, popcorn));
+              }
+            } catch {
+              // 그대로 둔다
+            }
+          }),
+        );
       })
       .catch(() => {
         if (active) setFailed(true);
@@ -183,7 +239,7 @@ export default function PartyListPage() {
     return () => {
       active = false;
     };
-  }, [reloadCount]);
+  }, [desktop, reloadCount]);
 
   const hasParties = parties !== null && parties.length > 0;
   const hasInvitations = invitations !== null && invitations.length > 0;
@@ -194,19 +250,113 @@ export default function PartyListPage() {
    */
   const firstParty = parties?.[0] ?? null;
   const restParties = parties?.slice(1) ?? [];
+  const popcorn = firstParty ? (popcorns.get(firstParty.partyId) ?? null) : null;
   /*
-   * 섞은 맛 가운데 많은 셋. 시안의 `우리의 공통 취향` 칩이다.
+   * 섞은 맛 가운데 많은 셋. 시안의 `우리의 공통 취향` 칩이다. 412px의 강조 카드와
+   * 데스크톱 우측 패널이 같은 함수를 쓴다 — 같은 파티가 폭에 따라 다른 취향을 말하지 않는다.
    *
    * **이름을 못 받은 맛은 뺀다.** 파티 팝콘(API-057)은 코드만 주므로 이름표(API-044)가
    * 없으면 `FLAVOR_A`가 그대로 화면에 남는다. 이름이 없으면 칩이 없는 편이 낫다.
    */
-  const commonFlavors = popcorn
-    ? [...mixedFlavors(popcorn)]
-        .sort((a, b) => b.count - a.count)
-        .map((entry) => flavorNames.get(entry.code))
-        .filter((name): name is string => Boolean(name))
-        .slice(0, COMMON_FLAVOR_COUNT)
-    : [];
+  function commonFlavorsOf(value: PartyPopcorn | null): string[] {
+    if (!value) return [];
+
+    return [...mixedFlavors(value)]
+      .sort((a, b) => b.count - a.count)
+      .map((entry) => flavorNames.get(entry.code))
+      .filter((name): name is string => Boolean(name))
+      .slice(0, COMMON_FLAVOR_COUNT);
+  }
+
+  const commonFlavors = commonFlavorsOf(popcorn);
+
+  /*
+   * ─────────────────────────── 데스크톱 시안 (업무 -785)
+   *
+   * 1024px 이상에서는 2026-09-21 PC 시안의 배치를 쓴다. **412px 이하 화면은 아래 그대로다** —
+   * 폭에 따라 그리는 것 자체가 갈린다(`hooks/useShellSize`, 업무 -782).
+   *
+   * 오류 · 안내 · 알림 막대는 두 폭이 함께 쓴다. 상단 검색 · 알림 · 프로필은 데스크톱
+   * 셸의 상단 바가 이미 그리므로 `AppHeader`를 두지 않는다.
+   */
+  if (desktop) {
+    const selected = parties?.find((party) => party.partyId === selectedId) ?? null;
+
+    /** 카드에서 바로 수락한다(API-053). 5.6과 같은 호출이고 성공하면 두 목록을 다시 읽는다 */
+    const handleAccept = (invitationId: number) => {
+      setAcceptingId(invitationId);
+
+      acceptInvitation(invitationId)
+        .then(() => {
+          setReloadCount((count) => count + 1);
+        })
+        .catch(() => {
+          setNotice('초대를 수락하지 못했어요. 잠시 후 다시 시도해 주세요');
+        })
+        .finally(() => setAcceptingId(null));
+    };
+
+    return (
+      <>
+        {failed ? (
+          <div className={styles.desktopStatus}>
+            <StatusView
+              title="파티 목록을 불러오지 못했어요"
+              description="잠시 후 다시 시도해 주세요."
+            >
+              <Button variant="text" onClick={() => setReloadCount((count) => count + 1)}>
+                다시 시도
+              </Button>
+            </StatusView>
+          </div>
+        ) : null}
+
+        <PartyDesktop
+          parties={parties ?? []}
+          loaded={parties !== null}
+          invitations={invitations ?? []}
+          popcorns={popcorns}
+          mixedFlavorsOf={mixedFlavors}
+          commonFlavorsOf={(partyId) => commonFlavorsOf(popcorns.get(partyId) ?? null)}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onOpenParty={(partyId) => void navigate(path.partyPopcorn(partyId))}
+          onOpenInvitation={(invitationId) => void navigate(path.partyInvitation(invitationId))}
+          onAccept={handleAccept}
+          acceptingId={acceptingId}
+          onCreateParty={() => void navigate(path.partyNew())}
+          onJoinByCode={() => setNotice('초대 코드로 참여하기는 준비 중이에요')}
+        />
+
+        {/* 초대만 못 받아 온 경우다. 파티 목록은 그대로 둔다 */}
+        {invitationsFailed ? (
+          <p className={styles.desktopInvitationsError}>
+            받은 초대를 불러오지 못했어요.{' '}
+            <Button variant="text" onClick={() => setReloadCount((count) => count + 1)}>
+              초대 다시 불러오기
+            </Button>
+          </p>
+        ) : null}
+
+        {/* 우측 보조 패널. 1280px 이상에서만 자리가 있다(업무 -782) */}
+        <DesktopAside>
+          <PartyAside
+            party={selected}
+            commonFlavors={commonFlavorsOf(
+              selected ? (popcorns.get(selected.partyId) ?? null) : null,
+            )}
+            onCreateParty={() => void navigate(path.partyNew())}
+          />
+        </DesktopAside>
+
+        {notice ? (
+          <Snackbar actionLabel="확인" onAction={() => setNotice('')}>
+            {notice}
+          </Snackbar>
+        ) : null}
+      </>
+    );
+  }
 
   return (
     <>
