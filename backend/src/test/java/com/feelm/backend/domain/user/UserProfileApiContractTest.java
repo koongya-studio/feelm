@@ -49,6 +49,7 @@ class UserProfileApiContractTest extends UserProfileApiTestSupport {
                                         """
                                         {"userId":%d,"email":"user@example.com","nickname":"팝콘러버",
                                          "birthDate":"%s","gender":"FEMALE","visibility":"PRIVATE",
+                                         "avatarUrl":null,
                                          "hasPassword":true,"linkedProviders":[],
                                          "onboardingCompleted":false,
                                          "stats":{"frameCount":0,"popcornCount":0,"ratingCount":0},

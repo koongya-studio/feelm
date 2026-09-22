@@ -32,6 +32,7 @@ public class UserWithdrawalService {
     private final RefreshTokenService refreshTokenService;
     private final SocialReauthenticator socialReauthenticator;
     private final PartyWithdrawalService partyWithdrawalService;
+    private final AvatarStorage avatarStorage;
 
     /**
      * 계정을 파기하고 뒷정리를 한다. 이 메서드에는 트랜잭션이 없다 — 아래 다섯 단계가 각각 독립이어야 하기 때문이다.
@@ -59,7 +60,8 @@ public class UserWithdrawalService {
      */
     public void withdraw(long userId, AccountWithdrawalRequest request) {
         SocialCredential credential = reauthenticate(request);
-        writer.withdrawAccount(userId, request.password(), credential);
+        String avatarStorageKey = writer.withdrawAccount(userId, request.password(), credential);
+        avatarStorage.delete(avatarStorageKey);
         refreshTokenService.revokeAll(userId);
         writer.deleteAuthTokens(userId);
         userBlockService.deleteAllForWithdrawal(userId);

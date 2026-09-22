@@ -16,6 +16,7 @@ services:
       - /run/feelm-claude-review:/run/feelm-claude-review:ro
       - ${SWAGGER_HTPASSWD_PATH:-/dev/null}:/run/secrets/swagger_htpasswd:ro
       - ${GRAFANA_HTPASSWD_PATH:-/dev/null}:/run/secrets/grafana_htpasswd:ro
+      - ${AVATAR_HOST_PATH:-/srv/feelm/data/avatars}:/var/www/avatars:ro
 
     depends_on:
       frontend:
@@ -126,10 +127,13 @@ services:
       KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:?KAKAO_CLIENT_SECRET is required}
       NAVER_CLIENT_ID: ${NAVER_CLIENT_ID:?NAVER_CLIENT_ID is required}
       NAVER_CLIENT_SECRET: ${NAVER_CLIENT_SECRET:?NAVER_CLIENT_SECRET is required}
+      AVATAR_STORAGE_PATH: /data/avatars
+      AVATAR_PUBLIC_URL_PREFIX: ${AVATAR_PUBLIC_URL_PREFIX:-/media/avatars}
       MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:?MAIL_USERNAME is required}
       MAIL_PASSWORD: ${MAIL_PASSWORD:?MAIL_PASSWORD is required}
+
       MAIL_FROM: ${MAIL_FROM:-${MAIL_USERNAME}}
       MAIL_RATE_LIMIT_EMAIL_INTERVAL: ${MAIL_RATE_LIMIT_EMAIL_INTERVAL:-1m}
       MAIL_RATE_LIMIT_IP_LIMIT: ${MAIL_RATE_LIMIT_IP_LIMIT:-30}
@@ -147,6 +151,9 @@ services:
       WEB_PUSH_MAXIMUM_RETRY_DELAY: ${WEB_PUSH_MAXIMUM_RETRY_DELAY:-1h}
       WEB_PUSH_LEASE_DURATION: ${WEB_PUSH_LEASE_DURATION:-2m}
       WEB_PUSH_REQUEST_TIMEOUT: ${WEB_PUSH_REQUEST_TIMEOUT:-15s}
+
+    volumes:
+      - ${AVATAR_HOST_PATH:-/srv/feelm/data/avatars}:/data/avatars
 
     depends_on:
       postgres:

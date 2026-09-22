@@ -1,4 +1,8 @@
 spring:
+  servlet:
+    multipart:
+      max-file-size: 10MiB
+      max-request-size: 11MiB
   application:
     name: backend
   profiles:
@@ -95,6 +99,9 @@ springdoc:
     enabled: ${SWAGGER_ENABLED:false}
 
 feelm:
+  avatar:
+    storage-path: ${AVATAR_STORAGE_PATH:/tmp/feelm/avatars}
+    public-url-prefix: ${AVATAR_PUBLIC_URL_PREFIX:/media/avatars}
   report:
     generation:
       # 반기 마감 스냅샷 생성 배치. 테스트는 설정을 두지 않아 스케줄러를 등록하지 않는다.

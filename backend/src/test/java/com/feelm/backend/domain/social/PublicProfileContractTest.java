@@ -70,6 +70,10 @@ class PublicProfileContractTest extends SharedPostgresContractTest {
     @Test
     @DisplayName("T01 비회원이 PUBLIC 사용자를 조회하면 계약의 응답 모양 그대로 200이다")
     void anonymousReadsPublicProfile() throws Exception {
+        jdbc.sql("UPDATE users SET avatar_storage_key = :key WHERE id = :id")
+                .param("key", "0b649505-0917-41d9-a41f-0d4402ec63d5.jpg")
+                .param("id", ownerId)
+                .update();
         long movieId = insertMovie("파이트 클럽", "https://image.test/poster.jpg", firstFlavorId);
         long ratingId = insertRating(ownerId, movieId, "4.5", "인생 영화", "PUBLIC", BASE_TIME);
         long frameId = insertFrame(ratingId, ownerId, movieId, BASE_TIME);
@@ -79,6 +83,9 @@ class PublicProfileContractTest extends SharedPostgresContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.user.userId").value(ownerId))
                 .andExpect(jsonPath("$.user.nickname").value(ownerNickname))
+                .andExpect(
+                        jsonPath("$.user.avatarUrl")
+                                .value("/media/avatars/0b649505-0917-41d9-a41f-0d4402ec63d5.jpg"))
                 .andExpect(jsonPath("$.user.visibility").value("PUBLIC"))
                 // 공개 프로필은 계정 식별 정보를 더 내려보내지 않는다.
                 .andExpect(jsonPath("$.user.email").doesNotExist())

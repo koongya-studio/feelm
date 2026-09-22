@@ -24,6 +24,8 @@
 | [API-020](#api-020-사용자-차단) | 사용자 차단 | POST | `/users/{userId}/block` | 1차 MVP | 회원 |
 | [API-021](#api-021-사용자-차단-해제) | 사용자 차단 해제 | DELETE | `/users/{userId}/block` | 1차 MVP | 회원 |
 | [API-022](#api-022-차단-목록-조회) | 차단 목록 조회 | GET | `/users/me/blocks` | 1차 MVP | 회원 |
+| [API-081](#api-081-프로필-사진-등록교체) | 프로필 사진 등록·교체 | PUT | `/users/me/avatar` | 2차 MVP | 회원 |
+| [API-082](#api-082-프로필-사진-삭제) | 프로필 사진 삭제 | DELETE | `/users/me/avatar` | 2차 MVP | 회원 |
 | [API-078](#api-078-이메일-인증번호-발송) | 이메일 인증번호 발송 | POST | `/auth/email/verification-code` | 1차 MVP | 공개 |
 | [API-079](#api-079-이메일-인증번호-확인) | 이메일 인증번호 확인 | POST | `/auth/email/verification-code/verify` | 1차 MVP | 공개 |
 
@@ -886,6 +888,7 @@ OAuth 인가 코드를 받아 소셜 계정을 확인한다. 이미 연결된 �
   "userId": 1024,
   "email": "user@example.com",
   "nickname": "팝콘러버",
+  "avatarUrl": "/media/avatars/0b649505-0917-41d9-a41f-0d4402ec63d5.jpg",
   "birthDate": "1999-03-14",
   "gender": "FEMALE",
   "visibility": "PRIVATE",
@@ -904,6 +907,7 @@ OAuth 인가 코드를 받아 소셜 계정을 확인한다. 이미 연결된 �
 ### 처리 규칙
 
 - `stats`의 프레임 수와 평가 수는 1:1이며, 팝콘 수는 평가를 영화의 대표 맛별로 집계한 값이다
+- 등록된 프로필 사진이 없으면 `avatarUrl`은 `null`이다. URL은 공개·비만료 경로이며 사진 교체·삭제·회원 탈퇴 후 기존 URL은 `404`가 된다
 - 활성 계정이 아니면 `401 UNAUTHORIZED`로 거절한다. Access Token은 계정 상태를 담지 않아 탈퇴 계정도 잔여 수명 동안 서명이 유효하기 때문이다(API-012와 같은 판정)
 
 ### 상태값
@@ -913,6 +917,64 @@ OAuth 인가 코드를 받아 소셜 계정을 확인한다. 이미 연결된 �
 ### 미정 사항
 
 없음
+
+## API-081 프로필 사진 등록·교체
+
+`PUT` `/api/v1/users/me/avatar`
+
+| 항목 | 값 |
+|---|---|
+| 단계 | 2차 MVP |
+| 인증 | 회원 |
+| 관련 요구사항 | FR-38 |
+| 화면 | ⑪ 프로필 대시보드, ⑪-6 설정 |
+| 미정 사항 | 없음 |
+| 비고 | `multipart/form-data` |
+
+### 설명
+
+프로필 사진을 처음 등록하거나 새 사진으로 교체한다.
+
+### Request Body
+
+- multipart 필드 `file` (필수)
+- JPEG, PNG, WEBP
+- 최대 10 MiB
+
+### Response
+
+`200 OK`
+
+```json
+{ "avatarUrl": "/media/avatars/0b649505-0917-41d9-a41f-0d4402ec63d5.jpg" }
+```
+
+### 오류 응답
+
+- `400 AVATAR_INVALID`: 비어 있거나 디코딩할 수 없는 파일, 지원하지 않는 이미지 형식
+- `413 AVATAR_TOO_LARGE`: 10 MiB 초과
+- `503 AVATAR_STORAGE_UNAVAILABLE`: 로컬 저장소를 사용할 수 없음
+
+### 처리 규칙
+
+- 서버가 실제 파일 내용을 판별하며 클라이언트의 파일명과 Content-Type을 신뢰하지 않는다
+- EXIF 방향을 반영하고 메타데이터를 제거한 뒤 가운데 기준으로 자르고 512×512 JPEG(품질 85)로 저장한다. 투명 영역은 흰색으로 합성한다
+- 파일명은 서버가 생성한 UUID이며 URL은 인증 없이 조회할 수 있다. `Cache-Control: public, max-age=86400`을 적용한다
+- DB 교체가 완료된 다음 이전 파일을 삭제한다. 실패 시 기존 사진은 유지한다
+
+## API-082 프로필 사진 삭제
+
+`DELETE` `/api/v1/users/me/avatar`
+
+로그인한 사용자의 프로필 사진 연결과 원본 파일을 제거한다. 이미 사진이 없어도 성공한다.
+
+### Response
+
+`204 No Content`
+
+### 처리 규칙
+
+- 삭제 후 API-014와 API-062의 `avatarUrl`은 `null`이며 기존 공개 URL은 `404`가 된다
 
 ## API-015 내 프로필 수정
 
