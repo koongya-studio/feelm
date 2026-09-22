@@ -17,6 +17,7 @@ import { BASE_WEEKLY_FRAME_DELTA } from '../mocks/watch';
 import { getPopcornBucket } from './taste';
 import { getMyProfile } from './users';
 import { request } from './client';
+import { getAccessToken } from './session';
 import type { WatchStatus } from '../types/enums';
 import type {
   MyRatingList,
@@ -76,6 +77,22 @@ export async function recordOttClick(movieId: number, ottId: number): Promise<Wa
 }
 
 /**
+ * 진행 중인 조회. **같은 인증 세션에서** 조건이 같으면 하나로 합친다.
+ *
+ * **StrictMode가 effect를 두 번 실행해도 요청은 한 번이다.** 개발에서는 React가 effect를
+ * 붙였다 떼고 다시 붙이므로 같은 조회가 두 번 나가는데, 두 요청의 주소가 완전히 같아 브라우저가
+ * 둘째를 첫째의 응답이 올 때까지 붙잡는다(HTTP 캐시 합치기). 화면은 나중에 붙은 effect가 받는
+ * 둘째 응답을 그리므로, 응답 시간만큼 늦게 찬다 — 2.2의 `최근 본 영화`가 카드보다 한 박자 늦게
+ * 나타나던 까닭이다(2026-09-23 측정: 개발 +258ms · 빌드본 +15ms).
+ *
+ * 인증 세션도 키에 넣는다. 이전 사용자의 요청이 끝나기 전에 로그아웃하고 다른 사용자가
+ * 로그인하더라도, 새 화면이 이전 사용자의 응답 Promise를 이어받으면 안 된다. 끝난 뒤에는
+ * 남기지 않는다. 캐시가 아니라 **같은 세션·같은 순간의 중복만** 막는 것이라, 다음 진입은 늘
+ * 서버에 다시 묻는다(`api/recommendations.ts`의 API-045와 같은 방식).
+ */
+const pendingWatchRecordRequests = new Map<string, Promise<WatchRecordList>>();
+
+/**
  * API-034 감상 기록 목록 · GET /api/v1/watch-records
  *
  * 정렬(`clickedAt` 내림차순 · `null`은 뒤)과 만료 반영은 서버가 한다. 목록을 읽는 것만으로
@@ -88,10 +105,32 @@ export async function recordOttClick(movieId: number, ottId: number): Promise<Wa
  */
 export async function getWatchRecords(query: WatchRecordQuery = {}): Promise<WatchRecordList> {
   const { status, confirmDue, cursor, size } = query;
+  const key = JSON.stringify([
+    getAccessToken(),
+    status ?? null,
+    confirmDue ?? null,
+    cursor ?? null,
+    size ?? null,
+  ]);
+  const pending = pendingWatchRecordRequests.get(key);
 
-  return request<WatchRecordList>('/watch-records', {
+  if (pending) return pending;
+
+  const current = request<WatchRecordList>('/watch-records', {
     query: { status, confirmDue, cursor, size },
   });
+
+  pendingWatchRecordRequests.set(key, current);
+
+  const clear = () => {
+    if (pendingWatchRecordRequests.get(key) === current) {
+      pendingWatchRecordRequests.delete(key);
+    }
+  };
+
+  void current.then(clear, clear);
+
+  return current;
 }
 
 /** 조건에 맞는 첫 기록. 계약에 단건 조회가 없어 목록을 커서로 훑는다 */

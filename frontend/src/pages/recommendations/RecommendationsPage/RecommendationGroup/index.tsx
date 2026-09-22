@@ -5,9 +5,8 @@
  * 필름 안에서는 첫 카드가 크게 위에 놓이고 나머지가 작게 그 아래 두 열로 앉는다 — 서버가 준
  * 순서의 첫 카드가 그 묶음의 대표라는 뜻이다. 묶음 둘은 좌우로 선다.
  *
- * 좌우로 세우려면 두 묶음의 카드 수가 같아야 한다. 계약은 맞춤 둘 · 발견 하나를 주므로
- * 데스크톱 표시에서만 받은 카드를 석 장까지 되풀이한다. API 응답과 모바일 목록은 건드리지
- * 않는다.
+ * 좌우로 세우려면 두 묶음의 카드 수가 같아야 한다. 화면이 여섯 편을 요청하면 계약이 맞춤 셋 ·
+ * 발견 셋을 주므로(API-045 `size=6`, 업무 -793 · -794) 묶음마다 석 장이 그대로 선다.
  *
  * **모바일은 지금까지와 같다.** 412px에서는 묶음 이름표 없이 카드가 한 줄로 이어진다
  * (업무 -672). 넓은 화면은 두 묶음이 좌우로 놓여 이름 없이는 구분되지 않아 시안이 이름을
@@ -30,7 +29,7 @@ const REST_POSTER_WIDTH = 72;
 const LEAD_OTT_SIZE = 30;
 const REST_OTT_SIZE = 22;
 
-/** 2026-09-21 데스크톱 시안이 묶음마다 보여 주는 카드 수 */
+/** 2026-09-21 데스크톱 시안이 묶음마다 보여 주는 카드 수. 더 와도 이만큼만 그린다 */
 const DESIGN_CARD_COUNT = 3;
 
 type Props = {
@@ -59,14 +58,17 @@ export default function RecommendationGroup({
   if (items.length === 0) return null;
 
   /*
-   * API-045는 현재 맞춤 둘 · 발견 하나를 준다. 서버 계약을 바꾸거나 모바일에 중복 카드를
-   * 노출하지 않고 데스크톱 시안만 확인할 수 있도록 이 묶음 안에서만 석 장까지 채운다.
-   * S15P21E106-793이 유형별 석 장을 주면 이 변환은 결과를 바꾸지 않는다.
+   * **앞에서부터 석 장까지만 그린다**(사용자 결정 2026-09-22, 업무 -794).
+   *
+   * -783은 계약이 맞춤 둘 · 발견 하나를 주던 동안 시안의 석 장을 채우려고 이 자리에서 카드를
+   * 되풀이했다. 이제 여섯 편을 요청하면 유형별로 석 장이 오므로 되풀이를 걷어냈다 — PC에서
+   * 같은 영화가 두 번 서던 것이 사라진다.
+   *
+   * 취향 발견 후보가 모자라면 그 자리를 맞춤이 채워(업무 -793) 한 묶음에 넷 이상이 올 수 있다.
+   * 그때도 묶음은 석 장이다 — 시안의 한 칸(대표 하나 + 아래 둘)이 묶음의 모양이고, 여기서
+   * 줄을 늘리면 좌우 두 묶음의 길이가 갈린다.
    */
-  const displayedItems =
-    items.length >= DESIGN_CARD_COUNT
-      ? items
-      : Array.from({ length: DESIGN_CARD_COUNT }, (_, index) => items[index % items.length]);
+  const displayedItems = items.slice(0, DESIGN_CARD_COUNT);
   const [lead, ...rest] = displayedItems;
 
   /*
@@ -133,9 +135,9 @@ export default function RecommendationGroup({
 
           {rest.length > 0 ? (
             <div className={styles.rest}>
-              {rest.map((item, index) => (
+              {rest.map((item) => (
                 <MovieBriefCard
-                  key={`${item.recommendationItemId}-${index}`}
+                  key={item.recommendationItemId}
                   movie={item.movie}
                   otts={otts}
                   posterWidth={REST_POSTER_WIDTH}
