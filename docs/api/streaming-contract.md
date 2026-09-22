@@ -105,8 +105,8 @@ Consumer 후보에는 영화 표시용 메타데이터를 넣지 않고 구조�
 적격 그룹 후보가 소진된 경우에만 100편 미만을 허용한다. 모집된 후보만 현재 평가·서빙 모델의 개인
 점수로 최종 정렬해 게시한다.
 `taste`와 `discovery`는 독립 순위이므로 서로 같은 영화가 있을 수 있다. Spring은 TASTE를
-최대 20편 먼저 저장하고, DISCOVERY에서 이 영화들을 건너뛴 뒤 다음 고유 후보로 최대 20편을 채운다.
-화면에는 저장된 TASTE 2편과 DISCOVERY 1편을 노출한다.
+최대 50편 먼저 저장하고, DISCOVERY에서 이 영화들을 건너뛴 뒤 다음 고유 후보로 최대 50편을 채운다.
+화면에는 모바일 기본값으로 저장된 TASTE 2편과 DISCOVERY 1편, PC 요청에는 각각 3편을 노출한다.
 
 #### 구현·운영 책임 경계
 
@@ -365,8 +365,8 @@ position의 알림이 다시 발행될 수 있으며 Spring의 완료 상태 ups
 2. Python Consumer가 PostgreSQL의 현재 평가·관심없음을 한 snapshot으로 다시 읽어 User Vector와 후보를 재계산한다.
 3. Python Consumer가 ALS·콘텐츠 지원 범위별 백분위를 결합한 TASTE 최대 500편을 만들고, 그룹 산출물을
    활성화한 경우 DISCOVERY 최대 100편도 만든다. Spring은 서비스 DB 미존재·평가·관심없음 후보만
-   제외하고 종류별 점수 정렬과 동점 결정적 셔플 후 TASTE를 최대 20편 저장하고, DISCOVERY는
-   저장된 TASTE와 겹치는 영화를 건너뛰어 다음 고유 후보로 최대 20편 채운다. Consumer의
+   제외하고 종류별 점수 정렬과 동점 결정적 셔플 후 TASTE를 최대 50편 저장하고, DISCOVERY는
+   저장된 TASTE와 겹치는 영화를 건너뛰어 다음 고유 후보로 최대 50편 채운다. Consumer의
    구조화 `reasons[]`는 원본 그대로 스냅샷한다.
 4. Python Consumer가 `feelm:user:{userId}:candidate-version`, `feelm:user:{userId}:vector`, `feelm:user:{userId}:candidates`을 Lua 스크립트 한 번으로 원자적으로 기록한다. `candidate-version` String은 성공한 게시마다 증가하는 게시 순번이며, `vector`와 `candidates` JSON은 같은 `candidateVersion`(형식 버전)과 `generationId`(한 번의 생성 결과 식별자)를 가진다.
 
@@ -384,7 +384,7 @@ assign의 여러 claim 중 하나라도 Redis 오류가 나면 Consumer는 fail-
 
 Spark Streaming은 이 경로에 참여하지 않습니다. Spark는 여러 사용자 행동을 집계해 `behavior`와 전역 인기 결과를 갱신하고,
 Spring은 **다음 개인 추천 세트 생성 시** `candidates.taste` 최대 500편과 `candidates.discovery`
-최대 100편, 최신 `behavior`를 읽어 제외·경량 가중치 재정렬과 TASTE 2 + DISCOVERY 1 조립을 수행합니다.
+최대 100편, 최신 `behavior`를 읽어 제외·경량 가중치 재정렬과 모바일 TASTE 2 + DISCOVERY 1 또는 PC TASTE 3 + DISCOVERY 3 조립을 수행합니다.
 약한 신호만으로 현재 세트 버퍼를 무효화하지 않으므로 반영 시점은 Spark 집계 완료 후 사용자의 다음 세트 생성이며,
 Python Consumer를 다시 실행하거나 전체 사용자를 주기적으로 재계산하지 않습니다.
 
@@ -627,10 +627,10 @@ Consumer는 구조화된 근거만 저장하고, Spring은 영화 제목과 표�
 복구 뒤 전체 재게시로 기존 정책 후보를 복원한다.
 배열 자체가 유형을 나타내므로 항목의 중복 `type` 필드는 두지 않는다. 공급 그룹 수·적격 그룹 수 같은
 DISCOVERY 진단 정보도 Redis 계약에 넣지 않고 Consumer 로그에만 남긴다.
-Spring은 미존재·평가·관심없음 후보를 제외하고 종류별 점수 정렬 후 TASTE를 최대 20편 저장한다.
-DISCOVERY에서는 저장된 TASTE와 같은 영화를 건너뛰고 다음 고유 후보로 최대 20편을 채운다.
-동점 후보는 사용자와 generation ID를 seed로 결정적으로 섞는다. TASTE 2:DISCOVERY 1은
-저장 순서가 아니라 화면 조회 시 각 타입 버퍼에서 꺼내는 규칙이다. DISCOVERY가 부족하면 다음 TASTE로
+Spring은 미존재·평가·관심없음 후보를 제외하고 종류별 점수 정렬 후 TASTE를 최대 50편 저장한다.
+DISCOVERY에서는 저장된 TASTE와 같은 영화를 건너뛰고 다음 고유 후보로 최대 50편을 채운다.
+동점 후보는 사용자와 generation ID를 seed로 결정적으로 섞는다. 모바일 TASTE 2:DISCOVERY 1과 PC TASTE 3:DISCOVERY 3은
+저장 순서가 아니라 화면 조회 시 각 타입 버퍼에서 꺼내는 규칙이다. DISCOVERY가 부족하면 빈 슬롯마다 다음 TASTE로
 채운다. 이 Consumer는 별도 POPULAR fallback 목록을 생성하지 않는다.
 Consumer는 DISCOVERY 공급량을 낭비하지 않도록 현재 평가·확정 감상·관심없음을 발견 목록에서
 선필터한다. 기존 TASTE 원시 후보의 의미는 바꾸지 않으며 Spring이 조회 시점에 두 목록을 다시 제외한다.
@@ -649,7 +649,7 @@ S15P21E106-471에서 Candidate v3 그룹화 writer를 반영했고, S15P21E106-4
 추가해 Candidate v4가 됐다. S15P21E106-488은 전체 이력 기반 DISCOVERY 전용 단일 `reason` 객체를 추가한 Candidate v5
 기준선을 만들었고, S15P21E106-505는 보충 근거를 추가해 Candidate v6가 됐다. S15P21E106-164는 기존
 v4 배열 계약을 유지하고, S15P21E106-498에서 v6 배열 계약 대응을 진행한다. 전체 활성 후보 v6 재게시,
-generation 일치 확인과 TASTE 2 + DISCOVERY 1 통합 검증을 같은 전환 절차로 완료하기 전에는 Backend
+generation 일치 확인과 모바일 TASTE 2 + DISCOVERY 1·PC TASTE 3 + DISCOVERY 3 통합 검증을 같은 전환 절차로 완료하기 전에는 Backend
 연동 완료로 보지 않는다.
 
 **`feelm:model:current`**

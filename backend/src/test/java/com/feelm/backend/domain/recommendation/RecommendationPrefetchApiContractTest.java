@@ -96,14 +96,17 @@ class RecommendationPrefetchApiContractTest extends SharedPostgresContractTest {
                         + " RESTART IDENTITY CASCADE");
         flavor(FLAVOR, "FLAVOR_C");
         user(USER, "prefetch");
-        for (long movieId = 301; movieId <= 345; movieId++) {
+        for (long movieId = 301; movieId <= 400; movieId++) {
             movie(movieId);
         }
         recommendationSet(SET, GENERATION, 0);
-        // 노출 중인 3편(TASTE 2 + DISCOVERY 1). 목표 구성을 채우므로 조회가 보충하지 않는다.
+        // 노출 중인 6편(TASTE 3 + DISCOVERY 3). 목표 구성을 채우므로 조회가 보충하지 않는다.
         item(4001, SET, 301, "TASTE", 1, true);
         item(4002, SET, 302, "TASTE", 2, true);
-        item(4003, SET, 320, "DISCOVERY", 1, true);
+        item(4003, SET, 310, "TASTE", 3, true);
+        item(4004, SET, 320, "DISCOVERY", 1, true);
+        item(4005, SET, 321, "DISCOVERY", 2, true);
+        item(4006, SET, 322, "DISCOVERY", 3, true);
         jdbc.execute("SELECT setval(pg_get_serial_sequence('recommendation_sets','id'),4000,true)");
         jdbc.execute(
                 "SELECT setval(pg_get_serial_sequence('recommendation_items','id'),4100,true)");
@@ -128,14 +131,14 @@ class RecommendationPrefetchApiContractTest extends SharedPostgresContractTest {
         getRecommendations()
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.recommendationSetId").value(SET))
-                .andExpect(jsonPath("$.items.length()").value(3));
+                .andExpect(jsonPath("$.items.length()").value(6));
 
         awaitPrefetchIdle();
         assertThat(setCount()).isEqualTo(2);
         assertThat(batchNoOf(prefetchedSetId)).isEqualTo(1);
         assertThat(generationOf(prefetchedSetId)).isEqualTo(GENERATION);
         // 미리 만든 회차는 노출하지 않는다. exposed_at이 NULL이라 추천 이력(API-048)에도 들어가지 않는다.
-        assertThat(itemCount(prefetchedSetId)).isEqualTo(10);
+        assertThat(itemCount(prefetchedSetId)).isEqualTo(15);
         assertThat(exposedItemCount(prefetchedSetId)).isZero();
     }
 
@@ -166,7 +169,7 @@ class RecommendationPrefetchApiContractTest extends SharedPostgresContractTest {
         getRecommendations()
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.recommendationSetId").value(SET))
-                .andExpect(jsonPath("$.items.length()").value(3));
+                .andExpect(jsonPath("$.items.length()").value(6));
 
         awaitPrefetchIdle();
         assertThat(exposedItemCount(prefetchedSetId)).isZero();
@@ -187,7 +190,7 @@ class RecommendationPrefetchApiContractTest extends SharedPostgresContractTest {
         getRecommendations()
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.recommendationSetId").value(prefetchedSetId))
-                .andExpect(jsonPath("$.items.length()").value(3));
+                .andExpect(jsonPath("$.items.length()").value(6));
 
         awaitNoPrefetch();
         // 프리페치 한 번이 전부다. 소진 시점에 Redis를 다시 읽지 않는 것이 이 작업의 목적이다.
@@ -203,16 +206,19 @@ class RecommendationPrefetchApiContractTest extends SharedPostgresContractTest {
         recommendationSet(newGenerationSetId, OTHER_GENERATION, 0);
         item(4501, newGenerationSetId, 341, "TASTE", 1, false);
         item(4502, newGenerationSetId, 342, "TASTE", 2, false);
-        item(4503, newGenerationSetId, 343, "DISCOVERY", 1, false);
+        item(4503, newGenerationSetId, 343, "TASTE", 3, false);
+        item(4504, newGenerationSetId, 344, "DISCOVERY", 1, false);
+        item(4505, newGenerationSetId, 345, "DISCOVERY", 2, false);
+        item(4506, newGenerationSetId, 346, "DISCOVERY", 3, false);
 
         getRecommendations()
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.recommendationSetId").value(newGenerationSetId))
-                .andExpect(jsonPath("$.items.length()").value(3));
+                .andExpect(jsonPath("$.items.length()").value(6));
 
         awaitPrefetchIdle();
         // 이전 generation의 노출 이력은 보존한다.
-        assertThat(exposedItemCount(SET)).isEqualTo(3);
+        assertThat(exposedItemCount(SET)).isEqualTo(6);
     }
 
     @Test
@@ -223,7 +229,7 @@ class RecommendationPrefetchApiContractTest extends SharedPostgresContractTest {
         getRecommendations()
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.recommendationSetId").value(SET))
-                .andExpect(jsonPath("$.items.length()").value(3));
+                .andExpect(jsonPath("$.items.length()").value(6));
 
         awaitPrefetchIdle();
         verify(candidateReader, times(1)).read(USER);
@@ -321,7 +327,7 @@ class RecommendationPrefetchApiContractTest extends SharedPostgresContractTest {
         getRecommendations()
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.recommendationSetId").value(SET))
-                .andExpect(jsonPath("$.items.length()").value(3));
+                .andExpect(jsonPath("$.items.length()").value(6));
 
         // 여기 도달한 것 자체가 응답 경로가 Redis를 기다리지 않았다는 증거다.
         release.countDown();
@@ -350,7 +356,7 @@ class RecommendationPrefetchApiContractTest extends SharedPostgresContractTest {
     /**
      * 두 프리페치가 모두 후보를 읽은 뒤에야 쓰기 트랜잭션에 들어가도록 묶는다.
      *
-     * <p>후보를 타입당 버퍼 크기(20)보다 많이 준다. 후보가 적으면 첫 회차가 전부 가져가 두 번째 회차가 어차피 비므로, 잠금 후 재확인을 지워도 회차가 늘지 않아
+     * <p>후보를 타입당 버퍼 크기(50)보다 많이 준다. 후보가 적으면 첫 회차가 전부 가져가 두 번째 회차가 어차피 비므로, 잠금 후 재확인을 지워도 회차가 늘지 않아
      * 이 테스트가 통과해 버린다.
      */
     private void nextBatchCandidatesAfter(CyclicBarrier barrier) {
@@ -364,16 +370,16 @@ class RecommendationPrefetchApiContractTest extends SharedPostgresContractTest {
                 .read(USER);
     }
 
-    /** 1회차가 저장하지 않은 영화로 다음 회차 후보를 만든다. 7 TASTE + 3 DISCOVERY = 10편이다. */
+    /** 1회차가 저장하지 않은 영화로 다음 회차 후보를 만든다. 10 TASTE + 5 DISCOVERY = 15편이다. */
     private void nextBatchCandidates() {
         candidates(GENERATION, nextBatchItems());
     }
 
-    /** 한 회차(타입당 최대 20편)를 넘기는 TASTE 후보 25편이다. */
+    /** 한 회차(타입당 최대 50편)를 넘기는 TASTE 후보 80편이다. */
     private RecommendationCandidate[] overflowingBatchItems() {
-        RecommendationCandidate[] items = new RecommendationCandidate[25];
+        RecommendationCandidate[] items = new RecommendationCandidate[80];
         for (int index = 0; index < items.length; index++) {
-            items[index] = candidate(321 + index, String.valueOf(25 - index) + ".0", "TASTE");
+            items[index] = candidate(321 + index, String.valueOf(80 - index) + ".0", "TASTE");
         }
         return items;
     }
@@ -387,9 +393,14 @@ class RecommendationPrefetchApiContractTest extends SharedPostgresContractTest {
             candidate(335, "5.0", "TASTE"),
             candidate(336, "4.0", "TASTE"),
             candidate(337, "3.0", "TASTE"),
+            candidate(347, "2.9", "TASTE"),
+            candidate(348, "2.8", "TASTE"),
+            candidate(349, "2.7", "TASTE"),
             candidate(338, "9.0", "DISCOVERY"),
             candidate(339, "8.0", "DISCOVERY"),
-            candidate(340, "7.0", "DISCOVERY")
+            candidate(340, "7.0", "DISCOVERY"),
+            candidate(350, "6.0", "DISCOVERY"),
+            candidate(351, "5.0", "DISCOVERY")
         };
     }
 
@@ -445,13 +456,19 @@ class RecommendationPrefetchApiContractTest extends SharedPostgresContractTest {
     }
 
     private ResultActions getRecommendations() throws Exception {
-        return mvc.perform(get("/api/v1/recommendations").header("Authorization", bearer()));
+        return mvc.perform(
+                get("/api/v1/recommendations")
+                        .param("size", "6")
+                        .header("Authorization", bearer()));
     }
 
     private int concurrentGet(CountDownLatch ready, CountDownLatch start) throws Exception {
         ready.countDown();
         assertThat(start.await(5, TimeUnit.SECONDS)).isTrue();
-        return mvc.perform(get("/api/v1/recommendations").header("Authorization", bearer()))
+        return mvc.perform(
+                        get("/api/v1/recommendations")
+                                .param("size", "6")
+                                .header("Authorization", bearer()))
                 .andReturn()
                 .getResponse()
                 .getStatus();

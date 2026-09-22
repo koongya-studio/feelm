@@ -31,7 +31,12 @@ public class RecommendationServingService {
     private final RecommendationPrefetchProperties prefetchProperties;
 
     public RecommendationResponse getRecommendations(long userId) {
-        ServingSnapshot snapshot = reader.read(userId);
+        return getRecommendations(userId, 3);
+    }
+
+    public RecommendationResponse getRecommendations(long userId, int size) {
+        RecommendationServingPolicy policy = RecommendationServingPolicy.forSize(size);
+        ServingSnapshot snapshot = reader.read(userId, policy);
         if (!snapshot.exhausted()) {
             if (prefetchProperties.needsPrefetch(snapshot.unexposedValidCount())) {
                 prefetchDispatcher.submit(userId, snapshot.setId(), snapshot.generationId());
@@ -57,7 +62,7 @@ public class RecommendationServingService {
 
         // 방금 만든 회차는 여기서 프리페치를 판단하지 않는다. 한 요청에서 회차를 만들고 그다음 회차까지
         // 준비하면 쓰기가 두 번 겹친다. 버퍼가 얕으면 다음 조회가 바로 판단한다.
-        ServingSnapshot refreshed = reader.read(userId);
+        ServingSnapshot refreshed = reader.read(userId, policy);
         if (refreshed.response().items().isEmpty()) {
             throw new BusinessException(ErrorCode.RECOMMENDATION_PREPARING);
         }
