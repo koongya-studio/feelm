@@ -39,7 +39,8 @@
  */
 .backdrop {
   position: fixed;
-  inset: 0;
+  /* 셸 안에서는 상단 바와 좌측 내비 자리를 비운다(`layouts/DesktopShell`, 업무 -787) */
+  inset: var(--shell-backdrop-inset, 0);
   z-index: 0;
   background-color: #0d0c0f;
   background-image: var(--detail-poster, none);
@@ -65,7 +66,8 @@
  */
 .scrim {
   position: fixed;
-  inset: 0;
+  /* 셸 안에서는 상단 바와 좌측 내비 자리를 비운다(`layouts/DesktopShell`, 업무 -787) */
+  inset: var(--shell-backdrop-inset, 0);
   z-index: 1;
   background: linear-gradient(
     180deg,

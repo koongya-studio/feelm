@@ -1,0 +1,141 @@
+/*
+ * 데스크톱 셸 (업무 -782에서 만들고 -787에서 `AppLayout`으로부터 떼어냈다).
+ *
+ * 1024px 이상에서 `AppLayout`과 `FullScreenLayout`이 이 뼈대를 세운다. 미디어 쿼리로 감추는
+ * 것이 아니라 그리는 것 자체가 갈리므로 여기에는 `@media`가 없다 — 이 클래스들이 붙었다는
+ * 것이 이미 데스크톱이라는 뜻이다.
+ *
+ * 화면 높이를 고정하는 것은 모바일과 같은 이유다. 좌측 띠와 상단 바가 제자리에 있어야 하고,
+ * 그러려면 스크롤이 문서가 아니라 안쪽에서 일어나야 한다.
+ *
+ * 배경은 body가 한 벌만 깔므로 여기서 다시 칠하지 않는다
+ * (`docs/screens/design-concept.md` 2.1).
+ */
+.desktop {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+
+  /*
+   * 화면에 고정해 두는 페이지 배경층이 비켜 서야 할 자리 (업무 -787).
+   *
+   * 2.4 영화 상세와 7.1 · 7.2 프로필은 포스터 · 사진을 `position: fixed; inset: 0`으로 깔고
+   * 본문만 그 위로 흘려보낸다. 창 전체가 곧 화면이던 모바일에서는 그것이 맞았지만, 셸 안에
+   * 들어오면 `inset: 0`이 좌측 내비와 상단 바 자리까지 덮는다. 좌측 내비는 자기 배경이
+   * 있어 가려지지 않았지만(`DesktopNav`의 `z-index: 2`), 배경을 칠하지 않는 상단 바는
+   * 포스터에 그대로 묻혔다(2026-09-22 브라우저 확인).
+   *
+   * 그 배경층들이 `inset: var(--shell-backdrop-inset, 0)`으로 이 값을 읽는다. 모바일에는
+   * 이 변수가 없어 `0`으로 떨어지므로 지금까지와 같다.
+   *
+   * **덮개는 이 값을 쓰지 않는다.** 바텀시트와 확인 창은 데스크톱에서 화면 전체를 어둡게
+   * 덮는 것이 맞다(업무 -782). 여기서 자리를 좁히는 것은 화면 한 장의 배경일 뿐이다.
+   */
+  --shell-backdrop-inset: var(--desktop-topbar-height) 0 0 var(--desktop-nav-width);
+}
+
+/* 좌측 띠 오른쪽 전부. 위에 상단 바, 아래에 본문 · 보조 패널이 든다 */
+.column {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+/*
+ * 중앙 본문과 우측 패널이 나란히 놓이는 줄. `min-height: 0`이 없으면 flex 항목의 기본
+ * 최소 높이가 내용 높이라 안쪽 `overflow-y: auto`가 듣지 않고 줄 전체가 늘어난다.
+ */
+.split {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  gap: var(--desktop-gutter);
+  padding: 0 var(--desktop-gutter) var(--desktop-gutter);
+}
+
+/*
+ * 중앙 주 콘텐츠. 여기 한 곳이 세로로 스크롤한다.
+ *
+ * 최대 폭을 두는 것은 1440px 이상에서 한 줄이 끝없이 길어지지 않게 하기 위한 것이고,
+ * 넘는 폭은 `margin-inline: auto`가 좌우로 나눠 가진다 — 우측 패널이 없는 1024~1279px에서
+ * 본문이 왼쪽에 붙어 있지 않게 한다.
+ *
+ * 화면들이 좌우 여백을 스스로 `--screen-padding-x`로 넣으므로 여기서 가로 패딩을 더하지 않는다.
+ */
+.main {
+  display: flex;
+  min-width: 0;
+  max-width: var(--desktop-main-max-width);
+  flex: 1;
+  flex-direction: column;
+  margin-inline: auto;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+/*
+ * 우측 보조 패널. 1280px 이상에서만 있고, 중앙과 따로 스크롤한다.
+ *
+ * 내용은 페이지가 포털로 보낸다(`components/DesktopAside`). 자리를 잡아 두어야 페이지가
+ * 그리로 보낼 수 있으므로 요소는 늘 있고, **아무것도 들어오지 않았으면 `:empty`로 접는다** —
+ * 접지 않으면 아직 시안을 적용하지 않은 화면마다 오른쪽에 빈 단이 남는다.
+ */
+.aside {
+  display: flex;
+  width: var(--desktop-aside-width);
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  gap: var(--space-4);
+  padding-top: var(--space-2);
+}
+
+/*
+ * 페이지가 보낸 것이 없으면 자리를 차지하지 않는다. 포털이 넣는 것은 실제 요소라 내용이
+ * 들어오는 순간 `:empty`가 풀리고, 화면을 옮겨 내용이 빠지면 다시 접힌다. JS로 세어 두지
+ * 않아도 되는 것은 이 한 줄 덕분이다.
+ */
+.aside:empty {
+  display: none;
+}
+
+/*
+ * 본문으로 건너뛰기. 평소에는 보이지 않다가 Tab으로 초점을 받으면 왼쪽 위에 나타난다.
+ *
+ * `display: none`으로 숨기지 않는다 — 그러면 초점을 받을 수 없어 있으나 마나다. 화면 밖으로
+ * 밀어 두었다가 초점이 오면 제자리로 가져온다.
+ *
+ * **`:focus-visible`이 아니라 `:focus`다.** `:focus-visible`은 브라우저가 키보드 조작이라고
+ * 판단해야 켜지고 그 판단이 상황마다 달라, 눌러야 할 때 나타나지 않는 일이 있었다(2026-09-21
+ * 사용자 확인). 이 단추는 화면 밖에 있어 마우스로 누를 수 없으므로 초점이 왔다는 것 자체가
+ * 키보드로 왔다는 뜻이다. 가릴 이유가 없다.
+ */
+.skip {
+  position: fixed;
+  z-index: 40;
+  top: var(--space-4);
+  left: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-action);
+  box-shadow: var(--shadow-action);
+  color: var(--color-on-action);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  transform: translateY(calc(-100% - var(--space-4) * 2));
+  transition: transform var(--motion-fast) var(--ease-standard);
+}
+
+.skip:focus {
+  transform: translateY(0);
+}
+
+/* 초점을 받은 본문에 테두리를 두르지 않는다. 단추가 이미 어디로 갔는지 말했다 */
+.main:focus {
+  outline: none;
+}

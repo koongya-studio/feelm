@@ -8,7 +8,7 @@
  * 본문에 흘러나오지 않는지도 함께 본다 — 흘러나오면 모바일 화면 한가운데에 카드가 끼어든다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import AppLayout from './index';
 import DesktopAside from '../../components/DesktopAside';
@@ -70,7 +70,16 @@ beforeEach(() => {
   vi.mocked(getMyProfile).mockReset().mockRejectedValue(new Error('쓰지 않는다'));
 });
 
+/*
+ * **화면을 먼저 걷고 폭을 되돌린다**(업무 -789의 규칙, -787에서 여기에도 적용).
+ *
+ * `afterEach`는 나중에 등록한 것부터 돈다(vitest 기본값 `sequence.hooks: 'stack'`). 그래서
+ * 이 자리는 `test/setup.ts`의 `cleanup()`보다 먼저 돌고, 화면이 아직 붙어 있는 채로
+ * `matchMedia`가 원래대로 돌아간다. 셸은 그것을 구독하고 있으므로 걷기 전에 되돌리면
+ * 남은 화면이 폭을 다시 읽는다.
+ */
 afterEach(() => {
+  cleanup();
   resetViewport();
 });
 

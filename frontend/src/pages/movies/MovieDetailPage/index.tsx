@@ -47,6 +47,7 @@ import { getPopcornFlavors } from '../../../api/taste';
 import { recordOttClick } from '../../../api/watch';
 import { useAuth } from '../../../contexts/authContext';
 import { useBack } from '../../../hooks/useBack';
+import { scrollParent, useScrollFade } from '../../../hooks/useScrollFade';
 import { path } from '../../../routes/paths';
 import { movieMetaLine } from '../../../utils/movie';
 import { ottMovieUrl } from '../../../utils/ott';
@@ -205,35 +206,23 @@ export default function MovieDetailPage() {
     };
   }, []);
 
+  /*
+   * 다른 영화로 갈아타면 맨 위에서 시작한다. 문서가 스크롤하는 1024px 미만에서 하는 일이다.
+   *
+   * 1024px 이상에서는 이 화면도 데스크톱 셸 안에 들어가 문서가 잠기므로(업무 -787) 이 줄은
+   * 아무 일도 하지 않는다. 대신 셸을 세운 `FullScreenLayout`의 `useScrollRestoration`이
+   * 새 히스토리 항목으로 들어온 이동을 맨 위에서 시작시킨다 — 되돌릴 자리를 기억해 둔
+   * 뒤로 가기가 아니면 0으로 맞추는 것이 그 장치의 규칙이다.
+   */
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [id]);
 
-  useEffect(() => {
-    const page = pageRef.current;
-    if (!page) return;
-
-    let frame = 0;
-    const apply = () => {
-      frame = 0;
-      const end = window.innerHeight * BACKDROP_FADE_RATIO;
-      const progress = end > 0 ? Math.min(1, window.scrollY / end) : 1;
-      page.style.setProperty('--detail-scroll', progress.toFixed(3));
-    };
-    const onScroll = () => {
-      if (frame === 0) frame = window.requestAnimationFrame(apply);
-    };
-
-    apply();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll, { passive: true });
-
-    return () => {
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
-      if (frame !== 0) window.cancelAnimationFrame(frame);
-    };
-  }, [movie]);
+  /*
+   * 내려간 만큼 배경 사진을 흐리고 어둡게 한다. 위와 같은 이유로 스크롤 영역을 스스로 찾는
+   * `useScrollFade`에 맡긴다 — 7.1 · 7.2 프로필이 같은 것을 쓴다.
+   */
+  useScrollFade(pageRef, '--detail-scroll', BACKDROP_FADE_RATIO, [movie]);
 
   const bufferedReviews = reviewPage?.movieId === id ? reviewPage.items : [];
   const visibleReviewCount =
@@ -274,7 +263,10 @@ export default function MovieDetailPage() {
   }
 
   function handleBackToTop() {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const scroller = pageRef.current ? scrollParent(pageRef.current) : null;
+
+    if (scroller) scroller.scrollTo({ top: 0, behavior: 'smooth' });
+    else window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function handlePeoplePointerDown(event: ReactPointerEvent<HTMLUListElement>) {
