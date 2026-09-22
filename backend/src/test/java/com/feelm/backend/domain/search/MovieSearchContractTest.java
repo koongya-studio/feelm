@@ -206,6 +206,147 @@ class MovieSearchContractTest extends SharedPostgresContractTest {
                 .containsExactly(107L, 106L, 103L, 101L, 102L, 104L, 105L);
     }
 
+    @Test
+    @DisplayName("검색 홈 평점 목록은 한국 날짜로 오늘까지 포함하고 미래·NULL 개봉일은 제외한다")
+    void topRatedHomeUsesKoreanReleaseDateBoundary() throws Exception {
+        LocalDate today = koreanToday();
+        int yearFrom = today.minusYears(1).getYear();
+        MovieSearchFixture.movie(jdbc, 108, "미래 개봉작", null, today.plusDays(1).toString(), 5.0);
+        MovieSearchFixture.movie(jdbc, 109, "오늘 개봉작", null, today.toString(), 4.9);
+        MovieSearchFixture.movie(jdbc, 110, "과거 개봉작", null, today.minusDays(1).toString(), 4.8);
+        MovieSearchFixture.movie(jdbc, 111, "개봉일 미정", null, null, 4.7);
+
+        JsonNode result =
+                read(
+                        memberRequest()
+                                .param("yearFrom", Integer.toString(yearFrom))
+                                .param("sort", "RATING"));
+
+        assertThat(result.path("totalCount").asLong()).isEqualTo(2);
+        assertThat(ids(result)).containsExactly(109L, 110L);
+    }
+
+    @Test
+    @DisplayName("검색 홈 평점 동률은 평가 수·영화 ID 순으로 모든 cursor 페이지를 유지한다")
+    void topRatedHomeSortsAndPaginatesRatingTies() throws Exception {
+        LocalDate today = koreanToday();
+        int yearFrom = today.minusYears(1).getYear();
+        String released = today.minusDays(1).toString();
+        MovieSearchFixture.movie(jdbc, 125, "고평점 저평가수 영화", null, released, 4.6);
+        MovieSearchFixture.movie(jdbc, 120, "동률 영화 하나", null, released, 4.5);
+        MovieSearchFixture.movie(jdbc, 121, "동률 영화 둘", null, released, 4.5);
+        MovieSearchFixture.movie(jdbc, 122, "동률 영화 셋", null, released, 4.5);
+        MovieSearchFixture.movie(jdbc, 123, "평가 없는 동률 영화", null, released, 4.5);
+        MovieSearchFixture.movie(jdbc, 124, "동률 영화 넷", null, released, 4.5);
+        jdbc.update("UPDATE movies SET rating_count = 1 WHERE id = 125");
+        jdbc.update("UPDATE movies SET rating_count = 10 WHERE id IN (120, 121)");
+        jdbc.update("UPDATE movies SET rating_count = 5 WHERE id IN (122, 124)");
+
+        assertThat(collectTopRatedPages(2, yearFrom))
+                .containsExactly(125L, 121L, 120L, 124L, 122L, 123L);
+    }
+
+    @Test
+    @DisplayName("키워드 평점 검색은 미래·NULL 개봉일 영화도 기존처럼 반환한다")
+    void keywordRatingSearchKeepsUnreleasedAndUnknownDates() throws Exception {
+        LocalDate today = koreanToday();
+        MovieSearchFixture.movie(jdbc, 130, "일반 검색 개봉 예정", null, today.plusDays(1).toString(), 5.0);
+        MovieSearchFixture.movie(jdbc, 131, "일반 검색 개봉 미정", null, null, 4.9);
+
+        JsonNode result = read(memberRequest().param("q", "일반 검색").param("sort", "RATING"));
+
+        assertThat(result.path("totalCount").asLong()).isEqualTo(2);
+        assertThat(ids(result)).containsExactly(130L, 131L);
+    }
+
+    @Test
+    @DisplayName("임의 시작 연도의 평점 필터는 검색 홈 특례가 아니므로 미래 개봉작을 유지한다")
+    void arbitraryYearRatingFilterIsNotSearchHome() throws Exception {
+        LocalDate today = koreanToday();
+        MovieSearchFixture.movie(
+                jdbc, 132, "임의 연도 미래 개봉작", null, today.plusDays(1).toString(), 5.0);
+        MovieSearchFixture.movie(
+                jdbc, 133, "임의 연도 과거 개봉작", null, today.minusDays(1).toString(), 4.9);
+
+        JsonNode result = read(memberRequest().param("yearFrom", "1900").param("sort", "RATING"));
+
+        assertThat(result.path("totalCount").asLong()).isGreaterThanOrEqualTo(2);
+        assertThat(ids(result)).startsWith(132L, 133L);
+    }
+
+    @Test
+    @DisplayName("검색 홈 cursor는 최초 한국 기준일을 유지해 자정 이후 신작과 전체 건수를 바꾸지 않는다")
+    void topRatedHomeCursorKeepsKoreanReleaseBoundary() throws Exception {
+        LocalDate releasedThrough = koreanToday().minusDays(1);
+        int yearFrom = releasedThrough.minusYears(1).getYear();
+        String previouslyReleased = releasedThrough.minusDays(1).toString();
+        MovieSearchFixture.movie(jdbc, 140, "기준일 첫 페이지 영화", null, previouslyReleased, 5.0);
+        MovieSearchFixture.movie(jdbc, 141, "기준일 다음 페이지 영화", null, previouslyReleased, 4.0);
+        MovieSearchFixture.movie(
+                jdbc, 142, "자정 뒤 오늘 개봉작", null, releasedThrough.plusDays(1).toString(), 4.5);
+        MovieSearchCriteria criteria =
+                new MovieSearchCriteria(
+                        null,
+                        List.of(),
+                        List.of(),
+                        yearFrom,
+                        null,
+                        List.of(),
+                        MovieSearchSort.RATING,
+                        null,
+                        20);
+        String cursor =
+                cursorCodec.encode(
+                        new MovieSearchCursor(
+                                MovieSearchSort.RATING,
+                                BigDecimal.valueOf(5),
+                                releasedThrough,
+                                140L,
+                                cursorCodec.criteriaKey(criteria, releasedThrough)));
+
+        JsonNode result =
+                read(
+                        memberRequest()
+                                .param("yearFrom", Integer.toString(yearFrom))
+                                .param("sort", "RATING")
+                                .param("cursor", cursor));
+
+        assertThat(result.path("totalCount").asLong()).isEqualTo(2);
+        assertThat(ids(result)).containsExactly(141L);
+    }
+
+    @Test
+    @DisplayName("기준일 고정 전 version 4 검색 홈 cursor는 400으로 거부한다")
+    void rejectsPreviousTopRatedHomeCursor() throws Exception {
+        int yearFrom = koreanToday().minusYears(1).getYear();
+        String previousCriteriaKey =
+                HexFormat.of()
+                        .formatHex(
+                                MessageDigest.getInstance("SHA-256")
+                                        .digest(
+                                                ("{\"version\":4,\"query\":null,"
+                                                                + "\"genres\":[],\"countries\":[],"
+                                                                + "\"yearFrom\":%d,\"yearTo\":null,"
+                                                                + "\"otts\":[],\"requestedSort\":\"RATING\","
+                                                                + "\"effectiveSort\":\"RATING\"}")
+                                                        .formatted(yearFrom)
+                                                        .getBytes(StandardCharsets.UTF_8)));
+        String oldCursor =
+                cursorCodec.encode(
+                        new MovieSearchCursor(
+                                MovieSearchSort.RATING,
+                                BigDecimal.valueOf(4.5),
+                                null,
+                                101L,
+                                previousCriteriaKey));
+
+        invalid(
+                memberRequest()
+                        .param("yearFrom", Integer.toString(yearFrom))
+                        .param("sort", "RATING")
+                        .param("cursor", oldCursor));
+    }
+
     private void addFilterSortTies() {
         // 더 오래된 영화도 평점이 같으면 movieId가 큰 순서여야 한다. 첫 페이지 중간에 동률이 걸린다.
         MovieSearchFixture.movie(jdbc, 106, "평점 동률 하나", null, "1990-01-01", 4.6);
@@ -1482,6 +1623,32 @@ class MovieSearchContractTest extends SharedPostgresContractTest {
         return collectPages(2, sort, query, genres);
     }
 
+    private List<Long> collectTopRatedPages(int size, int yearFrom) throws Exception {
+        List<Long> all = new ArrayList<>();
+        String cursor = null;
+        for (int pageNumber = 0; pageNumber < 10; pageNumber++) {
+            MockHttpServletRequestBuilder request =
+                    memberRequest()
+                            .param("yearFrom", Integer.toString(yearFrom))
+                            .param("sort", "RATING")
+                            .param("size", Integer.toString(size));
+            if (cursor != null) request.param("cursor", cursor);
+            JsonNode page = read(request);
+            List<Long> current = ids(page);
+            assertThat(current).isNotEmpty().doesNotHaveDuplicates();
+            assertThat(all).doesNotContainAnyElementsOf(current);
+            all.addAll(current);
+            if (!page.path("hasNext").asBoolean()) {
+                assertThat(page.path("nextCursor").isNull()).isTrue();
+                return all;
+            }
+            assertThat(current).hasSize(size);
+            cursor = page.path("nextCursor").asText();
+            assertThat(cursor).isNotBlank();
+        }
+        throw new AssertionError("검색 홈 평점 목록의 마지막 cursor 페이지에 도달하지 못했습니다");
+    }
+
     private List<Long> collectPages(int size, String sort, String query, String... genres)
             throws Exception {
         List<Long> all = new ArrayList<>();
@@ -1517,6 +1684,12 @@ class MovieSearchContractTest extends SharedPostgresContractTest {
                 .header(
                         "Authorization",
                         "Bearer " + tokenProvider.createAccessToken(MovieSearchFixture.MEMBER_ID));
+    }
+
+    private LocalDate koreanToday() {
+        return jdbc.queryForObject(
+                "SELECT CAST(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul' AS date)",
+                LocalDate.class);
     }
 
     private ResultActions perform(MockHttpServletRequestBuilder request) throws Exception {
