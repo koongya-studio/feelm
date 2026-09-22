@@ -138,3 +138,21 @@ export function formatAgeGroup(birthDate: string, today: Date = new Date()): str
 
   return `${Math.floor(age / 10) * 10}대`;
 }
+
+/**
+ * ISO 8601 문자열을 `6월 12일 (수)` 형식으로 만든다.
+ *
+ * 2.2 추천 영화의 데스크톱 시안이 오늘 날짜를 이렇게 적는다(업무 -783). 요일까지 적는 것은
+ * 오늘의 추천이 하루에 한 벌이라 **오늘이 언제인지**가 화면의 내용이기 때문이다.
+ */
+export function formatMonthDayWeekday(isoString: string): string {
+  const date = new Date(isoString);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const weekday = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
+
+  return `${formatMonthDay(isoString)} (${weekday})`;
+}

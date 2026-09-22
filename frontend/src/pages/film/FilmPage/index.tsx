@@ -26,6 +26,21 @@
  * **프레임 수와 팝콘 수를 같다고 가정하지 않는다.** 대표 맛이 없는 영화는 팝콘을
  * 만들지 않으므로(API-036 · API-041) 두 수는 어긋난다. 각자 자기 API의 총수를 쓴다.
  *
+ * ─────────────────────────── 데스크톱 시안 (업무 -783)
+ *
+ * 1024px 이상에서는 2026-09-21 시안의 배치를 쓴다. **모바일 화면은 한 줄도 바뀌지 않는다** —
+ * 폭에 따라 그리는 것 자체가 갈린다(`hooks/useShellSize`).
+ *
+ * - 제목 오른쪽에 `‹ 1 – 6 / 73 ›`가 붙는다. 넓은 릴에서는 한 번에 여섯 칸쯤 보이므로
+ *   모바일의 `6 / 73`으로는 어디까지 봤는지 말이 되지 않는다
+ * - 필름 아래에 `오늘의 추천`이 선다(`TodayRecommendations`). 2.2 추천 영화 화면과 같은
+ *   것(API-045)이며, 시안이 그 앞자리 몇 장을 여기서 먼저 보여준다
+ * - 팝콘 요약 · 취향 리포트 줄이 우측 보조 패널로 간다(`FilmAside`). 본문에서는 뺀다 —
+ *   같은 것을 두 자리에 두면 무엇을 눌러야 하는지가 흐려진다
+ * - **`필름 늘리기` 버튼과 `옆으로 넘겨보세요` 힌트를 넓은 화면에서 뺀다**(사용자 결정
+ *   2026-09-22). 시안에 없고, 2.2로 가는 길은 `오늘의 추천`의 `맞춤 N : 확장 M`이 맡는다.
+ *   마우스로 끄는 것과 좌우 화살표가 있어 넘기는 방법도 힌트 없이 드러난다
+ *
  * **필름을 끝까지 넘기면 다음 장을 이어 받는다**(업무 -656). API-042는 한 장에 20개를 주고
  * 나머지는 `nextCursor`로 온다. 첫 장만 그리던 동안 `73개의 프레임을 넘겨보세요`라고 말하면서
  * 20개만 넘길 수 있었다. 릴 끝에 다음 장 칸을 두고, 그 칸이 보일 즈음 다음 장을 부른다
@@ -35,15 +50,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import AppHeader from '../../../components/AppHeader';
 import Button from '../../../components/Button';
+import DesktopAside from '../../../components/DesktopAside';
 import FilmReel from '../../../components/FilmReel';
-import { ChevronRightIcon } from '../../../components/Icon';
+import { ChevronLeftIcon, ChevronRightIcon } from '../../../components/Icon';
 import Poster from '../../../components/Poster';
 import PosterCue from '../../../components/PosterCue';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import { kernelSprite } from '../../../components/PopcornBucket/sprites';
+import FilmAside from './FilmAside';
+import TodayRecommendations from './TodayRecommendations';
 import { getLatestReadyReport } from '../../../api/reports';
 import { getMyFrames, getPopcornBucket } from '../../../api/taste';
+import { useShellSize } from '../../../hooks/useShellSize';
 import { path } from '../../../routes/paths';
 import styles from './FilmPage.module.css';
 import type { FrameList, PopcornBucket } from '../../../types/taste';
@@ -60,6 +79,13 @@ import type { FrameList, PopcornBucket } from '../../../types/taste';
 const FRAME_WIDTH = 110;
 const FRAME_HEIGHT = 165;
 
+/*
+ * 넓은 화면의 프레임 한 칸 (업무 -783). 중앙 단(920px)에서 여섯 칸이 보이고 일곱째가 잘리는
+ * 크기다 — 2026-09-21 시안의 릴과 같은 밀도이며, 잘린 오른쪽이 여기서도 "더 있다"를 말한다.
+ */
+const DESKTOP_FRAME_WIDTH = 132;
+const DESKTOP_FRAME_HEIGHT = 198;
+
 /** 요약에 올릴 맛 수. 8종을 다 늘어놓으면 요약이 아니라 표가 된다 */
 const SUMMARY_FLAVOR_COUNT = 4;
 
@@ -72,27 +98,35 @@ const SUPPORTS_OBSERVER = typeof IntersectionObserver !== 'undefined';
  */
 const PREFETCH_MARGIN = '0px 360px 0px 0px';
 
+/** 지금 릴에 보이는 프레임 구간(1부터, 양끝 포함) */
+type FrameRange = { first: number; last: number };
+
 /**
- * 릴에서 오른쪽 끝까지 온전히 보이는 프레임이 몇 번째인지(1부터). `N / 전체`의 N이다(업무 -680).
+ * 릴에서 온전히 보이는 프레임이 몇 번째부터 몇 번째인지(1부터). 모바일 `N / 전체`의 N은
+ * `last`이고(업무 -680), 넓은 화면의 `1 – 6 / 73`은 두 수를 모두 쓴다(업무 -783).
  *
- * 왼쪽 끝이 아니라 오른쪽 끝을 센다. 끝까지 넘기면 `전체 / 전체`가 되어 "다 봤다"가 맞게 읽힌다.
- * 왼쪽 끝을 세면 마지막 칸에 닿아도 `22 / 24`에서 멈춘다. 칸 간격은 첫 두 칸의 위치 차로 잰다 —
- * 칸 폭 · 간격 · 테두리가 CSS에 있어 여기서 다시 계산하면 어긋난다.
+ * `last`는 왼쪽 끝이 아니라 오른쪽 끝을 센다. 끝까지 넘기면 `전체 / 전체`가 되어 "다 봤다"가
+ * 맞게 읽힌다. 왼쪽 끝을 세면 마지막 칸에 닿아도 `22 / 24`에서 멈춘다. 칸 간격은 첫 두 칸의
+ * 위치 차로 잰다 — 칸 폭 · 간격 · 테두리가 CSS에 있어 여기서 다시 계산하면 어긋난다.
  */
-function lastVisibleFrame(track: HTMLElement, frameCount: number): number {
+function visibleFrameRange(track: HTMLElement, frameCount: number): FrameRange {
   const [first, second] = track.children as unknown as HTMLElement[];
 
-  if (!first || frameCount <= 1) return Math.min(frameCount, 1);
+  if (!first || frameCount <= 1)
+    return { first: Math.min(frameCount, 1), last: Math.min(frameCount, 1) };
 
   const step = second ? second.offsetLeft - first.offsetLeft : first.offsetWidth;
 
   // 레이아웃이 없는 환경(테스트)은 폭이 0이다. 첫 칸이 보인다고 본다
-  if (step <= 0) return 1;
+  if (step <= 0) return { first: 1, last: 1 };
 
   const visibleRight = track.scrollLeft + track.clientWidth;
   const count = Math.floor((visibleRight - first.offsetLeft - first.offsetWidth) / step) + 1;
+  const last = Math.min(Math.max(count, 1), frameCount);
+  // 한 번에 몇 칸이 들어오는지. 모바일처럼 두 칸 반만 보이면 1이 된다
+  const fits = Math.max(Math.floor(track.clientWidth / step), 1);
 
-  return Math.min(Math.max(count, 1), frameCount);
+  return { first: Math.max(last - fits + 1, 1), last };
 }
 
 /** 다음 장 칸의 상태. `failed`면 자동으로 다시 부르지 않고 버튼으로 잇는다 */
@@ -103,13 +137,14 @@ const EMPTY_SLOT_LABELS = ['첫 번째 프레임', '두 번째 프레임'];
 
 export default function FilmPage() {
   const navigate = useNavigate();
+  const desktop = useShellSize() !== 'mobile';
 
   const [frames, setFrames] = useState<FrameList | null>(null);
   const [more, setMore] = useState<MoreState>('idle');
   const moreRef = useRef<HTMLSpanElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
-  /** 오른쪽 끝까지 보이는 프레임 번호. `N / 전체`의 N이다 */
-  const [seenFrame, setSeenFrame] = useState(1);
+  /** 지금 릴에 보이는 프레임 구간. 모바일은 `last`만, 넓은 화면은 둘 다 쓴다 */
+  const [range, setRange] = useState<FrameRange>({ first: 1, last: 1 });
   const [bucket, setBucket] = useState<PopcornBucket | null>(null);
   /** 아직 3.3에서 받지 않은 새 리포트. 있으면 리포트 줄이 발급(3.3)으로 간다 */
   const [newReportId, setNewReportId] = useState<number | null>(null);
@@ -211,7 +246,12 @@ export default function FilmPage() {
 
   /*
    * 넘길 때마다 `N / 전체`의 N을 다시 잰다. 한 프레임에 한 번만 잰다 — 스크롤 이벤트는 그보다
-   * 잦다. 다음 장이 붙어 칸이 늘거나 화면 폭이 바뀌어도 다시 잰다.
+   * 잦다. 다음 장이 붙어 칸이 늘거나 릴의 폭이 바뀌어도 다시 잰다.
+   *
+   * **창 크기가 아니라 릴 자체를 지켜본다**(`ResizeObserver`, 업무 -783). 우측 보조 패널은
+   * 페이지가 내용을 보낸 뒤에야 자리를 차지하므로(`components/DesktopAside`) 창 크기가 그대로인
+   * 채로 중앙 단이 좁아진다. 창의 `resize`만 듣던 동안에는 그때 잰 값이 그대로 남아, 1280px에서
+   * 넉 장만 보이는데 `1 – 6`이라고 적혀 있었다(2026-09-22 브라우저 확인).
    */
   const loadedFrameCount = frames?.items.length ?? 0;
 
@@ -223,7 +263,7 @@ export default function FilmPage() {
     let frame = 0;
     const measure = () => {
       frame = 0;
-      setSeenFrame(lastVisibleFrame(track, loadedFrameCount));
+      setRange(visibleFrameRange(track, loadedFrameCount));
     };
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(measure);
@@ -233,12 +273,31 @@ export default function FilmPage() {
     track.addEventListener('scroll', schedule, { passive: true });
     window.addEventListener('resize', schedule);
 
+    // 없는 환경(테스트)에서는 스크롤과 창 크기만으로 잰다
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
+
+    observer?.observe(track);
+
     return () => {
       cancelAnimationFrame(frame);
+      observer?.disconnect();
       track.removeEventListener('scroll', schedule);
       window.removeEventListener('resize', schedule);
     };
   }, [loadedFrameCount]);
+
+  /**
+   * 넓은 화면의 `‹ ›`. 한 번에 한 화면씩 넘긴다(업무 -783).
+   *
+   * 칸 수가 아니라 보이는 폭만큼 옮긴다 — 칸 폭과 간격이 CSS에 있어 여기서 다시 세면 어긋난다.
+   */
+  function scrollFrames(direction: 1 | -1) {
+    const track = trackRef.current;
+
+    if (!track) return;
+
+    track.scrollBy({ left: track.clientWidth * direction, behavior: 'smooth' });
+  }
 
   if (failed) {
     return (
@@ -281,21 +340,77 @@ export default function FilmPage() {
       <AppHeader />
 
       <div className={styles.page}>
-        <header className={styles.head}>
-          <p className={styles.eyebrow}>YOUR TASTE ON FILM</p>
-          <h1 className={styles.title}>나의 취향 필름</h1>
+        {/*
+          제목 영역. 넓은 화면은 오른쪽에 `‹ 1 – 6 / 73 ›`가 붙어 가로로 놓이고, 모바일은
+          지금까지처럼 세로 한 단이다. 둘을 한 덩어리로 묶지 않는 것은 `.head`의 세로 간격이
+          자식 사이에 걸려 있어 감싸는 요소를 하나 끼우면 간격이 무너지기 때문이다.
+        */}
+        {desktop ? (
+          <header className={styles.desktopHead}>
+            <div className={styles.head}>
+              <p className={styles.eyebrow}>YOUR TASTE ON FILM</p>
+              <h1 className={styles.title}>나의 취향 필름</h1>
 
-          {frames ? (
-            <p className={styles.subtitle}>
-              {isEmpty ? '아직 첫 프레임 전이에요' : `${totalCount}개의 프레임이 감겼어요`}
-            </p>
-          ) : null}
-        </header>
+              {frames ? (
+                <p className={styles.subtitle}>
+                  {isEmpty ? '아직 첫 프레임 전이에요' : `${totalCount}개의 프레임이 감겼어요`}
+                </p>
+              ) : null}
+            </div>
+
+            {!isEmpty && items.length > 1 ? (
+              <div className={styles.pager}>
+                <button
+                  type="button"
+                  className={styles.pagerButton}
+                  aria-label="이전 프레임 보기"
+                  disabled={range.first <= 1}
+                  onClick={() => scrollFrames(-1)}
+                >
+                  <ChevronLeftIcon />
+                </button>
+
+                <p className={styles.pagerLabel}>
+                  <span aria-hidden="true">
+                    {range.first} – {range.last} / {totalCount}
+                  </span>
+                  <VisuallyHidden>
+                    전체 {totalCount}개 중 {range.first}번째부터 {range.last}번째 프레임까지 보고
+                    있어요
+                  </VisuallyHidden>
+                </p>
+
+                <button
+                  type="button"
+                  className={styles.pagerButton}
+                  aria-label="다음 프레임 보기"
+                  disabled={range.last >= totalCount}
+                  onClick={() => scrollFrames(1)}
+                >
+                  <ChevronRightIcon />
+                </button>
+              </div>
+            ) : null}
+          </header>
+        ) : (
+          <header className={styles.head}>
+            <p className={styles.eyebrow}>YOUR TASTE ON FILM</p>
+            <h1 className={styles.title}>나의 취향 필름</h1>
+
+            {frames ? (
+              <p className={styles.subtitle}>
+                {isEmpty ? '아직 첫 프레임 전이에요' : `${totalCount}개의 프레임이 감겼어요`}
+              </p>
+            ) : null}
+          </header>
+        )}
 
         <div className={styles.reelArea}>
+          {/* 넓은 화면의 필름은 주황빛이 없는 검정이다(2026-09-21 PC 웹 시안) */}
           <FilmReel
-            frameWidth={FRAME_WIDTH}
-            frameHeight={FRAME_HEIGHT}
+            tone={desktop ? 'plain' : 'warm'}
+            frameWidth={desktop ? DESKTOP_FRAME_WIDTH : FRAME_WIDTH}
+            frameHeight={desktop ? DESKTOP_FRAME_HEIGHT : FRAME_HEIGHT}
             label={isEmpty ? '아직 비어 있는 취향 필름' : '취향 필름 프레임'}
             trackRef={trackRef}
           >
@@ -315,8 +430,8 @@ export default function FilmPage() {
                   >
                     <PosterCue>
                       <Poster
-                        width={FRAME_WIDTH}
-                        height={FRAME_HEIGHT}
+                        width={desktop ? DESKTOP_FRAME_WIDTH : FRAME_WIDTH}
+                        height={desktop ? DESKTOP_FRAME_HEIGHT : FRAME_HEIGHT}
                         radius={0}
                         src={frame.movie.posterUrl ?? undefined}
                         title=""
@@ -352,19 +467,22 @@ export default function FilmPage() {
            *
            * 끝까지 넘기면 화살표 힌트를 거둔다 — 더 넘길 곳이 없는데 오른쪽을 가리키면 틀린 말이다.
            * 위치는 넘길 때마다 바뀌므로 읽기 도구에 매번 알리지 않는다(`aria-live` 없음).
+           *
+           * **넓은 화면에는 두지 않는다**(업무 -783). 같은 것을 제목 옆 `‹ 1 – 6 / 73 ›`가
+           * 말하고, 시안에도 이 줄이 없다.
            */}
-          {!isEmpty && items.length > 1 ? (
+          {!desktop && !isEmpty && items.length > 1 ? (
             <p className={styles.reelHint}>
               <span className={styles.reelCounter}>
                 <span aria-hidden="true">
-                  {seenFrame} / {totalCount}
+                  {range.last} / {totalCount}
                 </span>
                 <VisuallyHidden>
-                  전체 {totalCount}개 중 {seenFrame}번째 프레임까지 보고 있어요
+                  전체 {totalCount}개 중 {range.last}번째 프레임까지 보고 있어요
                 </VisuallyHidden>
               </span>
 
-              {seenFrame < totalCount ? (
+              {range.last < totalCount ? (
                 <span className={styles.reelSwipe}>
                   옆으로 넘겨보세요
                   <ChevronRightIcon />
@@ -374,6 +492,10 @@ export default function FilmPage() {
           ) : null}
         </div>
 
+        {/*
+          넓은 화면에서는 팝콘 · 리포트 줄이 우측 보조 패널로 가고(`FilmAside`) 이 자리에
+          `오늘의 추천`이 선다(업무 -783). 모바일은 지금까지와 같다.
+        */}
         {isEmpty ? (
           <div className={styles.empty}>
             <h3 className={styles.emptyTitle}>아직 필름에 담긴 영화가 없어요</h3>
@@ -383,6 +505,8 @@ export default function FilmPage() {
               추천 영화 둘러보기
             </Button>
           </div>
+        ) : desktop ? (
+          <TodayRecommendations />
         ) : (
           <div className={styles.content}>
             {/*
@@ -477,6 +601,16 @@ export default function FilmPage() {
           </div>
         )}
       </div>
+
+      {/*
+        우측 보조 패널. 1280px 이상에서만 자리가 있고, 좁으면 `DesktopAside`가 아무것도
+        그리지 않는다(업무 -782). 필름이 비어 있으면 보여줄 요약도 없어 보내지 않는다.
+      */}
+      {desktop && !isEmpty ? (
+        <DesktopAside>
+          <FilmAside bucket={bucket} frames={items} newReportId={newReportId} />
+        </DesktopAside>
+      ) : null}
     </>
   );
 }

@@ -1,0 +1,67 @@
+/*
+ * 우측 보조 패널 카드 (업무 -783). 값은 2026-09-21 시안 5종의 오른쪽 단에서 잰 것이다.
+ *
+ * 카드는 벽 위에 걸린 흰 면이다(`design-concept.md` 2.1 — 밝은 벽에 어두운 것들을 건다).
+ * 어두운 안쪽(`data-tone="dark"`)은 팝콘 카드 하나뿐이고, 팝콘 8색이 밝은 면에서 네 종류가
+ * 사라지기 때문에 둔 예외다(`design-concept.md` 2.5).
+ */
+.panel {
+  flex: none;
+  padding: var(--space-5);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-solid);
+  box-shadow: var(--shadow-raised);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--font-size-heading);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-heading);
+}
+
+/* 지금 상태를 말하는 표식. 제목과 화살표 사이에 놓인다 */
+.mark {
+  margin-left: auto;
+}
+
+/*
+ * 화살표. 표식이 없으면 이것이 제목 줄 오른쪽 끝을 맡는다.
+ * 44px은 터치 최소 크기다(`common-components.md` 6.3).
+ */
+.link {
+  display: flex;
+  width: var(--tap-target-min);
+  height: var(--tap-target-min);
+  align-items: center;
+  justify-content: center;
+  margin-right: calc(var(--space-2) * -1);
+  margin-left: auto;
+  color: var(--color-ink-muted);
+}
+
+.mark + .link {
+  margin-left: 0;
+}
+
+.link:hover {
+  color: var(--color-ink);
+}
+
+.body {
+  margin-top: var(--space-3);
+}
+
+/* 팝콘 카드 안쪽. 카드의 흰 면 위에 어두운 판을 한 겹 더 얹는다 */
+.panel[data-tone='dark'] .body {
+  padding: var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--color-film);
+}

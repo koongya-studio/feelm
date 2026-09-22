@@ -116,3 +116,99 @@
   max-width: calc(var(--layout-max-width) - var(--screen-padding-x) * 2);
   margin: 0 auto;
 }
+
+/* ─────────────────────────── 데스크톱 시안 (업무 -783) */
+
+/*
+ * 넓은 화면의 2.2. 모바일과 달리 이 화면은 스스로 스크롤하지 않는다 — 데스크톱 셸의 중앙
+ * 본문이 스크롤을 맡는다(`layouts/AppLayout`). 이 클래스가 붙었다는 것 자체가 1024px
+ * 이상이라는 뜻이라 미디어 쿼리가 없다.
+ */
+.desktopPage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-6) var(--screen-padding-x) var(--space-10);
+}
+
+.desktopHead {
+  display: flex;
+  align-items: flex-end;
+  margin-bottom: var(--space-6);
+  gap: var(--space-6);
+}
+
+.desktopHeading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* 자간 넓은 소제목. 3.1의 `YOUR TASTE ON FILM`과 같은 층이다 */
+.eyebrow {
+  color: var(--color-ink-hint);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.desktopTitle {
+  color: var(--color-ink);
+  font-size: var(--font-size-title);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-title);
+  letter-spacing: var(--letter-spacing-title);
+}
+
+.desktopSubtitle {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+
+/* 오늘 날짜. 제목 줄 오른쪽 끝에 선다 */
+.date {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin: 0 0 0 auto;
+  gap: 2px;
+  text-align: right;
+}
+
+.dateValue {
+  color: var(--color-ink);
+  font-size: var(--font-size-heading);
+  font-weight: var(--font-weight-bold);
+}
+
+.dateNote {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+}
+
+/*
+ * 두 묶음이 좌우로 선다(2026-09-21 시안). 데스크톱 묶음 안에서만 석 장씩 채우므로
+ * 두 단의 길이가 같다. 한쪽이 통째로 비면 남은 쪽이 단을 그대로 쓴다.
+ *
+ * **들어갈 폭이 없으면 위아래로 내려간다.** 1280px에서는 우측 보조 패널이 열려 중앙이
+ * 632px로 줄고, 그 폭을 둘로 나누면 묶음 안의 작은 카드가 125px가 되어 제목도 이유도
+ * 글자 단위로 꺾인다(2026-09-22 브라우저 확인). 한 묶음이 제 모양을 갖는 최소 폭을 정해
+ * 두고 그보다 좁으면 한 줄에 하나씩 놓는다.
+ */
+/*
+ * **두 묶음의 높이를 맞춘다**(`stretch`, 사용자 지적 2026-09-22). 지금은 화면이 묶음마다
+ * 석 장씩 채워 길이가 같지만, 서버가 유형별로 다른 수를 주기 시작하면(S15P21E106-793)
+ * 한쪽 필름만 길어진다. 남는 높이는 필름이 가져간다(`RecommendationGroup`).
+ */
+.groups {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--space-6) var(--space-5);
+}
+
+.groups > * {
+  flex: 1 1 340px;
+  min-width: 0;
+}
