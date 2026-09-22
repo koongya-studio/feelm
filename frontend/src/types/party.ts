@@ -149,10 +149,17 @@ export type PartyRecommendationItem = {
   };
 };
 
-/** API-058 파티 영화 추천 */
+/**
+ * API-058 파티 영화 추천.
+ *
+ * `hasNext`는 다시 받기(`refresh=true`)로 더 보여줄 후보가 남아 있는지다(업무 -802). `false`면
+ * 저장 후보를 다 썼거나 남은 것이 전부 파티원 기준으로 제외된 상태라, 5.5는 `다른 영화
+ * 추천받기`를 감추고 더 없다고 알린다.
+ */
 export type PartyRecommendationSet = {
   recommendationSetId: number;
   partyId: number;
   generatedAt: string;
   items: PartyRecommendationItem[];
+  hasNext: boolean;
 };

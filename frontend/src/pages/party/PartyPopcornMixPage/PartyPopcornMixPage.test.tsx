@@ -158,3 +158,44 @@ describe('5.9 팝콘 모으기 · 섞기', () => {
     expect(await screen.findByText('파티원의 팝콘을 모으지 못했어요')).toBeInTheDocument();
   });
 });
+
+/*
+ * 업무 -802. 5.5의 `다른 영화 추천받기`로 들어왔을 때만 API-058에 `refresh=true`를 붙인다.
+ */
+describe('다시 받기로 들어왔을 때', () => {
+  function renderRefresh() {
+    return renderWithRouter(<PartyPopcornMixPage />, {
+      route: `/parties/${TEST_PARTY_ID}/popcorn/mix`,
+      path: '/parties/:partyId/popcorn/mix',
+      state: { refresh: true },
+    });
+  }
+
+  it('추천 요청에 refresh를 붙이고 주소의 state는 지운다', async () => {
+    renderRefresh();
+
+    await screen.findByText('우리의 취향을 모아요');
+    expect(getPartyRecommendations).toHaveBeenCalledWith(TEST_PARTY_ID, { refresh: true });
+    await waitFor(() => expect(screen.getByTestId('location-state').textContent).toBe(''));
+  });
+
+  it('첫 진입은 refresh 없이 부른다', async () => {
+    renderMix();
+
+    await screen.findByText('우리의 취향을 모아요');
+    expect(vi.mocked(getPartyRecommendations).mock.calls[0]).toEqual([TEST_PARTY_ID]);
+  });
+
+  it('다시 받기가 실패해 다시 시도하면 그것도 다시 받기다', async () => {
+    vi.mocked(getPartyRecommendations).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    renderRefresh();
+
+    fireEvent.click(await screen.findByRole('button', { name: '다시 시도' }, { timeout: 8000 }));
+
+    await waitFor(() => expect(getPartyRecommendations).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(getPartyRecommendations).mock.calls[1]).toEqual([
+      TEST_PARTY_ID,
+      { refresh: true },
+    ]);
+  });
+});
