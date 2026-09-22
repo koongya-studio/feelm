@@ -34,6 +34,8 @@ class OnboardingBackfillMigrationTest {
     /** 이 마이그레이션 직전 버전. 사이에 새 마이그레이션이 끼면 이 값도 함께 올린다. */
     private static final String VERSION_BEFORE_BACKFILL = "202609191400";
 
+    private static final String BACKFILL_VERSION = "202609192100";
+
     private static final Path MIGRATION_FILE =
             Path.of(
                     "src/main/resources/db/migration/"
@@ -154,7 +156,11 @@ class OnboardingBackfillMigrationTest {
                 "UPDATE movies SET rating_count = 99, average_rating = 1.11 WHERE id = "
                         + untouchedMovieId);
 
-        DATABASE.flyway().migrate();
+        Flyway.configure()
+                .dataSource(DATABASE.getJdbcUrl(), DATABASE.getUsername(), DATABASE.getPassword())
+                .target(MigrationVersion.fromVersion(BACKFILL_VERSION))
+                .load()
+                .migrate();
     }
 
     @AfterAll

@@ -138,6 +138,40 @@ class RatingMutationApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
+    @DisplayName("영화 상세 집계는 여러 사용자 평가의 생성·수정·삭제를 실제 ratings와 동일하게 반영한다")
+    void movieDetailAggregateTracksCreateUpdateAndDelete() throws Exception {
+        long thirdUserId = insertUser("aggregate-third@feelm.test", "세 번째 평가자", "ACTIVE");
+        long fourthUserId = insertUser("aggregate-fourth@feelm.test", "네 번째 평가자", "ACTIVE");
+        long firstRatingId = create(movieId, userId, privateBody("4.5")).path("ratingId").asLong();
+        long secondRatingId =
+                create(movieId, otherUserId, privateBody("4.5")).path("ratingId").asLong();
+        long thirdRatingId =
+                create(movieId, thirdUserId, privateBody("4.5")).path("ratingId").asLong();
+        long fourthRatingId =
+                create(movieId, fourthUserId, privateBody("4.0")).path("ratingId").asLong();
+
+        assertDetailAggregate(movieId, "4.38", 4);
+        assertAggregateMatchesRatings(movieId);
+
+        update(firstRatingId, userId, privateBody("2.5"));
+
+        assertDetailAggregate(movieId, "3.88", 4);
+        assertAggregateMatchesRatings(movieId);
+
+        remove(fourthRatingId, fourthUserId).andExpect(status().isNoContent());
+
+        assertDetailAggregate(movieId, "3.83", 3);
+        assertAggregateMatchesRatings(movieId);
+
+        remove(firstRatingId, userId).andExpect(status().isNoContent());
+        remove(secondRatingId, otherUserId).andExpect(status().isNoContent());
+        remove(thirdRatingId, thirdUserId).andExpect(status().isNoContent());
+
+        assertDetailAggregate(movieId, "0", 0);
+        assertAggregateMatchesRatings(movieId);
+    }
+
+    @Test
     @DisplayName("한줄평 null 수정은 공개 목록에서 제거한다")
     void updateCommentToNullHidesReview() throws Exception {
         long ratingId =
@@ -885,6 +919,13 @@ class RatingMutationApiContractTest extends SharedPostgresContractTest {
                                         .header("Authorization", bearer(user)))
                         .andExpect(status().isOk())
                         .andReturn());
+    }
+
+    private void assertDetailAggregate(long movie, String average, int count) throws Exception {
+        mockMvc.perform(get("/api/v1/movies/{movieId}", movie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.averageRating").value(Double.parseDouble(average)))
+                .andExpect(jsonPath("$.ratingCount").value(count));
     }
 
     private JsonNode watchRecords(long user) throws Exception {
