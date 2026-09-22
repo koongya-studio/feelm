@@ -44,7 +44,9 @@ class ReportContentAssemblerTest {
                         List.of(),
                         List.of(),
                         List.of(),
-                        false);
+                        false,
+                        // 이 테스트는 시대·키워드만 본다. 카드 축은 고정 임계값 폴백을 쓴다(업무 -779)
+                        CharacterCardSelector.medians(List.of()));
     }
 
     @Test
@@ -111,7 +113,8 @@ class ReportContentAssemblerTest {
                         List.of(),
                         List.of(),
                         people,
-                        false);
+                        false,
+                        CharacterCardSelector.medians(List.of()));
     }
 
     private static List<String> codes(ReportContent content) {

@@ -1,5 +1,7 @@
 package com.feelm.backend.domain.report.service;
 
+import com.feelm.backend.domain.report.model.CharacterAxisMedians;
+import com.feelm.backend.domain.report.model.CharacterAxisMetrics;
 import com.feelm.backend.domain.report.model.ReportContent;
 import com.feelm.backend.domain.report.model.ReportPeriod;
 import com.feelm.backend.domain.report.model.ReportSource;
@@ -69,12 +71,30 @@ public class ReportPreparationService {
 
         List<Long> eligibleUserIds = repository.findEligibleUserIds(period, effectiveEnd);
         int deleted = repository.deleteIneligibleGenerating(period, eligibleUserIds);
+
+        /*
+         * 캐릭터 카드 판정이 대상자 전체의 중앙값 기준 상대 판정이라 조립보다 먼저 지표를 한 번 훑는다
+         * (업무 -779). 같은 반기의 모든 리포트가 같은 스냅샷을 쓰고, 리포트가 생성 시점 스냅샷이므로
+         * 조회할 때 다시 계산하지 않는다(API-060 처리 규칙).
+         *
+         * 이 패스는 프레임만 읽는다 — 네 축 지표와 동값 판정용 표준편차가 전부 프레임에서 나온다.
+         * 프레임을 패스 사이에 들고 있지 않고 2패스에서 다시 조회한다. 대상자 수에 비례해 메모리가
+         * 커지는 것을 막는 쪽을 골랐다(플랜 7장).
+         */
+        CharacterAxisMedians medians = collectAxisMedians(period, effectiveEnd, eligibleUserIds);
+
         int prepared = 0;
         for (int start = 0; start < eligibleUserIds.size(); start += USER_BATCH_SIZE) {
             int end = Math.min(start + USER_BATCH_SIZE, eligibleUserIds.size());
             List<Long> batch = eligibleUserIds.subList(start, end);
             prepared +=
-                    prepareBatch(period, effectiveEnd, snapshotAcquiredAt, finalSnapshot, batch);
+                    prepareBatch(
+                            period,
+                            effectiveEnd,
+                            snapshotAcquiredAt,
+                            finalSnapshot,
+                            batch,
+                            medians);
         }
         if (finalSnapshot) {
             repository.recordCompletedFinalRun(period, snapshotAcquiredAt, prepared);
@@ -82,12 +102,37 @@ public class ReportPreparationService {
         return new PreparationResult(true, prepared, deleted);
     }
 
+    /** 대상자 전체의 축 지표를 훑어 중앙값 스냅샷을 만든다. 프레임만 읽는다 */
+    private CharacterAxisMedians collectAxisMedians(
+            ReportPeriod period, Instant effectiveEnd, List<Long> eligibleUserIds) {
+        List<CharacterAxisMetrics> population = new ArrayList<>(eligibleUserIds.size());
+        for (int start = 0; start < eligibleUserIds.size(); start += USER_BATCH_SIZE) {
+            int end = Math.min(start + USER_BATCH_SIZE, eligibleUserIds.size());
+            List<Long> batch = eligibleUserIds.subList(start, end);
+            Map<Long, List<ReportSource.Frame>> framesByUser = new HashMap<>();
+            for (ReportSource.Frame frame : repository.findFrames(batch, effectiveEnd)) {
+                framesByUser
+                        .computeIfAbsent(frame.userId(), ignored -> new ArrayList<>())
+                        .add(frame);
+            }
+            for (long userId : batch) {
+                population.add(
+                        CharacterCardSelector.metrics(
+                                framesByUser.getOrDefault(userId, List.of()),
+                                period.startInclusive(),
+                                effectiveEnd));
+            }
+        }
+        return CharacterCardSelector.medians(population);
+    }
+
     private int prepareBatch(
             ReportPeriod period,
             Instant effectiveEnd,
             Instant snapshotAcquiredAt,
             boolean finalSnapshot,
-            List<Long> userIds) {
+            List<Long> userIds,
+            CharacterAxisMedians medians) {
         List<ReportSource.Frame> frames = repository.findFrames(userIds, effectiveEnd);
         Map<Long, Long> ownerByFrame = new HashMap<>();
         Map<Long, List<ReportSource.Frame>> framesByUser = new HashMap<>();
@@ -126,7 +171,8 @@ public class ReportPreparationService {
                             genresByUser.getOrDefault(userId, List.of()),
                             countriesByUser.getOrDefault(userId, List.of()),
                             peopleByUser.getOrDefault(userId, List.of()),
-                            usersWithPrevious.contains(userId));
+                            usersWithPrevious.contains(userId),
+                            medians);
             repository.upsertGenerating(userId, period, serialize(content), Instant.now());
             prepared++;
         }
