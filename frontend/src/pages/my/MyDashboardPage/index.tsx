@@ -608,6 +608,7 @@ export default function MyDashboardPage() {
                       cuts={report.fourCut}
                       createdAt={report.createdAt}
                       head={false}
+                      characterCode={report.characterCard?.code}
                     />
                   ) : (
                     <span className={styles.reportBlank} />

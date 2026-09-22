@@ -32,6 +32,7 @@ import Chip from '../../../components/Chip';
 import IconButton from '../../../components/IconButton';
 import MeterRow from '../../../components/MeterRow';
 import ReportFourCut from '../../../components/ReportFourCut';
+import { CHARACTER_AXIS_POLES } from '../../../components/ReportFourCut/characterCards';
 import ScreenHeader from '../../../components/ScreenHeader';
 import Section from '../../../components/Section';
 import StatusView from '../../../components/StatusView';
@@ -43,7 +44,12 @@ import { path } from '../../../routes/paths';
 import { formatDelta, formatHalf } from '../../../utils/report';
 import ReportShareSheet from './ReportShareSheet';
 import styles from './ReportDetailPage.module.css';
-import type { ReportDetail, ReportShare } from '../../../types/report';
+import type {
+  ReportCharacterAxis,
+  ReportCharacterCard,
+  ReportDetail,
+  ReportShare,
+} from '../../../types/report';
 
 type Props = {
   /** `film` 3.4(2.1 · 3.3에서 옴) · `my` 7.4(7.3에서 옴) */
@@ -145,7 +151,12 @@ export default function ReportDetailPage({ from }: Props) {
       <div className={styles.page}>
         {/* 4컷. 인화지가 화면에서 유일한 어두운 블록이다 */}
         <div className={styles.fourCut}>
-          <ReportFourCut cuts={report.fourCut} owner={nickname} createdAt={report.createdAt} />
+          <ReportFourCut
+            cuts={report.fourCut}
+            owner={nickname}
+            createdAt={report.createdAt}
+            characterCode={report.characterCard?.code}
+          />
         </div>
 
         <Section label="상세 리포트">
@@ -157,12 +168,7 @@ export default function ReportDetailPage({ from }: Props) {
             <PeopleGroup label="감독" people={report.topDirectors} />
             <PeopleGroup label="배우" people={report.topActors} />
 
-            {report.characterCard ? (
-              <div className={styles.group}>
-                <h3 className={styles.groupLabel}>캐릭터</h3>
-                <p className={styles.paragraph}>{report.characterCard.description}</p>
-              </div>
-            ) : null}
+            {report.characterCard ? <CharacterGroup card={report.characterCard} /> : null}
           </div>
         </Section>
 
@@ -210,6 +216,60 @@ export default function ReportDetailPage({ from }: Props) {
         />
       ) : null}
     </>
+  );
+}
+
+/*
+ * 캐릭터 카드 한 장. 이름 · 한 줄 · 설명문과 네 축을 보인다(업무 -618 · -780).
+ *
+ * **축을 함께 보이는 이유가 있다.** 카드는 그 반기 대상자 전체의 중앙값 기준 상대 판정이라
+ * 같은 감상이어도 반기마다 다른 카드가 나올 수 있다. 네 축을 펼쳐 두면 왜 이 카드인지가
+ * 설명되어 그 점이 덜 뜬금없다(업무 -618 결정).
+ *
+ * 축은 두 값 중 하나라서 **크기가 없다.** 퍼센트 막대(`MeterRow`)를 쓰면 없는 수치를
+ * 만들어 내므로, 양쪽 끝을 나란히 두고 고른 쪽만 강조한다.
+ */
+function CharacterGroup({ card }: { card: ReportCharacterCard }) {
+  return (
+    <div className={styles.group}>
+      <h3 className={styles.groupLabel}>캐릭터</h3>
+
+      <p className={styles.cardName}>
+        {card.name}
+        <span className={styles.cardCode}>{card.code}</span>
+      </p>
+      <p className={styles.cardTagline}>{card.tagline}</p>
+
+      <ul className={styles.axes}>
+        {card.axes.map((axis) => (
+          <AxisRow key={axis.axis} axis={axis} />
+        ))}
+      </ul>
+
+      <p className={styles.paragraph}>{card.description}</p>
+
+      {/* 프레임 10편 미만은 표본이 적다. 카드는 그대로 주고 기준 편수를 함께 알린다 */}
+      {card.basis.lowSample ? (
+        <p className={styles.cardBasis}>이번 반기 {card.basis.frameCount}편을 기준으로 뽑았어요</p>
+      ) : null}
+    </div>
+  );
+}
+
+/** 축 한 줄. 고른 쪽 이름은 계약이 준 `label`, 반대쪽은 화면이 가진 표를 쓴다 */
+function AxisRow({ axis }: { axis: ReportCharacterAxis }) {
+  const poles = CHARACTER_AXIS_POLES[axis.axis];
+  const headPicked = poles[0].value === axis.value;
+  const [head, tail] = headPicked ? [axis.label, poles[1].label] : [poles[0].label, axis.label];
+
+  return (
+    <li className={styles.axis} data-picked={headPicked ? 'head' : 'tail'}>
+      <span className={styles.axisPole}>{head}</span>
+      <span className={styles.axisTrack} aria-hidden="true">
+        <span className={styles.axisDot} />
+      </span>
+      <span className={styles.axisPole}>{tail}</span>
+    </li>
   );
 }
 

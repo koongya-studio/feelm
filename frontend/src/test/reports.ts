@@ -6,10 +6,32 @@
  *
  * **필드는 계약 응답 그대로다.** 빠뜨린 필드가 있으면 화면이 아니라 여기가 틀린 것이다.
  * 사진(`image.url`)은 서버가 감독 · 배우 칸에만, 그것도 `people.profile_url`이 있을 때만
- * 주므로 여기서는 늘 null이다. 캐릭터(`characterCard` · `fourCut.character`)도 선정 기준이
- * 업무 -618에서 정해질 때까지 서버가 null로 준다(백엔드 답 2026-09-21).
+ * 주므로 여기서는 늘 null이다. 캐릭터(`characterCard` · `fourCut.character`)는 선정 기준이
+ * 업무 -618에서 확정됐지만 백엔드 구현(업무 -779)이 아직이라 서버가 null로 준다. 카드가
+ * 찬 뒤의 모양은 `reportCharacterCard`로 따로 세운다.
  */
-import type { ReportCurrent, ReportDetail, ReportList } from '../types/report';
+import type { ReportCharacterCard, ReportCurrent, ReportDetail, ReportList } from '../types/report';
+
+/**
+ * 업무 -779가 채운 뒤의 `characterCard` 한 장(API-060). 고정 16종 중 `RDMV`다.
+ *
+ * `basis.frameCount`가 10 미만이라 `lowSample`이 true다 — 카드는 그대로 주고 화면이 기준
+ * 편수를 함께 알리는 쪽을 고정한다(업무 -618).
+ */
+export const reportCharacterCard: ReportCharacterCard = {
+  code: 'RDMV',
+  name: '안락의자 탐정',
+  tagline: '움직이지 않고 사건만 잔뜩 봤습니다',
+  description:
+    '익숙한 맛 안에서 아주 많이 봤고 평가는 냉정했습니다. 셜록 홈즈처럼 방을 나서지 않고 전부 풀었습니다',
+  axes: [
+    { axis: 'EXPLORATION', value: 'R', label: '정착' },
+    { axis: 'TONE', value: 'D', label: '그림자' },
+    { axis: 'STANCE', value: 'M', label: '머리' },
+    { axis: 'VOLUME', value: 'V', label: '다작' },
+  ],
+  basis: { frameCount: 7, lowSample: true },
+};
 
 /**
  * API-059 응답. 2026 하반기(302)는 아직 만드는 중이라 `items`가 아니라 `current`에만 있다.

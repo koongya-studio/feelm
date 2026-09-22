@@ -72,15 +72,18 @@ export type ReportCutName = { name: string; displayName?: string | null };
  * API-060 `fourCut`. 네 칸의 이름은 `topGenres[0]` · `topDirectors[0]` · `topActors[0]` ·
  * `characterCard`와 같다(사용자 시안 2026-09-15, 업무 -321).
  *
- * **선정 결과가 없는 칸은 카드째로 null이다.** 캐릭터는 선정 기준이 업무 -618에서 정해질
- * 때까지 늘 null이며 임의 값을 내려주지 않는다(백엔드 답 2026-09-21). 화면은 레이아웃을
- * 그대로 두고 그 칸만 `준비 중`으로 그린다.
+ * **선정 결과가 없는 칸은 카드째로 null이다.** 화면은 레이아웃을 그대로 두고 그 칸만
+ * `준비 중`으로 그린다.
+ *
+ * **`character`에는 `image`가 없다.** 캐릭터 카드가 고정 16종이라 04 칸 그림은 저장소
+ * 에셋이고 화면이 `characterCard.code`로 짝짓는다(업무 -618). 계약도 이 칸의 이미지 URL을
+ * 내리지 않는다. 백엔드 구현(업무 -779) 전까지는 `character`가 계속 null이다.
  */
 export type ReportFourCut = {
   genre: (ReportCutName & { image: ReportCutImage }) | null;
   director: (ReportCutName & { image: ReportCutImage; work: ReportCutImage | null }) | null;
   actor: (ReportCutName & { image: ReportCutImage }) | null;
-  character: (ReportCutName & { image: ReportCutImage }) | null;
+  character: ReportCutName | null;
 };
 
 /** 3.4 · 7.4 비율 한 줄. `share`는 화면에 쓰는 0~100 정수 퍼센트다 */
@@ -99,6 +102,41 @@ export type ReportComparison = { label: string; delta: number; isNew: boolean };
  */
 export type ReportKeyword = { code: string; label: string; rationale: string };
 
+/**
+ * `characterCard.axes` 한 축. 순서는 코드의 글자 순서와 같다.
+ *
+ * 화면은 이걸로 네 축 막대를 그려 **왜 이 카드인지**를 보인다. 판정이 그 반기 대상자 전체의
+ * 중앙값 기준 상대 판정이라 반기마다 바뀔 수 있는데, 축을 같이 보이면 그 점이 설명된다.
+ */
+export type ReportCharacterAxis = {
+  axis: 'EXPLORATION' | 'TONE' | 'STANCE' | 'VOLUME';
+  /** 그 축의 판정 결과 한 글자. `E`/`R` · `L`/`D` · `H`/`M` · `V`/`S` */
+  value: string;
+  /** 사용자에게 보이는 축 값 이름. `탐험` · `그림자` 같은 말이다 */
+  label: string;
+};
+
+/**
+ * API-060 `characterCard`. 고정 16종 중 하나다(업무 -618).
+ *
+ * **계약은 `code`뿐이다.** `name` · `tagline` · `description`은 바뀔 수 있는 기준정보라
+ * 서버가 주는 값을 그대로 쓰고 화면이 따로 갖지 않는다. 04 칸 그림만 저장소에 있어
+ * `code`로 짝짓는다(`components/ReportFourCut/characterCards.ts`).
+ */
+export type ReportCharacterCard = {
+  /** `ELHV` 형태의 4글자. 불변 계약이며 사용자에게도 보인다 */
+  code: string;
+  /** 카드 이름. 보통명사다 */
+  name: string;
+  /** 한 줄 요약 */
+  tagline: string;
+  /** 네 축을 풀어 쓴 설명문 */
+  description: string;
+  axes: ReportCharacterAxis[];
+  /** `frameCount`가 10 미만이면 `lowSample`이 true이고 화면이 기준 편수를 함께 알린다 */
+  basis: { frameCount: number; lowSample: boolean };
+};
+
 /** API-060 응답 */
 export type ReportDetail = {
   reportId: number;
@@ -107,13 +145,12 @@ export type ReportDetail = {
   topGenres: (ReportCount & { code: string })[];
   topActors: (ReportCount & { personId: number })[];
   topDirectors: (ReportCount & { personId: number })[];
-  /** 선정 기준이 없는 동안에는 null이다(업무 -618). 화면은 캐릭터 설명을 숨긴다 */
-  characterCard: {
-    name: string;
-    movieTitle: string;
-    description: string;
-    imageUrl: string | null;
-  } | null;
+  /**
+   * 고정 16종 중 하나(업무 -618). 백엔드 구현(업무 -779) 전까지는 null이고 화면은 캐릭터
+   * 설명을 숨긴다. 구현 뒤에는 리포트가 생기면 늘 값이 있다 — 16종을 다 쓰므로 후보 없음이
+   * 생기지 않는다.
+   */
+  characterCard: ReportCharacterCard | null;
   flavorChanges: { flavorCode: string; before: number; after: number }[];
   createdAt: string;
   fourCut: ReportFourCut;
