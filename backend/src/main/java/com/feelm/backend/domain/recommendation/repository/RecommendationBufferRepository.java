@@ -2,6 +2,7 @@ package com.feelm.backend.domain.recommendation.repository;
 
 import com.feelm.backend.domain.recommendation.model.RecommendationCandidate;
 import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
@@ -140,13 +141,20 @@ public class RecommendationBufferRepository {
         return id;
     }
 
+    /** 저장 순서는 {@code position}이 정하므로 INSERT 순서는 자유다. */
     public void insertItems(long setId, List<RecommendationBufferItem> items) {
+        // FK 검사가 movies 행에 KEY SHARE를 행 순서대로 건다. 온보딩(API-024)의 id 오름차순 FOR UPDATE와 같은 방향으로
+        // 맞춰 다른 사용자 간 교착을 막는다(S15P21E106-804).
+        List<RecommendationBufferItem> byMovieId =
+                items.stream()
+                        .sorted(Comparator.comparingLong(RecommendationBufferItem::movieId))
+                        .toList();
         jdbcTemplate.batchUpdate(
                 "INSERT INTO recommendation_items"
                         + " (set_id,movie_id,type,flavor_code,position,reason)"
                         + " VALUES (?,?,?,?,?,CAST(? AS jsonb))",
-                items,
-                items.size(),
+                byMovieId,
+                byMovieId.size(),
                 (statement, item) -> {
                     statement.setLong(1, setId);
                     statement.setLong(2, item.movieId());
