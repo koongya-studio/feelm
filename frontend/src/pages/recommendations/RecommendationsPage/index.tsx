@@ -65,6 +65,7 @@ import RecommendationGroup from './RecommendationGroup';
 import RecommendationsAside from './RecommendationsAside';
 import { ApiError } from '../../../api/apiError';
 import { dismissMovie, getRecommendations } from '../../../api/recommendations';
+import type { RecommendationSize } from '../../../api/recommendations';
 import { getOtts } from '../../../api/otts';
 import { useShellSize } from '../../../hooks/useShellSize';
 import { formatMonthDayWeekday } from '../../../utils/date';
@@ -101,6 +102,9 @@ type Failure = 'preparing' | 'error';
 /** ⋯ 메뉴의 폭(px). `components/Menu`의 실측값이며 누른 버튼에 맞출 때 쓴다 */
 const MENU_WIDTH = 148;
 
+/** 넓은 화면의 묶음 하나에 서는 카드 수. 2026-09-21 시안이 묶음마다 석 장이다 */
+const DESKTOP_GROUP_SIZE = 3;
+
 function failureOf(error: unknown): Failure {
   return error instanceof ApiError && error.code === 'RECOMMENDATION_UNAVAILABLE'
     ? 'preparing'
@@ -121,7 +125,19 @@ type OpenMenu = {
 
 export default function RecommendationsPage() {
   const rootRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(true);
   const desktop = useShellSize() !== 'mobile';
+  /*
+   * 요청할 노출 편수 (업무 S15P21E106-794). 넓은 화면은 묶음마다 석 장이 서므로 여섯 편이
+   * 필요하고, 모바일은 지금까지와 같은 세 편이다(API-045 `size`).
+   *
+   * 폭이 기준을 넘나들면 그 폭에 맞춰 다시 부른다. API-045는 조회가 곧 노출 기록이라 다시
+   * 부르는 것이 공짜는 아니지만, **추천 입력과 요청 편수가 같으면 같은 세트를 준다**(계약).
+   * 즉 되돌아온 폭에서는 이미 본 카드가 그대로 오고 카드가 뒤바뀌지 않는다.
+   */
+  const size: RecommendationSize = desktop ? 6 : 3;
+  /** 비동기 관심없음 처리가 끝나는 순간의 화면 폭에 맞는 편수를 읽는다 */
+  const sizeRef = useRef<RecommendationSize>(size);
   const [otts, setOtts] = useState<Ott[]>([]);
   const [items, setItems] = useState<RecommendationItem[] | null>(null);
   /** 이 추천을 만든 시각(API-045 `generatedAt`). 넓은 화면의 날짜 줄이 쓴다 */
@@ -136,6 +152,18 @@ export default function RecommendationsPage() {
   const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
+    sizeRef.current = size;
+  }, [size]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     // OTT 기준정보는 실패해도 배지가 코드를 쓰므로 화면을 막지 않는다
     getOtts()
       .then(setOtts)
@@ -145,7 +173,7 @@ export default function RecommendationsPage() {
   useEffect(() => {
     let active = true;
 
-    getRecommendations()
+    getRecommendations(size)
       .then((set) => {
         if (active) {
           setItems(set.items);
@@ -162,7 +190,7 @@ export default function RecommendationsPage() {
     return () => {
       active = false;
     };
-  }, [reloadCount]);
+  }, [reloadCount, size]);
 
   /** 2.2-A 다시 시도 */
   function handleRetry() {
@@ -187,21 +215,33 @@ export default function RecommendationsPage() {
         if (!(error instanceof ApiError && error.code === 'ALREADY_DISMISSED')) throw error;
       })
       .then(() => {
+        // 셸이 PC/모바일 사이에서 교체되면 새 페이지가 현재 편수를 이미 다시 요청한다
+        if (!mountedRef.current) return;
+
         setItems((prev) =>
           prev
             ? prev.filter((card) => card.recommendationItemId !== item.recommendationItemId)
             : prev,
         );
 
-        return getRecommendations()
+        const refillSize = sizeRef.current;
+
+        return getRecommendations(refillSize)
           .then((set) => {
-            setItems(set.items);
-            setGeneratedAt(set.generatedAt);
+            // 보충 요청 중 폭이 다시 바뀌었다면 그 폭의 useEffect 응답만 화면에 반영한다
+            if (sizeRef.current === refillSize) {
+              setItems(set.items);
+              setGeneratedAt(set.generatedAt);
+            }
           })
           .catch(() => undefined);
       })
-      .catch(() => setDismissFailed(true))
-      .finally(() => setDismissingId(null));
+      .catch(() => {
+        if (mountedRef.current) setDismissFailed(true);
+      })
+      .finally(() => {
+        if (mountedRef.current) setDismissingId(null);
+      });
   }
 
   function handleOpenMenu(event: MouseEvent<HTMLButtonElement>, item: RecommendationItem) {
@@ -230,6 +270,23 @@ export default function RecommendationsPage() {
 
   const tasteItems = items?.filter((item) => item.type === 'TASTE') ?? [];
   const discoveryItems = items?.filter((item) => item.type === 'DISCOVERY') ?? [];
+
+  /*
+   * 넓은 화면의 두 묶음 (업무 S15P21E106-794, 사용자 결정 2026-09-22).
+   *
+   * **서버가 채워 준 자리는 채워진 대로 세운다.** 취향 발견 후보가 모자라면 그 슬롯을 맞춤이
+   * 대신 채워 여섯 편이 온다(업무 -793). 유형으로만 가르면 그 대체분이 모두 맞춤 묶음으로 몰려
+   * 발견 묶음이 비고, 시안의 좌우 두 단이 한 단으로 무너진다 — 카드 수는 늘었는데 화면은
+   * 예전보다 못해진다.
+   *
+   * 그래서 발견 묶음은 **발견 카드를 먼저 놓고 남는 자리를 맞춤의 나머지로 채운다.** 묶음 이름은
+   * 자리의 이름이고, 그 자리에 무엇이 왔는지는 서버가 정한다.
+   */
+  const desktopTasteItems = tasteItems.slice(0, DESKTOP_GROUP_SIZE);
+  const desktopDiscoveryItems = [...discoveryItems, ...tasteItems.slice(DESKTOP_GROUP_SIZE)].slice(
+    0,
+    DESKTOP_GROUP_SIZE,
+  );
 
   if (failure) {
     const preparing = failure === 'preparing';
@@ -316,7 +373,7 @@ export default function RecommendationsPage() {
               <RecommendationGroup
                 title="취향 맞춤 추천"
                 description="좋아한 영화와 가장 가까운 편이에요"
-                items={tasteItems}
+                items={desktopTasteItems}
                 otts={otts}
                 openMenuId={openMenu?.item.recommendationItemId ?? null}
                 onOpenMenu={handleOpenMenu}
@@ -327,7 +384,7 @@ export default function RecommendationsPage() {
               <RecommendationGroup
                 title="취향 발견 추천"
                 description="기존 취향과 연결되는 새로운 맛이에요"
-                items={discoveryItems}
+                items={desktopDiscoveryItems}
                 otts={otts}
                 openMenuId={openMenu?.item.recommendationItemId ?? null}
                 onOpenMenu={handleOpenMenu}
