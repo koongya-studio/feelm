@@ -130,6 +130,13 @@ uv run python -m jobs.batch.parquet_roundtrip --help
 `Dockerfile`을 사용합니다. 로컬 검증과 컨테이너 빌드·실행 방법은
 [`consumer/README.md`](consumer/README.md)를 따릅니다.
 
+## ALS distributed performance benchmark
+
+검증된 MovieLens ratings에서 1M·10M 고정 입력을 준비하고, 1/2 Worker로 동일한 ALS 단일
+학습을 실행해 시간·처리량·speedup을 비교하는 절차는
+[`spark/batch/benchmark/README.md`](spark/batch/benchmark/README.md)를 따릅니다. 이 작업은
+추천 품질이나 운영 모델을 변경하지 않으며 benchmark 전용 no-overwrite 경로만 사용합니다.
+
 ## ALS baseline input and settings
 
 118번 MovieLens 전처리와 영화 ID 매핑은
