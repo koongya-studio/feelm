@@ -1,15 +1,16 @@
 /*
  * 1.1 배치 카드.
  *
- * 크기 88x124와 `⊖`의 22/44px은 부모의 상수와 짝이 맞아야 하는 기하값이다.
+ * 크기는 화면이 넘긴다(`--card-width` · `--card-height`, 기준 72x100 · 업무 -805). 배치
+ * 영역이 작으면 줄어든다. `⊖`의 22/44px은 누를 자리라 줄이지 않는다.
  * 색은 전부 토큰을 쓴다.
  */
 .card {
   position: absolute;
   top: var(--card-y);
   left: var(--card-x);
-  width: 88px;
-  height: 124px;
+  width: var(--card-width);
+  height: var(--card-height);
   touch-action: none;
 }
 

@@ -32,25 +32,28 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 class RecommendationServingReader {
 
-    private static final int TARGET_SIZE = 3;
-
     private final RecommendationServingRepository repository;
     private final RecommendationReplenisher replenisher;
     private final RecommendationReasonPresenter reasonPresenter;
     private final Clock clock;
 
     @Transactional
-    public ServingSnapshot read(long userId) {
+    public ServingSnapshot read(long userId, RecommendationServingPolicy policy) {
         lockActiveUser(userId);
         RecommendationSet set = findCurrentSet(userId);
-        List<ServingItem> items = repository.findInitialVisibleItems(userId, set.id());
+        List<ServingItem> items =
+                repository.findInitialVisibleItems(
+                        userId, set.id(), policy.tasteSize(), policy.discoverySize());
         if (items.isEmpty() && !repository.hasExposedItems(set.id())) {
-            items = exposeInitial(userId, set.id());
+            items = exposeInitial(userId, set.id(), policy);
         }
         // 최초 노출이 목표 구성을 못 채운 경우에도 같은 요청에서 보충을 시도한다(S15P21E106-219).
-        if (items.size() < TARGET_SIZE) {
-            replenisher.replenishVacancies(userId, set.id(), items);
-            items = repository.findInitialVisibleItems(userId, set.id());
+        if (items.size() < policy.size()) {
+            replenisher.replenishVacancies(
+                    userId, set.id(), items, policy.tasteSize(), policy.discoverySize());
+            items =
+                    repository.findInitialVisibleItems(
+                            userId, set.id(), policy.tasteSize(), policy.discoverySize());
         }
         boolean exhausted = items.isEmpty() && !repository.hasValidItems(userId, set.id());
         return new ServingSnapshot(
@@ -73,8 +76,11 @@ class RecommendationServingReader {
         }
     }
 
-    private List<ServingItem> exposeInitial(long userId, long setId) {
-        List<ServingItem> items = repository.findAndLockInitialItems(userId, setId);
+    private List<ServingItem> exposeInitial(
+            long userId, long setId, RecommendationServingPolicy policy) {
+        List<ServingItem> items =
+                repository.findAndLockInitialItems(
+                        userId, setId, policy.tasteSize(), policy.discoverySize());
         if (!items.isEmpty()) {
             if (!repository.expose(
                     userId,

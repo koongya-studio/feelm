@@ -23,7 +23,7 @@ public class PublicProfileQueryRepository {
 
     private static final String TARGET_SQL =
             """
-            SELECT id, nickname, visibility
+            SELECT id, nickname, avatar_storage_key, visibility
             FROM users
             WHERE public_id = :publicId AND status = 'ACTIVE'
             """;
@@ -56,6 +56,7 @@ public class PublicProfileQueryRepository {
                                 new ProfileTarget(
                                         row.getLong("id"),
                                         row.getString("nickname"),
+                                        row.getString("avatar_storage_key"),
                                         Visibility.valueOf(row.getString("visibility"))))
                 .optional();
     }
@@ -64,5 +65,6 @@ public class PublicProfileQueryRepository {
         return jdbc.sql(PUBLIC_REVIEW_COUNT_SQL).param("userId", userId).query(Long.class).single();
     }
 
-    public record ProfileTarget(long userId, String nickname, Visibility visibility) {}
+    public record ProfileTarget(
+            long userId, String nickname, String avatarStorageKey, Visibility visibility) {}
 }

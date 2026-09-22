@@ -17,20 +17,23 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class RecommendationReplenisher {
 
-    private static final int TARGET_SIZE = 3;
-
     private final RecommendationServingRepository repository;
     private final Clock clock;
 
     /** 활성 트랜잭션 안에서 현재 세트의 빈 슬롯만 보충한다. 호출자가 사용자 단위 직렬화를 보장한다. */
     @Transactional(propagation = Propagation.MANDATORY)
     public List<ServingItem> replenishVacancies(
-            long userId, long setId, List<ServingItem> visible) {
+            long userId,
+            long setId,
+            List<ServingItem> visible,
+            int tasteTarget,
+            int discoveryTarget) {
         List<ServingItem> added = new ArrayList<>();
         long taste = count(visible, "TASTE");
         long discovery = count(visible, "DISCOVERY");
+        int targetSize = tasteTarget + discoveryTarget;
 
-        while (taste < 2) {
+        while (taste < tasteTarget && visible.size() + added.size() < targetSize) {
             ServingItem next = exposeNext(userId, setId, "TASTE");
             if (next == null) {
                 break;
@@ -39,15 +42,16 @@ public class RecommendationReplenisher {
             taste++;
         }
 
-        if (discovery == 0) {
+        while (discovery < discoveryTarget && visible.size() + added.size() < targetSize) {
             ServingItem next = exposeNext(userId, setId, "DISCOVERY");
-            if (next != null) {
-                added.add(next);
-                discovery++;
+            if (next == null) {
+                break;
             }
+            added.add(next);
+            discovery++;
         }
 
-        while (visible.size() + added.size() < TARGET_SIZE && discovery == 0) {
+        while (visible.size() + added.size() < targetSize && discovery < discoveryTarget) {
             ServingItem next = exposeNext(userId, setId, "TASTE");
             if (next == null) {
                 break;

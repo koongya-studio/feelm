@@ -87,7 +87,7 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
         user(USER, "user");
         user(OTHER_USER, "other");
         recommendationSet(SET, USER, OffsetDateTime.parse("2026-09-17T00:00:00Z"));
-        for (long movieId = 101; movieId <= 106; movieId++) {
+        for (long movieId = 101; movieId <= 111; movieId++) {
             movie(movieId);
         }
         item(1001, 101, "TASTE", 1, false);
@@ -96,6 +96,11 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
         item(1004, 104, "TASTE", 4, false);
         item(1005, 105, "DISCOVERY", 1, false);
         item(1006, 106, "DISCOVERY", 2, false);
+        item(1007, 107, "TASTE", 5, false);
+        item(1008, 108, "TASTE", 6, false);
+        item(1009, 109, "TASTE", 7, false);
+        item(1010, 110, "DISCOVERY", 3, false);
+        item(1011, 111, "DISCOVERY", 4, false);
     }
 
     @Test
@@ -199,17 +204,64 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("T1 기본 추천은 TASTE 2편과 DISCOVERY 1편만 함께 노출한다")
+    @DisplayName("T1 기본 추천은 TASTE 3편과 DISCOVERY 3편을 함께 노출한다")
     void exposesExactInitialComposition() throws Exception {
         getRecommendations(USER)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.recommendationSetId").value(SET))
+                .andExpect(jsonPath("$.items.length()").value(6))
+                .andExpect(jsonPath("$.items[0].recommendationItemId").value(1001))
+                .andExpect(jsonPath("$.items[1].recommendationItemId").value(1002))
+                .andExpect(jsonPath("$.items[2].recommendationItemId").value(1003))
+                .andExpect(jsonPath("$.items[3].recommendationItemId").value(1005))
+                .andExpect(jsonPath("$.items[4].recommendationItemId").value(1006))
+                .andExpect(jsonPath("$.items[5].recommendationItemId").value(1010));
+
+        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1003L, 1005L, 1006L, 1010L);
+    }
+
+    @Test
+    @DisplayName("size를 생략하면 모바일 기본 구성인 TASTE 2편과 DISCOVERY 1편을 노출한다")
+    void defaultsToThreeItemsForMobile() throws Exception {
+        mvc.perform(get("/api/v1/recommendations").header("Authorization", bearer(USER)))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items.length()").value(3))
                 .andExpect(jsonPath("$.items[0].recommendationItemId").value(1001))
                 .andExpect(jsonPath("$.items[1].recommendationItemId").value(1002))
                 .andExpect(jsonPath("$.items[2].recommendationItemId").value(1005));
+    }
 
-        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1005L);
+    @Test
+    @DisplayName("모바일 3편을 노출한 세트도 PC 요청에서 같은 카드를 유지하며 6편으로 보충한다")
+    void expandsMobileExposureForDesktopRequest() throws Exception {
+        mvc.perform(get("/api/v1/recommendations").header("Authorization", bearer(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(3));
+
+        getRecommendations(USER)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(6))
+                .andExpect(jsonPath("$.items[0].recommendationItemId").value(1001))
+                .andExpect(jsonPath("$.items[1].recommendationItemId").value(1002))
+                .andExpect(jsonPath("$.items[2].recommendationItemId").value(1003))
+                .andExpect(jsonPath("$.items[3].recommendationItemId").value(1005));
+
+        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1003L, 1005L, 1006L, 1010L);
+    }
+
+    @Test
+    @DisplayName("지원하지 않거나 비어 있는 노출 편수는 검증 오류로 거절한다")
+    void rejectsUnsupportedServingSize() throws Exception {
+        for (String size : List.of("4", "", "invalid")) {
+            mvc.perform(
+                            get("/api/v1/recommendations")
+                                    .param("size", size)
+                                    .header("Authorization", bearer(USER)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        }
+
+        assertThat(exposedIds()).isEmpty();
     }
 
     @Test
@@ -219,15 +271,15 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
         getRecommendations(USER)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].recommendationItemId").value(1001))
-                .andExpect(jsonPath("$.items[2].recommendationItemId").value(1005));
+                .andExpect(jsonPath("$.items[5].recommendationItemId").value(1010));
 
-        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1005L);
+        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1003L, 1005L, 1006L, 1010L);
     }
 
     @Test
     @DisplayName("보충 컴포넌트는 활성 트랜잭션 밖에서 호출할 수 없다")
     void replenisherRequiresExistingTransaction() {
-        assertThatThrownBy(() -> replenisher.replenishVacancies(USER, SET, List.of()))
+        assertThatThrownBy(() -> replenisher.replenishVacancies(USER, SET, List.of(), 3, 3))
                 .isInstanceOf(IllegalTransactionStateException.class);
     }
 
@@ -245,18 +297,37 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("T4 DISCOVERY 후보가 없으면 TASTE 3편을 노출한다")
-    void fallsBackToThreeTasteItems() throws Exception {
+    @DisplayName("T4 DISCOVERY 후보가 없으면 TASTE 6편을 노출한다")
+    void fallsBackToSixTasteItems() throws Exception {
         jdbc.update("DELETE FROM recommendation_items WHERE type='DISCOVERY'");
 
         getRecommendations(USER)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items.length()").value(3))
+                .andExpect(jsonPath("$.items.length()").value(6))
                 .andExpect(jsonPath("$.items[0].recommendationItemId").value(1001))
                 .andExpect(jsonPath("$.items[1].recommendationItemId").value(1002))
-                .andExpect(jsonPath("$.items[2].recommendationItemId").value(1003));
+                .andExpect(jsonPath("$.items[2].recommendationItemId").value(1003))
+                .andExpect(jsonPath("$.items[3].recommendationItemId").value(1004))
+                .andExpect(jsonPath("$.items[4].recommendationItemId").value(1007))
+                .andExpect(jsonPath("$.items[5].recommendationItemId").value(1008));
 
-        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1003L);
+        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1003L, 1004L, 1007L, 1008L);
+    }
+
+    @Test
+    @DisplayName("DISCOVERY 후보가 두 편이면 부족한 한 슬롯을 TASTE로 대체한다")
+    void fallsBackPerMissingDiscoverySlot() throws Exception {
+        jdbc.update("DELETE FROM recommendation_items WHERE id IN (1010,1011)");
+
+        getRecommendations(USER)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(6))
+                .andExpect(jsonPath("$.items[0].recommendationItemId").value(1001))
+                .andExpect(jsonPath("$.items[1].recommendationItemId").value(1002))
+                .andExpect(jsonPath("$.items[2].recommendationItemId").value(1003))
+                .andExpect(jsonPath("$.items[3].recommendationItemId").value(1004))
+                .andExpect(jsonPath("$.items[4].recommendationItemId").value(1005))
+                .andExpect(jsonPath("$.items[5].recommendationItemId").value(1006));
     }
 
     @Test
@@ -268,9 +339,11 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].recommendationItemId").value(1002))
                 .andExpect(jsonPath("$.items[1].recommendationItemId").value(1003))
-                .andExpect(jsonPath("$.items[2].recommendationItemId").value(1005));
+                .andExpect(jsonPath("$.items[2].recommendationItemId").value(1004))
+                .andExpect(jsonPath("$.items[3].recommendationItemId").value(1005))
+                .andExpect(jsonPath("$.items[5].recommendationItemId").value(1010));
 
-        assertThat(exposedIds()).containsExactly(1002L, 1003L, 1005L);
+        assertThat(exposedIds()).containsExactly(1002L, 1003L, 1004L, 1005L, 1006L, 1010L);
     }
 
     @Test
@@ -283,7 +356,8 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].recommendationItemId").value(1002))
                 .andExpect(jsonPath("$.items[1].recommendationItemId").value(1003))
-                .andExpect(jsonPath("$.items[2].recommendationItemId").value(1005));
+                .andExpect(jsonPath("$.items[2].recommendationItemId").value(1004))
+                .andExpect(jsonPath("$.items[3].recommendationItemId").value(1005));
         // 보충 경로(Replenisher)의 upsert도 원본과 어긋나지 않아야 한다.
         assertExposureHistoryMatchesItems();
     }
@@ -298,30 +372,35 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].recommendationItemId").value(1002))
                 .andExpect(jsonPath("$.items[1].recommendationItemId").value(1003))
-                .andExpect(jsonPath("$.items[2].recommendationItemId").value(1005));
+                .andExpect(jsonPath("$.items[2].recommendationItemId").value(1004))
+                .andExpect(jsonPath("$.items[3].recommendationItemId").value(1005));
     }
 
     @Test
-    @DisplayName("유효 카드가 이미 세 편이면 다음 후보를 소비하지 않는다")
+    @DisplayName("유효 카드가 이미 여섯 편이면 다음 후보를 소비하지 않는다")
     void doesNotConsumeCandidateWhenSlotsAreFull() throws Exception {
         getRecommendations(USER).andExpect(status().isOk());
         getRecommendations(USER).andExpect(status().isOk());
 
-        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1005L);
+        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1003L, 1005L, 1006L, 1010L);
     }
 
     @Test
-    @DisplayName("T6 DISCOVERY 카드가 빠지고 후보가 없으면 TASTE 한 편으로 보충한다")
+    @DisplayName("T6 DISCOVERY 카드가 빠지고 후보가 없으면 TASTE로 보충한다")
     void replenishesDiscoveryWithTasteFallback() throws Exception {
         getRecommendations(USER).andExpect(status().isOk());
-        jdbc.update("DELETE FROM recommendation_items WHERE id=1006");
+        jdbc.update("DELETE FROM recommendation_items WHERE id IN (1006,1010,1011)");
         dismissal(105, 1005);
 
         getRecommendations(USER)
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(6))
                 .andExpect(jsonPath("$.items[0].recommendationItemId").value(1001))
                 .andExpect(jsonPath("$.items[1].recommendationItemId").value(1002))
-                .andExpect(jsonPath("$.items[2].recommendationItemId").value(1003));
+                .andExpect(jsonPath("$.items[2].recommendationItemId").value(1003))
+                .andExpect(jsonPath("$.items[3].recommendationItemId").value(1004))
+                .andExpect(jsonPath("$.items[4].recommendationItemId").value(1007))
+                .andExpect(jsonPath("$.items[5].recommendationItemId").value(1008));
         assertExposureHistoryMatchesItems();
     }
 
@@ -336,9 +415,13 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[0].recommendationItemId").value(1002))
                 .andExpect(jsonPath("$.items[1].recommendationItemId").value(1003))
-                .andExpect(jsonPath("$.items[2].recommendationItemId").value(1006));
+                .andExpect(jsonPath("$.items[2].recommendationItemId").value(1004))
+                .andExpect(jsonPath("$.items[3].recommendationItemId").value(1006))
+                .andExpect(jsonPath("$.items[4].recommendationItemId").value(1010))
+                .andExpect(jsonPath("$.items[5].recommendationItemId").value(1011));
 
-        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1003L, 1005L, 1006L);
+        assertThat(exposedIds())
+                .containsExactly(1001L, 1002L, 1003L, 1004L, 1005L, 1006L, 1010L, 1011L);
         assertExposureHistoryMatchesItems();
     }
 
@@ -385,9 +468,26 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
         assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
         start.countDown();
 
-        assertThat(first.get(10, TimeUnit.SECONDS)).contains("\"recommendationItemId\":1003");
-        assertThat(second.get(10, TimeUnit.SECONDS)).contains("\"recommendationItemId\":1003");
-        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1003L, 1005L);
+        assertThat(first.get(10, TimeUnit.SECONDS)).contains("\"recommendationItemId\":1004");
+        assertThat(second.get(10, TimeUnit.SECONDS)).contains("\"recommendationItemId\":1004");
+        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1003L, 1004L, 1005L, 1006L, 1010L);
+    }
+
+    @Test
+    @DisplayName("모바일과 PC의 동시 첫 조회도 각 요청 크기를 지키고 노출 이력을 중복하지 않는다")
+    void concurrentMobileAndDesktopReadsKeepRequestedSizes() throws Exception {
+        executor = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        Future<String> mobile = executor.submit(() -> concurrentGet(USER, 3, ready, start));
+        Future<String> desktop = executor.submit(() -> concurrentGet(USER, 6, ready, start));
+        assertThat(ready.await(5, TimeUnit.SECONDS)).isTrue();
+        start.countDown();
+
+        assertThat(responseItemCount(mobile.get(10, TimeUnit.SECONDS))).isEqualTo(3);
+        assertThat(responseItemCount(desktop.get(10, TimeUnit.SECONDS))).isEqualTo(6);
+        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1003L, 1005L, 1006L, 1010L);
+        assertExposureHistoryMatchesItems();
     }
 
     @Test
@@ -495,13 +595,13 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
     void noReplacementKeepsExistingCards() throws Exception {
         getRecommendations(USER).andExpect(status().isOk());
         dismissal(101, 1001);
-        jdbc.update("DELETE FROM recommendation_items WHERE id IN (1003,1004)");
+        jdbc.update("DELETE FROM recommendation_items WHERE id IN (1004,1007,1008,1009)");
 
         assertThat(jdbc.queryForObject("SELECT count(*) FROM recommendation_sets", Integer.class))
                 .isEqualTo(1);
         getRecommendations(USER)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items.length()").value(2));
+                .andExpect(jsonPath("$.items.length()").value(5));
     }
 
     @Test
@@ -528,23 +628,38 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
                                 Integer.class,
                                 USER))
                 .isEqualTo(1);
-        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1005L);
+        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1003L, 1005L, 1006L, 1010L);
     }
 
     private org.springframework.test.web.servlet.ResultActions getRecommendations(long userId)
             throws Exception {
-        return mvc.perform(get("/api/v1/recommendations").header("Authorization", bearer(userId)));
+        return mvc.perform(
+                get("/api/v1/recommendations")
+                        .param("size", "6")
+                        .header("Authorization", bearer(userId)));
     }
 
     private String concurrentGet(long userId, CountDownLatch ready, CountDownLatch start)
             throws Exception {
+        return concurrentGet(userId, 6, ready, start);
+    }
+
+    private String concurrentGet(long userId, int size, CountDownLatch ready, CountDownLatch start)
+            throws Exception {
         ready.countDown();
         assertThat(start.await(5, TimeUnit.SECONDS)).isTrue();
-        return getRecommendations(userId)
+        return mvc.perform(
+                        get("/api/v1/recommendations")
+                                .param("size", Integer.toString(size))
+                                .header("Authorization", bearer(userId)))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()
                 .getContentAsString();
+    }
+
+    private int responseItemCount(String body) throws Exception {
+        return new tools.jackson.databind.ObjectMapper().readTree(body).path("items").size();
     }
 
     private String concurrentGetWithoutBarrier(long userId) throws Exception {
@@ -588,7 +703,7 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
 
         assertThat(exposureHistory(USER))
                 .as("노출한 카드 수만큼 이력이 쌓인다")
-                .hasSize(3)
+                .hasSize(6)
                 .allSatisfy(row -> assertThat(row.get("set_id")).isEqualTo(SET));
         assertExposureHistoryMatchesItems();
     }
@@ -598,7 +713,7 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
     void movesExposureHistoryToNewerSetOnReexposure() throws Exception {
         getRecommendations(USER).andExpect(status().isOk());
         List<Long> firstMovies = exposedMovieIds(USER);
-        assertThat(firstMovies).hasSize(3);
+        assertThat(firstMovies).hasSize(6);
 
         // 픽스처가 세트 id를 1000으로 박아 두므로 시퀀스를 올려야 새 세트가 실제로 "더 최신"이 된다.
         // 계약상 최신 판정 기준이 세트 ID 내림차순이라 id가 작으면 새로 만들어도 최신이 아니다.
@@ -608,7 +723,10 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
                 "generation-reexpose",
                 candidate(firstMovies.get(0), "5.0", "TASTE", null),
                 candidate(firstMovies.get(1), "4.0", "TASTE", null),
-                candidate(firstMovies.get(2), "3.0", "DISCOVERY", "FLAVOR_B"));
+                candidate(firstMovies.get(2), "3.0", "TASTE", null),
+                candidate(firstMovies.get(3), "5.0", "DISCOVERY", "FLAVOR_B"),
+                candidate(firstMovies.get(4), "4.0", "DISCOVERY", "FLAVOR_B"),
+                candidate(firstMovies.get(5), "3.0", "DISCOVERY", "FLAVOR_B"));
         candidateListener.onMessage(candidateNotice(), mock(Acknowledgment.class));
         getRecommendations(USER).andExpect(status().isOk());
 
@@ -619,7 +737,7 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
                         Long.class);
         assertThat(exposureHistory(USER))
                 .as("재노출은 이력 행을 늘리지 않는다")
-                .hasSize(3)
+                .hasSize(6)
                 .allSatisfy(row -> assertThat(row.get("set_id")).isEqualTo(newSetId));
         assertThat(
                         jdbc.queryForObject(
@@ -627,7 +745,7 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
                                         + " WHERE exposed_at IS NOT NULL",
                                 Integer.class))
                 .as("원본 노출 기록은 두 세트 모두에 보존된다")
-                .isEqualTo(6);
+                .isEqualTo(12);
         assertExposureHistoryMatchesItems();
     }
 

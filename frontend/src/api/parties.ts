@@ -193,13 +193,25 @@ export async function getPartyPopcorn(partyId: number): Promise<PartyPopcorn> {
 /**
  * API-058 파티 영화 추천 · GET /api/v1/parties/{partyId}/recommendations
  *
- * 개수(`size`)는 계약 기본값 3을 쓴다. 5.5 시안이 세 편이다.
+ * 개수(`size`)는 계약 기본값 3을 쓴다. 5.5 시안이 세 편이다. **호출마다 같은 `size`를 써야
+ * 한다** — 묶음의 크기는 그것을 만든 요청의 `size`이고, 더 작게 조회하면 나머지는 노출된 채
+ * 다시 볼 수 없다(계약 처리 규칙).
  *
  * 파티원만 부를 수 있다. 오류는 `404 RESOURCE_NOT_FOUND`(없는 파티 · 파티원 아님) ·
  * `409 PARTY_CLOSED` · `503 RECOMMENDATION_UNAVAILABLE`(파티원 취향이 아직 준비 안 됨)이다.
- * 같은 파티원 · 같은 취향이면 서버가 이전 추천 세트를 다시 쓴다 — 5.9가 미리 부르고 5.5가
- * 다시 불러도 같은 세 편이다.
+ *
+ * **일반 조회는 현재 묶음을 그대로 돌려준다.** 같은 파티원 · 같은 취향이면 서버가 이전 추천
+ * 세트를 다시 쓴다 — 5.9가 미리 부르고 5.5가 다시 불러도 같은 세 편이다. **`refresh`가 참이면
+ * 다시 받기다**(백엔드 -792 · 업무 -802). 아직 노출하지 않은 후보로 다음 묶음을 만들며 직전
+ * 응답과 겹치지 않는다. 5.5의 `다른 영화 추천받기`로 5.9에 들어온 경우에만 붙인다 — 파티
+ * 목록에서의 첫 진입 · 5.5의 본요청 · 재시도까지 붙이면 들를 때마다 묶음이 앞으로 가 버린다.
+ * 다 소진한 다시 받기는 커서를 움직이지 않고 현재 묶음에 `hasNext: false`를 돌려준다.
  */
-export async function getPartyRecommendations(partyId: number): Promise<PartyRecommendationSet> {
-  return request<PartyRecommendationSet>(`/parties/${partyId}/recommendations`);
+export async function getPartyRecommendations(
+  partyId: number,
+  options: { refresh?: boolean } = {},
+): Promise<PartyRecommendationSet> {
+  return request<PartyRecommendationSet>(`/parties/${partyId}/recommendations`, {
+    query: { refresh: options.refresh ? true : undefined },
+  });
 }

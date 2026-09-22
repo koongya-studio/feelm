@@ -73,6 +73,7 @@ class MovieSearchCursorCodecTest {
                         "RELEVANCE", new BigDecimal("0.1234567890123456789"), null, Long.MAX_VALUE),
                 Arguments.of("RELEVANCE", BigDecimal.ZERO, null, 1L),
                 Arguments.of("RATING", new BigDecimal("4.30"), null, 550L),
+                Arguments.of("RATING", new BigDecimal("4.30"), LocalDate.of(2026, 9, 22), 550L),
                 Arguments.of("RATING", BigDecimal.ZERO, null, 1L),
                 Arguments.of("RATING", new BigDecimal("5.00"), null, Long.MAX_VALUE),
                 Arguments.of("RELEVANCE", new BigDecimal("1e-16383"), null, 1L),

@@ -20,9 +20,15 @@
  * 연동 API는 API-057 파티원 팝콘 조회와 API-058 파티 영화 추천이다. 섞인 통의 맛은
  * API-057에서 오고, 추천은 **화면을 열자마자** 부른다 — 장면이 도는 동안 받아 두면 5.5가 빈
  * 화면으로 시작하지 않는다. 추천을 받지 못하면 장면을 끝까지 보여 준 뒤 이 화면에서 알린다.
+ *
+ * **다시 받기는 이 화면이 보낸다**(업무 -802). 5.5의 `다른 영화 추천받기`는 라우터 state
+ * `refresh: true`를 들고 여기로 오고, 그때만 API-058에 `refresh=true`를 붙여 다음 묶음을
+ * 받는다. 5.5가 그 뒤에 부르는 본요청은 일반 조회라 방금 노출한 묶음이 그대로 온다. 파티
+ * 목록 · 5.8 · 5.3에서 들어온 첫 진입은 일반 조회다 — 들를 때마다 묶음이 앞으로 가면 안 된다.
+ * 처음 그릴 때 한 번만 읽고 주소의 state는 지운다. 새로고침이 다시 받기가 되면 안 된다.
  */
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import PartyFlowShell from '../../../components/PartyFlowShell';
 import PopcornMachine from '../../../components/PopcornMachine';
@@ -100,11 +106,25 @@ function recommendFailure(error: unknown): string {
 
 type Failure = { kind: 'popcorn' } | { kind: 'recommend'; message: string };
 
+/** 5.5가 `다른 영화 추천받기`로 넘길 때 싣는 state */
+export type PartyMixEntry = { refresh: true };
+
+/** 라우터 state에서 다시 받기 표시를 꺼낸다. 다른 화면이 남긴 state는 없는 것으로 본다 */
+function isRefreshEntry(state: unknown): boolean {
+  return Boolean(
+    state && typeof state === 'object' && (state as { refresh?: unknown }).refresh === true,
+  );
+}
+
 export default function PartyPopcornMixPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { partyId } = useParams();
 
   const id = Number(partyId);
+
+  /** 다시 받기로 들어왔는지. 처음 그릴 때 한 번만 읽는다 — 아래에서 state를 지운다 */
+  const [refresh] = useState(() => isRefreshEntry(location.state));
 
   const [popcorn, setPopcorn] = useState<PartyPopcorn | null>(null);
   const [names, setNames] = useState<string[]>([]);
@@ -126,11 +146,19 @@ export default function PartyPopcornMixPage() {
   }, []);
 
   useEffect(() => {
+    if (refresh) void navigate(location.pathname, { replace: true, state: null });
+    // 한 번만. `location`을 의존성에 넣으면 지운 뒤의 이동이 다시 효과를 돌린다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     let active = true;
     const timers: number[] = [];
 
     // 장면이 도는 동안 받아 둔다. 실패는 여기서 삼키고 장면이 끝날 때 알린다
-    const request = getPartyRecommendations(id);
+    const request = refresh
+      ? getPartyRecommendations(id, { refresh: true })
+      : getPartyRecommendations(id);
     request.catch(() => undefined);
 
     getParty(id)
@@ -180,14 +208,19 @@ export default function PartyPopcornMixPage() {
       active = false;
       for (const timer of timers) window.clearTimeout(timer);
     };
-  }, [id, navigate]);
+  }, [id, navigate, refresh]);
 
-  /** 추천만 다시 묻는다. 팝콘은 이미 섞였으므로 장면을 되풀이하지 않는다 */
+  /**
+   * 추천만 다시 묻는다. 팝콘은 이미 섞였으므로 장면을 되풀이하지 않는다. 다시 받기로
+   * 들어왔으면 재시도도 다시 받기다 — 실패한 요청은 아무것도 노출하지 않았다.
+   */
   async function retryRecommendation() {
     setRetrying(true);
 
     try {
-      await getPartyRecommendations(id);
+      await (refresh
+        ? getPartyRecommendations(id, { refresh: true })
+        : getPartyRecommendations(id));
       if (mounted.current) void navigate(path.partyRecommendations(id), { replace: true });
     } catch (error) {
       if (!mounted.current) return;

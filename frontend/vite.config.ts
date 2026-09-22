@@ -54,6 +54,14 @@ export default defineConfig(({ mode }) => ({
      * import하므로 켜 두면 죽은 설정이 되고, 전역 타입 선언도 따로 필요해진다.
      */
     setupFiles: ['./src/test/setup.ts'],
+    /*
+     * 시험 하나의 예산 (업무 S15P21E106-797).
+     *
+     * 기본값 5초는 장면이 도는 화면(5.9 팝콘 섞기 · EXT 분석)이 바쁠 때 그대로 넘긴다 —
+     * CPU를 점유한 전체 실행에서 한 시험이 7.5초까지 갔고, 5초에 걸려 깨진 것이 간헐
+     * 실패의 절반이었다. 기다리는 단정문의 예산(`src/test/setup.ts`)과 같은 이유로 늘린다.
+     */
+    testTimeout: 20_000,
     // 소스 옆이 아니라 파일명 규칙으로 찾는다. 위치는 대상 파일 옆에 둔다
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     css: true,

@@ -4,3 +4,26 @@
   padding: var(--space-2) var(--screen-padding-x) var(--space-6);
   gap: var(--space-5);
 }
+
+/* 소셜 계정 묶음과 그 결과 안내가 한 덩어리다 */
+.social {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.done,
+.failure {
+  margin: 0;
+  padding: 0 var(--space-4);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.done {
+  color: var(--color-success);
+}
+
+.failure {
+  color: var(--color-danger);
+}

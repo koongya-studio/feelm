@@ -21,9 +21,6 @@ import org.springframework.stereotype.Repository;
 @RequiredArgsConstructor
 public class RecommendationServingRepository {
 
-    private static final int TASTE_SIZE = 2;
-    private static final int DISCOVERY_SIZE = 1;
-
     private final JdbcTemplate jdbcTemplate;
 
     public boolean lockActiveUserIfExists(long userId) {
@@ -140,9 +137,10 @@ public class RecommendationServingRepository {
                 + where;
     }
 
-    public List<ServingItem> findInitialVisibleItems(long userId, long setId) {
-        List<ServingItem> discovery = findExposed(userId, setId, "DISCOVERY", DISCOVERY_SIZE);
-        int tasteSize = discovery.isEmpty() ? TASTE_SIZE + DISCOVERY_SIZE : TASTE_SIZE;
+    public List<ServingItem> findInitialVisibleItems(
+            long userId, long setId, int tasteTarget, int discoveryTarget) {
+        List<ServingItem> discovery = findExposed(userId, setId, "DISCOVERY", discoveryTarget);
+        int tasteSize = tasteTarget + Math.max(0, discoveryTarget - discovery.size());
         List<ServingItem> taste = findExposed(userId, setId, "TASTE", tasteSize);
         return ordered(taste, discovery);
     }
@@ -180,10 +178,11 @@ public class RecommendationServingRepository {
         return count != null && count > 0;
     }
 
-    public List<ServingItem> findAndLockInitialItems(long userId, long setId) {
+    public List<ServingItem> findAndLockInitialItems(
+            long userId, long setId, int tasteTarget, int discoveryTarget) {
         List<ServingItem> discovery =
-                findUnexposedForUpdate(userId, setId, "DISCOVERY", DISCOVERY_SIZE);
-        int tasteSize = discovery.isEmpty() ? TASTE_SIZE + DISCOVERY_SIZE : TASTE_SIZE;
+                findUnexposedForUpdate(userId, setId, "DISCOVERY", discoveryTarget);
+        int tasteSize = tasteTarget + Math.max(0, discoveryTarget - discovery.size());
         List<ServingItem> taste = findUnexposedForUpdate(userId, setId, "TASTE", tasteSize);
         // 목표 구성을 못 채워도 확보한 만큼 노출한다. 부족분은 보충·소진 흐름이 이어받는다(S15P21E106-219).
         return ordered(taste, discovery);

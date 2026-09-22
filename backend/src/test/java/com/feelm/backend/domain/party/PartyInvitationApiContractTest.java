@@ -216,6 +216,47 @@ class PartyInvitationApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
+    void rejectsWithdrawnRequester() throws Exception {
+        long party = party(10, "ACTIVE", CREATED_AT);
+        member(party, 20);
+        // 탈퇴 1단계는 커밋됐지만 4단계 파티 정리가 아직 멤버십을 지우지 않은 순간(S15P21E106-758).
+        jdbc.update(
+                "UPDATE users SET status='WITHDRAWN', withdrawn_at=? WHERE id=20",
+                Timestamp.from(CREATED_AT));
+
+        invite(party, 30, 20)
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+        assertThat(invitationCount()).isZero();
+    }
+
+    @Test
+    void rejectsWithdrawnRequesterBeforeRevealingParty() throws Exception {
+        jdbc.update("UPDATE users SET status='WITHDRAWN' WHERE id=10");
+
+        invite(9999, 20, 10)
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+        assertThat(invitationCount()).isZero();
+    }
+
+    /** 대상 계정 잠금이 파티 잠금 앞으로 갔어도 오류는 계약의 순서(파티·요청자·종료 → 대상)대로 난다. */
+    @Test
+    void keepsExistingRejectionOrderAfterLockReorder() throws Exception {
+        jdbc.update("UPDATE users SET status='WITHDRAWN' WHERE id=20");
+        long closed = party(10, "CLOSED", CREATED_AT);
+        invite(closed, 20, 10)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PARTY_CLOSED"));
+
+        long active = party(30, "ACTIVE", CREATED_AT.plusSeconds(1));
+        invite(active, 20, 10)
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+        assertThat(invitationCount()).isZero();
+    }
+
+    @Test
     void rejectsRequesterOutsideParty() throws Exception {
         long party = party(10, "ACTIVE", CREATED_AT);
 
@@ -326,34 +367,95 @@ class PartyInvitationApiContractTest extends SharedPostgresContractTest {
     @Test
     void waitsUntilPartyRowLockIsReleased() throws Exception {
         long party = party(10, "ACTIVE", CREATED_AT);
+        LockHold hold =
+                holdRowLock("SELECT id FROM parties WHERE id=? FOR UPDATE", party, () -> {});
+        Future<InviteResult> blockedRequest =
+                executor.submit(() -> performInvite(party, 20, bearer(10)));
+
+        assertBlockedUntilReleased(blockedRequest, hold);
+
+        assertThat(blockedRequest.get(5, TimeUnit.SECONDS).status()).isEqualTo(201);
+    }
+
+    /**
+     * 대상 계정 행을 잠그고 활성 여부를 본다(S15P21E106-758). 잠금이 풀리기 전에는 초대가 만들어지지 않는다.
+     *
+     * <p>이 테스트는 명시 잠금을 지워도 통과한다 — 초대 INSERT의 FK 검사가 선잠금 {@code FOR UPDATE}에 막히기 때문이다. 잠금 제거 회귀는 바로
+     * 아래 {@link #rejectsInviteeWithdrawnWhileWaitingForRowLock}가 잡는다(리뷰 A-3·B-3).
+     */
+    @Test
+    void waitsUntilInviteeRowLockIsReleased() throws Exception {
+        long party = party(10, "ACTIVE", CREATED_AT);
+        LockHold hold = holdRowLock("SELECT id FROM users WHERE id=? FOR UPDATE", 20, () -> {});
+        Future<InviteResult> blockedRequest =
+                executor.submit(() -> performInvite(party, 20, bearer(10)));
+
+        assertBlockedUntilReleased(blockedRequest, hold);
+
+        assertThat(blockedRequest.get(5, TimeUnit.SECONDS).status()).isEqualTo(201);
+        assertThat(invitationCount()).isEqualTo(1);
+    }
+
+    /** 잠금을 기다리는 동안 대상이 탈퇴하면 잠금 뒤에 다시 판정해 거절한다. 잠금 없는 읽기였다면 ACTIVE를 보고 초대를 만들었을 순간이다. */
+    @Test
+    void rejectsInviteeWithdrawnWhileWaitingForRowLock() throws Exception {
+        long party = party(10, "ACTIVE", CREATED_AT);
+        LockHold hold =
+                holdRowLock(
+                        "SELECT id FROM users WHERE id=? FOR UPDATE",
+                        20,
+                        () ->
+                                jdbc.update(
+                                        "UPDATE users SET status='WITHDRAWN', withdrawn_at=now()"
+                                                + " WHERE id=20"));
+        Future<InviteResult> blockedRequest =
+                executor.submit(() -> performInvite(party, 20, bearer(10)));
+
+        assertBlockedUntilReleased(blockedRequest, hold);
+
+        InviteResult result = blockedRequest.get(5, TimeUnit.SECONDS);
+        assertThat(result.status()).isEqualTo(404);
+        assertThat(result.code()).isEqualTo("RESOURCE_NOT_FOUND");
+        assertThat(invitationCount()).isZero();
+    }
+
+    /**
+     * 별도 트랜잭션이 행 하나를 {@code FOR UPDATE}로 잠근 채 기다린다. {@code beforeRelease}는 잠금을 놓기 직전에 같은 트랜잭션에서
+     * 실행되어 커밋과 함께 보인다.
+     */
+    private LockHold holdRowLock(String lockSql, long id, Runnable beforeRelease)
+            throws InterruptedException {
         executor = Executors.newFixedThreadPool(2);
         CountDownLatch locked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
-        Future<?> lockHolder =
+        Future<?> holder =
                 executor.submit(
                         () ->
                                 new TransactionTemplate(transactionManager)
                                         .executeWithoutResult(
                                                 ignored -> {
-                                                    jdbc.queryForObject(
-                                                            "SELECT id FROM parties WHERE id=? FOR UPDATE",
-                                                            Long.class,
-                                                            party);
+                                                    jdbc.queryForObject(lockSql, Long.class, id);
                                                     locked.countDown();
                                                     await(release);
+                                                    beforeRelease.run();
                                                 }));
         assertThat(locked.await(5, TimeUnit.SECONDS)).isTrue();
-        Future<InviteResult> blockedRequest =
-                executor.submit(() -> performInvite(party, 20, bearer(10)));
+        return new LockHold(holder, release);
+    }
+
+    /** 요청이 잠금에 실제로 막혀 있는지 확인한 뒤 잠금을 놓고, 잠금 보유 트랜잭션이 커밋될 때까지 기다린다. */
+    private void assertBlockedUntilReleased(Future<InviteResult> blockedRequest, LockHold hold)
+            throws Exception {
         try {
             assertThatThrownBy(() -> blockedRequest.get(300, TimeUnit.MILLISECONDS))
                     .isInstanceOf(TimeoutException.class);
         } finally {
-            release.countDown();
+            hold.release().countDown();
         }
-        lockHolder.get(5, TimeUnit.SECONDS);
-        assertThat(blockedRequest.get(5, TimeUnit.SECONDS).status()).isEqualTo(201);
+        hold.holder().get(5, TimeUnit.SECONDS);
     }
+
+    private record LockHold(Future<?> holder, CountDownLatch release) {}
 
     @Test
     void listsPendingInvitationsByDefault() throws Exception {

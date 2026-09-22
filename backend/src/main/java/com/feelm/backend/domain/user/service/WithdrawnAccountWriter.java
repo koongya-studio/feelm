@@ -64,7 +64,7 @@ class WithdrawnAccountWriter {
      * UPDATE가 나가지 않는다. 순서를 바꾸면 치환이 조용히 사라지고 응답은 그대로 204다.
      */
     @Transactional
-    void withdrawAccount(long userId, String password, SocialCredential credential) {
+    String withdrawAccount(long userId, String password, SocialCredential credential) {
         User user =
                 userRepository
                         .findByIdForUpdate(userId)
@@ -76,12 +76,14 @@ class WithdrawnAccountWriter {
             verifyLinkedProvider(userId, credential);
         }
 
+        String avatarStorageKey = user.removeAvatar();
         user.withdraw(Instant.now());
         authProviderRepository.deleteByUserId(userId);
         userOttRepository.deleteByUserId(userId);
         notificationSettingsRepository.deleteByUserId(userId);
         notificationCommandService.deleteByUserId(userId);
         onboardingPreferenceRepository.deleteByUserId(userId);
+        return avatarStorageKey;
     }
 
     /** 이메일 경로의 본인 확인. 순서의 근거는 {@link #withdrawAccount} 주석에 있다. */

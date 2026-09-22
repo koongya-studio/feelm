@@ -34,6 +34,10 @@ class ErrorCodeTest {
         assertThat(ErrorCode.INVALID_WATCH_STATUS.getStatus()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(ErrorCode.UNSUPPORTED_MEDIA_TYPE.getStatus())
                 .isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        assertThat(ErrorCode.AVATAR_INVALID.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(ErrorCode.AVATAR_TOO_LARGE.getStatus()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        assertThat(ErrorCode.AVATAR_STORAGE_UNAVAILABLE.getStatus())
+                .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(ErrorCode.RATE_LIMITED.getStatus()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
         assertThat(ErrorCode.INTERNAL_ERROR.getStatus())
                 .isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
@@ -60,6 +64,9 @@ class ErrorCodeTest {
                         "METHOD_NOT_ALLOWED",
                         "CONFLICT",
                         "UNSUPPORTED_MEDIA_TYPE",
+                        "AVATAR_INVALID",
+                        "AVATAR_TOO_LARGE",
+                        "AVATAR_STORAGE_UNAVAILABLE",
                         "RATE_LIMITED",
                         "INTERNAL_ERROR",
                         "RECOMMENDATION_UNAVAILABLE",

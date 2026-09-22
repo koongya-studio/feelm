@@ -5,6 +5,7 @@ import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -51,6 +52,17 @@ public record MovieSearchCriteria(
     @AssertTrue(message = "시작 연도는 종료 연도보다 클 수 없습니다.")
     public boolean isYearRangeValid() {
         return yearFrom == null || yearTo == null || yearFrom <= yearTo;
+    }
+
+    public boolean isSearchHomeTopRatedRequest(LocalDate releasedThrough) {
+        return releasedThrough != null
+                && q == null
+                && genre.isEmpty()
+                && country.isEmpty()
+                && ott.isEmpty()
+                && Objects.equals(yearFrom, releasedThrough.minusYears(1).getYear())
+                && yearTo == null
+                && sort == MovieSearchSort.RATING;
     }
 
     private static List<String> normalize(List<String> values) {

@@ -54,6 +54,16 @@
   justify-content: center;
 }
 
+/* 더 보여줄 후보가 없을 때 버튼 자리에 놓이는 한 줄(업무 -802) */
+.exhausted {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  text-align: center;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
 /* 오류는 흐름 셸 없이 화면 전체를 덮는다 */
 .page {
   display: flex;

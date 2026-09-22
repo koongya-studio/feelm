@@ -136,7 +136,7 @@
 
 ```json
 {
-  "user": { "userId": 2048, "nickname": "영화광", "visibility": "PUBLIC" },
+  "user": { "userId": 2048, "nickname": "영화광", "avatarUrl": "/media/avatars/0b649505-0917-41d9-a41f-0d4402ec63d5.jpg", "visibility": "PUBLIC" },
   "keywords": [{ "code": "DARK_THRILLER_LOVER", "label": "어둠 속 스릴러 애호가" }],
   "stats": { "frameCount": 88, "popcornCount": 88 },
   "popcorn": { "flavors": [{ "flavorCode": "FLAVOR_A", "popcornCount": 30, "averageScore": 4.5 }] },
@@ -156,6 +156,7 @@
 
 - 공개 프로필의 평가 중 `PRIVATE` 한줄평은 제외한다
 - 본인이 자신의 `userId`로 조회하면 `visibility`와 무관하게 `200`
+- 등록된 프로필 사진이 없으면 `user.avatarUrl`은 `null`
 
 ### 상태값
 

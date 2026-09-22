@@ -51,8 +51,9 @@
 }
 
 /*
- * 점선 원 — 내 쪽 공간이다. 지름 292px는 와이어프레임 실측값이고, 카드 여섯 장이
- * 안팎으로 놀 수 있는 크기라 그대로 쓴다.
+ * 점선 원 — 내 쪽 공간이다. 지름은 화면이 넘긴다(`--ring-size`, 기준 320px · 업무
+ * -805). 배치 영역이 기준보다 작으면 카드와 함께 줄어든다. 와이어프레임 실측값 292px에서는
+ * 88x124 카드가 원 안에 두 장밖에 들어가지 않아 카드를 줄이고 원을 키웠다.
  *
  * 선을 얇게 하고 안쪽 면만 벽보다 한 톤 낮춘다. 이전에는 2px 파선에 폐기 팔레트
  * 색이라 공간이 카드보다 강하게 읽혔다. 이 화면의 주인공은 포스터다.
@@ -63,10 +64,10 @@
  */
 .ring {
   position: absolute;
-  top: 47%;
+  top: 50%;
   left: 50%;
-  width: 292px;
-  height: 292px;
+  width: var(--ring-size);
+  height: var(--ring-size);
   box-sizing: border-box;
   border: 1.5px dashed var(--color-line);
   border-radius: 50%;
@@ -83,11 +84,11 @@
  */
 .center {
   position: absolute;
-  top: 47%;
+  top: 50%;
   left: 50%;
   display: flex;
-  width: 76px;
-  height: 76px;
+  width: var(--center-size);
+  height: var(--center-size);
   box-sizing: border-box;
   align-items: center;
   justify-content: center;

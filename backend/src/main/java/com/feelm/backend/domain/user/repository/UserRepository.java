@@ -31,7 +31,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /**
      * 계정 행을 잠그고 읽는다. 같은 계정을 동시에 바꾸는 요청들이 서로의 결과를 덮어쓰지 않게 한다.
      *
-     * <p>호출자는 넷이다.
+     * <p>호출자는 다음과 같다.
      *
      * <ul>
      *   <li>비밀번호 재설정(API-011, {@code PasswordResetService.reset}) — 토큰을 소진하고 비밀번호를 바꾸는 동안 같은 계정의 다른
@@ -46,7 +46,22 @@ public interface UserRepository extends JpaRepository<User, Long> {
      *       변경과 교차해 되살아나지 않게 한다.
      *   <li>소셜 계정 연결(API-009, {@code OAuthLinkWriter.insert}) — 활성 확인과 삽입 사이에 탈퇴가 끼어들면 탈퇴가 지운 연결이
      *       되살아나 그 소셜 계정으로 재가입할 수 없게 되므로, 탈퇴와 같은 계정 행에서 직렬화한다.
+     *   <li>파티 초대(API-051, {@code PartyService.invite}) — 초대 대상의 활성 확인이 탈퇴(API-013)의 파티 정리와 교차하면
+     *       정리가 목록을 읽은 뒤 커밋된 초대가 응답할 주체 없이 남으므로, 탈퇴와 같은 계정 행에서 직렬화한다(S15P21E106-758). 대상 행을 파티 행보다
+     *       먼저 잠근다 — 초대 수락(API-053)과 같은 <b>사용자 → 파티</b> 순서다.
+     *   <li>초대 수락·거절(API-053·054, {@code PartyService.acceptInvitation}·{@code declineInvitation})
+     *       — 응답자의 활성 확인과 멤버 추가를 탈퇴와 직렬화하고, 수락은 이어서 파티 행을 잠근다(사용자 → 파티 순서의 기준).
+     *   <li>온보딩 제출(API-023, {@code OnboardingSubmitService.submit}) — 완료 판정과 전이 사이에 같은 사용자의 다른 제출이
+     *       끼어들어 두 요청이 모두 성공하지 않게 한다.
+     *   <li>프로필 수정(API-015, {@code UserProfileService.updateProfile}) — 같은 사용자의 동시 수정이 서로의 결과를 덮어쓰지
+     *       않게 한다.
      * </ul>
+     *
+     * <p>잠금 강도는 Hibernate가 PostgreSQL에 내는 {@code FOR NO KEY UPDATE}다. 같은 잠금끼리는 충돌하므로 위 호출자들은 서로
+     * 직렬화되지만, 이 행을 가리키는 외래키 검사({@code FOR KEY SHARE} — 초대·멤버 INSERT, 파티 오너 승계의 {@code
+     * parties.owner_id} UPDATE)와는 충돌하지 않는다. 그래서 파티 초대(사용자 → 파티)와 파티 나가기의 오너 승계(파티 → 승계자 외래키 검사)가
+     * 겹쳐도 교착하지 않는다. 이 메서드를 native {@code FOR UPDATE}로 바꾸면 그 쌍이 교착하므로 바꾸지 않는다(S15P21E106-758 리뷰
+     * A-1).
      *
      * <p>인증의 세 경로는 <b>토큰 → 계정</b> 잠금 순서를 지킨다. 재가입의 삭제 경로도 토큰을 먼저 지우고 계정을 지운다. API-012는 계정 행을 잠그기 전에
      * 재설정 토큰 무효화를 먼저 호출해 이 순서를 지키므로, 재설정과 비밀번호 변경이 동시에 들어와도 교착하지 않는다.

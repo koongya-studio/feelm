@@ -74,7 +74,7 @@ no border, 3:2 landscape
 | --- | --- | --- |
 | `ELHS` | 디즈니 앨리스 | 하늘색 원피스 · 흰 앞치마 · 검정 머리띠 |
 | `RLHS` | 디즈니 신데렐라 | 하늘색 볼가운 · 특정 머리 모양 |
-| `RLHV` | 코카콜라 광고 산타 | 빨간 옷에 흰 털 · 넓은 검정 벨트 · 볼 홍조 |
+| `RLHV` | 애니메이션 · 드라마판 빨간 머리 앤 | 특정 배우의 얼굴 · 애니메이션 특유의 눈 비례 |
 | `EDMV` | 유니버설 프랑켄슈타인 | 목 볼트 · 평평한 머리 · 초록 피부 |
 | `RDHV` | 휴 잭맨 영화판 · 게임 반 헬싱 | 넓은 검정 모자 + 긴 가죽 코트 조합 |
 | `RDMV` | BBC · 가이 리치 영화 디자인 | 특정 배우의 얼굴 · 디어스토커 + 인버네스 세트 |
@@ -97,7 +97,7 @@ no border, 3:2 landscape
 | `EDHS` | 돌아오지 못한 자 | a young musician in draped antique cloth holding a small lyre, head turned back over his shoulder, grief opening on his face, darkness behind |
 | `EDMV` | 금기를 여는 자 | a young scientist in a stained laboratory apron, lamp lit from below, exhausted brilliant eyes, glass apparatus catching light at the frame edge |
 | `EDMS` | 심연을 들여다본 학자 | an aging scholar in a heavy dark robe in a candlelit study, deep-set eyes reading something he regrets, towering shelves falling into shadow |
-| `RLHV` | 인심 좋은 이웃 | a broad cheerful old man with a full white beard in plain heavy winter wool, earth tones not red, crinkled laughing eyes, snow on his shoulders |
+| `RLHV` | 이야기 많은 아이 | a freckled girl with long braided red hair resting her chin on one hand, bright daydreaming eyes turned upward, farmhouse field and low cloud behind |
 | `RLHS` | 무도회를 기다린 사람 | a young woman in a plain grey work dress by a shuttered window, hair tied back, hopeful patient eyes turned toward the light, hearth ash on her sleeve |
 | `RLMV` | 동네 꾀돌이 | a barefoot boy in a straw hat and suspenders leaning on a whitewashed fence, sideways scheming grin, riverbank summer haze behind |
 | `RLMS` | 등대지기 | a bearded castaway in hand-stitched goat hide, wide-brimmed shaggy hat, steady measuring eyes, notched tally stick and distant grey sea |
@@ -106,9 +106,10 @@ no border, 3:2 landscape
 | `RDMV` | 안락의자 탐정 | a lean sharp-eyed man in a plain dark dressing gown seated in a deep armchair, fingertips pressed together, pipe smoke drifting, no cap and no cape |
 | `RDMS` | 금고지기 | a thin miserly old man in a threadbare nightshirt and cap, single candle, guarded suspicious eyes, ledger and coin box in the near dark |
 
-금지 표식을 프롬프트에서 미리 밀어낸 곳이 셋이다. `RLHV`는 `earth tones not red`,
-`RDHV`는 `no hat and no long coat`, `RDMV`는 `no cap and no cape`다. 나머지는 4장의
-장면 묘사 자체가 금지 디자인과 다른 옷 · 소도구를 지정한다.
+금지 표식을 프롬프트에서 미리 밀어낸 곳이 둘이다. `RDHV`는 `no hat and no long coat`,
+`RDMV`는 `no cap and no cape`다. 나머지는 4장의 장면 묘사 자체가 금지 디자인과 다른
+옷 · 소도구를 지정한다. `RLHV`는 영상화판이 실사 · 애니메이션 양쪽에 있어 표식을 한 마디로
+못 박기 어렵다 — 검수 때 얼굴을 직접 대조한다.
 
 ## 5. 검수 체크리스트
 

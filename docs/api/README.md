@@ -121,6 +121,8 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-078 | [이메일 인증번호 발송](./users.md#api-078-이메일-인증번호-발송) | POST | `/auth/email/verification-code` | 사용자 | 1차 MVP | 공개 | FR-01 |  |
 | API-079 | [이메일 인증번호 확인](./users.md#api-079-이메일-인증번호-확인) | POST | `/auth/email/verification-code/verify` | 사용자 | 1차 MVP | 공개 | FR-01 |  |
 | API-080 | [리포트 첫 발급 기록](./report-trend.md#api-080-리포트-첫-발급-기록) | POST | `/reports/{reportId}/issue` | 리포트 | 2차 MVP | 회원 | FR-23 |  |
+| API-081 | [프로필 사진 등록·교체](./users.md#api-081-프로필-사진-등록교체) | PUT | `/users/me/avatar` | 사용자 | 2차 MVP | 회원 | FR-38 |  |
+| API-082 | [프로필 사진 삭제](./users.md#api-082-프로필-사진-삭제) | DELETE | `/users/me/avatar` | 사용자 | 2차 MVP | 회원 | FR-38 |  |
 
 ### 삭제된 API
 
