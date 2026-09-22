@@ -73,7 +73,9 @@ deploy 알림과 동일한 값을 사용합니다. `MATTERMOST_PASSWORD`는 상�
 복제하거나 편집하지 않습니다. 알림 정책 트리는 팀이 UI에서 만든 다른 정책을 덮어쓰지 않도록
 provisioning하지 않고, 각 규칙이 `FEELM Mattermost` 연락 지점을 직접 사용합니다.
 로그 알림은 환경·서비스·감지 건수와 최근 15분 Grafana Explore 링크만 전송하며 원문 로그와
-스택 트레이스는 Mattermost 메시지에 포함하지 않습니다.
+스택 트레이스는 Mattermost 메시지에 포함하지 않습니다. Explore 링크의 오류 검색식이 Nginx
+접근 로그의 요청 URL이나 Referer에 다시 기록되어 자기 자신을 오류로 감지하지 않도록,
+`/grafana/` 요청이 같은 오류 키워드를 포함한 접근 로그는 알림과 Explore 조회에서 제외합니다.
 
 ### 로그 알림 테스트와 복구 확인
 
