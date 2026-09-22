@@ -30,11 +30,13 @@
  *   바깥에 적용된다
  */
 import { useState } from 'react';
+import { Link } from 'react-router';
 import type { CSSProperties, ReactNode } from 'react';
 import Wordmark from '../Wordmark';
 import { formatPrintDate } from '../../utils/report';
 import { useFitText } from './useFitText';
 import { characterCardImage } from './characterCards';
+import { path } from '../../routes/paths';
 import styles from './ReportFourCut.module.css';
 import type { ReportCutImage, ReportCutName, ReportFourCut } from '../../types/report';
 
@@ -54,6 +56,8 @@ type Props = {
    * 내리지 않으므로 그림은 코드로 찾는다. 없으면 이름만 그린다
    */
   characterCode?: string | null;
+  /** 상세 화면에서 감독·배우 칸을 같은 이름의 통합 검색으로 연결한다. */
+  linkPeople?: boolean;
 };
 
 export default function ReportFourCut({
@@ -62,6 +66,7 @@ export default function ReportFourCut({
   createdAt,
   head = true,
   characterCode,
+  linkPeople = false,
 }: Props) {
   const title = `${owner ? `${owner}의` : '나의'} 취향 4컷`;
   const date = formatPrintDate(createdAt);
@@ -79,11 +84,15 @@ export default function ReportFourCut({
         <ol className={styles.cuts}>
           {cuts.genre ? <GenreCut {...cuts.genre} /> : <PendingCut kind="genre" label="장르" />}
           {cuts.director ? (
-            <DirectorCut {...cuts.director} />
+            <DirectorCut {...cuts.director} searchable={linkPeople} />
           ) : (
             <PendingCut kind="director" label="감독" />
           )}
-          {cuts.actor ? <ActorCut {...cuts.actor} /> : <PendingCut kind="actor" label="배우" />}
+          {cuts.actor ? (
+            <ActorCut {...cuts.actor} searchable={linkPeople} />
+          ) : (
+            <PendingCut kind="actor" label="배우" />
+          )}
           {cuts.character ? (
             <CharacterCut {...cuts.character} code={characterCode} />
           ) : (
@@ -121,7 +130,8 @@ function DirectorCut({
   displayName,
   image,
   work,
-}: CutProps & { work: ReportCutImage | null }) {
+  searchable,
+}: CutProps & { work: ReportCutImage | null; searchable: boolean }) {
   const photo = useCutImage(image);
   const [workFailed, setWorkFailed] = useState<string | null>(null);
   const workUrl = work?.url && work.url !== workFailed ? work.url : null;
@@ -133,6 +143,7 @@ function DirectorCut({
       name={name}
       displayName={displayName}
       photo={photo}
+      searchName={searchable ? name : undefined}
       extra={
         workUrl ? (
           <span className={styles.work}>
@@ -153,7 +164,7 @@ function DirectorCut({
   );
 }
 
-function ActorCut({ name, displayName, image }: CutProps) {
+function ActorCut({ name, displayName, image, searchable }: CutProps & { searchable: boolean }) {
   const photo = useCutImage(image);
   const text = displayName || name;
   const words = text.trim().split(/\s+/);
@@ -161,7 +172,14 @@ function ActorCut({ name, displayName, image }: CutProps) {
   const lead = words.join(' ');
 
   return (
-    <Cut kind="actor" label="배우" name={name} displayName={displayName} photo={photo}>
+    <Cut
+      kind="actor"
+      label="배우"
+      name={name}
+      displayName={displayName}
+      photo={photo}
+      searchName={searchable ? name : undefined}
+    >
       {/* 두 단어를 서로 다른 크기로 한 줄씩 쓴다. 줄 수가 아니라 상자 폭 · 높이로만 맞춘다 */}
       <FitName text={text} maxLines={3} className={styles.actorName}>
         {lead ? <span className={styles.actorLead}>{lead}</span> : null}
@@ -232,6 +250,8 @@ type CutFrameProps = ReportCutName & {
   photo: CutImageState;
   /** 사진과 이름 사이에 놓는 장식. 감독 칸의 대표작 */
   extra?: ReactNode;
+  /** 값이 있으면 칸 전체를 해당 인물 검색 링크로 만든다. */
+  searchName?: string;
   children: ReactNode;
 };
 
@@ -242,7 +262,16 @@ type CutFrameProps = ReportCutName & {
  * 영문 이름이 있으면 큰 글자는 장식이라 읽지 않고, 아래의 한글 이름을 읽는다. 영문 이름이
  * 없으면 한글 이름이 곧 큰 글자라 아래에 한 번 더 쓰지 않는다.
  */
-function Cut({ kind, label, name, displayName, photo, extra, children }: CutFrameProps) {
+function Cut({
+  kind,
+  label,
+  name,
+  displayName,
+  photo,
+  extra,
+  searchName,
+  children,
+}: CutFrameProps) {
   const hasDisplayName = Boolean(displayName) && displayName !== name;
 
   return (
@@ -267,6 +296,13 @@ function Cut({ kind, label, name, displayName, photo, extra, children }: CutFram
 
       <CutLabel kind={kind} label={label} />
       {hasDisplayName ? <span className={styles.caption}>{name}</span> : null}
+      {searchName ? (
+        <Link
+          className={styles.personSearchLink}
+          to={path.searchWith(searchName)}
+          aria-label={`${searchName} 검색`}
+        />
+      ) : null}
     </li>
   );
 }

@@ -132,7 +132,7 @@ beforeEach(() => {
 function LocationProbe() {
   const location = useLocation();
 
-  return <div data-testid="location">{location.pathname}</div>;
+  return <div data-testid="location">{location.pathname + location.search}</div>;
 }
 
 function renderApp(entries: string[]) {
@@ -193,6 +193,28 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
     // 이번 반기에 처음 나온 맛은 이름 옆에도 표시한다. 계약은 `isNew`만 주고 문구는 화면이 만든다
     expect(screen.getByText('블루베리 (새로운 맛)')).toBeInTheDocument();
     expect(screen.getByText('다크초코')).toBeInTheDocument();
+  });
+
+  it('4컷과 상세 목록의 감독·배우 이름을 같은 이름의 검색으로 연결한다', async () => {
+    renderApp(['/reports/301']);
+
+    const directorCut = await screen.findByRole('link', { name: '웨스 앤더슨 검색' });
+    const directorList = screen.getByRole('link', { name: '웨스 앤더슨' });
+    const actorCut = screen.getByRole('link', { name: '엠마 스톤 검색' });
+    const actorList = screen.getByRole('link', { name: '엠마 스톤' });
+
+    [directorCut, directorList].forEach((link) =>
+      expect(link).toHaveAttribute(
+        'href',
+        '/search?q=%EC%9B%A8%EC%8A%A4%20%EC%95%A4%EB%8D%94%EC%8A%A8',
+      ),
+    );
+    [actorCut, actorList].forEach((link) =>
+      expect(link).toHaveAttribute('href', '/search?q=%EC%97%A0%EB%A7%88%20%EC%8A%A4%ED%86%A4'),
+    );
+
+    fireEvent.click(actorCut);
+    expect(location()).toBe('/search?q=%EC%97%A0%EB%A7%88%20%EC%8A%A4%ED%86%A4');
   });
 
   it('취향 키워드는 근거와 함께 그리고, 비면 칸째 숨긴다', async () => {

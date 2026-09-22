@@ -26,7 +26,7 @@
  * `[?]` 7.4는 와이어프레임에 `공유하기` 버튼이 없지만 이동표에 `7.4 ⇢ 3.5`가 있어 두었다.
  */
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import Chip from '../../../components/Chip';
 import IconButton from '../../../components/IconButton';
@@ -156,6 +156,7 @@ export default function ReportDetailPage({ from }: Props) {
             owner={nickname}
             createdAt={report.createdAt}
             characterCode={report.characterCard?.code}
+            linkPeople
           />
         </div>
 
@@ -302,7 +303,9 @@ function PeopleGroup({
       <ul className={styles.people}>
         {people.map((person) => (
           <li key={person.name} className={styles.person}>
-            <span>{person.name}</span>
+            <Link className={styles.personLink} to={path.searchWith(person.name)}>
+              {person.name}
+            </Link>
             <span className={styles.count}>{person.count}편 감상</span>
           </li>
         ))}

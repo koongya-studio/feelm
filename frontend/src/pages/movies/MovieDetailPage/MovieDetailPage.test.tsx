@@ -384,6 +384,39 @@ describe('2.4 화면', () => {
 });
 
 describe('2.4 공개 한줄평과 출연진', () => {
+  it('감독과 배우 이름을 URL에 안전하게 인코딩한 검색으로 연결한다', async () => {
+    vi.mocked(getMovieDetail).mockResolvedValue(
+      movie({
+        directors: [{ personId: 1, name: '봉 준호/감독', profileUrl: null }],
+        cast: [{ personId: 2, name: '틸다 스윈튼', profileUrl: null }],
+      }),
+    );
+
+    renderMovie();
+
+    const director = await screen.findByRole('link', { name: '봉 준호/감독' });
+    expect(director).toHaveAttribute(
+      'href',
+      '/search?q=%EB%B4%89%20%EC%A4%80%ED%98%B8%2F%EA%B0%90%EB%8F%85',
+    );
+
+    const list = director.closest('ul');
+    if (!list) throw new Error('출연·제작 목록이 없습니다.');
+    const setPointerCapture = vi.fn();
+    Object.assign(list, { setPointerCapture });
+    expect(
+      fireEvent.pointerDown(director, {
+        pointerId: 7,
+        pointerType: 'mouse',
+        button: 0,
+        clientX: 100,
+      }),
+    ).toBe(true);
+    expect(setPointerCapture).not.toHaveBeenCalled();
+    fireEvent.click(director);
+    expect(location()).toBe('/search?q=%EB%B4%89%20%EC%A4%80%ED%98%B8%2F%EA%B0%90%EB%8F%85');
+  });
+
   it('감독과 배우의 작은 프로필 이미지를 표시한다', async () => {
     vi.mocked(getMovieDetail).mockResolvedValue(
       movie({
