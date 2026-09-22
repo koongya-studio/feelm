@@ -1,8 +1,8 @@
 spring:
   servlet:
     multipart:
-      max-file-size: 10MiB
-      max-request-size: 11MiB
+      max-file-size: 10MB
+      max-request-size: 11MB
   application:
     name: backend
   profiles:
