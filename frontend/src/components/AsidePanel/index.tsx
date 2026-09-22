@@ -27,6 +27,15 @@ type Props = {
   mark?: ReactNode;
   /** 카드 안쪽을 어두운 면으로 둔다. 팝콘은 밝은 면에서 4종이 구분되지 않는다 */
   tone?: 'light' | 'dark';
+  /**
+   * 제목 줄 오른쪽의 닫기 버튼 (업무 -784).
+   *
+   * 4.2 검색의 우측 패널은 **고른 영화**를 말하므로 고르기를 물릴 수 있어야 한다. 시안이
+   * 그 자리에 `✕`를 두었다. 주지 않으면 그리지 않으므로 다른 화면의 카드는 그대로다.
+   */
+  onClose?: () => void;
+  /** 닫기 버튼에 읽히는 이름 */
+  closeLabel?: string;
   children: ReactNode;
 };
 
@@ -36,6 +45,8 @@ export default function AsidePanel({
   linkLabel,
   mark,
   tone = 'light',
+  onClose,
+  closeLabel,
   children,
 }: Props) {
   return (
@@ -49,6 +60,18 @@ export default function AsidePanel({
           <Link to={to} className={styles.link} aria-label={linkLabel ?? `${title} 자세히 보기`}>
             <ChevronRightIcon />
           </Link>
+        ) : null}
+
+        {onClose ? (
+          <button
+            type="button"
+            className={styles.close}
+            aria-label={closeLabel ?? `${title} 닫기`}
+            onClick={onClose}
+          >
+            {/* 닫기 표식. 이 모양의 아이콘이 없어 글자로 둔다 — 새 자산을 만들지 않는다 */}
+            <span aria-hidden="true">✕</span>
+          </button>
         ) : null}
       </div>
 

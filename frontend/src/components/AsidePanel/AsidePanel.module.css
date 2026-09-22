@@ -55,6 +55,34 @@
   color: var(--color-ink);
 }
 
+/* 닫기(업무 -784). 화살표가 없으면 이것이 제목 줄 오른쪽 끝을 맡는다 */
+.close {
+  display: flex;
+  width: var(--tap-target-min);
+  height: var(--tap-target-min);
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  margin-right: calc(var(--space-2) * -1);
+  margin-left: auto;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-body);
+  line-height: 1;
+}
+
+.mark + .close,
+.link + .close {
+  margin-left: 0;
+}
+
+.close:hover {
+  color: var(--color-ink);
+}
+
 .body {
   margin-top: var(--space-3);
 }

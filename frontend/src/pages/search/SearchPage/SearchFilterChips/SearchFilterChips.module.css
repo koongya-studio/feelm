@@ -1,0 +1,65 @@
+/*
+ * 4.2 검색 — 걸려 있는 필터 칩 (업무 S15P21E106-784).
+ *
+ * 1024px 이상에서만 그려지므로 `@media`가 없다(업무 -782의 규칙).
+ *
+ * **시안의 분홍 칩은 무채색으로 둔다** — UI 요소에 유채색을 쓰지 않는다
+ * (`design-concept.md` 2.3). 걸려 있다는 것은 테두리와 `✕`가 말한다.
+ */
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-solid);
+  color: var(--color-ink);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  font-weight: var(--font-weight-bold);
+}
+
+.chip:hover {
+  background: var(--color-surface);
+}
+
+.remove {
+  color: var(--color-ink-muted);
+}
+
+/* 칩 줄과 같은 높이에 서는 글자 단추. 앞에 세로선을 둬 칩과 구분한다(시안) */
+.reset {
+  padding: var(--space-1) 0 var(--space-1) var(--space-3);
+  border: 0;
+  border-left: 1px solid var(--color-line);
+  background: none;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  font-weight: var(--font-weight-medium);
+}
+
+.reset:hover {
+  color: var(--color-ink);
+}
