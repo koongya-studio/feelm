@@ -11,8 +11,14 @@
 import { useEffect } from 'react';
 import type { DependencyList, RefObject } from 'react';
 
-/** 요소를 감싼 가장 가까운 세로 스크롤 영역. 없으면 `null`(창이 스크롤한다) */
-function scrollParent(node: HTMLElement): HTMLElement | null {
+/**
+ * 요소를 감싼 가장 가까운 세로 스크롤 영역. 없으면 `null`(창이 스크롤한다).
+ *
+ * 내보내는 이유는 스크롤 위치를 **읽는** 것 말고 **옮겨야** 하는 화면이 있어서다. 2.4 영화
+ * 상세가 영화를 바꿀 때 맨 위로 되돌리고 `맨 위로` 단추로 올라간다(업무 -787). 같은 판정을
+ * 두 벌 두면 한쪽만 고치게 된다.
+ */
+export function scrollParent(node: HTMLElement): HTMLElement | null {
   let current = node.parentElement;
 
   while (current) {
