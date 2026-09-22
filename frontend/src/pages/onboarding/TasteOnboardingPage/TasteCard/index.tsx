@@ -22,6 +22,9 @@ type Props = {
   title: string;
   posterUrl: string | null;
   value: TasteValue;
+  /** 카드 크기(px). 배치 영역이 작으면 화면이 줄여서 준다(업무 -805) */
+  width: number;
+  height: number;
   x: number;
   y: number;
   dragging: boolean;
@@ -49,6 +52,8 @@ export default function TasteCard({
   title,
   posterUrl,
   value,
+  width,
+  height,
   x,
   y,
   dragging,
@@ -77,7 +82,14 @@ export default function TasteCard({
   return (
     <div
       className={styles.card}
-      style={{ '--card-x': `${x}px`, '--card-y': `${y}px` } as CSSProperties}
+      style={
+        {
+          '--card-x': `${x}px`,
+          '--card-y': `${y}px`,
+          '--card-width': `${width}px`,
+          '--card-height': `${height}px`,
+        } as CSSProperties
+      }
       data-value={value}
       data-dragging={dragging}
       data-front={front}
@@ -93,8 +105,8 @@ export default function TasteCard({
         aria-label={`${title}, ${tasteValueLabel(value)}`}
       >
         <Poster
-          width={88}
-          height={124}
+          width={width}
+          height={height}
           radius={11}
           src={posterUrl ?? undefined}
           title=""

@@ -33,7 +33,7 @@
  * 늘어놓는다(API-023 처리 규칙).
  *
  * 모든 카드에 처음부터 판정값이 있으므로 별도 최소 선택 개수 제한을 두지 않는다.
- * 초기 배치 위치는 와이어프레임의 카드 6장 좌표에 네 자리를 더해 쓴다.
+ * 초기 배치는 원을 위 3 · 양옆 2장씩 · 아래 3장으로 두른다(`INITIAL_POSITIONS`, 업무 -805).
  *
  * 팀 결정 2026-09-15 (업무 -449) — **이 화면은 카드를 받기 전과 빈 목록에 상태를 둔다.**
  * `StatusView`는 `로딩 상태는 만들지 않는다`(팀 결정 2026-09-08)를 따르고 있고 다른
@@ -60,16 +60,29 @@ import { getOnboardingCards, submitOnboardingPreferences } from '../../../api/on
 import { useOnboarding } from '../../../contexts/onboardingContext';
 import { path } from '../../../routes/paths';
 import styles from './TasteOnboardingPage.module.css';
-import type { PointerEvent } from 'react';
+import type { CSSProperties, PointerEvent } from 'react';
 import type { OnboardingCard, OnboardingPreference } from '../../../types/onboarding';
 import type { TasteValue } from './tasteValue';
 
-const CARD_WIDTH = 88;
-const CARD_HEIGHT = 124;
+/*
+ * 카드 · 점선 원 · 가운데 표식의 기준 크기 (업무 -805, 사용자 결정 2026-09-22).
+ *
+ * 한때 카드 88x124 · 원 292px(와이어프레임 실측)이었다. 가운데 표식(76px)을 빼면 원 안에
+ * 카드가 놓일 폭이 반지름으로 108px뿐이라, 겹치지 않고 원 안에 온전히 들어가는 카드가
+ * 두 장이었다. 카드를 줄이고 원을 키워 여섯 장이 들어가게 했다. 포스터가 알아볼 만한
+ * 크기는 남긴다.
+ *
+ * 이 값은 **기준 배치(`REFERENCE_BOARD`)에서의 크기**다. 배치 영역이 그보다 작으면 전부
+ * 같은 비율로 줄인다(`layoutScale`). CSS는 화면이 넘기는 변수(`--ring-size` ·
+ * `--center-size`)와 카드의 `width` · `height`로 받는다.
+ */
+const CARD_WIDTH = 72;
+const CARD_HEIGHT = 100;
+const RING_DIAMETER = 320;
+const CENTER_DIAMETER = 76;
 
-/** 점선 원. 와이어프레임 실측값 — 지름 292px, 중심은 배치 영역의 (50%, 47%) */
-const RING_DIAMETER = 292;
-const RING_CENTER_Y_RATIO = 0.47;
+/** 점선 원의 중심. 배치 영역의 가로 · 세로 한가운데다 */
+const RING_CENTER_Y_RATIO = 0.5;
 
 /**
  * 서버에 요청할 확정 카드 장수(API-023 `size`. 기본·최대 10).
@@ -83,17 +96,22 @@ const RING_CENTER_Y_RATIO = 0.47;
 const CARD_COUNT = 10;
 
 /*
- * 카드 초기 좌표.
+ * 기준 배치 영역과 카드 초기 좌표 (업무 -805).
  *
- * 와이어프레임의 배치 영역은 412 x 653이다(892에서 헤더와 하단 영역을 뺀 값).
- * 실제 영역 높이는 헤더 · 하단 높이에 따라 달라지므로 좌표를 비율로 바꿔 둔다.
- * 그러지 않으면 영역이 짧을 때 카드가 가운데 표식과 겹친다.
+ * 카드 10장을 점선 원 둘레에 **위 3 · 양옆 2장씩 · 아래 3장**으로 액자처럼 두른다. 좌표는
+ * 412x476 영역에서 카드 왼쪽 위다. 모든 카드 중심이 원(반지름 160px)에서 8px 이상 밖이고,
+ * `⊖`까지 포함해 카드끼리 4px 이상 떨어진다. 이 조건을 지키는 가장 낮은 배치를 계산으로
+ * 찾았다(업무 -805 검증 기록).
  *
- * 88x124 카드 10장을 점선 원을 감싸는 10각형 형태로 놓는다. 412px 화면에도 가로로
- * 최대 네 장만 들어가는 크기다. 최초 카드는 원 밖의 흐린 DISLIKE이며, 점선 안은
- * 선명한 LIKE로 드래그 중에도 즉시 바뀐다.
+ * 한때 기준은 와이어프레임의 412x653이었고 카드가 원을 10각형으로 감쌌다. 그 높이를 쓰는
+ * 화면은 412x915뿐이라, 360x740 같은 흔한 기종에서도 카드 대부분이 처음부터 원 안에
+ * 그려졌다. 판정은 싫어요인데 눈에는 좋아요 자리에 있는 셈이었다.
+ *
+ * 실제 영역이 기준보다 크면 좌표를 비율로 넓혀 쓴다. 작으면 크기를 줄이고(`layoutScale`)
+ * 좌표는 같은 비율로 펼친다. 줄이는 비율은 가로 · 세로 중 더 모자란 쪽을 따르므로, 다른
+ * 쪽은 기준보다 넉넉해져 카드가 원에서 더 멀어질 뿐 원 안으로 들어오지 않는다.
  */
-const WIREFRAME_BOARD = { width: 412, height: 653 };
+const REFERENCE_BOARD = { width: 412, height: 476 };
 
 /** `⊖`가 카드 밖으로 나가는 크기. 카드를 영역 안에 가둘 때 쓴다 */
 const REMOVE_OVERHANG = 8;
@@ -105,20 +123,41 @@ const REMOVE_OVERHANG = 8;
 const EDGE_INSET = 8;
 
 const INITIAL_POSITIONS = [
-  { x: 162, y: 8 },
-  { x: 256, y: 58 },
-  { x: 316, y: 178 },
-  { x: 316, y: 312 },
-  { x: 256, y: 448 },
-  { x: 162, y: 513 },
-  { x: 68, y: 448 },
-  { x: 8, y: 312 },
-  { x: 8, y: 178 },
-  { x: 68, y: 58 },
+  { x: 170, y: 8 },
+  { x: 254, y: 8 },
+  { x: 324, y: 120 },
+  { x: 324, y: 256 },
+  { x: 254, y: 368 },
+  { x: 170, y: 376 },
+  { x: 86, y: 368 },
+  { x: 16, y: 256 },
+  { x: 16, y: 120 },
+  { x: 86, y: 8 },
 ].map((position) => ({
-  xRatio: position.x / (WIREFRAME_BOARD.width - CARD_WIDTH - REMOVE_OVERHANG),
-  yRatio: (position.y - REMOVE_OVERHANG) / (WIREFRAME_BOARD.height - CARD_HEIGHT - REMOVE_OVERHANG),
+  /*
+   * 비율은 `positionFromRatio`가 되돌리는 구간과 같은 구간으로 잡는다. 한때 분모에
+   * 가장자리 여백(`EDGE_INSET`)이 빠져 있어 기준 영역에서도 좌표가 안쪽으로 몇 px씩
+   * 밀렸다 — 옆 카드가 원 쪽으로 붙는 방향이다(업무 -805).
+   */
+  xRatio:
+    (position.x - EDGE_INSET) /
+    (REFERENCE_BOARD.width - CARD_WIDTH - REMOVE_OVERHANG - 2 * EDGE_INSET),
+  yRatio: (position.y - REMOVE_OVERHANG) / (REFERENCE_BOARD.height - CARD_HEIGHT - REMOVE_OVERHANG),
 }));
+
+/**
+ * 배치 영역에 맞춰 원 · 카드 · 가운데 표식을 줄이는 비율. 기준 영역보다 크면 1이다.
+ *
+ * 가로 · 세로 중 더 모자란 쪽을 따른다. 영역을 재기 전(0)에는 1로 둔다 — 그때는 카드를
+ * 그리지 않는다.
+ */
+function layoutScale(board: { width: number; height: number }): number {
+  if (board.width === 0 || board.height === 0) {
+    return 1;
+  }
+
+  return Math.min(1, board.width / REFERENCE_BOARD.width, board.height / REFERENCE_BOARD.height);
+}
 
 /** 포인터 흔들림으로 상태가 바뀌지 않도록 이 거리를 넘은 뒤부터 드래그로 본다 */
 const TAP_THRESHOLD = 5;
@@ -171,6 +210,13 @@ export default function TasteOnboardingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [board, setBoard] = useState({ width: 0, height: 0 });
+
+  /** 이 영역에서의 크기. 작은 화면에서는 기준보다 줄어든다(`layoutScale`) */
+  const scale = layoutScale(board);
+  const cardWidth = Math.round(CARD_WIDTH * scale);
+  const cardHeight = Math.round(CARD_HEIGHT * scale);
+  const ringDiameter = Math.round(RING_DIAMETER * scale);
+  const centerDiameter = Math.round(CENTER_DIAMETER * scale);
 
   /*
    * 배치 영역을 세우는 조건. 카드를 받기 전과 서버가 0장을 준 뒤에는 점선 원과 가운데
@@ -252,8 +298,8 @@ export default function TasteOnboardingPage() {
   function positionFromRatio(xRatio: number, yRatio: number) {
     const minY = REMOVE_OVERHANG;
     const minX = EDGE_INSET;
-    const maxX = Math.max(minX, board.width - CARD_WIDTH - REMOVE_OVERHANG - EDGE_INSET);
-    const maxY = Math.max(minY, board.height - CARD_HEIGHT);
+    const maxX = Math.max(minX, board.width - cardWidth - REMOVE_OVERHANG - EDGE_INSET);
+    const maxY = Math.max(minY, board.height - cardHeight);
 
     return {
       x: minX + xRatio * (maxX - minX),
@@ -266,11 +312,11 @@ export default function TasteOnboardingPage() {
     const centerX = board.width / 2;
     const centerY = board.height * RING_CENTER_Y_RATIO;
     const position = positionFromRatio(xRatio, yRatio);
-    const cardCenterX = position.x + CARD_WIDTH / 2;
-    const cardCenterY = position.y + CARD_HEIGHT / 2;
+    const cardCenterX = position.x + cardWidth / 2;
+    const cardCenterY = position.y + cardHeight / 2;
     const distance = Math.hypot(cardCenterX - centerX, cardCenterY - centerY);
 
-    return distance <= RING_DIAMETER / 2 ? 'LIKE' : 'DISLIKE';
+    return distance <= ringDiameter / 2 ? 'LIKE' : 'DISLIKE';
   }
 
   /**
@@ -280,8 +326,8 @@ export default function TasteOnboardingPage() {
   function toRatio(x: number, y: number) {
     const minY = REMOVE_OVERHANG;
     const minX = EDGE_INSET;
-    const maxX = Math.max(minX, board.width - CARD_WIDTH - REMOVE_OVERHANG - EDGE_INSET);
-    const maxY = Math.max(minY, board.height - CARD_HEIGHT);
+    const maxX = Math.max(minX, board.width - cardWidth - REMOVE_OVERHANG - EDGE_INSET);
+    const maxY = Math.max(minY, board.height - cardHeight);
 
     return {
       xRatio: maxX === minX ? 0 : (Math.min(Math.max(x, minX), maxX) - minX) / (maxX - minX),
@@ -383,10 +429,10 @@ export default function TasteOnboardingPage() {
 
       const insideCount = previous.filter((item) => item.value === 'LIKE').length;
       const angle = insideCount * 2.4;
-      const spread = Math.min(insideCount, 3) * 14;
+      const spread = Math.min(insideCount, 3) * 14 * scale;
       const next = toRatio(
-        board.width / 2 - CARD_WIDTH / 2 + Math.cos(angle) * spread,
-        board.height * RING_CENTER_Y_RATIO - CARD_HEIGHT / 2 + Math.sin(angle) * spread,
+        board.width / 2 - cardWidth / 2 + Math.cos(angle) * spread,
+        board.height * RING_CENTER_Y_RATIO - cardHeight / 2 + Math.sin(angle) * spread,
       );
 
       return previous.map((item) =>
@@ -547,6 +593,12 @@ export default function TasteOnboardingPage() {
       <div
         className={styles.board}
         ref={boardRef}
+        style={
+          {
+            '--ring-size': `${ringDiameter}px`,
+            '--center-size': `${centerDiameter}px`,
+          } as CSSProperties
+        }
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
@@ -566,6 +618,8 @@ export default function TasteOnboardingPage() {
               title={item.card.title}
               posterUrl={item.card.posterUrl}
               value={item.value}
+              width={cardWidth}
+              height={cardHeight}
               x={position.x}
               y={position.y}
               dragging={draggingId === item.card.movieId}
