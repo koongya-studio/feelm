@@ -1,0 +1,70 @@
+/*
+ * 팝콘 맛 분포 표 (업무 S15P21E106-783에서 만들고 -786에서 공용으로 옮겼다).
+ *
+ * 카드의 검은 면과 제목 줄은 `components/AsidePanel`(`tone="dark"`)이 그린다.
+ * 여기 있는 것은 표뿐이다.
+ */
+.flavorTable {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--color-on-action);
+  font-size: var(--font-size-caption);
+}
+
+.flavorTable th,
+.flavorTable td {
+  padding: 5px 0;
+  font-weight: var(--font-weight-regular);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.flavorTable thead th {
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.62);
+}
+
+/*
+ * 맛 이름 열의 머리. **시안에는 이 칸에 글자가 없다** — 옆의 팝콘 그림과 이름이 이미 무엇을
+ * 세는 줄인지 말한다. 읽기 도구에는 남겨 두어야 표의 행 머리가 무엇인지 들리므로 글자를
+ * 지우지 않고 화면에서만 감춘다.
+ *
+ * 선택자를 `.flavorTable`로 한 번 더 묶는다. 위의 `.flavorTable th`가 오른쪽 정렬을 걸어서
+ * 클래스 하나로는 이기지 못한다(2026-09-22 브라우저 확인).
+ */
+.flavorTable .flavorNameHead {
+  width: 100%;
+  clip-path: inset(50%);
+  color: transparent;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.flavorName {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-on-action);
+  font-size: var(--font-size-meta);
+  text-align: left;
+}
+
+/* 팝콘 알 그림. 색 점으로는 밝은 면에서 4종이 구분되지 않아 스프라이트를 쓴다 */
+.kernel {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.flavorShare {
+  padding-right: var(--space-4) !important;
+  font-size: var(--font-size-meta);
+  font-variant-numeric: tabular-nums;
+}
+
+.flavorScore {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: var(--font-size-meta);
+  font-variant-numeric: tabular-nums;
+}
