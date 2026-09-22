@@ -96,3 +96,47 @@ describe('5.5 추천 완성', () => {
     expect(screen.getByRole('button', { name: '다시 추천받기' })).toBeInTheDocument();
   });
 });
+
+/*
+ * 업무 -802. 백엔드 -792가 API-058에 다시 받기(`refresh`)와 `hasNext`를 더했다. 이 화면은
+ * 다시 받기를 직접 부르지 않고 5.9에 표시를 실어 보낸다.
+ */
+describe('다시 받기 (API-058 refresh · hasNext)', () => {
+  it('이 화면의 본요청은 일반 조회다', async () => {
+    renderPage();
+
+    await screen.findByText('우리에게 어울리는 3편');
+    expect(getPartyRecommendations).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(getPartyRecommendations).mock.calls[0]).toEqual([TEST_PARTY_ID]);
+  });
+
+  it('다른 영화 추천받기는 refresh 표시를 들고 5.9로 간다', async () => {
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: '다른 영화 추천받기' }));
+
+    expect(location()).toBe(`/parties/${TEST_PARTY_ID}/popcorn/mix`);
+    expect(screen.getByTestId('location-state').textContent).toBe('{"refresh":true}');
+  });
+
+  it('hasNext가 거짓이면 버튼을 감추고 더 없다고 알린다', async () => {
+    vi.mocked(getPartyRecommendations).mockResolvedValue({
+      ...partyRecommendations(),
+      hasNext: false,
+    });
+    renderPage();
+
+    expect(await screen.findByText('우리에게 어울리는 3편')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '다른 영화 추천받기' })).not.toBeInTheDocument();
+    expect(screen.getByText(/더 보여줄 영화가 없어요/)).toBeInTheDocument();
+  });
+
+  it('hasNext가 없는 옛 응답은 있는 것으로 본다', async () => {
+    const legacy: Partial<ReturnType<typeof partyRecommendations>> = partyRecommendations();
+    delete legacy.hasNext;
+    vi.mocked(getPartyRecommendations).mockResolvedValue(legacy as never);
+    renderPage();
+
+    expect(await screen.findByRole('button', { name: '다른 영화 추천받기' })).toBeInTheDocument();
+  });
+});

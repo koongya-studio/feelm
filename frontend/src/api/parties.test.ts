@@ -19,13 +19,20 @@ import {
   getMyInvitations,
   getMyParties,
   getPartyPopcorn,
+  getPartyRecommendations,
   inviteToParty,
   kickPartyMember,
   leaveParty,
 } from './parties';
 import { ApiError } from './apiError';
 import { resetSessionForTest, startSession } from './session';
-import { invitation, party, partyPopcorn, TEST_PARTY_ID } from '../test/party';
+import {
+  invitation,
+  party,
+  partyPopcorn,
+  partyRecommendations,
+  TEST_PARTY_ID,
+} from '../test/party';
 
 const fetchMock = vi.fn();
 
@@ -273,5 +280,30 @@ describe('API-057 파티원 팝콘 조회', () => {
     await expect(getPartyPopcorn(TEST_PARTY_ID)).rejects.toMatchObject({
       code: 'RESOURCE_NOT_FOUND',
     });
+  });
+});
+
+/*
+ * 업무 -802. `refresh`를 붙이지 않으면 일반 조회라 주소에 아무것도 실리지 않아야 한다 —
+ * `refresh=false`가 실려도 서버는 같은 뜻으로 받지만, 붙일 때만 붙이는 것이 계약을 읽는 사람이
+ * 기대하는 모양이다.
+ */
+describe('API-058 파티 영화 추천', () => {
+  it('일반 조회는 refresh를 싣지 않는다', async () => {
+    fetchMock.mockResolvedValue(json(200, partyRecommendations()));
+
+    const set = await getPartyRecommendations(TEST_PARTY_ID);
+
+    expect(call()[0]).toBe(`/api/v1/parties/${TEST_PARTY_ID}/recommendations`);
+    expect(set.hasNext).toBe(true);
+  });
+
+  it('다시 받기는 refresh=true를 싣는다', async () => {
+    fetchMock.mockResolvedValue(json(200, { ...partyRecommendations(), hasNext: false }));
+
+    const set = await getPartyRecommendations(TEST_PARTY_ID, { refresh: true });
+
+    expect(call()[0]).toBe(`/api/v1/parties/${TEST_PARTY_ID}/recommendations?refresh=true`);
+    expect(set.hasNext).toBe(false);
   });
 });

@@ -129,5 +129,6 @@ export function partyRecommendations(partyId = TEST_PARTY_ID): PartyRecommendati
         ottProviders: ['NETFLIX'],
       },
     })),
+    hasNext: true,
   };
 }

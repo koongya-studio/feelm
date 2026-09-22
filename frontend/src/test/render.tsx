@@ -29,7 +29,13 @@ import type { ReactElement, ReactNode } from 'react';
 function LocationProbe() {
   const location = useLocation();
 
-  return <div data-testid="location">{location.pathname + location.search}</div>;
+  return (
+    <>
+      <div data-testid="location">{location.pathname + location.search}</div>
+      {/* 화면 사이에 넘긴 라우터 state. 없으면 빈 문자열이다(업무 -802) */}
+      <div data-testid="location-state">{location.state ? JSON.stringify(location.state) : ''}</div>
+    </>
+  );
 }
 
 type Options = {

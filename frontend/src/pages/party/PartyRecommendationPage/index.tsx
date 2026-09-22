@@ -11,7 +11,12 @@
  * 담은 결과가 이 3편이라는 말을 그림이 먼저 한다.
  *
  * `다른 영화 추천받기`가 모으기로 되돌아가는 것은 이동표가 정한 것이다(한때 5.4, 업무
- * -773부터 5.9). 결과만 갈아 끼우지 않고 모으기 · 섞기 장면을 다시 보여준다.
+ * -773부터 5.9). 결과만 갈아 끼우지 않고 모으기 · 섞기 장면을 다시 보여준다. **그 이동에
+ * `refresh: true`를 실어 보낸다**(업무 -802) — 5.9가 API-058에 `refresh=true`를 붙여 다음
+ * 묶음을 받고, 이 화면의 본요청은 일반 조회라 방금 노출한 묶음이 그대로 온다. 한때는 같은
+ * 세 편이 되풀이됐다(백엔드 -792 전). 응답의 `hasNext`가 거짓이면 더 보여줄 후보가 없는
+ * 것이라 버튼을 감추고 그렇다고 알린다. 파티원이 평가 · 관심없음 · 감상 확정을 하거나
+ * 파티원이 바뀌면 새 세트가 생겨 다시 참이 될 수 있다.
  *
  * **계약에 없던 값을 모두 걷어냈다**(사용자 결정 2026-09-17).
  * - 상단 공통 키워드 칩. 대응 필드가 API-058에 없어 `getPartyMix`(CR-17) 자리표시자를
@@ -29,7 +34,9 @@
  * 추천을 못 받은 까닭을 가른다. 가를 수 있어야 사용자가 다음에 할 일을 안다.
  * - `404` 없는 파티이거나 파티원이 아니다 · `409 PARTY_CLOSED` 끝난 파티다 → 내 파티로
  * - `503 RECOMMENDATION_UNAVAILABLE` 파티원 취향이 아직 준비되지 않았다 → 다시 추천받기
- * - 추천이 0편 → 다시 추천받기. 파티원이 이미 평가 · 감상 · 관심없음 처리한 영화는 서버가 뺀다
+ * - 추천이 0편 → 다시 추천받기. 파티원이 이미 평가 · 감상 · 관심없음 처리한 영화는 서버가
+ *   **묶음을 새로 고르는 시점**(세트 생성 · 첫 노출 · 다시 받기)에 뺀다. 이미 노출 중인 묶음은
+ *   그 사이 파티원이 무엇을 해도 바뀌지 않는다 — 조회마다 실시간으로 걸러 주지 않는다
  */
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
@@ -44,6 +51,7 @@ import { ChevronRightIcon } from '../../../components/Icon';
 import { getParty, getPartyPopcorn, getPartyRecommendations } from '../../../api/parties';
 import { path } from '../../../routes/paths';
 import { mixedFlavors } from '../../../utils/party';
+import type { PartyMixEntry } from '../PartyPopcornMixPage';
 import type { PartyPopcorn, PartyRecommendationItem } from '../../../types/party';
 import styles from './PartyRecommendationPage.module.css';
 
@@ -85,6 +93,8 @@ export default function PartyRecommendationPage() {
   const id = Number(partyId);
 
   const [items, setItems] = useState<PartyRecommendationItem[] | null>(null);
+  /** 다시 받기로 더 보여줄 후보가 남았는지. 값이 없으면(옛 응답) 있는 것으로 본다 */
+  const [hasNext, setHasNext] = useState(true);
   const [members, setMembers] = useState<string[]>([]);
   const [popcorn, setPopcorn] = useState<PartyPopcorn | null>(null);
   const [failed, setFailed] = useState(false);
@@ -98,6 +108,7 @@ export default function PartyRecommendationPage() {
         if (!active) return;
 
         setItems(set.items);
+        setHasNext(set.hasNext !== false);
         setFailure(set.items.length === 0 ? 'empty' : null);
         setFailed(set.items.length === 0);
       })
@@ -202,9 +213,22 @@ export default function PartyRecommendationPage() {
       </ul>
 
       <div className={styles.actions}>
-        <Button variant="text" onClick={() => void navigate(path.partyPopcornMix(id))}>
-          다른 영화 추천받기
-        </Button>
+        {hasNext ? (
+          <Button
+            variant="text"
+            onClick={() =>
+              void navigate(path.partyPopcornMix(id), {
+                state: { refresh: true } satisfies PartyMixEntry,
+              })
+            }
+          >
+            다른 영화 추천받기
+          </Button>
+        ) : (
+          <p className={styles.exhausted}>
+            지금은 더 보여줄 영화가 없어요. 파티원이 영화를 평가하면 새로 추천해 드려요.
+          </p>
+        )}
       </div>
     </PartyFlowShell>
   );
