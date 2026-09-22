@@ -1,0 +1,97 @@
+{
+  "format": "feelm-gbt-research-handoff-v2",
+  "jira": "S15P21E106-625",
+  "status": "USER_APPROVED_LOCAL_RESEARCH_CLOSEOUT_NOT_INTEGRATED_NOT_DEPLOYED",
+  "selected_model": "GBT_v26",
+  "intended_recommendation_modes": [
+    "PERSONAL",
+    "PARTY"
+  ],
+  "public_evidence_post_filter": {
+    "TASTE": false,
+    "DISCOVERY": false,
+    "PARTY": false
+  },
+  "existing_api_db_and_final_exclusions_preserved": true,
+  "team_base_revision": "1878a31b275f00e0128b2e7cdca75deca4d17853",
+  "research": {
+    "repository": "https://github.com/itcksgud/FEELM",
+    "revision": "4fa2ecc40dc00b7c45823f2df689a9a0cf0ff949",
+    "entrypoint": "https://github.com/itcksgud/FEELM/tree/4fa2ecc40dc00b7c45823f2df689a9a0cf0ff949/experiments/gbt-v26-closeout-public",
+    "inventory": "https://github.com/itcksgud/FEELM/blob/4fa2ecc40dc00b7c45823f2df689a9a0cf0ff949/experiments/gbt-v26-closeout-public/ARTIFACT-INDEX.json",
+    "entrypoint_path": "experiments/gbt-v26-closeout-public/README.md",
+    "inventory_path": "experiments/gbt-v26-closeout-public/ARTIFACT-INDEX.json",
+    "published_scope": "DECISION_AGGREGATES_IDENTIFIERS_ONLY",
+    "clone_alone_reproduces_v26": false,
+    "legacy_v12_is_not_v26_implementation": true
+  },
+  "current_gbt_weight": {
+    "filename": "gbt.json",
+    "bytes": 168690,
+    "sha256": "4d035f96f362458f0ce9b749bad4decbd4626cf279a072b6c1acd3b3acf92c25",
+    "sharing": "LOCAL_ONLY_NOT_UPLOADED",
+    "feature_count": 71,
+    "trees": 80,
+    "depth": 4,
+    "seed": 625
+  },
+  "ordered_feature_schema_sha256": "c052b00282c647af610d6904c4daaa5a19a16a250e28346fbed079c65fb0fa8e",
+  "frozen_run_manifest_sha256": "f5035a613757652eda03a8f44a57ad6000b13f265e9c69e0624eb2ee868589d0",
+  "training": {
+    "rows": 859363,
+    "policy_target_suppressed_rows": 202103,
+    "suppressed_target": 0.5,
+    "actual_observed_ratings_preserved": true,
+    "unseen_feelm_fake_negative_targets": false,
+    "tmdb_vote_threshold": 2294,
+    "verified_kobis_list_movies": 1741,
+    "kobis_audience_to_vote_coefficient": 0.0007732457348003972,
+    "separate_tmdb_vote_count_precision_path": false,
+    "tmdb_average_retained": true
+  },
+  "inputs": {
+    "genuine_preference_ratings": 322,
+    "test_ratings": 6,
+    "test_seen_candidate_pairs_restored": 6,
+    "existing_score_parity_candidates": 303,
+    "max_parity_error": 0,
+    "is_language_exclusion_policy": false
+  },
+  "raw_party": {
+    "audit_manifest_sha256": "5b678767a5ac8fe1782c7d804b86bd16f1381e622d8268f427cb12d2c7fd8a3e",
+    "users": 10,
+    "parties": 165,
+    "member_counts": [
+      2,
+      3
+    ],
+    "top500_union_missing_joint_top100_slots": 0,
+    "top500_union_same_joint_top100_order_parties": 165,
+    "top100_union_missing_joint_top100_slots": 878,
+    "candidate_source_per_member": 500,
+    "all_future_party_combinations_guaranteed": false,
+    "actual_party_satisfaction_measured": false
+  },
+  "limitations": [
+    "NO_NEW_ACTUAL_SERVICE_OR_PARTY_SATISFACTION",
+    "ALS_COMPARISON_NOT_SAME_LATEST_FEATURE_SNAPSHOT",
+    "ALS_REVERSE_SCORE_INVARIANCE_FAILED_36_STATES",
+    "MAX_K_RAW_TOP100_INCLUDES_SIX_INSUFFICIENT_EVIDENCE_ITEMS",
+    "LINUX_AND_SERVICE_INTEGRATION_NOT_VERIFIED"
+  ],
+  "gbt_only_service_bundle": {
+    "status": "FOLLOWUP_626_REQUIRED",
+    "uploaded": false,
+    "activated": false
+  },
+  "pending_jira": {
+    "contract": "S15P21E106-742",
+    "gbt_only_bundle": "S15P21E106-626",
+    "cold_start": "S15P21E106-483",
+    "personal_scoring": "S15P21E106-627",
+    "party_scoring": "S15P21E106-747",
+    "linux_runtime": "S15P21E106-644",
+    "end_to_end_validation": "S15P21E106-628",
+    "full_republication": "S15P21E106-735"
+  }
+}
