@@ -104,3 +104,98 @@
 .actions > * {
   flex: 1;
 }
+
+/*
+ * 캐릭터 카드. 이름 · 코드 · 한 줄 · 네 축 · 설명문 순이다(업무 -780).
+ *
+ * 코드(`RDMV`)는 불변 계약이고 사용자에게도 보이는 값이라(업무 -618) 이름 옆에 작게 붙인다.
+ */
+.cardName {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--color-ink);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-body);
+}
+
+.cardCode {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
+  letter-spacing: 0.08em;
+}
+
+.cardTagline {
+  color: var(--color-ink-body);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+/*
+ * 네 축. 축은 두 값 중 하나라서 크기가 없다 — 퍼센트 막대를 쓰지 않고 양쪽 끝을 나란히 두고
+ * 고른 쪽만 강조한다. 점은 고른 쪽으로 붙는다(`data-picked`).
+ */
+.axes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+.axis {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-meta);
+}
+
+.axisPole {
+  color: var(--color-ink-muted);
+}
+
+.axis[data-picked='head'] .axisPole:first-child,
+.axis[data-picked='tail'] .axisPole:last-child {
+  color: var(--color-ink);
+  font-weight: var(--font-weight-bold);
+}
+
+.axisPole:last-child {
+  text-align: right;
+}
+
+.axisTrack {
+  position: relative;
+  width: calc(var(--space-5) * 2);
+  height: 2px;
+  border-radius: 1px;
+  background: var(--color-line);
+}
+
+.axisDot {
+  position: absolute;
+  top: 50%;
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: 50%;
+  background: var(--color-ink);
+  transform: translateY(-50%);
+}
+
+.axis[data-picked='head'] .axisDot {
+  left: 0;
+}
+
+.axis[data-picked='tail'] .axisDot {
+  right: 0;
+}
+
+/* 프레임 10편 미만일 때만. 카드를 막지 않고 기준 편수를 함께 알린다 */
+.cardBasis {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-meta);
+}

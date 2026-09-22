@@ -3,11 +3,13 @@
  * 대응 명세는 docs/api/movies-search.md이다.
  *
  * 업무 S15P21E106-476에서 검색(API-028)과 필터 옵션(API-029)을 실제 호출로 바꿨다.
- * 급상승(API-064)은 업무 -612에서 화면과 함께 지웠다 — 백엔드에 없는 계약을 목업으로
- * 보여 주지 않는다. 실제 구현이 생기면 그때 다시 붙인다.
+ * 급상승(API-064)은 업무 -612에서 화면과 함께 지웠다가 — 백엔드에 없는 계약을 목업으로
+ * 보여 주지 않으려고 — 백엔드가 -561에서 구현한 뒤 업무 -798에서 `getTrendingMovies`로
+ * 다시 붙였다.
  *
- * 그 빈자리는 `getTopRatedMovies`가 **검색 API로** 채운다(업무 -714). 급상승이 아니라
- * 평점 높은 영화다 — 아래 주석을 볼 것.
+ * `getTopRatedMovies`는 급상승이 빠져 있던 동안 그 자리를 **검색 API로** 채운
+ * 것이다(업무 -714). 급상승이 아니라 평점 높은 영화이고, 급상승이 돌아온 뒤에도 그 아래에
+ * 남는다 — 아래 주석을 볼 것.
  *
  * 검색은 `api/movies.ts`에 두지 않고 나눴다. 그 파일은 영화 한 편(상세 · 유사 · 한줄평)을
  * 다루고, 여기는 목록을 만드는 질의를 다룬다.
@@ -19,6 +21,7 @@ import type {
   MovieSearchItem,
   MovieSearchQuery,
   MovieSearchResult,
+  TrendingMovies,
 } from '../types/search';
 
 /**
@@ -46,6 +49,13 @@ const COUNT_PAGE_SIZE = 1;
  */
 const TOP_RATED_YEARS = 2;
 
+/**
+ * 급상승으로 받아 올 수. 계약의 `size`이며 허용 범위는 1~30, 기본값은 10이다(API-064).
+ *
+ * 4.1의 급상승은 옆으로 넘기는 한 줄이라 열 편이면 충분하다. 초기 고정 목록도 열 편이다.
+ */
+const TRENDING_SIZE = 10;
+
 /** 검색 조건을 계약의 Query Parameter로 편다. 배열은 같은 이름을 반복해 실린다 */
 function toParams(query: MovieSearchQuery): Record<string, QueryEntry> {
   const { q, genre, country, yearFrom, yearTo, ott, sort } = query;
@@ -57,16 +67,17 @@ function toParams(query: MovieSearchQuery): Record<string, QueryEntry> {
  * 4.1 검색 전 화면에 까는 평점 높은 영화 (업무 S15P21E106-714)
  *
  * 검색하기 전에도 영화가 보이면 좋겠다는 사용자 피드백이다(2026-09-20). 그 자리는 원래
- * 급상승(API-064)이었는데 백엔드에 없어 업무 -612에서 걷어냈다. 기다리지 않고 지금 있는
- * 검색 API로 채운다.
+ * 급상승(API-064)이었는데 당시 백엔드에 없어 업무 -612에서 걷어냈고, 기다리지 않고 지금
+ * 있는 검색 API로 채웠다. 급상승이 돌아온 뒤(업무 -798)에도 이 목록은 그 아래에 남는다 —
+ * 피드백으로 생긴 목록이라 급상승이 대체하지 않는다.
  *
  * **검색어 없이 부른다.** 계약은 `q` 없이도 장르 · 국가 · OTT · 연도 중 하나만 있으면
  * 받는다(백엔드 `MovieSearchCriteria.isSearchConditionPresent`). 그래서 연도 하한만 걸고
  * `sort=RATING`으로 받는다.
  *
- * **급상승이라고 부르지 않는다.** 조회수 기반 급상승은 API-064의 몫이고 이것은 평점 높은
- * 영화다. 화면의 소제목도 `평점 높은 영화`다 — 근거 없는 이름을 붙이면 -612에서 지운
- * 문제가 이름만 바꿔 돌아온다.
+ * **급상승이라고 부르지 않는다.** 조회수 기반 급상승은 API-064(`getTrendingMovies`)의
+ * 몫이고 이것은 평점 높은 영화다. 화면의 소제목도 `평점 높은 영화`다 — 근거 없는 이름을
+ * 붙이면 -612에서 지운 문제가 이름만 바꿔 돌아온다.
  *
  * 실패하면 빈 배열이다. 곁들이는 목록이라 화면 전체를 실패 상태로 만들지 않는다.
  */
@@ -83,6 +94,32 @@ export async function getTopRatedMovies(): Promise<MovieSearchItem[]> {
     return items;
   } catch {
     return [];
+  }
+}
+
+/**
+ * API-064 급상승 영화 · GET /api/v1/movies/trending (업무 S15P21E106-798)
+ *
+ * **공개 API라 토큰을 싣지 않는다.** 4.1 검색 홈이 검색 전에 `평점 높은 영화` 위에 깐다.
+ *
+ * 순위는 Spark가 5분마다 집계해 게시한 것이고 서버가 요청 때 다시 계산하지 않는다
+ * (ADR-0017). 첫 유효 집계 전에는 계약의 고정 초기 목록(`source=DEFAULT`)이 오며 그때는
+ * `rankDelta`가 모두 `null`이라 화면은 순위 변동을 그리지 않는다. `stale`은 마지막 유효
+ * 결과를 주는 중이라는 표시인데, 화면은 그것을 따로 알리지 않는다 — 사용자에게는 여전히
+ * 가장 최근의 급상승이다.
+ *
+ * 실패(503 `TREND_UNAVAILABLE` 포함)하면 `null`이다. 곁들이는 목록이라 화면 전체를 실패
+ * 상태로 만들지 않고 그 자리만 비운다. 응답을 통째로 돌려주는 것은 화면이 `source`로 순위
+ * 변동을 그릴지 정하기 때문이다(`TrendingRail`).
+ */
+export async function getTrendingMovies(): Promise<TrendingMovies | null> {
+  try {
+    return await request<TrendingMovies>('/movies/trending', {
+      query: { size: TRENDING_SIZE },
+      auth: 'none',
+    });
+  } catch {
+    return null;
   }
 }
 

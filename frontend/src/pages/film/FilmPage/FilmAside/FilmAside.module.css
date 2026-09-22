@@ -1,0 +1,67 @@
+/* 3.1 취향 필름의 우측 보조 패널 (업무 -783). 2026-09-21 시안에서 잰 값이다 */
+
+/* 팝콘 표는 `components/PopcornFlavorPanel`로 옮겼다(업무 -786). 7.1 MY가 같은 표를 쓴다 */
+
+/* 리포트 카드의 작은 필름. 카드 폭을 넘는 만큼은 잘린다 */
+.reportReel {
+  margin-bottom: var(--space-3);
+  overflow: hidden;
+}
+
+.reportText {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+/* 감상 확인 카드 */
+.pending {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.pendingInfo {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pendingTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+
+.pendingMeta {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+}
+
+/* 이 카드의 동작. 검정 알약은 화면에 하나뿐이라(디자인 원칙) 여기서는 테두리 버튼이다 */
+.pendingAction {
+  display: inline-flex;
+  height: var(--control-height-sm);
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--space-2);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-control);
+  background: var(--gradient-button);
+  box-shadow: var(--shadow-button);
+  color: var(--color-ink);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  text-decoration: none;
+}
+
+.pendingAction:hover {
+  background: var(--gradient-button-hover);
+  box-shadow: var(--shadow-button-hover);
+}

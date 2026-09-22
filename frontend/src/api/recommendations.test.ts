@@ -101,7 +101,7 @@ describe('API-045 기본 추천 조회', () => {
     expect(result).toEqual(body);
   });
 
-  it('빈 세트도 그대로 돌려준다 — 목업 카드로 채우지 않는다', async () => {
+  it('빈 세트는 빈 채로 둔다 — 목업 카드로 채우지 않는다', async () => {
     fetchMock.mockResolvedValueOnce(
       json(200, { recommendationSetId: 1, generatedAt: '2026-09-18T00:00:00Z', items: [] }),
     );

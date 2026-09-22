@@ -15,7 +15,7 @@
  * 동안 `73개의 프레임을 넘겨보세요`라고 말하면서 오래된 53개에 닿을 길이 없었다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import FilmPage from './index';
 import { renderWithRouter } from '../../../test/render';
 import type { FrameList, PopcornBucket, PopcornBucketFlavor } from '../../../types/taste';
@@ -280,7 +280,17 @@ describe('FilmPage 자동으로 이어 받기', () => {
     vi.mocked(getPopcornBucket).mockResolvedValue(bucket);
   });
 
+  /*
+   * **화면을 먼저 걷고 스텁을 거둔다**(업무 S15P21E106-789).
+   *
+   * `afterEach`는 나중에 등록한 것부터 돈다(vitest 기본값 `sequence.hooks: 'stack'`). 그래서
+   * 이 자리는 `test/setup.ts`의 `cleanup()`보다 먼저 돌고, 화면이 아직 붙어 있는 채로
+   * `IntersectionObserver`가 사라진다. 그 사이에 앞선 요청이 돌아와 화면이 다시 그려지면
+   * 관찰자를 만드는 자리에서 `IntersectionObserver is not defined`로 터진다 — 전체 실행에서만
+   * 간헐적으로 깨지던 원인이다.
+   */
   afterEach(() => {
+    cleanup();
     vi.unstubAllGlobals();
     vi.resetModules();
   });

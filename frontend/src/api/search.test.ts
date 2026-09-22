@@ -10,12 +10,14 @@
  *   세면 21편부터 20으로 굳는다
  * - **필터 옵션은 공개 API라 토큰을 싣지 않는다.** 실어도 서버는 200을 주므로 드러나지
  *   않는다
+ * - **급상승(API-064)도 공개 API라 토큰을 싣지 않고, 실패는 `null`로 삼킨다.** 곁들이는
+ *   목록이라 4.1이 실패 상태가 되면 안 된다(업무 -798)
  *
  * 필터 결합(AND · OR)과 정렬, 400 두 가지는 이제 서버가 판정한다. 목업 시절 이 파일이
  * 고정하던 규칙이라 backend 쪽 시험으로 옮겨 갔다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { countSearchResults, getFilterOptions, searchMovies } from './search';
+import { countSearchResults, getFilterOptions, getTrendingMovies, searchMovies } from './search';
 import { ApiError } from './apiError';
 import { resetSessionForTest, startSession } from './session';
 import type { MovieSearchItem, MovieSearchResult } from '../types/search';
@@ -184,5 +186,48 @@ describe('API-029 검색 필터 옵션', () => {
     const options = await getFilterOptions();
 
     expect(options.yearRange).toEqual({ min: null, max: null });
+  });
+});
+
+describe('getTrendingMovies (API-064)', () => {
+  const body = {
+    source: 'VIEW',
+    period: { from: '2026-09-22T00:00:00Z', to: '2026-09-22T00:05:00Z' },
+    updatedAt: '2026-09-22T00:05:00Z',
+    stale: false,
+    items: [
+      {
+        rank: 1,
+        rankDelta: 4,
+        movie: { movieId: 134626, title: '오디세이', posterUrl: null },
+        ratingCount: 120,
+        averageScore: 4.3,
+        trendScore: 0.9,
+      },
+    ],
+  };
+
+  it('토큰 없이 size=10으로 부르고 응답을 그대로 준다', async () => {
+    fetchMock.mockResolvedValueOnce(json(200, body));
+
+    const result = await getTrendingMovies();
+
+    expect(requestedUrl()).toBe('/api/v1/movies/trending?size=10');
+    expect(requestedHeaders().Authorization).toBeUndefined();
+    expect(result).toEqual(body);
+  });
+
+  it('503 TREND_UNAVAILABLE이면 던지지 않고 null이다', async () => {
+    fetchMock.mockResolvedValueOnce(
+      json(503, { code: 'TREND_UNAVAILABLE', message: '급상승 결과를 조회할 수 없습니다.' }),
+    );
+
+    await expect(getTrendingMovies()).resolves.toBeNull();
+  });
+
+  it('네트워크 실패도 null이다', async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+    await expect(getTrendingMovies()).resolves.toBeNull();
   });
 });

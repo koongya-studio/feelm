@@ -7,6 +7,16 @@ ROOT = Path(__file__).resolve().parents[2]
 CI_ROOT = ROOT / '.gitlab-ci.yml'
 CI_DIR = ROOT / '.gitlab' / 'ci'
 
+# frontend-image가 빌드 인자로 넘기는 공개 값과 그 출처 CI 변수.
+# frontend/Dockerfile이 같은 이름으로 ARG를 선언했는지는
+# infra.scripts.test_ci_frontend_paths가 이 표를 그대로 사용해 검증한다.
+FRONTEND_OAUTH_BUILD_INPUTS = {
+    'VITE_GOOGLE_CLIENT_ID': 'GOOGLE_CLIENT_ID',
+    'VITE_KAKAO_CLIENT_ID': 'KAKAO_CLIENT_ID',
+    'VITE_NAVER_CLIENT_ID': 'NAVER_CLIENT_ID',
+    'VITE_OAUTH_REDIRECT_URI': 'VITE_OAUTH_REDIRECT_URI',
+}
+
 
 def job_block(text, name):
     match = re.search(r'(?ms)^' + re.escape(name) + r':\n(.*?)(?=^[.]?[A-Za-z0-9_-]+:\n|\Z)',
@@ -586,6 +596,22 @@ include:
         self.assertIn('--init-script gradle/test-timing.gradle', backend_test)
         self.assertIn('action: prepare', backend_env)
         self.assertIn('ci-backend-env-contract.py --require-values', backend_env)
+
+    def test_frontend_image_injects_only_public_oauth_build_inputs(self):
+        # Dockerfile 자체의 ARG 선언은 infra-config-test 스냅샷 밖이라
+        # infra.scripts.test_ci_frontend_paths가 검증한다.
+        frontend_image = job_block(self.frontend, 'frontend-image')
+        self.assertIn('environment:', frontend_image)
+        self.assertIn('name: service', frontend_image)
+        self.assertIn('action: prepare', frontend_image)
+        # 프론트 client-id는 백엔드가 코드를 교환할 때 쓰는 값과 같아야 하므로 같은 변수를 읽는다.
+        for key, source in FRONTEND_OAUTH_BUILD_INPUTS.items():
+            with self.subTest(key=key):
+                self.assertIn(
+                    f'--build-arg {key}="${{{source}:-}}"',
+                    frontend_image,
+                )
+        self.assertNotIn('CLIENT_SECRET', frontend_image)
 
     def test_service_release_jobs_exclude_develop_mr_api_and_web_pipelines(self):
         release_jobs = (

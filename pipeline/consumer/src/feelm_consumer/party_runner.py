@@ -90,7 +90,7 @@ def run(settings: PartySettings) -> None:
             "bootstrap.servers": settings.kafka_bootstrap_servers,
             "group.id": settings.kafka_group_id,
             "enable.auto.commit": False,
-            "auto.offset.reset": "latest",
+            "auto.offset.reset": "earliest",
         }
     )
     producer: Producer | None = None

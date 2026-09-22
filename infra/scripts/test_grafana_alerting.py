@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 import unittest
+from urllib.parse import parse_qs, urlparse
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -64,6 +65,26 @@ class GrafanaAlertingProvisioningTest(unittest.TestCase):
                 self.assertEqual(notification["group_wait"], "30s")
                 self.assertEqual(notification["group_interval"], "5m")
                 self.assertEqual(notification["repeat_interval"], "4h")
+
+    def test_log_alerts_exclude_their_own_grafana_explore_requests(self) -> None:
+        for uid in ("feelm_critical_log_detected", "feelm_error_log_spike"):
+            rule = next(rule for rule in self.rules if rule["uid"] == uid)
+            loki_expression = rule["data"][0]["model"]["expr"]
+            self.assertIn(
+                '!~ "(?i)/grafana/.*'
+                '(ERROR|Exception|FATAL|OutOfMemoryError|Unhandled exception)"',
+                loki_expression,
+            )
+
+            panes = json.loads(
+                parse_qs(urlparse(rule["annotations"]["explore_url"]).query)["panes"][0]
+            )
+            explore_expression = panes["logs"]["queries"][0]["expr"]
+            self.assertIn(
+                "!~ `(?i)/grafana/.*"
+                "(ERROR|Exception|FATAL|OutOfMemoryError|Unhandled exception)`",
+                explore_expression,
+            )
 
     def test_mattermost_contact_point_uses_authenticated_internal_relay(self) -> None:
         self.assertNotIn("policies", self.payload)

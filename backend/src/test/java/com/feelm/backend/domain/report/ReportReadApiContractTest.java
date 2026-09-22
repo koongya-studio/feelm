@@ -95,7 +95,24 @@ class ReportReadApiContractTest extends ReportApiContractSupport {
                 .andExpect(jsonPath("$.genreShares[0].share").value(67))
                 .andExpect(jsonPath("$.topDirectors[0].count").value(2))
                 .andExpect(jsonPath("$.comparisons[0].delta").value(12))
-                .andExpect(jsonPath("$.highlights[0]").value("로맨스 취향이 12%p 늘었어요"))
+                .andExpect(jsonPath("$.keywords[0].code").value("GENRE_FAVORITE"))
+                .andExpect(jsonPath("$.keywords[0].rationale").value("로맨스 2편 평균 ★4.0"))
+                .andExpect(jsonPath("$.highlights[0]").value("다크초코 취향이 12%p 늘었어요"))
+                // 캐릭터 카드는 code만 계약이고 이름·설명은 기준정보다(API-060, 업무 -618)
+                .andExpect(jsonPath("$.characterCard.code").value("RDMV"))
+                .andExpect(jsonPath("$.characterCard.name").value("안락의자 탐정"))
+                .andExpect(jsonPath("$.characterCard.tagline").value("움직이지 않고 사건만 잔뜩 봤습니다"))
+                .andExpect(jsonPath("$.characterCard.axes", hasSize(4)))
+                .andExpect(jsonPath("$.characterCard.axes[0].axis").value("EXPLORATION"))
+                .andExpect(jsonPath("$.characterCard.axes[3].label").value("다작"))
+                .andExpect(jsonPath("$.characterCard.basis.frameCount").value(3))
+                .andExpect(jsonPath("$.characterCard.basis.lowSample").value(true))
+                // 04 칸 그림은 저장소 에셋이라 계약이 이미지 URL을 내리지 않는다
+                .andExpect(jsonPath("$.characterCard.imageUrl").doesNotExist())
+                .andExpect(jsonPath("$.fourCut.character.name").value("안락의자 탐정"))
+                .andExpect(jsonPath("$.fourCut.character.image").doesNotExist())
+                // 판정 기준 스냅샷은 저장하지만 응답에 내리지 않는다
+                .andExpect(jsonPath("$.characterAxisMedians").doesNotExist())
                 .andExpect(jsonPath("$.generation").doesNotExist());
 
         for (long id : new long[] {5_560_102, 5_560_199}) {

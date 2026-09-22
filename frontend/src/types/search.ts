@@ -79,3 +79,39 @@ export type FilterOptions = {
   yearRange: { min: number | null; max: number | null };
   otts: { ottId: number; code: string; name: string }[];
 };
+
+/**
+ * API-064 `source`. `DEFAULT`는 첫 유효 집계가 생기기 전의 고정 초기 목록이고 `VIEW`는
+ * 조회 이벤트를 집계한 결과다.
+ */
+export type TrendingSource = 'DEFAULT' | 'VIEW';
+
+/** API-064 `items[]`. 초기 고정 목록에서는 `rankDelta` · `trendScore`가 `null`이다 */
+export type TrendingMovieItem = {
+  rank: number;
+  /** 직전 게시 대비 순위 상승 폭. 신규 진입이면 `null` */
+  rankDelta: number | null;
+  movie: {
+    movieId: number;
+    title: string;
+    posterUrl: string | null;
+  };
+  ratingCount: number;
+  averageScore: number;
+  /** 급상승 점수 (0, 1]. 평점이 아니다 */
+  trendScore: number | null;
+};
+
+/**
+ * API-064 급상승 영화.
+ *
+ * `stale`이 참이면 최신 집계가 만료돼 마지막 유효 결과를 주는 중이다. 그때도 `period` ·
+ * `updatedAt`은 게시 당시 값이다. 초기 고정 목록에서는 둘 다 `null`이다.
+ */
+export type TrendingMovies = {
+  source: TrendingSource;
+  period: { from: string; to: string } | null;
+  updatedAt: string | null;
+  stale: boolean;
+  items: TrendingMovieItem[];
+};

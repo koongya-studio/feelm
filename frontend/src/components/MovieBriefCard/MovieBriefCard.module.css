@@ -1,0 +1,327 @@
+/*
+ * 데스크톱 영화 카드 (업무 -783). 2026-09-21 시안의 카드에서 잰 값이다.
+ *
+ * 카드는 벽에 걸린 흰 면이고 포스터만 어둡다(`design-concept.md` 2.1).
+ */
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-solid);
+  box-shadow: var(--shadow-raised);
+}
+
+/*
+ * 표식이 놓이는 줄. 버튼은 이 줄에 있지 않고 모서리에 붙으므로(아래 `.actions`), 이 줄은
+ * 버튼이 덮을 높이를 비워 두는 일도 함께 한다.
+ */
+.head {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  margin-bottom: var(--space-2);
+  gap: var(--space-2);
+}
+
+.badge {
+  display: inline-flex;
+}
+
+/*
+ * 관심없음 · `⋯`. 시안은 카드의 오른쪽 위 모서리에 바짝 붙인다.
+ *
+ * **자리를 흐름에서 빼 모서리에 직접 붙인다.** 버튼은 보이는 상자보다 큰 터치 영역(44px)을
+ * 가지므로(`IconButton`) 흐름 안에서는 그 여분이 카드 안쪽 여백에 더해져 상자가 모서리에서
+ * 29px이나 들어와 보였다(2026-09-22 브라우저 측정). 아래 값은 **보이는 상자**가 모서리에서
+ * 8px 떨어지도록 터치 영역의 여분(7px)을 뺀 것이다.
+ */
+.actions {
+  position: absolute;
+  z-index: 1;
+  top: 1px;
+  right: 1px;
+  display: inline-flex;
+  gap: 0;
+}
+
+/*
+ * 두 버튼을 붙인다. 버튼마다 44px 터치 영역이 있어 그냥 두면 보이는 상자 사이가 14px
+ * 벌어진다. 겹치는 만큼 뒤 버튼의 터치 영역이 앞 버튼을 덮지만, 남는 영역이 각각 30px이라
+ * 누르는 데 지장이 없다.
+ */
+.actions > * + * {
+  margin-left: -12px;
+}
+
+/*
+ * 포스터와 정보가 나란히 선다. **위를 맞춘다** — 기본값(`stretch`)으로 두면 포스터를 감싼
+ * 링크가 카드 높이만큼 늘어나 포스터 아래에 흰 꼬리가 남는다(2026-09-22 브라우저 확인).
+ */
+.body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+/* 포스터는 벽에 걸린 것처럼 그림자를 진다 */
+.posterLink {
+  flex: none;
+  border-radius: 6px;
+  box-shadow: var(--shadow-poster);
+  line-height: 0;
+  overflow: hidden;
+}
+
+.info {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/*
+ * 제목. **두 줄 자리를 늘 비워 둔다**(사용자 지적 2026-09-22).
+ *
+ * 제목이 한 줄인 카드와 두 줄인 카드가 나란히 서면 그만큼 카드 높이가 어긋난다. 자르지
+ * 않고 자리를 비워 두는 쪽을 골랐다 — 영화 제목은 그 카드가 무엇인지 말하는 유일한 글이라
+ * 말줄임으로 지우면 `에브리씽 에브리웨어…`처럼 어느 영화인지 흐려진다. 세 줄을 넘기면
+ * 그때는 접는다.
+ */
+.title {
+  display: -webkit-box;
+  min-height: calc(2 * 1.35em);
+  margin: 0;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--color-ink);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.35;
+  letter-spacing: var(--letter-spacing-heading);
+  overflow: hidden;
+}
+
+.titleLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.titleLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* 개봉연도와 장르. 좁은 카드에서 글자가 세로로 서지 않게 줄 단위로 접는다 */
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  gap: var(--space-2);
+}
+
+.metaBar {
+  color: var(--color-ink-disabled);
+}
+
+/* 평가가 없어 안이 비어도 한 줄 높이를 지킨다(`index.tsx`) */
+.rating {
+  display: flex;
+  min-height: calc(var(--font-size-body) * 1.2);
+  align-items: baseline;
+  margin: var(--space-1) 0 0;
+  gap: 3px;
+}
+
+.star {
+  color: var(--color-brand);
+  font-size: 13px;
+}
+
+.ratingValue {
+  color: var(--color-ink);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+
+.ratingUnit {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+}
+
+/*
+ * 추천 이유. 시안의 카드는 두 줄까지 보이고 그보다 길면 줄임표로 접는다.
+ *
+ * **두 줄 자리를 늘 비워 둔다.** 이유가 한 줄인 카드와 두 줄인 카드가 나란히 서면 그만큼
+ * 카드 높이가 어긋나는데, 필름이 둘로 갈린 자리에서는 그 차이가 두 단의 길이 차이로
+ * 드러난다(2026-09-22 브라우저 확인 · 사용자 지적).
+ */
+.reason {
+  display: -webkit-box;
+  min-height: calc(2 * var(--line-height-meta) * 1em);
+  margin: var(--space-2) 0 0;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--color-ink-body);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  overflow: hidden;
+}
+
+/*
+ * OTT 로고 줄. 글이 짧아도 카드 아래쪽에 붙어 카드마다 높이가 맞는다.
+ *
+ * 볼 수 있는 곳이 없으면 같은 자리에 그렇다고 적는다(`.ottEmpty`). 줄을 통째로 지우면
+ * 그 카드만 로고 한 줄만큼 짧아진다(사용자 지적 2026-09-22).
+ */
+.ottList,
+.ottEmpty {
+  display: flex;
+  min-height: var(--ott-row-height, 26px);
+  align-items: center;
+  margin: auto 0 0;
+  padding-top: var(--space-3);
+  gap: var(--space-2);
+  list-style: none;
+}
+
+.ottEmpty {
+  color: var(--color-ink-hint);
+  font-size: var(--font-size-caption);
+}
+
+.footer {
+  margin-top: var(--space-4);
+}
+
+/*
+ * 카드 아래 `영화 상세 보기` (업무 -783). 2026-09-21 시안이 카드마다 둔 버튼이다.
+ *
+ * 브랜드 빨강 면이며 **모든 카드가 같다**(사용자 결정 2026-09-22). 디자인 원칙은 빨강 면을
+ * 3.1과 2.4만 쓰도록 정해 두었으나(`tokens.css`), 시안이 이 화면들에서도 빨강을 썼다.
+ */
+.detailButton {
+  display: flex;
+  height: var(--control-height-sm);
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  /*
+   * 카드 바닥에 붙인다. 한 줄에 선 카드들은 높이가 같지만 안에 든 글의 길이는 달라서,
+   * 글 바로 뒤에 두면 버튼의 높이가 카드마다 어긋난다(2026-09-22 브라우저 확인).
+   */
+  margin-top: var(--space-4);
+  border-radius: var(--radius-pill);
+  gap: var(--space-2);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  text-decoration: none;
+}
+
+.detailButton {
+  background: var(--color-action-brand);
+  box-shadow: var(--shadow-action);
+  color: var(--color-on-action);
+}
+
+.detailButton:active {
+  background: var(--color-action-brand-pressed);
+}
+
+/*
+ * 작은 카드 (업무 -783). 시안이 대표 카드 아래에 두 열로 앉히는 카드다.
+ * 폭이 절반이라 여백과 글자를 한 단계 줄인다 — 같은 크기로 두면 제목이 글자 단위로 꺾인다.
+ */
+.card[data-compact] {
+  padding: var(--space-3);
+}
+
+.card[data-compact] .body {
+  gap: 6px;
+}
+
+.card[data-compact] .head {
+  min-height: 26px;
+  margin-bottom: var(--space-1);
+}
+
+/* 작은 카드는 상자가 26px이라 터치 영역의 여분이 9px이다 */
+.card[data-compact] .actions {
+  top: -1px;
+  right: -1px;
+}
+
+.card[data-compact] .actions > * + * {
+  margin-left: -16px;
+}
+
+.card[data-compact] .title {
+  font-size: var(--font-size-meta);
+}
+
+.card[data-compact] .meta,
+.card[data-compact] .ratingUnit {
+  font-size: 9.5px;
+}
+
+/* 작은 카드의 개봉연도 · 장르는 한 줄이다(시안). 장르를 하나만 적어 자리를 맞춘다 */
+.card[data-compact] .meta {
+  flex-wrap: nowrap;
+  gap: 0 5px;
+  line-height: 1.3;
+}
+
+.card[data-compact] .rating {
+  min-height: calc(var(--font-size-meta) * 1.2);
+}
+
+.card[data-compact] .ratingValue {
+  font-size: var(--font-size-meta);
+}
+
+/* 작은 카드는 세 줄이고, 그 세 줄 자리를 늘 비워 둔다 */
+.card[data-compact] .reason {
+  min-height: calc(3 * 1.5em);
+  margin-top: var(--space-1);
+  -webkit-line-clamp: 3;
+  font-size: var(--font-size-caption);
+  line-height: 1.5;
+}
+
+/*
+ * 작은 카드의 OTT 줄은 포스터 아래에 있다(시안). 카드의 마지막 요소이므로 카드 바닥에
+ * 붙고, 로고가 포스터 왼쪽 끝에서 시작해 오른쪽으로 이어진다.
+ */
+.card[data-compact] .ottList,
+.card[data-compact] .ottEmpty {
+  padding-top: var(--space-2);
+  gap: 5px;
+}
+
+/*
+ * 작은 카드의 제목은 한 줄이다. 카드 폭이 시안보다 좁아(중앙 단이 시안 캔버스보다 좁다)
+ * 접히게 두면 제목이 글자 단위로 꺾인다. 넘치면 말줄임한다.
+ */
+.card[data-compact] .title {
+  display: block;
+  min-height: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * 개봉연도와 장르는 자리가 없으면 줄을 바꾼다. 말줄임하면 장르가 `로맨스 ·`처럼 잘려
+ * 무슨 장르인지 알 수 없는데, 줄을 바꾸면 `2015 |` 다음 줄에 장르가 통째로 온다.
+ * 낱말이 쪼개지지 않게 각 조각은 한 줄로 둔다.
+ */
+.card[data-compact] .meta > span {
+  flex: none;
+  white-space: nowrap;
+}

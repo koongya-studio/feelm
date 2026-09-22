@@ -155,10 +155,11 @@ movie metadata 고정 URI 세 개를 `load_bundle`로 검증한다. Redis 게시
 broker ACK까지 확인된 뒤에만 입력 Kafka record의
 Offset을 동기 커밋한다. poison record나 영구 실패 partition은 pause하고 다른 partition은 계속 처리한다.
 
-새 `feelm-party-consumer-v1` group이 처음 할당될 때는 `latest`에서 시작한다. 전환 중 Spring
-발행을 멈추고 기존 Spark writer가 당시 topic tail까지 처리한 것을 확인한 뒤 시작하며, 할당 후
-현재 활성 파티 입력을 다시 발행해 기준 상태를 만든다. 이미 commit된 group은 기존 Offset을
-그대로 재개한다. 모델 교체 전에는 발행을 멈추고 모든 partition lag가 0인지 확인한다.
+새 `feelm-party-consumer-v1` group이 처음 할당될 때는 `earliest`에서 시작해 Consumer 기동 전에
+발행된 미처리 이벤트도 소비한다. 이미 commit된 group은 `auto.offset.reset`과 무관하게 기존
+Offset을 그대로 재개한다. 전환 중에는 중복 writer를 막기 위해 Spring 발행을 멈추고 기존 Spark
+writer가 당시 topic tail까지 처리한 것을 확인한 뒤 시작한다. 모델 교체 전에는 발행을 멈추고 모든
+partition lag가 0인지 확인한다.
 
 ```bash
 uv run python -m feelm_consumer.party_main

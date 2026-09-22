@@ -1,0 +1,105 @@
+/* 2.2 데스크톱 추천 묶음 (업무 -783). 값은 2026-09-21 시안에서 잰 것이다 */
+
+/*
+ * 묶음 하나가 흰 패널이다(시안). 제목 줄과 필름이 한 면 위에 얹혀 두 묶음이 각각 하나의
+ * 덩어리로 읽힌다 — 벽에 바로 놓으면 제목이 어느 필름의 것인지 흐려진다.
+ */
+.group {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-solid);
+  box-shadow: var(--shadow-raised);
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: var(--space-4);
+  gap: 2px;
+}
+
+.title {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: var(--font-size-heading);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-heading);
+}
+
+.description {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+}
+
+/*
+ * 필름 한 칸 안의 카드 줄. 대표 카드가 위, 나머지가 아래다.
+ *
+ * **카드들이 맞닿아 하나의 흰 덩어리가 된다**(시안). 사이를 벌리지 않고 얇은 검은 선만
+ * 두어 필름이 비치게 하고, 둥근 모서리는 덩어리의 바깥 네 귀퉁이에만 준다 — 카드마다
+ * 모서리를 둥글리면 필름 안에 카드 셋이 흩어져 놓인 것처럼 보인다.
+ */
+.stack {
+  display: grid;
+  min-width: 0;
+  height: 100%;
+  border-radius: var(--radius-control);
+  gap: 3px;
+  grid-template-rows: auto 1fr;
+  overflow: hidden;
+}
+
+/* 덩어리 안에서는 카드가 제 모서리와 그림자를 갖지 않는다 */
+.stack article {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.lead {
+  display: flex;
+}
+
+.lead > * {
+  flex: 1;
+}
+
+/*
+ * 나머지 카드. 한 칸 안에서 두 열로 앉는다(시안). 열 하나가 150px보다 좁아지면 한 줄에
+ * 하나씩 내려간다 — 그보다 좁으면 제목이 글자 단위로 꺾인다.
+ */
+.rest {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 3px;
+}
+
+/* 남는 높이를 나눠 갖는다. 같은 줄의 카드는 서로 같고, 좌우 묶음끼리도 같다 */
+.rest > * {
+  height: 100%;
+}
+
+/*
+ * 남는 높이는 필름이 가져가고, 필름 안의 카드 덩어리가 그 높이를 그대로 채운다.
+ *
+ * 카드 안의 줄들이 모두 정해진 자리를 지켜도(`MovieBriefCard`) 포스터 이미지의 비율처럼
+ * 화면이 정하지 못하는 것이 남아 좌우 덩어리의 길이가 갈렸다(2026-09-22 사용자 화면).
+ * **덩어리를 필름 높이에 맞춰 늘리면** 무엇이 들어오든 두 묶음이 같아진다. 늘어난 만큼은
+ * 아래쪽 작은 카드 줄이 나눠 가지므로 카드 종류별 크기도 좌우가 같다.
+ */
+.group > [data-testid='film-reel'] {
+  flex: 1;
+}
+
+/* 필름의 칸 줄(`FilmReel`의 트랙). 띠 안쪽 높이를 다 쓴다 */
+.group > [data-testid='film-reel'] > div {
+  height: 100%;
+}
+
+/* 카드 오른쪽 위 `⋯`. 아이콘이 아니라 글자라 크기를 직접 맞춘다 */
+.ellipsis {
+  font-size: 15px;
+  line-height: 1;
+}

@@ -1466,9 +1466,10 @@ Compose 단계에서 수행한다.
 4. `feelm-party-consumer-v1` group이 없거나, 이전 실패 시도에서 만들어졌다면 의도한 tail offset과
    일치하는지 확인한다. 예상하지 못한 committed offset이 있으면 자동 reset하지 말고 전환을 중단한다.
 5. Backend migration과 완료 알림 listener가 실행 중인지 확인한다. 기존 writer 정지를 확인한 뒤에만
-   파티 Consumer를 시작한다. 신규 입력 group은 `latest`에서 시작한다.
-6. 모든 partition 할당 뒤 Spark query가 여전히 없는지 다시 확인하고, Spring worker를 재개해 현재
-   활성 파티 입력을 다시 발행한다.
+   파티 Consumer를 시작한다. 신규 입력 group은 `earliest`에서 시작해 기동 전에 쌓인 이벤트까지
+   처리하고, 이미 commit된 group은 기존 Offset을 그대로 재개한다.
+6. 모든 partition의 lag가 0이 되고 Spark query가 여전히 없는지 다시 확인한 뒤 Spring worker를
+   재개한다.
 
 ```bash
 CONSUMER_IMAGE="${PARTY_IMAGE}" \
@@ -1614,13 +1615,25 @@ GitLab에서 관리하고 서버에서 직접 수정하지 않습니다. 현재 
 남고 값은 출력하지 않습니다. 변수의 Protected·Masked·환경 범위 속성은 GitLab 설정에서
 별도로 검토합니다.
 
-모니터링 배포가 공통으로 사용하는 필수 CI 변수와 기대 메타데이터는
+서비스 배포가 공통으로 사용하는 필수 CI 변수와 기대 메타데이터는
 `infra/config/required-ci-variables.json`에서 값 없이 관리합니다. 현재 `service` 환경 계약은
 `DISTRIBUTED_NODE_IP`, `GRAFANA_ADMIN_PASSWORD`, `GRAFANA_ALERT_HMAC_SECRET`, `POSTGRES_DB`,
-`POSTGRES_USER`, `POSTGRES_PASSWORD`, `REDIS_PASSWORD`를 포함합니다. 비밀번호와 HMAC 서명 키는
-Protected, Masked and hidden,
+`POSTGRES_USER`, `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET`, `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET`, `NAVER_CLIENT_ID`,
+`NAVER_CLIENT_SECRET`, `OAUTH_ALLOWED_REDIRECT_URIS`를 포함합니다. 비밀번호, HMAC 서명 키와
+OAuth client-secret은 Protected, Masked and hidden,
 변수 확장 비활성화(`raw`)로 등록하고 나머지 변수도 Protected와 `service` 환경 범위를
 유지합니다. 실제 값은 계약 파일, 문서, MR과 Job 로그에 기록하지 않습니다.
+
+세 소셜 로그인 제공자는 배포 기능으로 보장하므로 OAuth 변수도 필수 계약에 포함합니다.
+각 제공자 콘솔에서 발급한 client-id와 client-secret을 같은 이름의 GitLab CI/CD Variable로
+등록하고, `OAUTH_ALLOWED_REDIRECT_URIS`에는 콘솔에 등록한 서비스 콜백 주소를 쉼표로 구분해
+입력합니다. 기본 서비스 콜백은 `https://<service-host>/app/oauth/callback`입니다.
+client-id와 redirect URI는 브라우저에서 사용되는 공개 설정이지만 GitLab에서는 Protected,
+`service` 범위, 변수 확장 비활성화로 제한합니다. client-secret은 프론트 빌드 변수나
+Docker build argument로 전달하지 않습니다. 값을 갱신할 때는 제공자 콘솔과 GitLab 변수를
+같이 교체한 뒤 보호된 `develop` Pipeline의 `ci-variable-preflight` 통과를 확인하고 백엔드를
+재배포합니다.
 
 develop 대상 MR의 `ci-variable-contract-check`는 격리 Runner에서 계약 구조만 검사합니다.
 이 Job에는 보호 변수를 전달하지 않으며 Secret 값이나 GitLab API 토큰도 필요하지 않습니다.

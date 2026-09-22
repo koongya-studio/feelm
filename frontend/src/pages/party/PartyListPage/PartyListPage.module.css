@@ -488,3 +488,21 @@
   justify-content: space-between;
   gap: var(--space-2);
 }
+
+/* ─────────────────────────── 데스크톱 시안 (업무 -785) */
+
+/*
+ * 목록을 못 받았을 때의 안내. 데스크톱 본문은 `PartyDesktop`이 그리므로 그 위에 얹는다.
+ * 좌우 여백만 본문과 맞춘다.
+ */
+.desktopStatus {
+  padding: var(--space-6) var(--space-4) 0;
+}
+
+.desktopInvitationsError {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-6);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}

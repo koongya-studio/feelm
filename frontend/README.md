@@ -44,6 +44,12 @@ React + Vite 기반 반응형 웹 애플리케이션 소스와 관련 문서를 
 몇 알에 대응하는지, 2026-09-17 여정 QA가 본 `+2알`이 왜 화면 결함이 아니었는지, 그런데도
 `저장 전 값 + 1`이라는 전제가 어떤 경로로 깨지는지가 적혀 있습니다.
 
+2026-09-21에 데스크톱 셸을 붙이고 폭 네 단계에서 확인한 기록은
+[S15P21E106-782 검증 기록](verification/S15P21E106-782.md)에 있습니다. 412·768·1280·1440px
+에서 가로 넘침과 콘텐츠 겹침이 없는지, 1024px 미만이 기존 화면 그대로인지, 좌측 내비가
+생기면서 본문까지 `Tab`이 열한 번이 된 것을 어떻게 다뤘는지가 적혀 있습니다. 확인하면서
+드러난 상단 바 검색·빈 보조 패널·검색어 잔류 셋의 원인과 고친 방법도 함께 있습니다.
+
 백엔드가 단독으로 확인한 로그인 제한·메일 제한·차단은
 [backend/verification/S15P21E106-375.md](../backend/verification/S15P21E106-375.md)에
 있습니다.
@@ -189,7 +195,12 @@ MR 코드를 실행하는 전용 Runner는 현재 백엔드 Job만 허용하므�
 생성되므로 운영 Nginx는 접두사를 제거하지 않고 프론트엔드 컨테이너에 전달합니다.
 
 ```bash
-docker build --pull -t feelm-frontend:local ./frontend
+docker build --pull \
+  --build-arg VITE_GOOGLE_CLIENT_ID="${VITE_GOOGLE_CLIENT_ID:-}" \
+  --build-arg VITE_KAKAO_CLIENT_ID="${VITE_KAKAO_CLIENT_ID:-}" \
+  --build-arg VITE_NAVER_CLIENT_ID="${VITE_NAVER_CLIENT_ID:-}" \
+  --build-arg VITE_OAUTH_REDIRECT_URI="${VITE_OAUTH_REDIRECT_URI:-}" \
+  -t feelm-frontend:local ./frontend
 docker run --rm -p 8081:80 --name feelm-frontend feelm-frontend:local
 ```
 
@@ -240,6 +251,19 @@ Vite는 `VITE_` 접두사가 붙은 변수만 클라이언트 코드에 노출�
 되는 값이지만 client-secret은 백엔드만 가지며 이곳에 두지 않습니다. 값이 없는 제공자는
 버튼이 잠깁니다. 콜백 주소는 각 사 개발자 콘솔과 백엔드 허용 목록
 (`OAUTH_ALLOWED_REDIRECT_URIS`)에 등록한 값과 **정확히 같아야** 합니다.
+
+운영 이미지는 GitLab CI/CD Variable의 공개 client-id를 `frontend-image` Job에서 Docker
+build argument로 전달해 빌드합니다. 이때 읽는 변수는 백엔드와 같은 `GOOGLE_CLIENT_ID`,
+`KAKAO_CLIENT_ID`, `NAVER_CLIENT_ID`입니다. 제공자는 동의 화면의 `client_id`와 백엔드가
+인가 코드를 교환할 때 보내는 `client_id`가 다르면 거절하므로 두 값은 반드시 같아야 하고,
+변수를 따로 두면 한쪽만 갱신됐을 때 조용히 어긋납니다. 그래서 프론트 전용 client-id 변수는
+만들지 않습니다. `VITE_OAUTH_REDIRECT_URI`만 프론트 전용이며 기본값
+(`{origin}/app/oauth/callback`)과 다른 콜백을 등록한 환경에서만 설정합니다. 미설정 값은
+빈 문자열로 전달되므로 이미지 빌드는 계속되고 해당 제공자 버튼만 잠깁니다.
+`GOOGLE_CLIENT_SECRET`, `KAKAO_CLIENT_SECRET`, `NAVER_CLIENT_SECRET`은 프론트 변수,
+build argument 또는 이미지에 절대 전달하지 않습니다. `frontend-image`는 `service` 환경을
+준비하는 Job으로 선언되어 이 범위의 값을 읽되 실제 배포 상태는 뒤의 `deploy-frontend` Job만
+기록합니다.
 
 `VITE_API_PROXY_TARGET`은 개발 서버 설정에서만 읽으므로 클라이언트 번들에 들어가지
 않습니다. 값을 바꾸려면 `frontend/.env`에 적습니다. 키 이름은

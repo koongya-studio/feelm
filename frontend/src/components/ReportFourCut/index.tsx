@@ -17,8 +17,11 @@
  * 4컷과 3.4 상세의 큰 4컷이 같은 모양이다.
  *
  * - 이름이 길면 최대 두 줄 안에서 글자만 작아진다(`useFitText`)
- * - 계약이 카드를 주지 않은 칸은 `준비 중`만 적는다(`PendingCut`). 04 캐릭터는 선정 기준이
- *   정해질 때까지 늘 이 모양이다(백엔드 답 2026-09-21, 기준은 업무 -618)
+ * - 계약이 카드를 주지 않은 칸은 `준비 중`만 적는다(`PendingCut`). 04 캐릭터는 백엔드
+ *   구현(업무 -779) 전까지 늘 이 모양이다
+ * - **04 캐릭터 칸의 그림만 저장소에 있다.** 카드가 고정 16종이라 계약이 이 칸의 이미지
+ *   URL을 내리지 않고 화면이 `characterCard.code`로 짝짓는다(`characterCards.ts`, 업무 -618).
+ *   01 ~ 03은 계약이 주는 사진을 쓴다
  * - 사진 한 칸은 `url`(원본) · `cutoutUrl`(누끼)로 세 가지 모양이 된다(`useCutImage`)
  *   - 누끼 — 단색 바탕 위에 인물을 올리고 글자와 겹친다
  *   - 원본 — 원래 배경을 두고 글자 쪽에 어두운 그라데이션을 깐다
@@ -31,6 +34,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import Wordmark from '../Wordmark';
 import { formatPrintDate } from '../../utils/report';
 import { useFitText } from './useFitText';
+import { characterCardImage } from './characterCards';
 import styles from './ReportFourCut.module.css';
 import type { ReportCutImage, ReportCutName, ReportFourCut } from '../../types/report';
 
@@ -45,9 +49,20 @@ type Props = {
    * 시작한다(사용자 시안 2026-09-15, 업무 -446). 발의 로고 · 날짜는 늘 그린다
    */
   head?: boolean;
+  /**
+   * 04 칸 그림을 고를 카드 코드(API-060 `characterCard.code`). 계약이 이 칸의 이미지 URL을
+   * 내리지 않으므로 그림은 코드로 찾는다. 없으면 이름만 그린다
+   */
+  characterCode?: string | null;
 };
 
-export default function ReportFourCut({ cuts, owner, createdAt, head = true }: Props) {
+export default function ReportFourCut({
+  cuts,
+  owner,
+  createdAt,
+  head = true,
+  characterCode,
+}: Props) {
   const title = `${owner ? `${owner}의` : '나의'} 취향 4컷`;
   const date = formatPrintDate(createdAt);
 
@@ -70,7 +85,7 @@ export default function ReportFourCut({ cuts, owner, createdAt, head = true }: P
           )}
           {cuts.actor ? <ActorCut {...cuts.actor} /> : <PendingCut kind="actor" label="배우" />}
           {cuts.character ? (
-            <CharacterCut {...cuts.character} />
+            <CharacterCut {...cuts.character} code={characterCode} />
           ) : (
             <PendingCut kind="character" label="캐릭터" />
           )}
@@ -159,8 +174,13 @@ function ActorCut({ name, displayName, image }: CutProps) {
   );
 }
 
-function CharacterCut({ name, displayName, image }: CutProps) {
-  const photo = useCutImage(image);
+/*
+ * 04 캐릭터. 다른 세 칸과 달리 사진이 계약에 없고 **코드로 저장소 에셋을 찾는다**
+ * (`characterCards.ts`, 업무 -618). 그림이 없거나 못 불러오면 `useCutImage`가 `none`으로
+ * 떨어져 이름만 크게 쓴다 — 에셋 16장(업무 -781)이 늦어도 칸은 동작한다.
+ */
+function CharacterCut({ name, displayName, code }: ReportCutName & { code?: string | null }) {
+  const photo = useCutImage({ url: characterCardImage(code) });
 
   return (
     <Cut kind="character" label="캐릭터" name={name} displayName={displayName} photo={photo}>
@@ -178,8 +198,8 @@ function CharacterCut({ name, displayName, image }: CutProps) {
  * 계약이 카드를 주지 않은 칸. 칸 크기와 번호 라벨은 그대로 두고 안만 비운다 — 4컷 레이아웃은
  * 확정된 것이라 칸을 빼지 않는다(백엔드 답 2026-09-21).
  *
- * 04 캐릭터는 선정 기준이 업무 -618에서 정해질 때까지 늘 여기로 오고, 나머지 칸은 그 반기에
- * 셀 수 있는 장르 · 인물이 없을 때만 온다.
+ * 04 캐릭터는 백엔드 구현(업무 -779) 전까지 늘 여기로 오고, 나머지 칸은 그 반기에 셀 수 있는
+ * 장르 · 인물이 없을 때만 온다. 구현 뒤에는 16종을 다 쓰므로 캐릭터 칸이 비지 않는다.
  */
 function PendingCut({ kind, label }: { kind: CutKind; label: string }) {
   return (

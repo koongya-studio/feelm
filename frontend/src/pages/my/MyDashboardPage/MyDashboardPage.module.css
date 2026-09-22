@@ -114,9 +114,17 @@
   justify-content: center;
 }
 
-.shortcutLabel {
+/* 이름과 설명 줄을 감싼다. 넓은 화면에서만 설명이 있고 좁은 화면은 이름 한 줄이다(업무 -786) */
+.shortcutText {
+  display: flex;
   min-width: 0;
   flex: 1;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shortcutLabel {
+  min-width: 0;
   font-size: var(--font-size-meta);
   font-weight: var(--font-weight-bold);
   line-height: var(--line-height-meta);
@@ -349,4 +357,202 @@
 .profileAction:focus-visible,
 .shortcut:focus-visible {
   outline-color: var(--color-on-dark);
+}
+
+/* ─────────────────────────── 데스크톱 시안 (업무 -786) */
+
+/*
+ * 1024px 이상에서 `index.tsx`가 `.page` 대신 이 클래스를 붙인다. 미디어 쿼리가 아니라
+ * 그리는 것 자체가 갈리므로 여기에는 `@media`가 없다(업무 -782의 셸과 같은 규칙).
+ *
+ * **사진 배경 틀이 없다.** 시안의 프로필은 밝은 벽 위의 흰 카드라, 어두운 면 위에서 쓰던
+ * 글자색을 이 안에서 다시 잡아 준다.
+ */
+.desktopPage {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-6) var(--space-4) var(--space-8);
+}
+
+.desktopHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.desktopTitle {
+  margin: 0;
+  font-size: 34px;
+  line-height: 1.15;
+  letter-spacing: var(--letter-spacing-title);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+/*
+ * 프로필 카드의 버튼 둘. 좁은 화면의 유리 판은 사진 배경 위의 것이라 밝은 면에서는 글자가
+ * 보이지 않는다. 시안대로 `편집`은 흰 면, `공유`는 빨간 테두리다.
+ */
+.desktopPage .profileAction {
+  height: var(--control-height-sm);
+  padding: 0 var(--space-4);
+  border-color: var(--color-line-strong);
+  background: var(--color-surface-solid);
+  box-shadow: var(--shadow-button);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  color: var(--color-ink);
+  font-weight: var(--font-weight-bold);
+}
+
+.desktopPage .profileAction:last-child {
+  border-color: var(--color-action-brand);
+  color: var(--color-action-brand);
+}
+
+/* 설정. 보이는 것은 20px이고 눌리는 자리는 44px이다(좁은 화면의 헤더 아이콘과 같다) */
+.desktopSettings {
+  display: inline-flex;
+  width: var(--tap-target-min);
+  height: var(--tap-target-min);
+  align-items: center;
+  justify-content: center;
+  margin-right: calc(var(--space-3) * -1);
+  color: var(--color-ink-muted);
+  text-decoration: none;
+}
+
+.desktopSettings:hover {
+  color: var(--color-ink);
+}
+
+/* 바로가기 두 장은 시안대로 검은 면이다. 좁은 화면의 유리 판은 사진 배경 위의 것이다 */
+.desktopPage .shortcut {
+  min-height: 132px;
+  align-items: flex-start;
+  padding: var(--space-5);
+  border-color: transparent;
+  background: var(--color-surface-dark);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.desktopPage .shortcutLabel {
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+}
+
+.shortcutNote {
+  overflow: hidden;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-on-dark-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 그림이 카드 오른쪽 아래를 채운다(시안). 글은 왼쪽 위에 남는다 */
+.desktopPage .shortcut {
+  position: relative;
+  overflow: hidden;
+}
+
+.desktopPage .shortcutArt {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-3);
+  height: 76px;
+}
+
+.desktopPage .shortcutChevron {
+  margin-left: auto;
+  color: var(--color-on-dark);
+}
+
+/* `내 기록`. 탭 줄 위에 서는 구역 이름이다 */
+.feedTitle {
+  margin: var(--space-2) 0 0;
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+/*
+ * 탭은 왼쪽으로 모인다. 좁은 화면은 3열로 폭을 나눠 가지지만 데스크톱 단에서는 세 칸이
+ * 너무 넓게 벌어진다.
+ */
+.desktopPage .tabs {
+  display: flex;
+  gap: var(--space-5);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.desktopPage .tab {
+  padding: 0 var(--space-1) var(--space-3);
+  margin-bottom: -1px;
+  color: var(--color-ink-muted);
+}
+
+.desktopPage .tab[aria-selected='true'] {
+  border-bottom-color: var(--color-action-brand);
+  color: var(--color-ink);
+}
+
+.desktopPage .feedNote {
+  color: var(--color-ink-muted);
+}
+
+/*
+ * 포스터 격자. **열 수를 고정하지 않는다** — 중앙 단은 1024px에서 넓고 1280px에서는 우측
+ * 패널이 열려 좁아진다. 한 칸의 최소 폭만 정하고 좁아지면 줄을 바꾼다. 좁은 화면이 쓰던
+ * 음수 여백(화면 폭 꽉 채우기)은 여기서 되돌린다 — 데스크톱 단에는 그 여백이 없다.
+ */
+.desktopPage .grid {
+  margin: 0;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+}
+
+/* 칸이 자기 내용만큼 벌어지지 않게 한다(업무 -784에서 같은 것을 겪었다) */
+.desktopPage .grid > li {
+  min-width: 0;
+}
+
+.desktopPage .cell {
+  color: var(--color-ink);
+}
+
+.desktopPage .caption {
+  padding: var(--space-2) 0 0;
+}
+
+.desktopPage .captionSource,
+.desktopPage .captionDate {
+  color: var(--color-ink-muted);
+  font-weight: var(--font-weight-regular);
+}
+
+/* 포스터 아래의 제목. 두 줄까지이며 넘치면 말줄임이다(시안) */
+.captionTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+  overflow-wrap: anywhere;
+}
+
+/* 알림 막대는 하단 내비가 없는 폭이라 화면 아래에 그대로 붙는다 */
+.desktopPage ~ .notice,
+.desktopNotice {
+  bottom: var(--space-6);
 }

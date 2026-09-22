@@ -1,0 +1,132 @@
+/*
+ * 파티원 얼굴 줄 — 데스크톱 (업무 S15P21E106-785).
+ *
+ * 두 모양이 한 파일에 있다. `panel`은 우측 패널의 큰 얼굴 넉 줄, `row`는 카드 안의
+ * 작은 얼굴 줄이다. 둘 다 얼굴 아래에 이름이 서므로 뼈대가 같고 치수만 다르다.
+ */
+.faces {
+  display: flex;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.face {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.person {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/*
+ * 닉네임 첫 글자. 사진 자리이지만 사진이 계약에 없다(`index.tsx` 머리말).
+ * 색은 무채색이다 — UI에 유채색을 쓰지 않는다(`design-concept.md` 2.2).
+ */
+.mark {
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--color-surface-sunken);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink-body);
+}
+
+.name {
+  max-width: 100%;
+  overflow: hidden;
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-body);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* `방장` · `멤버`. 역할은 API-050이 주는 값이다 */
+.badge {
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink-muted);
+  white-space: nowrap;
+}
+
+/* 얼굴 사이의 `×`. 시안의 장식이다 */
+.cross {
+  flex: none;
+  padding: 0 var(--space-2);
+  font-size: var(--font-size-caption);
+  color: var(--color-ink-muted);
+}
+
+/* ─────────────────────────── 우측 패널 (56px) */
+
+.faces[data-variant='panel'] {
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.faces[data-variant='panel'] .face {
+  min-width: 0;
+  flex: 1;
+}
+
+.faces[data-variant='panel'] .person {
+  width: 100%;
+}
+
+.faces[data-variant='panel'] .mark {
+  width: 56px;
+  height: 56px;
+  font-size: var(--font-size-heading);
+}
+
+.faces[data-variant='panel'] .name {
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-medium);
+}
+
+/* ─────────────────────────── 카드 안의 줄 (32px) */
+
+.faces[data-variant='row'] {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.faces[data-variant='row'] .mark {
+  width: 32px;
+  height: 32px;
+  font-size: var(--font-size-caption);
+}
+
+.faces[data-variant='row'] .name {
+  font-size: var(--font-size-caption);
+  color: var(--color-ink-muted);
+}
+
+/* ─────────────────────────── 어두운 면 위 */
+
+.faces[data-tone='dark'] .mark {
+  background: var(--color-line-on-dark);
+  color: var(--color-on-dark);
+}
+
+.faces[data-tone='dark'] .name,
+.faces[data-tone='dark'] .cross {
+  color: var(--color-on-dark-muted);
+}
+
+.faces[data-tone='dark'] .badge {
+  background: var(--color-line-on-dark);
+  color: var(--color-on-dark);
+}

@@ -1,6 +1,10 @@
 package com.feelm.backend.domain.report.service;
 
+import com.feelm.backend.domain.report.model.CharacterAxisMedians;
+import com.feelm.backend.domain.report.model.CharacterAxisMetrics;
 import com.feelm.backend.domain.report.model.ReportContent;
+import com.feelm.backend.domain.report.model.ReportContent.CharacterCardContent;
+import com.feelm.backend.domain.report.model.ReportContent.CharacterCutCard;
 import com.feelm.backend.domain.report.model.ReportContent.Comparison;
 import com.feelm.backend.domain.report.model.ReportContent.DirectorCard;
 import com.feelm.backend.domain.report.model.ReportContent.FlavorChange;
@@ -9,6 +13,7 @@ import com.feelm.backend.domain.report.model.ReportContent.Generation;
 import com.feelm.backend.domain.report.model.ReportContent.GenreCard;
 import com.feelm.backend.domain.report.model.ReportContent.GenreRank;
 import com.feelm.backend.domain.report.model.ReportContent.ImageRef;
+import com.feelm.backend.domain.report.model.ReportContent.Keyword;
 import com.feelm.backend.domain.report.model.ReportContent.PersonCard;
 import com.feelm.backend.domain.report.model.ReportContent.PersonRank;
 import com.feelm.backend.domain.report.model.ReportContent.Share;
@@ -29,6 +34,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.IntPredicate;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
@@ -36,6 +42,33 @@ import org.springframework.stereotype.Component;
 public class ReportContentAssembler {
 
     private static final int DISPLAY_LIMIT = 3;
+
+    /** 시대 칸에서 연대 이름을 그대로 쓰는 줄 수. 나머지는 `그 이전` 한 줄로 합친다 */
+    private static final int ERA_NAMED_LIMIT = 2;
+
+    private static final String ERA_REST_LABEL = "그 이전";
+
+    /** 취향 키워드 칸 수. 와이어프레임이 네 개를 그린다 */
+    private static final int KEYWORD_LIMIT = 4;
+
+    /** 한 사람을 `몰아봤다`고 부를 최소 편수 */
+    private static final int PERSON_BINGE = 3;
+
+    private static final int NEW_DIRECTOR_MIN = 3;
+
+    /** 한 항목이 그 반기를 대표한다고 볼 최소 비율 */
+    private static final int DEVOTEE_SHARE = 50;
+
+    private static final int OMNIVORE_GENRES = 8;
+    private static final int CLASSIC_YEARS = 20;
+    private static final int CLASSIC_SHARE = 30;
+    private static final int RECENT_SHARE = 50;
+    private static final int ERA_LOVER_SHARE = 40;
+    private static final int COUNTRY_SHARE = 50;
+    private static final int FAVORITE_MIN_COUNT = 2;
+    private static final BigDecimal FAVORITE_MIN_SCORE = new BigDecimal("4.0");
+    private static final BigDecimal GENEROUS_SCORE = new BigDecimal("4.3");
+    private static final BigDecimal STRICT_SCORE = new BigDecimal("3.0");
     private static final Map<String, String> TMDB_GENRE_DISPLAY_NAMES =
             Map.ofEntries(
                     Map.entry("28", "ACTION"),
@@ -67,7 +100,8 @@ public class ReportContentAssembler {
             List<ReportSource.Genre> genres,
             List<ReportSource.Country> countries,
             List<ReportSource.Person> people,
-            boolean previousReportExists) {
+            boolean previousReportExists,
+            CharacterAxisMedians characterAxisMedians) {
         Set<Long> currentIds = frameIds(frames, period.startInclusive(), effectiveEnd);
         Set<Long> previousIds =
                 frameIds(frames, period.previous().startInclusive(), period.startInclusive());
@@ -82,12 +116,6 @@ public class ReportContentAssembler {
                                 Collectors.toMap(ReportSource.Frame::frameId, Function.identity()));
 
         List<GenreStat> currentGenres = genreStats(genres, currentIds, frameById);
-        List<GenreStat> previousGenres = genreStats(genres, previousIds, frameById);
-        Set<String> historicalGenreCodes =
-                genres.stream()
-                        .filter(genre -> olderIds.contains(genre.frameId()))
-                        .map(ReportSource.Genre::code)
-                        .collect(Collectors.toSet());
         List<PersonStat> currentDirectors = personStats(people, currentIds, Role.DIRECTOR);
         List<PersonStat> currentActors = personStats(people, currentIds, Role.ACTOR);
         Set<Long> historicalDirectorIds =
@@ -116,15 +144,6 @@ public class ReportContentAssembler {
                         .toList();
         List<Share> countryShares = countryShares(countries, currentIds, currentTotal);
         List<Share> eraShares = eraShares(currentFrames, currentTotal);
-        List<Comparison> comparisons =
-                previousReportExists
-                        ? comparisons(
-                                currentGenres,
-                                previousGenres,
-                                historicalGenreCodes,
-                                currentTotal,
-                                previousTotal)
-                        : List.of();
         List<FlavorChange> flavorChanges = flavorChanges(currentFrames, previousFrames);
         Set<String> historicalFlavors =
                 frames.stream()
@@ -132,6 +151,15 @@ public class ReportContentAssembler {
                         .map(ReportSource.Frame::flavorCode)
                         .filter(code -> code != null)
                         .collect(Collectors.toSet());
+        List<Comparison> comparisons =
+                previousReportExists
+                        ? comparisons(
+                                currentFrames,
+                                previousFrames,
+                                historicalFlavors,
+                                currentTotal,
+                                previousTotal)
+                        : List.of();
         Map<String, String> newFlavors =
                 currentFrames.stream()
                         .filter(frame -> frame.flavorCode() != null)
@@ -150,24 +178,49 @@ public class ReportContentAssembler {
                                 .count();
 
         Summary summary = new Summary(currentTotal, newFlavors.size(), averageScore(currentFrames));
-        FourCut fourCut = fourCut(currentGenres, currentDirectors, currentActors);
+
+        /*
+         * 캐릭터 카드. 판정은 그 반기 대상자 전체의 중앙값 스냅샷 기준 상대 판정이라 조립기가 아니라
+         * `CharacterCardSelector`가 한다(업무 -779). 프레임이 3편 이상이면 리포트가 생기고 카드도
+         * 늘 함께 생긴다 — 16종이 모든 조합을 덮어 후보 없음이 없다(API-060).
+         */
+        CharacterAxisMetrics axisMetrics =
+                CharacterCardSelector.metrics(frames, period.startInclusive(), effectiveEnd);
+        CharacterCardContent characterCard =
+                CharacterCardSelector.select(axisMetrics, characterAxisMedians, currentTotal);
+        FourCut fourCut =
+                fourCut(currentGenres, currentDirectors, currentActors, characterCard.name());
         List<String> highlights =
                 highlights(comparisons, newDirectorCount, new ArrayList<>(newFlavors.values()));
+        List<Keyword> keywords =
+                keywords(
+                        period,
+                        currentTotal,
+                        currentFrames,
+                        currentGenres,
+                        currentDirectors,
+                        currentActors,
+                        newFlavors,
+                        newDirectorCount,
+                        eraShares,
+                        countryShares,
+                        summary.averageScore());
 
         return new ReportContent(
                 summary,
                 topGenres,
                 topActors,
                 topDirectors,
-                null,
+                characterCard,
                 flavorChanges,
                 fourCut,
                 genreShares,
                 countryShares,
                 eraShares,
-                List.of(),
+                keywords,
                 comparisons,
                 highlights,
+                characterAxisMedians,
                 new Generation(1, snapshotAcquiredAt, period.cutoffExclusive(), finalSnapshot));
     }
 
@@ -266,6 +319,13 @@ public class ReportContentAssembler {
                 .toList();
     }
 
+    /**
+     * 3.4 · 7.4 `시대`. 상위 두 연대를 그대로 쓰고 **나머지 연대는 `그 이전` 한 줄로 합친다** (업무 -774). 세 번째 연대만 남기면 4위 이하가
+     * 조용히 사라져 세 줄의 합이 무엇을 뜻하는지 알 수 없다.
+     *
+     * <p>`그 이전`은 이름과 달리 남은 연대 전부이며, 상위 두 줄보다 최근인 연대도 들어갈 수 있다. 개봉 연도가 없는 영화는 어느 줄에도 세지 않되 분모에는 남는다.
+     * 합칠 나머지가 없으면 그 줄을 넣지 않는다.
+     */
     private static List<Share> eraShares(List<ReportSource.Frame> frames, int total) {
         Map<Integer, Integer> counts = new HashMap<>();
         for (ReportSource.Frame frame : frames) {
@@ -274,41 +334,59 @@ public class ReportContentAssembler {
                 counts.merge(decade, 1, Integer::sum);
             }
         }
-        return counts.entrySet().stream()
-                .sorted(
-                        Map.Entry.<Integer, Integer>comparingByValue()
-                                .reversed()
-                                .thenComparing(Map.Entry.comparingByKey(Comparator.reverseOrder())))
-                .limit(DISPLAY_LIMIT)
-                .map(entry -> new Share(entry.getKey() + "년대", percentage(entry.getValue(), total)))
-                .toList();
+        List<Map.Entry<Integer, Integer>> ranked =
+                counts.entrySet().stream()
+                        .sorted(
+                                Map.Entry.<Integer, Integer>comparingByValue()
+                                        .reversed()
+                                        .thenComparing(
+                                                Map.Entry.comparingByKey(
+                                                        Comparator.reverseOrder())))
+                        .toList();
+        int named = Math.min(ERA_NAMED_LIMIT, ranked.size());
+        List<Share> shares = new ArrayList<>();
+        for (Map.Entry<Integer, Integer> entry : ranked.subList(0, named)) {
+            shares.add(new Share(entry.getKey() + "년대", percentage(entry.getValue(), total)));
+        }
+        int rest =
+                ranked.subList(named, ranked.size()).stream().mapToInt(Map.Entry::getValue).sum();
+        if (rest > 0) {
+            shares.add(new Share(ERA_REST_LABEL, percentage(rest, total)));
+        }
+        return List.copyOf(shares);
     }
 
+    /**
+     * 3.4 · 7.4 `지난 반기와 비교`. 축은 **팝콘 맛**이다(업무 -774).
+     *
+     * <p>영화 한 편에 대표 맛이 하나라 반기 안의 비율을 더하면 100%가 된다. 장르는 한 편이 여러 장르에 중복으로 세어져 같은 자리에 두면 합이 100을 넘는다.
+     * 3.3 인화 화면의 `새로 넓어진 팝콘 맛` 하이라이트도 같은 축이라 두 화면이 어긋나지 않는다.
+     *
+     * <p>대표 맛이 없는 프레임은 어느 항목에도 세지 않되 분모에는 남는다. `isNew`는 이번 반기 전 필름에 남아 있는 **모든** 프레임에서 그 맛을 찾을 수 없을
+     * 때만 붙인다(계약 API-060).
+     */
     private static List<Comparison> comparisons(
-            List<GenreStat> current,
-            List<GenreStat> previous,
+            List<ReportSource.Frame> currentFrames,
+            List<ReportSource.Frame> previousFrames,
             Set<String> historicalCodes,
             int currentTotal,
             int previousTotal) {
-        Map<String, GenreStat> currentByCode = byGenreCode(current);
-        Map<String, GenreStat> previousByCode = byGenreCode(previous);
-        Set<String> codes = new HashSet<>(currentByCode.keySet());
-        codes.addAll(previousByCode.keySet());
+        Map<String, Integer> currentCounts = flavorCounts(currentFrames);
+        Map<String, Integer> previousCounts = flavorCounts(previousFrames);
+        Map<String, String> labels = flavorLabels(currentFrames, previousFrames);
+        Set<String> codes = new HashSet<>(currentCounts.keySet());
+        codes.addAll(previousCounts.keySet());
         return codes.stream()
                 .map(
                         code -> {
-                            GenreStat currentStat = currentByCode.get(code);
-                            GenreStat previousStat = previousByCode.get(code);
-                            int currentCount = currentStat == null ? 0 : currentStat.count();
-                            int previousCount = previousStat == null ? 0 : previousStat.count();
+                            int currentCount = currentCounts.getOrDefault(code, 0);
+                            int previousCount = previousCounts.getOrDefault(code, 0);
                             double delta =
                                     ratio(currentCount, currentTotal)
                                             - ratio(previousCount, previousTotal);
-                            String label =
-                                    currentStat != null ? currentStat.name() : previousStat.name();
                             return new ComparisonCandidate(
                                     code,
-                                    label,
+                                    labels.getOrDefault(code, code),
                                     delta,
                                     currentCount > 0 && !historicalCodes.contains(code));
                         })
@@ -329,8 +407,23 @@ public class ReportContentAssembler {
                 .toList();
     }
 
-    private static Map<String, GenreStat> byGenreCode(List<GenreStat> stats) {
-        return stats.stream().collect(Collectors.toMap(GenreStat::code, Function.identity()));
+    /** 맛 코드 → 표시명. 두 반기의 프레임이 실어 온 이름을 쓰고, 없으면 코드를 그대로 쓴다 */
+    private static Map<String, String> flavorLabels(
+            List<ReportSource.Frame> current, List<ReportSource.Frame> previous) {
+        Map<String, String> labels = new HashMap<>();
+        putFlavorLabels(labels, current);
+        putFlavorLabels(labels, previous);
+        return labels;
+    }
+
+    private static void putFlavorLabels(
+            Map<String, String> labels, List<ReportSource.Frame> frames) {
+        for (ReportSource.Frame frame : frames) {
+            if (frame.flavorCode() != null) {
+                labels.putIfAbsent(
+                        frame.flavorCode(), flavorName(frame.flavorName(), frame.flavorCode()));
+            }
+        }
     }
 
     private static List<FlavorChange> flavorChanges(
@@ -358,7 +451,10 @@ public class ReportContentAssembler {
     }
 
     private static FourCut fourCut(
-            List<GenreStat> genres, List<PersonStat> directors, List<PersonStat> actors) {
+            List<GenreStat> genres,
+            List<PersonStat> directors,
+            List<PersonStat> actors,
+            String characterName) {
         GenreCard genre =
                 genres.isEmpty()
                         ? null
@@ -381,7 +477,7 @@ public class ReportContentAssembler {
                                 actors.getFirst().name(),
                                 null,
                                 new ImageRef(actors.getFirst().profileUrl()));
-        return new FourCut(genre, director, actor, null);
+        return new FourCut(genre, director, actor, new CharacterCutCard(characterName, null));
     }
 
     static String genreDisplayName(String code) {
@@ -392,6 +488,175 @@ public class ReportContentAssembler {
             return TMDB_GENRE_DISPLAY_NAMES.get(code.substring("TMDB_".length()));
         }
         return code;
+    }
+
+    /**
+     * 3.4 · 7.4 `취향 키워드`. 그 반기 집계에서 **수치로 뒷받침되는 것만** 만들고 근거 문장에 그 수치를 그대로 적는다(업무 -774).
+     *
+     * <p>규칙마다 임계값을 두고 **넘긴 것만** 아래 순서대로 최대 네 개를 고른다. 누구나 같은 네 칸이 뜨지 않게 하려는 것이라, 취향이 뚜렷하면 뚜렷한 칩이 뜨고
+     * 고르게 본 반기는 두세 개만 뜨거나 하나도 안 뜬다. 하나도 못 넘기면 빈 배열이고 화면이 섹션을 숨긴다.
+     *
+     * <p>순서는 `사람 → 맛 → 장르 → 시대 → 평가 습관 → 국가`다. 앞쪽일수록 그 반기를 남의 반기와 가르는 힘이 세다고 보았다.
+     *
+     * <p>와이어프레임의 `계획형 안티히어로` · `빠른 전개` · `반전 선호`는 캐릭터 성격과 전개 태그가 있어야 하는데 그런 기준정보 테이블이 없다. 없는 근거를
+     * 지어내지 않고 여기서 뺐다. 태그 기준정보가 생기면 규칙을 더한다.
+     */
+    private static List<Keyword> keywords(
+            ReportPeriod period,
+            int currentTotal,
+            List<ReportSource.Frame> currentFrames,
+            List<GenreStat> currentGenres,
+            List<PersonStat> currentDirectors,
+            List<PersonStat> currentActors,
+            Map<String, String> newFlavors,
+            int newDirectorCount,
+            List<Share> eraShares,
+            List<Share> countryShares,
+            BigDecimal averageScore) {
+        List<Keyword> keywords = new ArrayList<>();
+        Map<String, Integer> flavorCounts = flavorCounts(currentFrames);
+        Map<String, String> flavorLabels = flavorLabels(currentFrames, List.of());
+
+        // 01 사람 — 한 감독·배우를 몰아본 반기
+        if (!currentDirectors.isEmpty() && currentDirectors.getFirst().count() >= PERSON_BINGE) {
+            PersonStat director = currentDirectors.getFirst();
+            add(
+                    keywords,
+                    "DIRECTOR_BINGE",
+                    director.name() + " 몰아보기",
+                    director.name() + " 영화 " + director.count() + "편");
+        }
+        if (!currentActors.isEmpty() && currentActors.getFirst().count() >= PERSON_BINGE) {
+            PersonStat actor = currentActors.getFirst();
+            add(
+                    keywords,
+                    "ACTOR_FAVORITE",
+                    actor.name() + " 최애",
+                    actor.name() + " " + actor.count() + "편");
+        }
+        if (newDirectorCount >= NEW_DIRECTOR_MIN) {
+            add(keywords, "NEW_DIRECTOR_HUNTER", "새 감독 발굴", "처음 본 감독 " + newDirectorCount + "명");
+        }
+
+        // 02 맛 — 넓혔는지 한 우물을 팠는지
+        for (Map.Entry<String, String> flavor : newFlavors.entrySet()) {
+            add(
+                    keywords,
+                    "FLAVOR_EXPLORER",
+                    flavor.getValue() + " 탐험가",
+                    "이번 반기에 "
+                            + flavor.getValue()
+                            + " 프레임 "
+                            + flavorCounts.getOrDefault(flavor.getKey(), 0)
+                            + "개 추가");
+            break;
+        }
+        Map.Entry<String, Integer> topFlavor = top(flavorCounts);
+        if (topFlavor != null) {
+            int share = percentage(topFlavor.getValue(), currentTotal);
+            if (share >= DEVOTEE_SHARE) {
+                String name = flavorLabels.getOrDefault(topFlavor.getKey(), topFlavor.getKey());
+                add(keywords, "FLAVOR_DEVOTEE", name + " 한 우물", name + "가 " + share + "%");
+            }
+        }
+
+        // 03 장르 — 편식인지 잡식인지, 또는 특별히 높이 준 장르
+        if (!currentGenres.isEmpty()) {
+            GenreStat top = currentGenres.getFirst();
+            int share = percentage(top.count(), currentTotal);
+            if (share >= DEVOTEE_SHARE) {
+                add(keywords, "GENRE_DEVOTEE", top.name() + " 편식", top.name() + "가 " + share + "%");
+            }
+            if (currentGenres.size() >= OMNIVORE_GENRES) {
+                add(keywords, "GENRE_OMNIVORE", "장르 잡식", "이번 반기에 " + currentGenres.size() + "개 장르");
+            }
+            if (top.count() >= FAVORITE_MIN_COUNT
+                    && top.averageScore().compareTo(FAVORITE_MIN_SCORE) >= 0) {
+                add(
+                        keywords,
+                        "GENRE_FAVORITE",
+                        top.name() + " 편애",
+                        top.name()
+                                + " "
+                                + top.count()
+                                + "편 평균 ★"
+                                + top.averageScore()
+                                        .setScale(1, RoundingMode.HALF_UP)
+                                        .toPlainString());
+            }
+        }
+
+        // 04 시대 — 고전을 팠는지 신작을 쫓았는지
+        int classicCutoff = period.year() - CLASSIC_YEARS;
+        int classicShare =
+                percentage(countYears(currentFrames, year -> year <= classicCutoff), currentTotal);
+        if (classicShare >= CLASSIC_SHARE) {
+            add(
+                    keywords,
+                    "CLASSIC_DIGGER",
+                    "고전 발굴가",
+                    classicCutoff + "년 이전 영화가 " + classicShare + "%");
+        }
+        int recentCutoff = period.year() - 1;
+        int recentShare =
+                percentage(countYears(currentFrames, year -> year >= recentCutoff), currentTotal);
+        if (recentShare >= RECENT_SHARE) {
+            add(keywords, "NEW_RELEASE_CHASER", "신작 추적자", "최근 2년 영화가 " + recentShare + "%");
+        }
+        if (!eraShares.isEmpty() && eraShares.getFirst().share() >= ERA_LOVER_SHARE) {
+            Share era = eraShares.getFirst();
+            add(
+                    keywords,
+                    "ERA_LOVER",
+                    era.label() + " 애호가",
+                    era.label() + " 프레임이 " + era.share() + "%");
+        }
+
+        // 05 평가 습관
+        String score = averageScore.setScale(1, RoundingMode.HALF_UP).toPlainString();
+        if (averageScore.compareTo(GENEROUS_SCORE) >= 0) {
+            add(keywords, "GENEROUS_RATER", "후한 평가자", "이번 반기 평균 ★" + score);
+        } else if (averageScore.compareTo(STRICT_SCORE) <= 0) {
+            add(keywords, "STRICT_RATER", "깐깐한 눈", "이번 반기 평균 ★" + score);
+        }
+
+        // 06 국가
+        if (!countryShares.isEmpty() && countryShares.getFirst().share() >= COUNTRY_SHARE) {
+            Share country = countryShares.getFirst();
+            add(
+                    keywords,
+                    "COUNTRY_FOCUS",
+                    country.label() + " 영화 집중",
+                    country.label() + " 영화가 " + country.share() + "%");
+        }
+
+        return List.copyOf(keywords);
+    }
+
+    /** 네 개를 채웠으면 더 넣지 않는다. 우선순위는 부르는 순서가 정한다 */
+    private static void add(List<Keyword> keywords, String code, String label, String rationale) {
+        if (keywords.size() < KEYWORD_LIMIT) {
+            keywords.add(new Keyword(code, label, rationale));
+        }
+    }
+
+    private static Map.Entry<String, Integer> top(Map<String, Integer> counts) {
+        return counts.entrySet().stream()
+                .sorted(
+                        Map.Entry.<String, Integer>comparingByValue()
+                                .reversed()
+                                .thenComparing(Map.Entry.comparingByKey()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private static int countYears(List<ReportSource.Frame> frames, IntPredicate match) {
+        return (int)
+                frames.stream()
+                        .map(ReportSource.Frame::releaseYear)
+                        .filter(year -> year != null)
+                        .filter(match::test)
+                        .count();
     }
 
     private static List<String> highlights(

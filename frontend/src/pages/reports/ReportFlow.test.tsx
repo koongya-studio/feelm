@@ -24,6 +24,7 @@ import { mockMyProfileView } from '../../mocks/publicProfiles';
 import { mockMyProfile } from '../../mocks/user';
 import { ROUTE_PATTERN } from '../../routes/paths';
 import {
+  reportCharacterCard,
   reportDetails,
   reportList,
   reportListAfterIssue,
@@ -160,7 +161,7 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
 
     await waitFor(() => expect(location()).toBe('/reports/301/new'));
     expect(await screen.findByText('2026년 상반기 취향 필름을 인화했어요')).toBeInTheDocument();
-    expect(screen.getByText('지난 반기보다 스릴러 취향이 12% 증가했어요')).toBeInTheDocument();
+    expect(screen.getByText('지난 반기보다 다크초코 취향이 12% 증가했어요')).toBeInTheDocument();
 
     // 인화 연출은 건너뛸 수 있고, 건너뛰면 버튼이 사라진다
     fireEvent.click(screen.getByRole('button', { name: '건너뛰기' }));
@@ -189,12 +190,22 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
     expect(screen.getAllByText('웨스 앤더슨')).toHaveLength(2);
     expect(screen.getByText('+4% 신규')).toBeInTheDocument();
     expect(screen.getByText('−6%')).toBeInTheDocument();
-    // 취향 키워드는 계약이 빈 배열을 주는 후속 범위다(API-060)
-    expect(screen.queryByText('취향 키워드')).toBeNull();
+    // 이번 반기에 처음 나온 맛은 이름 옆에도 표시한다. 계약은 `isNew`만 주고 문구는 화면이 만든다
+    expect(screen.getByText('블루베리 (새로운 맛)')).toBeInTheDocument();
+    expect(screen.getByText('다크초코')).toBeInTheDocument();
+  });
+
+  it('취향 키워드는 근거와 함께 그리고, 비면 칸째 숨긴다', async () => {
+    renderApp(['/reports/301']);
+
+    expect(await screen.findByText('취향 키워드')).toBeInTheDocument();
+    expect(screen.getByText('웨스 앤더슨 몰아보기')).toBeInTheDocument();
+    expect(screen.getByText('이번 반기에 블루베리 프레임 4개 추가')).toBeInTheDocument();
+    expect(screen.getByText('이번 반기 평균 ★4.3')).toBeInTheDocument();
   });
 
   it('캐릭터가 없는 리포트는 설명을 숨기고 4컷의 04 칸만 준비 중으로 둔다', async () => {
-    // 선정 기준이 정해질 때까지 characterCard · fourCut.character가 null로 온다(업무 -618)
+    // 기준은 업무 -618에서 확정됐지만 백엔드 구현(업무 -779) 전까지 null로 온다
     renderApp(['/reports/301']);
 
     expect(await screen.findByText('04 캐릭터')).toBeInTheDocument();
@@ -203,6 +214,49 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
     // 나머지 칸과 상세는 그대로 그린다
     expect(screen.getByText('01 장르')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '감독' })).toBeInTheDocument();
+  });
+
+  /*
+   * 카드가 찬 뒤(업무 -779). 상대 판정이라 반기마다 카드가 바뀔 수 있어서 **네 축을 함께
+   * 보인다** — 왜 이 카드인지가 설명되는 자리다(업무 -618 결정).
+   */
+  it('캐릭터 카드가 오면 이름 · 코드 · 한 줄 · 네 축 · 설명문을 그린다', async () => {
+    vi.mocked(getReportDetail).mockResolvedValue({
+      ...reportDetails[301],
+      characterCard: reportCharacterCard,
+      fourCut: { ...reportDetails[301].fourCut, character: { name: '안락의자 탐정' } },
+    });
+
+    renderApp(['/reports/301']);
+
+    expect(await screen.findByRole('heading', { name: '캐릭터' })).toBeInTheDocument();
+    // 4컷의 04 칸과 상세의 캐릭터 칸에 한 번씩
+    expect(screen.getAllByText('안락의자 탐정')).toHaveLength(2);
+    expect(screen.getByText('RDMV')).toBeInTheDocument();
+    expect(screen.getByText('움직이지 않고 사건만 잔뜩 봤습니다')).toBeInTheDocument();
+
+    // 고른 쪽은 계약이 준 label, 반대쪽은 화면이 가진 표에서 온다
+    ['정착', '탐험', '그림자', '빛', '머리', '가슴', '다작', '정독'].forEach((pole) =>
+      expect(screen.getByText(pole)).toBeInTheDocument(),
+    );
+
+    // 프레임 10편 미만이라 기준 편수를 함께 알린다
+    expect(screen.getByText('이번 반기 7편을 기준으로 뽑았어요')).toBeInTheDocument();
+  });
+
+  it('프레임이 10편 이상이면 기준 편수 문구를 보이지 않는다', async () => {
+    vi.mocked(getReportDetail).mockResolvedValue({
+      ...reportDetails[301],
+      characterCard: {
+        ...reportCharacterCard,
+        basis: { frameCount: 38, lowSample: false },
+      },
+    });
+
+    renderApp(['/reports/301']);
+
+    expect(await screen.findByRole('heading', { name: '캐릭터' })).toBeInTheDocument();
+    expect(screen.queryByText(/기준으로 뽑았어요/)).toBeNull();
   });
 
   /*

@@ -9,8 +9,9 @@ import org.springframework.http.HttpMethod;
 /**
  * 공개 경로 판정이 회원 전용 경로를 함께 열지 않는지 확인한다.
  *
- * <p>닉네임 사용 가능 확인(API-016)은 {@code /api/v1/users/} 아래에 있는 유일한 공개 API다. 목록에 와일드카드를 쓰면 같은 접두사의 {@code
- * /users/me} 계열이 통째로 열리므로, 그 경계를 테스트로 고정한다.
+ * <p>{@code /api/v1/users/} 아래에는 인증 없이 닿는 경로가 둘 있다. 닉네임 사용 가능 확인(API-016)은 공개이고, 공개 프로필
+ * 조회(API-062)는 선택 인증이다. 목록이나 템플릿에 와일드카드를 쓰면 같은 접두사의 {@code /users/me} 계열이 통째로 열리므로, 그 경계를 테스트로
+ * 고정한다.
  */
 @DisplayName("공개 API 경로 판정")
 class PublicApiPathTest {
@@ -65,5 +66,33 @@ class PublicApiPathTest {
                     .as(method.name())
                     .isFalse();
         }
+    }
+
+    @Test
+    @DisplayName("공개 프로필은 GET만 선택 인증으로 열리고 내 프로필 계열은 열지 않는다")
+    void publicProfileIsOptionalAuthenticationForGetOnly() {
+        String path = "/api/v1/users/1b4e28ba-2fa1-11d2-883f-0016d3cca427/profile";
+        assertThat(SecurityConfig.isOptionalAuthenticationApi(HttpMethod.GET, path)).isTrue();
+        assertThat(SecurityConfig.isPublicApi(HttpMethod.GET, path)).isTrue();
+        // 같은 경로에 쓰기 계열이 생겨도 등록 절차 없이 열리지 않아야 한다.
+        assertThat(SecurityConfig.isPublicApi(HttpMethod.POST, path)).isFalse();
+        assertThat(SecurityConfig.isPublicApi(HttpMethod.PATCH, path)).isFalse();
+        assertThat(SecurityConfig.isPublicApi(HttpMethod.DELETE, path)).isFalse();
+        // 템플릿이 회원 전용 접두사를 삼키지 않는다.
+        assertThat(SecurityConfig.isPublicApi(HttpMethod.GET, "/api/v1/users/me/profile"))
+                .isFalse();
+        assertThat(SecurityConfig.isPublicApi(HttpMethod.GET, "/api/v1/users/me/frames")).isFalse();
+        // AntPathMatcher가 빈 세그먼트를 버리므로 생문자열 접두사 검사로는 막히지 않는다(리뷰 B-1).
+        assertThat(SecurityConfig.isPublicApi(HttpMethod.GET, "/api/v1/users//me/profile"))
+                .isFalse();
+        assertThat(SecurityConfig.isPublicApi(HttpMethod.GET, "/api/v1/users/ME/profile"))
+                .isFalse();
+        // 프로필 아래로 더 들어가는 경로는 별도 등록 대상이다.
+        assertThat(
+                        SecurityConfig.isPublicApi(
+                                HttpMethod.GET,
+                                "/api/v1/users/1b4e28ba-2fa1-11d2-883f-0016d3cca427"
+                                        + "/taste-comparison"))
+                .isFalse();
     }
 }

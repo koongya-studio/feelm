@@ -70,6 +70,7 @@ frontend-test:
         - frontend/nginx.conf
         - frontend/.dockerignore
         - infra/scripts/test_ci_frontend_paths.py
+        - infra/scripts/test_ci_config.py
         - infra/compose/service.yml
         - infra/nginx/nginx.conf
         - infra/scripts/deploy-frontend.sh
@@ -86,11 +87,20 @@ frontend-image:
   stage: build
   tags: [e106-shell]
   needs: [frontend-test]
+  environment:
+    name: service
+    action: prepare
   before_script:
     - printf '%s' "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
   script:
     - FRONTEND_IMAGE="$DOCKERHUB_NAMESPACE/feelm-frontend:$CI_COMMIT_SHA"
-    - docker build --pull -t "$FRONTEND_IMAGE" ./frontend
+    - >-
+      docker build --pull
+      --build-arg VITE_GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID:-}"
+      --build-arg VITE_KAKAO_CLIENT_ID="${KAKAO_CLIENT_ID:-}"
+      --build-arg VITE_NAVER_CLIENT_ID="${NAVER_CLIENT_ID:-}"
+      --build-arg VITE_OAUTH_REDIRECT_URI="${VITE_OAUTH_REDIRECT_URI:-}"
+      -t "$FRONTEND_IMAGE" ./frontend
     - docker push "$FRONTEND_IMAGE"
     - echo "Built frontend image $FRONTEND_IMAGE"
   interruptible: true

@@ -37,20 +37,36 @@ abstract class ReportApiContractSupport extends SharedPostgresContractTest {
               "topGenres": [{"code": "ROMANCE", "name": "로맨스", "count": 2}],
               "topActors": [{"personId": 40, "name": "배우", "count": 2}],
               "topDirectors": [{"personId": 30, "name": "감독", "count": 2}],
-              "characterCard": null,
+              "characterCard": {
+                "code": "RDMV",
+                "name": "안락의자 탐정",
+                "tagline": "움직이지 않고 사건만 잔뜩 봤습니다",
+                "description": "익숙한 맛 안에서 아주 많이 봤고 평가는 냉정했습니다.",
+                "axes": [
+                  {"axis": "EXPLORATION", "value": "R", "label": "정착"},
+                  {"axis": "TONE", "value": "D", "label": "그림자"},
+                  {"axis": "STANCE", "value": "M", "label": "머리"},
+                  {"axis": "VOLUME", "value": "V", "label": "다작"}
+                ],
+                "basis": {"frameCount": 3, "lowSample": true}
+              },
               "flavorChanges": [],
               "fourCut": {
                 "genre": {"name": "로맨스", "displayName": "ROMANCE", "image": {"url": null}},
                 "director": {"name": "감독", "displayName": null, "image": {"url": null}, "work": null},
                 "actor": {"name": "배우", "displayName": null, "image": {"url": null}},
-                "character": null
+                "character": {"name": "안락의자 탐정", "displayName": null}
               },
               "genreShares": [{"label": "로맨스", "share": 67}],
               "countryShares": [{"label": "한국", "share": 33}],
               "eraShares": [{"label": "2020년대", "share": 67}],
-              "keywords": [],
-              "comparisons": [{"label": "로맨스", "delta": 12, "isNew": false}],
-              "highlights": ["로맨스 취향이 12%p 늘었어요"],
+              "keywords": [{"code": "GENRE_FAVORITE", "label": "로맨스 편애",
+                "rationale": "로맨스 2편 평균 ★4.0"}],
+              "comparisons": [{"label": "다크초코", "delta": 12, "isNew": false}],
+              "highlights": ["다크초코 취향이 12%p 늘었어요"],
+              "characterAxisMedians": {"subjectCount": 30, "fixedThreshold": false,
+                "newFlavorCount": 1, "brightRatio": 0.5, "averageScore": 3.5,
+                "scoreStdDev": 0.5, "ratingCount": 20},
               "generation": {"contentVersion": 1, "snapshotAt": "2030-06-30T14:51:00Z",
                 "cutoffAt": "2030-06-30T14:50:00Z", "finalSnapshot": true}
             }

@@ -22,6 +22,10 @@ __pycache__/
 /plans/
 /*/plans/
 
+# Git worktrees for parallel Jira tasks are local workspaces, not repository content.
+# plans/worktrees/ is already covered by the /plans/ rule above.
+/.worktrees/
+
 
 # Frontend dependencies and build outputs.
 node_modules/

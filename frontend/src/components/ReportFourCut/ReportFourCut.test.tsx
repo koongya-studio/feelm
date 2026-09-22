@@ -22,10 +22,8 @@ const cuts: ReportFourCutData = {
     work: { url: '/work.jpg' },
   },
   actor: { name: '엠마 스톤', displayName: 'Emma Stone', image: { url: null } },
-  character: {
-    name: '묵묵한 조력자',
-    image: { url: '/character.jpg', position: { x: 30, y: 20 } },
-  },
+  // 04 칸은 계약이 사진을 주지 않는다. 그림은 `characterCode`로 저장소에서 찾는다(업무 -618)
+  character: { name: '안락의자 탐정' },
 };
 
 function cut(kind: string) {
@@ -61,7 +59,7 @@ describe('ReportFourCut', () => {
     // 배우 이름은 마지막 단어만 따로 그린다
     expect(screen.getByText('Emma')).toBeInTheDocument();
     expect(screen.getByText('Stone')).toBeInTheDocument();
-    expect(screen.getAllByText('묵묵한 조력자')).toHaveLength(1);
+    expect(screen.getAllByText('안락의자 탐정')).toHaveLength(1);
   });
 
   it('누끼가 있으면 누끼, 없으면 원본, 둘 다 없으면 이름만 그린다', () => {
@@ -72,20 +70,16 @@ describe('ReportFourCut', () => {
     // 계약이 사진을 주지 않는 칸은 다른 사진으로 채우지 않는다
     expect(cut('actor')).toHaveAttribute('data-mode', 'none');
     expect(cut('actor').querySelector('img')).toBeNull();
-    expect(cut('character').querySelector('img')).toHaveStyle({
-      '--image-x': '30%',
-      '--image-y': '20%',
-    });
   });
 
   it('계약이 카드를 주지 않은 칸은 번호 라벨과 준비 중만 남는다', () => {
-    // 04 캐릭터는 선정 기준이 정해질 때까지 늘 null이다(백엔드 답 2026-09-21, 업무 -618)
+    // 04 캐릭터는 백엔드 구현(업무 -779) 전까지 늘 null이다
     render(<ReportFourCut cuts={{ ...cuts, character: null }} createdAt="2026-09-01T12:00:00Z" />);
 
     expect(screen.getAllByRole('listitem')).toHaveLength(4);
     expect(screen.getByText('04 캐릭터')).toBeInTheDocument();
     expect(screen.getByText('준비 중')).toBeInTheDocument();
-    expect(screen.queryByText('묵묵한 조력자')).toBeNull();
+    expect(screen.queryByText('안락의자 탐정')).toBeNull();
     expect(cut('character').querySelector('img')).toBeNull();
   });
 

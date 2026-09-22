@@ -482,7 +482,7 @@ erDiagram
     REPORT_IMAGES {
         bigint id PK
         bigint report_id FK
-        varchar storage_key "비공개 버킷 키"
+        varchar storage_key "비공개 서버 파일 키"
         varchar format "PNG"
         timestamptz created_at
     }
@@ -495,7 +495,7 @@ erDiagram
 |---|---|---|---|
 | `taste_reports` | 반기 취향 리포트 | UK(`user_id`, `year`, `half`). 생성 시점 스냅샷. nullable `issued_at`은 홈의 첫 인화 완료 시각이며 `status=READY`나 다음 반기 자동 목록 공개와 별개 | FR-23 · API-059, API-060, API-080 |
 | `taste_report_generation_runs` | 반기 마감 준비의 정상 완료 기록 | UK(`year`, `half`). 대상 0명도 `prepared_count=0`으로 기록하며 리포트 생성과 같은 트랜잭션에서 저장 | FR-23 · S15P21E106-555 |
-| `report_images` | 이미지 카드 | 파일은 S3 호환 스토리지, DB에는 키만. 다운로드 URL은 요청 시 서명 발급 | FR-24, NFR-07 · API-061 |
+| `report_images` | 이미지 카드 | 파일은 서비스 노드의 비공개 호스트 디렉터리, DB에는 서버가 생성한 상대 키만 저장. 다운로드 URL은 요청 시 10분 유효 서명 발급 | FR-24, NFR-07 · API-061 · ADR-0023 |
 
 ---
 
