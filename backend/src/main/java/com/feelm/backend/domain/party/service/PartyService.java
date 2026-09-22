@@ -22,6 +22,7 @@ import com.feelm.backend.domain.party.repository.PartyMemberRepository;
 import com.feelm.backend.domain.party.repository.PartyQueryRepository;
 import com.feelm.backend.domain.party.repository.PartyRefreshRequestRepository;
 import com.feelm.backend.domain.party.repository.PartyRepository;
+import com.feelm.backend.domain.user.entity.User;
 import com.feelm.backend.domain.user.repository.UserRepository;
 import com.feelm.backend.domain.user.service.UserBlockFilter;
 import com.feelm.backend.global.error.BusinessException;
@@ -29,6 +30,7 @@ import com.feelm.backend.global.error.ErrorCode;
 import com.feelm.backend.global.response.CursorPageResponse;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -125,9 +127,29 @@ public class PartyService {
         return new CursorPageResponse<>(items, nextCursor, hasNext);
     }
 
-    /** 현재 파티원이 사용자를 초대하고 PENDING 초대를 반환한다. */
+    /**
+     * 현재 파티원이 사용자를 초대하고 PENDING 초대를 반환한다.
+     *
+     * <p>초대 대상의 계정 행은 {@link UserRepository#findByIdForUpdate}로 <b>잠근 뒤</b> 활성 여부를
+     * 본다(S15P21E106-758). 잠금 없이 읽으면 탈퇴(API-013)와 교차한다 — 탈퇴의 파티 정리({@link PartyWithdrawalService})는
+     * 대기 초대 목록을 한 번 읽고 정리하므로, 목록을 읽은 뒤 커밋된 초대는 정리에 걸리지 않고 응답할 주체 없이 정원 한 자리를 영구히 차지한다. 탈퇴
+     * 1단계({@code WithdrawnAccountWriter.withdrawAccount})가 같은 행을 잠그므로 두 경우만 남는다. 이 초대가 먼저 잠그면 탈퇴는 이
+     * 커밋을 기다린 뒤 진행해 목록 읽기가 이 초대를 포함하고, 탈퇴가 먼저면 여기서 {@code WITHDRAWN}을 읽어 거절한다.
+     *
+     * <p>잠금 순서는 <b>사용자 → 파티</b>다. 초대 수락({@link #acceptInvitation})이 초대받은 사용자 행을 먼저 잠그고 파티 행을 잠그므로,
+     * 여기서 반대로 잡으면 A가 P의 초대를 수락하는 동안 P의 멤버가 A를 다시 초대할 때 교착한다. 그래서 대상 계정 잠금이 파티 잠금보다 앞에 있고, 대상이 없거나
+     * 탈퇴했다는 오류는 계약의 판정 순서(파티 → 요청자 → 종료 → 대상)를 지키기 위해 잠금 뒤로 미뤄 던진다. 대상 Entity를 이 잠금보다 먼저 읽으면 영속성
+     * 컨텍스트가 낡은 인스턴스를 돌려주므로({@code UserRepository#findByIdForUpdate} 주석) 대상은 여기서 한 번만 읽는다. 요청자와 대상이
+     * 같으면 요청자 검사가 먼저 읽은 인스턴스를 다시 받지만, 그 경우는 요청자가 멤버여야 하므로 어차피 {@code ALREADY_MEMBER}다.
+     *
+     * <p>요청자는 잠그지 않고 상태만 본다({@link #requireActiveRequester}). 탈퇴한 요청자가 만든 초대가 남지 않는 것은 이 검사가 아니라 파티
+     * 행 잠금과 탈퇴 정리가 보장한다 — 정리는 파티 행을 잠그고 멤버십을 지운 뒤 탈퇴자가 <b>보낸</b> 대기 초대까지 {@code DECLINED}로 처리하므로,
+     * 초대가 그 나가기보다 먼저 커밋되면 목록에 걸리고 뒤면 멤버십이 없어 {@code FORBIDDEN}이다.
+     */
     @Transactional
     public PartyInvitationResponse invite(long requesterId, long partyId, long inviteeId) {
+        requireActiveRequester(requesterId);
+        Optional<User> invitee = userRepository.findByIdForUpdate(inviteeId).filter(User::isActive);
         Party party =
                 partyRepository
                         .findByIdForUpdate(partyId)
@@ -138,11 +160,8 @@ public class PartyService {
         if (party.getStatus() == PartyStatus.CLOSED) {
             throw new BusinessException(ErrorCode.PARTY_CLOSED);
         }
-        var invitee =
-                queryRepository
-                        .findUser(inviteeId)
-                        .filter(user -> user.isActive())
-                        .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
+        User target =
+                invitee.orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND));
         if (memberRepository.existsByPartyIdAndUserId(partyId, inviteeId)) {
             throw new BusinessException(ErrorCode.ALREADY_MEMBER);
         }
@@ -162,10 +181,25 @@ public class PartyService {
         }
         PartyInvitation invitation =
                 invitationRepository.saveAndFlush(
-                        PartyInvitation.create(party, requesterId, invitee));
+                        PartyInvitation.create(party, requesterId, target));
         notificationCommandService.createPartyInvitation(
                 inviteeId, invitation.getId(), invitation.getCreatedAt());
         return PartyInvitationResponse.from(invitation);
+    }
+
+    /**
+     * 요청자가 활성 계정인지 본다. 탈퇴한 계정의 Access Token은 잔여 수명 안이라도 {@code 401 UNAUTHORIZED}로 거절한다는 사용자 도메인
+     * 규칙(API-012·013)을 따른다 — Access Token은 계정 상태를 담지 않는다. 파티 존재보다 먼저 판정해 탈퇴한 토큰에 파티 존재를 알리지 않는다.
+     *
+     * <p>잠그지 않는다. 정상 경로에서 이 검사는 잔여 토큰의 조기 거절이고, 유령 초대를 막는 역할은 {@link #invite} 주석의 파티 잠금과 탈퇴 정리가
+     * 맡는다. 다만 탈퇴 4단계의 파티 정리가 실패해 멤버십이 남은 계정(API-013이 수동 복구로 둔 상태)에서는 정리가 다시 돌지 않으므로, 그 잔여 토큰이 새 초대를
+     * 만드는 경로를 막는 유일한 장치가 이 검사다(리뷰 B-6). 요청자와 대상이 다르면 요청자 행은 이 트랜잭션에서 다시 잠가 읽지 않으므로 잠금 없는 Entity 읽기가
+     * 낡은 인스턴스 문제를 만들지 않는다.
+     */
+    private void requireActiveRequester(long requesterId) {
+        if (queryRepository.findUser(requesterId).filter(User::isActive).isEmpty()) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
     }
 
     /** 내가 받은 초대를 상태별·최신순으로 페이지 조회한다. */
