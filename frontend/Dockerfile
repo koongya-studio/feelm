@@ -3,6 +3,11 @@ FROM node:20.19-alpine AS builder
 
 WORKDIR /app
 
+ARG VITE_GOOGLE_CLIENT_ID=
+ARG VITE_KAKAO_CLIENT_ID=
+ARG VITE_NAVER_CLIENT_ID=
+ARG VITE_OAUTH_REDIRECT_URI=
+
 COPY package.json package-lock.json ./
 RUN npm ci
 

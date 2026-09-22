@@ -195,7 +195,12 @@ MR 코드를 실행하는 전용 Runner는 현재 백엔드 Job만 허용하므�
 생성되므로 운영 Nginx는 접두사를 제거하지 않고 프론트엔드 컨테이너에 전달합니다.
 
 ```bash
-docker build --pull -t feelm-frontend:local ./frontend
+docker build --pull \
+  --build-arg VITE_GOOGLE_CLIENT_ID="${VITE_GOOGLE_CLIENT_ID:-}" \
+  --build-arg VITE_KAKAO_CLIENT_ID="${VITE_KAKAO_CLIENT_ID:-}" \
+  --build-arg VITE_NAVER_CLIENT_ID="${VITE_NAVER_CLIENT_ID:-}" \
+  --build-arg VITE_OAUTH_REDIRECT_URI="${VITE_OAUTH_REDIRECT_URI:-}" \
+  -t feelm-frontend:local ./frontend
 docker run --rm -p 8081:80 --name feelm-frontend feelm-frontend:local
 ```
 
@@ -246,6 +251,19 @@ Vite는 `VITE_` 접두사가 붙은 변수만 클라이언트 코드에 노출�
 되는 값이지만 client-secret은 백엔드만 가지며 이곳에 두지 않습니다. 값이 없는 제공자는
 버튼이 잠깁니다. 콜백 주소는 각 사 개발자 콘솔과 백엔드 허용 목록
 (`OAUTH_ALLOWED_REDIRECT_URIS`)에 등록한 값과 **정확히 같아야** 합니다.
+
+운영 이미지는 GitLab CI/CD Variable의 공개 client-id를 `frontend-image` Job에서 Docker
+build argument로 전달해 빌드합니다. 이때 읽는 변수는 백엔드와 같은 `GOOGLE_CLIENT_ID`,
+`KAKAO_CLIENT_ID`, `NAVER_CLIENT_ID`입니다. 제공자는 동의 화면의 `client_id`와 백엔드가
+인가 코드를 교환할 때 보내는 `client_id`가 다르면 거절하므로 두 값은 반드시 같아야 하고,
+변수를 따로 두면 한쪽만 갱신됐을 때 조용히 어긋납니다. 그래서 프론트 전용 client-id 변수는
+만들지 않습니다. `VITE_OAUTH_REDIRECT_URI`만 프론트 전용이며 기본값
+(`{origin}/app/oauth/callback`)과 다른 콜백을 등록한 환경에서만 설정합니다. 미설정 값은
+빈 문자열로 전달되므로 이미지 빌드는 계속되고 해당 제공자 버튼만 잠깁니다.
+`GOOGLE_CLIENT_SECRET`, `KAKAO_CLIENT_SECRET`, `NAVER_CLIENT_SECRET`은 프론트 변수,
+build argument 또는 이미지에 절대 전달하지 않습니다. `frontend-image`는 `service` 환경을
+준비하는 Job으로 선언되어 이 범위의 값을 읽되 실제 배포 상태는 뒤의 `deploy-frontend` Job만
+기록합니다.
 
 `VITE_API_PROXY_TARGET`은 개발 서버 설정에서만 읽으므로 클라이언트 번들에 들어가지
 않습니다. 값을 바꾸려면 `frontend/.env`에 적습니다. 키 이름은
