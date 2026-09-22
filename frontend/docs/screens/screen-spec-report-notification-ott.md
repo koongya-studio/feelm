@@ -100,7 +100,7 @@ Consumer Candidate 계약도 변경하지 않는다.
 | 01 장르 | 흑백 사진 · 굵고 좁은 빨간 영문(Anton). 누끼면 글자가 인물 뒤로 들어간다 |
 | 02 감독 | 빨간 바탕 · 오른쪽 흑백 인물 · 왼쪽 위 대표작 · 흰 세리프 이탤릭 대문자 |
 | 03 배우 | 흑백 인물을 크게 자름 · 흰 이탤릭 + 마지막 단어만 빨간 대문자(Playfair Display) · 별표 |
-| 04 캐릭터 | 컬러 사진 · 흰 세리프 이탤릭 · 빨간 밑줄 |
+| 04 캐릭터 | 컬러 사진 · 흰 세리프 이탤릭 · 빨간 밑줄. 고정 16종의 저장소 에셋을 `characterCard.code`로 짝지어 쓴다 |
 | 발 | Feelm 로고 · `2026.09` |
 
 3.3 · 3.4 · 7.4가 같은 `components/ReportFourCut`을 쓴다.
@@ -115,8 +115,12 @@ Consumer Candidate 계약도 변경하지 않는다.
   인물을 올리고, 원본만 있으면 원래 배경에 어두운 그라데이션을 깐다. **화면이 누끼를 만들지 않는다**
 - 사진이 없거나 못 불러오면 칸은 그대로 두고 이름을 크게 쓴다. 누끼 → 원본 → 없음 순으로 넘어간다
 - `[!]` 인화지 안의 빨강은 콘텐츠다. 앱 UI의 무채색 규칙(`design-concept.md` 3장)은 인화지 바깥에만 적용한다
-- `[!]` 사진 · 누끼 · 영문 이름 · 감독 대표작은 API-060에 없다(`types/unspecified.ts` `ReportFourCutView`).
+- `[!]` 01 ~ 03의 사진 · 누끼 · 영문 이름 · 감독 대표작은 API-060에 없다(`types/unspecified.ts` `ReportFourCutView`).
   목업 사진은 시안 이미지에서 잘라 낸 자리표시자다(`mocks/images/reports/`)
+- **04 캐릭터 칸은 예외다.** 캐릭터 카드가 고정 16종이므로(API-060, 업무 -618) 그림 파일을 저장소가
+  갖고 화면이 `characterCard.code`로 짝짓는다. `PopcornBucket/sprites.ts`가 같은 이유로 이미 이 구조다.
+  계약은 04 칸 이미지 URL을 내리지 않고 `fourCut.character`에는 `image`가 없다. 따라서 이 칸은
+  `url` · `cutoutUrl` · `position` · `zoom` 규칙을 쓰지 않으며, 에셋이 없는 코드는 이름만 그린다
 
 ### 7.3 취향 4컷 목록
 
