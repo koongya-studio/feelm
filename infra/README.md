@@ -1615,13 +1615,25 @@ GitLab에서 관리하고 서버에서 직접 수정하지 않습니다. 현재 
 남고 값은 출력하지 않습니다. 변수의 Protected·Masked·환경 범위 속성은 GitLab 설정에서
 별도로 검토합니다.
 
-모니터링 배포가 공통으로 사용하는 필수 CI 변수와 기대 메타데이터는
+서비스 배포가 공통으로 사용하는 필수 CI 변수와 기대 메타데이터는
 `infra/config/required-ci-variables.json`에서 값 없이 관리합니다. 현재 `service` 환경 계약은
 `DISTRIBUTED_NODE_IP`, `GRAFANA_ADMIN_PASSWORD`, `GRAFANA_ALERT_HMAC_SECRET`, `POSTGRES_DB`,
-`POSTGRES_USER`, `POSTGRES_PASSWORD`, `REDIS_PASSWORD`를 포함합니다. 비밀번호와 HMAC 서명 키는
-Protected, Masked and hidden,
+`POSTGRES_USER`, `POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET`, `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET`, `NAVER_CLIENT_ID`,
+`NAVER_CLIENT_SECRET`, `OAUTH_ALLOWED_REDIRECT_URIS`를 포함합니다. 비밀번호, HMAC 서명 키와
+OAuth client-secret은 Protected, Masked and hidden,
 변수 확장 비활성화(`raw`)로 등록하고 나머지 변수도 Protected와 `service` 환경 범위를
 유지합니다. 실제 값은 계약 파일, 문서, MR과 Job 로그에 기록하지 않습니다.
+
+세 소셜 로그인 제공자는 배포 기능으로 보장하므로 OAuth 변수도 필수 계약에 포함합니다.
+각 제공자 콘솔에서 발급한 client-id와 client-secret을 같은 이름의 GitLab CI/CD Variable로
+등록하고, `OAUTH_ALLOWED_REDIRECT_URIS`에는 콘솔에 등록한 서비스 콜백 주소를 쉼표로 구분해
+입력합니다. 기본 서비스 콜백은 `https://<service-host>/app/oauth/callback`입니다.
+client-id와 redirect URI는 브라우저에서 사용되는 공개 설정이지만 GitLab에서는 Protected,
+`service` 범위, 변수 확장 비활성화로 제한합니다. client-secret은 프론트 빌드 변수나
+Docker build argument로 전달하지 않습니다. 값을 갱신할 때는 제공자 콘솔과 GitLab 변수를
+같이 교체한 뒤 보호된 `develop` Pipeline의 `ci-variable-preflight` 통과를 확인하고 백엔드를
+재배포합니다.
 
 develop 대상 MR의 `ci-variable-contract-check`는 격리 Runner에서 계약 구조만 검사합니다.
 이 Job에는 보호 변수를 전달하지 않으며 Secret 값이나 GitLab API 토큰도 필요하지 않습니다.
