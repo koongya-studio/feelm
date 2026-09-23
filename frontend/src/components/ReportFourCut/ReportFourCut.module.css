@@ -117,6 +117,18 @@
   isolation: isolate;
 }
 
+.personSearchLink {
+  position: absolute;
+  z-index: 6;
+  inset: calc(var(--u) * 6);
+  border-radius: calc(var(--u) * 3);
+}
+
+.personSearchLink:focus-visible {
+  outline-color: #fff;
+  outline-offset: calc(var(--u) * -2);
+}
+
 .label,
 .caption {
   position: absolute;

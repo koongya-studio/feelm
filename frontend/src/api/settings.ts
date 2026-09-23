@@ -73,8 +73,8 @@ export async function isBlockedUser(userId: number): Promise<boolean> {
  * 이미 차단했으면 `409 ALREADY_BLOCKED`, 없는 사람이면 `404`, 자기 자신이면 `400`이다.
  * 함께 있는 파티에서는 나가게 되므로 부르기 전에 확인을 받는다(API-020 처리 규칙).
  *
- * `[!]` 7.2-B 공개 프로필은 아직 목업(API-062 미구현)이라 거기서는 부르지 않는다 —
- * 목업 번호로 실제 차단을 부르면 늘 404였다(업무 -610).
+ * 5.8 파티원 메뉴와 7.2-B 공개 프로필의 ⋯ 메뉴가 부른다. 7.2-B는 API-062 본문의 숫자
+ * `user.userId`를 넘긴다(업무 -810. 그 전에는 목업 번호라 잠가 두었다 — 업무 -610).
  */
 export async function blockUser(userId: number): Promise<BlockResult> {
   return request<BlockResult>(`/users/${userId}/block`, { method: 'POST' });

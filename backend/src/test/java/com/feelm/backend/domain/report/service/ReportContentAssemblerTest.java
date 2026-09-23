@@ -25,6 +25,19 @@ class ReportContentAssemblerTest {
         assertThat(ReportContentAssembler.genreDisplayName("ACTION")).isEqualTo("ACTION");
     }
 
+    @Test
+    @DisplayName("외국 인물만 영문을 병기하고 한국 인물은 한 줄로 둔다")
+    void personDisplayNameOnlyForForeignPeople() {
+        assertThat(ReportContentAssembler.personDisplayName("마크 해밀", "Mark Hamill"))
+                .isEqualTo("Mark Hamill");
+        // 한국 인물은 적재에서 제외되어 원어명이 없다(시안: 봉준호는 한글 한 줄).
+        assertThat(ReportContentAssembler.personDisplayName("봉준호", null)).isNull();
+        // ko-KR 번역이 없어 이름이 이미 영문인 인물도 병기할 것이 없다.
+        assertThat(ReportContentAssembler.personDisplayName("Geoffrey Arend", "Geoffrey Arend"))
+                .isNull();
+        assertThat(ReportContentAssembler.personDisplayName("봉준호", "  ")).isNull();
+    }
+
     private static final ReportPeriod PERIOD = new ReportPeriod(2026, ReportHalf.H1);
     private static final Instant IN_PERIOD = Instant.parse("2026-02-01T00:00:00Z");
 
@@ -92,13 +105,36 @@ class ReportContentAssemblerTest {
         assertThat(content.eraShares()).containsExactly(new Share("2010년대", 50));
     }
 
+    @Test
+    @DisplayName("4컷 감독 카드는 외국 인물만 영문을 병기하고 한국 인물은 비워 둔다")
+    void fourCutDirectorCarriesOriginalNameOnlyForForeignPeople() {
+        ReportContent foreign =
+                assemble(
+                        List.of(scored(1, "4.5", 2011)),
+                        List.of(director(1, 100, "드니 빌뇌브", "Denis Villeneuve")));
+        assertThat(foreign.fourCut().director().name()).isEqualTo("드니 빌뇌브");
+        assertThat(foreign.fourCut().director().displayName()).isEqualTo("Denis Villeneuve");
+
+        // 한국 인물은 적재에서 제외되어 원어명이 없다(시안: 봉준호는 한글 한 줄).
+        ReportContent korean =
+                assemble(List.of(scored(1, "4.5", 2011)), List.of(director(1, 100, "봉준호")));
+        assertThat(korean.fourCut().director().name()).isEqualTo("봉준호");
+        assertThat(korean.fourCut().director().displayName()).isNull();
+    }
+
     private static ReportSource.Frame scored(long id, String score, Integer releaseYear) {
         return new ReportSource.Frame(
                 id, 1L, id, new BigDecimal(score), IN_PERIOD, releaseYear, null, null);
     }
 
     private static ReportSource.Person director(long frameId, long personId, String name) {
-        return new ReportSource.Person(frameId, personId, name, null, ReportSource.Role.DIRECTOR);
+        return director(frameId, personId, name, null);
+    }
+
+    private static ReportSource.Person director(
+            long frameId, long personId, String name, String originalName) {
+        return new ReportSource.Person(
+                frameId, personId, name, originalName, null, ReportSource.Role.DIRECTOR);
     }
 
     private static ReportContent assemble(

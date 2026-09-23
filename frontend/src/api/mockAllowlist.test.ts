@@ -38,26 +38,17 @@ const ALLOWED: Record<string, Record<string, Allowed>> = {
       until: 'S15P21E106-731',
     },
   },
-  'taste.ts': {
-    '../mocks/taste': {
-      reason: '3.1 `요즘 취향 흐름`(`getTasteFlow`)의 흐름 문장에 대응하는 계약이 없다(CR-16)',
-    },
-    './mockTransport': {
-      reason: '위 `getTasteFlow`를 목업 응답으로 돌려준다',
-    },
-  },
   'users.ts': {
     '../mocks/publicProfiles': {
       reason:
-        'API-062 공개 프로필이 백엔드에 없다. 7.1 프로필 머리의 계약 밖 항목(키워드 · 필름 배치)도 이 기본값에서 온다',
-      until: 'S15P21E106-553',
+        '내 프로필(7.1 · 7.2 · 7.2-A)의 키워드 · 필름 · 소개 기준값. 내 publicId를 알려 주는 API가 없어 내 공개 프로필(API-062)을 부를 수 없다(업무 -810)',
     },
     '../mocks/sessionStore': {
       reason: '자기소개 · 항목별 공개 여부가 계약에 아예 없어 세션에만 둔다(업무 -616)',
     },
     './mockTransport': {
-      reason: 'API-062 공개 프로필 목업 응답과 404',
-      until: 'S15P21E106-553',
+      reason:
+        '개발용 목업 계정의 내 프로필 응답과, 계약이 없는 소개 · 공개 항목 저장의 검증 오류(업무 -616)',
     },
   },
   'watch.ts': {

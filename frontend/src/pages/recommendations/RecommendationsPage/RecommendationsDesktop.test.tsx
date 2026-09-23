@@ -9,7 +9,7 @@
  * 바뀌지 않았는지 함께 본다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import RecommendationsPage from './index';
 import AppLayout from '../../../layouts/AppLayout';
@@ -97,6 +97,24 @@ const set: RecommendationSet = {
       },
     },
     {
+      recommendationItemId: 3304,
+      type: 'TASTE',
+      flavorCode: 'FLAVOR_A',
+      movie: {
+        movieId: 552,
+        title: '더 게임',
+        posterUrl: null,
+        releaseYear: 1997,
+        genres: ['미스터리'],
+        averageRating: 3.9,
+        ottProviders: [],
+      },
+      reason: {
+        summary: '비슷한 분위기의 영화를 찾으셨어요',
+        factors: [{ type: 'GENRE', label: '미스터리' }],
+      },
+    },
+    {
       recommendationItemId: 3303,
       type: 'DISCOVERY',
       flavorCode: 'FLAVOR_B',
@@ -114,7 +132,61 @@ const set: RecommendationSet = {
         factors: [{ type: 'NEW_FLAVOR', label: '느와르' }],
       },
     },
+    {
+      recommendationItemId: 3305,
+      type: 'DISCOVERY',
+      flavorCode: 'FLAVOR_B',
+      movie: {
+        movieId: 808,
+        title: '미스틱 리버',
+        posterUrl: null,
+        releaseYear: 2003,
+        genres: ['드라마'],
+        averageRating: 4.0,
+        ottProviders: [],
+      },
+      reason: {
+        summary: '아직 담지 않은 맛이에요',
+        factors: [{ type: 'NEW_FLAVOR', label: '느와르' }],
+      },
+    },
+    {
+      recommendationItemId: 3306,
+      type: 'DISCOVERY',
+      flavorCode: 'FLAVOR_B',
+      movie: {
+        movieId: 809,
+        title: '메멘토',
+        posterUrl: null,
+        releaseYear: 2000,
+        genres: ['미스터리'],
+        averageRating: 4.4,
+        ottProviders: [],
+      },
+      reason: {
+        summary: '취향과 이어지는 새로운 결이에요',
+        factors: [{ type: 'NEW_FLAVOR', label: '비선형 서사' }],
+      },
+    },
   ],
+};
+
+/**
+ * 취향 발견 후보가 없어 서버가 여섯 자리를 모두 맞춤으로 채운 경우(업무 -793의 대체 규칙).
+ * 화면은 채워진 대로 두 묶음에 석 장씩 세운다.
+ */
+const filledSet: RecommendationSet = {
+  ...set,
+  items: set.items.map((item) => ({ ...item, type: 'TASTE' as const })),
+};
+
+/**
+ * 모바일이 받는 세 편 — 취향 맞춤 둘 + 취향 발견 하나(API-045 기본값, 업무 -793).
+ * 화면이 `size`로 무엇을 요청했는지에 따라 가짜 서버가 이 둘을 갈라 준다.
+ */
+const mobileSet: RecommendationSet = {
+  ...set,
+  items: [set.items[0], set.items[1], set.items[3]],
 };
 
 const watched: WatchRecordList = {
@@ -152,7 +224,9 @@ function renderRecommendations(width: number) {
 }
 
 beforeEach(() => {
-  vi.mocked(getRecommendations).mockReset().mockResolvedValue(set);
+  vi.mocked(getRecommendations)
+    .mockReset()
+    .mockImplementation((size) => Promise.resolve(size === 6 ? set : mobileSet));
   vi.mocked(dismissMovie).mockReset().mockResolvedValue(undefined);
   vi.mocked(getOtts).mockReset().mockResolvedValue([]);
   vi.mocked(getWatchRecords).mockReset().mockResolvedValue(watched);
@@ -165,19 +239,52 @@ afterEach(() => {
 });
 
 describe('RecommendationsPage 데스크톱 시안', () => {
-  it('카드를 취향 맞춤 · 취향 발견 두 필름으로 나눈다', async () => {
+  it('카드를 취향 맞춤 · 취향 발견 두 필름으로 나누고 묶음마다 석 장을 세운다', async () => {
     renderRecommendations(1440);
 
     const taste = await screen.findByRole('group', { name: '취향 맞춤 추천 카드' });
     const discovery = screen.getByRole('group', { name: '취향 발견 추천 카드' });
 
-    expect(within(taste).getAllByText('파이트 클럽')).toHaveLength(2);
+    // 넓은 화면은 여섯 편을 요청한다(API-045 `size=6`, 업무 -794)
+    expect(getRecommendations).toHaveBeenCalledWith(6);
+
+    expect(within(taste).getByText('파이트 클럽')).toBeInTheDocument();
     expect(within(taste).getByText('조디악')).toBeInTheDocument();
-    expect(within(discovery).getAllByText('세븐')).toHaveLength(3);
+    expect(within(taste).getByText('더 게임')).toBeInTheDocument();
+    expect(within(discovery).getByText('세븐')).toBeInTheDocument();
+    expect(within(discovery).getByText('미스틱 리버')).toBeInTheDocument();
+    expect(within(discovery).getByText('메멘토')).toBeInTheDocument();
     expect(within(discovery).queryByText('파이트 클럽')).not.toBeInTheDocument();
-    // 계약의 맞춤 2편 · 발견 1편은 데스크톱 묶음 안에서만 석 장씩 채운다
+
+    /*
+     * **같은 영화가 두 번 서지 않는다**(업무 -794). 계약이 맞춤 둘 · 발견 하나를 주던 동안
+     * -783이 시안의 석 장을 채우려고 카드를 되풀이했고, 그것을 걷어낸 것이 이 업무다.
+     */
     expect(within(taste).getAllByRole('article')).toHaveLength(3);
     expect(within(discovery).getAllByRole('article')).toHaveLength(3);
+    expect(screen.getAllByRole('article')).toHaveLength(6);
+  });
+
+  /*
+   * **발견 묶음은 자리의 이름이다**(사용자 결정 2026-09-22).
+   *
+   * 유형으로만 가르면 대체분이 맞춤 묶음으로 몰려 발견 묶음이 비고, 좌우 두 단이 한 단으로
+   * 무너진다. 카드 수는 늘었는데 화면은 예전보다 못해지므로 채워진 대로 세운다.
+   */
+  it('발견 후보가 모자라 맞춤으로 채워 와도 두 묶음이 석 장씩 선다', async () => {
+    vi.mocked(getRecommendations).mockImplementation(() => Promise.resolve(filledSet));
+
+    renderRecommendations(1440);
+
+    const taste = await screen.findByRole('group', { name: '취향 맞춤 추천 카드' });
+    const discovery = screen.getByRole('group', { name: '취향 발견 추천 카드' });
+
+    expect(within(taste).getAllByRole('article')).toHaveLength(3);
+    expect(within(discovery).getAllByRole('article')).toHaveLength(3);
+    // 채워진 카드가 발견 묶음 자리에 그대로 선다
+    expect(within(discovery).getByText('세븐')).toBeInTheDocument();
+    expect(within(discovery).getByText('메멘토')).toBeInTheDocument();
+    expect(screen.getAllByRole('article')).toHaveLength(6);
   });
 
   it('숨겨 두었던 화면 제목과 오늘 날짜를 드러낸다', async () => {
@@ -220,13 +327,45 @@ describe('RecommendationsPage 데스크톱 시안', () => {
     await waitFor(() => expect(dismissMovie).toHaveBeenCalledWith(550, 3301));
   });
 
-  it('412px에서는 지금까지의 화면 그대로다', async () => {
+  it('관심없음 처리 중 모바일로 바뀌면 현재 폭의 세 편으로 보충한다', async () => {
+    let resolveDismiss!: () => void;
+    vi.mocked(dismissMovie).mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveDismiss = resolve;
+      }),
+    );
+
+    renderRecommendations(1440);
+
+    const dismissButtons = await screen.findAllByRole('button', {
+      name: '파이트 클럽 관심없음',
+    });
+    fireEvent.click(dismissButtons[0]);
+    await waitFor(() => expect(dismissMovie).toHaveBeenCalledWith(550, 3301));
+
+    act(() => setViewportWidth(412));
+    await waitFor(() => expect(getRecommendations).toHaveBeenCalledWith(3));
+
+    await act(async () => resolveDismiss());
+
+    // 셸 전환으로 기존 페이지는 사라졌으므로 그 페이지의 6편 보충 요청은 이어지지 않는다.
+    expect(vi.mocked(getRecommendations).mock.calls.map(([size]) => size)).toEqual([6, 3]);
+    expect(screen.getAllByRole('link', { name: /상세 보기/ })).toHaveLength(3);
+  });
+
+  it('412px에서는 지금까지의 화면 그대로다 — 세 편을 요청한다', async () => {
     renderRecommendations(412);
 
     expect(await screen.findByText(/포스터를 탭하면/)).toBeInTheDocument();
+    // 모바일은 편수를 싣지 않는다. 계약의 기본값이 3이다(업무 -793)
+    expect(getRecommendations).toHaveBeenCalledWith(3);
     expect(screen.queryByRole('group', { name: '취향 맞춤 추천 카드' })).not.toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: /상세 보기/ })).toHaveLength(set.items.length);
-    expect(screen.getAllByRole('button', { name: /관심없음/ })).toHaveLength(set.items.length);
+    expect(await screen.findAllByRole('link', { name: /상세 보기/ })).toHaveLength(
+      mobileSet.items.length,
+    );
+    expect(screen.getAllByRole('button', { name: /관심없음/ })).toHaveLength(
+      mobileSet.items.length,
+    );
     expect(getWatchRecords).not.toHaveBeenCalled();
   });
 });

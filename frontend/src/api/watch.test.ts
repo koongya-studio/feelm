@@ -31,7 +31,7 @@ import {
   recordOttClick,
   updateRating,
 } from './watch';
-import { resetSessionForTest, startSession } from './session';
+import { endSession, resetSessionForTest, startSession } from './session';
 import type { Rating, WatchRecordListItem } from '../types/watch';
 
 const fetchMock = vi.fn();
@@ -142,6 +142,82 @@ describe('API-034 감상 기록 목록', () => {
 
     await getWatchRecords();
     expect(requestedUrl(1).search).toBe('');
+  });
+
+  /*
+   * 겹치는 조회 합치기 (2026-09-23).
+   *
+   * 개발에서는 StrictMode가 effect를 두 번 실행해 같은 조회가 두 번 나갔다. 두 요청의 주소가
+   * 같아 브라우저가 둘째를 첫째의 응답까지 붙잡고, 화면은 둘째 응답을 그리므로 2.2의
+   * `최근 본 영화`가 카드보다 응답 시간만큼 늦게 찼다.
+   */
+  it('같은 순간에 같은 조건으로 부르면 요청은 한 번이다', async () => {
+    let resolveFirst: ((response: Response) => void) | undefined;
+
+    fetchMock.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        resolveFirst = resolve;
+      }),
+    );
+
+    const first = getWatchRecords({ status: ['RATED'], size: 3 });
+    const second = getWatchRecords({ status: ['RATED'], size: 3 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    resolveFirst?.(json(200, page([])));
+
+    const [a, b] = await Promise.all([first, second]);
+
+    expect(a).toEqual(b);
+
+    // 조건이 다르면 합치지 않는다
+    fetchMock.mockImplementation(() => Promise.resolve(json(200, page([]))));
+    await getWatchRecords({ status: ['WATCHED_UNRATED'], size: 3 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    // 끝난 조회는 남기지 않는다. 다음 진입은 다시 묻는다
+    await getWatchRecords({ status: ['RATED'], size: 3 });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('인증 세션이 바뀌면 이전 사용자의 진행 중인 조회를 재사용하지 않는다', async () => {
+    let resolveFirst: ((response: Response) => void) | undefined;
+    let resolveSecond: ((response: Response) => void) | undefined;
+
+    fetchMock
+      .mockReturnValueOnce(
+        new Promise<Response>((resolve) => {
+          resolveFirst = resolve;
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise<Response>((resolve) => {
+          resolveSecond = resolve;
+        }),
+      );
+
+    startSession('user-a-token');
+    const first = getWatchRecords({ status: ['RATED'], size: 3 });
+
+    // 첫 요청이 끝나기 전에 로그아웃·재로그인한 경우를 재현한다.
+    endSession('signed-out');
+    startSession('user-b-token');
+    const second = getWatchRecords({ status: ['RATED'], size: 3 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(requestedInit(0).headers).toEqual(
+      expect.objectContaining({ Authorization: 'Bearer user-a-token' }),
+    );
+    expect(requestedInit(1).headers).toEqual(
+      expect.objectContaining({ Authorization: 'Bearer user-b-token' }),
+    );
+
+    resolveFirst?.(json(200, page([record({ watchRecordId: 5001 })])));
+    resolveSecond?.(json(200, page([record({ watchRecordId: 6001 })])));
+
+    await expect(first).resolves.toEqual(page([record({ watchRecordId: 5001 })]));
+    await expect(second).resolves.toEqual(page([record({ watchRecordId: 6001 })]));
   });
 });
 

@@ -7,6 +7,7 @@ import java.sql.SQLException;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -267,7 +268,10 @@ public class RecommendationServingRepository {
     }
 
     /**
-     * 항목을 노출 상태로 기록하고 같은 트랜잭션에서 추천 이력을 갱신한다.
+     * 항목을 노출 상태로 기록하고 같은 트랜잭션에서 추천 이력을 갱신한다. 한 번에 노출하는 모든 항목을 함께 넘길 때만 쓴다 — 호출을 여러 번 나누면 {@link
+     * #recordExposureHistory}가 매번 그 호출 안에서만 movie_id를 정렬해, 호출 간 잠금 순서는 온보딩과 여전히 어긋날 수
+     * 있다(S15P21E106-804). 항목을 하나씩 순차로 노출해야 하는 호출자(예: 빈 슬롯 보충)는 {@link #markExposed}로 items만 갱신하고, 다
+     * 모은 뒤 {@link #recordExposureHistory}를 한 번만 호출한다.
      *
      * <p>{@code user_movie_exposures} upsert를 여기 두는 이유는 이 메서드가 <b>개인 세트</b>의 {@code exposed_at}을 찍는
      * 유일한 지점이기 때문이다(파티는 {@code PartyRecommendationRepository.expose()}가 따로 찍고, {@code user_id}가 없어
@@ -276,6 +280,18 @@ public class RecommendationServingRepository {
      */
     public boolean expose(
             long userId, long setId, List<ServingItem> items, OffsetDateTime exposedAt) {
+        boolean exposed = markExposed(items, exposedAt);
+        if (exposed) {
+            recordExposureHistory(userId, setId, items, exposedAt);
+        }
+        return exposed;
+    }
+
+    /**
+     * 항목을 노출 상태로만 기록한다({@code recommendation_items.exposed_at}). movies를 참조하지 않아 온보딩의 movies 잠금과
+     * 무관하다. 이력 기록({@link #recordExposureHistory})은 호출자가 별도로, 가능하면 한 트랜잭션의 모든 노출분을 모아 한 번만 한다.
+     */
+    public boolean markExposed(List<ServingItem> items, OffsetDateTime exposedAt) {
         int[][] results =
                 jdbcTemplate.batchUpdate(
                         "UPDATE recommendation_items SET exposed_at=?"
@@ -286,16 +302,11 @@ public class RecommendationServingRepository {
                             statement.setObject(1, exposedAt);
                             statement.setLong(2, item.id());
                         });
-        boolean exposed =
-                java.util.Arrays.stream(results).flatMapToInt(java.util.Arrays::stream).count()
-                                == items.size()
-                        && java.util.Arrays.stream(results)
-                                .flatMapToInt(java.util.Arrays::stream)
-                                .allMatch(updated -> updated == 1);
-        if (exposed) {
-            recordExposureHistory(userId, setId, items, exposedAt);
-        }
-        return exposed;
+        return java.util.Arrays.stream(results).flatMapToInt(java.util.Arrays::stream).count()
+                        == items.size()
+                && java.util.Arrays.stream(results)
+                        .flatMapToInt(java.util.Arrays::stream)
+                        .allMatch(updated -> updated == 1);
     }
 
     /**
@@ -312,8 +323,19 @@ public class RecommendationServingRepository {
      * <p>테스트 픽스처 {@code RecommendationHistoryApiContractTest.recordExposure()}와 마이그레이션 {@code
      * V202609211000}의 백필이 이 문장을 복제한다. 가드나 컬럼을 바꾸면 셋을 함께 바꾼다.
      */
-    private void recordExposureHistory(
+    /**
+     * 트랜잭션 안에서 노출한 모든 항목을 한 번에 넘긴다. 여러 호출로 나누면 각 호출 안에서만 movie_id가 정렬되어 호출 간 잠금 순서가 어긋날 수
+     * 있다(S15P21E106-804 리뷰 B-F6). {@link #markExposed}로 항목별 노출은 미리 끝내고 이 메서드는 트랜잭션당 한 번만 부른다.
+     */
+    public void recordExposureHistory(
             long userId, long setId, List<ServingItem> items, OffsetDateTime exposedAt) {
+        if (items.isEmpty()) {
+            return;
+        }
+        // FK 검사가 movies 행에 KEY SHARE를 행 순서대로 건다. 온보딩(API-024)이 movies를 id 오름차순 FOR UPDATE로
+        // 여러 개 잠그므로 같은 방향으로 맞춰 다른 사용자 간 교착을 막는다(S15P21E106-804). 응답 순서와 무관하다.
+        List<ServingItem> byMovieId =
+                items.stream().sorted(Comparator.comparingLong(ServingItem::movieId)).toList();
         int[][] results =
                 jdbcTemplate.batchUpdate(
                         """
@@ -326,8 +348,8 @@ public class RecommendationServingRepository {
                     exposed_at = EXCLUDED.exposed_at
                 WHERE user_movie_exposures.set_id < EXCLUDED.set_id
                 """,
-                        items,
-                        items.size(),
+                        byMovieId,
+                        byMovieId.size(),
                         (statement, item) -> {
                             statement.setLong(1, userId);
                             statement.setLong(2, item.movieId());

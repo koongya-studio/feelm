@@ -8,6 +8,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.feelm.backend.infrastructure.mail.AuthMailProperties.Mode;
+import com.feelm.backend.support.SharedTestRuntime;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,7 @@ import org.springframework.mail.javamail.JavaMailSender;
  * <p>제목과 본문을 <b>글자 단위로</b> 고정한다(284 리뷰 A-4). 이 업무의 전제가 "메일 문안 불변"이므로 문안이 바뀌면 테스트가 함께 고쳐지는 편이 낫다.
  * 본문이 바뀌어야 하는 변경이라면 그 변경의 diff에 이 테스트가 함께 드러난다.
  */
+@SharedTestRuntime
 @DisplayName("계정 메일 발송 — 종류별 제목·본문·본문 값")
 class AuthMailSenderTest {
 

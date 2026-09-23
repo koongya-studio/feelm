@@ -506,13 +506,14 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
 
         assertThat(rowCount("recommendation_sets")).isEqualTo(1);
         assertThat(rowCount("recommendation_items")).isEqualTo(2);
+        // 이유 확정은 항목마다 별도 커밋한다(S15P21E106-804). 성공한 첫 항목은 남고 실패한 둘째 항목만 재요청이 채운다.
         assertThat(
                         jdbc.queryForList(
                                 "SELECT reason->>'summary' FROM recommendation_items"
                                         + " WHERE set_id=? ORDER BY movie_id",
                                 String.class,
                                 setId))
-                .containsExactly(null, null);
+                .containsExactly("새로운 영화를 만나보세요.", null);
         reset(reasonRepository);
         assertThat(service.createBuffer(USER).recommendationSetId()).isEqualTo(setId);
         assertThat(

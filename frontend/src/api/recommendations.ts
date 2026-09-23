@@ -12,12 +12,28 @@
 import { request } from './client';
 import type { RecommendationHistory, RecommendationSet } from '../types/recommendation';
 
-let pendingRecommendationRequest: Promise<RecommendationSet> | null = null;
+/**
+ * 화면이 요청하는 노출 편수(API-045 `size`). 계약이 받는 값은 둘뿐이다 — 모바일 3편,
+ * PC 6편(업무 S15P21E106-793).
+ */
+export type RecommendationSize = 3 | 6;
+
+/** 생략하면 서버가 쓰는 값. 모바일과 하위 호환을 위한 것이라 보낼 때도 적지 않는다 */
+const DEFAULT_SIZE: RecommendationSize = 3;
+
+/**
+ * 진행 중인 조회. **편수마다 따로 둔다** — 3편과 6편은 서로 다른 요청이고, 하나로 합치면
+ * 폭이 넓어진 직후의 6편 요청이 앞서 나간 3편 응답을 받는다.
+ */
+const pendingRecommendationRequests = new Map<RecommendationSize, Promise<RecommendationSet>>();
 
 /**
  * API-045 기본 추천 조회 · GET /api/v1/recommendations
  *
- * 취향 맞춤 2편 + 취향 발견 1편이 기본이고, 후보가 없으면 그보다 적게 온다(처리 규칙).
+ * `size`는 화면이 정한다 — 모바일은 3편(취향 맞춤 2 + 취향 발견 1), PC는 6편(맞춤 3 +
+ * 발견 3)이다. 기본값이 3이라 3편은 값을 싣지 않는다. 취향 발견 후보가 모자라면 그 자리를
+ * 맞춤이 채우므로(업무 -793) 유형별 수는 요청한 대로 오지 않을 수 있고, 후보가 없으면
+ * 요청한 편수보다 적게 온다(처리 규칙).
  * 조회 자체가 노출을 기록하는 쓰기 트랜잭션이라 화면이 다시 부르는 것은 사용자가 재시도를
  * 눌렀을 때뿐이다. 추천 서비스가 잠시 닫혀 있으면 `503 RECOMMENDATION_UNAVAILABLE`이고
  * 2.2-A가 받는다.
@@ -27,27 +43,34 @@ let pendingRecommendationRequest: Promise<RecommendationSet> | null = null;
  *
  * 관심없음(API-047)은 카드 오른쪽 위 버튼이 부른다(업무 -672, `dismissMovie`).
  */
-export function getRecommendations(): Promise<RecommendationSet> {
+export function getRecommendations(
+  size: RecommendationSize = DEFAULT_SIZE,
+): Promise<RecommendationSet> {
   /*
    * API-045는 GET이지만 선택한 카드의 노출 시각을 기록한다. React StrictMode가 개발에서
    * effect를 다시 실행하거나 사용자가 빠르게 같은 화면에 진입해도 진행 중인 요청은 한 번만
    * 보낸다. 요청이 끝난 뒤에는 캐시하지 않아 다음 진입·재시도가 최신 generation을 확인한다
    * (S15P21E106-613).
    */
-  if (!pendingRecommendationRequest) {
-    const current = request<RecommendationSet>('/recommendations');
-    pendingRecommendationRequest = current;
+  const pending = pendingRecommendationRequests.get(size);
 
-    const clear = () => {
-      if (pendingRecommendationRequest === current) {
-        pendingRecommendationRequest = null;
-      }
-    };
+  if (pending) return pending;
 
-    void current.then(clear, clear);
-  }
+  const current = request<RecommendationSet>('/recommendations', {
+    query: size === DEFAULT_SIZE ? undefined : { size },
+  });
 
-  return pendingRecommendationRequest;
+  pendingRecommendationRequests.set(size, current);
+
+  const clear = () => {
+    if (pendingRecommendationRequests.get(size) === current) {
+      pendingRecommendationRequests.delete(size);
+    }
+  };
+
+  void current.then(clear, clear);
+
+  return current;
 }
 
 /**

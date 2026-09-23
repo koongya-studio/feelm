@@ -157,6 +157,49 @@ describe('API-045 기본 추천 조회', () => {
     await expect(getRecommendations()).resolves.toEqual(nextBody);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  /*
+   * 화면별 노출 편수 (업무 S15P21E106-794 · 계약은 -793).
+   *
+   * 모바일은 계약의 기본값 3을 쓰므로 값을 싣지 않고, PC만 `size=6`을 싣는다. 편수가 다르면
+   * 서로 다른 요청이므로 진행 중인 것에 얹지 않는다 — 합치면 폭이 넓어진 직후의 여섯 편
+   * 요청이 앞서 나간 세 편 응답을 받는다.
+   */
+  it('PC는 여섯 편을 싣고, 모바일 세 편은 기본값이라 싣지 않는다', async () => {
+    const body = { recommendationSetId: 7001, generatedAt: '2026-09-18T00:00:00Z', items: [] };
+
+    // 응답 본문은 한 번만 읽을 수 있다. 부를 때마다 새 `Response`를 만든다
+    fetchMock.mockImplementation(() => Promise.resolve(json(200, body)));
+
+    await getRecommendations(6);
+    expect(requestedUrl()).toBe('/api/v1/recommendations?size=6');
+
+    await getRecommendations(3);
+    expect(requestedUrl(1)).toBe('/api/v1/recommendations');
+  });
+
+  it('편수가 다른 조회는 진행 중이어도 각자 나간다', async () => {
+    const three = { recommendationSetId: 7001, generatedAt: '2026-09-18T00:00:00Z', items: [] };
+    const six = { recommendationSetId: 7002, generatedAt: '2026-09-18T00:00:00Z', items: [] };
+    let resolveThree: ((response: Response) => void) | undefined;
+
+    fetchMock
+      .mockReturnValueOnce(
+        new Promise<Response>((resolve) => {
+          resolveThree = resolve;
+        }),
+      )
+      .mockResolvedValueOnce(json(200, six));
+
+    const mobile = getRecommendations(3);
+    const desktop = getRecommendations(6);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    resolveThree?.(json(200, three));
+
+    await expect(mobile).resolves.toEqual(three);
+    await expect(desktop).resolves.toEqual(six);
+  });
 });
 
 describe('API-048 추천 이력 조회', () => {

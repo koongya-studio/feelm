@@ -105,10 +105,11 @@ public class PartyController {
     public PartyRecommendationResponse recommendations(
             @AuthenticationPrincipal Long userId,
             @PathVariable long partyId,
-            @RequestParam(defaultValue = "3") int size) {
+            @RequestParam(defaultValue = "3") int size,
+            @RequestParam(defaultValue = "false") boolean refresh) {
         if (size < 1 || size > 10) {
             throw new BusinessException(ErrorCode.VALIDATION_FAILED);
         }
-        return partyRecommendationService.getRecommendations(userId, partyId, size);
+        return partyRecommendationService.getRecommendations(userId, partyId, size, refresh);
     }
 }

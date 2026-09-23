@@ -537,6 +537,10 @@
   -webkit-line-clamp: 2;
 }
 
+.personName:focus-visible {
+  outline-color: var(--color-on-dark);
+}
+
 /* ─────────────────────────── 한줄평 */
 
 .reviewList {

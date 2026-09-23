@@ -53,11 +53,12 @@
  * 화면은 배경을 칠하지 않는다.
  *
  * **`프로필 공유`는 계약이 아니라 브라우저가 한다**(사용자 지시 2026-09-16). 공유 API가
- * 없으므로 서버를 부르지 않고, 7.2-B 공개 프로필 주소(`/users/{userId}`)를 기기의 공유
+ * 없으므로 서버를 부르지 않고, 7.2-B 공개 프로필 주소를 기기의 공유
  * 메뉴(Web Share API)에 넘긴다. 없는 브라우저에서는 주소를 복사한다. 3.5 리포트 공유가
  * 쓰는 방법과 같다.
- * `[!]` 계약의 공개 프로필 키는 `publicId`인데 라우트는 `userId`다(9.4). 주소 규칙이
- * 정해지면 공유하는 주소도 같이 바꾼다.
+ * `[!]` 공개 프로필 주소는 `publicId`(UUID)로 연다(업무 -810). 그런데 내 `publicId`를 알려
+ * 주는 API가 아직 없어, 지금 공유하는 주소는 숫자 ID라 받는 사람에게 `프로필을 볼 수 없어요`로
+ * 열린다. API-014가 `publicId`를 주면 그 값으로 바꾼다.
  *
  * **프로필 사진과 소개는 계약에 없다**(업무 -616). 7.2에서 바꿀 수 있지만 값은 목업
  * 저장소에만 남는다(`api/users.ts` `getMyProfileView`). 해시태그처럼 시안에도 계약에도 없는
@@ -486,7 +487,8 @@ export default function MyDashboardPage() {
   const shareProfile = async () => {
     const result = await shareLink({
       title: `${profile.nickname}님의 Feelm 프로필`,
-      url: appUrl(path.publicProfile(profile.userId)),
+      // [!] 머리말 참고. publicId가 생기면 바꾼다
+      url: appUrl(path.publicProfile(String(profile.userId))),
     });
 
     if (result === 'copied') setNotice('프로필 주소를 복사했어요');

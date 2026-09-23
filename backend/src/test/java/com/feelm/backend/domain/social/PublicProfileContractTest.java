@@ -35,10 +35,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 class PublicProfileContractTest extends SharedPostgresContractTest {
 
     private static final Instant BASE_TIME = Instant.parse("2026-09-20T01:00:00Z");
-    private static final String FIRST_FLAVOR_ID =
-            "SELECT id FROM popcorn_flavors ORDER BY sort_order LIMIT 1";
-    private static final String FIRST_FLAVOR_CODE =
-            "SELECT code FROM popcorn_flavors ORDER BY sort_order LIMIT 1";
+    private static final long TEST_FLAVOR_ID = -749L;
+    private static final String TEST_FLAVOR_CODE = "PUBLIC_PROFILE_TEST";
 
     @Autowired private MockMvc mockMvc;
     @Autowired private TokenProvider tokenProvider;
@@ -54,12 +52,13 @@ class PublicProfileContractTest extends SharedPostgresContractTest {
     @BeforeEach
     void setUp() {
         truncate();
+        insertTestFlavor();
         sequence = 0;
         ownerId = insertUser("owner", "무비버디", "ACTIVE", "PUBLIC");
         ownerPublicId = publicIdOf(ownerId);
         ownerNickname = nicknameOf(ownerId);
-        firstFlavorId = jdbc.sql(FIRST_FLAVOR_ID).query(Long.class).single();
-        firstFlavorCode = jdbc.sql(FIRST_FLAVOR_CODE).query(String.class).single();
+        firstFlavorId = TEST_FLAVOR_ID;
+        firstFlavorCode = TEST_FLAVOR_CODE;
     }
 
     @AfterEach
@@ -422,7 +421,30 @@ class PublicProfileContractTest extends SharedPostgresContractTest {
                 .update();
     }
 
+    private void insertTestFlavor() {
+        jdbc.sql(
+                        """
+                        INSERT INTO popcorn_flavors(
+                            id,code,display_name,color,sort_order,cluster_id,
+                            representative_keywords)
+                        VALUES (
+                            :id,:code,'공개 프로필 테스트 맛','#000000',-749,-749,
+                            CAST('[]' AS jsonb))
+                        """)
+                .param("id", TEST_FLAVOR_ID)
+                .param("code", TEST_FLAVOR_CODE)
+                .update();
+    }
+
     private void truncate() {
         jdbc.sql("TRUNCATE TABLE users, movies RESTART IDENTITY CASCADE").update();
+        jdbc.sql(
+                        """
+                        DELETE FROM popcorn_flavors
+                        WHERE id = :id OR code = :code OR cluster_id = -749
+                        """)
+                .param("id", TEST_FLAVOR_ID)
+                .param("code", TEST_FLAVOR_CODE)
+                .update();
     }
 }

@@ -4,9 +4,20 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 hdfs_subject="$script_dir/../run-initial-data-load.sh"
 postgres_subject="$script_dir/../run-tmdb-ingestion.sh"
+approved_people_subject="$script_dir/../data/approved-foreign-person-original-names.tsv"
+original_name_extractor="$script_dir/../extract-people-original-name.py"
 readme_subject="$script_dir/../../README.md"
 test_dir="$(mktemp -d)"
 trap 'rm -rf -- "$test_dir"' EXIT
+
+if command -v python3 >/dev/null 2>&1; then
+  python_command=python3
+elif command -v python >/dev/null 2>&1; then
+  python_command=python
+else
+  printf 'python is required to test the original-name extractor\n' >&2
+  exit 1
+fi
 
 printf 'alpha\n' >"$test_dir/ratings.csv"
 printf 'beta\n' >"$test_dir/links.csv"
@@ -87,6 +98,93 @@ fi
 grep -F 'INSERT INTO otts (code, name, logo_url, tmdb_provider_id)' \
   "$postgres_subject" >/dev/null
 grep -F 'GROUP BY tmdb_person_id' "$postgres_subject" >/dev/null
+grep -F 'declare -A approved_foreign_person_names=()' "$postgres_subject" >/dev/null
+grep -F -- '--rawfile approved_person_names "$current_approved_names"' "$postgres_subject" >/dev/null
+grep -F 'CREATE TEMP TABLE _approved_person_names' "$postgres_subject" >/dev/null
+grep -F 'cannot reconcile people.original_name with approved data' "$postgres_subject" >/dev/null
+if grep -F $'^2027339\t' "$approved_people_subject" >/dev/null; then
+  printf 'reviewed Korean person 준회 must not be approved as foreign\n' >&2
+  exit 1
+fi
+grep -Fx $'64707\tYu Chenghui' "$approved_people_subject" >/dev/null
+grep -Fx $'77271\tP!nk' "$approved_people_subject" >/dev/null
+grep -Fx $'107730\tTrần Anh Hùng' "$approved_people_subject" >/dev/null
+if grep -F "person->>'name' ~" "$postgres_subject" >/dev/null; then
+  printf 'person nationality must come from reviewed TMDb person-name pairs, not a name regex\n' >&2
+  exit 1
+fi
+
+mkdir -p "$test_dir/original-name-raw"
+printf '1\n' >"$test_dir/original-name-movie-ids.txt"
+cat >"$test_dir/original-name-raw/1.json" <<'JSON'
+{"details":{"id":1},"credits":{"crew":[{"id":107730,"name":"트란 안 홍","original_name":"Trần Anh Hùng","job":"Director"}],"cast":[{"id":2027339,"name":"준회","original_name":"Ju-ne"},{"id":64707,"name":"우승혜","original_name":"Yu Chenghui"},{"id":77271,"name":"핑크","original_name":"P!nk"}]}}
+JSON
+"$python_command" "$original_name_extractor" \
+  --raw-dir "$test_dir/original-name-raw" \
+  --expected-movie-ids "$test_dir/original-name-movie-ids.txt" \
+  --expected-file-count 1 \
+  --expected-selected-count 3 \
+  --output "$test_dir/original-names.tsv" >/dev/null
+if grep -F $'2027339\t' "$test_dir/original-names.tsv" >/dev/null; then
+  printf 'reviewed Korean person 준회 must not receive a Latin display name\n' >&2
+  exit 1
+fi
+grep -Fx $'64707\tYu Chenghui' "$test_dir/original-names.tsv" >/dev/null
+grep -Fx $'77271\tP!nk' "$test_dir/original-names.tsv" >/dev/null
+grep -Fx $'107730\tTrần Anh Hùng' "$test_dir/original-names.tsv" >/dev/null
+if "$python_command" "$original_name_extractor" \
+    --raw-dir "$test_dir/original-name-raw" \
+    --expected-movie-ids "$test_dir/original-name-movie-ids.txt" \
+    --expected-file-count 2 \
+    --expected-selected-count 3 \
+    --output "$test_dir/incomplete-original-names.tsv" >/dev/null 2>&1; then
+  printf 'expected incomplete TMDb raw directory to fail validation\n' >&2
+  exit 1
+fi
+mkdir -p "$test_dir/conflicting-original-name-raw"
+cat >"$test_dir/conflicting-original-name-raw/1.json" <<'JSON'
+{"details":{"id":1},"credits":{"crew":[],"cast":[{"id":64707,"name":"우승혜","original_name":"Yu Chenghui"}]}}
+JSON
+cat >"$test_dir/conflicting-original-name-raw/2.json" <<'JSON'
+{"details":{"id":2},"credits":{"crew":[],"cast":[{"id":64707,"name":"우승혜","original_name":"Yu Cheng-hui"}]}}
+JSON
+printf '1\n2\n' >"$test_dir/conflicting-original-name-movie-ids.txt"
+if "$python_command" "$original_name_extractor" \
+    --raw-dir "$test_dir/conflicting-original-name-raw" \
+    --expected-movie-ids "$test_dir/conflicting-original-name-movie-ids.txt" \
+    --expected-file-count 2 \
+    --expected-selected-count 1 \
+    --output "$test_dir/conflicting-original-names.tsv" >/dev/null 2>&1; then
+  printf 'expected conflicting original names for one TMDb person to fail validation\n' >&2
+  exit 1
+fi
+
+mkdir -p "$test_dir/missing-approved-original-name-raw"
+cat >"$test_dir/missing-approved-original-name-raw/1.json" <<'JSON'
+{"details":{"id":1},"credits":{"crew":[],"cast":[{"id":64707,"name":"우승혜","original_name":null}]}}
+JSON
+if "$python_command" "$original_name_extractor" \
+    --raw-dir "$test_dir/missing-approved-original-name-raw" \
+    --expected-movie-ids "$test_dir/original-name-movie-ids.txt" \
+    --expected-file-count 1 \
+    --expected-selected-count 1 \
+    --output "$test_dir/missing-approved-original-names.tsv" >/dev/null 2>&1; then
+  printf 'expected missing original name for an approved person to fail validation\n' >&2
+  exit 1
+fi
+
+mkdir -p "$test_dir/substituted-original-name-raw"
+cp "$test_dir/original-name-raw/1.json" "$test_dir/substituted-original-name-raw/2.json"
+if "$python_command" "$original_name_extractor" \
+    --raw-dir "$test_dir/substituted-original-name-raw" \
+    --expected-movie-ids "$test_dir/original-name-movie-ids.txt" \
+    --expected-file-count 1 \
+    --expected-selected-count 3 \
+    --output "$test_dir/substituted-original-names.tsv" >/dev/null 2>&1; then
+  printf 'expected same-count substituted TMDb payload set to fail validation\n' >&2
+  exit 1
+fi
+
 grep -F 'genres: ([($d.genres // [])[] | select(.id > 0 and (.name | length) > 0) | {id,name}] | unique_by(.id))' \
   "$postgres_subject" >/dev/null
 grep -F "GROUP BY (genre->>'id')::int" "$postgres_subject" >/dev/null

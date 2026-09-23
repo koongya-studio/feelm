@@ -208,6 +208,7 @@ erDiagram
         bigint id PK
         int tmdb_person_id UK
         varchar name
+        varchar original_name "검토된 외국인의 라틴 원어명, 없으면 NULL. name과 다를 때 화면에 병기한다"
         varchar profile_url "TMDb 미제공 시 NULL 가능"
     }
     MOVIE_PEOPLE {
@@ -257,7 +258,7 @@ erDiagram
 | `movie_embeddings` | 영화별 현재 콘텐츠 임베딩 | 별도 `id` PK와 UK(`movie_id`). 확정된 `vector(768)` 및 50자 이내의 안정적인 `model_version`을 저장하고 코사인 HNSW로 검색한다. 전체 산출물 SHA는 파이프라인 manifest에서 관리한다. 영화 삭제 시 함께 삭제하며 Redis에 중복 저장하지 않는다 | FR-11 · API-031 · ADR-0014 |
 | `genres` | 장르 기준정보 | TMDb 장르 ID 매핑 | FR-15 · API-029 |
 | `movie_genres`, `movie_countries`, `movie_people` | 영화 속성 매핑 | `movie_people.role`로 감독·배우 구분 | FR-14, FR-15, FR-34 |
-| `people` | 인물(감독·배우) | 검색 대상(FR-14) | API-028, API-030 |
+| `people` | 인물(감독·배우) | 검색 대상(FR-14). `original_name`은 4컷 리포트의 영문 병기용이며 **라틴 원어명이 있는 외국 인물만** 채운다. 검토된 TMDb person ID와 정확한 `original_name` 쌍이 allow-list와 일치할 때만 허용하고, 미확인 인물과 한국인은 NULL로 두어 4컷에서 한글 한 줄로 표시한다 | API-028, API-030 |
 | `otts` | OTT 기준정보 | 지원 목록 5종(API-025)을 새 Flyway seed로 초기화한다. 기존 식별쌍·ID·참조는 보존하고 이후 콘텐츠 적재는 같은 쌍의 표시 정보를 갱신한다 | FR-03, FR-16 · API-025 |
 | `movie_ott_providers` | 영화별 시청 가능 OTT | TMDb watch provider 동기화 | FR-16 · API-030 |
 | `popcorn_flavors` | 팝콘 맛 8종 기준정보와 439 상위 맛 매핑 | `cluster_id=taste_id`와 `code=FLAVOR_A..H`는 각각 유일하며 순서대로 1:1 대응한다. 표시명·색상은 변경 가능하고 실배정 해석 키워드도 함께 보관한다. 내부 `cluster_id`는 공개 API에 노출하지 않는다 | FR-06 · API-044 · ADR-0020 |
@@ -399,7 +400,7 @@ erDiagram
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
 | `recommendation_sets` | 추천 세트(이력 단위) | `user_id`·`party_id` 중 하나만 NOT NULL(CHECK). Redis 개인 세트는 `generation_id`로 같은 배치를 식별하고, 소진 후 만든 회차는 `batch_no`로 구분한다. UK(`generation_id`, `batch_no`)는 사용자와 무관한 전역 고유이며 첫 회차는 0이다. `batch_no >= 0`(CHECK `ck_recommendation_sets_batch_no`). 파티 세트의 후보 버전 기본값은 0이고 generation ID는 NULL이다 | FR-10, FR-33 · API-045, API-048, API-058 |
-| `recommendation_items` | 세트의 후보 영화 + 이유 스냅샷 | 유형은 `TASTE`·`DISCOVERY`·`PARTY`. nullable `flavor_code`는 Redis 후보 값을 스냅샷하며 PARTY의 `reason`은 빈 객체다. UK(`set_id`, `type`, `position`), UK(`set_id`, `movie_id`), `position >= 1`. TASTE·DISCOVERY를 각각 최대 20편, PARTY를 최대 10편 저장하고 `exposed_at`으로 실제 노출분을 구분한다 | FR-12, FR-13, FR-33 · API-045, API-047, API-048, API-058 |
+| `recommendation_items` | 세트의 후보 영화 + 이유 스냅샷 | 유형은 `TASTE`·`DISCOVERY`·`PARTY`. nullable `flavor_code`는 Redis 후보 값을 스냅샷하며 PARTY의 `reason`은 빈 객체다. UK(`set_id`, `type`, `position`), UK(`set_id`, `movie_id`), `position >= 1`. TASTE·DISCOVERY를 각각 최대 20편, PARTY를 최대 50편 저장하고 `exposed_at`으로 실제 노출분을 구분한다. PARTY는 같은 `exposed_at`을 가진 항목이 한 번에 노출한 묶음이며 가장 최근 묶음이 현재 노출 중인 묶음이다(API-058 다시 받기) | FR-12, FR-13, FR-33 · API-045, API-047, API-048, API-058 |
 | `user_movie_dismissals` | 사용자별 영화 관심없음 | UK(`user_id`, `movie_id`). 모든 화면의 모든 영화에 적용한다. `recommendation_item_id`는 선택적 출처이며 아이템 삭제 시 NULL로 전환한다 | FR-36 · API-047 |
 | `user_movie_exposures` | 사용자별 영화의 **가장 최신 노출** (추천 이력 정본) | PK(`user_id`, `movie_id`)이므로 같은 영화의 재노출은 행을 늘리지 않고 `recommendation_item_id`·`set_id`·`exposed_at`을 최신으로 갱신한다. 행 수는 노출 횟수가 아니라 그 사용자가 본 고유 영화 수다. `recommendation_items.exposed_at`을 찍는 `expose()`가 같은 트랜잭션에서 upsert하며, 더 오래된 세트(`set_id`가 작은 쪽)의 노출은 승자를 덮어쓰지 못한다. `type`·`reason`·`position`은 복사하지 않고 항목을 가리킨다. 개인 세트만 대상이며 파티 노출은 넣지 않는다. 아이템·세트 삭제 시 함께 삭제(CASCADE)되며 이전 노출로 자동 복원되지 않으므로, 항목·세트를 삭제했으면 마이그레이션 `V202609211000`의 멱등 백필 INSERT를 다시 실행해 원본 기준 승자를 복원한다 | FR-33 · API-045(쓰기), API-048(읽기) |
 

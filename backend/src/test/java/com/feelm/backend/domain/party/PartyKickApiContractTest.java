@@ -41,7 +41,7 @@ class PartyKickApiContractTest extends SharedPostgresContractTest {
 
     @BeforeEach
     void fixtures() {
-        jdbc.execute("TRUNCATE TABLE users, popcorn_flavors RESTART IDENTITY CASCADE");
+        jdbc.execute("TRUNCATE TABLE users RESTART IDENTITY CASCADE");
         user(10, "owner");
         user(20, "member20");
         user(30, "member30");
@@ -234,9 +234,6 @@ class PartyKickApiContractTest extends SharedPostgresContractTest {
 
     @Test
     void excludesKickedMemberFromPartyPopcorn() throws Exception {
-        for (int order = 1; order <= 8; order++) {
-            flavor(order);
-        }
         long party = party(10, "ACTIVE");
         member(party, 20, "MEMBER", CREATED_AT.plusSeconds(1));
         member(party, 30, "MEMBER", CREATED_AT.plusSeconds(2));
@@ -349,18 +346,6 @@ class PartyKickApiContractTest extends SharedPostgresContractTest {
                 Long.class,
                 party,
                 Timestamp.from(CREATED_AT));
-    }
-
-    private void flavor(int order) {
-        jdbc.update(
-                "INSERT INTO popcorn_flavors"
-                        + " (id,code,display_name,color,sort_order,cluster_id,representative_keywords)"
-                        + " VALUES (?,?,?,'#000000',?,?,CAST('[]' AS jsonb))",
-                (long) order,
-                "FLAVOR_" + order,
-                "FLAVOR_" + order,
-                order,
-                order - 1);
     }
 
     private List<Long> memberIds(long party) {
