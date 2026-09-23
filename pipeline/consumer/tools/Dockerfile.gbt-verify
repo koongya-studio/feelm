@@ -1,0 +1,11 @@
+# Local verification image only, NOT the production Consumer Dockerfile.
+FROM python:3.12.14-slim-bookworm AS runtime
+COPY gbt-runtime-requirements.txt /requirements.txt
+RUN pip install --no-cache-dir -r /requirements.txt
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2
+WORKDIR /work
+ENTRYPOINT ["python", "-B"]
+
+FROM runtime AS test
+RUN pip install --no-cache-dir pytest==8.4.2 ruff==0.16.7 \
+    confluent-kafka==2.15.1 psycopg[binary]==3.3.5 redis==5.3.1
