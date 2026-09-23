@@ -29,13 +29,19 @@
  *
  * 끝에 닿은 스크롤이 문서로 넘어가지 않게 한다(`overscroll-behavior`, 업무 -741). 넘어가면
  * iOS 사파리가 화면 전체를 튕겨 하단 바가 같이 움직인다. 문서 쪽 잠금은 `global.css`에 있다.
+ *
+ * **가로도 막는다**(업무 -809). 세로만 막아 두었더니, 5.1 `참여 중인 파티` 카드 줄을 끝까지
+ * 넘긴 가로 제스처가 문서로 올라가 화면 전체와 하단 바가 옆으로 밀리고 앱 폭 바깥이 드러났다.
+ * `overflow-y: auto`만 쓰면 가로도 `auto`로 계산되므로 본문이 옆으로 움직일 여지 자체를 없앤다.
+ * 옆으로 넘기는 것은 안쪽 줄(카드 줄 · 칩 줄)이 저마다 한다.
  */
 .body {
   display: flex;
   min-height: 0;
   flex: 1;
   flex-direction: column;
+  overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior-y: contain;
+  overscroll-behavior: contain;
   padding-bottom: calc(var(--nav-height) + var(--space-4) + env(safe-area-inset-bottom, 0px));
 }
