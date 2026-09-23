@@ -79,7 +79,7 @@ public class RecommendationHistoryService {
                 item.type(),
                 new RecommendationHistoryMovieResponse(
                         item.movieId(), item.title(), item.posterUrl()),
-                reasonPresenter.present(item.reason()),
+                reasonPresenter.present(item.type(), item.reason()),
                 item.dismissed(),
                 item.watchStatus());
     }

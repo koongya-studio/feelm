@@ -9,6 +9,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -40,6 +41,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.support.Acknowledgment;
@@ -260,13 +262,51 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
     @Test
     @DisplayName("T2 기본 추천을 반복 조회해도 다음 버퍼를 소비하지 않는다")
     void returnsSameInitialItemsIdempotently() throws Exception {
-        getRecommendations(USER).andExpect(status().isOk());
+        String first =
+                getRecommendations(USER)
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        List<java.util.Map<String, Object>> itemExposures =
+                jdbc.queryForList(
+                        "SELECT id, exposed_at FROM recommendation_items"
+                                + " WHERE exposed_at IS NOT NULL ORDER BY id");
+        List<java.util.Map<String, Object>> exposureHistory =
+                jdbc.queryForList(
+                        "SELECT movie_id, recommendation_item_id, set_id, exposed_at"
+                                + " FROM user_movie_exposures WHERE user_id=? ORDER BY movie_id",
+                        USER);
+
+        String second =
+                getRecommendations(USER)
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+
+        assertThat(second).isEqualTo(first);
+        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1003L, 1005L, 1006L, 1010L);
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT id, exposed_at FROM recommendation_items"
+                                        + " WHERE exposed_at IS NOT NULL ORDER BY id"))
+                .containsExactlyElementsOf(itemExposures);
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT movie_id, recommendation_item_id, set_id, exposed_at"
+                                        + " FROM user_movie_exposures"
+                                        + " WHERE user_id=? ORDER BY movie_id",
+                                USER))
+                .containsExactlyElementsOf(exposureHistory);
+    }
+
+    @Test
+    @DisplayName("추천 조회 응답을 저장하지 않도록 캐시 금지 헤더를 보낸다")
+    void sendsNoStoreCacheControlHeader() throws Exception {
         getRecommendations(USER)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[0].recommendationItemId").value(1001))
-                .andExpect(jsonPath("$.items[5].recommendationItemId").value(1010));
-
-        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1003L, 1005L, 1006L, 1010L);
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"));
     }
 
     @Test
@@ -562,6 +602,42 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
                 .andExpect(jsonPath("$.recommendation.reason.summary").value("검증된 이유"))
                 .andExpect(jsonPath("$.recommendation.reason.factors[0].label").value("드라마"))
                 .andExpect(jsonPath("$.recommendation.reason.reasons").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("추천 카드·영화 상세·이력은 원본-only 이유에 같은 유형별 일반 문구를 반환한다")
+    void cardDetailAndHistoryShareTypeFallback() throws Exception {
+        jdbc.update(
+                "UPDATE recommendation_items"
+                        + " SET reason='{\"reasons\":[{\"code\":\"TOP_RATED_SOURCE\"}]}'::jsonb"
+                        + " WHERE id IN (1001,1005)");
+
+        getRecommendations(USER)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].reason.summary").value("취향 데이터를 바탕으로 영화를 골라봤어요."))
+                .andExpect(jsonPath("$.items[0].reason.factors.length()").value(0))
+                .andExpect(jsonPath("$.items[3].reason.summary").value("새로운 영화를 만나보세요."))
+                .andExpect(jsonPath("$.items[3].reason.factors.length()").value(0));
+        mvc.perform(get("/api/v1/recommendations/history").header("Authorization", bearer(USER)))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.items[0].items[0].reason.summary")
+                                .value("취향 데이터를 바탕으로 영화를 골라봤어요."))
+                .andExpect(jsonPath("$.items[0].items[1].reason.summary").value("새로운 영화를 만나보세요."));
+        mvc.perform(
+                        get("/api/v1/movies/101")
+                                .param("recommendationItemId", "1001")
+                                .header("Authorization", bearer(USER)))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.recommendation.reason.summary")
+                                .value("취향 데이터를 바탕으로 영화를 골라봤어요."));
+        mvc.perform(
+                        get("/api/v1/movies/105")
+                                .param("recommendationItemId", "1005")
+                                .header("Authorization", bearer(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recommendation.reason.summary").value("새로운 영화를 만나보세요."));
     }
 
     @Test
