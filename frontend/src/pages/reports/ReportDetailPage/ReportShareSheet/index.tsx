@@ -10,34 +10,28 @@
  *   (`utils/share.ts`, 업무 -767). 한때 제목 글자만 공유 메뉴에 넘겼고, 데스크톱 Chrome에서는
  *   메뉴가 있다고 답하고 열지 못해 아무 일이 없었다
  * - `이미지로 저장`은 화면의 `ReportFourCut` DOM을 그대로 PNG로 캡처하고 API-061에 저장한 뒤
- *   서명 URL을 실제 파일 다운로드로 연결한다
+ *   서명 URL을 실제 파일 다운로드로 연결한다(`../saveReportImage.ts`). 3.4 · 7.4의 `저장`과
+ *   같은 함수라 부른 화면이 넘긴다
  * - 공유를 마치거나 취소하면 시트를 닫는다(`3.5 ⇢ 3.4`)
  *
- * `공유하기`는 제목과 주소, `이미지로 저장`은 PNG 파일을 맡는다. 이미지 파일을 기기 공유 시트에
- * 직접 넘기는 동작은 브라우저별 지원 범위가 달라 별도 범위로 둔다.
+ * `공유하기`는 제목과 주소, `이미지로 저장`은 PNG 파일을 맡는다. PNG를 기기 공유 시트에 직접
+ * 넘기는 동작은 API-061 범위 밖이다(계약 처리 규칙). 그래서 저장을 마치면 내려받은 이미지를
+ * 원하는 앱에서 직접 공유하라고 알린다(업무 -731).
  */
 import { useEffect, useId, useRef, useState } from 'react';
 import Button from '../../../../components/Button';
-import { createReportImage } from '../../../../api/reports';
-import { captureReportImage, downloadReportImage } from '../../../../utils/reportImage';
 import { shareLink } from '../../../../utils/share';
+import { reportImageFailure } from '../saveReportImage';
 import styles from './ReportShareSheet.module.css';
 
 type Props = {
-  reportId: number;
   title: string;
-  getImageNode: () => HTMLElement | null;
-  prepareImage: () => Promise<void>;
+  /** 4컷 PNG를 저장해 내려받는다. 실패하면 던진다 */
+  onSaveImage: () => Promise<void>;
   onClose: () => void;
 };
 
-export default function ReportShareSheet({
-  reportId,
-  title,
-  getImageNode,
-  prepareImage,
-  onClose,
-}: Props) {
+export default function ReportShareSheet({ title, onSaveImage, onClose }: Props) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const titleId = useId();
@@ -80,15 +74,10 @@ export default function ReportShareSheet({
     setNotice('');
 
     try {
-      await prepareImage();
-      const node = getImageNode();
-      if (!node) throw new Error('ReportFourCut is unavailable');
-      const png = await captureReportImage(node);
-      const image = await createReportImage(reportId, png);
-      await downloadReportImage(image.downloadUrl, reportId);
-      setNotice('이미지를 저장했어요');
-    } catch {
-      setNotice('이미지를 만들지 못했어요. 잠시 후 다시 시도해 주세요');
+      await onSaveImage();
+      setNotice('이미지를 저장했어요. 원하는 앱에서 직접 공유해 주세요');
+    } catch (error) {
+      setNotice(reportImageFailure(error));
     } finally {
       setBusy(false);
     }

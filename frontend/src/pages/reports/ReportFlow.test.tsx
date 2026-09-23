@@ -199,9 +199,14 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
       await screen.findByRole('heading', { name: '2026 상반기 취향 리포트' }),
     ).toBeInTheDocument();
 
-    // 3.4 ⇢ 3.1 저장 후 취향 필름으로 돌아가기
+    // 3.4 ⇢ 3.1 저장 후 취향 필름으로 돌아가기. 4컷 PNG를 내려받은 뒤에 나간다(업무 -731)
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    expect(location()).toBe('/film');
+    await waitFor(() => expect(location()).toBe('/film'));
+    expect(createReportImage).toHaveBeenCalledWith(301, expect.any(Blob));
+    expect(downloadReportImage).toHaveBeenCalledWith(
+      '/api/v1/report-images/901/download?expires=1&signature=x',
+      301,
+    );
   });
 
   it('01 장르 뒷면에 국가 비율이, 04 캐릭터 뒷면에 지난 반기 비교가 있다', async () => {
@@ -463,6 +468,64 @@ describe('3.4 → 3.5', () => {
     const captured = vi.mocked(captureReportImage).mock.calls[0][0];
     expect(captured.querySelector('figure')).toHaveAttribute('aria-label', '김난다의 취향 4컷');
   });
+
+  it('PNG를 기기 공유 시트로 넘기지 않으므로, 저장하면 직접 공유하라고 알린다', async () => {
+    renderApp(['/reports/301']);
+    const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
+    fireEvent.click(headerShare);
+
+    const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
+    fireEvent.click(sheet.getByRole('button', { name: '이미지로 저장' }));
+
+    await waitFor(() =>
+      expect(sheet.getByRole('status')).toHaveTextContent(
+        '이미지를 저장했어요. 원하는 앱에서 직접 공유해 주세요',
+      ),
+    );
+  });
+
+  it('API-061의 409 · 429는 기다리면 풀리는 이유를 각각 알린다', async () => {
+    vi.mocked(createReportImage)
+      .mockReset()
+      .mockRejectedValueOnce(new ApiError(409, 'REPORT_GENERATING', '생성 중'))
+      .mockRejectedValueOnce(new ApiError(429, 'RATE_LIMITED', '요청 제한'))
+      .mockRejectedValueOnce(new ApiError(503, 'REPORT_IMAGE_STORAGE_UNAVAILABLE', '저장소'));
+    renderApp(['/reports/301']);
+    const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
+    fireEvent.click(headerShare);
+
+    const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
+    const saveButton = sheet.getByRole('button', { name: '이미지로 저장' });
+
+    fireEvent.click(saveButton);
+    await waitFor(() =>
+      expect(sheet.getByRole('status')).toHaveTextContent('리포트를 아직 만드는 중이에요'),
+    );
+
+    await waitFor(() => expect(saveButton).toBeEnabled());
+    fireEvent.click(saveButton);
+    await waitFor(() =>
+      expect(sheet.getByRole('status')).toHaveTextContent('이미지 요청이 몰렸어요'),
+    );
+
+    await waitFor(() => expect(saveButton).toBeEnabled());
+    fireEvent.click(saveButton);
+    await waitFor(() =>
+      expect(sheet.getByRole('status')).toHaveTextContent('이미지를 만들지 못했어요'),
+    );
+    expect(downloadReportImage).not.toHaveBeenCalled();
+  });
+
+  it('3.4 `저장`이 PNG를 받지 못하면 나가지 않고 버튼 위에 이유를 알린다', async () => {
+    vi.mocked(downloadReportImage).mockReset().mockRejectedValueOnce(new Error('expired'));
+    renderApp(['/reports/301']);
+
+    fireEvent.click(await screen.findByRole('button', { name: '저장' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('이미지를 만들지 못했어요');
+    expect(location()).toBe('/reports/301');
+    expect(screen.getByRole('button', { name: '저장' })).toBeEnabled();
+  });
 });
 
 describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
@@ -497,6 +560,8 @@ describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '저장' }));
     await waitFor(() => expect(location()).toBe('/my/reports'));
+    expect(createReportImage).toHaveBeenCalledWith(202, expect.any(Blob));
+    expect(downloadReportImage).toHaveBeenCalledOnce();
   });
 
   it('3.1의 리포트 버튼은 하나다. 새 리포트를 받기 전에는 3.3, 받은 뒤에는 7.3으로 간다', async () => {
