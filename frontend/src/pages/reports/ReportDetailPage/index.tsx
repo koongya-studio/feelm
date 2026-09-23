@@ -8,15 +8,39 @@
  * 와이어프레임은 두 화면을 같은 내용으로 그렸다. 차이는 **`저장`이 어디로 돌아가는지**다.
  * 필름 쪽(3.4)은 3.1로, MY 쪽(7.4)은 온 곳(7.3)으로 간다. `from`으로 가른다.
  *
- * 요소 — 4컷(한 칸에 장르 · 감독 · 배우 · 캐릭터 하나씩), `상세 리포트`(장르 · 국가 · 시대 비율, 감독 · 배우 `N편 감상`, 캐릭터
- * 문단), `취향 키워드`와 근거, `지난 반기와 비교`, `저장` · `공유하기`.
+ * 요소 — 4컷(한 칸에 장르 · 감독 · 배우 · 캐릭터 하나씩), `저장` · `공유하기`.
+ *
+ * **설명은 4컷 아래가 아니라 칸 뒷면에 있다**(사용자 요청 2026-09-23, 업무 -812). 와이어프레임은
+ * `상세 리포트` · `취향 키워드` · `지난 반기와 비교`를 4컷 아래에 이어 붙였는데, 설명이 화면을
+ * 길게 채워 4컷을 읽는 흐름이 끊겼다. 같은 내용을 그 값이 나온 칸의 뒷면으로 옮긴다.
+ *
+ * | 칸 | 뒷면 |
+ * | --- | --- |
+ * | 01 장르 | 장르 · 국가 · 시대 비율, 취향 키워드와 근거 |
+ * | 02 감독 | 감독별 `N편 감상` |
+ * | 03 배우 | 배우별 `N편 감상` |
+ * | 04 캐릭터 | 캐릭터 카드, 지난 반기와 비교 |
+ *
+ * 어느 칸에도 속하지 않는 취향 키워드는 근거가 장르 · 인물 편수라 01에, 지난 반기 비교는 맛
+ * 변화라 캐릭터 칸에 붙였다(사용자 결정 2026-09-23).
+ *
+ * - 뒷면 내용은 이 화면이 만들고 서식도 이 화면의 CSS가 정한다. 인화지는 뒤집는 틀과 어두운
+ *   바탕만 맡는다. 어두운 바탕에 맞춰 `.back`이 색 토큰만 다시 정의하므로 `MeterRow` · `Chip`
+ *   같은 공용 컴포넌트를 그대로 쓴다
+ * - 그릴 값이 없는 뒷면은 아예 주지 않는다. 그 칸은 뒤집히지 않는 그림 칸으로 남는다
+ * - 인화지를 그림으로 저장할 때(3.5 `이미지로 저장`)는 뒤집힌 칸을 먼저 되돌린다. 저장되는 것은
+ *   앞면 넷이다
+ * - **인물 검색으로 가는 길은 뒷면 목록의 이름뿐이다.** 업무 -557은 감독 · 배우 칸 전체를 검색
+ *   링크로 덮었는데 그 자리를 뒤집기가 쓰게 되어 한 칸이 두 동작을 가질 수 없다. 누르면
+ *   뒤집히는 쪽으로 통일하고(사용자 결정 2026-09-23) `ReportFourCut`의 `linkPeople`을 지웠다.
+ *   1위 한 명이 아니라 목록의 세 명 모두로 갈 수 있어 오히려 길이 넓어진다
  *
  * 국가 · 시대 비율, 지난 반기 비교 %, 4컷은 2026-09-21 확정된 API-060 계약에서 온다(업무 -558).
  * 취향 키워드는 계약이 빈 배열을 주는 후속 범위라 값이 있을 때만 그린다. **캐릭터 설명도
  * 마찬가지다** — 선정 기준이 업무 -618에서 정해질 때까지 `characterCard`가 null로 오므로
  * 그 칸을 숨긴다(백엔드 답 2026-09-21).
  *
- * - 어두운 블록은 맨 위 4컷의 인화지다(`components/ReportFourCut`)
+ * - 화면은 4컷 인화지 한 장과 버튼 두 개다
  * - `지난 반기와 비교`의 빼기는 흐리게 쓴다. 색으로 늘고 준 것을 가르지 않는다
  *   (`design-concept.md` 2.2). 와이어프레임도 줄어든 값만 흐렸다
  * - 비교할 지난 반기가 없으면(첫 리포트) 그 칸을 그리지 않는다
@@ -32,9 +56,9 @@ import Chip from '../../../components/Chip';
 import IconButton from '../../../components/IconButton';
 import MeterRow from '../../../components/MeterRow';
 import ReportFourCut from '../../../components/ReportFourCut';
+import type { ReportCutKind } from '../../../components/ReportFourCut';
 import { CHARACTER_AXIS_POLES } from '../../../components/ReportFourCut/characterCards';
 import ScreenHeader from '../../../components/ScreenHeader';
-import Section from '../../../components/Section';
 import StatusView from '../../../components/StatusView';
 import { ShareIcon } from '../../../components/Icon';
 import { getReportDetail } from '../../../api/reports';
@@ -44,10 +68,13 @@ import { path } from '../../../routes/paths';
 import { formatComparisonLabel, formatDelta, formatHalf } from '../../../utils/report';
 import ReportShareSheet from './ReportShareSheet';
 import styles from './ReportDetailPage.module.css';
+import type { ReactNode } from 'react';
 import type {
   ReportCharacterAxis,
   ReportCharacterCard,
+  ReportComparison,
   ReportDetail,
+  ReportKeyword,
   ReportShare,
 } from '../../../types/report';
 
@@ -55,6 +82,13 @@ type Props = {
   /** `film` 3.4(2.1 · 3.3에서 옴) · `my` 7.4(7.3에서 옴) */
   from: 'film' | 'my';
 };
+
+/** 뒤집힌 칸이 앞면으로 되돌아오는 데 걸리는 시간. 인화지의 `--flip-duration`과 맞춘다 */
+const FLIP_BACK_MS = 560;
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
 
 function nextFrameOrFallback(): Promise<void> {
   return new Promise((resolve) => {
@@ -81,6 +115,7 @@ export default function ReportDetailPage({ from }: Props) {
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
   const [sharing, setSharing] = useState(false);
+  const [flipped, setFlipped] = useState<ReportCutKind[]>([]);
   const fourCutRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -125,7 +160,17 @@ export default function ReportDetailPage({ from }: Props) {
     }
   }
 
+  function toggleFlip(kind: ReportCutKind) {
+    setFlipped((list) => (list.includes(kind) ? list.filter((k) => k !== kind) : [...list, kind]));
+  }
+
   async function prepareImage() {
+    // 저장되는 것은 앞면 넷이다. 뒤집힌 칸이 있으면 되돌아가는 것을 기다린 뒤 찍는다
+    if (flipped.length > 0) {
+      setFlipped([]);
+      await wait(FLIP_BACK_MS);
+    }
+
     try {
       const profile = await getMyProfile();
       if (profile.nickname !== nickname) {
@@ -177,57 +222,18 @@ export default function ReportDetailPage({ from }: Props) {
       />
 
       <div className={styles.page}>
-        {/* 4컷. 인화지가 화면에서 유일한 어두운 블록이다 */}
+        {/* 4컷. 인화지가 화면에서 유일한 어두운 블록이고, 설명은 그 칸 뒷면에 있다 */}
         <div ref={fourCutRef} className={styles.fourCut}>
           <ReportFourCut
             cuts={report.fourCut}
             owner={nickname}
             createdAt={report.createdAt}
             characterCode={report.characterCard?.code}
-            linkPeople
+            backs={cutBacks(report)}
+            flipped={flipped}
+            onFlip={toggleFlip}
           />
         </div>
-
-        <Section label="상세 리포트">
-          <div className={styles.card}>
-            <ShareGroup label="장르" shares={report.genreShares} />
-            <ShareGroup label="국가" shares={report.countryShares} />
-            <ShareGroup label="시대" shares={report.eraShares} />
-
-            <PeopleGroup label="감독" people={report.topDirectors} />
-            <PeopleGroup label="배우" people={report.topActors} />
-
-            {report.characterCard ? <CharacterGroup card={report.characterCard} /> : null}
-          </div>
-        </Section>
-
-        {report.keywords.length > 0 ? (
-          <Section label="취향 키워드">
-            <ul className={styles.keywords}>
-              {report.keywords.map((keyword) => (
-                <li key={keyword.code} className={styles.keyword}>
-                  <Chip>{keyword.label}</Chip>
-                  <span className={styles.rationale}>{keyword.rationale}</span>
-                </li>
-              ))}
-            </ul>
-          </Section>
-        ) : null}
-
-        {report.comparisons.length > 0 ? (
-          <Section label="지난 반기와 비교">
-            <ul className={styles.card}>
-              {report.comparisons.map((item) => (
-                <li key={item.label} className={styles.compare}>
-                  <span>{formatComparisonLabel(item.label, item.isNew)}</span>
-                  <span className={styles.delta} data-negative={item.delta < 0}>
-                    {formatDelta(item.delta, item.isNew)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </Section>
-        ) : null}
 
         <div className={styles.actions}>
           <Button variant="secondary" onClick={save}>
@@ -247,6 +253,94 @@ export default function ReportDetailPage({ from }: Props) {
         />
       ) : null}
     </>
+  );
+}
+
+/*
+ * 칸 넷의 뒷면. 그릴 값이 없는 칸은 주지 않는다 — 그 칸은 뒤집히지 않는 그림 칸으로 남는다.
+ *
+ * 뒷면 바탕이 어두우므로 색 토큰만 `.back`에서 다시 정의하고, `MeterRow` · `Chip` 같은 공용
+ * 컴포넌트는 그대로 쓴다(`ReportDetailPage.module.css`).
+ */
+function cutBacks(report: ReportDetail): Partial<Record<ReportCutKind, ReactNode>> {
+  const shareGroups = [
+    { label: '장르', shares: report.genreShares },
+    { label: '국가', shares: report.countryShares },
+    { label: '시대', shares: report.eraShares },
+  ].filter((group) => group.shares.length > 0);
+
+  const hasCharacter = Boolean(report.characterCard) || report.comparisons.length > 0;
+
+  return {
+    genre:
+      shareGroups.length > 0 || report.keywords.length > 0 ? (
+        <Back>
+          {shareGroups.map((group) => (
+            <ShareGroup key={group.label} label={group.label} shares={group.shares} />
+          ))}
+          {report.keywords.length > 0 ? <KeywordGroup keywords={report.keywords} /> : null}
+        </Back>
+      ) : undefined,
+
+    director:
+      report.topDirectors.length > 0 ? (
+        <Back>
+          <PeopleGroup label="감독" people={report.topDirectors} />
+        </Back>
+      ) : undefined,
+
+    actor:
+      report.topActors.length > 0 ? (
+        <Back>
+          <PeopleGroup label="배우" people={report.topActors} />
+        </Back>
+      ) : undefined,
+
+    character: hasCharacter ? (
+      <Back>
+        {report.characterCard ? <CharacterGroup card={report.characterCard} /> : null}
+        {report.comparisons.length > 0 ? <ComparisonGroup items={report.comparisons} /> : null}
+      </Back>
+    ) : undefined,
+  };
+}
+
+/** 뒷면 한 장. 어두운 바탕에 맞춰 색 토큰을 바꾸는 자리다 */
+function Back({ children }: { children: ReactNode }) {
+  return <div className={styles.back}>{children}</div>;
+}
+
+function KeywordGroup({ keywords }: { keywords: ReportKeyword[] }) {
+  return (
+    <div className={styles.group}>
+      <h3 className={styles.groupLabel}>취향 키워드</h3>
+      <ul className={styles.keywords}>
+        {keywords.map((keyword) => (
+          <li key={keyword.code} className={styles.keyword}>
+            <Chip>{keyword.label}</Chip>
+            <span className={styles.rationale}>{keyword.rationale}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ComparisonGroup({ items }: { items: ReportComparison[] }) {
+  return (
+    <div className={styles.group}>
+      <h3 className={styles.groupLabel}>지난 반기와 비교</h3>
+      <ul className={styles.compares}>
+        {items.map((item) => (
+          <li key={item.label} className={styles.compare}>
+            <span>{formatComparisonLabel(item.label, item.isNew)}</span>
+            <span className={styles.delta} data-negative={item.delta < 0}>
+              {formatDelta(item.delta, item.isNew)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

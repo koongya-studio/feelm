@@ -31,6 +31,9 @@
   --small-size: max(calc(var(--text-floor, 1) * 11px), calc(var(--u) * 12));
   --label-size: max(calc(var(--text-floor, 1) * 12px), calc(var(--u) * 15));
   --caption-size: max(calc(var(--text-floor, 1) * 12px), calc(var(--u) * 14));
+  /* 뒤집는 데 걸리는 시간. 앞뒤 면이 바뀌는 순간이 그 절반이다 */
+  --flip-duration: 520ms;
+  --flip-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
   /* 라벨 · 한글 이름이 차지하는 높이. 큰 이름 상자와 대표작이 이 안으로 들어오지 않는다 */
   --label-room: calc(var(--u) * 14 + var(--label-size) * 1.2);
   --caption-room: calc(var(--u) * 14 + var(--caption-size) * 1.2);
@@ -109,24 +112,136 @@
   list-style: none;
 }
 
-.cut {
+/*
+ * 칸 한 자리. 앞면은 늘 시안의 246u지만 뒤집으면 뒷면 높이(`--back-height`)까지 늘어난다.
+ * 늘어나는 것은 이 자리뿐이라 사진은 그대로다.
+ */
+.cell {
   position: relative;
+  height: calc(var(--u) * 246);
+  perspective: calc(var(--u) * 1400);
+  transition: height var(--flip-duration) var(--flip-ease);
+}
+
+.cell[data-flipped] {
+  height: var(--back-height, calc(var(--u) * 246));
+}
+
+.flipper {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform var(--flip-duration) var(--flip-ease);
+}
+
+.cell[data-flipped] .flipper {
+  transform: rotateY(180deg);
+}
+
+/*
+ * 앞뒤 면. `backface-visibility`만으로도 뒤통수는 가려지지만, 인화지를 그대로 그림으로
+ * 저장하는 길(업무 -557)이 있어 `visibility`로도 한 번 더 숨긴다. 전환을 절반만큼 늦춰
+ * 돌아가는 동안에는 보이던 면이 계속 보인다.
+ */
+.cut,
+.back {
+  backface-visibility: hidden;
+  transition: visibility 0s linear calc(var(--flip-duration) / 2);
+}
+
+.cell[data-flipped] .cut,
+.cell:not([data-flipped]) .back {
+  visibility: hidden;
+}
+
+.cut {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
   height: calc(var(--u) * 246);
   overflow: hidden;
   background: #111;
   isolation: isolate;
 }
 
-.personSearchLink {
+/* 뒷면. 내용만큼 길어지고 앞면보다 짧아지지는 않는다 */
+.back {
   position: absolute;
-  z-index: 6;
-  inset: calc(var(--u) * 6);
-  border-radius: calc(var(--u) * 3);
+  top: 0;
+  left: 0;
+  width: 100%;
+  min-height: calc(var(--u) * 246);
+  box-sizing: border-box;
+  /* 아래는 오른쪽 아래 단서(`.flipHint`)가 마지막 줄을 덮지 않을 만큼 띄운다 */
+  padding: calc(var(--u) * 34) calc(var(--u) * 14) calc(var(--u) * 42);
+  background: #16161a;
+  transform: rotateY(180deg);
 }
 
-.personSearchLink:focus-visible {
-  outline-color: #fff;
-  outline-offset: calc(var(--u) * -2);
+.backLabel {
+  position: absolute;
+  top: calc(var(--u) * 10);
+  left: calc(var(--u) * 12);
+  color: var(--red);
+  font-size: var(--label-size);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+}
+
+/* 칸 전체를 덮는 누름 자리. 돌아가는 면 바깥이라 뒤집힌 뒤에도 그대로 눌린다 */
+.flipButton {
+  position: absolute;
+  z-index: 6;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  inset: 0;
+}
+
+.flipButton:focus-visible {
+  outline: calc(var(--u) * 3) solid var(--red);
+  outline-offset: calc(var(--u) * -3);
+}
+
+/* 뒤집힌다는 단서. 오른쪽 아래의 작은 화살표 하나다 */
+.flipHint {
+  position: absolute;
+  right: calc(var(--u) * 10);
+  bottom: calc(var(--u) * 10);
+  display: flex;
+  width: calc(var(--u) * 26);
+  height: calc(var(--u) * 26);
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  transition: transform var(--flip-duration) var(--flip-ease);
+}
+
+.flipHint svg {
+  width: calc(var(--u) * 15);
+  height: calc(var(--u) * 15);
+  fill: currentcolor;
+}
+
+.cell[data-flipped] .flipHint {
+  transform: rotate(-180deg);
+}
+
+/* 움직임을 줄여 달라고 한 사람에게는 돌리지 않고 바로 바꾼다 */
+@media (prefers-reduced-motion: reduce) {
+  .cell,
+  .flipper,
+  .cut,
+  .back,
+  .flipHint {
+    transition: none;
+  }
 }
 
 .label,

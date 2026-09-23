@@ -170,6 +170,14 @@ function renderApp(entries: string[]) {
 
 const location = () => screen.getByTestId('location').textContent;
 
+/*
+ * 3.4 · 7.4의 설명은 4컷 칸 뒷면에 있다(업무 -812). 뒤집기 전에는 `visibility: hidden`이라
+ * 역할 질의에 잡히지 않으므로, 뒷면을 보는 검사는 그 칸을 먼저 뒤집는다.
+ */
+function flipCut(label: string) {
+  fireEvent.click(screen.getByRole('button', { name: `${label} 설명 보기` }));
+}
+
 describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
   it('안 본 리포트가 있으면 발급 화면을 거쳐 상세로 간다', async () => {
     renderApp([ROUTE_PATTERN.film]);
@@ -196,10 +204,14 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
     expect(location()).toBe('/film');
   });
 
-  it('상세에 국가 비율과 지난 반기 비교가 나오고, 키워드 칸은 숨는다', async () => {
+  it('01 장르 뒷면에 국가 비율이, 04 캐릭터 뒷면에 지난 반기 비교가 있다', async () => {
     renderApp(['/reports/301']);
 
-    expect(await screen.findByRole('progressbar', { name: '한국' })).toHaveAttribute(
+    await screen.findByText('01 장르');
+    flipCut('01 장르');
+    flipCut('04 캐릭터');
+
+    expect(screen.getByRole('progressbar', { name: '한국' })).toHaveAttribute(
       'aria-valuenow',
       '42',
     );
@@ -212,32 +224,41 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
     expect(screen.getByText('다크초코')).toBeInTheDocument();
   });
 
-  it('4컷과 상세 목록의 감독·배우 이름을 같은 이름의 검색으로 연결한다', async () => {
+  /*
+   * 인물 검색으로 가는 길은 **뒷면 목록의 이름 하나뿐이다**(업무 -812). 업무 -557은 감독 · 배우
+   * 칸 전체를 검색 링크로 덮었는데, 그 자리를 뒤집기가 쓰게 되어 칸 하나가 두 동작을 가질 수
+   * 없게 됐다. 누르면 뒤집히는 쪽으로 통일하고(사용자 결정 2026-09-23) 검색은 뒷면이 맡는다 —
+   * 1위 한 명만이 아니라 목록의 세 명 모두로 갈 수 있어 오히려 넓어진다.
+   */
+  it('뒷면 목록의 감독·배우 이름을 같은 이름의 검색으로 연결한다', async () => {
     renderApp(['/reports/301']);
 
-    const directorCut = await screen.findByRole('link', { name: '웨스 앤더슨 검색' });
-    const directorList = screen.getByRole('link', { name: '웨스 앤더슨' });
-    const actorCut = screen.getByRole('link', { name: '엠마 스톤 검색' });
+    await screen.findByText('02 감독');
+    flipCut('02 감독');
+    flipCut('03 배우');
+
+    // 앞면을 덮던 칸 전체 검색 링크는 없다. 앞면을 누르면 뒤집힌다
+    expect(screen.queryByRole('link', { name: '웨스 앤더슨 검색' })).toBeNull();
+
+    expect(screen.getByRole('link', { name: '웨스 앤더슨' })).toHaveAttribute(
+      'href',
+      '/search?q=%EC%9B%A8%EC%8A%A4%20%EC%95%A4%EB%8D%94%EC%8A%A8',
+    );
+
     const actorList = screen.getByRole('link', { name: '엠마 스톤' });
+    expect(actorList).toHaveAttribute('href', '/search?q=%EC%97%A0%EB%A7%88%20%EC%8A%A4%ED%86%A4');
 
-    [directorCut, directorList].forEach((link) =>
-      expect(link).toHaveAttribute(
-        'href',
-        '/search?q=%EC%9B%A8%EC%8A%A4%20%EC%95%A4%EB%8D%94%EC%8A%A8',
-      ),
-    );
-    [actorCut, actorList].forEach((link) =>
-      expect(link).toHaveAttribute('href', '/search?q=%EC%97%A0%EB%A7%88%20%EC%8A%A4%ED%86%A4'),
-    );
-
-    fireEvent.click(actorCut);
+    fireEvent.click(actorList);
     expect(location()).toBe('/search?q=%EC%97%A0%EB%A7%88%20%EC%8A%A4%ED%86%A4');
   });
 
   it('취향 키워드는 근거와 함께 그리고, 비면 칸째 숨긴다', async () => {
     renderApp(['/reports/301']);
 
-    expect(await screen.findByText('취향 키워드')).toBeInTheDocument();
+    await screen.findByText('01 장르');
+    flipCut('01 장르');
+
+    expect(screen.getByText('취향 키워드')).toBeInTheDocument();
     expect(screen.getByText('웨스 앤더슨 몰아보기')).toBeInTheDocument();
     expect(screen.getByText('이번 반기에 블루베리 프레임 4개 추가')).toBeInTheDocument();
     expect(screen.getByText('이번 반기 평균 ★4.3')).toBeInTheDocument();
@@ -250,8 +271,9 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
     expect(await screen.findByText('04 캐릭터')).toBeInTheDocument();
     expect(screen.getByText('준비 중')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '캐릭터' })).toBeNull();
-    // 나머지 칸과 상세는 그대로 그린다
+    // 나머지 칸과 뒷면은 그대로 그린다
     expect(screen.getByText('01 장르')).toBeInTheDocument();
+    flipCut('02 감독');
     expect(screen.getByRole('heading', { name: '감독' })).toBeInTheDocument();
   });
 
@@ -268,8 +290,11 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
 
     renderApp(['/reports/301']);
 
-    expect(await screen.findByRole('heading', { name: '캐릭터' })).toBeInTheDocument();
-    // 4컷의 04 칸과 상세의 캐릭터 칸에 한 번씩
+    await screen.findByText('04 캐릭터');
+    flipCut('04 캐릭터');
+
+    expect(screen.getByRole('heading', { name: '캐릭터' })).toBeInTheDocument();
+    // 4컷의 04 칸과 뒷면의 캐릭터 카드에 한 번씩
     expect(screen.getAllByText('안락의자 탐정')).toHaveLength(2);
     expect(screen.getByText('RDMV')).toBeInTheDocument();
     expect(screen.getByText('움직이지 않고 사건만 잔뜩 봤습니다')).toBeInTheDocument();
@@ -294,7 +319,10 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
 
     renderApp(['/reports/301']);
 
-    expect(await screen.findByRole('heading', { name: '캐릭터' })).toBeInTheDocument();
+    await screen.findByText('04 캐릭터');
+    flipCut('04 캐릭터');
+
+    expect(screen.getByRole('heading', { name: '캐릭터' })).toBeInTheDocument();
     expect(screen.queryByText(/기준으로 뽑았어요/)).toBeNull();
   });
 
@@ -393,6 +421,31 @@ describe('3.4 → 3.5', () => {
     expect(getMyProfile).toHaveBeenCalledTimes(2);
   });
 
+  /*
+   * 저장되는 것은 앞면 넷이다(업무 -812). 뒤집어 둔 채로 저장하면 뒷면이 찍히므로 먼저 되돌린다.
+   */
+  it('칸을 뒤집어 둔 채 이미지로 저장하면 앞면으로 되돌린 뒤 찍는다', async () => {
+    renderApp(['/reports/301']);
+
+    await screen.findByText('01 장르');
+    flipCut('01 장르');
+    expect(screen.getByRole('button', { name: '01 장르 사진 보기' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+
+    const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
+    fireEvent.click(headerShare);
+    const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
+    fireEvent.click(sheet.getByRole('button', { name: '이미지로 저장' }));
+
+    await waitFor(() => expect(sheet.getByRole('status')).toHaveTextContent('이미지를 저장했어요'));
+    expect(screen.getByRole('button', { name: '01 장르 설명 보기' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  });
+
   it('프로필 조회가 먼저 실패해도 저장 시 다시 읽고 닉네임이 반영된 DOM만 캡처한다', async () => {
     vi.mocked(getMyProfile)
       .mockReset()
@@ -473,6 +526,8 @@ describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
 
     await screen.findByRole('heading', { name: '2025 상반기 취향 리포트' });
     expect(screen.queryByText('지난 반기와 비교')).toBeNull();
+    // 뒷면이 없는 칸은 뒤집는 버튼도 없다
+    expect(screen.queryByRole('button', { name: '04 캐릭터 설명 보기' })).toBeNull();
   });
 
   it('최신 반기를 준비하는 중이고 공개된 리포트가 없으면 인화 중이라고 알린다', async () => {
