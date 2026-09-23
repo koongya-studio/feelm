@@ -105,10 +105,6 @@
   white-space: normal;
 }
 
-.reasonLabel {
-  color: var(--color-ink-muted);
-}
-
 /*
  * 상세로 가는 단서. 공통 포스터 단서(`PosterCue`)와 같은 동그라미를 상자 안에 작게 둔다.
  * 포스터에 마우스를 올리면 검정으로 채워진다.
