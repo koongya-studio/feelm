@@ -24,7 +24,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -32,7 +31,6 @@ import tools.jackson.databind.ObjectMapper;
 
 /** API-053·054: 파티 초대 수락·거절의 HTTP 및 동시성 계약 테스트. */
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
-@AutoConfigureMockMvc
 class PartyInvitationResponseApiContractTest extends SharedPostgresContractTest {
     private static final Instant CREATED_AT = Instant.parse("2026-09-01T00:00:00Z");
     private static final String AVATAR_KEY = "22222222-2222-2222-2222-222222222222.jpg";

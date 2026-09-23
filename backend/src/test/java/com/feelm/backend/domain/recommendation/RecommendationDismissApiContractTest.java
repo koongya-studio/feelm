@@ -33,20 +33,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 /** API-047: 실제 마이그레이션과 PostgreSQL을 사용하는 관심없음 HTTP 계약 테스트. */
-@SpringBootTest(
-        properties = {
-            "spring.flyway.enabled=true",
-            "spring.jpa.hibernate.ddl-auto=none",
-            "spring.task.scheduling.enabled=false"
-        })
-@AutoConfigureMockMvc
+@SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 @DisplayName("API-047 관심없음 처리")
 class RecommendationDismissApiContractTest extends SharedPostgresContractTest {
 
@@ -67,8 +59,8 @@ class RecommendationDismissApiContractTest extends SharedPostgresContractTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired TokenProvider tokens;
     @Autowired RecommendationDismissService recommendationDismissService;
-    @MockitoSpyBean RecommendationDismissRepository recommendationDismissRepository;
-    @MockitoSpyBean KafkaEventPublisher kafkaEventPublisherSpy;
+    @Autowired RecommendationDismissRepository recommendationDismissRepository;
+    @Autowired KafkaEventPublisher kafkaEventPublisherSpy;
 
     private ExecutorService executor;
 

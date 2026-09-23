@@ -14,12 +14,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.support.Acknowledgment;
 
-@SpringBootTest(
-        properties = {
-            "spring.flyway.enabled=true",
-            "spring.jpa.hibernate.ddl-auto=none",
-            "feelm.party.candidate-updated.consumer-enabled=false"
-        })
+@SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 class PartyCandidatePublicationIntegrationTest extends SharedPostgresContractTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired PartyCandidateUpdatedListener listener;

@@ -27,7 +27,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -39,7 +38,6 @@ import tools.jackson.databind.ObjectMapper;
 
 /** API-049·050: 실제 마이그레이션과 PostgreSQL을 사용하는 HTTP 계약 테스트. */
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
-@AutoConfigureMockMvc
 class PartyApiContractTest extends SharedPostgresContractTest {
     private static final String PATH = "/api/v1/parties";
     private static final String AVATAR_KEY = "11111111-1111-1111-1111-111111111111.jpg";

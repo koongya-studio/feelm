@@ -34,7 +34,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -44,13 +43,7 @@ import org.springframework.test.web.servlet.ResultActions;
  * API-058 다시 받기(S15P21E106-792). 노출 커서는 {@code exposed_at} 시각 동일성으로 구분한 묶음이며, 일반 조회는 묶음을 그대로 돌려주고
  * {@code refresh=true}만 미노출 유효 후보로 다음 묶음을 만든다.
  */
-@SpringBootTest(
-        properties = {
-            "spring.flyway.enabled=true",
-            "spring.jpa.hibernate.ddl-auto=none",
-            "spring.task.scheduling.enabled=false"
-        })
-@AutoConfigureMockMvc
+@SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 class PartyRecommendationRefreshApiContractTest extends SharedPostgresContractTest {
     private static final Instant GENERATED_AT = Instant.parse("2026-09-17T05:21:00Z");
     private static final long FIRST_MOVIE = 101;

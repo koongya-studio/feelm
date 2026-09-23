@@ -14,7 +14,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-@SpringBootTest(properties = {"springdoc.api-docs.enabled=true", "feelm.auth.mock.enabled=false"})
+@SpringBootTest(
+        properties = {
+            "springdoc.api-docs.enabled=true",
+            "springdoc.swagger-ui.enabled=true",
+            "feelm.auth.mock.enabled=false"
+        })
 @AutoConfigureMockMvc
 @SharedTestRuntime
 class OttRecommendationOpenApiContractTest {

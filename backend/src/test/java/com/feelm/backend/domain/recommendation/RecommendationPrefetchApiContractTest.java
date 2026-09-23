@@ -38,7 +38,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -55,10 +54,8 @@ import org.springframework.test.web.servlet.ResultActions;
         properties = {
             "spring.flyway.enabled=true",
             "spring.jpa.hibernate.ddl-auto=none",
-            "spring.task.scheduling.enabled=false",
             "feelm.recommendation.buffer.prefetch-threshold=5"
         })
-@AutoConfigureMockMvc
 @DisplayName("API-045 추천 버퍼 프리페치와 서빙 회차 선택")
 class RecommendationPrefetchApiContractTest extends SharedPostgresContractTest {
 

@@ -3,6 +3,7 @@ package com.feelm.backend.infrastructure.mail;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
+import com.feelm.backend.support.SharedTestRuntime;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -38,6 +39,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 @DisplayName("계정 메일 디스패처 — 포화와 실패")
 @ExtendWith(OutputCaptureExtension.class)
 @ResourceLock("backend-output-capture")
+@SharedTestRuntime
 class MailDispatcherTest {
 
     private static final Duration IDLE_TIMEOUT = Duration.ofSeconds(5);

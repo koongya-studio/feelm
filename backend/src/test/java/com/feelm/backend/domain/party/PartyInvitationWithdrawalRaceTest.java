@@ -6,8 +6,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedPostgresContractTest;
-import com.feelm.backend.support.SharedRedisContainer;
-import com.redis.testcontainers.RedisContainer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.Timestamp;
@@ -29,8 +27,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -54,12 +50,8 @@ import tools.jackson.databind.ObjectMapper;
  * Hikari 풀을 공유한다.
  */
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
-@AutoConfigureMockMvc
 @DisplayName("파티 초대 생성과 탈퇴의 교차 실행 — API-051")
 class PartyInvitationWithdrawalRaceTest extends SharedPostgresContractTest {
-
-    @ServiceConnection static final RedisContainer REDIS = SharedRedisContainer.instance();
-
     private static final Instant CREATED_AT = Instant.parse("2026-09-01T00:00:00Z");
     private static final String PASSWORD = "P@ssw0rd!42";
     private static final long OWNER = 10;

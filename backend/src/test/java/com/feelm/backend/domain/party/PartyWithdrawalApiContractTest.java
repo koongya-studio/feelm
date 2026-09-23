@@ -9,8 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedPostgresContractTest;
-import com.feelm.backend.support.SharedRedisContainer;
-import com.redis.testcontainers.RedisContainer;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -20,8 +18,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -37,8 +33,7 @@ import org.springframework.test.web.servlet.ResultActions;
  * <p>규칙 자체(승계 순서·종료 사유·초대 무효화)는 파티 나가기(API-055)의 계약 테스트가 이미 고정한다. 여기서 보는 것은 탈퇴가 그 규칙에 <b>도달하는지</b>와
  * 여러 파티·양방향 초대처럼 탈퇴에만 있는 상황이다.
  *
- * <p>같은 패키지의 다른 파티 계약 테스트와 달리 Redis 컨테이너를 함께 띄운다. 탈퇴(API-013)는 파티 정리에 닿기 전에 리프레시 토큰을 폐기하며 Redis를
- * 거치기 때문이다. 로컬에 6379가 떠 있으면 이것 없이도 통과하지만 CI에는 Redis가 없어 탈퇴 요청이 통째로 500이 된다.
+ * <p>탈퇴(API-013)는 파티 정리에 닿기 전에 리프레시 토큰을 폐기하며 Redis를 거친다. 공유 Redis 연결은 상위 클래스가 제공한다.
  *
  * <p>{@code @SpringBootTest}의 속성 집합은 {@link
  * com.feelm.backend.domain.user.UserWithdrawalConcurrencyTest}· {@code
@@ -46,12 +41,8 @@ import org.springframework.test.web.servlet.ResultActions;
  * PostgreSQL의 연결 상한에 걸리고, 그때 깨지는 것은 이 클래스가 아니라 무관한 테스트다.
  */
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
-@AutoConfigureMockMvc
 @DisplayName("회원 탈퇴의 파티 처리 — API-013")
 class PartyWithdrawalApiContractTest extends SharedPostgresContractTest {
-
-    @ServiceConnection static final RedisContainer REDIS = SharedRedisContainer.instance();
-
     private static final Instant CREATED_AT = Instant.parse("2026-09-01T00:00:00Z");
     private static final String WITHDRAWAL_PATH = "/api/v1/users/me";
     private static final String PASSWORD = "P@ssw0rd!42";
