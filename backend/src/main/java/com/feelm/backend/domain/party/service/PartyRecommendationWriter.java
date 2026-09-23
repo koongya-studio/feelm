@@ -76,7 +76,7 @@ class PartyRecommendationWriter {
                 recommendationRepository
                         .findExistingSet(partyId, candidates.inputId(), candidates.modelVersion())
                         .orElseGet(() -> createSet(partyId, currentMemberIds, candidates));
-        List<StoredItem> items = serve(set.id(), currentMemberIds, size, refresh);
+        List<StoredItem> items = serve(partyId, set.id(), currentMemberIds, size, refresh);
         boolean hasNext = recommendationRepository.hasUnexposedEligible(set.id(), currentMemberIds);
         return response(partyId, set, items, hasNext);
     }
@@ -85,14 +85,15 @@ class PartyRecommendationWriter {
      * 노출 이력이 없는 세트는 첫 묶음을 만들고, 다시 받기는 미노출 유효 후보로 다음 묶음을 만든다. 그 밖의 조회와 후보를 다 쓴 다시 받기는 현재 묶음을 저장된 그대로
      * 돌려준다.
      */
-    private List<StoredItem> serve(long setId, List<Long> memberIds, int size, boolean refresh) {
+    private List<StoredItem> serve(
+            long partyId, long setId, List<Long> memberIds, int size, boolean refresh) {
         Optional<OffsetDateTime> bundleExposedAt =
                 recommendationRepository.findLatestExposedAt(setId);
         if (refresh || bundleExposedAt.isEmpty()) {
             List<StoredItem> next =
                     recommendationRepository.findUnexposedEligible(setId, memberIds, size);
             if (!next.isEmpty()) {
-                recommendationRepository.expose(next, nextExposureTime(bundleExposedAt));
+                recommendationRepository.expose(partyId, next, nextExposureTime(bundleExposedAt));
                 return next;
             }
             if (bundleExposedAt.isEmpty()) {

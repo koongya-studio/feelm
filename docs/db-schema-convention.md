@@ -97,6 +97,7 @@ scale 없는 `numeric`으로 입력값을 그대로 검사한다. 기존 정수 
 | SET NULL | `recommendation_items` → `user_movie_dismissals.recommendation_item_id` | 아이템이 사라져도 관심없음 이력은 남는다 |
 | CASCADE | `users` → `user_movie_exposures` | 계정에 종속된 추천 이력. 탈퇴는 상태 전이라 평상시 발동하지 않고 개인정보 삭제 요청에 대비해 정의만 둔다 |
 | CASCADE | `recommendation_items`, `recommendation_sets` → `user_movie_exposures` | 이력 행은 영화별 최신 노출 항목을 가리키는 포인터라 항목·세트가 없으면 가리킬 곳이 없다. 삭제 뒤 이전 노출로 자동 복원되지 않으므로 `V202609211000`의 멱등 백필을 다시 실행해 복원한다 |
+| CASCADE | `parties`, `recommendation_items`, `recommendation_sets` → `party_movie_exposures` | 파티 추천 이력(API-083)의 정본. `user_movie_exposures`와 같은 이유로 포인터 행이며, 삭제 뒤에는 `V202609231400`의 멱등 백필을 다시 실행해 복원한다 |
 | RESTRICT | 위 CASCADE 예외를 제외한 기준정보 참조(`movies`, `genres`, `people`, `otts`, `popcorn_flavors`) | 기준정보는 삭제하지 않는다 |
 | RESTRICT | `ratings.watch_record_id` → `watch_records` | 감상 기록은 삭제하지 않고 상태만 전이한다 |
 

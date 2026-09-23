@@ -69,8 +69,9 @@ class PartyRecommendationRefreshApiContractTest extends SharedPostgresContractTe
         reset(inputReader, candidateReader);
         jdbc.execute(
                 "TRUNCATE TABLE user_movie_dismissals, ratings, watch_records,"
-                        + " recommendation_items, recommendation_sets, party_members, parties,"
-                        + " movie_ott_providers, movies, otts, users RESTART IDENTITY CASCADE");
+                        + " party_movie_exposures, recommendation_items, recommendation_sets,"
+                        + " party_members, parties, movie_ott_providers, movies, otts, users"
+                        + " RESTART IDENTITY CASCADE");
         user(10);
         user(20);
         ott(1, "NETFLIX");
@@ -328,6 +329,103 @@ class PartyRecommendationRefreshApiContractTest extends SharedPostgresContractTe
                         Long.class);
         assertThat(movieIds(plain(partyId, 3)))
                 .containsExactlyElementsOf(latestBundle.stream().map(Long::intValue).toList());
+    }
+
+    /** 노출과 같은 트랜잭션에서 파티 추천 이력 표가 갱신된다(S15P21E106-815). 다시 받기의 다음 묶음도 같은 파티 행에 누적된다. */
+    @Test
+    @DisplayName("815-T13 노출할 때마다 party_movie_exposures가 같은 트랜잭션에서 갱신된다")
+    void recordsPartyExposureHistoryWithEveryExposure() throws Exception {
+        long partyId = party();
+        stub(partyId, movies(FIRST_MOVIE, FIRST_MOVIE + 9));
+
+        String first = body(plain(partyId, 3).andExpect(status().isOk()));
+        String second = body(refresh(partyId, 3).andExpect(status().isOk()));
+
+        List<Long> recorded =
+                jdbc.queryForList(
+                        "SELECT movie_id FROM party_movie_exposures WHERE party_id=? ORDER BY movie_id",
+                        Long.class,
+                        partyId);
+        List<Long> shown = new java.util.ArrayList<>();
+        movieIds(first).forEach(id -> shown.add(id.longValue()));
+        movieIds(second).forEach(id -> shown.add(id.longValue()));
+        assertThat(recorded).containsExactlyInAnyOrderElementsOf(shown);
+        // 두 묶음의 노출 시각이 그대로 이력에 실려야 한다(같은 트랜잭션, 항목 행에서 읽음).
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(DISTINCT exposed_at) FROM party_movie_exposures"
+                                        + " WHERE party_id=?",
+                                Long.class,
+                                partyId))
+                .isEqualTo(2);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM party_movie_exposures e"
+                                        + " JOIN recommendation_items i ON i.id=e.recommendation_item_id"
+                                        + " WHERE e.party_id=? AND i.exposed_at IS NULL",
+                                Long.class,
+                                partyId))
+                .isZero();
+    }
+
+    /**
+     * 가드({@code set_id < EXCLUDED.set_id})의 거절 경로(S15P21E106-815 리뷰 B-2). 파티원이 나갔다 돌아오면 입력이 이전 값으로
+     * 돌아가 예전 세트가 다시 서빙된다. 그 세트가 노출한 영화 중 더 새 세트에 이미 기록된 영화는 이력 위치가 바뀌지 않고, 나머지는 예전 세트로 기록된다. 응답은
+     * 영향받지 않는다.
+     */
+    @Test
+    @DisplayName("815-T15 예전 세트가 다시 서빙돼도 이력은 더 새 세트의 노출을 유지한다")
+    void keepsNewerExposureWhenOlderSetIsReServed() throws Exception {
+        long partyId = party();
+        PartyInputSnapshot input = input();
+        String revertedInputId = PartyInputId.from(partyId, input);
+        long olderSet = legacySet(partyId, revertedInputId);
+        for (long movieId = 101; movieId <= 105; movieId++) {
+            legacyItem(olderSet, movieId, (int) (movieId - 100), null);
+        }
+        long newerSet = legacySet(partyId, "input-while-member-c-joined");
+        OffsetDateTime newerExposedAt = OffsetDateTime.parse("2026-09-18T00:00:00Z");
+        legacyItem(newerSet, 101, 1, newerExposedAt);
+        long newerItem =
+                jdbc.queryForObject(
+                        "SELECT id FROM recommendation_items WHERE set_id=? AND movie_id=101",
+                        Long.class,
+                        newerSet);
+        jdbc.update(
+                "INSERT INTO party_movie_exposures"
+                        + " (party_id,movie_id,recommendation_item_id,set_id,exposed_at) VALUES (?,?,?,?,?)",
+                partyId,
+                101,
+                newerItem,
+                newerSet,
+                newerExposedAt);
+        when(inputReader.read(List.of(10L, 20L))).thenReturn(input);
+        when(candidateReader.read(partyId))
+                .thenReturn(snapshot(partyId, revertedInputId, "v1", movies(101, 105)));
+
+        assertThat(movieIds(plain(partyId, 3).andExpect(status().isOk())))
+                .containsExactly(101, 102, 103);
+
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT set_id FROM party_movie_exposures WHERE party_id=? AND movie_id=101",
+                                Long.class,
+                                partyId))
+                .isEqualTo(newerSet);
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT set_id FROM party_movie_exposures"
+                                        + " WHERE party_id=? AND movie_id IN (102,103) ORDER BY movie_id",
+                                Long.class,
+                                partyId))
+                .containsExactly(olderSet, olderSet);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM recommendation_items"
+                                        + " WHERE set_id=? AND exposed_at IS NOT NULL",
+                                Long.class,
+                                olderSet))
+                .isEqualTo(3);
     }
 
     @Test
