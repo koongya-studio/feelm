@@ -9,6 +9,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -40,6 +41,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.support.Acknowledgment;
@@ -260,13 +262,51 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
     @Test
     @DisplayName("T2 기본 추천을 반복 조회해도 다음 버퍼를 소비하지 않는다")
     void returnsSameInitialItemsIdempotently() throws Exception {
-        getRecommendations(USER).andExpect(status().isOk());
+        String first =
+                getRecommendations(USER)
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        List<java.util.Map<String, Object>> itemExposures =
+                jdbc.queryForList(
+                        "SELECT id, exposed_at FROM recommendation_items"
+                                + " WHERE exposed_at IS NOT NULL ORDER BY id");
+        List<java.util.Map<String, Object>> exposureHistory =
+                jdbc.queryForList(
+                        "SELECT movie_id, recommendation_item_id, set_id, exposed_at"
+                                + " FROM user_movie_exposures WHERE user_id=? ORDER BY movie_id",
+                        USER);
+
+        String second =
+                getRecommendations(USER)
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+
+        assertThat(second).isEqualTo(first);
+        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1003L, 1005L, 1006L, 1010L);
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT id, exposed_at FROM recommendation_items"
+                                        + " WHERE exposed_at IS NOT NULL ORDER BY id"))
+                .containsExactlyElementsOf(itemExposures);
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT movie_id, recommendation_item_id, set_id, exposed_at"
+                                        + " FROM user_movie_exposures"
+                                        + " WHERE user_id=? ORDER BY movie_id",
+                                USER))
+                .containsExactlyElementsOf(exposureHistory);
+    }
+
+    @Test
+    @DisplayName("추천 조회 응답을 저장하지 않도록 캐시 금지 헤더를 보낸다")
+    void sendsNoStoreCacheControlHeader() throws Exception {
         getRecommendations(USER)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.items[0].recommendationItemId").value(1001))
-                .andExpect(jsonPath("$.items[5].recommendationItemId").value(1010));
-
-        assertThat(exposedIds()).containsExactly(1001L, 1002L, 1003L, 1005L, 1006L, 1010L);
+                .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"));
     }
 
     @Test
