@@ -11,8 +11,8 @@
  *   취향 발견 카드에만(사용자 지시 2026-09-18)
  * - 추천 이유 상자: left 6 right 6 bottom 6
  *
- * 추천 이유 상자는 와이어프레임에서 유형별로 다르게 그려져 있다. 취향 맞춤 카드는
- * `추천 이유:` 라벨과 한 줄, 취향 발견 카드는 라벨 없이 문장 전체다. 그대로 따른다.
+ * 추천 이유 상자는 API-045의 `reason.summary`만 표시한다(업무 -822). `추천 이유:` 같은
+ * 고정 라벨을 덧붙이지 않아 서버가 확정한 사용자용 문장을 그대로 읽을 수 있게 한다.
  *
  * **배지는 취향 발견 카드의 `새로운 맛` 하나다**(사용자 지시 2026-09-18, 업무 -672).
  * 섹션 이름표를 뺐으므로 어느 카드가 새로운 맛을 여는 추천인지는 이 배지가 말한다. 취향 맞춤
@@ -124,10 +124,7 @@ export default function RecommendationCard({
       ) : null}
 
       <p className={styles.reason} data-multiline={isDiscovery}>
-        <span className={styles.reasonText}>
-          {isDiscovery ? null : <span className={styles.reasonLabel}>추천 이유: </span>}
-          {reason.summary}
-        </span>
+        <span className={styles.reasonText}>{reason.summary}</span>
         <span className={styles.reasonCue} aria-hidden="true">
           <ChevronRightIcon />
         </span>
