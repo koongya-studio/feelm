@@ -34,7 +34,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -46,13 +45,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
  * S15P21E106-804. 추천 이유 보강이 항목마다 별도 커밋하는지, 그래서 서빙 조회와 잠금 순서가 반대여도 교착이 성립하지 않는지 실제 PostgreSQL 잠금으로
  * 확인한다.
  */
-@SpringBootTest(
-        properties = {
-            "spring.flyway.enabled=true",
-            "spring.jpa.hibernate.ddl-auto=none",
-            "spring.task.scheduling.enabled=false"
-        })
-@AutoConfigureMockMvc
+@SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 @DisplayName("추천 이유 보강의 항목 단위 커밋과 서빙 잠금 순서")
 class RecommendationReasonSnapshotWriterContractTest extends SharedPostgresContractTest {
 

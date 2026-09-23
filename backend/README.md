@@ -477,13 +477,19 @@ PostgreSQL·Redis 기반 계약 테스트는 테스트 클래스마다 컨테이
 공유 실행 환경을 사용합니다. 컨테이너 주소가 고정돼야 같은 Spring 설정을 사용하는 테스트가
 ApplicationContext를 재사용할 수 있습니다.
 
-- PostgreSQL 계약 테스트는 `SharedPostgresContractTest`를 상속합니다.
-- Redis는 `SharedRedisContainer.instance()`를 `@ServiceConnection`에 연결하고, 각 테스트
-  시작 시 `SharedRedisState.clear()`로 키를 비웁니다.
+- PostgreSQL 계약 테스트는 `SharedPostgresContractTest`를 상속합니다. 이 클래스가 MockMvc, 공유 Redis
+  연결, 테스트마다 Redis 비우기와 공용 spy를 함께 제공하므로 하위 클래스는 이를 다시 선언하지 않습니다.
+  공용 spy 타입은 `@Autowired`로 받아 stub하며, 하위 클래스에서 같은 타입을 `@MockitoBean`으로 바꿀 수
+  없습니다. 중간 지원 클래스를 거친 하위 클래스까지 재선언을 `SharedTestcontainerPolicyTest`가 실패시킵니다.
+- 공유 PostgreSQL을 쓰지 않는 테스트가 Redis를 쓰면 `SharedRedisContainer.instance()`를
+  `@ServiceConnection`에 연결하고, 각 테스트 시작 시 `SharedRedisState.clear()`로 키를 비웁니다.
 - fixture는 자신이 사용하는 DB 테이블을 테스트 전에 명시적으로 초기화합니다. 공유 DB에
   이전 클래스의 데이터가 남아 있어도 단독 실행과 같은 결과가 나와야 합니다.
-- `@SpringBootTest` 속성·web environment·`@Import`가 다르면 Context cache가 분리됩니다.
-  테스트 의미에 필요한 차이만 추가하고, 같은 설정은 공통 지원 클래스에 둡니다.
+- `@SpringBootTest` 속성·web environment·`@Import`·`@MockitoBean`/`@MockitoSpyBean` 조합·
+  `@AutoConfigureMockMvc` 속성이 다르면 Context cache가 분리됩니다. slice 테스트(`@WebMvcTest` 등)도 각자
+  context를 만듭니다. 테스트 의미에 필요한 차이만 추가하고, 같은 설정은 공통 지원 클래스에 둡니다.
+  context 종류가 cache 최대 크기(32)를 넘으면 제거된 context를 다시 만들므로, 새 조합을 추가하기 전에
+  기존 조합으로 쓸 수 있는지 먼저 확인합니다.
 - 캐시한 context는 다른 context로 넘어갈 때 `pause()`되고 다시 쓸 때 `restart()`됩니다. Spring Boot
   자동 설정이 켜진 context에서는 테스트 classpath의 `KafkaListenerTestStartupAutoConfiguration`이 이때도
   Kafka listener의 `autoStartup` 설정을 따르게 하므로, consumer를 쓰는 테스트는 해당 `consumer-enabled`
@@ -498,6 +504,8 @@ JUnit은 테스트 클래스 두 개를 병렬로 실행하되, 한 클래스 �
 `@SharedTestRuntime`을 직접 선언하거나 해당 annotation이 붙은 공통 지원 클래스를
 상속해야 합니다. 이 테스트들은 동일한 resource lock을 사용해 서로 순차 실행되고, 공유
 상태가 없는 단위 테스트와 database 단위로 격리된 migration 테스트만 병렬 실행됩니다.
+출력 캡처(`OutputCaptureExtension`) 테스트도 `@SharedTestRuntime`을 함께 선언합니다. Spring context가
+시작되면 로깅 설정을 다시 초기화하므로, 캡처 중에 다른 클래스의 context가 뜨면 기대한 로그가 빠집니다.
 `ParallelTestExecutionPolicyTest`는 병렬 설정과 Spring 통합 테스트의 lock 누락을 검사합니다.
 
 ### Windows

@@ -28,7 +28,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -36,13 +35,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 /** Candidate 알림이 저장 세트를 바꾸고 API 조회는 Redis 후보를 읽지 않는지 검증한다. */
-@SpringBootTest(
-        properties = {
-            "spring.flyway.enabled=true",
-            "spring.jpa.hibernate.ddl-auto=none",
-            "spring.task.scheduling.enabled=false"
-        })
-@AutoConfigureMockMvc
+@SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 @DisplayName("S15P21E106-585 Candidate 알림 기반 세트 전환")
 class RecommendationServingSyncAbTest extends SharedPostgresContractTest {
 

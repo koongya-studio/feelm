@@ -32,11 +32,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.JsonNode;
@@ -45,16 +43,10 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * API-024: 실제 마이그레이션과 PostgreSQL을 사용하는 초기 취향 제출 HTTP 계약 테스트.
  *
- * <p>아웃박스 폴링 주기를 길게 잡아 Relay가 검증 대상 행의 상태를 바꾸지 않게 한다. 테스트 환경에는 Broker가 없어 발행은 어차피 실패하지만, 재시도 기록으로
- * 행이 바뀌면 발행 여부 검증이 흔들린다.
+ * <p>아웃박스 Relay는 테스트 공통 설정({@code feelm.kafka.outbox.relay-enabled=false})으로 꺼져 있어 검증 대상 행의 상태를 바꾸지
+ * 않는다.
  */
-@SpringBootTest(
-        properties = {
-            "spring.flyway.enabled=true",
-            "spring.jpa.hibernate.ddl-auto=none",
-            "feelm.kafka.outbox.poll-interval=1h"
-        })
-@AutoConfigureMockMvc
+@SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 @DisplayName("API-024 초기 취향 제출")
 class OnboardingSubmitApiContractTest extends SharedPostgresContractTest {
 
@@ -70,14 +62,14 @@ class OnboardingSubmitApiContractTest extends SharedPostgresContractTest {
     @Autowired ObjectMapper objectMapper;
     @Autowired PasswordEncoder passwordEncoder;
 
-    /** T24에서 비밀번호 변경 트랜잭션을 사전 검사와 계정 행 잠금 사이에 세우기 위한 spy. 기본 동작은 실제 빈과 같다. */
-    @MockitoSpyBean PasswordResetTokenIssuer resetTokenIssuer;
-
     /**
-     * 이 컨텍스트에는 Redis가 없어 세션 폐기가 그대로면 비밀번호 변경이 500이 된다. 폐기 자체는 API-012 계약 테스트가 보고, 여기서 보는 것은 비밀번호
-     * 변경이 계정 행에 남기는 결과다. T24에서만 폐기를 비운다.
+     * T24에서 비밀번호 변경 트랜잭션을 사전 검사와 계정 행 잠금 사이에 세우기 위한 spy. {@link SharedPostgresContractTest}가 등록하며
+     * 기본 동작은 실제 빈과 같다.
      */
-    @MockitoSpyBean RefreshTokenService refreshTokenService;
+    @Autowired PasswordResetTokenIssuer resetTokenIssuer;
+
+    /** 세션 폐기 spy. 폐기 자체는 API-012 계약 테스트가 보고, 여기서 보는 것은 비밀번호 변경이 계정 행에 남기는 결과다. T24에서만 폐기를 비운다. */
+    @Autowired RefreshTokenService refreshTokenService;
 
     private ExecutorService executor;
 

@@ -28,16 +28,13 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
 /** API-026·027: 실제 마이그레이션과 PostgreSQL을 사용하는 내 구독 OTT HTTP 계약 테스트. */
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
-@AutoConfigureMockMvc
 @DisplayName("API-026·027 내 구독 OTT 조회·설정")
 class UserOttApiContractTest extends SharedPostgresContractTest {
 
@@ -53,7 +50,7 @@ class UserOttApiContractTest extends SharedPostgresContractTest {
     @Autowired TokenProvider tokens;
 
     /** T13에서 입력 검증이 존재 확인 조회보다 앞선다는 것을 보기 위한 spy. 기본 동작은 실제 빈과 같다. */
-    @MockitoSpyBean OttRepository ottRepositorySpy;
+    @Autowired OttRepository ottRepositorySpy;
 
     private ExecutorService executor;
 

@@ -20,6 +20,7 @@ import com.feelm.backend.domain.notification.repository.WebPushDeliveryRepositor
 import com.feelm.backend.domain.notification.repository.WebPushSubscriptionRepository;
 import com.feelm.backend.domain.notification.service.WebPushDeliveryWorker;
 import com.feelm.backend.domain.notification.service.WebPushPayloadFactory;
+import com.feelm.backend.support.SharedTestRuntime;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
 import java.time.Duration;
@@ -36,6 +37,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(OutputCaptureExtension.class)
 @ResourceLock("backend-output-capture")
+@SharedTestRuntime
 class WebPushObservabilityTest {
 
     @Test

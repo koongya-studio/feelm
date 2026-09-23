@@ -11,16 +11,13 @@ import com.feelm.backend.domain.trend.model.TrendingSnapshot;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
 import com.feelm.backend.support.SharedPostgresContractTest;
-import com.feelm.backend.support.SharedRedisContainer;
 import com.feelm.backend.support.SharedRedisState;
-import com.redis.testcontainers.RedisContainer;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -36,9 +33,6 @@ class RedisTrendingSnapshotReaderTest extends SharedPostgresContractTest {
 
     private static final String CURRENT_KEY = "feelm:trending:current";
     private static final String LAST_GOOD_KEY = "feelm:trending:last-good";
-
-    @ServiceConnection static final RedisContainer REDIS = SharedRedisContainer.instance();
-
     @Autowired StringRedisTemplate redisTemplate;
     @Autowired ObjectMapper objectMapper;
 
