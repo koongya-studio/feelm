@@ -475,7 +475,7 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
 ```
 
 - `servingRevision`은 모델·순서 고정 특징 schema·카탈로그·서비스 movieId 매핑·정책 버전 조합을 식별하는 1~100자의 공백 아닌 불변 문자열이다. 이 구성 중 하나라도 바뀌면 새 revision을 사용한다. `modelVersion`은 기존 파티 결과·DB 이력과 호환되는 1~50자의 `[a-z0-9][a-z0-9._-]*` 모델 식별자다. Java publisher와 Python consumer는 이 경계를 같은 fixture로 검증한다.
-- `generationId`는 한 사용자의 상태와 Candidate를 한 번 게시한 opaque 식별자다. `inputSchemaVersion`은 627이 게시한 불변 입력 스냅샷 형식, `inputHash`는 그 스냅샷의 canonical bytes에 대한 소문자 SHA-256이다.
+- `generationId`는 한 사용자의 상태와 Candidate를 한 번 게시한 opaque 식별자다. `inputSchemaVersion`은 627이 게시한 불변 입력 스냅샷 형식이다. `gbt-input-v1`의 `inputHash`는 실제 평점·관심없음·감상·정렬된 계산 입력/source·schema를 담은 입력 본문의 canonical UTF-8 JSON에 대한 소문자 SHA-256이다. user/generation/model/revision 참조 메타데이터는 hash와 별도로 일치 여부를 검증한다. 정확한 codec과 실행은 [627 안내](../../pipeline/consumer/GBT-627.md)를 따른다.
 - `ratingCount`·`dismissCount`는 실제 평가·관심없음 원본 수, `supportedInputCount`는 해당 GBT 특징 계약으로 실제 계산 가능한 입력 수다. 세 값은 0 이상의 정수이며 vector 차원이나 ALS factor 지원 수로 재해석하지 않는다.
 - GBT Candidate에 위 revision·generation·입력 참조 중 하나라도 없거나 상태와 다르면 Spring은 부분 게시로 거절한다. 다른 사용자 ID의 상태를 대신 읽을 수도 없다.
 
@@ -532,7 +532,7 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
 
 - GBT 특징·카탈로그·서비스 movieId 매핑을 모두 만족하는 영화만 후보에 포함한다. 지원 여부는 같은 `servingRevision`의 immutable 산출물로 판정하고 Backend가 추측해 보충하지 않는다.
 - 동점은 같은 값을 받고, 동일 점수 안의 결정론적 순서는 `movieId` 오름차순이다.
-- **유효 입력 수로 지원되는 GBT 추론을 임의 제한하지 않는다.** K≥1의 지원 입력은 모두 사용한다. K0·지원 입력 없음·후보 부족은 483의 명시적 fallback 상태로 구분하며, 구현 전에는 가짜 0점이나 ALS 필드를 만들어 정상 GBT 결과처럼 게시하지 않는다.
+- **유효 입력 수로 지원되는 GBT 추론을 임의 제한하지 않는다.** K≥1의 지원 입력은 모두 사용한다. 개인 K0는 627의 비개인화 인기순 후보를 사용한다(§6.3). 미지원 이력은 K0로 숨기지 않으며, K≥1 후보 소진·추가 모집단 보충은 별도 범위다. 가짜 평가나 ALS 필드를 만들지 않는다.
 - 온보딩 LIKE/DISLIKE를 **실제 별점 행으로 저장한다**(팀 결정 2026-09-18, S15P21E106-647). LIKE는
   `4.0`, DISLIKE는 `2.0`이며 `onboarding_preferences` 행도 화면·감사 기록으로 남는다. Consumer는
   S15P21E106-649부터 `ratings`만 개인 GBT·DISCOVERY 계산 입력으로 사용한다. 과거 ALS adapter의
@@ -691,6 +691,7 @@ generation 일치 확인과 모바일 TASTE 2 + DISCOVERY 1·PC TASTE 3 + DISCOV
 | 대상 | 정책 |
 |---|---|
 | `recommendation-state` · `candidates` | TTL 없음. 담당 처리기가 같은 Lua 게시에서 함께 덮어쓴다 |
+| GBT `user:{id}:input:{generation}` · `input-current` | 현재 입력과 identity/CAS head는 TTL 없음. 다음 세대 게시 때 이전 입력만 명시 보존 기간으로 만료한다. 기간·최대 bytes는 644/628 운영 검증에서 결정한다 |
 | 기존 `vector` | GBT 활성 뒤 읽지 않는다. rollback 보존 기간 후 735에서 정리한다 |
 | `behavior` | 키 단위 슬라이딩 TTL 8일. 필드는 일자 버킷이며 집계는 최근 7일분만 사용한다(아래) |
 | `trending:current` | 마지막 정상 게시부터 15분 보관. 게시가 멈추면 만료되어 마지막 정상 결과를 읽는다 |
@@ -769,7 +770,16 @@ Python Consumer나 Streaming 지연·장애 시에도 **마지막으로 성공�
 
 ### 6.3 콜드 스타트
 
-GBT 특징 계약으로 계산 가능한 입력이 없는 K0 사용자는 `supportedInputCount=0`인 상태를 게시하되 가짜 vector나 factor 수를 만들지 않습니다. 실제 fallback 후보와 상태 구분은 S15P21E106-483이 구현하며, 그 전에는 지원 입력이 없는 사용자의 새 Candidate를 게시하지 않습니다.
+평가와 관심없음 입력이 모두 없는 개인 K0 사용자는 S15P21E106-627에서 지원 개봉 카탈로그의
+인기순 후보를 TASTE 최대 500편 게시합니다. 기존 v26 특징 `reach_log1p` 내림차순, 동점은
+movieId 오름차순이며, 인기도는 유효 TMDB 투표 수와 검증된 KOBIS 누적 관객 수 환산값의
+MAX를 사용합니다(환산 계수 0.0007732457348003972). 이 `score`는 GBT 예측점수가 아닙니다.
+가짜 평점·vector·factor를 만들지 않고 `supportedInputCount=0`과 실제 빈 입력 hash를 유지합니다.
+후보가 있으면 같은 generation의 상태와 Candidate를 READY로 원자 게시하고 기존 완료 알림을
+발행합니다. K0는 count 0으로 구분하며 공개 API·이벤트 형식은 바꾸지 않습니다. Backend의
+최신 평가·관심없음 제외를 재사용하고, 이 K0 공급에 watched-only 추가 제외는 넣지 않습니다.
+K≥1의 기존 공통 제외는 유지합니다. 서비스 가능 카탈로그 자체가 비면 EXHAUSTED이며,
+K≥1 후보 소진·파티 전원 K0·카탈로그 밖 보충은 이번 개인 K0 공급과 별도입니다.
 
 ## 7. 미정 사항
 
@@ -782,9 +792,9 @@ GBT 특징 계약으로 계산 가능한 입력이 없는 K0 사용자는 `suppo
 - [ ] `candidates.taste` 후보 수 최대 500편 — 실데이터로 캘리브레이션. `discovery`는 정책상 최대 100편
 - [ ] 허용 지연 초기값과 Structured Streaming 트리거 주기 — 실측 후 확정
 - [ ] 비활성 사용자 Redis 키 정리 주기
-- [x] `candidate-version` 시작값·부분 유실 처리 — 신규 사용자 또는 Redis 전체 유실은 게시 순번을 `1`부터 시작한다. 버전 키만 없는데 결과 키 일부가 남으면 Consumer는 Lua 안에서 불완전한 결과 세 키를 함께 삭제한 뒤 `1`부터 재구축한다. JSON의 `candidateVersion`은 별도의 형식 버전이다.
-- [x] 콜드 스타트 처리 주체 — S15P21E106-483이 K0 fallback 후보와 상태 구분을 구현하며, 그 전에는 `0.0` 동점 Candidate를 정상 GBT 결과로 게시하지 않는다
-- [ ] 콜드 스타트 POPULAR 순서·후보 모집단 확장 — S15P21E106-483에서 확정
+- [x] `candidate-version` 시작값·부분 유실 처리 — 신규 사용자 또는 Redis 전체 유실은 게시 순번을 `1`부터 시작한다. GBT는 버전 키가 유실돼도 `input-current`의 게시 순번을 사용해 오래된 계산의 덮어쓰기를 막는다. head 유실 시 fenced Lua가 새 사용자 CAS epoch를 발급하며, 두 순번도 유실되고 결과 키가 남으면 identity와 순번을 함께 복구한다. 게시에는 DB 조회 전에 읽은 순번과 epoch가 모두 필요하므로 다른 topic/group의 오래된 계산도 거부되고 DB를 다시 읽어야 한다. 기존 ALS 경로는 불완전한 결과 세 키를 함께 삭제한 뒤 `1`부터 재구축한다. JSON의 `candidateVersion`은 별도의 형식 버전이다.
+- [x] 개인 콜드 스타트 처리 주체·순서 — S15P21E106-627이 §6.3의 K0 인기순 최대 500편을 게시하며 가짜 GBT 예측점수를 만들지 않는다
+- [ ] 후보 모집단 확장·파티 전원 K0 — 개인 K0 기본 공급과 별도 후속 범위
 - [ ] 추천 이유 문장 생성 방식(템플릿 vs LLM) — 내부 API 명세에서 이월
 - [x] Kafka 발행 실패 시 재시도·보상 정책 — 폴링 기반 트랜잭셔널 아웃박스 채택(ADR-0018)
 - [ ] Python Consumer가 사용할 PostgreSQL 읽기 전용 롤의 계정 발급(접근 대상 테이블은 2.2에서 확정)

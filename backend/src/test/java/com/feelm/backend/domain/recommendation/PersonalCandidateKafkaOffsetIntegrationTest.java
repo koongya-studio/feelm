@@ -39,6 +39,8 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -53,6 +55,8 @@ import org.testcontainers.containers.output.OutputFrame;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.images.builder.Transferable;
 import org.testcontainers.utility.DockerImageName;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /** 실제 Kafka·Redis·PostgreSQL에서 개인 버퍼 커밋과 두 Consumer group의 offset을 확인한다. */
 @SpringBootTest(
@@ -394,6 +398,109 @@ class PersonalCandidateKafkaOffsetIntegrationTest extends SharedPostgresContract
                                 Integer.class,
                                 NEXT_USER))
                 .isEqualTo(1);
+    }
+
+    @Test
+    void lastRatingDeletionPublishesPopularCandidatesAndFollowingUserStillAdvances()
+            throws Exception {
+        JsonNode fixture = coldStartFixture();
+        jdbc.update("INSERT INTO ratings(user_id,movie_id,score) VALUES (?,1,5)", USER);
+        publishGbtFixture(fixture, "before");
+        long next = endOffset() + 1;
+        sendNotice(USER);
+        awaitOffset(PERSONAL, next);
+        awaitOffset(PARTY, next);
+
+        jdbc.update("DELETE FROM ratings WHERE user_id=?", USER);
+        publishGbtFixture(fixture, "cold");
+        publishGbtFixture(fixture, "next");
+        sendNotice(USER);
+        sendNotice(NEXT_USER);
+        awaitOffset(PERSONAL, next + 2);
+        awaitOffset(PARTY, next + 2);
+
+        assertThat(count("recommendation_sets")).isEqualTo(3);
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT movie_id FROM recommendation_items WHERE set_id=? ORDER BY position",
+                                Long.class,
+                                latestSet(USER)))
+                .containsExactly(5L, 6L, 4L, 3L, 2L, 1L);
+        mvc.perform(get("/api/v1/recommendations").header("Authorization", bearer(USER)))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/v1/recommendations").header("Authorization", bearer(NEXT_USER)))
+                .andExpect(status().isOk());
+
+        sendNotice(USER);
+        awaitOffset(PERSONAL, next + 3);
+        awaitOffset(PARTY, next + 3);
+        assertThat(count("recommendation_sets")).isEqualTo(3);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void popularNoticeUsesLatestBackendExclusionsAndAcknowledgesFullyFilteredBatch(
+            boolean allExcluded) throws Exception {
+        JsonNode fixture = coldStartFixture();
+        publishGbtFixture(fixture, "cold");
+        publishGbtFixture(fixture, "next");
+        // Changes after the Consumer snapshot must still be filtered by Backend.
+        jdbc.update("INSERT INTO ratings(user_id,movie_id,score) VALUES (?,1,5)", USER);
+        jdbc.update("INSERT INTO user_movie_dismissals(user_id,movie_id) VALUES (?,5)", USER);
+        if (allExcluded) {
+            for (long movieId : new long[] {2, 3, 4, 6}) {
+                jdbc.update(
+                        "INSERT INTO user_movie_dismissals(user_id,movie_id) VALUES (?,?)",
+                        USER,
+                        movieId);
+            }
+        }
+        long next = endOffset() + 2;
+        sendNotice(USER);
+        sendNotice(NEXT_USER);
+        awaitOffset(PERSONAL, next);
+        awaitOffset(PARTY, next);
+        assertThat(lag(PERSONAL)).isZero();
+        if (allExcluded) {
+            assertThat(count("recommendation_sets")).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT user_id FROM recommendation_sets", Long.class))
+                    .isEqualTo(NEXT_USER);
+        } else {
+            assertThat(
+                            jdbc.queryForList(
+                                    "SELECT movie_id FROM recommendation_items WHERE set_id=? ORDER BY position",
+                                    Long.class,
+                                    latestSet(USER)))
+                    .containsExactly(6L, 4L, 3L, 2L);
+        }
+        mvc.perform(get("/api/v1/recommendations").header("Authorization", bearer(NEXT_USER)))
+                .andExpect(status().isOk());
+    }
+
+    private JsonNode coldStartFixture() throws Exception {
+        JsonNode fixture;
+        try (var stream = getClass().getResourceAsStream("/gbt-personal-cold-state.json")) {
+            fixture = new ObjectMapper().readTree(stream);
+        }
+        for (long movieId = 1; movieId <= 6; movieId++) {
+            jdbc.update(
+                    "INSERT INTO movies(id,tmdb_id,title) VALUES (?,?,?)",
+                    movieId,
+                    movieId + 50000,
+                    "인기 영화 " + movieId);
+        }
+        redis.opsForValue().set("feelm:model:current", fixture.get("model").toString());
+        return fixture;
+    }
+
+    private void publishGbtFixture(JsonNode fixture, String name) {
+        JsonNode result = fixture.get(name);
+        long userId = result.get("state").get("userId").longValue();
+        redis.opsForValue()
+                .multiSet(
+                        Map.of(
+                                key(userId, "recommendation-state"), result.get("state").toString(),
+                                key(userId, "candidates"), result.get("candidates").toString()));
     }
 
     @Test
