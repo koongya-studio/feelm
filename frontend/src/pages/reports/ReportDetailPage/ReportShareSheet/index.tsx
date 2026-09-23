@@ -9,27 +9,35 @@
  * - `공유하기`는 이 화면 주소를 공유한다. 휴대폰은 기기의 공유 메뉴, 데스크톱은 복사다
  *   (`utils/share.ts`, 업무 -767). 한때 제목 글자만 공유 메뉴에 넘겼고, 데스크톱 Chrome에서는
  *   메뉴가 있다고 답하고 열지 못해 아무 일이 없었다
- * - `이미지로 저장`은 API-061로 이미지 카드를 만든다. 계약은 서명된 짧은 주소를 주고
- *   클라이언트가 내려받는 방식이다. **목업에는 실제 이미지가 없어** 만든 뒤 안내만 한다
+ * - `이미지로 저장`은 화면의 `ReportFourCut` DOM을 그대로 PNG로 캡처하고 API-061에 저장한 뒤
+ *   서명 URL을 실제 파일 다운로드로 연결한다
  * - 공유를 마치거나 취소하면 시트를 닫는다(`3.5 ⇢ 3.4`)
  *
- * `[?]` 공유할 내용이 이미지인지 주소인지 정해지지 않았다. 와이어프레임 안내는 `공유 이미지`라고
- * 적었지만 이미지 파일 공유는 브라우저마다 지원이 다르다. 지금은 제목과 주소를 넘긴다 — 이미지는
- * S15P21E106-731에서 API-061과 함께 정한다.
+ * `공유하기`는 제목과 주소, `이미지로 저장`은 PNG 파일을 맡는다. 이미지 파일을 기기 공유 시트에
+ * 직접 넘기는 동작은 브라우저별 지원 범위가 달라 별도 범위로 둔다.
  */
 import { useEffect, useId, useRef, useState } from 'react';
 import Button from '../../../../components/Button';
 import { createReportImage } from '../../../../api/reports';
+import { captureReportImage, downloadReportImage } from '../../../../utils/reportImage';
 import { shareLink } from '../../../../utils/share';
 import styles from './ReportShareSheet.module.css';
 
 type Props = {
   reportId: number;
   title: string;
+  getImageNode: () => HTMLElement | null;
+  prepareImage: () => Promise<void>;
   onClose: () => void;
 };
 
-export default function ReportShareSheet({ reportId, title, onClose }: Props) {
+export default function ReportShareSheet({
+  reportId,
+  title,
+  getImageNode,
+  prepareImage,
+  onClose,
+}: Props) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const titleId = useId();
@@ -72,8 +80,13 @@ export default function ReportShareSheet({ reportId, title, onClose }: Props) {
     setNotice('');
 
     try {
-      await createReportImage(reportId);
-      setNotice('이미지를 만들었어요');
+      await prepareImage();
+      const node = getImageNode();
+      if (!node) throw new Error('ReportFourCut is unavailable');
+      const png = await captureReportImage(node);
+      const image = await createReportImage(reportId, png);
+      await downloadReportImage(image.downloadUrl, reportId);
+      setNotice('이미지를 저장했어요');
     } catch {
       setNotice('이미지를 만들지 못했어요. 잠시 후 다시 시도해 주세요');
     } finally {

@@ -6,7 +6,7 @@
  * 칸 비율 · 글자 크기 · 간격이 같다.
  *
  * 시안에서 잰 값(단위 u)
- * - 인화지 385 × 1165 · 옆 여백 15 · 머리 58 · 칸 사이 9 · 발 90
+ * - 인화지 385 × 1165 · 옆 여백 15 · 머리 58 · 칸 사이 9 · 발 96
  * - 칸 355 × 246 · 라벨 왼쪽 위 12 · 10 · 한글 이름 왼쪽 아래 12 · 10
  * - 감독 대표작 왼쪽 13 · 위 33 · 166 × 101
  *
@@ -82,7 +82,7 @@
 
 .foot {
   display: flex;
-  height: calc(var(--u) * 90);
+  height: calc(var(--u) * 96);
   flex-direction: column;
   align-items: center;
   justify-content: center;

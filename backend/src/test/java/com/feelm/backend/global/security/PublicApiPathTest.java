@@ -95,4 +95,26 @@ class PublicApiPathTest {
                                         + "/taste-comparison"))
                 .isFalse();
     }
+
+    @Test
+    @DisplayName("리포트 이미지 다운로드만 GET 공개이고 생성·비정상 경로는 열지 않는다")
+    void reportImageDownloadIsPublicForGetOnly() {
+        String download = "/api/v1/report-images/811/download";
+        assertThat(SecurityConfig.isPublicApi(HttpMethod.GET, download)).isTrue();
+        assertThat(SecurityConfig.isPublicApi(HttpMethod.POST, download)).isFalse();
+        assertThat(SecurityConfig.isPublicApi(HttpMethod.GET, "/api/v1/report-images/me/download"))
+                .isFalse();
+        assertThat(
+                        SecurityConfig.isPublicApi(
+                                HttpMethod.GET, "/api/v1/report-images//811/download"))
+                .isFalse();
+        assertThat(
+                        SecurityConfig.isPublicApi(
+                                HttpMethod.GET, "/api/v1/report-images/811/download/extra"))
+                .isFalse();
+        assertThat(SecurityConfig.isPublicApi(HttpMethod.GET, "/api/v1/report-images/811"))
+                .isFalse();
+        assertThat(SecurityConfig.isPublicApi(HttpMethod.POST, "/api/v1/reports/811/image"))
+                .isFalse();
+    }
 }

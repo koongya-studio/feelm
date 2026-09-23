@@ -42,6 +42,7 @@ export REDIS_PASSWORD="ci-redis-application-placeholder"
 export REDIS_READONLY_PASSWORD="ci-redis-readonly-placeholder"
 export REDIS_LOCAL_BACKEND_PASSWORD="ci-redis-local-backend-placeholder"
 export JWT_SECRET="ci-jwt-placeholder-at-least-32-bytes"
+export REPORT_IMAGE_SIGNING_SECRET="ci-report-image-placeholder-at-least-32-bytes"
 export CORS_ALLOWED_ORIGINS="http://127.0.0.1"
 export FRONTEND_BASE_URL="http://127.0.0.1"
 # 소셜 로그인 자격 증명(S15P21E106-531)도 검사에서는 실제 값을 쓰지 않는다.

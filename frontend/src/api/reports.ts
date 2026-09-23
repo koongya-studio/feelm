@@ -2,12 +2,10 @@
  * 취향 리포트 데이터 접근 함수. 대응 명세는 docs/api/report-trend.md(API-059 · 060 · 080 ·
  * 061)이다.
  *
- * 목록 · 상세 · 첫 발급은 실제 백엔드를 부른다(업무 -558, 백엔드 -556). **이미지 카드
- * (API-061)만 목업으로 남는다** — 백엔드 -557과 이미지 스토리지 정책(인프라 -549)을 기다리며,
- * 프론트 연동은 업무 -731이다.
+ * 목록 · 상세 · 첫 발급은 실제 백엔드를 부른다(업무 -558, 백엔드 -556). 이미지 카드도
+ * 화면의 `ReportFourCut`을 PNG로 캡처해 API-061에 저장한다(업무 -557).
  */
 import { request } from './client';
-import { respond } from './mockTransport';
 import type { ReportDetail, ReportImage, ReportIssue, ReportList } from '../types/report';
 
 /** API-059 내 리포트 목록 · GET /api/v1/users/me/reports — 최신 반기가 앞이다 */
@@ -36,21 +34,11 @@ export async function issueReport(reportId: number): Promise<ReportIssue> {
 /**
  * API-061 리포트 이미지 카드 생성 · POST /api/v1/reports/{reportId}/image
  *
- * **목업이다**(업무 -731). 실제 이미지가 없어 주소 모양만 계약대로 돌려준다. 3.5가 이 주소로
- * 이미지를 받아 저장하거나 공유 시트에 넘기는 부분은 연동 때 만든다.
+ * 본문은 화면의 `ReportFourCut` DOM을 캡처한 PNG다. 백엔드는 디자인을 다시 그리지 않고
+ * 파일을 검증·비공개 저장한 뒤 10분 서명 URL을 돌려준다.
  */
-export async function createReportImage(reportId: number): Promise<ReportImage> {
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-
-  return respond(
-    {
-      imageId: 800 + reportId,
-      format: 'PNG' as const,
-      downloadUrl: `https://storage.example.com/reports/${reportId}.png`,
-      expiresAt,
-    },
-    'reports',
-  );
+export async function createReportImage(reportId: number, png: Blob): Promise<ReportImage> {
+  return request<ReportImage>(`/reports/${reportId}/image`, { method: 'POST', body: png });
 }
 
 /**

@@ -245,7 +245,8 @@ class ReportReadApiContractTest extends ReportApiContractSupport {
                         '{topDirectors,0,name}', '"웨스 앤더슨"'::jsonb),
                     '{fourCut,director}',
                     '{"name": "웨스 앤더슨", "displayName": null,
-                       "image": {"url": "https://images.test/d.jpg"}, "work": "대표작"}'::jsonb)
+                       "image": {"url": "https://images.test/d.jpg"},
+                       "work": {"url": "https://images.test/work.jpg"}}'::jsonb)
                 WHERE id = ?
                 """,
                 directorId,
@@ -262,7 +263,9 @@ class ReportReadApiContractTest extends ReportApiContractSupport {
                     .andExpect(
                             jsonPath("$.fourCut.director.image.url")
                                     .value("https://images.test/d.jpg"))
-                    .andExpect(jsonPath("$.fourCut.director.work").value("대표작"));
+                    .andExpect(
+                            jsonPath("$.fourCut.director.work.url")
+                                    .value("https://images.test/work.jpg"));
         } finally {
             jdbc.update("DELETE FROM people WHERE id = ?", directorId);
         }

@@ -144,6 +144,25 @@ docker compose --env-file infra/.env -f infra/compose/service.yml config
 `df -h "$AVATAR_HOST_PATH"`로 용량을 감시하고 별도 백업 정책을 적용합니다. Nginx는
 `/media/avatars/{uuid}.jpg`를 공개하며 1일 캐시를 설정합니다.
 
+### 리포트 이미지 비공개 저장소
+
+취향 리포트 PNG는 기본적으로 서비스 노드의 `/srv/feelm/data/report-images`를 Backend의
+`/data/report-images`에만 읽기·쓰기로 bind mount합니다. 프로필 사진과 달리 Nginx 정적 볼륨이나
+공개 location에는 연결하지 않습니다. 배포 전 디렉터리를 Backend 전용 권한으로 만들고,
+`REPORT_IMAGE_SIGNING_SECRET`에는 `JWT_SECRET`과 다른 32바이트 이상의 Secret을 주입합니다.
+
+```bash
+sudo install -d -m 0700 /srv/feelm/data/report-images
+docker compose --env-file infra/.env -f infra/compose/service.yml config
+```
+
+다른 경로를 쓰려면 `REPORT_IMAGE_HOST_PATH`를 절대 경로로 변경합니다. 호스트 볼륨이 유실되면
+사용자가 리포트 상세에서 다시 저장할 때 같은 `ReportFourCut` DOM을 재캡처해 PNG를 복구하지만,
+그 전까지 기존 다운로드 URL은 404를 반환합니다.
+`df -h "$REPORT_IMAGE_HOST_PATH"`로 용량을 감시하고 필요하면 호스트 볼륨 백업을 별도로 적용합니다.
+Nginx의 API-061 전용 경로만 요청 상한을 26MiB로 두어 25MiB 경계를 Backend가 공통 JSON 오류로
+판정하게 합니다. Backend는 실제 PNG decode의 동시 처리 수도 제한합니다.
+
 ### Local Kafka
 
 Windows에서 실행하는 Spring Boot가 `localhost:9092`로 Kafka에 연결할 수 있도록 로컬
