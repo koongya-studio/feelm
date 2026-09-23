@@ -162,6 +162,148 @@ class ReportReadApiContractTest extends ReportApiContractSupport {
     }
 
     @Test
+    void detailCanonicalizesStoredPersonDisplayNames() throws Exception {
+        users();
+        long reportId = 5_560_106;
+        long directorId = 5_560_030;
+        long actorId = 5_560_040;
+        report(reportId, OWNER, 2030, "H1", "READY");
+        // 한국 인물은 원어명이 없어 NULL로 남고, 외국 인물만 영문이 붙는다.
+        insertPerson(directorId, "봉준호", null);
+        // 현재 name이 이미 라틴으로 바뀌어도 기존 READY JSON의 한글 카드는 승인 원어명으로 보정한다.
+        insertPerson(actorId, "Mark Hamill", "Mark Hamill");
+        jdbc.update(
+                """
+                UPDATE taste_reports
+                SET content = jsonb_set(
+                    jsonb_set(
+                        jsonb_set(content, '{topDirectors,0,personId}', to_jsonb(?::bigint)),
+                        '{topActors,0,personId}', to_jsonb(?::bigint)),
+                    '{fourCut,director,name}', '"봉준호"'::jsonb)
+                WHERE id = ?
+                """,
+                directorId,
+                actorId,
+                reportId);
+        jdbc.update(
+                """
+                UPDATE taste_reports
+                SET content = jsonb_set(
+                    jsonb_set(content, '{topDirectors,0,name}', '"봉준호"'::jsonb),
+                    '{fourCut,actor,name}', '"마크 해밀"'::jsonb)
+                WHERE id = ?
+                """,
+                reportId);
+        jdbc.update(
+                """
+                UPDATE taste_reports
+                SET content = jsonb_set(
+                    jsonb_set(content, '{topActors,0,name}', '"마크 해밀"'::jsonb),
+                    '{fourCut,director,displayName}', '"Stale Korean Name"'::jsonb)
+                WHERE id = ?
+                """,
+                reportId);
+
+        try {
+            mockMvc.perform(
+                            get("/api/v1/reports/{id}", reportId)
+                                    .header("Authorization", bearer(OWNER)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.fourCut.director").exists())
+                    .andExpect(jsonPath("$.fourCut.director.name").value("봉준호"))
+                    .andExpect(jsonPath("$.fourCut.director.displayName").doesNotExist())
+                    .andExpect(jsonPath("$.fourCut.actor.name").value("마크 해밀"))
+                    .andExpect(jsonPath("$.fourCut.actor.displayName").value("Mark Hamill"));
+
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT (content #>> '{fourCut,director,displayName}')"
+                                            + " || '|' || coalesce(content #>>"
+                                            + " '{fourCut,actor,displayName}', '<NULL>')"
+                                            + " FROM taste_reports WHERE id = ?",
+                                    String.class,
+                                    reportId))
+                    .isEqualTo("Stale Korean Name|<NULL>");
+        } finally {
+            jdbc.update("DELETE FROM people WHERE id IN (?, ?)", directorId, actorId);
+        }
+    }
+
+    @Test
+    void detailFillsDirectorDisplayNameAndKeepsCardFields() throws Exception {
+        users();
+        long reportId = 5_560_108;
+        long directorId = 5_560_031;
+        report(reportId, OWNER, 2030, "H1", "READY");
+        insertPerson(directorId, "웨스 앤더슨", "Wes Anderson");
+        jdbc.update(
+                """
+                UPDATE taste_reports
+                SET content = jsonb_set(
+                    jsonb_set(
+                        jsonb_set(content, '{topDirectors,0,personId}', to_jsonb(?::bigint)),
+                        '{topDirectors,0,name}', '"웨스 앤더슨"'::jsonb),
+                    '{fourCut,director}',
+                    '{"name": "웨스 앤더슨", "displayName": null,
+                       "image": {"url": "https://images.test/d.jpg"}, "work": "대표작"}'::jsonb)
+                WHERE id = ?
+                """,
+                directorId,
+                reportId);
+
+        try {
+            mockMvc.perform(
+                            get("/api/v1/reports/{id}", reportId)
+                                    .header("Authorization", bearer(OWNER)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.fourCut.director.name").value("웨스 앤더슨"))
+                    .andExpect(jsonPath("$.fourCut.director.displayName").value("Wes Anderson"))
+                    // 재조립이 나머지 인자를 유실하거나 뒤바꾸지 않아야 한다.
+                    .andExpect(
+                            jsonPath("$.fourCut.director.image.url")
+                                    .value("https://images.test/d.jpg"))
+                    .andExpect(jsonPath("$.fourCut.director.work").value("대표작"));
+        } finally {
+            jdbc.update("DELETE FROM people WHERE id = ?", directorId);
+        }
+    }
+
+    @Test
+    void detailKeepsEmptyFourCutCards() throws Exception {
+        users();
+        long reportId = 5_560_107;
+        report(reportId, OWNER, 2030, "H1", "READY");
+        // 감독·배우 크레딧이 없는 사용자는 카드 자체가 null로 저장된다.
+        jdbc.update(
+                """
+                UPDATE taste_reports
+                SET content = jsonb_set(
+                    jsonb_set(content, '{fourCut,director}', 'null'::jsonb),
+                    '{fourCut,actor}', 'null'::jsonb)
+                WHERE id = ?
+                """,
+                reportId);
+
+        mockMvc.perform(
+                        get("/api/v1/reports/{id}", reportId)
+                                .header("Authorization", bearer(OWNER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.fourCut.director").doesNotExist())
+                .andExpect(jsonPath("$.fourCut.actor").doesNotExist())
+                .andExpect(jsonPath("$.fourCut.genre.displayName").value("ROMANCE"));
+    }
+
+    private void insertPerson(long id, String name, String originalName) {
+        jdbc.update(
+                "INSERT INTO people (id, tmdb_person_id, name, original_name)"
+                        + " VALUES (?, ?, ?, ?)",
+                id,
+                Math.toIntExact(id),
+                name,
+                originalName);
+    }
+
+    @Test
     void detailHidesUnpublishedReportRegardlessOfStatus() throws Exception {
         users();
         report(5_560_105, OWNER, 2030, "H2", "GENERATING");

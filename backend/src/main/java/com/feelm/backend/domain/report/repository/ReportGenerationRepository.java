@@ -125,7 +125,7 @@ public class ReportGenerationRepository {
     public List<ReportSource.Person> findPeople(List<Long> userIds, Instant effectiveEnd) {
         return jdbc.query(
                 """
-                SELECT f.id AS frame_id, p.id AS person_id, p.name, p.profile_url, mp.role
+                SELECT f.id AS frame_id, p.id AS person_id, p.name, p.original_name, p.profile_url, mp.role
                 FROM frames f
                 JOIN movie_people mp ON mp.movie_id = f.movie_id
                 JOIN people p ON p.id = mp.person_id
@@ -140,6 +140,7 @@ public class ReportGenerationRepository {
                                 result.getLong("frame_id"),
                                 result.getLong("person_id"),
                                 result.getString("name"),
+                                result.getString("original_name"),
                                 result.getString("profile_url"),
                                 Role.valueOf(result.getString("role"))));
     }

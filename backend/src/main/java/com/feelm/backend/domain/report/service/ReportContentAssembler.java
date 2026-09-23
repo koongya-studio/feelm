@@ -276,7 +276,10 @@ public class ReportContentAssembler {
                             person.personId(),
                             ignored ->
                                     new MutablePersonStat(
-                                            person.personId(), person.name(), person.profileUrl()))
+                                            person.personId(),
+                                            person.name(),
+                                            person.originalName(),
+                                            person.profileUrl()))
                     .add(person.frameId());
         }
         return stats.values().stream()
@@ -467,7 +470,9 @@ public class ReportContentAssembler {
                         ? null
                         : new DirectorCard(
                                 directors.getFirst().name(),
-                                null,
+                                personDisplayName(
+                                        directors.getFirst().name(),
+                                        directors.getFirst().originalName()),
                                 new ImageRef(directors.getFirst().profileUrl()),
                                 null);
         PersonCard actor =
@@ -475,9 +480,20 @@ public class ReportContentAssembler {
                         ? null
                         : new PersonCard(
                                 actors.getFirst().name(),
-                                null,
+                                personDisplayName(
+                                        actors.getFirst().name(), actors.getFirst().originalName()),
                                 new ImageRef(actors.getFirst().profileUrl()));
         return new FourCut(genre, director, actor, new CharacterCutCard(characterName, null));
+    }
+
+    /**
+     * people.original_name은 외국 인물의 라틴 원어명만 담는다. 한국 인물은 시안대로 한글 한 줄로 두려고 적재에서 제외하므로 여기서는 NULL로 들어온다.
+     */
+    static String personDisplayName(String name, String originalName) {
+        if (originalName == null || originalName.isBlank() || originalName.equals(name)) {
+            return null;
+        }
+        return originalName;
     }
 
     static String genreDisplayName(String code) {
@@ -744,17 +760,21 @@ public class ReportContentAssembler {
         }
     }
 
-    private record PersonStat(long personId, String name, String profileUrl, int count) {}
+    private record PersonStat(
+            long personId, String name, String originalName, String profileUrl, int count) {}
 
     private static final class MutablePersonStat {
         private final long personId;
         private final String name;
+        private final String originalName;
         private final String profileUrl;
         private final Set<Long> frameIds = new HashSet<>();
 
-        private MutablePersonStat(long personId, String name, String profileUrl) {
+        private MutablePersonStat(
+                long personId, String name, String originalName, String profileUrl) {
             this.personId = personId;
             this.name = name;
+            this.originalName = originalName;
             this.profileUrl = profileUrl;
         }
 
@@ -763,7 +783,7 @@ public class ReportContentAssembler {
         }
 
         private PersonStat freeze() {
-            return new PersonStat(personId, name, profileUrl, frameIds.size());
+            return new PersonStat(personId, name, originalName, profileUrl, frameIds.size());
         }
     }
 

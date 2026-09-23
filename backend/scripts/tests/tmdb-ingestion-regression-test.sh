@@ -162,6 +162,50 @@ if [[ "$group" == all || "$group" == titles ]]; then
   grep -q 'append_to_response=translations,alternative_titles' "$CURL_LOG"
 fi
 
+if [[ "$group" == all || "$group" == people ]]; then
+  printf 'ingestion regression: approved foreign person names and stale-value clearing\n'
+  jq '.credits = {id:2,
+      crew:[{"id":107730,"name":"트란 안 홍","original_name":"Trần Anh Hùng","job":"Director"}],
+      cast:[
+        {"id":2027339,"name":"준회","original_name":"Ju-ne","order":0},
+        {"id":64707,"name":"우승혜","original_name":"Yu Chenghui","order":1},
+        {"id":77271,"name":"핑크","original_name":"P!nk","order":2}
+      ]
+    }' "$test_dir/good.json" >"$test_dir/raw/2.json"
+  if ! run_ingestion "$test_dir/people-approved" --raw-dir "$test_dir/raw" --refresh >/dev/null; then
+    find "$test_dir/people-approved" -maxdepth 2 -type f -print -exec sed -n '1,80p' {} \; >&2
+    exit 1
+  fi
+  [[ "$(db -qAt -c "SELECT coalesce(original_name, '<NULL>') FROM people WHERE tmdb_person_id=2027339")" == '<NULL>' ]]
+  [[ "$(db -qAt -c 'SELECT original_name FROM people WHERE tmdb_person_id=64707')" == 'Yu Chenghui' ]]
+  [[ "$(db -qAt -c 'SELECT original_name FROM people WHERE tmdb_person_id=77271')" == 'P!nk' ]]
+  [[ "$(db -qAt -c 'SELECT original_name FROM people WHERE tmdb_person_id=107730')" == 'Trần Anh Hùng' ]]
+
+  db -q -c "UPDATE people SET original_name = CASE tmdb_person_id
+      WHEN 2027339 THEN 'Ju-ne'
+      WHEN 64707 THEN NULL
+      WHEN 77271 THEN 'Wrong stale value'
+      ELSE original_name END
+    WHERE tmdb_person_id IN (2027339,64707,77271)" >/dev/null
+  jq '.credits.cast |= map(
+      if .id == 64707 then .original_name = .name
+      elif .id == 77271 then .name = "P!nk" | .original_name = "123"
+      else . end)' \
+    "$test_dir/raw/2.json" >"$test_dir/people-stale.json"
+  cp "$test_dir/people-stale.json" "$test_dir/raw/2.json"
+  # Reuse the successful checkpoint without --refresh. Global reconciliation must
+  # still clear a removed approval and restore approved names before the movie skips.
+  run_ingestion "$test_dir/people-approved" --raw-dir "$test_dir/raw" >/dev/null
+  jq -e '.postgresql.skipped == 1 and .postgresql.succeeded == 0' \
+    "$test_dir/people-approved/run-manifest.json" >/dev/null
+  [[ "$(db -qAt -c "SELECT coalesce(original_name, '<NULL>') FROM people WHERE tmdb_person_id=2027339")" == '<NULL>' ]]
+  [[ "$(db -qAt -c 'SELECT original_name FROM people WHERE tmdb_person_id=64707')" == 'Yu Chenghui' ]]
+  [[ "$(db -qAt -c 'SELECT original_name FROM people WHERE tmdb_person_id=77271')" == 'P!nk' ]]
+
+  db -q -c 'TRUNCATE movie_people, people RESTART IDENTITY CASCADE' >/dev/null
+  cp "$test_dir/good.json" "$test_dir/raw/2.json"
+fi
+
 if [[ "$group" == all || "$group" == ott ]]; then
   printf 'ingestion regression: approved OTT SQL and repeat\n'
   [[ "$(db -qAt -c "SELECT count(*) FROM otts WHERE (code,tmdb_provider_id) IN (('DISNEY_PLUS',337),('WATCHA',97),('WAVVE',356),('TVING',1883))")" == 4 ]]
@@ -206,10 +250,11 @@ if [[ "$group" == all || "$group" == invalid ]]; then
       expect_failure run_ingestion "$output" --refresh --ott-mapping "$test_dir/approved.csv" "${args[@]}"
       jq -e '.postgresql.succeeded == 0 and .postgresql.failed == 1 and .postgresql.status != "SUCCESS"' "$output/run-manifest.json" >/dev/null
       jq -e 'length == 1 and .[0].tmdb_id == 2 and (.[0].reason | length > 0)' "$output/failure-report.json" >/dev/null
-      # The approved catalog now has its own transaction before raw validation.
-      # Exactly that one may begin; invalid raw must never start a movie transaction.
+      # Person-name reconciliation and the approved OTT catalog each transact before
+      # raw validation. Exactly those two may begin; invalid raw must never start a
+      # movie transaction.
       if grep -Eq 'DELETE FROM movie_|INSERT INTO movies' "$SQL_LOG" \
-          || [[ "$(grep -c '^BEGIN;$' "$SQL_LOG")" != 1 ]]; then
+          || [[ "$(grep -c '^BEGIN;$' "$SQL_LOG")" != 2 ]]; then
         printf 'invalid response reached movie transaction: %s (%s)\n' "$filter" "$mode" >&2; exit 1
       fi
       if [[ "$mode" == api-fresh ]]; then

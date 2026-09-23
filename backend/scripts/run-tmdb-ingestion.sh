@@ -7,6 +7,7 @@ readonly TMDB_IMAGE_BASE="${TMDB_IMAGE_BASE:-https://image.tmdb.org/t/p/original
 readonly TMDB_POSTER_IMAGE_BASE="${TMDB_POSTER_IMAGE_BASE:-https://image.tmdb.org/t/p/w500}"
 readonly TMDB_BACKDROP_IMAGE_BASE="${TMDB_BACKDROP_IMAGE_BASE:-https://image.tmdb.org/t/p/w1280}"
 readonly KOREAN_TITLE_OVERRIDES="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/data/verified-korean-titles.tsv"
+readonly APPROVED_FOREIGN_PERSON_NAMES="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/data/approved-foreign-person-original-names.tsv"
 
 usage() {
   cat <<'USAGE'
@@ -116,6 +117,22 @@ require_command sha256sum
 require_command stat
 require_command sort
 require_command uniq
+
+[[ -r "$APPROVED_FOREIGN_PERSON_NAMES" && -f "$APPROVED_FOREIGN_PERSON_NAMES" ]] \
+  || fail 'approved foreign person name data is missing'
+declare -A approved_foreign_person_names=()
+while IFS=$'\t' read -r approved_person_id approved_original_name extra \
+    || [[ -n "$approved_person_id$approved_original_name$extra" ]]; do
+  [[ -z "$approved_person_id" || "$approved_person_id" == \#* ]] && continue
+  [[ "$approved_person_id" =~ ^[1-9][0-9]*$ ]] \
+    || fail 'approved foreign person name data contains an invalid TMDb ID'
+  [[ -n "$approved_original_name" && -z "$extra" ]] \
+    || fail "approved foreign person name data contains an invalid row: $approved_person_id"
+  [[ -z "${approved_foreign_person_names[$approved_person_id]:-}" ]] \
+    || fail "approved foreign person name data contains a duplicate ID: $approved_person_id"
+  approved_foreign_person_names[$approved_person_id]="$approved_original_name"
+done <"$APPROVED_FOREIGN_PERSON_NAMES"
+((${#approved_foreign_person_names[@]} > 0)) || fail 'approved foreign person name data is empty'
 
 [[ -n "$input" ]] || fail '--input is required'
 [[ -n "$output_dir" ]] || fail '--output-dir is required'
@@ -291,6 +308,11 @@ SELECT (
   AND to_regclass('public.movie_genres') IS NOT NULL
   AND to_regclass('public.movie_countries') IS NOT NULL
   AND to_regclass('public.people') IS NOT NULL
+  AND EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'people'
+      AND column_name = 'original_name'
+  )
   AND to_regclass('public.movie_people') IS NOT NULL
   AND to_regclass('public.otts') IS NOT NULL
   AND to_regclass('public.movie_ott_providers') IS NOT NULL
@@ -306,6 +328,42 @@ SQL
 )" || fail 'cannot verify PostgreSQL schema'
   [[ "$schema_ready" == '1' ]] \
     || fail 'required movie migrations or movies.tmdb_id unique constraint are missing'
+
+  # Reconcile the global person table before checkpoint skips. The reviewed TSV is
+  # authoritative even when no movie row needs reprocessing in this run.
+  person_names_sql="$work_dir/person-original-names.sql"
+  cat >"$person_names_sql" <<'SQL' || fail 'cannot stage person name reconciliation'
+BEGIN;
+CREATE TEMP TABLE _approved_person_names (
+  tmdb_person_id int PRIMARY KEY,
+  original_name_base64 text NOT NULL
+) ON COMMIT DROP;
+\copy _approved_person_names (tmdb_person_id, original_name_base64) FROM STDIN
+SQL
+  jq -Rr 'select(length > 0 and (startswith("#") | not)) |
+    split("\t") | [.[0], (.[1] | @base64)] | @tsv' \
+    "$APPROVED_FOREIGN_PERSON_NAMES" >>"$person_names_sql" \
+    || fail 'cannot encode approved person names'
+  cat >>"$person_names_sql" <<'SQL' || fail 'cannot complete person name reconciliation'
+\.
+UPDATE people p
+SET original_name = convert_from(decode(a.original_name_base64, 'base64'), 'UTF8')
+FROM _approved_person_names a
+WHERE p.tmdb_person_id = a.tmdb_person_id
+  AND p.original_name IS DISTINCT FROM
+      convert_from(decode(a.original_name_base64, 'base64'), 'UTF8');
+
+UPDATE people p
+SET original_name = NULL
+WHERE p.original_name IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM _approved_person_names a
+    WHERE a.tmdb_person_id = p.tmdb_person_id
+  );
+COMMIT;
+SQL
+  postgres_psql -q <"$person_names_sql" >/dev/null \
+    || fail 'cannot reconcile people.original_name with approved data'
 fi
 
 declare -A approved_ott_ids=()
@@ -509,14 +567,28 @@ while IFS= read -r tmdb_id; do
     fi
   fi
 
+  current_approved_names="$work_dir/$tmdb_id-approved-person-names.tsv"
+  : >"$current_approved_names"
+  while IFS= read -r person_id; do
+    approved_original_name="${approved_foreign_person_names[$person_id]:-}"
+    if [[ -n "$approved_original_name" ]]; then
+      printf '%s\t%s\n' "$person_id" "$approved_original_name" >>"$current_approved_names"
+    fi
+  done < <(jq -r '(.credits.crew // []) + (.credits.cast // []) | .[].id |
+    select(type == "number" and . > 0)' "$raw_file" | sort -un)
+
   payload="$work_dir/$tmdb_id-payload.json"
   # Keep the complete provider response in raw-tmdb, but synchronize only KR subscription offers.
   # results.KR.link is a regional TMDb/JustWatch page, not a provider-specific deep link.
   if ! jq \
       --arg poster_image_base "$TMDB_POSTER_IMAGE_BASE" \
       --arg backdrop_image_base "$TMDB_BACKDROP_IMAGE_BASE" \
+      --rawfile approved_person_names "$current_approved_names" \
       --arg verified_title "$verified_title" '
       .details as $d | .credits as $c | .providers as $p |
+      ($approved_person_names | split("\n") |
+        map(select(length > 0) | split("\t") | {key:.[0],value:.[1]}) |
+        from_entries) as $approved_names |
       ($d.title // "") as $localized_title |
       (if ($localized_title | length) > 0 then $localized_title
        else ($d.original_title // "") end) as $fallback_title |
@@ -547,8 +619,10 @@ while IFS= read -r tmdb_id; do
         countries: [($d.production_countries // [])[] | .iso_3166_1 | select(test("^[A-Z]{2}$"))] | unique,
         people: ((
           [($c.crew // [])[] | select(.job == "Director") |
-            {id,name,profile_path,role:"DIRECTOR",character:null,display_order:null}] +
-          [($c.cast // [])[] | {id,name,profile_path,role:"ACTOR",
+            .id as $person_id |
+            {id,name,original_name:($approved_names[($person_id | tostring)] // null),profile_path,role:"DIRECTOR",character:null,display_order:null}] +
+          [($c.cast // [])[] | .id as $person_id |
+            {id,name,original_name:($approved_names[($person_id | tostring)] // null),profile_path,role:"ACTOR",
             character:(.character // null),display_order:(.order // null)}]
         ) | map(select(.id > 0 and (.name | length) > 0)) | unique_by([.id,.role])),
         providers: ([($p.results.KR.flatrate // [])[] |
@@ -641,21 +715,30 @@ WITH person_rows AS (
   SELECT
     (person->>'id')::int AS tmdb_person_id,
     person->>'name' AS name,
+    -- The payload builder passes the reviewed Latin name from the versioned TSV,
+    -- keyed by TMDb person ID. Unknown IDs are NULL, so SQL never infers
+    -- nationality or script from the spelling in a movie payload.
+    CASE WHEN NULLIF(person->>'original_name', '') IS NOT NULL
+         THEN person->>'original_name' END AS original_name,
     CASE WHEN NULLIF(person->>'profile_path', '') IS NULL THEN NULL
          ELSE '$TMDB_IMAGE_BASE' || (person->>'profile_path') END AS profile_url
   FROM _tmdb_payload, jsonb_array_elements(data->'people') AS person
 ), deduplicated_people AS (
   -- The same person can be both director and actor in one movie. Upsert each
   -- TMDb person only once, while movie_people keeps both role rows below.
-  SELECT tmdb_person_id, max(name) AS name, max(profile_url) AS profile_url
+  SELECT tmdb_person_id, max(name) AS name, max(original_name) AS original_name,
+         max(profile_url) AS profile_url
   FROM person_rows
   GROUP BY tmdb_person_id
 )
-INSERT INTO people (tmdb_person_id, name, profile_url)
-SELECT tmdb_person_id, name, profile_url
+INSERT INTO people (tmdb_person_id, name, original_name, profile_url)
+SELECT tmdb_person_id, name, original_name, profile_url
 FROM deduplicated_people
 ON CONFLICT (tmdb_person_id) DO UPDATE
-SET name = EXCLUDED.name, profile_url = EXCLUDED.profile_url;
+SET name = EXCLUDED.name,
+    -- Source truth wins: clear stale values when approval is removed from the TSV.
+    original_name = EXCLUDED.original_name,
+    profile_url = EXCLUDED.profile_url;
 DELETE FROM movie_people WHERE movie_id = (SELECT id FROM _movie_id);
 INSERT INTO movie_people (movie_id, person_id, role, character_name, display_order)
 SELECT

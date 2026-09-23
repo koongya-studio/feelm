@@ -12,8 +12,12 @@ import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -83,7 +87,7 @@ public class ReportReadService {
                 content.characterCard(),
                 content.flavorChanges(),
                 row.createdAt(),
-                fourCutWithGenreDisplayName(content),
+                fourCutWithDisplayNames(content),
                 content.genreShares(),
                 content.countryShares(),
                 content.eraShares(),
@@ -150,32 +154,108 @@ public class ReportReadService {
         }
     }
 
-    private ReportContent.FourCut fourCutWithGenreDisplayName(ReportContent content) {
+    /**
+     * Resolve person display names from the current people table on every read. This both fills old
+     * READY reports and clears a stored value if the person classification is corrected.
+     */
+    private ReportContent.FourCut fourCutWithDisplayNames(ReportContent content) {
         ReportContent.FourCut fourCut = content.fourCut();
-        if (fourCut == null
-                || fourCut.genre() == null
+        if (fourCut == null) {
+            return null;
+        }
+
+        ReportContent.GenreCard genre = genreWithDisplayName(content, fourCut.genre());
+        Map<Long, String> originalNames = originalNames(content, fourCut);
+        ReportContent.DirectorCard director = fourCut.director();
+        if (director != null && leadRank(content.topDirectors(), director.name()) != null) {
+            String displayName =
+                    personDisplayName(content.topDirectors(), director.name(), originalNames);
+            if (!Objects.equals(displayName, director.displayName())) {
+                director =
+                        new ReportContent.DirectorCard(
+                                director.name(), displayName, director.image(), director.work());
+            }
+        }
+        ReportContent.PersonCard actor = fourCut.actor();
+        if (actor != null && leadRank(content.topActors(), actor.name()) != null) {
+            String displayName =
+                    personDisplayName(content.topActors(), actor.name(), originalNames);
+            if (!Objects.equals(displayName, actor.displayName())) {
+                actor = new ReportContent.PersonCard(actor.name(), displayName, actor.image());
+            }
+        }
+
+        if (genre == fourCut.genre()
+                && director == fourCut.director()
+                && actor == fourCut.actor()) {
+            return fourCut;
+        }
+        return new ReportContent.FourCut(genre, director, actor, fourCut.character());
+    }
+
+    private ReportContent.GenreCard genreWithDisplayName(
+            ReportContent content, ReportContent.GenreCard genre) {
+        if (genre == null
+                || !needsDisplayName(genre.displayName())
                 || content.topGenres() == null
                 || content.topGenres().isEmpty()) {
-            return fourCut;
+            return genre;
         }
-
-        ReportContent.GenreCard genre = fourCut.genre();
-        if (genre.displayName() != null && !genre.displayName().isBlank()) {
-            return fourCut;
-        }
-
         ReportContent.GenreRank representative = content.topGenres().getFirst();
         if (!Objects.equals(genre.name(), representative.name())) {
-            return fourCut;
+            return genre;
         }
         String displayName = ReportContentAssembler.genreDisplayName(representative.code());
-        if (displayName == null) {
-            return fourCut;
+        return displayName == null
+                ? genre
+                : new ReportContent.GenreCard(genre.name(), displayName, genre.image());
+    }
+
+    /** Looks up both cards at once so a detail read costs at most one extra query. */
+    private Map<Long, String> originalNames(ReportContent content, ReportContent.FourCut fourCut) {
+        Set<Long> personIds = new LinkedHashSet<>();
+        if (fourCut.director() != null) {
+            addLeadPersonId(personIds, content.topDirectors(), fourCut.director().name());
         }
-        return new ReportContent.FourCut(
-                new ReportContent.GenreCard(genre.name(), displayName, genre.image()),
-                fourCut.director(),
-                fourCut.actor(),
-                fourCut.character());
+        if (fourCut.actor() != null) {
+            addLeadPersonId(personIds, content.topActors(), fourCut.actor().name());
+        }
+        return personIds.isEmpty()
+                ? Map.of()
+                : repository.findOriginalNames(new ArrayList<>(personIds));
+    }
+
+    private void addLeadPersonId(
+            Set<Long> personIds, List<ReportContent.PersonRank> ranks, String cardName) {
+        ReportContent.PersonRank lead = leadRank(ranks, cardName);
+        if (lead != null) {
+            personIds.add(lead.personId());
+        }
+    }
+
+    private String personDisplayName(
+            List<ReportContent.PersonRank> ranks,
+            String cardName,
+            Map<Long, String> originalNames) {
+        ReportContent.PersonRank lead = leadRank(ranks, cardName);
+        if (lead == null) {
+            return null;
+        }
+        return ReportContentAssembler.personDisplayName(
+                cardName, originalNames.get(lead.personId()));
+    }
+
+    /** The four-cut card always shows the top-ranked person, so only that row can identify it. */
+    private ReportContent.PersonRank leadRank(
+            List<ReportContent.PersonRank> ranks, String cardName) {
+        if (ranks == null || ranks.isEmpty()) {
+            return null;
+        }
+        ReportContent.PersonRank lead = ranks.getFirst();
+        return Objects.equals(cardName, lead.name()) ? lead : null;
+    }
+
+    private boolean needsDisplayName(String displayName) {
+        return displayName == null || displayName.isBlank();
     }
 }
