@@ -57,8 +57,9 @@ React + Vite 기반 반응형 웹 애플리케이션 소스와 관련 문서를 
 ## 디렉터리 구성
 
 - `src/`: React 애플리케이션 소스
-- `landing/`: 독립적으로 배포하는 Feelm 정적 HTML 랜딩 페이지. 데스크톱 웹 전용이며 서체 · 이미지 · 영상을
-  `index.html` 한 파일에 담았습니다. 시작하기 버튼은 `/app/`으로 이동합니다
+- `landing/`: 독립적으로 배포하는 Feelm 정적 HTML 랜딩 페이지. 데스크톱 웹 전용이며 이미지를
+  `index.html` 한 파일에 담았고 서체만 Google Fonts에서 불러옵니다. 상단의 `시작하기`는 0.2 회원가입
+  (`/app/signup`), 자물쇠(`로그인`)는 0.6 로그인(`/app/login`)으로 이동합니다(업무 -704)
 - `docs/`: 화면 목업 및 프론트엔드 설계 자료
 
 React 프로젝트는 `frontend/`를 루트로 구성합니다. 랜딩 페이지는 `landing/index.html`에
