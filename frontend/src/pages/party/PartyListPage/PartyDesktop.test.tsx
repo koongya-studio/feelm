@@ -185,6 +185,20 @@ describe('5.1 파티팝콘 데스크톱 시안', () => {
     expect(within(aside).getByRole('button', { name: /파티 추천 보기/ })).toBeInTheDocument();
   });
 
+  it('우측 패널의 얼굴은 사진이 있으면 사진, 없으면 첫 글자다 (업무 -762)', async () => {
+    const photo = '/media/avatars/nanda.jpg';
+    vi.mocked(getMyParties).mockResolvedValue([
+      party({ members: [member({ ...ME, avatarUrl: photo }, 'OWNER'), member(BUDDY)] }),
+      SECOND,
+    ]);
+    renderParty(1440);
+
+    const aside = await screen.findByRole('complementary', { name: '보조 정보' });
+
+    await waitFor(() => expect(aside.querySelector(`img[src="${photo}"]`)).not.toBeNull());
+    expect(within(aside).getByText('무')).toBeInTheDocument();
+  });
+
   it('다른 파티 카드를 고르면 우측 패널이 그 파티를 말한다', async () => {
     renderParty(1440);
 

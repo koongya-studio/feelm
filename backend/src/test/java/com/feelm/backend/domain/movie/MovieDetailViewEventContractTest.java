@@ -7,10 +7,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedPostgresContractTest;
-import com.feelm.backend.support.SharedRedisContainer;
 import com.feelm.backend.support.SharedRedisState;
 import com.feelm.backend.support.SharedTestRuntime;
-import com.redis.testcontainers.RedisContainer;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Instant;
 import java.util.Map;
@@ -21,9 +19,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
-import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -33,7 +28,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
-@AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 @SharedTestRuntime
 @DisplayName("API-030 영화 상세 VIEW 이벤트 계약")
 class MovieDetailViewEventContractTest extends SharedPostgresContractTest {
@@ -42,9 +36,6 @@ class MovieDetailViewEventContractTest extends SharedPostgresContractTest {
     private static final String VIEW_METRIC = "feelm.movie.view.outbox";
     private static final long MOVIE = 1_559_001L;
     private static final long USER = 1_559_101L;
-
-    @ServiceConnection static final RedisContainer REDIS = SharedRedisContainer.instance();
-
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private JdbcTemplate jdbc;

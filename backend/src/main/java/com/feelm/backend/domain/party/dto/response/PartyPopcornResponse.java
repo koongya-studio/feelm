@@ -15,15 +15,15 @@ public record PartyPopcornResponse(long partyId, List<MemberPopcorn> members) {
 
     public record MemberPopcorn(UserSummary user, long totalCount, List<FlavorBucket> flavors) {
         public static MemberPopcorn from(
-                long userId, String nickname, PopcornBucketResponse bucket) {
+                long userId, String nickname, String avatarUrl, PopcornBucketResponse bucket) {
             return new MemberPopcorn(
-                    new UserSummary(userId, nickname),
+                    new UserSummary(userId, nickname, avatarUrl),
                     bucket.totalCount(),
                     bucket.flavors().stream().map(FlavorBucket::from).toList());
         }
     }
 
-    public record UserSummary(long userId, String nickname) {}
+    public record UserSummary(long userId, String nickname, String avatarUrl) {}
 
     public record FlavorBucket(String flavorCode, long popcornCount, BigDecimal averageScore) {
         private static FlavorBucket from(PopcornBucketResponse.FlavorBucket bucket) {

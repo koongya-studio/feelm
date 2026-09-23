@@ -22,7 +22,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -30,7 +29,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** API-064의 공개 경로·A→B 표시 정책·size 계약을 실제 보안 체인과 PostgreSQL에서 검증한다. */
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
-@AutoConfigureMockMvc
 @Transactional
 class TrendingMovieApiContractTest extends SharedPostgresContractTest {
 

@@ -121,4 +121,95 @@ class RedisOttCandidateReaderTest {
         assertThat(reader.read(7).taste()).hasSize(1);
         verify(values, times(2)).get(KEY);
     }
+
+    @Test
+    void readsGbtTasteOnlyWhenRecommendationStateMatches() {
+        String hash = "sha256:" + "a".repeat(64);
+        when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r1"));
+        when(values.get("feelm:user:7:recommendation-state"))
+                .thenReturn(
+                        """
+                        {"stateVersion":1,"userId":7,"modelKind":"GBT",
+                         "modelVersion":"gbt-v26","servingRevision":"serving-r1",
+                         "generationId":"g-1","inputSchemaVersion":"gbt-input-v1",
+                         "inputHash":"%s","ratingCount":1,"dismissCount":0,
+                         "supportedInputCount":1,"updatedAt":"2026-09-23T00:00:00Z"}
+                        """
+                                .formatted(hash));
+        when(values.get(KEY))
+                .thenReturn(
+                        """
+                        {"modelVersion":"gbt-v26","servingRevision":"serving-r1",
+                         "candidateVersion":6,"generationId":"g-1",
+                         "inputSchemaVersion":"gbt-input-v1","inputHash":"%s",
+                         "taste":[{"movieId":11,"score":0.7}],"discovery":[]}
+                        """
+                                .formatted(hash));
+
+        assertThat(reader.read(7).taste()).hasSize(1);
+    }
+
+    @Test
+    void rejectsGbtCandidatesWithoutMatchingState() {
+        String hash = "sha256:" + "a".repeat(64);
+        when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r1"));
+        when(values.get(KEY))
+                .thenReturn(
+                        """
+                        {"modelVersion":"gbt-v26","servingRevision":"serving-r1",
+                         "candidateVersion":6,"generationId":"g-1",
+                         "inputSchemaVersion":"gbt-input-v1","inputHash":"%s",
+                         "taste":[{"movieId":11,"score":0.7}],"discovery":[]}
+                        """
+                                .formatted(hash));
+
+        assertThatThrownBy(() -> reader.read(7)).isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void rejectsGbtCandidatesFromStaleServingRevision() {
+        String hash = "sha256:" + "a".repeat(64);
+        when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r2"));
+        when(values.get("feelm:user:7:recommendation-state"))
+                .thenReturn(
+                        """
+                        {"stateVersion":1,"userId":7,"modelKind":"GBT",
+                         "modelVersion":"gbt-v26","servingRevision":"serving-r1",
+                         "generationId":"g-1","inputSchemaVersion":"gbt-input-v1",
+                         "inputHash":"%s","ratingCount":1,"dismissCount":0,
+                         "supportedInputCount":1,"updatedAt":"2026-09-23T00:00:00Z"}
+                        """
+                                .formatted(hash));
+        when(values.get(KEY))
+                .thenReturn(
+                        """
+                        {"modelVersion":"gbt-v26","servingRevision":"serving-r1",
+                         "candidateVersion":6,"generationId":"g-1",
+                         "inputSchemaVersion":"gbt-input-v1","inputHash":"%s",
+                         "taste":[{"movieId":11,"score":0.7}],"discovery":[]}
+                        """
+                                .formatted(hash));
+
+        assertThatThrownBy(() -> reader.read(7)).isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void rejectsLegacyCandidatesWhenGbtModelIsCurrent() {
+        when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r1"));
+        when(values.get(KEY))
+                .thenReturn(
+                        """
+                        {"candidateVersion":6,"generationId":"g-1",
+                         "taste":[{"movieId":11,"score":0.7}],"discovery":[]}
+                        """);
+
+        assertThatThrownBy(() -> reader.read(7)).isInstanceOf(BusinessException.class);
+    }
+
+    private static String gbtCurrent(String servingRevision) {
+        return """
+                {"modelKind":"GBT","modelVersion":"gbt-v26","servingRevision":"%s"}
+                """
+                .formatted(servingRevision);
+    }
 }

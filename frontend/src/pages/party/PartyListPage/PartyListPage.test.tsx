@@ -9,8 +9,9 @@
  * **대표 파티는 아래 줄에서 빠진다**(같은 이름이 두 번 서면 어느 것을 눌러야 하는지 모른다),
  * 그리고 **이동표는 그대로다**(강조 카드의 주 버튼도 5.8로 간다).
  *
- * 얼굴 사진은 계약에 없어 닉네임 첫 글자를 쓴다(API-050 · API-052는 `userId`와 닉네임뿐).
- * 이름이 화면에 남는지까지 본다 — 첫 글자만 남으면 누구인지 알 수 없다.
+ * 얼굴 자리는 사진이 있으면 사진, 없으면 닉네임 첫 글자다(업무 -762). 사진은 파티 응답의
+ * `owner` · `members[]`에만 오고 받은 초대(API-052)에는 없다. 이름이 화면에 남는지까지 본다 —
+ * 첫 글자나 사진만 남으면 누구인지 알 수 없다.
  *
  * 5.2는 **계약이 정한 정원(4)만 고를 수 있어야 한다.** 와이어프레임은 6인까지 그렸으므로
  * 나중에 누군가 와이어프레임을 보고 되돌리기 쉬운 자리다.
@@ -22,7 +23,19 @@ import PartySizePage from '../PartySizePage';
 import { renderWithRouter } from '../../../test/render';
 import { getMyInvitations, getMyParties, getPartyPopcorn } from '../../../api/parties';
 import { getPopcornFlavors } from '../../../api/taste';
-import { flavors, invitation, party, partyPopcorn, TEST_PARTY_ID } from '../../../test/party';
+import {
+  BUDDY,
+  flavors,
+  invitation,
+  ME,
+  member,
+  party,
+  partyPopcorn,
+  TEST_PARTY_ID,
+} from '../../../test/party';
+
+/** 파티 응답이 주는 사진 주소(업무 -811). 모양만 계약과 같으면 된다 */
+const PHOTO = '/media/avatars/nanda.jpg';
 
 // 5.2가 같은 모듈에서 정원 상수를 읽으므로 나머지는 실제 것을 남긴다
 vi.mock('../../../api/parties', async () => {
@@ -57,10 +70,34 @@ describe('5.1 파티 시작', () => {
 
     expect(await screen.findByRole('heading', { name: '금요 심야 상영회' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '파티팝콘' })).toBeInTheDocument();
-    // 얼굴 사진이 없어 첫 글자를 쓰지만 이름이 사라지면 누구인지 알 수 없다
+    // 얼굴 자리가 첫 글자여도 이름이 사라지면 누구인지 알 수 없다
     expect(screen.getByText('김난다')).toBeInTheDocument();
     expect(screen.getByText('무비버디')).toBeInTheDocument();
     expect(screen.getByText('2 / 4명 참여')).toBeInTheDocument();
+  });
+
+  it('사진이 있는 파티원은 사진으로, 없는 사람과 받은 초대의 방장은 첫 글자로 선다', async () => {
+    const withPhoto = { ...ME, avatarUrl: PHOTO };
+    vi.mocked(getMyParties).mockResolvedValue([
+      party({ members: [member(withPhoto, 'OWNER'), member(BUDDY)] }),
+      party({
+        partyId: 9101,
+        name: '주말 애니 모임',
+        members: [member(withPhoto, 'OWNER'), member(BUDDY)],
+      }),
+    ]);
+    vi.mocked(getMyInvitations).mockResolvedValue([invitation()]);
+
+    const { container } = renderWithRouter(<PartyListPage />, { route: '/party' });
+
+    expect(await screen.findByText('참여 중인 파티 2')).toBeInTheDocument();
+    // 강조 카드와 아래 카드 줄에 한 번씩
+    expect(container.querySelectorAll(`img[src="${PHOTO}"]`)).toHaveLength(2);
+    expect(screen.queryByText('김')).not.toBeInTheDocument();
+    // 사진이 없는 무비버디(강조 카드 · 카드 줄)와 사진이 오지 않는 초대 방장 무비버디
+    expect(screen.getAllByText('무')).toHaveLength(3);
+    // 사진이 있어도 이름은 남는다 — 강조 카드는 보이는 글자, 카드 줄은 숨은 글자다
+    expect(screen.getAllByText('김난다')).toHaveLength(2);
   });
 
   it('파티원의 팝콘을 섞어 공통 취향으로 세운다', async () => {

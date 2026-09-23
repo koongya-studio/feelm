@@ -21,7 +21,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -37,7 +36,6 @@ import tools.jackson.databind.ObjectMapper;
             "spring.jpa.hibernate.ddl-auto=none",
             "feelm.notification.web-push.poll-interval=24h"
         })
-@AutoConfigureMockMvc
 class WebPushApiContractTest extends SharedPostgresContractTest {
 
     private static final VapidKeys VAPID_KEYS = VapidKeys.generate();

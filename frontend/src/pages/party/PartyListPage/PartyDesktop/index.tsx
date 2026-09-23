@@ -209,6 +209,7 @@ export default function PartyDesktop({
                       faces={party.members.map((member) => ({
                         key: String(member.userId),
                         nickname: member.nickname,
+                        avatarUrl: member.avatarUrl,
                       }))}
                     />
 

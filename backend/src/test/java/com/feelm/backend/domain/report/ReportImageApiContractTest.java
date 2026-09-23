@@ -40,7 +40,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import tools.jackson.databind.JsonNode;
@@ -53,9 +52,9 @@ class ReportImageApiContractTest extends ReportApiContractSupport {
     private static final byte[] VALID_PNG = png(1080, 3268);
 
     @Autowired private ObjectMapper objectMapper;
-    @MockitoSpyBean private ReportImageStorage storage;
-    @MockitoSpyBean private ReportImageLockManager lockManager;
-    @MockitoSpyBean private ReportImageRepository repository;
+    @Autowired private ReportImageStorage storage;
+    @Autowired private ReportImageLockManager lockManager;
+    @Autowired private ReportImageRepository repository;
 
     @Test
     @DisplayName("본인 READY 리포트를 비공개 PNG로 만들고 10분 서명 URL을 반환한다")

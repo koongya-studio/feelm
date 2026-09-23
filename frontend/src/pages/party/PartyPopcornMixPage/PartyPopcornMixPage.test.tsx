@@ -69,6 +69,24 @@ describe('5.9 팝콘 모으기 · 섞기', () => {
     expect(getPartyRecommendations).toHaveBeenCalledWith(TEST_PARTY_ID);
   });
 
+  it('위 파티원 줄은 API-057의 사진을 쓴다 (업무 -762)', async () => {
+    const photo = '/media/avatars/nanda.jpg';
+    const base = partyPopcorn();
+    vi.mocked(getPartyPopcorn).mockResolvedValue({
+      ...base,
+      members: base.members.map((item, index) =>
+        index === 0 ? { ...item, user: { ...item.user, avatarUrl: photo } } : item,
+      ),
+    });
+    renderMix();
+
+    const first = base.members[0].user.nickname;
+    expect(await screen.findByRole('img', { name: `${first}의 프로필 이미지` })).toHaveAttribute(
+      'src',
+      photo,
+    );
+  });
+
   it('누르지 않아도 섞는 장면으로 이어져 새 팝콘이 한 통에 담긴다', async () => {
     renderMix();
 

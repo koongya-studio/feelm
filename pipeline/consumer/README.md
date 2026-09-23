@@ -1,5 +1,8 @@
 # Fold-in Consumer
 
+v26 GBT 전용 번들·독립 scorer 준비는 [GBT.md](./GBT.md)를 따른다. 아직 아래 ALS 실행 경로를
+교체하지 않았으며 실제 개인/파티 연결과 운영 이미지 통합은 후속 업무다.
+
 Kafka의 평가·온보딩·관심없음 이벤트를 받아 최신 사용자 입력으로 ALS Fold-in을 수행하고 TASTE 최대 500편과
 DISCOVERY 최대 100편을 갱신한다. Python 3.12의 독립 프로젝트이며 Spark 코드를 import하지 않는다.
 모델·매핑·영화 메타데이터는 모두 같은 `input_snapshot`을 가리켜야 하며, 하나라도 맞지 않으면 시작을 거부한다.
@@ -144,6 +147,18 @@ uv run feelm-foldin-consumer
 Kafka Group, 환경변수 prefix로 실행한다. `feelm.party-refresh.v1`의 8바이트 Long Kafka key가
 payload의 `partyId`와 같은지 검증하고 기존 `party-mean-fit-v2` 정책으로 최대 500편을 계산한다.
 Spark 코드를 import하지 않으며 기존 Spark 구현은 parity와 롤백 기준선으로만 남긴다.
+
+S15P21E106-742는 같은 토픽의 `schemaVersion=2` GBT 입력 참조를 parser 계약에 추가했다. v2는
+`modelVersion`·`servingRevision`과 구성원별 `generationId`·`inputSchemaVersion`·`inputHash`·후보 ID만
+가지며 vector를 허용하지 않는다. 이 단계에서는 직렬화 경계만 검증하고 v2 점수 계산은 명시적으로
+거절한다. v2가 실제 Kafka에 발행되기 전에 S15P21E106-627의 불변 입력 스냅샷 게시와
+S15P21E106-747의 같은 GBT 구성원별 재점수화가 함께 배포되어야 한다. schema가 없는 v1은 전환 전
+ALS rollback 입력으로 구분한다.
+
+늦은 v1을 결과 게시 없이 소진하고 최신 v2 refresh를 재요청하는 경로, v2 snapshot/schema 오류가
+같은 offset의 pause/restart를 반복하지 않게 하는 격리·재시도 경로와 runner 통합 테스트는
+S15P21E106-747이 소유한다. 해당 구현이 배포되기 전에는 `model:current.modelKind=GBT` 전환과 Backend
+v2 발행을 활성화하지 않는다.
 
 파티 Consumer는 시작할 때 개인 Consumer와 같은 `als-artifacts-v2` SERVING model, mapping,
 movie metadata 고정 URI 세 개를 `load_bundle`로 검증한다. Redis 게시 Lua는 partition assign 때

@@ -73,14 +73,19 @@ class ParallelTestExecutionPolicyTest {
             violations =
                     sources.filter(path -> path.toString().endsWith(".java"))
                             .filter(ParallelTestExecutionPolicyTest::declaresOutputCapture)
-                            .filter(path -> !read(path).contains(OUTPUT_CAPTURE_LOCK))
+                            .filter(
+                                    path ->
+                                            !read(path).contains(OUTPUT_CAPTURE_LOCK)
+                                                    || !usesSharedRuntimeLock(path))
                             .map(ParallelTestExecutionPolicyTest::relativePath)
                             .sorted()
                             .toList();
         }
 
         assertThat(violations)
-                .as("Output capture tests must serialize changes to the process output streams")
+                .as(
+                        "Output capture tests must serialize changes to the process output streams"
+                                + " and must not overlap a Spring context start, which resets logging")
                 .isEmpty();
     }
 

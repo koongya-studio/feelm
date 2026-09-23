@@ -138,6 +138,28 @@ describe('5.8 파티원 팝콘 — 친구 고르기', () => {
    * 통은 30알로 요약해 그린다(`design-concept.md` 2.10). 실제 알 수는 범례가 말해야
    * 하므로 펼친 목록이 사라지면 그 수를 아는 방법이 없어진다.
    */
+  it('친구 칩은 API-057의 사진을 쓰고, 사진이 없으면 자리표시자다 (업무 -762)', async () => {
+    const photo = '/media/avatars/nanda.jpg';
+    const base = partyPopcorn();
+    vi.mocked(getPartyPopcorn).mockResolvedValue({
+      ...base,
+      members: base.members.map((item) =>
+        item.user.userId === ME.userId
+          ? { ...item, user: { ...item.user, avatarUrl: photo } }
+          : item,
+      ),
+    });
+    await renderPopcorn();
+
+    expect(screen.getByRole('img', { name: `${ME.nickname}의 프로필 이미지` })).toHaveAttribute(
+      'src',
+      photo,
+    );
+    expect(
+      screen.queryByRole('img', { name: `${BUDDY.nickname}의 프로필 이미지` }),
+    ).not.toBeInTheDocument();
+  });
+
   it('펼치면 8가지 맛 개수를 보여준다', async () => {
     await renderPopcorn();
 

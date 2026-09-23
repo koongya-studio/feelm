@@ -28,7 +28,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
@@ -40,7 +39,6 @@ import tools.jackson.databind.ObjectMapper;
 
 /** API-051·052: 파티 초대 생성과 받은 초대 목록의 HTTP 계약 테스트. */
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
-@AutoConfigureMockMvc
 class PartyInvitationApiContractTest extends SharedPostgresContractTest {
     private static final String LIST_PATH = "/api/v1/parties/invitations";
     private static final Instant CREATED_AT = Instant.parse("2026-09-01T00:00:00Z");

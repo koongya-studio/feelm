@@ -6,9 +6,7 @@ import com.feelm.backend.global.security.JjwtTokenProvider;
 import com.feelm.backend.global.security.JwtProperties;
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedPostgresContractTest;
-import com.feelm.backend.support.SharedRedisContainer;
 import com.feelm.backend.support.SharedRedisState;
-import com.redis.testcontainers.RedisContainer;
 import jakarta.persistence.EntityManagerFactory;
 import java.math.BigDecimal;
 import java.net.URI;
@@ -34,7 +32,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.JsonNode;
@@ -51,9 +48,6 @@ import tools.jackson.databind.node.ObjectNode;
         })
 @DisplayName("API-028 영화 검색 — 실제 HTTP 입력 경계")
 class MovieSearchInputHttpContractTest extends SharedPostgresContractTest {
-
-    @ServiceConnection static final RedisContainer REDIS = SharedRedisContainer.instance();
-
     @LocalServerPort private int port;
     @Autowired private TokenProvider tokenProvider;
     @Autowired private JwtProperties jwtProperties;

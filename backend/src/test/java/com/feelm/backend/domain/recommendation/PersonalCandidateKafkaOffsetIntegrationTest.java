@@ -15,9 +15,7 @@ import com.feelm.backend.domain.recommendation.service.RecommendationReasonServi
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.infrastructure.redis.RedisRecommendationCandidateReader;
 import com.feelm.backend.support.SharedPostgresContractTest;
-import com.feelm.backend.support.SharedRedisContainer;
 import com.github.dockerjava.api.command.InspectContainerResponse;
-import com.redis.testcontainers.RedisContainer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.time.Duration;
@@ -43,8 +41,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -63,12 +59,10 @@ import org.testcontainers.utility.DockerImageName;
         properties = {
             "spring.flyway.enabled=true",
             "spring.jpa.hibernate.ddl-auto=none",
-            "spring.task.scheduling.enabled=false",
             "feelm.party.refresh.consumer-enabled=true",
             "feelm.party.refresh.worker-enabled=false",
             "feelm.recommendation.candidate-consumer-enabled=true"
         })
-@AutoConfigureMockMvc
 class PersonalCandidateKafkaOffsetIntegrationTest extends SharedPostgresContractTest {
     private static final String TOPIC = "feelm.candidate-updated.v1";
     private static final String PERSONAL = "feelm-personal-buffer-v1";
@@ -77,9 +71,6 @@ class PersonalCandidateKafkaOffsetIntegrationTest extends SharedPostgresContract
     private static final long NEXT_USER = 58502L;
     private static final TopicPartition PARTITION = new TopicPartition(TOPIC, 0);
     private static final MappedKafkaContainer KAFKA = startKafka();
-
-    @ServiceConnection static final RedisContainer REDIS = SharedRedisContainer.instance();
-
     @Autowired JdbcTemplate jdbc;
     @Autowired StringRedisTemplate redis;
     @Autowired DataSource dataSource;

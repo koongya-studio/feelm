@@ -82,27 +82,95 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
 
     private RecommendationCandidateBatch readOnce(long userId) {
         String stored;
-        String vector;
         try {
             stored = redisTemplate.opsForValue().get(key(userId));
-            vector = redisTemplate.opsForValue().get(vectorKey(userId));
         } catch (RuntimeException exception) {
             throw unavailable(exception);
         }
-        if (stored == null || stored.isBlank() || vector == null || vector.isBlank()) {
+        if (stored == null || stored.isBlank()) {
             throw unavailable(null);
         }
 
         try {
+            JsonNode candidate = objectMapper.readTree(stored);
             StoredCandidateBatch storedBatch =
                     objectMapper.readValue(stored, StoredCandidateBatch.class);
-            StoredVector storedVector = objectMapper.readValue(vector, StoredVector.class);
             validate(storedBatch);
-            validateVector(storedBatch, storedVector);
+            String storedState = readState(userId);
+            JsonNode currentModel = readCurrentModel();
+            if (currentModel != null && currentModel.has("modelKind")
+                    || UserRecommendationStateContract.hasGbtMetadata(candidate)
+                    || storedState != null && !storedState.isBlank()) {
+                validateGbtState(userId, storedBatch, candidate, storedState, currentModel);
+            } else {
+                validateLegacyVector(userId, storedBatch);
+            }
             return toBatch(storedBatch);
         } catch (JacksonException | IllegalArgumentException exception) {
             throw unavailable(exception);
         }
+    }
+
+    private JsonNode readCurrentModel() throws JacksonException {
+        String stored;
+        try {
+            stored =
+                    redisTemplate
+                            .opsForValue()
+                            .get(UserRecommendationStateContract.CURRENT_MODEL_KEY);
+        } catch (RuntimeException exception) {
+            throw unavailable(exception);
+        }
+        if (stored == null || stored.isBlank()) {
+            return null;
+        }
+        JsonNode currentModel = objectMapper.readTree(stored);
+        if (!currentModel.isObject()) {
+            throw new IllegalArgumentException("Invalid current serving model");
+        }
+        return currentModel;
+    }
+
+    private String readState(long userId) {
+        try {
+            return redisTemplate.opsForValue().get(UserRecommendationStateContract.key(userId));
+        } catch (RuntimeException exception) {
+            throw unavailable(exception);
+        }
+    }
+
+    private void validateGbtState(
+            long userId,
+            StoredCandidateBatch batch,
+            JsonNode candidate,
+            String storedState,
+            JsonNode currentModel)
+            throws JacksonException {
+        if (batch.candidateVersion() != CURRENT_CANDIDATE_VERSION) {
+            throw new IllegalArgumentException("GBT candidates require Candidate v6");
+        }
+        if (storedState == null || storedState.isBlank()) {
+            throw new IllegalArgumentException("Recommendation state is missing");
+        }
+        var state =
+                UserRecommendationStateContract.parse(objectMapper.readTree(storedState), userId);
+        UserRecommendationStateContract.verifyCandidate(candidate, state);
+        UserRecommendationStateContract.verifyCurrentModel(currentModel, state);
+    }
+
+    private void validateLegacyVector(long userId, StoredCandidateBatch batch)
+            throws JacksonException {
+        String vector;
+        try {
+            vector = redisTemplate.opsForValue().get(vectorKey(userId));
+        } catch (RuntimeException exception) {
+            throw unavailable(exception);
+        }
+        if (vector == null || vector.isBlank()) {
+            throw new IllegalArgumentException("Legacy vector is missing");
+        }
+        StoredVector storedVector = objectMapper.readValue(vector, StoredVector.class);
+        validateVector(batch, storedVector);
     }
 
     private String key(long userId) {

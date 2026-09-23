@@ -133,7 +133,8 @@ class PartyRecommendationServiceTest {
 
         service.getRecommendations(10, PARTY_ID, 3, true);
 
-        verify(recommendations).expose(List.of(storedItem()), CLOCK_NOW.plus(1, ChronoUnit.MICROS));
+        verify(recommendations)
+                .expose(PARTY_ID, List.of(storedItem()), CLOCK_NOW.plus(1, ChronoUnit.MICROS));
     }
 
     @Test
@@ -150,7 +151,7 @@ class PartyRecommendationServiceTest {
 
         service.getRecommendations(10, PARTY_ID, 3, true);
 
-        verify(recommendations).expose(List.of(storedItem()), CLOCK_NOW);
+        verify(recommendations).expose(PARTY_ID, List.of(storedItem()), CLOCK_NOW);
     }
 
     private PartyInputSnapshot accessible() {

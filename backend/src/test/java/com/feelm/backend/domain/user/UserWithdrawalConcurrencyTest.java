@@ -6,8 +6,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedPostgresContractTest;
-import com.feelm.backend.support.SharedRedisContainer;
-import com.redis.testcontainers.RedisContainer;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.time.Instant;
@@ -25,8 +23,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -41,7 +37,6 @@ import org.springframework.test.web.servlet.MockMvc;
  * V202609051000) Entity로 만든 H2 스키마로는 둘 다 확인할 수 없다. 내 구독 OTT 계약 테스트가 같은 방식을 쓴다.
  */
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
-@AutoConfigureMockMvc
 @DisplayName("회원 탈퇴 동시성 — API-013")
 class UserWithdrawalConcurrencyTest extends SharedPostgresContractTest {
 
@@ -49,16 +44,13 @@ class UserWithdrawalConcurrencyTest extends SharedPostgresContractTest {
     private static final long USER_ID = 10;
     private static final String PASSWORD = "P@ssw0rd1";
 
-    /**
-     * 탈퇴가 Refresh Token을 폐기하므로 Redis도 필요하다. PostgreSQL은 상위 클래스가 공유한다.
+    /*
+     * 탈퇴가 Refresh Token을 폐기하므로 Redis도 필요하다. PostgreSQL과 Redis는 상위 클래스가 공유한다.
      *
-     * <p>{@code @SpringBootTest}의 속성 집합을 {@code MovieFilterOptionsContractTest}와 똑같이 맞춘 이유는 Spring
-     * Context를 공유하기 위해서다. 속성이 하나라도 다르면 컨텍스트가 따로 만들어지고 커넥션 풀도 따로 생기는데, 공유 PostgreSQL 한 대에 풀이 쌓이면
-     * 클라이언트 한도를 넘겨 무관한 테스트의 컨텍스트 생성이 실패한다. 인증 mock 비활성화는 공유 PostgreSQL 지원 클래스가 모든 하위 테스트에 공통으로
-     * 적용한다.
+     * @SpringBootTest의 속성 집합을 다른 공유 PostgreSQL 테스트와 똑같이 맞춘 이유는 Spring Context를 공유하기 위해서다.
+     * 속성이 하나라도 다르면 컨텍스트가 따로 만들어지고 커넥션 풀도 따로 생기는데, 공유 PostgreSQL 한 대에 풀이 쌓이면 클라이언트 한도를 넘겨
+     * 무관한 테스트의 컨텍스트 생성이 실패한다.
      */
-    @ServiceConnection static final RedisContainer REDIS = SharedRedisContainer.instance();
-
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired TokenProvider tokens;

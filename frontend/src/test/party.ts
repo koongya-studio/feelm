@@ -26,11 +26,12 @@ export const ME = { userId: 1024, nickname: '김난다' };
 /** 다른 파티원 */
 export const BUDDY = { userId: 2048, nickname: '무비버디' };
 
+/** 파티원. 사진(`avatarUrl`)은 따로 주지 않으면 없는 사람이다(업무 -811) */
 export function member(
-  user: { userId: number; nickname: string },
+  user: { userId: number; nickname: string; avatarUrl?: string | null },
   role: 'OWNER' | 'MEMBER' = 'MEMBER',
 ): PartyMember {
-  return { ...user, role, joinedAt: '2026-09-01T00:00:00Z' };
+  return { avatarUrl: null, ...user, role, joinedAt: '2026-09-01T00:00:00Z' };
 }
 
 export function party(overrides: Partial<Party> = {}): Party {
@@ -66,11 +67,11 @@ export function invitation(overrides: Partial<PartyInvitation> = {}): PartyInvit
 
 /** 8종 맛 자리를 모두 채운 한 사람의 팝콘. 계약이 0알도 내려주기로 정했다(API-057) */
 export function memberPopcorn(
-  user: { userId: number; nickname: string },
+  user: { userId: number; nickname: string; avatarUrl?: string | null },
   counts: number[],
 ): PartyMemberPopcorn {
   return {
-    user,
+    user: { avatarUrl: null, ...user },
     totalCount: counts.reduce((sum, count) => sum + count, 0),
     flavors: FLAVOR_CODES.map((flavorCode, index) => ({
       flavorCode,

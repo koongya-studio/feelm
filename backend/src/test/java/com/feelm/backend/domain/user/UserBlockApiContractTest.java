@@ -29,9 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import tools.jackson.databind.JsonNode;
@@ -39,7 +37,6 @@ import tools.jackson.databind.ObjectMapper;
 
 /** API-020~022: 실제 마이그레이션과 PostgreSQL을 사용하는 사용자 차단 HTTP 계약 테스트. */
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
-@AutoConfigureMockMvc
 @DisplayName("API-020~022 사용자 차단·해제·목록")
 class UserBlockApiContractTest extends SharedPostgresContractTest {
 
@@ -51,7 +48,7 @@ class UserBlockApiContractTest extends SharedPostgresContractTest {
     @Autowired ObjectMapper objectMapper;
 
     /** T25에서 선조회만 통과시키고 UNIQUE 제약 경로를 결정적으로 태우기 위한 spy. 기본 동작은 실제 빈과 같다. */
-    @MockitoSpyBean UserBlockRepository blockRepositorySpy;
+    @Autowired UserBlockRepository blockRepositorySpy;
 
     private ExecutorService executor;
 

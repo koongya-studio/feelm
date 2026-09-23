@@ -17,7 +17,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -29,7 +28,6 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * user_blocks}의 양방향 판정이 모두 마이그레이션에 있어 손으로 만든 스키마로는 같은 것을 확인할 수 없다.
  */
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
-@AutoConfigureMockMvc
 @SharedTestRuntime
 @DisplayName("공개 프로필 API 계약 — API-062")
 class PublicProfileContractTest extends SharedPostgresContractTest {

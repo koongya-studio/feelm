@@ -11,8 +11,6 @@ import com.feelm.backend.domain.recommendation.service.RecommendationBufferServi
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.infrastructure.gemini.GeminiRecommendationReasonGenerator;
 import com.feelm.backend.support.SharedPostgresContractTest;
-import com.feelm.backend.support.SharedRedisContainer;
-import com.redis.testcontainers.RedisContainer;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Set;
@@ -24,8 +22,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.core.env.Environment;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -37,13 +33,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /** 수동 실행: 실제 GMS 키가 있을 때 Redis v6 → DB → GMS → 세 응답을 검증한다. */
-@SpringBootTest(
-        properties = {
-            "spring.flyway.enabled=true",
-            "spring.jpa.hibernate.ddl-auto=none",
-            "spring.task.scheduling.enabled=false"
-        })
-@AutoConfigureMockMvc
+@SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 @Tag("live")
 @EnabledIfEnvironmentVariable(named = "GMS_KEY", matches = ".+")
 class RecommendationReasonLiveIntegrationTest extends SharedPostgresContractTest {
@@ -51,8 +41,6 @@ class RecommendationReasonLiveIntegrationTest extends SharedPostgresContractTest
     private static final long USER = 49801;
     private static final String CANDIDATES_KEY = "feelm:user:" + USER + ":candidates";
     private static final String VECTOR_KEY = "feelm:user:" + USER + ":vector";
-
-    @ServiceConnection static final RedisContainer REDIS = SharedRedisContainer.instance();
 
     @DynamicPropertySource
     static void gmsKey(DynamicPropertyRegistry registry) {

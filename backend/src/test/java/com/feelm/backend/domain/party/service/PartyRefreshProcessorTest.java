@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 class PartyRefreshProcessorTest {
     private final PartyRepository parties = mock(PartyRepository.class);
@@ -35,7 +37,7 @@ class PartyRefreshProcessorTest {
             new PartyRefreshProcessor(parties, members, requests, redis, publisher);
 
     @Test
-    void publishesCurrentInputThenDeletesRequest() {
+    void publishesCurrentInputThenDeletesRequest() throws Exception {
         activeParty(9001L);
         when(members.findUserIdsByPartyId(9001L)).thenReturn(List.of(1024L));
         when(redis.read(List.of(1024L))).thenReturn(snapshot("g1"));
@@ -44,11 +46,33 @@ class PartyRefreshProcessorTest {
 
         ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
         verify(publisher).publishPartyRefresh(eq(9001L), payload.capture());
-        PartyRefreshPayload message = (PartyRefreshPayload) payload.getValue();
-        assertThat(message.partyId()).isEqualTo(9001L);
-        assertThat(message.inputId()).startsWith("sha256:");
-        assertThat(message.members().getFirst().candidateMovieIds()).containsExactly(550L);
+        JsonNode message = new ObjectMapper().valueToTree(payload.getValue());
+        assertThat(message.path("partyId").longValue()).isEqualTo(9001L);
+        assertThat(message.path("inputId").textValue()).startsWith("sha256:");
+        assertThat(message.path("members").get(0).path("candidateMovieIds").get(0).longValue())
+                .isEqualTo(550L);
+        assertThat(message.has("schemaVersion")).isFalse();
         verify(requests).delete(9001L);
+    }
+
+    @Test
+    void publishesGbtStateReferencesWithoutVectors() throws Exception {
+        activeParty(9001L);
+        when(members.findUserIdsByPartyId(9001L)).thenReturn(List.of(1024L));
+        when(redis.read(List.of(1024L))).thenReturn(gbtSnapshot("g1", HASH));
+
+        processor.process(9001L);
+
+        ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
+        verify(publisher).publishPartyRefresh(eq(9001L), payload.capture());
+        JsonNode message = new ObjectMapper().valueToTree(payload.getValue());
+        assertThat(message.path("schemaVersion").intValue())
+                .isEqualTo(PartyRefreshPayload.SCHEMA_VERSION);
+        assertThat(message.path("modelVersion").textValue()).isEqualTo("gbt-v26");
+        assertThat(message.path("servingRevision").textValue()).isEqualTo("serving-r1");
+        assertThat(message.path("members").get(0).path("generationId").textValue()).isEqualTo("g1");
+        assertThat(message.path("members").get(0).path("inputHash").textValue()).isEqualTo(HASH);
+        assertThat(message.path("members").get(0).has("vector")).isFalse();
     }
 
     @Test
@@ -98,6 +122,24 @@ class PartyRefreshProcessorTest {
         assertThat(initial).matches("sha256:[0-9a-f]{64}");
     }
 
+    @Test
+    void gbtInputIdDependsOnServingRevisionAndInputReference() {
+        String initial = PartyInputId.from(9001L, gbtSnapshot("g1", HASH));
+
+        assertThat(PartyInputId.from(9001L, gbtSnapshot("g1", HASH))).isEqualTo(initial);
+        assertThat(PartyInputId.from(9001L, gbtSnapshot("g1", OTHER_HASH))).isNotEqualTo(initial);
+        PartyInputSnapshot changedRevision =
+                new PartyInputSnapshot(
+                        PartyInputSnapshot.GBT_STATE_SCHEMA_VERSION,
+                        "gbt-v26",
+                        "serving-r2",
+                        gbtSnapshot("g1", HASH).members());
+        assertThat(PartyInputId.from(9001L, changedRevision)).isNotEqualTo(initial);
+    }
+
+    private static final String HASH = "sha256:" + "a".repeat(64);
+    private static final String OTHER_HASH = "sha256:" + "b".repeat(64);
+
     private void activeParty(long partyId) {
         Party party = mock(Party.class);
         when(party.getStatus()).thenReturn(PartyStatus.ACTIVE);
@@ -111,5 +153,15 @@ class PartyRefreshProcessorTest {
                 List.of(
                         new PartyInputSnapshot.Member(
                                 1024L, generation, List.of(), List.of(550L))));
+    }
+
+    private static PartyInputSnapshot gbtSnapshot(String generation, String inputHash) {
+        return new PartyInputSnapshot(
+                PartyInputSnapshot.GBT_STATE_SCHEMA_VERSION,
+                "gbt-v26",
+                "serving-r1",
+                List.of(
+                        PartyInputSnapshot.Member.gbt(
+                                1024L, generation, "gbt-input-v1", inputHash, List.of(550L))));
     }
 }

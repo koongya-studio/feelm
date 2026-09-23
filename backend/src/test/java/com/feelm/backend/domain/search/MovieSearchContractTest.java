@@ -14,9 +14,7 @@ import com.feelm.backend.global.security.JjwtTokenProvider;
 import com.feelm.backend.global.security.JwtProperties;
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedPostgresContractTest;
-import com.feelm.backend.support.SharedRedisContainer;
 import com.feelm.backend.support.SharedRedisState;
-import com.redis.testcontainers.RedisContainer;
 import jakarta.persistence.EntityManagerFactory;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -40,8 +38,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -67,15 +63,11 @@ import tools.jackson.databind.node.ObjectNode;
             "spring.jpa.hibernate.ddl-auto=none",
             "spring.jpa.properties.hibernate.generate_statistics=true"
         })
-@AutoConfigureMockMvc
 @Transactional
 @DisplayName("API-028 영화 검색 — PostgreSQL 계약")
 class MovieSearchContractTest extends SharedPostgresContractTest {
 
     private static final String PATH = "/api/v1/movies/search";
-
-    @ServiceConnection static final RedisContainer REDIS = SharedRedisContainer.instance();
-
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private MovieSearchCursorCodec cursorCodec;

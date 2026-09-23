@@ -25,10 +25,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.feelm.backend.domain.movie.service.MovieViewEventWriter;
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedPostgresContractTest;
-import com.feelm.backend.support.SharedRedisContainer;
 import com.feelm.backend.support.SharedRedisState;
 import com.feelm.backend.support.SharedTestRuntime;
-import com.redis.testcontainers.RedisContainer;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -44,7 +42,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
 import org.springframework.context.annotation.Import;
@@ -68,9 +65,6 @@ import tools.jackson.databind.ObjectMapper;
 class MovieDetailContractTest extends SharedPostgresContractTest {
 
     private static final String PATH = "/api/v1/movies/{movieId}";
-
-    @ServiceConnection static final RedisContainer REDIS = SharedRedisContainer.instance();
-
     @Autowired private MockMvc mockMvc;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private JdbcTemplate jdbc;
