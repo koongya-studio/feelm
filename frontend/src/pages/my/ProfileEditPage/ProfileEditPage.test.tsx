@@ -20,16 +20,32 @@ import MyDashboardPage from '../MyDashboardPage';
 import PublicProfilePage from '../PublicProfilePage';
 import { resetSessionForTest, startSession } from '../../../api/session';
 import { resetSessionStore } from '../../../mocks/sessionStore';
-import { saveAvatar } from '../../../api/avatarStore';
 import { mockMyProfile } from '../../../mocks/user';
+import { renderCrop } from '../../../utils/avatarImage';
 import { ROUTE_PATTERN } from '../../../routes/paths';
 import type { MyProfile } from '../../../types/user';
+
+/*
+ * jsdom에는 캔버스가 없어 자르기 결과를 만들 수 없다. 자르는 셈은 `utils/avatarImage.test.ts`가
+ * 보고, 여기서는 잘린 JPEG가 API-081로 가는 길만 본다.
+ */
+vi.mock('../../../utils/avatarImage', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../utils/avatarImage')>()),
+  renderCrop: vi.fn(() => Promise.resolve(new Blob(['jpeg'], { type: 'image/jpeg' }))),
+}));
 
 /** 서버가 이미 쓰고 있다고 답하는 닉네임 */
 const TAKEN = '이미있음';
 
 let me: MyProfile;
 let patches: unknown[];
+/** 프로필 사진 요청(API-081 · 082). 올린 파일은 multipart `file` 칸이다 */
+let avatarCalls: { method?: string; file: FormDataEntryValue | null }[];
+/** API-081이 거절할 때의 응답. 없으면 받아들인다 */
+let avatarFailure: { status: number; code: string } | null;
+
+/** 서버가 새 사진에 붙이는 주소 */
+const NEW_PHOTO = '/media/avatars/new.jpg';
 /** 닉네임 사용 가능 확인(API-016)으로 물어본 값 */
 let checks: string[];
 
@@ -66,6 +82,27 @@ function stubServer() {
         return json(me);
       }
 
+      if (url === '/api/v1/users/me/avatar') {
+        avatarCalls.push({
+          method: init?.method,
+          file: init?.body instanceof FormData ? init.body.get('file') : null,
+        });
+
+        if (init?.method === 'DELETE') {
+          me = { ...me, avatarUrl: null };
+
+          return Promise.resolve(new Response(null, { status: 204 }));
+        }
+
+        if (avatarFailure) {
+          return json({ code: avatarFailure.code, message: '거절' }, avatarFailure.status);
+        }
+
+        me = { ...me, avatarUrl: NEW_PHOTO };
+
+        return json({ avatarUrl: NEW_PHOTO });
+      }
+
       if (url === '/api/v1/users/me') return json(me);
 
       if (url.startsWith('/api/v1/users/nickname-availability')) {
@@ -89,8 +126,10 @@ beforeEach(() => {
   me = { ...mockMyProfile };
   patches = [];
   checks = [];
+  avatarCalls = [];
+  avatarFailure = null;
+  vi.mocked(renderCrop).mockClear();
   resetSessionStore();
-  // 사진은 기기 저장소에 남는다(업무 -740). 시험마다 비우고 시작한다
   localStorage.clear();
   resetSessionForTest();
   startSession('token');
@@ -455,8 +494,8 @@ describe('7.2 프로필 사진', () => {
     expect(screen.getByRole('slider')).toBeInTheDocument();
   });
 
-  it('현재 사진을 지우면 한 번 더 묻고 기본 이미지로 돌아간다', async () => {
-    saveAvatar(me.userId, 'data:image/jpeg;base64,AAAA');
+  it('현재 사진을 지우면 한 번 더 묻고 API-082로 기본 이미지로 돌아간다', async () => {
+    me = { ...me, avatarUrl: '/media/avatars/old.jpg' };
     await renderEdit();
 
     expect(screen.getByRole('img', { name: `${me.nickname}의 프로필 이미지` })).toBeInTheDocument();
@@ -476,5 +515,97 @@ describe('7.2 프로필 사진', () => {
       ).not.toBeInTheDocument(),
     );
     expect(screen.getByRole('status')).toHaveTextContent('프로필 사진을 삭제했어요');
+    expect(avatarCalls).toEqual([{ method: 'DELETE', file: null }]);
+  });
+
+  /** 앨범에서 사진을 골라 자르기 화면에서 `적용`까지 누른다 */
+  async function applyPhoto() {
+    fireEvent.change(screen.getByTestId('avatar-album-input'), {
+      target: { files: [new File(['png'], 'me.png', { type: 'image/png' })] },
+    });
+
+    const cropper = await screen.findByRole('dialog', { name: '사진 위치 조정' });
+    const image = cropper.querySelector('img');
+
+    if (!image) throw new Error('자르기 사진이 없다');
+    Object.defineProperties(image, {
+      naturalWidth: { value: 800 },
+      naturalHeight: { value: 600 },
+    });
+    fireEvent.load(image);
+    fireEvent.click(within(cropper).getByRole('button', { name: '적용' }));
+  }
+
+  it('7.2 → 7.1 잘라 올린 사진은 API-081이 준 주소로 보이고 기기에 남기지 않는다', async () => {
+    const router = await renderEdit();
+
+    await applyPhoto();
+
+    expect(await screen.findByRole('status')).toHaveTextContent('프로필 사진을 바꿨어요');
+    expect(avatarCalls).toHaveLength(1);
+    expect(avatarCalls[0].method).toBe('PUT');
+    expect(avatarCalls[0].file).toBeInstanceOf(Blob);
+    expect(screen.getByRole('img', { name: `${me.nickname}의 프로필 이미지` })).toHaveAttribute(
+      'src',
+      NEW_PHOTO,
+    );
+    expect(localStorage.length).toBe(0);
+
+    // 7.1은 API-014를 다시 읽는다. 다른 기기에서 로그인해도 같은 값이다. 7.1은 사진을 배경에 깐다
+    fireEvent.click(screen.getByRole('button', { name: '완료' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe(ROUTE_PATTERN.my));
+    await waitFor(() =>
+      expect(screen.getByTestId('profile-backdrop')).toHaveAttribute('data-photo', 'image'),
+    );
+    expect(screen.getByTestId('profile-backdrop').style.getPropertyValue('--profile-photo')).toBe(
+      `url("${NEW_PHOTO}")`,
+    );
+  });
+
+  it('서버가 사진을 거절하면(400 · 413) 기존 사진을 둔 채 다른 사진을 고르게 한다', async () => {
+    me = { ...me, avatarUrl: '/media/avatars/old.jpg' };
+    avatarFailure = { status: 400, code: 'AVATAR_INVALID' };
+    await renderEdit();
+
+    await applyPhoto();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '이 사진은 올릴 수 없어요. 다른 사진을 골라 주세요',
+    );
+    expect(screen.queryByRole('button', { name: '다시 시도' })).not.toBeInTheDocument();
+    expect(screen.getByRole('img', { name: `${me.nickname}의 프로필 이미지` })).toHaveAttribute(
+      'src',
+      '/media/avatars/old.jpg',
+    );
+
+    avatarFailure = { status: 413, code: 'AVATAR_TOO_LARGE' };
+    await applyPhoto();
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('10MB 이하의 사진만 올릴 수 있어요'),
+    );
+  });
+
+  it('저장소가 막히면(503) 기존 사진을 두고, 다시 시도하면 같은 사진을 다시 올린다', async () => {
+    avatarFailure = { status: 503, code: 'AVATAR_STORAGE_UNAVAILABLE' };
+    await renderEdit();
+
+    await applyPhoto();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '사진을 올리지 못했어요. 기존 사진은 그대로예요.',
+    );
+    expect(
+      screen.queryByRole('img', { name: `${me.nickname}의 프로필 이미지` }),
+    ).not.toBeInTheDocument();
+
+    avatarFailure = null;
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+
+    expect(await screen.findByText('프로필 사진을 바꿨어요')).toBeInTheDocument();
+    // 다시 자르지 않고 들고 있던 사진을 그대로 보낸다
+    expect(renderCrop).toHaveBeenCalledOnce();
+    expect(avatarCalls).toHaveLength(2);
+    expect(await (avatarCalls[1].file as Blob).text()).toBe('jpeg');
   });
 });

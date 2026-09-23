@@ -31,7 +31,7 @@
 | 화면 | 함수 | 남은 이유 | 선행 백엔드 업무 | 프론트 연동 업무 |
 | --- | --- | --- | --- | --- |
 | 7.2-B로 들어가는 링크(5.8 `취향 보기` · 7.1 `프로필 공유`) | — | 7.2-B는 실제 API-062를 부르지만(업무 -810) 주소를 여는 `publicId`를 주는 API가 없다(API-014 · API-057 응답에 없음). 링크는 감춰 두었고 7.1 공유는 숫자 ID 주소라 받는 사람에게 404다 | API-014 · API-057에 `publicId` 추가(업무 없음) | 없음 |
-| 7.1 · 7.2 · 7.2-A 프로필 사진 | `users.getMyProfileView` · `updateProfileExtras` · `api/avatarStore.ts` | 계약에 필드도 업로드 API도 이미지 저장소도 없다(업무 -616). 이 기기의 `localStorage`에 계정별로 둬서 앱을 다시 열어도 남지만(업무 -740), **다른 기기와 다른 사람(공개 프로필 · 파티)에게는 보이지 않는다** | 사진 업로드 · 삭제 API, API-014 · 062 `avatarUrl`, 이미지 저장소 | 없음. 서버가 생기면 `avatarStore.ts`를 지운다 |
+| 5.x 파티원 자리의 프로필 사진 | — | 7.x 사진은 서버에 있지만(API-014 · 062 · 081 · 082, 업무 -762) 파티 목록 · 상세 · 팝콘 응답의 사용자 요약에 `avatarUrl`이 없다. 자리표시자를 그린다 | S15P21E106-811 | S15P21E106-762(두 번째 MR) |
 | 7.1 · 7.2 · 7.2-A 자기소개 · 공개 키워드 · 공개 필름 | `users.getMyProfileView` · `updateProfileExtras` · `getMyPublicProfile` | 계약에 필드가 없다. API-015는 닉네임 · 생년월일 · 성별 · 공개 범위만 받는다(업무 -616). 세션 메모리라 새로고침하면 처음 값으로 돌아간다 | 없음. 계약부터 정해야 한다 | 없음 |
 | 2.6 · 2.7 `이번 주 +N` | `watch.getRatingCounts`의 `weeklyFrameDelta` | 대응 필드가 없어 고정값(`types/unspecified.ts`). 프레임 · 팝콘 수는 실제(API-014 · 041) | 없음 | 없음 |
 
@@ -81,10 +81,12 @@
 | `updateMyProfile` | 실제 | API-015 |
 | `checkNicknameAvailability` | 실제 | API-016 |
 | `searchUsers` | 실제 | API-019 |
-| `getMyProfileView` | 조합 + 기기 + **목업** | 닉네임 · 수치는 API-014, 사진은 이 기기의 저장소, 소개 · 공개 항목은 목업(2장) |
+| `getMyProfileView` | 조합 + **목업** | 닉네임 · 사진 · 수치는 API-014, 소개 · 공개 항목은 목업(2장) |
 | `getMyPublicProfile` | 조합 + **목업** | `getMyProfileView`를 공개용으로 거른다. 내 `publicId`를 알 길이 없어 API-062를 부르지 못한다 |
 | `getPublicProfile` | 실제 | API-062(업무 -810). 응답을 `ProfileView`로 바꾼다. 한줄평 목록은 계약에 없어 `null` |
-| `updateProfileExtras` | 기기 + **목업** | 계약 없음(2장). 사진은 기기 저장소에 계정별로, 나머지는 세션 메모리에 둔다 |
+| `updateProfileExtras` | **목업** | 계약 없음(2장). 소개 · 공개 항목을 세션 메모리에 둔다 |
+| `uploadMyAvatar` | 실제 | API-081 multipart `file`. 7.2가 잘라 만든 512px JPEG를 올린다(업무 -762) |
+| `deleteMyAvatar` | 실제 | API-082. 7.2 `기본 이미지로 변경` · `현재 사진 삭제` |
 
 ### `settings.ts` — 알림 설정 · 차단 · 탈퇴
 
