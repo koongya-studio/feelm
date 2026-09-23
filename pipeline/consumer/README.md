@@ -152,17 +152,17 @@ Spark 코드를 import하지 않으며 기존 Spark 구현은 parity와 롤백 �
 
 S15P21E106-742는 같은 토픽의 `schemaVersion=2` GBT 입력 참조를 parser 계약에 추가했다. v2는
 `modelVersion`·`servingRevision`과 구성원별 `generationId`·`inputSchemaVersion`·`inputHash`·후보 ID만
-가지며 vector를 허용하지 않는다. 이 단계에서는 직렬화 경계만 검증하고 v2 점수 계산은 명시적으로
-거절한다. v2가 실제 Kafka에 발행되기 전에 S15P21E106-627의 불변 입력 스냅샷 게시와
-S15P21E106-747의 같은 GBT 구성원별 재점수화가 함께 배포되어야 한다. schema가 없는 v1은 전환 전
-ALS rollback 입력으로 구분한다.
+가지며 vector를 허용하지 않는다. `--gbt-bundle`을 명시하면 627의 불변 입력을 읽어 동일 GBT로
+구성원별 재점수화를 수행한다. 실행과 검증은 [747 안내](GBT-747.md)를 따른다. v2가 실제 Kafka에
+발행되기 전에 627의 입력 게시와 747의 GBT 경로가 함께 배포되어야 한다. schema가 없는 v1은
+전환 전 ALS rollback 입력으로 구분한다.
 
 늦은 v1을 결과 게시 없이 소진하고 최신 v2 refresh를 재요청하는 경로, v2 snapshot/schema 오류가
-같은 offset의 pause/restart를 반복하지 않게 하는 격리·재시도 경로와 runner 통합 테스트는
-S15P21E106-747이 소유한다. 해당 구현이 배포되기 전에는 `model:current.modelKind=GBT` 전환과 Backend
-v2 발행을 활성화하지 않는다.
+같은 offset을 반복하지 않게 하는 durable 격리·재요청 ACK·runner 연결은 747에 구현되어 있다.
+GBT 경로에서 오류는 기존 성공 결과를 유지한다. 483의 전원 K0·후보 소진 공급은 포함하지 않는다.
+해당 구현과 644 런타임이 배포되기 전에는 modelKind 전환과 Backend v2 발행을 활성화하지 않는다.
 
-파티 Consumer는 시작할 때 개인 Consumer와 같은 `als-artifacts-v2` SERVING model, mapping,
+기존 ALS 실행 경로는 시작할 때 개인 Consumer와 같은 `als-artifacts-v2` SERVING model, mapping,
 movie metadata 고정 URI 세 개를 `load_bundle`로 검증한다. Redis 게시 Lua는 partition assign 때
 발급한 전용 fence와 `feelm:model:current.modelVersion`을 함께 확인하고
 `feelm:party:{partyId}:candidates` JSON 하나를 교체한다. 게시 성공 뒤

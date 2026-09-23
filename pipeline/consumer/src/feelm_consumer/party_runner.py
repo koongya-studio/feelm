@@ -11,6 +11,8 @@ import redis
 from confluent_kafka import Consumer, KafkaException, Producer, TopicPartition
 
 from feelm_consumer.artifacts import ArtifactBundle, load_bundle
+from feelm_consumer.candidate_events import CandidateEventPublishError, publish_candidate_updated
+from feelm_consumer.gbt_party_runner import GbtPartyRuntime, model_is_gbt
 from feelm_consumer.party_candidate_events import (
     MAX_MODEL_VERSION_LENGTH,
     MODEL_VERSION_PATTERN,
@@ -76,15 +78,17 @@ def process_party(
     return False
 
 
-def run(settings: PartySettings) -> None:
+def run(settings: PartySettings, *, gbt_runtime: GbtPartyRuntime | None = None) -> None:
     # Artifact and revision validation must finish before external clients are created.
-    bundle = load_bundle(settings.model_uri, settings.mapping_uri, settings.metadata_uri)
+    bundle = (load_bundle(settings.model_uri, settings.mapping_uri, settings.metadata_uri)
+              if gbt_runtime is None else gbt_runtime.scorer.bundle)
     if (
         len(bundle.model_version) > MAX_MODEL_VERSION_LENGTH
         or not MODEL_VERSION_PATTERN.fullmatch(bundle.model_version)
     ):
         raise ValueError("party model version exceeds the Spring reader contract")
-    store = redis.Redis.from_url(settings.redis_url, decode_responses=True)
+    store = (redis.Redis.from_url(settings.redis_url, decode_responses=True)
+             if gbt_runtime is None else gbt_runtime.client)
     consumer = Consumer(
         {
             "bootstrap.servers": settings.kafka_bootstrap_servers,
@@ -118,6 +122,14 @@ def run(settings: PartySettings) -> None:
             source_partition=source_partition,
             source_offset=source_offset,
         )
+
+    def request_member_refresh(user_id: int) -> None:
+        nonlocal producer
+        if producer is None:
+            producer = Producer({"bootstrap.servers": settings.kafka_bootstrap_servers,
+                                 "enable.idempotence": True, "acks": "all"})
+        # Existing Backend listener persists DB refresh requests before committing this signal.
+        publish_candidate_updated(producer, user_id)
     stopping = False
     paused: dict[tuple[str, int], int] = {}
     owned: set[tuple[str, int]] = set()
@@ -192,26 +204,54 @@ def run(settings: PartySettings) -> None:
                 LOG.warning("party Kafka record error topic=%s partition=%s", message.topic(), message.partition())
                 continue
             partition = TopicPartition(message.topic(), message.partition())
+            key = (message.topic(), message.partition())
+            if key in paused:
+                continue
             try:
-                refresh = parse_party_refresh(message.value(), message.key())
-                generated_at = _source_generated_at(message)
+                active_gbt = model_is_gbt(store) if hasattr(store, "get") else False
+                if active_gbt and gbt_runtime is not None:
+                    receipt = gbt_runtime.process(
+                        message, fences.get(key), is_still_owned=lambda: key in owned,
+                        notify=lambda result: send_candidate_event(result, message.partition(), message.offset()),
+                        requeue_member=request_member_refresh)
+                    if receipt.disposition == "QUARANTINED":
+                        LOG.warning("party request durably quarantined code=%s", receipt.result_status)
+                    processed = None if receipt.disposition == "FENCED" else receipt.commit_allowed
+                else:
+                    refresh = parse_party_refresh(message.value(), message.key())
+                    if active_gbt and refresh.schema_version == 1:
+                        receipt = GbtPartyRuntime(store, None, None).process(
+                            message, fences.get(key), is_still_owned=lambda: key in owned, notify=None,
+                            requeue_member=request_member_refresh)
+                        LOG.info("late legacy request disposition=%s", receipt.disposition)
+                        processed = None if receipt.disposition == "FENCED" else receipt.commit_allowed
+                    elif refresh.schema_version == 2:
+                        # Never feed input references into the ALS vector scorer.
+                        processed = False
+                    else:
+                        legacy_bundle = bundle
+                        if gbt_runtime is not None:
+                            if not settings.model_uri:
+                                raise ValueError("legacy artifacts required before GBT activation")
+                            if gbt_runtime.legacy_bundle is None:
+                                gbt_runtime.legacy_bundle = load_bundle(
+                                    settings.model_uri, settings.mapping_uri, settings.metadata_uri)
+                            legacy_bundle = gbt_runtime.legacy_bundle
+                        processed = process_party(
+                            store, legacy_bundle, refresh, partition_fence=fences.get(key),
+                            attempts=settings.retry_attempts, backoff_seconds=settings.retry_backoff_seconds,
+                            is_still_owned=lambda: key in owned,
+                            candidate_event_publisher=lambda result: send_candidate_event(
+                                result, message.partition(), message.offset()),
+                            generated_at=_source_generated_at(message))
             except PartyEventValidationError:
                 pause_for_failure(message, partition, "invalid party Kafka event")
                 continue
-            key = (message.topic(), message.partition())
-            processed = process_party(
-                store,
-                bundle,
-                refresh,
-                partition_fence=fences.get(key),
-                attempts=settings.retry_attempts,
-                backoff_seconds=settings.retry_backoff_seconds,
-                is_still_owned=lambda: key in owned,
-                candidate_event_publisher=lambda result: send_candidate_event(
-                    result, message.partition(), message.offset()
-                ),
-                generated_at=generated_at,
-            )
+            except (redis.RedisError, ValueError, PartyCandidateEventPublishError, CandidateEventPublishError,
+                    KafkaException) as exc:
+                LOG.warning("party processing dependency failure code=%s", type(exc).__name__)
+                pause_for_failure(message, partition, "party dependency or notification failed")
+                continue
             if processed is None:
                 LOG.warning("party partition ownership lost before commit topic=%s partition=%s", *key)
                 continue
