@@ -297,10 +297,10 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
     // 4컷의 04 칸과 뒷면의 캐릭터 카드에 한 번씩
     expect(screen.getAllByText('안락의자 탐정')).toHaveLength(2);
     expect(screen.getByText('RDMV')).toBeInTheDocument();
-    expect(screen.getByText('움직이지 않고 사건만 잔뜩 봤습니다')).toBeInTheDocument();
+    expect(screen.getByText('익숙한 자리에서 잔뜩 봤고, 별점은 냉정했어요')).toBeInTheDocument();
 
     // 고른 쪽은 계약이 준 label, 반대쪽은 화면이 가진 표에서 온다
-    ['정착', '탐험', '그림자', '빛', '머리', '가슴', '다작', '정독'].forEach((pole) =>
+    ['익숙함', '새로움', '어두움', '밝음', '박함', '후함', '많음', '적음'].forEach((pole) =>
       expect(screen.getByText(pole)).toBeInTheDocument(),
     );
 
