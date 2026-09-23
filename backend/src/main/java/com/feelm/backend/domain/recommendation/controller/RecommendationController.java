@@ -5,6 +5,8 @@ import com.feelm.backend.domain.recommendation.service.RecommendationServingServ
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,12 +18,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class RecommendationController {
 
+    private static final CacheControl CACHE_CONTROL = CacheControl.noStore();
+
     private final RecommendationServingService service;
 
     @GetMapping
-    public RecommendationResponse getRecommendations(
+    public ResponseEntity<RecommendationResponse> getRecommendations(
             @AuthenticationPrincipal Long userId, @RequestParam(required = false) String size) {
-        return service.getRecommendations(userId, parseSizeOrDefault(size));
+        return ResponseEntity.ok()
+                .cacheControl(CACHE_CONTROL)
+                .body(service.getRecommendations(userId, parseSizeOrDefault(size)));
     }
 
     private int parseSizeOrDefault(String size) {
