@@ -77,7 +77,7 @@ class PartyRefreshProcessor {
         List<Long> userIds = memberRepository.findUserIdsByPartyId(partyId);
         try {
             PartyInputSnapshot snapshot = inputReader.read(userIds);
-            PartyRefreshPayload payload = payload(partyId, snapshot);
+            Object payload = payload(partyId, snapshot);
             eventPublisher.publishPartyRefresh(partyId, payload);
             requestRepository.delete(partyId);
         } catch (IllegalStateException | IllegalArgumentException exception) {
@@ -86,17 +86,42 @@ class PartyRefreshProcessor {
         }
     }
 
-    private static PartyRefreshPayload payload(long partyId, PartyInputSnapshot snapshot) {
+    private static Object payload(long partyId, PartyInputSnapshot snapshot) {
         String inputId = PartyInputId.from(partyId, snapshot);
+        if (!snapshot.isGbtState()) {
+            List<LegacyPartyRefreshPayload.Member> members =
+                    snapshot.members().stream()
+                            .map(
+                                    member ->
+                                            new LegacyPartyRefreshPayload.Member(
+                                                    member.userId(),
+                                                    member.legacyVector(),
+                                                    member.candidateMovieIds()))
+                            .toList();
+            return new LegacyPartyRefreshPayload(partyId, inputId, members);
+        }
         List<PartyRefreshPayload.Member> members =
                 snapshot.members().stream()
                         .map(
                                 member ->
                                         new PartyRefreshPayload.Member(
                                                 member.userId(),
-                                                member.vector(),
+                                                member.generationId(),
+                                                member.inputSchemaVersion(),
+                                                member.inputHash(),
                                                 member.candidateMovieIds()))
                         .toList();
-        return new PartyRefreshPayload(partyId, inputId, members);
+        return new PartyRefreshPayload(
+                PartyRefreshPayload.SCHEMA_VERSION,
+                partyId,
+                inputId,
+                snapshot.modelVersion(),
+                snapshot.servingRevision(),
+                members);
+    }
+
+    /** GBT 전환 전 메시지를 같은 토픽에서 소진하기 위한 v1 직렬화 형태. */
+    private record LegacyPartyRefreshPayload(long partyId, String inputId, List<Member> members) {
+        private record Member(long userId, List<Double> vector, List<Long> candidateMovieIds) {}
     }
 }

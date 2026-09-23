@@ -15,9 +15,20 @@ public final class PartyInputId {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             digest.update(ByteBuffer.allocate(Long.BYTES).putLong(partyId).array());
             update(digest, snapshot.modelVersion());
+            if (snapshot.isGbtState()) {
+                digest.update(
+                        ByteBuffer.allocate(Integer.BYTES)
+                                .putInt(snapshot.schemaVersion())
+                                .array());
+                update(digest, snapshot.servingRevision());
+            }
             for (PartyInputSnapshot.Member member : snapshot.members()) {
                 digest.update(ByteBuffer.allocate(Long.BYTES).putLong(member.userId()).array());
                 update(digest, member.generationId());
+                if (snapshot.isGbtState()) {
+                    update(digest, member.inputSchemaVersion());
+                    update(digest, member.inputHash());
+                }
             }
             return "sha256:" + HexFormat.of().formatHex(digest.digest());
         } catch (NoSuchAlgorithmException exception) {

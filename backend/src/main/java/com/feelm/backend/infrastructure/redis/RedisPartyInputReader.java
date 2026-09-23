@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** 파티 전체의 모델·vector·candidates를 단일 Redis MGET 스냅샷으로 읽는다. */
+/** 파티 전체의 모델·사용자 상태·후보를 단일 Redis MGET 스냅샷으로 읽는다. */
 @Component
 @RequiredArgsConstructor
 public class RedisPartyInputReader {
@@ -24,9 +24,14 @@ public class RedisPartyInputReader {
         if (userIds.isEmpty() || userIds.size() > 4) {
             throw new IllegalArgumentException("Party must have 1–4 members");
         }
-        List<String> keys = new ArrayList<>(1 + userIds.size() * 2);
-        keys.add("feelm:model:current");
-        for (long userId : userIds) {
+        List<Long> sortedUserIds = userIds.stream().sorted().distinct().toList();
+        if (sortedUserIds.size() != userIds.size() || sortedUserIds.getFirst() <= 0) {
+            throw new IllegalArgumentException("Party member IDs must be positive and unique");
+        }
+        List<String> keys = new ArrayList<>(1 + sortedUserIds.size() * 3);
+        keys.add(UserRecommendationStateContract.CURRENT_MODEL_KEY);
+        for (long userId : sortedUserIds) {
+            keys.add(UserRecommendationStateContract.key(userId));
             keys.add("feelm:user:" + userId + ":vector");
             keys.add("feelm:user:" + userId + ":candidates");
         }
@@ -36,31 +41,72 @@ public class RedisPartyInputReader {
                 throw new IllegalArgumentException("Party Redis snapshot is incomplete");
             }
             JsonNode model = parse(values.getFirst());
-            String modelVersion = requiredText(model, "modelVersion");
-            int dimension = requiredPositiveInt(model, "factorDimension");
-            List<PartyInputSnapshot.Member> members = new ArrayList<>(userIds.size());
-            for (int index = 0; index < userIds.size(); index++) {
-                JsonNode vector = parse(values.get(index * 2 + 1));
-                JsonNode candidates = parse(values.get(index * 2 + 2));
-                String generationId = requiredText(vector, "generationId");
-                if (!modelVersion.equals(requiredText(vector, "modelVersion"))
-                        || !modelVersion.equals(requiredText(candidates, "modelVersion"))
-                        || !generationId.equals(requiredText(candidates, "generationId"))
-                        || requiredPositiveInt(vector, "candidateVersion") != CANDIDATE_VERSION
-                        || requiredPositiveInt(candidates, "candidateVersion")
-                                != CANDIDATE_VERSION) {
-                    throw new IllegalArgumentException("Party member generation or model mismatch");
-                }
-                List<Double> factors = factors(vector.path("vector"), dimension);
-                List<Long> movieIds = movieIds(candidates);
-                members.add(
-                        new PartyInputSnapshot.Member(
-                                userIds.get(index), generationId, factors, movieIds));
+            if (model.has("modelKind")) {
+                return readGbt(model, values, sortedUserIds);
             }
-            return new PartyInputSnapshot(modelVersion, List.copyOf(members));
+            return readLegacy(model, values, sortedUserIds);
         } catch (Exception exception) {
             throw new IllegalStateException("Party Redis snapshot is invalid", exception);
         }
+    }
+
+    private PartyInputSnapshot readGbt(JsonNode model, List<String> values, List<Long> userIds)
+            throws Exception {
+        var servingModel = UserRecommendationStateContract.parseGbtModel(model);
+        String modelVersion = servingModel.modelVersion();
+        String servingRevision = servingModel.servingRevision();
+        List<PartyInputSnapshot.Member> members = new ArrayList<>(userIds.size());
+        for (int index = 0; index < userIds.size(); index++) {
+            int offset = index * 3 + 1;
+            long userId = userIds.get(index);
+            JsonNode stateValue = parse(values.get(offset));
+            JsonNode candidates = parse(values.get(offset + 2));
+            var state = UserRecommendationStateContract.parse(stateValue, userId);
+            UserRecommendationStateContract.verifyCandidate(candidates, state);
+            if (!modelVersion.equals(state.modelVersion())
+                    || !servingRevision.equals(state.servingRevision())
+                    || requiredPositiveInt(candidates, "candidateVersion") != CANDIDATE_VERSION) {
+                throw new IllegalArgumentException("Party member serving revision mismatch");
+            }
+            members.add(
+                    PartyInputSnapshot.Member.gbt(
+                            userId,
+                            state.generationId(),
+                            state.inputSchemaVersion(),
+                            state.inputHash(),
+                            movieIds(candidates)));
+        }
+        return new PartyInputSnapshot(
+                PartyInputSnapshot.GBT_STATE_SCHEMA_VERSION,
+                modelVersion,
+                servingRevision,
+                List.copyOf(members));
+    }
+
+    private PartyInputSnapshot readLegacy(JsonNode model, List<String> values, List<Long> userIds)
+            throws Exception {
+        String modelVersion = requiredText(model, "modelVersion");
+        int dimension = requiredPositiveInt(model, "factorDimension");
+        List<PartyInputSnapshot.Member> members = new ArrayList<>(userIds.size());
+        for (int index = 0; index < userIds.size(); index++) {
+            int offset = index * 3 + 1;
+            JsonNode vector = parse(values.get(offset + 1));
+            JsonNode candidates = parse(values.get(offset + 2));
+            String generationId = requiredText(vector, "generationId");
+            if (!modelVersion.equals(requiredText(vector, "modelVersion"))
+                    || !modelVersion.equals(requiredText(candidates, "modelVersion"))
+                    || !generationId.equals(requiredText(candidates, "generationId"))
+                    || requiredPositiveInt(vector, "candidateVersion") != CANDIDATE_VERSION
+                    || requiredPositiveInt(candidates, "candidateVersion") != CANDIDATE_VERSION) {
+                throw new IllegalArgumentException("Party member generation or model mismatch");
+            }
+            List<Double> factors = factors(vector.path("vector"), dimension);
+            List<Long> movieIds = movieIds(candidates);
+            members.add(
+                    new PartyInputSnapshot.Member(
+                            userIds.get(index), generationId, factors, movieIds));
+        }
+        return new PartyInputSnapshot(modelVersion, List.copyOf(members));
     }
 
     private JsonNode parse(String value) throws Exception {

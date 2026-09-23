@@ -1,9 +1,16 @@
+import hashlib
 import json
+from pathlib import Path
 from struct import pack
 
 import pytest
 
 from feelm_consumer.party_events import PartyEventValidationError, parse_party_refresh
+
+SHARED_V2_FIXTURE = Path(__file__).parent / "fixtures/party-refresh-v2.json"
+PARTY_REFRESH_V2_FIXTURE_SHA256 = (
+    "99f9260db317b52d69ef22a8b54e626bcc256cb85184f7371ed170a803de79f5"
+)
 
 
 def payload() -> dict[str, object]:
@@ -22,6 +29,54 @@ def test_accepts_direct_payload_with_long_key() -> None:
 
     assert result.party_id == 99
     assert [member.user_id for member in result.members] == [10, 20]
+
+
+def test_accepts_gbt_input_reference_payload_without_vectors() -> None:
+    fixture = SHARED_V2_FIXTURE.read_bytes()
+    assert hashlib.sha256(fixture).hexdigest() == PARTY_REFRESH_V2_FIXTURE_SHA256
+    result = parse_party_refresh(fixture, pack(">q", 9001))
+
+    assert result.schema_version == 2
+    assert result.party_id == 9001
+    assert result.model_version == "gbt-v26"
+    assert result.serving_revision == "serving-r1"
+    assert result.members[0].generation_id == "g1"
+    assert result.members[0].input_hash == "sha256:" + "a" * 64
+    assert not hasattr(result.members[0], "vector")
+
+
+@pytest.mark.parametrize(
+    ("mutation", "error"),
+    [
+        (lambda body: body.update(schemaVersion=3), "unsupported schemaVersion"),
+        (lambda body: body.pop("servingRevision"), "servingRevision"),
+        (lambda body: body.update(modelVersion="GBT-V26"), "invalid format"),
+        (lambda body: body.update(servingRevision="   "), "non-empty"),
+        (lambda body: body["members"][0].update(inputHash="sha256:bad"), "sha256"),
+        (lambda body: body["members"][0].update(vector=[]), "must not contain vector"),
+    ],
+)
+def test_rejects_invalid_gbt_input_reference_payload(mutation, error) -> None:
+    body = {
+        "schemaVersion": 2,
+        "partyId": 99,
+        "inputId": "sha256:" + "a" * 64,
+        "modelVersion": "gbt-v26",
+        "servingRevision": "serving-r1",
+        "members": [
+            {
+                "userId": 10,
+                "generationId": "g1",
+                "inputSchemaVersion": "gbt-input-v1",
+                "inputHash": "sha256:" + "b" * 64,
+                "candidateMovieIds": [100],
+            }
+        ],
+    }
+    mutation(body)
+
+    with pytest.raises(PartyEventValidationError, match=error):
+        parse_party_refresh(json.dumps(body).encode(), pack(">q", 99))
 
 
 def test_rejects_common_event_envelope() -> None:

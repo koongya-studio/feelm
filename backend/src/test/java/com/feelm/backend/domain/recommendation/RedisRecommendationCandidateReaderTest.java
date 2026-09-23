@@ -469,6 +469,120 @@ class RedisRecommendationCandidateReaderTest {
                                 + "\"matchedGenreCodes\":[]}");
     }
 
+    @Test
+    @DisplayName("GBT Candidate는 vector 없이 같은 추천 상태 세대로 읽는다")
+    void readsGbtCandidatesWithoutVector() {
+        when(values.get("feelm:user:10:vector")).thenReturn(null);
+        when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r1"));
+        when(values.get("feelm:user:10:recommendation-state")).thenReturn(gbtState("g1", HASH));
+        when(values.get("feelm:user:10:candidates")).thenReturn(gbtCandidates("g1", HASH));
+
+        RecommendationCandidateBatch result = reader.read(10);
+
+        assertThat(result.modelVersion()).isEqualTo("gbt-v26");
+        assertThat(result.generationId()).isEqualTo("g1");
+        assertThat(result.items()).extracting(item -> item.movieId()).containsExactly(101L);
+        verify(values, times(0)).get("feelm:user:10:vector");
+    }
+
+    @Test
+    @DisplayName("GBT 상태와 Candidate의 입력 hash가 다르면 추천 불가로 처리한다")
+    void rejectsGbtInputMismatch() {
+        when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r1"));
+        when(values.get("feelm:user:10:recommendation-state")).thenReturn(gbtState("g1", HASH));
+        when(values.get("feelm:user:10:candidates"))
+                .thenReturn(gbtCandidates("g1", "sha256:" + "b".repeat(64)));
+
+        assertUnavailable(() -> reader.read(10));
+    }
+
+    @Test
+    @DisplayName("GBT 메타데이터가 있는데 추천 상태가 없으면 legacy vector로 대체하지 않는다")
+    void rejectsMissingGbtStateWithoutLegacyFallback() {
+        when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r1"));
+        when(values.get("feelm:user:10:recommendation-state")).thenReturn(null);
+        when(values.get("feelm:user:10:candidates")).thenReturn(gbtCandidates("g1", HASH));
+
+        assertUnavailable(() -> reader.read(10));
+        verify(values, times(0)).get("feelm:user:10:vector");
+    }
+
+    @Test
+    @DisplayName("GBT 상태만 게시된 부분 세대도 legacy vector로 대체하지 않는다")
+    void rejectsStateWithLegacyShapedCandidates() {
+        when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r1"));
+        when(values.get("feelm:user:10:recommendation-state")).thenReturn(gbtState("g1", HASH));
+        when(values.get("feelm:user:10:candidates"))
+                .thenReturn(
+                        """
+                        {"modelVersion":"gbt-v26","candidateVersion":6,"generationId":"g1",
+                         "updatedAt":"2026-09-23T00:00:00Z",
+                         "taste":[{"movieId":101,"score":4.2,"reasons":[]}],"discovery":[]}
+                        """);
+
+        assertUnavailable(() -> reader.read(10));
+        verify(values, times(0)).get("feelm:user:10:vector");
+    }
+
+    @Test
+    @DisplayName("현재 serving revision과 다른 GBT 세대는 추천 불가로 처리한다")
+    void rejectsGbtStateFromStaleServingRevision() {
+        when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r2"));
+        when(values.get("feelm:user:10:recommendation-state")).thenReturn(gbtState("g1", HASH));
+        when(values.get("feelm:user:10:candidates")).thenReturn(gbtCandidates("g1", HASH));
+
+        assertUnavailable(() -> reader.read(10));
+        verify(values, times(0)).get("feelm:user:10:vector");
+    }
+
+    @Test
+    @DisplayName("GBT 활성 중에는 완전한 legacy Candidate와 vector도 fallback하지 않는다")
+    void rejectsLegacyCandidatesWhenGbtModelIsCurrent() {
+        when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r1"));
+        when(values.get("feelm:user:10:recommendation-state")).thenReturn(null);
+        when(values.get("feelm:user:10:candidates"))
+                .thenReturn(
+                        """
+                        {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
+                         "updatedAt":"2026-09-23T00:00:00Z",
+                         "taste":[{"movieId":101,"score":4.2,"reasons":[]}],"discovery":[]}
+                        """);
+
+        assertUnavailable(() -> reader.read(10));
+        verify(values, times(0)).get("feelm:user:10:vector");
+    }
+
+    private static final String HASH = "sha256:" + "a".repeat(64);
+
+    private static String gbtCurrent(String servingRevision) {
+        return """
+                {"modelKind":"GBT","modelVersion":"gbt-v26","servingRevision":"%s"}
+                """
+                .formatted(servingRevision);
+    }
+
+    private static String gbtState(String generation, String inputHash) {
+        return """
+                {"stateVersion":1,"userId":10,"modelKind":"GBT",
+                 "modelVersion":"gbt-v26","servingRevision":"serving-r1",
+                 "generationId":"%s","inputSchemaVersion":"gbt-input-v1",
+                 "inputHash":"%s","ratingCount":3,"dismissCount":1,
+                 "supportedInputCount":4,"updatedAt":"2026-09-23T00:00:00Z"}
+                """
+                .formatted(generation, inputHash);
+    }
+
+    private static String gbtCandidates(String generation, String inputHash) {
+        return """
+                {"modelVersion":"gbt-v26","servingRevision":"serving-r1",
+                 "candidateVersion":6,"generationId":"%s",
+                 "inputSchemaVersion":"gbt-input-v1","inputHash":"%s",
+                 "updatedAt":"2026-09-23T00:00:00Z",
+                 "taste":[{"movieId":101,"score":4.2,"reasons":[]}],"discovery":[]}
+                """
+                .formatted(generation, inputHash);
+    }
+
     private void assertUnavailable(org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {
         assertThatThrownBy(call)
                 .isInstanceOf(BusinessException.class)

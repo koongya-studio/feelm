@@ -59,6 +59,14 @@ public class RedisOttCandidateReader implements OttCandidateReader {
             throw new IllegalArgumentException("Candidate key is missing");
         }
         JsonNode root = objectMapper.readTree(stored);
+        String storedState =
+                redisTemplate.opsForValue().get(UserRecommendationStateContract.key(userId));
+        JsonNode currentModel = readCurrentModel();
+        if (currentModel != null && currentModel.has("modelKind")
+                || UserRecommendationStateContract.hasGbtMetadata(root)
+                || storedState != null && !storedState.isBlank()) {
+            verifyGbtState(userId, root, storedState, currentModel);
+        }
         JsonNode taste = root.path("taste");
         if (!root.path("candidateVersion").isIntegralNumber()
                 || !root.path("candidateVersion").canConvertToLong()
@@ -86,5 +94,30 @@ public class RedisOttCandidateReader implements OttCandidateReader {
             items.add(new ScoredMovie(id.longValue(), value));
         }
         return new OttCandidateSnapshot(List.copyOf(items));
+    }
+
+    private JsonNode readCurrentModel() throws JacksonException {
+        String stored =
+                redisTemplate.opsForValue().get(UserRecommendationStateContract.CURRENT_MODEL_KEY);
+        if (stored == null || stored.isBlank()) {
+            return null;
+        }
+        JsonNode currentModel = objectMapper.readTree(stored);
+        if (!currentModel.isObject()) {
+            throw new IllegalArgumentException("Invalid current serving model");
+        }
+        return currentModel;
+    }
+
+    private void verifyGbtState(
+            long userId, JsonNode candidate, String storedState, JsonNode currentModel)
+            throws JacksonException {
+        if (storedState == null || storedState.isBlank()) {
+            throw new IllegalArgumentException("Recommendation state is missing");
+        }
+        var state =
+                UserRecommendationStateContract.parse(objectMapper.readTree(storedState), userId);
+        UserRecommendationStateContract.verifyCandidate(candidate, state);
+        UserRecommendationStateContract.verifyCurrentModel(currentModel, state);
     }
 }
