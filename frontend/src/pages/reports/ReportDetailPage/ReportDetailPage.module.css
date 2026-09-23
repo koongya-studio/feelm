@@ -126,6 +126,20 @@
   color: var(--color-ink-muted);
 }
 
+/* `저장` 실패 안내는 버튼 바로 위에 붙인다. 페이지 간격만큼 떨어지면 무엇의 안내인지 흐려진다 */
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.notice {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  text-align: center;
+}
+
 .actions {
   display: flex;
   gap: var(--space-2);
