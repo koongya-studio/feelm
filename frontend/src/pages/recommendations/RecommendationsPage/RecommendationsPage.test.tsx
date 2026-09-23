@@ -95,6 +95,10 @@ describe('2.2 오늘의 추천', () => {
     expect(screen.getByRole('link', { name: '세븐 상세 보기' }).parentElement).toHaveTextContent(
       '새로운 맛',
     );
+    // 고정 라벨 없이 API-045의 reason.summary를 그대로 보여 준다(업무 -822)
+    expect(screen.queryByText('추천 이유:')).toBeNull();
+    expect(screen.getByText('스릴러를 높게 평가하셨어요')).toBeInTheDocument();
+    expect(screen.getByText('좋아하는 스릴러와 연결되는 느와르예요')).toBeInTheDocument();
     // 취향 맞춤이 먼저, 취향 발견이 뒤다
     const titles = screen
       .getAllByRole('link', { name: / 상세 보기$/ })
