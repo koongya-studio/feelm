@@ -30,6 +30,7 @@ import com.feelm.backend.support.SharedPostgresContractTest;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -44,8 +45,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.kafka.config.KafkaListenerEndpointRegistry;
+import org.springframework.kafka.listener.MessageListenerContainer;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -69,6 +73,8 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
     @MockitoBean RecommendationCandidateReader candidateReader;
     @MockitoBean RecommendationReasonGenerator reasonGenerator;
     @MockitoSpyBean RecommendationBufferRepository bufferRepository;
+    @Autowired KafkaListenerEndpointRegistry listenerRegistry;
+    @Autowired ConfigurableApplicationContext appContext;
 
     private ExecutorService executor;
 
@@ -89,6 +95,23 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
         }
         executor.shutdownNow();
         assertThat(executor.awaitTermination(5, TimeUnit.SECONDS)).isTrue();
+    }
+
+    @Test
+    @DisplayName("일반 테스트 context는 재개된 뒤에도 Kafka consumer를 기동하지 않는다")
+    void kafkaConsumersStayStoppedInOrdinaryContext() {
+        Collection<MessageListenerContainer> containers = listenerRegistry.getListenerContainers();
+
+        assertThat(containers)
+                .extracting(MessageListenerContainer::getGroupId)
+                .contains("feelm-personal-buffer-v1");
+        assertThat(containers).noneMatch(MessageListenerContainer::isRunning);
+
+        // 캐시한 context를 다른 context로 넘어갔다가 다시 쓸 때 TestContext가 호출하는 pause·restart를 재현한다.
+        appContext.pause();
+        appContext.restart();
+
+        assertThat(containers).noneMatch(MessageListenerContainer::isRunning);
     }
 
     @Test

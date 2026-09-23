@@ -484,6 +484,10 @@ ApplicationContext를 재사용할 수 있습니다.
   이전 클래스의 데이터가 남아 있어도 단독 실행과 같은 결과가 나와야 합니다.
 - `@SpringBootTest` 속성·web environment·`@Import`가 다르면 Context cache가 분리됩니다.
   테스트 의미에 필요한 차이만 추가하고, 같은 설정은 공통 지원 클래스에 둡니다.
+- 캐시한 context는 다른 context로 넘어갈 때 `pause()`되고 다시 쓸 때 `restart()`됩니다. Spring Boot
+  자동 설정이 켜진 context에서는 테스트 classpath의 `KafkaListenerTestStartupAutoConfiguration`이 이때도
+  Kafka listener의 `autoStartup` 설정을 따르게 하므로, consumer를 쓰는 테스트는 해당 `consumer-enabled`
+  속성을 명시적으로 켭니다.
 - database 단위 격리가 필요한 migration 테스트는 `MigrationPostgresSupport`를 사용합니다.
   병렬 실행이나 별도 장애 격리가 필요한 경우에는 공유 여부와 초기화 경계를 먼저 합의합니다.
 - 허용된 공통 지원 코드 밖에서 `PostgreSQLContainer`나 `RedisContainer`를 직접 생성하면
