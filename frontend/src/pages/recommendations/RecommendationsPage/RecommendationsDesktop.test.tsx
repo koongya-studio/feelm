@@ -291,7 +291,9 @@ describe('RecommendationsPage 데스크톱 시안', () => {
     renderRecommendations(1440);
 
     expect(await screen.findByRole('heading', { level: 1, name: '오늘의 추천' })).toBeVisible();
-    expect(screen.getByText('9월 16일 (수)')).toBeInTheDocument();
+    // 제목은 곧바로 그려지지만 날짜는 API-045 `generatedAt`이 반영된 뒤에 그려진다. 제목만
+    // 기다리고 날짜를 바로 찾으면 부하가 걸린 전체 실행에서 응답보다 먼저 검사해 깨진다
+    expect(await screen.findByText('9월 16일 (수)')).toBeInTheDocument();
   });
 
   it('우측 보조 패널에 추천 기준과 최근 본 영화를 보낸다', async () => {
