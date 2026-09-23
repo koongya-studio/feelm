@@ -606,6 +606,16 @@ include:
                 'AVATAR_STORAGE_PATH: "$CI_PROJECT_DIR/backend/build/test-avatars/$CI_JOB_ID"',
                 block)
 
+    def test_backend_test_report_image_storage_is_job_isolated(self):
+        # /tmp/feelm은 다른 runner 사용자가 먼저 만들 수 있어 Job 작업 디렉터리 아래를 쓴다.
+        backend_mr_test = job_block(self.backend, 'backend-mr-test')
+        backend_test = job_block(self.backend, 'backend-test')
+        for block in (backend_mr_test, backend_test):
+            self.assertIn(
+                'REPORT_IMAGE_STORAGE_PATH: '
+                '"$CI_PROJECT_DIR/backend/build/test-report-images/$CI_JOB_ID"',
+                block)
+
     def test_frontend_image_injects_only_public_oauth_build_inputs(self):
         # Dockerfile 자체의 ARG 선언은 infra-config-test 스냅샷 밖이라
         # infra.scripts.test_ci_frontend_paths가 검증한다.
