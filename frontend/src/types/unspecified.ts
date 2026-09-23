@@ -47,9 +47,9 @@ export type WeeklyFrameDelta = {
  * 같은 모양에서 `isPublic`인 것만 남긴 것이다(`api/users.ts` `toPublicView`).
  *
  * **계약은 일부만 있다.** 7.2-B는 API-062 공개 프로필 조회(`docs/api/social.md`)를 부르고
- * 그 응답을 이 모양으로 바꾼다(`api/users.ts` `toPublicProfileView`, 업무 -810). **아래 셋은
- * 계약에 자리가 아예 없다.**
- * - `avatarUrl` 프로필 사진과 그 업로드 · 삭제
+ * 그 응답을 이 모양으로 바꾼다(`api/users.ts` `toPublicProfileView`, 업무 -810). 사진
+ * (`avatarUrl`)은 API-014 · 062가 주고 API-081 · 082로 바꾼다(업무 -762). **아래 둘은 계약에
+ * 자리가 아예 없다.**
  * - `bio` 자기소개
  * - 키워드 · 필름마다의 `isPublic`
  * 화면은 목업 저장소(`mocks/sessionStore.ts`)에 쓰고 읽는다. 계약이 생기면 `api/users.ts`의
@@ -115,9 +115,8 @@ export type ProfileView = {
     | null;
 };
 
-/** 프로필 사진 · 소개 · 공개 항목 변경. 계약에 없다(위 머리말) */
+/** 소개 · 공개 항목 변경. 계약에 없다(위 머리말). 사진은 API-081 · 082다 */
 export type ProfileExtrasUpdate = {
-  avatarUrl?: string | null;
   bio?: string;
   publicKeywordCodes?: string[];
   publicFrameIds?: number[];

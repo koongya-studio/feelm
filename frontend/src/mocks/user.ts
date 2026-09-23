@@ -21,6 +21,7 @@ export const mockMyProfile: MyProfile = {
   userId: 1024,
   email: 'nanda@feelm.kr',
   nickname: '김난다',
+  avatarUrl: null,
   // 와이어프레임 7.2가 `20대`로 표시한다. 계약은 생년월일을 주고 화면이 연령대로 바꾼다
   birthDate: '1999-03-14',
   gender: 'FEMALE',

@@ -487,6 +487,31 @@ class PartyInvitationApiContractTest extends SharedPostgresContractTest {
                 .andExpect(jsonPath("$.items[1].party.memberCount").value(2));
     }
 
+    /** 초대 이력에는 종료된 파티가 포함되고 그 오너가 탈퇴했을 수 있다(S15P21E106-759). 대기 초대 목록은 활성 파티만이라 해당 없다. */
+    @Test
+    void labelsWithdrawnOwnerInInvitationHistory() throws Exception {
+        long closed = party(20, "CLOSED", CREATED_AT);
+        invitation(closed, 20, 10, "DECLINED", CREATED_AT);
+        long active = party(30, "ACTIVE", CREATED_AT.plusSeconds(1));
+        invitation(active, 30, 10, "ACCEPTED", CREATED_AT.plusSeconds(1));
+        jdbc.update(
+                "UPDATE users SET status='WITHDRAWN', nickname='withdrawn-20', withdrawn_at=?"
+                        + " WHERE id=20",
+                Timestamp.from(CREATED_AT.plusSeconds(10)));
+
+        mvc.perform(get(LIST_PATH).param("status", "DECLINED").header("Authorization", bearer(10)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].party.partyId").value(closed))
+                .andExpect(jsonPath("$.items[0].party.owner.userId").value(20))
+                .andExpect(jsonPath("$.items[0].party.owner.nickname").value("탈퇴한 사용자"));
+        mvc.perform(get(LIST_PATH).param("status", "ACCEPTED").header("Authorization", bearer(10)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].party.owner.userId").value(30))
+                .andExpect(jsonPath("$.items[0].party.owner.nickname").value("member30"));
+    }
+
     @Test
     void filtersInvitationsByStatus() throws Exception {
         long party = party(20, "ACTIVE", CREATED_AT);

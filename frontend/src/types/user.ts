@@ -28,6 +28,11 @@ export type MyProfile = {
   /** 변경 불가(API-015 처리 규칙). 7.2가 읽기 전용으로 표시한다 */
   email: string;
   nickname: string;
+  /**
+   * 프로필 사진(업무 -761 · -762). 없으면 `null`이다. 공개 · 비만료 경로(`/media/avatars/…`)이며
+   * 사진을 바꾸거나 지우면 옛 주소는 404가 된다. 올리기 · 지우기는 API-081 · 082다
+   */
+  avatarUrl: string | null;
   /** 생년월일 `YYYY-MM-DD`. 실명은 수집하지 않는다. 7.2는 연령대로 바꿔 보여준다 */
   birthDate: string;
   gender: Gender;
@@ -45,8 +50,8 @@ export type MyProfile = {
 /**
  * 7.2가 저장하는 값. API-015는 전달한 필드만 바꾼다.
  *
- * **프로필 이미지와 한 줄 소개는 계약에 없다.** API-014 응답에도 API-015 요청에도
- * 그런 필드가 없다. 두 값은 `types/unspecified.ts`가 다룬다.
+ * 프로필 사진은 API-015가 아니라 따로 올리고 지운다(API-081 · 082). **한 줄 소개는 계약에
+ * 없어** `types/unspecified.ts`가 다룬다.
  */
 export type MyProfileUpdate = {
   nickname?: string;

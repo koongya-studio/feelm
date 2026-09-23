@@ -28,8 +28,8 @@
  *   바탕만 맡는다. 어두운 바탕에 맞춰 `.back`이 색 토큰만 다시 정의하므로 `MeterRow` · `Chip`
  *   같은 공용 컴포넌트를 그대로 쓴다
  * - 그릴 값이 없는 뒷면은 아예 주지 않는다. 그 칸은 뒤집히지 않는 그림 칸으로 남는다
- * - 인화지를 그림으로 저장할 때(3.5 `이미지로 저장`)는 뒤집힌 칸을 먼저 되돌린다. 저장되는 것은
- *   앞면 넷이다
+ * - 인화지를 그림으로 저장할 때(`저장` · 3.5 `이미지로 저장`)는 뒤집힌 칸을 먼저 되돌린다.
+ *   저장되는 것은 앞면 넷이다
  * - **인물 검색으로 가는 길은 뒷면 목록의 이름뿐이다.** 업무 -557은 감독 · 배우 칸 전체를 검색
  *   링크로 덮었는데 그 자리를 뒤집기가 쓰게 되어 한 칸이 두 동작을 가질 수 없다. 누르면
  *   뒤집히는 쪽으로 통일하고(사용자 결정 2026-09-23) `ReportFourCut`의 `linkPeople`을 지웠다.
@@ -45,8 +45,9 @@
  *   (`design-concept.md` 2.2). 와이어프레임도 줄어든 값만 흐렸다
  * - 비교할 지난 반기가 없으면(첫 리포트) 그 칸을 그리지 않는다
  *
- * `[?]` `저장`이 무엇을 저장하는지 적혀 있지 않다. 리포트는 이미 서버에 있으므로 확인하고
- * 나가는 동작으로 보았다. 이미지 저장은 3.5의 `이미지로 저장`이 맡는다.
+ * `저장`은 4컷 PNG를 내려받은 뒤 위의 곳으로 돌아간다(사용자 결정 2026-09-23, 업무 -731).
+ * 3.5의 `이미지로 저장`과 같은 함수다(`saveReportImage.ts`). 실패하면 나가지 않고 버튼 위에
+ * 이유를 알린다 — 내려받지 못했는데 돌아가면 저장된 줄 안다.
  * `[?]` 7.4는 와이어프레임에 `공유하기` 버튼이 없지만 이동표에 `7.4 ⇢ 3.5`가 있어 두었다.
  */
 import { useEffect, useRef, useState } from 'react';
@@ -67,6 +68,7 @@ import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
 import { formatComparisonLabel, formatDelta, formatHalf } from '../../../utils/report';
 import ReportShareSheet from './ReportShareSheet';
+import { reportImageFailure, saveReportImage } from './saveReportImage';
 import styles from './ReportDetailPage.module.css';
 import type { ReactNode } from 'react';
 import type {
@@ -116,6 +118,8 @@ export default function ReportDetailPage({ from }: Props) {
   const [reloadCount, setReloadCount] = useState(0);
   const [sharing, setSharing] = useState(false);
   const [flipped, setFlipped] = useState<ReportCutKind[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saveFailure, setSaveFailure] = useState('');
   const fourCutRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -152,7 +156,19 @@ export default function ReportDetailPage({ from }: Props) {
     };
   }, []);
 
-  function save() {
+  async function save() {
+    setSaving(true);
+    setSaveFailure('');
+
+    try {
+      await saveImage();
+    } catch (error) {
+      setSaveFailure(reportImageFailure(error));
+      setSaving(false);
+
+      return;
+    }
+
     if (from === 'my') {
       back();
     } else {
@@ -181,6 +197,11 @@ export default function ReportDetailPage({ from }: Props) {
       // 화면에 이미 닉네임이 있으면 현재 보이는 DOM을 그대로 저장할 수 있다.
       if (!nickname) throw error;
     }
+  }
+
+  async function saveImage() {
+    await prepareImage();
+    await saveReportImage(id, fourCutRef.current?.firstElementChild as HTMLElement | null);
   }
 
   if (failed) {
@@ -217,7 +238,12 @@ export default function ReportDetailPage({ from }: Props) {
         showBack
         fallbackTo={path.tasteReports()}
         action={
-          <IconButton label="공유하기" icon={<ShareIcon />} onClick={() => setSharing(true)} />
+          <IconButton
+            label="공유하기"
+            icon={<ShareIcon />}
+            disabled={saving}
+            onClick={() => setSharing(true)}
+          />
         }
       />
 
@@ -235,22 +261,26 @@ export default function ReportDetailPage({ from }: Props) {
           />
         </div>
 
-        <div className={styles.actions}>
-          <Button variant="secondary" onClick={save}>
-            저장
-          </Button>
-          <Button onClick={() => setSharing(true)}>공유하기</Button>
+        <div className={styles.footer}>
+          {saveFailure ? (
+            <p className={styles.notice} role="status">
+              {saveFailure}
+            </p>
+          ) : null}
+
+          <div className={styles.actions}>
+            <Button variant="secondary" disabled={saving} onClick={() => void save()}>
+              저장
+            </Button>
+            <Button disabled={saving} onClick={() => setSharing(true)}>
+              공유하기
+            </Button>
+          </div>
         </div>
       </div>
 
       {sharing ? (
-        <ReportShareSheet
-          reportId={report.reportId}
-          title={title}
-          getImageNode={() => fourCutRef.current?.firstElementChild as HTMLElement | null}
-          prepareImage={prepareImage}
-          onClose={() => setSharing(false)}
-        />
+        <ReportShareSheet title={title} onSaveImage={saveImage} onClose={() => setSharing(false)} />
       ) : null}
     </>
   );

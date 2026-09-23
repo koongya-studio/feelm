@@ -22,7 +22,7 @@ const KEY_STEP = 8;
 
 type Props = {
   src: string;
-  onApply: (dataUrl: string) => void;
+  onApply: (photo: Blob) => void;
   onCancel: () => void;
 };
 
@@ -75,11 +75,11 @@ export default function AvatarCropper({ src, onApply, onCancel }: Props) {
     update({ ...crop, offsetX: crop.offsetX + delta[0], offsetY: crop.offsetY + delta[1] });
   };
 
-  const apply = () => {
+  const apply = async () => {
     if (!imageRef.current || !natural) return;
 
     try {
-      onApply(renderCrop(imageRef.current, crop, STAGE));
+      onApply(await renderCrop(imageRef.current, crop, STAGE));
     } catch {
       setError('사진을 자르지 못했어요. 다른 사진을 골라 주세요');
     }
@@ -152,7 +152,7 @@ export default function AvatarCropper({ src, onApply, onCancel }: Props) {
         <button type="button" className={styles.cropCancel} onClick={onCancel}>
           취소
         </button>
-        <Button variant="brand" disabled={!natural} onClick={apply}>
+        <Button variant="brand" disabled={!natural} onClick={() => void apply()}>
           적용
         </Button>
       </div>

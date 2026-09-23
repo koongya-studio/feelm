@@ -5,15 +5,15 @@
  * 목업을 걷어내고 실제 API를 부르는 첫 도메인이다(업무 S15P21E106-364).
  *
  * **한 파일에 실제 호출과 목업이 섞여 있다.**
- * - API-014 · API-015 · API-016 · API-019 · API-062는 실제로 부른다. 공개 프로필(API-062)은
- *   업무 -810에서 목업을 걷어냈다
- * - 프로필 사진 · 자기소개 · 항목별 공개 여부는 **계약에 아예 없다**(업무 -616,
- *   `types/unspecified.ts`). 세션 저장소에만 남는다. 내 프로필의 키워드 · 필름 목록도 목업
- *   기준값에서 온다 — 내 `publicId`를 알 길이 없어 내 공개 프로필을 부를 수 없다
+ * - API-014 · API-015 · API-016 · API-019 · API-062 · API-081 · API-082는 실제로 부른다. 공개
+ *   프로필(API-062)은 업무 -810, 프로필 사진(API-081 · 082)은 업무 -762에서 목업을 걷어냈다
+ * - 자기소개 · 항목별 공개 여부는 **계약에 아예 없다**(업무 -616, `types/unspecified.ts`).
+ *   세션 저장소에만 남는다. 내 프로필의 키워드 · 필름 목록도 목업 기준값에서 온다 — 내
+ *   `publicId`를 알 길이 없어 내 공개 프로필을 부를 수 없다
  */
 import { mockMyProfileView } from '../mocks/publicProfiles';
 import { getProfileExtras, saveProfileExtras } from '../mocks/sessionStore';
-import { loadAvatar, saveAvatar } from './avatarStore';
+import { readAsDataUrl } from '../utils/avatarImage';
 import { request } from './client';
 import { getMockProfile, isMockSession, saveMockProfile } from './mockAccount';
 import { respond, respondError } from './mockTransport';
@@ -117,9 +117,9 @@ export const BIO_MAX_LENGTH = 40;
 /**
  * 내 프로필 전체(7.1 · 7.2). 모든 키워드 · 필름이 `isPublic`과 함께 온다.
  *
- * 닉네임과 프레임 · 팝콘 수는 **실제 API-014**다. 나머지는 목업 기준값(`mockMyProfileView`)에
- * 바꾼 사진 · 소개 · 공개 항목을 덮는다 — 그 셋은 계약에 자리가 없다. 사진은 이 기기의
- * 저장소(`avatarStore.ts`)에서, 소개 · 공개 항목은 이번 세션의 목업 저장소에서 온다.
+ * 닉네임 · 사진과 프레임 · 팝콘 수는 **실제 API-014**다. 나머지는 목업 기준값
+ * (`mockMyProfileView`)에 바꾼 소개 · 공개 항목을 덮는다 — 그 둘은 계약에 자리가 없어 이번
+ * 세션의 목업 저장소에서 온다.
  */
 export async function getMyProfileView(): Promise<ProfileView> {
   return respond(toProfileView(await getMyProfile()), 'users');
@@ -133,7 +133,7 @@ function toProfileView(profile: MyProfile): ProfileView {
     ...base,
     userId: profile.userId,
     nickname: profile.nickname,
-    avatarUrl: loadAvatar(profile.userId) ?? base.avatarUrl,
+    avatarUrl: profile.avatarUrl,
     bio: extras.bio ?? base.bio,
     stats: {
       ...base.stats,
@@ -231,14 +231,10 @@ export async function getMyPublicProfile(): Promise<ProfileView> {
 }
 
 /**
- * 프로필 사진 · 자기소개 · 공개 키워드 · 공개 필름 저장. **계약이 없다**(업무 -616).
+ * 자기소개 · 공개 키워드 · 공개 필름 저장. **계약이 없다**(업무 -616).
  *
- * 7.2는 항목별로 저장하므로 한 번에 한 키만 보낸다. 사진은 화면이 잘라 만든 data URL이고
- * `null`이면 기본 이미지로 돌아간다. 응답은 저장된 뒤의 내 프로필 전체다.
- *
- * 사진은 이 기기에 계정별로 남는다(`avatarStore.ts`, 업무 -740). 저장하지 못하면 던져서 7.2가
- * 기존 사진을 두고 `다시 시도`를 준다. 소개 · 공개 항목은 아직 세션 메모리라 새로고침하면 처음
- * 값으로 돌아간다.
+ * 7.2는 항목별로 저장하므로 한 번에 한 키만 보낸다. 응답은 저장된 뒤의 내 프로필 전체다.
+ * 세션 메모리라 새로고침하면 처음 값으로 돌아간다. 사진은 여기가 아니라 API-081 · 082다.
  */
 export async function updateProfileExtras(update: ProfileExtrasUpdate): Promise<ProfileView> {
   if (update.bio !== undefined && [...update.bio].length > BIO_MAX_LENGTH) {
@@ -246,11 +242,51 @@ export async function updateProfileExtras(update: ProfileExtrasUpdate): Promise<
   }
 
   const profile = await getMyProfile();
-  const { avatarUrl, ...rest } = update;
 
-  if (avatarUrl !== undefined) saveAvatar(profile.userId, avatarUrl);
-
-  saveProfileExtras(rest);
+  saveProfileExtras(update);
 
   return respond(toProfileView(profile), 'users');
+}
+
+/**
+ * API-081 프로필 사진 등록 · 교체 · PUT /api/v1/users/me/avatar — 7.2가 부른다(업무 -762).
+ *
+ * multipart `file` 한 칸이다. 화면이 원 안을 512px JPEG로 잘라 보내지만, 서버도 내용을 다시
+ * 판별해 가운데 기준 512×512 JPEG로 저장한다. 돌려받은 `avatarUrl`은 매번 새 주소다.
+ *
+ * 오류는 `400 AVATAR_INVALID`(읽을 수 없거나 받지 않는 형식) · `413 AVATAR_TOO_LARGE`(10MiB
+ * 초과) · `503 AVATAR_STORAGE_UNAVAILABLE`이다. 실패하면 서버는 기존 사진을 그대로 둔다.
+ */
+export async function uploadMyAvatar(photo: Blob): Promise<string> {
+  if (isMockSession()) {
+    // 목업 계정은 서버에 올리지 않는다. 탭 저장소에 넣을 수 있게 글자로 바꿔 둔다
+    const dataUrl = await readAsDataUrl(photo);
+    saveMockProfile({ avatarUrl: dataUrl });
+
+    return respond(dataUrl, 'users');
+  }
+
+  const body = new FormData();
+  body.append('file', photo, 'avatar.jpg');
+
+  const { avatarUrl } = await request<{ avatarUrl: string }>('/users/me/avatar', {
+    method: 'PUT',
+    body,
+  });
+
+  return avatarUrl;
+}
+
+/**
+ * API-082 프로필 사진 삭제 · DELETE /api/v1/users/me/avatar — 7.2의 `기본 이미지` · `현재 사진
+ * 삭제`가 부른다. 사진이 없어도 성공(204)이다. 지운 뒤 API-014 · 062의 `avatarUrl`은 `null`이다.
+ */
+export async function deleteMyAvatar(): Promise<void> {
+  if (isMockSession()) {
+    saveMockProfile({ avatarUrl: null });
+
+    return respond(undefined, 'users');
+  }
+
+  await request<void>('/users/me/avatar', { method: 'DELETE' });
 }

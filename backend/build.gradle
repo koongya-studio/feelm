@@ -65,6 +65,8 @@ dependencies {
 }
 
 tasks.named('test') {
+	maxHeapSize = '1g'
+
 	useJUnitPlatform {
 		excludeTags 'live'
 	}
