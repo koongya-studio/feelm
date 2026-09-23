@@ -375,9 +375,8 @@ export default function PartyPopcornPage() {
         </div>
 
         {/*
-         * 친구 칩. 시안은 사진 아바타를 그렸지만 **프로필 이미지 계약이 없다**(업무
-         * -393에서 임의로 만든 `avatarUrl`을 걷어냈다). Avatar의 무채색 자리표시자를
-         * 쓴다 — 닉네임에서 밝기를 뽑으므로 서로 구분된다.
+         * 친구 칩. 시안대로 사진 아바타다 — API-057 `user.avatarUrl`(업무 -811 · -762). 사진이
+         * 없는 사람은 Avatar의 무채색 자리표시자다. 닉네임에서 밝기를 뽑으므로 서로 구분된다.
          */}
         <ul className={styles.friends}>
           {popcorn.members.map((member) => {
@@ -395,7 +394,11 @@ export default function PartyPopcornPage() {
                     setExpanded(false);
                   }}
                 >
-                  <Avatar size={AVATAR_SIZE} nickname={member.user.nickname} />
+                  <Avatar
+                    size={AVATAR_SIZE}
+                    src={member.user.avatarUrl}
+                    nickname={member.user.nickname}
+                  />
                   <span className={styles.friendName}>{member.user.nickname}</span>
                 </button>
               </li>

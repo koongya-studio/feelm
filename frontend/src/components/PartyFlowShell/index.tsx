@@ -16,6 +16,7 @@ import type { ReactNode } from 'react';
 import Avatar from '../Avatar';
 import ScreenHeader from '../ScreenHeader';
 import styles from './PartyFlowShell.module.css';
+import type { PartyAvatarUser } from '../../types/party';
 
 /** 진행 표시의 단계. 5.5는 표시하지 않으므로 값이 없다 */
 export type PartyFlowStep = 'gather' | 'mix';
@@ -30,8 +31,8 @@ const STEPS: { key: PartyFlowStep | 'recommend'; label: string }[] = [
 const AVATAR_SIZE = 26;
 
 type Props = {
-  /** 파티원 닉네임. 순서는 API-057 · API-050 응답 순서를 그대로 쓴다 */
-  members: string[];
+  /** 파티원. 순서는 API-057 · API-050 응답 순서를 그대로 쓴다 */
+  members: PartyAvatarUser[];
   /** 헤더 우측 자리 */
   action?: ReactNode;
   title: ReactNode;
@@ -58,16 +59,16 @@ export default function PartyFlowShell({
 
       <div className={styles.page}>
         {/*
-         * 파티원 줄. 시안은 사진 아바타를 그렸지만 **프로필 이미지 계약이 없다**
-         * (업무 -393에서 임의로 만든 `avatarUrl`을 걷어냈다). Avatar의 무채색
-         * 자리표시자를 쓴다 — 닉네임에서 밝기를 뽑으므로 서로 구분된다.
+         * 파티원 줄. 시안대로 사진 아바타다 — 파티 · 팝콘 응답의 `avatarUrl`(업무 -811 · -762).
+         * 사진이 없는 사람은 Avatar의 무채색 자리표시자다. 닉네임에서 밝기를 뽑으므로 서로
+         * 구분된다.
          */}
         <div className={styles.members}>
           <ul className={styles.memberList}>
-            {members.map((nickname) => (
-              <li key={nickname} className={styles.member}>
-                <Avatar size={AVATAR_SIZE} nickname={nickname} />
-                <span className={styles.memberName}>{nickname}</span>
+            {members.map((member) => (
+              <li key={member.userId} className={styles.member}>
+                <Avatar size={AVATAR_SIZE} src={member.avatarUrl} nickname={member.nickname} />
+                <span className={styles.memberName}>{member.nickname}</span>
               </li>
             ))}
           </ul>

@@ -6,13 +6,26 @@
  * 이유).
  */
 
-/** 파티 응답 곳곳의 사용자 요약. `userId` · `nickname` 둘뿐이다 */
+/**
+ * 파티 응답 곳곳의 사용자 요약. `userId` · `nickname` 둘뿐이다.
+ *
+ * 초대 쪽(API-051 `invitee` · API-052 `party.owner` · API-050 `pendingInvitations[].invitee`)이
+ * 이 모양이다. 사진은 오지 않는다.
+ */
 export type PartyUser = {
   userId: number;
   nickname: string;
 };
 
-export type PartyMember = PartyUser & {
+/**
+ * 사진까지 오는 사용자 요약(업무 -811 · -762). 파티 응답의 `owner` · `members[]`와 API-057
+ * `members[].user`다. 사진이 없으면 `null`이고, 있으면 API-014와 같은 공개 · 비만료 주소다.
+ */
+export type PartyAvatarUser = PartyUser & {
+  avatarUrl: string | null;
+};
+
+export type PartyMember = PartyAvatarUser & {
   role: 'OWNER' | 'MEMBER';
   joinedAt: string;
 };
@@ -34,7 +47,7 @@ export type Party = {
   partyId: number;
   name: string;
   status: 'ACTIVE' | 'CLOSED';
-  owner: PartyUser;
+  owner: PartyAvatarUser;
   members: PartyMember[];
   maxMembers: number;
   pendingInvitations?: PartyPendingInvitation[];
@@ -115,7 +128,7 @@ export type PartyMemberFlavor = {
  * 개별 프레임·평가는 내려오지 않는다. 맛별 집계만 있다(API-057 처리 규칙).
  */
 export type PartyMemberPopcorn = {
-  user: PartyUser;
+  user: PartyAvatarUser;
   /** 팝콘 알 총 수 */
   totalCount: number;
   flavors: PartyMemberFlavor[];
