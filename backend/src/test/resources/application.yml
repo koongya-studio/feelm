@@ -18,7 +18,7 @@ spring:
 
 feelm:
   avatar:
-    storage-path: ${java.io.tmpdir}/feelm/avatars
+    storage-path: ${AVATAR_STORAGE_PATH:${java.io.tmpdir}/feelm/avatars}
     public-url-prefix: /media/avatars
   kafka:
     outbox:
