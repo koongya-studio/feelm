@@ -37,7 +37,7 @@ describe('캐릭터 카드 기준정보', () => {
   });
 
   it('네 축의 글자를 한 번씩 쓴 조합이 16종을 이룬다', () => {
-    // 축 순서는 탐험·정착 -> 빛·그림자 -> 가슴·머리 -> 다작·정독이다(API-060)
+    // 축 순서는 새로움·익숙함 -> 밝음·어두움 -> 후함·박함 -> 많음·적음이다(API-060)
     const axes = [
       CHARACTER_AXIS_POLES.EXPLORATION,
       CHARACTER_AXIS_POLES.TONE,

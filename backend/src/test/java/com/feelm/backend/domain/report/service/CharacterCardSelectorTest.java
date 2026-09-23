@@ -42,7 +42,7 @@ class CharacterCardSelectorTest {
     }
 
     @Test
-    @DisplayName("탐험 중앙값이 0이면 새 맛 1개 이상을 E로 본다")
+    @DisplayName("새로움 중앙값이 0이면 새 맛 1개 이상을 E로 본다")
     void treatsAnyNewFlavorAsExploringWhenMedianIsZero() {
         // 중앙값 0이면 `이상` 규칙으로는 전원 E가 된다. 그때만 1개 이상을 기준으로 내린다
         CharacterAxisMedians medians = medians(BigDecimal.ZERO, "0.5", "3.5", "0.5", "20");
@@ -205,10 +205,10 @@ class CharacterCardSelectorTest {
         assertThat(card.axes())
                 .extracting("axis", "value", "label")
                 .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple("EXPLORATION", "R", "정착"),
-                        org.assertj.core.groups.Tuple.tuple("TONE", "D", "그림자"),
-                        org.assertj.core.groups.Tuple.tuple("STANCE", "M", "머리"),
-                        org.assertj.core.groups.Tuple.tuple("VOLUME", "S", "정독"));
+                        org.assertj.core.groups.Tuple.tuple("EXPLORATION", "R", "익숙함"),
+                        org.assertj.core.groups.Tuple.tuple("TONE", "D", "어두움"),
+                        org.assertj.core.groups.Tuple.tuple("STANCE", "M", "박함"),
+                        org.assertj.core.groups.Tuple.tuple("VOLUME", "S", "적음"));
         assertThat(card.code()).isEqualTo("RDMS");
         assertThat(card.name()).isEqualTo("금고지기");
     }

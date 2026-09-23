@@ -29,7 +29,7 @@ import RDHS from '../../assets/reports/character/RDHS.webp';
 import RDMV from '../../assets/reports/character/RDMV.webp';
 import RDMS from '../../assets/reports/character/RDMS.webp';
 
-/** 16종 전체. 축 순서는 탐험·정착 -> 빛·그림자 -> 가슴·머리 -> 다작·정독이다 */
+/** 16종 전체. 축 순서는 새로움·익숙함 -> 밝음·어두움 -> 후함·박함 -> 많음·적음이다 */
 export const CHARACTER_CARD_CODES = [
   'ELHV',
   'ELHS',
@@ -90,23 +90,28 @@ export function characterCardImage(code: string | null | undefined): string | nu
  *
  * 계약은 **고른 쪽의 `label`만** 주므로 반대쪽 이름을 여기서 가져온다. 고른 쪽 이름은 계약이
  * 준 `label`을 그대로 쓴다 — 표시명이 바뀌면 서버 쪽이 먼저 바뀐다.
+ *
+ * **이름은 그 축이 재는 값을 그대로 부르는 한 낱말이다**(업무 -814). 화면은 축 이름 없이 양 끝 두
+ * 낱말만 보이므로 낱말이 곧 축 설명이어야 하고, 축 막대 양 끝에 놓이므로 짧아야 한다. 앞의
+ * `탐험 / 정착` · `빛 / 그림자` · `가슴 / 머리` · `다작 / 정독`은 무엇을 재는지 읽히지 않았다.
+ * 서버의 `CharacterAxis`와 같은 말을 쓴다.
  */
 export const CHARACTER_AXIS_POLES = {
   EXPLORATION: [
-    { value: 'E', label: '탐험' },
-    { value: 'R', label: '정착' },
+    { value: 'E', label: '새로움' },
+    { value: 'R', label: '익숙함' },
   ],
   TONE: [
-    { value: 'L', label: '빛' },
-    { value: 'D', label: '그림자' },
+    { value: 'L', label: '밝음' },
+    { value: 'D', label: '어두움' },
   ],
   STANCE: [
-    { value: 'H', label: '가슴' },
-    { value: 'M', label: '머리' },
+    { value: 'H', label: '후함' },
+    { value: 'M', label: '박함' },
   ],
   VOLUME: [
-    { value: 'V', label: '다작' },
-    { value: 'S', label: '정독' },
+    { value: 'V', label: '많음' },
+    { value: 'S', label: '적음' },
   ],
 } as const satisfies Record<
   string,
