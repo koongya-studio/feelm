@@ -253,6 +253,39 @@ class PartyApiContractTest extends SharedPostgresContractTest {
                 .andExpect(jsonPath("$.items[0].partyId").value(closed));
     }
 
+    /** 종료 파티는 멤버십과 마지막 오너를 이력으로 남기므로 탈퇴자가 여기서만 나타난다(S15P21E106-759). */
+    @Test
+    void labelsWithdrawnOwnerAndMembersInClosedParty() throws Exception {
+        long closed = party(10, "CLOSED");
+        member(closed, 20);
+        member(closed, 30);
+        for (long withdrawn : List.of(10L, 20L)) {
+            jdbc.update(
+                    "UPDATE users SET status='WITHDRAWN', nickname=?, withdrawn_at=? WHERE id=?",
+                    "withdrawn-" + withdrawn,
+                    Timestamp.from(CREATED_AT.plusSeconds(10)),
+                    withdrawn);
+        }
+
+        mvc.perform(
+                        get(PATH)
+                                .param("status", "CLOSED")
+                                .header("Authorization", "Bearer " + tokens.createAccessToken(30)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].partyId").value(closed))
+                .andExpect(jsonPath("$.items[0].owner.userId").value(10))
+                .andExpect(jsonPath("$.items[0].owner.nickname").value("탈퇴한 사용자"))
+                .andExpect(jsonPath("$.items[0].members", hasSize(3)))
+                .andExpect(jsonPath("$.items[0].members[0].userId").value(10))
+                .andExpect(jsonPath("$.items[0].members[0].nickname").value("탈퇴한 사용자"))
+                .andExpect(jsonPath("$.items[0].members[1].userId").value(20))
+                .andExpect(jsonPath("$.items[0].members[1].nickname").value("탈퇴한 사용자"))
+                .andExpect(jsonPath("$.items[0].members[2].userId").value(30))
+                .andExpect(jsonPath("$.items[0].members[2].nickname").value("member30"))
+                .andExpect(jsonPath("$.items[0].pendingInvitations", hasSize(0)));
+    }
+
     @Test
     void returnsEmptyCursorPage() throws Exception {
         list().andExpect(status().isOk())
