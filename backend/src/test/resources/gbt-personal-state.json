@@ -1,0 +1,60 @@
+{
+  "model": {
+    "modelKind": "GBT",
+    "modelVersion": "gbt-test627",
+    "servingRevision": "sha256:a4a6e66a2f8ec76d4bd8d2784c295b12513c9c15cf4eec1e205732f8ffc2b762"
+  },
+  "state": {
+    "userId": 10,
+    "modelVersion": "gbt-test627",
+    "servingRevision": "sha256:a4a6e66a2f8ec76d4bd8d2784c295b12513c9c15cf4eec1e205732f8ffc2b762",
+    "generationId": "g1",
+    "inputHash": "sha256:71c4edca6d3f4412fb97bae210131163eec731c2268cd0026b335e799053e271",
+    "candidateVersion": 6,
+    "inputSchemaVersion": "gbt-input-v1",
+    "updatedAt": "2026-09-23T00:00:00Z",
+    "status": "READY",
+    "stateVersion": 1,
+    "modelKind": "GBT",
+    "ratingCount": 1,
+    "inputCount": 2,
+    "dismissCount": 1,
+    "dismissInputCount": 1,
+    "supportedInputCount": 2,
+    "excludedCounts": {
+      "rating": 1,
+      "dismissOnly": 1,
+      "watchOnly": 1000
+    },
+    "eligibleCandidateCount": 3
+  },
+  "candidates": {
+    "userId": 10,
+    "modelVersion": "gbt-test627",
+    "servingRevision": "sha256:a4a6e66a2f8ec76d4bd8d2784c295b12513c9c15cf4eec1e205732f8ffc2b762",
+    "generationId": "g1",
+    "inputHash": "sha256:71c4edca6d3f4412fb97bae210131163eec731c2268cd0026b335e799053e271",
+    "candidateVersion": 6,
+    "inputSchemaVersion": "gbt-input-v1",
+    "updatedAt": "2026-09-23T00:00:00Z",
+    "status": "READY",
+    "taste": [
+      {
+        "movieId": 3,
+        "score": 1.422775387763977,
+        "reasons": []
+      },
+      {
+        "movieId": 4,
+        "score": 1.422775387763977,
+        "reasons": []
+      },
+      {
+        "movieId": 5,
+        "score": 1.422775387763977,
+        "reasons": []
+      }
+    ],
+    "discovery": []
+  }
+}

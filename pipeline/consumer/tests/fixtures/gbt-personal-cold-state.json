@@ -1,0 +1,207 @@
+{
+  "model": {
+    "modelKind": "GBT",
+    "modelVersion": "gbt-cold627",
+    "servingRevision": "sha256:e03602d9b8793c9715493d34605f3d5dadd6c36f745d3b459a3531b6dbaac391"
+  },
+  "before": {
+    "state": {
+      "userId": 58501,
+      "modelVersion": "gbt-cold627",
+      "servingRevision": "sha256:e03602d9b8793c9715493d34605f3d5dadd6c36f745d3b459a3531b6dbaac391",
+      "generationId": "before",
+      "inputHash": "sha256:947e7a20428cf75524d82b7c98db07628ea81744d1db7f98c52aa537b975f4ac",
+      "candidateVersion": 6,
+      "inputSchemaVersion": "gbt-input-v1",
+      "updatedAt": "2026-09-23T00:00:00Z",
+      "status": "READY",
+      "stateVersion": 1,
+      "modelKind": "GBT",
+      "ratingCount": 1,
+      "inputCount": 1,
+      "dismissCount": 0,
+      "dismissInputCount": 0,
+      "supportedInputCount": 1,
+      "excludedCounts": {
+        "rating": 1,
+        "dismissOnly": 0,
+        "watchOnly": 0
+      },
+      "eligibleCandidateCount": 5
+    },
+    "candidates": {
+      "userId": 58501,
+      "modelVersion": "gbt-cold627",
+      "servingRevision": "sha256:e03602d9b8793c9715493d34605f3d5dadd6c36f745d3b459a3531b6dbaac391",
+      "generationId": "before",
+      "inputHash": "sha256:947e7a20428cf75524d82b7c98db07628ea81744d1db7f98c52aa537b975f4ac",
+      "candidateVersion": 6,
+      "inputSchemaVersion": "gbt-input-v1",
+      "updatedAt": "2026-09-23T00:00:00Z",
+      "status": "READY",
+      "taste": [
+        {
+          "movieId": 2,
+          "score": 1.422775387763977,
+          "reasons": []
+        },
+        {
+          "movieId": 3,
+          "score": 1.422775387763977,
+          "reasons": []
+        },
+        {
+          "movieId": 4,
+          "score": 1.422775387763977,
+          "reasons": []
+        },
+        {
+          "movieId": 5,
+          "score": 1.422775387763977,
+          "reasons": []
+        },
+        {
+          "movieId": 6,
+          "score": 1.422775387763977,
+          "reasons": []
+        }
+      ],
+      "discovery": []
+    }
+  },
+  "cold": {
+    "state": {
+      "userId": 58501,
+      "modelVersion": "gbt-cold627",
+      "servingRevision": "sha256:e03602d9b8793c9715493d34605f3d5dadd6c36f745d3b459a3531b6dbaac391",
+      "generationId": "cold",
+      "inputHash": "sha256:6ae90037aad51c630679bdf2622181077c7d1bd2d14a9a54c83ac24cd7c69c61",
+      "candidateVersion": 6,
+      "inputSchemaVersion": "gbt-input-v1",
+      "updatedAt": "2026-09-23T00:00:00Z",
+      "status": "READY",
+      "stateVersion": 1,
+      "modelKind": "GBT",
+      "ratingCount": 0,
+      "inputCount": 0,
+      "dismissCount": 0,
+      "dismissInputCount": 0,
+      "supportedInputCount": 0,
+      "excludedCounts": {
+        "rating": 0,
+        "dismissOnly": 0,
+        "watchOnly": 0
+      },
+      "eligibleCandidateCount": 6
+    },
+    "candidates": {
+      "userId": 58501,
+      "modelVersion": "gbt-cold627",
+      "servingRevision": "sha256:e03602d9b8793c9715493d34605f3d5dadd6c36f745d3b459a3531b6dbaac391",
+      "generationId": "cold",
+      "inputHash": "sha256:6ae90037aad51c630679bdf2622181077c7d1bd2d14a9a54c83ac24cd7c69c61",
+      "candidateVersion": 6,
+      "inputSchemaVersion": "gbt-input-v1",
+      "updatedAt": "2026-09-23T00:00:00Z",
+      "status": "READY",
+      "taste": [
+        {
+          "movieId": 5,
+          "score": 8.9533109664917,
+          "reasons": []
+        },
+        {
+          "movieId": 6,
+          "score": 4.110873699188232,
+          "reasons": []
+        },
+        {
+          "movieId": 4,
+          "score": 3.7135720252990723,
+          "reasons": []
+        },
+        {
+          "movieId": 3,
+          "score": 3.4339871406555176,
+          "reasons": []
+        },
+        {
+          "movieId": 2,
+          "score": 3.044522523880005,
+          "reasons": []
+        },
+        {
+          "movieId": 1,
+          "score": 2.397895336151123,
+          "reasons": []
+        }
+      ],
+      "discovery": []
+    }
+  },
+  "next": {
+    "state": {
+      "userId": 58502,
+      "modelVersion": "gbt-cold627",
+      "servingRevision": "sha256:e03602d9b8793c9715493d34605f3d5dadd6c36f745d3b459a3531b6dbaac391",
+      "generationId": "next",
+      "inputHash": "sha256:6acac4d47ec2700a23ae9d1881df72127feb5343179bbfe903e9af11a115fa12",
+      "candidateVersion": 6,
+      "inputSchemaVersion": "gbt-input-v1",
+      "updatedAt": "2026-09-23T00:00:00Z",
+      "status": "READY",
+      "stateVersion": 1,
+      "modelKind": "GBT",
+      "ratingCount": 1,
+      "inputCount": 1,
+      "dismissCount": 0,
+      "dismissInputCount": 0,
+      "supportedInputCount": 1,
+      "excludedCounts": {
+        "rating": 1,
+        "dismissOnly": 0,
+        "watchOnly": 0
+      },
+      "eligibleCandidateCount": 5
+    },
+    "candidates": {
+      "userId": 58502,
+      "modelVersion": "gbt-cold627",
+      "servingRevision": "sha256:e03602d9b8793c9715493d34605f3d5dadd6c36f745d3b459a3531b6dbaac391",
+      "generationId": "next",
+      "inputHash": "sha256:6acac4d47ec2700a23ae9d1881df72127feb5343179bbfe903e9af11a115fa12",
+      "candidateVersion": 6,
+      "inputSchemaVersion": "gbt-input-v1",
+      "updatedAt": "2026-09-23T00:00:00Z",
+      "status": "READY",
+      "taste": [
+        {
+          "movieId": 1,
+          "score": 1.422775387763977,
+          "reasons": []
+        },
+        {
+          "movieId": 3,
+          "score": 1.422775387763977,
+          "reasons": []
+        },
+        {
+          "movieId": 4,
+          "score": 1.422775387763977,
+          "reasons": []
+        },
+        {
+          "movieId": 5,
+          "score": 1.422775387763977,
+          "reasons": []
+        },
+        {
+          "movieId": 6,
+          "score": 1.422775387763977,
+          "reasons": []
+        }
+      ],
+      "discovery": []
+    }
+  }
+}

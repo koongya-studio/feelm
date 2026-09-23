@@ -1,7 +1,9 @@
 # Fold-in Consumer
 
-v26 GBT 전용 번들·독립 scorer 준비는 [GBT.md](./GBT.md)를 따른다. 아직 아래 ALS 실행 경로를
-교체하지 않았으며 실제 개인/파티 연결과 운영 이미지 통합은 후속 업무다.
+742 계약에 연결된 개인 GBT 실행·입력 보존·검증은 [627 안내](GBT-627.md)를 참고한다.
+
+v26 GBT 전용 번들·독립 scorer는 [GBT.md](./GBT.md)를 따른다. 개인 실행은 명시적인
+`--gbt-bundle`로 선택한다. 아래는 기존 ALS 경로이며 운영 이미지 통합은 644에서 수행한다.
 
 Kafka의 평가·온보딩·관심없음 이벤트를 받아 최신 사용자 입력으로 ALS Fold-in을 수행하고 TASTE 최대 500편과
 DISCOVERY 최대 100편을 갱신한다. Python 3.12의 독립 프로젝트이며 Spark 코드를 import하지 않는다.
