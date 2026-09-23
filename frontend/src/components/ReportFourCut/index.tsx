@@ -117,7 +117,14 @@ function GenreCut({ name, displayName, image }: CutProps) {
   const photo = useCutImage(image);
 
   return (
-    <Cut kind="genre" label="장르" name={name} displayName={displayName} photo={photo}>
+    <Cut
+      kind="genre"
+      label="장르"
+      name={name}
+      displayName={displayName}
+      photo={photo}
+      imageError={photo.failed}
+    >
       <FitName text={displayName || name} maxLines={2} stretch={1.9} className={styles.genreName}>
         {displayName || name}
       </FitName>
@@ -144,6 +151,7 @@ function DirectorCut({
       displayName={displayName}
       photo={photo}
       searchName={searchable ? name : undefined}
+      imageError={photo.failed || Boolean(work?.url && workFailed === work.url)}
       extra={
         workUrl ? (
           <span className={styles.work}>
@@ -179,6 +187,7 @@ function ActorCut({ name, displayName, image, searchable }: CutProps & { searcha
       displayName={displayName}
       photo={photo}
       searchName={searchable ? name : undefined}
+      imageError={photo.failed}
     >
       {/* 두 단어를 서로 다른 크기로 한 줄씩 쓴다. 줄 수가 아니라 상자 폭 · 높이로만 맞춘다 */}
       <FitName text={text} maxLines={3} className={styles.actorName}>
@@ -201,7 +210,14 @@ function CharacterCut({ name, displayName, code }: ReportCutName & { code?: stri
   const photo = useCutImage({ url: characterCardImage(code) });
 
   return (
-    <Cut kind="character" label="캐릭터" name={name} displayName={displayName} photo={photo}>
+    <Cut
+      kind="character"
+      label="캐릭터"
+      name={name}
+      displayName={displayName}
+      photo={photo}
+      imageError={photo.failed}
+    >
       <FitName text={displayName || name} maxLines={2} className={styles.characterName}>
         <span className={styles.underlined}>
           {displayName || name}
@@ -248,6 +264,7 @@ type CutFrameProps = ReportCutName & {
   kind: CutKind;
   label: string;
   photo: CutImageState;
+  imageError?: boolean;
   /** 사진과 이름 사이에 놓는 장식. 감독 칸의 대표작 */
   extra?: ReactNode;
   /** 값이 있으면 칸 전체를 해당 인물 검색 링크로 만든다. */
@@ -268,6 +285,7 @@ function Cut({
   name,
   displayName,
   photo,
+  imageError,
   extra,
   searchName,
   children,
@@ -275,7 +293,12 @@ function Cut({
   const hasDisplayName = Boolean(displayName) && displayName !== name;
 
   return (
-    <li className={styles.cut} data-cut={kind} data-mode={photo.mode}>
+    <li
+      className={styles.cut}
+      data-cut={kind}
+      data-mode={photo.mode}
+      data-image-error={imageError || undefined}
+    >
       {photo.mode === 'photo' && photo.src ? (
         <span className={styles.photo}>
           <img src={photo.src} alt="" style={imageStyle(photo.image)} onError={photo.fail} />
@@ -332,6 +355,7 @@ type CutImageState = {
   mode: 'cutout' | 'photo' | 'none';
   src: string | null;
   image: ReportCutImage;
+  failed: boolean;
   fail: () => void;
 };
 
@@ -355,6 +379,7 @@ function useCutImage(image: ReportCutImage): CutImageState {
     mode,
     src,
     image,
+    failed: !src && failed.length > 0,
     fail: () => {
       if (src) setFailed((list) => [...list, src]);
     },

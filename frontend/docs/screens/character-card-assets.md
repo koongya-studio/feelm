@@ -135,3 +135,5 @@ no border, 3:2 landscape
 3. `characterCards.test.tsx`의 "그림이 없는 코드와 모르는 코드는 모두 null이다"가
    16종 전부 null을 전제하므로, 그림이 찬 뒤의 전제로 바꾼다
 4. 목록(7.3)과 상세(3.4)에서 실제 크기로 눈으로 확인한다
+5. API-061 저장 PNG는 이 `ReportFourCut` DOM 자체를 캡처하므로 Backend에 에셋을 복사하지
+   않는다. 16장의 정본은 이 프론트 디렉터리 하나다

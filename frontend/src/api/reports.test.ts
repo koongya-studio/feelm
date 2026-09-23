@@ -8,8 +8,7 @@
  * - **인화 중인 반기는 목록에 없다.** `GENERATING`은 `current`로만 오므로 `items`만 읽으면
  *   7.3의 `인화 중` 칸이 사라진다(API-059 처리 규칙)
  * - **첫 발급은 본문 없는 POST다.** 재요청도 200이고 처음 기록한 시각을 그대로 준다(API-080)
- * - **이미지 카드(API-061)는 아직 목업이라 서버에 가지 않는다**(업무 -731). 목업이 남았다는
- *   것을 시험으로 붙잡아 둔다 — 실제 호출로 바꾸면 이 시험이 먼저 깨진다
+ * - 이미지 카드 API-061은 화면에서 캡처한 PNG를 그대로 본문에 싣는다
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -150,11 +149,23 @@ describe('3.1 리포트 버튼 판정', () => {
 });
 
 describe('API-061 리포트 이미지 카드', () => {
-  it('아직 목업이라 서버에 가지 않는다', async () => {
-    const image = await createReportImage(301);
+  it('ReportFourCut에서 캡처한 PNG를 가공하지 않고 서버에 보낸다', async () => {
+    const png = new Blob(['frontend-four-cut'], { type: 'image/png' });
+    fetchMock.mockResolvedValue(
+      json(201, {
+        imageId: 901,
+        format: 'PNG',
+        downloadUrl: '/api/v1/report-images/901/download?expires=1&signature=x',
+        expiresAt: '2026-07-01T00:10:00Z',
+      }),
+    );
+
+    const image = await createReportImage(301, png);
 
     expect(image.format).toBe('PNG');
-    expect(image.downloadUrl).toContain('301');
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(call()[0]).toBe('/api/v1/reports/301/image');
+    expect(call()[1].method).toBe('POST');
+    expect(call()[1].body).toBe(png);
+    expect((call()[1].headers as Record<string, string>)['Content-Type']).toBe('image/png');
   });
 });

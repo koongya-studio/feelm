@@ -1,5 +1,6 @@
 package com.feelm.backend.domain.report;
 
+import com.feelm.backend.domain.report.service.ReportImageStorage;
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedPostgresContractTest;
 import java.sql.Timestamp;
@@ -76,10 +77,22 @@ abstract class ReportApiContractSupport extends SharedPostgresContractTest {
     @Autowired protected JdbcTemplate jdbc;
     @Autowired protected TokenProvider tokenProvider;
     @Autowired protected MutableClock clock;
+    @Autowired private ReportImageStorage reportImageStorage;
 
     @BeforeEach
     @AfterEach
     void clean() {
+        jdbc.query(
+                        """
+                        SELECT ri.storage_key
+                        FROM report_images ri
+                        JOIN taste_reports tr ON tr.id = ri.report_id
+                        WHERE tr.user_id IN (?, ?)
+                        """,
+                        (result, row) -> result.getString("storage_key"),
+                        OWNER,
+                        OTHER)
+                .forEach(reportImageStorage::delete);
         jdbc.update("DELETE FROM taste_reports WHERE user_id IN (?, ?)", OWNER, OTHER);
         jdbc.update("DELETE FROM taste_report_generation_runs WHERE year = 2030");
         jdbc.update("DELETE FROM users WHERE id IN (?, ?)", OWNER, OTHER);

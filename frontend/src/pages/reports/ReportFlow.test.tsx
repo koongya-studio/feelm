@@ -47,6 +47,11 @@ vi.mock('../../api/users', () => ({
   getMyProfileView: vi.fn(),
 }));
 
+vi.mock('../../utils/reportImage', () => ({
+  captureReportImage: vi.fn(),
+  downloadReportImage: vi.fn(),
+}));
+
 /*
  * 3.1과 7.1이 부르는 필름 · 팝콘은 실제 API다(업무 -392). 가로채지 않으면 화면이
  * 실패 상태로 떨어져 리포트 버튼 자체가 나오지 않는다.
@@ -70,10 +75,12 @@ vi.mock('../../api/reports', async (importOriginal) => ({
   getMyReports: vi.fn(),
   getReportDetail: vi.fn(),
   issueReport: vi.fn(),
+  createReportImage: vi.fn(),
 }));
 
-const { getLatestReadyReport, getMyReports, getReportDetail, issueReport } =
+const { createReportImage, getLatestReadyReport, getMyReports, getReportDetail, issueReport } =
   await import('../../api/reports');
+const { captureReportImage, downloadReportImage } = await import('../../utils/reportImage');
 
 /** 7.3 목록이 읽는 API-059 응답을 바꿔 끼운다 */
 function serveList(list: ReportList) {
@@ -104,6 +111,16 @@ beforeEach(() => {
   vi.mocked(getPopcornBucket).mockReset().mockResolvedValue(mockPopcornBucket);
 
   vi.mocked(getMyReports).mockReset();
+  vi.mocked(captureReportImage)
+    .mockReset()
+    .mockResolvedValue(new Blob(['four-cut'], { type: 'image/png' }));
+  vi.mocked(createReportImage).mockReset().mockResolvedValue({
+    imageId: 901,
+    format: 'PNG',
+    downloadUrl: '/api/v1/report-images/901/download?expires=1&signature=x',
+    expiresAt: '2026-07-01T00:10:00Z',
+  });
+  vi.mocked(downloadReportImage).mockReset().mockResolvedValue(undefined);
   serveList(reportListBeforeIssue);
   /*
    * 3.1의 버튼은 `getLatestReadyReport`가 가른다. 이 시험은 두 상태를 직접 세우고, 발급
@@ -355,6 +372,7 @@ describe('3.4 → 3.5', () => {
   it('공유도 복사도 못 하는 브라우저면 알리고, 이미지는 API-061로 만든다', async () => {
     renderApp(['/reports/301']);
     const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
+    await waitFor(() => expect(getMyProfile).toHaveBeenCalledOnce());
     fireEvent.click(headerShare);
 
     const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
@@ -365,7 +383,32 @@ describe('3.4 → 3.5', () => {
     );
 
     fireEvent.click(sheet.getByRole('button', { name: '이미지로 저장' }));
-    await waitFor(() => expect(sheet.getByRole('status')).toHaveTextContent('이미지를 만들었어요'));
+    await waitFor(() => expect(sheet.getByRole('status')).toHaveTextContent('이미지를 저장했어요'));
+    expect(captureReportImage).toHaveBeenCalledWith(expect.any(HTMLElement));
+    expect(createReportImage).toHaveBeenCalledWith(301, expect.any(Blob));
+    expect(downloadReportImage).toHaveBeenCalledWith(
+      '/api/v1/report-images/901/download?expires=1&signature=x',
+      301,
+    );
+    expect(getMyProfile).toHaveBeenCalledTimes(2);
+  });
+
+  it('프로필 조회가 먼저 실패해도 저장 시 다시 읽고 닉네임이 반영된 DOM만 캡처한다', async () => {
+    vi.mocked(getMyProfile)
+      .mockReset()
+      .mockRejectedValueOnce(new Error('profile unavailable'))
+      .mockResolvedValueOnce(mockMyProfile);
+    renderApp(['/reports/301']);
+
+    const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
+    fireEvent.click(headerShare);
+    const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
+    fireEvent.click(sheet.getByRole('button', { name: '이미지로 저장' }));
+
+    await waitFor(() => expect(sheet.getByRole('status')).toHaveTextContent('이미지를 저장했어요'));
+    expect(getMyProfile).toHaveBeenCalledTimes(2);
+    const captured = vi.mocked(captureReportImage).mock.calls[0][0];
+    expect(captured.querySelector('figure')).toHaveAttribute('aria-label', '김난다의 취향 4컷');
   });
 });
 

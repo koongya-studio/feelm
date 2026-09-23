@@ -32,12 +32,6 @@ const ALLOWED: Record<string, Record<string, Allowed>> = {
       reason: '개발 서버 전용 목업 계정(`feelm.mockAccount`). 배포 빌드에서는 켜지지 않는다',
     },
   },
-  'reports.ts': {
-    './mockTransport': {
-      reason: 'API-061 리포트 이미지 카드(`createReportImage`)가 백엔드에 없다',
-      until: 'S15P21E106-731',
-    },
-  },
   'users.ts': {
     '../mocks/publicProfiles': {
       reason:

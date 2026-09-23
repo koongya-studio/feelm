@@ -57,6 +57,7 @@ class RequiredVariablePreflightTest(unittest.TestCase):
             "POSTGRES_PASSWORD": self.secret,
             "POSTGRES_USER": "feelm",
             "REDIS_PASSWORD": self.secret,
+            "REPORT_IMAGE_SIGNING_SECRET": self.secret,
         }
         return environment
 
@@ -71,12 +72,17 @@ class RequiredVariablePreflightTest(unittest.TestCase):
 
     def test_repository_contract_is_value_free_and_valid(self):
         variables = MODULE.load_contract()
-        self.assertEqual(len(variables), 14)
+        self.assertEqual(len(variables), 15)
         self.assertNotIn(self.secret, json.dumps(variables))
         self.assertTrue(all("value" not in entry for entry in variables))
 
         by_key = {entry["key"]: entry for entry in variables}
-        for key in ("GOOGLE_CLIENT_SECRET", "KAKAO_CLIENT_SECRET", "NAVER_CLIENT_SECRET"):
+        for key in (
+            "GOOGLE_CLIENT_SECRET",
+            "KAKAO_CLIENT_SECRET",
+            "NAVER_CLIENT_SECRET",
+            "REPORT_IMAGE_SIGNING_SECRET",
+        ):
             self.assertTrue(by_key[key]["masked"])
             self.assertTrue(by_key[key]["hidden"])
         for key in (

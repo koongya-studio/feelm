@@ -133,6 +133,8 @@ class ReportGenerationIntegrationTest extends SharedPostgresContractTest {
         assertThat(content.path("fourCut").path("genre").path("name").asText()).isEqualTo("드라마");
         assertThat(content.path("fourCut").path("genre").path("displayName").asText())
                 .isEqualTo("R555_DRAMA");
+        assertThat(content.path("fourCut").path("genre").path("image").path("url").asText())
+                .isEqualTo("https://image.tmdb.org/t/p/original/report-backdrop-3.jpg");
         assertThat(content.path("topDirectors").get(0).path("personId").asLong())
                 .isEqualTo(personId(1));
         assertThat(content.path("topActors").get(0).path("personId").asLong())
@@ -155,6 +157,8 @@ class ReportGenerationIntegrationTest extends SharedPostgresContractTest {
                 .isEqualTo("Director One");
         assertThat(content.path("fourCut").path("actor").path("displayName").asText())
                 .isEqualTo("Actor One");
+        assertThat(content.path("fourCut").path("director").path("work").path("url").asText())
+                .isEqualTo("https://image.tmdb.org/t/p/original/report-backdrop-1.jpg");
         /*
          * 캐릭터 카드는 프레임 3편 이상이면 늘 함께 생긴다 — 16종이 모든 조합을 덮어 후보 없음이
          * 없다(API-060, 업무 -779). 이 사용자는 3편이라 소량 표본이다.
@@ -475,14 +479,18 @@ class ReportGenerationIntegrationTest extends SharedPostgresContractTest {
         long movieId = movieId(suffix);
         jdbc.update(
                 """
-                INSERT INTO movies (id, tmdb_id, title, release_date, representative_flavor_id)
-                VALUES (?, ?, ?, make_date(?, 1, 1), ?)
+                INSERT INTO movies
+                    (id, tmdb_id, title, release_date, representative_flavor_id,
+                     poster_url, backdrop_url)
+                VALUES (?, ?, ?, make_date(?, 1, 1), ?, ?, ?)
                 """,
                 movieId,
                 Math.toIntExact(movieId),
                 "리포트 영화 " + suffix,
                 releaseYear,
-                flavorSuffix == null ? null : flavorId(flavorSuffix));
+                flavorSuffix == null ? null : flavorId(flavorSuffix),
+                "https://image.tmdb.org/t/p/original/report-poster-" + suffix + ".jpg",
+                "https://image.tmdb.org/t/p/original/report-backdrop-" + suffix + ".jpg");
         Instant instant = Instant.parse(createdAt);
         jdbc.update(
                 """

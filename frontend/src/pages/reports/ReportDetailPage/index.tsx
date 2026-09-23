@@ -25,7 +25,7 @@
  * 나가는 동작으로 보았다. 이미지 저장은 3.5의 `이미지로 저장`이 맡는다.
  * `[?]` 7.4는 와이어프레임에 `공유하기` 버튼이 없지만 이동표에 `7.4 ⇢ 3.5`가 있어 두었다.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import Chip from '../../../components/Chip';
@@ -56,6 +56,20 @@ type Props = {
   from: 'film' | 'my';
 };
 
+function nextFrameOrFallback(): Promise<void> {
+  return new Promise((resolve) => {
+    let completed = false;
+    const finish = () => {
+      if (completed) return;
+      completed = true;
+      window.clearTimeout(fallback);
+      resolve();
+    };
+    const fallback = window.setTimeout(finish, 1_000);
+    requestAnimationFrame(finish);
+  });
+}
+
 export default function ReportDetailPage({ from }: Props) {
   const navigate = useNavigate();
   const back = useBack(path.tasteReports());
@@ -67,6 +81,7 @@ export default function ReportDetailPage({ from }: Props) {
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
   const [sharing, setSharing] = useState(false);
+  const fourCutRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let active = true;
@@ -110,6 +125,19 @@ export default function ReportDetailPage({ from }: Props) {
     }
   }
 
+  async function prepareImage() {
+    try {
+      const profile = await getMyProfile();
+      if (profile.nickname !== nickname) {
+        setNickname(profile.nickname);
+        await nextFrameOrFallback();
+      }
+    } catch (error) {
+      // 화면에 이미 닉네임이 있으면 현재 보이는 DOM을 그대로 저장할 수 있다.
+      if (!nickname) throw error;
+    }
+  }
+
   if (failed) {
     return (
       <>
@@ -150,7 +178,7 @@ export default function ReportDetailPage({ from }: Props) {
 
       <div className={styles.page}>
         {/* 4컷. 인화지가 화면에서 유일한 어두운 블록이다 */}
-        <div className={styles.fourCut}>
+        <div ref={fourCutRef} className={styles.fourCut}>
           <ReportFourCut
             cuts={report.fourCut}
             owner={nickname}
@@ -213,6 +241,8 @@ export default function ReportDetailPage({ from }: Props) {
         <ReportShareSheet
           reportId={report.reportId}
           title={title}
+          getImageNode={() => fourCutRef.current?.firstElementChild as HTMLElement | null}
+          prepareImage={prepareImage}
           onClose={() => setSharing(false)}
         />
       ) : null}

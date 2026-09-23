@@ -280,6 +280,15 @@ class CharacterCardSelectorTest {
     private static ReportSource.Frame frameAt(
             long frameId, String score, String flavorCode, Instant createdAt) {
         return new ReportSource.Frame(
-                frameId, 1L, frameId, new BigDecimal(score), createdAt, 2020, flavorCode, null);
+                frameId,
+                1L,
+                frameId,
+                new BigDecimal(score),
+                createdAt,
+                2020,
+                flavorCode,
+                null,
+                null,
+                null);
     }
 }

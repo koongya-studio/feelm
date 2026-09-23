@@ -1,6 +1,7 @@
 package com.feelm.backend.global.security;
 
 import java.util.List;
+import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -39,6 +40,10 @@ public class SecurityConfig {
     private static final String PUBLIC_PROFILE_TEMPLATE = "/api/v1/users/{publicId}/profile";
 
     private static final String PUBLIC_PROFILE_VARIABLE = "publicId";
+
+    /** API-061이 발급한 HMAC capability로만 접근하는 PNG 다운로드 경로. */
+    private static final Pattern REPORT_IMAGE_DOWNLOAD_PATH =
+            Pattern.compile("^/api/v1/report-images/[1-9][0-9]*/download$");
 
     /**
      * 인증 없이 호출할 수 있는 경로. 도메인별 공개 API는 여기에 추가한다.
@@ -85,6 +90,9 @@ public class SecurityConfig {
             return true;
         }
         if (HttpMethod.GET.equals(method)) {
+            if (isReportImageDownloadApi(path)) {
+                return true;
+            }
             for (String getOnlyPath : PUBLIC_GET_PATHS) {
                 if (getOnlyPath.equals(path)) {
                     return true;
@@ -97,6 +105,10 @@ public class SecurityConfig {
             }
         }
         return false;
+    }
+
+    private static boolean isReportImageDownloadApi(String path) {
+        return REPORT_IMAGE_DOWNLOAD_PATH.matcher(path).matches();
     }
 
     /** API-030·031 영화 상세와 API-062 공개 프로필이 선택 인증이다. 정적 검색·필터·급상승 경로는 영화 ID 템플릿에 포함하지 않는다. */
