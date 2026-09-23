@@ -1,12 +1,20 @@
 /*
- * 사용자 검색 (업무 S15P21E106-393) · 공개 프로필 (업무 -810).
+ * 사용자 검색 (업무 S15P21E106-393) · 공개 프로필 (업무 -810) · 프로필 사진 (업무 -762).
  *
  * 5.3이 초대할 사람을 고르는 유일한 길이다. 화면에서는 드러나지 않는 두 가지를 고정한다.
  * - `items` 래퍼를 벗기지 않는다. 검색은 이어 받을 수 있어야 해서 `nextCursor`가 필요하다
  * - **길이 검증을 화면이 먼저 한다.** 한 글자만 쳐도 요청이 나가면 매번 `400`이다
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getPublicProfile, isSearchableNickname, searchUsers } from './users';
+import {
+  deleteMyAvatar,
+  getMyProfileView,
+  getPublicProfile,
+  isSearchableNickname,
+  searchUsers,
+  uploadMyAvatar,
+} from './users';
+import { mockMyProfile } from '../mocks/user';
 import { resetSessionForTest, startSession } from './session';
 
 const fetchMock = vi.fn();
@@ -148,5 +156,50 @@ describe('API-062 공개 프로필', () => {
     );
 
     await expect(getPublicProfile('nope')).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe('API-081 · 082 프로필 사진', () => {
+  it('잘린 사진을 multipart `file` 칸으로 PUT하고 서버가 준 주소를 돌려준다', async () => {
+    fetchMock.mockResolvedValue(json(200, { avatarUrl: '/media/avatars/new.jpg' }));
+    const photo = new Blob(['jpeg'], { type: 'image/jpeg' });
+
+    await expect(uploadMyAvatar(photo)).resolves.toBe('/media/avatars/new.jpg');
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/v1/users/me/avatar');
+    expect(init.method).toBe('PUT');
+    expect(init.body).toBeInstanceOf(FormData);
+    expect(await ((init.body as FormData).get('file') as Blob).text()).toBe('jpeg');
+    // 경계(boundary)는 브라우저가 붙인다. 직접 쓰면 서버가 본문을 나누지 못한다
+    expect(init.headers).not.toHaveProperty('Content-Type');
+  });
+
+  it('거절은 계약의 코드 그대로 올라간다', async () => {
+    fetchMock.mockResolvedValue(json(413, { code: 'AVATAR_TOO_LARGE', message: '너무 큼' }));
+
+    await expect(uploadMyAvatar(new Blob(['x']))).rejects.toMatchObject({
+      status: 413,
+      code: 'AVATAR_TOO_LARGE',
+    });
+  });
+
+  it('지우기는 DELETE이고 204를 받는다', async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+
+    await expect(deleteMyAvatar()).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/v1/users/me/avatar',
+      expect.objectContaining({ method: 'DELETE' }),
+    );
+  });
+
+  it('내 프로필 사진은 API-014의 `avatarUrl`이다. 기기 저장소를 읽지 않는다', async () => {
+    localStorage.setItem(`feelm.avatar.${mockMyProfile.userId}`, 'data:image/jpeg;base64,OLD');
+    fetchMock.mockResolvedValue(json(200, { ...mockMyProfile, avatarUrl: '/media/avatars/a.jpg' }));
+
+    expect((await getMyProfileView()).avatarUrl).toBe('/media/avatars/a.jpg');
+
+    localStorage.clear();
   });
 });

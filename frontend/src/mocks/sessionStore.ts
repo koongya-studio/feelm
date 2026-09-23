@@ -30,9 +30,6 @@
  */
 import type { ProfileExtrasUpdate } from '../types/unspecified';
 
-/** 세션에 두는 프로필 항목. 사진은 기기 저장소로 옮겼다(`api/avatarStore.ts`, 업무 -740) */
-type SessionProfileExtras = Omit<ProfileExtrasUpdate, 'avatarUrl'>;
-
 type SessionState = {
   /**
    * API-027로 설정한 구독 OTT. `null`이면 아직 설정하지 않은 상태이며
@@ -51,7 +48,7 @@ type SessionState = {
    * 7.2에서 바꾼 소개 · 공개 항목(업무 -616). **계약에 자리가 없다**
    * (`types/unspecified.ts` 프로필 머리말). 비어 있는 키는 기준 목업 값을 쓴다는 뜻이다.
    */
-  profileExtras: SessionProfileExtras;
+  profileExtras: ProfileExtrasUpdate;
 };
 
 function emptyState(): SessionState {
@@ -115,11 +112,11 @@ export function clearRecentSearchQueries(): void {
 
 // ─────────────────────────────────────────── 프로필 소개 · 공개 항목 (업무 -616)
 
-export function getProfileExtras(): SessionProfileExtras {
+export function getProfileExtras(): ProfileExtrasUpdate {
   return state.profileExtras;
 }
 
 /** 넘긴 키만 바꾼다 */
-export function saveProfileExtras(update: SessionProfileExtras): void {
+export function saveProfileExtras(update: ProfileExtrasUpdate): void {
   state.profileExtras = { ...state.profileExtras, ...update };
 }

@@ -2,8 +2,8 @@
  * 프로필 사진 고르기 · 자르기 (업무 S15P21E106-616)
  *
  * 7.2에서 고른 사진은 올리기 전에 **원 안에 들어갈 정사각형으로 자른다.** 원은 CSS가
- * 그리므로(`Avatar`) 저장하는 것은 정사각형 한 장이다. 사진 올리기 계약이 없어 결과는
- * data URL로 목업 저장소에 들어간다(`api/users.ts` `updateProfileExtras`).
+ * 그리므로(`Avatar`) 저장하는 것은 정사각형 한 장이다. 결과 JPEG를 API-081로 올린다
+ * (`api/users.ts` `uploadMyAvatar`, 업무 -762). 형식 · 크기 상한은 API-081과 같다.
  */
 
 /** 받는 형식. HEIC 같은 형식은 브라우저가 그리지 못해 자를 수 없다 */
@@ -29,7 +29,7 @@ export function avatarFileProblem(file: File): string | null {
 }
 
 /** 파일을 data URL로 읽는다. 자르기 화면이 이 주소로 사진을 그린다 */
-export function readAsDataUrl(file: File): Promise<string> {
+export function readAsDataUrl(file: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
 
@@ -91,8 +91,8 @@ export function cropSourceRect(
   };
 }
 
-/** 잘라서 정사각형 JPEG data URL로 만든다. 그릴 수 없는 환경이면 실패한다 */
-export function renderCrop(image: HTMLImageElement, crop: CropState, stage: number): string {
+/** 잘라서 정사각형 JPEG로 만든다. 그릴 수 없는 환경이면 실패한다 */
+export function renderCrop(image: HTMLImageElement, crop: CropState, stage: number): Promise<Blob> {
   const canvas = document.createElement('canvas');
   canvas.width = AVATAR_OUTPUT_SIZE;
   canvas.height = AVATAR_OUTPUT_SIZE;
@@ -115,5 +115,11 @@ export function renderCrop(image: HTMLImageElement, crop: CropState, stage: numb
     AVATAR_OUTPUT_SIZE,
   );
 
-  return canvas.toDataURL('image/jpeg', 0.9);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('사진을 자르지 못했어요'))),
+      'image/jpeg',
+      0.9,
+    );
+  });
 }

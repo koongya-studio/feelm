@@ -36,7 +36,7 @@ export type QueryEntry = QueryValue | readonly QueryValue[];
 
 export type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  /** JSON 본문 또는 Blob. 없으면 `Content-Type`을 붙이지 않는다 */
+  /** JSON 본문 · Blob · FormData. 없으면 `Content-Type`을 붙이지 않는다 */
   body?: unknown;
   /** 질의 문자열. `undefined`·`null` 값과 빈 배열은 보내지 않는다 */
   query?: Record<string, QueryEntry>;
@@ -103,6 +103,8 @@ function headers(body: unknown, token: string | null): Record<string, string> {
 
   if (body instanceof Blob) {
     result['Content-Type'] = body.type || 'application/octet-stream';
+  } else if (body instanceof FormData) {
+    // multipart 경계(boundary)는 브라우저가 붙인다. 직접 쓰면 서버가 본문을 나누지 못한다
   } else if (body !== undefined) {
     result['Content-Type'] = 'application/json; charset=utf-8';
   }
@@ -116,7 +118,7 @@ function headers(body: unknown, token: string | null): Record<string, string> {
 
 function requestBody(body: unknown): BodyInit | undefined {
   if (body === undefined) return undefined;
-  if (body instanceof Blob) return body;
+  if (body instanceof Blob || body instanceof FormData) return body;
   return JSON.stringify(body);
 }
 

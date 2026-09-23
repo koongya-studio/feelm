@@ -7,6 +7,11 @@ import { loadEnv } from 'vite';
 /** 개발에서 `/api`를 넘길 백엔드. `.env`의 `VITE_API_PROXY_TARGET`으로 바꾼다 */
 const DEFAULT_API_TARGET = 'http://localhost:8080';
 
+/** 개발 서버가 `/api` · `/media`를 넘길 백엔드. `.env`의 `VITE_API_PROXY_TARGET`이 정한다 */
+function apiTarget(mode: string): string {
+  return loadEnv(mode, process.cwd(), '').VITE_API_PROXY_TARGET || DEFAULT_API_TARGET;
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
   base: '/app/',
@@ -23,10 +28,9 @@ export default defineConfig(({ mode }) => ({
      * http에서도 저장된다.
      */
     proxy: {
-      '/api': {
-        target: loadEnv(mode, process.cwd(), '').VITE_API_PROXY_TARGET || DEFAULT_API_TARGET,
-        changeOrigin: true,
-      },
+      '/api': { target: apiTarget(mode), changeOrigin: true },
+      // 프로필 사진(API-014 · 062 `avatarUrl`)은 `/media/avatars/…` 상대 주소로 온다(업무 -762)
+      '/media': { target: apiTarget(mode), changeOrigin: true },
     },
   },
   // landing/은 독립 배포하는 정적 페이지이므로 Vite의 의존성 스캔 대상에서 제외한다.

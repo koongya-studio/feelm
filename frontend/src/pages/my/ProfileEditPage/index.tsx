@@ -7,7 +7,7 @@
  *
  * | 항목 | 편집 | 저장 |
  * | --- | --- | --- |
- * | 사진 | 시트 → 촬영 · 앨범 → 자르기 / 기본 이미지 / 삭제 | 계약 없음(목업) |
+ * | 사진 | 시트 → 촬영 · 앨범 → 자르기 / 기본 이미지 / 삭제 | API-081 · 082(업무 -762) |
  * | 닉네임 | 그 자리의 입력칸. 규칙 · 중복을 확인한다 | API-015 |
  * | 소개 | 그 자리의 여러 줄 입력. 40자 | 계약 없음(목업) |
  * | 공개된 취향 키워드 | 칩을 눌러 공개할 것을 고른다 | 계약 없음(목업) |
@@ -35,13 +35,15 @@ import ScreenHeader from '../../../components/ScreenHeader';
 import Snackbar from '../../../components/Snackbar';
 import StatusView from '../../../components/StatusView';
 import { failureDescription } from '../../../components/StatusView/failure';
-import { ApiError } from '../../../api/apiError';
+import { ApiError, isApiError } from '../../../api/apiError';
 import {
   checkNicknameAvailability,
+  deleteMyAvatar,
   getMyProfileView,
   isValidNickname,
   updateMyProfile,
   updateProfileExtras,
+  uploadMyAvatar,
 } from '../../../api/users';
 import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
@@ -114,12 +116,27 @@ function isDirty(key: EditableKey, draft: Draft, profile: ProfileView): boolean 
   return !sameSet(draft.frameIds, saved.frameIds);
 }
 
-/** 사진 한 장의 진행. 실패하면 다시 올릴 사진을 들고 있는다 — 기존 사진은 그대로다 */
+/**
+ * 사진 한 장의 진행. 어느 실패든 기존 사진은 그대로다(API-081 처리 규칙).
+ *
+ * - `failed` 서버 · 네트워크 탓이라 같은 사진으로 다시 올리면 될 수 있다. 사진을 들고 있는다
+ * - `invalid` 사진 자체가 안 된다. 같은 것을 다시 보내도 같으므로 다른 사진을 고르게 한다
+ */
 type AvatarState =
   | { status: 'idle' }
   | { status: 'uploading' }
-  | { status: 'failed'; next: string | null }
+  | { status: 'failed'; next: Blob | null }
   | { status: 'invalid'; message: string };
+
+/** 서버가 사진 자체를 거절한 까닭(API-081). 다시 보내면 될 수 있는 실패면 `null`이다 */
+function avatarRejection(error: unknown): string | null {
+  if (!isApiError(error)) return null;
+  if (error.code === 'AVATAR_INVALID') return '이 사진은 올릴 수 없어요. 다른 사진을 골라 주세요';
+  // 화면이 먼저 10MB를 보지만 서버의 판정이 기준이다
+  if (error.code === 'AVATAR_TOO_LARGE') return '10MB 이하의 사진만 올릴 수 있어요';
+
+  return null;
+}
 
 /** 연필을 누른 곳 · 떠나려는 곳. 고치던 것이 있으면 여기를 들고 묻는다 */
 type Pending = { kind: 'switch'; key: EditableKey } | { kind: 'leave' };
@@ -363,21 +380,26 @@ export default function ProfileEditPage() {
     if (blocker.state === 'blocked') blocker.proceed();
   };
 
-  /** 사진을 올리거나(`data URL`) 기본으로 돌린다(`null`). 실패해도 기존 사진은 그대로다 */
-  const uploadAvatar = async (next: string | null, done: string) => {
+  /** 잘라 둔 사진을 올리거나(API-081) 기본으로 돌린다(`null`, API-082) */
+  const uploadAvatar = async (next: Blob | null, done: string) => {
     if (avatar.status === 'uploading') return;
 
     setAvatar({ status: 'uploading' });
 
     try {
-      const saved = await updateProfileExtras({ avatarUrl: next });
+      let avatarUrl: string | null = null;
+
+      if (next) avatarUrl = await uploadMyAvatar(next);
+      else await deleteMyAvatar();
 
       // 사진만 바꾼다. 다른 항목을 고치던 중이면 그 초안은 건드리지 않는다
-      setProfile((prev) => (prev ? { ...prev, avatarUrl: saved.avatarUrl } : prev));
+      setProfile((prev) => (prev ? { ...prev, avatarUrl } : prev));
       setAvatar({ status: 'idle' });
       setNotice(done);
-    } catch {
-      setAvatar({ status: 'failed', next });
+    } catch (error) {
+      const message = avatarRejection(error);
+
+      setAvatar(message ? { status: 'invalid', message } : { status: 'failed', next });
     }
   };
 
@@ -596,9 +618,9 @@ export default function ProfileEditPage() {
         <AvatarCropper
           src={cropSrc}
           onCancel={() => setCropSrc(null)}
-          onApply={(dataUrl) => {
+          onApply={(photo) => {
             setCropSrc(null);
-            void uploadAvatar(dataUrl, '프로필 사진을 바꿨어요');
+            void uploadAvatar(photo, '프로필 사진을 바꿨어요');
           }}
         />
       ) : null}
