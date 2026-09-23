@@ -21,7 +21,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
@@ -37,7 +36,6 @@ import tools.jackson.databind.ObjectMapper;
  * PartyMovieExposuresBackfillMigrationTest}가 검증한다.
  */
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
-@AutoConfigureMockMvc
 @DisplayName("파티 추천 이력 조회 — API-083")
 class PartyRecommendationHistoryApiContractTest extends SharedPostgresContractTest {
     private static final Instant CREATED_AT = Instant.parse("2026-09-17T05:21:00Z");
