@@ -21,7 +21,7 @@ class PartySettings:
     max_paused_polls: int
 
 
-def load_party_settings(env: dict[str, str] | None = None) -> PartySettings:
+def load_party_settings(env: dict[str, str] | None = None, *, gbt: bool = False) -> PartySettings:
     values = environ if env is None else env
     required = {
         "kafka_bootstrap_servers": "PARTY_CONSUMER_KAFKA_BOOTSTRAP_SERVERS",
@@ -33,13 +33,17 @@ def load_party_settings(env: dict[str, str] | None = None) -> PartySettings:
     }
     result = {field: values.get(name, "").strip() for field, name in required.items()}
     result["kafka_topic"] = values.get("PARTY_CONSUMER_KAFKA_TOPIC", "feelm.party-refresh.v1").strip()
-    missing = [name for field, name in required.items() if not result[field]]
+    artifacts = {"model_uri", "mapping_uri", "metadata_uri"}
+    missing = [name for field, name in required.items() if not result[field] and not (gbt and field in artifacts)]
     if not result["kafka_topic"]:
         missing.append("PARTY_CONSUMER_KAFKA_TOPIC")
     if missing:
         raise SettingsError("missing required Party Consumer settings: " + ", ".join(missing))
     for field in ("model_uri", "mapping_uri", "metadata_uri"):
-        validate_immutable_artifact_uri(result[field], required[field])
+        if result[field]:
+            validate_immutable_artifact_uri(result[field], required[field])
+    if gbt and any(result[field] for field in artifacts) and not all(result[field] for field in artifacts):
+        raise SettingsError("legacy transition artifacts must be configured together")
 
     def positive_int(name: str, default: int, maximum: int) -> int:
         try:

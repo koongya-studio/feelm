@@ -26,7 +26,8 @@ local fence_token = ARGV[2]
 local payload_text = ARGV[3]
 if redis.call('GET', fence_key) ~= fence_token then return -1 end
 local model_ok, model = pcall(cjson.decode, redis.call('GET', model_key) or '')
-if not model_ok or type(model) ~= 'table' or model['modelVersion'] ~= expected_model then return -2 end
+if not model_ok or type(model) ~= 'table' or model['modelVersion'] ~= expected_model
+  or (model['modelKind'] ~= nil and model['modelKind'] ~= 'ALS') then return -2 end
 local payload_ok, payload = pcall(cjson.decode, payload_text)
 if not payload_ok or type(payload) ~= 'table'
   or payload['modelVersion'] ~= expected_model
