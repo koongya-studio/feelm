@@ -168,7 +168,7 @@ class RecommendationReasonLiveIntegrationTest extends SharedPostgresContractTest
                                         + " WHERE set_id=? AND movie_id=102",
                                 String.class,
                                 setId));
-        assertThat(noEvidence.path("summary").textValue()).isEqualTo("새로운 영화를 만나보세요.");
+        assertThat(noEvidence.path("summary").textValue()).isEqualTo("취향 데이터를 바탕으로 영화를 골라봤어요.");
         assertThat(noEvidence.path("factors").isEmpty()).isTrue();
 
         String bearer = "Bearer " + tokens.createAccessToken(USER);

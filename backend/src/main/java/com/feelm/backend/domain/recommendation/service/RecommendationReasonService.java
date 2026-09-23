@@ -20,7 +20,8 @@ import tools.jackson.databind.node.ObjectNode;
 @RequiredArgsConstructor
 public class RecommendationReasonService {
 
-    static final String NO_EVIDENCE = "새로운 영화를 만나보세요.";
+    static final String TASTE_NO_EVIDENCE = "취향 데이터를 바탕으로 영화를 골라봤어요.";
+    static final String DISCOVERY_NO_EVIDENCE = "새로운 영화를 만나보세요.";
 
     private final RecommendationReasonRepository repository;
     private final RecommendationReasonGenerator generator;
@@ -28,9 +29,9 @@ public class RecommendationReasonService {
     private final ObjectMapper objectMapper;
 
     /** 알림 경로의 버퍼 커밋 전에 확인된 근거만으로 첫 노출용 문구를 저장한다. */
-    ObjectNode initialReason(JsonNode storedReason) {
+    ObjectNode initialReason(String type, JsonNode storedReason) {
         RecommendationReasonPrompt prompt = resolve(0L, storedReason.toString());
-        ReasonSnapshot snapshot = render(prompt, null);
+        ReasonSnapshot snapshot = render(type, prompt, null);
         ObjectNode initial = ((ObjectNode) storedReason).deepCopy();
         initial.put("summary", snapshot.summary());
         initial.set("factors", objectMapper.readTree(snapshot.factorsJson()));
@@ -47,8 +48,15 @@ public class RecommendationReasonService {
         if (unresolved.isEmpty()) {
             return;
         }
+        List<ResolvedReason> resolved =
+                unresolved.stream()
+                        .map(
+                                item ->
+                                        new ResolvedReason(
+                                                item.type(), resolve(item.id(), item.reason())))
+                        .toList();
         List<RecommendationReasonPrompt> prompts =
-                unresolved.stream().map(item -> resolve(item.id(), item.reason())).toList();
+                resolved.stream().map(ResolvedReason::prompt).toList();
         List<RecommendationReasonPrompt> grounded =
                 prompts.stream().filter(prompt -> prompt.code() != null).toList();
         Map<Long, String> variants;
@@ -61,8 +69,9 @@ public class RecommendationReasonService {
             variants = Map.of();
         }
         List<ReasonSnapshot> snapshots = new ArrayList<>();
-        for (RecommendationReasonPrompt prompt : prompts) {
-            snapshots.add(render(prompt, variants.get(prompt.itemId())));
+        for (ResolvedReason reason : resolved) {
+            RecommendationReasonPrompt prompt = reason.prompt();
+            snapshots.add(render(reason.type(), prompt, variants.get(prompt.itemId())));
         }
         writer.complete(snapshots);
     }
@@ -146,8 +155,8 @@ public class RecommendationReasonService {
         return null;
     }
 
-    private ReasonSnapshot render(RecommendationReasonPrompt prompt, String variant) {
-        String summary = NO_EVIDENCE;
+    private ReasonSnapshot render(String type, RecommendationReasonPrompt prompt, String variant) {
+        String summary = fallbackSummary(type);
         ArrayNode factors = objectMapper.createArrayNode();
         if (prompt.code() != null) {
             switch (prompt.code()) {
@@ -167,22 +176,22 @@ public class RecommendationReasonService {
                         summary = "좋아하신 영화와 " + prompt.genreName() + " 장르가 같아요.";
                         factors.addObject().put("type", "GENRE").put("label", prompt.genreName());
                     } else {
-                        summary = "취향을 바탕으로 새롭게 고른 영화예요.";
+                        summary = DISCOVERY_NO_EVIDENCE;
                     }
                 }
-                case "DISCOVERY_AGGREGATE_AFFINITY" ->
-                        summary =
-                                "ONBOARDING".equals(prompt.directionSource())
-                                        ? "선호 이력을 바탕으로 발견한 영화예요."
-                                        : "평가 이력을 바탕으로 발견한 영화예요.";
+                case "DISCOVERY_AGGREGATE_AFFINITY" -> summary = DISCOVERY_NO_EVIDENCE;
                 default -> {}
             }
         }
         if (summary.length() > 200) {
-            summary = NO_EVIDENCE;
+            summary = fallbackSummary(type);
             factors = objectMapper.createArrayNode();
         }
         return new ReasonSnapshot(prompt.itemId(), summary, factors.toString());
+    }
+
+    static String fallbackSummary(String type) {
+        return "TASTE".equals(type) ? TASTE_NO_EVIDENCE : DISCOVERY_NO_EVIDENCE;
     }
 
     private String sourceTitleForSummary(String title) {
@@ -191,4 +200,6 @@ public class RecommendationReasonService {
         }
         return title.substring(0, title.offsetByCodePoints(0, 59)) + "…";
     }
+
+    private record ResolvedReason(String type, RecommendationReasonPrompt prompt) {}
 }

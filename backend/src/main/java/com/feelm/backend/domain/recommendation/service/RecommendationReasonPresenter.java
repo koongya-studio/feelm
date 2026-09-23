@@ -16,7 +16,7 @@ public class RecommendationReasonPresenter {
         this.objectMapper = objectMapper;
     }
 
-    public JsonNode present(String storedReason) {
+    public JsonNode present(String type, String storedReason) {
         JsonNode stored;
         try {
             stored = objectMapper.readTree(storedReason);
@@ -30,7 +30,9 @@ public class RecommendationReasonPresenter {
         JsonNode summaryNode = stored.path("summary");
         String summary = summaryNode.isTextual() ? summaryNode.textValue() : null;
         boolean hasSummary = summary != null && !summary.isBlank();
-        response.put("summary", hasSummary ? summary : RecommendationReasonService.NO_EVIDENCE);
+        response.put(
+                "summary",
+                hasSummary ? summary : RecommendationReasonService.fallbackSummary(type));
         JsonNode factors = stored.path("factors");
         response.set(
                 "factors",

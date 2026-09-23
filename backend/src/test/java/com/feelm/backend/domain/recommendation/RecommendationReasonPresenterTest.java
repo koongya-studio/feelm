@@ -16,6 +16,7 @@ class RecommendationReasonPresenterTest {
     void exposesOnlyUserFacingSnapshot() {
         JsonNode reason =
                 presenter.present(
+                        "TASTE",
                         """
                         {"reasons":[{"code":"SHARED_GENRE","sourceMovieIds":[55],
                         "matchedGenreCodes":["THRILLER"]}],"summary":"스릴러 장르가 같아요.",
@@ -28,10 +29,18 @@ class RecommendationReasonPresenterTest {
     }
 
     @Test
-    void legacyRawReasonUsesNeutralFallback() {
-        JsonNode reason = presenter.present("{\"reasons\":[{\"code\":\"TOP_RATED_SOURCE\"}]}");
+    void legacyRawReasonUsesTypeFallback() {
+        String storedReason = "{\"reasons\":[{\"code\":\"TOP_RATED_SOURCE\"}]}";
 
-        assertThat(reason.path("summary").textValue()).isEqualTo("새로운 영화를 만나보세요.");
-        assertThat(reason.path("factors")).isEmpty();
+        JsonNode taste = presenter.present("TASTE", storedReason);
+        JsonNode discovery = presenter.present("DISCOVERY", storedReason);
+        JsonNode party = presenter.present("PARTY", storedReason);
+
+        assertThat(taste.path("summary").textValue()).isEqualTo("취향 데이터를 바탕으로 영화를 골라봤어요.");
+        assertThat(discovery.path("summary").textValue()).isEqualTo("새로운 영화를 만나보세요.");
+        assertThat(party.path("summary").textValue()).isEqualTo("새로운 영화를 만나보세요.");
+        assertThat(taste.path("factors")).isEmpty();
+        assertThat(discovery.path("factors")).isEmpty();
+        assertThat(party.path("factors")).isEmpty();
     }
 }
