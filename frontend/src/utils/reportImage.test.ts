@@ -77,9 +77,17 @@ describe('ReportFourCut PNG 저장', () => {
 
   it('서명 URL의 실제 PNG 응답을 확인한 뒤 파일 다운로드로 연결한다', async () => {
     vi.useFakeTimers();
-    const png = new Blob(['png'], { type: 'image/png' });
+    /*
+     * 응답 본문은 jsdom `Blob`이 아니라 바이트로 준다. CI의 Node 20은 `Response` 본문에
+     * `.stream()`을 요구하는데 jsdom `Blob`에는 그게 없어 여기서 `TypeError`가 났다(Node 22+는
+     * 통과해 로컬에서는 드러나지 않았다). 실제 fetch 응답도 바이트이고, `blob().type`은 두 경우
+     * 모두 `Content-Type` 헤더에서 오므로 구현의 검사는 그대로 시험된다.
+     */
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(png, { status: 200, headers: { 'Content-Type': 'image/png' } }),
+      new Response(new TextEncoder().encode('png'), {
+        status: 200,
+        headers: { 'Content-Type': 'image/png' },
+      }),
     );
     const createObjectURL = vi.fn().mockReturnValue('blob:report-image');
     const revokeObjectURL = vi.fn();
