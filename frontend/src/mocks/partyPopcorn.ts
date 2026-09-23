@@ -38,7 +38,7 @@ function member(
   scoresInOrder: (number | null)[],
 ): PartyMemberPopcorn {
   return {
-    user: { userId, nickname },
+    user: { userId, nickname, avatarUrl: null },
     totalCount: countsInOrder.reduce((sum, count) => sum + count, 0),
     flavors: flavors(countsInOrder, scoresInOrder),
   };

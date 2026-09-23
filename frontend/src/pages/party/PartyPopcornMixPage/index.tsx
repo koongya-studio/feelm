@@ -41,7 +41,7 @@ import { path } from '../../../routes/paths';
 import { mixedFlavors } from '../../../utils/party';
 import styles from './PartyPopcornMixPage.module.css';
 import type { MachinePhase } from '../../../components/PopcornMachine';
-import type { PartyPopcorn } from '../../../types/party';
+import type { PartyAvatarUser, PartyPopcorn } from '../../../types/party';
 
 /**
  * 모으기. 파티원 통이 기계 위로 다 내려온 뒤 한 번 보이고 나서 섞기가 시작된다.
@@ -127,7 +127,7 @@ export default function PartyPopcornMixPage() {
   const [refresh] = useState(() => isRefreshEntry(location.state));
 
   const [popcorn, setPopcorn] = useState<PartyPopcorn | null>(null);
-  const [names, setNames] = useState<string[]>([]);
+  const [partyMembers, setPartyMembers] = useState<PartyAvatarUser[]>([]);
   const [phase, setPhase] = useState<MachinePhase>('idle');
   const [failure, setFailure] = useState<Failure | null>(null);
   const [retrying, setRetrying] = useState(false);
@@ -164,7 +164,7 @@ export default function PartyPopcornMixPage() {
     getParty(id)
       .then((party) => {
         if (active && party) {
-          setNames(party.members.map((member) => member.nickname));
+          setPartyMembers(party.members);
         }
       })
       .catch(() => {
@@ -262,13 +262,13 @@ export default function PartyPopcornMixPage() {
     );
   }
 
-  const shownNames = popcorn ? popcorn.members.map((member) => member.user.nickname) : names;
+  const shownMembers = popcorn ? popcorn.members.map((member) => member.user) : partyMembers;
 
   return (
     <PartyFlowShell
-      members={shownNames}
+      members={shownMembers}
       title={phaseTitle(phase)}
-      subtitle={phaseSubtitle(phase, shownNames.length)}
+      subtitle={phaseSubtitle(phase, shownMembers.length)}
       note={phaseNote(phase)}
       step={phase === 'idle' ? 'gather' : 'mix'}
     >

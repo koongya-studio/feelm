@@ -52,7 +52,7 @@ import { getParty, getPartyPopcorn, getPartyRecommendations } from '../../../api
 import { path } from '../../../routes/paths';
 import { mixedFlavors } from '../../../utils/party';
 import type { PartyMixEntry } from '../PartyPopcornMixPage';
-import type { PartyPopcorn, PartyRecommendationItem } from '../../../types/party';
+import type { PartyAvatarUser, PartyPopcorn, PartyRecommendationItem } from '../../../types/party';
 import styles from './PartyRecommendationPage.module.css';
 
 /** 목록의 포스터 크기. 시안 그대로다 */
@@ -95,7 +95,7 @@ export default function PartyRecommendationPage() {
   const [items, setItems] = useState<PartyRecommendationItem[] | null>(null);
   /** 다시 받기로 더 보여줄 후보가 남았는지. 값이 없으면(옛 응답) 있는 것으로 본다 */
   const [hasNext, setHasNext] = useState(true);
-  const [members, setMembers] = useState<string[]>([]);
+  const [members, setMembers] = useState<PartyAvatarUser[]>([]);
   const [popcorn, setPopcorn] = useState<PartyPopcorn | null>(null);
   const [failed, setFailed] = useState(false);
   const [failure, setFailure] = useState<Failure>(null);
@@ -122,7 +122,7 @@ export default function PartyRecommendationPage() {
     getParty(id)
       .then((party) => {
         if (active && party) {
-          setMembers(party.members.map((member) => member.nickname));
+          setMembers(party.members);
         }
       })
       .catch(() => {
@@ -171,13 +171,13 @@ export default function PartyRecommendationPage() {
 
   if (!items) return null;
 
-  const shownNames = popcorn ? popcorn.members.map((member) => member.user.nickname) : members;
+  const shownMembers = popcorn ? popcorn.members.map((member) => member.user) : members;
 
   return (
     <PartyFlowShell
-      members={shownNames}
+      members={shownMembers}
       title={`우리에게 어울리는 ${items.length}편`}
-      subtitle={`${shownNames.length}명의 취향을 한 통에 담았어요`}
+      subtitle={`${shownMembers.length}명의 취향을 한 통에 담았어요`}
     >
       {popcorn ? (
         <div className={styles.bucket}>

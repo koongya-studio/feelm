@@ -80,7 +80,7 @@ import { getPopcornFlavors } from '../../../api/taste';
 import { useShellSize } from '../../../hooks/useShellSize';
 import { path } from '../../../routes/paths';
 import { mixedFlavors } from '../../../utils/party';
-import type { Party, PartyInvitation, PartyPopcorn } from '../../../types/party';
+import type { Party, PartyInvitation, PartyMember, PartyPopcorn } from '../../../types/party';
 import styles from './PartyListPage.module.css';
 
 /** 강조 카드 오른쪽의 통. 시안의 크기다 */
@@ -92,26 +92,33 @@ const COMMON_FLAVOR_COUNT = 3;
 /**
  * 얼굴 자리.
  *
- * **프로필 사진이 계약에 없다** — 파티가 주는 것은 `userId`와 닉네임뿐이다(API-050 · API-052).
- * 시안의 얼굴 자리에 닉네임 첫 글자를 넣는다. 지어낸 사진을 두는 것보다 낫다.
+ * 사진이 있으면 동그라미에 사진을, 없으면 닉네임 첫 글자를 넣는다(업무 -762). 사진은 파티
+ * 응답의 `owner` · `members[]`에만 온다(업무 -811). 받은 초대(API-052)의 방장에는 없어 늘
+ * 첫 글자다 — 지어낸 사진을 두는 것보다 낫다.
+ *
+ * 사진은 장식이다. 이름은 옆 글자나 숨은 글자가 읽힌다.
  */
 function Initials({
-  names,
+  people,
   rest = 0,
   tone,
   labelled = false,
 }: {
-  names: string[];
+  people: { name: string; avatarUrl?: string | null }[];
   rest?: number;
   tone?: 'dark';
   labelled?: boolean;
 }) {
   return (
     <ul className={styles.initials} data-tone={tone ?? null} data-labelled={labelled}>
-      {names.map((name) => (
+      {people.map(({ name, avatarUrl }) => (
         <li key={name} className={styles.initial}>
           <span className={styles.initialMark} aria-hidden="true">
-            {[...name][0] ?? '?'}
+            {avatarUrl ? (
+              <img className={styles.initialPhoto} src={avatarUrl} alt="" loading="lazy" />
+            ) : (
+              ([...name][0] ?? '?')
+            )}
           </span>
           {labelled ? <span className={styles.initialName}>{name}</span> : null}
           {labelled ? null : <VisuallyHidden>{name}</VisuallyHidden>}
@@ -127,6 +134,11 @@ function Initials({
       ) : null}
     </ul>
   );
+}
+
+/** 파티원을 얼굴 자리 모양으로. 사진이 없으면 `avatarUrl`이 `null`이라 첫 글자가 된다 */
+function toFaces(members: PartyMember[]) {
+  return members.map((member) => ({ name: member.nickname, avatarUrl: member.avatarUrl }));
 }
 
 export default function PartyListPage() {
@@ -402,11 +414,11 @@ export default function PartyListPage() {
                     </span>
 
                     {/*
-                     * 얼굴 자리. 프로필 사진은 계약에 없어(API-052) 닉네임 첫 글자를 쓴다.
-                     * `+N`은 나 말고 이미 들어가 있는 사람 수다.
+                     * 얼굴 자리. 받은 초대의 방장에는 사진이 오지 않아(API-052) 닉네임 첫 글자를
+                     * 쓴다. `+N`은 나 말고 이미 들어가 있는 사람 수다.
                      */}
                     <Initials
-                      names={[invitation.party.owner.nickname]}
+                      people={[{ name: invitation.party.owner.nickname }]}
                       rest={Math.max(invitation.party.memberCount - 1, 0)}
                     />
 
@@ -447,11 +459,7 @@ export default function PartyListPage() {
               </span>
             </div>
 
-            <Initials
-              names={firstParty.members.map((member) => member.nickname)}
-              tone="dark"
-              labelled
-            />
+            <Initials people={toFaces(firstParty.members)} tone="dark" labelled />
 
             <div className={styles.progress}>
               <p className={styles.progressLabel}>
@@ -531,7 +539,7 @@ export default function PartyListPage() {
                       {party.members.length} / {party.maxMembers}명
                     </span>
 
-                    <Initials names={party.members.map((member) => member.nickname)} />
+                    <Initials people={toFaces(party.members)} />
                   </button>
                 </li>
               ))}
