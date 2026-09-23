@@ -3,6 +3,7 @@ package com.feelm.backend.domain.party;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.hasSize;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -41,6 +42,8 @@ import tools.jackson.databind.ObjectMapper;
 @AutoConfigureMockMvc
 class PartyApiContractTest extends SharedPostgresContractTest {
     private static final String PATH = "/api/v1/parties";
+    private static final String AVATAR_KEY = "11111111-1111-1111-1111-111111111111.jpg";
+    private static final String AVATAR_URL = "/media/avatars/" + AVATAR_KEY;
     private static final Instant CREATED_AT = Instant.parse("2026-09-01T00:00:00Z");
 
     @Autowired MockMvc mvc;
@@ -85,10 +88,12 @@ class PartyApiContractTest extends SharedPostgresContractTest {
                                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                                 .andExpect(jsonPath("$.owner.userId").value(10))
                                 .andExpect(jsonPath("$.owner.nickname").value("member10"))
+                                .andExpect(jsonPath("$.owner.avatarUrl").value(nullValue()))
                                 .andExpect(jsonPath("$.maxMembers").value(4))
                                 .andExpect(jsonPath("$.members", hasSize(1)))
                                 .andExpect(jsonPath("$.members[0].userId").value(10))
                                 .andExpect(jsonPath("$.members[0].nickname").value("member10"))
+                                .andExpect(jsonPath("$.members[0].avatarUrl").value(nullValue()))
                                 .andExpect(jsonPath("$.members[0].role").value("OWNER")));
         long id = body.get("partyId").asLong();
         assertThat(id).isPositive();
@@ -226,6 +231,7 @@ class PartyApiContractTest extends SharedPostgresContractTest {
 
     @Test
     void listsOnlyCurrentMembershipAndPendingInvitations() throws Exception {
+        jdbc.update("UPDATE users SET avatar_storage_key=? WHERE id=10", AVATAR_KEY);
         long own = party(10, "ACTIVE");
         member(own, 30);
         invitation(own, 40, "PENDING");
@@ -242,15 +248,43 @@ class PartyApiContractTest extends SharedPostgresContractTest {
                 .andExpect(jsonPath("$.items[1].partyId").value(own))
                 .andExpect(jsonPath("$.items[1].members", hasSize(2)))
                 .andExpect(jsonPath("$.items[1].owner.nickname").value("member10"))
+                .andExpect(jsonPath("$.items[1].owner.avatarUrl").value(AVATAR_URL))
+                .andExpect(jsonPath("$.items[1].members[0].avatarUrl").value(AVATAR_URL))
+                .andExpect(jsonPath("$.items[1].members[1].avatarUrl").value(nullValue()))
                 .andExpect(jsonPath("$.items[1].pendingInvitations", hasSize(1)))
                 .andExpect(jsonPath("$.items[1].pendingInvitations[0].invitee.userId").value(40))
                 .andExpect(
                         jsonPath("$.items[1].pendingInvitations[0].invitee.nickname")
-                                .value("member40"));
+                                .value("member40"))
+                .andExpect(
+                        jsonPath("$.items[1].pendingInvitations[0].invitee.avatarUrl")
+                                .doesNotExist());
         mvc.perform(get(PATH).param("status", "CLOSED").header("Authorization", bearer()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items", hasSize(1)))
                 .andExpect(jsonPath("$.items[0].partyId").value(closed));
+    }
+
+    @Test
+    void masksWithdrawnPendingInviteeWithoutExpandingFields() throws Exception {
+        long party = party(10, "ACTIVE");
+        invitation(party, 40, "PENDING");
+        jdbc.update(
+                "UPDATE users SET status='WITHDRAWN', nickname=?, withdrawn_at=? WHERE id=?",
+                "withdrawn-40",
+                Timestamp.from(CREATED_AT.plusSeconds(10)),
+                40);
+
+        list().andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].pendingInvitations", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].pendingInvitations[0].invitee.userId").value(40))
+                .andExpect(
+                        jsonPath("$.items[0].pendingInvitations[0].invitee.nickname")
+                                .value("탈퇴한 사용자"))
+                .andExpect(
+                        jsonPath("$.items[0].pendingInvitations[0].invitee.avatarUrl")
+                                .doesNotExist());
     }
 
     /** 종료 파티는 멤버십과 마지막 오너를 이력으로 남기므로 탈퇴자가 여기서만 나타난다(S15P21E106-759). */

@@ -11,23 +11,23 @@ public record PartyResponse(
         long partyId,
         String name,
         PartyStatus status,
-        UserSummary owner,
+        AvatarUserSummary owner,
         List<Member> members,
         int maxMembers,
         Instant createdAt) {
-    public static PartyResponse from(Party party, List<Member> members) {
+    public static PartyResponse from(Party party, String ownerAvatarUrl, List<Member> members) {
         return new PartyResponse(
                 party.getId(),
                 party.getName(),
                 party.getStatus(),
-                UserSummary.from(party.getOwner()),
+                AvatarUserSummary.from(party.getOwner(), ownerAvatarUrl),
                 members,
                 Party.MAX_MEMBERS,
                 party.getCreatedAt());
     }
 
     /**
-     * 파티 응답에 실리는 사용자 요약. 파티 도메인의 모든 응답이 사용자를 이 변환으로 내보낸다.
+     * 파티 응답에 실리는 사용자 요약의 공통 표시 규칙. 아바타를 포함하는 응답도 {@link #displayNickname}을 재사용한다.
      *
      * <p>탈퇴({@code WITHDRAWN})한 사용자는 {@code nickname}을 {@link #WITHDRAWN_NICKNAME}으로 바꾸고 {@code
      * userId}는 그대로 둔다(S15P21E106-759, API-050·052). 탈퇴는 유일 제약을 풀기 위해 닉네임을 {@code withdrawn-{id}}로
@@ -54,11 +54,26 @@ public record PartyResponse(
         }
     }
 
-    public record Member(long userId, String nickname, PartyMember.Role role, Instant joinedAt) {
-        public static Member from(PartyMember member) {
-            UserSummary user = UserSummary.from(member.getUser());
+    public record AvatarUserSummary(long userId, String nickname, String avatarUrl) {
+        public static AvatarUserSummary from(User user, String avatarUrl) {
+            return new AvatarUserSummary(
+                    user.getId(), UserSummary.displayNickname(user), avatarUrl);
+        }
+    }
+
+    public record Member(
+            long userId,
+            String nickname,
+            String avatarUrl,
+            PartyMember.Role role,
+            Instant joinedAt) {
+        public static Member from(PartyMember member, String avatarUrl) {
             return new Member(
-                    user.userId(), user.nickname(), member.getRole(), member.getJoinedAt());
+                    member.getUser().getId(),
+                    UserSummary.displayNickname(member.getUser()),
+                    avatarUrl,
+                    member.getRole(),
+                    member.getJoinedAt());
         }
     }
 }

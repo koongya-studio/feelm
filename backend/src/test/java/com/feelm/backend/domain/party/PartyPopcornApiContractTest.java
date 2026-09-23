@@ -26,6 +26,8 @@ import tools.jackson.databind.ObjectMapper;
 @AutoConfigureMockMvc
 class PartyPopcornApiContractTest extends SharedPostgresContractTest {
     private static final Instant CREATED_AT = Instant.parse("2026-09-01T00:00:00Z");
+    private static final String AVATAR_KEY = "33333333-3333-3333-3333-333333333333.jpg";
+    private static final String AVATAR_URL = "/media/avatars/" + AVATAR_KEY;
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
@@ -77,6 +79,7 @@ class PartyPopcornApiContractTest extends SharedPostgresContractTest {
 
     @Test
     void aggregatesEveryCurrentMemberIncludingPrivateProfiles() throws Exception {
+        jdbc.update("UPDATE users SET avatar_storage_key=? WHERE id=10", AVATAR_KEY);
         long party = party(10, "ACTIVE");
         member(party, 20, "MEMBER", CREATED_AT.plusSeconds(1));
         member(party, 30, "MEMBER", CREATED_AT.plusSeconds(2));
@@ -103,6 +106,7 @@ class PartyPopcornApiContractTest extends SharedPostgresContractTest {
 
         JsonNode owner = memberBody(body, 10);
         assertThat(owner.path("user").path("nickname").asText()).isEqualTo("owner");
+        assertThat(owner.path("user").path("avatarUrl").asText()).isEqualTo(AVATAR_URL);
         assertThat(owner.path("totalCount").asLong()).isEqualTo(2);
         assertThat(owner.path("flavors")).hasSize(8);
         assertFlavor(owner, "FLAVOR_1", 2, "4.0");
@@ -110,6 +114,7 @@ class PartyPopcornApiContractTest extends SharedPostgresContractTest {
 
         JsonNode member = memberBody(body, 20);
         assertThat(member.path("user").path("nickname").asText()).isEqualTo("member");
+        assertThat(member.path("user").path("avatarUrl").isNull()).isTrue();
         assertThat(member.path("totalCount").asLong()).isEqualTo(1);
         assertThat(member.path("flavors")).hasSize(8);
         assertFlavor(member, "FLAVOR_2", 1, "5.0");
