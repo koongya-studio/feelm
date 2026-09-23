@@ -4,7 +4,7 @@
  * 사진 모양(누끼 · 원본 · 없음)은 칸의 `data-mode`로 CSS가 가른다. 사진을 못 불러오면 칸이
  * 사라지지 않고 이름 중심 모양으로 바뀌는지 본다. 글자 크기 맞춤은 jsdom에 크기가 없어 잴 수 없다.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import ReportFourCut from '.';
 import type { ReportFourCut as ReportFourCutData } from '../../types/report';
@@ -81,6 +81,62 @@ describe('ReportFourCut', () => {
     expect(screen.getByText('준비 중')).toBeInTheDocument();
     expect(screen.queryByText('안락의자 탐정')).toBeNull();
     expect(cut('character').querySelector('img')).toBeNull();
+  });
+
+  /*
+   * 뒤집기(업무 -812). 뒷면을 준 칸만 뒤집히고, 뒷면 내용과 서식은 화면이 가진다.
+   * 3.3 인화기 · 7.3 목록 · 7.1 대시보드는 뒷면을 주지 않으므로 그대로 그림 칸이다.
+   */
+  it('뒷면을 준 칸만 뒤집는 버튼이 생긴다', () => {
+    const onFlip = vi.fn();
+    render(
+      <ReportFourCut
+        cuts={cuts}
+        createdAt="2026-09-01T12:00:00Z"
+        backs={{ genre: <p>장르 설명</p> }}
+        onFlip={onFlip}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: '02 감독 설명 보기' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '01 장르 설명 보기' }));
+    expect(onFlip).toHaveBeenCalledWith('genre');
+  });
+
+  it('뒤집힌 칸은 버튼 이름과 aria-expanded가 바뀐다', () => {
+    render(
+      <ReportFourCut
+        cuts={cuts}
+        createdAt="2026-09-01T12:00:00Z"
+        backs={{ genre: <p>장르 설명</p> }}
+        flipped={['genre']}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: '01 장르 사진 보기' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+  });
+
+  it('뒷면은 그림이 없는 준비 중 칸에도 붙는다', () => {
+    render(
+      <ReportFourCut
+        cuts={{ ...cuts, character: null }}
+        createdAt="2026-09-01T12:00:00Z"
+        backs={{ character: <p>지난 반기와 비교</p> }}
+      />,
+    );
+
+    expect(screen.getByText('준비 중')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '04 캐릭터 설명 보기' })).toBeInTheDocument();
+  });
+
+  it('뒷면을 주지 않으면 누를 곳이 없다', () => {
+    render(<ReportFourCut cuts={cuts} createdAt="2026-09-01T12:00:00Z" />);
+
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
 
   it('사진을 못 불러오면 다음 사진으로, 끝내 없으면 칸을 남기고 이름만 그린다', () => {

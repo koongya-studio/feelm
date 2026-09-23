@@ -28,15 +28,20 @@
  *   - 없거나 못 불러옴 — 칸 크기는 그대로, 이름을 크게 쓴다
  * - 이 인화지 안의 빨강은 **콘텐츠**다. 앱 UI의 무채색 규칙(`design-concept.md` 3장)은 인화지
  *   바깥에 적용된다
+ * - `backs`를 준 칸은 **눌러서 뒤집는다**(3.4 · 7.4 상세, 업무 -812). 앞면 사진 뒤에 그 칸의
+ *   설명이 있고, 칸은 뒷면 높이만큼 늘어난다. 뒷면을 안 주면 지금까지처럼 그림만 있는 칸이라
+ *   3.3 인화기 · 7.3 목록 · 7.1 대시보드의 4컷은 그대로다
+ * - 칸을 누르는 동작은 뒤집기 하나다. 업무 -557의 `linkPeople`(감독 · 배우 칸 전체를 인물 검색
+ *   링크로 덮기)은 같은 자리를 놓고 다퉈서 지웠다(사용자 결정 2026-09-23). 인물 검색은 3.4 · 7.4
+ *   뒷면 목록의 이름이 맡는다
  */
-import { useState } from 'react';
-import { Link } from 'react-router';
-import type { CSSProperties, ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { CSSProperties, ReactNode, RefObject } from 'react';
+import VisuallyHidden from '../VisuallyHidden';
 import Wordmark from '../Wordmark';
 import { formatPrintDate } from '../../utils/report';
 import { useFitText } from './useFitText';
 import { characterCardImage } from './characterCards';
-import { path } from '../../routes/paths';
 import styles from './ReportFourCut.module.css';
 import type { ReportCutImage, ReportCutName, ReportFourCut } from '../../types/report';
 
@@ -56,8 +61,15 @@ type Props = {
    * 내리지 않으므로 그림은 코드로 찾는다. 없으면 이름만 그린다
    */
   characterCode?: string | null;
-  /** 상세 화면에서 감독·배우 칸을 같은 이름의 통합 검색으로 연결한다. */
-  linkPeople?: boolean;
+  /**
+   * 칸 뒷면. 준 칸만 눌러서 뒤집힌다. 뒷면 내용과 그 서식은 화면이 가진다 — 인화지는 뒤집는
+   * 틀과 어두운 바탕만 맡는다(`index.tsx` 머리 주석의 데이터 · 모양 분리)
+   */
+  backs?: Partial<Record<CutKind, ReactNode>>;
+  /** 지금 뒤집혀 있는 칸. `onFlip`과 함께 부모가 상태를 가진다 */
+  flipped?: CutKind[];
+  /** 칸을 눌렀을 때. 부모가 `flipped`를 고쳐 준다 */
+  onFlip?: (kind: CutKind) => void;
 };
 
 export default function ReportFourCut({
@@ -66,10 +78,20 @@ export default function ReportFourCut({
   createdAt,
   head = true,
   characterCode,
-  linkPeople = false,
+  backs,
+  flipped = [],
+  onFlip,
 }: Props) {
   const title = `${owner ? `${owner}의` : '나의'} 취향 4컷`;
   const date = formatPrintDate(createdAt);
+
+  /** 뒷면을 받은 칸만 뒤집히는 칸이 된다 */
+  function flipOf(kind: CutKind): FlipProps | undefined {
+    const back = backs?.[kind];
+    if (!back) return undefined;
+
+    return { back, flipped: flipped.includes(kind), onFlip: () => onFlip?.(kind) };
+  }
 
   return (
     <div className={styles.root}>
@@ -82,21 +104,25 @@ export default function ReportFourCut({
         ) : null}
 
         <ol className={styles.cuts}>
-          {cuts.genre ? <GenreCut {...cuts.genre} /> : <PendingCut kind="genre" label="장르" />}
-          {cuts.director ? (
-            <DirectorCut {...cuts.director} searchable={linkPeople} />
+          {cuts.genre ? (
+            <GenreCut {...cuts.genre} flip={flipOf('genre')} />
           ) : (
-            <PendingCut kind="director" label="감독" />
+            <PendingCut kind="genre" label="장르" flip={flipOf('genre')} />
+          )}
+          {cuts.director ? (
+            <DirectorCut {...cuts.director} flip={flipOf('director')} />
+          ) : (
+            <PendingCut kind="director" label="감독" flip={flipOf('director')} />
           )}
           {cuts.actor ? (
-            <ActorCut {...cuts.actor} searchable={linkPeople} />
+            <ActorCut {...cuts.actor} flip={flipOf('actor')} />
           ) : (
-            <PendingCut kind="actor" label="배우" />
+            <PendingCut kind="actor" label="배우" flip={flipOf('actor')} />
           )}
           {cuts.character ? (
-            <CharacterCut {...cuts.character} code={characterCode} />
+            <CharacterCut {...cuts.character} code={characterCode} flip={flipOf('character')} />
           ) : (
-            <PendingCut kind="character" label="캐릭터" />
+            <PendingCut kind="character" label="캐릭터" flip={flipOf('character')} />
           )}
         </ol>
 
@@ -111,9 +137,9 @@ export default function ReportFourCut({
 
 // ─────────────────────────── 칸 넷
 
-type CutProps = ReportCutName & { image: ReportCutImage };
+type CutProps = ReportCutName & { image: ReportCutImage; flip?: FlipProps };
 
-function GenreCut({ name, displayName, image }: CutProps) {
+function GenreCut({ name, displayName, image, flip }: CutProps) {
   const photo = useCutImage(image);
 
   return (
@@ -124,6 +150,7 @@ function GenreCut({ name, displayName, image }: CutProps) {
       displayName={displayName}
       photo={photo}
       imageError={photo.failed}
+      flip={flip}
     >
       <FitName text={displayName || name} maxLines={2} stretch={1.9} className={styles.genreName}>
         {displayName || name}
@@ -137,8 +164,8 @@ function DirectorCut({
   displayName,
   image,
   work,
-  searchable,
-}: CutProps & { work: ReportCutImage | null; searchable: boolean }) {
+  flip,
+}: CutProps & { work: ReportCutImage | null }) {
   const photo = useCutImage(image);
   const [workFailed, setWorkFailed] = useState<string | null>(null);
   const workUrl = work?.url && work.url !== workFailed ? work.url : null;
@@ -150,8 +177,8 @@ function DirectorCut({
       name={name}
       displayName={displayName}
       photo={photo}
-      searchName={searchable ? name : undefined}
       imageError={photo.failed || Boolean(work?.url && workFailed === work.url)}
+      flip={flip}
       extra={
         workUrl ? (
           <span className={styles.work}>
@@ -172,7 +199,7 @@ function DirectorCut({
   );
 }
 
-function ActorCut({ name, displayName, image, searchable }: CutProps & { searchable: boolean }) {
+function ActorCut({ name, displayName, image, flip }: CutProps) {
   const photo = useCutImage(image);
   const text = displayName || name;
   const words = text.trim().split(/\s+/);
@@ -186,8 +213,8 @@ function ActorCut({ name, displayName, image, searchable }: CutProps & { searcha
       name={name}
       displayName={displayName}
       photo={photo}
-      searchName={searchable ? name : undefined}
       imageError={photo.failed}
+      flip={flip}
     >
       {/* 두 단어를 서로 다른 크기로 한 줄씩 쓴다. 줄 수가 아니라 상자 폭 · 높이로만 맞춘다 */}
       <FitName text={text} maxLines={3} className={styles.actorName}>
@@ -206,7 +233,12 @@ function ActorCut({ name, displayName, image, searchable }: CutProps & { searcha
  * (`characterCards.ts`, 업무 -618). 그림이 없거나 못 불러오면 `useCutImage`가 `none`으로
  * 떨어져 이름만 크게 쓴다 — 에셋 16장(업무 -781)이 늦어도 칸은 동작한다.
  */
-function CharacterCut({ name, displayName, code }: ReportCutName & { code?: string | null }) {
+function CharacterCut({
+  name,
+  displayName,
+  code,
+  flip,
+}: ReportCutName & { code?: string | null; flip?: FlipProps }) {
   const photo = useCutImage({ url: characterCardImage(code) });
 
   return (
@@ -217,6 +249,7 @@ function CharacterCut({ name, displayName, code }: ReportCutName & { code?: stri
       displayName={displayName}
       photo={photo}
       imageError={photo.failed}
+      flip={flip}
     >
       <FitName text={displayName || name} maxLines={2} className={styles.characterName}>
         <span className={styles.underlined}>
@@ -235,12 +268,11 @@ function CharacterCut({ name, displayName, code }: ReportCutName & { code?: stri
  * 04 캐릭터는 백엔드 구현(업무 -779) 전까지 늘 여기로 오고, 나머지 칸은 그 반기에 셀 수 있는
  * 장르 · 인물이 없을 때만 온다. 구현 뒤에는 16종을 다 쓰므로 캐릭터 칸이 비지 않는다.
  */
-function PendingCut({ kind, label }: { kind: CutKind; label: string }) {
+function PendingCut({ kind, label, flip }: { kind: CutKind; label: string; flip?: FlipProps }) {
   return (
-    <li className={styles.cut} data-cut={kind} data-mode="none">
+    <CutShell kind={kind} label={label} mode="none" flip={flip}>
       <span className={styles.pending}>준비 중</span>
-      <CutLabel kind={kind} label={label} />
-    </li>
+    </CutShell>
   );
 }
 
@@ -255,7 +287,9 @@ function CutLabel({ kind, label }: { kind: CutKind; label: string }) {
 
 // ─────────────────────────── 칸의 뼈대
 
-type CutKind = 'genre' | 'director' | 'actor' | 'character';
+export type ReportCutKind = 'genre' | 'director' | 'actor' | 'character';
+
+type CutKind = ReportCutKind;
 
 /** 인화지에 찍는 칸 번호 */
 const CUT_INDEX: Record<CutKind, number> = { genre: 1, director: 2, actor: 3, character: 4 };
@@ -265,10 +299,9 @@ type CutFrameProps = ReportCutName & {
   label: string;
   photo: CutImageState;
   imageError?: boolean;
+  flip?: FlipProps;
   /** 사진과 이름 사이에 놓는 장식. 감독 칸의 대표작 */
   extra?: ReactNode;
-  /** 값이 있으면 칸 전체를 해당 인물 검색 링크로 만든다. */
-  searchName?: string;
   children: ReactNode;
 };
 
@@ -286,18 +319,20 @@ function Cut({
   displayName,
   photo,
   imageError,
+  flip,
   extra,
-  searchName,
   children,
 }: CutFrameProps) {
   const hasDisplayName = Boolean(displayName) && displayName !== name;
 
   return (
-    <li
-      className={styles.cut}
-      data-cut={kind}
-      data-mode={photo.mode}
-      data-image-error={imageError || undefined}
+    <CutShell
+      kind={kind}
+      label={label}
+      mode={photo.mode}
+      imageError={imageError}
+      flip={flip}
+      caption={hasDisplayName ? <span className={styles.caption}>{name}</span> : null}
     >
       {photo.mode === 'photo' && photo.src ? (
         <span className={styles.photo}>
@@ -316,18 +351,111 @@ function Cut({
           <img src={photo.src} alt="" style={imageStyle(photo.image)} onError={photo.fail} />
         </span>
       ) : null}
+    </CutShell>
+  );
+}
 
-      <CutLabel kind={kind} label={label} />
-      {hasDisplayName ? <span className={styles.caption}>{name}</span> : null}
-      {searchName ? (
-        <Link
-          className={styles.personSearchLink}
-          to={path.searchWith(searchName)}
-          aria-label={`${searchName} 검색`}
-        />
+// ─────────────────────────── 뒤집기
+
+/** 뒤집히는 칸이 받는 것. `back`이 없으면 그 칸은 뒤집히지 않는다 */
+type FlipProps = { back: ReactNode; flipped: boolean; onFlip: () => void };
+
+type CutShellProps = {
+  kind: CutKind;
+  label: string;
+  mode: CutImageState['mode'];
+  imageError?: boolean;
+  flip?: FlipProps;
+  /** 사진 위에 얹는 한글 이름. 앞면 맨 위층이다 */
+  caption?: ReactNode;
+  children: ReactNode;
+};
+
+/*
+ * 칸 하나의 바깥 껍데기. 앞면(`.cut`)과 뒷면(`.back`)을 같은 자리에 두고 `.flipper`를 돌린다.
+ *
+ * **앞면은 늘 시안의 246u 높이다.** 늘어나는 것은 칸 자리(`li`)뿐이라, 뒤집는 동안에도 사진이
+ * 늘어나지 않는다. 뒷면은 내용만큼 길어지므로 그 높이를 재서(`useBackHeight`) `--back-height`로
+ * 넘기고, 칸 자리가 그 높이까지 늘어난다.
+ *
+ * 누르는 자리는 칸 전체를 덮는 버튼이다 — 돌아가는 `.flipper` 바깥에 있어 뒤집힌 뒤에도 그대로
+ * 눌리고, 버튼이라 Enter · Space와 초점 이동이 저절로 된다. 번호 라벨은 앞면이 `01 장르`,
+ * 뒷면이 `01`이다. 뒷면에 같은 글자를 다시 쓰면 화면에 같은 이름이 두 번 나온다.
+ */
+function CutShell({ kind, label, mode, imageError, flip, caption, children }: CutShellProps) {
+  const back = flip?.back;
+  const flipped = Boolean(back) && Boolean(flip?.flipped);
+  const backRef = useRef<HTMLDivElement>(null);
+  const backHeight = useBackHeight(backRef, Boolean(back));
+
+  return (
+    <li
+      className={styles.cell}
+      data-flipped={flipped || undefined}
+      style={backHeight ? ({ '--back-height': `${backHeight}px` } as CSSProperties) : undefined}
+    >
+      <div className={styles.flipper}>
+        <div
+          className={styles.cut}
+          data-cut={kind}
+          data-mode={mode}
+          data-image-error={imageError || undefined}
+        >
+          {children}
+          <CutLabel kind={kind} label={label} />
+          {caption}
+        </div>
+
+        {back ? (
+          <div className={styles.back} ref={backRef}>
+            <span className={styles.backLabel} aria-hidden="true">
+              {String(CUT_INDEX[kind]).padStart(2, '0')}
+            </span>
+            {back}
+          </div>
+        ) : null}
+      </div>
+
+      {back ? (
+        <button
+          type="button"
+          className={styles.flipButton}
+          aria-expanded={flipped}
+          onClick={flip?.onFlip}
+        >
+          <VisuallyHidden>
+            {`${String(CUT_INDEX[kind]).padStart(2, '0')} ${label} ${flipped ? '사진 보기' : '설명 보기'}`}
+          </VisuallyHidden>
+          <span className={styles.flipHint} aria-hidden="true">
+            <FlipIcon />
+          </span>
+        </button>
       ) : null}
     </li>
   );
+}
+
+/**
+ * 뒷면의 높이. 뒷면은 앞면과 같은 자리에 겹쳐 두어 칸 높이에 잡히지 않으므로, 실제로 그려진
+ * 높이를 재서 칸 자리에 돌려준다. `ResizeObserver`가 없는 곳(테스트)에서는 0을 돌려주고 CSS의
+ * 기본값이 대신 쓰인다.
+ */
+function useBackHeight(ref: RefObject<HTMLElement | null>, enabled: boolean): number {
+  const [height, setHeight] = useState(0);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!enabled || !node || typeof ResizeObserver === 'undefined') return;
+
+    const measure = () => setHeight(node.scrollHeight);
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    measure();
+
+    return () => observer.disconnect();
+  }, [ref, enabled]);
+
+  return height;
 }
 
 type FitNameProps = {
@@ -405,6 +533,15 @@ function Sparkle() {
   return (
     <svg className={styles.sparkle} viewBox="0 0 20 20" aria-hidden="true">
       <path d="M10 0 L11 8.6 L20 10 L11 11.4 L10 20 L9 11.4 L0 10 L9 8.6 Z" />
+    </svg>
+  );
+}
+
+/** 뒤집는 칸의 오른쪽 아래 단서. 돌아가는 화살표 하나다 */
+function FlipIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7Z" />
     </svg>
   );
 }
