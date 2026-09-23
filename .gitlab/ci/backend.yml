@@ -96,6 +96,7 @@ backend-mr-test:
   variables:
     GIT_STRATEGY: none
     AVATAR_STORAGE_PATH: "$CI_PROJECT_DIR/backend/build/test-avatars/$CI_JOB_ID"
+    REPORT_IMAGE_STORAGE_PATH: "$CI_PROJECT_DIR/backend/build/test-report-images/$CI_JOB_ID"
   script:
     - cd backend
     - ./gradlew clean test spotlessCheck --no-daemon
@@ -181,6 +182,7 @@ backend-test:
   tags: [e106-shell]
   variables:
     AVATAR_STORAGE_PATH: "$CI_PROJECT_DIR/backend/build/test-avatars/$CI_JOB_ID"
+    REPORT_IMAGE_STORAGE_PATH: "$CI_PROJECT_DIR/backend/build/test-report-images/$CI_JOB_ID"
   script:
     - python3 -B -m unittest infra.scripts.test_ci_config infra.scripts.test_notify_deployment infra.scripts.test_ci_backend_mr_paths infra.scripts.test_ci_backend_develop_paths infra.scripts.test_ci_backend_env_contract infra.scripts.test_ci_deploy_current_commit infra.scripts.test_deploy_backend infra.scripts.test_deploy_frontend infra.scripts.test_deploy_redis -v
     - cd backend
