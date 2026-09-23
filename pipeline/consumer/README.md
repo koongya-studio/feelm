@@ -1,5 +1,8 @@
 # Fold-in Consumer
 
+v26 GBT 전용 번들·독립 scorer 준비는 [GBT.md](./GBT.md)를 따른다. 아직 아래 ALS 실행 경로를
+교체하지 않았으며 실제 개인/파티 연결과 운영 이미지 통합은 후속 업무다.
+
 Kafka의 평가·온보딩·관심없음 이벤트를 받아 최신 사용자 입력으로 ALS Fold-in을 수행하고 TASTE 최대 500편과
 DISCOVERY 최대 100편을 갱신한다. Python 3.12의 독립 프로젝트이며 Spark 코드를 import하지 않는다.
 모델·매핑·영화 메타데이터는 모두 같은 `input_snapshot`을 가리켜야 하며, 하나라도 맞지 않으면 시작을 거부한다.

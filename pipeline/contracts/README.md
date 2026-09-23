@@ -5,6 +5,7 @@
 ## 계약 목록
 
 - [ALS 모델 산출물 계약](./als-model-artifacts.md): ALSModel, User/Item Factor와 학습 메타데이터
+- [v26 GBT 전용 서빙 번들](./gbt-model-artifacts.md): 71특징 원점수, 모든 K 입력, 불변 데이터 번들·공통 scorer·검증과 게시 경계
 - [서비스 영화 ID 매핑](./movie_id_mapping/service-movie-id-map.md): 118번 전처리의 백엔드 export 입력과 서비스·TMDb·MovieLens ID 매핑
 - [콘텐츠 산출물 계약](./content-artifacts.md): 315 콘텐츠 벡터의 오프라인 평가용 v1과 서빙용 v2, TMDb 정규화 스냅샷
 - [추천 내부 8×128 그룹 서빙 산출물](./group-serving-artifacts.md): 고정 분류 geometry, 영화 assignment, 안전 번들·HDFS 공개와 Consumer 시작 조건
