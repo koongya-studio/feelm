@@ -15,13 +15,15 @@ public class RecommendationReasonRepository {
     public List<UnresolvedItem> findUnresolved(long setId) {
         return jdbcTemplate.query(
                 """
-                SELECT id, cast(reason AS text) AS reason
+                SELECT id, type, cast(reason AS text) AS reason
                 FROM recommendation_items
                 WHERE set_id=? AND exposed_at IS NULL
                   AND (reason->>'summary' IS NULL OR reason->>'_reasonPending' = 'true')
                 ORDER BY id
                 """,
-                (row, ignored) -> new UnresolvedItem(row.getLong("id"), row.getString("reason")),
+                (row, ignored) ->
+                        new UnresolvedItem(
+                                row.getLong("id"), row.getString("type"), row.getString("reason")),
                 setId);
     }
 
@@ -58,5 +60,5 @@ public class RecommendationReasonRepository {
                 == 1;
     }
 
-    public record UnresolvedItem(long id, String reason) {}
+    public record UnresolvedItem(long id, String type, String reason) {}
 }

@@ -210,7 +210,7 @@
   S15P21E106-483에서 다룬다.
   `discovery-popularity`는 선택된 그룹 안의 공통 후보 진입 순서이며 fallback 목록이 아니다
 - Python Consumer가 Redis에 갱신한 TASTE·DISCOVERY 후보를 Spring이 종류별 점수로 정렬하고 동점을 결정적으로 섞는다. TASTE를 최대 50편 저장한 뒤 DISCOVERY에서 이미 저장한 TASTE 영화는 건너뛰고 다음 고유 후보로 최대 50편을 채운다. 조회 시 `size=3`이면 TASTE 2편과 DISCOVERY 1편, `size=6`이면 각각 3편을 꺼내며 사용 가능한 DISCOVERY가 부족하면 빈 슬롯마다 다음 TASTE를 사용한다
-- 버퍼는 PostgreSQL `recommendation_items`에 저장하고 `exposed_at`으로 노출 여부를 구분한다. `reason` JSON에는 Consumer가 전달한 구조화된 `reasons[]` 원본과 사용자용 `summary`·`factors`를 함께 저장한다. Candidate 알림 경로는 버퍼 커밋 전에 확인된 영화·장르 근거로 첫 노출용 문구를 확정한다. 근거가 없거나 필요한 표시명을 조회할 수 없을 때만 중립 문구를 저장한다. API에는 `summary`·`factors`만 반환하며, 이전 버전의 원본-only 항목에는 `새로운 영화를 만나보세요.`와 빈 `factors`를 반환한다.
+- 버퍼는 PostgreSQL `recommendation_items`에 저장하고 `exposed_at`으로 노출 여부를 구분한다. `reason` JSON에는 Consumer가 전달한 구조화된 `reasons[]` 원본과 사용자용 `summary`·`factors`를 함께 저장한다. Candidate 알림 경로는 버퍼 커밋 전에 확인된 영화·장르 근거로 첫 노출용 문구를 확정한다. 근거가 없거나 필요한 표시명을 조회할 수 없을 때는 유형별 일반 문구를 저장한다. TASTE는 `취향 데이터를 바탕으로 영화를 골라봤어요.`, DISCOVERY는 `새로운 영화를 만나보세요.`를 사용한다. 장르가 없는 `DISCOVERY_PERSONAL_SCORE`와 `DISCOVERY_AGGREGATE_AFFINITY`도 DISCOVERY 일반 문구를 사용하며, 확인된 장르·source 영화가 있는 구체 문구는 유지한다. API에는 `summary`·`factors`만 반환한다. 이전 버전의 원본-only 항목도 같은 유형별 일반 문구와 빈 `factors`를 카드(API-045)·영화 상세(API-030)·추천 이력(API-048)에서 일관되게 반환하며, PARTY 또는 알 수 없는 유형은 DISCOVERY 일반 문구를 사용한다.
 - LLM 호출은 버퍼 저장 트랜잭션 뒤에 수행한다. Candidate 알림 경로에서는 이유 보강을 별도 실행기로 제출하며, Kafka offset 확정은 이 작업을 기다리지 않는다. LLM은 확인된 영화·장르 근거에 대해 허용된 표현 유형만 고르고, Spring이 최종 문장을 조립한다. 모델 오류·타임아웃·빈/무효 응답은 확인된 근거의 결정적 문구로 대체한다. 이유는 첫 노출 전까지만 갱신하며 노출 후에는 같은 스냅샷을 카드·상세·이력에서 재사용한다. 생성 완료 전에 첫 조회가 항목을 노출해도 커밋 때 저장한 근거 문구가 유지된다.
 - 버퍼가 커밋된 뒤 이유 보강의 DB 조회·갱신만 실패하면 이미 저장한 세트를 반환한다. 미노출 이유는 같은 generation 재요청에서 다시 보강한다. 그 전에 첫 조회가 노출해도 커밋 때 저장한 근거 문구가 유지된다. 버퍼 저장 자체나 카드 조회 DB 장애는 이 fallback의 대상이 아니다.
 - v6 TASTE 근거는 `SHARED_GENRE` 또는 `TOP_RATED_SOURCE`, DISCOVERY 근거는 `DISCOVERY_AGGREGATE_AFFINITY` 또는 `DISCOVERY_PERSONAL_SCORE`다. `reasons[]`의 첫 항목을 표시명으로 해석할 수 없으면 뒤의 유효한 항목을 순서대로 찾는다. 영화 ID는 서비스 영화 제목으로, 장르 코드는 서비스 표시명으로 변환한다. `SHARED_GENRE`와 장르가 있는 `DISCOVERY_PERSONAL_SCORE`는 확인된 공통 장르만 언급한다. `sourceMovieIds`와 `matchedGenreCodes`는 각각의 목록이라 특정 source 영화와 장르의 짝을 증명하지 못하므로 두 값을 한 문장에 묶지 않는다. `TOP_RATED_SOURCE`는 확인된 source 영화 제목을 문구에 넣되 후보와 source 영화가 비슷하다고 단정하지 않는다. 표시할 제목이 60자를 넘으면 앞 59자와 줄임표를 사용한다. 그룹 근거의 `topContributionCoverage`는 그룹 적합도 근거의 집중도이지 후보 영화 최종 점수 설명률이 아니다. v6에 없는 감독·배우 공통성은 언급하지 않는다.
@@ -391,6 +391,7 @@
 ### 처리 규칙
 
 - 이력은 생성 시점 스냅샷이며 이후 영화 정보 변경과 무관하게 추천 이유를 보존한다
+- 사용자용 `summary`가 없는 이전 버전 원본-only 항목은 API-045의 유형별 일반 문구 규칙을 적용하며, 저장된 추천 이유를 수정하지 않는다
 - 개인·파티 추천 구분은 세트의 `user_id`·`party_id` 중 어느 값이 존재하는지로 판단하며 별도 `source`는 저장하지 않는다
 - 관심없음 처리한 항목은 `dismissed: true`로 남긴다
 - **같은 영화가 여러 세트에 노출되었으면 가장 최신 세트의 항목 1건만 반환한다.** 평가마다 새 generation의 세트가 생기므로 후보 상위권이 고착된 구간에서는 같은 영화가 세트마다 다시 노출된다. 남길 항목은 `recommendation_items.set_id`가 가장 큰 노출이고, 그보다 오래된 노출은 `exposed_at`을 보존한 채 응답에서만 제외한다. API-045의 "한 번이라도 노출된 항목은 삭제하거나 `exposed_at`을 되돌리지 않는다"는 규칙은 그대로다

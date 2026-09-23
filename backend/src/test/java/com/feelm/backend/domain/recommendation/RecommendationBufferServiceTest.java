@@ -295,7 +295,7 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
         assertThat(items).hasSize(2);
         assertThat(items.get(0)).containsEntry("type", "TASTE").containsEntry("flavor_code", null);
         assertThat(items.get(0).get("reason").toString())
-                .contains("SHARED_GENRE", "sourceMovieIds", "THRILLER", "새로운 영화를 만나보세요.");
+                .contains("SHARED_GENRE", "sourceMovieIds", "THRILLER", "취향 데이터를 바탕으로 영화를 골라봤어요.");
         assertThat(items.get(1))
                 .containsEntry("type", "DISCOVERY")
                 .containsEntry("flavor_code", "FLAVOR_A");
@@ -500,7 +500,7 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                                 "SELECT reason->>'summary' FROM recommendation_items WHERE set_id=?",
                                 String.class,
                                 setId))
-                .isEqualTo("새로운 영화를 만나보세요.");
+                .isEqualTo("취향 데이터를 바탕으로 영화를 골라봤어요.");
     }
 
     @Test
@@ -531,7 +531,7 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                                         + " WHERE set_id=? ORDER BY movie_id",
                                 String.class,
                                 setId))
-                .containsExactly("새로운 영화를 만나보세요.", null);
+                .containsExactly("취향 데이터를 바탕으로 영화를 골라봤어요.", null);
         reset(reasonRepository);
         assertThat(service.createBuffer(USER).recommendationSetId()).isEqualTo(setId);
         assertThat(
@@ -540,7 +540,7 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                                         + " WHERE set_id=? ORDER BY movie_id",
                                 String.class,
                                 setId))
-                .containsExactly("새로운 영화를 만나보세요.", "새로운 영화를 만나보세요.");
+                .containsExactly("취향 데이터를 바탕으로 영화를 골라봤어요.", "취향 데이터를 바탕으로 영화를 골라봤어요.");
     }
 
     @Test
@@ -581,20 +581,22 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("구조화 근거가 없으면 LLM을 호출하지 않고 중립 문구를 저장한다")
-    void emptyReasonSkipsGenerator() {
-        movies(100);
-        candidates(candidate(100, "5.0", "TASTE", null));
+    @DisplayName("구조화 근거가 없으면 유형별 일반 문구를 저장하고 LLM을 호출하지 않는다")
+    void emptyReasonStoresTypeFallbackAndSkipsGenerator() {
+        movies(100, 200);
+        candidates(candidate(100, "5.0", "TASTE", null), candidate(200, "4.0", "DISCOVERY", null));
 
         long setId = service.createBuffer(USER).recommendationSetId();
 
         verifyNoInteractions(reasonGenerator);
         assertThat(
-                        jdbc.queryForObject(
-                                "SELECT reason->>'summary' FROM recommendation_items WHERE set_id=?",
+                        jdbc.queryForList(
+                                "SELECT reason->>'summary' FROM recommendation_items"
+                                        + " WHERE set_id=?"
+                                        + " ORDER BY CASE type WHEN 'TASTE' THEN 1 ELSE 2 END",
                                 String.class,
                                 setId))
-                .isEqualTo("새로운 영화를 만나보세요.");
+                .containsExactly("취향 데이터를 바탕으로 영화를 골라봤어요.", "새로운 영화를 만나보세요.");
     }
 
     @Test
@@ -620,7 +622,7 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                                 "SELECT reason->>'summary' FROM recommendation_items WHERE set_id=?",
                                 String.class,
                                 setId))
-                .isEqualTo("새로운 영화를 만나보세요.");
+                .isEqualTo("취향 데이터를 바탕으로 영화를 골라봤어요.");
     }
 
     @Test
@@ -640,7 +642,7 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                                 "SELECT reason->>'summary' FROM recommendation_items WHERE id=?",
                                 String.class,
                                 itemId))
-                .isEqualTo("새로운 영화를 만나보세요.");
+                .isEqualTo("취향 데이터를 바탕으로 영화를 골라봤어요.");
     }
 
     @Test
@@ -699,7 +701,7 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                                     .reason()
                                     .path("summary")
                                     .textValue())
-                    .isEqualTo("새로운 영화를 만나보세요.");
+                    .isEqualTo("취향 데이터를 바탕으로 영화를 골라봤어요.");
             assertThat(
                             first.items().stream()
                                     .filter(item -> item.recommendationItemId() == itemId)
@@ -784,9 +786,7 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                         setId);
         assertThat(summaries)
                 .containsExactly(
-                        "좋아하신 영화 'movie-55'을 바탕으로 골랐어요.",
-                        "평가 이력을 바탕으로 발견한 영화예요.",
-                        "취향을 바탕으로 새롭게 고른 영화예요.");
+                        "좋아하신 영화 'movie-55'을 바탕으로 골랐어요.", "새로운 영화를 만나보세요.", "새로운 영화를 만나보세요.");
     }
 
     @Test

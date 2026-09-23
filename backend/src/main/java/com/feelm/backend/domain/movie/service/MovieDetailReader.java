@@ -118,7 +118,8 @@ class MovieDetailReader {
                                 new MovieRecommendationResponse(
                                         snapshot.recommendationItemId(),
                                         snapshot.type(),
-                                        reasonPresenter.present(snapshot.reason())))
+                                        reasonPresenter.present(
+                                                snapshot.type(), snapshot.reason())))
                 .orElse(null);
     }
 }

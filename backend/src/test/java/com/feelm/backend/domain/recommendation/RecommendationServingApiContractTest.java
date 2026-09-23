@@ -565,6 +565,42 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
+    @DisplayName("추천 카드·영화 상세·이력은 원본-only 이유에 같은 유형별 일반 문구를 반환한다")
+    void cardDetailAndHistoryShareTypeFallback() throws Exception {
+        jdbc.update(
+                "UPDATE recommendation_items"
+                        + " SET reason='{\"reasons\":[{\"code\":\"TOP_RATED_SOURCE\"}]}'::jsonb"
+                        + " WHERE id IN (1001,1005)");
+
+        getRecommendations(USER)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].reason.summary").value("취향 데이터를 바탕으로 영화를 골라봤어요."))
+                .andExpect(jsonPath("$.items[0].reason.factors.length()").value(0))
+                .andExpect(jsonPath("$.items[3].reason.summary").value("새로운 영화를 만나보세요."))
+                .andExpect(jsonPath("$.items[3].reason.factors.length()").value(0));
+        mvc.perform(get("/api/v1/recommendations/history").header("Authorization", bearer(USER)))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.items[0].items[0].reason.summary")
+                                .value("취향 데이터를 바탕으로 영화를 골라봤어요."))
+                .andExpect(jsonPath("$.items[0].items[1].reason.summary").value("새로운 영화를 만나보세요."));
+        mvc.perform(
+                        get("/api/v1/movies/101")
+                                .param("recommendationItemId", "1001")
+                                .header("Authorization", bearer(USER)))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.recommendation.reason.summary")
+                                .value("취향 데이터를 바탕으로 영화를 골라봤어요."));
+        mvc.perform(
+                        get("/api/v1/movies/105")
+                                .param("recommendationItemId", "1005")
+                                .header("Authorization", bearer(USER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recommendation.reason.summary").value("새로운 영화를 만나보세요."));
+    }
+
+    @Test
     @DisplayName("추천 당시 맛이 없으면 영화 대표 맛을 반환한다")
     void fallsBackToMovieFlavor() throws Exception {
         jdbc.update("UPDATE movies SET representative_flavor_id=? WHERE id=101", FLAVOR);

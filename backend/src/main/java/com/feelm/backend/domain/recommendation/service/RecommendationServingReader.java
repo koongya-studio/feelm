@@ -116,7 +116,7 @@ class RecommendationServingReader {
                 item.type(),
                 movie,
                 item.flavorCode(),
-                reasonPresenter.present(item.reason()));
+                reasonPresenter.present(item.type(), item.reason()));
     }
 
     /**
