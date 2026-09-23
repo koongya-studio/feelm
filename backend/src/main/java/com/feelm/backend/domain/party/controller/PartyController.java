@@ -5,10 +5,12 @@ import com.feelm.backend.domain.party.dto.request.PartyInvitationCreateRequest;
 import com.feelm.backend.domain.party.dto.response.PartyInvitationResponse;
 import com.feelm.backend.domain.party.dto.response.PartyInvitationStatusResponse;
 import com.feelm.backend.domain.party.dto.response.PartyListItemResponse;
+import com.feelm.backend.domain.party.dto.response.PartyRecommendationHistorySetResponse;
 import com.feelm.backend.domain.party.dto.response.PartyRecommendationResponse;
 import com.feelm.backend.domain.party.dto.response.PartyResponse;
 import com.feelm.backend.domain.party.dto.response.PartyStateResponse;
 import com.feelm.backend.domain.party.dto.response.ReceivedPartyInvitationResponse;
+import com.feelm.backend.domain.party.service.PartyRecommendationHistoryService;
 import com.feelm.backend.domain.party.service.PartyRecommendationService;
 import com.feelm.backend.domain.party.service.PartyService;
 import com.feelm.backend.global.error.BusinessException;
@@ -34,6 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PartyController {
     private final PartyService partyService;
     private final PartyRecommendationService partyRecommendationService;
+    private final PartyRecommendationHistoryService partyRecommendationHistoryService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -111,5 +114,15 @@ public class PartyController {
             throw new BusinessException(ErrorCode.VALIDATION_FAILED);
         }
         return partyRecommendationService.getRecommendations(userId, partyId, size, refresh);
+    }
+
+    /** API-083. 종료 파티 포함, 그 파티의 멤버십이 있으면 읽는다. */
+    @GetMapping("/{partyId}/recommendations/history")
+    public CursorPageResponse<PartyRecommendationHistorySetResponse> recommendationHistory(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable long partyId,
+            @RequestParam(required = false) String cursor,
+            @RequestParam(required = false) Integer size) {
+        return partyRecommendationHistoryService.getHistory(userId, partyId, cursor, size);
     }
 }

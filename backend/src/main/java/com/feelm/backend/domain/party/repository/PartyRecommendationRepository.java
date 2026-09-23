@@ -14,12 +14,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /** 파티 추천 후보 필터와 세트·아이템 이력 저장을 담당한다. */
+@Slf4j
 @Repository
 @RequiredArgsConstructor
 public class PartyRecommendationRepository {
@@ -213,7 +215,14 @@ public class PartyRecommendationRepository {
         return Boolean.TRUE.equals(exists);
     }
 
-    public void expose(List<StoredItem> items, OffsetDateTime exposedAt) {
+    /**
+     * 항목을 노출 상태로 기록하고 같은 트랜잭션에서 파티 추천 이력({@code party_movie_exposures})을 갱신한다(S15P21E106-815).
+     *
+     * <p>이 메서드가 <b>파티 세트</b>의 {@code exposed_at}을 찍는 유일한 지점이므로 이력 upsert도 여기 둔다. 개인 세트의 {@code
+     * RecommendationServingRepository.expose()}와 같은 배치다. 두 쓰기가 같은 트랜잭션(파티 행 잠금 안)에서 커밋되므로 원본과 이력이
+     * 어긋나는 창이 없고, 같은 파티의 동시 다시 받기도 직렬화된다.
+     */
+    public void expose(long partyId, List<StoredItem> items, OffsetDateTime exposedAt) {
         if (items.isEmpty()) {
             return;
         }
@@ -225,6 +234,62 @@ public class PartyRecommendationRepository {
                     statement.setObject(1, exposedAt);
                     statement.setLong(2, item.id());
                 });
+        recordExposureHistory(partyId, items);
+    }
+
+    /**
+     * 같은 영화의 재노출은 행을 늘리지 않고 최신 노출로 갱신한다. 이력(API-083)의 "같은 영화는 최신 세트 1건" 규칙이 여기서 끝난다.
+     *
+     * <p>{@code set_id}와 {@code exposed_at}은 인자가 아니라 <b>항목 행에서</b> 읽는다. 바로 앞의 UPDATE가 {@code
+     * COALESCE(exposed_at, ?)}로 이미 노출된 항목의 시각을 보존하므로, 인자를 넣으면 원본과 이력이 어긋나는 경로가 남는다(리뷰 A-1·B-5). 행에서
+     * 읽으면 원본이 무엇이든 이력은 그것을 가리킨다. {@code exposed_at IS NOT NULL} 조건은 UPDATE가 실패한 행을 이력에 넣지 않기 위한
+     * 방어다.
+     *
+     * <p>{@code WHERE ... set_id < EXCLUDED.set_id} 가드는 더 오래된 세트의 노출이 최신 승자를 덮어쓰지 못하게 한다. 이 가드는
+     * <b>정상 운영에서도 걸린다</b>(리뷰 A-2·B-1). 파티 입력은 파티원과 각자의 후보 세대의 해시라, 파티원이 나갔다가 돌아오면 입력이 이전 값으로 되돌아가
+     * {@code findExistingSet}이 예전 세트를 다시 서빙한다. 그 세트가 새로 노출한 영화 중 더 새 세트에 이미 기록된 영화는 가드에 걸려 이력 위치가
+     * 바뀌지 않는다 — 이것이 계약(세트 ID 내림차순, 최신 세트 1건)이 요구하는 결과이므로 오류가 아니라 정보 로그로만 남긴다.
+     *
+     * <p>FK 검사가 movies 행에 KEY SHARE를 행 순서대로 걸므로 {@link #insertItems}와 같이 movie_id 오름차순으로 넣어
+     * 온보딩(API-024)의 잠금 방향과 맞춘다(S15P21E106-804). 테스트 픽스처 {@code
+     * PartyRecommendationHistoryApiContractTest.item()}과 마이그레이션 {@code V202609231400}의 백필이 같은 승자
+     * 규칙을 쓴다. 가드나 컬럼을 바꾸면 셋을 함께 바꾼다.
+     */
+    private void recordExposureHistory(long partyId, List<StoredItem> items) {
+        List<StoredItem> byMovieId =
+                items.stream().sorted(Comparator.comparingLong(StoredItem::movieId)).toList();
+        int[][] results =
+                jdbcTemplate.batchUpdate(
+                        """
+                        INSERT INTO party_movie_exposures
+                            (party_id, movie_id, recommendation_item_id, set_id, exposed_at)
+                        SELECT ?, ?, ?, i.set_id, i.exposed_at
+                        FROM recommendation_items i
+                        WHERE i.id = ? AND i.exposed_at IS NOT NULL
+                        ON CONFLICT (party_id, movie_id) DO UPDATE SET
+                            recommendation_item_id = EXCLUDED.recommendation_item_id,
+                            set_id = EXCLUDED.set_id,
+                            exposed_at = EXCLUDED.exposed_at
+                        WHERE party_movie_exposures.set_id < EXCLUDED.set_id
+                        """,
+                        byMovieId,
+                        byMovieId.size(),
+                        (statement, item) -> {
+                            statement.setLong(1, partyId);
+                            statement.setLong(2, item.movieId());
+                            statement.setLong(3, item.id());
+                            statement.setLong(4, item.id());
+                        });
+        long recorded =
+                java.util.Arrays.stream(results).flatMapToInt(java.util.Arrays::stream).sum();
+        if (recorded < items.size()) {
+            log.info(
+                    "Party exposure history kept newer sets for {} of {} rows in party {}:"
+                            + " an older set was re-served after a newer one",
+                    items.size() - recorded,
+                    items.size(),
+                    partyId);
+        }
     }
 
     public Map<Long, List<String>> findGenreNames(List<Long> movieIds) {
