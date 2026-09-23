@@ -36,7 +36,7 @@ export type QueryEntry = QueryValue | readonly QueryValue[];
 
 export type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  /** JSON 본문. 없으면 `Content-Type`을 붙이지 않는다 */
+  /** JSON 본문 또는 Blob. 없으면 `Content-Type`을 붙이지 않는다 */
   body?: unknown;
   /** 질의 문자열. `undefined`·`null` 값과 빈 배열은 보내지 않는다 */
   query?: Record<string, QueryEntry>;
@@ -66,8 +66,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     fetchOrThrow(url, {
       method,
       credentials: 'include',
-      headers: headers(body !== undefined, token),
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: headers(body, token),
+      body: requestBody(body),
     });
 
   let response = await send(auth === 'none' ? null : getAccessToken());
@@ -98,10 +98,12 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   return parse<T>(response);
 }
 
-function headers(hasBody: boolean, token: string | null): Record<string, string> {
+function headers(body: unknown, token: string | null): Record<string, string> {
   const result: Record<string, string> = { Accept: 'application/json' };
 
-  if (hasBody) {
+  if (body instanceof Blob) {
+    result['Content-Type'] = body.type || 'application/octet-stream';
+  } else if (body !== undefined) {
     result['Content-Type'] = 'application/json; charset=utf-8';
   }
 
@@ -110,6 +112,12 @@ function headers(hasBody: boolean, token: string | null): Record<string, string>
   }
 
   return result;
+}
+
+function requestBody(body: unknown): BodyInit | undefined {
+  if (body === undefined) return undefined;
+  if (body instanceof Blob) return body;
+  return JSON.stringify(body);
 }
 
 function queryString(query: Record<string, QueryEntry> | undefined): string {

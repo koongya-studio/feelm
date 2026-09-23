@@ -18,13 +18,20 @@ spring:
 
 feelm:
   avatar:
-    storage-path: ${java.io.tmpdir}/feelm/avatars
+    storage-path: ${AVATAR_STORAGE_PATH:${java.io.tmpdir}/feelm/avatars}
     public-url-prefix: /media/avatars
   kafka:
     outbox:
       # Spring 테스트 클래스가 병렬 실행되므로 다른 ApplicationContext의 Relay가 공유 DB 행을
       # 선점하지 않게 한다. Relay 전달·재시도는 생성자로 직접 구성하는 전용 테스트가 검증한다.
       relay-enabled: false
+  report-image:
+    storage-path: ${java.io.tmpdir}/feelm/report-images
+    # 테스트 전용이며 JWT 테스트 키와 의도적으로 다르다.
+    signing-secret: feelm-test-report-image-key-at-least-32-bytes
+    url-ttl: 10m
+    regeneration-interval: 1m
+    download-url-prefix: /api/v1/report-images
   recommendation:
     buffer:
       # 프리페치는 응답과 분리된 배경 작업이라 테스트가 끝난 뒤에도 DB를 읽는다. 다음 테스트의

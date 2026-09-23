@@ -17,6 +17,7 @@ import com.feelm.backend.infrastructure.oauth.OAuthUserProfile;
 import jakarta.servlet.http.Cookie;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -88,7 +89,7 @@ class UserWithdrawalContractTest extends OAuthApiTestSupport {
     @DisplayName("프로필 사진 연결을 커밋한 뒤 저장된 파일을 제거한다")
     void deletesAvatarAfterWithdrawal(CapturedOutput output) throws Exception {
         Member member = newMember(output);
-        String storageKey = "0b649505-0917-41d9-a41f-0d4402ec63d5.jpg";
+        String storageKey = UUID.randomUUID() + ".jpg";
         Path stored = avatarStorageProperties.storagePath().resolve(storageKey);
         Files.createDirectories(stored.getParent());
         Files.write(stored, new byte[] {1, 2, 3});

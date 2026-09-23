@@ -51,6 +51,10 @@ public enum ErrorCode {
     RECOMMENDATION_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "추천 서비스를 일시적으로 사용할 수 없습니다."),
     RECOMMENDATION_PREPARING(HttpStatus.SERVICE_UNAVAILABLE, "추천을 준비하고 있습니다. 잠시 후 다시 시도해 주세요."),
     REPORT_GENERATING(HttpStatus.CONFLICT, "리포트를 준비 중입니다."),
+    REPORT_IMAGE_INVALID(HttpStatus.BAD_REQUEST, "리포트 이미지 파일이 올바르지 않습니다."),
+    REPORT_IMAGE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "리포트 이미지는 25MB 이하여야 합니다."),
+    REPORT_IMAGE_STORAGE_UNAVAILABLE(
+            HttpStatus.SERVICE_UNAVAILABLE, "리포트 이미지 저장소를 일시적으로 사용할 수 없습니다."),
     PUSH_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "브라우저 푸시를 일시적으로 사용할 수 없습니다."),
     TREND_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "급상승 영화를 일시적으로 사용할 수 없습니다.");
 

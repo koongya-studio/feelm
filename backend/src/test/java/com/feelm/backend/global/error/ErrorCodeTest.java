@@ -47,6 +47,8 @@ class ErrorCodeTest {
                 .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(ErrorCode.PUSH_UNAVAILABLE.getStatus())
                 .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(ErrorCode.REPORT_IMAGE_STORAGE_UNAVAILABLE.getStatus())
+                .isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     }
 
     @Test
@@ -116,6 +118,10 @@ class ErrorCodeTest {
                         "INVITATION_NOT_PENDING",
                         // 리포트 도메인 — API-060·080 (S15P21E106-556)
                         "REPORT_GENERATING",
+                        // 리포트 도메인 — API-061 (S15P21E106-557)
+                        "REPORT_IMAGE_INVALID",
+                        "REPORT_IMAGE_TOO_LARGE",
+                        "REPORT_IMAGE_STORAGE_UNAVAILABLE",
                         // 트렌드 도메인 — API-064 급상승 영화 (S15P21E106-561)
                         "TREND_UNAVAILABLE");
     }

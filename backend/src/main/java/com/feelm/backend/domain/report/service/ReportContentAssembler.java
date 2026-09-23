@@ -116,8 +116,9 @@ public class ReportContentAssembler {
                                 Collectors.toMap(ReportSource.Frame::frameId, Function.identity()));
 
         List<GenreStat> currentGenres = genreStats(genres, currentIds, frameById);
-        List<PersonStat> currentDirectors = personStats(people, currentIds, Role.DIRECTOR);
-        List<PersonStat> currentActors = personStats(people, currentIds, Role.ACTOR);
+        List<PersonStat> currentDirectors =
+                personStats(people, currentIds, frameById, Role.DIRECTOR);
+        List<PersonStat> currentActors = personStats(people, currentIds, frameById, Role.ACTOR);
         Set<Long> historicalDirectorIds =
                 people.stream()
                         .filter(person -> person.role() == Role.DIRECTOR)
@@ -253,7 +254,7 @@ public class ReportContentAssembler {
                     stats.computeIfAbsent(
                             genre.code(),
                             ignored -> new MutableGenreStat(genre.code(), genre.name()));
-            stat.add(frame.score());
+            stat.add(frame);
         }
         return stats.values().stream()
                 .map(MutableGenreStat::freeze)
@@ -266,7 +267,10 @@ public class ReportContentAssembler {
     }
 
     private static List<PersonStat> personStats(
-            List<ReportSource.Person> people, Set<Long> frameIds, Role role) {
+            List<ReportSource.Person> people,
+            Set<Long> frameIds,
+            Map<Long, ReportSource.Frame> frameById,
+            Role role) {
         Map<Long, MutablePersonStat> stats = new HashMap<>();
         for (ReportSource.Person person : people) {
             if (person.role() != role || !frameIds.contains(person.frameId())) {
@@ -280,7 +284,7 @@ public class ReportContentAssembler {
                                             person.name(),
                                             person.originalName(),
                                             person.profileUrl()))
-                    .add(person.frameId());
+                    .add(person.frameId(), frameById.get(person.frameId()));
         }
         return stats.values().stream()
                 .map(MutablePersonStat::freeze)
@@ -464,7 +468,7 @@ public class ReportContentAssembler {
                         : new GenreCard(
                                 genres.getFirst().name(),
                                 genreDisplayName(genres.getFirst().code()),
-                                new ImageRef(null));
+                                new ImageRef(genres.getFirst().representativeImageUrl()));
         DirectorCard director =
                 directors.isEmpty()
                         ? null
@@ -474,7 +478,7 @@ public class ReportContentAssembler {
                                         directors.getFirst().name(),
                                         directors.getFirst().originalName()),
                                 new ImageRef(directors.getFirst().profileUrl()),
-                                null);
+                                imageRefOrNull(directors.getFirst().representativeWorkUrl()));
         PersonCard actor =
                 actors.isEmpty()
                         ? null
@@ -733,22 +737,31 @@ public class ReportContentAssembler {
         return name == null || name.isBlank() ? code : name;
     }
 
-    private record GenreStat(String code, String name, int count, BigDecimal averageScore) {}
+    private record GenreStat(
+            String code,
+            String name,
+            int count,
+            BigDecimal averageScore,
+            String representativeImageUrl) {}
 
     private static final class MutableGenreStat {
         private final String code;
         private final String name;
         private int count;
         private BigDecimal scoreSum = BigDecimal.ZERO;
+        private ReportSource.Frame representative;
 
         private MutableGenreStat(String code, String name) {
             this.code = code;
             this.name = name;
         }
 
-        private void add(BigDecimal score) {
+        private void add(ReportSource.Frame frame) {
             count++;
-            scoreSum = scoreSum.add(score);
+            scoreSum = scoreSum.add(frame.score());
+            if (isBetterRepresentative(frame, representative)) {
+                representative = frame;
+            }
         }
 
         private GenreStat freeze() {
@@ -756,12 +769,18 @@ public class ReportContentAssembler {
                     code,
                     name,
                     count,
-                    scoreSum.divide(BigDecimal.valueOf(count), 4, RoundingMode.HALF_UP));
+                    scoreSum.divide(BigDecimal.valueOf(count), 4, RoundingMode.HALF_UP),
+                    imageUrl(representative));
         }
     }
 
     private record PersonStat(
-            long personId, String name, String originalName, String profileUrl, int count) {}
+            long personId,
+            String name,
+            String originalName,
+            String profileUrl,
+            int count,
+            String representativeWorkUrl) {}
 
     private static final class MutablePersonStat {
         private final long personId;
@@ -769,6 +788,7 @@ public class ReportContentAssembler {
         private final String originalName;
         private final String profileUrl;
         private final Set<Long> frameIds = new HashSet<>();
+        private ReportSource.Frame representative;
 
         private MutablePersonStat(
                 long personId, String name, String originalName, String profileUrl) {
@@ -778,13 +798,51 @@ public class ReportContentAssembler {
             this.profileUrl = profileUrl;
         }
 
-        private void add(long frameId) {
-            frameIds.add(frameId);
+        private void add(long frameId, ReportSource.Frame frame) {
+            if (frameIds.add(frameId) && isBetterRepresentative(frame, representative)) {
+                representative = frame;
+            }
         }
 
         private PersonStat freeze() {
-            return new PersonStat(personId, name, originalName, profileUrl, frameIds.size());
+            return new PersonStat(
+                    personId,
+                    name,
+                    originalName,
+                    profileUrl,
+                    frameIds.size(),
+                    imageUrl(representative));
         }
+    }
+
+    private static boolean isBetterRepresentative(
+            ReportSource.Frame candidate, ReportSource.Frame current) {
+        if (imageUrl(candidate) == null) {
+            return false;
+        }
+        if (current == null || imageUrl(current) == null) {
+            return true;
+        }
+        int score = candidate.score().compareTo(current.score());
+        if (score != 0) {
+            return score > 0;
+        }
+        int createdAt = candidate.createdAt().compareTo(current.createdAt());
+        return createdAt > 0 || (createdAt == 0 && candidate.frameId() < current.frameId());
+    }
+
+    private static String imageUrl(ReportSource.Frame frame) {
+        if (frame == null) {
+            return null;
+        }
+        if (frame.backdropUrl() != null && !frame.backdropUrl().isBlank()) {
+            return frame.backdropUrl();
+        }
+        return frame.posterUrl() == null || frame.posterUrl().isBlank() ? null : frame.posterUrl();
+    }
+
+    private static ImageRef imageRefOrNull(String url) {
+        return url == null || url.isBlank() ? null : new ImageRef(url);
     }
 
     private record ComparisonCandidate(String code, String label, double delta, boolean isNew) {}

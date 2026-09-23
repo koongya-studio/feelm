@@ -2,8 +2,8 @@
  * 취향 리포트 타입. API-059 내 리포트 목록 · API-060 리포트 상세 · API-080 첫 발급 기록 ·
  * API-061 이미지 카드. 대응 명세는 docs/api/report-trend.md이다.
  *
- * 059 · 060 · 080은 2026-09-21에 백엔드가 생겼다(업무 -556). **061 이미지 카드만 아직 없어**
- * `api/reports.ts`의 `createReportImage`가 목업으로 남는다(업무 -731).
+ * 059 · 060 · 080은 2026-09-21에 백엔드가 생겼고(업무 -556), 061 이미지 카드는 업무 -557에서
+ * 기존 `ReportFourCut` DOM 캡처·서버 저장·실제 다운로드까지 연결됐다.
  *
  * 계약의 사본이며 계약에 없는 필드를 넣지 않는다(frontend-structure.md 8.3). 와이어프레임 3.3 ·
  * 3.4 · 7.4가 그리던 4컷 · 국가 · 시대 비율 · 지난 반기 비교 · 발급 요약은 같은 날 계약으로
@@ -51,8 +51,9 @@ type ReportCount = { name: string; count: number };
 /**
  * 4컷 한 칸의 사진. `url`은 원본, `cutoutUrl`은 배경을 지운 이미지다.
  *
- * 감독 · 배우 칸은 `people.profile_url`을 그대로 준다. 장르 · 캐릭터 칸의 출처와 누끼 ·
- * 크롭은 계약의 미정 사항이라 지금은 늘 `null`이다.
+ * 장르는 해당 장르의 반기 대표 영화 backdrop/poster, 감독 · 배우는 `people.profile_url`을
+ * 사용한다. 감독 `work`는 그 감독의 반기 대표 영화다. 캐릭터 그림만 코드별 저장소 에셋이다.
+ * 누끼 · 크롭은 계약이 실제 값을 줄 때만 적용한다.
  */
 export type ReportCutImage = {
   url: string | null;

@@ -548,6 +548,7 @@ include:
         self.assertIn('needs: [frontend-image]', frontend_deploy)
         self.assertIn('needs: [consumer-test]', consumer_image)
         self.assertIn('needs: [consumer-image]', consumer_deploy)
+
         for block in (backend_deploy, frontend_deploy):
             self.assertIn('resource_group: service-and-backend-cache', block)
             self.assertIn('ci-deploy-current-commit.py', block)
@@ -596,6 +597,14 @@ include:
         self.assertIn('--init-script gradle/test-timing.gradle', backend_test)
         self.assertIn('action: prepare', backend_env)
         self.assertIn('ci-backend-env-contract.py --require-values', backend_env)
+
+    def test_backend_test_avatar_storage_is_job_isolated(self):
+        backend_mr_test = job_block(self.backend, 'backend-mr-test')
+        backend_test = job_block(self.backend, 'backend-test')
+        for block in (backend_mr_test, backend_test):
+            self.assertIn(
+                'AVATAR_STORAGE_PATH: "$CI_PROJECT_DIR/backend/build/test-avatars/$CI_JOB_ID"',
+                block)
 
     def test_frontend_image_injects_only_public_oauth_build_inputs(self):
         # Dockerfile 자체의 ARG 선언은 infra-config-test 스냅샷 밖이라

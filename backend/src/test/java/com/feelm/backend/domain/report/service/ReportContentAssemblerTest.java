@@ -38,12 +38,64 @@ class ReportContentAssemblerTest {
         assertThat(ReportContentAssembler.personDisplayName("봉준호", "  ")).isNull();
     }
 
+    @Test
+    @DisplayName("장르와 감독 대표 이미지는 사진이 있는 작품 중 평점·최신순으로 고른다")
+    void representativeImagesPreferHighestRatedAvailableVisual() {
+        ReportSource.Frame noImage =
+                new ReportSource.Frame(
+                        1, 1, 1, new BigDecimal("5.0"), IN_PERIOD, 2026, null, null, null, null);
+        ReportSource.Frame visual =
+                new ReportSource.Frame(
+                        2,
+                        1,
+                        2,
+                        new BigDecimal("4.5"),
+                        IN_PERIOD.plusSeconds(1),
+                        2026,
+                        null,
+                        null,
+                        "https://image.tmdb.org/t/p/original/poster.jpg",
+                        "https://image.tmdb.org/t/p/original/backdrop.jpg");
+        ReportContent content =
+                new ReportContentAssembler()
+                        .assemble(
+                                PERIOD,
+                                PERIOD.cutoffExclusive(),
+                                IN_PERIOD,
+                                true,
+                                List.of(noImage, visual),
+                                List.of(
+                                        new ReportSource.Genre(1, "TMDB_18", "드라마"),
+                                        new ReportSource.Genre(2, "TMDB_18", "드라마")),
+                                List.of(),
+                                List.of(
+                                        new ReportSource.Person(
+                                                1,
+                                                10,
+                                                "감독",
+                                                null,
+                                                "https://image.tmdb.org/t/p/original/director.jpg",
+                                                ReportSource.Role.DIRECTOR),
+                                        new ReportSource.Person(
+                                                2,
+                                                10,
+                                                "감독",
+                                                null,
+                                                "https://image.tmdb.org/t/p/original/director.jpg",
+                                                ReportSource.Role.DIRECTOR)),
+                                false,
+                                CharacterCardSelector.medians(List.of()));
+
+        assertThat(content.fourCut().genre().image().url()).endsWith("/backdrop.jpg");
+        assertThat(content.fourCut().director().work().url()).endsWith("/backdrop.jpg");
+    }
+
     private static final ReportPeriod PERIOD = new ReportPeriod(2026, ReportHalf.H1);
     private static final Instant IN_PERIOD = Instant.parse("2026-02-01T00:00:00Z");
 
     private static ReportSource.Frame frame(long id, Integer releaseYear) {
         return new ReportSource.Frame(
-                id, 1L, id, new BigDecimal("4.0"), IN_PERIOD, releaseYear, null, null);
+                id, 1L, id, new BigDecimal("4.0"), IN_PERIOD, releaseYear, null, null, null, null);
     }
 
     private static ReportContent assemble(List<ReportSource.Frame> frames) {
@@ -124,7 +176,7 @@ class ReportContentAssemblerTest {
 
     private static ReportSource.Frame scored(long id, String score, Integer releaseYear) {
         return new ReportSource.Frame(
-                id, 1L, id, new BigDecimal(score), IN_PERIOD, releaseYear, null, null);
+                id, 1L, id, new BigDecimal(score), IN_PERIOD, releaseYear, null, null, null, null);
     }
 
     private static ReportSource.Person director(long frameId, long personId, String name) {

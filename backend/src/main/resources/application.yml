@@ -102,6 +102,14 @@ feelm:
   avatar:
     storage-path: ${AVATAR_STORAGE_PATH:/tmp/feelm/avatars}
     public-url-prefix: ${AVATAR_PUBLIC_URL_PREFIX:/media/avatars}
+  report-image:
+    # 프로필 사진 공개 경로와 분리된 Backend 전용 디렉터리다(ADR-0023).
+    storage-path: ${REPORT_IMAGE_STORAGE_PATH:/tmp/feelm/report-images}
+    # JWT와 다른 필수 Secret이다. 기본값을 두지 않아 누락 시 기동에 실패한다.
+    signing-secret: ${REPORT_IMAGE_SIGNING_SECRET}
+    url-ttl: 10m
+    regeneration-interval: 1m
+    download-url-prefix: /api/v1/report-images
   report:
     generation:
       # 반기 마감 스냅샷 생성 배치. 테스트는 설정을 두지 않아 스케줄러를 등록하지 않는다.

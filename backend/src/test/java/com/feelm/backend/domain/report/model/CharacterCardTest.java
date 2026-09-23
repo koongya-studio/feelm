@@ -50,14 +50,14 @@ class CharacterCardTest {
     @Test
     @DisplayName("네 축의 판정 결과가 코드의 글자 순서로 이어진다")
     void buildsCodeFromAxisOrder() {
-        // 축 순서는 탐험·정착 -> 빛·그림자 -> 가슴·머리 -> 다작·정독이다
+        // 축 순서는 새로움·익숙함 -> 밝음·어두움 -> 후함·박함 -> 많음·적음이다
         assertThat(CharacterCard.of(true, true, true, true).code()).isEqualTo("ELHV");
         assertThat(CharacterCard.of(false, false, false, false).code()).isEqualTo("RDMS");
         assertThat(CharacterCard.of(false, false, false, true).code()).isEqualTo("RDMV");
     }
 
     @Test
-    @DisplayName("맛의 빛·그림자를 표시명이 아니라 코드로 가른다")
+    @DisplayName("맛의 밝고 어두움을 표시명이 아니라 코드로 가른다")
     void assignsFlavorToneByCode() {
         // 표시명은 마이그레이션에서 옮겨간 적이 있다 — 다크초코가 FLAVOR_D에서 FLAVOR_B로 갔다
         assertThat(FlavorTone.of("FLAVOR_C")).isEqualTo(FlavorTone.BRIGHT);

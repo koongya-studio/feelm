@@ -1,5 +1,6 @@
 package com.feelm.backend.domain.report;
 
+import com.feelm.backend.domain.report.service.ReportImageStorage;
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedPostgresContractTest;
 import java.sql.Timestamp;
@@ -40,13 +41,13 @@ abstract class ReportApiContractSupport extends SharedPostgresContractTest {
               "characterCard": {
                 "code": "RDMV",
                 "name": "안락의자 탐정",
-                "tagline": "움직이지 않고 사건만 잔뜩 봤습니다",
-                "description": "익숙한 맛 안에서 아주 많이 봤고 평가는 냉정했습니다.",
+                "tagline": "익숙한 자리에서 잔뜩 봤고, 별점은 냉정했어요",
+                "description": "익숙한 영화 안에서 어두운 쪽을 많이 봤고, 별점은 박했어요.",
                 "axes": [
-                  {"axis": "EXPLORATION", "value": "R", "label": "정착"},
-                  {"axis": "TONE", "value": "D", "label": "그림자"},
-                  {"axis": "STANCE", "value": "M", "label": "머리"},
-                  {"axis": "VOLUME", "value": "V", "label": "다작"}
+                  {"axis": "EXPLORATION", "value": "R", "label": "익숙함"},
+                  {"axis": "TONE", "value": "D", "label": "어두움"},
+                  {"axis": "STANCE", "value": "M", "label": "박함"},
+                  {"axis": "VOLUME", "value": "V", "label": "많음"}
                 ],
                 "basis": {"frameCount": 3, "lowSample": true}
               },
@@ -76,10 +77,22 @@ abstract class ReportApiContractSupport extends SharedPostgresContractTest {
     @Autowired protected JdbcTemplate jdbc;
     @Autowired protected TokenProvider tokenProvider;
     @Autowired protected MutableClock clock;
+    @Autowired private ReportImageStorage reportImageStorage;
 
     @BeforeEach
     @AfterEach
     void clean() {
+        jdbc.query(
+                        """
+                        SELECT ri.storage_key
+                        FROM report_images ri
+                        JOIN taste_reports tr ON tr.id = ri.report_id
+                        WHERE tr.user_id IN (?, ?)
+                        """,
+                        (result, row) -> result.getString("storage_key"),
+                        OWNER,
+                        OTHER)
+                .forEach(reportImageStorage::delete);
         jdbc.update("DELETE FROM taste_reports WHERE user_id IN (?, ?)", OWNER, OTHER);
         jdbc.update("DELETE FROM taste_report_generation_runs WHERE year = 2030");
         jdbc.update("DELETE FROM users WHERE id IN (?, ?)", OWNER, OTHER);

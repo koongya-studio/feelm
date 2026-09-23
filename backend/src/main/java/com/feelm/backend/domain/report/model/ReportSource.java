@@ -15,7 +15,9 @@ public final class ReportSource {
             Instant createdAt,
             Integer releaseYear,
             String flavorCode,
-            String flavorName) {}
+            String flavorName,
+            String posterUrl,
+            String backdropUrl) {}
 
     public record Genre(long frameId, String code, String name) {}
 

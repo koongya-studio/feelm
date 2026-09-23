@@ -65,7 +65,9 @@ public class ReportGenerationRepository {
                        f.created_at,
                        EXTRACT(YEAR FROM m.release_date)::int,
                        pf.code,
-                       pf.display_name
+                       pf.display_name,
+                       m.poster_url,
+                       m.backdrop_url
                 FROM frames f
                 JOIN ratings r ON r.id = f.rating_id
                 JOIN movies m ON m.id = f.movie_id
@@ -84,7 +86,9 @@ public class ReportGenerationRepository {
                                 instant(result.getObject("created_at")),
                                 (Integer) result.getObject(6),
                                 result.getString("code"),
-                                result.getString("display_name")));
+                                result.getString("display_name"),
+                                result.getString("poster_url"),
+                                result.getString("backdrop_url")));
     }
 
     public List<ReportSource.Genre> findGenres(List<Long> userIds, Instant effectiveEnd) {

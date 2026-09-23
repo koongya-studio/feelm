@@ -32,11 +32,17 @@ public record ReportContent(
     public record FourCut(
             GenreCard genre, DirectorCard director, PersonCard actor, CharacterCutCard character) {}
 
-    public record ImageRef(String url) {}
+    public record ImagePosition(int x, int y) {}
+
+    public record ImageRef(String url, String cutoutUrl, ImagePosition position, BigDecimal zoom) {
+        public ImageRef(String url) {
+            this(url, null, null, null);
+        }
+    }
 
     public record GenreCard(String name, String displayName, ImageRef image) {}
 
-    public record DirectorCard(String name, String displayName, ImageRef image, Object work) {}
+    public record DirectorCard(String name, String displayName, ImageRef image, ImageRef work) {}
 
     public record PersonCard(String name, String displayName, ImageRef image) {}
 

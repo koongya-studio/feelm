@@ -125,6 +125,8 @@ Topic 확인 방법은 [인프라 README](../infra/README.md#local-kafka)를 따
 | `NAVER_CLIENT_ID` / `NAVER_CLIENT_SECRET` | 비어 있음 | 선택(**Secret**) |
 | `RECOMMENDATION_ACCEPT_V5` | `true` | Candidate v6 재게시 확인 후 `false` |
 | `GMS_KEY` | 비어 있음(결정적 문구 사용) | 선택(**Secret**). GMS Gateway를 통한 Gemini 추천 이유 생성용 |
+| `REPORT_IMAGE_STORAGE_PATH` | `/tmp/feelm/report-images` | API-061 비공개 PNG 절대 경로 |
+| `REPORT_IMAGE_SIGNING_SECRET` | 비어 있음 | **필수(Secret)**. JWT와 다른 32바이트 이상 HMAC 키 |
 | `GEMINI_REASON_MODEL` | `gemini-2.5-flash-lite` | 선택. 추천 이유 표현 선택 모델 |
 
 변수 목록과 용도는 [`.env.example`](./.env.example)에서 관리합니다. 실제 값은 커밋하지

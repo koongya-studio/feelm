@@ -129,6 +129,8 @@ services:
       NAVER_CLIENT_SECRET: ${NAVER_CLIENT_SECRET:?NAVER_CLIENT_SECRET is required}
       AVATAR_STORAGE_PATH: /data/avatars
       AVATAR_PUBLIC_URL_PREFIX: ${AVATAR_PUBLIC_URL_PREFIX:-/media/avatars}
+      REPORT_IMAGE_STORAGE_PATH: /data/report-images
+      REPORT_IMAGE_SIGNING_SECRET: ${REPORT_IMAGE_SIGNING_SECRET:?REPORT_IMAGE_SIGNING_SECRET is required}
       MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
       MAIL_PORT: ${MAIL_PORT:-587}
       MAIL_USERNAME: ${MAIL_USERNAME:?MAIL_USERNAME is required}
@@ -154,6 +156,8 @@ services:
 
     volumes:
       - ${AVATAR_HOST_PATH:-/srv/feelm/data/avatars}:/data/avatars
+      # 비공개 리포트 PNG는 Backend에만 연결한다. Nginx 정적 볼륨으로 마운트하지 않는다.
+      - ${REPORT_IMAGE_HOST_PATH:-/srv/feelm/data/report-images}:/data/report-images
 
     depends_on:
       postgres:

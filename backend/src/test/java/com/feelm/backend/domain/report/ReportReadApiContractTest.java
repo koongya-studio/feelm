@@ -101,10 +101,10 @@ class ReportReadApiContractTest extends ReportApiContractSupport {
                 // 캐릭터 카드는 code만 계약이고 이름·설명은 기준정보다(API-060, 업무 -618)
                 .andExpect(jsonPath("$.characterCard.code").value("RDMV"))
                 .andExpect(jsonPath("$.characterCard.name").value("안락의자 탐정"))
-                .andExpect(jsonPath("$.characterCard.tagline").value("움직이지 않고 사건만 잔뜩 봤습니다"))
+                .andExpect(jsonPath("$.characterCard.tagline").value("익숙한 자리에서 잔뜩 봤고, 별점은 냉정했어요"))
                 .andExpect(jsonPath("$.characterCard.axes", hasSize(4)))
                 .andExpect(jsonPath("$.characterCard.axes[0].axis").value("EXPLORATION"))
-                .andExpect(jsonPath("$.characterCard.axes[3].label").value("다작"))
+                .andExpect(jsonPath("$.characterCard.axes[3].label").value("많음"))
                 .andExpect(jsonPath("$.characterCard.basis.frameCount").value(3))
                 .andExpect(jsonPath("$.characterCard.basis.lowSample").value(true))
                 // 04 칸 그림은 저장소 에셋이라 계약이 이미지 URL을 내리지 않는다
@@ -245,7 +245,8 @@ class ReportReadApiContractTest extends ReportApiContractSupport {
                         '{topDirectors,0,name}', '"웨스 앤더슨"'::jsonb),
                     '{fourCut,director}',
                     '{"name": "웨스 앤더슨", "displayName": null,
-                       "image": {"url": "https://images.test/d.jpg"}, "work": "대표작"}'::jsonb)
+                       "image": {"url": "https://images.test/d.jpg"},
+                       "work": {"url": "https://images.test/work.jpg"}}'::jsonb)
                 WHERE id = ?
                 """,
                 directorId,
@@ -262,7 +263,9 @@ class ReportReadApiContractTest extends ReportApiContractSupport {
                     .andExpect(
                             jsonPath("$.fourCut.director.image.url")
                                     .value("https://images.test/d.jpg"))
-                    .andExpect(jsonPath("$.fourCut.director.work").value("대표작"));
+                    .andExpect(
+                            jsonPath("$.fourCut.director.work.url")
+                                    .value("https://images.test/work.jpg"));
         } finally {
             jdbc.update("DELETE FROM people WHERE id = ?", directorId);
         }

@@ -122,3 +122,14 @@ Secret이 Git, 로그, 이슈, MR, 메신저, 문서 또는 AI 프롬프트에 �
 - 브라우저 번들, 컨테이너 이미지 및 CI 로그에 Secret이 포함되지 않는가?
 - GitLab 변수의 마스킹, 보호 및 환경 범위가 용도에 맞는가?
 - 노출된 적이 있는 Secret을 삭제만 하지 않고 폐기·재발급했는가?
+
+## 11. 리포트 이미지 서명 Secret
+
+- `REPORT_IMAGE_SIGNING_SECRET`은 API-061 다운로드 URL의 HMAC-SHA256 서명에 사용하는 Backend
+  전용 필수 Secret이다.
+- UTF-8 기준 32바이트 이상이어야 하며 `JWT_SECRET`과 같은 값을 사용할 수 없다. 누락되거나 두
+  값이 같으면 애플리케이션이 기동하지 않는다.
+- 로컬은 `backend/.env`, 배포는 보호·마스킹된 CI/CD Variable 또는 승인된 Secret 저장소에서
+  주입한다. Compose에는 `${REPORT_IMAGE_SIGNING_SECRET:?…}` 참조만 둔다.
+- 값을 교체하면 교체 전에 발급한 다운로드 URL은 즉시 무효가 된다. URL 수명은 10분이므로 정상
+  교체 시에는 최대 10분의 전환 창을 고려한다.
