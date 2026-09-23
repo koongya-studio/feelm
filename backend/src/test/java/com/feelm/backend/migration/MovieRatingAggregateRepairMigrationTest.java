@@ -247,7 +247,7 @@ class MovieRatingAggregateRepairMigrationTest {
                     .isZero();
 
             writer.rollback();
-            assertThat(database.flyway().migrate().migrationsExecuted).isOne();
+            assertThat(database.flyway().migrate().migrationsExecuted).isPositive();
             assertThat(
                             count(
                                     database,

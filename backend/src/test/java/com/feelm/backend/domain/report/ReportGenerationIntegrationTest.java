@@ -151,6 +151,10 @@ class ReportGenerationIntegrationTest extends SharedPostgresContractTest {
         assertThat(noir.path("isNew").asBoolean()).isFalse();
         assertThat(content.path("fourCut").path("director").path("image").path("url").asText())
                 .isEqualTo("https://images.test/director-1.jpg");
+        assertThat(content.path("fourCut").path("director").path("displayName").asText())
+                .isEqualTo("Director One");
+        assertThat(content.path("fourCut").path("actor").path("displayName").asText())
+                .isEqualTo("Actor One");
         /*
          * 캐릭터 카드는 프레임 3편 이상이면 늘 함께 생긴다 — 16종이 모든 조합을 덮어 후보 없음이
          * 없다(API-060, 업무 -779). 이 사용자는 3편이라 소량 표본이다.
@@ -218,6 +222,7 @@ class ReportGenerationIntegrationTest extends SharedPostgresContractTest {
                 .isEqualTo("열한 번째 배우");
         assertThat(content.path("fourCut").path("actor").path("image").path("url").asText())
                 .isEqualTo("https://images.test/actor-11.jpg");
+        assertThat(content.path("fourCut").path("actor").path("displayName").isNull()).isTrue();
     }
 
     @Test
@@ -408,18 +413,24 @@ class ReportGenerationIntegrationTest extends SharedPostgresContractTest {
                         + " (id, code, display_name, color, sort_order, cluster_id, representative_keywords)"
                         + " VALUES (?, 'R555_SWEET', '달콤', '#ffaaaa', 555102, 555102, '[]'::jsonb)",
                 flavorId(2));
-        insertPerson(1, "감독 하나", "https://images.test/director-1.jpg");
+        insertPerson(1, "감독 하나", "Director One", "https://images.test/director-1.jpg");
         insertPerson(2, "감독 둘", null);
-        insertPerson(3, "배우 하나", "https://images.test/actor-1.jpg");
+        insertPerson(3, "배우 하나", "Actor One", "https://images.test/actor-1.jpg");
         insertPerson(4, "배우 둘", null);
     }
 
     private void insertPerson(int suffix, String name, String profileUrl) {
+        insertPerson(suffix, name, null, profileUrl);
+    }
+
+    private void insertPerson(int suffix, String name, String originalName, String profileUrl) {
         jdbc.update(
-                "INSERT INTO people (id, tmdb_person_id, name, profile_url) VALUES (?, ?, ?, ?)",
+                "INSERT INTO people (id, tmdb_person_id, name, original_name, profile_url)"
+                        + " VALUES (?, ?, ?, ?, ?)",
                 personId(suffix),
                 Math.toIntExact(personId(suffix)),
                 name,
+                originalName,
                 profileUrl);
     }
 

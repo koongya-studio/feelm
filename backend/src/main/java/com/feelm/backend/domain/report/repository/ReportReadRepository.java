@@ -5,8 +5,12 @@ import com.feelm.backend.domain.report.model.ReportPeriod;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
@@ -59,6 +63,25 @@ public class ReportReadRepository {
                         period.year(),
                         period.half().name());
         return count != null && count > 0;
+    }
+
+    /** Latin-script names for the given people; ids without one are absent from the map. */
+    public Map<Long, String> findOriginalNames(Collection<Long> personIds) {
+        if (personIds.isEmpty()) {
+            return Map.of();
+        }
+        String placeholders = String.join(", ", Collections.nCopies(personIds.size(), "?"));
+        return jdbc
+                .query(
+                        "SELECT id, original_name FROM people"
+                                + " WHERE original_name IS NOT NULL AND id IN ("
+                                + placeholders
+                                + ")",
+                        (result, row) ->
+                                Map.entry(result.getLong("id"), result.getString("original_name")),
+                        personIds.toArray())
+                .stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     public int issueIfUnissued(long userId, long reportId, Instant now) {

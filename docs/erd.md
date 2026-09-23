@@ -208,6 +208,7 @@ erDiagram
         bigint id PK
         int tmdb_person_id UK
         varchar name
+        varchar original_name "검토된 외국인의 라틴 원어명, 없으면 NULL. name과 다를 때 화면에 병기한다"
         varchar profile_url "TMDb 미제공 시 NULL 가능"
     }
     MOVIE_PEOPLE {
@@ -257,7 +258,7 @@ erDiagram
 | `movie_embeddings` | 영화별 현재 콘텐츠 임베딩 | 별도 `id` PK와 UK(`movie_id`). 확정된 `vector(768)` 및 50자 이내의 안정적인 `model_version`을 저장하고 코사인 HNSW로 검색한다. 전체 산출물 SHA는 파이프라인 manifest에서 관리한다. 영화 삭제 시 함께 삭제하며 Redis에 중복 저장하지 않는다 | FR-11 · API-031 · ADR-0014 |
 | `genres` | 장르 기준정보 | TMDb 장르 ID 매핑 | FR-15 · API-029 |
 | `movie_genres`, `movie_countries`, `movie_people` | 영화 속성 매핑 | `movie_people.role`로 감독·배우 구분 | FR-14, FR-15, FR-34 |
-| `people` | 인물(감독·배우) | 검색 대상(FR-14) | API-028, API-030 |
+| `people` | 인물(감독·배우) | 검색 대상(FR-14). `original_name`은 4컷 리포트의 영문 병기용이며 **라틴 원어명이 있는 외국 인물만** 채운다. 검토된 TMDb person ID와 정확한 `original_name` 쌍이 allow-list와 일치할 때만 허용하고, 미확인 인물과 한국인은 NULL로 두어 4컷에서 한글 한 줄로 표시한다 | API-028, API-030 |
 | `otts` | OTT 기준정보 | 지원 목록 5종(API-025)을 새 Flyway seed로 초기화한다. 기존 식별쌍·ID·참조는 보존하고 이후 콘텐츠 적재는 같은 쌍의 표시 정보를 갱신한다 | FR-03, FR-16 · API-025 |
 | `movie_ott_providers` | 영화별 시청 가능 OTT | TMDb watch provider 동기화 | FR-16 · API-030 |
 | `popcorn_flavors` | 팝콘 맛 8종 기준정보와 439 상위 맛 매핑 | `cluster_id=taste_id`와 `code=FLAVOR_A..H`는 각각 유일하며 순서대로 1:1 대응한다. 표시명·색상은 변경 가능하고 실배정 해석 키워드도 함께 보관한다. 내부 `cluster_id`는 공개 API에 노출하지 않는다 | FR-06 · API-044 · ADR-0020 |

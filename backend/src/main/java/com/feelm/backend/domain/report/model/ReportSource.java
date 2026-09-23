@@ -21,7 +21,13 @@ public final class ReportSource {
 
     public record Country(long frameId, String code) {}
 
-    public record Person(long frameId, long personId, String name, String profileUrl, Role role) {}
+    public record Person(
+            long frameId,
+            long personId,
+            String name,
+            String originalName,
+            String profileUrl,
+            Role role) {}
 
     public enum Role {
         DIRECTOR,
