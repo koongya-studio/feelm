@@ -1,7 +1,7 @@
 # 이벤트·Redis 계약 — Spring Boot ↔ Python Consumer ↔ Spark Structured Streaming
 
-[ADR-0017](../adr/0017-python-foldin-spark-trending-split.md)에 따라 사용자 단위 Fold-in과 전역 인기 집계를
-각각 Python Consumer와 Spark Structured Streaming으로 분리합니다. 이 문서는 Spring Boot, Python Consumer와
+[S15P21E106-625의 GBT v26 전환 결정](../../pipeline/docs/gbt-transition/README.md)에 따라 사용자 단위 GBT 추론과 전역 인기 집계를
+각각 Python Consumer와 Spark Structured Streaming으로 분리합니다. 기존 [ADR-0017](../adr/0017-python-foldin-spark-trending-split.md)의 토폴로지와 장애 격리는 유지하되 ALS vector 계약은 이 문서의 GBT 추천 상태 계약으로 대체합니다. 이 문서는 Spring Boot, Python Consumer와
 Spark가 주고받는 **Kafka 이벤트 스키마와 Redis 키 구조**의 계약 기준 문서입니다.
 
 **클라이언트에 공개되는 API가 아니며**, 공개 계약은 [API 명세](./README.md)를 따릅니다.
@@ -16,9 +16,9 @@ flowchart LR
     U["사용자 행동"] --> BE1["Spring Boot"]
     BE1 -->|"① PostgreSQL 저장"| PG[("PostgreSQL")]
     BE1 -->|"② 이벤트 발행"| KF["Kafka"]
-    KF -->|"평가 · 온보딩"| PC["Python Fold-in Consumer"]
+    KF -->|"평가 · 온보딩"| PC["Python GBT Consumer"]
     PG -->|"③ 사용자 평가 조회"| PC
-    PC -->|"④ Vector · TASTE 500 · DISCOVERY 100"| RD[("Redis")]
+    PC -->|"④ 추천 상태 · TASTE 500 · DISCOVERY 100"| RD[("Redis")]
     KF -->|"⑤ 조회 · 클릭 등 행동"| SS["Spark Structured Streaming"]
     SS -->|"⑥ 행동 Feature · 인기"| RD
     RD -->|"⑦ Candidate · 행동 Feature · 인기 조회"| BE2["Spring Boot"]
@@ -27,7 +27,7 @@ flowchart LR
 ```
 
 **①이 ②보다 먼저**여야 합니다. 순서가 바뀌면 Python Consumer가 ③에서 조회할 때 방금 저장한 평가가 보이지 않습니다.
-Python Consumer는 ④에서 `vector`·`candidates`와 version 키를 원자적으로 갱신합니다.
+Python Consumer는 ④에서 `recommendation-state`·`candidates`와 version 키를 원자적으로 갱신합니다.
 
 ## 2. 책임 경계
 
@@ -35,7 +35,7 @@ Python Consumer는 ④에서 `vector`·`candidates`와 version 키를 원자적�
 |---|---|---|
 | 사용자 행동 이벤트 발행 | Spring Boot | PostgreSQL 저장 성공 후 발행 |
 | Candidate 게시 완료 알림 발행 | Python Consumer | Redis 원자 게시와 Kafka 확인 이후 원본 Offset 커밋 |
-| Fold-in · User Vector 계산 | Python Consumer | ADR-0017 |
+| GBT 입력 스냅샷 확인 · 사용자별 영화 점수 계산 | Python Consumer | S15P21E106-625·627 |
 | TASTE 최대 500편 · DISCOVERY 최대 100편 갱신 | Python Consumer | ADR-0017, S15P21E106-415 |
 | 행동 Feature 집계 | Spark Streaming | ADR-0017 |
 | 전역 인기 영화 윈도우 집계 | Spark Streaming | FR-27, ADR-0017 |
@@ -65,7 +65,7 @@ Spark가 미리 제외하려면 제외 목록의 복제본을 상태로 유지�
 
 ### 2.2 Python Consumer가 PostgreSQL을 직접 조회하는 범위
 
-Fold-in은 사용자의 평가 전체를 입력으로 하며, Python Consumer는 이를 **읽기 전용 롤**로 PostgreSQL에서 조회합니다.
+GBT는 사용자의 평가·관심없음과 같은 확정 입력 전체를 사용하며, Python Consumer는 이를 **읽기 전용 롤**로 PostgreSQL에서 조회합니다.
 
 - 대상: `ratings`(`user_id`, `movie_id`, `score`), `watch_records`의 확정 감상 상태,
   `user_movie_dismissals`. `onboarding_preferences`는 화면·감사 기록으로 유지하지만 Consumer 계산 입력으로
@@ -90,7 +90,7 @@ Consumer 후보에는 영화 표시용 메타데이터를 넣지 않고 구조�
 | 영화 대표 맛(`representative_flavor_code`) | **HDFS immutable movie metadata snapshot** | 후보와 같은 artifact revision으로 읽는다 |
 | 영화별 OTT 제공처·사용자 클릭 | **PostgreSQL** | `movie_ott_providers`·`otts`·`watch_records`가 원본이며 Spring이 재정렬 시 조회한다 |
 
-`TASTE`는 사용자의 평가를 Fold-in에 반영한 기본 순위 최대 500편이다. 온보딩 LIKE·DISLIKE도 각각
+`TASTE`는 사용자의 평가를 GBT 특징으로 변환해 계산한 기본 순위 최대 500편이다. 온보딩 LIKE·DISLIKE도 각각
 `4.0`·`2.0` 평가 행으로 저장되므로 같은 입력을 사용한다. `DISCOVERY`는
 `group-serving-artifacts-v1`의 고정 8×128 영화 그룹으로 만드는 별도 순위다. 상위 `taste_id` 0~7은
 `FLAVOR_A`~`FLAVOR_H`와 대응하지만, 저이력·신규성 판정과 후보 선발은 내부 `child_id`·`group_id`
@@ -110,6 +110,9 @@ Consumer 후보에는 영화 표시용 메타데이터를 넣지 않고 구조�
 
 #### 구현·운영 책임 경계
 
+- S15P21E106-742: GBT 추천 상태·파티 입력 참조의 공통 계약과 Backend reader/이벤트 연결
+- S15P21E106-627: 같은 generation의 불변 사용자 입력 스냅샷과 상태·Candidate 원자 게시
+- S15P21E106-747: 파티 공통 후보를 같은 GBT로 구성원별 재점수화하고 결정적으로 집계
 - S15P21E106-415: Consumer의 DISCOVERY 후보 생성과 로컬 정책 검증
 - S15P21E106-471: Redis Candidate v3 `taste`/`discovery` 그룹화와 `generationId` writer 기준선
 - S15P21E106-481: TASTE 후보별 구조화 단일 `reason` 객체를 추가한 Candidate v4 writer·payload 기준선
@@ -133,25 +136,9 @@ PostgreSQL 집계는 동일한 `FLAVOR_A`~`FLAVOR_H` 체계를 사용합니다.
 - 배치 스냅샷의 신선도는 하루이며, 신규 영화는 다음 야간 배치 이후 추천 대상이 된다
 - `movies` · `genres` · `movie_genres` · `popcorn_flavors`는 Python Consumer와 Spark가 PG에서 직접 조회하지 않는다
 
-#### 매번 전체를 재계산해도 되는 이유
+#### 매번 전체 입력 스냅샷을 다시 읽는 이유
 
-Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (Σ rᵢyᵢ)` 이며,
-`m`은 Factor를 가진 입력 수입니다. A와 B가 모두 합이므로 증분 누적도 가능합니다.
-그러나 누적값을 별도 저장소나 Streaming 상태로 유지해야 하고, 평가 수정·삭제 시 이전 값 차감,
-재학습 시 무효화, 중복 이벤트에 대한 이중 반영 방지가 각각 필요합니다.
-
-전체 재계산을 선택한 이유는 절약되는 비용이 크지 않기 때문입니다. 참고 측정값(단일 노드 numpy, `k=64`,
-영화 87,000편 기준이며 EC2 실측이 아님)은 다음과 같습니다.
-
-| 단계 | 평가 500편 | 평가 수에 비례 |
-|---|---|---|
-| Fold-in 재계산(A·b + 선형 풀이) | 약 0.12ms | 비례하나 미미 |
-| 후보 전체 점수 계산 | 약 0.63ms | 무관(고정) |
-| Top-500 추출 | 약 0.30ms | 무관(고정) |
-
-지배적인 비용은 사용자 벡터가 바뀔 때마다 어차피 수행해야 하는 후보 점수 계산이며, 증분 방식으로
-절약되는 부분은 전체의 10% 미만입니다. 실제로는 Structured Streaming의 micro-batch 고정 오버헤드가
-이보다 훨씬 크므로, 상태를 두지 않는 단순한 구조를 우선합니다.
+Consumer는 이벤트 payload의 과거 값을 누적하지 않고 현재 PostgreSQL 입력과 고정된 특징·카탈로그·매핑 revision으로 GBT 입력을 다시 만듭니다. 평가 수정·삭제와 관심없음 취소가 자연스럽게 현재 상태로 수렴하고, 중복 이벤트가 점수를 이중 반영하지 않기 때문입니다. 입력 canonical hash와 generation을 상태·Candidate에 함께 기록하므로 부분 게시나 다른 입력 세대 혼합은 Backend와 파티 Consumer 양쪽에서 거절할 수 있습니다. 처리량·CPU 인수 조건은 644, 실제 게시와 종단 복구는 628/735에서 검증합니다.
 
 ## 3. 공통 규약
 
@@ -161,7 +148,7 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 - Topic 이름: `feelm.<이벤트>.v1`. 계약이 깨지는 변경만 `v2`를 병행했다가 이전 버전을 제거한다
 - 파티션 키: 공통 사용자 행동 이벤트(`RATING`·`ONBOARDING`·`DISMISS`·`VIEW`·`RECOMMENDATION_CLICK`·`OTT_CLICK`)는 `userId`를 Kafka `LongSerializer`로 직렬화한 8바이트 big-endian signed long이다. JSON 본문의 `userId`는 숫자로 유지한다. `candidate-updated` 알림의 키 형식은 아래 별도 계약을 따른다. 같은 Topic의 같은 Partition 안에서 Kafka에 실제 기록된 순서를 보장한다
 - Redis 키 이름: `feelm:<대상>:<식별자>:<용도>`
-- Consumer Group: Python Fold-in과 Spark Streaming은 서로 다른 Group을 사용하며 Offset·Checkpoint를 공유하지 않는다
+- Consumer Group: Python GBT Consumer와 Spark Streaming은 서로 다른 Group을 사용하며 Offset·Checkpoint를 공유하지 않는다
 
 ## 4. Kafka 이벤트
 
@@ -169,7 +156,7 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 
 | Topic | eventType | 발행 시점 | 처리 | 신호 |
 |---|---|---|---|---|
-| `feelm.rating.v1` | `RATING` | 별점 등록·수정·삭제 | Fold-in → TASTE 최대 500편·DISCOVERY 최대 100편 | 강함 |
+| `feelm.rating.v1` | `RATING` | 별점 등록·수정·삭제 | GBT 재계산 → TASTE 최대 500편·DISCOVERY 최대 100편 | 강함 |
 | `feelm.rating.v1` | `ONBOARDING` | 초기 취향 제출(API-024) | 위와 동일 | 강함 |
 | `feelm.dismiss.v1` | `DISMISS` | 관심없음(API-047) | 부정 신호로 점수 반영 | 중간 |
 | `feelm.view.v1` | `VIEW` | 영화 상세 조회 | 행동 Feature · 전역 인기 집계 | 약함 |
@@ -212,8 +199,8 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 ```
 
 - `action`: `CREATE` / `UPDATE` / `DELETE`. `DELETE`는 `score`를 생략한다
-- `CREATE`·`UPDATE`의 `score`는 API-036과 같은 0.5~5.0점, 0.5점 단위의 JSON 숫자다. DB 조회·이벤트 직렬화·Fold-in 입력에서 정수로 절삭하지 않는다
-- Python Consumer는 `action`을 계산에 사용하지 않고 로깅에만 사용한다. 어떤 값이든 처리는 "해당 사용자 Fold-in 재계산"으로 동일하다
+- `CREATE`·`UPDATE`의 `score`는 API-036과 같은 0.5~5.0점, 0.5점 단위의 JSON 숫자다. DB 조회·이벤트 직렬화·GBT 입력에서 정수로 절삭하지 않는다
+- Python Consumer는 `action`을 계산에 사용하지 않고 로깅에만 사용한다. 어떤 값이든 처리는 "해당 사용자 GBT 상태·후보 재계산"으로 동일하다
 
 **`ONBOARDING`**
 
@@ -277,29 +264,42 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 ```
 
 - Kafka 키는 `userId`의 UTF-8 십진 문자열(예: `"1024"`), 값은 위 JSON이다. `null` 값·빈 payload·공통 봉투를 사용하지 않는다.
-- Python Consumer가 `vector`·`candidates`의 원자 게시에 성공한 뒤 발행한다. Kafka 수신 자체가 후보 갱신 알림이며 `occurredAt`을 비교하지 않는다.
+- Python Consumer가 `recommendation-state`·`candidates`의 원자 게시에 성공한 뒤 발행한다. Kafka 수신 자체가 후보 갱신 알림이며 `occurredAt`을 비교하지 않는다.
 - Spring의 개인 추천 Consumer는 파티 Consumer와 독립된 group에서 알림을 받는다. 현재 Redis Candidate를 읽어 개인 버퍼를 저장·커밋한 뒤 offset을 확정한다. 알림보다 새 generation이 이미 게시됐으면 현재 Redis generation을 사용하며, 같은 generation의 재전달은 기존 세트를 재사용한다. 새 세트는 API-045의 최신 세트로 즉시 노출된다. 이전 세트의 노출·추천 이력은 보존한다. 유효한 알림의 Redis·DB 장애는 offset을 확정하지 않고 재시도한다. 형식이 잘못된 알림, 비활성·삭제된 사용자, 필터 후 저장 가능한 후보가 없는 경우는 새 세트 없이 offset을 확정한다.
-- 알림은 중복되거나 더 새 Candidate 게시 뒤 도착할 수 있다. Spring은 관련 활성 파티별 지속성 있는 refresh 요청을 DB에 저장한 뒤 수신 offset을 확정한다. 대기 중 중복 요청은 파티별로 합친다. 처리 작업자는 현재 Redis 값을 다시 읽고, 파티원별 `vector`·`candidates`를 한 번의 Redis 읽기로 가져와 두 값의 `generationId`·`modelVersion` 일치를 확인한다.
-- Spring은 이 최신 전체 입력으로 `feelm.party-refresh.v1` 이벤트를 만든다. 벡터와 후보 목록은 Candidate 게시 완료 알림에 싣지 않는다. 파티 구성 변경 때도 같은 DB 요청을 저장한다. Redis 장애나 불완전 입력은 요청을 남겨 재시도하며 파티 API를 실패시키지 않는다. 종료된 파티의 요청은 계산 이벤트 없이 정리한다.
+- 알림은 중복되거나 더 새 Candidate 게시 뒤 도착할 수 있다. Spring은 관련 활성 파티별 지속성 있는 refresh 요청을 DB에 저장한 뒤 수신 offset을 확정한다. 대기 중 중복 요청은 파티별로 합친다. 처리 작업자는 현재 Redis 값을 다시 읽고, 파티원별 `recommendation-state`·`candidates`를 한 번의 Redis MGET으로 가져와 `modelVersion`·`servingRevision`·`generationId`·`inputSchemaVersion`·`inputHash` 일치를 확인한다.
+- Spring은 이 최신 전체 입력으로 `feelm.party-refresh.v1`의 schema v2 이벤트를 만든다. 전체 평가나 영화 특징은 Kafka에 복사하지 않고 627이 게시한 불변 입력 스냅샷의 사용자·세대·schema·hash만 참조한다. 파티 구성 변경 때도 같은 DB 요청을 저장한다. Redis 장애나 불완전 입력은 요청을 남겨 재시도하며 파티 API를 실패시키지 않는다. 종료된 파티의 요청은 계산 이벤트 없이 정리한다.
 
 **파티 입력 갱신 — `feelm.party-refresh.v1`**
 
 ```json
 {
+  "schemaVersion": 2,
   "partyId": 9001,
   "inputId": "sha256:<party-snapshot-digest>",
+  "modelVersion": "gbt-v26-20260923",
+  "servingRevision": "gbt-v26-feature71-catalog20260923-policy1",
   "members": [
-    {"userId": 1024, "vector": [0.1, 0.2], "candidateMovieIds": [550, 807]}
+    {
+      "userId": 1024,
+      "generationId": "550e8400-e29b-41d4-a716-446655440000",
+      "inputSchemaVersion": "gbt-input-v1",
+      "inputHash": "sha256:<immutable-user-input-digest>",
+      "candidateMovieIds": [550, 807]
+    }
   ]
 }
 ```
 
-- Kafka 키는 `partyId`를 Kafka `LongSerializer`로 직렬화한 8바이트 정수다. 값은 위 전용 JSON이며 공통 사용자 이벤트 봉투를 사용하지 않는다. 멤버는 1~4명, `userId` 오름차순이고 `candidateMovieIds`는 사용자 선호 순서의 중복 없는 최대 600개다. 빈 vector는 허용한다.
-- Spring은 각 파티원의 Redis vector·candidates를 한 번에 읽어 같은 `generationId`·`modelVersion`인지 확인한다. 모든 파티원 모델 버전이 현재 SERVING 모델과 같을 때만 발행한다.
-- `inputId`는 Spring이 `partyId`, 모델 버전, 정렬된 파티원 `userId`·`generationId`에서 결정적으로 만든 식별자다. 파티 Consumer는 이를 그대로 결과에 돌려주고 자신이 로드한 `modelVersion`도 기록한다. Spring은 결과를 사용할 때 현재 파티 구성·사용자 세대로 `inputId`를 다시 만들고 결과의 모델 버전도 현재 모델과 비교한다.
-- Kafka 이벤트에는 `modelVersion`과 파티원별 `generationId`를 싣지 않는다. 파티 Consumer는 게시 Lua 안에서 자신이 로드한 버전과 Redis `feelm:model:current.modelVersion`이 같은지 확인한다. 모델 교체로 달라졌다면 기존 파티 결과와 Offset을 유지하고 현재 산출물로 재시작한다.
+- Kafka 키는 `partyId`를 Kafka `LongSerializer`로 직렬화한 8바이트 정수다. 값은 위 전용 JSON이며 공통 사용자 이벤트 봉투를 사용하지 않는다. 멤버는 1~4명, `userId` 오름차순이고 `candidateMovieIds`는 사용자 선호 순서의 중복 없는 최대 600개다. schema v2에는 `vector`·`factorDimension`을 두지 않는다.
+- Spring은 모든 파티원의 GBT 상태와 Candidate가 현재 `feelm:model:current`의 `modelVersion`·`servingRevision`과 같을 때만 발행한다. 한 사용자 안에서도 상태와 Candidate의 generation·입력 참조가 모두 같아야 한다. 사용자 사이의 `generationId`가 같을 필요는 없다.
+- `inputId`는 Spring이 `partyId`, `modelVersion`, schema version, `servingRevision`, 정렬된 파티원별 `userId`·`generationId`·`inputSchemaVersion`·`inputHash`에서 길이 구분 SHA-256으로 결정한다. 모델·특징·카탈로그·매핑·정책·구성원·사용자 입력 중 하나가 바뀌면 달라지고 같은 Kafka record 재처리에서는 같다.
+- 파티 Consumer는 payload가 가리키는 불변 입력 스냅샷의 userId·generation·schema·hash를 모두 검증한 뒤 같은 GBT와 특징 변환으로 재점수화한다. 결과에는 `inputId`와 `modelVersion`을 그대로 기록한다. Spring은 결과 사용 시 현재 입력으로 `inputId`를 다시 계산하고 결과 모델 버전도 비교한다.
 - 파티별 대기 요청은 하나로 합치되, 처리 완료 후 같은 `inputId`가 다시 발행될 수 있다. 파티 Consumer는 해당 파티 Redis 값을 원자적으로 교체하며 Spring은 조회 시 현재 `inputId`와 모델 버전을 다시 비교한다.
 - 파티 refresh 아웃박스는 같은 파티의 앞선 이벤트가 Kafka에 기록되고 `PUBLISHED`로 확정될 때까지 후속 이벤트를 발행하지 않는다. 다른 파티와 사용자 이벤트의 발행은 계속한다. `partyId` Kafka 키로 같은 파티의 순서를 한 partition에 고정하고, 파티 Consumer는 Redis 게시와 아래 완료 알림의 broker ACK가 모두 성공한 뒤 해당 record의 Offset만 동기 커밋한다.
+
+schema가 없는 기존 vector형 payload는 v1이며 schema v2 GBT 입력으로 해석하지 않는다. 전환 때는 (1) 새 Consumer가 v1을 식별해 기존 처리로 소진할 수 있는 상태로 먼저 배포하고, (2) 627의 사용자 상태·입력 스냅샷 전체 게시를 검증하고, (3) `model:current.modelKind=GBT`를 전환한 뒤 Backend가 v2를 발행하게 하며, (4) 모든 활성 파티 refresh를 다시 요청한다. v2 Consumer는 snapshot 부재·hash 불일치·지원하지 않는 schema를 처리 성공으로 커밋하지 않고 기존 파티 결과를 유지한다. 구형 v1이 뒤늦게 도착하면 GBT 결과를 덮어쓰지 않고 offset만 소진한 뒤 해당 파티의 v2 refresh를 다시 요청한다. 구체적인 전체 전환·rollback 실행은 628/735 runbook에서 검증한다.
+
+S15P21E106-742는 v1/v2 식별과 직렬화 계약까지만 제공한다. 늦은 v1의 drain 후 v2 재요청, v2 snapshot/schema 오류의 격리·재시도와 partition 진행, 실제 GBT 점수 계산은 S15P21E106-747이 소유한다. 747의 runner 통합 테스트와 배포가 완료되기 전에는 `feelm:model:current.modelKind=GBT`로 전환하지 않으며 Backend v2 발행을 활성화하지 않는다.
 
 **파티 raw Candidate 게시 완료 알림 — `feelm.party-candidate-updated.v1`**
 
@@ -307,7 +307,7 @@ Fold-in은 Spark ALS-WR 정규화와 같은 `x = (Σ yᵢyᵢᵀ + λmI)⁻¹ (�
 {
   "partyId": 9001,
   "inputId": "sha256:<party-snapshot-digest>",
-  "modelVersion": "als-2026-09-18",
+  "modelVersion": "gbt-v26-20260923",
   "generatedAt": "2026-09-18T12:00:00Z",
   "sourcePartition": 1,
   "sourceOffset": 1234
@@ -336,7 +336,7 @@ Kafka는 장애 상황에서 같은 메시지를 두 번 전달할 수 있습니
 - Python Consumer의 재시작 위치는 전용 Consumer Group Offset으로, Spark의 재시작 위치는 전용 Checkpoint로 각각 보존한다(ADR-0017)
 - Python Consumer가 연속된 같은 `userId`의 `RATING`을 함께 가져오면 `userId`로 묶어 마지막 DB 상태 기준 1회만 계산할 수 있다
 
-Python Consumer는 **Redis `vector`·`candidates` 기록과 Candidate 게시 완료 알림의 Kafka 전달 확인이 모두 성공한 뒤**
+Python Consumer는 **Redis `recommendation-state`·`candidates` 기록과 Candidate 게시 완료 알림의 Kafka 전달 확인이 모두 성공한 뒤**
 원본 `RATING`/`ONBOARDING`/`DISMISS` Offset을 커밋합니다. 중간 실패로 재시도되면 같은 DB 상태를 다시 읽고
 새 `generationId`로 게시할 수 있으므로 완료 알림은 at-least-once로 취급합니다.
 
@@ -362,13 +362,13 @@ position의 알림이 다시 발행될 수 있으며 Spring의 완료 상태 ups
 강한 신호의 최종 경로는 다음 순서로 고정합니다.
 
 1. Spring이 `RATING`, `ONBOARDING` 또는 `DISMISS`를 발행한다.
-2. Python Consumer가 PostgreSQL의 현재 평가·관심없음을 한 snapshot으로 다시 읽어 User Vector와 후보를 재계산한다.
-3. Python Consumer가 ALS·콘텐츠 지원 범위별 백분위를 결합한 TASTE 최대 500편을 만들고, 그룹 산출물을
+2. Python Consumer가 PostgreSQL의 현재 평가·관심없음을 한 snapshot으로 다시 읽고 GBT 입력 특징과 후보 점수를 계산한다.
+3. Python Consumer가 GBT 원점수의 TASTE 최대 500편을 만들고, 그룹 산출물을
    활성화한 경우 DISCOVERY 최대 100편도 만든다. Spring은 서비스 DB 미존재·평가·관심없음 후보만
    제외하고 종류별 점수 정렬과 동점 결정적 셔플 후 TASTE를 최대 50편 저장하고, DISCOVERY는
    저장된 TASTE와 겹치는 영화를 건너뛰어 다음 고유 후보로 최대 50편 채운다. Consumer의
    구조화 `reasons[]`는 원본 그대로 스냅샷한다.
-4. Python Consumer가 `feelm:user:{userId}:candidate-version`, `feelm:user:{userId}:vector`, `feelm:user:{userId}:candidates`을 Lua 스크립트 한 번으로 원자적으로 기록한다. `candidate-version` String은 성공한 게시마다 증가하는 게시 순번이며, `vector`와 `candidates` JSON은 같은 `candidateVersion`(형식 버전)과 `generationId`(한 번의 생성 결과 식별자)를 가진다.
+4. Python Consumer가 `feelm:user:{userId}:candidate-version`, `feelm:user:{userId}:recommendation-state`, `feelm:user:{userId}:candidates`를 Lua 스크립트 한 번으로 원자적으로 기록한다. `candidate-version` String은 성공한 게시마다 증가하는 게시 순번이며, 상태와 Candidate는 같은 `modelVersion`·`servingRevision`·`generationId`·`inputSchemaVersion`·`inputHash`를 가진다.
 
 Consumer group에서 partition을 새로 assign받은 Consumer는 먼저 partition별 fencing key에 새 CSPRNG opaque
 token을 설치한다. 후보 게시 Lua와 corrupt/partial 3키 복구 Lua는 전달된 token이 현재 key와 일치할 때만
@@ -397,7 +397,8 @@ Spring은 `candidates` JSON을 한 번 읽어 해당 버전의 후보 전체를 
 | 키 | 타입 | 쓰기 | 읽기 | TTL |
 |---|---|---|---|---|
 | `feelm:user:{userId}:candidate-version` | String(정수) | Python Consumer | Python Consumer | 없음 |
-| `feelm:user:{userId}:vector` | String(JSON) | Python Consumer | Python Consumer · Spring(파티 입력 생성) | 없음 |
+| `feelm:user:{userId}:recommendation-state` | String(JSON) | Python Consumer | Python Consumer · **Spring** | 없음 |
+| `feelm:user:{userId}:vector` | String(JSON) | 기존 Python Consumer | 전환 전 기존 Consumer · Spring | 없음. GBT 전환 뒤 읽지 않고 rollback 기간 후 정리 |
 | `feelm:user:{userId}:candidates` | String(JSON) | Python Consumer | Python Consumer · **Spring** | 없음 |
 | `feelm:party:{partyId}:candidates` | String(JSON) | 파티 전용 Python Consumer | Spring | 없음 |
 | `feelm:consumer-fence:{groupId}:{topic}:{partition}` | String(opaque CSPRNG token) | Python Consumer | Python Consumer | 없음 |
@@ -414,8 +415,8 @@ Spring은 `candidates` JSON을 한 번 읽어 해당 버전의 후보 전체를 
 | `feelm:trending:bucket:committed-hour:{yyyyMMddTHHZ}` | Set(기록 완료된 5분 시각) | Spark | Spark | 마지막 쓰기 후 4시간 |
 | `feelm:model:current` | String(JSON) | Spark Batch | Python Consumer · Spring | 없음 |
 
-**Spring은 개인 추천에 사용자 `candidates` · `behavior` · `model:current`를 읽습니다.** 파티 입력
-생성 시 사용자 `vector`·`candidates`를 함께 읽고, 파티 결과에는 별도 파티 `candidates`를 읽습니다.
+**Spring은 개인 추천에 사용자 `recommendation-state`·`candidates`·`behavior`·`model:current`를 읽습니다.** 파티 입력
+생성 시 사용자 상태·Candidate를 한 MGET으로 읽고, 파티 결과에는 별도 파티 `candidates`를 읽습니다.
 
 급상승 `bucket` 키는 고유 조회자 계산을 위한 내부 임시 상태다. 회원 ID 집합은 Spark
 급상승 작업만 읽고 쓰며 API 응답·로그에는 넣지 않는다. 탈퇴 전 발생한 정상 `VIEW`는
@@ -442,44 +443,54 @@ monotonic coordinator 없이는 구별할 수 없으므로 이 계약의 fencing
 
 | Spring이 읽는 키 | 용도 |
 |---|---|
+| 사용자 `recommendation-state` | 개인·OTT Candidate 세대 검증 · 파티 입력 스냅샷 참조 |
 | 사용자 `candidates` | 개인 추천 후보 · 파티 Consumer 입력 스냅샷 · **OTT 구독 추천**(API-068) |
 | 파티 `candidates` | 파티 Consumer가 계산한 raw Candidate. Spring이 제외·부가 신호를 반영해 최종 재정렬 |
 | `behavior` | 새 개인 추천 세트를 만들 때 `candidates`에 적용할 최근 행동 Feature |
 | `trending:current` · `trending:last-good` | 급상승 영화 최신·대체 스냅샷(API-064) |
-| `model:current` | `modelVersion` 확인과 이력 저장 |
+| `model:current` | `modelKind`·`modelVersion`·`servingRevision` 확인과 이력 저장 |
 
 Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점수를 집계합니다. 파티에서는 전용 Consumer가
 별도 게시한 raw Candidate를 현재 `inputId`·모델 버전 확인 후 재정렬합니다.
 
 ### 5.2 값 구조
 
-**`feelm:user:{userId}:vector`**
+**`feelm:user:{userId}:recommendation-state`**
 
 ```json
 {
-  "modelVersion": "als-2026-09-05",
-  "candidateVersion": 6,
+  "stateVersion": 1,
+  "userId": 1024,
+  "modelKind": "GBT",
+  "modelVersion": "gbt-v26-20260923",
+  "servingRevision": "gbt-v26-feature71-catalog20260923-policy1",
   "generationId": "550e8400-e29b-41d4-a716-446655440000",
-  "vector": [0.132, -0.041, "... 64개"],
+  "inputSchemaVersion": "gbt-input-v1",
+  "inputHash": "sha256:<immutable-user-input-digest>",
   "ratingCount": 42,
-  "factorBackedInputCount": 39,
+  "dismissCount": 3,
+  "supportedInputCount": 45,
   "updatedAt": "2026-08-31T07:21:03Z"
 }
 ```
 
-- `ratingCount`는 PostgreSQL에 저장된 실제 `RATING` 입력 수다. DISMISS 기반 가상 평점 입력은
-  포함하지 않는다.
-- `factorBackedInputCount`는 ALS Item Factor가 있어 실제 Fold-in 계산에 참여한 `RATING`과
-  DISMISS 기반 가상 평점 입력의 합이다. 따라서 실제 평가보다 factor-backed 관심없음 입력이 추가되면
-  `factorBackedInputCount`가 `ratingCount`보다 클 수 있다.
+- `servingRevision`은 모델·순서 고정 특징 schema·카탈로그·서비스 movieId 매핑·정책 버전 조합을 식별하는 1~100자의 공백 아닌 불변 문자열이다. 이 구성 중 하나라도 바뀌면 새 revision을 사용한다. `modelVersion`은 기존 파티 결과·DB 이력과 호환되는 1~50자의 `[a-z0-9][a-z0-9._-]*` 모델 식별자다. Java publisher와 Python consumer는 이 경계를 같은 fixture로 검증한다.
+- `generationId`는 한 사용자의 상태와 Candidate를 한 번 게시한 opaque 식별자다. `inputSchemaVersion`은 627이 게시한 불변 입력 스냅샷 형식, `inputHash`는 그 스냅샷의 canonical bytes에 대한 소문자 SHA-256이다.
+- `ratingCount`·`dismissCount`는 실제 평가·관심없음 원본 수, `supportedInputCount`는 해당 GBT 특징 계약으로 실제 계산 가능한 입력 수다. 세 값은 0 이상의 정수이며 vector 차원이나 ALS factor 지원 수로 재해석하지 않는다.
+- GBT Candidate에 위 revision·generation·입력 참조 중 하나라도 없거나 상태와 다르면 Spring은 부분 게시로 거절한다. 다른 사용자 ID의 상태를 대신 읽을 수도 없다.
+
+기존 `feelm:user:{userId}:vector`는 `model:current`에 `modelKind`가 없던 v1 ALS 전환 전 계약으로만 읽는다. GBT 활성 상태에서는 키가 남아 있어도 읽거나 fallback하지 않는다. rollback 보존 기간이 끝난 뒤 735에서 정리한다.
 
 **`feelm:user:{userId}:candidates`** — Spring이 파티 입력·OTT 집계에 읽는 후보 점수
 
 ```json
 {
-  "modelVersion": "als-2026-09-05",
+  "modelVersion": "gbt-v26-20260923",
+  "servingRevision": "gbt-v26-feature71-catalog20260923-policy1",
   "candidateVersion": 6,
   "generationId": "550e8400-e29b-41d4-a716-446655440000",
+  "inputSchemaVersion": "gbt-input-v1",
+  "inputHash": "sha256:<immutable-user-input-digest>",
   "taste": [{
     "movieId": 807,
     "score": 4.32,
@@ -515,20 +526,16 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
   `type` 필드는 두지 않는다.
 - `score`는 별점이나 사용자 간 절대 비교값이 아니라 **같은 사용자·같은 생성 결과 안의 상대 순위
   점수**다. 값이 클수록 해당 배열 안에서 먼저 추천한다는 순서만 계약으로 보장한다.
-- 계산식과 범위는 현재 고정하지 않는다. Consumer는 활성 모델이 만든 상대 점수를 추가 정규화하지
-  않고 게시하므로 ALS 전용·ALS+콘텐츠·향후 다른 모델의 값 범위가 서로 다를 수 있다. 여러 모델의
+- 계산식과 범위는 현재 고정하지 않는다. Consumer는 활성 GBT가 만든 상대 점수를 추가 정규화하지
+  않고 게시하므로 모델 revision별 값 범위가 서로 다를 수 있다. 여러 모델의
   점수를 한 목록에서 통합하거나 사용자 간 값을 집계해야 할 때 별도 정규화·버전 계약을 확정한다.
 
-- 콘텐츠 산출물이 설정되면 MovieLens에 연결되지 않은 영화(평점이 없어 ALS Factor가 없는 영화)도
-  후보에 포함된다. 한 컴포넌트만 지원하는 영화는 그 컴포넌트의 순위를 그대로 받는다(S15P21E106-315 규칙).
+- GBT 특징·카탈로그·서비스 movieId 매핑을 모두 만족하는 영화만 후보에 포함한다. 지원 여부는 같은 `servingRevision`의 immutable 산출물로 판정하고 Backend가 추측해 보충하지 않는다.
 - 동점은 같은 값을 받고, 동일 점수 안의 결정론적 순서는 `movieId` 오름차순이다.
-- **유효 입력 수로 후보 계산을 제한하지 않는다.** 서로 다른 평가 입력이 1편뿐이어도 가용한
-  ALS·콘텐츠 성분으로 후보를 게시한다. 입력이 없거나 그 이력으로 어떤 성분도 사용자 프로필을 만들지
-  못하면 ALS에 매핑된 서비스 영화와 콘텐츠 지원 영화의 합집합에 모두 `0.0`을 부여하고 `movieId`
-  오름차순으로 TASTE를 게시한다. 후보 모집단 자체가 비어 있을 때만 세 키를 갱신하지 않는다.
+- **유효 입력 수로 지원되는 GBT 추론을 임의 제한하지 않는다.** K≥1의 지원 입력은 모두 사용한다. K0·지원 입력 없음·후보 부족은 483의 명시적 fallback 상태로 구분하며, 구현 전에는 가짜 0점이나 ALS 필드를 만들어 정상 GBT 결과처럼 게시하지 않는다.
 - 온보딩 LIKE/DISLIKE를 **실제 별점 행으로 저장한다**(팀 결정 2026-09-18, S15P21E106-647). LIKE는
   `4.0`, DISLIKE는 `2.0`이며 `onboarding_preferences` 행도 화면·감사 기록으로 남는다. Consumer는
-  S15P21E106-649부터 `ratings`만 Fold-in·콘텐츠·DISCOVERY 계산 입력으로 사용한다. 과거 ALS adapter의
+  S15P21E106-649부터 `ratings`만 개인 GBT·DISCOVERY 계산 입력으로 사용한다. 과거 ALS adapter의
   온보딩 보정 상수와 이진 LIKE/DISLIKE 방향 fallback은 제거했다. S15P21E106-648 소급 migration이
   적용되지 않은 환경에는 이 Consumer를 배포하지 않으며, 전환 전 설명되지 않은 미보정 행이 0건인지
   확인한다. migration 뒤 사용자가 평가를 삭제해 `WATCHED_UNRATED`로 돌아가고 rating·frame이 함께
@@ -553,9 +560,7 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
   400개 이상인 사용자도 있고 30개 미만(최대 244편 동점)인 사용자도 있다. 같은 점수 안의 순서는
   `movieId` 오름차순일 뿐 선호 순서가 아니므로, **노출 순서는 Spring의 재정렬 결과를 따른다.**
   같은 이유로 상위 500 컷은 동점 무리의 중간을 자를 수 있으며, 그때 탈락 여부도 `movieId`가 정한다.
-- 사용자 Candidate의 `score`는 사용자 간 직접 비교하지 않는다. 파티 집계는 사용자별 ALS 적합도와
-  후보 순위 fallback을 각각 percentile로 정규화한 `party-mean-fit-v2`를 사용하며, 최종 소비 규칙은
-  party.md API-058을 따른다.
+- 사용자 Candidate의 `score`는 사용자 간 직접 비교하지 않는다. 파티 집계는 747에서 같은 GBT로 공통 후보를 구성원별 재점수화하고 사용자별 midrank 백분위를 동등 가중 평균한다. 최종 소비 규칙과 공개 응답은 party.md API-058을 유지한다.
   OTT 구독 추천의 소비 범위와 대표 영화 정렬은 recommendation.md API-068을 따른다.
 - `candidateVersion`은 Candidate JSON 형식·구성 규칙과 허용 `reasons[].code` 버전이며 현재 `6`으로
   고정되어 후보 재생성만으로 바꾸지 않는다. `candidate-version` Redis String은 성공한 후보 게시마다
@@ -640,9 +645,8 @@ OTT 제공처는 `movie_ott_providers`·`otts`에서 조회하며, 사용자 클
 전환하기 전에 Consumer 전체 재구축 또는 사용자별 재게시로 모든 활성 후보를 새 형식으로 갱신해야 한다.
 `candidateVersion=3`은 두 배열 모두 근거가 없고, `candidateVersion=4`는 TASTE에만 단일 `reason` 객체가 있다.
 Candidate v5는 그룹 DISCOVERY 근거를 추가했고 각 TASTE·DISCOVERY 항목에 단일 `reason` 객체를 저장한다. Candidate v6는 개인 점수 보충 근거를 추가하고 항목별 `reasons[]` 배열을 저장한다. 전환 reader는 v5 단일 객체를 내부 `reasons[]` 스냅샷으로 변환한다.
-Candidate v6 전환 시 Backend는 v5와 v6를 함께 읽는 전환 reader를 먼저 반영한다. 이어서 Consumer v6 writer를
-전환하고 모든 활성 후보를 재게시한다. vector와 candidates의 `candidateVersion=6` 및 `generationId` 일치를
-확인한 뒤 Backend의 v5 호환을 제거한다. 최종 reader는 version 6 이외의 payload를 추측해 문구를 만들지 않고
+Candidate v6 전환 시 Backend는 v5와 v6를 함께 읽는 전환 reader를 먼저 반영했다. GBT 전환에서는 Candidate v6의 배열 형태는 유지하되 `recommendation-state`와 Candidate의 revision·generation·입력 참조 일치를
+확인한 뒤 Backend의 v5·legacy vector 호환을 제거한다. 최종 reader는 version 6 이외의 payload를 추측해 문구를 만들지 않고
 재시도 후 `503 RECOMMENDATION_UNAVAILABLE`을 반환한다.
 
 S15P21E106-471에서 Candidate v3 그룹화 writer를 반영했고, S15P21E106-481에서 TASTE 구조화 단일 `reason` 객체를
@@ -656,12 +660,14 @@ generation 일치 확인과 모바일 TASTE 2 + DISCOVERY 1·PC TASTE 3 + DISCOV
 
 ```json
 {
-  "modelVersion": "als-2026-09-05",
-  "embeddingModelVersion": "e5-2026-09-05",
-  "factorDimension": 64,
+  "modelKind": "GBT",
+  "modelVersion": "gbt-v26-20260923",
+  "servingRevision": "gbt-v26-feature71-catalog20260923-policy1",
   "trainedAt": "2026-09-05T18:00:00Z"
 }
 ```
+
+`modelKind=GBT`이면 Spring은 `servingRevision`을 필수로 검사하고 `factorDimension`을 요구하지 않는다. `modelKind`가 없는 기존 문서는 전환 전 ALS v1으로만 해석한다. 알 수 없는 `modelKind`, GBT revision 누락, 서로 다른 revision의 사용자 상태 혼합은 새 결과를 만들지 않는다.
 
 **`feelm:trending:current` · `feelm:trending:last-good`** — 비어 있지 않은 유효 B만 두 키에 같은 스냅샷으로 게시한다
 
@@ -684,7 +690,8 @@ generation 일치 확인과 모바일 TASTE 2 + DISCOVERY 1·PC TASTE 3 + DISCOV
 
 | 대상 | 정책 |
 |---|---|
-| `vector` · `candidates` | TTL 없음. 담당 처리기가 이벤트마다 덮어쓴다 |
+| `recommendation-state` · `candidates` | TTL 없음. 담당 처리기가 같은 Lua 게시에서 함께 덮어쓴다 |
+| 기존 `vector` | GBT 활성 뒤 읽지 않는다. rollback 보존 기간 후 735에서 정리한다 |
 | `behavior` | 키 단위 슬라이딩 TTL 8일. 필드는 일자 버킷이며 집계는 최근 7일분만 사용한다(아래) |
 | `trending:current` | 마지막 정상 게시부터 15분 보관. 게시가 멈추면 만료되어 마지막 정상 결과를 읽는다 |
 | `trending:last-good` | TTL 없음. 마지막 유효 B를 새 유효 B가 게시될 때까지 유지한다. Redis 자체 유실 후 B가 없음을 확인하면 초기 A를 사용한다 |
@@ -702,14 +709,14 @@ generation 일치 확인과 모바일 TASTE 2 + DISCOVERY 1·PC TASTE 3 + DISCOV
 
 ### 5.4 야간 배치 재구축
 
-ALS 재학습 배치가 끝나면 Python Consumer에 전체 사용자 추천 재구축을 요청해 Fold-in과 Candidate를 다시 생성합니다.
+GBT 모델·특징·카탈로그·매핑·정책 중 하나가 바뀌면 Python Consumer에 전체 사용자 추천 재구축을 요청해 새 입력 스냅샷 참조와 Candidate를 생성합니다.
 
 Consumer는 기동 시 고정된 model·mapping·movie metadata URI를 함께 검증한다. 모델 metadata의
 `mapping_revision`·`movie_metadata_revision`은 각 immutable snapshot의 자체 revision과 정확히
 일치해야 하며, 불일치면 기존 Redis 결과를 유지하고 새 게시를 시작하지 않는다. HDFS 인증정보는
 URI나 Redis에 저장하지 않고 runtime filesystem 설정으로 제공한다.
 
-- 재학습으로 Item Factor가 바뀌면 기존 User Vector와 후보가 모두 무효가 되므로 필수다
+- serving revision이 바뀌면 기존 사용자 상태와 후보를 새 revision 결과로 사용할 수 없으므로 필수다
 - 이벤트 유실이나 Redis 데이터 손실이 있어도 하루 한 번 정합이 회복된다
 - 완료 후 `feelm:model:current`를 갱신한다
 - 전체 재구축도 `candidates` 게시이므로 `candidate-version`은 사용자별 기존 값에서 이어서 증가시키며
@@ -747,9 +754,9 @@ Python Consumer나 Streaming 지연·장애 시에도 **마지막으로 성공�
 `generatedAt`이 오래되었다는 이유만으로 오류를 반환하지 않습니다.
 새 세트는 유효한 `candidates` 스냅샷으로만 생성합니다.
 
-`503 RECOMMENDATION_UNAVAILABLE`은 다음 경우에만 반환합니다.
+`503 RECOMMENDATION_UNAVAILABLE`은 다음 경우에 반환합니다.
 
-- `feelm:user:{userId}:candidates` 키가 없다(신규 사용자이며 아직 첫 계산이 끝나지 않음)
+- `recommendation-state` 또는 `candidates`가 없거나 revision·generation·입력 schema/hash가 다르다
 - 제외 필터 적용 후 남은 후보가 0편이다
 - Redis 연결 실패
 
@@ -762,24 +769,22 @@ Python Consumer나 Streaming 지연·장애 시에도 **마지막으로 성공�
 
 ### 6.3 콜드 스타트
 
-평가가 없는 사용자는 Fold-in 입력이 없어 벡터를 만들 수 없습니다.
-현재 Python Consumer는 서비스 가능한 영화에 `0.0` 동점 점수를 부여해 `TASTE`를 게시합니다.
-POPULAR 기반 순서와 개인 후보 모집단 밖 확장은 S15P21E106-483 이후 단계에서 개선합니다.
+GBT 특징 계약으로 계산 가능한 입력이 없는 K0 사용자는 `supportedInputCount=0`인 상태를 게시하되 가짜 vector나 factor 수를 만들지 않습니다. 실제 fallback 후보와 상태 구분은 S15P21E106-483이 구현하며, 그 전에는 지원 입력이 없는 사용자의 새 Candidate를 게시하지 않습니다.
 
 ## 7. 미정 사항
 
 이벤트 필드와 Redis 키의 나머지 값은 아래 항목이 확정된 뒤 갱신합니다.
 
 - [ ] Kafka 파티션 수와 복제 계수 — 인프라 담당 협의(EC2 2대 구성)
-- [ ] Python Fold-in Consumer와 Spark Streaming의 Consumer Group 이름·배포 환경변수 — 구현 업무에서 확정
+- [ ] Python GBT Consumer와 Spark Streaming의 Consumer Group 이름·배포 환경변수 — 구현 업무에서 확정
 - [ ] 행동 Feature 목록과 Re-ranking 가중치 — Re-ranking 설계에서 확정
 - [ ] 439 고정 8×128 그룹 기반 DISCOVERY 선정 방식·기준값과 저이력 사용자 처리 — Consumer 구현 완료, Backend 소비·감상 변경 재계산·운영 활성화 검증 대기
 - [ ] `candidates.taste` 후보 수 최대 500편 — 실데이터로 캘리브레이션. `discovery`는 정책상 최대 100편
 - [ ] 허용 지연 초기값과 Structured Streaming 트리거 주기 — 실측 후 확정
 - [ ] 비활성 사용자 Redis 키 정리 주기
 - [x] `candidate-version` 시작값·부분 유실 처리 — 신규 사용자 또는 Redis 전체 유실은 게시 순번을 `1`부터 시작한다. 버전 키만 없는데 결과 키 일부가 남으면 Consumer는 Lua 안에서 불완전한 결과 세 키를 함께 삭제한 뒤 `1`부터 재구축한다. JSON의 `candidateVersion`은 별도의 형식 버전이다.
-- [x] 콜드 스타트 임시 처리 주체 — Python Consumer가 `0.0` 동점 TASTE를 게시
-- [ ] 콜드 스타트 POPULAR 순서·후보 모집단 확장 — S15P21E106-483 이후
+- [x] 콜드 스타트 처리 주체 — S15P21E106-483이 K0 fallback 후보와 상태 구분을 구현하며, 그 전에는 `0.0` 동점 Candidate를 정상 GBT 결과로 게시하지 않는다
+- [ ] 콜드 스타트 POPULAR 순서·후보 모집단 확장 — S15P21E106-483에서 확정
 - [ ] 추천 이유 문장 생성 방식(템플릿 vs LLM) — 내부 API 명세에서 이월
 - [x] Kafka 발행 실패 시 재시도·보상 정책 — 폴링 기반 트랜잭셔널 아웃박스 채택(ADR-0018)
 - [ ] Python Consumer가 사용할 PostgreSQL 읽기 전용 롤의 계정 발급(접근 대상 테이블은 2.2에서 확정)
@@ -788,4 +793,4 @@ POPULAR 기반 순서와 개인 후보 모집단 밖 확장은 S15P21E106-483 �
 - [x] 파티 점수 집계식과 사용자 간 정규화 — `party-mean-fit-v2`, party.md API-058
 - [x] OTT 구독 추천 후보 범위 — API-068은 `taste` 최대 500편 전체를 사용하고 점수 임계치를 두지 않는다
 - [ ] 영화 메타데이터 HDFS 스냅샷의 산출 형식과 배치 시각 — 추천 모듈 환경(S15P21E106-130)에서 확정
-- [x] 온보딩 선택의 Fold-in 입력 — S15P21E106-649에서 실제 `ratings`로 단일화하고 보정 상수·이진 방향 fallback 제거
+- [x] 온보딩 선택의 추천 입력 — S15P21E106-649에서 실제 `ratings`로 단일화하고 보정 상수·이진 방향 fallback 제거

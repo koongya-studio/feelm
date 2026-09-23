@@ -16,6 +16,8 @@ def calculate_party_result(
     *,
     generated_at: str | None = None,
 ) -> dict[str, object]:
+    if refresh.schema_version != 1:
+        raise ValueError("party refresh schema v2 scoring is implemented by S15P21E106-747")
     movie_ids = sorted({movie_id for member in refresh.members for movie_id in member.candidate_movie_ids})
     factors: dict[int, Sequence[float]] = {}
     missing: list[int] = []

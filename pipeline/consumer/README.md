@@ -145,6 +145,18 @@ Kafka Group, 환경변수 prefix로 실행한다. `feelm.party-refresh.v1`의 8�
 payload의 `partyId`와 같은지 검증하고 기존 `party-mean-fit-v2` 정책으로 최대 500편을 계산한다.
 Spark 코드를 import하지 않으며 기존 Spark 구현은 parity와 롤백 기준선으로만 남긴다.
 
+S15P21E106-742는 같은 토픽의 `schemaVersion=2` GBT 입력 참조를 parser 계약에 추가했다. v2는
+`modelVersion`·`servingRevision`과 구성원별 `generationId`·`inputSchemaVersion`·`inputHash`·후보 ID만
+가지며 vector를 허용하지 않는다. 이 단계에서는 직렬화 경계만 검증하고 v2 점수 계산은 명시적으로
+거절한다. v2가 실제 Kafka에 발행되기 전에 S15P21E106-627의 불변 입력 스냅샷 게시와
+S15P21E106-747의 같은 GBT 구성원별 재점수화가 함께 배포되어야 한다. schema가 없는 v1은 전환 전
+ALS rollback 입력으로 구분한다.
+
+늦은 v1을 결과 게시 없이 소진하고 최신 v2 refresh를 재요청하는 경로, v2 snapshot/schema 오류가
+같은 offset의 pause/restart를 반복하지 않게 하는 격리·재시도 경로와 runner 통합 테스트는
+S15P21E106-747이 소유한다. 해당 구현이 배포되기 전에는 `model:current.modelKind=GBT` 전환과 Backend
+v2 발행을 활성화하지 않는다.
+
 파티 Consumer는 시작할 때 개인 Consumer와 같은 `als-artifacts-v2` SERVING model, mapping,
 movie metadata 고정 URI 세 개를 `load_bundle`로 검증한다. Redis 게시 Lua는 partition assign 때
 발급한 전용 fence와 `feelm:model:current.modelVersion`을 함께 확인하고

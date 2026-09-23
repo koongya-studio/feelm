@@ -5,11 +5,15 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import com.feelm.backend.domain.party.model.PartyRefreshPayload;
+import java.io.InputStream;
 import java.math.BigDecimal;
+import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,6 +26,9 @@ import tools.jackson.databind.ObjectMapper;
 @JsonTest
 @DisplayName("Kafka 공통 이벤트 기록")
 class KafkaEventPublisherTest {
+
+    private static final String PARTY_REFRESH_V2_FIXTURE_SHA256 =
+            "99f9260db317b52d69ef22a8b54e626bcc256cb85184f7371ed170a803de79f5";
 
     @Autowired private ObjectMapper objectMapper;
 
@@ -76,9 +83,18 @@ class KafkaEventPublisherTest {
         publisher.publishPartyRefresh(
                 9001L,
                 new PartyRefreshPayload(
+                        PartyRefreshPayload.SCHEMA_VERSION,
                         9001L,
-                        "sha256:abc",
-                        List.of(new PartyRefreshPayload.Member(1024L, List.of(), List.of(550L)))));
+                        "sha256:" + "c".repeat(64),
+                        "gbt-v26",
+                        "serving-r1",
+                        List.of(
+                                new PartyRefreshPayload.Member(
+                                        1024L,
+                                        "g1",
+                                        "gbt-input-v1",
+                                        "sha256:" + "a".repeat(64),
+                                        List.of(550L)))));
 
         ArgumentCaptor<String> message = ArgumentCaptor.forClass(String.class);
         verify(store)
@@ -88,9 +104,18 @@ class KafkaEventPublisherTest {
                         message.capture(),
                         org.mockito.ArgumentMatchers.eq(occurredAt));
         JsonNode body = objectMapper.readTree(message.getValue());
-        assertThat(body.get("partyId").asLong()).isEqualTo(9001L);
-        assertThat(body.get("members").get(0).get("candidateMovieIds").get(0).asLong())
-                .isEqualTo(550L);
-        assertThat(body.size()).isEqualTo(3);
+        assertThat(body).isEqualTo(sharedPartyRefreshFixture());
+    }
+
+    private JsonNode sharedPartyRefreshFixture() throws Exception {
+        byte[] fixture;
+        try (InputStream input =
+                Objects.requireNonNull(
+                        getClass().getResourceAsStream("/contracts/party-refresh-v2.json"))) {
+            fixture = input.readAllBytes();
+        }
+        assertThat(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(fixture)))
+                .isEqualTo(PARTY_REFRESH_V2_FIXTURE_SHA256);
+        return objectMapper.readTree(fixture);
     }
 }

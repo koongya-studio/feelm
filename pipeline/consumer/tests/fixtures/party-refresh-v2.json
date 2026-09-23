@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 2,
+  "partyId": 9001,
+  "inputId": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "modelVersion": "gbt-v26",
+  "servingRevision": "serving-r1",
+  "members": [
+    {
+      "userId": 1024,
+      "generationId": "g1",
+      "inputSchemaVersion": "gbt-input-v1",
+      "inputHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "candidateMovieIds": [550]
+    }
+  ]
+}
