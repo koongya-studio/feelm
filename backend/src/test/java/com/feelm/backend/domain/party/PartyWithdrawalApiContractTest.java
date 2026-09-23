@@ -1,7 +1,10 @@
 package com.feelm.backend.domain.party;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.feelm.backend.global.security.TokenProvider;
@@ -164,6 +167,31 @@ class PartyWithdrawalApiContractTest extends SharedPostgresContractTest {
 
         assertThat(memberIds(closed)).containsExactly(10L, 20L);
         assertParty(closed, 10, "CLOSED", "OWNER_CLOSED");
+    }
+
+    /** 실제 탈퇴 경로가 만든 치환 값이 종료 파티 목록에서 표기 규칙을 타는지 본다(S15P21E106-759). */
+    @Test
+    @DisplayName("759-T5 종료 파티에 남은 탈퇴자는 목록에서 '탈퇴한 사용자'로 보인다")
+    void labelsWithdrawnOwnerInClosedPartyListAfterWithdrawal() throws Exception {
+        long closed = party(10, "CLOSED");
+        member(closed, 20, "MEMBER", CREATED_AT.plusSeconds(1));
+
+        withdraw(10).andExpect(status().isNoContent());
+
+        mvc.perform(
+                        get("/api/v1/parties")
+                                .param("status", "CLOSED")
+                                .header("Authorization", "Bearer " + tokens.createAccessToken(20)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].partyId").value(closed))
+                .andExpect(jsonPath("$.items[0].owner.userId").value(10))
+                .andExpect(jsonPath("$.items[0].owner.nickname").value("탈퇴한 사용자"))
+                .andExpect(jsonPath("$.items[0].members[0].userId").value(10))
+                .andExpect(jsonPath("$.items[0].members[0].nickname").value("탈퇴한 사용자"))
+                .andExpect(jsonPath("$.items[0].members[1].userId").value(20))
+                .andExpect(jsonPath("$.items[0].members[1].nickname").value("member20"));
+        assertThat(userStatus(10)).isEqualTo("WITHDRAWN");
     }
 
     @Test
