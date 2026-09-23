@@ -17,7 +17,7 @@ public class PartyPopcornQueryRepository {
                 entityManager
                         .createNativeQuery(
                                 """
-                                SELECT member.user_id, users.nickname
+                                SELECT member.user_id, users.nickname, users.avatar_storage_key
                                 FROM parties party
                                 JOIN party_members member ON member.party_id = party.id
                                 JOIN users ON users.id = member.user_id
@@ -35,9 +35,14 @@ public class PartyPopcornQueryRepository {
                         .setParameter("requesterId", requesterId)
                         .getResultList();
         return rows.stream()
-                .map(row -> new MemberSummary(((Number) row[0]).longValue(), (String) row[1]))
+                .map(
+                        row ->
+                                new MemberSummary(
+                                        ((Number) row[0]).longValue(),
+                                        (String) row[1],
+                                        (String) row[2]))
                 .toList();
     }
 
-    public record MemberSummary(long userId, String nickname) {}
+    public record MemberSummary(long userId, String nickname, String avatarStorageKey) {}
 }

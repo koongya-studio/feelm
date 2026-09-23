@@ -137,9 +137,9 @@
   "partyId": 9001,
   "name": "금요일 영화 모임",
   "status": "ACTIVE",
-  "owner": { "userId": 1024, "nickname": "팝콘러버" },
+  "owner": { "userId": 1024, "nickname": "팝콘러버", "avatarUrl": "/media/avatars/0b649505-0917-41d9-a41f-0d4402ec63d5.jpg" },
   "members": [
-    { "userId": 1024, "nickname": "팝콘러버", "role": "OWNER", "joinedAt": "2026-08-30T05:21:00Z" }
+    { "userId": 1024, "nickname": "팝콘러버", "avatarUrl": "/media/avatars/0b649505-0917-41d9-a41f-0d4402ec63d5.jpg", "role": "OWNER", "joinedAt": "2026-08-30T05:21:00Z" }
   ],
   "maxMembers": 4,
   "createdAt": "2026-08-30T05:21:00Z"
@@ -155,6 +155,7 @@
 - 사용자당 참여 가능한 활성 파티는 최대 10개다. 생성과 초대 수락이 동시에 실행되어도 10개를 넘지 않도록 사용자 단위로 직렬화한다.
 - 파티는 파티장 포함 최대 4명
 - 생성자는 `party_members`에도 `OWNER` 역할로 저장한다
+- `owner`와 `members`의 `avatarUrl`은 프로필 사진이 없으면 `null`이며, 있으면 API-014와 같은 공개·비만료 URL을 반환한다
 
 ### 상태값
 
@@ -208,9 +209,9 @@
       "partyId": 9001,
       "name": "금요일 영화 모임",
       "status": "ACTIVE",
-      "owner": { "userId": 1024, "nickname": "팝콘러버" },
+      "owner": { "userId": 1024, "nickname": "팝콘러버", "avatarUrl": "/media/avatars/0b649505-0917-41d9-a41f-0d4402ec63d5.jpg" },
       "members": [
-        { "userId": 1024, "nickname": "팝콘러버", "role": "OWNER", "joinedAt": "2026-08-30T05:21:00Z" }
+        { "userId": 1024, "nickname": "팝콘러버", "avatarUrl": "/media/avatars/0b649505-0917-41d9-a41f-0d4402ec63d5.jpg", "role": "OWNER", "joinedAt": "2026-08-30T05:21:00Z" }
       ],
       "maxMembers": 4,
       "pendingInvitations": [
@@ -223,6 +224,7 @@
 ```
 
 - `pendingInvitations`는 내가 현재 멤버인 파티에 포함한다
+- `owner`와 `members`의 `avatarUrl`은 프로필 사진이 없으면 `null`이며, 있으면 API-014와 같은 공개·비만료 URL을 반환한다. `pendingInvitations.invitee`는 기존 필드를 유지한다
 
 ### 오류 응답
 
@@ -683,7 +685,7 @@
   "partyId": 9001,
   "members": [
     {
-      "user": { "userId": 1024, "nickname": "팝콘러버" },
+      "user": { "userId": 1024, "nickname": "팝콘러버", "avatarUrl": "/media/avatars/0b649505-0917-41d9-a41f-0d4402ec63d5.jpg" },
       "totalCount": 42,
       "flavors": [
         { "flavorCode": "FLAVOR_A", "popcornCount": 12, "averageScore": 4.4 }
@@ -700,6 +702,7 @@
 ### 처리 규칙
 
 - 프로필 공개 범위가 `PRIVATE`이어도 같은 활성 파티의 현재 멤버에게 팝콘 집계를 노출한다. 개별 필름·프레임·평가의 공개 범위는 확대하지 않는다
+- `user.avatarUrl`은 프로필 사진이 없으면 `null`이며, 있으면 API-014와 같은 공개·비만료 URL을 반환한다
 - 각 파티원의 팝콘은 API-041과 같은 집계 규칙을 사용한다. 8개 맛을 항상 모두 포함하며 팝콘이 없으면 `popcornCount: 0`, `averageScore: null`로 반환한다
 - 팝콘 공유·추가 비교 분석은 범위 밖(FR-21)
 

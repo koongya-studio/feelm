@@ -6,6 +6,7 @@ import com.feelm.backend.domain.party.repository.PartyPopcornQueryRepository;
 import com.feelm.backend.domain.party.repository.PartyPopcornQueryRepository.MemberSummary;
 import com.feelm.backend.domain.taste.dto.response.PopcornBucketResponse;
 import com.feelm.backend.domain.taste.service.TasteQueryService;
+import com.feelm.backend.domain.user.service.AvatarStorage;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
 import java.util.List;
@@ -20,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PartyPopcornService {
     private final PartyPopcornQueryRepository partyPopcornQueryRepository;
     private final TasteQueryService tasteQueryService;
+    private final AvatarStorage avatarStorage;
 
     public PartyPopcornResponse getPartyPopcorn(long partyId, long requesterId) {
         List<MemberSummary> members =
@@ -38,6 +40,7 @@ public class PartyPopcornService {
                                         MemberPopcorn.from(
                                                 member.userId(),
                                                 member.nickname(),
+                                                avatarStorage.publicUrl(member.avatarStorageKey()),
                                                 buckets.get(member.userId())))
                         .toList());
     }

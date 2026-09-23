@@ -1,6 +1,7 @@
 package com.feelm.backend.domain.party;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.handler;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -34,6 +35,8 @@ import tools.jackson.databind.ObjectMapper;
 @AutoConfigureMockMvc
 class PartyInvitationResponseApiContractTest extends SharedPostgresContractTest {
     private static final Instant CREATED_AT = Instant.parse("2026-09-01T00:00:00Z");
+    private static final String AVATAR_KEY = "22222222-2222-2222-2222-222222222222.jpg";
+    private static final String AVATAR_URL = "/media/avatars/" + AVATAR_KEY;
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
@@ -61,6 +64,7 @@ class PartyInvitationResponseApiContractTest extends SharedPostgresContractTest 
 
     @Test
     void acceptAddsMemberAndMarksInvitationAccepted() throws Exception {
+        jdbc.update("UPDATE users SET avatar_storage_key=? WHERE id=20", AVATAR_KEY);
         long party = party(20, "ACTIVE", CREATED_AT);
         long invitation = invitation(party, 20, 10, "PENDING");
         jdbc.update(
@@ -82,7 +86,10 @@ class PartyInvitationResponseApiContractTest extends SharedPostgresContractTest 
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.partyId").value(party))
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andExpect(jsonPath("$.owner.avatarUrl").value(AVATAR_URL))
                 .andExpect(jsonPath("$.members.length()").value(2))
+                .andExpect(jsonPath("$.members[0].avatarUrl").value(AVATAR_URL))
+                .andExpect(jsonPath("$.members[1].avatarUrl").value(nullValue()))
                 .andExpect(jsonPath("$.members[?(@.userId == 10)].role").value("MEMBER"));
 
         assertInvitation(invitation, "ACCEPTED", true);

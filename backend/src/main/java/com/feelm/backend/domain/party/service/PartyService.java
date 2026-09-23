@@ -24,6 +24,7 @@ import com.feelm.backend.domain.party.repository.PartyRefreshRequestRepository;
 import com.feelm.backend.domain.party.repository.PartyRepository;
 import com.feelm.backend.domain.user.entity.User;
 import com.feelm.backend.domain.user.repository.UserRepository;
+import com.feelm.backend.domain.user.service.AvatarStorage;
 import com.feelm.backend.domain.user.service.UserBlockFilter;
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
@@ -47,6 +48,7 @@ public class PartyService {
     private final PartyQueryRepository queryRepository;
     private final UserRepository userRepository;
     private final UserBlockFilter userBlockFilter;
+    private final AvatarStorage avatarStorage;
 
     /** 파티와 생성자의 OWNER 멤버 정보를 함께 저장하고 생성 결과를 반환한다. */
     @Transactional
@@ -63,7 +65,7 @@ public class PartyService {
         Party party = partyRepository.save(Party.create(name, owner));
         PartyMember member = memberRepository.save(PartyMember.ownerOf(party));
         refreshRequestRepository.request(party.getId());
-        return PartyResponse.from(party, List.of(Member.from(member)));
+        return partyResponse(party, List.of(memberResponse(member)));
     }
 
     /**
@@ -105,7 +107,7 @@ public class PartyService {
                         .collect(
                                 groupingBy(
                                         m -> m.getParty().getId(),
-                                        mapping(Member::from, toList())));
+                                        mapping(this::memberResponse, toList())));
         var invitations =
                 queryRepository.findPendingInvitations(ids).stream()
                         .collect(
@@ -118,6 +120,7 @@ public class PartyService {
                                 p ->
                                         PartyListItemResponse.from(
                                                 p,
+                                                avatarUrl(p.getOwner()),
                                                 members.getOrDefault(p.getId(), List.of()),
                                                 invitations.getOrDefault(p.getId(), List.of())))
                         .toList();
@@ -296,8 +299,10 @@ public class PartyService {
                 respondedAt);
         refreshRequestRepository.request(partyId);
         List<Member> members =
-                queryRepository.findMembers(List.of(partyId)).stream().map(Member::from).toList();
-        return PartyResponse.from(party, members);
+                queryRepository.findMembers(List.of(partyId)).stream()
+                        .map(this::memberResponse)
+                        .toList();
+        return partyResponse(party, members);
     }
 
     /** 받은 대기 초대를 거절하고 응답 상태를 반환한다. */
@@ -445,5 +450,17 @@ public class PartyService {
                                     invitation.getId(),
                                     respondedAt);
                         });
+    }
+
+    private PartyResponse partyResponse(Party party, List<Member> members) {
+        return PartyResponse.from(party, avatarUrl(party.getOwner()), members);
+    }
+
+    private Member memberResponse(PartyMember member) {
+        return Member.from(member, avatarUrl(member.getUser()));
+    }
+
+    private String avatarUrl(User user) {
+        return avatarStorage.publicUrl(user.getAvatarStorageKey());
     }
 }
