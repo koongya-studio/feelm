@@ -18,8 +18,8 @@
  * `46% · 38%`, 공통 취향 일치 `72%`, 태그 4종은 산출 규칙이 계약에 없어 시안에서도 뺐다(CR-17).
  *
  * 연동 API는 API-057 파티원 팝콘 조회와 API-058 파티 영화 추천이다. 섞인 통의 맛은
- * API-057에서 오고, 추천은 **화면을 열자마자** 부른다 — 장면이 도는 동안 받아 두면 5.5가 빈
- * 화면으로 시작하지 않는다. 추천을 받지 못하면 장면을 끝까지 보여 준 뒤 이 화면에서 알린다.
+ * API-057에서 오고, 실제 참여자가 2명 이상이면 추천을 장면 시작 전에 부른다. 1명이면
+ * 초대한 친구의 입장을 기다린다. 추천을 받지 못하면 장면을 끝까지 보여 준 뒤 알린다.
  *
  * **다시 받기는 이 화면이 보낸다**(업무 -802). 5.5의 `다른 영화 추천받기`는 라우터 state
  * `refresh: true`를 들고 여기로 오고, 그때만 API-058에 `refresh=true`를 붙여 다음 묶음을
@@ -36,7 +36,12 @@ import { kernelCounts } from '../../../components/PopcornBucket/kernels';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import { isApiError } from '../../../api/apiError';
-import { getParty, getPartyPopcorn, getPartyRecommendations } from '../../../api/parties';
+import {
+  getParty,
+  getPartyPopcorn,
+  getPartyRecommendations,
+  PARTY_MIN_MEMBERS,
+} from '../../../api/parties';
 import { path } from '../../../routes/paths';
 import { mixedFlavors } from '../../../utils/party';
 import styles from './PartyPopcornMixPage.module.css';
@@ -131,6 +136,10 @@ export default function PartyPopcornMixPage() {
   const [phase, setPhase] = useState<MachinePhase>('idle');
   const [failure, setFailure] = useState<Failure | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [waiting, setWaiting] = useState(false);
+  const [waitingChecked, setWaitingChecked] = useState(false);
+  const [checkCount, setCheckCount] = useState(0);
+  const [pendingNames, setPendingNames] = useState<string[]>([]);
   /**
    * 화면이 떠 있는지. `다시 시도`의 응답은 화면을 떠난 뒤에 올 수 있다 — `내 파티로 돌아가기`를
    * 누르고 나서 성공이 오면 5.1에 있던 사용자를 5.5로 끌고 간다(!531 리뷰).
@@ -152,28 +161,40 @@ export default function PartyPopcornMixPage() {
   }, []);
 
   useEffect(() => {
+    if (!waiting) return;
+    const interval = window.setInterval(() => setCheckCount((count) => count + 1), 8000);
+    return () => window.clearInterval(interval);
+  }, [waiting]);
+
+  useEffect(() => {
     let active = true;
     const timers: number[] = [];
 
-    // 장면이 도는 동안 받아 둔다. 실패는 여기서 삼키고 장면이 끝날 때 알린다
-    const request = refresh
-      ? getPartyRecommendations(id, { refresh: true })
-      : getPartyRecommendations(id);
-    request.catch(() => undefined);
-
     getParty(id)
       .then((party) => {
-        if (active && party) {
-          setPartyMembers(party.members);
-        }
-      })
-      .catch(() => {
-        // 파티 이름 목록을 못 받아도 API-057이 파티원까지 준다
-      });
-
-    getPartyPopcorn(id)
-      .then((value) => {
         if (!active) return;
+        if (!party) throw new Error('파티를 찾을 수 없어요');
+        setPartyMembers(party.members);
+        setPendingNames(party.pendingInvitations?.map(({ invitee }) => invitee.nickname) ?? []);
+        if (party.members.length < PARTY_MIN_MEMBERS) {
+          setWaiting(true);
+          setWaitingChecked(checkCount > 0);
+          return;
+        }
+        setWaiting(false);
+        setWaitingChecked(false);
+
+        // 실제 참여자가 모인 뒤에만 추천과 섞는 장면을 시작한다.
+        const request = refresh
+          ? getPartyRecommendations(id, { refresh: true })
+          : getPartyRecommendations(id);
+        request.catch(() => undefined);
+        return getPartyPopcorn(id).then((value) => ({ value, request }));
+      })
+      .then((result) => {
+        if (!result) return;
+        if (!active) return;
+        const { value, request } = result;
 
         setPopcorn(value);
 
@@ -200,7 +221,10 @@ export default function PartyPopcornMixPage() {
         );
       })
       .catch(() => {
-        if (active) setFailure({ kind: 'popcorn' });
+        if (active) {
+          setWaiting(false);
+          setFailure({ kind: 'popcorn' });
+        }
       });
 
     return () => {
@@ -208,7 +232,7 @@ export default function PartyPopcornMixPage() {
       active = false;
       for (const timer of timers) window.clearTimeout(timer);
     };
-  }, [id, navigate, refresh]);
+  }, [id, navigate, refresh, checkCount]);
 
   /**
    * 추천만 다시 묻는다. 팝콘은 이미 섞였으므로 장면을 되풀이하지 않는다. 다시 받기로
@@ -228,6 +252,48 @@ export default function PartyPopcornMixPage() {
       setRetrying(false);
       setFailure({ kind: 'recommend', message: recommendFailure(error) });
     }
+  }
+
+  if (waiting) {
+    return (
+      <PartyFlowShell
+        members={partyMembers}
+        title="친구가 오면 함께 섞어요"
+        subtitle="초대받은 친구가 파티에 들어오길 기다리고 있어요"
+      >
+        <div className={styles.waitingStage}>
+          <div className={styles.waitingSeats} aria-hidden="true">
+            <div className={styles.occupiedSeat}>✓</div>
+            <div className={styles.seatLink} />
+            <div className={styles.emptySeat}>
+              <span>···</span>
+            </div>
+          </div>
+          <div className={styles.waitingLabels}>
+            <span>나, 참여 완료</span>
+            <span>친구, 입장 대기</span>
+          </div>
+          {pendingNames.length > 0 ? (
+            <p className={styles.invitees}>
+              {pendingNames.join(', ')} 님의 초대 수락을 기다리는 중
+            </p>
+          ) : null}
+        </div>
+        <div className={styles.waitingFooter}>
+          <p className={styles.waitingNote} role="status">
+            {waitingChecked
+              ? '아직 친구가 입장하지 않았어요. 계속 확인하고 있어요.'
+              : `${PARTY_MIN_MEMBERS}명 이상 모이면 자동으로 팝콘을 섞기 시작해요.`}
+          </p>
+          <div className={styles.waitingActions}>
+            <Button onClick={() => setCheckCount((count) => count + 1)}>참여 확인하기</Button>
+            <Button variant="text" onClick={() => void navigate(path.party())}>
+              내 파티로 돌아가기
+            </Button>
+          </div>
+        </div>
+      </PartyFlowShell>
+    );
   }
 
   if (failure) {
