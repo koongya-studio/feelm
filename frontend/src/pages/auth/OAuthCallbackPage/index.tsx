@@ -124,7 +124,6 @@ export default function OAuthCallbackPage() {
             state: {
               provider: request.provider,
               signupToken: result.signupToken,
-              suggestedNickname: result.suggestedNickname,
             },
           });
 

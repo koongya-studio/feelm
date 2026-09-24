@@ -48,6 +48,7 @@ import { useAuth } from '../../../contexts/authContext';
 import { useNicknameCheck } from '../../../hooks/useNicknameCheck';
 import type { NicknameCheck } from '../../../hooks/useNicknameCheck';
 import { path } from '../../../routes/paths';
+import { toDateInputValue } from '../../../utils/date';
 import { markSignupCompleted } from '../../../utils/signupCompletion';
 import { isValidPassword, PASSWORD_HINT } from '../password';
 import styles from './EmailSignupPage.module.css';
@@ -356,6 +357,7 @@ function BirthDateLine({ value, onChange }: { value: string; onChange: (v: strin
     <TextField
       label="생년월일"
       type="date"
+      max={toDateInputValue()}
       placeholder="생년월일"
       autoComplete="bday"
       value={value}

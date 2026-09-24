@@ -9,6 +9,10 @@
  * 가지만 API-008이 닉네임 · 생년월일 · 성별을 필수로 받는다. 받을 자리가 없으면 가입을
  * 마칠 수 없어 한 단계를 만들었다(팀 결정 2026-09-16, S15P21E106-499).
  *
+ * **닉네임은 빈 칸에서 시작한다**(업무 -851). API-007이 주는 `suggestedNickname`을 채워
+ * 두었더니, 고치지 않고 중복 확인만 누른 사용자는 다음 줄(생년월일)이 열리지 않아 가입을
+ * 마칠 수 없었다. 줄은 입력해야 열리므로 제안값을 쓰지 않는다.
+ *
  * 이메일과 제공자 식별자는 `signupToken` 안에 있어 여기서 받지 않는다. 그래서 0.4와
  * 달리 이메일 · 비밀번호 줄이 없고, 종이는 세 줄로 끝난다.
  *
@@ -31,6 +35,7 @@ import { useNicknameCheck } from '../../../hooks/useNicknameCheck';
 import type { NicknameCheck } from '../../../hooks/useNicknameCheck';
 import { path } from '../../../routes/paths';
 import { SOCIAL_PROVIDER_LABEL } from '../../../utils/oauth';
+import { toDateInputValue } from '../../../utils/date';
 import { markSignupCompleted } from '../../../utils/signupCompletion';
 import styles from './SocialSignupProfilePage.module.css';
 import type { Gender, SocialProvider } from '../../../types/auth';
@@ -39,7 +44,6 @@ import type { Gender, SocialProvider } from '../../../types/auth';
 type State = {
   provider?: SocialProvider;
   signupToken?: string;
-  suggestedNickname?: string;
 } | null;
 
 /** 서버 문구 대신 화면이 정하는 경우만 둔다 */
@@ -67,7 +71,7 @@ export default function SocialSignupProfilePage() {
   const signupToken = state?.signupToken;
   const provider = state?.provider;
 
-  const nicknameCheck = useNicknameCheck(state?.suggestedNickname ?? '');
+  const nicknameCheck = useNicknameCheck();
   const [birthDate, setBirthDate] = useState('');
   const [gender, setGender] = useState<Gender | null>(null);
   const [pending, setPending] = useState(false);
@@ -179,11 +183,6 @@ export default function SocialSignupProfilePage() {
   );
 }
 
-/*
- * 제안 닉네임이 이미 들어와 있어 첫 줄에 입력이 없을 수 있다. 그래도 다음 줄은 손을
- * 대야 열리게 둔다 — 0.4와 같은 규칙이라 종이의 동작이 화면마다 다르지 않다.
- */
-
 function NicknameLine({ check }: { check: NicknameCheck }) {
   const { feed } = useSignupPaper();
 
@@ -197,6 +196,7 @@ function BirthDateLine({ value, onChange }: { value: string; onChange: (v: strin
     <TextField
       label="생년월일"
       type="date"
+      max={toDateInputValue()}
       placeholder="생년월일"
       autoComplete="bday"
       value={value}

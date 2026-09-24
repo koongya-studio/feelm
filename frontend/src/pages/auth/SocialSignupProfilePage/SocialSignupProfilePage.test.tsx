@@ -55,6 +55,7 @@ function renderPage(state: unknown = STATE) {
 }
 
 async function fill() {
+  fireEvent.change(screen.getByLabelText('닉네임'), { target: { value: '구글사용자' } });
   fireEvent.click(screen.getByRole('button', { name: '중복 확인' }));
   await screen.findByText('사용할 수 있는 닉네임이에요.');
   fireEvent.change(screen.getByLabelText('생년월일'), { target: { value: '1999-03-14' } });
@@ -77,10 +78,19 @@ beforeEach(() => {
 });
 
 describe('0.3-A 소셜 가입 정보 입력', () => {
-  it('제안 닉네임이 들어와 있다', () => {
+  it('제안 닉네임을 채우지 않고 빈 칸에서 시작한다', () => {
     renderPage();
 
-    expect(screen.getByLabelText('닉네임')).toHaveValue('구글사용자');
+    expect(screen.getByLabelText('닉네임')).toHaveValue('');
+  });
+
+  it('생년월일 연도는 4자리까지다', () => {
+    renderPage();
+
+    expect(screen.getByLabelText('생년월일')).toHaveAttribute(
+      'max',
+      expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+    );
   });
 
   it('이메일·비밀번호는 묻지 않는다', () => {
