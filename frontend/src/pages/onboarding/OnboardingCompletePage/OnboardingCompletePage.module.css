@@ -36,3 +36,11 @@
   flex: none;
   padding: 0 var(--screen-padding-x) var(--space-12);
 }
+
+.ratingNotice {
+  margin-bottom: var(--space-3);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-body);
+  text-align: center;
+}
