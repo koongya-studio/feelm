@@ -123,6 +123,13 @@ afterEach(() => {
 });
 
 describe('5.1 파티팝콘 데스크톱 시안', () => {
+  it('계약에 없는 초대 코드 참여 버튼을 노출하지 않는다', async () => {
+    renderParty(1440);
+
+    await screen.findByRole('heading', { name: '파티팝콘' });
+    expect(screen.queryByRole('button', { name: '초대 코드로 참여하기' })).toBeNull();
+  });
+
   it('받은 초대를 방장 · 때 · 인원과 함께 카드로 세운다', async () => {
     renderParty(1440);
 

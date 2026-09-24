@@ -58,7 +58,6 @@ type Props = {
   /** 수락을 보내는 중인 초대. 그동안 그 카드의 두 버튼은 눌리지 않는다 */
   acceptingId: number | null;
   onCreateParty: () => void;
-  onJoinByCode: () => void;
   /** 끝난 파티(API-050 `status=CLOSED`). 추천 이력(5.10)으로만 들어간다(업무 -826) */
   closedParties: Party[];
   onOpenHistory: (partyId: number) => void;
@@ -78,7 +77,6 @@ export default function PartyDesktop({
   onAccept,
   acceptingId,
   onCreateParty,
-  onJoinByCode,
   closedParties,
   onOpenHistory,
 }: Props) {
@@ -96,11 +94,6 @@ export default function PartyDesktop({
             {/* 시안의 `+`. 더하기 아이콘이 없어 글자로 둔다 — 새 자산을 만들지 않는다 */}
             <span aria-hidden="true">+</span>
             파티 만들기
-          </Button>
-
-          <Button variant="secondary" onClick={onJoinByCode}>
-            <PartyGroupIcon />
-            초대 코드로 참여하기
           </Button>
         </div>
       </header>

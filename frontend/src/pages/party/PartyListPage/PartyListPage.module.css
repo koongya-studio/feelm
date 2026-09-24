@@ -128,10 +128,7 @@
   max-height: 100%;
 }
 
-/*
- * 버튼 두 개가 화면 아래를 잡는다. 주 버튼은 브랜드 빨강 면이다
- * (`design-concept.md` 2.9 — 시안이 파티 화면까지 넓혔다).
- */
+/* 화면 아래의 만들기 버튼은 브랜드 빨강 면이다(`design-concept.md` 2.9). */
 .actions {
   display: flex;
   margin-top: auto;
