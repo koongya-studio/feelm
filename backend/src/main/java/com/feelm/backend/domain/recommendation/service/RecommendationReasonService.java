@@ -1,13 +1,18 @@
 package com.feelm.backend.domain.recommendation.service;
 
+import com.feelm.backend.domain.recommendation.model.GbtRecommendationReasonPrompt;
+import com.feelm.backend.domain.recommendation.model.GbtRecommendationReasonPrompt.Evidence;
+import com.feelm.backend.domain.recommendation.model.GbtRecommendationReasonResult;
 import com.feelm.backend.domain.recommendation.model.RecommendationReasonPrompt;
 import com.feelm.backend.domain.recommendation.repository.RecommendationReasonGenerator;
 import com.feelm.backend.domain.recommendation.repository.RecommendationReasonRepository;
 import com.feelm.backend.domain.recommendation.service.RecommendationReasonSnapshotWriter.ReasonSnapshot;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -17,7 +22,6 @@ import tools.jackson.databind.node.ObjectNode;
 
 /** 구조화 근거를 확인된 표시명으로 해석하고 사용자용 문구를 저장한다. */
 @Service
-@RequiredArgsConstructor
 public class RecommendationReasonService {
 
     static final String TASTE_NO_EVIDENCE = "취향 데이터를 바탕으로 영화를 골라봤어요.";
@@ -27,15 +31,33 @@ public class RecommendationReasonService {
     private final RecommendationReasonGenerator generator;
     private final RecommendationReasonSnapshotWriter writer;
     private final ObjectMapper objectMapper;
+    private final MeterRegistry meterRegistry;
+    private final boolean gbtAiEnabled;
+
+    public RecommendationReasonService(
+            RecommendationReasonRepository repository,
+            RecommendationReasonGenerator generator,
+            RecommendationReasonSnapshotWriter writer,
+            ObjectMapper objectMapper,
+            MeterRegistry meterRegistry,
+            @Value("${feelm.recommendation.reason.gbt-ai.enabled:false}") boolean gbtAiEnabled) {
+        this.repository = repository;
+        this.generator = generator;
+        this.writer = writer;
+        this.objectMapper = objectMapper;
+        this.meterRegistry = meterRegistry;
+        this.gbtAiEnabled = gbtAiEnabled;
+    }
 
     /** 알림 경로의 버퍼 커밋 전에 확인된 근거만으로 첫 노출용 문구를 저장한다. */
     ObjectNode initialReason(String type, JsonNode storedReason) {
-        RecommendationReasonPrompt prompt = resolve(0L, storedReason.toString());
+        ResolvedPrompt prompt = resolve(0L, storedReason.toString());
         ReasonSnapshot snapshot = render(type, prompt, null);
         ObjectNode initial = ((ObjectNode) storedReason).deepCopy();
         initial.put("summary", snapshot.summary());
         initial.set("factors", objectMapper.readTree(snapshot.factorsJson()));
-        if (prompt.code() != null) {
+        initial.set("usedEvidenceIds", objectMapper.readTree(snapshot.usedEvidenceIdsJson()));
+        if (prompt.legacy().code() != null || gbtAiEnabled && prompt.gbt() != null) {
             initial.put("_reasonPending", true);
         }
         return initial;
@@ -55,43 +77,95 @@ public class RecommendationReasonService {
                                         new ResolvedReason(
                                                 item.type(), resolve(item.id(), item.reason())))
                         .toList();
-        List<RecommendationReasonPrompt> prompts =
-                resolved.stream().map(ResolvedReason::prompt).toList();
-        List<RecommendationReasonPrompt> grounded =
-                prompts.stream().filter(prompt -> prompt.code() != null).toList();
-        Map<Long, String> variants;
+        List<GbtRecommendationReasonPrompt> gbtPrompts =
+                gbtAiEnabled
+                        ? resolved.stream()
+                                .map(reason -> reason.prompt().gbt())
+                                .filter(java.util.Objects::nonNull)
+                                .toList()
+                        : List.of();
+        Map<Long, GbtRecommendationReasonResult> generated;
         try {
-            variants = grounded.isEmpty() ? Map.of() : generator.selectVariants(grounded);
+            generated = gbtPrompts.isEmpty() ? Map.of() : generator.generateGbtReasons(gbtPrompts);
         } catch (RuntimeException exception) {
-            variants = Map.of();
+            generated = Map.of();
         }
-        if (variants == null) {
-            variants = Map.of();
+        if (generated == null) {
+            generated = Map.of();
         }
         List<ReasonSnapshot> snapshots = new ArrayList<>();
         for (ResolvedReason reason : resolved) {
-            RecommendationReasonPrompt prompt = reason.prompt();
-            snapshots.add(render(reason.type(), prompt, variants.get(prompt.itemId())));
+            ResolvedPrompt prompt = reason.prompt();
+            snapshots.add(render(reason.type(), prompt, generated.get(prompt.legacy().itemId())));
         }
         writer.complete(snapshots);
     }
 
-    private RecommendationReasonPrompt resolve(long itemId, String storedReason) {
+    private ResolvedPrompt resolve(long itemId, String storedReason) {
         try {
-            JsonNode reasons = objectMapper.readTree(storedReason).path("reasons");
+            JsonNode root = objectMapper.readTree(storedReason);
+            GbtRecommendationReasonPrompt gbt = resolveGbt(itemId, root);
+            JsonNode reasons = root.path("reasons");
             if (!reasons.isArray() || reasons.isEmpty()) {
-                return empty(itemId);
+                return new ResolvedPrompt(empty(itemId), gbt);
             }
             for (JsonNode reason : reasons) {
                 RecommendationReasonPrompt prompt = resolveOne(itemId, reason);
                 if (prompt.code() != null) {
-                    return prompt;
+                    return new ResolvedPrompt(prompt, gbt);
                 }
             }
-            return empty(itemId);
+            return new ResolvedPrompt(empty(itemId), gbt);
         } catch (JacksonException exception) {
-            return empty(itemId);
+            return new ResolvedPrompt(empty(itemId), null);
         }
+    }
+
+    private GbtRecommendationReasonPrompt resolveGbt(long itemId, JsonNode root) {
+        if (!root.has("modelKind")
+                || !root.has("modelVersion")
+                || !root.has("rankingVersion")
+                || !root.has("explanationVersion")
+                || !root.has("evidence")) {
+            return null;
+        }
+        JsonNode snapshot = root.path("evidence");
+        if (!"GBT".equals(root.path("modelKind").textValue())
+                || !"gbt-feature-attribution-v1".equals(root.path("explanationVersion").textValue())
+                || !root.path("modelVersion").equals(snapshot.path("modelVersion"))
+                || !root.path("rankingVersion").equals(snapshot.path("rankingVersion"))
+                || !root.path("explanationVersion").equals(snapshot.path("explanationVersion"))) {
+            return null;
+        }
+        JsonNode values = snapshot.path("item").path("evidence");
+        if (!values.isArray() || values.isEmpty() || values.size() > 3) {
+            return null;
+        }
+        Map<String, String> labels = evidenceLabels();
+        List<Evidence> evidence = new ArrayList<>();
+        for (JsonNode value : values) {
+            String id = value.path("evidenceId").textValue();
+            String group = value.path("group").textValue();
+            String label = labels.get(group);
+            if (id == null
+                    || label == null
+                    || !"POSITIVE".equals(value.path("direction").textValue())) {
+                return null;
+            }
+            evidence.add(new Evidence(id, group, label));
+        }
+        return new GbtRecommendationReasonPrompt(
+                itemId, root.path("explanationVersion").textValue(), evidence);
+    }
+
+    private Map<String, String> evidenceLabels() {
+        Map<String, String> labels = new LinkedHashMap<>();
+        labels.put("GENRE_PATTERN", "장르 취향 패턴");
+        labels.put("RATING_PATTERN", "평가 성향");
+        labels.put("CONTENT_RELATION", "선호 콘텐츠와의 연관성");
+        labels.put("POPULARITY_SIGNAL", "인기도 경향");
+        labels.put("AUDIENCE_RATING_SIGNAL", "관객 평가 경향");
+        return labels;
     }
 
     private RecommendationReasonPrompt resolveOne(long itemId, JsonNode reason) {
@@ -155,26 +229,41 @@ public class RecommendationReasonService {
         return null;
     }
 
-    private ReasonSnapshot render(String type, RecommendationReasonPrompt prompt, String variant) {
+    private ReasonSnapshot render(
+            String type, ResolvedPrompt prompt, GbtRecommendationReasonResult generated) {
+        if (gbtAiEnabled && prompt.gbt() != null) {
+            GbtRecommendationReasonResult selected = generated;
+            String outcome = "success";
+            if (!prompt.gbt().supports(selected)) {
+                selected = prompt.gbt().fallback();
+                outcome = "fallback";
+            }
+            meterRegistry
+                    .counter("feelm.recommendation.reason.gbt.ai", "outcome", outcome)
+                    .increment();
+            return new ReasonSnapshot(
+                    prompt.legacy().itemId(),
+                    selected.summary(),
+                    "[]",
+                    objectMapper.valueToTree(selected.usedEvidenceIds()).toString());
+        }
+        RecommendationReasonPrompt legacy = prompt.legacy();
         String summary = fallbackSummary(type);
         ArrayNode factors = objectMapper.createArrayNode();
-        if (prompt.code() != null) {
-            switch (prompt.code()) {
+        if (legacy.code() != null) {
+            switch (legacy.code()) {
                 case "SHARED_GENRE" -> {
-                    summary = "좋아하신 영화와 " + prompt.genreName() + " 장르가 같아요.";
-                    factors.addObject().put("type", "GENRE").put("label", prompt.genreName());
+                    summary = "좋아하신 영화와 " + legacy.genreName() + " 장르가 같아요.";
+                    factors.addObject().put("type", "GENRE").put("label", legacy.genreName());
                 }
                 case "TOP_RATED_SOURCE" -> {
-                    String title = sourceTitleForSummary(prompt.sourceTitle());
-                    summary =
-                            "HISTORY".equals(variant)
-                                    ? "영화 '" + title + "'을 좋아하신 기록을 참고해 골랐어요."
-                                    : "좋아하신 영화 '" + title + "'을 바탕으로 골랐어요.";
+                    String title = sourceTitleForSummary(legacy.sourceTitle());
+                    summary = "좋아하신 영화 '" + title + "'을 바탕으로 골랐어요.";
                 }
                 case "DISCOVERY_PERSONAL_SCORE" -> {
-                    if (prompt.genreName() != null) {
-                        summary = "좋아하신 영화와 " + prompt.genreName() + " 장르가 같아요.";
-                        factors.addObject().put("type", "GENRE").put("label", prompt.genreName());
+                    if (legacy.genreName() != null) {
+                        summary = "좋아하신 영화와 " + legacy.genreName() + " 장르가 같아요.";
+                        factors.addObject().put("type", "GENRE").put("label", legacy.genreName());
                     } else {
                         summary = DISCOVERY_NO_EVIDENCE;
                     }
@@ -187,7 +276,7 @@ public class RecommendationReasonService {
             summary = fallbackSummary(type);
             factors = objectMapper.createArrayNode();
         }
-        return new ReasonSnapshot(prompt.itemId(), summary, factors.toString());
+        return new ReasonSnapshot(legacy.itemId(), summary, factors.toString(), "[]");
     }
 
     static String fallbackSummary(String type) {
@@ -201,5 +290,8 @@ public class RecommendationReasonService {
         return title.substring(0, title.offsetByCodePoints(0, 59)) + "…";
     }
 
-    private record ResolvedReason(String type, RecommendationReasonPrompt prompt) {}
+    private record ResolvedPrompt(
+            RecommendationReasonPrompt legacy, GbtRecommendationReasonPrompt gbt) {}
+
+    private record ResolvedReason(String type, ResolvedPrompt prompt) {}
 }

@@ -45,17 +45,25 @@ public class RecommendationReasonRepository {
 
     /** 이미 노출되었거나 다른 요청이 확정한 문구는 덮어쓰지 않는다. */
     public boolean completeIfUnexposed(long itemId, String summary, String factorsJson) {
+        return completeIfUnexposed(itemId, summary, factorsJson, "[]");
+    }
+
+    /** 이미 노출되었거나 다른 요청이 확정한 문구는 덮어쓰지 않는다. */
+    public boolean completeIfUnexposed(
+            long itemId, String summary, String factorsJson, String usedEvidenceIdsJson) {
         return jdbcTemplate.update(
                         """
                         UPDATE recommendation_items
                         SET reason = (reason - '_reasonPending')
                                      || jsonb_build_object('summary', cast(? AS text),
-                                                                  'factors', cast(? AS jsonb))
+                                                                  'factors', cast(? AS jsonb),
+                                                                  'usedEvidenceIds', cast(? AS jsonb))
                         WHERE id=? AND exposed_at IS NULL
                           AND (reason->>'summary' IS NULL OR reason->>'_reasonPending' = 'true')
                         """,
                         summary,
                         factorsJson,
+                        usedEvidenceIdsJson,
                         itemId)
                 == 1;
     }
