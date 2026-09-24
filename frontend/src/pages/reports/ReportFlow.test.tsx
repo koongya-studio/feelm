@@ -10,7 +10,7 @@
  * 목록 · 상세 · 첫 발급은 실제 API다(업무 -558). 응답은 `test/reports.ts`에서 온다.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import FilmPage from '../film/FilmPage';
 import MyDashboardPage from '../my/MyDashboardPage';
@@ -227,7 +227,7 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
       await screen.findByRole('heading', { name: '2026 상반기 취향 리포트' }),
     ).toBeInTheDocument();
 
-    expect(screen.queryByRole('button', { name: '저장' })).toBeNull();
+    expect(screen.getByRole('button', { name: '저장' })).toBeInTheDocument();
   });
 
   it('01 장르 뒷면에 국가 비율이, 04 캐릭터 뒷면에 지난 반기 비교가 있다', async () => {
@@ -394,247 +394,110 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
   );
 });
 
-describe('3.4 → 3.5', () => {
-  /*
-   * 공유하기는 주소가 아니라 4컷 이미지 두 장이다(업무 -849). API-060은 타인 리포트를 404로
-   * 숨겨 주소를 받은 사람은 아무것도 볼 수 없었다.
-   */
-  it('휴대폰에서는 앞면 · 뒷면 두 장을 공유 메뉴로 넘기고, 마치면 시트를 닫는다', async () => {
+describe('리포트 상세 저장과 공유', () => {
+  it('공유 버튼 한 번으로 두 이미지를 공유하고 중간 시트가 없다', async () => {
     const phone = stubPhoneShare(vi.fn().mockResolvedValue(undefined));
-
     try {
       renderApp(['/reports/301']);
-
-      // 헤더 아이콘과 아래 버튼 둘 다 3.5를 연다. 아래 버튼을 쓴다
-      const buttons = await screen.findAllByRole('button', { name: '공유하기' });
-      fireEvent.click(buttons[buttons.length - 1]);
-
-      const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
-      fireEvent.click(sheet.getByRole('button', { name: '공유하기' }));
-
-      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-      expect(phone.share).toHaveBeenCalledOnce();
-      const shared = phone.share.mock.calls[0][0] as ShareData;
-      expect(shared.title).toBe('2026 상반기 취향 리포트');
-      expect(shared.url).toBeUndefined();
-      expect(shared.files?.map((file) => file.name)).toEqual([
+      const share = await screen.findByRole('button', { name: '공유하기' });
+      expect(screen.getByRole('button', { name: '저장' })).toBeInTheDocument();
+      expect(screen.getByText('공유 이미지에는 닉네임과 취향 정보가 담겨요')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: '이미지로 저장' })).not.toBeInTheDocument();
+      fireEvent.click(share);
+      await waitFor(() => expect(phone.share).toHaveBeenCalledOnce());
+      expect((phone.share.mock.calls[0][0] as ShareData).files?.map((file) => file.name)).toEqual([
         'feelm-report-301-front.png',
         'feelm-report-301-back.png',
       ]);
-      // 서버에는 올리지 않는다. API-061은 `이미지로 저장`만 쓴다
       expect(createReportImage).not.toHaveBeenCalled();
     } finally {
       phone.restore();
     }
   });
 
-  it('뒷면은 칸을 모두 뒤집어 찍고, 뒤집어 두었던 모양으로 되돌린다', async () => {
+  it('공유 메뉴를 쓸 수 없으면 저장 없이 지원 불가를 알린다', async () => {
+    renderApp(['/reports/301']);
+    fireEvent.click(await screen.findByRole('button', { name: '공유하기' }));
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('이미지 공유를 지원하지 않아요'),
+    );
+    expect(downloadBlob).not.toHaveBeenCalled();
+    expect(createReportImage).not.toHaveBeenCalled();
+    expect(captureReportImage).not.toHaveBeenCalled();
+  });
+
+  it('공유 메뉴가 클릭 효력 만료로 거절되면 저장 없이 안내한다', async () => {
+    const phone = stubPhoneShare(
+      vi.fn().mockRejectedValue(new DOMException('expired', 'NotAllowedError')),
+    );
+    try {
+      renderApp(['/reports/301']);
+      fireEvent.click(await screen.findByRole('button', { name: '공유하기' }));
+      await waitFor(() =>
+        expect(screen.getByRole('status')).toHaveTextContent('공유 메뉴를 열지 못했어요'),
+      );
+      expect(phone.share).toHaveBeenCalledOnce();
+      expect(downloadBlob).not.toHaveBeenCalled();
+    } finally {
+      phone.restore();
+    }
+  });
+
+  it('뒤집힌 칸을 복원하고 앞면과 뒷면을 만든다', async () => {
     const phone = stubPhoneShare(vi.fn().mockResolvedValue(undefined));
-    let unflippedAtBackCapture: number | null = null;
-    vi.mocked(captureReportBackImage).mockImplementation(async () => {
-      unflippedAtBackCapture = screen.queryAllByRole('button', { name: /설명 보기$/ }).length;
-
-      return new Blob(['four-cut-back'], { type: 'image/png' });
-    });
-
     try {
       renderApp(['/reports/301']);
       await screen.findByText('01 장르');
       flipCut('01 장르');
-
-      const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
-      fireEvent.click(headerShare);
-      const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
-      fireEvent.click(sheet.getByRole('button', { name: '공유하기' }));
-
-      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-      expect(unflippedAtBackCapture).toBe(0);
+      fireEvent.click(screen.getByRole('button', { name: '공유하기' }));
+      await waitFor(() => expect(phone.share).toHaveBeenCalledOnce());
+      expect(captureReportImage).toHaveBeenCalledOnce();
+      expect(captureReportBackImage).toHaveBeenCalledOnce();
       expect(screen.getByRole('button', { name: '01 장르 사진 보기' })).toHaveAttribute(
         'aria-expanded',
         'true',
       );
-      expect(screen.getByRole('button', { name: '02 감독 설명 보기' })).toHaveAttribute(
-        'aria-expanded',
-        'false',
-      );
     } finally {
       phone.restore();
     }
   });
 
-  it('찍는 동안 공유가 거절되면 다시 누르게 하고, 두 번째는 찍지 않고 바로 연다', async () => {
-    const phone = stubPhoneShare(
-      vi
-        .fn()
-        .mockRejectedValueOnce(new DOMException('expired', 'NotAllowedError'))
-        .mockResolvedValueOnce(undefined),
-    );
-
+  it('이미지 캡처 실패를 알리고 다시 공유할 수 있다', async () => {
+    const phone = stubPhoneShare(vi.fn().mockResolvedValue(undefined));
+    vi.mocked(captureReportImage).mockRejectedValueOnce(new Error('image failed'));
     try {
       renderApp(['/reports/301']);
-      const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
-      fireEvent.click(headerShare);
-      const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
-      const shareButton = sheet.getByRole('button', { name: '공유하기' });
-
-      fireEvent.click(shareButton);
+      const share = await screen.findByRole('button', { name: '공유하기' });
+      fireEvent.click(share);
       await waitFor(() =>
-        expect(sheet.getByRole('status')).toHaveTextContent('공유하기를 한 번 더 눌러 주세요'),
+        expect(screen.getByRole('status')).toHaveTextContent('이미지를 만들지 못했어요'),
       );
-
-      fireEvent.click(shareButton);
-      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-      expect(phone.share).toHaveBeenCalledTimes(2);
-      expect(captureReportImage).toHaveBeenCalledOnce();
-      expect(captureReportBackImage).toHaveBeenCalledOnce();
+      expect(share).toBeEnabled();
+      fireEvent.click(share);
+      await waitFor(() => expect(phone.share).toHaveBeenCalledOnce());
+      expect(downloadBlob).not.toHaveBeenCalled();
     } finally {
       phone.restore();
     }
   });
 
-  it('데스크톱이면 두 장을 내려받고 알린다. 이미지로 저장은 API-061로 만든다', async () => {
+  it('저장 버튼은 PNG를 내려받고 화면에 머문다', async () => {
     renderApp(['/reports/301']);
-    const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
-    fireEvent.click(headerShare);
-
-    const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
-    fireEvent.click(sheet.getByRole('button', { name: '공유하기' }));
-    await waitFor(() =>
-      expect(sheet.getByRole('status')).toHaveTextContent('이미지 두 장을 저장했어요'),
-    );
-    expect(vi.mocked(downloadBlob).mock.calls.map(([, name]) => name)).toEqual([
-      'feelm-report-301-front.png',
-      'feelm-report-301-back.png',
-    ]);
-    expect(createReportImage).not.toHaveBeenCalled();
-
-    fireEvent.click(sheet.getByRole('button', { name: '이미지로 저장' }));
-    await waitFor(() =>
-      expect(sheet.getByRole('status')).toHaveTextContent(/^이미지를 저장했어요/),
-    );
+    fireEvent.click(await screen.findByRole('button', { name: '저장' }));
+    await waitFor(() => expect(downloadReportImage).toHaveBeenCalledOnce());
     expect(createReportImage).toHaveBeenCalledWith(301, expect.any(Blob));
-    expect(downloadReportImage).toHaveBeenCalledWith(
-      '/api/v1/report-images/901/download?expires=1&signature=x',
-      301,
-    );
+    expect(location()).toBe('/reports/301');
   });
 
-  it('공유할 이미지를 찍지 못하면 알리고 시트를 둔다', async () => {
-    vi.mocked(captureReportImage).mockReset().mockRejectedValueOnce(new Error('image failed'));
+  it('저장 실패 시 화면에 남아 이유를 알린다', async () => {
+    vi.mocked(downloadReportImage).mockRejectedValueOnce(new Error('expired'));
     renderApp(['/reports/301']);
-    const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
-    fireEvent.click(headerShare);
-
-    const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
-    fireEvent.click(sheet.getByRole('button', { name: '공유하기' }));
-
+    fireEvent.click(await screen.findByRole('button', { name: '저장' }));
     await waitFor(() =>
-      expect(sheet.getByRole('status')).toHaveTextContent('이미지를 만들지 못했어요'),
+      expect(screen.getByRole('status')).toHaveTextContent('이미지를 만들지 못했어요'),
     );
-    expect(downloadBlob).not.toHaveBeenCalled();
-  });
-
-  it('이미지로 저장은 API-061 PNG를 만들고 프로필을 다시 읽는다', async () => {
-    renderApp(['/reports/301']);
-    const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
-    await waitFor(() => expect(getMyProfile).toHaveBeenCalledOnce());
-    fireEvent.click(headerShare);
-
-    const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
-    fireEvent.click(sheet.getByRole('button', { name: '이미지로 저장' }));
-    await waitFor(() => expect(sheet.getByRole('status')).toHaveTextContent('이미지를 저장했어요'));
-    expect(captureReportImage).toHaveBeenCalledWith(expect.any(HTMLElement));
-    expect(getMyProfile).toHaveBeenCalledTimes(2);
-  });
-
-  /*
-   * 저장되는 것은 앞면 넷이다(업무 -812). 뒤집어 둔 채로 저장하면 뒷면이 찍히므로 먼저 되돌린다.
-   */
-  it('칸을 뒤집어 둔 채 이미지로 저장하면 앞면으로 되돌린 뒤 찍는다', async () => {
-    renderApp(['/reports/301']);
-
-    await screen.findByText('01 장르');
-    flipCut('01 장르');
-    expect(screen.getByRole('button', { name: '01 장르 사진 보기' })).toHaveAttribute(
-      'aria-expanded',
-      'true',
-    );
-
-    const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
-    fireEvent.click(headerShare);
-    const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
-    fireEvent.click(sheet.getByRole('button', { name: '이미지로 저장' }));
-
-    await waitFor(() => expect(sheet.getByRole('status')).toHaveTextContent('이미지를 저장했어요'));
-    expect(screen.getByRole('button', { name: '01 장르 설명 보기' })).toHaveAttribute(
-      'aria-expanded',
-      'false',
-    );
-  });
-
-  it('프로필 조회가 먼저 실패해도 저장 시 다시 읽고 닉네임이 반영된 DOM만 캡처한다', async () => {
-    vi.mocked(getMyProfile)
-      .mockReset()
-      .mockRejectedValueOnce(new Error('profile unavailable'))
-      .mockResolvedValueOnce(mockMyProfile);
-    renderApp(['/reports/301']);
-
-    const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
-    fireEvent.click(headerShare);
-    const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
-    fireEvent.click(sheet.getByRole('button', { name: '이미지로 저장' }));
-
-    await waitFor(() => expect(sheet.getByRole('status')).toHaveTextContent('이미지를 저장했어요'));
-    expect(getMyProfile).toHaveBeenCalledTimes(2);
-    const captured = vi.mocked(captureReportImage).mock.calls[0][0];
-    expect(captured.querySelector('figure')).toHaveAttribute('aria-label', '김난다의 취향 4컷');
-  });
-
-  it('이미지로 저장을 마치면 내려받은 이미지를 직접 공유하라고 알린다', async () => {
-    renderApp(['/reports/301']);
-    const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
-    fireEvent.click(headerShare);
-
-    const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
-    fireEvent.click(sheet.getByRole('button', { name: '이미지로 저장' }));
-
-    await waitFor(() =>
-      expect(sheet.getByRole('status')).toHaveTextContent(
-        '이미지를 저장했어요. 원하는 앱에서 직접 공유해 주세요',
-      ),
-    );
-  });
-
-  it('API-061의 409 · 429는 기다리면 풀리는 이유를 각각 알린다', async () => {
-    vi.mocked(createReportImage)
-      .mockReset()
-      .mockRejectedValueOnce(new ApiError(409, 'REPORT_GENERATING', '생성 중'))
-      .mockRejectedValueOnce(new ApiError(429, 'RATE_LIMITED', '요청 제한'))
-      .mockRejectedValueOnce(new ApiError(503, 'REPORT_IMAGE_STORAGE_UNAVAILABLE', '저장소'));
-    renderApp(['/reports/301']);
-    const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
-    fireEvent.click(headerShare);
-
-    const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
-    const saveButton = sheet.getByRole('button', { name: '이미지로 저장' });
-
-    fireEvent.click(saveButton);
-    await waitFor(() =>
-      expect(sheet.getByRole('status')).toHaveTextContent('리포트를 아직 만드는 중이에요'),
-    );
-
-    await waitFor(() => expect(saveButton).toBeEnabled());
-    fireEvent.click(saveButton);
-    await waitFor(() =>
-      expect(sheet.getByRole('status')).toHaveTextContent('이미지 요청이 몰렸어요'),
-    );
-
-    await waitFor(() => expect(saveButton).toBeEnabled());
-    fireEvent.click(saveButton);
-    await waitFor(() =>
-      expect(sheet.getByRole('status')).toHaveTextContent('이미지를 만들지 못했어요'),
-    );
-    expect(downloadReportImage).not.toHaveBeenCalled();
+    expect(location()).toBe('/reports/301');
   });
 });
 
@@ -647,7 +510,7 @@ describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
    * 같은 날 시안으로 배치가 바뀌면서 메뉴 줄이 아니라 **`4컷 리포트` 그림**이 됐다.
    * 이름만 바뀌었고 목적지는 그대로다.
    */
-  it('MY에서 목록으로 가서 상세를 열면 직접 저장 버튼 없이 공유만 제공한다', async () => {
+  it('MY에서 목록으로 가서 상세를 열면 저장과 공유를 제공한다', async () => {
     // 인화 중인 반기는 `items`가 아니라 `current`로 온다(API-059)
     serveList(reportList);
     renderApp([ROUTE_PATTERN.my]);
@@ -668,8 +531,8 @@ describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
       await screen.findByRole('heading', { name: '2025 하반기 취향 리포트' }),
     ).toBeInTheDocument();
 
-    expect(screen.queryByRole('button', { name: '저장' })).toBeNull();
-    expect(screen.getAllByRole('button', { name: '공유하기' })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: '저장' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '공유하기' })).toBeInTheDocument();
   });
 
   it('3.1의 리포트 버튼은 하나다. 새 리포트를 받기 전에는 3.3, 받은 뒤에는 7.3으로 간다', async () => {

@@ -1,7 +1,7 @@
 /*
  * 취향 4컷 PNG 저장 (API-061, 업무 -731).
  *
- * 3.5 공유 시트의 `이미지로 저장`이 화면의 `ReportFourCut`을 캡처해 API-061에 올리고, 받은
+ * 상세 화면의 `저장`이 `ReportFourCut`을 캡처해 API-061에 올리고, 받은
  * 서명 URL의 PNG를 실제로 내려받은 뒤에야 끝난다. URL 발급만으로 성공을 알리지 않는다
  * (`docs/api/report-trend.md` API-061 처리 규칙).
  */
