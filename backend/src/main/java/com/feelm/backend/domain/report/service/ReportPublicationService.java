@@ -29,6 +29,11 @@ public class ReportPublicationService {
     }
 
     @Transactional(readOnly = true)
+    public boolean hasCompletedFinalRun(ReportPeriod period) {
+        return repository.findCompletedPreparedCount(period) != null;
+    }
+
+    @Transactional(readOnly = true)
     public boolean completedWithoutEligibleUsers(ReportPeriod period) {
         return Integer.valueOf(0).equals(repository.findCompletedPreparedCount(period));
     }
