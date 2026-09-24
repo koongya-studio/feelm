@@ -57,7 +57,6 @@ import Ticket, { Barcode } from './Ticket';
 /** 와이어프레임 0.6의 나열 순서다 */
 const PROVIDERS: { provider: SocialProvider; label: string }[] = [
   { provider: 'google', label: '구글 로그인' },
-  { provider: 'naver', label: '네이버 로그인' },
   { provider: 'kakao', label: '카카오 로그인' },
 ];
 

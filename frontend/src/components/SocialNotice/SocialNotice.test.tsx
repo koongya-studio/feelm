@@ -18,7 +18,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-/** 세 제공자의 client-id를 모두 비운다. 로컬 `.env`에 값이 있어도 시험은 같은 상태에서 시작한다 */
+/** 모든 제공자의 client-id를 비운다. 로컬 `.env` 값과 무관하게 같은 상태에서 시작한다 */
 function noSocial() {
   vi.stubEnv('VITE_GOOGLE_CLIENT_ID', '');
   vi.stubEnv('VITE_KAKAO_CLIENT_ID', '');
@@ -57,6 +57,28 @@ describe('소셜 준비 중 안내', () => {
     render(<SocialNotice action="로그인" />);
 
     expect(screen.queryByText(/준비 중입니다/)).toBeNull();
+  });
+
+  it('네이버만 설정돼 있어도 노출 가능한 소셜 인증이 없다고 알린다', () => {
+    noSocial();
+    vi.stubEnv('VITE_NAVER_CLIENT_ID', 'naver-client');
+    render(<SocialNotice action="로그인" />);
+
+    expect(screen.getByText('소셜 로그인은 준비 중입니다.')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['0.6 로그인', <LoginPage key="login" />],
+    ['0.2 가입 방식 선택', <SignupMethodPage key="method" />],
+  ])('%s에 네이버 인증 진입점을 노출하지 않는다', (_, page) => {
+    noSocial();
+    vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'google-client');
+    vi.stubEnv('VITE_KAKAO_CLIENT_ID', 'kakao-client');
+    vi.stubEnv('VITE_NAVER_CLIENT_ID', 'naver-client');
+    renderPage(page);
+
+    expect(screen.queryByRole('button', { name: /네이버/ })).toBeNull();
+    expect(screen.getAllByRole('button', { name: /구글|카카오/ })).toHaveLength(2);
   });
 
   it.each([

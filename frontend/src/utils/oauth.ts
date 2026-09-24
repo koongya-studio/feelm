@@ -58,6 +58,9 @@ export const SOCIAL_PROVIDER_LABEL: Record<SocialProvider, string> = {
   naver: '네이버',
 };
 
+/** 화면에서 새 로그인·가입·연결·재인증을 시작할 수 있는 제공자(업무 -880) */
+export const SOCIAL_ENTRY_PROVIDERS: readonly SocialProvider[] = ['google', 'kakao'];
+
 /**
  * 콜백에서 이어 갈 곳. 로그인으로 시작했는지 가입으로 시작했는지에 따라 다르다.
  *
@@ -96,9 +99,9 @@ export function isOAuthConfigured(provider: SocialProvider): boolean {
   return clientId(provider) !== '';
 }
 
-/** 제공자가 하나라도 열려 있는지. 소셜 준비 중 안내의 기준이다(`components/SocialNotice`) */
+/** 화면에 노출하는 제공자가 하나라도 열려 있는지. 소셜 준비 중 안내의 기준이다 */
 export function isAnySocialConfigured(): boolean {
-  return (Object.keys(AUTHORIZE_URL) as SocialProvider[]).some(isOAuthConfigured);
+  return SOCIAL_ENTRY_PROVIDERS.some(isOAuthConfigured);
 }
 
 /**
