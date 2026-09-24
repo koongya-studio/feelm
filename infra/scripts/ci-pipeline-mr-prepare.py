@@ -34,9 +34,9 @@ UV_SHA256 = 'ab9b309d4586403f024e100abaceb396616e178a553e2500c36087d180f09509'
 NUMPY_WHEEL = 'numpy-2.2.6-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl'
 NUMPY_URL = 'https://files.pythonhosted.org/packages/b4/63/3de6a34ad7ad6646ac7d2f55ebc6ad439dbbf9c4370017c50cf403fb19b5/' + NUMPY_WHEEL
 NUMPY_SHA256 = 'fc7b73d02efb0e18c000e9ad8b83480dfcd5dfd11065997ed4c6747470ae8915'
-# Reviewed dependency inputs from MR !311 head d2d86d6348e53aee640e60451982049568fd5d30.
-PROJECT_SHA256 = '9af26ce74eb1e9ce9de985bc4e686b06f168d120a8346499ed6bfa4b85826150'
-LOCK_SHA256 = 'a61495007822f2456d63aeba01c5b22a0c26eba076aa2a0d79552eb3dc2a6c23'
+# Reviewed dependency inputs for the GBT benchmark MR !637.
+PROJECT_SHA256 = '42738eab21974db2d94509d99c708a89cbb05c8d0d676c6502e2b031d79454d8'
+LOCK_SHA256 = 'cc1c77bdb6fa16cf21c132f43deb886d2a0f38667a141969e4ab61344a06c56c'
 CACHE_PARENT = Path('/var/lib/feelm-ci222/pipeline-cache')
 MAX_DOWNLOAD = 64 * 1024**2
 
@@ -51,6 +51,7 @@ def load(name, filename):
 
 cache_policy = load('pipeline_prepare_cache_policy', 'ci-pipeline-cache-policy.py')
 configurator = load('pipeline_prepare_config', 'ci-pipeline-mr-config.py')
+runner = load('pipeline_prepare_runner', 'ci-pipeline-mr-runner.py')
 
 
 def rootless_command(*arguments):
@@ -281,9 +282,22 @@ def prepare_cache(inputs):
                 shutil.rmtree(path, ignore_errors=True)
 
 
-def prepare(source_root):
+def verify_config_target(replace_config):
+    if replace_config:
+        current = runner.read_config(configurator.CONFIG)
+        runner.verify_cache_identity(current)
+    else:
+        try:
+            configurator.CONFIG.lstat()
+        except FileNotFoundError:
+            return
+        raise RuntimeError('Pipeline configuration already exists; explicit replacement required')
+
+
+def prepare(source_root, replace_config=False):
     require_host()
     inputs = trusted_source(source_root)
+    verify_config_target(replace_config)
     image_id = existing_image()
     if image_id is None:
         with tempfile.TemporaryDirectory(prefix='ci352-image-') as temporary:
@@ -298,7 +312,8 @@ def prepare(source_root):
     else:
         print('PIPELINE_IMAGE_REUSED=' + image_id)
     cache, digest = prepare_cache(inputs)
-    configurator.install(str(cache), digest, PROJECT_SHA256, LOCK_SHA256)
+    configurator.install(str(cache), digest, PROJECT_SHA256, LOCK_SHA256,
+                         replace=replace_config)
     print('PIPELINE_MR_PREPARE: PASS')
     print('PIPELINE_IMAGE_ID=' + image_id)
     print('PIPELINE_CACHE=' + str(cache))
@@ -309,7 +324,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source-root')
     parser.add_argument('--confirm-prepare', action='store_true')
+    parser.add_argument('--confirm-replace-config', action='store_true')
     args = parser.parse_args()
+    if args.confirm_replace_config and not args.confirm_prepare:
+        parser.error('--confirm-replace-config requires --confirm-prepare')
     if not args.confirm_prepare:
         print('PLAN: download hash-pinned uv/NumPy inputs; build a separate Pipeline image '
               'offline from the preloaded pinned Spark base; load it into Rootless Docker; '
@@ -317,7 +335,7 @@ def main():
         return 0
     if args.source_root is None:
         parser.error('--source-root is required with --confirm-prepare')
-    prepare(args.source_root)
+    prepare(args.source_root, replace_config=args.confirm_replace_config)
     return 0
 
 

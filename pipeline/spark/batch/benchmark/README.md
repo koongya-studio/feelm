@@ -1,5 +1,7 @@
 # ALS distributed benchmark
 
+발표용 합성 데이터 기반 XGBoost 분산 학습은 별도 [GBT 실행 안내](GBT-README.md)를 따른다.
+
 이 작업은 검증된 MovieLens ratings Parquet으로 **ALS 모델 하나**를 학습해 Spark Worker
 scale-out 효과를 측정한다. 운영 baseline의 모델 선택·오프라인 평가·서빙 산출물은 실행하지
 않는다. 결과는 추천 품질 비교가 아니라 동일 연산의 처리 시간·처리량 비교에만 사용한다.

@@ -2,6 +2,13 @@
 
 ## Spark ML 런타임 검증
 
+S15P21E106-847의 발표용 GBT 분산 학습 벤치마크 때문에 Spark Master·두 Worker의
+공통 런타임 이미지에는 `xgboost-cpu==2.1.4`와 Spark XGBoost가 요구하는 pandas,
+PyArrow, SciPy, scikit-learn 및 그 전이 의존성을 같은 lock 버전으로 설치한다.
+기존 서비스 GBT 모델·Consumer 런타임에는 영향이 없다. 배포 후 세 컨테이너에서
+`from xgboost.spark import SparkXGBRegressor` import를 확인하고, 벤치마크 전용
+소규모 학습을 통과한 뒤 본 측정을 진행한다. [실행 안내](../../pipeline/spark/batch/benchmark/GBT-README.md)를 따른다.
+
 S15P21E106-290의 `ml-cluster-check.py`는 `spark-submit` client mode Driver와 두 Worker가
 모두 NumPy 2.2.6을 사용하고, 작은 고정 rating 데이터로 ALS 학습·예측이 성공하는지 확인합니다.
 보호된 `main` push에서 Dockerfile·requirements 또는 Spark 코드·배포 계약이 변경되면

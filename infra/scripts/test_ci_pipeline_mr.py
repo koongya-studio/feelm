@@ -20,10 +20,14 @@ version = "0.1.0"
 description = "FEELM PySpark pipeline batch and streaming jobs"
 requires-python = ">=3.10,<3.11"
 dependencies = [
+  "pandas==2.2.3",
   "psycopg[binary]==3.2.10",
+  "pyarrow==19.0.1",
   "pyspark[ml]==4.1.3",
+  "scikit-learn==1.6.1",
   "torch==2.6.0",
   "transformers==4.48.3",
+  "xgboost-cpu==2.1.4",
 ]
 
 [dependency-groups]
@@ -130,6 +134,21 @@ class PipelineBoundaryTests(unittest.TestCase):
         self.assertIn('pipeline/spark/tests/fixtures/example.csv', files)
         self.assertTrue(all(name == 'pipeline' or name.startswith('pipeline/spark')
                             for name in files))
+
+    def test_current_gbt_dependency_inputs_match_reviewed_policy(self):
+        boundary = self.boundary()
+        files = {
+            'pipeline/spark/.python-version': (SPARK / '.python-version').read_bytes(),
+            'pipeline/spark/pyproject.toml': (SPARK / 'pyproject.toml').read_bytes(),
+            'pipeline/spark/uv.lock': (SPARK / 'uv.lock').read_bytes(),
+        }
+        boundary.validate_project_policy(files)
+        changed = files | {
+            'pipeline/spark/pyproject.toml': files['pipeline/spark/pyproject.toml'].replace(
+                b'xgboost-cpu==2.1.4', b'xgboost-cpu==2.1.5'),
+        }
+        with self.assertRaisesRegex(ValueError, 'reviewed runtime policy'):
+            boundary.validate_project_policy(changed)
 
     def test_rejects_out_of_scope_secret_executable_and_link(self):
         boundary = self.boundary()
