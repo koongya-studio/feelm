@@ -222,6 +222,8 @@
 
 `GENRE_FAVORITE`(1위 장르가 2편 이상이고 평균 ★4.0 이상)는 `GENRE_DEVOTEE` · `GENRE_OMNIVORE` 다음에 같은 장르 묶음에서 판정한다. 앞쪽 규칙일수록 그 반기를 다른 사용자의 반기와 가르는 힘이 세다고 보아 순서를 정했다.
 
+위 표의 `code` 여러 개가 API-040 취향 키워드와 이름이 겹치지만 **별개 규칙**이다. 이쪽은 반기 집계이고 저쪽은 전체 이력이라 기간과 임계값이 다르며(`DIRECTOR_BINGE` 3편 대 4편, `GENRE_DEVOTEE` 50% 대 45%), `rationale`은 이쪽에만 있다. 한쪽 임계값을 바꿀 때 다른 쪽을 따라 바꾸지 않는다.
+
 `fourCut.*.image`는 `{ "url": string | null, "cutoutUrl"?: string | null, "position"?: { "x": number, "y": number }, "zoom"?: number }` 형태를 사용하며 `genre`·`director`·`actor` 세 칸에만 있다. `cutoutUrl`은 배경이 제거된 이미지, `position.x/y`는 0~100 범위의 크롭 위치다. `cutoutUrl`, `position`, `zoom`은 없으면 생략할 수 있다. 이미지가 없어도 네 칸의 이름과 상세 데이터는 반환하며 화면은 텍스트 대체 표시를 사용한다.
 
 감독·배우 칸의 `displayName`은 `people.original_name`(라틴 문자 원어명)이며 **외국 인물에만** 값이 있다.
