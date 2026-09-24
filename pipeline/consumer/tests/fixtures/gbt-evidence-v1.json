@@ -1,0 +1,77 @@
+{
+  "candidateVersion": 6,
+  "evidenceSchemaVersion": "gbt-evidence-v1",
+  "explanationVersion": "gbt-feature-attribution-v1",
+  "featureVersion": "v26-max70-kobis-flag-71-v1",
+  "generationId": "g1",
+  "inputVersion": "sha256:71c4edca6d3f4412fb97bae210131163eec731c2268cd0026b335e799053e271",
+  "items": [
+    {
+      "coverage": 1.0,
+      "evidence": [
+        {
+          "contribution": 0.20469269156455994,
+          "coverage": 0.5224635024281002,
+          "direction": "POSITIVE",
+          "evidenceId": "sha256:e85f3a022df7a8ba790c2bfc7bb05126ddd28857ddaef1ddc8657d9ec46791d1",
+          "group": "RATING_PATTERN"
+        },
+        {
+          "contribution": 0.18709102272987366,
+          "coverage": 0.47753649757189975,
+          "direction": "POSITIVE",
+          "evidenceId": "sha256:71995752477dc9fd58b331cdf6ea9dbcf5e9f40f0edbb93dd21cb8a084ead2cd",
+          "group": "POPULARITY_SIGNAL"
+        }
+      ],
+      "movieId": 3,
+      "score": 1.422775387763977
+    },
+    {
+      "coverage": 1.0,
+      "evidence": [
+        {
+          "contribution": 0.20469269156455994,
+          "coverage": 0.5224635024281002,
+          "direction": "POSITIVE",
+          "evidenceId": "sha256:c510bb93da95154a8c3a75b0a20229db9bd1f259cea1c948a5650feb04507fd8",
+          "group": "RATING_PATTERN"
+        },
+        {
+          "contribution": 0.18709102272987366,
+          "coverage": 0.47753649757189975,
+          "direction": "POSITIVE",
+          "evidenceId": "sha256:017f86da60d155658720908b86f215c109ce27e0b1b3054f20ccd2168b8add55",
+          "group": "POPULARITY_SIGNAL"
+        }
+      ],
+      "movieId": 4,
+      "score": 1.422775387763977
+    },
+    {
+      "coverage": 1.0,
+      "evidence": [
+        {
+          "contribution": 0.20469269156455994,
+          "coverage": 0.5224635024281002,
+          "direction": "POSITIVE",
+          "evidenceId": "sha256:a335a1026c7fbf4fe9206166a5a0c9b2fab03b82f2b13f031e2051afd03af2d4",
+          "group": "RATING_PATTERN"
+        },
+        {
+          "contribution": 0.18709102272987366,
+          "coverage": 0.47753649757189975,
+          "direction": "POSITIVE",
+          "evidenceId": "sha256:cc701c4c2502c5d1be8f4085386caa68a0144ccabdd0ffddc63d26991c503343",
+          "group": "POPULARITY_SIGNAL"
+        }
+      ],
+      "movieId": 5,
+      "score": 1.422775387763977
+    }
+  ],
+  "modelVersion": "gbt-test627",
+  "rankingVersion": "gbt-personal-raw-score-v1",
+  "servingRevision": "sha256:a4a6e66a2f8ec76d4bd8d2784c295b12513c9c15cf4eec1e205732f8ffc2b762",
+  "userId": 10
+}

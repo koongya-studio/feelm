@@ -41,7 +41,8 @@ Python Consumer는 ④에서 `recommendation-state`·`candidates`와 version 키
 | 전역 인기 영화 윈도우 집계 | Spark Streaming | FR-27, ADR-0017 |
 | **후보 점수 정렬 · 결정적 동점 셔플** | **Spring Boot** | 추천시스템 점수에 행동 가중치를 다시 적용하지 않음 |
 | **서비스 DB 미존재 · 평가 · 관심없음 제외 필터** | **Spring Boot** | 아래 2.1 |
-| 구조화 추천 근거 원본 저장 | Spring Boot | Consumer의 `reasons[]`를 세트 항목에 스냅샷 |
+| 기존 구조화 추천 근거 원본 저장 | Spring Boot | Consumer의 Candidate v6 `reasons[]`를 세트 항목에 스냅샷 |
+| GBT local attribution 근거 게시 | Python Consumer | Candidate v6와 분리된 같은 generation evidence snapshot |
 | 세트 버퍼 저장 · 노출 | Spring Boot | API-045 처리 규칙, `recommendation_items` |
 | 파티 raw Candidate 계산 | 파티 전용 Python Consumer | `feelm.party-refresh.v1` 입력을 계산해 Redis에 게시 |
 | 파티 raw Candidate 게시 완료 상태 기록 | 파티 전용 Python Consumer → Spring Boot | Redis 게시 뒤 완료 알림을 발행하고 Spring이 DB에 파티별 최신 위치 기록 |
@@ -364,8 +365,12 @@ position의 알림이 다시 발행될 수 있으며 Spring의 완료 상태 ups
    활성화한 경우 DISCOVERY 최대 100편도 만든다. Spring은 서비스 DB 미존재·평가·관심없음 후보만
    제외하고 종류별 점수 정렬과 동점 결정적 셔플 후 TASTE를 최대 50편 저장하고, DISCOVERY는
    저장된 TASTE와 겹치는 영화를 건너뛰어 다음 고유 후보로 최대 50편 채운다. Consumer의
-   구조화 `reasons[]`는 원본 그대로 스냅샷한다.
-4. Python Consumer가 `feelm:user:{userId}:candidate-version`, `feelm:user:{userId}:recommendation-state`, `feelm:user:{userId}:candidates`를 Lua 스크립트 한 번으로 원자적으로 기록한다. `candidate-version` String은 성공한 게시마다 증가하는 게시 순번이며, 상태와 Candidate는 같은 `modelVersion`·`servingRevision`·`generationId`·`inputSchemaVersion`·`inputHash`를 가진다.
+   구조화 `reasons[]`는 원본 그대로 스냅샷한다. K≥1 GBT TASTE는 같은 점수 행렬의 local attribution을
+   별도 evidence snapshot으로 만든다.
+4. Python Consumer가 `feelm:user:{userId}:candidate-version`, `feelm:user:{userId}:recommendation-state`,
+   `feelm:user:{userId}:candidates`, 같은 generation의 `gbt-evidence`를 Lua 스크립트 한 번으로 원자적으로
+   기록한다. `candidate-version` String은 성공한 게시마다 증가하는 게시 순번이며, 상태와 Candidate와
+   evidence는 같은 `modelVersion`·`servingRevision`·`generationId`·입력 hash를 가진다.
 
 Consumer group에서 partition을 새로 assign받은 Consumer는 먼저 partition별 fencing key에 새 CSPRNG opaque
 token을 설치한다. 후보 게시 Lua와 corrupt/partial 3키 복구 Lua는 전달된 token이 현재 key와 일치할 때만
@@ -397,6 +402,8 @@ Spring은 `candidates` JSON을 한 번 읽어 해당 버전의 후보 전체를 
 | `feelm:user:{userId}:recommendation-state` | String(JSON) | Python Consumer | Python Consumer · **Spring** | 없음 |
 | `feelm:user:{userId}:vector` | String(JSON) | 기존 Python Consumer | 전환 전 기존 Consumer · Spring | 없음. GBT 전환 뒤 읽지 않고 rollback 기간 후 정리 |
 | `feelm:user:{userId}:candidates` | String(JSON) | Python Consumer | Python Consumer · **Spring** | 없음 |
+| `feelm:user:{userId}:gbt-evidence:{generationId}` | String(JSON) | Python Consumer | **Spring(825 이후)** | 현재 generation 없음, 교체된 generation은 입력 snapshot과 같은 보존 기간 |
+| `feelm:user:{userId}:gbt-evidence-current` | String(JSON identity) | Python Consumer | Python Consumer | 없음. evidence 세대 복구·보존용 내부 포인터이며 Spring은 읽지 않음 |
 | `feelm:party:{partyId}:candidates` | String(JSON) | 파티 전용 Python Consumer | Spring | 없음 |
 | `feelm:consumer-fence:{groupId}:{topic}:{partition}` | String(opaque CSPRNG token) | Python Consumer | Python Consumer | 없음 |
 | `feelm:party-consumer-fence:{groupId}:{topic}:{partition}` | String(opaque CSPRNG token) | 파티 전용 Python Consumer | 파티 전용 Python Consumer | 없음 |
@@ -566,6 +573,53 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
   영화를 OTT 제공처별로 집계한다. `discovery`는 사용하지 않으며 점수 임계치나 추가 상위 편수 제한을
   적용하지 않는다. 취향 입력이 없어 `0.0` 동점 후보가 게시된 경우에도 같은 범위로 집계한다.
 
+**`feelm:user:{userId}:gbt-evidence:{generationId}`** — Candidate v6와 분리한 GBT 설명 근거
+
+```json
+{
+  "evidenceSchemaVersion": "gbt-evidence-v1",
+  "explanationVersion": "gbt-feature-attribution-v1",
+  "userId": 1024,
+  "generationId": "550e8400-e29b-41d4-a716-446655440000",
+  "modelVersion": "gbt-v26-20260923",
+  "servingRevision": "sha256:<bundle-manifest-digest>",
+  "featureVersion": "v26-max70-kobis-flag-71-v1",
+  "rankingVersion": "gbt-personal-raw-score-v1",
+  "inputVersion": "sha256:<immutable-user-input-digest>",
+  "candidateVersion": 6,
+  "items": [{
+    "movieId": 807,
+    "score": 4.32,
+    "coverage": 0.73,
+    "evidence": [{
+      "evidenceId": "sha256:<version-bound-evidence-digest>",
+      "group": "GENRE_PATTERN",
+      "direction": "POSITIVE",
+      "contribution": 0.41,
+      "coverage": 0.73
+    }]
+  }]
+}
+```
+
+- Candidate v6와 그 `reasons[]` 형식·허용 코드는 바꾸지 않는다. 824 이전 Backend는 이 별도 key를 읽지
+  않으므로 기존 추천 조회가 깨지지 않는다. 825는 사용자 state와 Candidate의 generation·model·serving·
+  input 결속을 먼저 검증한 뒤 정확히 같은 generation key만 읽는다.
+- root 필드는 위 집합과 정확히 같아야 한다. `items`는 TASTE 순서와 점수가 정확히 같은 최대 500편이며
+  K0 인기순·빈 결과에는 빈 배열이다. DISCOVERY·ALS·fallback 근거를 이 key에 넣지 않는다.
+- canonical JSON은 최대 2 MiB이며 넘으면 Candidate를 포함한 해당 세대 전체 게시를 실패시킨다.
+- 허용 그룹은 `GENRE_PATTERN`, `RATING_PATTERN`, `CONTENT_RELATION`, `POPULARITY_SIGNAL`,
+  `AUDIENCE_RATING_SIGNAL`뿐이다. `direction`은 `POSITIVE`, 후보별 evidence는 최대 3개다. contribution은
+  양의 유한 수, 각 coverage와 합계 coverage는 0~1 유한 수이며 evidence ID와 그룹은 후보 안에서 유일하다.
+- 입력 snapshot·상태·Candidate·evidence는 같은 fenced Lua에서 함께 기록한다. 같은 generation의 기존
+  evidence 바이트가 다르면 immutable publication conflict로 거부한다. 새 generation 게시 시 직전 evidence는
+  직전 입력 snapshot과 같은 TTL을 부여하고 현재 evidence에는 TTL을 두지 않는다. 같은 Lua는
+  `gbt-evidence-current` identity 포인터도 갱신하여 input head·상태·Candidate가 부분 유실돼 evidence만
+  남은 경우에도 직전 generation을 복구하고 보존 TTL을 적용한다.
+- 실제 알고리즘·feature 그룹·ID·coverage 정의는
+  [`gbt-model-artifacts-v1 §4.1`](../../pipeline/contracts/gbt-model-artifacts.md#41-gbt-local-attribution-근거-v1-s15p21e106-824)을 따른다.
+  825가 이 계약을 소비하고 628이 shadow·종단 승인을 마치기 전에는 GBT AI 문구를 운영에 노출하지 않는다.
+
 **`feelm:user:{userId}:behavior`**
 
 | 필드 | 의미 |
@@ -688,6 +742,8 @@ generation 일치 확인과 모바일 TASTE 2 + DISCOVERY 1·PC TASTE 3 + DISCOV
 | 대상 | 정책 |
 |---|---|
 | `recommendation-state` · `candidates` | TTL 없음. 담당 처리기가 같은 Lua 게시에서 함께 덮어쓴다 |
+| 현재 generation의 `gbt-evidence` | TTL 없음. 새 generation 게시 시 이전 evidence에 입력 snapshot과 같은 보존 TTL을 부여한다 |
+| GBT `user:{id}:gbt-evidence-current` | TTL 없음. evidence만 남는 부분 유실에서도 이전 generation을 찾아 보존 기간을 적용하기 위한 내부 identity 포인터다 |
 | GBT `user:{id}:input:{generation}` · `input-current` | 현재 입력과 identity/CAS head는 TTL 없음. 다음 세대 게시 때 이전 입력만 명시 보존 기간으로 만료한다. 기간·최대 bytes는 644/628 운영 검증에서 결정한다 |
 | 기존 `vector` | GBT 활성 뒤 읽지 않는다. rollback 보존 기간 후 735에서 정리한다 |
 | `behavior` | 키 단위 슬라이딩 TTL 8일. 필드는 일자 버킷이며 집계는 최근 7일분만 사용한다(아래) |

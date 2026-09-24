@@ -1,4 +1,4 @@
-"""742 fenced publication; only superseded input generations expire."""
+"""742 fenced publication; only superseded generation snapshots expire."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import secrets
 
 from feelm_consumer.gbt.errors import GbtError
 from feelm_consumer.gbt.inputs import movie_id
+from feelm_consumer.gbt_evidence import MAX_EVIDENCE_BYTES, EvidenceSnapshot, validate_evidence
 from feelm_consumer.gbt_snapshot import (
     INPUT_SCHEMA,
     MODEL_VERSION,
@@ -74,8 +75,8 @@ local head = object_at(KEYS[4])
 local epoch = head and head['publicationEpoch']
 if not known or type(epoch) ~= 'string' or #epoch ~= 64 or not string.match(epoch, '^[a-f0-9]+$') then
   -- A new user epoch invalidates prepared writers across every topic/group fence.
-  if not known and redis.call('EXISTS', KEYS[5], KEYS[6]) > 0 then current = 1 end
-  head = object_at(KEYS[5]) or object_at(KEYS[6]) or {}
+  if not known and redis.call('EXISTS', KEYS[5], KEYS[6], KEYS[7]) > 0 then current = 1 end
+  head = object_at(KEYS[5]) or object_at(KEYS[6]) or object_at(KEYS[7]) or {}
   head['publicationVersion'] = current
   head['publicationEpoch'] = ARGV[4]
   redis.call('SET', KEYS[4], cjson.encode(head))
@@ -86,15 +87,17 @@ return {current, head['publicationEpoch']}
 
 PUBLISH_LUA = MODEL_GUARD + READ_METADATA + """
 local current, known = current_version(KEYS[7])
-if not known and redis.call('EXISTS', KEYS[5], KEYS[6]) > 0 then return -3 end
+if not known and redis.call('EXISTS', KEYS[5], KEYS[6], KEYS[9]) > 0 then return -3 end
 local head = object_at(KEYS[7])
 if not head or head['publicationEpoch'] ~= ARGV[12] then return -3 end
 if current ~= tonumber(ARGV[4]) then return -3 end
 local prior = redis.call('GET', KEYS[4])
 if prior and prior ~= ARGV[5] then return -4 end
+local prior_evidence = redis.call('GET', KEYS[8])
+if prior_evidence and prior_evidence ~= ARGV[13] then return -4 end
 local identity = cjson.decode(ARGV[11])
 local old_keys = {}
-for _, key in ipairs({KEYS[7], KEYS[5], KEYS[6]}) do
+for _, key in ipairs({KEYS[7], KEYS[5], KEYS[6], KEYS[9]}) do
   local previous = object_at(key)
   if previous then
     local generation = previous['generationId']
@@ -104,11 +107,14 @@ for _, key in ipairs({KEYS[7], KEYS[5], KEYS[6]}) do
         for _, field in ipairs({'inputHash', 'inputSchemaVersion', 'modelVersion', 'servingRevision'}) do
           if previous[field] ~= identity[field] then return -4 end
         end
-      else old_keys[ARGV[10] .. generation] = true end
+      else
+        old_keys[ARGV[10] .. generation] = true
+        old_keys[ARGV[14] .. generation] = true
+      end
     end
   end
 end
--- Current state/candidates/input remain readable; only superseded inputs expire.
+-- Current state/candidates/input/evidence remain readable; superseded snapshots expire.
 for old_key, _ in pairs(old_keys) do
   if redis.call('PTTL', old_key) == -1 then redis.call('EXPIRE', old_key, ARGV[8]) end
 end
@@ -116,10 +122,12 @@ redis.call('SET', KEYS[4], ARGV[5])
 redis.call('SET', KEYS[5], ARGV[6])
 if ARGV[9] == '1' then redis.call('SET', KEYS[6], ARGV[7])
 else redis.call('DEL', KEYS[6]) end
+redis.call('SET', KEYS[8], ARGV[13])
 redis.call('SET', KEYS[3], current + 1)
 identity['publicationVersion'] = current + 1
 identity['publicationEpoch'] = ARGV[12]
 redis.call('SET', KEYS[7], cjson.encode(identity))
+redis.call('SET', KEYS[9], cjson.encode(identity))
 return current + 1
 """
 
@@ -174,9 +182,10 @@ class GbtStore:
     def current_version(self, user_id: int, fence: tuple[str, str]) -> PublicationVersion:
         key, token = self._fence(fence)
         base = f"{self.namespace}:user:{movie_id(user_id)}"
-        result = self.client.eval(VERSION_LUA, 6, key, self.revision_key,
+        result = self.client.eval(VERSION_LUA, 7, key, self.revision_key,
                                   f"{base}:candidate-version", f"{base}:input-current",
                                   f"{base}:recommendation-state", f"{base}:candidates",
+                                  f"{base}:gbt-evidence-current",
                                   token, self.serving_revision, self.model_version, secrets.token_hex(32))
         if not isinstance(result, list):
             self._checked(result)
@@ -202,14 +211,32 @@ class GbtStore:
         if (result.state.get("stateVersion") != 1 or result.state.get("modelKind") != "GBT"
                 or result.candidates.get("candidateVersion") != 6):
             raise GbtError("PUBLICATION_SCHEMA_MISMATCH")
+        if not isinstance(result.evidence, EvidenceSnapshot) or not result.evidence.sealed_for_publication():
+            raise GbtError("UNTRUSTED_EVIDENCE_RESULT")
+        evidence_payload = result.evidence.to_payload()
+        taste = result.candidates.get("taste")
+        if not isinstance(taste, list):
+            raise GbtError("PUBLICATION_SCHEMA_MISMATCH")
+        evidence_taste = taste if result.state.get("supportedInputCount", 0) > 0 else []
+        validate_evidence(
+            evidence_payload,
+            snapshot=snapshot,
+            candidates=[item.get("movieId") for item in evidence_taste],
+            scores=[item.get("score") for item in evidence_taste],
+        )
+        encoded_evidence = canonical(evidence_payload)
+        if len(encoded_evidence) > MAX_EVIDENCE_BYTES:
+            raise GbtError("EVIDENCE_TOO_LARGE")
         base = f"{self.namespace}:user:{snapshot.user_id}"
         return self._checked(self.client.eval(
-            PUBLISH_LUA, 7, key, self.revision_key, f"{base}:candidate-version",
+            PUBLISH_LUA, 9, key, self.revision_key, f"{base}:candidate-version",
             f"{base}:input:{snapshot.generation_id}", f"{base}:recommendation-state", f"{base}:candidates",
-            f"{base}:input-current",
+            f"{base}:input-current", f"{base}:gbt-evidence:{snapshot.generation_id}",
+            f"{base}:gbt-evidence-current",
             token, self.serving_revision, self.model_version, expected_version, encoded,
             canonical(result.state), canonical(result.candidates), self.snapshot_ttl_seconds,
             int(result.state["status"] == "READY"), f"{base}:input:", canonical(identity), expected_version.epoch,
+            encoded_evidence, f"{base}:gbt-evidence:",
         ))
 
     def read_snapshot(self, user_id: int, generation_id: str, *, serving_revision: str,
@@ -218,6 +245,10 @@ class GbtStore:
         return decode_snapshot(self.client.get(key), user_id=user_id, generation_id=generation_id,
                                serving_revision=serving_revision, model_version=model_version,
                                input_hash=input_hash, max_bytes=self.max_snapshot_bytes)
+
+    def read_evidence(self, user_id: int, generation_id: str):
+        key = f"{self.namespace}:user:{movie_id(user_id)}:gbt-evidence:{safe_identifier(generation_id)}"
+        return self.client.get(key)
 
     def record_failure(self, *, topic: str, partition: int, offset: int, code: str, fence: tuple[str, str]) -> None:
         safe_identifier(topic)

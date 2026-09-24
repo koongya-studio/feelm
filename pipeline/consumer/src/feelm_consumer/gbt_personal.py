@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from feelm_consumer.discovery import select_discovery_candidates
 from feelm_consumer.discovery_release import validate_discovery_artifacts
 from feelm_consumer.gbt.errors import GbtError
+from feelm_consumer.gbt_evidence import AttributionBuilder, EvidenceSnapshot, empty_evidence
 from feelm_consumer.gbt_snapshot import INPUT_SCHEMA, InputSnapshot
 from feelm_consumer.group_artifacts import compare_live_mapping
 from feelm_consumer.profile import ProfileInput
@@ -19,6 +20,7 @@ class PersonalResult:
     snapshot: InputSnapshot
     state: dict
     candidates: dict
+    evidence: EvidenceSnapshot
 
 
 class PersonalScorer:
@@ -28,6 +30,7 @@ class PersonalScorer:
         if (groups is None) != (popularity is None):
             raise GbtError("INCOMPLETE_DISCOVERY_ARTIFACTS")
         self.scorer, self.groups, self.popularity = scorer, groups, popularity
+        self.attribution = AttributionBuilder(scorer)
         if groups is not None:
             validate_discovery_artifacts(groups, popularity)
             table = scorer.bundle.table
@@ -60,6 +63,11 @@ class PersonalScorer:
                 key=lambda item: (-item.score, item.movie_id),
             )
         taste = [{"movieId": item.movie_id, "score": item.score, "reasons": []} for item in population[:500]]
+        evidence = (
+            self.attribution.build(snapshot, raw, [item["movieId"] for item in taste])
+            if raw.status == "OK"
+            else empty_evidence(snapshot)
+        )
         discovery = []
         if self.groups is not None and raw.status == "OK":
             selected = select_discovery_candidates(
@@ -98,4 +106,4 @@ class PersonalScorer:
             "eligibleCandidateCount": len(population),
         }
         return PersonalResult(snapshot, state,
-                              {**common, "taste": taste, "discovery": discovery})
+                              {**common, "taste": taste, "discovery": discovery}, evidence)

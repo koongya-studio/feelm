@@ -93,6 +93,53 @@ manifest가 묶은 코드/런타임/매핑/파일/71특징이 하나라도 다�
 - 각 요청의 특징 상태는 독립이다. 한 번 로드한 모델/영화 정적 정보로 반복 계산한다.
   전체/부분 후보 점수 오차≤1e-6, frozen Top100/500은 ID·순서 완전 일치해야 한다.
 
+### 4.1 GBT local attribution 근거 v1 (S15P21E106-824)
+
+K≥1의 개인 GBT TASTE 상위 500편은 원점수를 계산한 같은 `Booster`와 같은 71열 행렬로 exact
+TreeSHAP(`pred_contribs`, `approx_contribs=false`)을 계산한다. bias를 포함한 72개 기여 합이 방금 게시할
+원점수와 `rtol=1e-6`, `atol=1e-6` 안에서 일치해야 하며 shape·유한성·점수 결속 중 하나라도 실패하면
+해당 세대 전체 게시를 실패시킨다. attribution 때문에 후보 점수·정렬·제외를 바꾸지 않는다.
+
+근거 계약 버전은 다음 식별자를 함께 고정한다.
+
+- `explanationVersion=gbt-feature-attribution-v1`
+- `featureVersion=v26-max70-kobis-flag-71-v1`(bundle manifest의 `transform`)
+- `rankingVersion=gbt-personal-raw-score-v1`
+- 같은 bundle의 `modelVersion`·`servingRevision`
+- 같은 불변 사용자 입력의 `inputVersion`(`gbt-input-v1` snapshot `inputHash`)
+- Candidate v6의 같은 `generationId`, 후보 `movieId`와 원점수
+
+raw feature 이름·token·배우·감독 ID는 게시하지 않는다. bias와 결측/내부 보조 feature인
+`*_known`, `*_known_share`, `*_present`, `*_anchor`, `verified_kobis_member`도 공개 근거에서 제외한다.
+나머지 양의 기여만 다음 사용자 설명 그룹으로 합산한다.
+
+| 그룹 | 포함 신호 |
+| --- | --- |
+| `GENRE_PATTERN` | 국가×장르 평가 관계와 그 도달도 교차 |
+| `RATING_PATTERN` | 이력 규모·평균·표준편차·양/음 평가 비율 |
+| `CONTENT_RELATION` | 시리즈·키워드와 비식별화한 감독·출연진 관계 집계 |
+| `POPULARITY_SIGNAL` | 공개 도달도와 사용자 이력 도달도 관계 |
+| `AUDIENCE_RATING_SIGNAL` | 유효 TMDB 원평점 |
+
+현재 71특징에 없는 개봉 시기·상영시간은 모델 기여도로 만들지 않는다. 해당 근거가 필요하면 특징 계약과
+모델을 별도 버전으로 재학습·검증한 뒤 새 serving revision에서만 추가한다.
+
+그룹 양의 기여 내림차순, 동률이면 그룹 이름 오름차순으로 최대 3개를 게시한다. 각 coverage는
+`그룹 양의 기여 / bias를 제외한 71개 raw feature 전체 양의 기여`이고 후보 coverage는 게시한 그룹
+coverage의 합이다. 따라서 설명 불가 양의 기여가 있으면 coverage가 1보다 작을 수 있다. evidence ID는
+explanation/model/serving/feature/ranking/input version, movie ID와 그룹의 length-prefix UTF-8 SHA-256이다.
+같은 모델·입력·후보 재실행에서는 generation이 달라도 같고, 결속 식별자 하나라도 바뀌면 달라진다.
+
+Candidate v6와 기존 `reasons[]`는 변경하지 않는다. 결과는
+`feelm:user:{userId}:gbt-evidence:{generationId}`의 별도 strict JSON snapshot으로 입력·상태·Candidate와
+같은 fenced Lua에서 원자 게시한다. canonical JSON은 최대 2 MiB이며 초과 시 해당 세대 전체 게시를
+실패시킨다. attribution builder가 만든 깊은 불변 snapshot만 프로세스 내부 seal 검증을 통과해 게시할 수
+있으며, builder 뒤 contribution·coverage가 바뀐 객체는 Redis 호출 전에 거부한다. 내부
+`gbt-evidence-current` identity 포인터는 evidence만 남은 부분 유실에서도 직전 generation의 보존 TTL을
+복구하며 Backend 공개 계약에는 포함되지 않는다. K0 인기순, GBT 오류·미지원, 빈 결과, DISCOVERY, ALS·fallback에는
+후보별 GBT attribution을 만들지 않고 빈 `items`를 게시하거나 결과 세대 자체를 게시하지 않는다.
+Backend 소비와 문구 생성은 S15P21E106-825, 실제 shadow·활성화 승인은 S15P21E106-628 범위다.
+
 ## 5. 게시·복원과 검증 계층
 
 로컬 exporter는 전용 임시 디렉터리에 쓰고 전체 검증 뒤 atomic no-replace rename한다.
