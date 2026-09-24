@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.ResourceLock;
 
 /**
- * 취향 분석 소급 백필 마이그레이션 검증(S15P21E106-775).
+ * 취향 분석 소급 백필 마이그레이션 검증(S15P21E106-775, S15P21E106-883).
  *
  * <p>보정 대상이 이 마이그레이션 <i>이전</i>부터 평가가 있던 사용자라, 직전 버전까지 적용해 평가를 만든 뒤 나머지를 적용한다.
  *
@@ -28,15 +28,15 @@ import org.junit.jupiter.api.parallel.ResourceLock;
 @ResourceLock("backend-output-capture")
 class TasteAnalysesBackfillMigrationTest {
 
-    /** 이 마이그레이션 직전 버전. 사이에 새 마이그레이션이 끼면 이 값도 함께 올린다. */
-    private static final String VERSION_BEFORE_BACKFILL = "202609240005";
+    /** 개발 DB에 먼저 적용된 버전. 이 상태에서 백필이 순서 오류 없이 이어서 적용되어야 한다. */
+    private static final String VERSION_BEFORE_BACKFILL = "202609241438";
 
-    private static final String BACKFILL_VERSION = "202609241200";
+    private static final String BACKFILL_VERSION = "202609250144";
 
     private static final Path MIGRATION_FILE =
             Path.of(
                     "src/main/resources/db/migration/"
-                            + "V202609241200__backfill_taste_analyses.sql");
+                            + "V202609250144__backfill_taste_analyses.sql");
 
     private static final MigrationPostgresSupport.MigrationTestDatabase DATABASE =
             MigrationPostgresSupport.database("taste_analyses_backfill");
@@ -180,6 +180,31 @@ class TasteAnalysesBackfillMigrationTest {
                 Statement statement = connection.createStatement()) {
             assertThat(scalar(statement, "SELECT count(*) FROM taste_analyses")).isEqualTo(before);
             assertThat(scalar(statement, ratingCountQuery(alreadyCachedUserId))).isEqualTo(99L);
+        }
+    }
+
+    @Test
+    @DisplayName("이미 적용된 최신 버전 다음 순번으로 백필이 기록된다")
+    void recordsBackfillAfterPreviouslyAppliedMigration() throws SQLException {
+        try (Connection connection = DATABASE.connect();
+                Statement statement = connection.createStatement()) {
+            long previousRank =
+                    scalar(
+                            statement,
+                            "SELECT installed_rank FROM flyway_schema_history"
+                                    + " WHERE version = '"
+                                    + VERSION_BEFORE_BACKFILL
+                                    + "'");
+            long backfillRank =
+                    scalar(
+                            statement,
+                            "SELECT installed_rank FROM flyway_schema_history"
+                                    + " WHERE version = '"
+                                    + BACKFILL_VERSION
+                                    + "'");
+
+            assertThat(previousRank).isPositive();
+            assertThat(backfillRank).isGreaterThan(previousRank);
         }
     }
 
