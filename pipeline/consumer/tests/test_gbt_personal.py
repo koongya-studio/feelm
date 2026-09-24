@@ -55,6 +55,13 @@ def test_actual_personal_payload_matches_java_reader_fixture(scorer):
     # Cross-service fixture equality is mandatory in infra/scripts/test_verify_consumer_e2e.py.
 
 
+def test_actual_evidence_payload_matches_backend_handoff_fixture(scorer):
+    value = snapshot(scorer, [(1, 1.0)], dismissed=[2], watched=range(6, 1006))
+    result = PersonalScorer(scorer).calculate(value, generated_at="2026-09-23T00:00:00Z")
+    fixture = Path(__file__).parent / "fixtures/gbt-evidence-v1.json"
+    assert result.evidence.to_payload() == json.loads(fixture.read_text(encoding="utf-8"))
+
+
 def decoded(value, raw=None, **overrides):
     args = dict(user_id=value.user_id, generation_id=value.generation_id, model_version=value.model_version,
                 serving_revision=value.serving_revision, input_hash=value.input_hash, max_bytes=10**7)
@@ -230,5 +237,6 @@ def test_discovery_receives_population_beyond_taste_limit(scorer, monkeypatch):
     personal.popularity = SimpleNamespace(candidates=())
     actual = personal.calculate(snapshot(scorer, [(1, 5)]))
     assert captured["count"] == 1004 and len(captured["ratings"]) == 1
-    assert actual.candidates["discovery"][0]["movieId"] not in {
-        item["movieId"] for item in actual.candidates["taste"]}
+    discovery_id = actual.candidates["discovery"][0]["movieId"]
+    assert discovery_id not in {item["movieId"] for item in actual.candidates["taste"]}
+    assert discovery_id not in {item["movieId"] for item in actual.evidence.to_payload()["items"]}

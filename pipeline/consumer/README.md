@@ -7,6 +7,16 @@ v26 GBT 전용 번들·독립 scorer는 [GBT.md](./GBT.md)를 따른다. 개인 
 운영 기본 명령의 개인·파티 GBT 선택, 필수 환경 변수와 전환 인계는
 [644 실행 안내](GBT-644.md)를 따른다. 기본 `CONSUMER_RUNTIME=legacy`에서는 아래 기존 ALS 경로를 사용한다.
 
+S15P21E106-824부터 K≥1 개인 GBT TASTE 상위 500편은 같은 모델·71특징·입력으로 exact TreeSHAP을
+계산하고, Candidate v6와 분리된 `feelm:user:{userId}:gbt-evidence:{generationId}`에 설명 근거를
+입력 snapshot·상태·Candidate와 원자 게시한다. 기존 Candidate v6와 `reasons[]`는 바꾸지 않는다.
+Consumer는 같은 Lua에서 내부 `gbt-evidence-current` identity도 갱신해 evidence 단독 잔존 시 이전 세대
+보존 TTL을 복구하며, attribution builder가 seal한 불변 snapshot 외의 게시를 거부한다.
+K0·DISCOVERY·ALS·오류/fallback은 GBT 근거로 표시하지 않는다. 상세 schema와 그룹은
+[`gbt-model-artifacts-v1 §4.1`](../contracts/gbt-model-artifacts.md#41-gbt-local-attribution-근거-v1-s15p21e106-824)과
+[`streaming-contract §5.2`](../../docs/api/streaming-contract.md#52-값-구조)를 따른다. 825가 별도 key를
+소비하고 628이 shadow·종단 승인을 끝내기 전에는 이 근거 기반 문구를 운영에 활성화하지 않는다.
+
 Kafka의 평가·온보딩·관심없음 이벤트를 받아 최신 사용자 입력으로 ALS Fold-in을 수행하고 TASTE 최대 500편과
 DISCOVERY 최대 100편을 갱신한다. Python 3.12의 독립 프로젝트이며 Spark 코드를 import하지 않는다.
 모델·매핑·영화 메타데이터는 모두 같은 `input_snapshot`을 가리켜야 하며, 하나라도 맞지 않으면 시작을 거부한다.
