@@ -71,6 +71,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import Button from '../../../components/Button';
+import Chip from '../../../components/Chip';
 import PopcornBucket from '../../../components/PopcornBucket';
 import AppHeader from '../../../components/AppHeader';
 import DesktopAside from '../../../components/DesktopAside';
@@ -89,6 +90,7 @@ import { ChevronRightIcon, SettingsIcon } from '../../../components/Icon';
 import MyAside from './MyAside';
 import { useShellSize } from '../../../hooks/useShellSize';
 import { getOtts } from '../../../api/otts';
+import { getMyTaste } from '../../../api/taste';
 import { getRecommendationHistory } from '../../../api/recommendations';
 import { getMyReports, getReportDetail } from '../../../api/reports';
 import { getPopcornBucket } from '../../../api/taste';
@@ -105,12 +107,34 @@ import type { RecommendationHistoryItem } from '../../../types/recommendation';
 // 같은 이름의 통 그림 컴포넌트가 이미 있어 타입은 이름을 바꿔 들여온다
 import type { PopcornBucket as PopcornBucketData } from '../../../types/taste';
 import type { ReportDetail, ReportSummary } from '../../../types/report';
+import type { TasteAnalysis } from '../../../types/taste';
 import type { ProfileView } from '../../../types/unspecified';
 import type { Ott } from '../../../types/ott';
 import type { MyRatedItem, MyRatingList, WatchRecordListItem } from '../../../types/watch';
 
 /** 포스터 비율 2:3. 격자는 칸 폭이 화면에 따라 달라지므로 비율만 고정한다 */
 const POSTER_RATIO = { width: 2, height: 3 };
+
+/** 앞의 몇 개를 채운 칩으로 그릴지. 7.2-A · 7.2-B와 같은 수다 */
+const LEADING_KEYWORDS = 2;
+
+/** API-040이 키워드를 만드는 최소 평가 편수. 계약 처리 규칙과 같은 값이다 */
+const MINIMUM_RATINGS_FOR_KEYWORDS = 15;
+
+/**
+ * 키워드가 없을 때 무엇을 말할지.
+ *
+ * **두 경우가 다르다.** 계약은 `insufficientData`를 평가 수가 아니라 키워드 공백으로 정하므로
+ * (API-040), 평가가 넉넉한데 규칙을 못 넘겨 비는 사용자가 있다. 그 사람에게 `평가가 부족해요`라고
+ * 하면 화면에 보이는 평가 수와 어긋난다.
+ */
+function emptyTasteText(ratingCount: number): string {
+  const left = MINIMUM_RATINGS_FOR_KEYWORDS - ratingCount;
+
+  return left > 0
+    ? `${left}개만 더 평가하면 취향 키워드가 생겨요`
+    : '아직 뚜렷한 취향이 잡히지 않았어요. 더 평가하면 키워드가 생겨요';
+}
 
 const TABS = [
   { key: 'ratings', label: '평가한 영화' },
@@ -325,6 +349,30 @@ export default function MyDashboardPage() {
    */
   const desktop = useShellSize() !== 'mobile';
   const [profile, setProfile] = useState<ProfileView | null>(null);
+
+  /**
+   * 취향 키워드(API-040). 서버가 못 주면 `null`로 두고 구역을 그리지 않는다 — 키워드를 못
+   * 받았다고 프로필과 피드까지 오류로 만들 이유가 없다.
+   *
+   * 프로필(`getMyProfileView`)도 같은 키워드를 싣지만 그쪽은 공개 여부를 걸러 쓰는 쪽(7.2 ·
+   * 7.2-A · 7.2-B)을 위한 것이다. **내 대시보드는 비공개로 둔 것까지 내 키워드를 다 보여준다.**
+   * 남은 개수를 말하려면 `ratingCount`도 필요해 여기서 따로 부른다.
+   */
+  const [taste, setTaste] = useState<TasteAnalysis | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    getMyTaste()
+      .then((value) => {
+        if (active) setTaste(value);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      active = false;
+    };
+  }, []);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
 
@@ -653,6 +701,27 @@ export default function MyDashboardPage() {
           </span>
         </Link>
       </div>
+
+      {taste ? (
+        <section className={styles.taste} aria-labelledby="my-taste-heading">
+          <h2 id="my-taste-heading" className={styles.tasteTitle}>
+            내 취향
+          </h2>
+          {taste.keywords.length > 0 ? (
+            <ul className={styles.tasteKeywords}>
+              {taste.keywords.map((keyword, index) => (
+                <li key={keyword.code}>
+                  <Chip variant={index < LEADING_KEYWORDS ? 'solid' : 'outline'}>
+                    {keyword.label}
+                  </Chip>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className={styles.tasteNote}>{emptyTasteText(taste.ratingCount)}</p>
+          )}
+        </section>
+      ) : null}
 
       {/* 시안이 탭 위에 둔 구역 이름. 좁은 화면은 탭 자체가 그 말을 해 두지 않는다 */}
       {desktop ? <h2 className={styles.feedTitle}>내 기록</h2> : null}

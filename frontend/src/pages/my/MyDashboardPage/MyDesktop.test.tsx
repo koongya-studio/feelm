@@ -39,6 +39,14 @@ vi.mock('../../../api/users', () => ({
 
 vi.mock('../../../api/taste', () => ({
   getPopcornBucket: vi.fn(),
+  // 대시보드가 취향 키워드 구역을 그리려고 부른다(업무 -836)
+  getMyTaste: vi.fn().mockResolvedValue({
+    ratingCount: 0,
+    insufficientData: true,
+    analysis: { genres: [] },
+    keywords: [],
+    analyzedAt: null,
+  }),
 }));
 
 vi.mock('../../../api/reports', () => ({
