@@ -26,6 +26,8 @@
 /*
  * 하단 바가 본문 위에 겹쳐 있으므로, 끝까지 스크롤했을 때 마지막 요소가 가리지
  * 않도록 바 높이(safe area 포함)에 숨 쉴 여백 16px을 더해 자리를 비운다(업무 -688).
+ * 여백은 스크롤 컨테이너의 padding 대신 실제 flex 자식으로 둔다. iOS Safari에서
+ * 넘치는 flex 자식 뒤의 padding이 스크롤 높이에 잡히지 않는 경우에도 끝까지 닿는다.
  *
  * 끝에 닿은 스크롤이 문서로 넘어가지 않게 한다(`overscroll-behavior`, 업무 -741). 넘어가면
  * iOS 사파리가 화면 전체를 튕겨 하단 바가 같이 움직인다. 문서 쪽 잠금은 `global.css`에 있다.
@@ -43,5 +45,10 @@
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding-bottom: calc(var(--nav-height) + var(--space-4) + env(safe-area-inset-bottom, 0px));
+}
+
+.body::after {
+  content: '';
+  flex: none;
+  height: calc(var(--nav-height) + var(--space-4) + env(safe-area-inset-bottom, 0px));
 }
