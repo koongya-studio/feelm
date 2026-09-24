@@ -1,8 +1,8 @@
 /*
  * 취향 리포트 — 이동 경로 (업무 S15P21E106-308)
  *
- * 같은 리포트를 두 길로 본다. 필름 쪽(3.1 → 3.3 → 3.4 ⇢ 3.1)과 MY 쪽(7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3)이다.
- * 둘 다 같은 상세 화면을 쓰므로 **`저장`이 어디로 돌아가는지**가 갈리는 자리다.
+ * 같은 리포트를 두 길로 본다. 필름 쪽(3.1 → 3.3 → 3.4)과 MY 쪽(7.1 · 3.1 → 7.3 → 7.4)이다.
+ * 둘 다 같은 상세 화면을 쓰며 PNG 저장은 공유 시트에서만 제공한다.
  *
  * 3.3은 들어오는 화살표가 없어 규칙을 정했다 — 아직 뽑지 않은 리포트가 있으면 3.1의 버튼이
  * 3.3으로 간다. 홈을 없애면서(업무 -461) 그 출발점이 2.1에서 3.1로 옮겨왔다.
@@ -166,9 +166,9 @@ function renderApp(entries: string[]) {
         <Route path={ROUTE_PATTERN.film} element={<FilmPage />} />
         <Route path={ROUTE_PATTERN.my} element={<MyDashboardPage />} />
         <Route path={ROUTE_PATTERN.tasteReports} element={<ReportListPage />} />
-        <Route path={ROUTE_PATTERN.myReport} element={<ReportDetailPage from="my" />} />
+        <Route path={ROUTE_PATTERN.myReport} element={<ReportDetailPage />} />
         <Route path={ROUTE_PATTERN.reportIssued} element={<ReportIssuedPage />} />
-        <Route path={ROUTE_PATTERN.report} element={<ReportDetailPage from="film" />} />
+        <Route path={ROUTE_PATTERN.report} element={<ReportDetailPage />} />
       </Routes>
       <LocationProbe />
     </MemoryRouter>,
@@ -227,14 +227,7 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
       await screen.findByRole('heading', { name: '2026 상반기 취향 리포트' }),
     ).toBeInTheDocument();
 
-    // 3.4 ⇢ 3.1 저장 후 취향 필름으로 돌아가기. 4컷 PNG를 내려받은 뒤에 나간다(업무 -731)
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    await waitFor(() => expect(location()).toBe('/film'));
-    expect(createReportImage).toHaveBeenCalledWith(301, expect.any(Blob));
-    expect(downloadReportImage).toHaveBeenCalledWith(
-      '/api/v1/report-images/901/download?expires=1&signature=x',
-      301,
-    );
+    expect(screen.queryByRole('button', { name: '저장' })).toBeNull();
   });
 
   it('01 장르 뒷면에 국가 비율이, 04 캐릭터 뒷면에 지난 반기 비교가 있다', async () => {
@@ -643,17 +636,6 @@ describe('3.4 → 3.5', () => {
     );
     expect(downloadReportImage).not.toHaveBeenCalled();
   });
-
-  it('3.4 `저장`이 PNG를 받지 못하면 나가지 않고 버튼 위에 이유를 알린다', async () => {
-    vi.mocked(downloadReportImage).mockReset().mockRejectedValueOnce(new Error('expired'));
-    renderApp(['/reports/301']);
-
-    fireEvent.click(await screen.findByRole('button', { name: '저장' }));
-
-    expect(await screen.findByRole('status')).toHaveTextContent('이미지를 만들지 못했어요');
-    expect(location()).toBe('/reports/301');
-    expect(screen.getByRole('button', { name: '저장' })).toBeEnabled();
-  });
 });
 
 describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
@@ -665,7 +647,7 @@ describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
    * 같은 날 시안으로 배치가 바뀌면서 메뉴 줄이 아니라 **`4컷 리포트` 그림**이 됐다.
    * 이름만 바뀌었고 목적지는 그대로다.
    */
-  it('MY에서 목록으로 가서 상세를 열고, 저장하면 목록으로 돌아온다', async () => {
+  it('MY에서 목록으로 가서 상세를 열면 직접 저장 버튼 없이 공유만 제공한다', async () => {
     // 인화 중인 반기는 `items`가 아니라 `current`로 온다(API-059)
     serveList(reportList);
     renderApp([ROUTE_PATTERN.my]);
@@ -686,10 +668,8 @@ describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
       await screen.findByRole('heading', { name: '2025 하반기 취향 리포트' }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '저장' }));
-    await waitFor(() => expect(location()).toBe('/my/reports'));
-    expect(createReportImage).toHaveBeenCalledWith(202, expect.any(Blob));
-    expect(downloadReportImage).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('button', { name: '저장' })).toBeNull();
+    expect(screen.getAllByRole('button', { name: '공유하기' })).toHaveLength(2);
   });
 
   it('3.1의 리포트 버튼은 하나다. 새 리포트를 받기 전에는 3.3, 받은 뒤에는 7.3으로 간다', async () => {
@@ -737,6 +717,16 @@ describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
     renderApp([ROUTE_PATTERN.tasteReports]);
 
     expect(await screen.findByText('아직 인화된 취향 4컷이 없어요')).toBeInTheDocument();
+  });
+
+  it('첫 미발급 리포트가 준비됐으면 빈 목록 대신 확인하러 가기를 제공한다', async () => {
+    serveList({ items: [], current: reportListBeforeIssue.current, preparing: false });
+    renderApp([ROUTE_PATTERN.tasteReports]);
+
+    expect(await screen.findByText('새 취향 4컷이 도착했어요')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '확인하러 가기' }));
+
+    expect(location()).toBe('/reports/301/new');
   });
 
   /*

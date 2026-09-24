@@ -176,8 +176,8 @@ export const router = createBrowserRouter(
 
             // 취향 리포트 · 알림 · OTT 찾기 (업무 -308). 와이어프레임에 하단 내비가 없다
             { path: ROUTE_PATTERN.reportIssued, element: <ReportIssuedPage /> },
-            { path: ROUTE_PATTERN.report, element: <ReportDetailPage from="film" /> },
-            { path: ROUTE_PATTERN.myReport, element: <ReportDetailPage from="my" /> },
+            { path: ROUTE_PATTERN.report, element: <ReportDetailPage /> },
+            { path: ROUTE_PATTERN.myReport, element: <ReportDetailPage /> },
             { path: ROUTE_PATTERN.notifications, element: <NotificationListPage /> },
             { path: ROUTE_PATTERN.pushPreview, element: <PushPreviewPage /> },
             { path: ROUTE_PATTERN.ottFinder, element: <OttFinderPage /> },

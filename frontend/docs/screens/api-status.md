@@ -177,7 +177,7 @@
 | `getMyReports` | 실제 | API-059(업무 -558) |
 | `getReportDetail` | 실제 | API-060(업무 -558) |
 | `issueReport` | 실제 | API-080 첫 발급 기록(업무 -558) |
-| `createReportImage` | 실제 | 화면의 `ReportFourCut` PNG를 API-061에 저장하고 서명 URL을 다운로드한다(업무 -557). 3.4 · 7.4 `저장`과 3.5 `이미지로 저장`이 같이 쓰고, 409 · 429를 따로 안내한다(업무 -731) |
+| `createReportImage` | 실제 | 화면의 `ReportFourCut` PNG를 API-061에 저장하고 서명 URL을 다운로드한다(업무 -557). 3.5 공유 시트의 `이미지로 저장`이 쓰고, 409 · 429를 따로 안내한다(업무 -731 · -848) |
 | `getLatestReadyReport` | 조합 | API-059 `current`로 3.1 버튼을 가른다. 목업 시절 세션에 두었던 `본 적 있음` 표시를 서버의 `issuedAt`으로 바꿨다 |
 
 ### `notifications.ts` · `push.ts`

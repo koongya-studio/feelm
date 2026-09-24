@@ -35,6 +35,135 @@
   gap: var(--space-4);
 }
 
+/* ─────────────────────────── 첫 미발급 리포트 도착 안내 */
+
+/*
+ * 일반 빈 상태 대신 이 목록의 모눈 벽에 새 인화 안내지를 붙인다(업무 -848).
+ * 리포트 목록의 인화지와 같은 빨간 테이프 · 종이 그림자를 써서 다음 동작이 3.3 인화임을
+ * 보여 준다. 빨강은 새 항목 표식과 테이프에만 쓰고, 주 동작은 앱 기본 검정 알약이다.
+ */
+.readyPage {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6) var(--screen-padding-x) var(--space-10);
+}
+
+.readyNote {
+  --tape-width: 32%;
+  --tape-height: 18px;
+  --tape-top: -9px;
+  --tape-shift: -50%;
+  --tape-angle: -4deg;
+
+  position: relative;
+  display: flex;
+  width: min(100%, 312px);
+  box-sizing: border-box;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-8) var(--space-5) var(--space-5);
+  border: 1px solid var(--color-line);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow:
+    0 1px 2px rgba(38, 39, 41, 0.12),
+    0 14px 32px rgba(38, 39, 41, 0.14);
+  text-align: center;
+  transform: rotate(-0.35deg);
+}
+
+/* 실제 4컷이 아직 화면에 나오기 전이라 내용을 지어내지 않고 네 칸의 인화지만 보여 준다 */
+.readyStrip {
+  display: grid;
+  width: 56px;
+  box-sizing: border-box;
+  padding: 5px;
+  margin-bottom: var(--space-4);
+  aspect-ratio: 385 / 1116;
+  background: var(--color-surface-dark);
+  box-shadow: var(--shadow-card);
+  gap: 3px;
+  grid-template-rows: repeat(4, 1fr);
+  transform: rotate(1.2deg);
+}
+
+.readyStrip > span {
+  border: 1px solid var(--color-line-on-dark);
+  background: linear-gradient(145deg, #4a4b50, #292a2e);
+}
+
+.readyLabel {
+  display: inline-flex;
+  align-items: center;
+  margin-bottom: var(--space-2);
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  gap: var(--space-2);
+  letter-spacing: 0.08em;
+  line-height: var(--line-height-caption);
+  text-transform: uppercase;
+}
+
+.readyDot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-brand);
+}
+
+.readyTitle {
+  color: var(--color-ink);
+  font-size: var(--font-size-heading);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-heading);
+}
+
+.readyDescription {
+  margin-top: var(--space-2);
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-body);
+}
+
+.readyAction {
+  width: 100%;
+  margin-top: var(--space-5);
+}
+
+/* 320×568에서도 안내지와 주 동작이 하단 내비 위에서 끝나게 세로 장식만 압축한다 */
+@media (max-height: 620px) {
+  .readyPage {
+    align-items: flex-start;
+    padding-top: var(--space-4);
+    padding-bottom: var(--space-4);
+  }
+
+  .readyNote {
+    padding: var(--space-6) var(--space-4) var(--space-4);
+  }
+
+  .readyStrip {
+    width: 42px;
+    margin-bottom: var(--space-3);
+  }
+
+  .readyLabel {
+    margin-bottom: var(--space-1);
+  }
+
+  .readyDescription {
+    margin-top: var(--space-1);
+  }
+
+  .readyAction {
+    margin-top: var(--space-3);
+  }
+}
+
 .year {
   display: flex;
   flex-direction: column;

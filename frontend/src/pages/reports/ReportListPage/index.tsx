@@ -24,7 +24,7 @@
  * 인화 중인 반기만 있어도 잠긴다.
  */
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import Button from '../../../components/Button';
 import IconButton from '../../../components/IconButton';
 import ReportFourCut from '../../../components/ReportFourCut';
@@ -56,9 +56,12 @@ type Entry = {
 };
 
 export default function ReportListPage() {
+  const navigate = useNavigate();
   const [entries, setEntries] = useState<Entry[] | null>(null);
   /** 최신 반기를 아직 만들고 있는지(API-059 `preparing`) */
   const [preparing, setPreparing] = useState(false);
+  /** 공개됐지만 아직 첫 발급하지 않은 최신 리포트(API-059 current) */
+  const [readyReportId, setReadyReportId] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
 
@@ -67,7 +70,12 @@ export default function ReportListPage() {
 
     getMyReports()
       .then(async ({ items, current, preparing: inProgress }) => {
-        if (active) setPreparing(inProgress);
+        if (active) {
+          setPreparing(inProgress);
+          setReadyReportId(
+            current?.status === 'READY' && current.issuedAt === null ? current.reportId : null,
+          );
+        }
 
         const opened = await Promise.all(
           items.map(async (summary): Promise<Entry> => ({
@@ -166,6 +174,44 @@ export default function ReportListPage() {
   }
 
   if (entries.length === 0) {
+    if (readyReportId !== null) {
+      return (
+        <div className={styles.screen}>
+          {header}
+
+          <main className={styles.readyPage}>
+            <section className={styles.readyNote} aria-labelledby="ready-report-title">
+              <ReportTape />
+
+              <div className={styles.readyStrip} aria-hidden="true">
+                <span />
+                <span />
+                <span />
+                <span />
+              </div>
+
+              <p className={styles.readyLabel}>
+                <span className={styles.readyDot} aria-hidden="true" />새 리포트
+              </p>
+              <h2 className={styles.readyTitle} id="ready-report-title">
+                새 취향 4컷이 도착했어요
+              </h2>
+              <p className={styles.readyDescription}>
+                이번 반기에 쌓인 영화 취향을
+                <br />한 장씩 인화해 보세요
+              </p>
+
+              <div className={styles.readyAction}>
+                <Button onClick={() => void navigate(path.reportIssued(readyReportId))}>
+                  확인하러 가기
+                </Button>
+              </div>
+            </section>
+          </main>
+        </div>
+      );
+    }
+
     return (
       <>
         {header}
