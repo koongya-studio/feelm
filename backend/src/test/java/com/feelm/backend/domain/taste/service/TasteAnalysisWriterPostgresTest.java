@@ -35,6 +35,7 @@ class TasteAnalysisWriterPostgresTest extends SharedPostgresContractTest {
     private static final long ID_MIN = 4_775_000L;
     private static final long ID_MAX = 4_775_999L;
     private static final long USER_ID = 4_775_001L;
+    private static final String GENRE_CODE_PREFIX = "TASTE_775_";
     private static final Instant ANALYZED_AT = Instant.parse("2026-09-24T01:23:45.123456Z");
 
     @Autowired private TasteAnalysisWriter tasteAnalysisWriter;
@@ -81,7 +82,7 @@ class TasteAnalysisWriterPostgresTest extends SharedPostgresContractTest {
                 .singleElement()
                 .satisfies(
                         genre -> {
-                            assertThat(genre.code()).isEqualTo("THRILLER");
+                            assertThat(genre.code()).isEqualTo(GENRE_CODE_PREFIX + "THRILLER");
                             assertThat(genre.name()).isEqualTo("스릴러");
                             assertThat(genre.count()).isEqualTo(1);
                             assertThat(genre.averageScore()).isEqualByComparingTo("4.5");
@@ -119,7 +120,9 @@ class TasteAnalysisWriterPostgresTest extends SharedPostgresContractTest {
         assertThat(saved.getRatingCount()).isEqualTo(1);
         assertThat(saved.getAnalysis().genres())
                 .singleElement()
-                .satisfies(genre -> assertThat(genre.code()).isEqualTo("THRILLER"));
+                .satisfies(
+                        genre ->
+                                assertThat(genre.code()).isEqualTo(GENRE_CODE_PREFIX + "THRILLER"));
     }
 
     @Test
@@ -377,7 +380,7 @@ class TasteAnalysisWriterPostgresTest extends SharedPostgresContractTest {
         jdbcTemplate.update(
                 "INSERT INTO genres (id, code, name, tmdb_genre_id) VALUES (?, ?, ?, ?)",
                 id,
-                code,
+                GENRE_CODE_PREFIX + code,
                 name,
                 (int) id);
     }
