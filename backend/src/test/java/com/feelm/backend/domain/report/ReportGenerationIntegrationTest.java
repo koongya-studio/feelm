@@ -409,13 +409,13 @@ class ReportGenerationIntegrationTest extends SharedPostgresContractTest {
                 genreId(2));
         jdbc.update(
                 "INSERT INTO popcorn_flavors"
-                        + " (id, code, display_name, color, sort_order, cluster_id, representative_keywords)"
-                        + " VALUES (?, 'R555_NOIR', '느와르', '#111111', 555101, 555101, '[]'::jsonb)",
+                        + " (id, code, display_name, color, description, sort_order, cluster_id, representative_keywords)"
+                        + " VALUES (?, 'R555_NOIR', '느와르', '#111111', '테스트 맛 설명', 555101, 555101, '[]'::jsonb)",
                 flavorId(1));
         jdbc.update(
                 "INSERT INTO popcorn_flavors"
-                        + " (id, code, display_name, color, sort_order, cluster_id, representative_keywords)"
-                        + " VALUES (?, 'R555_SWEET', '달콤', '#ffaaaa', 555102, 555102, '[]'::jsonb)",
+                        + " (id, code, display_name, color, description, sort_order, cluster_id, representative_keywords)"
+                        + " VALUES (?, 'R555_SWEET', '달콤', '#ffaaaa', '테스트 맛 설명', 555102, 555102, '[]'::jsonb)",
                 flavorId(2));
         insertPerson(1, "감독 하나", "Director One", "https://images.test/director-1.jpg");
         insertPerson(2, "감독 둘", null);

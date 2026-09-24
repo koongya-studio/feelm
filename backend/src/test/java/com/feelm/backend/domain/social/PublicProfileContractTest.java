@@ -423,10 +423,10 @@ class PublicProfileContractTest extends SharedPostgresContractTest {
         jdbc.sql(
                         """
                         INSERT INTO popcorn_flavors(
-                            id,code,display_name,color,sort_order,cluster_id,
+                            id,code,display_name,color,description,sort_order,cluster_id,
                             representative_keywords)
                         VALUES (
-                            :id,:code,'공개 프로필 테스트 맛','#000000',-749,-749,
+                            :id,:code,'공개 프로필 테스트 맛','#000000','테스트 맛 설명',-749,-749,
                             CAST('[]' AS jsonb))
                         """)
                 .param("id", TEST_FLAVOR_ID)

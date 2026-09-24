@@ -651,10 +651,10 @@ class RatingCreateApiContractTest extends SharedPostgresContractTest {
         return jdbc.sql(
                         """
                         INSERT INTO popcorn_flavors(
-                            code, display_name, color, sort_order,
+                            code, display_name, color, description, sort_order,
                             cluster_id, representative_keywords
                         ) VALUES (
-                            :code, '테스트 맛', '#123456', 1,
+                            :code, '테스트 맛', '#123456', '테스트 맛 설명', 1,
                             0, '[]'::jsonb
                         ) RETURNING id
                         """)

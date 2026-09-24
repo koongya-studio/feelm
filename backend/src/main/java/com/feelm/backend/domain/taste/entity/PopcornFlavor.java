@@ -29,6 +29,9 @@ public class PopcornFlavor {
     @Column(nullable = false, length = 20)
     private String color;
 
+    @Column(nullable = false, columnDefinition = "text")
+    private String description;
+
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 

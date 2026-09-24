@@ -868,8 +868,8 @@ class RecommendationServingApiContractTest extends SharedPostgresContractTest {
     private void flavor(long id, String code) {
         jdbc.update(
                 "INSERT INTO popcorn_flavors"
-                        + "(id,code,display_name,color,sort_order,cluster_id,representative_keywords)"
-                        + " VALUES (?,?,'대표 맛','#000000',?,?,CAST('[]' AS jsonb))",
+                        + "(id,code,display_name,color,description,sort_order,cluster_id,representative_keywords)"
+                        + " VALUES (?,?,'대표 맛','#000000','테스트 맛 설명',?,?,CAST('[]' AS jsonb))",
                 id,
                 code,
                 Math.toIntExact(id),
