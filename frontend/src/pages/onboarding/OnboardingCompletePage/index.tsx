@@ -16,7 +16,7 @@
  * `[?]` 필름 영역 터치 시 동작(확대 · 애니메이션 · 이동)은 미확정이다. 와이어프레임의
  * `터치할 수 있어요` 힌트는 **뺐다**(업무 -610) — 동작이 없는데 상호작용을 약속하는 문구였다.
  * 동작이 정해지면 문구와 함께 되살린다.
- * `[?]` `홈으로 이동` 진입점이 와이어프레임에 없어 `필름 늘리기`만 두었다.
+ * `[?]` `홈으로 이동` 진입점이 와이어프레임에 없어 추천 화면으로 가는 버튼만 두었다.
  */
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router';
@@ -82,7 +82,7 @@ export default function OnboardingCompletePage() {
         </div>
 
         <div className={styles.actions}>
-          <Button onClick={() => void navigate(path.recommendations())}>필름 늘리기</Button>
+          <Button onClick={() => void navigate(path.recommendations())}>영화 추천받기</Button>
         </div>
       </div>
     </>
