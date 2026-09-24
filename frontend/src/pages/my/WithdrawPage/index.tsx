@@ -42,6 +42,7 @@ import { forgetWebPush } from '../../../pwa/webPush';
 import { path } from '../../../routes/paths';
 import {
   isOAuthConfigured,
+  SOCIAL_ENTRY_PROVIDERS,
   SOCIAL_PROVIDER_LABEL,
   startOAuth,
   toSocialProvider,
@@ -116,9 +117,12 @@ export default function WithdrawPage() {
   const linked = (profile?.linkedProviders ?? [])
     .map(toSocialProvider)
     .filter((value): value is SocialProvider => value !== null);
-  /** 본인 확인에 쓸 제공자. 이 앱이 인가를 시작할 수 있는 첫 번째 연결이다 */
-  const provider = linked.find(isOAuthConfigured) ?? null;
-  const providerLabel = SOCIAL_PROVIDER_LABEL[provider ?? linked[0] ?? 'google'];
+  /** 본인 확인에 쓸 제공자. 화면에 노출하며 인가도 시작할 수 있는 첫 번째 연결이다 */
+  const provider =
+    linked.find(
+      (candidate) => SOCIAL_ENTRY_PROVIDERS.includes(candidate) && isOAuthConfigured(candidate),
+    ) ?? null;
+  const providerLabel = provider ? SOCIAL_PROVIDER_LABEL[provider] : '연결된 소셜 계정';
 
   /** 탈퇴를 누른 자리. 잠그고 지난 안내를 걷은 뒤 보낸다 */
   function withdrawWith(proof: WithdrawProof, messages: Record<string, string>) {

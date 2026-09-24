@@ -44,8 +44,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv('VITE_KAKAO_CLIENT_ID', 'kakao-client');
   vi.stubEnv('VITE_GOOGLE_CLIENT_ID', 'google-client');
-  vi.stubEnv('VITE_NAVER_CLIENT_ID', '');
-  vi.mocked(getMyProfile).mockResolvedValue(profile({ linkedProviders: ['KAKAO'] }));
+  vi.stubEnv('VITE_NAVER_CLIENT_ID', 'naver-client');
+  vi.mocked(getMyProfile).mockResolvedValue(profile({ linkedProviders: ['KAKAO', 'NAVER'] }));
 });
 
 afterEach(() => {
@@ -53,7 +53,7 @@ afterEach(() => {
 });
 
 describe('소셜 계정 묶음', () => {
-  it('연결된 제공자는 연결됨, 아닌 제공자는 연결하기다. 자격 증명 없는 제공자는 줄이 없다', async () => {
+  it('연결된 제공자는 연결됨, 아닌 제공자는 연결하기다. 네이버는 설정돼도 줄이 없다', async () => {
     renderWithRouter(<AccountManagePage />, { route: '/my/settings/account' });
 
     expect(await screen.findByRole('heading', { name: '소셜 계정' })).toBeInTheDocument();

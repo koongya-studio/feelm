@@ -547,6 +547,20 @@ describe('7.8-A-1 회원 탈퇴', () => {
     expect(screen.getByRole('button', { name: '탈퇴하기' })).toBeDisabled();
   });
 
+  it('네이버만 연결된 소셜 계정에는 재인증 진입점을 열지 않는다', async () => {
+    vi.mocked(getMyProfile).mockResolvedValue({
+      ...socialOnly,
+      linkedProviders: ['NAVER'],
+    });
+    renderApp([ROUTE_PATTERN.settings, ROUTE_PATTERN.withdraw]);
+
+    expect(await screen.findByText(/지금은 확인을 쓸 수 없어요/)).toBeInTheDocument();
+    expect(screen.queryByText(/네이버/)).toBeNull();
+    fireEvent.click(screen.getByLabelText('위 내용을 모두 확인했어요'));
+    expect(screen.getByRole('button', { name: '탈퇴하기' })).toBeDisabled();
+    expect(startOAuth).not.toHaveBeenCalled();
+  });
+
   it('7.8 맨 아래 회원 탈퇴도 같은 확인 화면으로 간다', async () => {
     renderApp([ROUTE_PATTERN.settings]);
 
