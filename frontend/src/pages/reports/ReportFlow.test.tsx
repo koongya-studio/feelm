@@ -49,7 +49,9 @@ vi.mock('../../api/users', () => ({
 
 vi.mock('../../utils/reportImage', () => ({
   captureReportImage: vi.fn(),
+  captureReportBackImage: vi.fn(),
   downloadReportImage: vi.fn(),
+  downloadBlob: vi.fn(),
 }));
 
 /*
@@ -80,7 +82,8 @@ vi.mock('../../api/reports', async (importOriginal) => ({
 
 const { createReportImage, getLatestReadyReport, getMyReports, getReportDetail, issueReport } =
   await import('../../api/reports');
-const { captureReportImage, downloadReportImage } = await import('../../utils/reportImage');
+const { captureReportBackImage, captureReportImage, downloadBlob, downloadReportImage } =
+  await import('../../utils/reportImage');
 
 /** 7.3 목록이 읽는 API-059 응답을 바꿔 끼운다 */
 function serveList(list: ReportList) {
@@ -120,7 +123,11 @@ beforeEach(() => {
     downloadUrl: '/api/v1/report-images/901/download?expires=1&signature=x',
     expiresAt: '2026-07-01T00:10:00Z',
   });
+  vi.mocked(captureReportBackImage)
+    .mockReset()
+    .mockResolvedValue(new Blob(['four-cut-back'], { type: 'image/png' }));
   vi.mocked(downloadReportImage).mockReset().mockResolvedValue(undefined);
+  vi.mocked(downloadBlob).mockReset();
   serveList(reportListBeforeIssue);
   /*
    * 3.1의 버튼은 `getLatestReadyReport`가 가른다. 이 시험은 두 상태를 직접 세우고, 발급
@@ -176,6 +183,27 @@ const location = () => screen.getByTestId('location').textContent;
  */
 function flipCut(label: string) {
   fireEvent.click(screen.getByRole('button', { name: `${label} 설명 보기` }));
+}
+
+/**
+ * 휴대폰의 파일 공유 메뉴를 세운다. 기기의 공유 메뉴는 손가락이 주 입력인 기기에서만 연다
+ * (업무 -767, `utils/share.ts`)
+ */
+function stubPhoneShare(share: ReturnType<typeof vi.fn>) {
+  Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+  Object.defineProperty(navigator, 'canShare', { value: () => true, configurable: true });
+  const coarse = vi
+    .spyOn(window, 'matchMedia')
+    .mockImplementation((query: string) => ({ matches: true, media: query }) as MediaQueryList);
+
+  return {
+    share,
+    restore() {
+      Reflect.deleteProperty(navigator, 'share');
+      Reflect.deleteProperty(navigator, 'canShare');
+      coarse.mockRestore();
+    },
+  };
 }
 
 describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
@@ -374,13 +402,12 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
 });
 
 describe('3.4 → 3.5', () => {
-  it('휴대폰에서는 공유 메뉴를 열고, 마치면 시트를 닫는다', async () => {
-    const share = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
-    // 기기의 공유 메뉴는 손가락이 주 입력인 기기에서만 연다(업무 -767, `utils/share.ts`)
-    const coarse = vi
-      .spyOn(window, 'matchMedia')
-      .mockImplementation((query: string) => ({ matches: true, media: query }) as MediaQueryList);
+  /*
+   * 공유하기는 주소가 아니라 4컷 이미지 두 장이다(업무 -849). API-060은 타인 리포트를 404로
+   * 숨겨 주소를 받은 사람은 아무것도 볼 수 없었다.
+   */
+  it('휴대폰에서는 앞면 · 뒷면 두 장을 공유 메뉴로 넘기고, 마치면 시트를 닫는다', async () => {
+    const phone = stubPhoneShare(vi.fn().mockResolvedValue(undefined));
 
     try {
       renderApp(['/reports/301']);
@@ -393,36 +420,137 @@ describe('3.4 → 3.5', () => {
       fireEvent.click(sheet.getByRole('button', { name: '공유하기' }));
 
       await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-      expect(share).toHaveBeenCalledWith(
-        expect.objectContaining({ title: '2026 상반기 취향 리포트' }),
-      );
+      expect(phone.share).toHaveBeenCalledOnce();
+      const shared = phone.share.mock.calls[0][0] as ShareData;
+      expect(shared.title).toBe('2026 상반기 취향 리포트');
+      expect(shared.url).toBeUndefined();
+      expect(shared.files?.map((file) => file.name)).toEqual([
+        'feelm-report-301-front.png',
+        'feelm-report-301-back.png',
+      ]);
+      // 서버에는 올리지 않는다. API-061은 `이미지로 저장`만 쓴다
+      expect(createReportImage).not.toHaveBeenCalled();
     } finally {
-      Reflect.deleteProperty(navigator, 'share');
-      coarse.mockRestore();
+      phone.restore();
     }
   });
 
-  it('공유도 복사도 못 하는 브라우저면 알리고, 이미지는 API-061로 만든다', async () => {
+  it('뒷면은 칸을 모두 뒤집어 찍고, 뒤집어 두었던 모양으로 되돌린다', async () => {
+    const phone = stubPhoneShare(vi.fn().mockResolvedValue(undefined));
+    let unflippedAtBackCapture: number | null = null;
+    vi.mocked(captureReportBackImage).mockImplementation(async () => {
+      unflippedAtBackCapture = screen.queryAllByRole('button', { name: /설명 보기$/ }).length;
+
+      return new Blob(['four-cut-back'], { type: 'image/png' });
+    });
+
+    try {
+      renderApp(['/reports/301']);
+      await screen.findByText('01 장르');
+      flipCut('01 장르');
+
+      const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
+      fireEvent.click(headerShare);
+      const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
+      fireEvent.click(sheet.getByRole('button', { name: '공유하기' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(unflippedAtBackCapture).toBe(0);
+      expect(screen.getByRole('button', { name: '01 장르 사진 보기' })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      );
+      expect(screen.getByRole('button', { name: '02 감독 설명 보기' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+    } finally {
+      phone.restore();
+    }
+  });
+
+  it('찍는 동안 공유가 거절되면 다시 누르게 하고, 두 번째는 찍지 않고 바로 연다', async () => {
+    const phone = stubPhoneShare(
+      vi
+        .fn()
+        .mockRejectedValueOnce(new DOMException('expired', 'NotAllowedError'))
+        .mockResolvedValueOnce(undefined),
+    );
+
+    try {
+      renderApp(['/reports/301']);
+      const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
+      fireEvent.click(headerShare);
+      const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
+      const shareButton = sheet.getByRole('button', { name: '공유하기' });
+
+      fireEvent.click(shareButton);
+      await waitFor(() =>
+        expect(sheet.getByRole('status')).toHaveTextContent('공유하기를 한 번 더 눌러 주세요'),
+      );
+
+      fireEvent.click(shareButton);
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(phone.share).toHaveBeenCalledTimes(2);
+      expect(captureReportImage).toHaveBeenCalledOnce();
+      expect(captureReportBackImage).toHaveBeenCalledOnce();
+    } finally {
+      phone.restore();
+    }
+  });
+
+  it('데스크톱이면 두 장을 내려받고 알린다. 이미지로 저장은 API-061로 만든다', async () => {
+    renderApp(['/reports/301']);
+    const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
+    fireEvent.click(headerShare);
+
+    const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
+    fireEvent.click(sheet.getByRole('button', { name: '공유하기' }));
+    await waitFor(() =>
+      expect(sheet.getByRole('status')).toHaveTextContent('이미지 두 장을 저장했어요'),
+    );
+    expect(vi.mocked(downloadBlob).mock.calls.map(([, name]) => name)).toEqual([
+      'feelm-report-301-front.png',
+      'feelm-report-301-back.png',
+    ]);
+    expect(createReportImage).not.toHaveBeenCalled();
+
+    fireEvent.click(sheet.getByRole('button', { name: '이미지로 저장' }));
+    await waitFor(() =>
+      expect(sheet.getByRole('status')).toHaveTextContent(/^이미지를 저장했어요/),
+    );
+    expect(createReportImage).toHaveBeenCalledWith(301, expect.any(Blob));
+    expect(downloadReportImage).toHaveBeenCalledWith(
+      '/api/v1/report-images/901/download?expires=1&signature=x',
+      301,
+    );
+  });
+
+  it('공유할 이미지를 찍지 못하면 알리고 시트를 둔다', async () => {
+    vi.mocked(captureReportImage).mockReset().mockRejectedValueOnce(new Error('image failed'));
+    renderApp(['/reports/301']);
+    const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
+    fireEvent.click(headerShare);
+
+    const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
+    fireEvent.click(sheet.getByRole('button', { name: '공유하기' }));
+
+    await waitFor(() =>
+      expect(sheet.getByRole('status')).toHaveTextContent('이미지를 만들지 못했어요'),
+    );
+    expect(downloadBlob).not.toHaveBeenCalled();
+  });
+
+  it('이미지로 저장은 API-061 PNG를 만들고 프로필을 다시 읽는다', async () => {
     renderApp(['/reports/301']);
     const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
     await waitFor(() => expect(getMyProfile).toHaveBeenCalledOnce());
     fireEvent.click(headerShare);
 
     const sheet = within(screen.getByRole('dialog', { name: '공유하기' }));
-    fireEvent.click(sheet.getByRole('button', { name: '공유하기' }));
-    // jsdom에는 클립보드가 없다. 조용히 끝내지 않고 알린다
-    await waitFor(() =>
-      expect(sheet.getByRole('status')).toHaveTextContent('이 브라우저에서는 공유할 수 없어요'),
-    );
-
     fireEvent.click(sheet.getByRole('button', { name: '이미지로 저장' }));
     await waitFor(() => expect(sheet.getByRole('status')).toHaveTextContent('이미지를 저장했어요'));
     expect(captureReportImage).toHaveBeenCalledWith(expect.any(HTMLElement));
-    expect(createReportImage).toHaveBeenCalledWith(301, expect.any(Blob));
-    expect(downloadReportImage).toHaveBeenCalledWith(
-      '/api/v1/report-images/901/download?expires=1&signature=x',
-      301,
-    );
     expect(getMyProfile).toHaveBeenCalledTimes(2);
   });
 
@@ -469,7 +597,7 @@ describe('3.4 → 3.5', () => {
     expect(captured.querySelector('figure')).toHaveAttribute('aria-label', '김난다의 취향 4컷');
   });
 
-  it('PNG를 기기 공유 시트로 넘기지 않으므로, 저장하면 직접 공유하라고 알린다', async () => {
+  it('이미지로 저장을 마치면 내려받은 이미지를 직접 공유하라고 알린다', async () => {
     renderApp(['/reports/301']);
     const [headerShare] = await screen.findAllByRole('button', { name: '공유하기' });
     fireEvent.click(headerShare);

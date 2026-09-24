@@ -30,6 +30,9 @@
  * - 그릴 값이 없는 뒷면은 아예 주지 않는다. 그 칸은 뒤집히지 않는 그림 칸으로 남는다
  * - 인화지를 그림으로 저장할 때(`저장` · 3.5 `이미지로 저장`)는 뒤집힌 칸을 먼저 되돌린다.
  *   저장되는 것은 앞면 넷이다
+ * - **3.5 `공유하기`는 앞면과 뒷면 두 장을 보낸다**(업무 -849). 앞면을 찍은 뒤 뒷면이 있는 칸을
+ *   모두 뒤집어 한 장 더 찍고, 사용자가 뒤집어 두었던 모양으로 되돌린다. 받은 사람은 리포트
+ *   주소를 열 수 없으므로(API-060 타인 404) 설명도 그림에 담는다
  * - **인물 검색으로 가는 길은 뒷면 목록의 이름뿐이다.** 업무 -557은 감독 · 배우 칸 전체를 검색
  *   링크로 덮었는데 그 자리를 뒤집기가 쓰게 되어 한 칸이 두 동작을 가질 수 없다. 누르면
  *   뒤집히는 쪽으로 통일하고(사용자 결정 2026-09-23) `ReportFourCut`의 `linkPeople`을 지웠다.
@@ -67,6 +70,7 @@ import { getMyProfile } from '../../../api/users';
 import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
 import { formatComparisonLabel, formatDelta, formatHalf } from '../../../utils/report';
+import { captureReportBackImage, captureReportImage } from '../../../utils/reportImage';
 import ReportShareSheet from './ReportShareSheet';
 import { reportImageFailure, saveReportImage } from './saveReportImage';
 import styles from './ReportDetailPage.module.css';
@@ -85,7 +89,7 @@ type Props = {
   from: 'film' | 'my';
 };
 
-/** 뒤집힌 칸이 앞면으로 되돌아오는 데 걸리는 시간. 인화지의 `--flip-duration`과 맞춘다 */
+/** 칸이 뒤집히거나 앞면으로 되돌아오는 데 걸리는 시간. 인화지의 `--flip-duration`과 맞춘다 */
 const FLIP_BACK_MS = 560;
 
 function wait(ms: number): Promise<void> {
@@ -201,7 +205,47 @@ export default function ReportDetailPage({ from }: Props) {
 
   async function saveImage() {
     await prepareImage();
-    await saveReportImage(id, fourCutRef.current?.firstElementChild as HTMLElement | null);
+    await saveReportImage(id, fourCutNode());
+  }
+
+  /** 3.5 `공유하기`의 두 장. 앞면을 찍고, 뒷면이 있는 칸을 모두 뒤집어 한 장 더 찍는다 */
+  async function prepareShareImages(): Promise<File[]> {
+    const before = flipped;
+    const backKinds = report
+      ? (Object.entries(cutBacks(report)) as [ReportCutKind, ReactNode][])
+          .filter(([, back]) => Boolean(back))
+          .map(([kind]) => kind)
+      : [];
+
+    try {
+      await prepareImage();
+      const files = [imageFile(await captureReportImage(requireFourCut()), 'front')];
+
+      if (backKinds.length > 0) {
+        setFlipped(backKinds);
+        await wait(FLIP_BACK_MS);
+        files.push(imageFile(await captureReportBackImage(requireFourCut()), 'back'));
+      }
+
+      return files;
+    } finally {
+      setFlipped(before);
+    }
+  }
+
+  function fourCutNode(): HTMLElement | null {
+    return fourCutRef.current?.firstElementChild as HTMLElement | null;
+  }
+
+  function requireFourCut(): HTMLElement {
+    const node = fourCutNode();
+    if (!node) throw new Error('ReportFourCut is unavailable');
+
+    return node;
+  }
+
+  function imageFile(png: Blob, face: 'front' | 'back'): File {
+    return new File([png], `feelm-report-${id}-${face}.png`, { type: 'image/png' });
   }
 
   if (failed) {
@@ -280,7 +324,12 @@ export default function ReportDetailPage({ from }: Props) {
       </div>
 
       {sharing ? (
-        <ReportShareSheet title={title} onSaveImage={saveImage} onClose={() => setSharing(false)} />
+        <ReportShareSheet
+          title={title}
+          onPrepareShare={prepareShareImages}
+          onSaveImage={saveImage}
+          onClose={() => setSharing(false)}
+        />
       ) : null}
     </>
   );
