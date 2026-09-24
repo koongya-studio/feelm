@@ -1,0 +1,13 @@
+{
+  "partyId": 9001,
+  "inputId": "sha256:c0d25e189d0474402a67496142a6eb4d11c69e413f58887e650ffed0add48395",
+  "members": [
+    {
+      "userId": 1024,
+      "generationId": "g1",
+      "inputSchemaVersion": "gbt-input-v1",
+      "inputHash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "candidateMovieIds": [550]
+    }
+  ]
+}

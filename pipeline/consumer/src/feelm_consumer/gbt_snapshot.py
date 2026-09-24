@@ -100,7 +100,7 @@ def create_snapshot(*, user_id, generation_id, serving_revision, model_version, 
 
 
 def decode_snapshot(raw: bytes | str, *, user_id: int, generation_id: str,
-                    serving_revision: str, model_version: str, input_hash: str,
+                    serving_revision: str | None, model_version: str | None, input_hash: str,
                     max_bytes: int) -> InputSnapshot:
     if type(max_bytes) is not int or max_bytes < 1:
         raise ValueError("max_bytes must be a positive integer")
@@ -123,7 +123,13 @@ def decode_snapshot(raw: bytes | str, *, user_id: int, generation_id: str,
         if not isinstance(payload, dict) or payload.get("inputSchemaVersion") != INPUT_SCHEMA:
             raise GbtError("SNAPSHOT_SCHEMA")
         expected = {"userId": movie_id(user_id), "generationId": safe_identifier(generation_id),
-                    "servingRevision": serving_revision, "modelVersion": model_version, "inputHash": input_hash}
+                    "inputHash": input_hash}
+        # 829 omits model metadata on the wire. The full codec still validates the
+        # stored metadata and content before returning it to the caller.
+        if serving_revision is not None:
+            expected["servingRevision"] = serving_revision
+        if model_version is not None:
+            expected["modelVersion"] = model_version
         if any(payload.get(key) != value for key, value in expected.items()):
             raise GbtError("SNAPSHOT_REFERENCE_MISMATCH")
         snapshot = create_snapshot(

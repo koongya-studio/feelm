@@ -70,9 +70,13 @@ def test_atomic_snapshot_state_candidate_and_historical_read(prepared, scorer):
     client, store, fence, result = prepared
     assert store.current_version(10, fence) == 0
     assert store.publish(result, cas(store, 0, fence), fence) == 1
-    raw_state, raw_candidates = client.mget(
-        f"{NAMESPACE}:user:10:recommendation-state", f"{NAMESPACE}:user:10:candidates")
+    raw_state, raw_candidates, raw_evidence = client.mget(
+        f"{NAMESPACE}:user:10:recommendation-state", f"{NAMESPACE}:user:10:candidates",
+        f"{NAMESPACE}:user:10:gbt-evidence:g1")
     assert json.loads(raw_state)["generationId"] == json.loads(raw_candidates)["generationId"] == "g1"
+    evidence = json.loads(raw_evidence)
+    assert evidence["generationId"] == "g1" and evidence["candidateVersion"] == 6
+    assert evidence["items"]
     second = PersonalScorer(scorer).calculate(snapshot(scorer, [(1, 5)], generation="g2"))
     store.publish(second, cas(store, 1, fence), fence)
     old = store.read_snapshot(10, "g1", serving_revision=result.snapshot.serving_revision,
@@ -81,6 +85,8 @@ def test_atomic_snapshot_state_candidate_and_historical_read(prepared, scorer):
     assert not list(client.scan_iter("feelm:user:*:vector"))
     assert client.ttl(f"{NAMESPACE}:user:10:input:g2") == -1
     assert 0 < client.ttl(f"{NAMESPACE}:user:10:input:g1") <= 600
+    assert client.ttl(f"{NAMESPACE}:user:10:gbt-evidence:g2") == -1
+    assert 0 < client.ttl(f"{NAMESPACE}:user:10:gbt-evidence:g1") <= 600
 
 
 @pytest.mark.parametrize("stale", ["fence", "revision", "version"])
@@ -95,6 +101,7 @@ def test_stale_writer_rejected_without_partial_snapshot(prepared, stale):
     with pytest.raises((StaleWriter, PublicationConflict)):
         store.publish(result, cas(store, 0, fence), fence)
     assert not list(client.scan_iter(f"{NAMESPACE}:user:10:input:*"))
+    assert not list(client.scan_iter(f"{NAMESPACE}:user:10:gbt-evidence:*"))
     assert not client.exists(f"{NAMESPACE}:user:10:recommendation-state")
 
 
@@ -152,9 +159,10 @@ def test_current_snapshot_state_candidates_do_not_expire_on_replay(prepared):
     store.publish(result, cas(store, 0, fence), fence)
     time.sleep(.15)
     store.publish(result, cas(store, 1, fence), fence)
-    keys = [f"{NAMESPACE}:user:10:{suffix}" for suffix in ("input:g1", "recommendation-state", "candidates")]
+    keys = [f"{NAMESPACE}:user:10:{suffix}" for suffix in (
+        "input:g1", "recommendation-state", "candidates", "gbt-evidence:g1")]
     expiries = [client.pexpiretime(key) for key in keys]
-    assert expiries == [-1, -1, -1]
+    assert expiries == [-1, -1, -1, -1]
 
 
 def test_last_input_delete_publishes_popularity_in_same_generation_and_replays(prepared, scorer):
@@ -170,6 +178,7 @@ def test_last_input_delete_publishes_popularity_in_same_generation_and_replays(p
     assert state["generationId"] == candidates["generationId"] == "cold"
     assert state["inputHash"] == candidates["inputHash"] == cold.snapshot.input_hash
     assert json.loads(client.get(f"{NAMESPACE}:user:10:input:cold"))["inputs"] == []
+    assert json.loads(client.get(f"{NAMESPACE}:user:10:gbt-evidence:cold"))["items"] == []
     client.delete(f"{NAMESPACE}:user:10:candidates")  # Repair a lost fallback on redelivery.
     store.publish(cold, cas(store, 2, fence), fence)
     assert json.loads(client.get(f"{NAMESPACE}:user:10:candidates")) == candidates
@@ -185,6 +194,40 @@ def test_exhausted_state_still_removes_previous_candidates(prepared, scorer):
     store.publish(empty, cas(store, 1, fence), fence)
     assert json.loads(client.get(f"{NAMESPACE}:user:10:recommendation-state"))["status"] == "EXHAUSTED"
     assert not client.exists(f"{NAMESPACE}:user:10:candidates")
+    assert json.loads(client.get(f"{NAMESPACE}:user:10:gbt-evidence:empty"))["items"] == []
+
+
+def test_same_generation_evidence_is_immutable(prepared):
+    client, store, fence, result = prepared
+    store.publish(result, cas(store, 0, fence), fence)
+    first_item = result.evidence.items[0]
+    first_entry = first_item.evidence[0]
+    tampered_entry = replace(first_entry, contribution=first_entry.contribution + 0.01)
+    tampered_item = replace(first_item, evidence=(tampered_entry, *first_item.evidence[1:]))
+    tampered_evidence = replace(result.evidence, items=(tampered_item, *result.evidence.items[1:]))
+    changed = replace(result, evidence=tampered_evidence)
+    with pytest.raises(GbtError, match="UNTRUSTED_EVIDENCE_RESULT"):
+        store.publish(changed, cas(store, 1, fence), fence)
+    assert store.current_version(10, fence) == 1
+
+
+def test_evidence_only_recovery_expires_superseded_generation(prepared, scorer):
+    client, store, fence, result = prepared
+    store.publish(result, cas(store, 0, fence), fence)
+    evidence_head = f"{NAMESPACE}:user:10:gbt-evidence-current"
+    assert json.loads(client.get(evidence_head))["generationId"] == "g1"
+    client.delete(*(f"{NAMESPACE}:user:10:{suffix}" for suffix in (
+        "input:g1", "input-current", "recommendation-state", "candidates", "candidate-version"
+    )))
+
+    recovered = store.current_version(10, fence)
+    assert recovered == 1
+    second = PersonalScorer(scorer).calculate(snapshot(scorer, [(1, 5)], generation="g2"))
+    store.publish(second, recovered, fence)
+
+    assert 0 < client.ttl(f"{NAMESPACE}:user:10:gbt-evidence:g1") <= 600
+    assert client.ttl(f"{NAMESPACE}:user:10:gbt-evidence:g2") == -1
+    assert json.loads(client.get(evidence_head))["generationId"] == "g2"
 
 
 def test_model_version_is_fenced_independently_of_revision(prepared):

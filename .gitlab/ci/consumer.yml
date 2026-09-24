@@ -45,6 +45,8 @@ consumer-test:
     - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
       changes:
         - pipeline/consumer/**/*
+        - backend/src/test/resources/gbt-personal-state.json
+        - backend/src/test/resources/gbt-personal-cold-state.json
         - .gitlab-ci.yml
         - .gitlab/ci/common.yml
         - .gitlab/ci/consumer.yml

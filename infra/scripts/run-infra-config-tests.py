@@ -23,7 +23,9 @@ TESTS = (
     "infra.scripts.test_spark_code_state",
     "infra.scripts.test_runtime_config_release",
     "infra.scripts.test_deploy_consumer",
-    "infra.scripts.test_verify_consumer_e2e",
+    # MR archives contain only infra/.gitlab; cross-service fixture equality is
+    # required by main consumer-test, which loads this entire module.
+    "infra.scripts.test_verify_consumer_e2e.VerifyConsumerE2ETest",
     "infra.scripts.test_notify_deployment",
     "infra.scripts.test_ci_required_variable_preflight",
     "infra.scripts.test_ci_deploy_current_commit",

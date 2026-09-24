@@ -3,6 +3,8 @@ package com.feelm.backend.domain.recommendation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -39,12 +41,16 @@ import tools.jackson.databind.ObjectMapper;
 class RecommendationReasonLiveIntegrationTest extends SharedPostgresContractTest {
 
     private static final long USER = 49801;
+    private static final String HASH = "sha256:" + "b".repeat(64);
     private static final String CANDIDATES_KEY = "feelm:user:" + USER + ":candidates";
-    private static final String VECTOR_KEY = "feelm:user:" + USER + ":vector";
+    private static final String STATE_KEY = "feelm:user:" + USER + ":recommendation-state";
+    private static final String CURRENT_MODEL_KEY = "feelm:model:current";
+    private String evidenceKey;
 
     @DynamicPropertySource
     static void gmsKey(DynamicPropertyRegistry registry) {
         registry.add("feelm.recommendation.reason.gemini.api-key", () -> System.getenv("GMS_KEY"));
+        registry.add("feelm.recommendation.reason.gbt-ai.enabled", () -> "true");
     }
 
     @Autowired JdbcTemplate jdbc;
@@ -80,31 +86,56 @@ class RecommendationReasonLiveIntegrationTest extends SharedPostgresContractTest
         jdbc.update("INSERT INTO movie_genres(movie_id,genre_id) VALUES (90,1),(101,1)");
         jdbc.update("INSERT INTO ratings(user_id,movie_id,score) VALUES (?,90,5)", USER);
         String generation = UUID.randomUUID().toString();
+        evidenceKey = "feelm:user:" + USER + ":gbt-evidence:" + generation;
         redis.opsForValue()
-                .set(
-                        VECTOR_KEY,
-                        """
-                        {"modelVersion":"live-498","candidateVersion":6,"generationId":"%s"}
-                        """
-                                .formatted(generation));
-        redis.opsForValue()
-                .set(
-                        CANDIDATES_KEY,
-                        """
-                        {"modelVersion":"live-498","candidateVersion":6,"generationId":"%s",
+                .multiSet(
+                        Map.of(
+                                CURRENT_MODEL_KEY,
+                                """
+                                {"modelKind":"GBT","modelVersion":"gbt-live",
+                                 "servingRevision":"serving-live"}
+                                """,
+                                STATE_KEY,
+                                """
+                                {"stateVersion":1,"userId":%d,"modelKind":"GBT",
+                                 "modelVersion":"gbt-live","servingRevision":"serving-live",
+                                 "generationId":"%s","inputSchemaVersion":"gbt-input-v1",
+                                 "inputHash":"%s","ratingCount":1,"dismissCount":0,
+                                 "supportedInputCount":1,"updatedAt":"2026-09-17T12:00:00Z"}
+                                """
+                                        .formatted(USER, generation, HASH),
+                                CANDIDATES_KEY,
+                                """
+                        {"modelVersion":"gbt-live","servingRevision":"serving-live",
+                         "candidateVersion":6,"generationId":"%s",
+                         "inputSchemaVersion":"gbt-input-v1","inputHash":"%s",
                          "updatedAt":"2026-09-17T12:00:00Z",
                          "taste":[
-                           {"movieId":101,"score":0.9,"reasons":[{"code":"SHARED_GENRE",
-                             "sourceMovieIds":[90],"matchedGenreCodes":["THRILLER"]}]},
+                           {"movieId":101,"score":0.9,"reasons":[]},
                            {"movieId":102,"score":0.8,"reasons":[]}],
                          "discovery":[{"movieId":201,"score":0.7,"reasons":[]}]}
                         """
-                                .formatted(generation));
+                                        .formatted(generation, HASH),
+                                evidenceKey,
+                                """
+                                {"evidenceSchemaVersion":"gbt-evidence-v1",
+                                 "explanationVersion":"gbt-feature-attribution-v1",
+                                 "userId":%d,"generationId":"%s","modelVersion":"gbt-live",
+                                 "servingRevision":"serving-live",
+                                 "featureVersion":"v26-max70-kobis-flag-71-v1",
+                                 "rankingVersion":"gbt-personal-raw-score-v1",
+                                 "inputVersion":"%s","candidateVersion":6,"items":[
+                                   {"movieId":101,"score":0.9,"coverage":0.7,"evidence":[{
+                                     "evidenceId":"sha256:%s","group":"GENRE_PATTERN",
+                                     "direction":"POSITIVE","contribution":0.4,"coverage":0.7}]},
+                                   {"movieId":102,"score":0.8,"coverage":0,"evidence":[]}]}
+                                """
+                                        .formatted(USER, generation, HASH, "a".repeat(64))));
     }
 
     @AfterEach
     void clearRedis() {
-        redis.delete(Set.of(CANDIDATES_KEY, VECTOR_KEY));
+        redis.delete(Set.of(CANDIDATES_KEY, STATE_KEY, CURRENT_MODEL_KEY, evidenceKey));
     }
 
     @Test
@@ -114,17 +145,12 @@ class RecommendationReasonLiveIntegrationTest extends SharedPostgresContractTest
         assertThat(configuredKey != null && !configuredKey.isBlank()).isTrue();
         doAnswer(
                         invocation -> {
-                            Map<?, ?> variants = (Map<?, ?>) invocation.callRealMethod();
-                            assertThat(variants).hasSize(1);
-                            assertThat(variants.values())
-                                    .allMatch(
-                                            value ->
-                                                    Set.of("SOURCE_GENRE", "GENRE_ONLY")
-                                                            .contains(value));
-                            return variants;
+                            Map<?, ?> reasons = (Map<?, ?>) invocation.callRealMethod();
+                            assertThat(reasons).hasSize(1);
+                            return reasons;
                         })
                 .when(gemini)
-                .selectVariants(anyList());
+                .generateGbtReasons(anyList());
 
         RecommendationBufferResult result = buffer.createBuffer(USER);
         long setId = result.recommendationSetId();
@@ -157,10 +183,10 @@ class RecommendationReasonLiveIntegrationTest extends SharedPostgresContractTest
                                 "SELECT cast(reason AS text) FROM recommendation_items WHERE id=?",
                                 String.class,
                                 itemId));
-        assertThat(stored.path("reasons").path(0).path("code").textValue())
-                .isEqualTo("SHARED_GENRE");
-        assertThat(stored.path("summary").textValue()).contains("스릴러");
-        assertThat(stored.path("factors").path(0).path("label").textValue()).isEqualTo("스릴러");
+        assertThat(stored.path("summary").textValue()).containsAnyOf("장르 취향 패턴", "추천");
+        assertThat(stored.path("usedEvidenceIds").path(0).textValue())
+                .isEqualTo("sha256:" + "a".repeat(64));
+        assertThat(stored.path("factors").isEmpty()).isTrue();
         JsonNode noEvidence =
                 mapper.readTree(
                         jdbc.queryForObject(
@@ -205,8 +231,11 @@ class RecommendationReasonLiveIntegrationTest extends SharedPostgresContractTest
         JsonNode detailReason = detail.path("recommendation").path("reason");
         JsonNode historyReason = history.path("items").path(0).path("items").path(0).path("reason");
         assertThat(cardReason).isEqualTo(detailReason).isEqualTo(historyReason);
-        assertThat(cardReason.path("summary").textValue()).contains("스릴러");
+        assertThat(cardReason.path("summary").textValue()).containsAnyOf("장르 취향 패턴", "추천");
         assertThat(cardReason.has("reasons")).isFalse();
+        assertThat(cardReason.has("usedEvidenceIds")).isFalse();
+        assertThat(cardReason.has("evidence")).isFalse();
+        verify(gemini, times(1)).generateGbtReasons(anyList());
     }
 
     private JsonNode response(String body) {

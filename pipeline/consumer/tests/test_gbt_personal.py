@@ -52,10 +52,14 @@ def contract_payload(scorer):
 def test_actual_personal_payload_matches_java_reader_fixture(scorer):
     fixture = Path(__file__).parent / "fixtures/gbt-personal-state.json"
     assert contract_payload(scorer) == json.loads(fixture.read_text(encoding="utf-8"))
-    # Each CI job archives only its own service. A full checkout verifies the shared copy too.
-    backend_fixture = Path(__file__).resolve().parents[3] / "backend/src/test/resources/gbt-personal-state.json"
-    if backend_fixture.exists():
-        assert json.loads(backend_fixture.read_text(encoding="utf-8")) == contract_payload(scorer)
+    # Cross-service fixture equality is mandatory in infra/scripts/test_verify_consumer_e2e.py.
+
+
+def test_actual_evidence_payload_matches_backend_handoff_fixture(scorer):
+    value = snapshot(scorer, [(1, 1.0)], dismissed=[2], watched=range(6, 1006))
+    result = PersonalScorer(scorer).calculate(value, generated_at="2026-09-23T00:00:00Z")
+    fixture = Path(__file__).parent / "fixtures/gbt-evidence-v1.json"
+    assert result.evidence.to_payload() == json.loads(fixture.read_text(encoding="utf-8"))
 
 
 def decoded(value, raw=None, **overrides):
@@ -212,9 +216,7 @@ def test_cold_start_payload_matches_backend_kafka_fixture(cold_scorer):
     payload = cold_contract_payload(cold_scorer)
     fixture = Path(__file__).parent / "fixtures/gbt-personal-cold-state.json"
     assert json.loads(fixture.read_text(encoding="utf-8")) == payload
-    backend_fixture = Path(__file__).resolve().parents[3] / "backend/src/test/resources/gbt-personal-cold-state.json"
-    if backend_fixture.exists():
-        assert json.loads(backend_fixture.read_text(encoding="utf-8")) == payload
+    # The whole-repository CI checks equality with the Java reader's fixture.
 
 
 def test_discovery_receives_population_beyond_taste_limit(scorer, monkeypatch):
@@ -235,5 +237,6 @@ def test_discovery_receives_population_beyond_taste_limit(scorer, monkeypatch):
     personal.popularity = SimpleNamespace(candidates=())
     actual = personal.calculate(snapshot(scorer, [(1, 5)]))
     assert captured["count"] == 1004 and len(captured["ratings"]) == 1
-    assert actual.candidates["discovery"][0]["movieId"] not in {
-        item["movieId"] for item in actual.candidates["taste"]}
+    discovery_id = actual.candidates["discovery"][0]["movieId"]
+    assert discovery_id not in {item["movieId"] for item in actual.candidates["taste"]}
+    assert discovery_id not in {item["movieId"] for item in actual.evidence.to_payload()["items"]}

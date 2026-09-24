@@ -74,6 +74,36 @@ class PartyRefreshMigrationTest {
     }
 
     @Test
+    void rejectsUnexpectedPartyRefreshTopLevelFields() {
+        String[] unexpectedFields = {
+            "\"schemaVersion\":2",
+            "\"modelVersion\":\"gbt-v26\"",
+            "\"servingRevision\":\"serving-r1\""
+        };
+        for (int index = 0; index < unexpectedFields.length; index++) {
+            String eventId = "00000000-0000-0000-0000-%012d".formatted(600 + index);
+            String message =
+                    "{\"partyId\":9001,\"inputId\":\"sha256:abcd\",\"members\":[{\"userId\":1024}],"
+                            + unexpectedFields[index]
+                            + "}";
+
+            assertThatThrownBy(
+                            () ->
+                                    execute(
+                                            """
+                                            INSERT INTO outbox_events(
+                                                event_id,event_type,topic,partition_key,message,
+                                                status,attempt_count,next_attempt_at
+                                            ) VALUES ('%s','PARTY_REFRESH','feelm.party-refresh.v1',
+                                                      9001,'%s','PENDING',0,now())
+                                            """
+                                                    .formatted(eventId, message)))
+                    .isInstanceOf(SQLException.class)
+                    .hasMessageContaining("ck_outbox_events_message_contract");
+        }
+    }
+
+    @Test
     void keepsOnePendingRequestPerParty() throws SQLException {
         execute("INSERT INTO party_refresh_requests(party_id) VALUES (9001)");
         execute(

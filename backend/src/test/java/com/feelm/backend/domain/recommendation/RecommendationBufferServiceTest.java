@@ -15,6 +15,8 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.feelm.backend.domain.recommendation.dto.response.RecommendationResponse;
+import com.feelm.backend.domain.recommendation.model.GbtRecommendationReasonPrompt;
+import com.feelm.backend.domain.recommendation.model.GbtRecommendationReasonResult;
 import com.feelm.backend.domain.recommendation.model.RecommendationBufferResult;
 import com.feelm.backend.domain.recommendation.model.RecommendationCandidate;
 import com.feelm.backend.domain.recommendation.model.RecommendationCandidateBatch;
@@ -27,6 +29,7 @@ import com.feelm.backend.domain.recommendation.service.RecommendationServingServ
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
 import com.feelm.backend.support.SharedPostgresContractTest;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -54,7 +57,12 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-@SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
+@SpringBootTest(
+        properties = {
+            "spring.flyway.enabled=true",
+            "spring.jpa.hibernate.ddl-auto=none",
+            "feelm.recommendation.reason.gbt-ai.enabled=true"
+        })
 @DisplayName("개인 추천 버퍼 생성")
 class RecommendationBufferServiceTest extends SharedPostgresContractTest {
 
@@ -70,6 +78,7 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
     @MockitoSpyBean RecommendationBufferRepository bufferRepository;
     @Autowired KafkaListenerEndpointRegistry listenerRegistry;
     @Autowired ConfigurableApplicationContext appContext;
+    @Autowired MeterRegistry meterRegistry;
 
     private ExecutorService executor;
 
@@ -320,23 +329,6 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                         {"reasons":[{"code":"SHARED_GENRE","sourceMovieIds":[55],
                         "matchedGenreCodes":["THRILLER"]}]}
                         """));
-        when(reasonGenerator.selectVariants(anyList()))
-                .thenAnswer(
-                        invocation -> {
-                            assertThat(
-                                            TransactionSynchronizationManager
-                                                    .isActualTransactionActive())
-                                    .isFalse();
-                            List<?> prompts = invocation.getArgument(0);
-                            assertThat(prompts).hasSize(1);
-                            return Map.of(
-                                    ((com.feelm.backend.domain.recommendation.model
-                                                            .RecommendationReasonPrompt)
-                                                    prompts.getFirst())
-                                            .itemId(),
-                                    "SOURCE_GENRE");
-                        });
-
         long setId = service.createBuffer(USER).recommendationSetId();
         String reason =
                 jdbc.queryForObject(
@@ -363,25 +355,13 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                           {"code":"TOP_RATED_SOURCE","sourceMovieIds":[55],"matchedGenreCodes":[]}
                         ]}
                         """));
-        when(reasonGenerator.selectVariants(anyList()))
-                .thenAnswer(
-                        invocation -> {
-                            List<
-                                            com.feelm.backend.domain.recommendation.model
-                                                    .RecommendationReasonPrompt>
-                                    prompts = invocation.getArgument(0);
-                            assertThat(prompts).hasSize(1);
-                            assertThat(prompts.getFirst().sourceTitle()).isEqualTo("movie-55");
-                            return Map.of(prompts.getFirst().itemId(), "HISTORY");
-                        });
-
         long setId = service.createBuffer(USER).recommendationSetId();
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT reason->>'summary' FROM recommendation_items WHERE set_id=?",
                                 String.class,
                                 setId))
-                .isEqualTo("영화 'movie-55'을 좋아하신 기록을 참고해 골랐어요.");
+                .isEqualTo("좋아하신 영화 'movie-55'을 바탕으로 골랐어요.");
     }
 
     @Test
@@ -417,24 +397,6 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                         {"reasons":[{"code":"DISCOVERY_PERSONAL_SCORE","sourceMovieIds":[55,56],
                         "matchedGenreCodes":["ACTION","DRAMA"]}]}
                         """));
-        when(reasonGenerator.selectVariants(anyList()))
-                .thenAnswer(
-                        invocation -> {
-                            List<
-                                            com.feelm.backend.domain.recommendation.model
-                                                    .RecommendationReasonPrompt>
-                                    prompts = invocation.getArgument(0);
-                            assertThat(prompts).hasSize(2);
-                            assertThat(prompts)
-                                    .allSatisfy(
-                                            prompt -> assertThat(prompt.sourceTitle()).isNull());
-                            return Map.of(
-                                    prompts.get(0).itemId(),
-                                    "SOURCE_GENRE",
-                                    prompts.get(1).itemId(),
-                                    "SOURCE_GENRE");
-                        });
-
         long setId = service.createBuffer(USER).recommendationSetId();
         assertThat(
                         jdbc.queryForList(
@@ -462,9 +424,6 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                         {"reasons":[{"code":"SHARED_GENRE","sourceMovieIds":[55],
                         "matchedGenreCodes":["THRILLER"]}]}
                         """));
-        when(reasonGenerator.selectVariants(anyList()))
-                .thenThrow(new IllegalStateException("timeout"));
-
         long setId = service.createBuffer(USER).recommendationSetId();
         String reason =
                 jdbc.queryForObject(
@@ -560,16 +519,6 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                         {"reasons":[{"code":"SHARED_GENRE","sourceMovieIds":[55],
                         "matchedGenreCodes":["THRILLER"]}]}
                         """));
-        when(reasonGenerator.selectVariants(anyList()))
-                .thenAnswer(
-                        invocation -> {
-                            List<
-                                            com.feelm.backend.domain.recommendation.model
-                                                    .RecommendationReasonPrompt>
-                                    prompts = invocation.getArgument(0);
-                            return Map.of(prompts.getFirst().itemId(), "SAME_DIRECTOR");
-                        });
-
         long setId = service.createBuffer(USER).recommendationSetId();
         String summary =
                 jdbc.queryForObject(
@@ -597,6 +546,120 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                                 String.class,
                                 setId))
                 .containsExactly("취향 데이터를 바탕으로 영화를 골라봤어요.", "새로운 영화를 만나보세요.");
+    }
+
+    @Test
+    @DisplayName("검증된 GBT AI 이유와 내부 evidence 스냅샷을 한 번 저장하고 재사용한다")
+    void storesSuccessfulGbtAiSnapshotOnce() {
+        movies(100);
+        candidates(candidate(100, "5.0", "TASTE", null, gbtReason()));
+        when(reasonGenerator.generateGbtReasons(anyList()))
+                .thenAnswer(
+                        invocation -> {
+                            assertThat(
+                                            TransactionSynchronizationManager
+                                                    .isActualTransactionActive())
+                                    .isFalse();
+                            List<GbtRecommendationReasonPrompt> prompts = invocation.getArgument(0);
+                            assertThat(prompts).hasSize(1);
+                            return Map.of(
+                                    prompts.getFirst().itemId(),
+                                    new GbtRecommendationReasonResult(
+                                            "장르 취향 패턴을 바탕으로 골랐어요.",
+                                            List.of("sha256:" + "a".repeat(64))));
+                        });
+
+        long setId = service.createBuffer(USER).recommendationSetId();
+        assertThat(service.createBuffer(USER).recommendationSetId()).isEqualTo(setId);
+
+        var stored =
+                jdbc.queryForMap(
+                        "SELECT reason->>'summary' AS summary, reason->'factors' AS factors,"
+                                + " reason->'usedEvidenceIds' AS used_ids,"
+                                + " reason->>'modelKind' AS model_kind,"
+                                + " reason->>'modelVersion' AS model_version,"
+                                + " reason->>'rankingVersion' AS ranking_version,"
+                                + " reason->>'explanationVersion' AS explanation_version,"
+                                + " reason->'evidence' AS evidence,"
+                                + " reason->>'_reasonPending' AS pending"
+                                + " FROM recommendation_items WHERE set_id=?",
+                        setId);
+        assertThat(stored)
+                .containsEntry("summary", "장르 취향 패턴을 바탕으로 골랐어요.")
+                .containsEntry("model_kind", "GBT")
+                .containsEntry("model_version", "gbt-v26")
+                .containsEntry("ranking_version", "gbt-personal-raw-score-v1")
+                .containsEntry("explanation_version", "gbt-feature-attribution-v1")
+                .containsEntry("pending", null);
+        assertThat(stored.get("factors").toString()).isEqualTo("[]");
+        assertThat(stored.get("used_ids").toString()).contains("sha256:" + "a".repeat(64));
+        assertThat(stored.get("evidence").toString())
+                .contains("GENRE_PATTERN", "gbt-feature-attribution-v1");
+        verify(reasonGenerator, times(1)).generateGbtReasons(anyList());
+    }
+
+    @Test
+    @DisplayName("GBT 생성 실패는 실제 evidence의 결정적 일반 문구를 저장한다")
+    void storesEvidenceBasedFallbackWhenGenerationFails() {
+        movies(100);
+        candidates(candidate(100, "5.0", "TASTE", null, gbtReason()));
+        when(reasonGenerator.generateGbtReasons(anyList()))
+                .thenThrow(new IllegalStateException("timeout"));
+        double fallbackBefore =
+                meterRegistry
+                        .counter("feelm.recommendation.reason.gbt.ai", "outcome", "fallback")
+                        .count();
+
+        long setId = service.createBuffer(USER).recommendationSetId();
+
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT reason->>'summary' FROM recommendation_items WHERE set_id=?",
+                                String.class,
+                                setId))
+                .isEqualTo("장르 취향 패턴을 바탕으로 골랐어요.");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT reason->'usedEvidenceIds'->>0"
+                                        + " FROM recommendation_items WHERE set_id=?",
+                                String.class,
+                                setId))
+                .isEqualTo("sha256:" + "a".repeat(64));
+        assertThat(
+                        meterRegistry
+                                        .counter(
+                                                "feelm.recommendation.reason.gbt.ai",
+                                                "outcome",
+                                                "fallback")
+                                        .count()
+                                - fallbackBefore)
+                .isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("버전 결속이 깨진 GBT evidence는 일반 TASTE fallback만 사용한다")
+    void keepsModelSpecificFallbackWithoutCompatibleGbtEvidence() {
+        movies(100);
+        candidates(
+                candidate(
+                        100,
+                        "5.0",
+                        "TASTE",
+                        null,
+                        gbtReason()
+                                .replace(
+                                        "\"explanationVersion\":\"gbt-feature-attribution-v1\",\"evidence\"",
+                                        "\"explanationVersion\":\"wrong-version\",\"evidence\"")));
+
+        long setId = service.createBuffer(USER).recommendationSetId();
+
+        verify(reasonGenerator, times(0)).generateGbtReasons(anyList());
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT reason->>'summary' FROM recommendation_items WHERE set_id=?",
+                                String.class,
+                                setId))
+                .isEqualTo("취향 데이터를 바탕으로 영화를 골라봤어요.");
     }
 
     @Test
@@ -648,36 +711,26 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
     @Test
     @DisplayName("이유 생성 대기 중 첫 노출의 중립 스냅샷은 생성 완료 뒤에도 유지한다")
     void firstExposureWhileGeneratingKeepsNeutralSnapshot() throws Exception {
-        movies(55, 100, 101, 200);
-        jdbc.update(
-                "INSERT INTO genres(code,name,tmdb_genre_id) VALUES ('THRILLER','스릴러',53)"
-                        + " ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name");
+        movies(100, 101, 200);
         candidates(
-                candidate(
-                        100,
-                        "5.0",
-                        "TASTE",
-                        null,
-                        """
-                        {"reasons":[{"code":"SHARED_GENRE","sourceMovieIds":[55],
-                        "matchedGenreCodes":["THRILLER"]}]}
-                        """),
+                candidate(100, "5.0", "TASTE", null, gbtReason()),
                 candidate(101, "4.0", "TASTE", null),
                 candidate(200, "3.0", "DISCOVERY", "FLAVOR_A"));
         CountDownLatch generationStarted = new CountDownLatch(1);
         CountDownLatch finishGeneration = new CountDownLatch(1);
-        when(reasonGenerator.selectVariants(anyList()))
+        when(reasonGenerator.generateGbtReasons(anyList()))
                 .thenAnswer(
                         invocation -> {
                             generationStarted.countDown();
                             if (!finishGeneration.await(5, TimeUnit.SECONDS)) {
                                 throw new IllegalStateException("generation was not released");
                             }
-                            List<
-                                            com.feelm.backend.domain.recommendation.model
-                                                    .RecommendationReasonPrompt>
-                                    prompts = invocation.getArgument(0);
-                            return Map.of(prompts.getFirst().itemId(), "SOURCE_GENRE");
+                            List<GbtRecommendationReasonPrompt> prompts = invocation.getArgument(0);
+                            return Map.of(
+                                    prompts.getFirst().itemId(),
+                                    new GbtRecommendationReasonResult(
+                                            "장르 취향 패턴이 추천에 긍정적으로 작용했어요.",
+                                            List.of("sha256:" + "a".repeat(64))));
                         });
         executor = Executors.newSingleThreadExecutor();
         Future<Long> creation =
@@ -915,6 +968,24 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
     private RecommendationCandidate candidate(
             long movieId, String score, String type, String flavorCode) {
         return candidate(movieId, score, type, flavorCode, "{\"reasons\":[]}");
+    }
+
+    private String gbtReason() {
+        return """
+                {"reasons":[],"modelKind":"GBT","modelVersion":"gbt-v26",
+                 "rankingVersion":"gbt-personal-raw-score-v1",
+                 "explanationVersion":"gbt-feature-attribution-v1","evidence":{
+                   "evidenceSchemaVersion":"gbt-evidence-v1",
+                   "explanationVersion":"gbt-feature-attribution-v1","generationId":"g1",
+                   "modelVersion":"gbt-v26","servingRevision":"serving-r1",
+                   "featureVersion":"v26-max70-kobis-flag-71-v1",
+                   "rankingVersion":"gbt-personal-raw-score-v1",
+                   "inputVersion":"sha256:%s","candidateVersion":6,
+                   "item":{"movieId":100,"score":5.0,"coverage":0.7,"evidence":[{
+                     "evidenceId":"sha256:%s","group":"GENRE_PATTERN",
+                     "direction":"POSITIVE","contribution":0.4,"coverage":0.7}]}}}
+                """
+                .formatted("b".repeat(64), "a".repeat(64));
     }
 
     private RecommendationCandidate candidate(

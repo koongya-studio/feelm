@@ -76,6 +76,29 @@ class PartyRefreshIntegrationTest extends SharedPostgresContractTest {
     }
 
     @Test
+    void gbtRequestPassesExistingOutboxConstraintWithoutTopLevelMetadata() {
+        when(redis.read(List.of(101L))).thenReturn(gbtSnapshot(101L));
+
+        processor.process(9001L);
+
+        assertThat(requestCount(9001L)).isZero();
+        assertThat(eventCount(9001L)).isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT message ? 'schemaVersion' OR message ? 'modelVersion'"
+                                        + " OR message ? 'servingRevision'"
+                                        + " FROM outbox_events WHERE event_type='PARTY_REFRESH'",
+                                Boolean.class))
+                .isFalse();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT message -> 'members' -> 0 ->> 'inputSchemaVersion'"
+                                        + " FROM outbox_events WHERE event_type='PARTY_REFRESH'",
+                                String.class))
+                .isEqualTo("gbt-input-v1");
+    }
+
+    @Test
     void retriesRedisFailureAfterPartyCreateCommit() {
         long partyId = partyService.create(101L, "created party").partyId();
         when(redis.read(List.of(101L)))
@@ -314,5 +337,19 @@ class PartyRefreshIntegrationTest extends SharedPostgresContractTest {
                                         new PartyInputSnapshot.Member(
                                                 id, "g1", List.of(), List.of(550L)))
                         .toList());
+    }
+
+    private static PartyInputSnapshot gbtSnapshot(long userId) {
+        return new PartyInputSnapshot(
+                PartyInputSnapshot.GBT_STATE_SCHEMA_VERSION,
+                "gbt-v26",
+                "serving-r1",
+                List.of(
+                        PartyInputSnapshot.Member.gbt(
+                                userId,
+                                "g1",
+                                "gbt-input-v1",
+                                "sha256:" + "a".repeat(64),
+                                List.of(550L))));
     }
 }

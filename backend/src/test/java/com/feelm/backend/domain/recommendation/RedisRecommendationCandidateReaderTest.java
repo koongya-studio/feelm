@@ -11,6 +11,7 @@ import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
 import com.feelm.backend.infrastructure.redis.RedisRecommendationCandidateReader;
 import java.time.Instant;
+import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
@@ -486,6 +487,111 @@ class RedisRecommendationCandidateReaderTest {
     }
 
     @Test
+    @DisplayName("GBT Candidate와 결속된 evidence v1을 항목 내부 스냅샷으로 보존한다")
+    void readsBoundGbtEvidenceSnapshot() {
+        when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r1"));
+        when(values.get("feelm:user:10:recommendation-state")).thenReturn(gbtState("g1", HASH));
+        when(values.get("feelm:user:10:candidates")).thenReturn(gbtCandidates("g1", HASH));
+        when(values.get("feelm:user:10:gbt-evidence:g1")).thenReturn(gbtEvidence("g1", HASH));
+
+        var reason = reader.read(10).items().getFirst().reason();
+
+        assertThat(reason.path("modelKind").textValue()).isEqualTo("GBT");
+        assertThat(reason.path("modelVersion").textValue()).isEqualTo("gbt-v26");
+        assertThat(reason.path("rankingVersion").textValue())
+                .isEqualTo("gbt-personal-raw-score-v1");
+        assertThat(reason.path("explanationVersion").textValue())
+                .isEqualTo("gbt-feature-attribution-v1");
+        assertThat(reason.path("evidence").path("userId").longValue()).isEqualTo(10);
+        assertThat(reason.path("evidence").path("generationId").textValue()).isEqualTo("g1");
+        assertThat(reason.path("evidence").path("servingRevision").textValue())
+                .isEqualTo("serving-r1");
+        assertThat(reason.path("evidence").path("featureVersion").textValue())
+                .isEqualTo("v26-max70-kobis-flag-71-v1");
+        assertThat(reason.path("evidence").path("inputVersion").textValue()).isEqualTo(HASH);
+        assertThat(reason.path("evidence").path("candidateVersion").longValue()).isEqualTo(6);
+        assertThat(reason.path("evidence").path("item").path("movieId").longValue()).isEqualTo(101);
+        assertThat(reason.path("evidence").path("item").path("score").decimalValue())
+                .isEqualByComparingTo("4.2");
+        assertThat(reason.path("evidence").path("item").path("coverage").decimalValue())
+                .isEqualByComparingTo("0.7");
+        assertThat(
+                        reason.path("evidence")
+                                .path("item")
+                                .path("evidence")
+                                .get(0)
+                                .path("group")
+                                .textValue())
+                .isEqualTo("GENRE_PATTERN");
+        assertThat(
+                        reason.path("evidence")
+                                .path("item")
+                                .path("evidence")
+                                .get(0)
+                                .path("contribution")
+                                .decimalValue())
+                .isEqualByComparingTo("0.4");
+    }
+
+    @Test
+    @DisplayName("evidence가 없거나 버전이 다르면 Candidate는 유지하고 GBT 설명 근거만 비운다")
+    void ignoresMissingOrVersionMismatchedEvidence() {
+        when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r1"));
+        when(values.get("feelm:user:10:recommendation-state")).thenReturn(gbtState("g1", HASH));
+        when(values.get("feelm:user:10:candidates")).thenReturn(gbtCandidates("g1", HASH));
+        when(values.get("feelm:user:10:gbt-evidence:g1")).thenReturn(null);
+        assertEvidenceIgnored();
+
+        for (String mismatched :
+                List.of(
+                        gbtEvidence("g1", HASH)
+                                .replace("gbt-feature-attribution-v1", "unknown-version"),
+                        gbtEvidence("g1", HASH)
+                                .replace("v26-max70-kobis-flag-71-v1", "unknown-feature"),
+                        gbtEvidence("g1", HASH)
+                                .replace("gbt-personal-raw-score-v1", "unknown-ranking"),
+                        gbtEvidence("g1", HASH).replace("gbt-v26", "gbt-stale"),
+                        gbtEvidence("g1", HASH).replace("serving-r1", "serving-stale"),
+                        gbtEvidence("g1", HASH).replace(HASH, "sha256:" + "b".repeat(64)),
+                        gbtEvidence("g1", HASH)
+                                .replace("\"candidateVersion\":6", "\"candidateVersion\":5"),
+                        gbtEvidence("g1", HASH)
+                                .replace("\"generationId\":\"g1\"", "\"generationId\":\"g2\""))) {
+            when(values.get("feelm:user:10:gbt-evidence:g1")).thenReturn(mismatched);
+            assertEvidenceIgnored();
+        }
+    }
+
+    @Test
+    @DisplayName("허용되지 않은 그룹이나 score 불일치 evidence는 설명에 사용하지 않는다")
+    void rejectsMalformedEvidenceItemsWithoutUsingThem() {
+        when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r1"));
+        when(values.get("feelm:user:10:recommendation-state")).thenReturn(gbtState("g1", HASH));
+        when(values.get("feelm:user:10:candidates")).thenReturn(gbtCandidates("g1", HASH));
+        String valid = gbtEvidence("g1", HASH);
+        for (String malformed :
+                List.of(
+                        valid.replace(
+                                "{\"evidenceSchemaVersion\"",
+                                "{\"extra\":true,\"evidenceSchemaVersion\""),
+                        valid.replace(
+                                "{\"movieId\":101,\"score\"",
+                                "{\"extra\":true,\"movieId\":101,\"score\""),
+                        valid.replace("\"evidenceId\"", "\"extra\":true,\"evidenceId\""),
+                        valid.replace("GENRE_PATTERN", "UNKNOWN_GROUP"),
+                        valid.replace("\"direction\":\"POSITIVE\"", "\"direction\":\"NEGATIVE\""),
+                        valid.replace("sha256:" + "c".repeat(64), "not-a-digest"),
+                        valid.replace("\"movieId\":101", "\"movieId\":102"),
+                        valid.replace("\"score\":4.2", "\"score\":4.1"),
+                        valid.replace("\"contribution\":0.4", "\"contribution\":0"),
+                        valid.replace("\"coverage\":0.7}]", "\"coverage\":0.6}]"))) {
+            assertThat(malformed).isNotEqualTo(valid);
+            when(values.get("feelm:user:10:gbt-evidence:g1")).thenReturn(malformed);
+            assertEvidenceIgnored();
+        }
+    }
+
+    @Test
     @DisplayName("GBT 상태와 Candidate의 입력 hash가 다르면 추천 불가로 처리한다")
     void rejectsGbtInputMismatch() {
         when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r1"));
@@ -581,6 +687,28 @@ class RedisRecommendationCandidateReaderTest {
                  "taste":[{"movieId":101,"score":4.2,"reasons":[]}],"discovery":[]}
                 """
                 .formatted(generation, inputHash);
+    }
+
+    private static String gbtEvidence(String generation, String inputHash) {
+        return """
+                {"evidenceSchemaVersion":"gbt-evidence-v1",
+                 "explanationVersion":"gbt-feature-attribution-v1","userId":10,
+                 "generationId":"%s","modelVersion":"gbt-v26",
+                 "servingRevision":"serving-r1",
+                 "featureVersion":"v26-max70-kobis-flag-71-v1",
+                 "rankingVersion":"gbt-personal-raw-score-v1","inputVersion":"%s",
+                 "candidateVersion":6,"items":[{"movieId":101,"score":4.2,
+                   "coverage":0.7,"evidence":[{
+                     "evidenceId":"sha256:%s","group":"GENRE_PATTERN",
+                     "direction":"POSITIVE","contribution":0.4,"coverage":0.7}]}]}
+                """
+                .formatted(generation, inputHash, "c".repeat(64));
+    }
+
+    private void assertEvidenceIgnored() {
+        assertThat(reader.read(10).items().getFirst().reason().has("evidence"))
+                .as("malformed evidence must not be attached")
+                .isFalse();
     }
 
     private void assertUnavailable(org.assertj.core.api.ThrowableAssert.ThrowingCallable call) {

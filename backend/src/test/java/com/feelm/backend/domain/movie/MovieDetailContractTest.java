@@ -787,9 +787,9 @@ class MovieDetailContractTest extends SharedPostgresContractTest {
         for (int order = 1; order <= 8; order++) {
             jdbc.update(
                     """
-                    INSERT INTO popcorn_flavors (id, code, display_name, color, sort_order,
-                        cluster_id, representative_keywords)
-                    VALUES (?, ?, ?, '#000000', ?, ?, '[]'::jsonb)
+                    INSERT INTO popcorn_flavors (id, code, display_name, color, description,
+                        sort_order, cluster_id, representative_keywords)
+                    VALUES (?, ?, ?, '#000000', '테스트 맛 설명', ?, ?, '[]'::jsonb)
                     """,
                     order,
                     "FLAVOR_" + order,

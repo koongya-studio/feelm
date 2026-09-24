@@ -50,6 +50,18 @@ def archive_with_directories(entries):
 
 
 class InfraMrTests(unittest.TestCase):
+    def test_cross_service_fixtures_remain_required_only_in_full_checkout(self):
+        module = "infra.scripts.test_verify_consumer_e2e"
+        selected = [name for name in load("run-infra-config-tests").TESTS
+                    if name.startswith(module)]
+        self.assertEqual(selected, [module + ".VerifyConsumerE2ETest"])
+        consumer_ci = (HERE.parents[1] / ".gitlab/ci/consumer.yml").read_text(encoding="utf-8")
+        main_job = consumer_ci.split("\nconsumer-test:\n", 1)[1].split("\nconsumer-image:\n", 1)[0]
+        command = next(line for line in main_job.splitlines() if "-m unittest " in line)
+        self.assertIn(module, command.split())  # Whole module includes fixture equality; no skip.
+        for fixture in ("gbt-personal-state.json", "gbt-personal-cold-state.json"):
+            self.assertIn("- backend/src/test/resources/" + fixture, main_job)
+
     def test_boundary_accepts_only_gitlab_and_infra_files(self):
         payload = archive({
             ".gitlab-ci.yml": b"include:\n",

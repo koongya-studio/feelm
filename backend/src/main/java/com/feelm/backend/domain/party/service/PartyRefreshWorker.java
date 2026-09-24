@@ -111,13 +111,7 @@ class PartyRefreshProcessor {
                                                 member.inputHash(),
                                                 member.candidateMovieIds()))
                         .toList();
-        return new PartyRefreshPayload(
-                PartyRefreshPayload.SCHEMA_VERSION,
-                partyId,
-                inputId,
-                snapshot.modelVersion(),
-                snapshot.servingRevision(),
-                members);
+        return new PartyRefreshPayload(partyId, inputId, members);
     }
 
     /** GBT 전환 전 메시지를 같은 토픽에서 소진하기 위한 v1 직렬화 형태. */

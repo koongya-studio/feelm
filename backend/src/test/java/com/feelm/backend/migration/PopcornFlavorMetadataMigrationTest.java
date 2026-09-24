@@ -7,6 +7,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -20,7 +21,7 @@ class PopcornFlavorMetadataMigrationTest {
     @Test
     void updatesAllApprovedDisplayMetadata() throws Exception {
         try (var database = previousSchema()) {
-            database.flyway().migrate();
+            migrateTarget(database);
 
             assertThat(
                             query(
@@ -55,10 +56,10 @@ class PopcornFlavorMetadataMigrationTest {
                     """);
             String before = identityAndInterpretationSnapshot(database);
 
-            database.flyway().migrate();
+            migrateTarget(database);
 
             assertThat(identityAndInterpretationSnapshot(database)).isEqualTo(before);
-            assertThat(database.flyway().validateWithResult().validationSuccessful).isTrue();
+            assertThat(targetFlyway(database).validateWithResult().validationSuccessful).isTrue();
         }
     }
 
@@ -80,7 +81,7 @@ class PopcornFlavorMetadataMigrationTest {
                     """);
             String before = displayMetadataSnapshot(database);
 
-            assertThatThrownBy(() -> database.flyway().migrate())
+            assertThatThrownBy(() -> migrateTarget(database))
                     .isInstanceOf(FlywayException.class)
                     .hasMessageContaining("injected flavor metadata failure");
 
@@ -99,7 +100,7 @@ class PopcornFlavorMetadataMigrationTest {
                     DROP TRIGGER reject_flavor_metadata ON popcorn_flavors;
                     DROP FUNCTION reject_flavor_h_metadata()
                     """);
-            database.flyway().migrate();
+            migrateTarget(database);
             assertThat(
                             query(
                                     database,
@@ -132,7 +133,7 @@ class PopcornFlavorMetadataMigrationTest {
             }
             String before = displayMetadataSnapshot(database);
 
-            assertThatThrownBy(() -> database.flyway().migrate())
+            assertThatThrownBy(() -> migrateTarget(database))
                     .isInstanceOf(FlywayException.class)
                     .hasMessageContaining("Popcorn flavor metadata identity conflict");
 
@@ -149,6 +150,17 @@ class PopcornFlavorMetadataMigrationTest {
 
     private static MigrationPostgresSupport.MigrationTestDatabase previousSchema() {
         return MigrationPostgresSupport.databaseAtVersion("flavor_metadata", PREVIOUS_VERSION);
+    }
+
+    private static void migrateTarget(MigrationPostgresSupport.MigrationTestDatabase database) {
+        targetFlyway(database).migrate();
+    }
+
+    private static Flyway targetFlyway(MigrationPostgresSupport.MigrationTestDatabase database) {
+        return Flyway.configure()
+                .dataSource(database.getJdbcUrl(), database.getUsername(), database.getPassword())
+                .target(MIGRATION_VERSION)
+                .load();
     }
 
     private static String identityAndInterpretationSnapshot(

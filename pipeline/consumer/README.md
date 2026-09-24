@@ -3,7 +3,19 @@
 742 계약에 연결된 개인 GBT 실행·입력 보존·검증은 [627 안내](GBT-627.md)를 참고한다.
 
 v26 GBT 전용 번들·독립 scorer는 [GBT.md](./GBT.md)를 따른다. 개인 실행은 명시적인
-`--gbt-bundle`로 선택한다. 아래는 기존 ALS 경로이며 운영 이미지 통합은 644에서 수행한다.
+`--gbt-bundle`로 선택한다. 표준 이미지에는 GBT CPU 의존성도 포함된다.
+운영 기본 명령의 개인·파티 GBT 선택, 필수 환경 변수와 전환 인계는
+[644 실행 안내](GBT-644.md)를 따른다. 기본 `CONSUMER_RUNTIME=legacy`에서는 아래 기존 ALS 경로를 사용한다.
+
+S15P21E106-824부터 K≥1 개인 GBT TASTE 상위 500편은 같은 모델·71특징·입력으로 exact TreeSHAP을
+계산하고, Candidate v6와 분리된 `feelm:user:{userId}:gbt-evidence:{generationId}`에 설명 근거를
+입력 snapshot·상태·Candidate와 원자 게시한다. 기존 Candidate v6와 `reasons[]`는 바꾸지 않는다.
+Consumer는 같은 Lua에서 내부 `gbt-evidence-current` identity도 갱신해 evidence 단독 잔존 시 이전 세대
+보존 TTL을 복구하며, attribution builder가 seal한 불변 snapshot 외의 게시를 거부한다.
+K0·DISCOVERY·ALS·오류/fallback은 GBT 근거로 표시하지 않는다. 상세 schema와 그룹은
+[`gbt-model-artifacts-v1 §4.1`](../contracts/gbt-model-artifacts.md#41-gbt-local-attribution-근거-v1-s15p21e106-824)과
+[`streaming-contract §5.2`](../../docs/api/streaming-contract.md#52-값-구조)를 따른다. 825가 별도 key를
+소비하고 628이 shadow·종단 승인을 끝내기 전에는 이 근거 기반 문구를 운영에 활성화하지 않는다.
 
 Kafka의 평가·온보딩·관심없음 이벤트를 받아 최신 사용자 입력으로 ALS Fold-in을 수행하고 TASTE 최대 500편과
 DISCOVERY 최대 100편을 갱신한다. Python 3.12의 독립 프로젝트이며 Spark 코드를 import하지 않는다.
@@ -150,17 +162,23 @@ Kafka Group, 환경변수 prefix로 실행한다. `feelm.party-refresh.v1`의 8�
 payload의 `partyId`와 같은지 검증하고 기존 `party-mean-fit-v2` 정책으로 최대 500편을 계산한다.
 Spark 코드를 import하지 않으며 기존 Spark 구현은 parity와 롤백 기준선으로만 남긴다.
 
-S15P21E106-742는 같은 토픽의 `schemaVersion=2` GBT 입력 참조를 parser 계약에 추가했다. v2는
-`modelVersion`·`servingRevision`과 구성원별 `generationId`·`inputSchemaVersion`·`inputHash`·후보 ID만
-가지며 vector를 허용하지 않는다. `--gbt-bundle`을 명시하면 627의 불변 입력을 읽어 동일 GBT로
-구성원별 재점수화를 수행한다. 실행과 검증은 [747 안내](GBT-747.md)를 따른다. v2가 실제 Kafka에
-발행되기 전에 627의 입력 게시와 747의 GBT 경로가 함께 배포되어야 한다. schema가 없는 v1은
-전환 전 ALS rollback 입력으로 구분한다.
+S15P21E106-829는 기존 PostgreSQL CHECK 제약에 맞춰 GBT 요청 최상위를
+`partyId`·`inputId`·`members`로 제한한다. 멤버의 엄격한
+`userId`·`generationId`·`inputSchemaVersion`·`inputHash`·`candidateMovieIds` 구조로 구 vector 입력과
+구분한다. model/revision은 요청한 불변 입력 스냅샷에서 확인하며 모든 멤버 및 현재 로딩 모델과 같아야
+한다. 최신 snapshot이나 `model:current`만으로 과거 요청 메타데이터를 추정하지 않는다.
 
-늦은 v1을 결과 게시 없이 소진하고 최신 v2 refresh를 재요청하는 경로, v2 snapshot/schema 오류가
-같은 offset을 반복하지 않게 하는 durable 격리·재요청 ACK·runner 연결은 747에 구현되어 있다.
-GBT 경로에서 오류는 기존 성공 결과를 유지한다. 483의 전원 K0·후보 소진 공급은 포함하지 않는다.
-해당 구현과 644 런타임이 배포되기 전에는 modelKind 전환과 Backend v2 발행을 활성화하지 않는다.
+`--gbt-bundle`을 명시하면 627의 불변 입력으로 같은 GBT를 사용해 구성원별 재점수화를 수행한다.
+실행과 검증은 [747 안내](GBT-747.md)를 따른다. 새 Consumer를 먼저 배포해 구 vector, 742의
+최상위 6필드 GBT, 829의 최상위 3필드 GBT를 모두 소진·격리할 수 있게 한다. 이후 627 snapshot
+게시를 확인하고 829 Backend를 배포한 뒤 승인된 `model:current.modelKind=GBT` 전환을 수행한다.
+새 3필드 GBT를 이해하지 못하는 Consumer로 rollback하지 않는다.
+
+늦은 vector를 결과 게시 없이 소진하고 최신 GBT refresh를 재요청하는 경로와 snapshot/schema 오류의
+지속 격리·재요청 ACK·runner 연결은 747에 구현되어 있다. 829는 3필드 요청의 모델 검증과 성공 후
+snapshot 만료 재처리를 연결한다. 오류는 기존 성공 결과를 보존하며 483의 전원 K0·후보 소진 공급은
+포함하지 않는다. 이 Consumer와 644 런타임 배포가 Backend의 새 형식 발행보다 먼저 완료되어야 한다.
+
 
 기존 ALS 실행 경로는 시작할 때 개인 Consumer와 같은 `als-artifacts-v2` SERVING model, mapping,
 movie metadata 고정 URI 세 개를 `load_bundle`로 검증한다. Redis 게시 Lua는 partition assign 때
