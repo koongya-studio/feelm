@@ -1,7 +1,7 @@
 {
   "candidateVersion": 6,
-  "evidenceSchemaVersion": "gbt-evidence-v1",
-  "explanationVersion": "gbt-feature-attribution-v1",
+  "evidenceSchemaVersion": "gbt-evidence-v2",
+  "explanationVersion": "gbt-feature-attribution-v2",
   "featureVersion": "v26-max70-kobis-flag-71-v1",
   "generationId": "g1",
   "inputVersion": "sha256:71c4edca6d3f4412fb97bae210131163eec731c2268cd0026b335e799053e271",
@@ -13,14 +13,14 @@
           "contribution": 0.20469269156455994,
           "coverage": 0.5224635024281002,
           "direction": "POSITIVE",
-          "evidenceId": "sha256:e85f3a022df7a8ba790c2bfc7bb05126ddd28857ddaef1ddc8657d9ec46791d1",
+          "evidenceId": "sha256:b29ab56e2440e043a8d20ace13f14e64790f83bccb2e06a65f6e49535f4cc55a",
           "group": "RATING_PATTERN"
         },
         {
           "contribution": 0.18709102272987366,
           "coverage": 0.47753649757189975,
           "direction": "POSITIVE",
-          "evidenceId": "sha256:71995752477dc9fd58b331cdf6ea9dbcf5e9f40f0edbb93dd21cb8a084ead2cd",
+          "evidenceId": "sha256:c6c7bd8a98b80ec1958ffdf79426fa23ba990ccd4076e65b7df73983ad9e6546",
           "group": "POPULARITY_SIGNAL"
         }
       ],
@@ -34,14 +34,14 @@
           "contribution": 0.20469269156455994,
           "coverage": 0.5224635024281002,
           "direction": "POSITIVE",
-          "evidenceId": "sha256:c510bb93da95154a8c3a75b0a20229db9bd1f259cea1c948a5650feb04507fd8",
+          "evidenceId": "sha256:5b46fe392958f55fa524f84bc64962bb2f55c064443761874d84ea0710f26075",
           "group": "RATING_PATTERN"
         },
         {
           "contribution": 0.18709102272987366,
           "coverage": 0.47753649757189975,
           "direction": "POSITIVE",
-          "evidenceId": "sha256:017f86da60d155658720908b86f215c109ce27e0b1b3054f20ccd2168b8add55",
+          "evidenceId": "sha256:84d8b557cbcd4271efba0647742f8eb82cf55a7c2a72d2309dead6f8cf6d3b23",
           "group": "POPULARITY_SIGNAL"
         }
       ],
@@ -55,14 +55,14 @@
           "contribution": 0.20469269156455994,
           "coverage": 0.5224635024281002,
           "direction": "POSITIVE",
-          "evidenceId": "sha256:a335a1026c7fbf4fe9206166a5a0c9b2fab03b82f2b13f031e2051afd03af2d4",
+          "evidenceId": "sha256:5878bd615442724254353136a344a3af4976802d14ff90a7ded105d0c4b62fff",
           "group": "RATING_PATTERN"
         },
         {
           "contribution": 0.18709102272987366,
           "coverage": 0.47753649757189975,
           "direction": "POSITIVE",
-          "evidenceId": "sha256:cc701c4c2502c5d1be8f4085386caa68a0144ccabdd0ffddc63d26991c503343",
+          "evidenceId": "sha256:438030bd61c29ef4d49b3c51a48423534e9008bf15bac3175ea0aa5cd954ecd8",
           "group": "POPULARITY_SIGNAL"
         }
       ],

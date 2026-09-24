@@ -58,7 +58,7 @@ def test_actual_personal_payload_matches_java_reader_fixture(scorer):
 def test_actual_evidence_payload_matches_backend_handoff_fixture(scorer):
     value = snapshot(scorer, [(1, 1.0)], dismissed=[2], watched=range(6, 1006))
     result = PersonalScorer(scorer).calculate(value, generated_at="2026-09-23T00:00:00Z")
-    fixture = Path(__file__).parent / "fixtures/gbt-evidence-v1.json"
+    fixture = Path(__file__).parent / "fixtures/gbt-evidence-v2.json"
     assert result.evidence.to_payload() == json.loads(fixture.read_text(encoding="utf-8"))
 
 

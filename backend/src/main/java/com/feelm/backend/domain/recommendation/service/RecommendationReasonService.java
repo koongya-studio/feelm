@@ -9,9 +9,11 @@ import com.feelm.backend.domain.recommendation.repository.RecommendationReasonRe
 import com.feelm.backend.domain.recommendation.service.RecommendationReasonSnapshotWriter.ReasonSnapshot;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
@@ -26,6 +28,7 @@ public class RecommendationReasonService {
 
     static final String TASTE_NO_EVIDENCE = "취향 데이터를 바탕으로 영화를 골라봤어요.";
     static final String DISCOVERY_NO_EVIDENCE = "새로운 영화를 만나보세요.";
+    private static final Pattern GBT_GENRE_CODE = Pattern.compile("TMDB_[1-9][0-9]*");
 
     private final RecommendationReasonRepository repository;
     private final RecommendationReasonGenerator generator;
@@ -50,8 +53,8 @@ public class RecommendationReasonService {
     }
 
     /** 알림 경로의 버퍼 커밋 전에 확인된 근거만으로 첫 노출용 문구를 저장한다. */
-    ObjectNode initialReason(String type, JsonNode storedReason) {
-        ResolvedPrompt prompt = resolve(0L, storedReason.toString());
+    ObjectNode initialReason(long userId, String type, JsonNode storedReason) {
+        ResolvedPrompt prompt = resolve(0L, userId, storedReason.toString());
         ReasonSnapshot snapshot = render(type, prompt, null);
         ObjectNode initial = ((ObjectNode) storedReason).deepCopy();
         initial.put("summary", snapshot.summary());
@@ -75,7 +78,8 @@ public class RecommendationReasonService {
                         .map(
                                 item ->
                                         new ResolvedReason(
-                                                item.type(), resolve(item.id(), item.reason())))
+                                                item.type(),
+                                                resolve(item.id(), null, item.reason())))
                         .toList();
         List<GbtRecommendationReasonPrompt> gbtPrompts =
                 gbtAiEnabled
@@ -101,10 +105,10 @@ public class RecommendationReasonService {
         writer.complete(snapshots);
     }
 
-    private ResolvedPrompt resolve(long itemId, String storedReason) {
+    private ResolvedPrompt resolve(long itemId, Long initialUserId, String storedReason) {
         try {
             JsonNode root = objectMapper.readTree(storedReason);
-            GbtRecommendationReasonPrompt gbt = resolveGbt(itemId, root);
+            GbtRecommendationReasonPrompt gbt = resolveGbt(itemId, initialUserId, root);
             JsonNode reasons = root.path("reasons");
             if (!reasons.isArray() || reasons.isEmpty()) {
                 return new ResolvedPrompt(empty(itemId), gbt);
@@ -121,7 +125,8 @@ public class RecommendationReasonService {
         }
     }
 
-    private GbtRecommendationReasonPrompt resolveGbt(long itemId, JsonNode root) {
+    private GbtRecommendationReasonPrompt resolveGbt(
+            long itemId, Long initialUserId, JsonNode root) {
         if (!root.has("modelKind")
                 || !root.has("modelVersion")
                 || !root.has("rankingVersion")
@@ -130,11 +135,29 @@ public class RecommendationReasonService {
             return null;
         }
         JsonNode snapshot = root.path("evidence");
+        String explanationVersion = root.path("explanationVersion").textValue();
+        String evidenceSchemaVersion = snapshot.path("evidenceSchemaVersion").textValue();
+        boolean v1 =
+                "gbt-feature-attribution-v1".equals(explanationVersion)
+                        && "gbt-evidence-v1".equals(evidenceSchemaVersion);
+        boolean v2 =
+                "gbt-feature-attribution-v2".equals(explanationVersion)
+                        && "gbt-evidence-v2".equals(evidenceSchemaVersion);
         if (!"GBT".equals(root.path("modelKind").textValue())
-                || !"gbt-feature-attribution-v1".equals(root.path("explanationVersion").textValue())
+                || !v1 && !v2
                 || !root.path("modelVersion").equals(snapshot.path("modelVersion"))
                 || !root.path("rankingVersion").equals(snapshot.path("rankingVersion"))
                 || !root.path("explanationVersion").equals(snapshot.path("explanationVersion"))) {
+            return null;
+        }
+        JsonNode snapshotUserId = snapshot.path("userId");
+        if (v2
+                && (snapshotUserId == null
+                        || !snapshotUserId.isIntegralNumber()
+                        || !snapshotUserId.canConvertToLong()
+                        || snapshotUserId.longValue() <= 0
+                        || initialUserId != null
+                                && snapshotUserId.longValue() != initialUserId.longValue())) {
             return null;
         }
         JsonNode values = snapshot.path("item").path("evidence");
@@ -152,10 +175,50 @@ public class RecommendationReasonService {
                     || !"POSITIVE".equals(value.path("direction").textValue())) {
                 return null;
             }
-            evidence.add(new Evidence(id, group, label));
+            String specificSummary =
+                    v2 ? specificSummary(itemId, initialUserId, snapshot, group, value) : null;
+            evidence.add(new Evidence(id, group, label, specificSummary));
         }
-        return new GbtRecommendationReasonPrompt(
-                itemId, root.path("explanationVersion").textValue(), evidence);
+        evidence.sort(
+                Comparator.comparing(
+                        item -> item.specificSummary() == null, Comparator.naturalOrder()));
+        return new GbtRecommendationReasonPrompt(itemId, explanationVersion, evidence);
+    }
+
+    private String specificSummary(
+            long itemId, Long initialUserId, JsonNode snapshot, String group, JsonNode value) {
+        if ("GENRE_PATTERN".equals(group) && value.path("genreCode").isTextual()) {
+            String code = value.path("genreCode").textValue();
+            if (GBT_GENRE_CODE.matcher(code).matches()) {
+                return repository
+                        .findGenreName(code)
+                        .map(name -> "평소 " + name + " 장르를 좋아해서 골랐어요.")
+                        .orElse(null);
+            }
+        }
+        if ("CONTENT_RELATION".equals(group)
+                && value.path("sourceMovieId").isIntegralNumber()
+                && value.path("sourceMovieId").canConvertToLong()
+                && value.path("sourceMovieId").longValue() > 0
+                && snapshot.path("userId").isIntegralNumber()
+                && snapshot.path("userId").canConvertToLong()
+                && snapshot.path("userId").longValue() > 0) {
+            long userId = snapshot.path("userId").longValue();
+            long sourceMovieId = value.path("sourceMovieId").longValue();
+            long candidateMovieId = snapshot.path("item").path("movieId").longValue();
+            var verifiedTitle =
+                    initialUserId == null
+                            ? repository.findPositiveRatedMovieTitle(itemId, userId, sourceMovieId)
+                            : candidateMovieId > 0
+                                    ? repository.findPositiveRatedMovieTitleBeforeInsert(
+                                            userId, candidateMovieId, sourceMovieId)
+                                    : java.util.Optional.<String>empty();
+            return verifiedTitle
+                    .map(this::sourceTitleForSummary)
+                    .map(sourceTitle -> "\"" + sourceTitle + "\"을 재미있게 봐서 골랐어요.")
+                    .orElse(null);
+        }
+        return null;
     }
 
     private Map<String, String> evidenceLabels() {

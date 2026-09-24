@@ -91,11 +91,11 @@ public class GeminiRecommendationReasonGenerator implements RecommendationReason
         }
         ObjectNode requestBody = objectMapper.createObjectNode();
         ObjectNode input = objectMapper.createObjectNode();
-        input.put("explanationVersion", "gbt-feature-attribution-v1");
         var items = input.putArray("items");
         for (GbtRecommendationReasonPrompt prompt : prompts) {
             ObjectNode item = items.addObject();
             item.put("itemId", prompt.itemId());
+            item.put("explanationVersion", prompt.explanationVersion());
             item.set("evidence", objectMapper.valueToTree(prompt.evidence()));
             var allowed = item.putArray("allowedResponses");
             for (AllowedResponse response : allowedResponses(prompt)) {
