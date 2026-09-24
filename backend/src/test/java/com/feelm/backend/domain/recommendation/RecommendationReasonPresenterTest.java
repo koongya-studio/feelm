@@ -20,12 +20,23 @@ class RecommendationReasonPresenterTest {
                         """
                         {"reasons":[{"code":"SHARED_GENRE","sourceMovieIds":[55],
                         "matchedGenreCodes":["THRILLER"]}],"summary":"스릴러 장르가 같아요.",
-                        "factors":[{"type":"GENRE","label":"스릴러"}]}
+                        "factors":[{"type":"GENRE","label":"스릴러"}],
+                        "usedEvidenceIds":["sha256:internal"],"modelKind":"GBT",
+                        "modelVersion":"gbt-v26","rankingVersion":"internal",
+                        "explanationVersion":"internal","evidence":{"secret":true},
+                        "_reasonPending":true}
                         """);
 
         assertThat(reason.path("summary").textValue()).isEqualTo("스릴러 장르가 같아요.");
         assertThat(reason.path("factors")).hasSize(1);
         assertThat(reason.has("reasons")).isFalse();
+        assertThat(reason.has("usedEvidenceIds")).isFalse();
+        assertThat(reason.has("modelKind")).isFalse();
+        assertThat(reason.has("modelVersion")).isFalse();
+        assertThat(reason.has("rankingVersion")).isFalse();
+        assertThat(reason.has("explanationVersion")).isFalse();
+        assertThat(reason.has("evidence")).isFalse();
+        assertThat(reason.has("_reasonPending")).isFalse();
     }
 
     @Test

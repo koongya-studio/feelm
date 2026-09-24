@@ -193,6 +193,27 @@ class RecommendationReasonSnapshotWriterContractTest extends SharedPostgresContr
     }
 
     @Test
+    @DisplayName("확장 reason 필드를 한 UPDATE로 교체하고 pending을 제거한다")
+    void completesFullSnapshotPerItemWithoutChangingLockBoundary() {
+        String usedEvidenceIds = "[\"sha256:" + "a".repeat(64) + "\"]";
+
+        writer.complete(
+                List.of(
+                        new ReasonSnapshot(
+                                TASTE_1, "장르 취향 패턴을 바탕으로 골랐어요.", "[]", usedEvidenceIds)));
+
+        assertThat(summary(TASTE_1)).isEqualTo("장르 취향 패턴을 바탕으로 골랐어요.");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT cast(reason->'usedEvidenceIds' AS text)"
+                                        + " FROM recommendation_items WHERE id=?",
+                                String.class,
+                                TASTE_1))
+                .isEqualTo(usedEvidenceIds);
+        assertThat(pending(TASTE_1)).isNull();
+    }
+
+    @Test
     @DisplayName("T4 보강이 TASTE 항목을 든 채 조회가 들어와도 교착 없이 대기 후 200을 돌려준다")
     void servingReadDoesNotDeadlockWhileEnrichmentHoldsAnItem() throws Exception {
         // 수정 전 보강이 첫 항목(TASTE 1)을 갱신한 채 멈춰 있던 상태를 재현한다.

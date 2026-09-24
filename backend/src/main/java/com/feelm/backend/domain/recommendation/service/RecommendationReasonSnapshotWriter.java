@@ -34,10 +34,24 @@ class RecommendationReasonSnapshotWriter {
         }
         for (ReasonSnapshot snapshot : snapshots) {
             // 트랜잭션 밖의 JdbcTemplate 호출은 문장마다 autocommit되어 항목 하나의 잠금만 잠깐 든다.
-            repository.completeIfUnexposed(
-                    snapshot.itemId(), snapshot.summary(), snapshot.factorsJson());
+            if ("[]".equals(snapshot.usedEvidenceIdsJson())) {
+                repository.completeIfUnexposed(
+                        snapshot.itemId(), snapshot.summary(), snapshot.factorsJson());
+            } else {
+                repository.completeIfUnexposed(
+                        snapshot.itemId(),
+                        snapshot.summary(),
+                        snapshot.factorsJson(),
+                        snapshot.usedEvidenceIdsJson());
+            }
         }
     }
 
-    record ReasonSnapshot(long itemId, String summary, String factorsJson) {}
+    record ReasonSnapshot(
+            long itemId, String summary, String factorsJson, String usedEvidenceIdsJson) {
+
+        ReasonSnapshot(long itemId, String summary, String factorsJson) {
+            this(itemId, summary, factorsJson, "[]");
+        }
+    }
 }

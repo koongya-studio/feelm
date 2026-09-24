@@ -6,12 +6,16 @@ import com.feelm.backend.domain.recommendation.repository.RecommendationCandidat
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.locks.LockSupport;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -22,6 +26,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.ValueDeserializer;
 import tools.jackson.databind.annotation.JsonDeserialize;
+import tools.jackson.databind.node.ObjectNode;
 
 /** Redis의 개인 추천 후보 JSON을 읽고 전환 기간의 Candidate v5/v6 계약을 검증한다. */
 @Component
@@ -31,12 +36,42 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
     private static final int MAX_GENERATION_ID_LENGTH = 100;
     private static final int READ_ATTEMPTS = 3;
     private static final long RETRY_DELAY_NANOS = 20_000_000L;
+    private static final int MAX_EVIDENCE_BYTES = 2 * 1024 * 1024;
     private static final long CURRENT_CANDIDATE_VERSION = 6;
     private static final long PREVIOUS_CANDIDATE_VERSION = 5;
     private static final String SHARED_GENRE_REASON = "SHARED_GENRE";
     private static final String TOP_RATED_SOURCE_REASON = "TOP_RATED_SOURCE";
     private static final String DISCOVERY_AGGREGATE_REASON = "DISCOVERY_AGGREGATE_AFFINITY";
     private static final String DISCOVERY_PERSONAL_REASON = "DISCOVERY_PERSONAL_SCORE";
+    private static final String EVIDENCE_SCHEMA_VERSION = "gbt-evidence-v1";
+    private static final String EXPLANATION_VERSION = "gbt-feature-attribution-v1";
+    private static final String FEATURE_VERSION = "v26-max70-kobis-flag-71-v1";
+    private static final String RANKING_VERSION = "gbt-personal-raw-score-v1";
+    private static final Pattern SHA256 = Pattern.compile("sha256:[0-9a-f]{64}");
+    private static final Set<String> EVIDENCE_GROUPS =
+            Set.of(
+                    "GENRE_PATTERN",
+                    "RATING_PATTERN",
+                    "CONTENT_RELATION",
+                    "POPULARITY_SIGNAL",
+                    "AUDIENCE_RATING_SIGNAL");
+    private static final Set<String> EVIDENCE_ROOT_FIELDS =
+            Set.of(
+                    "evidenceSchemaVersion",
+                    "explanationVersion",
+                    "userId",
+                    "generationId",
+                    "modelVersion",
+                    "servingRevision",
+                    "featureVersion",
+                    "rankingVersion",
+                    "inputVersion",
+                    "candidateVersion",
+                    "items");
+    private static final Set<String> EVIDENCE_ITEM_FIELDS =
+            Set.of("movieId", "score", "coverage", "evidence");
+    private static final Set<String> EVIDENCE_FIELDS =
+            Set.of("evidenceId", "group", "direction", "contribution", "coverage");
     private static final Set<String> DIRECTION_SOURCES = Set.of("RATING", "ONBOARDING");
     private static final Set<String> CONTRIBUTOR_RELATIONS =
             Set.of("POSITIVE_ALIGNMENT", "NEGATIVE_CONTRAST");
@@ -98,14 +133,17 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
             validate(storedBatch);
             String storedState = readState(userId);
             JsonNode currentModel = readCurrentModel();
+            Map<Long, JsonNode> evidence = Map.of();
             if (currentModel != null && currentModel.has("modelKind")
                     || UserRecommendationStateContract.hasGbtMetadata(candidate)
                     || storedState != null && !storedState.isBlank()) {
-                validateGbtState(userId, storedBatch, candidate, storedState, currentModel);
+                var state =
+                        validateGbtState(userId, storedBatch, candidate, storedState, currentModel);
+                evidence = readGbtEvidence(userId, storedBatch, state);
             } else {
                 validateLegacyVector(userId, storedBatch);
             }
-            return toBatch(storedBatch);
+            return toBatch(storedBatch, evidence);
         } catch (JacksonException | IllegalArgumentException exception) {
             throw unavailable(exception);
         }
@@ -139,7 +177,7 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
         }
     }
 
-    private void validateGbtState(
+    private UserRecommendationStateContract.Snapshot validateGbtState(
             long userId,
             StoredCandidateBatch batch,
             JsonNode candidate,
@@ -156,6 +194,116 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
                 UserRecommendationStateContract.parse(objectMapper.readTree(storedState), userId);
         UserRecommendationStateContract.verifyCandidate(candidate, state);
         UserRecommendationStateContract.verifyCurrentModel(currentModel, state);
+        return state;
+    }
+
+    /** evidence 장애나 버전 불일치는 추천 후보 자체를 사용할 수 없게 만들지 않고 설명만 fallback한다. */
+    private Map<Long, JsonNode> readGbtEvidence(
+            long userId,
+            StoredCandidateBatch candidates,
+            UserRecommendationStateContract.Snapshot state) {
+        String stored;
+        try {
+            stored = redisTemplate.opsForValue().get(evidenceKey(userId, state.generationId()));
+            if (stored == null
+                    || stored.isBlank()
+                    || stored.getBytes(StandardCharsets.UTF_8).length > MAX_EVIDENCE_BYTES) {
+                return Map.of();
+            }
+            return validateGbtEvidence(objectMapper.readTree(stored), userId, candidates, state);
+        } catch (RuntimeException exception) {
+            return Map.of();
+        }
+    }
+
+    private Map<Long, JsonNode> validateGbtEvidence(
+            JsonNode root,
+            long userId,
+            StoredCandidateBatch candidates,
+            UserRecommendationStateContract.Snapshot state) {
+        if (!hasExactFields(root, EVIDENCE_ROOT_FIELDS)
+                || !EVIDENCE_SCHEMA_VERSION.equals(root.path("evidenceSchemaVersion").textValue())
+                || !EXPLANATION_VERSION.equals(root.path("explanationVersion").textValue())
+                || !positiveLong(root.path("userId"))
+                || root.path("userId").longValue() != userId
+                || !state.generationId().equals(root.path("generationId").textValue())
+                || !state.modelVersion().equals(root.path("modelVersion").textValue())
+                || !state.servingRevision().equals(root.path("servingRevision").textValue())
+                || !FEATURE_VERSION.equals(root.path("featureVersion").textValue())
+                || !RANKING_VERSION.equals(root.path("rankingVersion").textValue())
+                || !state.inputHash().equals(root.path("inputVersion").textValue())
+                || !positiveLong(root.path("candidateVersion"))
+                || root.path("candidateVersion").longValue() != CURRENT_CANDIDATE_VERSION
+                || !root.path("items").isArray()
+                || root.path("items").size() != candidates.taste().size()) {
+            throw new IllegalArgumentException("GBT evidence metadata differs");
+        }
+
+        Map<Long, JsonNode> snapshots = new HashMap<>();
+        for (int index = 0; index < candidates.taste().size(); index++) {
+            StoredTasteCandidate candidate = candidates.taste().get(index);
+            JsonNode item = root.path("items").get(index);
+            validateEvidenceItem(item, candidate);
+            ObjectNode snapshot = objectMapper.createObjectNode();
+            snapshot.put("evidenceSchemaVersion", EVIDENCE_SCHEMA_VERSION);
+            snapshot.put("explanationVersion", EXPLANATION_VERSION);
+            snapshot.put("userId", userId);
+            snapshot.put("generationId", state.generationId());
+            snapshot.put("modelVersion", state.modelVersion());
+            snapshot.put("servingRevision", state.servingRevision());
+            snapshot.put("featureVersion", FEATURE_VERSION);
+            snapshot.put("rankingVersion", RANKING_VERSION);
+            snapshot.put("inputVersion", state.inputHash());
+            snapshot.put("candidateVersion", CURRENT_CANDIDATE_VERSION);
+            snapshot.set("item", item.deepCopy());
+            snapshots.put(candidate.movieId(), snapshot);
+        }
+        return Map.copyOf(snapshots);
+    }
+
+    private void validateEvidenceItem(JsonNode item, StoredTasteCandidate candidate) {
+        if (!hasExactFields(item, EVIDENCE_ITEM_FIELDS)
+                || !positiveLong(item.path("movieId"))
+                || item.path("movieId").longValue() != candidate.movieId()
+                || !item.path("score").isNumber()
+                || item.path("score").decimalValue().compareTo(candidate.score()) != 0
+                || !decimalBetweenZeroAndOne(item.path("coverage"))
+                || !item.path("evidence").isArray()
+                || item.path("evidence").size() > 3) {
+            throw new IllegalArgumentException("Invalid GBT evidence item");
+        }
+        Set<String> ids = new HashSet<>();
+        Set<String> groups = new HashSet<>();
+        BigDecimal coverage = BigDecimal.ZERO;
+        for (JsonNode evidence : item.path("evidence")) {
+            String id = evidence.path("evidenceId").textValue();
+            String group = evidence.path("group").textValue();
+            if (!hasExactFields(evidence, EVIDENCE_FIELDS)
+                    || id == null
+                    || !SHA256.matcher(id).matches()
+                    || !ids.add(id)
+                    || !EVIDENCE_GROUPS.contains(group)
+                    || !groups.add(group)
+                    || !"POSITIVE".equals(evidence.path("direction").textValue())
+                    || !evidence.path("contribution").isNumber()
+                    || evidence.path("contribution").decimalValue().compareTo(BigDecimal.ZERO) <= 0
+                    || !decimalBetweenZeroAndOne(evidence.path("coverage"))) {
+                throw new IllegalArgumentException("Invalid GBT evidence");
+            }
+            coverage = coverage.add(evidence.path("coverage").decimalValue());
+        }
+        if (coverage.compareTo(item.path("coverage").decimalValue()) != 0) {
+            throw new IllegalArgumentException("GBT evidence coverage differs");
+        }
+    }
+
+    private boolean hasExactFields(JsonNode node, Set<String> fields) {
+        if (node == null || !node.isObject()) {
+            return false;
+        }
+        Set<String> actual = new HashSet<>();
+        node.properties().forEach(property -> actual.add(property.getKey()));
+        return actual.equals(fields);
     }
 
     private void validateLegacyVector(long userId, StoredCandidateBatch batch)
@@ -179,6 +327,10 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
 
     private String vectorKey(long userId) {
         return "feelm:user:" + userId + ":vector";
+    }
+
+    private String evidenceKey(long userId, String generationId) {
+        return "feelm:user:" + userId + ":gbt-evidence:" + generationId;
     }
 
     private void validate(StoredCandidateBatch batch) {
@@ -369,7 +521,8 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
                 && value.decimalValue().compareTo(BigDecimal.ONE) <= 0;
     }
 
-    private RecommendationCandidateBatch toBatch(StoredCandidateBatch stored) {
+    private RecommendationCandidateBatch toBatch(
+            StoredCandidateBatch stored, Map<Long, JsonNode> evidence) {
         List<RecommendationCandidate> items = new ArrayList<>();
         stored.taste()
                 .forEach(
@@ -384,7 +537,8 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
                                                         reasons(
                                                                 stored.candidateVersion(),
                                                                 item.reason(),
-                                                                item.reasons())))));
+                                                                item.reasons()),
+                                                        evidence.get(item.movieId())))));
         stored.discovery()
                 .forEach(
                         item ->
@@ -398,7 +552,8 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
                                                         reasons(
                                                                 stored.candidateVersion(),
                                                                 item.reason(),
-                                                                item.reasons())))));
+                                                                item.reasons()),
+                                                        null))));
         return new RecommendationCandidateBatch(
                 stored.modelVersion(),
                 stored.candidateVersion(),
@@ -408,8 +563,17 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
     }
 
     /** 이유 객체의 코드별 필드를 재조립하지 않고 수신한 배열 그대로 버퍼 저장 계층에 전달한다. */
-    private JsonNode reason(JsonNode reasons) {
-        return objectMapper.createObjectNode().set("reasons", reasons.deepCopy());
+    private JsonNode reason(JsonNode reasons, JsonNode evidence) {
+        ObjectNode reason = objectMapper.createObjectNode();
+        reason.set("reasons", reasons.deepCopy());
+        if (evidence != null) {
+            reason.put("modelKind", "GBT");
+            reason.put("modelVersion", evidence.path("modelVersion").textValue());
+            reason.put("rankingVersion", evidence.path("rankingVersion").textValue());
+            reason.put("explanationVersion", evidence.path("explanationVersion").textValue());
+            reason.set("evidence", evidence.deepCopy());
+        }
+        return reason;
     }
 
     private BusinessException unavailable(Exception cause) {
