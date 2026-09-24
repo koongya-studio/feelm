@@ -2,13 +2,11 @@
  * 3.4 취향 리포트 상세 · 7.4 취향 리포트 상세 — MY 경로
  *
  * 이동표
- * - 3.3 → 3.4 · 3.4 → 3.5 공유하기 · 3.4 ⇢ 3.1 저장 후 취향 필름으로 돌아가기
- * - 7.3 → 7.4 · 7.4 ⇢ 3.5 공유하기 · 7.4 ⇢ 7.3 저장 또는 뒤로 가기
+ * - 3.3 → 3.4 · 3.4 → 3.5 공유하기
+ * - 7.3 → 7.4 · 7.4 ⇢ 3.5 공유하기 · 7.4 ⇢ 7.3 뒤로 가기
  *
- * 와이어프레임은 두 화면을 같은 내용으로 그렸다. 차이는 **`저장`이 어디로 돌아가는지**다.
- * 필름 쪽(3.4)은 3.1로, MY 쪽(7.4)은 온 곳(7.3)으로 간다. `from`으로 가른다.
- *
- * 요소 — 4컷(한 칸에 장르 · 감독 · 배우 · 캐릭터 하나씩), `저장` · `공유하기`.
+ * 두 경로는 같은 상세 화면을 사용한다. 요소는 4컷(한 칸에 장르 · 감독 · 배우 · 캐릭터
+ * 하나씩)과 `공유하기`다. PNG 다운로드는 공유 시트의 `이미지로 저장` 한 곳에서 제공한다.
  *
  * **설명은 4컷 아래가 아니라 칸 뒷면에 있다**(사용자 요청 2026-09-23, 업무 -812). 와이어프레임은
  * `상세 리포트` · `취향 키워드` · `지난 반기와 비교`를 4컷 아래에 이어 붙였는데, 설명이 화면을
@@ -28,7 +26,7 @@
  *   바탕만 맡는다. 어두운 바탕에 맞춰 `.back`이 색 토큰만 다시 정의하므로 `MeterRow` · `Chip`
  *   같은 공용 컴포넌트를 그대로 쓴다
  * - 그릴 값이 없는 뒷면은 아예 주지 않는다. 그 칸은 뒤집히지 않는 그림 칸으로 남는다
- * - 인화지를 그림으로 저장할 때(`저장` · 3.5 `이미지로 저장`)는 뒤집힌 칸을 먼저 되돌린다.
+ * - 인화지를 그림으로 저장할 때(3.5 `이미지로 저장`)는 뒤집힌 칸을 먼저 되돌린다.
  *   저장되는 것은 앞면 넷이다
  * - **3.5 `공유하기`는 앞면과 뒷면 두 장을 보낸다**(업무 -849). 앞면을 찍은 뒤 뒷면이 있는 칸을
  *   모두 뒤집어 한 장 더 찍고, 사용자가 뒤집어 두었던 모양으로 되돌린다. 받은 사람은 리포트
@@ -43,18 +41,17 @@
  * 마찬가지다** — 선정 기준이 업무 -618에서 정해질 때까지 `characterCard`가 null로 오므로
  * 그 칸을 숨긴다(백엔드 답 2026-09-21).
  *
- * - 화면은 4컷 인화지 한 장과 버튼 두 개다
+ * - 화면은 4컷 인화지 한 장과 `공유하기` 버튼 하나다
  * - `지난 반기와 비교`의 빼기는 흐리게 쓴다. 색으로 늘고 준 것을 가르지 않는다
  *   (`design-concept.md` 2.2). 와이어프레임도 줄어든 값만 흐렸다
  * - 비교할 지난 반기가 없으면(첫 리포트) 그 칸을 그리지 않는다
  *
- * `저장`은 4컷 PNG를 내려받은 뒤 위의 곳으로 돌아간다(사용자 결정 2026-09-23, 업무 -731).
- * 3.5의 `이미지로 저장`과 같은 함수다(`saveReportImage.ts`). 실패하면 나가지 않고 버튼 위에
- * 이유를 알린다 — 내려받지 못했는데 돌아가면 저장된 줄 안다.
+ * 직접 `저장` 버튼은 S15P21E106-848에서 제거했다. 리포트의 목록 노출은 첫 발급으로 이미
+ * 결정되며, PNG 다운로드는 3.5의 `이미지로 저장`만 맡는다(`saveReportImage.ts`).
  * `[?]` 7.4는 와이어프레임에 `공유하기` 버튼이 없지만 이동표에 `7.4 ⇢ 3.5`가 있어 두었다.
  */
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import Chip from '../../../components/Chip';
 import IconButton from '../../../components/IconButton';
@@ -67,12 +64,11 @@ import StatusView from '../../../components/StatusView';
 import { ShareIcon } from '../../../components/Icon';
 import { getReportDetail } from '../../../api/reports';
 import { getMyProfile } from '../../../api/users';
-import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
 import { formatComparisonLabel, formatDelta, formatHalf } from '../../../utils/report';
 import { captureReportBackImage, captureReportImage } from '../../../utils/reportImage';
 import ReportShareSheet from './ReportShareSheet';
-import { reportImageFailure, saveReportImage } from './saveReportImage';
+import { saveReportImage } from './saveReportImage';
 import styles from './ReportDetailPage.module.css';
 import type { ReactNode } from 'react';
 import type {
@@ -83,11 +79,6 @@ import type {
   ReportKeyword,
   ReportShare,
 } from '../../../types/report';
-
-type Props = {
-  /** `film` 3.4(2.1 · 3.3에서 옴) · `my` 7.4(7.3에서 옴) */
-  from: 'film' | 'my';
-};
 
 /** 칸이 뒤집히거나 앞면으로 되돌아오는 데 걸리는 시간. 인화지의 `--flip-duration`과 맞춘다 */
 const FLIP_BACK_MS = 560;
@@ -110,9 +101,7 @@ function nextFrameOrFallback(): Promise<void> {
   });
 }
 
-export default function ReportDetailPage({ from }: Props) {
-  const navigate = useNavigate();
-  const back = useBack(path.tasteReports());
+export default function ReportDetailPage() {
   const { reportId } = useParams();
   const id = Number(reportId);
 
@@ -122,8 +111,6 @@ export default function ReportDetailPage({ from }: Props) {
   const [reloadCount, setReloadCount] = useState(0);
   const [sharing, setSharing] = useState(false);
   const [flipped, setFlipped] = useState<ReportCutKind[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [saveFailure, setSaveFailure] = useState('');
   const fourCutRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -159,26 +146,6 @@ export default function ReportDetailPage({ from }: Props) {
       active = false;
     };
   }, []);
-
-  async function save() {
-    setSaving(true);
-    setSaveFailure('');
-
-    try {
-      await saveImage();
-    } catch (error) {
-      setSaveFailure(reportImageFailure(error));
-      setSaving(false);
-
-      return;
-    }
-
-    if (from === 'my') {
-      back();
-    } else {
-      void navigate(path.film());
-    }
-  }
 
   function toggleFlip(kind: ReportCutKind) {
     setFlipped((list) => (list.includes(kind) ? list.filter((k) => k !== kind) : [...list, kind]));
@@ -282,12 +249,7 @@ export default function ReportDetailPage({ from }: Props) {
         showBack
         fallbackTo={path.tasteReports()}
         action={
-          <IconButton
-            label="공유하기"
-            icon={<ShareIcon />}
-            disabled={saving}
-            onClick={() => setSharing(true)}
-          />
+          <IconButton label="공유하기" icon={<ShareIcon />} onClick={() => setSharing(true)} />
         }
       />
 
@@ -306,19 +268,8 @@ export default function ReportDetailPage({ from }: Props) {
         </div>
 
         <div className={styles.footer}>
-          {saveFailure ? (
-            <p className={styles.notice} role="status">
-              {saveFailure}
-            </p>
-          ) : null}
-
           <div className={styles.actions}>
-            <Button variant="secondary" disabled={saving} onClick={() => void save()}>
-              저장
-            </Button>
-            <Button disabled={saving} onClick={() => setSharing(true)}>
-              공유하기
-            </Button>
+            <Button onClick={() => setSharing(true)}>공유하기</Button>
           </div>
         </div>
       </div>
