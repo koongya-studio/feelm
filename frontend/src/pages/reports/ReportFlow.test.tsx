@@ -13,6 +13,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import FilmPage from '../film/FilmPage';
+import { AuthContext } from '../../contexts/authContext';
+import { testAuth } from '../../test/auth';
 import MyDashboardPage from '../my/MyDashboardPage';
 import ReportDetailPage from './ReportDetailPage';
 import ReportIssuedPage from './ReportIssuedPage';
@@ -161,17 +163,19 @@ function LocationProbe() {
 
 function renderApp(entries: string[]) {
   return render(
-    <MemoryRouter initialEntries={entries} initialIndex={entries.length - 1}>
-      <Routes>
-        <Route path={ROUTE_PATTERN.film} element={<FilmPage />} />
-        <Route path={ROUTE_PATTERN.my} element={<MyDashboardPage />} />
-        <Route path={ROUTE_PATTERN.tasteReports} element={<ReportListPage />} />
-        <Route path={ROUTE_PATTERN.myReport} element={<ReportDetailPage />} />
-        <Route path={ROUTE_PATTERN.reportIssued} element={<ReportIssuedPage />} />
-        <Route path={ROUTE_PATTERN.report} element={<ReportDetailPage />} />
-      </Routes>
-      <LocationProbe />
-    </MemoryRouter>,
+    <AuthContext.Provider value={testAuth}>
+      <MemoryRouter initialEntries={entries} initialIndex={entries.length - 1}>
+        <Routes>
+          <Route path={ROUTE_PATTERN.film} element={<FilmPage />} />
+          <Route path={ROUTE_PATTERN.my} element={<MyDashboardPage />} />
+          <Route path={ROUTE_PATTERN.tasteReports} element={<ReportListPage />} />
+          <Route path={ROUTE_PATTERN.myReport} element={<ReportDetailPage />} />
+          <Route path={ROUTE_PATTERN.reportIssued} element={<ReportIssuedPage />} />
+          <Route path={ROUTE_PATTERN.report} element={<ReportDetailPage />} />
+        </Routes>
+        <LocationProbe />
+      </MemoryRouter>
+    </AuthContext.Provider>,
   );
 }
 

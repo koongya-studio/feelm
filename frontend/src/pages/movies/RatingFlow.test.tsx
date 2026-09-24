@@ -14,6 +14,8 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import MovieRatingPage from './MovieRatingPage';
 import RatingResultPage from './RatingResultPage';
 import FilmPage from '../film/FilmPage';
+import { AuthContext } from '../../contexts/authContext';
+import { testAuth } from '../../test/auth';
 import { ROUTE_PATTERN } from '../../routes/paths';
 import type { MovieDetail } from '../../types/movie';
 import type { FrameList, FrameSummary } from '../../types/taste';
@@ -125,13 +127,15 @@ function reelPosters() {
 describe('2.5 → 2.6 → 3.1', () => {
   it('평가한 영화가 기존 필름에 이어 붙고 3.1에서도 필름의 맨 앞에 있다', async () => {
     render(
-      <MemoryRouter initialEntries={['/movies/550/rate']}>
-        <Routes>
-          <Route path={ROUTE_PATTERN.movieRating} element={<MovieRatingPage />} />
-          <Route path={ROUTE_PATTERN.ratingResult} element={<RatingResultPage />} />
-          <Route path={ROUTE_PATTERN.film} element={<FilmPage />} />
-        </Routes>
-      </MemoryRouter>,
+      <AuthContext.Provider value={testAuth}>
+        <MemoryRouter initialEntries={['/movies/550/rate']}>
+          <Routes>
+            <Route path={ROUTE_PATTERN.movieRating} element={<MovieRatingPage />} />
+            <Route path={ROUTE_PATTERN.ratingResult} element={<RatingResultPage />} />
+            <Route path={ROUTE_PATTERN.film} element={<FilmPage />} />
+          </Routes>
+        </MemoryRouter>
+      </AuthContext.Provider>,
     );
 
     // 2.5
