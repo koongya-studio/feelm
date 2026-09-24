@@ -44,6 +44,7 @@ class TasteApiContractTest {
                     code varchar(30) NOT NULL UNIQUE,
                     display_name varchar(30) NOT NULL,
                     color varchar(20) NOT NULL,
+                    description text NOT NULL,
                     sort_order int NOT NULL,
                     cluster_id int NOT NULL UNIQUE,
                     representative_keywords json NOT NULL
@@ -72,8 +73,17 @@ class TasteApiContractTest {
     @Test
     @DisplayName("팝콘 맛 기준정보는 인증 없이 표시 순서대로 조회되고 원시 군집 ID를 노출하지 않는다")
     void popcornFlavorsArePublicAndHideClusterId() throws Exception {
-        insertFlavor(1, "FLAVOR_B", "두 번째 맛", "#222222", 2, 7, "[\"여운\",\"성장\"]");
-        insertFlavor(2, "FLAVOR_A", "첫 번째 맛", "#111111", 1, 3, "[\"긴장\",\"반전\"]");
+        insertFlavor(
+                1, "FLAVOR_B", "두 번째 맛", "#222222", "서늘하고 낯선 세계를 즐겨요", 2, 7, "[\"여운\",\"성장\"]");
+        insertFlavor(
+                2,
+                "FLAVOR_A",
+                "첫 번째 맛",
+                "#111111",
+                "있었던 일을 그대로 담은 이야기에 끌려요",
+                1,
+                3,
+                "[\"긴장\",\"반전\"]");
 
         mockMvc.perform(get(FLAVORS_PATH))
                 .andExpect(status().isOk())
@@ -81,9 +91,10 @@ class TasteApiContractTest {
                 .andExpect(jsonPath("$.items[0].code").value("FLAVOR_A"))
                 .andExpect(jsonPath("$.items[0].displayName").value("첫 번째 맛"))
                 .andExpect(jsonPath("$.items[0].color").value("#111111"))
+                .andExpect(jsonPath("$.items[0].description").value("있었던 일을 그대로 담은 이야기에 끌려요"))
                 .andExpect(jsonPath("$.items[0].sortOrder").value(1))
                 // 필드 이름만 막으면 다른 이름으로 되살아나도 통과하므로 키 집합을 고정한다
-                .andExpect(jsonPath("$.items[0].*", hasSize(4)))
+                .andExpect(jsonPath("$.items[0].*", hasSize(5)))
                 .andExpect(jsonPath("$.items[0].representativeKeywords").doesNotExist())
                 .andExpect(jsonPath("$.items[0].clusterId").doesNotExist());
     }
@@ -105,6 +116,7 @@ class TasteApiContractTest {
                     "FLAVOR_" + order,
                     "맛 " + order,
                     "#00000" + order,
+                    "맛 설명 " + order,
                     order,
                     order - 1,
                     "[\"키워드" + order + "\"]");
@@ -146,19 +158,22 @@ class TasteApiContractTest {
             String code,
             String displayName,
             String color,
+            String description,
             int sortOrder,
             int clusterId,
             String keywords) {
         jdbcTemplate.update(
                 """
                 INSERT INTO popcorn_flavors
-                    (id, code, display_name, color, sort_order, cluster_id, representative_keywords)
-                VALUES (?, ?, ?, ?, ?, ?, ? FORMAT JSON)
+                    (id, code, display_name, color, description, sort_order, cluster_id,
+                     representative_keywords)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ? FORMAT JSON)
                 """,
                 id,
                 code,
                 displayName,
                 color,
+                description,
                 sortOrder,
                 clusterId,
                 keywords);

@@ -237,6 +237,7 @@ erDiagram
         varchar code UK "불변"
         varchar display_name "변경 가능"
         varchar color "변경 가능"
+        text description "사람이 확정한 맛 설명"
         int sort_order
         jsonb representative_keywords "실배정 해석 키워드"
     }
@@ -261,7 +262,7 @@ erDiagram
 | `people` | 인물(감독·배우) | 검색 대상(FR-14). `original_name`은 4컷 리포트의 영문 병기용이며 **라틴 원어명이 있는 외국 인물만** 채운다. 검토된 TMDb person ID와 정확한 `original_name` 쌍이 allow-list와 일치할 때만 허용하고, 미확인 인물과 한국인은 NULL로 두어 4컷에서 한글 한 줄로 표시한다 | API-028, API-030 |
 | `otts` | OTT 기준정보 | 지원 목록 5종(API-025)을 새 Flyway seed로 초기화한다. 기존 식별쌍·ID·참조는 보존하고 이후 콘텐츠 적재는 같은 쌍의 표시 정보를 갱신한다 | FR-03, FR-16 · API-025 |
 | `movie_ott_providers` | 영화별 시청 가능 OTT | TMDb watch provider 동기화 | FR-16 · API-030 |
-| `popcorn_flavors` | 팝콘 맛 8종 기준정보와 439 상위 맛 매핑 | `cluster_id=taste_id`와 `code=FLAVOR_A..H`는 각각 유일하며 순서대로 1:1 대응한다. 표시명·색상은 변경 가능하고 실배정 해석 키워드도 함께 보관한다. 내부 `cluster_id`는 공개 API에 노출하지 않는다 | FR-06 · API-044 · ADR-0020 |
+| `popcorn_flavors` | 팝콘 맛 8종 기준정보와 439 상위 맛 매핑 | `cluster_id=taste_id`와 `code=FLAVOR_A..H`는 각각 유일하며 순서대로 1:1 대응한다. 표시명·색상과 사람이 확정한 설명 문장은 변경 가능하고 실배정 해석 키워드도 함께 보관한다. 내부 `cluster_id`는 공개 API에 노출하지 않는다 | FR-06 · API-044 · ADR-0020 |
 
 ### 2.3 온보딩·감상·취향
 

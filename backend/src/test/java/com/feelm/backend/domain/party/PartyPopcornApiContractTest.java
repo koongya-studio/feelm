@@ -171,8 +171,8 @@ class PartyPopcornApiContractTest extends SharedPostgresContractTest {
     private void flavor(long id, String code, int sortOrder) {
         jdbc.update(
                 "INSERT INTO popcorn_flavors"
-                        + " (id,code,display_name,color,sort_order,cluster_id,representative_keywords)"
-                        + " VALUES (?,?,?,'#000000',?,?,CAST('[]' AS jsonb))",
+                        + " (id,code,display_name,color,description,sort_order,cluster_id,representative_keywords)"
+                        + " VALUES (?,?,?,'#000000','테스트 맛 설명',?,?,CAST('[]' AS jsonb))",
                 id,
                 code,
                 code,

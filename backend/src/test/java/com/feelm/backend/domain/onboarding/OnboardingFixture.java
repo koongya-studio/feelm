@@ -45,9 +45,9 @@ final class OnboardingFixture {
     static void flavors(JdbcTemplate jdbc) {
         for (int index = 0; index < FLAVOR_CODES.length; index++) {
             jdbc.update(
-                    "INSERT INTO popcorn_flavors(id,code,display_name,color,sort_order,"
+                    "INSERT INTO popcorn_flavors(id,code,display_name,color,description,sort_order,"
                             + "cluster_id,representative_keywords)"
-                            + " VALUES (?,?,?,?,?,?,CAST('[]' AS jsonb))",
+                            + " VALUES (?,?,?,?,'테스트 맛 설명',?,?,CAST('[]' AS jsonb))",
                     index + 1,
                     FLAVOR_CODES[index],
                     FLAVOR_CODES[index],

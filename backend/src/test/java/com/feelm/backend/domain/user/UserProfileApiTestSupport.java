@@ -100,6 +100,7 @@ abstract class UserProfileApiTestSupport {
                     code varchar(30) NOT NULL UNIQUE,
                     display_name varchar(30) NOT NULL,
                     color varchar(20) NOT NULL,
+                    description text NOT NULL,
                     sort_order int NOT NULL,
                     cluster_id int NOT NULL UNIQUE,
                     representative_keywords json NOT NULL
@@ -187,8 +188,9 @@ abstract class UserProfileApiTestSupport {
         jdbcTemplate.update(
                 """
                 INSERT INTO popcorn_flavors
-                    (id, code, display_name, color, sort_order, cluster_id, representative_keywords)
-                VALUES (?, ?, ?, ?, ?, ?, ? FORMAT JSON)
+                    (id, code, display_name, color, description, sort_order, cluster_id,
+                     representative_keywords)
+                VALUES (?, ?, ?, ?, '테스트 맛 설명', ?, ?, ? FORMAT JSON)
                 """,
                 id,
                 code,

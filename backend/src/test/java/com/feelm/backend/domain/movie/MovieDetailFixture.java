@@ -70,9 +70,10 @@ final class MovieDetailFixture {
         // Flyway seed(V202609161115)의 FLAVOR_A를 그대로 옮겨 온다. 남아 있는지는 묻지 않는다.
         jdbc.update(
                 """
-                INSERT INTO popcorn_flavors (id, code, display_name, color, sort_order,
-                    cluster_id, representative_keywords)
-                VALUES (?, 'FLAVOR_A', '오리지널 솔트', '#FBF1CF', 1, 0, '[]'::jsonb)
+                INSERT INTO popcorn_flavors (id, code, display_name, color, description,
+                    sort_order, cluster_id, representative_keywords)
+                VALUES (?, 'FLAVOR_A', '오리지널 솔트', '#FBF1CF',
+                    '있었던 일을 그대로 담은 이야기에 끌려요', 1, 0, '[]'::jsonb)
                 """,
                 FLAVOR);
         jdbc.update(

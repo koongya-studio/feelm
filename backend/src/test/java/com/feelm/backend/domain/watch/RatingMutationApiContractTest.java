@@ -1075,8 +1075,11 @@ class RatingMutationApiContractTest extends SharedPostgresContractTest {
     private long insertFlavor() {
         return jdbc.sql(
                         """
-                        INSERT INTO popcorn_flavors(code,display_name,color,sort_order,cluster_id,representative_keywords)
-                        VALUES ('FLAVOR_MUTATION','수정 맛','#123456',1,0,'[]'::jsonb) RETURNING id
+                        INSERT INTO popcorn_flavors(
+                            code,display_name,color,description,sort_order,cluster_id,representative_keywords)
+                        VALUES (
+                            'FLAVOR_MUTATION','수정 맛','#123456','테스트 맛 설명',1,0,'[]'::jsonb)
+                        RETURNING id
                         """)
                 .query(Long.class)
                 .single();
