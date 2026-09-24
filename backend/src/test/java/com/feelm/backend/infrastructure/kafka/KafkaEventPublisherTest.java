@@ -27,8 +27,8 @@ import tools.jackson.databind.ObjectMapper;
 @DisplayName("Kafka 공통 이벤트 기록")
 class KafkaEventPublisherTest {
 
-    private static final String PARTY_REFRESH_V2_FIXTURE_SHA256 =
-            "99f9260db317b52d69ef22a8b54e626bcc256cb85184f7371ed170a803de79f5";
+    private static final String PARTY_REFRESH_GBT_FIXTURE_SHA256 =
+            "a7fc8391f3aee22da1a65bf4218c242b43b161f72a780caca2c9f7e93ddcfa6a";
 
     @Autowired private ObjectMapper objectMapper;
 
@@ -69,7 +69,7 @@ class KafkaEventPublisherTest {
 
     @Test
     @DisplayName("파티 refresh는 사용자 이벤트 봉투 없이 전용 JSON을 아웃박스에 저장한다")
-    void storesPartyRefreshBody() throws Exception {
+    void storesDbCompatibleGbtPartyRefreshBody() throws Exception {
         OutboxEventStore store = mock(OutboxEventStore.class);
         UUID eventId = UUID.fromString("0f3c9a1e-6b2d-4f77-9a10-5c2b8e41d0aa");
         Instant occurredAt = Instant.parse("2026-09-07T00:00:00Z");
@@ -83,11 +83,8 @@ class KafkaEventPublisherTest {
         publisher.publishPartyRefresh(
                 9001L,
                 new PartyRefreshPayload(
-                        PartyRefreshPayload.SCHEMA_VERSION,
                         9001L,
-                        "sha256:" + "c".repeat(64),
-                        "gbt-v26",
-                        "serving-r1",
+                        "sha256:c0d25e189d0474402a67496142a6eb4d11c69e413f58887e650ffed0add48395",
                         List.of(
                                 new PartyRefreshPayload.Member(
                                         1024L,
@@ -104,18 +101,20 @@ class KafkaEventPublisherTest {
                         message.capture(),
                         org.mockito.ArgumentMatchers.eq(occurredAt));
         JsonNode body = objectMapper.readTree(message.getValue());
-        assertThat(body).isEqualTo(sharedPartyRefreshFixture());
+        assertThat(body).isEqualTo(sharedGbtPartyRefreshFixture());
     }
 
-    private JsonNode sharedPartyRefreshFixture() throws Exception {
+    private JsonNode sharedGbtPartyRefreshFixture() throws Exception {
         byte[] fixture;
         try (InputStream input =
                 Objects.requireNonNull(
-                        getClass().getResourceAsStream("/contracts/party-refresh-v2.json"))) {
+                        getClass()
+                                .getResourceAsStream(
+                                        "/contracts/party-refresh-gbt-reference.json"))) {
             fixture = input.readAllBytes();
         }
         assertThat(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(fixture)))
-                .isEqualTo(PARTY_REFRESH_V2_FIXTURE_SHA256);
+                .isEqualTo(PARTY_REFRESH_GBT_FIXTURE_SHA256);
         return objectMapper.readTree(fixture);
     }
 }

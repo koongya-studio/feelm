@@ -56,6 +56,8 @@ def request_hash(request: PartyRefresh) -> str:
 def validate_request(request: PartyRefresh) -> None:
     if request.schema_version != 2 or not all(isinstance(m, PartyInputReference) for m in request.members):
         raise GbtError("INVALID_PARTY_REQUEST_VERSION")
+    if request.model_version is None or request.serving_revision is None:
+        raise GbtError("UNRESOLVED_PARTY_MODEL")
     if not valid_revision(request.serving_revision):
         raise GbtError("INVALID_SERVING_REVISION")
     try:

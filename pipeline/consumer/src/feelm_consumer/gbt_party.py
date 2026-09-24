@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from statistics import fmean, pstdev
 from typing import Protocol
 
@@ -16,8 +16,8 @@ ALGORITHM_VERSION = "party-gbt-mean-fit-v1"
 
 
 class SnapshotReader(Protocol):
-    def read_snapshot(self, user_id: int, generation_id: str, *, serving_revision: str,
-                      model_version: str, input_hash: str) -> InputSnapshot: ...
+    def read_snapshot(self, user_id: int, generation_id: str, *, serving_revision: str | None,
+                      model_version: str | None, input_hash: str) -> InputSnapshot: ...
 
 
 @dataclass(frozen=True)
@@ -119,3 +119,18 @@ def calculate_party(scorer, request: PartyRequest, reader: SnapshotReader) -> Pa
                                           model_version=request.model_version, input_hash=member.input_hash)
                       for member in request.members)
     return score_party(scorer, request, snapshots)
+
+
+def resolve_party_input(request: PartyRequest, reader: SnapshotReader):
+    """Resolve only the requested generations and reuse the validated bytes for scoring."""
+    snapshots = tuple(reader.read_snapshot(member.user_id, member.generation_id,
+                                          serving_revision=request.serving_revision,
+                                          model_version=request.model_version, input_hash=member.input_hash)
+                      for member in request.members)
+    metadata = {(value.model_version, value.serving_revision) for value in snapshots}
+    if len(metadata) != 1:
+        raise GbtError("PARTY_SNAPSHOT_MODEL_MISMATCH")
+    model_version, serving_revision = next(iter(metadata))
+    resolved = replace(request, model_version=model_version, serving_revision=serving_revision)
+    validate_request(resolved)
+    return resolved, snapshots

@@ -8,20 +8,24 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.feelm.backend.domain.party.model.PartyRefreshPayload;
 import com.feelm.backend.domain.party.service.CandidateUpdatedRequestService;
 import com.feelm.backend.domain.recommendation.repository.RecommendationBufferRepository;
 import com.feelm.backend.domain.recommendation.service.RecommendationBufferService;
 import com.feelm.backend.domain.recommendation.service.RecommendationReasonService;
 import com.feelm.backend.global.security.TokenProvider;
+import com.feelm.backend.infrastructure.kafka.KafkaEventPublisher;
 import com.feelm.backend.infrastructure.redis.RedisRecommendationCandidateReader;
 import com.feelm.backend.support.SharedPostgresContractTest;
 import com.github.dockerjava.api.command.InspectContainerResponse;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -30,11 +34,16 @@ import javax.sql.DataSource;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.OffsetSpec;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.LongDeserializer;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -63,12 +72,14 @@ import tools.jackson.databind.ObjectMapper;
         properties = {
             "spring.flyway.enabled=true",
             "spring.jpa.hibernate.ddl-auto=none",
+            "feelm.kafka.outbox.relay-enabled=true",
             "feelm.party.refresh.consumer-enabled=true",
             "feelm.party.refresh.worker-enabled=false",
             "feelm.recommendation.candidate-consumer-enabled=true"
         })
 class PersonalCandidateKafkaOffsetIntegrationTest extends SharedPostgresContractTest {
     private static final String TOPIC = "feelm.candidate-updated.v1";
+    private static final String PARTY_REFRESH_TOPIC = "feelm.party-refresh.v1";
     private static final String PERSONAL = "feelm-personal-buffer-v1";
     private static final String PARTY = "feelm-party-refresh-v1";
     private static final long USER = 58501L;
@@ -80,6 +91,8 @@ class PersonalCandidateKafkaOffsetIntegrationTest extends SharedPostgresContract
     @Autowired DataSource dataSource;
     @Autowired MockMvc mvc;
     @Autowired TokenProvider tokens;
+    @Autowired KafkaEventPublisher eventPublisher;
+    @Autowired ObjectMapper objectMapper;
     @Autowired RecommendationBufferService bufferService;
     @MockitoSpyBean RecommendationBufferRepository bufferRepository;
     @MockitoSpyBean RedisRecommendationCandidateReader candidateReader;
@@ -98,6 +111,7 @@ class PersonalCandidateKafkaOffsetIntegrationTest extends SharedPostgresContract
     void fixtures() throws Exception {
         awaitOffset(PERSONAL, endOffset());
         awaitOffset(PARTY, endOffset());
+        jdbc.execute("TRUNCATE TABLE outbox_events");
         jdbc.execute("TRUNCATE TABLE users, movies RESTART IDENTITY CASCADE");
         for (long userId : new long[] {USER, NEXT_USER}) {
             jdbc.update(
@@ -165,6 +179,51 @@ class PersonalCandidateKafkaOffsetIntegrationTest extends SharedPostgresContract
         awaitOffset(PERSONAL, next + 1);
         awaitOffset(PARTY, next + 1);
         assertThat(count("recommendation_sets")).isEqualTo(1);
+    }
+
+    @Test
+    void persistsAndPublishesDbCompatibleGbtPartyRefresh() throws Exception {
+        String inputId = "sha256:c0d25e189d0474402a67496142a6eb4d11c69e413f58887e650ffed0add48395";
+        UUID eventId =
+                eventPublisher.publishPartyRefresh(
+                        9001L,
+                        new PartyRefreshPayload(
+                                9001L,
+                                inputId,
+                                List.of(
+                                        new PartyRefreshPayload.Member(
+                                                1024L,
+                                                "g1",
+                                                "gbt-input-v1",
+                                                "sha256:" + "a".repeat(64),
+                                                List.of(550L)))));
+        try {
+            ConsumerRecord<Long, String> record = awaitPartyRefresh(inputId);
+            awaitOutboxStatus(eventId, "PUBLISHED");
+
+            assertThat(record.key()).isEqualTo(9001L);
+            JsonNode body = objectMapper.readTree(record.value());
+            assertThat(body.propertyNames())
+                    .containsExactlyInAnyOrder("partyId", "inputId", "members");
+            assertThat(body.path("members").get(0).propertyNames())
+                    .containsExactlyInAnyOrder(
+                            "userId",
+                            "generationId",
+                            "inputSchemaVersion",
+                            "inputHash",
+                            "candidateMovieIds");
+            assertThat(body.path("inputId").textValue()).isEqualTo(inputId);
+            assertThat(
+                            objectMapper.readTree(
+                                    jdbc.queryForObject(
+                                            "SELECT message::text FROM outbox_events"
+                                                    + " WHERE event_id=?",
+                                            String.class,
+                                            eventId)))
+                    .isEqualTo(body);
+        } finally {
+            jdbc.update("DELETE FROM outbox_events WHERE event_id=?", eventId);
+        }
     }
 
     @Test
@@ -686,6 +745,48 @@ class PersonalCandidateKafkaOffsetIntegrationTest extends SharedPostgresContract
         }
     }
 
+    private static ConsumerRecord<Long, String> awaitPartyRefresh(String inputId) {
+        Properties config = new Properties();
+        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers());
+        config.put(ConsumerConfig.GROUP_ID_CONFIG, "party-refresh-contract-" + UUID.randomUUID());
+        config.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, LongDeserializer.class);
+        config.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        try (KafkaConsumer<Long, String> consumer = new KafkaConsumer<>(config)) {
+            consumer.subscribe(List.of(PARTY_REFRESH_TOPIC));
+            long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
+            while (System.nanoTime() < deadline) {
+                for (ConsumerRecord<Long, String> record : consumer.poll(Duration.ofMillis(250))) {
+                    if (record.value().contains(inputId)) {
+                        return record;
+                    }
+                }
+            }
+        }
+        throw new AssertionError("party refresh was not published to Kafka");
+    }
+
+    private void awaitOutboxStatus(UUID eventId, String expected) throws InterruptedException {
+        long deadline = System.nanoTime() + Duration.ofSeconds(30).toNanos();
+        while (System.nanoTime() < deadline) {
+            String status =
+                    jdbc.queryForObject(
+                            "SELECT status FROM outbox_events WHERE event_id=?",
+                            String.class,
+                            eventId);
+            if (expected.equals(status)) {
+                return;
+            }
+            Thread.sleep(100);
+        }
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT status FROM outbox_events WHERE event_id=?",
+                                String.class,
+                                eventId))
+                .isEqualTo(expected);
+    }
+
     private int count(String table) {
         return jdbc.queryForObject("SELECT count(*) FROM " + table, Integer.class);
     }
@@ -791,7 +892,10 @@ class PersonalCandidateKafkaOffsetIntegrationTest extends SharedPostgresContract
         }
         try (AdminClient admin =
                 AdminClient.create(Map.of("bootstrap.servers", container.getBootstrapServers()))) {
-            admin.createTopics(java.util.List.of(new NewTopic(TOPIC, 1, (short) 1)))
+            admin.createTopics(
+                            List.of(
+                                    new NewTopic(TOPIC, 1, (short) 1),
+                                    new NewTopic(PARTY_REFRESH_TOPIC, 1, (short) 1)))
                     .all()
                     .get(10, TimeUnit.SECONDS);
         } catch (Exception exception) {

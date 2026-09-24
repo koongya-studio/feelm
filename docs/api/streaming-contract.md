@@ -267,17 +267,14 @@ Consumer는 이벤트 payload의 과거 값을 누적하지 않고 현재 Postgr
 - Python Consumer가 `recommendation-state`·`candidates`의 원자 게시에 성공한 뒤 발행한다. Kafka 수신 자체가 후보 갱신 알림이며 `occurredAt`을 비교하지 않는다.
 - Spring의 개인 추천 Consumer는 파티 Consumer와 독립된 group에서 알림을 받는다. 현재 Redis Candidate를 읽어 개인 버퍼를 저장·커밋한 뒤 offset을 확정한다. 알림보다 새 generation이 이미 게시됐으면 현재 Redis generation을 사용하며, 같은 generation의 재전달은 기존 세트를 재사용한다. 새 세트는 API-045의 최신 세트로 즉시 노출된다. 이전 세트의 노출·추천 이력은 보존한다. 유효한 알림의 Redis·DB 장애는 offset을 확정하지 않고 재시도한다. 형식이 잘못된 알림, 비활성·삭제된 사용자, 필터 후 저장 가능한 후보가 없는 경우는 새 세트 없이 offset을 확정한다.
 - 알림은 중복되거나 더 새 Candidate 게시 뒤 도착할 수 있다. Spring은 관련 활성 파티별 지속성 있는 refresh 요청을 DB에 저장한 뒤 수신 offset을 확정한다. 대기 중 중복 요청은 파티별로 합친다. 처리 작업자는 현재 Redis 값을 다시 읽고, 파티원별 `recommendation-state`·`candidates`를 한 번의 Redis MGET으로 가져와 `modelVersion`·`servingRevision`·`generationId`·`inputSchemaVersion`·`inputHash` 일치를 확인한다.
-- Spring은 이 최신 전체 입력으로 `feelm.party-refresh.v1`의 schema v2 이벤트를 만든다. 전체 평가나 영화 특징은 Kafka에 복사하지 않고 627이 게시한 불변 입력 스냅샷의 사용자·세대·schema·hash만 참조한다. 파티 구성 변경 때도 같은 DB 요청을 저장한다. Redis 장애나 불완전 입력은 요청을 남겨 재시도하며 파티 API를 실패시키지 않는다. 종료된 파티의 요청은 계산 이벤트 없이 정리한다.
+- Spring은 이 최신 전체 입력으로 `feelm.party-refresh.v1`의 GBT 입력 참조 이벤트를 만든다. 전체 평가나 영화 특징은 Kafka에 복사하지 않고 627이 게시한 불변 입력 스냅샷의 사용자·세대·schema·hash만 참조한다. 파티 구성 변경 때도 같은 DB 요청을 저장한다. Redis 장애나 불완전 입력은 요청을 남겨 재시도하며 파티 API를 실패시키지 않는다. 종료된 파티의 요청은 계산 이벤트 없이 정리한다.
 
 **파티 입력 갱신 — `feelm.party-refresh.v1`**
 
 ```json
 {
-  "schemaVersion": 2,
   "partyId": 9001,
   "inputId": "sha256:<party-snapshot-digest>",
-  "modelVersion": "gbt-v26-20260923",
-  "servingRevision": "gbt-v26-feature71-catalog20260923-policy1",
   "members": [
     {
       "userId": 1024,
@@ -290,16 +287,16 @@ Consumer는 이벤트 payload의 과거 값을 누적하지 않고 현재 Postgr
 }
 ```
 
-- Kafka 키는 `partyId`를 Kafka `LongSerializer`로 직렬화한 8바이트 정수다. 값은 위 전용 JSON이며 공통 사용자 이벤트 봉투를 사용하지 않는다. 멤버는 1~4명, `userId` 오름차순이고 `candidateMovieIds`는 사용자 선호 순서의 중복 없는 최대 600개다. schema v2에는 `vector`·`factorDimension`을 두지 않는다.
+- Kafka 키는 `partyId`를 Kafka `LongSerializer`로 직렬화한 8바이트 정수다. 값은 위 전용 JSON이며 공통 사용자 이벤트 봉투를 사용하지 않는다. 기존 PostgreSQL `ck_outbox_events_message_contract`에 맞춰 최상위 필드는 `partyId`·`inputId`·`members`만 허용한다. 멤버는 1~4명, `userId` 오름차순이고 `candidateMovieIds`는 사용자 선호 순서의 중복 없는 최대 600개다. GBT 입력 참조 멤버는 `userId`·`generationId`·`inputSchemaVersion`·`inputHash`·`candidateMovieIds`만 가지며 `vector`·`factorDimension`을 두지 않는다.
 - Spring은 모든 파티원의 GBT 상태와 Candidate가 현재 `feelm:model:current`의 `modelVersion`·`servingRevision`과 같을 때만 발행한다. 한 사용자 안에서도 상태와 Candidate의 generation·입력 참조가 모두 같아야 한다. 사용자 사이의 `generationId`가 같을 필요는 없다.
-- `inputId`는 Spring이 `partyId`, `modelVersion`, schema version, `servingRevision`, 정렬된 파티원별 `userId`·`generationId`·`inputSchemaVersion`·`inputHash`에서 길이 구분 SHA-256으로 결정한다. 모델·특징·카탈로그·매핑·정책·구성원·사용자 입력 중 하나가 바뀌면 달라지고 같은 Kafka record 재처리에서는 같다.
-- 파티 Consumer는 payload가 가리키는 불변 입력 스냅샷의 userId·generation·schema·hash를 모두 검증한 뒤 같은 GBT와 특징 변환으로 재점수화한다. 결과에는 `inputId`와 `modelVersion`을 그대로 기록한다. Spring은 결과 사용 시 현재 입력으로 `inputId`를 다시 계산하고 결과 모델 버전도 비교한다.
+- `inputId`는 Spring이 `partyId`, 내부 `modelVersion`, 내부 schema version, 내부 `servingRevision`, 정렬된 파티원별 `userId`·`generationId`·`inputSchemaVersion`·`inputHash`에서 길이 구분 SHA-256으로 결정한다. 세 최상위 필드를 전송하지 않아도 이 해시 입력은 바꾸지 않는다. 모델·특징·카탈로그·매핑·정책·구성원·사용자 입력 중 하나가 바뀌면 달라지고 같은 Kafka record 재처리에서는 같다.
+- 파티 Consumer는 멤버의 엄격한 필드 집합과 `inputSchemaVersion`으로 GBT 참조를 식별한다. 각 참조가 가리키는 불변 입력 스냅샷에서 userId·generation·schema·hash와 `modelVersion`·`servingRevision`을 검증하고, 모든 멤버가 같은 모델/revision이며 현재 활성·로딩 모델과 일치할 때만 같은 GBT와 특징 변환으로 재점수화한다. 최신 사용자 입력이나 `model:current`만으로 과거 요청의 모델을 추정하지 않는다. 결과에는 검증한 `inputId`와 `modelVersion`을 기록한다. Spring은 결과 사용 시 현재 입력으로 `inputId`를 다시 계산하고 결과 모델 버전도 비교한다.
 - 파티별 대기 요청은 하나로 합치되, 처리 완료 후 같은 `inputId`가 다시 발행될 수 있다. 파티 Consumer는 해당 파티 Redis 값을 원자적으로 교체하며 Spring은 조회 시 현재 `inputId`와 모델 버전을 다시 비교한다.
 - 파티 refresh 아웃박스는 같은 파티의 앞선 이벤트가 Kafka에 기록되고 `PUBLISHED`로 확정될 때까지 후속 이벤트를 발행하지 않는다. 다른 파티와 사용자 이벤트의 발행은 계속한다. `partyId` Kafka 키로 같은 파티의 순서를 한 partition에 고정하고, 파티 Consumer는 Redis 게시와 아래 완료 알림의 broker ACK가 모두 성공한 뒤 해당 record의 Offset만 동기 커밋한다.
 
-schema가 없는 기존 vector형 payload는 v1이며 schema v2 GBT 입력으로 해석하지 않는다. 전환 때는 (1) 새 Consumer가 v1을 식별해 기존 처리로 소진할 수 있는 상태로 먼저 배포하고, (2) 627의 사용자 상태·입력 스냅샷 전체 게시를 검증하고, (3) `model:current.modelKind=GBT`를 전환한 뒤 Backend가 v2를 발행하게 하며, (4) 모든 활성 파티 refresh를 다시 요청한다. v2 Consumer는 snapshot 부재·hash 불일치·지원하지 않는 schema를 처리 성공으로 커밋하지 않고 기존 파티 결과를 유지한다. 구형 v1이 뒤늦게 도착하면 GBT 결과를 덮어쓰지 않고 offset만 소진한 뒤 해당 파티의 v2 refresh를 다시 요청한다. 구체적인 전체 전환·rollback 실행은 628/735 runbook에서 검증한다.
+기존 vector형 payload는 멤버의 `userId`·`vector`·`candidateMovieIds` 구조로만 식별하며 GBT 입력 참조와 섞인 요청은 거부한다. 742가 발행한 `schemaVersion`·`modelVersion`·`servingRevision` 포함 GBT 메시지는 전환 중 이미 큐에 있을 수 있으므로 747 Consumer가 스냅샷 메타데이터와 대조해 먼저 소진한다. 배포 순서는 (1) 747 Consumer가 구 vector, 742 GBT, 새 3필드 GBT를 엄격히 구분하고 격리·복구할 수 있는 상태로 먼저 배포하고, (2) 627의 사용자 상태·불변 입력 스냅샷 전체 게시를 검증하고, (3) 829 Backend를 배포한 뒤 `model:current.modelKind=GBT`를 전환하며, (4) 모든 활성 파티 refresh를 다시 요청한다. snapshot 부재·hash/model/revision 불일치는 기존 파티 결과를 보존하고 다음 정상 record가 진행할 수 있게 격리한다. 구형 vector가 뒤늦게 도착하면 GBT 결과를 덮어쓰지 않고 소진한 뒤 새 refresh를 한 번만 요청한다. Backend를 먼저 배포하거나 새 3필드 GBT를 이해하지 못하는 Consumer로 rollback하지 않는다. 구체적인 전체 전환·rollback 실행은 628/735 runbook에서 검증한다.
 
-S15P21E106-742는 v1/v2 식별과 직렬화 계약까지만 제공한다. 늦은 v1의 drain 후 v2 재요청, v2 snapshot/schema 오류의 격리·재시도와 partition 진행, 실제 GBT 점수 계산은 S15P21E106-747이 소유한다. 747의 runner 통합 테스트와 배포가 완료되기 전에는 `feelm:model:current.modelKind=GBT`로 전환하지 않으며 Backend v2 발행을 활성화하지 않는다.
+S15P21E106-742는 이전 v1/v2 직렬화 경계를 제공했고 S15P21E106-829가 DB 제약과 일치하는 최상위 3필드 계약으로 바로잡는다. 늦은 vector drain 후 GBT 재요청, snapshot/schema/model 오류의 격리·재처리와 partition 진행, 실제 GBT 점수 계산은 S15P21E106-747이 소유한다. 747의 runner 통합 테스트와 배포가 완료되기 전에는 `feelm:model:current.modelKind=GBT`로 전환하거나 829 Backend 발행을 운영에 적용하지 않는다.
 
 **파티 raw Candidate 게시 완료 알림 — `feelm.party-candidate-updated.v1`**
 

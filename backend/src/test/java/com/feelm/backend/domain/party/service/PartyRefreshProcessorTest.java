@@ -12,7 +12,6 @@ import com.feelm.backend.domain.party.entity.Party;
 import com.feelm.backend.domain.party.entity.PartyStatus;
 import com.feelm.backend.domain.party.model.PartyInputId;
 import com.feelm.backend.domain.party.model.PartyInputSnapshot;
-import com.feelm.backend.domain.party.model.PartyRefreshPayload;
 import com.feelm.backend.domain.party.repository.PartyMemberRepository;
 import com.feelm.backend.domain.party.repository.PartyRefreshRequestRepository;
 import com.feelm.backend.domain.party.repository.PartyRepository;
@@ -56,7 +55,7 @@ class PartyRefreshProcessorTest {
     }
 
     @Test
-    void publishesGbtStateReferencesWithoutVectors() throws Exception {
+    void publishesGbtStateReferencesWithoutTopLevelModelFields() throws Exception {
         activeParty(9001L);
         when(members.findUserIdsByPartyId(9001L)).thenReturn(List.of(1024L));
         when(redis.read(List.of(1024L))).thenReturn(gbtSnapshot("g1", HASH));
@@ -66,11 +65,11 @@ class PartyRefreshProcessorTest {
         ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
         verify(publisher).publishPartyRefresh(eq(9001L), payload.capture());
         JsonNode message = new ObjectMapper().valueToTree(payload.getValue());
-        assertThat(message.path("schemaVersion").intValue())
-                .isEqualTo(PartyRefreshPayload.SCHEMA_VERSION);
-        assertThat(message.path("modelVersion").textValue()).isEqualTo("gbt-v26");
-        assertThat(message.path("servingRevision").textValue()).isEqualTo("serving-r1");
+        assertThat(message.propertyNames())
+                .containsExactlyInAnyOrder("partyId", "inputId", "members");
         assertThat(message.path("members").get(0).path("generationId").textValue()).isEqualTo("g1");
+        assertThat(message.path("members").get(0).path("inputSchemaVersion").textValue())
+                .isEqualTo("gbt-input-v1");
         assertThat(message.path("members").get(0).path("inputHash").textValue()).isEqualTo(HASH);
         assertThat(message.path("members").get(0).has("vector")).isFalse();
     }
@@ -123,11 +122,18 @@ class PartyRefreshProcessorTest {
     }
 
     @Test
-    void gbtInputIdDependsOnServingRevisionAndInputReference() {
+    void gbtInputIdDependsOnModelRevisionAndInputReference() {
         String initial = PartyInputId.from(9001L, gbtSnapshot("g1", HASH));
 
         assertThat(PartyInputId.from(9001L, gbtSnapshot("g1", HASH))).isEqualTo(initial);
         assertThat(PartyInputId.from(9001L, gbtSnapshot("g1", OTHER_HASH))).isNotEqualTo(initial);
+        PartyInputSnapshot changedModel =
+                new PartyInputSnapshot(
+                        PartyInputSnapshot.GBT_STATE_SCHEMA_VERSION,
+                        "gbt-v27",
+                        "serving-r1",
+                        gbtSnapshot("g1", HASH).members());
+        assertThat(PartyInputId.from(9001L, changedModel)).isNotEqualTo(initial);
         PartyInputSnapshot changedRevision =
                 new PartyInputSnapshot(
                         PartyInputSnapshot.GBT_STATE_SCHEMA_VERSION,

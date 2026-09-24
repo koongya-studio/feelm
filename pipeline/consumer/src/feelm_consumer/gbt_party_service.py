@@ -8,12 +8,12 @@ invalid request gets a durable, input-free quarantine record before completion.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 
 from feelm_consumer.gbt.errors import GbtError
-from feelm_consumer.gbt_party import ALGORITHM_VERSION, calculate_party
-from feelm_consumer.gbt_party_events import parse_versioned_request, validate_request
+from feelm_consumer.gbt_party import ALGORITHM_VERSION, calculate_party, resolve_party_input, score_party
+from feelm_consumer.gbt_party_events import INPUT_SCHEMA_VERSION, parse_versioned_request, validate_request
 from feelm_consumer.gbt_party_store import PublishRejected
 
 
@@ -58,15 +58,28 @@ def process_record(*, scorer, snapshot_reader, outcome_store, raw: bytes | str, 
     request = None
     payload = {"source": source.to_payload(), "generatedAt": source.generated_at,
                "algorithmVersion": ALGORITHM_VERSION}
+    failure_identity = payload.copy()
     try:
         try:
             request = parse_versioned_request(raw, key)
             payload.update(partyId=request.party_id, inputId=request.input_id,
                            modelVersion=request.model_version, servingRevision=request.serving_revision)
+            failure_identity = payload.copy()
             if request.schema_version == 1:
                 raise GbtError("LATE_LEGACY_REQUEST")
             # A stale loaded process must not consume a valid request as terminal failure.
             outcome_store.validate_model(scorer.bundle, partition_fence)
+            if any(member.input_schema_version != INPUT_SCHEMA_VERSION for member in request.members):
+                raise GbtError("UNSUPPORTED_PARTY_INPUT_SCHEMA")
+            snapshots = None
+            if request.model_version is None:
+                saved = outcome_store.replay_metadata(payload, partition_fence)
+                if saved is not None:
+                    request = replace(request, model_version=saved.get("modelVersion"),
+                                      serving_revision=saved.get("servingRevision"))
+                else:
+                    request, snapshots = resolve_party_input(request, snapshot_reader)
+                payload.update(modelVersion=request.model_version, servingRevision=request.serving_revision)
             validate_request(request)
             if (scorer.bundle.serving_revision != request.serving_revision
                     or scorer.bundle.model_version != request.model_version):
@@ -74,14 +87,15 @@ def process_record(*, scorer, snapshot_reader, outcome_store, raw: bytes | str, 
             replayed = outcome_store.replay(payload, partition_fence)
             if replayed is not None:
                 return _notify_receipt(replayed, "IDEMPOTENT", notify, is_still_owned)
-            result = calculate_party(scorer, request, snapshot_reader)
+            result = (score_party(scorer, request, snapshots) if snapshots is not None
+                      else calculate_party(scorer, request, snapshot_reader))
             if result.status != "OK":
                 raise GbtError(result.status)
             payload.update(status="OK", populationCount=result.population_count,
                            activeMemberIds=list(result.active_member_ids),
                            candidates=[candidate.to_payload() for candidate in result.candidates])
         except GbtError as exc:
-            payload.update(status="QUARANTINED", errorCode=exc.code)
+            payload = {**failure_identity, "status": "QUARANTINED", "errorCode": exc.code}
             if is_still_owned is not None and not is_still_owned():
                 return ProcessingReceipt("FENCED", exc.code, False)
             payload = outcome_store.quarantine(payload, partition_fence)

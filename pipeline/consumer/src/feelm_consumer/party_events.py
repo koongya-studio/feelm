@@ -17,6 +17,10 @@ class PartyEventValidationError(ValueError):
 
 INPUT_ID_PATTERN = re.compile(r"sha256:[0-9a-f]{64}\Z")
 MODEL_VERSION_PATTERN = re.compile(r"[a-z0-9][a-z0-9._-]*\Z")
+PARTY_FIELDS = {"partyId", "inputId", "members"}
+GBT_METADATA_FIELDS = {"schemaVersion", "modelVersion", "servingRevision"}
+REFERENCE_FIELDS = {"userId", "generationId", "inputSchemaVersion", "inputHash", "candidateMovieIds"}
+LEGACY_FIELDS = {"userId", "vector", "candidateMovieIds"}
 
 
 @dataclass(frozen=True)
@@ -49,13 +53,18 @@ def parse_party_refresh(value: bytes | str, key: bytes | None) -> PartyRefresh:
     try:
         party_id = _positive_int(payload.get("partyId"), "partyId")
         input_id = _non_blank_string(payload.get("inputId"), "inputId")
-        schema_version = payload.get("schemaVersion", 1)
-        if isinstance(schema_version, bool) or not isinstance(schema_version, int):
-            raise ValueError("schemaVersion must be an integer")
         raw_members = payload.get("members")
         if not isinstance(raw_members, list):
             raise ValueError("members must be a list")
+        reference_wire = "schemaVersion" not in payload and any(
+            isinstance(member, Mapping) and set(member) & (REFERENCE_FIELDS - LEGACY_FIELDS)
+            for member in raw_members
+        )
+        schema_version = payload.get("schemaVersion", 2 if reference_wire else 1)
+        if isinstance(schema_version, bool) or not isinstance(schema_version, int):
+            raise ValueError("schemaVersion must be an integer")
         if schema_version == 1:
+            _fields(payload, PARTY_FIELDS, "legacy request")
             members: tuple[PartyMember | PartyInputReference, ...] = tuple(
                 _parse_legacy_member(member) for member in raw_members
             )
@@ -63,12 +72,18 @@ def parse_party_refresh(value: bytes | str, key: bytes | None) -> PartyRefresh:
             serving_revision = None
         elif schema_version == 2:
             members = tuple(_parse_input_reference(member) for member in raw_members)
-            model_version = _bounded_string(payload.get("modelVersion"), "modelVersion", 50)
-            if not MODEL_VERSION_PATTERN.fullmatch(model_version):
-                raise ValueError("modelVersion has an invalid format")
-            serving_revision = _bounded_string(
-                payload.get("servingRevision"), "servingRevision", 100
-            )
+            if reference_wire:
+                _fields(payload, PARTY_FIELDS, "GBT reference request")
+                # Resolved from the requested immutable snapshots, never from model:current.
+                model_version = serving_revision = None
+            else:
+                _fields(payload, PARTY_FIELDS | GBT_METADATA_FIELDS, "GBT v2 request")
+                model_version = _bounded_string(payload.get("modelVersion"), "modelVersion", 50)
+                if not MODEL_VERSION_PATTERN.fullmatch(model_version):
+                    raise ValueError("modelVersion has an invalid format")
+                serving_revision = _bounded_string(
+                    payload.get("servingRevision"), "servingRevision", 100
+                )
         else:
             raise ValueError("unsupported schemaVersion")
         if not 1 <= len(members) <= MAX_PARTY_MEMBERS:
@@ -111,6 +126,7 @@ def _party_id_from_key(key: bytes | None) -> int:
 def _parse_legacy_member(value: object) -> PartyMember:
     if not isinstance(value, Mapping):
         raise ValueError("member must be an object")
+    _fields(value, LEGACY_FIELDS, "legacy member")
     user_id = _positive_int(value.get("userId"), "member.userId")
     vector = _number_tuple(value.get("vector"), "member.vector")
     movie_ids = _movie_ids(value.get("candidateMovieIds"))
@@ -128,6 +144,7 @@ def _parse_input_reference(value: object) -> PartyInputReference:
         raise ValueError("member must be an object")
     if "vector" in value:
         raise ValueError("schema v2 member must not contain vector")
+    _fields(value, REFERENCE_FIELDS, "GBT member")
     user_id = _positive_int(value.get("userId"), "member.userId")
     generation_id = _bounded_string(value.get("generationId"), "member.generationId", 100)
     input_schema_version = _bounded_string(
@@ -142,6 +159,11 @@ def _parse_input_reference(value: object) -> PartyInputReference:
     return PartyInputReference(
         user_id, generation_id, input_schema_version, input_hash, movie_ids
     )
+
+
+def _fields(value: Mapping, expected: set[str], label: str) -> None:
+    if set(value) != expected:
+        raise ValueError(f"invalid {label} fields: {', '.join(sorted(set(value) ^ expected))}")
 
 
 def _positive_int(value: object, field: str) -> int:
