@@ -9,7 +9,7 @@
  * 행동을 아래로 붙이고, 길어지면 줄지 않아 넘친 높이가 그대로 스크롤 높이가 된다.
  *
  * **`flex: 1`(= `1 1 0`)로 두면 안 된다.** 페이지가 본문 높이에 고정돼 넘친 부분이
- * 스크롤 높이에 잡히지 않고, 작은 기기에서 `필름 늘리기`가 하단 내비 밑으로 들어간다.
+ * 스크롤 높이에 잡히지 않고, 작은 기기에서 행동 버튼이 하단 내비 밑으로 들어간다.
  */
 .page {
   display: flex;
@@ -214,9 +214,11 @@
   color: var(--color-ink-muted);
 }
 
-/* 안내와 버튼 사이만 벌린다. 버튼은 이 화면 폭을 채운다 */
-.empty > button {
+/* 안내와 행동 사이만 벌린다 */
+.empty > .actionButtons {
   margin-top: var(--space-4);
+  width: 100%;
+  max-width: 420px;
 }
 
 /* ─────────────────────────── 팝콘 요약 · 리포트 · 주 동작 */
@@ -284,7 +286,7 @@
 /*
  * 팝콘 요약 · 리포트. 3.2 · 7.3으로 가는 이동 행이다(업무 -697). 한때 위 선 하나로 나뉜
  * 정보 줄이라 눌러도 되는지 보이지 않았다. 면 · 테두리 · 화살표를 공통 이동 행 규칙에서
- * 받고, 두 줄이 같은 모양이다. 그림자가 없어 아래 `필름 늘리기`보다 강해지지 않는다.
+ * 받고, 두 줄이 같은 모양이다. 그림자가 없어 아래 평가·추천 버튼보다 강해지지 않는다.
  */
 .popcorn {
   composes: navRow from '../../../styles/interaction.module.css';
@@ -399,6 +401,31 @@
   text-align: center;
 }
 
+.actionButtons {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.actionButtons > button {
+  min-width: 0;
+  flex: 1;
+  padding: 0 var(--space-1);
+  font-size: var(--font-size-meta);
+  white-space: nowrap;
+}
+
+.actionButtons > button[data-variant='secondary'] {
+  border-color: var(--color-action-brand);
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-brand-ink);
+}
+
+.actionButtons > button[data-variant='secondary']:hover:not(:disabled) {
+  background: var(--color-surface);
+  box-shadow: none;
+}
+
 /* ─────────────────────────── 데스크톱 시안 (업무 -783) */
 
 /*
@@ -412,6 +439,24 @@
   display: flex;
   align-items: flex-end;
   gap: var(--space-6);
+}
+
+.desktopRate {
+  display: inline-flex;
+  min-height: var(--tap-target-min);
+  flex: none;
+  align-items: center;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--color-action-brand);
+  color: var(--color-on-action);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  text-decoration: none;
+}
+
+.desktopRate:hover {
+  background: var(--color-action-brand-pressed);
 }
 
 .pager {
