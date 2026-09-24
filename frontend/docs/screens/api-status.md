@@ -138,7 +138,7 @@
 
 | 함수 | 상태 | API |
 | --- | --- | --- |
-| `getMyTaste` | 실제 | API-040 |
+| `getMyTaste` | 실제 | API-040 · 7.1이 취향 키워드 구역에, `api/users.ts`가 프로필 키워드에 쓴다(업무 -836) |
 | `getPopcornBucket` | 실제 | API-041 |
 | `getMyFrames` | 실제 | API-042 |
 | `getFrameDetail` | 실제 | API-043 |

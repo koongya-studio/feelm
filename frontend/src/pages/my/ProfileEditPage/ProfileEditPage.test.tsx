@@ -37,6 +37,14 @@ vi.mock('../../../utils/avatarImage', async (importOriginal) => ({
 /** 서버가 이미 쓰고 있다고 답하는 닉네임 */
 const TAKEN = '이미있음';
 
+/** API-040이 주는 취향 키워드. 공개 설정 흐름이 칩을 눌러야 해서 비워 둘 수 없다 */
+const KEYWORDS = [
+  { code: 'PLANNED_ANTIHERO', label: '계획형 안티히어로' },
+  { code: 'FAST_PACED', label: '빠른 전개' },
+  { code: 'TWIST_LOVER', label: '반전 선호' },
+  { code: 'NOIR_EXPLORER', label: '느와르 탐험가' },
+];
+
 let me: MyProfile;
 let patches: unknown[];
 /** 프로필 사진 요청(API-081 · 082). 올린 파일은 multipart `file` 칸이다 */
@@ -101,6 +109,18 @@ function stubServer() {
         me = { ...me, avatarUrl: NEW_PHOTO };
 
         return json({ avatarUrl: NEW_PHOTO });
+      }
+
+      // 프로필 화면이 취향 키워드(API-040)를 함께 읽는다(업무 -836). 키워드는 더 이상 목업이
+      // 아니라 서버 값이므로 공개 설정 흐름을 보려면 여기서 줘야 한다.
+      if (url === '/api/v1/users/me/taste') {
+        return json({
+          ratingCount: 30,
+          insufficientData: false,
+          analysis: { genres: [] },
+          keywords: KEYWORDS,
+          analyzedAt: '2026-09-24T00:00:00Z',
+        });
       }
 
       if (url === '/api/v1/users/me') return json(me);
