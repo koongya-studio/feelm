@@ -52,7 +52,7 @@ public class PartyService {
 
     /** 파티와 생성자의 OWNER 멤버 정보를 함께 저장하고 생성 결과를 반환한다. */
     @Transactional
-    public PartyResponse create(long userId, String name) {
+    public PartyResponse create(long userId, String name, Integer maxMembers) {
         var owner =
                 userRepository
                         .findByIdForUpdate(userId)
@@ -62,7 +62,10 @@ public class PartyService {
                 >= Party.MAX_ACTIVE_PARTIES_PER_USER) {
             throw new BusinessException(ErrorCode.ACTIVE_PARTY_LIMIT_REACHED);
         }
-        Party party = partyRepository.save(Party.create(name, owner));
+        Party party =
+                partyRepository.save(
+                        Party.create(
+                                name, owner, maxMembers == null ? Party.MAX_MEMBERS : maxMembers));
         PartyMember member = memberRepository.save(PartyMember.ownerOf(party));
         refreshRequestRepository.request(party.getId());
         return partyResponse(party, List.of(memberResponse(member)));
@@ -179,7 +182,7 @@ public class PartyService {
                 memberRepository.countByPartyId(partyId)
                         + invitationRepository.countByPartyIdAndStatus(
                                 partyId, PartyInvitation.Status.PENDING);
-        if (reserved >= Party.MAX_MEMBERS) {
+        if (reserved >= party.getMaxMembers()) {
             throw new BusinessException(ErrorCode.PARTY_FULL);
         }
         PartyInvitation invitation =
@@ -283,7 +286,7 @@ public class PartyService {
                 >= Party.MAX_ACTIVE_PARTIES_PER_USER) {
             throw new BusinessException(ErrorCode.ACTIVE_PARTY_LIMIT_REACHED);
         }
-        if (memberRepository.countByPartyId(partyId) >= Party.MAX_MEMBERS) {
+        if (memberRepository.countByPartyId(partyId) >= party.getMaxMembers()) {
             throw new BusinessException(ErrorCode.PARTY_FULL);
         }
 

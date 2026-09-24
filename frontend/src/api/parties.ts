@@ -28,7 +28,7 @@ import type {
 
 /**
  * 파티 정원. **계약이 정한 값이다** — API-049 처리 규칙 `파티는 파티장 포함 최대 4명`,
- * 응답의 `maxMembers: 4`, API-051이 4명에서 `PARTY_FULL`.
+ * 새 파티의 정원은 2~4명 중에서 고르고, 기존 파티는 4명을 유지한다.
  *
  * `[!]` 와이어프레임 5.2는 2~6인을 고르게 하고 5.3은 `1/6명 · 최대 6명까지`라고 적었다.
  * 계약을 기준으로 4로 둔다(`screen-spec.md` 2장).
@@ -113,15 +113,13 @@ export async function getParty(
 /**
  * API-049 파티 생성 · POST /api/v1/parties
  *
- * 요청 본문은 `{ name }`뿐이다. 와이어프레임 5.2가 고르게 하는 **인원 수를 받는 필드가
- * 계약에 없다** — 정원은 응답의 `maxMembers`로 서버가 정한다. 화면이 고른 값은 초대할
- * 친구 수를 정하는 데만 쓰고 요청에 넣지 않는다.
+ * 5.2에서 고른 인원을 `maxMembers`로 보내고 서버가 파티별 정원으로 저장한다.
  *
  * 이름이 비었거나 20자를 넘으면 `400 VALIDATION_FAILED`, 활성 파티가 10개면
  * `409 ACTIVE_PARTY_LIMIT_REACHED`다.
  */
-export async function createParty(name: string): Promise<Party> {
-  return request<Party>('/parties', { method: 'POST', body: { name: name.trim() } });
+export async function createParty(name: string, maxMembers: number): Promise<Party> {
+  return request<Party>('/parties', { method: 'POST', body: { name: name.trim(), maxMembers } });
 }
 
 /**

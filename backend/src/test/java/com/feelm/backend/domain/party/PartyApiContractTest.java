@@ -114,6 +114,34 @@ class PartyApiContractTest extends SharedPostgresContractTest {
     }
 
     @ParameterizedTest
+    @ValueSource(ints = {2, 3, 4})
+    void storesSelectedCapacityAndReturnsItInList(int maxMembers) throws Exception {
+        long partyId =
+                body(create("{\"name\":\"capacity\",\"maxMembers\":" + maxMembers + "}")
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.maxMembers").value(maxMembers)))
+                        .get("partyId")
+                        .asLong();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT max_members FROM parties WHERE id=?",
+                                Integer.class,
+                                partyId))
+                .isEqualTo(maxMembers);
+        list().andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].maxMembers").value(maxMembers));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {1, 5})
+    void rejectsCapacityOutsideSupportedRange(int maxMembers) throws Exception {
+        create("{\"name\":\"capacity\",\"maxMembers\":" + maxMembers + "}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM parties", Long.class)).isZero();
+    }
+
+    @ParameterizedTest
     @ValueSource(
             strings = {
                 "{}",
