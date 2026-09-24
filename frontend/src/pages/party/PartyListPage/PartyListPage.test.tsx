@@ -21,7 +21,12 @@ import { fireEvent, screen } from '@testing-library/react';
 import PartyListPage from './index';
 import PartySizePage from '../PartySizePage';
 import { renderWithRouter } from '../../../test/render';
-import { getMyInvitations, getMyParties, getPartyPopcorn } from '../../../api/parties';
+import {
+  getClosedParties,
+  getMyInvitations,
+  getMyParties,
+  getPartyPopcorn,
+} from '../../../api/parties';
 import { getPopcornFlavors } from '../../../api/taste';
 import {
   BUDDY,
@@ -45,6 +50,7 @@ vi.mock('../../../api/parties', async () => {
   return {
     ...actual,
     getMyParties: vi.fn(),
+    getClosedParties: vi.fn(),
     getMyInvitations: vi.fn(),
     getPartyPopcorn: vi.fn(),
   };
@@ -58,7 +64,8 @@ vi.mock('../../../api/taste', async () => {
 
 beforeEach(() => {
   vi.mocked(getMyParties).mockReset().mockResolvedValue([party()]);
-  // 초대는 받지 않은 것이 보통 상태다. 필요한 테스트만 채운다
+  // 초대와 지난 파티는 없는 것이 보통 상태다. 필요한 테스트만 채운다
+  vi.mocked(getClosedParties).mockReset().mockResolvedValue([]);
   vi.mocked(getMyInvitations).mockReset().mockResolvedValue([]);
   vi.mocked(getPartyPopcorn).mockReset().mockResolvedValue(partyPopcorn());
   vi.mocked(getPopcornFlavors).mockReset().mockResolvedValue(flavors());
@@ -285,5 +292,48 @@ describe('5.2 새 파티 인원 설정', () => {
     expect(picked).toHaveAttribute('aria-checked', 'true');
     expect(picked.querySelector('svg')).not.toBeNull();
     expect(screen.getByRole('radio', { name: '2인' }).querySelector('svg')).toBeNull();
+  });
+});
+
+/*
+ * 지난 파티 (업무 S15P21E106-826)
+ *
+ * API-050이 종료 파티를 `추천 이력 확인용`으로 내려주는데 화면에 자리가 없었다. 여기서
+ * 고정하는 것은 셋이다 — 끝난 파티가 **참여 중인 파티와 섞이지 않는 것**, 줄을 누르면
+ * **5.10 추천 이력**으로 가는 것(끝난 파티의 팝콘 5.8로 가지 않는다), 그리고 **없으면
+ * 구역을 그리지 않는 것**.
+ */
+describe('지난 파티', () => {
+  const closed = () => party({ partyId: 9301, name: '지난달 심야 상영회', status: 'CLOSED' });
+
+  it('끝난 파티를 따로 세우고 줄을 누르면 5.10 추천 이력으로 간다', async () => {
+    vi.mocked(getClosedParties).mockResolvedValue([closed()]);
+
+    renderWithRouter(<PartyListPage />, { route: '/party' });
+
+    expect(await screen.findByText('지난 파티 1')).toBeInTheDocument();
+    // 참여 중인 파티 쪽에는 섞이지 않는다
+    expect(screen.getByRole('heading', { name: '금요 심야 상영회' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /지난달 심야 상영회/ }));
+    expect(screen.getByTestId('location').textContent).toBe(
+      '/parties/9301/recommendations/history',
+    );
+  });
+
+  it('끝난 파티가 없으면 구역을 그리지 않는다', async () => {
+    renderWithRouter(<PartyListPage />, { route: '/party' });
+
+    expect(await screen.findByRole('heading', { name: '금요 심야 상영회' })).toBeInTheDocument();
+    expect(screen.queryByText(/지난 파티/)).toBeNull();
+  });
+
+  it('끝난 파티를 못 받아 와도 참여 중인 파티는 그대로 보여준다', async () => {
+    vi.mocked(getClosedParties).mockRejectedValue(new TypeError('Failed to fetch'));
+
+    renderWithRouter(<PartyListPage />, { route: '/party' });
+
+    expect(await screen.findByRole('heading', { name: '금요 심야 상영회' })).toBeInTheDocument();
+    expect(screen.queryByText(/지난 파티/)).toBeNull();
   });
 });

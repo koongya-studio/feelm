@@ -113,6 +113,15 @@ export const ROUTE_PATTERN = {
   partyNew: '/party/new',
   partySetup: '/party/new/setup',
   partyRecommendations: '/parties/:partyId/recommendations',
+  /**
+   * 5.10 파티 추천 이력 (업무 -826). 와이어프레임에 없이 새로 만든 화면이다.
+   *
+   * 5.1의 `지난 파티`에서 들어온다. API-050이 종료 파티를 `추천 이력 확인용`으로
+   * 내려주는데 그 목적지가 없었다 — 백엔드가 API-083을 만들며(업무 -815) 생긴 자리다.
+   * 활성 파티도 같은 주소로 본다. 정적 마디가 있어 위의 `partyRecommendations`보다
+   * 먼저 맞는다.
+   */
+  partyRecommendationHistory: '/parties/:partyId/recommendations/history',
   partyInvitation: '/parties/invitations/:invitationId',
   partyJoined: '/parties/:partyId/joined',
 
@@ -193,6 +202,8 @@ export const path = {
   partyNew: () => ROUTE_PATTERN.partyNew,
   partySetup: () => ROUTE_PATTERN.partySetup,
   partyRecommendations: (partyId: string | number) => `/parties/${partyId}/recommendations`,
+  partyRecommendationHistory: (partyId: string | number) =>
+    `/parties/${partyId}/recommendations/history`,
   partyInvitation: (invitationId: string | number) => `/parties/invitations/${invitationId}`,
   partyJoined: (partyId: string | number) => `/parties/${partyId}/joined`,
 } as const;
@@ -220,6 +231,8 @@ export const TAB_MATCH = {
     ROUTE_PATTERN.partyPopcorn,
     ROUTE_PATTERN.partyPopcornMix,
     ROUTE_PATTERN.partyRecommendations,
+    // 5.10은 5.1에서 들어와 5.1로 돌아간다. 파티 탭 안의 화면이다(업무 -826)
+    ROUTE_PATTERN.partyRecommendationHistory,
   ],
   /*
    * 가운데 탭이자 **앱의 시작 화면**이다(사용자 결정 2026-09-16, 업무 -461).

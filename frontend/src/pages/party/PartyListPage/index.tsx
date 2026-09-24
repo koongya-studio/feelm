@@ -39,6 +39,18 @@
  *
  * 목록은 **활성 파티만** 보여준다(API-050 기본값). 나가거나 종료한 파티는 여기서 빠진다.
  *
+ * **`지난 파티` 구역은 업무 -826에서 넣었다.** API-050이 `status=CLOSED`로 종료 파티를
+ * 내려주고 계약이 그 목적을 `추천 이력 확인용`이라고 적어 두었는데, 프론트는 기본값만
+ * 불러 종료 파티를 어디에도 보여 주지 않았다. 백엔드가 파티 추천 이력 API-083을 만들며
+ * (업무 -815) 목적지가 생겼으므로 그 길을 여기에 둔다.
+ *
+ * - 참여 중인 파티 **아래**에 둔다. 지난 일은 지금 하는 일보다 급하지 않다
+ * - 끝난 파티가 없으면 구역을 그리지 않는다. 받은 초대 구역과 같은 이유다
+ * - 줄을 누르면 5.10 파티 추천 이력으로 간다. 종료 파티의 팝콘(5.8)으로는 가지 않는다 —
+ *   계약이 종료 파티에 남겨 둔 것은 추천 이력뿐이다
+ * - **끝난 파티를 못 받아 와도 활성 목록은 그대로 둔다.** 서로 다른 요청이다
+ * - **첫 장만 보여준다**(`getClosedParties` 머리말). 지난 파티를 끝까지 훑는 화면이 아니다
+ *
  * `[?]` 와이어프레임은 파티마다 `케이퍼 · 스릴러` 같은 **공통 장르**를 보여주는데
  * API-050 응답에는 없다(이름 · 상태 · 멤버 · 정원뿐). 없는 값을 지어내지 않고 같은
  * 자리에 멤버 이름을 둔다.
@@ -72,6 +84,7 @@ import PartyAside from './PartyAside';
 import PartyDesktop from './PartyDesktop';
 import {
   acceptInvitation,
+  getClosedParties,
   getMyInvitations,
   getMyParties,
   getPartyPopcorn,
@@ -145,6 +158,8 @@ export default function PartyListPage() {
   const navigate = useNavigate();
   const desktop = useShellSize() !== 'mobile';
   const [parties, setParties] = useState<Party[] | null>(null);
+  /** 끝난 파티(API-050 `status=CLOSED`). 5.10으로 가는 `지난 파티` 구역이 쓴다(업무 -826) */
+  const [closedParties, setClosedParties] = useState<Party[]>([]);
   const [invitations, setInvitations] = useState<PartyInvitation[] | null>(null);
   /**
    * 파티별 팝콘(API-057). 412px에서는 첫 파티 하나뿐이고, 데스크톱에서는 카드마다 통이
@@ -183,6 +198,27 @@ export default function PartyListPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    /*
+     * 끝난 파티는 활성 목록과 **다른 요청**이다(API-050에 둘을 함께 주는 값이 없다).
+     * 못 받아 와도 활성 목록은 그대로 두고 구역만 그리지 않는다 — 지난 파티는 이 화면이
+     * 하려는 일(파티 시작하기)의 곁가지다.
+     */
+    getClosedParties()
+      .then((value) => {
+        if (active) setClosedParties(value);
+      })
+      .catch(() => {
+        if (active) setClosedParties([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [reloadCount]);
 
   useEffect(() => {
     let active = true;
@@ -336,6 +372,8 @@ export default function PartyListPage() {
           onOpenInvitation={(invitationId) => void navigate(path.partyInvitation(invitationId))}
           onAccept={handleAccept}
           acceptingId={acceptingId}
+          closedParties={closedParties}
+          onOpenHistory={(partyId) => void navigate(path.partyRecommendationHistory(partyId))}
           onCreateParty={() => void navigate(path.partyNew())}
           onJoinByCode={() => setNotice('초대 코드로 참여하기는 준비 중이에요')}
         />
@@ -540,6 +578,39 @@ export default function PartyListPage() {
                     </span>
 
                     <Initials people={toFaces(party.members)} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {/*
+         * 지난 파티(업무 -826). 끝난 파티는 추천 이력(5.10)으로만 들어간다 — 팝콘 · 멤버는
+         * 계약이 종료 파티에 열어 두지 않았다.
+         */}
+        {closedParties.length > 0 ? (
+          <section className={styles.closed} aria-labelledby="party-closed">
+            <h2 className={styles.sectionLabel} id="party-closed">
+              지난 파티 {closedParties.length}
+            </h2>
+
+            <ul className={styles.list}>
+              {closedParties.map((party) => (
+                <li key={party.partyId}>
+                  <button
+                    type="button"
+                    className={styles.closedCard}
+                    onClick={() => void navigate(path.partyRecommendationHistory(party.partyId))}
+                  >
+                    <span className={styles.body}>
+                      <span className={styles.name}>{party.name}</span>
+                      <span className={styles.inviteText}>그때 추천받은 영화 보기</span>
+                    </span>
+
+                    <span className={styles.chevron} aria-hidden="true">
+                      ›
+                    </span>
                   </button>
                 </li>
               ))}

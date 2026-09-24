@@ -15,10 +15,13 @@ import {
   closeParty,
   createParty,
   declineInvitation,
+  getClosedParties,
   getInvitation,
   getMyInvitations,
   getMyParties,
+  getParty,
   getPartyPopcorn,
+  getPartyRecommendationHistory,
   getPartyRecommendations,
   inviteToParty,
   kickPartyMember,
@@ -27,6 +30,7 @@ import {
 import { ApiError } from './apiError';
 import { resetSessionForTest, startSession } from './session';
 import {
+  historyPage,
   invitation,
   party,
   partyPopcorn,
@@ -74,6 +78,64 @@ describe('API-050 내 파티 목록', () => {
     fetchMock.mockResolvedValue(json(200, { items: [], nextCursor: null, hasNext: false }));
 
     expect(await getMyParties()).toEqual([]);
+  });
+
+  /*
+   * 업무 -826. 기본 호출에는 `status`가 실리지 않아야 한다 — 서버 기본값이 활성이고,
+   * 붙일 때만 붙이는 것이 계약을 읽는 사람이 기대하는 모양이다(API-058 `refresh`와 같다).
+   */
+  it('기본 조회에는 status를 싣지 않는다', async () => {
+    fetchMock.mockResolvedValue(json(200, { items: [party()], nextCursor: null, hasNext: false }));
+
+    await getMyParties();
+
+    expect(call()[0]).toBe('/api/v1/parties?size=50');
+  });
+
+  it('끝난 파티는 status=CLOSED로 따로 조회한다', async () => {
+    fetchMock.mockResolvedValue(
+      json(200, { items: [party({ status: 'CLOSED' })], nextCursor: null, hasNext: false }),
+    );
+
+    const parties = await getClosedParties();
+
+    expect(call()[0]).toBe('/api/v1/parties?status=CLOSED&size=50');
+    expect(parties[0].status).toBe('CLOSED');
+  });
+});
+
+/*
+ * 업무 -826. 5.10은 끝난 파티의 이름을 머리에 적어야 하는데 그 파티는 기본 목록에 없다.
+ * **기본값은 예전 그대로다** — 5.7 · 5.8은 끝난 파티를 찾아내면 안 된다.
+ */
+describe('getParty 조합', () => {
+  it('기본은 활성 목록만 본다', async () => {
+    fetchMock.mockResolvedValue(json(200, { items: [], nextCursor: null, hasNext: false }));
+
+    expect(await getParty(TEST_PARTY_ID)).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('includeClosed면 활성에서 못 찾았을 때 종료 파티도 본다', async () => {
+    fetchMock
+      .mockResolvedValueOnce(json(200, { items: [], nextCursor: null, hasNext: false }))
+      .mockResolvedValueOnce(
+        json(200, { items: [party({ status: 'CLOSED' })], nextCursor: null, hasNext: false }),
+      );
+
+    const found = await getParty(TEST_PARTY_ID, { includeClosed: true });
+
+    expect(found?.status).toBe('CLOSED');
+    expect(call(1)[0]).toBe('/api/v1/parties?status=CLOSED&size=50');
+  });
+
+  it('활성에서 찾으면 종료 파티를 부르지 않는다', async () => {
+    fetchMock.mockResolvedValue(json(200, { items: [party()], nextCursor: null, hasNext: false }));
+
+    const found = await getParty(TEST_PARTY_ID, { includeClosed: true });
+
+    expect(found?.status).toBe('ACTIVE');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -305,5 +367,43 @@ describe('API-058 파티 영화 추천', () => {
 
     expect(call()[0]).toBe(`/api/v1/parties/${TEST_PARTY_ID}/recommendations?refresh=true`);
     expect(set.hasNext).toBe(false);
+  });
+});
+
+/*
+ * 업무 -826. 세트 단위 커서 페이지이며 화면이 `더 보기`로 한 장씩 받는다. 커서를 싣지
+ * 않은 첫 장의 주소에 빈 질의가 붙지 않는지도 함께 고정한다.
+ */
+describe('API-083 파티 추천 이력 조회', () => {
+  it('첫 장은 커서 없이 부른다', async () => {
+    fetchMock.mockResolvedValue(json(200, historyPage()));
+
+    const page = await getPartyRecommendationHistory(TEST_PARTY_ID);
+
+    expect(call()[0]).toBe(`/api/v1/parties/${TEST_PARTY_ID}/recommendations/history`);
+    expect(call()[1].method).toBe('GET');
+    expect(page.items[0].items[0].exposedAt).toBe('2026-09-20T10:01:00Z');
+    expect(page.hasNext).toBe(false);
+  });
+
+  it('다음 장은 직전 응답의 커서로 부른다', async () => {
+    fetchMock.mockResolvedValue(json(200, historyPage()));
+
+    await getPartyRecommendationHistory(TEST_PARTY_ID, { cursor: 'cursor-2', size: 10 });
+
+    expect(call()[0]).toBe(
+      `/api/v1/parties/${TEST_PARTY_ID}/recommendations/history?cursor=cursor-2&size=10`,
+    );
+  });
+
+  it('멤버가 아니면 404다. 파티가 없는 것과 구분하지 않는다', async () => {
+    fetchMock.mockResolvedValue(
+      json(404, { code: 'RESOURCE_NOT_FOUND', message: '파티를 찾을 수 없습니다.' }),
+    );
+
+    await expect(getPartyRecommendationHistory(TEST_PARTY_ID)).rejects.toMatchObject({
+      status: 404,
+      code: 'RESOURCE_NOT_FOUND',
+    });
   });
 });

@@ -465,3 +465,40 @@
   line-height: var(--line-height-meta);
   color: var(--color-ink-muted);
 }
+
+/* ─────────────────────────── 지난 파티 (업무 -826) */
+
+.closedList {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+}
+
+/* 끝난 파티 줄. 파티 카드와 달리 고를 것이 없어 바로 이력으로 간다 */
+.closedCard {
+  composes: navRow from '../../../../styles/interaction.module.css';
+
+  width: 100%;
+  padding: var(--space-4);
+  align-items: center;
+  gap: var(--space-3);
+  border-radius: var(--radius-card);
+  text-align: left;
+}
+
+.closedBody {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.closedText {
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}

@@ -202,6 +202,19 @@
   cursor: pointer;
 }
 
+/* 지난 파티 구역(업무 -826). 받은 초대 구역과 같은 모양이고 자리만 아래다 */
+.closed {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* 끝난 파티 줄. 초대 카드와 같은 판이지만 얼굴 자리가 없다 */
+.closedCard {
+  composes: inviteCard;
+}
+
 .inviteText {
   font-size: var(--font-size-meta);
   line-height: var(--line-height-meta);
