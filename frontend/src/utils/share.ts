@@ -66,15 +66,20 @@ export async function shareLink({
  * - `cancelled` 사용자가 공유 메뉴를 닫았다
  * - `blocked` 브라우저가 공유를 거절했다(`NotAllowedError`). 파일을 만드는 동안 누른 동작의
  *   효력이 끝났을 수 있어, 부른 화면이 한 번 더 눌러 달라고 할 수 있다
- * - `unavailable` 파일 공유를 쓸 수 없다. 부른 화면이 내려받기로 넘어간다
+ * - `unavailable` 파일 공유를 쓸 수 없다. 부른 화면이 지원 불가를 안내한다
  */
 export type FileShareResult = 'shared' | 'cancelled' | 'blocked' | 'unavailable';
+
+/** 파일 공유 메뉴를 시도할 수 있는 기기인지. 실제 파일 지원은 준비 후 `canShare`로 확인한다. */
+export function canUseFileShare(): boolean {
+  return prefersShareSheet() && typeof navigator.canShare === 'function';
+}
 
 /**
  * 파일을 기기의 공유 메뉴로 보낸다(업무 -849, 취향 리포트 이미지).
  *
  * 주소 공유와 같이 **휴대폰에서만 메뉴를 연다.** 데스크톱은 곧바로 `unavailable`이라 부른
- * 화면이 파일을 내려받게 한다. 파일을 받지 못하는 브라우저도 `canShare`로 걸러 같은 길로 간다.
+ * 화면이 지원 불가를 알린다. 파일을 받지 못하는 브라우저도 `canShare`로 걸러 같은 길로 간다.
  */
 export async function shareFiles({
   title,
@@ -83,8 +88,7 @@ export async function shareFiles({
   title: string;
   files: File[];
 }): Promise<FileShareResult> {
-  if (!prefersShareSheet()) return 'unavailable';
-  if (typeof navigator.canShare !== 'function' || !navigator.canShare({ files })) {
+  if (!canUseFileShare() || !navigator.canShare?.({ files })) {
     return 'unavailable';
   }
 

@@ -132,6 +132,13 @@
   gap: var(--space-2);
 }
 
+.shareHint {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  text-align: center;
+}
+
 .actions {
   display: flex;
   justify-content: center;
