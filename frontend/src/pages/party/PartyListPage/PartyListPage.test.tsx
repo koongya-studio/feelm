@@ -191,18 +191,11 @@ describe('5.1 파티 시작', () => {
     expect(screen.getByRole('button', { name: '파티 만들기' })).toBeInTheDocument();
   });
 
-  /*
-   * 계약에 초대 코드 경로가 없다(API-051은 닉네임 검색으로 받은 `userId`만 받는다).
-   * 시안이 확정한 자리라 버튼은 두지만, 되는 것처럼 보이면 안 된다.
-   */
-  it('초대 코드로 참여하기는 준비 중임을 알린다', async () => {
+  it('계약에 없는 초대 코드 참여 버튼을 노출하지 않는다', async () => {
     renderWithRouter(<PartyListPage />, { route: '/party' });
     await screen.findByRole('heading', { name: '금요 심야 상영회' });
 
-    fireEvent.click(screen.getByRole('button', { name: '초대 코드로 참여하기' }));
-
-    expect(screen.getByText('초대 코드로 참여하기는 준비 중이에요')).toBeInTheDocument();
-    expect(screen.getByTestId('location').textContent).toBe('/party');
+    expect(screen.queryByRole('button', { name: '초대 코드로 참여하기' })).toBeNull();
   });
 
   /*

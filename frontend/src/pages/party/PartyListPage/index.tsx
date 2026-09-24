@@ -33,9 +33,10 @@
  *   5.6이 `초대를 확인하지 못했어요`로 받는다
  * - 초대를 못 받아 와도 파티 목록은 그대로 둔다. 둘은 다른 요청이다
  *
- * `[?]` **`초대 코드로 참여하기`는 계약에 없다.** API-051 초대는 닉네임 검색(API-019)으로
- * 찾은 `userId`를 받고, 코드나 링크로 참여하는 경로는 정의되어 있지 않다. 시안이 확정한
- * 자리이므로 버튼은 두고, 누르면 준비 중임을 알린다(`wireframe-change-requests.md` CR-26).
+ * **`초대 코드로 참여하기`는 업무 -853에서 제거했다.** API-051 초대는 닉네임 검색
+ * (API-019)으로 찾은 `userId`를 받고, 코드나 링크로 참여하는 경로는 정의되어 있지 않다.
+ * 제공하지 않는 참여 방법을 준비 중 기능처럼 노출하지 않는다(`wireframe-change-requests.md`
+ * CR-26).
  *
  * 목록은 **활성 파티만** 보여준다(API-050 기본값). 나가거나 종료한 파티는 여기서 빠진다.
  *
@@ -61,7 +62,7 @@
  * **412px 이하 화면은 아래 그대로다** — 폭에 따라 그리는 것 자체가 갈린다
  * (`hooks/useShellSize`, 업무 -782).
  *
- * - 제목 줄 오른쪽에 `파티 만들기` · `초대 코드로 참여하기`가 선다
+ * - 제목 줄 오른쪽에 `파티 만들기`가 선다
  * - `받은 초대`가 카드가 되고 카드에서 **바로 수락**할 수 있다(API-053). 5.6은 그대로 있다
  * - `참여 중인 파티`가 격자가 되고, **카드를 누르면 고른 파티가 바뀐다.** 파티 화면으로
  *   가는 것은 카드 아래의 `파티로 이동`이다
@@ -375,7 +376,6 @@ export default function PartyListPage() {
           closedParties={closedParties}
           onOpenHistory={(partyId) => void navigate(path.partyRecommendationHistory(partyId))}
           onCreateParty={() => void navigate(path.partyNew())}
-          onJoinByCode={() => setNotice('초대 코드로 참여하기는 준비 중이에요')}
         />
 
         {/* 초대만 못 받아 온 경우다. 파티 목록은 그대로 둔다 */}
@@ -633,13 +633,6 @@ export default function PartyListPage() {
           <div className={styles.actions}>
             <Button variant="brand" onClick={() => void navigate(path.partyNew())}>
               파티 만들기
-            </Button>
-
-            <Button
-              variant="secondary"
-              onClick={() => setNotice('초대 코드로 참여하기는 준비 중이에요')}
-            >
-              초대 코드로 참여하기
             </Button>
           </div>
         ) : null}
