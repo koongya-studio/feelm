@@ -1,0 +1,146 @@
+.shade {
+  position: fixed;
+  z-index: 1098;
+  background: rgb(15 18 26 / 64%);
+}
+
+.focusRing {
+  position: fixed;
+  z-index: 1099;
+  box-sizing: border-box;
+  border: 3px solid #f1b665;
+  border-radius: 14px;
+  box-shadow:
+    0 0 0 3px rgb(255 255 255 / 75%),
+    0 0 28px rgb(241 182 101 / 65%);
+  pointer-events: none;
+}
+
+.callout {
+  position: fixed;
+  z-index: 1100;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  width: min(340px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 18px 20px 20px;
+  border: 1px solid #e8ded4;
+  border-top: 5px solid #ac383b;
+  border-radius: 20px;
+  background: #fffdf9;
+  color: #272321;
+  box-shadow: 0 20px 48px rgb(0 0 0 / 28%);
+}
+
+.top {
+  top: calc(72px + env(safe-area-inset-top));
+  bottom: auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.eyebrow {
+  color: #a63739;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+}
+
+.skip {
+  border: 0;
+  background: transparent;
+  color: #6b625c;
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.progress {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 14px 0 12px;
+}
+
+.progress > span:not(.stepNumber) {
+  width: 24px;
+  height: 5px;
+  border-radius: 99px;
+  background: #e6dfd8;
+}
+
+.progress > span.activeStep {
+  background: #a63739;
+}
+
+.stepNumber {
+  margin-left: 5px;
+  color: #6b625c;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.title {
+  display: block;
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.callout p {
+  margin: 7px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.hint {
+  display: block;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #eee6de;
+  color: #8b413d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.action {
+  margin-top: 15px;
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: #a63739;
+  color: white;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.secondaryAction {
+  margin: 15px 0 0 12px;
+  border: 0;
+  padding: 10px 0;
+  background: transparent;
+  color: #8b413d;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .callout {
+    left: 16px;
+    right: 16px;
+    width: auto;
+    bottom: calc(78px + env(safe-area-inset-bottom));
+  }
+
+  .top {
+    bottom: auto;
+  }
+}

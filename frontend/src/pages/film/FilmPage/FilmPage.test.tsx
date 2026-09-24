@@ -20,6 +20,8 @@ import FilmPage from './index';
 import { renderWithRouter } from '../../../test/render';
 import type { FrameList, PopcornBucket, PopcornBucketFlavor } from '../../../types/taste';
 
+vi.mock('../../../contexts/authContext', () => ({ useAuth: () => ({ user: null }) }));
+
 vi.mock('../../../api/taste', () => ({
   getMyFrames: vi.fn(),
   getPopcornBucket: vi.fn(),

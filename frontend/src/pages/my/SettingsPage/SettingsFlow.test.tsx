@@ -33,6 +33,7 @@ import { mockMyProfileView } from '../../../mocks/publicProfiles';
 import { mockMyProfile } from '../../../mocks/user';
 import { forgetWebPush } from '../../../pwa/webPush';
 import { ROUTE_PATTERN } from '../../../routes/paths';
+import { RECOMMENDATIONS_GUIDE, completeGuide, hasSeenGuide } from '../../../utils/userGuides';
 import type { AuthValue } from '../../../contexts/authContext';
 import type { BlockedUser, NotificationSettings } from '../../../types/user';
 
@@ -340,6 +341,17 @@ describe('7.8 → 6.1', () => {
     renderApp([ROUTE_PATTERN.settings]);
 
     expect(await screen.findByRole('link', { name: /OTT 관리/ })).toHaveAttribute('href', '/otts');
+  });
+});
+
+describe('앱 사용법 다시 보기', () => {
+  it('완료한 계정의 안내를 추천 단계로 되돌리고 추천 화면으로 이동한다', async () => {
+    completeGuide(1024, RECOMMENDATIONS_GUIDE);
+    renderApp([ROUTE_PATTERN.settings]);
+
+    fireEvent.click(await screen.findByRole('button', { name: '앱 사용법 다시 보기' }));
+    expect(hasSeenGuide(1024, RECOMMENDATIONS_GUIDE)).toBe(false);
+    await waitFor(() => expect(location()).toBe('/recommendations'));
   });
 });
 

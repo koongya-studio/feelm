@@ -26,6 +26,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import Button from '../../../components/Button';
+import GuideCallout from '../../../components/GuideCallout';
 import IconButton from '../../../components/IconButton';
 import OttBadge from '../../../components/OttBadge';
 import Poster from '../../../components/Poster';
@@ -49,6 +50,13 @@ import { useAuth } from '../../../contexts/authContext';
 import { useBack } from '../../../hooks/useBack';
 import { scrollParent, useScrollFade } from '../../../hooks/useScrollFade';
 import { path } from '../../../routes/paths';
+import {
+  FILM_GUIDE,
+  MOVIE_DETAIL_GUIDE,
+  completeGuide,
+  hasSeenGuide,
+  restartGuide,
+} from '../../../utils/userGuides';
 import { movieMetaLine } from '../../../utils/movie';
 import { ottMovieUrl } from '../../../utils/ott';
 import styles from './MovieDetailPage.module.css';
@@ -100,7 +108,15 @@ export default function MovieDetailPage() {
    * 유사 영화(API-031)와 한줄평(API-032)은 `required`라 `401` → 재발급 → 재시도로
    * 되살아나므로 기다릴 필요가 없다.
    */
-  const { status: authStatus } = useAuth();
+  const { status: authStatus, user } = useAuth();
+  const [guideDismissed, setGuideDismissed] = useState(false);
+  const showDetailGuide = Boolean(
+    user && !guideDismissed && !hasSeenGuide(user.userId, MOVIE_DETAIL_GUIDE),
+  );
+  function finishDetailGuide() {
+    if (user) completeGuide(user.userId, MOVIE_DETAIL_GUIDE);
+    setGuideDismissed(true);
+  }
   const sessionSettled = authStatus !== 'restoring';
 
   const [movie, setMovie] = useState<MovieDetail | null>(null);
@@ -489,9 +505,16 @@ export default function MovieDetailPage() {
            * 같은 아이콘이다. 주 동작은 별점이므로 관심없음은 글자 없이 작게 둔다.
            */}
           <div className={styles.actionRow}>
-            <Button variant="brand" onClick={() => void navigate(path.movieRating(id))}>
-              {movie.myRating ? '내 별점 수정하기' : '내 별점 남기기'}
-            </Button>
+            <span>
+              <Button
+                variant="brand"
+                onClick={() => {
+                  void navigate(path.movieRating(id));
+                }}
+              >
+                {movie.myRating ? '내 별점 수정하기' : '내 별점 남기기'}
+              </Button>
+            </span>
             <IconButton
               label={dismissStatus === 'done' ? '관심없음 처리됨' : '관심없음'}
               icon={<BlockIcon />}
@@ -729,6 +752,26 @@ export default function MovieDetailPage() {
           </Button>
         </div>
       </div>
+      {showDetailGuide && user ? (
+        <GuideCallout
+          title="영화 상세를 자유롭게 둘러보세요"
+          description="영화 정보를 살펴보세요. 별점은 원할 때 남기면 됩니다."
+          step={1}
+          totalSteps={1}
+          action={{
+            label: '상세 안내 마치기',
+            onClick: finishDetailGuide,
+          }}
+          secondaryAction={{
+            label: '필름 가이드 보기',
+            onClick: () => {
+              finishDetailGuide();
+              restartGuide(user.userId, FILM_GUIDE);
+              void navigate(path.film());
+            },
+          }}
+        />
+      ) : null}
     </div>
   );
 }

@@ -14,6 +14,7 @@ Epic [S15P21E106-266] `[FE] Feelm 와이어프레임 기반 프론트엔드 초�
 | --- | --- |
 | `frontend/docs/screens/` | 이번 에픽의 화면 설계 산출물 (Screen Spec, 화면 구조, 공통 컴포넌트 기준) |
 | [`screen-spec-auth.md`](./screen-spec-auth.md) | 에픽 `S15P21E106-301`의 가입·로그인 화면(0.1 ~ 0.7-A) |
+| [`screen-spec.md` 1.3](./screen-spec.md#13-첫-취향-필름-생성-완료) | FR-42 첫 이용·새 기능 안내 원칙. 새 기능 담당자는 안내와 다시 보기 경로를 확인 |
 | [`screen-spec-search-ott.md`](./screen-spec-search-ott.md) | 에픽 `S15P21E106-301`의 검색·OTT 관리 화면(4.1 ~ 4.4, 6.1) |
 | [`screen-spec-party.md`](./screen-spec-party.md) | 에픽 `S15P21E106-301`의 파티 화면(5.1 ~ 5.7)과 5.10 파티 추천 이력 |
 | [`screen-spec-my.md`](./screen-spec-my.md) | 에픽 `S15P21E106-301`의 MY 화면(7.1 ~ 7.8-D) |

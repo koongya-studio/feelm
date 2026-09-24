@@ -89,7 +89,7 @@ export default function PartyDesktop({
           <p className={styles.subtitle}>같이 볼 영화, 함께 골라요</p>
         </div>
 
-        <div className={styles.headActions}>
+        <div className={styles.headActions} data-guide-target="party-create">
           <Button variant="brand" onClick={onCreateParty}>
             {/* 시안의 `+`. 더하기 아이콘이 없어 글자로 둔다 — 새 자산을 만들지 않는다 */}
             <span aria-hidden="true">+</span>
@@ -99,7 +99,11 @@ export default function PartyDesktop({
       </header>
 
       {invitations.length > 0 ? (
-        <section className={styles.section} aria-labelledby="party-invitations">
+        <section
+          className={styles.section}
+          aria-labelledby="party-invitations"
+          data-guide-target="party-invitations"
+        >
           <h2 className={styles.sectionTitle} id="party-invitations">
             받은 초대 {invitations.length}
           </h2>
@@ -169,7 +173,11 @@ export default function PartyDesktop({
       ) : null}
 
       {parties.length > 0 ? (
-        <section className={styles.section} aria-labelledby="party-joined">
+        <section
+          className={styles.section}
+          aria-labelledby="party-joined"
+          data-guide-target="party-active"
+        >
           <h2 className={styles.sectionTitle} id="party-joined">
             참여 중인 파티 {parties.length}
           </h2>
@@ -248,7 +256,11 @@ export default function PartyDesktop({
                     </span>
                   </button>
 
-                  <Button variant="secondary" onClick={() => onOpenParty(party.partyId)}>
+                  <Button
+                    variant="secondary"
+                    data-guide-target="party-open"
+                    onClick={() => onOpenParty(party.partyId)}
+                  >
                     파티로 이동
                     <ChevronRightIcon />
                   </Button>
@@ -264,7 +276,11 @@ export default function PartyDesktop({
        * 끝난 파티에는 보여 줄 통도 취향도 없다(계약이 종료 파티에 남긴 것은 추천 이력뿐이다).
        */}
       {closedParties.length > 0 ? (
-        <section className={styles.section} aria-labelledby="party-closed">
+        <section
+          className={styles.section}
+          aria-labelledby="party-closed"
+          data-guide-target="party-history"
+        >
           <h2 className={styles.sectionTitle} id="party-closed">
             지난 파티 {closedParties.length}
           </h2>

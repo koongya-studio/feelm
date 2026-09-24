@@ -48,9 +48,10 @@
  * 지시 2026-09-18). 그전에는 와이어프레임의 회색 판에 구멍 줄을 직접 그렸는데, 3.1의
  * 필름이 확정되고 나서 추천 카드가 다른 필름처럼 보였다.
  */
-import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router';
 import Button from '../../../components/Button';
+import GuideCallout from '../../../components/GuideCallout';
 import DesktopAside from '../../../components/DesktopAside';
 import FilmReel from '../../../components/FilmReel';
 import Menu from '../../../components/Menu';
@@ -70,6 +71,8 @@ import { getOtts } from '../../../api/otts';
 import { useShellSize } from '../../../hooks/useShellSize';
 import { formatMonthDayWeekday } from '../../../utils/date';
 import { path } from '../../../routes/paths';
+import { AuthContext } from '../../../contexts/authContext';
+import { RECOMMENDATIONS_GUIDE, completeGuide, hasSeenGuide } from '../../../utils/userGuides';
 import styles from './RecommendationsPage.module.css';
 import type { MouseEvent } from 'react';
 import type { Ott } from '../../../types/ott';
@@ -124,6 +127,21 @@ type OpenMenu = {
 };
 
 export default function RecommendationsPage() {
+  const navigate = useNavigate();
+  const user = useContext(AuthContext)?.user ?? null;
+  const [guideDismissed, setGuideDismissed] = useState(false);
+  const guideActive = Boolean(
+    user && !guideDismissed && !hasSeenGuide(user.userId, RECOMMENDATIONS_GUIDE),
+  );
+  function finishGuide() {
+    if (!user) return;
+    completeGuide(user.userId, RECOMMENDATIONS_GUIDE);
+    setGuideDismissed(true);
+  }
+  function continueGuideInSearch() {
+    finishGuide();
+    void navigate(path.search());
+  }
   const rootRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
   const desktop = useShellSize() !== 'mobile';
@@ -310,6 +328,19 @@ export default function RecommendationsPage() {
             영화 검색하기
           </Link>
         </StatusView>
+        {guideActive ? (
+          <GuideCallout
+            title="추천을 준비하고 있어요"
+            description="그동안 검색에서 본 영화를 찾아 평가해 보세요."
+            step={1}
+            totalSteps={1}
+            onSkip={finishGuide}
+            action={{
+              label: '영화 검색하기',
+              onClick: continueGuideInSearch,
+            }}
+          />
+        ) : null}
       </>
     );
   }
@@ -327,6 +358,19 @@ export default function RecommendationsPage() {
         >
           <Button onClick={handleRetry}>다시 시도</Button>
         </StatusView>
+        {guideActive ? (
+          <GuideCallout
+            title="다른 영화부터 찾아볼까요?"
+            description="검색에서 본 영화를 평가하면 필름을 늘릴 수 있어요."
+            step={1}
+            totalSteps={1}
+            onSkip={finishGuide}
+            action={{
+              label: '영화 검색하기',
+              onClick: continueGuideInSearch,
+            }}
+          />
+        ) : null}
       </>
     );
   }
@@ -345,7 +389,17 @@ export default function RecommendationsPage() {
         </h1>
       )}
 
-      <div className={desktop ? styles.desktopPage : styles.page} ref={rootRef}>
+      <div
+        className={desktop ? styles.desktopPage : styles.page}
+        ref={rootRef}
+        onClickCapture={(event) => {
+          if (
+            event.target instanceof Element &&
+            event.target.closest('[data-guide-target="recommendation"]')
+          )
+            finishGuide();
+        }}
+      >
         {desktop ? (
           <>
             <header className={styles.desktopHead}>
@@ -491,6 +545,17 @@ export default function RecommendationsPage() {
         <DesktopAside>
           <RecommendationsAside items={items ?? []} />
         </DesktopAside>
+      ) : null}
+      {guideActive && items && items.length > 0 ? (
+        <GuideCallout
+          title="추천 영화가 도착했어요"
+          description="관심 있는 포스터를 눌러 영화 상세를 확인해 보세요."
+          step={1}
+          totalSteps={1}
+          targetSelector="[data-guide-target='recommendation']"
+          onSkip={finishGuide}
+          secondaryAction={{ label: '추천 안내 마치기', onClick: finishGuide }}
+        />
       ) : null}
     </>
   );

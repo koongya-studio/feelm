@@ -17,6 +17,9 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import RecommendationsPage from './index';
 import { ApiError } from '../../../api/apiError';
 import { renderWithRouter } from '../../../test/render';
+import { AuthContext } from '../../../contexts/authContext';
+import { RECOMMENDATIONS_GUIDE, hasSeenGuide, restartGuide } from '../../../utils/userGuides';
+import type { AuthValue } from '../../../contexts/authContext';
 import type { RecommendationSet } from '../../../types/recommendation';
 
 vi.mock('../../../api/recommendations', () => ({
@@ -70,11 +73,61 @@ const set: RecommendationSet = {
 };
 
 beforeEach(() => {
+  localStorage.clear();
   vi.mocked(getRecommendations).mockReset().mockResolvedValue(set);
   vi.mocked(dismissMovie).mockReset().mockResolvedValue(undefined);
   vi.mocked(getOtts)
     .mockReset()
     .mockResolvedValue([{ ottId: 1, code: 'NETFLIX', name: '넷플릭스', logoUrl: null }]);
+});
+
+const guideAuth: AuthValue = {
+  status: 'authenticated',
+  user: { userId: 42, nickname: '새 사용자', onboardingCompleted: true },
+  signIn: vi.fn(),
+  signInWithSocial: vi.fn(),
+  completeEmailSignup: vi.fn(),
+  completeSocialSignup: vi.fn(),
+  signOut: vi.fn(),
+};
+
+describe('첫 이용 안내', () => {
+  it('추천 카드가 있을 때 실제 포스터를 안내하고 건너뛰기를 저장한다', async () => {
+    restartGuide(42, RECOMMENDATIONS_GUIDE);
+    renderWithRouter(
+      <AuthContext.Provider value={guideAuth}>
+        <RecommendationsPage />
+      </AuthContext.Provider>,
+      { route: '/recommendations' },
+    );
+
+    expect(await screen.findByText('추천 영화가 도착했어요')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '파이트 클럽 상세 보기' })).toHaveAttribute(
+      'data-guide-target',
+      'recommendation',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '건너뛰기' }));
+    expect(hasSeenGuide(42, RECOMMENDATIONS_GUIDE)).toBe(true);
+  });
+
+  it('추천을 준비 중이면 없는 카드를 가리키지 않고 검색으로 보낸다', async () => {
+    restartGuide(42, RECOMMENDATIONS_GUIDE);
+    vi.mocked(getRecommendations).mockRejectedValue(
+      new ApiError(503, 'RECOMMENDATION_UNAVAILABLE', '준비 중'),
+    );
+    renderWithRouter(
+      <AuthContext.Provider value={guideAuth}>
+        <RecommendationsPage />
+      </AuthContext.Provider>,
+      { route: '/recommendations' },
+    );
+
+    expect(await screen.findByText('추천을 준비하고 있어요')).toBeInTheDocument();
+    expect(screen.queryByText('추천 영화가 도착했어요')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '영화 검색하기' }));
+    expect(hasSeenGuide(42, RECOMMENDATIONS_GUIDE)).toBe(true);
+    expect(screen.getByTestId('location')).toHaveTextContent('/search');
+  });
 });
 
 describe('2.2 오늘의 추천', () => {

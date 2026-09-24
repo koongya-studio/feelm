@@ -74,6 +74,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import Button from '../../../components/Button';
+import GuideCallout from '../../../components/GuideCallout';
 import PopcornBucket from '../../../components/PopcornBucket';
 import Snackbar from '../../../components/Snackbar';
 import StatusView from '../../../components/StatusView';
@@ -92,8 +93,10 @@ import {
 } from '../../../api/parties';
 import { getPopcornFlavors } from '../../../api/taste';
 import { useShellSize } from '../../../hooks/useShellSize';
+import { useAuth } from '../../../contexts/authContext';
 import { path } from '../../../routes/paths';
 import { mixedFlavors } from '../../../utils/party';
+import { PARTY_GUIDE, completeGuide, hasSeenGuide } from '../../../utils/userGuides';
 import type { Party, PartyInvitation, PartyMember, PartyPopcorn } from '../../../types/party';
 import styles from './PartyListPage.module.css';
 
@@ -157,6 +160,14 @@ function toFaces(members: PartyMember[]) {
 
 export default function PartyListPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [guideDismissed, setGuideDismissed] = useState(false);
+  const [guideIndex, setGuideIndex] = useState(0);
+  const showGuide = Boolean(user && !guideDismissed && !hasSeenGuide(user.userId, PARTY_GUIDE));
+  const finishGuide = () => {
+    if (user) completeGuide(user.userId, PARTY_GUIDE);
+    setGuideDismissed(true);
+  };
   const desktop = useShellSize() !== 'mobile';
   const [parties, setParties] = useState<Party[] | null>(null);
   /** 끝난 파티(API-050 `status=CLOSED`). 5.10으로 가는 `지난 파티` 구역이 쓴다(업무 -826) */
@@ -292,6 +303,64 @@ export default function PartyListPage() {
 
   const hasParties = parties !== null && parties.length > 0;
   const hasInvitations = invitations !== null && invitations.length > 0;
+  const guideSteps = [
+    ...(hasInvitations
+      ? [
+          {
+            title: '받은 초대',
+            description: '친구가 초대했다면 여기에서 확인하고 참여할 수 있어요.',
+            targetSelector: "[data-guide-target='party-invitations']",
+          },
+        ]
+      : []),
+    ...(hasParties
+      ? [
+          {
+            title: '참여 중인 파티',
+            description: '파티원과 참여 인원, 함께 모인 취향을 여기에서 확인할 수 있어요.',
+            targetSelector: "[data-guide-target='party-active']",
+          },
+          {
+            title: '파티 안으로 들어가기',
+            description: '파티를 열면 멤버의 팝콘을 보고 함께 볼 영화를 추천받을 수 있어요.',
+            targetSelector: "[data-guide-target='party-open']",
+          },
+        ]
+      : [
+          {
+            title: '함께 영화 고르기',
+            description:
+              '파티를 만들면 친구를 초대하고 함께 볼 영화를 고를 수 있어요. 지금은 둘러보기만 해도 됩니다.',
+            targetSelector: "[data-guide-target='party-create']",
+          },
+        ]),
+    ...(closedParties.length > 0
+      ? [
+          {
+            title: '지난 파티',
+            description: '끝난 파티에서 추천받았던 영화는 여기에서 다시 볼 수 있어요.',
+            targetSelector: "[data-guide-target='party-history']",
+          },
+        ]
+      : []),
+  ];
+  const activeGuideIndex = Math.min(guideIndex, guideSteps.length - 1);
+  const guideCallout =
+    showGuide && parties !== null && (invitations !== null || invitationsFailed) && !failed ? (
+      <GuideCallout
+        step={activeGuideIndex + 1}
+        totalSteps={guideSteps.length}
+        targetSelector={guideSteps[activeGuideIndex].targetSelector}
+        title={guideSteps[activeGuideIndex].title}
+        description={guideSteps[activeGuideIndex].description}
+        onSkip={finishGuide}
+        action={
+          activeGuideIndex < guideSteps.length - 1
+            ? { label: '다음', onClick: () => setGuideIndex(activeGuideIndex + 1) }
+            : { label: '둘러보기', onClick: finishGuide }
+        }
+      />
+    ) : null;
 
   /*
    * 대표 파티 한 방과 나머지. **대표는 아래 줄에서 뺀다** — 같은 파티 이름이 화면에 두 번
@@ -369,14 +438,21 @@ export default function PartyListPage() {
           commonFlavorsOf={(partyId) => commonFlavorsOf(popcorns.get(partyId) ?? null)}
           selectedId={selectedId}
           onSelect={setSelectedId}
-          onOpenParty={(partyId) => void navigate(path.partyPopcorn(partyId))}
+          onOpenParty={(partyId) => {
+            finishGuide();
+            void navigate(path.partyPopcorn(partyId));
+          }}
           onOpenInvitation={(invitationId) => void navigate(path.partyInvitation(invitationId))}
           onAccept={handleAccept}
           acceptingId={acceptingId}
           closedParties={closedParties}
           onOpenHistory={(partyId) => void navigate(path.partyRecommendationHistory(partyId))}
-          onCreateParty={() => void navigate(path.partyNew())}
+          onCreateParty={() => {
+            finishGuide();
+            void navigate(path.partyNew());
+          }}
         />
+        {guideCallout}
 
         {/* 초대만 못 받아 온 경우다. 파티 목록은 그대로 둔다 */}
         {invitationsFailed ? (
@@ -431,7 +507,11 @@ export default function PartyListPage() {
         ) : null}
 
         {hasInvitations ? (
-          <section className={styles.invitations} aria-labelledby="party-invitations">
+          <section
+            className={styles.invitations}
+            aria-labelledby="party-invitations"
+            data-guide-target="party-invitations"
+          >
             <h2 className={styles.sectionLabel} id="party-invitations">
               받은 초대 {invitations.length}
             </h2>
@@ -487,7 +567,7 @@ export default function PartyListPage() {
          * 누르면 지금까지와 같은 곳(5.8 파티원 팝콘)으로 간다.
          */}
         {firstParty ? (
-          <section className={styles.hero}>
+          <section className={styles.hero} data-guide-target="party-active">
             <div className={styles.heroHead}>
               <h2 className={styles.heroTitle}>{firstParty.name}</h2>
 
@@ -537,7 +617,11 @@ export default function PartyListPage() {
             <button
               type="button"
               className={styles.heroAction}
-              onClick={() => void navigate(path.partyPopcorn(firstParty.partyId))}
+              data-guide-target="party-open"
+              onClick={() => {
+                finishGuide();
+                void navigate(path.partyPopcorn(firstParty.partyId));
+              }}
             >
               <PlayIcon />
               파티 팝콘 보기
@@ -590,7 +674,11 @@ export default function PartyListPage() {
          * 계약이 종료 파티에 열어 두지 않았다.
          */}
         {closedParties.length > 0 ? (
-          <section className={styles.closed} aria-labelledby="party-closed">
+          <section
+            className={styles.closed}
+            aria-labelledby="party-closed"
+            data-guide-target="party-history"
+          >
             <h2 className={styles.sectionLabel} id="party-closed">
               지난 파티 {closedParties.length}
             </h2>
@@ -630,8 +718,14 @@ export default function PartyListPage() {
         ) : null}
 
         {parties !== null ? (
-          <div className={styles.actions}>
-            <Button variant="brand" onClick={() => void navigate(path.partyNew())}>
+          <div className={styles.actions} data-guide-target="party-create">
+            <Button
+              variant="brand"
+              onClick={() => {
+                finishGuide();
+                void navigate(path.partyNew());
+              }}
+            >
               파티 만들기
             </Button>
           </div>
@@ -642,6 +736,7 @@ export default function PartyListPage() {
             {notice}
           </Snackbar>
         ) : null}
+        {guideCallout}
       </div>
     </>
   );

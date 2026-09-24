@@ -18,14 +18,17 @@
  * 동작이 정해지면 문구와 함께 되살린다.
  * `[?]` `홈으로 이동` 진입점이 와이어프레임에 없어 추천 화면으로 가는 버튼만 두었다.
  */
-import { useEffect } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import Button from '../../../components/Button';
+import GuideCallout from '../../../components/GuideCallout';
 import FilmReel from '../../../components/FilmReel';
 import Poster from '../../../components/Poster';
 import ScreenHeader from '../../../components/ScreenHeader';
 import { useOnboarding } from '../../../contexts/onboardingContext';
+import { AuthContext } from '../../../contexts/authContext';
 import { path } from '../../../routes/paths';
+import { readFirstUseStep, setFirstUseStep } from '../../../utils/userGuides';
 import styles from './OnboardingCompletePage.module.css';
 
 /*
@@ -41,6 +44,9 @@ const FRAME_HEIGHT = 165;
 export default function OnboardingCompletePage() {
   const navigate = useNavigate();
   const { ottSubmitted, preferences } = useOnboarding();
+  const user = useContext(AuthContext)?.user ?? null;
+  const [guideDismissed, setGuideDismissed] = useState(false);
+  const showGuide = Boolean(user && !guideDismissed && readFirstUseStep(user.userId) === null);
 
   // 1.2를 거치지 않고 이 화면을 직접 열면 되돌린다 (frontend-structure.md 6.3)
   useEffect(() => {
@@ -89,9 +95,32 @@ export default function OnboardingCompletePage() {
               <strong>좋아요 4점 · 싫어요 2점</strong>
             </p>
           ) : null}
-          <Button onClick={() => void navigate(path.recommendations())}>영화 추천받기</Button>
+          <span data-guide-target="first-use-start">
+            <Button
+              onClick={() => {
+                if (user && showGuide) setFirstUseStep(user.userId, 'done');
+                void navigate(path.recommendations());
+              }}
+            >
+              영화 추천받기
+            </Button>
+          </span>
         </div>
       </div>
+      {showGuide && user ? (
+        <GuideCallout
+          title="첫 필름이 완성됐어요"
+          description="영화 추천받기를 눌러 취향에 맞는 영화를 만나보세요."
+          step={1}
+          totalSteps={1}
+          targetSelector="[data-guide-target='first-use-start']"
+          placement="top"
+          onSkip={() => {
+            setFirstUseStep(user.userId, 'done');
+            setGuideDismissed(true);
+          }}
+        />
+      ) : null}
     </>
   );
 }
