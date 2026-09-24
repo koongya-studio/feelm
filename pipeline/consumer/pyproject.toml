@@ -1,14 +1,16 @@
 [project]
 name = "feelm-foldin-consumer"
 version = "0.1.0"
-description = "Kafka-driven ALS Fold-in candidate updater"
+description = "Kafka-driven personal and party recommendation consumers"
 requires-python = ">=3.12"
 dependencies = [
   "confluent-kafka>=2.6,<3",
-  "numpy>=2.0,<3",
+  "numpy==2.4.6",
   "psycopg[binary]>=3.2,<4",
-  "pyarrow>=18,<20",
+  "pyarrow==19.0.1",
   "redis>=5.2,<6",
+  "scipy==1.15.2",
+  "xgboost-cpu==2.1.4",
 ]
 
 [project.scripts]

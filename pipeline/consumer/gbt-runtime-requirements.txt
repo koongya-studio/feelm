@@ -1,4 +1,4 @@
-# Isolated 626 verifier/runtime only. Production image integration belongs to 644.
+# Standalone verifier pins; the production pyproject/lock use the same versions.
 # Python 3.12; CPU wheel. SciPy is an XGBoost dependency, not a feature-builder dependency.
 # No pandas, Spark or ALS/FM assets required.
 numpy==2.4.6

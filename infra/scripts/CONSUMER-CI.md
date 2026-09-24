@@ -28,6 +28,15 @@ The boundary currently pins the reviewed `.python-version`, `pyproject.toml`,
 therefore update the reviewed runtime/cache and these identities in the same CI
 policy change; an untrusted MR cannot select a new package source or image.
 
+S15P21E106-644 pins the v26 CPU runtime in the existing Consumer project and
+updates the three reviewed manifest/lock/Dockerfile hashes together. The fixed
+Python/uv MR image and package-source allowlist are unchanged. An infrastructure
+operator must review and install the updated root-owned boundary before the GBT
+MR snapshot can pass; merging this file does not update the installed adapter.
+Verify the frozen sync and GBT tests in that isolated environment without
+disabling the boundary checks. See `pipeline/consumer/GBT-644.md` for the
+separate runtime activation and whole-release rollback boundary.
+
 ## Main image publication
 
 `consumer-test` builds the Dockerfile `test` target on a protected `main` push.
