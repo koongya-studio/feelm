@@ -1,14 +1,17 @@
 /*
  * 파티 화면 테스트가 함께 쓰는 응답 조각 (업무 S15P21E106-393).
  *
- * 파티 화면은 실제 API를 부르므로 화면 테스트마다 API-049 · API-050 · API-052 · API-057
- * 응답을 손으로 만들어야 한다. 여섯 화면이 같은 모양을 각자 적으면 계약이 바뀔 때 고칠
+ * 파티 화면은 실제 API를 부르므로 화면 테스트마다 API-049 · API-050 · API-052 · API-057 ·
+ * API-083 응답을 손으로 만들어야 한다. 여섯 화면이 같은 모양을 각자 적으면 계약이 바뀔 때 고칠
  * 자리가 여섯 곳이 된다. 여기 한 곳에 둔다.
  *
  * **필드는 계약 응답 그대로다.** 빠뜨린 필드가 있으면 화면이 아니라 여기가 틀린 것이다.
  */
 import type {
   Party,
+  PartyHistoryItem,
+  PartyHistoryPage,
+  PartyHistorySet,
   PartyInvitation,
   PartyMember,
   PartyMemberPopcorn,
@@ -131,5 +134,56 @@ export function partyRecommendations(partyId = TEST_PARTY_ID): PartyRecommendati
       },
     })),
     hasNext: true,
+  };
+}
+
+/**
+ * API-083 파티 추천 이력의 항목 하나.
+ *
+ * 영화 요약은 API-058과 같다 — 5.5가 쓰지 않는 개봉 연도 · 장르 · 평점까지 온다.
+ */
+export function historyItem(
+  index: number,
+  title: string,
+  exposedAt: string,
+  overrides: Partial<PartyHistoryItem['movie']> = {},
+): PartyHistoryItem {
+  return {
+    recommendationItemId: 3500 + index,
+    type: 'PARTY',
+    exposedAt,
+    movie: {
+      movieId: 550 + index,
+      title,
+      posterUrl: null,
+      releaseYear: 1999,
+      genres: ['드라마', '스릴러'],
+      averageRating: 4.3,
+      ottProviders: ['NETFLIX'],
+      ...overrides,
+    },
+  };
+}
+
+/** API-083 세트 하나. 따로 주지 않으면 한 번에 노출된 두 편이다 */
+export function historySet(overrides: Partial<PartyHistorySet> = {}): PartyHistorySet {
+  return {
+    recommendationSetId: 7102,
+    generatedAt: '2026-09-20T10:00:00Z',
+    items: [
+      historyItem(1, '파이트 클럽', '2026-09-20T10:01:00Z'),
+      historyItem(2, '펄프 픽션', '2026-09-20T10:01:00Z'),
+    ],
+    ...overrides,
+  };
+}
+
+/** API-083 응답 한 장. 세트 단위 커서 페이지다 */
+export function historyPage(overrides: Partial<PartyHistoryPage> = {}): PartyHistoryPage {
+  return {
+    items: [historySet()],
+    nextCursor: null,
+    hasNext: false,
+    ...overrides,
   };
 }

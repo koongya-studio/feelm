@@ -7,6 +7,9 @@
  * 파티원 팝콘(API-057) · 멤버 강퇴(API-069)를 실제 호출로 바꿨다.
  *
  * 파티 영화 추천(API-058)도 업무 -705에서 실제 호출로 바꿨다. **이 파일에 목업은 없다.**
+ *
+ * 파티 추천 이력(API-083)은 업무 -826에서 더했다. 종료 파티를 읽는 `getMyParties`의
+ * `status`도 같은 업무에서 열었다.
  */
 import { request } from './client';
 import type {
@@ -16,8 +19,10 @@ import type {
   PartyInvitationState,
   PartyList,
   PartyPopcorn,
+  PartyHistoryPage,
   PartyRecommendationSet,
   PartyState,
+  PartyStatus,
   SentPartyInvitation,
 } from '../types/party';
 
@@ -50,20 +55,59 @@ const PAGE_SIZE = 50;
  *
  * 기본은 활성 파티만 반환하며 파티가 없으면 빈 배열이다.
  *
+ * 끝난 파티는 `getClosedParties`가 따로 준다(업무 -826).
+ *
  * `[!]` **계약은 `{ items }` 하나인데 구현은 커서 페이지(`items` · `nextCursor` ·
  * `hasNext`)로 내려준다.** 화면이 쓰는 것은 `items`뿐이라 배열만 돌려준다.
  */
 export async function getMyParties(): Promise<Party[]> {
-  const page = await request<PartyList>('/parties', { query: { size: PAGE_SIZE } });
+  return listParties();
+}
+
+/**
+ * API-050 내 파티 목록 · 끝난 파티 (`status=CLOSED`)
+ *
+ * 5.1의 `지난 파티` 구역과 5.10이 쓴다(업무 -826). 계약이 종료 파티를 내려주는 목적을
+ * `추천 이력 확인용`이라고 적어 두었고, 그 목적지가 파티 추천 이력(API-083)이다.
+ *
+ * **활성 목록과 다른 함수로 둔다.** 계약에 둘을 함께 주는 값이 없어 어차피 두 번 불러야
+ * 하고, 부르는 쪽에서 무엇을 받는지가 이름으로 드러나는 편이 낫다.
+ *
+ * `[!]` 종료 파티에는 상한이 없어(활성은 사용자당 10개, API-049) 한 장(50개)에 다 들어오지
+ * 않을 수 있다. **첫 장만 준다** — 지난 파티를 끝까지 따라가는 화면이 아직 없고, 커서를
+ * 끝까지 도는 것은 오래 쓴 사용자에게 5.1을 느리게 만든다.
+ */
+export async function getClosedParties(): Promise<Party[]> {
+  return listParties('CLOSED');
+}
+
+async function listParties(status?: PartyStatus): Promise<Party[]> {
+  const page = await request<PartyList>('/parties', { query: { status, size: PAGE_SIZE } });
 
   return page.items;
 }
 
-/** 파티 하나. 파티 단건 조회 계약이 없어 목록에서 고른다(5.7 · 5.8이 쓴다) */
-export async function getParty(partyId: number): Promise<Party | null> {
-  const parties = await getMyParties();
+/**
+ * 파티 하나. 파티 단건 조회 계약이 없어 목록에서 고른다(5.7 · 5.8이 쓴다).
+ *
+ * `includeClosed`면 활성에서 못 찾았을 때 종료 파티도 본다(업무 -826). 5.10은 종료 파티의
+ * 이름을 머리에 적어야 하는데 그 파티는 기본 목록에 없다. **기본값은 예전 그대로다** —
+ * 5.7 · 5.8은 끝난 파티를 찾아내면 안 된다(5.8은 종료 파티를 다룰 화면이 아니다).
+ */
+export async function getParty(
+  partyId: number,
+  options: { includeClosed?: boolean } = {},
+): Promise<Party | null> {
+  const active = await getMyParties();
+  const found = active.find((party) => party.partyId === partyId);
 
-  return parties.find((party) => party.partyId === partyId) ?? null;
+  if (found || !options.includeClosed) {
+    return found ?? null;
+  }
+
+  const closed = await getClosedParties();
+
+  return closed.find((party) => party.partyId === partyId) ?? null;
 }
 
 /**
@@ -213,5 +257,29 @@ export async function getPartyRecommendations(
 ): Promise<PartyRecommendationSet> {
   return request<PartyRecommendationSet>(`/parties/${partyId}/recommendations`, {
     query: { refresh: options.refresh ? true : undefined },
+  });
+}
+
+/**
+ * API-083 파티 추천 이력 조회 · GET /api/v1/parties/{partyId}/recommendations/history
+ *
+ * 그 파티가 **화면에 노출한** 영화를 세트 최신순으로 준다. 저장만 되고 노출되지 않은 후보는
+ * 이력이 아니다. 페이지는 **세트 단위**이고(API-048과 같다) `size`도 세트 수다 — 생략하면
+ * 서버 기본값(20)이다. 첫 장은 커서 없이, 다음 장은 직전 응답의 `nextCursor`로 부른다.
+ *
+ * **파티 상태를 보지 않는다.** 그 파티의 멤버십 행이 있으면 활성 · 종료 모두 읽고, 없으면
+ * `404 RESOURCE_NOT_FOUND`다(파티가 없는 것과 구분하지 않는다 — 계약이 파티 존재를
+ * 노출하지 않기로 했다). 마지막 멤버가 나가서 종료된 파티는 멤버십이 남지 않아 아무도
+ * 읽을 수 없다. 깨진 커서와 범위 밖 `size`는 `400 VALIDATION_FAILED`다.
+ *
+ * 같은 영화는 그 파티에서 **가장 최신 세트 1건**만 온다. 페이지를 넘겨도 같은 영화가 두 번
+ * 나오지 않으므로 화면은 받은 세트를 그대로 이어 붙이면 된다.
+ */
+export async function getPartyRecommendationHistory(
+  partyId: number,
+  options: { cursor?: string; size?: number } = {},
+): Promise<PartyHistoryPage> {
+  return request<PartyHistoryPage>(`/parties/${partyId}/recommendations/history`, {
+    query: { cursor: options.cursor, size: options.size },
   });
 }

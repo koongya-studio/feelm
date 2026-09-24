@@ -1,0 +1,112 @@
+/*
+ * 5.10 파티 추천 이력 (업무 -826).
+ *
+ * 카드로 감싸지 않는다. 5.5 추천 결과와 같은 테두리 없는 줄 목록이고, 절의 머리만
+ * 세트를 가른다(`design-concept.md`).
+ */
+.page {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: var(--space-4) var(--screen-padding-x) var(--space-8);
+  gap: var(--space-6);
+}
+
+/* 세트 하나 = 절 하나 */
+.set {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.setHead {
+  display: flex;
+  margin: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.setDate {
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+.setCount {
+  flex: none;
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+.batch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* 한 세트를 여러 번에 걸쳐 받았을 때만 붙는 시각 줄 */
+.batchTime {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-hint);
+}
+
+.list {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+}
+
+/* 영화 상세로 가는 이동 행. 면 · 테두리 · 누름은 공통 규칙(`navRow`)이 정한다 */
+.row {
+  composes: navRow from '../../../styles/interaction.module.css';
+
+  width: 100%;
+  padding: var(--space-3);
+  align-items: center;
+  gap: var(--space-4);
+  border-radius: var(--radius-card);
+  text-decoration: none;
+}
+
+.body {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.title {
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  letter-spacing: var(--letter-spacing-body);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-ink);
+}
+
+/* 개봉 연도 · 장르. 둘 다 없으면 빈 문자열이라 자리만 접힌다 */
+.meta {
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
+}
+
+.chevron {
+  display: flex;
+  flex: none;
+  color: var(--color-ink-hint);
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+}

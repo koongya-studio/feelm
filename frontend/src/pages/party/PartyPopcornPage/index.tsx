@@ -4,6 +4,7 @@
  * 이동표
  * 5.1 → 5.8 참여 중인 파티방 선택
  * 5.8 → 5.9 함께 볼 영화 추천받기 (파티팝콘 흐름의 입구)
+ * 5.8 → 5.10 지난 추천 보기 (업무 -826)
  * 5.8 ⇢ 7.8-D 사용자 차단 후 차단 사용자 관리
  *
  * **사용자 시안 2026-09-17(업무 -462)이 구성을 바꿨다.** 이전에는 파티원마다 통을 하나씩
@@ -495,6 +496,15 @@ export default function PartyPopcornPage() {
             onClick={() => void navigate(path.partyPopcornMix(id))}
           >
             함께 볼 영화 추천받기
+          </Button>
+
+          {/*
+           * 5.10 파티 추천 이력(업무 -826). 5.5는 지금 묶음 하나만 보여 주므로 이 파티가
+           * 지금까지 본 영화 전부를 볼 자리가 여기 말고는 없다. 끝난 파티는 5.1의
+           * `지난 파티`로 들어가고 이 화면을 지나지 않는다.
+           */}
+          <Button variant="text" onClick={() => void navigate(path.partyRecommendationHistory(id))}>
+            지난 추천 보기
           </Button>
         </div>
       </div>

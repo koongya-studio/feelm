@@ -156,3 +156,29 @@ export function formatMonthDayWeekday(isoString: string): string {
 
   return `${formatMonthDay(isoString)} (${weekday})`;
 }
+
+/**
+ * ISO 8601 문자열을 `오후 7:05` 형식으로 만든다.
+ *
+ * 5.10 파티 추천 이력이 한 세트 안의 **노출 묶음**을 가를 때 쓴다(업무 -826). 같은 세트를
+ * 여러 번에 걸쳐 받았으면(다시 받기) 묶음마다 `exposedAt`이 다르고, 그 차이는 대개 같은 날
+ * 몇 분 · 몇 시간이라 날짜로는 구분되지 않는다.
+ *
+ * 묶음에 `다시 받기` 같은 이름을 붙이지 않고 시각을 적는다. 다시 받기 이전에 만들어진
+ * 세트는 항목마다 노출 시각이 다를 수 있어(API-083 처리 규칙) 순서에 이름을 붙이면 틀린
+ * 말이 된다. 시각은 어느 세트에서도 사실이다.
+ */
+export function formatTimeOfDay(isoString: string): string {
+  const date = new Date(isoString);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const hours = date.getHours();
+  const meridiem = hours < 12 ? '오전' : '오후';
+  // 0시는 오전 12시, 12시는 오후 12시다
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+
+  return `${meridiem} ${hour12}:${String(date.getMinutes()).padStart(2, '0')}`;
+}

@@ -24,6 +24,7 @@ import { resetViewport, setViewportWidth } from '../../../test/viewport';
 import { BUDDY, flavors, invitation, ME, member, party, partyPopcorn } from '../../../test/party';
 import {
   acceptInvitation,
+  getClosedParties,
   getMyInvitations,
   getMyParties,
   getPartyPopcorn,
@@ -40,6 +41,7 @@ vi.mock('../../../api/parties', async () => {
   return {
     ...actual,
     getMyParties: vi.fn(),
+    getClosedParties: vi.fn(),
     getMyInvitations: vi.fn(),
     getPartyPopcorn: vi.fn(),
     acceptInvitation: vi.fn(),
@@ -107,6 +109,7 @@ function renderParty(width: number) {
 
 beforeEach(() => {
   vi.mocked(getMyParties).mockReset().mockResolvedValue([party(), SECOND]);
+  vi.mocked(getClosedParties).mockReset().mockResolvedValue([]);
   vi.mocked(getMyInvitations).mockReset().mockResolvedValue([invitation()]);
   vi.mocked(getPartyPopcorn).mockReset().mockResolvedValue(partyPopcorn());
   vi.mocked(acceptInvitation).mockReset().mockResolvedValue(party());
@@ -253,5 +256,32 @@ describe('5.1 파티팝콘 데스크톱 시안', () => {
     expect(screen.queryByText('PARTY POPCORN')).not.toBeInTheDocument();
     expect(screen.queryByRole('complementary', { name: '보조 정보' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '수락하기' })).not.toBeInTheDocument();
+  });
+});
+
+/*
+ * 지난 파티 (업무 S15P21E106-826). 종료 파티로 들어가는 길이 **폭에 따라 있다가 없으면
+ * 안 된다** — 412px과 같은 구역을 같은 자리에 둔다.
+ */
+describe('지난 파티', () => {
+  it('넓은 화면에도 지난 파티 구역을 두고 5.10으로 보낸다', async () => {
+    vi.mocked(getClosedParties).mockResolvedValue([
+      party({ partyId: 9301, name: '지난달 심야 상영회', status: 'CLOSED' }),
+    ]);
+
+    renderParty(1440);
+
+    expect(await screen.findByText('지난 파티 1')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /지난달 심야 상영회/ }));
+    expect(screen.getByTestId('location').textContent).toBe(
+      '/parties/9301/recommendations/history',
+    );
+  });
+
+  it('끝난 파티가 없으면 구역을 그리지 않는다', async () => {
+    renderParty(1440);
+
+    expect(await screen.findByText('참여 중인 파티 2')).toBeInTheDocument();
+    expect(screen.queryByText(/지난 파티/)).toBeNull();
   });
 });
