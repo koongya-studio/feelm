@@ -237,6 +237,20 @@ class PartyInvitationResponseApiContractTest extends SharedPostgresContractTest 
     }
 
     @Test
+    void rejectsAcceptAtSelectedTwoPersonCapacity() throws Exception {
+        long party = party(20, "ACTIVE", CREATED_AT);
+        jdbc.update("UPDATE parties SET max_members=2 WHERE id=?", party);
+        member(party, 30);
+        long invitation = invitation(party, 20, 10, "PENDING");
+
+        accept(invitation, 10)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("PARTY_FULL"));
+        assertInvitation(invitation, "PENDING", false);
+        assertThat(memberCount(party, 10)).isZero();
+    }
+
+    @Test
     void rejectsAcceptAtActivePartyLimit() throws Exception {
         for (int index = 0; index < 10; index++) {
             long activeParty = party(20, "ACTIVE", CREATED_AT.plusSeconds(index));

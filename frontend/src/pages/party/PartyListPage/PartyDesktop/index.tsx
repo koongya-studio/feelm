@@ -132,7 +132,7 @@ export default function PartyDesktop({
                       {/*
                        * `memberCount`는 지금 참여 중인 사람 수라 **나까지 세려면 1을 더한다**
                        * (5.6과 같은 계산). 정원은 계약이 정한 값이며 초대 응답에 없어
-                       * 파티 응답의 `maxMembers`와 같은 수(4)를 쓴다.
+                       * 정원 표시는 파티 응답의 `maxMembers`를 쓴다.
                        */}
                       <p className={styles.inviteCount}>
                         <PartyGroupIcon />

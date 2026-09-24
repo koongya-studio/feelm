@@ -42,7 +42,7 @@ public class PartyController {
     @ResponseStatus(HttpStatus.CREATED)
     public PartyResponse create(
             @AuthenticationPrincipal Long userId, @Valid @RequestBody PartyCreateRequest request) {
-        return partyService.create(userId, request.name());
+        return partyService.create(userId, request.name(), request.maxMembers());
     }
 
     @GetMapping

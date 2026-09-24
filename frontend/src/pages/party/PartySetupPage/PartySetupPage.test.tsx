@@ -80,7 +80,7 @@ describe('5.3 파티 만들기', () => {
         `/parties/${TEST_PARTY_ID}/popcorn/mix`,
       ),
     );
-    expect(createParty).toHaveBeenCalledWith('금요 심야 상영회');
+    expect(createParty).toHaveBeenCalledWith('금요 심야 상영회', 2);
   });
 
   it('이름이 비면 보내지 않고 알린다', async () => {
@@ -96,8 +96,7 @@ describe('5.3 파티 만들기', () => {
 
   it('인원 표시는 5.2에서 고른 정원을 따른다', () => {
     /*
-     * 2인을 골랐는데 `1/4명`이 나오던 것을 고쳤다(업무 -610). 계약(API-049)에 정원을 보낼
-     * 필드가 없어 서버는 4로 두지만, 이 화면이 말하는 상한은 사용자가 고른 수다.
+     * 5.2에서 고른 정원이 화면과 API-049 요청에 동일하게 쓰인다.
      */
     renderSetup();
     expect(screen.getByText('1/2명 · 최대 2명까지')).toBeInTheDocument();

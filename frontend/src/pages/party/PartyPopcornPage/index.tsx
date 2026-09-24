@@ -470,7 +470,7 @@ export default function PartyPopcornPage() {
               disabled={inviting}
               pickLabel={() => '초대'}
               onPick={invite}
-              note={`파티는 파티장 포함 최대 ${PARTY_MAX_MEMBERS}명까지예요`}
+              note={`이 파티는 파티장 포함 최대 ${party?.maxMembers ?? PARTY_MAX_MEMBERS}명까지예요`}
             />
           </section>
         ) : null}

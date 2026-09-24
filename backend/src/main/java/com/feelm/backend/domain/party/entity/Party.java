@@ -24,6 +24,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Party extends BaseTimeEntity {
     public static final int MAX_MEMBERS = 4;
+    public static final int MIN_MEMBERS = 2;
     public static final int MAX_ACTIVE_PARTIES_PER_USER = 10;
 
     @Id
@@ -32,6 +33,9 @@ public class Party extends BaseTimeEntity {
 
     @Column(nullable = false, length = 20)
     private String name;
+
+    @Column(nullable = false)
+    private int maxMembers;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "owner_id", nullable = false)
@@ -47,13 +51,17 @@ public class Party extends BaseTimeEntity {
 
     private Instant closedAt;
 
-    public static Party create(String name, User owner) {
+    public static Party create(String name, User owner, int maxMembers) {
         if (name == null || name.isBlank() || name.length() > 20 || owner == null) {
             throw new IllegalArgumentException(
                     "Party requires a name of 1–20 characters and an owner");
         }
+        if (maxMembers < MIN_MEMBERS || maxMembers > MAX_MEMBERS) {
+            throw new IllegalArgumentException("Party capacity must be between 2 and 4");
+        }
         Party party = new Party();
         party.name = name;
+        party.maxMembers = maxMembers;
         party.owner = owner;
         party.status = PartyStatus.ACTIVE;
         return party;

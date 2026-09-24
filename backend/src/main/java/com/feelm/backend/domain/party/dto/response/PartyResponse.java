@@ -22,7 +22,7 @@ public record PartyResponse(
                 party.getStatus(),
                 AvatarUserSummary.from(party.getOwner(), ownerAvatarUrl),
                 members,
-                Party.MAX_MEMBERS,
+                party.getMaxMembers(),
                 party.getCreatedAt());
     }
 

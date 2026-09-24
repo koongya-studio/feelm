@@ -140,15 +140,15 @@ describe('getParty 조합', () => {
 });
 
 describe('API-049 파티 생성', () => {
-  it('이름만 보낸다. 5.2에서 고른 인원은 요청에 없다', async () => {
+  it('이름과 5.2에서 고른 정원을 보낸다', async () => {
     fetchMock.mockResolvedValue(json(201, party()));
 
-    await createParty('  금요 심야 상영회  ');
+    await createParty('  금요 심야 상영회  ', 2);
 
     const [url, init] = call();
     expect(url).toBe('/api/v1/parties');
     expect(init.method).toBe('POST');
-    expect(JSON.parse(init.body as string)).toEqual({ name: '금요 심야 상영회' });
+    expect(JSON.parse(init.body as string)).toEqual({ name: '금요 심야 상영회', maxMembers: 2 });
   });
 
   it('활성 파티 상한은 계약 코드 그대로 올라간다', async () => {
@@ -159,7 +159,7 @@ describe('API-049 파티 생성', () => {
       }),
     );
 
-    await expect(createParty('새 파티')).rejects.toMatchObject({
+    await expect(createParty('새 파티', 3)).rejects.toMatchObject({
       code: 'ACTIVE_PARTY_LIMIT_REACHED',
     });
   });
