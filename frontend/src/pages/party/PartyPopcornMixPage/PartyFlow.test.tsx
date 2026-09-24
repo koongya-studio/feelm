@@ -29,7 +29,7 @@ import {
 } from '../../../api/parties';
 import { getMyProfile, searchUsers } from '../../../api/users';
 import { mockMyProfile } from '../../../mocks/user';
-import { party, partyPopcorn, partyRecommendations } from '../../../test/party';
+import { ME, member, party, partyPopcorn, partyRecommendations } from '../../../test/party';
 
 /** 서버가 만든 파티 번호. 시험 기본 번호(9001)와 달라야 이 시험이 뜻을 갖는다 */
 const NEW_PARTY_ID = 9137;
@@ -110,7 +110,11 @@ async function pickBuddy() {
 }
 
 describe('파티를 만들고 추천까지', () => {
-  it('새로 만든 파티도 5.9에서 모으고 섞어 5.5에 닿는다. 누를 곳은 파티 시작하기뿐이다', async () => {
+  it('새로 만든 파티는 초대 수락을 기다리고, 참여 확인 뒤 섞어 5.5에 닿는다', async () => {
+    vi.mocked(getParty)
+      .mockResolvedValueOnce(party({ partyId: NEW_PARTY_ID, members: [member(ME, 'OWNER')] }))
+      .mockResolvedValueOnce(party({ partyId: NEW_PARTY_ID, members: [member(ME, 'OWNER')] }))
+      .mockResolvedValue(party({ partyId: NEW_PARTY_ID }));
     renderFlow();
 
     fireEvent.change(screen.getByLabelText('파티 이름'), {
@@ -119,7 +123,19 @@ describe('파티를 만들고 추천까지', () => {
     await pickBuddy();
     fireEvent.click(screen.getByRole('button', { name: '파티 시작하기' }));
 
-    // 5.9 모으기. 따로 된 5.4 화면을 지나지 않는다
+    expect(await screen.findByText('친구가 오면 함께 섞어요')).toBeInTheDocument();
+    expect(screen.getByText('친구, 입장 대기')).toBeInTheDocument();
+    expect(screen.getByText('2명 이상 모이면 자동으로 팝콘을 섞기 시작해요.')).toBeInTheDocument();
+    expect(getPartyRecommendations).not.toHaveBeenCalled();
+    expect(getPartyPopcorn).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '참여 확인하기' }));
+    expect(
+      await screen.findByText('아직 친구가 입장하지 않았어요. 계속 확인하고 있어요.'),
+    ).toBeInTheDocument();
+    expect(getPartyRecommendations).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '참여 확인하기' }));
+
+    // 친구가 들어온 뒤 5.9 모으기. 따로 된 5.4 화면을 지나지 않는다
     expect(await screen.findByText('우리의 취향을 모아요')).toBeInTheDocument();
     expect(screen.getByTestId('location').textContent).toBe(`/parties/${NEW_PARTY_ID}/popcorn/mix`);
     expect(screen.queryByRole('button', { name: '팝콘 섞기' })).not.toBeInTheDocument();
