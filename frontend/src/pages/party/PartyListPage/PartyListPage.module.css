@@ -482,10 +482,12 @@
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scroll-snap-type: x proximity;
+  touch-action: pan-x;
 }
 
 .cardRow > li {
   width: 62%;
+  height: 128px;
   flex: none;
   scroll-snap-align: start;
 }
