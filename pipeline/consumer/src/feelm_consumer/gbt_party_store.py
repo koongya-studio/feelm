@@ -18,6 +18,7 @@ class PublishRejected(RuntimeError):
 
 
 MODEL_GUARD = """
+local metadata_only = false
 if redis.call('GET', KEYS[3]) ~= ARGV[1] then return -1 end
 local value = cjson.decode(ARGV[2])
 local ok, current = pcall(cjson.decode, redis.call('GET', KEYS[2]) or '')
@@ -56,20 +57,28 @@ if old then
   if left == right then
     for _, field in ipairs({'partyId', 'inputId', 'modelVersion', 'servingRevision',
                            'algorithmVersion', 'generatedAt'}) do
-      if previous[field] ~= value[field] then return -7 end
+      if not (metadata_only and (field == 'modelVersion' or field == 'servingRevision'))
+        and previous[field] ~= value[field] then return -7 end
     end
     if a['timestampMs'] ~= b['timestampMs'] then return -7 end
     if previous['status'] ~= 'OK' or type(previous['candidates']) ~= 'table'
       or #previous['candidates'] < 1 or #previous['candidates'] > 500 then return -6 end
     -- Repairs are protected by the same model, ownership and both source guards as publication.
-    redis.call('SET', KEYS[1], old)
-    redis.call('SET', KEYS[4], old)
+    if not metadata_only then
+      redis.call('SET', KEYS[1], old)
+      redis.call('SET', KEYS[4], old)
+    end
     return old
   end
 end
 """
 
 REPLAY_LUA = MODEL_GUARD + SOURCE_GUARD + "return false"
+REPLAY_METADATA_LUA = """
+local metadata_only = true
+if redis.call('GET', KEYS[3]) ~= ARGV[1] then return -1 end
+local value = cjson.decode(ARGV[2])
+""" + SOURCE_GUARD + "return false"
 PUBLISH_LUA = MODEL_GUARD + SOURCE_GUARD + """
 if value['status'] ~= 'OK' or type(value['candidates']) ~= 'table'
   or #value['candidates'] < 1 or #value['candidates'] > 500 then return -6 end
@@ -142,8 +151,19 @@ class PartyStore:
         return self._result(result)
 
     def replay(self, identity: dict, partition_fence: tuple[str, str]) -> dict | None:
+        return self._replay(identity, partition_fence, REPLAY_LUA)
+
+    def replay_metadata(self, identity: dict, partition_fence: tuple[str, str]) -> dict | None:
+        """Read a same-source success without repairing keys or trusting current-model guesses.
+
+        The caller must validate inputId with this metadata and call guarded replay
+        before using the saved result or acknowledging the source record.
+        """
+        return self._replay(identity, partition_fence, REPLAY_METADATA_LUA)
+
+    def _replay(self, identity, partition_fence, script):
         key, token = self._fence(partition_fence)
-        result = self.client.eval(REPLAY_LUA, 4, f"feelm:party:{identity['partyId']}:gbt-outcome",
+        result = self.client.eval(script, 4, f"feelm:party:{identity['partyId']}:gbt-outcome",
                                   "feelm:model:current", key, f"feelm:party:{identity['partyId']}:candidates",
                                   token, canonical(identity))
         if result is None:

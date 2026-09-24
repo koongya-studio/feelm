@@ -8,8 +8,14 @@ import pytest
 from feelm_consumer.party_events import PartyEventValidationError, parse_party_refresh
 
 SHARED_V2_FIXTURE = Path(__file__).parent / "fixtures/party-refresh-v2.json"
+SHARED_GBT_REFERENCE_FIXTURE = (
+    Path(__file__).parent / "fixtures/party-refresh-gbt-reference.json"
+)
 PARTY_REFRESH_V2_FIXTURE_SHA256 = (
     "99f9260db317b52d69ef22a8b54e626bcc256cb85184f7371ed170a803de79f5"
+)
+PARTY_REFRESH_GBT_FIXTURE_SHA256 = (
+    "a7fc8391f3aee22da1a65bf4218c242b43b161f72a780caca2c9f7e93ddcfa6a"
 )
 
 
@@ -43,6 +49,46 @@ def test_accepts_gbt_input_reference_payload_without_vectors() -> None:
     assert result.members[0].generation_id == "g1"
     assert result.members[0].input_hash == "sha256:" + "a" * 64
     assert not hasattr(result.members[0], "vector")
+
+
+def test_gbt_reference_fixture_has_db_compatible_wire_shape_and_stable_input_id() -> None:
+    fixture = SHARED_GBT_REFERENCE_FIXTURE.read_bytes()
+    # Consumer CI/image contains only src/ and tests/. Compare both copies when
+    # running from the monorepo, and always verify the pinned consumer bytes below.
+    parents = Path(__file__).resolve().parents
+    if len(parents) > 3 and (parents[3] / "backend").is_dir():
+        backend_fixture = (
+            parents[3] / "backend/src/test/resources/contracts/party-refresh-gbt-reference.json"
+        ).read_bytes()
+        assert fixture == backend_fixture
+    assert hashlib.sha256(fixture).hexdigest() == PARTY_REFRESH_GBT_FIXTURE_SHA256
+
+    body = json.loads(fixture)
+    assert set(body) == {"partyId", "inputId", "members"}
+    assert set(body["members"][0]) == {
+        "userId",
+        "generationId",
+        "inputSchemaVersion",
+        "inputHash",
+        "candidateMovieIds",
+    }
+
+    digest = hashlib.sha256(pack(">q", body["partyId"]))
+
+    def update(value: str) -> None:
+        encoded = value.encode("utf-8")
+        digest.update(pack(">i", len(encoded)))
+        digest.update(encoded)
+
+    update("gbt-v26")
+    digest.update(pack(">i", 2))
+    update("serving-r1")
+    for member in body["members"]:
+        digest.update(pack(">q", member["userId"]))
+        update(member["generationId"])
+        update(member["inputSchemaVersion"])
+        update(member["inputHash"])
+    assert body["inputId"] == "sha256:" + digest.hexdigest()
 
 
 @pytest.mark.parametrize(
