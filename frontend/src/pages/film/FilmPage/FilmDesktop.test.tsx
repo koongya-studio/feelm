@@ -234,7 +234,10 @@ describe('FilmPage 데스크톱 시안', () => {
 
     await screen.findByRole('heading', { name: '오늘의 추천' });
 
-    expect(screen.queryByRole('button', { name: '필름 늘리기' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '본 영화 평가하기' })).toHaveAttribute(
+      'href',
+      '/search',
+    );
     expect(screen.queryByText('옆으로 넘겨보세요')).not.toBeInTheDocument();
     // 본문의 팝콘 줄. 같은 내용이 우측 카드로 갔다
     expect(screen.queryByTestId('popcorn-summary-kernels')).not.toBeInTheDocument();
@@ -261,10 +264,11 @@ describe('FilmPage 데스크톱 시안', () => {
     expect(getWatchRecords).not.toHaveBeenCalled();
   });
 
-  it('412px에서는 지금까지의 화면 그대로다', async () => {
+  it('412px에서는 평가와 추천 버튼을 나란히 제공한다', async () => {
     renderFilm(412);
 
-    expect(await screen.findByRole('button', { name: '필름 늘리기' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: '본 영화 평가하기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '영화 추천받기' })).toBeInTheDocument();
     expect(screen.getByTestId('popcorn-summary-kernels')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '오늘의 추천' })).not.toBeInTheDocument();
 

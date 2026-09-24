@@ -4,7 +4,7 @@
  * 구성은 사용자 시안 2026-09-17(업무 -458)을 따른다. 시안이 이 화면에 요구하는 것은
  * 하나다. **필름이 화면의 중심이고, 정보와 카드는 그 아래로 물러난다.**
  *
- * 공통 헤더(워드마크 · 검색 · 알림, `AppHeader`) / 제목 / 필름 / 팝콘 요약 / 취향 리포트 / 필름 늘리기
+ * 공통 헤더(워드마크 · 검색 · 알림, `AppHeader`) / 제목 / 필름 / 팝콘 요약 / 취향 리포트 / 평가·추천 진입점
  *
  * 이전 구성에서 바뀐 것
  * - 필름이 밝은 반투명 판(`FilmStrip` paper)에서 **검정에 주황빛이 도는 반투명 릴**로
@@ -14,8 +14,8 @@
  *   바꿨다. 분포는 3.2가 보여주는 화면이고 여기서는 "얼마나 모였나"만 말한다
  * - 팝콘을 색 점이 아니라 3D 스프라이트로 그린다. 8색은 밝은 면에서 4종이 판별되지
  *   않아(`design-concept.md` 2.5) 밝은 벽 위 요약에 색 점을 쓸 수 없다
- * - **주 버튼이 `필름 늘리기`다.** 이전에는 리포트가 검정 알약이고 필름 늘리기가 글자
- *   버튼이었다. 시안은 다음 영화를 만나는 것을 이 화면의 주 동작으로 본다
+ * - 평가와 추천을 명확히 나눈다(업무 -885). 모바일은 두 버튼을 나란히 놓고,
+ *   데스크톱은 제목 줄의 평가 버튼과 아래 오늘의 추천을 함께 보여준다
  * - 리포트는 작은 메뉴 줄로 내렸다
  * - 주 버튼이 로고와 같은 빨강이다(`Button` brand). 이 화면과 2.4만 쓴다
  *
@@ -37,8 +37,8 @@
  *   것(API-045)이며, 시안이 그 앞자리 몇 장을 여기서 먼저 보여준다
  * - 팝콘 요약 · 취향 리포트 줄이 우측 보조 패널로 간다(`FilmAside`). 본문에서는 뺀다 —
  *   같은 것을 두 자리에 두면 무엇을 눌러야 하는지가 흐려진다
- * - **`필름 늘리기` 버튼과 `옆으로 넘겨보세요` 힌트를 넓은 화면에서 뺀다**(사용자 결정
- *   2026-09-22). 시안에 없고, 2.2로 가는 길은 `오늘의 추천`의 `맞춤 N : 확장 M`이 맡는다.
+ * - **모바일의 행동 버튼과 `옆으로 넘겨보세요` 힌트를 넓은 화면에서 뺀다**(사용자 결정
+ *   2026-09-22). 2.2로 가는 길은 `오늘의 추천`의 `맞춤 N : 확장 M`이 맡는다.
  *   마우스로 끄는 것과 좌우 화살표가 있어 넘기는 방법도 힌트 없이 드러난다
  *
  * **필름을 끝까지 넘기면 다음 장을 이어 받는다**(업무 -656). API-042는 한 장에 20개를 주고
@@ -47,7 +47,7 @@
  * (4.2 검색과 같은 방식 — `IntersectionObserver`, 실패 뒤와 관찰이 안 되는 환경은 버튼).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import AppHeader from '../../../components/AppHeader';
 import Button from '../../../components/Button';
 import DesktopAside from '../../../components/DesktopAside';
@@ -74,7 +74,7 @@ import type { FrameList, PopcornBucket } from '../../../types/taste';
  * 두 칸 반이 보이는 값이라, 오른쪽이 잘린 모습이 "더 있다"를 말해 준다.
  *
  * 높이는 375×812에서 이 화면 전체가 스크롤 없이 들어오는 상한이다. 측정해서 맞췄고
- * (본문 632px), 여기서 더 키우면 `필름 늘리기`가 하단 내비 밑으로 내려간다.
+ * (본문 632px), 여기서 더 키우면 행동 버튼이 하단 내비 밑으로 내려간다.
  */
 const FRAME_WIDTH = 110;
 const FRAME_HEIGHT = 165;
@@ -358,6 +358,12 @@ export default function FilmPage() {
               ) : null}
             </div>
 
+            {!isEmpty ? (
+              <Link to={path.search()} className={styles.desktopRate}>
+                본 영화 평가하기
+              </Link>
+            ) : null}
+
             {!isEmpty && items.length > 1 ? (
               <div className={styles.pager}>
                 <button
@@ -499,11 +505,15 @@ export default function FilmPage() {
         {isEmpty ? (
           <div className={styles.empty}>
             <h3 className={styles.emptyTitle}>아직 필름에 담긴 영화가 없어요</h3>
-            <p className={styles.emptyText}>영화를 만나며 취향 필름을 채워보세요</p>
-
-            <Button variant="brand" onClick={() => void navigate(path.recommendations())}>
-              추천 영화 둘러보기
-            </Button>
+            <p className={styles.emptyText}>본 영화를 평가하면 필름에 한 장씩 추가돼요</p>
+            <div className={styles.actionButtons}>
+              <Button variant="brand" onClick={() => void navigate(path.search())}>
+                본 영화 평가하기
+              </Button>
+              <Button variant="secondary" onClick={() => void navigate(path.recommendations())}>
+                영화 추천받기
+              </Button>
+            </div>
           </div>
         ) : desktop ? (
           <TodayRecommendations />
@@ -587,16 +597,17 @@ export default function FilmPage() {
               <span className={styles.reportText}>지금까지 본 영화로 만든 나만의 취향 분석</span>
             </button>
 
-            {/*
-             * 이 화면의 주 동작. 다음 영화를 만나는 것이 필름을 늘리는 유일한 길이다.
-             * **홈에서 오늘의 추천을 빼면서 이 자리가 2.2로 가는 상시 진입점이 됐다**(업무 -461).
-             */}
+            {/* 검색에서 본 영화를 골라 평가하고, 추천은 기존 2.2로 보낸다(업무 -885). */}
             <div className={styles.action}>
-              <p className={styles.actionHint}>다음 영화를 추천받아요</p>
-
-              <Button variant="brand" onClick={() => void navigate(path.recommendations())}>
-                필름 늘리기
-              </Button>
+              <p className={styles.actionHint}>본 영화를 평가하면 필름에 한 장씩 추가돼요</p>
+              <div className={styles.actionButtons}>
+                <Button variant="brand" onClick={() => void navigate(path.search())}>
+                  본 영화 평가하기
+                </Button>
+                <Button variant="secondary" onClick={() => void navigate(path.recommendations())}>
+                  영화 추천받기
+                </Button>
+              </div>
             </div>
           </div>
         )}

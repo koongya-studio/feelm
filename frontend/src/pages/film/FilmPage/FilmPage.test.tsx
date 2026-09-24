@@ -99,15 +99,16 @@ describe('FilmPage', () => {
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
   });
 
-  it('프레임이 0개면 빈 상태와 추천 영화 보기를 보여준다', async () => {
+  it('프레임이 0개여도 평가와 추천으로 바로 갈 수 있다', async () => {
     vi.mocked(getMyFrames).mockResolvedValue(frameList(0, 0));
     vi.mocked(getPopcornBucket).mockResolvedValue(bucket);
 
     renderWithRouter(<FilmPage />);
 
     expect(await screen.findByText('아직 필름에 담긴 영화가 없어요')).toBeInTheDocument();
-    expect(screen.getByText('영화를 만나며 취향 필름을 채워보세요')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '추천 영화 둘러보기' })).toBeInTheDocument();
+    expect(screen.getByText('본 영화를 평가하면 필름에 한 장씩 추가돼요')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '본 영화 평가하기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '영화 추천받기' })).toBeInTheDocument();
 
     // 빈 상태에서도 필름은 자리를 지킨다. 채울 칸이 남았다는 것을 보여주는 화면이다
     expect(screen.getByText('첫 번째 프레임')).toBeInTheDocument();
@@ -178,15 +179,18 @@ describe('FilmPage', () => {
    * 상시 진입점이 됐다.** 전에는 프레임 0개인 빈 상태에만 있던 길이다. 이 버튼이
    * 사라지면 추천 화면이 앱에서 고아가 되므로 시험으로 잡는다.
    */
-  it('프레임이 있어도 필름 늘리기로 추천에 갈 수 있다', async () => {
+  it('프레임이 있어도 평가와 추천에 각각 갈 수 있다', async () => {
     vi.mocked(getMyFrames).mockResolvedValue(frameList(3));
     vi.mocked(getPopcornBucket).mockResolvedValue(bucket);
 
     renderWithRouter(<FilmPage />);
 
-    expect(await screen.findByRole('button', { name: '필름 늘리기' })).toBeInTheDocument();
-    // 빈 상태의 길은 프레임이 있으면 나오지 않는다
-    expect(screen.queryByRole('button', { name: '추천 영화 둘러보기' })).not.toBeInTheDocument();
+    const rate = await screen.findByRole('button', { name: '본 영화 평가하기' });
+    const recommend = screen.getByRole('button', { name: '영화 추천받기' });
+    fireEvent.click(rate);
+    expect(screen.getByTestId('location')).toHaveTextContent('/search');
+    fireEvent.click(recommend);
+    expect(screen.getByTestId('location')).toHaveTextContent('/recommendations');
   });
 });
 
