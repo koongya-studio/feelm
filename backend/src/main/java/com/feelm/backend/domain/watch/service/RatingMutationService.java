@@ -1,5 +1,6 @@
 package com.feelm.backend.domain.watch.service;
 
+import com.feelm.backend.domain.taste.service.TasteAnalysisWriter;
 import com.feelm.backend.domain.watch.dto.request.RatingUpdateRequest;
 import com.feelm.backend.domain.watch.dto.response.RatingCreateResponse;
 import com.feelm.backend.domain.watch.dto.response.RatingCreateResponse.Frame;
@@ -30,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class RatingMutationService {
 
     private final RatingCommandRepository repository;
+    private final TasteAnalysisWriter tasteAnalysisWriter;
     private final KafkaEventPublisher eventPublisher;
     private final Clock clock;
 
@@ -51,6 +53,8 @@ public class RatingMutationService {
                     request.spoiler(),
                     updatedAt);
             repository.refreshMovieRatingAggregate(target.movie().movieId());
+            // 값이 바뀐 경우에만 돈다. 값이 같으면 집계 결과도 같아 다시 계산할 이유가 없다.
+            tasteAnalysisWriter.refresh(userId, updatedAt);
             eventPublisher.publish(
                     KafkaEventType.RATING,
                     userId,
@@ -85,6 +89,8 @@ public class RatingMutationService {
                     target.rating().watchRecordId(), userId, target.movie().movieId());
         }
         repository.refreshMovieRatingAggregate(target.movie().movieId());
+        // 마지막 평가를 지우면 캐시 행도 사라진다(API-040).
+        tasteAnalysisWriter.refresh(userId, Instant.now(clock).truncatedTo(ChronoUnit.MICROS));
         eventPublisher.publish(
                 KafkaEventType.RATING,
                 userId,
