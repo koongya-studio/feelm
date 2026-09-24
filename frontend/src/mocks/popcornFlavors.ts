@@ -17,56 +17,56 @@ export const mockPopcornFlavors: PopcornFlavor[] = [
   {
     code: 'FLAVOR_A',
     displayName: '오리지널 솔트',
-    color: '#F0D8B4', // 아이보리 알맹이, 버터빛 속살
+    color: '#F3DFB2', // 아이보리 알맹이, 버터빛 속살
     description: '있었던 일을 그대로 담은 이야기에 끌려요',
     sortOrder: 1,
   },
   {
     code: 'FLAVOR_B',
     displayName: '다크초코',
-    color: '#3C2418', // 윗부분만 다크 초콜릿에 담근 초코송이 스타일
+    color: '#5A3623', // 윗부분만 다크 초콜릿에 담근 초코송이 스타일
     description: '서늘하고 낯선 세계를 즐겨요',
     sortOrder: 2,
   },
   {
     code: 'FLAVOR_C',
     displayName: '솔티카라멜',
-    color: '#B46C24', // 윤기 나는 카라멜 글레이즈와 소금 결정
+    color: '#CF8F4A', // 윤기 나는 카라멜 글레이즈와 소금 결정
     description: '웃기면서 씁쓸한 관계 이야기를 봐요',
     sortOrder: 3,
   },
   {
     code: 'FLAVOR_D',
     displayName: '피스타치오',
-    color: '#B4B46C', // 연두색 피스타치오 코팅
+    color: '#D6CF9C', // 연두색 피스타치오 코팅
     description: '사람과 시대를 깊게 들여다봐요',
     sortOrder: 4,
   },
   {
     code: 'FLAVOR_E',
     displayName: '쿠키앤크림',
-    color: '#E4D8B4', // 크림 코팅에 박힌 쿠키 조각
+    color: '#F0E7D3', // 크림 코팅에 박힌 쿠키 조각
     description: '쫓고 쫓기는 긴장감을 즐겨요',
     sortOrder: 5,
   },
   {
     code: 'FLAVOR_F',
     displayName: '체다치즈',
-    color: '#D87824', // 보송한 체다 파우더, 깊은 속살만 크림색
+    color: '#E6AA52', // 보송한 체다 파우더, 깊은 속살만 크림색
     description: '가볍게 웃고 기분 좋아지는 영화를 봐요',
     sortOrder: 6,
   },
   {
     code: 'FLAVOR_G',
     displayName: '스트로베리',
-    color: '#D89C9C', // 딸기 코팅과 과육 조각
+    color: '#E7A79E', // 딸기 코팅과 과육 조각
     description: '상상으로 그린 세계를 여행해요',
     sortOrder: 7,
   },
   {
     code: 'FLAVOR_H',
     displayName: '블루베리',
-    color: '#A890B4', // 블루베리 스월과 마카롱 조각
+    color: '#B78A96', // 블루베리 스월과 마카롱 조각
     description: '크고 시원한 모험에 빠져요',
     sortOrder: 8,
   },

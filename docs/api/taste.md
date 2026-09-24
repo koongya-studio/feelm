@@ -148,7 +148,7 @@
     {
       "flavorCode": "FLAVOR_A",
       "displayName": "오리지널 솔트",
-      "color": "#F0D8B4",
+      "color": "#F3DFB2",
       "popcornCount": 12,
       "averageScore": 4.4,
       "discoveredAt": "2026-07-01T00:00:00Z"
@@ -370,7 +370,7 @@ S15P21E106-439의 고정 `taste_id` 0~7에 대응하는 8개 팝콘 맛의 코�
     {
       "code": "FLAVOR_A",
       "displayName": "오리지널 솔트",
-      "color": "#F0D8B4",
+      "color": "#F3DFB2",
       "sortOrder": 1
     }
   ]
@@ -389,14 +389,14 @@ S15P21E106-439의 고정 `taste_id` 0~7에 대응하는 8개 팝콘 맛의 코�
 
 | 내부 taste_id | code | displayName | color |
 |---:|---|---|---|
-| 0 | `FLAVOR_A` | 오리지널 솔트 | `#F0D8B4` |
-| 1 | `FLAVOR_B` | 다크초코 | `#3C2418` |
-| 2 | `FLAVOR_C` | 솔티카라멜 | `#B46C24` |
-| 3 | `FLAVOR_D` | 피스타치오 | `#B4B46C` |
-| 4 | `FLAVOR_E` | 쿠키앤크림 | `#E4D8B4` |
-| 5 | `FLAVOR_F` | 체다치즈 | `#D87824` |
-| 6 | `FLAVOR_G` | 스트로베리 | `#D89C9C` |
-| 7 | `FLAVOR_H` | 블루베리 | `#A890B4` |
+| 0 | `FLAVOR_A` | 오리지널 솔트 | `#F3DFB2` |
+| 1 | `FLAVOR_B` | 다크초코 | `#5A3623` |
+| 2 | `FLAVOR_C` | 솔티카라멜 | `#CF8F4A` |
+| 3 | `FLAVOR_D` | 피스타치오 | `#D6CF9C` |
+| 4 | `FLAVOR_E` | 쿠키앤크림 | `#F0E7D3` |
+| 5 | `FLAVOR_F` | 체다치즈 | `#E6AA52` |
+| 6 | `FLAVOR_G` | 스트로베리 | `#E7A79E` |
+| 7 | `FLAVOR_H` | 블루베리 | `#B78A96` |
 
 표시명·색상은 기준정보 수정으로 바꿀 수 있지만 `code`와 내부 `taste_id` 순서의 대응은 바꾸지 않는다.
 `taste_id=7`은 서비스에 반영된 영화 기준 장르 믹스이며 장르 근거 부족을 뜻하지 않는다.
