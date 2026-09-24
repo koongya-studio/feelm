@@ -534,6 +534,46 @@ class RedisRecommendationCandidateReaderTest {
     }
 
     @Test
+    @DisplayName("GBT evidence v2의 허용된 구체 장르와 원천 영화 필드를 보존한다")
+    void readsBoundGbtEvidenceV2SpecificSources() {
+        when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r1"));
+        when(values.get("feelm:user:10:recommendation-state")).thenReturn(gbtState("g1", HASH));
+        when(values.get("feelm:user:10:candidates")).thenReturn(gbtCandidates("g1", HASH));
+        when(values.get("feelm:user:10:gbt-evidence:g1")).thenReturn(gbtEvidenceV2("g1", HASH));
+
+        var reason = reader.read(10).items().getFirst().reason();
+        var entries = reason.path("evidence").path("item").path("evidence");
+
+        assertThat(reason.path("explanationVersion").textValue())
+                .isEqualTo("gbt-feature-attribution-v2");
+        assertThat(entries.get(0).path("genreCode").textValue()).isEqualTo("TMDB_53");
+        assertThat(entries.get(1).path("sourceMovieId").longValue()).isEqualTo(55);
+    }
+
+    @Test
+    @DisplayName("GBT evidence v2의 허용되지 않은 구체 출처는 Candidate를 유지하고 버린다")
+    void rejectsInvalidGbtEvidenceV2SpecificSources() {
+        when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r1"));
+        when(values.get("feelm:user:10:recommendation-state")).thenReturn(gbtState("g1", HASH));
+        when(values.get("feelm:user:10:candidates")).thenReturn(gbtCandidates("g1", HASH));
+        String valid = gbtEvidenceV2("g1", HASH);
+        for (String malformed :
+                List.of(
+                        valid.replace("TMDB_53", "THRILLER"),
+                        valid.replace("TMDB_53", "TMDB_28"),
+                        valid.replace("\"sourceMovieId\":55", "\"sourceMovieId\":0"),
+                        valid.replace("\"contribution\":0.4", "\"contribution\":0.2"),
+                        valid.replace(
+                                "\"group\":\"CONTENT_RELATION\"", "\"group\":\"RATING_PATTERN\""),
+                        valid.replace(
+                                "\"genreCode\":\"TMDB_53\"",
+                                "\"genreCode\":\"TMDB_53\",\"unexpected\":true"))) {
+            when(values.get("feelm:user:10:gbt-evidence:g1")).thenReturn(malformed);
+            assertEvidenceIgnored();
+        }
+    }
+
+    @Test
     @DisplayName("evidence가 없거나 버전이 다르면 Candidate는 유지하고 GBT 설명 근거만 비운다")
     void ignoresMissingOrVersionMismatchedEvidence() {
         when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r1"));
@@ -703,6 +743,30 @@ class RedisRecommendationCandidateReaderTest {
                      "direction":"POSITIVE","contribution":0.4,"coverage":0.7}]}]}
                 """
                 .formatted(generation, inputHash, "c".repeat(64));
+    }
+
+    private static String gbtEvidenceV2(String generation, String inputHash) {
+        return """
+                {"evidenceSchemaVersion":"gbt-evidence-v2",
+                 "explanationVersion":"gbt-feature-attribution-v2","userId":10,
+                 "generationId":"%s","modelVersion":"gbt-v26",
+                 "servingRevision":"serving-r1",
+                 "featureVersion":"v26-max70-kobis-flag-71-v1",
+                 "rankingVersion":"gbt-personal-raw-score-v1","inputVersion":"%s",
+                 "candidateVersion":6,"items":[{"movieId":101,"score":4.2,
+                   "coverage":0.7,"evidence":[{
+                     "evidenceId":"sha256:%s","group":"GENRE_PATTERN",
+                     "direction":"POSITIVE","contribution":0.4,"coverage":0.4,
+                     "genreCode":"TMDB_53"},{
+                     "evidenceId":"sha256:%s","group":"CONTENT_RELATION",
+                     "direction":"POSITIVE","contribution":0.3,"coverage":0.3,
+                     "sourceMovieId":55}]}]}
+                """
+                .formatted(
+                        generation,
+                        inputHash,
+                        "82211a19e9405804bf5d90912454215795e3a88dca410ed9b7bebf7f6c35cf84",
+                        "562d59adbc18f27a129439452741343e6a918f3a8fb279cf077f7c8050cfcf06");
     }
 
     private void assertEvidenceIgnored() {

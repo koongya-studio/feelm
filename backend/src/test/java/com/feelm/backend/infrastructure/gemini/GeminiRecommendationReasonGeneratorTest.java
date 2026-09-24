@@ -102,6 +102,43 @@ class GeminiRecommendationReasonGeneratorTest {
 
     @Test
     @SuppressWarnings("unchecked")
+    void acceptsVerifiedSpecificSentenceAndRejectsInventedMovie() throws Exception {
+        String id = "sha256:" + "a".repeat(64);
+        GbtRecommendationReasonPrompt prompt =
+                new GbtRecommendationReasonPrompt(
+                        1,
+                        "gbt-feature-attribution-v2",
+                        List.of(
+                                new Evidence(
+                                        id,
+                                        "CONTENT_RELATION",
+                                        "선호 콘텐츠와의 연관성",
+                                        "\"스파이더맨\"을 재미있게 봐서 골랐어요.")));
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body())
+                .thenReturn(
+                        outerBody(
+                                "{\"reasons\":[{\"itemId\":1,\"summary\":\"\\\"스파이더맨\\\"을 재미있게 봐서 골랐어요.\",\"usedEvidenceIds\":[\""
+                                        + id
+                                        + "\"]}]}"))
+                .thenReturn(
+                        outerBody(
+                                "{\"reasons\":[{\"itemId\":1,\"summary\":\"\\\"배트맨\\\"을 재미있게 봐서 골랐어요.\",\"usedEvidenceIds\":[\""
+                                        + id
+                                        + "\"]}]}"));
+        when(client.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenReturn(response);
+
+        assertThat(generator.generateGbtReasons(List.of(prompt)))
+                .containsEntry(
+                        1L,
+                        new GbtRecommendationReasonResult("\"스파이더맨\"을 재미있게 봐서 골랐어요.", List.of(id)));
+        assertThat(generator.generateGbtReasons(List.of(prompt))).isEmpty();
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
     void rejectsUnknownEvidenceAndUnsupportedClaims() throws Exception {
         SimpleMeterRegistry metrics = new SimpleMeterRegistry();
         GeminiRecommendationReasonGenerator grounded = generator(metrics);

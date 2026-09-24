@@ -21,6 +21,8 @@ from feelm_consumer.gbt_evidence import (
     AttributionBuilder,
     _candidate_evidence,
     _feature_group,
+    _specific_evidence,
+    empty_evidence,
     validate_evidence,
 )
 from feelm_consumer.gbt_personal import PersonalScorer
@@ -69,8 +71,9 @@ def test_evidence_versions_groups_and_replay_are_deterministic(scorer):
         assert len(item["evidence"]) <= 3
         assert item["coverage"] == pytest.approx(sum(entry["coverage"] for entry in item["evidence"]))
         assert all(entry["group"] in GROUPS and entry["direction"] == "POSITIVE" for entry in item["evidence"])
-        assert all(set(entry) == {"evidenceId", "group", "direction", "contribution", "coverage"}
-                   for entry in item["evidence"])
+        required = {"evidenceId", "group", "direction", "contribution", "coverage"}
+        allowed = required | {"genreCode", "sourceMovieId"}
+        assert all(required <= set(entry) <= allowed for entry in item["evidence"])
 
     changed = PersonalScorer(scorer).calculate(snapshot(scorer, [(1, 4)], generation="changed"))
     first_ids = [entry["evidenceId"] for item in first["items"] for entry in item["evidence"]]
@@ -137,6 +140,58 @@ def test_mixed_contributions_have_deterministic_ties_top3_and_coverage(scorer):
     assert item["coverage"] == pytest.approx(10.0 / 22.0)
     assert [entry["coverage"] for entry in item["evidence"]] == pytest.approx([4 / 22, 3 / 22, 3 / 22])
     assert not any(name in json.dumps(item) for name in assigned)
+
+
+def test_specific_genre_and_source_require_traceable_positive_rating(scorer, monkeypatch):
+    contributions = np.zeros(len(FEATURES), np.float64)
+    contributions[FEATURES.index("country_genre_pos_log1p")] = 2.0
+    contributions[FEATURES.index("collection_pos_log1p")] = 1.0
+    specifics = _specific_evidence(
+        scorer.features, 11, [(2, 3.5), (1, 4.0)], contributions
+    )
+    assert specifics == {
+        "GENRE_PATTERN": ("TMDB_16", None),
+        "CONTENT_RELATION": (None, 1),
+    }
+    assert _specific_evidence(scorer.features, 11, [(1, 3.5)], contributions) == {}
+    assert _specific_evidence(scorer.features, 11, [], contributions) == {}
+    # 같은 장르만으로는 country|genre 결합 입력의 근거가 아니다.
+    assert _specific_evidence(scorer.features, 11, [(3, 5.0)], contributions) == {}
+
+    axes = list(scorer.features.axes)
+    candidate_axes = list(axes[scorer.features.positions[11]])
+    candidate_axes[3] = None
+    axes[scorer.features.positions[11]] = tuple(candidate_axes)
+    monkeypatch.setattr(scorer.features, "axes", axes)
+    assert _specific_evidence(scorer.features, 11, [(1, 4.0)], contributions) == {
+        "CONTENT_RELATION": (None, 1)
+    }
+
+    value = snapshot(scorer, [(1, 4.0)])
+    item = _candidate_evidence(value, 11, 1.5, contributions, specifics).to_payload()
+    by_group = {entry["group"]: entry for entry in item["evidence"]}
+    assert by_group["GENRE_PATTERN"]["genreCode"] == "TMDB_16"
+    assert by_group["CONTENT_RELATION"]["sourceMovieId"] == 1
+    assert "genre_ids" not in json.dumps(item)
+    assert "director_ids" not in json.dumps(item)
+
+    without_specifics = _candidate_evidence(value, 11, 1.5, contributions).to_payload()
+    assert {
+        entry["evidenceId"] for entry in item["evidence"]
+    }.isdisjoint(entry["evidenceId"] for entry in without_specifics["evidence"])
+
+    payload = empty_evidence(value).to_payload()
+    payload["items"] = [item]
+    validate_evidence(payload, snapshot=value, candidates=[11], scores=[1.5])
+    tampered = copy.deepcopy(payload)
+    tampered["items"][0]["evidence"][0]["genreCode"] = "TMDB_53"
+    with pytest.raises(GbtError, match="INVALID_EVIDENCE_ENTRY"):
+        validate_evidence(tampered, snapshot=value, candidates=[11], scores=[1.5])
+
+    unrelated = np.zeros(len(FEATURES), np.float64)
+    unrelated[FEATURES.index("country_genre_neg_log1p")] = 2.0
+    unrelated[FEATURES.index("strict_negative_series")] = 1.0
+    assert _specific_evidence(scorer.features, 11, [(1, 4.0)], unrelated) == {}
 
 
 def test_k0_and_exhausted_have_no_gbt_attribution(scorer):
@@ -256,7 +311,7 @@ def test_invalid_attribution_matrix_fails_closed(scorer, monkeypatch, attack, er
 
 def test_backend_handoff_fixture_passes_strict_validator(scorer):
     value = snapshot(scorer, [(1, 1.0)], dismissed=[2], watched=range(6, 1006))
-    payload = json.loads((Path(__file__).parent / "fixtures/gbt-evidence-v1.json").read_text())
+    payload = json.loads((Path(__file__).parent / "fixtures/gbt-evidence-v2.json").read_text())
     candidates = [item["movieId"] for item in payload["items"]]
     scores = [item["score"] for item in payload["items"]]
     validate_evidence(payload, snapshot=value, candidates=candidates, scores=scores)

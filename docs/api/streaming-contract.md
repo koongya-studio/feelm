@@ -577,8 +577,8 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
 
 ```json
 {
-  "evidenceSchemaVersion": "gbt-evidence-v1",
-  "explanationVersion": "gbt-feature-attribution-v1",
+  "evidenceSchemaVersion": "gbt-evidence-v2",
+  "explanationVersion": "gbt-feature-attribution-v2",
   "userId": 1024,
   "generationId": "550e8400-e29b-41d4-a716-446655440000",
   "modelVersion": "gbt-v26-20260923",
@@ -596,7 +596,15 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
       "group": "GENRE_PATTERN",
       "direction": "POSITIVE",
       "contribution": 0.41,
-      "coverage": 0.73
+      "coverage": 0.43,
+      "genreCode": "TMDB_53"
+    }, {
+      "evidenceId": "sha256:<version-bound-evidence-digest>",
+      "group": "CONTENT_RELATION",
+      "direction": "POSITIVE",
+      "contribution": 0.29,
+      "coverage": 0.30,
+      "sourceMovieId": 550
     }]
   }]
 }
@@ -611,13 +619,19 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
 - 허용 그룹은 `GENRE_PATTERN`, `RATING_PATTERN`, `CONTENT_RELATION`, `POPULARITY_SIGNAL`,
   `AUDIENCE_RATING_SIGNAL`뿐이다. `direction`은 `POSITIVE`, 후보별 evidence는 최대 3개다. contribution은
   양의 유한 수, 각 coverage와 합계 coverage는 0~1 유한 수이며 evidence ID와 그룹은 후보 안에서 유일하다.
+- v2의 `genreCode`는 `GENRE_PATTERN`에만 선택적으로 존재하며 `TMDB_<양의 TMDb 장르 ID>` 형식이다.
+  `sourceMovieId`는 `CONTENT_RELATION`에만 선택적으로 존재하는 양의 서비스 영화 ID다. 둘은 실제 4.0 이상
+  평가와 후보의 추적 가능한 양의 모델 입력 관계에서만 생성하고 evidence ID 해시에 포함한다. 다른 그룹,
+  관심없음, 4.0 미만 평가에는 넣지 않는다. v1 항목에는 두 필드가 없어야 한다.
 - 입력 snapshot·상태·Candidate·evidence는 같은 fenced Lua에서 함께 기록한다. 같은 generation의 기존
   evidence 바이트가 다르면 immutable publication conflict로 거부한다. 새 generation 게시 시 직전 evidence는
   직전 입력 snapshot과 같은 TTL을 부여하고 현재 evidence에는 TTL을 두지 않는다. 같은 Lua는
   `gbt-evidence-current` identity 포인터도 갱신하여 input head·상태·Candidate가 부분 유실돼 evidence만
   남은 경우에도 직전 generation을 복구하고 보존 TTL을 적용한다.
-- 실제 알고리즘·feature 그룹·ID·coverage 정의는
-  [`gbt-model-artifacts-v1 §4.1`](../../pipeline/contracts/gbt-model-artifacts.md#41-gbt-local-attribution-근거-v1-s15p21e106-824)을 따른다.
+- 실제 알고리즘·feature 그룹·ID·coverage와 구체 출처 정의는
+  [`gbt-model-artifacts-v1 §4.1~4.2`](../../pipeline/contracts/gbt-model-artifacts.md#42-gbt-구체-표시-근거-v2-s15p21e106-840)을 따른다.
+  Backend는 먼저 strict v1/v2를 함께 수용하고 Pipeline은 그 배포 뒤 v2를 게시한다. 남은 v1 snapshot은
+  TTL 동안 계속 소비하며 v1/v2 schema·explanation version 쌍을 섞으면 근거만 버리고 Candidate는 유지한다.
   825가 이 계약을 소비하고 628이 shadow·종단 승인을 마치기 전에는 GBT AI 문구를 운영에 노출하지 않는다.
 
 **`feelm:user:{userId}:behavior`**

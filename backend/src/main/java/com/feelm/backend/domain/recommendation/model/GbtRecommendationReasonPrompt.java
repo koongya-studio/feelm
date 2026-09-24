@@ -26,34 +26,35 @@ public record GbtRecommendationReasonPrompt(
             return false;
         }
         Map<String, Evidence> byId = byId();
-        List<String> labels = new ArrayList<>();
+        List<Evidence> selected = new ArrayList<>();
         for (String id : ids) {
             Evidence item = byId.get(id);
             if (item == null) {
                 return false;
             }
-            labels.add(item.label());
+            selected.add(item);
         }
-        return buildAllowedSummaries(labels).contains(result.summary());
+        return buildAllowedSummaries(selected).contains(result.summary());
     }
 
     public List<String> allowedSummaries(List<String> evidenceIds) {
         Map<String, Evidence> byId = byId();
-        List<String> labels = new ArrayList<>();
+        List<Evidence> selected = new ArrayList<>();
         for (String id : evidenceIds) {
             Evidence item = byId.get(id);
             if (item == null) {
                 return List.of();
             }
-            labels.add(item.label());
+            selected.add(item);
         }
-        return buildAllowedSummaries(labels);
+        return buildAllowedSummaries(selected);
     }
 
     public GbtRecommendationReasonResult fallback() {
         Evidence first = evidence.getFirst();
         return new GbtRecommendationReasonResult(
-                first.label() + "을 바탕으로 골랐어요.", List.of(first.evidenceId()));
+                allowedSummaries(List.of(first.evidenceId())).getFirst(),
+                List.of(first.evidenceId()));
     }
 
     private Map<String, Evidence> byId() {
@@ -64,13 +65,25 @@ public record GbtRecommendationReasonPrompt(
         return result;
     }
 
-    private List<String> buildAllowedSummaries(List<String> labels) {
-        if (labels.isEmpty()) {
+    private List<String> buildAllowedSummaries(List<Evidence> selected) {
+        if (selected.isEmpty()) {
             return List.of();
         }
+        if (selected.size() == 1 && selected.getFirst().specificSummary() != null) {
+            return List.of(selected.getFirst().specificSummary());
+        }
+        if (selected.stream().anyMatch(item -> item.specificSummary() != null)) {
+            return List.of();
+        }
+        List<String> labels = selected.stream().map(Evidence::label).toList();
         String joined = String.join("·", labels);
         return List.of(joined + "을 바탕으로 골랐어요.", joined + "이 추천에 긍정적으로 작용했어요.");
     }
 
-    public record Evidence(String evidenceId, String group, String label) {}
+    public record Evidence(String evidenceId, String group, String label, String specificSummary) {
+
+        public Evidence(String evidenceId, String group, String label) {
+            this(evidenceId, group, label, null);
+        }
+    }
 }

@@ -637,6 +637,50 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
     }
 
     @Test
+    @DisplayName("실제 고평점 원천 영화만 구체 GBT 이유로 한 번 저장하고 재사용한다")
+    void storesVerifiedSpecificGbtMovieReasonOnce() {
+        movies(55, 100);
+        rating(USER, 55, "4.0");
+        candidates(candidate(100, "5.0", "TASTE", null, gbtV2SourceReason(55)));
+
+        long setId = service.createBuffer(USER).recommendationSetId();
+        assertThat(service.createBuffer(USER).recommendationSetId()).isEqualTo(setId);
+
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT reason->>'summary' FROM recommendation_items WHERE set_id=?",
+                                String.class,
+                                setId))
+                .isEqualTo("\"movie-55\"을 재미있게 봐서 골랐어요.");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT reason->'usedEvidenceIds'->>0"
+                                        + " FROM recommendation_items WHERE set_id=?",
+                                String.class,
+                                setId))
+                .isEqualTo("sha256:" + "d".repeat(64));
+        verify(reasonGenerator, times(1)).generateGbtReasons(anyList());
+    }
+
+    @Test
+    @DisplayName("알림 경로는 항목 저장 전에도 실제 사용자의 고평점 원천 영화를 검증한다")
+    void noticeStoresVerifiedSpecificGbtMovieReasonBeforeAsyncCompletion() {
+        movies(55, 100);
+        rating(USER, 55, "4.0");
+        candidates(candidate(100, "5.0", "TASTE", null, gbtV2SourceReason(55)));
+
+        long setId = service.createBufferFromNotice(USER).recommendationSetId();
+
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT reason->>'summary' FROM recommendation_items WHERE set_id=?",
+                                String.class,
+                                setId))
+                .isEqualTo("\"movie-55\"을 재미있게 봐서 골랐어요.");
+        verify(reasonRepository).findPositiveRatedMovieTitleBeforeInsert(USER, 100, 55);
+    }
+
+    @Test
     @DisplayName("버전 결속이 깨진 GBT evidence는 일반 TASTE fallback만 사용한다")
     void keepsModelSpecificFallbackWithoutCompatibleGbtEvidence() {
         movies(100);
@@ -988,6 +1032,26 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                 .formatted("b".repeat(64), "a".repeat(64));
     }
 
+    private String gbtV2SourceReason(long sourceMovieId) {
+        return """
+                {"reasons":[],"modelKind":"GBT","modelVersion":"gbt-v26",
+                 "rankingVersion":"gbt-personal-raw-score-v1",
+                 "explanationVersion":"gbt-feature-attribution-v2","evidence":{
+                   "evidenceSchemaVersion":"gbt-evidence-v2",
+                   "explanationVersion":"gbt-feature-attribution-v2","userId":%d,
+                   "generationId":"g1","modelVersion":"gbt-v26",
+                   "servingRevision":"serving-r1",
+                   "featureVersion":"v26-max70-kobis-flag-71-v1",
+                   "rankingVersion":"gbt-personal-raw-score-v1",
+                   "inputVersion":"sha256:%s","candidateVersion":6,
+                   "item":{"movieId":100,"score":5.0,"coverage":0.7,"evidence":[{
+                     "evidenceId":"sha256:%s","group":"CONTENT_RELATION",
+                     "direction":"POSITIVE","contribution":0.4,"coverage":0.7,
+                     "sourceMovieId":%d}]}}}
+                """
+                .formatted(USER, "b".repeat(64), "d".repeat(64), sourceMovieId);
+    }
+
     private RecommendationCandidate candidate(
             long movieId, String score, String type, String flavorCode, String reason) {
         try {
@@ -1041,6 +1105,14 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
 
     private void rating(long userId, long movieId) {
         jdbc.update("INSERT INTO ratings(user_id,movie_id,score) VALUES (?,?,5)", userId, movieId);
+    }
+
+    private void rating(long userId, long movieId, String score) {
+        jdbc.update(
+                "INSERT INTO ratings(user_id,movie_id,score) VALUES (?,?,?)",
+                userId,
+                movieId,
+                new BigDecimal(score));
     }
 
     private void watchRecord(long userId, long movieId, Long ottId, String status) {
