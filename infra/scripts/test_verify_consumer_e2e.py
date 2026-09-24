@@ -13,6 +13,19 @@ sys.modules[SPEC.name] = MODULE
 SPEC.loader.exec_module(MODULE)
 
 
+class ConsumerBackendFixtureContractTest(unittest.TestCase):
+    """Full-checkout check, required by the main Consumer image test job."""
+
+    def test_personal_gbt_fixtures_match_backend_contract(self):
+        root = HERE.parents[1]
+        for name in ("gbt-personal-state.json", "gbt-personal-cold-state.json"):
+            with self.subTest(fixture=name):
+                consumer = root / "pipeline/consumer/tests/fixtures" / name
+                backend = root / "backend/src/test/resources" / name
+                self.assertEqual(json.loads(consumer.read_text(encoding="utf-8")),
+                                 json.loads(backend.read_text(encoding="utf-8")))
+
+
 class VerifyConsumerE2ETest(unittest.TestCase):
     generation = "550e8400-e29b-41d4-a716-446655440000"
 

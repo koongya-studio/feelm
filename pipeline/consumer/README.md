@@ -3,7 +3,9 @@
 742 계약에 연결된 개인 GBT 실행·입력 보존·검증은 [627 안내](GBT-627.md)를 참고한다.
 
 v26 GBT 전용 번들·독립 scorer는 [GBT.md](./GBT.md)를 따른다. 개인 실행은 명시적인
-`--gbt-bundle`로 선택한다. 아래는 기존 ALS 경로이며 운영 이미지 통합은 644에서 수행한다.
+`--gbt-bundle`로 선택한다. 표준 이미지에는 GBT CPU 의존성도 포함된다.
+운영 기본 명령의 개인·파티 GBT 선택, 필수 환경 변수와 전환 인계는
+[644 실행 안내](GBT-644.md)를 따른다. 기본 `CONSUMER_RUNTIME=legacy`에서는 아래 기존 ALS 경로를 사용한다.
 
 Kafka의 평가·온보딩·관심없음 이벤트를 받아 최신 사용자 입력으로 ALS Fold-in을 수행하고 TASTE 최대 500편과
 DISCOVERY 최대 100편을 갱신한다. Python 3.12의 독립 프로젝트이며 Spark 코드를 import하지 않는다.

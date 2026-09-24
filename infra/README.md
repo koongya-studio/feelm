@@ -84,6 +84,12 @@ sudo chown -R "$USER:$USER" <repo>/.git
 
 ## Recommendation Processing
 
+GBT 준비 이미지와 공용 `CONSUMER_RUNTIME=gbt` 실행 설정은
+[Consumer GBT 운영 연결 안내](../pipeline/consumer/GBT-644.md)를 따른다.
+이미지 병합·배포만으로 모델이 전환되지 않는다. 628/735의 모델 포인터·전체 사용자 재게시와
+개인/파티 전환을 함께 준비해야 하며 기존 배포 스크립트의 프로세스·Kafka 할당 확인만으로
+GBT 전환 완료를 판정하지 않는다.
+
 추천 모델은 별도의 FastAPI Serving 서버를 두지 않고 Batch 및 Consumer 기반으로 처리합니다.
 
 - Spark Batch

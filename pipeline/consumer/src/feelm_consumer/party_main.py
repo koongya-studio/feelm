@@ -1,6 +1,7 @@
 import logging
 import sys
 
+from feelm_consumer.deployment import gbt_deployment_args
 from feelm_consumer.party_runner import run
 from feelm_consumer.party_settings import load_party_settings
 
@@ -13,8 +14,17 @@ def main() -> None:
     if any(value == "--gbt-bundle" or value.startswith("--gbt-bundle=") for value in sys.argv[1:]):
         from feelm_consumer.gbt_party_runner import main as gbt_main
         gbt_main()
-    else:
-        run(load_party_settings())
+        return
+    try:
+        args = gbt_deployment_args("party")
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from None
+    logging.getLogger(__name__).info("consumer runtime selected role=party mode=%s", "GBT" if args else "legacy")
+    if args is not None:
+        from feelm_consumer.gbt_party_runner import main as gbt_main
+        gbt_main(args)
+        return
+    run(load_party_settings())
 
 
 if __name__ == "__main__":

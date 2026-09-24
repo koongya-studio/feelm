@@ -52,10 +52,7 @@ def contract_payload(scorer):
 def test_actual_personal_payload_matches_java_reader_fixture(scorer):
     fixture = Path(__file__).parent / "fixtures/gbt-personal-state.json"
     assert contract_payload(scorer) == json.loads(fixture.read_text(encoding="utf-8"))
-    # Each CI job archives only its own service. A full checkout verifies the shared copy too.
-    backend_fixture = Path(__file__).resolve().parents[3] / "backend/src/test/resources/gbt-personal-state.json"
-    if backend_fixture.exists():
-        assert json.loads(backend_fixture.read_text(encoding="utf-8")) == contract_payload(scorer)
+    # Cross-service fixture equality is mandatory in infra/scripts/test_verify_consumer_e2e.py.
 
 
 def decoded(value, raw=None, **overrides):
@@ -212,9 +209,7 @@ def test_cold_start_payload_matches_backend_kafka_fixture(cold_scorer):
     payload = cold_contract_payload(cold_scorer)
     fixture = Path(__file__).parent / "fixtures/gbt-personal-cold-state.json"
     assert json.loads(fixture.read_text(encoding="utf-8")) == payload
-    backend_fixture = Path(__file__).resolve().parents[3] / "backend/src/test/resources/gbt-personal-cold-state.json"
-    if backend_fixture.exists():
-        assert json.loads(backend_fixture.read_text(encoding="utf-8")) == payload
+    # The whole-repository CI checks equality with the Java reader's fixture.
 
 
 def test_discovery_receives_population_beyond_taste_limit(scorer, monkeypatch):

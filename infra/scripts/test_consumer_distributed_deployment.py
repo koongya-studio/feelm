@@ -10,6 +10,21 @@ RUNTIME_VERIFY = ROOT / "infra/scripts/verify-datastores.sh"
 
 
 class ConsumerDistributedDeploymentTest(unittest.TestCase):
+    def test_gbt_mode_and_pins_are_shared_without_party_database_access(self) -> None:
+        compose = DISTRIBUTED_COMPOSE.read_text(encoding="utf-8")
+        personal = compose.split("  consumer:\n", 1)[1].split("  party-consumer:\n", 1)[0]
+        party = compose.split("  party-consumer:\n", 1)[1].split("  node-exporter:\n", 1)[0]
+        for name in ("CONSUMER_RUNTIME", "CONSUMER_GBT_BUNDLE_URI",
+                     "CONSUMER_GBT_SERVING_REVISION", "CONSUMER_GBT_MAX_SNAPSHOT_BYTES"):
+            fallback = "legacy" if name == "CONSUMER_RUNTIME" else ""
+            line = f"{name}: ${{{name}:-{fallback}}}"
+            self.assertIn(line, personal)
+            self.assertIn(line, party)
+            self.assertIn(f"{name}=", ENV_EXAMPLE.read_text(encoding="utf-8"))
+        self.assertIn("CONSUMER_GBT_SNAPSHOT_RETENTION_SECONDS:", personal)
+        self.assertNotIn("CONSUMER_GBT_SNAPSHOT_RETENTION_SECONDS:", party)
+        self.assertNotIn("POSTGRES", party)
+
     def test_consumer_runs_on_distributed_host_with_required_contract(self) -> None:
         compose = DISTRIBUTED_COMPOSE.read_text(encoding="utf-8")
 

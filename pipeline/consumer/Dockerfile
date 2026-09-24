@@ -18,6 +18,7 @@ COPY pyproject.toml uv.lock .python-version ./
 COPY src ./src
 
 RUN uv sync --locked --no-dev --no-editable \
+    && .venv/bin/python -c "from feelm_consumer.gbt.artifacts import runtime; print(runtime())" \
     && rm -rf /root/.cache/uv
 
 
@@ -25,6 +26,7 @@ FROM builder AS test
 
 COPY Dockerfile .dockerignore ./
 COPY tests ./tests
+COPY tools ./tools
 
 RUN uv sync --locked \
     && uv run ruff check . \
@@ -56,7 +58,8 @@ COPY --from=java /opt/java/openjdk /opt/java/openjdk
 COPY --from=builder --chown=10001:10001 /app/.venv /app/.venv
 
 RUN java -cp "$CLASSPATH" org.apache.hadoop.util.VersionInfo | grep -Fqx "Hadoop 3.4.3" \
-    && /app/.venv/bin/python -c "import ctypes; ctypes.CDLL('/opt/hadoop/lib/native/libhdfs.so')"
+    && /app/.venv/bin/python -c "import ctypes; ctypes.CDLL('/opt/hadoop/lib/native/libhdfs.so')" \
+    && /app/.venv/bin/python -c "from feelm_consumer.gbt.artifacts import runtime; print(runtime())"
 
 USER consumer
 
