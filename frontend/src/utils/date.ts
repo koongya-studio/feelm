@@ -140,6 +140,20 @@ export function formatAgeGroup(birthDate: string, today: Date = new Date()): str
 }
 
 /**
+ * 날짜를 `<input type="date">`의 값 형식(`YYYY-MM-DD`)으로 만든다. 로컬 날짜 기준이다.
+ *
+ * 생년월일 칸의 `max`로 쓴다(업무 -851). `max`가 없으면 Chrome은 연도 칸에 6자리까지
+ * 받아 `19990314`를 이어 치면 월 · 일 칸으로 넘어가지 않는다. 4자리 연도를 `max`로 주면
+ * 연도 칸이 4자리에서 끝나 Tab 없이 8자리로 다 채워진다. 미래 날짜를 막는 것은 덤이다.
+ */
+export function toDateInputValue(date: Date = new Date()): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/**
  * ISO 8601 문자열을 `6월 12일 (수)` 형식으로 만든다.
  *
  * 2.2 추천 영화의 데스크톱 시안이 오늘 날짜를 이렇게 적는다(업무 -783). 요일까지 적는 것은
