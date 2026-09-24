@@ -1644,6 +1644,13 @@ GitLab에서 관리하고 서버에서 직접 수정하지 않습니다. 현재 
 - 배포 변수는 GitLab CI/CD Variables에 `service` 환경 범위와 Protected 속성으로 등록합니다.
 - 비밀번호와 JWT 키는 Masked and hidden으로 등록하며 Pipeline 로그에 출력하지 않습니다.
 
+GBT 추천 이유 AI 생성을 활성화할 때는 GitLab CI/CD Variables의 `service` 환경 범위에
+`GBT_XAI_ENABLED=true`를 등록하고, `GMS_KEY`를 Protected 및 Masked and hidden Secret으로
+등록합니다. Compose가 두 값을 백엔드 컨테이너에 전달합니다. `GMS_KEY`가 없으면 AI 문구
+대신 결정적 문구가 사용됩니다. 변수 변경 후에는 `main` 백엔드 배포로 컨테이너를 재생성하고,
+컨테이너의 `GBT_XAI_ENABLED` 값과 GBT 추천 이유 응답을 확인합니다. 이전 동작으로 되돌릴
+때는 `GBT_XAI_ENABLED=false`로 바꾼 뒤 백엔드를 다시 배포합니다.
+
 백엔드가 사용하는 주요 변수는 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `REDIS_HOST`,
 `REDIS_PORT`, `REDIS_PASSWORD`, `JWT_SECRET`, `CORS_ALLOWED_ORIGINS`와
 `AUTH_MOCK_ENABLED`입니다. 컨테이너에서는 `postgres:5432`와 `redis:6379`를 사용합니다.
