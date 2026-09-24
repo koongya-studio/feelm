@@ -82,6 +82,13 @@ export default function OnboardingCompletePage() {
         </div>
 
         <div className={styles.actions}>
+          {preferences.length > 0 ? (
+            <p className={styles.ratingNotice}>
+              고른 영화는 평가에도 반영됐어요
+              <br />
+              <strong>좋아요 4점 · 싫어요 2점</strong>
+            </p>
+          ) : null}
           <Button onClick={() => void navigate(path.recommendations())}>영화 추천받기</Button>
         </div>
       </div>
