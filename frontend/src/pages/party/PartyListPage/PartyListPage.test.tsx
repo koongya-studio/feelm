@@ -21,6 +21,8 @@ import { fireEvent, screen } from '@testing-library/react';
 import PartyListPage from './index';
 import PartySizePage from '../PartySizePage';
 import { renderWithRouter } from '../../../test/render';
+
+vi.mock('../../../contexts/authContext', () => ({ useAuth: () => ({ user: null }) }));
 import {
   getClosedParties,
   getMyInvitations,

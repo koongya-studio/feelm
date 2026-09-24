@@ -52,6 +52,7 @@ import AppHeader from '../../../components/AppHeader';
 import Button from '../../../components/Button';
 import DesktopAside from '../../../components/DesktopAside';
 import FilmReel from '../../../components/FilmReel';
+import GuideCallout from '../../../components/GuideCallout';
 import { ChevronLeftIcon, ChevronRightIcon } from '../../../components/Icon';
 import Poster from '../../../components/Poster';
 import PosterCue from '../../../components/PosterCue';
@@ -63,7 +64,16 @@ import TodayRecommendations from './TodayRecommendations';
 import { getLatestReadyReport } from '../../../api/reports';
 import { getMyFrames, getPopcornBucket } from '../../../api/taste';
 import { useShellSize } from '../../../hooks/useShellSize';
+import { useAuth } from '../../../contexts/authContext';
+import { useDesktopAsideSlot } from '../../../contexts/desktopAsideContext';
 import { path } from '../../../routes/paths';
+import {
+  FILM_GUIDE,
+  PARTY_GUIDE,
+  completeGuide,
+  hasSeenGuide,
+  restartGuide,
+} from '../../../utils/userGuides';
 import styles from './FilmPage.module.css';
 import type { FrameList, PopcornBucket } from '../../../types/taste';
 
@@ -135,9 +145,63 @@ type MoreState = 'idle' | 'loading' | 'failed';
 /** 빈 필름에 남겨 두는 자리. 시안 01이 두 칸을 보여준다 */
 const EMPTY_SLOT_LABELS = ['첫 번째 프레임', '두 번째 프레임'];
 
+type FilmGuideStep = {
+  title: string;
+  description: string;
+  targetSelector: string;
+  placement?: 'top' | 'bottom';
+};
+
+const FILM_GUIDE_STEPS: FilmGuideStep[] = [
+  {
+    title: '감상 기록을 넘겨보세요',
+    description:
+      '처음 고른 영화부터 앞으로 평가할 영화까지 필름에 쌓여요. 옆으로 넘기며 다시 볼 수 있어요.',
+    targetSelector: "[data-guide-target='film-reel']",
+  },
+  {
+    title: '나의 취향 팝콘',
+    description:
+      '평가한 영화가 맛별 팝콘으로 모여요. 누르면 어떤 취향이 많은지 자세히 볼 수 있어요.',
+    targetSelector: "[aria-label^='나의 취향 팝콘']",
+  },
+  {
+    title: '취향 리포트',
+    description: '영화 감상 기록을 분석한 리포트를 확인하는 곳이에요.',
+    targetSelector: "[aria-label='취향 리포트 보기'],[aria-label='새 취향 리포트 받기']",
+  },
+  {
+    title: '새 소식을 확인하세요',
+    description: '새 추천이나 리포트 같은 소식은 알림에서 확인할 수 있어요.',
+    targetSelector: "a[aria-label^='알림']",
+  },
+  {
+    title: '본 영화를 평가해 보세요',
+    description:
+      '이 버튼과 상단 검색 모두 검색 화면으로 가요. 본 영화를 찾아 원할 때 평가하면 필름이 늘어나요.',
+    targetSelector: "[data-guide-target='film-rate']",
+    placement: 'top',
+  },
+  {
+    title: '영화 추천을 받아보세요',
+    description: '지금 취향에 맞는 추천 영화를 보러 갈 수 있어요.',
+    targetSelector: "[data-guide-target='film-recommendations']",
+    placement: 'top',
+  },
+];
+
 export default function FilmPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [guideDismissed, setGuideDismissed] = useState(false);
+  const showGuide = Boolean(user && !guideDismissed && !hasSeenGuide(user.userId, FILM_GUIDE));
+  const [guideIndex, setGuideIndex] = useState(0);
+  const finishGuide = () => {
+    if (user) completeGuide(user.userId, FILM_GUIDE);
+    setGuideDismissed(true);
+  };
   const desktop = useShellSize() !== 'mobile';
+  const asideSlot = useDesktopAsideSlot();
 
   const [frames, setFrames] = useState<FrameList | null>(null);
   const [more, setMore] = useState<MoreState>('idle');
@@ -146,6 +210,7 @@ export default function FilmPage() {
   /** 지금 릴에 보이는 프레임 구간. 모바일은 `last`만, 넓은 화면은 둘 다 쓴다 */
   const [range, setRange] = useState<FrameRange>({ first: 1, last: 1 });
   const [bucket, setBucket] = useState<PopcornBucket | null>(null);
+  const [bucketSettled, setBucketSettled] = useState(false);
   /** 아직 3.3에서 받지 않은 새 리포트. 있으면 리포트 줄이 발급(3.3)으로 간다 */
   const [newReportId, setNewReportId] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
@@ -175,7 +240,10 @@ export default function FilmPage() {
           setBucket(value);
         }
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setBucketSettled(true);
+      });
 
     // 새 리포트를 확인하지 못해도 리포트 줄은 목록(7.3)으로 가는 원래 동작을 한다
     getLatestReadyReport()
@@ -334,6 +402,25 @@ export default function FilmPage() {
     (rest, flavor) => rest - flavor.popcornCount,
     bucket?.totalCount ?? 0,
   );
+  const showFilmGuide = showGuide && frames !== null && bucketSettled;
+  const hasAside = !desktop || asideSlot !== null;
+  const guideSteps = showFilmGuide
+    ? FILM_GUIDE_STEPS.filter((step) => {
+        if (step.title === '나의 취향 팝콘') {
+          return !isEmpty && hasAside && summaryFlavors.length > 0;
+        }
+        if (step.title === '취향 리포트') return !isEmpty && hasAside;
+        return true;
+      }).map((step) =>
+        step.title === '영화 추천을 받아보세요' && desktop
+          ? {
+              ...step,
+              targetSelector: "nav[aria-label='주요 화면'] a[href$='/recommendations']",
+            }
+          : step,
+      )
+    : [];
+  const activeGuideIndex = Math.min(guideIndex, guideSteps.length - 1);
 
   return (
     <>
@@ -359,7 +446,7 @@ export default function FilmPage() {
             </div>
 
             {!isEmpty ? (
-              <Link to={path.search()} className={styles.desktopRate}>
+              <Link to={path.search()} className={styles.desktopRate} data-guide-target="film-rate">
                 본 영화 평가하기
               </Link>
             ) : null}
@@ -411,7 +498,7 @@ export default function FilmPage() {
           </header>
         )}
 
-        <div className={styles.reelArea}>
+        <div className={styles.reelArea} data-guide-target="film-reel">
           {/* 넓은 화면의 필름은 주황빛이 없는 검정이다(2026-09-21 PC 웹 시안) */}
           <FilmReel
             tone={desktop ? 'plain' : 'warm'}
@@ -432,7 +519,10 @@ export default function FilmPage() {
                     key={frame.frameId}
                     type="button"
                     className={styles.frameButton}
-                    onClick={() => void navigate(path.movieDetail(frame.movie.movieId))}
+                    onClick={() => {
+                      finishGuide();
+                      void navigate(path.movieDetail(frame.movie.movieId));
+                    }}
                   >
                     <PosterCue>
                       <Poster
@@ -507,10 +597,18 @@ export default function FilmPage() {
             <h3 className={styles.emptyTitle}>아직 필름에 담긴 영화가 없어요</h3>
             <p className={styles.emptyText}>본 영화를 평가하면 필름에 한 장씩 추가돼요</p>
             <div className={styles.actionButtons}>
-              <Button variant="brand" onClick={() => void navigate(path.search())}>
+              <Button
+                variant="brand"
+                data-guide-target="film-rate"
+                onClick={() => void navigate(path.search())}
+              >
                 본 영화 평가하기
               </Button>
-              <Button variant="secondary" onClick={() => void navigate(path.recommendations())}>
+              <Button
+                variant="secondary"
+                data-guide-target="film-recommendations"
+                onClick={() => void navigate(path.recommendations())}
+              >
                 영화 추천받기
               </Button>
             </div>
@@ -601,10 +699,18 @@ export default function FilmPage() {
             <div className={styles.action}>
               <p className={styles.actionHint}>본 영화를 평가하면 필름에 한 장씩 추가돼요</p>
               <div className={styles.actionButtons}>
-                <Button variant="brand" onClick={() => void navigate(path.search())}>
+                <Button
+                  variant="brand"
+                  data-guide-target="film-rate"
+                  onClick={() => void navigate(path.search())}
+                >
                   본 영화 평가하기
                 </Button>
-                <Button variant="secondary" onClick={() => void navigate(path.recommendations())}>
+                <Button
+                  variant="secondary"
+                  data-guide-target="film-recommendations"
+                  onClick={() => void navigate(path.recommendations())}
+                >
                   영화 추천받기
                 </Button>
               </div>
@@ -621,6 +727,34 @@ export default function FilmPage() {
         <DesktopAside>
           <FilmAside bucket={bucket} frames={items} newReportId={newReportId} />
         </DesktopAside>
+      ) : null}
+      {showGuide && guideSteps.length > 0 ? (
+        <GuideCallout
+          step={activeGuideIndex + 1}
+          totalSteps={guideSteps.length}
+          targetSelector={guideSteps[activeGuideIndex].targetSelector}
+          placement={guideSteps[activeGuideIndex].placement}
+          title={guideSteps[activeGuideIndex].title}
+          description={guideSteps[activeGuideIndex].description}
+          onSkip={finishGuide}
+          action={
+            activeGuideIndex < guideSteps.length - 1
+              ? { label: '다음', onClick: () => setGuideIndex(activeGuideIndex + 1) }
+              : { label: '둘러보기', onClick: finishGuide }
+          }
+          secondaryAction={
+            activeGuideIndex === guideSteps.length - 1
+              ? {
+                  label: '파티 가이드 보기',
+                  onClick: () => {
+                    finishGuide();
+                    if (user) restartGuide(user.userId, PARTY_GUIDE);
+                    void navigate(path.party());
+                  },
+                }
+              : undefined
+          }
+        />
       ) : null}
     </>
   );
