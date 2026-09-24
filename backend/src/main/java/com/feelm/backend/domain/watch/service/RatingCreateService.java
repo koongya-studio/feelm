@@ -1,5 +1,6 @@
 package com.feelm.backend.domain.watch.service;
 
+import com.feelm.backend.domain.taste.service.TasteAnalysisWriter;
 import com.feelm.backend.domain.watch.dto.request.RatingCreateRequest;
 import com.feelm.backend.domain.watch.dto.response.RatingCreateResponse;
 import com.feelm.backend.domain.watch.dto.response.RatingCreateResponse.Frame;
@@ -26,6 +27,7 @@ public class RatingCreateService {
 
     private final RatingCommandRepository repository;
     private final RatingStateWriter ratingStateWriter;
+    private final TasteAnalysisWriter tasteAnalysisWriter;
     private final KafkaEventPublisher eventPublisher;
     private final Clock clock;
 
@@ -52,6 +54,8 @@ public class RatingCreateService {
                         request.visibility(),
                         request.spoiler(),
                         now);
+        // 계약이 정한 대로 같은 트랜잭션에서 취향 분석 캐시를 다시 만든다(API-040).
+        tasteAnalysisWriter.refresh(userId, now);
         eventPublisher.publish(
                 KafkaEventType.RATING,
                 userId,
