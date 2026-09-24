@@ -7,7 +7,7 @@
  * 그리고 **결과가 늘 돌아오는지** 본다.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { shareLink } from './share';
+import { shareFiles, shareLink } from './share';
 
 const LINK = { title: '영화광님의 Feelm 프로필', url: 'https://feelm.test/app/users/7' };
 
@@ -36,6 +36,7 @@ function stubClipboard(impl: () => Promise<void>) {
 afterEach(() => {
   vi.restoreAllMocks();
   Reflect.deleteProperty(navigator, 'share');
+  Reflect.deleteProperty(navigator, 'canShare');
   Reflect.deleteProperty(navigator, 'clipboard');
 });
 
@@ -95,5 +96,70 @@ describe('주소 공유', () => {
     });
 
     await expect(shareLink(LINK)).resolves.toBe('failed');
+  });
+});
+
+/*
+ * 파일 공유 (업무 -849). 취향 리포트는 주소를 받은 사람이 열 수 없어 4컷 이미지를 보낸다.
+ * 공유 메뉴를 못 쓰는 경우는 `unavailable`로 돌려주고, 부른 화면이 내려받는다.
+ */
+describe('파일 공유', () => {
+  const FILES = {
+    title: '2026 상반기 취향 리포트',
+    files: [new File(['png'], 'feelm-report-301-front.png', { type: 'image/png' })],
+  };
+
+  function stubCanShare(result: boolean) {
+    const canShare = vi.fn(() => result);
+    Object.defineProperty(navigator, 'canShare', { value: canShare, configurable: true });
+
+    return canShare;
+  }
+
+  it('휴대폰은 파일을 기기의 공유 메뉴로 보낸다', async () => {
+    pointer(true);
+    stubCanShare(true);
+    const share = stubShare(async () => undefined);
+
+    await expect(shareFiles(FILES)).resolves.toBe('shared');
+    expect(share).toHaveBeenCalledWith(FILES);
+  });
+
+  it('데스크톱은 공유 메뉴를 열지 않는다', async () => {
+    pointer(false);
+    stubCanShare(true);
+    const share = stubShare(async () => undefined);
+
+    await expect(shareFiles(FILES)).resolves.toBe('unavailable');
+    expect(share).not.toHaveBeenCalled();
+  });
+
+  it('파일을 받지 못하는 공유 메뉴는 쓰지 않는다', async () => {
+    pointer(true);
+    stubCanShare(false);
+    const share = stubShare(async () => undefined);
+
+    await expect(shareFiles(FILES)).resolves.toBe('unavailable');
+    expect(share).not.toHaveBeenCalled();
+  });
+
+  it('닫으면 취소, 브라우저가 거절하면 blocked, 그 밖의 실패는 unavailable이다', async () => {
+    pointer(true);
+    stubCanShare(true);
+
+    stubShare(async () => {
+      throw new DOMException('closed', 'AbortError');
+    });
+    await expect(shareFiles(FILES)).resolves.toBe('cancelled');
+
+    stubShare(async () => {
+      throw new DOMException('expired', 'NotAllowedError');
+    });
+    await expect(shareFiles(FILES)).resolves.toBe('blocked');
+
+    stubShare(async () => {
+      throw new DOMException('broken', 'DataError');
+    });
+    await expect(shareFiles(FILES)).resolves.toBe('unavailable');
   });
 });

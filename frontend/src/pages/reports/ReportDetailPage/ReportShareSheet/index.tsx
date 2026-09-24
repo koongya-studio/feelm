@@ -6,34 +6,41 @@
  * 와이어프레임은 3.4 위에 올라온 시트로 그렸다. 3.4 · 7.4가 같은 화면이라 그 폴더 안에 둔다.
  * 요소 — `공유하기`, `이미지로 저장`, 안내 두 줄.
  *
- * - `공유하기`는 이 화면 주소를 공유한다. 휴대폰은 기기의 공유 메뉴, 데스크톱은 복사다
- *   (`utils/share.ts`, 업무 -767). 한때 제목 글자만 공유 메뉴에 넘겼고, 데스크톱 Chrome에서는
- *   메뉴가 있다고 답하고 열지 못해 아무 일이 없었다
+ * - `공유하기`는 4컷 이미지 파일을 공유한다(업무 -849). 앞면 넷 한 장과 칸을 모두 뒤집은 뒷면
+ *   한 장이다. 휴대폰은 기기의 공유 메뉴로 넘기고, 파일 공유를 못 쓰는 데스크톱 · 브라우저는
+ *   두 장을 내려받는다(`utils/share.ts`의 `shareFiles`). 이미지는 부른 화면이 찍어 넘긴다
+ * - 한때 이 화면 주소를 공유했는데(업무 -767) API-060은 타인 리포트를 404로 숨겨 **받은 사람은
+ *   아무것도 볼 수 없었다.** 그래서 주소가 아니라 그림을 보낸다
+ * - 공유 이미지는 브라우저에서만 쓰고 서버에 올리지 않는다. API-061은 여전히 `이미지로 저장`의
+ *   앞면 한 장만 받는다
+ * - 이미지를 찍는 동안 누른 동작의 효력이 끝나 브라우저가 공유를 거절할 수 있다(`blocked`).
+ *   찍은 파일을 들고 있다가 한 번 더 누르면 바로 메뉴를 연다. 그래도 거절되면 내려받는다
  * - `이미지로 저장`은 화면의 `ReportFourCut` DOM을 그대로 PNG로 캡처하고 API-061에 저장한 뒤
  *   서명 URL을 실제 파일 다운로드로 연결한다(`../saveReportImage.ts`). 3.4 · 7.4의 `저장`과
  *   같은 함수라 부른 화면이 넘긴다
- * - 공유를 마치거나 취소하면 시트를 닫는다(`3.5 ⇢ 3.4`)
- *
- * `공유하기`는 제목과 주소, `이미지로 저장`은 PNG 파일을 맡는다. PNG를 기기 공유 시트에 직접
- * 넘기는 동작은 API-061 범위 밖이다(계약 처리 규칙). 그래서 저장을 마치면 내려받은 이미지를
- * 원하는 앱에서 직접 공유하라고 알린다(업무 -731).
+ * - 공유를 마치면 시트를 닫는다(`3.5 ⇢ 3.4`). 메뉴를 닫은 것(취소)은 시트를 그대로 둔다
  */
 import { useEffect, useId, useRef, useState } from 'react';
 import Button from '../../../../components/Button';
-import { shareLink } from '../../../../utils/share';
+import { downloadBlob } from '../../../../utils/reportImage';
+import { shareFiles } from '../../../../utils/share';
 import { reportImageFailure } from '../saveReportImage';
 import styles from './ReportShareSheet.module.css';
 
 type Props = {
   title: string;
+  /** 공유할 4컷 PNG(앞면 · 뒷면)를 찍는다. 실패하면 던진다 */
+  onPrepareShare: () => Promise<File[]>;
   /** 4컷 PNG를 저장해 내려받는다. 실패하면 던진다 */
   onSaveImage: () => Promise<void>;
   onClose: () => void;
 };
 
-export default function ReportShareSheet({ title, onSaveImage, onClose }: Props) {
+export default function ReportShareSheet({ title, onPrepareShare, onSaveImage, onClose }: Props) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
+  /** 찍어 둔 공유 이미지. 메뉴를 다시 열 때 또 찍지 않는다 */
+  const [prepared, setPrepared] = useState<File[] | null>(null);
   const titleId = useId();
   const titleRef = useRef<HTMLHeadingElement>(null);
 
@@ -55,9 +62,21 @@ export default function ReportShareSheet({ title, onSaveImage, onClose }: Props)
     setBusy(true);
     setNotice('');
 
-    const result = await shareLink({ title, url: window.location.href });
+    let files = prepared;
+    if (!files) {
+      try {
+        files = await onPrepareShare();
+      } catch (error) {
+        setNotice(reportImageFailure(error));
+        setBusy(false);
 
-    // 공유 메뉴로 보냈으면 마친 것이다. 닫은 것(취소)은 시트를 그대로 둔다
+        return;
+      }
+    }
+
+    const result = await shareFiles({ title, files });
+
+    // 공유 메뉴로 보냈으면 마친 것이다
     if (result === 'shared') {
       onClose();
 
@@ -65,8 +84,34 @@ export default function ReportShareSheet({ title, onSaveImage, onClose }: Props)
     }
 
     setBusy(false);
-    if (result === 'copied') setNotice('리포트 주소를 복사했어요');
-    if (result === 'failed') setNotice('이 브라우저에서는 공유할 수 없어요');
+    if (result === 'cancelled') {
+      setPrepared(files);
+
+      return;
+    }
+
+    // 찍는 동안 누른 효력이 끝났을 수 있다. 처음 한 번은 다시 눌러 달라고 한다
+    if (result === 'blocked' && !prepared) {
+      setPrepared(files);
+      setNotice('이미지를 준비했어요. 공유하기를 한 번 더 눌러 주세요');
+
+      return;
+    }
+
+    setNotice(download(files));
+  }
+
+  /** 공유 메뉴를 못 쓰면 내려받는다. 부른 쪽이 알릴 문구를 돌려준다 */
+  function download(files: File[]): string {
+    try {
+      files.forEach((file) => downloadBlob(file, file.name));
+    } catch {
+      return '이 브라우저에서는 공유할 수 없어요';
+    }
+
+    return files.length > 1
+      ? '이미지 두 장을 저장했어요. 원하는 앱에서 직접 공유해 주세요'
+      : '이미지를 저장했어요. 원하는 앱에서 직접 공유해 주세요';
   }
 
   async function saveImage() {
