@@ -5,6 +5,8 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import NotificationListPage from './NotificationListPage';
 import PushPreviewPage from './PushPreviewPage';
 import FilmPage from '../film/FilmPage';
+import { AuthContext } from '../../contexts/authContext';
+import { testAuth } from '../../test/auth';
 import { ROUTE_PATTERN } from '../../routes/paths';
 import type { NotificationItem } from '../../types/notification';
 
@@ -90,18 +92,20 @@ function LocationProbe() {
 
 function renderApp(entries: string[]) {
   return render(
-    <MemoryRouter initialEntries={entries} initialIndex={entries.length - 1}>
-      <Routes>
-        <Route path={ROUTE_PATTERN.film} element={<FilmPage />} />
-        <Route path={ROUTE_PATTERN.notifications} element={<NotificationListPage />} />
-        <Route path={ROUTE_PATTERN.pushPreview} element={<PushPreviewPage />} />
-        <Route path={ROUTE_PATTERN.watchConfirm} element={<p>감상 확인</p>} />
-        <Route path={ROUTE_PATTERN.partyInvitation} element={<p>파티 초대</p>} />
-        <Route path={ROUTE_PATTERN.partyPopcorn} element={<p>파티 상세</p>} />
-        <Route path="*" element={<p>다른 화면</p>} />
-      </Routes>
-      <LocationProbe />
-    </MemoryRouter>,
+    <AuthContext.Provider value={testAuth}>
+      <MemoryRouter initialEntries={entries} initialIndex={entries.length - 1}>
+        <Routes>
+          <Route path={ROUTE_PATTERN.film} element={<FilmPage />} />
+          <Route path={ROUTE_PATTERN.notifications} element={<NotificationListPage />} />
+          <Route path={ROUTE_PATTERN.pushPreview} element={<PushPreviewPage />} />
+          <Route path={ROUTE_PATTERN.watchConfirm} element={<p>감상 확인</p>} />
+          <Route path={ROUTE_PATTERN.partyInvitation} element={<p>파티 초대</p>} />
+          <Route path={ROUTE_PATTERN.partyPopcorn} element={<p>파티 상세</p>} />
+          <Route path="*" element={<p>다른 화면</p>} />
+        </Routes>
+        <LocationProbe />
+      </MemoryRouter>
+    </AuthContext.Provider>,
   );
 }
 
