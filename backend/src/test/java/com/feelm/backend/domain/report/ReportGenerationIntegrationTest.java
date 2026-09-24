@@ -13,6 +13,7 @@ import com.feelm.backend.domain.report.model.ReportPeriod;
 import com.feelm.backend.domain.report.repository.ReportGenerationRepository;
 import com.feelm.backend.domain.report.repository.ReportGenerationRepository.LockAttempt;
 import com.feelm.backend.domain.report.service.ReportGenerationCoordinator;
+import com.feelm.backend.domain.report.service.ReportGenerationCoordinator.CatchUpResult;
 import com.feelm.backend.domain.report.service.ReportGenerationCoordinator.PublicationResult;
 import com.feelm.backend.domain.report.service.ReportPreparationService;
 import com.feelm.backend.domain.report.service.ReportPublicationService;
@@ -45,6 +46,7 @@ class ReportGenerationIntegrationTest extends SharedPostgresContractTest {
     private static final long BASE = 5_550_000L;
     private static final long USER = BASE + 1;
     private static final ReportPeriod PERIOD = new ReportPeriod(2026, ReportHalf.H1);
+    private static final Instant CATCH_UP_NOW = Instant.parse("2026-09-24T03:00:00Z");
 
     @Autowired private ReportPreparationService preparationService;
     @Autowired private ReportPublicationService publicationService;
@@ -381,6 +383,132 @@ class ReportGenerationIntegrationTest extends SharedPostgresContractTest {
                                 .preparedCount())
                 .isZero();
         assertThat(reportCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("최종 집계 기록이 없는 최신 공개 반기를 늦게 집계해 공개한다")
+    void catchUpPublishesMissedHalf() throws Exception {
+        insertUser();
+        insertFrames(1, 3, "2026-01-10T00:00:00Z");
+
+        assertThat(coordinator.catchUpMissedFinal(CATCH_UP_NOW)).isEqualTo(CatchUpResult.READY);
+
+        assertThat(reportStatus()).isEqualTo("READY");
+        JsonNode generation = reportContent().path("generation");
+        assertThat(generation.path("finalSnapshot").asBoolean()).isTrue();
+        assertThat(Instant.parse(generation.path("cutoffAt").asText()))
+                .isEqualTo(PERIOD.cutoffExclusive());
+        assertThat(Instant.parse(generation.path("snapshotAt").asText()))
+                .isAfter(PERIOD.publicationAt());
+        assertThat(completedRunCount()).isOne();
+        assertThat(completedPreparedCount()).isOne();
+    }
+
+    @Test
+    @DisplayName("정상 최종 집계를 마친 반기는 다시 집계하지 않는다")
+    void catchUpSkipsCompletedHalf() throws Exception {
+        insertUser();
+        insertFrames(1, 3, "2026-01-10T00:00:00Z");
+        preparationService.prepare(PERIOD, PERIOD.cutoffExclusive(), true);
+        String before = reportContent().toString();
+
+        assertThat(coordinator.catchUpMissedFinal(CATCH_UP_NOW))
+                .isEqualTo(CatchUpResult.NOT_MISSED);
+
+        assertThat(reportStatus()).isEqualTo("GENERATING");
+        assertThat(reportContent().toString()).isEqualTo(before);
+        assertThat(completedRunCount()).isOne();
+    }
+
+    @Test
+    @DisplayName("공개 시각 30분이 지나기 전에는 보충하지 않는다")
+    void catchUpWaitsForPublicationWindow() {
+        insertUser();
+        insertFrames(1, 3, "2026-01-10T00:00:00Z");
+
+        assertThat(coordinator.catchUpMissedFinal(PERIOD.publicationAt().plusSeconds(29 * 60)))
+                .isEqualTo(CatchUpResult.NOT_DUE);
+
+        assertThat(reportCount()).isZero();
+        assertThat(completedRunCount()).isZero();
+
+        assertThat(coordinator.catchUpMissedFinal(PERIOD.publicationAt().plusSeconds(30 * 60)))
+                .isEqualTo(CatchUpResult.READY);
+    }
+
+    @Test
+    @DisplayName("2026 상반기가 아닌 최신 공개 반기는 보충하지 않는다")
+    void catchUpSkipsOtherHalves() {
+        insertUser();
+        insertFrames(1, 3, "2026-08-01T00:00:00Z");
+
+        assertThat(coordinator.catchUpMissedFinal(Instant.parse("2027-02-01T03:00:00Z")))
+                .isEqualTo(CatchUpResult.NOT_TARGET);
+
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM taste_reports WHERE user_id = ?"
+                                        + " AND year = 2026 AND half = 'H2'",
+                                Long.class,
+                                USER))
+                .isZero();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM taste_report_generation_runs"
+                                        + " WHERE year = 2026 AND half = 'H2'",
+                                Long.class))
+                .isZero();
+    }
+
+    @Test
+    @DisplayName("완료 기록 없이 READY만 있어도 다시 집계하지 않는다")
+    void catchUpSkipsReadyWithoutRunRecord() {
+        insertUser();
+        insertFrames(1, 3, "2026-01-10T00:00:00Z");
+        jdbc.update(
+                "INSERT INTO taste_reports (user_id, year, half, status, content)"
+                        + " VALUES (?, 2026, 'H1', 'READY', '{}'::jsonb)",
+                USER);
+
+        assertThat(coordinator.catchUpMissedFinal(CATCH_UP_NOW))
+                .isEqualTo(CatchUpResult.NOT_MISSED);
+
+        assertThat(reportStatus()).isEqualTo("READY");
+        assertThat(completedRunCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("마감 뒤 프레임은 집계하지 않고 대상이 없어도 한 번만 실행한다")
+    void catchUpIgnoresFramesAfterCutoffAndRunsOnce() {
+        insertUser();
+        insertFrames(1, 2, "2026-01-10T00:00:00Z");
+        insertFrames(3, 7, "2026-08-01T00:00:00Z");
+
+        assertThat(coordinator.catchUpMissedFinal(CATCH_UP_NOW))
+                .isEqualTo(CatchUpResult.NO_ELIGIBLE_USERS);
+        assertThat(completedPreparedCount()).isZero();
+        assertThat(reportCount()).isZero();
+
+        assertThat(coordinator.catchUpMissedFinal(CATCH_UP_NOW))
+                .isEqualTo(CatchUpResult.NOT_MISSED);
+        assertThat(completedRunCount()).isOne();
+    }
+
+    @Test
+    @DisplayName("보충 집계가 실패하면 기록을 남기지 않고 다음 호출에서 다시 시도한다")
+    void catchUpRetriesAfterFailure() {
+        insertUser();
+        insertFrames(1, 3, "2026-01-10T00:00:00Z");
+
+        installReportFailureTrigger(USER);
+        assertThatThrownBy(() -> coordinator.catchUpMissedFinal(CATCH_UP_NOW))
+                .isInstanceOf(DataAccessException.class);
+        assertThat(reportCount()).isZero();
+        assertThat(completedRunCount()).isZero();
+        removeReportFailureTrigger();
+
+        assertThat(coordinator.catchUpMissedFinal(CATCH_UP_NOW)).isEqualTo(CatchUpResult.READY);
+        assertThat(reportStatus()).isEqualTo("READY");
     }
 
     private void insertUser() {

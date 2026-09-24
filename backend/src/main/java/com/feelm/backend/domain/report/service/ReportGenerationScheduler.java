@@ -2,9 +2,11 @@ package com.feelm.backend.domain.report.service;
 
 import com.feelm.backend.domain.report.model.ReportHalf;
 import com.feelm.backend.domain.report.model.ReportPeriod;
+import com.feelm.backend.domain.report.service.ReportGenerationCoordinator.CatchUpResult;
 import com.feelm.backend.domain.report.service.ReportGenerationCoordinator.PublicationResult;
 import java.time.Instant;
 import java.time.ZonedDateTime;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -62,6 +64,13 @@ public class ReportGenerationScheduler {
         for (ReportPeriod period : coordinator.findPreparedPeriodsReadyToPublish(Instant.now())) {
             publishPrepared(period);
         }
+    }
+
+    // 기동 직후 동기로 돌리면 readiness가 늦어 배포 health check가 실패할 수 있어 1분 뒤로 미룬다.
+    @Scheduled(initialDelay = 1, fixedDelay = 60, timeUnit = TimeUnit.MINUTES)
+    public void catchUpMissedFinal() {
+        CatchUpResult result = coordinator.catchUpMissedFinal(Instant.now());
+        log.info("Missed report catch-up completed: result={}", result);
     }
 
     private void prepareFinal(ReportPeriod period) {
