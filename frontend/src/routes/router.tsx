@@ -53,6 +53,7 @@ import OttOnboardingPage from '../pages/onboarding/OttOnboardingPage';
 import TasteOnboardingPage from '../pages/onboarding/TasteOnboardingPage';
 import PartyInvitationPage from '../pages/party/PartyInvitationPage';
 import PartyJoinedPage from '../pages/party/PartyJoinedPage';
+import PartyHistoryPage from '../pages/party/PartyHistoryPage';
 import PartyListPage from '../pages/party/PartyListPage';
 import PartyPopcornMixPage from '../pages/party/PartyPopcornMixPage';
 import PartyRecommendationPage from '../pages/party/PartyRecommendationPage';
@@ -130,6 +131,15 @@ export const router = createBrowserRouter(
             { path: ROUTE_PATTERN.partyPopcornMix, element: <PartyPopcornMixPage /> },
             { path: ROUTE_PATTERN.partyRecommendations, element: <PartyRecommendationPage /> },
 
+            /*
+             * 5.10 파티 추천 이력 (업무 -826). 5.1의 `지난 파티`에서 들어오고 하단 내비가
+             * 파티에 남는다 — 5.1로 돌아갈 길이 뒤로 가기 말고도 있어야 한다.
+             */
+            {
+              path: ROUTE_PATTERN.partyRecommendationHistory,
+              element: <PartyHistoryPage />,
+            },
+
             // 7.3 취향 리포트 목록 (업무 -308). 와이어프레임이 하단 내비를 그렸다
             { path: ROUTE_PATTERN.tasteReports, element: <ReportListPage /> },
 
@@ -166,8 +176,8 @@ export const router = createBrowserRouter(
 
             // 취향 리포트 · 알림 · OTT 찾기 (업무 -308). 와이어프레임에 하단 내비가 없다
             { path: ROUTE_PATTERN.reportIssued, element: <ReportIssuedPage /> },
-            { path: ROUTE_PATTERN.report, element: <ReportDetailPage from="film" /> },
-            { path: ROUTE_PATTERN.myReport, element: <ReportDetailPage from="my" /> },
+            { path: ROUTE_PATTERN.report, element: <ReportDetailPage /> },
+            { path: ROUTE_PATTERN.myReport, element: <ReportDetailPage /> },
             { path: ROUTE_PATTERN.notifications, element: <NotificationListPage /> },
             { path: ROUTE_PATTERN.pushPreview, element: <PushPreviewPage /> },
             { path: ROUTE_PATTERN.ottFinder, element: <OttFinderPage /> },

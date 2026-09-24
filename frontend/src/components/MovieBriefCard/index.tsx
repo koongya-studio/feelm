@@ -133,6 +133,7 @@ export default function MovieBriefCard({
           to={detail}
           state={linkState}
           className={styles.posterLink}
+          data-guide-target="recommendation"
           aria-label={`${movie.title} 상세 보기`}
         >
           <PosterCue cue={false}>

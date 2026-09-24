@@ -26,10 +26,12 @@ import { getMyProfileView } from '../../../api/users';
 import { getMyRatings, getWatchRecords } from '../../../api/watch';
 import { getOtts } from '../../../api/otts';
 import { getRecommendationHistory } from '../../../api/recommendations';
+import { getMyTaste } from '../../../api/taste';
 import { mockMyProfileView } from '../../../mocks/publicProfiles';
 import type { MyRatedItem, MyRatingList } from '../../../types/watch';
 import type { WatchRecordListItem } from '../../../types/watch';
 import type { RecommendationHistory } from '../../../types/recommendation';
+import type { TasteAnalysis } from '../../../types/taste';
 
 vi.mock('../../../api/users', () => ({
   getMyProfileView: vi.fn(),
@@ -43,6 +45,14 @@ vi.mock('../../../api/watch', () => ({
 vi.mock('../../../api/taste', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/taste')>()),
   getPopcornBucket: vi.fn().mockResolvedValue({ totalCount: 0, flavors: [] }),
+  // 기본은 빈 취향이다. 키워드를 보는 시험만 따로 값을 준다(업무 -836)
+  getMyTaste: vi.fn().mockResolvedValue({
+    ratingCount: 0,
+    insufficientData: true,
+    analysis: { genres: [] },
+    keywords: [],
+    analyzedAt: null,
+  }),
 }));
 
 vi.mock('../../../api/otts', () => ({
@@ -140,7 +150,19 @@ beforeEach(() => {
   vi.mocked(getOtts)
     .mockReset()
     .mockResolvedValue([{ ottId: 1, code: 'NETFLIX', name: '넷플릭스', logoUrl: null }]);
+  vi.mocked(getMyTaste).mockReset().mockResolvedValue(taste(0, []));
 });
+
+/** API-040 응답을 만든다. `insufficientData`는 계약대로 키워드가 비었는지로 정한다 */
+function taste(ratingCount: number, keywords: { code: string; label: string }[]): TasteAnalysis {
+  return {
+    ratingCount,
+    insufficientData: keywords.length === 0,
+    analysis: { genres: [] },
+    keywords,
+    analyzedAt: keywords.length === 0 ? null : '2026-09-24T00:00:00Z',
+  };
+}
 
 async function renderDashboard() {
   const result = renderWithRouter(<MyDashboardPage />, { route: '/my' });
@@ -478,5 +500,67 @@ describe('7.1 MY 대시보드', () => {
 
     // 7.1은 보기 전용이다. 고치는 연필은 7.2에만 있다
     expect(screen.queryByRole('button', { name: /수정/ })).toBeNull();
+  });
+});
+
+/*
+ * 내 취향 구역 (업무 S15P21E106-836)
+ *
+ * 이 구역이 잡을 것은 셋이다.
+ *
+ * - 키워드가 **서버 값**인지. 목업이던 시절 네 개가 누구에게나 똑같이 떴다
+ * - 키워드가 없을 때 **두 경우를 가르는지**. 계약은 `insufficientData`를 평가 수가 아니라
+ *   키워드 공백으로 정하므로(API-040), 평가가 넉넉한데도 비는 사용자가 있다
+ * - 취향 분석을 못 받아도 **나머지 화면이 살아 있는지**
+ */
+describe('내 취향', () => {
+  const section = () => screen.getByRole('region', { name: '내 취향' });
+
+  it('T1 서버가 준 키워드를 그린다', async () => {
+    vi.mocked(getMyTaste).mockResolvedValue(
+      taste(30, [
+        { code: 'DIRECTOR_BINGE', label: '봉준호 몰아보기' },
+        { code: 'GENRE_DEVOTEE', label: '스릴러 편식' },
+        { code: 'COUNTRY_FOCUS', label: '한국 영화 집중' },
+      ]),
+    );
+
+    await renderDashboard();
+
+    const taste구역 = await screen.findByRole('region', { name: '내 취향' });
+    expect(within(taste구역).getByText('봉준호 몰아보기')).toBeInTheDocument();
+    expect(within(taste구역).getByText('스릴러 편식')).toBeInTheDocument();
+    expect(within(taste구역).getByText('한국 영화 집중')).toBeInTheDocument();
+    // 목업 키워드가 남아 있으면 출처를 안 바꾼 것이다
+    expect(screen.queryByText('계획형 안티히어로')).toBeNull();
+  });
+
+  it('T2 평가가 모자라면 몇 개를 더 하면 되는지 말한다', async () => {
+    vi.mocked(getMyTaste).mockResolvedValue(taste(10, []));
+
+    await renderDashboard();
+
+    // 최소 15편이므로 5개가 남았다
+    expect(await within(section()).findByText(/5개만 더/)).toBeInTheDocument();
+  });
+
+  it('T3 평가는 충분한데 키워드가 없으면 남은 개수를 말하지 않는다', async () => {
+    vi.mocked(getMyTaste).mockResolvedValue(taste(40, []));
+
+    await renderDashboard();
+
+    const note = within(section()).getByText(/뚜렷한 취향/);
+    expect(note).toBeInTheDocument();
+    expect(within(section()).queryByText(/개만 더/)).toBeNull();
+  });
+
+  it('T4 취향 분석을 못 받아도 프로필과 피드는 그대로다', async () => {
+    vi.mocked(getMyTaste).mockRejectedValue(new Error('network'));
+
+    await renderDashboard();
+
+    expect(screen.queryByRole('region', { name: '내 취향' })).toBeNull();
+    expect(screen.getByRole('link', { name: '프로필 편집' })).toBeInTheDocument();
+    expect(feed()).toBeInTheDocument();
   });
 });

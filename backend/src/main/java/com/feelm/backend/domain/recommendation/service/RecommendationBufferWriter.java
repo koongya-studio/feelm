@@ -175,7 +175,7 @@ class RecommendationBufferWriter {
                         batch.generationId(),
                         nextBatchNo,
                         OffsetDateTime.now(clock).withOffsetSameInstant(ZoneOffset.UTC));
-        repository.insertItems(setId, withInitialReason(items));
+        repository.insertItems(setId, withInitialReason(userId, items));
         return new RecommendationBufferResult(setId);
     }
 
@@ -195,7 +195,7 @@ class RecommendationBufferWriter {
             throw new NoEligibleRecommendationCandidatesException();
         }
         if (initialReason) {
-            items = withInitialReason(items);
+            items = withInitialReason(userId, items);
         }
 
         long setId =
@@ -212,7 +212,8 @@ class RecommendationBufferWriter {
     }
 
     /** 첫 노출 전에 확인된 근거만으로 문구를 확정한다. 이유 보강이 늦거나 실패해도 중립 문구로 고착되지 않는다. */
-    private List<RecommendationBufferItem> withInitialReason(List<RecommendationBufferItem> items) {
+    private List<RecommendationBufferItem> withInitialReason(
+            long userId, List<RecommendationBufferItem> items) {
         return items.stream()
                 .map(
                         item ->
@@ -220,7 +221,8 @@ class RecommendationBufferWriter {
                                         item.movieId(),
                                         item.type(),
                                         item.flavorCode(),
-                                        reasonService.initialReason(item.type(), item.reason()),
+                                        reasonService.initialReason(
+                                                userId, item.type(), item.reason()),
                                         item.position()))
                 .toList();
     }

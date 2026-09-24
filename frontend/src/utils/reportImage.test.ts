@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { toBlob } from 'html-to-image';
 import {
+  captureReportBackImage,
   captureReportImage,
+  downloadBlob,
   downloadReportImage,
   REPORT_IMAGE_HEIGHT,
   REPORT_IMAGE_WIDTH,
@@ -47,6 +49,27 @@ describe('ReportFourCut PNG 저장', () => {
         height: 1165,
         canvasWidth: REPORT_IMAGE_WIDTH,
         canvasHeight: REPORT_IMAGE_HEIGHT,
+      }),
+    );
+  });
+
+  it('뒷면은 폭만 1080으로 맞추고 높이는 화면 비율을 따른다', async () => {
+    const node = document.createElement('div');
+    Object.defineProperties(node, {
+      scrollWidth: { value: 385 },
+      scrollHeight: { value: 1540 },
+    });
+    const png = new Blob(['png'], { type: 'image/png' });
+    vi.mocked(toBlob).mockResolvedValue(png);
+
+    await expect(captureReportBackImage(node)).resolves.toBe(png);
+    expect(toBlob).toHaveBeenCalledWith(
+      node,
+      expect.objectContaining({
+        width: 385,
+        height: 1540,
+        canvasWidth: REPORT_IMAGE_WIDTH,
+        canvasHeight: 4320,
       }),
     );
   });
@@ -108,6 +131,24 @@ describe('ReportFourCut PNG 저장', () => {
     expect(revokeObjectURL).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1_000);
     expect(revokeObjectURL).toHaveBeenCalledWith('blob:report-image');
+  });
+
+  it('손에 든 파일을 그 이름으로 내려받는다', () => {
+    const createObjectURL = vi.fn().mockReturnValue('blob:share-image');
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectURL });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
+    let downloaded = '';
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (
+      this: HTMLAnchorElement,
+    ) {
+      downloaded = this.download;
+    });
+    const file = new File(['png'], 'feelm-report-301-back.png', { type: 'image/png' });
+
+    downloadBlob(file, file.name);
+
+    expect(createObjectURL).toHaveBeenCalledWith(file);
+    expect(downloaded).toBe('feelm-report-301-back.png');
   });
 
   it('서명 URL 다운로드가 실패하면 성공으로 처리하지 않는다', async () => {

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.feelm.backend.domain.taste.service.FrameWriter;
 import com.feelm.backend.domain.taste.service.FrameWriter.FrameCreation;
+import com.feelm.backend.domain.taste.service.TasteAnalysisWriter;
 import com.feelm.backend.domain.watch.dto.request.RatingCreateRequest;
 import com.feelm.backend.domain.watch.dto.response.RatingCreateResponse;
 import com.feelm.backend.domain.watch.model.RatingVisibility;
@@ -42,6 +43,7 @@ class RatingCreateServiceTest {
 
     private RatingCommandRepository repository;
     private FrameWriter frameWriter;
+    private TasteAnalysisWriter tasteAnalysisWriter;
     private KafkaEventPublisher eventPublisher;
     private RatingCreateService service;
 
@@ -49,11 +51,13 @@ class RatingCreateServiceTest {
     void setUp() {
         repository = mock(RatingCommandRepository.class);
         frameWriter = mock(FrameWriter.class);
+        tasteAnalysisWriter = mock(TasteAnalysisWriter.class);
         eventPublisher = mock(KafkaEventPublisher.class);
         service =
                 new RatingCreateService(
                         repository,
                         new RatingStateWriter(repository, frameWriter),
+                        tasteAnalysisWriter,
                         eventPublisher,
                         Clock.fixed(NOW, ZoneOffset.UTC));
     }
@@ -89,7 +93,7 @@ class RatingCreateServiceTest {
         assertThat(response.frame().frameId()).isEqualTo(17L);
         assertThat(response.popcorn().isNewFlavor()).isTrue();
         assertThat(response.popcorn().flavorCount()).isEqualTo(1L);
-        InOrder order = inOrder(repository, frameWriter, eventPublisher);
+        InOrder order = inOrder(repository, frameWriter, tasteAnalysisWriter, eventPublisher);
         order.verify(repository).lockActiveUser(USER_ID);
         order.verify(repository).lockMovie(MOVIE_ID);
         order.verify(repository).ratingExists(USER_ID, MOVIE_ID);
@@ -107,6 +111,8 @@ class RatingCreateServiceTest {
         order.verify(repository).refreshMovieRatingAggregate(MOVIE_ID);
         order.verify(frameWriter).create(13L, USER_ID, MOVIE_ID, NOW);
         order.verify(repository).countUserRatingsForFlavor(USER_ID, 7L);
+        // 취향 분석 캐시는 평가 저장 뒤 같은 트랜잭션에서 한 번 다시 계산된다(S15P21E106-775).
+        order.verify(tasteAnalysisWriter).refresh(USER_ID, NOW);
         order.verify(eventPublisher)
                 .publish(
                         KafkaEventType.RATING,
@@ -130,7 +136,7 @@ class RatingCreateServiceTest {
                                         .isEqualTo(ErrorCode.RATING_ALREADY_EXISTS));
 
         verify(repository, never()).createRatedWatch(USER_ID, MOVIE_ID, NOW);
-        verifyNoInteractions(frameWriter, eventPublisher);
+        verifyNoInteractions(frameWriter, tasteAnalysisWriter, eventPublisher);
     }
 
     @Test
@@ -146,7 +152,7 @@ class RatingCreateServiceTest {
                                         .isEqualTo(ErrorCode.UNAUTHORIZED));
 
         verify(repository, never()).lockMovie(MOVIE_ID);
-        verifyNoInteractions(frameWriter, eventPublisher);
+        verifyNoInteractions(frameWriter, tasteAnalysisWriter, eventPublisher);
     }
 
     @Test
@@ -174,7 +180,7 @@ class RatingCreateServiceTest {
         RatingCreateResponse response = service.create(USER_ID, MOVIE_ID, request);
 
         assertThat(response.spoiler()).isTrue();
-        InOrder order = inOrder(repository, frameWriter, eventPublisher);
+        InOrder order = inOrder(repository, frameWriter, tasteAnalysisWriter, eventPublisher);
         order.verify(repository)
                 .createRating(
                         USER_ID,

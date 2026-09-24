@@ -93,7 +93,8 @@ GitLab API의 정확한 커밋 archive를 사용한다. MR이 `.gitlab-ci.yml`�
 
 어댑터는 인증된 커밋에서 `pipeline/spark`만 다시 archive하고, 실행 파일·링크·`.env*`·가상환경과
 범위 밖 경로를 거부한다. Python 3.10.12, PySpark 4.1.3, pytest 8.4.2, ruff 0.12.12와
-검토된 psycopg 3.2.10, PyTorch 2.6.0 CPU, Transformers 4.48.3만 허용한다. uv lock은
+검토된 psycopg 3.2.10, PyTorch 2.6.0 CPU, Transformers 4.48.3과 GBT 벤치마크용
+pandas 2.2.3, pyarrow 19.0.1, scikit-learn 1.6.1, xgboost-cpu 2.1.4만 허용한다. uv lock은
 PyPI와 `https://download.pytorch.org/whl/cpu` registry, `files.pythonhosted.org/packages/`와
 `download-r2.pytorch.org/whl/cpu/`의 해시가 있는 패키지만 허용한다. 실행기는 digest로 고정한 전용
 Python/Java 이미지와 root 소유 설정에 고정된 의존성 캐시를 사용한다. 컨테이너는
@@ -126,6 +127,19 @@ sudo python3 /usr/local/lib/feelm-ci222/gitlab/ci-pipeline-mr-prepare.py
 sudo python3 /usr/local/lib/feelm-ci222/gitlab/ci-pipeline-mr-prepare.py \
   --source-root /path/to/reviewed/S15P21E106 \
   --confirm-prepare
+```
+
+기존 Pipeline MR 설정을 새 의존성 잠금 파일로 갱신할 때는 먼저 아래 adapter-only 갱신
+절차로 새 정책·준비 스크립트를 설치하고, 실행 중인 MR 작업이 없는 상태에서 검토된
+소스 checkout을 지정해 다음과 같이 실행한다. `--confirm-replace-config`는 기존
+설정의 소유권·형식과 캐시 identity를 확인한 뒤 새 캐시를 준비하고, 새 설정을 원자
+교체한다. 옵션을 생략하면 기존 설정을 캐시 준비 전에 거부한다. 이전 캐시는 성공
+확인 전까지 보존한다.
+
+```bash
+sudo python3 /usr/local/lib/feelm-ci222/gitlab/ci-pipeline-mr-prepare.py \
+  --source-root /path/to/reviewed/S15P21E106 \
+  --confirm-prepare --confirm-replace-config
 ```
 
 준비 중 의존성 다운로드는 Rootless Docker의 격리 계정에서 한 번만 허용하고, 같은 캐시로

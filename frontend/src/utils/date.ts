@@ -140,6 +140,20 @@ export function formatAgeGroup(birthDate: string, today: Date = new Date()): str
 }
 
 /**
+ * 날짜를 `<input type="date">`의 값 형식(`YYYY-MM-DD`)으로 만든다. 로컬 날짜 기준이다.
+ *
+ * 생년월일 칸의 `max`로 쓴다(업무 -851). `max`가 없으면 Chrome은 연도 칸에 6자리까지
+ * 받아 `19990314`를 이어 치면 월 · 일 칸으로 넘어가지 않는다. 4자리 연도를 `max`로 주면
+ * 연도 칸이 4자리에서 끝나 Tab 없이 8자리로 다 채워진다. 미래 날짜를 막는 것은 덤이다.
+ */
+export function toDateInputValue(date: Date = new Date()): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/**
  * ISO 8601 문자열을 `6월 12일 (수)` 형식으로 만든다.
  *
  * 2.2 추천 영화의 데스크톱 시안이 오늘 날짜를 이렇게 적는다(업무 -783). 요일까지 적는 것은
@@ -155,4 +169,30 @@ export function formatMonthDayWeekday(isoString: string): string {
   const weekday = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
 
   return `${formatMonthDay(isoString)} (${weekday})`;
+}
+
+/**
+ * ISO 8601 문자열을 `오후 7:05` 형식으로 만든다.
+ *
+ * 5.10 파티 추천 이력이 한 세트 안의 **노출 묶음**을 가를 때 쓴다(업무 -826). 같은 세트를
+ * 여러 번에 걸쳐 받았으면(다시 받기) 묶음마다 `exposedAt`이 다르고, 그 차이는 대개 같은 날
+ * 몇 분 · 몇 시간이라 날짜로는 구분되지 않는다.
+ *
+ * 묶음에 `다시 받기` 같은 이름을 붙이지 않고 시각을 적는다. 다시 받기 이전에 만들어진
+ * 세트는 항목마다 노출 시각이 다를 수 있어(API-083 처리 규칙) 순서에 이름을 붙이면 틀린
+ * 말이 된다. 시각은 어느 세트에서도 사실이다.
+ */
+export function formatTimeOfDay(isoString: string): string {
+  const date = new Date(isoString);
+
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  const hours = date.getHours();
+  const meridiem = hours < 12 ? '오전' : '오후';
+  // 0시는 오전 12시, 12시는 오후 12시다
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+
+  return `${meridiem} ${hour12}:${String(date.getMinutes()).padStart(2, '0')}`;
 }

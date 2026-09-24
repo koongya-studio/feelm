@@ -5,6 +5,7 @@ import com.feelm.backend.domain.onboarding.dto.response.OnboardingSubmitResponse
 import com.feelm.backend.domain.onboarding.entity.OnboardingPreference;
 import com.feelm.backend.domain.onboarding.entity.PreferenceChoice;
 import com.feelm.backend.domain.onboarding.repository.OnboardingPreferenceRepository;
+import com.feelm.backend.domain.taste.service.TasteAnalysisWriter;
 import com.feelm.backend.domain.user.entity.User;
 import com.feelm.backend.domain.user.repository.UserRepository;
 import com.feelm.backend.domain.watch.service.OnboardingRatingWriter;
@@ -16,6 +17,9 @@ import com.feelm.backend.infrastructure.kafka.KafkaEventPublisher;
 import com.feelm.backend.infrastructure.kafka.KafkaEventType;
 import com.feelm.backend.infrastructure.kafka.OnboardingEventPayload;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -35,7 +39,9 @@ public class OnboardingSubmitService {
     private final OnboardingPreferenceRepository onboardingPreferenceRepository;
     private final UserRepository userRepository;
     private final OnboardingRatingWriter onboardingRatingWriter;
+    private final TasteAnalysisWriter tasteAnalysisWriter;
     private final KafkaEventPublisher kafkaEventPublisher;
+    private final Clock clock;
 
     /**
      * 선택을 저장하고 온보딩을 완료 처리한다. 건너뛴 제출은 저장 없이 완료만 한다.
@@ -58,6 +64,7 @@ public class OnboardingSubmitService {
         if (user.isOnboardingCompleted()) {
             throw new BusinessException(ErrorCode.ONBOARDING_ALREADY_COMPLETED);
         }
+        Instant submittedAt = Instant.now(clock).truncatedTo(ChronoUnit.MICROS);
         onboardingRatingWriter.createMissing(
                 userId,
                 choices.stream()
@@ -80,6 +87,8 @@ public class OnboardingSubmitService {
         }
         user.completeOnboarding();
         if (!choices.isEmpty()) {
+            // 카드 수만큼 부르지 않도록 평가 생성 루프 밖에서 한 번만 다시 계산한다(S15P21E106-775).
+            tasteAnalysisWriter.refresh(userId, submittedAt);
             // 선택이 없으면 Consumer가 읽을 행도 없어 Fold-in 입력이 생기지 않는다(이벤트·Redis 계약 7장).
             kafkaEventPublisher.publish(
                     KafkaEventType.ONBOARDING, userId, new OnboardingEventPayload(choices.size()));

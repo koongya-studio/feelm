@@ -4,7 +4,7 @@
  * 구성은 사용자 시안 2026-09-17(업무 -458)을 따른다. 시안이 이 화면에 요구하는 것은
  * 하나다. **필름이 화면의 중심이고, 정보와 카드는 그 아래로 물러난다.**
  *
- * 공통 헤더(워드마크 · 검색 · 알림, `AppHeader`) / 제목 / 필름 / 팝콘 요약 / 취향 리포트 / 필름 늘리기
+ * 공통 헤더(워드마크 · 검색 · 알림, `AppHeader`) / 제목 / 필름 / 팝콘 요약 / 취향 리포트 / 평가·추천 진입점
  *
  * 이전 구성에서 바뀐 것
  * - 필름이 밝은 반투명 판(`FilmStrip` paper)에서 **검정에 주황빛이 도는 반투명 릴**로
@@ -14,8 +14,8 @@
  *   바꿨다. 분포는 3.2가 보여주는 화면이고 여기서는 "얼마나 모였나"만 말한다
  * - 팝콘을 색 점이 아니라 3D 스프라이트로 그린다. 8색은 밝은 면에서 4종이 판별되지
  *   않아(`design-concept.md` 2.5) 밝은 벽 위 요약에 색 점을 쓸 수 없다
- * - **주 버튼이 `필름 늘리기`다.** 이전에는 리포트가 검정 알약이고 필름 늘리기가 글자
- *   버튼이었다. 시안은 다음 영화를 만나는 것을 이 화면의 주 동작으로 본다
+ * - 평가와 추천을 명확히 나눈다(업무 -885). 모바일은 두 버튼을 나란히 놓고,
+ *   데스크톱은 제목 줄의 평가 버튼과 아래 오늘의 추천을 함께 보여준다
  * - 리포트는 작은 메뉴 줄로 내렸다
  * - 주 버튼이 로고와 같은 빨강이다(`Button` brand). 이 화면과 2.4만 쓴다
  *
@@ -37,8 +37,8 @@
  *   것(API-045)이며, 시안이 그 앞자리 몇 장을 여기서 먼저 보여준다
  * - 팝콘 요약 · 취향 리포트 줄이 우측 보조 패널로 간다(`FilmAside`). 본문에서는 뺀다 —
  *   같은 것을 두 자리에 두면 무엇을 눌러야 하는지가 흐려진다
- * - **`필름 늘리기` 버튼과 `옆으로 넘겨보세요` 힌트를 넓은 화면에서 뺀다**(사용자 결정
- *   2026-09-22). 시안에 없고, 2.2로 가는 길은 `오늘의 추천`의 `맞춤 N : 확장 M`이 맡는다.
+ * - **모바일의 행동 버튼과 `옆으로 넘겨보세요` 힌트를 넓은 화면에서 뺀다**(사용자 결정
+ *   2026-09-22). 2.2로 가는 길은 `오늘의 추천`의 `맞춤 N : 확장 M`이 맡는다.
  *   마우스로 끄는 것과 좌우 화살표가 있어 넘기는 방법도 힌트 없이 드러난다
  *
  * **필름을 끝까지 넘기면 다음 장을 이어 받는다**(업무 -656). API-042는 한 장에 20개를 주고
@@ -47,11 +47,12 @@
  * (4.2 검색과 같은 방식 — `IntersectionObserver`, 실패 뒤와 관찰이 안 되는 환경은 버튼).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import AppHeader from '../../../components/AppHeader';
 import Button from '../../../components/Button';
 import DesktopAside from '../../../components/DesktopAside';
 import FilmReel from '../../../components/FilmReel';
+import GuideCallout from '../../../components/GuideCallout';
 import { ChevronLeftIcon, ChevronRightIcon } from '../../../components/Icon';
 import Poster from '../../../components/Poster';
 import PosterCue from '../../../components/PosterCue';
@@ -63,7 +64,16 @@ import TodayRecommendations from './TodayRecommendations';
 import { getLatestReadyReport } from '../../../api/reports';
 import { getMyFrames, getPopcornBucket } from '../../../api/taste';
 import { useShellSize } from '../../../hooks/useShellSize';
+import { useAuth } from '../../../contexts/authContext';
+import { useDesktopAsideSlot } from '../../../contexts/desktopAsideContext';
 import { path } from '../../../routes/paths';
+import {
+  FILM_GUIDE,
+  PARTY_GUIDE,
+  completeGuide,
+  hasSeenGuide,
+  restartGuide,
+} from '../../../utils/userGuides';
 import styles from './FilmPage.module.css';
 import type { FrameList, PopcornBucket } from '../../../types/taste';
 
@@ -74,7 +84,7 @@ import type { FrameList, PopcornBucket } from '../../../types/taste';
  * 두 칸 반이 보이는 값이라, 오른쪽이 잘린 모습이 "더 있다"를 말해 준다.
  *
  * 높이는 375×812에서 이 화면 전체가 스크롤 없이 들어오는 상한이다. 측정해서 맞췄고
- * (본문 632px), 여기서 더 키우면 `필름 늘리기`가 하단 내비 밑으로 내려간다.
+ * (본문 632px), 여기서 더 키우면 행동 버튼이 하단 내비 밑으로 내려간다.
  */
 const FRAME_WIDTH = 110;
 const FRAME_HEIGHT = 165;
@@ -135,9 +145,63 @@ type MoreState = 'idle' | 'loading' | 'failed';
 /** 빈 필름에 남겨 두는 자리. 시안 01이 두 칸을 보여준다 */
 const EMPTY_SLOT_LABELS = ['첫 번째 프레임', '두 번째 프레임'];
 
+type FilmGuideStep = {
+  title: string;
+  description: string;
+  targetSelector: string;
+  placement?: 'top' | 'bottom';
+};
+
+const FILM_GUIDE_STEPS: FilmGuideStep[] = [
+  {
+    title: '감상 기록을 넘겨보세요',
+    description:
+      '처음 고른 영화부터 앞으로 평가할 영화까지 필름에 쌓여요. 옆으로 넘기며 다시 볼 수 있어요.',
+    targetSelector: "[data-guide-target='film-reel']",
+  },
+  {
+    title: '나의 취향 팝콘',
+    description:
+      '평가한 영화가 맛별 팝콘으로 모여요. 누르면 어떤 취향이 많은지 자세히 볼 수 있어요.',
+    targetSelector: "[aria-label^='나의 취향 팝콘']",
+  },
+  {
+    title: '취향 리포트',
+    description: '영화 감상 기록을 분석한 리포트를 확인하는 곳이에요.',
+    targetSelector: "[aria-label='취향 리포트 보기'],[aria-label='새 취향 리포트 받기']",
+  },
+  {
+    title: '새 소식을 확인하세요',
+    description: '새 추천이나 리포트 같은 소식은 알림에서 확인할 수 있어요.',
+    targetSelector: "a[aria-label^='알림']",
+  },
+  {
+    title: '본 영화를 평가해 보세요',
+    description:
+      '이 버튼과 상단 검색 모두 검색 화면으로 가요. 본 영화를 찾아 원할 때 평가하면 필름이 늘어나요.',
+    targetSelector: "[data-guide-target='film-rate']",
+    placement: 'top',
+  },
+  {
+    title: '영화 추천을 받아보세요',
+    description: '지금 취향에 맞는 추천 영화를 보러 갈 수 있어요.',
+    targetSelector: "[data-guide-target='film-recommendations']",
+    placement: 'top',
+  },
+];
+
 export default function FilmPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [guideDismissed, setGuideDismissed] = useState(false);
+  const showGuide = Boolean(user && !guideDismissed && !hasSeenGuide(user.userId, FILM_GUIDE));
+  const [guideIndex, setGuideIndex] = useState(0);
+  const finishGuide = () => {
+    if (user) completeGuide(user.userId, FILM_GUIDE);
+    setGuideDismissed(true);
+  };
   const desktop = useShellSize() !== 'mobile';
+  const asideSlot = useDesktopAsideSlot();
 
   const [frames, setFrames] = useState<FrameList | null>(null);
   const [more, setMore] = useState<MoreState>('idle');
@@ -146,6 +210,7 @@ export default function FilmPage() {
   /** 지금 릴에 보이는 프레임 구간. 모바일은 `last`만, 넓은 화면은 둘 다 쓴다 */
   const [range, setRange] = useState<FrameRange>({ first: 1, last: 1 });
   const [bucket, setBucket] = useState<PopcornBucket | null>(null);
+  const [bucketSettled, setBucketSettled] = useState(false);
   /** 아직 3.3에서 받지 않은 새 리포트. 있으면 리포트 줄이 발급(3.3)으로 간다 */
   const [newReportId, setNewReportId] = useState<number | null>(null);
   const [failed, setFailed] = useState(false);
@@ -175,7 +240,10 @@ export default function FilmPage() {
           setBucket(value);
         }
       })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => {
+        if (active) setBucketSettled(true);
+      });
 
     // 새 리포트를 확인하지 못해도 리포트 줄은 목록(7.3)으로 가는 원래 동작을 한다
     getLatestReadyReport()
@@ -334,6 +402,25 @@ export default function FilmPage() {
     (rest, flavor) => rest - flavor.popcornCount,
     bucket?.totalCount ?? 0,
   );
+  const showFilmGuide = showGuide && frames !== null && bucketSettled;
+  const hasAside = !desktop || asideSlot !== null;
+  const guideSteps = showFilmGuide
+    ? FILM_GUIDE_STEPS.filter((step) => {
+        if (step.title === '나의 취향 팝콘') {
+          return !isEmpty && hasAside && summaryFlavors.length > 0;
+        }
+        if (step.title === '취향 리포트') return !isEmpty && hasAside;
+        return true;
+      }).map((step) =>
+        step.title === '영화 추천을 받아보세요' && desktop
+          ? {
+              ...step,
+              targetSelector: "nav[aria-label='주요 화면'] a[href$='/recommendations']",
+            }
+          : step,
+      )
+    : [];
+  const activeGuideIndex = Math.min(guideIndex, guideSteps.length - 1);
 
   return (
     <>
@@ -357,6 +444,12 @@ export default function FilmPage() {
                 </p>
               ) : null}
             </div>
+
+            {!isEmpty ? (
+              <Link to={path.search()} className={styles.desktopRate} data-guide-target="film-rate">
+                본 영화 평가하기
+              </Link>
+            ) : null}
 
             {!isEmpty && items.length > 1 ? (
               <div className={styles.pager}>
@@ -405,7 +498,7 @@ export default function FilmPage() {
           </header>
         )}
 
-        <div className={styles.reelArea}>
+        <div className={styles.reelArea} data-guide-target="film-reel">
           {/* 넓은 화면의 필름은 주황빛이 없는 검정이다(2026-09-21 PC 웹 시안) */}
           <FilmReel
             tone={desktop ? 'plain' : 'warm'}
@@ -426,7 +519,10 @@ export default function FilmPage() {
                     key={frame.frameId}
                     type="button"
                     className={styles.frameButton}
-                    onClick={() => void navigate(path.movieDetail(frame.movie.movieId))}
+                    onClick={() => {
+                      finishGuide();
+                      void navigate(path.movieDetail(frame.movie.movieId));
+                    }}
                   >
                     <PosterCue>
                       <Poster
@@ -499,11 +595,23 @@ export default function FilmPage() {
         {isEmpty ? (
           <div className={styles.empty}>
             <h3 className={styles.emptyTitle}>아직 필름에 담긴 영화가 없어요</h3>
-            <p className={styles.emptyText}>영화를 만나며 취향 필름을 채워보세요</p>
-
-            <Button variant="brand" onClick={() => void navigate(path.recommendations())}>
-              추천 영화 둘러보기
-            </Button>
+            <p className={styles.emptyText}>본 영화를 평가하면 필름에 한 장씩 추가돼요</p>
+            <div className={styles.actionButtons}>
+              <Button
+                variant="brand"
+                data-guide-target="film-rate"
+                onClick={() => void navigate(path.search())}
+              >
+                본 영화 평가하기
+              </Button>
+              <Button
+                variant="secondary"
+                data-guide-target="film-recommendations"
+                onClick={() => void navigate(path.recommendations())}
+              >
+                영화 추천받기
+              </Button>
+            </div>
           </div>
         ) : desktop ? (
           <TodayRecommendations />
@@ -587,16 +695,25 @@ export default function FilmPage() {
               <span className={styles.reportText}>지금까지 본 영화로 만든 나만의 취향 분석</span>
             </button>
 
-            {/*
-             * 이 화면의 주 동작. 다음 영화를 만나는 것이 필름을 늘리는 유일한 길이다.
-             * **홈에서 오늘의 추천을 빼면서 이 자리가 2.2로 가는 상시 진입점이 됐다**(업무 -461).
-             */}
+            {/* 검색에서 본 영화를 골라 평가하고, 추천은 기존 2.2로 보낸다(업무 -885). */}
             <div className={styles.action}>
-              <p className={styles.actionHint}>다음 영화를 추천받아요</p>
-
-              <Button variant="brand" onClick={() => void navigate(path.recommendations())}>
-                필름 늘리기
-              </Button>
+              <p className={styles.actionHint}>본 영화를 평가하면 필름에 한 장씩 추가돼요</p>
+              <div className={styles.actionButtons}>
+                <Button
+                  variant="brand"
+                  data-guide-target="film-rate"
+                  onClick={() => void navigate(path.search())}
+                >
+                  본 영화 평가하기
+                </Button>
+                <Button
+                  variant="secondary"
+                  data-guide-target="film-recommendations"
+                  onClick={() => void navigate(path.recommendations())}
+                >
+                  영화 추천받기
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -610,6 +727,34 @@ export default function FilmPage() {
         <DesktopAside>
           <FilmAside bucket={bucket} frames={items} newReportId={newReportId} />
         </DesktopAside>
+      ) : null}
+      {showGuide && guideSteps.length > 0 ? (
+        <GuideCallout
+          step={activeGuideIndex + 1}
+          totalSteps={guideSteps.length}
+          targetSelector={guideSteps[activeGuideIndex].targetSelector}
+          placement={guideSteps[activeGuideIndex].placement}
+          title={guideSteps[activeGuideIndex].title}
+          description={guideSteps[activeGuideIndex].description}
+          onSkip={finishGuide}
+          action={
+            activeGuideIndex < guideSteps.length - 1
+              ? { label: '다음', onClick: () => setGuideIndex(activeGuideIndex + 1) }
+              : { label: '둘러보기', onClick: finishGuide }
+          }
+          secondaryAction={
+            activeGuideIndex === guideSteps.length - 1
+              ? {
+                  label: '파티 가이드 보기',
+                  onClick: () => {
+                    finishGuide();
+                    if (user) restartGuide(user.userId, PARTY_GUIDE);
+                    void navigate(path.party());
+                  },
+                }
+              : undefined
+          }
+        />
       ) : null}
     </>
   );

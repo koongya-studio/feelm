@@ -12,8 +12,10 @@ S15P21E106-824부터 K≥1 개인 GBT TASTE 상위 500편은 같은 모델·71�
 입력 snapshot·상태·Candidate와 원자 게시한다. 기존 Candidate v6와 `reasons[]`는 바꾸지 않는다.
 Consumer는 같은 Lua에서 내부 `gbt-evidence-current` identity도 갱신해 evidence 단독 잔존 시 이전 세대
 보존 TTL을 복구하며, attribution builder가 seal한 불변 snapshot 외의 게시를 거부한다.
-K0·DISCOVERY·ALS·오류/fallback은 GBT 근거로 표시하지 않는다. 상세 schema와 그룹은
-[`gbt-model-artifacts-v1 §4.1`](../contracts/gbt-model-artifacts.md#41-gbt-local-attribution-근거-v1-s15p21e106-824)과
+K0·DISCOVERY·ALS·오류/fallback은 GBT 근거로 표시하지 않는다. S15P21E106-840부터 v2는 양의 장르·콘텐츠
+관계 기여를 실제 4.0 이상 평가까지 추적할 수 있을 때만 `genreCode` 또는 `sourceMovieId`를 게시한다.
+Backend v1/v2 동시 수용을 먼저 배포한 뒤 Consumer v2를 활성화하고, v1-only Backend로 롤백하지 않는다.
+상세 schema와 그룹은 [`gbt-model-artifacts-v1 §4.1~4.2`](../contracts/gbt-model-artifacts.md#42-gbt-구체-표시-근거-v2-s15p21e106-840)과
 [`streaming-contract §5.2`](../../docs/api/streaming-contract.md#52-값-구조)를 따른다. 825가 별도 key를
 소비하고 628이 shadow·종단 승인을 끝내기 전에는 이 근거 기반 문구를 운영에 활성화하지 않는다.
 

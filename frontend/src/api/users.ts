@@ -13,10 +13,12 @@
  */
 import { mockMyProfileView } from '../mocks/publicProfiles';
 import { getProfileExtras, saveProfileExtras } from '../mocks/sessionStore';
+import { getMyTaste } from './taste';
 import { readAsDataUrl } from '../utils/avatarImage';
 import { request } from './client';
 import { getMockProfile, isMockSession, saveMockProfile } from './mockAccount';
 import { respond, respondError } from './mockTransport';
+import type { TasteKeyword } from '../types/taste';
 import type { ProfileExtrasUpdate, ProfileView } from '../types/unspecified';
 import type {
   MyProfile,
@@ -117,15 +119,20 @@ export const BIO_MAX_LENGTH = 40;
 /**
  * 내 프로필 전체(7.1 · 7.2). 모든 키워드 · 필름이 `isPublic`과 함께 온다.
  *
- * 닉네임 · 사진과 프레임 · 팝콘 수는 **실제 API-014**다. 나머지는 목업 기준값
- * (`mockMyProfileView`)에 바꾼 소개 · 공개 항목을 덮는다 — 그 둘은 계약에 자리가 없어 이번
- * 세션의 목업 저장소에서 온다.
+ * 닉네임 · 사진과 프레임 · 팝콘 수는 **실제 API-014**, 취향 키워드는 **실제 API-040**이다
+ * (업무 S15P21E106-836). 나머지는 목업 기준값(`mockMyProfileView`)에 바꾼 소개 · 공개 항목을
+ * 덮는다 — 그 둘은 계약에 자리가 없어 이번 세션의 목업 저장소에서 온다.
+ *
+ * **키워드를 못 받아도 프로필은 준다.** 취향 분석이 실패했다고 프로필 화면 전체를 막을 이유가
+ * 없다. 그때는 키워드가 빈 배열이고 화면이 빈 상태 문구를 그린다.
  */
 export async function getMyProfileView(): Promise<ProfileView> {
-  return respond(toProfileView(await getMyProfile()), 'users');
+  const [profile, taste] = await Promise.all([getMyProfile(), getMyTaste().catch(() => null)]);
+
+  return respond(toProfileView(profile, taste?.keywords ?? []), 'users');
 }
 
-function toProfileView(profile: MyProfile): ProfileView {
+function toProfileView(profile: MyProfile, keywords: TasteKeyword[]): ProfileView {
   const extras = getProfileExtras();
   const base = mockMyProfileView;
 
@@ -140,9 +147,11 @@ function toProfileView(profile: MyProfile): ProfileView {
       frameCount: profile.stats.frameCount,
       popcornCount: profile.stats.popcornCount,
     },
-    keywords: base.keywords.map((keyword) => ({
+    keywords: keywords.map((keyword) => ({
       ...keyword,
-      isPublic: extras.publicKeywordCodes?.includes(keyword.code) ?? keyword.isPublic,
+      // 저장된 공개 목록에 없는 코드는 공개로 본다(업무 -836). 평가할 때마다 키워드가 달라지는데
+      // 기본을 비공개로 두면 서버가 새로 만들어 준 키워드가 공개 프로필 어디에도 안 보인다.
+      isPublic: extras.publicKeywordCodes?.includes(keyword.code) ?? true,
     })),
     frames: base.frames.map((frame) => ({
       ...frame,
@@ -241,11 +250,11 @@ export async function updateProfileExtras(update: ProfileExtrasUpdate): Promise<
     return respondError(400, 'VALIDATION_FAILED', `소개는 ${BIO_MAX_LENGTH}자까지 쓸 수 있어요.`);
   }
 
-  const profile = await getMyProfile();
+  const [profile, taste] = await Promise.all([getMyProfile(), getMyTaste().catch(() => null)]);
 
   saveProfileExtras(update);
 
-  return respond(toProfileView(profile), 'users');
+  return respond(toProfileView(profile, taste?.keywords ?? []), 'users');
 }
 
 /**

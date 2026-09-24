@@ -18,6 +18,7 @@ import MovieDetailPage from './index';
 import { renderWithRouter } from '../../../test/render';
 import { AuthContext } from '../../../contexts/authContext';
 import { ROUTE_PATTERN, path } from '../../../routes/paths';
+import { MOVIE_DETAIL_GUIDE, hasSeenGuide, restartGuide } from '../../../utils/userGuides';
 import type { AuthStatus, AuthValue } from '../../../contexts/authContext';
 import type { MovieDetail } from '../../../types/movie';
 import type { WatchRecord } from '../../../types/watch';
@@ -155,6 +156,7 @@ function renderMovie(movieId = 101, status: AuthStatus = 'anonymous') {
 const location = () => screen.getByTestId('location').textContent;
 
 beforeEach(() => {
+  localStorage.clear();
   vi.mocked(getMovieDetail).mockReset().mockResolvedValue(movie());
   vi.mocked(getSimilarMovies).mockReset().mockResolvedValue([]);
   vi.mocked(getMovieReviews)
@@ -164,6 +166,31 @@ beforeEach(() => {
   vi.mocked(getPopcornFlavors).mockReset().mockResolvedValue(FLAVORS);
   // jsdom의 `scrollTo`는 구현이 없다고 콘솔에 찍는다. 불렸는지만 세면 된다
   vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+});
+
+describe('첫 이용 안내', () => {
+  it('어느 경로로 연 영화든 평가하지 않고 상세 안내를 마칠 수 있다', async () => {
+    restartGuide(42, MOVIE_DETAIL_GUIDE);
+    renderWithRouter(
+      <AuthContext.Provider
+        value={{
+          ...authValue('authenticated'),
+          user: { userId: 42, nickname: '새 사용자', onboardingCompleted: true },
+        }}
+      >
+        <MovieDetailPage />
+      </AuthContext.Provider>,
+      {
+        route: path.movieDetail(101),
+        path: ROUTE_PATTERN.movieDetail,
+      },
+    );
+
+    expect(await screen.findByText('영화 상세를 자유롭게 둘러보세요')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '상세 안내 마치기' }));
+    expect(hasSeenGuide(42, MOVIE_DETAIL_GUIDE)).toBe(true);
+    expect(screen.getByRole('button', { name: '내 별점 남기기' })).toBeInTheDocument();
+  });
 });
 
 /*

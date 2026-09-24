@@ -100,7 +100,7 @@ class PartyRefreshIntegrationTest extends SharedPostgresContractTest {
 
     @Test
     void retriesRedisFailureAfterPartyCreateCommit() {
-        long partyId = partyService.create(101L, "created party").partyId();
+        long partyId = partyService.create(101L, "created party", 4).partyId();
         when(redis.read(List.of(101L)))
                 .thenThrow(new IllegalStateException("redis unavailable"))
                 .thenReturn(snapshot(101L));

@@ -107,7 +107,8 @@ describe('소셜 로그인 콜백', () => {
 
     await waitFor(() => expect(location).toHaveTextContent('/signup/social/profile'));
     expect(location).toHaveTextContent('signup-token');
-    expect(location).toHaveTextContent('구글사용자');
+    // 제안 닉네임은 넘기지 않는다. 0.3-A는 빈 칸에서 시작한다(업무 -851)
+    expect(location).not.toHaveTextContent('구글사용자');
   });
 
   it('보낸 적 없는 state로 돌아오면 코드를 넘기지 않는다', async () => {

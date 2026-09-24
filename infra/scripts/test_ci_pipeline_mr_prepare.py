@@ -27,6 +27,54 @@ class PipelinePrepareTests(unittest.TestCase):
             self.assertEqual(prepare.main(), 0)
         run.assert_not_called()
 
+    def test_replace_requires_explicit_prepare_confirmation(self):
+        prepare = load_prepare()
+        with patch.object(sys, 'argv', ['prepare', '--confirm-replace-config']), \
+             patch.object(prepare, 'prepare') as run, \
+             self.assertRaises(SystemExit) as error:
+            prepare.main()
+        self.assertEqual(2, error.exception.code)
+        run.assert_not_called()
+
+    def test_confirmed_replacement_is_forwarded_to_preparer(self):
+        prepare = load_prepare()
+        with patch.object(sys, 'argv', ['prepare', '--source-root', '/reviewed',
+                                        '--confirm-prepare', '--confirm-replace-config']), \
+             patch.object(prepare, 'prepare') as run:
+            self.assertEqual(0, prepare.main())
+        run.assert_called_once_with('/reviewed', replace_config=True)
+
+    def test_preparer_installs_with_explicit_replace_flag(self):
+        prepare = load_prepare()
+        with patch.object(prepare, 'require_host'), \
+             patch.object(prepare, 'trusted_source', return_value={}) as source, \
+             patch.object(prepare, 'verify_config_target') as target, \
+             patch.object(prepare, 'existing_image', return_value='sha256:' + 'a' * 64), \
+             patch.object(prepare, 'prepare_cache', return_value=(Path('/cache'), 'b' * 64)), \
+             patch.object(prepare.configurator, 'install') as install:
+            prepare.prepare('/reviewed', replace_config=True)
+        source.assert_called_once_with('/reviewed')
+        target.assert_called_once_with(True)
+        install.assert_called_once_with(str(Path('/cache')), 'b' * 64, prepare.PROJECT_SHA256,
+                                        prepare.LOCK_SHA256, replace=True)
+
+    def test_existing_config_requires_replacement_before_cache_creation(self):
+        prepare = load_prepare()
+        with tempfile.TemporaryDirectory() as temporary, \
+             patch.object(prepare.configurator, 'CONFIG', Path(temporary) / 'config.json'), \
+             patch.object(prepare.runner, 'read_config') as read, \
+             patch.object(prepare.runner, 'verify_cache_identity') as verify:
+            prepare.verify_config_target(False)
+            read.assert_not_called()
+            (Path(temporary) / 'config.json').write_text('existing')
+            with self.assertRaisesRegex(RuntimeError, 'explicit replacement required'):
+                prepare.verify_config_target(False)
+            read.assert_not_called()
+            read.return_value = {'dependency_cache': 'old'}
+            prepare.verify_config_target(True)
+            read.assert_called_once_with(Path(temporary) / 'config.json')
+            verify.assert_called_once_with(read.return_value)
+
     def test_build_inputs_and_base_are_digest_pinned(self):
         prepare = load_prepare()
         self.assertRegex(prepare.BASE_IMAGE, r'@sha256:[0-9a-f]{64}$')
@@ -55,13 +103,13 @@ class PipelinePrepareTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, 'reviewed revision'):
                 prepare.trusted_source(root)
 
-    def test_reviewed_dependency_hashes_match_embedding_mr(self):
+    def test_reviewed_dependency_hashes_match_gbt_benchmark_mr(self):
         prepare = load_prepare()
-        self.assertEqual(
-            '9af26ce74eb1e9ce9de985bc4e686b06f168d120a8346499ed6bfa4b85826150',
+        self.assertEqual(hashlib.sha256(
+            (ROOT / 'pipeline/spark/pyproject.toml').read_bytes()).hexdigest(),
             prepare.PROJECT_SHA256)
-        self.assertEqual(
-            'a61495007822f2456d63aeba01c5b22a0c26eba076aa2a0d79552eb3dc2a6c23',
+        self.assertEqual(hashlib.sha256(
+            (ROOT / 'pipeline/spark/uv.lock').read_bytes()).hexdigest(),
             prepare.LOCK_SHA256)
 
     def test_cache_population_is_online_once_then_offline(self):

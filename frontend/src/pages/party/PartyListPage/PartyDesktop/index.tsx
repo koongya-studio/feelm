@@ -1,7 +1,9 @@
 /*
  * 5.1 파티팝콘 데스크톱 본문 (업무 S15P21E106-785).
  *
- * 2026-09-21 PC 시안의 가운데 단이다. 위에서부터 제목 줄 · `받은 초대` · `참여 중인 파티`다.
+ * 2026-09-21 PC 시안의 가운데 단이다. 위에서부터 제목 줄 · `받은 초대` · `참여 중인 파티` ·
+ * `지난 파티`다. 마지막 구역은 시안에 없고 업무 -826에서 412px과 나란히 넣었다 — 종료 파티로
+ * 들어가는 길이 폭에 따라 있다가 없으면 안 된다.
  * **412px 이하는 이 파일을 지나지 않는다** — 폭에 따라 그리는 것 자체가 갈린다
  * (`hooks/useShellSize`, 업무 -782).
  *
@@ -56,7 +58,9 @@ type Props = {
   /** 수락을 보내는 중인 초대. 그동안 그 카드의 두 버튼은 눌리지 않는다 */
   acceptingId: number | null;
   onCreateParty: () => void;
-  onJoinByCode: () => void;
+  /** 끝난 파티(API-050 `status=CLOSED`). 추천 이력(5.10)으로만 들어간다(업무 -826) */
+  closedParties: Party[];
+  onOpenHistory: (partyId: number) => void;
 };
 
 export default function PartyDesktop({
@@ -73,7 +77,8 @@ export default function PartyDesktop({
   onAccept,
   acceptingId,
   onCreateParty,
-  onJoinByCode,
+  closedParties,
+  onOpenHistory,
 }: Props) {
   return (
     <div className={styles.page}>
@@ -84,22 +89,21 @@ export default function PartyDesktop({
           <p className={styles.subtitle}>같이 볼 영화, 함께 골라요</p>
         </div>
 
-        <div className={styles.headActions}>
+        <div className={styles.headActions} data-guide-target="party-create">
           <Button variant="brand" onClick={onCreateParty}>
             {/* 시안의 `+`. 더하기 아이콘이 없어 글자로 둔다 — 새 자산을 만들지 않는다 */}
             <span aria-hidden="true">+</span>
             파티 만들기
           </Button>
-
-          <Button variant="secondary" onClick={onJoinByCode}>
-            <PartyGroupIcon />
-            초대 코드로 참여하기
-          </Button>
         </div>
       </header>
 
       {invitations.length > 0 ? (
-        <section className={styles.section} aria-labelledby="party-invitations">
+        <section
+          className={styles.section}
+          aria-labelledby="party-invitations"
+          data-guide-target="party-invitations"
+        >
           <h2 className={styles.sectionTitle} id="party-invitations">
             받은 초대 {invitations.length}
           </h2>
@@ -132,7 +136,7 @@ export default function PartyDesktop({
                       {/*
                        * `memberCount`는 지금 참여 중인 사람 수라 **나까지 세려면 1을 더한다**
                        * (5.6과 같은 계산). 정원은 계약이 정한 값이며 초대 응답에 없어
-                       * 파티 응답의 `maxMembers`와 같은 수(4)를 쓴다.
+                       * 정원 표시는 파티 응답의 `maxMembers`를 쓴다.
                        */}
                       <p className={styles.inviteCount}>
                         <PartyGroupIcon />
@@ -169,7 +173,11 @@ export default function PartyDesktop({
       ) : null}
 
       {parties.length > 0 ? (
-        <section className={styles.section} aria-labelledby="party-joined">
+        <section
+          className={styles.section}
+          aria-labelledby="party-joined"
+          data-guide-target="party-active"
+        >
           <h2 className={styles.sectionTitle} id="party-joined">
             참여 중인 파티 {parties.length}
           </h2>
@@ -248,13 +256,52 @@ export default function PartyDesktop({
                     </span>
                   </button>
 
-                  <Button variant="secondary" onClick={() => onOpenParty(party.partyId)}>
+                  <Button
+                    variant="secondary"
+                    data-guide-target="party-open"
+                    onClick={() => onOpenParty(party.partyId)}
+                  >
                     파티로 이동
                     <ChevronRightIcon />
                   </Button>
                 </li>
               );
             })}
+          </ul>
+        </section>
+      ) : null}
+
+      {/*
+       * 지난 파티(업무 -826). 412px과 같은 자리 · 같은 문구이며 격자가 아니라 줄 목록이다 —
+       * 끝난 파티에는 보여 줄 통도 취향도 없다(계약이 종료 파티에 남긴 것은 추천 이력뿐이다).
+       */}
+      {closedParties.length > 0 ? (
+        <section
+          className={styles.section}
+          aria-labelledby="party-closed"
+          data-guide-target="party-history"
+        >
+          <h2 className={styles.sectionTitle} id="party-closed">
+            지난 파티 {closedParties.length}
+          </h2>
+
+          <ul className={styles.closedList}>
+            {closedParties.map((party) => (
+              <li key={party.partyId}>
+                <button
+                  type="button"
+                  className={styles.closedCard}
+                  onClick={() => onOpenHistory(party.partyId)}
+                >
+                  <span className={styles.closedBody}>
+                    <span className={styles.partyName}>{party.name}</span>
+                    <span className={styles.closedText}>그때 추천받은 영화 보기</span>
+                  </span>
+
+                  <ChevronRightIcon />
+                </button>
+              </li>
+            ))}
           </ul>
         </section>
       ) : null}

@@ -35,6 +35,13 @@ import ScreenHeader from '../../../components/ScreenHeader';
 import { useAuth } from '../../../contexts/authContext';
 import { usePwaInstall } from '../../../pwa/installContext';
 import { path } from '../../../routes/paths';
+import {
+  FILM_GUIDE,
+  MOVIE_DETAIL_GUIDE,
+  PARTY_GUIDE,
+  restartFirstUse,
+  restartGuide,
+} from '../../../utils/userGuides';
 import styles from './SettingsPage.module.css';
 
 /** 와이어프레임 7.8의 표기 */
@@ -42,7 +49,7 @@ const APP_VERSION = 'v 1.0.0';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const { availability: installAvailability, install } = usePwaInstall();
   const [signingOut, setSigningOut] = useState(false);
   const [showIosInstallGuide, setShowIosInstallGuide] = useState(false);
@@ -119,6 +126,18 @@ export default function SettingsPage() {
               ? [{ label: 'Feelm 앱 설치', onClick: handleInstall }]
               : []),
             { label: '차단 사용자 관리', to: path.blockedUsers() },
+            {
+              label: '앱 사용법 다시 보기',
+              onClick: () => {
+                if (user) {
+                  restartFirstUse(user.userId);
+                  restartGuide(user.userId, MOVIE_DETAIL_GUIDE);
+                  restartGuide(user.userId, PARTY_GUIDE);
+                  restartGuide(user.userId, FILM_GUIDE);
+                }
+                void navigate(path.recommendations());
+              },
+            },
             { label: '버전 정보', value: APP_VERSION },
             { label: '로그아웃', onClick: () => void handleSignOut() },
           ]}

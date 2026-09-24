@@ -547,7 +547,7 @@ include:
         self.assertIn('needs: [frontend-test]', frontend_image)
         self.assertIn('needs: [frontend-image]', frontend_deploy)
         self.assertIn('needs: [consumer-test]', consumer_image)
-        self.assertIn('needs: [consumer-image]', consumer_deploy)
+        self.assertIn('needs:\n    - job: consumer-image\n    - job: deploy-backend\n      optional: true\n      artifacts: false', consumer_deploy)
 
         for block in (backend_deploy, frontend_deploy):
             self.assertIn('resource_group: service-and-backend-cache', block)

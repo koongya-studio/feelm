@@ -66,6 +66,7 @@ export default function RecommendationCard({
         to={path.movieDetail(movie.movieId)}
         state={{ recommendationItemId: item.recommendationItemId }}
         className={styles.posterLink}
+        data-guide-target="recommendation"
         aria-label={`${movie.title} 상세 보기`}
       >
         <PosterCue cue={false}>

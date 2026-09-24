@@ -33,11 +33,24 @@
  *   5.6이 `초대를 확인하지 못했어요`로 받는다
  * - 초대를 못 받아 와도 파티 목록은 그대로 둔다. 둘은 다른 요청이다
  *
- * `[?]` **`초대 코드로 참여하기`는 계약에 없다.** API-051 초대는 닉네임 검색(API-019)으로
- * 찾은 `userId`를 받고, 코드나 링크로 참여하는 경로는 정의되어 있지 않다. 시안이 확정한
- * 자리이므로 버튼은 두고, 누르면 준비 중임을 알린다(`wireframe-change-requests.md` CR-26).
+ * **`초대 코드로 참여하기`는 업무 -853에서 제거했다.** API-051 초대는 닉네임 검색
+ * (API-019)으로 찾은 `userId`를 받고, 코드나 링크로 참여하는 경로는 정의되어 있지 않다.
+ * 제공하지 않는 참여 방법을 준비 중 기능처럼 노출하지 않는다(`wireframe-change-requests.md`
+ * CR-26).
  *
  * 목록은 **활성 파티만** 보여준다(API-050 기본값). 나가거나 종료한 파티는 여기서 빠진다.
+ *
+ * **`지난 파티` 구역은 업무 -826에서 넣었다.** API-050이 `status=CLOSED`로 종료 파티를
+ * 내려주고 계약이 그 목적을 `추천 이력 확인용`이라고 적어 두었는데, 프론트는 기본값만
+ * 불러 종료 파티를 어디에도 보여 주지 않았다. 백엔드가 파티 추천 이력 API-083을 만들며
+ * (업무 -815) 목적지가 생겼으므로 그 길을 여기에 둔다.
+ *
+ * - 참여 중인 파티 **아래**에 둔다. 지난 일은 지금 하는 일보다 급하지 않다
+ * - 끝난 파티가 없으면 구역을 그리지 않는다. 받은 초대 구역과 같은 이유다
+ * - 줄을 누르면 5.10 파티 추천 이력으로 간다. 종료 파티의 팝콘(5.8)으로는 가지 않는다 —
+ *   계약이 종료 파티에 남겨 둔 것은 추천 이력뿐이다
+ * - **끝난 파티를 못 받아 와도 활성 목록은 그대로 둔다.** 서로 다른 요청이다
+ * - **첫 장만 보여준다**(`getClosedParties` 머리말). 지난 파티를 끝까지 훑는 화면이 아니다
  *
  * `[?]` 와이어프레임은 파티마다 `케이퍼 · 스릴러` 같은 **공통 장르**를 보여주는데
  * API-050 응답에는 없다(이름 · 상태 · 멤버 · 정원뿐). 없는 값을 지어내지 않고 같은
@@ -49,7 +62,7 @@
  * **412px 이하 화면은 아래 그대로다** — 폭에 따라 그리는 것 자체가 갈린다
  * (`hooks/useShellSize`, 업무 -782).
  *
- * - 제목 줄 오른쪽에 `파티 만들기` · `초대 코드로 참여하기`가 선다
+ * - 제목 줄 오른쪽에 `파티 만들기`가 선다
  * - `받은 초대`가 카드가 되고 카드에서 **바로 수락**할 수 있다(API-053). 5.6은 그대로 있다
  * - `참여 중인 파티`가 격자가 되고, **카드를 누르면 고른 파티가 바뀐다.** 파티 화면으로
  *   가는 것은 카드 아래의 `파티로 이동`이다
@@ -61,6 +74,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import Button from '../../../components/Button';
+import GuideCallout from '../../../components/GuideCallout';
 import PopcornBucket from '../../../components/PopcornBucket';
 import Snackbar from '../../../components/Snackbar';
 import StatusView from '../../../components/StatusView';
@@ -72,14 +86,17 @@ import PartyAside from './PartyAside';
 import PartyDesktop from './PartyDesktop';
 import {
   acceptInvitation,
+  getClosedParties,
   getMyInvitations,
   getMyParties,
   getPartyPopcorn,
 } from '../../../api/parties';
 import { getPopcornFlavors } from '../../../api/taste';
 import { useShellSize } from '../../../hooks/useShellSize';
+import { useAuth } from '../../../contexts/authContext';
 import { path } from '../../../routes/paths';
 import { mixedFlavors } from '../../../utils/party';
+import { PARTY_GUIDE, completeGuide, hasSeenGuide } from '../../../utils/userGuides';
 import type { Party, PartyInvitation, PartyMember, PartyPopcorn } from '../../../types/party';
 import styles from './PartyListPage.module.css';
 
@@ -143,8 +160,18 @@ function toFaces(members: PartyMember[]) {
 
 export default function PartyListPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const [guideDismissed, setGuideDismissed] = useState(false);
+  const [guideIndex, setGuideIndex] = useState(0);
+  const showGuide = Boolean(user && !guideDismissed && !hasSeenGuide(user.userId, PARTY_GUIDE));
+  const finishGuide = () => {
+    if (user) completeGuide(user.userId, PARTY_GUIDE);
+    setGuideDismissed(true);
+  };
   const desktop = useShellSize() !== 'mobile';
   const [parties, setParties] = useState<Party[] | null>(null);
+  /** 끝난 파티(API-050 `status=CLOSED`). 5.10으로 가는 `지난 파티` 구역이 쓴다(업무 -826) */
+  const [closedParties, setClosedParties] = useState<Party[]>([]);
   const [invitations, setInvitations] = useState<PartyInvitation[] | null>(null);
   /**
    * 파티별 팝콘(API-057). 412px에서는 첫 파티 하나뿐이고, 데스크톱에서는 카드마다 통이
@@ -183,6 +210,27 @@ export default function PartyListPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    /*
+     * 끝난 파티는 활성 목록과 **다른 요청**이다(API-050에 둘을 함께 주는 값이 없다).
+     * 못 받아 와도 활성 목록은 그대로 두고 구역만 그리지 않는다 — 지난 파티는 이 화면이
+     * 하려는 일(파티 시작하기)의 곁가지다.
+     */
+    getClosedParties()
+      .then((value) => {
+        if (active) setClosedParties(value);
+      })
+      .catch(() => {
+        if (active) setClosedParties([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [reloadCount]);
 
   useEffect(() => {
     let active = true;
@@ -255,6 +303,64 @@ export default function PartyListPage() {
 
   const hasParties = parties !== null && parties.length > 0;
   const hasInvitations = invitations !== null && invitations.length > 0;
+  const guideSteps = [
+    ...(hasInvitations
+      ? [
+          {
+            title: '받은 초대',
+            description: '친구가 초대했다면 여기에서 확인하고 참여할 수 있어요.',
+            targetSelector: "[data-guide-target='party-invitations']",
+          },
+        ]
+      : []),
+    ...(hasParties
+      ? [
+          {
+            title: '참여 중인 파티',
+            description: '파티원과 참여 인원, 함께 모인 취향을 여기에서 확인할 수 있어요.',
+            targetSelector: "[data-guide-target='party-active']",
+          },
+          {
+            title: '파티 안으로 들어가기',
+            description: '파티를 열면 멤버의 팝콘을 보고 함께 볼 영화를 추천받을 수 있어요.',
+            targetSelector: "[data-guide-target='party-open']",
+          },
+        ]
+      : [
+          {
+            title: '함께 영화 고르기',
+            description:
+              '파티를 만들면 친구를 초대하고 함께 볼 영화를 고를 수 있어요. 지금은 둘러보기만 해도 됩니다.',
+            targetSelector: "[data-guide-target='party-create']",
+          },
+        ]),
+    ...(closedParties.length > 0
+      ? [
+          {
+            title: '지난 파티',
+            description: '끝난 파티에서 추천받았던 영화는 여기에서 다시 볼 수 있어요.',
+            targetSelector: "[data-guide-target='party-history']",
+          },
+        ]
+      : []),
+  ];
+  const activeGuideIndex = Math.min(guideIndex, guideSteps.length - 1);
+  const guideCallout =
+    showGuide && parties !== null && (invitations !== null || invitationsFailed) && !failed ? (
+      <GuideCallout
+        step={activeGuideIndex + 1}
+        totalSteps={guideSteps.length}
+        targetSelector={guideSteps[activeGuideIndex].targetSelector}
+        title={guideSteps[activeGuideIndex].title}
+        description={guideSteps[activeGuideIndex].description}
+        onSkip={finishGuide}
+        action={
+          activeGuideIndex < guideSteps.length - 1
+            ? { label: '다음', onClick: () => setGuideIndex(activeGuideIndex + 1) }
+            : { label: '둘러보기', onClick: finishGuide }
+        }
+      />
+    ) : null;
 
   /*
    * 대표 파티 한 방과 나머지. **대표는 아래 줄에서 뺀다** — 같은 파티 이름이 화면에 두 번
@@ -332,13 +438,21 @@ export default function PartyListPage() {
           commonFlavorsOf={(partyId) => commonFlavorsOf(popcorns.get(partyId) ?? null)}
           selectedId={selectedId}
           onSelect={setSelectedId}
-          onOpenParty={(partyId) => void navigate(path.partyPopcorn(partyId))}
+          onOpenParty={(partyId) => {
+            finishGuide();
+            void navigate(path.partyPopcorn(partyId));
+          }}
           onOpenInvitation={(invitationId) => void navigate(path.partyInvitation(invitationId))}
           onAccept={handleAccept}
           acceptingId={acceptingId}
-          onCreateParty={() => void navigate(path.partyNew())}
-          onJoinByCode={() => setNotice('초대 코드로 참여하기는 준비 중이에요')}
+          closedParties={closedParties}
+          onOpenHistory={(partyId) => void navigate(path.partyRecommendationHistory(partyId))}
+          onCreateParty={() => {
+            finishGuide();
+            void navigate(path.partyNew());
+          }}
         />
+        {guideCallout}
 
         {/* 초대만 못 받아 온 경우다. 파티 목록은 그대로 둔다 */}
         {invitationsFailed ? (
@@ -393,7 +507,11 @@ export default function PartyListPage() {
         ) : null}
 
         {hasInvitations ? (
-          <section className={styles.invitations} aria-labelledby="party-invitations">
+          <section
+            className={styles.invitations}
+            aria-labelledby="party-invitations"
+            data-guide-target="party-invitations"
+          >
             <h2 className={styles.sectionLabel} id="party-invitations">
               받은 초대 {invitations.length}
             </h2>
@@ -449,7 +567,7 @@ export default function PartyListPage() {
          * 누르면 지금까지와 같은 곳(5.8 파티원 팝콘)으로 간다.
          */}
         {firstParty ? (
-          <section className={styles.hero}>
+          <section className={styles.hero} data-guide-target="party-active">
             <div className={styles.heroHead}>
               <h2 className={styles.heroTitle}>{firstParty.name}</h2>
 
@@ -499,7 +617,11 @@ export default function PartyListPage() {
             <button
               type="button"
               className={styles.heroAction}
-              onClick={() => void navigate(path.partyPopcorn(firstParty.partyId))}
+              data-guide-target="party-open"
+              onClick={() => {
+                finishGuide();
+                void navigate(path.partyPopcorn(firstParty.partyId));
+              }}
             >
               <PlayIcon />
               파티 팝콘 보기
@@ -547,6 +669,43 @@ export default function PartyListPage() {
           </section>
         ) : null}
 
+        {/*
+         * 지난 파티(업무 -826). 끝난 파티는 추천 이력(5.10)으로만 들어간다 — 팝콘 · 멤버는
+         * 계약이 종료 파티에 열어 두지 않았다.
+         */}
+        {closedParties.length > 0 ? (
+          <section
+            className={styles.closed}
+            aria-labelledby="party-closed"
+            data-guide-target="party-history"
+          >
+            <h2 className={styles.sectionLabel} id="party-closed">
+              지난 파티 {closedParties.length}
+            </h2>
+
+            <ul className={styles.list}>
+              {closedParties.map((party) => (
+                <li key={party.partyId}>
+                  <button
+                    type="button"
+                    className={styles.closedCard}
+                    onClick={() => void navigate(path.partyRecommendationHistory(party.partyId))}
+                  >
+                    <span className={styles.body}>
+                      <span className={styles.name}>{party.name}</span>
+                      <span className={styles.inviteText}>그때 추천받은 영화 보기</span>
+                    </span>
+
+                    <span className={styles.chevron} aria-hidden="true">
+                      ›
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
         {/* 파티가 없으면 통이 화면 가운데를 잡는다. 시안의 강조 카드가 설 자리다 */}
         {parties !== null && !hasParties ? (
           <div className={styles.stage}>
@@ -559,16 +718,15 @@ export default function PartyListPage() {
         ) : null}
 
         {parties !== null ? (
-          <div className={styles.actions}>
-            <Button variant="brand" onClick={() => void navigate(path.partyNew())}>
-              파티 만들기
-            </Button>
-
+          <div className={styles.actions} data-guide-target="party-create">
             <Button
-              variant="secondary"
-              onClick={() => setNotice('초대 코드로 참여하기는 준비 중이에요')}
+              variant="brand"
+              onClick={() => {
+                finishGuide();
+                void navigate(path.partyNew());
+              }}
             >
-              초대 코드로 참여하기
+              파티 만들기
             </Button>
           </div>
         ) : null}
@@ -578,6 +736,7 @@ export default function PartyListPage() {
             {notice}
           </Snackbar>
         ) : null}
+        {guideCallout}
       </div>
     </>
   );

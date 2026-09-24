@@ -33,6 +33,7 @@ import { mockMyProfileView } from '../../../mocks/publicProfiles';
 import { mockMyProfile } from '../../../mocks/user';
 import { forgetWebPush } from '../../../pwa/webPush';
 import { ROUTE_PATTERN } from '../../../routes/paths';
+import { RECOMMENDATIONS_GUIDE, completeGuide, hasSeenGuide } from '../../../utils/userGuides';
 import type { AuthValue } from '../../../contexts/authContext';
 import type { BlockedUser, NotificationSettings } from '../../../types/user';
 
@@ -343,6 +344,17 @@ describe('7.8 → 6.1', () => {
   });
 });
 
+describe('앱 사용법 다시 보기', () => {
+  it('완료한 계정의 안내를 추천 단계로 되돌리고 추천 화면으로 이동한다', async () => {
+    completeGuide(1024, RECOMMENDATIONS_GUIDE);
+    renderApp([ROUTE_PATTERN.settings]);
+
+    fireEvent.click(await screen.findByRole('button', { name: '앱 사용법 다시 보기' }));
+    expect(hasSeenGuide(1024, RECOMMENDATIONS_GUIDE)).toBe(false);
+    await waitFor(() => expect(location()).toBe('/recommendations'));
+  });
+});
+
 describe('7.1 → 7.8 → 7.8-A → 7.8-A-1', () => {
   it('회원 탈퇴 확인에서 계속 이용하기를 누르면 계정 관리로 돌아온다', async () => {
     renderApp([ROUTE_PATTERN.my]);
@@ -545,6 +557,20 @@ describe('7.8-A-1 회원 탈퇴', () => {
     expect(await screen.findByText(/지금은 확인을 쓸 수 없어요/)).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('위 내용을 모두 확인했어요'));
     expect(screen.getByRole('button', { name: '탈퇴하기' })).toBeDisabled();
+  });
+
+  it('네이버만 연결된 소셜 계정에는 재인증 진입점을 열지 않는다', async () => {
+    vi.mocked(getMyProfile).mockResolvedValue({
+      ...socialOnly,
+      linkedProviders: ['NAVER'],
+    });
+    renderApp([ROUTE_PATTERN.settings, ROUTE_PATTERN.withdraw]);
+
+    expect(await screen.findByText(/지금은 확인을 쓸 수 없어요/)).toBeInTheDocument();
+    expect(screen.queryByText(/네이버/)).toBeNull();
+    fireEvent.click(screen.getByLabelText('위 내용을 모두 확인했어요'));
+    expect(screen.getByRole('button', { name: '탈퇴하기' })).toBeDisabled();
+    expect(startOAuth).not.toHaveBeenCalled();
   });
 
   it('7.8 맨 아래 회원 탈퇴도 같은 확인 화면으로 간다', async () => {

@@ -79,6 +79,13 @@ vi.mock('../../../api/taste', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/taste')>()),
   getPopcornBucket: vi.fn(),
   getPopcornFlavors: vi.fn(),
+  getMyTaste: vi.fn().mockResolvedValue({
+    ratingCount: 0,
+    insufficientData: true,
+    analysis: { genres: [] },
+    keywords: [],
+    analyzedAt: null,
+  }),
 }));
 
 vi.mock('../../../api/movies', async (importOriginal) => ({

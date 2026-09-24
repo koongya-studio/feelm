@@ -58,8 +58,8 @@ import type { SocialProvider } from '../../../types/auth';
 import type { MyProfile } from '../../../types/user';
 import styles from './AccountManagePage.module.css';
 
-/** 줄의 순서. 0.6 로그인의 버튼 순서와 같다 */
-const PROVIDERS: SocialProvider[] = ['kakao', 'naver', 'google'];
+/** 사용자가 새 인증을 시작할 수 있는 제공자만 둔다(업무 -880) */
+const PROVIDERS: SocialProvider[] = ['kakao', 'google'];
 
 /** 연결 실패. 계약(API-009)의 오류 코드마다 무엇을 하면 되는지 적는다 */
 const LINK_MESSAGE: Record<string, string> = {

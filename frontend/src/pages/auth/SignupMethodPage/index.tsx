@@ -2,7 +2,7 @@
  * 0.2 가입 방식 선택
  *
  * 이동표
- * 0.2 → 0.5 카카오·네이버·구글 가입 완료
+ * 0.2 → 0.5 카카오·구글 가입 완료
  * 0.2 → 0.4 이메일로 가입하기
  * 0.2 ⇢ 0.6 이미 계정이 있는 사용자의 로그인
  *
@@ -31,7 +31,6 @@ import styles from './SignupMethodPage.module.css';
 /** 와이어프레임 0.2의 나열 순서다 */
 const PROVIDERS: { provider: SocialProvider; label: string }[] = [
   { provider: 'kakao', label: '카카오로 시작하기' },
-  { provider: 'naver', label: '네이버로 시작하기' },
   { provider: 'google', label: '구글로 시작하기' },
 ];
 

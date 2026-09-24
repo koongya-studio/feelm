@@ -22,7 +22,7 @@
 
 - **백엔드에 있는 API는 모두 프론트가 부릅니다.** 연결을 기다리는 백엔드 API는 없습니다.
   API-038 평가 삭제는 업무 -724에서, 리포트 목록 · 상세 · 첫 발급(API-059 · 060 · 080)은 업무
-  -558에서 붙였습니다
+  -558에서, 파티 추천 이력(API-083, 백엔드 업무 -815)은 업무 -826에서 붙였습니다
 - **목업으로 남은 것은 백엔드에 API가 없거나, 계약에 필드가 없는 것뿐입니다**(2장)
 - **쓰는 화면이 없는 목업 함수는 남지 않았습니다**(3장). `getMockPopcornFlavors`는 업무 -707, `getTasteFlow`는 업무 -810에서 지웠습니다
 
@@ -138,7 +138,7 @@
 
 | 함수 | 상태 | API |
 | --- | --- | --- |
-| `getMyTaste` | 실제 | API-040 |
+| `getMyTaste` | 실제 | API-040 · 7.1이 취향 키워드 구역에, `api/users.ts`가 프로필 키워드에 쓴다(업무 -836) |
 | `getPopcornBucket` | 실제 | API-041 |
 | `getMyFrames` | 실제 | API-042 |
 | `getFrameDetail` | 실제 | API-043 |
@@ -157,8 +157,9 @@
 | 함수 | 상태 | API |
 | --- | --- | --- |
 | `createParty` | 실제 | API-049 |
-| `getMyParties` | 실제 | API-050 |
-| `getParty` | 조합 | API-050 목록에서 찾는다 |
+| `getMyParties` | 실제 | API-050 (활성 파티) |
+| `getClosedParties` | 실제 | API-050 `status=CLOSED`(업무 -826). 5.1 `지난 파티` · 5.10 |
+| `getParty` | 조합 | API-050 목록에서 찾는다. `includeClosed`면 종료분도 본다(업무 -826) |
 | `inviteToParty` | 실제 | API-051 |
 | `getMyInvitations` | 실제 | API-052 |
 | `getInvitation` | 조합 | API-052 목록에서 찾는다 |
@@ -166,6 +167,7 @@
 | `leaveParty` · `closeParty` | 실제 | API-055 · 056 |
 | `getPartyPopcorn` | 실제 | API-057 |
 | `getPartyRecommendations` | 실제 | API-058(업무 -705) |
+| `getPartyRecommendationHistory` | 실제 | API-083(업무 -826). 5.10 파티 추천 이력 |
 | `kickPartyMember` | 실제 | API-069 |
 
 ### `reports.ts`
@@ -175,7 +177,7 @@
 | `getMyReports` | 실제 | API-059(업무 -558) |
 | `getReportDetail` | 실제 | API-060(업무 -558) |
 | `issueReport` | 실제 | API-080 첫 발급 기록(업무 -558) |
-| `createReportImage` | 실제 | 화면의 `ReportFourCut` PNG를 API-061에 저장하고 서명 URL을 다운로드한다(업무 -557). 3.4 · 7.4 `저장`과 3.5 `이미지로 저장`이 같이 쓰고, 409 · 429를 따로 안내한다(업무 -731) |
+| `createReportImage` | 실제 | 화면의 `ReportFourCut` PNG를 API-061에 저장하고 서명 URL을 다운로드한다(업무 -557). 상세 화면 `저장`이 쓰고, 409 · 429를 따로 안내한다(업무 -731 · -861) |
 | `getLatestReadyReport` | 조합 | API-059 `current`로 3.1 버튼을 가른다. 목업 시절 세션에 두었던 `본 적 있음` 표시를 서버의 `issuedAt`으로 바꿨다 |
 
 ### `notifications.ts` · `push.ts`

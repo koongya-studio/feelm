@@ -13,8 +13,8 @@
  * 두었다. 업무 -393에서 그 자리를 검색으로 바꿨다. 링크 · QR 경로는 여전히 계약에 없다.
  *
  * `[!]` `1/6명 · 최대 6명까지`는 계약의 정원(4)과 다르다. 5.2에서 고른 인원을 상한으로
- * 보여준다(업무 -610) — 2인을 골랐는데 `1/4명`이 나오던 것을 고쳤다. 정원 자체는 계약에
- * 보낼 필드가 없어 서버가 4로 정한다(`api/parties.ts`).
+ * 보여준다(업무 -610) — 2인을 골랐는데 `1/4명`이 나오던 것을 고쳤다. 고른 정원을
+ * API-049에 보내므로 생성된 파티도 같은 정원을 가진다.
  *
  * `[?]` **일부 초대만 실패할 수 있다.** 파티는 이미 만들어진 뒤라 되돌릴 계약이 없고
  * (API-056 종료뿐이다) 다시 누르면 같은 이름의 파티가 하나 더 생긴다. 그래서 실패한
@@ -69,7 +69,7 @@ export default function PartySetupPage() {
     };
   }, []);
 
-  /** 5.2에서 고른 인원에서 내 자리를 뺀 수. 계약이 정한 정원(4)을 넘길 수 없다 */
+  /** 5.2에서 고른 인원에서 내 자리를 뺀 수. 허용 최대 정원은 4명이다 */
   const inviteLimit = Math.min(size, PARTY_MAX_MEMBERS) - 1;
   const waitingSlots = Math.max(0, inviteLimit - invitees.length);
   const locked = createdPartyId !== null;
@@ -126,7 +126,7 @@ export default function PartySetupPage() {
     setSubmitting(true);
     setError(undefined);
 
-    createParty(name)
+    createParty(name, size)
       .then(async (party) => {
         const failed: string[] = [];
 

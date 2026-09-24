@@ -6,11 +6,15 @@ import com.feelm.backend.domain.recommendation.repository.RecommendationCandidat
 import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,11 +47,14 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
     private static final String TOP_RATED_SOURCE_REASON = "TOP_RATED_SOURCE";
     private static final String DISCOVERY_AGGREGATE_REASON = "DISCOVERY_AGGREGATE_AFFINITY";
     private static final String DISCOVERY_PERSONAL_REASON = "DISCOVERY_PERSONAL_SCORE";
-    private static final String EVIDENCE_SCHEMA_VERSION = "gbt-evidence-v1";
-    private static final String EXPLANATION_VERSION = "gbt-feature-attribution-v1";
+    private static final String EVIDENCE_SCHEMA_V1 = "gbt-evidence-v1";
+    private static final String EVIDENCE_SCHEMA_V2 = "gbt-evidence-v2";
+    private static final String EXPLANATION_V1 = "gbt-feature-attribution-v1";
+    private static final String EXPLANATION_V2 = "gbt-feature-attribution-v2";
     private static final String FEATURE_VERSION = "v26-max70-kobis-flag-71-v1";
     private static final String RANKING_VERSION = "gbt-personal-raw-score-v1";
     private static final Pattern SHA256 = Pattern.compile("sha256:[0-9a-f]{64}");
+    private static final Pattern GENRE_CODE = Pattern.compile("TMDB_[1-9][0-9]*");
     private static final Set<String> EVIDENCE_GROUPS =
             Set.of(
                     "GENRE_PATTERN",
@@ -72,6 +79,15 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
             Set.of("movieId", "score", "coverage", "evidence");
     private static final Set<String> EVIDENCE_FIELDS =
             Set.of("evidenceId", "group", "direction", "contribution", "coverage");
+    private static final Set<String> EVIDENCE_V2_FIELDS =
+            Set.of(
+                    "evidenceId",
+                    "group",
+                    "direction",
+                    "contribution",
+                    "coverage",
+                    "genreCode",
+                    "sourceMovieId");
     private static final Set<String> DIRECTION_SOURCES = Set.of("RATING", "ONBOARDING");
     private static final Set<String> CONTRIBUTOR_RELATIONS =
             Set.of("POSITIVE_ALIGNMENT", "NEGATIVE_CONTRAST");
@@ -221,9 +237,16 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
             long userId,
             StoredCandidateBatch candidates,
             UserRecommendationStateContract.Snapshot state) {
+        String evidenceSchemaVersion = root.path("evidenceSchemaVersion").textValue();
+        String explanationVersion = root.path("explanationVersion").textValue();
+        boolean v1 =
+                EVIDENCE_SCHEMA_V1.equals(evidenceSchemaVersion)
+                        && EXPLANATION_V1.equals(explanationVersion);
+        boolean v2 =
+                EVIDENCE_SCHEMA_V2.equals(evidenceSchemaVersion)
+                        && EXPLANATION_V2.equals(explanationVersion);
         if (!hasExactFields(root, EVIDENCE_ROOT_FIELDS)
-                || !EVIDENCE_SCHEMA_VERSION.equals(root.path("evidenceSchemaVersion").textValue())
-                || !EXPLANATION_VERSION.equals(root.path("explanationVersion").textValue())
+                || !v1 && !v2
                 || !positiveLong(root.path("userId"))
                 || root.path("userId").longValue() != userId
                 || !state.generationId().equals(root.path("generationId").textValue())
@@ -243,10 +266,10 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
         for (int index = 0; index < candidates.taste().size(); index++) {
             StoredTasteCandidate candidate = candidates.taste().get(index);
             JsonNode item = root.path("items").get(index);
-            validateEvidenceItem(item, candidate);
+            validateEvidenceItem(item, candidate, v2, state);
             ObjectNode snapshot = objectMapper.createObjectNode();
-            snapshot.put("evidenceSchemaVersion", EVIDENCE_SCHEMA_VERSION);
-            snapshot.put("explanationVersion", EXPLANATION_VERSION);
+            snapshot.put("evidenceSchemaVersion", evidenceSchemaVersion);
+            snapshot.put("explanationVersion", explanationVersion);
             snapshot.put("userId", userId);
             snapshot.put("generationId", state.generationId());
             snapshot.put("modelVersion", state.modelVersion());
@@ -261,7 +284,11 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
         return Map.copyOf(snapshots);
     }
 
-    private void validateEvidenceItem(JsonNode item, StoredTasteCandidate candidate) {
+    private void validateEvidenceItem(
+            JsonNode item,
+            StoredTasteCandidate candidate,
+            boolean v2,
+            UserRecommendationStateContract.Snapshot state) {
         if (!hasExactFields(item, EVIDENCE_ITEM_FIELDS)
                 || !positiveLong(item.path("movieId"))
                 || item.path("movieId").longValue() != candidate.movieId()
@@ -275,10 +302,21 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
         Set<String> ids = new HashSet<>();
         Set<String> groups = new HashSet<>();
         BigDecimal coverage = BigDecimal.ZERO;
+        BigDecimal previousContribution = null;
+        String previousGroup = null;
         for (JsonNode evidence : item.path("evidence")) {
             String id = evidence.path("evidenceId").textValue();
             String group = evidence.path("group").textValue();
-            if (!hasExactFields(evidence, EVIDENCE_FIELDS)
+            Set<String> fields = new HashSet<>();
+            evidence.properties().forEach(property -> fields.add(property.getKey()));
+            boolean validFields =
+                    v2
+                            ? EVIDENCE_V2_FIELDS.containsAll(fields)
+                                    && fields.containsAll(EVIDENCE_FIELDS)
+                            : fields.equals(EVIDENCE_FIELDS);
+            JsonNode genreCode = evidence.get("genreCode");
+            JsonNode sourceMovieId = evidence.get("sourceMovieId");
+            if (!validFields
                     || id == null
                     || !SHA256.matcher(id).matches()
                     || !ids.add(id)
@@ -287,13 +325,68 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
                     || !"POSITIVE".equals(evidence.path("direction").textValue())
                     || !evidence.path("contribution").isNumber()
                     || evidence.path("contribution").decimalValue().compareTo(BigDecimal.ZERO) <= 0
-                    || !decimalBetweenZeroAndOne(evidence.path("coverage"))) {
+                    || !decimalBetweenZeroAndOne(evidence.path("coverage"))
+                    || genreCode != null
+                            && (!"GENRE_PATTERN".equals(group)
+                                    || !genreCode.isTextual()
+                                    || !GENRE_CODE.matcher(genreCode.textValue()).matches())
+                    || sourceMovieId != null
+                            && (!"CONTENT_RELATION".equals(group) || !positiveLong(sourceMovieId))
+                    || v2
+                            && !id.equals(
+                                    evidenceIdV2(
+                                            state,
+                                            candidate.movieId(),
+                                            group,
+                                            genreCode == null ? "" : genreCode.textValue(),
+                                            sourceMovieId == null
+                                                    ? ""
+                                                    : Long.toString(sourceMovieId.longValue())))) {
                 throw new IllegalArgumentException("Invalid GBT evidence");
             }
+            BigDecimal contribution = evidence.path("contribution").decimalValue();
+            if (previousContribution != null
+                    && (contribution.compareTo(previousContribution) > 0
+                            || contribution.compareTo(previousContribution) == 0
+                                    && group.compareTo(previousGroup) < 0)) {
+                throw new IllegalArgumentException("Unsorted GBT evidence");
+            }
+            previousContribution = contribution;
+            previousGroup = group;
             coverage = coverage.add(evidence.path("coverage").decimalValue());
         }
         if (coverage.compareTo(item.path("coverage").decimalValue()) != 0) {
             throw new IllegalArgumentException("GBT evidence coverage differs");
+        }
+    }
+
+    private String evidenceIdV2(
+            UserRecommendationStateContract.Snapshot state,
+            long movieId,
+            String group,
+            String genreCode,
+            String sourceMovieId) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            for (String value :
+                    List.of(
+                            EXPLANATION_V2,
+                            state.modelVersion(),
+                            state.servingRevision(),
+                            FEATURE_VERSION,
+                            RANKING_VERSION,
+                            state.inputHash(),
+                            Long.toString(movieId),
+                            group,
+                            genreCode,
+                            sourceMovieId)) {
+                byte[] encoded = value.getBytes(StandardCharsets.UTF_8);
+                digest.update(ByteBuffer.allocate(Integer.BYTES).putInt(encoded.length).array());
+                digest.update(encoded);
+            }
+            return "sha256:" + HexFormat.of().formatHex(digest.digest());
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
         }
     }
 

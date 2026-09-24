@@ -140,6 +140,31 @@ Candidate v6와 기존 `reasons[]`는 변경하지 않는다. 결과는
 후보별 GBT attribution을 만들지 않고 빈 `items`를 게시하거나 결과 세대 자체를 게시하지 않는다.
 Backend 소비와 문구 생성은 S15P21E106-825, 실제 shadow·활성화 승인은 S15P21E106-628 범위다.
 
+### 4.2 GBT 구체 표시 근거 v2 (S15P21E106-840)
+
+`gbt-evidence-v2`와 `gbt-feature-attribution-v2`는 v1의 그룹 기여·coverage·최대 3개·2 MiB·원자 게시
+규칙을 유지하고, 해당 그룹의 양의 모델 기여를 사용자 입력까지 직접 추적할 수 있을 때만 다음 선택 필드를
+evidence 항목에 추가한다.
+
+| 필드 | 허용 그룹 | 의미·생성 조건 |
+| --- | --- | --- |
+| `genreCode` | `GENRE_PATTERN` | 후보와 실제 4.0 이상 평가 영화가 공유하는 양의 TMDb 장르 ID를 DB ingestion과 같은 `TMDB_<genre_id>`로 표현한다. 평점 내림차순·영화 ID·장르 ID 오름차순으로 하나를 고른다. |
+| `sourceMovieId` | `CONTENT_RELATION` | 후보와 collection/director/cast/keyword 중 모델 입력에 사용한 직접 관계를 공유하는 실제 4.0 이상 평가 서비스 영화다. 평점 내림차순·영화 ID 오름차순으로 하나를 고른다. cast는 모델과 같은 국가·장르·애니메이션 일치 조건도 만족해야 한다. |
+
+관심없음의 계산상 1.0점, 4.0 미만 실제 평가, 후보와 관계없는 영화는 구체 출처가 아니다. 장르·원천 영화가
+없어도 v2 그룹 근거 자체는 유지하지만 소비자는 일반 그룹 문구로 fallback한다. raw feature token과 장르
+숫자 외 배우·감독·키워드·시리즈 ID는 게시하지 않는다.
+
+evidence ID의 length-prefix SHA-256 입력에는 v1 식별자에 `genreCode`(없으면 빈 문자열)와
+`sourceMovieId`(없으면 빈 문자열)를 추가한다. 따라서 구체 출처를 추가·삭제·변조하면 ID가 달라진다.
+Backend는 strict v1과 strict v2를 함께 읽되 버전 쌍을 섞지 않는다. v2 장르는 `genres.code/name`, 원천 영화는
+추천 항목 소유 사용자의 실제 `ratings.score >= 4.0`과 `movies.title`을 다시 검증한 뒤 Gemini 입력에 넣는다.
+검증 실패 시 구체 주장을 버리고 일반 그룹 문구를 사용한다.
+
+전환은 Backend의 v1/v2 동시 수용을 먼저 배포하고 Pipeline v2 게시를 나중에 활성화한다. 롤백하거나 기존
+snapshot TTL이 남아 있는 동안 Backend는 v1을 계속 소비한다. Pipeline v2 활성화 뒤 v1-only Backend로
+되돌리지 않는다.
+
 ## 5. 게시·복원과 검증 계층
 
 로컬 exporter는 전용 임시 디렉터리에 쓰고 전체 검증 뒤 atomic no-replace rename한다.

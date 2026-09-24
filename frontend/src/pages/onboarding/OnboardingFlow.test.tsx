@@ -395,6 +395,23 @@ describe('1.2 구독 OTT 초기 설정', () => {
 
     await waitFor(() => expect(setMyOttIds).toHaveBeenCalledWith([]));
     await waitFor(() => expect(location()).toBe(ROUTE_PATTERN.onboardingComplete));
+    expect(screen.queryByText('고른 영화는 평가에도 반영됐어요')).not.toBeInTheDocument();
+  });
+
+  it('초기 취향을 저장했다면 완료 화면에서 평가 반영을 알린다', async () => {
+    renderApp(ROUTE_PATTERN.onboardingTaste);
+
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: '취향 설정 완료 (좋아요 0개 · 싫어요 1개)',
+      }),
+    );
+    await waitFor(() => expect(location()).toBe(ROUTE_PATTERN.onboardingOtt));
+
+    fireEvent.click(await screen.findByRole('button', { name: '구독 중인 OTT가 없어요' }));
+
+    expect(await screen.findByText('고른 영화는 평가에도 반영됐어요')).toBeInTheDocument();
+    expect(screen.getByText('좋아요 4점 · 싫어요 2점')).toBeInTheDocument();
   });
 
   it('저장에 실패하면 알리고 그 자리에 머문다', async () => {

@@ -128,10 +128,7 @@
   max-height: 100%;
 }
 
-/*
- * 버튼 두 개가 화면 아래를 잡는다. 주 버튼은 브랜드 빨강 면이다
- * (`design-concept.md` 2.9 — 시안이 파티 화면까지 넓혔다).
- */
+/* 화면 아래의 만들기 버튼은 브랜드 빨강 면이다(`design-concept.md` 2.9). */
 .actions {
   display: flex;
   margin-top: auto;
@@ -200,6 +197,19 @@
   border-radius: var(--radius-card);
   text-align: left;
   cursor: pointer;
+}
+
+/* 지난 파티 구역(업무 -826). 받은 초대 구역과 같은 모양이고 자리만 아래다 */
+.closed {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* 끝난 파티 줄. 초대 카드와 같은 판이지만 얼굴 자리가 없다 */
+.closedCard {
+  composes: inviteCard;
 }
 
 .inviteText {
@@ -472,10 +482,12 @@
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scroll-snap-type: x proximity;
+  touch-action: pan-x;
 }
 
 .cardRow > li {
   width: 62%;
+  height: 128px;
   flex: none;
   scroll-snap-align: start;
 }

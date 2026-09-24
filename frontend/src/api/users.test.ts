@@ -15,6 +15,7 @@ import {
   uploadMyAvatar,
 } from './users';
 import { mockMyProfile } from '../mocks/user';
+import { resetSessionStore, saveProfileExtras } from '../mocks/sessionStore';
 import { resetSessionForTest, startSession } from './session';
 
 const fetchMock = vi.fn();
@@ -201,5 +202,92 @@ describe('API-081 · 082 프로필 사진', () => {
     expect((await getMyProfileView()).avatarUrl).toBe('/media/avatars/a.jpg');
 
     localStorage.clear();
+  });
+});
+
+/*
+ * 내 프로필의 취향 키워드 (업무 S15P21E106-836)
+ *
+ * 전에는 `mocks/publicProfiles`의 고정 네 개를 실어 **누가 로그인하든 같은 키워드**가 떴다.
+ * 이제 API-040이 준 값을 싣는다. 공개 여부는 서버에 자리가 없어 기기에 남는데, 평가할 때마다
+ * 키워드가 달라지므로 저장된 목록에 없는 새 코드를 어떻게 볼지가 갈린다.
+ */
+describe('API-040 취향 키워드를 내 프로필에 싣는다', () => {
+  const KEYWORDS = [
+    { code: 'DIRECTOR_BINGE', label: '봉준호 몰아보기' },
+    { code: 'GENRE_DEVOTEE', label: '스릴러 편식' },
+  ];
+
+  /** 주소에 따라 다른 응답을 준다. 한 응답 객체를 두 번 읽을 수 없어 호출마다 새로 만든다 */
+  function serve(keywords = KEYWORDS): void {
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : String(input);
+
+      if (url.includes('/users/me/taste')) {
+        return Promise.resolve(
+          json(200, {
+            ratingCount: 30,
+            insufficientData: keywords.length === 0,
+            analysis: { genres: [] },
+            keywords,
+            analyzedAt: '2026-09-24T00:00:00Z',
+          }),
+        );
+      }
+
+      return Promise.resolve(json(200, mockMyProfile));
+    });
+  }
+
+  beforeEach(() => {
+    resetSessionStore();
+  });
+
+  it('T5 목업이 아니라 서버가 준 키워드를 싣는다', async () => {
+    serve();
+
+    const profile = await getMyProfileView();
+
+    expect(profile.keywords.map((keyword) => keyword.label)).toEqual([
+      '봉준호 몰아보기',
+      '스릴러 편식',
+    ]);
+  });
+
+  it('T6 기기에 저장한 공개 목록이 서버 키워드에 적용된다', async () => {
+    serve();
+    saveProfileExtras({ publicKeywordCodes: ['GENRE_DEVOTEE'] });
+
+    const profile = await getMyProfileView();
+
+    expect(profile.keywords.find((keyword) => keyword.code === 'GENRE_DEVOTEE')?.isPublic).toBe(
+      true,
+    );
+    expect(profile.keywords.find((keyword) => keyword.code === 'DIRECTOR_BINGE')?.isPublic).toBe(
+      false,
+    );
+  });
+
+  it('T7 저장한 목록이 아예 없으면 모두 공개로 본다', async () => {
+    serve();
+
+    const profile = await getMyProfileView();
+
+    expect(profile.keywords.every((keyword) => keyword.isPublic)).toBe(true);
+  });
+
+  it('취향 분석이 실패해도 프로필은 준다', async () => {
+    fetchMock.mockImplementation((input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : String(input);
+
+      return url.includes('/users/me/taste')
+        ? Promise.reject(new Error('network'))
+        : Promise.resolve(json(200, mockMyProfile));
+    });
+
+    const profile = await getMyProfileView();
+
+    expect(profile.nickname).toBe(mockMyProfile.nickname);
+    expect(profile.keywords).toEqual([]);
   });
 });
