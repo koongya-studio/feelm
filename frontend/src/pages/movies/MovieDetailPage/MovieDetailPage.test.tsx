@@ -783,11 +783,16 @@ describe('MovieDetailPage 관심없음', () => {
     vi.mocked(dismissMovie).mockReset();
   });
 
-  it('누르면 API-047을 부르고 처리된 상태로 바뀐다', async () => {
+  it('확인 팝오버에서 예를 누른 뒤 API-047을 부르고 처리된 상태로 바뀐다', async () => {
     vi.mocked(dismissMovie).mockResolvedValue();
 
     renderMovie();
     fireEvent.click(await screen.findByRole('button', { name: '관심없음' }));
+    expect(dismissMovie).not.toHaveBeenCalled();
+    expect(screen.getByRole('group', { name: /관심없음 확인/ })).toHaveTextContent(
+      '추천에서 제외할까요?',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '예' }));
 
     expect(await screen.findByText(/관심없음으로 처리했어요/)).toBeInTheDocument();
     expect(dismissMovie).toHaveBeenCalledWith(101, undefined);
@@ -808,6 +813,7 @@ describe('MovieDetailPage 관심없음', () => {
       },
     );
     fireEvent.click(await screen.findByRole('button', { name: '관심없음' }));
+    fireEvent.click(screen.getByRole('button', { name: '예' }));
 
     await waitFor(() => expect(dismissMovie).toHaveBeenCalledWith(101, 281));
   });
@@ -819,6 +825,7 @@ describe('MovieDetailPage 관심없음', () => {
 
     renderMovie();
     fireEvent.click(await screen.findByRole('button', { name: '관심없음' }));
+    fireEvent.click(screen.getByRole('button', { name: '예' }));
 
     expect(await screen.findByText(/관심없음으로 처리했어요/)).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
@@ -831,14 +838,34 @@ describe('MovieDetailPage 관심없음', () => {
 
     renderMovie();
     fireEvent.click(await screen.findByRole('button', { name: '관심없음' }));
+    fireEvent.click(screen.getByRole('button', { name: '예' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('관심없음으로 처리하지 못했어요');
     const button = screen.getByRole('button', { name: '관심없음' });
     expect(button).toBeEnabled();
 
     fireEvent.click(button);
+    fireEvent.click(screen.getByRole('button', { name: '예' }));
     expect(await screen.findByText(/관심없음으로 처리했어요/)).toBeInTheDocument();
     expect(dismissMovie).toHaveBeenCalledTimes(2);
+  });
+
+  it('아니요, Esc, 바깥 영역 탭으로 닫으면 API-047을 부르지 않는다', async () => {
+    renderMovie();
+    const button = await screen.findByRole('button', { name: '관심없음' });
+
+    fireEvent.click(button);
+    fireEvent.click(screen.getByRole('button', { name: '아니요' }));
+    expect(screen.queryByRole('group', { name: /관심없음 확인/ })).toBeNull();
+
+    fireEvent.click(button);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('group', { name: /관심없음 확인/ })).toBeNull();
+
+    fireEvent.click(button);
+    fireEvent.click(screen.getByTestId('menu-backdrop'));
+    expect(screen.queryByRole('group', { name: /관심없음 확인/ })).toBeNull();
+    expect(dismissMovie).not.toHaveBeenCalled();
   });
 });
 

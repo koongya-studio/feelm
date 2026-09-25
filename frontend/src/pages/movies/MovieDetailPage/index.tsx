@@ -28,6 +28,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import Button from '../../../components/Button';
 import GuideCallout from '../../../components/GuideCallout';
 import IconButton from '../../../components/IconButton';
+import Menu from '../../../components/Menu';
 import OttBadge from '../../../components/OttBadge';
 import Poster from '../../../components/Poster';
 import PosterCue from '../../../components/PosterCue';
@@ -60,7 +61,11 @@ import {
 import { movieMetaLine } from '../../../utils/movie';
 import { ottMovieUrl } from '../../../utils/ott';
 import styles from './MovieDetailPage.module.css';
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
+import type {
+  CSSProperties,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+} from 'react';
 import type { MovieDetail, SimilarMovie } from '../../../types/movie';
 import type { PopcornFlavor } from '../../../types/taste';
 import type { PublicReview, PublicReviewList } from '../../../types/watch';
@@ -149,6 +154,12 @@ export default function MovieDetailPage() {
   const [dismissal, setDismissal] = useState<{
     movieId: number;
     status: 'pending' | 'done' | 'failed';
+  } | null>(null);
+  const [pendingDismiss, setPendingDismiss] = useState<{
+    movieId: number;
+    top: number;
+    left: number;
+    placement: 'below' | 'above';
   } | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const peopleDragRef = useRef<{
@@ -263,6 +274,7 @@ export default function MovieDetailPage() {
    * 대로다. 해제는 계약 미정이라 처리된 버튼은 다시 눌리지 않는다.
    */
   function handleDismiss() {
+    setPendingDismiss(null);
     setDismissal({ movieId: id, status: 'pending' });
 
     dismissMovie(id, recommendationItemId)
@@ -271,6 +283,16 @@ export default function MovieDetailPage() {
       })
       .then(() => setDismissal({ movieId: id, status: 'done' }))
       .catch(() => setDismissal({ movieId: id, status: 'failed' }));
+  }
+
+  function handleOpenDismiss(event: ReactMouseEvent<HTMLButtonElement>) {
+    const button = event.currentTarget.getBoundingClientRect();
+    const page = pageRef.current?.getBoundingClientRect();
+    const below = window.innerHeight - button.bottom >= 170;
+    const top = (below ? button.bottom + 1 : button.top - 162) - (page?.top ?? 0);
+    const left = Math.max(button.right - (page?.left ?? 0) - 196, 0);
+
+    setPendingDismiss({ movieId: id, top, left, placement: below ? 'below' : 'above' });
   }
 
   function handleRetry() {
@@ -521,7 +543,7 @@ export default function MovieDetailPage() {
               size={DISMISS_BUTTON_SIZE}
               variant={dismissStatus === 'done' ? 'filled' : 'translucent'}
               disabled={dismissStatus === 'pending' || dismissStatus === 'done'}
-              onClick={handleDismiss}
+              onClick={handleOpenDismiss}
             />
           </div>
           {dismissStatus === 'done' ? (
@@ -752,6 +774,34 @@ export default function MovieDetailPage() {
           </Button>
         </div>
       </div>
+      {pendingDismiss?.movieId === id ? (
+        <div className={styles.dismissMenu} data-placement={pendingDismiss.placement}>
+          <Menu
+            label={`${movie.title} 관심없음 확인`}
+            top={pendingDismiss.top}
+            left={pendingDismiss.left}
+            onClose={() => setPendingDismiss(null)}
+          >
+            <div className={styles.dismissHead}>
+              <span className={styles.dismissIcon} aria-hidden="true">
+                <BlockIcon />
+              </span>
+              <div>
+                <strong>추천에서 제외할까요?</strong>
+                <p className={styles.dismissMovieTitle}>{movie.title}</p>
+              </div>
+            </div>
+            <div className={styles.dismissActions}>
+              <button type="button" onClick={() => setPendingDismiss(null)}>
+                아니요
+              </button>
+              <button type="button" onClick={handleDismiss}>
+                예
+              </button>
+            </div>
+          </Menu>
+        </div>
+      ) : null}
       {showDetailGuide && user ? (
         <GuideCallout
           title="영화 상세를 자유롭게 둘러보세요"
