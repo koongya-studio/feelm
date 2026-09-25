@@ -78,11 +78,32 @@ import type {
 
 /** 칸이 뒤집히거나 앞면으로 되돌아오는 데 걸리는 시간. 인화지의 `--flip-duration`과 맞춘다 */
 const FLIP_BACK_MS = 560;
+const PROFILE_TIMEOUT_MS = 5_000;
+const SAVE_TIMEOUT_MS = 75_000;
 const UNSUPPORTED_SHARE_NOTICE =
   '이 브라우저에서는 이미지 공유를 지원하지 않아요. 공유 메뉴를 지원하는 기기에서 시도해 주세요';
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(
+      () => reject(new Error('Report image operation timed out')),
+      ms,
+    );
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
 }
 
 function nextFrameOrFallback(): Promise<void> {
@@ -159,7 +180,7 @@ export default function ReportDetailPage() {
     }
 
     try {
-      const profile = await getMyProfile();
+      const profile = await withTimeout(getMyProfile(), PROFILE_TIMEOUT_MS);
       if (profile.nickname !== nickname) {
         setNickname(profile.nickname);
         await nextFrameOrFallback();
@@ -170,17 +191,24 @@ export default function ReportDetailPage() {
     }
   }
 
-  async function saveImage() {
+  async function saveImage(onStage?: (stage: 'capture' | 'upload' | 'download') => void) {
     await prepareImage();
-    await saveReportImage(id, fourCutNode());
+    onStage?.('capture');
+    return saveReportImage(id, fourCutNode(), onStage);
   }
 
   async function save() {
     setSaving(true);
-    setNotice('');
+    setNotice('이미지를 준비하고 있어요…');
     try {
-      await saveImage();
-      setNotice('이미지를 저장했어요');
+      await withTimeout(
+        saveImage((next) => {
+          if (next === 'upload') setNotice('이미지를 서버에 저장하고 있어요…');
+          if (next === 'download') setNotice('파일을 내려받고 있어요…');
+        }),
+        SAVE_TIMEOUT_MS,
+      );
+      setNotice('다운로드를 시작했어요. 파일 앱에서 확인해 주세요');
     } catch (error) {
       setNotice(reportImageFailure(error));
     } finally {
