@@ -261,6 +261,7 @@ describe('2.6 필름 릴', () => {
     // 새 프레임은 한 번만, 맨 앞에 선다
     expect(reelPosters()).toEqual(['/p/new.jpg', '/p/60.jpg', '/p/41.jpg']);
     const reel = within(screen.getByTestId('film-reel'));
+    expect(reel.getByRole('group').firstElementChild).toContainElement(reel.getByAltText('영화'));
     expect(reel.getByAltText('영화 60')).toBeInTheDocument();
   });
 
