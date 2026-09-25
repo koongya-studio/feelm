@@ -619,6 +619,8 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
 - 허용 그룹은 `GENRE_PATTERN`, `RATING_PATTERN`, `CONTENT_RELATION`, `POPULARITY_SIGNAL`,
   `AUDIENCE_RATING_SIGNAL`뿐이다. `direction`은 `POSITIVE`, 후보별 evidence는 최대 3개다. contribution은
   양의 유한 수, 각 coverage와 합계 coverage는 0~1 유한 수이며 evidence ID와 그룹은 후보 안에서 유일하다.
+  항목의 합계 coverage와 evidence별 coverage 합계는 JSON 부동소수점 직렬화 차이를 고려해 절대 오차
+  `1e-9` 이하를 같은 값으로 검증하고, 이를 초과하면 해당 evidence를 거부한다.
 - v2의 `genreCode`는 `GENRE_PATTERN`에만 선택적으로 존재하며 `TMDB_<양의 TMDb 장르 ID>` 형식이다.
   `sourceMovieId`는 `CONTENT_RELATION`에만 선택적으로 존재하는 양의 서비스 영화 ID다. 둘은 실제 4.0 이상
   평가와 후보의 추적 가능한 양의 모델 입력 관계에서만 생성하고 evidence ID 해시에 포함한다. 다른 그룹,
