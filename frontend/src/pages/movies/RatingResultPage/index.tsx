@@ -307,9 +307,19 @@ export default function RatingResultPage() {
               </div>
             ) : null}
 
+            {/*
+             * `다른 영화 평가하기`는 이어서 평가할 곳이다(업무 -918). 뒤로 가기는 진입 경로에 따라
+             * 방금 평가한 영화의 상세나 그 앞 화면으로 돌아가 연속 평가의 목적지가 되지 못했다.
+             * 조건 없는 4.1 검색은 늘 빈 검색으로 열리고 입력창에 초점을 두므로, 어디서 평가를
+             * 시작했든 같은 곳에서 다음 영화를 고른다.
+             */}
             <div className={styles.resultActions}>
               <Button onClick={() => void navigate(path.recommendations())}>
                 다음 추천 보러 가기
+              </Button>
+
+              <Button variant="secondary" onClick={() => void navigate(path.search())}>
+                다른 영화 평가하기
               </Button>
 
               <Button variant="text" onClick={() => void navigate(path.film())}>
