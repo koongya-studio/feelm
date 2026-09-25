@@ -52,8 +52,8 @@ export default function DesktopShell({ bodyRef, children }: Props) {
     <DesktopAsideContext.Provider value={asideSlot}>
       <div className={styles.desktop} data-layout="app">
         {/*
-          좌측 내비가 생기면서 본문까지 Tab 11번(로고 · 항목 다섯 · 설정 · 계정 · 검색 · 알림 ·
-          프로필)이 됐다. 키보드로 쓰는 사람은 화면을 옮길 때마다 그 열한 번을 다시 지난다.
+          좌측 내비가 생기면서 본문까지 여러 Tab(로고 · 항목 다섯 · 설정 · 계정 · 검색 ·
+          알림)을 지난다. 키보드로 쓰는 사람은 화면을 옮길 때마다 이를 다시 지난다.
 
           주소에 `#`을 남기지 않으려고 링크가 아니라 단추로 두고 본문에 직접 초점을 준다.
           해시 이동은 react-router에게 새 이동이라 4.1 검색이 그것을 바깥에서 온 이동으로 보고
@@ -68,7 +68,7 @@ export default function DesktopShell({ bodyRef, children }: Props) {
         <DesktopNav account={account} />
 
         <div className={styles.column}>
-          <DesktopTopBar account={account} />
+          <DesktopTopBar />
 
           <div className={styles.split}>
             {/* 건너뛰기 단추가 초점을 주는 곳. `-1`이라 Tab 순서에는 들어가지 않는다 */}

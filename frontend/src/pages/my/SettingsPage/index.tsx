@@ -33,6 +33,7 @@ import ActionList from '../../../components/ActionList';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import ScreenHeader from '../../../components/ScreenHeader';
 import { useAuth } from '../../../contexts/authContext';
+import { useShellSize } from '../../../hooks/useShellSize';
 import { usePwaInstall } from '../../../pwa/installContext';
 import { path } from '../../../routes/paths';
 import {
@@ -49,6 +50,7 @@ const APP_VERSION = 'v 1.0.0';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
+  const desktop = useShellSize() !== 'mobile';
   const { signOut, user } = useAuth();
   const { availability: installAvailability, install } = usePwaInstall();
   const [signingOut, setSigningOut] = useState(false);
@@ -78,7 +80,7 @@ export default function SettingsPage() {
 
   return (
     <>
-      <ScreenHeader title="설정" showBack fallbackTo={path.my()} />
+      <ScreenHeader title="설정" showBack={!desktop} fallbackTo={path.my()} />
 
       <div className={styles.page}>
         <ActionList

@@ -32,6 +32,7 @@ import { resetSessionStore } from '../../../mocks/sessionStore';
 import { mockMyProfileView } from '../../../mocks/publicProfiles';
 import { mockMyProfile } from '../../../mocks/user';
 import { ROUTE_PATTERN } from '../../../routes/paths';
+import { resetViewport, setViewportWidth } from '../../../test/viewport';
 import { RECOMMENDATIONS_GUIDE, completeGuide, hasSeenGuide } from '../../../utils/userGuides';
 import type { AuthValue } from '../../../contexts/authContext';
 import type { BlockedUser, NotificationSettings } from '../../../types/user';
@@ -325,6 +326,19 @@ function renderApp(
 
 const location = () => screen.getByTestId('location').textContent;
 const back = () => fireEvent.click(screen.getByRole('button', { name: '뒤로 가기' }));
+
+describe('설정 첫 화면의 뒤로 가기', () => {
+  it('데스크톱에서는 숨기고 모바일에서는 유지한다', () => {
+    setViewportWidth(1440);
+    const desktop = renderApp([ROUTE_PATTERN.settings]);
+    expect(screen.queryByRole('button', { name: '뒤로 가기' })).not.toBeInTheDocument();
+
+    desktop.unmount();
+    resetViewport();
+    renderApp([ROUTE_PATTERN.settings]);
+    expect(screen.getByRole('button', { name: '뒤로 가기' })).toBeInTheDocument();
+  });
+});
 
 describe('7.8 → 6.1', () => {
   it('OTT 관리가 설정 안에 있다', async () => {

@@ -16,14 +16,11 @@
   flex-shrink: 0;
 }
 
-/*
- * 검색 입력. 남는 폭을 모두 가져가되 시안처럼 끝까지 늘어나지는 않는다 — 1440px에서
- * 입력이 1000px을 넘으면 글자가 왼쪽 끝에 한 줌 붙어 있는 모양이 된다.
- */
+/* 검색 입력은 알림 버튼 앞까지 남은 폭을 채운다. */
 .search {
   position: relative;
   display: flex;
-  max-width: var(--desktop-main-max-width);
+  min-width: 0;
   flex: 1;
   align-items: center;
 }
@@ -71,6 +68,7 @@
 .actions {
   display: flex;
   align-items: center;
+  margin-left: auto;
   gap: var(--space-3);
   flex-shrink: 0;
 }
@@ -104,10 +102,4 @@
   border: 1.5px solid var(--color-bg);
   border-radius: var(--radius-pill);
   background: var(--color-brand);
-}
-
-.profile {
-  display: flex;
-  border-radius: var(--radius-pill);
-  text-decoration: none;
 }

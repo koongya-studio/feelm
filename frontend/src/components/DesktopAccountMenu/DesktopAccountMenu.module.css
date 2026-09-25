@@ -1,0 +1,135 @@
+.root {
+  position: relative;
+}
+
+.trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-top: 1px solid var(--color-line);
+  background: transparent;
+  color: var(--color-ink);
+  cursor: pointer;
+  font: inherit;
+  gap: var(--space-3);
+  text-align: left;
+}
+
+.trigger:hover,
+.trigger[aria-expanded='true'] {
+  background: var(--color-line-faint);
+}
+
+.trigger[aria-expanded='true'] {
+  border-radius: var(--radius-control);
+}
+
+.trigger:focus-visible,
+.menu button:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+.accountText {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.accountName,
+.accountEmail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountName {
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-meta);
+}
+
+.accountEmail {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+}
+
+.chevron {
+  display: flex;
+  color: var(--color-ink-hint);
+  flex-shrink: 0;
+}
+
+.menu {
+  position: absolute;
+  bottom: 0;
+  left: calc(100% + var(--space-2));
+  z-index: 5;
+  width: 240px;
+  padding: var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-solid);
+  box-shadow: var(--shadow-card);
+}
+
+.menu::before {
+  position: absolute;
+  bottom: 20px;
+  left: -7px;
+  width: 12px;
+  height: 12px;
+  border-bottom: 1px solid var(--color-line);
+  border-left: 1px solid var(--color-line);
+  background: var(--color-surface-solid);
+  content: '';
+  transform: rotate(45deg);
+}
+
+.menuAccount {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.menuCaption {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+}
+
+.menuName {
+  font-size: var(--font-size-body);
+}
+
+.menuEmail {
+  overflow: hidden;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.signOut {
+  width: 100%;
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-ink);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.signOut:hover {
+  background: var(--color-brand-tint);
+  color: var(--color-brand-ink);
+}

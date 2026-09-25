@@ -453,22 +453,6 @@
   color: var(--color-action-brand);
 }
 
-/* 설정. 보이는 것은 20px이고 눌리는 자리는 44px이다(좁은 화면의 헤더 아이콘과 같다) */
-.desktopSettings {
-  display: inline-flex;
-  width: var(--tap-target-min);
-  height: var(--tap-target-min);
-  align-items: center;
-  justify-content: center;
-  margin-right: calc(var(--space-3) * -1);
-  color: var(--color-ink-muted);
-  text-decoration: none;
-}
-
-.desktopSettings:hover {
-  color: var(--color-ink);
-}
-
 /* 바로가기 두 장은 시안대로 검은 면이다. 좁은 화면의 유리 판은 사진 배경 위의 것이다 */
 .desktopPage .shortcut {
   min-height: 132px;
@@ -484,6 +468,20 @@
 .desktopPage .shortcutLabel {
   font-size: var(--font-size-heading);
   line-height: var(--line-height-heading);
+}
+
+/* 데스크톱은 밝은 벽 위에 놓이므로 모바일의 흰 글자와 유리 면을 쓰지 않는다. */
+.desktopPage .taste {
+  border-color: var(--color-line);
+  background: var(--color-surface-solid);
+}
+
+.desktopPage .tasteTitle {
+  color: var(--color-ink);
+}
+
+.desktopPage .tasteNote {
+  color: var(--color-ink-muted);
 }
 
 .shortcutNote {

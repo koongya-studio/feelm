@@ -5,11 +5,14 @@
  * 3탭 계약(`TAB_MATCH`)과 달리 검색과 추천 영화가 제 자리를 갖는 것이 이 내비의 핵심이라
  * 그 둘이 필름에 묻히지 않는지를 함께 고정한다.
  */
-import { describe, expect, it } from 'vitest';
-import { screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import DesktopNav from './index';
 import { renderWithRouter } from '../../test/render';
 import type { ShellAccount } from '../../hooks/useShellAccount';
+
+const signOut = vi.fn().mockResolvedValue(undefined);
+vi.mock('../../contexts/authContext', () => ({ useAuth: () => ({ signOut }) }));
 
 const account: ShellAccount = {
   userId: 7,
@@ -71,13 +74,31 @@ describe('DesktopNav', () => {
     expect(screen.getByRole('link', { name: '취향 필름' })).toHaveAttribute('aria-current', 'page');
   });
 
-  it('계정 행이 이름과 이메일을 보여주고 MY로 간다', () => {
+  it('계정 행이 이름과 이메일을 보여주고 로그아웃 메뉴를 연다', () => {
     nav('/film');
 
-    const link = screen.getByRole('link', { name: /김난다/ });
+    const trigger = screen.getByRole('button', { name: '김난다 계정 메뉴' });
 
-    expect(link).toHaveAttribute('href', '/my');
-    expect(screen.getByText('nanda@feelm.app')).toBeInTheDocument();
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('menuitem', { name: '로그아웃' })).toBeInTheDocument();
+    expect(within(trigger).getByText('nanda@feelm.app')).toBeInTheDocument();
+  });
+
+  it('메뉴에서 로그아웃하면 로그인 화면으로 이동한다', async () => {
+    nav('/my');
+    fireEvent.click(screen.getByRole('button', { name: '김난다 계정 메뉴' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: '로그아웃' }));
+
+    await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/login'));
+    expect(signOut).toHaveBeenCalled();
+  });
+
+  it('설정 하위 화면은 설정만 선택한다', () => {
+    nav('/my/settings/notifications');
+
+    expect(screen.getByRole('link', { name: '설정' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'MY' })).not.toHaveAttribute('aria-current');
   });
 
   it('프로필을 받지 못했으면 이름만 둔다', () => {

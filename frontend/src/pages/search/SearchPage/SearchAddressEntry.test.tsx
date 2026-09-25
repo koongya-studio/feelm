@@ -48,7 +48,7 @@ beforeEach(() => {
 function renderShell(route: string) {
   return render(
     <MemoryRouter initialEntries={[route]}>
-      <DesktopTopBar account={null} />
+      <DesktopTopBar />
       <Routes>
         <Route path="/film" element={<p>필름 화면</p>} />
         <Route path="/search" element={<SearchPage />} />
