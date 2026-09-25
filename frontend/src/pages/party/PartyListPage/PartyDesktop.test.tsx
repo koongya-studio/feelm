@@ -21,13 +21,24 @@ import PartyListPage from './index';
 import AppLayout from '../../../layouts/AppLayout';
 import { AuthContext } from '../../../contexts/authContext';
 import { resetViewport, setViewportWidth } from '../../../test/viewport';
-import { BUDDY, flavors, invitation, ME, member, party, partyPopcorn } from '../../../test/party';
+import {
+  BUDDY,
+  flavors,
+  invitation,
+  ME,
+  member,
+  party,
+  partyPopcorn,
+  partyRecommendations,
+} from '../../../test/party';
+import { markPartyRecommendationSeen } from '../../../utils/partyRecommendationSeen';
 import {
   acceptInvitation,
   getClosedParties,
   getMyInvitations,
   getMyParties,
   getPartyPopcorn,
+  getPartyRecommendations,
 } from '../../../api/parties';
 import { getPopcornFlavors } from '../../../api/taste';
 import { getUnreadNotificationCount } from '../../../api/notifications';
@@ -44,6 +55,7 @@ vi.mock('../../../api/parties', async () => {
     getClosedParties: vi.fn(),
     getMyInvitations: vi.fn(),
     getPartyPopcorn: vi.fn(),
+    getPartyRecommendations: vi.fn(),
     acceptInvitation: vi.fn(),
   };
 });
@@ -98,6 +110,8 @@ function renderParty(width: number) {
             <Route path="/party" element={<PartyListPage />} />
             <Route path="/party/new" element={<p>5.2 파티 만들기</p>} />
             <Route path="/parties/:partyId/popcorn" element={<p>5.8 파티원 팝콘</p>} />
+            <Route path="/parties/:partyId/popcorn/mix" element={<p>5.9 팝콘 섞기</p>} />
+            <Route path="/parties/:partyId/recommendations" element={<p>5.5 추천 완성</p>} />
             <Route path="/parties/invitations/:invitationId" element={<p>5.6 파티 초대 수신</p>} />
           </Route>
         </Routes>
@@ -112,6 +126,11 @@ beforeEach(() => {
   vi.mocked(getClosedParties).mockReset().mockResolvedValue([]);
   vi.mocked(getMyInvitations).mockReset().mockResolvedValue([invitation()]);
   vi.mocked(getPartyPopcorn).mockReset().mockResolvedValue(partyPopcorn());
+  vi.mocked(getPartyRecommendations)
+    .mockReset()
+    .mockResolvedValue(partyRecommendations(party().partyId));
+  // 기본은 아무 묶음도 본 적 없는 기기다
+  localStorage.clear();
   vi.mocked(acceptInvitation).mockReset().mockResolvedValue(party());
   vi.mocked(getPopcornFlavors).mockReset().mockResolvedValue(flavors());
   vi.mocked(getUnreadNotificationCount).mockReset().mockResolvedValue(0);
@@ -193,6 +212,39 @@ describe('5.1 파티팝콘 데스크톱 시안', () => {
     // 공통 취향은 파티 팝콘(API-057)을 맛별로 합쳐 많은 셋이다
     expect(within(aside).getByText('맛1')).toBeInTheDocument();
     expect(within(aside).getByRole('button', { name: /파티 추천 보기/ })).toBeInTheDocument();
+  });
+
+  /*
+   * 업무 -855. 5.8의 `함께 볼 영화 추천받기`와 같은 규칙이다 — 내가 이미 본 묶음이면 5.5를
+   * 바로 열고, 아니면 5.9 팝콘 섞기로 간다(`PartyPopcornPage.test.tsx`가 5.8 쪽을 자세히 본다).
+   */
+  it('파티 추천 보기는 내가 아직 못 본 묶음이면 5.9 팝콘 섞기로 간다', async () => {
+    renderParty(1440);
+
+    const aside = await screen.findByRole('complementary', { name: '보조 정보' });
+    fireEvent.click(within(aside).getByRole('button', { name: /파티 추천 보기/ }));
+
+    expect(await screen.findByText('5.9 팝콘 섞기')).toBeInTheDocument();
+    expect(screen.getByTestId('location').textContent).toBe(
+      `/parties/${party().partyId}/popcorn/mix`,
+    );
+    expect(getPartyRecommendations).toHaveBeenCalledWith(party().partyId);
+  });
+
+  it('파티 추천 보기는 내가 이미 본 묶음이면 5.5를 바로 연다', async () => {
+    markPartyRecommendationSeen(ME.userId, party().partyId, partyRecommendations(party().partyId));
+    renderParty(1440);
+
+    const aside = await screen.findByRole('complementary', { name: '보조 정보' });
+    fireEvent.click(within(aside).getByRole('button', { name: /파티 추천 보기/ }));
+
+    expect(await screen.findByText('5.5 추천 완성')).toBeInTheDocument();
+    expect(screen.getByTestId('location').textContent).toBe(
+      `/parties/${party().partyId}/recommendations`,
+    );
+    // 다시 받기(refresh)가 아니라 일반 조회 한 번이다
+    expect(getPartyRecommendations).toHaveBeenCalledTimes(1);
+    expect(getPartyRecommendations).toHaveBeenCalledWith(party().partyId);
   });
 
   it('우측 패널의 얼굴은 사진이 있으면 사진, 없으면 첫 글자다 (업무 -762)', async () => {

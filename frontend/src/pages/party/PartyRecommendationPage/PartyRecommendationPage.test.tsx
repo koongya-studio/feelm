@@ -10,6 +10,9 @@ import PartyRecommendationPage from './index';
 import { ApiError } from '../../../api/apiError';
 import { getParty, getPartyPopcorn, getPartyRecommendations } from '../../../api/parties';
 import { renderWithRouter } from '../../../test/render';
+import { AuthContext } from '../../../contexts/authContext';
+import { testAuth } from '../../../test/auth';
+import { hasSeenPartyRecommendation } from '../../../utils/partyRecommendationSeen';
 import { party, partyPopcorn, partyRecommendations, TEST_PARTY_ID } from '../../../test/party';
 
 vi.mock('../../../api/parties', async () => {
@@ -138,5 +141,47 @@ describe('다시 받기 (API-058 refresh · hasNext)', () => {
     renderPage();
 
     expect(await screen.findByRole('button', { name: '다른 영화 추천받기' })).toBeInTheDocument();
+  });
+});
+
+/*
+ * 업무 -855. 5.8 · 5.1 보조 패널은 이 계정이 본 묶음이면 5.9 섞는 장면을 건너뛴다. 본 것은
+ * 여기서 남긴다 — 그린 묶음만, 계정마다 따로.
+ */
+describe('본 묶음 남기기', () => {
+  const USER_ID = 1024;
+
+  function renderAs(userId: number) {
+    return renderWithRouter(
+      <AuthContext.Provider value={{ ...testAuth, user: { ...testAuth.user!, userId } }}>
+        <PartyRecommendationPage />
+      </AuthContext.Provider>,
+      {
+        route: `/parties/${TEST_PARTY_ID}/recommendations`,
+        path: '/parties/:partyId/recommendations',
+      },
+    );
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('그린 묶음을 이 계정이 본 것으로 남긴다. 다른 계정은 본 것이 아니다', async () => {
+    renderAs(USER_ID);
+
+    expect(await screen.findByText('우리에게 어울리는 3편')).toBeInTheDocument();
+    expect(hasSeenPartyRecommendation(USER_ID, TEST_PARTY_ID, partyRecommendations())).toBe(true);
+    expect(hasSeenPartyRecommendation(2048, TEST_PARTY_ID, partyRecommendations())).toBe(false);
+  });
+
+  it('추천을 못 받으면 아무것도 남기지 않는다', async () => {
+    vi.mocked(getPartyRecommendations).mockRejectedValue(
+      new ApiError(503, 'RECOMMENDATION_UNAVAILABLE', '준비 중'),
+    );
+    renderAs(USER_ID);
+
+    expect(await screen.findByText('아직 추천을 준비하고 있어요')).toBeInTheDocument();
+    expect(localStorage.length).toBe(0);
   });
 });
