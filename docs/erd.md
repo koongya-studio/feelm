@@ -85,6 +85,7 @@ erDiagram
         bigint user_id PK, FK
         boolean rating_enabled
         boolean recommendation_enabled
+        boolean party_invite_enabled
         boolean marketing_enabled
     }
     NOTIFICATIONS {
@@ -158,7 +159,7 @@ erDiagram
 | `users` | 서비스 계정 | `nickname`은 정규화 값(공백 제거·소문자)으로 유일. 같은 정규화식에 `text_pattern_ops`를 적용한 일반 인덱스를 따로 두어 사용자 검색(API-019)의 접두 조건이 인덱스를 타게 합니다. `avatar_storage_key`는 공개 URL이 아닌 로컬 저장소 파일명만 보관합니다. `frame_visibility`·`popcorn_visibility`·`review_visibility`는 항목별 공개 범위이며 기존 노출을 보존하도록 기본 `PUBLIC`입니다(S15P21E106-856). 탈퇴 시 `status=WITHDRAWN`으로 전환하고 이메일·닉네임을 치환해 즉시 재사용을 허용하며 생년월일·성별·프로필 사진을 삭제합니다(D-9) | FR-01, FR-37, FR-38 · API-001~016, API-019, API-078, API-079, API-081, API-082 |
 | `user_auth_providers` | 소셜 로그인 수단 | UK(`provider`, `provider_user_id`). 같은 이메일이어도 기존 계정에 자동 통합하지 않음 | FR-35 · API-007~009 |
 | `password_reset_tokens` | 비밀번호 재설정 | 1회용, 만료 30분(가정). 성공 시 해당 사용자 Refresh Token 전부 폐기 | FR-37 · API-010, API-011 |
-| `notification_settings` | 알림 수신 설정 | 사용자당 1행. 실제 인앱 사건 종류와 독립적인 수신 설정이며 푸시 채널 적용은 S15P21E106-582 범위 | FR-38 · API-017, API-018 |
+| `notification_settings` | 알림 수신 설정 | 사용자당 1행. 실제 인앱 사건 종류와 독립적인 수신 설정. `party_invite_enabled`(기본 true)가 false면 파티 초대 알림 행을 만들지 않는다(S15P21E106-857) | FR-38 · API-017, API-018 |
 | `notifications` | 인앱 알림 정본 | UK(`type`, `source_id`)로 원본 사건의 중복 생성을 막는다. 원본과 같은 트랜잭션에서 생성하고, `notified_at <= now < expires_at`이며 `closed_at IS NULL`, `dismissed_at IS NULL`인 행만 노출한다. 사용자 삭제 시 함께 삭제한다 | FR-41 · API-070~074 · ADR-0021 |
 | `web_push_subscriptions` | 사용자·브라우저별 Web Push capability | canonical endpoint의 SHA-256 fingerprint가 유일하다. 등록·갱신 때 `capability_version`을 증가시켜 이전 전송 응답이 새 capability를 지우지 못하게 한다. 해제·만료·탈퇴 시 endpoint와 `p256dh`·`auth` 원문을 지우고 fingerprint만 감사용으로 남긴다 | FR-41 · API-078~077 · ADR-0022 |
 | `web_push_deliveries` | 알림별 durable 발송 상태 | UK(`notification_id`, `endpoint_fingerprint`). 실제 전송 직전에 한 행씩 lease하고 claim token으로 stale worker 완료 경합을 막으며 최대 5회 지수 재시도한다. 구독 삭제 후에도 비민감 결과는 보존한다 | FR-41 · ADR-0022 |

@@ -7,12 +7,12 @@
  * 마케팅), 맨 아래 감상 확인 알림이 오는 시점. 와이어프레임의 `OTT 이동 2일 후`는 계약과 달라
  * 계약(클릭 즉시)을 따른다 — 문구와 값은 `utils/watchConfirm.ts` 한 곳이다(업무 -766).
  *
- * 계약(API-017 · API-018)은 `RATING` · `RECOMMENDATION` · `MARKETING` 셋이다. 파티 초대 ·
- * 리포트 발급은 계약에 없다. 한때 세션 저장소에만 남겨 저장된 것처럼 보였는데, 새로고침하면
- * 사라지는 값이라 설정처럼 보이면 안 된다(업무 -610). **그 둘은 잠그고 준비 중이라고 적는다.**
- * 자리는 와이어프레임대로 두어 계약이 열리면 값만 잇는다.
+ * 계약(API-017 · API-018)은 `RATING` · `RECOMMENDATION` · `PARTY_INVITE` · `MARKETING`
+ * 넷이다(파티 초대는 업무 -857). 리포트 발급은 계약에 없다. 한때 세션 저장소에만 남겨 저장된
+ * 것처럼 보였는데, 새로고침하면 사라지는 값이라 설정처럼 보이면 안 된다(업무 -610). **그
+ * 줄은 잠그고 준비 중이라고 적는다.** 자리는 와이어프레임대로 두어 계약이 열리면 값만 잇는다.
  *
- * 토글은 누르는 즉시 저장한다. API-018이 전체 교체라 계약의 세 값을 모두 보낸다
+ * 토글은 누르는 즉시 저장한다. API-018이 전체 교체라 계약의 네 값을 모두 보낸다
  * (`api/settings.ts`). 실패하면 누르기 전 값으로 되돌리고 알린다. 저장이 도는 동안 같은
  * 토글을 다시 눌러도 요청이 겹치지 않는다.
  *
@@ -31,11 +31,11 @@ import { watchConfirmTiming } from '../../../utils/watchConfirm';
 import styles from './NotificationSettingsPage.module.css';
 import type { NotificationSettings } from '../../../types/user';
 
-/** 와이어프레임 7.8-C의 순서와 문구. 계약에 없는 둘은 `key`가 없다 */
+/** 와이어프레임 7.8-C의 순서와 문구. 계약에 없는 줄은 `key`가 없다 */
 const ITEMS: { key: keyof NotificationSettings | null; label: string }[] = [
   { key: 'RATING', label: '감상 확인 알림' },
   { key: 'RECOMMENDATION', label: '추천 알림' },
-  { key: null, label: '파티 초대 알림' },
+  { key: 'PARTY_INVITE', label: '파티 초대 알림' },
   { key: null, label: '리포트 발급 알림' },
   { key: 'MARKETING', label: '마케팅 알림' },
 ];
@@ -143,7 +143,7 @@ export default function NotificationSettingsPage() {
           </p>
         ) : null}
 
-        <p className={styles.hint}>파티 초대 · 리포트 발급 알림 설정은 준비 중이에요</p>
+        <p className={styles.hint}>리포트 발급 알림 설정은 준비 중이에요</p>
         <p className={styles.hint}>{watchConfirmTiming()}</p>
       </div>
     </>

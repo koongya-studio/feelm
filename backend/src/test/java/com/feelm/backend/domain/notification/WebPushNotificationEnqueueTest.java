@@ -62,6 +62,39 @@ class WebPushNotificationEnqueueTest extends SharedPostgresContractTest {
     }
 
     @Test
+    void partyInviteIsNotCreatedWhenSettingIsOff() {
+        // S15P21E106-857: 파티 초대 알림을 끈 사용자에게는 알림 행도, 그에 딸린 발송도 생기지 않는다
+        jdbc.update("UPDATE notification_settings SET party_invite_enabled=false WHERE user_id=10");
+        subscribe(10, "invite-off", "6".repeat(64));
+
+        transactions.executeWithoutResult(
+                ignored ->
+                        commands.createPartyInvitation(
+                                10, 104, Instant.parse("2026-09-25T00:00:00Z")));
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM notifications", Long.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM web_push_deliveries", Long.class))
+                .isZero();
+    }
+
+    @Test
+    void partyInviteIsCreatedWhenSettingsRowIsMissing() {
+        // 설정 행이 없는 계정은 기본값(켜짐)으로 본다(API-017 처리 규칙)
+        jdbc.update("DELETE FROM notification_settings WHERE user_id=10");
+
+        transactions.executeWithoutResult(
+                ignored ->
+                        commands.createPartyInvitation(
+                                10, 105, Instant.parse("2026-09-25T00:00:00Z")));
+
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM notifications WHERE type='PARTY_INVITE'",
+                                Long.class))
+                .isOne();
+    }
+
+    @Test
     void watchConfirmationIsStoredWithoutWebPushDelivery() {
         subscribe(10, "rating-on", "3".repeat(64));
         subscribe(20, "rating-off", "4".repeat(64));

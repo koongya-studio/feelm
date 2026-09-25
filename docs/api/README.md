@@ -268,11 +268,11 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 
 #### NotificationType — 알림 설정 항목 (FR-38)
 
-- `RATING`, `RECOMMENDATION`, `MARKETING`
+- `RATING`, `RECOMMENDATION`, `PARTY_INVITE`, `MARKETING`
 
 #### InAppNotificationType — 인앱 알림 사건 (FR-41)
 
-- `PARTY_INVITE`, `PARTY_INVITE_ACCEPTED`, `WATCH_CONFIRM`. 알림 설정 항목과 인앱 사건 종류는 서로 다른 계약이다.
+- `PARTY_INVITE`, `PARTY_INVITE_ACCEPTED`, `WATCH_CONFIRM`. 알림 설정 항목과 인앱 사건 종류는 서로 다른 계약이다. 설정 항목 `PARTY_INVITE`는 같은 이름의 인앱 사건 하나만 켜고 끈다(`PARTY_INVITE_ACCEPTED`는 설정과 무관).
 
 #### PopcornFlavor — 팝콘 맛 (FR-06)
 

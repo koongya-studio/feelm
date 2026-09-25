@@ -1540,7 +1540,7 @@
         "description" : "인앱 알림 항목",
         "properties" : {
           "body" : {
-            "example" : "새로운 파티 초대가 도착했어요.",
+            "example" : "새로운 파티팝콘 초대가 도착했어요.",
             "type" : "string"
           },
           "notificationId" : {
@@ -1574,7 +1574,7 @@
             "type" : "string"
           },
           "title" : {
-            "example" : "파티 모드 초대",
+            "example" : "파티팝콘 초대",
             "type" : "string"
           },
           "type" : {
@@ -1615,6 +1615,9 @@
           "MARKETING" : {
             "type" : "boolean"
           },
+          "PARTY_INVITE" : {
+            "type" : "boolean"
+          },
           "RATING" : {
             "type" : "boolean"
           },
@@ -1629,6 +1632,9 @@
           "MARKETING" : {
             "type" : "boolean"
           },
+          "PARTY_INVITE" : {
+            "type" : "boolean"
+          },
           "RATING" : {
             "type" : "boolean"
           },
@@ -1638,6 +1644,7 @@
         },
         "required" : [
           "MARKETING",
+          "PARTY_INVITE",
           "RATING",
           "RECOMMENDATION"
         ],

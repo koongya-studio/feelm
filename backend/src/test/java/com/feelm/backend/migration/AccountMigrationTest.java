@@ -276,10 +276,10 @@ class AccountMigrationTest {
         assertThat(
                         column(
                                 "SELECT rating_enabled || ',' || recommendation_enabled || ',' ||"
-                                        + " marketing_enabled FROM notification_settings WHERE"
-                                        + " user_id = "
+                                        + " marketing_enabled || ',' || party_invite_enabled"
+                                        + " FROM notification_settings WHERE user_id = "
                                         + userId))
-                .containsExactly("true,true,false");
+                .containsExactly("true,true,false,true");
     }
 
     @Test
