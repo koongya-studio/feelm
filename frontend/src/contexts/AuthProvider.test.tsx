@@ -1,14 +1,12 @@
 /*
- * AuthProvider가 브라우저 푸시 구독을 세션과 맞추는지(업무 S15P21E106-583).
+ * AuthProvider가 세션 상태를 올리고 내리는지.
  *
- * 구독 자체(브라우저 · 서버 호출)는 `pwa/webPush.test.ts`가 본다. 여기서는 언제 · 어떤 순서로
- * 부르는지만 본다.
+ * 기기 푸시 구독을 세션과 맞추던 처리(업무 -583)는 기기 푸시를 걷어내며 뺐다(업무 -859).
  */
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { login, logout, restoreSession } from '../api/auth';
 import { endSession } from '../api/session';
-import { forgetWebPush, releaseWebPush, syncWebPush } from '../pwa/webPush';
 import { AuthProvider } from './AuthProvider';
 import { useAuth } from './authContext';
 import type { AuthenticatedUser } from '../types/auth';
@@ -20,12 +18,6 @@ vi.mock('../api/auth', () => ({
   signup: vi.fn(),
   socialLogin: vi.fn(),
   socialSignup: vi.fn(),
-}));
-
-vi.mock('../pwa/webPush', () => ({
-  syncWebPush: vi.fn(async () => undefined),
-  releaseWebPush: vi.fn(async () => undefined),
-  forgetWebPush: vi.fn(async () => undefined),
 }));
 
 const USER: AuthenticatedUser = { userId: 7, nickname: '은서', onboardingCompleted: true };
@@ -59,63 +51,35 @@ beforeEach(() => {
   vi.mocked(restoreSession).mockReset().mockResolvedValue(null);
   vi.mocked(login).mockReset().mockResolvedValue(USER);
   vi.mocked(logout).mockReset().mockResolvedValue(undefined);
-  vi.mocked(syncWebPush).mockClear();
-  vi.mocked(releaseWebPush).mockClear();
-  vi.mocked(forgetWebPush).mockClear();
 });
 
-describe('AuthProvider · 브라우저 푸시', () => {
-  it('세션을 되살리면 이 기기의 구독을 한 번 다시 올린다', async () => {
-    vi.mocked(restoreSession).mockResolvedValue(USER);
-
-    const { rerender } = renderProvider();
+describe('AuthProvider · 세션', () => {
+  it('세션을 되살리면 로그인 상태로 뜨고, 없으면 비로그인으로 뜬다', async () => {
+    vi.mocked(restoreSession).mockResolvedValueOnce(USER);
+    const { unmount } = renderProvider();
 
     expect(await screen.findByText('authenticated')).toBeInTheDocument();
-    await waitFor(() => expect(syncWebPush).toHaveBeenCalledTimes(1));
-    rerender(
-      <AuthProvider>
-        <Probe />
-      </AuthProvider>,
-    );
+    unmount();
 
-    // 다시 그려도 같은 사용자면 또 올리지 않는다
-    expect(syncWebPush).toHaveBeenCalledTimes(1);
-  });
-
-  it('로그인하지 않은 채로 뜨면 올리지 않는다', async () => {
     renderProvider();
 
     expect(await screen.findByText('anonymous')).toBeInTheDocument();
-    expect(syncWebPush).not.toHaveBeenCalled();
   });
 
-  it('로그인하면 그때 한 번 올린다', async () => {
+  it('로그인하면 로그인 상태가 되고, 로그아웃하면 서버에 알린 뒤 비로그인이 된다', async () => {
     renderProvider();
     await screen.findByText('anonymous');
 
     fireEvent.click(screen.getByRole('button', { name: '로그인' }));
-
     expect(await screen.findByText('authenticated')).toBeInTheDocument();
-    // 구독 재등록은 화면이 그려진 뒤의 effect다. 그려진 것만 보고 바로 세면 흔들린다
-    await waitFor(() => expect(syncWebPush).toHaveBeenCalledTimes(1));
-  });
-
-  it('로그아웃하면 인증이 살아 있을 때 구독을 먼저 해제하고 로그아웃한다', async () => {
-    vi.mocked(restoreSession).mockResolvedValue(USER);
-    renderProvider();
-    await screen.findByText('authenticated');
 
     fireEvent.click(screen.getByRole('button', { name: '로그아웃' }));
 
     await waitFor(() => expect(screen.getByText('anonymous')).toBeInTheDocument());
-    expect(releaseWebPush).toHaveBeenCalledTimes(1);
     expect(logout).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(releaseWebPush).mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(logout).mock.invocationCallOrder[0],
-    );
   });
 
-  it('세션이 만료돼 로그아웃 상태가 되면 이 기기의 푸시 알림도 끈다', async () => {
+  it('세션이 만료되면 비로그인 상태로 돌아간다', async () => {
     vi.mocked(restoreSession).mockResolvedValue(USER);
     renderProvider();
     await screen.findByText('authenticated');
@@ -123,19 +87,5 @@ describe('AuthProvider · 브라우저 푸시', () => {
     act(() => endSession('expired'));
 
     expect(await screen.findByText('anonymous')).toBeInTheDocument();
-    // 토큰이 없어 서버 해제는 보낼 수 없다. 기기 등록만 지운다
-    expect(forgetWebPush).toHaveBeenCalledTimes(1);
-    expect(releaseWebPush).not.toHaveBeenCalled();
-  });
-
-  it('누른 로그아웃은 서버까지 해제하므로 기기만 지우는 처리를 또 하지 않는다', async () => {
-    vi.mocked(restoreSession).mockResolvedValue(USER);
-    renderProvider();
-    await screen.findByText('authenticated');
-
-    act(() => endSession('signed-out'));
-
-    expect(await screen.findByText('anonymous')).toBeInTheDocument();
-    expect(forgetWebPush).not.toHaveBeenCalled();
   });
 });

@@ -180,7 +180,7 @@
 | `createReportImage` | 실제 | 화면의 `ReportFourCut` PNG를 API-061에 저장하고 서명 URL을 다운로드한다(업무 -557). 상세 화면 `저장`이 쓰고, 409 · 429를 따로 안내한다(업무 -731 · -861) |
 | `getLatestReadyReport` | 조합 | API-059 `current`로 3.1 버튼을 가른다. 목업 시절 세션에 두었던 `본 적 있음` 표시를 서버의 `issuedAt`으로 바꿨다 |
 
-### `notifications.ts` · `push.ts`
+### `notifications.ts`
 
 | 함수 | 상태 | API |
 | --- | --- | --- |
@@ -189,10 +189,9 @@
 | `readNotification` · `readAllNotifications` | 실제 | API-072 · 073 |
 | `dismissNotification` | 실제 | API-074 |
 | `getLatestPushNotification` | 조합 | 8.2 예시. API-070 목록에서 고른다 |
-| `getWebPushConfig` | 실제 | API-075(업무 -583) |
-| `registerWebPushSubscription` · `unregisterWebPushSubscription` | 실제 | API-076 · 077 |
 
-브라우저 구독을 만들고 지우는 일은 `src/pwa/webPush.ts`가 맡습니다.
+브라우저 푸시(API-075~077)는 쓰지 않습니다. `push.ts`와 기기 구독은 업무 -859에서 걷어냈고,
+`src/pwa/webPush.ts`는 그 전에 남은 기기 구독을 앱이 뜰 때 지우기만 합니다.
 
 ## 5. 함께 보는 문서
 

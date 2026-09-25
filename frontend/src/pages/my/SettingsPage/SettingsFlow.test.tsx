@@ -31,7 +31,6 @@ import { AuthContext } from '../../../contexts/authContext';
 import { resetSessionStore } from '../../../mocks/sessionStore';
 import { mockMyProfileView } from '../../../mocks/publicProfiles';
 import { mockMyProfile } from '../../../mocks/user';
-import { forgetWebPush } from '../../../pwa/webPush';
 import { ROUTE_PATTERN } from '../../../routes/paths';
 import { RECOMMENDATIONS_GUIDE, completeGuide, hasSeenGuide } from '../../../utils/userGuides';
 import type { AuthValue } from '../../../contexts/authContext';
@@ -60,12 +59,6 @@ vi.mock('../../../utils/oauth', async (importOriginal) => ({
 }));
 
 const { startOAuth, isOAuthConfigured } = await import('../../../utils/oauth');
-
-// 탈퇴 뒤 기기 푸시 구독을 지우는지만 본다(업무 -583). 브라우저 구독은 `webPush.test.ts`가 본다
-vi.mock('../../../pwa/webPush', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../pwa/webPush')>()),
-  forgetWebPush: vi.fn(async () => undefined),
-}));
 
 const signOut = vi.fn<AuthValue['signOut']>();
 
@@ -273,7 +266,6 @@ beforeEach(() => {
       Promise.resolve({ ...mockMyProfileView, nickname: server.profile.nickname }),
     );
   signOut.mockReset().mockResolvedValue(undefined);
-  vi.mocked(forgetWebPush).mockClear();
   vi.mocked(startOAuth).mockReset();
   vi.mocked(isOAuthConfigured).mockReset().mockReturnValue(true);
 });
@@ -445,11 +437,6 @@ describe('7.8-A-1 회원 탈퇴', () => {
     await waitFor(() => expect(location()).toBe('/start'));
     expect(signOut).toHaveBeenCalledTimes(1);
     expect(server.account.withdrawn).toBe(true);
-    // 기기 푸시 구독은 세션을 끊기 전에 지운다. 탈퇴한 계정은 서버 해제를 받지 않는다
-    expect(forgetWebPush).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(forgetWebPush).mock.invocationCallOrder[0]).toBeLessThan(
-      signOut.mock.invocationCallOrder[0],
-    );
   });
 
   it('비밀번호가 틀리면 그 사실을 알리고 계정은 그대로 남는다', async () => {
@@ -465,7 +452,6 @@ describe('7.8-A-1 회원 탈퇴', () => {
     expect(location()).toBe('/my/settings/account/withdraw');
     expect(server.account.withdrawn).toBe(false);
     expect(signOut).not.toHaveBeenCalled();
-    expect(forgetWebPush).not.toHaveBeenCalled();
   });
 
   /*
@@ -514,7 +500,6 @@ describe('7.8-A-1 회원 탈퇴', () => {
     expect(server.account.withdrawn).toBe(true);
     expect(server.social.received).toEqual(['code-linked']);
     expect(signOut).toHaveBeenCalledTimes(1);
-    expect(forgetWebPush).toHaveBeenCalledTimes(1);
   });
 
   it('연결되지 않은 소셜 계정으로 확인하면 그렇게 알리고, 같은 코드를 다시 보내지 않는다', async () => {

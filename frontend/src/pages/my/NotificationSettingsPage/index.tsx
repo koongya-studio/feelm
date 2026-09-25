@@ -16,9 +16,8 @@
  * (`api/settings.ts`). 실패하면 누르기 전 값으로 되돌리고 알린다. 저장이 도는 동안 같은
  * 토글을 다시 눌러도 요청이 겹치지 않는다.
  *
- * 맨 위 `이 기기로 푸시 받기`는 브라우저 Web Push 구독이다(업무 -583, `WebPushSection`).
- * 종류 토글과 달리 계정이 아니라 이 기기에 매인다. 푸시로 오는 알림은 파티 초대 · 초대 수락
- * 둘이다(API-075~077 발송 규칙). 감상 확인은 앱 안 알림 목록으로만 온다.
+ * 맨 위에 두었던 `이 기기로 푸시 받기`(업무 -583)는 걷어냈다(업무 -859). 알림은 앱 안 알림
+ * 목록(8.1)으로만 온다.
  */
 import { useEffect, useId, useState } from 'react';
 import Button from '../../../components/Button';
@@ -30,7 +29,6 @@ import { getNotificationSettings, updateNotificationSettings } from '../../../ap
 import { path } from '../../../routes/paths';
 import { watchConfirmTiming } from '../../../utils/watchConfirm';
 import styles from './NotificationSettingsPage.module.css';
-import WebPushSection from './WebPushSection';
 import type { NotificationSettings } from '../../../types/user';
 
 /** 와이어프레임 7.8-C의 순서와 문구. 계약에 없는 둘은 `key`가 없다 */
@@ -119,8 +117,6 @@ export default function NotificationSettingsPage() {
       {header}
 
       <div className={styles.page}>
-        <WebPushSection />
-
         <ul className={styles.list}>
           {ITEMS.map((item) =>
             item.key ? (
