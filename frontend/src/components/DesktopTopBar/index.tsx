@@ -4,9 +4,8 @@
  * 2026-09-21 사용자 시안 5종이 모두 같은 줄을 위에 그렸다. 왼쪽 끝까지 늘어난 검색 입력과
  * 오른쪽 끝의 알림 종이다. 계정 메뉴는 좌측 내비에서 연다(업무 -909).
  *
- * **검색은 입력이고 좌측 내비의 `검색`은 화면이다.** 둘이 같은 4.1로 가지만 하는 일이 다르다 —
- * 여기서는 무엇을 찾을지 이미 아는 사람이 바로 적고, 내비 항목은 필터를 만지러 가는 길이다.
- * 적고 Enter를 치면 검색어를 주소에 싣고 4.1로 간다(`path.searchWith`).
+ * 다른 화면에서는 검색어를 주소에 싣고 탐색 화면으로 들어간다. 탐색 화면에서는 이 입력이
+ * 유일한 검색창이며, 타이핑·제출·지우기를 화면의 검색 상태에 바로 전달한다.
  *
  * 알림 종은 `AppHeader`와 같은 일을 한다 — 읽지 않은 수를 스스로 받고, 못 받으면 점 없이 둔다.
  * 두 헤더가 같은 요청을 두 번 내지 않는 것은 `AppHeader`가 데스크톱에서 그려지지 않기 때문이다.
@@ -14,17 +13,22 @@
  * 모바일 헤더(`AppHeader`)를 고쳐 쓰지 않고 따로 둔다. 모바일은 워드마크 + 아이콘 둘이고
  * 데스크톱은 로고가 좌측 띠로 올라가 그 자리에 입력이 들어온다 — 같은 줄의 다른 구성이다.
  */
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { getUnreadNotificationCount } from '../../api/notifications';
+import { DesktopSearchContext } from '../../contexts/desktopSearchContext';
 import { path } from '../../routes/paths';
-import { BellIcon, SearchIcon } from '../Icon';
+import { BellIcon, ClearIcon, SearchIcon } from '../Icon';
 import styles from './DesktopTopBar.module.css';
 
 export default function DesktopTopBar() {
   const navigate = useNavigate();
-  const [keyword, setKeyword] = useState('');
+  const location = useLocation();
+  const desktopSearch = useContext(DesktopSearchContext);
+  const [entryKeyword, setEntryKeyword] = useState('');
+  const onSearchPage = location.pathname === path.search() && desktopSearch !== null;
+  const keyword = onSearchPage ? (desktopSearch?.keyword ?? '') : entryKeyword;
   const [unread, setUnread] = useState(0);
 
   useEffect(() => {
@@ -41,19 +45,15 @@ export default function DesktopTopBar() {
     };
   }, []);
 
-  /*
-   * 빈 검색어로도 4.1에 간다. 조건 없는 4.1은 최근 검색어와 필터를 보여주는 화면이라
-   * 빈 채로 들어가는 것이 막다른 길이 아니다.
-   *
-   * **보내고 나면 입력을 비운다**(사용자 결정 2026-09-21, 시안의 상단 바도 비어 있다).
-   * 이 바는 셸에 있어 화면이 바뀌어도 살아 있으므로, 비우지 않으면 4.1에 도착한 뒤 상단 바와
-   * 화면 입력에 같은 검색어가 위아래로 두 번 보인다. 보낸 검색어의 주인은 그때부터 4.1이고,
-   * 이 바는 다음 검색을 받는 빈 자리로 돌아간다.
-   */
+  /** 다른 화면에서는 Enter로 탐색 화면에 들어간다. 탐색 화면에서는 현재 필터를 보존해 제출한다. */
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (onSearchPage && desktopSearch?.handlers.current) {
+      desktopSearch.handlers.current.submit(keyword);
+      return;
+    }
     navigate(path.searchWith(keyword));
-    setKeyword('');
+    setEntryKeyword('');
   }
 
   return (
@@ -63,13 +63,38 @@ export default function DesktopTopBar() {
           <SearchIcon />
         </span>
         <input
+          ref={desktopSearch?.inputRef}
           type="search"
           className={styles.input}
           value={keyword}
           placeholder="영화, 감독, 배우로 검색해보세요."
           aria-label="영화, 감독, 배우 검색"
-          onChange={(event) => setKeyword(event.target.value)}
+          onCompositionStart={() => {
+            if (onSearchPage) desktopSearch?.handlers.current?.compositionStart();
+          }}
+          onCompositionEnd={(event) => {
+            if (onSearchPage)
+              desktopSearch?.handlers.current?.compositionEnd(event.currentTarget.value);
+          }}
+          onChange={(event) => {
+            if (onSearchPage) {
+              desktopSearch?.setKeyword(event.target.value);
+              desktopSearch?.handlers.current?.change(event.target.value);
+            } else {
+              setEntryKeyword(event.target.value);
+            }
+          }}
         />
+        {onSearchPage && keyword ? (
+          <button
+            type="button"
+            className={styles.clear}
+            aria-label="검색어 지우기"
+            onClick={() => desktopSearch?.handlers.current?.clear()}
+          >
+            <ClearIcon />
+          </button>
+        ) : null}
       </form>
 
       <div className={styles.actions}>
