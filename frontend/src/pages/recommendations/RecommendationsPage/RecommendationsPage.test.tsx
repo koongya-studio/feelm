@@ -154,6 +154,10 @@ describe('2.2 오늘의 추천', () => {
     expect(screen.getByRole('link', { name: '세븐 상세 보기' }).parentElement).toHaveTextContent(
       '제공 중인 OTT가 없어요',
     );
+    // 제목 옆에 연도 · 대표 장르를 글로 적는다(업무 -874). 포스터 그림만으로 알아보지 않게 한다
+    expect(screen.getByText('파이트 클럽').parentElement).toHaveTextContent(
+      '파이트 클럽1999 · 드라마',
+    );
     expect(getRecommendations).toHaveBeenCalledTimes(1);
 
     // 일치도 %는 계약에 없어 그리지 않는다(CR-13)
