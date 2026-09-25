@@ -114,6 +114,35 @@ class PublicReviewContractTest extends SharedPostgresContractTest {
     }
 
     @Test
+    @DisplayName("T44 작성자가 한줄평 공개 범위를 비공개로 두면 PUBLIC 평가도 타인 목록에서 뺀다")
+    void authorPrivateReviewSettingHidesFromOthers() throws Exception {
+        long visibleAuthor = insertUser("visible", "공개설정", "ACTIVE");
+        long hiddenAuthor = insertUser("hidden", "비공개설정", "ACTIVE");
+        long visible =
+                insertRating(visibleAuthor, movieId, "PUBLIC", "설정이 공개인 한줄평", false, BASE_TIME);
+        insertRating(
+                hiddenAuthor, movieId, "PUBLIC", "설정이 비공개인 한줄평", false, BASE_TIME.plusSeconds(1));
+        setReviewVisibility(hiddenAuthor, "PRIVATE");
+
+        JsonNode response = response(reviews(viewerId).andExpect(status().isOk()).andReturn());
+
+        assertThat(ids(response)).containsExactly(visible);
+        assertThat(response.toString()).doesNotContain("설정이 비공개인 한줄평");
+    }
+
+    @Test
+    @DisplayName("T45 한줄평 공개 범위를 비공개로 둔 작성자 본인은 자기 한줄평을 그대로 본다")
+    void authorPrivateReviewSettingStillShowsOwn() throws Exception {
+        long publicRating = insertRating(viewerId, movieId, "PUBLIC", "내 공개 평가", false, BASE_TIME);
+        setReviewVisibility(viewerId, "PRIVATE");
+
+        JsonNode item = firstItem(response(reviews(viewerId).andReturn()));
+
+        assertThat(item.path("ratingId").asLong()).isEqualTo(publicRating);
+        assertThat(item.path("mine").asBoolean()).isTrue();
+    }
+
+    @Test
     @DisplayName("T04 본인의 PUBLIC 한줄평도 mine=true로 반환한다")
     void memberPublicCommentIsAlsoMine() throws Exception {
         insertRating(viewerId, movieId, "PUBLIC", "내 공개 한줄평", false, BASE_TIME);
@@ -895,6 +924,13 @@ class PublicReviewContractTest extends SharedPostgresContractTest {
                 .param("status", status)
                 .query(Long.class)
                 .single();
+    }
+
+    private void setReviewVisibility(long userId, String value) {
+        jdbc.sql("UPDATE users SET review_visibility = :value WHERE id = :id")
+                .param("value", value)
+                .param("id", userId)
+                .update();
     }
 
     private long insertMovie(int tmdbId, String title) {

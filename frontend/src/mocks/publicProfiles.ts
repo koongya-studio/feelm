@@ -61,4 +61,6 @@ export const mockMyProfileView: ProfileView = {
   })),
   // 비공개로 설정한 항목은 미리보기에도 나오지 않는다
   reviews: [],
+  // 항목별 공개 범위의 기본값은 모두 공개다(API-014, 업무 -856)
+  hidden: { frames: false, popcorn: false, reviews: false },
 };

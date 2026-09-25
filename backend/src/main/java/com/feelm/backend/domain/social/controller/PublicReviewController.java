@@ -46,7 +46,8 @@ public class PublicReviewController {
             description =
                     "로그인한 ACTIVE 회원이 영화 한줄평을 최신순으로 조회합니다. "
                             + "타인의 PUBLIC과 본인의 PUBLIC·PRIVATE 한줄평만 포함하며, "
-                            + "양방향 차단 상대와 비활성 작성자는 제외합니다.")
+                            + "양방향 차단 상대, 비활성 작성자와 한줄평 공개 범위(reviewVisibility)를 "
+                            + "PRIVATE으로 둔 타인 작성자는 제외합니다.")
     @ApiResponses({
         @ApiResponse(
                 responseCode = "200",

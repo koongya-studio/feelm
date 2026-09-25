@@ -123,6 +123,28 @@ class PartyPopcornApiContractTest extends SharedPostgresContractTest {
         assertEmptyFlavor(empty, "FLAVOR_1");
     }
 
+    /** 팝콘 버킷 공개 범위를 비공개로 둬도 같은 파티원에게는 집계를 보인다(API-057, S15P21E106-856 D-6). */
+    @Test
+    void privatePopcornSettingKeepsPartyException() throws Exception {
+        jdbc.update("UPDATE users SET popcorn_visibility='PRIVATE' WHERE id=10");
+        long party = party(10, "ACTIVE");
+        member(party, 30, "MEMBER", CREATED_AT.plusSeconds(1));
+        movie(101, 1L);
+        rating(10, 101, "4.5");
+
+        JsonNode body =
+                json.readTree(
+                        mvc.perform(get(path(party)).header("Authorization", bearer(30)))
+                                .andExpect(status().isOk())
+                                .andReturn()
+                                .getResponse()
+                                .getContentAsString());
+
+        JsonNode owner = memberBody(body, 10);
+        assertThat(owner.path("totalCount").asLong()).isEqualTo(1);
+        assertFlavor(owner, "FLAVOR_1", 1, "4.5");
+    }
+
     private JsonNode memberBody(JsonNode body, long userId) {
         return StreamSupport.stream(body.path("members").spliterator(), false)
                 .filter(item -> item.path("user").path("userId").asLong() == userId)

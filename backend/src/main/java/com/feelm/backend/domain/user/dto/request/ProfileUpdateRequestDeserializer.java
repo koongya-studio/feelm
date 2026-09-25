@@ -3,6 +3,7 @@ package com.feelm.backend.domain.user.dto.request;
 import com.feelm.backend.domain.user.entity.Gender;
 import com.feelm.backend.domain.user.entity.Visibility;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 import tools.jackson.core.JsonParser;
 import tools.jackson.databind.DeserializationContext;
@@ -17,8 +18,9 @@ import tools.jackson.databind.ValueDeserializer;
  * <b>명시적 null</b>(잘못된 요청)을 구분해야 하는데, record에 값을 바인딩하고 나면 둘 다 {@code null}이라 구분이 사라진다. 그래서 바인딩 전에 원본
  * JSON을 본다.
  *
- * <p>{@code visibility}는 계약의 문장에 없지만 같은 규칙을 적용한다. 기본값이 있는 NOT NULL 컬럼이라 비우는 요청이 성립하지 않는 것은 나머지 셋과
- * 같고, 필드마다 null의 의미가 달라지면 클라이언트가 규칙을 외워야 한다.
+ * <p>{@code visibility}와 세 항목 공개 범위({@code frameVisibility}·{@code popcornVisibility}·{@code
+ * reviewVisibility})는 같은 규칙을 적용한다. 기본값이 있는 NOT NULL 컬럼이라 비우는 요청이 성립하지 않는 것은 나머지 셋과 같고, 필드마다 null의
+ * 의미가 달라지면 클라이언트가 규칙을 외워야 한다.
  *
  * <p>Jackson의 {@code @JsonSetter(nulls = Nulls.FAIL)}로 대신할 수 없다. 그 설정은 부재 값도 같은 provider로 처리해 아무
  * 필드도 보내지 않은 요청까지 거절한다(부분 수정이 불가능해진다).
@@ -26,7 +28,14 @@ import tools.jackson.databind.ValueDeserializer;
 public class ProfileUpdateRequestDeserializer extends ValueDeserializer<ProfileUpdateRequest> {
 
     private static final List<String> NON_NULLABLE_FIELDS =
-            List.of("nickname", "birthDate", "gender", "visibility");
+            List.of(
+                    "nickname",
+                    "birthDate",
+                    "gender",
+                    "visibility",
+                    "frameVisibility",
+                    "popcornVisibility",
+                    "reviewVisibility");
 
     @Override
     public ProfileUpdateRequest deserialize(JsonParser parser, DeserializationContext context) {
@@ -37,7 +46,10 @@ public class ProfileUpdateRequestDeserializer extends ValueDeserializer<ProfileU
                 read(context, body, "nickname", String.class),
                 read(context, body, "birthDate", LocalDate.class),
                 read(context, body, "gender", Gender.class),
-                read(context, body, "visibility", Visibility.class));
+                read(context, body, "visibility", Visibility.class),
+                read(context, body, "frameVisibility", Visibility.class),
+                read(context, body, "popcornVisibility", Visibility.class),
+                read(context, body, "reviewVisibility", Visibility.class));
     }
 
     /**
@@ -79,6 +91,27 @@ public class ProfileUpdateRequestDeserializer extends ValueDeserializer<ProfileU
             context.reportInputMismatch(
                     ProfileUpdateRequest.class, "%s에 빈 문자열이나 공백만 있는 값을 보낼 수 없습니다.", field);
         }
+        if (type.isEnum()) {
+            rejectNonConstantEnum(context, value, field, type);
+        }
         return context.readTreeAsValue(value, type);
+    }
+
+    /**
+     * enum 필드는 상수 이름 문자열만 받는다.
+     *
+     * <p>전역 설정이 숫자를 enum 순번으로 읽어 {@code 1}·{@code "1"}이 {@code PRIVATE}으로 저장되던 경로를 막는다. 순번 해석은 상수
+     * 선언 순서에 묶여 있어 순서가 바뀌면 공개·비공개가 뒤집힌다(S15P21E106-856 리뷰 B-1). 앞뒤 공백은 위 규칙대로 {@code trim}한 뒤 비교한다.
+     */
+    private void rejectNonConstantEnum(
+            DeserializationContext context, JsonNode value, String field, Class<?> type) {
+        String name = value.isString() ? value.stringValue().trim() : null;
+        boolean known =
+                name != null
+                        && Arrays.stream(type.getEnumConstants())
+                                .anyMatch(constant -> ((Enum<?>) constant).name().equals(name));
+        if (!known) {
+            context.reportInputMismatch(ProfileUpdateRequest.class, "%s에 허용하지 않는 값입니다.", field);
+        }
     }
 }

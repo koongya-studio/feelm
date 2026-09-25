@@ -595,8 +595,12 @@ describe('7.8 → 7.8-B · 7.8-C', () => {
       'aria-checked',
       'true',
     );
-    // 계약(API-015)의 단계는 둘이다. `파티원만`은 고를 수 없다
-    expect(within(profile).getByRole('radio', { name: '파티원만' })).toBeDisabled();
+    // 계약(API-015)의 단계는 둘이다. `파티원만` 칸은 그리지 않는다
+    expect(
+      within(profile)
+        .getAllByRole('radio')
+        .map((radio) => radio.textContent),
+    ).toEqual(['전체 공개', '비공개']);
 
     fireEvent.click(within(profile).getByRole('radio', { name: '비공개' }));
     await waitFor(() => expect(server.profile.visibility).toBe('PRIVATE'));
@@ -612,19 +616,94 @@ describe('7.8 → 7.8-B · 7.8-C', () => {
     );
   });
 
-  it('취향 필름 · 팝콘 · 한줄평 공개 범위는 계약이 없어 잠겨 있다', async () => {
+  it('취향 필름 · 팝콘 · 한줄평 공개 범위도 API-015로 저장되어 나갔다 들어와도 그대로다', async () => {
     /*
-     * 한때 세션 저장소에 두어 저장된 것처럼 보였다. 새로고침하면 사라지는 값이라 설정처럼
-     * 보이면 안 된다(업무 -610).
+     * 한때 세션 저장소에만 두어 새로고침하면 사라졌고(업무 -610) 그래서 잠갔다. 업무 -856에서
+     * 계약(API-014 · 015의 세 필드)이 생겨 서버에 저장한다
      */
+    renderApp([ROUTE_PATTERN.settings]);
+
+    fireEvent.click(screen.getByRole('link', { name: /공개 범위 설정/ }));
+
+    const film = await screen.findByRole('radiogroup', { name: '취향 필름 공개' });
+    // 기본값은 모두 공개다
+    expect(within(film).getByRole('radio', { name: '전체 공개' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(screen.queryByText(/준비 중/)).not.toBeInTheDocument();
+
+    // 네 줄 모두 `파티원만`은 계약에 없어 칸이 없다(업무 -856 결정 D-1)
+    for (const name of ['프로필 공개', '취향 필름 공개', '팝콘 버킷 공개', '한줄평 공개']) {
+      const group = screen.getByRole('radiogroup', { name });
+      expect(within(group).queryByRole('radio', { name: '파티원만' })).toBeNull();
+      expect(within(group).getByRole('radio', { name: '비공개' })).toBeEnabled();
+    }
+
+    fireEvent.click(within(film).getByRole('radio', { name: '비공개' }));
+    // 저장 중에는 다른 줄도 잠겨 요청이 겹치지 않는다
+    expect(
+      within(screen.getByRole('radiogroup', { name: '한줄평 공개' })).getByRole('radio', {
+        name: '비공개',
+      }),
+    ).toBeDisabled();
+    await waitFor(() => expect(server.profile.frameVisibility).toBe('PRIVATE'));
+
+    const review = screen.getByRole('radiogroup', { name: '한줄평 공개' });
+    await waitFor(() =>
+      expect(within(review).getByRole('radio', { name: '비공개' })).toBeEnabled(),
+    );
+    fireEvent.click(within(review).getByRole('radio', { name: '비공개' }));
+    await waitFor(() => expect(server.profile.reviewVisibility).toBe('PRIVATE'));
+
+    // 보낸 것은 고른 필드 하나뿐이다. 다른 줄은 건드리지 않는다
+    expect(server.profile.popcornVisibility).toBe('PUBLIC');
+    expect(server.profile.visibility).toBe('PUBLIC');
+
+    back();
+    await waitFor(() => expect(location()).toBe('/my/settings'));
+    fireEvent.click(screen.getByRole('link', { name: /공개 범위 설정/ }));
+
+    const reopened = await screen.findByRole('radiogroup', { name: '취향 필름 공개' });
+    expect(within(reopened).getByRole('radio', { name: '비공개' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(
+      within(screen.getByRole('radiogroup', { name: '한줄평 공개' })).getByRole('radio', {
+        name: '비공개',
+      }),
+    ).toHaveAttribute('aria-checked', 'true');
+    expect(
+      within(screen.getByRole('radiogroup', { name: '팝콘 버킷 공개' })).getByRole('radio', {
+        name: '전체 공개',
+      }),
+    ).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('공개 범위를 저장하지 못하면 고르기 전 값으로 돌아가고 알린다', async () => {
     renderApp([ROUTE_PATTERN.privacySettings]);
 
-    const film = await screen.findByRole('radiogroup', { name: /취향 필름 공개/ });
-    for (const radio of within(film).getAllByRole('radio')) {
-      expect(radio).toBeDisabled();
-      expect(radio).toHaveAttribute('aria-checked', 'false');
-    }
-    expect(screen.getByText(/공개 범위는 준비 중이에요/)).toBeInTheDocument();
+    const popcorn = await screen.findByRole('radiogroup', { name: /팝콘 버킷 공개/ });
+    // 팝콘 버킷 줄에는 파티 예외(API-057)를 적는다
+    expect(popcorn).toHaveAccessibleDescription(/파티원에게는 파티 화면에서 보여요/);
+
+    vi.mocked(fetch).mockImplementationOnce(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ code: 'INTERNAL_ERROR', message: '서버 오류' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+    fireEvent.click(within(popcorn).getByRole('radio', { name: '비공개' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('저장하지 못했어요');
+    expect(within(popcorn).getByRole('radio', { name: '전체 공개' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(server.profile.popcornVisibility).toBe('PUBLIC');
   });
 
   it('계약에 있는 알림은 저장되어 나갔다 들어와도 그대로고, 없는 둘은 잠겨 있다', async () => {

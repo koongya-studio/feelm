@@ -313,14 +313,16 @@ class PublicReviewMigrationTest {
             statement.setBoolean(3, true);
             statement.setLong(4, movieId);
             statement.setLong(5, userId);
+            // 작성자 한줄평 공개 범위의 본인 예외(S15P21E106-856)
             statement.setLong(6, userId);
             statement.setLong(7, userId);
+            statement.setLong(8, userId);
             OffsetDateTime cursorTime =
                     Instant.parse("2026-09-17T00:00:00Z").atOffset(ZoneOffset.UTC);
-            statement.setObject(8, cursorTime);
             statement.setObject(9, cursorTime);
-            statement.setLong(10, Long.MAX_VALUE);
-            statement.setInt(11, 20);
+            statement.setObject(10, cursorTime);
+            statement.setLong(11, Long.MAX_VALUE);
+            statement.setInt(12, 20);
             try (ResultSet result = statement.executeQuery()) {
                 List<String> lines = new ArrayList<>();
                 while (result.next()) {

@@ -55,6 +55,15 @@ public class UserProfileService {
         if (request.visibility() != null) {
             user.changeVisibility(request.visibility());
         }
+        if (request.frameVisibility() != null) {
+            user.changeFrameVisibility(request.frameVisibility());
+        }
+        if (request.popcornVisibility() != null) {
+            user.changePopcornVisibility(request.popcornVisibility());
+        }
+        if (request.reviewVisibility() != null) {
+            user.changeReviewVisibility(request.reviewVisibility());
+        }
         flush();
         return toResponse(user);
     }

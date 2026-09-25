@@ -61,7 +61,9 @@ class UserProfileServiceTest {
         assertThatThrownBy(
                         () ->
                                 userProfileService.updateProfile(
-                                        1L, new ProfileUpdateRequest("새닉네임", null, null, null)))
+                                        1L,
+                                        new ProfileUpdateRequest(
+                                                "새닉네임", null, null, null, null, null, null)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.NICKNAME_DUPLICATED);
@@ -75,7 +77,9 @@ class UserProfileServiceTest {
         stubResponseAssembly();
 
         userProfileService.updateProfile(
-                1L, new ProfileUpdateRequest(null, LocalDate.of(2000, 1, 2), null, null));
+                1L,
+                new ProfileUpdateRequest(
+                        null, LocalDate.of(2000, 1, 2), null, null, null, null, null));
 
         // findById로 되돌리는 회귀가 여기서 반드시 실패한다(D-7의 보호를 결정적으로 고정).
         verify(userRepository).findByIdForUpdate(1L);
@@ -91,7 +95,9 @@ class UserProfileServiceTest {
         assertThatThrownBy(
                         () ->
                                 userProfileService.updateProfile(
-                                        1L, new ProfileUpdateRequest("새닉네임", null, null, null)))
+                                        1L,
+                                        new ProfileUpdateRequest(
+                                                "새닉네임", null, null, null, null, null, null)))
                 .isInstanceOf(BusinessException.class)
                 .extracting(exception -> ((BusinessException) exception).getErrorCode())
                 .isEqualTo(ErrorCode.UNAUTHORIZED);

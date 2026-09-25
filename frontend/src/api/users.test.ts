@@ -92,7 +92,15 @@ describe('isSearchableNickname', () => {
  */
 describe('API-062 공개 프로필', () => {
   const response = {
-    user: { userId: 2048, nickname: '영화광', avatarUrl: '/media/a.jpg', visibility: 'PUBLIC' },
+    user: {
+      userId: 2048,
+      nickname: '영화광',
+      avatarUrl: '/media/a.jpg',
+      visibility: 'PUBLIC',
+      frameVisibility: 'PUBLIC',
+      popcornVisibility: 'PUBLIC',
+      reviewVisibility: 'PUBLIC',
+    },
     keywords: [{ code: 'DARK_THRILLER_LOVER', label: '어둠 속 스릴러 애호가' }],
     stats: { frameCount: 88, popcornCount: 88 },
     popcorn: { flavors: [{ flavorCode: 'FLAVOR_A', popcornCount: 30, averageScore: 4.5 }] },
@@ -140,6 +148,7 @@ describe('API-062 공개 프로필', () => {
       keywords: [{ code: 'DARK_THRILLER_LOVER', label: '어둠 속 스릴러 애호가', isPublic: true }],
       popcorn: [{ flavorCode: 'FLAVOR_A', popcornCount: 30 }],
       reviews: null,
+      hidden: { frames: false, popcorn: false, reviews: false },
     });
     expect(view.frames.map((frame) => frame.frameId)).toEqual([191, 192, 193]);
     expect(view.frames[0]).toEqual({
@@ -149,6 +158,25 @@ describe('API-062 공개 프로필', () => {
       posterUrl: null,
       isPublic: true,
     });
+  });
+
+  it('항목별 공개 범위가 PRIVATE인 구역은 가린 것으로 표시한다(업무 -856)', async () => {
+    fetchMock.mockResolvedValue(
+      json(200, {
+        ...response,
+        user: { ...response.user, frameVisibility: 'PRIVATE', reviewVisibility: 'PRIVATE' },
+        stats: { frameCount: 0, popcornCount: 88 },
+        recentFrames: [],
+        publicReviewCount: 0,
+      }),
+    );
+
+    const view = await getPublicProfile('1b4e28ba-2fa1');
+
+    expect(view.hidden).toEqual({ frames: true, popcorn: false, reviews: true });
+    expect(view.frames).toEqual([]);
+    expect(view.stats).toEqual({ frameCount: 0, popcornCount: 88, publicReviewCount: 0 });
+    expect(view.popcorn).toEqual([{ flavorCode: 'FLAVOR_A', popcornCount: 30 }]);
   });
 
   it('없음 · 비공개 · 차단 관계는 404로 올라간다', async () => {

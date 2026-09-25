@@ -35,6 +35,10 @@ class UserProfileApiContractTest extends UserProfileApiTestSupport {
                 .andExpect(jsonPath("$.birthDate").value(BIRTH_DATE))
                 .andExpect(jsonPath("$.gender").value("FEMALE"))
                 .andExpect(jsonPath("$.visibility").value("PRIVATE"))
+                // 항목별 공개 범위의 기본값은 PUBLIC이다(S15P21E106-856).
+                .andExpect(jsonPath("$.frameVisibility").value("PUBLIC"))
+                .andExpect(jsonPath("$.popcornVisibility").value("PUBLIC"))
+                .andExpect(jsonPath("$.reviewVisibility").value("PUBLIC"))
                 .andExpect(jsonPath("$.hasPassword").value(true))
                 .andExpect(jsonPath("$.linkedProviders", empty()))
                 .andExpect(jsonPath("$.onboardingCompleted").value(false))
@@ -49,6 +53,8 @@ class UserProfileApiContractTest extends UserProfileApiTestSupport {
                                         """
                                         {"userId":%d,"email":"user@example.com","nickname":"팝콘러버",
                                          "birthDate":"%s","gender":"FEMALE","visibility":"PRIVATE",
+                                         "frameVisibility":"PUBLIC","popcornVisibility":"PUBLIC",
+                                         "reviewVisibility":"PUBLIC",
                                          "avatarUrl":null,
                                          "hasPassword":true,"linkedProviders":[],
                                          "onboardingCompleted":false,

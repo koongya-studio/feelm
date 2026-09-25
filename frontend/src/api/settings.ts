@@ -9,9 +9,9 @@
  * 없다. 한때 세션 저장소에만 남겨 저장된 것처럼 보였는데, 새로고침하면 사라지는 값이라
  * 설정처럼 보이면 안 된다. 그 둘은 화면에서 준비 중으로 잠근다(`NotificationSettingsPage`).
  *
- * 7.8-B 공개 범위도 같다. 계약에 있는 것은 프로필 `visibility`(API-015, `PUBLIC` · `PRIVATE`)
- * 하나라 그 값만 `users.updateMyProfile`로 저장하고, 취향 필름 · 팝콘 · 한줄평의 공개 범위는
- * 준비 중이다(`PrivacySettingsPage`).
+ * 7.8-B 공개 범위는 이 파일이 아니라 `users.updateMyProfile`(API-015)이 저장한다. 프로필
+ * `visibility`와 항목별 `frameVisibility` · `popcornVisibility` · `reviewVisibility`가 모두 API-014 ·
+ * 015에 있다(업무 -856). 값은 `PUBLIC` · `PRIVATE` 둘이다(`PrivacySettingsPage`).
  */
 import { request } from './client';
 import type { SocialProvider } from '../types/auth';

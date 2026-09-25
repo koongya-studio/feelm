@@ -82,6 +82,8 @@ public class PublicReviewQueryRepository {
                           AND %s
                           AND (r.visibility = 'PUBLIC'
                                OR (r.user_id = :viewerId AND r.visibility = 'PRIVATE'))
+                          -- 작성자의 한줄평 공개 범위(S15P21E106-856). 본인 한줄평에는 적용하지 않는다.
+                          AND (u.review_visibility = 'PUBLIC' OR r.user_id = :viewerId)
                           -- FR-39 양방향 차단 의미를 복제한다. user 도메인 공통 SQL 조각 제공 시 교체한다.
                           AND NOT EXISTS (
                               SELECT 1

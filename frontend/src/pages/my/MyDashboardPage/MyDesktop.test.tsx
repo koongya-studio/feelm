@@ -94,6 +94,7 @@ const profile: ProfileView = {
   frames: [],
   popcorn: [],
   reviews: [],
+  hidden: { frames: false, popcorn: false, reviews: false },
 };
 
 const bucket: PopcornBucket = {

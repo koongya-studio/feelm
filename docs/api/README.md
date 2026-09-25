@@ -226,7 +226,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 ### 처리 규칙
 
 - 차단 관계 필터(FR-39)는 서버가 적용한다. 클라이언트는 차단 목록을 받아 직접 걸러내지 않는다.
-- 공개 범위 `PRIVATE` 리소스는 본인 외 조회 시 `404`
+- 공개 범위 `PRIVATE` 리소스는 본인 외 조회 시 `404`. 단 공개 프로필 안의 항목별 공개 범위(`frameVisibility`·`popcornVisibility`·`reviewVisibility`)는 `404` 대신 그 구역의 값을 비운다(API-062)
 - 추천 서비스 장애 시 추천 API만 `503`을 반환하고 영화·검색·평가 API는 영향받지 않는다(NFR-05).
 - 멱등성: `PUT`·`DELETE`는 멱등. 동일 리소스 중복 `POST`는 `409`로 거절한다.
 
@@ -244,6 +244,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 #### Visibility — 공개 범위
 
 - `PUBLIC`, `PRIVATE` (기본값 `PRIVATE`)
+- 항목별 공개 범위 `frameVisibility`·`popcornVisibility`·`reviewVisibility`(API-014·015)도 같은 값을 쓰며 기본값은 `PUBLIC`이다. 와이어프레임 7.8-B의 `파티원만`은 값에 없다
 
 #### RecommendationType — 추천 유형
 

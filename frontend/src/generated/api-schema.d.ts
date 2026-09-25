@@ -285,7 +285,7 @@ export interface paths {
         };
         /**
          * 공개 한줄평 목록 조회
-         * @description 로그인한 ACTIVE 회원이 영화 한줄평을 최신순으로 조회합니다. 타인의 PUBLIC과 본인의 PUBLIC·PRIVATE 한줄평만 포함하며, 양방향 차단 상대와 비활성 작성자는 제외합니다.
+         * @description 로그인한 ACTIVE 회원이 영화 한줄평을 최신순으로 조회합니다. 타인의 PUBLIC과 본인의 PUBLIC·PRIVATE 한줄평만 포함하며, 양방향 차단 상대, 비활성 작성자와 한줄평 공개 범위(reviewVisibility)를 PRIVATE으로 둔 타인 작성자는 제외합니다.
          */
         get: operations["getReviews"];
         put?: never;
@@ -899,7 +899,7 @@ export interface paths {
         };
         /**
          * 공개 프로필 조회
-         * @description PUBLIC 사용자의 닉네임·취향 키워드·팝콘·최근 필름·공개 한줄평 수를 조회합니다. 비회원도 호출할 수 있습니다. 없는 사용자, PRIVATE 사용자, 로그인 사용자와 차단 관계인 사용자는 모두 404로 구분 없이 응답합니다. 본인이 자신의 publicId로 조회하면 공개 범위와 무관하게 200입니다.
+         * @description PUBLIC 사용자의 닉네임·취향 키워드·팝콘·최근 필름·공개 한줄평 수를 조회합니다. 비회원도 호출할 수 있습니다. 없는 사용자, PRIVATE 사용자, 로그인 사용자와 차단 관계인 사용자는 모두 404로 구분 없이 응답합니다. 본인이 자신의 publicId로 조회하면 공개 범위와 무관하게 200입니다. 항목별 공개 범위(user.frameVisibility·popcornVisibility·reviewVisibility)가 PRIVATE인 구역은 본인 외 조회에서 필드 모양을 유지한 채 값을 비웁니다.
          */
         get: operations["getPublicProfile"];
         put?: never;
@@ -2154,7 +2154,13 @@ export interface components {
         };
         Profile: {
             avatarUrl?: string;
+            /** @enum {string} */
+            frameVisibility?: "PUBLIC" | "PRIVATE";
             nickname?: string;
+            /** @enum {string} */
+            popcornVisibility?: "PUBLIC" | "PRIVATE";
+            /** @enum {string} */
+            reviewVisibility?: "PUBLIC" | "PRIVATE";
             /** Format: int64 */
             userId?: number;
             /** @enum {string} */
@@ -2164,8 +2170,14 @@ export interface components {
             /** Format: date */
             birthDate?: string;
             /** @enum {string} */
+            frameVisibility?: "PUBLIC" | "PRIVATE";
+            /** @enum {string} */
             gender?: "MALE" | "FEMALE" | "OTHER";
             nickname?: string;
+            /** @enum {string} */
+            popcornVisibility?: "PUBLIC" | "PRIVATE";
+            /** @enum {string} */
+            reviewVisibility?: "PUBLIC" | "PRIVATE";
             /** @enum {string} */
             visibility?: "PUBLIC" | "PRIVATE";
         };
@@ -2574,11 +2586,17 @@ export interface components {
             createdAt?: string;
             email?: string;
             /** @enum {string} */
+            frameVisibility?: "PUBLIC" | "PRIVATE";
+            /** @enum {string} */
             gender?: "MALE" | "FEMALE" | "OTHER";
             hasPassword?: boolean;
             linkedProviders?: string[];
             nickname?: string;
             onboardingCompleted?: boolean;
+            /** @enum {string} */
+            popcornVisibility?: "PUBLIC" | "PRIVATE";
+            /** @enum {string} */
+            reviewVisibility?: "PUBLIC" | "PRIVATE";
             stats?: components["schemas"]["Stats"];
             /** Format: int64 */
             userId?: number;
