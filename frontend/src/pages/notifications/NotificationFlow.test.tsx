@@ -29,6 +29,9 @@ vi.mock('../../api/taste', () => ({
   getPopcornBucket: vi.fn().mockResolvedValue({ totalCount: 0, flavors: [] }),
 }));
 
+// 파티 초대 수락 알림은 이동 전에 내 파티 목록에서 파티를 찾는다(업무 -866)
+vi.mock('../../api/parties', () => ({ getParty: vi.fn() }));
+
 vi.mock('../../api/reports', () => ({
   getLatestReadyReport: vi.fn().mockResolvedValue(null),
 }));
@@ -41,6 +44,22 @@ const {
   readAllNotifications,
   readNotification,
 } = await import('../../api/notifications');
+const { getParty } = await import('../../api/parties');
+
+/** 파티 초대 수락 알림이 가리키는 파티. 기본은 참여 중인 활성 파티다 */
+function acceptedParty(status: 'ACTIVE' | 'CLOSED') {
+  const owner = { userId: 7, nickname: '테스트 사용자', avatarUrl: null };
+
+  return {
+    partyId: 77,
+    name: '금요 심야 상영회',
+    status,
+    owner,
+    members: [{ ...owner, role: 'OWNER' as const, joinedAt: '2026-09-18T09:00:00Z' }],
+    maxMembers: 4,
+    createdAt: '2026-09-18T09:00:00Z',
+  };
+}
 
 const watch: NotificationItem = {
   notificationId: 1,
@@ -93,6 +112,7 @@ beforeEach(() => {
   vi.mocked(readNotification).mockReset().mockResolvedValue();
   vi.mocked(readAllNotifications).mockReset().mockResolvedValue();
   vi.mocked(dismissNotification).mockReset().mockResolvedValue();
+  vi.mocked(getParty).mockReset().mockResolvedValue(acceptedParty('ACTIVE'));
 });
 
 function LocationProbe() {
@@ -170,6 +190,65 @@ describe('알림 대상 이동', () => {
 
     await waitFor(() => expect(location()).toBe(target));
     expect(readNotification).toHaveBeenCalledWith(id);
+  });
+});
+
+/*
+ * 업무 -866. 파티 초대 수락 알림은 그 뒤에도 목록에 남는다. 그사이 파티가 끝났거나 내가
+ * 나갔으면 5.8로 보내 일반 오류를 보이지 않고, 머문 채 까닭을 말한다.
+ */
+describe('파티 초대 수락 알림', () => {
+  it('참여 중인 파티면 그 파티의 파티원 팝콘(5.8)을 연다', async () => {
+    renderApp([ROUTE_PATTERN.notifications]);
+
+    fireEvent.click(await findRow('파티팝콘 초대 수락'));
+
+    await waitFor(() => expect(location()).toBe('/parties/77/popcorn'));
+    // 끝난 파티도 찾아본다. 활성 목록에만 없다고 나간 파티로 볼 수 없다
+    expect(getParty).toHaveBeenCalledWith(77, { includeClosed: true });
+  });
+
+  it('끝난 파티면 이동하지 않고 끝났다고 알린다. 알림은 읽음이 된다', async () => {
+    vi.mocked(getParty).mockResolvedValue(acceptedParty('CLOSED'));
+    renderApp([ROUTE_PATTERN.notifications]);
+
+    fireEvent.click(await findRow('파티팝콘 초대 수락'));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('끝난 파티예요');
+    expect(location()).toBe('/notifications');
+    expect(readNotification).toHaveBeenCalledWith(3);
+    expect(within(await findRow('파티팝콘 초대 수락')).queryByText('· 읽지 않음')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '확인' }));
+    expect(screen.queryByText(/끝난 파티예요/)).not.toBeInTheDocument();
+  });
+
+  it('나갔거나 내보내진 파티면 이동하지 않고 그렇다고 알린다', async () => {
+    vi.mocked(getParty).mockResolvedValue(null);
+    renderApp([ROUTE_PATTERN.notifications]);
+
+    fireEvent.click(await findRow('파티팝콘 초대 수락'));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('나갔거나 내보내진 파티예요');
+    expect(location()).toBe('/notifications');
+  });
+
+  it('파티 목록을 못 받으면 가려내지 못한 것이라 이동한다 — 5.8이 제 오류를 보인다', async () => {
+    vi.mocked(getParty).mockRejectedValue(new Error('network'));
+    renderApp([ROUTE_PATTERN.notifications]);
+
+    fireEvent.click(await findRow('파티팝콘 초대 수락'));
+
+    await waitFor(() => expect(location()).toBe('/parties/77/popcorn'));
+  });
+
+  it('다른 알림은 파티를 찾지 않는다', async () => {
+    renderApp([ROUTE_PATTERN.notifications]);
+
+    fireEvent.click(await findRow('파티팝콘 초대'));
+
+    await waitFor(() => expect(location()).toBe('/parties/invitations/501'));
+    expect(getParty).not.toHaveBeenCalled();
   });
 });
 

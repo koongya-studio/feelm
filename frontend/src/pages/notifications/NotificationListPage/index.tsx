@@ -3,7 +3,10 @@
  *
  * 이동표
  * - 2.1 → 8.1 홈의 알림 아이콘
- * - 8.1 → 2.4-A 감상 확인 · 5.6 파티 초대
+ * - 8.1 → 2.4-A 감상 확인 · 5.6 파티 초대 · 5.8 파티 초대 수락 · 3.3 리포트 발급
+ *
+ * **파티 초대 수락 알림은 파티가 끝났거나 내가 나갔으면 이동하지 않고 까닭을 말한다**(업무 -866).
+ * 알림은 그 뒤에도 목록에 남는데, 5.8로 보내면 일반 오류만 보였다(`destination.ts`).
  *
  * 알림 종류를 나누지 않고 최신순 단일 목록으로 보여준다(사용자 결정 2026-09-17).
  *
@@ -12,11 +15,12 @@
  * API-074의 숨김 처리라 원본 파티 초대·감상 기록을 지우지 않는다.
  * `[?]` 와이어프레임 8.1에는 뒤로 가기가 없다. 전체화면이라 돌아갈 길이 없어 두었다.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import Button from '../../../components/Button';
 import { path } from '../../../routes/paths';
 import ScreenHeader from '../../../components/ScreenHeader';
+import Snackbar from '../../../components/Snackbar';
 import StatusView from '../../../components/StatusView';
 import {
   dismissNotification,
@@ -25,7 +29,7 @@ import {
   readNotification,
 } from '../../../api/notifications';
 import { formatRelativeTime } from '../../../utils/date';
-import { notificationPath } from '../destination';
+import { notificationPath, unavailableReason } from '../destination';
 import NotificationIcon from './NotificationIcon';
 import styles from './NotificationListPage.module.css';
 import type { NotificationItem } from '../../../types/notification';
@@ -51,6 +55,10 @@ export default function NotificationListPage() {
   const [actionFailed, setActionFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
+  /** 알림이 가리키는 곳으로 갈 수 없는 까닭 */
+  const [notice, setNotice] = useState('');
+  /** 누른 알림의 목적지를 확인하는 중이다. 거듭 누른 것은 무시한다 */
+  const openingRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -72,15 +80,46 @@ export default function NotificationListPage() {
   }, [reloadCount]);
 
   async function open(item: NotificationItem) {
-    try {
-      if (item.readAt === null) {
-        await readNotification(item.notificationId);
-      }
-    } catch {
-      // 대상 화면 진입은 막지 않는다. 목록에 돌아오면 서버 상태를 다시 조회한다.
-    }
+    if (openingRef.current) return;
 
-    void navigate(notificationPath(item));
+    openingRef.current = true;
+    setNotice('');
+
+    try {
+      // 갈 수 없어도 읽은 것이다. 목적지 확인과 함께 보낸다
+      const [reason] = await Promise.all([
+        unavailableReason(item),
+        item.readAt === null
+          ? readNotification(item.notificationId).then(
+              () => markRead(item.notificationId),
+              // 대상 화면 진입은 막지 않는다. 목록에 돌아오면 서버 상태를 다시 조회한다.
+              () => undefined,
+            )
+          : undefined,
+      ]);
+
+      if (reason) {
+        setNotice(reason);
+        return;
+      }
+
+      void navigate(notificationPath(item));
+    } finally {
+      openingRef.current = false;
+    }
+  }
+
+  function markRead(notificationId: number) {
+    const readAt = new Date().toISOString();
+
+    setItems(
+      (current) =>
+        current?.map((item) =>
+          item.notificationId === notificationId && item.readAt === null
+            ? { ...item, readAt }
+            : item,
+        ) ?? null,
+    );
   }
 
   async function readAll() {
@@ -219,6 +258,14 @@ export default function NotificationListPage() {
           </ul>
         )}
       </div>
+
+      {notice ? (
+        <div className={styles.snackbarSlot}>
+          <Snackbar actionLabel="확인" onAction={() => setNotice('')}>
+            {notice}
+          </Snackbar>
+        </div>
+      ) : null}
     </>
   );
 }
