@@ -147,6 +147,13 @@ describe('2.2 오늘의 추천', () => {
     );
     expect(ottLink).toHaveAttribute('target', '_blank');
     expect(poster).not.toContainElement(ottLink);
+    // 어두운 정보 영역에서 22px 로고가 묻혀 한 단계 키웠다(업무 -917)
+    expect(ottLink.firstElementChild).toHaveStyle('--ott-badge-size: 26px');
+    // 로고는 제목 옆이 아니라 이유 아래 자기 줄에 선다. OTT가 없으면 그 자리를 글로 채운다
+    expect(screen.getByText('파이트 클럽')).not.toContainElement(ottLink);
+    expect(screen.getByRole('link', { name: '세븐 상세 보기' }).parentElement).toHaveTextContent(
+      '제공 중인 OTT가 없어요',
+    );
     expect(getRecommendations).toHaveBeenCalledTimes(1);
 
     // 일치도 %는 계약에 없어 그리지 않는다(CR-13)
