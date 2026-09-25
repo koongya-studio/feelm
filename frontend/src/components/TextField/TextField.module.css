@@ -100,3 +100,37 @@
 .error {
   color: var(--color-danger);
 }
+
+/*
+ * 값이 없는 `type="date"` 칸. 브라우저 기본 글자(`연도-월-일`)를 감추고 그 자리에
+ * placeholder를 겹쳐, 닉네임·이메일 칸과 같은 모양으로 무엇을 받는 칸인지 보여 준다.
+ * 색만 투명하게 두는 것은 `::-webkit-datetime-edit`가 브라우저마다 달라서다 — 날짜
+ * 글자는 어느 브라우저에서나 입력의 `color`를 따른다. 초점이 오면 되돌린다.
+ */
+.dateSlot {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex: 1;
+}
+
+.input[data-empty='true']:not(:focus) {
+  color: transparent;
+}
+
+.datePlaceholder {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  color: var(--color-ink-hint);
+  pointer-events: none;
+}
+
+.dateSlot:focus-within .datePlaceholder {
+  display: none;
+}
