@@ -193,6 +193,19 @@ function nextPaint(): Promise<void> {
   });
 }
 
+/**
+ * 실패를 `Error`로 맞춘다. **`instanceof`만 보지 않는다** — 다른 실행 환경(iframe · jsdom 등)에서
+ * 만든 오류는 `Error`인데도 `instanceof Error`가 거짓이다. 그런 실패를 시간 초과 문구로 바꿔 버려
+ * `FileReader`가 Blob을 거절한 것이 `capture timed out`으로 보였다(업무 S15P21E106-916).
+ * 시간 초과 문구는 실제로 시간이 다 됐을 때만 쓴다. 오류가 아닌 값은 원인으로 붙여 감싼다.
+ */
+function asError(error: unknown): Error {
+  if (error instanceof Error) return error;
+  if (Object.prototype.toString.call(error) === '[object Error]') return error as Error;
+
+  return new Error('ReportFourCut capture failed', { cause: error });
+}
+
 function withTimeout<T>(
   promise: PromiseLike<T>,
   message: string,
@@ -207,7 +220,7 @@ function withTimeout<T>(
       },
       (error: unknown) => {
         window.clearTimeout(timeout);
-        reject(error instanceof Error ? error : new Error(message));
+        reject(asError(error));
       },
     );
   });
