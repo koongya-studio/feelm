@@ -5,13 +5,21 @@
  * 되살린다. 그동안은 `restoring`이며, 로그인 여부를 모르는 이 구간을 화면이 구분할 수
  * 있어야 새로고침할 때마다 로그인 화면이 잠깐 스치는 일이 없다.
  *
+ * **복구가 일시 오류로 끝나면 비로그인으로 떨어뜨리지 않는다**(업무 -908). 재발급은 됐는데
+ * 프로필을 서버 · 네트워크 사정으로 끝내 못 받았으면 세션은 살아 있다. 한때 모든 복구 실패를
+ * 비로그인으로 다뤄, 서버가 잠깐 흔들리면 새로고침만으로 로그인 화면에 떨어졌다. 그때는
+ * `restoring`을 유지하고 `SessionRestoreContext`로 다시 시도를 내려 준다. 재발급이 거절되면
+ * (401) 세션이 끝나 `canRefresh()`가 내려가므로 지금처럼 비로그인이다.
+ *
  * 세션은 로그아웃 말고도 끊긴다. 재발급이 거절되면 아무 API 호출 도중에나 끊기므로
  * `onSessionEnd`를 구독해 상태를 되돌린다.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { login, logout, restoreSession, signup, socialLogin, socialSignup } from '../api/auth';
-import { onSessionEnd } from '../api/session';
+import { isTransientFailure } from '../api/retry';
+import { canRefresh, onSessionEnd } from '../api/session';
 import { AuthContext } from './authContext';
+import { SessionRestoreContext } from './sessionRestoreContext';
 import type { ReactNode } from 'react';
 import type { AuthStatus, AuthValue } from './authContext';
 import type {
@@ -27,6 +35,10 @@ const ANONYMOUS: State = { status: 'anonymous', user: null };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>({ status: 'restoring', user: null });
+  /** 세션은 살아 있는데 복구를 끝내지 못했다 */
+  const [restoreFailed, setRestoreFailed] = useState(false);
+  /** 다시 시도할 때마다 늘려 복구를 처음부터 다시 돌린다 */
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -37,17 +49,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    // 복구 실패는 비로그인과 같게 다룬다. 앱 진입을 막을 이유가 없다
     void restoreSession()
       .then(settle)
-      .catch(() => settle(null));
+      .catch((error: unknown) => {
+        if (!active) return;
+
+        // 세션이 살아 있는 일시 실패만 붙든다. 그 밖의 복구 실패는 비로그인과 같다 — 앱
+        // 진입을 막을 이유가 없다
+        if (isTransientFailure(error) && canRefresh()) {
+          setRestoreFailed(true);
+        } else {
+          settle(null);
+        }
+      });
 
     return () => {
       active = false;
     };
+  }, [restoreAttempt]);
+
+  const retryRestore = useCallback(() => {
+    setRestoreFailed(false);
+    setRestoreAttempt((count) => count + 1);
   }, []);
 
-  useEffect(() => onSessionEnd(() => setState(ANONYMOUS)), []);
+  const restore = useMemo(
+    () => ({ failed: restoreFailed, retry: retryRestore }),
+    [restoreFailed, retryRestore],
+  );
+
+  useEffect(
+    () =>
+      onSessionEnd(() => {
+        setState(ANONYMOUS);
+        setRestoreFailed(false);
+      }),
+    [],
+  );
 
   const signIn = useCallback(async (email: string, password: string) => {
     const user = await login(email, password);
@@ -110,5 +148,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [state, signIn, signInWithSocial, completeEmailSignup, completeSocialSignup, signOut],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      <SessionRestoreContext.Provider value={restore}>{children}</SessionRestoreContext.Provider>
+    </AuthContext.Provider>
+  );
 }
