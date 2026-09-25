@@ -11,7 +11,7 @@
 | [API-076](#api-076-web-push-구독-등록갱신) | Web Push 구독 등록·갱신 | PUT | `/notifications/push/subscriptions` | 2차 MVP | 회원 |
 | [API-077](#api-077-web-push-구독-해제) | Web Push 구독 해제 | DELETE | `/notifications/push/subscriptions/{subscriptionId}` | 2차 MVP | 회원 |
 
-공통 URL·인증·오류·커서 규약은 [API-000](./README.md#공통-규약)을 따른다. 이 문서의 알림 종류는 알림 설정 API-017·018의 `RATING`, `RECOMMENDATION`, `MARKETING`과 별개인 실제 인앱 사건 종류다.
+공통 URL·인증·오류·커서 규약은 [API-000](./README.md#공통-규약)을 따른다. 이 문서의 알림 종류는 알림 설정 API-017·018의 수신 설정 키와 별개인 실제 인앱 사건 종류다. 수신 설정 `PARTY_INVITE`가 꺼진 사용자에게는 `PARTY_INVITE` 알림을 만들지 않는다.
 
 ## 공통 알림 항목
 
@@ -61,7 +61,7 @@
 
 ### 처리 규칙
 
-- 파티 초대는 생성 즉시 노출하며 최대 90일 보관한다.
+- 파티 초대는 생성 즉시 노출하며 최대 90일 보관한다. 초대받은 사람의 수신 설정 `PARTY_INVITE`(API-017)가 꺼져 있으면 알림을 만들지 않는다.
 - 초대 수락은 수락 즉시 현재 파티장에게 노출하며 최대 90일 보관한다.
 - 감상 확인은 OTT 클릭 24시간 뒤 앱에서 알림 목록을 다시 조회할 때부터 기존 감상 기록 만료 시각까지 노출한다.
 - 초대 수락·거절·파티 종료와 감상 확인이 완료되면 연결 알림을 닫아 목록에서 제외한다.

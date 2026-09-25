@@ -1815,7 +1815,7 @@ export interface components {
         };
         /** @description 인앱 알림 항목 */
         NotificationItemResponse: {
-            /** @example 새로운 파티 초대가 도착했어요. */
+            /** @example 새로운 파티팝콘 초대가 도착했어요. */
             body?: string;
             /**
              * Format: int64
@@ -1836,7 +1836,7 @@ export interface components {
              * @enum {string}
              */
             targetType?: "PARTY_INVITATION" | "PARTY" | "WATCH_RECORD";
-            /** @example 파티 모드 초대 */
+            /** @example 파티팝콘 초대 */
             title?: string;
             /**
              * @example PARTY_INVITE
@@ -1852,11 +1852,13 @@ export interface components {
         };
         NotificationSettingsResponse: {
             MARKETING?: boolean;
+            PARTY_INVITE?: boolean;
             RATING?: boolean;
             RECOMMENDATION?: boolean;
         };
         NotificationSettingsUpdateRequest: {
             MARKETING: boolean;
+            PARTY_INVITE: boolean;
             RATING: boolean;
             RECOMMENDATION: boolean;
         };

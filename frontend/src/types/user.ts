@@ -82,15 +82,17 @@ export type NicknameAvailability = {
 };
 
 /**
- * API-017 · API-018 알림 설정. 세 키가 모두 있어야 한다(API-018 `400 VALIDATION_FAILED`).
+ * API-017 · API-018 알림 설정. 네 키가 모두 있어야 한다(API-018 `400 VALIDATION_FAILED`).
  *
- * 7.8-C는 토글 다섯 개를 그리지만 계약은 셋이다. 나머지 둘(파티 초대 · 리포트 발급)은
- * 보낼 곳이 없어 화면에서 준비 중으로 잠근다(업무 -610).
+ * 7.8-C는 토글 다섯 개를 그리지만 계약은 넷이다. 리포트 발급은 보낼 곳이 없어 화면에서
+ * 준비 중으로 잠근다(업무 -610). 파티 초대는 업무 -857에서 계약에 들어왔다.
  */
 export type NotificationSettings = {
   /** 감상 확인 알림 */
   RATING: boolean;
   RECOMMENDATION: boolean;
+  /** 끄면 파티 초대 알림이 오지 않는다. 초대 자체는 초대 목록에 그대로 온다 */
+  PARTY_INVITE: boolean;
   MARKETING: boolean;
 };
 

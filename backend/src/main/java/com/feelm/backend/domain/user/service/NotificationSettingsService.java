@@ -18,8 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>설정 행은 가입 트랜잭션이 사용자당 하나씩 만든다. 그래도 행이 없는 계정을 만나면 조회는 명세 기본값을 응답만 하고(저장하지 않는다) 변경은 기본행을 만들어 적용한다.
  * 조회 경로에 쓰기를 넣지 않으면서 데이터 이상이 조회 실패로 드러나지 않게 하기 위해서다(플랜 U1).
  *
- * <p>변경은 세 항목을 함께 덮는 전체 교체라 두 요청이 겹쳐도 항목이 섞이지 않는다. 구독 OTT 설정과 달리 삭제·삽입이 없어 계정 행을 잠그지 않는다. 다만 이 보장은
- * 갱신이 세 컬럼을 함께 쓴다는 전제 위에 있다. 이 엔티티에 {@code @DynamicUpdate}를 붙이면 두 요청이 서로 다른 컬럼만 써서 어느 쪽도 요청하지 않은
+ * <p>변경은 모든 항목을 함께 덮는 전체 교체라 두 요청이 겹쳐도 항목이 섞이지 않는다. 구독 OTT 설정과 달리 삭제·삽입이 없어 계정 행을 잠그지 않는다. 다만 이 보장은
+ * 갱신이 모든 컬럼을 함께 쓴다는 전제 위에 있다. 이 엔티티에 {@code @DynamicUpdate}를 붙이면 두 요청이 서로 다른 컬럼만 써서 어느 쪽도 요청하지 않은
  * 조합이 남을 수 있다(리뷰 A-F1·B-F3).
  *
  * <p>값을 실제로 바꾸는 요청 사이에서는 나중 커밋이 이긴다. 요청 값이 읽은 값과 같으면 갱신 자체가 생기지 않으므로, 그 요청은 응답한 값과 다른 상태를 남길 수 있다.
@@ -62,7 +62,11 @@ public class NotificationSettingsService {
                                 () ->
                                         notificationSettingsRepository.save(
                                                 NotificationSettings.createDefault(userId)));
-        settings.replace(request.rating(), request.recommendation(), request.marketing());
+        settings.replace(
+                request.rating(),
+                request.recommendation(),
+                request.partyInvite(),
+                request.marketing());
         return NotificationSettingsResponse.from(settings);
     }
 

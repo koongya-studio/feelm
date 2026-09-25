@@ -45,15 +45,15 @@ class NotificationSettingsApiContractTest extends SharedPostgresContractTest {
         user(WITHDRAWN, "withdrawn", "WITHDRAWN");
         user(OTHER, "other", "ACTIVE");
         // 가입 트랜잭션이 만드는 기본행을 그대로 재현한다.
-        settings(ACTIVE, true, true, false);
-        settings(WITHDRAWN, true, true, false);
-        settings(OTHER, false, true, true);
+        settings(ACTIVE, true, true, true, false);
+        settings(WITHDRAWN, true, true, true, false);
+        settings(OTHER, false, true, false, true);
     }
 
     /** 어떤 경로도 다른 사용자의 설정을 건드리지 않는다. */
     @AfterEach
     void keepsOtherUserSettings() {
-        assertThat(settingsOf(OTHER)).containsExactly(false, true, true);
+        assertThat(settingsOf(OTHER)).containsExactly(false, true, false, true);
     }
 
     // ----- API-017 알림 설정 조회 -----
@@ -65,18 +65,20 @@ class NotificationSettingsApiContractTest extends SharedPostgresContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.RATING").value(true))
                 .andExpect(jsonPath("$.RECOMMENDATION").value(true))
+                .andExpect(jsonPath("$.PARTY_INVITE").value(true))
                 .andExpect(jsonPath("$.MARKETING").value(false));
     }
 
     @Test
     @DisplayName("T2 저장된 값을 항목마다 그대로 내려준다")
     void returnsStoredValuesPerField() throws Exception {
-        settings(ACTIVE, false, true, true);
+        settings(ACTIVE, false, true, false, true);
 
         read(ACTIVE)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.RATING").value(false))
                 .andExpect(jsonPath("$.RECOMMENDATION").value(true))
+                .andExpect(jsonPath("$.PARTY_INVITE").value(false))
                 .andExpect(jsonPath("$.MARKETING").value(true));
     }
 
@@ -108,6 +110,7 @@ class NotificationSettingsApiContractTest extends SharedPostgresContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.RATING").value(true))
                 .andExpect(jsonPath("$.RECOMMENDATION").value(true))
+                .andExpect(jsonPath("$.PARTY_INVITE").value(true))
                 .andExpect(jsonPath("$.MARKETING").value(false));
 
         assertThat(rowCount(ACTIVE)).isZero();
@@ -116,61 +119,76 @@ class NotificationSettingsApiContractTest extends SharedPostgresContractTest {
     // ----- API-018 알림 설정 변경 -----
 
     @Test
-    @DisplayName("T5 세 항목을 전체 교체하고 재조회에 반영한다")
+    @DisplayName("T5 네 항목을 전체 교체하고 재조회에 반영한다")
     void replacesAllSettings() throws Exception {
-        replace(ACTIVE, "{\"RATING\":false,\"RECOMMENDATION\":false,\"MARKETING\":true}")
+        replace(
+                        ACTIVE,
+                        "{\"RATING\":false,\"RECOMMENDATION\":false,\"PARTY_INVITE\":false,"
+                                + "\"MARKETING\":true}")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.RATING").value(false))
                 .andExpect(jsonPath("$.RECOMMENDATION").value(false))
+                .andExpect(jsonPath("$.PARTY_INVITE").value(false))
                 .andExpect(jsonPath("$.MARKETING").value(true));
 
-        assertThat(settingsOf(ACTIVE)).containsExactly(false, false, true);
+        assertThat(settingsOf(ACTIVE)).containsExactly(false, false, false, true);
         read(ACTIVE)
                 .andExpect(jsonPath("$.RATING").value(false))
                 .andExpect(jsonPath("$.RECOMMENDATION").value(false))
+                .andExpect(jsonPath("$.PARTY_INVITE").value(false))
                 .andExpect(jsonPath("$.MARKETING").value(true));
     }
 
     @Test
     @DisplayName("T6 같은 요청을 반복해도 결과가 같다")
     void isIdempotentOnRepeatedRequest() throws Exception {
-        String body = "{\"RATING\":false,\"RECOMMENDATION\":true,\"MARKETING\":true}";
+        String body =
+                "{\"RATING\":false,\"RECOMMENDATION\":true,\"PARTY_INVITE\":false,"
+                        + "\"MARKETING\":true}";
 
         replace(ACTIVE, body).andExpect(status().isOk());
         replace(ACTIVE, body)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.RATING").value(false))
                 .andExpect(jsonPath("$.RECOMMENDATION").value(true))
+                .andExpect(jsonPath("$.PARTY_INVITE").value(false))
                 .andExpect(jsonPath("$.MARKETING").value(true));
 
-        assertThat(settingsOf(ACTIVE)).containsExactly(false, true, true);
+        assertThat(settingsOf(ACTIVE)).containsExactly(false, true, false, true);
     }
 
     @Test
-    @DisplayName("T7 세 키 중 하나가 없으면 거절한다")
+    @DisplayName("T7 네 키 중 하나가 없으면 거절한다")
     void rejectsMissingKey() throws Exception {
         for (String body :
                 new String[] {
-                    "{\"RECOMMENDATION\":false,\"MARKETING\":true}",
-                    "{\"RATING\":false,\"MARKETING\":true}",
-                    "{\"RATING\":false,\"RECOMMENDATION\":false}"
+                    "{\"RECOMMENDATION\":false,\"PARTY_INVITE\":false,\"MARKETING\":true}",
+                    "{\"RATING\":false,\"PARTY_INVITE\":false,\"MARKETING\":true}",
+                    "{\"RATING\":false,\"RECOMMENDATION\":false,\"MARKETING\":true}",
+                    "{\"RATING\":false,\"RECOMMENDATION\":false,\"PARTY_INVITE\":false}"
                 }) {
             replace(ACTIVE, body)
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         }
 
-        assertThat(settingsOf(ACTIVE)).containsExactly(true, true, false);
+        assertThat(settingsOf(ACTIVE)).containsExactly(true, true, true, false);
     }
 
     @Test
     @DisplayName("T8 값이 null이면 거절한다")
     void rejectsNullValue() throws Exception {
-        replace(ACTIVE, "{\"RATING\":null,\"RECOMMENDATION\":true,\"MARKETING\":false}")
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        for (String body :
+                new String[] {
+                    "{\"RATING\":null,\"RECOMMENDATION\":true,\"PARTY_INVITE\":true,\"MARKETING\":false}",
+                    "{\"RATING\":true,\"RECOMMENDATION\":true,\"PARTY_INVITE\":null,\"MARKETING\":false}"
+                }) {
+            replace(ACTIVE, body)
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        }
 
-        assertThat(settingsOf(ACTIVE)).containsExactly(true, true, false);
+        assertThat(settingsOf(ACTIVE)).containsExactly(true, true, true, false);
     }
 
     @Test
@@ -180,13 +198,15 @@ class NotificationSettingsApiContractTest extends SharedPostgresContractTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
 
-        assertThat(settingsOf(ACTIVE)).containsExactly(true, true, false);
+        assertThat(settingsOf(ACTIVE)).containsExactly(true, true, true, false);
     }
 
     @Test
     @DisplayName("T10 인증 없이 변경할 수 없다")
     void rejectsUnauthenticatedUpdate() throws Exception {
-        String body = "{\"RATING\":false,\"RECOMMENDATION\":false,\"MARKETING\":true}";
+        String body =
+                "{\"RATING\":false,\"RECOMMENDATION\":false,\"PARTY_INVITE\":false,"
+                        + "\"MARKETING\":true}";
 
         mvc.perform(put(PATH).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isUnauthorized())
@@ -199,17 +219,20 @@ class NotificationSettingsApiContractTest extends SharedPostgresContractTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 
-        assertThat(settingsOf(ACTIVE)).containsExactly(true, true, false);
+        assertThat(settingsOf(ACTIVE)).containsExactly(true, true, true, false);
     }
 
     @Test
     @DisplayName("T11 활성 계정이 아니면 변경할 수 없다")
     void rejectsInactiveAccountUpdate() throws Exception {
-        replace(WITHDRAWN, "{\"RATING\":false,\"RECOMMENDATION\":false,\"MARKETING\":true}")
+        replace(
+                        WITHDRAWN,
+                        "{\"RATING\":false,\"RECOMMENDATION\":false,\"PARTY_INVITE\":false,"
+                                + "\"MARKETING\":true}")
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
 
-        assertThat(settingsOf(WITHDRAWN)).containsExactly(true, true, false);
+        assertThat(settingsOf(WITHDRAWN)).containsExactly(true, true, true, false);
     }
 
     @Test
@@ -217,18 +240,22 @@ class NotificationSettingsApiContractTest extends SharedPostgresContractTest {
     void createsRowWhenMissingOnUpdate() throws Exception {
         deleteSettings(ACTIVE);
 
-        replace(ACTIVE, "{\"RATING\":false,\"RECOMMENDATION\":false,\"MARKETING\":false}")
+        replace(
+                        ACTIVE,
+                        "{\"RATING\":false,\"RECOMMENDATION\":false,\"PARTY_INVITE\":false,"
+                                + "\"MARKETING\":false}")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.RATING").value(false))
                 .andExpect(jsonPath("$.RECOMMENDATION").value(false))
+                .andExpect(jsonPath("$.PARTY_INVITE").value(false))
                 .andExpect(jsonPath("$.MARKETING").value(false));
 
         assertThat(rowCount(ACTIVE)).isEqualTo(1);
-        assertThat(settingsOf(ACTIVE)).containsExactly(false, false, false);
+        assertThat(settingsOf(ACTIVE)).containsExactly(false, false, false, false);
     }
 
     @Test
-    @DisplayName("T15 두 경로의 응답 본문 키가 명세의 세 개뿐이다")
+    @DisplayName("T15 두 경로의 응답 본문 키가 명세의 네 개뿐이다")
     void returnsExactlySpecifiedKeys() throws Exception {
         // 키 이름은 이 API의 계약 자체다. 값 단언만으로는 키가 하나 늘거나 자바 이름으로 새는 회귀를 잡지 못한다(리뷰 A-F3).
         for (ResultActions response :
@@ -236,11 +263,13 @@ class NotificationSettingsApiContractTest extends SharedPostgresContractTest {
                         read(ACTIVE),
                         replace(
                                 ACTIVE,
-                                "{\"RATING\":false,\"RECOMMENDATION\":true,\"MARKETING\":false}"))) {
+                                "{\"RATING\":false,\"RECOMMENDATION\":true,"
+                                        + "\"PARTY_INVITE\":true,\"MARKETING\":false}"))) {
             response.andExpect(status().isOk())
-                    .andExpect(jsonPath("$.*", hasSize(3)))
+                    .andExpect(jsonPath("$.*", hasSize(4)))
                     .andExpect(jsonPath("$.RATING").exists())
                     .andExpect(jsonPath("$.RECOMMENDATION").exists())
+                    .andExpect(jsonPath("$.PARTY_INVITE").exists())
                     .andExpect(jsonPath("$.MARKETING").exists());
         }
     }
@@ -271,17 +300,24 @@ class NotificationSettingsApiContractTest extends SharedPostgresContractTest {
                 status);
     }
 
-    private void settings(long userId, boolean rating, boolean recommendation, boolean marketing) {
+    private void settings(
+            long userId,
+            boolean rating,
+            boolean recommendation,
+            boolean partyInvite,
+            boolean marketing) {
         jdbc.update(
                 "INSERT INTO notification_settings(user_id,rating_enabled,recommendation_enabled,"
-                        + "marketing_enabled) VALUES (?,?,?,?)"
+                        + "party_invite_enabled,marketing_enabled) VALUES (?,?,?,?,?)"
                         + " ON CONFLICT (user_id) DO UPDATE SET"
                         + " rating_enabled=EXCLUDED.rating_enabled,"
                         + " recommendation_enabled=EXCLUDED.recommendation_enabled,"
+                        + " party_invite_enabled=EXCLUDED.party_invite_enabled,"
                         + " marketing_enabled=EXCLUDED.marketing_enabled",
                 userId,
                 rating,
                 recommendation,
+                partyInvite,
                 marketing);
     }
 
@@ -296,16 +332,17 @@ class NotificationSettingsApiContractTest extends SharedPostgresContractTest {
                 userId);
     }
 
-    /** 저장된 값을 평가·추천·마케팅 순서로 읽는다. */
+    /** 저장된 값을 평가·추천·파티 초대·마케팅 순서로 읽는다. */
     private List<Boolean> settingsOf(long userId) {
         Map<String, Object> row =
                 jdbc.queryForMap(
-                        "SELECT rating_enabled,recommendation_enabled,marketing_enabled"
-                                + " FROM notification_settings WHERE user_id=?",
+                        "SELECT rating_enabled,recommendation_enabled,party_invite_enabled,"
+                                + "marketing_enabled FROM notification_settings WHERE user_id=?",
                         userId);
         return List.of(
                 (Boolean) row.get("rating_enabled"),
                 (Boolean) row.get("recommendation_enabled"),
+                (Boolean) row.get("party_invite_enabled"),
                 (Boolean) row.get("marketing_enabled"));
     }
 }

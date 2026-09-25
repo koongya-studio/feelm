@@ -24,14 +24,15 @@ public class NotificationCommandService {
     private final WebPushSubscriptionRepository subscriptionRepository;
     private final Clock clock;
 
+    /** 파티 초대 알림을 만들고 발송을 건다. 파티 초대 알림을 끈 사용자에게는 둘 다 하지 않는다(S15P21E106-857). */
     public void createPartyInvitation(long userId, long invitationId, Instant createdAt) {
-        long notificationId =
-                repository.createPartyInvitation(
+        repository
+                .createPartyInvitation(
                         userId,
                         invitationId,
                         createdAt,
-                        createdAt.plus(PARTY_NOTIFICATION_RETENTION));
-        deliveryRepository.enqueue(notificationId);
+                        createdAt.plus(PARTY_NOTIFICATION_RETENTION))
+                .ifPresent(deliveryRepository::enqueue);
     }
 
     public void createPartyInvitationAccepted(

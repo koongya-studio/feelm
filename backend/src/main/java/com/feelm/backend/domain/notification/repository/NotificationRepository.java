@@ -30,17 +30,27 @@ public class NotificationRepository {
                 .isPresent();
     }
 
-    public long createPartyInvitation(
+    /**
+     * 파티 초대 알림을 만든다. 초대받은 사람이 파티 초대 알림을 껐으면(API-017 {@code PARTY_INVITE}) 만들지 않고 비어 있는 값을
+     * 돌려준다(S15P21E106-857).
+     *
+     * <p>수신 여부를 같은 INSERT 문에서 판정해 조회와 삽입 사이에 설정이 바뀌는 틈을 두지 않는다. 설정 행이 없으면 기본값(켜짐)으로 본다.
+     */
+    public Optional<Long> createPartyInvitation(
             long userId, long invitationId, Instant notifiedAt, Instant expiresAt) {
         return jdbc.sql(
                         """
                         INSERT INTO notifications(
                             user_id, type, source_id, target_type, target_id,
                             title, body, notified_at, expires_at
-                        ) VALUES (
+                        )
+                        SELECT
                             :userId, 'PARTY_INVITE', :invitationId, 'PARTY_INVITATION',
                             :invitationId, '파티팝콘 초대', '새로운 파티팝콘 초대가 도착했어요.',
                             :notifiedAt, :expiresAt
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM notification_settings
+                            WHERE user_id = :userId AND NOT party_invite_enabled
                         )
                         ON CONFLICT (type, source_id) DO UPDATE SET
                             updated_at = notifications.updated_at
@@ -51,7 +61,7 @@ public class NotificationRepository {
                 .param("notifiedAt", offset(notifiedAt))
                 .param("expiresAt", offset(expiresAt))
                 .query(Long.class)
-                .single();
+                .optional();
     }
 
     public long createPartyInvitationAccepted(

@@ -5,9 +5,10 @@
  * **이 파일에 목업은 없다**(업무 -610). 알림 설정(API-017 · 018) · 차단(API-020 ~ 022) ·
  * 탈퇴(API-013)는 전부 서버다.
  *
- * 7.8-C가 그리는 `파티 초대 알림` · `리포트 발급 알림`은 계약(API-017 NotificationType)에
- * 없다. 한때 세션 저장소에만 남겨 저장된 것처럼 보였는데, 새로고침하면 사라지는 값이라
- * 설정처럼 보이면 안 된다. 그 둘은 화면에서 준비 중으로 잠근다(`NotificationSettingsPage`).
+ * 7.8-C가 그리는 `리포트 발급 알림`은 계약(API-017 NotificationType)에 없다. 한때 세션
+ * 저장소에만 남겨 저장된 것처럼 보였는데, 새로고침하면 사라지는 값이라 설정처럼 보이면 안
+ * 된다. 화면에서 준비 중으로 잠근다(`NotificationSettingsPage`). `파티 초대 알림`은 업무
+ * -857에서 계약(`PARTY_INVITE`)에 들어왔다.
  *
  * 7.8-B 공개 범위는 이 파일이 아니라 `users.updateMyProfile`(API-015)이 저장한다. 프로필
  * `visibility`와 항목별 `frameVisibility` · `popcornVisibility` · `reviewVisibility`가 모두 API-014 ·
@@ -30,16 +31,16 @@ export async function getNotificationSettings(): Promise<NotificationSettings> {
 /**
  * API-018 알림 설정 변경 · PUT /api/v1/users/me/notification-settings
  *
- * 전체 교체다. 계약의 세 키를 모두 보낸다.
+ * 전체 교체다. 계약의 네 키를 모두 보낸다.
  */
 export async function updateNotificationSettings(
   settings: NotificationSettings,
 ): Promise<NotificationSettings> {
-  const { RATING, RECOMMENDATION, MARKETING } = settings;
+  const { RATING, RECOMMENDATION, PARTY_INVITE, MARKETING } = settings;
 
   return request<NotificationSettings>(NOTIFICATION_SETTINGS_PATH, {
     method: 'PUT',
-    body: { RATING, RECOMMENDATION, MARKETING },
+    body: { RATING, RECOMMENDATION, PARTY_INVITE, MARKETING },
   });
 }
 

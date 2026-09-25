@@ -1137,11 +1137,11 @@ OAuth 인가 코드를 받아 소셜 계정을 확인한다. 이미 연결된 �
 | 관련 요구사항 | FR-38 |
 | 화면 | ⑪-6 설정 |
 | 미정 사항 | 있음 |
-| 비고 | 인앱 알림은 FR-41·API-070~074, 푸시 채널 적용은 S15P21E106-582 |
+| 비고 | 인앱 알림은 FR-41·API-070~074. `PARTY_INVITE`는 인앱 알림과 그 Web Push에 적용(S15P21E106-857) |
 
 ### 설명
 
-평가·추천·마케팅 알림 수신 설정을 조회한다.
+평가·추천·파티 초대·마케팅 알림 수신 설정을 조회한다.
 
 ### 인증 및 권한
 
@@ -1164,7 +1164,7 @@ OAuth 인가 코드를 받아 소셜 계정을 확인한다. 이미 연결된 �
 `200 OK`
 
 ```json
-{ "RATING": true, "RECOMMENDATION": true, "MARKETING": false }
+{ "RATING": true, "RECOMMENDATION": true, "PARTY_INVITE": true, "MARKETING": false }
 ```
 
 ### 오류 응답
@@ -1173,15 +1173,17 @@ OAuth 인가 코드를 받아 소셜 계정을 확인한다. 이미 연결된 �
 
 ### 처리 규칙
 
-- 기본값: `RATING` true, `RECOMMENDATION` true, `MARKETING` false(가정)
+- 기본값: `RATING` true, `RECOMMENDATION` true, `PARTY_INVITE` true, `MARKETING` false(가정)
+- `PARTY_INVITE`가 false인 사용자에게는 파티 초대 인앱 알림(API-070 `PARTY_INVITE`)을 만들지 않는다. 알림이 없으므로 그 알림의 Web Push 발송도 생기지 않는다. 초대 자체와 초대 목록은 설정과 무관하다(S15P21E106-857)
+- 설정을 끄기 전에 이미 만든 알림과 그 알림의 대기 중 Web Push 발송은 그대로 둔다. 설정은 이후에 생기는 초대에만 적용된다
 
 ### 상태값
 
-- NotificationType: `RATING`, `RECOMMENDATION`, `MARKETING`
+- NotificationType: `RATING`, `RECOMMENDATION`, `PARTY_INVITE`, `MARKETING`
 
 ### 미정 사항
 
-- 인앱 알림 정본과 읽음·숨김 동기화는 FR-41·API-070~074에서 다룬다. 이 설정을 브라우저 푸시 채널에 적용하는 범위는 S15P21E106-582에서 확정한다
+- 인앱 알림 정본과 읽음·숨김 동기화는 FR-41·API-070~074에서 다룬다. `RATING`·`RECOMMENDATION`·`MARKETING`을 실제 발송에 적용하는 범위는 정하지 않았다
 
 ## API-018 알림 설정 변경
 
@@ -1215,7 +1217,7 @@ OAuth 인가 코드를 받아 소셜 계정을 확인한다. 이미 연결된 �
 ### Request Body
 
 ```json
-{ "RATING": true, "RECOMMENDATION": false, "MARKETING": false }
+{ "RATING": true, "RECOMMENDATION": false, "PARTY_INVITE": true, "MARKETING": false }
 ```
 
 ### Response
@@ -1224,7 +1226,7 @@ OAuth 인가 코드를 받아 소셜 계정을 확인한다. 이미 연결된 �
 
 ### 오류 응답
 
-- `400 VALIDATION_FAILED` 세 키 중 누락
+- `400 VALIDATION_FAILED` 네 키 중 누락 또는 `null`
 
 ### 처리 규칙
 
