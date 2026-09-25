@@ -122,6 +122,7 @@ export default function NotificationSettingsPage() {
               <SwitchRow
                 label={item.label}
                 checked={settings[item.key]}
+                disabled={saving}
                 onChange={(checked) => void toggle(item.key, checked)}
               />
             </li>
@@ -143,10 +144,12 @@ export default function NotificationSettingsPage() {
 function SwitchRow({
   label,
   checked,
+  disabled,
   onChange,
 }: {
   label: string;
   checked: boolean;
+  disabled: boolean;
   onChange: (checked: boolean) => void;
 }) {
   const labelId = useId();
@@ -156,7 +159,7 @@ function SwitchRow({
       <span id={labelId} className={styles.label}>
         {label}
       </span>
-      <Switch checked={checked} onChange={onChange} labelledBy={labelId} />
+      <Switch checked={checked} disabled={disabled} onChange={onChange} labelledBy={labelId} />
     </div>
   );
 }
