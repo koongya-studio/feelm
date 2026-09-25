@@ -72,7 +72,9 @@ import {
   PARTY_GUIDE,
   completeGuide,
   hasSeenGuide,
+  readGuideProgress,
   restartGuide,
+  setGuideProgress,
 } from '../../../utils/userGuides';
 import styles from './FilmPage.module.css';
 import type { FrameList, PopcornBucket } from '../../../types/taste';
@@ -146,6 +148,7 @@ type MoreState = 'idle' | 'loading' | 'failed';
 const EMPTY_SLOT_LABELS = ['첫 번째 프레임', '두 번째 프레임'];
 
 type FilmGuideStep = {
+  id: string;
   title: string;
   description: string;
   targetSelector: string;
@@ -154,28 +157,33 @@ type FilmGuideStep = {
 
 const FILM_GUIDE_STEPS: FilmGuideStep[] = [
   {
+    id: 'reel',
     title: '감상 기록을 넘겨보세요',
     description:
       '처음 고른 영화부터 앞으로 평가할 영화까지 필름에 쌓여요. 옆으로 넘기며 다시 볼 수 있어요.',
     targetSelector: "[data-guide-target='film-reel']",
   },
   {
+    id: 'popcorn',
     title: '나의 취향 팝콘',
     description:
       '평가한 영화가 맛별 팝콘으로 모여요. 누르면 어떤 취향이 많은지 자세히 볼 수 있어요.',
     targetSelector: "[aria-label^='나의 취향 팝콘']",
   },
   {
+    id: 'report',
     title: '취향 리포트',
     description: '영화 감상 기록을 분석한 리포트를 확인하는 곳이에요.',
     targetSelector: "[aria-label='취향 리포트 보기'],[aria-label='새 취향 리포트 받기']",
   },
   {
+    id: 'notifications',
     title: '새 소식을 확인하세요',
     description: '새 추천이나 리포트 같은 소식은 알림에서 확인할 수 있어요.',
     targetSelector: "a[aria-label^='알림']",
   },
   {
+    id: 'rate',
     title: '본 영화를 평가해 보세요',
     description:
       '이 버튼과 상단 검색 모두 검색 화면으로 가요. 본 영화를 찾아 원할 때 평가하면 필름이 늘어나요.',
@@ -183,6 +191,7 @@ const FILM_GUIDE_STEPS: FilmGuideStep[] = [
     placement: 'top',
   },
   {
+    id: 'recommendations',
     title: '영화 추천을 받아보세요',
     description: '지금 취향에 맞는 추천 영화를 보러 갈 수 있어요.',
     targetSelector: "[data-guide-target='film-recommendations']",
@@ -195,7 +204,7 @@ export default function FilmPage() {
   const { user } = useAuth();
   const [guideDismissed, setGuideDismissed] = useState(false);
   const showGuide = Boolean(user && !guideDismissed && !hasSeenGuide(user.userId, FILM_GUIDE));
-  const [guideIndex, setGuideIndex] = useState(0);
+  const [guideStep, setGuideStep] = useState<{ userId: number; id: string } | null>(null);
   const finishGuide = () => {
     if (user) completeGuide(user.userId, FILM_GUIDE);
     setGuideDismissed(true);
@@ -420,7 +429,31 @@ export default function FilmPage() {
           : step,
       )
     : [];
-  const activeGuideIndex = Math.min(guideIndex, guideSteps.length - 1);
+  const savedGuideStep = user
+    ? guideStep?.userId === user.userId
+      ? guideStep.id
+      : readGuideProgress(user.userId, FILM_GUIDE)
+    : null;
+  const activeGuideIndex = Math.max(
+    0,
+    guideSteps.findIndex((step) => step.id === savedGuideStep),
+  );
+  const activeGuideStep = guideSteps[activeGuideIndex];
+  const guidePlacement =
+    !desktop && (activeGuideStep?.id === 'popcorn' || activeGuideStep?.id === 'report')
+      ? 'top'
+      : activeGuideStep?.placement;
+  const moveGuideTo = (id: string) => {
+    if (!user) return;
+    setGuideProgress(user.userId, FILM_GUIDE, id);
+    setGuideStep({ userId: user.userId, id });
+  };
+  const continueAfterRate = () => {
+    if (showGuide && guideSteps[activeGuideIndex]?.id === 'rate') {
+      const next = guideSteps[activeGuideIndex + 1];
+      if (next) moveGuideTo(next.id);
+    }
+  };
 
   return (
     <>
@@ -446,7 +479,12 @@ export default function FilmPage() {
             </div>
 
             {!isEmpty ? (
-              <Link to={path.search()} className={styles.desktopRate} data-guide-target="film-rate">
+              <Link
+                to={path.search()}
+                className={styles.desktopRate}
+                data-guide-target="film-rate"
+                onClick={continueAfterRate}
+              >
                 본 영화 평가하기
               </Link>
             ) : null}
@@ -600,7 +638,10 @@ export default function FilmPage() {
               <Button
                 variant="primary"
                 data-guide-target="film-rate"
-                onClick={() => void navigate(path.search())}
+                onClick={() => {
+                  continueAfterRate();
+                  void navigate(path.search());
+                }}
               >
                 본 영화 평가하기
               </Button>
@@ -702,7 +743,10 @@ export default function FilmPage() {
                 <Button
                   variant="primary"
                   data-guide-target="film-rate"
-                  onClick={() => void navigate(path.search())}
+                  onClick={() => {
+                    continueAfterRate();
+                    void navigate(path.search());
+                  }}
                 >
                   본 영화 평가하기
                 </Button>
@@ -733,13 +777,13 @@ export default function FilmPage() {
           step={activeGuideIndex + 1}
           totalSteps={guideSteps.length}
           targetSelector={guideSteps[activeGuideIndex].targetSelector}
-          placement={guideSteps[activeGuideIndex].placement}
+          placement={guidePlacement}
           title={guideSteps[activeGuideIndex].title}
           description={guideSteps[activeGuideIndex].description}
           onSkip={finishGuide}
           action={
             activeGuideIndex < guideSteps.length - 1
-              ? { label: '다음', onClick: () => setGuideIndex(activeGuideIndex + 1) }
+              ? { label: '다음', onClick: () => moveGuideTo(guideSteps[activeGuideIndex + 1].id) }
               : { label: '둘러보기', onClick: finishGuide }
           }
           secondaryAction={

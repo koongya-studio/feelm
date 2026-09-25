@@ -10,6 +10,27 @@ function key(userId: number, guideId: string) {
   return `feelm:guide:${userId}:${guideId}`;
 }
 
+function progressKey(userId: number, guideId: string) {
+  return `${key(userId, guideId)}:progress`;
+}
+
+/** 화면을 잠시 떠나도 진행 중인 안내 단계로 돌아온다. */
+export function readGuideProgress(userId: number, guideId: string): string | null {
+  try {
+    return localStorage.getItem(progressKey(userId, guideId));
+  } catch {
+    return null;
+  }
+}
+
+export function setGuideProgress(userId: number, guideId: string, stepId: string): void {
+  try {
+    localStorage.setItem(progressKey(userId, guideId), stepId);
+  } catch {
+    // 저장소가 막혀도 현재 화면 안에서는 계속 진행할 수 있다.
+  }
+}
+
 /** 안내 ID를 바꾸면 해당 기능의 새 버전을 한 번 더 안내할 수 있다. 계정마다 상태를 분리한다. */
 export function hasSeenGuide(userId: number, guideId: string): boolean {
   try {
@@ -22,6 +43,7 @@ export function hasSeenGuide(userId: number, guideId: string): boolean {
 export function completeGuide(userId: number, guideId: string): void {
   try {
     localStorage.setItem(key(userId, guideId), 'done');
+    localStorage.removeItem(progressKey(userId, guideId));
   } catch {
     // 저장소가 막혀도 안내를 마칠 수 있어야 한다.
   }
@@ -31,6 +53,7 @@ export function completeGuide(userId: number, guideId: string): void {
 export function restartGuide(userId: number, guideId: string): void {
   try {
     localStorage.removeItem(key(userId, guideId));
+    localStorage.removeItem(progressKey(userId, guideId));
   } catch {
     // 저장소에 접근할 수 없으면 다음 진입에서 다시 안내할 수 있다.
   }

@@ -4,9 +4,11 @@ import {
   RECOMMENDATIONS_GUIDE,
   completeGuide,
   hasSeenGuide,
+  readGuideProgress,
   readFirstUseStep,
   restartFirstUse,
   restartGuide,
+  setGuideProgress,
   setFirstUseStep,
 } from './userGuides';
 
@@ -37,5 +39,18 @@ describe('사용 안내 상태', () => {
     restartGuide(1, 'feature-ott-v1');
     expect(hasSeenGuide(1, 'feature-ott-v1')).toBe(false);
     expect(hasSeenGuide(1, FIRST_USE_GUIDE)).toBe(true);
+  });
+
+  it('화면을 떠난 중간 단계를 기억하고 완료하거나 다시 보면 지운다', () => {
+    setGuideProgress(1, 'film-overview-v2', 'rate');
+    expect(readGuideProgress(1, 'film-overview-v2')).toBe('rate');
+    expect(readGuideProgress(2, 'film-overview-v2')).toBeNull();
+
+    completeGuide(1, 'film-overview-v2');
+    expect(readGuideProgress(1, 'film-overview-v2')).toBeNull();
+
+    setGuideProgress(1, 'film-overview-v2', 'recommendations');
+    restartGuide(1, 'film-overview-v2');
+    expect(readGuideProgress(1, 'film-overview-v2')).toBeNull();
   });
 });
