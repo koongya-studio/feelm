@@ -109,6 +109,75 @@ describe('API-050 내 파티 목록', () => {
  * **기본값은 예전 그대로다** — 5.7 · 5.8은 끝난 파티를 찾아내면 안 된다.
  */
 describe('getParty 조합', () => {
+  /*
+   * !683 리뷰. 끝난 파티에는 상한이 없어 첫 장(50개)에 없을 수 있다. 첫 장만 보면 오래된 종료
+   * 파티를 `나갔거나 내보내진 파티`로 잘못 안내했다(8.1 파티 초대 수락 알림, 90일 보관).
+   */
+  it('includeClosed면 종료 파티를 찾을 때까지 커서를 따라가고, 찾으면 멈춘다', async () => {
+    const other = (partyId: number) => party({ partyId, status: 'CLOSED' });
+
+    fetchMock
+      .mockResolvedValueOnce(json(200, { items: [], nextCursor: null, hasNext: false }))
+      .mockResolvedValueOnce(
+        json(200, { items: [other(1), other(2)], nextCursor: 'c1', hasNext: true }),
+      )
+      .mockResolvedValueOnce(
+        json(200, {
+          items: [other(3), party({ status: 'CLOSED' })],
+          nextCursor: 'c2',
+          hasNext: true,
+        }),
+      );
+
+    const found = await getParty(TEST_PARTY_ID, { includeClosed: true });
+
+    expect(found?.status).toBe('CLOSED');
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      '/api/v1/parties?size=50',
+      '/api/v1/parties?status=CLOSED&size=50',
+      '/api/v1/parties?status=CLOSED&size=50&cursor=c1',
+    ]);
+  });
+
+  it('includeClosed면 마지막 장까지 봐도 없을 때만 null이다', async () => {
+    fetchMock
+      .mockResolvedValueOnce(json(200, { items: [], nextCursor: null, hasNext: false }))
+      .mockResolvedValueOnce(
+        json(200, {
+          items: [party({ partyId: 1, status: 'CLOSED' })],
+          nextCursor: 'c1',
+          hasNext: true,
+        }),
+      )
+      .mockResolvedValueOnce(
+        json(200, {
+          items: [party({ partyId: 2, status: 'CLOSED' })],
+          nextCursor: null,
+          hasNext: false,
+        }),
+      );
+
+    expect(await getParty(TEST_PARTY_ID, { includeClosed: true })).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('같은 커서가 다시 오면 끝없이 부르지 않고 멈춘다', async () => {
+    fetchMock.mockResolvedValueOnce(json(200, { items: [], nextCursor: null, hasNext: false }));
+    fetchMock.mockImplementation(() =>
+      Promise.resolve(
+        json(200, {
+          items: [party({ partyId: 1, status: 'CLOSED' })],
+          nextCursor: 'same',
+          hasNext: true,
+        }),
+      ),
+    );
+
+    expect(await getParty(TEST_PARTY_ID, { includeClosed: true })).toBeNull();
+    // 활성 1 + 종료 첫 장 1 + 같은 커서로 한 번 더 1
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it('기본은 활성 목록만 본다', async () => {
     fetchMock.mockResolvedValue(json(200, { items: [], nextCursor: null, hasNext: false }));
 

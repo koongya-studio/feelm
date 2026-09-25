@@ -147,3 +147,14 @@
 .time {
   flex: none;
 }
+
+/* 갈 수 없는 알림의 까닭(업무 -866). 전체화면이라 하단 내비가 없어 화면 아래에 띄운다 */
+.snackbarSlot {
+  position: fixed;
+  z-index: 10;
+  right: var(--screen-padding-x);
+  bottom: calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+  left: var(--screen-padding-x);
+  max-width: calc(var(--layout-max-width) - var(--screen-padding-x) * 2);
+  margin: 0 auto;
+}
