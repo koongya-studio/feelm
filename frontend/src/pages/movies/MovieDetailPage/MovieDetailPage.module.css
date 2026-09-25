@@ -260,7 +260,7 @@
   gap: var(--space-2);
 }
 
-/* 별점 버튼이 남는 폭을 다 쓰고, 관심없음 아이콘 버튼이 오른쪽에 선다(업무 -664) */
+/* 별점 버튼이 남는 폭을 다 쓰고, 관심없음 버튼이 오른쪽에 선다(업무 -664) */
 .actionRow {
   display: flex;
   align-items: center;
@@ -270,6 +270,98 @@
 .actionRow > :first-child {
   flex: 1;
   min-width: 0;
+}
+
+/*
+ * 관심없음. 아이콘 아래에 글자를 둔 단추다(업무 -873). 높이는 옆의 별점 버튼과 같다.
+ *
+ * **면은 아래 OTT 줄(`.ottButton`)과 같은 어두운 유리다.** 공용 `IconButton`의 밝은 유리를
+ * 쓰면 이 화면에서 혼자 하얗게 떠, 주 동작인 별점 버튼보다 눈에 먼저 들어왔다. 보조 동작이라
+ * 글자와 아이콘은 한 단계 흐린 색으로 두고, 누를 수 있다는 것은 면과 그림자가 말한다.
+ */
+.dismissButton {
+  display: inline-flex;
+  min-width: var(--control-height);
+  height: var(--control-height);
+  box-sizing: border-box;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 var(--space-2);
+  border: 0.5px solid var(--color-line-on-dark);
+  border-radius: var(--radius-control);
+  background: var(--gradient-button-on-dark);
+  box-shadow: var(--shadow-button-on-dark);
+  color: var(--color-on-dark-muted);
+  cursor: pointer;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-press) var(--ease-standard);
+}
+
+/* 아이콘은 13px로 그려져 있다. 글자와 무게가 맞도록 이 자리에서만 키운다 */
+.dismissButton svg {
+  width: 17px;
+  height: 17px;
+}
+
+.dismissLabel {
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+@media (hover: hover) {
+  .dismissButton:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.18);
+    color: var(--color-on-dark);
+  }
+}
+
+.dismissButton:active:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
+  transform: translateY(1px);
+}
+
+/* 어두운 면이라 초점 링은 흰 선이다(`.ottButton`과 같다) */
+.dismissButton:focus-visible {
+  outline: 2px solid var(--color-on-dark);
+  outline-offset: 2px;
+}
+
+.dismissButton:disabled {
+  box-shadow: none;
+  cursor: default;
+}
+
+/* 처리 중에만 흐린다 */
+.dismissButton:disabled:not([data-done]) {
+  opacity: 0.45;
+}
+
+/*
+ * 처리됨. 가라앉은 면에 흰 글자로 **끝난 동작**으로 읽히게 한다. 흐리게 두면 누를 수 없다는
+ * 표시로만 읽힌다(`IconButton`의 `filled`와 같은 판단).
+ */
+.dismissButton[data-done] {
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.45);
+  color: var(--color-on-dark);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dismissButton:active:not(:disabled) {
+    transform: none;
+  }
 }
 
 .dismissMenu {

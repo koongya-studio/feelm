@@ -1,7 +1,6 @@
 /* 2.2 모바일 추천 카드. 릴 칸 높이 안에서 포스터와 정보 영역을 나눈다(업무 -906). */
 import { Link } from 'react-router';
 import Badge from '../../../../components/Badge';
-import IconButton from '../../../../components/IconButton';
 import OttBadge from '../../../../components/OttBadge';
 import { BlockIcon, ChevronRightIcon } from '../../../../components/Icon';
 import Poster from '../../../../components/Poster';
@@ -85,17 +84,20 @@ export default function RecommendationCard({ item, otts, dismissing, onDismiss }
         </span>
       </div>
 
-      <span className={styles.dismissButton}>
-        <IconButton
-          label={`${movie.title} 관심없음`}
-          icon={<BlockIcon />}
-          size={26}
-          shape="rounded"
-          variant="translucent"
-          disabled={dismissing}
-          onClick={(event) => onDismiss(event, item)}
-        />
-      </span>
+      {/*
+       * 관심없음. 아이콘에 글자를 붙인 작은 알약이다(업무 -873). 2.4 영화 상세의 관심없음과 같은
+       * 어두운 유리 면이라, 밝은 유리 사각형처럼 어두운 필름 틀 위에서 혼자 떠 보이지 않는다.
+       */}
+      <button
+        type="button"
+        className={styles.dismissButton}
+        aria-label={`${movie.title} 관심없음`}
+        disabled={dismissing}
+        onClick={(event) => onDismiss(event, item)}
+      >
+        <BlockIcon />
+        <span aria-hidden="true">관심없음</span>
+      </button>
 
       {isDiscovery ? (
         <span className={styles.badge}>

@@ -358,9 +358,11 @@ describe('RecommendationsPage 데스크톱 시안', () => {
     const leadDismiss = within(lead).getByRole('button', { name: '파이트 클럽 관심없음' });
     const compactDismiss = within(compact).getByRole('button', { name: '조디악 관심없음' });
 
-    expect(leadDismiss).toHaveStyle('--icon-button-size: 36px');
-    expect(compactDismiss).toHaveStyle('--icon-button-size: 26px');
-    expect(leadDismiss).toHaveAttribute('data-variant', 'plain');
+    // 아이콘만 두지 않고 글자를 함께 보인다(업무 -873). 대표 카드만 한 단계 크다
+    expect(leadDismiss).toHaveTextContent('관심없음');
+    expect(compactDismiss).toHaveTextContent('관심없음');
+    expect(leadDismiss).toHaveAttribute('data-size', 'lead');
+    expect(compactDismiss).not.toHaveAttribute('data-size');
     expect(leadDismiss.className).toBe(compactDismiss.className);
     expect(
       within(lead)

@@ -827,6 +827,46 @@ describe('MovieDetailPage 관심없음', () => {
     vi.mocked(dismissMovie).mockReset();
   });
 
+  it('평가 전 영화에서는 아이콘 아래 글자로 뜻을 보여 준다 (업무 -873)', async () => {
+    renderMovie();
+
+    const button = await screen.findByRole('button', { name: '관심없음' });
+    expect(button).toHaveTextContent('관심없음');
+  });
+
+  it.each([
+    [
+      '별점을 남긴 영화',
+      {
+        myRating: {
+          ratingId: 90,
+          score: 3,
+          comment: null,
+          visibility: 'PRIVATE' as const,
+          spoiler: false,
+        },
+        myWatchStatus: 'RATED' as const,
+      },
+    ],
+    ['초기 설정에서 평가한 영화', { myWatchStatus: 'RATED' as const }],
+    ['감상만 확정한 영화', { myWatchStatus: 'WATCHED_UNRATED' as const }],
+  ])('%s에는 관심없음을 두지 않는다 (업무 -873)', async (_, overrides) => {
+    vi.mocked(getMovieDetail).mockResolvedValue(movie(overrides));
+
+    renderMovie();
+
+    await screen.findByRole('heading', { level: 1, name: '괴물' });
+    expect(screen.queryByRole('button', { name: /관심없음/ })).toBeNull();
+  });
+
+  it('OTT 링크만 누른 영화에는 관심없음을 남긴다', async () => {
+    vi.mocked(getMovieDetail).mockResolvedValue(movie({ myWatchStatus: 'LINK_CLICKED' }));
+
+    renderMovie();
+
+    expect(await screen.findByRole('button', { name: '관심없음' })).toBeInTheDocument();
+  });
+
   it('확인 팝오버에서 예를 누른 뒤 API-047을 부르고 처리된 상태로 바뀐다', async () => {
     vi.mocked(dismissMovie).mockResolvedValue();
 
