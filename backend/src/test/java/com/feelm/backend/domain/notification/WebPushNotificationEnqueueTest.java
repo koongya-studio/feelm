@@ -46,6 +46,11 @@ class WebPushNotificationEnqueueTest extends SharedPostgresContractTest {
                                 "SELECT count(*) FROM notifications WHERE type='PARTY_INVITE'",
                                 Long.class))
                 .isOne();
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT title,body FROM notifications WHERE type='PARTY_INVITE'"))
+                .containsEntry("title", "파티팝콘 초대")
+                .containsEntry("body", "새로운 파티팝콘 초대가 도착했어요.");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM web_push_deliveries", Long.class))
                 .isEqualTo(2);
         assertThat(
@@ -96,8 +101,8 @@ class WebPushNotificationEnqueueTest extends SharedPostgresContractTest {
                 .containsEntry("source_id", 103L)
                 .containsEntry("target_type", "PARTY")
                 .containsEntry("target_id", 203L)
-                .containsEntry("title", "파티 모드 초대 수락")
-                .containsEntry("body", "초대받은사람 님이 파티 모드에 참여했어요.");
+                .containsEntry("title", "파티팝콘 초대 수락")
+                .containsEntry("body", "초대받은사람 님이 파티팝콘에 참여했어요.");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM web_push_deliveries", Long.class))
                 .isOne();
     }

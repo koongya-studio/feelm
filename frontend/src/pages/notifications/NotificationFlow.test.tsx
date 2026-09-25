@@ -56,8 +56,8 @@ const watch: NotificationItem = {
 const invite: NotificationItem = {
   notificationId: 2,
   type: 'PARTY_INVITE',
-  title: '파티 모드 초대',
-  body: '새로운 파티 초대가 도착했어요.',
+  title: '파티팝콘 초대',
+  body: '새로운 파티팝콘 초대가 도착했어요.',
   targetType: 'PARTY_INVITATION',
   targetId: 501,
   readAt: null,
@@ -67,8 +67,8 @@ const invite: NotificationItem = {
 const accepted: NotificationItem = {
   notificationId: 3,
   type: 'PARTY_INVITE_ACCEPTED',
-  title: '파티 모드 초대 수락',
-  body: 'film_daily 님이 파티 모드에 참여했어요.',
+  title: '파티팝콘 초대 수락',
+  body: 'film_daily 님이 파티팝콘에 참여했어요.',
   targetType: 'PARTY',
   targetId: 77,
   readAt: null,
@@ -131,8 +131,10 @@ describe('3.1 → 8.1', () => {
     const list = within(await screen.findByRole('list', { name: '알림 목록' }));
     expect(list.getAllByRole('listitem')).toHaveLength(3);
     expect(list.getByText('영화 잘 보셨나요?')).toBeInTheDocument();
-    expect(list.getByText('파티 모드 초대')).toBeInTheDocument();
-    expect(list.getByText('파티 모드 초대 수락')).toBeInTheDocument();
+    expect(list.getByText('파티팝콘 초대')).toBeInTheDocument();
+    expect(list.getByText('파티팝콘 초대 수락')).toBeInTheDocument();
+    expect(list.getByText('새로운 파티팝콘 초대가 도착했어요.')).toBeInTheDocument();
+    expect(list.getByText('film_daily 님이 파티팝콘에 참여했어요.')).toBeInTheDocument();
     expect(list.getByText('초대 응답 시 삭제 · 최대 90일 보관')).toBeInTheDocument();
     expect(list.getByText('90일 후 자동 삭제')).toBeInTheDocument();
     expect(list.getByText('감상 확인 시 삭제 · OTT 이동 후 7일까지 보관')).toBeInTheDocument();
@@ -142,8 +144,8 @@ describe('3.1 → 8.1', () => {
 describe('알림 대상 이동', () => {
   it.each([
     ['영화 잘 보셨나요?', '/watch-records/4004/confirm', 1],
-    ['파티 모드 초대', '/parties/invitations/501', 2],
-    ['파티 모드 초대 수락', '/parties/77/popcorn', 3],
+    ['파티팝콘 초대', '/parties/invitations/501', 2],
+    ['파티팝콘 초대 수락', '/parties/77/popcorn', 3],
   ])('%s 알림을 읽음 처리하고 계약 대상 화면으로 이동한다', async (title, target, id) => {
     renderApp([ROUTE_PATTERN.notifications]);
 
@@ -169,10 +171,10 @@ describe('알림 상태 변경', () => {
   it('한 건 삭제 후 현재 목록에서 제거한다', async () => {
     renderApp([ROUTE_PATTERN.notifications]);
 
-    fireEvent.click(await screen.findByRole('button', { name: '파티 모드 초대 수락 알림 삭제' }));
+    fireEvent.click(await screen.findByRole('button', { name: '파티팝콘 초대 수락 알림 삭제' }));
 
     await waitFor(() => expect(dismissNotification).toHaveBeenCalledWith(3));
-    expect(screen.queryByText('파티 모드 초대 수락')).not.toBeInTheDocument();
+    expect(screen.queryByText('파티팝콘 초대 수락')).not.toBeInTheDocument();
   });
 });
 

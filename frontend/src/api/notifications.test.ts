@@ -24,8 +24,8 @@ function item(overrides: Partial<NotificationItem> = {}): NotificationItem {
   return {
     notificationId: 101,
     type: 'PARTY_INVITE',
-    title: '파티 모드 초대',
-    body: '새로운 파티 초대가 도착했어요.',
+    title: '파티팝콘 초대',
+    body: '새로운 파티팝콘 초대가 도착했어요.',
     targetType: 'PARTY_INVITATION',
     targetId: 501,
     readAt: null,
@@ -58,7 +58,7 @@ describe('API-070 인앱 알림 목록', () => {
     const accepted = item({
       notificationId: 102,
       type: 'PARTY_INVITE_ACCEPTED',
-      title: '파티 모드 초대 수락',
+      title: '파티팝콘 초대 수락',
       targetType: 'PARTY',
       targetId: 77,
       notifiedAt: '2026-09-17T10:00:00Z',

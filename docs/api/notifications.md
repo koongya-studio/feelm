@@ -19,8 +19,8 @@
 {
   "notificationId": 101,
   "type": "PARTY_INVITE",
-  "title": "파티 모드 초대",
-  "body": "새로운 파티 초대가 도착했어요.",
+  "title": "파티팝콘 초대",
+  "body": "새로운 파티팝콘 초대가 도착했어요.",
   "targetType": "PARTY_INVITATION",
   "targetId": 501,
   "readAt": null,
