@@ -29,6 +29,13 @@ type Props = {
 export default function RecommendationCard({ item, otts, dismissing, onDismiss }: Props) {
   const { movie, reason, type } = item;
   const isDiscovery = type === 'DISCOVERY';
+  /*
+   * 제목 옆의 연도 · 대표 장르(업무 -874). 포스터 그림만으로 영화를 알아봐야 했다. 줄을 새로
+   * 두면 포스터가 한 번 더 작아지므로 제목과 같은 줄에 흐리게 붙인다. 장르는 첫 하나만 적는다.
+   */
+  const meta = [movie.releaseYear ? String(movie.releaseYear) : null, movie.genres[0] ?? null]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <div className={styles.card}>
@@ -63,12 +70,20 @@ export default function RecommendationCard({ item, otts, dismissing, onDismiss }
          * 포스터 면 안에 OTT 링크가 겹쳐 쓰지 않았다(사용자 결정 2026-09-26).
          */}
         <span className={styles.info}>
-          <strong className={styles.title}>{movie.title}</strong>
-          <span className={styles.reason}>
-            <span className={styles.reasonText}>{reason.summary}</span>
-            <span className={styles.reasonCue} aria-hidden="true">
+          {/*
+           * `›`는 카드 전체가 영화 상세로 간다는 단서다(업무 -697). 제목 줄 끝에 둔다(업무 -874,
+           * 사용자 결정 2026-09-26) — 추천 이유 줄 끝에 있을 때는 "이유를 더 보여 준다"로도 읽혔다.
+           * 파티 목록 카드도 제목 줄 끝에 `›`를 둔다.
+           */}
+          <span className={styles.titleRow}>
+            <strong className={styles.title}>{movie.title}</strong>
+            {meta ? <span className={styles.meta}>{meta}</span> : null}
+            <span className={styles.detailCue} aria-hidden="true">
               <ChevronRightIcon />
             </span>
+          </span>
+          <span className={styles.reason}>
+            <span className={styles.reasonText}>{reason.summary}</span>
           </span>
           {movie.ottProviders.length > 0 ? (
             <span className={styles.ottList}>

@@ -72,14 +72,30 @@
   color: var(--color-on-dark);
 }
 
-.title {
+/* 제목과 연도 · 장르가 한 줄이다. 길면 제목이 먼저 줄고 연도 · 장르는 남는다(업무 -874) */
+.titleRow {
+  display: flex;
   min-width: 0;
   flex: none;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.title {
+  min-width: 0;
+  flex: 0 1 auto;
   overflow: hidden;
   font-size: 15px;
   font-weight: var(--font-weight-bold);
   line-height: 1.35;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  flex: none;
+  color: var(--color-on-dark-muted);
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -158,11 +174,14 @@
   -webkit-line-clamp: 2;
 }
 
-.reasonCue {
+/* 상세로 가는 단서. 제목 줄 오른쪽 끝에 선다(업무 -874) */
+.detailCue {
   display: flex;
   width: 18px;
   height: 18px;
   flex: none;
+  align-self: center;
+  margin-left: auto;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-pill);
@@ -170,7 +189,7 @@
   color: var(--color-on-dark);
 }
 
-.reasonCue svg {
+.detailCue svg {
   width: 10px;
   height: 10px;
 }
