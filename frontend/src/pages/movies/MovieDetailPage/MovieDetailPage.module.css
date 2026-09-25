@@ -36,6 +36,10 @@
  *
  * 세로 포스터의 양옆이 잘리지 않도록 화면 폭에 맞춘다. 남는 아래 영역은 배경색과
  * 그라디언트가 이어 받고, 밝기는 처음부터 살짝 눌러 상단 버튼의 대비를 지킨다.
+ *
+ * **포인터를 받지 않는다.** 데스크톱 셸에서는 창이 아니라 `main`이 스크롤하는데, 고정된
+ * 층은 그 스크롤의 자식으로 치지 않아 포스터만 보이는 윗구간에서 휠이 먹히지 않았다.
+ * 아래의 `.stage`가 휠을 받게 넘긴다(업무 -877). `.scrim`도 같다.
  */
 .backdrop {
   position: fixed;
@@ -49,6 +53,7 @@
   background-size: 100% auto;
   filter: blur(calc(1px + var(--detail-scroll) * 21px))
     brightness(calc(0.82 - var(--detail-scroll) * 0.42));
+  pointer-events: none;
   will-change: filter;
 }
 
@@ -76,6 +81,7 @@
     rgba(13, 12, 15, 0.78) 58%,
     #0d0c0f 82%
   );
+  pointer-events: none;
 }
 
 /*
@@ -620,10 +626,6 @@
   display: flex;
   width: 68px;
   flex: none;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-1);
-  text-align: center;
 }
 
 /* API-030 프로필 이미지가 없을 때도 같은 크기의 빈 원을 유지한다 */
@@ -634,6 +636,19 @@
   border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.08);
   object-fit: cover;
+}
+
+/* 사진과 이름을 한 링크로 묶어 칸 전체를 누를 자리로 쓴다 */
+.personLink {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  color: inherit;
+  text-align: center;
+  text-decoration: none;
+  -webkit-user-drag: none;
 }
 
 .personName {
@@ -648,7 +663,7 @@
   -webkit-line-clamp: 2;
 }
 
-.personName:focus-visible {
+.personLink:focus-visible {
   outline-color: var(--color-on-dark);
 }
 

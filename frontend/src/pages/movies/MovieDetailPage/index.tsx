@@ -78,6 +78,8 @@ const SIMILAR_POSTER_HEIGHT = 144;
 const BACKDROP_FADE_RATIO = 0.55;
 const REVIEW_FETCH_SIZE = 20;
 const REVIEW_REVEAL_SIZE = 5;
+/** 출연·제작 목록에서 이만큼 움직이기 전까지는 끌기가 아니라 누르기로 본다 */
+const PEOPLE_DRAG_THRESHOLD_PX = 5;
 /** 숨김 상태에서 실제 문장 길이와 형태를 노출하지 않는 고정 가림 문구 */
 const SPOILER_PLACEHOLDER = '스포일러가 포함된 한줄평을 가려두었어요';
 
@@ -166,7 +168,10 @@ export default function MovieDetailPage() {
     pointerId: number;
     clientX: number;
     scrollLeft: number;
+    moved: boolean;
   } | null>(null);
+  /** 방금 끝난 누름이 끌기였는지. 뒤따르는 click이 인물 검색으로 이어지지 않게 막는다 */
+  const peopleDraggedRef = useRef(false);
 
   useEffect(() => {
     // 복구가 끝나기 전에 부르면 비회원 응답이 굳는다(위 주석)
@@ -307,23 +312,35 @@ export default function MovieDetailPage() {
     else window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  /*
+   * 칸 전체(사진 · 이름)가 인물 검색 링크라 링크 위에서도 끌기를 시작할 수 있어야 한다. 누르는
+   * 순간에 포인터를 잡으면 click이 목록으로 가 링크가 열리지 않으므로, 실제로 끌기 시작한
+   * 뒤에만 잡고 그때 뒤따르는 click은 막는다.
+   */
   function handlePeoplePointerDown(event: ReactPointerEvent<HTMLUListElement>) {
+    peopleDraggedRef.current = false;
     if (event.pointerType !== 'mouse' || event.button !== 0) return;
-    if (event.target instanceof Element && event.target.closest('a')) return;
 
     peopleDragRef.current = {
       pointerId: event.pointerId,
       clientX: event.clientX,
       scrollLeft: event.currentTarget.scrollLeft,
+      moved: false,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
   }
 
   function handlePeoplePointerMove(event: ReactPointerEvent<HTMLUListElement>) {
     const drag = peopleDragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
 
-    event.currentTarget.scrollLeft = drag.scrollLeft - (event.clientX - drag.clientX);
+    const distance = event.clientX - drag.clientX;
+    if (!drag.moved) {
+      if (Math.abs(distance) < PEOPLE_DRAG_THRESHOLD_PX) return;
+      drag.moved = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+
+    event.currentTarget.scrollLeft = drag.scrollLeft - distance;
     event.preventDefault();
   }
 
@@ -334,7 +351,16 @@ export default function MovieDetailPage() {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    peopleDraggedRef.current = drag.moved;
     peopleDragRef.current = null;
+  }
+
+  function handlePeopleClickCapture(event: ReactMouseEvent<HTMLUListElement>) {
+    if (!peopleDraggedRef.current) return;
+
+    peopleDraggedRef.current = false;
+    event.preventDefault();
+    event.stopPropagation();
   }
 
   async function handleLoadMoreReviews() {
@@ -648,21 +674,23 @@ export default function MovieDetailPage() {
               onPointerMove={handlePeoplePointerMove}
               onPointerUp={finishPeopleDrag}
               onPointerCancel={finishPeopleDrag}
+              onClickCapture={handlePeopleClickCapture}
             >
               {people.map((person) => (
                 <li key={person.creditKey} className={styles.personItem}>
-                  {person.profileUrl ? (
-                    <img
-                      className={styles.personPhoto}
-                      src={person.profileUrl}
-                      alt=""
-                      loading="lazy"
-                    />
-                  ) : (
-                    <span className={styles.personPhoto} aria-hidden="true" />
-                  )}
-                  <Link className={styles.personName} to={path.searchWith(person.name)}>
-                    {person.name}
+                  <Link className={styles.personLink} to={path.searchWith(person.name)}>
+                    {person.profileUrl ? (
+                      <img
+                        className={styles.personPhoto}
+                        src={person.profileUrl}
+                        alt=""
+                        loading="lazy"
+                        draggable={false}
+                      />
+                    ) : (
+                      <span className={styles.personPhoto} aria-hidden="true" />
+                    )}
+                    <span className={styles.personName}>{person.name}</span>
                   </Link>
                 </li>
               ))}

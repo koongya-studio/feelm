@@ -100,7 +100,10 @@ describe('ReportFourCut', () => {
 
     expect(screen.queryByRole('button', { name: '02 감독 설명 보기' })).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: '01 장르 설명 보기' }));
+    const flip = screen.getByRole('button', { name: '01 장르 설명 보기' });
+    // 숨긴 글자에 기대지 않고 버튼 자체에 이름을 둔다 (업무 -877)
+    expect(flip).toHaveAttribute('aria-label', '01 장르 설명 보기');
+    fireEvent.click(flip);
     expect(onFlip).toHaveBeenCalledWith('genre');
   });
 

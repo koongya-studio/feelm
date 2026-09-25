@@ -37,7 +37,6 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode, RefObject } from 'react';
-import VisuallyHidden from '../VisuallyHidden';
 import Wordmark from '../Wordmark';
 import { formatPrintDate } from '../../utils/report';
 import { useFitText } from './useFitText';
@@ -422,11 +421,9 @@ function CutShell({ kind, label, mode, imageError, flip, caption, children }: Cu
           className={styles.flipButton}
           data-report-flip-control="true"
           aria-expanded={flipped}
+          aria-label={`${String(CUT_INDEX[kind]).padStart(2, '0')} ${label} ${flipped ? '사진 보기' : '설명 보기'}`}
           onClick={flip?.onFlip}
         >
-          <VisuallyHidden>
-            {`${String(CUT_INDEX[kind]).padStart(2, '0')} ${label} ${flipped ? '사진 보기' : '설명 보기'}`}
-          </VisuallyHidden>
           <span className={styles.flipHint} aria-hidden="true">
             <FlipIcon />
           </span>
