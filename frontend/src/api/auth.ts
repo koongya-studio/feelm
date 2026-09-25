@@ -15,7 +15,8 @@ import {
   isMockSession,
   startMockSession,
 } from './mockAccount';
-import { endSession, refreshAccessToken, startSession } from './session';
+import { retryTransient } from './retry';
+import { endSession, getAccessToken, refreshAccessToken, startSession } from './session';
 import { getMyProfile } from './users';
 import type {
   AuthenticatedUser,
@@ -204,6 +205,16 @@ export async function changePassword(currentPassword: string, newPassword: strin
  * Access Token은 메모리에만 있어 새로고침하면 사라진다. 쿠키의 Refresh Token으로
  * 재발급해 보고, 되면 프로필(API-014)까지 읽어 로그인 상태를 되돌린다. 재발급이
  * 거절되면 비로그인 상태다.
+ *
+ * 재발급 뒤의 프로필 조회는 일시 오류(네트워크 · 5xx)면 짧게 기다렸다 다시 부른다(업무 -908,
+ * `api/retry.ts`). 끝내 실패하면 그 오류를 던진다 — 세션이 살아 있는데 비로그인으로 떨어지지
+ * 않도록 `AuthProvider`가 가른다.
+ *
+ * **이미 Access Token이 있으면 재발급을 건너뛴다**(!677 리뷰). 복구 실패 화면의 `다시 시도`가
+ * 이 함수를 다시 부르는데, 그때는 앞선 재발급이 성공해 세션이 살아 있다는 것을 안다. 재발급부터
+ * 다시 보내면 그 요청이 잠깐 5xx · 네트워크 오류를 만나는 것만으로 `null`이 되어 살아 있는
+ * 세션이 비로그인으로 떨어졌다. 프로필만 다시 부른다 — 토큰이 그사이 만료됐으면 클라이언트가
+ * 401에서 스스로 재발급한다(`client.ts`).
  */
 export async function restoreSession(): Promise<AuthenticatedUser | null> {
   if (isMockSession()) {
@@ -212,13 +223,13 @@ export async function restoreSession(): Promise<AuthenticatedUser | null> {
     return toUser(getMockProfile());
   }
 
-  const token = await refreshAccessToken();
+  const token = getAccessToken() ?? (await refreshAccessToken());
 
   if (!token) {
     return null;
   }
 
-  return toUser(await getMyProfile());
+  return toUser(await retryTransient(() => getMyProfile()));
 }
 
 function toUser(profile: MyProfile): AuthenticatedUser {
