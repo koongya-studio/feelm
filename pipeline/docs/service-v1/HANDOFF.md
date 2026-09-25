@@ -1,5 +1,8 @@
 # 추천 v1 팀 인계
 
+**과거 인계 자료**: 현재 모델·구현·학습 자료는 [v26 GBT 안내](../gbt-v26/README.md)에서 시작한다.
+아래 구현 순서·모델 선택 보류·준비 상태는387 당시 snapshot이며 현재의 미완료 업무 목록이 아니다.
+
 Jira: [387](https://ssafy.atlassian.net/browse/S15P21E106-387). 기준: `origin/develop`의 `ae9de07be180027d90e4c809d168fab1e7dad88b`.
 
 **이 자료는 구현할 추천 v1과 그 판단 근거다. 모델 학습·API 구현·배포 완료 보고서가 아니다.**

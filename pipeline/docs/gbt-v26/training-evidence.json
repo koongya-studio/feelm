@@ -1,0 +1,114 @@
+{
+  "format": "feelm-v26-training-documentation-evidence-v1",
+  "jira": "S15P21E106-838",
+  "checked_at": "2026-09-24",
+  "code_baseline": "12ae0cf6",
+  "source_package": "v26-training-20260924",
+  "source_manifest_sha256": "8865e1ffafbf993e3f36b898b063976c7b3f2d26c2f6c22a892799a98a400a49",
+  "scope": "DOCUMENTATION_METADATA_ONLY_NO_MODEL_OR_TRAINING_ROWS",
+  "model_version": "gbt-v26-top2-raw",
+  "transform": "v26-max70-kobis-flag-71-v1",
+  "files": {
+    "data/training-data.npz": {
+      "bytes": 74976794,
+      "sha256": "2ec1010acfcef556f05b5f86c54772779342112695ad666757cc100241c69f85"
+    },
+    "data/label-inputs.parquet": {
+      "bytes": 23325402,
+      "sha256": "74ed235842ca0c73b9ef0c355978f33ab38fb31ebe3161b8147be1113b76fca5"
+    },
+    "data/feature-schema.json": {
+      "bytes": 2452,
+      "sha256": "c052b00282c647af610d6904c4daaa5a19a16a250e28346fbed079c65fb0fa8e"
+    },
+    "data/gbt.json": {
+      "bytes": 168690,
+      "sha256": "4d035f96f362458f0ce9b749bad4decbd4626cf279a072b6c1acd3b3acf92c25"
+    },
+    "data/xgboost-params.json": {
+      "bytes": 271,
+      "sha256": "bb2a15333d1532fab2774518dee5f36066bbf533e9265be53acc2af72a70623e"
+    },
+    "data/verification.json": {
+      "bytes": 945,
+      "sha256": "17c311d19d38d351ba15ae619be44dafc55dc26b89976e484d458bc122bdd8b5"
+    },
+    "reference-source/run_gbt_top2_v26.py": {
+      "bytes": 15858,
+      "sha256": "e1a3c238cef25c9f679fb9a93653e9a2ee1875e9e9811bb9254794da7bf56001"
+    },
+    "reference-source/public_threshold_v25.py": {
+      "bytes": 3581,
+      "sha256": "3f176fa7db7342bb8660f854ebd253aacefe8a9418dba3ee46b216cd8eb1d09a"
+    }
+  },
+  "training_parameters": {
+    "objective": "reg:squarederror",
+    "n_estimators": 80,
+    "learning_rate": 0.05,
+    "max_depth": 4,
+    "min_child_weight": 10,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "reg_lambda": 2,
+    "tree_method": "hist",
+    "random_state": 625,
+    "n_jobs": 6
+  },
+  "historical_reconstruction_verification": {
+    "status": "PASS",
+    "rows": 859363,
+    "features": 71,
+    "dtype": "float32",
+    "label_regeneration_exact": true,
+    "frozen_prediction_exact_rows": 859363,
+    "frozen_prediction_max_abs_error": 0.0,
+    "historical_feature_probe_rows": 20,
+    "historical_feature_probe_max_abs_error": 0.0,
+    "suppressed_rows": 202103,
+    "changed_from_observed_rows": 199253,
+    "feelm_service_users_in_training": 0,
+    "full_retraining_performed": false,
+    "source_run_sha256": "f5035a613757652eda03a8f44a57ad6000b13f265e9c69e0624eb2ee868589d0",
+    "source_model_sha256": "4d035f96f362458f0ce9b749bad4decbd4626cf279a072b6c1acd3b3acf92c25",
+    "original_training_python": "3.12.10",
+    "original_training_xgboost": "2.1.4",
+    "reconstruction_runtime": {
+      "python": "3.12.5",
+      "numpy": "1.26.4",
+      "pandas": "2.2.3",
+      "scipy": "1.15.2",
+      "pyarrow": "23.0.1",
+      "xgboost": "2.1.4"
+    },
+    "elapsed_seconds": 29.17199999999957
+  },
+  "this_documentation_check": {
+    "command": "python -X utf8 verify.py",
+    "working_directory": "delivered training package",
+    "status": "PASS",
+    "files": 18,
+    "rows": 859363,
+    "features": 71,
+    "dtype": "float32",
+    "policy_target_regeneration_exact": true,
+    "suppressed_rows": 202103,
+    "changed_from_observed_rows": 199253,
+    "model_reload_and_finite_predictions": true,
+    "historical_prediction_parity_rerun": false,
+    "full_retraining_performed": false,
+    "runtime": {
+      "python": "3.12.10",
+      "numpy": "2.4.6",
+      "pandas": "2.2.3",
+      "pyarrow": "20.0.0",
+      "xgboost": "2.1.4"
+    }
+  },
+  "limitations": [
+    "Original training transitive dependencies were not fully frozen.",
+    "Some original research sources were uncommitted; Git revision alone is insufficient.",
+    "Training package and raw data are distributed separately, not included in this repository.",
+    "No service deployment or live end-to-end validation was performed by this documentation task."
+  ]
+}
