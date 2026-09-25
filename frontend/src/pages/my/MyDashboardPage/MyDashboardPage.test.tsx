@@ -18,8 +18,8 @@
  * `api/users` · `api/watch` · `api/recommendations` · `api/otts`를 가로챈다. API-014와
  * OTT 기준정보가 실제 호출이라(업무 -364 · -379) 가로채지 않으면 네트워크를 두드린다.
  */
-import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { describe, expect, it, afterEach, beforeEach, vi } from 'vitest';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import MyDashboardPage from './index';
 import { renderWithRouter } from '../../../test/render';
 import { getMyProfileView } from '../../../api/users';
@@ -27,6 +27,8 @@ import { getMyRatings, getWatchRecords } from '../../../api/watch';
 import { getOtts } from '../../../api/otts';
 import { getRecommendationHistory } from '../../../api/recommendations';
 import { getMyTaste } from '../../../api/taste';
+import { ApiError, NETWORK_ERROR } from '../../../api/apiError';
+import { RETRY_DELAYS_MS } from '../../../api/retry';
 import { mockMyProfileView } from '../../../mocks/publicProfiles';
 import type { MyRatedItem, MyRatingList } from '../../../types/watch';
 import type { WatchRecordListItem } from '../../../types/watch';
@@ -562,5 +564,150 @@ describe('내 취향', () => {
     expect(screen.queryByRole('region', { name: '내 취향' })).toBeNull();
     expect(screen.getByRole('link', { name: '프로필 편집' })).toBeInTheDocument();
     expect(feed()).toBeInTheDocument();
+  });
+});
+
+/*
+ * 첫 진입 일시 오류 자동 복구 (업무 S15P21E106-893)
+ *
+ * 모바일에서 MY 탭에 처음 들어갈 때 재발급 · 네트워크가 잠깐 실패하면 오류 화면이 떴다가,
+ * 탭을 다시 열면 멀쩡했다. 일시 오류면 뼈대를 둔 채 다시 부르고, 횟수를 다 쓰거나 영구 오류일
+ * 때만 오류 화면을 보인다. 기다림은 가짜 시계로 넘긴다.
+ */
+describe('프로필 첫 조회 자동 재시도', () => {
+  const networkError = () => new ApiError(0, NETWORK_ERROR, '서버에 연결할 수 없습니다.');
+  const serverError = () => new ApiError(503, 'SERVICE_UNAVAILABLE', '잠시 후 다시 시도해 주세요.');
+  const errorTitle = () => screen.queryByText('프로필을 불러오지 못했어요');
+
+  /** 다음 재시도까지 기다린다 */
+  async function waitRetry(attempt: number) {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS_MS[attempt]);
+    });
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('처음 한 번 실패해도 뼈대를 둔 채 다시 불러 정상 화면을 그린다', async () => {
+    vi.mocked(getMyProfileView)
+      .mockRejectedValueOnce(networkError())
+      .mockResolvedValue(mockMyProfileView);
+
+    renderWithRouter(<MyDashboardPage />, { route: '/my' });
+
+    // 첫 실패 직후에도 오류 화면이 아니라 뼈대다
+    await act(async () => undefined);
+    expect(getMyProfileView).toHaveBeenCalledTimes(1);
+    expect(errorTitle()).toBeNull();
+    expect(screen.getByText('프로필을 불러오는 중')).toBeInTheDocument();
+
+    await waitRetry(0);
+
+    expect(await screen.findByRole('link', { name: '프로필 편집' })).toBeInTheDocument();
+    expect(getMyProfileView).toHaveBeenCalledTimes(2);
+    expect(errorTitle()).toBeNull();
+  });
+
+  it('일시 오류가 이어져 횟수를 다 쓰면 오류와 다시 시도를 보이고, 누르면 다시 부른다', async () => {
+    vi.mocked(getMyProfileView).mockRejectedValue(serverError());
+
+    renderWithRouter(<MyDashboardPage />, { route: '/my' });
+    await act(async () => undefined);
+
+    for (let attempt = 0; attempt < RETRY_DELAYS_MS.length; attempt += 1) {
+      expect(errorTitle()).toBeNull();
+      await waitRetry(attempt);
+    }
+
+    expect(await screen.findByText('프로필을 불러오지 못했어요')).toBeInTheDocument();
+    expect(getMyProfileView).toHaveBeenCalledTimes(RETRY_DELAYS_MS.length + 1);
+
+    vi.mocked(getMyProfileView).mockResolvedValue(mockMyProfileView);
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+
+    expect(await screen.findByRole('link', { name: '프로필 편집' })).toBeInTheDocument();
+    expect(getMyProfileView).toHaveBeenCalledTimes(RETRY_DELAYS_MS.length + 2);
+  });
+
+  it('영구적인 4xx는 다시 부르지 않고 곧바로 오류를 보인다', async () => {
+    vi.mocked(getMyProfileView).mockRejectedValue(
+      new ApiError(404, 'USER_NOT_FOUND', '사용자를 찾을 수 없어요.'),
+    );
+
+    renderWithRouter(<MyDashboardPage />, { route: '/my' });
+
+    expect(await screen.findByText('프로필을 불러오지 못했어요')).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS_MS.reduce((sum, ms) => sum + ms, 0));
+    });
+    expect(getMyProfileView).toHaveBeenCalledTimes(1);
+  });
+
+  it('다시 부르기를 기다리는 사이 화면을 떠나면 더 부르지 않고, 늦은 응답도 상태를 바꾸지 않는다', async () => {
+    let answerLate: (value: typeof mockMyProfileView) => void = () => undefined;
+    const errors = vi.spyOn(console, 'error');
+
+    vi.mocked(getMyProfileView)
+      .mockRejectedValueOnce(networkError())
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            answerLate = resolve;
+          }),
+      );
+
+    const { unmount } = renderWithRouter(<MyDashboardPage />, { route: '/my' });
+    await act(async () => undefined);
+    await waitRetry(0);
+    expect(getMyProfileView).toHaveBeenCalledTimes(2);
+
+    // 두 번째 요청이 나가 있는 사이 떠난다. 그 뒤 온 응답은 버린다
+    unmount();
+    await act(async () => {
+      answerLate(mockMyProfileView);
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS_MS.reduce((sum, ms) => sum + ms, 0));
+    });
+
+    expect(getMyProfileView).toHaveBeenCalledTimes(2);
+    expect(errors).not.toHaveBeenCalled();
+    errors.mockRestore();
+  });
+
+  it('기다리는 사이 떠나면 다음 재시도를 보내지 않는다', async () => {
+    vi.mocked(getMyProfileView).mockRejectedValue(networkError());
+
+    const { unmount } = renderWithRouter(<MyDashboardPage />, { route: '/my' });
+    await act(async () => undefined);
+    expect(getMyProfileView).toHaveBeenCalledTimes(1);
+
+    unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(RETRY_DELAYS_MS.reduce((sum, ms) => sum + ms, 0));
+    });
+
+    expect(getMyProfileView).toHaveBeenCalledTimes(1);
+  });
+
+  it('프로필을 다시 불러도 취향 분석은 한 번만 부르고 프로필이 그 응답을 같이 쓴다', async () => {
+    vi.mocked(getMyProfileView)
+      .mockRejectedValueOnce(networkError())
+      .mockResolvedValue(mockMyProfileView);
+
+    renderWithRouter(<MyDashboardPage />, { route: '/my' });
+    await act(async () => undefined);
+    await waitRetry(0);
+    await screen.findByRole('link', { name: '프로필 편집' });
+
+    expect(getMyTaste).toHaveBeenCalledTimes(1);
+    const [first, second] = vi.mocked(getMyProfileView).mock.calls.map(([taste]) => taste);
+    expect(first).toBeInstanceOf(Promise);
+    expect(second).toBe(first);
   });
 });

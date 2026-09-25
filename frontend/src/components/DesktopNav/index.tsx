@@ -16,16 +16,8 @@
  */
 import type { ReactNode } from 'react';
 import { Link, matchPath, useLocation } from 'react-router';
-import Avatar from '../Avatar';
-import {
-  ChevronRightIcon,
-  CompassIcon,
-  FilmIcon,
-  MyIcon,
-  PartyIcon,
-  SearchIcon,
-  SettingsIcon,
-} from '../Icon';
+import DesktopAccountMenu from '../DesktopAccountMenu';
+import { CompassIcon, FilmIcon, MyIcon, PartyIcon, SearchIcon, SettingsIcon } from '../Icon';
 import Wordmark from '../Wordmark';
 import { DESKTOP_NAV_MATCH, path } from '../../routes/paths';
 import type { ShellAccount } from '../../hooks/useShellAccount';
@@ -43,7 +35,7 @@ const ITEMS: Item[] = [
   { key: 'film', label: '취향 필름', to: path.film(), icon: <FilmIcon /> },
   { key: 'recommendations', label: '추천 영화', to: path.recommendations(), icon: <CompassIcon /> },
   { key: 'party', label: '파티팝콘', to: path.party(), icon: <PartyIcon /> },
-  { key: 'search', label: '검색', to: path.search(), icon: <SearchIcon /> },
+  { key: 'search', label: '영화 탐색', to: path.search(), icon: <SearchIcon /> },
   { key: 'my', label: 'MY', to: path.my(), icon: <MyIcon /> },
 ];
 
@@ -54,9 +46,14 @@ const ITEMS: Item[] = [
  * 좌측 5항목이 한 값에 묶여 한쪽을 고칠 때 다른 쪽이 조용히 바뀐다.
  */
 function isItemActive(key: keyof typeof DESKTOP_NAV_MATCH, pathname: string) {
+  if (key === 'my' && isSettingsActive(pathname)) return false;
   return DESKTOP_NAV_MATCH[key].some((pattern) =>
     matchPath({ path: pattern, end: false }, pathname),
   );
+}
+
+function isSettingsActive(pathname: string) {
+  return Boolean(matchPath({ path: path.settings(), end: false }, pathname));
 }
 
 type Props = {
@@ -65,10 +62,11 @@ type Props = {
 
 export default function DesktopNav({ account }: Props) {
   const { pathname } = useLocation();
+  const settingsActive = isSettingsActive(pathname);
 
   return (
     <div className={styles.rail}>
-      <Link to={path.film()} className={styles.brand}>
+      <Link to={path.film()} className={styles.brand} aria-label="Feelm 취향 필름으로 이동">
         <Wordmark size={40} />
       </Link>
 
@@ -92,25 +90,19 @@ export default function DesktopNav({ account }: Props) {
       </nav>
 
       <div className={styles.foot}>
-        <Link to={path.settings()} className={styles.item} data-active={false}>
+        <Link
+          to={path.settings()}
+          className={styles.item}
+          data-active={settingsActive}
+          aria-current={settingsActive ? 'page' : undefined}
+        >
           <span className={styles.icon}>
             <SettingsIcon />
           </span>
           <span className={styles.label}>설정</span>
         </Link>
 
-        {account ? (
-          <Link to={path.my()} className={styles.account}>
-            <Avatar size={36} nickname={account.nickname} src={account.avatarUrl} />
-            <span className={styles.accountText}>
-              <span className={styles.accountName}>{account.nickname}</span>
-              {account.email ? <span className={styles.accountEmail}>{account.email}</span> : null}
-            </span>
-            <span className={styles.accountChevron}>
-              <ChevronRightIcon />
-            </span>
-          </Link>
-        ) : null}
+        {account ? <DesktopAccountMenu account={account} /> : null}
       </div>
     </div>
   );

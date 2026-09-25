@@ -125,13 +125,11 @@ Screen Spec 3.2절에서 미확정으로 남긴 항목을 여기서 정합니다
 
 | 화면 | 결정 | 이유 |
 | --- | --- | --- |
-| 2.3 추천 카드 ⋯ 메뉴 | `/recommendations` 내부 상태 | 어느 카드의 메뉴인지가 화면 상태이고, 열고 닫는 동작이 화면 이동이 아닙니다 |
 | 2.3-A 관심없음 처리 | `/recommendations` 내부 상태 | 토스트와 카드 교체는 목록 화면의 상태 변화입니다 |
 | 2.4-A 감상 확인 | **라우트로 만듦** | 알림(8.1 · 8.2)에서 특정 감상 기록으로 진입하는 화면이라 식별자가 URL에 필요합니다 |
 
-**2.3 · 2.3-A의 대가**: 시트가 열린 상태에서 브라우저 뒤로 가기를 누르면 시트가 닫히지
-않고 이전 화면으로 이동합니다. 이 동작을 바꿔야 한다면 라우트로 승격하는 것이 맞습니다.
-공통 레이아웃 업무(S15P21E106-255)에서 시트 컴포넌트를 만들 때 다시 확인합니다.
+2.3 추천 카드 ⋯ 메뉴는 업무 S15P21E106-890에서 제거했습니다. 2.3-A 관심없음 처리는
+`/recommendations` 안에서 카드 교체와 알림 상태로 유지합니다.
 
 ### 3.4 진입 경로가 없는 화면
 
@@ -532,15 +530,20 @@ export async function getRecommendations(): Promise<RecommendationSet>
 
 ```text
 src/types/
-├─ enums.ts        공통 규약의 상태값
-├─ common.ts       페이지네이션, 오류 응답
+├─ enums.ts               공통 규약의 상태값
+├─ common.ts              페이지네이션, 오류 응답
 ├─ movie.ts
 ├─ recommendation.ts
 ├─ watch.ts
 ├─ taste.ts
 ├─ party.ts
 ├─ onboarding.ts
-└─ user.ts
+├─ user.ts
+└─ schema-conformance.ts  손으로 쓴 타입과 생성 스키마의 대조 (업무 -777)
+
+src/generated/            백엔드 OpenAPI에서 만든 파일. 손으로 고치지 않는다 (업무 -777)
+├─ openapi.json           백엔드 springdoc 문서의 스냅샷
+└─ api-schema.d.ts        스냅샷에서 만든 타입
 ```
 
 ### 8.2 열거형
@@ -563,6 +566,55 @@ src/types/
 
 타입은 계약의 사본입니다. 계약이 바뀌면 타입을 고치고, 타입을 먼저 바꿔 계약을 앞서지
 않습니다. 계약에 없는 필드를 타입에 넣지 않습니다.
+
+**이 규칙을 기계가 지킵니다**(업무 S15P21E106-777). 손으로 쓴 타입에 서버에 없는 필드가
+들어가는 일이 세 번 있었습니다 — 파티 추천 `reason`(업무 -705), OTT 추천 `matchRate` ·
+`similarity`(업무 -563), 관심없음 `replacement`. 세 건 모두 정리했지만 막는 장치가
+없었습니다. 8.4가 그 장치입니다.
+
+### 8.4 백엔드 스키마와의 대조 (업무 -777)
+
+백엔드 springdoc 문서(`/v3/api-docs`)를 `src/generated/openapi.json`에 스냅샷으로 두고,
+`openapi-typescript`로 `src/generated/api-schema.d.ts`를 만듭니다. 두 파일 모두 커밋합니다.
+
+| 무엇을 지키나 | 누가 | 언제 |
+| --- | --- | --- |
+| 스냅샷 = 백엔드 실제 문서 | 백엔드 `OpenApiSnapshotTest` | `backend-test`(main)와 로컬 |
+| 생성 타입 = 스냅샷 | `vite build`의 `feelm-api-schema-drift` 플러그인 | `npm run build`, 프론트 MR Job |
+| 손으로 쓴 타입 ⊆ 생성 타입 | `src/types/schema-conformance.ts` | `tsc -b`(=`npm run build`) |
+
+명령
+
+```bash
+npm run api:generate   # 스냅샷에서 타입을 다시 만든다
+npm run api:check      # 다시 만든 결과가 커밋본과 다르면 실패한다
+```
+
+스냅샷 갱신은 백엔드에서 합니다.
+
+```bash
+cd backend && FEELM_OPENAPI_SNAPSHOT_WRITE=1 ./gradlew test --tests '*OpenApiSnapshotTest'
+```
+
+**생성 타입으로 갈아끼우지 않고 대조만 합니다.** springdoc은 Java record에서 문서를 만들고
+record에는 필수·null 정보가 없어, 생성 스키마에는 `required`가 거의 없고 `null` 표시도
+없습니다. 그대로 별칭을 걸면 `title?: string`이 되어 화면 코드가 전부 `?.`로 덮입니다.
+무엇이 반드시 오고 무엇이 `null`인지는 계약 문서가 정하고, 그 지식은 `src/types/*`에
+있습니다. 자세한 근거는 `schema-conformance.ts` 머리말에 있습니다.
+
+`[!]` **검사 자리가 `vite build`인 것은 CI 제약 때문입니다.** 프론트 MR Job이 돌리는 명령은
+CI 서버에 설치된 러너에 고정되어 있고(`infra/scripts/ci-frontend-mr-runner.py`의
+`FIXED_COMMAND`), 그 계약이 `npm run`을 금지합니다(`infra/scripts/test_ci_frontend_mr.py`).
+고정 명령 안에서 검사를 걸 수 있는 곳은 `vite build`뿐입니다. 러너 계약을 고쳐 검사 단계를
+따로 두는 것은 인프라와 합의할 후속 과제입니다.
+
+`[?]` **아직 대조에 들어오지 못한 것이 둘 있습니다.** 둘 다 백엔드가 고쳐야 합니다.
+
+- 추천 이유(`RecommendationItemResponse.reason`)가 Jackson `JsonNode`라 springdoc이
+  `JsonNode`의 getter를 스키마로 만듭니다. 계약이 정한 `summary` · `factors[]`가 생성
+  문서에 없습니다
+- OTT 추천 항목이 `Item`이라는 이름으로 나오고, 같은 이름을 취향 입력의 중첩 record가 이미
+  쓰고 있어 두 모양이 한 스키마로 뭉개졌습니다. `@Schema(name = ...)`로 갈라야 합니다
 
 Screen Spec 8.1절에서 계약 기준으로 확정한 항목은 타입에도 반영합니다.
 
@@ -683,8 +735,10 @@ ADR-0013이 반응형 웹앱으로 정하고 있고, 와이어프레임은 Andro
 2. API가 없는 기능은 **목업 안에서 끝납니다.** 목업 데이터로 실제 GET · POST 화면에 들어가지
    않습니다. 상세로 갈 수 없으면 눌리지 않게 두거나(5.5 파티 추천 · EXT-04 영화), 번호 없이
    열리는 목록 화면으로 보냅니다(8.1 · 8.2 알림). 4.1 급상승 목업은 업무 -612에서 제거했습니다
-3. 계약에 없는 설정값을 세션 저장소에 두어 저장된 것처럼 보이게 하지 않습니다. 준비 중으로
-   잠급니다(7.8-B 세 줄 · 7.8-C 두 토글 · 7.2-B 차단)
+3. 계약에 없는 설정값을 세션 저장소에 두어 저장된 것처럼 보이게 하지 않습니다. 계약이 생길
+   때까지 준비 중으로 잠급니다. 업무 -610에서 잠갔던 자리(7.8-B 세 줄 · 7.8-C 두 토글 · 7.2-B
+   차단)는 모두 계약이 생겨 풀렸습니다 — 7.8-B는 업무 -856, 7.8-C는 업무 -857 · -858, 7.2-B는
+   업무 -810
 
 > 아래 표는 업무 -610 당시의 기록입니다. **지금의 연동 상태는 [`api-status.md`](./api-status.md)가
 > 정본입니다**(업무 -395). 그 뒤 관심없음 · 인앱 알림 · OTT 추천 · 파티 추천이 실제 API로 바뀌었습니다.
@@ -697,9 +751,9 @@ ADR-0013이 반응형 웹앱으로 정하고 있고, 와이어프레임은 Andro
 | 내 평가 목록 (7.1) | **실제** API-039(S15P21E106-611에서 연동) | 그전에는 평가와 1:1인 내 필름 API-042로 그렸음. 내 평가 목업(`mockMyRatings`)은 지움 |
 | 인앱 알림 (8.1 · 8.2) | 백엔드 API-070~074 있음 · 프론트 연동은 S15P21E106-537 | 목업은 번호를 갖지 않고(`destination`) 목록 화면으로만 감 |
 | 파티 영화 추천 (5.5 · 5.9) | **실제** API-058(S15P21E106-705에서 연동) | 목업(`mockPartyRecommendations`)과 계약에 없던 `reason`은 지움. 카드는 영화 상세로 감 |
-| 공개 프로필 (7.2-A · B) | API-062 백엔드 없음 → 목업 | 차단 잠금. 목업이 실제 차단 목록(API-022)을 섞어 보지 않음 |
-| 공개 범위 (7.8-B) | 계약은 프로필 `visibility`(API-015)뿐 | 프로필 줄만 실제 저장. 나머지 세 줄 잠금 |
-| 알림 설정 (7.8-C) | 계약 세 키(API-017 · 018) | 파티 초대 · 리포트 발급 토글 잠금 |
+| 공개 프로필 (7.2-A · B) | **실제** API-062(S15P21E106-810에서 연동) | 목업이던 동안 잠갔던 차단을 되살림. API-062 본문의 `userId`로 API-020 차단 |
+| 공개 범위 (7.8-B) | 계약 네 필드(API-015 `visibility` · `frameVisibility` · `popcornVisibility` · `reviewVisibility`, -856) | 네 줄 모두 실제 저장. 잠금 없음. 계약에 없는 `파티원만`은 칸을 그리지 않음 |
+| 알림 설정 (7.8-C) | 계약 다섯 키(API-017 · 018, 파티 초대 -857 · 리포트 발급 -858) | 잠금 없음 |
 | 급상승 (4.1) | API-064 백엔드 미구현. 업무 -612에서 목업 제거 | 현재 미노출. API 구현 후 후속 FE 업무에서 실제 결과 연동 |
 | OTT 추천 (EXT-01~05) · 리포트 (3.3 · 3.4 · 7.3 · 7.4) | 목업 | 영화 링크 없앰(EXT-04). 리포트는 실제 화면으로 가는 링크가 없음 |
 | 취향 리포트 이미지 생성 | **실제** API-061 | 화면의 `ReportFourCut` DOM 캡처 → PNG 업로드 → 서명 URL 다운로드(-557) |

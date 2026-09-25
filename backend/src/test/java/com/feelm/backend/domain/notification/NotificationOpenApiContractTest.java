@@ -65,7 +65,7 @@ class NotificationOpenApiContractTest {
                         "notifiedAt");
         assertThat(values(item.path("properties").path("type").path("enum")))
                 .containsExactlyInAnyOrder(
-                        "PARTY_INVITE", "PARTY_INVITE_ACCEPTED", "WATCH_CONFIRM");
+                        "PARTY_INVITE", "PARTY_INVITE_ACCEPTED", "WATCH_CONFIRM", "REPORT_ISSUED");
 
         JsonNode count = paths.path("/api/v1/notifications/unread-count").path("get");
         assertBearer(count);

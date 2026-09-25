@@ -8,6 +8,11 @@
 의 경로와 프론트 호출을 하나씩 맞춰 확인했습니다. 리포트 목록 · 상세 · 첫 발급(API-059 · 060 ·
 080)이 생겨 연동했고(업무 -558), 그전 기준 시점은 `54038217`(2026-09-20)입니다.
 
+업무 -884에서 `watch.ts` 절만 다시 맞췄습니다. 다른 절은 위 기준 시점 그대로입니다. 평가
+삭제(API-038)는 업무 -724에서 이미 붙었는데 표에는 `부르지 않음`으로 남아 1장과 어긋나 있었고,
+이때 함께 고쳤습니다. API-038은 이제 감상 기록까지 되돌리므로(ADR-0025) 화면이 API-035를
+따로 부르지 않습니다.
+
 **갱신 규칙.** 백엔드에 API가 생기거나 프론트가 목업을 실제 호출로 바꾸면 이 표를 같은 MR에서
 고칩니다. 목업을 남기는 변경이면 2장에 이유와 선행 업무를 적습니다.
 
@@ -130,7 +135,7 @@
 | `confirmWatch` | 실제 | API-035 |
 | `createRating` | 실제 | API-036 |
 | `updateRating` | 실제 | API-037 |
-| — | 부르지 않음 | API-038 평가 삭제. 1장 |
+| `deleteRating` | 실제 | API-038. 2.5의 평가 삭제가 부르며 감상 기록도 함께 되돌아간다 |
 | `getMyRatings` | 실제 | API-039 |
 | `getRatingCounts` | 조합 + **목업** | API-014 · 041. `weeklyFrameDelta`만 고정값(2장) |
 
@@ -180,7 +185,7 @@
 | `createReportImage` | 실제 | 화면의 `ReportFourCut` PNG를 API-061에 저장하고 서명 URL을 다운로드한다(업무 -557). 상세 화면 `저장`이 쓰고, 409 · 429를 따로 안내한다(업무 -731 · -861) |
 | `getLatestReadyReport` | 조합 | API-059 `current`로 3.1 버튼을 가른다. 목업 시절 세션에 두었던 `본 적 있음` 표시를 서버의 `issuedAt`으로 바꿨다 |
 
-### `notifications.ts` · `push.ts`
+### `notifications.ts`
 
 | 함수 | 상태 | API |
 | --- | --- | --- |
@@ -189,10 +194,9 @@
 | `readNotification` · `readAllNotifications` | 실제 | API-072 · 073 |
 | `dismissNotification` | 실제 | API-074 |
 | `getLatestPushNotification` | 조합 | 8.2 예시. API-070 목록에서 고른다 |
-| `getWebPushConfig` | 실제 | API-075(업무 -583) |
-| `registerWebPushSubscription` · `unregisterWebPushSubscription` | 실제 | API-076 · 077 |
 
-브라우저 구독을 만들고 지우는 일은 `src/pwa/webPush.ts`가 맡습니다.
+브라우저 푸시(API-075~077)는 쓰지 않습니다. `push.ts`와 기기 구독은 업무 -859에서 걷어냈고,
+`src/pwa/webPush.ts`는 그 전에 남은 기기 구독을 앱이 뜰 때 지우기만 합니다.
 
 ## 5. 함께 보는 문서
 

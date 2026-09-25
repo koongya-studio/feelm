@@ -31,8 +31,8 @@ import { AuthContext } from '../../../contexts/authContext';
 import { resetSessionStore } from '../../../mocks/sessionStore';
 import { mockMyProfileView } from '../../../mocks/publicProfiles';
 import { mockMyProfile } from '../../../mocks/user';
-import { forgetWebPush } from '../../../pwa/webPush';
 import { ROUTE_PATTERN } from '../../../routes/paths';
+import { resetViewport, setViewportWidth } from '../../../test/viewport';
 import { RECOMMENDATIONS_GUIDE, completeGuide, hasSeenGuide } from '../../../utils/userGuides';
 import type { AuthValue } from '../../../contexts/authContext';
 import type { BlockedUser, NotificationSettings } from '../../../types/user';
@@ -61,12 +61,6 @@ vi.mock('../../../utils/oauth', async (importOriginal) => ({
 
 const { startOAuth, isOAuthConfigured } = await import('../../../utils/oauth');
 
-// 탈퇴 뒤 기기 푸시 구독을 지우는지만 본다(업무 -583). 브라우저 구독은 `webPush.test.ts`가 본다
-vi.mock('../../../pwa/webPush', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../pwa/webPush')>()),
-  forgetWebPush: vi.fn(async () => undefined),
-}));
-
 const signOut = vi.fn<AuthValue['signOut']>();
 
 /** `beforeEach`가 새로 만든다. 탈퇴 판정에 쓰는 계정 상태를 시험마다 바꾼다 */
@@ -86,6 +80,8 @@ function createFakeServer() {
   const notification: NotificationSettings = {
     RATING: true,
     RECOMMENDATION: true,
+    PARTY_INVITE: true,
+    REPORT_ISSUED: true,
     MARKETING: false,
   };
   /** API-013이 대조하는 계정. `getMyProfile`의 `hasPassword`와 짝을 맞춰 쓴다 */
@@ -190,7 +186,7 @@ function createFakeServer() {
 
     if (url.pathname === '/api/v1/users/me/notification-settings') {
       if (method === 'PUT') {
-        // 전체 교체다(API-018). 화면이 보낸 세 키가 그대로 다음 조회에 나온다
+        // 전체 교체다(API-018). 화면이 보낸 다섯 키가 그대로 다음 조회에 나온다
         Object.assign(notification, JSON.parse(init.body as string));
       }
 
@@ -273,7 +269,6 @@ beforeEach(() => {
       Promise.resolve({ ...mockMyProfileView, nickname: server.profile.nickname }),
     );
   signOut.mockReset().mockResolvedValue(undefined);
-  vi.mocked(forgetWebPush).mockClear();
   vi.mocked(startOAuth).mockReset();
   vi.mocked(isOAuthConfigured).mockReset().mockReturnValue(true);
 });
@@ -331,6 +326,19 @@ function renderApp(
 
 const location = () => screen.getByTestId('location').textContent;
 const back = () => fireEvent.click(screen.getByRole('button', { name: '뒤로 가기' }));
+
+describe('설정 첫 화면의 뒤로 가기', () => {
+  it('데스크톱에서는 숨기고 모바일에서는 유지한다', () => {
+    setViewportWidth(1440);
+    const desktop = renderApp([ROUTE_PATTERN.settings]);
+    expect(screen.queryByRole('button', { name: '뒤로 가기' })).not.toBeInTheDocument();
+
+    desktop.unmount();
+    resetViewport();
+    renderApp([ROUTE_PATTERN.settings]);
+    expect(screen.getByRole('button', { name: '뒤로 가기' })).toBeInTheDocument();
+  });
+});
 
 describe('7.8 → 6.1', () => {
   it('OTT 관리가 설정 안에 있다', async () => {
@@ -445,11 +453,6 @@ describe('7.8-A-1 회원 탈퇴', () => {
     await waitFor(() => expect(location()).toBe('/start'));
     expect(signOut).toHaveBeenCalledTimes(1);
     expect(server.account.withdrawn).toBe(true);
-    // 기기 푸시 구독은 세션을 끊기 전에 지운다. 탈퇴한 계정은 서버 해제를 받지 않는다
-    expect(forgetWebPush).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(forgetWebPush).mock.invocationCallOrder[0]).toBeLessThan(
-      signOut.mock.invocationCallOrder[0],
-    );
   });
 
   it('비밀번호가 틀리면 그 사실을 알리고 계정은 그대로 남는다', async () => {
@@ -465,7 +468,6 @@ describe('7.8-A-1 회원 탈퇴', () => {
     expect(location()).toBe('/my/settings/account/withdraw');
     expect(server.account.withdrawn).toBe(false);
     expect(signOut).not.toHaveBeenCalled();
-    expect(forgetWebPush).not.toHaveBeenCalled();
   });
 
   /*
@@ -514,7 +516,6 @@ describe('7.8-A-1 회원 탈퇴', () => {
     expect(server.account.withdrawn).toBe(true);
     expect(server.social.received).toEqual(['code-linked']);
     expect(signOut).toHaveBeenCalledTimes(1);
-    expect(forgetWebPush).toHaveBeenCalledTimes(1);
   });
 
   it('연결되지 않은 소셜 계정으로 확인하면 그렇게 알리고, 같은 코드를 다시 보내지 않는다', async () => {
@@ -610,8 +611,12 @@ describe('7.8 → 7.8-B · 7.8-C', () => {
       'aria-checked',
       'true',
     );
-    // 계약(API-015)의 단계는 둘이다. `파티원만`은 고를 수 없다
-    expect(within(profile).getByRole('radio', { name: '파티원만' })).toBeDisabled();
+    // 계약(API-015)의 단계는 둘이다. `파티원만` 칸은 그리지 않는다
+    expect(
+      within(profile)
+        .getAllByRole('radio')
+        .map((radio) => radio.textContent),
+    ).toEqual(['전체 공개', '비공개']);
 
     fireEvent.click(within(profile).getByRole('radio', { name: '비공개' }));
     await waitFor(() => expect(server.profile.visibility).toBe('PRIVATE'));
@@ -627,19 +632,87 @@ describe('7.8 → 7.8-B · 7.8-C', () => {
     );
   });
 
-  it('취향 필름 · 팝콘 · 한줄평 공개 범위는 계약이 없어 잠겨 있다', async () => {
+  it('취향 필름 · 팝콘 · 한줄평 공개 범위도 API-015로 저장되어 나갔다 들어와도 그대로다', async () => {
     /*
-     * 한때 세션 저장소에 두어 저장된 것처럼 보였다. 새로고침하면 사라지는 값이라 설정처럼
-     * 보이면 안 된다(업무 -610).
+     * 한때 세션 저장소에만 두어 새로고침하면 사라졌고(업무 -610) 그래서 잠갔다. 업무 -856에서
+     * 계약(API-014 · 015의 세 필드)이 생겨 서버에 저장한다
      */
+    renderApp([ROUTE_PATTERN.settings]);
+
+    fireEvent.click(screen.getByRole('link', { name: /공개 범위 설정/ }));
+
+    const film = await screen.findByRole('radiogroup', { name: '취향 필름 공개' });
+    // 기본값은 모두 공개다
+    expect(within(film).getByRole('radio', { name: '전체 공개' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(screen.queryByText(/준비 중/)).not.toBeInTheDocument();
+
+    // 네 줄 모두 `파티원만`은 계약에 없어 칸이 없다(업무 -856 결정 D-1)
+    for (const name of ['프로필 공개', '취향 필름 공개', '팝콘 버킷 공개', '한줄평 공개']) {
+      const group = screen.getByRole('radiogroup', { name });
+      expect(within(group).queryByRole('radio', { name: '파티원만' })).toBeNull();
+      expect(within(group).getByRole('radio', { name: '비공개' })).toBeEnabled();
+    }
+
+    fireEvent.click(within(film).getByRole('radio', { name: '비공개' }));
+    // 저장 중에도 다른 줄은 잠기지 않는다. 요청은 차례로 나간다(업무 -854)
+    const review = screen.getByRole('radiogroup', { name: '한줄평 공개' });
+    expect(within(review).getByRole('radio', { name: '비공개' })).toBeEnabled();
+    fireEvent.click(within(review).getByRole('radio', { name: '비공개' }));
+
+    await waitFor(() => expect(server.profile.frameVisibility).toBe('PRIVATE'));
+    await waitFor(() => expect(server.profile.reviewVisibility).toBe('PRIVATE'));
+
+    // 보낸 것은 고른 필드 하나뿐이다. 다른 줄은 건드리지 않는다
+    expect(server.profile.popcornVisibility).toBe('PUBLIC');
+    expect(server.profile.visibility).toBe('PUBLIC');
+
+    back();
+    await waitFor(() => expect(location()).toBe('/my/settings'));
+    fireEvent.click(screen.getByRole('link', { name: /공개 범위 설정/ }));
+
+    const reopened = await screen.findByRole('radiogroup', { name: '취향 필름 공개' });
+    expect(within(reopened).getByRole('radio', { name: '비공개' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(
+      within(screen.getByRole('radiogroup', { name: '한줄평 공개' })).getByRole('radio', {
+        name: '비공개',
+      }),
+    ).toHaveAttribute('aria-checked', 'true');
+    expect(
+      within(screen.getByRole('radiogroup', { name: '팝콘 버킷 공개' })).getByRole('radio', {
+        name: '전체 공개',
+      }),
+    ).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('공개 범위를 저장하지 못하면 고르기 전 값으로 돌아가고 알린다', async () => {
     renderApp([ROUTE_PATTERN.privacySettings]);
 
-    const film = await screen.findByRole('radiogroup', { name: /취향 필름 공개/ });
-    for (const radio of within(film).getAllByRole('radio')) {
-      expect(radio).toBeDisabled();
-      expect(radio).toHaveAttribute('aria-checked', 'false');
-    }
-    expect(screen.getByText(/공개 범위는 준비 중이에요/)).toBeInTheDocument();
+    const popcorn = await screen.findByRole('radiogroup', { name: /팝콘 버킷 공개/ });
+    // 팝콘 버킷 줄에는 파티 예외(API-057)를 적는다
+    expect(popcorn).toHaveAccessibleDescription(/파티원에게는 파티 화면에서 보여요/);
+
+    vi.mocked(fetch).mockImplementationOnce(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ code: 'INTERNAL_ERROR', message: '서버 오류' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+    fireEvent.click(within(popcorn).getByRole('radio', { name: '비공개' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('저장하지 못했어요');
+    expect(within(popcorn).getByRole('radio', { name: '전체 공개' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(server.profile.popcornVisibility).toBe('PUBLIC');
   });
 
   it('계약에 있는 알림은 저장되어 나갔다 들어와도 그대로고, 없는 둘은 잠겨 있다', async () => {
@@ -654,9 +727,30 @@ describe('7.8 → 7.8-B · 7.8-C', () => {
       'false',
     );
 
-    // 파티 초대 · 리포트 발급은 계약(API-017)에 없어 켤 수 없다(업무 -610)
-    expect(screen.getByRole('switch', { name: /파티 초대 알림/ })).toBeDisabled();
-    expect(screen.getByRole('switch', { name: /리포트 발급 알림/ })).toBeDisabled();
+    // 업무 -610에서 잠갔던 두 줄이 모두 열렸다. 준비 중 안내가 남지 않는다(업무 -857 · -858)
+    for (const toggle of screen.getAllByRole('switch')) expect(toggle).toBeEnabled();
+    expect(screen.queryByText(/준비 중/)).toBeNull();
+
+    // 리포트 발급도 서버에 저장되고 다시 들어와도 남는다(업무 -858)
+    fireEvent.click(screen.getByRole('switch', { name: '리포트 발급 알림' }));
+    await waitFor(() =>
+      expect(screen.getByRole('switch', { name: '리포트 발급 알림' })).toHaveAttribute(
+        'aria-checked',
+        'false',
+      ),
+    );
+
+    // 파티 초대는 계약에 들어와(업무 -857) 서버에 저장되고 다시 들어와도 남는다
+    const partyInvite = screen.getByRole('switch', { name: '파티 초대 알림' });
+    expect(partyInvite).toBeEnabled();
+    expect(partyInvite).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(partyInvite);
+    await waitFor(() =>
+      expect(screen.getByRole('switch', { name: '파티 초대 알림' })).toHaveAttribute(
+        'aria-checked',
+        'false',
+      ),
+    );
 
     fireEvent.click(screen.getByRole('switch', { name: '마케팅 알림' }));
     await waitFor(() =>
@@ -673,6 +767,14 @@ describe('7.8 → 7.8-B · 7.8-C', () => {
     expect(await screen.findByRole('switch', { name: '마케팅 알림' })).toHaveAttribute(
       'aria-checked',
       'true',
+    );
+    expect(screen.getByRole('switch', { name: '파티 초대 알림' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    expect(screen.getByRole('switch', { name: '리포트 발급 알림' })).toHaveAttribute(
+      'aria-checked',
+      'false',
     );
   });
 });

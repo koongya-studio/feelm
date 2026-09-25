@@ -514,6 +514,50 @@ describe('2.4 공개 한줄평과 출연진', () => {
     expect(releasePointerCapture).toHaveBeenCalledWith(7);
   });
 
+  it('사진을 눌러도 이름과 같은 검색으로 가고, 링크 위에서 끈 것은 이동하지 않는다', async () => {
+    vi.mocked(getMovieDetail).mockResolvedValue(
+      movie({
+        directors: [],
+        cast: [
+          {
+            personId: 2,
+            name: '틸다 스윈튼',
+            profileUrl: 'https://image.tmdb.org/t/p/w185/actor.jpg',
+          },
+        ],
+      }),
+    );
+
+    const { container } = renderMovie();
+
+    const actor = await screen.findByRole('link', { name: '틸다 스윈튼' });
+    const photo = container.querySelector('img[src$="actor.jpg"]');
+    if (!photo) throw new Error('프로필 사진이 없습니다.');
+    expect(actor).toContainElement(photo as HTMLElement);
+
+    const list = actor.closest('ul');
+    if (!list) throw new Error('출연·제작 목록이 없습니다.');
+    Object.assign(list, {
+      scrollLeft: 0,
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: vi.fn(() => true),
+      releasePointerCapture: vi.fn(),
+    });
+    const before = location();
+
+    fireEvent.pointerDown(photo, { pointerId: 3, pointerType: 'mouse', button: 0, clientX: 200 });
+    fireEvent.pointerMove(photo, { pointerId: 3, pointerType: 'mouse', clientX: 120 });
+    fireEvent.pointerUp(photo, { pointerId: 3, pointerType: 'mouse' });
+    fireEvent.click(photo);
+    expect(list.scrollLeft).toBe(80);
+    expect(location()).toBe(before);
+
+    fireEvent.pointerDown(photo, { pointerId: 4, pointerType: 'mouse', button: 0, clientX: 200 });
+    fireEvent.pointerUp(photo, { pointerId: 4, pointerType: 'mouse' });
+    fireEvent.click(photo);
+    expect(location()).toBe('/search?q=%ED%8B%B8%EB%8B%A4%20%EC%8A%A4%EC%9C%88%ED%8A%BC');
+  });
+
   it('목록의 스포일러는 작성자가 본인이어도 사용자가 열기 전까지 가린다', async () => {
     vi.mocked(getMovieReviews).mockResolvedValue({
       items: [
@@ -783,11 +827,56 @@ describe('MovieDetailPage 관심없음', () => {
     vi.mocked(dismissMovie).mockReset();
   });
 
-  it('누르면 API-047을 부르고 처리된 상태로 바뀐다', async () => {
+  it('평가 전 영화에서는 아이콘 아래 글자로 뜻을 보여 준다 (업무 -873)', async () => {
+    renderMovie();
+
+    const button = await screen.findByRole('button', { name: '관심없음' });
+    expect(button).toHaveTextContent('관심없음');
+  });
+
+  it.each([
+    [
+      '별점을 남긴 영화',
+      {
+        myRating: {
+          ratingId: 90,
+          score: 3,
+          comment: null,
+          visibility: 'PRIVATE' as const,
+          spoiler: false,
+        },
+        myWatchStatus: 'RATED' as const,
+      },
+    ],
+    ['초기 설정에서 평가한 영화', { myWatchStatus: 'RATED' as const }],
+    ['감상만 확정한 영화', { myWatchStatus: 'WATCHED_UNRATED' as const }],
+  ])('%s에는 관심없음을 두지 않는다 (업무 -873)', async (_, overrides) => {
+    vi.mocked(getMovieDetail).mockResolvedValue(movie(overrides));
+
+    renderMovie();
+
+    await screen.findByRole('heading', { level: 1, name: '괴물' });
+    expect(screen.queryByRole('button', { name: /관심없음/ })).toBeNull();
+  });
+
+  it('OTT 링크만 누른 영화에는 관심없음을 남긴다', async () => {
+    vi.mocked(getMovieDetail).mockResolvedValue(movie({ myWatchStatus: 'LINK_CLICKED' }));
+
+    renderMovie();
+
+    expect(await screen.findByRole('button', { name: '관심없음' })).toBeInTheDocument();
+  });
+
+  it('확인 팝오버에서 예를 누른 뒤 API-047을 부르고 처리된 상태로 바뀐다', async () => {
     vi.mocked(dismissMovie).mockResolvedValue();
 
     renderMovie();
     fireEvent.click(await screen.findByRole('button', { name: '관심없음' }));
+    expect(dismissMovie).not.toHaveBeenCalled();
+    expect(screen.getByRole('group', { name: /관심없음 확인/ })).toHaveTextContent(
+      '추천에서 제외할까요?',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '예' }));
 
     expect(await screen.findByText(/관심없음으로 처리했어요/)).toBeInTheDocument();
     expect(dismissMovie).toHaveBeenCalledWith(101, undefined);
@@ -808,6 +897,7 @@ describe('MovieDetailPage 관심없음', () => {
       },
     );
     fireEvent.click(await screen.findByRole('button', { name: '관심없음' }));
+    fireEvent.click(screen.getByRole('button', { name: '예' }));
 
     await waitFor(() => expect(dismissMovie).toHaveBeenCalledWith(101, 281));
   });
@@ -819,6 +909,7 @@ describe('MovieDetailPage 관심없음', () => {
 
     renderMovie();
     fireEvent.click(await screen.findByRole('button', { name: '관심없음' }));
+    fireEvent.click(screen.getByRole('button', { name: '예' }));
 
     expect(await screen.findByText(/관심없음으로 처리했어요/)).toBeInTheDocument();
     expect(screen.queryByRole('alert')).toBeNull();
@@ -831,14 +922,34 @@ describe('MovieDetailPage 관심없음', () => {
 
     renderMovie();
     fireEvent.click(await screen.findByRole('button', { name: '관심없음' }));
+    fireEvent.click(screen.getByRole('button', { name: '예' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('관심없음으로 처리하지 못했어요');
     const button = screen.getByRole('button', { name: '관심없음' });
     expect(button).toBeEnabled();
 
     fireEvent.click(button);
+    fireEvent.click(screen.getByRole('button', { name: '예' }));
     expect(await screen.findByText(/관심없음으로 처리했어요/)).toBeInTheDocument();
     expect(dismissMovie).toHaveBeenCalledTimes(2);
+  });
+
+  it('아니요, Esc, 바깥 영역 탭으로 닫으면 API-047을 부르지 않는다', async () => {
+    renderMovie();
+    const button = await screen.findByRole('button', { name: '관심없음' });
+
+    fireEvent.click(button);
+    fireEvent.click(screen.getByRole('button', { name: '아니요' }));
+    expect(screen.queryByRole('group', { name: /관심없음 확인/ })).toBeNull();
+
+    fireEvent.click(button);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('group', { name: /관심없음 확인/ })).toBeNull();
+
+    fireEvent.click(button);
+    fireEvent.click(screen.getByTestId('menu-backdrop'));
+    expect(screen.queryByRole('group', { name: /관심없음 확인/ })).toBeNull();
+    expect(dismissMovie).not.toHaveBeenCalled();
   });
 });
 

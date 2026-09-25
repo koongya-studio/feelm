@@ -23,7 +23,12 @@
  * 카드 열은 `FilmReel`의 세로 필름이다(업무 -605). 칸 폭이 화면 폭을 따라 릴이 화면 양 끝에
  * 닿는다(업무 -672). 가로 flex에서 줄어들지 않게 `flex: none`으로 둔다. 위아래 여백만 여기서 준다 — 필름 끝이 헤더와 힌트에 붙지 않게.
  */
-.scrollArea > [data-testid='film-reel'] {
+.recommendationFlow {
+  width: 100%;
+  flex: none;
+}
+
+.recommendationFlow > [data-testid='film-reel'] {
   flex: none;
   margin: var(--space-2) 0 var(--space-3);
 }
@@ -36,59 +41,108 @@
   text-align: center;
 }
 
-.menuOttList {
-  display: flex;
-  margin-bottom: 6px;
-  gap: 7px;
+.dismissMenu {
+  display: contents;
 }
 
-.menuOttNames {
-  margin-bottom: 10px;
-  color: var(--color-ink-hint);
-  font-size: 10.5px;
+.dismissMenu > :global([role='group']) {
+  width: 196px;
+  padding: 14px;
+  border-color: var(--color-line);
+  border-radius: 14px;
+  background: var(--color-surface-solid);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.2);
+  backdrop-filter: none;
 }
 
-.menuDivider {
-  height: 1px;
-  margin: 0 0 10px;
+.dismissMenu > :global([role='group'])::before {
+  position: absolute;
+  top: -6px;
+  right: 12px;
+  width: 10px;
+  height: 10px;
+  border-top: 1px solid var(--color-line);
+  border-left: 1px solid var(--color-line);
+  background: var(--color-surface-solid);
+  content: '';
+  transform: rotate(45deg);
+}
+
+.dismissMenu[data-placement='above'] > :global([role='group'])::before {
+  top: auto;
+  bottom: -6px;
   border: 0;
-  background: var(--color-line);
+  border-right: 1px solid var(--color-line);
+  border-bottom: 1px solid var(--color-line);
 }
 
-.menuItems {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-
-/*
- * 와이어프레임 2.3의 항목 간격은 7px이고 항목 높이는 아이콘 크기(13px)에 맞춰져 있다.
- * 터치 영역을 44px로 넓히면 메뉴 배치 자체가 바뀌므로 여기서는 넓히지 않는다
- * (common-components.md 6.3 — 배치를 바꾸지 않는 범위에서 적용).
- * 남은 문제로 보고했다.
- */
-.menuItem {
+.dismissHead {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 0;
-  border: 0;
-  background: none;
+  gap: 8px;
+}
+
+.dismissHead > div {
+  min-width: 0;
+}
+
+.dismissHead strong {
   color: var(--color-ink);
-  text-align: left;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.dismissIcon {
+  display: flex;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
+  color: var(--color-ink-muted);
+}
+
+.dismissIcon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.dismissMovieTitle {
+  overflow: hidden;
+  margin-top: 3px;
+  color: var(--color-ink-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dismissActions {
+  display: flex;
+  margin-top: 14px;
+  gap: 8px;
+}
+
+.dismissActions button {
+  min-width: 0;
+  min-height: 44px;
+  flex: 1;
+  padding: 0 8px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-solid);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
   cursor: pointer;
 }
 
-.menuItem:disabled {
-  cursor: default;
-  opacity: 0.45;
-}
-
-.menuItemLabel {
-  color: var(--color-ink);
-  font-size: 11px;
-  text-decoration: underline;
-  text-underline-offset: 2px;
+.dismissActions button:last-child {
+  border-color: var(--color-action);
+  background: var(--color-action);
+  color: var(--color-on-action);
 }
 
 /* 2.2-A · 빈 데이터 안내의 보조 동작. 이동이라 Button이 아니라 링크다 */

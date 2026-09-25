@@ -261,6 +261,7 @@ describe('2.6 필름 릴', () => {
     // 새 프레임은 한 번만, 맨 앞에 선다
     expect(reelPosters()).toEqual(['/p/new.jpg', '/p/60.jpg', '/p/41.jpg']);
     const reel = within(screen.getByTestId('film-reel'));
+    expect(reel.getByRole('group').firstElementChild).toContainElement(reel.getByAltText('영화'));
     expect(reel.getByAltText('영화 60')).toBeInTheDocument();
   });
 
@@ -346,5 +347,77 @@ describe('2.6 · 2.7 새 프레임은 무엇이 추가됐는지 보인다', () =
     });
 
     expect(within(screen.getByTestId('film-reel')).getByText('괴물')).toBeInTheDocument();
+  });
+});
+
+/*
+ * 2.7 다음 동선 (업무 -918). 뒤로 가기는 진입 경로에 따라 방금 평가한 영화나 그 앞 화면으로
+ * 돌아가므로, 이어서 평가할 곳은 버튼이 정한다. 추천에서 왔든 검색에서 왔든 같은 곳이어야 한다.
+ */
+describe('2.7 다음 동선', () => {
+  function renderFrom(before: string[]) {
+    render(
+      <MemoryRouter
+        initialEntries={[
+          ...before,
+          {
+            pathname: '/movies/550/rate/result',
+            state: { rating, counts, after: counts, movieTitle: '영화', posterUrl: null },
+          },
+        ]}
+        initialIndex={before.length}
+      >
+        <Routes>
+          <Route path={ROUTE_PATTERN.ratingResult} element={<RatingResultPage />} />
+          <Route path={ROUTE_PATTERN.search} element={<p>4.1 검색</p>} />
+          <Route path={ROUTE_PATTERN.recommendations} element={<p>2.2 추천</p>} />
+          <Route path={ROUTE_PATTERN.film} element={<p>3.1 필름</p>} />
+          <Route path="*" element={<p>다른 화면</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  }
+
+  it('추천 · 다른 영화 평가 · 필름 순서로 세 동선을 둔다', async () => {
+    renderFrom([]);
+    await finish();
+
+    const actions = screen.getByRole('status').querySelectorAll('button');
+
+    expect([...actions].map((button) => button.textContent)).toEqual([
+      '다음 추천 보러 가기',
+      '다른 영화 평가하기',
+      '취향 필름 확인',
+    ]);
+  });
+
+  it.each([
+    ['추천에서 들어온 평가', ['/recommendations', '/movies/550', '/movies/550/rate']],
+    [
+      '검색에서 들어온 평가',
+      ['/search?q=%ED%8C%8C%EC%9D%B4%ED%8A%B8', '/movies/550', '/movies/550/rate'],
+    ],
+    ['기록 없이 열린 결과', []],
+  ])('%s도 다른 영화 평가하기는 빈 4.1 검색으로 간다', async (_, before) => {
+    renderFrom(before);
+    await finish();
+
+    fireEvent.click(screen.getByRole('button', { name: '다른 영화 평가하기' }));
+
+    expect(screen.getByText('4.1 검색')).toBeInTheDocument();
+  });
+
+  it('기존 두 동선은 그대로 추천과 필름으로 간다', async () => {
+    renderFrom([]);
+    await finish();
+    fireEvent.click(screen.getByRole('button', { name: '다음 추천 보러 가기' }));
+    expect(screen.getByText('2.2 추천')).toBeInTheDocument();
+  });
+
+  it('취향 필름 확인은 3.1로 간다', async () => {
+    renderFrom([]);
+    await finish();
+    fireEvent.click(screen.getByRole('button', { name: '취향 필름 확인' }));
+    expect(screen.getByText('3.1 필름')).toBeInTheDocument();
   });
 });

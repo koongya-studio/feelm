@@ -98,8 +98,63 @@
   height: 100%;
 }
 
-/* 카드 오른쪽 위 `⋯`. 아이콘이 아니라 글자라 크기를 직접 맞춘다 */
-.ellipsis {
-  font-size: 15px;
+/*
+ * 관심없음(업무 -873). 아이콘 옆에 글자를 둔 면 없는 단추다. 흰 카드 위라 면을 겹치지 않고
+ * 흐린 글자색으로 보조 동작임을 말하며, 올리면 진해진다. 터치 영역은 44px 높이다.
+ *
+ * 대표 카드는 카드 크기에 맞춰 한 단계 크게 둔다(업무 -890).
+ */
+.dismissButton {
+  display: inline-flex;
+  min-height: var(--tap-target-min);
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: var(--radius-icon);
+  background: none;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
   line-height: 1;
+  white-space: nowrap;
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+
+.dismissButton svg {
+  width: 13px;
+  height: 13px;
+}
+
+.dismissButton[data-size='lead'] {
+  gap: 5px;
+  font-size: var(--font-size-meta);
+}
+
+.dismissButton[data-size='lead'] svg {
+  width: 16px;
+  height: 16px;
+}
+
+@media (hover: hover) {
+  .dismissButton:hover:not(:disabled) {
+    color: var(--color-ink);
+  }
+}
+
+.dismissButton:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.dismissButton:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dismissButton:active:not(:disabled) {
+    transform: none;
+  }
 }

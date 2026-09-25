@@ -1,0 +1,7441 @@
+{
+  "components" : {
+    "schemas" : {
+      "AccountWithdrawalRequest" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "password" : {
+            "type" : "string"
+          },
+          "provider" : {
+            "type" : "string"
+          },
+          "redirectUri" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Analysis" : {
+        "properties" : {
+          "countries" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Country"
+            },
+            "type" : "array"
+          },
+          "directors" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Director"
+            },
+            "type" : "array"
+          },
+          "eras" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Era"
+            },
+            "type" : "array"
+          },
+          "genres" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Genre"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "AvatarResponse" : {
+        "properties" : {
+          "avatarUrl" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "AvatarUserSummary" : {
+        "properties" : {
+          "avatarUrl" : {
+            "type" : "string"
+          },
+          "nickname" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "AxisJudgement" : {
+        "properties" : {
+          "axis" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "value" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "BlockedUserResponse" : {
+        "properties" : {
+          "blockedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "nickname" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "CastResponse" : {
+        "description" : "TMDb display_order 기준 상위 10명의 배우 크레딧",
+        "properties" : {
+          "character" : {
+            "description" : "배역명. 없으면 null",
+            "example" : "Tyler Durden",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "name" : {
+            "description" : "배우 이름",
+            "example" : "브래드 피트",
+            "type" : "string"
+          },
+          "personId" : {
+            "description" : "서비스 인물 ID",
+            "example" : 287,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "profileUrl" : {
+            "description" : "작은 인물 프로필 이미지 URL. 없으면 null",
+            "type" : [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required" : [
+          "character",
+          "name",
+          "personId",
+          "profileUrl"
+        ],
+        "type" : "object"
+      },
+      "CharacterBasis" : {
+        "properties" : {
+          "frameCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "lowSample" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "CharacterCardContent" : {
+        "properties" : {
+          "axes" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AxisJudgement"
+            },
+            "type" : "array"
+          },
+          "basis" : {
+            "$ref" : "#/components/schemas/CharacterBasis"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "tagline" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CharacterCutCard" : {
+        "properties" : {
+          "displayName" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Comparison" : {
+        "properties" : {
+          "delta" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "isNew" : {
+            "type" : "boolean"
+          },
+          "label" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Country" : {
+        "properties" : {
+          "averageScore" : {
+            "type" : "number"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "count" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "share" : {
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "CountryResponse" : {
+        "description" : "제작 국가. 수집 원문의 역사적 국가·지역 코드를 유지합니다.",
+        "properties" : {
+          "code" : {
+            "description" : "국가 코드",
+            "example" : "KR",
+            "type" : "string"
+          },
+          "name" : {
+            "description" : "한국어 국가 표시명",
+            "example" : "한국",
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "code",
+          "name"
+        ],
+        "type" : "object"
+      },
+      "Current" : {
+        "properties" : {
+          "issuedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "period" : {
+            "$ref" : "#/components/schemas/ReportPeriod"
+          },
+          "reportId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "status" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CursorPageResponseBlockedUserResponse" : {
+        "properties" : {
+          "hasNext" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/BlockedUserResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CursorPageResponsePartyListItemResponse" : {
+        "properties" : {
+          "hasNext" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PartyListItemResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CursorPageResponsePartyRecommendationHistorySetResponse" : {
+        "properties" : {
+          "hasNext" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PartyRecommendationHistorySetResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CursorPageResponseReceivedPartyInvitationResponse" : {
+        "properties" : {
+          "hasNext" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ReceivedPartyInvitationResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CursorPageResponseRecommendationHistorySetResponse" : {
+        "properties" : {
+          "hasNext" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RecommendationHistorySetResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "CursorPageResponseSearchedUserResponse" : {
+        "properties" : {
+          "hasNext" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SearchedUserResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Director" : {
+        "properties" : {
+          "averageScore" : {
+            "type" : "number"
+          },
+          "count" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "personId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "DirectorCard" : {
+        "properties" : {
+          "displayName" : {
+            "type" : "string"
+          },
+          "image" : {
+            "$ref" : "#/components/schemas/ImageRef"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "work" : {
+            "$ref" : "#/components/schemas/ImageRef"
+          }
+        },
+        "type" : "object"
+      },
+      "DirectorResponse" : {
+        "description" : "감독 크레딧. 인원 제한 없이 반환합니다.",
+        "properties" : {
+          "name" : {
+            "description" : "감독 이름",
+            "example" : "데이비드 핀처",
+            "type" : "string"
+          },
+          "personId" : {
+            "description" : "서비스 인물 ID",
+            "example" : 7467,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "profileUrl" : {
+            "description" : "작은 인물 프로필 이미지 URL. 없으면 null",
+            "type" : [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required" : [
+          "name",
+          "personId",
+          "profileUrl"
+        ],
+        "type" : "object"
+      },
+      "EmailVerificationCodeRequest" : {
+        "properties" : {
+          "email" : {
+            "format" : "email",
+            "maxLength" : 255,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "email"
+        ],
+        "type" : "object"
+      },
+      "EmailVerificationCodeVerifyRequest" : {
+        "properties" : {
+          "code" : {
+            "minLength" : 1,
+            "pattern" : "^[0-9]{6}$",
+            "type" : "string"
+          },
+          "email" : {
+            "format" : "email",
+            "maxLength" : 255,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "code",
+          "email"
+        ],
+        "type" : "object"
+      },
+      "EmailVerificationTokenResponse" : {
+        "properties" : {
+          "emailVerificationToken" : {
+            "type" : "string"
+          },
+          "expiresIn" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "Era" : {
+        "properties" : {
+          "averageScore" : {
+            "type" : "number"
+          },
+          "count" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "label" : {
+            "type" : "string"
+          },
+          "share" : {
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "ErrorResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "details" : { },
+          "message" : {
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "code",
+          "message"
+        ],
+        "type" : "object"
+      },
+      "FeedbackRequest" : {
+        "properties" : {
+          "category" : {
+            "enum" : [
+              "GENERAL",
+              "RECOMMENDATION"
+            ],
+            "type" : "string"
+          },
+          "comment" : {
+            "maxLength" : 1000,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "movieId" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "recommendationType" : {
+            "pattern" : "[A-Z0-9_]{1,30}",
+            "type" : "string"
+          },
+          "satisfaction" : {
+            "enum" : [
+              "GOOD",
+              "MIXED",
+              "BAD"
+            ],
+            "type" : "string"
+          },
+          "screenPath" : {
+            "maxLength" : 300,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "category",
+          "screenPath"
+        ],
+        "type" : "object"
+      },
+      "FeedbackResponse" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "FlavorBucket" : {
+        "properties" : {
+          "averageScore" : {
+            "type" : "number"
+          },
+          "flavorCode" : {
+            "type" : "string"
+          },
+          "popcornCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "FlavorChange" : {
+        "properties" : {
+          "after" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "before" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "flavorCode" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "FourCut" : {
+        "properties" : {
+          "actor" : {
+            "$ref" : "#/components/schemas/PersonCard"
+          },
+          "character" : {
+            "$ref" : "#/components/schemas/CharacterCutCard"
+          },
+          "director" : {
+            "$ref" : "#/components/schemas/DirectorCard"
+          },
+          "genre" : {
+            "$ref" : "#/components/schemas/GenreCard"
+          }
+        },
+        "type" : "object"
+      },
+      "Frame" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "frameId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "FrameDetailResponse" : {
+        "properties" : {
+          "flavorCode" : {
+            "type" : "string"
+          },
+          "frameId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "movie" : {
+            "$ref" : "#/components/schemas/Movie"
+          },
+          "rating" : {
+            "$ref" : "#/components/schemas/Rating"
+          },
+          "watchRecord" : {
+            "$ref" : "#/components/schemas/WatchRecord"
+          }
+        },
+        "type" : "object"
+      },
+      "FrameListResponse" : {
+        "properties" : {
+          "hasNext" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Item"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          },
+          "totalCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "Genre" : {
+        "properties" : {
+          "averageScore" : {
+            "type" : "number"
+          },
+          "code" : {
+            "type" : "string"
+          },
+          "count" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "share" : {
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "GenreCard" : {
+        "properties" : {
+          "displayName" : {
+            "type" : "string"
+          },
+          "image" : {
+            "$ref" : "#/components/schemas/ImageRef"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "GenreRank" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "count" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "GenreResponse" : {
+        "description" : "영화에 연결된 장르",
+        "properties" : {
+          "code" : {
+            "description" : "장르 코드",
+            "example" : "DRAMA",
+            "type" : "string"
+          },
+          "name" : {
+            "description" : "장르 표시명",
+            "example" : "드라마",
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "code",
+          "name"
+        ],
+        "type" : "object"
+      },
+      "ImagePosition" : {
+        "properties" : {
+          "x" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "y" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ImageRef" : {
+        "properties" : {
+          "cutoutUrl" : {
+            "type" : "string"
+          },
+          "position" : {
+            "$ref" : "#/components/schemas/ImagePosition"
+          },
+          "url" : {
+            "type" : "string"
+          },
+          "zoom" : {
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "InviteeSummary" : {
+        "properties" : {
+          "nickname" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "Item" : {
+        "properties" : {
+          "movieId" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "preference" : {
+            "enum" : [
+              "LIKE",
+              "DISLIKE"
+            ],
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "movieId",
+          "preference"
+        ],
+        "type" : "object"
+      },
+      "JsonNode" : {
+        "properties" : {
+          "array" : {
+            "type" : "boolean"
+          },
+          "bigDecimal" : {
+            "type" : "boolean"
+          },
+          "bigInteger" : {
+            "type" : "boolean"
+          },
+          "binary" : {
+            "type" : "boolean"
+          },
+          "boolean" : {
+            "type" : "boolean"
+          },
+          "container" : {
+            "type" : "boolean"
+          },
+          "double" : {
+            "type" : "boolean"
+          },
+          "embeddedValue" : {
+            "type" : "boolean"
+          },
+          "empty" : {
+            "type" : "boolean"
+          },
+          "float" : {
+            "type" : "boolean"
+          },
+          "floatingPointNumber" : {
+            "type" : "boolean"
+          },
+          "int" : {
+            "type" : "boolean"
+          },
+          "integralNumber" : {
+            "type" : "boolean"
+          },
+          "long" : {
+            "type" : "boolean"
+          },
+          "missingNode" : {
+            "type" : "boolean"
+          },
+          "nodeType" : {
+            "enum" : [
+              "ARRAY",
+              "BINARY",
+              "BOOLEAN",
+              "MISSING",
+              "NULL",
+              "NUMBER",
+              "OBJECT",
+              "POJO",
+              "STRING"
+            ],
+            "type" : "string"
+          },
+          "null" : {
+            "type" : "boolean"
+          },
+          "number" : {
+            "type" : "boolean"
+          },
+          "object" : {
+            "type" : "boolean"
+          },
+          "pojo" : {
+            "type" : "boolean"
+          },
+          "short" : {
+            "type" : "boolean"
+          },
+          "string" : {
+            "type" : "boolean"
+          },
+          "textual" : {
+            "deprecated" : true,
+            "type" : "boolean"
+          },
+          "valueNode" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "Keys" : {
+        "properties" : {
+          "auth" : {
+            "maxLength" : 128,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "p256dh" : {
+            "maxLength" : 256,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "auth",
+          "p256dh"
+        ],
+        "type" : "object"
+      },
+      "Keyword" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "LoginRequest" : {
+        "properties" : {
+          "email" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "password" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "email",
+          "password"
+        ],
+        "type" : "object"
+      },
+      "LoginResponse" : {
+        "properties" : {
+          "accessToken" : {
+            "type" : "string"
+          },
+          "expiresIn" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "user" : {
+            "$ref" : "#/components/schemas/UserSummary"
+          }
+        },
+        "type" : "object"
+      },
+      "Member" : {
+        "properties" : {
+          "avatarUrl" : {
+            "type" : "string"
+          },
+          "joinedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "nickname" : {
+            "type" : "string"
+          },
+          "role" : {
+            "enum" : [
+              "OWNER",
+              "MEMBER"
+            ],
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "MemberPopcorn" : {
+        "properties" : {
+          "flavors" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FlavorBucket"
+            },
+            "type" : "array"
+          },
+          "totalCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "user" : {
+            "$ref" : "#/components/schemas/UserSummary"
+          }
+        },
+        "type" : "object"
+      },
+      "Movie" : {
+        "description" : "평가 피드의 영화 요약",
+        "properties" : {
+          "movieId" : {
+            "description" : "서비스 영화 ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "posterUrl" : {
+            "description" : "포스터 URL. 없으면 null",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "title" : {
+            "description" : "영화 제목",
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "movieId",
+          "posterUrl",
+          "title"
+        ],
+        "type" : "object"
+      },
+      "MovieDetailResponse" : {
+        "description" : "영화 상세. 값이 없는 선택 필드는 null, 연결 데이터가 없는 컬렉션은 빈 배열로 반환합니다.",
+        "properties" : {
+          "averageRating" : {
+            "description" : "전체 사용자 평균 평점. 차단 필터 미적용, 평가 없으면 0",
+            "example" : 4.3,
+            "type" : "number"
+          },
+          "backdropUrl" : {
+            "description" : "배경 이미지 URL. 없으면 null",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "cast" : {
+            "description" : "배우 최대 10명. display_order 오름차순(null은 마지막), 동률은 personId 순",
+            "items" : {
+              "$ref" : "#/components/schemas/CastResponse"
+            },
+            "type" : "array"
+          },
+          "countries" : {
+            "description" : "제작 국가 코드와 한국어 표시명. 없으면 빈 배열",
+            "items" : {
+              "$ref" : "#/components/schemas/CountryResponse"
+            },
+            "type" : "array"
+          },
+          "directors" : {
+            "description" : "감독 전체. display_order 오름차순(null은 마지막), 동률은 personId 순",
+            "items" : {
+              "$ref" : "#/components/schemas/DirectorResponse"
+            },
+            "type" : "array"
+          },
+          "flavorCode" : {
+            "description" : "대표 팝콘 맛 코드. 미배정이면 null",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "genres" : {
+            "description" : "영화에 연결된 장르. 없으면 빈 배열",
+            "items" : {
+              "$ref" : "#/components/schemas/GenreResponse"
+            },
+            "type" : "array"
+          },
+          "movieId" : {
+            "description" : "서비스 영화 ID",
+            "example" : 550,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "myRating" : {
+            "anyOf" : [
+              {
+                "$ref" : "#/components/schemas/MyRatingResponse"
+              },
+              {
+                "type" : "null"
+              }
+            ],
+            "description" : "본인 평가. 비회원 또는 평가 없으면 null"
+          },
+          "myWatchStatus" : {
+            "description" : "현재 감상 상태(LINK_CLICKED, WATCHED_UNRATED, RATED). 비회원·기록 없음·EXPIRED만 있으면 null",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "originalTitle" : {
+            "description" : "원제. 없으면 null",
+            "example" : "Fight Club",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "ottProviders" : {
+            "description" : "영화에 연결된 OTT. 구독 우선, 그룹 내 ottId 오름차순. 없으면 빈 배열",
+            "items" : {
+              "$ref" : "#/components/schemas/MovieOttProviderResponse"
+            },
+            "type" : "array"
+          },
+          "posterUrl" : {
+            "description" : "포스터 URL. 없으면 null",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "ratingCount" : {
+            "description" : "전체 사용자 평가 수. 차단 필터 미적용",
+            "example" : 1280,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "recommendation" : {
+            "anyOf" : [
+              {
+                "$ref" : "#/components/schemas/MovieRecommendationResponse"
+              },
+              {
+                "type" : "null"
+              }
+            ],
+            "description" : "영화 일치 및 열람 권한이 확인된 추천 이유. 비회원·ID 미제공·권한 없음이면 null"
+          },
+          "releaseDate" : {
+            "description" : "개봉일. 없으면 null",
+            "example" : "1999-10-15",
+            "format" : "date",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "runtimeMinutes" : {
+            "description" : "상영 시간(분). 없으면 null",
+            "example" : 139,
+            "format" : "int32",
+            "type" : [
+              "integer",
+              "null"
+            ]
+          },
+          "synopsis" : {
+            "description" : "줄거리. 없으면 null",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "title" : {
+            "description" : "영화 제목",
+            "example" : "파이트 클럽",
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "averageRating",
+          "backdropUrl",
+          "cast",
+          "countries",
+          "directors",
+          "flavorCode",
+          "genres",
+          "movieId",
+          "myRating",
+          "myWatchStatus",
+          "originalTitle",
+          "ottProviders",
+          "posterUrl",
+          "ratingCount",
+          "recommendation",
+          "releaseDate",
+          "runtimeMinutes",
+          "synopsis",
+          "title"
+        ],
+        "type" : "object"
+      },
+      "MovieFilterOptionsResponse" : {
+        "description" : "영화 검색 필터 옵션",
+        "properties" : {
+          "countries" : {
+            "description" : "영화에 저장된 제작 국가 목록",
+            "items" : {
+              "$ref" : "#/components/schemas/Option"
+            },
+            "type" : "array"
+          },
+          "genres" : {
+            "description" : "영화와 연결된 장르 목록",
+            "items" : {
+              "$ref" : "#/components/schemas/Option"
+            },
+            "type" : "array"
+          },
+          "otts" : {
+            "description" : "영화와 연결된 지원 OTT 목록",
+            "items" : {
+              "$ref" : "#/components/schemas/OttOption"
+            },
+            "type" : "array"
+          },
+          "yearRange" : {
+            "$ref" : "#/components/schemas/YearRange",
+            "description" : "개봉연도 최소·최대 범위"
+          }
+        },
+        "required" : [
+          "countries",
+          "genres",
+          "otts",
+          "yearRange"
+        ],
+        "type" : "object"
+      },
+      "MovieOttProviderResponse" : {
+        "description" : "영화의 OTT 제공처와 현재 사용자의 구독 여부",
+        "properties" : {
+          "code" : {
+            "description" : "OTT 코드",
+            "example" : "NETFLIX",
+            "type" : "string"
+          },
+          "name" : {
+            "description" : "OTT 표시명",
+            "example" : "넷플릭스",
+            "type" : "string"
+          },
+          "ottId" : {
+            "description" : "서비스 OTT ID",
+            "example" : 1,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "subscribed" : {
+            "description" : "로그인 사용자의 구독 여부. 비회원은 false",
+            "example" : true,
+            "type" : "boolean"
+          },
+          "watchUrl" : {
+            "description" : "시청 바로가기 URL. 없으면 null",
+            "type" : [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required" : [
+          "code",
+          "name",
+          "ottId",
+          "subscribed",
+          "watchUrl"
+        ],
+        "type" : "object"
+      },
+      "MovieRecommendationResponse" : {
+        "description" : "본인 개인 추천 또는 현재 party_members에 속한 파티 추천의 저장된 이유",
+        "properties" : {
+          "reason" : {
+            "additionalProperties" : { },
+            "description" : "저장된 추천 이유 JSON 스냅샷. 재계산 없이 반환",
+            "example" : {
+              "factors" : [
+                {
+                  "label" : "스릴러",
+                  "type" : "GENRE"
+                }
+              ],
+              "summary" : "스릴러 장르를 높게 평가하셨어요"
+            },
+            "type" : "object"
+          },
+          "recommendationItemId" : {
+            "description" : "추천 항목 ID",
+            "example" : 3301,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "type" : {
+            "description" : "추천 유형",
+            "enum" : [
+              "TASTE",
+              "DISCOVERY",
+              "PARTY"
+            ],
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "reason",
+          "recommendationItemId",
+          "type"
+        ],
+        "type" : "object"
+      },
+      "MovieSearchItemResponse" : {
+        "properties" : {
+          "averageRating" : {
+            "type" : "number"
+          },
+          "genres" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "movieId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "originalTitle" : {
+            "type" : "string"
+          },
+          "ottProviders" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "posterUrl" : {
+            "type" : "string"
+          },
+          "releaseYear" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "watched" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "MovieSearchPageResponse" : {
+        "description" : "영화 검색 결과",
+        "properties" : {
+          "hasNext" : {
+            "description" : "다음 페이지 존재 여부",
+            "type" : "boolean"
+          },
+          "items" : {
+            "description" : "현재 페이지의 영화 목록",
+            "items" : {
+              "$ref" : "#/components/schemas/MovieSearchItemResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "description" : "다음 페이지 조회용 불투명 커서",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "totalCount" : {
+            "description" : "현재 검색조건에 일치하는 전체 영화 수",
+            "example" : 24,
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [
+          "hasNext",
+          "items",
+          "totalCount"
+        ],
+        "type" : "object"
+      },
+      "MovieSummary" : {
+        "description" : "감상 기록의 영화 요약",
+        "properties" : {
+          "movieId" : {
+            "description" : "서비스 영화 ID",
+            "example" : 550,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "posterUrl" : {
+            "description" : "포스터 URL",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "title" : {
+            "description" : "영화 제목",
+            "example" : "파이트 클럽",
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "movieId",
+          "posterUrl",
+          "title"
+        ],
+        "type" : "object"
+      },
+      "MyRatingItemResponse" : {
+        "description" : "본인 평가 또는 감상 후 미평가 영화",
+        "properties" : {
+          "activityAt" : {
+            "description" : "목록 정렬 시각(UTC). 이력이 없으면 null",
+            "format" : "date-time",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "comment" : {
+            "description" : "본인 한줄평 원문. 없으면 null",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt" : {
+            "description" : "평가 생성 시각(UTC). 미평가이면 null",
+            "format" : "date-time",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "frameId" : {
+            "description" : "프레임 ID. 없으면 null",
+            "format" : "int64",
+            "type" : [
+              "integer",
+              "null"
+            ]
+          },
+          "itemType" : {
+            "description" : "평가 여부",
+            "enum" : [
+              "RATED",
+              "UNRATED"
+            ],
+            "type" : "string"
+          },
+          "movie" : {
+            "$ref" : "#/components/schemas/Movie",
+            "description" : "영화 요약"
+          },
+          "ratingId" : {
+            "description" : "평가 ID. 미평가이면 null",
+            "format" : "int64",
+            "type" : [
+              "integer",
+              "null"
+            ]
+          },
+          "score" : {
+            "description" : "본인 별점. 미평가이면 null",
+            "type" : [
+              "number",
+              "null"
+            ]
+          },
+          "spoiler" : {
+            "description" : "스포일러 여부. 미평가이면 null",
+            "type" : [
+              "boolean",
+              "null"
+            ]
+          },
+          "visibility" : {
+            "description" : "한줄평 공개 범위. 없으면 null",
+            "enum" : [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type" : [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required" : [
+          "activityAt",
+          "comment",
+          "createdAt",
+          "frameId",
+          "itemType",
+          "movie",
+          "ratingId",
+          "score",
+          "spoiler",
+          "visibility"
+        ],
+        "type" : "object"
+      },
+      "MyRatingPageResponse" : {
+        "description" : "본인 평가·미평가 통합 cursor 페이지",
+        "properties" : {
+          "hasNext" : {
+            "description" : "다음 페이지 존재 여부",
+            "type" : "boolean"
+          },
+          "items" : {
+            "description" : "현재 페이지",
+            "items" : {
+              "$ref" : "#/components/schemas/MyRatingItemResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "description" : "다음 페이지 cursor. 마지막 페이지면 null",
+            "type" : [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required" : [
+          "hasNext",
+          "items",
+          "nextCursor"
+        ],
+        "type" : "object"
+      },
+      "MyRatingResponse" : {
+        "description" : "현재 로그인 사용자의 평가. 비공개 한줄평도 본인에게만 반환합니다.",
+        "properties" : {
+          "comment" : {
+            "description" : "내 한줄평. 없으면 null",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "ratingId" : {
+            "description" : "평가 ID",
+            "example" : 91,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "score" : {
+            "description" : "평점. 0.5~5.0, 0.5점 단위",
+            "example" : 4.5,
+            "type" : "number"
+          },
+          "spoiler" : {
+            "description" : "내 한줄평의 스포일러 포함 여부",
+            "example" : true,
+            "type" : "boolean"
+          },
+          "visibility" : {
+            "description" : "한줄평 공개 범위(PUBLIC, PRIVATE). 한줄평이 없으면 null 가능",
+            "type" : [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required" : [
+          "comment",
+          "ratingId",
+          "score",
+          "spoiler",
+          "visibility"
+        ],
+        "type" : "object"
+      },
+      "NicknameAvailabilityResponse" : {
+        "properties" : {
+          "available" : {
+            "type" : "boolean"
+          },
+          "nickname" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "NotificationItemResponse" : {
+        "description" : "인앱 알림 항목",
+        "properties" : {
+          "body" : {
+            "example" : "새로운 파티팝콘 초대가 도착했어요.",
+            "type" : "string"
+          },
+          "notificationId" : {
+            "example" : 101,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "notifiedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "readAt" : {
+            "format" : "date-time",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "targetId" : {
+            "example" : 501,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "targetType" : {
+            "enum" : [
+              "PARTY_INVITATION",
+              "PARTY",
+              "WATCH_RECORD",
+              "TASTE_REPORT"
+            ],
+            "example" : "PARTY_INVITATION",
+            "type" : "string"
+          },
+          "title" : {
+            "example" : "파티팝콘 초대",
+            "type" : "string"
+          },
+          "type" : {
+            "enum" : [
+              "PARTY_INVITE",
+              "PARTY_INVITE_ACCEPTED",
+              "WATCH_CONFIRM",
+              "REPORT_ISSUED"
+            ],
+            "example" : "PARTY_INVITE",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "NotificationPageResponse" : {
+        "description" : "인앱 알림 커서 페이지",
+        "properties" : {
+          "hasNext" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/NotificationItemResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type" : "object"
+      },
+      "NotificationSettingsResponse" : {
+        "properties" : {
+          "MARKETING" : {
+            "type" : "boolean"
+          },
+          "PARTY_INVITE" : {
+            "type" : "boolean"
+          },
+          "RATING" : {
+            "type" : "boolean"
+          },
+          "RECOMMENDATION" : {
+            "type" : "boolean"
+          },
+          "REPORT_ISSUED" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "NotificationSettingsUpdateRequest" : {
+        "properties" : {
+          "MARKETING" : {
+            "type" : "boolean"
+          },
+          "PARTY_INVITE" : {
+            "type" : "boolean"
+          },
+          "RATING" : {
+            "type" : "boolean"
+          },
+          "RECOMMENDATION" : {
+            "type" : "boolean"
+          },
+          "REPORT_ISSUED" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [
+          "MARKETING",
+          "PARTY_INVITE",
+          "RATING",
+          "RECOMMENDATION",
+          "REPORT_ISSUED"
+        ],
+        "type" : "object"
+      },
+      "NotificationUnreadCountResponse" : {
+        "description" : "미확인 인앱 알림 개수",
+        "properties" : {
+          "count" : {
+            "example" : 2,
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "OAuthCodeRequest" : {
+        "properties" : {
+          "code" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "redirectUri" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "code",
+          "redirectUri"
+        ],
+        "type" : "object"
+      },
+      "OAuthLinkResponse" : {
+        "properties" : {
+          "linkedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "provider" : {
+            "enum" : [
+              "GOOGLE",
+              "KAKAO",
+              "NAVER"
+            ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "OAuthSignupRequest" : {
+        "properties" : {
+          "birthDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "gender" : {
+            "enum" : [
+              "MALE",
+              "FEMALE",
+              "OTHER"
+            ],
+            "type" : "string"
+          },
+          "nickname" : {
+            "minLength" : 1,
+            "pattern" : "^[가-힣a-zA-Z0-9_]{2,10}$",
+            "type" : "string"
+          },
+          "signupToken" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "birthDate",
+          "gender",
+          "nickname",
+          "signupToken"
+        ],
+        "type" : "object"
+      },
+      "OnboardingCardCriteria" : {
+        "properties" : {
+          "size" : {
+            "format" : "int32",
+            "maximum" : 10,
+            "minimum" : 1,
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "OnboardingCardListResponse" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Item"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "OnboardingSubmitRequest" : {
+        "properties" : {
+          "movieIdUnique" : {
+            "type" : "boolean"
+          },
+          "preferences" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Item"
+            },
+            "maxItems" : 40,
+            "minItems" : 0,
+            "type" : "array"
+          },
+          "skipConsistent" : {
+            "type" : "boolean"
+          },
+          "skipped" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [
+          "preferences",
+          "skipped"
+        ],
+        "type" : "object"
+      },
+      "OnboardingSubmitResponse" : {
+        "properties" : {
+          "onboardingCompleted" : {
+            "type" : "boolean"
+          },
+          "savedCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "skipped" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "Option" : {
+        "description" : "코드와 한국어 표시명",
+        "properties" : {
+          "code" : {
+            "example" : "THRILLER",
+            "type" : "string"
+          },
+          "name" : {
+            "example" : "스릴러",
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "code",
+          "name"
+        ],
+        "type" : "object"
+      },
+      "Ott" : {
+        "properties" : {
+          "code" : {
+            "type" : "string"
+          },
+          "logoUrl" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "ottId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "OttClickRequest" : {
+        "description" : "영화 OTT 링크 클릭 요청",
+        "properties" : {
+          "ottId" : {
+            "description" : "영화에 연결된 OTT의 서비스 ID. 양의 64비트 정수",
+            "example" : 1,
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "minimum" : 1,
+            "type" : "integer"
+          }
+        },
+        "required" : [
+          "ottId"
+        ],
+        "type" : "object"
+      },
+      "OttClickResponse" : {
+        "description" : "OTT 클릭으로 처리된 감상 기록",
+        "properties" : {
+          "clickedAt" : {
+            "description" : "최근 OTT 클릭 시각(UTC). 클릭 이력 없는 평가 기록이면 null",
+            "example" : "2026-08-30T05:21:00Z",
+            "format" : "date-time",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "confirmDueAt" : {
+            "description" : "감상 확인 가능 시각(UTC, clickedAt과 같다). 클릭 이력이 없으면 null",
+            "example" : "2026-08-30T05:21:00Z",
+            "format" : "date-time",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "expiresAt" : {
+            "description" : "감상 기록 만료 시각(UTC, clickedAt + 7일). 클릭 이력이 없으면 null",
+            "example" : "2026-09-06T05:21:00Z",
+            "format" : "date-time",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "movieId" : {
+            "description" : "서비스 영화 ID",
+            "example" : 550,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "status" : {
+            "description" : "현재 감상 상태",
+            "enum" : [
+              "LINK_CLICKED",
+              "WATCHED_UNRATED",
+              "RATED"
+            ],
+            "type" : "string"
+          },
+          "watchRecordId" : {
+            "description" : "처리된 감상 기록 ID",
+            "example" : 5001,
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [
+          "clickedAt",
+          "confirmDueAt",
+          "expiresAt",
+          "movieId",
+          "status",
+          "watchRecordId"
+        ],
+        "type" : "object"
+      },
+      "OttListResponse" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Item"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "OttOption" : {
+        "description" : "지원 OTT",
+        "properties" : {
+          "code" : {
+            "example" : "NETFLIX",
+            "type" : "string"
+          },
+          "name" : {
+            "example" : "넷플릭스",
+            "type" : "string"
+          },
+          "ottId" : {
+            "example" : 1,
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [
+          "code",
+          "name",
+          "ottId"
+        ],
+        "type" : "object"
+      },
+      "OttRecommendationResponse" : {
+        "properties" : {
+          "aggregatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "insufficientData" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Item"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "OttSummary" : {
+        "description" : "클릭한 OTT 요약",
+        "properties" : {
+          "code" : {
+            "description" : "OTT 코드",
+            "example" : "NETFLIX",
+            "type" : "string"
+          },
+          "ottId" : {
+            "description" : "서비스 OTT ID",
+            "example" : 1,
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [
+          "code",
+          "ottId"
+        ],
+        "type" : "object"
+      },
+      "PartyCreateRequest" : {
+        "properties" : {
+          "maxMembers" : {
+            "format" : "int32",
+            "maximum" : 4,
+            "minimum" : 2,
+            "type" : "integer"
+          },
+          "name" : {
+            "maxLength" : 20,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "name"
+        ],
+        "type" : "object"
+      },
+      "PartyInvitationCreateRequest" : {
+        "properties" : {
+          "userId" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [
+          "userId"
+        ],
+        "type" : "object"
+      },
+      "PartyInvitationResponse" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "invitationId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "invitee" : {
+            "$ref" : "#/components/schemas/UserSummary"
+          },
+          "partyId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "status" : {
+            "enum" : [
+              "PENDING",
+              "ACCEPTED",
+              "DECLINED"
+            ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PartyInvitationStatusResponse" : {
+        "properties" : {
+          "invitationId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "status" : {
+            "enum" : [
+              "PENDING",
+              "ACCEPTED",
+              "DECLINED"
+            ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PartyListItemResponse" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "maxMembers" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "members" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Member"
+            },
+            "type" : "array"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "owner" : {
+            "$ref" : "#/components/schemas/AvatarUserSummary"
+          },
+          "partyId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "pendingInvitations" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PendingInvitation"
+            },
+            "type" : "array"
+          },
+          "status" : {
+            "enum" : [
+              "ACTIVE",
+              "CLOSED"
+            ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PartyPopcornResponse" : {
+        "properties" : {
+          "members" : {
+            "items" : {
+              "$ref" : "#/components/schemas/MemberPopcorn"
+            },
+            "type" : "array"
+          },
+          "partyId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PartyRecommendationHistoryItemResponse" : {
+        "properties" : {
+          "exposedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "movie" : {
+            "$ref" : "#/components/schemas/RecommendationMovieResponse"
+          },
+          "recommendationItemId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PartyRecommendationHistorySetResponse" : {
+        "properties" : {
+          "generatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PartyRecommendationHistoryItemResponse"
+            },
+            "type" : "array"
+          },
+          "recommendationSetId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PartyRecommendationItemResponse" : {
+        "properties" : {
+          "movie" : {
+            "$ref" : "#/components/schemas/RecommendationMovieResponse"
+          },
+          "recommendationItemId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PartyRecommendationResponse" : {
+        "properties" : {
+          "generatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "hasNext" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PartyRecommendationItemResponse"
+            },
+            "type" : "array"
+          },
+          "partyId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "recommendationSetId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PartyResponse" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "maxMembers" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "members" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Member"
+            },
+            "type" : "array"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "owner" : {
+            "$ref" : "#/components/schemas/AvatarUserSummary"
+          },
+          "partyId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "status" : {
+            "enum" : [
+              "ACTIVE",
+              "CLOSED"
+            ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PartyStateResponse" : {
+        "properties" : {
+          "closedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "closedReason" : {
+            "enum" : [
+              "INSUFFICIENT_MEMBERS",
+              "OWNER_CLOSED"
+            ],
+            "type" : "string"
+          },
+          "ownerId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "partyId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "status" : {
+            "enum" : [
+              "ACTIVE",
+              "CLOSED"
+            ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PartySummary" : {
+        "properties" : {
+          "memberCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "owner" : {
+            "$ref" : "#/components/schemas/UserSummary"
+          },
+          "partyId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PasswordChangeRequest" : {
+        "properties" : {
+          "currentPassword" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "newPassword" : {
+            "minLength" : 1,
+            "pattern" : "^(?=.*[A-Za-z])(?=.*[0-9])(?=.*[^A-Za-z0-9])[\\x21-\\x7E]{8,64}$",
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "currentPassword",
+          "newPassword"
+        ],
+        "type" : "object"
+      },
+      "PasswordResetMailRequest" : {
+        "properties" : {
+          "email" : {
+            "format" : "email",
+            "maxLength" : 255,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "email"
+        ],
+        "type" : "object"
+      },
+      "PasswordResetRequest" : {
+        "properties" : {
+          "newPassword" : {
+            "minLength" : 1,
+            "pattern" : "^(?=.*[A-Za-z])(?=.*[0-9])(?=.*[^A-Za-z0-9])[\\x21-\\x7E]{8,64}$",
+            "type" : "string"
+          },
+          "token" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "newPassword",
+          "token"
+        ],
+        "type" : "object"
+      },
+      "PendingInvitation" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "invitationId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "invitee" : {
+            "$ref" : "#/components/schemas/InviteeSummary"
+          }
+        },
+        "type" : "object"
+      },
+      "PersonCard" : {
+        "properties" : {
+          "displayName" : {
+            "type" : "string"
+          },
+          "image" : {
+            "$ref" : "#/components/schemas/ImageRef"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PersonRank" : {
+        "properties" : {
+          "count" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "personId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "Popcorn" : {
+        "properties" : {
+          "flavors" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FlavorBucket"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "PopcornBucketResponse" : {
+        "properties" : {
+          "flavors" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FlavorBucket"
+            },
+            "type" : "array"
+          },
+          "totalCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PopcornFlavorListResponse" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Item"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "Profile" : {
+        "properties" : {
+          "avatarUrl" : {
+            "type" : "string"
+          },
+          "frameVisibility" : {
+            "enum" : [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type" : "string"
+          },
+          "nickname" : {
+            "type" : "string"
+          },
+          "popcornVisibility" : {
+            "enum" : [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type" : "string"
+          },
+          "reviewVisibility" : {
+            "enum" : [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "visibility" : {
+            "enum" : [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ProfileUpdateRequest" : {
+        "properties" : {
+          "birthDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "frameVisibility" : {
+            "enum" : [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type" : "string"
+          },
+          "gender" : {
+            "enum" : [
+              "MALE",
+              "FEMALE",
+              "OTHER"
+            ],
+            "type" : "string"
+          },
+          "nickname" : {
+            "pattern" : "^[가-힣a-zA-Z0-9_]{2,10}$",
+            "type" : "string"
+          },
+          "popcornVisibility" : {
+            "enum" : [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type" : "string"
+          },
+          "reviewVisibility" : {
+            "enum" : [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type" : "string"
+          },
+          "visibility" : {
+            "enum" : [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "PublicProfileResponse" : {
+        "properties" : {
+          "isBlockedByMe" : {
+            "type" : "boolean"
+          },
+          "keywords" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Keyword"
+            },
+            "type" : "array"
+          },
+          "popcorn" : {
+            "$ref" : "#/components/schemas/Popcorn"
+          },
+          "publicReviewCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "recentFrames" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RecentFrame"
+            },
+            "type" : "array"
+          },
+          "stats" : {
+            "$ref" : "#/components/schemas/Stats"
+          },
+          "user" : {
+            "$ref" : "#/components/schemas/Profile"
+          }
+        },
+        "type" : "object"
+      },
+      "PublicReviewItemResponse" : {
+        "description" : "공개 한줄평 목록 항목",
+        "properties" : {
+          "comment" : {
+            "description" : "한줄평 원문",
+            "example" : "스포일러가 포함된 한줄평",
+            "type" : "string"
+          },
+          "createdAt" : {
+            "description" : "평가 생성 시각(UTC)",
+            "example" : "2026-09-16T01:00:00Z",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "mine" : {
+            "description" : "로그인 사용자가 작성한 평가인지 여부",
+            "example" : false,
+            "type" : "boolean"
+          },
+          "ratingId" : {
+            "description" : "평가 ID",
+            "example" : 91,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "score" : {
+            "description" : "평점(0.5~5.0, 0.5 단위)",
+            "example" : 4.5,
+            "type" : "number"
+          },
+          "spoiler" : {
+            "description" : "작성자가 한줄평을 스포일러로 표시했는지 여부",
+            "example" : true,
+            "type" : "boolean"
+          },
+          "user" : {
+            "$ref" : "#/components/schemas/PublicReviewUserResponse",
+            "description" : "작성자 요약"
+          }
+        },
+        "required" : [
+          "comment",
+          "createdAt",
+          "mine",
+          "ratingId",
+          "score",
+          "spoiler",
+          "user"
+        ],
+        "type" : "object"
+      },
+      "PublicReviewPageResponse" : {
+        "description" : "공개 한줄평 cursor 페이지",
+        "properties" : {
+          "hasNext" : {
+            "description" : "다음 페이지 존재 여부",
+            "type" : "boolean"
+          },
+          "items" : {
+            "description" : "현재 페이지의 한줄평",
+            "items" : {
+              "$ref" : "#/components/schemas/PublicReviewItemResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "description" : "다음 페이지 cursor. 마지막 페이지면 null",
+            "type" : [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required" : [
+          "hasNext",
+          "items",
+          "nextCursor"
+        ],
+        "type" : "object"
+      },
+      "PublicReviewUserResponse" : {
+        "description" : "공개 한줄평 작성자 요약",
+        "properties" : {
+          "nickname" : {
+            "description" : "작성자 닉네임",
+            "example" : "팝콘러버",
+            "type" : "string"
+          },
+          "userId" : {
+            "description" : "작성자 사용자 ID",
+            "example" : 1024,
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [
+          "nickname",
+          "userId"
+        ],
+        "type" : "object"
+      },
+      "Rating" : {
+        "properties" : {
+          "comment" : {
+            "type" : "string"
+          },
+          "ratingId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "score" : {
+            "type" : "number"
+          },
+          "visibility" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RatingCreateRequest" : {
+        "properties" : {
+          "comment" : {
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "score" : {
+            "maximum" : 5.0,
+            "minimum" : 0.5,
+            "multipleOf" : 0.5,
+            "type" : "number"
+          },
+          "spoiler" : {
+            "default" : false,
+            "description" : "한줄평에 스포일러가 포함됐는지 여부. 생략 시 false",
+            "type" : "boolean"
+          },
+          "visibility" : {
+            "enum" : [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "score"
+        ],
+        "type" : "object"
+      },
+      "RatingCreateResponse" : {
+        "properties" : {
+          "comment" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "frame" : {
+            "$ref" : "#/components/schemas/Frame"
+          },
+          "movieId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "popcorn" : {
+            "$ref" : "#/components/schemas/Popcorn"
+          },
+          "ratingId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "score" : {
+            "type" : "number"
+          },
+          "spoiler" : {
+            "description" : "작성자가 선택한 한줄평 스포일러 여부",
+            "type" : "boolean"
+          },
+          "visibility" : {
+            "enum" : [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type" : "string"
+          },
+          "watchStatus" : {
+            "enum" : [
+              "LINK_CLICKED",
+              "WATCHED_UNRATED",
+              "RATED",
+              "EXPIRED"
+            ],
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "spoiler"
+        ],
+        "type" : "object"
+      },
+      "RatingUpdateRequest" : {
+        "properties" : {
+          "comment" : {
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "score" : {
+            "maximum" : 5.0,
+            "minimum" : 0.5,
+            "multipleOf" : 0.5,
+            "type" : "number"
+          },
+          "spoiler" : {
+            "default" : false,
+            "description" : "한줄평 스포일러 여부. 생략 시 false",
+            "type" : "boolean"
+          },
+          "visibility" : {
+            "enum" : [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "score"
+        ],
+        "type" : "object"
+      },
+      "ReceivedPartyInvitationResponse" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "invitationId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "party" : {
+            "$ref" : "#/components/schemas/PartySummary"
+          },
+          "status" : {
+            "enum" : [
+              "PENDING",
+              "ACCEPTED",
+              "DECLINED"
+            ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RecentFrame" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "frameId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "movie" : {
+            "$ref" : "#/components/schemas/Movie"
+          },
+          "score" : {
+            "type" : "number"
+          }
+        },
+        "type" : "object"
+      },
+      "RecommendationDismissRequest" : {
+        "properties" : {
+          "recommendationItemId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "RecommendationDismissResponse" : {
+        "properties" : {
+          "movieId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "RecommendationHistoryItemResponse" : {
+        "properties" : {
+          "dismissed" : {
+            "type" : "boolean"
+          },
+          "movie" : {
+            "$ref" : "#/components/schemas/RecommendationHistoryMovieResponse"
+          },
+          "reason" : {
+            "$ref" : "#/components/schemas/JsonNode"
+          },
+          "recommendationItemId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "watchStatus" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RecommendationHistoryMovieResponse" : {
+        "properties" : {
+          "movieId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "posterUrl" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RecommendationHistorySetResponse" : {
+        "properties" : {
+          "generatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RecommendationHistoryItemResponse"
+            },
+            "type" : "array"
+          },
+          "recommendationSetId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "RecommendationItemResponse" : {
+        "properties" : {
+          "flavorCode" : {
+            "type" : "string"
+          },
+          "movie" : {
+            "$ref" : "#/components/schemas/RecommendationMovieResponse"
+          },
+          "reason" : {
+            "$ref" : "#/components/schemas/JsonNode"
+          },
+          "recommendationItemId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RecommendationMovieResponse" : {
+        "properties" : {
+          "averageRating" : {
+            "type" : "number"
+          },
+          "genres" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "movieId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "ottProviders" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "posterUrl" : {
+            "type" : "string"
+          },
+          "releaseYear" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "title" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "RecommendationResponse" : {
+        "properties" : {
+          "generatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RecommendationItemResponse"
+            },
+            "type" : "array"
+          },
+          "recommendationSetId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ReportDetailResponse" : {
+        "properties" : {
+          "characterCard" : {
+            "$ref" : "#/components/schemas/CharacterCardContent"
+          },
+          "comparisons" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Comparison"
+            },
+            "type" : "array"
+          },
+          "countryShares" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Share"
+            },
+            "type" : "array"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "eraShares" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Share"
+            },
+            "type" : "array"
+          },
+          "flavorChanges" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FlavorChange"
+            },
+            "type" : "array"
+          },
+          "fourCut" : {
+            "$ref" : "#/components/schemas/FourCut"
+          },
+          "genreShares" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Share"
+            },
+            "type" : "array"
+          },
+          "highlights" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "keywords" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Keyword"
+            },
+            "type" : "array"
+          },
+          "period" : {
+            "$ref" : "#/components/schemas/ReportPeriod"
+          },
+          "reportId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "summary" : {
+            "$ref" : "#/components/schemas/Summary"
+          },
+          "topActors" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PersonRank"
+            },
+            "type" : "array"
+          },
+          "topDirectors" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PersonRank"
+            },
+            "type" : "array"
+          },
+          "topGenres" : {
+            "items" : {
+              "$ref" : "#/components/schemas/GenreRank"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "ReportImageResponse" : {
+        "properties" : {
+          "downloadUrl" : {
+            "type" : "string"
+          },
+          "expiresAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "format" : {
+            "type" : "string"
+          },
+          "imageId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ReportIssueResponse" : {
+        "properties" : {
+          "issuedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "reportId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "ReportListResponse" : {
+        "properties" : {
+          "current" : {
+            "$ref" : "#/components/schemas/Current"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Item"
+            },
+            "type" : "array"
+          },
+          "preparing" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ReportPeriod" : {
+        "properties" : {
+          "half" : {
+            "enum" : [
+              "H1",
+              "H2"
+            ],
+            "type" : "string"
+          },
+          "year" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "SampleRequest" : {
+        "properties" : {
+          "nickname" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "score" : {
+            "format" : "int32",
+            "minimum" : 1,
+            "type" : "integer"
+          }
+        },
+        "required" : [
+          "nickname"
+        ],
+        "type" : "object"
+      },
+      "SearchedUserResponse" : {
+        "properties" : {
+          "nickname" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "visibility" : {
+            "enum" : [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "Share" : {
+        "properties" : {
+          "label" : {
+            "type" : "string"
+          },
+          "share" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "SignupRequest" : {
+        "properties" : {
+          "birthDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "emailVerificationToken" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "gender" : {
+            "enum" : [
+              "MALE",
+              "FEMALE",
+              "OTHER"
+            ],
+            "type" : "string"
+          },
+          "nickname" : {
+            "minLength" : 1,
+            "pattern" : "^[가-힣a-zA-Z0-9_]{2,10}$",
+            "type" : "string"
+          },
+          "password" : {
+            "minLength" : 1,
+            "pattern" : "^(?=.*[A-Za-z])(?=.*[0-9])(?=.*[^A-Za-z0-9])[\\x21-\\x7E]{8,64}$",
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "birthDate",
+          "emailVerificationToken",
+          "gender",
+          "nickname",
+          "password"
+        ],
+        "type" : "object"
+      },
+      "SimilarMovieItemResponse" : {
+        "description" : "기준 영화와 콘텐츠 임베딩이 가까운 영화",
+        "properties" : {
+          "averageRating" : {
+            "description" : "전체 사용자 평균 평점",
+            "type" : "number"
+          },
+          "movieId" : {
+            "description" : "서비스 영화 ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "posterUrl" : {
+            "description" : "포스터 URL. 없으면 null",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "similarity" : {
+            "description" : "코사인 유사도. 1에 가까울수록 유사함",
+            "format" : "double",
+            "type" : "number"
+          },
+          "title" : {
+            "description" : "영화 제목",
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "averageRating",
+          "movieId",
+          "posterUrl",
+          "similarity",
+          "title"
+        ],
+        "type" : "object"
+      },
+      "SimilarMoviesResponse" : {
+        "description" : "기준 영화의 콘텐츠 임베딩과 가까운 영화 목록",
+        "properties" : {
+          "baseMovieId" : {
+            "description" : "기준 서비스 영화 ID",
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "items" : {
+            "description" : "코사인 유사도 내림차순 영화 목록",
+            "items" : {
+              "$ref" : "#/components/schemas/SimilarMovieItemResponse"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [
+          "baseMovieId",
+          "items"
+        ],
+        "type" : "object"
+      },
+      "Stats" : {
+        "properties" : {
+          "frameCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "popcornCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "Summary" : {
+        "properties" : {
+          "averageScore" : {
+            "type" : "number"
+          },
+          "newFlavorCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "ratingCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "TasteAnalysisResponse" : {
+        "properties" : {
+          "analysis" : {
+            "$ref" : "#/components/schemas/Analysis"
+          },
+          "analyzedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "insufficientData" : {
+            "type" : "boolean"
+          },
+          "keywords" : {
+            "items" : {
+              "$ref" : "#/components/schemas/Keyword"
+            },
+            "type" : "array"
+          },
+          "ratingCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "TokenResponse" : {
+        "properties" : {
+          "accessToken" : {
+            "type" : "string"
+          },
+          "expiresIn" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "TrendingMovieItemResponse" : {
+        "description" : "급상승 항목",
+        "properties" : {
+          "averageScore" : {
+            "example" : 4.3,
+            "type" : "number"
+          },
+          "movie" : {
+            "$ref" : "#/components/schemas/TrendingMovieResponse"
+          },
+          "rank" : {
+            "example" : 1,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "rankDelta" : {
+            "description" : "직전 게시 대비 순위 상승 폭. 신규 진입이면 null",
+            "example" : 4,
+            "format" : "int32",
+            "type" : [
+              "integer",
+              "null"
+            ]
+          },
+          "ratingCount" : {
+            "example" : 120,
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "trendScore" : {
+            "description" : "급상승 점수 (0, 1]. 평점이 아니다. 초기 고정 목록에서는 null",
+            "type" : [
+              "number",
+              "null"
+            ]
+          }
+        },
+        "type" : "object"
+      },
+      "TrendingMovieResponse" : {
+        "description" : "영화 표시 정보",
+        "properties" : {
+          "movieId" : {
+            "example" : 550,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "posterUrl" : {
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "title" : {
+            "example" : "파이트 클럽",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "TrendingMoviesResponse" : {
+        "description" : "급상승 영화 목록",
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TrendingMovieItemResponse"
+            },
+            "type" : "array"
+          },
+          "period" : {
+            "$ref" : "#/components/schemas/TrendingPeriodResponse",
+            "type" : "null"
+          },
+          "source" : {
+            "enum" : [
+              "DEFAULT",
+              "VIEW"
+            ],
+            "example" : "VIEW",
+            "type" : "string"
+          },
+          "stale" : {
+            "description" : "마지막 유효 집계를 제공하는 중이면 true",
+            "example" : false,
+            "type" : "boolean"
+          },
+          "updatedAt" : {
+            "example" : "2026-09-18T12:00:00Z",
+            "format" : "date-time",
+            "type" : [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type" : "object"
+      },
+      "TrendingPeriodResponse" : {
+        "description" : "집계 구간. 초기 고정 목록에서는 null",
+        "properties" : {
+          "from" : {
+            "example" : "2026-09-18T11:00:00Z",
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "to" : {
+            "example" : "2026-09-18T12:00:00Z",
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "UserBlockResponse" : {
+        "properties" : {
+          "blockedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "blockedUserId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "UserOttResponse" : {
+        "properties" : {
+          "ottIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "array"
+          }
+        },
+        "type" : "object"
+      },
+      "UserOttUpdateRequest" : {
+        "properties" : {
+          "ottIds" : {
+            "items" : {
+              "exclusiveMinimum" : 0,
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "maxItems" : 50,
+            "minItems" : 0,
+            "type" : "array"
+          }
+        },
+        "required" : [
+          "ottIds"
+        ],
+        "type" : "object"
+      },
+      "UserProfileResponse" : {
+        "properties" : {
+          "avatarUrl" : {
+            "type" : "string"
+          },
+          "birthDate" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "frameVisibility" : {
+            "enum" : [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type" : "string"
+          },
+          "gender" : {
+            "enum" : [
+              "MALE",
+              "FEMALE",
+              "OTHER"
+            ],
+            "type" : "string"
+          },
+          "hasPassword" : {
+            "type" : "boolean"
+          },
+          "linkedProviders" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "nickname" : {
+            "type" : "string"
+          },
+          "onboardingCompleted" : {
+            "type" : "boolean"
+          },
+          "popcornVisibility" : {
+            "enum" : [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type" : "string"
+          },
+          "reviewVisibility" : {
+            "enum" : [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type" : "string"
+          },
+          "stats" : {
+            "$ref" : "#/components/schemas/Stats"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "visibility" : {
+            "enum" : [
+              "PUBLIC",
+              "PRIVATE"
+            ],
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "UserSummary" : {
+        "properties" : {
+          "nickname" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "WatchConfirmRequest" : {
+        "description" : "감상 확인 요청",
+        "properties" : {
+          "watched" : {
+            "description" : "실제로 영화를 감상했는지 여부",
+            "example" : true,
+            "type" : "boolean"
+          }
+        },
+        "required" : [
+          "watched"
+        ],
+        "type" : "object"
+      },
+      "WatchConfirmResponse" : {
+        "description" : "감상 확인 결과",
+        "properties" : {
+          "status" : {
+            "description" : "확인 후 상태",
+            "enum" : [
+              "WATCHED_UNRATED",
+              "EXPIRED"
+            ],
+            "type" : "string"
+          },
+          "watchRecordId" : {
+            "description" : "감상 기록 ID",
+            "example" : 5001,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "watchedAt" : {
+            "description" : "감상 완료 시각(UTC). 안 봤어요 응답이면 null",
+            "format" : "date-time",
+            "type" : [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required" : [
+          "status",
+          "watchRecordId",
+          "watchedAt"
+        ],
+        "type" : "object"
+      },
+      "WatchRecord" : {
+        "properties" : {
+          "clickedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "ott" : {
+            "$ref" : "#/components/schemas/Ott"
+          },
+          "ratedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "watchedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "WatchRecordItemResponse" : {
+        "description" : "감상 기록 목록 항목",
+        "properties" : {
+          "clickedAt" : {
+            "description" : "OTT 클릭 시각(UTC)",
+            "format" : "date-time",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "confirmDueAt" : {
+            "description" : "감상 확인 노출 시각(UTC, clickedAt과 같다)",
+            "format" : "date-time",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "expiresAt" : {
+            "description" : "감상 기록 만료 시각(UTC, clickedAt + 7일)",
+            "format" : "date-time",
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "movie" : {
+            "$ref" : "#/components/schemas/MovieSummary",
+            "description" : "영화 요약"
+          },
+          "ott" : {
+            "$ref" : "#/components/schemas/OttSummary",
+            "description" : "클릭한 OTT 요약. 클릭 이력이 없으면 null",
+            "type" : "null"
+          },
+          "ratingId" : {
+            "description" : "연결된 평가 ID. 평가가 없으면 null",
+            "format" : "int64",
+            "type" : [
+              "integer",
+              "null"
+            ]
+          },
+          "status" : {
+            "description" : "감상 상태",
+            "enum" : [
+              "LINK_CLICKED",
+              "WATCHED_UNRATED",
+              "RATED",
+              "EXPIRED"
+            ],
+            "type" : "string"
+          },
+          "watchRecordId" : {
+            "description" : "감상 기록 ID",
+            "example" : 5001,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "watchedAt" : {
+            "description" : "감상 완료 시각(UTC)",
+            "format" : "date-time",
+            "type" : [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required" : [
+          "clickedAt",
+          "confirmDueAt",
+          "expiresAt",
+          "movie",
+          "ott",
+          "ratingId",
+          "status",
+          "watchRecordId",
+          "watchedAt"
+        ],
+        "type" : "object"
+      },
+      "WatchRecordPageResponse" : {
+        "description" : "감상 기록 cursor 페이지",
+        "properties" : {
+          "hasNext" : {
+            "description" : "다음 페이지 존재 여부",
+            "type" : "boolean"
+          },
+          "items" : {
+            "description" : "현재 페이지의 감상 기록",
+            "items" : {
+              "$ref" : "#/components/schemas/WatchRecordItemResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "description" : "다음 페이지 cursor. 마지막 페이지면 null",
+            "type" : [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required" : [
+          "hasNext",
+          "items",
+          "nextCursor"
+        ],
+        "type" : "object"
+      },
+      "WebPushConfigResponse" : {
+        "description" : "브라우저 Web Push 공개 설정",
+        "properties" : {
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "publicKey" : {
+            "type" : [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type" : "object"
+      },
+      "WebPushSubscriptionRequest" : {
+        "properties" : {
+          "endpoint" : {
+            "maxLength" : 2048,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "expirationTime" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "minimum" : 1,
+            "type" : "integer"
+          },
+          "keys" : {
+            "$ref" : "#/components/schemas/Keys"
+          }
+        },
+        "required" : [
+          "endpoint",
+          "keys"
+        ],
+        "type" : "object"
+      },
+      "WebPushSubscriptionResponse" : {
+        "description" : "등록된 브라우저 Web Push 구독",
+        "properties" : {
+          "subscriptionId" : {
+            "example" : 42,
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "YearRange" : {
+        "description" : "개봉연도 범위. 날짜가 있는 영화가 없으면 두 값 모두 null",
+        "properties" : {
+          "max" : {
+            "example" : 2026,
+            "format" : "int32",
+            "type" : [
+              "integer",
+              "null"
+            ]
+          },
+          "min" : {
+            "example" : 1920,
+            "format" : "int32",
+            "type" : [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "type" : "object"
+      }
+    },
+    "securitySchemes" : {
+      "bearerAuth" : {
+        "bearerFormat" : "JWT",
+        "scheme" : "bearer",
+        "type" : "http"
+      }
+    }
+  },
+  "info" : {
+    "title" : "FEELM API",
+    "version" : "v1"
+  },
+  "openapi" : "3.1.0",
+  "paths" : {
+    "/api/v1/auth/email/verification-code" : {
+      "post" : {
+        "operationId" : "sendVerificationCode",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EmailVerificationCodeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "202" : {
+            "description" : "Accepted"
+          }
+        },
+        "security" : [ ],
+        "tags" : [
+          "email-verification-code-controller"
+        ]
+      }
+    },
+    "/api/v1/auth/email/verification-code/verify" : {
+      "post" : {
+        "operationId" : "verifyVerificationCode",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EmailVerificationCodeVerifyRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/EmailVerificationTokenResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [ ],
+        "tags" : [
+          "email-verification-code-controller"
+        ]
+      }
+    },
+    "/api/v1/auth/login" : {
+      "post" : {
+        "operationId" : "login_1",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/LoginRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LoginResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [ ],
+        "tags" : [
+          "email-auth-controller"
+        ]
+      }
+    },
+    "/api/v1/auth/logout" : {
+      "post" : {
+        "operationId" : "logout",
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "email-auth-controller"
+        ]
+      }
+    },
+    "/api/v1/auth/oauth/signup" : {
+      "post" : {
+        "operationId" : "signup_1",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OAuthSignupRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LoginResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [ ],
+        "tags" : [
+          "o-auth-controller"
+        ]
+      }
+    },
+    "/api/v1/auth/oauth/{provider}" : {
+      "post" : {
+        "operationId" : "login",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "provider",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OAuthCodeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [ ],
+        "tags" : [
+          "o-auth-controller"
+        ]
+      }
+    },
+    "/api/v1/auth/password/reset" : {
+      "post" : {
+        "operationId" : "resetPassword",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PasswordResetRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        },
+        "security" : [ ],
+        "tags" : [
+          "password-reset-controller"
+        ]
+      }
+    },
+    "/api/v1/auth/password/reset-request" : {
+      "post" : {
+        "operationId" : "requestPasswordReset",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PasswordResetMailRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "202" : {
+            "description" : "Accepted"
+          }
+        },
+        "security" : [ ],
+        "tags" : [
+          "password-reset-controller"
+        ]
+      }
+    },
+    "/api/v1/auth/private-test" : {
+      "get" : {
+        "operationId" : "privateAuth",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "format" : "int64",
+                  "type" : "integer"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "private-auth-contract-test-controller"
+        ]
+      }
+    },
+    "/api/v1/auth/signup" : {
+      "post" : {
+        "operationId" : "signup",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SignupRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/LoginResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [ ],
+        "tags" : [
+          "email-auth-controller"
+        ]
+      }
+    },
+    "/api/v1/auth/token/refresh" : {
+      "post" : {
+        "operationId" : "refresh",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TokenResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [ ],
+        "tags" : [
+          "auth-controller"
+        ]
+      }
+    },
+    "/api/v1/feedback" : {
+      "post" : {
+        "operationId" : "submit_1",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/FeedbackRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FeedbackResponse"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "feedback-controller"
+        ]
+      }
+    },
+    "/api/v1/frames/{frameId}" : {
+      "get" : {
+        "operationId" : "getFrameDetail",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "frameId",
+            "required" : true,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FrameDetailResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "frame-query-controller"
+        ]
+      }
+    },
+    "/api/v1/movies/filter-options" : {
+      "get" : {
+        "description" : "영화 검색 필터에 사용할 장르·국가·개봉연도 범위와 지원 OTT 목록을 조회합니다.",
+        "operationId" : "getOptions",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MovieFilterOptionsResponse"
+                }
+              }
+            },
+            "description" : "필터 옵션 조회 성공"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "저장된 국가 코드의 표시명 변환 실패 등 서버 오류"
+          }
+        },
+        "security" : [ ],
+        "summary" : "검색 필터 옵션 조회",
+        "tags" : [
+          "movie-filter-options-controller"
+        ]
+      }
+    },
+    "/api/v1/movies/search" : {
+      "get" : {
+        "description" : "영화 제목·원제·배우·감독을 검색하고 장르·국가·개봉연도·OTT 조건으로 필터링합니다.",
+        "operationId" : "search_1",
+        "parameters" : [
+          {
+            "description" : "영화 제목·원제·배우·감독 검색어. 필터가 없으면 필수",
+            "example" : "기생충",
+            "in" : "query",
+            "name" : "q",
+            "required" : false,
+            "schema" : {
+              "pattern" : "[^\\x00]*",
+              "type" : "string"
+            }
+          },
+          {
+            "description" : "장르 코드. 같은 이름을 반복하면 OR로 검색",
+            "example" : "DRAMA",
+            "in" : "query",
+            "name" : "genre",
+            "required" : false,
+            "schema" : {
+              "items" : {
+                "pattern" : "[^\\x00]*",
+                "type" : "string"
+              },
+              "type" : "array"
+            }
+          },
+          {
+            "description" : "ISO 3166-1 alpha-2 국가 코드. 같은 이름을 반복하면 OR로 검색",
+            "example" : "KR",
+            "in" : "query",
+            "name" : "country",
+            "required" : false,
+            "schema" : {
+              "items" : {
+                "pattern" : "[^\\x00]*",
+                "type" : "string"
+              },
+              "type" : "array"
+            }
+          },
+          {
+            "description" : "개봉연도 시작값(포함)",
+            "example" : 2000,
+            "in" : "query",
+            "name" : "yearFrom",
+            "required" : false,
+            "schema" : {
+              "format" : "int32",
+              "type" : "integer"
+            }
+          },
+          {
+            "description" : "개봉연도 종료값(포함)",
+            "example" : 2026,
+            "in" : "query",
+            "name" : "yearTo",
+            "required" : false,
+            "schema" : {
+              "format" : "int32",
+              "type" : "integer"
+            }
+          },
+          {
+            "description" : "OTT 식별자. 같은 이름을 반복하면 OR로 검색",
+            "example" : 1,
+            "in" : "query",
+            "name" : "ott",
+            "required" : false,
+            "schema" : {
+              "items" : {
+                "format" : "int64",
+                "type" : "integer"
+              },
+              "type" : "array"
+            }
+          },
+          {
+            "description" : "정렬 기준: RELEVANCE, RATING, RELEASE_DATE",
+            "example" : "RELEVANCE",
+            "in" : "query",
+            "name" : "sort",
+            "required" : false,
+            "schema" : {
+              "enum" : [
+                "RELEVANCE",
+                "RATING",
+                "RELEASE_DATE"
+              ],
+              "type" : "string"
+            }
+          },
+          {
+            "description" : "이전 응답의 다음 페이지 cursor",
+            "in" : "query",
+            "name" : "cursor",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "description" : "페이지 크기(1~50, 기본 20)",
+            "example" : 20,
+            "in" : "query",
+            "name" : "size",
+            "required" : false,
+            "schema" : {
+              "format" : "int32",
+              "maximum" : 50,
+              "minimum" : 1,
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MovieSearchPageResponse"
+                }
+              }
+            },
+            "description" : "검색 성공. 결과가 없으면 totalCount=0과 빈 items를 반환합니다."
+          },
+          "400" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MovieSearchPageResponse"
+                }
+              }
+            },
+            "description" : "검색조건 또는 cursor 검증 실패"
+          },
+          "401" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MovieSearchPageResponse"
+                }
+              }
+            },
+            "description" : "Access Token이 없거나 유효하지 않음"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "영화 검색",
+        "tags" : [
+          "movie-search-controller"
+        ]
+      }
+    },
+    "/api/v1/movies/trending" : {
+      "get" : {
+        "description" : "최근 회원의 영화 상세 조회 추이를 Spark가 사전 집계한 급상승 목록을 조회합니다. 공개 API이며 요청 시 순위를 다시 계산하지 않습니다. 유효한 집계가 아직 없으면 확정된 초기 고정 목록(source=DEFAULT)을 반환하고, 첫 유효 집계 이후에는 최신 결과가 만료돼도 마지막 유효 결과를 stale=true로 계속 반환합니다.",
+        "operationId" : "getTrending",
+        "parameters" : [
+          {
+            "description" : "반환할 영화 수(기본 10, 1~30)",
+            "in" : "query",
+            "name" : "size",
+            "required" : false,
+            "schema" : {
+              "default" : 10,
+              "maximum" : 30,
+              "minimum" : 1,
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TrendingMoviesResponse"
+                }
+              }
+            },
+            "description" : "급상승 영화 조회 성공"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "size가 정수가 아니거나 1~30 범위를 벗어남"
+          },
+          "503" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "게시된 급상승 결과를 조회할 수 없고 초기 고정 목록으로 대체할 수도 없음"
+          }
+        },
+        "security" : [ ],
+        "summary" : "급상승 영화 조회",
+        "tags" : [
+          "trending-movie-controller"
+        ]
+      }
+    },
+    "/api/v1/movies/{movieId}" : {
+      "get" : {
+        "description" : "영화 메타데이터, 출연진·감독, 전체 평점 집계와 OTT 제공처를 조회합니다. 선택 인증 API로 비회원도 조회할 수 있으며 myRating, myWatchStatus, recommendation은 null이고 OTT subscribed는 false입니다. 유효한 Access Token이 있으면 본인 평가·감상 상태·구독을 포함합니다. recommendationItemId는 조회 영화와 일치하고 본인 개인 추천 또는 현재 참여 중인 파티 추천일 때만 추천 이유를 반환하며, 권한이 없으면 recommendation=null과 200을 반환합니다. 유효하지 않은 토큰·Refresh Token·다른 인증 스킴은 비회원으로 처리합니다.",
+        "operationId" : "getDetail",
+        "parameters" : [
+          {
+            "description" : "서비스 영화 ID. 양의 64비트 정수(1~9223372036854775807)",
+            "in" : "path",
+            "name" : "movieId",
+            "required" : true,
+            "schema" : {
+              "example" : 550,
+              "exclusiveMinimum" : 0,
+              "format" : "int64",
+              "minimum" : 1,
+              "type" : "integer"
+            }
+          },
+          {
+            "description" : "추천 카드의 항목 ID. 양의 64비트 정수(1~9223372036854775807), 생략 가능. 영화 일치·열람 권한 확인 후 추천 이유 반환",
+            "in" : "query",
+            "name" : "recommendationItemId",
+            "required" : false,
+            "schema" : {
+              "example" : 3301,
+              "exclusiveMinimum" : 0,
+              "format" : "int64",
+              "minimum" : 1,
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MovieDetailResponse"
+                }
+              }
+            },
+            "description" : "영화 상세 조회 성공"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "VALIDATION_FAILED: ID 형식 오류 또는 양의 64비트 정수 범위 초과"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "RESOURCE_NOT_FOUND: 존재하지 않는 영화"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "example" : {
+                  "code" : "INTERNAL_ERROR",
+                  "message" : "서버 내부 오류가 발생했습니다."
+                },
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR: 내부 데이터 계약 위반 등 서버 오류"
+          }
+        },
+        "security" : [
+          { },
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "영화 상세 조회",
+        "tags" : [
+          "movie-detail-controller"
+        ]
+      }
+    },
+    "/api/v1/movies/{movieId}/dismiss" : {
+      "post" : {
+        "operationId" : "dismiss",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "movieId",
+            "required" : true,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RecommendationDismissRequest"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RecommendationDismissResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "recommendation-dismiss-controller"
+        ]
+      }
+    },
+    "/api/v1/movies/{movieId}/ott-clicks" : {
+      "post" : {
+        "description" : "로그인한 활성 사용자의 보러가기 클릭을 기록합니다. 활성 감상 기록이 LINK_CLICKED이면 같은 행의 OTT와 시각을 갱신하고, EXPIRED 이력만 있으면 새 LINK_CLICKED 기록을 만듭니다. WATCHED_UNRATED·RATED 상태는 유지하며, 성공한 실제 호출마다 추천 행동 신호인 OTT_CLICK 아웃박스 이벤트를 한 건 저장합니다.",
+        "operationId" : "click",
+        "parameters" : [
+          {
+            "description" : "서비스 영화 ID. 양의 64비트 정수(1~9223372036854775807)",
+            "in" : "path",
+            "name" : "movieId",
+            "required" : true,
+            "schema" : {
+              "example" : 550,
+              "exclusiveMinimum" : 0,
+              "format" : "int64",
+              "minimum" : 1,
+              "type" : "integer"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OttClickRequest"
+              }
+            }
+          },
+          "description" : "클릭한 영화 연결 OTT",
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OttClickResponse"
+                }
+              }
+            },
+            "description" : "LINK_CLICKED 재클릭 갱신 또는 기존 WATCHED_UNRATED·RATED 상태 유지"
+          },
+          "201" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OttClickResponse"
+                }
+              }
+            },
+            "description" : "활성 기록이 없어 새 LINK_CLICKED 감상 기록 생성"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "VALIDATION_FAILED: movieId 또는 ottId가 양의 64비트 정수가 아님"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "UNAUTHORIZED: Access Token이 없거나 사용자 계정이 활성 상태가 아님"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "RESOURCE_NOT_FOUND: 영화·OTT가 없거나 영화에 OTT가 연결되지 않음"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR: 감상 기록 또는 아웃박스 저장 실패"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "OTT 링크 클릭 기록",
+        "tags" : [
+          "ott-click-controller"
+        ]
+      }
+    },
+    "/api/v1/movies/{movieId}/ratings" : {
+      "post" : {
+        "description" : "영화에 0.5점 단위 평가와 선택적 한줄평을 저장합니다. 한줄평의 스포일러 여부는 생략 시 false입니다. 평점, 감상 상태, 프레임과 추천 갱신 이벤트는 같은 트랜잭션으로 처리됩니다.",
+        "operationId" : "create_2",
+        "parameters" : [
+          {
+            "description" : "평가할 영화 ID. 양의 64비트 정수",
+            "in" : "path",
+            "name" : "movieId",
+            "required" : true,
+            "schema" : {
+              "exclusiveMinimum" : 0,
+              "format" : "int64",
+              "minimum" : 1,
+              "type" : "integer"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RatingCreateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RatingCreateResponse"
+                }
+              }
+            },
+            "description" : "평가 생성"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "VALIDATION_FAILED: 요청 값이 평가 계약을 위반함"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "UNAUTHORIZED: 인증 정보가 없거나 활성 사용자가 아님"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "RESOURCE_NOT_FOUND: 영화가 존재하지 않음"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "RATING_ALREADY_EXISTS: 같은 영화에 이미 평가가 존재함"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR: 평가 또는 연관 데이터 저장 실패"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "평가 생성",
+        "tags" : [
+          "rating-create-controller"
+        ]
+      }
+    },
+    "/api/v1/movies/{movieId}/reviews" : {
+      "get" : {
+        "description" : "로그인한 ACTIVE 회원이 영화 한줄평을 최신순으로 조회합니다. 타인의 PUBLIC과 본인의 PUBLIC·PRIVATE 한줄평만 포함하며, 양방향 차단 상대, 비활성 작성자와 한줄평 공개 범위(reviewVisibility)를 PRIVATE으로 둔 타인 작성자는 제외합니다.",
+        "operationId" : "getReviews",
+        "parameters" : [
+          {
+            "description" : "서비스 영화 ID. 양의 64비트 정수",
+            "in" : "path",
+            "name" : "movieId",
+            "required" : true,
+            "schema" : {
+              "example" : 550,
+              "exclusiveMinimum" : 0,
+              "format" : "int64",
+              "minimum" : 1,
+              "type" : "integer"
+            }
+          },
+          {
+            "description" : "서버가 직전 응답에서 발급한 불투명 cursor",
+            "in" : "query",
+            "name" : "cursor",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "description" : "페이지 크기(기본 20, 1~50)",
+            "in" : "query",
+            "name" : "size",
+            "required" : false,
+            "schema" : {
+              "default" : 20,
+              "maximum" : 50,
+              "minimum" : 1,
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublicReviewPageResponse"
+                }
+              }
+            },
+            "description" : "공개 한줄평 목록 조회 성공"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "VALIDATION_FAILED: 잘못된 movieId·size·cursor"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "UNAUTHORIZED: 인증이 없거나 유효하지 않거나 ACTIVE 회원이 아님; TOKEN_EXPIRED: Access Token이 만료됨"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "RESOURCE_NOT_FOUND: 존재하지 않는 영화"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR: 한줄평 조회 실패"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "공개 한줄평 목록 조회",
+        "tags" : [
+          "public-review-controller"
+        ]
+      }
+    },
+    "/api/v1/movies/{movieId}/similar" : {
+      "get" : {
+        "operationId" : "getSimilarMovies",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "movieId",
+            "required" : true,
+            "schema" : {
+              "exclusiveMinimum" : 0,
+              "format" : "int64",
+              "type" : "integer"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "size",
+            "required" : false,
+            "schema" : {
+              "format" : "int32",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SimilarMoviesResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          { },
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "similar-movie-controller"
+        ]
+      }
+    },
+    "/api/v1/notifications" : {
+      "get" : {
+        "description" : "현재 사용자에게 노출 중인 알림을 최신순으로 조회한다.",
+        "operationId" : "list_2",
+        "parameters" : [
+          {
+            "description" : "서버가 직전 응답에서 발급한 불투명 커서",
+            "in" : "query",
+            "name" : "cursor",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "description" : "페이지 크기(기본 20, 1~50)",
+            "in" : "query",
+            "name" : "size",
+            "required" : false,
+            "schema" : {
+              "default" : 20,
+              "maximum" : 50,
+              "minimum" : 1,
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NotificationPageResponse"
+                }
+              }
+            },
+            "description" : "인앱 알림 목록 조회 성공"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "인앱 알림 목록",
+        "tags" : [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/push/config" : {
+      "get" : {
+        "operationId" : "config",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WebPushConfigResponse"
+                }
+              }
+            },
+            "description" : "공개 Web Push 설정 조회 성공"
+          },
+          "401" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "인증되지 않았거나 비활성 회원"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "브라우저 푸시 설정 조회",
+        "tags" : [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/push/subscriptions" : {
+      "put" : {
+        "operationId" : "register",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WebPushSubscriptionRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WebPushSubscriptionResponse"
+                }
+              }
+            },
+            "description" : "구독 등록 또는 갱신 성공"
+          },
+          "400" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "구독 정보 검증 실패"
+          },
+          "401" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "인증되지 않았거나 비활성 회원"
+          },
+          "503" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "Web Push 비활성화"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "브라우저 푸시 구독 등록 또는 갱신",
+        "tags" : [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/push/subscriptions/{subscriptionId}" : {
+      "delete" : {
+        "operationId" : "unregister",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "subscriptionId",
+            "required" : true,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "204" : {
+            "description" : "구독 해제 성공"
+          },
+          "401" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "인증되지 않았거나 비활성 회원"
+          },
+          "404" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "현재 사용자 소유 구독 없음"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "브라우저 푸시 구독 해제",
+        "tags" : [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/read-all" : {
+      "patch" : {
+        "operationId" : "markAllRead",
+        "responses" : {
+          "204" : {
+            "description" : "전체 읽음 처리 성공"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "전체 알림 읽음 처리",
+        "tags" : [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/unread-count" : {
+      "get" : {
+        "operationId" : "unreadCount",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NotificationUnreadCountResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "미확인 알림 개수",
+        "tags" : [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/{notificationId}" : {
+      "delete" : {
+        "description" : "현재 사용자의 알림을 목록과 미확인 개수에서 제외한다.",
+        "operationId" : "dismiss_1",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "notificationId",
+            "required" : true,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "204" : {
+            "description" : "알림 숨김 성공"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "알림 숨김",
+        "tags" : [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/v1/notifications/{notificationId}/read" : {
+      "patch" : {
+        "operationId" : "markRead",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "notificationId",
+            "required" : true,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "204" : {
+            "description" : "읽음 처리 성공"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "알림 읽음 처리",
+        "tags" : [
+          "Notifications"
+        ]
+      }
+    },
+    "/api/v1/onboarding/cards" : {
+      "get" : {
+        "operationId" : "getCards",
+        "parameters" : [
+          {
+            "in" : "query",
+            "name" : "criteria",
+            "required" : true,
+            "schema" : {
+              "$ref" : "#/components/schemas/OnboardingCardCriteria"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OnboardingCardListResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "onboarding-controller"
+        ]
+      }
+    },
+    "/api/v1/onboarding/preferences" : {
+      "post" : {
+        "operationId" : "submit",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OnboardingSubmitRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OnboardingSubmitResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "onboarding-controller"
+        ]
+      }
+    },
+    "/api/v1/otts" : {
+      "get" : {
+        "operationId" : "getOtts",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OttListResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [ ],
+        "tags" : [
+          "ott-controller"
+        ]
+      }
+    },
+    "/api/v1/parties" : {
+      "get" : {
+        "operationId" : "list",
+        "parameters" : [
+          {
+            "in" : "query",
+            "name" : "status",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "cursor",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "size",
+            "required" : false,
+            "schema" : {
+              "format" : "int32",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CursorPageResponsePartyListItemResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "party-controller"
+        ]
+      },
+      "post" : {
+        "operationId" : "create_1",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PartyCreateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PartyResponse"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "party-controller"
+        ]
+      }
+    },
+    "/api/v1/parties/invitations" : {
+      "get" : {
+        "operationId" : "listInvitations",
+        "parameters" : [
+          {
+            "in" : "query",
+            "name" : "status",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "cursor",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "size",
+            "required" : false,
+            "schema" : {
+              "format" : "int32",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CursorPageResponseReceivedPartyInvitationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "party-controller"
+        ]
+      }
+    },
+    "/api/v1/parties/invitations/{invitationId}/accept" : {
+      "post" : {
+        "operationId" : "acceptInvitation",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "invitationId",
+            "required" : true,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PartyResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "party-controller"
+        ]
+      }
+    },
+    "/api/v1/parties/invitations/{invitationId}/decline" : {
+      "post" : {
+        "operationId" : "declineInvitation",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "invitationId",
+            "required" : true,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PartyInvitationStatusResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "party-controller"
+        ]
+      }
+    },
+    "/api/v1/parties/{partyId}" : {
+      "delete" : {
+        "operationId" : "close",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "partyId",
+            "required" : true,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PartyStateResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "party-controller"
+        ]
+      }
+    },
+    "/api/v1/parties/{partyId}/invitations" : {
+      "post" : {
+        "operationId" : "invite",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "partyId",
+            "required" : true,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PartyInvitationCreateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PartyInvitationResponse"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "party-controller"
+        ]
+      }
+    },
+    "/api/v1/parties/{partyId}/leave" : {
+      "post" : {
+        "operationId" : "leave",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "partyId",
+            "required" : true,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PartyStateResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "party-controller"
+        ]
+      }
+    },
+    "/api/v1/parties/{partyId}/members/{userId}" : {
+      "delete" : {
+        "operationId" : "kick",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "partyId",
+            "required" : true,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          },
+          {
+            "in" : "path",
+            "name" : "userId",
+            "required" : true,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PartyStateResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "party-controller"
+        ]
+      }
+    },
+    "/api/v1/parties/{partyId}/popcorn" : {
+      "get" : {
+        "operationId" : "getPartyPopcorn",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "partyId",
+            "required" : true,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PartyPopcornResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "party-popcorn-controller"
+        ]
+      }
+    },
+    "/api/v1/parties/{partyId}/recommendations" : {
+      "get" : {
+        "operationId" : "recommendations",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "partyId",
+            "required" : true,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "size",
+            "required" : false,
+            "schema" : {
+              "default" : 3,
+              "format" : "int32",
+              "type" : "integer"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "refresh",
+            "required" : false,
+            "schema" : {
+              "default" : false,
+              "type" : "boolean"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PartyRecommendationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "party-controller"
+        ]
+      }
+    },
+    "/api/v1/parties/{partyId}/recommendations/history" : {
+      "get" : {
+        "operationId" : "recommendationHistory",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "partyId",
+            "required" : true,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "cursor",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "size",
+            "required" : false,
+            "schema" : {
+              "format" : "int32",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CursorPageResponsePartyRecommendationHistorySetResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "party-controller"
+        ]
+      }
+    },
+    "/api/v1/popcorn-flavors" : {
+      "get" : {
+        "operationId" : "getPopcornFlavors",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PopcornFlavorListResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [ ],
+        "tags" : [
+          "taste-query-controller"
+        ]
+      }
+    },
+    "/api/v1/ratings/{ratingId}" : {
+      "delete" : {
+        "description" : "본인 평가와 연결 프레임을 삭제하고 감상 기록은 보존합니다. 영화 평점 집계와 RATING DELETE 이벤트를 같은 트랜잭션에 기록합니다.",
+        "operationId" : "delete_1",
+        "parameters" : [
+          {
+            "description" : "본인 평가 ID. 양의 64비트 정수",
+            "in" : "path",
+            "name" : "ratingId",
+            "required" : true,
+            "schema" : {
+              "exclusiveMinimum" : 0,
+              "format" : "int64",
+              "minimum" : 1,
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "204" : {
+            "description" : "평가 삭제"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "VALIDATION_FAILED: 경로 ID 오류"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "UNAUTHORIZED: 인증 정보가 없거나 활성 사용자가 아님"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "RESOURCE_NOT_FOUND: 평가가 없거나 다른 사용자의 평가"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR: 평가 또는 연관 데이터 삭제 실패"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "평가 삭제",
+        "tags" : [
+          "rating-mutation-controller"
+        ]
+      },
+      "put" : {
+        "description" : "본인 평가의 별점, 한줄평, 공개 범위와 스포일러 여부를 전체 교체합니다. 기존 프레임은 유지하고 영화 평점 집계와 RATING UPDATE 이벤트를 같은 트랜잭션에 기록합니다.",
+        "operationId" : "update",
+        "parameters" : [
+          {
+            "description" : "본인 평가 ID. 양의 64비트 정수",
+            "in" : "path",
+            "name" : "ratingId",
+            "required" : true,
+            "schema" : {
+              "exclusiveMinimum" : 0,
+              "format" : "int64",
+              "minimum" : 1,
+              "type" : "integer"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RatingUpdateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RatingCreateResponse"
+                }
+              }
+            },
+            "description" : "수정된 평가"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "VALIDATION_FAILED: 경로 ID 또는 요청 본문 오류"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "UNAUTHORIZED: 인증 정보가 없거나 활성 사용자가 아님"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "RESOURCE_NOT_FOUND: 평가가 없거나 다른 사용자의 평가"
+          },
+          "415" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "UNSUPPORTED_MEDIA_TYPE: Content-Type 누락 또는 비지원"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR: 평가 또는 연관 데이터 저장 실패"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "평가 수정",
+        "tags" : [
+          "rating-mutation-controller"
+        ]
+      }
+    },
+    "/api/v1/recommendations" : {
+      "get" : {
+        "operationId" : "getRecommendations",
+        "parameters" : [
+          {
+            "in" : "query",
+            "name" : "size",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RecommendationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "recommendation-controller"
+        ]
+      }
+    },
+    "/api/v1/recommendations/history" : {
+      "get" : {
+        "operationId" : "getHistory",
+        "parameters" : [
+          {
+            "in" : "query",
+            "name" : "cursor",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "size",
+            "required" : false,
+            "schema" : {
+              "format" : "int32",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CursorPageResponseRecommendationHistorySetResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "recommendation-history-controller"
+        ]
+      }
+    },
+    "/api/v1/recommendations/otts" : {
+      "get" : {
+        "operationId" : "getOttRecommendations",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OttRecommendationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "ott-recommendation-controller"
+        ]
+      }
+    },
+    "/api/v1/report-images/{imageId}/download" : {
+      "get" : {
+        "operationId" : "download",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "imageId",
+            "required" : true,
+            "schema" : {
+              "exclusiveMinimum" : 0,
+              "format" : "int64",
+              "type" : "integer"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "expires",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "signature",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "report-image-controller"
+        ]
+      }
+    },
+    "/api/v1/reports/{reportId}" : {
+      "get" : {
+        "operationId" : "detail",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "reportId",
+            "required" : true,
+            "schema" : {
+              "exclusiveMinimum" : 0,
+              "format" : "int64",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ReportDetailResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "report-read-controller"
+        ]
+      }
+    },
+    "/api/v1/reports/{reportId}/image" : {
+      "post" : {
+        "operationId" : "create",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "reportId",
+            "required" : true,
+            "schema" : {
+              "exclusiveMinimum" : 0,
+              "format" : "int64",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ReportImageResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "report-image-controller"
+        ]
+      }
+    },
+    "/api/v1/reports/{reportId}/issue" : {
+      "post" : {
+        "operationId" : "issue",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "reportId",
+            "required" : true,
+            "schema" : {
+              "exclusiveMinimum" : 0,
+              "format" : "int64",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ReportIssueResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "report-read-controller"
+        ]
+      }
+    },
+    "/api/v1/users/me" : {
+      "delete" : {
+        "operationId" : "withdraw",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AccountWithdrawalRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "user-withdrawal-controller"
+        ]
+      },
+      "get" : {
+        "operationId" : "getProfile",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserProfileResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "user-profile-controller"
+        ]
+      },
+      "patch" : {
+        "operationId" : "updateProfile",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ProfileUpdateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserProfileResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "user-profile-controller"
+        ]
+      }
+    },
+    "/api/v1/users/me/avatar" : {
+      "delete" : {
+        "operationId" : "delete",
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "user-avatar-controller"
+        ]
+      },
+      "put" : {
+        "operationId" : "upload",
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "properties" : {
+                  "file" : {
+                    "format" : "binary",
+                    "type" : "string"
+                  }
+                },
+                "required" : [
+                  "file"
+                ],
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AvatarResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "user-avatar-controller"
+        ]
+      }
+    },
+    "/api/v1/users/me/blocks" : {
+      "get" : {
+        "operationId" : "blocks",
+        "parameters" : [
+          {
+            "in" : "query",
+            "name" : "cursor",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "size",
+            "required" : false,
+            "schema" : {
+              "format" : "int32",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CursorPageResponseBlockedUserResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "user-block-controller"
+        ]
+      }
+    },
+    "/api/v1/users/me/frames" : {
+      "get" : {
+        "operationId" : "getMyFrames",
+        "parameters" : [
+          {
+            "in" : "query",
+            "name" : "flavorCode",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "cursor",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "size",
+            "required" : false,
+            "schema" : {
+              "format" : "int32",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FrameListResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "frame-query-controller"
+        ]
+      }
+    },
+    "/api/v1/users/me/notification-settings" : {
+      "get" : {
+        "operationId" : "getMySettings",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NotificationSettingsResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "notification-settings-controller"
+        ]
+      },
+      "put" : {
+        "operationId" : "replaceMySettings",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/NotificationSettingsUpdateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NotificationSettingsResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "notification-settings-controller"
+        ]
+      }
+    },
+    "/api/v1/users/me/oauth/{provider}" : {
+      "post" : {
+        "operationId" : "link",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "provider",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OAuthCodeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OAuthLinkResponse"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "o-auth-link-controller"
+        ]
+      }
+    },
+    "/api/v1/users/me/otts" : {
+      "get" : {
+        "operationId" : "getMyOtts",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserOttResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "user-ott-controller"
+        ]
+      },
+      "put" : {
+        "operationId" : "replaceMyOtts",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UserOttUpdateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserOttResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "user-ott-controller"
+        ]
+      }
+    },
+    "/api/v1/users/me/password" : {
+      "put" : {
+        "operationId" : "changePassword",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PasswordChangeRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "password-change-controller"
+        ]
+      }
+    },
+    "/api/v1/users/me/popcorn" : {
+      "get" : {
+        "operationId" : "getMyPopcornBucket",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PopcornBucketResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "taste-query-controller"
+        ]
+      }
+    },
+    "/api/v1/users/me/ratings" : {
+      "get" : {
+        "description" : "ACTIVE 회원 본인의 평가를 조회합니다. 필터 생략 시 기존 평가-only 최신순이며, ALL은 평가와 감상 후 미평가 영화를 한 페이지로 합칩니다. 미평가 영화는 별점순에서 항상 뒤에 옵니다.",
+        "operationId" : "getMyRatings",
+        "parameters" : [
+          {
+            "description" : "생략 시 평가만; ALL, COMMENTED, UNRATED",
+            "in" : "query",
+            "name" : "filter",
+            "required" : false,
+            "schema" : {
+              "enum" : [
+                "ALL",
+                "COMMENTED",
+                "UNRATED"
+              ],
+              "type" : "string"
+            }
+          },
+          {
+            "description" : "정렬(기본 LATEST)",
+            "in" : "query",
+            "name" : "sort",
+            "required" : false,
+            "schema" : {
+              "default" : "LATEST",
+              "enum" : [
+                "LATEST",
+                "SCORE_DESC",
+                "SCORE_ASC",
+                "OLDEST"
+              ],
+              "type" : "string"
+            }
+          },
+          {
+            "description" : "서버가 직전 응답에서 발급한 불투명 cursor",
+            "in" : "query",
+            "name" : "cursor",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "description" : "페이지 크기(기본 20, 1~50)",
+            "in" : "query",
+            "name" : "size",
+            "required" : false,
+            "schema" : {
+              "default" : 20,
+              "maximum" : 50,
+              "minimum" : 1,
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MyRatingPageResponse"
+                }
+              }
+            },
+            "description" : "내 평가 목록 조회 성공"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "VALIDATION_FAILED: 잘못된 filter·sort·size·cursor"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "UNAUTHORIZED: 인증이 없거나 유효하지 않거나 ACTIVE 회원이 아님; TOKEN_EXPIRED: Access Token 만료"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR: 평가 목록 조회 실패"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "내 평가·미평가 영화 목록",
+        "tags" : [
+          "my-rating-controller"
+        ]
+      }
+    },
+    "/api/v1/users/me/reports" : {
+      "get" : {
+        "operationId" : "list_1",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ReportListResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "report-read-controller"
+        ]
+      }
+    },
+    "/api/v1/users/me/taste" : {
+      "get" : {
+        "operationId" : "getMyTasteAnalysis",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TasteAnalysisResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "taste-query-controller"
+        ]
+      }
+    },
+    "/api/v1/users/nickname-availability" : {
+      "get" : {
+        "operationId" : "check",
+        "parameters" : [
+          {
+            "in" : "query",
+            "name" : "nickname",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/NicknameAvailabilityResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [ ],
+        "tags" : [
+          "nickname-availability-controller"
+        ]
+      }
+    },
+    "/api/v1/users/search" : {
+      "get" : {
+        "operationId" : "search",
+        "parameters" : [
+          {
+            "in" : "query",
+            "name" : "nickname",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "cursor",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "size",
+            "required" : false,
+            "schema" : {
+              "format" : "int32",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CursorPageResponseSearchedUserResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "user-search-controller"
+        ]
+      }
+    },
+    "/api/v1/users/{publicId}/profile" : {
+      "get" : {
+        "description" : "PUBLIC 사용자의 닉네임·취향 키워드·팝콘·최근 필름·공개 한줄평 수를 조회합니다. 비회원도 호출할 수 있습니다. 없는 사용자, PRIVATE 사용자, 로그인 사용자와 차단 관계인 사용자는 모두 404로 구분 없이 응답합니다. 본인이 자신의 publicId로 조회하면 공개 범위와 무관하게 200입니다. 항목별 공개 범위(user.frameVisibility·popcornVisibility·reviewVisibility)가 PRIVATE인 구역은 본인 외 조회에서 필드 모양을 유지한 채 값을 비웁니다.",
+        "operationId" : "getPublicProfile",
+        "parameters" : [
+          {
+            "description" : "users.public_id(UUID). 내부 숫자 ID는 공개 URL에 쓰지 않는다(ADR-0008)",
+            "in" : "path",
+            "name" : "publicId",
+            "required" : true,
+            "schema" : {
+              "example" : "1b4e28ba-2fa1-11d2-883f-0016d3cca427",
+              "format" : "uuid",
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PublicProfileResponse"
+                }
+              }
+            },
+            "description" : "공개 프로필 조회 성공"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "RESOURCE_NOT_FOUND: 없는 사용자·PRIVATE 사용자·차단 관계"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR: 공개 프로필 조회 실패"
+          }
+        },
+        "security" : [
+          { },
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "공개 프로필 조회",
+        "tags" : [
+          "public-profile-controller"
+        ]
+      }
+    },
+    "/api/v1/users/{userId}/block" : {
+      "delete" : {
+        "operationId" : "unblock",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "userId",
+            "required" : true,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "204" : {
+            "description" : "No Content"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "user-block-controller"
+        ]
+      },
+      "post" : {
+        "operationId" : "block",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "userId",
+            "required" : true,
+            "schema" : {
+              "format" : "int64",
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserBlockResponse"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "user-block-controller"
+        ]
+      }
+    },
+    "/api/v1/watch-records" : {
+      "get" : {
+        "description" : "로그인한 활성 사용자의 감상 기록을 상태별로 조회합니다. 7일 만료 경계에 도달한 LINK_CLICKED 기록은 같은 트랜잭션에서 EXPIRED로 반영하며, 커서는 사용자와 필터 조건에 묶입니다.",
+        "operationId" : "getWatchRecords",
+        "parameters" : [
+          {
+            "description" : "감상 상태. status=A&status=B처럼 이름을 반복해 전달하며 중복은 제거됩니다. 인덱스·중첩 표기는 400입니다.",
+            "in" : "query",
+            "name" : "status",
+            "required" : false,
+            "schema" : {
+              "items" : {
+                "enum" : [
+                  "LINK_CLICKED",
+                  "WATCHED_UNRATED",
+                  "RATED",
+                  "EXPIRED"
+                ],
+                "type" : "string"
+              },
+              "type" : "array"
+            }
+          },
+          {
+            "description" : "true이면 확인 시각(clickedAt과 같다)에 도달했고 만료 시각(7일) 전인 LINK_CLICKED 기록만 조회",
+            "in" : "query",
+            "name" : "confirmDue",
+            "required" : false,
+            "schema" : {
+              "default" : false,
+              "type" : "boolean"
+            }
+          },
+          {
+            "description" : "서버가 직전 응답에서 발급한 불투명 커서",
+            "in" : "query",
+            "name" : "cursor",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "description" : "페이지 크기(기본 20, 1~50)",
+            "in" : "query",
+            "name" : "size",
+            "required" : false,
+            "schema" : {
+              "default" : 20,
+              "maximum" : 50,
+              "minimum" : 1,
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WatchRecordPageResponse"
+                }
+              }
+            },
+            "description" : "감상 기록 목록 조회 성공"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "VALIDATION_FAILED: 잘못된 상태·confirmDue·size·cursor, 인덱스·중첩 파라미터 표기"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "UNAUTHORIZED: 인증이 없거나 활성 사용자가 아님"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR: 조회 또는 만료 반영 실패"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "감상 기록 목록",
+        "tags" : [
+          "watch-record-controller"
+        ]
+      }
+    },
+    "/api/v1/watch-records/{watchRecordId}/confirm" : {
+      "post" : {
+        "description" : "본인의 만료 전 LINK_CLICKED 기록에 응답합니다. 클릭 직후부터 응답할 수 있으며, 봤어요는 WATCHED_UNRATED, 안 봤어요는 EXPIRED로 전이합니다. 평가 삭제 후 WATCHED_UNRATED 기록은 클릭 기한이 지나도 안 봤어요로 취소할 수 있습니다.",
+        "operationId" : "confirm",
+        "parameters" : [
+          {
+            "description" : "본인 감상 기록 ID. 양의 64비트 정수",
+            "in" : "path",
+            "name" : "watchRecordId",
+            "required" : true,
+            "schema" : {
+              "exclusiveMinimum" : 0,
+              "format" : "int64",
+              "minimum" : 1,
+              "type" : "integer"
+            }
+          }
+        ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/WatchConfirmRequest"
+              }
+            }
+          },
+          "description" : "감상 여부. watched는 JSON boolean이어야 합니다.",
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/WatchConfirmResponse"
+                }
+              }
+            },
+            "description" : "감상 확인 반영 성공"
+          },
+          "400" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "VALIDATION_FAILED: 경로 ID 또는 JSON boolean 본문 오류, 인덱스·중첩 파라미터 표기"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "UNAUTHORIZED: 인증이 없거나 활성 사용자가 아님"
+          },
+          "404" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "RESOURCE_NOT_FOUND: 기록이 없거나 다른 사용자의 기록"
+          },
+          "409" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "INVALID_WATCH_STATUS: 요청에 허용되지 않는 상태, 클릭 응답 기한 경과 또는 경쟁 전이"
+          },
+          "415" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "UNSUPPORTED_MEDIA_TYPE: Content-Type 누락 또는 비지원"
+          },
+          "500" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR: 상태 전이 저장 또는 commit 실패"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "감상 확인 응답",
+        "tags" : [
+          "watch-record-controller"
+        ]
+      }
+    }
+  },
+  "servers" : [
+    {
+      "description" : "Generated server url",
+      "url" : "http://localhost"
+    }
+  ],
+  "tags" : [
+    {
+      "description" : "인앱 알림 및 브라우저 푸시",
+      "name" : "Notifications"
+    },
+    {
+      "description" : "인앱 알림",
+      "name" : "Notifications"
+    }
+  ]
+}

@@ -17,7 +17,7 @@
  * 나중에 누군가 와이어프레임을 보고 되돌리기 쉬운 자리다.
  */
 import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import PartyListPage from './index';
 import PartySizePage from '../PartySizePage';
 import { renderWithRouter } from '../../../test/render';
@@ -83,6 +83,29 @@ describe('5.1 파티 시작', () => {
     expect(screen.getByText('김난다')).toBeInTheDocument();
     expect(screen.getByText('무비버디')).toBeInTheDocument();
     expect(screen.getByText('2 / 4명 참여')).toBeInTheDocument();
+  });
+
+  it('대표 카드의 상태를 데스크톱과 같은 기준으로 적는다 (업무 -872)', async () => {
+    const { unmount } = renderWithRouter(<PartyListPage />, { route: '/party' });
+
+    // 2/4명. 추천을 받을 수 있어 `진행 중`이다. 데스크톱도 같은 문구를 쓴다
+    const active = (await screen.findByRole('heading', { name: '금요 심야 상영회' })).closest(
+      'section',
+    );
+    if (!active) throw new Error('대표 파티 카드가 없습니다.');
+    expect(within(active).getByText('진행 중')).toBeInTheDocument();
+    unmount();
+
+    vi.mocked(getMyParties).mockResolvedValue([party({ members: [member(ME, 'OWNER')] })]);
+    renderWithRouter(<PartyListPage />, { route: '/party' });
+
+    // 방장 혼자라 아직 추천을 받을 수 없다. 이 경우만 `모집 중`이다
+    const solo = (await screen.findByRole('heading', { name: '금요 심야 상영회' })).closest(
+      'section',
+    );
+    if (!solo) throw new Error('대표 파티 카드가 없습니다.');
+    expect(within(solo).getByText('모집 중')).toBeInTheDocument();
+    expect(within(solo).queryByText('진행 중')).toBeNull();
   });
 
   it('사진이 있는 파티원은 사진으로, 없는 사람과 받은 초대의 방장은 첫 글자로 선다', async () => {

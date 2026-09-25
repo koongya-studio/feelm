@@ -58,6 +58,9 @@ erDiagram
         date birth_date "생년월일, 탈퇴 시 NULL (D-8·D-9 결정)"
         varchar gender "MALE / FEMALE / OTHER, 탈퇴 시 NULL (D-8·D-9 결정)"
         varchar visibility "PUBLIC / PRIVATE, 기본 PRIVATE"
+        varchar frame_visibility "취향 필름 공개 범위 PUBLIC / PRIVATE, 기본 PUBLIC"
+        varchar popcorn_visibility "팝콘 버킷 공개 범위 PUBLIC / PRIVATE, 기본 PUBLIC"
+        varchar review_visibility "한줄평 공개 범위 PUBLIC / PRIVATE, 기본 PUBLIC"
         varchar avatar_storage_key "UUID.jpg, 미등록·탈퇴 시 NULL"
         varchar status "ACTIVE / WITHDRAWN"
         boolean onboarding_completed
@@ -82,14 +85,16 @@ erDiagram
         bigint user_id PK, FK
         boolean rating_enabled
         boolean recommendation_enabled
+        boolean party_invite_enabled
+        boolean report_issued_enabled
         boolean marketing_enabled
     }
     NOTIFICATIONS {
         bigint id PK
         bigint user_id FK
-        varchar type "PARTY_INVITE / WATCH_CONFIRM"
+        varchar type "PARTY_INVITE / PARTY_INVITE_ACCEPTED / WATCH_CONFIRM / REPORT_ISSUED"
         bigint source_id
-        varchar target_type "PARTY_INVITATION / WATCH_RECORD"
+        varchar target_type "PARTY_INVITATION / PARTY / WATCH_RECORD / TASTE_REPORT"
         bigint target_id
         varchar title
         varchar body
@@ -152,10 +157,10 @@ erDiagram
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `users` | 서비스 계정 | `nickname`은 정규화 값(공백 제거·소문자)으로 유일. 같은 정규화식에 `text_pattern_ops`를 적용한 일반 인덱스를 따로 두어 사용자 검색(API-019)의 접두 조건이 인덱스를 타게 합니다. `avatar_storage_key`는 공개 URL이 아닌 로컬 저장소 파일명만 보관합니다. 탈퇴 시 `status=WITHDRAWN`으로 전환하고 이메일·닉네임을 치환해 즉시 재사용을 허용하며 생년월일·성별·프로필 사진을 삭제합니다(D-9) | FR-01, FR-37, FR-38 · API-001~016, API-019, API-078, API-079, API-081, API-082 |
+| `users` | 서비스 계정 | `nickname`은 정규화 값(공백 제거·소문자)으로 유일. 같은 정규화식에 `text_pattern_ops`를 적용한 일반 인덱스를 따로 두어 사용자 검색(API-019)의 접두 조건이 인덱스를 타게 합니다. `avatar_storage_key`는 공개 URL이 아닌 로컬 저장소 파일명만 보관합니다. `frame_visibility`·`popcorn_visibility`·`review_visibility`는 항목별 공개 범위이며 기존 노출을 보존하도록 기본 `PUBLIC`입니다(S15P21E106-856). 탈퇴 시 `status=WITHDRAWN`으로 전환하고 이메일·닉네임을 치환해 즉시 재사용을 허용하며 생년월일·성별·프로필 사진을 삭제합니다(D-9) | FR-01, FR-37, FR-38 · API-001~016, API-019, API-078, API-079, API-081, API-082 |
 | `user_auth_providers` | 소셜 로그인 수단 | UK(`provider`, `provider_user_id`). 같은 이메일이어도 기존 계정에 자동 통합하지 않음 | FR-35 · API-007~009 |
 | `password_reset_tokens` | 비밀번호 재설정 | 1회용, 만료 30분(가정). 성공 시 해당 사용자 Refresh Token 전부 폐기 | FR-37 · API-010, API-011 |
-| `notification_settings` | 알림 수신 설정 | 사용자당 1행. 실제 인앱 사건 종류와 독립적인 수신 설정이며 푸시 채널 적용은 S15P21E106-582 범위 | FR-38 · API-017, API-018 |
+| `notification_settings` | 알림 수신 설정 | 사용자당 1행. 실제 인앱 사건 종류와 독립적인 수신 설정. `party_invite_enabled`(기본 true)가 false면 파티 초대 알림 행을(S15P21E106-857), `report_issued_enabled`(기본 true)가 false면 리포트 발급 알림 행을 만들지 않는다(S15P21E106-858) | FR-38 · API-017, API-018 |
 | `notifications` | 인앱 알림 정본 | UK(`type`, `source_id`)로 원본 사건의 중복 생성을 막는다. 원본과 같은 트랜잭션에서 생성하고, `notified_at <= now < expires_at`이며 `closed_at IS NULL`, `dismissed_at IS NULL`인 행만 노출한다. 사용자 삭제 시 함께 삭제한다 | FR-41 · API-070~074 · ADR-0021 |
 | `web_push_subscriptions` | 사용자·브라우저별 Web Push capability | canonical endpoint의 SHA-256 fingerprint가 유일하다. 등록·갱신 때 `capability_version`을 증가시켜 이전 전송 응답이 새 capability를 지우지 못하게 한다. 해제·만료·탈퇴 시 endpoint와 `p256dh`·`auth` 원문을 지우고 fingerprint만 감사용으로 남긴다 | FR-41 · API-078~077 · ADR-0022 |
 | `web_push_deliveries` | 알림별 durable 발송 상태 | UK(`notification_id`, `endpoint_fingerprint`). 실제 전송 직전에 한 행씩 lease하고 claim token으로 stale worker 완료 경합을 막으며 최대 5회 지수 재시도한다. 구독 삭제 후에도 비민감 결과는 보존한다 | FR-41 · ADR-0022 |
@@ -339,7 +344,7 @@ erDiagram
 | `onboarding_preferences` | 초기 취향(LIKE/DISLIKE) 화면·감사 기록 | UK(`user_id`, `movie_id`). API-024 제출 시 LIKE 4.0점·DISLIKE 2.0점 평가와 감상 기록·프레임을 함께 생성함. 추천 계산 원천은 생성된 `ratings`이며 Consumer는 이 테이블을 직접 읽지 않음. 기존 평가 영화는 평가 관련 상태를 덮어쓰지 않음 | FR-02 · API-023, API-024 |
 | `user_otts` | 구독 OTT | 전체 교체(PUT) | FR-03 · API-026, API-027 |
 | `watch_records` | 감상 상태 머신 | 사용자·영화별 **활성 기록**(EXPIRED 아님)은 1개 — 부분 유일 인덱스(D-6 결정). 만료 후 재클릭은 새 행 | FR-17, FR-18 · API-033~035 |
-| `ratings` | 평가 + 한줄평 | UK(`user_id`, `movie_id`). 한줄평은 컬럼(별도 테이블 아님). `is_spoiler`는 NOT NULL·기본 false이며 기존 평가도 false. 삭제 시 프레임도 삭제되고 감상 기록은 `WATCHED_UNRATED`로 복귀 | FR-19, FR-26 · API-032, API-036~039 |
+| `ratings` | 평가 + 한줄평 | UK(`user_id`, `movie_id`). 한줄평은 컬럼(별도 테이블 아님). `is_spoiler`는 NOT NULL·기본 false이며 기존 평가도 false. 삭제 시 프레임도 삭제되고 감상 기록은 `EXPIRED`로 되돌아감(ADR-0025) | FR-19, FR-26 · API-032, API-036~039 |
 | `frames` | 필름의 프레임 | 평가와 1:1. 조회용 `user_id`·`movie_id`를 보관하고 인덱싱하며 애플리케이션이 평가와의 일치를 보장한다. 맛은 영화 조인으로 조회한다 | FR-07, FR-08 · API-042, API-043 |
 | `taste_analyses` | 취향 분석 결과 캐시 | 별도 `id`와 UK(`user_id`), `rating_count >= 0` CHECK를 둔다. Spring이 평가 추가·수정·삭제 시 평가와 영화 정보를 집계해 갱신하며 평가가 없으면 행을 만들지 않는다. 기본 Re-ranking·XAI 근거는 Python Consumer, 행동 Feature 경량 재정렬·최종 XAI 조립은 Spring이 담당한다(D-4) | FR-04, FR-05 · API-040 |
 
@@ -509,7 +514,7 @@ erDiagram
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `taste_reports` | 반기 취향 리포트 | UK(`user_id`, `year`, `half`). 생성 시점 스냅샷. nullable `issued_at`은 홈의 첫 인화 완료 시각이며 `status=READY`나 다음 반기 자동 목록 공개와 별개 | FR-23 · API-059, API-060, API-080 |
+| `taste_reports` | 반기 취향 리포트 | UK(`user_id`, `year`, `half`). 생성 시점 스냅샷. nullable `issued_at`은 홈의 첫 인화 완료 시각이며 `status=READY`나 다음 반기 자동 목록 공개와 별개. `READY` 공개 시 같은 트랜잭션에서 리포트 발급 알림(`notifications.type=REPORT_ISSUED`)을 만든다(S15P21E106-858) | FR-23 · API-059, API-060, API-080 |
 | `taste_report_generation_runs` | 반기 마감 준비의 정상 완료 기록 | UK(`year`, `half`). 대상 0명도 `prepared_count=0`으로 기록하며 리포트 생성과 같은 트랜잭션에서 저장 | FR-23 · S15P21E106-555 |
 | `report_images` | 이미지 카드 | 파일은 서비스 노드의 비공개 호스트 디렉터리, DB에는 서버가 생성한 상대 키만 저장. 다운로드 URL은 요청 시 10분 유효 서명 발급 | FR-24, NFR-07 · API-061 · ADR-0023 |
 
@@ -526,21 +531,22 @@ flowchart LR
     B -->|감상 취소| X
     B -->|평가 저장| C["RATED"]
     C -->|ratings + frames<br/>단일 트랜잭션 생성| D["필름 반영·팝콘 버킷 재집계"]
-    C -->|평가 삭제| B
+    C -->|평가 삭제| X
     S["감상 기록 없이 평가<br/>(D-6 결정: 허용)"] -.->|허용 시 RATED 기록 생성| C
 ```
 
 - `ratings` 저장·`frames` 생성·`watch_records.status=RATED` 전이는 **하나의 트랜잭션**으로 처리합니다(NFR-06).
-- `ratings` 삭제 시 `frames`는 CASCADE 삭제되고 `watch_records`는 `WATCHED_UNRATED`로 되돌립니다(FR-18).
-- 실수로 평가한 영화를 보지 않은 것으로 되돌릴 때는 평가 삭제 후 감상 취소(`WATCHED_UNRATED` → `EXPIRED`)를 수행합니다. 감상 시각은 비우고 만료 시각을 기록하며, `EXPIRED` 행은 이력으로 보존합니다(S15P21E106-721).
+- `ratings` 삭제 시 `frames`는 CASCADE 삭제되고 `watch_records`는 `EXPIRED`로 되돌립니다(FR-18, ADR-0025). 평가 삭제가 곧 그 영화를 안 본 것으로 되돌리는 동작이므로 감상 시각을 비우고 만료 시각을 기록합니다.
+- 되돌린 뒤에도 `EXPIRED` 행은 이력으로 보존합니다(D-9). 같은 영화를 다시 보러 가거나 평가하면 `EXPIRED`는 활성 기록이 아니므로 새 행이 생깁니다. 평가 없이 `WATCHED_UNRATED`인 기록의 취소 전이(S15P21E106-721)는 API-035에 남아 있으나 이를 부르는 화면은 없습니다.
 - 팝콘 버킷은 별도 행을 생성하지 않고 `ratings JOIN movies`를 맛별로 집계합니다.
 - `movies.average_rating`·`rating_count`와 `taste_analyses`는 평가 변경 시 갱신되는 파생 데이터입니다.
 
 ### 차단·공개 범위
 
 - 차단은 `user_blocks`에 단방향 행으로 저장하고, 조회 시 `(blocker=A AND blocked=B) OR (blocker=B AND blocked=A)`로 양방향 필터를 적용합니다(FR-39).
-- 공개 한줄평(API-032)은 ACTIVE 작성자의 `PUBLIC` 한줄평을 작성자 프로필의 공개 범위와 무관하게 로그인 회원에게 노출하며, 스포일러 여부와 무관하게 원문을 반환합니다. blur/reveal은 FE 로컬 상태이고 별도 서버 상태를 저장하지 않습니다.
+- 공개 한줄평(API-032)은 ACTIVE 작성자의 `PUBLIC` 한줄평을 작성자 프로필의 공개 범위와 무관하게 로그인 회원에게 노출하며(단 작성자의 `users.review_visibility=PRIVATE`이면 제외, 아래 항목별 공개 범위), 스포일러 여부와 무관하게 원문을 반환합니다. blur/reveal은 FE 로컬 상태이고 별도 서버 상태를 저장하지 않습니다.
 - `users.visibility=PRIVATE`인 사용자의 프로필·필름·팝콘·프로필의 평가 목록은 본인 외 조회 시 404로 처리합니다(NFR-07). 영화별 API-032의 `PUBLIC` 한줄평은 별개이며, 작성자 프로필에 접근하면 비공개 정책을 적용합니다. 같은 활성 파티의 현재 멤버에게는 API-057의 팝콘 집계만 공개하며, 개별 필름·프레임·프로필 평가 목록에는 이 예외를 적용하지 않습니다.
+- 항목별 공개 범위(S15P21E106-856): `users.frame_visibility`·`popcorn_visibility`가 `PRIVATE`이면 본인 외 API-062에서 해당 구역(최근 필름과 프레임 수, 팝콘 분포와 팝콘 수)을 비웁니다. `users.review_visibility=PRIVATE`이면 본인 외 API-062의 공개 한줄평 수를 비우고 API-032에서 그 작성자의 한줄평을 평가별 `visibility`와 무관하게 제외합니다. API-057의 파티 팝콘 예외는 `popcorn_visibility`에도 적용합니다.
 - 차단자는 파티장 여부와 관계없이 상대와 함께 속한 모든 활성 파티에서 탈퇴합니다. 차단 저장과 탈퇴·승계·종료는 하나의 트랜잭션으로 처리합니다(API-020). 초대·수락 시 현재 파티원 전원과의 양방향 차단 관계를 검사합니다.
 
 ### 파티 인원 변경
@@ -612,3 +618,10 @@ flowchart LR
 
 미결은 D-9의 계정 외 영역(공개 한줄평, 학습 데이터),
 맞춤·발견 판정 방식·기준값 등입니다.
+# 사용자 의견 (S15P21E106-915)
+
+`user_feedback`은 인증된 회원의 자유 의견과 추천 만족도를 저장한다. `id` PK,
+`user_id` FK(`users.id`, 회원 삭제 시 연쇄 삭제), `category`, `satisfaction`(선택),
+`comment`(선택), `screen_path`, `movie_id`(선택), `recommendation_type`(선택),
+`created_at`, `notification_sent_at`(알림 성공 전 null)을 둔다. 만족도 또는 의견 하나 이상이
+필수다. 새 의견 조회 화면은 이 업무 범위에 없다.

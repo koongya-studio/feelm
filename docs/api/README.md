@@ -124,6 +124,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-081 | [프로필 사진 등록·교체](./users.md#api-081-프로필-사진-등록교체) | PUT | `/users/me/avatar` | 사용자 | 2차 MVP | 회원 | FR-38 |  |
 | API-082 | [프로필 사진 삭제](./users.md#api-082-프로필-사진-삭제) | DELETE | `/users/me/avatar` | 사용자 | 2차 MVP | 회원 | FR-38 |  |
 | API-083 | [파티 추천 이력 조회](./party.md#api-083-파티-추천-이력-조회) | GET | `/parties/{partyId}/recommendations/history` | 파티 | 2차 MVP | 회원 | FR-22, FR-33 |  |
+| API-084 | [사용자 의견 제출](./feedback.md#api-084-사용자-의견-제출) | POST | `/feedback` | 의견 | 시연 QA | 회원 | S15P21E106-915 |  |
 
 ### 삭제된 API
 
@@ -226,7 +227,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 ### 처리 규칙
 
 - 차단 관계 필터(FR-39)는 서버가 적용한다. 클라이언트는 차단 목록을 받아 직접 걸러내지 않는다.
-- 공개 범위 `PRIVATE` 리소스는 본인 외 조회 시 `404`
+- 공개 범위 `PRIVATE` 리소스는 본인 외 조회 시 `404`. 단 공개 프로필 안의 항목별 공개 범위(`frameVisibility`·`popcornVisibility`·`reviewVisibility`)는 `404` 대신 그 구역의 값을 비운다(API-062)
 - 추천 서비스 장애 시 추천 API만 `503`을 반환하고 영화·검색·평가 API는 영향받지 않는다(NFR-05).
 - 멱등성: `PUT`·`DELETE`는 멱등. 동일 리소스 중복 `POST`는 `409`로 거절한다.
 
@@ -238,12 +239,13 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 |---|---|---|
 | `LINK_CLICKED` | OTT 보러가기 클릭. 감상 확정 아님 | 클릭 24시간 후 접속 시 감상 확인 질문 대상 |
 | `WATCHED_UNRATED` | 감상 완료(평가 전) | 감상 확인에 '감상함' 응답 |
-| `RATED` | 평가 완료. 프레임이 생성되고 팝콘 버킷 집계에 반영됨 | 평가 저장. 평가 삭제 시 `WATCHED_UNRATED`로 복귀 |
+| `RATED` | 평가 완료. 프레임이 생성되고 팝콘 버킷 집계에 반영됨 | 평가 저장. 평가 삭제 시 `EXPIRED`로 되돌아감(ADR-0025) |
 | `EXPIRED` | 만료. 추천 신호로 사용하지 않음 | '감상하지 않음' 응답 또는 7일 미응답 |
 
 #### Visibility — 공개 범위
 
 - `PUBLIC`, `PRIVATE` (기본값 `PRIVATE`)
+- 항목별 공개 범위 `frameVisibility`·`popcornVisibility`·`reviewVisibility`(API-014·015)도 같은 값을 쓰며 기본값은 `PUBLIC`이다. 와이어프레임 7.8-B의 `파티원만`은 값에 없다
 
 #### RecommendationType — 추천 유형
 
@@ -267,11 +269,11 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 
 #### NotificationType — 알림 설정 항목 (FR-38)
 
-- `RATING`, `RECOMMENDATION`, `MARKETING`
+- `RATING`, `RECOMMENDATION`, `PARTY_INVITE`, `REPORT_ISSUED`, `MARKETING`
 
 #### InAppNotificationType — 인앱 알림 사건 (FR-41)
 
-- `PARTY_INVITE`, `PARTY_INVITE_ACCEPTED`, `WATCH_CONFIRM`. 알림 설정 항목과 인앱 사건 종류는 서로 다른 계약이다.
+- `PARTY_INVITE`, `PARTY_INVITE_ACCEPTED`, `WATCH_CONFIRM`, `REPORT_ISSUED`. 알림 설정 항목과 인앱 사건 종류는 서로 다른 계약이다. 설정 항목 `PARTY_INVITE`·`REPORT_ISSUED`는 같은 이름의 인앱 사건 하나씩만 켜고 끈다(`PARTY_INVITE_ACCEPTED`는 설정과 무관).
 
 #### PopcornFlavor — 팝콘 맛 (FR-06)
 

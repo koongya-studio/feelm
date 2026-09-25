@@ -124,10 +124,10 @@ describe('파티를 만들고 추천까지', () => {
     fireEvent.click(screen.getByRole('button', { name: '파티 시작하기' }));
 
     expect(await screen.findByText('친구가 오면 함께 섞어요')).toBeInTheDocument();
-    expect(screen.getByText('친구, 입장 대기')).toBeInTheDocument();
+    expect(screen.getByText('입장 대기')).toBeInTheDocument();
     expect(screen.getByText('2명 이상 모이면 자동으로 팝콘을 섞기 시작해요.')).toBeInTheDocument();
     expect(getPartyRecommendations).not.toHaveBeenCalled();
-    expect(getPartyPopcorn).not.toHaveBeenCalled();
+    expect(getPartyPopcorn).toHaveBeenCalledWith(NEW_PARTY_ID);
     fireEvent.click(screen.getByRole('button', { name: '참여 확인하기' }));
     expect(
       await screen.findByText('아직 친구가 입장하지 않았어요. 계속 확인하고 있어요.'),

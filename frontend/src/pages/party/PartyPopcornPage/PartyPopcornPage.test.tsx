@@ -14,6 +14,8 @@
  *
  * **파티팝콘 흐름의 입구.** `함께 볼 영화 추천받기`가 5.9로 간다. 모으기와 섞기가 그 한
  * 화면에서 이어지고 저절로 5.5까지 간다(업무 -773). 한때 5.4가 따로 있어 장면이 끊겼다.
+ * **내가 이미 본 묶음이면 5.5를 바로 연다**(업무 -855). 섞는 장면은 처음 보는 묶음에만
+ * 보여 준다. 파티원마다 따로 가린다 — 다른 파티원이 본 묶음이어도 나는 처음이면 장면을 본다.
  *
  * **파티 관리.** 나가기(API-055) · 종료(API-056) · 내보내기(API-069)도 와이어프레임에
  * 자리가 없어 5.8에 두기로 했다(사용자 결정 2026-09-16). 시안이 헤더 `···` 메뉴로
@@ -23,11 +25,15 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import PartyPopcornPage from './index';
+import { AuthContext } from '../../../contexts/authContext';
+import { testAuth } from '../../../test/auth';
+import { markPartyRecommendationSeen } from '../../../utils/partyRecommendationSeen';
 import { renderWithRouter } from '../../../test/render';
 import {
   closeParty,
   getParty,
   getPartyPopcorn,
+  getPartyRecommendations,
   inviteToParty,
   kickPartyMember,
   leaveParty,
@@ -43,6 +49,7 @@ import {
   member,
   party,
   partyPopcorn,
+  partyRecommendations,
   TEST_PARTY_ID,
 } from '../../../test/party';
 
@@ -55,6 +62,7 @@ vi.mock('../../../api/parties', async () => {
     ...actual,
     getParty: vi.fn(),
     getPartyPopcorn: vi.fn(),
+    getPartyRecommendations: vi.fn(),
     inviteToParty: vi.fn(),
     leaveParty: vi.fn(),
     closeParty: vi.fn(),
@@ -84,6 +92,9 @@ beforeEach(() => {
     .mockResolvedValue({ ...mockMyProfile, userId: ME.userId, nickname: ME.nickname });
   vi.mocked(getPartyPopcorn).mockReset().mockResolvedValue(partyPopcorn());
   vi.mocked(getPopcornFlavors).mockReset().mockResolvedValue(flavors());
+  vi.mocked(getPartyRecommendations).mockReset().mockResolvedValue(partyRecommendations());
+  // 기본은 아무 묶음도 본 적 없는 기기다
+  localStorage.clear();
   vi.mocked(searchUsers).mockReset();
   vi.mocked(inviteToParty).mockReset();
   vi.mocked(leaveParty).mockReset().mockResolvedValue(partyState);
@@ -101,10 +112,17 @@ beforeEach(() => {
 });
 
 async function renderPopcorn() {
-  const result = renderWithRouter(<PartyPopcornPage />, {
-    route: `/parties/${TEST_PARTY_ID}/popcorn`,
-    path: '/parties/:partyId/popcorn',
-  });
+  const result = renderWithRouter(
+    <AuthContext.Provider
+      value={{ ...testAuth, user: { ...testAuth.user!, userId: ME.userId, nickname: ME.nickname } }}
+    >
+      <PartyPopcornPage />
+    </AuthContext.Provider>,
+    {
+      route: `/parties/${TEST_PARTY_ID}/popcorn`,
+      path: '/parties/:partyId/popcorn',
+    },
+  );
   // 첫 파티원의 통이 먼저 열린다
   await screen.findByRole('heading', { name: `${ME.nickname}의 팝콘` });
 
@@ -241,14 +259,75 @@ describe('5.8 파티원 팝콘 — 공개 프로필과 차단', () => {
 });
 
 describe('5.8 파티팝콘 흐름 입구', () => {
-  it('함께 볼 영화 추천받기는 5.9 모으기 · 섞기로 간다', async () => {
+  const location = () => screen.getByTestId('location').textContent;
+  const MIX = `/parties/${TEST_PARTY_ID}/popcorn/mix`;
+  const RESULT = `/parties/${TEST_PARTY_ID}/recommendations`;
+
+  async function recommend() {
+    await renderPopcorn();
+    fireEvent.click(screen.getByRole('button', { name: '함께 볼 영화 추천받기' }));
+  }
+
+  it('내가 아직 못 본 묶음이면 5.9 모으기 · 섞기로 간다', async () => {
+    await recommend();
+
+    await waitFor(() => expect(location()).toBe(MIX));
+    // 5.9가 부르는 것과 같은 일반 조회다. 다시 받기(refresh)를 보내지 않는다
+    expect(getPartyRecommendations).toHaveBeenCalledWith(TEST_PARTY_ID);
+  });
+
+  it('내가 이미 본 묶음이면 섞는 장면 없이 5.5를 바로 연다', async () => {
+    markPartyRecommendationSeen(ME.userId, TEST_PARTY_ID, partyRecommendations());
+
+    await recommend();
+
+    await waitFor(() => expect(location()).toBe(RESULT));
+    expect(getPartyRecommendations).toHaveBeenCalledTimes(1);
+    expect(getPartyRecommendations).toHaveBeenCalledWith(TEST_PARTY_ID);
+  });
+
+  it('다른 파티원만 본 묶음이면 나에게는 섞는 장면을 보여 준다', async () => {
+    markPartyRecommendationSeen(BUDDY.userId, TEST_PARTY_ID, partyRecommendations());
+
+    await recommend();
+
+    await waitFor(() => expect(location()).toBe(MIX));
+  });
+
+  it('다른 파티원이 다른 영화 추천받기로 묶음을 바꿨으면 같은 세트여도 섞는 장면을 보여 준다', async () => {
+    markPartyRecommendationSeen(ME.userId, TEST_PARTY_ID, partyRecommendations());
+    const next = partyRecommendations();
+    vi.mocked(getPartyRecommendations).mockResolvedValue({
+      ...next,
+      items: next.items.map((item, index) => ({
+        ...item,
+        movie: { ...item.movie, movieId: 900 + index },
+      })),
+    });
+
+    await recommend();
+
+    await waitFor(() => expect(location()).toBe(MIX));
+  });
+
+  it('추천을 못 받으면 기존대로 5.9로 간다. 안내는 5.9가 장면 뒤에 한다', async () => {
+    markPartyRecommendationSeen(ME.userId, TEST_PARTY_ID, partyRecommendations());
+    vi.mocked(getPartyRecommendations).mockRejectedValue(new Error('network'));
+
+    await recommend();
+
+    await waitFor(() => expect(location()).toBe(MIX));
+  });
+
+  it('파티원이 모자라면 추천받기를 누를 수 없고 추천도 부르지 않는다', async () => {
+    // 초대를 거절당하거나 파티원이 나가 나 혼자 남았다
+    const alone = partyPopcorn();
+    vi.mocked(getPartyPopcorn).mockResolvedValue({ ...alone, members: alone.members.slice(0, 1) });
+
     await renderPopcorn();
 
-    fireEvent.click(screen.getByRole('button', { name: '함께 볼 영화 추천받기' }));
-
-    expect(screen.getByTestId('location').textContent).toBe(
-      `/parties/${TEST_PARTY_ID}/popcorn/mix`,
-    );
+    expect(screen.getByRole('button', { name: '함께 볼 영화 추천받기' })).toBeDisabled();
+    expect(getPartyRecommendations).not.toHaveBeenCalled();
   });
 });
 

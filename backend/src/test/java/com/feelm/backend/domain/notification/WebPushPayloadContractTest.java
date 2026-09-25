@@ -26,6 +26,7 @@ class WebPushPayloadContractTest {
                         case PARTY_INVITE -> NotificationTargetType.PARTY_INVITATION;
                         case PARTY_INVITE_ACCEPTED -> NotificationTargetType.PARTY;
                         case WATCH_CONFIRM -> NotificationTargetType.WATCH_RECORD;
+                        case REPORT_ISSUED -> NotificationTargetType.TASTE_REPORT;
                     };
             ClaimedDelivery delivery =
                     new ClaimedDelivery(

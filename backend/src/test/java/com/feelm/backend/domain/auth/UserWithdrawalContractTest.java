@@ -208,7 +208,7 @@ class UserWithdrawalContractTest extends OAuthApiTestSupport {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(
                                         """
-                                        {"RATING":false,"RECOMMENDATION":false,"MARKETING":true}
+                                        {"RATING":false,"RECOMMENDATION":false,"PARTY_INVITE":false,"REPORT_ISSUED":false,"MARKETING":true}
                                         """))
                 .andExpect(status().isOk());
         block(member.accessToken(), other.userId());

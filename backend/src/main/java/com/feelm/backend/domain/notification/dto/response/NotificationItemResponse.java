@@ -10,8 +10,8 @@ import java.time.Instant;
 public record NotificationItemResponse(
         @Schema(example = "101") long notificationId,
         @Schema(example = "PARTY_INVITE") NotificationType type,
-        @Schema(example = "파티 모드 초대") String title,
-        @Schema(example = "새로운 파티 초대가 도착했어요.") String body,
+        @Schema(example = "파티팝콘 초대") String title,
+        @Schema(example = "새로운 파티팝콘 초대가 도착했어요.") String body,
         @Schema(example = "PARTY_INVITATION") NotificationTargetType targetType,
         @Schema(example = "501") long targetId,
         @Schema(nullable = true) Instant readAt,

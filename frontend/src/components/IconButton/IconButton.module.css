@@ -40,8 +40,8 @@
 .button[data-variant='translucent'] .box {
   border: 0.5px solid var(--color-glass-line);
   background: var(--color-glass);
-  backdrop-filter: var(--blur-glass);
   -webkit-backdrop-filter: var(--blur-glass);
+  backdrop-filter: var(--blur-glass);
 }
 
 .button[data-variant='filled'] .box {
@@ -106,7 +106,7 @@
 }
 
 /*
- * 아이콘만 남는 단추 (업무 -783). 2026-09-21 시안의 카드 위 `관심없음` · `⋯`이다.
+ * 아이콘만 남는 단추 (업무 -783 · -890). 추천 카드 위 `관심없음`이 이 모양이다.
  *
  * 흰 카드 위에 놓이므로 면을 겹치지 않는다. 누를 수 있다는 것은 아이콘 색과 손 모양 커서가
  * 말하고, 초점은 브라우저 기본 표시를 그대로 쓴다.

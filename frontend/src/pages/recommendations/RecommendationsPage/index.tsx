@@ -1,6 +1,6 @@
 /*
  * 2.2 오늘의 추천 · 2.2-A 추천을 불러오지 못한 경우
- * 2.3 추천 카드 ⋯ 메뉴 · 2.3-A 관심없음 처리도 이 화면의 상태다
+ * 2.3-A 관심없음 처리도 이 화면의 상태다
  * (frontend-structure.md 3.3 — 라우트로 만들지 않는다).
  *
  * 카드 구성은 계약을 따라 취향 맞춤 2편 + 취향 발견 1편이다(API-045,
@@ -16,7 +16,7 @@
  * 않는다(CR-13).
  *
  * **관심없음은 카드 오른쪽 위 버튼이다**(사용자 지시 2026-09-18, 업무 -672 — -536을 합쳤다).
- * ⋯ 메뉴에서는 뺐다. 누르면 API-047에 `recommendationItemId`를 실어 보내고, 성공하면 그
+ * 누르면 API-047에 `recommendationItemId`를 실어 보내고, 성공하면 그
  * 카드를 빼고 API-045를 다시 불러 서버가 보충한 카드로 채운다(API-047 처리 규칙 — 응답은
  * `{ movieId }`뿐이다). 이미 관심없음인 영화(`409 ALREADY_DISMISSED`)도 처리된 것으로 본다.
  * 실패하면 카드를 그대로 두고 알린다 — 화면에서만 지운 척하면 다음 조회에서 되살아난다.
@@ -41,8 +41,8 @@
  *   묶음 이름표를 되살린 것은 좌우로 놓인 두 필름이 이름 없이는 구분되지 않기 때문이고,
  *   412px에서 이름표를 뺀 결정(업무 -672)은 그대로다
  * - 오른쪽에 추천 기준 · 최근 본 영화가 붙는다(`RecommendationsAside`)
- * - **아래 `포스터를 탭하면 ⋯` 안내를 넓은 화면에서 뺀다**(사용자 결정 2026-09-22). 시안에
- *   없고, 마우스로 누르는 화면에서 `탭`이라고 말하는 줄이기도 하다
+ * - **아래 포스터 탭 안내를 넓은 화면에서 뺀다**(사용자 결정 2026-09-22). 시안에 없고,
+ *   마우스로 누르는 화면에서 `탭`이라고 말하는 줄이기도 하다
  *
  * 카드 열은 **3.1과 같은 필름 릴을 세로로 세운 것**이다(`FilmReel`, 업무 -605 — 사용자
  * 지시 2026-09-18). 그전에는 와이어프레임의 회색 판에 구멍 줄을 직접 그렸는데, 3.1의
@@ -55,13 +55,13 @@ import GuideCallout from '../../../components/GuideCallout';
 import DesktopAside from '../../../components/DesktopAside';
 import FilmReel from '../../../components/FilmReel';
 import Menu from '../../../components/Menu';
-import OttBadge from '../../../components/OttBadge';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
-import { LinkIcon, PlayIcon } from '../../../components/Icon';
 import Snackbar from '../../../components/Snackbar';
+import { BlockIcon } from '../../../components/Icon';
 import RecommendationCard from './RecommendationCard';
+import RecommendationFeedback from '../../../components/RecommendationFeedback';
 import RecommendationGroup from './RecommendationGroup';
 import RecommendationsAside from './RecommendationsAside';
 import { ApiError } from '../../../api/apiError';
@@ -102,9 +102,6 @@ const FRAME_HEIGHT = 'calc((100cqw - 34px) * 220 / 156)';
  */
 type Failure = 'preparing' | 'error';
 
-/** ⋯ 메뉴의 폭(px). `components/Menu`의 실측값이며 누른 버튼에 맞출 때 쓴다 */
-const MENU_WIDTH = 148;
-
 /** 넓은 화면의 묶음 하나에 서는 카드 수. 2026-09-21 시안이 묶음마다 석 장이다 */
 const DESKTOP_GROUP_SIZE = 3;
 
@@ -113,18 +110,6 @@ function failureOf(error: unknown): Failure {
     ? 'preparing'
     : 'error';
 }
-
-type OpenMenu = {
-  item: RecommendationItem;
-  /** 화면 위쪽에서의 거리(px). 누른 버튼 위치에 맞춘다 */
-  top: number;
-  /**
-   * 왼쪽에서의 거리(px). 넓은 화면에서만 있다 — 412px에서는 카드와 화면의 오른쪽 끝이
-   * 같아 메뉴가 오른쪽에 붙는 것으로 충분하지만, 좌우로 갈린 두 묶음에서는 누른 카드
-   * 쪽에 열려야 한다(업무 -783)
-   */
-  left?: number;
-};
 
 export default function RecommendationsPage() {
   const navigate = useNavigate();
@@ -158,15 +143,20 @@ export default function RecommendationsPage() {
   const sizeRef = useRef<RecommendationSize>(size);
   const [otts, setOtts] = useState<Ott[]>([]);
   const [items, setItems] = useState<RecommendationItem[] | null>(null);
+  const [recommendationSetId, setRecommendationSetId] = useState<number | null>(null);
   /** 이 추천을 만든 시각(API-045 `generatedAt`). 넓은 화면의 날짜 줄이 쓴다 */
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   /** 관심없음을 처리 중인 카드. 그동안 그 카드의 버튼은 눌리지 않는다 */
   const [dismissingId, setDismissingId] = useState<number | null>(null);
+  const [pendingDismiss, setPendingDismiss] = useState<{
+    item: RecommendationItem;
+    top: number;
+    left: number;
+    placement: 'below' | 'above';
+  } | null>(null);
   /** 관심없음을 처리하지 못했으면 하단 막대로 알린다 */
   const [dismissFailed, setDismissFailed] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
-  const [openMenu, setOpenMenu] = useState<OpenMenu | null>(null);
-
   const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
@@ -195,6 +185,7 @@ export default function RecommendationsPage() {
       .then((set) => {
         if (active) {
           setItems(set.items);
+          setRecommendationSetId(set.recommendationSetId);
           setGeneratedAt(set.generatedAt);
           setFailure(null);
         }
@@ -213,8 +204,8 @@ export default function RecommendationsPage() {
   /** 2.2-A 다시 시도 */
   function handleRetry() {
     setItems(null);
+    setRecommendationSetId(null);
     setFailure(null);
-    setOpenMenu(null);
     setReloadCount((count) => count + 1);
   }
 
@@ -225,7 +216,6 @@ export default function RecommendationsPage() {
   function handleDismiss(item: RecommendationItem) {
     setDismissingId(item.recommendationItemId);
     setDismissFailed(false);
-    setOpenMenu(null);
 
     dismissMovie(item.movie.movieId, item.recommendationItemId)
       .catch((error: unknown) => {
@@ -249,6 +239,7 @@ export default function RecommendationsPage() {
             // 보충 요청 중 폭이 다시 바뀌었다면 그 폭의 useEffect 응답만 화면에 반영한다
             if (sizeRef.current === refillSize) {
               setItems(set.items);
+              setRecommendationSetId(set.recommendationSetId);
               setGeneratedAt(set.generatedAt);
             }
           })
@@ -262,32 +253,19 @@ export default function RecommendationsPage() {
       });
   }
 
-  function handleOpenMenu(event: MouseEvent<HTMLButtonElement>, item: RecommendationItem) {
-    if (openMenu?.item.recommendationItemId === item.recommendationItemId) {
-      setOpenMenu(null);
-
-      return;
-    }
-
-    const root = rootRef.current;
-    const buttonRect = event.currentTarget.getBoundingClientRect();
-    const rootRect = root?.getBoundingClientRect();
-    const top = buttonRect.top - (rootRect?.top ?? 0);
-
-    if (!desktop) {
-      setOpenMenu({ item, top });
-
-      return;
-    }
-
-    // 누른 버튼의 오른쪽 끝에 메뉴의 오른쪽 끝을 맞춘다
-    const left = Math.max(buttonRect.right - (rootRect?.left ?? 0) - MENU_WIDTH, 0);
-
-    setOpenMenu({ item, top, left });
+  function handleOpenDismiss(event: MouseEvent<HTMLButtonElement>, item: RecommendationItem) {
+    const button = event.currentTarget.getBoundingClientRect();
+    const root = rootRef.current?.getBoundingClientRect();
+    // 아래 공간이 모자라면 버튼 바로 위에 붙여 화면 밖으로 잘리지 않게 한다.
+    const below = window.innerHeight - button.bottom >= 170;
+    const top = (below ? button.bottom + 1 : button.top - 162) - (root?.top ?? 0);
+    const left = Math.max(button.right - (root?.left ?? 0) - 196, 0);
+    setPendingDismiss({ item, top, left, placement: below ? 'below' : 'above' });
   }
 
   const tasteItems = items?.filter((item) => item.type === 'TASTE') ?? [];
   const discoveryItems = items?.filter((item) => item.type === 'DISCOVERY') ?? [];
+  const feedbackStorageKey = `feelm:recommendation-feedback:${user?.userId ?? 'unknown'}:${recommendationSetId ?? items?.map((item) => item.recommendationItemId).join(',') ?? 'pending'}`;
 
   /*
    * 넓은 화면의 두 묶음 (업무 S15P21E106-794, 사용자 결정 2026-09-22).
@@ -429,8 +407,6 @@ export default function RecommendationsPage() {
                 description="좋아한 영화와 가장 가까운 편이에요"
                 items={desktopTasteItems}
                 otts={otts}
-                openMenuId={openMenu?.item.recommendationItemId ?? null}
-                onOpenMenu={handleOpenMenu}
                 dismissingId={dismissingId}
                 onDismiss={handleDismiss}
               />
@@ -440,94 +416,81 @@ export default function RecommendationsPage() {
                 description="기존 취향과 연결되는 새로운 맛이에요"
                 items={desktopDiscoveryItems}
                 otts={otts}
-                openMenuId={openMenu?.item.recommendationItemId ?? null}
-                onOpenMenu={handleOpenMenu}
                 dismissingId={dismissingId}
                 onDismiss={handleDismiss}
               />
             </div>
+            {items ? (
+              <RecommendationFeedback key={feedbackStorageKey} storageKey={feedbackStorageKey} />
+            ) : null}
           </>
         ) : (
           <>
-            <div className={styles.scrollArea}>
+            <div className={styles.scrollArea} onScroll={() => setPendingDismiss(null)}>
               {items ? (
-                <FilmReel
-                  orientation="vertical"
-                  flat
-                  frameWidth={FRAME_WIDTH}
-                  frameHeight={FRAME_HEIGHT}
-                  label="오늘의 추천 카드"
-                >
-                  {[...tasteItems, ...discoveryItems].map((item) => (
-                    <RecommendationCard
-                      key={item.recommendationItemId}
-                      item={item}
-                      otts={otts}
-                      menuOpen={openMenu?.item.recommendationItemId === item.recommendationItemId}
-                      onOpenMenu={handleOpenMenu}
-                      dismissing={dismissingId === item.recommendationItemId}
-                      onDismiss={handleDismiss}
-                    />
-                  ))}
-                </FilmReel>
+                <div className={styles.recommendationFlow}>
+                  <FilmReel
+                    orientation="vertical"
+                    flat
+                    frameWidth={FRAME_WIDTH}
+                    frameHeight={FRAME_HEIGHT}
+                    label="오늘의 추천 카드"
+                  >
+                    {[...tasteItems, ...discoveryItems].map((item) => (
+                      <RecommendationCard
+                        key={item.recommendationItemId}
+                        item={item}
+                        otts={otts}
+                        dismissing={dismissingId === item.recommendationItemId}
+                        onDismiss={handleOpenDismiss}
+                      />
+                    ))}
+                  </FilmReel>
+                  <RecommendationFeedback
+                    key={feedbackStorageKey}
+                    storageKey={feedbackStorageKey}
+                  />
+                </div>
               ) : null}
             </div>
 
-            <p className={styles.hint}>포스터를 탭하면 상세 화면 · ⋯ 버튼을 탭하면 OTT 메뉴</p>
+            <p className={styles.hint}>카드를 탭하면 영화 상세 화면으로 이동해요</p>
           </>
         )}
 
-        {/* 2.3 추천 카드 ⋯ 메뉴 */}
-        {openMenu ? (
-          <Menu
-            label={`${openMenu.item.movie.title} OTT 메뉴`}
-            title="OTT · 바로보기"
-            top={openMenu.top}
-            left={openMenu.left}
-            onClose={() => setOpenMenu(null)}
-          >
-            <ul className={styles.menuOttList}>
-              {openMenu.item.movie.ottProviders.map((code) => {
-                const ott = otts.find((candidate) => candidate.code === code);
-
-                return (
-                  <li key={code}>
-                    <OttBadge code={code} name={ott?.name ?? code} size={28} />
-                  </li>
-                );
-              })}
-            </ul>
-
-            <p className={styles.menuOttNames}>
-              {openMenu.item.movie.ottProviders
-                .map((code) => otts.find((candidate) => candidate.code === code)?.name ?? code)
-                .join(' · ')}
-            </p>
-
-            <hr className={styles.menuDivider} />
-
-            <div className={styles.menuItems}>
-              {/*
-               * OTT 바로보기 주소는 API-030 영화 상세의 `ottProviders[].watchUrl`에만 있고
-               * 추천 응답(API-045)에는 없다. OTT가 여러 개일 때 어느 것으로 이동하는지도
-               * 미확정이다(screen-spec.md 2.3). 결정 전까지 동작하지 않는다.
-               */}
-              <button type="button" className={styles.menuItem} disabled>
-                <PlayIcon />
-                <span className={styles.menuItemLabel}>OTT에서 바로 보기</span>
-              </button>
-
-              <Link
-                to={path.movieDetail(openMenu.item.movie.movieId)}
-                state={{ recommendationItemId: openMenu.item.recommendationItemId }}
-                className={styles.menuItem}
-                onClick={() => setOpenMenu(null)}
-              >
-                <LinkIcon />
-                <span className={styles.menuItemLabel}>영화 상세 보기</span>
-              </Link>
-            </div>
-          </Menu>
+        {pendingDismiss ? (
+          <div className={styles.dismissMenu} data-placement={pendingDismiss.placement}>
+            <Menu
+              label={`${pendingDismiss.item.movie.title} 관심없음 확인`}
+              top={pendingDismiss.top}
+              left={pendingDismiss.left}
+              onClose={() => setPendingDismiss(null)}
+            >
+              <div className={styles.dismissHead}>
+                <span className={styles.dismissIcon} aria-hidden="true">
+                  <BlockIcon />
+                </span>
+                <div>
+                  <strong>추천에서 제외할까요?</strong>
+                  <p className={styles.dismissMovieTitle}>{pendingDismiss.item.movie.title}</p>
+                </div>
+              </div>
+              <div className={styles.dismissActions}>
+                <button type="button" onClick={() => setPendingDismiss(null)}>
+                  아니요
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDismiss(pendingDismiss.item);
+                    setPendingDismiss(null);
+                  }}
+                >
+                  예
+                </button>
+              </div>
+            </Menu>
+          </div>
         ) : null}
 
         {/* 관심없음을 처리하지 못했을 때. 카드는 그대로 남아 다시 누를 수 있다 */}

@@ -118,6 +118,24 @@ class PartyInvitationApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
+    void invitesUserWhoTurnedOffPartyInviteNotificationWithoutNotification() throws Exception {
+        // S15P21E106-857: 알림만 빠지고 초대 자체와 받은 초대 목록은 설정과 무관하다
+        jdbc.update(
+                "INSERT INTO notification_settings(user_id,party_invite_enabled) VALUES (20,false)");
+        long party = party(10, "ACTIVE", CREATED_AT);
+
+        invite(party, 20, 10)
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("PENDING"));
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM notifications", Long.class)).isZero();
+        list(20).andExpect(status().isOk())
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].party.partyId").value(party))
+                .andExpect(jsonPath("$.items[0].status").value("PENDING"));
+    }
+
+    @Test
     void rollsBackInvitationWhenNotificationWriteFails() throws Exception {
         long party = party(10, "ACTIVE", CREATED_AT);
         jdbc.execute(

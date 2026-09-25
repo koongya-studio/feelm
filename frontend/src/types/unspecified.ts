@@ -86,6 +86,19 @@ export type ProfileFrame = {
   isPublic: boolean;
 };
 
+/**
+ * 다른 사용자에게 가려지는 구역(업무 -856). 7.8-B의 항목별 공개 범위가 `PRIVATE`인 것이다.
+ *
+ * **계약에 있는 값이다**(API-014 · API-062의 `frameVisibility` · `popcornVisibility` ·
+ * `reviewVisibility`). 공개 모양(7.2-A · 7.2-B)만 이 값으로 구역을 `비공개`로 그린다. 본인 화면
+ * (7.1 · 7.2)은 가리지 않는다.
+ */
+export type ProfileHiddenSections = {
+  frames: boolean;
+  popcorn: boolean;
+  reviews: boolean;
+};
+
 /** 7.1 · 7.2 · 7.2-A · 7.2-B 프로필 */
 export type ProfileView = {
   userId: number;
@@ -101,6 +114,8 @@ export type ProfileView = {
   frames: ProfileFrame[];
   /** 팝콘 맛 분포. 코드와 알 수만 담고 색·이름은 API-044에서 온다 */
   popcorn: { flavorCode: string; popcornCount: number }[];
+  /** 다른 사용자에게 가려지는 구역(업무 -856) */
+  hidden: ProfileHiddenSections;
   /**
    * 공개 한줄평. **`null`이면 목록을 받을 수 없는 것이다** — API-062는 개수만 주고 사용자별
    * 공개 한줄평 목록 API는 계약에 없다(업무 -810). 빈 배열(공개한 것이 없음)과 다르다.

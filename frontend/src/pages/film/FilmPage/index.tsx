@@ -31,8 +31,8 @@
  * 1024px 이상에서는 2026-09-21 시안의 배치를 쓴다. **모바일 화면은 한 줄도 바뀌지 않는다** —
  * 폭에 따라 그리는 것 자체가 갈린다(`hooks/useShellSize`).
  *
- * - 제목 오른쪽에 `‹ 1 – 6 / 73 ›`가 붙는다. 넓은 릴에서는 한 번에 여섯 칸쯤 보이므로
- *   모바일의 `6 / 73`으로는 어디까지 봤는지 말이 되지 않는다
+ * - 제목 오른쪽에 `‹ 1 – 6 / 73 ›`가 붙는다. 모바일 필름 아래 줄과 같은 표기다(`frameRangeLabel`,
+ *   업무 -876)
  * - 필름 아래에 `오늘의 추천`이 선다(`TodayRecommendations`). 2.2 추천 영화 화면과 같은
  *   것(API-045)이며, 시안이 그 앞자리 몇 장을 여기서 먼저 보여준다
  * - 팝콘 요약 · 취향 리포트 줄이 우측 보조 패널로 간다(`FilmAside`). 본문에서는 뺀다 —
@@ -72,7 +72,9 @@ import {
   PARTY_GUIDE,
   completeGuide,
   hasSeenGuide,
+  readGuideProgress,
   restartGuide,
+  setGuideProgress,
 } from '../../../utils/userGuides';
 import styles from './FilmPage.module.css';
 import type { FrameList, PopcornBucket } from '../../../types/taste';
@@ -112,12 +114,16 @@ const PREFETCH_MARGIN = '0px 360px 0px 0px';
 type FrameRange = { first: number; last: number };
 
 /**
- * 릴에서 온전히 보이는 프레임이 몇 번째부터 몇 번째인지(1부터). 모바일 `N / 전체`의 N은
- * `last`이고(업무 -680), 넓은 화면의 `1 – 6 / 73`은 두 수를 모두 쓴다(업무 -783).
+ * 릴에서 온전히 보이는 프레임이 몇 번째부터 몇 번째인지(1부터). 모바일 · 넓은 화면 모두 이
+ * 구간을 `frameRangeLabel`로 적는다(업무 -876).
  *
- * `last`는 왼쪽 끝이 아니라 오른쪽 끝을 센다. 끝까지 넘기면 `전체 / 전체`가 되어 "다 봤다"가
- * 맞게 읽힌다. 왼쪽 끝을 세면 마지막 칸에 닿아도 `22 / 24`에서 멈춘다. 칸 간격은 첫 두 칸의
- * 위치 차로 잰다 — 칸 폭 · 간격 · 테두리가 CSS에 있어 여기서 다시 계산하면 어긋난다.
+ * 양끝 모두 **온전히 보이는 칸**을 센다. 끝까지 넘기면 `last`가 전체와 같아져 "다 봤다"가 맞게
+ * 읽히고, 처음에는 `first`가 1이다. 칸 간격은 첫 두 칸의 위치 차로 잰다 — 칸 폭 · 간격 · 테두리가
+ * CSS에 있어 여기서 다시 계산하면 어긋난다.
+ *
+ * `first`를 `last`에서 "한 화면에 들어가는 칸 수"를 빼서 구하지 않는다. 마지막 칸 뒤에는 간격이
+ * 없어 세 칸이 온전히 보여도 릴 폭이 세 칸 간격에 조금 못 미치면 두 칸으로 세어져, 첫 화면이
+ * `2 – 3`으로 적혔다.
  */
 function visibleFrameRange(track: HTMLElement, frameCount: number): FrameRange {
   const [first, second] = track.children as unknown as HTMLElement[];
@@ -130,13 +136,29 @@ function visibleFrameRange(track: HTMLElement, frameCount: number): FrameRange {
   // 레이아웃이 없는 환경(테스트)은 폭이 0이다. 첫 칸이 보인다고 본다
   if (step <= 0) return { first: 1, last: 1 };
 
-  const visibleRight = track.scrollLeft + track.clientWidth;
+  const visibleLeft = track.scrollLeft;
+  const visibleRight = visibleLeft + track.clientWidth;
   const count = Math.floor((visibleRight - first.offsetLeft - first.offsetWidth) / step) + 1;
   const last = Math.min(Math.max(count, 1), frameCount);
-  // 한 번에 몇 칸이 들어오는지. 모바일처럼 두 칸 반만 보이면 1이 된다
-  const fits = Math.max(Math.floor(track.clientWidth / step), 1);
+  // 왼쪽 끝이 보이는 영역 안에 든 첫 칸. 반쯤 잘린 칸은 세지 않는다
+  const start = Math.max(Math.ceil((visibleLeft - first.offsetLeft) / step), 0) + 1;
 
-  return { first: Math.max(last - fits + 1, 1), last };
+  return { first: Math.min(start, last), last };
+}
+
+/**
+ * 넘김 표시. 모바일과 넓은 화면이 같은 기준으로 적는다(업무 -876) — 전에는 모바일이 보이는
+ * 마지막 칸만(`3 / 74`), 넓은 화면이 구간을(`1 – 6 / 74`) 적어 같은 필름이 달리 읽혔고, 첫 장을
+ * 보면서도 `3`이 무엇인지 알기 어려웠다. 한 칸만 보이면 `1 – 1` 대신 `1 / 74`로 적는다.
+ */
+function frameRangeLabel({ first, last }: FrameRange, total: number) {
+  return {
+    text: first === last ? `${last} / ${total}` : `${first} – ${last} / ${total}`,
+    spoken:
+      first === last
+        ? `전체 ${total}개 중 ${last}번째 프레임을 보고 있어요`
+        : `전체 ${total}개 중 ${first}번째부터 ${last}번째 프레임까지 보고 있어요`,
+  };
 }
 
 /** 다음 장 칸의 상태. `failed`면 자동으로 다시 부르지 않고 버튼으로 잇는다 */
@@ -146,6 +168,7 @@ type MoreState = 'idle' | 'loading' | 'failed';
 const EMPTY_SLOT_LABELS = ['첫 번째 프레임', '두 번째 프레임'];
 
 type FilmGuideStep = {
+  id: string;
   title: string;
   description: string;
   targetSelector: string;
@@ -154,28 +177,33 @@ type FilmGuideStep = {
 
 const FILM_GUIDE_STEPS: FilmGuideStep[] = [
   {
+    id: 'reel',
     title: '감상 기록을 넘겨보세요',
     description:
       '처음 고른 영화부터 앞으로 평가할 영화까지 필름에 쌓여요. 옆으로 넘기며 다시 볼 수 있어요.',
     targetSelector: "[data-guide-target='film-reel']",
   },
   {
+    id: 'popcorn',
     title: '나의 취향 팝콘',
     description:
       '평가한 영화가 맛별 팝콘으로 모여요. 누르면 어떤 취향이 많은지 자세히 볼 수 있어요.',
     targetSelector: "[aria-label^='나의 취향 팝콘']",
   },
   {
+    id: 'report',
     title: '취향 리포트',
     description: '영화 감상 기록을 분석한 리포트를 확인하는 곳이에요.',
     targetSelector: "[aria-label='취향 리포트 보기'],[aria-label='새 취향 리포트 받기']",
   },
   {
+    id: 'notifications',
     title: '새 소식을 확인하세요',
     description: '새 추천이나 리포트 같은 소식은 알림에서 확인할 수 있어요.',
     targetSelector: "a[aria-label^='알림']",
   },
   {
+    id: 'rate',
     title: '본 영화를 평가해 보세요',
     description:
       '이 버튼과 상단 검색 모두 검색 화면으로 가요. 본 영화를 찾아 원할 때 평가하면 필름이 늘어나요.',
@@ -183,6 +211,7 @@ const FILM_GUIDE_STEPS: FilmGuideStep[] = [
     placement: 'top',
   },
   {
+    id: 'recommendations',
     title: '영화 추천을 받아보세요',
     description: '지금 취향에 맞는 추천 영화를 보러 갈 수 있어요.',
     targetSelector: "[data-guide-target='film-recommendations']",
@@ -195,7 +224,7 @@ export default function FilmPage() {
   const { user } = useAuth();
   const [guideDismissed, setGuideDismissed] = useState(false);
   const showGuide = Boolean(user && !guideDismissed && !hasSeenGuide(user.userId, FILM_GUIDE));
-  const [guideIndex, setGuideIndex] = useState(0);
+  const [guideStep, setGuideStep] = useState<{ userId: number; id: string } | null>(null);
   const finishGuide = () => {
     if (user) completeGuide(user.userId, FILM_GUIDE);
     setGuideDismissed(true);
@@ -313,7 +342,7 @@ export default function FilmPage() {
   }, [canAutoLoad, loadMore]);
 
   /*
-   * 넘길 때마다 `N / 전체`의 N을 다시 잰다. 한 프레임에 한 번만 잰다 — 스크롤 이벤트는 그보다
+   * 넘길 때마다 보이는 구간을 다시 잰다. 한 프레임에 한 번만 잰다 — 스크롤 이벤트는 그보다
    * 잦다. 다음 장이 붙어 칸이 늘거나 릴의 폭이 바뀌어도 다시 잰다.
    *
    * **창 크기가 아니라 릴 자체를 지켜본다**(`ResizeObserver`, 업무 -783). 우측 보조 패널은
@@ -388,6 +417,7 @@ export default function FilmPage() {
 
   const items = frames?.items ?? [];
   const totalCount = frames?.totalCount ?? 0;
+  const rangeLabel = frameRangeLabel(range, totalCount);
   // 받기 전에는 빈 상태로 단정하지 않는다. `0개`로 보이면 없는 정보를 말하는 셈이다
   const isEmpty = frames !== null && totalCount === 0;
 
@@ -420,7 +450,31 @@ export default function FilmPage() {
           : step,
       )
     : [];
-  const activeGuideIndex = Math.min(guideIndex, guideSteps.length - 1);
+  const savedGuideStep = user
+    ? guideStep?.userId === user.userId
+      ? guideStep.id
+      : readGuideProgress(user.userId, FILM_GUIDE)
+    : null;
+  const activeGuideIndex = Math.max(
+    0,
+    guideSteps.findIndex((step) => step.id === savedGuideStep),
+  );
+  const activeGuideStep = guideSteps[activeGuideIndex];
+  const guidePlacement =
+    !desktop && (activeGuideStep?.id === 'popcorn' || activeGuideStep?.id === 'report')
+      ? 'top'
+      : activeGuideStep?.placement;
+  const moveGuideTo = (id: string) => {
+    if (!user) return;
+    setGuideProgress(user.userId, FILM_GUIDE, id);
+    setGuideStep({ userId: user.userId, id });
+  };
+  const continueAfterRate = () => {
+    if (showGuide && guideSteps[activeGuideIndex]?.id === 'rate') {
+      const next = guideSteps[activeGuideIndex + 1];
+      if (next) moveGuideTo(next.id);
+    }
+  };
 
   return (
     <>
@@ -446,7 +500,12 @@ export default function FilmPage() {
             </div>
 
             {!isEmpty ? (
-              <Link to={path.search()} className={styles.desktopRate} data-guide-target="film-rate">
+              <Link
+                to={path.search()}
+                className={styles.desktopRate}
+                data-guide-target="film-rate"
+                onClick={continueAfterRate}
+              >
                 본 영화 평가하기
               </Link>
             ) : null}
@@ -464,13 +523,8 @@ export default function FilmPage() {
                 </button>
 
                 <p className={styles.pagerLabel}>
-                  <span aria-hidden="true">
-                    {range.first} – {range.last} / {totalCount}
-                  </span>
-                  <VisuallyHidden>
-                    전체 {totalCount}개 중 {range.first}번째부터 {range.last}번째 프레임까지 보고
-                    있어요
-                  </VisuallyHidden>
+                  <span aria-hidden="true">{rangeLabel.text}</span>
+                  <VisuallyHidden>{rangeLabel.spoken}</VisuallyHidden>
                 </p>
 
                 <button
@@ -559,7 +613,8 @@ export default function FilmPage() {
 
           {/*
            * 지금 위치와 넘기는 방향(업무 -680, UI/UX 분석 리포트 P1-02). 잘린 오른쪽이 "더 있다"는
-           * 말해 주지만, 옆으로 넘긴다는 것과 몇 번째까지 왔는지는 말해 주지 않았다.
+           * 말해 주지만, 옆으로 넘긴다는 것과 몇 번째까지 왔는지는 말해 주지 않았다. 위치는 넓은
+           * 화면과 같은 구간 표기(`1 – 3 / 74`)다(업무 -876).
            *
            * 끝까지 넘기면 화살표 힌트를 거둔다 — 더 넘길 곳이 없는데 오른쪽을 가리키면 틀린 말이다.
            * 위치는 넘길 때마다 바뀌므로 읽기 도구에 매번 알리지 않는다(`aria-live` 없음).
@@ -570,12 +625,8 @@ export default function FilmPage() {
           {!desktop && !isEmpty && items.length > 1 ? (
             <p className={styles.reelHint}>
               <span className={styles.reelCounter}>
-                <span aria-hidden="true">
-                  {range.last} / {totalCount}
-                </span>
-                <VisuallyHidden>
-                  전체 {totalCount}개 중 {range.last}번째 프레임까지 보고 있어요
-                </VisuallyHidden>
+                <span aria-hidden="true">{rangeLabel.text}</span>
+                <VisuallyHidden>{rangeLabel.spoken}</VisuallyHidden>
               </span>
 
               {range.last < totalCount ? (
@@ -598,14 +649,17 @@ export default function FilmPage() {
             <p className={styles.emptyText}>본 영화를 평가하면 필름에 한 장씩 추가돼요</p>
             <div className={styles.actionButtons}>
               <Button
-                variant="brand"
+                variant="primary"
                 data-guide-target="film-rate"
-                onClick={() => void navigate(path.search())}
+                onClick={() => {
+                  continueAfterRate();
+                  void navigate(path.search());
+                }}
               >
                 본 영화 평가하기
               </Button>
               <Button
-                variant="secondary"
+                variant="brand"
                 data-guide-target="film-recommendations"
                 onClick={() => void navigate(path.recommendations())}
               >
@@ -700,14 +754,17 @@ export default function FilmPage() {
               <p className={styles.actionHint}>본 영화를 평가하면 필름에 한 장씩 추가돼요</p>
               <div className={styles.actionButtons}>
                 <Button
-                  variant="brand"
+                  variant="primary"
                   data-guide-target="film-rate"
-                  onClick={() => void navigate(path.search())}
+                  onClick={() => {
+                    continueAfterRate();
+                    void navigate(path.search());
+                  }}
                 >
                   본 영화 평가하기
                 </Button>
                 <Button
-                  variant="secondary"
+                  variant="brand"
                   data-guide-target="film-recommendations"
                   onClick={() => void navigate(path.recommendations())}
                 >
@@ -733,13 +790,13 @@ export default function FilmPage() {
           step={activeGuideIndex + 1}
           totalSteps={guideSteps.length}
           targetSelector={guideSteps[activeGuideIndex].targetSelector}
-          placement={guideSteps[activeGuideIndex].placement}
+          placement={guidePlacement}
           title={guideSteps[activeGuideIndex].title}
           description={guideSteps[activeGuideIndex].description}
           onSkip={finishGuide}
           action={
             activeGuideIndex < guideSteps.length - 1
-              ? { label: '다음', onClick: () => setGuideIndex(activeGuideIndex + 1) }
+              ? { label: '다음', onClick: () => moveGuideTo(guideSteps[activeGuideIndex + 1].id) }
               : { label: '둘러보기', onClick: finishGuide }
           }
           secondaryAction={

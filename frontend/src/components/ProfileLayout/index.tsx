@@ -8,6 +8,9 @@
  * 프로필(7.2-A · 7.2-B)에 무엇이 남는지는 `api/users.ts`가 정한다. 이 컴포넌트는 값을 가려
  * 내지 않는다.
  *
+ * 공개 모양에서 `hidden`(업무 -856, 7.8-B 항목별 공개 범위)인 구역은 `비공개` 안내를 그린다.
+ * 값은 이미 비어 오지만 `없어요`라고 쓰면 사실과 다르다 — 없는 것이 아니라 가린 것이다.
+ *
  * | mode | 화면 | 구역 |
  * | --- | --- | --- |
  * | `view` | 7.1 MY | 머리 · `actions` · 수치 |
@@ -73,6 +76,19 @@ const BUCKET_WIDTH = 120;
 
 /** 공개 한줄평 별 크기 */
 const REVIEW_STAR_SIZE = 14;
+
+/** 가린 구역의 안내(업무 -856). 7.8-B 맨 아래 `비공개 항목은 다른 사용자에게 표시되지 않아요`와 짝이다 */
+const HIDDEN_NOTE = '비공개로 설정한 항목이에요';
+
+/** 수치 카드 한 칸. 가린 수는 0이 아니라 `비공개`로 적는다 */
+function Stat({ label, value, hidden }: { label: string; value: number; hidden: boolean }) {
+  return (
+    <div className={styles.stat}>
+      <dt>{label}</dt>
+      <dd data-hidden={hidden || undefined}>{hidden ? '비공개' : value}</dd>
+    </div>
+  );
+}
 
 /** 구역마다 같은 모양의 연필. 보이는 아이콘은 작고 누르는 자리는 44px이다 */
 function EditButton({ label, onClick }: { label: string; onClick?: () => void }) {
@@ -162,6 +178,8 @@ export default function ProfileLayout({
   // 사진이 배경에 깔려 있으면 동그라미 사진을 또 두지 않는다
   const photoBehind = tone === 'dark' && Boolean(profile.avatarUrl);
   const isPublic = mode === 'public' || mode === 'preview';
+  // 가림은 다른 사용자가 보는 모양에서만이다. 7.1 · 7.2는 본인 화면이라 모두 보인다
+  const hidden = isPublic ? profile.hidden : { frames: false, popcorn: false, reviews: false };
   const editorFor = (key: EditableKey) => (editing?.key === key ? editing.node : null);
 
   const avatar = (
@@ -236,18 +254,9 @@ export default function ProfileLayout({
 
       {/* 이름표(dt)가 먼저인 것이 목록의 규칙이다. 숫자가 위로 가는 것은 CSS가 뒤집는다 */}
       <dl className={styles.stats} data-plain={isEdit || undefined}>
-        <div className={styles.stat}>
-          <dt>프레임</dt>
-          <dd>{profile.stats.frameCount}</dd>
-        </div>
-        <div className={styles.stat}>
-          <dt>팝콘</dt>
-          <dd>{profile.stats.popcornCount}</dd>
-        </div>
-        <div className={styles.stat}>
-          <dt>공개 한줄평</dt>
-          <dd>{profile.stats.publicReviewCount}</dd>
-        </div>
+        <Stat label="프레임" value={profile.stats.frameCount} hidden={hidden.frames} />
+        <Stat label="팝콘" value={profile.stats.popcornCount} hidden={hidden.popcorn} />
+        <Stat label="공개 한줄평" value={profile.stats.publicReviewCount} hidden={hidden.reviews} />
       </dl>
 
       {isEdit || isPublic ? (
@@ -274,20 +283,29 @@ export default function ProfileLayout({
             ) : null
           }
         >
-          {filmsEditor ?? <Films profile={profile} compact={isEdit} />}
+          {filmsEditor ??
+            (hidden.frames ? (
+              <p className={styles.empty}>{HIDDEN_NOTE}</p>
+            ) : (
+              <Films profile={profile} compact={isEdit} />
+            ))}
         </Card>
       ) : null}
 
       {isPublic ? (
         <Card title="팝콘 버킷">
-          <div className={styles.bucket}>
-            <PopcornBucket
-              width={BUCKET_WIDTH}
-              flavors={kernelCounts(profile.popcorn)}
-              label={`팝콘 ${profile.stats.popcornCount}알`}
-            />
-            <p className={styles.bucketCount}>팝콘 {profile.stats.popcornCount}알</p>
-          </div>
+          {hidden.popcorn ? (
+            <p className={styles.empty}>{HIDDEN_NOTE}</p>
+          ) : (
+            <div className={styles.bucket}>
+              <PopcornBucket
+                width={BUCKET_WIDTH}
+                flavors={kernelCounts(profile.popcorn)}
+                label={`팝콘 ${profile.stats.popcornCount}알`}
+              />
+              <p className={styles.bucketCount}>팝콘 {profile.stats.popcornCount}알</p>
+            </div>
+          )}
         </Card>
       ) : null}
 
@@ -297,7 +315,12 @@ export default function ProfileLayout({
            * 목록을 받을 수 없으면(`null`, API-062는 개수만 준다 · 업무 -810) `없어요`라고 쓰지
            * 않는다. 위 수치가 한줄평이 있다고 말하는데 아래에서 없다고 하면 서로 어긋난다
            */}
-          {profile.reviews === null ? (
+          {hidden.reviews ? (
+            <div className={styles.emptyReviews}>
+              <SpeechBubbleIcon />
+              <p>{HIDDEN_NOTE}</p>
+            </div>
+          ) : profile.reviews === null ? (
             <div className={styles.emptyReviews}>
               <SpeechBubbleIcon />
               <p>한줄평 목록은 아직 볼 수 없어요</p>

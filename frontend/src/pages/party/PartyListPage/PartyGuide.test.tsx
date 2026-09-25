@@ -10,6 +10,7 @@ import {
   getPartyPopcorn,
 } from '../../../api/parties';
 import { getPopcornFlavors } from '../../../api/taste';
+import { PARTY_GUIDE, readGuideProgress } from '../../../utils/userGuides';
 
 vi.mock('../../../contexts/authContext', () => ({
   useAuth: () => ({ user: { userId: 891 } }),
@@ -46,10 +47,15 @@ it('파티가 없으면 만들기를 설명하고 이 화면에서 안내를 마
 
 it('참여 중인 파티가 있으면 입장을 순서대로 설명한다', async () => {
   vi.mocked(getMyParties).mockResolvedValue([party()]);
-  renderWithRouter(<PartyListPage />, { route: '/party' });
+  const firstVisit = renderWithRouter(<PartyListPage />, { route: '/party' });
 
   expect(await screen.findByText('참여 중인 파티', { selector: 'strong' })).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '다음' }));
   expect(screen.getByText('파티 안으로 들어가기')).toBeInTheDocument();
   expect(screen.getByRole('status', { name: '앱 사용 안내 2/2 단계' })).toBeInTheDocument();
+  expect(readGuideProgress(891, PARTY_GUIDE)).toBe('open');
+
+  firstVisit.unmount();
+  renderWithRouter(<PartyListPage />, { route: '/party' });
+  expect(await screen.findByRole('status', { name: '앱 사용 안내 2/2 단계' })).toBeInTheDocument();
 });

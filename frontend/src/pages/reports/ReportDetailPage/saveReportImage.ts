@@ -9,11 +9,17 @@ import { isApiError } from '../../../api/apiError';
 import { createReportImage } from '../../../api/reports';
 import { captureReportImage, downloadReportImage } from '../../../utils/reportImage';
 
-export async function saveReportImage(reportId: number, node: HTMLElement | null): Promise<void> {
+export async function saveReportImage(
+  reportId: number,
+  node: HTMLElement | null,
+  onStage?: (stage: 'upload' | 'download') => void,
+): Promise<void> {
   if (!node) throw new Error('ReportFourCut is unavailable');
 
   const png = await captureReportImage(node);
+  onStage?.('upload');
   const image = await createReportImage(reportId, png);
+  onStage?.('download');
   await downloadReportImage(image.downloadUrl, reportId);
 }
 

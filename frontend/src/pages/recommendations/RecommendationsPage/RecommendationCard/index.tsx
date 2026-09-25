@@ -1,62 +1,32 @@
-/*
- * 2.2 오늘의 추천 — 카드 (MovieCard 목록형)
- *
- * **크기는 릴의 칸을 채운다** — 필름이 화면 폭을 꽉 채우도록 칸이 화면 폭을 따른다(업무 -672,
- * `RecommendationsPage`의 FRAME_WIDTH). 비율은 와이어프레임 156 × 220이고 아래 위치값도
- * 와이어프레임 그대로다.
- * - `⋯` 버튼 26px: top 6 left 6, 반투명 흰 배경
- * - 관심없음 버튼 26px: top 6 right 6 — ⋯ 버튼과 같은 모양(업무 -672)
- * - OTT 배지 22px: 관심없음 버튼 왼쪽, gap 4
- * - `새로운 맛` 배지: ⋯ 버튼 오른쪽(top 6 · left 38, 버튼 높이 가운데), 빨간 면 —
- *   취향 발견 카드에만(사용자 지시 2026-09-18)
- * - 추천 이유 상자: left 6 right 6 bottom 6
- *
- * 추천 이유 상자는 API-045의 `reason.summary`만 표시한다(업무 -822). `추천 이유:` 같은
- * 고정 라벨을 덧붙이지 않아 서버가 확정한 사용자용 문장을 그대로 읽을 수 있게 한다.
- *
- * **배지는 취향 발견 카드의 `새로운 맛` 하나다**(사용자 지시 2026-09-18, 업무 -672).
- * 섹션 이름표를 뺐으므로 어느 카드가 새로운 맛을 여는 추천인지는 이 배지가 말한다. 취향 맞춤
- * 카드의 `안 봄`은 뺐다. `일치 %` · `연결 %`(matchRate)도 계약에 없어 그리지 않는다
- * (CR-13, 업무 -610).
- *
- * **관심없음은 ⋯ 메뉴가 아니라 오른쪽 위 버튼이다**(사용자 지시 2026-09-18, 업무 -672).
- * 누르면 화면이 API-047을 부른다(`RecommendationsPage`). 처리하는 동안은 눌리지 않는다.
- *
- * **포스터가 상세로 간다는 단서는 추천 이유 상자 끝의 화살표다**(업무 -697). 다른 포스터는
- * 오른쪽 아래에 화살표를 얹지만(`PosterCue`) 이 카드는 그 자리를 추천 이유가 덮는다. 상자는
- * 누름을 가로채지 않아(`pointer-events: none`) 상자 위를 눌러도 상세로 간다.
- */
+/* 2.2 모바일 추천 카드. 릴 칸 높이 안에서 포스터와 정보 영역을 나눈다(업무 -906). */
 import { Link } from 'react-router';
 import Badge from '../../../../components/Badge';
-import IconButton from '../../../../components/IconButton';
 import OttBadge from '../../../../components/OttBadge';
 import { BlockIcon, ChevronRightIcon } from '../../../../components/Icon';
 import Poster from '../../../../components/Poster';
 import PosterCue from '../../../../components/PosterCue';
 import { path } from '../../../../routes/paths';
+import { ottMovieUrl } from '../../../../utils/ott';
 import styles from './RecommendationCard.module.css';
 import type { MouseEvent } from 'react';
 import type { Ott } from '../../../../types/ott';
 import type { RecommendationItem } from '../../../../types/recommendation';
 
+/**
+ * OTT 로고 한 변. 어두운 정보 영역 위에서 22px은 바탕이 어두운 로고(넷플릭스 · 디즈니+)가
+ * 배경에 묻혀 한 단계 키웠다(업무 -917).
+ */
+const OTT_BADGE_SIZE = 26;
+
 type Props = {
   item: RecommendationItem;
   otts: Ott[];
-  menuOpen: boolean;
-  onOpenMenu: (event: MouseEvent<HTMLButtonElement>, item: RecommendationItem) => void;
   /** 관심없음을 처리하는 중이면 버튼을 막는다 */
   dismissing: boolean;
-  onDismiss: (item: RecommendationItem) => void;
+  onDismiss: (event: MouseEvent<HTMLButtonElement>, item: RecommendationItem) => void;
 };
 
-export default function RecommendationCard({
-  item,
-  otts,
-  menuOpen,
-  onOpenMenu,
-  dismissing,
-  onDismiss,
-}: Props) {
+export default function RecommendationCard({ item, otts, dismissing, onDismiss }: Props) {
   const { movie, reason, type } = item;
   const isDiscovery = type === 'DISCOVERY';
 
@@ -68,68 +38,94 @@ export default function RecommendationCard({
         className={styles.posterLink}
         data-guide-target="recommendation"
         aria-label={`${movie.title} 상세 보기`}
+      />
+      <div className={styles.cardContent}>
+        <span className={styles.posterArea}>
+          <PosterCue cue={false}>
+            <Poster
+              width={156}
+              height={220}
+              radius={0}
+              src={movie.posterUrl ?? undefined}
+              title=""
+              seed={movie.movieId}
+            />
+          </PosterCue>
+        </span>
+
+        {/*
+         * 정보 영역은 위에서부터 제목 · 추천 이유 · 볼 수 있는 곳이다(업무 -917). OTT 로고가
+         * 제목 옆에 있을 때는 OTT가 많을수록 제목이 잘렸다(5개면 일곱 글자). 로고 줄을 따로
+         * 두어 제목과 이유가 온전히 보이고, 로고는 개수와 상관없이 늘 같은 자리에 선다 —
+         * 데스크톱 카드(`MovieBriefCard`)와 같은 순서다.
+         *
+         * 포스터 위에 얹는 안은 포스터 아래쪽에 모인 부제 · 크레딧을 가리고, 상세로 가는
+         * 포스터 면 안에 OTT 링크가 겹쳐 쓰지 않았다(사용자 결정 2026-09-26).
+         */}
+        <span className={styles.info}>
+          <strong className={styles.title}>{movie.title}</strong>
+          <span className={styles.reason}>
+            <span className={styles.reasonText}>{reason.summary}</span>
+            <span className={styles.reasonCue} aria-hidden="true">
+              <ChevronRightIcon />
+            </span>
+          </span>
+          {movie.ottProviders.length > 0 ? (
+            <span className={styles.ottList}>
+              {movie.ottProviders.map((code) => {
+                const ott = otts.find((candidate) => candidate.code === code);
+                const destination = ottMovieUrl(code, movie.title);
+
+                return (
+                  <span key={code}>
+                    {destination ? (
+                      <a
+                        href={destination}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.ottLink}
+                        aria-label={`${ott?.name ?? code}에서 ${movie.title} 보기 (새 창)`}
+                      >
+                        <OttBadge
+                          code={code}
+                          name={ott?.name ?? code}
+                          size={OTT_BADGE_SIZE}
+                          labelled={false}
+                        />
+                      </a>
+                    ) : (
+                      <OttBadge code={code} name={ott?.name ?? code} size={OTT_BADGE_SIZE} />
+                    )}
+                  </span>
+                );
+              })}
+            </span>
+          ) : (
+            <span className={styles.ottEmpty}>제공 중인 OTT가 없어요</span>
+          )}
+        </span>
+      </div>
+
+      {/*
+       * 관심없음. 아이콘에 글자를 붙인 작은 알약이다(업무 -873). 2.4 영화 상세의 관심없음과 같은
+       * 어두운 유리 면이라, 밝은 유리 사각형처럼 어두운 필름 틀 위에서 혼자 떠 보이지 않는다.
+       */}
+      <button
+        type="button"
+        className={styles.dismissButton}
+        aria-label={`${movie.title} 관심없음`}
+        disabled={dismissing}
+        onClick={(event) => onDismiss(event, item)}
       >
-        <PosterCue cue={false}>
-          <Poster
-            width={156}
-            height={220}
-            fluid
-            radius={0}
-            src={movie.posterUrl ?? undefined}
-            title=""
-            seed={movie.movieId}
-          />
-        </PosterCue>
-      </Link>
-
-      <span className={styles.menuButton}>
-        <IconButton
-          label={`${movie.title} OTT 메뉴`}
-          icon={<span className={styles.ellipsis}>⋯</span>}
-          size={26}
-          shape="rounded"
-          variant={menuOpen ? 'filled' : 'translucent'}
-          aria-expanded={menuOpen}
-          onClick={(event) => onOpenMenu(event, item)}
-        />
-      </span>
-
-      <span className={styles.dismissButton}>
-        <IconButton
-          label={`${movie.title} 관심없음`}
-          icon={<BlockIcon />}
-          size={26}
-          shape="rounded"
-          variant="translucent"
-          disabled={dismissing}
-          onClick={() => onDismiss(item)}
-        />
-      </span>
-
-      <ul className={styles.ottList}>
-        {movie.ottProviders.map((code) => {
-          const ott = otts.find((candidate) => candidate.code === code);
-
-          return (
-            <li key={code}>
-              <OttBadge code={code} name={ott?.name ?? code} size={22} />
-            </li>
-          );
-        })}
-      </ul>
+        <BlockIcon />
+        <span aria-hidden="true">관심없음</span>
+      </button>
 
       {isDiscovery ? (
         <span className={styles.badge}>
           <Badge tone="accent">새로운 맛</Badge>
         </span>
       ) : null}
-
-      <p className={styles.reason} data-multiline={isDiscovery}>
-        <span className={styles.reasonText}>{reason.summary}</span>
-        <span className={styles.reasonCue} aria-hidden="true">
-          <ChevronRightIcon />
-        </span>
-      </p>
     </div>
   );
 }

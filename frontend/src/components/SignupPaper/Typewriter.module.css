@@ -3,20 +3,41 @@
  * 블록은 이것 하나다.
  */
 .typewriter {
+  /* 키보드가 올라온 동안 남는 윗판의 높이. 초점 칸을 가리지 않도록 종이도 이 값을 쓴다 */
+  --typewriter-deck-height: 14px;
+
   position: relative;
   flex: none;
 }
 
 /*
- * 폰 키보드가 올라온 동안(업무 -718).
+ * 폰 키보드가 올라온 동안(업무 -718 · -882).
  *
- * **키만 감추고 롤러는 남긴다.** OS 키보드와 겹치는 것은 키 부분이고, 종이가 나오는
- * 느낌을 만드는 것은 롤러다. 둘 다 치우면 종이가 허공에 뜬다 — 재 보니 종이 아래끝과
- * 키보드 사이가 172px 비었다. 롤러를 남기면 그 자리에 OS 키보드가 들어서면서 타자기
- * 자리를 대신한다.
+ * **키를 감추고 롤러와 얇은 윗판만 남겨 키보드 바로 위에 붙박는다.** OS 키보드와 겹치는
+ * 것은 키 부분이고, 종이가 나오는 느낌을 만드는 것은 롤러다. 둘 다 치우면 종이가 허공에
+ * 뜬다 — 재 보니 종이 아래끝과 키보드 사이가 172px 비었다. 롤러만 남겼더니 롤러가 키보드
+ * 위에 떠 보였다. 윗판(몸체의 맨 윗단)이 키보드 윗변에 닿아 진짜 키보드가 타자기 몸체로
+ * 이어진다.
+ *
+ * `sticky`로 스크롤 영역 아래에 붙인다. 작은 폰에서 종이가 길어 올려 봐도 타자기는 키보드
+ * 위에 남는다. 스크롤 영역의 아래 끝을 키보드 윗변에 맞추는 것은 `SignupPaper`가 한다.
  */
-.typewriter[data-hidden='true'] .body {
+.typewriter[data-compact='true'] {
+  position: sticky;
+  z-index: 2;
+  bottom: 0;
+}
+
+.typewriter[data-compact='true'] .row {
   display: none;
+}
+
+.typewriter[data-compact='true'] .body {
+  height: var(--typewriter-deck-height);
+  padding: 0;
+  gap: 0;
+  /* 키보드와 맞닿는 면. 위쪽에만 한 줄 빛을 두어 몸체의 윗단으로 읽히게 한다 */
+  box-shadow: inset 0 1px 0 var(--color-line-on-dark);
 }
 
 /*

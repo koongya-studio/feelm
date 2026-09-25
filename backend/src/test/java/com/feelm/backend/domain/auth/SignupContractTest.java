@@ -267,6 +267,8 @@ class SignupContractTest extends EmailAuthApiTestSupport {
         Map<String, Object> settings = notificationSettings(userId);
         assertThat(settings.get("rating_enabled")).isEqualTo(true);
         assertThat(settings.get("recommendation_enabled")).isEqualTo(true);
+        assertThat(settings.get("party_invite_enabled")).isEqualTo(true);
+        assertThat(settings.get("report_issued_enabled")).isEqualTo(true);
         assertThat(settings.get("marketing_enabled")).isEqualTo(false);
     }
 

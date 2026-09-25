@@ -18,13 +18,17 @@
  */
 import { Navigate } from 'react-router';
 import { useAuth } from '../contexts/authContext';
+import { useSessionRestore } from '../contexts/sessionRestoreContext';
+import SessionRestoreFailure from './SessionRestoreFailure';
 import { path } from './paths';
 
 export default function HomeEntry() {
   const { status } = useAuth();
+  const { failed: restoreFailed } = useSessionRestore();
 
   if (status === 'restoring') {
-    return null;
+    // 세션이 살아 있는데 복구가 일시 오류로 끝났으면 로그인 화면이 아니라 다시 시도다(업무 -908)
+    return restoreFailed ? <SessionRestoreFailure /> : null;
   }
 
   return <Navigate to={status === 'anonymous' ? path.authStart() : path.film()} replace />;

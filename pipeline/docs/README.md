@@ -1,14 +1,14 @@
 # Pipeline 근거와 인계 자료
 
-2026-09-23 최신 전환 근거: [v26 개인·파티 GBT 연구 마감 인계](gbt-transition/README.md).
-사용자가 v26 채택·로컬 검증 종료를 승인했다. 개인·파티는 별도 공개근거 품질 필터 없이 GBT를
-사용하되 기존 모드별 제외 계약은 유지한다. 익명 집계는 GitHub에, 팀 연결
-범위·산출물 식별은 GitLab에 구분한다. 기존 두 모델 ZIP은 v26 운영 번들이 아니며 이 인계는
-서비스 통합·배포 완료가 아니다.
+2026-09-25 현재 안내: [v26 GBT 추천 기준](gbt-v26/README.md).
+개인·파티 모델은 v26으로 확정됐고 공통 scorer·개인/파티 Consumer·이미지 실행 연결이
+develop에 반영됐다. 서버 적용도 완료된 상태이며, 확인 기준과
+[71특징·학습 목표·재현 설명](gbt-v26/TRAINING.md), 종료된 업무의 실제 의미는 현재 안내를 따른다.
+[625 연구 마감 인계](gbt-transition/README.md)와 publication.json은 9월23일 연구 snapshot이다.
 
 이전 서비스 설계 인계: [추천 v1](service-v1/HANDOFF.md) — GBT 기본, 맞춤2+발견1,
 배치500 재정렬, 발견 그룹 확장형 최대100, TMDB/KOBIS와 상세 유사 영화. 아래 기존 연구 결론과
-새 v1 설계/미구현 상태를 구분한다. Jira387에서 팀 리뷰에 넘기는 자료이며 기존 계약을 자동 변경하지 않는다.
+당시 v1 설계/미구현 상태를 구분한다. Jira387 당시 자료이며 현재 구현 기준을 대체하지 않는다.
 
 `service-v1/`은 2026-09-13 시점의 로컬 설계·인계 snapshot이다. 그 안의 `items`,
 `personalizedItems`, `discoveryItems`는 당시 제안 형식을 보존한 역사 자료이며 현재 Redis payload나

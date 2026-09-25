@@ -239,6 +239,27 @@ afterEach(() => {
 });
 
 describe('RecommendationsPage 데스크톱 시안', () => {
+  it('OTT 배지만 서비스로 연결하고 영화 포스터는 상세로 연결한다', async () => {
+    vi.mocked(getOtts).mockResolvedValue([
+      { ottId: 1, code: 'NETFLIX', name: '넷플릭스', logoUrl: null },
+    ]);
+    renderRecommendations(1440);
+
+    const taste = await screen.findByRole('group', { name: '취향 맞춤 추천 카드' });
+    const ottLink = within(taste).getByRole('link', {
+      name: '넷플릭스에서 파이트 클럽 보기 (새 창)',
+    });
+    expect(ottLink).toHaveAttribute(
+      'href',
+      'https://www.netflix.com/search?q=%ED%8C%8C%EC%9D%B4%ED%8A%B8%20%ED%81%B4%EB%9F%BD',
+    );
+    expect(ottLink).toHaveAttribute('target', '_blank');
+    expect(within(taste).getByRole('link', { name: '파이트 클럽 상세 보기' })).toHaveAttribute(
+      'href',
+      '/movies/550',
+    );
+  });
+
   it('카드를 취향 맞춤 · 취향 발견 두 필름으로 나누고 묶음마다 석 장을 세운다', async () => {
     renderRecommendations(1440);
 
@@ -329,6 +350,31 @@ describe('RecommendationsPage 데스크톱 시안', () => {
     await waitFor(() => expect(dismissMovie).toHaveBeenCalledWith(550, 3301));
   });
 
+  it('대표·작은 카드 모두 관심없음만 표시하고 대표 버튼만 크게 그린다', async () => {
+    renderRecommendations(1440);
+
+    const taste = await screen.findByRole('group', { name: '취향 맞춤 추천 카드' });
+    const [lead, compact] = within(taste).getAllByRole('article');
+    const leadDismiss = within(lead).getByRole('button', { name: '파이트 클럽 관심없음' });
+    const compactDismiss = within(compact).getByRole('button', { name: '조디악 관심없음' });
+
+    // 아이콘만 두지 않고 글자를 함께 보인다(업무 -873). 대표 카드만 한 단계 크다
+    expect(leadDismiss).toHaveTextContent('관심없음');
+    expect(compactDismiss).toHaveTextContent('관심없음');
+    expect(leadDismiss).toHaveAttribute('data-size', 'lead');
+    expect(compactDismiss).not.toHaveAttribute('data-size');
+    expect(leadDismiss.className).toBe(compactDismiss.className);
+    expect(
+      within(lead)
+        .getByRole('link', { name: 'NETFLIX에서 파이트 클럽 보기 (새 창)' })
+        .closest('ul')
+        ?.parentElement?.querySelector('h3'),
+    ).not.toBeNull();
+    expect(within(lead).queryByRole('button', { name: '파이트 클럽 OTT 메뉴' })).toBeNull();
+    expect(within(compact).queryByRole('button', { name: '조디악 OTT 메뉴' })).toBeNull();
+    expect(within(taste).queryByRole('button', { name: /OTT 메뉴/ })).toBeNull();
+  });
+
   it('관심없음 처리 중 모바일로 바뀌면 현재 폭의 세 편으로 보충한다', async () => {
     let resolveDismiss!: () => void;
     vi.mocked(dismissMovie).mockReturnValue(
@@ -355,10 +401,10 @@ describe('RecommendationsPage 데스크톱 시안', () => {
     expect(screen.getAllByRole('link', { name: /상세 보기/ })).toHaveLength(3);
   });
 
-  it('412px에서는 지금까지의 화면 그대로다 — 세 편을 요청한다', async () => {
+  it('412px에서는 모바일 카드 세 편을 요청한다', async () => {
     renderRecommendations(412);
 
-    expect(await screen.findByText(/포스터를 탭하면/)).toBeInTheDocument();
+    expect(await screen.findByText(/카드를 탭하면/)).toBeInTheDocument();
     // 모바일은 편수를 싣지 않는다. 계약의 기본값이 3이다(업무 -793)
     expect(getRecommendations).toHaveBeenCalledWith(3);
     expect(screen.queryByRole('group', { name: '취향 맞춤 추천 카드' })).not.toBeInTheDocument();

@@ -95,8 +95,14 @@ import { getPopcornFlavors } from '../../../api/taste';
 import { useShellSize } from '../../../hooks/useShellSize';
 import { useAuth } from '../../../contexts/authContext';
 import { path } from '../../../routes/paths';
-import { mixedFlavors } from '../../../utils/party';
-import { PARTY_GUIDE, completeGuide, hasSeenGuide } from '../../../utils/userGuides';
+import { mixedFlavors, partyStatusLabel } from '../../../utils/party';
+import {
+  PARTY_GUIDE,
+  completeGuide,
+  hasSeenGuide,
+  readGuideProgress,
+  setGuideProgress,
+} from '../../../utils/userGuides';
 import type { Party, PartyInvitation, PartyMember, PartyPopcorn } from '../../../types/party';
 import styles from './PartyListPage.module.css';
 
@@ -162,7 +168,7 @@ export default function PartyListPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [guideDismissed, setGuideDismissed] = useState(false);
-  const [guideIndex, setGuideIndex] = useState(0);
+  const [guideStep, setGuideStep] = useState<{ userId: number; id: string } | null>(null);
   const showGuide = Boolean(user && !guideDismissed && !hasSeenGuide(user.userId, PARTY_GUIDE));
   const finishGuide = () => {
     if (user) completeGuide(user.userId, PARTY_GUIDE);
@@ -307,6 +313,7 @@ export default function PartyListPage() {
     ...(hasInvitations
       ? [
           {
+            id: 'invitations',
             title: '받은 초대',
             description: '친구가 초대했다면 여기에서 확인하고 참여할 수 있어요.',
             targetSelector: "[data-guide-target='party-invitations']",
@@ -316,11 +323,13 @@ export default function PartyListPage() {
     ...(hasParties
       ? [
           {
+            id: 'active',
             title: '참여 중인 파티',
             description: '파티원과 참여 인원, 함께 모인 취향을 여기에서 확인할 수 있어요.',
             targetSelector: "[data-guide-target='party-active']",
           },
           {
+            id: 'open',
             title: '파티 안으로 들어가기',
             description: '파티를 열면 멤버의 팝콘을 보고 함께 볼 영화를 추천받을 수 있어요.',
             targetSelector: "[data-guide-target='party-open']",
@@ -328,6 +337,7 @@ export default function PartyListPage() {
         ]
       : [
           {
+            id: 'create',
             title: '함께 영화 고르기',
             description:
               '파티를 만들면 친구를 초대하고 함께 볼 영화를 고를 수 있어요. 지금은 둘러보기만 해도 됩니다.',
@@ -337,6 +347,7 @@ export default function PartyListPage() {
     ...(closedParties.length > 0
       ? [
           {
+            id: 'history',
             title: '지난 파티',
             description: '끝난 파티에서 추천받았던 영화는 여기에서 다시 볼 수 있어요.',
             targetSelector: "[data-guide-target='party-history']",
@@ -344,7 +355,20 @@ export default function PartyListPage() {
         ]
       : []),
   ];
-  const activeGuideIndex = Math.min(guideIndex, guideSteps.length - 1);
+  const savedGuideStep = user
+    ? guideStep?.userId === user.userId
+      ? guideStep.id
+      : readGuideProgress(user.userId, PARTY_GUIDE)
+    : null;
+  const activeGuideIndex = Math.max(
+    0,
+    guideSteps.findIndex((step) => step.id === savedGuideStep),
+  );
+  const moveGuideTo = (id: string) => {
+    if (!user) return;
+    setGuideProgress(user.userId, PARTY_GUIDE, id);
+    setGuideStep({ userId: user.userId, id });
+  };
   const guideCallout =
     showGuide && parties !== null && (invitations !== null || invitationsFailed) && !failed ? (
       <GuideCallout
@@ -356,7 +380,7 @@ export default function PartyListPage() {
         onSkip={finishGuide}
         action={
           activeGuideIndex < guideSteps.length - 1
-            ? { label: '다음', onClick: () => setGuideIndex(activeGuideIndex + 1) }
+            ? { label: '다음', onClick: () => moveGuideTo(guideSteps[activeGuideIndex + 1].id) }
             : { label: '둘러보기', onClick: finishGuide }
         }
       />
@@ -573,7 +597,7 @@ export default function PartyListPage() {
 
               <span className={styles.heroBadge}>
                 <span className={styles.heroDot} aria-hidden="true" />
-                진행 중
+                {partyStatusLabel(firstParty)}
               </span>
             </div>
 

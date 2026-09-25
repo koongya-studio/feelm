@@ -109,6 +109,7 @@ const frames: FrameList = {
 };
 
 beforeEach(() => {
+  window.localStorage.removeItem('feelm-report-flip-intro-v4:301');
   resetSessionStore();
   vi.mocked(getMyProfile).mockReset().mockResolvedValue(mockMyProfile);
   vi.mocked(getMyProfileView).mockReset().mockResolvedValue(mockMyProfileView);
@@ -211,6 +212,164 @@ function stubPhoneShare(share: ReturnType<typeof vi.fn>) {
 }
 
 describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
+  it('첫 방문에는 뒷면 네 컷을 차례로 보여주고 재방문에는 반복하지 않는다', async () => {
+    const view = renderApp(['/reports/301']);
+    await screen.findByRole('button', { name: '01 장르 설명 보기' });
+
+    expect(screen.getByText('각 컷을 눌러 뒷면의 설명을 확인해 보세요')).toBeInTheDocument();
+    for (const label of ['01 장르', '02 감독', '03 배우', '04 캐릭터']) {
+      await waitFor(
+        () => {
+          expect(
+            screen.getByText(`${label.slice(0, 2)} / 04 · ${label.slice(3)} 뒷면 살펴보기`),
+          ).toBeInTheDocument();
+          expect(screen.getByRole('button', { name: `${label} 사진 보기` })).toHaveAttribute(
+            'aria-expanded',
+            'true',
+          );
+          expect(document.querySelectorAll('button[aria-expanded="true"]')).toHaveLength(1);
+        },
+        { timeout: 5_000 },
+      );
+      await waitFor(
+        () => {
+          expect(screen.getByRole('button', { name: `${label} 설명 보기` })).toHaveAttribute(
+            'aria-expanded',
+            'false',
+          );
+        },
+        { timeout: 5_000 },
+      );
+    }
+    expect(window.localStorage.getItem('feelm-report-flip-intro-v4:301')).toBe('1');
+
+    view.unmount();
+    renderApp(['/reports/301']);
+    const revisitedFlip = await screen.findByRole('button', { name: '01 장르 설명 보기' });
+    await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+    expect(revisitedFlip).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('움직임 줄이기 설정에서는 자동으로 뒤집지 않고 안내 문구만 보인다', async () => {
+    const media = vi.spyOn(window, 'matchMedia').mockImplementation(
+      (query: string) =>
+        ({
+          matches: query === '(prefers-reduced-motion: reduce)',
+          media: query,
+        }) as MediaQueryList,
+    );
+    try {
+      renderApp(['/reports/301']);
+      const flip = await screen.findByRole('button', { name: '01 장르 설명 보기' });
+      expect(screen.getByText('각 컷을 눌러 뒷면의 설명을 확인해 보세요')).toBeInTheDocument();
+      expect(window.localStorage.getItem('feelm-report-flip-intro-v4:301')).toBe('1');
+      await new Promise((resolve) => window.setTimeout(resolve, 900));
+      expect(flip).toHaveAttribute('aria-expanded', 'false');
+    } finally {
+      media.mockRestore();
+    }
+  });
+
+  it('사용자가 먼저 칸을 누르면 자동 시연이 끼어들지 않는다', async () => {
+    renderApp(['/reports/301']);
+    const flip = await screen.findByRole('button', { name: '01 장르 설명 보기' });
+    fireEvent.click(flip);
+
+    await new Promise((resolve) => window.setTimeout(resolve, 1_000));
+    expect(screen.getByRole('button', { name: '01 장르 사진 보기' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+  });
+
+  it('화면 밖의 다음 컷은 스크롤해서 보여준 뒤 뒤집는다', async () => {
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    const scrollIntoView = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect');
+    rect.mockImplementation(function (this: HTMLElement) {
+      if (this.querySelector('[data-cut="director"]')) {
+        return { top: window.innerHeight + 10, bottom: window.innerHeight + 200 } as DOMRect;
+      }
+      return { top: 20, bottom: 200 } as DOMRect;
+    });
+
+    try {
+      renderApp(['/reports/301']);
+      await screen.findByRole('button', { name: '01 장르 설명 보기' });
+      await waitFor(
+        () => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'center' }),
+        { timeout: 6_000 },
+      );
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: '02 감독 사진 보기' })).toHaveAttribute(
+          'aria-expanded',
+          'true',
+        ),
+      );
+    } finally {
+      rect.mockRestore();
+      HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+    }
+  });
+
+  it('마지막 컷이 앞면으로 돌아오면 페이지 맨 위로 이동한다', async () => {
+    const previousScrollY = Object.getOwnPropertyDescriptor(window, 'scrollY');
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 640 });
+
+    try {
+      renderApp(['/reports/301']);
+      await waitFor(
+        () =>
+          expect(screen.getByRole('button', { name: '04 캐릭터 사진 보기' })).toHaveAttribute(
+            'aria-expanded',
+            'true',
+          ),
+        { timeout: 12_000 },
+      );
+      expect(scrollTo).not.toHaveBeenCalled();
+      await waitFor(() => expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' }), {
+        timeout: 5_000,
+      });
+      expect(screen.getByRole('button', { name: '04 캐릭터 설명 보기' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+    } finally {
+      scrollTo.mockRestore();
+      if (previousScrollY) Object.defineProperty(window, 'scrollY', previousScrollY);
+    }
+  });
+
+  it('사용자가 직접 스크롤하면 자동 시연을 멈춘다', async () => {
+    renderApp(['/reports/301']);
+    const flip = await screen.findByRole('button', { name: '01 장르 설명 보기' });
+    fireEvent.wheel(window);
+    await new Promise((resolve) => window.setTimeout(resolve, 900));
+    expect(flip).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('preview=1에서는 새로고침해도 첫 컷 시연을 다시 볼 수 있다', async () => {
+    window.localStorage.setItem('feelm-report-flip-intro-v4:301', '1');
+    const view = renderApp(['/reports/301?preview=1']);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '01 장르 사진 보기' })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      ),
+    );
+
+    view.unmount();
+    renderApp(['/reports/301?preview=1']);
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: '01 장르 사진 보기' })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      ),
+    );
+  });
+
   it('안 본 리포트가 있으면 발급 화면을 거쳐 상세로 간다', async () => {
     renderApp([ROUTE_PATTERN.film]);
 
@@ -399,6 +558,21 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
 });
 
 describe('리포트 상세 저장과 공유', () => {
+  it('자동 시연 전에 저장하면 안내는 PNG 밖에 있고 뒤집기가 시작되지 않는다', async () => {
+    renderApp(['/reports/301']);
+    const save = await screen.findByRole('button', { name: '저장' });
+    fireEvent.click(save);
+
+    await waitFor(() => expect(captureReportImage).toHaveBeenCalledOnce());
+    const captured = vi.mocked(captureReportImage).mock.calls[0][0];
+    expect(captured).not.toHaveTextContent('각 컷을 눌러 뒷면의 설명을 확인해 보세요');
+    await new Promise((resolve) => window.setTimeout(resolve, 900));
+    expect(screen.getByRole('button', { name: '01 장르 설명 보기' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  });
+
   it('공유 버튼 한 번으로 두 이미지를 공유하고 중간 시트가 없다', async () => {
     const phone = stubPhoneShare(vi.fn().mockResolvedValue(undefined));
     try {

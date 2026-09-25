@@ -542,7 +542,7 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
   S15P21E106-649부터 `ratings`만 개인 GBT·DISCOVERY 계산 입력으로 사용한다. 과거 ALS adapter의
   온보딩 보정 상수와 이진 LIKE/DISLIKE 방향 fallback은 제거했다. S15P21E106-648 소급 migration이
   적용되지 않은 환경에는 이 Consumer를 배포하지 않으며, 전환 전 설명되지 않은 미보정 행이 0건인지
-  확인한다. migration 뒤 사용자가 평가를 삭제해 `WATCHED_UNRATED`로 돌아가고 rating·frame이 함께
+  확인한다. migration 뒤 사용자가 평가를 삭제해 `EXPIRED`로 돌아가고 rating·frame이 함께
   사라진 행은 정상 현재 상태이므로 미보정으로 세거나 평가를 복원하지 않는다. 운영 증거에는 raw 조회
   건수, 확인된 사후 삭제 건수와 근거, 설명되지 않은 잔여 건수를 각각 남긴다. 이
   S15P21E106-648 migration 확인은 S15P21E106-649 병합 선행 조건이 아니라 신규 Consumer의
@@ -619,6 +619,8 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
 - 허용 그룹은 `GENRE_PATTERN`, `RATING_PATTERN`, `CONTENT_RELATION`, `POPULARITY_SIGNAL`,
   `AUDIENCE_RATING_SIGNAL`뿐이다. `direction`은 `POSITIVE`, 후보별 evidence는 최대 3개다. contribution은
   양의 유한 수, 각 coverage와 합계 coverage는 0~1 유한 수이며 evidence ID와 그룹은 후보 안에서 유일하다.
+  항목의 합계 coverage와 evidence별 coverage 합계는 JSON 부동소수점 직렬화 차이를 고려해 절대 오차
+  `1e-9` 이하를 같은 값으로 검증하고, 이를 초과하면 해당 evidence를 거부한다.
 - v2의 `genreCode`는 `GENRE_PATTERN`에만 선택적으로 존재하며 `TMDB_<양의 TMDb 장르 ID>` 형식이다.
   `sourceMovieId`는 `CONTENT_RELATION`에만 선택적으로 존재하는 양의 서비스 영화 ID다. 둘은 실제 4.0 이상
   평가와 후보의 추적 가능한 양의 모델 입력 관계에서만 생성하고 evidence ID 해시에 포함한다. 다른 그룹,

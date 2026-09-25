@@ -9,7 +9,7 @@
  * 휴대폰에서 2.2로 가는 유일한 상시 진입점이 없어진다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import FilmPage from './index';
 import AppLayout from '../../../layouts/AppLayout';
@@ -117,7 +117,7 @@ const recommendations: RecommendationSet = {
         releaseYear: 2014,
         genres: ['코미디', '드라마'],
         averageRating: 4.3,
-        ottProviders: ['NETFLIX'],
+        ottProviders: ['NETFLIX', 'TVING', 'WAVVE'],
       },
       reason: {
         summary: '좋아한 케이퍼 무비와 가장 가까운 한 편이에요',
@@ -207,6 +207,18 @@ describe('FilmPage 데스크톱 시안', () => {
       'href',
       '/recommendations',
     );
+
+    const card = screen
+      .getByRole('link', { name: '그랜드 부다페스트 호텔 상세 보기' })
+      .closest('article');
+    expect(card).not.toBeNull();
+    const ottBadges = within(card as HTMLElement).getAllByRole('img');
+    expect(ottBadges.map((badge) => badge.getAttribute('aria-label'))).toEqual([
+      'NETFLIX',
+      'TVING',
+      'WAVVE',
+    ]);
+    expect(ottBadges[0].closest('ul')?.parentElement?.querySelector('h3')).not.toBeNull();
   });
 
   it('우측 보조 패널에 팝콘 · 리포트 · 감상 확인 카드를 보낸다', async () => {
@@ -248,9 +260,11 @@ describe('FilmPage 데스크톱 시안', () => {
 
     /*
      * 레이아웃이 없는 환경이라 칸 폭이 0이고, 그때 릴은 첫 칸만 보인다고 본다
-     * (`visibleFrameRange`). 여기서 고정하는 것은 수가 아니라 **구간으로 말한다**는 것이다.
+     * (`visibleFrameRange`). 한 칸만 보이면 모바일과 같이 `1 – 1`이 아니라 `1 / 73`으로 적는다
+     * (`frameRangeLabel`, 업무 -876). 여러 칸이 보일 때의 구간 표기는 `FilmPage.test`가 고정한다.
      */
-    expect(await screen.findByText('1 – 1 / 73')).toBeInTheDocument();
+    expect(await screen.findByText('1 / 73')).toBeInTheDocument();
+    expect(screen.getByText('전체 73개 중 1번째 프레임을 보고 있어요')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '이전 프레임 보기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '다음 프레임 보기' })).toBeEnabled();
   });

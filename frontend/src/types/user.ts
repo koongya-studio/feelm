@@ -38,6 +38,13 @@ export type MyProfile = {
   gender: Gender;
   /** 프로필 공개 범위. 기본값 `PRIVATE`. `PRIVATE`이면 API-062가 404다 */
   visibility: Visibility;
+  /**
+   * 항목별 공개 범위(업무 -856, API-014 `항목별 공개 범위`). 기본값 `PUBLIC`. `PRIVATE`이면 다른
+   * 사용자가 보는 API-062에서 그 구역이 비고, 한줄평은 API-032 목록에서도 빠진다. 7.8-B가 고른다
+   */
+  frameVisibility: Visibility;
+  popcornVisibility: Visibility;
+  reviewVisibility: Visibility;
   hasPassword: boolean;
   /** 연결된 소셜 로그인 수단. 7.8-A 계정 관리가 쓴다 */
   linkedProviders: string[];
@@ -58,6 +65,9 @@ export type MyProfileUpdate = {
   birthDate?: string;
   gender?: Gender;
   visibility?: Visibility;
+  frameVisibility?: Visibility;
+  popcornVisibility?: Visibility;
+  reviewVisibility?: Visibility;
 };
 
 /**
@@ -72,15 +82,19 @@ export type NicknameAvailability = {
 };
 
 /**
- * API-017 · API-018 알림 설정. 세 키가 모두 있어야 한다(API-018 `400 VALIDATION_FAILED`).
+ * API-017 · API-018 알림 설정. 다섯 키가 모두 있어야 한다(API-018 `400 VALIDATION_FAILED`).
  *
- * 7.8-C는 토글 다섯 개를 그리지만 계약은 셋이다. 나머지 둘(파티 초대 · 리포트 발급)은
- * 보낼 곳이 없어 화면에서 준비 중으로 잠근다(업무 -610).
+ * 7.8-C의 토글 다섯 개가 계약 다섯 키와 하나씩 맞는다. 파티 초대는 업무 -857, 리포트 발급은
+ * 업무 -858에서 계약에 들어왔다.
  */
 export type NotificationSettings = {
   /** 감상 확인 알림 */
   RATING: boolean;
   RECOMMENDATION: boolean;
+  /** 끄면 파티 초대 알림이 오지 않는다. 초대 자체는 초대 목록에 그대로 온다 */
+  PARTY_INVITE: boolean;
+  /** 끄면 반기 취향 리포트가 공개돼도 알림이 오지 않는다. 리포트는 그대로 볼 수 있다 */
+  REPORT_ISSUED: boolean;
   MARKETING: boolean;
 };
 
@@ -142,6 +156,14 @@ export type PublicProfile = {
     /** 등록한 사진이 없으면 `null` */
     avatarUrl: string | null;
     visibility: Visibility;
+    /**
+     * 항목별 공개 범위(업무 -856). 본인이 아니면 `PRIVATE`인 구역은 모양만 남고 값이 빈다 —
+     * `recentFrames: []` · `frameCount: 0`, `flavors: []` · `popcornCount: 0`, `publicReviewCount: 0`.
+     * 빈 것과 가린 것은 이 값으로 가른다
+     */
+    frameVisibility: Visibility;
+    popcornVisibility: Visibility;
+    reviewVisibility: Visibility;
   };
   keywords: { code: string; label: string }[];
   stats: { frameCount: number; popcornCount: number };

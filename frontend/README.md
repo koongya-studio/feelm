@@ -2,6 +2,20 @@
 
 React + Vite 기반 반응형 웹 애플리케이션 소스와 관련 문서를 관리합니다.
 
+## 시연 전 사용자 의견
+
+개인 추천과 파티 추천 결과에 카드가 실제로 있을 때 목록 끝에서 추천 의견을 묻습니다.
+파티 의견은 결과 묶음과 참여자별로 따로 기록합니다. 글 입력을 접어 두면
+선택지 하나를 누르는 즉시 제출됩니다. 펼치면 평가를 고르고 글을 함께 보내거나 글만 보낼 수
+있습니다. 같은 추천 세트에서는 브라우저에 제출 상태를 기억해 다시
+묻지 않습니다. 서비스 전체 의견은 추천 의견과 분리해, 이용 기록이 생긴 뒤 MY 하단에서
+한 번만 가볍게 안내합니다. 안내를 닫거나 누르면 다시 띄우지 않으며, 설정의 `서비스 의견
+보내기`에서는 언제든 자유롭게 남길 수 있습니다.
+추천 의견에는 추천 화면 이름을 보여주고, 일반 의견에는 서비스 전반을 묻습니다. 두 경우 모두
+출발 경로는 서버에 함께 보냅니다.
+저장·팀 채널 알림 계약은
+[`docs/api/feedback.md`](../docs/api/feedback.md)를 따릅니다.
+
 ## 수동 검증 기록
 
 자동 테스트로 덮기 어려운 것은 실제로 돌려 본 절차와 결과를 `verification/`에 남깁니다.
@@ -61,6 +75,7 @@ React + Vite 기반 반응형 웹 애플리케이션 소스와 관련 문서를 
   `index.html` 한 파일에 담았고 서체만 Google Fonts에서 불러옵니다. 상단의 `시작하기`는 0.2 회원가입
   (`/app/signup`), 자물쇠(`로그인`)는 0.6 로그인(`/app/login`)으로 이동합니다(업무 -704)
 - `docs/`: 화면 목업 및 프론트엔드 설계 자료
+- `scripts/`: 빌드 도구 스크립트. 지금은 API 타입 생성기 하나입니다(업무 -777)
 
 React 프로젝트는 `frontend/`를 루트로 구성합니다. 랜딩 페이지는 `landing/index.html`에
 두어 React 진입 파일과 분리하며, React 빌드와 lint · 포맷 검사 대상에서 제외합니다.
@@ -92,8 +107,24 @@ npm install
 | `npm run lint:fix` | ESLint 자동 수정 |
 | `npm run format` | Prettier 포맷 적용 |
 | `npm run format:check` | Prettier 포맷 검사 |
+| `npm run api:generate` | 백엔드 OpenAPI 스냅샷에서 API 타입을 다시 만듭니다 |
+| `npm run api:check` | 생성 타입이 스냅샷과 어긋나면 실패합니다 |
 
 커밋 전에 `npm run lint`와 `npm run format:check`를 통과하는지 확인합니다.
+
+### API 타입 생성 (업무 S15P21E106-777)
+
+`src/generated/openapi.json`은 백엔드 springdoc 문서(`/v3/api-docs`)의 스냅샷이고,
+`src/generated/api-schema.d.ts`는 거기서 만든 타입입니다. **둘 다 손으로 고치지 않습니다.**
+
+- 백엔드 계약이 바뀌면 스냅샷을 갱신합니다 —
+  `cd backend && FEELM_OPENAPI_SNAPSHOT_WRITE=1 ./gradlew test --tests '*OpenApiSnapshotTest'`
+- 스냅샷이 바뀌면 `npm run api:generate`로 타입을 다시 만듭니다
+- 잊으면 `npm run build`가 멈춥니다(`vite.config.ts`의 `feelm-api-schema-drift`)
+
+손으로 쓴 `src/types/*`가 생성 스키마와 어긋나는지는 `src/types/schema-conformance.ts`가
+`tsc -b`에서 봅니다. 구조와 남은 제약은
+[`docs/screens/frontend-structure.md`](./docs/screens/frontend-structure.md) 8.4에 있습니다.
 
 ### 백엔드 연동
 

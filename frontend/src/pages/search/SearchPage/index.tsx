@@ -43,7 +43,7 @@
  * **최근 검색어는 제출했거나 결과를 눌렀을 때만 남긴다.** 타이핑마다 남기면 `ㄷ` · `달` ·
  * `달의`가 전부 쌓인다. 같은 말은 다시 저장하지 않고 맨 앞으로 옮긴다(`sessionStore`).
  */
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useId, useRef, useState } from 'react';
 import { useLocation, useNavigationType, useSearchParams } from 'react-router';
 import Button from '../../../components/Button';
 import ScreenHeader from '../../../components/ScreenHeader';
@@ -60,6 +60,7 @@ import {
 import { getMovieDetail, getSimilarMovies } from '../../../api/movies';
 import { getOtts } from '../../../api/otts';
 import { useShellSize } from '../../../hooks/useShellSize';
+import { DesktopSearchContext } from '../../../contexts/desktopSearchContext';
 import {
   addRecentSearchQuery,
   clearRecentSearchQueries,
@@ -226,7 +227,7 @@ export default function SearchPage() {
   // 처음 한 번만 계산한다. 이후의 주소는 이 화면이 바꿔 쓰는 결과일 뿐이다
   const [initial] = useState(() => initialState(params));
 
-  const [keyword, setKeyword] = useState(initial.keyword);
+  const [keyword, setPageKeyword] = useState(initial.keyword);
   const [filter, setFilter] = useState<SearchFilterState>(initial.filter);
   const [filterOpen, setFilterOpen] = useState(false);
   const [options, setOptions] = useState<FilterOptions | null>(null);
@@ -250,7 +251,25 @@ export default function SearchPage() {
    */
   const shell = useShellSize();
   const desktop = shell !== 'mobile';
+  const desktopSearch = useContext(DesktopSearchContext);
+  const useTopSearch = desktop && desktopSearch !== null;
+  const setTopKeyword = desktopSearch?.setKeyword;
+  const setTopHandlers = desktopSearch?.setHandlers;
+  const topInputRef = desktopSearch?.inputRef;
+  const updateKeyword = useCallback(
+    (value: string) => {
+      setPageKeyword(value);
+      if (useTopSearch) setTopKeyword?.(value);
+    },
+    [useTopSearch, setTopKeyword],
+  );
   const wide = shell === 'wide';
+
+  useEffect(() => {
+    if (!useTopSearch) return;
+    setTopKeyword?.(initial.keyword);
+    return () => setTopKeyword?.('');
+  }, [useTopSearch, setTopKeyword, initial.keyword]);
   /**
    * 명시적으로 고른 영화의 번호. `null`이면 아직 고르지 않았다는 뜻이고, 그때 패널은
    * **결과의 첫 영화**를 말한다(시안 — 첫 칸에 테두리가 있다)
@@ -299,10 +318,9 @@ export default function SearchPage() {
   const runSeq = useRef(0);
 
   /*
-   * 들어오자마자 입력창에 포커스를 둔다(사용자 지시 2026-09-16, 업무 -461).
+   * 들어오자마자 검색 입력창에 포커스를 둔다(사용자 지시 2026-09-16, 업무 -461).
    *
-   * 검색은 3.1 필름 헤더의 돋보기에서만 들어오는 하위 화면이다. 돋보기를 누른 사람은
-   * 이미 검색어를 칠 참이므로 한 번 더 두드리게 하지 않는다.
+   * 모바일은 본문 입력, 데스크톱은 상단 공통 입력이 실제 검색창이다.
    */
   useEffect(() => {
     // 뒤로 와서 결과를 되살렸으면 보던 자리로 스크롤한다. 그때는 입력창에 초점을 두지 않는다 —
@@ -313,8 +331,11 @@ export default function SearchPage() {
       return;
     }
 
-    if (initial.search.status === 'idle') inputRef.current?.focus();
-  }, [initial]);
+    if (initial.search.status === 'idle') {
+      if (useTopSearch) topInputRef?.current?.focus();
+      else inputRef.current?.focus();
+    }
+  }, [initial, useTopSearch, topInputRef]);
 
   /*
    * 검색 전에 깔 평점 높은 영화를 한 번 받는다(업무 -714).
@@ -532,11 +553,11 @@ export default function SearchPage() {
 
     const next = fromSearchParams(new URLSearchParams(location.search));
 
-    setKeyword(next.keyword);
+    updateKeyword(next.keyword);
     setFilter(next.filter);
     cancelPending();
     run(next.keyword, next.filter);
-  }, [location.key, location.search, navigationType, run]);
+  }, [location.key, location.search, navigationType, run, updateKeyword]);
 
   /**
    * 타이핑에 따른 검색(업무 -640).
@@ -680,9 +701,10 @@ export default function SearchPage() {
    * 새로고침할 때 방금 지운 결과가 되살아났다(!405 리뷰). 필터도 없으면 4.1이다.
    */
   const clear = () => {
-    setKeyword('');
+    updateKeyword('');
     runNow('', filter);
-    inputRef.current?.focus();
+    if (useTopSearch) topInputRef?.current?.focus();
+    else inputRef.current?.focus();
   };
 
   /**
@@ -715,6 +737,35 @@ export default function SearchPage() {
   /** 걸려 있는 필터 수. 넓은 화면의 필터 단추가 배지로 적는다(시안) */
   const activeFilterCount =
     filter.genre.length + filter.ott.length + (filter.year === EMPTY_FILTER.year ? 0 : 1);
+  const SearchControls = useTopSearch ? 'div' : 'form';
+
+  useEffect(() => {
+    if (!useTopSearch || !desktopSearch) return;
+
+    setTopHandlers?.({
+      change: (value) => {
+        setPageKeyword(value);
+        if (!composing.current) schedule(value);
+      },
+      submit: (value) => {
+        setPageKeyword(value);
+        remember(value);
+        runNow(value, filter);
+      },
+      clear,
+      compositionStart: () => {
+        composing.current = true;
+      },
+      compositionEnd: (value) => {
+        composing.current = false;
+        schedule(value);
+      },
+    });
+
+    return () => {
+      setTopHandlers?.(null);
+    };
+  });
 
   return (
     <>
@@ -723,56 +774,62 @@ export default function SearchPage() {
          * 넓은 화면에서는 시안대로 큰 제목이 선다. 좁은 화면의 화면 헤더는 그대로다 —
          * 데스크톱 셸은 상단 바가 검색 · 알림 · 프로필을 이미 맡는다(업무 -782).
          */}
-        {desktop ? <h1 className={styles.desktopTitle}>검색</h1> : <ScreenHeader title="검색" />}
+        {desktop ? (
+          <h1 className={styles.desktopTitle}>영화 탐색</h1>
+        ) : (
+          <ScreenHeader title="검색" />
+        )}
 
-        <form
+        <SearchControls
           className={styles.searchBar}
-          role="search"
+          role={useTopSearch ? undefined : 'search'}
           onSubmit={(event) => {
             event.preventDefault();
             remember(keyword);
             runNow(keyword, filter);
           }}
         >
-          <div className={styles.field}>
-            <span className={styles.fieldIcon}>
-              <SearchIcon />
-            </span>
+          {!useTopSearch ? (
+            <div className={styles.field}>
+              <span className={styles.fieldIcon}>
+                <SearchIcon />
+              </span>
 
-            <input
-              ref={inputRef}
-              type="search"
-              enterKeyHint="search"
-              autoComplete="off"
-              className={styles.input}
-              value={keyword}
-              aria-label="영화 검색"
-              placeholder="영화 제목, 감독, 배우 검색"
-              onCompositionStart={() => {
-                composing.current = true;
-              }}
-              onCompositionEnd={(event) => {
-                composing.current = false;
-                schedule(event.currentTarget.value);
-              }}
-              onChange={(event) => {
-                setKeyword(event.target.value);
-                // 조합 중의 자모는 보내지 않는다. 조합이 끝나면 `onCompositionEnd`가 잇는다
-                if (!composing.current) schedule(event.target.value);
-              }}
-            />
+              <input
+                ref={inputRef}
+                type="search"
+                enterKeyHint="search"
+                autoComplete="off"
+                className={styles.input}
+                value={keyword}
+                aria-label="영화 검색"
+                placeholder="영화 제목, 감독, 배우 검색"
+                onCompositionStart={() => {
+                  composing.current = true;
+                }}
+                onCompositionEnd={(event) => {
+                  composing.current = false;
+                  schedule(event.currentTarget.value);
+                }}
+                onChange={(event) => {
+                  updateKeyword(event.target.value);
+                  // 조합 중의 자모는 보내지 않는다. 조합이 끝나면 `onCompositionEnd`가 잇는다
+                  if (!composing.current) schedule(event.target.value);
+                }}
+              />
 
-            {keyword ? (
-              <button
-                type="button"
-                className={styles.clear}
-                aria-label="검색어 지우기"
-                onClick={clear}
-              >
-                <ClearIcon />
-              </button>
-            ) : null}
-          </div>
+              {keyword ? (
+                <button
+                  type="button"
+                  className={styles.clear}
+                  aria-label="검색어 지우기"
+                  onClick={clear}
+                >
+                  <ClearIcon />
+                </button>
+              ) : null}
+            </div>
+          ) : null}
 
           {/*
            * 시트를 여는 버튼이다(업무 -674). 한때 `aria-pressed`만 있어 보조기술이 켜고 끄는
@@ -810,9 +867,9 @@ export default function SearchPage() {
               필터 적용 중
             </span>
           ) : null}
-        </form>
+        </SearchControls>
 
-        <p className={styles.scope}>제목 · 감독 · 배우 통합 검색</p>
+        {!useTopSearch ? <p className={styles.scope}>제목 · 감독 · 배우 통합 검색</p> : null}
 
         {shortNotice ? (
           <p className={styles.shortNotice} role="status">
@@ -844,7 +901,7 @@ export default function SearchPage() {
                     type="button"
                     className={styles.recentItem}
                     onClick={() => {
-                      setKeyword(query);
+                      updateKeyword(query);
                       remember(query);
                       runNow(query, filter);
                     }}

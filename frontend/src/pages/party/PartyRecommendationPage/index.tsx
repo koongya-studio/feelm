@@ -3,6 +3,7 @@
  *
  * 이동표
  * 5.9 → 5.5 팝콘 섞기 완료
+ * 5.8 · 5.1 보조 패널 → 5.5 이미 본 묶음을 다시 열 때 (업무 -855)
  * 5.5 ⇢ 2.4 추천 영화 선택
  * 5.5 ⇢ 5.9 다른 영화 추천받기
  *
@@ -31,6 +32,10 @@
  * 이유(`reason.summary`)도 걷어냈다 — 목업만 채우던 값이다. 카드는 서버 영화이므로 다시
  * 영화 상세(2.4)로 간다.
  *
+ * **그린 묶음을 이 계정이 본 것으로 남긴다**(업무 -855). 5.8 · 5.1 보조 패널은 본 적 있는
+ * 묶음이면 5.9 섞는 장면을 건너뛰고 여기로 곧장 온다(`usePartyRecommendationEntry`). 파티원마다
+ * 따로 남기므로 같은 묶음도 처음 보는 파티원은 장면을 본다.
+ *
  * 추천을 못 받은 까닭을 가른다. 가를 수 있어야 사용자가 다음에 할 일을 안다.
  * - `404` 없는 파티이거나 파티원이 아니다 · `409 PARTY_CLOSED` 끝난 파티다 → 내 파티로
  * - `503 RECOMMENDATION_UNAVAILABLE` 파티원 취향이 아직 준비되지 않았다 → 다시 추천받기
@@ -38,7 +43,7 @@
  *   **묶음을 새로 고르는 시점**(세트 생성 · 첫 노출 · 다시 받기)에 뺀다. 이미 노출 중인 묶음은
  *   그 사이 파티원이 무엇을 해도 바뀌지 않는다 — 조회마다 실시간으로 걸러 주지 않는다
  */
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import PartyFlowShell from '../../../components/PartyFlowShell';
@@ -46,11 +51,14 @@ import PopcornBucket from '../../../components/PopcornBucket';
 import Poster from '../../../components/Poster';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
+import RecommendationFeedback from '../../../components/RecommendationFeedback';
 import { ApiError } from '../../../api/apiError';
+import { AuthContext } from '../../../contexts/authContext';
 import { ChevronRightIcon } from '../../../components/Icon';
 import { getParty, getPartyPopcorn, getPartyRecommendations } from '../../../api/parties';
 import { path } from '../../../routes/paths';
 import { mixedFlavors } from '../../../utils/party';
+import { markPartyRecommendationSeen } from '../../../utils/partyRecommendationSeen';
 import type { PartyMixEntry } from '../PartyPopcornMixPage';
 import type { PartyAvatarUser, PartyPopcorn, PartyRecommendationItem } from '../../../types/party';
 import styles from './PartyRecommendationPage.module.css';
@@ -91,8 +99,10 @@ export default function PartyRecommendationPage() {
   const navigate = useNavigate();
   const { partyId } = useParams();
   const id = Number(partyId);
+  const userId = useContext(AuthContext)?.user?.userId ?? null;
 
   const [items, setItems] = useState<PartyRecommendationItem[] | null>(null);
+  const [recommendationSetId, setRecommendationSetId] = useState<number | null>(null);
   /** 다시 받기로 더 보여줄 후보가 남았는지. 값이 없으면(옛 응답) 있는 것으로 본다 */
   const [hasNext, setHasNext] = useState(true);
   const [members, setMembers] = useState<PartyAvatarUser[]>([]);
@@ -107,7 +117,9 @@ export default function PartyRecommendationPage() {
       .then((set) => {
         if (!active) return;
 
+        if (userId !== null) markPartyRecommendationSeen(userId, id, set);
         setItems(set.items);
+        setRecommendationSetId(set.recommendationSetId);
         setHasNext(set.hasNext !== false);
         setFailure(set.items.length === 0 ? 'empty' : null);
         setFailed(set.items.length === 0);
@@ -140,7 +152,7 @@ export default function PartyRecommendationPage() {
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, userId]);
 
   if (failed) {
     const copy = failure
@@ -172,6 +184,10 @@ export default function PartyRecommendationPage() {
   if (!items) return null;
 
   const shownMembers = popcorn ? popcorn.members.map((member) => member.user) : members;
+  const feedbackStorageKey = `feelm:party-recommendation-feedback:${userId}:${id}:${recommendationSetId}:${items
+    .map((item) => item.recommendationItemId)
+    .sort((a, b) => a - b)
+    .join(',')}`;
 
   return (
     <PartyFlowShell
@@ -211,6 +227,14 @@ export default function PartyRecommendationPage() {
           </li>
         ))}
       </ul>
+
+      {items.length > 0 && userId !== null && recommendationSetId !== null ? (
+        <RecommendationFeedback
+          key={feedbackStorageKey}
+          storageKey={feedbackStorageKey}
+          partyId={id}
+        />
+      ) : null}
 
       <div className={styles.actions}>
         {hasNext ? (

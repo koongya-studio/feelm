@@ -88,10 +88,38 @@ async function listParties(status?: PartyStatus): Promise<Party[]> {
 }
 
 /**
+ * 끝난 파티 하나를 커서를 따라가며 찾는다(!683 리뷰).
+ *
+ * 끝난 파티에는 상한이 없어 첫 장(50개)에 없을 수 있다. 첫 장만 보고 없다고 하면 오래된 종료
+ * 파티를 `나갔거나 내보내진 파티`로 잘못 안내한다 — 파티 초대 수락 알림은 90일 남는다(8.1).
+ * 찾거나 마지막 장까지 본 뒤에 답한다. 같은 커서가 다시 오면 멈춘다(서버가 커서를 못 넘겨도
+ * 끝없이 부르지 않는다).
+ */
+async function findClosedParty(partyId: number): Promise<Party | null> {
+  const seen = new Set<string>();
+  let cursor: string | undefined;
+
+  for (;;) {
+    const page = await request<PartyList>('/parties', {
+      query: { status: 'CLOSED', size: PAGE_SIZE, cursor },
+    });
+    const found = page.items.find((party) => party.partyId === partyId);
+
+    if (found) return found;
+    if (!page.hasNext || !page.nextCursor || seen.has(page.nextCursor)) return null;
+
+    seen.add(page.nextCursor);
+    cursor = page.nextCursor;
+  }
+}
+
+/**
  * 파티 하나. 파티 단건 조회 계약이 없어 목록에서 고른다(5.7 · 5.8이 쓴다).
  *
  * `includeClosed`면 활성에서 못 찾았을 때 종료 파티도 본다(업무 -826). 5.10은 종료 파티의
- * 이름을 머리에 적어야 하는데 그 파티는 기본 목록에 없다. **기본값은 예전 그대로다** —
+ * 이름을 머리에 적어야 하는데 그 파티는 기본 목록에 없다. 8.1은 파티 초대 수락 알림의 파티가
+ * 끝났는지 나갔는지 가른다(업무 -866). 종료 파티는 첫 장만이 아니라 찾을 때까지 넘겨 본다
+ * (`findClosedParty`). **기본값은 예전 그대로다** —
  * 5.7 · 5.8은 끝난 파티를 찾아내면 안 된다(5.8은 종료 파티를 다룰 화면이 아니다).
  */
 export async function getParty(
@@ -105,9 +133,7 @@ export async function getParty(
     return found ?? null;
   }
 
-  const closed = await getClosedParties();
-
-  return closed.find((party) => party.partyId === partyId) ?? null;
+  return findClosedParty(partyId);
 }
 
 /**

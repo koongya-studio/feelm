@@ -2,12 +2,17 @@
 
 FEELM의 데이터 수집, 전처리, 추천 계산 코드를 관리합니다.
 
+현재 개인·파티 추천은 **v26 GBT**를 기준으로 하며 서버에도 적용된 상태입니다.
+[추천 기준·문서 안내](docs/gbt-v26/README.md), [학습·71특징 설명](docs/gbt-v26/TRAINING.md),
+[Consumer 실행](consumer/GBT-644.md)을 먼저 확인합니다. 아래 ALS 학습·분산 벤치마크는
+기준선과 역사 실험의 실행 안내이며 현재 GBT 요청의 선행 단계가 아닙니다.
+
 AI 코딩 도구는 루트 [`AGENTS.md`](../AGENTS.md)의 공통 절차와
 [`pipeline/AGENTS.md`](AGENTS.md)의 파이프라인 전용 작업·검증 절차를 따릅니다.
 
 - `contracts/`: 파이프라인 내부 HDFS 경로, Parquet 스키마, 모델 산출물 계약
 - `spark/`: Spark Batch와 Structured Streaming 작업
-- `consumer/`: Fold-in, Candidate, Top-N 계산을 담당하는 Python Consumer
+- `consumer/`: 개인·파티 GBT와 발견 후보 계산을 담당하는 Python Consumer, 전환용 legacy 경로
 - `configs/`: 학습·평가 설정값 기록. 기존 `settings.py`를 이동하지 않습니다.
 - `artifacts/`: 외부 데이터·모델의 출처, 해시, 공유 상태를 담는 JSON 목록
 - `templates/`: Pipeline 작업 플랜과 리뷰 기록 양식
@@ -33,7 +38,7 @@ pipeline/
 │   ├── jobs/                    # spark-submit 진입점
 │   ├── streaming/               # 향후 Structured Streaming 작업 위치
 │   └── tests/                   # Spark 단위·로컬 통합 테스트
-└── consumer/                    # Python 3.12 Fold-in Consumer 위치
+└── consumer/                    # Python 3.12 개인·파티 Consumer 위치
 ```
 
 확정 연구 자료는 [`docs/README.md`](docs/README.md)에서 시작합니다. 계산 참고 코드와
@@ -53,11 +58,11 @@ EC2
 │   ├── Java 21
 │   ├── Scala 2.13
 │   └── Python 3.10.12
-└── Fold-in Consumer container
+└── Python Consumer container
     ├── python:3.12-slim
     ├── Kafka client
     ├── Redis client
-    └── Fold-in code
+    └── 개인·파티 GBT / legacy 실행 코드
 ```
 
 ## Spark setup

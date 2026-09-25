@@ -30,17 +30,27 @@ public class NotificationRepository {
                 .isPresent();
     }
 
-    public long createPartyInvitation(
+    /**
+     * 파티 초대 알림을 만든다. 초대받은 사람이 파티 초대 알림을 껐으면(API-017 {@code PARTY_INVITE}) 만들지 않고 비어 있는 값을
+     * 돌려준다(S15P21E106-857).
+     *
+     * <p>수신 여부를 같은 INSERT 문에서 판정해 조회와 삽입 사이에 설정이 바뀌는 틈을 두지 않는다. 설정 행이 없으면 기본값(켜짐)으로 본다.
+     */
+    public Optional<Long> createPartyInvitation(
             long userId, long invitationId, Instant notifiedAt, Instant expiresAt) {
         return jdbc.sql(
                         """
                         INSERT INTO notifications(
                             user_id, type, source_id, target_type, target_id,
                             title, body, notified_at, expires_at
-                        ) VALUES (
+                        )
+                        SELECT
                             :userId, 'PARTY_INVITE', :invitationId, 'PARTY_INVITATION',
-                            :invitationId, '파티 모드 초대', '새로운 파티 초대가 도착했어요.',
+                            :invitationId, '파티팝콘 초대', '새로운 파티팝콘 초대가 도착했어요.',
                             :notifiedAt, :expiresAt
+                        WHERE NOT EXISTS (
+                            SELECT 1 FROM notification_settings
+                            WHERE user_id = :userId AND NOT party_invite_enabled
                         )
                         ON CONFLICT (type, source_id) DO UPDATE SET
                             updated_at = notifications.updated_at
@@ -51,7 +61,49 @@ public class NotificationRepository {
                 .param("notifiedAt", offset(notifiedAt))
                 .param("expiresAt", offset(expiresAt))
                 .query(Long.class)
-                .single();
+                .optional();
+    }
+
+    /**
+     * 이번에 공개한 리포트마다 주인에게 리포트 발급 알림을 만들고 만든 수를 돌려준다(S15P21E106-858).
+     *
+     * <p>활성 계정이 아니거나 리포트 발급 알림을 끈 사용자(API-017 {@code REPORT_ISSUED})는 건너뛴다. 설정 행이 없으면 기본값(켜짐)으로 본다.
+     * 같은 리포트는 UK(type, source_id)로 한 번만 만든다.
+     *
+     * <p>주인 계정 행을 공유 잠금으로 읽는다. 탈퇴(API-013)는 계정 행을 잠그고 알림을 지우는데, 잠그지 않으면 탈퇴가 커밋되기 전의 {@code ACTIVE}를
+     * 보고 넣은 알림이 탈퇴의 삭제를 비켜 가 남는다. 잠그면 탈퇴 커밋을 기다린 뒤 상태를 다시 보고 건너뛴다. 교착을 막으려고 계정 번호 순으로 잠근다.
+     */
+    public int createReportIssued(
+            List<Long> reportIds, String body, Instant notifiedAt, Instant expiresAt) {
+        if (reportIds.isEmpty()) {
+            return 0;
+        }
+        return jdbc.sql(
+                        """
+                        INSERT INTO notifications(
+                            user_id, type, source_id, target_type, target_id,
+                            title, body, notified_at, expires_at
+                        )
+                        SELECT
+                            report.user_id, 'REPORT_ISSUED', report.id, 'TASTE_REPORT',
+                            report.id, '취향 리포트 발급', :body, :notifiedAt, :expiresAt
+                        FROM taste_reports report
+                        JOIN users owner ON owner.id = report.user_id AND owner.status = 'ACTIVE'
+                        WHERE report.id IN (:reportIds)
+                          AND NOT EXISTS (
+                              SELECT 1 FROM notification_settings setting
+                              WHERE setting.user_id = report.user_id
+                                AND NOT setting.report_issued_enabled
+                          )
+                        ORDER BY owner.id
+                        FOR SHARE OF owner
+                        ON CONFLICT (type, source_id) DO NOTHING
+                        """)
+                .param("reportIds", reportIds)
+                .param("body", body)
+                .param("notifiedAt", offset(notifiedAt))
+                .param("expiresAt", offset(expiresAt))
+                .update();
     }
 
     public long createPartyInvitationAccepted(
@@ -68,7 +120,7 @@ public class NotificationRepository {
                             title, body, notified_at, expires_at
                         ) VALUES (
                             :ownerId, 'PARTY_INVITE_ACCEPTED', :invitationId, 'PARTY',
-                            :partyId, '파티 모드 초대 수락', :body,
+                            :partyId, '파티팝콘 초대 수락', :body,
                             :notifiedAt, :expiresAt
                         )
                         ON CONFLICT (type, source_id) DO UPDATE SET
@@ -78,7 +130,7 @@ public class NotificationRepository {
                 .param("ownerId", ownerId)
                 .param("invitationId", invitationId)
                 .param("partyId", partyId)
-                .param("body", inviteeNickname + " 님이 파티 모드에 참여했어요.")
+                .param("body", inviteeNickname + " 님이 파티팝콘에 참여했어요.")
                 .param("notifiedAt", offset(notifiedAt))
                 .param("expiresAt", offset(expiresAt))
                 .query(Long.class)

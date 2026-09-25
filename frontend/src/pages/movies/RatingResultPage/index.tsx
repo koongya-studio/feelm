@@ -53,7 +53,8 @@
  * - 포스터가 없거나 받지 못한 영화는 자리표시자에 **제목을 적는다**(`caption`). 필름의
  *   기존 프레임도 같다
  *
- * 맨 위의 점선 칸은 비어 있는 것이 맞다. 다음 평가가 감길 자리다.
+ * 완료 화면에서는 새 프레임을 필름의 첫 칸에 둔다. 다음 평가용 빈 칸이 위에 있으면
+ * 방금 추가한 영화가 한 칸 밀려 보인다.
  */
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
@@ -227,8 +228,6 @@ export default function RatingResultPage() {
             frameHeight={FRAME_HEIGHT}
             label="취향 필름에 감기는 프레임"
           >
-            <span className={styles.emptyFrame} aria-hidden="true" />
-
             <span className={styles.newFrame}>
               <Poster
                 width={FRAME_WIDTH}
@@ -308,9 +307,19 @@ export default function RatingResultPage() {
               </div>
             ) : null}
 
+            {/*
+             * `다른 영화 평가하기`는 이어서 평가할 곳이다(업무 -918). 뒤로 가기는 진입 경로에 따라
+             * 방금 평가한 영화의 상세나 그 앞 화면으로 돌아가 연속 평가의 목적지가 되지 못했다.
+             * 조건 없는 4.1 검색은 늘 빈 검색으로 열리고 입력창에 초점을 두므로, 어디서 평가를
+             * 시작했든 같은 곳에서 다음 영화를 고른다.
+             */}
             <div className={styles.resultActions}>
               <Button onClick={() => void navigate(path.recommendations())}>
                 다음 추천 보러 가기
+              </Button>
+
+              <Button variant="secondary" onClick={() => void navigate(path.search())}>
+                다른 영화 평가하기
               </Button>
 
               <Button variant="text" onClick={() => void navigate(path.film())}>

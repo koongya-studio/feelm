@@ -6,9 +6,7 @@
  * 큰 카드와 작은 카드의 차이는 포스터 폭과 아래 버튼의 유무뿐이라 한 컴포넌트로 둔다 —
  * 두 화면이 각자 그리면 같은 카드가 조금씩 다른 두 벌이 된다(Jira -783 완료 조건).
  *
- * **모바일 카드(`RecommendationsPage/RecommendationCard`)를 바꾸지 않는다.** 그쪽은 포스터
- * 위에 이유를 겹쳐 놓는 세로 카드이고 412px 이하에서 그대로 남는다(Jira -783 완료 조건 —
- * 412px 이하 모바일 UI 유지).
+ * 모바일은 별도 `RecommendationCard`가 세로 필름 칸을 그린다.
  *
  * 평점은 계약의 `averageRating` 그대로 5점 만점이다(API-045). 시안은 8.6처럼 10점처럼
  * 보이는 수를 적지만, 이 앱의 평가는 0.5~5.0이고(FR-19) 영화 상세도 5점으로 적는다.
@@ -23,6 +21,7 @@ import OttBadge from '../OttBadge';
 import Poster from '../Poster';
 import PosterCue from '../PosterCue';
 import { path } from '../../routes/paths';
+import { ottMovieUrl } from '../../utils/ott';
 import styles from './MovieBriefCard.module.css';
 import type { CSSProperties, ReactNode } from 'react';
 import type { Ott } from '../../types/ott';
@@ -48,13 +47,12 @@ type Props = {
    *
    * **모든 카드가 같은 빨강이다**(사용자 결정 2026-09-22). 시안은 첫 카드만 빨강이고
    * 나머지는 흰 면이지만, 시안에서 두 버튼은 서로 다른 동작(`지금 바로 보기` · `자세히 보기`)
-   * 이었다. 이 앱은 OTT 재생 주소가 추천 응답에 없어(API-030에만 있다) 모든 버튼이 같은
-   * 곳으로 가므로, 같은 동작에 두 가지 무게를 주지 않는다.
+   * 이었다. 모든 카드의 하단 버튼은 같은 상세 화면으로 가므로 같은 무게를 준다.
    */
   detailButton?: boolean;
   /** 카드 왼쪽 위 표식. 추천 종류(`맞춤 추천` · `취향 확장`)를 말한다 */
   badge?: ReactNode;
-  /** 카드 오른쪽 위에 놓이는 버튼들. 관심없음 · OTT 메뉴가 들어온다 */
+  /** 카드 오른쪽 위에 놓이는 조작 버튼 */
   actions?: ReactNode;
   /** 추천 이유 한 줄. 없으면 그 줄을 비운다 */
   reason?: string;
@@ -65,6 +63,8 @@ type Props = {
    * `recommendation`). 추천이 아닌 곳에서 쓰면 생략한다
    */
   recommendationItemId?: number;
+  /** 추천 화면에서만 OTT 배지를 각 서비스의 이동 링크로 표시한다. */
+  ottLinks?: boolean;
 };
 
 export default function MovieBriefCard({
@@ -79,6 +79,7 @@ export default function MovieBriefCard({
   footer,
   detailButton,
   recommendationItemId,
+  ottLinks = false,
 }: Props) {
   const detail = path.movieDetail(movie.movieId);
   const ottRowStyle = { '--ott-row-height': `${ottSize}px` } as CSSProperties;
@@ -102,10 +103,23 @@ export default function MovieBriefCard({
       <ul className={styles.ottList} style={ottRowStyle}>
         {movie.ottProviders.map((code) => {
           const ott = otts.find((candidate) => candidate.code === code);
+          const destination = ottLinks ? ottMovieUrl(code, movie.title) : null;
 
           return (
             <li key={code}>
-              <OttBadge code={code} name={ott?.name ?? code} size={ottSize} />
+              {destination ? (
+                <a
+                  href={destination}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={styles.ottLink}
+                  aria-label={`${ott?.name ?? code}에서 ${movie.title} 보기 (새 창)`}
+                >
+                  <OttBadge code={code} name={ott?.name ?? code} size={ottSize} labelled={false} />
+                </a>
+              ) : (
+                <OttBadge code={code} name={ott?.name ?? code} size={ottSize} />
+              )}
             </li>
           );
         })}

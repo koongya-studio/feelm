@@ -207,6 +207,13 @@
   color: var(--color-ink);
 }
 
+/* 가린 수(업무 -856)는 숫자 자리에 `비공개`를 작게 적는다. 줄 높이는 숫자와 같게 둬 칸이 튀지 않는다 */
+.stat dd[data-hidden='true'] {
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-ink-muted);
+}
+
 .stat dt {
   font-size: var(--font-size-meta);
   line-height: var(--line-height-meta);
@@ -454,8 +461,8 @@
   border-color: var(--glass-dark-line);
   background: var(--glass-dark-fill);
   box-shadow: var(--shadow-glass-dark);
-  backdrop-filter: var(--blur-glass-dark);
   -webkit-backdrop-filter: var(--blur-glass-dark);
+  backdrop-filter: var(--blur-glass-dark);
 }
 
 .layout[data-tone='dark'] .stat + .stat {
@@ -469,6 +476,7 @@
 }
 
 .layout[data-tone='dark'] .stat dt,
+.layout[data-tone='dark'] .stat dd[data-hidden='true'],
 .layout[data-tone='dark'] .empty,
 .layout[data-tone='dark'] .bucketCount,
 .layout[data-tone='dark'] .emptyReviews,

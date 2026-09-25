@@ -664,8 +664,8 @@ class WatchRecordApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("평가 삭제 후 미평가 감상은 클릭 기한이 지나도 취소되고 미평가 목록에서 빠진다")
-    void cancelsUnratedWatchAfterClickExpiry() throws Exception {
+    @DisplayName("평가를 지우면 클릭 기한이 지난 감상도 안 본 상태가 되고 미평가 목록에서 빠진다")
+    void ratingDeleteExpiresWatchAfterClickExpiry() throws Exception {
         long ratingId =
                 response(
                                 mockMvc.perform(
@@ -691,44 +691,27 @@ class WatchRecordApiContractTest extends SharedPostgresContractTest {
                 .param("watchedAt", offset(watchedAt))
                 .param("id", recordId)
                 .update();
+        Instant before = Instant.now();
+
         mockMvc.perform(
                         delete("/api/v1/ratings/{ratingId}", ratingId)
                                 .header("Authorization", bearer(userId)))
                 .andExpect(status().isNoContent());
-        assertThat(watch(recordId).status()).isEqualTo("WATCHED_UNRATED");
-        assertThat(watch(recordId).watchedAt()).isEqualTo(watchedAt);
-        assertThat(
-                        response(
-                                        mockMvc.perform(
-                                                        get("/api/v1/users/me/ratings")
-                                                                .header(
-                                                                        "Authorization",
-                                                                        bearer(userId))
-                                                                .param("filter", "UNRATED"))
-                                                .andExpect(status().isOk())
-                                                .andReturn())
-                                .path("items")
-                                .get(0)
-                                .path("movie")
-                                .path("movieId")
-                                .asLong())
-                .isEqualTo(movieId);
-        Instant before = Instant.now();
-
-        JsonNode cancelled =
-                response(
-                        confirm(recordId, userId, "{\"watched\":false}")
-                                .andExpect(status().isOk())
-                                .andReturn());
 
         Instant after = Instant.now();
-        assertThat(cancelled.path("status").asText()).isEqualTo("EXPIRED");
-        assertThat(cancelled.path("watchedAt").isNull()).isTrue();
+        // 평가 삭제 하나로 안 본 상태가 된다. 취소를 따로 부르지 않는다(ADR-0025)
         WatchRow stored = watch(recordId);
         assertThat(stored.status()).isEqualTo("EXPIRED");
         assertThat(stored.watchedAt()).isNull();
         assertThat(stored.expiredAt()).isBetween(before, after);
         assertThat(ids(response(list(userId, "status", "WATCHED_UNRATED").andReturn()))).isEmpty();
+        // API-038 처리 규칙이 적은 `본 영화 목록`은 두 상태를 함께 거른 조회다
+        assertThat(
+                        ids(
+                                response(
+                                        list(userId, "status", "WATCHED_UNRATED", "status", "RATED")
+                                                .andReturn())))
+                .isEmpty();
         assertThat(
                         response(
                                         mockMvc.perform(
@@ -745,6 +728,53 @@ class WatchRecordApiContractTest extends SharedPostgresContractTest {
         confirm(recordId, userId, "{\"watched\":false}")
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("INVALID_WATCH_STATUS"));
+    }
+
+    @Test
+    @DisplayName("보러가기로 만든 기록도 평가를 지우면 되돌아가고 클릭 이력은 남는다")
+    void ratingDeleteExpiresClickedWatchAndKeepsClickTrail() throws Exception {
+        Instant clickedAt = Instant.now().minusSeconds(DAY).truncatedTo(ChronoUnit.MICROS);
+        long recordId =
+                insertWatch(
+                        userId,
+                        movieId,
+                        ottId,
+                        "LINK_CLICKED",
+                        clickedAt,
+                        clickedAt.plusSeconds(7 * DAY));
+        confirm(recordId, userId, "{\"watched\":true}").andExpect(status().isOk());
+        assertThat(watch(recordId).status()).isEqualTo("WATCHED_UNRATED");
+
+        long ratingId =
+                response(
+                                mockMvc.perform(
+                                                post("/api/v1/movies/{movieId}/ratings", movieId)
+                                                        .header("Authorization", bearer(userId))
+                                                        .contentType(MediaType.APPLICATION_JSON)
+                                                        .content(
+                                                                "{\"score\":4.0,\"visibility\":\"PRIVATE\"}"))
+                                        .andExpect(status().isCreated())
+                                        .andReturn())
+                        .path("ratingId")
+                        .asLong();
+        // 보러가기로 만든 기록을 평가가 재사용한다(D-6)
+        assertThat(rating(ratingId).watchRecordId()).isEqualTo(recordId);
+
+        mockMvc.perform(
+                        delete("/api/v1/ratings/{ratingId}", ratingId)
+                                .header("Authorization", bearer(userId)))
+                .andExpect(status().isNoContent());
+
+        /*
+         * 되돌아가되 클릭 이력은 남는다. ADR-0025가 `감수하는 것`으로 적은 결과를 계약으로
+         * 고정한다 — 상태와 감상 시각만 비우고 ott_id·clicked_at은 건드리지 않는다.
+         */
+        WatchRow stored = watch(recordId);
+        assertThat(stored.status()).isEqualTo("EXPIRED");
+        assertThat(stored.watchedAt()).isNull();
+        assertThat(stored.expiredAt()).isNotNull();
+        assertThat(stored.clickedAt()).isEqualTo(clickedAt);
+        assertThat(ottOf(recordId)).isEqualTo(ottId);
     }
 
     @ParameterizedTest
@@ -1258,6 +1288,14 @@ class WatchRecordApiContractTest extends SharedPostgresContractTest {
                                         instant(row, "expires_at"),
                                         instant(row, "watched_at"),
                                         instant(row, "expired_at")))
+                .single();
+    }
+
+    /** 되돌린 뒤에도 어느 OTT로 갔는지 남는지 본다(ADR-0025) */
+    private Long ottOf(long watchRecordId) {
+        return jdbc.sql("SELECT ott_id FROM watch_records WHERE id=:id")
+                .param("id", watchRecordId)
+                .query(Long.class)
                 .single();
     }
 

@@ -35,7 +35,9 @@ public class PublicProfileController {
                     "PUBLIC 사용자의 닉네임·취향 키워드·팝콘·최근 필름·공개 한줄평 수를 조회합니다. "
                             + "비회원도 호출할 수 있습니다. 없는 사용자, PRIVATE 사용자, "
                             + "로그인 사용자와 차단 관계인 사용자는 모두 404로 구분 없이 응답합니다. "
-                            + "본인이 자신의 publicId로 조회하면 공개 범위와 무관하게 200입니다.")
+                            + "본인이 자신의 publicId로 조회하면 공개 범위와 무관하게 200입니다. "
+                            + "항목별 공개 범위(user.frameVisibility·popcornVisibility·reviewVisibility)가 "
+                            + "PRIVATE인 구역은 본인 외 조회에서 필드 모양을 유지한 채 값을 비웁니다.")
     @ApiResponses({
         @ApiResponse(
                 responseCode = "200",

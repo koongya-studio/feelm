@@ -551,6 +551,48 @@ class RedisRecommendationCandidateReaderTest {
     }
 
     @Test
+    @DisplayName("GBT evidence coverage의 producer 허용 오차 이하는 보존한다")
+    void acceptsGbtEvidenceCoverageWithinProducerTolerance() {
+        when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r1"));
+        when(values.get("feelm:user:10:recommendation-state")).thenReturn(gbtState("g1", HASH));
+        when(values.get("feelm:user:10:candidates")).thenReturn(gbtCandidates("g1", HASH));
+        String serializedFloatCoverage =
+                gbtEvidenceV2("g1", HASH)
+                        .replace(
+                                "\"coverage\":0.7,\"evidence\"",
+                                "\"coverage\":0.7000000000000001,\"evidence\"");
+        when(values.get("feelm:user:10:gbt-evidence:g1")).thenReturn(serializedFloatCoverage);
+
+        var reason = reader.read(10).items().getFirst().reason();
+
+        assertThat(reason.path("evidence").path("item").path("coverage").decimalValue())
+                .isEqualByComparingTo("0.7000000000000001");
+
+        when(values.get("feelm:user:10:gbt-evidence:g1"))
+                .thenReturn(gbtEvidenceWithRepeatingCoverage("g1", HASH));
+
+        var repeatingReason = reader.read(10).items().getFirst().reason();
+
+        assertThat(repeatingReason.path("evidence").path("item").path("evidence")).hasSize(3);
+    }
+
+    @Test
+    @DisplayName("GBT evidence coverage의 producer 허용 오차 초과는 거부한다")
+    void rejectsGbtEvidenceCoverageBeyondProducerTolerance() {
+        when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r1"));
+        when(values.get("feelm:user:10:recommendation-state")).thenReturn(gbtState("g1", HASH));
+        when(values.get("feelm:user:10:candidates")).thenReturn(gbtCandidates("g1", HASH));
+        String mismatchedCoverage =
+                gbtEvidenceV2("g1", HASH)
+                        .replace(
+                                "\"coverage\":0.7,\"evidence\"",
+                                "\"coverage\":0.7000000011,\"evidence\"");
+        when(values.get("feelm:user:10:gbt-evidence:g1")).thenReturn(mismatchedCoverage);
+
+        assertEvidenceIgnored();
+    }
+
+    @Test
     @DisplayName("GBT evidence v2의 허용되지 않은 구체 출처는 Candidate를 유지하고 버린다")
     void rejectsInvalidGbtEvidenceV2SpecificSources() {
         when(values.get("feelm:model:current")).thenReturn(gbtCurrent("serving-r1"));
@@ -767,6 +809,26 @@ class RedisRecommendationCandidateReaderTest {
                         inputHash,
                         "82211a19e9405804bf5d90912454215795e3a88dca410ed9b7bebf7f6c35cf84",
                         "562d59adbc18f27a129439452741343e6a918f3a8fb279cf077f7c8050cfcf06");
+    }
+
+    private static String gbtEvidenceWithRepeatingCoverage(String generation, String inputHash) {
+        return """
+                {"evidenceSchemaVersion":"gbt-evidence-v1",
+                 "explanationVersion":"gbt-feature-attribution-v1","userId":10,
+                 "generationId":"%s","modelVersion":"gbt-v26",
+                 "servingRevision":"serving-r1",
+                 "featureVersion":"v26-max70-kobis-flag-71-v1",
+                 "rankingVersion":"gbt-personal-raw-score-v1","inputVersion":"%s",
+                 "candidateVersion":6,"items":[{"movieId":101,"score":4.2,
+                   "coverage":1.0,"evidence":[{
+                     "evidenceId":"sha256:%s","group":"GENRE_PATTERN",
+                     "direction":"POSITIVE","contribution":0.5,"coverage":0.3333333333333333},{
+                     "evidenceId":"sha256:%s","group":"RATING_PATTERN",
+                     "direction":"POSITIVE","contribution":0.4,"coverage":0.3333333333333333},{
+                     "evidenceId":"sha256:%s","group":"POPULARITY_SIGNAL",
+                     "direction":"POSITIVE","contribution":0.3,"coverage":0.3333333333333333}]}]}
+                """
+                .formatted(generation, inputHash, "c".repeat(64), "d".repeat(64), "e".repeat(64));
     }
 
     private void assertEvidenceIgnored() {

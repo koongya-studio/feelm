@@ -28,6 +28,7 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import Button from '../../../components/Button';
 import GuideCallout from '../../../components/GuideCallout';
 import IconButton from '../../../components/IconButton';
+import Menu from '../../../components/Menu';
 import OttBadge from '../../../components/OttBadge';
 import Poster from '../../../components/Poster';
 import PosterCue from '../../../components/PosterCue';
@@ -60,19 +61,23 @@ import {
 import { movieMetaLine } from '../../../utils/movie';
 import { ottMovieUrl } from '../../../utils/ott';
 import styles from './MovieDetailPage.module.css';
-import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
+import type {
+  CSSProperties,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent as ReactPointerEvent,
+} from 'react';
 import type { MovieDetail, SimilarMovie } from '../../../types/movie';
 import type { PopcornFlavor } from '../../../types/taste';
 import type { PublicReview, PublicReviewList } from '../../../types/watch';
 
 const BACK_BUTTON_SIZE = 39;
-/** 관심없음 버튼. 옆의 별점 버튼(`--control-height`)과 높이를 맞춘다 */
-const DISMISS_BUTTON_SIZE = 52;
 const SIMILAR_POSTER_WIDTH = 96;
 const SIMILAR_POSTER_HEIGHT = 144;
 const BACKDROP_FADE_RATIO = 0.55;
 const REVIEW_FETCH_SIZE = 20;
 const REVIEW_REVEAL_SIZE = 5;
+/** 출연·제작 목록에서 이만큼 움직이기 전까지는 끌기가 아니라 누르기로 본다 */
+const PEOPLE_DRAG_THRESHOLD_PX = 5;
 /** 숨김 상태에서 실제 문장 길이와 형태를 노출하지 않는 고정 가림 문구 */
 const SPOILER_PLACEHOLDER = '스포일러가 포함된 한줄평을 가려두었어요';
 
@@ -150,12 +155,21 @@ export default function MovieDetailPage() {
     movieId: number;
     status: 'pending' | 'done' | 'failed';
   } | null>(null);
+  const [pendingDismiss, setPendingDismiss] = useState<{
+    movieId: number;
+    top: number;
+    left: number;
+    placement: 'below' | 'above';
+  } | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const peopleDragRef = useRef<{
     pointerId: number;
     clientX: number;
     scrollLeft: number;
+    moved: boolean;
   } | null>(null);
+  /** 방금 끝난 누름이 끌기였는지. 뒤따르는 click이 인물 검색으로 이어지지 않게 막는다 */
+  const peopleDraggedRef = useRef(false);
 
   useEffect(() => {
     // 복구가 끝나기 전에 부르면 비회원 응답이 굳는다(위 주석)
@@ -263,6 +277,7 @@ export default function MovieDetailPage() {
    * 대로다. 해제는 계약 미정이라 처리된 버튼은 다시 눌리지 않는다.
    */
   function handleDismiss() {
+    setPendingDismiss(null);
     setDismissal({ movieId: id, status: 'pending' });
 
     dismissMovie(id, recommendationItemId)
@@ -271,6 +286,16 @@ export default function MovieDetailPage() {
       })
       .then(() => setDismissal({ movieId: id, status: 'done' }))
       .catch(() => setDismissal({ movieId: id, status: 'failed' }));
+  }
+
+  function handleOpenDismiss(event: ReactMouseEvent<HTMLButtonElement>) {
+    const button = event.currentTarget.getBoundingClientRect();
+    const page = pageRef.current?.getBoundingClientRect();
+    const below = window.innerHeight - button.bottom >= 170;
+    const top = (below ? button.bottom + 1 : button.top - 162) - (page?.top ?? 0);
+    const left = Math.max(button.right - (page?.left ?? 0) - 196, 0);
+
+    setPendingDismiss({ movieId: id, top, left, placement: below ? 'below' : 'above' });
   }
 
   function handleRetry() {
@@ -285,23 +310,35 @@ export default function MovieDetailPage() {
     else window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  /*
+   * 칸 전체(사진 · 이름)가 인물 검색 링크라 링크 위에서도 끌기를 시작할 수 있어야 한다. 누르는
+   * 순간에 포인터를 잡으면 click이 목록으로 가 링크가 열리지 않으므로, 실제로 끌기 시작한
+   * 뒤에만 잡고 그때 뒤따르는 click은 막는다.
+   */
   function handlePeoplePointerDown(event: ReactPointerEvent<HTMLUListElement>) {
+    peopleDraggedRef.current = false;
     if (event.pointerType !== 'mouse' || event.button !== 0) return;
-    if (event.target instanceof Element && event.target.closest('a')) return;
 
     peopleDragRef.current = {
       pointerId: event.pointerId,
       clientX: event.clientX,
       scrollLeft: event.currentTarget.scrollLeft,
+      moved: false,
     };
-    event.currentTarget.setPointerCapture(event.pointerId);
   }
 
   function handlePeoplePointerMove(event: ReactPointerEvent<HTMLUListElement>) {
     const drag = peopleDragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
 
-    event.currentTarget.scrollLeft = drag.scrollLeft - (event.clientX - drag.clientX);
+    const distance = event.clientX - drag.clientX;
+    if (!drag.moved) {
+      if (Math.abs(distance) < PEOPLE_DRAG_THRESHOLD_PX) return;
+      drag.moved = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+
+    event.currentTarget.scrollLeft = drag.scrollLeft - distance;
     event.preventDefault();
   }
 
@@ -312,7 +349,16 @@ export default function MovieDetailPage() {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    peopleDraggedRef.current = drag.moved;
     peopleDragRef.current = null;
+  }
+
+  function handlePeopleClickCapture(event: ReactMouseEvent<HTMLUListElement>) {
+    if (!peopleDraggedRef.current) return;
+
+    peopleDraggedRef.current = false;
+    event.preventDefault();
+    event.stopPropagation();
   }
 
   async function handleLoadMoreReviews() {
@@ -423,6 +469,8 @@ export default function MovieDetailPage() {
     ? flavors.find((candidate) => candidate.code === movie.flavorCode)
     : undefined;
   const dismissStatus = dismissal?.movieId === id ? dismissal.status : null;
+  const canDismiss =
+    !movie.myRating && movie.myWatchStatus !== 'RATED' && movie.myWatchStatus !== 'WATCHED_UNRATED';
   const people = [
     ...movie.directors.map((person) => ({ ...person, creditKey: `director:${person.personId}` })),
     ...movie.cast.map((person) => ({ ...person, creditKey: `cast:${person.personId}` })),
@@ -501,8 +549,14 @@ export default function MovieDetailPage() {
             </div>
           ) : null}
           {/*
-           * 관심없음은 별점 버튼 오른쪽의 아이콘 버튼이다(업무 -664). 2.2 추천 카드의 관심없음과
-           * 같은 아이콘이다. 주 동작은 별점이므로 관심없음은 글자 없이 작게 둔다.
+           * 관심없음은 별점 버튼 오른쪽에 선다(업무 -664). 2.2 추천 카드의 관심없음과 같은 아이콘이다.
+           *
+           * **아이콘 아래에 글자를 둔다**(업무 -873). 아이콘만으로는 무슨 단추인지 알기 어려웠다.
+           * 공용 `IconButton`은 글자를 숨기므로 이 자리만 따로 그린다.
+           *
+           * **평가했거나 감상을 확정한 영화에는 두지 않는다**(업무 -873, 사용자 결정 2026-09-25).
+           * 그 영화는 이미 추천에서 빠지므로(`docs/api/streaming-contract.md` 2.1) 관심없음이
+           * 바꾸는 것이 없고, 본 영화를 관심없음으로 표시하는 것은 뜻이 맞지 않는다.
            */}
           <div className={styles.actionRow}>
             <span>
@@ -515,14 +569,19 @@ export default function MovieDetailPage() {
                 {movie.myRating ? '내 별점 수정하기' : '내 별점 남기기'}
               </Button>
             </span>
-            <IconButton
-              label={dismissStatus === 'done' ? '관심없음 처리됨' : '관심없음'}
-              icon={<BlockIcon />}
-              size={DISMISS_BUTTON_SIZE}
-              variant={dismissStatus === 'done' ? 'filled' : 'translucent'}
-              disabled={dismissStatus === 'pending' || dismissStatus === 'done'}
-              onClick={handleDismiss}
-            />
+            {canDismiss ? (
+              <button
+                type="button"
+                className={styles.dismissButton}
+                data-done={dismissStatus === 'done' || undefined}
+                aria-label={dismissStatus === 'done' ? '관심없음 처리됨' : undefined}
+                disabled={dismissStatus === 'pending' || dismissStatus === 'done'}
+                onClick={handleOpenDismiss}
+              >
+                <BlockIcon />
+                <span className={styles.dismissLabel}>관심없음</span>
+              </button>
+            ) : null}
           </div>
           {dismissStatus === 'done' ? (
             <p className={styles.dismissNote} role="status">
@@ -626,21 +685,23 @@ export default function MovieDetailPage() {
               onPointerMove={handlePeoplePointerMove}
               onPointerUp={finishPeopleDrag}
               onPointerCancel={finishPeopleDrag}
+              onClickCapture={handlePeopleClickCapture}
             >
               {people.map((person) => (
                 <li key={person.creditKey} className={styles.personItem}>
-                  {person.profileUrl ? (
-                    <img
-                      className={styles.personPhoto}
-                      src={person.profileUrl}
-                      alt=""
-                      loading="lazy"
-                    />
-                  ) : (
-                    <span className={styles.personPhoto} aria-hidden="true" />
-                  )}
-                  <Link className={styles.personName} to={path.searchWith(person.name)}>
-                    {person.name}
+                  <Link className={styles.personLink} to={path.searchWith(person.name)}>
+                    {person.profileUrl ? (
+                      <img
+                        className={styles.personPhoto}
+                        src={person.profileUrl}
+                        alt=""
+                        loading="lazy"
+                        draggable={false}
+                      />
+                    ) : (
+                      <span className={styles.personPhoto} aria-hidden="true" />
+                    )}
+                    <span className={styles.personName}>{person.name}</span>
                   </Link>
                 </li>
               ))}
@@ -752,6 +813,34 @@ export default function MovieDetailPage() {
           </Button>
         </div>
       </div>
+      {pendingDismiss?.movieId === id ? (
+        <div className={styles.dismissMenu} data-placement={pendingDismiss.placement}>
+          <Menu
+            label={`${movie.title} 관심없음 확인`}
+            top={pendingDismiss.top}
+            left={pendingDismiss.left}
+            onClose={() => setPendingDismiss(null)}
+          >
+            <div className={styles.dismissHead}>
+              <span className={styles.dismissIcon} aria-hidden="true">
+                <BlockIcon />
+              </span>
+              <div>
+                <strong>추천에서 제외할까요?</strong>
+                <p className={styles.dismissMovieTitle}>{movie.title}</p>
+              </div>
+            </div>
+            <div className={styles.dismissActions}>
+              <button type="button" onClick={() => setPendingDismiss(null)}>
+                아니요
+              </button>
+              <button type="button" onClick={handleDismiss}>
+                예
+              </button>
+            </div>
+          </Menu>
+        </div>
+      ) : null}
       {showDetailGuide && user ? (
         <GuideCallout
           title="영화 상세를 자유롭게 둘러보세요"

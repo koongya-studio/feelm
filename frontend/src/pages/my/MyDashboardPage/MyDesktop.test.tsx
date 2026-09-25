@@ -94,6 +94,7 @@ const profile: ProfileView = {
   frames: [],
   popcorn: [],
   reviews: [],
+  hidden: { frames: false, popcorn: false, reviews: false },
 };
 
 const bucket: PopcornBucket = {
@@ -190,20 +191,17 @@ afterEach(() => {
 });
 
 describe('7.1 MY 데스크톱 시안', () => {
-  it('화면 제목과 설정 진입점이 본문 머리에 선다', async () => {
+  it('화면 제목은 본문 머리에 두고 중복 설정 버튼은 숨긴다', async () => {
     renderMy(1440);
 
     // 프로필을 받기 전에는 자리만 있다. 본문이 선 뒤에 제목을 찾는다
     await screen.findByRole('main');
 
     expect(await screen.findByRole('heading', { level: 1, name: '프로필' })).toBeInTheDocument();
-    // 좌측 내비에도 `설정`이 있으므로(업무 -782) 본문 안으로 좁힌다
     const main = screen.getByRole('main');
 
-    expect(within(main).getByRole('link', { name: '설정' })).toHaveAttribute(
-      'href',
-      '/my/settings',
-    );
+    expect(within(main).queryByRole('link', { name: '설정' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '설정' })).toHaveAttribute('href', '/my/settings');
   });
 
   it('우측 보조 패널이 취향 키워드 · 팝콘 분포도 · 최근 활동을 말한다', async () => {

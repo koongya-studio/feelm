@@ -371,7 +371,10 @@ describe('2.5 평가 삭제', () => {
     fireEvent.click(await screen.findByRole('button', { name: '평가 삭제' }));
 
     // 무엇까지 사라지는지 그 자리에서 말한다
-    expect(await screen.findByRole('alertdialog')).toHaveTextContent('평가를 삭제할까요?');
+    const dialog = await screen.findByRole('alertdialog');
+    expect(dialog).toHaveTextContent('평가를 삭제할까요?');
+    // 본 기록까지 되돌아간다는 것을 그 자리에서 말한다(ADR-0025)
+    expect(dialog).toHaveTextContent('본 영화 목록에서도 빠지고');
     expect(screen.getByText(/프레임과 팝콘 한 알도 함께 빠져요/)).toBeInTheDocument();
     expect(deleteRating).not.toHaveBeenCalled();
 

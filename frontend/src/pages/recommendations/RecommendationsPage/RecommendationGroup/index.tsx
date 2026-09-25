@@ -14,10 +14,8 @@
  */
 import MovieBriefCard from '../../../../components/MovieBriefCard';
 import FilmReel from '../../../../components/FilmReel';
-import IconButton from '../../../../components/IconButton';
 import { BlockIcon } from '../../../../components/Icon';
 import styles from './RecommendationGroup.module.css';
-import type { MouseEvent } from 'react';
 import type { Ott } from '../../../../types/ott';
 import type { RecommendationItem } from '../../../../types/recommendation';
 
@@ -37,9 +35,6 @@ type Props = {
   description: string;
   items: RecommendationItem[];
   otts: Ott[];
-  /** 지금 ⋯ 메뉴가 열려 있는 카드 */
-  openMenuId: number | null;
-  onOpenMenu: (event: MouseEvent<HTMLButtonElement>, item: RecommendationItem) => void;
   /** 관심없음을 처리 중인 카드. 그동안 그 카드의 버튼은 눌리지 않는다 */
   dismissingId: number | null;
   onDismiss: (item: RecommendationItem) => void;
@@ -50,8 +45,6 @@ export default function RecommendationGroup({
   description,
   items,
   otts,
-  openMenuId,
-  onOpenMenu,
   dismissingId,
   onDismiss,
 }: Props) {
@@ -72,32 +65,25 @@ export default function RecommendationGroup({
   const [lead, ...rest] = displayedItems;
 
   /*
-   * 카드 오른쪽 위 버튼 둘. 모바일 카드와 같은 동작이다(업무 -672) — 왼쪽이 관심없음(API-047),
-   * 오른쪽이 OTT 메뉴(2.3)다. **시안의 하트(좋아요)는 이 앱에 없는 기능이라 그리지 않는다.**
+   * 모든 추천 카드는 관심없음만 표시한다(업무 -890). 대표 카드는 카드 크기에 맞춰 한 단계
+   * 크게 두고, 작은 카드는 작게 둔다. 시안의 하트는 앱에 없는 기능이라 그리지 않는다.
+   *
+   * **아이콘 옆에 `관심없음` 글자를 둔다**(업무 -873). 모바일 카드 · 2.4 영화 상세와 같이
+   * 아이콘만으로 두지 않는다. 흰 카드 위라 면은 두지 않고 글자와 아이콘 색만 쓴다.
    */
-  function actions(item: RecommendationItem, size: number) {
+  function actions(item: RecommendationItem, lead = false) {
     return (
-      <>
-        <IconButton
-          label={`${item.movie.title} 관심없음`}
-          icon={<BlockIcon />}
-          size={size}
-          shape="rounded"
-          variant="plain"
-          disabled={dismissingId === item.recommendationItemId}
-          onClick={() => onDismiss(item)}
-        />
-
-        <IconButton
-          label={`${item.movie.title} OTT 메뉴`}
-          icon={<span className={styles.ellipsis}>⋯</span>}
-          size={size}
-          shape="rounded"
-          variant="plain"
-          aria-expanded={openMenuId === item.recommendationItemId}
-          onClick={(event) => onOpenMenu(event, item)}
-        />
-      </>
+      <button
+        type="button"
+        className={styles.dismissButton}
+        data-size={lead ? 'lead' : undefined}
+        aria-label={`${item.movie.title} 관심없음`}
+        disabled={dismissingId === item.recommendationItemId}
+        onClick={() => onDismiss(item)}
+      >
+        <BlockIcon />
+        <span aria-hidden="true">관심없음</span>
+      </button>
     );
   }
 
@@ -126,10 +112,11 @@ export default function RecommendationGroup({
               otts={otts}
               posterWidth={LEAD_POSTER_WIDTH}
               ottSize={LEAD_OTT_SIZE}
-              actions={actions(lead, 30)}
+              actions={actions(lead, true)}
               reason={lead.reason.summary}
               detailButton
               recommendationItemId={lead.recommendationItemId}
+              ottLinks
             />
           </div>
 
@@ -142,10 +129,11 @@ export default function RecommendationGroup({
                   otts={otts}
                   posterWidth={REST_POSTER_WIDTH}
                   ottSize={REST_OTT_SIZE}
-                  actions={actions(item, 26)}
+                  actions={actions(item)}
                   reason={item.reason.summary}
                   compact
                   recommendationItemId={item.recommendationItemId}
+                  ottLinks
                 />
               ))}
             </div>

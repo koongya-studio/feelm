@@ -25,7 +25,7 @@
 
 ### 설명
 
-영화의 한줄평을 `createdAt DESC`, `ratingId DESC` 순으로 조회한다. 타인의 `PUBLIC`과 본인의 `PUBLIC`·`PRIVATE`를 포함한다.
+영화의 한줄평을 `createdAt DESC`, `ratingId DESC` 순으로 조회한다. 타인의 `PUBLIC`(작성자의 `reviewVisibility`도 `PUBLIC`인 것)과 본인의 `PUBLIC`·`PRIVATE`를 포함한다.
 
 ### 인증 및 권한
 
@@ -33,6 +33,7 @@
 - 조회자는 `ACTIVE` 회원이어야 한다. 작성자도 `ACTIVE`인 한줄평만 노출한다
 - 본인 한줄평은 `PRIVATE`이어도 `mine: true`로 포함하고, 양방향 차단 상대의 한줄평은 제외한다
 - 작성자 프로필이 `PRIVATE`여도 평가가 `PUBLIC`이면 영화별 목록에 포함한다. 작성자 프로필 접근은 별도 공개 범위 정책을 따른다(API-062)
+- 작성자의 한줄평 공개 범위(`reviewVisibility`, API-014·015)가 `PRIVATE`이면 평가가 `PUBLIC`이어도 타인에게 노출하지 않는다. 본인 한줄평에는 적용하지 않는다(S15P21E106-856)
 
 ### Path Parameters
 
@@ -81,7 +82,7 @@
 
 - 한줄평은 평가(FR-19)의 선택 항목이므로 별도 생성 API가 없다. 작성·수정·삭제는 API-036/037/038
 - `comment IS NULL`이거나 빈 문자열·탭·개행·Unicode 공백뿐인 평가는 제외한다
-- 타인의 `PRIVATE`, 양방향 차단 상대, `ACTIVE`가 아닌 작성자의 한줄평은 서버에서 제외한다
+- 타인의 `PRIVATE`, `reviewVisibility=PRIVATE`인 작성자, 양방향 차단 상대, `ACTIVE`가 아닌 작성자의 한줄평은 서버에서 제외한다
 - `size + 1`행으로 다음 페이지 여부를 판단하며 마지막 페이지의 `nextCursor`는 `null`이다. 페이지 사이에는 현재 커밋된 차단·평가 상태를 다시 적용하며 전체 페이지의 snapshot은 보장하지 않는다
 - `spoiler`는 항상 반환하는 boolean이다. 백엔드는 값과 무관하게 원문 `comment`를 반환한다
 - FE는 작성자가 본인인지와 관계없이 `spoiler=true`인 공개 목록 항목을 기본 블러하고
@@ -136,7 +137,15 @@
 
 ```json
 {
-  "user": { "userId": 2048, "nickname": "영화광", "avatarUrl": "/media/avatars/0b649505-0917-41d9-a41f-0d4402ec63d5.jpg", "visibility": "PUBLIC" },
+  "user": {
+    "userId": 2048,
+    "nickname": "영화광",
+    "avatarUrl": "/media/avatars/0b649505-0917-41d9-a41f-0d4402ec63d5.jpg",
+    "visibility": "PUBLIC",
+    "frameVisibility": "PUBLIC",
+    "popcornVisibility": "PUBLIC",
+    "reviewVisibility": "PUBLIC"
+  },
   "keywords": [{ "code": "DARK_THRILLER_LOVER", "label": "어둠 속 스릴러 애호가" }],
   "stats": { "frameCount": 88, "popcornCount": 88 },
   "popcorn": { "flavors": [{ "flavorCode": "FLAVOR_A", "popcornCount": 30, "averageScore": 4.5 }] },
@@ -157,6 +166,17 @@
 - 공개 프로필의 평가 중 `PRIVATE` 한줄평은 제외한다
 - 본인이 자신의 `userId`로 조회하면 `visibility`와 무관하게 `200`
 - 등록된 프로필 사진이 없으면 `user.avatarUrl`은 `null`
+- 항목별 공개 범위(API-014 [항목별 공개 범위](./users.md#항목별-공개-범위), S15P21E106-856)가 `PRIVATE`인 항목은 본인 외 조회에서 **필드 모양을 유지한 채 값을 비운다.** 기존 필드의 타입과 필수 여부는 바뀌지 않는다
+
+  | `user.` 필드 | `PRIVATE`일 때 |
+  |---|---|
+  | `frameVisibility` | `recentFrames: []`, `stats.frameCount: 0` |
+  | `popcornVisibility` | `popcorn.flavors: []`, `stats.popcornCount: 0` |
+  | `reviewVisibility` | `publicReviewCount: 0` |
+
+- 빈 값과 가린 값은 `user.frameVisibility`·`popcornVisibility`·`reviewVisibility`로 구분한다. 세 필드는 본인 조회에서도 실제 설정값을 돌려준다. 가려도 `404`로 바꾸지 않는다 — 프로필은 보이고 그 안의 구역만 가린다
+- 본인 조회는 세 값과 무관하게 모든 항목을 채운다
+- `keywords`(취향 분석 결과)는 세 항목에 속하지 않아 가리지 않는다
 
 ### 상태값
 

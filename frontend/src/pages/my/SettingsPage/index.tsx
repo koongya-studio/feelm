@@ -33,6 +33,7 @@ import ActionList from '../../../components/ActionList';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import ScreenHeader from '../../../components/ScreenHeader';
 import { useAuth } from '../../../contexts/authContext';
+import { useShellSize } from '../../../hooks/useShellSize';
 import { usePwaInstall } from '../../../pwa/installContext';
 import { path } from '../../../routes/paths';
 import {
@@ -49,6 +50,7 @@ const APP_VERSION = 'v 1.0.0';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
+  const desktop = useShellSize() !== 'mobile';
   const { signOut, user } = useAuth();
   const { availability: installAvailability, install } = usePwaInstall();
   const [signingOut, setSigningOut] = useState(false);
@@ -78,7 +80,7 @@ export default function SettingsPage() {
 
   return (
     <>
-      <ScreenHeader title="설정" showBack fallbackTo={path.my()} />
+      <ScreenHeader title="설정" showBack={!desktop} fallbackTo={path.my()} />
 
       <div className={styles.page}>
         <ActionList
@@ -126,6 +128,7 @@ export default function SettingsPage() {
               ? [{ label: 'Feelm 앱 설치', onClick: handleInstall }]
               : []),
             { label: '차단 사용자 관리', to: path.blockedUsers() },
+            { label: '서비스 의견 보내기', to: path.feedback(window.location.pathname) },
             {
               label: '앱 사용법 다시 보기',
               onClick: () => {

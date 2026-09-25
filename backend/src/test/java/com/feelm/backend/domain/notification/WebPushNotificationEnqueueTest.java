@@ -46,6 +46,11 @@ class WebPushNotificationEnqueueTest extends SharedPostgresContractTest {
                                 "SELECT count(*) FROM notifications WHERE type='PARTY_INVITE'",
                                 Long.class))
                 .isOne();
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT title,body FROM notifications WHERE type='PARTY_INVITE'"))
+                .containsEntry("title", "파티팝콘 초대")
+                .containsEntry("body", "새로운 파티팝콘 초대가 도착했어요.");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM web_push_deliveries", Long.class))
                 .isEqualTo(2);
         assertThat(
@@ -54,6 +59,39 @@ class WebPushNotificationEnqueueTest extends SharedPostgresContractTest {
                                         Timestamp.class)
                                 .toInstant())
                 .isEqualTo(createdAt);
+    }
+
+    @Test
+    void partyInviteIsNotCreatedWhenSettingIsOff() {
+        // S15P21E106-857: 파티 초대 알림을 끈 사용자에게는 알림 행도, 그에 딸린 발송도 생기지 않는다
+        jdbc.update("UPDATE notification_settings SET party_invite_enabled=false WHERE user_id=10");
+        subscribe(10, "invite-off", "6".repeat(64));
+
+        transactions.executeWithoutResult(
+                ignored ->
+                        commands.createPartyInvitation(
+                                10, 104, Instant.parse("2026-09-25T00:00:00Z")));
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM notifications", Long.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM web_push_deliveries", Long.class))
+                .isZero();
+    }
+
+    @Test
+    void partyInviteIsCreatedWhenSettingsRowIsMissing() {
+        // 설정 행이 없는 계정은 기본값(켜짐)으로 본다(API-017 처리 규칙)
+        jdbc.update("DELETE FROM notification_settings WHERE user_id=10");
+
+        transactions.executeWithoutResult(
+                ignored ->
+                        commands.createPartyInvitation(
+                                10, 105, Instant.parse("2026-09-25T00:00:00Z")));
+
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM notifications WHERE type='PARTY_INVITE'",
+                                Long.class))
+                .isOne();
     }
 
     @Test
@@ -96,8 +134,8 @@ class WebPushNotificationEnqueueTest extends SharedPostgresContractTest {
                 .containsEntry("source_id", 103L)
                 .containsEntry("target_type", "PARTY")
                 .containsEntry("target_id", 203L)
-                .containsEntry("title", "파티 모드 초대 수락")
-                .containsEntry("body", "초대받은사람 님이 파티 모드에 참여했어요.");
+                .containsEntry("title", "파티팝콘 초대 수락")
+                .containsEntry("body", "초대받은사람 님이 파티팝콘에 참여했어요.");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM web_push_deliveries", Long.class))
                 .isOne();
     }

@@ -350,6 +350,10 @@
   padding-bottom: 0;
 }
 
+.desktopPage .searchBar {
+  justify-content: flex-end;
+}
+
 /* 검색창이 시안만큼 커진다. 데스크톱 단은 한 줄이 길어 글자도 한 단계 크다 */
 .desktopPage .field {
   height: var(--control-height);

@@ -14,11 +14,27 @@
  * 중에는 진짜 키보드가 타자기 역할을 하므로 둘 다 있을 이유가 없고, 키보드가 닫히면 다시
  * 나온다. **롤러는 남겨 종이가 나오는 연출을 잇는다** — 둘 다 치우면 종이가 허공에 뜬다.
  * 키보드가 뜨지 않는 환경(PC)에서는 아무것도 바뀌지 않는다(`hooks/useOnScreenKeyboard`).
+ *
+ * **키보드 바로 위에 타자기 윗부분을 붙인다**(업무 -882). 키만 감추고 나머지는 그대로 두었더니
+ * 기종마다 롤러와 키보드 사이가 떴다 — 안드로이드는 키보드를 아예 못 알아채 타자기 전체가
+ * 줄어든 화면에 끼었고, 홈 막대가 있는 아이폰은 아래 안전 영역(34px)만큼, iOS가 보이는 영역을
+ * 옮기면 그만큼 더 떴다. 이제
+ *
+ * - 스크롤 영역의 아래 끝을 **보이는 영역의 아래 끝(= 키보드 윗변)에 잰 값으로** 맞춘다. 키보드
+ *   높이로 계산하지 않고 두 위치의 차이를 재므로 안전 영역 · 옮김 · 안드로이드의 줄어든 화면이
+ *   한 번에 맞는다
+ * - 타자기는 롤러와 얇은 윗판만 남기고 스크롤 영역 아래에 **붙박는다**(`sticky`). 작은 폰에서
+ *   종이를 올려 봐도 타자기가 따라 올라가지 않는다
+ * - 초점이 간 줄(입력 칸과 그 아래 오류 문구)이 타자기 윗판에 가리지 않게 보이는 곳으로 올린다.
+ *   오류 문구가 늦게 붙어 줄이 길어질 때도 다시 맞춘다
+ *
+ * 웹(데스크톱 셸)은 키보드 상태와 무관하게 전체 타자기다(`useShellSize`).
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import Typewriter from './Typewriter';
 import { useOnScreenKeyboard } from '../../hooks/useOnScreenKeyboard';
+import { useShellSize } from '../../hooks/useShellSize';
 import { PaperContext, useSignupPaper } from './paperContext';
 import styles from './SignupPaper.module.css';
 
@@ -43,6 +59,11 @@ export default function SignupPaper({ onSubmit, children }: Props) {
   const [fed, setFed] = useState(1);
   const [typed, setTyped] = useState<string | null>(null);
   const keyboard = useOnScreenKeyboard();
+  const shell = useShellSize();
+  // 웹(데스크톱 셸)은 늘 전체 타자기다. 폰의 키보드가 올라온 동안만 윗부분으로 줄인다
+  const compact = keyboard.open && shell === 'mobile';
+  /** 스크롤 영역 아래 끝을 키보드 윗변까지 올리는 거리(px) */
+  const [lift, setLift] = useState(0);
 
   /* 나온 줄은 다시 들어가지 않는다 */
   const feed = (line: number) => setFed((current) => Math.max(current, line));
@@ -73,7 +94,8 @@ export default function SignupPaper({ onSubmit, children }: Props) {
    * 새 줄이 올라오는 모습이 보여야 한다.
    */
   useEffect(() => {
-    if (fed === 1) {
+    // 키보드가 올라온 동안은 타자기가 붙박여 있어 따라갈 필요가 없다. 초점 칸을 지킨다(아래)
+    if (fed === 1 || compact) {
       return;
     }
 
@@ -87,7 +109,62 @@ export default function SignupPaper({ onSubmit, children }: Props) {
     }, FEED_MS);
 
     return () => window.clearTimeout(timer);
-  }, [fed]);
+  }, [fed, compact]);
+
+  /*
+   * 스크롤 영역의 아래 끝과 보이는 영역의 아래 끝의 차이를 잰다. 둘 다 레이아웃 좌표라 뺄 수
+   * 있다. 여백(`margin-bottom`)은 영역 밖이라 재는 값을 바꾸지 않는다.
+   */
+  useLayoutEffect(() => {
+    const page = scrollerRef.current;
+    const measure = () => {
+      if (!compact || !page || keyboard.visibleBottom === null) return 0;
+
+      const bottom = page.getBoundingClientRect().bottom + lift;
+
+      return Math.max(0, Math.round(bottom - keyboard.visibleBottom));
+    };
+    const next = measure();
+
+    // 레이아웃을 재야 알 수 있는 값이라 그린 뒤에 한 번 더 그린다. 같은 값이면 멈춘다
+    if (next !== lift) setLift(next);
+  }, [compact, keyboard.visibleBottom, lift]);
+
+  /*
+   * 초점이 간 줄을 타자기 윗판 위로 올린다. 줄 전체(입력 칸 + 오류 문구)를 본다 — 칸만 보이면
+   * 그 아래 오류 문구가 윗판 뒤에 숨는다. 오류가 늦게 붙어 줄이 길어져도 다시 맞춘다.
+   */
+  useEffect(() => {
+    const paper = paperRef.current;
+
+    if (!compact || !paper) return;
+
+    let frame = 0;
+    const reveal = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        const focused = document.activeElement;
+
+        if (!(focused instanceof HTMLElement) || !paper.contains(focused)) return;
+
+        const line = focused.closest<HTMLElement>('[data-signup-line]') ?? focused;
+
+        // jsdom에는 없다
+        line.scrollIntoView?.({ block: 'nearest' });
+      });
+    };
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(reveal);
+
+    reveal();
+    observer?.observe(paper);
+    paper.addEventListener('focusin', reveal);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer?.disconnect();
+      paper.removeEventListener('focusin', reveal);
+    };
+  }, [compact, lift]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -97,17 +174,19 @@ export default function SignupPaper({ onSubmit, children }: Props) {
   return (
     <PaperContext.Provider value={{ fed, feed, type }}>
       {/*
-       * 키보드가 덮은 만큼 아래 자리를 줄인다(업무 -718).
+       * 키보드가 덮은 만큼 아래 자리를 줄인다(업무 -718 · -882).
        *
        * 종이는 `::before`의 남는 자리에 밀려 아래에 붙어 있다. 키보드가 올라오면 그 자리가
        * 키보드 뒤로 들어가는데, **스크롤로는 못 올린다** — 내용이 짧을 때는 넘치는 높이가
        * 없어 스크롤할 여지가 아예 없다(재 보니 `scrollHeight`와 `clientHeight`가 720으로
-       * 같았다). 그래서 아래 여백으로 자리를 줄여 종이가 키보드 위에 서게 한다.
+       * 같았다). 그래서 영역 자체를 줄여 종이가 키보드 위에 서게 한다. 안쪽 여백이 아니라
+       * 바깥 여백이다 — 스크롤 영역의 아래 끝이 키보드 윗변이어야 붙박인 타자기가 거기 선다.
        */}
       <div
         ref={scrollerRef}
         className={styles.page}
-        style={{ paddingBottom: keyboard.inset || undefined }}
+        data-keyboard={compact || undefined}
+        style={{ marginBottom: lift || undefined }}
       >
         <form
           ref={paperRef}
@@ -118,7 +197,7 @@ export default function SignupPaper({ onSubmit, children }: Props) {
           {children}
         </form>
 
-        <Typewriter typed={typed} hidden={keyboard.open} />
+        <Typewriter typed={typed} compact={compact} />
       </div>
     </PaperContext.Provider>
   );
@@ -156,7 +235,9 @@ export function SignupPaperLine({ line, children }: { line: number; children: Re
   return (
     <div className={styles.line} data-fed={open} inert={!open}>
       <div className={styles.lineClip}>
-        <div className={styles.lineBody}>{children}</div>
+        <div className={styles.lineBody} data-signup-line="">
+          {children}
+        </div>
       </div>
     </div>
   );

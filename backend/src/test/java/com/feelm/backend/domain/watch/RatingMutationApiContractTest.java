@@ -233,8 +233,8 @@ class RatingMutationApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("삭제는 프레임을 지우고 감상 기록과 감상 시각을 보존한다")
-    void deleteRatingRemovesFrameAndPreservesWatch() throws Exception {
+    @DisplayName("삭제는 프레임을 지우고 감상 기록을 안 본 상태로 되돌린다")
+    void deleteRatingRemovesFrameAndExpiresWatch() throws Exception {
         JsonNode created = create(movieId, userId, privateBody("4.0"));
         long ratingId = created.path("ratingId").asLong();
         long frameId = created.path("frame").path("frameId").asLong();
@@ -250,15 +250,16 @@ class RatingMutationApiContractTest extends SharedPostgresContractTest {
 
         assertThat(count("ratings")).isZero();
         assertThat(count("frames")).isZero();
+        // 행은 이력으로 남기고 상태만 되돌린다(D-9, ADR-0025)
         assertThat(count("watch_records")).isEqualTo(1);
-        assertThat(watch(watchId)).isEqualTo(new WatchRow("WATCHED_UNRATED", watchedAt, null));
+        assertThat(watch(watchId)).isEqualTo(new WatchRow("EXPIRED", null, null));
+        assertThat(expiredAt(watchId)).isNotNull();
         mockMvc.perform(
                         get("/api/v1/frames/{frameId}", frameId)
                                 .header("Authorization", bearer(userId)))
                 .andExpect(status().isNotFound());
         JsonNode records = watchRecords(userId);
-        assertThat(records.path("items").path(0).path("status").asText())
-                .isEqualTo("WATCHED_UNRATED");
+        assertThat(records.path("items").path(0).path("status").asText()).isEqualTo("EXPIRED");
         assertThat(records.path("items").path(0).path("ratingId").isNull()).isTrue();
     }
 
@@ -328,8 +329,15 @@ class RatingMutationApiContractTest extends SharedPostgresContractTest {
 
         assertThat(recreated.path("ratingId").asLong()).isNotEqualTo(oldRating);
         assertThat(recreated.path("frame").path("frameId").asLong()).isNotEqualTo(oldFrame);
-        assertThat(rating(recreated.path("ratingId").asLong()).watchRecordId()).isEqualTo(watchId);
-        assertThat(watch(watchId).status()).isEqualTo("RATED");
+        /*
+         * 되돌린 기록은 활성 기록이 아니므로(ADR-0025) 재평가는 새 감상 기록을 만든다.
+         * 앞의 행은 이력으로 남는다(D-9).
+         */
+        long newWatchId = rating(recreated.path("ratingId").asLong()).watchRecordId();
+        assertThat(newWatchId).isNotEqualTo(watchId);
+        assertThat(watch(watchId).status()).isEqualTo("EXPIRED");
+        assertThat(watch(newWatchId).status()).isEqualTo("RATED");
+        assertThat(count("watch_records")).isEqualTo(2);
         assertThat(movieAggregate(movieId)).isEqualTo(new MovieAggregate(1, "2.50"));
     }
 
@@ -612,7 +620,8 @@ class RatingMutationApiContractTest extends SharedPostgresContractTest {
         assertThat(eventCount("DELETE")).isEqualTo(1);
         assertThat(count("ratings")).isZero();
         assertThat(count("frames")).isZero();
-        assertThat(watch(watchId).status()).isEqualTo("WATCHED_UNRATED");
+        // 경쟁이 어느 순서로 끝나든 삭제가 감상 기록을 되돌린다(ADR-0025)
+        assertThat(watch(watchId).status()).isEqualTo("EXPIRED");
         assertAggregateMatchesRatings(movieId);
     }
 
@@ -999,6 +1008,14 @@ class RatingMutationApiContractTest extends SharedPostgresContractTest {
                                         row.getString("status"),
                                         instant(row.getObject("watched_at", OffsetDateTime.class)),
                                         instant(row.getObject("rated_at", OffsetDateTime.class))))
+                .single();
+    }
+
+    /** 되돌린 기록에 만료 시각이 적혔는지 본다(ADR-0025) */
+    private Instant expiredAt(long watchId) {
+        return jdbc.sql("SELECT expired_at FROM watch_records WHERE id=:watchId")
+                .param("watchId", watchId)
+                .query((row, number) -> instant(row.getObject("expired_at", OffsetDateTime.class)))
                 .single();
     }
 

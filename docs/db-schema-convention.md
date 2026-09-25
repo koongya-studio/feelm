@@ -77,6 +77,9 @@ scale 없는 `numeric`으로 입력값을 그대로 검사한다. 기존 정수 
   기본값은 Seed나 적재 파이프라인의 직접 삽입에 대한 방어다.
 - 상태 컬럼에는 기본값을 두지 않는다. 삽입 시 명시적으로 지정하게 한다.
   단 `users.visibility`는 ERD가 기본 `PRIVATE`을 규정하므로 예외다.
+  `users.frame_visibility`·`popcorn_visibility`·`review_visibility`도 ERD가 기본 `PUBLIC`을
+  규정하므로 예외다. 기존 계정 행에 컬럼을 더할 때 지금까지의 노출을 그대로 보존하는 값이다
+  (S15P21E106-856).
 - `updated_at`은 ERD가 해당 컬럼을 가진 테이블에만 둔다. `users`에는 없다.
 
 ## 5. 외래키 삭제 정책

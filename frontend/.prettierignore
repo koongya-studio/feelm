@@ -3,5 +3,8 @@ node_modules
 landing
 docs
 
+# 백엔드 OpenAPI 스냅샷과 거기서 만든 타입 (업무 -777). 생성기 출력 그대로 커밋한다
+src/generated
+
 # 마크다운은 저장소 기존 문서 스타일을 따르므로 Prettier 대상에서 제외한다.
 *.md

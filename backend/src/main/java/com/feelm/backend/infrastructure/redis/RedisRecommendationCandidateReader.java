@@ -41,6 +41,7 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
     private static final int READ_ATTEMPTS = 3;
     private static final long RETRY_DELAY_NANOS = 20_000_000L;
     private static final int MAX_EVIDENCE_BYTES = 2 * 1024 * 1024;
+    private static final BigDecimal EVIDENCE_COVERAGE_TOLERANCE = new BigDecimal("1e-9");
     private static final long CURRENT_CANDIDATE_VERSION = 6;
     private static final long PREVIOUS_CANDIDATE_VERSION = 5;
     private static final String SHARED_GENRE_REASON = "SHARED_GENRE";
@@ -355,7 +356,10 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
             previousGroup = group;
             coverage = coverage.add(evidence.path("coverage").decimalValue());
         }
-        if (coverage.compareTo(item.path("coverage").decimalValue()) != 0) {
+        if (coverage.subtract(item.path("coverage").decimalValue())
+                        .abs()
+                        .compareTo(EVIDENCE_COVERAGE_TOLERANCE)
+                > 0) {
             throw new IllegalArgumentException("GBT evidence coverage differs");
         }
     }

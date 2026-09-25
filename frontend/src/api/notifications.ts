@@ -1,4 +1,4 @@
-/* API-070~074 인앱 알림 접근 함수. 브라우저 푸시(API-075~077)는 `api/push.ts` · `pwa/webPush.ts`다. */
+/* API-070~074 인앱 알림 접근 함수. 브라우저 푸시(API-075~077)는 쓰지 않는다(업무 -859). */
 import { request } from './client';
 import type {
   NotificationItem,
@@ -45,7 +45,7 @@ export async function getUnreadNotificationCount(): Promise<number> {
   return result.count;
 }
 
-/** 8.2 예시 화면이 보여줄 한 건. 실제 Web Push 수신은 API-075~077 연동에서 구현한다. */
+/** 8.2 예시 화면이 보여줄 한 건. 브라우저 푸시는 쓰지 않는다(업무 -859). */
 export async function getLatestPushNotification(): Promise<NotificationItem | null> {
   const items = await getNotifications();
 

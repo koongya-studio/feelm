@@ -3,6 +3,15 @@
 FEELM의 회원, 영화, 평가, 파티, OTT 등 서비스 API를 제공하는 Spring Boot
 애플리케이션입니다.
 
+## 사용자 의견 알림
+
+`POST /api/v1/feedback`은 의견을 DB에 저장하고 최대 30초 간격의 작업이 기존 Mattermost 팀 채널로 알림을
+보냅니다. 실패한 알림은 DB에 미전송 상태로 남아 다음 실행에서 재시도합니다. 배포 Compose는 기존 `MATTERMOST_BASE_URL`, `MATTERMOST_LOGIN_ID`,
+`MATTERMOST_PASSWORD`와 채널 선택 변수를 백엔드에 전달합니다. 이 값이 없거나
+전송에 실패해도 의견 저장은 성공하며, 알림 실패는 서버 로그에 제출 ID와 함께 남습니다.
+팀 채널 메시지에는 계정의 이름·이메일을 자동으로 넣지 않습니다. 전송 오류 시 원본은
+`user_feedback` 테이블에서 확인할 수 있습니다.
+
 ## 수동 검증 기록
 
 자동 테스트로 덮기 어려운 기능은 실제로 돌려 본 절차와 결과를 `verification/`에 남깁니다.

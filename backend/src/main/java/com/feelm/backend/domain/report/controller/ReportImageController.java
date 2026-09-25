@@ -12,6 +12,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.constraints.Positive;
 import java.io.IOException;
+import java.io.InputStream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -46,11 +47,28 @@ public class ReportImageController {
                 () -> {
                     ReportImageResponse existing = service.reuseExistingOrReject(userId, reportId);
                     if (existing != null) {
+                        // Safari는 업로드를 보내는 중 서버가 응답을 닫으면 fetch를 Load failed로
+                        // 처리할 수 있다. 본문을 메모리에 보관하지 않고 끝까지 소비한다.
+                        discardBody(request);
                         return ResponseEntity.status(201).body(existing);
                     }
                     byte[] png = request.getInputStream().readNBytes(MAX_PNG_BYTES + 1);
                     return ResponseEntity.status(201).body(service.create(userId, reportId, png));
                 });
+    }
+
+    private static void discardBody(HttpServletRequest request) throws IOException {
+        byte[] buffer = new byte[8192];
+        long received = 0;
+        try (InputStream input = request.getInputStream()) {
+            int count;
+            while ((count = input.read(buffer)) != -1) {
+                received += count;
+                if (received > MAX_PNG_BYTES) {
+                    throw new BusinessException(ErrorCode.REPORT_IMAGE_TOO_LARGE);
+                }
+            }
+        }
     }
 
     @GetMapping("/report-images/{imageId}/download")

@@ -32,12 +32,15 @@ SSAFY 15기 2학기 특화 프로젝트(빅데이터 분산) · 팀 E106
 사용자의 영화 감상·평가 데이터를 분석해 개인 취향을 파악하고, 감상한 영화를 필름 형태로
 시각화하는 영화 추천 서비스다.
 
-ALS와 콘텐츠 기반 추천을 활용해 **취향 맞춤 추천 / 취향 발견 추천 / 유사 추천**을 제공하며,
+v26 GBT 기반 **취향 맞춤 추천**, 고정 그룹 기반 **취향 발견 추천**, 임베딩 기반 **유사 추천**을 제공하며,
 여러 사용자가 함께 영화를 고를 수 있는 **파티 추천** 기능도 제공한다. 감상과 평가가 쌓일수록
 필름이 확장되어 사용자가 자신의 취향을 발견해 나가도록 하는 것을 목표로 한다.
 
 MovieLens 32M 규모의 평점 데이터를 **Hadoop/HDFS와 Spark로 분산 처리**하는 것이 본 프로젝트의
 기술적 핵심이다.
+
+개인·파티의 최신 모델·학습·실행 기준은 [v26 GBT 안내](./pipeline/docs/gbt-v26/README.md)를 따른다.
+모델 선택·코드 연결과 서버 적용까지 완료된 상태이며, 확인 기준은 해당 안내에 기록한다.
 
 ### 핵심 용어
 
@@ -49,10 +52,10 @@ MovieLens 32M 규모의 평점 데이터를 **Hadoop/HDFS와 Spark로 분산 처
 | **팝콘 맛** | S15P21E106-439의 고정 장르 기반 상위 `taste_id` 0~7에 대응하는 8개 취향 유형 |
 | **팝콘 맛 별 양** | 해당 맛의 팝콘 수로 **감상량**을 나타낸다 |
 | **팝콘 맛 선호도** | 해당 맛의 평균 평점으로 **선호도**를 나타내며 감상량과 독립이다 |
-| **새로운 맛** | 439 고정 그룹 기반으로 판정할 새로운 취향 영역. 구체 판정 방식·기준값은 미정 |
+| **새로운 맛** | 439 고정 그룹 기반으로 판정할 새로운 취향 영역. 공급·정렬은 현행 DISCOVERY 계약을 따름 |
 | **발견** | 새로운 맛의 영화를 감상하고 **평가까지 완료**하는 행위 |
 | **파티(Party)** | 함께 볼 영화를 고르기 위한 모임. 문서와 코드 모두 `Party`로 통일한다 |
-| **후보(Candidate)** | Python Fold-in Consumer가 ALS Item Factor로 생성하는 사용자별 추천 후보 목록. 500편 기준 |
+| **후보(Candidate)** | Python Consumer가 게시하는 TASTE 최대500편·DISCOVERY 최대100편. 개인 GBT와 발견 그룹 정책으로 계산 |
 
 > 필름은 **기록 축**, 팝콘 버킷은 **취향 축**으로 분리한다.
 
@@ -231,8 +234,9 @@ stateDiagram-v2
 
 | 데이터 | 활용 |
 | --- | --- |
-| [MovieLens 32M](https://grouplens.org/datasets/movielens/) | 사용자-영화 평점 기반 취향 분석 및 ALS 학습 |
+| [MovieLens 32M](https://grouplens.org/datasets/movielens/) | 원천 평점. v26은 동결 학습859,363행을 사용하며 ALS 기준선·분산 실험도 보존 |
 | [TMDb API](https://developer.themoviedb.org/) | 포스터·줄거리·감독·배우·국가·키워드 등 영화 메타데이터 |
+| KOBIS 관객 자료 | 검증된 영화 연결의 관객 수를 TMDB 평가 수와 환산·결합한 v26 특징에 사용 |
 | [IMDb Dataset](https://developer.imdb.com/non-commercial-datasets/) | 감독·배우·연도 등 추가 메타데이터 |
 
 ### MovieLens 32M 규모
@@ -246,7 +250,8 @@ stateDiagram-v2
 
 > MovieLens 사용자와 서비스 사용자는 **완전히 분리**한다. MovieLens 사용자 ID는 학습 원천에만
 > 두고 서비스 `user_id`와 연결하지 않으며 영화만 TMDb 링크를 기준으로 매핑한다.
-> 서비스 사용자는 평가 기반 **fold-in**으로 벡터를 생성한다.
+> 서비스 사용자는 전체 유효 평가·관심없음을 **GBT 특징**으로 변환한다. 실제 FEELM 사용자 평가는
+> v26 학습에 포함하지 않았다. 학습 목표와 원별점의 차이는 [학습 설명](./pipeline/docs/gbt-v26/TRAINING.md)을 따른다.
 
 ---
 
@@ -264,28 +269,34 @@ flowchart TB
 
     subgraph STORE["Serving Store"]
         PG[("PostgreSQL + pgvector<br/>서비스 데이터 · 영화 임베딩")]
-        RD[("Redis<br/>User Vector · Candidate · 행동 Feature<br/>기본 Top-N · 실시간 인기")]
+        RD[("Redis<br/>GBT 입력 스냅샷 · Candidate<br/>추천 상태 · 실시간 인기")]
     end
 
     subgraph SPARK["Spark Cluster · EC2 2대"]
-        SM["Spark Batch<br/>ALS · E5 · 고정 그룹 산출물"]
+        SM["Spark Batch<br/>전처리 · ALS 기준선 · 임베딩/그룹 산출물"]
         SS["Structured Streaming<br/>행동 Feature<br/>전역 인기 윈도우 집계"]
         W1["Worker 1"]
         W2["Worker 2"]
     end
 
-    LAKE[("HDFS / Parquet<br/>MovieLens · TMDb 원본 및 가공<br/>Item Factor")]
+    LAKE[("HDFS / Parquet<br/>원본 · 가공 · 불변 서빙 번들")]
     KF["Kafka<br/>Rating · Onboarding<br/>Dismiss · View · Click · OTT Click"]
-    PC["Python Fold-in Consumer<br/>User Vector · Candidate · 기본 Top-N/XAI"]
+    PC["Python 개인 GBT Consumer<br/>전체 입력 · TASTE · DISCOVERY"]
+    PARTY["Python 파티 GBT Consumer<br/>공통 후보 재점수화 · fit 집계"]
     TMDB["TMDb API"]
 
     FE --> BE
     BE --> PG
     BE --> RD
     BE --> KF
-    KF -->|"Rating · Onboarding"| PC
+    KF -->|"Rating · Onboarding · Dismiss"| PC
     PC --> RD
-    KF -->|"View · Click · Dismiss"| SS
+    LAKE --> PC
+    LAKE --> PARTY
+    KF -->|"Party Refresh"| PARTY
+    RD -->|"요청 세대 입력"| PARTY
+    PARTY --> RD
+    KF -->|"View"| SS
     SS --> RD
     BE -->|"유사 영화 벡터 검색"| PG
     TMDB --> BE
@@ -306,20 +317,22 @@ flowchart TB
 
 | 컴포넌트 | 역할 |
 | --- | --- |
-| **Spark / PySpark Batch** | 전처리, ALS 학습, E5 임베딩, 439 고정 그룹 산출물, 모델·Item Factor 산출 |
+| **Spark / PySpark Batch** | 전처리, ALS 기준선·분산 실험, 임베딩·439 고정 그룹 산출물. v26은 별도 CPU XGBoost 학습 |
 | **Kafka** | 평점·온보딩·관심없음·조회·추천 클릭·OTT 클릭 이벤트 전달 |
-| **Python Fold-in Consumer** | 평가·온보딩 변경 사용자의 User Vector, Candidate Top-500, 기본 Top-N·XAI 갱신 |
+| **Python 개인·파티 Consumer** | 개인 전체 이력 GBT·발견 후보·불변 입력 게시, 파티 공통 후보 GBT 재점수화·집계 |
 | **Spark Structured Streaming** | 행동 Feature와 전체 사용자 실시간 인기 윈도우 집계 |
-| **HDFS / Parquet** | MovieLens·TMDb 원본 및 가공 데이터, Item Factor 저장 |
-| **Redis** | User Vector, Candidate Top-500, 행동 Feature, 기본 Top-N·추천 근거와 실시간 인기 스냅샷 저장 |
+| **HDFS / Parquet** | 원천·가공 데이터, 검증된 불변 모델·영화·그룹 서빙 산출물 저장 |
+| **Redis** | GBT 추천 상태·불변 입력·개인/파티 후보·구조화 근거·실시간 인기 저장 |
 | **PostgreSQL + pgvector** | 영속 데이터와 영화 임베딩 저장, 유사 영화 벡터 검색 |
-| **Spring Boot** | 서비스 API, Kafka 발행, 행동 Feature 기반 경량 재정렬, 파티·OTT 집계, Redis 추천 서빙·이력 저장 |
+| **Spring Boot** | 서비스 API·Kafka 발행, 후보 최종 제외·점수 정렬·세트 조립, 파티 후보 소비·OTT 집계·추천 이력 저장 |
 | **React + Vite** | 필름·팝콘 버킷·개인·파티 추천 UI와 SVG 시각화 |
 
-### 미확정 사항
+### 기준 문서와 확인 범위
 
-- 실시간 처리는 **Python Fold-in Consumer + Spark Structured Streaming**으로 책임을 분리했다(ADR-0017).
-  Kafka 이벤트·Redis 키 계약은 [스트리밍 계약](./docs/api/streaming-contract.md)을 따르며 Re-ranking 가중치와 파티·OTT 점수식은 구현 전에 확정한다.
+- 실시간 처리는 **Python Consumer + Spark Structured Streaming**으로 책임을 분리했다.
+  Kafka·Redis는 [스트리밍 계약](./docs/api/streaming-contract.md), 개인·파티 GBT는
+  [v26 안내](./pipeline/docs/gbt-v26/README.md)를 따른다. ADR-0002·0017의 모델 설명은
+  [ADR-0025 제안](./docs/adr/0025-v26-gbt-personal-party-recommendation.md)에서 소급 정리한다.
 - 물리 스키마·마이그레이션은 [논리 ERD](./docs/erd.md)를 기준으로 구현 전에 작성한다.
 - 리포트 기능의 결과 이미지는 서비스 노드의 비공개 호스트 디렉터리에 저장하고, 애플리케이션이 발급·검증하는 10분 유효 서명 URL로만 제공한다(ADR-0023).
 
@@ -338,22 +351,20 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-    A["MovieLens · TMDb"] --> B["HDFS / Parquet"]
-    B --> C["Spark Batch<br/>ALS · E5 · 고정 그룹"]
-    C --> D["Item Factor · Embedding<br/>Taste Assignment"]
-    D --> E["Model Version · Item Factor 갱신"]
-    E --> F["Redis"]
-    G["평점 · 온보딩"] --> BEE["Spring Boot 이벤트 발행"]
-    BEE --> H["Kafka"]
-    H -->|"평가 · 온보딩"| I["Python Fold-in Consumer"]
-    E -->|"전체 사용자 재구축 요청"| I
-    I --> J["User Vector · Candidate · 기본 Top-N/XAI"]
-    J --> F
-    BH["조회 · 클릭 · 관심없음"] --> BEE
-    H -->|"조회 · 클릭 · 관심없음"| M["Spark Structured Streaming"]
-    M --> N["행동 Feature<br/>전역 인기 윈도우 집계"]
-    N --> F
-    F --> SB["Spring Boot<br/>행동 Feature 경량 재정렬"]
+    A["MovieLens · TMDB · KOBIS 동결 자료"] --> B["71특징 · 정책 목표<br/>CPU XGBoost v26 학습"]
+    B --> C["불변 GBT 서빙 번들<br/>모델 · 영화 · 매핑 · runtime pin"]
+    C --> I["Python 개인 GBT Consumer"]
+    G["평가 · 온보딩 · 관심없음"] --> H["Spring Outbox · Kafka"]
+    H --> I
+    DB["PostgreSQL 최신 전체 입력"] --> I
+    GROUP["고정 그룹 · 출처별 대중성 번들"] --> I
+    I --> F["Redis<br/>입력 snapshot · 상태 · TASTE500 / DISCOVERY100"]
+    F --> P["Python 파티 GBT Consumer<br/>공통 후보 재점수화 · midrank fit 평균"]
+    C --> P
+    H -->|"파티 요청"| P
+    P --> PR["Redis 파티 후보"]
+    F --> SB["Spring Boot<br/>최신 제외 · 점수 정렬 · 세트 조립"]
+    PR --> SB
     SB --> O["React + Vite Web App"]
 ```
 
@@ -361,13 +372,14 @@ flowchart LR
 
 | 추천 | 방식 |
 | --- | --- |
-| **취향 맞춤 추천** | ALS·콘텐츠 Hybrid를 활용해 선호 가능성이 높은 영화를 추천 |
+| **취향 맞춤 추천** | 전체 유효 이력의 v26 GBT 정책 점수로 지원 개봉 카탈로그를 정렬 |
 | **취향 발견 추천** | 439 고정 그룹을 기반으로 기존 취향과 연결되면서 새로운 맛인 영화를 추천 |
 | **유사 추천** | 영화 상세 화면에서 콘텐츠 특성이 유사한 영화를 추천 |
-| **파티 추천** | 파티원 예상 선호도를 평균·최저 만족도·편차 페널티로 결합해 추천 |
+| **파티 추천** | 공통 후보의 구성원별 GBT 점수를 midrank fit으로 변환해 동등 평균. 동점은 최솟값·표준편차·movieId 순 |
 
-> ALS 잠재 벡터 차원은 64 예정이며 Candidate는 사용자별 500편 기준이다.
-> 맞춤·발견의 구체 구분 방식(군집별 감상량·선호도·거리 등)과 기준값, 적합도 표기 방식은 미정이다.
+> v26의71특징은 잠재 벡터 차원이 아니다. 개인 K0는 비개인화 인기순을 사용한다.
+> 후보 상한과 화면 반환 수는 다르며 모바일은 맞춤2+발견1, PC는 맞춤3+발견3이다.
+> 재현·품질 한계·파티 전원K0·서버 적용 상태는 [현재 기준](./pipeline/docs/gbt-v26/README.md)을 따른다.
 
 ---
 
@@ -417,10 +429,10 @@ flowchart LR
 | 분산 저장 | Hadoop HDFS, Parquet | 확정 |
 | 분산 처리 | Apache Spark / PySpark | 확정 |
 | 이벤트 스트림 | Kafka, Python Consumer, Spark Structured Streaming | 확정 |
-| 추천 | ALS, 콘텐츠 기반, Hybrid | 확정 |
+| 개인 추천 | v26 GBT (XGBoost CPU, 71특징) | 채택·코드 연결·서버 적용 완료 |
 | 콘텐츠 임베딩 | 다국어 임베딩, pgvector (`multilingual-e5-base`는 MVP 베이스라인) | 모델 비교 평가 후 체크포인트 확정 |
 | 취향 유형 | 439 고정 131차원 기하, 상위 taste 8종 | 확정 |
-| 파티 추천 | Average / Least Misery / 개선식 | 비교 후 확정 |
+| 파티 추천 | 같은 v26 GBT 재점수화·구성원 midrank fit 동등 평균 | 구현 반영 |
 | Backend | Spring Boot | 확정 |
 | 추천 갱신·인기 집계·서빙 | Python Consumer, Spark Structured Streaming, Redis, Spring Boot | 확정 |
 | 검색 | PostgreSQL full-text, pg_trgm | 확정 |
@@ -478,8 +490,8 @@ S15P21E106
 
 ## 13. 실행 방법
 
-> 서비스 애플리케이션은 설계 단계이며 실행 절차는 구현 착수 시점에 추가한다.
-> 현재 저장소에서 실행할 수 있는 것은 Jira 업무 생성 자동화 스크립트다.
+추천 실행은 [Consumer 안내](./pipeline/consumer/README.md)와 [GBT 실행 설정](./pipeline/consumer/GBT-644.md),
+서비스 실행은 각 [Backend](./backend/README.md)·[Frontend](./frontend/README.md)·[인프라](./infra/README.md) 안내를 따른다.
 
 ### Jira 업무 생성 자동화
 
@@ -510,9 +522,9 @@ python -m pytest tests
 | 요구사항 정의서 | [docs/requirements.md](./docs/requirements.md) · 검토 중(미결 사항은 문서 5장) |
 | 논리 ERD | [docs/erd.md](./docs/erd.md) · 작성 완료, 물리 스키마는 구현 전 작성 |
 | API 명세 | [docs/api](./docs/api/README.md) · 초안 68건, FastAPI 내부 API 초안은 ADR-0017로 대체 |
-| 기술 결정 기록(ADR) | [docs/adr](./docs/adr/README.md) · 17건(채택 14, 대체 3) |
+| 기술 결정 기록(ADR) | [docs/adr](./docs/adr/README.md) · 상태·대체 관계는 목록 참조 |
 | 와이어프레임 | 29개 화면 · [화면 설계](#5-화면-설계) 참고 · 검색 화면 미정 |
-| 추천·인기 처리 구조 설계 | Python Fold-in Consumer·Spark Structured Streaming 책임 분할 확정(ADR-0017) · 파티 집계식은 비교 실험 후 확정 |
+| 추천·인기 처리 구조 설계 | [v26 개인·파티 GBT](./pipeline/docs/gbt-v26/README.md) · [학습 근거](./pipeline/docs/gbt-v26/TRAINING.md) · 전역 인기 Spark 집계 |
 
 기획과 설계 원본은 팀 Notion에서 관리하며, 확정된 계약과 규칙은 이 저장소의 `docs/`에 반영한다.
 

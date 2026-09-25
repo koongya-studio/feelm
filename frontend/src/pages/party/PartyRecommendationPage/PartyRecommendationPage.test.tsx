@@ -5,11 +5,15 @@
  * 0편 · 그 밖의 실패)마다 문구와 다음 행동이 갈리는지 본다.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import PartyRecommendationPage from './index';
 import { ApiError } from '../../../api/apiError';
 import { getParty, getPartyPopcorn, getPartyRecommendations } from '../../../api/parties';
+import { submitFeedback } from '../../../api/feedback';
 import { renderWithRouter } from '../../../test/render';
+import { AuthContext } from '../../../contexts/authContext';
+import { testAuth } from '../../../test/auth';
+import { hasSeenPartyRecommendation } from '../../../utils/partyRecommendationSeen';
 import { party, partyPopcorn, partyRecommendations, TEST_PARTY_ID } from '../../../test/party';
 
 vi.mock('../../../api/parties', async () => {
@@ -24,10 +28,16 @@ vi.mock('../../../api/parties', async () => {
   };
 });
 
+vi.mock('../../../api/feedback', () => ({ submitFeedback: vi.fn() }));
+
 beforeEach(() => {
   vi.mocked(getParty).mockReset().mockResolvedValue(party());
   vi.mocked(getPartyPopcorn).mockReset().mockResolvedValue(partyPopcorn());
   vi.mocked(getPartyRecommendations).mockReset().mockResolvedValue(partyRecommendations());
+  vi.mocked(submitFeedback).mockReset().mockResolvedValue({
+    id: 1,
+    createdAt: '2026-09-26T00:00:00Z',
+  });
 });
 
 function renderPage() {
@@ -61,6 +71,7 @@ describe('5.5 추천 완성', () => {
     renderPage();
 
     expect(await screen.findByText('지금은 함께 볼 영화를 찾지 못했어요')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '이번 파티 추천 의견' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '다시 추천받기' }));
     expect(location()).toBe(`/parties/${TEST_PARTY_ID}/popcorn/mix`);
   });
@@ -95,6 +106,44 @@ describe('5.5 추천 완성', () => {
     expect(await screen.findByText('추천을 불러오지 못했어요')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '다시 추천받기' })).toBeInTheDocument();
   });
+});
+
+it('shows feedback after the last party movie and remembers it per member and bundle', async () => {
+  localStorage.clear();
+  const userId = 1024;
+  const { unmount } = renderWithRouter(
+    <AuthContext.Provider value={{ ...testAuth, user: { ...testAuth.user!, userId } }}>
+      <PartyRecommendationPage />
+    </AuthContext.Provider>,
+    {
+      route: `/parties/${TEST_PARTY_ID}/recommendations`,
+      path: '/parties/:partyId/recommendations',
+    },
+  );
+
+  const feedback = await screen.findByRole('region', { name: '이번 파티 추천 의견' });
+  const lastMovie = screen.getByRole('link', { name: /포레스트 검프/ });
+  expect(lastMovie.compareDocumentPosition(feedback)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+
+  fireEvent.click(screen.getByRole('button', { name: '마음에 들어요' }));
+  await waitFor(() => expect(submitFeedback).toHaveBeenCalledTimes(1));
+  expect(
+    localStorage.getItem('feelm:party-recommendation-feedback:1024:9001:7101:3401,3402,3403'),
+  ).toBe('sent');
+  unmount();
+
+  renderWithRouter(
+    <AuthContext.Provider value={{ ...testAuth, user: { ...testAuth.user!, userId: 2048 } }}>
+      <PartyRecommendationPage />
+    </AuthContext.Provider>,
+    {
+      route: `/parties/${TEST_PARTY_ID}/recommendations`,
+      path: '/parties/:partyId/recommendations',
+    },
+  );
+  expect(await screen.findByRole('region', { name: '이번 파티 추천 의견' })).toHaveTextContent(
+    '이번 파티 추천은 어땠나요?',
+  );
 });
 
 /*
@@ -138,5 +187,47 @@ describe('다시 받기 (API-058 refresh · hasNext)', () => {
     renderPage();
 
     expect(await screen.findByRole('button', { name: '다른 영화 추천받기' })).toBeInTheDocument();
+  });
+});
+
+/*
+ * 업무 -855. 5.8 · 5.1 보조 패널은 이 계정이 본 묶음이면 5.9 섞는 장면을 건너뛴다. 본 것은
+ * 여기서 남긴다 — 그린 묶음만, 계정마다 따로.
+ */
+describe('본 묶음 남기기', () => {
+  const USER_ID = 1024;
+
+  function renderAs(userId: number) {
+    return renderWithRouter(
+      <AuthContext.Provider value={{ ...testAuth, user: { ...testAuth.user!, userId } }}>
+        <PartyRecommendationPage />
+      </AuthContext.Provider>,
+      {
+        route: `/parties/${TEST_PARTY_ID}/recommendations`,
+        path: '/parties/:partyId/recommendations',
+      },
+    );
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('그린 묶음을 이 계정이 본 것으로 남긴다. 다른 계정은 본 것이 아니다', async () => {
+    renderAs(USER_ID);
+
+    expect(await screen.findByText('우리에게 어울리는 3편')).toBeInTheDocument();
+    expect(hasSeenPartyRecommendation(USER_ID, TEST_PARTY_ID, partyRecommendations())).toBe(true);
+    expect(hasSeenPartyRecommendation(2048, TEST_PARTY_ID, partyRecommendations())).toBe(false);
+  });
+
+  it('추천을 못 받으면 아무것도 남기지 않는다', async () => {
+    vi.mocked(getPartyRecommendations).mockRejectedValue(
+      new ApiError(503, 'RECOMMENDATION_UNAVAILABLE', '준비 중'),
+    );
+    renderAs(USER_ID);
+
+    expect(await screen.findByText('아직 추천을 준비하고 있어요')).toBeInTheDocument();
+    expect(localStorage.length).toBe(0);
   });
 });

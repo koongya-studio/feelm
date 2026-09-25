@@ -5,7 +5,14 @@
   inset: 0;
 }
 
-/* 와이어프레임 2.3 실측값 */
+/*
+ * 와이어프레임 2.3 실측값.
+ *
+ * **`-webkit-backdrop-filter`를 먼저, `backdrop-filter`를 뒤에 쓴다**(업무 -868). 반대로 쓰면
+ * 배포 빌드의 CSS 압축(lightningcss)이 뒤의 접두사 선언이 앞을 덮는다고 보고 접두사 없는 쪽을
+ * 지운다. Chrome은 접두사 선언을 읽지 않아 흐림이 `none`이 되고, 72% 흰 면 너머로 아래 카드의
+ * 글자가 메뉴 글자와 겹쳐 보였다(2026-09-25 배포 QA). 순서는 `styles/backdropFilter.test.ts`가 지킨다.
+ */
 .menu {
   position: absolute;
   z-index: 2;
@@ -17,12 +24,21 @@
   border-radius: var(--radius-control);
   background: var(--color-surface-raised);
   box-shadow: var(--shadow-raised);
-  backdrop-filter: var(--blur-glass);
   -webkit-backdrop-filter: var(--blur-glass);
+  backdrop-filter: var(--blur-glass);
 }
 
 .title {
   margin-bottom: var(--space-3);
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
+}
+
+/*
+ * 흐림을 못 쓰는 환경. 반투명 면만 남으면 아래 글자가 비쳐 읽을 수 없으므로 불투명 면으로 둔다.
+ */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .menu {
+    background: var(--color-surface-solid);
+  }
 }

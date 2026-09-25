@@ -80,13 +80,27 @@ public class RatingMutationService {
                 target.rating().createdAt());
     }
 
+    /**
+     * 평가를 지우고 그 영화를 <b>안 본 것으로 되돌린다</b>(API-038, ADR-0025).
+     *
+     * <p>평가 삭제와 감상 취소를 나누어 고르게 하지 않는다. 점수만 고칠 때는 수정(API-037)을 쓰고 영화가 마음에 들지 않았을 뿐이면 낮은 점수를 남기므로,
+     * 평가를 지우는 사람은 대체로 잘못 남겼거나 보지 않은 경우다.
+     *
+     * <p>감상 기록은 한 트랜잭션에서 {@code EXPIRED}로 옮긴다. 화면이 평가 삭제와 감상 취소를 이어 부르면 사이에서 끊길 때 평가만 사라지고 기록이 남는데,
+     * 그 상태를 수습할 경로를 화면마다 다시 만들어야 한다.
+     *
+     * <p>평가에 연결된 감상 기록이 없으면 건너뛴다. 과거에 기록 없이 만들어진 평가가 그렇다(D-6).
+     */
     @Transactional
     public void delete(long userId, long ratingId) {
         LockedTarget target = lockTarget(userId, ratingId);
         repository.deleteRating(ratingId, userId);
         if (target.rating().watchRecordId() != null) {
-            repository.markWatchUnrated(
-                    target.rating().watchRecordId(), userId, target.movie().movieId());
+            repository.markWatchExpired(
+                    target.rating().watchRecordId(),
+                    userId,
+                    target.movie().movieId(),
+                    Instant.now(clock).truncatedTo(ChronoUnit.MICROS));
         }
         repository.refreshMovieRatingAggregate(target.movie().movieId());
         // 마지막 평가를 지우면 캐시 행도 사라진다(API-040).

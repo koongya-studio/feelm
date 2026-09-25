@@ -18,7 +18,7 @@ import { resetSessionForTest, startSession } from '../../../api/session';
 import { resetSessionStore, saveProfileExtras } from '../../../mocks/sessionStore';
 import { mockMyProfile } from '../../../mocks/user';
 import { renderWithRouter } from '../../../test/render';
-import type { PublicProfile } from '../../../types/user';
+import type { MyProfile, PublicProfile } from '../../../types/user';
 
 /** 공개 프로필 주소의 식별자. `users.public_id`(UUID)다 */
 const PUBLIC_ID = '1b4e28ba-2fa1-11d2-883f-0016d3cca427';
@@ -27,7 +27,15 @@ const USER_ID = 2048;
 
 /** API-062 응답. 계약 예시와 같은 모양이다 */
 const buddy: PublicProfile = {
-  user: { userId: USER_ID, nickname: '무비버디', avatarUrl: null, visibility: 'PUBLIC' },
+  user: {
+    userId: USER_ID,
+    nickname: '무비버디',
+    avatarUrl: null,
+    visibility: 'PUBLIC',
+    frameVisibility: 'PUBLIC',
+    popcornVisibility: 'PUBLIC',
+    reviewVisibility: 'PUBLIC',
+  },
   keywords: [
     { code: 'TWIST_LOVER', label: '반전 선호' },
     { code: 'NOIR', label: '느와르' },
@@ -59,6 +67,11 @@ function json(status: number, body: unknown) {
 }
 
 /** 가짜 서버. 차단 응답은 시험마다 바꿀 수 있다 */
+/** API-062 본문. 항목을 가린 사람으로 바꿀 수 있다(업무 -856) */
+let profileBody: PublicProfile = buddy;
+/** 미리보기가 받는 API-014 본문 */
+let myProfileBody: MyProfile = mockMyProfile;
+
 let blockResponse: () => Promise<Response> = () =>
   json(201, { blockedUserId: USER_ID, blockedAt: '2026-09-16T00:00:00Z' });
 
@@ -67,9 +80,9 @@ function stubServer() {
     'fetch',
     vi.fn((url: string, init?: RequestInit) => {
       // 미리보기가 내 프로필을 받는다(API-014)
-      if (url === '/api/v1/users/me') return json(200, mockMyProfile);
+      if (url === '/api/v1/users/me') return json(200, myProfileBody);
 
-      if (url === `/api/v1/users/${PUBLIC_ID}/profile`) return json(200, buddy);
+      if (url === `/api/v1/users/${PUBLIC_ID}/profile`) return json(200, profileBody);
 
       if (url.endsWith('/profile')) {
         return json(404, { code: 'RESOURCE_NOT_FOUND', message: '프로필을 찾을 수 없습니다.' });
@@ -89,6 +102,8 @@ beforeEach(() => {
   resetSessionForTest();
   startSession('token');
   blockResponse = () => json(201, { blockedUserId: USER_ID, blockedAt: '2026-09-16T00:00:00Z' });
+  profileBody = buddy;
+  myProfileBody = mockMyProfile;
   stubServer();
 });
 
@@ -181,6 +196,58 @@ describe('7.2-B 다른 사용자 공개 프로필', () => {
     const reviews = screen.getByRole('heading', { name: '공개 한줄평' }).closest('section')!;
     expect(within(reviews).getByText('한줄평 목록은 아직 볼 수 없어요')).toBeInTheDocument();
     expect(within(reviews).queryByText('아직 공개한 한줄평이 없어요')).not.toBeInTheDocument();
+  });
+
+  it('비공개로 둔 항목은 없다고 하지 않고 비공개라고 그린다(업무 -856)', async () => {
+    // 서버가 가린 모양 그대로다(API-062 처리 규칙) — 구역은 비고 `user`의 세 값이 PRIVATE다
+    profileBody = {
+      ...buddy,
+      user: {
+        ...buddy.user,
+        frameVisibility: 'PRIVATE',
+        popcornVisibility: 'PRIVATE',
+        reviewVisibility: 'PRIVATE',
+      },
+      stats: { frameCount: 0, popcornCount: 0 },
+      popcorn: { flavors: [] },
+      recentFrames: [],
+      publicReviewCount: 0,
+    };
+    await renderProfile();
+
+    const section = (title: string) =>
+      screen.getByRole('heading', { name: title }).closest('section')!;
+    for (const title of ['취향 필름', '팝콘 버킷', '공개 한줄평']) {
+      expect(within(section(title)).getByText('비공개로 설정한 항목이에요')).toBeInTheDocument();
+    }
+    expect(within(section('취향 필름')).queryByText('공개된 취향 필름이 없어요')).toBeNull();
+    expect(within(section('공개 한줄평')).queryByText(/한줄평 목록은/)).toBeNull();
+    expect(screen.queryByText('팝콘 0알')).not.toBeInTheDocument();
+
+    // 수치는 0이 아니라 `비공개`다
+    const stat = (label: string) => screen.getByText(label, { selector: 'dt' }).nextSibling;
+    expect(stat('프레임')).toHaveTextContent('비공개');
+    expect(stat('팝콘')).toHaveTextContent('비공개');
+    expect(stat('공개 한줄평')).toHaveTextContent('비공개');
+
+    // 키워드는 세 항목이 아니라 그대로다
+    expect(screen.getByText('반전 선호')).toBeInTheDocument();
+  });
+
+  it('항목 하나만 가리면 나머지 구역은 그대로 그린다', async () => {
+    profileBody = {
+      ...buddy,
+      user: { ...buddy.user, popcornVisibility: 'PRIVATE' },
+      stats: { frameCount: 86, popcornCount: 0 },
+      popcorn: { flavors: [] },
+    };
+    await renderProfile();
+
+    const stat = (label: string) => screen.getByText(label, { selector: 'dt' }).nextSibling;
+    expect(stat('프레임')).toHaveTextContent('86');
+    expect(stat('팝콘')).toHaveTextContent('비공개');
+    const films = screen.getByRole('heading', { name: '취향 필름' }).closest('section')!;
+    expect(films.querySelectorAll('li')).toHaveLength(3);
   });
 
   it('차단은 확인 창을 거쳐 숫자 ID로 차단하고 7.8-D로 간다', async () => {
@@ -283,6 +350,27 @@ describe('7.2-A 내 공개 프로필 미리보기', () => {
       .mocked(fetch)
       .mock.calls.filter(([url]) => String(url) === '/api/v1/users/me');
     expect(profileCalls).toHaveLength(1);
+  });
+
+  it('7.8-B에서 비공개로 둔 항목은 미리보기에서도 비공개로 보인다(업무 -856)', async () => {
+    myProfileBody = { ...mockMyProfile, frameVisibility: 'PRIVATE', popcornVisibility: 'PRIVATE' };
+    await renderPreview();
+
+    const section = (title: string) =>
+      screen.getByRole('heading', { name: title }).closest('section')!;
+    expect(
+      within(section('취향 필름')).getByText('비공개로 설정한 항목이에요'),
+    ).toBeInTheDocument();
+    expect(section('취향 필름').querySelectorAll('li')).toHaveLength(0);
+    expect(
+      within(section('팝콘 버킷')).getByText('비공개로 설정한 항목이에요'),
+    ).toBeInTheDocument();
+    // 한줄평은 공개 그대로다
+    expect(within(section('공개 한줄평')).queryByText('비공개로 설정한 항목이에요')).toBeNull();
+
+    const stat = (label: string) => screen.getByText(label, { selector: 'dt' }).nextSibling;
+    expect(stat('프레임')).toHaveTextContent('비공개');
+    expect(stat('공개 한줄평')).not.toHaveTextContent('비공개');
   });
 
   it('비공개로 둔 것과 본인 전용 기능 · 자기에게 하는 차단 · 신고가 없다', async () => {

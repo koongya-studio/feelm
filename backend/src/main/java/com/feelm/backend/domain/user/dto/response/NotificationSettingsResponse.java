@@ -12,12 +12,16 @@ import com.feelm.backend.domain.user.entity.NotificationSettings;
 public record NotificationSettingsResponse(
         @JsonProperty("RATING") boolean rating,
         @JsonProperty("RECOMMENDATION") boolean recommendation,
+        @JsonProperty("PARTY_INVITE") boolean partyInvite,
+        @JsonProperty("REPORT_ISSUED") boolean reportIssued,
         @JsonProperty("MARKETING") boolean marketing) {
 
     public static NotificationSettingsResponse from(NotificationSettings settings) {
         return new NotificationSettingsResponse(
                 settings.isRatingEnabled(),
                 settings.isRecommendationEnabled(),
+                settings.isPartyInviteEnabled(),
+                settings.isReportIssuedEnabled(),
                 settings.isMarketingEnabled());
     }
 }

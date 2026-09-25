@@ -5,7 +5,7 @@
  * 문제를 없앴다. 카드는 API-045 응답 그대로이고, 포스터와 `영화 상세 보기`는 그 서버
  * 영화의 번호로 간다.
  *
- * 관심없음(API-047)은 카드 오른쪽 위 버튼이다(업무 S15P21E106-672). ⋯ 메뉴에는 없다. 서버가
+ * 관심없음(API-047)은 카드 오른쪽 위 버튼이다(업무 S15P21E106-672). 서버가
  * 받은 뒤에만 카드를 빼고 API-045를 다시 불러 보충한다. 섹션 이름표와 `안 봄` 배지는 없고,
  * 취향 발견 카드에만 `새로운 맛` 배지가 있다(같은 업무).
  *
@@ -13,7 +13,7 @@
  * 안내한다(업무 S15P21E106-654). 그 밖의 실패만 2.2-A 문구를 쓴다.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import RecommendationsPage from './index';
 import { ApiError } from '../../../api/apiError';
 import { renderWithRouter } from '../../../test/render';
@@ -136,6 +136,24 @@ describe('2.2 오늘의 추천', () => {
 
     const poster = await screen.findByRole('link', { name: '파이트 클럽 상세 보기' });
     expect(poster).toHaveAttribute('href', '/movies/550');
+    expect(screen.getByText('파이트 클럽')).toBeInTheDocument();
+    expect(screen.getByText('스릴러를 높게 평가하셨어요')).toBeInTheDocument();
+    const ottLink = screen.getByRole('link', {
+      name: '넷플릭스에서 파이트 클럽 보기 (새 창)',
+    });
+    expect(ottLink).toHaveAttribute(
+      'href',
+      'https://www.netflix.com/search?q=%ED%8C%8C%EC%9D%B4%ED%8A%B8%20%ED%81%B4%EB%9F%BD',
+    );
+    expect(ottLink).toHaveAttribute('target', '_blank');
+    expect(poster).not.toContainElement(ottLink);
+    // 어두운 정보 영역에서 22px 로고가 묻혀 한 단계 키웠다(업무 -917)
+    expect(ottLink.firstElementChild).toHaveStyle('--ott-badge-size: 26px');
+    // 로고는 제목 옆이 아니라 이유 아래 자기 줄에 선다. OTT가 없으면 그 자리를 글로 채운다
+    expect(screen.getByText('파이트 클럽')).not.toContainElement(ottLink);
+    expect(screen.getByRole('link', { name: '세븐 상세 보기' }).parentElement).toHaveTextContent(
+      '제공 중인 OTT가 없어요',
+    );
     expect(getRecommendations).toHaveBeenCalledTimes(1);
 
     // 일치도 %는 계약에 없어 그리지 않는다(CR-13)
@@ -159,18 +177,19 @@ describe('2.2 오늘의 추천', () => {
     expect(titles).toEqual(['파이트 클럽 상세 보기', '세븐 상세 보기']);
   });
 
-  it('⋯ 메뉴의 영화 상세 보기도 서버 영화로 가고, 관심없음은 메뉴에 없다', async () => {
+  it('모바일 카드에는 OTT 메뉴 없이 관심없음과 상세 이동만 표시한다', async () => {
     renderWithRouter(<RecommendationsPage />, { route: '/recommendations' });
 
-    fireEvent.click(await screen.findByRole('button', { name: /세븐 OTT 메뉴/ }));
-
-    expect(screen.getByRole('link', { name: /영화 상세 보기/ })).toHaveAttribute(
+    expect(await screen.findByRole('button', { name: '세븐 관심없음' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /OTT 메뉴/ })).toBeNull();
+    expect(screen.getByRole('link', { name: '세븐 상세 보기' })).toHaveAttribute(
       'href',
       '/movies/807',
     );
-    expect(
-      within(screen.getByRole('group', { name: '세븐 OTT 메뉴' })).queryByText('관심없음'),
-    ).toBeNull();
+    expect(screen.getByText('카드를 탭하면 영화 상세 화면으로 이동해요')).toBeInTheDocument();
+    const lastCard = screen.getByRole('link', { name: '세븐 상세 보기' });
+    const feedback = screen.getByRole('region', { name: '오늘의 추천 의견' });
+    expect(lastCard.compareDocumentPosition(feedback)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('빈 세트는 목업으로 채우지 않고 빈 상태를 말한다', async () => {
@@ -179,6 +198,7 @@ describe('2.2 오늘의 추천', () => {
 
     expect(await screen.findByText('추천할 영화를 아직 찾지 못했어요')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /상세 보기/ })).toBeNull();
+    expect(screen.queryByRole('region', { name: '오늘의 추천 의견' })).toBeNull();
   });
 });
 
@@ -245,10 +265,27 @@ describe('2.2 관심없음', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '파이트 클럽 관심없음' }));
 
+    expect(dismissMovie).not.toHaveBeenCalled();
+    expect(screen.getByRole('group', { name: '파이트 클럽 관심없음 확인' })).toHaveTextContent(
+      '추천에서 제외할까요?',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '예' }));
+
     expect(dismissMovie).toHaveBeenCalledWith(550, 3301);
     expect(await screen.findByRole('link', { name: '펄프 픽션 상세 보기' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '파이트 클럽 상세 보기' })).toBeNull();
     expect(getRecommendations).toHaveBeenCalledTimes(2);
+  });
+
+  it('확인 창에서 취소하면 추천을 변경하지 않는다', async () => {
+    renderWithRouter(<RecommendationsPage />, { route: '/recommendations' });
+
+    fireEvent.click(await screen.findByRole('button', { name: '파이트 클럽 관심없음' }));
+    fireEvent.click(screen.getByRole('button', { name: '아니요' }));
+
+    expect(screen.queryByRole('group', { name: '파이트 클럽 관심없음 확인' })).toBeNull();
+    expect(dismissMovie).not.toHaveBeenCalled();
+    expect(screen.getByRole('link', { name: '파이트 클럽 상세 보기' })).toBeInTheDocument();
   });
 
   it('이미 관심없음인 영화(409)도 처리된 것으로 보고 카드를 뺀다', async () => {
@@ -259,6 +296,7 @@ describe('2.2 관심없음', () => {
     renderWithRouter(<RecommendationsPage />, { route: '/recommendations' });
 
     fireEvent.click(await screen.findByRole('button', { name: '파이트 클럽 관심없음' }));
+    fireEvent.click(screen.getByRole('button', { name: '예' }));
 
     expect(await screen.findByRole('link', { name: '펄프 픽션 상세 보기' })).toBeInTheDocument();
     expect(screen.queryByText(/관심없음으로 처리하지 못했어요/)).toBeNull();
@@ -271,6 +309,7 @@ describe('2.2 관심없음', () => {
     renderWithRouter(<RecommendationsPage />, { route: '/recommendations' });
 
     fireEvent.click(await screen.findByRole('button', { name: '파이트 클럽 관심없음' }));
+    fireEvent.click(screen.getByRole('button', { name: '예' }));
 
     await waitFor(() =>
       expect(screen.queryByRole('link', { name: '파이트 클럽 상세 보기' })).toBeNull(),
@@ -285,6 +324,7 @@ describe('2.2 관심없음', () => {
     renderWithRouter(<RecommendationsPage />, { route: '/recommendations' });
 
     fireEvent.click(await screen.findByRole('button', { name: '파이트 클럽 관심없음' }));
+    fireEvent.click(screen.getByRole('button', { name: '예' }));
 
     expect(await screen.findByText(/관심없음으로 처리하지 못했어요/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '파이트 클럽 상세 보기' })).toBeInTheDocument();
