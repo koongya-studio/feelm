@@ -739,6 +739,9 @@ describe('7.8 → 7.8-B · 7.8-C', () => {
         'false',
       ),
     );
+    await waitFor(() =>
+      expect(screen.getByRole('switch', { name: '파티 초대 알림' })).toBeEnabled(),
+    );
 
     // 파티 초대는 계약에 들어와(업무 -857) 서버에 저장되고 다시 들어와도 남는다
     const partyInvite = screen.getByRole('switch', { name: '파티 초대 알림' });
@@ -751,6 +754,7 @@ describe('7.8 → 7.8-B · 7.8-C', () => {
         'false',
       ),
     );
+    await waitFor(() => expect(screen.getByRole('switch', { name: '마케팅 알림' })).toBeEnabled());
 
     fireEvent.click(screen.getByRole('switch', { name: '마케팅 알림' }));
     await waitFor(() =>
