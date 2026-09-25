@@ -19,6 +19,7 @@ import { renderWithRouter } from '../../../test/render';
 import { AuthContext } from '../../../contexts/authContext';
 import { ROUTE_PATTERN, path } from '../../../routes/paths';
 import { MOVIE_DETAIL_GUIDE, hasSeenGuide, restartGuide } from '../../../utils/userGuides';
+import guideStyles from '../../../components/GuideCallout/GuideCallout.module.css';
 import type { AuthStatus, AuthValue } from '../../../contexts/authContext';
 import type { MovieDetail } from '../../../types/movie';
 import type { WatchRecord } from '../../../types/watch';
@@ -187,6 +188,12 @@ describe('첫 이용 안내', () => {
     );
 
     expect(await screen.findByText('영화 상세를 자유롭게 둘러보세요')).toBeInTheDocument();
+    expect(
+      document.querySelector("[data-guide-target='movie-detail-summary']"),
+    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(document.querySelector(`.${guideStyles.focusRing}`)).toBeInTheDocument(),
+    );
     fireEvent.click(screen.getByRole('button', { name: '상세 안내 마치기' }));
     expect(hasSeenGuide(42, MOVIE_DETAIL_GUIDE)).toBe(true);
     expect(screen.getByRole('button', { name: '내 별점 남기기' })).toBeInTheDocument();

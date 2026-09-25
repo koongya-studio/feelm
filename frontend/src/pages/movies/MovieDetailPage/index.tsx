@@ -502,7 +502,7 @@ export default function MovieDetailPage() {
       <div className={styles.stage} aria-hidden="true" />
 
       <div className={styles.sheet}>
-        <header className={styles.head}>
+        <header className={styles.head} data-guide-target="movie-detail-summary">
           <h1 className={styles.title}>{movie.title}</h1>
           {meta ? <p className={styles.meta}>{meta}</p> : null}
           {flavor ? (
@@ -847,6 +847,7 @@ export default function MovieDetailPage() {
           description="영화 정보를 살펴보세요. 별점은 원할 때 남기면 됩니다."
           step={1}
           totalSteps={1}
+          targetSelector="[data-guide-target='movie-detail-summary']"
           action={{
             label: '상세 안내 마치기',
             onClick: finishDetailGuide,

@@ -28,7 +28,12 @@ export default function GuideCallout({
   action,
   secondaryAction,
 }: Props) {
-  const [spotlight, setSpotlight] = useState<Spotlight | null>(null);
+  const [spotlight, setSpotlight] = useState<{
+    selector: string;
+    bounds: Spotlight;
+  } | null>(null);
+  const currentSpotlight =
+    spotlight && spotlight.selector === targetSelector ? spotlight.bounds : null;
 
   useEffect(() => {
     if (!targetSelector) return;
@@ -38,10 +43,13 @@ export default function GuideCallout({
       const rect = target.getBoundingClientRect();
       const inset = 8;
       setSpotlight({
-        top: Math.max(0, rect.top - inset),
-        right: Math.min(window.innerWidth, rect.right + inset),
-        bottom: Math.min(window.innerHeight, rect.bottom + inset),
-        left: Math.max(0, rect.left - inset),
+        selector: targetSelector,
+        bounds: {
+          top: Math.max(0, rect.top - inset),
+          right: Math.min(window.innerWidth, rect.right + inset),
+          bottom: Math.min(window.innerHeight, rect.bottom + inset),
+          left: Math.max(0, rect.left - inset),
+        },
       });
     };
     target.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
@@ -59,45 +67,45 @@ export default function GuideCallout({
 
   return createPortal(
     <>
-      {spotlight ? (
+      {currentSpotlight ? (
         <>
           <div
             className={styles.shade}
-            style={{ top: 0, left: 0, right: 0, height: spotlight.top }}
+            style={{ top: 0, left: 0, right: 0, height: currentSpotlight.top }}
             aria-hidden="true"
           />
           <div
             className={styles.shade}
-            style={{ top: spotlight.bottom, left: 0, right: 0, bottom: 0 }}
+            style={{ top: currentSpotlight.bottom, left: 0, right: 0, bottom: 0 }}
             aria-hidden="true"
           />
           <div
             className={styles.shade}
             style={{
-              top: spotlight.top,
+              top: currentSpotlight.top,
               left: 0,
-              width: spotlight.left,
-              height: spotlight.bottom - spotlight.top,
+              width: currentSpotlight.left,
+              height: currentSpotlight.bottom - currentSpotlight.top,
             }}
             aria-hidden="true"
           />
           <div
             className={styles.shade}
             style={{
-              top: spotlight.top,
-              left: spotlight.right,
+              top: currentSpotlight.top,
+              left: currentSpotlight.right,
               right: 0,
-              height: spotlight.bottom - spotlight.top,
+              height: currentSpotlight.bottom - currentSpotlight.top,
             }}
             aria-hidden="true"
           />
           <div
             className={styles.focusRing}
             style={{
-              top: spotlight.top,
-              left: spotlight.left,
-              width: spotlight.right - spotlight.left,
-              height: spotlight.bottom - spotlight.top,
+              top: currentSpotlight.top,
+              left: currentSpotlight.left,
+              width: currentSpotlight.right - currentSpotlight.left,
+              height: currentSpotlight.bottom - currentSpotlight.top,
             }}
             aria-hidden="true"
           />
