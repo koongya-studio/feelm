@@ -12,6 +12,12 @@ import type { MouseEvent } from 'react';
 import type { Ott } from '../../../../types/ott';
 import type { RecommendationItem } from '../../../../types/recommendation';
 
+/**
+ * OTT 로고 한 변. 어두운 정보 영역 위에서 22px은 바탕이 어두운 로고(넷플릭스 · 디즈니+)가
+ * 배경에 묻혀 한 단계 키웠다(업무 -917).
+ */
+const OTT_BADGE_SIZE = 26;
+
 type Props = {
   item: RecommendationItem;
   otts: Ott[];
@@ -47,9 +53,24 @@ export default function RecommendationCard({ item, otts, dismissing, onDismiss }
           </PosterCue>
         </span>
 
+        {/*
+         * 정보 영역은 위에서부터 제목 · 추천 이유 · 볼 수 있는 곳이다(업무 -917). OTT 로고가
+         * 제목 옆에 있을 때는 OTT가 많을수록 제목이 잘렸다(5개면 일곱 글자). 로고 줄을 따로
+         * 두어 제목과 이유가 온전히 보이고, 로고는 개수와 상관없이 늘 같은 자리에 선다 —
+         * 데스크톱 카드(`MovieBriefCard`)와 같은 순서다.
+         *
+         * 포스터 위에 얹는 안은 포스터 아래쪽에 모인 부제 · 크레딧을 가리고, 상세로 가는
+         * 포스터 면 안에 OTT 링크가 겹쳐 쓰지 않았다(사용자 결정 2026-09-26).
+         */}
         <span className={styles.info}>
-          <span className={styles.infoTop}>
-            <strong className={styles.title}>{movie.title}</strong>
+          <strong className={styles.title}>{movie.title}</strong>
+          <span className={styles.reason}>
+            <span className={styles.reasonText}>{reason.summary}</span>
+            <span className={styles.reasonCue} aria-hidden="true">
+              <ChevronRightIcon />
+            </span>
+          </span>
+          {movie.ottProviders.length > 0 ? (
             <span className={styles.ottList}>
               {movie.ottProviders.map((code) => {
                 const ott = otts.find((candidate) => candidate.code === code);
@@ -65,22 +86,23 @@ export default function RecommendationCard({ item, otts, dismissing, onDismiss }
                         className={styles.ottLink}
                         aria-label={`${ott?.name ?? code}에서 ${movie.title} 보기 (새 창)`}
                       >
-                        <OttBadge code={code} name={ott?.name ?? code} size={22} labelled={false} />
+                        <OttBadge
+                          code={code}
+                          name={ott?.name ?? code}
+                          size={OTT_BADGE_SIZE}
+                          labelled={false}
+                        />
                       </a>
                     ) : (
-                      <OttBadge code={code} name={ott?.name ?? code} size={22} />
+                      <OttBadge code={code} name={ott?.name ?? code} size={OTT_BADGE_SIZE} />
                     )}
                   </span>
                 );
               })}
             </span>
-          </span>
-          <span className={styles.reason}>
-            <span className={styles.reasonText}>{reason.summary}</span>
-            <span className={styles.reasonCue} aria-hidden="true">
-              <ChevronRightIcon />
-            </span>
-          </span>
+          ) : (
+            <span className={styles.ottEmpty}>제공 중인 OTT가 없어요</span>
+          )}
         </span>
       </div>
 

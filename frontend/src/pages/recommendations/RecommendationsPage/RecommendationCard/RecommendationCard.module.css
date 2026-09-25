@@ -55,9 +55,13 @@
   object-fit: contain;
 }
 
+/*
+ * 높이를 고정한다. 제목 한 줄 · 이유 두 줄 · 로고 줄(26px)이 들어가는 값이다. OTT가 없는
+ * 카드만 짧아지면 카드마다 포스터 크기가 달라진다(`.ottEmpty`가 그 자리를 채운다).
+ */
 .info {
   display: flex;
-  height: 78px;
+  height: 108px;
   box-sizing: border-box;
   flex: none;
   flex-direction: column;
@@ -68,16 +72,9 @@
   color: var(--color-on-dark);
 }
 
-.infoTop {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 8px;
-}
-
 .title {
   min-width: 0;
-  flex: 1;
+  flex: none;
   overflow: hidden;
   font-size: 15px;
   font-weight: var(--font-weight-bold);
@@ -86,17 +83,31 @@
   white-space: nowrap;
 }
 
-.ottList {
+.ottList,
+.ottEmpty {
   display: flex;
-  min-width: 0;
+  min-height: 26px;
   flex: none;
   align-items: center;
-  /* 22px 배지 사이에 44px 터치 영역이 겹치지 않을 공간을 둔다. */
-  gap: 22px;
+}
+
+.ottList {
+  min-width: 0;
+  /* 26px 배지 사이에 44px 터치 영역이 겹치지 않을 공간을 둔다. */
+  gap: 18px;
 }
 
 .ottList > span {
   display: flex;
+}
+
+/*
+ * 로고 둘레의 옅은 흰 선(업무 -917). 넷플릭스 · 디즈니+처럼 바탕이 어두운 로고는 어두운
+ * 정보 영역과 경계가 사라져 로고가 있는지조차 잘 보이지 않았다. 선은 로고 바깥에 둘러
+ * 로고 이미지 자체는 가리지 않는다.
+ */
+.ottList [data-logo] {
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.32);
 }
 
 .ottLink {
@@ -105,19 +116,27 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  color: inherit;
+  /* 로고를 못 불러와 글자 배지로 떨어질 때 링크 밑줄이 글자 아래에 남지 않게 한다 */
+  text-decoration: none;
   pointer-events: auto;
 }
 
 .ottLink::before {
   position: absolute;
   /* 보이는 배지 크기는 유지하고 누를 수 있는 면만 44px로 넓힌다. */
-  inset: -11px;
+  inset: -9px;
   content: '';
 }
 
 .ottLink:focus-visible {
   outline: 2px solid var(--color-film-hole);
   outline-offset: 8px;
+}
+
+.ottEmpty {
+  color: var(--color-on-dark-muted);
+  font-size: 12px;
 }
 
 .reason {
