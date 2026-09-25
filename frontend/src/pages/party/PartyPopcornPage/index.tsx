@@ -4,6 +4,7 @@
  * 이동표
  * 5.1 → 5.8 참여 중인 파티방 선택
  * 5.8 → 5.9 함께 볼 영화 추천받기 (파티팝콘 흐름의 입구)
+ * 5.8 → 5.5 함께 볼 영화 추천받기 — 내가 이미 본 묶음일 때 (업무 -855)
  * 5.8 → 5.10 지난 추천 보기 (업무 -826)
  * 5.8 ⇢ 7.8-D 사용자 차단 후 차단 사용자 관리
  *
@@ -69,6 +70,7 @@ import {
 import { blockUser } from '../../../api/settings';
 import { getMyProfile } from '../../../api/users';
 import { getPopcornFlavors } from '../../../api/taste';
+import { usePartyRecommendationEntry } from '../../../hooks/usePartyRecommendationEntry';
 import { path } from '../../../routes/paths';
 import styles from './PartyPopcornPage.module.css';
 import type { Party, PartyMemberPopcorn, PartyPopcorn } from '../../../types/party';
@@ -144,6 +146,7 @@ function topFlavorCode(member: PartyMemberPopcorn): string | undefined {
 export default function PartyPopcornPage() {
   const { partyId } = useParams();
   const navigate = useNavigate();
+  const recommendationEntry = usePartyRecommendationEntry();
 
   const id = Number(partyId);
 
@@ -490,10 +493,15 @@ export default function PartyPopcornPage() {
             </p>
           ) : null}
 
+          {/*
+           * 섞는 장면(5.9)은 내가 아직 못 본 묶음일 때만 보여 주고, 이미 본 묶음이면 5.5를
+           * 바로 연다(업무 -855). 규칙은 데스크톱 보조 패널과 같다(`usePartyRecommendationEntry`)
+           */}
           <Button
             variant="brand"
             disabled={popcorn.members.length < PARTY_MIN_MEMBERS}
-            onClick={() => void navigate(path.partyPopcornMix(id))}
+            aria-busy={recommendationEntry.checking || undefined}
+            onClick={() => recommendationEntry.open(id, popcorn.members.length)}
           >
             함께 볼 영화 추천받기
           </Button>

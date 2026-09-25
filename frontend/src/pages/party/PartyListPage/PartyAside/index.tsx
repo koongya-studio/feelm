@@ -19,12 +19,12 @@
  * `우리의 공통 취향` 칩은 412px의 강조 카드와 **같은 값**이다 — 파티 팝콘(API-057)을 맛별로
  * 합쳐 알이 많은 셋이다. 두 폭에서 같은 파티가 서로 다른 취향을 말하지 않게 한다.
  */
-import { useNavigate } from 'react-router';
 import AsidePanel from '../../../../components/AsidePanel';
 import Button from '../../../../components/Button';
 import PopcornBucket from '../../../../components/PopcornBucket';
 import { PlayIcon } from '../../../../components/Icon';
 import MemberFaces from '../MemberFaces';
+import { usePartyRecommendationEntry } from '../../../../hooks/usePartyRecommendationEntry';
 import { path } from '../../../../routes/paths';
 import styles from './PartyAside.module.css';
 import type { Party } from '../../../../types/party';
@@ -41,7 +41,7 @@ type Props = {
 };
 
 export default function PartyAside({ party, commonFlavors, onCreateParty }: Props) {
-  const navigate = useNavigate();
+  const recommendationEntry = usePartyRecommendationEntry();
 
   return (
     <>
@@ -99,13 +99,15 @@ export default function PartyAside({ party, commonFlavors, onCreateParty }: Prop
             </section>
 
             {/*
-             * 5.9 팝콘 섞기로 간다. 5.8의 `함께 볼 영화 추천받기`와 같은 곳이며 거기서
-             * 5.5 추천 완성으로 이어진다. 흐름을 새로 만들지 않는다.
+             * 5.8의 `함께 볼 영화 추천받기`와 같은 규칙이다(`usePartyRecommendationEntry`,
+             * 업무 -855). 내가 아직 못 본 묶음일 때만 5.9 팝콘 섞기를 거치고, 이미 본 묶음이면
+             * 5.5를 바로 연다.
              */}
             <button
               type="button"
               className={styles.action}
-              onClick={() => void navigate(path.partyPopcornMix(party.partyId))}
+              aria-busy={recommendationEntry.checking || undefined}
+              onClick={() => recommendationEntry.open(party.partyId, party.members.length)}
             >
               <PlayIcon />
               파티 추천 보기
