@@ -140,11 +140,12 @@ describe('ReportFourCut PNG 저장', () => {
     });
     node.append(image);
     parent.append(node);
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(new TextEncoder().encode('image'), {
-        headers: { 'Content-Type': 'image/webp' },
-      }),
-    );
+    // 브라우저처럼 응답 Blob이 FileReader와 같은 환경의 것이어야 한다. Node의 `Response`를 그대로
+    // 쓰면 Node의 Blob이 와서 jsdom의 FileReader가 거절한다(업무 S15P21E106-916)
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(['image'], { type: 'image/webp' }),
+    } as Response);
     const png = new Blob(['png'], { type: 'image/png' });
     vi.mocked(toBlob).mockImplementation(async (captureNode) => {
       expect(captureNode).toBe(node);
@@ -155,6 +156,46 @@ describe('ReportFourCut PNG 저장', () => {
     await expect(captureReportImage(node)).resolves.toBe(png);
     expect(parent.childElementCount).toBe(1);
     expect(image.getAttribute('src')).toBe('/photo.webp');
+  });
+
+  /*
+   * 업무 S15P21E106-916. 다른 실행 환경에서 만든 오류는 `instanceof Error`가 거짓이라, 예전에는
+   * 시간 초과 문구로 바뀌어 원인이 가려졌다. 시간 초과는 실제로 시간이 다 됐을 때만이다.
+   */
+  it('다른 환경에서 만든 오류도 시간 초과로 바꾸지 않고 원래 원인을 드러낸다', async () => {
+    const node = document.createElement('div');
+    Object.defineProperties(node, {
+      scrollWidth: { value: 385 },
+      scrollHeight: { value: 1165 },
+    });
+    // iframe은 제 전역을 따로 가진다. 브라우저에서 다른 창의 오류가 그렇듯 `instanceof Error`가 거짓이다
+    const frame = document.createElement('iframe');
+    document.body.append(frame);
+    const ForeignTypeError = (frame.contentWindow as unknown as { TypeError: TypeErrorConstructor })
+      .TypeError;
+    const foreign = new ForeignTypeError("parameter 1 is not of type 'Blob'.");
+    frame.remove();
+    expect(foreign instanceof Error).toBe(false);
+    vi.mocked(toBlob).mockRejectedValue(foreign);
+
+    await expect(captureReportImage(node)).rejects.toThrow("parameter 1 is not of type 'Blob'.");
+  });
+
+  it('오류가 아닌 값으로 실패하면 캡처 실패로 감싸고 원래 값을 원인으로 남긴다', async () => {
+    const node = document.createElement('div');
+    Object.defineProperties(node, {
+      scrollWidth: { value: 385 },
+      scrollHeight: { value: 1165 },
+    });
+    vi.mocked(toBlob).mockRejectedValue('Load failed');
+
+    const failure = (await captureReportImage(node).then(
+      () => null,
+      (error: unknown) => error,
+    )) as Error;
+
+    expect(failure.message).toBe('ReportFourCut capture failed');
+    expect(failure.cause).toBe('Load failed');
   });
 
   it('사진을 다시 읽지 못하면 불완전한 PNG를 만들지 않는다', async () => {
