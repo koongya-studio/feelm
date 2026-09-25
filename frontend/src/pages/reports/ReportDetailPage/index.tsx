@@ -48,8 +48,8 @@
  * `저장`은 API-061로 앞면 PNG를 내려받고 화면에 머문다. 공유 메뉴를 쓸 수 없으면
  * 파일을 내려받지 않고 지원하지 않는 브라우저임을 알린다(업무 -861).
  */
-import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import Chip from '../../../components/Chip';
 import MeterRow from '../../../components/MeterRow';
@@ -76,10 +76,21 @@ import type {
   ReportShare,
 } from '../../../types/report';
 
-/** 칸이 뒤집히거나 앞면으로 되돌아오는 데 걸리는 시간. 인화지의 `--flip-duration`과 맞춘다 */
+/** 인화지의 520ms 회전이 끝나고 캡처할 수 있도록 여유를 둔다. */
 const FLIP_BACK_MS = 560;
 const PROFILE_TIMEOUT_MS = 5_000;
 const SAVE_TIMEOUT_MS = 75_000;
+const INTRO_DELAY_MS = 800;
+const INTRO_READ_MS = 1_000;
+const INTRO_GAP_MS = FLIP_BACK_MS + 180;
+const INTRO_SCROLL_MS = 450;
+const INTRO_STORAGE_PREFIX = 'feelm-report-flip-intro-v4:';
+const CUT_LABELS: Record<ReportCutKind, string> = {
+  genre: '장르',
+  director: '감독',
+  actor: '배우',
+  character: '캐릭터',
+};
 const UNSUPPORTED_SHARE_NOTICE =
   '이 브라우저에서는 이미지 공유를 지원하지 않아요. 공유 메뉴를 지원하는 기기에서 시도해 주세요';
 
@@ -106,6 +117,22 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+function hasSeenFlipIntro(reportId: number): boolean {
+  try {
+    return window.localStorage.getItem(`${INTRO_STORAGE_PREFIX}${reportId}`) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function rememberFlipIntro(reportId: number): void {
+  try {
+    window.localStorage.setItem(`${INTRO_STORAGE_PREFIX}${reportId}`, '1');
+  } catch {
+    // 저장소 접근이 제한되어도 이번 화면의 안내 동작은 계속할 수 있다.
+  }
+}
+
 function nextFrameOrFallback(): Promise<void> {
   return new Promise((resolve) => {
     let completed = false;
@@ -122,7 +149,9 @@ function nextFrameOrFallback(): Promise<void> {
 
 export default function ReportDetailPage() {
   const { reportId } = useParams();
+  const location = useLocation();
   const id = Number(reportId);
+  const replayIntro = new URLSearchParams(location.search).get('preview') === '1';
 
   const [report, setReport] = useState<ReportDetail | null>(null);
   const [nickname, setNickname] = useState<string | null>(null);
@@ -132,7 +161,120 @@ export default function ReportDetailPage() {
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
   const [flipped, setFlipped] = useState<ReportCutKind[]>([]);
+  const [introStep, setIntroStep] = useState<{
+    kind: ReportCutKind;
+    index: number;
+    total: number;
+  } | null>(null);
   const fourCutRef = useRef<HTMLDivElement>(null);
+  const introTimers = useRef<number[]>([]);
+  const introKind = useRef<ReportCutKind | null>(null);
+  const introDismissed = useRef(false);
+  const introCancelled = useRef(false);
+  const introReportId = useRef<number | null>(null);
+
+  const stopFlipIntro = useCallback((): ReportCutKind | null => {
+    introDismissed.current = true;
+    introCancelled.current = true;
+    if (!replayIntro) rememberFlipIntro(id);
+    introTimers.current.forEach((timer) => window.clearTimeout(timer));
+    introTimers.current = [];
+    const demoKind = introKind.current;
+    introKind.current = null;
+    setIntroStep(null);
+    if (demoKind) setFlipped((list) => list.filter((kind) => kind !== demoKind));
+    return demoKind;
+  }, [id, replayIntro]);
+
+  useEffect(() => {
+    if (!report || report.reportId !== id) return;
+    if (introReportId.current !== id) {
+      introReportId.current = id;
+      introDismissed.current = false;
+      introCancelled.current = false;
+    }
+    const backKinds = (Object.entries(cutBacks(report)) as [ReportCutKind, ReactNode][])
+      .filter(([, back]) => Boolean(back))
+      .map(([kind]) => kind);
+    if (backKinds.length === 0 || introDismissed.current || (!replayIntro && hasSeenFlipIntro(id)))
+      return;
+
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      introDismissed.current = true;
+      if (!replayIntro) rememberFlipIntro(id);
+      return;
+    }
+
+    const showNext = (index: number) => {
+      const kind = backKinds[index];
+      const cut = fourCutRef.current?.querySelector(`[data-cut="${kind}"]`)?.closest('li');
+      const rect = cut?.getBoundingClientRect();
+      const offscreen = Boolean(
+        cut &&
+        typeof cut.scrollIntoView === 'function' &&
+        rect &&
+        (rect.top < 16 || rect.bottom > window.innerHeight - 16),
+      );
+      if (offscreen) cut?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      const reveal = window.setTimeout(
+        () => {
+          if (introCancelled.current) return;
+          introKind.current = kind;
+          setIntroStep({ kind, index, total: backKinds.length });
+          setFlipped([kind]);
+
+          const close = window.setTimeout(() => {
+            if (introKind.current !== kind) return;
+            introKind.current = null;
+            setFlipped([]);
+            if (index + 1 < backKinds.length) {
+              const next = window.setTimeout(() => showNext(index + 1), INTRO_GAP_MS);
+              introTimers.current.push(next);
+            } else {
+              const finish = window.setTimeout(() => {
+                if (introCancelled.current) return;
+                setIntroStep(null);
+                if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: 'smooth' });
+              }, FLIP_BACK_MS);
+              introTimers.current.push(finish);
+            }
+          }, FLIP_BACK_MS + INTRO_READ_MS);
+          introTimers.current.push(close);
+        },
+        offscreen ? INTRO_SCROLL_MS : 0,
+      );
+      introTimers.current.push(reveal);
+    };
+
+    const open = window.setTimeout(() => {
+      if (introCancelled.current) return;
+      introDismissed.current = true;
+      if (!replayIntro) rememberFlipIntro(id);
+      showNext(0);
+    }, INTRO_DELAY_MS);
+    introTimers.current.push(open);
+
+    const cancelOnScrollIntent = () => {
+      if (!introCancelled.current) stopFlipIntro();
+    };
+    const cancelOnScrollKey = (event: KeyboardEvent) => {
+      if (['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' '].includes(event.key)) {
+        cancelOnScrollIntent();
+      }
+    };
+    window.addEventListener('wheel', cancelOnScrollIntent, { passive: true });
+    window.addEventListener('touchstart', cancelOnScrollIntent, { passive: true });
+    window.addEventListener('keydown', cancelOnScrollKey);
+
+    return () => {
+      introTimers.current.forEach((timer) => window.clearTimeout(timer));
+      introTimers.current = [];
+      window.removeEventListener('wheel', cancelOnScrollIntent);
+      window.removeEventListener('touchstart', cancelOnScrollIntent);
+      window.removeEventListener('keydown', cancelOnScrollKey);
+    };
+  }, [report, id, replayIntro, stopFlipIntro]);
 
   useEffect(() => {
     let active = true;
@@ -169,7 +311,11 @@ export default function ReportDetailPage() {
   }, []);
 
   function toggleFlip(kind: ReportCutKind) {
-    setFlipped((list) => (list.includes(kind) ? list.filter((k) => k !== kind) : [...list, kind]));
+    const demoKind = stopFlipIntro();
+    setFlipped((list) => {
+      const current = demoKind ? list.filter((item) => item !== demoKind) : list;
+      return current.includes(kind) ? current.filter((item) => item !== kind) : [...current, kind];
+    });
   }
 
   async function prepareImage() {
@@ -198,6 +344,7 @@ export default function ReportDetailPage() {
   }
 
   async function save() {
+    stopFlipIntro();
     setSaving(true);
     setNotice('이미지를 준비하고 있어요…');
     try {
@@ -219,6 +366,7 @@ export default function ReportDetailPage() {
   async function share() {
     setNotice('');
     if (!canUseFileShare()) {
+      stopFlipIntro();
       setNotice(UNSUPPORTED_SHARE_NOTICE);
       return;
     }
@@ -243,7 +391,10 @@ export default function ReportDetailPage() {
 
   /** 공유할 두 장. 앞면을 찍고, 뒷면이 있는 칸을 모두 뒤집어 한 장 더 찍는다 */
   async function prepareShareImages(): Promise<File[]> {
-    const before = flipped;
+    const before = introKind.current
+      ? flipped.filter((kind) => kind !== introKind.current)
+      : flipped;
+    stopFlipIntro();
     const backKinds = report
       ? (Object.entries(cutBacks(report)) as [ReportCutKind, ReactNode][])
           .filter(([, back]) => Boolean(back))
@@ -313,6 +464,13 @@ export default function ReportDetailPage() {
       <ScreenHeader title={title} showBack fallbackTo={path.tasteReports()} />
 
       <div className={styles.page}>
+        {Object.values(cutBacks(report)).some(Boolean) ? (
+          <p className={styles.flipGuide}>
+            {introStep
+              ? `${String(introStep.index + 1).padStart(2, '0')} / ${String(introStep.total).padStart(2, '0')} · ${CUT_LABELS[introStep.kind]} 뒷면 살펴보기`
+              : '각 컷을 눌러 뒷면의 설명을 확인해 보세요'}
+          </p>
+        ) : null}
         {/* 4컷. 인화지가 화면에서 유일한 어두운 블록이고, 설명은 그 칸 뒷면에 있다 */}
         <div ref={fourCutRef} className={styles.fourCut}>
           <ReportFourCut
