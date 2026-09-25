@@ -13,7 +13,7 @@
  * 안내한다(업무 S15P21E106-654). 그 밖의 실패만 2.2-A 문구를 쓴다.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import RecommendationsPage from './index';
 import { ApiError } from '../../../api/apiError';
 import { renderWithRouter } from '../../../test/render';
@@ -136,9 +136,17 @@ describe('2.2 오늘의 추천', () => {
 
     const poster = await screen.findByRole('link', { name: '파이트 클럽 상세 보기' });
     expect(poster).toHaveAttribute('href', '/movies/550');
-    expect(within(poster).getByText('파이트 클럽')).toBeInTheDocument();
-    expect(within(poster).getByText('스릴러를 높게 평가하셨어요')).toBeInTheDocument();
-    expect(within(poster).getByRole('img', { name: '넷플릭스' })).toBeInTheDocument();
+    expect(screen.getByText('파이트 클럽')).toBeInTheDocument();
+    expect(screen.getByText('스릴러를 높게 평가하셨어요')).toBeInTheDocument();
+    const ottLink = screen.getByRole('link', {
+      name: '넷플릭스에서 파이트 클럽 보기 (새 창)',
+    });
+    expect(ottLink).toHaveAttribute(
+      'href',
+      'https://www.netflix.com/search?q=%ED%8C%8C%EC%9D%B4%ED%8A%B8%20%ED%81%B4%EB%9F%BD',
+    );
+    expect(ottLink).toHaveAttribute('target', '_blank');
+    expect(poster).not.toContainElement(ottLink);
     expect(getRecommendations).toHaveBeenCalledTimes(1);
 
     // 일치도 %는 계약에 없어 그리지 않는다(CR-13)
