@@ -106,7 +106,7 @@ describe('5.9 팝콘 모으기 · 섞기', () => {
     renderMix();
 
     expect(await screen.findByText('우리의 취향을 모아요')).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: '아직 비어 있는 통' })).toBeInTheDocument();
+    expect(await screen.findByRole('img', { name: '아직 비어 있는 통' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '팝콘 섞기' })).not.toBeInTheDocument();
     // 진행 표시는 모으기에 있다
     expect(screen.getByText('모으기').closest('li')).toHaveAttribute('aria-current', 'step');
