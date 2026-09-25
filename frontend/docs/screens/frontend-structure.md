@@ -530,15 +530,20 @@ export async function getRecommendations(): Promise<RecommendationSet>
 
 ```text
 src/types/
-├─ enums.ts        공통 규약의 상태값
-├─ common.ts       페이지네이션, 오류 응답
+├─ enums.ts               공통 규약의 상태값
+├─ common.ts              페이지네이션, 오류 응답
 ├─ movie.ts
 ├─ recommendation.ts
 ├─ watch.ts
 ├─ taste.ts
 ├─ party.ts
 ├─ onboarding.ts
-└─ user.ts
+├─ user.ts
+└─ schema-conformance.ts  손으로 쓴 타입과 생성 스키마의 대조 (업무 -777)
+
+src/generated/            백엔드 OpenAPI에서 만든 파일. 손으로 고치지 않는다 (업무 -777)
+├─ openapi.json           백엔드 springdoc 문서의 스냅샷
+└─ api-schema.d.ts        스냅샷에서 만든 타입
 ```
 
 ### 8.2 열거형
@@ -561,6 +566,55 @@ src/types/
 
 타입은 계약의 사본입니다. 계약이 바뀌면 타입을 고치고, 타입을 먼저 바꿔 계약을 앞서지
 않습니다. 계약에 없는 필드를 타입에 넣지 않습니다.
+
+**이 규칙을 기계가 지킵니다**(업무 S15P21E106-777). 손으로 쓴 타입에 서버에 없는 필드가
+들어가는 일이 세 번 있었습니다 — 파티 추천 `reason`(업무 -705), OTT 추천 `matchRate` ·
+`similarity`(업무 -563), 관심없음 `replacement`. 세 건 모두 정리했지만 막는 장치가
+없었습니다. 8.4가 그 장치입니다.
+
+### 8.4 백엔드 스키마와의 대조 (업무 -777)
+
+백엔드 springdoc 문서(`/v3/api-docs`)를 `src/generated/openapi.json`에 스냅샷으로 두고,
+`openapi-typescript`로 `src/generated/api-schema.d.ts`를 만듭니다. 두 파일 모두 커밋합니다.
+
+| 무엇을 지키나 | 누가 | 언제 |
+| --- | --- | --- |
+| 스냅샷 = 백엔드 실제 문서 | 백엔드 `OpenApiSnapshotTest` | `backend-test`(main)와 로컬 |
+| 생성 타입 = 스냅샷 | `vite build`의 `feelm-api-schema-drift` 플러그인 | `npm run build`, 프론트 MR Job |
+| 손으로 쓴 타입 ⊆ 생성 타입 | `src/types/schema-conformance.ts` | `tsc -b`(=`npm run build`) |
+
+명령
+
+```bash
+npm run api:generate   # 스냅샷에서 타입을 다시 만든다
+npm run api:check      # 다시 만든 결과가 커밋본과 다르면 실패한다
+```
+
+스냅샷 갱신은 백엔드에서 합니다.
+
+```bash
+cd backend && FEELM_OPENAPI_SNAPSHOT_WRITE=1 ./gradlew test --tests '*OpenApiSnapshotTest'
+```
+
+**생성 타입으로 갈아끼우지 않고 대조만 합니다.** springdoc은 Java record에서 문서를 만들고
+record에는 필수·null 정보가 없어, 생성 스키마에는 `required`가 거의 없고 `null` 표시도
+없습니다. 그대로 별칭을 걸면 `title?: string`이 되어 화면 코드가 전부 `?.`로 덮입니다.
+무엇이 반드시 오고 무엇이 `null`인지는 계약 문서가 정하고, 그 지식은 `src/types/*`에
+있습니다. 자세한 근거는 `schema-conformance.ts` 머리말에 있습니다.
+
+`[!]` **검사 자리가 `vite build`인 것은 CI 제약 때문입니다.** 프론트 MR Job이 돌리는 명령은
+CI 서버에 설치된 러너에 고정되어 있고(`infra/scripts/ci-frontend-mr-runner.py`의
+`FIXED_COMMAND`), 그 계약이 `npm run`을 금지합니다(`infra/scripts/test_ci_frontend_mr.py`).
+고정 명령 안에서 검사를 걸 수 있는 곳은 `vite build`뿐입니다. 러너 계약을 고쳐 검사 단계를
+따로 두는 것은 인프라와 합의할 후속 과제입니다.
+
+`[?]` **아직 대조에 들어오지 못한 것이 둘 있습니다.** 둘 다 백엔드가 고쳐야 합니다.
+
+- 추천 이유(`RecommendationItemResponse.reason`)가 Jackson `JsonNode`라 springdoc이
+  `JsonNode`의 getter를 스키마로 만듭니다. 계약이 정한 `summary` · `factors[]`가 생성
+  문서에 없습니다
+- OTT 추천 항목이 `Item`이라는 이름으로 나오고, 같은 이름을 취향 입력의 중첩 record가 이미
+  쓰고 있어 두 모양이 한 스키마로 뭉개졌습니다. `@Schema(name = ...)`로 갈라야 합니다
 
 Screen Spec 8.1절에서 계약 기준으로 확정한 항목은 타입에도 반영합니다.
 

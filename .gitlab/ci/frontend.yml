@@ -17,6 +17,7 @@ frontend-mr-test:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "develop"'
       changes:
         - frontend/src/**/*
+        - frontend/scripts/**/*
         - frontend/public/**/*
         - frontend/index.html
         - frontend/package.json
@@ -58,6 +59,7 @@ frontend-test:
     - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
       changes:
         - frontend/src/**/*
+        - frontend/scripts/**/*
         - frontend/public/**/*
         - frontend/index.html
         - frontend/package.json
@@ -111,6 +113,7 @@ frontend-image:
     - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
       changes:
         - frontend/src/**/*
+        - frontend/scripts/**/*
         - frontend/public/**/*
         - frontend/index.html
         - frontend/package.json
@@ -160,6 +163,7 @@ deploy-frontend:
     - if: '$CI_COMMIT_BRANCH == "main" && $CI_COMMIT_REF_PROTECTED == "true" && $CI_PIPELINE_SOURCE == "push"'
       changes:
         - frontend/src/**/*
+        - frontend/scripts/**/*
         - frontend/public/**/*
         - frontend/index.html
         - frontend/package.json

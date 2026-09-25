@@ -92,6 +92,8 @@ class FrontendPathRulesTests(unittest.TestCase):
         inputs = (
             'frontend/src/main.tsx',
             'frontend/src/api/client.test.ts',
+            # API 타입 생성기. `vite build`가 부르므로 빌드 입력이다 (업무 -777)
+            'frontend/scripts/api-types.mjs',
             'frontend/public/favicon.svg',
             'frontend/index.html',
             'frontend/package.json',
