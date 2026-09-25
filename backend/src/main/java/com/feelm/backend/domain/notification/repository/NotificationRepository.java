@@ -39,7 +39,7 @@ public class NotificationRepository {
                             title, body, notified_at, expires_at
                         ) VALUES (
                             :userId, 'PARTY_INVITE', :invitationId, 'PARTY_INVITATION',
-                            :invitationId, '파티 모드 초대', '새로운 파티 초대가 도착했어요.',
+                            :invitationId, '파티팝콘 초대', '새로운 파티팝콘 초대가 도착했어요.',
                             :notifiedAt, :expiresAt
                         )
                         ON CONFLICT (type, source_id) DO UPDATE SET
@@ -68,7 +68,7 @@ public class NotificationRepository {
                             title, body, notified_at, expires_at
                         ) VALUES (
                             :ownerId, 'PARTY_INVITE_ACCEPTED', :invitationId, 'PARTY',
-                            :partyId, '파티 모드 초대 수락', :body,
+                            :partyId, '파티팝콘 초대 수락', :body,
                             :notifiedAt, :expiresAt
                         )
                         ON CONFLICT (type, source_id) DO UPDATE SET
@@ -78,7 +78,7 @@ public class NotificationRepository {
                 .param("ownerId", ownerId)
                 .param("invitationId", invitationId)
                 .param("partyId", partyId)
-                .param("body", inviteeNickname + " 님이 파티 모드에 참여했어요.")
+                .param("body", inviteeNickname + " 님이 파티팝콘에 참여했어요.")
                 .param("notifiedAt", offset(notifiedAt))
                 .param("expiresAt", offset(expiresAt))
                 .query(Long.class)

@@ -110,8 +110,8 @@ class PartyInvitationResponseApiContractTest extends SharedPostgresContractTest 
                 .containsEntry("user_id", 20L)
                 .containsEntry("target_type", "PARTY")
                 .containsEntry("target_id", party)
-                .containsEntry("title", "파티 모드 초대 수락")
-                .containsEntry("body", "response10 님이 파티 모드에 참여했어요.")
+                .containsEntry("title", "파티팝콘 초대 수락")
+                .containsEntry("body", "response10 님이 파티팝콘에 참여했어요.")
                 .containsEntry("closed_at", null);
         assertThat(
                         jdbc.queryForObject(

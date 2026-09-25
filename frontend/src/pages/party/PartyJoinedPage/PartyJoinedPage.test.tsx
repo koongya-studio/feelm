@@ -44,11 +44,11 @@ describe('5.7 파티 초대 수락 완료', () => {
     expect(screen.getByText('김난다 × 무비버디')).toBeInTheDocument();
   });
 
-  it('파티 모드 시작하기는 5.9로 간다', async () => {
+  it('파티팝콘 시작하기는 5.9로 간다', async () => {
     render();
     await screen.findByText('무비버디 님이 초대를 수락했어요!');
 
-    fireEvent.click(screen.getByRole('button', { name: '파티 모드 시작하기' }));
+    fireEvent.click(screen.getByRole('button', { name: '파티팝콘 시작하기' }));
 
     expect(screen.getByTestId('location').textContent).toBe(
       `/parties/${TEST_PARTY_ID}/popcorn/mix`,
