@@ -128,6 +128,7 @@ export default function SettingsPage() {
               ? [{ label: 'Feelm 앱 설치', onClick: handleInstall }]
               : []),
             { label: '차단 사용자 관리', to: path.blockedUsers() },
+            { label: '서비스 의견 보내기', to: path.feedback(window.location.pathname) },
             {
               label: '앱 사용법 다시 보기',
               onClick: () => {

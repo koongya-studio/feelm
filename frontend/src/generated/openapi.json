@@ -509,6 +509,62 @@
         ],
         "type" : "object"
       },
+      "FeedbackRequest" : {
+        "properties" : {
+          "category" : {
+            "enum" : [
+              "GENERAL",
+              "RECOMMENDATION"
+            ],
+            "type" : "string"
+          },
+          "comment" : {
+            "maxLength" : 1000,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "movieId" : {
+            "exclusiveMinimum" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "recommendationType" : {
+            "pattern" : "[A-Z0-9_]{1,30}",
+            "type" : "string"
+          },
+          "satisfaction" : {
+            "enum" : [
+              "GOOD",
+              "MIXED",
+              "BAD"
+            ],
+            "type" : "string"
+          },
+          "screenPath" : {
+            "maxLength" : 300,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "category",
+          "screenPath"
+        ],
+        "type" : "object"
+      },
+      "FeedbackResponse" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
       "FlavorBucket" : {
         "properties" : {
           "averageScore" : {
@@ -4141,6 +4197,41 @@
         "security" : [ ],
         "tags" : [
           "auth-controller"
+        ]
+      }
+    },
+    "/api/v1/feedback" : {
+      "post" : {
+        "operationId" : "submit_1",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/FeedbackRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "201" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/FeedbackResponse"
+                }
+              }
+            },
+            "description" : "Created"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "feedback-controller"
         ]
       }
     },

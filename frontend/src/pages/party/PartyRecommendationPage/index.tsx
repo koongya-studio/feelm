@@ -51,6 +51,7 @@ import PopcornBucket from '../../../components/PopcornBucket';
 import Poster from '../../../components/Poster';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
+import RecommendationFeedback from '../../../components/RecommendationFeedback';
 import { ApiError } from '../../../api/apiError';
 import { AuthContext } from '../../../contexts/authContext';
 import { ChevronRightIcon } from '../../../components/Icon';
@@ -101,6 +102,7 @@ export default function PartyRecommendationPage() {
   const userId = useContext(AuthContext)?.user?.userId ?? null;
 
   const [items, setItems] = useState<PartyRecommendationItem[] | null>(null);
+  const [recommendationSetId, setRecommendationSetId] = useState<number | null>(null);
   /** 다시 받기로 더 보여줄 후보가 남았는지. 값이 없으면(옛 응답) 있는 것으로 본다 */
   const [hasNext, setHasNext] = useState(true);
   const [members, setMembers] = useState<PartyAvatarUser[]>([]);
@@ -117,6 +119,7 @@ export default function PartyRecommendationPage() {
 
         if (userId !== null) markPartyRecommendationSeen(userId, id, set);
         setItems(set.items);
+        setRecommendationSetId(set.recommendationSetId);
         setHasNext(set.hasNext !== false);
         setFailure(set.items.length === 0 ? 'empty' : null);
         setFailed(set.items.length === 0);
@@ -181,6 +184,10 @@ export default function PartyRecommendationPage() {
   if (!items) return null;
 
   const shownMembers = popcorn ? popcorn.members.map((member) => member.user) : members;
+  const feedbackStorageKey = `feelm:party-recommendation-feedback:${userId}:${id}:${recommendationSetId}:${items
+    .map((item) => item.recommendationItemId)
+    .sort((a, b) => a - b)
+    .join(',')}`;
 
   return (
     <PartyFlowShell
@@ -220,6 +227,14 @@ export default function PartyRecommendationPage() {
           </li>
         ))}
       </ul>
+
+      {items.length > 0 && userId !== null && recommendationSetId !== null ? (
+        <RecommendationFeedback
+          key={feedbackStorageKey}
+          storageKey={feedbackStorageKey}
+          partyId={id}
+        />
+      ) : null}
 
       <div className={styles.actions}>
         {hasNext ? (

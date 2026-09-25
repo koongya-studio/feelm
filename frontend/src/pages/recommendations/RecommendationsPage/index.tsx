@@ -61,6 +61,7 @@ import VisuallyHidden from '../../../components/VisuallyHidden';
 import Snackbar from '../../../components/Snackbar';
 import { BlockIcon } from '../../../components/Icon';
 import RecommendationCard from './RecommendationCard';
+import RecommendationFeedback from '../../../components/RecommendationFeedback';
 import RecommendationGroup from './RecommendationGroup';
 import RecommendationsAside from './RecommendationsAside';
 import { ApiError } from '../../../api/apiError';
@@ -142,6 +143,7 @@ export default function RecommendationsPage() {
   const sizeRef = useRef<RecommendationSize>(size);
   const [otts, setOtts] = useState<Ott[]>([]);
   const [items, setItems] = useState<RecommendationItem[] | null>(null);
+  const [recommendationSetId, setRecommendationSetId] = useState<number | null>(null);
   /** 이 추천을 만든 시각(API-045 `generatedAt`). 넓은 화면의 날짜 줄이 쓴다 */
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   /** 관심없음을 처리 중인 카드. 그동안 그 카드의 버튼은 눌리지 않는다 */
@@ -183,6 +185,7 @@ export default function RecommendationsPage() {
       .then((set) => {
         if (active) {
           setItems(set.items);
+          setRecommendationSetId(set.recommendationSetId);
           setGeneratedAt(set.generatedAt);
           setFailure(null);
         }
@@ -201,6 +204,7 @@ export default function RecommendationsPage() {
   /** 2.2-A 다시 시도 */
   function handleRetry() {
     setItems(null);
+    setRecommendationSetId(null);
     setFailure(null);
     setReloadCount((count) => count + 1);
   }
@@ -235,6 +239,7 @@ export default function RecommendationsPage() {
             // 보충 요청 중 폭이 다시 바뀌었다면 그 폭의 useEffect 응답만 화면에 반영한다
             if (sizeRef.current === refillSize) {
               setItems(set.items);
+              setRecommendationSetId(set.recommendationSetId);
               setGeneratedAt(set.generatedAt);
             }
           })
@@ -260,6 +265,7 @@ export default function RecommendationsPage() {
 
   const tasteItems = items?.filter((item) => item.type === 'TASTE') ?? [];
   const discoveryItems = items?.filter((item) => item.type === 'DISCOVERY') ?? [];
+  const feedbackStorageKey = `feelm:recommendation-feedback:${user?.userId ?? 'unknown'}:${recommendationSetId ?? items?.map((item) => item.recommendationItemId).join(',') ?? 'pending'}`;
 
   /*
    * 넓은 화면의 두 묶음 (업무 S15P21E106-794, 사용자 결정 2026-09-22).
@@ -414,28 +420,37 @@ export default function RecommendationsPage() {
                 onDismiss={handleDismiss}
               />
             </div>
+            {items ? (
+              <RecommendationFeedback key={feedbackStorageKey} storageKey={feedbackStorageKey} />
+            ) : null}
           </>
         ) : (
           <>
             <div className={styles.scrollArea} onScroll={() => setPendingDismiss(null)}>
               {items ? (
-                <FilmReel
-                  orientation="vertical"
-                  flat
-                  frameWidth={FRAME_WIDTH}
-                  frameHeight={FRAME_HEIGHT}
-                  label="오늘의 추천 카드"
-                >
-                  {[...tasteItems, ...discoveryItems].map((item) => (
-                    <RecommendationCard
-                      key={item.recommendationItemId}
-                      item={item}
-                      otts={otts}
-                      dismissing={dismissingId === item.recommendationItemId}
-                      onDismiss={handleOpenDismiss}
-                    />
-                  ))}
-                </FilmReel>
+                <div className={styles.recommendationFlow}>
+                  <FilmReel
+                    orientation="vertical"
+                    flat
+                    frameWidth={FRAME_WIDTH}
+                    frameHeight={FRAME_HEIGHT}
+                    label="오늘의 추천 카드"
+                  >
+                    {[...tasteItems, ...discoveryItems].map((item) => (
+                      <RecommendationCard
+                        key={item.recommendationItemId}
+                        item={item}
+                        otts={otts}
+                        dismissing={dismissingId === item.recommendationItemId}
+                        onDismiss={handleOpenDismiss}
+                      />
+                    ))}
+                  </FilmReel>
+                  <RecommendationFeedback
+                    key={feedbackStorageKey}
+                    storageKey={feedbackStorageKey}
+                  />
+                </div>
               ) : null}
             </div>
 

@@ -184,6 +184,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["submit_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/frames/{frameId}": {
         parameters: {
             query?: never;
@@ -1389,6 +1405,23 @@ export interface components {
             code: string;
             details?: unknown;
             message: string;
+        };
+        FeedbackRequest: {
+            /** @enum {string} */
+            category: "GENERAL" | "RECOMMENDATION";
+            comment?: string;
+            /** Format: int64 */
+            movieId?: number;
+            recommendationType?: string;
+            /** @enum {string} */
+            satisfaction?: "GOOD" | "MIXED" | "BAD";
+            screenPath: string;
+        };
+        FeedbackResponse: {
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: int64 */
+            id?: number;
         };
         FlavorBucket: {
             averageScore?: number;
@@ -2983,6 +3016,30 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["TokenResponse"];
+                };
+            };
+        };
+    };
+    submit_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FeedbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["FeedbackResponse"];
                 };
             };
         };

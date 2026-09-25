@@ -88,6 +88,7 @@ import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import { ChevronRightIcon, SettingsIcon } from '../../../components/Icon';
 import MyAside from './MyAside';
+import ServiceFeedbackPrompt from './ServiceFeedbackPrompt';
 import { useShellSize } from '../../../hooks/useShellSize';
 import { getOtts } from '../../../api/otts';
 import { getMyTaste } from '../../../api/taste';
@@ -909,6 +910,10 @@ export default function MyDashboardPage() {
           </div>
         ) : null}
       </div>
+      {((ratings.status === 'ready' && ratings.items.length > 0) ||
+        (history.status === 'ready' && history.items.length > 0)) && (
+        <ServiceFeedbackPrompt key={profile.userId} userId={profile.userId} desktop={desktop} />
+      )}
     </div>
   );
 

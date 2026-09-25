@@ -23,7 +23,12 @@
  * 카드 열은 `FilmReel`의 세로 필름이다(업무 -605). 칸 폭이 화면 폭을 따라 릴이 화면 양 끝에
  * 닿는다(업무 -672). 가로 flex에서 줄어들지 않게 `flex: none`으로 둔다. 위아래 여백만 여기서 준다 — 필름 끝이 헤더와 힌트에 붙지 않게.
  */
-.scrollArea > [data-testid='film-reel'] {
+.recommendationFlow {
+  width: 100%;
+  flex: none;
+}
+
+.recommendationFlow > [data-testid='film-reel'] {
   flex: none;
   margin: var(--space-2) 0 var(--space-3);
 }

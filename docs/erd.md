@@ -618,3 +618,10 @@ flowchart LR
 
 미결은 D-9의 계정 외 영역(공개 한줄평, 학습 데이터),
 맞춤·발견 판정 방식·기준값 등입니다.
+# 사용자 의견 (S15P21E106-915)
+
+`user_feedback`은 인증된 회원의 자유 의견과 추천 만족도를 저장한다. `id` PK,
+`user_id` FK(`users.id`, 회원 삭제 시 연쇄 삭제), `category`, `satisfaction`(선택),
+`comment`(선택), `screen_path`, `movie_id`(선택), `recommendation_type`(선택),
+`created_at`, `notification_sent_at`(알림 성공 전 null)을 둔다. 만족도 또는 의견 하나 이상이
+필수다. 새 의견 조회 화면은 이 업무 범위에 없다.

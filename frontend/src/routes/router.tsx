@@ -36,6 +36,7 @@ import PrivacySettingsPage from '../pages/my/PrivacySettingsPage';
 import ProfileEditPage from '../pages/my/ProfileEditPage';
 import PublicProfilePage from '../pages/my/PublicProfilePage';
 import SettingsPage from '../pages/my/SettingsPage';
+import FeedbackPage from '../pages/my/FeedbackPage';
 import WithdrawPage from '../pages/my/WithdrawPage';
 import NotificationListPage from '../pages/notifications/NotificationListPage';
 import PushPreviewPage from '../pages/notifications/PushPreviewPage';
@@ -145,6 +146,7 @@ export const router = createBrowserRouter(
 
             // 7.8 설정 (업무 -307). 와이어프레임이 하단 내비를 그린 유일한 설정 화면이다
             { path: ROUTE_PATTERN.settings, element: <SettingsPage /> },
+            { path: ROUTE_PATTERN.feedback, element: <FeedbackPage /> },
           ],
         },
         {
