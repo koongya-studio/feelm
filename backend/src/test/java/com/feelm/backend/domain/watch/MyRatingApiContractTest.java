@@ -612,12 +612,12 @@ class MyRatingApiContractTest extends SharedPostgresContractTest {
                 .andExpect(status().isNoContent());
         assertThat(ok(userId, null, null, null, null).path("items").size()).isZero();
         assertThat(ok(userId, "COMMENTED", null, null, null).path("items").size()).isZero();
-        JsonNode unrated = ok(userId, "UNRATED", null, null, null).path("items");
-        assertThat(movieIds(unrated)).containsExactly(movie);
-        assertThat(unrated.get(0).path("itemType").asText()).isEqualTo("UNRATED");
-        assertThat(unrated.get(0).path("score").isNull()).isTrue();
-        assertThat(movieIds(ok(userId, "ALL", null, null, null).path("items")))
-                .containsExactly(movie);
+        /*
+         * 평가를 지우면 그 영화를 안 본 것으로 되돌린다(ADR-0025). 미평가 목록에도 남지 않는다 —
+         * 예전에는 `WATCHED_UNRATED`로 남아 이 자리에 보였다.
+         */
+        assertThat(ok(userId, "UNRATED", null, null, null).path("items").size()).isZero();
+        assertThat(ok(userId, "ALL", null, null, null).path("items").size()).isZero();
     }
 
     private JsonNode ok(long user, String filter, String sort, String cursor, String size)

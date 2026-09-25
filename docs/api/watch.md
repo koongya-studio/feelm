@@ -230,8 +230,8 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 - `LINK_CLICKED`에서 `watched: true` → `WATCHED_UNRATED`, 평가 요청 UI로 이어진다. 평가는 지금 하지 않고 나중에 남겨도 된다
 - `LINK_CLICKED`에서 `watched: false` → `EXPIRED`. 만료는 추천 신호로 사용하지 않는다
-- `WATCHED_UNRATED`에서 `watched: false` → `EXPIRED`로 감상 확정을 취소한다. `watched_at`을 비우고 `expired_at`을 기록하며 응답 `watchedAt`은 `null`이다. 클릭의 `expires_at`이 지나도 취소할 수 있다. 평가가 아직 있는 `RATED` 상태라면 API-038로 평가를 먼저 삭제해야 한다
-- API-038 삭제와 API-035 취소는 별개의 요청·트랜잭션이다. 삭제 후 취소 요청이 실패하면 기록이 `WATCHED_UNRATED`로 남으므로 클라이언트는 취소를 재시도하거나 실패를 안내해야 한다
+- `WATCHED_UNRATED`에서 `watched: false` → `EXPIRED`로 감상 확정을 취소한다. `watched_at`을 비우고 `expired_at`을 기록하며 응답 `watchedAt`은 `null`이다. 클릭의 `expires_at`이 지나도 취소할 수 있다. 평가가 있는 `RATED` 기록은 거절하며, 그 경우는 API-038 평가 삭제가 되돌린다. `[!]` 이 전이를 부르는 화면은 아직 없다(ADR-0025의 남는 공백)
+- API-038 평가 삭제는 감상 기록을 같은 트랜잭션에서 `EXPIRED`로 되돌린다(ADR-0025). 평가를 지운 뒤 이 API를 따로 부를 필요가 없고, 이미 되돌아간 기록에 다시 부르면 `409`다
 - 확인 질문 노출에 지연을 두지 않는다. `confirm_due_at`은 `clicked_at`과 같아 클릭 직후부터 노출 대상이다(팀 결정 2026-09-18, S15P21E106-667). `confirm_due_at`은 노출 기준이지 상태 전이 제한이 아니므로 사용자가 먼저 응답해도 받아들인다
 - `LINK_CLICKED`에서 `expires_at == now`는 만료로 보아 확인을 거절한다
 - 잠금 순서는 OTT 클릭 API와 동일하게 `active user → owned watch record`이며 조건부 update가 정확히 1행이 아니면 경쟁 상태로 거절한다
@@ -427,7 +427,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 
 ### 설명
 
-평가를 삭제한다. 연결된 프레임도 함께 삭제되고 팝콘 버킷 집계에서 해당 평가가 제외된다.
+평가를 삭제하고 **그 영화를 안 본 것으로 되돌린다**(ADR-0025). 연결된 프레임도 함께 삭제되고 팝콘 버킷 집계에서 해당 평가가 제외되며, 감상 기록은 `EXPIRED`가 되어 본 영화 목록과 추천 제외 대상에서 빠진다.
 
 ### 인증 및 권한
 
@@ -454,20 +454,22 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 - `400 VALIDATION_FAILED` 잘못된 경로 ID
 - `401 UNAUTHORIZED` 인증 정보가 없거나 활성 사용자가 아님
 - `404 RESOURCE_NOT_FOUND` 타인 평가 포함
-- `500 INTERNAL_ERROR` 평가 또는 연관 데이터 삭제 실패
+- `500 INTERNAL_ERROR` 평가 또는 연관 데이터 삭제 실패. 감상 기록 전이가 정확히 1행이 아니면 전체를 롤백하고 이 오류를 낸다. 직전에 같은 행을 잠그고 상태를 확인하므로 정상 경로에서는 발생하지 않는다(API-035가 같은 상황을 `409`로 다루는 것과 다른 이유다)
 
 ### 처리 규칙
 
 - 취향 분석 캐시의 동기 갱신·원자성은 400 writer가 연결된 뒤 통합 인수 조건으로 검증한다. 213 범위에서는 평가·프레임·감상·영화 집계·아웃박스의 PostgreSQL 트랜잭션을 처리한다
 - 평가 삭제와 프레임 FK CASCADE, 영화 평균 별점·평가 수 재계산, `RATING DELETE`(점수 없음) 아웃박스 기록은 같은 PostgreSQL 트랜잭션에서 처리한다. 마지막 평가가 삭제되면 평균 별점은 `0.00`, 평가 수는 `0`이다
-- 감상 기록은 삭제하지 않고 `WATCHED_UNRATED`로 되돌리며 `rated_at`만 비운다(FR-18). 기존 감상 시각은 유지하고 추천에서는 계속 제외된다. 평가에 감상 기록 연결이 없었다면 새 감상 기록을 만들지 않는다
+- 감상 기록은 삭제하지 않고 `EXPIRED`로 되돌린다(ADR-0025). `rated_at`과 `watched_at`을 비우고 `expired_at`을 기록한다. 감상 취소(API-035 `watched:false`)가 남기는 모양과 같아 어느 경로로 왔든 `EXPIRED` 행의 뜻이 하나다. 평가에 감상 기록 연결이 없었다면 새 감상 기록을 만들지 않는다
+- 되돌린 영화는 본 영화 목록(API-034의 `WATCHED_UNRATED`·`RATED` 조회)과 추천 제외 대상에서 빠진다. 평가 삭제와 감상 취소를 사용자가 나누어 고르지 않는다 — 점수만 고칠 때는 API-037 수정을 쓴다
+- 감상 기록 전이는 평가 삭제와 **같은 트랜잭션**이다. 평가만 지워지고 기록이 남는 중간 상태는 생기지 않는다
 - 본인 평가만 삭제할 수 있다. 타인 평가와 없는 평가는 모두 404로 처리한다
 - 삭제를 재요청하면 404를 반환하되 삭제 상태를 유지하고 이벤트를 추가하지 않는다
 - 삭제 후 같은 영화에 다시 평가하면 새 프레임이 생성되고 팝콘 버킷 집계에 다시 포함된다
 
 ### 상태값
 
-- WatchStatus `RATED` → `WATCHED_UNRATED`
+- WatchStatus `RATED` → `EXPIRED`
 
 ### 미정 사항
 
@@ -568,7 +570,7 @@ OTT 보러가기 클릭을 `LINK_CLICKED` 감상 기록으로 남긴다. 클라�
 - 본인의 PUBLIC·PRIVATE 평가를 모두 조회하고 본인 스포일러 한줄평 원문을 반환한다. 타인의 평가·감상 기록은 반환하지 않는다.
 - `COMMENTED`는 null·Unicode 공백만 있는 한줄평을 제외한다. 공개 범위와 스포일러 여부는 이 필터에 영향을 주지 않는다.
 - `UNRATED`는 현재 `WATCHED_UNRATED` 감상 기록만 포함한다. `LINK_CLICKED`·`EXPIRED`는 포함하지 않는다. 같은 영화에 평가가 존재하면 미평가로 중복 노출하지 않는다.
-- `LATEST`·`OLDEST`는 평가의 `created_at`과 미평가 감상의 `watched_at`을 비교한다. `watched_at`이 없으면 남아 있는 `rated_at`, 그마저 없으면 `clicked_at` 순으로 fallback한다. 평가 삭제 시 `rated_at`이 지워지는 직접 평가 이력처럼 시각이 모두 없으면 마지막에 둔다. 동률은 평가 우선·항목 ID 내림차순이다.
+- `LATEST`·`OLDEST`는 평가의 `created_at`과 미평가 감상의 `watched_at`을 비교한다. `watched_at`이 없으면 남아 있는 `rated_at`, 그마저 없으면 `clicked_at` 순으로 fallback한다. 보러가기 없이 만들어진 기록처럼 시각이 모두 없으면 마지막에 둔다. 평가를 지운 기록은 `EXPIRED`가 되어 `UNRATED`에 들어오지 않으므로 이 fallback의 대상이 아니다(ADR-0025). 동률은 평가 우선·항목 ID 내림차순이다.
 - `SCORE_DESC`·`SCORE_ASC` 모두 평가를 점수순으로 먼저 정렬하고 점수 없는 미평가는 뒤에 둔다. 점수가 같거나 미평가끼리는 `activityAt DESC NULLS LAST`, 평가 우선, 항목 ID 내림차순으로 고정한다.
 - 서버에서 `size+1`개를 조회해 `hasNext`를 정하고, 마지막 페이지의 `nextCursor`는 null이다. 페이지 간 데이터 변경에 대한 고정 snapshot은 보장하지 않는다.
 
