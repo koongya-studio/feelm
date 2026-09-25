@@ -5,7 +5,7 @@
  * 문제를 없앴다. 카드는 API-045 응답 그대로이고, 포스터와 `영화 상세 보기`는 그 서버
  * 영화의 번호로 간다.
  *
- * 관심없음(API-047)은 카드 오른쪽 위 버튼이다(업무 S15P21E106-672). ⋯ 메뉴에는 없다. 서버가
+ * 관심없음(API-047)은 카드 오른쪽 위 버튼이다(업무 S15P21E106-672). 서버가
  * 받은 뒤에만 카드를 빼고 API-045를 다시 불러 보충한다. 섹션 이름표와 `안 봄` 배지는 없고,
  * 취향 발견 카드에만 `새로운 맛` 배지가 있다(같은 업무).
  *
@@ -13,7 +13,7 @@
  * 안내한다(업무 S15P21E106-654). 그 밖의 실패만 2.2-A 문구를 쓴다.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import RecommendationsPage from './index';
 import { ApiError } from '../../../api/apiError';
 import { renderWithRouter } from '../../../test/render';
@@ -159,18 +159,16 @@ describe('2.2 오늘의 추천', () => {
     expect(titles).toEqual(['파이트 클럽 상세 보기', '세븐 상세 보기']);
   });
 
-  it('⋯ 메뉴의 영화 상세 보기도 서버 영화로 가고, 관심없음은 메뉴에 없다', async () => {
+  it('모바일 카드에는 OTT 메뉴 없이 관심없음과 상세 이동만 표시한다', async () => {
     renderWithRouter(<RecommendationsPage />, { route: '/recommendations' });
 
-    fireEvent.click(await screen.findByRole('button', { name: /세븐 OTT 메뉴/ }));
-
-    expect(screen.getByRole('link', { name: /영화 상세 보기/ })).toHaveAttribute(
+    expect(await screen.findByRole('button', { name: '세븐 관심없음' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /OTT 메뉴/ })).toBeNull();
+    expect(screen.getByRole('link', { name: '세븐 상세 보기' })).toHaveAttribute(
       'href',
       '/movies/807',
     );
-    expect(
-      within(screen.getByRole('group', { name: '세븐 OTT 메뉴' })).queryByText('관심없음'),
-    ).toBeNull();
+    expect(screen.getByText('포스터를 탭하면 영화 상세 화면으로 이동해요')).toBeInTheDocument();
   });
 
   it('빈 세트는 목업으로 채우지 않고 빈 상태를 말한다', async () => {

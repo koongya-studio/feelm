@@ -54,7 +54,7 @@ type Props = {
   detailButton?: boolean;
   /** 카드 왼쪽 위 표식. 추천 종류(`맞춤 추천` · `취향 확장`)를 말한다 */
   badge?: ReactNode;
-  /** 카드 오른쪽 위에 놓이는 버튼들. 관심없음 · OTT 메뉴가 들어온다 */
+  /** 카드 오른쪽 위에 놓이는 조작 버튼 */
   actions?: ReactNode;
   /** 추천 이유 한 줄. 없으면 그 줄을 비운다 */
   reason?: string;
