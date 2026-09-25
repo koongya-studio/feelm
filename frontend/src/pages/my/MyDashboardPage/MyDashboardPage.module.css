@@ -50,8 +50,8 @@
   border: 1px solid var(--glass-dark-line);
   background: var(--glass-dark-fill);
   box-shadow: var(--shadow-glass-dark);
-  backdrop-filter: var(--blur-glass-dark);
   -webkit-backdrop-filter: var(--blur-glass-dark);
+  backdrop-filter: var(--blur-glass-dark);
   color: var(--color-on-dark);
   cursor: pointer;
   font-family: inherit;
@@ -100,8 +100,8 @@
   border: 1px solid var(--glass-dark-line);
   background: var(--glass-dark-fill);
   box-shadow: var(--shadow-glass-dark);
-  backdrop-filter: var(--blur-glass-dark);
   -webkit-backdrop-filter: var(--blur-glass-dark);
+  backdrop-filter: var(--blur-glass-dark);
   color: var(--color-on-dark);
   text-decoration: none;
 }
@@ -442,8 +442,8 @@
   border-color: var(--color-line-strong);
   background: var(--color-surface-solid);
   box-shadow: var(--shadow-button);
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   color: var(--color-ink);
   font-weight: var(--font-weight-bold);
 }
@@ -461,8 +461,8 @@
   border-color: transparent;
   background: var(--color-surface-dark);
   box-shadow: var(--shadow-card);
-  backdrop-filter: none;
   -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .desktopPage .shortcutLabel {

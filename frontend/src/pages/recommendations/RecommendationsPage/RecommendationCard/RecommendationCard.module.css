@@ -201,8 +201,8 @@
   font-weight: var(--font-weight-bold);
   line-height: 1;
   white-space: nowrap;
-  backdrop-filter: var(--blur-glass);
   -webkit-backdrop-filter: var(--blur-glass);
+  backdrop-filter: var(--blur-glass);
   -webkit-tap-highlight-color: transparent;
   transition:
     background var(--motion-fast) var(--ease-standard),

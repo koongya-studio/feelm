@@ -461,8 +461,8 @@
   border-color: var(--glass-dark-line);
   background: var(--glass-dark-fill);
   box-shadow: var(--shadow-glass-dark);
-  backdrop-filter: var(--blur-glass-dark);
   -webkit-backdrop-filter: var(--blur-glass-dark);
+  backdrop-filter: var(--blur-glass-dark);
 }
 
 .layout[data-tone='dark'] .stat + .stat {

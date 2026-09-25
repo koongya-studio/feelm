@@ -40,8 +40,8 @@
 .button[data-variant='translucent'] .box {
   border: 0.5px solid var(--color-glass-line);
   background: var(--color-glass);
-  backdrop-filter: var(--blur-glass);
   -webkit-backdrop-filter: var(--blur-glass);
+  backdrop-filter: var(--blur-glass);
 }
 
 .button[data-variant='filled'] .box {
