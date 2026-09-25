@@ -47,6 +47,18 @@ describe('DesktopNav', () => {
     ]);
   });
 
+  it('로고와 모든 링크·버튼에 접근 가능한 이름이 있다', () => {
+    nav('/film');
+
+    expect(screen.getByRole('link', { name: 'Feelm 취향 필름으로 이동' })).toHaveAttribute(
+      'href',
+      '/film',
+    );
+    for (const control of [...screen.getAllByRole('link'), ...screen.getAllByRole('button')]) {
+      expect(control).toHaveAccessibleName();
+    }
+  });
+
   it('지금 있는 화면 하나만 선택으로 표시한다', () => {
     nav('/party');
 

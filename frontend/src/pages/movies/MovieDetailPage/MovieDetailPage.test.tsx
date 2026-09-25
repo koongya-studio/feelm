@@ -514,6 +514,50 @@ describe('2.4 공개 한줄평과 출연진', () => {
     expect(releasePointerCapture).toHaveBeenCalledWith(7);
   });
 
+  it('사진을 눌러도 이름과 같은 검색으로 가고, 링크 위에서 끈 것은 이동하지 않는다', async () => {
+    vi.mocked(getMovieDetail).mockResolvedValue(
+      movie({
+        directors: [],
+        cast: [
+          {
+            personId: 2,
+            name: '틸다 스윈튼',
+            profileUrl: 'https://image.tmdb.org/t/p/w185/actor.jpg',
+          },
+        ],
+      }),
+    );
+
+    const { container } = renderMovie();
+
+    const actor = await screen.findByRole('link', { name: '틸다 스윈튼' });
+    const photo = container.querySelector('img[src$="actor.jpg"]');
+    if (!photo) throw new Error('프로필 사진이 없습니다.');
+    expect(actor).toContainElement(photo as HTMLElement);
+
+    const list = actor.closest('ul');
+    if (!list) throw new Error('출연·제작 목록이 없습니다.');
+    Object.assign(list, {
+      scrollLeft: 0,
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: vi.fn(() => true),
+      releasePointerCapture: vi.fn(),
+    });
+    const before = location();
+
+    fireEvent.pointerDown(photo, { pointerId: 3, pointerType: 'mouse', button: 0, clientX: 200 });
+    fireEvent.pointerMove(photo, { pointerId: 3, pointerType: 'mouse', clientX: 120 });
+    fireEvent.pointerUp(photo, { pointerId: 3, pointerType: 'mouse' });
+    fireEvent.click(photo);
+    expect(list.scrollLeft).toBe(80);
+    expect(location()).toBe(before);
+
+    fireEvent.pointerDown(photo, { pointerId: 4, pointerType: 'mouse', button: 0, clientX: 200 });
+    fireEvent.pointerUp(photo, { pointerId: 4, pointerType: 'mouse' });
+    fireEvent.click(photo);
+    expect(location()).toBe('/search?q=%ED%8B%B8%EB%8B%A4%20%EC%8A%A4%EC%9C%88%ED%8A%BC');
+  });
+
   it('목록의 스포일러는 작성자가 본인이어도 사용자가 열기 전까지 가린다', async () => {
     vi.mocked(getMovieReviews).mockResolvedValue({
       items: [

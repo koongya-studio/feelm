@@ -66,7 +66,7 @@ export default function DesktopNav({ account }: Props) {
 
   return (
     <div className={styles.rail}>
-      <Link to={path.film()} className={styles.brand}>
+      <Link to={path.film()} className={styles.brand} aria-label="Feelm 취향 필름으로 이동">
         <Wordmark size={40} />
       </Link>
 
