@@ -35,7 +35,7 @@ describe('DesktopNav', () => {
       '취향 필름',
       '추천 영화',
       '파티팝콘',
-      '검색',
+      '영화 탐색',
       'MY',
     ]);
     expect([...items].map((item) => item.getAttribute('href'))).toEqual([
@@ -57,7 +57,7 @@ describe('DesktopNav', () => {
   it('검색은 필름이 아니라 검색으로 표시한다', () => {
     nav('/search');
 
-    expect(screen.getByRole('link', { name: '검색' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: '영화 탐색' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('link', { name: '취향 필름' })).not.toHaveAttribute('aria-current');
   });
 

@@ -35,7 +35,7 @@ const ITEMS: Item[] = [
   { key: 'film', label: '취향 필름', to: path.film(), icon: <FilmIcon /> },
   { key: 'recommendations', label: '추천 영화', to: path.recommendations(), icon: <CompassIcon /> },
   { key: 'party', label: '파티팝콘', to: path.party(), icon: <PartyIcon /> },
-  { key: 'search', label: '검색', to: path.search(), icon: <SearchIcon /> },
+  { key: 'search', label: '영화 탐색', to: path.search(), icon: <SearchIcon /> },
   { key: 'my', label: 'MY', to: path.my(), icon: <MyIcon /> },
 ];
 

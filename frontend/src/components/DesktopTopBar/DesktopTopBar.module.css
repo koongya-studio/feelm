@@ -60,6 +60,21 @@
   outline-offset: 2px;
 }
 
+.clear {
+  display: flex;
+  width: var(--tap-target-min);
+  height: var(--tap-target-min);
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  margin-left: calc(-1 * var(--tap-target-min) - var(--space-2));
+  margin-right: var(--space-2);
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-hint);
+  cursor: pointer;
+}
+
 /* 검색 입력의 기본 지우기 단추는 그리지 않는다. 모양이 브라우저마다 다르다 */
 .input::-webkit-search-cancel-button {
   appearance: none;

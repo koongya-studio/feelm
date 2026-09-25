@@ -23,10 +23,12 @@
  * 스크롤하는 요소를 쓰는 쪽에 알려야 해서 `bodyRef`를 받는다. 뒤로 가기로 돌아왔을 때 자리를
  * 되돌리는 것(`useScrollRestoration`)이 그 요소를 필요로 한다.
  */
-import { useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import DesktopNav from '../../components/DesktopNav';
 import DesktopTopBar from '../../components/DesktopTopBar';
 import { DesktopAsideContext } from '../../contexts/desktopAsideContext';
+import { DesktopSearchContext } from '../../contexts/desktopSearchContext';
+import type { DesktopSearchHandlers } from '../../contexts/desktopSearchContext';
 import { useShellAccount } from '../../hooks/useShellAccount';
 import { useShellSize } from '../../hooks/useShellSize';
 import styles from './DesktopShell.module.css';
@@ -45,13 +47,28 @@ export default function DesktopShell({ bodyRef, children }: Props) {
    * React가 `null`로 다시 불러 주므로 낡은 요소를 가리킨 채 남지 않는다.
    */
   const [asideSlot, setAsideSlot] = useState<HTMLElement | null>(null);
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const searchHandlers = useRef<DesktopSearchHandlers | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const setSearchHandlers = useCallback((handlers: DesktopSearchHandlers | null) => {
+    searchHandlers.current = handlers;
+  }, []);
   const shell = useShellSize();
   const account = useShellAccount(true);
 
   return (
     <DesktopAsideContext.Provider value={asideSlot}>
-      <div className={styles.desktop} data-layout="app">
-        {/*
+      <DesktopSearchContext.Provider
+        value={{
+          keyword: searchKeyword,
+          setKeyword: setSearchKeyword,
+          handlers: searchHandlers,
+          inputRef: searchInputRef,
+          setHandlers: setSearchHandlers,
+        }}
+      >
+        <div className={styles.desktop} data-layout="app">
+          {/*
           좌측 내비가 생기면서 본문까지 여러 Tab(로고 · 항목 다섯 · 설정 · 계정 · 검색 ·
           알림)을 지난다. 키보드로 쓰는 사람은 화면을 옮길 때마다 이를 다시 지난다.
 
@@ -61,27 +78,28 @@ export default function DesktopShell({ bodyRef, children }: Props) {
 
           모바일에는 두지 않는다. 헤더의 아이콘 둘만 지나면 본문이라 건너뛸 거리가 없다.
         */}
-        <button type="button" className={styles.skip} onClick={() => bodyRef.current?.focus()}>
-          본문으로 건너뛰기
-        </button>
+          <button type="button" className={styles.skip} onClick={() => bodyRef.current?.focus()}>
+            본문으로 건너뛰기
+          </button>
 
-        <DesktopNav account={account} />
+          <DesktopNav account={account} />
 
-        <div className={styles.column}>
-          <DesktopTopBar />
+          <div className={styles.column}>
+            <DesktopTopBar />
 
-          <div className={styles.split}>
-            {/* 건너뛰기 단추가 초점을 주는 곳. `-1`이라 Tab 순서에는 들어가지 않는다 */}
-            <main ref={bodyRef} className={styles.main} tabIndex={-1}>
-              {children}
-            </main>
+            <div className={styles.split}>
+              {/* 건너뛰기 단추가 초점을 주는 곳. `-1`이라 Tab 순서에는 들어가지 않는다 */}
+              <main ref={bodyRef} className={styles.main} tabIndex={-1}>
+                {children}
+              </main>
 
-            {shell === 'wide' ? (
-              <aside ref={setAsideSlot} className={styles.aside} aria-label="보조 정보" />
-            ) : null}
+              {shell === 'wide' ? (
+                <aside ref={setAsideSlot} className={styles.aside} aria-label="보조 정보" />
+              ) : null}
+            </div>
           </div>
         </div>
-      </div>
+      </DesktopSearchContext.Provider>
     </DesktopAsideContext.Provider>
   );
 }
