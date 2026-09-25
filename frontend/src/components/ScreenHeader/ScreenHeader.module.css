@@ -11,7 +11,6 @@
   display: flex;
   min-height: var(--tap-target-min);
   align-items: center;
-  gap: var(--space-2);
 }
 
 .title {
@@ -47,6 +46,7 @@
 .action {
   display: flex;
   align-items: center;
+  gap: var(--space-2);
 }
 
 .header[data-align='center'] .title,

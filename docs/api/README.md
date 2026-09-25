@@ -124,6 +124,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-081 | [프로필 사진 등록·교체](./users.md#api-081-프로필-사진-등록교체) | PUT | `/users/me/avatar` | 사용자 | 2차 MVP | 회원 | FR-38 |  |
 | API-082 | [프로필 사진 삭제](./users.md#api-082-프로필-사진-삭제) | DELETE | `/users/me/avatar` | 사용자 | 2차 MVP | 회원 | FR-38 |  |
 | API-083 | [파티 추천 이력 조회](./party.md#api-083-파티-추천-이력-조회) | GET | `/parties/{partyId}/recommendations/history` | 파티 | 2차 MVP | 회원 | FR-22, FR-33 |  |
+| API-084 | [사용자 의견 제출](./feedback.md#api-084-사용자-의견-제출) | POST | `/feedback` | 의견 | 시연 QA | 회원 | S15P21E106-915 |  |
 
 ### 삭제된 API
 

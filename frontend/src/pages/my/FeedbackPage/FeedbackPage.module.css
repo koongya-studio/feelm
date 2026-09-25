@@ -1,0 +1,198 @@
+.page {
+  width: min(100%, 580px);
+  margin: 0 auto;
+  padding: var(--space-5) var(--screen-padding-x) var(--space-10);
+  box-sizing: border-box;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.source {
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--color-line-strong);
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-5);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-raised);
+}
+
+.choices {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.choices legend,
+.commentLabel {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: var(--space-4);
+  color: var(--color-ink);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-bold);
+}
+
+.optional {
+  margin-left: var(--space-2);
+  color: var(--color-ink-hint);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
+}
+
+.commentLabel .optional {
+  margin-left: auto;
+}
+
+.choiceGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.choice {
+  composes: raised from '../../../styles/interaction.module.css';
+
+  display: flex;
+  min-width: 0;
+  min-height: 104px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-1);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-control);
+  color: var(--color-ink-muted);
+  cursor: pointer;
+  text-align: center;
+}
+
+.choice:has(input:checked) {
+  border-color: var(--color-brand);
+  background: var(--color-brand-tint);
+  box-shadow:
+    inset 0 0 0 0.5px var(--color-brand),
+    var(--shadow-button-inset);
+  color: var(--color-brand-ink);
+}
+
+.choice:has(input:focus-visible) {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+.choices input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.choiceText {
+  color: inherit;
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-meta);
+}
+
+.choice svg {
+  font-size: 32px;
+}
+
+.commentGroup {
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--color-line);
+}
+
+.commentGroup textarea {
+  display: block;
+  width: 100%;
+  min-height: 126px;
+  box-sizing: border-box;
+  padding: var(--space-4);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-solid);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  resize: vertical;
+}
+
+.commentGroup textarea::placeholder {
+  color: var(--color-ink-hint);
+}
+
+.commentGroup textarea:focus {
+  border-color: var(--color-ink);
+  outline: none;
+}
+
+.count {
+  align-self: flex-end;
+  margin-top: var(--space-2);
+  color: var(--color-ink-hint);
+  font-size: var(--font-size-caption);
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--font-size-meta);
+}
+
+.done {
+  display: flex;
+  min-height: 55vh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.done h2 {
+  margin: var(--space-5) 0 var(--space-2);
+  color: var(--color-ink);
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+}
+
+.done p {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+}
+
+.doneMark {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border: 1px solid var(--color-brand);
+  border-radius: 50%;
+  background: var(--color-brand-tint);
+  color: var(--color-brand-ink);
+  font-size: 30px;
+}
+
+.done button {
+  margin-top: var(--space-8);
+}

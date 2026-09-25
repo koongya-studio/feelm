@@ -5,10 +5,11 @@
  * 0편 · 그 밖의 실패)마다 문구와 다음 행동이 갈리는지 본다.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import PartyRecommendationPage from './index';
 import { ApiError } from '../../../api/apiError';
 import { getParty, getPartyPopcorn, getPartyRecommendations } from '../../../api/parties';
+import { submitFeedback } from '../../../api/feedback';
 import { renderWithRouter } from '../../../test/render';
 import { AuthContext } from '../../../contexts/authContext';
 import { testAuth } from '../../../test/auth';
@@ -27,10 +28,16 @@ vi.mock('../../../api/parties', async () => {
   };
 });
 
+vi.mock('../../../api/feedback', () => ({ submitFeedback: vi.fn() }));
+
 beforeEach(() => {
   vi.mocked(getParty).mockReset().mockResolvedValue(party());
   vi.mocked(getPartyPopcorn).mockReset().mockResolvedValue(partyPopcorn());
   vi.mocked(getPartyRecommendations).mockReset().mockResolvedValue(partyRecommendations());
+  vi.mocked(submitFeedback).mockReset().mockResolvedValue({
+    id: 1,
+    createdAt: '2026-09-26T00:00:00Z',
+  });
 });
 
 function renderPage() {
@@ -64,6 +71,7 @@ describe('5.5 추천 완성', () => {
     renderPage();
 
     expect(await screen.findByText('지금은 함께 볼 영화를 찾지 못했어요')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: '이번 파티 추천 의견' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: '다시 추천받기' }));
     expect(location()).toBe(`/parties/${TEST_PARTY_ID}/popcorn/mix`);
   });
@@ -98,6 +106,44 @@ describe('5.5 추천 완성', () => {
     expect(await screen.findByText('추천을 불러오지 못했어요')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '다시 추천받기' })).toBeInTheDocument();
   });
+});
+
+it('shows feedback after the last party movie and remembers it per member and bundle', async () => {
+  localStorage.clear();
+  const userId = 1024;
+  const { unmount } = renderWithRouter(
+    <AuthContext.Provider value={{ ...testAuth, user: { ...testAuth.user!, userId } }}>
+      <PartyRecommendationPage />
+    </AuthContext.Provider>,
+    {
+      route: `/parties/${TEST_PARTY_ID}/recommendations`,
+      path: '/parties/:partyId/recommendations',
+    },
+  );
+
+  const feedback = await screen.findByRole('region', { name: '이번 파티 추천 의견' });
+  const lastMovie = screen.getByRole('link', { name: /포레스트 검프/ });
+  expect(lastMovie.compareDocumentPosition(feedback)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+
+  fireEvent.click(screen.getByRole('button', { name: '마음에 들어요' }));
+  await waitFor(() => expect(submitFeedback).toHaveBeenCalledTimes(1));
+  expect(
+    localStorage.getItem('feelm:party-recommendation-feedback:1024:9001:7101:3401,3402,3403'),
+  ).toBe('sent');
+  unmount();
+
+  renderWithRouter(
+    <AuthContext.Provider value={{ ...testAuth, user: { ...testAuth.user!, userId: 2048 } }}>
+      <PartyRecommendationPage />
+    </AuthContext.Provider>,
+    {
+      route: `/parties/${TEST_PARTY_ID}/recommendations`,
+      path: '/parties/:partyId/recommendations',
+    },
+  );
+  expect(await screen.findByRole('region', { name: '이번 파티 추천 의견' })).toHaveTextContent(
+    '이번 파티 추천은 어땠나요?',
+  );
 });
 
 /*
