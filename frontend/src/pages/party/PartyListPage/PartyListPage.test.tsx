@@ -123,6 +123,7 @@ describe('5.1 파티 시작', () => {
     const { container } = renderWithRouter(<PartyListPage />, { route: '/party' });
 
     expect(await screen.findByText('참여 중인 파티 2')).toBeInTheDocument();
+    await screen.findByText('오늘 저녁 같이 볼 영화');
     // 강조 카드와 아래 카드 줄에 한 번씩
     expect(container.querySelectorAll(`img[src="${PHOTO}"]`)).toHaveLength(2);
     expect(screen.queryByText('김')).not.toBeInTheDocument();
@@ -331,7 +332,7 @@ describe('지난 파티', () => {
 
     expect(await screen.findByText('지난 파티 1')).toBeInTheDocument();
     // 참여 중인 파티 쪽에는 섞이지 않는다
-    expect(screen.getByRole('heading', { name: '금요 심야 상영회' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '금요 심야 상영회' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /지난달 심야 상영회/ }));
     expect(screen.getByTestId('location').textContent).toBe(
