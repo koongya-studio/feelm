@@ -213,11 +213,13 @@ describe('5.1 파티팝콘 데스크톱 시안', () => {
 
     const aside = await screen.findByRole('complementary', { name: '보조 정보' });
 
-    expect(within(aside).getByRole('heading', { name: '금요 심야 상영회' })).toBeInTheDocument();
+    expect(
+      await within(aside).findByRole('heading', { name: '금요 심야 상영회' }),
+    ).toBeInTheDocument();
     expect(within(aside).getByText('방장')).toBeInTheDocument();
     expect(within(aside).getByText('2 / 4명 참여')).toBeInTheDocument();
     // 공통 취향은 파티 팝콘(API-057)을 맛별로 합쳐 많은 셋이다
-    expect(within(aside).getByText('맛1')).toBeInTheDocument();
+    expect(await within(aside).findByText('맛1')).toBeInTheDocument();
     expect(within(aside).getByRole('button', { name: /파티 추천 보기/ })).toBeInTheDocument();
   });
 
@@ -226,10 +228,20 @@ describe('5.1 파티팝콘 데스크톱 시안', () => {
    * 바로 열고, 아니면 5.9 팝콘 섞기로 간다(`PartyPopcornPage.test.tsx`가 5.8 쪽을 자세히 본다).
    */
   it('파티 추천 보기는 내가 아직 못 본 묶음이면 5.9 팝콘 섞기로 간다', async () => {
+    let resolveParties!: (parties: Awaited<ReturnType<typeof getMyParties>>) => void;
+    vi.mocked(getMyParties).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveParties = resolve;
+        }),
+    );
     renderParty(1440);
 
+    // 보조 패널 껍데기는 목록 요청보다 먼저 나타난다.
     const aside = await screen.findByRole('complementary', { name: '보조 정보' });
-    fireEvent.click(within(aside).getByRole('button', { name: /파티 추천 보기/ }));
+    expect(within(aside).queryByRole('button', { name: /파티 추천 보기/ })).toBeNull();
+    resolveParties([party(), SECOND]);
+    fireEvent.click(await within(aside).findByRole('button', { name: /파티 추천 보기/ }));
 
     expect(await screen.findByText('5.9 팝콘 섞기')).toBeInTheDocument();
     expect(screen.getByTestId('location').textContent).toBe(
@@ -243,7 +255,7 @@ describe('5.1 파티팝콘 데스크톱 시안', () => {
     renderParty(1440);
 
     const aside = await screen.findByRole('complementary', { name: '보조 정보' });
-    fireEvent.click(within(aside).getByRole('button', { name: /파티 추천 보기/ }));
+    fireEvent.click(await within(aside).findByRole('button', { name: /파티 추천 보기/ }));
 
     expect(await screen.findByText('5.5 추천 완성')).toBeInTheDocument();
     expect(screen.getByTestId('location').textContent).toBe(
