@@ -598,14 +598,14 @@ export default function FilmPage() {
             <p className={styles.emptyText}>본 영화를 평가하면 필름에 한 장씩 추가돼요</p>
             <div className={styles.actionButtons}>
               <Button
-                variant="brand"
+                variant="primary"
                 data-guide-target="film-rate"
                 onClick={() => void navigate(path.search())}
               >
                 본 영화 평가하기
               </Button>
               <Button
-                variant="secondary"
+                variant="brand"
                 data-guide-target="film-recommendations"
                 onClick={() => void navigate(path.recommendations())}
               >
@@ -700,14 +700,14 @@ export default function FilmPage() {
               <p className={styles.actionHint}>본 영화를 평가하면 필름에 한 장씩 추가돼요</p>
               <div className={styles.actionButtons}>
                 <Button
-                  variant="brand"
+                  variant="primary"
                   data-guide-target="film-rate"
                   onClick={() => void navigate(path.search())}
                 >
                   본 영화 평가하기
                 </Button>
                 <Button
-                  variant="secondary"
+                  variant="brand"
                   data-guide-target="film-recommendations"
                   onClick={() => void navigate(path.recommendations())}
                 >

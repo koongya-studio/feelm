@@ -109,8 +109,14 @@ describe('FilmPage', () => {
 
     expect(await screen.findByText('아직 필름에 담긴 영화가 없어요')).toBeInTheDocument();
     expect(screen.getByText('본 영화를 평가하면 필름에 한 장씩 추가돼요')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '본 영화 평가하기' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '영화 추천받기' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '본 영화 평가하기' })).toHaveAttribute(
+      'data-variant',
+      'primary',
+    );
+    expect(screen.getByRole('button', { name: '영화 추천받기' })).toHaveAttribute(
+      'data-variant',
+      'brand',
+    );
 
     // 빈 상태에서도 필름은 자리를 지킨다. 채울 칸이 남았다는 것을 보여주는 화면이다
     expect(screen.getByText('첫 번째 프레임')).toBeInTheDocument();
@@ -189,6 +195,8 @@ describe('FilmPage', () => {
 
     const rate = await screen.findByRole('button', { name: '본 영화 평가하기' });
     const recommend = screen.getByRole('button', { name: '영화 추천받기' });
+    expect(rate).toHaveAttribute('data-variant', 'primary');
+    expect(recommend).toHaveAttribute('data-variant', 'brand');
     fireEvent.click(rate);
     expect(screen.getByTestId('location')).toHaveTextContent('/search');
     fireEvent.click(recommend);
