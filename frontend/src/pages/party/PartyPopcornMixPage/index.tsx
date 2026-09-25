@@ -31,6 +31,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import PartyFlowShell from '../../../components/PartyFlowShell';
+import PopcornBucket from '../../../components/PopcornBucket';
 import PopcornMachine from '../../../components/PopcornMachine';
 import { kernelCounts } from '../../../components/PopcornBucket/kernels';
 import ScreenHeader from '../../../components/ScreenHeader';
@@ -46,7 +47,7 @@ import { path } from '../../../routes/paths';
 import { mixedFlavors } from '../../../utils/party';
 import styles from './PartyPopcornMixPage.module.css';
 import type { MachinePhase } from '../../../components/PopcornMachine';
-import type { PartyAvatarUser, PartyPopcorn } from '../../../types/party';
+import type { PartyAvatarUser, PartyPendingInvitation, PartyPopcorn } from '../../../types/party';
 
 /**
  * 모으기. 파티원 통이 기계 위로 다 내려온 뒤 한 번 보이고 나서 섞기가 시작된다.
@@ -132,6 +133,7 @@ export default function PartyPopcornMixPage() {
   const [refresh] = useState(() => isRefreshEntry(location.state));
 
   const [popcorn, setPopcorn] = useState<PartyPopcorn | null>(null);
+  const [waitingPopcorn, setWaitingPopcorn] = useState<PartyPopcorn | null>(null);
   const [partyMembers, setPartyMembers] = useState<PartyAvatarUser[]>([]);
   const [phase, setPhase] = useState<MachinePhase>('idle');
   const [failure, setFailure] = useState<Failure | null>(null);
@@ -139,7 +141,7 @@ export default function PartyPopcornMixPage() {
   const [waiting, setWaiting] = useState(false);
   const [waitingChecked, setWaitingChecked] = useState(false);
   const [checkCount, setCheckCount] = useState(0);
-  const [pendingNames, setPendingNames] = useState<string[]>([]);
+  const [pendingInvitations, setPendingInvitations] = useState<PartyPendingInvitation[]>([]);
   /**
    * 화면이 떠 있는지. `다시 시도`의 응답은 화면을 떠난 뒤에 올 수 있다 — `내 파티로 돌아가기`를
    * 누르고 나서 성공이 오면 5.1에 있던 사용자를 5.5로 끌고 간다(!531 리뷰).
@@ -175,10 +177,16 @@ export default function PartyPopcornMixPage() {
         if (!active) return;
         if (!party) throw new Error('파티를 찾을 수 없어요');
         setPartyMembers(party.members);
-        setPendingNames(party.pendingInvitations?.map(({ invitee }) => invitee.nickname) ?? []);
+        setPendingInvitations(party.pendingInvitations ?? []);
         if (party.members.length < PARTY_MIN_MEMBERS) {
           setWaiting(true);
           setWaitingChecked(checkCount > 0);
+          // API-057은 1명인 파티도 조회할 수 있다. 추천은 입장 후에만 시작한다.
+          void getPartyPopcorn(id)
+            .then((value) => {
+              if (active) setWaitingPopcorn(value);
+            })
+            .catch(() => undefined);
           return;
         }
         setWaiting(false);
@@ -255,29 +263,56 @@ export default function PartyPopcornMixPage() {
   }
 
   if (waiting) {
+    const invitations = pendingInvitations.length > 0 ? pendingInvitations : [null];
+
     return (
       <PartyFlowShell
         members={partyMembers}
         title="친구가 오면 함께 섞어요"
-        subtitle="초대받은 친구가 파티에 들어오길 기다리고 있어요"
+        subtitle={`${partyMembers.length}명 참여 중 · ${pendingInvitations.length}명 초대 수락 대기`}
       >
         <div className={styles.waitingStage}>
-          <div className={styles.waitingSeats} aria-hidden="true">
-            <div className={styles.occupiedSeat}>✓</div>
-            <div className={styles.seatLink} />
-            <div className={styles.emptySeat}>
-              <span>···</span>
-            </div>
-          </div>
-          <div className={styles.waitingLabels}>
-            <span>나, 참여 완료</span>
-            <span>친구, 입장 대기</span>
-          </div>
-          {pendingNames.length > 0 ? (
-            <p className={styles.invitees}>
-              {pendingNames.join(', ')} 님의 초대 수락을 기다리는 중
-            </p>
-          ) : null}
+          <ol className={styles.waitingSeats} data-count={partyMembers.length + invitations.length}>
+            {partyMembers.map((member) => (
+              <li
+                key={`member-${member.userId}`}
+                className={`${styles.waitingSeat} ${styles.joinedSeat}`}
+              >
+                <div className={styles.bucketPlatform}>
+                  <PopcornBucket
+                    width={112}
+                    flavors={kernelCounts(
+                      waitingPopcorn?.members.find((item) => item.user.userId === member.userId)
+                        ?.flavors ?? [],
+                    )}
+                    label={`${member.nickname}님의 팝콘`}
+                  />
+                </div>
+                <strong className={styles.seatName}>{member.nickname}</strong>
+                <span className={styles.seatStatus}>참여 완료</span>
+              </li>
+            ))}
+            {invitations.map((invitation, index) => (
+              <li
+                key={invitation ? `invitation-${invitation.invitationId}` : `empty-${index}`}
+                className={`${styles.waitingSeat} ${styles.pendingSeat}`}
+              >
+                <div className={`${styles.bucketPlatform} ${styles.pendingPlatform}`}>
+                  <PopcornBucket
+                    width={112}
+                    label={`${invitation?.invitee.nickname ?? '친구'}님의 입장 대기 팝콘`}
+                  />
+                  <span className={styles.questionMark} aria-hidden="true">
+                    ?
+                  </span>
+                </div>
+                <strong className={styles.seatName}>
+                  {invitation?.invitee.nickname ?? '친구'}
+                </strong>
+                <span className={styles.seatStatus}>입장 대기</span>
+              </li>
+            ))}
+          </ol>
         </div>
         <div className={styles.waitingFooter}>
           <p className={styles.waitingNote} role="status">
@@ -286,7 +321,9 @@ export default function PartyPopcornMixPage() {
               : `${PARTY_MIN_MEMBERS}명 이상 모이면 자동으로 팝콘을 섞기 시작해요.`}
           </p>
           <div className={styles.waitingActions}>
-            <Button onClick={() => setCheckCount((count) => count + 1)}>참여 확인하기</Button>
+            <Button variant="brand" onClick={() => setCheckCount((count) => count + 1)}>
+              참여 확인하기
+            </Button>
             <Button variant="text" onClick={() => void navigate(path.party())}>
               내 파티로 돌아가기
             </Button>
