@@ -542,7 +542,7 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
   S15P21E106-649부터 `ratings`만 개인 GBT·DISCOVERY 계산 입력으로 사용한다. 과거 ALS adapter의
   온보딩 보정 상수와 이진 LIKE/DISLIKE 방향 fallback은 제거했다. S15P21E106-648 소급 migration이
   적용되지 않은 환경에는 이 Consumer를 배포하지 않으며, 전환 전 설명되지 않은 미보정 행이 0건인지
-  확인한다. migration 뒤 사용자가 평가를 삭제해 `WATCHED_UNRATED`로 돌아가고 rating·frame이 함께
+  확인한다. migration 뒤 사용자가 평가를 삭제해 `EXPIRED`로 돌아가고 rating·frame이 함께
   사라진 행은 정상 현재 상태이므로 미보정으로 세거나 평가를 복원하지 않는다. 운영 증거에는 raw 조회
   건수, 확인된 사후 삭제 건수와 근거, 설명되지 않은 잔여 건수를 각각 남긴다. 이
   S15P21E106-648 migration 확인은 S15P21E106-649 병합 선행 조건이 아니라 신규 Consumer의

@@ -161,18 +161,32 @@ public class RatingCommandRepository {
         }
     }
 
-    public void markWatchUnrated(long watchRecordId, long userId, long movieId) {
+    /**
+     * 평가를 지운 감상 기록을 안 본 상태로 되돌린다(ADR-0025).
+     *
+     * <p>평가 삭제는 <b>그 영화를 보지 않은 것으로 되돌리는</b> 동작이다. 잘못 평가했으면 평가 화면에서 바로 지우고, 점수만 고칠 때는 삭제가 아니라
+     * 수정(API-037)을 쓴다. 두 동작을 나누어 사용자에게 고르게 하지 않는다.
+     *
+     * <p>{@code watched_at}과 {@code rated_at}을 비우고 {@code expired_at}을 적는다. 감상 취소(API-035 {@code
+     * watched:false})가 남기는 모양과 같아, 어느 경로로 왔든 {@code EXPIRED} 행이 같은 뜻을 갖는다.
+     *
+     * <p>행을 지우지 않는 이유는 이력이다(D-9). 되돌린 영화를 다시 보러 가면 {@code findActiveWatchForUpdate}가 {@code
+     * EXPIRED}를 활성 기록으로 보지 않아 새 기록이 만들어진다.
+     */
+    public void markWatchExpired(long watchRecordId, long userId, long movieId, Instant expiredAt) {
         int updated =
                 jdbc.sql(
                                 """
                                 UPDATE watch_records
-                                SET status = 'WATCHED_UNRATED', rated_at = NULL
+                                SET status = 'EXPIRED', rated_at = NULL, watched_at = NULL,
+                                    expired_at = :expiredAt
                                 WHERE id = :watchRecordId AND user_id = :userId
                                   AND movie_id = :movieId AND status = 'RATED'
                                 """)
                         .param("watchRecordId", watchRecordId)
                         .param("userId", userId)
                         .param("movieId", movieId)
+                        .param("expiredAt", offset(expiredAt))
                         .update();
         if (updated != 1) {
             throw new IllegalStateException("평가에 연결된 감상 기록 상태가 변경되었습니다.");

@@ -344,7 +344,7 @@ erDiagram
 | `onboarding_preferences` | 초기 취향(LIKE/DISLIKE) 화면·감사 기록 | UK(`user_id`, `movie_id`). API-024 제출 시 LIKE 4.0점·DISLIKE 2.0점 평가와 감상 기록·프레임을 함께 생성함. 추천 계산 원천은 생성된 `ratings`이며 Consumer는 이 테이블을 직접 읽지 않음. 기존 평가 영화는 평가 관련 상태를 덮어쓰지 않음 | FR-02 · API-023, API-024 |
 | `user_otts` | 구독 OTT | 전체 교체(PUT) | FR-03 · API-026, API-027 |
 | `watch_records` | 감상 상태 머신 | 사용자·영화별 **활성 기록**(EXPIRED 아님)은 1개 — 부분 유일 인덱스(D-6 결정). 만료 후 재클릭은 새 행 | FR-17, FR-18 · API-033~035 |
-| `ratings` | 평가 + 한줄평 | UK(`user_id`, `movie_id`). 한줄평은 컬럼(별도 테이블 아님). `is_spoiler`는 NOT NULL·기본 false이며 기존 평가도 false. 삭제 시 프레임도 삭제되고 감상 기록은 `WATCHED_UNRATED`로 복귀 | FR-19, FR-26 · API-032, API-036~039 |
+| `ratings` | 평가 + 한줄평 | UK(`user_id`, `movie_id`). 한줄평은 컬럼(별도 테이블 아님). `is_spoiler`는 NOT NULL·기본 false이며 기존 평가도 false. 삭제 시 프레임도 삭제되고 감상 기록은 `EXPIRED`로 되돌아감(ADR-0025) | FR-19, FR-26 · API-032, API-036~039 |
 | `frames` | 필름의 프레임 | 평가와 1:1. 조회용 `user_id`·`movie_id`를 보관하고 인덱싱하며 애플리케이션이 평가와의 일치를 보장한다. 맛은 영화 조인으로 조회한다 | FR-07, FR-08 · API-042, API-043 |
 | `taste_analyses` | 취향 분석 결과 캐시 | 별도 `id`와 UK(`user_id`), `rating_count >= 0` CHECK를 둔다. Spring이 평가 추가·수정·삭제 시 평가와 영화 정보를 집계해 갱신하며 평가가 없으면 행을 만들지 않는다. 기본 Re-ranking·XAI 근거는 Python Consumer, 행동 Feature 경량 재정렬·최종 XAI 조립은 Spring이 담당한다(D-4) | FR-04, FR-05 · API-040 |
 
@@ -531,13 +531,13 @@ flowchart LR
     B -->|감상 취소| X
     B -->|평가 저장| C["RATED"]
     C -->|ratings + frames<br/>단일 트랜잭션 생성| D["필름 반영·팝콘 버킷 재집계"]
-    C -->|평가 삭제| B
+    C -->|평가 삭제| X
     S["감상 기록 없이 평가<br/>(D-6 결정: 허용)"] -.->|허용 시 RATED 기록 생성| C
 ```
 
 - `ratings` 저장·`frames` 생성·`watch_records.status=RATED` 전이는 **하나의 트랜잭션**으로 처리합니다(NFR-06).
-- `ratings` 삭제 시 `frames`는 CASCADE 삭제되고 `watch_records`는 `WATCHED_UNRATED`로 되돌립니다(FR-18).
-- 실수로 평가한 영화를 보지 않은 것으로 되돌릴 때는 평가 삭제 후 감상 취소(`WATCHED_UNRATED` → `EXPIRED`)를 수행합니다. 감상 시각은 비우고 만료 시각을 기록하며, `EXPIRED` 행은 이력으로 보존합니다(S15P21E106-721).
+- `ratings` 삭제 시 `frames`는 CASCADE 삭제되고 `watch_records`는 `EXPIRED`로 되돌립니다(FR-18, ADR-0025). 평가 삭제가 곧 그 영화를 안 본 것으로 되돌리는 동작이므로 감상 시각을 비우고 만료 시각을 기록합니다.
+- 되돌린 뒤에도 `EXPIRED` 행은 이력으로 보존합니다(D-9). 같은 영화를 다시 보러 가거나 평가하면 `EXPIRED`는 활성 기록이 아니므로 새 행이 생깁니다. 평가 없이 `WATCHED_UNRATED`인 기록의 취소 전이(S15P21E106-721)는 API-035에 남아 있으나 이를 부르는 화면은 없습니다.
 - 팝콘 버킷은 별도 행을 생성하지 않고 `ratings JOIN movies`를 맛별로 집계합니다.
 - `movies.average_rating`·`rating_count`와 `taste_analyses`는 평가 변경 시 갱신되는 파생 데이터입니다.
 
