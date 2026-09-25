@@ -414,18 +414,6 @@
   white-space: nowrap;
 }
 
-.actionButtons > button[data-variant='secondary'] {
-  border-color: var(--color-action-brand);
-  background: transparent;
-  box-shadow: none;
-  color: var(--color-brand-ink);
-}
-
-.actionButtons > button[data-variant='secondary']:hover:not(:disabled) {
-  background: var(--color-surface);
-  box-shadow: none;
-}
-
 /* ─────────────────────────── 데스크톱 시안 (업무 -783) */
 
 /*
@@ -448,7 +436,7 @@
   align-items: center;
   padding: 0 var(--space-4);
   border-radius: var(--radius-pill);
-  background: var(--color-action-brand);
+  background: var(--color-action);
   color: var(--color-on-action);
   font-size: var(--font-size-meta);
   font-weight: var(--font-weight-bold);
@@ -456,7 +444,7 @@
 }
 
 .desktopRate:hover {
-  background: var(--color-action-brand-pressed);
+  background: var(--color-action-hover);
 }
 
 .pager {
