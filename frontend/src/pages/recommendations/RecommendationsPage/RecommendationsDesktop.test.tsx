@@ -341,6 +341,12 @@ describe('RecommendationsPage 데스크톱 시안', () => {
     expect(compactDismiss).toHaveStyle('--icon-button-size: 26px');
     expect(leadDismiss).toHaveAttribute('data-variant', 'plain');
     expect(leadDismiss.className).toBe(compactDismiss.className);
+    expect(
+      within(lead)
+        .getByRole('img', { name: 'NETFLIX' })
+        .closest('ul')
+        ?.parentElement?.querySelector('h3'),
+    ).not.toBeNull();
     expect(within(lead).queryByRole('button', { name: '파이트 클럽 OTT 메뉴' })).toBeNull();
     expect(within(compact).queryByRole('button', { name: '조디악 OTT 메뉴' })).toBeNull();
     expect(within(taste).queryByRole('button', { name: /OTT 메뉴/ })).toBeNull();
