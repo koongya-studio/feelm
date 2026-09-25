@@ -11,6 +11,13 @@
   gap: var(--space-2);
 }
 
+.itemHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
 .itemLabel {
   color: var(--color-ink);
   font-size: var(--font-size-body);
@@ -38,6 +45,19 @@
   font-family: inherit;
   font-size: var(--font-size-meta);
   font-weight: var(--font-weight-medium);
+  /* 탭이 확대 제스처를 기다리지 않고 바로 눌리게 한다(업무 -854) */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+
+/* 누른 순간을 보인다. 고르지 않은 칸은 면이 살짝 깔린다 */
+.level[aria-checked='false']:active {
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
 }
 
 @media (hover: hover) {
@@ -51,6 +71,13 @@
   box-shadow: var(--shadow-raised);
   color: var(--color-ink);
   font-weight: var(--font-weight-bold);
+}
+
+/* 고른 값이 아직 서버에 닿지 않았다. 칸은 그대로 누를 수 있다 */
+.saving {
+  color: var(--color-ink-hint);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
 }
 
 .error {

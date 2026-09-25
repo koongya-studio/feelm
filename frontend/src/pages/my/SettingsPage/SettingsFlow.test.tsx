@@ -643,19 +643,12 @@ describe('7.8 → 7.8-B · 7.8-C', () => {
     }
 
     fireEvent.click(within(film).getByRole('radio', { name: '비공개' }));
-    // 저장 중에는 다른 줄도 잠겨 요청이 겹치지 않는다
-    expect(
-      within(screen.getByRole('radiogroup', { name: '한줄평 공개' })).getByRole('radio', {
-        name: '비공개',
-      }),
-    ).toBeDisabled();
-    await waitFor(() => expect(server.profile.frameVisibility).toBe('PRIVATE'));
-
+    // 저장 중에도 다른 줄은 잠기지 않는다. 요청은 차례로 나간다(업무 -854)
     const review = screen.getByRole('radiogroup', { name: '한줄평 공개' });
-    await waitFor(() =>
-      expect(within(review).getByRole('radio', { name: '비공개' })).toBeEnabled(),
-    );
+    expect(within(review).getByRole('radio', { name: '비공개' })).toBeEnabled();
     fireEvent.click(within(review).getByRole('radio', { name: '비공개' }));
+
+    await waitFor(() => expect(server.profile.frameVisibility).toBe('PRIVATE'));
     await waitFor(() => expect(server.profile.reviewVisibility).toBe('PRIVATE'));
 
     // 보낸 것은 고른 필드 하나뿐이다. 다른 줄은 건드리지 않는다
