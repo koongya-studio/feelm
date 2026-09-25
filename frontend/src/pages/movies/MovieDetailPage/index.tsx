@@ -71,8 +71,6 @@ import type { PopcornFlavor } from '../../../types/taste';
 import type { PublicReview, PublicReviewList } from '../../../types/watch';
 
 const BACK_BUTTON_SIZE = 39;
-/** 관심없음 버튼. 옆의 별점 버튼(`--control-height`)과 높이를 맞춘다 */
-const DISMISS_BUTTON_SIZE = 52;
 const SIMILAR_POSTER_WIDTH = 96;
 const SIMILAR_POSTER_HEIGHT = 144;
 const BACKDROP_FADE_RATIO = 0.55;
@@ -471,6 +469,8 @@ export default function MovieDetailPage() {
     ? flavors.find((candidate) => candidate.code === movie.flavorCode)
     : undefined;
   const dismissStatus = dismissal?.movieId === id ? dismissal.status : null;
+  const canDismiss =
+    !movie.myRating && movie.myWatchStatus !== 'RATED' && movie.myWatchStatus !== 'WATCHED_UNRATED';
   const people = [
     ...movie.directors.map((person) => ({ ...person, creditKey: `director:${person.personId}` })),
     ...movie.cast.map((person) => ({ ...person, creditKey: `cast:${person.personId}` })),
@@ -549,8 +549,14 @@ export default function MovieDetailPage() {
             </div>
           ) : null}
           {/*
-           * 관심없음은 별점 버튼 오른쪽의 아이콘 버튼이다(업무 -664). 2.2 추천 카드의 관심없음과
-           * 같은 아이콘이다. 주 동작은 별점이므로 관심없음은 글자 없이 작게 둔다.
+           * 관심없음은 별점 버튼 오른쪽에 선다(업무 -664). 2.2 추천 카드의 관심없음과 같은 아이콘이다.
+           *
+           * **아이콘 아래에 글자를 둔다**(업무 -873). 아이콘만으로는 무슨 단추인지 알기 어려웠다.
+           * 공용 `IconButton`은 글자를 숨기므로 이 자리만 따로 그린다.
+           *
+           * **평가했거나 감상을 확정한 영화에는 두지 않는다**(업무 -873, 사용자 결정 2026-09-25).
+           * 그 영화는 이미 추천에서 빠지므로(`docs/api/streaming-contract.md` 2.1) 관심없음이
+           * 바꾸는 것이 없고, 본 영화를 관심없음으로 표시하는 것은 뜻이 맞지 않는다.
            */}
           <div className={styles.actionRow}>
             <span>
@@ -563,14 +569,19 @@ export default function MovieDetailPage() {
                 {movie.myRating ? '내 별점 수정하기' : '내 별점 남기기'}
               </Button>
             </span>
-            <IconButton
-              label={dismissStatus === 'done' ? '관심없음 처리됨' : '관심없음'}
-              icon={<BlockIcon />}
-              size={DISMISS_BUTTON_SIZE}
-              variant={dismissStatus === 'done' ? 'filled' : 'translucent'}
-              disabled={dismissStatus === 'pending' || dismissStatus === 'done'}
-              onClick={handleOpenDismiss}
-            />
+            {canDismiss ? (
+              <button
+                type="button"
+                className={styles.dismissButton}
+                data-done={dismissStatus === 'done' || undefined}
+                aria-label={dismissStatus === 'done' ? '관심없음 처리됨' : undefined}
+                disabled={dismissStatus === 'pending' || dismissStatus === 'done'}
+                onClick={handleOpenDismiss}
+              >
+                <BlockIcon />
+                <span className={styles.dismissLabel}>관심없음</span>
+              </button>
+            ) : null}
           </div>
           {dismissStatus === 'done' ? (
             <p className={styles.dismissNote} role="status">
