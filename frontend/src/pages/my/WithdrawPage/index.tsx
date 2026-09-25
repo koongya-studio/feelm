@@ -38,7 +38,6 @@ import type { WithdrawProof } from '../../../api/settings';
 import { getMyProfile } from '../../../api/users';
 import { useAuth } from '../../../contexts/authContext';
 import { useBack } from '../../../hooks/useBack';
-import { forgetWebPush } from '../../../pwa/webPush';
 import { path } from '../../../routes/paths';
 import {
   isOAuthConfigured,
@@ -148,12 +147,6 @@ export default function WithdrawPage() {
 
       return;
     }
-
-    /*
-     * 이 기기의 푸시 구독을 지운다(업무 -583). 서버 해제(API-077)는 활성 회원만 받아 탈퇴한
-     * 뒤에는 보낼 수 없으므로 기기 쪽만 지운다. 기기 구독이 없으면 푸시가 올 곳도 없다.
-     */
-    await forgetWebPush();
 
     // 계정이 사라졌으니 세션도 끊는다. 서버가 쿠키를 지우지만(API-013) 화면 상태는 여기서 바꾼다
     try {
