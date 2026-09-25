@@ -8,6 +8,11 @@
  * placeholder만으로는 입력 후 무엇을 적는 칸인지 사라지므로, 보이는 형태는 유지하되
  * 라벨을 `VisuallyHidden`으로 넣어 보조기술이 읽게 했다(`common-components.md` 6.5).
  *
+ * `type="date"`는 브라우저가 placeholder를 무시하고 `연도-월-일`을 대신 보여 준다.
+ * 비어 있는 칸이 무엇을 받는 칸인지 알 수 없어, 값이 없고 초점도 없는 동안에는 기본
+ * 글자를 감추고 placeholder를 같은 자리에 겹쳐 놓는다. 초점이 오면 기본 글자로 돌아가
+ * 연·월·일 어느 자리를 채우는 중인지 보인다.
+ *
  * `[?]` 오류 문구의 표시 위치와 문구는 와이어프레임에 없다. `error`를 받으면 필드
  * 아래에 두고 테두리만 바꾸는 최소 형태로 두었다.
  */
@@ -48,6 +53,20 @@ export default function TextField({
   const id = useId();
   const describedBy = error ? `${id}-error` : hint ? `${id}-hint` : undefined;
 
+  /* 값이 없는 날짜 칸만 placeholder를 겹친다. 다른 칸은 브라우저가 직접 보여 준다 */
+  const emptyDate = rest.type === 'date' && !rest.value;
+
+  const input = (
+    <input
+      id={id}
+      className={styles.input}
+      data-empty={emptyDate ? 'true' : undefined}
+      aria-invalid={error ? true : undefined}
+      aria-describedby={describedBy}
+      {...rest}
+    />
+  );
+
   return (
     <div className={styles.field}>
       <div className={styles.control} data-invalid={error ? 'true' : undefined}>
@@ -57,13 +76,18 @@ export default function TextField({
           <label htmlFor={id}>{label}</label>
         </VisuallyHidden>
 
-        <input
-          id={id}
-          className={styles.input}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy}
-          {...rest}
-        />
+        {emptyDate && rest.placeholder ? (
+          <span className={styles.dateSlot}>
+            {input}
+
+            {/* 라벨이 이미 이름을 읽어 준다. 보조기술에는 중복이라 감춘다 */}
+            <span className={styles.datePlaceholder} aria-hidden="true">
+              {rest.placeholder}
+            </span>
+          </span>
+        ) : (
+          input
+        )}
 
         {action ? (
           <button
