@@ -1,21 +1,16 @@
-/*
- * 2.2 카드. 크기는 릴이 칸 크기로 입힌다(`FilmReel`의 `.track > *`) — 여기서 폭을 정하면
- * 그 규칙을 덮어써 칸 대신 트랙 폭을 따라간다. 칸이 화면 폭을 따르므로(업무 -672) 카드도 따라
- * 커진다.
- * 버튼 · 배지 · 이유 상자의 위치값은 와이어프레임 그대로다. 카드는 세로 필름(`FilmReel`)의
- * 한 칸이라 모서리는 릴이 정한다(업무 -605) — 포스터 자체의 둥근 모서리는 0이다.
- */
+/* FilmReel이 카드 크기를 정한다. 정보 영역은 프레임 안에서만 자리를 차지한다. */
 .card {
   position: relative;
 }
 
-/*
- * 누름 상태는 공통 포스터 규칙이다(업무 -697). 칸이 릴 안이라(`FilmReel`이 `overflow: hidden`)
- * 바깥 초점 링은 잘리므로 안쪽에 필름 구멍 색으로 긋는다 — 3.1 프레임과 같다.
- */
 .posterLink {
   composes: posterLink from '../../../../styles/interaction.module.css';
-  display: block;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+  text-decoration: none;
 }
 
 .posterLink:focus-visible {
@@ -23,10 +18,110 @@
   outline-offset: -2px;
 }
 
-/*
- * 관심없음은 보이는 크기 26px, 터치 영역 44px라 카드 밖으로 넘친다. 넘치는 만큼 음수
- * 여백으로 되돌려 오른쪽 위(top 6 right 6)에 맞춘다.
- */
+/* 포스터의 높이와 폭을 함께 줄여 156:220 비율을 유지한다. */
+.posterArea {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--color-film);
+}
+
+.posterArea > span {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  aspect-ratio: 156 / 220;
+}
+
+.posterArea img,
+.posterArea span[data-placeholder='true'] {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.info {
+  display: flex;
+  height: 78px;
+  box-sizing: border-box;
+  flex: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--color-film);
+  color: var(--color-on-dark);
+}
+
+.infoTop {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ottList {
+  display: flex;
+  min-width: 0;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.ottList > span {
+  display: flex;
+}
+
+.reason {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-on-dark-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.reasonText {
+  display: -webkit-box;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.reasonCue {
+  display: flex;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--color-on-dark);
+}
+
+.reasonCue svg {
+  width: 10px;
+  height: 10px;
+}
+
 .dismissButton {
   position: absolute;
   top: -3px;
@@ -38,18 +133,6 @@
   height: 14px;
 }
 
-/* 관심없음 버튼(26px) 왼쪽에 4px 띄워 선다. 22px 로고를 버튼 높이 가운데에 맞춘다 */
-.ottList {
-  position: absolute;
-  top: 8px;
-  right: 36px;
-  display: flex;
-  gap: 4px;
-}
-
-/*
- * `새로운 맛` 배지. ⋯ 버튼이 빠진 카드의 왼쪽 위에 두고 관심없음 버튼과 높이를 맞춘다.
- */
 .badge {
   position: absolute;
   top: 6px;
@@ -57,67 +140,4 @@
   display: flex;
   height: 26px;
   align-items: center;
-}
-
-.reason {
-  position: absolute;
-  right: 6px;
-  bottom: 6px;
-  left: 6px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  box-sizing: border-box;
-  padding: 5px 5px 5px 8px;
-  border: 1px solid var(--color-line);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.94);
-  color: var(--color-ink-body);
-  font-size: 10px;
-  /* 상자 위를 눌러도 아래 포스터 링크가 받는다 */
-  pointer-events: none;
-}
-
-.reasonText {
-  min-width: 0;
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.reason[data-multiline='true'] .reasonText {
-  line-height: 1.4;
-  white-space: normal;
-}
-
-/*
- * 상세로 가는 단서. 공통 포스터 단서(`PosterCue`)와 같은 동그라미를 상자 안에 작게 둔다.
- * 포스터에 마우스를 올리면 검정으로 채워진다.
- */
-.reasonCue {
-  display: flex;
-  width: 16px;
-  height: 16px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-sunken);
-  color: var(--color-ink);
-  transition:
-    background-color var(--motion-fast) var(--ease-standard),
-    color var(--motion-fast) var(--ease-standard);
-}
-
-.reasonCue svg {
-  width: 9px;
-  height: 9px;
-}
-
-@media (hover: hover) {
-  .card:has(.posterLink:hover) .reasonCue {
-    background: var(--color-action);
-    color: var(--color-on-action);
-  }
 }

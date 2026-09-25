@@ -13,7 +13,7 @@
  * 안내한다(업무 S15P21E106-654). 그 밖의 실패만 2.2-A 문구를 쓴다.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import RecommendationsPage from './index';
 import { ApiError } from '../../../api/apiError';
 import { renderWithRouter } from '../../../test/render';
@@ -136,6 +136,9 @@ describe('2.2 오늘의 추천', () => {
 
     const poster = await screen.findByRole('link', { name: '파이트 클럽 상세 보기' });
     expect(poster).toHaveAttribute('href', '/movies/550');
+    expect(within(poster).getByText('파이트 클럽')).toBeInTheDocument();
+    expect(within(poster).getByText('스릴러를 높게 평가하셨어요')).toBeInTheDocument();
+    expect(within(poster).getByRole('img', { name: '넷플릭스' })).toBeInTheDocument();
     expect(getRecommendations).toHaveBeenCalledTimes(1);
 
     // 일치도 %는 계약에 없어 그리지 않는다(CR-13)
@@ -168,7 +171,7 @@ describe('2.2 오늘의 추천', () => {
       'href',
       '/movies/807',
     );
-    expect(screen.getByText('포스터를 탭하면 영화 상세 화면으로 이동해요')).toBeInTheDocument();
+    expect(screen.getByText('카드를 탭하면 영화 상세 화면으로 이동해요')).toBeInTheDocument();
   });
 
   it('빈 세트는 목업으로 채우지 않고 빈 상태를 말한다', async () => {
@@ -243,10 +246,27 @@ describe('2.2 관심없음', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '파이트 클럽 관심없음' }));
 
+    expect(dismissMovie).not.toHaveBeenCalled();
+    expect(screen.getByRole('group', { name: '파이트 클럽 관심없음 확인' })).toHaveTextContent(
+      '추천에서 제외할까요?',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '예' }));
+
     expect(dismissMovie).toHaveBeenCalledWith(550, 3301);
     expect(await screen.findByRole('link', { name: '펄프 픽션 상세 보기' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: '파이트 클럽 상세 보기' })).toBeNull();
     expect(getRecommendations).toHaveBeenCalledTimes(2);
+  });
+
+  it('확인 창에서 취소하면 추천을 변경하지 않는다', async () => {
+    renderWithRouter(<RecommendationsPage />, { route: '/recommendations' });
+
+    fireEvent.click(await screen.findByRole('button', { name: '파이트 클럽 관심없음' }));
+    fireEvent.click(screen.getByRole('button', { name: '아니요' }));
+
+    expect(screen.queryByRole('group', { name: '파이트 클럽 관심없음 확인' })).toBeNull();
+    expect(dismissMovie).not.toHaveBeenCalled();
+    expect(screen.getByRole('link', { name: '파이트 클럽 상세 보기' })).toBeInTheDocument();
   });
 
   it('이미 관심없음인 영화(409)도 처리된 것으로 보고 카드를 뺀다', async () => {
@@ -257,6 +277,7 @@ describe('2.2 관심없음', () => {
     renderWithRouter(<RecommendationsPage />, { route: '/recommendations' });
 
     fireEvent.click(await screen.findByRole('button', { name: '파이트 클럽 관심없음' }));
+    fireEvent.click(screen.getByRole('button', { name: '예' }));
 
     expect(await screen.findByRole('link', { name: '펄프 픽션 상세 보기' })).toBeInTheDocument();
     expect(screen.queryByText(/관심없음으로 처리하지 못했어요/)).toBeNull();
@@ -269,6 +290,7 @@ describe('2.2 관심없음', () => {
     renderWithRouter(<RecommendationsPage />, { route: '/recommendations' });
 
     fireEvent.click(await screen.findByRole('button', { name: '파이트 클럽 관심없음' }));
+    fireEvent.click(screen.getByRole('button', { name: '예' }));
 
     await waitFor(() =>
       expect(screen.queryByRole('link', { name: '파이트 클럽 상세 보기' })).toBeNull(),
@@ -283,6 +305,7 @@ describe('2.2 관심없음', () => {
     renderWithRouter(<RecommendationsPage />, { route: '/recommendations' });
 
     fireEvent.click(await screen.findByRole('button', { name: '파이트 클럽 관심없음' }));
+    fireEvent.click(screen.getByRole('button', { name: '예' }));
 
     expect(await screen.findByText(/관심없음으로 처리하지 못했어요/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: '파이트 클럽 상세 보기' })).toBeInTheDocument();

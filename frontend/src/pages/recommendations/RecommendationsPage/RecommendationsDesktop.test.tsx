@@ -378,10 +378,10 @@ describe('RecommendationsPage 데스크톱 시안', () => {
     expect(screen.getAllByRole('link', { name: /상세 보기/ })).toHaveLength(3);
   });
 
-  it('412px에서는 지금까지의 화면 그대로다 — 세 편을 요청한다', async () => {
+  it('412px에서는 모바일 카드 세 편을 요청한다', async () => {
     renderRecommendations(412);
 
-    expect(await screen.findByText(/포스터를 탭하면/)).toBeInTheDocument();
+    expect(await screen.findByText(/카드를 탭하면/)).toBeInTheDocument();
     // 모바일은 편수를 싣지 않는다. 계약의 기본값이 3이다(업무 -793)
     expect(getRecommendations).toHaveBeenCalledWith(3);
     expect(screen.queryByRole('group', { name: '취향 맞춤 추천 카드' })).not.toBeInTheDocument();

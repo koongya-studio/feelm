@@ -36,6 +36,110 @@
   text-align: center;
 }
 
+.dismissMenu {
+  display: contents;
+}
+
+.dismissMenu > :global([role='group']) {
+  width: 196px;
+  padding: 14px;
+  border-color: var(--color-line);
+  border-radius: 14px;
+  background: var(--color-surface-solid);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.2);
+  backdrop-filter: none;
+}
+
+.dismissMenu > :global([role='group'])::before {
+  position: absolute;
+  top: -6px;
+  right: 12px;
+  width: 10px;
+  height: 10px;
+  border-top: 1px solid var(--color-line);
+  border-left: 1px solid var(--color-line);
+  background: var(--color-surface-solid);
+  content: '';
+  transform: rotate(45deg);
+}
+
+.dismissMenu[data-placement='above'] > :global([role='group'])::before {
+  top: auto;
+  bottom: -6px;
+  border: 0;
+  border-right: 1px solid var(--color-line);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.dismissHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dismissHead > div {
+  min-width: 0;
+}
+
+.dismissHead strong {
+  color: var(--color-ink);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.dismissIcon {
+  display: flex;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
+  color: var(--color-ink-muted);
+}
+
+.dismissIcon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.dismissMovieTitle {
+  overflow: hidden;
+  margin-top: 3px;
+  color: var(--color-ink-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dismissActions {
+  display: flex;
+  margin-top: 14px;
+  gap: 8px;
+}
+
+.dismissActions button {
+  min-width: 0;
+  min-height: 44px;
+  flex: 1;
+  padding: 0 8px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-solid);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+
+.dismissActions button:last-child {
+  border-color: var(--color-action);
+  background: var(--color-action);
+  color: var(--color-on-action);
+}
+
 /* 2.2-A · 빈 데이터 안내의 보조 동작. 이동이라 Button이 아니라 링크다 */
 .searchLink {
   display: flex;

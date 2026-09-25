@@ -54,10 +54,12 @@ import Button from '../../../components/Button';
 import GuideCallout from '../../../components/GuideCallout';
 import DesktopAside from '../../../components/DesktopAside';
 import FilmReel from '../../../components/FilmReel';
+import Menu from '../../../components/Menu';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import Snackbar from '../../../components/Snackbar';
+import { BlockIcon } from '../../../components/Icon';
 import RecommendationCard from './RecommendationCard';
 import RecommendationGroup from './RecommendationGroup';
 import RecommendationsAside from './RecommendationsAside';
@@ -71,6 +73,7 @@ import { path } from '../../../routes/paths';
 import { AuthContext } from '../../../contexts/authContext';
 import { RECOMMENDATIONS_GUIDE, completeGuide, hasSeenGuide } from '../../../utils/userGuides';
 import styles from './RecommendationsPage.module.css';
+import type { MouseEvent } from 'react';
 import type { Ott } from '../../../types/ott';
 import type { RecommendationItem } from '../../../types/recommendation';
 
@@ -143,6 +146,12 @@ export default function RecommendationsPage() {
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   /** 관심없음을 처리 중인 카드. 그동안 그 카드의 버튼은 눌리지 않는다 */
   const [dismissingId, setDismissingId] = useState<number | null>(null);
+  const [pendingDismiss, setPendingDismiss] = useState<{
+    item: RecommendationItem;
+    top: number;
+    left: number;
+    placement: 'below' | 'above';
+  } | null>(null);
   /** 관심없음을 처리하지 못했으면 하단 막대로 알린다 */
   const [dismissFailed, setDismissFailed] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
@@ -237,6 +246,16 @@ export default function RecommendationsPage() {
       .finally(() => {
         if (mountedRef.current) setDismissingId(null);
       });
+  }
+
+  function handleOpenDismiss(event: MouseEvent<HTMLButtonElement>, item: RecommendationItem) {
+    const button = event.currentTarget.getBoundingClientRect();
+    const root = rootRef.current?.getBoundingClientRect();
+    // 아래 공간이 모자라면 버튼 바로 위에 붙여 화면 밖으로 잘리지 않게 한다.
+    const below = window.innerHeight - button.bottom >= 170;
+    const top = (below ? button.bottom + 1 : button.top - 162) - (root?.top ?? 0);
+    const left = Math.max(button.right - (root?.left ?? 0) - 196, 0);
+    setPendingDismiss({ item, top, left, placement: below ? 'below' : 'above' });
   }
 
   const tasteItems = items?.filter((item) => item.type === 'TASTE') ?? [];
@@ -398,7 +417,7 @@ export default function RecommendationsPage() {
           </>
         ) : (
           <>
-            <div className={styles.scrollArea}>
+            <div className={styles.scrollArea} onScroll={() => setPendingDismiss(null)}>
               {items ? (
                 <FilmReel
                   orientation="vertical"
@@ -413,16 +432,51 @@ export default function RecommendationsPage() {
                       item={item}
                       otts={otts}
                       dismissing={dismissingId === item.recommendationItemId}
-                      onDismiss={handleDismiss}
+                      onDismiss={handleOpenDismiss}
                     />
                   ))}
                 </FilmReel>
               ) : null}
             </div>
 
-            <p className={styles.hint}>포스터를 탭하면 영화 상세 화면으로 이동해요</p>
+            <p className={styles.hint}>카드를 탭하면 영화 상세 화면으로 이동해요</p>
           </>
         )}
+
+        {pendingDismiss ? (
+          <div className={styles.dismissMenu} data-placement={pendingDismiss.placement}>
+            <Menu
+              label={`${pendingDismiss.item.movie.title} 관심없음 확인`}
+              top={pendingDismiss.top}
+              left={pendingDismiss.left}
+              onClose={() => setPendingDismiss(null)}
+            >
+              <div className={styles.dismissHead}>
+                <span className={styles.dismissIcon} aria-hidden="true">
+                  <BlockIcon />
+                </span>
+                <div>
+                  <strong>추천에서 제외할까요?</strong>
+                  <p className={styles.dismissMovieTitle}>{pendingDismiss.item.movie.title}</p>
+                </div>
+              </div>
+              <div className={styles.dismissActions}>
+                <button type="button" onClick={() => setPendingDismiss(null)}>
+                  아니요
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleDismiss(pendingDismiss.item);
+                    setPendingDismiss(null);
+                  }}
+                >
+                  예
+                </button>
+              </div>
+            </Menu>
+          </div>
+        ) : null}
 
         {/* 관심없음을 처리하지 못했을 때. 카드는 그대로 남아 다시 누를 수 있다 */}
         {dismissFailed ? (
