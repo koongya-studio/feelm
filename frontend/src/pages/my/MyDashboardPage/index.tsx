@@ -95,6 +95,7 @@ import { getRecommendationHistory } from '../../../api/recommendations';
 import { getMyReports, getReportDetail } from '../../../api/reports';
 import { getPopcornBucket } from '../../../api/taste';
 import { getMyProfileView } from '../../../api/users';
+import { retryTransient } from '../../../api/retry';
 import { getMyRatings, getWatchRecords } from '../../../api/watch';
 import { path } from '../../../routes/paths';
 import { appUrl } from '../../../utils/appUrl';
@@ -356,23 +357,10 @@ export default function MyDashboardPage() {
    *
    * 프로필(`getMyProfileView`)도 같은 키워드를 싣지만 그쪽은 공개 여부를 걸러 쓰는 쪽(7.2 ·
    * 7.2-A · 7.2-B)을 위한 것이다. **내 대시보드는 비공개로 둔 것까지 내 키워드를 다 보여준다.**
-   * 남은 개수를 말하려면 `ratingCount`도 필요해 여기서 따로 부른다.
+   * 남은 개수를 말하려면 `ratingCount`도 필요해 여기서 따로 부른다. 요청은 프로필과 함께
+   * 한 번만 보낸다(아래 프로필 효과).
    */
   const [taste, setTaste] = useState<TasteAnalysis | null>(null);
-
-  useEffect(() => {
-    let active = true;
-
-    getMyTaste()
-      .then((value) => {
-        if (active) setTaste(value);
-      })
-      .catch(() => undefined);
-
-    return () => {
-      active = false;
-    };
-  }, []);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
 
@@ -400,24 +388,39 @@ export default function MyDashboardPage() {
   const { detail: report, summaries: reportSummaries } = useLatestReport();
   const { flavors: popcorn, bucket } = useMyPopcorn();
 
+  /*
+   * 프로필은 일시 오류면 짧게 기다렸다 다시 부른다(업무 S15P21E106-893). 모바일에서 처음
+   * 들어올 때 재발급 · 네트워크가 잠깐 실패해 오류 화면이 떴다가, 탭을 다시 열면 멀쩡했다.
+   * 다시 부르는 동안은 뼈대를 그대로 두고, 횟수를 다 써도 실패하면 그때 오류 화면이다.
+   * 어떤 실패를 다시 부르는지는 `api/retry.ts`가 정한다 — 영구적인 4xx는 곧바로 오류다.
+   *
+   * 취향 분석(API-040)은 한 번만 부르고 프로필이 그 응답을 같이 쓴다. 프로필을 다시 불러도
+   * 취향 분석은 다시 보내지 않는다. 화면을 떠나면 재시도를 멈추고 늦게 온 응답은 버린다.
+   */
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
+    const active = () => !controller.signal.aborted;
+    const tasteRequest = getMyTaste().catch(() => null);
 
-    getMyProfileView()
+    void tasteRequest.then((value) => {
+      if (active() && value) setTaste(value);
+    });
+
+    retryTransient(() => getMyProfileView(tasteRequest), { signal: controller.signal })
       .then((value) => {
-        if (active) {
+        if (active()) {
           setProfile(value);
           setFailed(false);
         }
       })
       .catch(() => {
-        if (active) {
+        if (active()) {
           setFailed(true);
         }
       });
 
     return () => {
-      active = false;
+      controller.abort();
     };
   }, [reloadCount]);
 

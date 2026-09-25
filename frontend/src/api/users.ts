@@ -18,7 +18,7 @@ import { readAsDataUrl } from '../utils/avatarImage';
 import { request } from './client';
 import { getMockProfile, isMockSession, saveMockProfile } from './mockAccount';
 import { respond, respondError } from './mockTransport';
-import type { TasteKeyword } from '../types/taste';
+import type { TasteAnalysis, TasteKeyword } from '../types/taste';
 import type { ProfileExtrasUpdate, ProfileView } from '../types/unspecified';
 import type {
   MyProfile,
@@ -125,11 +125,20 @@ export const BIO_MAX_LENGTH = 40;
  *
  * **키워드를 못 받아도 프로필은 준다.** 취향 분석이 실패했다고 프로필 화면 전체를 막을 이유가
  * 없다. 그때는 키워드가 빈 배열이고 화면이 빈 상태 문구를 그린다.
+ *
+ * 취향 분석을 이미 부른 쪽은 그 요청을 `taste`로 넘긴다. 7.1은 키워드와 평가 수를 따로
+ * 쓰느라 API-040을 직접 부르는데, 여기서 또 부르면 들어올 때마다 같은 요청이 두 번 나갔다
+ * (업무 S15P21E106-893).
  */
-export async function getMyProfileView(): Promise<ProfileView> {
-  const [profile, taste] = await Promise.all([getMyProfile(), getMyTaste().catch(() => null)]);
+export async function getMyProfileView(
+  taste?: Promise<TasteAnalysis | null>,
+): Promise<ProfileView> {
+  const [profile, analysis] = await Promise.all([
+    getMyProfile(),
+    taste ?? getMyTaste().catch(() => null),
+  ]);
 
-  return respond(toProfileView(profile, taste?.keywords ?? []), 'users');
+  return respond(toProfileView(profile, analysis?.keywords ?? []), 'users');
 }
 
 function toProfileView(profile: MyProfile, keywords: TasteKeyword[]): ProfileView {
