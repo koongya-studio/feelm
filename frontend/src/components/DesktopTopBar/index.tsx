@@ -1,8 +1,8 @@
 /*
- * 데스크톱 상단 바 — 통합 검색 · 알림 · 프로필 (업무 S15P21E106-782).
+ * 데스크톱 상단 바 — 통합 검색 · 알림 (업무 S15P21E106-782).
  *
  * 2026-09-21 사용자 시안 5종이 모두 같은 줄을 위에 그렸다. 왼쪽 끝까지 늘어난 검색 입력과
- * 오른쪽 끝의 알림 종 · 프로필 아바타다.
+ * 오른쪽 끝의 알림 종이다. 계정 메뉴는 좌측 내비에서 연다(업무 -909).
  *
  * **검색은 입력이고 좌측 내비의 `검색`은 화면이다.** 둘이 같은 4.1로 가지만 하는 일이 다르다 —
  * 여기서는 무엇을 찾을지 이미 아는 사람이 바로 적고, 내비 항목은 필터를 만지러 가는 길이다.
@@ -19,16 +19,10 @@ import type { FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { getUnreadNotificationCount } from '../../api/notifications';
 import { path } from '../../routes/paths';
-import Avatar from '../Avatar';
 import { BellIcon, SearchIcon } from '../Icon';
-import type { ShellAccount } from '../../hooks/useShellAccount';
 import styles from './DesktopTopBar.module.css';
 
-type Props = {
-  account: ShellAccount | null;
-};
-
-export default function DesktopTopBar({ account }: Props) {
+export default function DesktopTopBar() {
   const navigate = useNavigate();
   const [keyword, setKeyword] = useState('');
   const [unread, setUnread] = useState(0);
@@ -89,12 +83,6 @@ export default function DesktopTopBar({ account }: Props) {
             <span className={styles.dot} data-testid="desktop-notification-dot" />
           ) : null}
         </Link>
-
-        {account ? (
-          <Link to={path.my()} className={styles.profile} aria-label={`${account.nickname} 프로필`}>
-            <Avatar size={40} nickname={account.nickname} src={account.avatarUrl} />
-          </Link>
-        ) : null}
       </div>
     </header>
   );

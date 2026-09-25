@@ -616,16 +616,11 @@ export default function MyDashboardPage() {
     <div className={desktop ? styles.desktopPage : styles.page}>
       {/*
        * 넓은 화면의 제목 줄. 좁은 화면은 사진 배경 틀 위의 `ScreenHeader`가 같은 일을 한다.
-       * `설정`은 시안에서도 여기 오른쪽 톱니다.
+       * 데스크톱 설정은 좌측 내비에 있으므로 본문에는 중복 진입점을 두지 않는다.
        */}
       {desktop ? (
         <header className={styles.desktopHead}>
           <h1 className={styles.desktopTitle}>프로필</h1>
-
-          <Link to={path.settings()} className={styles.desktopSettings}>
-            <SettingsIcon />
-            <VisuallyHidden>설정</VisuallyHidden>
-          </Link>
         </header>
       ) : null}
 

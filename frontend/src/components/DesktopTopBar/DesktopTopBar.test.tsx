@@ -8,7 +8,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import DesktopTopBar from './index';
 import { renderWithRouter } from '../../test/render';
-import type { ShellAccount } from '../../hooks/useShellAccount';
 
 vi.mock('../../api/notifications', () => ({
   getUnreadNotificationCount: vi.fn(),
@@ -16,20 +15,13 @@ vi.mock('../../api/notifications', () => ({
 
 const { getUnreadNotificationCount } = await import('../../api/notifications');
 
-const account: ShellAccount = {
-  userId: 7,
-  nickname: '김난다',
-  email: 'nanda@feelm.app',
-  avatarUrl: null,
-};
-
 beforeEach(() => {
   vi.mocked(getUnreadNotificationCount).mockReset().mockResolvedValue(0);
 });
 
 describe('DesktopTopBar', () => {
   it('검색어를 들고 4.1로 간다', () => {
-    renderWithRouter(<DesktopTopBar account={account} />, { route: '/film' });
+    renderWithRouter(<DesktopTopBar />, { route: '/film' });
 
     const input = screen.getByLabelText('영화, 감독, 배우 검색');
 
@@ -42,7 +34,7 @@ describe('DesktopTopBar', () => {
   });
 
   it('빈 채로 보내면 조건 없는 4.1을 연다', () => {
-    renderWithRouter(<DesktopTopBar account={account} />, { route: '/film' });
+    renderWithRouter(<DesktopTopBar />, { route: '/film' });
 
     fireEvent.submit(screen.getByRole('search'));
 
@@ -50,7 +42,7 @@ describe('DesktopTopBar', () => {
   });
 
   it('보내고 나면 입력을 비운다', () => {
-    renderWithRouter(<DesktopTopBar account={account} />, { route: '/film' });
+    renderWithRouter(<DesktopTopBar />, { route: '/film' });
 
     const input = screen.getByLabelText('영화, 감독, 배우 검색');
 
@@ -61,7 +53,7 @@ describe('DesktopTopBar', () => {
   });
 
   it('앞뒤 공백만 적으면 조건 없는 4.1을 연다', () => {
-    renderWithRouter(<DesktopTopBar account={account} />, { route: '/film' });
+    renderWithRouter(<DesktopTopBar />, { route: '/film' });
 
     fireEvent.change(screen.getByLabelText('영화, 감독, 배우 검색'), { target: { value: '   ' } });
     fireEvent.submit(screen.getByRole('search'));
@@ -72,7 +64,7 @@ describe('DesktopTopBar', () => {
   it('읽지 않은 알림이 있으면 이름과 점으로 알린다', async () => {
     vi.mocked(getUnreadNotificationCount).mockResolvedValue(3);
 
-    renderWithRouter(<DesktopTopBar account={account} />);
+    renderWithRouter(<DesktopTopBar />);
 
     expect(
       await screen.findByRole('link', { name: '알림, 읽지 않은 알림 3개' }),
@@ -83,23 +75,16 @@ describe('DesktopTopBar', () => {
   it('알림 수를 받지 못해도 상단 바는 그대로다', async () => {
     vi.mocked(getUnreadNotificationCount).mockRejectedValue(new Error('network'));
 
-    renderWithRouter(<DesktopTopBar account={account} />);
+    renderWithRouter(<DesktopTopBar />);
 
     await waitFor(() => expect(getUnreadNotificationCount).toHaveBeenCalled());
     expect(screen.getByRole('link', { name: '알림' })).toBeInTheDocument();
     expect(screen.queryByTestId('desktop-notification-dot')).not.toBeInTheDocument();
   });
 
-  it('프로필 아바타가 MY로 간다', () => {
-    renderWithRouter(<DesktopTopBar account={account} />);
-
-    expect(screen.getByRole('link', { name: '김난다 프로필' })).toHaveAttribute('href', '/my');
-  });
-
-  it('로그인 정보가 아직 없으면 아바타를 그리지 않는다', () => {
-    renderWithRouter(<DesktopTopBar account={null} />);
-
-    expect(screen.queryByRole('link', { name: /프로필/ })).not.toBeInTheDocument();
+  it('계정 메뉴는 좌측 내비에만 둔다', () => {
+    renderWithRouter(<DesktopTopBar />);
+    expect(screen.queryByRole('button', { name: /계정 메뉴/ })).not.toBeInTheDocument();
     expect(screen.getByLabelText('영화, 감독, 배우 검색')).toBeInTheDocument();
   });
 });
