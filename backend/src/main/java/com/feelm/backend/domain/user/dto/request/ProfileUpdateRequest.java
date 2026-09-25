@@ -16,7 +16,8 @@ import tools.jackson.databind.annotation.JsonDeserialize;
  *
  * <p>이메일은 변경할 수 없으므로 필드를 두지 않는다. 본문에 실려 와도 역직렬화에서 무시된다(API-015 처리 규칙).
  *
- * <p>{@code gender}·{@code visibility}를 enum으로 받아 허용하지 않는 값은 역직렬화 단계에서 걸러진다.
+ * <p>{@code gender}·{@code visibility}와 세 항목 공개 범위를 enum으로 받아 허용하지 않는 값은 역직렬화 단계에서 걸러진다. 항목 공개 범위의
+ * {@code null} 규칙은 {@code visibility}와 같다(S15P21E106-856).
  *
  * <p>생년월일에 범위 제약을 두지 않는다. 계약(API-001·015)과 DB 어디에도 없는 규칙이라 이 경로에만 넣으면 가입에서 통과한 값이 수정에서 거절된다(리뷰
  * B-4). 세 경로의 생년월일 규칙 통일은 후속 작업으로 분리했다.
@@ -26,4 +27,7 @@ public record ProfileUpdateRequest(
         @Pattern(regexp = NicknamePolicy.PATTERN, message = NicknamePolicy.MESSAGE) String nickname,
         LocalDate birthDate,
         Gender gender,
-        Visibility visibility) {}
+        Visibility visibility,
+        Visibility frameVisibility,
+        Visibility popcornVisibility,
+        Visibility reviewVisibility) {}

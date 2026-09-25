@@ -36,6 +36,12 @@ abstract class UserProfileApiTestSupport {
     private static final String TEST_EMAIL_PATTERN = "%@example.com";
 
     protected static final String BIRTH_DATE = "1999-03-14";
+
+    /** 항목별 공개 범위 컬럼. JPA가 먼저 만든 테이블에는 DB 기본값이 없으므로 삽입할 때 값을 직접 넣는다. */
+    private static final String[] ITEM_VISIBILITY_COLUMNS = {
+        "frame_visibility", "popcorn_visibility", "review_visibility"
+    };
+
     protected static final String CREATED_AT = "2026-08-01T00:00:00Z";
 
     @Autowired protected MockMvc mockMvc;
@@ -76,6 +82,13 @@ abstract class UserProfileApiTestSupport {
                 """);
         jdbcTemplate.execute(
                 "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_storage_key varchar(40)");
+        // 항목별 공개 범위(S15P21E106-856). 마이그레이션과 같은 기본값을 둔다.
+        for (String column : ITEM_VISIBILITY_COLUMNS) {
+            jdbcTemplate.execute(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS "
+                            + column
+                            + " varchar(10) DEFAULT 'PUBLIC' NOT NULL");
+        }
         jdbcTemplate.execute(
                 """
                 CREATE TABLE IF NOT EXISTS user_auth_providers (
@@ -157,8 +170,9 @@ abstract class UserProfileApiTestSupport {
                 """
                 INSERT INTO users
                     (email, password_hash, nickname, birth_date, gender, visibility, status,
-                     onboarding_completed, created_at)
-                VALUES (?, ?, ?, ?, 'FEMALE', ?, ?, ?, ?)
+                     onboarding_completed, created_at,
+                     frame_visibility, popcorn_visibility, review_visibility)
+                VALUES (?, ?, ?, ?, 'FEMALE', ?, ?, ?, ?, 'PUBLIC', 'PUBLIC', 'PUBLIC')
                 """,
                 email,
                 passwordHash,

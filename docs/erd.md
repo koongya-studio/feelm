@@ -58,6 +58,9 @@ erDiagram
         date birth_date "생년월일, 탈퇴 시 NULL (D-8·D-9 결정)"
         varchar gender "MALE / FEMALE / OTHER, 탈퇴 시 NULL (D-8·D-9 결정)"
         varchar visibility "PUBLIC / PRIVATE, 기본 PRIVATE"
+        varchar frame_visibility "취향 필름 공개 범위 PUBLIC / PRIVATE, 기본 PUBLIC"
+        varchar popcorn_visibility "팝콘 버킷 공개 범위 PUBLIC / PRIVATE, 기본 PUBLIC"
+        varchar review_visibility "한줄평 공개 범위 PUBLIC / PRIVATE, 기본 PUBLIC"
         varchar avatar_storage_key "UUID.jpg, 미등록·탈퇴 시 NULL"
         varchar status "ACTIVE / WITHDRAWN"
         boolean onboarding_completed
@@ -152,7 +155,7 @@ erDiagram
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `users` | 서비스 계정 | `nickname`은 정규화 값(공백 제거·소문자)으로 유일. 같은 정규화식에 `text_pattern_ops`를 적용한 일반 인덱스를 따로 두어 사용자 검색(API-019)의 접두 조건이 인덱스를 타게 합니다. `avatar_storage_key`는 공개 URL이 아닌 로컬 저장소 파일명만 보관합니다. 탈퇴 시 `status=WITHDRAWN`으로 전환하고 이메일·닉네임을 치환해 즉시 재사용을 허용하며 생년월일·성별·프로필 사진을 삭제합니다(D-9) | FR-01, FR-37, FR-38 · API-001~016, API-019, API-078, API-079, API-081, API-082 |
+| `users` | 서비스 계정 | `nickname`은 정규화 값(공백 제거·소문자)으로 유일. 같은 정규화식에 `text_pattern_ops`를 적용한 일반 인덱스를 따로 두어 사용자 검색(API-019)의 접두 조건이 인덱스를 타게 합니다. `avatar_storage_key`는 공개 URL이 아닌 로컬 저장소 파일명만 보관합니다. `frame_visibility`·`popcorn_visibility`·`review_visibility`는 항목별 공개 범위이며 기존 노출을 보존하도록 기본 `PUBLIC`입니다(S15P21E106-856). 탈퇴 시 `status=WITHDRAWN`으로 전환하고 이메일·닉네임을 치환해 즉시 재사용을 허용하며 생년월일·성별·프로필 사진을 삭제합니다(D-9) | FR-01, FR-37, FR-38 · API-001~016, API-019, API-078, API-079, API-081, API-082 |
 | `user_auth_providers` | 소셜 로그인 수단 | UK(`provider`, `provider_user_id`). 같은 이메일이어도 기존 계정에 자동 통합하지 않음 | FR-35 · API-007~009 |
 | `password_reset_tokens` | 비밀번호 재설정 | 1회용, 만료 30분(가정). 성공 시 해당 사용자 Refresh Token 전부 폐기 | FR-37 · API-010, API-011 |
 | `notification_settings` | 알림 수신 설정 | 사용자당 1행. 실제 인앱 사건 종류와 독립적인 수신 설정이며 푸시 채널 적용은 S15P21E106-582 범위 | FR-38 · API-017, API-018 |
@@ -539,8 +542,9 @@ flowchart LR
 ### 차단·공개 범위
 
 - 차단은 `user_blocks`에 단방향 행으로 저장하고, 조회 시 `(blocker=A AND blocked=B) OR (blocker=B AND blocked=A)`로 양방향 필터를 적용합니다(FR-39).
-- 공개 한줄평(API-032)은 ACTIVE 작성자의 `PUBLIC` 한줄평을 작성자 프로필의 공개 범위와 무관하게 로그인 회원에게 노출하며, 스포일러 여부와 무관하게 원문을 반환합니다. blur/reveal은 FE 로컬 상태이고 별도 서버 상태를 저장하지 않습니다.
+- 공개 한줄평(API-032)은 ACTIVE 작성자의 `PUBLIC` 한줄평을 작성자 프로필의 공개 범위와 무관하게 로그인 회원에게 노출하며(단 작성자의 `users.review_visibility=PRIVATE`이면 제외, 아래 항목별 공개 범위), 스포일러 여부와 무관하게 원문을 반환합니다. blur/reveal은 FE 로컬 상태이고 별도 서버 상태를 저장하지 않습니다.
 - `users.visibility=PRIVATE`인 사용자의 프로필·필름·팝콘·프로필의 평가 목록은 본인 외 조회 시 404로 처리합니다(NFR-07). 영화별 API-032의 `PUBLIC` 한줄평은 별개이며, 작성자 프로필에 접근하면 비공개 정책을 적용합니다. 같은 활성 파티의 현재 멤버에게는 API-057의 팝콘 집계만 공개하며, 개별 필름·프레임·프로필 평가 목록에는 이 예외를 적용하지 않습니다.
+- 항목별 공개 범위(S15P21E106-856): `users.frame_visibility`·`popcorn_visibility`가 `PRIVATE`이면 본인 외 API-062에서 해당 구역(최근 필름과 프레임 수, 팝콘 분포와 팝콘 수)을 비웁니다. `users.review_visibility=PRIVATE`이면 본인 외 API-062의 공개 한줄평 수를 비우고 API-032에서 그 작성자의 한줄평을 평가별 `visibility`와 무관하게 제외합니다. API-057의 파티 팝콘 예외는 `popcorn_visibility`에도 적용합니다.
 - 차단자는 파티장 여부와 관계없이 상대와 함께 속한 모든 활성 파티에서 탈퇴합니다. 차단 저장과 탈퇴·승계·종료는 하나의 트랜잭션으로 처리합니다(API-020). 초대·수락 시 현재 파티원 전원과의 양방향 차단 관계를 검사합니다.
 
 ### 파티 인원 변경

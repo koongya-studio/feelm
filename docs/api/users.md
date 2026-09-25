@@ -892,6 +892,9 @@ OAuth 인가 코드를 받아 소셜 계정을 확인한다. 이미 연결된 �
   "birthDate": "1999-03-14",
   "gender": "FEMALE",
   "visibility": "PRIVATE",
+  "frameVisibility": "PUBLIC",
+  "popcornVisibility": "PUBLIC",
+  "reviewVisibility": "PRIVATE",
   "hasPassword": true,
   "linkedProviders": ["KAKAO"],
   "onboardingCompleted": true,
@@ -909,10 +912,27 @@ OAuth 인가 코드를 받아 소셜 계정을 확인한다. 이미 연결된 �
 - `stats`의 프레임 수와 평가 수는 1:1이며, 팝콘 수는 평가를 영화의 대표 맛별로 집계한 값이다
 - 등록된 프로필 사진이 없으면 `avatarUrl`은 `null`이다. URL은 공개·비만료 경로이며 사진 교체·삭제·회원 탈퇴 후 기존 URL은 `404`가 된다
 - 활성 계정이 아니면 `401 UNAUTHORIZED`로 거절한다. Access Token은 계정 상태를 담지 않아 탈퇴 계정도 잔여 수명 동안 서명이 유효하기 때문이다(API-012와 같은 판정)
+- `frameVisibility`·`popcornVisibility`·`reviewVisibility`는 항목별 공개 범위다(S15P21E106-856). 각각 취향 필름(프레임), 팝콘 버킷, 한줄평을 다른 사용자에게 보일지 정한다. 가림 규칙은 [항목별 공개 범위](#항목별-공개-범위)를 따른다
 
 ### 상태값
 
-- Visibility: `PUBLIC`, `PRIVATE`
+- Visibility: `PUBLIC`, `PRIVATE`. `visibility` 기본값 `PRIVATE`, 세 항목 기본값 `PUBLIC`
+
+### 항목별 공개 범위
+
+| 필드 | 항목 (7.8-B) | `PRIVATE`일 때 다른 사용자에게 가려지는 곳 |
+|---|---|---|
+| `frameVisibility` | 취향 필름 | API-062 `recentFrames`, `stats.frameCount` |
+| `popcornVisibility` | 팝콘 버킷 | API-062 `popcorn.flavors`, `stats.popcornCount` |
+| `reviewVisibility` | 한줄평 | API-062 `publicReviewCount`, API-032 목록 |
+
+- 값은 `Visibility`(`PUBLIC`·`PRIVATE`)를 그대로 쓴다. 와이어프레임의 `파티원만`은 지원하지 않는다
+- 기본값은 `PUBLIC`이다. 프로필 `visibility`가 `PRIVATE`이면 공개 프로필 자체가 `404`이므로, 세 항목은 프로필이 `PUBLIC`일 때 그 안에서 무엇을 보일지 정한다. 한줄평은 프로필과 별개로 API-032에도 적용된다
+- 본인 조회(API-014, 자기 `publicId`의 API-062, API-032의 본인 한줄평)에는 적용하지 않는다
+- 평가별 `visibility`(API-036·037)와 함께 적용한다. 한줄평이 타인에게 보이려면 평가가 `PUBLIC`이고 `reviewVisibility`도 `PUBLIC`이어야 한다
+- 같은 활성 파티의 현재 멤버에게 팝콘 집계를 보이는 API-057의 예외는 `popcornVisibility`에도 그대로 적용한다(파티 추천의 입력이다)
+- 가림은 **응답에 해당 구역을 싣지 않는 것**까지다. 공개로 둔 다른 구역에서 추정하는 것은 막지 않는다 — 예: 팝콘만 비공개여도 공개된 최근 필름(영화·점수)과 영화의 대표 맛(API-030)으로 분포를 짐작할 수 있고, 필름만 비공개여도 팝콘 수는 평가 수에 가깝다
+- 취향 키워드(API-040 결과, API-062 `keywords`)는 세 항목에 속하지 않아 가리지 않는다
 
 ### 미정 사항
 
@@ -991,7 +1011,7 @@ OAuth 인가 코드를 받아 소셜 계정을 확인한다. 이미 연결된 �
 
 ### 설명
 
-닉네임, 나이, 성별, 프로필 공개 범위를 부분 수정한다.
+닉네임, 나이, 성별, 프로필 공개 범위와 항목별 공개 범위를 부분 수정한다.
 
 ### 인증 및 권한
 
@@ -1010,8 +1030,10 @@ OAuth 인가 코드를 받아 소셜 계정을 확인한다. 이미 연결된 �
 전달한 필드만 변경한다.
 
 ```json
-{ "nickname": "새닉네임", "visibility": "PUBLIC" }
+{ "nickname": "새닉네임", "visibility": "PUBLIC", "reviewVisibility": "PRIVATE" }
 ```
+
+- `frameVisibility`·`popcornVisibility`·`reviewVisibility`: `PUBLIC`·`PRIVATE`. [항목별 공개 범위](#항목별-공개-범위)
 
 ### Response
 
@@ -1027,6 +1049,7 @@ OAuth 인가 코드를 받아 소셜 계정을 확인한다. 이미 연결된 �
 - `visibility`를 `PRIVATE`으로 바꾸면 공개 프로필(API-062)은 즉시 `404`가 된다
 - 전달한 필드만 바꾸되 `nickname`·`birthDate`·`gender`는 가입 시 필수값이므로 `null`로 되돌릴 수 없다. `null`을 보내면 `400 VALIDATION_FAILED`로 응답한다
 - `visibility`도 같은 이유로 `null`을 허용하지 않는다. 필드를 아예 보내지 않으면 변경하지 않는다
+- 세 항목 공개 범위도 `visibility`와 같다. `null`·빈 문자열·허용하지 않는 값(예: `PARTY`)은 `400 VALIDATION_FAILED`이고, 보내지 않으면 변경하지 않는다. 바꾸면 다른 사용자의 다음 조회부터 즉시 적용된다
 - `nickname` 형식 규칙은 가입(API-001)과 같다(2~10자, 한글·영문·숫자·`_`)
 - 자기 현재 닉네임과 정규화 값이 같으면 중복으로 보지 않는다. 대소문자만 바꾸는 변경이 자기 자신 때문에 `409`가 되지 않게 한다
 - 활성 계정이 아니면 `401 UNAUTHORIZED`로 거절한다(API-014와 같은 판정)
@@ -1034,7 +1057,7 @@ OAuth 인가 코드를 받아 소셜 계정을 확인한다. 이미 연결된 �
 
 ### 상태값
 
-- Visibility: `PUBLIC`, `PRIVATE` (기본값 `PRIVATE`)
+- Visibility: `PUBLIC`, `PRIVATE` (`visibility` 기본값 `PRIVATE`, 세 항목 기본값 `PUBLIC`)
 
 ### 미정 사항
 

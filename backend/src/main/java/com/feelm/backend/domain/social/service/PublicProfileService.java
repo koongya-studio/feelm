@@ -63,11 +63,12 @@ public class PublicProfileService {
                 parsePublicId(publicId)
                         .flatMap(publicProfileQueryRepository::findActiveTargetByPublicId)
                         .orElseThrow(PublicProfileService::notFound);
-        if (!isSelf(viewerId, target)) {
+        boolean self = isSelf(viewerId, target);
+        if (!self) {
             requireVisible(target);
             requireNotBlocked(viewerId, target);
         }
-        return assemble(target);
+        return assemble(target, self);
     }
 
     /** 공개 범위와 차단을 건너뛰는 본인 조회인지. 비회원은 언제나 아니다. */
@@ -92,22 +93,39 @@ public class PublicProfileService {
         }
     }
 
-    private PublicProfileResponse assemble(ProfileTarget target) {
+    /**
+     * 응답을 조립한다. 본인이 아니면 항목별 공개 범위가 {@code PRIVATE}인 구역을 비운다(S15P21E106-856).
+     *
+     * <p>가린 구역은 404로 바꾸지 않고 필드 모양을 유지한 채 값만 비운다 — 프로필은 보이고 그 안의 구역만 가리는 것이며, 기존 필드의 타입을 바꾸면 기존
+     * 클라이언트가 깨진다. 가린 구역은 집계 질의 자체를 하지 않는다. 비울 값을 계산하는 것은 낭비이고, 계산한 값을 실수로 담을 경로도 없앤다.
+     */
+    private PublicProfileResponse assemble(ProfileTarget target, boolean self) {
         long userId = target.userId();
-        FrameListResponse frames = frameQueryService.getRecentFrames(userId, RECENT_FRAME_LIMIT);
-        PopcornBucketResponse popcorn = tasteQueryService.getPopcornBucket(userId);
+        boolean showFrames = self || target.frameVisibility() == Visibility.PUBLIC;
+        boolean showPopcorn = self || target.popcornVisibility() == Visibility.PUBLIC;
+        boolean showReviews = self || target.reviewVisibility() == Visibility.PUBLIC;
+
+        FrameListResponse frames =
+                showFrames ? frameQueryService.getRecentFrames(userId, RECENT_FRAME_LIMIT) : null;
+        PopcornBucketResponse popcorn =
+                showPopcorn ? tasteQueryService.getPopcornBucket(userId) : null;
         TasteAnalysisResponse taste = tasteQueryService.getTasteAnalysis(userId);
         return new PublicProfileResponse(
                 new PublicProfileResponse.Profile(
                         userId,
                         target.nickname(),
                         avatarStorage.publicUrl(target.avatarStorageKey()),
-                        target.visibility()),
+                        target.visibility(),
+                        target.frameVisibility(),
+                        target.popcornVisibility(),
+                        target.reviewVisibility()),
                 keywords(taste),
-                new PublicProfileResponse.Stats(frames.totalCount(), popcorn.totalCount()),
-                new PublicProfileResponse.Popcorn(flavors(popcorn)),
-                recentFrames(frames),
-                publicProfileQueryRepository.countPublicReviews(userId),
+                new PublicProfileResponse.Stats(
+                        frames == null ? 0 : frames.totalCount(),
+                        popcorn == null ? 0 : popcorn.totalCount()),
+                new PublicProfileResponse.Popcorn(popcorn == null ? List.of() : flavors(popcorn)),
+                frames == null ? List.of() : recentFrames(frames),
+                showReviews ? publicProfileQueryRepository.countPublicReviews(userId) : 0,
                 // 차단 관계는 위에서 이미 404로 끝냈으므로 200 응답에서는 항상 false다.
                 false);
     }

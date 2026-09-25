@@ -38,6 +38,13 @@ export type MyProfile = {
   gender: Gender;
   /** 프로필 공개 범위. 기본값 `PRIVATE`. `PRIVATE`이면 API-062가 404다 */
   visibility: Visibility;
+  /**
+   * 항목별 공개 범위(업무 -856, API-014 `항목별 공개 범위`). 기본값 `PUBLIC`. `PRIVATE`이면 다른
+   * 사용자가 보는 API-062에서 그 구역이 비고, 한줄평은 API-032 목록에서도 빠진다. 7.8-B가 고른다
+   */
+  frameVisibility: Visibility;
+  popcornVisibility: Visibility;
+  reviewVisibility: Visibility;
   hasPassword: boolean;
   /** 연결된 소셜 로그인 수단. 7.8-A 계정 관리가 쓴다 */
   linkedProviders: string[];
@@ -58,6 +65,9 @@ export type MyProfileUpdate = {
   birthDate?: string;
   gender?: Gender;
   visibility?: Visibility;
+  frameVisibility?: Visibility;
+  popcornVisibility?: Visibility;
+  reviewVisibility?: Visibility;
 };
 
 /**
@@ -142,6 +152,14 @@ export type PublicProfile = {
     /** 등록한 사진이 없으면 `null` */
     avatarUrl: string | null;
     visibility: Visibility;
+    /**
+     * 항목별 공개 범위(업무 -856). 본인이 아니면 `PRIVATE`인 구역은 모양만 남고 값이 빈다 —
+     * `recentFrames: []` · `frameCount: 0`, `flavors: []` · `popcornCount: 0`, `publicReviewCount: 0`.
+     * 빈 것과 가린 것은 이 값으로 가른다
+     */
+    frameVisibility: Visibility;
+    popcornVisibility: Visibility;
+    reviewVisibility: Visibility;
   };
   keywords: { code: string; label: string }[];
   stats: { frameCount: number; popcornCount: number };

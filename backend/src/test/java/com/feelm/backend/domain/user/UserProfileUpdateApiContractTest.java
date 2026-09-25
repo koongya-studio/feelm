@@ -185,12 +185,81 @@ class UserProfileUpdateApiContractTest extends UserProfileApiTestSupport {
                         "{\"nickname\":null}",
                         "{\"birthDate\":null}",
                         "{\"gender\":null}",
-                        "{\"visibility\":null}")) {
+                        "{\"visibility\":null}",
+                        "{\"frameVisibility\":null}",
+                        "{\"popcornVisibility\":null}",
+                        "{\"reviewVisibility\":null}")) {
             mockMvc.perform(update(body, userId))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
         }
         assertThat(nicknameOf(userId)).isEqualTo("널테스트");
+        mockMvc.perform(get(ME_PATH).header("Authorization", bearerFor(userId)))
+                .andExpect(jsonPath("$.frameVisibility").value("PUBLIC"))
+                .andExpect(jsonPath("$.popcornVisibility").value("PUBLIC"))
+                .andExpect(jsonPath("$.reviewVisibility").value("PUBLIC"));
+    }
+
+    @Test
+    @DisplayName("항목별 공개 범위 세 값을 저장하고 다시 조회해도 그대로다")
+    void updatesItemVisibilities() throws Exception {
+        long userId = activeUser("user@example.com", "항목공개");
+
+        mockMvc.perform(
+                        update(
+                                """
+                                {"frameVisibility":"PRIVATE","popcornVisibility":"PRIVATE",
+                                 "reviewVisibility":"PRIVATE"}
+                                """,
+                                userId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.frameVisibility").value("PRIVATE"))
+                .andExpect(jsonPath("$.popcornVisibility").value("PRIVATE"))
+                .andExpect(jsonPath("$.reviewVisibility").value("PRIVATE"))
+                // 프로필 공개 범위와 다른 필드는 그대로다.
+                .andExpect(jsonPath("$.visibility").value("PRIVATE"))
+                .andExpect(jsonPath("$.nickname").value("항목공개"));
+
+        mockMvc.perform(get(ME_PATH).header("Authorization", bearerFor(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.frameVisibility").value("PRIVATE"))
+                .andExpect(jsonPath("$.popcornVisibility").value("PRIVATE"))
+                .andExpect(jsonPath("$.reviewVisibility").value("PRIVATE"));
+
+        // 하나만 보내면 그 하나만 바뀐다.
+        mockMvc.perform(update("{\"popcornVisibility\":\"PUBLIC\"}", userId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.frameVisibility").value("PRIVATE"))
+                .andExpect(jsonPath("$.popcornVisibility").value("PUBLIC"))
+                .andExpect(jsonPath("$.reviewVisibility").value("PRIVATE"));
+    }
+
+    @Test
+    @DisplayName("항목별 공개 범위에 계약에 없는 값을 보내면 400이다")
+    void unknownItemVisibilityIsRejected() throws Exception {
+        long userId = activeUser("user@example.com", "파티원만");
+
+        // 와이어프레임의 `파티원만`은 계약 값이 아니다(S15P21E106-856 D-1).
+        for (String body :
+                List.of(
+                        "{\"frameVisibility\":\"PARTY\"}",
+                        "{\"popcornVisibility\":\"FRIENDS\"}",
+                        "{\"reviewVisibility\":\"public\"}",
+                        // 숫자와 숫자 문자열을 enum 순번으로 읽지 않는다(리뷰 B-1)
+                        "{\"frameVisibility\":1}",
+                        "{\"popcornVisibility\":\"1\"}",
+                        "{\"reviewVisibility\":0}",
+                        "{\"visibility\":1}",
+                        "{\"gender\":0}",
+                        "{\"frameVisibility\":[\"PRIVATE\"]}")) {
+            mockMvc.perform(update(body, userId))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+        }
+        mockMvc.perform(get(ME_PATH).header("Authorization", bearerFor(userId)))
+                .andExpect(jsonPath("$.frameVisibility").value("PUBLIC"))
+                .andExpect(jsonPath("$.popcornVisibility").value("PUBLIC"))
+                .andExpect(jsonPath("$.reviewVisibility").value("PUBLIC"));
     }
 
     @Test
@@ -235,7 +304,10 @@ class UserProfileUpdateApiContractTest extends UserProfileApiTestSupport {
                         "{\"birthDate\":\" \"}",
                         "{\"gender\":\" \"}",
                         "{\"visibility\":\" \"}",
-                        "{\"nickname\":\" \"}")) {
+                        "{\"nickname\":\" \"}",
+                        "{\"frameVisibility\":\"\"}",
+                        "{\"popcornVisibility\":\" \"}",
+                        "{\"reviewVisibility\":\"\"}")) {
             mockMvc.perform(update(body, userId))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));

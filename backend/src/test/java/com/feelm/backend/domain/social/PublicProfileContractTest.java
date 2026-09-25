@@ -84,6 +84,10 @@ class PublicProfileContractTest extends SharedPostgresContractTest {
                         jsonPath("$.user.avatarUrl")
                                 .value("/media/avatars/0b649505-0917-41d9-a41f-0d4402ec63d5.jpg"))
                 .andExpect(jsonPath("$.user.visibility").value("PUBLIC"))
+                // 항목별 공개 범위의 기본값은 PUBLIC이다(S15P21E106-856).
+                .andExpect(jsonPath("$.user.frameVisibility").value("PUBLIC"))
+                .andExpect(jsonPath("$.user.popcornVisibility").value("PUBLIC"))
+                .andExpect(jsonPath("$.user.reviewVisibility").value("PUBLIC"))
                 // 공개 프로필은 계정 식별 정보를 더 내려보내지 않는다.
                 .andExpect(jsonPath("$.user.email").doesNotExist())
                 .andExpect(jsonPath("$.user.birthDate").doesNotExist())
@@ -299,6 +303,89 @@ class PublicProfileContractTest extends SharedPostgresContractTest {
         mockMvc.perform(path(ownerPublicId.toUpperCase(java.util.Locale.ROOT)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.user.userId").value(ownerId));
+    }
+
+    @Test
+    @DisplayName("T17 취향 필름을 비공개로 두면 타인에게 최근 필름과 프레임 수를 비워 준다")
+    void privateFramesAreHiddenFromOthers() throws Exception {
+        insertOwnerActivity();
+        setItemVisibility(ownerId, "frame_visibility", "PRIVATE");
+
+        mockMvc.perform(path(ownerPublicId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.frameVisibility").value("PRIVATE"))
+                .andExpect(jsonPath("$.recentFrames.length()").value(0))
+                .andExpect(jsonPath("$.stats.frameCount").value(0))
+                // 다른 항목은 그대로다.
+                .andExpect(jsonPath("$.user.popcornVisibility").value("PUBLIC"))
+                .andExpect(jsonPath("$.stats.popcornCount").value(1))
+                .andExpect(jsonPath("$.popcorn.flavors[0].popcornCount").value(1))
+                .andExpect(jsonPath("$.publicReviewCount").value(1));
+    }
+
+    @Test
+    @DisplayName("T18 팝콘 버킷을 비공개로 두면 로그인한 타인에게 팝콘 분포와 팝콘 수를 비워 준다")
+    void privatePopcornIsHiddenFromOthers() throws Exception {
+        insertOwnerActivity();
+        setItemVisibility(ownerId, "popcorn_visibility", "PRIVATE");
+        long viewer = insertUser("viewer", "조회자", "ACTIVE", "PUBLIC");
+
+        mockMvc.perform(path(ownerPublicId).header("Authorization", bearer(viewer)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.popcornVisibility").value("PRIVATE"))
+                .andExpect(jsonPath("$.popcorn.flavors.length()").value(0))
+                .andExpect(jsonPath("$.stats.popcornCount").value(0))
+                .andExpect(jsonPath("$.recentFrames.length()").value(1))
+                .andExpect(jsonPath("$.stats.frameCount").value(1))
+                .andExpect(jsonPath("$.publicReviewCount").value(1));
+    }
+
+    @Test
+    @DisplayName("T19 한줄평을 비공개로 두면 타인에게 공개 한줄평 수를 비워 준다")
+    void privateReviewsAreHiddenFromOthers() throws Exception {
+        insertOwnerActivity();
+        setItemVisibility(ownerId, "review_visibility", "PRIVATE");
+
+        mockMvc.perform(path(ownerPublicId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.reviewVisibility").value("PRIVATE"))
+                .andExpect(jsonPath("$.publicReviewCount").value(0))
+                .andExpect(jsonPath("$.recentFrames.length()").value(1))
+                .andExpect(jsonPath("$.stats.popcornCount").value(1));
+    }
+
+    @Test
+    @DisplayName("T20 본인 조회는 세 항목이 비공개여도 모든 값을 채우고 설정값을 그대로 알린다")
+    void ownerSeesOwnPrivateItems() throws Exception {
+        insertOwnerActivity();
+        setItemVisibility(ownerId, "frame_visibility", "PRIVATE");
+        setItemVisibility(ownerId, "popcorn_visibility", "PRIVATE");
+        setItemVisibility(ownerId, "review_visibility", "PRIVATE");
+
+        mockMvc.perform(path(ownerPublicId).header("Authorization", bearer(ownerId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.frameVisibility").value("PRIVATE"))
+                .andExpect(jsonPath("$.user.popcornVisibility").value("PRIVATE"))
+                .andExpect(jsonPath("$.user.reviewVisibility").value("PRIVATE"))
+                .andExpect(jsonPath("$.recentFrames.length()").value(1))
+                .andExpect(jsonPath("$.stats.frameCount").value(1))
+                .andExpect(jsonPath("$.stats.popcornCount").value(1))
+                .andExpect(jsonPath("$.popcorn.flavors[0].popcornCount").value(1))
+                .andExpect(jsonPath("$.publicReviewCount").value(1));
+    }
+
+    /** 대상의 평가·프레임·공개 한줄평을 하나씩 만든다. 세 항목이 모두 값이 있어야 가린 것과 빈 것을 구분할 수 있다. */
+    private void insertOwnerActivity() {
+        long movieId = insertMovie("항목 공개 영화", null, firstFlavorId);
+        long ratingId = insertRating(ownerId, movieId, "4.0", "공개 한줄평", "PUBLIC", BASE_TIME);
+        insertFrame(ratingId, ownerId, movieId, BASE_TIME);
+    }
+
+    private void setItemVisibility(long userId, String column, String value) {
+        jdbc.sql("UPDATE users SET " + column + " = :value WHERE id = :id")
+                .param("value", value)
+                .param("id", userId)
+                .update();
     }
 
     private static MockHttpServletRequestBuilder path(String publicId) {

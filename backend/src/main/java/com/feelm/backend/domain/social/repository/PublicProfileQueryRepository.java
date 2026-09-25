@@ -23,7 +23,8 @@ public class PublicProfileQueryRepository {
 
     private static final String TARGET_SQL =
             """
-            SELECT id, nickname, avatar_storage_key, visibility
+            SELECT id, nickname, avatar_storage_key, visibility,
+                   frame_visibility, popcorn_visibility, review_visibility
             FROM users
             WHERE public_id = :publicId AND status = 'ACTIVE'
             """;
@@ -57,7 +58,10 @@ public class PublicProfileQueryRepository {
                                         row.getLong("id"),
                                         row.getString("nickname"),
                                         row.getString("avatar_storage_key"),
-                                        Visibility.valueOf(row.getString("visibility"))))
+                                        Visibility.valueOf(row.getString("visibility")),
+                                        Visibility.valueOf(row.getString("frame_visibility")),
+                                        Visibility.valueOf(row.getString("popcorn_visibility")),
+                                        Visibility.valueOf(row.getString("review_visibility"))))
                 .optional();
     }
 
@@ -65,6 +69,13 @@ public class PublicProfileQueryRepository {
         return jdbc.sql(PUBLIC_REVIEW_COUNT_SQL).param("userId", userId).query(Long.class).single();
     }
 
+    /** 대상 계정. 세 항목 공개 범위는 S15P21E106-856에서 더했다. */
     public record ProfileTarget(
-            long userId, String nickname, String avatarStorageKey, Visibility visibility) {}
+            long userId,
+            String nickname,
+            String avatarStorageKey,
+            Visibility visibility,
+            Visibility frameVisibility,
+            Visibility popcornVisibility,
+            Visibility reviewVisibility) {}
 }

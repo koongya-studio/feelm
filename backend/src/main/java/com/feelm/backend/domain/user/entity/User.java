@@ -60,6 +60,24 @@ public class User extends BaseTimeEntity {
     @Column(name = "visibility", nullable = false, length = 10)
     private Visibility visibility = Visibility.PRIVATE;
 
+    /**
+     * 항목별 공개 범위(S15P21E106-856). 취향 필름·팝콘 버킷·한줄평을 다른 사용자에게 보일지 정한다.
+     *
+     * <p>기본 {@code PUBLIC}은 마이그레이션의 DB 기본값과 같다. 프로필 {@code visibility}가 {@code PRIVATE}이면 공개 프로필
+     * 자체가 404이므로, 세 값은 프로필이 공개일 때 그 안에서 무엇을 보일지를 정한다. 한줄평 값은 영화별 목록(API-032)에도 적용된다.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "frame_visibility", nullable = false, length = 10)
+    private Visibility frameVisibility = Visibility.PUBLIC;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "popcorn_visibility", nullable = false, length = 10)
+    private Visibility popcornVisibility = Visibility.PUBLIC;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "review_visibility", nullable = false, length = 10)
+    private Visibility reviewVisibility = Visibility.PUBLIC;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 30)
     private UserStatus status;
@@ -152,6 +170,21 @@ public class User extends BaseTimeEntity {
     /** 프로필 공개 범위를 바꾼다(API-015). {@code PRIVATE}이면 공개 프로필(API-062)이 즉시 404가 된다. */
     public void changeVisibility(Visibility visibility) {
         this.visibility = visibility;
+    }
+
+    /** 취향 필름 공개 범위를 바꾼다(API-015). {@code PRIVATE}이면 타인의 공개 프로필에서 최근 필름과 프레임 수가 비워진다. */
+    public void changeFrameVisibility(Visibility frameVisibility) {
+        this.frameVisibility = frameVisibility;
+    }
+
+    /** 팝콘 버킷 공개 범위를 바꾼다(API-015). 파티원 팝콘(API-057)의 파티 예외는 그대로다. */
+    public void changePopcornVisibility(Visibility popcornVisibility) {
+        this.popcornVisibility = popcornVisibility;
+    }
+
+    /** 한줄평 공개 범위를 바꾼다(API-015). {@code PRIVATE}이면 평가별 공개 범위와 무관하게 타인에게 한줄평을 보이지 않는다. */
+    public void changeReviewVisibility(Visibility reviewVisibility) {
+        this.reviewVisibility = reviewVisibility;
     }
 
     public String replaceAvatar(String storageKey) {

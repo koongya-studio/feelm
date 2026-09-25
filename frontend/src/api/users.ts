@@ -157,6 +157,20 @@ function toProfileView(profile: MyProfile, keywords: TasteKeyword[]): ProfileVie
       ...frame,
       isPublic: extras.publicFrameIds?.includes(frame.frameId) ?? frame.isPublic,
     })),
+    hidden: hiddenSections(profile),
+  };
+}
+
+/**
+ * 항목별 공개 범위(업무 -856)에서 가려지는 구역. API-014와 API-062의 `user`가 같은 세 이름을 준다.
+ */
+function hiddenSections(
+  owner: Pick<MyProfile, 'frameVisibility' | 'popcornVisibility' | 'reviewVisibility'>,
+): ProfileView['hidden'] {
+  return {
+    frames: owner.frameVisibility === 'PRIVATE',
+    popcorn: owner.popcornVisibility === 'PRIVATE',
+    reviews: owner.reviewVisibility === 'PRIVATE',
   };
 }
 
@@ -165,12 +179,26 @@ function toProfileView(profile: MyProfile, keywords: TasteKeyword[]): ProfileVie
  *
  * 비공개 키워드 · 필름을 빼고 필름은 앞의 세 편만 남긴다. 남의 프로필은 서버(API-062)가
  * 이미 공개된 것만 주지만, 필름 개수는 같은 규칙으로 맞춘다.
+ *
+ * 항목별 공개 범위(업무 -856)가 비공개인 구역은 비운다. 서버가 타인에게 주는 모양(API-062 처리
+ * 규칙)과 같게 해 두어, 미리보기가 내 값을 그대로 새어 보이지 않게 한다.
  */
 function toPublicView(profile: ProfileView): ProfileView {
+  const { hidden } = profile;
+
   return {
     ...profile,
+    stats: {
+      frameCount: hidden.frames ? 0 : profile.stats.frameCount,
+      popcornCount: hidden.popcorn ? 0 : profile.stats.popcornCount,
+      publicReviewCount: hidden.reviews ? 0 : profile.stats.publicReviewCount,
+    },
     keywords: profile.keywords.filter((keyword) => keyword.isPublic),
-    frames: profile.frames.filter((frame) => frame.isPublic).slice(0, PUBLIC_FRAME_COUNT),
+    frames: hidden.frames
+      ? []
+      : profile.frames.filter((frame) => frame.isPublic).slice(0, PUBLIC_FRAME_COUNT),
+    popcorn: hidden.popcorn ? [] : profile.popcorn,
+    reviews: hidden.reviews ? [] : profile.reviews,
   };
 }
 
@@ -200,6 +228,7 @@ export async function getPublicProfile(publicId: string): Promise<ProfileView> {
  * - 소개(`bio`)는 계약에 없어 빈 문자열이다. 화면은 빈 소개를 그리지 않는다
  * - 서버가 공개된 것만 주므로 키워드 · 필름은 모두 `isPublic`이다
  * - 한줄평은 개수만 오므로 목록은 `null`이다 — `공개한 한줄평이 없어요`와 구분한다
+ * - 가려진 구역(업무 -856)은 `user`의 세 공개 범위로 안다. 서버가 비워 준 값을 그대로 담는다
  */
 function toPublicProfileView(response: PublicProfile): ProfileView {
   return toPublicView({
@@ -225,6 +254,7 @@ function toPublicProfileView(response: PublicProfile): ProfileView {
       popcornCount,
     })),
     reviews: null,
+    hidden: hiddenSections(response.user),
   });
 }
 
