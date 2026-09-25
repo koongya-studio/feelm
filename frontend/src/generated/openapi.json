@@ -1568,7 +1568,8 @@
             "enum" : [
               "PARTY_INVITATION",
               "PARTY",
-              "WATCH_RECORD"
+              "WATCH_RECORD",
+              "TASTE_REPORT"
             ],
             "example" : "PARTY_INVITATION",
             "type" : "string"
@@ -1581,7 +1582,8 @@
             "enum" : [
               "PARTY_INVITE",
               "PARTY_INVITE_ACCEPTED",
-              "WATCH_CONFIRM"
+              "WATCH_CONFIRM",
+              "REPORT_ISSUED"
             ],
             "example" : "PARTY_INVITE",
             "type" : "string"
@@ -1623,6 +1625,9 @@
           },
           "RECOMMENDATION" : {
             "type" : "boolean"
+          },
+          "REPORT_ISSUED" : {
+            "type" : "boolean"
           }
         },
         "type" : "object"
@@ -1640,13 +1645,17 @@
           },
           "RECOMMENDATION" : {
             "type" : "boolean"
+          },
+          "REPORT_ISSUED" : {
+            "type" : "boolean"
           }
         },
         "required" : [
           "MARKETING",
           "PARTY_INVITE",
           "RATING",
-          "RECOMMENDATION"
+          "RECOMMENDATION",
+          "REPORT_ISSUED"
         ],
         "type" : "object"
       },

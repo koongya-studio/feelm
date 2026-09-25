@@ -80,6 +80,7 @@ function createFakeServer() {
     RATING: true,
     RECOMMENDATION: true,
     PARTY_INVITE: true,
+    REPORT_ISSUED: true,
     MARKETING: false,
   };
   /** API-013이 대조하는 계정. `getMyProfile`의 `hasPassword`와 짝을 맞춰 쓴다 */
@@ -184,7 +185,7 @@ function createFakeServer() {
 
     if (url.pathname === '/api/v1/users/me/notification-settings') {
       if (method === 'PUT') {
-        // 전체 교체다(API-018). 화면이 보낸 네 키가 그대로 다음 조회에 나온다
+        // 전체 교체다(API-018). 화면이 보낸 다섯 키가 그대로 다음 조회에 나온다
         Object.assign(notification, JSON.parse(init.body as string));
       }
 
@@ -719,8 +720,18 @@ describe('7.8 → 7.8-B · 7.8-C', () => {
       'false',
     );
 
-    // 리포트 발급은 계약(API-017)에 없어 켤 수 없다(업무 -610)
-    expect(screen.getByRole('switch', { name: /리포트 발급 알림/ })).toBeDisabled();
+    // 업무 -610에서 잠갔던 두 줄이 모두 열렸다. 준비 중 안내가 남지 않는다(업무 -857 · -858)
+    for (const toggle of screen.getAllByRole('switch')) expect(toggle).toBeEnabled();
+    expect(screen.queryByText(/준비 중/)).toBeNull();
+
+    // 리포트 발급도 서버에 저장되고 다시 들어와도 남는다(업무 -858)
+    fireEvent.click(screen.getByRole('switch', { name: '리포트 발급 알림' }));
+    await waitFor(() =>
+      expect(screen.getByRole('switch', { name: '리포트 발급 알림' })).toHaveAttribute(
+        'aria-checked',
+        'false',
+      ),
+    );
 
     // 파티 초대는 계약에 들어와(업무 -857) 서버에 저장되고 다시 들어와도 남는다
     const partyInvite = screen.getByRole('switch', { name: '파티 초대 알림' });
@@ -751,6 +762,10 @@ describe('7.8 → 7.8-B · 7.8-C', () => {
       'true',
     );
     expect(screen.getByRole('switch', { name: '파티 초대 알림' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    expect(screen.getByRole('switch', { name: '리포트 발급 알림' })).toHaveAttribute(
       'aria-checked',
       'false',
     );

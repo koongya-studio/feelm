@@ -38,6 +38,8 @@ function lifecycleText(type: NotificationItem['type']): string {
       return '90일 후 자동 삭제';
     case 'WATCH_CONFIRM':
       return '감상 확인 시 삭제 · OTT 이동 후 7일까지 보관';
+    case 'REPORT_ISSUED':
+      return '리포트는 MY에서 다시 볼 수 있어요 · 90일 후 자동 삭제';
   }
 }
 

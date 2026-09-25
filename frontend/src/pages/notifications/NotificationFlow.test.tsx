@@ -75,10 +75,21 @@ const accepted: NotificationItem = {
   notifiedAt: '2026-09-18T09:00:00Z',
 };
 
+const report: NotificationItem = {
+  notificationId: 4,
+  type: 'REPORT_ISSUED',
+  title: '취향 리포트 발급',
+  body: '2026년 상반기 취향 리포트가 도착했어요.',
+  targetType: 'TASTE_REPORT',
+  targetId: 301,
+  readAt: null,
+  notifiedAt: '2026-09-16T09:00:00Z',
+};
+
 beforeEach(() => {
-  vi.mocked(getNotifications).mockReset().mockResolvedValue([accepted, watch, invite]);
+  vi.mocked(getNotifications).mockReset().mockResolvedValue([accepted, watch, invite, report]);
   vi.mocked(getLatestPushNotification).mockReset().mockResolvedValue(watch);
-  vi.mocked(getUnreadNotificationCount).mockReset().mockResolvedValue(3);
+  vi.mocked(getUnreadNotificationCount).mockReset().mockResolvedValue(4);
   vi.mocked(readNotification).mockReset().mockResolvedValue();
   vi.mocked(readAllNotifications).mockReset().mockResolvedValue();
   vi.mocked(dismissNotification).mockReset().mockResolvedValue();
@@ -101,6 +112,7 @@ function renderApp(entries: string[]) {
           <Route path={ROUTE_PATTERN.watchConfirm} element={<p>감상 확인</p>} />
           <Route path={ROUTE_PATTERN.partyInvitation} element={<p>파티 초대</p>} />
           <Route path={ROUTE_PATTERN.partyPopcorn} element={<p>파티 상세</p>} />
+          <Route path={ROUTE_PATTERN.reportIssued} element={<p>새 리포트 발급</p>} />
           <Route path="*" element={<p>다른 화면</p>} />
         </Routes>
         <LocationProbe />
@@ -119,17 +131,21 @@ describe('3.1 → 8.1', () => {
   it('미확인 개수를 알림 링크에 표시하고 목록으로 이동한다', async () => {
     renderApp([ROUTE_PATTERN.film]);
 
-    const link = await screen.findByRole('link', { name: '알림, 읽지 않은 알림 3개' });
+    const link = await screen.findByRole('link', { name: '알림, 읽지 않은 알림 4개' });
     fireEvent.click(link);
 
     expect(location()).toBe('/notifications');
   });
 
-  it('감상 확인·파티 초대·파티 초대 수락을 최신순 단일 목록에 표시한다', async () => {
+  it('감상 확인·파티 초대·파티 초대 수락·리포트 발급을 최신순 단일 목록에 표시한다', async () => {
     renderApp([ROUTE_PATTERN.notifications]);
 
     const list = within(await screen.findByRole('list', { name: '알림 목록' }));
-    expect(list.getAllByRole('listitem')).toHaveLength(3);
+    expect(list.getAllByRole('listitem')).toHaveLength(4);
+    expect(list.getByText('취향 리포트 발급')).toBeInTheDocument();
+    expect(
+      list.getByText('리포트는 MY에서 다시 볼 수 있어요 · 90일 후 자동 삭제'),
+    ).toBeInTheDocument();
     expect(list.getByText('영화 잘 보셨나요?')).toBeInTheDocument();
     expect(list.getByText('파티팝콘 초대')).toBeInTheDocument();
     expect(list.getByText('파티팝콘 초대 수락')).toBeInTheDocument();
@@ -146,6 +162,7 @@ describe('알림 대상 이동', () => {
     ['영화 잘 보셨나요?', '/watch-records/4004/confirm', 1],
     ['파티팝콘 초대', '/parties/invitations/501', 2],
     ['파티팝콘 초대 수락', '/parties/77/popcorn', 3],
+    ['취향 리포트 발급', '/reports/301/new', 4],
   ])('%s 알림을 읽음 처리하고 계약 대상 화면으로 이동한다', async (title, target, id) => {
     renderApp([ROUTE_PATTERN.notifications]);
 

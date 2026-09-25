@@ -15,5 +15,7 @@ public record NotificationSettingsUpdateRequest(
                 Boolean recommendation,
         @JsonProperty("PARTY_INVITE") @NotNull(message = "파티 초대 알림 수신 여부를 입력해 주세요.")
                 Boolean partyInvite,
+        @JsonProperty("REPORT_ISSUED") @NotNull(message = "리포트 발급 알림 수신 여부를 입력해 주세요.")
+                Boolean reportIssued,
         @JsonProperty("MARKETING") @NotNull(message = "마케팅 알림 수신 여부를 입력해 주세요.")
                 Boolean marketing) {}

@@ -1,11 +1,9 @@
 /*
  * 알림 설정 · 차단 (업무 S15P21E106-394).
  *
- * 화면에서는 드러나지 않는 세 가지를 고정한다.
- * - 7.8-C의 토글은 다섯인데 **API-018로 나가는 것은 계약의 네 키뿐**이다. 나머지 하나가
- *   섞여 나가면 백엔드가 모르는 키를 받는다
- * - 계약에 없는 둘은 서버가 받아들인 뒤에만 세션 저장소에 남는다. 실패한 저장이 로컬에
- *   남으면 화면이 되돌린 값과 어긋난다
+ * 화면에서는 드러나지 않는 두 가지를 고정한다.
+ * - 7.8-C의 토글 다섯이 **API-018로 나가는 계약의 다섯 키**와 같다. 화면이 들고 있는 다른
+ *   값이 섞여 나가면 백엔드가 모르는 키를 받는다
  * - 차단 오류 코드(400 · 404 · 409)는 계약 그대로 화면까지 올라간다. 7.2-B가 이미 차단
  *   (409)과 나머지를 가르기 때문이다
  */
@@ -34,11 +32,12 @@ function call(index = 0) {
   return fetchMock.mock.calls[index] as [string, RequestInit];
 }
 
-/** 계약의 네 키(API-017 응답) */
+/** 계약의 다섯 키(API-017 응답) */
 const SERVER_SETTINGS = {
   RATING: true,
   RECOMMENDATION: true,
   PARTY_INVITE: true,
+  REPORT_ISSUED: true,
   MARKETING: false,
 };
 
@@ -54,17 +53,17 @@ afterEach(() => {
 });
 
 describe('API-017 알림 설정 조회', () => {
-  it('계약의 네 키를 그대로 돌려준다', async () => {
+  it('계약의 다섯 키를 그대로 돌려준다', async () => {
     fetchMock.mockResolvedValue(json(200, SERVER_SETTINGS));
 
-    // 7.8-C가 더 그리는 둘(파티 초대 · 리포트 발급)은 계약에 없어 여기서 만들지 않는다(업무 -610)
+    // 7.8-C의 다섯 토글이 서버가 준 다섯 키를 그대로 쓴다(업무 -857 · -858)
     expect(await getNotificationSettings()).toEqual(SERVER_SETTINGS);
     expect(call()[0]).toBe('/api/v1/users/me/notification-settings');
   });
 });
 
 describe('API-018 알림 설정 변경', () => {
-  it('계약의 네 키를 모두 보내고 서버가 준 값을 돌려준다', async () => {
+  it('계약의 다섯 키를 모두 보내고 서버가 준 값을 돌려준다', async () => {
     fetchMock.mockResolvedValue(json(200, { ...SERVER_SETTINGS, MARKETING: true }));
 
     const saved = await updateNotificationSettings({ ...SERVER_SETTINGS, MARKETING: true });
@@ -76,6 +75,7 @@ describe('API-018 알림 설정 변경', () => {
       RATING: true,
       RECOMMENDATION: true,
       PARTY_INVITE: true,
+      REPORT_ISSUED: true,
       MARKETING: true,
     });
     expect(saved).toEqual({ ...SERVER_SETTINGS, MARKETING: true });

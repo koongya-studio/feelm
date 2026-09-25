@@ -269,8 +269,9 @@ public class ReportGenerationRepository {
                                         ReportHalf.valueOf(result.getString("half"))));
     }
 
-    public int publishPreparedFinal(ReportPeriod period) {
-        return jdbc.update(
+    /** 준비를 마친 리포트를 공개하고 이번에 공개한 리포트 ID를 돌려준다. 이미 공개한 리포트는 다시 돌려주지 않는다. */
+    public List<Long> publishPreparedFinal(ReportPeriod period) {
+        return jdbc.queryForList(
                 """
                 UPDATE taste_reports
                 SET status = 'READY'
@@ -279,8 +280,10 @@ public class ReportGenerationRepository {
                   AND status = 'GENERATING'
                   AND content #>> '{generation,finalSnapshot}' = 'true'
                   AND content #>> '{generation,cutoffAt}' = :cutoffAt
+                RETURNING id
                 """,
-                periodParams(period));
+                periodParams(period),
+                Long.class);
     }
 
     private long countByStatus(ReportPeriod period, String status) {
