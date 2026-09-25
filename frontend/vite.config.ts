@@ -3,9 +3,43 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 // `loadEnv`는 vitest가 다시 export하지 않으므로 vite에서 직접 가져온다
 import { loadEnv } from 'vite';
+import { generate } from './scripts/api-types.mjs';
+import { readFile } from 'node:fs/promises';
+import type { Plugin } from 'vite';
 
 /** 개발에서 `/api`를 넘길 백엔드. `.env`의 `VITE_API_PROXY_TARGET`으로 바꾼다 */
 const DEFAULT_API_TARGET = 'http://localhost:8080';
+
+/**
+ * 생성 타입이 OpenAPI 스냅샷과 어긋나면 빌드를 세운다 (업무 S15P21E106-777).
+ *
+ * **이 자리인 이유.** 프론트 MR Job이 돌리는 명령은 CI 서버에 설치된 러너에 고정되어
+ * 있고(`infra/scripts/ci-frontend-mr-runner.py`의 `FIXED_COMMAND`), 그 계약이 `npm run`을
+ * 금지한다(`infra/scripts/test_ci_frontend_mr.py`). 고정 명령 안에서 검사를 걸 수 있는
+ * 곳은 `vite build`뿐이다. 러너 계약을 바꾸는 쪽은 인프라와 합의할 후속 과제다.
+ *
+ * `apply: 'build'`라 개발 서버와 vitest는 지나지 않는다 — 스냅샷을 갱신하는 도중에
+ * 개발 서버가 멈추면 안 되고, 테스트는 이 검사의 대상이 아니다.
+ */
+function apiSchemaDriftCheck(): Plugin {
+  return {
+    name: 'feelm-api-schema-drift',
+    apply: 'build',
+    async buildStart() {
+      const expected = await generate();
+      const current = await readFile(
+        new URL('./src/generated/api-schema.d.ts', import.meta.url),
+        'utf8',
+      ).catch(() => null);
+
+      if (current !== expected) {
+        this.error(
+          'src/generated/api-schema.d.ts 가 openapi.json 과 어긋납니다. `npm run api:generate`를 실행하세요.',
+        );
+      }
+    },
+  };
+}
 
 /** 개발 서버가 `/api` · `/media`를 넘길 백엔드. `.env`의 `VITE_API_PROXY_TARGET`이 정한다 */
 function apiTarget(mode: string): string {
@@ -15,7 +49,7 @@ function apiTarget(mode: string): string {
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
   base: '/app/',
-  plugins: [react()],
+  plugins: [react(), apiSchemaDriftCheck()],
   server: {
     port: 5173,
     /*
