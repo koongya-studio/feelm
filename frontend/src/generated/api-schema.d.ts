@@ -1835,14 +1835,14 @@ export interface components {
              * @example PARTY_INVITATION
              * @enum {string}
              */
-            targetType?: "PARTY_INVITATION" | "PARTY" | "WATCH_RECORD";
+            targetType?: "PARTY_INVITATION" | "PARTY" | "WATCH_RECORD" | "TASTE_REPORT";
             /** @example 파티팝콘 초대 */
             title?: string;
             /**
              * @example PARTY_INVITE
              * @enum {string}
              */
-            type?: "PARTY_INVITE" | "PARTY_INVITE_ACCEPTED" | "WATCH_CONFIRM";
+            type?: "PARTY_INVITE" | "PARTY_INVITE_ACCEPTED" | "WATCH_CONFIRM" | "REPORT_ISSUED";
         };
         /** @description 인앱 알림 커서 페이지 */
         NotificationPageResponse: {
@@ -1855,12 +1855,14 @@ export interface components {
             PARTY_INVITE?: boolean;
             RATING?: boolean;
             RECOMMENDATION?: boolean;
+            REPORT_ISSUED?: boolean;
         };
         NotificationSettingsUpdateRequest: {
             MARKETING: boolean;
             PARTY_INVITE: boolean;
             RATING: boolean;
             RECOMMENDATION: boolean;
+            REPORT_ISSUED: boolean;
         };
         /** @description 미확인 인앱 알림 개수 */
         NotificationUnreadCountResponse: {

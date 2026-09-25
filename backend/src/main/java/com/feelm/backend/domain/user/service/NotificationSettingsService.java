@@ -66,6 +66,7 @@ public class NotificationSettingsService {
                 request.rating(),
                 request.recommendation(),
                 request.partyInvite(),
+                request.reportIssued(),
                 request.marketing());
         return NotificationSettingsResponse.from(settings);
     }

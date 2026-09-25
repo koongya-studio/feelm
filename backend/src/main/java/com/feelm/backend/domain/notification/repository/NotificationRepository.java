@@ -64,6 +64,48 @@ public class NotificationRepository {
                 .optional();
     }
 
+    /**
+     * 이번에 공개한 리포트마다 주인에게 리포트 발급 알림을 만들고 만든 수를 돌려준다(S15P21E106-858).
+     *
+     * <p>활성 계정이 아니거나 리포트 발급 알림을 끈 사용자(API-017 {@code REPORT_ISSUED})는 건너뛴다. 설정 행이 없으면 기본값(켜짐)으로 본다.
+     * 같은 리포트는 UK(type, source_id)로 한 번만 만든다.
+     *
+     * <p>주인 계정 행을 공유 잠금으로 읽는다. 탈퇴(API-013)는 계정 행을 잠그고 알림을 지우는데, 잠그지 않으면 탈퇴가 커밋되기 전의 {@code ACTIVE}를
+     * 보고 넣은 알림이 탈퇴의 삭제를 비켜 가 남는다. 잠그면 탈퇴 커밋을 기다린 뒤 상태를 다시 보고 건너뛴다. 교착을 막으려고 계정 번호 순으로 잠근다.
+     */
+    public int createReportIssued(
+            List<Long> reportIds, String body, Instant notifiedAt, Instant expiresAt) {
+        if (reportIds.isEmpty()) {
+            return 0;
+        }
+        return jdbc.sql(
+                        """
+                        INSERT INTO notifications(
+                            user_id, type, source_id, target_type, target_id,
+                            title, body, notified_at, expires_at
+                        )
+                        SELECT
+                            report.user_id, 'REPORT_ISSUED', report.id, 'TASTE_REPORT',
+                            report.id, '취향 리포트 발급', :body, :notifiedAt, :expiresAt
+                        FROM taste_reports report
+                        JOIN users owner ON owner.id = report.user_id AND owner.status = 'ACTIVE'
+                        WHERE report.id IN (:reportIds)
+                          AND NOT EXISTS (
+                              SELECT 1 FROM notification_settings setting
+                              WHERE setting.user_id = report.user_id
+                                AND NOT setting.report_issued_enabled
+                          )
+                        ORDER BY owner.id
+                        FOR SHARE OF owner
+                        ON CONFLICT (type, source_id) DO NOTHING
+                        """)
+                .param("reportIds", reportIds)
+                .param("body", body)
+                .param("notifiedAt", offset(notifiedAt))
+                .param("expiresAt", offset(expiresAt))
+                .update();
+    }
+
     public long createPartyInvitationAccepted(
             long ownerId,
             long invitationId,

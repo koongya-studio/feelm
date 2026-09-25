@@ -533,7 +533,7 @@ abstract class EmailAuthApiTestSupport {
     Map<String, Object> notificationSettings(long userId) {
         return jdbcTemplate.queryForMap(
                 "select rating_enabled, recommendation_enabled, party_invite_enabled,"
-                        + " marketing_enabled from notification_settings where user_id = ?",
+                        + " report_issued_enabled, marketing_enabled from notification_settings where user_id = ?",
                 userId);
     }
 
