@@ -121,6 +121,7 @@ export default function RecommendationGroup({
               reason={lead.reason.summary}
               detailButton
               recommendationItemId={lead.recommendationItemId}
+              ottLinks
             />
           </div>
 
@@ -137,6 +138,7 @@ export default function RecommendationGroup({
                   reason={item.reason.summary}
                   compact
                   recommendationItemId={item.recommendationItemId}
+                  ottLinks
                 />
               ))}
             </div>

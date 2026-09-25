@@ -5,12 +5,24 @@
 
 .posterLink {
   composes: posterLink from '../../../../styles/interaction.module.css';
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+}
+
+.cardContent {
   display: flex;
   width: 100%;
   height: 100%;
   flex-direction: column;
   overflow: hidden;
-  text-decoration: none;
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  .posterLink:hover + .cardContent .posterArea {
+    filter: brightness(1.07);
+  }
 }
 
 .posterLink:focus-visible {
@@ -79,11 +91,33 @@
   min-width: 0;
   flex: none;
   align-items: center;
-  gap: 4px;
+  /* 22px 배지 사이에 44px 터치 영역이 겹치지 않을 공간을 둔다. */
+  gap: 22px;
 }
 
 .ottList > span {
   display: flex;
+}
+
+.ottLink {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.ottLink::before {
+  position: absolute;
+  /* 보이는 배지 크기는 유지하고 누를 수 있는 면만 44px로 넓힌다. */
+  inset: -11px;
+  content: '';
+}
+
+.ottLink:focus-visible {
+  outline: 2px solid var(--color-film-hole);
+  outline-offset: 8px;
 }
 
 .reason {
@@ -124,6 +158,7 @@
 
 .dismissButton {
   position: absolute;
+  z-index: 3;
   top: -3px;
   right: -3px;
 }

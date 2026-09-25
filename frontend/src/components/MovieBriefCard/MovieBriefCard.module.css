@@ -197,6 +197,20 @@
   padding-left: 0;
 }
 
+.ottLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  margin: -4px;
+  border-radius: 8px;
+}
+
+.ottLink:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 4px;
+}
+
 .ottEmpty {
   color: var(--color-ink-hint);
   font-size: var(--font-size-caption);

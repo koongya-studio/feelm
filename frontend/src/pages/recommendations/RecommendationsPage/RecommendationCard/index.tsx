@@ -7,6 +7,7 @@ import { BlockIcon, ChevronRightIcon } from '../../../../components/Icon';
 import Poster from '../../../../components/Poster';
 import PosterCue from '../../../../components/PosterCue';
 import { path } from '../../../../routes/paths';
+import { ottMovieUrl } from '../../../../utils/ott';
 import styles from './RecommendationCard.module.css';
 import type { MouseEvent } from 'react';
 import type { Ott } from '../../../../types/ott';
@@ -32,7 +33,8 @@ export default function RecommendationCard({ item, otts, dismissing, onDismiss }
         className={styles.posterLink}
         data-guide-target="recommendation"
         aria-label={`${movie.title} 상세 보기`}
-      >
+      />
+      <div className={styles.cardContent}>
         <span className={styles.posterArea}>
           <PosterCue cue={false}>
             <Poster
@@ -52,10 +54,23 @@ export default function RecommendationCard({ item, otts, dismissing, onDismiss }
             <span className={styles.ottList}>
               {movie.ottProviders.map((code) => {
                 const ott = otts.find((candidate) => candidate.code === code);
+                const destination = ottMovieUrl(code, movie.title);
 
                 return (
                   <span key={code}>
-                    <OttBadge code={code} name={ott?.name ?? code} size={22} />
+                    {destination ? (
+                      <a
+                        href={destination}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.ottLink}
+                        aria-label={`${ott?.name ?? code}에서 ${movie.title} 보기 (새 창)`}
+                      >
+                        <OttBadge code={code} name={ott?.name ?? code} size={22} labelled={false} />
+                      </a>
+                    ) : (
+                      <OttBadge code={code} name={ott?.name ?? code} size={22} />
+                    )}
                   </span>
                 );
               })}
@@ -68,7 +83,7 @@ export default function RecommendationCard({ item, otts, dismissing, onDismiss }
             </span>
           </span>
         </span>
-      </Link>
+      </div>
 
       <span className={styles.dismissButton}>
         <IconButton

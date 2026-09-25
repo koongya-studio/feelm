@@ -239,6 +239,27 @@ afterEach(() => {
 });
 
 describe('RecommendationsPage 데스크톱 시안', () => {
+  it('OTT 배지만 서비스로 연결하고 영화 포스터는 상세로 연결한다', async () => {
+    vi.mocked(getOtts).mockResolvedValue([
+      { ottId: 1, code: 'NETFLIX', name: '넷플릭스', logoUrl: null },
+    ]);
+    renderRecommendations(1440);
+
+    const taste = await screen.findByRole('group', { name: '취향 맞춤 추천 카드' });
+    const ottLink = within(taste).getByRole('link', {
+      name: '넷플릭스에서 파이트 클럽 보기 (새 창)',
+    });
+    expect(ottLink).toHaveAttribute(
+      'href',
+      'https://www.netflix.com/search?q=%ED%8C%8C%EC%9D%B4%ED%8A%B8%20%ED%81%B4%EB%9F%BD',
+    );
+    expect(ottLink).toHaveAttribute('target', '_blank');
+    expect(within(taste).getByRole('link', { name: '파이트 클럽 상세 보기' })).toHaveAttribute(
+      'href',
+      '/movies/550',
+    );
+  });
+
   it('카드를 취향 맞춤 · 취향 발견 두 필름으로 나누고 묶음마다 석 장을 세운다', async () => {
     renderRecommendations(1440);
 
@@ -343,7 +364,7 @@ describe('RecommendationsPage 데스크톱 시안', () => {
     expect(leadDismiss.className).toBe(compactDismiss.className);
     expect(
       within(lead)
-        .getByRole('img', { name: 'NETFLIX' })
+        .getByRole('link', { name: 'NETFLIX에서 파이트 클럽 보기 (새 창)' })
         .closest('ul')
         ?.parentElement?.querySelector('h3'),
     ).not.toBeNull();
