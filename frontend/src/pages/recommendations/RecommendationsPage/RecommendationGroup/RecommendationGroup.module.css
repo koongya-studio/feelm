@@ -98,8 +98,12 @@
   height: 100%;
 }
 
-/* 카드 오른쪽 위 `⋯`. 아이콘이 아니라 글자라 크기를 직접 맞춘다 */
-.ellipsis {
-  font-size: 15px;
-  line-height: 1;
+/* 대표 카드의 조작 아이콘도 넓어진 버튼 영역에 맞춰 함께 키운다(업무 -890) */
+.leadBlockIcon {
+  display: flex;
+}
+
+.leadBlockIcon svg {
+  width: 18px;
+  height: 18px;
 }

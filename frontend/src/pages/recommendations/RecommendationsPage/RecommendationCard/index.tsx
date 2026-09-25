@@ -4,10 +4,9 @@
  * **크기는 릴의 칸을 채운다** — 필름이 화면 폭을 꽉 채우도록 칸이 화면 폭을 따른다(업무 -672,
  * `RecommendationsPage`의 FRAME_WIDTH). 비율은 와이어프레임 156 × 220이고 아래 위치값도
  * 와이어프레임 그대로다.
- * - `⋯` 버튼 26px: top 6 left 6, 반투명 흰 배경
- * - 관심없음 버튼 26px: top 6 right 6 — ⋯ 버튼과 같은 모양(업무 -672)
+ * - 관심없음 버튼 26px: top 6 right 6, 반투명 흰 배경(업무 -672 · -890)
  * - OTT 배지 22px: 관심없음 버튼 왼쪽, gap 4
- * - `새로운 맛` 배지: ⋯ 버튼 오른쪽(top 6 · left 38, 버튼 높이 가운데), 빨간 면 —
+ * - `새로운 맛` 배지: 왼쪽 위(top 6 · left 6, 관심없음 버튼 높이 가운데), 빨간 면 —
  *   취향 발견 카드에만(사용자 지시 2026-09-18)
  * - 추천 이유 상자: left 6 right 6 bottom 6
  *
@@ -19,7 +18,7 @@
  * 카드의 `안 봄`은 뺐다. `일치 %` · `연결 %`(matchRate)도 계약에 없어 그리지 않는다
  * (CR-13, 업무 -610).
  *
- * **관심없음은 ⋯ 메뉴가 아니라 오른쪽 위 버튼이다**(사용자 지시 2026-09-18, 업무 -672).
+ * **관심없음은 오른쪽 위 독립 버튼이다**(사용자 지시 2026-09-18, 업무 -672 · -890).
  * 누르면 화면이 API-047을 부른다(`RecommendationsPage`). 처리하는 동안은 눌리지 않는다.
  *
  * **포스터가 상세로 간다는 단서는 추천 이유 상자 끝의 화살표다**(업무 -697). 다른 포스터는
@@ -35,28 +34,18 @@ import Poster from '../../../../components/Poster';
 import PosterCue from '../../../../components/PosterCue';
 import { path } from '../../../../routes/paths';
 import styles from './RecommendationCard.module.css';
-import type { MouseEvent } from 'react';
 import type { Ott } from '../../../../types/ott';
 import type { RecommendationItem } from '../../../../types/recommendation';
 
 type Props = {
   item: RecommendationItem;
   otts: Ott[];
-  menuOpen: boolean;
-  onOpenMenu: (event: MouseEvent<HTMLButtonElement>, item: RecommendationItem) => void;
   /** 관심없음을 처리하는 중이면 버튼을 막는다 */
   dismissing: boolean;
   onDismiss: (item: RecommendationItem) => void;
 };
 
-export default function RecommendationCard({
-  item,
-  otts,
-  menuOpen,
-  onOpenMenu,
-  dismissing,
-  onDismiss,
-}: Props) {
+export default function RecommendationCard({ item, otts, dismissing, onDismiss }: Props) {
   const { movie, reason, type } = item;
   const isDiscovery = type === 'DISCOVERY';
 
@@ -81,18 +70,6 @@ export default function RecommendationCard({
           />
         </PosterCue>
       </Link>
-
-      <span className={styles.menuButton}>
-        <IconButton
-          label={`${movie.title} OTT 메뉴`}
-          icon={<span className={styles.ellipsis}>⋯</span>}
-          size={26}
-          shape="rounded"
-          variant={menuOpen ? 'filled' : 'translucent'}
-          aria-expanded={menuOpen}
-          onClick={(event) => onOpenMenu(event, item)}
-        />
-      </span>
 
       <span className={styles.dismissButton}>
         <IconButton

@@ -329,6 +329,23 @@ describe('RecommendationsPage 데스크톱 시안', () => {
     await waitFor(() => expect(dismissMovie).toHaveBeenCalledWith(550, 3301));
   });
 
+  it('대표·작은 카드 모두 관심없음만 표시하고 대표 버튼만 크게 그린다', async () => {
+    renderRecommendations(1440);
+
+    const taste = await screen.findByRole('group', { name: '취향 맞춤 추천 카드' });
+    const [lead, compact] = within(taste).getAllByRole('article');
+    const leadDismiss = within(lead).getByRole('button', { name: '파이트 클럽 관심없음' });
+    const compactDismiss = within(compact).getByRole('button', { name: '조디악 관심없음' });
+
+    expect(leadDismiss).toHaveStyle('--icon-button-size: 36px');
+    expect(compactDismiss).toHaveStyle('--icon-button-size: 26px');
+    expect(leadDismiss).toHaveAttribute('data-variant', 'plain');
+    expect(leadDismiss.className).toBe(compactDismiss.className);
+    expect(within(lead).queryByRole('button', { name: '파이트 클럽 OTT 메뉴' })).toBeNull();
+    expect(within(compact).queryByRole('button', { name: '조디악 OTT 메뉴' })).toBeNull();
+    expect(within(taste).queryByRole('button', { name: /OTT 메뉴/ })).toBeNull();
+  });
+
   it('관심없음 처리 중 모바일로 바뀌면 현재 폭의 세 편으로 보충한다', async () => {
     let resolveDismiss!: () => void;
     vi.mocked(dismissMovie).mockReturnValue(

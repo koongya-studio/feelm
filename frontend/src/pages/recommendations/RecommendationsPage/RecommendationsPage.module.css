@@ -36,61 +36,6 @@
   text-align: center;
 }
 
-.menuOttList {
-  display: flex;
-  margin-bottom: 6px;
-  gap: 7px;
-}
-
-.menuOttNames {
-  margin-bottom: 10px;
-  color: var(--color-ink-hint);
-  font-size: 10.5px;
-}
-
-.menuDivider {
-  height: 1px;
-  margin: 0 0 10px;
-  border: 0;
-  background: var(--color-line);
-}
-
-.menuItems {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-
-/*
- * 와이어프레임 2.3의 항목 간격은 7px이고 항목 높이는 아이콘 크기(13px)에 맞춰져 있다.
- * 터치 영역을 44px로 넓히면 메뉴 배치 자체가 바뀌므로 여기서는 넓히지 않는다
- * (common-components.md 6.3 — 배치를 바꾸지 않는 범위에서 적용).
- * 남은 문제로 보고했다.
- */
-.menuItem {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-ink);
-  text-align: left;
-  cursor: pointer;
-}
-
-.menuItem:disabled {
-  cursor: default;
-  opacity: 0.45;
-}
-
-.menuItemLabel {
-  color: var(--color-ink);
-  font-size: 11px;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
 /* 2.2-A · 빈 데이터 안내의 보조 동작. 이동이라 Button이 아니라 링크다 */
 .searchLink {
   display: flex;
