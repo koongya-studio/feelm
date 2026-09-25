@@ -22,7 +22,15 @@ import { ApiError } from '../../../api/apiError';
 import PartyPopcornMixPage from './index';
 import { renderWithRouter } from '../../../test/render';
 import { getParty, getPartyPopcorn, getPartyRecommendations } from '../../../api/parties';
-import { party, partyPopcorn, partyRecommendations, TEST_PARTY_ID } from '../../../test/party';
+import {
+  ME,
+  member,
+  memberPopcorn,
+  party,
+  partyPopcorn,
+  partyRecommendations,
+  TEST_PARTY_ID,
+} from '../../../test/party';
 
 /*
  * 연출을 끝까지 기다리는 테스트가 있어 이 파일의 제한 시간을 올린다. `it`마다 제한을 붙이면
@@ -57,6 +65,43 @@ function renderMix() {
 }
 
 describe('5.9 팝콘 모으기 · 섞기', () => {
+  it('1명 참여와 초대 대기 3명을 각각 팝콘으로 표시한다', async () => {
+    const invitees = [2048, 3072, 4096].map((userId, index) => ({
+      invitationId: index + 1,
+      invitee: { userId, nickname: `친구${index + 1}` },
+      createdAt: '2026-09-25T00:00:00Z',
+    }));
+    vi.mocked(getParty).mockResolvedValue(
+      party({ members: [member(ME, 'OWNER')], pendingInvitations: invitees }),
+    );
+    vi.mocked(getPartyPopcorn).mockResolvedValue({
+      partyId: TEST_PARTY_ID,
+      members: [memberPopcorn(ME, [3, 0, 0, 0, 0, 0, 0, 0])],
+    });
+
+    const { container } = renderMix();
+
+    expect(await screen.findByText('1명 참여 중 · 3명 초대 수락 대기')).toBeInTheDocument();
+    expect(screen.getAllByText('입장 대기')).toHaveLength(3);
+    expect(screen.getAllByText('참여 완료')).toHaveLength(1);
+    for (let index = 1; index <= 3; index += 1) {
+      expect(
+        screen.getByRole('img', { name: `친구${index}님의 입장 대기 팝콘` }),
+      ).toBeInTheDocument();
+    }
+    expect(screen.getByRole('button', { name: '참여 확인하기' })).toHaveAttribute(
+      'data-variant',
+      'brand',
+    );
+    await waitFor(() => {
+      expect(
+        container.querySelector('svg[aria-label="김난다님의 팝콘"]')?.querySelectorAll('image')
+          .length,
+      ).toBeGreaterThan(1);
+    });
+    expect(getPartyRecommendations).not.toHaveBeenCalled();
+  });
+
   it('파티원 통이 기계 위로 모이는 것으로 시작하고, 섞기 버튼은 없다', async () => {
     renderMix();
 
