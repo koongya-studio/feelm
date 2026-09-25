@@ -88,7 +88,7 @@ const auth: AuthValue = {
 const SECOND = party({
   partyId: 9100,
   name: '주말 영화 모임',
-  // 정원이 찬 파티다. `진행 중` · `모집 중`을 가르는 것이 정원뿐이다
+  // 정원이 찬 파티다
   maxMembers: 2,
   members: [member(BUDDY, 'OWNER'), member({ userId: 3072, nickname: '팝콘러' })],
 });
@@ -191,14 +191,21 @@ describe('5.1 파티팝콘 데스크톱 시안', () => {
     expect(cards[1]).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('정원이 찼는지에 따라 `진행 중` · `모집 중`을 나눠 적는다', async () => {
+  it('추천을 받을 수 있는지에 따라 `진행 중` · `모집 중`을 나눠 적는다 (업무 -872)', async () => {
+    vi.mocked(getMyParties).mockResolvedValue([
+      party(),
+      SECOND,
+      party({ partyId: 9102, name: '혼자 모임', members: [member(ME, 'OWNER')] }),
+    ]);
     renderParty(1440);
 
     const joined = await screen.findByRole('region', { name: /참여 중인 파티/ });
+    const card = (name: string) => within(joined).getByRole('button', { name: new RegExp(name) });
 
-    // 금요 심야 상영회는 2 / 4명, 주말 영화 모임은 2 / 2명이다
-    expect(within(joined).getByText('모집 중')).toBeInTheDocument();
-    expect(within(joined).getByText('진행 중')).toBeInTheDocument();
+    // 2 / 4명도 정원이 차지 않았을 뿐 이미 추천을 받는다. 방장 혼자일 때만 모집 중이다
+    expect(within(card('금요 심야 상영회')).getByText('진행 중')).toBeInTheDocument();
+    expect(within(card('주말 영화 모임')).getByText('진행 중')).toBeInTheDocument();
+    expect(within(card('혼자 모임')).getByText('모집 중')).toBeInTheDocument();
   });
 
   it('우측 보조 패널이 고른 파티의 멤버 · 공통 취향 · 인원 현황을 말한다', async () => {

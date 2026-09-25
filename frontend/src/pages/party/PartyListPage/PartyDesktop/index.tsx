@@ -20,14 +20,15 @@
  * - **초대 카드의 참여자 얼굴** — API-052가 주는 것은 `memberCount` 하나다. 인원 수가
  *   이미 오른쪽 위에 있어 얼굴 없이도 몇이 모였는지 읽힌다
  * - **`토론 중` · `영화 선택 중` 상태** — 계약의 파티 상태는 `ACTIVE` · `CLOSED`뿐이다.
- *   목록에 오는 것은 활성 파티뿐이라(API-050 기본값) 그 자리에 **정원으로 가를 수 있는 두
- *   가지**를 둔다(사용자 결정 2026-09-22) — 자리가 남았으면 `모집 중`, 다 찼으면 `진행 중`
+ *   그 자리에 추천을 받을 수 있는지로 가르는 `진행 중` · `모집 중`을 둔다
+ *   (`utils/party`의 `partyStatusLabel`)
  */
 import Button from '../../../../components/Button';
 import PopcornBucket from '../../../../components/PopcornBucket';
 import { ChevronRightIcon, PartyGroupIcon } from '../../../../components/Icon';
 import MemberFaces from '../MemberFaces';
 import { formatRelativeTime } from '../../../../utils/date';
+import { partyStatusLabel } from '../../../../utils/party';
 import styles from './PartyDesktop.module.css';
 import type { Party, PartyInvitation, PartyPopcorn } from '../../../../types/party';
 import type { FlavorCount } from '../../../../components/PopcornBucket/kernels';
@@ -186,7 +187,6 @@ export default function PartyDesktop({
             {parties.map((party) => {
               const selected = party.partyId === selectedId;
               const popcorn = popcorns.get(party.partyId);
-              const full = party.members.length >= party.maxMembers;
 
               return (
                 <li key={party.partyId}>
@@ -207,7 +207,7 @@ export default function PartyDesktop({
 
                       <span className={styles.partyBadge}>
                         <span className={styles.partyDot} aria-hidden="true" />
-                        {full ? '진행 중' : '모집 중'}
+                        {partyStatusLabel(party)}
                       </span>
                     </span>
 

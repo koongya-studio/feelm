@@ -95,7 +95,7 @@ import { getPopcornFlavors } from '../../../api/taste';
 import { useShellSize } from '../../../hooks/useShellSize';
 import { useAuth } from '../../../contexts/authContext';
 import { path } from '../../../routes/paths';
-import { mixedFlavors } from '../../../utils/party';
+import { mixedFlavors, partyStatusLabel } from '../../../utils/party';
 import {
   PARTY_GUIDE,
   completeGuide,
@@ -597,7 +597,7 @@ export default function PartyListPage() {
 
               <span className={styles.heroBadge}>
                 <span className={styles.heroDot} aria-hidden="true" />
-                진행 중
+                {partyStatusLabel(firstParty)}
               </span>
             </div>
 
