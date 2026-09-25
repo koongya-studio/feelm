@@ -420,6 +420,7 @@ function CutShell({ kind, label, mode, imageError, flip, caption, children }: Cu
         <button
           type="button"
           className={styles.flipButton}
+          data-report-flip-control="true"
           aria-expanded={flipped}
           onClick={flip?.onFlip}
         >

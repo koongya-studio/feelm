@@ -53,6 +53,56 @@ describe('ReportFourCut PNG 저장', () => {
     );
   });
 
+  it('캡처에서는 칸 뒤집기 버튼을 제외한다', async () => {
+    const node = document.createElement('div');
+    const flipButton = document.createElement('button');
+    flipButton.dataset.reportFlipControl = 'true';
+    node.append(flipButton);
+    Object.defineProperties(node, {
+      scrollWidth: { value: 385 },
+      scrollHeight: { value: 1165 },
+    });
+    vi.mocked(toBlob).mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+
+    await captureReportImage(node);
+
+    const options = vi.mocked(toBlob).mock.calls[0][1];
+    expect(options?.filter?.(flipButton)).toBe(false);
+    expect(options?.filter?.(document.createElement('div'))).toBe(true);
+  });
+
+  it('iPhone에서는 웹폰트 재삽입을 생략하고 PNG를 만든다', async () => {
+    vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)',
+    );
+    const node = document.createElement('div');
+    Object.defineProperties(node, {
+      scrollWidth: { value: 385 },
+      scrollHeight: { value: 1165 },
+    });
+    vi.mocked(toBlob).mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+
+    await captureReportImage(node);
+
+    expect(toBlob).toHaveBeenCalledWith(node, expect.objectContaining({ skipFonts: true }));
+  });
+
+  it('iPhone의 첫 SVG 로딩이 실패하면 사진이 있는 DOM을 다시 캡처한다', async () => {
+    vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)',
+    );
+    const node = document.createElement('div');
+    Object.defineProperties(node, {
+      scrollWidth: { value: 385 },
+      scrollHeight: { value: 1165 },
+    });
+    const png = new Blob(['png'], { type: 'image/png' });
+    vi.mocked(toBlob).mockRejectedValueOnce(new Error('Load failed')).mockResolvedValueOnce(png);
+
+    await expect(captureReportImage(node)).resolves.toBe(png);
+    expect(toBlob).toHaveBeenCalledTimes(2);
+  });
+
   it('뒷면은 폭만 1080으로 맞추고 높이는 화면 비율을 따른다', async () => {
     const node = document.createElement('div');
     Object.defineProperties(node, {
@@ -74,6 +124,58 @@ describe('ReportFourCut PNG 저장', () => {
     );
   });
 
+  it('사진을 데이터 URL로 포함한 DOM만 PNG로 변환한다', async () => {
+    const parent = document.createElement('div');
+    const node = document.createElement('div');
+    const image = document.createElement('img');
+    image.src = '/photo.webp';
+    image.decode = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperties(image, {
+      complete: { value: true },
+      naturalWidth: { value: 100 },
+    });
+    Object.defineProperties(node, {
+      scrollWidth: { value: 385 },
+      scrollHeight: { value: 1165 },
+    });
+    node.append(image);
+    parent.append(node);
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(new TextEncoder().encode('image'), {
+        headers: { 'Content-Type': 'image/webp' },
+      }),
+    );
+    const png = new Blob(['png'], { type: 'image/png' });
+    vi.mocked(toBlob).mockImplementation(async (captureNode) => {
+      expect(captureNode).toBe(node);
+      expect(captureNode.querySelector('img')?.src).toMatch(/^data:image\/webp;base64,/);
+      return png;
+    });
+
+    await expect(captureReportImage(node)).resolves.toBe(png);
+    expect(parent.childElementCount).toBe(1);
+    expect(image.getAttribute('src')).toBe('/photo.webp');
+  });
+
+  it('사진을 다시 읽지 못하면 불완전한 PNG를 만들지 않는다', async () => {
+    const parent = document.createElement('div');
+    const node = document.createElement('div');
+    const image = document.createElement('img');
+    image.src = 'https://example.com/photo.jpg';
+    image.decode = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperties(image, { complete: { value: true }, naturalWidth: { value: 100 } });
+    Object.defineProperties(node, {
+      scrollWidth: { value: 385 },
+      scrollHeight: { value: 1165 },
+    });
+    node.append(image);
+    parent.append(node);
+    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'));
+
+    await expect(captureReportImage(node)).rejects.toThrow('Failed to fetch');
+    expect(toBlob).not.toHaveBeenCalled();
+  });
+
   it('사진 실패가 표시된 DOM은 업로드용 PNG를 만들지 않는다', async () => {
     const node = document.createElement('div');
     node.innerHTML = '<div data-image-error="true"></div>';
@@ -92,7 +194,7 @@ describe('ReportFourCut PNG 저장', () => {
     vi.mocked(toBlob).mockReturnValue(new Promise(() => undefined));
 
     const capture = captureReportImage(node);
-    const rejection = expect(capture).rejects.toThrow('capture timed out');
+    const rejection = expect(capture).rejects.toThrow('render timed out');
     await vi.advanceTimersByTimeAsync(15_000);
 
     await rejection;

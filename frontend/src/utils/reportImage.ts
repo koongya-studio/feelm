@@ -14,6 +14,7 @@ import { toBlob } from 'html-to-image';
 export const REPORT_IMAGE_WIDTH = 1080;
 export const REPORT_IMAGE_HEIGHT = 3268;
 const CAPTURE_TIMEOUT_MS = 15_000;
+const IOS_CAPTURE_TIMEOUT_MS = 30_000;
 const DOWNLOAD_TIMEOUT_MS = 30_000;
 
 /** 웹폰트와 사진 배치가 끝난 뒤 화면의 4컷 DOM을 고해상도 PNG로 캡처한다. */
@@ -21,6 +22,7 @@ export function captureReportImage(node: HTMLElement): Promise<Blob> {
   return withTimeout(
     captureReadyReportImage(node, () => REPORT_IMAGE_HEIGHT),
     'ReportFourCut PNG capture timed out',
+    isIOS() ? IOS_CAPTURE_TIMEOUT_MS : CAPTURE_TIMEOUT_MS,
   );
 }
 
@@ -31,7 +33,12 @@ export function captureReportBackImage(node: HTMLElement): Promise<Blob> {
       Math.round((REPORT_IMAGE_WIDTH * height) / width),
     ),
     'ReportFourCut back PNG capture timed out',
+    isIOS() ? IOS_CAPTURE_TIMEOUT_MS : CAPTURE_TIMEOUT_MS,
   );
+}
+
+function isIOS(): boolean {
+  return /iP(hone|ad|od)/.test(navigator.userAgent);
 }
 
 async function captureReadyReportImage(
@@ -42,7 +49,7 @@ async function captureReadyReportImage(
   if (document.fonts) {
     await document.fonts.ready;
   }
-  await Promise.all(Array.from(node.querySelectorAll('img')).map((image) => image.decode()));
+  await decodeVisibleImages(node);
   await nextPaint();
   assertImagesAvailable(node);
 
@@ -58,18 +65,83 @@ async function captureReadyReportImage(
   const height = node.scrollHeight;
   if (width <= 0 || height <= 0) throw new Error('ReportFourCut is not laid out');
 
-  const png = await toBlob(node, {
-    width,
-    height,
-    canvasWidth: REPORT_IMAGE_WIDTH,
-    canvasHeight: canvasHeightOf(width, height),
-    backgroundColor: '#0c0c0d',
-    cacheBust: true,
-    pixelRatio: 1,
-  });
+  // html-to-image는 복제한 <img>를 다시 fetch한다. 그 요청이 실패하면 빈 사진으로
+  // 계속 진행하므로, 먼저 모든 사진을 데이터 URL로 고정하고 실패를 사용자에게 알린다.
+  const images = Array.from(node.querySelectorAll('img'));
+  const imageData = await Promise.all(
+    images.map((image) => imageDataUrl(image.currentSrc || image.src)),
+  );
+  const originals = images.map((image) => ({
+    src: image.getAttribute('src'),
+    srcset: image.getAttribute('srcset'),
+  }));
+  try {
+    images.forEach((image, index) => {
+      image.removeAttribute('srcset');
+      image.src = imageData[index];
+    });
+    await decodeVisibleImages(node);
+    const options = {
+      width,
+      height,
+      canvasWidth: REPORT_IMAGE_WIDTH,
+      canvasHeight: canvasHeightOf(width, height),
+      backgroundColor: '#0c0c0d',
+      pixelRatio: 1,
+      filter: (child: HTMLElement) =>
+        !(child instanceof HTMLElement && child.hasAttribute('data-report-flip-control')),
+      // iOS Safari에서 동적 서브셋 웹폰트 수십 개를 SVG 안에 다시 넣으면
+      // 캡처가 끝나지 않는다. 기기 글꼴로 그려 PNG 생성과 사진 보존을 우선한다.
+      skipFonts: isIOS(),
+    };
+    let png: Blob | null;
+    try {
+      png = await withTimeout(toBlob(node, options), 'ReportFourCut PNG render timed out', 10_000);
+    } catch (error) {
+      if (!isIOS()) throw error;
+      // Safari의 SVG foreignObject 디코딩은 간헐적으로 Load failed를 낸다.
+      // 같은 원본 DOM을 한 프레임 뒤 다시 그리면 빈 사진으로 진행하지 않고 재시도할 수 있다.
+      await nextPaint();
+      png = await withTimeout(toBlob(node, options), 'ReportFourCut PNG render timed out', 10_000);
+    }
 
-  if (!png || png.type !== 'image/png') throw new Error('ReportFourCut PNG capture failed');
-  return png;
+    if (!png || png.type !== 'image/png') throw new Error('ReportFourCut PNG capture failed');
+    return png;
+  } finally {
+    images.forEach((image, index) => {
+      const { src, srcset } = originals[index];
+      if (src === null) image.removeAttribute('src');
+      else image.setAttribute('src', src);
+      if (srcset === null) image.removeAttribute('srcset');
+      else image.setAttribute('srcset', srcset);
+    });
+  }
+}
+
+async function decodeVisibleImages(node: HTMLElement): Promise<void> {
+  await Promise.all(
+    Array.from(node.querySelectorAll('img')).map(async (image) => {
+      try {
+        await image.decode();
+      } catch (error) {
+        // iOS는 표시된 사진에도 간헐적으로 decode()를 거절한다.
+        if (!image.complete || image.naturalWidth <= 0) throw error;
+      }
+    }),
+  );
+}
+
+async function imageDataUrl(url: string): Promise<string> {
+  const response = await fetch(url, { mode: 'cors' });
+  if (!response.ok) throw new Error('ReportFourCut image fetch failed');
+  const blob = await response.blob();
+  if (!blob.type.startsWith('image/')) throw new Error('ReportFourCut image response is invalid');
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('ReportFourCut image conversion failed'));
+    reader.readAsDataURL(blob);
+  });
 }
 
 /** API-061의 서명 URL을 브라우저 다운로드로 연결한다. */
@@ -89,7 +161,6 @@ export async function downloadReportImage(downloadUrl: string, reportId: number)
     window.clearTimeout(timeout);
   }
   if (png.type !== 'image/png') throw new Error('ReportFourCut PNG response is invalid');
-
   downloadBlob(png, `feelm-report-${reportId}.png`);
 }
 
@@ -122,9 +193,13 @@ function nextPaint(): Promise<void> {
   });
 }
 
-function withTimeout<T>(promise: PromiseLike<T>, message: string): Promise<T> {
+function withTimeout<T>(
+  promise: PromiseLike<T>,
+  message: string,
+  duration = CAPTURE_TIMEOUT_MS,
+): Promise<T> {
   return new Promise((resolve, reject) => {
-    const timeout = window.setTimeout(() => reject(new Error(message)), CAPTURE_TIMEOUT_MS);
+    const timeout = window.setTimeout(() => reject(new Error(message)), duration);
     Promise.resolve(promise).then(
       (value) => {
         window.clearTimeout(timeout);
