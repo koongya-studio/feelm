@@ -260,9 +260,11 @@ describe('FilmPage 데스크톱 시안', () => {
 
     /*
      * 레이아웃이 없는 환경이라 칸 폭이 0이고, 그때 릴은 첫 칸만 보인다고 본다
-     * (`visibleFrameRange`). 여기서 고정하는 것은 수가 아니라 **구간으로 말한다**는 것이다.
+     * (`visibleFrameRange`). 한 칸만 보이면 모바일과 같이 `1 – 1`이 아니라 `1 / 73`으로 적는다
+     * (`frameRangeLabel`, 업무 -876). 여러 칸이 보일 때의 구간 표기는 `FilmPage.test`가 고정한다.
      */
-    expect(await screen.findByText('1 – 1 / 73')).toBeInTheDocument();
+    expect(await screen.findByText('1 / 73')).toBeInTheDocument();
+    expect(screen.getByText('전체 73개 중 1번째 프레임을 보고 있어요')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '이전 프레임 보기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '다음 프레임 보기' })).toBeEnabled();
   });

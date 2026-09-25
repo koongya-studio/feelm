@@ -373,7 +373,7 @@ describe('FilmPage 필름 위치', () => {
     });
   }
 
-  it('온전히 보이는 마지막 칸을 `N / 전체`로 적고, 끝까지 넘기면 화살표 힌트를 거둔다', async () => {
+  it('온전히 보이는 구간을 넓은 화면과 같은 `처음 – 끝 / 전체`로 적고, 끝까지 넘기면 힌트를 거둔다 (업무 -876)', async () => {
     vi.mocked(getMyFrames).mockResolvedValue(frameList(5));
 
     renderWithRouter(<FilmPage />);
@@ -381,18 +381,39 @@ describe('FilmPage 필름 위치', () => {
     const track = await screen.findByRole('group', { name: '취향 필름 프레임' });
     layOut(track);
 
-    // 처음에는 세 칸이 온전히 보인다. 넷째 칸은 잘려 있다
+    // 처음에는 세 칸이 온전히 보인다. 넷째 칸은 잘려 있다. 첫 화면은 1부터 적는다
     track.scrollLeft = 0;
     fireEvent.scroll(track);
-    await waitFor(() => expect(screen.getByText('3 / 5')).toBeInTheDocument());
-    expect(screen.getByText('전체 5개 중 3번째 프레임까지 보고 있어요')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('1 – 3 / 5')).toBeInTheDocument());
+    expect(
+      screen.getByText('전체 5개 중 1번째부터 3번째 프레임까지 보고 있어요'),
+    ).toBeInTheDocument();
     expect(screen.getByText('옆으로 넘겨보세요')).toBeInTheDocument();
 
-    // 끝까지 넘기면 다 본 것이다. 더 넘길 곳이 없으므로 오른쪽을 가리키지 않는다
+    // 끝까지 넘기면 다 본 것이다. 셋째 칸은 왼쪽이 잘려 세지 않는다
     track.scrollLeft = 243;
     fireEvent.scroll(track);
-    await waitFor(() => expect(screen.getByText('5 / 5')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('4 – 5 / 5')).toBeInTheDocument());
     expect(screen.queryByText('옆으로 넘겨보세요')).toBeNull();
+  });
+
+  it('릴 폭이 세 칸 간격에 조금 못 미쳐도 첫 화면은 1부터 적는다 (업무 -876)', async () => {
+    vi.mocked(getMyFrames).mockResolvedValue(frameList(5));
+
+    renderWithRouter(<FilmPage />);
+
+    const track = await screen.findByRole('group', { name: '취향 필름 프레임' });
+    // 왼쪽 여백 없이 세 칸(110 · 4 · 110 · 4 · 110 = 338px)이 온전히 드는 340px 릴.
+    // 한 화면 칸 수를 폭 ÷ 간격(340 ÷ 114 = 2)으로 세던 때는 `2 – 3`으로 적혔다
+    Object.defineProperty(track, 'clientWidth', { configurable: true, value: 340 });
+    [...track.children].forEach((child, index) => {
+      Object.defineProperty(child, 'offsetLeft', { configurable: true, value: index * 114 });
+      Object.defineProperty(child, 'offsetWidth', { configurable: true, value: 110 });
+    });
+
+    track.scrollLeft = 0;
+    fireEvent.scroll(track);
+    await waitFor(() => expect(screen.getByText('1 – 3 / 5')).toBeInTheDocument());
   });
 
   it('분모는 받아 온 칸 수가 아니라 전체 프레임 수다', async () => {
