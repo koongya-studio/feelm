@@ -77,6 +77,12 @@ A 회의 안건 12건 중 아키텍처·기술 선택에 해당하는 5건입니
 | [ADR-0023](./0023-private-report-image-host-storage.md) | 리포트 이미지는 서비스 노드 비공개 디렉터리에 저장하고 애플리케이션 서명 URL로 제공한다 | 채택 (2026-09-22) |
 | [ADR-0024](./0024-recommendation-item-lock-order.md) | 추천 이유 보강은 항목 단위 커밋, movies 참조 다중 행 쓰기는 movie_id 오름차순으로 잠근다 | 채택 (2026-09-22) |
 
+### 채택 검토 중
+
+| ADR | 제안 | 상태 |
+|---|---|---|
+| [ADR-0025](./0025-v26-gbt-personal-party-recommendation.md) | 이미 확정·구현된 v26 개인·파티 GBT 전환을 소급 기록하고 ADR-0002·0017의 모델 설명을 정리한다 | 제안 (2026-09-24), 기존 ADR 상태 변경 전 |
+
 ## 관련 문서
 
 - [요구사항 정의서](../requirements.md) · [API 명세](../api/README.md) · [논리 ERD](../erd.md)

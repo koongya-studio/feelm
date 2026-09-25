@@ -1,5 +1,6 @@
-# Fold-in Consumer
+# 개인·파티 추천 Consumer
 
+현재 모델·학습·구현 상태는 [v26 GBT 안내](../docs/gbt-v26/README.md)를 먼저 확인한다.
 742 계약에 연결된 개인 GBT 실행·입력 보존·검증은 [627 안내](GBT-627.md)를 참고한다.
 
 v26 GBT 전용 번들·독립 scorer는 [GBT.md](./GBT.md)를 따른다. 개인 실행은 명시적인
@@ -19,7 +20,8 @@ Backend v1/v2 동시 수용을 먼저 배포한 뒤 Consumer v2를 활성화하�
 [`streaming-contract §5.2`](../../docs/api/streaming-contract.md#52-값-구조)를 따른다. 825가 별도 key를
 소비하고 628이 shadow·종단 승인을 끝내기 전에는 이 근거 기반 문구를 운영에 활성화하지 않는다.
 
-Kafka의 평가·온보딩·관심없음 이벤트를 받아 최신 사용자 입력으로 ALS Fold-in을 수행하고 TASTE 최대 500편과
+아래 legacy 실행 설명은 전환 전 경로다. Kafka의 평가·온보딩·관심없음 이벤트를 받아
+ALS Fold-in을 수행하고 TASTE 최대 500편과
 DISCOVERY 최대 100편을 갱신한다. Python 3.12의 독립 프로젝트이며 Spark 코드를 import하지 않는다.
 모델·매핑·영화 메타데이터는 모두 같은 `input_snapshot`을 가리켜야 하며, 하나라도 맞지 않으면 시작을 거부한다.
 
@@ -178,7 +180,7 @@ S15P21E106-829는 기존 PostgreSQL CHECK 제약에 맞춰 GBT 요청 최상위�
 
 늦은 vector를 결과 게시 없이 소진하고 최신 GBT refresh를 재요청하는 경로와 snapshot/schema 오류의
 지속 격리·재요청 ACK·runner 연결은 747에 구현되어 있다. 829는 3필드 요청의 모델 검증과 성공 후
-snapshot 만료 재처리를 연결한다. 오류는 기존 성공 결과를 보존하며 483의 전원 K0·후보 소진 공급은
+snapshot 만료 재처리를 연결한다. 오류는 기존 성공 결과를 보존하며 미진행 종료된483의 전원 K0·후보 소진 공급은
 포함하지 않는다. 이 Consumer와 644 런타임 배포가 Backend의 새 형식 발행보다 먼저 완료되어야 한다.
 
 
@@ -317,8 +319,8 @@ Spring은 모바일 기본 요청에서 TASTE 2편과 DISCOVERY 1편, PC 요청�
 - S15P21E106-482: 그룹·대중성 번들의 HDFS 게시, 두 URI 동시 활성화, 재시작·rollback 검증
 - S15P21E106-415 재개선: 상위 10개 그룹의 내부 순위 층별 확장, 소진 후 후순위 적격 그룹 확장과
   DISCOVERY 개인 후보 보충 제거
-- S15P21E106-483: 현재 개인 후보 보충 순서를 개선하고 후보 모집단 밖까지 확장하는 별도 POPULAR fallback.
-  이 절의 `discovery-popularity`와 다른 산출물
+- S15P21E106-483: 별도 POPULAR fallback·후보 모집단 확장 계획은2026-09-24 미진행 종료했다.
+  이 절의 `discovery-popularity`와627의 개인 K0 인기순 공급은 그 계획과 구분한다
 
 로컬 대중성 번들은 다음처럼 만든다. `--kobis-population`은 직접 코드 2,176편 전체의 백분위
 모집단이고, `--verified-kobis`만 실제 서비스 영화에 KOBIS 점수를 붙인다.

@@ -2,13 +2,15 @@
 
 이번 동결 번들의 식별자·실측 검증은 [GBT-626-VERIFICATION.md](./GBT-626-VERIFICATION.md)에 기록한다.
 
-[artifact 계약](../contracts/gbt-model-artifacts.md)이 기준이다. 이 모듈은 아직 기존 ALS 개인/파티
-event loop에 연결하지 않았다. 코드·번들 검증 성공과 운영 교체 완료는 다르다.
+[artifact 계약](../contracts/gbt-model-artifacts.md)이 기준이다. 개인·파티 event loop 연결은
+[627](GBT-627.md)·[747](GBT-747.md), 표준 이미지 실행은 [644](GBT-644.md)에 반영됐다.
+서버 적용도 완료된 상태이며, 확인 기준과 검증 기록은 [현재 안내](../docs/gbt-v26/README.md)를 따른다.
 
 ## 설치와 합성 테스트
 
-Python3.12 별도 환경에서 `gbt-runtime-requirements.txt`를 설치한다. 현재 Consumer lock/이미지는
-수정하지 않았다. NumPy2.4.6, PyArrow19.0.1, XGBoost CPU2.1.4, SciPy1.15.2를 고정한다.
+표준 Consumer lock/이미지는644에서 GBT CPU 런타임을 포함하도록 갱신됐다.
+626 독립 재현 시에는 Python3.12 별도 환경에서 `gbt-runtime-requirements.txt`를 설치한다.
+NumPy2.4.6, PyArrow19.0.1, XGBoost CPU2.1.4, SciPy1.15.2를 고정한다.
 PyArrow는 기존 Consumer의 `<20` 범위를 보존한다. pandas/Spark·연구 폴더·ALS/FM 모델은 불필요하다.
 
 ```bash
@@ -20,9 +22,9 @@ PYTHONPATH=pipeline/consumer/src python -m pytest pipeline/consumer/tests/test_g
 아래 독립 환경 테스트를 별도로 반드시 실행한다. skip 결과만으로 GBT 검증을 통과 처리하지 않는다.
 
 ```bash
-docker build --target test -f tools/Dockerfile.gbt-verify -t feelm-gbt-verify .
+docker build --target test -f pipeline/consumer/tools/Dockerfile.gbt-verify -t feelm-gbt-verify pipeline/consumer
 docker run --rm --network none --read-only --tmpfs /tmp:rw,size=256m \
-  -e PYTHONPATH=/work/src -v "$PWD:/work:ro" -w /work \
+  -e PYTHONPATH=/work/src -v "$PWD/pipeline/consumer:/work:ro" -w /work \
   feelm-gbt-verify -m pytest -p no:cacheprovider tests -q
 ```
 
@@ -54,7 +56,7 @@ PYTHONPATH=pipeline/consumer/src python pipeline/consumer/tools/verify_gbt_bundl
 live CSV에는 `service_movie_id,tmdb_id` 두 열만 담는다. 신규/삭제/재결합/지원률만 출력한다.
 실제 서비스 export 없이 snapshot만 확인했다면 운영 매핑 감사를 완료했다고 쓰지 않는다.
 
-## 호출 예시와 후속 업무
+## 호출 예시와 연결 문서
 
 ```python
 from feelm_consumer.gbt.artifacts import load_bundle
@@ -68,7 +70,7 @@ result = scorer.score(
     excluded_movie_ids=caller_mode_exclusions,
 )
 if result.status == "NEEDS_COLD_START":
-    pass  # 483/627에서 처리. 0점 개인 후보를 만들지 않는다.
+    pass  # 개인627은 reach 인기순으로 처리. 파티 전원K0는 별도 공급 없이 격리.
 else:
     personal_top500 = result.ranked_ids(500)
 # 파티 구성원별 동일 점수. 집계 자체는747에서 수행한다.
@@ -77,13 +79,13 @@ party_member = scorer.score(actual_ratings, candidate_ids=party_pool,
                             excluded_movie_ids=party_common_exclusions)
 ```
 
-| 후속 | 경계 |
+| 연결 업무 | 경계 |
 | --- | --- |
-| 742 | modelVersion/servingRevision 등 상태 계약 확정; 여기서 Redis 포맷을 확정하지 않음 |
-| 627 | 개인 Consumer 입력/후보 호출, 지원 불가·K0 분기, 기존 최종 제외 유지 |
-| 747 | 파티 개인 후보 합집합·구성원 subset 점수·집계, 공통 감상/관심없음 제외 |
-| 644 | 운영 이미지 의존성 통합·실서버 자원/네트워크/재시작 검증 |
-| 628/735 | 승인 후 전환·전체 재게시/복원 검증 |
+| 742/829 | 상태·불변 입력 참조와 현행 파티3필드 요청 계약. develop 반영 |
+| 627 | 개인 입력/후보·지원 불가 격리·K0 인기순 공급. develop 반영 |
+| 747 | 파티 TASTE+DISCOVERY 합집합·구성원 subset 점수·집계·복구. develop 반영 |
+| 644 | 표준 이미지·환경 연결 반영. GBT 서버 적용 완료(2026-09-25 사용자 확인) |
+| 483/628 | 추가 fallback/별도 종단 검증은 미진행 종료. 현재의 미완료 구현 지시로 사용하지 않음 |
 
 ## 동결 parity와 리소스
 
@@ -102,5 +104,6 @@ report에 RSS/cgroup/OOM/시간/runtime을 남긴다. 같은 CPU quota도 실제
 승인된 목적지가 정해진 뒤 Spark `jobs.batch.artifact_transfer manifest/publish`를 사용한다.
 bundle5파일 전체를 포함한 별도 전송 manifest를 만들고 sibling staging으로 업로드한 뒤
 SHA·크기·전체 목록을 검증해서 no-overwrite 게시한다. `--skip-sha256-verify` 금지.
-실제 HDFS URI, replication, loader 재시작과 이전 버전 복원 증거 없이는626 게시 완료가 아니다.
+644 검증 기록에는 HDFS의5파일과 전달 ZIP 해시가 일치한 관찰이 있다. 실제 loader 재시작·
+replication·이전 버전 복원 성공까지 의미하지 않는다.
 이 작업의 로컬 도구는 서버 파일·활성 포인터·DB·Jira를 변경하지 않는다.
