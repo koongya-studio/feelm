@@ -53,7 +53,8 @@
  * - 포스터가 없거나 받지 못한 영화는 자리표시자에 **제목을 적는다**(`caption`). 필름의
  *   기존 프레임도 같다
  *
- * 맨 위의 점선 칸은 비어 있는 것이 맞다. 다음 평가가 감길 자리다.
+ * 완료 화면에서는 새 프레임을 필름의 첫 칸에 둔다. 다음 평가용 빈 칸이 위에 있으면
+ * 방금 추가한 영화가 한 칸 밀려 보인다.
  */
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
@@ -227,8 +228,6 @@ export default function RatingResultPage() {
             frameHeight={FRAME_HEIGHT}
             label="취향 필름에 감기는 프레임"
           >
-            <span className={styles.emptyFrame} aria-hidden="true" />
-
             <span className={styles.newFrame}>
               <Poster
                 width={FRAME_WIDTH}
