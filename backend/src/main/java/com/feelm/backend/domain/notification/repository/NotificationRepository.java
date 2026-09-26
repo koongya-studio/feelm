@@ -208,6 +208,23 @@ public class NotificationRepository {
         return jdbc.sql(sql.toString()).params(parameters).query(this::mapRow).list();
     }
 
+    /** 노출 시점·읽음·내용 변경을 포함한 연결 복구용 지문. 알림 본문은 스트림에 싣지 않는다. */
+    public String streamVersion(long userId, Instant now) {
+        return jdbc.sql(
+                        """
+                SELECT md5(COALESCE(string_agg(
+                    id::text || ':' || updated_at::text || ':' || COALESCE(read_at::text, ''),
+                    ',' ORDER BY id), ''))
+                FROM notifications
+                WHERE user_id = :userId AND closed_at IS NULL AND dismissed_at IS NULL
+                    AND notified_at <= :now AND expires_at > :now
+                """)
+                .param("userId", userId)
+                .param("now", offset(now))
+                .query(String.class)
+                .single();
+    }
+
     public long countUnread(long userId, Instant now) {
         return jdbc.sql(
                         """

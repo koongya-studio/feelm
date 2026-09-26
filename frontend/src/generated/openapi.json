@@ -5232,6 +5232,33 @@
         ]
       }
     },
+    "/api/v1/notifications/stream" : {
+      "get" : {
+        "description" : "API-085. notification-changed 수신 시 목록·미확인 개수를 다시 조회한다.",
+        "operationId" : "stream",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "text/event-stream" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "description" : "알림 갱신 SSE 스트림"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "인앱 알림 변경 스트림",
+        "tags" : [
+          "Notifications"
+        ]
+      }
+    },
     "/api/v1/notifications/unread-count" : {
       "get" : {
         "operationId" : "unreadCount",
