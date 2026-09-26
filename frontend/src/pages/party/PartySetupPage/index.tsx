@@ -20,7 +20,7 @@
  * (API-056 종료뿐이다) 다시 누르면 같은 이름의 파티가 하나 더 생긴다. 그래서 실패한
  * 사람만 알리고 버튼을 `파티로 이동`으로 바꾼다. 파티 안에서 다시 초대할 수 있다(5.8).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import Button from '../../../components/Button';
 import PartyInviteSearch from '../../../components/PartyInviteSearch';
@@ -45,6 +45,16 @@ export default function PartySetupPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const size = (location.state as { size?: number } | null)?.size ?? PARTY_MIN_MEMBERS;
+
+  const nameLabelId = useId();
+  const searchId = useId();
+  const searchRef = useRef<HTMLElement>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+
+  const openSearch = () => {
+    setSearchOpen(true);
+    searchRef.current?.querySelector('input')?.focus();
+  };
 
   const [myNickname, setMyNickname] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -164,65 +174,108 @@ export default function PartySetupPage() {
       <ScreenHeader title="파티 만들기" showBack fallbackTo={path.party()} />
 
       <div className={styles.page}>
-        <TextField
-          label="파티 이름"
-          placeholder="예) 금요 심야 상영회"
-          maxLength={NAME_MAX_LENGTH}
-          value={name}
-          error={error}
-          disabled={locked}
-          onChange={(event) => {
-            setName(event.target.value);
-            setError(undefined);
-          }}
-        />
-
         <section className={styles.members}>
-          <h2 className={styles.label}>현재 참여자</h2>
-          <p className={styles.note}>
-            {invitees.length + 1}/{size}명 · 최대 {size}명까지
-          </p>
+          <h2 id={nameLabelId} className={styles.label}>
+            파티 이름
+          </h2>
+          <TextField
+            label="파티 이름"
+            aria-labelledby={nameLabelId}
+            placeholder="예) 금요 심야 상영회"
+            maxLength={NAME_MAX_LENGTH}
+            value={name}
+            error={error}
+            disabled={locked || submitting}
+            onChange={(event) => {
+              setName(event.target.value);
+              setError(undefined);
+            }}
+          />
+        </section>
+
+        <section className={styles.members} aria-label="함께할 친구">
+          <div className={styles.memberHeading}>
+            <h2 className={styles.label}>함께할 친구</h2>
+            <span className={styles.memberCount} aria-live="polite">
+              {invitees.length + 1}/{size}명
+            </span>
+          </div>
 
           <ul className={styles.slots}>
             <li className={styles.slot} data-mine="true">
-              {myNickname ? `${myNickname} (나)` : '나'}
+              <span className={styles.slotName}>
+                {myNickname ?? '나'}
+                <span className={styles.slotMeta}>나 · 파티장</span>
+              </span>
             </li>
 
             {invitees.map((invitee) => (
               <li key={invitee.userId} className={styles.slot} data-picked="true">
                 <span className={styles.slotName}>{invitee.nickname}</span>
-
                 <button
                   type="button"
                   className={styles.slotRemove}
+                  aria-label={`${invitee.nickname} 선택 해제`}
                   disabled={submitting || locked}
                   onClick={() => toggle(invitee)}
                 >
-                  빼기
+                  <span aria-hidden="true">×</span>
                 </button>
               </li>
             ))}
 
             {Array.from({ length: waitingSlots }, (_, index) => (
-              <li key={index} className={styles.slot}>
-                대기 중
+              <li key={`empty-${index}`}>
+                <button
+                  type="button"
+                  className={styles.slotAdd}
+                  disabled={submitting || locked}
+                  aria-expanded={searchOpen}
+                  aria-controls={searchId}
+                  onClick={openSearch}
+                >
+                  <span aria-hidden="true">＋</span> 친구 추가
+                </button>
               </li>
             ))}
           </ul>
-        </section>
+          <p className={styles.note}>
+            나를 포함해 최대 {size}명 · 초대는 파티를 만들면 전달돼요.
+            {!searchOpen ? ' 빈자리를 눌러 친구를 골라 주세요.' : ''}
+          </p>
 
-        <section className={styles.invite}>
-          <h2 className={styles.label}>친구 초대</h2>
-
-          <PartyInviteSearch
-            disabled={locked || submitting}
-            isPicked={(user) => invitees.some((item) => item.userId === user.userId)}
-            pickLabel={(user) =>
-              invitees.some((item) => item.userId === user.userId) ? '뺀다' : '초대'
-            }
-            onPick={toggle}
-            note={`초대는 파티를 만든 뒤에 전달돼요 · 최대 ${inviteLimit}명 · ${PARTY_MIN_MEMBERS - 1}명 이상 초대해야 시작할 수 있어요`}
-          />
+          <section
+            id={searchId}
+            ref={searchRef}
+            className={styles.invite}
+            aria-label="초대할 친구 찾기"
+            hidden={!searchOpen}
+          >
+            {searchOpen ? (
+              <>
+                <h2 className={styles.label}>초대할 친구 찾기</h2>
+                <PartyInviteSearch
+                  autoFocus
+                  disabled={locked || submitting}
+                  isPicked={(user) => invitees.some((item) => item.userId === user.userId)}
+                  isPickDisabled={(user) =>
+                    invitees.length >= inviteLimit &&
+                    !invitees.some((item) => item.userId === user.userId)
+                  }
+                  pickLabel={(user) =>
+                    invitees.some((item) => item.userId === user.userId) ? '✓ 선택됨' : '+ 추가'
+                  }
+                  onPick={toggle}
+                />
+                <p className={styles.note} role="status">
+                  {invitees.length >= inviteLimit
+                    ? '모든 자리를 채웠어요. 선택한 친구를 다시 누르면 해제돼요.'
+                    : '선택 즉시 반영돼요. 다른 친구도 계속 검색할 수 있어요.'}
+                </p>
+              </>
+            ) : null}
+          </section>
+          <p className={styles.note}>{PARTY_MIN_MEMBERS - 1}명 이상 초대해야 시작할 수 있어요.</p>
         </section>
 
         {failedInvites.length > 0 ? (
@@ -234,7 +287,11 @@ export default function PartySetupPage() {
 
         <div className={styles.actions}>
           <Button variant="brand" disabled={submitting || needsInvitee} onClick={start}>
-            {locked ? '파티로 이동' : '파티 시작하기'}
+            {locked
+              ? '파티로 이동'
+              : needsInvitee
+                ? '친구를 1명 이상 선택해 주세요'
+                : `친구 ${invitees.length}명과 파티 만들기`}
           </Button>
         </div>
       </div>

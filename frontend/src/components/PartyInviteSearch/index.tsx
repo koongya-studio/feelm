@@ -28,6 +28,8 @@ import type { SearchedUser } from '../../types/user';
 const KEYWORD_MAX_LENGTH = 10;
 
 type Props = {
+  /** 펼쳐진 검색으로 바로 입력할 때 사용한다 */
+  autoFocus?: boolean;
   /** 검색과 선택을 막는다. 보내는 중이거나 더 고를 수 없을 때다 */
   disabled?: boolean;
   /** 이미 고르거나 초대 완료한 사람인지 */
@@ -42,6 +44,7 @@ type Props = {
 };
 
 export default function PartyInviteSearch({
+  autoFocus = false,
   disabled = false,
   isPicked,
   isPickDisabled,
@@ -79,6 +82,7 @@ export default function PartyInviteSearch({
   return (
     <>
       <TextField
+        autoFocus={autoFocus}
         label="닉네임으로 친구 찾기"
         placeholder="닉네임을 입력해 주세요"
         maxLength={KEYWORD_MAX_LENGTH}
