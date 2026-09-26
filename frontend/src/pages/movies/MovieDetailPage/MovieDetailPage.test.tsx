@@ -18,7 +18,12 @@ import MovieDetailPage from './index';
 import { renderWithRouter } from '../../../test/render';
 import { AuthContext } from '../../../contexts/authContext';
 import { ROUTE_PATTERN, path } from '../../../routes/paths';
-import { MOVIE_DETAIL_GUIDE, hasSeenGuide, restartGuide } from '../../../utils/userGuides';
+import {
+  MOVIE_DETAIL_GUIDE,
+  MOVIE_OTT_GUIDE,
+  hasSeenGuide,
+  restartGuide,
+} from '../../../utils/userGuides';
 import guideStyles from '../../../components/GuideCallout/GuideCallout.module.css';
 import type { AuthStatus, AuthValue } from '../../../contexts/authContext';
 import type { MovieDetail } from '../../../types/movie';
@@ -194,7 +199,7 @@ describe('첫 이용 안내', () => {
     await waitFor(() =>
       expect(document.querySelector(`.${guideStyles.focusRing}`)).toBeInTheDocument(),
     );
-    fireEvent.click(screen.getByRole('button', { name: '상세 안내 마치기' }));
+    fireEvent.click(screen.getByRole('button', { name: 'OTT 이용 안내 보기' }));
     expect(hasSeenGuide(42, MOVIE_DETAIL_GUIDE)).toBe(true);
     expect(screen.getByRole('button', { name: '내 별점 남기기' })).toBeInTheDocument();
   });
@@ -986,5 +991,76 @@ describe('2.4 누를 수 있다는 단서 (업무 -697)', () => {
 
     expect(screen.getAllByTestId('poster-cue')).toHaveLength(2);
     expect(similar.querySelector('[data-testid="poster-cue"]')).not.toBeNull();
+  });
+});
+
+describe('영화 상세 OTT 첫 이용 안내', () => {
+  it('상세 안내 다음에 OTT 흐름을 알리고 완료 후에는 다시 노출하지 않는다', async () => {
+    localStorage.clear();
+    const first = renderWithRouter(
+      <AuthContext.Provider
+        value={{
+          ...authValue('authenticated'),
+          user: { userId: 42, nickname: '새 사용자', onboardingCompleted: true },
+        }}
+      >
+        <MovieDetailPage />
+      </AuthContext.Provider>,
+      { route: path.movieDetail(101), path: ROUTE_PATTERN.movieDetail },
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'OTT 이용 안내 보기' }));
+    expect(screen.getByText('OTT에서 보고 기록하기')).toBeInTheDocument();
+    expect(screen.getByText(/링크 이동만으로 감상이 완료되지는 않아요/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '확인' }));
+    expect(hasSeenGuide(42, MOVIE_OTT_GUIDE)).toBe(true);
+    first.unmount();
+    renderWithRouter(
+      <AuthContext.Provider
+        value={{
+          ...authValue('authenticated'),
+          user: { userId: 42, nickname: '새 사용자', onboardingCompleted: true },
+        }}
+      >
+        <MovieDetailPage />
+      </AuthContext.Provider>,
+      { route: path.movieDetail(101), path: ROUTE_PATTERN.movieDetail },
+    );
+    await screen.findByRole('heading', { level: 1, name: '괴물' });
+    expect(screen.queryByText('OTT에서 보고 기록하기')).toBeNull();
+  });
+
+  it('OTT 없는 영화는 건너뛰되 다른 영화에서 OTT 안내를 받을 수 있다', async () => {
+    localStorage.clear();
+    vi.mocked(getMovieDetail).mockResolvedValue(movie({ ottProviders: [] }));
+    const first = renderWithRouter(
+      <AuthContext.Provider
+        value={{
+          ...authValue('authenticated'),
+          user: { userId: 42, nickname: '새 사용자', onboardingCompleted: true },
+        }}
+      >
+        <MovieDetailPage />
+      </AuthContext.Provider>,
+      { route: path.movieDetail(101), path: ROUTE_PATTERN.movieDetail },
+    );
+    fireEvent.click(await screen.findByRole('button', { name: '상세 안내 마치기' }));
+    expect(screen.queryByText('OTT에서 보고 기록하기')).toBeNull();
+    expect(hasSeenGuide(42, MOVIE_OTT_GUIDE)).toBe(false);
+    first.unmount();
+    vi.mocked(getMovieDetail).mockResolvedValue(movie());
+    renderWithRouter(
+      <AuthContext.Provider
+        value={{
+          ...authValue('authenticated'),
+          user: { userId: 42, nickname: '새 사용자', onboardingCompleted: true },
+        }}
+      >
+        <MovieDetailPage />
+      </AuthContext.Provider>,
+      { route: path.movieDetail(101), path: ROUTE_PATTERN.movieDetail },
+    );
+    expect(await screen.findByText('OTT에서 보고 기록하기')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '건너뛰기' }));
+    expect(hasSeenGuide(42, MOVIE_OTT_GUIDE)).toBe(true);
   });
 });

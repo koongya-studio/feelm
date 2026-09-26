@@ -95,6 +95,7 @@ import VisuallyHidden from '../../../components/VisuallyHidden';
 import { ChevronRightIcon, SettingsIcon } from '../../../components/Icon';
 import MyAside from './MyAside';
 import ServiceFeedbackPrompt from './ServiceFeedbackPrompt';
+import MyGuide from './MyGuide';
 import { useShellSize } from '../../../hooks/useShellSize';
 import { getMyTaste } from '../../../api/taste';
 import { getMyDismissals, getRecommendationHistory } from '../../../api/recommendations';
@@ -846,7 +847,12 @@ export default function MyDashboardPage() {
       {desktop ? <h2 className={styles.feedTitle}>내 기록</h2> : null}
 
       {/* 화면 안의 전환이다. 다른 화면으로 가지 않으므로 링크가 아니라 탭이다 */}
-      <div className={styles.tabs} role="tablist" aria-label="내 기록">
+      <div
+        className={styles.tabs}
+        role="tablist"
+        aria-label="내 기록"
+        data-guide-target="my-records"
+      >
         {TABS.map((item) => (
           <button
             key={item.key}
@@ -1161,6 +1167,7 @@ export default function MyDashboardPage() {
         </DesktopAside>
 
         {noticeBar}
+        <MyGuide key={profile.userId} userId={profile.userId} desktop={desktop} />
       </>
     );
   }
@@ -1192,7 +1199,11 @@ export default function MyDashboardPage() {
               tone="dark"
               title="프로필"
               action={
-                <Link to={path.settings()} className={styles.headerLink}>
+                <Link
+                  to={path.settings()}
+                  className={styles.headerLink}
+                  data-guide-target="my-settings"
+                >
                   <SettingsIcon />
                   <VisuallyHidden>설정</VisuallyHidden>
                 </Link>
@@ -1205,6 +1216,7 @@ export default function MyDashboardPage() {
       </ProfileBackdrop>
 
       {noticeBar}
+      <MyGuide key={profile.userId} userId={profile.userId} desktop={desktop} />
     </>
   );
 }
