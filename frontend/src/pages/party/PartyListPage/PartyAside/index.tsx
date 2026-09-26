@@ -62,7 +62,9 @@ export default function PartyAside({ party, commonFlavors, onCreateParty }: Prop
               }))}
             />
 
-            {commonFlavors.length > 0 ? (
+            {party.members.length < 2 ? (
+              <p className={styles.progressLabel}>파티원이 참여하면 공통 취향을 확인할 수 있어요</p>
+            ) : commonFlavors.length > 0 ? (
               <section className={styles.section}>
                 <h3 className={styles.sectionTitle}>우리의 공통 취향</h3>
 

@@ -242,11 +242,15 @@ export default function PartyDesktop({
                        * 같은 값이다(API-057).
                        */
                       <span className={styles.partyFlavors}>
-                        {commonFlavorsOf(party.partyId).map((name) => (
-                          <span key={name} className={styles.partyChip}>
-                            {name}
-                          </span>
-                        ))}
+                        {party.members.length < 2 ? (
+                          <span>파티원이 참여하면 공통 취향을 확인할 수 있어요</span>
+                        ) : (
+                          commonFlavorsOf(party.partyId).map((name) => (
+                            <span key={name} className={styles.partyChip}>
+                              {name}
+                            </span>
+                          ))
+                        )}
                       </span>
                     )}
 

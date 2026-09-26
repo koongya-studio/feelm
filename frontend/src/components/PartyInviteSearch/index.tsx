@@ -30,8 +30,10 @@ const KEYWORD_MAX_LENGTH = 10;
 type Props = {
   /** 검색과 선택을 막는다. 보내는 중이거나 더 고를 수 없을 때다 */
   disabled?: boolean;
-  /** 이미 고른 사람인지. 5.8처럼 고른 상태가 남지 않는 화면은 넘기지 않는다 */
+  /** 이미 고르거나 초대 완료한 사람인지 */
   isPicked?: (user: SearchedUser) => boolean;
+  /** 초대를 이미 보낸 결과처럼 다시 선택할 수 없는 사람 */
+  isPickDisabled?: (user: SearchedUser) => boolean;
   /** 결과 줄 오른쪽 문구. 고른 상태에 따라 다른 말을 쓸 수 있다 */
   pickLabel: (user: SearchedUser) => string;
   onPick: (user: SearchedUser) => void;
@@ -42,6 +44,7 @@ type Props = {
 export default function PartyInviteSearch({
   disabled = false,
   isPicked,
+  isPickDisabled,
   pickLabel,
   onPick,
   note,
@@ -112,7 +115,7 @@ export default function PartyInviteSearch({
                   className={styles.result}
                   data-picked={picked}
                   aria-pressed={isPicked ? picked : undefined}
-                  disabled={disabled}
+                  disabled={disabled || isPickDisabled?.(user)}
                   onClick={() => onPick(user)}
                 >
                   <span className={styles.resultName}>{user.nickname}</span>

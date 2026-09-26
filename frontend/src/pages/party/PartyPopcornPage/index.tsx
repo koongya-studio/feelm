@@ -49,7 +49,7 @@ import Button from '../../../components/Button';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import IconButton from '../../../components/IconButton';
 import Menu from '../../../components/Menu';
-import PartyInviteSearch from '../../../components/PartyInviteSearch';
+import PartyInviteSheet from './PartyInviteSheet';
 import PopcornBucket from '../../../components/PopcornBucket';
 import { kernelCounts } from '../../../components/PopcornBucket/kernels';
 import ScreenHeader from '../../../components/ScreenHeader';
@@ -64,7 +64,6 @@ import {
   inviteToParty,
   kickPartyMember,
   leaveParty,
-  PARTY_MAX_MEMBERS,
   PARTY_MIN_MEMBERS,
 } from '../../../api/parties';
 import { blockUser } from '../../../api/settings';
@@ -161,6 +160,8 @@ export default function PartyPopcornPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviting, setInviting] = useState(false);
+  const [invitedIds, setInvitedIds] = useState<Set<number>>(new Set());
+  const [inviteNotice, setInviteNotice] = useState('');
   const [notice, setNotice] = useState('');
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [managing, setManaging] = useState(false);
@@ -292,20 +293,22 @@ export default function PartyPopcornPage() {
    * 고른 친구에게 곧바로 초대를 보낸다.
    *
    * 5.3과 달리 파티가 이미 있어 한 사람씩 바로 보낼 수 있다. 정원이 차면 계약이
-   * `PARTY_FULL`로 거절하므로(API-051) 화면에서 미리 막지 않고 그 문구를 보여준다.
+   * `PARTY_FULL`로 거절하므로(API-051) 시트 안에서 그 문구를 보여준다.
    */
   function invite(user: SearchedUser) {
+    if (inviting || invitedIds.has(user.userId)) return;
     setInviting(true);
+    setInviteNotice('초대를 보내는 중이에요');
 
     inviteToParty(id, user.userId)
       .then(() => {
         setInviting(false);
-        setInviteOpen(false);
-        setNotice(`${user.nickname} 님에게 초대를 보냈어요`);
+        setInvitedIds((current) => new Set(current).add(user.userId));
+        setInviteNotice(`${user.nickname} 님에게 초대를 보냈어요`);
       })
       .catch((cause: unknown) => {
         setInviting(false);
-        setNotice(
+        setInviteNotice(
           cause instanceof ApiError
             ? cause.message
             : '초대를 보내지 못했어요. 잠시 후 다시 시도해 주세요.',
@@ -354,6 +357,8 @@ export default function PartyPopcornPage() {
   const picked =
     popcorn.members.find((member) => member.user.userId === pickedUserId) ?? popcorn.members[0];
   const isMine = picked !== undefined && picked.user.userId === myUserId;
+  const canInvite =
+    party !== null && Math.max(party.members.length, popcorn.members.length) < party.maxMembers;
   const leadCode = picked ? topFlavorCode(picked) : undefined;
   const leadName = leadCode ? (flavorByCode.get(leadCode)?.displayName ?? leadCode) : '';
 
@@ -465,23 +470,18 @@ export default function PartyPopcornPage() {
           </section>
         ) : null}
 
-        {inviteOpen ? (
-          <section className={styles.invite}>
-            <h2 className={styles.label}>친구 초대</h2>
-
-            <PartyInviteSearch
-              disabled={inviting}
-              pickLabel={() => '초대'}
-              onPick={invite}
-              note={`이 파티는 파티장 포함 최대 ${party?.maxMembers ?? PARTY_MAX_MEMBERS}명까지예요`}
-            />
-          </section>
-        ) : null}
-
         <div className={styles.actions}>
-          <Button variant="secondary" onClick={() => setInviteOpen((value) => !value)}>
-            {inviteOpen ? '초대 접기' : '친구 초대하기'}
-          </Button>
+          {canInvite ? (
+            <Button
+              variant="secondary"
+              aria-haspopup="dialog"
+              aria-expanded={inviteOpen}
+              aria-controls={inviteOpen ? 'party-invite-sheet' : undefined}
+              onClick={() => setInviteOpen(true)}
+            >
+              친구 초대하기
+            </Button>
+          ) : null}
 
           {/*
            * 초대를 거절당하거나 파티원이 나가 나 혼자 남으면 추천을 받을 수 없다
@@ -516,6 +516,18 @@ export default function PartyPopcornPage() {
           </Button>
         </div>
       </div>
+
+      {canInvite && inviteOpen ? (
+        <PartyInviteSheet
+          key={id}
+          busy={inviting}
+          maxMembers={party.maxMembers}
+          invitedIds={invitedIds}
+          notice={inviteNotice}
+          onInvite={invite}
+          onClose={() => setInviteOpen(false)}
+        />
+      ) : null}
 
       {menuOpen ? (
         <Menu label="파티 관리" top={MENU_TOP} onClose={() => setMenuOpen(false)}>
