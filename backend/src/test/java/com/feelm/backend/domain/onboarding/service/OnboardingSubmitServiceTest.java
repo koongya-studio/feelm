@@ -16,6 +16,8 @@ import com.feelm.backend.domain.user.entity.User;
 import com.feelm.backend.domain.user.repository.UserRepository;
 import com.feelm.backend.domain.watch.service.OnboardingRatingWriter;
 import com.feelm.backend.infrastructure.kafka.KafkaEventPublisher;
+import com.feelm.backend.infrastructure.kafka.KafkaEventType;
+import com.feelm.backend.infrastructure.kafka.OnboardingEventPayload;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -41,6 +43,7 @@ class OnboardingSubmitServiceTest {
     private OnboardingRatingWriter onboardingRatingWriter;
     private TasteAnalysisWriter tasteAnalysisWriter;
     private OnboardingSubmitService service;
+    private KafkaEventPublisher kafkaEventPublisher;
 
     @BeforeEach
     void setUp() {
@@ -49,7 +52,7 @@ class OnboardingSubmitServiceTest {
         UserRepository userRepository = mock(UserRepository.class);
         onboardingRatingWriter = mock(OnboardingRatingWriter.class);
         tasteAnalysisWriter = mock(TasteAnalysisWriter.class);
-        KafkaEventPublisher kafkaEventPublisher = mock(KafkaEventPublisher.class);
+        kafkaEventPublisher = mock(KafkaEventPublisher.class);
         User user = mock(User.class);
         when(user.isActive()).thenReturn(true);
         when(user.isOnboardingCompleted()).thenReturn(false);
@@ -71,6 +74,8 @@ class OnboardingSubmitServiceTest {
 
         verify(onboardingRatingWriter).createMissing(anyLong(), any());
         verify(tasteAnalysisWriter, times(1)).refresh(USER_ID, NOW);
+        verify(kafkaEventPublisher)
+                .publish(KafkaEventType.ONBOARDING, USER_ID, new OnboardingEventPayload(10));
     }
 
     @Test
@@ -79,6 +84,8 @@ class OnboardingSubmitServiceTest {
         service.submit(USER_ID, new OnboardingSubmitRequest(List.of(), true));
 
         verify(tasteAnalysisWriter, never()).refresh(anyLong(), any());
+        verify(kafkaEventPublisher)
+                .publish(KafkaEventType.ONBOARDING, USER_ID, new OnboardingEventPayload(0));
     }
 
     private static OnboardingSubmitRequest submission(int cards) {

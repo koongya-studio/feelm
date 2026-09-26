@@ -30,6 +30,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -76,6 +78,7 @@ class OnboardingSubmitApiContractTest extends SharedPostgresContractTest {
     @BeforeEach
     void fixtures() {
         dropFailingFrameTrigger();
+        dropFailingOutboxTrigger();
         OnboardingFixture.reset(jdbc);
         OnboardingFixture.flavors(jdbc);
         OnboardingFixture.movie(jdbc, LIKED_MOVIE, 1L, 900);
@@ -101,6 +104,7 @@ class OnboardingSubmitApiContractTest extends SharedPostgresContractTest {
     @AfterEach
     void removeFailureTrigger() {
         dropFailingFrameTrigger();
+        dropFailingOutboxTrigger();
     }
 
     @Test
@@ -173,7 +177,7 @@ class OnboardingSubmitApiContractTest extends SharedPostgresContractTest {
     }
 
     @Test
-    @DisplayName("T12 건너뛴 제출은 아무것도 저장하지 않고 이벤트도 발행하지 않는다")
+    @DisplayName("T12 건너뛴 제출은 평가 없이 초기 추천 이벤트 한 건을 저장한다")
     void skippedSubmissionCreatesNoRatingArtifacts() throws Exception {
         submit(ACTIVE, "{\"preferences\":[],\"skipped\":true}")
                 .andExpect(status().isOk())
@@ -183,7 +187,13 @@ class OnboardingSubmitApiContractTest extends SharedPostgresContractTest {
 
         assertThat(preferencesOf(ACTIVE)).isEmpty();
         assertThat(onboardingCompleted(ACTIVE)).isTrue();
-        assertThat(outboxEvents()).isEmpty();
+        List<Map<String, Object>> events = outboxEvents();
+        assertThat(events).hasSize(1);
+        JsonNode message = objectMapper.readTree(events.get(0).get("message").toString());
+        assertThat(message.path("eventType").asText()).isEqualTo("ONBOARDING");
+        assertThat(message.path("payload").path("preferenceCount").asInt()).isZero();
+        submit(ACTIVE, "{\"preferences\":[],\"skipped\":true}").andExpect(status().isConflict());
+        assertThat(outboxEvents()).hasSize(1);
         assertThat(ratingsOf(ACTIVE)).isEmpty();
         assertThat(ratedWatchMoviesOf(ACTIVE)).isEmpty();
         assertThat(frameMoviesOf(ACTIVE)).isEmpty();
@@ -295,9 +305,10 @@ class OnboardingSubmitApiContractTest extends SharedPostgresContractTest {
         assertThat(onboardingCompleted(WITHDRAWN)).isFalse();
     }
 
-    @Test
-    @DisplayName("T19 같은 사용자의 동시 제출은 하나만 성공한다")
-    void serializesConcurrentSubmits() throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @DisplayName("T19 선택 또는 건너뛰기의 동시 제출은 하나만 성공한다")
+    void serializesConcurrentSubmits(boolean skipped) throws Exception {
         executor = Executors.newFixedThreadPool(2);
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
@@ -310,7 +321,9 @@ class OnboardingSubmitApiContractTest extends SharedPostgresContractTest {
                                         executor.submit(
                                                 () ->
                                                         concurrentSubmit(
-                                                                bothChoices(),
+                                                                skipped
+                                                                        ? "{\"preferences\":[],\"skipped\":true}"
+                                                                        : bothChoices(),
                                                                 token,
                                                                 ready,
                                                                 start)))
@@ -320,12 +333,12 @@ class OnboardingSubmitApiContractTest extends SharedPostgresContractTest {
 
         List<Integer> statuses = List.of(responses.get(0).get(), responses.get(1).get());
         assertThat(statuses).containsExactlyInAnyOrder(200, 409);
-        assertThat(preferencesOf(ACTIVE)).hasSize(2);
+        assertThat(preferencesOf(ACTIVE)).hasSize(skipped ? 0 : 2);
         assertThat(onboardingCompleted(ACTIVE)).isTrue();
         assertThat(outboxEvents()).hasSize(1);
-        assertThat(ratingsOf(ACTIVE)).hasSize(2);
-        assertThat(ratedWatchMoviesOf(ACTIVE)).hasSize(2);
-        assertThat(frameMoviesOf(ACTIVE)).hasSize(2);
+        assertThat(ratingsOf(ACTIVE)).hasSize(skipped ? 0 : 2);
+        assertThat(ratedWatchMoviesOf(ACTIVE)).hasSize(skipped ? 0 : 2);
+        assertThat(frameMoviesOf(ACTIVE)).hasSize(skipped ? 0 : 2);
     }
 
     @Test
@@ -602,6 +615,42 @@ class OnboardingSubmitApiContractTest extends SharedPostgresContractTest {
                                 row.getLong("id"),
                                 row.getObject("created_at", OffsetDateTime.class).toInstant()),
                 ratingId);
+    }
+
+    @Test
+    @DisplayName("건너뛰기 아웃박스 저장 실패는 완료 전이를 롤백하고 재시도할 수 있다")
+    void skippedOutboxFailureRollsBackAndCanRetry() throws Exception {
+        jdbc.execute(
+                """
+                CREATE FUNCTION test_fail_onboarding_outbox() RETURNS trigger AS $$
+                BEGIN
+                    IF NEW.event_type = 'ONBOARDING' THEN
+                        RAISE EXCEPTION 'forced onboarding outbox failure';
+                    END IF;
+                    RETURN NEW;
+                END;
+                $$ LANGUAGE plpgsql
+                """);
+        jdbc.execute(
+                """
+                CREATE TRIGGER test_fail_onboarding_outbox
+                BEFORE INSERT ON outbox_events
+                FOR EACH ROW EXECUTE FUNCTION test_fail_onboarding_outbox()
+                """);
+        submit(ACTIVE, "{\"preferences\":[],\"skipped\":true}")
+                .andExpect(status().isInternalServerError());
+        assertThat(onboardingCompleted(ACTIVE)).isFalse();
+        assertThat(outboxEvents()).isEmpty();
+        assertThat(ratingsOf(ACTIVE)).isEmpty();
+        dropFailingOutboxTrigger();
+        submit(ACTIVE, "{\"preferences\":[],\"skipped\":true}").andExpect(status().isOk());
+        assertThat(onboardingCompleted(ACTIVE)).isTrue();
+        assertThat(outboxEvents()).hasSize(1);
+    }
+
+    private void dropFailingOutboxTrigger() {
+        jdbc.execute("DROP TRIGGER IF EXISTS test_fail_onboarding_outbox ON outbox_events");
+        jdbc.execute("DROP FUNCTION IF EXISTS test_fail_onboarding_outbox()");
     }
 
     private void failFrameInsertFor(long movieId) {

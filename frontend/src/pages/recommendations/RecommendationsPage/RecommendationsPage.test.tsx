@@ -12,15 +12,18 @@
  * 추천 후보가 아직 없는 `503 RECOMMENDATION_UNAVAILABLE`은 장애가 아니라 준비 중으로
  * 안내한다(업무 S15P21E106-654). 그 밖의 실패만 2.2-A 문구를 쓴다.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import RecommendationsPage from './index';
 import { ApiError } from '../../../api/apiError';
-import { renderWithRouter } from '../../../test/render';
+import { renderWithRouter, withRouter } from '../../../test/render';
 import { AuthContext } from '../../../contexts/authContext';
 import { RECOMMENDATIONS_GUIDE, hasSeenGuide, restartGuide } from '../../../utils/userGuides';
 import type { AuthValue } from '../../../contexts/authContext';
+import { useShellSize } from '../../../hooks/useShellSize';
 import type { RecommendationSet } from '../../../types/recommendation';
+
+vi.mock('../../../hooks/useShellSize', () => ({ useShellSize: vi.fn(() => 'mobile') }));
 
 vi.mock('../../../api/recommendations', () => ({
   getRecommendations: vi.fn(),
@@ -74,11 +77,16 @@ const set: RecommendationSet = {
 
 beforeEach(() => {
   localStorage.clear();
+  vi.mocked(useShellSize).mockReturnValue('mobile');
   vi.mocked(getRecommendations).mockReset().mockResolvedValue(set);
   vi.mocked(dismissMovie).mockReset().mockResolvedValue(undefined);
   vi.mocked(getOtts)
     .mockReset()
     .mockResolvedValue([{ ottId: 1, code: 'NETFLIX', name: '넷플릭스', logoUrl: null }]);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 const guideAuth: AuthValue = {
@@ -110,7 +118,8 @@ describe('첫 이용 안내', () => {
     expect(hasSeenGuide(42, RECOMMENDATIONS_GUIDE)).toBe(true);
   });
 
-  it('추천을 준비 중이면 없는 카드를 가리키지 않고 검색으로 보낸다', async () => {
+  it('추천이 지연되면 없는 카드를 가리키지 않고 검색으로 보낸다', async () => {
+    vi.useFakeTimers();
     restartGuide(42, RECOMMENDATIONS_GUIDE);
     vi.mocked(getRecommendations).mockRejectedValue(
       new ApiError(503, 'RECOMMENDATION_UNAVAILABLE', '준비 중'),
@@ -122,7 +131,12 @@ describe('첫 이용 안내', () => {
       { route: '/recommendations' },
     );
 
-    expect(await screen.findByText('추천을 준비하고 있어요')).toBeInTheDocument();
+    await act(async () => {});
+    for (let i = 0; i < 15; i += 1)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000);
+      });
+    expect(screen.getByText('추천을 준비하고 있어요')).toBeInTheDocument();
     expect(screen.queryByText('추천 영화가 도착했어요')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '영화 검색하기' }));
     expect(hasSeenGuide(42, RECOMMENDATIONS_GUIDE)).toBe(true);
@@ -207,28 +221,32 @@ describe('2.2 오늘의 추천', () => {
 });
 
 describe('2.2-A 추천을 불러오지 못한 경우', () => {
-  it('추천 후보가 아직 없으면(503) 오류가 아니라 준비 중으로 안내하고 다시 확인할 수 있다', async () => {
-    vi.mocked(getRecommendations)
-      .mockRejectedValueOnce(
-        new ApiError(503, 'RECOMMENDATION_UNAVAILABLE', '추천을 사용할 수 없습니다.'),
-      )
-      .mockResolvedValue(set);
-    renderWithRouter(<RecommendationsPage />, { route: '/recommendations' });
-
-    expect(await screen.findByText('취향에 맞는 추천을 준비하고 있어요')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /잠시 후 다시 확인해 주세요\.\s+그동안 영화를 평가하면 추천이 더 정확해져요/,
-      ),
-    ).toBeInTheDocument();
-    expect(screen.queryByText('추천을 잠시 불러오지 못했어요')).toBeNull();
-    expect(screen.getByRole('link', { name: '영화 검색하기' })).toHaveAttribute('href', '/search');
-
-    fireEvent.click(screen.getByRole('button', { name: '다시 확인하기' }));
-
-    expect(await screen.findByRole('link', { name: '파이트 클럽 상세 보기' })).toBeInTheDocument();
-    expect(getRecommendations).toHaveBeenCalledTimes(2);
-  });
+  it.each(['RECOMMENDATION_UNAVAILABLE', 'RECOMMENDATION_PREPARING'])(
+    '%s는 오류 아이콘 없이 기다렸다가 자동으로 추천을 보여준다',
+    async (code) => {
+      vi.useFakeTimers();
+      vi.mocked(getRecommendations)
+        .mockRejectedValueOnce(new ApiError(503, code, '준비 중'))
+        .mockResolvedValue(set);
+      renderWithRouter(<RecommendationsPage />, { route: '/recommendations' });
+      await act(async () => {});
+      expect(screen.getByText('추천 영화를 준비하고 있어요')).toBeInTheDocument();
+      expect(screen.getByRole('status')).toHaveAttribute('data-variant', 'empty');
+      expect(screen.queryByRole('button', { name: '다시 확인하기' })).toBeNull();
+      expect(screen.getByRole('link', { name: '영화 검색하기' })).toHaveAttribute(
+        'href',
+        '/search',
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000);
+      });
+      expect(screen.getByRole('link', { name: '파이트 클럽 상세 보기' })).toBeInTheDocument();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+      expect(getRecommendations).toHaveBeenCalledTimes(2);
+    },
+  );
 
   it.each([
     ['네트워크 단절', new ApiError(0, 'NETWORK_ERROR', '네트워크에 연결할 수 없습니다.')],
@@ -335,5 +353,97 @@ describe('2.2 관심없음', () => {
     // 다시 누를 수 있다
     expect(screen.getByRole('button', { name: '파이트 클럽 관심없음' })).toBeEnabled();
     expect(getRecommendations).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('첫 추천 자동 조회 수명', () => {
+  function preparing() {
+    vi.useFakeTimers();
+    vi.mocked(getRecommendations).mockRejectedValue(
+      new ApiError(503, 'RECOMMENDATION_PREPARING', '준비 중'),
+    );
+  }
+  async function advanceRetries(count: number) {
+    for (let i = 0; i < count; i += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2_000);
+      });
+    }
+  }
+
+  it('15회 후 자동 조회를 멈추고 수동 재시도에서 다시 시작한다', async () => {
+    preparing();
+    renderWithRouter(<RecommendationsPage />);
+    await act(async () => {});
+    await advanceRetries(15);
+    expect(getRecommendations).toHaveBeenCalledTimes(16);
+    expect(
+      screen.getByText('추천 준비가 조금 늦어지고 있어요. 잠시 후 다시 확인해 주세요.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveAttribute('data-variant', 'empty');
+    await advanceRetries(2);
+    expect(getRecommendations).toHaveBeenCalledTimes(16);
+    fireEvent.click(screen.getByRole('button', { name: '다시 확인하기' }));
+    await act(async () => {});
+    expect(getRecommendations).toHaveBeenCalledTimes(17);
+    expect(screen.queryByRole('button', { name: '다시 확인하기' })).toBeNull();
+    await advanceRetries(1);
+    expect(getRecommendations).toHaveBeenCalledTimes(18);
+  });
+
+  it('일반 오류에서는 자동 조회하지 않는다', async () => {
+    vi.useFakeTimers();
+    vi.mocked(getRecommendations).mockRejectedValue(new ApiError(500, 'INTERNAL_ERROR', '오류'));
+    renderWithRouter(<RecommendationsPage />);
+    await act(async () => {});
+    await advanceRetries(20);
+    expect(getRecommendations).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('status')).toHaveAttribute('data-variant', 'error');
+  });
+
+  it('화면 이탈 후 예약한 요청을 실행하지 않는다', async () => {
+    preparing();
+    const view = renderWithRouter(<RecommendationsPage />);
+    await act(async () => {});
+    view.unmount();
+    await advanceRetries(2);
+    expect(getRecommendations).toHaveBeenCalledTimes(1);
+  });
+
+  it('계정 변경 후 이전 응답을 버리고 새 계정의 준비 상태를 유지한다', async () => {
+    preparing();
+    let resolveOld!: (value: RecommendationSet) => void;
+    vi.mocked(getRecommendations).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveOld = resolve;
+        }),
+    );
+    const renderPage = (id: number) => (
+      <AuthContext.Provider value={{ ...guideAuth, user: { ...guideAuth.user!, userId: id } }}>
+        <RecommendationsPage />
+      </AuthContext.Provider>
+    );
+    const view = renderWithRouter(renderPage(42));
+    view.rerender(withRouter(renderPage(43)));
+    await act(async () => {
+      resolveOld(set);
+    });
+    expect(getRecommendations).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText('파이트 클럽')).toBeNull();
+    await advanceRetries(1);
+    expect(getRecommendations).toHaveBeenCalledTimes(3);
+  });
+
+  it('화면 편수 변경 시 이전 타이머를 정리하고 새 편수만 재조회한다', async () => {
+    preparing();
+    const view = renderWithRouter(<RecommendationsPage />);
+    await act(async () => {});
+    vi.mocked(useShellSize).mockReturnValue('desktop');
+    view.rerender(withRouter(<RecommendationsPage />));
+    await act(async () => {});
+    expect(vi.mocked(getRecommendations).mock.calls.map(([size]) => size)).toEqual([3, 6]);
+    await advanceRetries(1);
+    expect(vi.mocked(getRecommendations).mock.calls.map(([size]) => size)).toEqual([3, 6, 6]);
   });
 });

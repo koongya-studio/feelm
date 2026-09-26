@@ -104,14 +104,24 @@ type Failure = 'preparing' | 'error';
 
 /** 넓은 화면의 묶음 하나에 서는 카드 수. 2026-09-21 시안이 묶음마다 석 장이다 */
 const DESKTOP_GROUP_SIZE = 3;
+const PREPARING_RETRY_MS = 2_000;
+const MAX_PREPARING_RETRIES = 15;
 
 function failureOf(error: unknown): Failure {
-  return error instanceof ApiError && error.code === 'RECOMMENDATION_UNAVAILABLE'
+  return error instanceof ApiError &&
+    (error.code === 'RECOMMENDATION_UNAVAILABLE' || error.code === 'RECOMMENDATION_PREPARING')
     ? 'preparing'
     : 'error';
 }
 
 export default function RecommendationsPage() {
+  const userId = useContext(AuthContext)?.user?.userId;
+  const desktop = useShellSize() !== 'mobile';
+  // 계정 또는 조회 편수가 바뀌면 이전 요청·타이머와 화면 상태를 함께 정리한다.
+  return <RecommendationsContent key={`${userId ?? 'anonymous'}:${desktop}`} desktop={desktop} />;
+}
+
+function RecommendationsContent({ desktop }: { desktop: boolean }) {
   const navigate = useNavigate();
   const user = useContext(AuthContext)?.user ?? null;
   const [guideDismissed, setGuideDismissed] = useState(false);
@@ -129,7 +139,6 @@ export default function RecommendationsPage() {
   }
   const rootRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(true);
-  const desktop = useShellSize() !== 'mobile';
   /*
    * 요청할 노출 편수 (업무 S15P21E106-794). 넓은 화면은 묶음마다 석 장이 서므로 여섯 편이
    * 필요하고, 모바일은 지금까지와 같은 세 편이다(API-045 `size`).
@@ -158,6 +167,7 @@ export default function RecommendationsPage() {
   const [dismissFailed, setDismissFailed] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
+  const [preparingTimedOut, setPreparingTimedOut] = useState(false);
 
   useEffect(() => {
     sizeRef.current = size;
@@ -180,24 +190,36 @@ export default function RecommendationsPage() {
 
   useEffect(() => {
     let active = true;
-
-    getRecommendations(size)
-      .then((set) => {
-        if (active) {
-          setItems(set.items);
-          setRecommendationSetId(set.recommendationSetId);
-          setGeneratedAt(set.generatedAt);
-          setFailure(null);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let retries = 0;
+    async function load() {
+      try {
+        const set = await getRecommendations(size);
+        if (!active) return;
+        setItems(set.items);
+        setRecommendationSetId(set.recommendationSetId);
+        setGeneratedAt(set.generatedAt);
+        setFailure(null);
+      } catch (error: unknown) {
+        if (!active) return;
+        const nextFailure = failureOf(error);
+        setFailure(nextFailure);
+        if (nextFailure !== 'preparing') return;
+        if (retries >= MAX_PREPARING_RETRIES) {
+          setPreparingTimedOut(true);
+          return;
         }
-      })
-      .catch((error: unknown) => {
-        if (active) {
-          setFailure(failureOf(error));
-        }
-      });
+        timer = setTimeout(() => {
+          retries += 1;
+          void load();
+        }, PREPARING_RETRY_MS);
+      }
+    }
+    void load();
 
     return () => {
       active = false;
+      clearTimeout(timer);
     };
   }, [reloadCount, size]);
 
@@ -205,7 +227,9 @@ export default function RecommendationsPage() {
   function handleRetry() {
     setItems(null);
     setRecommendationSetId(null);
+    setGeneratedAt(null);
     setFailure(null);
+    setPreparingTimedOut(false);
     setReloadCount((count) => count + 1);
   }
 
@@ -284,8 +308,8 @@ export default function RecommendationsPage() {
     DESKTOP_GROUP_SIZE,
   );
 
-  if (failure) {
-    const preparing = failure === 'preparing';
+  if (failure || items === null) {
+    const preparing = failure === 'preparing' || !failure;
 
     return (
       <>
@@ -293,20 +317,28 @@ export default function RecommendationsPage() {
 
         {/* 2.2-A 추천을 불러오지 못한 경우. 후보가 아직 없으면 준비 중으로 안내한다 */}
         <StatusView
-          title={preparing ? '취향에 맞는 추천을 준비하고 있어요' : '추천을 잠시 불러오지 못했어요'}
+          variant={preparing ? 'empty' : 'error'}
+          title={preparing ? '추천 영화를 준비하고 있어요' : '추천을 잠시 불러오지 못했어요'}
           description={
             preparing
-              ? '잠시 후 다시 확인해 주세요.\n그동안 영화를 평가하면 추천이 더 정확해져요'
+              ? preparingTimedOut
+                ? '추천 준비가 조금 늦어지고 있어요. 잠시 후 다시 확인해 주세요.'
+                : '영화를 고르고 있어요. 준비되면 자동으로 보여드릴게요.'
               : '검색과 영화 평가는 계속 이용할 수 있어요'
           }
         >
-          <Button onClick={handleRetry}>{preparing ? '다시 확인하기' : '다시 시도'}</Button>
+          {preparing && !preparingTimedOut ? (
+            <span className={styles.preparingSpinner} aria-hidden="true" />
+          ) : null}
+          {!preparing || preparingTimedOut ? (
+            <Button onClick={handleRetry}>{preparing ? '다시 확인하기' : '다시 시도'}</Button>
+          ) : null}
           {/* 검색(4.1)은 범위 밖이며 탭에서 안내 화면으로 이동한다 */}
           <Link to={path.search()} className={styles.searchLink}>
             영화 검색하기
           </Link>
         </StatusView>
-        {guideActive ? (
+        {guideActive && (!preparing || preparingTimedOut) ? (
           <GuideCallout
             title="추천을 준비하고 있어요"
             description="그동안 검색에서 본 영화를 찾아 평가해 보세요."

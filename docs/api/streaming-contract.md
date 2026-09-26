@@ -211,6 +211,8 @@ Consumer는 이벤트 payload의 과거 값을 누적하지 않고 현재 Postgr
 
 - 개별 선택 내용은 싣지 않는다. Backend는 같은 트랜잭션에서 LIKE `4.0`·DISLIKE `2.0` 평가를 저장하고,
   Python Consumer는 이 이벤트를 사용자별 최신 `ratings`를 다시 읽는 재계산 신호로만 사용한다
+- `preferenceCount`는 0 이상의 정수다. 건너뛴 제출도 `0`으로 발행하며, Consumer는 빈 현재 입력에
+  §6.3의 개인 K0 인기순 후보 공급을 적용한다. 음수·불리언·소수·누락은 거절한다.
 - 한 번의 제출에는 `ONBOARDING` 이벤트 한 건만 발행하고 선택별 `RATING` 이벤트는 추가 발행하지 않는다.
   payload에 계약 외 필드가 추가돼도 Consumer 계산 입력으로 사용하지 않는다(S15P21E106-649)
 
