@@ -46,6 +46,17 @@ function Nav() {
       <button type="button" onClick={() => void navigate(-1)}>
         뒤로
       </button>
+      <button
+        type="button"
+        onClick={() =>
+          void navigate('/my?tab=recommendations', {
+            replace: true,
+            state: { preserveScroll: true },
+          })
+        }
+      >
+        추천 기록
+      </button>
     </>
   );
 }
@@ -84,6 +95,26 @@ beforeEach(() => {
 });
 
 describe('useScrollRestoration', () => {
+  it('MY 내부 탭은 위치를 유지하고 상세에서 뒤로 와도 그 위치를 복원한다', async () => {
+    renderApp();
+    go('MY 탭');
+    scrollBodyTo(540);
+    go('추천 기록');
+    expect(body().scrollTop).toBe(540);
+    go('프레임');
+    await screen.findByText('프레임 상세');
+    go('뒤로');
+    expect(await screen.findByText('MY')).toBeInTheDocument();
+    expect(body().scrollTop).toBe(540);
+  });
+
+  it('스크롤 유지 표시가 있어도 다른 경로로 이동하면 맨 위에서 시작한다', () => {
+    renderApp();
+    scrollBodyTo(540);
+    go('추천 기록');
+    expect(body().scrollTop).toBe(0);
+  });
+
   it('전체화면에 다녀와 뒤로 오면 보던 자리로 돌아온다', async () => {
     renderApp();
     scrollBodyTo(640);
