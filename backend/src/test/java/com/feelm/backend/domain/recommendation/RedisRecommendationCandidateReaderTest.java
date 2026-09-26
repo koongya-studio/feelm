@@ -231,6 +231,21 @@ class RedisRecommendationCandidateReaderTest {
                      "code":"DISCOVERY_PERSONAL_SCORE","sourceMovieIds":[],
                      "matchedGenreCodes":["THRILLER"]
                    }]}]}
+                """,
+                // S15P21E106-925: topContributors는 계약상 최대 3편이다
+                """
+                {"modelVersion":"als","candidateVersion":6,"generationId":"g1",
+                 "updatedAt":"2026-09-16T08:30:00Z","taste":[],"discovery":[{
+                   "movieId":2,"score":3,"reasons":[{
+                     "code":"DISCOVERY_AGGREGATE_AFFINITY","directionSource":"RATING",
+                     "contributorCount":4,"topContributors":[
+                       {"movieId":11,"relation":"POSITIVE_ALIGNMENT"},
+                       {"movieId":12,"relation":"POSITIVE_ALIGNMENT"},
+                       {"movieId":13,"relation":"POSITIVE_ALIGNMENT"},
+                       {"movieId":14,"relation":"POSITIVE_ALIGNMENT"}],
+                     "topContributionCoverage":0.9,"viewedCountInGroup":0,
+                     "affinityRank":1,"popularityRankInGroup":1
+                   }]}]}
                 """
             })
     @DisplayName("T3 계약에 맞지 않는 메타데이터와 후보는 전체를 거절한다")

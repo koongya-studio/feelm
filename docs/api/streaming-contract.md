@@ -685,7 +685,7 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
 모두 반영하지만 `topContributors`와 coverage 분모에는
 양의 기여만 포함한다. 따라서 coverage는 그룹 적합도 근거가 소수 입력에 집중됐는지를 나타내며 후보 영화의
 최종 개인 점수 전체에 대한 설명률이 아니다. Consumer는 `CONCENTRATED` 같은 임의 구간값을 만들지 않는다.
-Spring은 합의한 coverage 기준보다 낮으면 영화명을 열거하지 않고 전체 평가 이력 기반 문구를 사용한다.
+Spring은 `topContributionCoverage`가 0.5(담당자 결정 2026-09-26, S15P21E106-925)보다 낮으면 영화명을 열거하지 않고 전체 평가 이력 기반 문구를 사용한다. 문구와 검증 규칙은 `docs/api/recommendation.md` API-045가 정한다.
 Consumer는 구조화된 근거만 저장하고, Spring은 영화 제목과 표시명을 조회해 사용자 문구를 만든다.
 
 그룹 후보가 100편보다 적으면 Consumer는 선택된 상위 10개 그룹의 다음 대중성 순위 층을 순회한다.

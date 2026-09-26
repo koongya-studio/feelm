@@ -48,6 +48,7 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
     private static final String TOP_RATED_SOURCE_REASON = "TOP_RATED_SOURCE";
     private static final String DISCOVERY_AGGREGATE_REASON = "DISCOVERY_AGGREGATE_AFFINITY";
     private static final String DISCOVERY_PERSONAL_REASON = "DISCOVERY_PERSONAL_SCORE";
+    private static final int MAX_TOP_CONTRIBUTORS = 3;
     private static final String EVIDENCE_SCHEMA_V1 = "gbt-evidence-v1";
     private static final String EVIDENCE_SCHEMA_V2 = "gbt-evidence-v2";
     private static final String EXPLANATION_V1 = "gbt-feature-attribution-v1";
@@ -564,6 +565,8 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
         if (!DIRECTION_SOURCES.contains(reason.path("directionSource").textValue())
                 || !nonNegativeLong(reason.path("contributorCount"))
                 || !contributors.isArray()
+                // 계약상 기여 순 최대 3편이다. 넘는 payload의 뒤쪽 영화를 근거로 쓰지 않는다(S15P21E106-925)
+                || contributors.size() > MAX_TOP_CONTRIBUTORS
                 || !decimalBetweenZeroAndOne(reason.path("topContributionCoverage"))
                 || !nonNegativeLong(reason.path("viewedCountInGroup"))
                 || !positiveLong(reason.path("affinityRank"))
