@@ -56,7 +56,7 @@ export default function NotificationListPage() {
   const [busy, setBusy] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
   /** 알림이 가리키는 곳으로 갈 수 없는 까닭 */
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState<Awaited<ReturnType<typeof unavailableReason>>>(null);
   /** 누른 알림의 목적지를 확인하는 중이다. 거듭 누른 것은 무시한다 */
   const openingRef = useRef(false);
 
@@ -83,7 +83,7 @@ export default function NotificationListPage() {
     if (openingRef.current) return;
 
     openingRef.current = true;
-    setNotice('');
+    setNotice(null);
 
     try {
       // 갈 수 없어도 읽은 것이다. 목적지 확인과 함께 보낸다
@@ -261,8 +261,14 @@ export default function NotificationListPage() {
 
       {notice ? (
         <div className={styles.snackbarSlot}>
-          <Snackbar actionLabel="확인" onAction={() => setNotice('')}>
-            {notice}
+          <Snackbar
+            actionLabel={notice.partyPath ? '파티로 이동' : '확인'}
+            onAction={() => {
+              if (notice.partyPath) void navigate(notice.partyPath);
+              setNotice(null);
+            }}
+          >
+            {notice.message}
           </Snackbar>
         </div>
       ) : null}
