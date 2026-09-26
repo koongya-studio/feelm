@@ -33,9 +33,6 @@ function stream() {
     controller,
   };
 }
-async function flush() {
-  for (let i = 0; i < 15; i++) await Promise.resolve();
-}
 
 describe('SSE 파싱', () => {
   it('청크 경계·CRLF·주석·다른 이벤트를 구분한다', () => {
@@ -64,12 +61,11 @@ it('Bearer 헤더로 연결하고 이벤트마다 재조회 신호를 보낸다'
   const changed = vi.fn();
   const unsubscribe = onNotificationChange(changed);
   stop = startNotificationStream();
-  await flush();
+  await vi.advanceTimersByTimeAsync(0);
   expect(fetchMock.mock.calls[0][0]).toBe('/api/v1/notifications/stream');
   expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer old');
   source.controller.enqueue(new TextEncoder().encode('event: notification-changed\ndata: {}\n\n'));
-  await flush();
-  expect(changed).toHaveBeenCalledTimes(2);
+  await vi.waitFor(() => expect(changed).toHaveBeenCalledTimes(2));
   unsubscribe();
 });
 
@@ -84,8 +80,7 @@ it('401이면 갱신된 토큰으로 다시 연결한다', async () => {
     )
     .mockResolvedValueOnce(source.response);
   stop = startNotificationStream();
-  await flush();
-  expect(fetchMock).toHaveBeenCalledTimes(3);
+  await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
   expect(fetchMock.mock.calls[2][1].headers.Authorization).toBe('Bearer new');
 });
 
@@ -94,9 +89,9 @@ it('종료 뒤 backoff로 재연결하며 로그아웃하면 중단한다', asyn
   const second = stream();
   fetchMock.mockResolvedValueOnce(first.response).mockResolvedValueOnce(second.response);
   stop = startNotificationStream();
-  await flush();
+  await vi.advanceTimersByTimeAsync(0);
   first.controller.close();
-  await flush();
+  await vi.advanceTimersByTimeAsync(0);
   await vi.advanceTimersByTimeAsync(999);
   expect(fetchMock).toHaveBeenCalledTimes(1);
   await vi.advanceTimersByTimeAsync(1);
@@ -113,7 +108,7 @@ it('45초 무수신 연결을 끊고 다시 연결한다', async () => {
   const second = stream();
   fetchMock.mockResolvedValueOnce(first.response).mockResolvedValueOnce(second.response);
   stop = startNotificationStream();
-  await flush();
+  await vi.advanceTimersByTimeAsync(0);
   await vi.advanceTimersByTimeAsync(46_000);
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });
@@ -127,10 +122,10 @@ it('갱신 도중 로그아웃하면 이전 세션을 재연결하지 않는다'
       }),
   );
   stop = startNotificationStream();
-  await flush();
+  await vi.advanceTimersByTimeAsync(0);
   endSession('signed-out');
   resolve(new Response(JSON.stringify({ accessToken: 'new', expiresIn: 1800 })));
-  await flush();
+  await vi.advanceTimersByTimeAsync(0);
   expect(fetchMock).toHaveBeenCalledTimes(2);
 });
 
@@ -144,7 +139,7 @@ it('최초 응답이 멈추면 요청을 중단하고 backoff로 다시 연결�
     )
     .mockResolvedValueOnce(stream().response);
   stop = startNotificationStream();
-  await flush();
+  await vi.advanceTimersByTimeAsync(0);
   await vi.advanceTimersByTimeAsync(46_000);
   expect(fetchMock.mock.calls[0][1].signal.aborted).toBe(true);
   expect(fetchMock).toHaveBeenCalledTimes(2);

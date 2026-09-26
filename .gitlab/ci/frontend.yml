@@ -9,6 +9,7 @@ frontend-mr-test:
     - npm ci
     - npm run lint
     - npm run format:check
+    - npm run test:run
     - npm run build
   resource_group: frontend-mr-isolated
   interruptible: true
@@ -50,7 +51,7 @@ frontend-test:
   tags: [e106-shell]
   script:
     - python3 -B -m unittest infra.scripts.test_ci_frontend_paths -v
-    - docker run --rm --pull always --volume "$CI_PROJECT_DIR/frontend:/src:ro" --workdir /app node:20.19-alpine sh -c 'cp -R /src/. /app && npm ci && npm run lint && npm run format:check && npm run test:run && npm run build'
+    - docker run --rm --pull always --volume "$CI_PROJECT_DIR/frontend:/src:ro" --workdir /app node:22.22.0-alpine sh -c 'cp -R /src/. /app && npm ci && npm run lint && npm run format:check && npm run test:run && npm run build'
   interruptible: true
   timeout: 15m
   rules:

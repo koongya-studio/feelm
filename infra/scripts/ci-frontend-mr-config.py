@@ -17,7 +17,7 @@ import sys
 CONFIG = Path('/etc/feelm-ci222/frontend-mr.json')
 RUNNER_USER = 'feelm-ci-test'
 DOCKER_HOST = 'unix:///run/user/1001/docker.sock'
-IMAGE_PATTERN = r'node:20\.19(?:\.\d+)?-alpine(?:\d+(?:\.\d+)?)?'
+IMAGE_PATTERN = r'node:22\.22\.\d+-alpine(?:\d+(?:\.\d+)?)?'
 
 
 def docker_command(*arguments):
@@ -83,7 +83,7 @@ def main():
     parser.add_argument('--node-image')
     args = parser.parse_args()
     if not (args.confirm_install or args.confirm_replace):
-        print('PLAN: inspect one preloaded rootless Node 20.19 image and create a root-only config')
+        print('PLAN: inspect one preloaded rootless Node 22.22.0 image and create a root-only config')
         return 0
     if args.node_image is None:
         parser.error('--node-image is required with a confirmation option')

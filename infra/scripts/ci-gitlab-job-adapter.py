@@ -53,7 +53,7 @@ JOB_STAGE = 'test'
 EXPECTED_SCRIPT = ['cd backend', './gradlew clean test spotlessCheck --no-daemon']
 FRONTEND_JOB_NAME = 'frontend-mr-test'
 FRONTEND_EXPECTED_SCRIPT = [
-    'cd frontend', 'npm ci', 'npm run lint', 'npm run format:check', 'npm run build',
+    'cd frontend', 'npm ci', 'npm run lint', 'npm run format:check', 'npm run test:run', 'npm run build',
 ]
 CONSUMER_JOB_NAME = 'consumer-mr-test'
 CONSUMER_EXPECTED_SCRIPT = [

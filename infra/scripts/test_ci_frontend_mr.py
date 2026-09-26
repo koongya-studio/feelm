@@ -100,18 +100,19 @@ class FrontendBoundaryTests(unittest.TestCase):
             boundary.source_plan(payload, hashlib.sha256(payload).hexdigest())
 
     def test_rejects_lifecycle_hooks_for_fixed_scripts(self):
-        scripts = dict(boundary.EXPECTED_SCRIPTS, prelint='curl https://example.invalid/')
-        payload = snapshot(scripts=scripts)
-
-        with self.assertRaisesRegex(ValueError, 'lifecycle hooks'):
-            boundary.source_plan(payload, hashlib.sha256(payload).hexdigest())
+        for hook in ('prelint', 'pretest:run', 'posttest:run'):
+            scripts = dict(boundary.EXPECTED_SCRIPTS)
+            scripts[hook] = 'curl https://example.invalid/'
+            payload = snapshot(scripts=scripts)
+            with self.subTest(hook=hook), self.assertRaisesRegex(ValueError, 'lifecycle hooks'):
+                boundary.source_plan(payload, hashlib.sha256(payload).hexdigest())
 
 
 class FrontendRunnerTests(unittest.TestCase):
     def config(self):
         return {'runner_user': 'feelm-ci-test',
                 'docker_host': 'unix:///run/user/1001/docker.sock',
-                'node_image': 'node:20.19-alpine', 'node_image_id': 'sha256:' + 'a' * 64}
+                'node_image': 'node:22.22.0-alpine', 'node_image_id': 'sha256:' + 'a' * 64}
 
     def test_fixed_container_has_no_socket_secret_or_host_network(self):
         command = runner.docker_command(self.config(), 'run')
@@ -135,7 +136,7 @@ class FrontendRunnerTests(unittest.TestCase):
         self.assertIn('npm ci --ignore-scripts', runner.FIXED_COMMAND)
         self.assertNotIn('npm run', runner.FIXED_COMMAND)
         for command in ('eslint/bin/eslint.js .', 'prettier/bin/prettier.cjs --check .',
-                        'typescript/bin/tsc -b', 'vite/bin/vite.js build'):
+                        'vitest/vitest.mjs run --maxWorkers=2', 'typescript/bin/tsc -b', 'vite/bin/vite.js build'):
             self.assertIn('node ./node_modules/' + command, runner.FIXED_COMMAND)
         self.assertNotIn('./node_modules/.bin/', runner.FIXED_COMMAND)
         self.assertNotIn('/var/run/docker.sock', source)
@@ -224,7 +225,7 @@ class FrontendConfigTests(unittest.TestCase):
         install.assert_not_called()
 
     def test_config_and_runner_accept_the_same_image_policy(self):
-        for image in ('node:20.19-alpine', 'node:20.19.1-alpine3.21'):
+        for image in ('node:22.22.0-alpine', 'node:22.22.1-alpine3.21'):
             self.assertIsNotNone(__import__('re').fullmatch(configurator.IMAGE_PATTERN, image))
             config = FrontendRunnerTests().config(); config['node_image'] = image
             with tempfile.NamedTemporaryFile(mode='w', delete=False) as output:
@@ -239,6 +240,18 @@ class FrontendConfigTests(unittest.TestCase):
                         self.assertEqual(runner.read_config(path)['node_image'], image)
             finally:
                 path.unlink(missing_ok=True)
+
+    def test_rejects_old_and_unpinned_node_images(self):
+        for image in ('node:20.19-alpine', 'node:22.21.0-alpine', 'node:22-alpine',
+                      'node:22.22-alpine', 'node:latest'):
+            self.assertIsNone(__import__('re').fullmatch(configurator.IMAGE_PATTERN, image))
+            config = FrontendRunnerTests().config(); config['node_image'] = image
+            with patch.object(runner.Path, 'lstat') as lstat:
+                lstat.return_value = type('Info', (), {
+                    'st_mode': 0o100600, 'st_uid': 0, 'st_nlink': 1, 'st_size': 256})()
+                with patch.object(runner.Path, 'read_text', return_value=json.dumps(config)):
+                    with self.assertRaisesRegex(RuntimeError, 'Unreviewed Node'):
+                        runner.read_config()
 
 
 if __name__ == '__main__':

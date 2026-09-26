@@ -19,6 +19,7 @@ EXPECTED_SCRIPTS = {
     'build': 'tsc -b && vite build',
     'lint': 'eslint .',
     'format:check': 'prettier --check .',
+    'test:run': 'vitest run',
 }
 FORBIDDEN_LIFECYCLE_SCRIPTS = {
     prefix + name
