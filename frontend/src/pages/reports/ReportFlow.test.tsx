@@ -275,7 +275,9 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
       renderApp(['/reports/301']);
       const flip = await screen.findByRole('button', { name: '01 장르 설명 보기' });
       expect(screen.getByText('각 컷을 눌러 뒷면의 설명을 확인해 보세요')).toBeInTheDocument();
-      expect(window.localStorage.getItem('feelm-report-flip-intro-v4:301')).toBe('1');
+      await waitFor(() =>
+        expect(window.localStorage.getItem('feelm-report-flip-intro-v4:301')).toBe('1'),
+      );
       await new Promise((resolve) => window.setTimeout(resolve, 900));
       expect(flip).toHaveAttribute('aria-expanded', 'false');
     } finally {
