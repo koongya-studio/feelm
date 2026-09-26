@@ -231,3 +231,65 @@ describe('본 묶음 남기기', () => {
     expect(localStorage.length).toBe(0);
   });
 });
+
+describe('추천 영화 페이지 (S15P21E106-961)', () => {
+  function recommendations(count: number) {
+    const set = partyRecommendations();
+    return {
+      ...set,
+      items: Array.from({ length: count }, (_, index) => ({
+        ...set.items[0],
+        recommendationItemId: 8000 + index,
+        movie: { ...set.items[0].movie, movieId: 9000 + index, title: `추천 영화 ${index + 1}` },
+      })),
+    };
+  }
+
+  it('9편을 3편씩 모두 넘겨보고 이전 페이지로 돌아간다. 페이지 이동은 API를 다시 부르지 않는다', async () => {
+    vi.mocked(getPartyRecommendations).mockResolvedValue(recommendations(9));
+    renderPage();
+    await screen.findByText('우리에게 어울리는 9편');
+    expect(screen.getByRole('button', { name: '이전' })).toBeDisabled();
+    for (let page = 0; page < 3; page++) {
+      expect(screen.getByRole('status', { name: `${page + 1} / 3 페이지` })).toBeInTheDocument();
+      for (let index = 0; index < 9; index++) {
+        const link = screen.queryByRole('link', { name: `추천 영화 ${index + 1}` });
+        if (Math.floor(index / 3) === page) {
+          expect(link).toHaveAttribute('href', `/movies/${9000 + index}`);
+        } else {
+          expect(link).toBeNull();
+        }
+      }
+      if (page < 2) fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    }
+    expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: '이전' }));
+    expect(screen.getByRole('status', { name: '2 / 3 페이지' })).toBeInTheDocument();
+    expect(getPartyRecommendations).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: '다른 영화 추천받기' })).toBeInTheDocument();
+  });
+
+  it.each([1, 2, 3])('%i편이면 불필요한 페이지 이동을 보이지 않는다', async (count) => {
+    vi.mocked(getPartyRecommendations).mockResolvedValue(recommendations(count));
+    renderPage();
+    await screen.findByText(`우리에게 어울리는 ${count}편`);
+    expect(screen.queryByRole('navigation', { name: '추천 영화 페이지' })).toBeNull();
+    expect(screen.getAllByRole('link', { name: /^추천 영화 / })).toHaveLength(count);
+  });
+
+  it('마지막 페이지가 1편이어도 누락하지 않고 상세로 이동한다', async () => {
+    vi.mocked(getPartyRecommendations).mockResolvedValue(recommendations(4));
+    renderPage();
+    await screen.findByText('우리에게 어울리는 4편');
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(screen.getAllByRole('link', { name: /^추천 영화 / })).toHaveLength(1);
+    fireEvent.click(screen.getByRole('link', { name: '추천 영화 4' }));
+    expect(location()).toBe('/movies/9003');
+  });
+
+  it('헤더의 추천 이력은 기존 이력 화면을 연다', async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole('link', { name: '추천 이력' }));
+    expect(location()).toBe(`/parties/${TEST_PARTY_ID}/recommendations/history`);
+  });
+});
