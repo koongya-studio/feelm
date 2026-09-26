@@ -63,7 +63,7 @@ def parse_event(raw: bytes, key: bytes | None) -> RecalculationEvent:
             raise EventValidationError("invalid score")
     elif event_type == "ONBOARDING":
         count = body.get("preferenceCount")
-        if isinstance(count, bool) or not isinstance(count, int) or count <= 0:
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
             raise EventValidationError("invalid preferenceCount")
     else:
         movie_id = body.get("movieId")

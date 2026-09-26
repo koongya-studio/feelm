@@ -249,3 +249,36 @@ def test_loop_revocation_during_notify_prevents_commit(scorer):
         consumer.lost(consumer, [SimpleNamespace(topic="feelm.dismiss.v1", partition=0)])
     loop(consumer, scorer, notify=revoke)
     assert not consumer.commits and consumer.closed
+
+
+def test_zero_onboarding_event_publishes_popularity_and_notice(scorer):
+    class OnboardingMessage(Message):
+        def topic(self):
+            return "feelm.rating.v1"
+
+    raw = json.dumps({
+        "eventId": "123e4567-e89b-12d3-a456-426614174000", "userId": 10,
+        "eventType": "ONBOARDING", "occurredAt": "2026-09-26T00:00:00Z",
+        "payload": {"preferenceCount": 0},
+    }).encode()
+    class OnboardingConsumer(Consumer):
+        def subscribe(self, topics, *, on_assign, on_revoke, on_lost):
+            self.revoked, self.lost = on_revoke, on_lost
+            on_assign(self, [SimpleNamespace(topic="feelm.rating.v1", partition=0)])
+
+    consumer, store, notices = OnboardingConsumer([OnboardingMessage(41, raw)]), Store(), []
+    store.claim = lambda *_: ("test-fence", "token")
+    run_consumer(consumer, store, Connection, PersonalScorer(scorer), group_id="gbt-test",
+                 topics=["feelm.rating.v1"], publisher=notices.append)
+    assert consumer.commits == [41] and consumer.closed
+    assert not store.failures and len(notices) == 1
+    result = store.published[0]
+    assert result.snapshot.ratings == () and result.state["supportedInputCount"] == 0
+    assert result.state["status"] == "READY" and len(result.candidates["taste"]) == 500
+    expected = sorted(
+        ((int(mid), float(scorer.features.movie[index, 0]))
+         for index, mid in enumerate(scorer.features.ids) if scorer.eligible[index]),
+        key=lambda item: (-item[1], item[0]),
+    )[:500]
+    assert [(item["movieId"], item["score"]) for item in result.candidates["taste"]] == expected
+    assert notices[0] == result

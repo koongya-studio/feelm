@@ -10,6 +10,7 @@
  * 구조적으로 사라진다. 목업 세트 · 교체 후보 · 세션 관심없음 기록은 함께 지웠다.
  */
 import { request } from './client';
+import { getAccessToken } from './session';
 import type { RecommendationHistory, RecommendationSet } from '../types/recommendation';
 
 /**
@@ -22,10 +23,10 @@ export type RecommendationSize = 3 | 6;
 const DEFAULT_SIZE: RecommendationSize = 3;
 
 /**
- * 진행 중인 조회. **편수마다 따로 둔다** — 3편과 6편은 서로 다른 요청이고, 하나로 합치면
+ * 진행 중인 조회. **인증 토큰과 편수마다 따로 둔다** — 3편과 6편은 서로 다른 요청이고, 하나로 합치면
  * 폭이 넓어진 직후의 6편 요청이 앞서 나간 3편 응답을 받는다.
  */
-const pendingRecommendationRequests = new Map<RecommendationSize, Promise<RecommendationSet>>();
+const pendingRecommendationRequests = new Map<string, Promise<RecommendationSet>>();
 
 /**
  * API-045 기본 추천 조회 · GET /api/v1/recommendations
@@ -34,8 +35,8 @@ const pendingRecommendationRequests = new Map<RecommendationSize, Promise<Recomm
  * 발견 3)이다. 기본값이 3이라 3편은 값을 싣지 않는다. 취향 발견 후보가 모자라면 그 자리를
  * 맞춤이 채우므로(업무 -793) 유형별 수는 요청한 대로 오지 않을 수 있고, 후보가 없으면
  * 요청한 편수보다 적게 온다(처리 규칙).
- * 조회 자체가 노출을 기록하는 쓰기 트랜잭션이라 화면이 다시 부르는 것은 사용자가 재시도를
- * 눌렀을 때뿐이다. 추천 서비스가 잠시 닫혀 있으면 `503 RECOMMENDATION_UNAVAILABLE`이고
+ * 조회 자체가 노출을 기록하는 쓰기 트랜잭션이다. 준비 중 응답에만 화면이 제한된 자동
+ * 재조회를 수행하며, 성공 후에는 자동 재조회하지 않는다. 추천 서비스가 잠시 닫혀 있으면 `503 RECOMMENDATION_UNAVAILABLE`이고
  * 2.2-A가 받는다.
  *
  * 일치도 `%`(와이어프레임의 `일치 92%`)는 계약에 없어 그리지 않는다(CR-13). 서버 값이
@@ -52,7 +53,8 @@ export function getRecommendations(
    * 보낸다. 요청이 끝난 뒤에는 캐시하지 않아 다음 진입·재시도가 최신 generation을 확인한다
    * (S15P21E106-613).
    */
-  const pending = pendingRecommendationRequests.get(size);
+  const key = JSON.stringify([getAccessToken(), size]);
+  const pending = pendingRecommendationRequests.get(key);
 
   if (pending) return pending;
 
@@ -60,11 +62,11 @@ export function getRecommendations(
     query: size === DEFAULT_SIZE ? undefined : { size },
   });
 
-  pendingRecommendationRequests.set(size, current);
+  pendingRecommendationRequests.set(key, current);
 
   const clear = () => {
-    if (pendingRecommendationRequests.get(size) === current) {
-      pendingRecommendationRequests.delete(size);
+    if (pendingRecommendationRequests.get(key) === current) {
+      pendingRecommendationRequests.delete(key);
     }
   };
 

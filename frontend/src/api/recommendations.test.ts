@@ -70,6 +70,38 @@ afterEach(() => {
 });
 
 describe('API-045 기본 추천 조회', () => {
+  it('같은 편수라도 계정이 바뀌면 이전 계정의 진행 중인 응답을 공유하지 않는다', async () => {
+    const firstBody = { recommendationSetId: 42, generatedAt: '2026-09-26T00:00:00Z', items: [] };
+    const nextBody = { ...firstBody, recommendationSetId: 43 };
+    let resolveOld!: (response: Response) => void;
+    let resolveNew!: (response: Response) => void;
+    fetchMock
+      .mockReturnValueOnce(
+        new Promise<Response>((resolve) => {
+          resolveOld = resolve;
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise<Response>((resolve) => {
+          resolveNew = resolve;
+        }),
+      );
+    startSession('user-42');
+    const first = getRecommendations(3);
+    startSession('user-43');
+    const next = getRecommendations(3);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(requestedHeaders(0).Authorization).toBe('Bearer user-42');
+    expect(requestedHeaders(1).Authorization).toBe('Bearer user-43');
+    resolveOld(json(200, firstBody));
+    await expect(first).resolves.toEqual(firstBody);
+    const duplicateNew = getRecommendations(3);
+    expect(duplicateNew).toBe(next);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    resolveNew(json(200, nextBody));
+    await expect(Promise.all([next, duplicateNew])).resolves.toEqual([nextBody, nextBody]);
+  });
+
   it('회원 토큰으로 GET /recommendations를 부르고 세트를 그대로 돌려준다', async () => {
     const body = {
       recommendationSetId: 7001,
