@@ -1,5 +1,6 @@
 package com.feelm.backend.domain.watch.service;
 
+import com.feelm.backend.domain.notification.service.NotificationCommandService;
 import com.feelm.backend.domain.taste.service.FrameWriter;
 import com.feelm.backend.domain.taste.service.FrameWriter.FrameCreation;
 import com.feelm.backend.domain.watch.model.RatingVisibility;
@@ -21,6 +22,7 @@ public class RatingStateWriter {
 
     private final RatingCommandRepository repository;
     private final FrameWriter frameWriter;
+    private final NotificationCommandService notificationCommandService;
 
     /** 호출자가 사용자·영화 잠금과 기존 평가 판정을 마친 트랜잭션에서 새 평가 상태를 만든다. */
     @Transactional(propagation = Propagation.MANDATORY)
@@ -50,6 +52,7 @@ public class RatingStateWriter {
                 movie.flavorId() == null
                         ? 0
                         : repository.countUserRatingsForFlavor(userId, movie.flavorId());
+        notificationCommandService.closeWatchConfirmation(userId, watchRecordId, createdAt);
         return new CreatedRatingState(rating, frame, flavorCount);
     }
 
