@@ -95,9 +95,7 @@ export default defineConfig(({ mode }) => ({
    * Vite 설정을 그대로 물려받으므로 CSS Modules · 경로 해석 · `import.meta.env`가
    * 화면과 같게 동작한다. 별도 트랜스폼 설정이 필요한 Jest 대신 Vitest를 쓴 이유다.
    *
-   * **Vitest 4를 쓴다.** 최신 5는 Node `^22.12` 이상만 지원하는데 CI의 `frontend-test`
-   * 잡이 `node:20.19-alpine`에서 돈다(`.gitlab-ci.yml`). 4는 `^20 || ^22 || >=24`이고
-   * Vite 8도 peer로 받는다. 둘을 동시에 만족하는 유일한 메이저다.
+   * Vitest 4와 Vite 8을 사용한다. CI와 이미지 빌드는 Node 22.22.0에서 실행한다.
    */
   test: {
     // 화면 컴포넌트를 렌더하므로 브라우저 DOM이 필요하다

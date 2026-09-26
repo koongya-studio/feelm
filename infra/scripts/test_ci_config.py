@@ -509,7 +509,7 @@ include:
     def test_frontend_mr_command_is_fixed_and_has_no_gitlab_runtime_inputs(self):
         block = job_block(self.frontend, 'frontend-mr-test')
         expected = ['- cd frontend', '- npm ci', '- npm run lint',
-                    '- npm run format:check', '- npm run build']
+                    '- npm run format:check', '- npm run test:run', '- npm run build']
         scripts = [line.strip() for line in block.splitlines()
                    if line.strip() in expected]
         self.assertEqual(scripts, expected)
