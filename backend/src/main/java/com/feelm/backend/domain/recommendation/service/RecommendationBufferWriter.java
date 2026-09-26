@@ -222,7 +222,7 @@ class RecommendationBufferWriter {
                                         item.type(),
                                         item.flavorCode(),
                                         reasonService.initialReason(
-                                                userId, item.type(), item.reason()),
+                                                userId, item.movieId(), item.type(), item.reason()),
                                         item.position()))
                 .toList();
     }
