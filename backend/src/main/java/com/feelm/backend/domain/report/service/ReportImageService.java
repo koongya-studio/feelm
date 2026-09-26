@@ -174,7 +174,7 @@ public class ReportImageService {
     }
 
     private void requireAvailable(ReportSource report, Instant now) {
-        if (now.isBefore(report.period().publicationAt())) {
+        if (!report.manual() && now.isBefore(report.period().publicationAt())) {
             throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
         }
         if (!"READY".equals(report.status())) {

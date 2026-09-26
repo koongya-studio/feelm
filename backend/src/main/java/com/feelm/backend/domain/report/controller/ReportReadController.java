@@ -1,8 +1,10 @@
 package com.feelm.backend.domain.report.controller;
 
 import com.feelm.backend.domain.report.dto.ReportDetailResponse;
+import com.feelm.backend.domain.report.dto.ReportGenerateResponse;
 import com.feelm.backend.domain.report.dto.ReportIssueResponse;
 import com.feelm.backend.domain.report.dto.ReportListResponse;
+import com.feelm.backend.domain.report.service.ReportManualService;
 import com.feelm.backend.domain.report.service.ReportReadService;
 import jakarta.validation.constraints.Positive;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReportReadController {
 
     private final ReportReadService service;
+    private final ReportManualService manualService;
+
+    @PostMapping("/users/me/reports")
+    public ReportGenerateResponse generate(@AuthenticationPrincipal Long userId) {
+        return manualService.generate(userId);
+    }
 
     @GetMapping("/users/me/reports")
     public ReportListResponse list(@AuthenticationPrincipal Long userId) {

@@ -25,7 +25,7 @@ public class ReportImageRepository {
         List<ReportSource> rows =
                 jdbc.query(
                         """
-                        SELECT tr.id, tr.year, tr.half, tr.status
+                        SELECT tr.id, tr.year, tr.half, tr.status, tr.source_fingerprint
                         FROM taste_reports tr
                         WHERE tr.user_id = ? AND tr.id = ?
                         FOR UPDATE
@@ -98,7 +98,8 @@ public class ReportImageRepository {
                 result.getLong("id"),
                 new ReportPeriod(
                         result.getInt("year"), ReportHalf.valueOf(result.getString("half"))),
-                result.getString("status"));
+                result.getString("status"),
+                result.getString("source_fingerprint") != null);
     }
 
     private ImageRow mapImage(ResultSet result) throws SQLException {
@@ -122,7 +123,7 @@ public class ReportImageRepository {
         throw new IllegalStateException("Unsupported timestamp type: " + value);
     }
 
-    public record ReportSource(long id, ReportPeriod period, String status) {}
+    public record ReportSource(long id, ReportPeriod period, String status, boolean manual) {}
 
     public record ImageRow(long id, long reportId, String storageKey, Instant createdAt) {}
 }

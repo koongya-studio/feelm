@@ -176,7 +176,7 @@ public class ReportGenerationRepository {
                 """
                 INSERT INTO taste_reports (user_id, year, half, status, content, created_at)
                 VALUES (:userId, :year, :half, 'GENERATING', CAST(:content AS jsonb), :createdAt)
-                ON CONFLICT (user_id, year, half) DO UPDATE
+                ON CONFLICT (user_id, year, half) WHERE source_fingerprint IS NULL DO UPDATE
                 SET status = 'GENERATING',
                     content = EXCLUDED.content,
                     created_at = EXCLUDED.created_at
