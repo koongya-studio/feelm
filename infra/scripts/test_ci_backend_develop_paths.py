@@ -185,7 +185,9 @@ class BackendDevelopPathRulesTests(unittest.TestCase):
         self.assertIn('job: backend-env-check', self.blocks['backend-image'])
         self.assertIn('job: datastore-config-check', self.blocks['backend-image'])
         self.assertIn('optional: true', self.blocks['backend-image'])
-        self.assertIn('needs: [backend-image]', self.blocks['deploy-backend'])
+        self.assertIn('job: backend-image', self.blocks['deploy-backend'])
+        self.assertIn('job: deploy-consumer\n      optional: true\n      artifacts: false',
+                      self.blocks['deploy-backend'])
         self.assertIn('$CI_PIPELINE_SOURCE == "push"', self.blocks['deploy-backend'])
         self.assertIn('$CI_COMMIT_REF_PROTECTED == "true"', self.blocks['deploy-backend'])
         self.assertIn('infra.scripts.test_ci_config', self.blocks['backend-test'])

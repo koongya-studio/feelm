@@ -1333,6 +1333,21 @@ MR, `develop`, API와 Web Pipeline은
 배포하지 않는다. 오래된 Pipeline은 배포 직전에 원격 `main` HEAD와 commit SHA가 다르면
 중단하며 `distributed-consumer` resource group으로 배포를 직렬화한다.
 
+Backend와 Consumer가 함께 배포되는 Pipeline은 `deploy-consumer` 성공 후
+`deploy-backend`를 실행한다(S15P21E106-945). Consumer의 기동·파티션 할당 검증이 실패하면
+Backend를 갱신하지 않는다. 새 Backend가 발행하는 빈 온보딩(`preferenceCount=0`) 이벤트를
+구형 GBT Consumer가 `INVALID_EVENT`로 격리하고 Offset까지 커밋하는 구간을 방지한다.
+Consumer 단독 배포와 Backend 단독 배포는 각각 실행하며, Backend의 Consumer 의존성은
+Job이 없는 경우에만 optional이다. 수동 재배포 Job은 독립적이므로 두 버전의 호환성을
+확인하고 Consumer를 먼저 배포한다. 향후 DB Migration과 Consumer 변경이 함께 필요한
+배포는 기존 DB와 새 Consumer의 호환성도 확인해야 한다.
+
+이미 구형 GBT Consumer가 처리한 이벤트는 이미지 교체만으로 재처리되지 않는다. 운영자는
+배포 시간대의 `INVALID_EVENT` 격리 기록과 원본 이벤트의 `eventId`, 온보딩 여부,
+`preferenceCount=0` 및 대상 사용자의 추천 상태를 조회해 영향 범위를 확인한다.
+복구가 필요하면 해당 이벤트만 재처리하는 별도 승인 절차와 중복 처리 검증을 준비한다.
+전체 Consumer Group Offset 초기화나 격리 상태 일괄 변경은 수행하지 않는다.
+
 배포에는 J15E106A에서 실행되는 전용 Shell Runner가 필요하다. GitLab Runner 설정은 다음
 경계를 모두 만족해야 한다.
 

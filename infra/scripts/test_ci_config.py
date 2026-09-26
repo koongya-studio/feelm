@@ -538,7 +538,7 @@ include:
         self.assertIn('job: backend-test', backend_image)
         self.assertIn('job: backend-env-check', backend_image)
         self.assertIn('job: datastore-config-check', backend_image)
-        self.assertIn('needs: [backend-image]', backend_deploy)
+        self.assertIn('needs:\n    - job: backend-image\n    - job: deploy-consumer\n      optional: true\n      artifacts: false', backend_deploy)
         for block in (backend_test, backend_image, backend_deploy):
             self.assertIn('changes:', block)
             self.assertIn('- backend/src/**/*', block)
@@ -547,7 +547,7 @@ include:
         self.assertIn('needs: [frontend-test]', frontend_image)
         self.assertIn('needs: [frontend-image]', frontend_deploy)
         self.assertIn('needs: [consumer-test]', consumer_image)
-        self.assertIn('needs:\n    - job: consumer-image\n    - job: deploy-backend\n      optional: true\n      artifacts: false', consumer_deploy)
+        self.assertIn('needs: [consumer-image]', consumer_deploy)
 
         for block in (backend_deploy, frontend_deploy):
             self.assertIn('resource_group: service-and-backend-cache', block)
@@ -597,6 +597,36 @@ include:
         self.assertIn('--init-script gradle/test-timing.gradle', backend_test)
         self.assertIn('action: prepare', backend_env)
         self.assertIn('ci-backend-env-contract.py --require-values', backend_env)
+
+    def test_consumer_rollout_blocks_new_producer_until_success(self):
+        # Resolve the actual needs graph for joint and independent deployments.
+        configs = {'deploy-backend': self.backend, 'deploy-consumer': self.consumer}
+        dependencies = {}
+        for name, config in configs.items():
+            block = job_block(config, name)
+            needs = re.search(r'(?m)^  needs:(.*?)(?=^  [a-z_]+:)', block,
+                              re.DOTALL).group(1)
+            dependencies[name] = re.findall(r'(?:job: |\[)([a-z-]+)', needs)
+        for present in ({'deploy-backend', 'deploy-consumer'},
+                        {'deploy-backend'}, {'deploy-consumer'}):
+            succeeded = {'backend-image', 'consumer-image'}
+            remaining = set(present)
+            order = []
+            while remaining:
+                ready = {name for name in remaining
+                         if all(dep in succeeded or dep not in present
+                                and dep.startswith('deploy-')
+                                for dep in dependencies[name])}
+                self.assertTrue(ready, 'Deployment dependency cycle')
+                order.extend(sorted(ready))
+                succeeded.update(ready)
+                remaining -= ready
+            if len(present) == 2:
+                self.assertEqual(order, ['deploy-consumer', 'deploy-backend'])
+        # A failed Consumer is present but not successful: Backend must stay blocked.
+        succeeded = {'backend-image', 'consumer-image'}
+        self.assertFalse(all(dep in succeeded for dep in dependencies['deploy-backend']))
+        self.assertNotIn('allow_failure: true', job_block(self.consumer, 'deploy-consumer'))
 
     def test_backend_test_avatar_storage_is_job_isolated(self):
         backend_mr_test = job_block(self.backend, 'backend-mr-test')

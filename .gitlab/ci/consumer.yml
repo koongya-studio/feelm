@@ -117,11 +117,7 @@ consumer-image:
 deploy-consumer:
   stage: deploy
   tags: [e106-distributed]
-  needs:
-    - job: consumer-image
-    - job: deploy-backend
-      optional: true
-      artifacts: false
+  needs: [consumer-image]
   resource_group: distributed-consumer
   environment:
     name: distributed
