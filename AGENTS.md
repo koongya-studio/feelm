@@ -28,6 +28,7 @@ AI가 같은 저장소에서 동시에 작업할 때의 작업 공간 분리, �
 - Jira-GitLab 작업 절차: `docs/development-workflow.md`
 - AI 병렬 작업과 충돌 방지: `docs/ai-collaboration.md`
 - Secret 및 환경변수 관리: `docs/secret-environment-variables.md`
+- 프론트엔드 작업 및 MR 전 포맷 검사: `frontend/AGENTS.md`
 
 ## 2. 작업 시작
 
@@ -101,6 +102,7 @@ API 계약 또는 DB Schema 변경은 영향받는 담당자 간 먼저 합의�
 ## 7. 커밋과 MR
 
 - 브랜치, 커밋 및 MR 규칙은 `docs/git-convention.md`를 따른다.
+- 브랜치 이름에 `codex/` 접두사를 사용하지 않는다.
 
 ## 8. 완료 보고
 
