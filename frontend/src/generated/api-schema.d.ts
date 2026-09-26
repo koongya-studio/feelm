@@ -605,7 +605,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["list"];
+        get: operations["list_1"];
         put?: never;
         post: operations["create_1"];
         delete?: never;
@@ -1133,9 +1133,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["list_1"];
+        get: operations["list"];
         put?: never;
-        post?: never;
+        post: operations["generate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1482,6 +1482,14 @@ export interface components {
             nextCursor?: string;
             /** Format: int64 */
             totalCount?: number;
+        };
+        Generation: {
+            canGenerate?: boolean;
+            /** Format: int32 */
+            frameCount?: number;
+            /** Format: int32 */
+            minimumFrames?: number;
+            reason?: string;
         };
         Genre: {
             averageScore?: number;
@@ -2429,6 +2437,7 @@ export interface components {
             recommendationSetId?: number;
         };
         ReportDetailResponse: {
+            analysisScope?: string;
             characterCard?: components["schemas"]["CharacterCardContent"];
             comparisons?: components["schemas"]["Comparison"][];
             countryShares?: components["schemas"]["Share"][];
@@ -2448,6 +2457,16 @@ export interface components {
             topDirectors?: components["schemas"]["PersonRank"][];
             topGenres?: components["schemas"]["GenreRank"][];
         };
+        ReportGenerateResponse: {
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            issuedAt?: string;
+            /** Format: int64 */
+            reportId?: number;
+            reused?: boolean;
+            reuseReason?: string;
+        };
         ReportImageResponse: {
             downloadUrl?: string;
             /** Format: date-time */
@@ -2464,6 +2483,7 @@ export interface components {
         };
         ReportListResponse: {
             current?: components["schemas"]["Current"];
+            generation?: components["schemas"]["Generation"];
             items?: components["schemas"]["Item"][];
             preparing?: boolean;
         };
@@ -3862,7 +3882,7 @@ export interface operations {
             };
         };
     };
-    list: {
+    list_1: {
         parameters: {
             query?: {
                 cursor?: string;
@@ -4899,7 +4919,7 @@ export interface operations {
             };
         };
     };
-    list_1: {
+    list: {
         parameters: {
             query?: never;
             header?: never;
@@ -4915,6 +4935,26 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ReportListResponse"];
+                };
+            };
+        };
+    };
+    generate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReportGenerateResponse"];
                 };
             };
         };

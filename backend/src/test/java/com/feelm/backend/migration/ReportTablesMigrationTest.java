@@ -45,7 +45,9 @@ class ReportTablesMigrationTest {
                         "status:character varying:10:NO",
                         "content:jsonb:-:NO",
                         "created_at:timestamp with time zone:-:NO",
-                        "issued_at:timestamp with time zone:-:YES");
+                        "issued_at:timestamp with time zone:-:YES",
+                        "source_fingerprint:character varying:64:YES",
+                        "source_frames:jsonb:-:YES");
         assertThat(columns(DATABASE, "report_images"))
                 .containsExactly(
                         "id:bigint:-:NO",
@@ -56,7 +58,6 @@ class ReportTablesMigrationTest {
         assertThat(constraints(DATABASE, "taste_reports"))
                 .containsExactlyInAnyOrder(
                         "taste_reports_pkey",
-                        "uk_taste_reports_user_id_year_half",
                         "fk_taste_reports_user_id",
                         "ck_taste_reports_half",
                         "ck_taste_reports_status");
@@ -68,9 +69,18 @@ class ReportTablesMigrationTest {
         assertThat(
                         stringValue(
                                 DATABASE,
-                                "SELECT pg_get_constraintdef(oid) FROM pg_constraint"
-                                        + " WHERE conname = 'uk_taste_reports_user_id_year_half'"))
-                .isEqualTo("UNIQUE (user_id, year, half)");
+                                "SELECT indexdef FROM pg_indexes"
+                                        + " WHERE indexname = 'uk_taste_reports_legacy_period'"))
+                .contains(
+                        "UNIQUE INDEX",
+                        "(user_id, year, half)",
+                        "WHERE (source_fingerprint IS NULL)");
+        assertThat(
+                        stringValue(
+                                DATABASE,
+                                "SELECT indexdef FROM pg_indexes"
+                                        + " WHERE indexname = 'ix_taste_reports_user_created'"))
+                .contains("(user_id, created_at DESC, id DESC)");
         assertThat(
                         stringValue(
                                 DATABASE,
@@ -139,7 +149,7 @@ class ReportTablesMigrationTest {
     }
 
     @Test
-    @DisplayName("T2 반기 유일성, 상태, 참조 무결성과 이미지 cascade를 강제한다")
+    @DisplayName("T2 수동 복수 생성, 기존 반기 유일성, 참조 무결성과 이미지 cascade를 강제한다")
     void enforcesReportAndImageRelations() throws SQLException {
         long userId =
                 longValue(
@@ -175,7 +185,22 @@ class ReportTablesMigrationTest {
 
         assertThatThrownBy(() -> insertReport(DATABASE, userId, 2026, "H1", "READY"))
                 .isInstanceOf(SQLException.class)
-                .hasMessageContaining("uk_taste_reports_user_id_year_half");
+                .hasMessageContaining("uk_taste_reports_legacy_period");
+        for (int snapshot = 0; snapshot < 2; snapshot++) {
+            execute(
+                    DATABASE,
+                    "INSERT INTO taste_reports(user_id,year,half,status,content,"
+                            + "source_fingerprint,source_frames) VALUES ("
+                            + userId
+                            + ",2026,'H1','READY','{}'::jsonb,'fingerprint','{}'::jsonb)");
+        }
+        assertThat(
+                        longValue(
+                                DATABASE,
+                                "SELECT count(*) FROM taste_reports WHERE user_id = "
+                                        + userId
+                                        + " AND year = 2026 AND half = 'H1'"))
+                .isEqualTo(3);
         assertThatThrownBy(() -> insertReport(DATABASE, userId, 2026, "H3", "READY"))
                 .isInstanceOf(SQLException.class)
                 .hasMessageContaining("ck_taste_reports_half");

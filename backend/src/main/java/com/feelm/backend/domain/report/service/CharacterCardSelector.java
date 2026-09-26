@@ -54,6 +54,29 @@ public final class CharacterCardSelector {
 
     private CharacterCardSelector() {}
 
+    public static CharacterAxisMetrics cumulativeMetrics(
+            List<ReportSource.Frame> current, List<ReportSource.Frame> previous) {
+        CharacterAxisMetrics metrics = metrics(current, Instant.MIN, Instant.MAX);
+        Set<String> seen =
+                previous.stream()
+                        .map(ReportSource.Frame::flavorCode)
+                        .filter(code -> code != null)
+                        .collect(Collectors.toSet());
+        int newFlavors =
+                (int)
+                        current.stream()
+                                .map(ReportSource.Frame::flavorCode)
+                                .filter(code -> code != null && !seen.contains(code))
+                                .distinct()
+                                .count();
+        return new CharacterAxisMetrics(
+                newFlavors,
+                metrics.brightRatio(),
+                metrics.averageScore(),
+                metrics.scoreStdDev(),
+                metrics.ratingCount());
+    }
+
     /**
      * 한 사용자의 네 축 지표. {@code frames}는 {@code end} 이전의 프레임 전체이고, 이 중 {@code [start, end)} 구간이 그 반기다.
      * 새로운 맛은 {@code start} 이전에 없던 맛을 뜻하므로 과거 프레임도 함께 받는다.

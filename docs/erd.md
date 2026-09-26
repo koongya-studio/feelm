@@ -490,7 +490,9 @@ erDiagram
         varchar status "GENERATING / READY"
         jsonb content "장르·배우·감독·캐릭터 카드·변화 요약"
         timestamptz created_at
-        timestamptz issued_at "NULL이면 홈에서 아직 인화하지 않음"
+        timestamptz issued_at "NULL이면 아직 인화하지 않음"
+        varchar source_fingerprint "신규 FILM 원천 SHA-256; 기존 HALF는 NULL"
+        jsonb source_frames "신규 FILM 전체 원천 스냅샷; 기존 HALF는 NULL"
     }
     TASTE_REPORT_GENERATION_RUNS {
         bigint id PK
@@ -514,8 +516,8 @@ erDiagram
 
 | 테이블 | 목적 | 제약·규칙 | 관련 |
 |---|---|---|---|
-| `taste_reports` | 반기 취향 리포트 | UK(`user_id`, `year`, `half`). 생성 시점 스냅샷. nullable `issued_at`은 홈의 첫 인화 완료 시각이며 `status=READY`나 다음 반기 자동 목록 공개와 별개. `READY` 공개 시 같은 트랜잭션에서 리포트 발급 알림(`notifications.type=REPORT_ISSUED`)을 만든다(S15P21E106-858) | FR-23 · API-059, API-060, API-080 |
-| `taste_report_generation_runs` | 반기 마감 준비의 정상 완료 기록 | UK(`year`, `half`). 대상 0명도 `prepared_count=0`으로 기록하며 리포트 생성과 같은 트랜잭션에서 저장 | FR-23 · S15P21E106-555 |
+| `taste_reports` | 요청 시점 전체 필름 취향 리포트 및 기존 반기 결과 | 사용자·반기에 복수 행. 기존 HALF 결과만 partial UK(`user_id`, `year`, `half`)이며 신규 FILM은 제외. 생성일 한국시간 반기로 목록 분류. `source_fingerprint`·`source_frames`는 신규 원천 지문·스냅샷이고 기존 결과는 NULL. nullable `issued_at`은 첫 인화 완료 시각이며 `status=READY`와 별개다. 신규 FILM은 생성 직후 본인이 상세·이미지를 조회하고 인화 완료 뒤 목록에 포함한다. 기존 HALF의 자동 목록 공개 이력·발급 알림은 보존하며 새 수동 생성에 배치 알림을 소급 적용하지 않는다 | FR-23 · API-059, API-060, API-080, API-085 |
+| `taste_report_generation_runs` | 기존 반기 배치 완료 기록 보존(신규 배치 중단) | UK(`year`, `half`). 대상 0명도 `prepared_count=0`으로 기록하며 리포트 생성과 같은 트랜잭션에서 저장 | FR-23 · S15P21E106-555 |
 | `report_images` | 이미지 카드 | 파일은 서비스 노드의 비공개 호스트 디렉터리, DB에는 서버가 생성한 상대 키만 저장. 다운로드 URL은 요청 시 10분 유효 서명 발급 | FR-24, NFR-07 · API-061 · ADR-0023 |
 
 ---
