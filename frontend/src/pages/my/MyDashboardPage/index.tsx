@@ -771,7 +771,9 @@ export default function MyDashboardPage() {
             aria-selected={tab === item.key}
             aria-controls="my-feed"
             className={styles.tab}
-            onClick={() => setParams({ tab: item.key }, { replace: true })}
+            onClick={() =>
+              setParams({ tab: item.key }, { replace: true, state: { preserveScroll: true } })
+            }
           >
             {item.label}
           </button>

@@ -22,7 +22,7 @@
  * 되돌리는 것은 스크롤 위치까지다. 목록에서 고른 항목 강조처럼 화면마다 다른 상태는 다루지 않는다.
  * 4.1 검색은 안쪽 목록이 스스로 스크롤하고 자기 복원(`searchSnapshot`)이 있어 본문은 움직이지 않는다.
  */
-import { useLayoutEffect } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import { useLocation, useNavigationType } from 'react-router';
 import type { RefObject } from 'react';
 
@@ -44,8 +44,9 @@ export function resetScrollPositions() {
 }
 
 export function useScrollRestoration(ref: RefObject<HTMLElement | null>) {
-  const { key } = useLocation();
+  const { key, pathname, state } = useLocation();
   const navigationType = useNavigationType();
+  const previousPath = useRef<string | null>(null);
 
   /*
    * 레이아웃 효과다. 화면이 바뀌어 본문이 짧아지면 브라우저가 스크롤을 잘라 `scroll` 이벤트를
@@ -55,6 +56,13 @@ export function useScrollRestoration(ref: RefObject<HTMLElement | null>) {
     const element = ref.current;
 
     if (!element) return;
+
+    // MY 내부 탭처럼 명시한 같은 화면의 전환은 현재 위치를 유지한다.
+    const preserveScroll =
+      navigationType === 'REPLACE' &&
+      previousPath.current === pathname &&
+      state?.preserveScroll === true;
+    previousPath.current = pathname;
 
     let restoring = false;
     let frame = 0;
@@ -73,7 +81,9 @@ export function useScrollRestoration(ref: RefObject<HTMLElement | null>) {
 
     element.addEventListener('scroll', record, { passive: true });
 
-    if (target === undefined || target === 0) {
+    if (preserveScroll) {
+      record();
+    } else if (target === undefined || target === 0) {
       element.scrollTop = 0;
     } else {
       restoring = true;
@@ -99,5 +109,5 @@ export function useScrollRestoration(ref: RefObject<HTMLElement | null>) {
       stop();
       element.removeEventListener('scroll', record);
     };
-  }, [ref, key, navigationType]);
+  }, [ref, key, pathname, state, navigationType]);
 }
