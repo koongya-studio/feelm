@@ -52,6 +52,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import Chip from '../../../components/Chip';
+import { ShareIcon } from '../../../components/Icon';
 import MeterRow from '../../../components/MeterRow';
 import ReportFourCut from '../../../components/ReportFourCut';
 import type { ReportCutKind } from '../../../components/ReportFourCut';
@@ -493,10 +494,24 @@ export default function ReportDetailPage() {
           <p className={styles.shareHint}>공유 이미지에는 닉네임과 취향 정보가 담겨요</p>
           <div className={styles.actions}>
             <Button variant="secondary" disabled={saving || sharing} onClick={() => void save()}>
-              저장
+              <span className={styles.actionLabel}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M12 3v12m-4-4 4 4 4-4M5 15v5h14v-5"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                저장
+              </span>
             </Button>
             <Button disabled={saving || sharing} onClick={() => void share()}>
-              공유하기
+              <span className={styles.actionLabel}>
+                <ShareIcon />
+                공유하기
+              </span>
             </Button>
           </div>
         </div>
