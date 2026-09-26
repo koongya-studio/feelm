@@ -770,43 +770,16 @@ describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
     expect(location()).toBe('/reports/301/new');
   });
 
-  /*
-   * 업무 -767. 한때 7.3의 `공유하기`는 공유 메뉴가 없는 브라우저에서 숨었고, 데스크톱 Chrome처럼
-   * 메뉴가 있다고 답하는 곳에서는 눌러도 아무 일이 없었다.
-   */
-  it('인화된 4컷이 없으면 공유 버튼이 잠겨 있다', async () => {
-    serveList({ items: [], current: null, preparing: true });
+  it.each([
+    ['인화된 리포트', reportList, '2025'],
+    ['빈 목록', { items: [], current: null, preparing: true }, '취향 4컷을 인화하는 중이에요'],
+    ['인화 중인 리포트', { items: [], current: reportList.current, preparing: false }, '인화 중'],
+  ])('%s 목록에는 공유 버튼이 없다', async (_, list, label) => {
+    serveList(list);
     renderApp([ROUTE_PATTERN.tasteReports]);
 
-    await screen.findByText('취향 4컷을 인화하는 중이에요');
-    expect(screen.getByRole('button', { name: '공유하기' })).toBeDisabled();
-  });
-
-  // 인화 중인 반기는 목록에 한 장으로 그려지지만 공유할 4컷은 아니다(!539 리뷰)
-  it('인화 중인 반기만 있어도 공유 버튼이 잠겨 있다', async () => {
-    serveList({ items: [], current: reportList.current, preparing: false });
-    renderApp([ROUTE_PATTERN.tasteReports]);
-
-    expect(await screen.findByText('인화 중')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '공유하기' })).toBeDisabled();
-  });
-
-  it('데스크톱에서 공유하면 주소를 복사하고 알린다', async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
-
-    try {
-      serveList(reportList);
-      renderApp([ROUTE_PATTERN.tasteReports]);
-
-      await screen.findByRole('heading', { name: '2025' });
-      fireEvent.click(screen.getByRole('button', { name: '공유하기' }));
-
-      expect(await screen.findByRole('status')).toHaveTextContent('취향 4컷 주소를 복사했어요');
-      expect(writeText).toHaveBeenCalledWith(window.location.href);
-    } finally {
-      Reflect.deleteProperty(navigator, 'clipboard');
-    }
+    await screen.findByText(label);
+    expect(screen.queryByRole('button', { name: '공유하기' })).not.toBeInTheDocument();
   });
 
   it('만드는 중인 리포트를 주소로 열면 안내한다', async () => {
