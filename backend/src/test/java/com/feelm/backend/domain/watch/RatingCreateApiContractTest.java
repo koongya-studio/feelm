@@ -2,14 +2,20 @@ package com.feelm.backend.domain.watch;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.feelm.backend.domain.watch.repository.RatingCommandRepository;
+import com.feelm.backend.domain.watch.service.OnboardingRatingWriter;
+import com.feelm.backend.domain.watch.service.WatchService;
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedPostgresContractTest;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -35,6 +41,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -46,6 +54,11 @@ class RatingCreateApiContractTest extends SharedPostgresContractTest {
     @Autowired private ObjectMapper objectMapper;
     @Autowired private TokenProvider tokenProvider;
     @Autowired private JdbcClient jdbc;
+
+    @Autowired private WatchService watchService;
+    @Autowired private OnboardingRatingWriter onboardingRatingWriter;
+    @Autowired private RatingCommandRepository ratingRepository;
+    @Autowired private PlatformTransactionManager transactionManager;
 
     private long userId;
     private long withdrawnUserId;
@@ -70,6 +83,229 @@ class RatingCreateApiContractTest extends SharedPostgresContractTest {
         jdbc.sql("DROP TRIGGER IF EXISTS test_fail_rating_frame ON frames").update();
         jdbc.sql("DROP FUNCTION IF EXISTS test_fail_rating_frame()").update();
         truncate();
+    }
+
+    @Test
+    void concurrentOttClickAndRatingDoNotLeaveVisibleNotification() throws Exception {
+        long ott =
+                jdbc.sql(
+                                "INSERT INTO otts(id,code,name,tmdb_provider_id) "
+                                        + "VALUES (998877,'TEST_RATING','test',998877) ON CONFLICT (code) DO UPDATE SET name=EXCLUDED.name RETURNING id")
+                        .query(Long.class)
+                        .single();
+        jdbc.sql("INSERT INTO movie_ott_providers(movie_id,ott_id) VALUES (:movie,:ott)")
+                .param("movie", movieId)
+                .param("ott", ott)
+                .update();
+        CountDownLatch start = new CountDownLatch(1);
+        try (ExecutorService executor = Executors.newFixedThreadPool(2)) {
+            Future<Integer> rating = executor.submit(() -> concurrentCreate(start));
+            Future<?> click =
+                    executor.submit(
+                            () -> {
+                                start.await(10, TimeUnit.SECONDS);
+                                return watchService.clickOtt(userId, movieId, ott);
+                            });
+            start.countDown();
+            assertThat(rating.get(10, TimeUnit.SECONDS)).isEqualTo(201);
+            click.get(10, TimeUnit.SECONDS);
+        }
+        assertVisibleNotificationCount(0);
+        // A later click after rating must not recreate the closed notification.
+        long previousCount = count("notifications");
+        watchService.clickOtt(userId, movieId, ott);
+        assertThat(count("notifications")).isEqualTo(previousCount);
+        assertVisibleNotificationCount(0);
+    }
+
+    @Test
+    void onboardingRatingClosesWatchNotificationIdempotently() throws Exception {
+        long watch = insertLinkClickedWatch(userId, movieId);
+        long notification = insertWatchNotification(userId, watch);
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        List<OnboardingRatingWriter.RatingChoice> choices =
+                List.of(new OnboardingRatingWriter.RatingChoice(movieId, new BigDecimal("4.5")));
+        assertThat(
+                        transaction.<Integer>execute(
+                                status -> {
+                                    ratingRepository.lockActiveUser(userId);
+                                    return onboardingRatingWriter.createMissing(userId, choices);
+                                }))
+                .isEqualTo(1);
+        assertThat(notificationClosed(notification)).isTrue();
+        assertThat(
+                        transaction.<Integer>execute(
+                                status -> {
+                                    ratingRepository.lockActiveUser(userId);
+                                    return onboardingRatingWriter.createMissing(userId, choices);
+                                }))
+                .isZero();
+        assertVisibleNotificationCount(0);
+    }
+
+    @Test
+    void directRatingClosesWatchNotification() throws Exception {
+        long watch = insertLinkClickedWatch(userId, movieId);
+        long notification = insertWatchNotification(userId, watch);
+        long ratingId = create(movieId, userId, validBody(), 201).path("ratingId").asLong();
+        assertThat(notificationClosed(notification)).isTrue();
+        assertThat(watchStatus(watch)).isEqualTo("RATED");
+        assertVisibleNotificationCount(0);
+        mockMvc.perform(
+                        delete("/api/v1/ratings/{id}", ratingId)
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenProvider.createAccessToken(userId)))
+                .andExpect(status().isNoContent());
+        assertThat(notificationClosed(notification)).isTrue();
+        assertVisibleNotificationCount(0);
+    }
+
+    @Test
+    void ratingFailureKeepsWatchNotification() throws Exception {
+        long watch = insertLinkClickedWatch(userId, movieId);
+        long notification = insertWatchNotification(userId, watch);
+        failingInsertTrigger("outbox_events", "test_fail_rating_outbox");
+        request(movieId, userId, validBody()).andExpect(status().isInternalServerError());
+        assertThat(notificationClosed(notification)).isFalse();
+        assertThat(watchStatus(watch)).isEqualTo("LINK_CLICKED");
+        assertThat(count("ratings")).isZero();
+        assertThat(count("frames")).isZero();
+        assertVisibleNotificationCount(1);
+    }
+
+    @Test
+    void directSearchRatingDoesNotCreateNotification() throws Exception {
+        create(movieId, userId, validBody(), 201);
+        assertThat(count("notifications")).isZero();
+        assertVisibleNotificationCount(0);
+    }
+
+    @Test
+    void ratedMovieNotificationIsExcluded() throws Exception {
+        long watch = insertLinkClickedWatch(userId, movieId);
+        create(movieId, userId, validBody(), 201);
+        // Legacy ratings may have no watch link while a click record remains active.
+        jdbc.sql("UPDATE ratings SET watch_record_id=NULL WHERE user_id=:user AND movie_id=:movie")
+                .param("user", userId)
+                .param("movie", movieId)
+                .update();
+        jdbc.sql("UPDATE watch_records SET status='LINK_CLICKED',rated_at=NULL WHERE id=:watch")
+                .param("watch", watch)
+                .update();
+        long stale = insertWatchNotification(userId, watch);
+        assertThat(notificationClosed(stale)).isFalse();
+        assertVisibleNotificationCount(0);
+        mockMvc.perform(
+                        patch("/api/v1/notifications/read-all")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenProvider.createAccessToken(userId)))
+                .andExpect(status().isNoContent());
+        assertThat(
+                        jdbc.sql("SELECT read_at IS NULL FROM notifications WHERE id=:id")
+                                .param("id", stale)
+                                .query(Boolean.class)
+                                .single())
+                .isTrue();
+        mockMvc.perform(
+                        patch("/api/v1/notifications/{id}/read", stale)
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenProvider.createAccessToken(userId)))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(
+                        delete("/api/v1/notifications/{id}", stale)
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenProvider.createAccessToken(userId)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void unrelatedNotificationsRemainVisible() throws Exception {
+        long rated = insertLinkClickedWatch(userId, movieId);
+        long unrated = insertLinkClickedWatch(userId, otherMovieId);
+        insertWatchNotification(userId, rated);
+        long retained = insertWatchNotification(userId, unrated);
+        jdbc.sql(
+                        """
+                        INSERT INTO notifications(user_id,type,source_id,target_type,target_id,
+                            title,body,notified_at,expires_at)
+                        VALUES (:user,'PARTY_INVITE',998811,'PARTY_INVITATION',998811,
+                            'invite','invite',now()-interval '2 minutes',now()+interval '7 days'),
+                            (:user,'REPORT_ISSUED',998812,'TASTE_REPORT',998812,
+                            'report','report',now()-interval '2 minutes',now()+interval '7 days')
+                        """)
+                .param("user", userId)
+                .update();
+        long foreignUser = insertUser("foreign-rating@feelm.test", "foreign", "ACTIVE");
+        long foreignWatch = insertLinkClickedWatch(foreignUser, movieId);
+        insertWatchNotification(foreignUser, foreignWatch);
+        create(movieId, userId, validBody(), 201);
+        assertVisibleNotificationCount(3);
+        mockMvc.perform(
+                        get("/api/v1/notifications")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenProvider.createAccessToken(userId)))
+                .andExpect(jsonPath("$.items[0].notificationId").value(retained));
+        assertThat(notificationClosed(retained)).isFalse();
+    }
+
+    @Test
+    void legacyExpiredWatchNotificationDoesNotReappearAfterRatingDeletion() throws Exception {
+        long watch = insertLinkClickedWatch(userId, movieId);
+        long ratingId = create(movieId, userId, validBody(), 201).path("ratingId").asLong();
+        long stale = insertWatchNotification(userId, watch);
+        mockMvc.perform(
+                        delete("/api/v1/ratings/{id}", ratingId)
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenProvider.createAccessToken(userId)))
+                .andExpect(status().isNoContent());
+        assertThat(watchStatus(watch)).isEqualTo("EXPIRED");
+        assertThat(notificationClosed(stale)).isFalse();
+        assertVisibleNotificationCount(0);
+    }
+
+    private long insertWatchNotification(long owner, long watch) {
+        return jdbc.sql(
+                        """
+                        INSERT INTO notifications(user_id,type,source_id,target_type,target_id,
+                            title,body,notified_at,expires_at)
+                        VALUES (:owner,'WATCH_CONFIRM',:watch,'WATCH_RECORD',:watch,
+                            '영화 잘 보셨나요?','감상 여부를 알려주세요.',now()-interval '1 minute',
+                            now()+interval '7 days') RETURNING id
+                        """)
+                .param("owner", owner)
+                .param("watch", watch)
+                .query(Long.class)
+                .single();
+    }
+
+    private boolean notificationClosed(long id) {
+        return jdbc.sql("SELECT closed_at IS NOT NULL FROM notifications WHERE id=:id")
+                .param("id", id)
+                .query(Boolean.class)
+                .single();
+    }
+
+    private void assertVisibleNotificationCount(int expected) throws Exception {
+        mockMvc.perform(
+                        get("/api/v1/notifications")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenProvider.createAccessToken(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(expected));
+        mockMvc.perform(
+                        get("/api/v1/notifications/unread-count")
+                                .header(
+                                        "Authorization",
+                                        "Bearer " + tokenProvider.createAccessToken(userId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.count").value(expected));
     }
 
     @Test

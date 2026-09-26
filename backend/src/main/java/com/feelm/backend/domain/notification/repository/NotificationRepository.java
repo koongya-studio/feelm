@@ -182,6 +182,16 @@ public class NotificationRepository {
                           AND dismissed_at IS NULL
                           AND notified_at <= :now
                           AND expires_at > :now
+                          AND (type <> 'WATCH_CONFIRM' OR NOT EXISTS (
+                              SELECT 1 FROM watch_records watch
+                              WHERE watch.id = notifications.source_id
+                                AND watch.user_id = notifications.user_id
+                                AND (watch.status <> 'LINK_CLICKED' OR EXISTS (
+                                    SELECT 1 FROM ratings rating
+                                    WHERE rating.user_id = watch.user_id
+                                      AND rating.movie_id = watch.movie_id
+                                ))
+                          ))
                         """);
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("userId", userId);
@@ -209,6 +219,16 @@ public class NotificationRepository {
                           AND dismissed_at IS NULL
                           AND notified_at <= :now
                           AND expires_at > :now
+                          AND (type <> 'WATCH_CONFIRM' OR NOT EXISTS (
+                              SELECT 1 FROM watch_records watch
+                              WHERE watch.id = notifications.source_id
+                                AND watch.user_id = notifications.user_id
+                                AND (watch.status <> 'LINK_CLICKED' OR EXISTS (
+                                    SELECT 1 FROM ratings rating
+                                    WHERE rating.user_id = watch.user_id
+                                      AND rating.movie_id = watch.movie_id
+                                ))
+                          ))
                         """)
                 .param("userId", userId)
                 .param("now", offset(now))
@@ -227,6 +247,16 @@ public class NotificationRepository {
                                   AND dismissed_at IS NULL
                                   AND notified_at <= :readAt
                                   AND expires_at > :readAt
+                                  AND (type <> 'WATCH_CONFIRM' OR NOT EXISTS (
+                                      SELECT 1 FROM watch_records watch
+                                      WHERE watch.id = notifications.source_id
+                                        AND watch.user_id = notifications.user_id
+                                        AND (watch.status <> 'LINK_CLICKED' OR EXISTS (
+                                            SELECT 1 FROM ratings rating
+                                            WHERE rating.user_id = watch.user_id
+                                              AND rating.movie_id = watch.movie_id
+                                        ))
+                                  ))
                                 """)
                         .param("readAt", offset(readAt))
                         .param("notificationId", notificationId)
@@ -246,6 +276,16 @@ public class NotificationRepository {
                           AND dismissed_at IS NULL
                           AND notified_at <= :readAt
                           AND expires_at > :readAt
+                          AND (type <> 'WATCH_CONFIRM' OR NOT EXISTS (
+                              SELECT 1 FROM watch_records watch
+                              WHERE watch.id = notifications.source_id
+                                AND watch.user_id = notifications.user_id
+                                AND (watch.status <> 'LINK_CLICKED' OR EXISTS (
+                                    SELECT 1 FROM ratings rating
+                                    WHERE rating.user_id = watch.user_id
+                                      AND rating.movie_id = watch.movie_id
+                                ))
+                          ))
                         """)
                 .param("readAt", offset(readAt))
                 .param("userId", userId)
@@ -266,6 +306,16 @@ public class NotificationRepository {
                                           closed_at IS NULL
                                           AND notified_at <= :dismissedAt
                                           AND expires_at > :dismissedAt
+                                          AND (type <> 'WATCH_CONFIRM' OR NOT EXISTS (
+                                              SELECT 1 FROM watch_records watch
+                                              WHERE watch.id = notifications.source_id
+                                                AND watch.user_id = notifications.user_id
+                                                AND (watch.status <> 'LINK_CLICKED' OR EXISTS (
+                                                    SELECT 1 FROM ratings rating
+                                                    WHERE rating.user_id = watch.user_id
+                                                      AND rating.movie_id = watch.movie_id
+                                                ))
+                                          ))
                                       )
                                   )
                                 """)
