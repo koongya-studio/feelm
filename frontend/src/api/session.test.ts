@@ -173,3 +173,61 @@ describe('토큰 재발급', () => {
     expect(getAccessToken()).toBe('recovered');
   });
 });
+
+it.each([200, 401])(
+  '이전 세션의 지연된 재발급 %s 응답은 새 로그인을 덮지 않는다',
+  async (status) => {
+    startSession('user-a');
+    let resolve!: (response: Response) => void;
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise<Response>((done) => {
+          resolve = done;
+        }),
+    );
+    const pending = refreshAccessToken();
+    endSession('signed-out');
+    startSession('user-b');
+    resolve(json(status, { accessToken: 'user-a-refreshed', expiresIn: 1800 }));
+    await expect(pending).resolves.toBeNull();
+    expect(getAccessToken()).toBe('user-b');
+    expect(canRefresh()).toBe(true);
+  },
+);
+
+it('로그아웃 뒤 도착한 재발급은 세션을 되살리지 않는다', async () => {
+  startSession('user-a');
+  let resolve!: (response: Response) => void;
+  fetchMock.mockImplementationOnce(
+    () =>
+      new Promise<Response>((done) => {
+        resolve = done;
+      }),
+  );
+  const pending = refreshAccessToken();
+  endSession('signed-out');
+  resolve(json(200, { accessToken: 'refreshed', expiresIn: 1800 }));
+  await expect(pending).resolves.toBeNull();
+  expect(getAccessToken()).toBeNull();
+  expect(canRefresh()).toBe(false);
+});
+
+it('15초 동안 멈춘 재발급을 중단하고 세션을 유지한다', async () => {
+  vi.useFakeTimers();
+  startSession('old');
+  fetchMock.mockImplementationOnce(
+    (_url, init) =>
+      new Promise((_resolve, reject) => {
+        init.signal.addEventListener('abort', () => reject(new Error('aborted')));
+      }),
+  );
+  try {
+    const pending = refreshAccessToken();
+    await vi.advanceTimersByTimeAsync(15_000);
+    await expect(pending).resolves.toBeNull();
+    expect(getAccessToken()).toBe('old');
+    expect(canRefresh()).toBe(true);
+  } finally {
+    vi.useRealTimers();
+  }
+});

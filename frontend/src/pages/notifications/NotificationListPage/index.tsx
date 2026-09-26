@@ -28,6 +28,9 @@ import {
   readAllNotifications,
   readNotification,
 } from '../../../api/notifications';
+import { retryNotificationQuery } from '../../../api/notificationRetry';
+import { useNotificationRevision } from '../../../hooks/useNotificationRevision';
+import { notifyNotificationChange } from '../../../api/notificationStream';
 import { formatRelativeTime } from '../../../utils/date';
 import { notificationPath, unavailableReason } from '../destination';
 import NotificationIcon from './NotificationIcon';
@@ -49,6 +52,8 @@ function lifecycleText(type: NotificationItem['type']): string {
 
 export default function NotificationListPage() {
   const navigate = useNavigate();
+  const revision = useNotificationRevision();
+  const mutationVersion = useRef(0);
 
   const [items, setItems] = useState<NotificationItem[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -62,10 +67,12 @@ export default function NotificationListPage() {
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
+    const version = mutationVersion.current;
 
-    getNotifications()
+    retryNotificationQuery(() => getNotifications({ fresh: true }), controller.signal)
       .then((value) => {
-        if (active) {
+        if (active && version === mutationVersion.current) {
           setItems(value);
           setFailed(false);
         }
@@ -76,8 +83,9 @@ export default function NotificationListPage() {
 
     return () => {
       active = false;
+      controller.abort();
     };
-  }, [reloadCount]);
+  }, [reloadCount, revision]);
 
   async function open(item: NotificationItem) {
     if (openingRef.current) return;
@@ -110,6 +118,8 @@ export default function NotificationListPage() {
   }
 
   function markRead(notificationId: number) {
+    notifyNotificationChange();
+    mutationVersion.current += 1;
     const readAt = new Date().toISOString();
 
     setItems(
@@ -130,8 +140,13 @@ export default function NotificationListPage() {
 
     try {
       await readAllNotifications();
+      notifyNotificationChange();
+      mutationVersion.current += 1;
       const readAt = new Date().toISOString();
-      setItems(items.map((item) => (item.readAt === null ? { ...item, readAt } : item)));
+      setItems(
+        (current) =>
+          current?.map((item) => (item.readAt === null ? { ...item, readAt } : item)) ?? null,
+      );
     } catch {
       setActionFailed(true);
     } finally {
@@ -147,6 +162,8 @@ export default function NotificationListPage() {
 
     try {
       await dismissNotification(item.notificationId);
+      notifyNotificationChange();
+      mutationVersion.current += 1;
       setItems(
         (current) =>
           current?.filter(({ notificationId }) => notificationId !== item.notificationId) ?? [],

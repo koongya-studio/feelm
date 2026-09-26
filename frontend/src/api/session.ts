@@ -31,6 +31,9 @@ const LOCK_WAIT_LIMIT_MS = 3000;
 
 let accessToken: string | null = null;
 
+/** 이전 세션의 지연된 재발급 응답이 새 로그인 상태를 덮지 않도록 구분한다. */
+let sessionVersion = 0;
+
 /**
  * 재발급으로 세션을 되살릴 수 있는지.
  *
@@ -65,12 +68,14 @@ export function getAccessToken(): string | null {
 
 /** 로그인·재발급이 성공했을 때 */
 export function startSession(token: string): void {
+  sessionVersion += 1;
   accessToken = token;
   refreshable = true;
 }
 
 /** 로그아웃했거나 재발급이 거절당했을 때 */
 export function endSession(reason: SessionEndReason): void {
+  sessionVersion += 1;
   accessToken = null;
   refreshable = false;
 
@@ -154,59 +159,37 @@ async function withRefreshLock(run: () => Promise<string | null>): Promise<strin
 }
 
 async function requestAccessToken(): Promise<string | null> {
-  let response: Response;
-
+  const version = sessionVersion;
+  const controller = new AbortController();
+  // 응답 헤더뿐 아니라 본문이 멈춘 경우도 포함한다.
+  const timer = setTimeout(() => controller.abort(), 15_000);
   try {
-    response = await fetch(REFRESH_URL, {
+    const response = await fetch(REFRESH_URL, {
       method: 'POST',
       credentials: 'include',
       headers: { Accept: 'application/json' },
+      signal: controller.signal,
     });
+    if (version !== sessionVersion) {
+      await response.body?.cancel();
+      return null;
+    }
+    // 네트워크·5xx 장애는 세션 종료를 뜻하지 않는다.
+    if (response.status === UNAUTHORIZED) {
+      endSession(accessToken ? 'expired' : 'unauthenticated');
+      return null;
+    }
+    if (!response.ok) return null;
+    const token = await readAccessToken(response);
+    // 본문을 읽는 동안 로그아웃·다른 로그인·재발급이 완료됐을 수 있다.
+    if (!token || version !== sessionVersion || controller.signal.aborted) return null;
+    startSession(token);
+    return token;
   } catch {
-    /*
-     * 요청이 서버에 닿지 못한 것은 세션이 없다는 뜻이 아니다. `refreshable`을 그대로
-     * 두어 연결이 돌아왔을 때 다시 시도할 수 있게 한다.
-     */
     return null;
+  } finally {
+    clearTimeout(timer);
   }
-
-  /*
-   * 세션이 없다는 신호와 서버가 잠시 응답하지 못한다는 신호를 가른다.
-   *
-   * 계약이 재발급 거절로 정의한 것은 401뿐이다(API-006 `REFRESH_TOKEN_INVALID`).
-   * 5xx는 세션에 대한 판정이 아니라 서버 사정이므로 여기서 세션을 끝내면 안 된다.
-   * 끝내 버리면 `refreshable`이 내려가 백엔드가 돌아와도 재발급을 다시 시도하지
-   * 않고, 사용자는 새로고침해야 로그인 상태로 돌아온다. 배포 중 재시작 한 번으로
-   * 앱을 열어 둔 모두가 로그아웃된 것처럼 보였다(S15P21E106-373).
-   */
-  if (response.status === UNAUTHORIZED) {
-    /*
-     * 쓰고 있던 세션이 끊긴 것과 애초에 없던 것을 가른다. 메모리에 Access Token이 있었다면
-     * 로그인 상태로 쓰던 중이었다는 뜻이고, 없었다면 이 재발급은 앱이 뜰 때의 복구
-     * 시도다(`restoreSession`). 복구 실패는 비로그인일 뿐이라 알릴 만료가 없다.
-     */
-    endSession(accessToken ? 'expired' : 'unauthenticated');
-
-    return null;
-  }
-
-  if (!response.ok) {
-    return null;
-  }
-
-  /*
-   * 본문에 토큰이 없는 200은 계약 위반이지 세션 만료가 아니다. 위와 같은 이유로
-   * 세션을 유지하고 이번 재발급만 실패로 둔다.
-   */
-  const token = await readAccessToken(response);
-
-  if (!token) {
-    return null;
-  }
-
-  startSession(token);
-
-  return token;
 }
 
 async function readAccessToken(response: Response): Promise<string | null> {
@@ -227,6 +210,7 @@ async function readAccessToken(response: Response): Promise<string | null> {
 
 /** 테스트에서 모듈 상태를 되돌린다. 화면 코드는 쓰지 않는다 */
 export function resetSessionForTest(): void {
+  sessionVersion += 1;
   accessToken = null;
   refreshable = true;
   inFlight = null;

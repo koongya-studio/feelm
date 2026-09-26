@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +29,7 @@ public class NotificationService {
     private final NotificationRepository repository;
     private final WebPushDeliveryRepository deliveryRepository;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
 
     public CursorPageResponse<NotificationItemResponse> list(
             long userId, String encodedCursor, Integer requestedSize) {
@@ -62,6 +64,7 @@ public class NotificationService {
             throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
         }
         deliveryRepository.cancelForNotification(notificationId, now, "NOTIFICATION_READ");
+        events.publishEvent(new NotificationChangedEvent(userId));
     }
 
     @Transactional
@@ -70,6 +73,7 @@ public class NotificationService {
         Instant now = now();
         repository.markAllRead(userId, now);
         deliveryRepository.cancelReadForUser(userId, now);
+        events.publishEvent(new NotificationChangedEvent(userId));
     }
 
     @Transactional
@@ -80,6 +84,7 @@ public class NotificationService {
             throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
         }
         deliveryRepository.cancelForNotification(notificationId, now, "NOTIFICATION_DISMISSED");
+        events.publishEvent(new NotificationChangedEvent(userId));
     }
 
     private void requireActiveUser(long userId) {

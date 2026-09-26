@@ -10,6 +10,7 @@
 | [API-075](#api-075-web-push-공개-설정-조회) | Web Push 공개 설정 조회 | GET | `/notifications/push/config` | 2차 MVP | 회원 |
 | [API-076](#api-076-web-push-구독-등록갱신) | Web Push 구독 등록·갱신 | PUT | `/notifications/push/subscriptions` | 2차 MVP | 회원 |
 | [API-077](#api-077-web-push-구독-해제) | Web Push 구독 해제 | DELETE | `/notifications/push/subscriptions/{subscriptionId}` | 2차 MVP | 회원 |
+| [API-085](#api-085-인앱-알림-변경-스트림) | 인앱 알림 변경 스트림 | GET | `/notifications/stream` | 2차 MVP | 회원 |
 
 공통 URL·인증·오류·커서 규약은 [API-000](./README.md#공통-규약)을 따른다. 이 문서의 알림 종류는 알림 설정 API-017·018의 수신 설정 키와 별개인 실제 인앱 사건 종류다. 수신 설정 `PARTY_INVITE`·`REPORT_ISSUED`가 꺼진 사용자에게는 같은 이름의 알림을 만들지 않는다.
 
@@ -141,8 +142,24 @@
 ## Web Push 발송 규칙
 
 - `PARTY_INVITE`와 `PARTY_INVITE_ACCEPTED`는 모든 활성 구독에 생성 즉시 발송한다.
-- `WATCH_CONFIRM`과 `REPORT_ISSUED`는 Web Push로 발송하지 않고 앱 진입 시 인앱 알림 목록 조회로만 노출한다.
+- `WATCH_CONFIRM`과 `REPORT_ISSUED`는 Web Push로 발송하지 않고 앱 진입 및 API-085 갱신 신호 수신 시 인앱 알림 목록 조회로 노출한다.
 - 읽음·숨김·원본 완료·만료·설정 해제된 알림은 대기 또는 lease 중인 발송을 취소한다.
 - 알림·canonical endpoint 조합을 유일하게 저장해 중복 enqueue를 막는다. worker는 실제 전송 직전에 한 건씩 lease한다. 일시 오류는 1분부터 지수 backoff로 최대 5회 시도하며, Push Service의 404·410 응답은 응답을 보낸 capability version이 현재 버전과 같을 때만 구독 만료로 처리한다.
 - 전송 성공과 DB 완료 기록은 하나의 transaction으로 묶을 수 없으므로 성공 응답 직후 프로세스가 중단되면 lease 회수 뒤 같은 payload가 한 번 더 전달될 수 있다. 서비스 워커는 `notificationId` 기준 중복 표시를 억제해야 한다.
 - payload는 공통 알림 항목의 `notificationId`, `type`, `title`, `body`, `targetType`, `targetId`를 담는다. 서비스 워커는 `targetType`과 `targetId`로 앱 화면을 연다.
+
+## API-085 인앱 알림 변경 스트림
+
+- GET `/api/v1/notifications/stream`, 회원 Bearer Access Token 필수.
+- 200 `text/event-stream`, `Cache-Control: no-store`, `X-Accel-Buffering: no`.
+- `event: notification-changed`, `data: {}`는 API-070 목록과 API-071 개수 재조회 신호다.
+  사용자 ID나 알림 본문은 보내지 않는다. 최초 연결도 신호를 보낸다.
+- 알림 변경은 커밋 이후 전달한다. 예약 도래·만료와 누락 복구는 15초 간격 DB 대조로 보완한다.
+  리포트 일괄 발급은 이 대조를 통해 갱신한다. 기본 배포는 단일 백엔드 컨테이너다.
+- 변화가 없으면 15초 간격 comment heartbeat. 연결은 최대 5분이며 전송 전 토큰과 활성 계정을 재확인한다.
+  만료·탈퇴·실패 시 종료한다. 최초 연결의 인증 오류는 기존 UNAUTHORIZED/TOKEN_EXPIRED를 따른다.
+- 클라이언트는 fetch Authorization 헤더를 사용하고 토큰을 URL에 넣지 않는다. 401이면 기존 토큰 재발급 후 다시 연결한다.
+  로그아웃 시 중단하고 네트워크 장애는 1~30초 backoff, 45초 무수신은 재연결한다. 재발급은 본문을 포함해 15초로 제한하고 이전 세션 응답은 적용하지 않는다.
+- 갱신 후 REST 조회의 일시 실패는 1·2·4·8·16·30초 간격으로 제한 재시도하며 화면 이탈·새 갱신 시 중단한다.
+- 이벤트 ID·재생은 제공하지 않는다. 재연결마다 REST 정본을 재조회한다. 기존 Web Push 정책은 유지한다.
+- 최초 REQUEST의 인증은 필수이며 해당 경로의 종료 ASYNC dispatch만 별도 허용한다.

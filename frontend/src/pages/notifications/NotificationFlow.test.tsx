@@ -8,6 +8,7 @@ import FilmPage from '../film/FilmPage';
 import { AuthContext } from '../../contexts/authContext';
 import { testAuth } from '../../test/auth';
 import { ROUTE_PATTERN } from '../../routes/paths';
+import { notifyNotificationChange } from '../../api/notificationStream';
 import type { NotificationItem } from '../../types/notification';
 
 vi.mock('../../api/notifications', () => ({
@@ -357,4 +358,32 @@ describe('이미 응답한 초대 알림', () => {
       await screen.findByText('초대 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.'),
     ).toBeInTheDocument();
   });
+});
+
+it('SSE 갱신 신호로 열린 알림 목록을 다시 조회한다', async () => {
+  vi.mocked(getNotifications).mockResolvedValueOnce([]).mockResolvedValue([invite]);
+  renderApp([ROUTE_PATTERN.notifications]);
+  await waitFor(() => expect(getNotifications).toHaveBeenCalledTimes(1));
+  notifyNotificationChange();
+  expect(await findRow('파티팝콘 초대')).toBeInTheDocument();
+  expect(getNotifications).toHaveBeenLastCalledWith({ fresh: true });
+});
+
+it('SSE 재조회 전에 시작한 응답이 최신 목록을 덮어쓰지 않는다', async () => {
+  let resolve!: (items: NotificationItem[]) => void;
+  vi.mocked(getNotifications)
+    .mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    )
+    .mockResolvedValue([invite]);
+  renderApp([ROUTE_PATTERN.notifications]);
+  notifyNotificationChange();
+  expect(await findRow('파티팝콘 초대')).toBeInTheDocument();
+  resolve([]);
+  await waitFor(() =>
+    expect(screen.getByText('새로운 파티팝콘 초대가 도착했어요.')).toBeInTheDocument(),
+  );
 });

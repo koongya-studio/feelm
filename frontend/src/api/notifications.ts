@@ -30,7 +30,8 @@ async function listAllNotifications(): Promise<NotificationItem[]> {
 }
 
 /** API-070 인앱 알림 목록. 서버가 최신순으로 준다. */
-export async function getNotifications(): Promise<NotificationItem[]> {
+export async function getNotifications(options?: { fresh: boolean }): Promise<NotificationItem[]> {
+  if (options?.fresh) return listAllNotifications();
   listingRequest ??= listAllNotifications().finally(() => {
     listingRequest = null;
   });

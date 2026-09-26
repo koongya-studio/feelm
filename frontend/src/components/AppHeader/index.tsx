@@ -18,6 +18,8 @@
  */
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
+import { retryNotificationQuery } from '../../api/notificationRetry';
+import { useNotificationRevision } from '../../hooks/useNotificationRevision';
 import { getUnreadNotificationCount } from '../../api/notifications';
 import { useShellSize } from '../../hooks/useShellSize';
 import { path } from '../../routes/paths';
@@ -27,14 +29,16 @@ import styles from './AppHeader.module.css';
 
 export default function AppHeader() {
   const [unread, setUnread] = useState(0);
+  const revision = useNotificationRevision();
   const desktop = useShellSize() !== 'mobile';
 
   useEffect(() => {
     if (desktop) return;
 
     let active = true;
+    const controller = new AbortController();
 
-    getUnreadNotificationCount()
+    retryNotificationQuery(getUnreadNotificationCount, controller.signal)
       .then((count) => {
         if (active) setUnread(count);
       })
@@ -42,8 +46,9 @@ export default function AppHeader() {
 
     return () => {
       active = false;
+      controller.abort();
     };
-  }, [desktop]);
+  }, [desktop, revision]);
 
   if (desktop) return null;
 
