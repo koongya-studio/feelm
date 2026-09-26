@@ -28,6 +28,7 @@
  * 영화 제목처럼 왼쪽에 크게 서고, 카드는 사진이 비치는 반투명 면이다.
  */
 import Avatar from '../Avatar';
+import ProfileReviews from '../ProfileReviews';
 import Chip from '../Chip';
 import { CameraIcon, PencilIcon, SpeechBubbleIcon } from '../Icon';
 import PopcornBucket from '../PopcornBucket';
@@ -326,6 +327,12 @@ export default function ProfileLayout({
               <SpeechBubbleIcon />
               <p>{HIDDEN_NOTE}</p>
             </div>
+          ) : profile.publicId ? (
+            <ProfileReviews
+              publicId={profile.publicId}
+              count={profile.stats.publicReviewCount}
+              preview
+            />
           ) : profile.reviews === null ? (
             <div className={styles.emptyReviews}>
               <SpeechBubbleIcon />

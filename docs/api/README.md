@@ -127,6 +127,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-083 | [파티 추천 이력 조회](./party.md#api-083-파티-추천-이력-조회) | GET | `/parties/{partyId}/recommendations/history` | 파티 | 2차 MVP | 회원 | FR-22, FR-33 |  |
 | API-084 | [사용자 의견 제출](./feedback.md#api-084-사용자-의견-제출) | POST | `/feedback` | 의견 | 시연 QA | 회원 | S15P21E106-915 |  |
 | API-085 | [인앱 알림 변경 스트림](./notifications.md#api-085-인앱-알림-변경-스트림) | GET | `/notifications/stream` | 알림 | 2차 MVP | 회원 | FR-41 |  |
+| API-087 | [사용자별 공개 한줄평 목록](./social.md#api-087-사용자별-공개-한줄평-목록) | GET | `/users/{publicId}/reviews` | 소셜 | 2차 MVP | 선택 | FR-25, FR-26, FR-39 | |
 | API-086 | [취향 리포트 생성](./report-trend.md#api-086-취향-리포트-생성) | POST | `/users/me/reports` | 리포트 | 2차 MVP | 회원 | FR-23 | |
 
 ### 삭제된 API

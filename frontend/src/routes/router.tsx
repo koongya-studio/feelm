@@ -35,6 +35,7 @@ import PasswordChangePage from '../pages/my/PasswordChangePage';
 import PrivacySettingsPage from '../pages/my/PrivacySettingsPage';
 import ProfileEditPage from '../pages/my/ProfileEditPage';
 import PublicProfilePage from '../pages/my/PublicProfilePage';
+import ProfileReviewsPage from '../pages/my/ProfileReviewsPage';
 import SettingsPage from '../pages/my/SettingsPage';
 import FeedbackPage from '../pages/my/FeedbackPage';
 import WithdrawPage from '../pages/my/WithdrawPage';
@@ -103,7 +104,10 @@ export const router = createBrowserRouter(
       children: [
         {
           element: <FullScreenLayout />,
-          children: [{ path: ROUTE_PATTERN.publicProfile, element: <PublicProfilePage /> }],
+          children: [
+            { path: ROUTE_PATTERN.publicProfile, element: <PublicProfilePage /> },
+            { path: ROUTE_PATTERN.profileReviews, element: <ProfileReviewsPage /> },
+          ],
         },
       ],
     },

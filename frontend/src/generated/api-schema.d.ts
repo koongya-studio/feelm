@@ -946,6 +946,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/{publicId}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 사용자별 공개 한줄평 조회
+         * @description API-087. 선택 인증. 공개 프로필과 같은 접근 조건이며 PUBLIC 한줄평만 최신순으로 반환합니다.
+         */
+        get: operations["getProfileReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users/{userId}/block": {
         parameters: {
             query?: never;
@@ -2268,6 +2288,30 @@ export interface components {
             userId?: number;
             /** @enum {string} */
             visibility?: "PUBLIC" | "PRIVATE";
+        };
+        /** @description 사용자별 공개 한줄평 항목 */
+        ProfileReviewItem: {
+            comment?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            movie?: components["schemas"]["ProfileReviewMovie"];
+            /** Format: int64 */
+            ratingId?: number;
+            score?: number;
+            spoiler?: boolean;
+        };
+        /** @description 한줄평 영화 요약 */
+        ProfileReviewMovie: {
+            /** Format: int64 */
+            movieId?: number;
+            posterUrl?: string;
+            title?: string;
+        };
+        /** @description 사용자별 공개 한줄평 커서 페이지 */
+        ProfileReviewPageResponse: {
+            hasNext?: boolean;
+            items?: components["schemas"]["ProfileReviewItem"][];
+            nextCursor?: string;
         };
         ProfileUpdateRequest: {
             /** Format: date */
@@ -4543,6 +4587,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getProfileReviews: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                /** @description 페이지 크기(기본 10, 1~50) */
+                size?: string;
+            };
+            header?: never;
+            path: {
+                publicId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProfileReviewPageResponse"];
                 };
             };
         };

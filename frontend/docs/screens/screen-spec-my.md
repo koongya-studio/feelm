@@ -249,7 +249,7 @@
 
 1. **응답 모양.** API-062는 `user` · `recentFrames` · `popcorn.flavors` ·
    `publicReviewCount` · `isBlockedByMe`로 내려준다. `api/users.ts`가 화면의 평평한 모양으로
-   바꾼다. 한줄평은 개수만 와서 목록 자리에 `한줄평 목록은 아직 볼 수 없어요`를 쓴다
+   바꾼다. 한줄평 개수는 API-062, 최근 3개 목록은 API-087로 받는다. 다음 페이지가 있으면 전체 보기로 이동해 10개씩 더 불러온다(업무 -953, [상세](./profile-reviews.md))
 2. **경로 파라미터.** 계약은 `publicId`(`users.public_id`, ADR-0008)다. **내부 숫자 ID를
    공개 URL에 노출하지 않는다**는 결정이므로 `/users/:userId`를 `/users/:publicId`로
    바꿨다

@@ -13,7 +13,7 @@
  * 떠나기를 막는 `useBlocker`가 데이터 라우터에서만 돌아서 `createMemoryRouter`로 그린다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { RouterProvider, createMemoryRouter } from 'react-router';
 import ProfileEditPage from './index';
 import './dialogTestSupport';
@@ -142,6 +142,26 @@ function stubServer() {
           nextCursor: null,
         });
 
+      // 미리보기는 API-062에서 실제 공개 한줄평 개수도 조회한다(업무 -953).
+      if (url === `/api/v1/users/${me.publicId}/profile`) {
+        return json({
+          user: {
+            userId: me.userId,
+            nickname: me.nickname,
+            avatarUrl: me.avatarUrl,
+            visibility: me.visibility,
+            frameVisibility: me.frameVisibility,
+            popcornVisibility: me.popcornVisibility,
+            reviewVisibility: me.reviewVisibility,
+          },
+          keywords: [],
+          stats: { frameCount: me.stats.frameCount, popcornCount: me.stats.popcornCount },
+          popcorn: { flavors: [] },
+          recentFrames: [],
+          publicReviewCount: 0,
+          isBlockedByMe: false,
+        });
+      }
       if (url === '/api/v1/users/me') return json(me);
 
       if (url.startsWith('/api/v1/users/nickname-availability')) {
@@ -651,15 +671,21 @@ describe('7.2 프로필 사진', () => {
 });
 
 it('실제 포스터를 공개 선택하고 저장하면 미리보기에서도 같은 영화가 나온다', async () => {
-  await renderEdit();
+  const router = await renderEdit();
   expect(screen.getByRole('img', { name: '실제 영화 1' })).toHaveAttribute('src', '/posters/1.jpg');
   fireEvent.click(pencil('공개할 취향 필름 수정'));
   const form = screen.getByRole('form', { name: '공개할 취향 필름 수정' });
   fireEvent.click(within(form).getByRole('button', { name: /실제 영화 1/ }));
   fireEvent.click(within(form).getByRole('button', { name: '저장' }));
+  // 저장 안내만 먼저 관찰하고 이동하면 useBlocker의 이전 dirty 상태가 남을 수 있다.
+  // 비동기 저장의 렌더와 effect까지 act로 완료한 뒤 실제 화면 전환을 검증한다.
   await screen.findByText('저장했어요');
+  await act(async () => {});
+  expect(screen.queryByRole('form', { name: '공개할 취향 필름 수정' })).not.toBeInTheDocument();
   expect(screen.queryByRole('img', { name: '실제 영화 1' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '내 공개 프로필 미리보기' }));
+  await waitFor(() => expect(router.state.location.pathname).toBe(ROUTE_PATTERN.profilePreview));
+  expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   await screen.findByRole('heading', { name: '취향 필름' });
   expect(screen.queryByRole('img', { name: '실제 영화 1' })).not.toBeInTheDocument();
   expect(screen.getByRole('img', { name: '실제 영화 2' })).toHaveAttribute('src', '/posters/2.jpg');

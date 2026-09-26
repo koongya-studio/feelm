@@ -120,7 +120,7 @@ export type ProfileView = {
   hidden: ProfileHiddenSections;
   /**
    * 공개 한줄평. **`null`이면 목록을 받을 수 없는 것이다** — API-062는 개수만 주고 사용자별
-   * 공개 한줄평 목록 API는 계약에 없다(업무 -810). 빈 배열(공개한 것이 없음)과 다르다.
+   * 공개 한줄평 목록은 별도 API-087로 조회한다(업무 -953). 빈 배열(공개한 것이 없음)과 다르다.
    */
   reviews:
     | {

@@ -15,6 +15,7 @@ import { getProfileExtras, saveProfileExtras } from '../mocks/sessionStore';
 import { getMyFrames, getMyTaste } from './taste';
 import { readAsDataUrl } from '../utils/avatarImage';
 import { request } from './client';
+import type { ProfileReviewPage } from '../types/profileReviews';
 import { getMockProfile, isMockSession, saveMockProfile } from './mockAccount';
 import { respond, respondError } from './mockTransport';
 import type { FrameSummary, TasteAnalysis, TasteKeyword } from '../types/taste';
@@ -254,7 +255,7 @@ export async function getPublicProfile(publicId: string): Promise<ProfileView> {
     auth: 'optional',
   });
 
-  return toPublicProfileView(response);
+  return { ...toPublicProfileView(response), publicId };
 }
 
 /**
@@ -262,7 +263,7 @@ export async function getPublicProfile(publicId: string): Promise<ProfileView> {
  *
  * - 소개(`bio`)는 계약에 없어 빈 문자열이다. 화면은 빈 소개를 그리지 않는다
  * - 서버가 공개된 것만 주므로 키워드 · 필름은 모두 `isPublic`이다
- * - 한줄평은 개수만 오므로 목록은 `null`이다 — `공개한 한줄평이 없어요`와 구분한다
+ * - 이 응답의 한줄평은 개수만 온다. 목록은 ProfileReviews가 API-087로 별도 조회한다
  * - 가려진 구역(업무 -856)은 `user`의 세 공개 범위로 안다. 서버가 비워 준 값을 그대로 담는다
  */
 function toPublicProfileView(response: PublicProfile): ProfileView {
@@ -301,7 +302,28 @@ function toPublicProfileView(response: PublicProfile): ProfileView {
  * 적용하는 이 변환을 유지한다.
  */
 export async function getMyPublicProfile(): Promise<ProfileView> {
-  return toPublicView(await getMyProfileView());
+  const profile = toPublicView(await getMyProfileView());
+  if (!profile.publicId || isMockSession()) return profile;
+  const publicProfile = await getPublicProfile(profile.publicId);
+  return {
+    ...profile,
+    stats: {
+      ...profile.stats,
+      publicReviewCount: profile.hidden.reviews ? 0 : publicProfile.stats.publicReviewCount,
+    },
+  };
+}
+
+/** API-087. 선택 인증 및 공개 프로필과 동일한 접근 정책. */
+export function getProfileReviews(
+  publicId: string,
+  cursor?: string,
+  size = 10,
+): Promise<ProfileReviewPage> {
+  return request(`/users/${encodeURIComponent(publicId)}/reviews`, {
+    auth: 'optional',
+    query: { cursor, size },
+  });
 }
 
 /**
