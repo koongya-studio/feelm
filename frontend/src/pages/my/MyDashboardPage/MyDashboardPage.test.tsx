@@ -827,3 +827,56 @@ describe('프로필 첫 조회 자동 재시도', () => {
     expect(second).toBe(first);
   });
 });
+
+it.each(['success', 'failure'] as const)(
+  '필터 전환 후 이전 ALL 페이지의 %s 응답을 무시하고 새 커서를 유지한다',
+  async (outcome) => {
+    let resolveAll!: (page: MyRatingList) => void;
+    let rejectAll!: (error: Error) => void;
+    let resolveFiltered!: (page: MyRatingList) => void;
+    const delayed = new Promise<MyRatingList>((resolve, reject) => {
+      resolveAll = resolve;
+      rejectAll = reject;
+    });
+    const firstFiltered = new Promise<MyRatingList>((resolve) => {
+      resolveFiltered = resolve;
+    });
+    const filtered = {
+      ...watched[0],
+      movie: { movieId: 503, title: '미평가 전용 영화', posterUrl: null },
+    };
+    vi.mocked(getMyRatings).mockImplementation((query = {}) => {
+      if (query.filter === 'UNRATED') {
+        return query.cursor ? Promise.resolve(watchedPage([])) : firstFiltered;
+      }
+      if (query.filter === 'ALL') {
+        return query.cursor ? delayed : Promise.resolve(watchedPage(watched, 'all-next'));
+      }
+      return Promise.resolve(ratingPage(ratings));
+    });
+    await renderDashboard();
+    fireEvent.click(screen.getByRole('tab', { name: '최근 본 영화' }));
+    await within(feed()).findByRole('link', { name: /최근 본 영화 A/ });
+    fireEvent.click(within(feed()).getByRole('button', { name: '더 보기' }));
+    fireEvent.click(screen.getByRole('button', { name: '평가 안 한 영화' }));
+    expect(within(feed()).queryByRole('button', { name: '더 보기' })).toBeNull();
+    expect(within(feed()).queryByRole('link', { name: /최근 본 영화 A/ })).toBeNull();
+    await act(async () => resolveFiltered(watchedPage([filtered], 'unrated-next')));
+    await within(feed()).findByRole('link', { name: /미평가 전용 영화/ });
+    await act(async () => {
+      if (outcome === 'success') {
+        resolveAll(watchedPage([rated(94, 404, '이전 평가 영화', 5)], 'all-next-3'));
+      } else {
+        rejectAll(new Error('old request failed'));
+      }
+    });
+    expect(within(feed()).queryByRole('link', { name: /이전 평가 영화/ })).toBeNull();
+    expect(within(feed()).queryByRole('button', { name: '다시 시도' })).toBeNull();
+    fireEvent.click(within(feed()).getByRole('button', { name: '더 보기' }));
+    expect(getMyRatings).toHaveBeenLastCalledWith({
+      filter: 'UNRATED',
+      cursor: 'unrated-next',
+      size: 18,
+    });
+  },
+);

@@ -74,7 +74,7 @@
  * 세 화면이 하던 일을 이 피드가 그대로 한다. 7.6-A 한줄평 관리 시트는 3.1-A 프레임
  * 상세에서 열리므로 남는다(screen-spec-my.md 11장).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import Button from '../../../components/Button';
 import Chip from '../../../components/Chip';
@@ -400,6 +400,7 @@ export default function MyDashboardPage() {
    * 같은 탭 안에서 목록만 거르는 것은 다르다. 그 훅은 모든 화면이 쓰므로 건드리지 않는다.
    */
   const [unratedOnly, setUnratedOnly] = useState(() => params.get(UNRATED_ONLY_PARAM) === 'true');
+  const watchedRequest = useRef<AbortController | null>(null);
 
   const [ratings, setRatings] = useState<Feed<MyRatedItem>>({ status: 'loading' });
   const [unrated, setUnrated] = useState<Feed<WatchedRow>>({ status: 'loading' });
@@ -499,21 +500,23 @@ export default function MyDashboardPage() {
    * 커서는 조회 조건에 묶이므로 조건이 바뀌면 첫 장부터 받는다.
    */
   useEffect(() => {
-    let active = true;
+    const controller = new AbortController();
+    watchedRequest.current = controller;
+    const active = () => !controller.signal.aborted;
 
     getMyRatings(watchedQuery(unratedOnly))
       .then((records) => {
-        if (!active) return;
+        if (!active()) return;
 
         setUnrated({ status: 'ready', items: records.items.map(toWatchedRow) });
         setCursors((prev) => ({ ...prev, unrated: nextCursor(records) }));
       })
       .catch(() => {
-        if (active) setUnrated({ status: 'failed' });
+        if (active()) setUnrated({ status: 'failed' });
       });
 
     return () => {
-      active = false;
+      controller.abort();
     };
   }, [feedReload, unratedOnly]);
 
@@ -616,12 +619,17 @@ export default function MyDashboardPage() {
     }
 
     if (current === 'unrated') {
+      const request = watchedRequest.current;
+      if (!request || request.signal.aborted) return;
       getMyRatings({ ...watchedQuery(unratedOnly), cursor })
         .then((page) => {
+          if (request.signal.aborted) return;
           done(nextCursor(page));
           setUnrated(append(page.items.map(toWatchedRow)));
         })
-        .catch(fail);
+        .catch(() => {
+          if (!request.signal.aborted) fail();
+        });
 
       return;
     }
@@ -634,7 +642,16 @@ export default function MyDashboardPage() {
       .catch(fail);
   }
 
+  function toggleUnratedOnly() {
+    watchedRequest.current?.abort();
+    setUnrated({ status: 'loading' });
+    setCursors((prev) => ({ ...prev, unrated: null }));
+    setMore((prev) => ({ ...prev, unrated: 'idle' }));
+    setUnratedOnly((on) => !on);
+  }
+
   function retryFeeds() {
+    watchedRequest.current?.abort();
     setCursors(NO_CURSORS);
     setMore(IDLE_MORE);
     setRatings({ status: 'loading' });
@@ -802,7 +819,7 @@ export default function MyDashboardPage() {
               className={styles.feedFilterButton}
               data-on={unratedOnly}
               aria-pressed={unratedOnly}
-              onClick={() => setUnratedOnly((on) => !on)}
+              onClick={toggleUnratedOnly}
             >
               평가 안 한 영화
             </button>
