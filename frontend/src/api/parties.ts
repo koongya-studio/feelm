@@ -17,6 +17,7 @@ import type {
   PartyInvitation,
   PartyInvitationList,
   PartyInvitationState,
+  InvitationStatus,
   PartyList,
   PartyPopcorn,
   PartyHistoryPage,
@@ -168,14 +169,14 @@ export async function inviteToParty(partyId: number, userId: number): Promise<Se
  *
  * 기본은 대기 중(`PENDING`)인 초대만이다. 답한 초대는 목록에서 빠진다.
  */
-export async function getMyInvitations(): Promise<PartyInvitation[]> {
+export async function getMyInvitations(status?: InvitationStatus): Promise<PartyInvitation[]> {
   const invitations: PartyInvitation[] = [];
   let cursor: string | undefined;
   let hasNext: boolean;
 
   do {
     const page = await request<PartyInvitationList>('/parties/invitations', {
-      query: { cursor, size: PAGE_SIZE },
+      query: { cursor, size: PAGE_SIZE, status },
     });
     invitations.push(...page.items);
     cursor = page.nextCursor ?? undefined;
