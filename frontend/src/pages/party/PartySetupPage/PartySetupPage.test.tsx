@@ -60,7 +60,12 @@ function fillName(name: string) {
   fireEvent.change(screen.getByLabelText('파티 이름'), { target: { value: name } });
 }
 
+function openSearch() {
+  fireEvent.click(screen.getAllByRole('button', { name: /친구 추가/ })[0]);
+}
+
 async function pickBuddy() {
+  openSearch();
   fireEvent.change(screen.getByLabelText('닉네임으로 친구 찾기'), { target: { value: '무비' } });
   fireEvent.click(screen.getByRole('button', { name: '검색' }));
 
@@ -73,7 +78,7 @@ describe('5.3 파티 만들기', () => {
 
     fillName('금요 심야 상영회');
     await pickBuddy();
-    fireEvent.click(screen.getByRole('button', { name: '파티 시작하기' }));
+    fireEvent.click(screen.getByRole('button', { name: '친구 1명과 파티 만들기' }));
 
     await waitFor(() =>
       expect(screen.getByTestId('location').textContent).toBe(
@@ -87,7 +92,7 @@ describe('5.3 파티 만들기', () => {
     renderSetup();
 
     await pickBuddy();
-    fireEvent.click(screen.getByRole('button', { name: '파티 시작하기' }));
+    fireEvent.click(screen.getByRole('button', { name: '친구 1명과 파티 만들기' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('파티 이름을 입력해 주세요.');
     expect(screen.getByTestId('location').textContent).toBe('/party/new/setup');
@@ -99,7 +104,7 @@ describe('5.3 파티 만들기', () => {
      * 5.2에서 고른 정원이 화면과 API-049 요청에 동일하게 쓰인다.
      */
     renderSetup();
-    expect(screen.getByText('1/2명 · 최대 2명까지')).toBeInTheDocument();
+    expect(screen.getByText('1/2명')).toBeInTheDocument();
   });
 
   it('5.2에서 3인을 골랐으면 3명이 상한이다', () => {
@@ -109,7 +114,7 @@ describe('5.3 파티 만들기', () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText('1/3명 · 최대 3명까지')).toBeInTheDocument();
+    expect(screen.getByText('1/3명')).toBeInTheDocument();
   });
 
   it('초대한 친구가 없으면 시작할 수 없다', () => {
@@ -121,7 +126,7 @@ describe('5.3 파티 만들기', () => {
 
     fillName('금요 심야 상영회');
 
-    expect(screen.getByRole('button', { name: '파티 시작하기' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '친구를 1명 이상 선택해 주세요' })).toBeDisabled();
     expect(screen.getByText(/1명 이상 초대해야 시작할 수 있어요/)).toBeInTheDocument();
     expect(createParty).not.toHaveBeenCalled();
   });
@@ -139,8 +144,11 @@ describe('5.3 파티 만들기', () => {
     fillName('금요 심야 상영회');
     await pickBuddy();
 
-    const start = screen.getByRole('button', { name: '파티 시작하기' });
+    const start = screen.getByRole('button', { name: '친구 1명과 파티 만들기' });
     fireEvent.click(start);
+    expect(screen.getByLabelText('파티 이름')).toBeDisabled();
+    expect(screen.getByRole('button', { name: '무비버디 선택 해제' })).toBeDisabled();
+    expect(screen.getByLabelText('닉네임으로 친구 찾기')).toBeDisabled();
     fireEvent.click(start);
     resolveParty(party());
 
@@ -160,7 +168,7 @@ describe('5.3 친구 초대', () => {
     await pickBuddy();
 
     expect(searchUsers).toHaveBeenCalledWith('무비');
-    expect(await screen.findByText('2/2명 · 최대 2명까지')).toBeInTheDocument();
+    expect(await screen.findByText('2/2명')).toBeInTheDocument();
   });
 
   it('파티를 만든 뒤에 초대를 보낸다', async () => {
@@ -168,7 +176,7 @@ describe('5.3 친구 초대', () => {
 
     fillName('금요 심야 상영회');
     await pickBuddy();
-    fireEvent.click(screen.getByRole('button', { name: '파티 시작하기' }));
+    fireEvent.click(screen.getByRole('button', { name: '친구 1명과 파티 만들기' }));
 
     await waitFor(() => expect(inviteToParty).toHaveBeenCalledWith(TEST_PARTY_ID, 2048));
     // 초대에는 파티 번호가 필요하다. 만들기가 먼저다
@@ -181,6 +189,7 @@ describe('5.3 친구 초대', () => {
   it('Enter로도 검색한다. 한글 조합을 끝내는 Enter는 검색이 아니다', async () => {
     renderSetup();
 
+    openSearch();
     const field = screen.getByLabelText('닉네임으로 친구 찾기');
     fireEvent.change(field, { target: { value: '무비' } });
 
@@ -195,6 +204,7 @@ describe('5.3 친구 초대', () => {
   it('두 글자가 안 되면 검색하지 않는다', async () => {
     renderSetup();
 
+    openSearch();
     fireEvent.change(screen.getByLabelText('닉네임으로 친구 찾기'), { target: { value: '무' } });
     fireEvent.click(screen.getByRole('button', { name: '검색' }));
 
@@ -211,10 +221,14 @@ describe('5.3 친구 초대', () => {
 
     fillName('금요 심야 상영회');
     await pickBuddy();
-    fireEvent.click(screen.getByRole('button', { name: '파티 시작하기' }));
+    fireEvent.click(screen.getByRole('button', { name: '친구 1명과 파티 만들기' }));
 
     expect(await screen.findByText(/초대를 보내지 못했어요/)).toBeInTheDocument();
     expect(screen.getByTestId('location').textContent).toBe('/party/new/setup');
+
+    expect(screen.getByLabelText('파티 이름')).toBeDisabled();
+    expect(screen.getByRole('button', { name: '무비버디 선택 해제' })).toBeDisabled();
+    expect(screen.getByLabelText('닉네임으로 친구 찾기')).toBeDisabled();
 
     // 다시 누르면 만들어 둔 파티로 간다
     fireEvent.click(screen.getByRole('button', { name: '파티로 이동' }));
@@ -225,5 +239,64 @@ describe('5.3 친구 초대', () => {
       ),
     );
     expect(createParty).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('빈자리에서 펼치는 친구 검색', () => {
+  it('파티 이름 제목을 표시하고 빈자리에서 검색을 열면 바로 입력할 수 있다', () => {
+    renderSetup();
+    expect(screen.getByRole('heading', { name: '파티 이름' })).toBeVisible();
+    expect(screen.queryByLabelText('닉네임으로 친구 찾기')).not.toBeInTheDocument();
+    const add = screen.getByRole('button', { name: /친구 추가/ });
+    expect(add).toHaveAttribute('aria-expanded', 'false');
+    openSearch();
+    expect(add).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByLabelText('닉네임으로 친구 찾기')).toHaveFocus();
+  });
+
+  it('정원이 차도 검색 결과와 입력을 유지하고 선택한 친구만 해제할 수 있다', async () => {
+    const other = { userId: 2049, nickname: '무비친구', visibility: 'PRIVATE' as const };
+    vi.mocked(searchUsers).mockResolvedValue({
+      items: [BUDDY, other],
+      nextCursor: null,
+      hasNext: false,
+    });
+    renderSetup();
+    await pickBuddy();
+    expect(screen.getByLabelText('닉네임으로 친구 찾기')).toHaveValue('무비');
+    expect(screen.getByRole('button', { name: /무비버디.*선택됨/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /무비친구.*추가/ })).toBeDisabled();
+    expect(screen.getByText(/모든 자리를 채웠어요/)).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '무비버디 선택 해제' }));
+    expect(screen.getByRole('button', { name: /무비친구.*추가/ })).toBeEnabled();
+    expect(screen.getByLabelText('닉네임으로 친구 찾기')).toHaveValue('무비');
+    fireEvent.click(screen.getByRole('button', { name: /무비친구.*추가/ }));
+    expect(screen.getByRole('button', { name: '무비친구 선택 해제' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: /무비친구.*선택됨/ }));
+    expect(screen.queryByRole('button', { name: '무비친구 선택 해제' })).not.toBeInTheDocument();
+  });
+
+  it('여러 명을 연속 선택하고 빈자리를 다시 누르면 입력과 결과를 보존한 채 포커스한다', async () => {
+    const other = { userId: 2049, nickname: '무비친구', visibility: 'PUBLIC' as const };
+    vi.mocked(searchUsers).mockResolvedValue({
+      items: [BUDDY, other],
+      nextCursor: null,
+      hasNext: false,
+    });
+    render(
+      <MemoryRouter initialEntries={[{ pathname: '/party/new/setup', state: { size: 4 } }]}>
+        <PartySetupPage />
+      </MemoryRouter>,
+    );
+    await pickBuddy();
+    fireEvent.click(screen.getByRole('button', { name: /무비친구.*추가/ }));
+    expect(screen.getByText('3/4명')).toBeVisible();
+    openSearch();
+    expect(screen.getByLabelText('닉네임으로 친구 찾기')).toHaveFocus();
+    expect(screen.getByLabelText('닉네임으로 친구 찾기')).toHaveValue('무비');
+    expect(searchUsers).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByRole('button', { pressed: true })).toHaveLength(2);
+    expect(createParty).not.toHaveBeenCalled();
+    expect(inviteToParty).not.toHaveBeenCalled();
   });
 });

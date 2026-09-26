@@ -33,8 +33,8 @@
 }
 
 .slots {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
   padding: 0;
   margin: var(--space-1) 0 0;
@@ -43,7 +43,9 @@
 
 .slot {
   display: flex;
-  height: 52px;
+  min-height: 76px;
+  min-width: 0;
+  gap: var(--space-1);
   align-items: center;
   padding: 0 var(--space-4);
   border: 1px dashed var(--color-line-strong);
@@ -81,11 +83,96 @@
 .slotRemove {
   border: 0;
   background: none;
-  font-size: var(--font-size-caption);
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+  font-size: var(--font-size-title);
   color: var(--color-ink-hint);
   cursor: pointer;
 }
 
 .slotRemove:disabled {
   cursor: default;
+}
+
+.memberHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.memberCount {
+  font-size: var(--font-size-caption);
+  color: var(--color-action-brand);
+  font-variant-numeric: tabular-nums;
+}
+
+.slotName {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.slotMeta {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-ink-hint);
+}
+
+.slotAdd {
+  composes: slot;
+  width: 100%;
+  justify-content: center;
+  background: transparent;
+  color: var(--color-action-brand);
+  cursor: pointer;
+}
+
+.slotAdd:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.slot[data-picked='true'] {
+  background: color-mix(in srgb, var(--color-action-brand) 6%, var(--color-surface-raised));
+  border-color: color-mix(in srgb, var(--color-action-brand) 30%, var(--color-line));
+  animation: friendAdded 180ms ease-out;
+}
+
+.invite {
+  padding-top: var(--space-4);
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--color-line);
+}
+
+.invite[hidden] {
+  display: none;
+}
+
+.invite button[data-picked='true'] {
+  background: color-mix(in srgb, var(--color-action-brand) 6%, var(--color-surface-raised));
+  border-color: color-mix(in srgb, var(--color-action-brand) 30%, var(--color-line));
+}
+
+.invite button[data-picked] > span:last-child {
+  color: var(--color-action-brand);
+}
+
+@keyframes friendAdded {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slot[data-picked='true'] {
+    animation: none;
+  }
 }
