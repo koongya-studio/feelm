@@ -12,6 +12,34 @@
   padding: var(--space-4) var(--screen-padding-x) var(--space-6);
 }
 
+/* 결과는 본문만 스크롤하고 다음 추천은 화면 아래에 남긴다. */
+.page[data-scrollable] {
+  min-height: 0;
+  flex: 1 1 0;
+  gap: var(--space-3);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+.footer {
+  flex: none;
+  padding: var(--space-3) var(--screen-padding-x) var(--space-4);
+  border-top: 1px solid var(--color-line);
+  background: var(--color-bg);
+}
+
+@media (min-width: 1024px) {
+  .page[data-scrollable] {
+    flex: 1 0 auto;
+    overflow-y: visible;
+  }
+
+  .footer {
+    position: sticky;
+    bottom: 0;
+  }
+}
+
 /* 파티원 줄. 이름까지 한 줄이고 인원 수가 오른쪽 끝을 잡는다 */
 .members {
   display: flex;

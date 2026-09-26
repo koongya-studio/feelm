@@ -26,7 +26,7 @@
   composes: navRow from '../../../styles/interaction.module.css';
 
   width: 100%;
-  padding: var(--space-3);
+  padding: var(--space-2);
   align-items: center;
   gap: var(--space-4);
   border-radius: var(--radius-card);
@@ -49,9 +49,35 @@
   color: var(--color-ink-hint);
 }
 
-.actions {
+.pagination {
   display: flex;
-  justify-content: center;
+  min-height: var(--tap-target-min);
+  align-items: center;
+  justify-content: space-between;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+  font-variant-numeric: tabular-nums;
+}
+
+.pagination button {
+  width: auto;
+  flex: none;
+  min-width: var(--tap-target-min);
+  min-height: var(--tap-target-min);
+}
+
+.pagination span {
+  flex: none;
+  white-space: nowrap;
+}
+
+.history {
+  display: flex;
+  min-height: var(--tap-target-min);
+  align-items: center;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+  text-decoration: none;
 }
 
 /* 더 보여줄 후보가 없을 때 버튼 자리에 놓이는 한 줄(업무 -802) */
