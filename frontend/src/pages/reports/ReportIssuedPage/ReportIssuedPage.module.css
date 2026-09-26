@@ -293,3 +293,12 @@
   background: var(--color-on-dark);
   color: var(--color-ink);
 }
+
+.sameNotice {
+  position: fixed;
+  z-index: 5;
+  bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
+  left: 50%;
+  width: min(90%, 420px);
+  transform: translateX(-50%);
+}

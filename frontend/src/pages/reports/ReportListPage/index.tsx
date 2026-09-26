@@ -7,15 +7,15 @@
  * 업무 -446). 첫 목록(와이어프레임의 필름 칸)을 바꿨다.
  *
  * - 머리는 가운데 `취향 4컷` · `차곡차곡 모아둔 나의 영화 취향`
- * - 연도마다 손글씨 연도와 가로줄, 그 아래 두 반기의 4컷을 나란히 붙인다. 연도는 최신이 위,
- *   한 해 안에서는 **최근 반기가 왼쪽**이다(시안). 4컷 아래에 인화한 날짜를 적는다
+ * - 연도는 손글씨로 표시하고 반기는 가로줄로 구분한다. 생성일 최신순으로 모바일은 세 장씩,
+ *   데스크톱은 네 장씩 다음 줄로 이어지며 4컷 아래에 생성 날짜를 적는다
  * - 4컷은 3.4 · 7.4 상세와 같은 `ReportFourCut`을 머리 없이 작게 쓴다. 누르면 7.4로 간다
  * - 4컷마다 조금씩 기울이고 윗변에 빨간 테이프를 붙인다
  * - `GENERATING`(아직 끝나지 않은 반기)은 누를 수 없다(API-060이 409다). 빈 인화지에 `인화 중`을 적는다.
  *   계약은 이 반기를 `items`가 아니라 `current`로만 알려 주므로(API-059) 목록 앞에 따로 붙인다
  * - 4컷 한 장을 못 불러오면 그 자리만 빈 인화지로 두고 상세로는 갈 수 있게 한다
  *
- * `[!]` API-059 목록에는 4컷 값이 없다. 반기마다 API-060 상세를 한 번씩 더 부른다. 반기가 쌓이면
+ * `[!]` API-059 목록에는 4컷 값이 없다. 리포트마다 API-060 상세를 한 번씩 더 부른다. 결과가 쌓이면
  * 호출이 늘어나므로 목록에 4컷 요약을 넣을지 정해야 한다(후속).
  */
 import { useEffect, useState } from 'react';
@@ -27,7 +27,7 @@ import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import { getMyReports, getReportDetail } from '../../../api/reports';
 import { path } from '../../../routes/paths';
-import { formatHalf, formatPrintDate } from '../../../utils/report';
+import { formatHalf } from '../../../utils/report';
 import styles from './ReportListPage.module.css';
 import type { ReportDetail, ReportPeriod, ReportSummary } from '../../../types/report';
 
@@ -161,7 +161,7 @@ export default function ReportListPage() {
                 새 취향 4컷이 도착했어요
               </h2>
               <p className={styles.readyDescription}>
-                이번 반기에 쌓인 영화 취향을
+                지금까지 쌓인 영화 취향을
                 <br />한 장씩 인화해 보세요
               </p>
 
@@ -183,26 +183,48 @@ export default function ReportListPage() {
           variant="empty"
           title={preparing ? '취향 4컷을 인화하는 중이에요' : '아직 인화된 취향 4컷이 없어요'}
           description={
-            preparing ? '반기 집계가 끝나면 알려 드려요' : '반기마다 한 번 취향 4컷을 인화해 드려요'
+            preparing
+              ? '잠시 후 다시 확인해 주세요'
+              : '필름에서 리포트 뽑기를 눌러 취향 4컷을 만들어 보세요'
           }
         />
       </>
     );
   }
 
+  const groups = groupByHalf(entries);
+
   return (
     <div className={styles.screen}>
       {header}
 
       <div className={styles.page}>
-        {groupByYear(entries).map(({ year, halves }) => (
-          <section key={year} className={styles.year} aria-labelledby={`report-year-${year}`}>
-            <h2 id={`report-year-${year}`} className={styles.yearLabel}>
-              <span className={styles.yearHand}>{year}</span>
-            </h2>
+        {readyReportId !== null ? (
+          <section className={styles.resume} aria-label="새 리포트 인화 안내">
+            <p className={styles.readyDescription}>
+              새 취향 4컷이 준비됐어요. 인화를 이어서 받아 보세요.
+            </p>
+            <Button onClick={() => void navigate(path.reportIssued(readyReportId))}>
+              확인하러 가기
+            </Button>
+          </section>
+        ) : null}
+        {groups.map(({ key, period, reports }, groupIndex) => (
+          <section
+            key={key}
+            className={styles.year}
+            aria-label={`${period.year} ${formatHalf(period)}`}
+          >
+            {groupIndex === 0 || groups[groupIndex - 1].period.year !== period.year ? (
+              <h2 className={styles.yearLabel}>
+                <span className={styles.yearHand}>{period.year}</span>
+              </h2>
+            ) : (
+              <hr className={styles.periodDivider} aria-hidden="true" />
+            )}
 
             <ul className={styles.board}>
-              {halves.map((entry, index) => (
+              {reports.map((entry, index) => (
                 <li key={entry.reportId} className={styles.slot}>
                   <PinnedStrip entry={entry} tilt={index % 2 === 0 ? 'left' : 'right'} />
                 </li>
@@ -216,18 +238,23 @@ export default function ReportListPage() {
 }
 
 /**
- * 연도로 묶는다. 연도는 최신이 위, 한 해 안에서는 최근 반기(하반기)가 왼쪽이다(시안).
- * API-059는 반기를 최신순 한 줄로 주므로 화면에서 다시 묶는다.
+ * 반기별로 묶고 반기와 생성일 최신순으로 붙인다. 같은 시각이면 ID로 순서를 고정한다.
  */
-function groupByYear(entries: Entry[]) {
-  const years = [...new Set(entries.map(({ period }) => period.year))].sort((a, b) => b - a);
-
-  return years.map((year) => ({
-    year,
-    halves: entries
-      .filter(({ period }) => period.year === year)
-      .sort((a, b) => b.period.half.localeCompare(a.period.half)),
-  }));
+function groupByHalf(entries: Entry[]) {
+  const ordered = [...entries].sort(
+    (a, b) =>
+      b.period.year - a.period.year ||
+      b.period.half.localeCompare(a.period.half) ||
+      (b.summary?.createdAt ?? '').localeCompare(a.summary?.createdAt ?? '') ||
+      b.reportId - a.reportId,
+  );
+  const groups = new Map<string, { key: string; period: ReportPeriod; reports: Entry[] }>();
+  for (const entry of ordered) {
+    const key = `${entry.period.year}-${entry.period.half}`;
+    if (!groups.has(key)) groups.set(key, { key, period: entry.period, reports: [] });
+    groups.get(key)!.reports.push(entry);
+  }
+  return [...groups.values()];
 }
 
 /** 테이프로 붙인 4컷 한 장과 그 아래 날짜 */
@@ -272,7 +299,12 @@ function PinnedStrip({ entry, tilt }: { entry: Entry; tilt: 'left' | 'right' }) 
         </div>
       )}
       <span className={styles.date} aria-hidden="true">
-        {formatPrintDate(summary.createdAt).stamp}
+        {new Date(summary.createdAt).toLocaleDateString('ko-KR', {
+          timeZone: 'Asia/Seoul',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })}
       </span>
     </Link>
   );

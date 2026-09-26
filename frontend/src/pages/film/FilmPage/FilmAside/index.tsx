@@ -19,7 +19,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import AsidePanel from '../../../../components/AsidePanel';
-import Badge from '../../../../components/Badge';
+import Button from '../../../../components/Button';
+import type { useReportGeneration } from '../../../reports/useReportGeneration';
 import FilmReel from '../../../../components/FilmReel';
 import PopcornFlavorPanel from '../../../../components/PopcornFlavorPanel';
 import Poster from '../../../../components/Poster';
@@ -40,11 +41,11 @@ type Props = {
   bucket: PopcornBucket | null;
   /** API-042 프레임 목록. 리포트 카드의 작은 필름에 앞쪽 넷을 쓴다 */
   frames: FrameSummary[];
-  /** 아직 받지 않은 새 리포트. 있으면 리포트 카드가 발급(3.3)으로 간다 */
-  newReportId: number | null;
+  /** 상시 생성 버튼과 서버의 생성 가능 상태 */
+  reportGeneration: ReturnType<typeof useReportGeneration>;
 };
 
-export default function FilmAside({ bucket, frames, newReportId }: Props) {
+export default function FilmAside({ bucket, frames, reportGeneration }: Props) {
   /** 링크를 눌러 놓고 아직 봤는지 답하지 않은 기록 하나. 없으면 `null` */
   const [pending, setPending] = useState<WatchRecordListItem | null>(null);
 
@@ -76,12 +77,7 @@ export default function FilmAside({ bucket, frames, newReportId }: Props) {
         />
       ) : null}
 
-      <AsidePanel
-        title="취향 리포트"
-        to={newReportId !== null ? path.reportIssued(newReportId) : path.tasteReports()}
-        linkLabel={newReportId !== null ? '새 취향 리포트 받기' : '취향 리포트 보기'}
-        mark={newReportId !== null ? <Badge tone="accent">새 리포트</Badge> : undefined}
-      >
+      <AsidePanel title="취향 리포트" to={path.tasteReports()} linkLabel="리포트 목록 보기">
         {reportFrames.length > 0 ? (
           <div className={styles.reportReel}>
             <FilmReel
@@ -105,11 +101,16 @@ export default function FilmAside({ bucket, frames, newReportId }: Props) {
           </div>
         ) : null}
 
-        <p className={styles.reportText}>
-          {newReportId !== null
-            ? '나의 영화 취향을 분석한 리포트가 도착했어요'
-            : '지금까지 본 영화로 만든 나만의 취향 분석'}
-        </p>
+        <p className={styles.reportText}>지금까지 본 영화로 만든 나만의 취향 분석</p>
+        <Button
+          variant="secondary"
+          disabled={reportGeneration.generating}
+          onClick={() => void reportGeneration.generate()}
+        >
+          <span className={styles.reportAction}>
+            {reportGeneration.generating ? '분석하는 중' : '리포트 뽑기'}
+          </span>
+        </Button>
       </AsidePanel>
 
       {pending ? (

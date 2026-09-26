@@ -296,6 +296,15 @@
   composes: navRow from '../../../styles/interaction.module.css';
 }
 
+.report .rowValue {
+  color: var(--color-brand-ink);
+  font-weight: var(--font-weight-bold);
+}
+
+.report .rowValue svg {
+  color: inherit;
+}
+
 .popcorn,
 .report {
   flex-direction: column;
@@ -490,4 +499,38 @@
   font-size: var(--font-size-meta);
   font-variant-numeric: tabular-nums;
   text-align: center;
+}
+
+.reportListLink {
+  align-self: flex-end;
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-meta);
+}
+.reportNotice {
+  position: fixed;
+  z-index: 5;
+  bottom: calc(var(--nav-height) + var(--space-4));
+  left: 50%;
+  width: min(90%, 420px);
+  transform: translateX(-50%);
+}
+
+/* 공용 팝업의 모양은 유지하고, 리포트 안내만 내용 높이에 맞춘다. */
+.reportNotice > [role='status'] {
+  height: auto;
+  min-height: var(--control-height-sm);
+  box-sizing: border-box;
+  padding: var(--space-3) var(--space-4);
+}
+
+.reportNotice > [role='status'] > span {
+  min-width: 0;
+  flex: 1;
+  white-space: pre-line;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.reportNotice > [role='status'] > button {
+  flex: none;
 }

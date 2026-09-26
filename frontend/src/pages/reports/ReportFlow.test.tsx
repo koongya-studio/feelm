@@ -10,7 +10,7 @@
  * 목록 · 상세 · 첫 발급은 실제 API다(업무 -558). 응답은 `test/reports.ts`에서 온다.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, within, act, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import FilmPage from '../film/FilmPage';
 import { AuthContext } from '../../contexts/authContext';
@@ -76,14 +76,21 @@ const { getMyFrames, getPopcornBucket } = await import('../../api/taste');
 vi.mock('../../api/reports', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/reports')>()),
   getLatestReadyReport: vi.fn(),
+  generateReport: vi.fn(),
   getMyReports: vi.fn(),
   getReportDetail: vi.fn(),
   issueReport: vi.fn(),
   createReportImage: vi.fn(),
 }));
 
-const { createReportImage, getLatestReadyReport, getMyReports, getReportDetail, issueReport } =
-  await import('../../api/reports');
+const {
+  createReportImage,
+  generateReport,
+  getLatestReadyReport,
+  getMyReports,
+  getReportDetail,
+  issueReport,
+} = await import('../../api/reports');
 const { captureReportBackImage, captureReportImage, downloadBlob, downloadReportImage } =
   await import('../../utils/reportImage');
 
@@ -117,6 +124,12 @@ beforeEach(() => {
   vi.mocked(getPopcornBucket).mockReset().mockResolvedValue(mockPopcornBucket);
 
   vi.mocked(getMyReports).mockReset();
+  vi.mocked(generateReport).mockReset().mockResolvedValue({
+    reportId: 301,
+    createdAt: reportDetails[301].createdAt,
+    reused: false,
+    issuedAt: null,
+  });
   vi.mocked(captureReportImage)
     .mockReset()
     .mockResolvedValue(new Blob(['four-cut'], { type: 'image/png' }));
@@ -373,7 +386,7 @@ describe('3.1 → 3.3 → 3.4 ⇢ 3.1', () => {
   it('안 본 리포트가 있으면 발급 화면을 거쳐 상세로 간다', async () => {
     renderApp([ROUTE_PATTERN.film]);
 
-    fireEvent.click(await screen.findByRole('button', { name: '새 취향 리포트 받기' }));
+    fireEvent.click(await screen.findByRole('button', { name: '리포트 뽑기' }));
 
     await waitFor(() => expect(location()).toBe('/reports/301/new'));
     expect(await screen.findByText('2026년 상반기 취향 필름을 인화했어요')).toBeInTheDocument();
@@ -697,7 +710,7 @@ describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
     expect(location()).toBe('/my/reports');
 
     // 연도마다 반기 4컷을 붙인다. 만드는 중인 반기는 빈 인화지이고 누를 수 없다
-    expect(await screen.findByRole('heading', { name: '2025' })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: '2025 하반기' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: '취향 4컷' })).toBeInTheDocument();
     expect(screen.getByText('인화 중')).toBeInTheDocument();
     expect(screen.getByText('만드는 중')).toBeInTheDocument();
@@ -713,26 +726,30 @@ describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
     expect(screen.getByRole('button', { name: '공유하기' })).toBeInTheDocument();
   });
 
-  it('3.1의 리포트 버튼은 하나다. 새 리포트를 받기 전에는 3.3, 받은 뒤에는 7.3으로 간다', async () => {
+  it('리포트 뽑기는 발급 후에도 유지되고 변화가 없으면 기존 결과를 안내한다', async () => {
     const first = renderApp([ROUTE_PATTERN.film]);
-
-    fireEvent.click(await screen.findByRole('button', { name: '새 취향 리포트 받기' }));
-    expect(screen.queryByRole('button', { name: '취향 리포트 보기' })).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: '리포트 뽑기' }));
     await waitFor(() => expect(location()).toBe('/reports/301/new'));
-
     fireEvent.click(await screen.findByRole('button', { name: '리포트 보기' }));
     await waitFor(() => expect(location()).toBe('/reports/301'));
     expect(issueReport).toHaveBeenCalledWith(301);
     first.unmount();
-
-    // 발급을 기록한 뒤에는 `current.issuedAt`이 차서 3.1이 목록으로 보낸다
     serveList(reportListAfterIssue);
-    vi.mocked(getLatestReadyReport).mockResolvedValue(null);
+    vi.mocked(generateReport).mockResolvedValue({
+      reportId: 301,
+      createdAt: reportDetails[301].createdAt,
+      reused: true,
+      issuedAt: '2026-07-01T00:00:14Z',
+    });
     renderApp([ROUTE_PATTERN.film]);
-
-    fireEvent.click(await screen.findByRole('button', { name: '취향 리포트 보기' }));
-    expect(screen.queryByRole('button', { name: '새 취향 리포트 받기' })).toBeNull();
-    expect(location()).toBe('/my/reports');
+    fireEvent.click(await screen.findByRole('button', { name: '리포트 뽑기' }));
+    expect(
+      await screen.findByText('지난 리포트 이후 필름 변화가 없어요. 기존 리포트를 확인해 주세요.'),
+    ).toBeInTheDocument();
+    expect(location()).toBe(ROUTE_PATTERN.film);
+    expect(screen.getByRole('button', { name: '리포트 뽑기' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: '리포트 보기' }));
+    await waitFor(() => expect(location()).toBe('/reports/301'));
   });
 
   it('첫 리포트에는 지난 반기 비교가 없다', async () => {
@@ -750,10 +767,10 @@ describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
     renderApp([ROUTE_PATTERN.tasteReports]);
 
     expect(await screen.findByText('취향 4컷을 인화하는 중이에요')).toBeInTheDocument();
-    expect(screen.getByText('반기 집계가 끝나면 알려 드려요')).toBeInTheDocument();
+    expect(screen.getByText('잠시 후 다시 확인해 주세요')).toBeInTheDocument();
   });
 
-  it('준비 중도 아니고 리포트도 없으면 반기마다 인화한다고 알린다', async () => {
+  it('빈 목록에서는 필름에서 리포트를 뽑도록 안내한다', async () => {
     serveList({ items: [], current: null, preparing: false });
     renderApp([ROUTE_PATTERN.tasteReports]);
 
@@ -787,5 +804,231 @@ describe('7.1 · 3.1 → 7.3 → 7.4 ⇢ 7.3', () => {
     renderApp(['/my/reports/302']);
 
     expect(await screen.findByText('리포트를 불러오지 못했어요')).toBeInTheDocument();
+  });
+});
+
+describe('전체 필름 요청 생성', () => {
+  it.each(['success', 'failure'])(
+    '필름을 떠난 뒤 지연 생성 %s 응답이 화면을 바꾸지 않는다',
+    async (outcome) => {
+      let settle!: () => void;
+      vi.mocked(generateReport).mockReturnValue(
+        new Promise((resolve, reject) => {
+          settle = () =>
+            outcome === 'success'
+              ? resolve({
+                  reportId: 301,
+                  createdAt: reportDetails[301].createdAt,
+                  reused: false,
+                  issuedAt: null,
+                })
+              : reject(new Error('delayed failure'));
+        }),
+      );
+      serveList(reportListAfterIssue);
+      renderApp([ROUTE_PATTERN.film]);
+      fireEvent.click(await screen.findByRole('button', { name: '리포트 뽑기' }));
+      fireEvent.click(screen.getByRole('link', { name: '리포트 목록 보기' }));
+      await screen.findByRole('heading', { name: '취향 4컷' });
+      await act(async () => settle());
+      expect(location()).toBe(ROUTE_PATTERN.tasteReports);
+      expect(
+        screen.queryByText('리포트를 만들지 못했어요. 다시 눌러 시도해 주세요.'),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it('기존 목록이 있어도 최신 미인화 결과를 이어 받을 수 있다', async () => {
+    serveList({
+      ...reportListAfterIssue,
+      current: {
+        reportId: 302,
+        period: { year: 2026, half: 'H2' },
+        status: 'READY',
+        issuedAt: null,
+      },
+    });
+    vi.mocked(getReportDetail).mockImplementation((id) =>
+      Promise.resolve({ ...reportDetails[301], reportId: id, analysisScope: 'FILM' }),
+    );
+    renderApp([ROUTE_PATTERN.tasteReports]);
+    const resume = await screen.findByRole('button', { name: '확인하러 가기' });
+    expect(screen.getByRole('link', { name: '2026 상반기 취향 리포트' })).toBeInTheDocument();
+    fireEvent.click(resume);
+    await waitFor(() => expect(location()).toBe('/reports/302/new'));
+    await screen.findByText('지금까지 쌓인 취향 필름을 인화했어요');
+  });
+
+  it('자연 인화 완료의 기록 실패를 안내하고 같은 결과로 재시도한다', async () => {
+    vi.mocked(getReportDetail).mockResolvedValue({ ...reportDetails[301], analysisScope: 'FILM' });
+    vi.mocked(issueReport).mockRejectedValueOnce(new ApiError(0, 'NETWORK_ERROR', 'network'));
+    const { container } = renderApp(['/reports/301/new']);
+    await screen.findByText('지금까지 쌓인 취향 필름을 인화했어요');
+    const genre = container.querySelector('[data-cut="genre"]')!;
+    fireEvent.animationEnd(genre);
+    // jsdom has no AnimationEvent constructor, so React can select the WebKit event name.
+    fireEvent(genre, new Event('webkitAnimationEnd', { bubbles: true }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('발급을 기록하지 못했어요');
+    expect(location()).toBe('/reports/301/new');
+    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+    await waitFor(() => expect(location()).toBe('/reports/301'));
+    expect(issueReport).toHaveBeenCalledTimes(2);
+    expect(issueReport).toHaveBeenLastCalledWith(301);
+  });
+
+  it('생성을 기다리는 동안 중복 클릭을 막고 실패하면 인화하지 않는다', async () => {
+    let reject!: (error: Error) => void;
+    vi.mocked(generateReport).mockReturnValue(
+      new Promise((_, fail) => {
+        reject = fail;
+      }),
+    );
+    renderApp([ROUTE_PATTERN.film]);
+    const button = await screen.findByRole('button', { name: '리포트 뽑기' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(generateReport).toHaveBeenCalledTimes(1);
+    expect(button).toBeDisabled();
+    expect(location()).toBe(ROUTE_PATTERN.film);
+    await act(async () => reject(new Error('network')));
+    expect(
+      await screen.findByText('리포트를 만들지 못했어요. 다시 눌러 시도해 주세요.'),
+    ).toBeInTheDocument();
+    expect(button).toBeEnabled();
+    expect(getReportDetail).not.toHaveBeenCalled();
+    vi.mocked(generateReport).mockResolvedValue({
+      reportId: 301,
+      createdAt: reportDetails[301].createdAt,
+      reused: false,
+      issuedAt: null,
+    });
+    fireEvent.click(button);
+    await waitFor(() => expect(location()).toBe('/reports/301/new'));
+  });
+
+  it('첫 생성 프레임 부족을 안내하고 버튼을 유지한다', async () => {
+    serveList({
+      items: [],
+      current: null,
+      preparing: false,
+      generation: {
+        frameCount: 19,
+        minimumFrames: 20,
+        canGenerate: false,
+        reason: 'INSUFFICIENT_FRAMES',
+      },
+    });
+    vi.mocked(generateReport).mockRejectedValue(
+      new ApiError(409, 'CONFLICT', '부족', { reason: 'INSUFFICIENT_FRAMES', minimumFrames: 20 }),
+    );
+    renderApp([ROUTE_PATTERN.film]);
+    fireEvent.click(await screen.findByRole('button', { name: '리포트 뽑기' }));
+    expect(
+      await screen.findByText('첫 리포트는 평가 프레임 20개부터 뽑을 수 있어요.'),
+    ).toBeInTheDocument();
+    expect(location()).toBe(ROUTE_PATTERN.film);
+    expect(screen.getByRole('button', { name: '리포트 뽑기' })).toBeEnabled();
+  });
+
+  it('전체 필름 결과를 기존 모션으로 인화하고 완료를 한 번 기록한다', async () => {
+    vi.mocked(getReportDetail).mockResolvedValue({ ...reportDetails[301], analysisScope: 'FILM' });
+    renderApp([ROUTE_PATTERN.film]);
+    fireEvent.click(await screen.findByRole('button', { name: '리포트 뽑기' }));
+    expect(await screen.findByText('지금까지 쌓인 취향 필름을 인화했어요')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '리포트 보기' })).toBeDisabled();
+    expect(issueReport).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: '건너뛰기' }));
+    await waitFor(() => expect(issueReport).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: '리포트 보기' })).toBeEnabled());
+    fireEvent.click(screen.getByRole('button', { name: '리포트 보기' }));
+    await waitFor(() => expect(location()).toBe('/reports/301'));
+    expect(issueReport).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['natural', 'skip'] as const)(
+    '같은 4컷과 뒷면 결과는 기존 모션 뒤 팝업을 한 번 띄우고 저장하지 않는다 (%s)',
+    async (completion) => {
+      vi.mocked(generateReport).mockResolvedValue({
+        reportId: 301,
+        createdAt: reportDetails[301].createdAt,
+        reused: true,
+        issuedAt: '2026-07-01T00:00:14Z',
+        reuseReason: 'SAME_CONTENT',
+      });
+      vi.mocked(getReportDetail).mockResolvedValue({
+        ...reportDetails[301],
+        analysisScope: 'FILM',
+      });
+      const { container } = renderApp([ROUTE_PATTERN.film]);
+      fireEvent.click(await screen.findByRole('button', { name: '리포트 뽑기' }));
+      await screen.findByText('지금까지 쌓인 취향 필름을 인화했어요');
+      expect(screen.getByRole('button', { name: '리포트 보기' })).toBeDisabled();
+      expect(screen.queryByText('지난 리포트와 같아요!')).not.toBeInTheDocument();
+      if (completion === 'skip') {
+        fireEvent.click(screen.getByRole('button', { name: '건너뛰기' }));
+      } else {
+        const genre = container.querySelector('[data-cut="genre"]')!;
+        fireEvent.animationEnd(genre);
+        fireEvent(genre, new Event('webkitAnimationEnd', { bubbles: true }));
+      }
+      expect(await screen.findByRole('status')).toHaveTextContent('지난 리포트와 같아요!');
+      expect(issueReport).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: '확인' }));
+      const genre = container.querySelector('[data-cut="genre"]')!;
+      fireEvent.animationEnd(genre);
+      fireEvent(genre, new Event('webkitAnimationEnd', { bubbles: true }));
+      expect(screen.queryByText('지난 리포트와 같아요!')).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: '리포트 보기' }));
+      await waitFor(() => expect(location()).toBe('/reports/301'));
+      expect(issueReport).not.toHaveBeenCalled();
+    },
+  );
+
+  it('같은 결과의 움직임 줄이기와 미인화 결과에서도 발급 기록을 추가하지 않는다', async () => {
+    const previous = window.matchMedia;
+    window.matchMedia = vi.fn().mockReturnValue({ matches: true });
+    vi.mocked(getReportDetail).mockResolvedValue({ ...reportDetails[301], analysisScope: 'FILM' });
+    try {
+      renderApp(['/reports/301/new?same=1']);
+      expect(await screen.findByRole('status')).toHaveTextContent('지난 리포트와 같아요!');
+      expect(screen.queryByRole('button', { name: '건너뛰기' })).not.toBeInTheDocument();
+      expect(issueReport).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: '리포트 보기' }));
+      await waitFor(() => expect(location()).toBe('/reports/301'));
+      expect(issueReport).not.toHaveBeenCalled();
+    } finally {
+      window.matchMedia = previous;
+    }
+  });
+
+  it('같은 반기의 여러 결과를 최신순으로 묶고 다음 반기와 구분한다', async () => {
+    const items = Array.from({ length: 5 }, (_, i) => ({
+      reportId: 400 + i,
+      period: { year: 2026, half: 'H2' as const },
+      status: 'READY' as const,
+      title: `리포트 ${i}`,
+      createdAt: `2026-09-${20 + i}T12:00:00Z`,
+    }));
+    serveList({ items: [reportList.items[0], ...items], current: null, preparing: false });
+    vi.mocked(getReportDetail).mockImplementation((id) =>
+      Promise.resolve({ ...reportDetails[301], reportId: id }),
+    );
+    renderApp([ROUTE_PATTERN.tasteReports]);
+    const section = await screen.findByRole('region', { name: '2026 하반기' });
+    expect(
+      within(section)
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href')),
+    ).toEqual([
+      '/my/reports/404',
+      '/my/reports/403',
+      '/my/reports/402',
+      '/my/reports/401',
+      '/my/reports/400',
+    ]);
+    expect(screen.getByRole('region', { name: '2026 상반기' })).toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { name: '2026' })).toHaveLength(1);
+    expect(screen.queryByRole('heading', { name: '2026 하반기' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: '2026 상반기' })).toBeNull();
   });
 });
