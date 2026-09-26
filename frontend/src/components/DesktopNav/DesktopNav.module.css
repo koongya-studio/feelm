@@ -9,7 +9,8 @@
  */
 .rail {
   position: relative;
-  z-index: 2;
+  /* 계정 메뉴도 이 층에 속하므로 페이지 본문 위, 시트(20)와 확인 창(30) 아래에 둔다. */
+  z-index: 10;
   display: flex;
   width: var(--desktop-nav-width);
   height: 100%;
