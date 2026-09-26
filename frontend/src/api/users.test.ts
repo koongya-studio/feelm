@@ -275,6 +275,7 @@ describe('API-040 취향 키워드를 내 프로필에 싣는다', () => {
     serve();
 
     const profile = await getMyProfileView();
+    expect(profile.publicId).toBe(mockMyProfile.publicId);
 
     expect(profile.keywords.map((keyword) => keyword.label)).toEqual([
       '봉준호 몰아보기',

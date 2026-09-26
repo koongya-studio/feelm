@@ -64,9 +64,7 @@
  * 없으므로 서버를 부르지 않고, 7.2-B 공개 프로필 주소를 기기의 공유
  * 메뉴(Web Share API)에 넘긴다. 없는 브라우저에서는 주소를 복사한다. 3.5 리포트 공유가
  * 쓰는 방법과 같다.
- * `[!]` 공개 프로필 주소는 `publicId`(UUID)로 연다(업무 -810). 그런데 내 `publicId`를 알려
- * 주는 API가 아직 없어, 지금 공유하는 주소는 숫자 ID라 받는 사람에게 `프로필을 볼 수 없어요`로
- * 열린다. API-014가 `publicId`를 주면 그 값으로 바꾼다.
+ * 공개 프로필 주소는 API-014의 `publicId`(UUID)로 만든다.
  *
  * 프로필 사진은 API-014의 `avatarUrl`이다(업무 -762). **소개는 계약에 없다**(업무 -616) — 7.2에서
  * 바꿀 수 있지만 값은 목업 저장소에만 남는다(`api/users.ts` `getMyProfileView`). 해시태그처럼
@@ -571,10 +569,13 @@ export default function MyDashboardPage() {
    * 사람이 404를 본다.
    */
   const shareProfile = async () => {
+    if (!profile.publicId) {
+      setNotice('공유 주소를 불러오지 못했어요. 새로고침 후 다시 시도해 주세요');
+      return;
+    }
     const result = await shareLink({
       title: `${profile.nickname}님의 Feelm 프로필`,
-      // [!] 머리말 참고. publicId가 생기면 바꾼다
-      url: appUrl(path.publicProfile(String(profile.userId))),
+      url: appUrl(path.publicProfile(profile.publicId)),
     });
 
     if (result === 'copied') setNotice('프로필 주소를 복사했어요');

@@ -35,10 +35,14 @@ class UserProfileUpdateApiContractTest extends UserProfileApiTestSupport {
     @DisplayName("전달한 필드만 바꾸고 나머지는 유지하며 조회와 같은 본문을 반환한다")
     void updatesOnlyProvidedFields() throws Exception {
         long userId = activeUser("user@example.com", "이전닉네임");
+        String publicId = "1b4e28ba-2fa1-11d2-883f-0016d3cca427";
+        jdbcTemplate.update(
+                "UPDATE users SET public_id = CAST(? AS uuid) WHERE id = ?", publicId, userId);
 
         mockMvc.perform(update("{\"nickname\":\"새닉네임\"}", userId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value(userId))
+                .andExpect(jsonPath("$.publicId").value(publicId))
                 .andExpect(jsonPath("$.email").value("user@example.com"))
                 .andExpect(jsonPath("$.nickname").value("새닉네임"))
                 .andExpect(jsonPath("$.birthDate").value(BIRTH_DATE))

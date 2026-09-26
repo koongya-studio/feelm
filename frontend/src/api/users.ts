@@ -8,8 +8,7 @@
  * - API-014 · API-015 · API-016 · API-019 · API-062 · API-081 · API-082는 실제로 부른다. 공개
  *   프로필(API-062)은 업무 -810, 프로필 사진(API-081 · 082)은 업무 -762에서 목업을 걷어냈다
  * - 자기소개 · 항목별 공개 여부는 **계약에 아예 없다**(업무 -616, `types/unspecified.ts`).
- *   세션 저장소에만 남는다. 내 프로필의 키워드 · 필름 목록도 목업 기준값에서 온다 — 내
- *   `publicId`를 알 길이 없어 내 공개 프로필을 부를 수 없다
+ *   세션 저장소에만 남는다. 내 프로필의 필름 목록은 목업 기준값에서 온다.
  */
 import { mockMyProfileView } from '../mocks/publicProfiles';
 import { getProfileExtras, saveProfileExtras } from '../mocks/sessionStore';
@@ -148,6 +147,7 @@ function toProfileView(profile: MyProfile, keywords: TasteKeyword[]): ProfileVie
   return {
     ...base,
     userId: profile.userId,
+    publicId: profile.publicId,
     nickname: profile.nickname,
     avatarUrl: profile.avatarUrl,
     bio: extras.bio ?? base.bio,
@@ -271,8 +271,8 @@ function toPublicProfileView(response: PublicProfile): ProfileView {
  * 7.2-A 내 공개 프로필 미리보기. **7.2-B와 같은 공개 모양**(`toPublicView`)으로 준다.
  *
  * 내 프로필(API-014 + 목업 기준값)을 한 번 받아 줄인다. 본래는 내 `publicId`로 API-062를
- * 부르면 되지만, `publicId`를 알려 주는 API가 아직 없다(업무 -810). 생기면 이 본문을
- * `getPublicProfile(내 publicId)`로 바꾼다.
+ * 부를 수도 있지만, 서버의 본인 조회는 비공개 구역도 반환하므로 미리보기는 공개 범위를
+ * 적용하는 이 변환을 유지한다.
  */
 export async function getMyPublicProfile(): Promise<ProfileView> {
   return toPublicView(await getMyProfileView());
