@@ -102,6 +102,8 @@ export type ProfileHiddenSections = {
 /** 7.1 · 7.2 · 7.2-A · 7.2-B 프로필 */
 export type ProfileView = {
   userId: number;
+  /** 내 프로필(API-014)에서 제공하는 공유 주소 식별자 */
+  publicId?: string;
   nickname: string;
   /** 프로필 사진. 없으면 `null`이고 화면은 기본 이미지를 그린다 */
   avatarUrl: string | null;

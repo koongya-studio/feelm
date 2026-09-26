@@ -102,7 +102,61 @@ public class ReportContentAssembler {
             List<ReportSource.Person> people,
             boolean previousReportExists,
             CharacterAxisMedians characterAxisMedians) {
-        Set<Long> currentIds = frameIds(frames, period.startInclusive(), effectiveEnd);
+        return assemble(
+                period,
+                effectiveEnd,
+                snapshotAcquiredAt,
+                finalSnapshot,
+                frames,
+                genres,
+                countries,
+                people,
+                previousReportExists,
+                characterAxisMedians,
+                null,
+                false);
+    }
+
+    public ReportContent assembleCumulative(
+            ReportPeriod period,
+            Instant now,
+            ReportSource.Snapshot current,
+            ReportSource.Snapshot previous,
+            CharacterAxisMedians medians) {
+        return assemble(
+                period,
+                now,
+                now,
+                true,
+                current.frames(),
+                current.genres(),
+                current.countries(),
+                current.people(),
+                previous != null,
+                medians,
+                previous,
+                true);
+    }
+
+    private ReportContent assemble(
+            ReportPeriod period,
+            Instant effectiveEnd,
+            Instant snapshotAcquiredAt,
+            boolean finalSnapshot,
+            List<ReportSource.Frame> frames,
+            List<ReportSource.Genre> genres,
+            List<ReportSource.Country> countries,
+            List<ReportSource.Person> people,
+            boolean previousReportExists,
+            CharacterAxisMedians characterAxisMedians,
+            ReportSource.Snapshot previous,
+            boolean cumulative) {
+        Set<Long> currentIds =
+                cumulative
+                        ? frames.stream()
+                                .map(ReportSource.Frame::frameId)
+                                .collect(Collectors.toSet())
+                        : frameIds(frames, period.startInclusive(), effectiveEnd);
         Set<Long> previousIds =
                 frameIds(frames, period.previous().startInclusive(), period.startInclusive());
         Set<Long> olderIds =
@@ -120,14 +174,22 @@ public class ReportContentAssembler {
                 personStats(people, currentIds, frameById, Role.DIRECTOR);
         List<PersonStat> currentActors = personStats(people, currentIds, frameById, Role.ACTOR);
         Set<Long> historicalDirectorIds =
-                people.stream()
-                        .filter(person -> person.role() == Role.DIRECTOR)
-                        .filter(person -> olderIds.contains(person.frameId()))
-                        .map(ReportSource.Person::personId)
-                        .collect(Collectors.toSet());
+                (cumulative && previous != null ? previous.people() : people)
+                        .stream()
+                                .filter(person -> person.role() == Role.DIRECTOR)
+                                .filter(
+                                        person ->
+                                                cumulative
+                                                        ? previous != null
+                                                        : olderIds.contains(person.frameId()))
+                                .map(ReportSource.Person::personId)
+                                .collect(Collectors.toSet());
 
         List<ReportSource.Frame> currentFrames = selectFrames(frames, currentIds);
-        List<ReportSource.Frame> previousFrames = selectFrames(frames, previousIds);
+        List<ReportSource.Frame> previousFrames =
+                cumulative
+                        ? previous == null ? List.of() : previous.frames()
+                        : selectFrames(frames, previousIds);
         int currentTotal = currentFrames.size();
         int previousTotal = previousFrames.size();
 
@@ -147,11 +209,12 @@ public class ReportContentAssembler {
         List<Share> eraShares = eraShares(currentFrames, currentTotal);
         List<FlavorChange> flavorChanges = flavorChanges(currentFrames, previousFrames);
         Set<String> historicalFlavors =
-                frames.stream()
-                        .filter(frame -> olderIds.contains(frame.frameId()))
-                        .map(ReportSource.Frame::flavorCode)
-                        .filter(code -> code != null)
-                        .collect(Collectors.toSet());
+                (cumulative ? previousFrames : frames)
+                        .stream()
+                                .filter(frame -> cumulative || olderIds.contains(frame.frameId()))
+                                .map(ReportSource.Frame::flavorCode)
+                                .filter(code -> code != null)
+                                .collect(Collectors.toSet());
         List<Comparison> comparisons =
                 previousReportExists
                         ? comparisons(
@@ -186,26 +249,49 @@ public class ReportContentAssembler {
          * 늘 함께 생긴다 — 16종이 모든 조합을 덮어 후보 없음이 없다(API-060).
          */
         CharacterAxisMetrics axisMetrics =
-                CharacterCardSelector.metrics(frames, period.startInclusive(), effectiveEnd);
+                cumulative
+                        ? CharacterCardSelector.cumulativeMetrics(currentFrames, previousFrames)
+                        : CharacterCardSelector.metrics(
+                                frames, period.startInclusive(), effectiveEnd);
         CharacterCardContent characterCard =
                 CharacterCardSelector.select(axisMetrics, characterAxisMedians, currentTotal);
         FourCut fourCut =
                 fourCut(currentGenres, currentDirectors, currentActors, characterCard.name());
         List<String> highlights =
-                highlights(comparisons, newDirectorCount, new ArrayList<>(newFlavors.values()));
+                highlights(comparisons, newDirectorCount, new ArrayList<>(newFlavors.values()))
+                        .stream()
+                        .map(
+                                line ->
+                                        cumulative
+                                                ? line.replace("지난 반기보다", "지난 리포트보다")
+                                                        .replace("이번 반기의", "지금까지의")
+                                                : line)
+                        .toList();
         List<Keyword> keywords =
                 keywords(
-                        period,
-                        currentTotal,
-                        currentFrames,
-                        currentGenres,
-                        currentDirectors,
-                        currentActors,
-                        newFlavors,
-                        newDirectorCount,
-                        eraShares,
-                        countryShares,
-                        summary.averageScore());
+                                period,
+                                currentTotal,
+                                currentFrames,
+                                currentGenres,
+                                currentDirectors,
+                                currentActors,
+                                newFlavors,
+                                newDirectorCount,
+                                eraShares,
+                                countryShares,
+                                summary.averageScore())
+                        .stream()
+                        .map(
+                                keyword ->
+                                        cumulative
+                                                ? new Keyword(
+                                                        keyword.code(),
+                                                        keyword.label(),
+                                                        keyword.rationale()
+                                                                .replace("이번 반기에", "필름에")
+                                                                .replace("이번 반기 평균", "전체 필름 평균"))
+                                                : keyword)
+                        .toList();
 
         return new ReportContent(
                 summary,
@@ -222,7 +308,11 @@ public class ReportContentAssembler {
                 comparisons,
                 highlights,
                 characterAxisMedians,
-                new Generation(1, snapshotAcquiredAt, period.cutoffExclusive(), finalSnapshot));
+                new Generation(
+                        cumulative ? 2 : 1,
+                        snapshotAcquiredAt,
+                        cumulative ? snapshotAcquiredAt : period.cutoffExclusive(),
+                        finalSnapshot));
     }
 
     private static Set<Long> frameIds(List<ReportSource.Frame> frames, Instant start, Instant end) {

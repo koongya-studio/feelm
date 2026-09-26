@@ -343,7 +343,7 @@ describe('EXT-02 ⇢ EXT-05', () => {
     ['insufficientData가 참이면', { ...recommendation, insufficientData: true, items: [] }],
     ['items가 비어 있으면', { ...recommendation, items: [] }],
   ])(
-    '%s 안내로 보내고, MY 안 남긴 영화 · 3.1로 이어진다',
+    '%s 안내로 보내고, MY 최근 본 영화 · 3.1로 이어진다',
     async (_name, response) => {
       vi.mocked(getOttRecommendations).mockResolvedValue(response);
       const { unmount } = renderApp([ROUTE_PATTERN.ottFinder]);

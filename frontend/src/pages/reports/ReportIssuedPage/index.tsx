@@ -1,17 +1,19 @@
 /*
  * 3.3 새 취향 리포트 발급
  *
- * 이동표: 3.3 → 3.4 새 리포트 확인 · 3.3 ⇢ 3.4 반기(6개월)마다 1회 발급 · 이전 반기와 비교
+ * 이동표: 필름의 생성 결과 → 3.3 기존 인화 모션 → 3.4 실제 결과 확인
  *
  * 요소는 와이어프레임 그대로다 — `반기 취향 리포트` · `2026년 상반기 취향 필름을 인화했어요`,
  * 인화기에서 나오는 4컷(한 칸에 하나씩), 요약 세 줄, `리포트 보기`.
  *
- * **들어오는 화살표가 이동표에 없다.** 2.1 `취향 리포트 보기`가 아직 발급되지 않은 리포트면
- * 여기를 거치게 했다(`api/reports.ts` `getLatestReadyReport`, 업무 -308).
- * `리포트 보기`를 누르면 **API-080으로 첫 발급을 기록한 뒤** 3.4로 **바꿔 끼운다** — 뒤로 가기가
+ * 신규 FILM은 모션 완료·건너뛰기 뒤 API-080으로 첫 인화를 기록하며, 미완료 결과는 목록에서
+ * 이어 받을 수 있다. 기존 HALF는 `리포트 보기`에서 완료를 기록한다. 상세로 **바꿔 끼운다** — 뒤로 가기가
  * 이 장면으로 돌아오면 같은 발급을 두 번 보게 된다. 기록에 실패하면 넘어가지 않고 그 자리에서
  * 다시 시도한다(계약 처리 규칙). 재요청은 처음 기록한 시각을 그대로 주므로 여러 번 눌러도
  * 발급 시각이 밀리지 않는다.
+ *
+ * SAME_CONTENT는 실제 재계산 결과가 같은 경우다. 기존 모션 뒤 동일 결과 팝업을 한 번
+ * 표시하고 발급 API를 호출하지 않는다. 원본 결과와 목록은 그대로 보존한다.
  *
  * **버건디 벽 위의 4컷 인화기** (팀 결정 2026-09-14 · 사용자 시안 2026-09-15, S15P21E106-321).
  * - 인화기는 받은 사진(`4컷리포트_기계.png`)을 그대로 쓴다. 4컷 인화지가 아래 롤러 밑에서
@@ -24,13 +26,14 @@
  * - 인화지가 나오는 동안 머리 오른쪽에 `건너뛰기`가 있다(사용자 요청 2026-09-15). 누르면 다 나온
  *   모습으로 바로 넘어가고, 다 나오면 사라진다
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams, useSearchParams } from 'react-router';
 import printerArt from '../../../assets/reports/report-printer.webp';
 import Button from '../../../components/Button';
 import ReportFourCut from '../../../components/ReportFourCut';
 import StatusView from '../../../components/StatusView';
+import Snackbar from '../../../components/Snackbar';
 import { getReportDetail, issueReport } from '../../../api/reports';
 import { isApiError } from '../../../api/apiError';
 import { getMyProfile } from '../../../api/users';
@@ -44,6 +47,10 @@ export default function ReportIssuedPage() {
   const navigate = useNavigate();
   const { reportId } = useParams();
   const id = Number(reportId);
+  const [searchParams] = useSearchParams();
+  const sameContent = searchParams.get('same') === '1';
+  const [sameNotice, setSameNotice] = useState(() => sameContent && prefersReducedMotion());
+  const notified = useRef(sameNotice);
 
   const [report, setReport] = useState<ReportDetail | null>(null);
   const [nickname, setNickname] = useState<string | null>(null);
@@ -54,6 +61,7 @@ export default function ReportIssuedPage() {
   /** 발급을 기록하는 동안 버튼을 잠근다 */
   const [issuing, setIssuing] = useState(false);
   const [issueFailure, setIssueFailure] = useState<string | null>(null);
+  const issueState = useRef({ id, pending: false, complete: false });
 
   // 불러오지 못한 상태는 인화기가 없어 공통 벽이다
   useReportWall(!failed);
@@ -92,20 +100,43 @@ export default function ReportIssuedPage() {
     };
   }, []);
 
-  async function openReport() {
+  const recordIssue = useCallback(async () => {
+    if (sameContent) return true;
+    if (issueState.current.id !== id) issueState.current = { id, pending: false, complete: false };
+    if (issueState.current.complete) return true;
+    if (issueState.current.pending) return false;
+    issueState.current.pending = true;
     setIssuing(true);
     setIssueFailure(null);
-
     try {
       await issueReport(id);
+      issueState.current.complete = true;
+      return true;
     } catch (error) {
-      setIssuing(false);
       setIssueFailure(issueMessage(error));
-
-      return;
+      return false;
+    } finally {
+      issueState.current.pending = false;
+      setIssuing(false);
     }
+  }, [id, sameContent]);
 
-    void navigate(path.report(id), { replace: true });
+  useEffect(() => {
+    if (!sameContent && report?.analysisScope === 'FILM' && !printing) {
+      void Promise.resolve().then(recordIssue);
+    }
+  }, [report, printing, recordIssue, sameContent]);
+
+  function finishPrinting() {
+    setPrinting(false);
+    if (sameContent && !notified.current) {
+      notified.current = true;
+      setSameNotice(true);
+    }
+  }
+
+  async function openReport() {
+    if (await recordIssue()) void navigate(path.report(id), { replace: true });
   }
 
   if (failed) {
@@ -140,14 +171,18 @@ export default function ReportIssuedPage() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div className={styles.heading}>
-          <h1 className={styles.title}>반기 취향 리포트</h1>
+          <h1 className={styles.title}>
+            {report.analysisScope === 'FILM' ? '취향 리포트' : '반기 취향 리포트'}
+          </h1>
           <p className={styles.lead}>
-            {report.period.year}년 {formatHalf(report.period)} 취향 필름을 인화했어요
+            {report.analysisScope === 'FILM'
+              ? '지금까지 쌓인 취향 필름을 인화했어요'
+              : `${report.period.year}년 ${formatHalf(report.period)} 취향 필름을 인화했어요`}
           </p>
         </div>
 
         {printing ? (
-          <button type="button" className={styles.skip} onClick={() => setPrinting(false)}>
+          <button type="button" className={styles.skip} onClick={finishPrinting}>
             건너뛰기
           </button>
         ) : null}
@@ -168,7 +203,7 @@ export default function ReportIssuedPage() {
               className={styles.feed}
               onAnimationEnd={(event) => {
                 if (event.target instanceof HTMLElement && event.target.dataset.cut === 'genre') {
-                  setPrinting(false);
+                  finishPrinting();
                 }
               }}
             >
@@ -195,10 +230,20 @@ export default function ReportIssuedPage() {
             {issueFailure}
           </p>
         ) : null}
-        <Button disabled={issuing} onClick={() => void openReport()}>
+        <Button
+          disabled={issuing || (report.analysisScope === 'FILM' && printing)}
+          onClick={() => void openReport()}
+        >
           {issueFailure ? '다시 시도' : '리포트 보기'}
         </Button>
       </div>
+      {sameNotice ? (
+        <div className={styles.sameNotice}>
+          <Snackbar actionLabel="확인" onAction={() => setSameNotice(false)}>
+            지난 리포트와 같아요!
+          </Snackbar>
+        </div>
+      ) : null}
     </div>
   );
 }

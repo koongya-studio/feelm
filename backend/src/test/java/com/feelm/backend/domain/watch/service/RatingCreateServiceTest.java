@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.feelm.backend.domain.notification.service.NotificationCommandService;
 import com.feelm.backend.domain.taste.service.FrameWriter;
 import com.feelm.backend.domain.taste.service.FrameWriter.FrameCreation;
 import com.feelm.backend.domain.taste.service.TasteAnalysisWriter;
@@ -56,7 +57,8 @@ class RatingCreateServiceTest {
         service =
                 new RatingCreateService(
                         repository,
-                        new RatingStateWriter(repository, frameWriter),
+                        new RatingStateWriter(
+                                repository, frameWriter, mock(NotificationCommandService.class)),
                         tasteAnalysisWriter,
                         eventPublisher,
                         Clock.fixed(NOW, ZoneOffset.UTC));

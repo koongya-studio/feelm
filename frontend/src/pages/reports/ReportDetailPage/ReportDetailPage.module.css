@@ -256,3 +256,14 @@
   font-size: var(--font-size-caption);
   line-height: var(--line-height-meta);
 }
+
+.actionLabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.actionLabel > svg {
+  flex-shrink: 0;
+}

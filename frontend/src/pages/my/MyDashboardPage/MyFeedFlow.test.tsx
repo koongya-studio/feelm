@@ -1,13 +1,13 @@
 /*
  * MY 피드 — 이동 경로 (업무 S15P21E106-495)
  *
- * 7.5 추천 기록 · 7.6 평가한 영화 · 7.7 안 남긴 영화 화면을 지우고 7.1 MY 안의 탭으로
+ * 7.5 추천 기록 · 7.6 평가한 영화 · 7.7 평가하지 않은 영화 화면을 지우고 7.1 MY 안의 탭으로
  * 옮겼다. **그 화면들이 걷던 사슬을 피드 위에서 그대로 걷는다.** 306에서 만든
  * `MyRecordsFlow.test.tsx`가 잡던 자리이고, 화면이 사라졌을 뿐 확인할 것은 같다.
  *
  * - 피드(평가) ⇢ 2.4 → 2.5: 이미 평가한 영화를 고치면 **평가가 늘면 안 된다**. 피드는 2.4 영화
  *   상세로 가고, 수정은 2.4의 `내 별점 수정하기`로 들어간다(업무 -638)
- * - 피드(안 남긴 영화) ⇢ 2.5: 평가하면 API-036으로 저장되고, 다시 받은 서버 목록에서 빠진다
+ * - 피드(최근 본 영화) ⇢ 2.5: 평가하면 API-036으로 저장되고, 다시 받은 서버 목록에 남는다
  *
  * 실제 호출인 도메인만 가로챈다 — API-014 내 프로필(`api/users`), OTT 기준정보(`api/otts`),
  * 팝콘과 맛 기준정보(`api/taste`), 영화 상세(`api/movies`, 업무 -475), 감상 기록 · 평가 생성 ·
@@ -36,6 +36,7 @@ import type { MovieDetail } from '../../../types/movie';
 import type {
   MyRatedItem,
   MyRatingList,
+  MyRatingListItem,
   RatingUpdateInput,
   WatchRecordListItem,
 } from '../../../types/watch';
@@ -118,7 +119,7 @@ const { getWatchRecords, getMyRatings, findWatchedRecord, createRating, updateRa
   await import('../../../api/watch');
 
 /**
- * 서버가 들고 있는 감상 기록(API-034). `안 남긴 영화` 탭이 그리는 세 건이다.
+ * 서버가 들고 있는 감상 기록(API-034). `최근 본 영화` 탭이 그리는 세 건이다.
  *
  * 와이어프레임 7.7의 날짜와 OTT를 옮겼다. 감상 기록이 실제 API가 되면서(업무 -477)
  * 목업 세션 저장소가 아니라 서버 대역이 준다.
@@ -166,10 +167,13 @@ function movieDetail(movieId: number): Promise<MovieDetail> {
 }
 
 /**
- * 내 평가 목록(API-039)을 주는 서버 대역. 기준 평가 세 편에 화면이 API-037로 고친 값을 얹고,
- * 화면이 API-036으로 새로 만든 평가를 앞에 붙인다(최신순).
+ * 내 평가 목록(API-039)을 주는 서버 대역.
+ *
+ * **`filter=ALL`이면 미평가까지 합쳐 준다**(업무 -919). `최근 본 영화` 탭이 그렇게 부른다.
+ * 서버가 하는 대로 같은 영화를 한 번만 두고(평가가 있으면 평가 쪽), `activityAt` 내림차순으로
+ * 세운다. 필터가 없으면 평가만이다 — `평가한 영화` 탭이다.
  */
-function myRatings(): Promise<MyRatingList> {
+function myRatings(query: { filter?: string } = {}): Promise<MyRatingList> {
   const saved = mockFrameList.items.map((frame): MyRatedItem => {
     const rating = withRatingEdit(myRatingOf(frame.movie.movieId));
 
@@ -187,12 +191,33 @@ function myRatings(): Promise<MyRatingList> {
     };
   });
 
-  return Promise.resolve({
-    items: [...createdRatings, ...saved],
-    nextCursor: null,
-    hasNext: false,
-  });
+  const rated = [...createdRatings, ...saved];
+
+  if (query.filter !== 'ALL') {
+    return Promise.resolve({ items: rated, nextCursor: null, hasNext: false });
+  }
+
+  const ratedMovieIds = new Set(rated.map((item) => item.movie.movieId));
+  const items = [...rated, ...unratedItems.filter((item) => !ratedMovieIds.has(item.movie.movieId))]
+    .slice()
+    .sort((a, b) => (b.activityAt ?? '').localeCompare(a.activityAt ?? ''));
+
+  return Promise.resolve({ items, nextCursor: null, hasNext: false });
 }
+
+/** 위 감상 기록을 API-039의 미평가 항목 모양으로 바꾼 것 */
+const unratedItems: MyRatingListItem[] = unratedRecords.map((record) => ({
+  itemType: 'UNRATED',
+  ratingId: null,
+  movie: record.movie,
+  score: null,
+  comment: null,
+  visibility: null,
+  spoiler: null,
+  frameId: null,
+  createdAt: null,
+  activityAt: record.watchedAt,
+}));
 
 /** 화면이 API-036으로 만든 평가. 서버가 저장했다고 보고 다음 조회에 돌려준다 */
 const createdRatings: MyRatedItem[] = [];
@@ -301,17 +326,20 @@ describe('MY 피드(평가) ⇢ 2.4 → 2.5', () => {
   });
 });
 
-describe('MY 피드(안 남긴 영화) ⇢ 2.5', () => {
+describe('MY 피드(최근 본 영화) ⇢ 2.5', () => {
   /*
    * 이 탭은 서버 기록(API-034)이고 평가 생성도 서버(API-036)다(업무 -491). 평가를 저장하면
-   * 서버가 같은 트랜잭션에서 기록을 `RATED`로 옮기므로, 화면이 할 일은 **API-036을 부르고
-   * 돌아와서 목록을 다시 받는 것**뿐이다. 그 두 자리를 고정한다. 옮기는 판정 자체는
-   * 백엔드 시험이 고정한다.
+   * 서버가 같은 트랜잭션에서 기록을 `RATED`로 옮긴다. 화면이 할 일은 **API-036을 부르고
+   * 돌아와서 목록을 다시 받는 것**뿐이다. 그 두 자리를 고정한다.
+   *
+   * **업무 -919에서 기대가 바뀌었다.** 탭이 `안 남긴 영화`였을 때는 평가한 영화가 목록에서
+   * 빠지는 것이 맞았다. 지금은 `최근 본 영화`라 `RATED`도 함께 받으므로 **그대로 남는다.**
+   * 본 영화인 것은 변함이 없기 때문이다.
    *
    * 평가한 영화(API-039)도 서버 목록이라(업무 -611) 돌아와서 다시 받으면 방금 저장한 평가가
    * 보인다. 그것까지 이어서 본다.
    */
-  it('평가하면 API-036으로 저장하고, 다시 받은 안 남긴 영화 목록에서 빠진다', async () => {
+  it('평가하면 API-036으로 저장하고, 최근 본 영화에는 그대로 남는다', async () => {
     vi.mocked(createRating).mockImplementation((movieId, input) => {
       const movie = findMockMovie(movieId);
 
@@ -344,7 +372,7 @@ describe('MY 피드(안 남긴 영화) ⇢ 2.5', () => {
 
     const { unmount } = renderApp([ROUTE_PATTERN.my]);
 
-    fireEvent.click(await findTab('안 남긴 영화'));
+    fireEvent.click(await findTab('최근 본 영화'));
 
     const cell = await screen.findByRole('link', { name: /영화 제목 5/ });
     fireEvent.click(cell);
@@ -361,17 +389,14 @@ describe('MY 피드(안 남긴 영화) ⇢ 2.5', () => {
     expect(createRating).toHaveBeenCalledWith(411, { score: 4 });
     unmount();
 
-    // 서버가 그 기록을 `RATED`로 옮겼다. 다시 받은 목록에는 411이 없다
-    vi.mocked(getWatchRecords).mockResolvedValue({
-      items: unratedRecords.filter((record) => record.movie.movieId !== 411),
-      nextCursor: null,
-      hasNext: false,
-    });
-
+    /*
+     * 서버 대역이 이미 안다 — 411에 평가가 생겼으므로 `filter=ALL`에서 그 영화는 미평가가 아니라
+     * 평가 항목으로 한 번만 나온다. 목록에서 사라지지 않는 것이 이번 변경의 요지다.
+     */
     renderApp([`${ROUTE_PATTERN.my}?tab=unrated`]);
-    await findTab('안 남긴 영화');
+    await findTab('최근 본 영화');
     expect(await screen.findByRole('link', { name: /영화 제목 6/ })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /영화 제목 5/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /영화 제목 5/ })).toHaveLength(1);
 
     // 평가한 영화 탭에는 방금 저장한 평가가 맨 앞에 보인다(API-039 다시 받기)
     fireEvent.click(await findTab('평가한 영화'));

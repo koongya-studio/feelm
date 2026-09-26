@@ -514,6 +514,6 @@ Candidate v6 reader는 전환 호환을 위해 과거
 포함된다. Backend가 v5/v6를 함께 읽는 전환 reader를 먼저 반영하고 Consumer v6 전환과 함께 모든 활성 사용자를
 재게시한다. v6와 `generationId` 일치를 확인한 뒤 Backend의 v5 호환을 제거한다. Consumer는 추천 문구나
 `CONCENTRATED` 같은 임의 구간값이 아니라 구조화된
-측정값만 생성한다. Spring은 합의한 coverage 기준보다 낮으면 개별 영화명 대신 전체 이력 기반 문구를 사용한다.
+측정값만 생성한다. Spring은 `topContributionCoverage`가 0.5(S15P21E106-925)보다 낮으면 개별 영화명 대신 전체 이력 기반 문구를 사용한다.
 Spring이 후보 전체의 최종 제외·재정렬을 담당한다. 영화별 OTT 제공 정보와 사용자 OTT 클릭 정보는 PostgreSQL에서 조회한다. 별도 `topn`은 생성하거나 복구 조건에 포함하지 않는다.
 기존 `topn` 키 자동 삭제는 하지 않는다. 배포 전 Spring reader 전환이 필요하다.

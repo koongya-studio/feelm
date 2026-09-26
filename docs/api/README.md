@@ -16,7 +16,7 @@ FEELM 서비스 REST API 명세입니다. Notion 「설계 > API 명세서」 �
 | [파티](./party.md) | 파티 | 10 |
 | [소셜](./social.md) | 소셜 | 5 |
 | [리포트·트렌드](./report-trend.md) | 리포트, 트렌드 | 5 |
-| [알림](./notifications.md) | 인앱 알림·브라우저 푸시 | 8 |
+| [알림](./notifications.md) | 인앱 알림·브라우저 푸시 | 9 |
 
 FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용하지 않습니다. 현재 이벤트·Redis 경계는 [스트리밍 계약](./streaming-contract.md), 이전 계약과 변경 배경은 [폐기된 내부 API 초안](./internal.md)을 참고합니다.
 
@@ -125,6 +125,8 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-082 | [프로필 사진 삭제](./users.md#api-082-프로필-사진-삭제) | DELETE | `/users/me/avatar` | 사용자 | 2차 MVP | 회원 | FR-38 |  |
 | API-083 | [파티 추천 이력 조회](./party.md#api-083-파티-추천-이력-조회) | GET | `/parties/{partyId}/recommendations/history` | 파티 | 2차 MVP | 회원 | FR-22, FR-33 |  |
 | API-084 | [사용자 의견 제출](./feedback.md#api-084-사용자-의견-제출) | POST | `/feedback` | 의견 | 시연 QA | 회원 | S15P21E106-915 |  |
+| API-085 | [인앱 알림 변경 스트림](./notifications.md#api-085-인앱-알림-변경-스트림) | GET | `/notifications/stream` | 알림 | 2차 MVP | 회원 | FR-41 |  |
+| API-086 | [취향 리포트 생성](./report-trend.md#api-086-취향-리포트-생성) | POST | `/users/me/reports` | 리포트 | 2차 MVP | 회원 | FR-23 | |
 
 ### 삭제된 API
 

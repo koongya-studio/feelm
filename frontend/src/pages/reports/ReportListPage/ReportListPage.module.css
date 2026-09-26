@@ -4,10 +4,8 @@
  * 벽 색은 앱 공통 벽 그대로 두고 그 위에 옅은 모눈만 긋는다. 시안 종이는 조금 따뜻하지만
  * 화면마다 벽 색을 바꾸지 않는다(`design-concept.md` 3장).
  *
- * **두 해 네 장이 스크롤 없이 한 화면에 들어온다**(사용자 요청 2026-09-15). 4컷 크기를 화면 높이에서
- * 거꾸로 구한다. 412 × 892에서 잰 고정 높이는 380px이다 — 머리 124 · 하단 내비 자리 92 · 연도 사이 16 ·
- * 연도마다 (손글씨 34 + 간격 12 + 간격 8 + 날짜 20) × 2. 남는 높이의 절반이 4컷 한 장의 높이이고,
- * 폭은 그 높이 × 385 / 1116이다. 화면이 너무 낮으면 72px에서 멈추고 스크롤된다.
+ * 같은 반기에 생성한 결과를 최신순으로 붙인다. 모바일은 한 줄 세 장, 데스크톱은 네 장이며
+ * 다음 장부터 아래 줄로 이어진다. 기존 모눈 · 인화지 · 빨간 테이프 디자인을 유지한다.
  *
  * 시안(853px 폭 캡처)에서 잰 비율
  * - 4컷 폭: 열 폭의 60%를 넘지 않는다
@@ -27,8 +25,6 @@
 }
 
 .page {
-  --list-chrome: 380px;
-
   display: flex;
   flex-direction: column;
   padding: var(--space-2) var(--screen-padding-x) var(--space-4);
@@ -134,6 +130,14 @@
   margin-top: var(--space-5);
 }
 
+.resume {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
 /* 320×568에서도 안내지와 주 동작이 하단 내비 위에서 끝나게 세로 장식만 압축한다 */
 @media (max-height: 620px) {
   .readyPage {
@@ -189,7 +193,7 @@
   display: inline-block;
   color: var(--color-ink);
   font-family: var(--font-report-hand);
-  font-size: 34px;
+  font-size: 28px;
   font-weight: 700;
   letter-spacing: 0.02em;
   line-height: 1;
@@ -197,12 +201,20 @@
   transform-origin: left bottom;
 }
 
+/* 같은 해의 다음 반기는 제목 없이 기존 가로줄로 구분한다. */
+.periodDivider {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--color-line-strong);
+}
+
 .board {
   display: grid;
   padding: 0;
   margin: 0;
   gap: var(--space-4);
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   list-style: none;
 }
 
@@ -216,7 +228,7 @@
 .pinned {
   position: relative;
   display: flex;
-  width: clamp(72px, calc((100dvh - var(--list-chrome)) / 2 * 385 / 1116), 60%);
+  width: min(100%, 100px);
   flex-direction: column;
   align-items: center;
   color: inherit;
@@ -273,7 +285,7 @@
   color: var(--color-ink-muted);
   font-size: var(--font-size-meta);
   font-weight: var(--font-weight-medium);
-  letter-spacing: 0.12em;
+  letter-spacing: 0;
   line-height: var(--line-height-meta);
   white-space: nowrap;
 }
@@ -312,13 +324,11 @@
   letter-spacing: 0;
 }
 
-/* 공유 결과(업무 -767). 7.1 MY의 안내와 같은 자리 — 하단 탭 위에 뜬다 */
-.notice {
-  position: fixed;
-  z-index: 2;
-  right: var(--screen-padding-x);
-  bottom: calc(var(--nav-height) + var(--space-6) + env(safe-area-inset-bottom, 0px));
-  left: var(--screen-padding-x);
-  max-width: calc(var(--layout-max-width) - var(--screen-padding-x) * 2);
-  margin: 0 auto;
+@media (min-width: 1024px) {
+  .board {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .pinned {
+    width: min(100%, 130px);
+  }
 }

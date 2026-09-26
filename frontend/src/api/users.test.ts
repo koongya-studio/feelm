@@ -9,6 +9,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   deleteMyAvatar,
   getMyProfileView,
+  getMyPublicProfile,
+  updateProfileExtras,
   getPublicProfile,
   isSearchableNickname,
   searchUsers,
@@ -225,7 +227,16 @@ describe('API-081 · 082 프로필 사진', () => {
 
   it('내 프로필 사진은 API-014의 `avatarUrl`이다. 기기 저장소를 읽지 않는다', async () => {
     localStorage.setItem(`feelm.avatar.${mockMyProfile.userId}`, 'data:image/jpeg;base64,OLD');
-    fetchMock.mockResolvedValue(json(200, { ...mockMyProfile, avatarUrl: '/media/avatars/a.jpg' }));
+    fetchMock.mockImplementation((url: string) =>
+      Promise.resolve(
+        json(
+          200,
+          url.includes('/frames')
+            ? { items: [], nextCursor: null, hasNext: false }
+            : { ...mockMyProfile, avatarUrl: '/media/avatars/a.jpg', keywords: [] },
+        ),
+      ),
+    );
 
     expect((await getMyProfileView()).avatarUrl).toBe('/media/avatars/a.jpg');
 
@@ -251,6 +262,10 @@ describe('API-040 취향 키워드를 내 프로필에 싣는다', () => {
     fetchMock.mockImplementation((input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : String(input);
 
+      if (url.includes('/users/me/frames')) {
+        return Promise.resolve(json(200, { items: [], nextCursor: null, hasNext: false }));
+      }
+
       if (url.includes('/users/me/taste')) {
         return Promise.resolve(
           json(200, {
@@ -275,6 +290,7 @@ describe('API-040 취향 키워드를 내 프로필에 싣는다', () => {
     serve();
 
     const profile = await getMyProfileView();
+    expect(profile.publicId).toBe(mockMyProfile.publicId);
 
     expect(profile.keywords.map((keyword) => keyword.label)).toEqual([
       '봉준호 몰아보기',
@@ -308,6 +324,10 @@ describe('API-040 취향 키워드를 내 프로필에 싣는다', () => {
     fetchMock.mockImplementation((input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : String(input);
 
+      if (url.includes('/users/me/frames')) {
+        return Promise.resolve(json(200, { items: [], nextCursor: null, hasNext: false }));
+      }
+
       return url.includes('/users/me/taste')
         ? Promise.reject(new Error('network'))
         : Promise.resolve(json(200, mockMyProfile));
@@ -317,5 +337,113 @@ describe('API-040 취향 키워드를 내 프로필에 싣는다', () => {
 
     expect(profile.nickname).toBe(mockMyProfile.nickname);
     expect(profile.keywords).toEqual([]);
+  });
+});
+
+describe('프로필 실제 필름 연동', () => {
+  const frames = [1, 2, 3, 4].map((id) => ({
+    frameId: 900 + id,
+    movie: { movieId: 1000 + id, title: `내 영화 ${id}`, posterUrl: `/posters/${id}.jpg` },
+    score: 4.5,
+    flavorCode: 'FLAVOR_A',
+    createdAt: '2026-09-27T00:00:00Z',
+  }));
+
+  beforeEach(() => {
+    resetSessionStore();
+    fetchMock.mockImplementation((url: string) => {
+      const body = url.includes('/frames')
+        ? url.includes('cursor=second')
+          ? { items: frames.slice(2), hasNext: false, nextCursor: null }
+          : { items: frames.slice(0, 2), hasNext: true, nextCursor: 'second' }
+        : url.endsWith('/taste')
+          ? { keywords: [] }
+          : mockMyProfile;
+      return Promise.resolve(json(200, body));
+    });
+  });
+
+  it('모든 페이지의 실제 영화와 포스터를 최신순으로 제공한다', async () => {
+    const profile = await getMyProfileView();
+    expect(profile.frames.map((frame) => frame.frameId)).toEqual([901, 902, 903, 904]);
+    expect(profile.frames[0]).toEqual({
+      frameId: 901,
+      movieId: 1001,
+      title: '내 영화 1',
+      posterUrl: '/posters/1.jpg',
+      isPublic: true,
+    });
+    expect(fetchMock.mock.calls.some(([url]) => url.endsWith('/frames?cursor=second'))).toBe(true);
+  });
+
+  it('공개 선택을 저장하면 실제 ID와 포스터가 미리보기에도 유지된다', async () => {
+    const saved = await updateProfileExtras({ publicFrameIds: [904] });
+    expect(saved.frames.filter((frame) => frame.isPublic).map((frame) => frame.frameId)).toEqual([
+      904,
+    ]);
+    const preview = await getMyPublicProfile();
+    expect(preview.frames).toEqual([
+      expect.objectContaining({ frameId: 904, posterUrl: '/posters/4.jpg' }),
+    ]);
+  });
+
+  it('미리보기는 공개된 최근 세 편만 표시하고 비공개 범위를 적용한다', async () => {
+    expect((await getMyPublicProfile()).frames.map((frame) => frame.frameId)).toEqual([
+      901, 902, 903,
+    ]);
+    fetchMock.mockImplementation((url: string) =>
+      Promise.resolve(
+        json(
+          200,
+          url.includes('/frames')
+            ? { items: frames, hasNext: false, nextCursor: null }
+            : url.endsWith('/taste')
+              ? { keywords: [] }
+              : { ...mockMyProfile, frameVisibility: 'PRIVATE' },
+        ),
+      ),
+    );
+    expect((await getMyPublicProfile()).frames).toEqual([]);
+  });
+
+  it('실제 필름이 없으면 샘플 프레임을 넣지 않는다', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      Promise.resolve(
+        json(
+          200,
+          url.includes('/frames')
+            ? { items: [], hasNext: false, nextCursor: null }
+            : url.endsWith('/taste')
+              ? { keywords: [] }
+              : mockMyProfile,
+        ),
+      ),
+    );
+    expect((await getMyProfileView()).frames).toEqual([]);
+  });
+
+  it('프레임 조회가 실패하면 목업으로 대체하지 않고 실패를 전달한다', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url.includes('/frames')
+        ? Promise.resolve(json(503, { code: 'UNAVAILABLE', message: '조회 실패' }))
+        : Promise.resolve(json(200, url.endsWith('/taste') ? { keywords: [] } : mockMyProfile)),
+    );
+    await expect(getMyProfileView()).rejects.toMatchObject({ status: 503 });
+  });
+
+  it('다음 커서가 반복되면 무한 요청 대신 실패한다', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      Promise.resolve(
+        json(
+          200,
+          url.includes('/frames')
+            ? { items: frames, hasNext: true, nextCursor: 'same' }
+            : url.endsWith('/taste')
+              ? { keywords: [] }
+              : mockMyProfile,
+        ),
+      ),
+    );
+    await expect(getMyProfileView()).rejects.toThrow('다음 페이지');
   });
 });

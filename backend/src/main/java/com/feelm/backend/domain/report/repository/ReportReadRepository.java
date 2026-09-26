@@ -27,10 +27,10 @@ public class ReportReadRepository {
         return jdbc.query(
                 """
                 SELECT id, year, half, status, content::text AS content,
-                       created_at, issued_at
+                       created_at, issued_at, source_fingerprint
                 FROM taste_reports
                 WHERE user_id = ?
-                ORDER BY year DESC, half DESC, id DESC
+                ORDER BY year DESC, half DESC, created_at DESC, id DESC
                 """,
                 (result, row) -> map(result),
                 userId);
@@ -41,7 +41,7 @@ public class ReportReadRepository {
                 jdbc.query(
                         """
                         SELECT id, year, half, status, content::text AS content,
-                               created_at, issued_at
+                               created_at, issued_at, source_fingerprint
                         FROM taste_reports
                         WHERE user_id = ? AND id = ?
                         """,
@@ -105,7 +105,8 @@ public class ReportReadRepository {
                 result.getString("status"),
                 result.getString("content"),
                 instant(result.getObject("created_at")),
-                instant(result.getObject("issued_at")));
+                instant(result.getObject("issued_at")),
+                result.getString("source_fingerprint"));
     }
 
     private Instant instant(Object value) {
@@ -130,5 +131,10 @@ public class ReportReadRepository {
             String status,
             String content,
             Instant createdAt,
-            Instant issuedAt) {}
+            Instant issuedAt,
+            String sourceFingerprint) {
+        public boolean manual() {
+            return sourceFingerprint != null;
+        }
+    }
 }

@@ -1,5 +1,6 @@
 package com.feelm.backend.global.security;
 
+import jakarta.servlet.DispatcherType;
 import java.util.List;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
@@ -175,7 +176,16 @@ public class SecurityConfig {
                         session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(
                         auth ->
-                                auth.requestMatchers(HttpMethod.GET, "/actuator/health")
+                                auth.requestMatchers(
+                                                request ->
+                                                        request.getDispatcherType()
+                                                                        == DispatcherType.ASYNC
+                                                                && "/api/v1/notifications/stream"
+                                                                        .equals(
+                                                                                request
+                                                                                        .getRequestURI()))
+                                        .permitAll()
+                                        .requestMatchers(HttpMethod.GET, "/actuator/health")
                                         .permitAll()
                                         // Prometheus가 JWT 없이 수집한다. 백엔드는 내부 Compose
                                         // 네트워크에만 있고 Nginx는 이 경로를 프록시하지 않는다.

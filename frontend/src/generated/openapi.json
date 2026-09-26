@@ -668,6 +668,25 @@
         },
         "type" : "object"
       },
+      "Generation" : {
+        "properties" : {
+          "canGenerate" : {
+            "type" : "boolean"
+          },
+          "frameCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "minimumFrames" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "reason" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "Genre" : {
         "properties" : {
           "averageScore" : {
@@ -3029,6 +3048,9 @@
       },
       "ReportDetailResponse" : {
         "properties" : {
+          "analysisScope" : {
+            "type" : "string"
+          },
           "characterCard" : {
             "$ref" : "#/components/schemas/CharacterCardContent"
           },
@@ -3112,6 +3134,29 @@
         },
         "type" : "object"
       },
+      "ReportGenerateResponse" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "issuedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "reportId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "reuseReason" : {
+            "type" : "string"
+          },
+          "reused" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
       "ReportImageResponse" : {
         "properties" : {
           "downloadUrl" : {
@@ -3148,6 +3193,9 @@
         "properties" : {
           "current" : {
             "$ref" : "#/components/schemas/Current"
+          },
+          "generation" : {
+            "$ref" : "#/components/schemas/Generation"
           },
           "items" : {
             "items" : {
@@ -3596,6 +3644,10 @@
               "PUBLIC",
               "PRIVATE"
             ],
+            "type" : "string"
+          },
+          "publicId" : {
+            "format" : "uuid",
             "type" : "string"
           },
           "reviewVisibility" : {
@@ -5232,6 +5284,33 @@
         ]
       }
     },
+    "/api/v1/notifications/stream" : {
+      "get" : {
+        "description" : "API-085. notification-changed 수신 시 목록·미확인 개수를 다시 조회한다.",
+        "operationId" : "stream",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "text/event-stream" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "description" : "알림 갱신 SSE 스트림"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "인앱 알림 변경 스트림",
+        "tags" : [
+          "Notifications"
+        ]
+      }
+    },
     "/api/v1/notifications/unread-count" : {
       "get" : {
         "operationId" : "unreadCount",
@@ -5412,7 +5491,7 @@
     },
     "/api/v1/parties" : {
       "get" : {
-        "operationId" : "list",
+        "operationId" : "list_1",
         "parameters" : [
           {
             "in" : "query",
@@ -6946,13 +7025,36 @@
     },
     "/api/v1/users/me/reports" : {
       "get" : {
-        "operationId" : "list_1",
+        "operationId" : "list",
         "responses" : {
           "200" : {
             "content" : {
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ReportListResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "tags" : [
+          "report-read-controller"
+        ]
+      },
+      "post" : {
+        "operationId" : "generate",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ReportGenerateResponse"
                 }
               }
             },

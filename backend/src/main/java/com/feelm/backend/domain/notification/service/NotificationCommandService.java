@@ -9,6 +9,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +26,7 @@ public class NotificationCommandService {
     private final WebPushDeliveryRepository deliveryRepository;
     private final WebPushSubscriptionRepository subscriptionRepository;
     private final Clock clock;
+    private final ApplicationEventPublisher events;
 
     /** 파티 초대 알림을 만들고 발송을 건다. 파티 초대 알림을 끈 사용자에게는 둘 다 하지 않는다(S15P21E106-857). */
     public void createPartyInvitation(long userId, long invitationId, Instant createdAt) {
@@ -34,7 +36,11 @@ public class NotificationCommandService {
                         invitationId,
                         createdAt,
                         createdAt.plus(PARTY_NOTIFICATION_RETENTION))
-                .ifPresent(deliveryRepository::enqueue);
+                .ifPresent(
+                        notificationId -> {
+                            deliveryRepository.enqueue(notificationId);
+                            events.publishEvent(new NotificationChangedEvent(userId));
+                        });
     }
 
     public void createPartyInvitationAccepted(
@@ -52,6 +58,7 @@ public class NotificationCommandService {
                         acceptedAt,
                         acceptedAt.plus(PARTY_NOTIFICATION_RETENTION));
         deliveryRepository.enqueue(notificationId);
+        events.publishEvent(new NotificationChangedEvent(ownerId));
     }
 
     /**
@@ -81,6 +88,7 @@ public class NotificationCommandService {
     public void upsertWatchConfirmation(
             long userId, long watchRecordId, Instant confirmDueAt, Instant expiresAt) {
         repository.upsertWatchConfirmation(userId, watchRecordId, confirmDueAt, expiresAt);
+        events.publishEvent(new NotificationChangedEvent(userId));
     }
 
     public void closePartyInvitation(long userId, long invitationId, Instant closedAt) {
@@ -90,6 +98,7 @@ public class NotificationCommandService {
                         notificationId ->
                                 deliveryRepository.cancelForNotification(
                                         notificationId, closedAt, "NOTIFICATION_CLOSED"));
+        events.publishEvent(new NotificationChangedEvent(userId));
     }
 
     public void closeWatchConfirmation(long userId, long watchRecordId, Instant closedAt) {
@@ -99,6 +108,7 @@ public class NotificationCommandService {
                         notificationId ->
                                 deliveryRepository.cancelForNotification(
                                         notificationId, closedAt, "NOTIFICATION_CLOSED"));
+        events.publishEvent(new NotificationChangedEvent(userId));
     }
 
     public void deleteByUserId(long userId) {
@@ -106,5 +116,6 @@ public class NotificationCommandService {
         deliveryRepository.cancelForUser(userId, now, "ACCOUNT_WITHDRAWN");
         subscriptionRepository.deactivateByUserId(userId, now);
         repository.deleteByUserId(userId);
+        events.publishEvent(new NotificationChangedEvent(userId));
     }
 }

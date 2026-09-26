@@ -33,4 +33,5 @@ public record ReportDetailResponse(
         List<Share> eraShares,
         List<Keyword> keywords,
         List<Comparison> comparisons,
-        List<String> highlights) {}
+        List<String> highlights,
+        String analysisScope) {}

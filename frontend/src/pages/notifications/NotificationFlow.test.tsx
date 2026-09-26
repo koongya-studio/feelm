@@ -8,6 +8,7 @@ import FilmPage from '../film/FilmPage';
 import { AuthContext } from '../../contexts/authContext';
 import { testAuth } from '../../test/auth';
 import { ROUTE_PATTERN } from '../../routes/paths';
+import { notifyNotificationChange } from '../../api/notificationStream';
 import type { NotificationItem } from '../../types/notification';
 
 vi.mock('../../api/notifications', () => ({
@@ -30,7 +31,7 @@ vi.mock('../../api/taste', () => ({
 }));
 
 // 파티 초대 수락 알림은 이동 전에 내 파티 목록에서 파티를 찾는다(업무 -866)
-vi.mock('../../api/parties', () => ({ getParty: vi.fn() }));
+vi.mock('../../api/parties', () => ({ getParty: vi.fn(), getMyInvitations: vi.fn() }));
 
 vi.mock('../../api/reports', () => ({
   getLatestReadyReport: vi.fn().mockResolvedValue(null),
@@ -44,7 +45,7 @@ const {
   readAllNotifications,
   readNotification,
 } = await import('../../api/notifications');
-const { getParty } = await import('../../api/parties');
+const { getParty, getMyInvitations } = await import('../../api/parties');
 
 /** 파티 초대 수락 알림이 가리키는 파티. 기본은 참여 중인 활성 파티다 */
 function acceptedParty(status: 'ACTIVE' | 'CLOSED') {
@@ -112,6 +113,21 @@ beforeEach(() => {
   vi.mocked(readNotification).mockReset().mockResolvedValue();
   vi.mocked(readAllNotifications).mockReset().mockResolvedValue();
   vi.mocked(dismissNotification).mockReset().mockResolvedValue();
+  vi.mocked(getMyInvitations)
+    .mockReset()
+    .mockResolvedValue([
+      {
+        invitationId: 501,
+        status: 'PENDING',
+        party: {
+          partyId: 77,
+          name: '테스트',
+          owner: { userId: 7, nickname: '테스트' },
+          memberCount: 1,
+        },
+        createdAt: '2026-09-18T09:00:00Z',
+      },
+    ]);
   vi.mocked(getParty).mockReset().mockResolvedValue(acceptedParty('ACTIVE'));
 });
 
@@ -206,6 +222,12 @@ describe('파티 초대 수락 알림', () => {
     await waitFor(() => expect(location()).toBe('/parties/77/popcorn'));
     // 끝난 파티도 찾아본다. 활성 목록에만 없다고 나간 파티로 볼 수 없다
     expect(getParty).toHaveBeenCalledWith(77, { includeClosed: true });
+    if (status === 'ACTIVE') {
+      fireEvent.click(screen.getByRole('button', { name: '파티로 이동' }));
+      expect(await screen.findByText('파티 상세')).toBeInTheDocument();
+    } else {
+      expect(screen.queryByRole('button', { name: '파티로 이동' })).not.toBeInTheDocument();
+    }
   });
 
   it('끝난 파티면 이동하지 않고 끝났다고 알린다. 알림은 읽음이 된다', async () => {
@@ -282,4 +304,86 @@ describe('8.2 예시', () => {
 
     await waitFor(() => expect(location()).toBe('/watch-records/4004/confirm'));
   });
+});
+
+describe('이미 응답한 초대 알림', () => {
+  beforeEach(() => {
+    vi.mocked(getMyInvitations).mockImplementation(async (status) =>
+      status === 'ACCEPTED'
+        ? [
+            {
+              invitationId: 501,
+              status: 'ACCEPTED',
+              createdAt: '2026-09-18T09:00:00Z',
+              party: {
+                partyId: 77,
+                name: '테스트',
+                owner: { userId: 7, nickname: '테스트' },
+                memberCount: 2,
+              },
+            },
+          ]
+        : [],
+    );
+  });
+
+  it.each([
+    ['ACTIVE', '이미 참여 중인 파티예요.'],
+    ['CLOSED', '이미 끝난 파티예요.'],
+  ] as const)(
+    '%s 파티의 수락한 초대를 현재 상태로 안내하고 읽음 처리한다',
+    async (status, message) => {
+      vi.mocked(getParty).mockResolvedValue(acceptedParty(status));
+      renderApp([ROUTE_PATTERN.notifications]);
+      fireEvent.click(await findRow(invite.title));
+      expect(await screen.findByText(message)).toBeInTheDocument();
+      expect(location()).toBe('/notifications');
+      expect(readNotification).toHaveBeenCalledWith(invite.notificationId);
+      expect(getParty).toHaveBeenCalledWith(77, { includeClosed: true });
+    },
+  );
+
+  it('이미 수락했어도 현재 멤버가 아니면 참여 중으로 안내하지 않는다', async () => {
+    vi.mocked(getParty).mockResolvedValue(null);
+    renderApp([ROUTE_PATTERN.notifications]);
+    fireEvent.click(await findRow(invite.title));
+    expect(await screen.findByText('나갔거나 내보내진 파티예요.')).toBeInTheDocument();
+  });
+
+  it('조회 실패를 파티 종료로 안내하지 않는다', async () => {
+    vi.mocked(getMyInvitations).mockRejectedValue(new Error('network'));
+    renderApp([ROUTE_PATTERN.notifications]);
+    fireEvent.click(await findRow(invite.title));
+    expect(
+      await screen.findByText('초대 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.'),
+    ).toBeInTheDocument();
+  });
+});
+
+it('SSE 갱신 신호로 열린 알림 목록을 다시 조회한다', async () => {
+  vi.mocked(getNotifications).mockResolvedValueOnce([]).mockResolvedValue([invite]);
+  renderApp([ROUTE_PATTERN.notifications]);
+  await waitFor(() => expect(getNotifications).toHaveBeenCalledTimes(1));
+  notifyNotificationChange();
+  expect(await findRow('파티팝콘 초대')).toBeInTheDocument();
+  expect(getNotifications).toHaveBeenLastCalledWith({ fresh: true });
+});
+
+it('SSE 재조회 전에 시작한 응답이 최신 목록을 덮어쓰지 않는다', async () => {
+  let resolve!: (items: NotificationItem[]) => void;
+  vi.mocked(getNotifications)
+    .mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        }),
+    )
+    .mockResolvedValue([invite]);
+  renderApp([ROUTE_PATTERN.notifications]);
+  notifyNotificationChange();
+  expect(await findRow('파티팝콘 초대')).toBeInTheDocument();
+  resolve([]);
+  await waitFor(() =>
+    expect(screen.getByText('새로운 파티팝콘 초대가 도착했어요.')).toBeInTheDocument(),
+  );
 });

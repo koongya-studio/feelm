@@ -89,10 +89,10 @@ public class OnboardingSubmitService {
         if (!choices.isEmpty()) {
             // 카드 수만큼 부르지 않도록 평가 생성 루프 밖에서 한 번만 다시 계산한다(S15P21E106-775).
             tasteAnalysisWriter.refresh(userId, submittedAt);
-            // 선택이 없으면 Consumer가 읽을 행도 없어 Fold-in 입력이 생기지 않는다(이벤트·Redis 계약 7장).
-            kafkaEventPublisher.publish(
-                    KafkaEventType.ONBOARDING, userId, new OnboardingEventPayload(choices.size()));
         }
+        // 빈 선택도 재계산을 시작해야 Consumer가 개인 K0 인기순 후보를 공급한다.
+        kafkaEventPublisher.publish(
+                KafkaEventType.ONBOARDING, userId, new OnboardingEventPayload(choices.size()));
         return new OnboardingSubmitResponse(true, choices.size(), request.skipped());
     }
 

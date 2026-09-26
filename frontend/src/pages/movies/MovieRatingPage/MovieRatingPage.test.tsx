@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import MovieRatingPage from './index';
+import WatchConfirmPage from '../../watch/WatchConfirmPage';
 import { ApiError } from '../../../api/apiError';
 import { ROUTE_PATTERN } from '../../../routes/paths';
 import type { MovieDetail } from '../../../types/movie';
@@ -25,6 +26,8 @@ import type { Rating } from '../../../types/watch';
 vi.mock('../../../api/movies', () => ({ getMovieDetail: vi.fn() }));
 vi.mock('../../../api/otts', () => ({ getOtts: vi.fn() }));
 vi.mock('../../../api/watch', () => ({
+  confirmWatch: vi.fn(),
+  findWatchRecord: vi.fn(),
   createRating: vi.fn(),
   deleteRating: vi.fn(),
   findWatchedRecord: vi.fn(),
@@ -36,6 +39,7 @@ const { getMovieDetail } = await import('../../../api/movies');
 const { getOtts } = await import('../../../api/otts');
 const { createRating, deleteRating, findWatchedRecord, getRatingCounts, updateRating } =
   await import('../../../api/watch');
+const { confirmWatch, findWatchRecord } = await import('../../../api/watch');
 
 /** 아직 평가하지 않은 실제 영화(API-030) */
 const movie: MovieDetail = {
@@ -75,6 +79,39 @@ const created: Rating = {
 };
 
 const counts = { frameCount: 12, popcornCount: 7, weeklyFrameDelta: 3 };
+
+it('알림에서 감상 확인 후 평가를 미루면 알림 목록으로 돌아간다', async () => {
+  vi.mocked(findWatchRecord).mockResolvedValue({
+    watchRecordId: 42,
+    movie: { movieId: 550, title: '파이트 클럽', posterUrl: null },
+    status: 'LINK_CLICKED',
+    ott: null,
+    clickedAt: null,
+    confirmDueAt: null,
+    expiresAt: null,
+    watchedAt: null,
+    ratingId: null,
+  });
+  vi.mocked(confirmWatch).mockResolvedValue({
+    watchRecordId: 42,
+    status: 'WATCHED_UNRATED',
+    watchedAt: '2026-09-26T00:00:00Z',
+  });
+  render(
+    <MemoryRouter initialEntries={['/notifications', '/watch-records/42/confirm']} initialIndex={1}>
+      <Routes>
+        <Route path={ROUTE_PATTERN.notifications} element={<h1>알림 목록</h1>} />
+        <Route path={ROUTE_PATTERN.watchConfirm} element={<WatchConfirmPage />} />
+        <Route path={ROUTE_PATTERN.movieRating} element={<MovieRatingPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  fireEvent.click(await screen.findByRole('button', { name: '봤어요' }));
+  fireEvent.click(await screen.findByRole('button', { name: '나중에 평가하기' }));
+  expect(await screen.findByRole('heading', { name: '알림 목록' })).toBeInTheDocument();
+  expect(confirmWatch).toHaveBeenCalledWith(42, true);
+  expect(createRating).not.toHaveBeenCalled();
+});
 
 beforeEach(() => {
   vi.mocked(getMovieDetail).mockReset().mockResolvedValue(movie);
@@ -427,4 +464,56 @@ describe('2.5 평가 삭제', () => {
     // 화면에 남아 다시 누를 수 있다
     expect(screen.getByRole('button', { name: '평가 삭제' })).toBeInTheDocument();
   });
+});
+
+describe('한줄평 공개 범위', () => {
+  it('새 한줄평은 선택한 공개 값으로 저장한다', async () => {
+    renderPage();
+    await screen.findByRole('slider', { name: '별점' });
+    expect(screen.getByRole('radio', { name: '공개' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('한줄평'), { target: { value: '좋아요' } });
+    expect(screen.getByRole('radio', { name: '비공개' })).toBeChecked();
+    fireEvent.click(screen.getByRole('radio', { name: '공개' }));
+    await rate(4, '좋아요');
+    await waitFor(() =>
+      expect(createRating).toHaveBeenCalledWith(550, {
+        score: 4,
+        comment: '좋아요',
+        visibility: 'PUBLIC',
+        spoiler: false,
+      }),
+    );
+  });
+
+  it.each(['PUBLIC', 'PRIVATE'] as const)(
+    '수정에서 %s를 유지하고 반대 값으로 변경한다',
+    async (original) => {
+      vi.mocked(getMovieDetail).mockResolvedValue({
+        ...movie,
+        myRating: {
+          ratingId: 91,
+          score: 4,
+          comment: '좋아요',
+          visibility: original,
+          spoiler: false,
+        },
+      });
+      renderPage();
+      await screen.findByRole('heading', { name: '평가 수정' });
+      expect(
+        screen.getByRole('radio', { name: original === 'PUBLIC' ? '공개' : '비공개' }),
+      ).toBeChecked();
+      const next = original === 'PUBLIC' ? 'PRIVATE' : 'PUBLIC';
+      fireEvent.click(screen.getByRole('radio', { name: next === 'PUBLIC' ? '공개' : '비공개' }));
+      await rate(4);
+      await waitFor(() =>
+        expect(updateRating).toHaveBeenCalledWith(91, {
+          score: 4,
+          comment: '좋아요',
+          visibility: next,
+          spoiler: false,
+        }),
+      );
+    },
+  );
 });

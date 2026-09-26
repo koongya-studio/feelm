@@ -16,16 +16,15 @@
  *
  * **수정에서는 평가를 지울 수 있다**(업무 -724, API-038). 평가와 프레임이 함께 사라지고 팝콘도
  * 한 알 빠진다. **그 영화는 안 본 것으로 되돌아간다**(업무 -884, ADR-0025) — 서버가 같은
- * 트랜잭션에서 감상 기록을 `EXPIRED`로 옮기므로 2.2의 `최근 본 영화`와 7.1의 `안 남긴 영화`에서
+ * 트랜잭션에서 감상 기록을 `EXPIRED`로 옮기므로 2.2와 7.1의 `최근 본 영화`에서
  * 빠지고 추천 후보로 돌아온다. 확인 창이 그 사실까지 말한다.
  *
  * **감상 취소를 따로 두지 않는다.** 평가 삭제와 나누어 고르게 하면 같은 목적에 선택지가 둘이라
  * 무엇을 눌러야 할지 헷갈린다(사용자 결정 2026-09-25). 점수만 고칠 때는 삭제가 아니라 수정
  * (API-037)을 쓰고, 영화가 별로였을 뿐이면 낮은 점수를 남긴다. 화면이 API-035를 부르지 않는다.
  *
- * 한줄평 공개 범위 선택 UI는 와이어프레임에 없어 만들지 않는다(CR-05). 대신 공통 규약의
- * 기본값인 `PRIVATE`을 붙여 보내고, 그 사실을 화면에 안내한다(팀 결정 2026-09-07).
- * CR-05가 반영되면 이 안내를 선택 컨트롤로 교체한다.
+ * 한줄평 공개 범위는 작성·수정 화면에서 선택한다. 새 글은 비공개로 시작하고,
+ * 수정은 기존 값을 유지한다. 계정의 한줄평 공개 설정도 공개여야 타인에게 표시된다.
  *
  * 이미 평가한 영화로 들어오면 수정이다(업무 -306, API-037). 7.6 · 3.1-A의 `평가 수정`과
  * 2.4의 `내 별점 남기기`가 여기로 온다. 저장 후 2.6 · 2.7이 아니라 온 곳으로 돌아간다.
@@ -39,7 +38,8 @@
  *
  * 영화 정보(API-030, 업무 -475) · 감상 기록(API-034, 업무 -477) · 평가 생성(API-036,
  * 업무 -491) · 평가 수정(API-037, 업무 -213)은 실제 API다. 저장하면 서버가 같은
- * 트랜잭션에서 감상 기록을 `RATED`로 옮기므로 평가한 영화는 7.7 `안 남긴 영화`에서 빠진다.
+ * 트랜잭션에서 감상 기록을 `RATED`로 옮긴다. 7.1 `최근 본 영화`는 `RATED`도 받으므로 평가한
+ * 영화도 그대로 남는다(업무 -919).
  * 목업 목록(7.6)에서 들어오면 그 `movieId`가 실제 DB에 없어 오류 상태가 될 수 있다.
  *
  * 저장 실패는 화면에 남기고 이동하지 않는다. 계약이 가르는 것 중 화면이 달리 말하는 것은
@@ -115,6 +115,7 @@ export default function MovieRatingPage() {
   const [score, setScore] = useState(0);
   const [comment, setComment] = useState('');
   const [spoiler, setSpoiler] = useState(false);
+  const [visibility, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PRIVATE');
   const [submitting, setSubmitting] = useState(false);
   /** 삭제 확인 창이 떠 있는지. 되돌릴 수 없는 동작이라 한 번 묻는다(업무 -724) */
   const [confirming, setConfirming] = useState(false);
@@ -150,6 +151,7 @@ export default function MovieRatingPage() {
           setScore(detail.myRating?.score ?? 0);
           setComment(detail.myRating?.comment ?? '');
           setSpoiler(detail.myRating?.spoiler ?? false);
+          setVisibility(detail.myRating?.visibility ?? 'PRIVATE');
         }
       })
       .catch(() => {
@@ -185,7 +187,7 @@ export default function MovieRatingPage() {
    * 평가 삭제(API-038, 업무 -724).
    *
    * **평가와 프레임이 함께 사라지고 감상 기록도 되돌아간다.** 서버가 한 트랜잭션에서 감상
-   * 기록을 `EXPIRED`로 옮기므로(ADR-0025) 그 영화는 `최근 본 영화` · `안 남긴 영화`에서 빠지고
+   * 기록을 `EXPIRED`로 옮기므로(ADR-0025) 그 영화는 2.2와 7.1의 `최근 본 영화`에서 빠지고
    * 추천 후보로 돌아온다. 화면이 감상 취소를 따로 부르지 않는다 — 삭제 하나가 그 뜻이다.
    * 지운 뒤에는 저장했을 때와 같이 온 곳으로 돌아간다.
    *
@@ -237,13 +239,7 @@ export default function MovieRatingPage() {
         await updateRating(movie.myRating.ratingId, {
           score,
           comment: trimmed || null,
-          /*
-           * 한줄평이 없던 평가는 서버가 주는 `visibility`가 **`null`** 이다(API-030 처리 규칙).
-           * 그 값을 그대로 실어 한줄평을 새로 붙이면 `comment`가 있는데 `visibility`가 없어
-           * 계약상 `400`이다(API-037, 업무 -763). 2.5에는 공개 범위 선택 UI가 없으므로 생성
-           * 경로와 같은 기본값 `PRIVATE`로 채운다(CR-05). 이미 값이 있던 평가는 그대로 둔다.
-           */
-          visibility: movie.myRating.visibility ?? 'PRIVATE',
+          visibility,
           spoiler: trimmed ? spoiler : false,
         });
 
@@ -257,8 +253,8 @@ export default function MovieRatingPage() {
       const counts = await countsRequest.current;
       const rating = await createRating(
         movie.movieId,
-        // comment가 있으면 visibility가 필수다(API-036). 선택 UI가 없어 기본값 PRIVATE
-        trimmed ? { score, comment: trimmed, visibility: 'PRIVATE', spoiler } : { score },
+        // 한줄평이 있으면 선택한 공개 범위를 함께 저장한다(API-036).
+        trimmed ? { score, comment: trimmed, visibility, spoiler } : { score },
       );
 
       /*
@@ -372,13 +368,25 @@ export default function MovieRatingPage() {
             />
             <span>스포일러가 포함되어 있어요</span>
           </label>
-          {comment.trim() ? (
-            <p className={styles.visibilityNote}>
-              {isEditing
-                ? `한줄평은 ${movie.myRating?.visibility === 'PUBLIC' ? '공개' : '비공개'}로 저장돼요 · 공개 범위는 한줄평 관리에서 바꿀 수 있어요`
-                : '한줄평은 비공개로 저장돼요 · 공개 범위 선택은 준비 중이에요'}
-            </p>
-          ) : null}
+          <fieldset className={styles.visibilityControl} disabled={!comment.trim() || submitting}>
+            <legend>한줄평 공개 범위</legend>
+            {(['PRIVATE', 'PUBLIC'] as const).map((value) => (
+              <label key={value} className={styles.spoilerControl}>
+                <input
+                  type="radio"
+                  name="reviewVisibility"
+                  value={value}
+                  checked={visibility === value}
+                  onChange={() => setVisibility(value)}
+                  aria-describedby="review-visibility-note"
+                />
+                <span>{value === 'PUBLIC' ? '공개' : '비공개'}</span>
+              </label>
+            ))}
+          </fieldset>
+          <p id="review-visibility-note" className={styles.visibilityNote}>
+            이 한줄평과 설정의 ‘한줄평 공개’가 모두 공개일 때 다른 사람에게 보여요
+          </p>
         </div>
 
         <div className={styles.actions}>

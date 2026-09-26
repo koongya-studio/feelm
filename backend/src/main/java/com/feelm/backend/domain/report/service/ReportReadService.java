@@ -12,12 +12,7 @@ import com.feelm.backend.global.error.BusinessException;
 import com.feelm.backend.global.error.ErrorCode;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
@@ -33,6 +28,7 @@ public class ReportReadService {
     private final ReportReadRepository repository;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final ReportManualService manualService;
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public ReportListResponse list(long userId) {
@@ -41,22 +37,26 @@ public class ReportReadService {
         List<ReportRow> reports = repository.findAllOwned(userId);
         ReportRow current =
                 reports.stream()
-                        .filter(row -> row.period().equals(latest))
+                        .filter(ReportRow::manual)
                         .findFirst()
-                        .orElse(null);
+                        .orElseGet(
+                                () ->
+                                        reports.stream()
+                                                .filter(row -> row.period().equals(latest))
+                                                .findFirst()
+                                                .orElse(null));
         List<ReportListResponse.Item> items =
                 reports.stream()
                         .filter(row -> "READY".equals(row.status()))
                         .filter(
                                 row ->
                                         row.issuedAt() != null
-                                                || !now.isBefore(row.period().nextPublicationAt()))
+                                                || (!row.manual()
+                                                        && !now.isBefore(
+                                                                row.period().nextPublicationAt())))
                         .map(this::toItem)
                         .toList();
-        boolean preparing =
-                current == null
-                        ? !repository.hasCompletedFinalRun(latest)
-                        : !"READY".equals(current.status());
+        boolean preparing = current != null && !"READY".equals(current.status());
         ReportListResponse.Current currentResponse =
                 current == null
                         ? null
@@ -65,14 +65,15 @@ public class ReportReadService {
                                 current.period(),
                                 current.status(),
                                 current.issuedAt());
-        return new ReportListResponse(items, currentResponse, preparing);
+        return new ReportListResponse(
+                items, currentResponse, preparing, manualService.availability(userId));
     }
 
     public ReportDetailResponse detail(long userId, long reportId) {
         ReportRow row = owned(userId, reportId);
         // Publication is checked first so an unpublished report stays hidden as 404 instead of
         // revealing that it is still generating.
-        if (clock.instant().isBefore(row.period().publicationAt())) {
+        if (!row.manual() && clock.instant().isBefore(row.period().publicationAt())) {
             throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND);
         }
         requireReady(row);
@@ -87,13 +88,14 @@ public class ReportReadService {
                 content.characterCard(),
                 content.flavorChanges(),
                 row.createdAt(),
-                fourCutWithDisplayNames(content),
+                ReportDisplayResolver.fourCut(content, repository),
                 content.genreShares(),
                 content.countryShares(),
                 content.eraShares(),
                 content.keywords(),
                 content.comparisons(),
-                content.highlights());
+                content.highlights(),
+                row.manual() ? "FILM" : "HALF");
     }
 
     @Transactional
@@ -105,8 +107,9 @@ public class ReportReadService {
         }
 
         Instant now = clock.instant();
-        if (now.isBefore(row.period().publicationAt())
-                || !now.isBefore(row.period().nextPublicationAt())) {
+        if (!row.manual()
+                && (now.isBefore(row.period().publicationAt())
+                        || (!row.manual() && !now.isBefore(row.period().nextPublicationAt())))) {
             ReportRow refreshed = owned(userId, reportId);
             if (refreshed.issuedAt() != null) {
                 return new ReportIssueResponse(refreshed.id(), refreshed.issuedAt());
@@ -152,110 +155,5 @@ public class ReportReadService {
         } catch (JacksonException exception) {
             throw new IllegalStateException("Stored report content is invalid", exception);
         }
-    }
-
-    /**
-     * Resolve person display names from the current people table on every read. This both fills old
-     * READY reports and clears a stored value if the person classification is corrected.
-     */
-    private ReportContent.FourCut fourCutWithDisplayNames(ReportContent content) {
-        ReportContent.FourCut fourCut = content.fourCut();
-        if (fourCut == null) {
-            return null;
-        }
-
-        ReportContent.GenreCard genre = genreWithDisplayName(content, fourCut.genre());
-        Map<Long, String> originalNames = originalNames(content, fourCut);
-        ReportContent.DirectorCard director = fourCut.director();
-        if (director != null && leadRank(content.topDirectors(), director.name()) != null) {
-            String displayName =
-                    personDisplayName(content.topDirectors(), director.name(), originalNames);
-            if (!Objects.equals(displayName, director.displayName())) {
-                director =
-                        new ReportContent.DirectorCard(
-                                director.name(), displayName, director.image(), director.work());
-            }
-        }
-        ReportContent.PersonCard actor = fourCut.actor();
-        if (actor != null && leadRank(content.topActors(), actor.name()) != null) {
-            String displayName =
-                    personDisplayName(content.topActors(), actor.name(), originalNames);
-            if (!Objects.equals(displayName, actor.displayName())) {
-                actor = new ReportContent.PersonCard(actor.name(), displayName, actor.image());
-            }
-        }
-
-        if (genre == fourCut.genre()
-                && director == fourCut.director()
-                && actor == fourCut.actor()) {
-            return fourCut;
-        }
-        return new ReportContent.FourCut(genre, director, actor, fourCut.character());
-    }
-
-    private ReportContent.GenreCard genreWithDisplayName(
-            ReportContent content, ReportContent.GenreCard genre) {
-        if (genre == null
-                || !needsDisplayName(genre.displayName())
-                || content.topGenres() == null
-                || content.topGenres().isEmpty()) {
-            return genre;
-        }
-        ReportContent.GenreRank representative = content.topGenres().getFirst();
-        if (!Objects.equals(genre.name(), representative.name())) {
-            return genre;
-        }
-        String displayName = ReportContentAssembler.genreDisplayName(representative.code());
-        return displayName == null
-                ? genre
-                : new ReportContent.GenreCard(genre.name(), displayName, genre.image());
-    }
-
-    /** Looks up both cards at once so a detail read costs at most one extra query. */
-    private Map<Long, String> originalNames(ReportContent content, ReportContent.FourCut fourCut) {
-        Set<Long> personIds = new LinkedHashSet<>();
-        if (fourCut.director() != null) {
-            addLeadPersonId(personIds, content.topDirectors(), fourCut.director().name());
-        }
-        if (fourCut.actor() != null) {
-            addLeadPersonId(personIds, content.topActors(), fourCut.actor().name());
-        }
-        return personIds.isEmpty()
-                ? Map.of()
-                : repository.findOriginalNames(new ArrayList<>(personIds));
-    }
-
-    private void addLeadPersonId(
-            Set<Long> personIds, List<ReportContent.PersonRank> ranks, String cardName) {
-        ReportContent.PersonRank lead = leadRank(ranks, cardName);
-        if (lead != null) {
-            personIds.add(lead.personId());
-        }
-    }
-
-    private String personDisplayName(
-            List<ReportContent.PersonRank> ranks,
-            String cardName,
-            Map<Long, String> originalNames) {
-        ReportContent.PersonRank lead = leadRank(ranks, cardName);
-        if (lead == null) {
-            return null;
-        }
-        return ReportContentAssembler.personDisplayName(
-                cardName, originalNames.get(lead.personId()));
-    }
-
-    /** The four-cut card always shows the top-ranked person, so only that row can identify it. */
-    private ReportContent.PersonRank leadRank(
-            List<ReportContent.PersonRank> ranks, String cardName) {
-        if (ranks == null || ranks.isEmpty()) {
-            return null;
-        }
-        ReportContent.PersonRank lead = ranks.getFirst();
-        return Objects.equals(cardName, lead.name()) ? lead : null;
-    }
-
-    private boolean needsDisplayName(String displayName) {
-        return displayName == null || displayName.isBlank();
     }
 }

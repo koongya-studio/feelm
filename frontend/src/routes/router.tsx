@@ -7,8 +7,8 @@
  * 전부 `RequireAuth` 아래에 있다**(업무 -610, 이동표 `비로그인 ⇢ 0.6`). 비로그인이면 가려던
  * 주소를 들고 0.6으로 가고, 세션을 되살리는 동안은 아무것도 그리지 않는다.
  *
- * 문지기 밖에 있는 것은 셋이다 — 0.x 인증 화면, 앱 진입점 `/`(로그인 전이면 0.1로 보낸다,
- * `HomeEntry`), 없는 경로. 온보딩(1.x)은 회원 API(API-023 · 024 · 027)를 부르므로 안쪽이다.
+ * 공개 프로필(API-062)은 비회원도 볼 수 있어 RequireAuth 밖에 둔다.
+ * 내 프로필 미리보기와 온보딩은 회원 API를 사용하므로 안쪽에 둔다.
  */
 import { createBrowserRouter } from 'react-router';
 import AppLayout from '../layouts/AppLayout';
@@ -70,6 +70,7 @@ import NotFoundPage from '../pages/system/NotFoundPage';
 import WatchConfirmPage from '../pages/watch/WatchConfirmPage';
 import HomeEntry from './HomeEntry';
 import RequireAuth from './RequireAuth';
+import OptionalSession from './OptionalSession';
 import { ROUTE_PATTERN } from './paths';
 
 export const router = createBrowserRouter(
@@ -96,6 +97,15 @@ export const router = createBrowserRouter(
     {
       element: <FullScreenLayout />,
       children: [{ path: ROUTE_PATTERN.notFound, element: <NotFoundPage /> }],
+    },
+    {
+      element: <OptionalSession />,
+      children: [
+        {
+          element: <FullScreenLayout />,
+          children: [{ path: ROUTE_PATTERN.publicProfile, element: <PublicProfilePage /> }],
+        },
+      ],
     },
     {
       element: <RequireAuth />,
@@ -165,7 +175,6 @@ export const router = createBrowserRouter(
             // MY 프로필 (업무 -305). 7.1만 탭 화면이고 나머지는 전체화면이다
             { path: ROUTE_PATTERN.profileEdit, element: <ProfileEditPage /> },
             { path: ROUTE_PATTERN.profilePreview, element: <PublicProfilePage mode="preview" /> },
-            { path: ROUTE_PATTERN.publicProfile, element: <PublicProfilePage /> },
 
             // 설정 하위 화면 (업무 -307). 와이어프레임에 하단 내비가 없다
             { path: ROUTE_PATTERN.accountManage, element: <AccountManagePage /> },

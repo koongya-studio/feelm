@@ -105,12 +105,24 @@ def test_parse_event_rejects_invalid_half_step_score() -> None:
         )
 
 
-def test_parse_event_rejects_empty_onboarding_submission() -> None:
+def test_parse_event_accepts_zero_onboarding() -> None:
+    event = parse_event(
+        b'{"eventId":"123e4567-e89b-12d3-a456-426614174000","userId":7,"eventType":"ONBOARDING","occurredAt":"2026-09-13T00:00:00Z","payload":{"preferenceCount":0}}',
+        pack(">q", 7),
+    )
+    assert event.user_id == 7
+
+
+@pytest.mark.parametrize("payload", [
+    {"preferenceCount": -1}, {"preferenceCount": True}, {"preferenceCount": 0.5}, {},
+])
+def test_parse_event_rejects_invalid_onboarding_count(payload) -> None:
+    import json
+
+    body = {"eventId": "123e4567-e89b-12d3-a456-426614174000", "userId": 7,
+            "eventType": "ONBOARDING", "occurredAt": "2026-09-13T00:00:00Z", "payload": payload}
     with pytest.raises(EventValidationError):
-        parse_event(
-            b'{"eventId":"123e4567-e89b-12d3-a456-426614174000","userId":7,"eventType":"ONBOARDING","occurredAt":"2026-09-13T00:00:00Z","payload":{"preferenceCount":0}}',
-            pack(">q", 7),
-        )
+        parse_event(json.dumps(body).encode(), pack(">q", 7))
 
 
 def test_settings_reports_names_but_not_values() -> None:

@@ -9,7 +9,7 @@
  * 휴대폰에서 2.2로 가는 유일한 상시 진입점이 없어진다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import FilmPage from './index';
 import AppLayout from '../../../layouts/AppLayout';
@@ -27,6 +27,8 @@ vi.mock('../../../api/taste', () => ({
 
 vi.mock('../../../api/reports', () => ({
   getLatestReadyReport: vi.fn(),
+  getMyReports: vi.fn(),
+  generateReport: vi.fn(),
 }));
 
 vi.mock('../../../api/recommendations', () => ({
@@ -50,7 +52,7 @@ vi.mock('../../../api/users', () => ({
 }));
 
 const { getMyFrames, getPopcornBucket } = await import('../../../api/taste');
-const { getLatestReadyReport } = await import('../../../api/reports');
+const { getLatestReadyReport, getMyReports, generateReport } = await import('../../../api/reports');
 const { getRecommendations } = await import('../../../api/recommendations');
 const { getOtts } = await import('../../../api/otts');
 const { getWatchRecords } = await import('../../../api/watch');
@@ -173,6 +175,7 @@ function renderFilm(width: number) {
           <Route element={<AppLayout />}>
             <Route path="/film" element={<FilmPage />} />
           </Route>
+          <Route path="/reports/301/new" element={<h1>생성 결과 인화 화면</h1>} />
         </Routes>
       </MemoryRouter>
     </AuthContext.Provider>,
@@ -183,6 +186,15 @@ beforeEach(() => {
   vi.mocked(getMyFrames).mockReset().mockResolvedValue(frames);
   vi.mocked(getPopcornBucket).mockReset().mockResolvedValue(bucket);
   vi.mocked(getLatestReadyReport).mockReset().mockResolvedValue(null);
+  vi.mocked(getMyReports)
+    .mockReset()
+    .mockResolvedValue({ items: [], current: null, preparing: false });
+  vi.mocked(generateReport).mockReset().mockResolvedValue({
+    reportId: 301,
+    createdAt: '2026-09-26T12:00:00Z',
+    reused: false,
+    issuedAt: null,
+  });
   vi.mocked(getRecommendations).mockReset().mockResolvedValue(recommendations);
   vi.mocked(getOtts).mockReset().mockResolvedValue([]);
   vi.mocked(getWatchRecords).mockReset().mockResolvedValue(pendingWatch);
@@ -195,6 +207,12 @@ afterEach(() => {
 });
 
 describe('FilmPage 데스크톱 시안', () => {
+  it.each([1100, 1440])('%spx에서 상시 버튼이 실제 생성 결과로 이동한다', async (width) => {
+    renderFilm(width);
+    fireEvent.click(await screen.findByRole('button', { name: '리포트 뽑기' }));
+    expect(await screen.findByRole('heading', { name: '생성 결과 인화 화면' })).toBeInTheDocument();
+    expect(generateReport).toHaveBeenCalledTimes(1);
+  });
   it('필름 아래에 오늘의 추천 카드를 세운다', async () => {
     renderFilm(1440);
 

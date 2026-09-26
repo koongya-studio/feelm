@@ -311,10 +311,9 @@ describe('RecommendationsPage 데스크톱 시안', () => {
   it('숨겨 두었던 화면 제목과 오늘 날짜를 드러낸다', async () => {
     renderRecommendations(1440);
 
-    expect(await screen.findByRole('heading', { level: 1, name: '오늘의 추천' })).toBeVisible();
-    // 제목은 곧바로 그려지지만 날짜는 API-045 `generatedAt`이 반영된 뒤에 그려진다. 제목만
-    // 기다리고 날짜를 바로 찾으면 부하가 걸린 전체 실행에서 응답보다 먼저 검사해 깨진다
+    // 첫 조회 중 로딩 안내가 표시되므로 추천 응답의 날짜가 도착한 뒤 완료 화면을 확인한다.
     expect(await screen.findByText('9월 16일 (수)')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: '오늘의 추천' })).toBeVisible();
   });
 
   it('우측 보조 패널에 추천 기준과 최근 본 영화를 보낸다', async () => {

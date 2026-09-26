@@ -8,17 +8,16 @@
  * - API-014 · API-015 · API-016 · API-019 · API-062 · API-081 · API-082는 실제로 부른다. 공개
  *   프로필(API-062)은 업무 -810, 프로필 사진(API-081 · 082)은 업무 -762에서 목업을 걷어냈다
  * - 자기소개 · 항목별 공개 여부는 **계약에 아예 없다**(업무 -616, `types/unspecified.ts`).
- *   세션 저장소에만 남는다. 내 프로필의 키워드 · 필름 목록도 목업 기준값에서 온다 — 내
- *   `publicId`를 알 길이 없어 내 공개 프로필을 부를 수 없다
+ *   세션 저장소에만 남는다. 내 프로필의 키워드 · 필름 목록은 API-040 · API-042로 받는다
  */
 import { mockMyProfileView } from '../mocks/publicProfiles';
 import { getProfileExtras, saveProfileExtras } from '../mocks/sessionStore';
-import { getMyTaste } from './taste';
+import { getMyFrames, getMyTaste } from './taste';
 import { readAsDataUrl } from '../utils/avatarImage';
 import { request } from './client';
 import { getMockProfile, isMockSession, saveMockProfile } from './mockAccount';
 import { respond, respondError } from './mockTransport';
-import type { TasteAnalysis, TasteKeyword } from '../types/taste';
+import type { FrameSummary, TasteAnalysis, TasteKeyword } from '../types/taste';
 import type { ProfileExtrasUpdate, ProfileView } from '../types/unspecified';
 import type {
   MyProfile,
@@ -119,7 +118,7 @@ export const BIO_MAX_LENGTH = 40;
 /**
  * 내 프로필 전체(7.1 · 7.2). 모든 키워드 · 필름이 `isPublic`과 함께 온다.
  *
- * 닉네임 · 사진과 프레임 · 팝콘 수는 **실제 API-014**, 취향 키워드는 **실제 API-040**이다
+ * 닉네임 · 사진과 프레임 · 팝콘 수는 **실제 API-014**, 키워드는 **API-040**, 필름은 **API-042**다
  * (업무 S15P21E106-836). 나머지는 목업 기준값(`mockMyProfileView`)에 바꾼 소개 · 공개 항목을
  * 덮는다 — 그 둘은 계약에 자리가 없어 이번 세션의 목업 저장소에서 온다.
  *
@@ -133,21 +132,45 @@ export const BIO_MAX_LENGTH = 40;
 export async function getMyProfileView(
   taste?: Promise<TasteAnalysis | null>,
 ): Promise<ProfileView> {
-  const [profile, analysis] = await Promise.all([
+  const [profile, analysis, frames] = await Promise.all([
     getMyProfile(),
     taste ?? getMyTaste().catch(() => null),
+    getProfileFrames(),
   ]);
 
-  return respond(toProfileView(profile, analysis?.keywords ?? []), 'users');
+  return respond(toProfileView(profile, analysis?.keywords ?? [], frames), 'users');
 }
 
-function toProfileView(profile: MyProfile, keywords: TasteKeyword[]): ProfileView {
+/** 공개할 영화를 고르도록 최신순의 모든 페이지를 받는다. 실패는 화면으로 전달한다. */
+async function getProfileFrames(): Promise<FrameSummary[]> {
+  const frames: FrameSummary[] = [];
+  const cursors = new Set<string>();
+  let cursor: string | undefined;
+
+  for (;;) {
+    const page = await getMyFrames(cursor);
+    frames.push(...page.items);
+    if (!page.hasNext) return frames;
+    if (!page.nextCursor || cursors.has(page.nextCursor)) {
+      throw new Error('필름 목록의 다음 페이지를 확인하지 못했어요');
+    }
+    cursors.add(page.nextCursor);
+    cursor = page.nextCursor;
+  }
+}
+
+function toProfileView(
+  profile: MyProfile,
+  keywords: TasteKeyword[],
+  frames: FrameSummary[],
+): ProfileView {
   const extras = getProfileExtras();
   const base = mockMyProfileView;
 
   return {
     ...base,
     userId: profile.userId,
+    publicId: profile.publicId,
     nickname: profile.nickname,
     avatarUrl: profile.avatarUrl,
     bio: extras.bio ?? base.bio,
@@ -162,9 +185,12 @@ function toProfileView(profile: MyProfile, keywords: TasteKeyword[]): ProfileVie
       // 기본을 비공개로 두면 서버가 새로 만들어 준 키워드가 공개 프로필 어디에도 안 보인다.
       isPublic: extras.publicKeywordCodes?.includes(keyword.code) ?? true,
     })),
-    frames: base.frames.map((frame) => ({
-      ...frame,
-      isPublic: extras.publicFrameIds?.includes(frame.frameId) ?? frame.isPublic,
+    frames: frames.map((frame) => ({
+      frameId: frame.frameId,
+      movieId: frame.movie.movieId,
+      title: frame.movie.title,
+      posterUrl: frame.movie.posterUrl,
+      isPublic: extras.publicFrameIds?.includes(frame.frameId) ?? true,
     })),
     hidden: hiddenSections(profile),
   };
@@ -271,8 +297,8 @@ function toPublicProfileView(response: PublicProfile): ProfileView {
  * 7.2-A 내 공개 프로필 미리보기. **7.2-B와 같은 공개 모양**(`toPublicView`)으로 준다.
  *
  * 내 프로필(API-014 + 목업 기준값)을 한 번 받아 줄인다. 본래는 내 `publicId`로 API-062를
- * 부르면 되지만, `publicId`를 알려 주는 API가 아직 없다(업무 -810). 생기면 이 본문을
- * `getPublicProfile(내 publicId)`로 바꾼다.
+ * 부를 수도 있지만, 서버의 본인 조회는 비공개 구역도 반환하므로 미리보기는 공개 범위를
+ * 적용하는 이 변환을 유지한다.
  */
 export async function getMyPublicProfile(): Promise<ProfileView> {
   return toPublicView(await getMyProfileView());
@@ -289,11 +315,15 @@ export async function updateProfileExtras(update: ProfileExtrasUpdate): Promise<
     return respondError(400, 'VALIDATION_FAILED', `소개는 ${BIO_MAX_LENGTH}자까지 쓸 수 있어요.`);
   }
 
-  const [profile, taste] = await Promise.all([getMyProfile(), getMyTaste().catch(() => null)]);
+  const [profile, taste, frames] = await Promise.all([
+    getMyProfile(),
+    getMyTaste().catch(() => null),
+    getProfileFrames(),
+  ]);
 
   saveProfileExtras(update);
 
-  return respond(toProfileView(profile, taste?.keywords ?? []), 'users');
+  return respond(toProfileView(profile, taste?.keywords ?? [], frames), 'users');
 }
 
 /**

@@ -16,6 +16,8 @@
 import { useContext, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
+import { retryNotificationQuery } from '../../api/notificationRetry';
+import { useNotificationRevision } from '../../hooks/useNotificationRevision';
 import { getUnreadNotificationCount } from '../../api/notifications';
 import { DesktopSearchContext } from '../../contexts/desktopSearchContext';
 import { path } from '../../routes/paths';
@@ -30,11 +32,13 @@ export default function DesktopTopBar() {
   const onSearchPage = location.pathname === path.search() && desktopSearch !== null;
   const keyword = onSearchPage ? (desktopSearch?.keyword ?? '') : entryKeyword;
   const [unread, setUnread] = useState(0);
+  const revision = useNotificationRevision();
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
 
-    getUnreadNotificationCount()
+    retryNotificationQuery(getUnreadNotificationCount, controller.signal)
       .then((count) => {
         if (active) setUnread(count);
       })
@@ -42,8 +46,9 @@ export default function DesktopTopBar() {
 
     return () => {
       active = false;
+      controller.abort();
     };
-  }, []);
+  }, [revision]);
 
   /** 다른 화면에서는 Enter로 탐색 화면에 들어간다. 탐색 화면에서는 현재 필터를 보존해 제출한다. */
   function onSubmit(event: FormEvent<HTMLFormElement>) {

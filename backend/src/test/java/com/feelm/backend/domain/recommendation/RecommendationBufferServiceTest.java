@@ -862,7 +862,8 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
                         """
                         {"reasons":[{"code":"DISCOVERY_AGGREGATE_AFFINITY",
                         "directionSource":"RATING","topContributors":[{"movieId":55,
-                        "relation":"POSITIVE_ALIGNMENT"}],"topContributionCoverage":0.5}]}
+                        "relation":"POSITIVE_ALIGNMENT"}],"topContributionCoverage":0.5,
+                        "viewedCountInGroup":1}]}
                         """),
                 candidate(
                         102,
@@ -884,6 +885,115 @@ class RecommendationBufferServiceTest extends SharedPostgresContractTest {
         assertThat(summaries)
                 .containsExactly(
                         "좋아하신 영화 'movie-55'을 바탕으로 골랐어요.", "새로운 영화를 만나보세요.", "새로운 영화를 만나보세요.");
+    }
+
+    @Test
+    @DisplayName("취향 발견은 사용자가 실제로 좋아한 기여 영화를 그룹 단위 문구로 말한다 (S15P21E106-925)")
+    void rendersDiscoveryReasonFromVerifiedPositiveContributor() {
+        movies(55, 56, 101, 102, 103, 104);
+        rating(USER, 55, "4.5");
+        rating(USER, 56, "2.0");
+        rating(USER, 104, "5.0");
+        candidates(
+                candidate(
+                        101,
+                        "4.0",
+                        "DISCOVERY",
+                        null,
+                        """
+                        {"reasons":[{"code":"DISCOVERY_AGGREGATE_AFFINITY",
+                        "directionSource":"RATING","contributorCount":2,"topContributors":[
+                        {"movieId":55,"relation":"POSITIVE_ALIGNMENT"},
+                        {"movieId":56,"relation":"NEGATIVE_CONTRAST"}],
+                        "topContributionCoverage":0.8,"viewedCountInGroup":1,
+                        "affinityRank":1,"popularityRankInGroup":2}]}
+                        """),
+                candidate(
+                        102,
+                        "3.0",
+                        "DISCOVERY",
+                        null,
+                        """
+                        {"reasons":[{"code":"DISCOVERY_AGGREGATE_AFFINITY",
+                        "directionSource":"RATING","contributorCount":1,"topContributors":[
+                        {"movieId":56,"relation":"POSITIVE_ALIGNMENT"}],
+                        "topContributionCoverage":1.0,"viewedCountInGroup":0,
+                        "affinityRank":2,"popularityRankInGroup":1}]}
+                        """),
+                candidate(
+                        103,
+                        "2.0",
+                        "DISCOVERY",
+                        null,
+                        """
+                        {"reasons":[{"code":"DISCOVERY_AGGREGATE_AFFINITY",
+                        "directionSource":"RATING","contributorCount":9,"topContributors":[
+                        {"movieId":55,"relation":"POSITIVE_ALIGNMENT"}],
+                        "topContributionCoverage":0.3,"viewedCountInGroup":2,
+                        "affinityRank":3,"popularityRankInGroup":4}]}
+                        """));
+
+        long setId = service.createBuffer(USER).recommendationSetId();
+        List<String> summaries =
+                jdbc.queryForList(
+                        "SELECT reason->>'summary' FROM recommendation_items WHERE set_id=?"
+                                + " ORDER BY movie_id",
+                        String.class,
+                        setId);
+        // 56은 2.0으로 평가해 좋아한 영화가 아니다. 근거로 쓰지 않고 일반 문구로 둔다.
+        // 103은 좋아한 영화가 확인되지만 기여가 퍼져 있어(coverage 0.3) 영화명 대신 전체 이력으로 말한다
+        assertThat(summaries)
+                .containsExactly(
+                        "'movie-55'를 좋아하셨다면 도전해 볼 만해요.",
+                        "새로운 영화를 만나보세요.",
+                        "좋아하신 영화들을 보면 도전해 볼 만해요.");
+
+        // 추천 영화 자신은 5.0으로 평가했어도 기여 근거로 쓰지 않는다. 평가한 영화는 후보에서 빠지므로 조회 조건을 직접 확인한다
+        assertThat(reasonRepository.findPositiveRatedMovieTitleBeforeInsert(USER, 101, 104))
+                .contains("movie-104");
+        assertThat(reasonRepository.findPositiveRatedMovieTitleBeforeInsert(USER, 104, 104))
+                .isEmpty();
+
+        // 저장 뒤 보강 경로는 항목이 속한 개인 세트의 소유자로 같은 평가를 다시 확인한다
+        long itemId =
+                jdbc.queryForObject(
+                        "SELECT id FROM recommendation_items WHERE set_id=? AND movie_id=101",
+                        Long.class,
+                        setId);
+        assertThat(reasonRepository.findOwnerPositiveRatedMovieTitle(itemId, 55))
+                .contains("movie-55");
+        assertThat(reasonRepository.findOwnerPositiveRatedMovieTitle(itemId, 56)).isEmpty();
+        assertThat(reasonRepository.findOwnerPositiveRatedMovieTitle(itemId, 101)).isEmpty();
+        long selfItemId =
+                jdbc.queryForObject(
+                        "INSERT INTO recommendation_items(set_id,movie_id,type,position,reason)"
+                                + " VALUES (?,104,'DISCOVERY',99,'{}'::jsonb) RETURNING id",
+                        Long.class,
+                        setId);
+        assertThat(reasonRepository.findOwnerPositiveRatedMovieTitle(itemId, 104))
+                .contains("movie-104");
+        assertThat(reasonRepository.findOwnerPositiveRatedMovieTitle(selfItemId, 104)).isEmpty();
+
+        // 파티 세트 항목은 파티장이 좋아한 영화라도 개인 평가 근거로 쓰지 않는다
+        long partyId =
+                jdbc.queryForObject(
+                        "INSERT INTO parties(name,owner_id,status) VALUES ('party',?,'ACTIVE')"
+                                + " RETURNING id",
+                        Long.class,
+                        USER);
+        long partySetId =
+                jdbc.queryForObject(
+                        "INSERT INTO recommendation_sets(party_id,input_version,model_version,"
+                                + "generated_at) VALUES (?,'party','v1',now()) RETURNING id",
+                        Long.class,
+                        partyId);
+        long partyItemId =
+                jdbc.queryForObject(
+                        "INSERT INTO recommendation_items(set_id,movie_id,type,position,reason)"
+                                + " VALUES (?,101,'PARTY',1,'{}'::jsonb) RETURNING id",
+                        Long.class,
+                        partySetId);
+        assertThat(reasonRepository.findOwnerPositiveRatedMovieTitle(partyItemId, 55)).isEmpty();
     }
 
     @Test

@@ -68,9 +68,6 @@ type Props = {
 /** 시안의 사진 크기. 편집은 `사진 변경` 띠가 들어가도록 조금 크다 */
 const AVATAR_SIZE: Record<ProfileMode, number> = { view: 88, edit: 104, public: 88, preview: 88 };
 
-/** 채운 칩으로 두는 대표 키워드 수. 시안이 앞의 둘을 채웠다(`Chip` `solid`의 용법) */
-const LEADING_KEYWORDS = 2;
-
 /** 팝콘 버킷 카드의 통 폭 */
 const BUCKET_WIDTH = 120;
 
@@ -129,9 +126,9 @@ function Keywords({ profile }: { profile: ProfileView }) {
 
   return (
     <ul className={styles.chips}>
-      {shown.map((keyword, index) => (
+      {shown.map((keyword) => (
         <li key={keyword.code}>
-          <Chip variant={index < LEADING_KEYWORDS ? 'solid' : 'outline'}>{keyword.label}</Chip>
+          <Chip hashtag>{keyword.label}</Chip>
         </li>
       ))}
     </ul>

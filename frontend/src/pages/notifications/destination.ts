@@ -1,5 +1,5 @@
 /* 알림이 여는 화면 (업무 S15P21E106-537). */
-import { getParty } from '../../api/parties';
+import { getMyInvitations, getParty } from '../../api/parties';
 import { path } from '../../routes/paths';
 import type { NotificationItem } from '../../types/notification';
 
@@ -27,9 +27,36 @@ export function notificationPath(item: NotificationItem): string {
  * 찾아보고, 못 가면 머문 채 까닭을 말한다.
  *
  * 목록을 못 받으면 가려내지 못한 것이지 갈 수 없는 것이 아니다 — 그때는 이동하고 5.8이
- * 제 오류를 보인다. 다른 알림(초대 · 감상 확인 · 리포트)은 도착 화면이 제 상태를 가른다.
+ * 제 오류를 보인다. 초대 알림은 API-052의 응답 이력과 현재 파티 상태를 대조한다.
+ * 이력이 없다는 이유만으로 파티가 종료됐다고 판단하지 않는다.
  */
-export async function unavailableReason(item: NotificationItem): Promise<string | null> {
+export async function unavailableReason(
+  item: NotificationItem,
+): Promise<{ message: string; partyPath?: string } | null> {
+  if (item.targetType === 'PARTY_INVITATION') {
+    try {
+      const pending = await getMyInvitations();
+      if (pending.some((invitation) => invitation.invitationId === item.targetId)) return null;
+
+      const accepted = await getMyInvitations('ACCEPTED');
+      const invitation = accepted.find((value) => value.invitationId === item.targetId);
+      if (invitation) {
+        const party = await getParty(invitation.party.partyId, { includeClosed: true });
+        if (party === null) return { message: '나갔거나 내보내진 파티예요.' };
+        return party.status === 'ACTIVE'
+          ? { message: '이미 참여 중인 파티예요.', partyPath: path.partyPopcorn(party.partyId) }
+          : { message: '이미 끝난 파티예요.' };
+      }
+
+      const declined = await getMyInvitations('DECLINED');
+      if (declined.some((value) => value.invitationId === item.targetId)) {
+        return { message: '이미 거절한 초대예요.' };
+      }
+      return { message: '초대가 만료됐거나 더 이상 유효하지 않아요.' };
+    } catch {
+      return { message: '초대 상태를 확인하지 못했어요. 잠시 후 다시 시도해 주세요.' };
+    }
+  }
   if (item.targetType !== 'PARTY') return null;
 
   let party: Awaited<ReturnType<typeof getParty>>;
@@ -40,8 +67,8 @@ export async function unavailableReason(item: NotificationItem): Promise<string 
     return null;
   }
 
-  if (party === null) return '나갔거나 내보내진 파티예요.';
-  if (party.status === 'CLOSED') return '이미 끝난 파티예요.';
+  if (party === null) return { message: '나갔거나 내보내진 파티예요.' };
+  if (party.status === 'CLOSED') return { message: '이미 끝난 파티예요.' };
 
   return null;
 }

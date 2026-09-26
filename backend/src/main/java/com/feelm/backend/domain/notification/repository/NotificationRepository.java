@@ -182,6 +182,16 @@ public class NotificationRepository {
                           AND dismissed_at IS NULL
                           AND notified_at <= :now
                           AND expires_at > :now
+                          AND (type <> 'WATCH_CONFIRM' OR NOT EXISTS (
+                              SELECT 1 FROM watch_records watch
+                              WHERE watch.id = notifications.source_id
+                                AND watch.user_id = notifications.user_id
+                                AND (watch.status <> 'LINK_CLICKED' OR EXISTS (
+                                    SELECT 1 FROM ratings rating
+                                    WHERE rating.user_id = watch.user_id
+                                      AND rating.movie_id = watch.movie_id
+                                ))
+                          ))
                         """);
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("userId", userId);
@@ -198,6 +208,23 @@ public class NotificationRepository {
         return jdbc.sql(sql.toString()).params(parameters).query(this::mapRow).list();
     }
 
+    /** 노출 시점·읽음·내용 변경을 포함한 연결 복구용 지문. 알림 본문은 스트림에 싣지 않는다. */
+    public String streamVersion(long userId, Instant now) {
+        return jdbc.sql(
+                        """
+                SELECT md5(COALESCE(string_agg(
+                    id::text || ':' || updated_at::text || ':' || COALESCE(read_at::text, ''),
+                    ',' ORDER BY id), ''))
+                FROM notifications
+                WHERE user_id = :userId AND closed_at IS NULL AND dismissed_at IS NULL
+                    AND notified_at <= :now AND expires_at > :now
+                """)
+                .param("userId", userId)
+                .param("now", offset(now))
+                .query(String.class)
+                .single();
+    }
+
     public long countUnread(long userId, Instant now) {
         return jdbc.sql(
                         """
@@ -209,6 +236,16 @@ public class NotificationRepository {
                           AND dismissed_at IS NULL
                           AND notified_at <= :now
                           AND expires_at > :now
+                          AND (type <> 'WATCH_CONFIRM' OR NOT EXISTS (
+                              SELECT 1 FROM watch_records watch
+                              WHERE watch.id = notifications.source_id
+                                AND watch.user_id = notifications.user_id
+                                AND (watch.status <> 'LINK_CLICKED' OR EXISTS (
+                                    SELECT 1 FROM ratings rating
+                                    WHERE rating.user_id = watch.user_id
+                                      AND rating.movie_id = watch.movie_id
+                                ))
+                          ))
                         """)
                 .param("userId", userId)
                 .param("now", offset(now))
@@ -227,6 +264,16 @@ public class NotificationRepository {
                                   AND dismissed_at IS NULL
                                   AND notified_at <= :readAt
                                   AND expires_at > :readAt
+                                  AND (type <> 'WATCH_CONFIRM' OR NOT EXISTS (
+                                      SELECT 1 FROM watch_records watch
+                                      WHERE watch.id = notifications.source_id
+                                        AND watch.user_id = notifications.user_id
+                                        AND (watch.status <> 'LINK_CLICKED' OR EXISTS (
+                                            SELECT 1 FROM ratings rating
+                                            WHERE rating.user_id = watch.user_id
+                                              AND rating.movie_id = watch.movie_id
+                                        ))
+                                  ))
                                 """)
                         .param("readAt", offset(readAt))
                         .param("notificationId", notificationId)
@@ -246,6 +293,16 @@ public class NotificationRepository {
                           AND dismissed_at IS NULL
                           AND notified_at <= :readAt
                           AND expires_at > :readAt
+                          AND (type <> 'WATCH_CONFIRM' OR NOT EXISTS (
+                              SELECT 1 FROM watch_records watch
+                              WHERE watch.id = notifications.source_id
+                                AND watch.user_id = notifications.user_id
+                                AND (watch.status <> 'LINK_CLICKED' OR EXISTS (
+                                    SELECT 1 FROM ratings rating
+                                    WHERE rating.user_id = watch.user_id
+                                      AND rating.movie_id = watch.movie_id
+                                ))
+                          ))
                         """)
                 .param("readAt", offset(readAt))
                 .param("userId", userId)
@@ -266,6 +323,16 @@ public class NotificationRepository {
                                           closed_at IS NULL
                                           AND notified_at <= :dismissedAt
                                           AND expires_at > :dismissedAt
+                                          AND (type <> 'WATCH_CONFIRM' OR NOT EXISTS (
+                                              SELECT 1 FROM watch_records watch
+                                              WHERE watch.id = notifications.source_id
+                                                AND watch.user_id = notifications.user_id
+                                                AND (watch.status <> 'LINK_CLICKED' OR EXISTS (
+                                                    SELECT 1 FROM ratings rating
+                                                    WHERE rating.user_id = watch.user_id
+                                                      AND rating.movie_id = watch.movie_id
+                                                ))
+                                          ))
                                       )
                                   )
                                 """)

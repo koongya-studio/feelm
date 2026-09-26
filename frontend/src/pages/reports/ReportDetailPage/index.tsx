@@ -52,6 +52,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import Chip from '../../../components/Chip';
+import { ShareIcon } from '../../../components/Icon';
 import MeterRow from '../../../components/MeterRow';
 import ReportFourCut from '../../../components/ReportFourCut';
 import type { ReportCutKind } from '../../../components/ReportFourCut';
@@ -493,10 +494,24 @@ export default function ReportDetailPage() {
           <p className={styles.shareHint}>공유 이미지에는 닉네임과 취향 정보가 담겨요</p>
           <div className={styles.actions}>
             <Button variant="secondary" disabled={saving || sharing} onClick={() => void save()}>
-              저장
+              <span className={styles.actionLabel}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path
+                    d="M12 3v12m-4-4 4 4 4-4M5 15v5h14v-5"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                저장
+              </span>
             </Button>
             <Button disabled={saving || sharing} onClick={() => void share()}>
-              공유하기
+              <span className={styles.actionLabel}>
+                <ShareIcon />
+                공유하기
+              </span>
             </Button>
           </div>
         </div>
@@ -547,8 +562,18 @@ function cutBacks(report: ReportDetail): Partial<Record<ReportCutKind, ReactNode
 
     character: hasCharacter ? (
       <Back>
-        {report.characterCard ? <CharacterGroup card={report.characterCard} /> : null}
-        {report.comparisons.length > 0 ? <ComparisonGroup items={report.comparisons} /> : null}
+        {report.characterCard ? (
+          <CharacterGroup
+            card={report.characterCard}
+            cumulative={report.analysisScope === 'FILM'}
+          />
+        ) : null}
+        {report.comparisons.length > 0 ? (
+          <ComparisonGroup
+            items={report.comparisons}
+            cumulative={report.analysisScope === 'FILM'}
+          />
+        ) : null}
       </Back>
     ) : undefined,
   };
@@ -575,10 +600,18 @@ function KeywordGroup({ keywords }: { keywords: ReportKeyword[] }) {
   );
 }
 
-function ComparisonGroup({ items }: { items: ReportComparison[] }) {
+function ComparisonGroup({
+  items,
+  cumulative,
+}: {
+  items: ReportComparison[];
+  cumulative: boolean;
+}) {
   return (
     <div className={styles.group}>
-      <h3 className={styles.groupLabel}>지난 반기와 비교</h3>
+      <h3 className={styles.groupLabel}>
+        {cumulative ? '지난 리포트와 비교' : '지난 반기와 비교'}
+      </h3>
       <ul className={styles.compares}>
         {items.map((item) => (
           <li key={item.label} className={styles.compare}>
@@ -603,7 +636,7 @@ function ComparisonGroup({ items }: { items: ReportComparison[] }) {
  * 축은 두 값 중 하나라서 **크기가 없다.** 퍼센트 막대(`MeterRow`)를 쓰면 없는 수치를
  * 만들어 내므로, 양쪽 끝을 나란히 두고 고른 쪽만 강조한다.
  */
-function CharacterGroup({ card }: { card: ReportCharacterCard }) {
+function CharacterGroup({ card, cumulative }: { card: ReportCharacterCard; cumulative: boolean }) {
   return (
     <div className={styles.group}>
       <h3 className={styles.groupLabel}>캐릭터</h3>
@@ -624,7 +657,9 @@ function CharacterGroup({ card }: { card: ReportCharacterCard }) {
 
       {/* 프레임 10편 미만은 표본이 적다. 카드는 그대로 주고 기준 편수를 함께 알린다 */}
       {card.basis.lowSample ? (
-        <p className={styles.cardBasis}>이번 반기 {card.basis.frameCount}편을 기준으로 뽑았어요</p>
+        <p className={styles.cardBasis}>
+          {cumulative ? '전체 필름' : '이번 반기'} {card.basis.frameCount}편을 기준으로 뽑았어요
+        </p>
       ) : null}
     </div>
   );

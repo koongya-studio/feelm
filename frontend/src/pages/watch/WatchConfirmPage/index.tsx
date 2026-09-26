@@ -6,11 +6,9 @@
  * (업무 -308에서 이었다).
  * 2.4에서 OTT 링크를 누르면 감상 기록이 만들어지고 이 화면으로 이어진다.
  *
- * 선택지는 계약에 맞춰 두 개다(screen-spec.md 8.1 #5). API-035는 `watched` 하나만
- * 받으므로 `봤어요`(true → `WATCHED_UNRATED`)와 `보지 않을래요`(false → `EXPIRED`)만
- * 구현한다. 와이어프레임의 `아직 못 봤어요`는 대응 값이 없다. 응답하지 않고 화면을
- * 벗어나면 상태가 `LINK_CLICKED`로 남고 7일 뒤 서버가 `EXPIRED`로 바꾸므로, 그 의도는
- * 기본 동작이 대신한다. 하단 안내 문구도 두 선택지에 맞춰 줄였다.
+ * `봤어요`와 `보지 않을래요`는 API-035로 확정한다. `아직 못 봤어요`는 API 호출 없이
+ * 알림 목록으로 돌아간다. `LINK_CLICKED`와 기존 7일 만료 기한은 그대로 유지하며,
+ * 재알림이나 만료 연장을 약속하지 않는다.
  *
  * **감상 기록도 확인 응답도 실제 API다**(업무 -477, API-034 · API-035). 계약에 단건
  * 조회가 없어 목록에서 번호로 찾는다(`api/watch.ts`).
@@ -29,6 +27,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import Poster from '../../../components/Poster';
+import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import { ApiError } from '../../../api/apiError';
 import { confirmWatch, findWatchRecord } from '../../../api/watch';
@@ -73,6 +72,15 @@ async function loadConfirmView(watchRecordId: number): Promise<ConfirmView | nul
 }
 
 export default function WatchConfirmPage() {
+  return (
+    <>
+      <ScreenHeader title="감상 확인" />
+      <WatchConfirmContent />
+    </>
+  );
+}
+
+function WatchConfirmContent() {
   const { watchRecordId } = useParams();
   const navigate = useNavigate();
 
@@ -141,7 +149,8 @@ export default function WatchConfirmPage() {
     }
 
     if (watched) {
-      void navigate(path.movieRating(movie.movieId));
+      // 완료된 감상 확인을 대체해 평가를 미뤄도 이 화면으로 돌아오지 않는다.
+      void navigate(path.movieRating(movie.movieId), { replace: true });
 
       return;
     }
@@ -153,11 +162,7 @@ export default function WatchConfirmPage() {
   if (failed) {
     return (
       <div className={styles.page}>
-        <StatusView
-          titleAs="h1"
-          title="감상 기록을 불러오지 못했어요"
-          description="잠시 문제가 생겼어요"
-        >
+        <StatusView title="감상 기록을 불러오지 못했어요" description="잠시 문제가 생겼어요">
           <Button onClick={retry}>다시 시도</Button>
 
           <Button variant="text" onClick={() => void navigate(path.film())}>
@@ -173,7 +178,6 @@ export default function WatchConfirmPage() {
     return (
       <div className={styles.page}>
         <StatusView
-          titleAs="h1"
           title="감상 기록을 찾을 수 없어요"
           description="주소가 잘못되었거나 이미 정리된 기록이에요"
         >
@@ -192,7 +196,6 @@ export default function WatchConfirmPage() {
       <div className={styles.page}>
         <StatusView
           variant="empty"
-          titleAs="h1"
           title="이미 답한 감상이에요"
           description={
             movie.watched
@@ -237,11 +240,19 @@ export default function WatchConfirmPage() {
         ) : null}
       </div>
 
-      <h1 className={styles.question}>이 영화, 잘 보셨나요?</h1>
+      <h2 className={styles.question}>이 영화, 잘 보셨나요?</h2>
 
       <div className={styles.actions}>
-        <Button disabled={submitting} onClick={() => void respond(true)}>
+        <Button variant="brand" disabled={submitting} onClick={() => void respond(true)}>
           봤어요
+        </Button>
+
+        <Button
+          variant="secondary"
+          disabled={submitting}
+          onClick={() => void navigate(path.notifications(), { replace: true })}
+        >
+          아직 못 봤어요
         </Button>
 
         <Button variant="text" disabled={submitting} onClick={() => void respond(false)}>
@@ -256,9 +267,9 @@ export default function WatchConfirmPage() {
       ) : null}
 
       <p className={styles.hint}>
-        봤어요 → 영화 평가 · 보지 않을래요 → 감상 대기 종료
+        아직 못 봤다면 감상 대기를 유지하고 돌아가요.
         <br />
-        답하지 않으면 7일 뒤 자동으로 감상 대기가 끝나요
+        이동한 날부터 7일 뒤에는 대기가 자동으로 끝나요.
       </p>
     </div>
   );

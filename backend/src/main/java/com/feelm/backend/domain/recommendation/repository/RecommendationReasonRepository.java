@@ -65,6 +65,30 @@ public class RecommendationReasonRepository {
                 .findFirst();
     }
 
+    /**
+     * 취향 발견의 기여 영화가 추천 항목 소유 사용자의 실제 4점 이상 평가인지 대조한다(S15P21E106-925). Candidate 근거에는 사용자 ID가 없으므로
+     * 항목이 속한 개인 세트의 소유자로 확인한다.
+     */
+    public Optional<String> findOwnerPositiveRatedMovieTitle(long itemId, long movieId) {
+        return jdbcTemplate
+                .queryForList(
+                        """
+                        SELECT m.title
+                        FROM recommendation_items ri
+                        JOIN recommendation_sets rs ON rs.id=ri.set_id
+                        JOIN ratings r ON r.user_id=rs.user_id AND r.movie_id=?
+                        JOIN movies m ON m.id=r.movie_id
+                        WHERE ri.id=? AND rs.party_id IS NULL
+                          AND r.score >= 4.0 AND r.movie_id <> ri.movie_id
+                        """,
+                        String.class,
+                        movieId,
+                        itemId)
+                .stream()
+                .filter(title -> title != null && !title.isBlank())
+                .findFirst();
+    }
+
     /** 항목 저장 전에는 실제 사용자와 추천 영화 ID로 원천 평가를 검증한다. */
     public Optional<String> findPositiveRatedMovieTitleBeforeInsert(
             long userId, long candidateMovieId, long sourceMovieId) {

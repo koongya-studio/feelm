@@ -55,7 +55,7 @@ class ReportReadApiContractTest extends ReportApiContractSupport {
         mockMvc.perform(get("/api/v1/users/me/reports").header("Authorization", bearer(OWNER)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.current").isEmpty())
-                .andExpect(jsonPath("$.preparing").value(true));
+                .andExpect(jsonPath("$.preparing").value(false));
 
         jdbc.update(
                 """

@@ -25,6 +25,8 @@ export type Gender = 'MALE' | 'FEMALE' | 'OTHER';
 
 export type MyProfile = {
   userId: number;
+  /** API-062 공유 주소에 사용하는 기존 계정 UUID */
+  publicId: string;
   /** 변경 불가(API-015 처리 규칙). 7.2가 읽기 전용으로 표시한다 */
   email: string;
   nickname: string;

@@ -211,6 +211,8 @@ Consumer는 이벤트 payload의 과거 값을 누적하지 않고 현재 Postgr
 
 - 개별 선택 내용은 싣지 않는다. Backend는 같은 트랜잭션에서 LIKE `4.0`·DISLIKE `2.0` 평가를 저장하고,
   Python Consumer는 이 이벤트를 사용자별 최신 `ratings`를 다시 읽는 재계산 신호로만 사용한다
+- `preferenceCount`는 0 이상의 정수다. 건너뛴 제출도 `0`으로 발행하며, Consumer는 빈 현재 입력에
+  §6.3의 개인 K0 인기순 후보 공급을 적용한다. 음수·불리언·소수·누락은 거절한다.
 - 한 번의 제출에는 `ONBOARDING` 이벤트 한 건만 발행하고 선택별 `RATING` 이벤트는 추가 발행하지 않는다.
   payload에 계약 외 필드가 추가돼도 Consumer 계산 입력으로 사용하지 않는다(S15P21E106-649)
 
@@ -685,7 +687,7 @@ Spring은 개인 추천 후보를 재정렬하고, OTT에서는 사용자별 점
 모두 반영하지만 `topContributors`와 coverage 분모에는
 양의 기여만 포함한다. 따라서 coverage는 그룹 적합도 근거가 소수 입력에 집중됐는지를 나타내며 후보 영화의
 최종 개인 점수 전체에 대한 설명률이 아니다. Consumer는 `CONCENTRATED` 같은 임의 구간값을 만들지 않는다.
-Spring은 합의한 coverage 기준보다 낮으면 영화명을 열거하지 않고 전체 평가 이력 기반 문구를 사용한다.
+Spring은 `topContributionCoverage`가 0.5(담당자 결정 2026-09-26, S15P21E106-925)보다 낮으면 영화명을 열거하지 않고 전체 평가 이력 기반 문구를 사용한다. 문구와 검증 규칙은 `docs/api/recommendation.md` API-045가 정한다.
 Consumer는 구조화된 근거만 저장하고, Spring은 영화 제목과 표시명을 조회해 사용자 문구를 만든다.
 
 그룹 후보가 100편보다 적으면 Consumer는 선택된 상위 10개 그룹의 다음 대중성 순위 층을 순회한다.

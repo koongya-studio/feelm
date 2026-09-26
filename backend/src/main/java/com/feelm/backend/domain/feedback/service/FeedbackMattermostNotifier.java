@@ -178,20 +178,37 @@ public class FeedbackMattermostNotifier {
                         "(?<![0-9])01[0-9][- ]?[0-9]{3,4}[- ]?[0-9]{4}(?![0-9])", "[전화번호 생략]");
         summary = summary.replaceAll("https?://[^\\s)]+", "[링크 생략]");
         summary = escapeMarkdown(summary);
-        return "[사용자 피드백] #"
-                + item.id()
-                + "\n- 종류: "
-                + item.category()
-                + "\n- 만족도: "
-                + (item.satisfaction() == null ? "미선택" : item.satisfaction())
-                + "\n- 화면: "
-                + item.screenPath()
-                + "\n- 영화 ID: "
-                + (item.movieId() == null ? "없음" : item.movieId())
-                + "\n- 추천 유형: "
-                + (item.recommendationType() == null ? "없음" : item.recommendationType())
-                + "\n- 의견: "
-                + summary;
+        String subject =
+                switch (item.category()) {
+                    case "RECOMMENDATION" ->
+                            "PARTY".equals(item.recommendationType())
+                                    ? "파티 추천"
+                                    : "TODAY".equals(item.recommendationType())
+                                            ? "오늘의 추천"
+                                            : "추천 의견";
+                    default -> "서비스 의견";
+                };
+        String satisfaction =
+                item.satisfaction() == null
+                        ? "미선택"
+                        : switch (item.satisfaction()) {
+                            case GOOD -> "마음에 들어요";
+                            case MIXED -> "애매해요";
+                            case BAD -> "아쉬워요";
+                        };
+        StringBuilder message =
+                new StringBuilder("## 💬 [FEEDBACK] 사용자 의견\n> 📩 접수 · ")
+                        .append(subject)
+                        .append(" · #")
+                        .append(item.id())
+                        .append("\n\n**🔎 의견 정보**\n- 만족도: ")
+                        .append(satisfaction)
+                        .append("\n- 작성 화면: `")
+                        .append(item.screenPath())
+                        .append('`');
+        if (item.movieId() != null) message.append("\n- 영화 ID: ").append(item.movieId());
+        message.append("\n- 의견: ").append(summary.isBlank() ? "없음" : summary);
+        return message.toString();
     }
 
     private static String escapeMarkdown(String text) {

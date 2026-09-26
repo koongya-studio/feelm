@@ -123,6 +123,23 @@ function stubServer() {
         });
       }
 
+      if (url === '/api/v1/users/me/frames')
+        return json({
+          items: [1, 2, 3].map((id) => ({
+            frameId: 900 + id,
+            movie: {
+              movieId: 1000 + id,
+              title: `실제 영화 ${id}`,
+              posterUrl: `/posters/${id}.jpg`,
+            },
+            score: 4.5,
+            flavorCode: 'FLAVOR_A',
+            createdAt: '2026-09-27T00:00:00Z',
+          })),
+          hasNext: false,
+          nextCursor: null,
+        });
+
       if (url === '/api/v1/users/me') return json(me);
 
       if (url.startsWith('/api/v1/users/nickname-availability')) {
@@ -628,4 +645,19 @@ describe('7.2 프로필 사진', () => {
     expect(avatarCalls).toHaveLength(2);
     expect(await (avatarCalls[1].file as Blob).text()).toBe('jpeg');
   });
+});
+
+it('실제 포스터를 공개 선택하고 저장하면 미리보기에서도 같은 영화가 나온다', async () => {
+  await renderEdit();
+  expect(screen.getByRole('img', { name: '실제 영화 1' })).toHaveAttribute('src', '/posters/1.jpg');
+  fireEvent.click(pencil('공개할 취향 필름 수정'));
+  const form = screen.getByRole('form', { name: '공개할 취향 필름 수정' });
+  fireEvent.click(within(form).getByRole('button', { name: /실제 영화 1/ }));
+  fireEvent.click(within(form).getByRole('button', { name: '저장' }));
+  await screen.findByText('저장했어요');
+  expect(screen.queryByRole('img', { name: '실제 영화 1' })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '내 공개 프로필 미리보기' }));
+  await screen.findByRole('heading', { name: '취향 필름' });
+  expect(screen.queryByRole('img', { name: '실제 영화 1' })).not.toBeInTheDocument();
+  expect(screen.getByRole('img', { name: '실제 영화 2' })).toHaveAttribute('src', '/posters/2.jpg');
 });

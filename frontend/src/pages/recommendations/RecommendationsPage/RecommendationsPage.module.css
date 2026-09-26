@@ -266,3 +266,26 @@
   flex: 1 1 340px;
   min-width: 0;
 }
+
+.preparingSpinner {
+  display: block;
+  width: 32px;
+  height: 32px;
+  margin: 0 auto;
+  border: 3px solid var(--color-border, #d3d3d3);
+  border-top-color: var(--color-text, #262626);
+  border-radius: 50%;
+  animation: preparing-spin 1s linear infinite;
+}
+
+@keyframes preparing-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .preparingSpinner {
+    animation: none;
+  }
+}

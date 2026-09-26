@@ -476,3 +476,15 @@ describe('API-083 파티 추천 이력 조회', () => {
     });
   });
 });
+
+it('수락한 초대 이력은 모든 페이지에서 ACCEPTED 질의를 유지한다', async () => {
+  fetchMock
+    .mockResolvedValueOnce(json(200, { items: [], nextCursor: 'next', hasNext: true }))
+    .mockResolvedValueOnce(json(200, { items: [], nextCursor: null, hasNext: false }));
+  await getMyInvitations('ACCEPTED');
+  for (let i = 0; i < 2; i++) {
+    const url = new URL(call(i)[0], 'https://example.test');
+    expect(url.searchParams.get('status')).toBe('ACCEPTED');
+  }
+  expect(new URL(call(1)[0], 'https://example.test').searchParams.get('cursor')).toBe('next');
+});

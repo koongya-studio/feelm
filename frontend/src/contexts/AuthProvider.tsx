@@ -16,6 +16,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { login, logout, restoreSession, signup, socialLogin, socialSignup } from '../api/auth';
+import { startNotificationStream } from '../api/notificationStream';
 import { isTransientFailure } from '../api/retry';
 import { canRefresh, onSessionEnd } from '../api/session';
 import { AuthContext } from './authContext';
@@ -86,6 +87,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }),
     [],
   );
+
+  useEffect(() => {
+    if (state.status === 'authenticated') return startNotificationStream();
+  }, [state.status, state.user?.userId]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     const user = await login(email, password);

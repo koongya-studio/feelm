@@ -2,10 +2,14 @@ package com.feelm.backend.domain.report.model;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 public final class ReportSource {
 
     private ReportSource() {}
+
+    public record Snapshot(
+            List<Frame> frames, List<Genre> genres, List<Country> countries, List<Person> people) {}
 
     public record Frame(
             long frameId,

@@ -80,6 +80,10 @@ function stubServer() {
     'fetch',
     vi.fn((url: string, init?: RequestInit) => {
       // 미리보기가 내 프로필을 받는다(API-014)
+      if (url === '/api/v1/users/me/frames') {
+        return json(200, { items: buddy.recentFrames, nextCursor: null, hasNext: false });
+      }
+
       if (url === '/api/v1/users/me') return json(200, myProfileBody);
 
       if (url === `/api/v1/users/${PUBLIC_ID}/profile`) return json(200, profileBody);

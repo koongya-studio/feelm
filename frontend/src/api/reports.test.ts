@@ -13,6 +13,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createReportImage,
+  generateReport,
   getLatestReadyReport,
   getMyReports,
   getReportDetail,
@@ -167,5 +168,21 @@ describe('API-061 리포트 이미지 카드', () => {
     expect(call()[1].method).toBe('POST');
     expect(call()[1].body).toBe(png);
     expect((call()[1].headers as Record<string, string>)['Content-Type']).toBe('image/png');
+  });
+});
+
+describe('API-086 사용자 요청 리포트 생성', () => {
+  it('본문 없는 POST로 실제 생성 결과와 재사용 여부를 받는다', async () => {
+    const result = {
+      reportId: 303,
+      createdAt: '2026-09-26T12:00:00Z',
+      reused: false,
+      issuedAt: null,
+    };
+    fetchMock.mockResolvedValue(json(200, result));
+    expect(await generateReport()).toEqual(result);
+    expect(call()[0]).toBe('/api/v1/users/me/reports');
+    expect(call()[1].method).toBe('POST');
+    expect(call()[1].body).toBeUndefined();
   });
 });

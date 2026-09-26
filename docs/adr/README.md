@@ -77,6 +77,7 @@ A 회의 안건 12건 중 아키텍처·기술 선택에 해당하는 5건입니
 | [ADR-0023](./0023-private-report-image-host-storage.md) | 리포트 이미지는 서비스 노드 비공개 디렉터리에 저장하고 애플리케이션 서명 URL로 제공한다 | 채택 (2026-09-22) |
 | [ADR-0024](./0024-recommendation-item-lock-order.md) | 추천 이유 보강은 항목 단위 커밋, movies 참조 다중 행 쓰기는 movie_id 오름차순으로 잠근다 | 채택 (2026-09-22) |
 | [ADR-0025](./0025-rating-delete-expires-watch-record.md) | 평가 삭제가 연결된 감상 기록을 EXPIRED로 되돌린다 | 채택 (2026-09-25) |
+| [ADR-0026](./0026-in-app-notification-sse.md) | 인앱 알림 변경을 SSE로 전달한다 | 채택 (2026-09-26) |
 
 ### 채택 검토 중
 
