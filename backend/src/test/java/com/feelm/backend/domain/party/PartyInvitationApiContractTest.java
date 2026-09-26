@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.feelm.backend.domain.notification.service.NotificationChangedEvent;
 import com.feelm.backend.global.security.TokenProvider;
 import com.feelm.backend.support.SharedPostgresContractTest;
 import java.nio.charset.StandardCharsets;
@@ -30,6 +31,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -39,11 +42,13 @@ import tools.jackson.databind.ObjectMapper;
 
 /** API-051·052: 파티 초대 생성과 받은 초대 목록의 HTTP 계약 테스트. */
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
+@RecordApplicationEvents
 class PartyInvitationApiContractTest extends SharedPostgresContractTest {
     private static final String LIST_PATH = "/api/v1/parties/invitations";
     private static final Instant CREATED_AT = Instant.parse("2026-09-01T00:00:00Z");
 
     @Autowired MockMvc mvc;
+    @Autowired ApplicationEvents events;
     @Autowired JdbcTemplate jdbc;
     @Autowired TokenProvider tokens;
     @Autowired ObjectMapper json;
@@ -129,6 +134,12 @@ class PartyInvitationApiContractTest extends SharedPostgresContractTest {
                 .andExpect(jsonPath("$.status").value("PENDING"));
 
         assertThat(jdbc.queryForObject("SELECT count(*) FROM notifications", Long.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM web_push_deliveries", Long.class))
+                .isZero();
+        assertThat(
+                        events.stream(NotificationChangedEvent.class)
+                                .map(NotificationChangedEvent::userId))
+                .containsExactly(20L);
         list(20).andExpect(status().isOk())
                 .andExpect(jsonPath("$.items", hasSize(1)))
                 .andExpect(jsonPath("$.items[0].party.partyId").value(party))
