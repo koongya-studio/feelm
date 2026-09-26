@@ -7,13 +7,12 @@
  * 저장 · 취소는 모든 편집기에서 같은 자리 · 같은 모양이다(`EditorActions`). 저장은 글자와
  * 빨간 면, 취소는 글자와 테두리로 구분한다 — 색만으로 가르지 않는다.
  */
-import Poster from '../../../components/Poster';
 import TextField from '../../../components/TextField';
 import { CheckIcon } from '../../../components/Icon';
 import { BIO_MAX_LENGTH } from '../../../api/users';
 import styles from './ProfileEditPage.module.css';
 import type { FormEvent, ReactNode } from 'react';
-import type { ProfileFrame, ProfileKeyword } from '../../../types/unspecified';
+import type { ProfileKeyword } from '../../../types/unspecified';
 
 type ActionProps = {
   saving: boolean;
@@ -179,61 +178,6 @@ export function KeywordsEditor({
               >
                 {on ? <CheckIcon /> : null}
                 {keyword.label}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-
-      <EditorActions {...actions} />
-    </EditorForm>
-  );
-}
-
-/** 공개할 필름 고르기. 포스터를 눌러 켜고 끈다. 공개 프로필에는 앞의 세 편까지 보인다 */
-export function FilmsEditor({
-  frames,
-  selected,
-  onToggle,
-  onSave,
-  ...actions
-}: ActionProps & {
-  frames: ProfileFrame[];
-  selected: number[];
-  onToggle: (frameId: number) => void;
-  onSave: () => void;
-}) {
-  return (
-    <EditorForm label="공개할 취향 필름 수정" onSave={onSave}>
-      <p className={styles.editorHint}>
-        다른 사용자에게 보여 줄 필름을 골라요. 최근 3편까지 보여요
-      </p>
-
-      <ul className={styles.toggleFilms}>
-        {frames.map((frame) => {
-          const on = selected.includes(frame.frameId);
-
-          return (
-            <li key={frame.frameId}>
-              <button
-                type="button"
-                className={styles.toggleFilm}
-                aria-pressed={on}
-                aria-label={frame.title}
-                onClick={() => onToggle(frame.frameId)}
-              >
-                <Poster
-                  fluid
-                  width={2}
-                  height={3}
-                  radius={10}
-                  src={frame.posterUrl ?? undefined}
-                  title={frame.title}
-                  seed={frame.movieId}
-                />
-                <span className={styles.toggleMark} aria-hidden="true">
-                  {on ? <CheckIcon /> : null}
-                </span>
               </button>
             </li>
           );
