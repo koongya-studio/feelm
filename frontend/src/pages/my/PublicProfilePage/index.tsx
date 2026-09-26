@@ -25,9 +25,7 @@
  * 뒤로 가기가 여기로 돌아오면 안 된다. `[?]` 신고는 계약이 없다. 안내만 하고 실제 처리는
  * 하지 않는다.
  *
- * `[!]` 이 화면으로 들어오는 링크는 아직 없다. 주소는 `publicId`로 여는데 그 값을 알려 주는
- * API가 없다(API-014 · API-057 응답에 없음). 5.8 `취향 보기`와 7.1 `프로필 공유`는 그 값이
- * 오면 연결한다.
+ * MY의 프로필 공유는 API-014의 `publicId`로 이 화면에 연결한다.
  */
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';

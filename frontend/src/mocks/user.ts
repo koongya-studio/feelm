@@ -19,6 +19,7 @@ import type { MyProfile } from '../types/user';
 
 export const mockMyProfile: MyProfile = {
   userId: 1024,
+  publicId: '1b4e28ba-2fa1-11d2-883f-0016d3cca427',
   email: 'nanda@feelm.kr',
   nickname: '김난다',
   avatarUrl: null,

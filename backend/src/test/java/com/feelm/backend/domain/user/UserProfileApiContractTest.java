@@ -26,10 +26,14 @@ class UserProfileApiContractTest extends UserProfileApiTestSupport {
     @DisplayName("계약의 모든 필드를 명세한 값으로 반환한다")
     void returnsFullProfileContract() throws Exception {
         long userId = activeUser("user@example.com", "팝콘러버");
+        String publicId = "1b4e28ba-2fa1-11d2-883f-0016d3cca427";
+        jdbcTemplate.update(
+                "UPDATE users SET public_id = CAST(? AS uuid) WHERE id = ?", publicId, userId);
 
         mockMvc.perform(get(ME_PATH).header("Authorization", bearerFor(userId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value(userId))
+                .andExpect(jsonPath("$.publicId").value(publicId))
                 .andExpect(jsonPath("$.email").value("user@example.com"))
                 .andExpect(jsonPath("$.nickname").value("팝콘러버"))
                 .andExpect(jsonPath("$.birthDate").value(BIRTH_DATE))
@@ -51,7 +55,7 @@ class UserProfileApiContractTest extends UserProfileApiTestSupport {
                         content()
                                 .json(
                                         """
-                                        {"userId":%d,"email":"user@example.com","nickname":"팝콘러버",
+                                        {"userId":%d,"publicId":"%s","email":"user@example.com","nickname":"팝콘러버",
                                          "birthDate":"%s","gender":"FEMALE","visibility":"PRIVATE",
                                          "frameVisibility":"PUBLIC","popcornVisibility":"PUBLIC",
                                          "reviewVisibility":"PUBLIC",
@@ -61,7 +65,8 @@ class UserProfileApiContractTest extends UserProfileApiTestSupport {
                                          "stats":{"frameCount":0,"popcornCount":0,"ratingCount":0},
                                          "createdAt":"%s"}
                                         """
-                                                .formatted(userId, BIRTH_DATE, CREATED_AT),
+                                                .formatted(
+                                                        userId, publicId, BIRTH_DATE, CREATED_AT),
                                         true));
     }
 

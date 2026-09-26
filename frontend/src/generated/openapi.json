@@ -3598,6 +3598,10 @@
             ],
             "type" : "string"
           },
+          "publicId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
           "reviewVisibility" : {
             "enum" : [
               "PUBLIC",

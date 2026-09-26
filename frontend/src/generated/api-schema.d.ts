@@ -2652,6 +2652,8 @@ export interface components {
             onboardingCompleted?: boolean;
             /** @enum {string} */
             popcornVisibility?: "PUBLIC" | "PRIVATE";
+            /** Format: uuid */
+            publicId?: string;
             /** @enum {string} */
             reviewVisibility?: "PUBLIC" | "PRIVATE";
             stats?: components["schemas"]["Stats"];

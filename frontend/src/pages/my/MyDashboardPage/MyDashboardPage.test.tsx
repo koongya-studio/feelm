@@ -152,7 +152,12 @@ const history: RecommendationHistory = {
 };
 
 beforeEach(() => {
-  vi.mocked(getMyProfileView).mockReset().mockResolvedValue(mockMyProfileView);
+  vi.mocked(getMyProfileView)
+    .mockReset()
+    .mockResolvedValue({
+      ...mockMyProfileView,
+      publicId: '1b4e28ba-2fa1-11d2-883f-0016d3cca427',
+    });
   /*
    * 두 탭이 같은 API-039를 부른다(업무 -919). `평가한 영화`는 필터 없이, `최근 본 영화`는
    * `filter=ALL`로 부르므로 **필터로 갈라** 다른 목록을 준다. 호출 순서에 기대면 탭이 늘거나
@@ -223,6 +228,7 @@ describe('7.1 MY 대시보드', () => {
    * 데스크톱 Chrome에도 `navigator.share`가 있어 그것만 믿고 불렀다.
    */
   it('데스크톱에서 프로필 공유는 공개 프로필 주소를 복사하고 알린다', async () => {
+    vi.stubEnv('BASE_URL', '/app/');
     const share = vi.fn(() => new Promise<void>(() => undefined));
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'share', { value: share, configurable: true });
@@ -234,9 +240,28 @@ describe('7.1 MY 대시보드', () => {
 
       expect(await screen.findByRole('status')).toHaveTextContent('프로필 주소를 복사했어요');
       expect(share).not.toHaveBeenCalled();
-      expect(writeText).toHaveBeenCalledWith(expect.stringMatching(/\/users\/\d+$/));
+      expect(writeText).toHaveBeenCalledWith(
+        `${window.location.origin}/app/users/1b4e28ba-2fa1-11d2-883f-0016d3cca427`,
+      );
     } finally {
+      vi.unstubAllEnvs();
       Reflect.deleteProperty(navigator, 'share');
+      Reflect.deleteProperty(navigator, 'clipboard');
+    }
+  });
+
+  it('공유 식별자가 없으면 잘못된 링크를 복사하지 않는다', async () => {
+    vi.mocked(getMyProfileView).mockResolvedValue(mockMyProfileView);
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    try {
+      await renderDashboard();
+      fireEvent.click(screen.getByRole('button', { name: '프로필 공유' }));
+      expect(
+        await screen.findByText('공유 주소를 불러오지 못했어요. 새로고침 후 다시 시도해 주세요'),
+      ).toBeInTheDocument();
+      expect(writeText).not.toHaveBeenCalled();
+    } finally {
       Reflect.deleteProperty(navigator, 'clipboard');
     }
   });

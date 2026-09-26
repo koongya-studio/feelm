@@ -886,6 +886,7 @@ OAuth 인가 코드를 받아 소셜 계정을 확인한다. 이미 연결된 �
 ```json
 {
   "userId": 1024,
+  "publicId": "1b4e28ba-2fa1-11d2-883f-0016d3cca427",
   "email": "user@example.com",
   "nickname": "팝콘러버",
   "avatarUrl": "/media/avatars/0b649505-0917-41d9-a41f-0d4402ec63d5.jpg",
@@ -908,6 +909,8 @@ OAuth 인가 코드를 받아 소셜 계정을 확인한다. 이미 연결된 �
 - 공통 오류만 해당
 
 ### 처리 규칙
+
+- `publicId`는 기존 `users.public_id` UUID이며 API-062 공유 주소에 사용한다. 내부 숫자 `userId`를 공개 주소에 사용하지 않는다. API-015 수정 응답에서도 같은 값이 유지된다.
 
 - `stats`의 프레임 수와 평가 수는 1:1이며, 팝콘 수는 평가를 영화의 대표 맛별로 집계한 값이다
 - 등록된 프로필 사진이 없으면 `avatarUrl`은 `null`이다. URL은 공개·비만료 경로이며 사진 교체·삭제·회원 탈퇴 후 기존 URL은 `404`가 된다

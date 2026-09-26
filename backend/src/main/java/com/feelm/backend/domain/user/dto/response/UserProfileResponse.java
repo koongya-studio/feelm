@@ -6,6 +6,7 @@ import com.feelm.backend.domain.user.entity.Visibility;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * API-014 내 프로필 조회 응답. 프로필 수정(API-015)도 같은 본문을 돌려준다.
@@ -14,6 +15,7 @@ import java.util.List;
  */
 public record UserProfileResponse(
         long userId,
+        UUID publicId,
         String email,
         String nickname,
         String avatarUrl,
@@ -33,6 +35,7 @@ public record UserProfileResponse(
             User user, String avatarUrl, List<String> linkedProviders, Stats stats) {
         return new UserProfileResponse(
                 user.getId(),
+                user.getPublicId(),
                 user.getEmail(),
                 user.getNickname(),
                 avatarUrl,
