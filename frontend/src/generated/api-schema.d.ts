@@ -1010,6 +1010,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/me/dismissals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 내 관심 없음 영화 목록
+         * @description ACTIVE 회원 본인의 관심 없음 영화를 표시 시각·ID 내림차순으로 조회합니다.
+         */
+        get: operations["getList"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users/me/frames": {
         parameters: {
             query?: never;
@@ -1399,6 +1419,24 @@ export interface components {
             personId: number;
             /** @description 작은 인물 프로필 이미지 URL. 없으면 null */
             profileUrl: string | null;
+        };
+        DismissalListItemResponse: {
+            /** Format: int64 */
+            dismissalId: number;
+            /** Format: date-time */
+            dismissedAt: string;
+            movie: components["schemas"]["DismissalMovieResponse"];
+        };
+        DismissalListResponse: {
+            hasNext: boolean;
+            items: components["schemas"]["DismissalListItemResponse"][];
+            nextCursor: string | null;
+        };
+        DismissalMovieResponse: {
+            /** Format: int64 */
+            movieId: number;
+            posterUrl: string | null;
+            title: string;
         };
         EmailVerificationCodeRequest: {
             /** Format: email */
@@ -4681,6 +4719,58 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["CursorPageResponseBlockedUserResponse"];
+                };
+            };
+        };
+    };
+    getList: {
+        parameters: {
+            query?: {
+                /** @description 같은 사용자의 직전 응답 cursor */
+                cursor?: string;
+                /** @description 페이지 크기 */
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 본인 관심 없음 목록 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DismissalListResponse"];
+                };
+            };
+            /** @description VALIDATION_FAILED: 잘못된 size 또는 cursor */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description UNAUTHORIZED: 인증 없음 또는 비활성 회원; TOKEN_EXPIRED: 토큰 만료 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 조회 실패 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ErrorResponse"];
                 };
             };
         };

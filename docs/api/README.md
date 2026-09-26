@@ -12,7 +12,7 @@ FEELM 서비스 REST API 명세입니다. Notion 「설계 > API 명세서」 �
 | [영화·검색](./movies-search.md) | 영화, 검색 | 3 |
 | [감상](./watch.md) | 감상 | 7 |
 | [취향](./taste.md) | 취향 | 5 |
-| [추천](./recommendation.md) | 추천 | 7 |
+| [추천](./recommendation.md) | 추천 | 8 |
 | [파티](./party.md) | 파티 | 10 |
 | [소셜](./social.md) | 소셜 | 5 |
 | [리포트·트렌드](./report-trend.md) | 리포트, 트렌드 | 5 |
@@ -88,6 +88,7 @@ FastAPI 내부 API 초안은 ADR-0016을 거쳐 ADR-0017로 대체되어 사용�
 | API-044 | [팝콘 맛 기준정보 조회](./taste.md#api-044-팝콘-맛-기준정보-조회) | GET | `/popcorn-flavors` | 취향 | 1차 MVP | 공개 | FR-06 | O |
 | API-045 | [기본 추천 조회](./recommendation.md#api-045-기본-추천-조회) | GET | `/recommendations` | 추천 | 1차 MVP | 회원 | FR-10, FR-12, FR-13 | O |
 | API-047 | [관심없음 표시](./recommendation.md#api-047-관심없음-표시) | POST | `/movies/{movieId}/dismiss` | 추천 | 1차 MVP | 회원 | FR-36 | O |
+| API-087 | [내 관심 없음 영화 목록](./recommendation.md#api-087-내-관심-없음-영화-목록) | GET | `/users/me/dismissals` | 추천 | 1차 MVP | 회원 | FR-36 |  |
 | API-048 | [추천 이력 조회](./recommendation.md#api-048-추천-이력-조회) | GET | `/recommendations/history` | 추천 | 1차 MVP | 회원 | FR-33, FR-13 |  |
 | API-049 | [파티 생성](./party.md#api-049-파티-생성) | POST | `/parties` | 파티 | 1차 MVP | 회원 | FR-20 | O |
 | API-050 | [내 파티 목록](./party.md#api-050-내-파티-목록) | GET | `/parties` | 파티 | 1차 MVP | 회원 | FR-20 |  |

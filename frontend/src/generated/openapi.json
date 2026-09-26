@@ -429,6 +429,75 @@
         ],
         "type" : "object"
       },
+      "DismissalListItemResponse" : {
+        "properties" : {
+          "dismissalId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "dismissedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "movie" : {
+            "$ref" : "#/components/schemas/DismissalMovieResponse"
+          }
+        },
+        "required" : [
+          "dismissalId",
+          "dismissedAt",
+          "movie"
+        ],
+        "type" : "object"
+      },
+      "DismissalListResponse" : {
+        "properties" : {
+          "hasNext" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/DismissalListItemResponse"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required" : [
+          "hasNext",
+          "items",
+          "nextCursor"
+        ],
+        "type" : "object"
+      },
+      "DismissalMovieResponse" : {
+        "properties" : {
+          "movieId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "posterUrl" : {
+            "type" : [
+              "string",
+              "null"
+            ]
+          },
+          "title" : {
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "movieId",
+          "posterUrl",
+          "title"
+        ],
+        "type" : "object"
+      },
       "EmailVerificationCodeRequest" : {
         "properties" : {
           "email" : {
@@ -6644,6 +6713,86 @@
         ],
         "tags" : [
           "user-block-controller"
+        ]
+      }
+    },
+    "/api/v1/users/me/dismissals" : {
+      "get" : {
+        "description" : "ACTIVE 회원 본인의 관심 없음 영화를 표시 시각·ID 내림차순으로 조회합니다.",
+        "operationId" : "getList",
+        "parameters" : [
+          {
+            "description" : "같은 사용자의 직전 응답 cursor",
+            "in" : "query",
+            "name" : "cursor",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "description" : "페이지 크기",
+            "in" : "query",
+            "name" : "size",
+            "required" : false,
+            "schema" : {
+              "default" : 20,
+              "maximum" : 50,
+              "minimum" : 1,
+              "type" : "integer"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DismissalListResponse"
+                }
+              }
+            },
+            "description" : "본인 관심 없음 목록"
+          },
+          "400" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "VALIDATION_FAILED: 잘못된 size 또는 cursor"
+          },
+          "401" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "UNAUTHORIZED: 인증 없음 또는 비활성 회원; TOKEN_EXPIRED: 토큰 만료"
+          },
+          "500" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description" : "INTERNAL_ERROR: 조회 실패"
+          }
+        },
+        "security" : [
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "내 관심 없음 영화 목록",
+        "tags" : [
+          "dismissal-list-controller"
         ]
       }
     },
