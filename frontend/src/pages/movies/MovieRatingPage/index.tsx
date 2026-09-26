@@ -23,9 +23,8 @@
  * 무엇을 눌러야 할지 헷갈린다(사용자 결정 2026-09-25). 점수만 고칠 때는 삭제가 아니라 수정
  * (API-037)을 쓰고, 영화가 별로였을 뿐이면 낮은 점수를 남긴다. 화면이 API-035를 부르지 않는다.
  *
- * 한줄평 공개 범위 선택 UI는 와이어프레임에 없어 만들지 않는다(CR-05). 대신 공통 규약의
- * 기본값인 `PRIVATE`을 붙여 보내고, 그 사실을 화면에 안내한다(팀 결정 2026-09-07).
- * CR-05가 반영되면 이 안내를 선택 컨트롤로 교체한다.
+ * 한줄평 공개 범위는 작성·수정 화면에서 선택한다. 새 글은 비공개로 시작하고,
+ * 수정은 기존 값을 유지한다. 계정의 한줄평 공개 설정도 공개여야 타인에게 표시된다.
  *
  * 이미 평가한 영화로 들어오면 수정이다(업무 -306, API-037). 7.6 · 3.1-A의 `평가 수정`과
  * 2.4의 `내 별점 남기기`가 여기로 온다. 저장 후 2.6 · 2.7이 아니라 온 곳으로 돌아간다.
@@ -116,6 +115,7 @@ export default function MovieRatingPage() {
   const [score, setScore] = useState(0);
   const [comment, setComment] = useState('');
   const [spoiler, setSpoiler] = useState(false);
+  const [visibility, setVisibility] = useState<'PUBLIC' | 'PRIVATE'>('PRIVATE');
   const [submitting, setSubmitting] = useState(false);
   /** 삭제 확인 창이 떠 있는지. 되돌릴 수 없는 동작이라 한 번 묻는다(업무 -724) */
   const [confirming, setConfirming] = useState(false);
@@ -151,6 +151,7 @@ export default function MovieRatingPage() {
           setScore(detail.myRating?.score ?? 0);
           setComment(detail.myRating?.comment ?? '');
           setSpoiler(detail.myRating?.spoiler ?? false);
+          setVisibility(detail.myRating?.visibility ?? 'PRIVATE');
         }
       })
       .catch(() => {
@@ -238,13 +239,7 @@ export default function MovieRatingPage() {
         await updateRating(movie.myRating.ratingId, {
           score,
           comment: trimmed || null,
-          /*
-           * 한줄평이 없던 평가는 서버가 주는 `visibility`가 **`null`** 이다(API-030 처리 규칙).
-           * 그 값을 그대로 실어 한줄평을 새로 붙이면 `comment`가 있는데 `visibility`가 없어
-           * 계약상 `400`이다(API-037, 업무 -763). 2.5에는 공개 범위 선택 UI가 없으므로 생성
-           * 경로와 같은 기본값 `PRIVATE`로 채운다(CR-05). 이미 값이 있던 평가는 그대로 둔다.
-           */
-          visibility: movie.myRating.visibility ?? 'PRIVATE',
+          visibility,
           spoiler: trimmed ? spoiler : false,
         });
 
@@ -258,8 +253,8 @@ export default function MovieRatingPage() {
       const counts = await countsRequest.current;
       const rating = await createRating(
         movie.movieId,
-        // comment가 있으면 visibility가 필수다(API-036). 선택 UI가 없어 기본값 PRIVATE
-        trimmed ? { score, comment: trimmed, visibility: 'PRIVATE', spoiler } : { score },
+        // 한줄평이 있으면 선택한 공개 범위를 함께 저장한다(API-036).
+        trimmed ? { score, comment: trimmed, visibility, spoiler } : { score },
       );
 
       /*
@@ -373,13 +368,25 @@ export default function MovieRatingPage() {
             />
             <span>스포일러가 포함되어 있어요</span>
           </label>
-          {comment.trim() ? (
-            <p className={styles.visibilityNote}>
-              {isEditing
-                ? `한줄평은 ${movie.myRating?.visibility === 'PUBLIC' ? '공개' : '비공개'}로 저장돼요 · 공개 범위는 한줄평 관리에서 바꿀 수 있어요`
-                : '한줄평은 비공개로 저장돼요 · 공개 범위 선택은 준비 중이에요'}
-            </p>
-          ) : null}
+          <fieldset className={styles.visibilityControl} disabled={!comment.trim() || submitting}>
+            <legend>한줄평 공개 범위</legend>
+            {(['PRIVATE', 'PUBLIC'] as const).map((value) => (
+              <label key={value} className={styles.spoilerControl}>
+                <input
+                  type="radio"
+                  name="reviewVisibility"
+                  value={value}
+                  checked={visibility === value}
+                  onChange={() => setVisibility(value)}
+                  aria-describedby="review-visibility-note"
+                />
+                <span>{value === 'PUBLIC' ? '공개' : '비공개'}</span>
+              </label>
+            ))}
+          </fieldset>
+          <p id="review-visibility-note" className={styles.visibilityNote}>
+            이 한줄평과 설정의 ‘한줄평 공개’가 모두 공개일 때 다른 사람에게 보여요
+          </p>
         </div>
 
         <div className={styles.actions}>

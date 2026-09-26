@@ -465,3 +465,55 @@ describe('2.5 평가 삭제', () => {
     expect(screen.getByRole('button', { name: '평가 삭제' })).toBeInTheDocument();
   });
 });
+
+describe('한줄평 공개 범위', () => {
+  it('새 한줄평은 선택한 공개 값으로 저장한다', async () => {
+    renderPage();
+    await screen.findByRole('slider', { name: '별점' });
+    expect(screen.getByRole('radio', { name: '공개' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('한줄평'), { target: { value: '좋아요' } });
+    expect(screen.getByRole('radio', { name: '비공개' })).toBeChecked();
+    fireEvent.click(screen.getByRole('radio', { name: '공개' }));
+    await rate(4, '좋아요');
+    await waitFor(() =>
+      expect(createRating).toHaveBeenCalledWith(550, {
+        score: 4,
+        comment: '좋아요',
+        visibility: 'PUBLIC',
+        spoiler: false,
+      }),
+    );
+  });
+
+  it.each(['PUBLIC', 'PRIVATE'] as const)(
+    '수정에서 %s를 유지하고 반대 값으로 변경한다',
+    async (original) => {
+      vi.mocked(getMovieDetail).mockResolvedValue({
+        ...movie,
+        myRating: {
+          ratingId: 91,
+          score: 4,
+          comment: '좋아요',
+          visibility: original,
+          spoiler: false,
+        },
+      });
+      renderPage();
+      await screen.findByRole('heading', { name: '평가 수정' });
+      expect(
+        screen.getByRole('radio', { name: original === 'PUBLIC' ? '공개' : '비공개' }),
+      ).toBeChecked();
+      const next = original === 'PUBLIC' ? 'PRIVATE' : 'PUBLIC';
+      fireEvent.click(screen.getByRole('radio', { name: next === 'PUBLIC' ? '공개' : '비공개' }));
+      await rate(4);
+      await waitFor(() =>
+        expect(updateRating).toHaveBeenCalledWith(91, {
+          score: 4,
+          comment: '좋아요',
+          visibility: next,
+          spoiler: false,
+        }),
+      );
+    },
+  );
+});
