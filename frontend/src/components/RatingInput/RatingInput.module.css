@@ -5,56 +5,86 @@
   gap: var(--space-3);
 }
 
-.control {
-  position: relative;
-  display: inline-flex;
-}
-
-/* 별 그림은 표시만 담당한다. 조작은 위에 겹친 range가 받는다 */
+/* 별 그림은 표시만 담당한다. 조작은 아래 range가 받는다 */
 .visual {
   display: inline-flex;
   pointer-events: none;
 }
 
 /*
- * 별 위에 투명하게 겹친다. 손잡이 폭을 0에 가깝게 두어 왼쪽 끝이 0,
- * 오른쪽 끝이 5.0에 대응하게 만든다.
+ * 별 묶음(40px × 5 + 10px × 4)과 같은 폭으로 둔다. 높이는 탭 영역 최소값을 지켜
+ * 손가락으로 잡기 쉽게 한다. 트랙은 손잡이 왼쪽을 브랜드 빨강으로 채워 별의
+ * 채움과 같은 뜻을 보인다. 손잡이는 작은 빨간 점으로 두어 별보다 눈에 띄지 않게 한다.
  */
 .slider {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+  --rating-track-height: 4px;
+  --rating-thumb-size: 14px;
+
+  width: 240px;
+  max-width: 100%;
+  min-height: var(--tap-target-min);
   margin: 0;
   padding: 0;
-  border: 0;
   appearance: none;
   background: none;
-  opacity: 0;
   cursor: pointer;
+  touch-action: none;
 }
 
 .slider:disabled {
   cursor: default;
 }
 
+.slider::-webkit-slider-runnable-track {
+  height: var(--rating-track-height);
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+    to right,
+    var(--color-brand) var(--rating-fill),
+    var(--color-line) var(--rating-fill)
+  );
+}
+
+.slider::-moz-range-track {
+  height: var(--rating-track-height);
+  border-radius: var(--radius-pill);
+  background: var(--color-line);
+}
+
+.slider::-moz-range-progress {
+  height: var(--rating-track-height);
+  border-radius: var(--radius-pill);
+  background: var(--color-brand);
+}
+
 .slider::-webkit-slider-thumb {
-  width: 1px;
-  height: 100%;
+  width: var(--rating-thumb-size);
+  height: var(--rating-thumb-size);
+  margin-top: calc((var(--rating-track-height) - var(--rating-thumb-size)) / 2);
+  border: 0;
+  border-radius: 50%;
   appearance: none;
-  background: none;
+  background: var(--color-brand);
 }
 
 .slider::-moz-range-thumb {
-  width: 1px;
-  height: 100%;
+  width: var(--rating-thumb-size);
+  height: var(--rating-thumb-size);
   border: 0;
-  background: none;
+  border-radius: 50%;
+  background: var(--color-brand);
 }
 
-/* range가 투명하므로 초점 표시를 별 묶음에 그린다 */
-.control:focus-within {
-  border-radius: var(--radius-icon);
+.slider:disabled::-webkit-slider-thumb {
+  background: var(--color-ink-disabled);
+}
+
+.slider:disabled::-moz-range-thumb {
+  background: var(--color-ink-disabled);
+}
+
+.slider:focus-visible {
+  border-radius: var(--radius-pill);
   outline: 2px solid var(--color-ink);
   outline-offset: 4px;
 }
