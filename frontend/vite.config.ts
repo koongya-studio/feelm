@@ -62,6 +62,21 @@ export default defineConfig(({ mode }) => ({
      * http에서도 저장된다.
      */
     proxy: {
+      // 배포 Nginx와 같은 TMDB 전용 경로. 인증정보는 외부로 전달하지 않는다.
+      '^/tmdb-images/(?:original|w[1-9][0-9]*)/[A-Za-z0-9_-]+\\.(?:jpg|jpeg|png|webp)$': {
+        target: 'https://image.tmdb.org',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/tmdb-images/', '/t/p/'),
+        configure: (proxy) => {
+          proxy.on('proxyReq', (request) => {
+            for (const header of request.getHeaderNames()) request.removeHeader(header);
+            request.setHeader('host', 'image.tmdb.org');
+          });
+          proxy.on('proxyRes', (response) => {
+            delete response.headers['set-cookie'];
+          });
+        },
+      },
       '/api': { target: apiTarget(mode), changeOrigin: true },
       // 프로필 사진(API-014 · 062 `avatarUrl`)은 `/media/avatars/…` 상대 주소로 온다(업무 -762)
       '/media': { target: apiTarget(mode), changeOrigin: true },

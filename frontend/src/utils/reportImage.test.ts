@@ -158,6 +158,50 @@ describe('ReportFourCut PNG 저장', () => {
     expect(image.getAttribute('src')).toBe('/photo.webp');
   });
 
+  it.each([
+    [
+      'https://image.tmdb.org/t/p/w1280/tiN6K0LnkK6jG20M39H3AfnXIgQ.jpg',
+      '/tmdb-images/w1280/tiN6K0LnkK6jG20M39H3AfnXIgQ.jpg',
+    ],
+    [
+      'https://image.tmdb.org/t/p/original/xuAIuYSmsUzKlUMBFGVZaWsY3DZ.jpg',
+      '/tmdb-images/original/xuAIuYSmsUzKlUMBFGVZaWsY3DZ.jpg',
+    ],
+    ['/photo.webp', 'http://localhost:3000/photo.webp'],
+    ['data:image/png;base64,aW1hZ2U=', 'data:image/png;base64,aW1hZ2U='],
+    [
+      'https://image.tmdb.org.evil.example/t/p/original/photo.jpg',
+      'https://image.tmdb.org.evil.example/t/p/original/photo.jpg',
+    ],
+  ])('사진 %s를 안전한 캡처 경로로 읽고 원본을 복원한다', async (src, expected) => {
+    const node = document.createElement('div');
+    const image = document.createElement('img');
+    image.src = src;
+    image.decode = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperties(image, {
+      complete: { value: true },
+      naturalWidth: { value: 100 },
+    });
+    Object.defineProperties(node, {
+      scrollWidth: { value: 385 },
+      scrollHeight: { value: 1165 },
+    });
+    node.append(image);
+    const fetchImage = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(['image'], { type: 'image/png' }),
+    } as Response);
+    const png = new Blob(['png'], { type: 'image/png' });
+    vi.mocked(toBlob).mockImplementation(async () => {
+      expect(image.src).toMatch(/^data:image\/png;base64,/);
+      return png;
+    });
+
+    await expect(captureReportImage(node)).resolves.toBe(png);
+    expect(fetchImage).toHaveBeenCalledWith(expected, { mode: 'cors', credentials: 'omit' });
+    expect(image.getAttribute('src')).toBe(src);
+  });
+
   /*
    * 업무 S15P21E106-916. 다른 실행 환경에서 만든 오류는 `instanceof Error`가 거짓이라, 예전에는
    * 시간 초과 문구로 바뀌어 원인이 가려졌다. 시간 초과는 실제로 시간이 다 됐을 때만이다.

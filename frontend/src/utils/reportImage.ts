@@ -132,7 +132,16 @@ async function decodeVisibleImages(node: HTMLElement): Promise<void> {
 }
 
 async function imageDataUrl(url: string): Promise<string> {
-  const response = await fetch(url, { mode: 'cors' });
+  // 화면에 보이는 사진도 fetch는 CORS에 막힐 수 있어 TMDB는 같은 출처로 읽는다.
+  const source = new URL(url, window.location.href);
+  const captureUrl =
+    source.origin === 'https://image.tmdb.org' &&
+    /^\/t\/p\/(?:original|w[1-9][0-9]*)\/[A-Za-z0-9_-]+\.(?:jpg|jpeg|png|webp)$/.test(
+      source.pathname,
+    )
+      ? `/tmdb-images${source.pathname.slice('/t/p'.length)}`
+      : url;
+  const response = await fetch(captureUrl, { mode: 'cors', credentials: 'omit' });
   if (!response.ok) throw new Error('ReportFourCut image fetch failed');
   const blob = await response.blob();
   if (!blob.type.startsWith('image/')) throw new Error('ReportFourCut image response is invalid');
