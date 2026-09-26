@@ -16,11 +16,15 @@
  * | 버튼 둘 | `프로필 편집`(→ 7.2) · `프로필 공유` |
  * | 수치 | 프레임 · 팝콘 · 공개 한줄평 |
  * | 바로가기 | `4컷 리포트`(→ 7.3) · `취향 팝콘`(→ 3.2) |
- * | 탭 | `평가한 영화` · `안 남긴 영화` · `추천 기록`. **화면 안에서 아래 피드만 바꾼다** |
+ * | 탭 | `평가한 영화` · `최근 본 영화` · `추천 기록`. **화면 안에서 아래 피드만 바꾼다** |
  * | 본문 | 고른 탭의 포스터 3열 피드 |
  *
- * **피드는 각 탭의 실제 기록이다.** 평가는 API-039(`getMyRatings`), 안 남긴 영화는
- * API-034(`getWatchRecords`, `WATCHED_UNRATED`), 추천은 API-048(`getRecommendationHistory`)이다.
+ * **피드는 각 탭의 실제 기록이다.** 평가는 API-039(`getMyRatings`), 최근 본 영화는 같은
+ * API-039를 `filter=ALL`로 부른 것, 추천은 API-048(`getRecommendationHistory`)이다.
+ *
+ * **`평가한 영화`와 `최근 본 영화`는 겹친다**(업무 -919). 평가한 영화가 둘 다에 나온다. 보는 것이
+ * 달라 그대로 둔다 — 평가한 영화는 별점과 한줄평이 있는 내 평가만이고, 최근 본 영화는 거기에
+ * 아직 평가하지 않은 영화까지 합쳐 본 순서로 세운 것이다.
  * 취향 필름(API-042)은 **부르지 않는다** — 프레임을 평가 · 추천 기록인 것처럼 쓸 수 없다.
  * 필름은 하단 내비 `필름` 탭(3.1)이 보여준다.
  *
@@ -28,9 +32,13 @@
  * 탭을 눌렀을 때 다시 기다리지 않는다.
  *
  * 고른 탭은 주소의 `?tab=`에 남는다. 화면 밖에서 특정 탭으로 보내야 하는 자리가 있기
- * 때문이다 — EXT-05 OTT 분석 데이터 부족의 `영화 평가하러 가기`가 `안 남긴 영화`로 온다.
+ * 때문이다 — EXT-05 OTT 분석 데이터 부족의 `영화 평가하러 가기`가 이 탭으로 온다.
  *
- * **세 탭 모두 실제 호출이다.** 추천 기록은 API-048(업무 S15P21E106-478), 안 남긴 영화는
+ * `?tab=`의 값은 `unrated` 그대로다(업무 -919). 이름과 내용이 바뀌었지만 값을 바꾸면 위 진입점과
+ * 밖에 남은 주소가 끊긴다. 카드를 누르면 2.5 평가하기로 가는 것도 그대로라, 그 화면에서 평가한
+ * 영화는 수정이 된다(API-037).
+ *
+ * **세 탭 모두 실제 호출이다.** 추천 기록은 API-048(업무 S15P21E106-478), 최근 본 영화는
  * API-034(업무 -477), 평가한 영화는 API-039(업무 -611)다. 평가한 영화는 그전까지 평가와
  * 1:1인 내 필름(API-042)으로 대신 그렸다(업무 -610). API-039는 **프레임 없는 과거 평가도**
  * 돌려주므로 필름의 프레임 수보다 많을 수 있다.
@@ -64,7 +72,7 @@
  * 바꿀 수 있지만 값은 목업 저장소에만 남는다(`api/users.ts` `getMyProfileView`). 해시태그처럼
  * 시안에도 계약에도 없는 값은 넣지 않았다.
  *
- * **7.5 추천 기록 · 7.6 평가한 영화 · 7.7 안 남긴 영화 화면은 지웠다**(업무 -495).
+ * **7.5 추천 기록 · 7.6 평가한 영화 · 7.7 평가하지 않은 영화 화면은 지웠다**(업무 -495).
  * 세 화면이 하던 일을 이 피드가 그대로 한다. 7.6-A 한줄평 관리 시트는 3.1-A 프레임
  * 상세에서 열리므로 남는다(screen-spec-my.md 11장).
  */
@@ -90,14 +98,13 @@ import { ChevronRightIcon, SettingsIcon } from '../../../components/Icon';
 import MyAside from './MyAside';
 import ServiceFeedbackPrompt from './ServiceFeedbackPrompt';
 import { useShellSize } from '../../../hooks/useShellSize';
-import { getOtts } from '../../../api/otts';
 import { getMyTaste } from '../../../api/taste';
 import { getRecommendationHistory } from '../../../api/recommendations';
 import { getMyReports, getReportDetail } from '../../../api/reports';
 import { getPopcornBucket } from '../../../api/taste';
 import { getMyProfileView } from '../../../api/users';
 import { retryTransient } from '../../../api/retry';
-import { getMyRatings, getWatchRecords } from '../../../api/watch';
+import { getMyRatings } from '../../../api/watch';
 import { path } from '../../../routes/paths';
 import { appUrl } from '../../../utils/appUrl';
 import { shareLink } from '../../../utils/share';
@@ -111,14 +118,10 @@ import type { PopcornBucket as PopcornBucketData } from '../../../types/taste';
 import type { ReportDetail, ReportSummary } from '../../../types/report';
 import type { TasteAnalysis } from '../../../types/taste';
 import type { ProfileView } from '../../../types/unspecified';
-import type { Ott } from '../../../types/ott';
-import type { MyRatedItem, MyRatingList, WatchRecordListItem } from '../../../types/watch';
+import type { MyRatedItem, MyRatingList, MyRatingListItem } from '../../../types/watch';
 
 /** 포스터 비율 2:3. 격자는 칸 폭이 화면에 따라 달라지므로 비율만 고정한다 */
 const POSTER_RATIO = { width: 2, height: 3 };
-
-/** 앞의 몇 개를 채운 칩으로 그릴지. 7.2-A · 7.2-B와 같은 수다 */
-const LEADING_KEYWORDS = 2;
 
 /** API-040이 키워드를 만드는 최소 평가 편수. 계약 처리 규칙과 같은 값이다 */
 const MINIMUM_RATINGS_FOR_KEYWORDS = 15;
@@ -140,7 +143,7 @@ function emptyTasteText(ratingCount: number): string {
 
 const TABS = [
   { key: 'ratings', label: '평가한 영화' },
-  { key: 'unrated', label: '안 남긴 영화' },
+  { key: 'unrated', label: '최근 본 영화' },
   { key: 'recommendations', label: '추천 기록' },
 ] as const;
 
@@ -149,7 +152,7 @@ type TabKey = (typeof TABS)[number]['key'];
 /** 탭마다 빈 목록일 때의 문구. 7.6 · 7.7이 쓰던 말을 줄여서 옮겼다 */
 const EMPTY_TEXT: Record<TabKey, string> = {
   ratings: '아직 평가한 영화가 없어요',
-  unrated: '평가를 기다리는 영화가 없어요',
+  unrated: '아직 본 영화가 없어요',
   recommendations: '아직 추천받은 기록이 없어요',
 };
 
@@ -183,18 +186,17 @@ function ratedItems(list: MyRatingList): MyRatedItem[] {
 type HistoryRow = { item: RecommendationHistoryItem; generatedAt: string };
 
 /**
- * 안 남긴 영화 한 칸. 감상 기록(API-034)에 OTT 이름과 날짜를 얹은 것이다.
+ * 최근 본 영화 한 칸. 감상 기록(API-034)에 OTT 이름과 날짜를 얹은 것이다.
  *
  * 기록은 `ottId`만 주고 이름은 기준정보(API-025)에 있다. 7.7이 쓰던 방식 그대로다.
  *
  * **둘 다 없을 수 있다.** 클릭 없이 평가로 만들어진 기록은 `ott`도 시각도 `null`이다
  * (업무 -477). 그런 칸은 OTT 이름과 날짜 없이 그린다.
  */
-type UnratedRow = {
-  record: WatchRecordListItem;
-  ottName?: string;
-  /** 본 시각. 적는 형식은 폭에 따라 다르므로 그릴 때 정한다(업무 -786) */
-  watchedOn?: string | null;
+type WatchedRow = {
+  item: MyRatingListItem;
+  /** 평가한 때 또는 봤다고 확인한 때. 적는 형식은 폭에 따라 다르므로 그릴 때 정한다(업무 -786) */
+  watchedOn: string | null;
 };
 
 /*
@@ -295,20 +297,35 @@ const FEED_PAGE_SIZE = 18;
  */
 const HISTORY_SETS_PER_PAGE = FEED_PAGE_SIZE / 3;
 
-/** 안 남긴 영화의 조건. 다음 장도 **같은 조건으로** 받아야 커서가 맞는다(API-034) */
-const UNRATED_QUERY = { status: ['WATCHED_UNRATED' as const], size: FEED_PAGE_SIZE };
+/**
+ * 최근 본 영화의 조건. 다음 장도 **같은 조건으로** 받아야 커서가 맞는다(API-039).
+ *
+ * 업무 -919에서 **감상 기록(API-034)에서 내 평가 목록(API-039)의 `filter=ALL`로 바꿨다.**
+ * 탭이 `안 남긴 영화`였을 때는 평가 안 한 것만 보이면 됐지만, `최근 본 영화`가 되면서 평가한
+ * 영화도 함께 보여야 한다. API-034로 둘을 함께 받을 수는 있어도 **순서가 맞지 않는다** —
+ * 그쪽은 `clickedAt` 내림차순이라, OTT 링크를 누르지 않고 바로 평가한 기록은 그 시각이 없어
+ * 맨 뒤로 밀린다. 방금 평가한 영화가 목록 끝에 서게 된다.
+ *
+ * `filter=ALL`은 서버가 평가와 미평가를 한 페이지에서 `activityAt` 내림차순으로 정렬해 준다.
+ * 그 시각은 평가한 항목이면 평가한 때, 미평가면 봤다고 확인한 때다. 같은 영화가 두 번 나오지도
+ * 않는다. 화면에서 두 목록을 합치는 방법도 있지만 한 장 안에서만 맞고 `더 보기`에서 어긋난다.
+ */
+function watchedQuery(unratedOnly: boolean) {
+  return { filter: unratedOnly ? ('UNRATED' as const) : ('ALL' as const), size: FEED_PAGE_SIZE };
+}
 
-/** 기록에 OTT 이름과 날짜를 얹는다. 기록은 `ottId`만 주고 이름은 기준정보에 있다 */
-function toUnratedRow(record: WatchRecordListItem, otts: Ott[]): UnratedRow {
-  return {
-    record,
-    ottName: otts.find((ott) => ott.ottId === record.ott?.ottId)?.name,
-    /*
-     * **날짜에 형식을 입히지 않고 그대로 둔다.** 폭에 따라 적는 방식이 달라지는데(업무 -786)
-     * 받아 둘 때 정해 버리면 폭이 바뀔 때마다 목록을 다시 받아야 한다
-     */
-    watchedOn: record.watchedAt ?? record.clickedAt,
-  };
+/** `평가 안 한 것만` 을 켠 상태를 주소에 남기는 이름 */
+const UNRATED_ONLY_PARAM = 'unratedOnly';
+
+/**
+ * 목록 한 칸. 서버가 정렬에 쓴 시각(`activityAt`)을 그대로 적는다 — 보이는 날짜와 줄 세운
+ * 순서가 같아야 한다.
+ *
+ * **날짜에 형식을 입히지 않고 그대로 둔다.** 폭에 따라 적는 방식이 달라지는데(업무 -786)
+ * 받아 둘 때 정해 버리면 폭이 바뀔 때마다 목록을 다시 받아야 한다.
+ */
+function toWatchedRow(item: MyRatingListItem): WatchedRow {
+  return { item, watchedOn: item.activityAt };
 }
 
 /** 받은 장을 이미 그린 격자 뒤에 붙인다. 격자가 없으면(실패 · 읽는 중) 그대로 둔다 */
@@ -367,7 +384,7 @@ export default function MyDashboardPage() {
 
   /*
    * 고른 탭은 주소에 남긴다(`?tab=`). 화면 밖에서 특정 탭으로 보내는 자리가 있어서다
-   * (EXT-05 → `안 남긴 영화`). 모르는 값이 오면 기본 탭이다.
+   * (EXT-05 → `최근 본 영화`). 모르는 값이 오면 기본 탭이다.
    */
   const [params, setParams] = useSearchParams();
   const requested = params.get('tab');
@@ -375,14 +392,24 @@ export default function MyDashboardPage() {
     ? (requested as TabKey)
     : 'ratings';
 
+  /*
+   * `최근 본 영화` 안에서 아직 평가하지 않은 것만 보는 스위치(업무 -919).
+   *
+   * **처음 값만 주소에서 읽고 그 뒤로는 화면이 들고 있는다.** 밖에서 켠 채로 보낼 수 있어야
+   * 해서 주소를 읽지만(EXT-05의 `영화 평가하러 가기`는 평가할 영화를 찾아가라는 뜻이다),
+   * 누를 때마다 주소를 고치면 **스크롤이 맨 위로 튄다.** `useScrollRestoration`이 주소가
+   * 바뀌는 것을 화면을 새로 연 것으로 보고 본문을 되감기 때문이다. 탭을 누를 때는 그것이 맞지만
+   * 같은 탭 안에서 목록만 거르는 것은 다르다. 그 훅은 모든 화면이 쓰므로 건드리지 않는다.
+   */
+  const [unratedOnly, setUnratedOnly] = useState(() => params.get(UNRATED_ONLY_PARAM) === 'true');
+
   const [ratings, setRatings] = useState<Feed<MyRatedItem>>({ status: 'loading' });
-  const [unrated, setUnrated] = useState<Feed<UnratedRow>>({ status: 'loading' });
+  const [unrated, setUnrated] = useState<Feed<WatchedRow>>({ status: 'loading' });
   const [history, setHistory] = useState<Feed<HistoryRow>>({ status: 'loading' });
   /** 탭마다 다음 장 커서. 더 받을 것이 없으면 `null`이다(각 API의 `hasNext`) */
   const [cursors, setCursors] = useState(NO_CURSORS);
   const [more, setMore] = useState(IDLE_MORE);
-  /** 안 남긴 영화의 OTT 이름표. 다음 장에도 같은 기준정보를 쓴다 */
-  const [otts, setOtts] = useState<Ott[]>([]);
+  /** 최근 본 영화의 OTT 이름표. 다음 장에도 같은 기준정보를 쓴다 */
   const [feedReload, setFeedReload] = useState(0);
   const [notice, setNotice] = useState('');
 
@@ -450,25 +477,6 @@ export default function MyDashboardPage() {
         if (active) setRatings({ status: 'failed' });
       });
 
-    /*
-     * 안 남긴 영화는 감상 기록과 OTT 기준정보를 함께 읽는다. 기록은 `ottId`만 주고
-     * 이름은 기준정보에 있다(7.7이 쓰던 방식).
-     */
-    Promise.all([getWatchRecords(UNRATED_QUERY), getOtts()])
-      .then(([records, ottList]) => {
-        if (!active) return;
-
-        setOtts(ottList);
-        setUnrated({
-          status: 'ready',
-          items: records.items.map((record) => toUnratedRow(record, ottList)),
-        });
-        setCursors((prev) => ({ ...prev, unrated: nextCursor(records) }));
-      })
-      .catch(() => {
-        if (active) setUnrated({ status: 'failed' });
-      });
-
     getRecommendationHistory(undefined, HISTORY_SETS_PER_PAGE)
       .then((value) => {
         if (!active) return;
@@ -484,6 +492,32 @@ export default function MyDashboardPage() {
       active = false;
     };
   }, [feedReload]);
+
+  /*
+   * 최근 본 영화만 따로 읽는다. 거르개를 누르면 이 목록만 다시 받고 **다른 두 탭은 건드리지
+   * 않는다** — 한 효과에 묶어 두면 거르개 한 번에 세 API를 다시 부른다.
+   *
+   * 평가와 미평가를 서버가 합쳐 정렬해 준다(API-039 `filter=ALL`). 거르개를 켜면 `UNRATED`다.
+   * 커서는 조회 조건에 묶이므로 조건이 바뀌면 첫 장부터 받는다.
+   */
+  useEffect(() => {
+    let active = true;
+
+    getMyRatings(watchedQuery(unratedOnly))
+      .then((records) => {
+        if (!active) return;
+
+        setUnrated({ status: 'ready', items: records.items.map(toWatchedRow) });
+        setCursors((prev) => ({ ...prev, unrated: nextCursor(records) }));
+      })
+      .catch(() => {
+        if (active) setUnrated({ status: 'failed' });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [feedReload, unratedOnly]);
 
   if (failed) {
     return (
@@ -581,10 +615,10 @@ export default function MyDashboardPage() {
     }
 
     if (current === 'unrated') {
-      getWatchRecords({ ...UNRATED_QUERY, cursor })
+      getMyRatings({ ...watchedQuery(unratedOnly), cursor })
         .then((page) => {
           done(nextCursor(page));
-          setUnrated(append(page.items.map((record) => toUnratedRow(record, otts))));
+          setUnrated(append(page.items.map(toWatchedRow)));
         })
         .catch(fail);
 
@@ -708,9 +742,9 @@ export default function MyDashboardPage() {
           </h2>
           {taste.keywords.length > 0 ? (
             <ul className={styles.tasteKeywords}>
-              {taste.keywords.map((keyword, index) => (
+              {taste.keywords.map((keyword) => (
                 <li key={keyword.code}>
-                  <Chip variant={index < LEADING_KEYWORDS ? 'solid' : 'outline'}>
+                  <Chip tone={desktop ? 'light' : 'dark'} hashtag>
                     {keyword.label}
                   </Chip>
                 </li>
@@ -749,6 +783,29 @@ export default function MyDashboardPage() {
         aria-labelledby={`my-feed-tab-${tab}`}
         className={styles.feed}
       >
+        {/*
+         * 아직 평가하지 않은 것만 보는 스위치. **목록 상태와 상관없이 늘 같은 자리에 둔다** —
+         * 읽는 중 · 실패 · 빈 목록에도 그린다. 목록이 비었을 때 사라지면 왜 비었는지(거르개를
+         * 켜 둔 탓인지) 알 길이 없고, 끌 수도 없어 갇힌다.
+         *
+         * **켜고 끄면 이 목록만 첫 장부터 다시 받는다** — 커서가 조회 조건에 묶여 있어(API-039)
+         * 조건이 바뀐 커서는 `400`이다. 다른 두 탭은 건드리지 않고, 주소도 바꾸지 않아 보던
+         * 자리에 그대로 있는다.
+         */}
+        {tab === 'unrated' && (
+          <div className={styles.feedFilter}>
+            <button
+              type="button"
+              className={styles.feedFilterButton}
+              data-on={unratedOnly}
+              aria-pressed={unratedOnly}
+              onClick={() => setUnratedOnly((on) => !on)}
+            >
+              평가 안 한 영화
+            </button>
+          </div>
+        )}
+
         {feed.status === 'loading' && <p className={styles.feedNote}>불러오는 중이에요</p>}
 
         {feed.status === 'failed' && (
@@ -821,38 +878,54 @@ export default function MyDashboardPage() {
         )}
 
         {/*
-         * 안 남긴 영화 탭. 본 기록은 있는데 평가가 없는 영화다(API-034
-         * `WATCHED_UNRATED`). 누르면 2.5 평가하기로 간다 — 7.7이 하던 이동 그대로다.
+         * 최근 본 영화 탭. 본 기록이 있는 영화다 — 평가한 것과 아직 안 한 것을 함께 담는다
+         * (API-034 `RATED` + `WATCHED_UNRATED`, 업무 -919). 누르면 2.5 평가하기로 간다.
+         * 이미 평가한 영화는 그 화면이 수정으로 받는다(API-037).
          * 날짜와 OTT는 기록이 주는 값이고, 클릭 이력이 없으면 둘 다 없다(업무 -477).
          */}
         {tab === 'unrated' && unrated.status === 'ready' && unrated.items.length > 0 && (
           <ul className={styles.grid}>
-            {unrated.items.map(({ record, ottName, watchedOn }) => (
-              <li key={record.watchRecordId}>
-                <Link to={path.movieRating(record.movie.movieId)} className={styles.cell}>
+            {unrated.items.map(({ item, watchedOn }) => (
+              <li key={`${item.itemType}-${item.movie.movieId}`}>
+                <Link to={path.movieRating(item.movie.movieId)} className={styles.cell}>
                   <PosterCue>
                     <Poster
                       fluid
                       width={POSTER_RATIO.width}
                       height={POSTER_RATIO.height}
                       radius={0}
-                      src={record.movie.posterUrl ?? undefined}
-                      title={record.movie.title}
-                      seed={record.movie.movieId}
+                      src={item.movie.posterUrl ?? undefined}
+                      title={item.movie.title}
+                      seed={item.movie.movieId}
                     />
+
+                    {/* 평가한 영화는 `평가한 영화` 탭과 같은 자리에 같은 배지를 얹는다 */}
+                    {item.itemType === 'RATED' ? (
+                      <span className={styles.score}>
+                        <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                          <path d={STAR_PATH} />
+                        </svg>
+                        {item.score.toFixed(1)}
+                      </span>
+                    ) : null}
                   </PosterCue>
 
-                  <VisuallyHidden>{record.movie.title} 평가하기</VisuallyHidden>
+                  <VisuallyHidden>
+                    {item.movie.title} {item.itemType === 'RATED' ? '평가 수정하기' : '평가하기'}
+                  </VisuallyHidden>
 
                   <span className={styles.caption}>
-                    <span className={styles.captionSource}>{ottName ?? '감상 기록'}</span>
+                    {/* 아직 평가하지 않은 영화만 그 사실을 적는다. 평가한 것은 포스터 위 별점이 말한다 */}
+                    {item.itemType === 'RATED' ? null : (
+                      <span className={styles.captionSource}>평가 전</span>
+                    )}
                     {watchedOn ? (
                       <span className={styles.captionDate}>
                         {desktop ? formatDate(watchedOn) : formatShortDate(watchedOn)}
                       </span>
                     ) : null}
                     {desktop ? (
-                      <span className={styles.captionTitle}>{record.movie.title}</span>
+                      <span className={styles.captionTitle}>{item.movie.title}</span>
                     ) : null}
                   </span>
                 </Link>

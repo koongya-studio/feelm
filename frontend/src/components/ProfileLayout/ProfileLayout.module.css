@@ -493,18 +493,6 @@
   border-top-color: var(--color-line-on-dark);
 }
 
-/* 키워드 칩. 테두리 칩은 흰빛 선, 채운 칩은 흰 면에 검정 글자다 */
-.layout[data-tone='dark'] .chips > li > span {
-  border-color: var(--color-line-on-dark);
-  color: var(--color-on-dark);
-}
-
-.layout[data-tone='dark'] .chips > li > span[data-variant='solid'] {
-  border-color: var(--color-on-dark);
-  background: var(--color-on-dark);
-  color: var(--color-ink);
-}
-
 /* 받는 동안의 자리. 사진 배경 위라 흰빛 옅은 면이다 */
 .layout[data-tone='dark'] .skeletonAvatar,
 .layout[data-tone='dark'] .skeletonLine,

@@ -241,8 +241,14 @@ describe('7.1 MY 데스크톱 시안', () => {
     expect(rows[0]).toHaveTextContent('인 셉 션');
     expect(rows[1]).toHaveTextContent('취향 리포트가 만들어졌어요');
 
-    // 활동 로그 API는 없다. 새로 부르는 것이 없어야 한다
-    expect(getMyRatings).toHaveBeenCalledTimes(1);
+    /*
+     * 활동 로그 API는 없다. 최근 활동은 **이미 받아 둔** 평가 · 리포트로 조립하므로 이 카드
+     * 때문에 새로 부르는 것이 없어야 한다.
+     *
+     * API-039는 두 번 불린다 — `평가한 영화` 탭과 `최근 본 영화` 탭이 같은 API를 필터만 달리
+     * 부른다(업무 -919). 최근 활동이 세 번째를 부르지 않는 것이 여기서 볼 것이다.
+     */
+    expect(getMyRatings).toHaveBeenCalledTimes(2);
     expect(getMyReports).toHaveBeenCalledTimes(1);
   });
 

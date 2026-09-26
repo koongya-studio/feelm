@@ -35,9 +35,6 @@ import type { MyRatedItem } from '../../../../types/watch';
 /** 최근 활동에 세우는 줄 수. 시안이 넷이다 */
 const ACTIVITY_COUNT = 4;
 
-/** 대표 키워드로 앞에 채워 넣는 칩 수. 시안의 첫 줄이다 */
-const SOLID_KEYWORD_COUNT = 3;
-
 type Activity = {
   key: string;
   /** 무슨 일이 있었는지 */
@@ -94,11 +91,9 @@ export default function MyAside({ profile, bucket, ratings, reports }: Props) {
       {keywords.length > 0 ? (
         <AsidePanel title="나의 취향 키워드">
           <ul className={styles.keywords}>
-            {keywords.map((keyword, index) => (
+            {keywords.map((keyword) => (
               <li key={keyword.code}>
-                <Chip variant={index < SOLID_KEYWORD_COUNT ? 'solid' : 'outline'}>
-                  {keyword.label}
-                </Chip>
+                <Chip hashtag>{keyword.label}</Chip>
               </li>
             ))}
           </ul>

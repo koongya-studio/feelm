@@ -23,6 +23,9 @@
  * 평가를 얼마나 해도 모든 사용자가 `insufficientData: true`와 빈 `keywords`를 받는다.
  */
 import { request } from './client';
+import { isMockSession } from './mockAccount';
+import { respond } from './mockTransport';
+import { mockTasteAnalysis } from '../mocks/taste';
 import type {
   FrameDetail,
   FrameList,
@@ -50,9 +53,10 @@ export async function getPopcornFlavors(): Promise<PopcornFlavor[]> {
 /**
  * API-040 취향 분석·키워드 조회 · GET /api/v1/users/me/taste
  *
- * 업무 -461에서 홈을 없앴고 7.2 프로필 편집도 업무 -459에서 선호 장르 칩을 걷어내,
- * 현재 이 함수를 호출하는 화면은 없다. API 계약과 후속 화면 연동을 위해 클라이언트와
- * 단위 테스트는 유지한다.
+ * 7.1 MY 대시보드의 `내 취향` 구역과 `api/users.ts`의 내 프로필이 부른다(업무 -836).
+ *
+ * 개발 서버의 목업 계정으로 로그인했으면 서버로 보내지 않는다. 그러지 않으면 목업 세션에서
+ * 호출이 실패해 `내 취향` 구역이 통째로 사라져, 백엔드 없이 그 화면을 볼 수 없다(업무 -919).
  *
  * 캐시가 없는 사용자에게도 `200`이다 — `insufficientData: true` · 빈 배열들 ·
  * `analyzedAt: null`이 온다(API-040 처리 규칙). 후속 화면은 이를 실패가 아닌 빈 상태로
@@ -60,6 +64,8 @@ export async function getPopcornFlavors(): Promise<PopcornFlavor[]> {
  * 두지 않았다(`types/taste.ts`).
  */
 export async function getMyTaste(): Promise<TasteAnalysis> {
+  if (isMockSession()) return respond(mockTasteAnalysis, 'taste');
+
   return request<TasteAnalysis>('/users/me/taste');
 }
 

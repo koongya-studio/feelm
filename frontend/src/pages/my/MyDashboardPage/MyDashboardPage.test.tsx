@@ -4,13 +4,13 @@
  * 메뉴는 눌러서 어디로 가는지가 전부다. 링크 주소가 어긋나도 화면은 멀쩡해 보이므로
  * 목적지를 고정한다(screen-spec-my.md 2장).
  *
- * 사용자 시안(2026-09-16)으로 **평가 · 안 남긴 영화 · 추천 기록이 화면 안의 탭이 됐다.**
+ * 사용자 시안(2026-09-16)으로 **평가 · 최근 본 영화 · 추천 기록이 화면 안의 탭이 됐다.**
  * 눌러도 다른 화면으로 가지 않고 아래 피드만 바뀐다. 7.5 · 7.6 · 7.7 화면은 지웠다
  * (업무 -495). 그래서 이 파일이 잡을 것이 둘로 늘었다.
  *
  * - 남은 이동(`설정` · `4컷 리포트` · `편집`)의 목적지. `OTT 관리`는 7.8 설정 안으로
  *   옮겨 이 화면에 없다(`SettingsFlow.test.tsx`가 잡는다)
- * - 탭을 눌렀을 때 **그 탭의 데이터**가 그려지는지. 평가는 API-039, 안 남긴 영화는
+ * - 탭을 눌렀을 때 **그 탭의 데이터**가 그려지는지. 평가는 API-039, 최근 본 영화는
  *   API-034, 추천은 API-048이다. 취향 필름(API-042)을 이 셋인 것처럼 쓰면 여기서 걸린다
  * - 추천 기록의 **`더 보기`가 직전 응답의 커서로 다음 장을 이어 붙이는지**(업무 -478).
  *   첫 장만 그려도 화면은 멀쩡해 보이므로 눈으로는 빠진 것을 알 수 없다
@@ -23,15 +23,14 @@ import { act, fireEvent, screen, within } from '@testing-library/react';
 import MyDashboardPage from './index';
 import { renderWithRouter } from '../../../test/render';
 import { getMyProfileView } from '../../../api/users';
-import { getMyRatings, getWatchRecords } from '../../../api/watch';
+import { getMyRatings } from '../../../api/watch';
 import { getOtts } from '../../../api/otts';
 import { getRecommendationHistory } from '../../../api/recommendations';
 import { getMyTaste } from '../../../api/taste';
 import { ApiError, NETWORK_ERROR } from '../../../api/apiError';
 import { RETRY_DELAYS_MS } from '../../../api/retry';
 import { mockMyProfileView } from '../../../mocks/publicProfiles';
-import type { MyRatedItem, MyRatingList } from '../../../types/watch';
-import type { WatchRecordListItem } from '../../../types/watch';
+import type { MyRatedItem, MyRatingList, MyRatingListItem } from '../../../types/watch';
 import type { RecommendationHistory } from '../../../types/recommendation';
 import type { TasteAnalysis } from '../../../types/taste';
 
@@ -98,20 +97,30 @@ function ratingPage(items: MyRatedItem[], nextCursor: string | null = null): MyR
   return { items, nextCursor, hasNext: nextCursor !== null };
 }
 
-/** 본 기록은 있는데 평가가 없는 영화. API-034 `WATCHED_UNRATED` */
-const unrated: WatchRecordListItem[] = [
+/**
+ * `최근 본 영화` 탭이 그리는 항목. API-039 `filter=ALL`이 평가와 미평가를 함께 준다(업무 -919).
+ *
+ * 전에는 감상 기록(API-034)이었다. 바꾼 까닭은 순서다 — 그쪽은 `clickedAt`으로 줄을 세워
+ * OTT를 누르지 않고 바로 평가한 기록이 맨 뒤로 밀렸다.
+ */
+const watched: MyRatingListItem[] = [
   {
-    watchRecordId: 701,
-    movie: { movieId: 501, title: '안 남긴 영화 A', posterUrl: null },
-    status: 'WATCHED_UNRATED',
-    ott: { ottId: 1, code: 'NETFLIX' },
-    clickedAt: '2026-08-26T09:00:00Z',
-    confirmDueAt: '2026-08-27T09:00:00Z',
-    expiresAt: '2026-09-26T09:00:00Z',
-    watchedAt: '2026-08-26T09:00:00Z',
+    itemType: 'UNRATED',
     ratingId: null,
+    movie: { movieId: 501, title: '최근 본 영화 A', posterUrl: null },
+    score: null,
+    comment: null,
+    visibility: null,
+    spoiler: null,
+    frameId: null,
+    createdAt: null,
+    activityAt: '2026-08-26T09:00:00Z',
   },
 ];
+
+function watchedPage(items: MyRatingListItem[], nextCursor: string | null = null): MyRatingList {
+  return { items, nextCursor, hasNext: nextCursor !== null };
+}
 
 const history: RecommendationHistory = {
   items: [
@@ -144,11 +153,17 @@ const history: RecommendationHistory = {
 
 beforeEach(() => {
   vi.mocked(getMyProfileView).mockReset().mockResolvedValue(mockMyProfileView);
-  vi.mocked(getMyRatings).mockReset().mockResolvedValue(ratingPage(ratings));
-  vi.mocked(getRecommendationHistory).mockReset().mockResolvedValue(history);
-  vi.mocked(getWatchRecords)
+  /*
+   * 두 탭이 같은 API-039를 부른다(업무 -919). `평가한 영화`는 필터 없이, `최근 본 영화`는
+   * `filter=ALL`로 부르므로 **필터로 갈라** 다른 목록을 준다. 호출 순서에 기대면 탭이 늘거나
+   * 읽는 차례가 바뀔 때마다 깨진다.
+   */
+  vi.mocked(getMyRatings)
     .mockReset()
-    .mockResolvedValue({ items: unrated, nextCursor: null, hasNext: false });
+    .mockImplementation((query = {}) =>
+      Promise.resolve(query.filter === 'ALL' ? watchedPage(watched) : ratingPage(ratings)),
+    );
+  vi.mocked(getRecommendationHistory).mockReset().mockResolvedValue(history);
   vi.mocked(getOtts)
     .mockReset()
     .mockResolvedValue([{ ottId: 1, code: 'NETFLIX', name: '넷플릭스', logoUrl: null }]);
@@ -244,21 +259,22 @@ describe('7.1 MY 대시보드', () => {
     expect(cells[1]).toHaveTextContent('3.0');
   });
 
-  it('안 남긴 영화 탭은 감상 기록을 깔고 2.5 평가하기로 간다', async () => {
+  it('최근 본 영화 탭은 감상 기록을 깔고 2.5 평가하기로 간다', async () => {
     /*
      * 7.7이 하던 일이다(업무 -495에서 화면을 지우고 탭으로 옮겼다). 날짜와 OTT는
      * API-034 기록과 API-025 기준정보가 주는 값이다.
      */
     await renderDashboard();
 
-    fireEvent.click(screen.getByRole('tab', { name: '안 남긴 영화' }));
+    fireEvent.click(screen.getByRole('tab', { name: '최근 본 영화' }));
 
     const cells = within(feed()).getAllByRole('link');
 
     expect(cells).toHaveLength(1);
     expect(cells[0]).toHaveAttribute('href', '/movies/501/rate');
-    expect(cells[0]).toHaveTextContent('안 남긴 영화 A');
-    expect(cells[0]).toHaveTextContent('넷플릭스');
+    expect(cells[0]).toHaveTextContent('최근 본 영화 A');
+    // 아직 평가하지 않은 영화라 그 사실을 적는다. 평가한 것은 포스터 위 별점이 말한다
+    expect(cells[0]).toHaveTextContent('평가 전');
     expect(cells[0]).toHaveTextContent('8. 26');
   });
 
@@ -359,50 +375,111 @@ describe('7.1 MY 대시보드', () => {
 
     expect(within(feed()).queryByRole('button', { name: '더 보기' })).toBeNull();
 
-    fireEvent.click(screen.getByRole('tab', { name: '안 남긴 영화' }));
+    fireEvent.click(screen.getByRole('tab', { name: '최근 본 영화' }));
     expect(within(feed()).queryByRole('button', { name: '더 보기' })).toBeNull();
 
     fireEvent.click(screen.getByRole('tab', { name: '추천 기록' }));
     expect(within(feed()).getByRole('button', { name: '더 보기' })).toBeInTheDocument();
   });
 
-  it('안 남긴 영화도 같은 조건에 커서를 실어 다음 장을 이어 붙인다', async () => {
+  it('최근 본 영화도 같은 조건에 커서를 실어 다음 장을 이어 붙인다', async () => {
     /*
-     * 업무 -503. 그전에는 이 탭만 첫 장뿐이었다. 커서는 `status=WATCHED_UNRATED` 조건에
-     * 묶이므로(API-034) 다음 장도 같은 조건으로 보낸다. OTT 이름은 첫 장의 기준정보를 쓴다.
+     * 업무 -503. 그전에는 이 탭만 첫 장뿐이었다. 커서는 조회 조건에 묶이므로(API-039)
+     * 다음 장도 `filter=ALL`을 그대로 실어 보낸다. 조건이 바뀐 커서는 `400`이다.
      */
-    vi.mocked(getWatchRecords).mockResolvedValueOnce({
-      items: unrated,
-      nextCursor: 'watch-cursor-2',
-      hasNext: true,
+    const second: MyRatingListItem = {
+      ...watched[0],
+      movie: { movieId: 502, title: '최근 본 영화 B', posterUrl: null },
+    };
+
+    vi.mocked(getMyRatings).mockImplementation((query = {}) => {
+      if (query.filter !== 'ALL') return Promise.resolve(ratingPage(ratings));
+
+      return Promise.resolve(
+        query.cursor ? watchedPage([second]) : watchedPage(watched, 'watch-cursor-2'),
+      );
     });
 
     await renderDashboard();
-    fireEvent.click(screen.getByRole('tab', { name: '안 남긴 영화' }));
-    await within(feed()).findByRole('link', { name: /안 남긴 영화 A/ });
+    fireEvent.click(screen.getByRole('tab', { name: '최근 본 영화' }));
+    await within(feed()).findByRole('link', { name: /최근 본 영화 A/ });
 
-    vi.mocked(getWatchRecords).mockResolvedValueOnce({
-      items: [
-        {
-          ...unrated[0],
-          watchRecordId: 702,
-          movie: { movieId: 502, title: '안 남긴 영화 B', posterUrl: null },
-        },
-      ],
-      nextCursor: null,
-      hasNext: false,
-    });
     fireEvent.click(within(feed()).getByRole('button', { name: '더 보기' }));
 
-    const next = await within(feed()).findByRole('link', { name: /안 남긴 영화 B/ });
-    expect(next).toHaveTextContent('넷플릭스');
+    const next = await within(feed()).findByRole('link', { name: /최근 본 영화 B/ });
+    expect(next).toHaveTextContent('평가 전');
     expect(within(feed()).getAllByRole('link')).toHaveLength(2);
-    expect(getWatchRecords).toHaveBeenLastCalledWith({
-      status: ['WATCHED_UNRATED'],
+    expect(getMyRatings).toHaveBeenLastCalledWith({
+      filter: 'ALL',
       size: 18,
       cursor: 'watch-cursor-2',
     });
     expect(within(feed()).queryByRole('button', { name: '더 보기' })).toBeNull();
+  });
+
+  it('`평가 안 한 것만`을 켜면 필터를 바꿔 첫 장부터 다시 받는다', async () => {
+    /*
+     * 업무 -919. 커서는 조회 조건에 묶이므로(API-039) 조건을 바꿀 때 목록과 커서를 버리고
+     * 첫 장부터 받아야 한다. 켠 상태는 주소에 남아 밖에서 그 화면으로 보낼 수 있다.
+     */
+    const onlyUnrated: MyRatingListItem = {
+      ...watched[0],
+      movie: { movieId: 503, title: '평가 전 영화', posterUrl: null },
+    };
+
+    vi.mocked(getMyRatings).mockImplementation((query = {}) => {
+      if (query.filter === 'UNRATED') return Promise.resolve(watchedPage([onlyUnrated]));
+      if (query.filter === 'ALL') return Promise.resolve(watchedPage(watched));
+
+      return Promise.resolve(ratingPage(ratings));
+    });
+
+    await renderDashboard();
+    fireEvent.click(screen.getByRole('tab', { name: '최근 본 영화' }));
+    await within(feed()).findByRole('link', { name: /최근 본 영화 A/ });
+
+    const toggle = screen.getByRole('button', { name: '평가 안 한 영화' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(toggle);
+
+    expect(await within(feed()).findByRole('link', { name: /평가 전 영화/ })).toBeInTheDocument();
+    expect(within(feed()).queryByRole('link', { name: /최근 본 영화 A/ })).toBeNull();
+    expect(screen.getByRole('button', { name: '평가 안 한 영화' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    // 커서 없이 첫 장부터 받는다
+    expect(getMyRatings).toHaveBeenLastCalledWith({ filter: 'UNRATED', size: 18 });
+  });
+
+  it('목록이 비어도 거르개는 빈 문구보다 위에 남는다', async () => {
+    /*
+     * 거르개를 켜면 목록이 빌 수 있다. 그때 거르개가 사라지면 왜 비었는지 알 수 없고 끌 수도
+     * 없어 갇힌다. 읽는 중 · 실패에도 같은 자리에 있어야 한다.
+     */
+    vi.mocked(getMyRatings).mockImplementation((query = {}) =>
+      Promise.resolve(query.filter ? watchedPage([]) : ratingPage(ratings)),
+    );
+
+    await renderDashboard();
+    fireEvent.click(screen.getByRole('tab', { name: '최근 본 영화' }));
+
+    const empty = await within(feed()).findByText('아직 본 영화가 없어요');
+    const toggle = screen.getByRole('button', { name: '평가 안 한 영화' });
+
+    expect(toggle).toBeInTheDocument();
+    // 문구보다 앞에 선다
+    expect(toggle.compareDocumentPosition(empty)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('거르개는 최근 본 영화 탭에서만 보인다', async () => {
+    await renderDashboard();
+
+    expect(screen.queryByRole('button', { name: '평가 안 한 영화' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('tab', { name: '최근 본 영화' }));
+    expect(screen.getByRole('button', { name: '평가 안 한 영화' })).toBeInTheDocument();
   });
 
   it('평가한 영화는 API-039 내 평가 목록으로 그린다', async () => {
@@ -413,7 +490,7 @@ describe('7.1 MY 대시보드', () => {
      */
     await renderDashboard();
 
-    expect(getMyRatings).toHaveBeenCalledTimes(1);
+    // 같은 API를 `최근 본 영화` 탭도 부르므로(업무 -919) 이 탭의 호출만 본다 — 필터가 없는 쪽이다
     expect(getMyRatings).toHaveBeenCalledWith({ size: 18 });
     expect(
       await within(feed()).findByRole('link', { name: /평가한 영화 A.*4\.5/ }),
@@ -554,6 +631,20 @@ describe('내 취향', () => {
     const note = within(section()).getByText(/뚜렷한 취향/);
     expect(note).toBeInTheDocument();
     expect(within(section()).queryByText(/개만 더/)).toBeNull();
+  });
+
+  it('T3 키워드를 해시태그로 보인다 (업무 -919)', async () => {
+    vi.mocked(getMyTaste).mockResolvedValue(
+      taste(30, [{ code: 'DIRECTOR_BINGE', label: '봉준호 몰아보기' }]),
+    );
+
+    await renderDashboard();
+
+    const chip = within(await screen.findByRole('region', { name: '내 취향' })).getByText(
+      '봉준호 몰아보기',
+    );
+    // `#`은 화면 표기일 뿐이라 라벨 칸과 나뉘어 있다. 보이는 줄로 확인한다
+    expect(chip.parentElement?.textContent).toBe('#봉준호 몰아보기');
   });
 
   it('T4 취향 분석을 못 받아도 프로필과 피드는 그대로다', async () => {
