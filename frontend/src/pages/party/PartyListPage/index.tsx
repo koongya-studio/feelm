@@ -631,7 +631,9 @@ export default function PartyListPage() {
               </div>
             </div>
 
-            {commonFlavors.length > 0 ? (
+            {firstParty.members.length < 2 ? (
+              <p className={styles.commonLabel}>파티원이 참여하면 공통 취향을 확인할 수 있어요</p>
+            ) : commonFlavors.length > 0 ? (
               <div className={styles.common}>
                 <p className={styles.commonLabel}>우리의 공통 취향</p>
 

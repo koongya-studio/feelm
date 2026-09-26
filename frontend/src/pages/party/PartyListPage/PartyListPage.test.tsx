@@ -76,6 +76,18 @@ beforeEach(() => {
 });
 
 describe('5.1 파티 시작', () => {
+  it('혼자인 대표 파티는 공통 취향 대신 참여 안내를 표시한다', async () => {
+    vi.mocked(getMyParties).mockResolvedValue([party({ members: [member(ME, 'OWNER')] })]);
+    vi.mocked(getPartyPopcorn).mockResolvedValue(partyPopcorn([partyPopcorn().members[0]]));
+    renderWithRouter(<PartyListPage />, { route: '/party' });
+
+    expect(
+      await screen.findByText('파티원이 참여하면 공통 취향을 확인할 수 있어요'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('우리의 공통 취향')).not.toBeInTheDocument();
+    expect(screen.queryByText('맛1')).not.toBeInTheDocument();
+  });
+
   it('대표 파티를 강조 카드로 세우고 파티원을 이름까지 보여준다', async () => {
     renderWithRouter(<PartyListPage />, { route: '/party' });
 
