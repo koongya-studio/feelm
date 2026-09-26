@@ -64,7 +64,11 @@ const ITEMS: { key: PrivacyKey; label: string; note?: string }[] = [
     label: '팝콘 버킷 공개',
     note: '비공개여도 함께 있는 파티의 파티원에게는 파티 화면에서 보여요',
   },
-  { key: 'reviewVisibility', label: '한줄평 공개' },
+  {
+    key: 'reviewVisibility',
+    label: '한줄평 공개',
+    note: '개별 한줄평도 공개로 설정해야 다른 사람에게 보여요. 기존 비공개 한줄평은 자동으로 공개되지 않아요',
+  },
 ];
 
 function pickSettings(profile: MyProfile): PrivacySettings {

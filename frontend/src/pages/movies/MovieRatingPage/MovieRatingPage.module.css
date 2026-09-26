@@ -103,10 +103,22 @@
   cursor: default;
 }
 
-/*
- * 공개 범위 선택 컨트롤을 만들지 않는 대신 적용되는 기본값을 알린다(CR-05).
- * 지시서가 반영되면 이 안내를 선택 컨트롤로 교체한다.
- */
+.visibilityControl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.visibilityControl legend {
+  margin-bottom: var(--space-2);
+  font-size: var(--font-size-meta);
+  color: var(--color-ink-muted);
+}
+
 .visibilityNote {
   font-size: var(--font-size-caption);
   line-height: var(--line-height-caption);
