@@ -277,7 +277,11 @@ backend-image:
 deploy-backend:
   stage: deploy
   tags: [e106-shell]
-  needs: [backend-image]
+  needs:
+    - job: backend-image
+    - job: deploy-consumer
+      optional: true
+      artifacts: false
   resource_group: service-and-backend-cache
   environment:
     name: service
