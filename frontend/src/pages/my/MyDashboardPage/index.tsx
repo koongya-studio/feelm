@@ -16,7 +16,7 @@
  * | 버튼 둘 | `프로필 편집`(→ 7.2) · `프로필 공유` |
  * | 수치 | 프레임 · 팝콘 · 공개 한줄평 |
  * | 바로가기 | `4컷 리포트`(→ 7.3) · `취향 팝콘`(→ 3.2) |
- * | 탭 | `평가한 영화` · `최근 본 영화` · `추천 기록`. **화면 안에서 아래 피드만 바꾼다** |
+ * | 탭 | `평가한 영화` · `최근 본 영화` · `추천 기록` · `관심 없음`. **화면 안에서 아래 피드만 바꾼다** |
  * | 본문 | 고른 탭의 포스터 3열 피드 |
  *
  * **피드는 각 탭의 실제 기록이다.** 평가는 API-039(`getMyRatings`), 최근 본 영화는 같은
@@ -97,7 +97,7 @@ import MyAside from './MyAside';
 import ServiceFeedbackPrompt from './ServiceFeedbackPrompt';
 import { useShellSize } from '../../../hooks/useShellSize';
 import { getMyTaste } from '../../../api/taste';
-import { getRecommendationHistory } from '../../../api/recommendations';
+import { getMyDismissals, getRecommendationHistory } from '../../../api/recommendations';
 import { getMyReports, getReportDetail } from '../../../api/reports';
 import { getPopcornBucket } from '../../../api/taste';
 import { getMyProfileView } from '../../../api/users';
@@ -110,13 +110,18 @@ import { formatDate, formatShortDate } from '../../../utils/date';
 import styles from './MyDashboardPage.module.css';
 import type { FlavorCount } from '../../../components/PopcornBucket/kernels';
 import type { RecommendationType } from '../../../types/enums';
-import type { RecommendationHistoryItem } from '../../../types/recommendation';
+import type { DismissalListItem, RecommendationHistoryItem } from '../../../types/recommendation';
 // 같은 이름의 통 그림 컴포넌트가 이미 있어 타입은 이름을 바꿔 들여온다
 import type { PopcornBucket as PopcornBucketData } from '../../../types/taste';
 import type { ReportDetail, ReportSummary } from '../../../types/report';
 import type { TasteAnalysis } from '../../../types/taste';
 import type { ProfileView } from '../../../types/unspecified';
-import type { MyRatedItem, MyRatingList, MyRatingListItem } from '../../../types/watch';
+import type {
+  MyRatedItem,
+  MyRatingList,
+  MyRatingListItem,
+  MyRatingSort,
+} from '../../../types/watch';
 
 /** 포스터 비율 2:3. 격자는 칸 폭이 화면에 따라 달라지므로 비율만 고정한다 */
 const POSTER_RATIO = { width: 2, height: 3 };
@@ -143,6 +148,7 @@ const TABS = [
   { key: 'ratings', label: '평가한 영화' },
   { key: 'unrated', label: '최근 본 영화' },
   { key: 'recommendations', label: '추천 기록' },
+  { key: 'dismissals', label: '관심 없음' },
 ] as const;
 
 type TabKey = (typeof TABS)[number]['key'];
@@ -152,6 +158,7 @@ const EMPTY_TEXT: Record<TabKey, string> = {
   ratings: '아직 평가한 영화가 없어요',
   unrated: '아직 본 영화가 없어요',
   recommendations: '아직 추천받은 기록이 없어요',
+  dismissals: '관심 없음으로 표시한 영화가 없어요',
 };
 
 /** 7.5의 출처 문구를 그대로 쓴다. 계약의 `type` 세 값과 하나씩 맞는다 */
@@ -342,12 +349,14 @@ const NO_CURSORS: Record<TabKey, string | null> = {
   ratings: null,
   unrated: null,
   recommendations: null,
+  dismissals: null,
 };
 
 const IDLE_MORE: Record<TabKey, MoreState> = {
   ratings: 'idle',
   unrated: 'idle',
   recommendations: 'idle',
+  dismissals: 'idle',
 };
 
 /** 다음 장을 못 받았을 때 버튼 아래 한 줄 */
@@ -355,6 +364,7 @@ const MORE_ERROR: Record<TabKey, string> = {
   ratings: '지난 평가를 불러오지 못했어요.',
   unrated: '지난 기록을 불러오지 못했어요.',
   recommendations: '지난 추천을 불러오지 못했어요.',
+  dismissals: '지난 관심 없음 목록을 불러오지 못했어요.',
 };
 
 export default function MyDashboardPage() {
@@ -401,6 +411,13 @@ export default function MyDashboardPage() {
    */
   const [unratedOnly, setUnratedOnly] = useState(() => params.get(UNRATED_ONLY_PARAM) === 'true');
   const watchedRequest = useRef<AbortController | null>(null);
+  const ratingsRequest = useRef<AbortController | null>(null);
+  const [ratingSort, setRatingSort] = useState<MyRatingSort>('LATEST');
+
+  const [dismissalsRequested, setDismissalsRequested] = useState(tab === 'dismissals');
+  const loadDismissals = dismissalsRequested || tab === 'dismissals';
+  const dismissalRequest = useRef<AbortController | null>(null);
+  const [dismissals, setDismissals] = useState<Feed<DismissalListItem>>({ status: 'loading' });
 
   const [ratings, setRatings] = useState<Feed<MyRatedItem>>({ status: 'loading' });
   const [unrated, setUnrated] = useState<Feed<WatchedRow>>({ status: 'loading' });
@@ -451,42 +468,33 @@ export default function MyDashboardPage() {
     };
   }, [reloadCount]);
 
-  /*
-   * 두 피드를 함께 읽는다. 탭은 이동이 아니라 화면 안의 전환이라, 눌렀을 때 다시
-   * 기다리지 않아야 한다. 하나가 실패해도 다른 하나는 그려진다.
-   *
-   * 다시 읽기 전에 `loading`으로 되돌리는 것은 `retryFeeds`가 한다. 여기서 하면 효과
-   * 안에서 상태를 바꾸게 된다.
-   */
+  // 정렬 변경은 평가 목록만 다시 읽는다. 이전 첫 장과 더 보기 응답은 무시한다.
   useEffect(() => {
-    let active = true;
-
-    /*
-     * 평가한 영화는 내 평가 목록(API-039)이다(업무 -611). 필터를 생략하면 서버가 평가만
-     * 최신순으로 준다. 2.5에서 방금 저장 · 수정한 평가도 다시 읽을 때 그대로 보인다.
-     */
-    getMyRatings({ size: FEED_PAGE_SIZE })
+    const controller = new AbortController();
+    ratingsRequest.current = controller;
+    getMyRatings({ size: FEED_PAGE_SIZE, ...(ratingSort === 'LATEST' ? {} : { sort: ratingSort }) })
       .then((value) => {
-        if (!active) return;
-
+        if (controller.signal.aborted) return;
         setRatings({ status: 'ready', items: ratedItems(value) });
         setCursors((prev) => ({ ...prev, ratings: nextCursor(value) }));
       })
       .catch(() => {
-        if (active) setRatings({ status: 'failed' });
+        if (!controller.signal.aborted) setRatings({ status: 'failed' });
       });
+    return () => controller.abort();
+  }, [feedReload, ratingSort]);
 
+  useEffect(() => {
+    let active = true;
     getRecommendationHistory(undefined, HISTORY_SETS_PER_PAGE)
       .then((value) => {
         if (!active) return;
-
         setHistory({ status: 'ready', items: flatten(value.items) });
         setCursors((prev) => ({ ...prev, recommendations: nextCursor(value) }));
       })
       .catch(() => {
         if (active) setHistory({ status: 'failed' });
       });
-
     return () => {
       active = false;
     };
@@ -519,6 +527,23 @@ export default function MyDashboardPage() {
       controller.abort();
     };
   }, [feedReload, unratedOnly]);
+
+  // 관심 없음은 처음 방문할 때 읽고, 탭을 오가도 받은 목록과 커서를 유지한다.
+  useEffect(() => {
+    if (!loadDismissals) return;
+    const controller = new AbortController();
+    dismissalRequest.current = controller;
+    getMyDismissals({ size: FEED_PAGE_SIZE })
+      .then((page) => {
+        if (controller.signal.aborted) return;
+        setDismissals({ status: 'ready', items: page.items });
+        setCursors((prev) => ({ ...prev, dismissals: nextCursor(page) }));
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setDismissals({ status: 'failed' });
+      });
+    return () => controller.abort();
+  }, [feedReload, loadDismissals]);
 
   if (failed) {
     return (
@@ -560,7 +585,14 @@ export default function MyDashboardPage() {
     );
   }
 
-  const feed = tab === 'ratings' ? ratings : tab === 'unrated' ? unrated : history;
+  const feed =
+    tab === 'ratings'
+      ? ratings
+      : tab === 'unrated'
+        ? unrated
+        : tab === 'dismissals'
+          ? dismissals
+          : history;
 
   /*
    * 7.2-B 공개 프로필 주소를 공유한다. 공유 API가 계약에 없으므로 서버를 부르지 않는다.
@@ -608,12 +640,21 @@ export default function MyDashboardPage() {
     const fail = () => setMore((prev) => ({ ...prev, [current]: 'failed' }));
 
     if (current === 'ratings') {
-      getMyRatings({ cursor, size: FEED_PAGE_SIZE })
+      const request = ratingsRequest.current;
+      if (!request || request.signal.aborted) return;
+      getMyRatings({
+        cursor,
+        size: FEED_PAGE_SIZE,
+        ...(ratingSort === 'LATEST' ? {} : { sort: ratingSort }),
+      })
         .then((page) => {
+          if (request.signal.aborted) return;
           done(nextCursor(page));
           setRatings(append(ratedItems(page)));
         })
-        .catch(fail);
+        .catch(() => {
+          if (!request.signal.aborted) fail();
+        });
 
       return;
     }
@@ -634,12 +675,36 @@ export default function MyDashboardPage() {
       return;
     }
 
+    if (current === 'dismissals') {
+      const request = dismissalRequest.current;
+      if (!request || request.signal.aborted) return;
+      getMyDismissals({ cursor, size: FEED_PAGE_SIZE })
+        .then((page) => {
+          if (request.signal.aborted) return;
+          done(nextCursor(page));
+          setDismissals(append(page.items));
+        })
+        .catch(() => {
+          if (!request.signal.aborted) fail();
+        });
+      return;
+    }
+
     getRecommendationHistory(cursor, HISTORY_SETS_PER_PAGE)
       .then((page) => {
         done(nextCursor(page));
         setHistory(append(flatten(page.items)));
       })
       .catch(fail);
+  }
+
+  function changeRatingSort(sort: MyRatingSort) {
+    if (sort === ratingSort) return;
+    ratingsRequest.current?.abort();
+    setRatings({ status: 'loading' });
+    setCursors((prev) => ({ ...prev, ratings: null }));
+    setMore((prev) => ({ ...prev, ratings: 'idle' }));
+    setRatingSort(sort);
   }
 
   function toggleUnratedOnly() {
@@ -651,6 +716,9 @@ export default function MyDashboardPage() {
   }
 
   function retryFeeds() {
+    dismissalRequest.current?.abort();
+    setDismissals({ status: 'loading' });
+    ratingsRequest.current?.abort();
     watchedRequest.current?.abort();
     setCursors(NO_CURSORS);
     setMore(IDLE_MORE);
@@ -788,9 +856,10 @@ export default function MyDashboardPage() {
             aria-selected={tab === item.key}
             aria-controls="my-feed"
             className={styles.tab}
-            onClick={() =>
-              setParams({ tab: item.key }, { replace: true, state: { preserveScroll: true } })
-            }
+            onClick={() => {
+              if (item.key === 'dismissals') setDismissalsRequested(true);
+              setParams({ tab: item.key }, { replace: true, state: { preserveScroll: true } });
+            }}
           >
             {item.label}
           </button>
@@ -812,6 +881,28 @@ export default function MyDashboardPage() {
          * 조건이 바뀐 커서는 `400`이다. 다른 두 탭은 건드리지 않고, 주소도 바꾸지 않아 보던
          * 자리에 그대로 있는다.
          */}
+        {tab === 'dismissals' && (
+          <p className={styles.dismissalNote}>관심 없음으로 표시한 영화는 추천에서 제외돼요.</p>
+        )}
+        {tab === 'ratings' && (
+          <div className={styles.ratingToolbar}>
+            <label className={styles.ratingSortLabel} htmlFor="my-rating-sort">
+              정렬
+            </label>
+            <select
+              id="my-rating-sort"
+              className={styles.ratingSort}
+              value={ratingSort}
+              onChange={(event) => changeRatingSort(event.target.value as MyRatingSort)}
+            >
+              <option value="LATEST">최근 평가순</option>
+              <option value="SCORE_DESC">별점 높은 순</option>
+              <option value="SCORE_ASC">별점 낮은 순</option>
+              <option value="OLDEST">오래된 평가순</option>
+            </select>
+          </div>
+        )}
+
         {tab === 'unrated' && (
           <div className={styles.feedFilter}>
             <button
@@ -992,7 +1083,39 @@ export default function MyDashboardPage() {
           </ul>
         )}
 
-        {/* 세 탭이 같은 자리 · 같은 모양으로 다음 장을 받는다(업무 -503) */}
+        {tab === 'dismissals' && dismissals.status === 'ready' && dismissals.items.length > 0 && (
+          <ul className={styles.grid}>
+            {dismissals.items.map((item) => (
+              <li key={item.dismissalId}>
+                <Link to={path.movieDetail(item.movie.movieId)} className={styles.cell}>
+                  <PosterCue>
+                    <Poster
+                      fluid
+                      width={POSTER_RATIO.width}
+                      height={POSTER_RATIO.height}
+                      radius={0}
+                      src={item.movie.posterUrl ?? undefined}
+                      title={item.movie.title}
+                      seed={item.movie.movieId}
+                    />
+                  </PosterCue>
+                  <VisuallyHidden>{item.movie.title}</VisuallyHidden>
+                  <span className={styles.caption}>
+                    <span className={styles.captionDate}>
+                      {desktop ? formatDate(item.dismissedAt) : formatShortDate(item.dismissedAt)}{' '}
+                      표시
+                    </span>
+                    <span className={`${styles.captionTitle} ${styles.dismissalTitle}`}>
+                      {item.movie.title}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* 모든 탭이 같은 자리 · 같은 모양으로 다음 장을 받는다(업무 -503) */}
         {feed.status === 'ready' && cursors[tab] ? (
           <div className={styles.more}>
             <Button variant="secondary" onClick={loadMore} disabled={more[tab] === 'loading'}>

@@ -11,7 +11,11 @@
  */
 import { request } from './client';
 import { getAccessToken } from './session';
-import type { RecommendationHistory, RecommendationSet } from '../types/recommendation';
+import type {
+  DismissalList,
+  RecommendationHistory,
+  RecommendationSet,
+} from '../types/recommendation';
 
 /**
  * 화면이 요청하는 노출 편수(API-045 `size`). 계약이 받는 값은 둘뿐이다 — 모바일 3편,
@@ -102,4 +106,11 @@ export async function getRecommendationHistory(
   size?: number,
 ): Promise<RecommendationHistory> {
   return request<RecommendationHistory>('/recommendations/history', { query: { cursor, size } });
+}
+
+/** API-087 GET /api/v1/users/me/dismissals · 추천 출처 없는 영화도 포함한 본인 목록. */
+export function getMyDismissals(
+  query: { cursor?: string; size?: number } = {},
+): Promise<DismissalList> {
+  return request<DismissalList>('/users/me/dismissals', { query });
 }

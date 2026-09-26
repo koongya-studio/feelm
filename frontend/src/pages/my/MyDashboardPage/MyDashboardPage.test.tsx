@@ -25,7 +25,7 @@ import { renderWithRouter } from '../../../test/render';
 import { getMyProfileView } from '../../../api/users';
 import { getMyRatings } from '../../../api/watch';
 import { getOtts } from '../../../api/otts';
-import { getRecommendationHistory } from '../../../api/recommendations';
+import { getMyDismissals, getRecommendationHistory } from '../../../api/recommendations';
 import { getMyTaste } from '../../../api/taste';
 import { ApiError, NETWORK_ERROR } from '../../../api/apiError';
 import { RETRY_DELAYS_MS } from '../../../api/retry';
@@ -62,6 +62,7 @@ vi.mock('../../../api/otts', () => ({
 
 vi.mock('../../../api/recommendations', () => ({
   getRecommendationHistory: vi.fn(),
+  getMyDismissals: vi.fn(),
 }));
 
 /** API-039 평가 한 건. `평가한 영화` 탭의 원천이다(업무 -611) */
@@ -169,6 +170,9 @@ beforeEach(() => {
       Promise.resolve(query.filter === 'ALL' ? watchedPage(watched) : ratingPage(ratings)),
     );
   vi.mocked(getRecommendationHistory).mockReset().mockResolvedValue(history);
+  vi.mocked(getMyDismissals)
+    .mockReset()
+    .mockResolvedValue({ items: [], nextCursor: null, hasNext: false });
   vi.mocked(getOtts)
     .mockReset()
     .mockResolvedValue([{ ottId: 1, code: 'NETFLIX', name: '넷플릭스', logoUrl: null }]);
@@ -880,3 +884,187 @@ it.each(['success', 'failure'] as const)(
     });
   },
 );
+
+describe('MY 평가 정렬', () => {
+  it('네 가지 정렬을 첫 장부터 조회하고 다른 피드는 다시 받지 않는다', async () => {
+    await renderDashboard();
+    await within(feed()).findByRole('link', { name: /평가한 영화 A/ });
+    const historyCalls = vi.mocked(getRecommendationHistory).mock.calls.length;
+    const watchedCalls = vi
+      .mocked(getMyRatings)
+      .mock.calls.filter(([q]) => q?.filter === 'ALL').length;
+    for (const sort of ['SCORE_DESC', 'SCORE_ASC', 'OLDEST', 'LATEST']) {
+      fireEvent.change(screen.getByRole('combobox', { name: '정렬' }), { target: { value: sort } });
+      await within(feed()).findByRole('link', { name: /평가한 영화 A/ });
+      expect(getMyRatings).toHaveBeenLastCalledWith({
+        size: 18,
+        ...(sort === 'LATEST' ? {} : { sort }),
+      });
+    }
+    expect(vi.mocked(getRecommendationHistory).mock.calls.length).toBe(historyCalls);
+    expect(vi.mocked(getMyRatings).mock.calls.filter(([q]) => q?.filter === 'ALL').length).toBe(
+      watchedCalls,
+    );
+  });
+
+  it('정렬을 바꾸면 다음 장도 새 정렬의 커서로 조회한다', async () => {
+    vi.mocked(getMyRatings).mockImplementation((query = {}) =>
+      Promise.resolve(
+        query.filter === 'ALL'
+          ? watchedPage(watched)
+          : ratingPage(ratings, query.sort ? 'score-next' : 'latest-next'),
+      ),
+    );
+    await renderDashboard();
+    await within(feed()).findByRole('link', { name: /평가한 영화 A/ });
+    fireEvent.change(screen.getByRole('combobox', { name: '정렬' }), {
+      target: { value: 'SCORE_DESC' },
+    });
+    await within(feed()).findByRole('link', { name: /평가한 영화 A/ });
+    fireEvent.click(within(feed()).getByRole('button', { name: '더 보기' }));
+    expect(getMyRatings).toHaveBeenLastCalledWith({
+      size: 18,
+      sort: 'SCORE_DESC',
+      cursor: 'score-next',
+    });
+    await act(async () => {});
+  });
+
+  it('이전 정렬의 늦은 첫 장이 새 정렬 목록을 덮어쓰지 않는다', async () => {
+    let resolveOld!: (value: MyRatingList) => void;
+    const old = new Promise<MyRatingList>((resolve) => {
+      resolveOld = resolve;
+    });
+    const fresh = rated(96, 406, '새 정렬 영화', 5);
+    vi.mocked(getMyRatings).mockImplementation((query = {}) => {
+      if (query.filter === 'ALL') return Promise.resolve(watchedPage(watched));
+      return query.sort ? Promise.resolve(ratingPage([fresh])) : old;
+    });
+    await renderDashboard();
+    fireEvent.change(screen.getByRole('combobox', { name: '정렬' }), {
+      target: { value: 'SCORE_DESC' },
+    });
+    await within(feed()).findByRole('link', { name: /새 정렬 영화/ });
+    await act(async () => resolveOld(ratingPage(ratings, 'old-next')));
+    expect(within(feed()).queryByRole('link', { name: /평가한 영화 A/ })).toBeNull();
+    expect(within(feed()).getByRole('link', { name: /새 정렬 영화/ })).toBeInTheDocument();
+    expect(within(feed()).queryByRole('button', { name: '더 보기' })).toBeNull();
+  });
+
+  it.each(['resolve', 'reject'])(
+    '정렬 전환 뒤 이전 더 보기의 %s 결과를 무시한다',
+    async (result) => {
+      let resolveOld!: (value: MyRatingList) => void;
+      let rejectOld!: (error: Error) => void;
+      const old = new Promise<MyRatingList>((resolve, reject) => {
+        resolveOld = resolve;
+        rejectOld = reject;
+      });
+      const fresh = rated(96, 406, '새 정렬 영화', 5);
+      vi.mocked(getMyRatings).mockImplementation((query = {}) => {
+        if (query.filter === 'ALL') return Promise.resolve(watchedPage(watched));
+        if (query.cursor) return old;
+        return Promise.resolve(
+          query.sort ? ratingPage([fresh], 'fresh-next') : ratingPage(ratings, 'old-next'),
+        );
+      });
+      await renderDashboard();
+      await within(feed()).findByRole('link', { name: /평가한 영화 A/ });
+      fireEvent.click(within(feed()).getByRole('button', { name: '더 보기' }));
+      fireEvent.change(screen.getByRole('combobox', { name: '정렬' }), {
+        target: { value: 'SCORE_ASC' },
+      });
+      await within(feed()).findByRole('link', { name: /새 정렬 영화/ });
+      await act(async () => {
+        if (result === 'resolve') resolveOld(ratingPage([rated(97, 407, '이전 다음 장', 1)]));
+        else rejectOld(new Error('old request failed'));
+      });
+      expect(within(feed()).queryByRole('link', { name: /이전 다음 장/ })).toBeNull();
+      expect(within(feed()).getByRole('button', { name: '더 보기' })).toBeInTheDocument();
+      expect(within(feed()).queryByText('지난 평가를 불러오지 못했어요.')).toBeNull();
+    },
+  );
+});
+
+const dismissedMovie = (id: number) => ({
+  dismissalId: id,
+  movie: { movieId: 700 + id, title: `관심 없음 영화 ${id}`, posterUrl: null },
+  dismissedAt: '2026-09-25T00:00:00Z',
+});
+describe('MY 관심 없음 목록', () => {
+  it('첫 방문에 조회하고 날짜와 상세 링크를 보여주며 탭을 오가도 유지한다', async () => {
+    vi.mocked(getMyDismissals).mockResolvedValue({
+      items: [dismissedMovie(1)],
+      nextCursor: null,
+      hasNext: false,
+    });
+    await renderDashboard();
+    expect(getMyDismissals).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('tab', { name: '관심 없음' }));
+    const link = await within(feed()).findByRole('link', { name: /관심 없음 영화 1/ });
+    expect(link).toHaveAttribute('href', '/movies/701');
+    expect(link).toHaveTextContent('표시');
+    expect(within(link).queryByText('4.5')).toBeNull();
+    expect(getMyDismissals).toHaveBeenCalledWith({ size: 18 });
+    fireEvent.click(screen.getByRole('tab', { name: '평가한 영화' }));
+    fireEvent.click(screen.getByRole('tab', { name: '관심 없음' }));
+    expect(getMyDismissals).toHaveBeenCalledTimes(1);
+  });
+
+  it('빈 목록에는 안내를 보여준다', async () => {
+    await renderDashboard();
+    fireEvent.click(screen.getByRole('tab', { name: '관심 없음' }));
+    expect(
+      await within(feed()).findByText('관심 없음으로 표시한 영화가 없어요'),
+    ).toBeInTheDocument();
+    expect(within(feed()).queryByRole('button', { name: '더 보기' })).toBeNull();
+  });
+
+  it('목록 조회가 실패하면 다시 시도할 수 있다', async () => {
+    vi.mocked(getMyDismissals).mockRejectedValueOnce(new Error('failed'));
+    await renderDashboard();
+    fireEvent.click(screen.getByRole('tab', { name: '관심 없음' }));
+    await within(feed()).findByText('목록을 불러오지 못했어요');
+    vi.mocked(getMyDismissals).mockResolvedValue({
+      items: [dismissedMovie(1)],
+      nextCursor: null,
+      hasNext: false,
+    });
+    fireEvent.click(within(feed()).getByRole('button', { name: '다시 시도' }));
+    expect(
+      await within(feed()).findByRole('link', { name: /관심 없음 영화 1/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('다음 장 실패 후 기존 목록을 보존하고 같은 커서로 재시도한다', async () => {
+    vi.mocked(getMyDismissals).mockResolvedValueOnce({
+      items: [dismissedMovie(1)],
+      nextCursor: 'dismiss-next',
+      hasNext: true,
+    });
+    await renderDashboard();
+    fireEvent.click(screen.getByRole('tab', { name: '관심 없음' }));
+    await within(feed()).findByRole('link', { name: /관심 없음 영화 1/ });
+    vi.mocked(getMyDismissals).mockRejectedValueOnce(new Error('failed'));
+    fireEvent.click(within(feed()).getByRole('button', { name: '더 보기' }));
+    await within(feed()).findByText('지난 관심 없음 목록을 불러오지 못했어요.');
+    expect(within(feed()).getByRole('link', { name: /관심 없음 영화 1/ })).toBeInTheDocument();
+    vi.mocked(getMyDismissals).mockResolvedValueOnce({
+      items: [dismissedMovie(2)],
+      nextCursor: null,
+      hasNext: false,
+    });
+    fireEvent.click(within(feed()).getByRole('button', { name: '다시 시도' }));
+    await within(feed()).findByRole('link', { name: /관심 없음 영화 2/ });
+    expect(getMyDismissals).toHaveBeenLastCalledWith({ size: 18, cursor: 'dismiss-next' });
+    expect(within(feed()).getByRole('link', { name: /관심 없음 영화 1/ })).toBeInTheDocument();
+    expect(within(feed()).queryByRole('button', { name: '더 보기' })).toBeNull();
+  });
+
+  it('관심 없음 주소로 직접 들어와도 본인 목록을 조회한다', async () => {
+    renderWithRouter(<MyDashboardPage />, { route: '/my?tab=dismissals' });
+    await screen.findByRole('tab', { name: '관심 없음', selected: true });
+    await within(feed()).findByText('관심 없음으로 표시한 영화가 없어요');
+    expect(getMyDismissals).toHaveBeenCalledWith({ size: 18 });
+  });
+});
