@@ -39,6 +39,7 @@ FIXED_COMMAND = (
     'npm ci --ignore-scripts'
     ' && node ./node_modules/eslint/bin/eslint.js .'
     ' && node ./node_modules/prettier/bin/prettier.cjs --check .'
+    ' && node ./node_modules/vitest/vitest.mjs run --maxWorkers=2'
     ' && node ./node_modules/typescript/bin/tsc -b'
     ' && node ./node_modules/vite/bin/vite.js build'
 )
@@ -56,7 +57,7 @@ def read_config(path=CONFIG):
         raise RuntimeError('Unexpected frontend runner account')
     if value['docker_host'] != 'unix:///run/user/1001/docker.sock':
         raise RuntimeError('Unexpected rootless Docker socket')
-    if not re.fullmatch(r'node:20\.19(?:\.\d+)?-alpine(?:\d+(?:\.\d+)?)?', value['node_image']):
+    if not re.fullmatch(r'node:22\.22\.\d+-alpine(?:\d+(?:\.\d+)?)?', value['node_image']):
         raise RuntimeError('Unreviewed Node image tag')
     if not re.fullmatch(r'sha256:[0-9a-f]{64}', value['node_image_id']):
         raise RuntimeError('Reviewed Node image ID is required')

@@ -103,7 +103,7 @@ Nginx·Compose 및 인증서 운영 절차는 [인프라 문서](../infra/README
 
 ## 실행 방법
 
-Node 20.19 이상이 필요합니다. 패키지 매니저는 npm을 사용하며 `package-lock.json`을
+Node 22.22.0 이상이 필요합니다. 패키지 매니저는 npm을 사용하며 `package-lock.json`을
 저장소에 포함합니다.
 
 ```bash
@@ -232,7 +232,7 @@ MR 코드를 실행하는 전용 Runner는 현재 백엔드 Job만 허용하므�
 
 ## 컨테이너 이미지
 
-프론트엔드 이미지는 Node 20.19 기반 빌드 단계에서 `npm ci`와 `npm run build`를
+프론트엔드 이미지는 Node 22.22.0 기반 빌드 단계에서 `npm ci`와 `npm run build`를
 실행하고, 운영 단계에는 빌드 결과인 `dist/`와 Nginx만 포함합니다. 컨테이너는 80번
 포트의 `/app/` 경로에서 React 앱을 제공하며, 클라이언트 라우트로 직접 접근해도
 `/app/index.html`로 연결됩니다. 정적 자원과 Browser Router도 `/app/`을 기준으로

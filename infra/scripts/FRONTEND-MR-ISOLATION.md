@@ -28,13 +28,13 @@ S15P21E106-330은 GitLab CI 정의를 공통·백엔드·프론트엔드 파일�
 실행하지 않고 adapter가 다음을 다시 확인한다.
 
 - 인증된 현재 Job과 열린 MR의 프로젝트, HEAD SHA, 대상 `develop`
-- `cd frontend`, `npm ci`, lint, format 검사, build로 고정된 CI script
+- `cd frontend`, `npm ci`, lint, format 검사, 전체 Vitest 테스트, build로 고정된 CI script
 - 현재 commit의 `frontend` archive만 포함되고 일반 파일·디렉터리만 존재함
 - `package.json`의 검토된 script와 v2/v3 lockfile, npm 공식 registry의 SHA-512 무결성
 - symlink, 실행 파일, `.env*`, `.git`, `node_modules`, `dist`, 영역 밖 파일이 없음
 
 검증된 소스는 root 소유 읽기 전용 staging에 둔다. 실제 명령은 UID 1001의 rootless Docker와
-검토된 Node 20.19 이미지 ID로만 실행한다. 컨테이너에는 Docker socket, GitLab Job token,
+검토된 Node 22.22.0 이미지 ID로만 실행한다. 컨테이너에는 Docker socket, GitLab Job token,
 운영 Secret, 호스트 network를 전달하지 않는다. root filesystem과 소스 mount는 읽기 전용이고
 작업·임시 공간은 크기가 제한된 tmpfs다. `/work`는 검증된 lockfile의 native build binding을
 로드할 수 있도록 컨테이너 내부에서만 실행을 허용하고 `/tmp`는 실행 금지를 유지한다. CPU 2개,
@@ -53,7 +53,7 @@ mount하지 않고, 검증된 staging을 Docker 표준입력 tar 스트림으로
 
 network guard 서비스와 소유 marker가 모두 유효해야 시작한다. 테스트 UID는 기존 guard 정책에
 따라 운영·사설망·metadata와 IPv6가 차단되고 DNS 및 공인 80/443만 사용할 수 있다. npm install
-script는 `--ignore-scripts`로 실행한다. lint·format·build는 `npm run`의 pre/post lifecycle hook을
+script는 `--ignore-scripts`로 실행한다. lint·format·test·build는 `npm run`의 pre/post lifecycle hook을
 거치지 않고 이미지의 Node 실행기로 설치된 도구의 고정 JS 진입점을 직접 호출한다. 해당 고정
 script의 pre/post hook이 package.json에 있으면 입력 검증에서 거부한다. 성공 후 산출물이나
 `node_modules`는 호스트로 내보내지 않는다.
@@ -72,7 +72,7 @@ systemd owner의 `ExecStopPost`가 같은 이름의 컨테이너 부재를 확�
 - `ci-frontend-mr-boundary.py`, `ci-frontend-mr-runner.py`, `ci-frontend-mr-config.py`
 - 기존 import 대상인 `ci-bounded-output.py`, `ci-network-guard.py`
 
-서비스가 정지된 상태에서 먼저 rootless Docker에 검토한 Node 20.19 이미지를 내려받는다.
+서비스가 정지된 상태에서 먼저 rootless Docker에 검토한 Node 22.22.0 이미지를 내려받는다.
 `latest`나 Node major 단독 태그는 사용하지 않는다. 다음 계획 명령은 아무 파일도 바꾸지 않는다.
 
 ```bash
@@ -85,7 +85,7 @@ sudo /usr/bin/python3 -I -B \
 ```bash
 sudo /usr/bin/python3 -I -B \
   /usr/local/lib/feelm-ci222/gitlab/ci-frontend-mr-config.py \
-  --confirm-install --node-image node:20.19-alpine
+  --confirm-install --node-image node:22.22.0-alpine
 ```
 
 `/etc/feelm-ci222/frontend-mr.json`의 tag와 `sha256:` ID, 권한을 확인하고 adapter 단위 테스트를
@@ -99,7 +99,7 @@ lockfile, symlink·영역 밖 파일, 취소, timeout, 대량 출력과 종료 �
 수행하므로 별도 cache 승격은 없다. 패키지를 바꿀 때는 `package.json`과 `package-lock.json`을
 같이 갱신하고, 공식 registry URL과 integrity가 유지되는지 확인한다.
 
-Node 이미지를 바꿀 때는 Runner를 멈추고 새 20.19 이미지를 rootless Docker에 미리 준비한 뒤,
+Node 이미지를 바꿀 때는 Runner를 멈추고 새 22.22.0 이미지를 rootless Docker에 미리 준비한 뒤,
 동일한 config 도구의 `--confirm-replace --node-image <검토한-tag>`로 ID를 원자적으로 교체한다.
 정상·실패 fixture를 다시 통과시킨 후 서비스를 시작한다. tag만 덮어써도 Job은 저장된 이미지 ID로
 실행되므로 검토 없이 실행 대상이 바뀌지 않는다.
@@ -115,3 +115,17 @@ Node 이미지를 바꿀 때는 Runner를 멈추고 새 20.19 이미지를 rootl
 
 서버에서 검증하지 못한 상태라면 격리 Runner를 멈춰 Job을 pending으로 두며 기존
 `e106-shell`로 fallback하지 않는다.
+
+## Node 22 및 전체 테스트 정책 적용 (S15P21E106-948)
+
+SSE 테스트 보완(S15P21E106-947)을 먼저 병합한다. 새 CI script는 기존 서버 adapter가
+거부하므로 이 MR을 만들기 전에 실행 중인 격리 Job이 끝난 것을 확인하고 Runner를 정지한다.
+검토된 이 브랜치의 adapter, frontend boundary, runner, config 네 파일을 위 설치 경로에
+반영하고 Node 22.22.0 이미지를 rootless Docker에 준비한다. 기존 설정은
+`--confirm-replace --node-image node:22.22.0-alpine`로 교체한 뒤 계약 테스트를 실행한다.
+서버 적용을 확인한 후 Runner를 시작하고 MR을 생성한다. 전환 중 이전 script를 사용하는
+프론트 MR은 새 adapter에서 거부되므로 최신 develop을 반영한 뒤 재실행한다.
+
+전체 테스트는 고정 Vitest 진입점에 `--maxWorkers=2`를 지정해 CPU 2개 제한에 맞춘다.
+테스트 실패 시 build로 진행하지 않는다. 시간·메모리·네트워크·Secret 경계는 유지한다.
+서버 적용과 실제 Alpine 컨테이너 검증 전에는 로컬 검증만으로 적용 완료로 판단하지 않는다.
