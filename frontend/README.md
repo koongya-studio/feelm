@@ -68,6 +68,19 @@ React + Vite 기반 반응형 웹 애플리케이션 소스와 관련 문서를 
 [backend/verification/S15P21E106-375.md](../backend/verification/S15P21E106-375.md)에
 있습니다.
 
+## 리포트 이미지의 TMDB 사진 캡처
+
+리포트 저장·공유는 화면 사진을 데이터 URL로 읽어 PNG에 포함합니다. TMDB 사진은
+`<img>`에서 보여도 직접 `fetch`하면 CORS에 막힐 수 있으므로 캡처할 때만
+`/tmdb-images/{size}/{file}` 같은 출처 경로로 읽습니다(S15P21E106-935).
+Vite 개발 서버와 서비스 Nginx가 이 경로를 HTTPS `image.tmdb.org/t/p/`로 전달합니다.
+기존 화면 이미지 URL과 API-061 계약은 유지합니다.
+
+**배포는 Nginx 프록시 적용 → 프론트 이미지 배포 순서입니다.** 프론트만 배포하면
+프록시가 없어 저장·공유가 실패합니다. `npm run preview`는 이 개발 프록시를 제공하지
+않으므로 프록시 뒤에서 검증하거나 `npm run dev`를 사용합니다.
+서버 적용 및 모바일 확인은 [검증 기록](verification/S15P21E106-935.md)을 참고합니다.
+
 ## 디렉터리 구성
 
 - `src/`: React 애플리케이션 소스
