@@ -29,6 +29,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
 import Poster from '../../../components/Poster';
+import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import { ApiError } from '../../../api/apiError';
 import { confirmWatch, findWatchRecord } from '../../../api/watch';
@@ -73,6 +74,15 @@ async function loadConfirmView(watchRecordId: number): Promise<ConfirmView | nul
 }
 
 export default function WatchConfirmPage() {
+  return (
+    <>
+      <ScreenHeader title="감상 확인" showBack fallbackTo={path.notifications()} />
+      <WatchConfirmContent />
+    </>
+  );
+}
+
+function WatchConfirmContent() {
   const { watchRecordId } = useParams();
   const navigate = useNavigate();
 
@@ -141,7 +151,8 @@ export default function WatchConfirmPage() {
     }
 
     if (watched) {
-      void navigate(path.movieRating(movie.movieId));
+      // 완료된 감상 확인을 대체해 평가를 미뤄도 이 화면으로 돌아오지 않는다.
+      void navigate(path.movieRating(movie.movieId), { replace: true });
 
       return;
     }
@@ -153,11 +164,7 @@ export default function WatchConfirmPage() {
   if (failed) {
     return (
       <div className={styles.page}>
-        <StatusView
-          titleAs="h1"
-          title="감상 기록을 불러오지 못했어요"
-          description="잠시 문제가 생겼어요"
-        >
+        <StatusView title="감상 기록을 불러오지 못했어요" description="잠시 문제가 생겼어요">
           <Button onClick={retry}>다시 시도</Button>
 
           <Button variant="text" onClick={() => void navigate(path.film())}>
@@ -173,7 +180,6 @@ export default function WatchConfirmPage() {
     return (
       <div className={styles.page}>
         <StatusView
-          titleAs="h1"
           title="감상 기록을 찾을 수 없어요"
           description="주소가 잘못되었거나 이미 정리된 기록이에요"
         >
@@ -192,7 +198,6 @@ export default function WatchConfirmPage() {
       <div className={styles.page}>
         <StatusView
           variant="empty"
-          titleAs="h1"
           title="이미 답한 감상이에요"
           description={
             movie.watched
@@ -237,7 +242,7 @@ export default function WatchConfirmPage() {
         ) : null}
       </div>
 
-      <h1 className={styles.question}>이 영화, 잘 보셨나요?</h1>
+      <h2 className={styles.question}>이 영화, 잘 보셨나요?</h2>
 
       <div className={styles.actions}>
         <Button disabled={submitting} onClick={() => void respond(true)}>

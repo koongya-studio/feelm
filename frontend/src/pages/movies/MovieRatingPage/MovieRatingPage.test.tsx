@@ -17,6 +17,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router';
 import MovieRatingPage from './index';
+import WatchConfirmPage from '../../watch/WatchConfirmPage';
 import { ApiError } from '../../../api/apiError';
 import { ROUTE_PATTERN } from '../../../routes/paths';
 import type { MovieDetail } from '../../../types/movie';
@@ -25,6 +26,8 @@ import type { Rating } from '../../../types/watch';
 vi.mock('../../../api/movies', () => ({ getMovieDetail: vi.fn() }));
 vi.mock('../../../api/otts', () => ({ getOtts: vi.fn() }));
 vi.mock('../../../api/watch', () => ({
+  confirmWatch: vi.fn(),
+  findWatchRecord: vi.fn(),
   createRating: vi.fn(),
   deleteRating: vi.fn(),
   findWatchedRecord: vi.fn(),
@@ -36,6 +39,7 @@ const { getMovieDetail } = await import('../../../api/movies');
 const { getOtts } = await import('../../../api/otts');
 const { createRating, deleteRating, findWatchedRecord, getRatingCounts, updateRating } =
   await import('../../../api/watch');
+const { confirmWatch, findWatchRecord } = await import('../../../api/watch');
 
 /** 아직 평가하지 않은 실제 영화(API-030) */
 const movie: MovieDetail = {
@@ -75,6 +79,39 @@ const created: Rating = {
 };
 
 const counts = { frameCount: 12, popcornCount: 7, weeklyFrameDelta: 3 };
+
+it('알림에서 감상 확인 후 평가를 미루면 알림 목록으로 돌아간다', async () => {
+  vi.mocked(findWatchRecord).mockResolvedValue({
+    watchRecordId: 42,
+    movie: { movieId: 550, title: '파이트 클럽', posterUrl: null },
+    status: 'LINK_CLICKED',
+    ott: null,
+    clickedAt: null,
+    confirmDueAt: null,
+    expiresAt: null,
+    watchedAt: null,
+    ratingId: null,
+  });
+  vi.mocked(confirmWatch).mockResolvedValue({
+    watchRecordId: 42,
+    status: 'WATCHED_UNRATED',
+    watchedAt: '2026-09-26T00:00:00Z',
+  });
+  render(
+    <MemoryRouter initialEntries={['/notifications', '/watch-records/42/confirm']} initialIndex={1}>
+      <Routes>
+        <Route path={ROUTE_PATTERN.notifications} element={<h1>알림 목록</h1>} />
+        <Route path={ROUTE_PATTERN.watchConfirm} element={<WatchConfirmPage />} />
+        <Route path={ROUTE_PATTERN.movieRating} element={<MovieRatingPage />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+  fireEvent.click(await screen.findByRole('button', { name: '봤어요' }));
+  fireEvent.click(await screen.findByRole('button', { name: '나중에 평가하기' }));
+  expect(await screen.findByRole('heading', { name: '알림 목록' })).toBeInTheDocument();
+  expect(confirmWatch).toHaveBeenCalledWith(42, true);
+  expect(createRating).not.toHaveBeenCalled();
+});
 
 beforeEach(() => {
   vi.mocked(getMovieDetail).mockReset().mockResolvedValue(movie);
