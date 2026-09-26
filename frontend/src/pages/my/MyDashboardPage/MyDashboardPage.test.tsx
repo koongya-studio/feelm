@@ -242,7 +242,9 @@ describe('7.1 MY 대시보드', () => {
       await renderDashboard();
       fireEvent.click(screen.getByRole('button', { name: '프로필 공유' }));
 
-      expect(await screen.findByRole('status')).toHaveTextContent('프로필 주소를 복사했어요');
+      expect(
+        (await screen.findByText('프로필 주소를 복사했어요')).closest('[role="status"]'),
+      ).toBeInTheDocument();
       expect(share).not.toHaveBeenCalled();
       expect(writeText).toHaveBeenCalledWith(
         `${window.location.origin}/app/users/1b4e28ba-2fa1-11d2-883f-0016d3cca427`,

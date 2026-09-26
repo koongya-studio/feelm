@@ -3,6 +3,8 @@ export const RECOMMENDATIONS_GUIDE = 'recommendations-overview-v1';
 export const MOVIE_DETAIL_GUIDE = 'movie-detail-overview-v1';
 export const PARTY_GUIDE = 'party-overview-v2';
 export const FILM_GUIDE = 'film-overview-v2';
+export const MY_GUIDE = 'my-overview-v1';
+export const MOVIE_OTT_GUIDE = 'movie-ott-flow-v1';
 
 export type FirstUseStep = 'intro' | 'recommendations' | 'detail' | 'done';
 
