@@ -2607,6 +2607,66 @@
         },
         "type" : "object"
       },
+      "ProfileReviewItem" : {
+        "description" : "사용자별 공개 한줄평 항목",
+        "properties" : {
+          "comment" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "movie" : {
+            "$ref" : "#/components/schemas/ProfileReviewMovie"
+          },
+          "ratingId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "score" : {
+            "type" : "number"
+          },
+          "spoiler" : {
+            "type" : "boolean"
+          }
+        },
+        "type" : "object"
+      },
+      "ProfileReviewMovie" : {
+        "description" : "한줄평 영화 요약",
+        "properties" : {
+          "movieId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "posterUrl" : {
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "ProfileReviewPageResponse" : {
+        "description" : "사용자별 공개 한줄평 커서 페이지",
+        "properties" : {
+          "hasNext" : {
+            "type" : "boolean"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ProfileReviewItem"
+            },
+            "type" : "array"
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "ProfileUpdateRequest" : {
         "properties" : {
           "birthDate" : {
@@ -7386,6 +7446,61 @@
         "summary" : "공개 프로필 조회",
         "tags" : [
           "public-profile-controller"
+        ]
+      }
+    },
+    "/api/v1/users/{publicId}/reviews" : {
+      "get" : {
+        "description" : "API-087. 선택 인증. 공개 프로필과 같은 접근 조건이며 PUBLIC 한줄평만 최신순으로 반환합니다.",
+        "operationId" : "getProfileReviews",
+        "parameters" : [
+          {
+            "in" : "path",
+            "name" : "publicId",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "in" : "query",
+            "name" : "cursor",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "description" : "페이지 크기(기본 10, 1~50)",
+            "in" : "query",
+            "name" : "size",
+            "required" : false,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ProfileReviewPageResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "security" : [
+          { },
+          {
+            "bearerAuth" : [ ]
+          }
+        ],
+        "summary" : "사용자별 공개 한줄평 조회",
+        "tags" : [
+          "profile-review-controller"
         ]
       }
     },

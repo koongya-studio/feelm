@@ -1,0 +1,82 @@
+.area {
+  color: inherit;
+}
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 20px;
+}
+.review {
+  padding-bottom: 20px;
+  border-bottom: 1px solid currentColor;
+  border-color: color-mix(in srgb, currentColor 15%, transparent);
+}
+.title {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.title:hover {
+  text-decoration: underline;
+}
+.score {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+.comment {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  line-height: 1.6;
+}
+.comment[data-expanded] {
+  display: block;
+}
+.textButton {
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 12px 0;
+  text-decoration: underline;
+  cursor: pointer;
+  min-height: 44px;
+}
+.more {
+  display: block;
+  margin: 20px auto 0;
+  padding: 12px 20px;
+  border: 1px solid currentColor;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  text-align: center;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.more:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.spoiler {
+  border-radius: 12px;
+  padding: 12px;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+.spoiler p {
+  margin: 0;
+}
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 24px 40px;
+}

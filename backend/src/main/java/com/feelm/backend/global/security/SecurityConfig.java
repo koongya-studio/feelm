@@ -139,12 +139,16 @@ public class SecurityConfig {
      * "/api/v1/users/me/"}로 시작하지는 않아, 접두사로 걸러 내면 그대로 열린다(리뷰 B-1).
      */
     private static boolean isPublicProfileApi(String path) {
-        if (!PATH_MATCHER.match(PUBLIC_PROFILE_TEMPLATE, path)) {
+        String template =
+                path.endsWith("/reviews")
+                        ? "/api/v1/users/{publicId}/reviews"
+                        : PUBLIC_PROFILE_TEMPLATE;
+        if (!PATH_MATCHER.match(template, path)) {
             return false;
         }
         String publicId =
                 PATH_MATCHER
-                        .extractUriTemplateVariables(PUBLIC_PROFILE_TEMPLATE, path)
+                        .extractUriTemplateVariables(template, path)
                         .get(PUBLIC_PROFILE_VARIABLE);
         return !"me".equalsIgnoreCase(publicId);
     }

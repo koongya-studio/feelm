@@ -87,7 +87,7 @@
 | `searchUsers` | 실제 | API-019 |
 | `getMyProfileView` | 조합 + **목업** | 닉네임 · 사진 · 수치는 API-014, 키워드는 API-040, 필름 목록과 포스터는 API-042. 소개 · 개별 공개 선택은 목업(2장) |
 | `getMyPublicProfile` | 조합 + **목업** | `getMyProfileView`를 공개용으로 거른다. 내 `publicId`를 알 길이 없어 API-062를 부르지 못한다 |
-| `getPublicProfile` | 실제 | API-062(업무 -810). 응답을 `ProfileView`로 바꾼다. 한줄평 목록은 계약에 없어 `null` |
+| `getPublicProfile` | 실제 | API-062(업무 -810). 응답을 `ProfileView`로 바꾼다. 개수는 API-062, 목록은 별도 API-087로 최근 3개 조회(업무 -953) |
 | `updateProfileExtras` | **목업** | 계약 없음(2장). 소개 · 공개 항목을 세션 메모리에 둔다 |
 | `uploadMyAvatar` | 실제 | API-081 multipart `file`. 7.2가 잘라 만든 512px JPEG를 올린다(업무 -762) |
 | `deleteMyAvatar` | 실제 | API-082. 7.2 `기본 이미지로 변경` · `현재 사진 삭제` |
