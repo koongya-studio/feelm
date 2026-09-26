@@ -162,7 +162,10 @@ export const path = {
   party: () => ROUTE_PATTERN.party,
   my: () => ROUTE_PATTERN.my,
   /**
-   * MY의 `안 남긴 영화` 탭. 탭은 화면 안 전환이라 라우트가 아니고 주소의 `?tab=`이다.
+   * MY의 `최근 본 영화` 탭. 탭은 화면 안 전환이라 라우트가 아니고 주소의 `?tab=`이다.
+   *
+   * 값이 `unrated`인 것은 이 탭이 `안 남긴 영화`였을 때의 이름이다(업무 -919에서 바뀌었다).
+   * 밖에 남은 주소와 EXT-05의 진입점이 이 값을 쓰고 있어 그대로 둔다.
    * 화면 밖에서 이 탭으로 보내는 곳이 EXT-05뿐이라 여기 한 줄로 둔다(업무 -495).
    */
   myUnrated: () => `${ROUTE_PATTERN.my}?tab=unrated`,

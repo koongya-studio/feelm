@@ -220,6 +220,44 @@
   font-size: var(--font-size-caption);
 }
 
+/*
+ * `최근 본 영화` 안의 거르개 (업무 -919). 탭과 격자 사이에 한 줄로 선다.
+ *
+ * 탭처럼 보이면 안 된다 — 탭은 세 갈래이고 이것은 켜고 끄는 스위치다. 그래서 폭을 채우지 않고
+ * 왼쪽에 칩 하나로 둔다.
+ */
+/*
+ * 탭 구분선에 가깝게 붙이고 격자와는 띄운다. 거르개는 탭에 딸린 것이지 목록의 첫 줄이 아니다.
+ */
+.feedFilter {
+  display: flex;
+  padding: var(--space-2) 0 var(--space-4);
+}
+
+/*
+ * 꺼진 것도 **누를 수 있는 것으로 보여야 한다.** 글자만 있으면 설명문으로 읽힌다. 옅은 면과
+ * 또렷한 선을 줘서 칩임을 드러낸다.
+ *
+ * 색으로 가르지 않는다 — 디자인 방향이 `UI에 유채색을 쓰지 않는다`이고 7.1은 그 예외가 아니다
+ * (`design-concept.md` 3장). 켜진 것은 흰 면에 잉크 글자로 뒤집어 대비를 최대로 준다.
+ */
+.feedFilterButton {
+  padding: 4px var(--space-3);
+  border: 1px solid var(--color-line-on-dark);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-on-dark);
+  font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+}
+
+.feedFilterButton[data-on='true'] {
+  border-color: var(--color-on-dark);
+  background: var(--color-on-dark);
+  color: var(--color-ink);
+}
+
 .tabs {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -544,6 +582,22 @@
 
 .desktopPage .feedNote {
   color: var(--color-ink-muted);
+}
+
+/*
+ * 넓은 화면은 밝은 면이라 어두운 면 색을 그대로 쓰면 흰 글자가 배경에 묻는다. 이 화면의 다른
+ * 요소들과 같이 잉크 계열로 되돌린다(업무 -919).
+ */
+.desktopPage .feedFilterButton {
+  border-color: var(--color-line-strong);
+  background: var(--color-surface-solid);
+  color: var(--color-ink-body);
+}
+
+.desktopPage .feedFilterButton[data-on='true'] {
+  border-color: var(--color-action);
+  background: var(--color-action);
+  color: var(--color-on-action);
 }
 
 /*
