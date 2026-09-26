@@ -85,7 +85,7 @@
 | `updateMyProfile` | 실제 | API-015 |
 | `checkNicknameAvailability` | 실제 | API-016 |
 | `searchUsers` | 실제 | API-019 |
-| `getMyProfileView` | 조합 + **목업** | 닉네임 · 사진 · 수치는 API-014, 소개 · 공개 항목은 목업(2장) |
+| `getMyProfileView` | 조합 + **목업** | 닉네임 · 사진 · 수치는 API-014, 키워드는 API-040, 필름 목록과 포스터는 API-042. 소개 · 개별 공개 선택은 목업(2장) |
 | `getMyPublicProfile` | 조합 + **목업** | `getMyProfileView`를 공개용으로 거른다. 내 `publicId`를 알 길이 없어 API-062를 부르지 못한다 |
 | `getPublicProfile` | 실제 | API-062(업무 -810). 응답을 `ProfileView`로 바꾼다. 한줄평 목록은 계약에 없어 `null` |
 | `updateProfileExtras` | **목업** | 계약 없음(2장). 소개 · 공개 항목을 세션 메모리에 둔다 |
