@@ -196,6 +196,55 @@ class NotificationStreamServiceTest {
     }
 
     @Test
+    void invitationSignalWithoutNotificationAfterCommit() throws Exception {
+        SseEmitter emitter = connect(10, "a");
+        SseEmitter other = connect(20, "b");
+        var delivery = mock(WebPushDeliveryRepository.class);
+        when(repository.createPartyInvitation(anyLong(), anyLong(), any(), any()))
+                .thenReturn(Optional.empty());
+        when(repository.close(anyLong(), any(), anyLong(), any())).thenReturn(Optional.empty());
+        try (var context = new AnnotationConfigApplicationContext()) {
+            context.register(TransactionConfig.class);
+            context.registerBean(NotificationStreamService.class, () -> streams);
+            context.refresh();
+            var commands =
+                    new NotificationCommandService(
+                            repository,
+                            delivery,
+                            mock(WebPushSubscriptionRepository.class),
+                            Clock.systemUTC(),
+                            context);
+            var transaction = new TransactionTemplate(context.getBean(TestTransactions.class));
+            Instant now = Instant.now();
+            transaction.executeWithoutResult(
+                    status -> {
+                        commands.createPartyInvitation(10, 7, now);
+                        assertThat(
+                                        mockingDetails(emitter).getInvocations().stream()
+                                                .filter(
+                                                        invocation ->
+                                                                invocation
+                                                                        .getMethod()
+                                                                        .getName()
+                                                                        .equals("send"))
+                                                .count())
+                                .isEqualTo(1);
+                    });
+            verify(emitter, timeout(2000).times(2)).send(any(SseEmitter.SseEventBuilder.class));
+            transaction.executeWithoutResult(
+                    status -> {
+                        commands.createPartyInvitation(10, 8, now);
+                        status.setRollbackOnly();
+                    });
+            verify(emitter, times(2)).send(any(SseEmitter.SseEventBuilder.class));
+            transaction.executeWithoutResult(status -> commands.closePartyInvitation(10, 7, now));
+            verify(emitter, timeout(2000).times(3)).send(any(SseEmitter.SseEventBuilder.class));
+            verify(other, times(1)).send(any(SseEmitter.SseEventBuilder.class));
+            verifyNoInteractions(delivery);
+        }
+    }
+
+    @Test
     void afterCommitOnlyAndRollbackDoesNotSend() throws Exception {
         SseEmitter emitter = connect(10, "a");
         try (var context = new AnnotationConfigApplicationContext()) {
