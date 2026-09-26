@@ -11,7 +11,7 @@
  * | 닉네임 | 그 자리의 입력칸. 규칙 · 중복을 확인한다 | API-015 |
  * | 소개 | 그 자리의 여러 줄 입력. 40자 | 계약 없음(목업) |
  * | 공개된 취향 키워드 | 칩을 눌러 공개할 것을 고른다 | 계약 없음(목업) |
- * | 공개된 취향 필름 | 포스터를 눌러 공개할 것을 고른다 | 계약 없음(목업) |
+ * | 공개된 취향 필름 | 관리 창에서 검색 · 필터 · 페이지로 공개할 것을 고른다 | 계약 없음(목업) |
  *
  * **한 번에 한 항목만 연다.** 고치던 것이 있는데 다른 연필을 누르거나 화면을 떠나려 하면
  * 저장 · 버리기 · 계속 편집을 묻는다(`UnsavedDialog`). 떠나는 것은 라우터가 막고
@@ -50,14 +50,9 @@ import { path } from '../../../routes/paths';
 import { avatarFileProblem, readAsDataUrl } from '../../../utils/avatarImage';
 import AvatarCropper from './AvatarCropper';
 import AvatarSheet from './AvatarSheet';
-import {
-  BioEditor,
-  FilmsEditor,
-  KeywordsEditor,
-  NICKNAME_HINT,
-  NicknameEditor,
-} from './ProfileEditors';
+import { BioEditor, KeywordsEditor, NICKNAME_HINT, NicknameEditor } from './ProfileEditors';
 import UnsavedDialog from './UnsavedDialog';
+import FilmsEditor from './FilmsEditor';
 import styles from './ProfileEditPage.module.css';
 import type { EditableKey } from '../../../components/ProfileLayout';
 import type { ProfileExtrasUpdate, ProfileView } from '../../../types/unspecified';
@@ -507,6 +502,7 @@ export default function ProfileEditPage() {
     return (
       <FilmsEditor
         {...actions}
+        suspended={Boolean(asking)}
         frames={profile.frames}
         selected={draft.frameIds}
         onToggle={(frameId) =>
@@ -548,7 +544,9 @@ export default function ProfileEditPage() {
           <ProfileLayout
             mode="edit"
             profile={profile}
-            editing={editing && editor ? { key: editing, node: editor } : null}
+            editing={
+              editing && editing !== 'films' && editor ? { key: editing, node: editor } : null
+            }
             onEdit={requestEdit}
             onAvatar={() => setSheetOpen(true)}
             avatarBusy={avatar.status === 'uploading'}
@@ -562,6 +560,8 @@ export default function ProfileEditPage() {
           <ProfileSkeleton />
         )}
       </div>
+
+      {editing === 'films' ? editor : null}
 
       {/* 사진 고르기. 화면에는 보이지 않고 시트의 두 버튼이 연다 */}
       <input

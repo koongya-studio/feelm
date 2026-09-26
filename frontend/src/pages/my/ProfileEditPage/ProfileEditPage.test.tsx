@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { RouterProvider, createMemoryRouter } from 'react-router';
 import ProfileEditPage from './index';
+import './dialogTestSupport';
 import MyDashboardPage from '../MyDashboardPage';
 import PublicProfilePage from '../PublicProfilePage';
 import { resetSessionForTest, startSession } from '../../../api/session';
@@ -46,6 +47,7 @@ const KEYWORDS = [
 ];
 
 let me: MyProfile;
+let frameCount: number;
 let patches: unknown[];
 /** 프로필 사진 요청(API-081 · 082). 올린 파일은 multipart `file` 칸이다 */
 let avatarCalls: { method?: string; file: FormDataEntryValue | null }[];
@@ -125,7 +127,7 @@ function stubServer() {
 
       if (url === '/api/v1/users/me/frames')
         return json({
-          items: [1, 2, 3].map((id) => ({
+          items: Array.from({ length: frameCount }, (_, i) => i + 1).map((id) => ({
             frameId: 900 + id,
             movie: {
               movieId: 1000 + id,
@@ -161,6 +163,7 @@ function stubServer() {
 
 beforeEach(() => {
   me = { ...mockMyProfile };
+  frameCount = 3;
   patches = [];
   checks = [];
   avatarCalls = [];
@@ -660,4 +663,136 @@ it('실제 포스터를 공개 선택하고 저장하면 미리보기에서도 �
   await screen.findByRole('heading', { name: '취향 필름' });
   expect(screen.queryByRole('img', { name: '실제 영화 1' })).not.toBeInTheDocument();
   expect(screen.getByRole('img', { name: '실제 영화 2' })).toHaveAttribute('src', '/posters/2.jpg');
+});
+
+describe('S15P21E106-952 공개 필름 관리', () => {
+  it('대량 필름은 본문에 최근 3편만 표시하고 관리 창에서 페이지별로 선택한다', async () => {
+    frameCount = 30;
+    await renderEdit();
+    const section = screen.getByRole('heading', { name: '공개된 취향 필름' }).closest('section')!;
+    expect(within(section).getAllByRole('img')).toHaveLength(3);
+    expect(screen.getByText('공개 중 30편 · 관리')).toBeInTheDocument();
+    pencil('공개할 취향 필름 수정').focus();
+    fireEvent.click(pencil('공개할 취향 필름 수정'));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getAllByRole('button', { pressed: true })).toHaveLength(13);
+    fireEvent.click(within(dialog).getByRole('button', { name: '실제 영화 1' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '다음' }));
+    expect(within(dialog).getByText('2 / 3 페이지 · 30편')).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole('button', { name: '실제 영화 13' }));
+    fireEvent.click(within(dialog).getByRole('button', { name: '저장' }));
+    await screen.findByText('저장했어요');
+    expect(screen.getByText('공개 중 28편 · 관리')).toBeInTheDocument();
+    pencil('공개할 취향 필름 수정').focus();
+    fireEvent.click(pencil('공개할 취향 필름 수정'));
+    expect(screen.getByRole('button', { name: '실제 영화 1' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    expect(screen.getByRole('button', { name: '실제 영화 13' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    expect(pencil('공개할 취향 필름 수정')).toHaveFocus();
+  });
+
+  it('검색과 공개 중 필터를 변경해도 선택을 유지하고 취소하면 원래 값으로 돌아간다', async () => {
+    frameCount = 25;
+    await renderEdit();
+    pencil('공개할 취향 필름 수정').focus();
+    fireEvent.click(pencil('공개할 취향 필름 수정'));
+    const search = screen.getByRole('textbox', { name: '영화 제목 검색' });
+    fireEvent.click(screen.getByRole('button', { name: '다음' }));
+    fireEvent.change(search, { target: { value: '실제 영화 25' } });
+    expect(screen.getByText('1 / 1 페이지 · 1편')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '실제 영화 25' }));
+    fireEvent.click(screen.getByRole('button', { name: '공개 중 24편' }));
+    expect(screen.getByText('검색 결과가 없어요')).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: '' } });
+    expect(screen.getByText('1 / 2 페이지 · 24편')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '전체 25편' }));
+    fireEvent.change(search, { target: { value: '실제 영화 25' } });
+    expect(screen.getByRole('button', { name: '실제 영화 25' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    fireEvent.keyDown(search, { key: 'Enter' });
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '취소' }));
+    pencil('공개할 취향 필름 수정').focus();
+    fireEvent.click(pencil('공개할 취향 필름 수정'));
+    fireEvent.change(screen.getByRole('textbox', { name: '영화 제목 검색' }), {
+      target: { value: '실제 영화 25' },
+    });
+    expect(screen.getByRole('button', { name: '실제 영화 25' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('관리 중 브라우저 뒤로 가기는 저장하지 않은 변경 확인을 제공한다', async () => {
+    const router = await renderEdit();
+    pencil('공개할 취향 필름 수정').focus();
+    fireEvent.click(pencil('공개할 취향 필름 수정'));
+    fireEvent.click(screen.getByRole('button', { name: '실제 영화 1' }));
+    await router.navigate(-1);
+    const confirmation = await screen.findByRole('alertdialog');
+    expect(confirmation).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    fireEvent.click(within(confirmation).getByRole('button', { name: '계속 편집' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '실제 영화 1' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+});
+
+it('필름 저장 실패 시 검색과 선택 초안을 유지하고 다시 저장할 수 있다', async () => {
+  await renderEdit();
+  fireEvent.click(pencil('공개할 취향 필름 수정'));
+  fireEvent.change(screen.getByRole('textbox', { name: '영화 제목 검색' }), {
+    target: { value: '실제 영화 1' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: '실제 영화 1' }));
+  const fetchNormally = vi.mocked(fetch).getMockImplementation()!;
+  vi.mocked(fetch).mockImplementation((...args) => {
+    if (args[0] === '/api/v1/users/me/frames') return json({ code: 'INTERNAL_SERVER_ERROR' }, 500);
+    return fetchNormally(...args);
+  });
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('저장하지 못했어요');
+  expect(screen.getByRole('textbox', { name: '영화 제목 검색' })).toHaveValue('실제 영화 1');
+  expect(screen.getByRole('button', { name: '실제 영화 1' })).toHaveAttribute(
+    'aria-pressed',
+    'false',
+  );
+  vi.mocked(fetch).mockImplementation(fetchNormally);
+  fireEvent.click(screen.getByRole('button', { name: '저장' }));
+  await screen.findByText('저장했어요');
+  expect(screen.getByText('공개 중 2편 · 관리')).toBeInTheDocument();
+});
+
+it('빈 필름 목록도 관리 창을 열고 취소할 수 있다', async () => {
+  frameCount = 0;
+  await renderEdit();
+  fireEvent.click(pencil('공개할 취향 필름 수정'));
+  expect(screen.getByText('아직 취향 필름이 없어요')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '이전' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '다음' })).toBeDisabled();
+  fireEvent.click(screen.getByRole('button', { name: '취소' }));
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+it('공개 중 필터의 마지막 페이지를 모두 해제하면 이전 페이지로 돌아간다', async () => {
+  frameCount = 13;
+  await renderEdit();
+  fireEvent.click(pencil('공개할 취향 필름 수정'));
+  fireEvent.click(screen.getByRole('button', { name: '공개 중 13편' }));
+  fireEvent.click(screen.getByRole('button', { name: '다음' }));
+  fireEvent.click(screen.getByRole('button', { name: '실제 영화 13' }));
+  expect(screen.getByText('1 / 1 페이지 · 12편')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '이전' })).toBeDisabled();
 });
