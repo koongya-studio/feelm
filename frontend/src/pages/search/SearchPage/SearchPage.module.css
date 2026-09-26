@@ -405,3 +405,18 @@
 .desktopPage .resultsTitle {
   font-size: 22px;
 }
+
+/* 결과 머리줄에서 필터와 정렬을 함께 정렬한다. */
+.searchBar[hidden] {
+  display: none;
+}
+
+.resultControls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.desktopPage .sortSelect {
+  height: var(--control-height);
+}

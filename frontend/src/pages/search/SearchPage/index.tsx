@@ -767,6 +767,48 @@ export default function SearchPage() {
     };
   });
 
+  const desktopResults = desktop && search.status === 'ready' && search.items.length > 0;
+  const filterControl = (
+    <>
+      {/*
+       * 시트를 여는 버튼이다(업무 -674). 한때 `aria-pressed`만 있어 보조기술이 켜고 끄는
+       * 토글로 읽었다. 지금은 대화상자를 연다는 것 · 열렸는지 · 어느 시트인지를 알리고,
+       * 필터가 걸려 있는지는 설명(`aria-describedby`)으로 따로 읽힌다
+       */}
+      <button
+        ref={filterButtonRef}
+        type="button"
+        className={styles.filterButton}
+        aria-label="필터"
+        disabled={!options}
+        aria-haspopup="dialog"
+        aria-expanded={filterOpen}
+        aria-controls={filterOpen ? filterSheetId : undefined}
+        aria-describedby={filtered ? filterStateId : undefined}
+        data-filtered={filtered || undefined}
+        data-variant={desktop ? 'desktop' : undefined}
+        onClick={() => setFilterOpen(true)}
+      >
+        <FilterIcon />
+
+        {/* 시안은 넓은 화면에서 `필터`와 걸린 개수를 함께 적는다 */}
+        {desktop ? (
+          <>
+            <span className={styles.filterLabel}>필터</span>
+            {activeFilterCount > 0 ? (
+              <span className={styles.filterCount}>{activeFilterCount}</span>
+            ) : null}
+          </>
+        ) : null}
+      </button>
+      {filtered ? (
+        <span id={filterStateId} hidden>
+          필터 적용 중
+        </span>
+      ) : null}
+    </>
+  );
+
   return (
     <>
       <div className={desktop ? styles.desktopPage : styles.page} ref={pageRef}>
@@ -782,6 +824,7 @@ export default function SearchPage() {
 
         <SearchControls
           className={styles.searchBar}
+          hidden={useTopSearch && desktopResults}
           role={useTopSearch ? undefined : 'search'}
           onSubmit={(event) => {
             event.preventDefault();
@@ -831,42 +874,7 @@ export default function SearchPage() {
             </div>
           ) : null}
 
-          {/*
-           * 시트를 여는 버튼이다(업무 -674). 한때 `aria-pressed`만 있어 보조기술이 켜고 끄는
-           * 토글로 읽었다. 지금은 대화상자를 연다는 것 · 열렸는지 · 어느 시트인지를 알리고,
-           * 필터가 걸려 있는지는 설명(`aria-describedby`)으로 따로 읽힌다
-           */}
-          <button
-            ref={filterButtonRef}
-            type="button"
-            className={styles.filterButton}
-            aria-label="필터"
-            disabled={!options}
-            aria-haspopup="dialog"
-            aria-expanded={filterOpen}
-            aria-controls={filterOpen ? filterSheetId : undefined}
-            aria-describedby={filtered ? filterStateId : undefined}
-            data-filtered={filtered || undefined}
-            data-variant={desktop ? 'desktop' : undefined}
-            onClick={() => setFilterOpen(true)}
-          >
-            <FilterIcon />
-
-            {/* 시안은 넓은 화면에서 `필터`와 걸린 개수를 함께 적는다 */}
-            {desktop ? (
-              <>
-                <span className={styles.filterLabel}>필터</span>
-                {activeFilterCount > 0 ? (
-                  <span className={styles.filterCount}>{activeFilterCount}</span>
-                ) : null}
-              </>
-            ) : null}
-          </button>
-          {filtered ? (
-            <span id={filterStateId} hidden>
-              필터 적용 중
-            </span>
-          ) : null}
+          {!desktopResults ? filterControl : null}
         </SearchControls>
 
         {!useTopSearch ? <p className={styles.scope}>제목 · 감독 · 배우 통합 검색</p> : null}
@@ -983,23 +991,26 @@ export default function SearchPage() {
                * 정렬은 브라우저의 `select`다. 시트를 하나 더 만들지 않고도 키보드 · 보조기술이
                * 그대로 다룬다. 겉모양만 버튼처럼 두고 화살표는 따로 그린다.
                */}
-              <label className={styles.sort}>
-                <VisuallyHidden>정렬</VisuallyHidden>
-                <select
-                  className={styles.sortSelect}
-                  value={filter.sort}
-                  onChange={(event) => changeSort(event.target.value as MovieSearchSort)}
-                >
-                  {SORT_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <span className={styles.sortChevron}>
-                  <ChevronDownIcon />
-                </span>
-              </label>
+              <div className={styles.resultControls}>
+                {desktopResults ? filterControl : null}
+                <label className={styles.sort}>
+                  <VisuallyHidden>정렬</VisuallyHidden>
+                  <select
+                    className={styles.sortSelect}
+                    value={filter.sort}
+                    onChange={(event) => changeSort(event.target.value as MovieSearchSort)}
+                  >
+                    {SORT_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className={styles.sortChevron}>
+                    <ChevronDownIcon />
+                  </span>
+                </label>
+              </div>
             </div>
 
             <SearchResultGrid
