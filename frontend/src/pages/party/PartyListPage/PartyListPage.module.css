@@ -475,7 +475,7 @@
 
 /*
  * 가로로 넘겨 보는 카드 줄(시안). 한 화면에 한 장 반이 보여 옆에 더 있다는 것이 보인다.
- * 화면 양 끝까지 흐르도록 좌우 여백을 음수로 열고 안쪽 패딩으로 되돌린다.
+ * 본문 좌우 여백 안에서 넘기며, 안쪽 여백으로 카드 그림자와 초점 표시 공간을 확보한다.
  *
  * 끝까지 넘긴 제스처는 이 줄에서 멈춘다(업무 -809). 바깥으로 이어지면 화면 전체가 옆으로
  * 밀린다(`AppLayout`의 `.body` 주석).
@@ -483,12 +483,13 @@
 .cardRow {
   display: flex;
   gap: var(--space-2);
-  padding: 0 var(--screen-padding-x);
-  margin: 0 calc(var(--screen-padding-x) * -1);
+  padding: var(--space-2);
+  margin: 0;
   list-style: none;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   scroll-snap-type: x proximity;
+  scroll-padding-inline: var(--space-2);
   touch-action: pan-x;
 }
 
