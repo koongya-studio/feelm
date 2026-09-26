@@ -124,6 +124,7 @@ npm install
 | `npm run api:check` | 생성 타입이 스냅샷과 어긋나면 실패합니다 |
 
 커밋 전에 `npm run lint`와 `npm run format:check`를 통과하는지 확인합니다.
+MR 생성 및 수정 커밋 Push 전 필수 포맷 검사 절차는 [`AGENTS.md`](AGENTS.md)를 따릅니다.
 
 ### API 타입 생성 (업무 S15P21E106-777)
 
