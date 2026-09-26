@@ -453,7 +453,7 @@ describe('FilmPage 누를 수 있다는 단서 (업무 -697)', () => {
     ).not.toBeNull();
 
     // 리포트 줄의 이름은 새 리포트가 있는지에 따라 바뀐다
-    for (const name of [/^나의 취향 팝콘/, /취향 리포트/]) {
+    for (const name of [/^나의 취향 팝콘/, /리포트 뽑기/]) {
       expect(screen.getByRole('button', { name }).querySelector('svg')).not.toBeNull();
     }
   });

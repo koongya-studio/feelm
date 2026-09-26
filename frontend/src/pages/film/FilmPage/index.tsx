@@ -57,11 +57,12 @@ import { ChevronLeftIcon, ChevronRightIcon } from '../../../components/Icon';
 import Poster from '../../../components/Poster';
 import PosterCue from '../../../components/PosterCue';
 import StatusView from '../../../components/StatusView';
+import Snackbar from '../../../components/Snackbar';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import { kernelSprite } from '../../../components/PopcornBucket/sprites';
 import FilmAside from './FilmAside';
 import TodayRecommendations from './TodayRecommendations';
-import { getLatestReadyReport } from '../../../api/reports';
+import { useReportGeneration } from '../../reports/useReportGeneration';
 import { getMyFrames, getPopcornBucket } from '../../../api/taste';
 import { useShellSize } from '../../../hooks/useShellSize';
 import { useAuth } from '../../../contexts/authContext';
@@ -194,7 +195,7 @@ const FILM_GUIDE_STEPS: FilmGuideStep[] = [
     id: 'report',
     title: '취향 리포트',
     description: '영화 감상 기록을 분석한 리포트를 확인하는 곳이에요.',
-    targetSelector: "[aria-label='취향 리포트 보기'],[aria-label='새 취향 리포트 받기']",
+    targetSelector: "[aria-label='리포트 뽑기']",
   },
   {
     id: 'notifications',
@@ -240,8 +241,8 @@ export default function FilmPage() {
   const [range, setRange] = useState<FrameRange>({ first: 1, last: 1 });
   const [bucket, setBucket] = useState<PopcornBucket | null>(null);
   const [bucketSettled, setBucketSettled] = useState(false);
-  /** 아직 3.3에서 받지 않은 새 리포트. 있으면 리포트 줄이 발급(3.3)으로 간다 */
-  const [newReportId, setNewReportId] = useState<number | null>(null);
+  /** 상시 생성 버튼과 서버의 생성 가능 상태 */
+  const reportGeneration = useReportGeneration();
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
 
@@ -273,15 +274,6 @@ export default function FilmPage() {
       .finally(() => {
         if (active) setBucketSettled(true);
       });
-
-    // 새 리포트를 확인하지 못해도 리포트 줄은 목록(7.3)으로 가는 원래 동작을 한다
-    getLatestReadyReport()
-      .then((latest) => {
-        if (active) {
-          setNewReportId(latest?.needsIntro ? latest.reportId : null);
-        }
-      })
-      .catch(() => undefined);
 
     return () => {
       active = false;
@@ -439,7 +431,7 @@ export default function FilmPage() {
         if (step.title === '나의 취향 팝콘') {
           return !isEmpty && hasAside && summaryFlavors.length > 0;
         }
-        if (step.title === '취향 리포트') return !isEmpty && hasAside;
+        if (step.title === '취향 리포트') return !isEmpty;
         return true;
       }).map((step) =>
         step.title === '영화 추천을 받아보세요' && desktop
@@ -647,6 +639,25 @@ export default function FilmPage() {
           <div className={styles.empty}>
             <h3 className={styles.emptyTitle}>아직 필름에 담긴 영화가 없어요</h3>
             <p className={styles.emptyText}>본 영화를 평가하면 필름에 한 장씩 추가돼요</p>
+            <button
+              className={styles.report}
+              type="button"
+              aria-label="리포트 뽑기"
+              disabled={reportGeneration.generating}
+              onClick={() => void reportGeneration.generate()}
+            >
+              <span className={styles.rowHead}>
+                <span className={styles.rowTitle}>취향 리포트</span>
+                <span className={styles.rowValue}>
+                  {reportGeneration.generating ? '분석하는 중' : '리포트 뽑기'}
+                  <ChevronRightIcon />
+                </span>
+              </span>
+              <span className={styles.reportText}>필름에 담긴 영화로 만드는 나만의 취향 분석</span>
+            </button>
+            <Link className={styles.reportListLink} to={path.tasteReports()}>
+              리포트 목록 보기
+            </Link>
             <div className={styles.actionButtons}>
               <Button
                 variant="primary"
@@ -668,7 +679,34 @@ export default function FilmPage() {
             </div>
           </div>
         ) : desktop ? (
-          <TodayRecommendations />
+          <>
+            {!hasAside ? (
+              <div className={styles.content}>
+                <button
+                  className={styles.report}
+                  type="button"
+                  aria-label="리포트 뽑기"
+                  disabled={reportGeneration.generating}
+                  onClick={() => void reportGeneration.generate()}
+                >
+                  <span className={styles.rowHead}>
+                    <span className={styles.rowTitle}>취향 리포트</span>
+                    <span className={styles.rowValue}>
+                      {reportGeneration.generating ? '분석하는 중' : '리포트 뽑기'}
+                      <ChevronRightIcon />
+                    </span>
+                  </span>
+                  <span className={styles.reportText}>
+                    필름에 담긴 영화로 만드는 나만의 취향 분석
+                  </span>
+                </button>
+                <Link className={styles.reportListLink} to={path.tasteReports()}>
+                  리포트 목록 보기
+                </Link>
+              </div>
+            ) : null}
+            <TodayRecommendations />
+          </>
         ) : (
           <div className={styles.content}>
             {/*
@@ -720,34 +758,29 @@ export default function FilmPage() {
               </button>
             ) : null}
 
-            {/*
-             * 취향 리포트. 작은 메뉴 줄이다.
-             *
-             * 아직 받지 않은 새 리포트가 있으면 3.3 발급으로, 없으면 7.3 목록으로 간다.
-             * 홈과 같은 규칙(`getLatestReadyReport`)이고 이동표에 3.3으로 들어오는
-             * 화살표가 없어 정한 길이다.
-             */}
             <button
               type="button"
               className={styles.report}
-              /* 팝콘 줄과 같은 이유로 이름을 직접 준다 */
-              aria-label={newReportId !== null ? '새 취향 리포트 받기' : '취향 리포트 보기'}
-              onClick={() =>
-                void navigate(
-                  newReportId !== null ? path.reportIssued(newReportId) : path.tasteReports(),
-                )
-              }
+              aria-label="리포트 뽑기"
+              disabled={reportGeneration.generating}
+              onClick={() => void reportGeneration.generate()}
             >
               <span className={styles.rowHead}>
                 <span className={styles.rowTitle}>취향 리포트</span>
-                <span className={styles.rowValue} data-tone={newReportId !== null ? 'new' : null}>
-                  {newReportId !== null ? '새 리포트 받기' : '리포트 보기'}
+                <span className={styles.rowValue}>
+                  {reportGeneration.generating ? '분석하는 중' : '리포트 뽑기'}
                   <ChevronRightIcon />
                 </span>
               </span>
-
-              <span className={styles.reportText}>지금까지 본 영화로 만든 나만의 취향 분석</span>
+              <span className={styles.reportText}>
+                {reportGeneration.availability?.reason === 'INSUFFICIENT_FRAMES'
+                  ? `평가 프레임 ${reportGeneration.availability.minimumFrames}개부터 뽑을 수 있어요`
+                  : '지금까지 본 영화로 만든 나만의 취향 분석'}
+              </span>
             </button>
+            <Link className={styles.reportListLink} to={path.tasteReports()}>
+              리포트 목록 보기
+            </Link>
 
             {/* 검색에서 본 영화를 골라 평가하고, 추천은 기존 2.2로 보낸다(업무 -885). */}
             <div className={styles.action}>
@@ -782,8 +815,22 @@ export default function FilmPage() {
       */}
       {desktop && !isEmpty ? (
         <DesktopAside>
-          <FilmAside bucket={bucket} frames={items} newReportId={newReportId} />
+          <FilmAside bucket={bucket} frames={items} reportGeneration={reportGeneration} />
         </DesktopAside>
+      ) : null}
+      {reportGeneration.message ? (
+        <div className={styles.reportNotice}>
+          <Snackbar
+            actionLabel={reportGeneration.existingId !== null ? '리포트 보기' : '확인'}
+            onAction={() =>
+              reportGeneration.existingId !== null
+                ? void navigate(path.report(reportGeneration.existingId))
+                : reportGeneration.dismiss()
+            }
+          >
+            {reportGeneration.message}
+          </Snackbar>
+        </div>
       ) : null}
       {showGuide && guideSteps.length > 0 ? (
         <GuideCallout

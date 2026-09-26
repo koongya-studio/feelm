@@ -16,7 +16,22 @@ export type ReportStatus = 'GENERATING' | 'READY';
 /** 반기. `H1` 상반기 · `H2` 하반기 */
 export type ReportPeriod = { year: number; half: 'H1' | 'H2' };
 
-/** API-059 `items[]`. 발급했거나 다음 반기 공개 시각이 지난 `READY`만 온다 */
+export type ReportGeneration = {
+  frameCount: number;
+  minimumFrames: number;
+  canGenerate: boolean;
+  reason: 'INSUFFICIENT_FRAMES' | 'UNCHANGED' | null;
+};
+
+export type ReportGenerated = {
+  reportId: number;
+  createdAt: string;
+  reused: boolean;
+  issuedAt: string | null;
+  reuseReason?: 'UNCHANGED_FILM' | 'SAME_CONTENT' | null;
+};
+
+/** API-059 `items[]`. 인화 완료한 FILM 및 이미 공개된 기존 HALF 결과 */
 export type ReportSummary = {
   reportId: number;
   period: ReportPeriod;
@@ -26,10 +41,10 @@ export type ReportSummary = {
 };
 
 /**
- * API-059 `current`. 공개 시각이 지난 가장 최근 반기 한 행이다.
+ * API-059 `current`. 최신 FILM 결과 또는 최신 공개 반기의 기존 HALF 결과.
  *
  * `status`가 `GENERATING`이면 아직 만드는 중이라 목록 카드가 아니라 이 자리에서만 알린다.
- * `issuedAt`이 null인 `READY`가 홈 · 필름의 `새 리포트 받기` 대상이다(API-080).
+ * `issuedAt`이 null인 `READY`는 기존 인화 화면에서 이어 받을 수 있다(API-080).
  */
 export type ReportCurrent = {
   reportId: number;
@@ -42,8 +57,9 @@ export type ReportCurrent = {
 export type ReportList = {
   items: ReportSummary[];
   current: ReportCurrent | null;
-  /** 최신 공개 반기가 아직 준비 중이거나 준비 기록조차 없으면 참이다 */
+  /** 실제 current가 GENERATING일 때만 참이다 */
   preparing: boolean;
+  generation?: ReportGeneration;
 };
 
 type ReportCount = { name: string; count: number };
@@ -140,6 +156,8 @@ export type ReportCharacterCard = {
 
 /** API-060 응답 */
 export type ReportDetail = {
+  /** 기존 반기 리포트와 새 전체 필름 리포트의 분석 범위 */
+  analysisScope?: 'FILM' | 'HALF';
   reportId: number;
   period: ReportPeriod;
   summary: { ratingCount: number; newFlavorCount: number; averageScore: number };

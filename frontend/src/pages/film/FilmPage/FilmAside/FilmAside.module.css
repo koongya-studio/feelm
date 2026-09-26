@@ -15,6 +15,10 @@
   line-height: var(--line-height-meta);
 }
 
+.reportAction {
+  color: var(--color-brand-ink);
+}
+
 /* 감상 확인 카드 */
 .pending {
   display: flex;

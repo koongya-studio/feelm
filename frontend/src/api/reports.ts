@@ -6,7 +6,18 @@
  * 화면의 `ReportFourCut`을 PNG로 캡처해 API-061에 저장한다(업무 -557).
  */
 import { request } from './client';
-import type { ReportDetail, ReportImage, ReportIssue, ReportList } from '../types/report';
+import type {
+  ReportDetail,
+  ReportGenerated,
+  ReportImage,
+  ReportIssue,
+  ReportList,
+} from '../types/report';
+
+/** 현재 전체 필름으로 생성한다. 변화가 없으면 마지막 결과를 반환한다. */
+export async function generateReport(): Promise<ReportGenerated> {
+  return request<ReportGenerated>('/users/me/reports', { method: 'POST' });
+}
 
 /** API-059 내 리포트 목록 · GET /api/v1/users/me/reports — 최신 반기가 앞이다 */
 export async function getMyReports(): Promise<ReportList> {
