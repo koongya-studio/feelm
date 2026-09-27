@@ -1,13 +1,17 @@
 /*
  * 취향 4컷 PNG 저장 (API-061, 업무 -731).
  *
- * 상세 화면의 `저장`이 `ReportFourCut`을 캡처해 API-061에 올리고, 받은
- * 서명 URL의 PNG를 실제로 내려받은 뒤에야 끝난다. URL 발급만으로 성공을 알리지 않는다
- * (`docs/api/report-trend.md` API-061 처리 규칙).
+ * iOS는 이번 `ReportFourCut` 캡처를 내려받아 서버의 기존 불완전한 PNG 재사용을 피한다.
+ * 다른 환경은 기존대로 API-061에서 받은 서명 URL의 PNG를 내려받는다.
  */
 import { isApiError } from '../../../api/apiError';
 import { createReportImage } from '../../../api/reports';
-import { captureReportImage, downloadReportImage } from '../../../utils/reportImage';
+import {
+  captureReportImage,
+  downloadBlob,
+  downloadReportImage,
+  isIOSReportDevice,
+} from '../../../utils/reportImage';
 
 export async function saveReportImage(
   reportId: number,
@@ -20,7 +24,8 @@ export async function saveReportImage(
   onStage?.('upload');
   const image = await createReportImage(reportId, png);
   onStage?.('download');
-  await downloadReportImage(image.downloadUrl, reportId);
+  if (isIOSReportDevice()) downloadBlob(png, `feelm-report-${reportId}.png`);
+  else await downloadReportImage(image.downloadUrl, reportId);
 }
 
 /** 저장 실패 안내. 기다리면 풀리는 409 · 429만 따로 알리고 나머지는 다시 시도로 묶는다 */

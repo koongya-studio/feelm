@@ -54,6 +54,7 @@ vi.mock('../../utils/reportImage', () => ({
   captureReportBackImage: vi.fn(),
   downloadReportImage: vi.fn(),
   downloadBlob: vi.fn(),
+  isIOSReportDevice: vi.fn(),
 }));
 
 /*
@@ -91,8 +92,13 @@ const {
   getReportDetail,
   issueReport,
 } = await import('../../api/reports');
-const { captureReportBackImage, captureReportImage, downloadBlob, downloadReportImage } =
-  await import('../../utils/reportImage');
+const {
+  captureReportBackImage,
+  captureReportImage,
+  downloadBlob,
+  downloadReportImage,
+  isIOSReportDevice,
+} = await import('../../utils/reportImage');
 
 /** 7.3 목록이 읽는 API-059 응답을 바꿔 끼운다 */
 function serveList(list: ReportList) {
@@ -144,6 +150,7 @@ beforeEach(() => {
     .mockResolvedValue(new Blob(['four-cut-back'], { type: 'image/png' }));
   vi.mocked(downloadReportImage).mockReset().mockResolvedValue(undefined);
   vi.mocked(downloadBlob).mockReset();
+  vi.mocked(isIOSReportDevice).mockReset().mockReturnValue(false);
   serveList(reportListBeforeIssue);
   /*
    * 3.1의 버튼은 `getLatestReadyReport`가 가른다. 이 시험은 두 상태를 직접 세우고, 발급
@@ -675,15 +682,56 @@ describe('리포트 상세 저장과 공유', () => {
     }
   });
 
-  it('저장 버튼은 PNG를 내려받고 화면에 머문다', async () => {
+  it('iOS 저장 버튼은 뒤집힌 칸을 복원하고 이번 앞면 한 장만 내려받는다', async () => {
+    vi.mocked(isIOSReportDevice).mockReturnValue(true);
     renderApp(['/reports/301']);
+    fireEvent.click(await screen.findByRole('button', { name: '01 장르 설명 보기' }));
+    expect(screen.getByRole('button', { name: '01 장르 사진 보기' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
     fireEvent.click(await screen.findByRole('button', { name: '저장' }));
-    await waitFor(() => expect(downloadReportImage).toHaveBeenCalledOnce());
+    await waitFor(() => expect(downloadBlob).toHaveBeenCalledOnce());
     expect(createReportImage).toHaveBeenCalledWith(301, expect.any(Blob));
+    expect(downloadBlob).toHaveBeenCalledWith(
+      await vi.mocked(captureReportImage).mock.results[0].value,
+      'feelm-report-301.png',
+    );
+    expect(downloadReportImage).not.toHaveBeenCalled();
+    expect(captureReportImage).toHaveBeenCalledOnce();
+    expect(captureReportBackImage).not.toHaveBeenCalled();
+    expect(
+      vi.mocked(captureReportImage).mock.calls[0][0].querySelector('[data-flipped]'),
+    ).toBeNull();
     expect(location()).toBe('/reports/301');
   });
 
-  it('저장 실패 시 화면에 남아 이유를 알린다', async () => {
+  it('갤럭시·웹 저장 버튼은 기존 API-061 서명 PNG를 내려받는다', async () => {
+    renderApp(['/reports/301']);
+    fireEvent.click(await screen.findByRole('button', { name: '저장' }));
+    await waitFor(() => expect(downloadReportImage).toHaveBeenCalledOnce());
+    expect(downloadReportImage).toHaveBeenCalledWith(
+      '/api/v1/report-images/901/download?expires=1&signature=x',
+      301,
+    );
+    expect(downloadBlob).not.toHaveBeenCalled();
+    expect(captureReportImage).toHaveBeenCalledOnce();
+    expect(captureReportBackImage).not.toHaveBeenCalled();
+    expect(location()).toBe('/reports/301');
+  });
+
+  it('API-061 업로드 실패 시 화면에 남아 이유를 알린다', async () => {
+    vi.mocked(createReportImage).mockRejectedValueOnce(new Error('upload failed'));
+    renderApp(['/reports/301']);
+    fireEvent.click(await screen.findByRole('button', { name: '저장' }));
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('이미지를 만들지 못했어요'),
+    );
+    expect(location()).toBe('/reports/301');
+    expect(downloadBlob).not.toHaveBeenCalled();
+  });
+
+  it('기존 서명 PNG 다운로드가 실패하면 화면에 남아 이유를 알린다', async () => {
     vi.mocked(downloadReportImage).mockRejectedValueOnce(new Error('expired'));
     renderApp(['/reports/301']);
     fireEvent.click(await screen.findByRole('button', { name: '저장' }));
@@ -691,6 +739,7 @@ describe('리포트 상세 저장과 공유', () => {
       expect(screen.getByRole('status')).toHaveTextContent('이미지를 만들지 못했어요'),
     );
     expect(location()).toBe('/reports/301');
+    expect(downloadBlob).not.toHaveBeenCalled();
   });
 });
 
