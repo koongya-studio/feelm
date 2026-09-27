@@ -174,7 +174,17 @@
   gap: var(--space-3);
 }
 
-/* 손글씨 연도와 오른쪽으로 이어지는 가로줄 */
+/* Caveat의 필기감에 맞춘 Nanum Brush Script의 상/하 글리프만 로드한다. */
+@font-face {
+  font-family: 'Report Half Hand';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../../../assets/reports/report-half-hand.woff2') format('woff2');
+  unicode-range: U+C0C1, U+D558;
+}
+
+/* 손글씨 연도·반기와 오른쪽으로 이어지는 가로줄 */
 .yearLabel {
   display: flex;
   align-items: center;
@@ -191,22 +201,23 @@
 
 .yearHand {
   display: inline-block;
+  flex: none;
   color: var(--color-ink);
   font-family: var(--font-report-hand);
   font-size: 28px;
   font-weight: 700;
   letter-spacing: 0.02em;
   line-height: 1;
+  white-space: nowrap;
   transform: rotate(-6deg);
   transform-origin: left bottom;
 }
 
-/* 같은 해의 다음 반기는 제목 없이 기존 가로줄로 구분한다. */
-.periodDivider {
-  width: 100%;
-  margin: 0;
-  border: 0;
-  border-top: 1px solid var(--color-line-strong);
+.halfHand {
+  font-family: 'Report Half Hand', var(--font-report-hand);
+  font-size: 0.92em;
+  font-weight: 400;
+  -webkit-text-stroke: 0.65px currentColor;
 }
 
 .board {

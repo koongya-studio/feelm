@@ -976,12 +976,8 @@ describe('전체 필름 요청 생성', () => {
       expect(await screen.findByRole('status')).toHaveTextContent('지난 리포트와 같아요!');
       expect(issueReport).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole('button', { name: '확인' }));
-      const genre = container.querySelector('[data-cut="genre"]')!;
-      fireEvent.animationEnd(genre);
-      fireEvent(genre, new Event('webkitAnimationEnd', { bubbles: true }));
-      expect(screen.queryByText('지난 리포트와 같아요!')).not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: '리포트 보기' }));
       await waitFor(() => expect(location()).toBe('/reports/301'));
+      expect(screen.queryByText('지난 리포트와 같아요!')).not.toBeInTheDocument();
       expect(issueReport).not.toHaveBeenCalled();
     },
   );
@@ -1003,6 +999,106 @@ describe('전체 필름 요청 생성', () => {
     }
   });
 
+  it.each(['natural', 'skip', 'reduced'] as const)(
+    '앞면만 같은 새 결과는 모션 뒤 뒷면 안내를 한 번 띄우고 정상 발급한다 (%s)',
+    async (completion) => {
+      const previous = window.matchMedia;
+      if (completion === 'reduced') {
+        window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+          matches: query === '(prefers-reduced-motion: reduce)',
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        }));
+      }
+      vi.mocked(generateReport).mockResolvedValue({
+        reportId: 301,
+        createdAt: reportDetails[301].createdAt,
+        reused: false,
+        issuedAt: null,
+        frontUnchanged: true,
+      });
+      vi.mocked(getReportDetail).mockResolvedValue({
+        ...reportDetails[301],
+        analysisScope: 'FILM',
+      });
+      try {
+        const { container } = renderApp([ROUTE_PATTERN.film]);
+        fireEvent.click(await screen.findByRole('button', { name: '리포트 뽑기' }));
+        await screen.findByText('지금까지 쌓인 취향 필름을 인화했어요');
+        expect(location()).toBe('/reports/301/new?similar=1');
+        if (completion !== 'reduced') {
+          expect(screen.queryByRole('status')).not.toBeInTheDocument();
+          expect(issueReport).not.toHaveBeenCalled();
+          if (completion === 'skip') {
+            fireEvent.click(screen.getByRole('button', { name: '건너뛰기' }));
+          } else {
+            fireEvent.animationEnd(container.querySelector('[data-cut="genre"]')!);
+            fireEvent(
+              container.querySelector('[data-cut="genre"]')!,
+              new Event('webkitAnimationEnd', { bubbles: true }),
+            );
+          }
+        }
+        const popup = await screen.findByRole('status');
+        expect(popup.textContent).toContain(
+          '지난 리포트와 미세한 차이가 있어요.\n뒷면을 확인해주세요!',
+        );
+        expect(screen.queryByText('지난 리포트와 같아요!')).not.toBeInTheDocument();
+        await waitFor(() => expect(issueReport).toHaveBeenCalledExactlyOnceWith(301));
+        fireEvent.click(screen.getByRole('button', { name: '확인' }));
+        await waitFor(() => expect(location()).toBe('/reports/301'));
+        expect(screen.queryByRole('status')).not.toBeInTheDocument();
+        expect(issueReport).toHaveBeenCalledTimes(1);
+      } finally {
+        window.matchMedia = previous;
+      }
+    },
+  );
+
+  it.each(['success', 'failure'] as const)(
+    '발급 기록 중 팝업 확인은 같은 요청을 기다리고 실패하면 다시 확인할 수 있다 (%s)',
+    async (outcome) => {
+      let resolveIssue!: (value: Awaited<ReturnType<typeof issueReport>>) => void;
+      let rejectIssue!: (reason: unknown) => void;
+      const pendingIssue = new Promise<Awaited<ReturnType<typeof issueReport>>>(
+        (resolve, reject) => {
+          resolveIssue = resolve;
+          rejectIssue = reject;
+        },
+      );
+      vi.mocked(issueReport).mockReturnValueOnce(pendingIssue);
+      vi.mocked(getReportDetail).mockResolvedValue({
+        ...reportDetails[301],
+        analysisScope: 'FILM',
+      });
+      renderApp(['/reports/301/new?similar=1']);
+      fireEvent.click(await screen.findByRole('button', { name: '건너뛰기' }));
+      await screen.findByRole('status');
+      await waitFor(() => expect(issueReport).toHaveBeenCalledExactlyOnceWith(301));
+      fireEvent.click(screen.getByRole('button', { name: '확인' }));
+      expect(location()).toBe('/reports/301/new?similar=1');
+      expect(issueReport).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        if (outcome === 'success') {
+          resolveIssue({ reportId: 301, issuedAt: '2026-07-01T00:00:14Z' });
+        } else {
+          rejectIssue(new ApiError(0, 'NETWORK_ERROR', '네트워크 오류'));
+        }
+      });
+      if (outcome === 'failure') {
+        expect(await screen.findByRole('alert')).toHaveTextContent(
+          '발급을 기록하지 못했어요. 잠시 후 다시 시도해 주세요.',
+        );
+        expect(location()).toBe('/reports/301/new?similar=1');
+        expect(screen.getByRole('status')).toHaveTextContent('뒷면을 확인해주세요!');
+        fireEvent.click(screen.getByRole('button', { name: '확인' }));
+      }
+      await waitFor(() => expect(location()).toBe('/reports/301'));
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
+      expect(issueReport).toHaveBeenCalledTimes(outcome === 'success' ? 1 : 2);
+    },
+  );
+
   it('같은 반기의 여러 결과를 최신순으로 묶고 다음 반기와 구분한다', async () => {
     const items = Array.from({ length: 5 }, (_, i) => ({
       reportId: 400 + i,
@@ -1011,7 +1107,11 @@ describe('전체 필름 요청 생성', () => {
       title: `리포트 ${i}`,
       createdAt: `2026-09-${20 + i}T12:00:00Z`,
     }));
-    serveList({ items: [reportList.items[0], ...items], current: null, preparing: false });
+    serveList({
+      items: [{ ...reportList.items[0], createdAt: '2026-06-01T12:00:00Z' }, ...items],
+      current: null,
+      preparing: false,
+    });
     vi.mocked(getReportDetail).mockImplementation((id) =>
       Promise.resolve({ ...reportDetails[301], reportId: id }),
     );
@@ -1029,8 +1129,60 @@ describe('전체 필름 요청 생성', () => {
       '/my/reports/400',
     ]);
     expect(screen.getByRole('region', { name: '2026 상반기' })).toBeInTheDocument();
-    expect(screen.getAllByRole('heading', { name: '2026' })).toHaveLength(1);
-    expect(screen.queryByRole('heading', { name: '2026 하반기' })).toBeNull();
-    expect(screen.queryByRole('heading', { name: '2026 상반기' })).toBeNull();
+    expect(within(section).getByRole('heading', { name: '2026 하' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '2026 상' })).toBeInTheDocument();
+    expect(screen.getAllByRole('region')).toHaveLength(2);
+  });
+
+  it('기존 분석 반기가 달라도 같은 생성 반기의 리포트에는 구분선을 추가하지 않는다', async () => {
+    serveList({
+      items: Array.from({ length: 5 }, (_, i) => ({
+        ...reportList.items[0],
+        reportId: 500 + i,
+        period: { year: 2026, half: i % 2 ? 'H1' : 'H2' },
+        createdAt: '2026-09-27T01:00:00Z',
+      })),
+      current: null,
+      preparing: false,
+    });
+    renderApp([ROUTE_PATTERN.tasteReports]);
+    const group = await screen.findByRole('region', { name: '2026 하반기' });
+    expect(within(group).getAllByRole('link')).toHaveLength(5);
+    expect(screen.getAllByRole('region')).toHaveLength(1);
+    expect(screen.getByRole('heading', { name: '2026 하' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '2026 상' })).not.toBeInTheDocument();
+  });
+
+  it('한국시간의 7월과 새해 경계에서만 생성 반기를 나눈다', async () => {
+    const dates = [
+      '2026-06-30T14:59:59Z',
+      '2026-06-30T15:00:00Z',
+      '2026-12-31T14:59:59Z',
+      '2026-12-31T15:00:00Z',
+    ];
+    serveList({
+      items: dates.map((createdAt, i) => ({
+        ...reportList.items[0],
+        reportId: 600 + i,
+        createdAt,
+      })),
+      current: null,
+      preparing: false,
+    });
+    renderApp([ROUTE_PATTERN.tasteReports]);
+    await screen.findByRole('region', { name: '2027 상반기' });
+    expect(
+      screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent),
+    ).toEqual(['2027 상', '2026 하', '2026 상']);
+    expect(
+      within(screen.getByRole('region', { name: '2026 하반기' }))
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href')),
+    ).toEqual(['/my/reports/602', '/my/reports/601']);
+    expect(
+      within(screen.getByRole('region', { name: '2027 상반기' }))
+        .getByRole('link')
+        .getAttribute('href'),
+    ).toBe('/my/reports/603');
   });
 });

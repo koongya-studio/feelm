@@ -49,8 +49,12 @@ export default function ReportIssuedPage() {
   const id = Number(reportId);
   const [searchParams] = useSearchParams();
   const sameContent = searchParams.get('same') === '1';
-  const [sameNotice, setSameNotice] = useState(() => sameContent && prefersReducedMotion());
-  const notified = useRef(sameNotice);
+  const frontUnchanged = !sameContent && searchParams.get('similar') === '1';
+  const hasComparison = sameContent || frontUnchanged;
+  const [comparisonNotice, setComparisonNotice] = useState(
+    () => hasComparison && prefersReducedMotion(),
+  );
+  const notified = useRef(comparisonNotice);
 
   const [report, setReport] = useState<ReportDetail | null>(null);
   const [nickname, setNickname] = useState<string | null>(null);
@@ -61,7 +65,11 @@ export default function ReportIssuedPage() {
   /** 발급을 기록하는 동안 버튼을 잠근다 */
   const [issuing, setIssuing] = useState(false);
   const [issueFailure, setIssueFailure] = useState<string | null>(null);
-  const issueState = useRef({ id, pending: false, complete: false });
+  const issueState = useRef<{
+    id: number;
+    pending: Promise<boolean> | null;
+    complete: boolean;
+  }>({ id, pending: null, complete: false });
 
   // 불러오지 못한 상태는 인화기가 없어 공통 벽이다
   useReportWall(!failed);
@@ -100,25 +108,28 @@ export default function ReportIssuedPage() {
     };
   }, []);
 
-  const recordIssue = useCallback(async () => {
-    if (sameContent) return true;
-    if (issueState.current.id !== id) issueState.current = { id, pending: false, complete: false };
-    if (issueState.current.complete) return true;
-    if (issueState.current.pending) return false;
-    issueState.current.pending = true;
+  const recordIssue = useCallback(() => {
+    if (sameContent) return Promise.resolve(true);
+    if (issueState.current.id !== id) issueState.current = { id, pending: null, complete: false };
+    const state = issueState.current;
+    if (state.complete) return Promise.resolve(true);
+    if (state.pending) return state.pending;
     setIssuing(true);
     setIssueFailure(null);
-    try {
-      await issueReport(id);
-      issueState.current.complete = true;
-      return true;
-    } catch (error) {
-      setIssueFailure(issueMessage(error));
-      return false;
-    } finally {
-      issueState.current.pending = false;
-      setIssuing(false);
-    }
+    state.pending = Promise.resolve().then(async () => {
+      try {
+        await issueReport(id);
+        state.complete = true;
+        return true;
+      } catch (error) {
+        setIssueFailure(issueMessage(error));
+        return false;
+      } finally {
+        state.pending = null;
+        setIssuing(false);
+      }
+    });
+    return state.pending;
   }, [id, sameContent]);
 
   useEffect(() => {
@@ -129,9 +140,9 @@ export default function ReportIssuedPage() {
 
   function finishPrinting() {
     setPrinting(false);
-    if (sameContent && !notified.current) {
+    if (hasComparison && !notified.current) {
       notified.current = true;
-      setSameNotice(true);
+      setComparisonNotice(true);
     }
   }
 
@@ -237,10 +248,12 @@ export default function ReportIssuedPage() {
           {issueFailure ? '다시 시도' : '리포트 보기'}
         </Button>
       </div>
-      {sameNotice ? (
+      {comparisonNotice ? (
         <div className={styles.sameNotice}>
-          <Snackbar actionLabel="확인" onAction={() => setSameNotice(false)}>
-            지난 리포트와 같아요!
+          <Snackbar actionLabel="확인" onAction={() => void openReport()}>
+            {sameContent
+              ? '지난 리포트와 같아요!'
+              : '지난 리포트와 미세한 차이가 있어요.\n뒷면을 확인해주세요!'}
           </Snackbar>
         </div>
       ) : null}
