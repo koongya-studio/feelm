@@ -305,3 +305,37 @@ it('preserves microsecond precision when linking consecutive recommendation mixe
   expect(await screen.findByText('0명 · 11알')).toBeInTheDocument();
   expect(screen.getByText('0명 · 22알')).toBeInTheDocument();
 });
+
+it('shows the saved two and three participants for each recommendation instead of current members', async () => {
+  const two = historyItem(1, '두 명의 추천', '2026-09-20T01:01:00Z');
+  const three = historyItem(2, '세 명의 추천', '2026-09-20T04:30:00Z');
+  const savedMembers = ['민수', '지연', '수빈'].map((nickname, index) => ({
+    user: { userId: index + 1, nickname, avatarUrl: null },
+    totalCount: 0,
+    flavors: [],
+  }));
+  vi.mocked(getPartyRecommendationHistory).mockResolvedValue(
+    historyPage({
+      items: [
+        historySet({
+          items: [two, three],
+          popcornSnapshots: [two, three].map((item, index) => ({
+            recommendationSetId: 1,
+            exposedAt: item.exposedAt,
+            recommendationMode: 'PERSONALIZED',
+            members: savedMembers.slice(0, index + 2),
+            totalCount: 0,
+            flavors: [],
+          })),
+        }),
+      ],
+    }),
+  );
+  renderPage();
+  const first = await screen.findByRole('link', { name: /두 명의 추천/ });
+  const second = screen.getByRole('link', { name: /세 명의 추천/ });
+  expect(first.closest('ul')?.parentElement).toHaveTextContent('당시 참여 멤버민수지연');
+  expect(first.closest('ul')?.parentElement).not.toHaveTextContent('수빈');
+  expect(second.closest('ul')?.parentElement).toHaveTextContent('당시 참여 멤버민수지연수빈');
+  expect(screen.queryByText('김난다')).not.toBeInTheDocument();
+});

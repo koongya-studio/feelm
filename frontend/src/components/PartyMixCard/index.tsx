@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react';
+import Avatar from '../Avatar';
 import PopcornBucket from '../PopcornBucket';
 import { kernelCounts } from '../PopcornBucket/kernels';
 import { ChevronDownIcon, ChevronUpIcon } from '../Icon';
@@ -58,6 +59,19 @@ export default function PartyMixCard({ mix }: { mix: PartyPopcornSnapshot }) {
       ) : (
         <div className={styles.head}>{head}</div>
       )}
+      {mix.members.length > 0 ? (
+        <div className={styles.participants}>
+          <p className={styles.participantLabel}>당시 참여 멤버</p>
+          <ul className={styles.participantList} aria-label="당시 참여 멤버">
+            {mix.members.map((member) => (
+              <li key={member.user.userId} className={styles.participant}>
+                <Avatar size={28} src={member.user.avatarUrl} nickname={member.user.nickname} />
+                <span>{member.user.nickname}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       {mix.recommendationMode === 'POPULARITY' ? (
         <p className={styles.notice}>{PARTY_POPULARITY_NOTICE}</p>
       ) : null}
