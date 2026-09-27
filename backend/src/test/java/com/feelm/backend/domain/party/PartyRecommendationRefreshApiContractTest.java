@@ -259,6 +259,24 @@ class PartyRecommendationRefreshApiContractTest extends SharedPostgresContractTe
     }
 
     @Test
+    void rollsBackExposureWhenSnapshotCannotBeStored() throws Exception {
+        long partyId = party();
+        stub(partyId, movies(101, 110));
+        jdbc.execute(
+                "ALTER TABLE party_popcorn_snapshots ADD CONSTRAINT snapshot_failure_test CHECK (party_id < 0)");
+        try {
+            request(10, partyId, 3, null).andExpect(status().is5xxServerError());
+            assertThat(count("recommendation_sets")).isZero();
+            assertThat(count("recommendation_items")).isZero();
+            assertThat(count("party_movie_exposures")).isZero();
+            assertThat(count("party_popcorn_snapshots")).isZero();
+        } finally {
+            jdbc.execute(
+                    "ALTER TABLE party_popcorn_snapshots DROP CONSTRAINT snapshot_failure_test");
+        }
+    }
+
+    @Test
     @DisplayName("T11 새 세트는 유효 후보를 순위대로 최대 50편 저장한다")
     void newSetStoresUpToFiftyEligibleCandidates() throws Exception {
         long partyId = party();
@@ -306,6 +324,12 @@ class PartyRecommendationRefreshApiContractTest extends SharedPostgresContractTe
         }
         assertThat(exposedCount()).isEqualTo(3 + 3 * threads);
         assertThat(distinctExposureTimes()).isEqualTo(1 + threads);
+        assertThat(count("party_popcorn_snapshots")).isEqualTo(1 + threads);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM recommendation_items i WHERE i.exposed_at IS NOT NULL AND NOT EXISTS (SELECT 1 FROM party_popcorn_snapshots s WHERE s.set_id=i.set_id AND s.exposed_at=i.exposed_at)",
+                                Long.class))
+                .isZero();
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT count(*) FROM recommendation_items"

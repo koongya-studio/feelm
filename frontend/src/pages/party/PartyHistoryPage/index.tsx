@@ -38,6 +38,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
+import PartyMixCard from '../../../components/PartyMixCard';
 import Poster from '../../../components/Poster';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
@@ -268,6 +269,12 @@ export default function PartyHistoryPage() {
                     <p className={styles.batchTime}>{formatTimeOfDay(batch.exposedAt)}</p>
                   ) : null}
 
+                  {(() => {
+                    const mix = set.popcornSnapshots?.find(
+                      (snapshot) => snapshot.exposedAt === batch.exposedAt,
+                    );
+                    return mix ? <PartyMixCard mix={mix} /> : null;
+                  })()}
                   <ul className={styles.list}>
                     {batch.items.map((item) => (
                       <li key={item.recommendationItemId}>

@@ -90,6 +90,7 @@ class PersonalScorer:
             "inputHash": snapshot.input_hash, "candidateVersion": CANDIDATE_VERSION,
             "inputSchemaVersion": INPUT_SCHEMA,
             "updatedAt": timestamp, "status": status,
+            "recommendationMode": "POPULARITY" if cold_start else "PERSONALIZED",
         }
         actual_ids = {mid for mid, _ in snapshot.ratings}
         state = {

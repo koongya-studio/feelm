@@ -225,3 +225,9 @@ PostgreSQL 문법이라 H2에서 실행되지 않으므로, 마이그레이션�
 상한 제약이 없으므로 이번 정책 변경에 새 마이그레이션은 필요 없다. 적용된 SQL은 수정하지 않는다.
 생성·수락은 사용자 행을 먼저 잠그고 활성 파티 참여 개수를 검사한다. 10개에 도달하면
 `ACTIVE_PARTY_LIMIT_REACHED`로 거절한다. 사용자와 파티를 함께 잠그는 순서는 사용자 → 파티로 통일한다.
+
+
+## 파티 믹스 기록
+S15P21E106-959: party_popcorn_snapshots는 노출 시각별 불변 집계를 JSONB로 저장하며 닉네임·사진을
+복제하지 않는다. UNIQUE(set_id, exposed_at), party_id 최신 인덱스와 FK CASCADE를 적용한다.
+recommendation_sets.recommendation_mode와 스냅샷 mode는 두 허용값 CHECK와 기본 PERSONALIZED를 사용한다.

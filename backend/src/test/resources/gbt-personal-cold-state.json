@@ -27,7 +27,8 @@
         "dismissOnly": 0,
         "watchOnly": 0
       },
-      "eligibleCandidateCount": 5
+      "eligibleCandidateCount": 5,
+      "recommendationMode": "PERSONALIZED"
     },
     "candidates": {
       "userId": 58501,
@@ -66,7 +67,8 @@
           "reasons": []
         }
       ],
-      "discovery": []
+      "discovery": [],
+      "recommendationMode": "PERSONALIZED"
     }
   },
   "cold": {
@@ -92,7 +94,8 @@
         "dismissOnly": 0,
         "watchOnly": 0
       },
-      "eligibleCandidateCount": 6
+      "eligibleCandidateCount": 6,
+      "recommendationMode": "POPULARITY"
     },
     "candidates": {
       "userId": 58501,
@@ -136,7 +139,8 @@
           "reasons": []
         }
       ],
-      "discovery": []
+      "discovery": [],
+      "recommendationMode": "POPULARITY"
     }
   },
   "next": {
@@ -162,7 +166,8 @@
         "dismissOnly": 0,
         "watchOnly": 0
       },
-      "eligibleCandidateCount": 5
+      "eligibleCandidateCount": 5,
+      "recommendationMode": "PERSONALIZED"
     },
     "candidates": {
       "userId": 58502,
@@ -201,7 +206,8 @@
           "reasons": []
         }
       ],
-      "discovery": []
+      "discovery": [],
+      "recommendationMode": "PERSONALIZED"
     }
   }
 }

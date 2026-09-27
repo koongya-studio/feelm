@@ -21,6 +21,25 @@ class RecommendationReasonServiceTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
+    void preservesPopularityNoticeWithoutAiPersonalization() {
+        for (boolean enabled : new boolean[] {true, false}) {
+            var result =
+                    service(enabled)
+                            .initialReason(
+                                    10,
+                                    101,
+                                    "TASTE",
+                                    objectMapper.readTree(
+                                            "{\"recommendationMode\":\"POPULARITY\",\"reasons\":[]}"));
+            assertThat(result.path("summary").textValue())
+                    .isEqualTo("아직 취향 정보가 없어, 인기도를 기준으로 영화를 골랐어요.");
+            assertThat(result.path("recommendationMode").textValue()).isEqualTo("POPULARITY");
+            assertThat(result.path("_reasonPending").asBoolean()).isFalse();
+        }
+        verifyNoInteractions(generator);
+    }
+
+    @Test
     void keepsLegacyGroundedReasonWhenGbtAiIsDisabled() {
         when(repository.findMovieTitle(55)).thenReturn(Optional.of("근거 영화"));
         when(repository.findGenreName("THRILLER")).thenReturn(Optional.of("스릴러"));

@@ -2145,9 +2145,21 @@ export interface components {
             status?: "ACTIVE" | "CLOSED";
         };
         PartyPopcornResponse: {
+            latestMix?: components["schemas"]["PartyPopcornSnapshotResponse"];
             members?: components["schemas"]["MemberPopcorn"][];
             /** Format: int64 */
             partyId?: number;
+        };
+        PartyPopcornSnapshotResponse: {
+            /** Format: date-time */
+            exposedAt?: string;
+            flavors?: components["schemas"]["FlavorBucket"][];
+            members?: components["schemas"]["MemberPopcorn"][];
+            recommendationMode?: string;
+            /** Format: int64 */
+            recommendationSetId?: number;
+            /** Format: int64 */
+            totalCount?: number;
         };
         PartyRecommendationHistoryItemResponse: {
             /** Format: date-time */
@@ -2161,6 +2173,7 @@ export interface components {
             /** Format: date-time */
             generatedAt?: string;
             items?: components["schemas"]["PartyRecommendationHistoryItemResponse"][];
+            popcornSnapshots?: components["schemas"]["PartyPopcornSnapshotResponse"][];
             /** Format: int64 */
             recommendationSetId?: number;
         };
@@ -2177,6 +2190,8 @@ export interface components {
             items?: components["schemas"]["PartyRecommendationItemResponse"][];
             /** Format: int64 */
             partyId?: number;
+            popcorn?: components["schemas"]["PartyPopcornSnapshotResponse"];
+            recommendationMode?: string;
             /** Format: int64 */
             recommendationSetId?: number;
         };

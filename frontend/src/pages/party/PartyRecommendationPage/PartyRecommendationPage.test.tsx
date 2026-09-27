@@ -293,3 +293,29 @@ describe('추천 영화 페이지 (S15P21E106-961)', () => {
     expect(location()).toBe(`/parties/${TEST_PARTY_ID}/recommendations/history`);
   });
 });
+
+it('shows popularity notice from actual mode and renders the saved empty mix', async () => {
+  const old = partyPopcorn();
+  const past = {
+    ...old.members[0]!,
+    totalCount: 0,
+    flavors: old.members[0]!.flavors.map((f) => ({ ...f, popcornCount: 0, averageScore: null })),
+  };
+  vi.mocked(getPartyRecommendations).mockResolvedValue({
+    ...partyRecommendations(),
+    recommendationMode: 'POPULARITY',
+    popcorn: {
+      recommendationSetId: 1,
+      exposedAt: '2026-09-27T00:00:00Z',
+      recommendationMode: 'POPULARITY',
+      members: [past],
+      totalCount: 0,
+      flavors: past.flavors,
+    },
+  });
+  renderPage();
+  expect(
+    await screen.findByText('아직 파티원들의 취향 정보가 없어, 인기도를 기준으로 영화를 골랐어요.'),
+  ).toBeInTheDocument();
+  expect(screen.getByText('1명의 취향을 한 통에 담았어요')).toBeInTheDocument();
+});

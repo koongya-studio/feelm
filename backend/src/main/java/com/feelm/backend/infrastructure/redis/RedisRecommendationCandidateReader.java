@@ -152,16 +152,34 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
             String storedState = readState(userId);
             JsonNode currentModel = readCurrentModel();
             Map<Long, JsonNode> evidence = Map.of();
+            String mode = "PERSONALIZED";
             if (currentModel != null && currentModel.has("modelKind")
                     || UserRecommendationStateContract.hasGbtMetadata(candidate)
                     || storedState != null && !storedState.isBlank()) {
                 var state =
                         validateGbtState(userId, storedBatch, candidate, storedState, currentModel);
                 evidence = readGbtEvidence(userId, storedBatch, state);
+                JsonNode stateJson = objectMapper.readTree(storedState);
+                if (candidate.has("recommendationMode") || stateJson.has("recommendationMode")) {
+                    if (!candidate.has("recommendationMode")
+                            || !stateJson.has("recommendationMode")) {
+                        throw new IllegalArgumentException("Recommendation mode metadata differs");
+                    }
+                    if (!candidate.get("recommendationMode").isTextual()
+                            || !stateJson.get("recommendationMode").isTextual()) {
+                        throw new IllegalArgumentException("Recommendation mode must be text");
+                    }
+                    mode = candidate.get("recommendationMode").textValue();
+                    if (!Set.of("PERSONALIZED", "POPULARITY").contains(mode)
+                            || !mode.equals(stateJson.path("recommendationMode").textValue())
+                            || "POPULARITY".equals(mode) && state.supportedInputCount() != 0) {
+                        throw new IllegalArgumentException("Invalid recommendation mode");
+                    }
+                }
             } else {
                 validateLegacyVector(userId, storedBatch);
             }
-            return toBatch(storedBatch, evidence);
+            return toBatch(storedBatch, evidence, mode);
         } catch (JacksonException | IllegalArgumentException exception) {
             throw unavailable(exception);
         }
@@ -622,7 +640,7 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
     }
 
     private RecommendationCandidateBatch toBatch(
-            StoredCandidateBatch stored, Map<Long, JsonNode> evidence) {
+            StoredCandidateBatch stored, Map<Long, JsonNode> evidence, String mode) {
         List<RecommendationCandidate> items = new ArrayList<>();
         stored.taste()
                 .forEach(
@@ -638,7 +656,8 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
                                                                 stored.candidateVersion(),
                                                                 item.reason(),
                                                                 item.reasons()),
-                                                        evidence.get(item.movieId())))));
+                                                        evidence.get(item.movieId()),
+                                                        mode))));
         stored.discovery()
                 .forEach(
                         item ->
@@ -653,7 +672,8 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
                                                                 stored.candidateVersion(),
                                                                 item.reason(),
                                                                 item.reasons()),
-                                                        null))));
+                                                        null,
+                                                        "PERSONALIZED"))));
         return new RecommendationCandidateBatch(
                 stored.modelVersion(),
                 stored.candidateVersion(),
@@ -663,9 +683,10 @@ public class RedisRecommendationCandidateReader implements RecommendationCandida
     }
 
     /** 이유 객체의 코드별 필드를 재조립하지 않고 수신한 배열 그대로 버퍼 저장 계층에 전달한다. */
-    private JsonNode reason(JsonNode reasons, JsonNode evidence) {
+    private JsonNode reason(JsonNode reasons, JsonNode evidence, String mode) {
         ObjectNode reason = objectMapper.createObjectNode();
         reason.set("reasons", reasons.deepCopy());
+        reason.put("recommendationMode", mode);
         if (evidence != null) {
             reason.put("modelKind", "GBT");
             reason.put("modelVersion", evidence.path("modelVersion").textValue());

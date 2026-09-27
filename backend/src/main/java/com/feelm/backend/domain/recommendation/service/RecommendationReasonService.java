@@ -73,7 +73,8 @@ public class RecommendationReasonService {
         initial.put("summary", snapshot.summary());
         initial.set("factors", objectMapper.readTree(snapshot.factorsJson()));
         initial.set("usedEvidenceIds", objectMapper.readTree(snapshot.usedEvidenceIdsJson()));
-        if (prompt.legacy().code() != null || gbtAiEnabled && prompt.gbt() != null) {
+        if (!"POPULARITY".equals(prompt.legacy().code())
+                && (prompt.legacy().code() != null || gbtAiEnabled && prompt.gbt() != null)) {
             initial.put("_reasonPending", true);
         }
         return initial;
@@ -122,6 +123,13 @@ public class RecommendationReasonService {
             long itemId, Long initialUserId, Long candidateMovieId, String storedReason) {
         try {
             JsonNode root = objectMapper.readTree(storedReason);
+            if (root.has("recommendationMode")
+                    && "POPULARITY".equals(root.get("recommendationMode").textValue())) {
+                return new ResolvedPrompt(
+                        new RecommendationReasonPrompt(
+                                itemId, "POPULARITY", null, null, null, false),
+                        null);
+            }
             GbtRecommendationReasonPrompt gbt = resolveGbt(itemId, initialUserId, root);
             JsonNode reasons = root.path("reasons");
             if (!reasons.isArray() || reasons.isEmpty()) {
@@ -415,6 +423,7 @@ public class RecommendationReasonService {
         ArrayNode factors = objectMapper.createArrayNode();
         if (legacy.code() != null) {
             switch (legacy.code()) {
+                case "POPULARITY" -> summary = "아직 취향 정보가 없어, 인기도를 기준으로 영화를 골랐어요.";
                 case "SHARED_GENRE" -> {
                     summary = "좋아하신 영화와 " + legacy.genreName() + " 장르가 같아요.";
                     factors.addObject().put("type", "GENRE").put("label", legacy.genreName());

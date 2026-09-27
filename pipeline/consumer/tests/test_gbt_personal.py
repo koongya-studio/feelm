@@ -240,3 +240,10 @@ def test_discovery_receives_population_beyond_taste_limit(scorer, monkeypatch):
     discovery_id = actual.candidates["discovery"][0]["movieId"]
     assert discovery_id not in {item["movieId"] for item in actual.candidates["taste"]}
     assert discovery_id not in {item["movieId"] for item in actual.evidence.to_payload()["items"]}
+
+
+def test_personal_cold_start_publishes_popularity_mode(scorer):
+    result = PersonalScorer(scorer).calculate(snapshot(scorer))
+    assert result.state["recommendationMode"] == result.candidates["recommendationMode"] == "POPULARITY"
+    personalized = PersonalScorer(scorer).calculate(snapshot(scorer, [(1,4.0)]))
+    assert personalized.state["recommendationMode"] == "PERSONALIZED"

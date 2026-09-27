@@ -212,6 +212,11 @@ export default function PartyPopcornMixPage() {
         const { value, request } = result;
 
         setPopcorn(value);
+        void request
+          .then((set) => {
+            if (active && set.popcorn) setPopcorn({ partyId: id, members: set.popcorn.members });
+          })
+          .catch(() => undefined);
 
         // 모으기 → 붓기 → 섞기 → 담기 → 완성. 모두 스스로 넘어간다
         let at = GATHER_MS;
