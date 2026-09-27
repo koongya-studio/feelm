@@ -7,6 +7,7 @@
 | [API-031](#api-031-유사-영화-추천) | 유사 영화 추천 | GET | `/movies/{movieId}/similar` | 1차 MVP | 선택 |
 | [API-045](#api-045-기본-추천-조회) | 기본 추천 조회 | GET | `/recommendations` | 1차 MVP | 회원 |
 | [API-047](#api-047-관심없음-표시) | 관심없음 표시 | POST | `/movies/{movieId}/dismiss` | 1차 MVP | 회원 |
+| [API-087](#api-087-내-관심-없음-영화-목록) | 내 관심 없음 영화 목록 | GET | `/users/me/dismissals` | 1차 MVP | 회원 |
 | [API-048](#api-048-추천-이력-조회) | 추천 이력 조회 | GET | `/recommendations/history` | 1차 MVP | 회원 |
 | [API-066](#api-066-오늘의-영화) | 오늘의 영화 | GET | `/recommendations/today` | 확장 | 회원 |
 | [API-068](#api-068-ott-구독-추천) | OTT 구독 추천 | GET | `/recommendations/otts` | 2차 MVP | 회원 |
@@ -565,3 +566,53 @@ Redis의 사용자별 TASTE 추천 후보 최대 500편에서 OTT별로 시청 �
 
 - [ ] S15P21E106-483의 검증된 POPULAR 목록이 준비되면 취향 입력이 없는 사용자의 OTT 집계와 화면 문구에 반영
 - [x] 화면 배치 — 7.8 설정의 `나에게 맞는 OTT 찾기` 배너에서 EXT-01 ~ EXT-05로 들어간다. 홈을 없애면서 배너가 옮겨졌고 다른 입구는 없다(S15P21E106-563 · 지시서 CR-18)
+
+
+## API-087 내 관심 없음 영화 목록
+
+- Method: `GET`
+- Endpoint: `/users/me/dismissals` (공통 `/api/v1` 접두사)
+- 인증: 회원, ACTIVE 본인만 조회
+- 화면: MY `관심 없음` 탭 · S15P21E106-956
+- 사용자 승인: 2026-09-27 A안 및 신규 조회 API 플랜 승인
+
+### 요청
+
+- `size`: 선택, 기본 20, 1~50 정수
+- `cursor`: 선택, 동일 사용자에게 발급한 직전 응답의 불투명 커서
+
+### 응답 200
+
+```json
+{
+  "items": [{
+    "dismissalId": 12,
+    "movie": {"movieId": 123, "title": "영화 제목", "posterUrl": null},
+    "dismissedAt": "2026-09-27T00:00:00Z"
+  }],
+  "nextCursor": null,
+  "hasNext": false
+}
+```
+
+- `movie.posterUrl`은 nullable. 날짜는 기존 관심 없음 관계의 `created_at`이다.
+- 본인의 모든 관심 없음 관계를 조회한다. 추천 출처가 없는 영화도 포함한다.
+- `created_at DESC, id DESC` 최근순 keyset 페이지네이션. 동일 시각은 ID 내림차순.
+- cursor는 API·사용자·정렬 시각·관계 ID에 한정된다. 대상 행의 사용자와 시각이 일치해야 한다.
+- 첫 페이지가 비면 `items: []`, `nextCursor: null`, `hasNext: false`.
+- 페이지마다 활성 사용자·커서 기준 행·목록을 같은 읽기 스냅샷에서 확인한다.
+- 새 관심 없음은 다음 첫 페이지 조회 때 반영된다. 순회 중 새로 추가된 최신 항목은 기존 페이지 뒤에 끼어들지 않는다.
+- 조회는 추천 제외 관계를 변경하지 않는다. DB 스키마 변경과 해제 기능은 포함하지 않는다.
+
+### 오류
+
+- `400 VALIDATION_FAILED`: 잘못된 size, 커서 형식·범위·사용자·시각·ID 또는 사라진 기준 행
+- `401 UNAUTHORIZED`: 인증 없음/유효하지 않음/비활성 회원, `TOKEN_EXPIRED`: 만료 토큰
+- `500 INTERNAL_ERROR`: 조회 실패
+
+
+## 취향 입력 없는 개인 추천 안내 (S15P21E106-959)
+개인 GBT POPULARITY 결과의 TASTE 이유는 “아직 취향 정보가 없어, 인기도를 기준으로 영화를 골랐어요.”이다.
+후보 결과의 검증된 모드를 이유에 저장하며 최초 노출·재조회·이력에 유지한다. 빈 팝콘이나 근거 없음으로
+모드를 추측하지 않으며 PERSONALIZED와 DISCOVERY 이유는 기존 규칙을 유지한다.
+이미 노출된 과거 기록을 현재 취향으로 재판정하지 않는다.

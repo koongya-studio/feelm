@@ -104,6 +104,7 @@ function renderFlow() {
 }
 
 async function pickBuddy() {
+  fireEvent.click(screen.getAllByRole('button', { name: '친구 추가' })[0]);
   fireEvent.change(screen.getByLabelText('닉네임으로 친구 찾기'), { target: { value: '무비' } });
   fireEvent.click(screen.getByRole('button', { name: '검색' }));
   fireEvent.click(await screen.findByRole('button', { name: /무비버디/ }));
@@ -121,7 +122,7 @@ describe('파티를 만들고 추천까지', () => {
       target: { value: '금요 심야 상영회' },
     });
     await pickBuddy();
-    fireEvent.click(screen.getByRole('button', { name: '파티 시작하기' }));
+    fireEvent.click(screen.getByRole('button', { name: '친구 1명과 파티 만들기' }));
 
     expect(await screen.findByText('친구가 오면 함께 섞어요')).toBeInTheDocument();
     expect(screen.getByText('입장 대기')).toBeInTheDocument();
@@ -162,7 +163,7 @@ describe('파티를 만들고 추천까지', () => {
 
     fireEvent.change(screen.getByLabelText('파티 이름'), { target: { value: '테스트 파티' } });
     await pickBuddy();
-    fireEvent.click(screen.getByRole('button', { name: '파티 시작하기' }));
+    fireEvent.click(screen.getByRole('button', { name: '친구 1명과 파티 만들기' }));
 
     await screen.findByText('우리의 취향을 모아요');
 

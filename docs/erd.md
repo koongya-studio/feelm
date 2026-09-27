@@ -627,3 +627,11 @@ flowchart LR
 `comment`(선택), `screen_path`, `movie_id`(선택), `recommendation_type`(선택),
 `created_at`, `notification_sent_at`(알림 성공 전 null)을 둔다. 만족도 또는 의견 하나 이상이
 필수다. 새 의견 조회 화면은 이 업무 범위에 없다.
+
+
+## party_popcorn_snapshots (S15P21E106-959)
+추천 노출 시점 믹스: id PK, party_id FK parties CASCADE, set_id FK recommendation_sets CASCADE,
+exposed_at timestamptz, members jsonb(사용자 ID·총 개수·전체 맛별 개수/평균점수),
+recommendation_mode varchar(20), created_at timestamptz. UNIQUE(set_id, exposed_at).
+파티 최근 조회 인덱스(party_id, exposed_at DESC, id DESC).
+recommendation_sets.recommendation_mode는 PERSONALIZED/POPULARITY, 기본 PERSONALIZED이며 당시 계산 방식을 보존한다.

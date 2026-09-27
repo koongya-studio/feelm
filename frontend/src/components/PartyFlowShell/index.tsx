@@ -42,6 +42,8 @@ type Props = {
   /** 지금 단계. 없으면 진행 표시를 그리지 않는다(5.5) */
   step?: PartyFlowStep;
   children: ReactNode;
+  /** 결과 화면에서 본문과 분리하는 하단 동작 */
+  footer?: ReactNode;
 };
 
 export default function PartyFlowShell({
@@ -52,12 +54,13 @@ export default function PartyFlowShell({
   note,
   step,
   children,
+  footer,
 }: Props) {
   return (
     <>
       <ScreenHeader title="파티팝콘" showBack action={action} />
 
-      <div className={styles.page}>
+      <div className={styles.page} data-scrollable={footer ? '' : undefined}>
         {/*
          * 파티원 줄. 시안대로 사진 아바타다 — 파티 · 팝콘 응답의 `avatarUrl`(업무 -811 · -762).
          * 사진이 없는 사람은 Avatar의 무채색 자리표시자다. 닉네임에서 밝기를 뽑으므로 서로
@@ -109,6 +112,7 @@ export default function PartyFlowShell({
           </div>
         ) : null}
       </div>
+      {footer ? <div className={styles.footer}>{footer}</div> : null}
     </>
   );
 }

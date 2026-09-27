@@ -44,6 +44,7 @@ import {
   PARTY_MIN_MEMBERS,
 } from '../../../api/parties';
 import { path } from '../../../routes/paths';
+import { useNotificationRevision } from '../../../hooks/useNotificationRevision';
 import { mixedFlavors } from '../../../utils/party';
 import styles from './PartyPopcornMixPage.module.css';
 import type { MachinePhase } from '../../../components/PopcornMachine';
@@ -128,6 +129,9 @@ export default function PartyPopcornMixPage() {
   const { partyId } = useParams();
 
   const id = Number(partyId);
+  const notificationRevision = useNotificationRevision();
+  const observedRevision = useRef(notificationRevision);
+  const mixingParty = useRef<number | null>(null);
 
   /** 다시 받기로 들어왔는지. 처음 그릴 때 한 번만 읽는다 — 아래에서 state를 지운다 */
   const [refresh] = useState(() => isRefreshEntry(location.state));
@@ -163,10 +167,12 @@ export default function PartyPopcornMixPage() {
   }, []);
 
   useEffect(() => {
-    if (!waiting) return;
-    const interval = window.setInterval(() => setCheckCount((count) => count + 1), 8000);
-    return () => window.clearInterval(interval);
-  }, [waiting]);
+    if (observedRevision.current === notificationRevision) return;
+    observedRevision.current = notificationRevision;
+    // 최초 연결·재연결과 초대 수락 알림에서 REST 정본을 확인한다.
+    // 섞기 시작 뒤의 알림은 진행 중인 추천 요청과 연출을 다시 시작하지 않는다.
+    if (mixingParty.current !== id) setCheckCount((count) => count + 1);
+  }, [id, notificationRevision]);
 
   useEffect(() => {
     let active = true;
@@ -191,6 +197,7 @@ export default function PartyPopcornMixPage() {
         }
         setWaiting(false);
         setWaitingChecked(false);
+        mixingParty.current = id;
 
         // 실제 참여자가 모인 뒤에만 추천과 섞는 장면을 시작한다.
         const request = refresh
@@ -205,6 +212,11 @@ export default function PartyPopcornMixPage() {
         const { value, request } = result;
 
         setPopcorn(value);
+        void request
+          .then((set) => {
+            if (active && set.popcorn) setPopcorn({ partyId: id, members: set.popcorn.members });
+          })
+          .catch(() => undefined);
 
         // 모으기 → 붓기 → 섞기 → 담기 → 완성. 모두 스스로 넘어간다
         let at = GATHER_MS;

@@ -149,7 +149,7 @@ export type SearchedUserList = {
  * `isBlockedByMe`는 계약에 있지만 **200 응답에서는 늘 `false`다** — 차단 관계는 어느 방향이든
  * 404로 감춘다(백엔드 `PublicProfileResponse` 주석). 화면은 이 값으로 아무것도 가르지 않는다.
  *
- * 한줄평은 **개수(`publicReviewCount`)만 온다.** 사용자별 공개 한줄평 목록 API는 계약에 없다.
+ * 한줄평은 **개수(`publicReviewCount`)만 온다.** 목록은 별도 API-087로 조회한다.
  */
 export type PublicProfile = {
   user: {

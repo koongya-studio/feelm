@@ -40,7 +40,7 @@ class PartyRecommendationApiContractTest extends SharedPostgresContractTest {
         jdbc.execute(
                 "TRUNCATE TABLE user_movie_dismissals, ratings, watch_records,"
                         + " recommendation_items, recommendation_sets, party_members, parties,"
-                        + " movie_ott_providers, movies, otts, users RESTART IDENTITY CASCADE");
+                        + " movie_ott_providers, movies, otts, users, popcorn_flavors RESTART IDENTITY CASCADE");
         user(10);
         user(20);
         user(30);
@@ -49,6 +49,200 @@ class PartyRecommendationApiContractTest extends SharedPostgresContractTest {
             movie(movieId);
             jdbc.update("INSERT INTO movie_ott_providers(movie_id,ott_id) VALUES (?,1)", movieId);
         }
+    }
+
+    @Test
+    void appliesSnapshotConstraintsWithoutChangingExistingRecords() throws Exception {
+        long partyId = party("ACTIVE");
+        stub(partyId, List.of(101L, 102L, 103L));
+        request(10, partyId, 3).andExpect(status().isOk());
+        String duplicate =
+                "INSERT INTO party_popcorn_snapshots(party_id,set_id,exposed_at,members,recommendation_mode) SELECT party_id,set_id,exposed_at,members,recommendation_mode FROM party_popcorn_snapshots";
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbc.update(duplicate))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () ->
+                                jdbc.update(
+                                        "INSERT INTO party_popcorn_snapshots(party_id,set_id,exposed_at,members,recommendation_mode) VALUES (99999,99999,now(),'[]','PERSONALIZED')"))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                        () ->
+                                jdbc.update(
+                                        "UPDATE party_popcorn_snapshots SET recommendation_mode='UNKNOWN'"))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        org.assertj.core.api.Assertions.assertThat(count("party_popcorn_snapshots")).isEqualTo(1);
+        org.assertj.core.api.Assertions.assertThat(count("recommendation_items")).isEqualTo(3);
+    }
+
+    @Test
+    void recordsAllEightFlavorsAndKeepsCountsAfterTasteChanges() throws Exception {
+        long partyId = party("ACTIVE");
+        for (int i = 0; i < 8; i++) {
+            String code = "FLAVOR_" + (char) ('A' + i);
+            jdbc.update(
+                    "INSERT INTO popcorn_flavors(code,display_name,color,cluster_id,sort_order,representative_keywords,description) VALUES (?,?,'#abcdef',?,?,'[]'::jsonb,'test') ON CONFLICT(code) DO NOTHING",
+                    code,
+                    code,
+                    i,
+                    i + 1);
+        }
+        jdbc.update(
+                "UPDATE movies SET representative_flavor_id=(SELECT id FROM popcorn_flavors WHERE code='FLAVOR_A') WHERE id=111");
+        jdbc.update(
+                "UPDATE movies SET representative_flavor_id=(SELECT id FROM popcorn_flavors WHERE code='FLAVOR_B') WHERE id=112");
+        jdbc.update(
+                "INSERT INTO ratings(user_id,movie_id,score) VALUES (10,111,5),(10,112,4),(20,112,3)");
+        stub(partyId, List.of(101L, 102L, 103L));
+        request(10, partyId, 3)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.popcorn.totalCount").value(3))
+                .andExpect(jsonPath("$.popcorn.flavors.length()").value(8))
+                .andExpect(jsonPath("$.popcorn.flavors[0].popcornCount").value(1))
+                .andExpect(jsonPath("$.popcorn.flavors[1].popcornCount").value(2))
+                .andExpect(jsonPath("$.popcorn.flavors[1].averageScore").value(3.5));
+        jdbc.update("DELETE FROM ratings WHERE user_id IN (10,20)");
+        request(20, partyId, 3)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.popcorn.totalCount").value(3));
+    }
+
+    @Test
+    void recordsEmptyMixOnceAndPreservesItAfterTasteChange() throws Exception {
+        long partyId = party("ACTIVE");
+        stub(partyId, List.of(101L, 102L, 103L, 104L));
+        request(10, partyId, 3)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.popcorn.totalCount").value(0))
+                .andExpect(jsonPath("$.popcorn.members.length()").value(2));
+        org.assertj.core.api.Assertions.assertThat(count("party_popcorn_snapshots")).isEqualTo(1);
+        jdbc.update("INSERT INTO ratings(user_id,movie_id,score) VALUES (10,104,5)");
+        request(20, partyId, 3)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.popcorn.totalCount").value(0));
+        org.assertj.core.api.Assertions.assertThat(count("party_popcorn_snapshots")).isEqualTo(1);
+        mvc.perform(
+                        get("/api/v1/parties/" + partyId + "/popcorn")
+                                .header("Authorization", "Bearer " + tokens.createAccessToken(10)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.latestMix.totalCount").value(0));
+        mvc.perform(
+                        get("/api/v1/parties/" + partyId + "/recommendations/history")
+                                .header("Authorization", "Bearer " + tokens.createAccessToken(10)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].popcornSnapshots.length()").value(1));
+    }
+
+    @Test
+    void preservesPopularityModeAcrossRedisChangesAndHistory() throws Exception {
+        long partyId = party("ACTIVE");
+        PartyInputSnapshot input = input();
+        when(inputReader.read(List.of(10L, 20L))).thenReturn(input);
+        var original =
+                snapshot(
+                        partyId,
+                        PartyInputId.from(partyId, input),
+                        "v1",
+                        List.of(101L, 102L, 103L));
+        when(candidateReader.read(partyId))
+                .thenReturn(
+                        new PartyCandidateSnapshot(
+                                partyId,
+                                original.modelVersion(),
+                                original.algorithmVersion(),
+                                original.inputId(),
+                                original.generatedAt(),
+                                original.candidates(),
+                                "POPULARITY"));
+        request(10, partyId, 3)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recommendationMode").value("POPULARITY"));
+        when(candidateReader.read(partyId)).thenReturn(original);
+        request(20, partyId, 3)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recommendationMode").value("POPULARITY"));
+        mvc.perform(
+                        get("/api/v1/parties/" + partyId + "/recommendations/history")
+                                .header("Authorization", "Bearer " + tokens.createAccessToken(10)))
+                .andExpect(status().isOk())
+                .andExpect(
+                        jsonPath("$.items[0].popcornSnapshots[0].recommendationMode")
+                                .value("POPULARITY"));
+        long oldSet =
+                jdbc.queryForObject(
+                        "SELECT id FROM recommendation_sets WHERE party_id=?", Long.class, partyId);
+        var changed =
+                new PartyInputSnapshot(
+                        "v1",
+                        List.of(
+                                new PartyInputSnapshot.Member(10, "g3", List.of(), List.of(101L)),
+                                new PartyInputSnapshot.Member(20, "g2", List.of(), List.of(101L))));
+        when(inputReader.read(List.of(10L, 20L))).thenReturn(changed);
+        when(candidateReader.read(partyId))
+                .thenReturn(
+                        snapshot(
+                                partyId,
+                                PartyInputId.from(partyId, changed),
+                                "v1",
+                                List.of(104L, 105L, 106L)));
+        request(10, partyId, 3)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recommendationMode").value("PERSONALIZED"));
+        org.assertj.core.api.Assertions.assertThat(
+                        jdbc.queryForList(
+                                "SELECT recommendation_mode FROM party_popcorn_snapshots ORDER BY id",
+                                String.class))
+                .containsExactly("POPULARITY", "PERSONALIZED");
+        when(inputReader.read(List.of(10L, 20L))).thenReturn(input);
+        when(candidateReader.read(partyId))
+                .thenReturn(
+                        snapshot(
+                                partyId,
+                                PartyInputId.from(partyId, input),
+                                "v1",
+                                List.of(101L, 102L, 103L, 107L, 108L, 109L)));
+        // Previously stored set retains its mode; extend its unexposed pool to exercise older-set
+        // reuse.
+        jdbc.update(
+                "INSERT INTO recommendation_items(set_id,movie_id,type,position,reason) VALUES (?,107,'PARTY',4,'{}')",
+                oldSet);
+        mvc.perform(
+                        get("/api/v1/parties/" + partyId + "/recommendations")
+                                .param("refresh", "true")
+                                .header("Authorization", "Bearer " + tokens.createAccessToken(10)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recommendationMode").value("POPULARITY"));
+        mvc.perform(
+                        get("/api/v1/parties/" + partyId + "/popcorn")
+                                .header("Authorization", "Bearer " + tokens.createAccessToken(10)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.latestMix.recommendationSetId").value(oldSet));
+        org.assertj.core.api.Assertions.assertThat(
+                        jdbc.queryForList(
+                                "SELECT recommendation_mode FROM party_popcorn_snapshots ORDER BY id",
+                                String.class))
+                .containsExactly("POPULARITY", "PERSONALIZED", "POPULARITY");
+    }
+
+    @Test
+    void recordsNewExposureAndKeepsHistoricalUsersAnonymous() throws Exception {
+        long partyId = party("ACTIVE");
+        stub(partyId, List.of(101L, 102L, 103L, 104L, 105L, 106L));
+        request(10, partyId, 3).andExpect(status().isOk());
+        mvc.perform(
+                        get("/api/v1/parties/" + partyId + "/recommendations")
+                                .param("refresh", "true")
+                                .header("Authorization", "Bearer " + tokens.createAccessToken(10)))
+                .andExpect(status().isOk());
+        org.assertj.core.api.Assertions.assertThat(count("party_popcorn_snapshots")).isEqualTo(2);
+        jdbc.update("DELETE FROM party_members WHERE party_id=? AND user_id=20", partyId);
+        jdbc.update(
+                "UPDATE users SET status='WITHDRAWN',nickname='withdrawn-20',birth_date=NULL,gender=NULL WHERE id=20");
+        mvc.perform(
+                        get("/api/v1/parties/" + partyId + "/popcorn")
+                                .header("Authorization", "Bearer " + tokens.createAccessToken(10)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.latestMix.members[1].user.nickname").value("탈퇴한 사용자"))
+                .andExpect(jsonPath("$.latestMix.members[1].user.avatarUrl").isEmpty());
     }
 
     @Test

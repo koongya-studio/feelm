@@ -7,7 +7,7 @@
  * 업무 -446). 첫 목록(와이어프레임의 필름 칸)을 바꿨다.
  *
  * - 머리는 가운데 `취향 4컷` · `차곡차곡 모아둔 나의 영화 취향`
- * - 연도는 손글씨로 표시하고 반기는 가로줄로 구분한다. 생성일 최신순으로 모바일은 세 장씩,
+ * - 생성일 기준 반기를 `2026 하`처럼 손글씨 제목과 가로줄로 구분한다. 최신순으로 모바일은 세 장씩,
  *   데스크톱은 네 장씩 다음 줄로 이어지며 4컷 아래에 생성 날짜를 적는다
  * - 4컷은 3.4 · 7.4 상세와 같은 `ReportFourCut`을 머리 없이 작게 쓴다. 누르면 7.4로 간다
  * - 4컷마다 조금씩 기울이고 윗변에 빨간 테이프를 붙인다
@@ -209,19 +209,18 @@ export default function ReportListPage() {
             </Button>
           </section>
         ) : null}
-        {groups.map(({ key, period, reports }, groupIndex) => (
+        {groups.map(({ key, period, reports }) => (
           <section
             key={key}
             className={styles.year}
             aria-label={`${period.year} ${formatHalf(period)}`}
           >
-            {groupIndex === 0 || groups[groupIndex - 1].period.year !== period.year ? (
-              <h2 className={styles.yearLabel}>
-                <span className={styles.yearHand}>{period.year}</span>
-              </h2>
-            ) : (
-              <hr className={styles.periodDivider} aria-hidden="true" />
-            )}
+            <h2 className={styles.yearLabel}>
+              <span className={styles.yearHand}>
+                {period.year}{' '}
+                <span className={styles.halfHand}>{period.half === 'H1' ? '상' : '하'}</span>
+              </span>
+            </h2>
 
             <ul className={styles.board}>
               {reports.map((entry, index) => (
@@ -241,13 +240,15 @@ export default function ReportListPage() {
  * 반기별로 묶고 반기와 생성일 최신순으로 붙인다. 같은 시각이면 ID로 순서를 고정한다.
  */
 function groupByHalf(entries: Entry[]) {
-  const ordered = [...entries].sort(
-    (a, b) =>
-      b.period.year - a.period.year ||
-      b.period.half.localeCompare(a.period.half) ||
-      (b.summary?.createdAt ?? '').localeCompare(a.summary?.createdAt ?? '') ||
-      b.reportId - a.reportId,
-  );
+  const ordered = entries
+    .map((entry) => ({ ...entry, period: listPeriod(entry) }))
+    .sort(
+      (a, b) =>
+        b.period.year - a.period.year ||
+        b.period.half.localeCompare(a.period.half) ||
+        (b.summary?.createdAt ?? '').localeCompare(a.summary?.createdAt ?? '') ||
+        b.reportId - a.reportId,
+    );
   const groups = new Map<string, { key: string; period: ReportPeriod; reports: Entry[] }>();
   for (const entry of ordered) {
     const key = `${entry.period.year}-${entry.period.half}`;
@@ -255,6 +256,21 @@ function groupByHalf(entries: Entry[]) {
     groups.get(key)!.reports.push(entry);
   }
   return [...groups.values()];
+}
+
+const periodDate = new Intl.DateTimeFormat('en', {
+  timeZone: 'Asia/Seoul',
+  year: 'numeric',
+  month: 'numeric',
+});
+
+/** 목록은 생성일로 분류한다. 기존 HALF의 분석 대상 반기와 생성일은 다를 수 있다. */
+function listPeriod(entry: Entry): ReportPeriod {
+  if (!entry.summary) return entry.period;
+  const parts = periodDate.formatToParts(new Date(entry.summary.createdAt));
+  const year = Number(parts.find((part) => part.type === 'year')!.value);
+  const month = Number(parts.find((part) => part.type === 'month')!.value);
+  return { year, half: month <= 6 ? 'H1' : 'H2' };
 }
 
 /** 테이프로 붙인 4컷 한 장과 그 아래 날짜 */

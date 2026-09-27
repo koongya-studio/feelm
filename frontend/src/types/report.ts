@@ -29,6 +29,8 @@ export type ReportGenerated = {
   reused: boolean;
   issuedAt: string | null;
   reuseReason?: 'UNCHANGED_FILM' | 'SAME_CONTENT' | null;
+  /** 새 결과의 앞면만 직전과 같으면 기존 모션 뒤 뒷면 확인을 안내한다. */
+  frontUnchanged?: boolean;
 };
 
 /** API-059 `items[]`. 인화 완료한 FILM 및 이미 공개된 기존 HALF 결과 */

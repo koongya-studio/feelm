@@ -60,3 +60,15 @@ export type RecommendationHistory = {
   nextCursor: string | null;
   hasNext: boolean;
 };
+
+/** API-087 본인 관심 없음 영화 목록 */
+export type DismissalListItem = {
+  dismissalId: number;
+  movie: { movieId: number; title: string; posterUrl: string | null };
+  dismissedAt: string;
+};
+export type DismissalList = {
+  items: DismissalListItem[];
+  nextCursor: string | null;
+  hasNext: boolean;
+};

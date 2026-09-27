@@ -28,8 +28,13 @@ class PartyCandidate:
     max_fit: float
     stddev_fit: float
     member_fit: tuple[tuple[int, float], ...]
+    popularity_score: float | None = None
 
     def to_payload(self) -> dict:
+        if self.popularity_score is not None:
+            return {"movieId": self.movie_id, "partyScore": self.popularity_score,
+                    "meanFit": None, "minFit": None, "maxFit": None, "stddevFit": None,
+                    "memberFit": []}
         return {"movieId": self.movie_id, "partyScore": self.mean_fit, "meanFit": self.mean_fit,
                 "minFit": self.min_fit, "maxFit": self.max_fit, "stddevFit": self.stddev_fit,
                 "memberFit": [{"userId": uid, "score": fit} for uid, fit in self.member_fit]}
@@ -41,6 +46,7 @@ class PartyResult:
     candidates: tuple[PartyCandidate, ...]
     active_member_ids: tuple[int, ...]
     population_count: int
+    recommendation_mode: str = "PERSONALIZED"
 
 
 def midrank_percentiles(scores: dict[int, float]) -> dict[int, float]:
@@ -84,7 +90,20 @@ def score_party(scorer, request: PartyRequest, snapshots: tuple[InputSnapshot, .
     union = {mid for member in request.members for mid in member.candidate_movie_ids}
     population = tuple(sorted(union - excluded))
     if not active:
-        return PartyResult("NEEDS_COLD_START", (), (), len(population))
+        candidates = []
+        for mid in population:
+            pos = scorer.features.positions.get(mid)
+            if pos is None:
+                raise GbtError("UNSUPPORTED_PARTY_CANDIDATE")
+            if not scorer.eligible[pos]:
+                raise GbtError("INELIGIBLE_PARTY_CANDIDATE")
+            score = float(scorer.features.movie[pos, 0])
+            if not math.isfinite(score):
+                raise GbtError("NONFINITE_PARTY_SCORE")
+            candidates.append(PartyCandidate(mid, 0, 0, 0, 0, (), score))
+        candidates.sort(key=lambda value: (-value.popularity_score, value.movie_id))
+        return PartyResult("OK" if candidates else "EXHAUSTED", tuple(candidates[:limit]),
+                           (), len(population), "POPULARITY")
     fit_by_user = {}
     for snapshot in active:
         # Even an empty population validates all history support before reporting EXHAUSTED.

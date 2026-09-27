@@ -7,4 +7,12 @@ import java.util.List;
 public record PartyRecommendationHistorySetResponse(
         long recommendationSetId,
         OffsetDateTime generatedAt,
-        List<PartyRecommendationHistoryItemResponse> items) {}
+        List<PartyRecommendationHistoryItemResponse> items,
+        List<PartyPopcornSnapshotResponse> popcornSnapshots) {
+    public PartyRecommendationHistorySetResponse(
+            long recommendationSetId,
+            OffsetDateTime generatedAt,
+            List<PartyRecommendationHistoryItemResponse> items) {
+        this(recommendationSetId, generatedAt, items, List.of());
+    }
+}

@@ -87,6 +87,21 @@ function stubServer() {
       if (url === '/api/v1/users/me') return json(200, myProfileBody);
 
       if (url === `/api/v1/users/${PUBLIC_ID}/profile`) return json(200, profileBody);
+      if (url.includes('/reviews?'))
+        return json(200, {
+          items: [
+            {
+              ratingId: 99,
+              movie: { movieId: 550, title: '실제 한줄평 영화', posterUrl: null },
+              score: 4.5,
+              comment: '서버 한줄평',
+              spoiler: false,
+              createdAt: '2026-09-20T01:00:00Z',
+            },
+          ],
+          nextCursor: null,
+          hasNext: false,
+        });
 
       if (url.endsWith('/profile')) {
         return json(404, { code: 'RESOURCE_NOT_FOUND', message: '프로필을 찾을 수 없습니다.' });
@@ -194,11 +209,15 @@ describe('7.2-B 다른 사용자 공개 프로필', () => {
     expect(screen.queryByText('다른 사용자에게 보이는 내 프로필입니다.')).not.toBeInTheDocument();
   });
 
-  it('한줄평은 개수만 오므로 목록 자리에 없다고 쓰지 않는다', async () => {
+  it('사용자별 API로 공개 한줄평 원문을 표시한다', async () => {
     await renderProfile();
 
     const reviews = screen.getByRole('heading', { name: '공개 한줄평' }).closest('section')!;
-    expect(within(reviews).getByText('한줄평 목록은 아직 볼 수 없어요')).toBeInTheDocument();
+    expect(await within(reviews).findByText('서버 한줄평')).toBeInTheDocument();
+    expect(within(reviews).getByRole('link', { name: '실제 한줄평 영화' })).toHaveAttribute(
+      'href',
+      '/movies/550',
+    );
     expect(within(reviews).queryByText('아직 공개한 한줄평이 없어요')).not.toBeInTheDocument();
   });
 

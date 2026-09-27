@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 import org.springframework.transaction.support.AbstractPlatformTransactionManager;
@@ -119,12 +121,36 @@ class NotificationStreamServiceTest {
 
     @Test
     void scheduledVisibilityAndHeartbeat() throws Exception {
-        SseEmitter emitter = connect(10, "a");
+        // send 호출 관찰만으로는 finally의 sending 해제를 기다릴 수 없다.
+        // 실제 전송 Runnable을 끝까지 실행한 뒤 다음 reconcile을 시작한다.
+        var originalSender = (ExecutorService) ReflectionTestUtils.getField(streams, "sender");
+        originalSender.shutdownNow();
+        var sender = mock(ExecutorService.class);
+        var tasks = new java.util.ArrayDeque<Runnable>();
+        doAnswer(
+                        invocation -> {
+                            tasks.add(invocation.getArgument(0, Runnable.class));
+                            return null;
+                        })
+                .when(sender)
+                .execute(any(Runnable.class));
+        ReflectionTestUtils.setField(streams, "sender", sender);
+        SseEmitter emitter = mock(SseEmitter.class);
+        emitters.add(emitter);
+        streams.subscribe(10, "a");
+        assertThat(tasks).hasSize(1);
+        tasks.remove().run();
+        verify(emitter, times(1)).send(any(SseEmitter.SseEventBuilder.class));
         streams.reconcile();
-        verify(emitter, timeout(2000).times(2)).send(any(SseEmitter.SseEventBuilder.class));
+        assertThat(tasks).hasSize(1);
+        tasks.remove().run();
+        verify(emitter, times(2)).send(any(SseEmitter.SseEventBuilder.class));
         when(repository.streamVersion(anyLong(), any())).thenReturn("v2");
         streams.reconcile();
-        verify(emitter, timeout(2000).times(3)).send(any(SseEmitter.SseEventBuilder.class));
+        assertThat(tasks).hasSize(1);
+        tasks.remove().run();
+        assertThat(tasks).isEmpty();
+        verify(emitter, times(3)).send(any(SseEmitter.SseEventBuilder.class));
         var frames = org.mockito.ArgumentCaptor.forClass(SseEmitter.SseEventBuilder.class);
         verify(emitter, times(3)).send(frames.capture());
         assertThat(frame(frames.getAllValues().get(0)))
@@ -192,6 +218,55 @@ class NotificationStreamServiceTest {
                         status.setRollbackOnly();
                     });
             verify(emitter, times(expected)).send(any(SseEmitter.SseEventBuilder.class));
+        }
+    }
+
+    @Test
+    void invitationSignalWithoutNotificationAfterCommit() throws Exception {
+        SseEmitter emitter = connect(10, "a");
+        SseEmitter other = connect(20, "b");
+        var delivery = mock(WebPushDeliveryRepository.class);
+        when(repository.createPartyInvitation(anyLong(), anyLong(), any(), any()))
+                .thenReturn(Optional.empty());
+        when(repository.close(anyLong(), any(), anyLong(), any())).thenReturn(Optional.empty());
+        try (var context = new AnnotationConfigApplicationContext()) {
+            context.register(TransactionConfig.class);
+            context.registerBean(NotificationStreamService.class, () -> streams);
+            context.refresh();
+            var commands =
+                    new NotificationCommandService(
+                            repository,
+                            delivery,
+                            mock(WebPushSubscriptionRepository.class),
+                            Clock.systemUTC(),
+                            context);
+            var transaction = new TransactionTemplate(context.getBean(TestTransactions.class));
+            Instant now = Instant.now();
+            transaction.executeWithoutResult(
+                    status -> {
+                        commands.createPartyInvitation(10, 7, now);
+                        assertThat(
+                                        mockingDetails(emitter).getInvocations().stream()
+                                                .filter(
+                                                        invocation ->
+                                                                invocation
+                                                                        .getMethod()
+                                                                        .getName()
+                                                                        .equals("send"))
+                                                .count())
+                                .isEqualTo(1);
+                    });
+            verify(emitter, timeout(2000).times(2)).send(any(SseEmitter.SseEventBuilder.class));
+            transaction.executeWithoutResult(
+                    status -> {
+                        commands.createPartyInvitation(10, 8, now);
+                        status.setRollbackOnly();
+                    });
+            verify(emitter, times(2)).send(any(SseEmitter.SseEventBuilder.class));
+            transaction.executeWithoutResult(status -> commands.closePartyInvitation(10, 7, now));
+            verify(emitter, timeout(2000).times(3)).send(any(SseEmitter.SseEventBuilder.class));
+            verify(other, times(1)).send(any(SseEmitter.SseEventBuilder.class));
+            verifyNoInteractions(delivery);
         }
     }
 

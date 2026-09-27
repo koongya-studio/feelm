@@ -1,0 +1,72 @@
+.overlay {
+  position: fixed;
+  z-index: 20;
+  display: flex;
+  width: 100%;
+  max-width: var(--overlay-max-width);
+  align-items: var(--overlay-place);
+  justify-content: center;
+  inset: 0;
+  margin: 0 auto;
+}
+
+.scrim {
+  position: absolute;
+  border: 0;
+  background: rgba(38, 39, 41, 0.32);
+  cursor: pointer;
+  inset: 0;
+}
+
+.sheet {
+  position: relative;
+  display: flex;
+  width: 100%;
+  max-width: var(--overlay-sheet-max-width);
+  max-height: 88%;
+  flex-direction: column;
+  border-radius: var(--overlay-sheet-radius);
+  background: var(--color-bg);
+  box-shadow: 0 -8px 24px rgba(38, 39, 41, 0.12);
+}
+
+.header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--screen-padding-x) var(--space-2);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-heading);
+  line-height: var(--line-height-heading);
+  font-weight: var(--font-weight-bold);
+}
+
+.close {
+  padding: var(--space-2);
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--color-ink-muted);
+  cursor: pointer;
+}
+
+.body {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--screen-padding-x) max(var(--space-4), env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.notice {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-caption);
+  color: var(--color-ink-body);
+}

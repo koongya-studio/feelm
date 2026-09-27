@@ -239,3 +239,103 @@ describe('빈 이력과 실패', () => {
     expect(screen.getByText('지난 추천')).toBeInTheDocument();
   });
 });
+
+it('binds saved mix to its exposure batch and preserves old movie-only history', async () => {
+  const first = historyItem(1, '첫 추천', '2026-09-20T01:01:00Z');
+  const second = historyItem(2, '다음 추천', '2026-09-20T04:30:00Z');
+  vi.mocked(getPartyRecommendationHistory).mockResolvedValue(
+    historyPage({
+      items: [
+        historySet({
+          items: [first, second],
+          popcornSnapshots: [
+            {
+              recommendationSetId: 1,
+              exposedAt: first.exposedAt,
+              recommendationMode: 'POPULARITY',
+              members: [],
+              totalCount: 0,
+              flavors: [],
+            },
+          ],
+        }),
+      ],
+    }),
+  );
+  renderPage();
+  expect(await screen.findByText('함께 섞은 팝콘')).toBeInTheDocument();
+  expect(screen.getAllByText('함께 섞은 팝콘')).toHaveLength(1);
+  expect(
+    screen.getByText('아직 파티원들의 취향 정보가 없어, 인기도를 기준으로 영화를 골랐어요.'),
+  ).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: /다음 추천/ })).toBeInTheDocument();
+});
+
+it('preserves microsecond precision when linking consecutive recommendation mixes', async () => {
+  const a = historyItem(1, '첫 마이크로초', '2026-09-20T01:01:00.123456Z');
+  const b = historyItem(2, '다음 마이크로초', '2026-09-20T01:01:00.123457Z');
+  vi.mocked(getPartyRecommendationHistory).mockResolvedValue(
+    historyPage({
+      items: [
+        historySet({
+          items: [a, b],
+          popcornSnapshots: [
+            {
+              recommendationSetId: 1,
+              exposedAt: a.exposedAt,
+              recommendationMode: 'PERSONALIZED',
+              members: [],
+              totalCount: 11,
+              flavors: [],
+            },
+            {
+              recommendationSetId: 1,
+              exposedAt: b.exposedAt,
+              recommendationMode: 'PERSONALIZED',
+              members: [],
+              totalCount: 22,
+              flavors: [],
+            },
+          ],
+        }),
+      ],
+    }),
+  );
+  renderPage();
+  expect(await screen.findByText('0명 · 11알')).toBeInTheDocument();
+  expect(screen.getByText('0명 · 22알')).toBeInTheDocument();
+});
+
+it('shows the saved two and three participants for each recommendation instead of current members', async () => {
+  const two = historyItem(1, '두 명의 추천', '2026-09-20T01:01:00Z');
+  const three = historyItem(2, '세 명의 추천', '2026-09-20T04:30:00Z');
+  const savedMembers = ['민수', '지연', '수빈'].map((nickname, index) => ({
+    user: { userId: index + 1, nickname, avatarUrl: null },
+    totalCount: 0,
+    flavors: [],
+  }));
+  vi.mocked(getPartyRecommendationHistory).mockResolvedValue(
+    historyPage({
+      items: [
+        historySet({
+          items: [two, three],
+          popcornSnapshots: [two, three].map((item, index) => ({
+            recommendationSetId: 1,
+            exposedAt: item.exposedAt,
+            recommendationMode: 'PERSONALIZED',
+            members: savedMembers.slice(0, index + 2),
+            totalCount: 0,
+            flavors: [],
+          })),
+        }),
+      ],
+    }),
+  );
+  renderPage();
+  const first = await screen.findByRole('link', { name: /두 명의 추천/ });
+  const second = screen.getByRole('link', { name: /세 명의 추천/ });
+  expect(first.closest('ul')?.parentElement).toHaveTextContent('당시 참여 멤버민수지연');
+  expect(first.closest('ul')?.parentElement).not.toHaveTextContent('수빈');
+  expect(second.closest('ul')?.parentElement).toHaveTextContent('당시 참여 멤버민수지연수빈');
+  expect(screen.queryByText('김난다')).not.toBeInTheDocument();
+});

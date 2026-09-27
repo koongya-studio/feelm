@@ -23,7 +23,7 @@
  * **파티장에게만** 보인다.
  */
 import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import PartyPopcornPage from './index';
 import { AuthContext } from '../../../contexts/authContext';
 import { testAuth } from '../../../test/auth';
@@ -332,6 +332,15 @@ describe('5.8 파티팝콘 흐름 입구', () => {
 });
 
 describe('5.8 친구 초대', () => {
+  it('파티별 정원이 가득 차면 초대 버튼을 숨긴다', async () => {
+    vi.mocked(getParty).mockResolvedValue(party({ maxMembers: 2 }));
+    await renderPopcorn();
+
+    expect(screen.queryByRole('button', { name: '친구 초대하기' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('닉네임으로 친구 찾기')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '함께 볼 영화 추천받기' })).toBeInTheDocument();
+  });
+
   it('찾은 친구에게 곧바로 초대를 보낸다', async () => {
     vi.mocked(searchUsers).mockResolvedValue({
       items: [{ userId: 3072, nickname: '필름러버', visibility: 'PUBLIC' }],
@@ -359,6 +368,67 @@ describe('5.8 친구 초대', () => {
 
     await waitFor(() => expect(inviteToParty).toHaveBeenCalledWith(TEST_PARTY_ID, 3072));
     expect(await screen.findByText('필름러버 님에게 초대를 보냈어요')).toBeInTheDocument();
+    const sheet = screen.getByRole('dialog', { name: '친구 초대' });
+    const invited = within(sheet).getByRole('button', { name: /필름러버.*초대 완료/ });
+    expect(invited).toBeDisabled();
+    fireEvent.click(invited);
+    expect(inviteToParty).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: '초대 접기' })).not.toBeInTheDocument();
+
+    vi.mocked(searchUsers).mockResolvedValue({
+      items: [{ userId: 3073, nickname: '다음친구', visibility: 'PUBLIC' }],
+      nextCursor: null,
+      hasNext: false,
+    });
+    fireEvent.change(within(sheet).getByLabelText('닉네임으로 친구 찾기'), {
+      target: { value: '다음친구' },
+    });
+    fireEvent.click(within(sheet).getByRole('button', { name: '검색' }));
+    fireEvent.click(await within(sheet).findByRole('button', { name: /다음친구/ }));
+    await waitFor(() => expect(inviteToParty).toHaveBeenCalledWith(TEST_PARTY_ID, 3073));
+    expect(await within(sheet).findByText('다음친구 님에게 초대를 보냈어요')).toBeInTheDocument();
+  });
+
+  it('닫기와 Escape로 시트를 닫고 초대 버튼으로 초점을 되돌린다', async () => {
+    await renderPopcorn();
+    const trigger = screen.getByRole('button', { name: '친구 초대하기' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const sheet = screen.getByRole('dialog', { name: '친구 초대' });
+    const close = within(sheet).getByRole('button', { name: '닫기' });
+    expect(close).toHaveFocus();
+    fireEvent.keyDown(close, { key: 'Tab', shiftKey: true });
+    expect(within(sheet).getByLabelText('닉네임으로 친구 찾기')).toHaveFocus();
+    fireEvent.keyDown(document.activeElement!, { key: 'Tab' });
+    expect(close).toHaveFocus();
+    fireEvent.click(close);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    fireEvent.click(trigger);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
+  it('초대 실패는 시트 안에서 알리고 다시 시도할 수 있다', async () => {
+    vi.mocked(searchUsers).mockResolvedValue({
+      items: [{ userId: 3072, nickname: '필름러버', visibility: 'PUBLIC' }],
+      nextCursor: null,
+      hasNext: false,
+    });
+    vi.mocked(inviteToParty).mockRejectedValue(new Error('실패'));
+    await renderPopcorn();
+    fireEvent.click(screen.getByRole('button', { name: '친구 초대하기' }));
+    const sheet = screen.getByRole('dialog', { name: '친구 초대' });
+    fireEvent.change(within(sheet).getByLabelText('닉네임으로 친구 찾기'), {
+      target: { value: '필름러버' },
+    });
+    fireEvent.click(within(sheet).getByRole('button', { name: '검색' }));
+    fireEvent.click(await within(sheet).findByRole('button', { name: /필름러버/ }));
+    expect(
+      await within(sheet).findByText('초대를 보내지 못했어요. 잠시 후 다시 시도해 주세요.'),
+    ).toBeInTheDocument();
+    expect(within(sheet).getByRole('button', { name: /필름러버/ })).toBeEnabled();
   });
 });
 
@@ -458,4 +528,33 @@ describe('5.8 파티 관리', () => {
     expect(await screen.findByText('파티장만 종료할 수 있습니다.')).toBeInTheDocument();
     expect(screen.getByTestId('location').textContent).toBe(`/parties/${TEST_PARTY_ID}/popcorn`);
   });
+});
+
+it('defaults to the latest mix, selects historical popcorn and keeps management on current friends', async () => {
+  const current = partyPopcorn();
+  const past = {
+    ...current.members[1],
+    user: { ...current.members[1]!.user, userId: 777, nickname: '지난친구' },
+  };
+  vi.mocked(getPartyPopcorn).mockResolvedValue({
+    ...current,
+    latestMix: {
+      recommendationSetId: 1,
+      exposedAt: '2026-09-27T00:00:00Z',
+      recommendationMode: 'PERSONALIZED',
+      members: [past],
+      totalCount: past.totalCount,
+      flavors: past.flavors,
+    },
+  });
+  renderWithRouter(<PartyPopcornPage />, {
+    route: `/parties/${TEST_PARTY_ID}/popcorn`,
+    path: '/parties/:partyId/popcorn',
+  });
+  expect(await screen.findByText('우리의 믹스 팝콘')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '지난친구' }));
+  expect(screen.getByText('지난친구의 팝콘')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '파티 관리' }));
+  expect(screen.queryByText('지난친구 님 내보내기')).not.toBeInTheDocument();
+  expect(screen.queryByText(/지난친구 님 차단/)).not.toBeInTheDocument();
 });

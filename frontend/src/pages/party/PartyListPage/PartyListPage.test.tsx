@@ -17,8 +17,10 @@
  * 나중에 누군가 와이어프레임을 보고 되돌리기 쉬운 자리다.
  */
 import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { fireEvent, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import PartyListPage from './index';
+import { notifyNotificationChange } from '../../../api/notificationStream';
+import { ApiError } from '../../../api/apiError';
 import PartySizePage from '../PartySizePage';
 import { renderWithRouter } from '../../../test/render';
 
@@ -74,6 +76,18 @@ beforeEach(() => {
 });
 
 describe('5.1 파티 시작', () => {
+  it('혼자인 대표 파티는 공통 취향 대신 참여 안내를 표시한다', async () => {
+    vi.mocked(getMyParties).mockResolvedValue([party({ members: [member(ME, 'OWNER')] })]);
+    vi.mocked(getPartyPopcorn).mockResolvedValue(partyPopcorn([partyPopcorn().members[0]]));
+    renderWithRouter(<PartyListPage />, { route: '/party' });
+
+    expect(
+      await screen.findByText('파티원이 참여하면 공통 취향을 확인할 수 있어요'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('우리의 공통 취향')).not.toBeInTheDocument();
+    expect(screen.queryByText('맛1')).not.toBeInTheDocument();
+  });
+
   it('대표 파티를 강조 카드로 세우고 파티원을 이름까지 보여준다', async () => {
     renderWithRouter(<PartyListPage />, { route: '/party' });
 
@@ -354,5 +368,83 @@ describe('지난 파티', () => {
 
     expect(await screen.findByRole('heading', { name: '금요 심야 상영회' })).toBeInTheDocument();
     expect(screen.queryByText(/지난 파티/)).toBeNull();
+  });
+});
+
+describe('SSE 파티 목록 갱신', () => {
+  async function change() {
+    act(() => notifyNotificationChange());
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    });
+  }
+
+  it('열린 화면에 새 초대를 표시하고 수락된 초대 대신 참여 파티를 표시한다', async () => {
+    renderWithRouter(<PartyListPage />, { route: '/party' });
+    await screen.findByRole('heading', { name: '금요 심야 상영회' });
+    vi.mocked(getMyInvitations).mockResolvedValue([invitation()]);
+    await change();
+    expect(await screen.findByText('받은 초대 1')).toBeInTheDocument();
+    expect(screen.getByText('오늘 저녁 같이 볼 영화')).toBeInTheDocument();
+
+    vi.mocked(getMyInvitations).mockResolvedValue([]);
+    vi.mocked(getMyParties).mockResolvedValue([party({ name: '새로 참여한 파티' })]);
+    await change();
+    expect(await screen.findByRole('heading', { name: '새로 참여한 파티' })).toBeInTheDocument();
+    expect(screen.queryByText('받은 초대 1')).toBeNull();
+    expect(screen.queryByText('오늘 저녁 같이 볼 영화')).toBeNull();
+    expect(getClosedParties).toHaveBeenCalledTimes(1);
+  });
+
+  it('이전 조회 응답이 새로운 SSE 조회 결과를 덮지 않는다', async () => {
+    let resolveOld!: (value: ReturnType<typeof invitation>[]) => void;
+    vi.mocked(getMyInvitations).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveOld = resolve;
+        }),
+    );
+    renderWithRouter(<PartyListPage />, { route: '/party' });
+    await screen.findByRole('heading', { name: '금요 심야 상영회' });
+    vi.mocked(getMyInvitations).mockResolvedValue([
+      invitation({ party: { ...invitation().party, name: '최신 초대' } }),
+    ]);
+    await change();
+    await screen.findByText('최신 초대');
+    await act(async () => resolveOld([invitation()]));
+    expect(screen.getByText('최신 초대')).toBeInTheDocument();
+    expect(screen.queryByText('오늘 저녁 같이 볼 영화')).toBeNull();
+  });
+
+  it('일시 오류 동안 기존 목록을 유지하고 다음 신호 없이 재시도한다', async () => {
+    renderWithRouter(<PartyListPage />, { route: '/party' });
+    await screen.findByRole('heading', { name: '금요 심야 상영회' });
+    vi.mocked(getMyInvitations)
+      .mockRejectedValueOnce(new ApiError(503, 'UNAVAILABLE', 'temporary'))
+      .mockResolvedValue([invitation()]);
+    vi.mocked(getMyParties)
+      .mockRejectedValueOnce(new ApiError(503, 'UNAVAILABLE', 'temporary'))
+      .mockResolvedValue([party({ name: '복구된 파티' })]);
+    await change();
+    expect(screen.getByRole('heading', { name: '금요 심야 상영회' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('받은 초대 1')).toBeInTheDocument(), {
+      timeout: 2500,
+    });
+    expect(await screen.findByRole('heading', { name: '복구된 파티' })).toBeInTheDocument();
+  });
+
+  it('화면을 떠나면 재시도와 SSE 구독을 중단한다', async () => {
+    const { unmount } = renderWithRouter(<PartyListPage />, { route: '/party' });
+    await screen.findByRole('heading', { name: '금요 심야 상영회' });
+    vi.mocked(getMyInvitations).mockRejectedValue(new ApiError(503, 'UNAVAILABLE', 'temporary'));
+    vi.mocked(getMyParties).mockRejectedValue(new ApiError(503, 'UNAVAILABLE', 'temporary'));
+    await change();
+    const invites = vi.mocked(getMyInvitations).mock.calls.length;
+    const parties = vi.mocked(getMyParties).mock.calls.length;
+    unmount();
+    await change();
+    await new Promise((resolve) => setTimeout(resolve, 1050));
+    expect(getMyInvitations).toHaveBeenCalledTimes(invites);
+    expect(getMyParties).toHaveBeenCalledTimes(parties);
   });
 });

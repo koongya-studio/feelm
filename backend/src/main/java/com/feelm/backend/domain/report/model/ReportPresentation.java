@@ -1,6 +1,7 @@
 package com.feelm.backend.domain.report.model;
 
 import java.util.List;
+import java.util.Objects;
 
 /** API-086 중복 비교: 실제 4컷과 뒷면에 표시하는 내용. 생성 시각과 숨은 집계값은 제외한다. */
 public record ReportPresentation(
@@ -45,6 +46,14 @@ public record ReportPresentation(
                 people(content.topDirectors()),
                 character,
                 list(content.comparisons()));
+    }
+
+    /** 앞면 캐릭터 그림은 이름 외에도 고정 카드 코드로 결정된다. */
+    public boolean hasSameFront(ReportPresentation previous) {
+        return Objects.equals(fourCut, previous.fourCut)
+                && Objects.equals(
+                        character == null ? null : character.code(),
+                        previous.character == null ? null : previous.character.code());
     }
 
     private static List<Person> people(List<ReportContent.PersonRank> ranks) {

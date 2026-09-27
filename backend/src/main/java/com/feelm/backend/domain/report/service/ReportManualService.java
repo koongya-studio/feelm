@@ -118,7 +118,8 @@ public class ReportManualService {
                     previous.createdAt(),
                     true,
                     previous.issuedAt(),
-                    "UNCHANGED_FILM");
+                    "UNCHANGED_FILM",
+                    false);
         }
         if (previous == null && repository.frameCount(userId) < MINIMUM_FRAMES) {
             throw new BusinessException(
@@ -158,11 +159,21 @@ public class ReportManualService {
         var content =
                 assembler.assembleCumulative(
                         period, now, snapshot, before, CharacterCardSelector.medians(population));
-        if (previous != null
-                && samePresentation(
-                        content, mapper.readValue(previous.content(), ReportContent.class))) {
-            return new ReportGenerateResponse(
-                    previous.id(), previous.createdAt(), true, previous.issuedAt(), "SAME_CONTENT");
+        boolean frontUnchanged = false;
+        if (previous != null) {
+            var currentPresentation = presentation(content);
+            var previousPresentation =
+                    presentation(mapper.readValue(previous.content(), ReportContent.class));
+            if (currentPresentation.equals(previousPresentation)) {
+                return new ReportGenerateResponse(
+                        previous.id(),
+                        previous.createdAt(),
+                        true,
+                        previous.issuedAt(),
+                        "SAME_CONTENT",
+                        false);
+            }
+            frontUnchanged = currentPresentation.hasSameFront(previousPresentation);
         }
         long id =
                 repository.insert(
@@ -172,7 +183,7 @@ public class ReportManualService {
                         fingerprint,
                         mapper.writeValueAsString(snapshot),
                         now);
-        return new ReportGenerateResponse(id, now, false, null, null);
+        return new ReportGenerateResponse(id, now, false, null, null, frontUnchanged);
     }
 
     private Snapshot snapshot(long userId) {
@@ -184,12 +195,9 @@ public class ReportManualService {
                 sources.findPeople(ids, ALL_FRAMES));
     }
 
-    private boolean samePresentation(ReportContent current, ReportContent previous) {
+    private ReportPresentation presentation(ReportContent content) {
         return ReportPresentation.from(
-                        current, ReportDisplayResolver.fourCut(current, readRepository))
-                .equals(
-                        ReportPresentation.from(
-                                previous, ReportDisplayResolver.fourCut(previous, readRepository)));
+                content, ReportDisplayResolver.fourCut(content, readRepository));
     }
 
     private static String fingerprint(String state) {

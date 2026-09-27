@@ -12,7 +12,12 @@
  * API-045는 업무 -610에서 실제 호출로 전환했고, API-047 관심없음은 업무 -672에서 연동했다.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { dismissMovie, getRecommendationHistory, getRecommendations } from './recommendations';
+import {
+  dismissMovie,
+  getMyDismissals,
+  getRecommendationHistory,
+  getRecommendations,
+} from './recommendations';
 import { ApiError } from './apiError';
 import { resetSessionForTest, startSession } from './session';
 import type { RecommendationHistory, RecommendationHistorySet } from '../types/recommendation';
@@ -336,5 +341,33 @@ describe('API-047 관심없음 표시', () => {
       status: 409,
       code: 'ALREADY_DISMISSED',
     });
+  });
+});
+
+describe('API-087 관심 없음 목록', () => {
+  it('본인 endpoint와 인증 토큰으로 첫 장을 조회한다', async () => {
+    const list = {
+      items: [
+        {
+          dismissalId: 1,
+          movie: { movieId: 10, title: '관심 없음', posterUrl: null },
+          dismissedAt: '2026-09-25T00:00:00Z',
+        },
+      ],
+      nextCursor: null,
+      hasNext: false,
+    };
+    fetchMock.mockResolvedValue(json(200, list));
+    expect(await getMyDismissals({ size: 18 })).toEqual(list);
+    expect(requestedUrl()).toContain('/api/v1/users/me/dismissals?size=18');
+    expect(requestedUrl()).not.toContain('cursor=');
+    expect(requestedHeaders().Authorization).toBe('Bearer token');
+  });
+  it('다음 장에 직전 cursor와 size를 전달한다', async () => {
+    fetchMock.mockResolvedValue(json(200, { items: [], nextCursor: null, hasNext: false }));
+    await getMyDismissals({ cursor: 'issued-cursor', size: 18 });
+    const url = new URL(requestedUrl(), 'https://example.test');
+    expect(url.searchParams.get('cursor')).toBe('issued-cursor');
+    expect(url.searchParams.get('size')).toBe('18');
   });
 });

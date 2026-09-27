@@ -45,7 +45,7 @@
  *   (`design-concept.md` 2.2). 와이어프레임도 줄어든 값만 흐렸다
  * - 비교할 지난 반기가 없으면(첫 리포트) 그 칸을 그리지 않는다
  *
- * `저장`은 API-061로 앞면 PNG를 내려받고 화면에 머문다. 공유 메뉴를 쓸 수 없으면
+ * `저장`은 API-061의 앞면 PNG(iOS는 이번 캡처)를 내려받고 화면에 머문다. 공유 메뉴를 쓸 수 없으면
  * 파일을 내려받지 않고 지원하지 않는 브라우저임을 알린다(업무 -861).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -161,6 +161,7 @@ export default function ReportDetailPage() {
   const [sharing, setSharing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState('');
+  const [noticeKind, setNoticeKind] = useState<'progress' | 'download' | 'error'>('progress');
   const [flipped, setFlipped] = useState<ReportCutKind[]>([]);
   const [introStep, setIntroStep] = useState<{
     kind: ReportCutKind;
@@ -338,27 +339,23 @@ export default function ReportDetailPage() {
     }
   }
 
-  async function saveImage(onStage?: (stage: 'capture' | 'upload' | 'download') => void) {
+  async function saveImage() {
     await prepareImage();
-    onStage?.('capture');
-    return saveReportImage(id, fourCutNode(), onStage);
+    return saveReportImage(id, fourCutNode());
   }
 
   async function save() {
     stopFlipIntro();
     setSaving(true);
-    setNotice('이미지를 준비하고 있어요…');
+    setNoticeKind('progress');
+    setNotice('리포트를 이미지로 만들고 있어요…');
     try {
-      await withTimeout(
-        saveImage((next) => {
-          if (next === 'upload') setNotice('이미지를 서버에 저장하고 있어요…');
-          if (next === 'download') setNotice('파일을 내려받고 있어요…');
-        }),
-        SAVE_TIMEOUT_MS,
-      );
-      setNotice('다운로드를 시작했어요. 파일 앱에서 확인해 주세요');
+      await withTimeout(saveImage(), SAVE_TIMEOUT_MS);
+      setNoticeKind('download');
+      setNotice('다운로드를 시작했어요');
     } catch (error) {
-      setNotice(reportImageFailure(error));
+      setNoticeKind('error');
+      setNotice(reportImageFailure(error, 'save'));
     } finally {
       setSaving(false);
     }
@@ -366,6 +363,7 @@ export default function ReportDetailPage() {
 
   async function share() {
     setNotice('');
+    setNoticeKind('error');
     if (!canUseFileShare()) {
       stopFlipIntro();
       setNotice(UNSUPPORTED_SHARE_NOTICE);
@@ -486,25 +484,26 @@ export default function ReportDetailPage() {
         </div>
 
         <div className={styles.footer}>
-          {notice ? (
-            <p className={styles.notice} role="status">
-              {notice}
-            </p>
-          ) : null}
           <p className={styles.shareHint}>공유 이미지에는 닉네임과 취향 정보가 담겨요</p>
+          <div className={styles.noticeSlot}>
+            <p className={styles.notice} data-kind={noticeKind} role="status">
+              {notice ? (
+                <>
+                  <ReportNoticeIcon kind={noticeKind} />
+                  <span>{notice}</span>
+                </>
+              ) : null}
+            </p>
+          </div>
           <div className={styles.actions}>
             <Button variant="secondary" disabled={saving || sharing} onClick={() => void save()}>
               <span className={styles.actionLabel}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <path
-                    d="M12 3v12m-4-4 4 4 4-4M5 15v5h14v-5"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                저장
+                {saving ? (
+                  <span className={styles.spinner} aria-hidden="true" />
+                ) : (
+                  <ReportNoticeIcon kind="download" />
+                )}
+                {saving ? '저장 중…' : '저장'}
               </span>
             </Button>
             <Button disabled={saving || sharing} onClick={() => void share()}>
@@ -719,5 +718,37 @@ function PeopleGroup({
         ))}
       </ul>
     </div>
+  );
+}
+
+function ReportNoticeIcon({ kind }: { kind: 'progress' | 'download' | 'error' }) {
+  return (
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {kind === 'download' ? (
+        <path d="M12 3v12m-4-4 4 4 4-4M5 15v5h14v-5" />
+      ) : kind === 'error' ? (
+        <>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 8v5m0 3h.01" />
+        </>
+      ) : (
+        <>
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="8" cy="8" r="1" />
+          <path d="m21 15-5-5L5 21" />
+        </>
+      )}
+    </svg>
   );
 }

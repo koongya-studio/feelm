@@ -28,6 +28,7 @@
  * 영화 제목처럼 왼쪽에 크게 서고, 카드는 사진이 비치는 반투명 면이다.
  */
 import Avatar from '../Avatar';
+import ProfileReviews from '../ProfileReviews';
 import Chip from '../Chip';
 import { CameraIcon, PencilIcon, SpeechBubbleIcon } from '../Icon';
 import PopcornBucket from '../PopcornBucket';
@@ -136,7 +137,8 @@ function Keywords({ profile }: { profile: ProfileView }) {
 }
 
 function Films({ profile, compact }: { profile: ProfileView; compact: boolean }) {
-  const shown = profile.frames.filter((frame) => frame.isPublic);
+  const publicFrames = profile.frames.filter((frame) => frame.isPublic);
+  const shown = compact ? publicFrames.slice(0, 3) : publicFrames;
 
   if (shown.length === 0) return <p className={styles.empty}>공개된 취향 필름이 없어요</p>;
 
@@ -276,7 +278,15 @@ export default function ProfileLayout({
           editing={Boolean(filmsEditor)}
           action={
             isEdit && !filmsEditor ? (
-              <EditButton label="공개할 취향 필름 수정" onClick={() => onEdit?.('films')} />
+              <button
+                type="button"
+                className={styles.manageFilms}
+                aria-label="공개할 취향 필름 수정"
+                aria-haspopup="dialog"
+                onClick={() => onEdit?.('films')}
+              >
+                공개 중 {profile.frames.filter((frame) => frame.isPublic).length}편 · 관리
+              </button>
             ) : null
           }
         >
@@ -317,6 +327,12 @@ export default function ProfileLayout({
               <SpeechBubbleIcon />
               <p>{HIDDEN_NOTE}</p>
             </div>
+          ) : profile.publicId ? (
+            <ProfileReviews
+              publicId={profile.publicId}
+              count={profile.stats.publicReviewCount}
+              preview
+            />
           ) : profile.reviews === null ? (
             <div className={styles.emptyReviews}>
               <SpeechBubbleIcon />

@@ -167,51 +167,6 @@
   color: var(--color-on-action);
 }
 
-/* 필름 고르기. 포스터가 버튼이고 오른쪽 위 동그라미에 체크가 선다 */
-.toggleFilms {
-  display: grid;
-  gap: var(--space-2);
-  padding: 0;
-  margin: 0;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  list-style: none;
-}
-
-.toggleFilm {
-  position: relative;
-  display: block;
-  width: 100%;
-  padding: 0;
-  border: 0;
-  border-radius: 10px;
-  background: none;
-  cursor: pointer;
-}
-
-.toggleFilm[aria-pressed='false'] {
-  opacity: 0.45;
-}
-
-.toggleMark {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
-  display: flex;
-  width: 24px;
-  height: 24px;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--color-on-action);
-  border-radius: var(--radius-pill);
-  background: rgba(38, 39, 41, 0.4);
-  color: var(--color-on-action);
-}
-
-.toggleFilm[aria-pressed='true'] .toggleMark {
-  border-color: var(--color-ink);
-  background: var(--color-ink);
-}
-
 /* ─────────────────────────── 사진 */
 
 .fileInput {

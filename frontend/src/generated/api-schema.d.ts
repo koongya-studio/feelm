@@ -946,6 +946,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/users/{publicId}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 사용자별 공개 한줄평 조회
+         * @description API-087. 선택 인증. 공개 프로필과 같은 접근 조건이며 PUBLIC 한줄평만 최신순으로 반환합니다.
+         */
+        get: operations["getProfileReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/users/{userId}/block": {
         parameters: {
             query?: never;
@@ -1002,6 +1022,26 @@ export interface paths {
             cookie?: never;
         };
         get: operations["blocks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/me/dismissals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 내 관심 없음 영화 목록
+         * @description ACTIVE 회원 본인의 관심 없음 영화를 표시 시각·ID 내림차순으로 조회합니다.
+         */
+        get: operations["getList"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1399,6 +1439,24 @@ export interface components {
             personId: number;
             /** @description 작은 인물 프로필 이미지 URL. 없으면 null */
             profileUrl: string | null;
+        };
+        DismissalListItemResponse: {
+            /** Format: int64 */
+            dismissalId: number;
+            /** Format: date-time */
+            dismissedAt: string;
+            movie: components["schemas"]["DismissalMovieResponse"];
+        };
+        DismissalListResponse: {
+            hasNext: boolean;
+            items: components["schemas"]["DismissalListItemResponse"][];
+            nextCursor: string | null;
+        };
+        DismissalMovieResponse: {
+            /** Format: int64 */
+            movieId: number;
+            posterUrl: string | null;
+            title: string;
         };
         EmailVerificationCodeRequest: {
             /** Format: email */
@@ -2107,9 +2165,21 @@ export interface components {
             status?: "ACTIVE" | "CLOSED";
         };
         PartyPopcornResponse: {
+            latestMix?: components["schemas"]["PartyPopcornSnapshotResponse"];
             members?: components["schemas"]["MemberPopcorn"][];
             /** Format: int64 */
             partyId?: number;
+        };
+        PartyPopcornSnapshotResponse: {
+            /** Format: date-time */
+            exposedAt?: string;
+            flavors?: components["schemas"]["FlavorBucket"][];
+            members?: components["schemas"]["MemberPopcorn"][];
+            recommendationMode?: string;
+            /** Format: int64 */
+            recommendationSetId?: number;
+            /** Format: int64 */
+            totalCount?: number;
         };
         PartyRecommendationHistoryItemResponse: {
             /** Format: date-time */
@@ -2123,6 +2193,7 @@ export interface components {
             /** Format: date-time */
             generatedAt?: string;
             items?: components["schemas"]["PartyRecommendationHistoryItemResponse"][];
+            popcornSnapshots?: components["schemas"]["PartyPopcornSnapshotResponse"][];
             /** Format: int64 */
             recommendationSetId?: number;
         };
@@ -2139,6 +2210,8 @@ export interface components {
             items?: components["schemas"]["PartyRecommendationItemResponse"][];
             /** Format: int64 */
             partyId?: number;
+            popcorn?: components["schemas"]["PartyPopcornSnapshotResponse"];
+            recommendationMode?: string;
             /** Format: int64 */
             recommendationSetId?: number;
         };
@@ -2230,6 +2303,30 @@ export interface components {
             userId?: number;
             /** @enum {string} */
             visibility?: "PUBLIC" | "PRIVATE";
+        };
+        /** @description 사용자별 공개 한줄평 항목 */
+        ProfileReviewItem: {
+            comment?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            movie?: components["schemas"]["ProfileReviewMovie"];
+            /** Format: int64 */
+            ratingId?: number;
+            score?: number;
+            spoiler?: boolean;
+        };
+        /** @description 한줄평 영화 요약 */
+        ProfileReviewMovie: {
+            /** Format: int64 */
+            movieId?: number;
+            posterUrl?: string;
+            title?: string;
+        };
+        /** @description 사용자별 공개 한줄평 커서 페이지 */
+        ProfileReviewPageResponse: {
+            hasNext?: boolean;
+            items?: components["schemas"]["ProfileReviewItem"][];
+            nextCursor?: string;
         };
         ProfileUpdateRequest: {
             /** Format: date */
@@ -2460,6 +2557,7 @@ export interface components {
         ReportGenerateResponse: {
             /** Format: date-time */
             createdAt?: string;
+            frontUnchanged?: boolean;
             /** Format: date-time */
             issuedAt?: string;
             /** Format: int64 */
@@ -4509,6 +4607,32 @@ export interface operations {
             };
         };
     };
+    getProfileReviews: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                /** @description 페이지 크기(기본 10, 1~50) */
+                size?: string;
+            };
+            header?: never;
+            path: {
+                publicId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProfileReviewPageResponse"];
+                };
+            };
+        };
+    };
     block: {
         parameters: {
             query?: never;
@@ -4681,6 +4805,58 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["CursorPageResponseBlockedUserResponse"];
+                };
+            };
+        };
+    };
+    getList: {
+        parameters: {
+            query?: {
+                /** @description 같은 사용자의 직전 응답 cursor */
+                cursor?: string;
+                /** @description 페이지 크기 */
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 본인 관심 없음 목록 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DismissalListResponse"];
+                };
+            };
+            /** @description VALIDATION_FAILED: 잘못된 size 또는 cursor */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description UNAUTHORIZED: 인증 없음 또는 비활성 회원; TOKEN_EXPIRED: 토큰 만료 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description INTERNAL_ERROR: 조회 실패 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ErrorResponse"];
                 };
             };
         };

@@ -40,10 +40,20 @@ public class RedisPartyCandidateReader {
                     algorithmVersion,
                     inputId,
                     generatedAt,
-                    candidates(root.path("candidates")));
+                    candidates(root.path("candidates")),
+                    mode(root));
         } catch (Exception exception) {
             throw new IllegalStateException("Party candidate Redis value is invalid", exception);
         }
+    }
+
+    private String mode(JsonNode root) {
+        if (!root.has("recommendationMode")) return "PERSONALIZED";
+        String mode = requiredText(root, "recommendationMode", 20);
+        if (!Set.of("PERSONALIZED", "POPULARITY").contains(mode)) {
+            throw new IllegalArgumentException("Invalid recommendation mode");
+        }
+        return mode;
     }
 
     private JsonNode parse(String value) throws Exception {

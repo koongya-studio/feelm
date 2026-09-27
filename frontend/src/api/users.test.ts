@@ -352,13 +352,23 @@ describe('프로필 실제 필름 연동', () => {
   beforeEach(() => {
     resetSessionStore();
     fetchMock.mockImplementation((url: string) => {
-      const body = url.includes('/frames')
-        ? url.includes('cursor=second')
-          ? { items: frames.slice(2), hasNext: false, nextCursor: null }
-          : { items: frames.slice(0, 2), hasNext: true, nextCursor: 'second' }
-        : url.endsWith('/taste')
-          ? { keywords: [] }
-          : mockMyProfile;
+      const body = url.endsWith('/profile')
+        ? {
+            user: { ...mockMyProfile, userId: mockMyProfile.userId },
+            keywords: [],
+            stats: mockMyProfile.stats,
+            popcorn: { flavors: [] },
+            recentFrames: [],
+            publicReviewCount: 7,
+            isBlockedByMe: false,
+          }
+        : url.includes('/frames')
+          ? url.includes('cursor=second')
+            ? { items: frames.slice(2), hasNext: false, nextCursor: null }
+            : { items: frames.slice(0, 2), hasNext: true, nextCursor: 'second' }
+          : url.endsWith('/taste')
+            ? { keywords: [] }
+            : mockMyProfile;
       return Promise.resolve(json(200, body));
     });
   });
@@ -382,6 +392,7 @@ describe('프로필 실제 필름 연동', () => {
       904,
     ]);
     const preview = await getMyPublicProfile();
+    expect(preview.stats.publicReviewCount).toBe(7);
     expect(preview.frames).toEqual([
       expect.objectContaining({ frameId: 904, posterUrl: '/posters/4.jpg' }),
     ]);
@@ -395,11 +406,21 @@ describe('프로필 실제 필름 연동', () => {
       Promise.resolve(
         json(
           200,
-          url.includes('/frames')
-            ? { items: frames, hasNext: false, nextCursor: null }
-            : url.endsWith('/taste')
-              ? { keywords: [] }
-              : { ...mockMyProfile, frameVisibility: 'PRIVATE' },
+          url.endsWith('/profile')
+            ? {
+                user: mockMyProfile,
+                keywords: [],
+                stats: mockMyProfile.stats,
+                popcorn: { flavors: [] },
+                recentFrames: [],
+                publicReviewCount: 7,
+                isBlockedByMe: false,
+              }
+            : url.includes('/frames')
+              ? { items: frames, hasNext: false, nextCursor: null }
+              : url.endsWith('/taste')
+                ? { keywords: [] }
+                : { ...mockMyProfile, frameVisibility: 'PRIVATE' },
         ),
       ),
     );
@@ -411,11 +432,21 @@ describe('프로필 실제 필름 연동', () => {
       Promise.resolve(
         json(
           200,
-          url.includes('/frames')
-            ? { items: [], hasNext: false, nextCursor: null }
-            : url.endsWith('/taste')
-              ? { keywords: [] }
-              : mockMyProfile,
+          url.endsWith('/profile')
+            ? {
+                user: mockMyProfile,
+                keywords: [],
+                stats: mockMyProfile.stats,
+                popcorn: { flavors: [] },
+                recentFrames: [],
+                publicReviewCount: 7,
+                isBlockedByMe: false,
+              }
+            : url.includes('/frames')
+              ? { items: [], hasNext: false, nextCursor: null }
+              : url.endsWith('/taste')
+                ? { keywords: [] }
+                : mockMyProfile,
         ),
       ),
     );
@@ -436,11 +467,21 @@ describe('프로필 실제 필름 연동', () => {
       Promise.resolve(
         json(
           200,
-          url.includes('/frames')
-            ? { items: frames, hasNext: true, nextCursor: 'same' }
-            : url.endsWith('/taste')
-              ? { keywords: [] }
-              : mockMyProfile,
+          url.endsWith('/profile')
+            ? {
+                user: mockMyProfile,
+                keywords: [],
+                stats: mockMyProfile.stats,
+                popcorn: { flavors: [] },
+                recentFrames: [],
+                publicReviewCount: 7,
+                isBlockedByMe: false,
+              }
+            : url.includes('/frames')
+              ? { items: frames, hasNext: true, nextCursor: 'same' }
+              : url.endsWith('/taste')
+                ? { keywords: [] }
+                : mockMyProfile,
         ),
       ),
     );

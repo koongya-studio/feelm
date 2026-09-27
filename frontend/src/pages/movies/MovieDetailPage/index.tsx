@@ -54,6 +54,7 @@ import { path } from '../../../routes/paths';
 import {
   FILM_GUIDE,
   MOVIE_DETAIL_GUIDE,
+  MOVIE_OTT_GUIDE,
   completeGuide,
   hasSeenGuide,
   restartGuide,
@@ -121,6 +122,11 @@ export default function MovieDetailPage() {
   function finishDetailGuide() {
     if (user) completeGuide(user.userId, MOVIE_DETAIL_GUIDE);
     setGuideDismissed(true);
+  }
+  const [ottGuideDismissed, setOttGuideDismissed] = useState(false);
+  function finishOttGuide() {
+    if (user) completeGuide(user.userId, MOVIE_OTT_GUIDE);
+    setOttGuideDismissed(true);
   }
   const sessionSettled = authStatus !== 'restoring';
 
@@ -602,7 +608,7 @@ export default function MovieDetailPage() {
          * 오른쪽에 바깥 이동 표시를, 앱 안(7.8 감상 확인)으로 가는 줄은 화살표를 둔다. 구독 중인
          * OTT는 `구독 중` 표식으로 알리고 설명으로도 읽힌다. 접근 가능한 이름은 그대로다.
          */}
-        <section className={styles.section}>
+        <section className={styles.section} data-guide-target="movie-ott">
           <h2 className={styles.sectionTitle}>OTT</h2>
           {movie.ottProviders.length > 0 ? (
             <>
@@ -841,6 +847,22 @@ export default function MovieDetailPage() {
           </Menu>
         </div>
       ) : null}
+      {!showDetailGuide &&
+      user &&
+      !ottGuideDismissed &&
+      !hasSeenGuide(user.userId, MOVIE_OTT_GUIDE) &&
+      movie.ottProviders.length > 0 ? (
+        <GuideCallout
+          title="OTT에서 보고 기록하기"
+          description="‘OTT에서 보기’를 누르면 감상 확인을 위한 기록이 남아요. 링크 이동만으로 감상이 완료되지는 않아요. 영화를 본 뒤 알림에서 감상 여부를 확인하고, 원할 때 별점을 남겨보세요."
+          step={1}
+          totalSteps={1}
+          targetSelector="[data-guide-target='movie-ott']"
+          placement="top"
+          onSkip={finishOttGuide}
+          action={{ label: '확인', onClick: finishOttGuide }}
+        />
+      ) : null}
       {showDetailGuide && user ? (
         <GuideCallout
           title="영화 상세를 자유롭게 둘러보세요"
@@ -849,7 +871,10 @@ export default function MovieDetailPage() {
           totalSteps={1}
           targetSelector="[data-guide-target='movie-detail-summary']"
           action={{
-            label: '상세 안내 마치기',
+            label:
+              movie.ottProviders.length > 0 && !hasSeenGuide(user.userId, MOVIE_OTT_GUIDE)
+                ? 'OTT 이용 안내 보기'
+                : '상세 안내 마치기',
             onClick: finishDetailGuide,
           }}
           secondaryAction={{

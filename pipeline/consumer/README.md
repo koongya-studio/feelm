@@ -517,3 +517,8 @@ Candidate v6 reader는 전환 호환을 위해 과거
 측정값만 생성한다. Spring은 `topContributionCoverage`가 0.5(S15P21E106-925)보다 낮으면 개별 영화명 대신 전체 이력 기반 문구를 사용한다.
 Spring이 후보 전체의 최종 제외·재정렬을 담당한다. 영화별 OTT 제공 정보와 사용자 OTT 클릭 정보는 PostgreSQL에서 조회한다. 별도 `topn`은 생성하거나 복구 조건에 포함하지 않는다.
 기존 `topn` 키 자동 삭제는 하지 않는다. 배포 전 Spring reader 전환이 필요하다.
+
+
+### S15P21E106-959 추천 방식 보존
+
+개인 후보와 상태, 파티 성공 결과는 `recommendationMode` (`PERSONALIZED` 또는 `POPULARITY`)를 게시한다. 개인은 지원 입력 수 0인 cold start, 파티는 모든 참여자의 유효 입력이 없을 때만 `POPULARITY`다. 파티는 기존 후보 합집합과 제외 조건을 유지하고 검증된 `reach_log1p` 내림차순·영화 ID 오름차순으로 정렬한다. 빈 후보는 `EXHAUSTED`, 잘못된 feature와 게시 실패는 기존 실패 계약을 유지한다. 게시 스냅샷 재생은 추천 방식까지 그대로 복원한다. Backend의 두 방식 읽기 배포 후 새 Consumer 게시를 활성화한다. 구 payload의 필드 부재는 레거시 처리이며 이미 노출된 개인 reason을 재해석하지 않는다.

@@ -39,6 +39,8 @@ import { path } from '../../../routes/paths';
 import {
   FILM_GUIDE,
   MOVIE_DETAIL_GUIDE,
+  MOVIE_OTT_GUIDE,
+  MY_GUIDE,
   PARTY_GUIDE,
   restartFirstUse,
   restartGuide,
@@ -135,6 +137,8 @@ export default function SettingsPage() {
                 if (user) {
                   restartFirstUse(user.userId);
                   restartGuide(user.userId, MOVIE_DETAIL_GUIDE);
+                  restartGuide(user.userId, MOVIE_OTT_GUIDE);
+                  restartGuide(user.userId, MY_GUIDE);
                   restartGuide(user.userId, PARTY_GUIDE);
                   restartGuide(user.userId, FILM_GUIDE);
                 }

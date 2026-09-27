@@ -92,6 +92,8 @@ import {
   getPartyPopcorn,
 } from '../../../api/parties';
 import { getPopcornFlavors } from '../../../api/taste';
+import { retryNotificationQuery } from '../../../api/notificationRetry';
+import { useNotificationRevision } from '../../../hooks/useNotificationRevision';
 import { useShellSize } from '../../../hooks/useShellSize';
 import { useAuth } from '../../../contexts/authContext';
 import { path } from '../../../routes/paths';
@@ -199,6 +201,7 @@ export default function PartyListPage() {
   /** 맛 코드 → 이름. 파티 팝콘(API-057)은 코드만 주므로 이름표가 따로 필요하다 */
   const [flavorNames, setFlavorNames] = useState<Map<string, string>>(new Map());
   const [reloadCount, setReloadCount] = useState(0);
+  const notificationRevision = useNotificationRevision();
 
   useEffect(() => {
     let active = true;
@@ -241,7 +244,8 @@ export default function PartyListPage() {
   useEffect(() => {
     let active = true;
 
-    getMyInvitations()
+    const controller = new AbortController();
+    retryNotificationQuery(() => getMyInvitations(), controller.signal)
       .then((value) => {
         if (!active) return;
 
@@ -254,13 +258,15 @@ export default function PartyListPage() {
 
     return () => {
       active = false;
+      controller.abort();
     };
-  }, [reloadCount]);
+  }, [reloadCount, notificationRevision]);
 
   useEffect(() => {
     let active = true;
 
-    getMyParties()
+    const controller = new AbortController();
+    retryNotificationQuery(() => getMyParties(), controller.signal)
       .then(async (value) => {
         if (!active) return;
 
@@ -304,8 +310,9 @@ export default function PartyListPage() {
 
     return () => {
       active = false;
+      controller.abort();
     };
-  }, [desktop, reloadCount]);
+  }, [desktop, reloadCount, notificationRevision]);
 
   const hasParties = parties !== null && parties.length > 0;
   const hasInvitations = invitations !== null && invitations.length > 0;
@@ -624,7 +631,9 @@ export default function PartyListPage() {
               </div>
             </div>
 
-            {commonFlavors.length > 0 ? (
+            {firstParty.members.length < 2 ? (
+              <p className={styles.commonLabel}>파티원이 참여하면 공통 취향을 확인할 수 있어요</p>
+            ) : commonFlavors.length > 0 ? (
               <div className={styles.common}>
                 <p className={styles.commonLabel}>우리의 공통 취향</p>
 

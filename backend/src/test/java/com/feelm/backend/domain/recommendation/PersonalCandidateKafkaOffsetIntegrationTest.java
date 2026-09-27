@@ -531,6 +531,20 @@ class PersonalCandidateKafkaOffsetIntegrationTest extends SharedPostgresContract
                                     Long.class,
                                     latestSet(USER)))
                     .containsExactly(6L, 4L, 3L, 2L);
+            String notice = "아직 취향 정보가 없어, 인기도를 기준으로 영화를 골랐어요.";
+            mvc.perform(get("/api/v1/recommendations").header("Authorization", bearer(USER)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items[0].reason.summary").value(notice));
+            // Current ratings changed after publication; exposed reason remains the saved mode.
+            reasonService.completeUnexposed(latestSet(USER));
+            mvc.perform(get("/api/v1/recommendations").header("Authorization", bearer(USER)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items[0].reason.summary").value(notice));
+            mvc.perform(
+                            get("/api/v1/recommendations/history")
+                                    .header("Authorization", bearer(USER)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.items[0].items[0].reason.summary").value(notice));
         }
         mvc.perform(get("/api/v1/recommendations").header("Authorization", bearer(NEXT_USER)))
                 .andExpect(status().isOk());

@@ -43,9 +43,10 @@
  *   **묶음을 새로 고르는 시점**(세트 생성 · 첫 노출 · 다시 받기)에 뺀다. 이미 노출 중인 묶음은
  *   그 사이 파티원이 무엇을 해도 바뀌지 않는다 — 조회마다 실시간으로 걸러 주지 않는다
  */
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
+import { PARTY_POPULARITY_NOTICE } from '../../../components/PartyMixCard';
 import PartyFlowShell from '../../../components/PartyFlowShell';
 import PopcornBucket from '../../../components/PopcornBucket';
 import Poster from '../../../components/Poster';
@@ -68,7 +69,8 @@ const POSTER_WIDTH = 56;
 const POSTER_HEIGHT = 80;
 
 /** 결과 머리의 섞인 통. 5.9의 통보다 작다 — 여기서 주인공은 3편이다 */
-const BUCKET_WIDTH = 132;
+const BUCKET_WIDTH = 72;
+const PAGE_SIZE = 3;
 
 /** 추천을 못 받은 까닭. `null`은 까닭을 모르는 실패(네트워크 · 서버 오류)다 */
 type Failure = 'gone' | 'closed' | 'unavailable' | 'empty' | null;
@@ -104,7 +106,10 @@ export default function PartyRecommendationPage() {
   const [items, setItems] = useState<PartyRecommendationItem[] | null>(null);
   const [recommendationSetId, setRecommendationSetId] = useState<number | null>(null);
   /** 다시 받기로 더 보여줄 후보가 남았는지. 값이 없으면(옛 응답) 있는 것으로 본다 */
+  const [popularity, setPopularity] = useState(false);
+  const savedPopcorn = useRef(false);
   const [hasNext, setHasNext] = useState(true);
+  const [page, setPage] = useState(0);
   const [members, setMembers] = useState<PartyAvatarUser[]>([]);
   const [popcorn, setPopcorn] = useState<PartyPopcorn | null>(null);
   const [failed, setFailed] = useState(false);
@@ -112,6 +117,7 @@ export default function PartyRecommendationPage() {
 
   useEffect(() => {
     let active = true;
+    savedPopcorn.current = false;
 
     getPartyRecommendations(id)
       .then((set) => {
@@ -119,6 +125,12 @@ export default function PartyRecommendationPage() {
 
         if (userId !== null) markPartyRecommendationSeen(userId, id, set);
         setItems(set.items);
+        setPage(0);
+        setPopularity(set.recommendationMode === 'POPULARITY');
+        if (set.popcorn) {
+          savedPopcorn.current = true;
+          setPopcorn({ partyId: id, members: set.popcorn.members });
+        }
         setRecommendationSetId(set.recommendationSetId);
         setHasNext(set.hasNext !== false);
         setFailure(set.items.length === 0 ? 'empty' : null);
@@ -143,7 +155,7 @@ export default function PartyRecommendationPage() {
 
     getPartyPopcorn(id)
       .then((value) => {
-        if (active) setPopcorn(value);
+        if (active && !savedPopcorn.current) setPopcorn(value);
       })
       .catch(() => {
         // 통을 못 그려도 추천 목록은 보여준다
@@ -183,6 +195,10 @@ export default function PartyRecommendationPage() {
 
   if (!items) return null;
 
+  const pageCount = Math.ceil(items.length / PAGE_SIZE);
+  const currentPage = Math.min(page, pageCount - 1);
+  const visibleItems = items.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+
   const shownMembers = popcorn ? popcorn.members.map((member) => member.user) : members;
   const feedbackStorageKey = `feelm:party-recommendation-feedback:${userId}:${id}:${recommendationSetId}:${items
     .map((item) => item.recommendationItemId)
@@ -192,6 +208,28 @@ export default function PartyRecommendationPage() {
   return (
     <PartyFlowShell
       members={shownMembers}
+      action={
+        <Link className={styles.history} to={path.partyRecommendationHistory(id)}>
+          추천 이력
+        </Link>
+      }
+      footer={
+        hasNext ? (
+          <Button
+            onClick={() =>
+              void navigate(path.partyPopcornMix(id), {
+                state: { refresh: true } satisfies PartyMixEntry,
+              })
+            }
+          >
+            다른 영화 추천받기
+          </Button>
+        ) : (
+          <p className={styles.exhausted}>
+            지금은 더 보여줄 영화가 없어요. 파티원이 영화를 평가하면 새로 추천해 드려요.
+          </p>
+        )
+      }
       title={`우리에게 어울리는 ${items.length}편`}
       subtitle={`${shownMembers.length}명의 취향을 한 통에 담았어요`}
     >
@@ -205,8 +243,9 @@ export default function PartyRecommendationPage() {
         </div>
       ) : null}
 
-      <ul className={styles.list}>
-        {items.map((item) => (
+      {popularity ? <p role="status">{PARTY_POPULARITY_NOTICE}</p> : null}
+      <ul className={styles.list} aria-label="추천 영화" aria-live="polite">
+        {visibleItems.map((item) => (
           <li key={item.recommendationItemId}>
             {/* 서버 영화라 상세(2.4)로 간다. 목업이던 동안(업무 -610)에는 막아 두었다 */}
             <Link to={path.movieDetail(item.movie.movieId)} className={styles.row}>
@@ -228,6 +267,28 @@ export default function PartyRecommendationPage() {
         ))}
       </ul>
 
+      {pageCount > 1 ? (
+        <nav className={styles.pagination} aria-label="추천 영화 페이지">
+          <Button
+            variant="text"
+            disabled={currentPage === 0}
+            onClick={() => setPage(currentPage - 1)}
+          >
+            이전
+          </Button>
+          <span role="status" aria-label={`${currentPage + 1} / ${pageCount} 페이지`}>
+            {currentPage + 1} / {pageCount}
+          </span>
+          <Button
+            variant="text"
+            disabled={currentPage === pageCount - 1}
+            onClick={() => setPage(currentPage + 1)}
+          >
+            다음
+          </Button>
+        </nav>
+      ) : null}
+
       {items.length > 0 && userId !== null && recommendationSetId !== null ? (
         <RecommendationFeedback
           key={feedbackStorageKey}
@@ -235,25 +296,6 @@ export default function PartyRecommendationPage() {
           partyId={id}
         />
       ) : null}
-
-      <div className={styles.actions}>
-        {hasNext ? (
-          <Button
-            variant="text"
-            onClick={() =>
-              void navigate(path.partyPopcornMix(id), {
-                state: { refresh: true } satisfies PartyMixEntry,
-              })
-            }
-          >
-            다른 영화 추천받기
-          </Button>
-        ) : (
-          <p className={styles.exhausted}>
-            지금은 더 보여줄 영화가 없어요. 파티원이 영화를 평가하면 새로 추천해 드려요.
-          </p>
-        )}
-      </div>
     </PartyFlowShell>
   );
 }

@@ -5,6 +5,7 @@
 | ID | 이름 | Method | Endpoint | 단계 | 인증 |
 |---|---|---|---|---|---|
 | [API-032](#api-032-공개-한줄평-목록) | 공개 한줄평 목록 | GET | `/movies/{movieId}/reviews` | 1차 MVP | 회원 |
+| [API-087](#api-087-사용자별-공개-한줄평-목록) | 사용자별 공개 한줄평 목록 | GET | `/users/{publicId}/reviews` | 2차 MVP | 선택 |
 | [API-062](#api-062-공개-프로필-조회) | 공개 프로필 조회 | GET | `/users/{publicId}/profile` | 2차 MVP | 선택 |
 | [API-063](#api-063-취향-비교) | 취향 비교 | GET | `/users/{publicId}/taste-comparison` | 2차 MVP | 회원 |
 | [API-065](#api-065-사용자-랭킹) | 사용자 랭킹 | GET | `/rankings/users` | 확장 | 선택 |
@@ -375,3 +376,26 @@
 
 - [ ] 커뮤니티 범위(게시판형 vs 영화별 토론 vs 추천 리스트 공유)
 - [ ] 한줄평(FR-26)과의 관계
+
+## API-087 사용자별 공개 한줄평 목록
+
+`GET` `/api/v1/users/{publicId}/reviews` · 선택 인증 · S15P21E106-953
+
+프로필에서는 최근 3개, 전체 목록에서는 10개씩 표시한다. API-062 응답은 변경하지 않는다.
+
+- 공개 프로필(API-062)과 같은 접근 조건: ACTIVE 작성자만 조회하며 없는·탈퇴·PRIVATE 프로필·양방향 차단은 404 RESOURCE_NOT_FOUND. 본인 조회는 프로필 공개 범위 예외를 따른다.
+- 타인의 reviewVisibility=PRIVATE이면 200 빈 페이지. 본인이라도 개별 visibility=PUBLIC인 비공백 한줄평만 포함한다.
+- 선택 인증은 토큰이 없는 비회원 조회를 허용하되 잘못된·만료 토큰은 기존 401 정책을 따른다.
+- publicId는 UUID. 잘못된 형식도 없는 사용자와 같은 404.
+- cursor는 직전 응답의 불투명 문자열로 대상과 조회자에 묶인다. size 기본 10, 범위 1~50. 잘못된 size·빈/형식 불량/다른 범위 cursor는 400 VALIDATION_FAILED.
+- cursor는 페이지 위치를 담는 값이며 인증 capability나 서명 토큰이 아니다. 위치를 같은 범위의 유효한 정렬 키로 변경해도 접근 권한은 넓어지지 않는다.
+- createdAt DESC, ratingId DESC 정렬. size+1행으로 hasNext를 판정하고 마지막 nextCursor는 null.
+- 각 요청의 접근 판정과 목록은 같은 스냅샷, 다음 페이지는 최신 공개·차단·평가 상태를 다시 적용한다. 전체 페이지 snapshot은 보장하지 않는다.
+- comment 제외 술어는 API-032와 공유한다. spoiler는 boolean이며 원문을 반환하고 FE가 기본 가림 및 로컬 해제를 적용한다.
+- 공통 401 UNAUTHORIZED/TOKEN_EXPIRED, 500 INTERNAL_ERROR 규약을 따른다.
+
+응답 200:
+
+```json
+{"items":[{"ratingId":91,"movie":{"movieId":550,"title":"파이트 클럽","posterUrl":null},"score":5,"comment":"인생 영화","spoiler":false,"createdAt":"2026-09-20T01:00:00Z"}],"nextCursor":null,"hasNext":false}
+```

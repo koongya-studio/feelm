@@ -36,11 +36,9 @@ public class NotificationCommandService {
                         invitationId,
                         createdAt,
                         createdAt.plus(PARTY_NOTIFICATION_RETENTION))
-                .ifPresent(
-                        notificationId -> {
-                            deliveryRepository.enqueue(notificationId);
-                            events.publishEvent(new NotificationChangedEvent(userId));
-                        });
+                .ifPresent(deliveryRepository::enqueue);
+        // 알림 수신을 꺼도 받은 초대 목록은 바뀐다. 내용 없는 갱신 신호는 별도로 보낸다.
+        events.publishEvent(new NotificationChangedEvent(userId));
     }
 
     public void createPartyInvitationAccepted(

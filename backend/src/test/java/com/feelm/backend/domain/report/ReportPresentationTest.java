@@ -97,6 +97,30 @@ class ReportPresentationTest {
         assertThat(ReportPresentation.from(mapper.treeToValue(changed, ReportContent.class)))
                 .isNotEqualTo(
                         ReportPresentation.from(mapper.treeToValue(content, ReportContent.class)));
+        assertThat(
+                        ReportPresentation.from(mapper.treeToValue(changed, ReportContent.class))
+                                .hasSameFront(
+                                        ReportPresentation.from(
+                                                mapper.treeToValue(content, ReportContent.class))))
+                .isEqualTo(!field.equals("fourCut"));
+    }
+
+    @Test
+    void sameFrontIgnoresBackButIncludesVisibleImagesAndCharacterCode() {
+        var original = presentation(ReportApiContractSupport.CONTENT);
+        var changedCode =
+                presentation(
+                        ReportApiContractSupport.CONTENT.replace(
+                                "\"code\": \"RDMV\"", "\"code\": \"ELHV\""));
+        assertThat(changedCode.fourCut()).isEqualTo(original.fourCut());
+        assertThat(changedCode.hasSameFront(original)).isFalse();
+        var changedBack =
+                presentation(
+                        ReportApiContractSupport.CONTENT.replace(
+                                "익숙한 영화 안에서 어두운 쪽을 많이 봤고, 별점은 박했어요.", "뒷면 설명 변경"));
+        assertThat(changedBack).isNotEqualTo(original);
+        assertThat(changedBack.hasSameFront(original)).isTrue();
+        assertThat(presentation("{}").hasSameFront(presentation("{}"))).isTrue();
     }
 
     @Test

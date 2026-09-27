@@ -1,22 +1,51 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { toBlob } from 'html-to-image';
+import { reportFontEmbedCSS } from './reportImageFonts';
+import { renderIOSReportImage } from './reportImageIOS';
 import {
-  captureReportBackImage,
   captureReportImage,
+  captureReportBackImage,
   downloadBlob,
   downloadReportImage,
   REPORT_IMAGE_HEIGHT,
   REPORT_IMAGE_WIDTH,
 } from './reportImage';
+import reportStyles from '../components/ReportFourCut/ReportFourCut.module.css';
 
 vi.mock('html-to-image', () => ({ toBlob: vi.fn() }));
+vi.mock('./reportImageIOS', () => ({ renderIOSReportImage: vi.fn() }));
+vi.mock('./reportImageFonts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./reportImageFonts')>()),
+  reportFontEmbedCSS: vi.fn(),
+}));
 
 describe('ReportFourCut PNG 저장', () => {
   const originalCreateObjectURL = URL.createObjectURL;
   const originalRevokeObjectURL = URL.revokeObjectURL;
-
   beforeEach(() => {
     vi.mocked(toBlob).mockReset();
+    vi.mocked(renderIOSReportImage).mockReset();
+    vi.mocked(reportFontEmbedCSS)
+      .mockReset()
+      .mockResolvedValue('@font-face { font-family: Anton; }');
+    Object.defineProperty(HTMLImageElement.prototype, 'decode', {
+      configurable: true,
+      writable: true,
+      value: vi.fn().mockResolvedValue(undefined),
+    });
+    vi.spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get').mockReturnValue(100);
+    vi.spyOn(HTMLImageElement.prototype, 'naturalHeight', 'get').mockReturnValue(100);
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(
+      'data:image/png;base64,cG5n',
+    );
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      return new DOMRect(0, 0, this.scrollWidth, this.scrollHeight);
+    });
   });
 
   afterEach(() => {
@@ -30,6 +59,14 @@ describe('ReportFourCut PNG 저장', () => {
       configurable: true,
       value: originalRevokeObjectURL,
     });
+  });
+
+  it('뒷면이 남아 있는 DOM은 앞면 저장본으로 캡처하지 않는다', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('iPhone');
+    const node = document.createElement('div');
+    node.innerHTML = '<li data-flipped="true"></li>';
+    await expect(captureReportImage(node)).rejects.toThrow('capture requires the front');
+    expect(toBlob).not.toHaveBeenCalled();
   });
 
   it('화면의 같은 DOM을 1080×3268 PNG로 캡처한다', async () => {
@@ -51,6 +88,9 @@ describe('ReportFourCut PNG 저장', () => {
         canvasHeight: REPORT_IMAGE_HEIGHT,
       }),
     );
+    expect(reportFontEmbedCSS).not.toHaveBeenCalled();
+    expect(renderIOSReportImage).not.toHaveBeenCalled();
+    expect(vi.mocked(toBlob).mock.calls[0][1]?.fontEmbedCSS).toBeUndefined();
   });
 
   it('캡처에서는 칸 뒤집기 버튼을 제외한다', async () => {
@@ -71,7 +111,7 @@ describe('ReportFourCut PNG 저장', () => {
     expect(options?.filter?.(document.createElement('div'))).toBe(true);
   });
 
-  it('iPhone에서는 웹폰트 재삽입을 생략하고 PNG를 만든다', async () => {
+  it('iPhone은 웹폰트를 포함해 사진을 직접 그리는 렌더러를 사용한다', async () => {
     vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue(
       'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)',
     );
@@ -80,11 +120,47 @@ describe('ReportFourCut PNG 저장', () => {
       scrollWidth: { value: 385 },
       scrollHeight: { value: 1165 },
     });
-    vi.mocked(toBlob).mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+    const complete = new Blob(['with-photos'], { type: 'image/png' });
+    vi.mocked(renderIOSReportImage).mockResolvedValue(complete);
+
+    await expect(captureReportImage(node)).resolves.toBe(complete);
+
+    expect(toBlob).not.toHaveBeenCalled();
+    expect(renderIOSReportImage).toHaveBeenCalledOnce();
+    expect(renderIOSReportImage).toHaveBeenCalledWith(
+      node,
+      [],
+      [],
+      expect.objectContaining({ fontEmbedCSS: '@font-face { font-family: Anton; }' }),
+      expect.any(AbortSignal),
+    );
+    expect(vi.mocked(renderIOSReportImage).mock.calls[0][3]?.skipFonts).not.toBe(true);
+  });
+
+  it('iPhone은 숨겨진 긴 뒷면을 제외한 앞면 경계로 사진과 글자를 배치한다', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('iPhone');
+    const node = document.createElement('div');
+    Object.defineProperties(node, {
+      scrollWidth: { value: 385 },
+      scrollHeight: { value: 1400 },
+    });
+    vi.spyOn(node, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 385, 1165.25));
+    vi.mocked(renderIOSReportImage).mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
 
     await captureReportImage(node);
 
-    expect(toBlob).toHaveBeenCalledWith(node, expect.objectContaining({ skipFonts: true }));
+    expect(renderIOSReportImage).toHaveBeenCalledWith(
+      node,
+      [],
+      [],
+      expect.objectContaining({
+        width: 385,
+        height: 1165.25,
+        canvasWidth: REPORT_IMAGE_WIDTH,
+        canvasHeight: REPORT_IMAGE_HEIGHT,
+      }),
+      expect.any(AbortSignal),
+    );
   });
 
   it('iPhone의 첫 SVG 로딩이 실패하면 사진이 있는 DOM을 다시 캡처한다', async () => {
@@ -97,31 +173,209 @@ describe('ReportFourCut PNG 저장', () => {
       scrollHeight: { value: 1165 },
     });
     const png = new Blob(['png'], { type: 'image/png' });
-    vi.mocked(toBlob).mockRejectedValueOnce(new Error('Load failed')).mockResolvedValueOnce(png);
+    vi.mocked(renderIOSReportImage)
+      .mockRejectedValueOnce(new Error('Load failed'))
+      .mockResolvedValue(png);
 
     await expect(captureReportImage(node)).resolves.toBe(png);
-    expect(toBlob).toHaveBeenCalledTimes(2);
+    expect(renderIOSReportImage).toHaveBeenCalledTimes(2);
+    expect(toBlob).not.toHaveBeenCalled();
   });
 
-  it('뒷면은 폭만 1080으로 맞추고 높이는 화면 비율을 따른다', async () => {
+  it('데스크톱 모드 iPad도 iOS 사진 렌더러를 사용한다', async () => {
+    vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue('Mozilla/5.0 (Macintosh)');
+    vi.spyOn(window.navigator, 'platform', 'get').mockReturnValue('MacIntel');
+    Object.defineProperty(window.navigator, 'maxTouchPoints', { configurable: true, value: 5 });
     const node = document.createElement('div');
     Object.defineProperties(node, {
       scrollWidth: { value: 385 },
-      scrollHeight: { value: 1540 },
+      scrollHeight: { value: 1165 },
     });
-    const png = new Blob(['png'], { type: 'image/png' });
-    vi.mocked(toBlob).mockResolvedValue(png);
+    vi.mocked(renderIOSReportImage).mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+    try {
+      await captureReportImage(node);
+      expect(renderIOSReportImage).toHaveBeenCalledOnce();
+      expect(toBlob).not.toHaveBeenCalled();
+    } finally {
+      delete (window.navigator as unknown as { maxTouchPoints?: number }).maxTouchPoints;
+    }
+  });
 
-    await expect(captureReportBackImage(node)).resolves.toBe(png);
-    expect(toBlob).toHaveBeenCalledWith(
-      node,
-      expect.objectContaining({
-        width: 385,
-        height: 1540,
-        canvasWidth: REPORT_IMAGE_WIDTH,
-        canvasHeight: 4320,
+  it.each([false, true])(
+    'iOS 사진 원본을 유지하고 평면화 상태는 캡처 성공·실패 뒤 복원한다 (%s)',
+    async (fails) => {
+      vi.spyOn(window.navigator, 'userAgent', 'get').mockReturnValue('iPhone');
+      const node = document.createElement('div');
+      const layer = document.createElement('li');
+      layer.className = reportStyles.cell;
+      layer.style.perspective = '1400px';
+      const originalLayerStyle = layer.getAttribute('style');
+      node.append(layer);
+      const image = document.createElement('img');
+      image.src = '/photo.webp';
+      image.srcset = '/photo-large.webp 2x';
+      image.style.cssText = 'object-fit: contain; object-position: 25% 75%;';
+      const originalStyle = image.getAttribute('style');
+      Object.defineProperties(image, { complete: { value: true }, naturalWidth: { value: 100 } });
+      Object.defineProperties(node, {
+        scrollWidth: { value: 385 },
+        scrollHeight: { value: 1165 },
+      });
+      node.append(image);
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+        ok: true,
+        blob: async () => new Blob(['photo'], { type: 'image/webp' }),
+      } as Response);
+      vi.mocked(renderIOSReportImage).mockImplementation(async (_node, photos, data) => {
+        expect(layer.style.perspective).toBe('none');
+        expect(layer.style.transition).toBe('none');
+        expect(photos).toEqual([image]);
+        expect(data).toEqual(['data:image/png;base64,cG5n']);
+        expect(image.getAttribute('style')).toBe(originalStyle);
+        expect(image.getAttribute('src')).toBe('/photo.webp');
+        expect(image.srcset).toBe('/photo-large.webp 2x');
+        if (fails) throw new Error('render failed');
+        return new Blob(['png'], { type: 'image/png' });
+      });
+      if (fails) await expect(captureReportImage(node)).rejects.toThrow('render failed');
+      else await captureReportImage(node);
+      expect(image.getAttribute('src')).toBe('/photo.webp');
+      expect(image.getAttribute('srcset')).toBe('/photo-large.webp 2x');
+      expect(image.getAttribute('style')).toBe(originalStyle);
+      expect(layer.getAttribute('style')).toBe(originalLayerStyle);
+    },
+  );
+
+  it('폰트를 포함하지 못하면 PNG 렌더링 전에 중단한다', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('iPhone');
+    const node = document.createElement('div');
+    Object.defineProperties(node, {
+      scrollWidth: { value: 385 },
+      scrollHeight: { value: 1165 },
+    });
+    vi.mocked(reportFontEmbedCSS).mockRejectedValue(new Error('font fetch failed'));
+    await expect(captureReportImage(node)).rejects.toThrow('font fetch failed');
+    expect(toBlob).not.toHaveBeenCalled();
+  });
+
+  function timeoutFixture() {
+    vi.useFakeTimers();
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('iPhone');
+    const node = document.createElement('div');
+    Object.defineProperties(node, {
+      scrollWidth: { value: 385 },
+      scrollHeight: { value: 1165 },
+    });
+    const layer = document.createElement('li');
+    layer.className = reportStyles.cell;
+    layer.style.perspective = '1400px';
+    node.append(layer);
+    return { node, layer, originalStyle: layer.getAttribute('style') };
+  }
+
+  it('iOS 폰트 대기가 시간 초과되면 늦은 응답도 화면 변경·렌더링을 시작하지 않는다', async () => {
+    const { node, layer, originalStyle } = timeoutFixture();
+    let finishFont!: (css: string) => void;
+    vi.mocked(reportFontEmbedCSS).mockReturnValue(
+      new Promise((resolve) => {
+        finishFont = resolve;
       }),
     );
+    const capture = captureReportImage(node);
+    const rejection = expect(capture).rejects.toThrow('capture timed out');
+    await vi.advanceTimersByTimeAsync(30_000);
+    await rejection;
+    expect(layer.getAttribute('style')).toBe(originalStyle);
+    layer.style.transform = 'rotateY(180deg)';
+    const updatedStyle = layer.getAttribute('style');
+    finishFont('@font-face { font-family: Anton; }');
+    await vi.advanceTimersByTimeAsync(100);
+    expect(layer.getAttribute('style')).toBe(updatedStyle);
+    expect(renderIOSReportImage).not.toHaveBeenCalled();
+  });
+
+  it('iOS 전체 시간 초과는 즉시 스타일을 복원하고 늦은 렌더러가 다음 캡처를 덮어쓰지 않는다', async () => {
+    const { node, layer, originalStyle } = timeoutFixture();
+    let finishFont!: (css: string) => void;
+    let finishOldRender!: (png: Blob) => void;
+    vi.mocked(reportFontEmbedCSS).mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishFont = resolve;
+      }),
+    );
+    vi.mocked(renderIOSReportImage).mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishOldRender = resolve;
+      }),
+    );
+    const capture = captureReportImage(node);
+    const rejection = expect(capture).rejects.toThrow('capture timed out');
+    await vi.advanceTimersByTimeAsync(25_000);
+    finishFont('@font-face { font-family: Anton; }');
+    await vi.advanceTimersByTimeAsync(100);
+    expect(layer.style.perspective).toBe('none');
+    expect(renderIOSReportImage).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(4_900);
+    await rejection;
+    expect(layer.getAttribute('style')).toBe(originalStyle);
+    expect(vi.mocked(renderIOSReportImage).mock.calls[0][4]?.aborted).toBe(true);
+    expect(renderIOSReportImage).toHaveBeenCalledOnce();
+
+    layer.style.perspective = '900px';
+    const newStyle = layer.getAttribute('style');
+    const png = new Blob(['new capture'], { type: 'image/png' });
+    vi.mocked(renderIOSReportImage).mockResolvedValueOnce(png);
+    const nextCapture = captureReportImage(node);
+    await vi.advanceTimersByTimeAsync(100);
+    await expect(nextCapture).resolves.toBe(png);
+    finishOldRender(new Blob(['old capture'], { type: 'image/png' }));
+    await vi.advanceTimersByTimeAsync(100);
+    expect(layer.getAttribute('style')).toBe(newStyle);
+    expect(renderIOSReportImage).toHaveBeenCalledTimes(2);
+  });
+
+  it('iOS 렌더링 재시도 전에 이전 시도를 취소하고 늦은 결과는 사용하지 않는다', async () => {
+    const { node, layer, originalStyle } = timeoutFixture();
+    let finishOldRender!: (png: Blob) => void;
+    const png = new Blob(['retry'], { type: 'image/png' });
+    vi.mocked(renderIOSReportImage)
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishOldRender = resolve;
+        }),
+      )
+      .mockResolvedValueOnce(png);
+    const capture = captureReportImage(node);
+    await vi.advanceTimersByTimeAsync(10_200);
+    await expect(capture).resolves.toBe(png);
+    const attempts = vi.mocked(renderIOSReportImage).mock.calls;
+    expect(attempts).toHaveLength(2);
+    expect(attempts[0][4]?.aborted).toBe(true);
+    expect(attempts[1][4]?.aborted).toBe(false);
+    expect(attempts[0][4]).not.toBe(attempts[1][4]);
+    layer.style.perspective = '800px';
+    const newStyle = layer.getAttribute('style');
+    finishOldRender(new Blob(['late'], { type: 'image/png' }));
+    await vi.advanceTimersByTimeAsync(100);
+    expect(layer.getAttribute('style')).toBe(newStyle);
+    expect(originalStyle).not.toBe(newStyle);
+  });
+
+  it('iOS 사진 요청도 전체 시간 초과에 취소하고 빈 사진으로 진행하지 않는다', async () => {
+    const { node, layer, originalStyle } = timeoutFixture();
+    const image = document.createElement('img');
+    image.src = '/photo.webp';
+    Object.defineProperty(image, 'complete', { value: true });
+    node.append(image);
+    const fetchPhoto = vi.spyOn(globalThis, 'fetch').mockReturnValue(new Promise(() => undefined));
+    const capture = captureReportImage(node);
+    const rejection = expect(capture).rejects.toThrow('capture timed out');
+    await vi.advanceTimersByTimeAsync(30_000);
+    await rejection;
+    expect(fetchPhoto.mock.calls[0][1]?.signal?.aborted).toBe(true);
+    expect(layer.getAttribute('style')).toBe(originalStyle);
+    expect(reportFontEmbedCSS).not.toHaveBeenCalled();
+    expect(renderIOSReportImage).not.toHaveBeenCalled();
   });
 
   it('사진을 데이터 URL로 포함한 DOM만 PNG로 변환한다', async () => {
@@ -284,7 +538,40 @@ describe('ReportFourCut PNG 저장', () => {
 
     await rejection;
   });
+  it('뒷면은 폭만 1080으로 맞추고 높이는 화면 비율을 따른다', async () => {
+    const node = document.createElement('div');
+    Object.defineProperties(node, {
+      scrollWidth: { value: 385 },
+      scrollHeight: { value: 1540 },
+    });
+    const png = new Blob(['png'], { type: 'image/png' });
+    vi.mocked(toBlob).mockResolvedValue(png);
 
+    await expect(captureReportBackImage(node)).resolves.toBe(png);
+    expect(toBlob).toHaveBeenCalledWith(
+      node,
+      expect.objectContaining({
+        width: 385,
+        height: 1540,
+        canvasWidth: REPORT_IMAGE_WIDTH,
+        canvasHeight: 4320,
+      }),
+    );
+  });
+
+  it('기존 iPhone 뒷면 캡처는 폰트 생략과 한 번 렌더링을 그대로 유지한다', async () => {
+    vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue('iPhone');
+    const node = document.createElement('div');
+    Object.defineProperties(node, { scrollWidth: { value: 385 }, scrollHeight: { value: 1540 } });
+    vi.mocked(toBlob).mockResolvedValue(new Blob(['back'], { type: 'image/png' }));
+    await captureReportBackImage(node);
+    expect(toBlob).toHaveBeenCalledOnce();
+    expect(toBlob).toHaveBeenCalledWith(
+      node,
+      expect.objectContaining({ skipFonts: true, canvasHeight: 4320 }),
+    );
+    expect(reportFontEmbedCSS).not.toHaveBeenCalled();
+  });
   it('서명 URL의 실제 PNG 응답을 확인한 뒤 파일 다운로드로 연결한다', async () => {
     vi.useFakeTimers();
     /*
