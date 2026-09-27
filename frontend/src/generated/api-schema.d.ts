@@ -2542,6 +2542,7 @@ export interface components {
         ReportGenerateResponse: {
             /** Format: date-time */
             createdAt?: string;
+            frontUnchanged?: boolean;
             /** Format: date-time */
             issuedAt?: string;
             /** Format: int64 */

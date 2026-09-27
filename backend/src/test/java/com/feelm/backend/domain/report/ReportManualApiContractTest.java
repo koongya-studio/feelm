@@ -59,7 +59,10 @@ class ReportManualApiContractTest extends ReportApiContractSupport {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.details.reason").value("INSUFFICIENT_FRAMES"));
         frame(20);
-        generate().andExpect(status().isOk()).andExpect(jsonPath("$.reused").value(false));
+        generate()
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reused").value(false))
+                .andExpect(jsonPath("$.frontUnchanged").value(false));
         var report = manual.generate(OWNER);
         mockMvc.perform(
                         get("/api/v1/reports/{id}", report.reportId())
@@ -84,6 +87,7 @@ class ReportManualApiContractTest extends ReportApiContractSupport {
         assertThat(second.createdAt()).isEqualTo(first.createdAt());
         assertThat(second.reused()).isTrue();
         assertThat(second.reuseReason()).isEqualTo("UNCHANGED_FILM");
+        assertThat(second.frontUnchanged()).isFalse();
         assertThat(count()).isOne();
         mockMvc.perform(get("/api/v1/users/me/reports").header("Authorization", bearer(OWNER)))
                 .andExpect(jsonPath("$.generation.reason").value("UNCHANGED"));
@@ -155,6 +159,7 @@ class ReportManualApiContractTest extends ReportApiContractSupport {
                 .andExpect(jsonPath("$.reportId").value(first.reportId()))
                 .andExpect(jsonPath("$.reused").value(true))
                 .andExpect(jsonPath("$.reuseReason").value("SAME_CONTENT"))
+                .andExpect(jsonPath("$.frontUnchanged").value(false))
                 .andExpect(jsonPath("$.createdAt").value(first.createdAt().toString()))
                 .andExpect(jsonPath("$.issuedAt").value(RELEASE.toString()));
         assertThat(manual.generate(OWNER).reuseReason()).isEqualTo("SAME_CONTENT");
@@ -187,20 +192,81 @@ class ReportManualApiContractTest extends ReportApiContractSupport {
     }
 
     @Test
-    void identicalFourCutWithDifferentBackAnalysisIsSaved() {
+    void identicalFourCutWithDifferentBackAnalysisIsSaved() throws Exception {
         frames(20);
         var first = manual.generate(OWNER);
         var mapper = context.getBean(ObjectMapper.class);
         var before = mapper.readTree(content(first.reportId()));
         frame(21);
         jdbc.update("UPDATE movies SET release_date = DATE '2000-01-01' WHERE id = ?", BASE + 21);
-        var next = manual.generate(OWNER);
-        var after = mapper.readTree(content(next.reportId()));
+        var response =
+                generate()
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.reused").value(false))
+                        .andExpect(jsonPath("$.frontUnchanged").value(true))
+                        .andReturn()
+                        .getResponse()
+                        .getContentAsString();
+        var result = mapper.readTree(response);
+        long nextId = result.get("reportId").asLong();
+        var after = mapper.readTree(content(nextId));
         assertThat(after.get("fourCut")).isEqualTo(before.get("fourCut"));
         assertThat(after.get("eraShares")).isNotEqualTo(before.get("eraShares"));
-        assertThat(next.reused()).isFalse();
-        assertThat(next.reuseReason()).isNull();
-        assertThat(next.reportId()).isNotEqualTo(first.reportId());
+        assertThat(result.get("reuseReason").isNull()).isTrue();
+        assertThat(nextId).isNotEqualTo(first.reportId());
+        mockMvc.perform(
+                        post("/api/v1/reports/{id}/issue", nextId)
+                                .header("Authorization", bearer(OWNER)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reportId").value(nextId))
+                .andExpect(jsonPath("$.issuedAt").value(RELEASE.toString()));
+        mockMvc.perform(get("/api/v1/users/me/reports").header("Authorization", bearer(OWNER)))
+                .andExpect(jsonPath("$.items", hasSize(1)))
+                .andExpect(jsonPath("$.items[0].reportId").value(nextId));
+        assertThat(count()).isEqualTo(2);
+    }
+
+    @Test
+    void firstReportAndChangedFrontDoNotShowMinorNotice() {
+        frames(20);
+        var first = manual.generate(OWNER);
+        assertThat(first.frontUnchanged()).isFalse();
+        jdbc.update("DELETE FROM frames WHERE user_id = ?", OWNER);
+        var empty = manual.generate(OWNER);
+        assertThat(empty.reused()).isFalse();
+        assertThat(empty.frontUnchanged()).isFalse();
+        assertThat(empty.reportId()).isNotEqualTo(first.reportId());
+        assertThat(count()).isEqualTo(2);
+    }
+
+    @Test
+    void concurrentBackOnlyChangeNotifiesOnlyNewResult() throws Exception {
+        frames(20);
+        var first = manual.generate(OWNER);
+        frame(21);
+        jdbc.update("UPDATE movies SET release_date = DATE '2000-01-01' WHERE id = ?", BASE + 21);
+        try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            var a = executor.submit(() -> manual.generate(OWNER));
+            var b = executor.submit(() -> manual.generate(OWNER));
+            var responses =
+                    java.util.List.of(a.get(10, TimeUnit.SECONDS), b.get(10, TimeUnit.SECONDS));
+            assertThat(responses)
+                    .filteredOn(result -> !result.reused())
+                    .singleElement()
+                    .satisfies(result -> assertThat(result.frontUnchanged()).isTrue());
+            assertThat(responses)
+                    .filteredOn(ReportGenerateResponse::reused)
+                    .singleElement()
+                    .satisfies(
+                            result -> {
+                                assertThat(result.frontUnchanged()).isFalse();
+                                assertThat(result.reuseReason()).isEqualTo("UNCHANGED_FILM");
+                            });
+            assertThat(responses)
+                    .extracting(ReportGenerateResponse::reportId)
+                    .containsOnly(responses.getFirst().reportId());
+            assertThat(responses.getFirst().reportId()).isNotEqualTo(first.reportId());
+        }
         assertThat(count()).isEqualTo(2);
     }
 
