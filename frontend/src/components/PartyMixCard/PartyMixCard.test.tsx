@@ -40,3 +40,23 @@ it('keeps empty mix without expansion and only shows popularity notice from mode
   view.rerender(<PartyMixCard mix={{ ...empty, recommendationMode: 'POPULARITY' }} />);
   expect(screen.getByText(PARTY_POPULARITY_NOTICE)).toBeInTheDocument();
 });
+
+it('shows saved participants even for empty popcorn and preserves anonymous names', () => {
+  const empty = mix([]);
+  empty.members.push(memberPopcorn({ userId: 2048, nickname: '탈퇴한 회원' }, []));
+  render(<PartyMixCard mix={empty} />);
+  expect(screen.getByRole('list', { name: '당시 참여 멤버' })).toHaveTextContent('김난다');
+  expect(screen.getByText('탈퇴한 회원')).toBeInTheDocument();
+  expect(screen.queryByRole('button')).not.toBeInTheDocument();
+});
+
+it('uses the saved profile image beside the nickname', () => {
+  const saved = mix();
+  saved.members[0].user.avatarUrl = '/saved-profile.png';
+  render(<PartyMixCard mix={saved} />);
+  expect(screen.getByRole('img', { name: '김난다의 프로필 이미지' })).toHaveAttribute(
+    'src',
+    '/saved-profile.png',
+  );
+  expect(screen.getByRole('list', { name: '당시 참여 멤버' })).toHaveTextContent('김난다');
+});
