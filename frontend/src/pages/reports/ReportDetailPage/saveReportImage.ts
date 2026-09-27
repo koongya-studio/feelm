@@ -29,7 +29,7 @@ export async function saveReportImage(
 }
 
 /** 저장 실패 안내. 기다리면 풀리는 409 · 429만 따로 알리고 나머지는 다시 시도로 묶는다 */
-export function reportImageFailure(error: unknown): string {
+export function reportImageFailure(error: unknown, action: 'save' | 'share' = 'share'): string {
   if (isApiError(error)) {
     if (error.code === 'REPORT_GENERATING') {
       return '리포트를 아직 만드는 중이에요. 잠시 후 다시 시도해 주세요';
@@ -41,5 +41,7 @@ export function reportImageFailure(error: unknown): string {
     }
   }
 
-  return '이미지를 만들지 못했어요. 잠시 후 다시 시도해 주세요';
+  return action === 'save'
+    ? '이미지를 저장하지 못했어요. 다시 시도해 주세요.'
+    : '이미지를 만들지 못했어요. 잠시 후 다시 시도해 주세요';
 }

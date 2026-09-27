@@ -267,3 +267,61 @@
 .actionLabel > svg {
   flex-shrink: 0;
 }
+
+.noticeSlot {
+  min-height: 64px;
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 64px;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-ink-body);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.notice:empty {
+  visibility: hidden;
+}
+
+.notice > svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.notice[data-kind='error'] {
+  background: var(--color-brand-tint);
+  color: var(--color-danger);
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border: 2px solid var(--color-line);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: saveSpin 1s linear infinite;
+}
+
+@keyframes saveSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}

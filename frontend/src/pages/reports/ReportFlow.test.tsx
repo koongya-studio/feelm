@@ -720,12 +720,68 @@ describe('리포트 상세 저장과 공유', () => {
     expect(location()).toBe('/reports/301');
   });
 
+  it('저장 중에는 같은 안내를 유지하고 다운로드 시작 후 버튼을 다시 활성화한다', async () => {
+    let finishUpload!: (value: Awaited<ReturnType<typeof createReportImage>>) => void;
+    let finishDownload!: () => void;
+    vi.mocked(createReportImage).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishUpload = resolve;
+        }),
+    );
+    vi.mocked(downloadReportImage).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishDownload = resolve;
+        }),
+    );
+    renderApp(['/reports/301']);
+    fireEvent.click(await screen.findByRole('button', { name: '저장' }));
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('리포트를 이미지로 만들고 있어요…');
+    expect(status).toHaveAttribute('data-kind', 'progress');
+    expect(screen.getByRole('button', { name: '저장 중…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: '공유하기' })).toBeDisabled();
+    await waitFor(() => expect(createReportImage).toHaveBeenCalledWith(301, expect.any(Blob)));
+    finishUpload({
+      imageId: 901,
+      format: 'PNG',
+      downloadUrl: '/report.png',
+      expiresAt: '2026-09-27T10:00:00Z',
+    });
+    await waitFor(() => expect(downloadReportImage).toHaveBeenCalledOnce());
+    expect(status).toHaveTextContent('리포트를 이미지로 만들고 있어요…');
+    finishDownload();
+    await waitFor(() => expect(status).toHaveTextContent(/^다운로드를 시작했어요$/));
+    expect(status).toHaveAttribute('data-kind', 'download');
+    expect(screen.getByRole('button', { name: '저장' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '공유하기' })).toBeEnabled();
+    expect(location()).toBe('/reports/301');
+  });
+
+  it('저장 실패 상태를 구분하고 같은 화면에서 다시 저장할 수 있다', async () => {
+    vi.mocked(downloadReportImage).mockRejectedValueOnce(new Error('expired'));
+    renderApp(['/reports/301']);
+    fireEvent.click(await screen.findByRole('button', { name: '저장' }));
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(
+        '이미지를 저장하지 못했어요. 다시 시도해 주세요.',
+      ),
+    );
+    expect(screen.getByRole('status')).toHaveAttribute('data-kind', 'error');
+    expect(screen.getByRole('button', { name: '저장' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: '저장' }));
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(/^다운로드를 시작했어요$/),
+    );
+    expect(location()).toBe('/reports/301');
+  });
   it('API-061 업로드 실패 시 화면에 남아 이유를 알린다', async () => {
     vi.mocked(createReportImage).mockRejectedValueOnce(new Error('upload failed'));
     renderApp(['/reports/301']);
     fireEvent.click(await screen.findByRole('button', { name: '저장' }));
     await waitFor(() =>
-      expect(screen.getByRole('status')).toHaveTextContent('이미지를 만들지 못했어요'),
+      expect(screen.getByRole('status')).toHaveTextContent('이미지를 저장하지 못했어요'),
     );
     expect(location()).toBe('/reports/301');
     expect(downloadBlob).not.toHaveBeenCalled();
@@ -736,7 +792,7 @@ describe('리포트 상세 저장과 공유', () => {
     renderApp(['/reports/301']);
     fireEvent.click(await screen.findByRole('button', { name: '저장' }));
     await waitFor(() =>
-      expect(screen.getByRole('status')).toHaveTextContent('이미지를 만들지 못했어요'),
+      expect(screen.getByRole('status')).toHaveTextContent('이미지를 저장하지 못했어요'),
     );
     expect(location()).toBe('/reports/301');
     expect(downloadBlob).not.toHaveBeenCalled();
