@@ -249,3 +249,26 @@ def test_quarantine_error_reclassification_never_accepts_a_different_request(red
     with pytest.raises(PublishRejected, match="REPLAY_CONFLICT"):
         args["outcome_store"].quarantine(conflicting, args["partition_fence"])
     assert client.get(key) == original
+
+
+
+def test_lua_popularity_mode_survives_ack_loss_and_snapshot_expiry(redis_case):
+    client, args, result_key, request_key = redis_case
+    empty = snapshot(ratings=())
+    party_id = int.from_bytes(args["key"], "big")
+    request = replace(request_for((empty,)), party_id=party_id)
+    request = replace(request, input_id=request_hash(request))
+    args.update(raw=canonical(request_payload(request)), snapshot_reader=Reader((empty,)))
+    def ack_loss(payload):
+        raise ConnectionError("injected ack loss")
+    with pytest.raises(ConnectionError):
+        process_record(**args, notify=ack_loss)
+    before = client.get(result_key)
+    assert json.loads(before)["recommendationMode"] == "POPULARITY"
+    assert json.loads(client.get(request_key))["recommendationMode"] == "POPULARITY"
+    args["snapshot_reader"] = Reader(())
+    delivered = []
+    receipt = process_record(**args, notify=delivered.append)
+    assert receipt.commit_allowed and receipt.disposition == "IDEMPOTENT"
+    assert client.get(result_key) == before
+    assert delivered[0]["recommendationMode"] == "POPULARITY"

@@ -262,3 +262,27 @@ describe('다시 받기로 들어왔을 때', () => {
     ]);
   });
 });
+
+it('late recommendation snapshot replaces current members in the mixing scene', async () => {
+  let answer: (value: ReturnType<typeof partyRecommendations>) => void = () => undefined;
+  vi.mocked(getPartyRecommendations).mockReturnValue(
+    new Promise((resolve) => {
+      answer = resolve;
+    }),
+  );
+  renderMix();
+  await screen.findByText('각자의 팝콘이 하나의 기계로');
+  const past = memberPopcorn({ ...ME, nickname: '지난참여자' }, [1, 2, 3, 4, 5, 6, 7, 8]);
+  answer({
+    ...partyRecommendations(),
+    popcorn: {
+      recommendationSetId: 1,
+      exposedAt: '2026-09-27T00:00:00Z',
+      recommendationMode: 'PERSONALIZED',
+      members: [past],
+      totalCount: past.totalCount,
+      flavors: past.flavors,
+    },
+  });
+  expect(await screen.findByText('지난참여자')).toBeInTheDocument();
+});

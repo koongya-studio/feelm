@@ -80,13 +80,14 @@ public class PartyRecommendationRepository {
             long partyId, String inputId, String modelVersion) {
         return jdbcTemplate
                 .query(
-                        "SELECT id,generated_at FROM recommendation_sets"
+                        "SELECT id,generated_at,recommendation_mode FROM recommendation_sets"
                                 + " WHERE party_id=? AND user_id IS NULL"
                                 + " AND input_version=? AND model_version=?",
                         (resultSet, rowNumber) ->
                                 new RecommendationSet(
                                         resultSet.getLong("id"),
-                                        resultSet.getObject("generated_at", OffsetDateTime.class)),
+                                        resultSet.getObject("generated_at", OffsetDateTime.class),
+                                        resultSet.getString("recommendation_mode")),
                         partyId,
                         inputId,
                         modelVersion)
@@ -110,6 +111,19 @@ public class PartyRecommendationRepository {
             throw new IllegalStateException("Party recommendation set ID was not generated");
         }
         return id;
+    }
+
+    public Optional<OffsetDateTime> findLatestPartyExposedAt(long partyId) {
+        return Optional.ofNullable(
+                jdbcTemplate.queryForObject(
+                        "SELECT max(i.exposed_at) FROM recommendation_items i JOIN recommendation_sets s ON s.id=i.set_id WHERE s.party_id=?",
+                        OffsetDateTime.class,
+                        partyId));
+    }
+
+    public void saveMode(long setId, String mode) {
+        jdbcTemplate.update(
+                "UPDATE recommendation_sets SET recommendation_mode=? WHERE id=?", mode, setId);
     }
 
     /** 저장 순서는 {@code position}이 정하므로 INSERT 순서는 자유다. 반환 id도 movie_id 오름차순이다. */
@@ -338,7 +352,12 @@ public class PartyRecommendationRepository {
                 resultSet.getBigDecimal("average_rating"));
     }
 
-    public record RecommendationSet(long id, OffsetDateTime generatedAt) {}
+    public record RecommendationSet(
+            long id, OffsetDateTime generatedAt, String recommendationMode) {
+        public RecommendationSet(long id, OffsetDateTime generatedAt) {
+            this(id, generatedAt, "PERSONALIZED");
+        }
+    }
 
     public record NewItem(long movieId, int position) {}
 

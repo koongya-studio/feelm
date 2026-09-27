@@ -529,3 +529,32 @@ describe('5.8 파티 관리', () => {
     expect(screen.getByTestId('location').textContent).toBe(`/parties/${TEST_PARTY_ID}/popcorn`);
   });
 });
+
+it('defaults to the latest mix, selects historical popcorn and keeps management on current friends', async () => {
+  const current = partyPopcorn();
+  const past = {
+    ...current.members[1],
+    user: { ...current.members[1]!.user, userId: 777, nickname: '지난친구' },
+  };
+  vi.mocked(getPartyPopcorn).mockResolvedValue({
+    ...current,
+    latestMix: {
+      recommendationSetId: 1,
+      exposedAt: '2026-09-27T00:00:00Z',
+      recommendationMode: 'PERSONALIZED',
+      members: [past],
+      totalCount: past.totalCount,
+      flavors: past.flavors,
+    },
+  });
+  renderWithRouter(<PartyPopcornPage />, {
+    route: `/parties/${TEST_PARTY_ID}/popcorn`,
+    path: '/parties/:partyId/popcorn',
+  });
+  expect(await screen.findByText('우리의 믹스 팝콘')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '지난친구' }));
+  expect(screen.getByText('지난친구의 팝콘')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '파티 관리' }));
+  expect(screen.queryByText('지난친구 님 내보내기')).not.toBeInTheDocument();
+  expect(screen.queryByText(/지난친구 님 차단/)).not.toBeInTheDocument();
+});

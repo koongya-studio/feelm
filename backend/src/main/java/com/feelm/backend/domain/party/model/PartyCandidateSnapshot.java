@@ -10,7 +10,24 @@ public record PartyCandidateSnapshot(
         String algorithmVersion,
         String inputId,
         Instant generatedAt,
-        List<Candidate> candidates) {
+        List<Candidate> candidates,
+        String recommendationMode) {
+    public PartyCandidateSnapshot(
+            long partyId,
+            String modelVersion,
+            String algorithmVersion,
+            String inputId,
+            Instant generatedAt,
+            List<Candidate> candidates) {
+        this(
+                partyId,
+                modelVersion,
+                algorithmVersion,
+                inputId,
+                generatedAt,
+                candidates,
+                "PERSONALIZED");
+    }
 
     public record Candidate(long movieId) {}
 }

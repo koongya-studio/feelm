@@ -47,6 +47,9 @@ class StubScorer:
     def __init__(self, score_maps=None):
         self.bundle = SimpleNamespace(serving_revision=REVISION, model_version=MODEL)
         self.calls = []
+        self.features = SimpleNamespace(positions={mid: mid - 10 for mid in (10,11,12)},
+                                        movie=np.array([[1.0], [3.0], [3.0]]))
+        self.eligible = np.ones(3, dtype=bool)
         self.score_maps = score_maps
 
     def score(self, ratings, *, dismissed_movie_ids, excluded_movie_ids, candidate_ids):
@@ -126,7 +129,7 @@ def test_zero_and_negative_have_explicit_results(kind):
         snapshots = (snapshot(watched=(10, 11, 12)),)
     scorer = StubScorer()
     result = score_party(scorer, request_for(snapshots), snapshots)
-    expected = {"all_zero": "NEEDS_COLD_START", "exhausted": "EXHAUSTED"}.get(kind, "OK")
+    expected = {"exhausted": "EXHAUSTED"}.get(kind, "OK")
     assert result.status == expected
     assert bool(result.candidates) == (expected == "OK")
     if kind == "mixed_zero":
@@ -255,3 +258,34 @@ def test_model_snapshot_count_and_scorer_population_errors():
         status="OK", model_version=MODEL, serving_revision=REVISION, movie_ids=[10], scores=[1.0])
     with pytest.raises(GbtError, match="PARTY_POPULATION_MISMATCH"):
         score_party(scorer, request, values)
+
+
+def test_party_without_inputs_uses_popularity():
+    values = (snapshot(ratings=()), snapshot(2, ratings=()))
+    scorer = StubScorer()
+    result = score_party(scorer, request_for(values), values)
+    assert result.recommendation_mode == "POPULARITY"
+    assert [c.movie_id for c in result.candidates] == [11, 12, 10]
+    assert not scorer.calls
+    assert result.candidates[0].to_payload()["meanFit"] is None
+    assert result.candidates[0].to_payload()["memberFit"] == []
+
+
+def test_party_popularity_keeps_exclusions_and_exhaustion():
+    values = (snapshot(ratings=(), watched=(10,11,12)),)
+    result = score_party(StubScorer(), request_for(values), values)
+    assert result.status == "EXHAUSTED" and result.recommendation_mode == "POPULARITY"
+
+
+@pytest.mark.parametrize("invalid", ["unknown", "ineligible", "nonfinite"])
+def test_party_popularity_does_not_mask_invalid_candidates(invalid):
+    values = (snapshot(ratings=()),)
+    scorer = StubScorer()
+    if invalid == "unknown":
+        scorer.features.positions.clear()
+    elif invalid == "ineligible":
+        scorer.eligible[0] = False
+    else:
+        scorer.features.movie[0,0] = np.nan
+    with pytest.raises(GbtError):
+        score_party(scorer, request_for(values), values)

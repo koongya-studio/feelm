@@ -22,6 +22,7 @@ public class PartyPopcornService {
     private final PartyPopcornQueryRepository partyPopcornQueryRepository;
     private final TasteQueryService tasteQueryService;
     private final AvatarStorage avatarStorage;
+    private final PartyPopcornSnapshots popcornSnapshots;
 
     public PartyPopcornResponse getPartyPopcorn(long partyId, long requesterId) {
         List<MemberSummary> members =
@@ -42,6 +43,7 @@ public class PartyPopcornService {
                                                 member.nickname(),
                                                 avatarStorage.publicUrl(member.avatarStorageKey()),
                                                 buckets.get(member.userId())))
-                        .toList());
+                        .toList(),
+                popcornSnapshots.latest(partyId));
     }
 }

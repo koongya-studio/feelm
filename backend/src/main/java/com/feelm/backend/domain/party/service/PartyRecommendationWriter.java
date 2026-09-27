@@ -49,6 +49,7 @@ class PartyRecommendationWriter {
     private final PartyMemberRepository memberRepository;
     private final PartyRecommendationRepository recommendationRepository;
     private final Clock clock;
+    private final PartyPopcornSnapshots popcornSnapshots;
 
     @Transactional
     public PartyRecommendationResponse write(
@@ -76,7 +77,8 @@ class PartyRecommendationWriter {
                 recommendationRepository
                         .findExistingSet(partyId, candidates.inputId(), candidates.modelVersion())
                         .orElseGet(() -> createSet(partyId, currentMemberIds, candidates));
-        List<StoredItem> items = serve(partyId, set.id(), currentMemberIds, size, refresh);
+        List<StoredItem> items =
+                serve(partyId, set.id(), currentMemberIds, size, refresh, set.recommendationMode());
         boolean hasNext = recommendationRepository.hasUnexposedEligible(set.id(), currentMemberIds);
         return response(partyId, set, items, hasNext);
     }
@@ -86,14 +88,29 @@ class PartyRecommendationWriter {
      * 돌려준다.
      */
     private List<StoredItem> serve(
-            long partyId, long setId, List<Long> memberIds, int size, boolean refresh) {
+            long partyId,
+            long setId,
+            List<Long> memberIds,
+            int size,
+            boolean refresh,
+            String mode) {
         Optional<OffsetDateTime> bundleExposedAt =
                 recommendationRepository.findLatestExposedAt(setId);
         if (refresh || bundleExposedAt.isEmpty()) {
             List<StoredItem> next =
                     recommendationRepository.findUnexposedEligible(setId, memberIds, size);
             if (!next.isEmpty()) {
-                recommendationRepository.expose(partyId, next, nextExposureTime(bundleExposedAt));
+                Optional<OffsetDateTime> latestParty =
+                        recommendationRepository.findLatestPartyExposedAt(partyId);
+                Optional<OffsetDateTime> latest =
+                        latestParty.isPresent()
+                                        && (bundleExposedAt.isEmpty()
+                                                || latestParty.get().isAfter(bundleExposedAt.get()))
+                                ? latestParty
+                                : bundleExposedAt;
+                OffsetDateTime exposedAt = nextExposureTime(latest);
+                recommendationRepository.expose(partyId, next, exposedAt);
+                popcornSnapshots.capture(partyId, setId, exposedAt, memberIds, mode);
                 return next;
             }
             if (bundleExposedAt.isEmpty()) {
@@ -154,7 +171,8 @@ class PartyRecommendationWriter {
             items.add(new NewItem(eligible.get(index).movieId(), index + 1));
         }
         recommendationRepository.insertItems(setId, items);
-        return new RecommendationSet(setId, generatedAt);
+        recommendationRepository.saveMode(setId, snapshot.recommendationMode());
+        return new RecommendationSet(setId, generatedAt, snapshot.recommendationMode());
     }
 
     private PartyRecommendationResponse response(
@@ -165,7 +183,16 @@ class PartyRecommendationWriter {
         List<PartyRecommendationItemResponse> responses =
                 items.stream().map(item -> response(item, genres, otts)).toList();
         return new PartyRecommendationResponse(
-                set.id(), partyId, set.generatedAt(), responses, hasNext);
+                set.id(),
+                partyId,
+                set.generatedAt(),
+                responses,
+                hasNext,
+                recommendationRepository
+                        .findLatestExposedAt(set.id())
+                        .map(at -> popcornSnapshots.current(partyId, set.id(), at))
+                        .orElse(null),
+                set.recommendationMode());
     }
 
     private PartyRecommendationItemResponse response(

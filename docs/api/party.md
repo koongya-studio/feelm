@@ -890,3 +890,14 @@
 ### 미정 사항
 
 없음
+
+
+## 추천 당시 믹스 기록 (S15P21E106-959)
+API-057은 기존 members와 nullable latestMix를 반환한다. API-058은 nullable popcorn과
+recommendationMode(PERSONALIZED/POPULARITY)를 추가한다. API-083의 세트는 popcornSnapshots 배열을
+추가한다. 믹스는 recommendationSetId, exposedAt, recommendationMode, members, totalCount, flavors로
+구성하며 members는 당시 user ID·8가지 맛 개수·평균점수이다. 이름·아바타는 조회 시점 값을 사용하고
+탈퇴자는 기존 탈퇴 표기를 적용한다. 모든 맛을 합산하며 0알도 성공 기록이다.
+새 노출 묶음과 같은 트랜잭션에 저장한다. 재조회·소진 요청은 불변이며 기존 기록은 백필하지 않는다.
+최근 기준은 exposedAt이며 세트 ID가 아니다. 권한·영화 중복 제거·페이지네이션은 기존 규칙을 유지한다.
+POPULARITY 안내: “아직 파티원들의 취향 정보가 없어, 인기도를 기준으로 영화를 골랐어요.”

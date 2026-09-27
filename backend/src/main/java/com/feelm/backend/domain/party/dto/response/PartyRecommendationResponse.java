@@ -12,4 +12,15 @@ public record PartyRecommendationResponse(
         long partyId,
         OffsetDateTime generatedAt,
         List<PartyRecommendationItemResponse> items,
-        boolean hasNext) {}
+        boolean hasNext,
+        PartyPopcornSnapshotResponse popcorn,
+        String recommendationMode) {
+    public PartyRecommendationResponse(
+            long recommendationSetId,
+            long partyId,
+            OffsetDateTime generatedAt,
+            List<PartyRecommendationItemResponse> items,
+            boolean hasNext) {
+        this(recommendationSetId, partyId, generatedAt, items, hasNext, null, "PERSONALIZED");
+    }
+}

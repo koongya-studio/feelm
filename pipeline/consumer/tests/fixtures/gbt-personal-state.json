@@ -26,7 +26,8 @@
       "dismissOnly": 1,
       "watchOnly": 1000
     },
-    "eligibleCandidateCount": 3
+    "eligibleCandidateCount": 3,
+    "recommendationMode": "PERSONALIZED"
   },
   "candidates": {
     "userId": 10,
@@ -55,6 +56,7 @@
         "reasons": []
       }
     ],
-    "discovery": []
+    "discovery": [],
+    "recommendationMode": "PERSONALIZED"
   }
 }

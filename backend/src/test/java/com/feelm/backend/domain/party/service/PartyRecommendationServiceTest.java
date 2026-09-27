@@ -49,7 +49,8 @@ class PartyRecommendationServiceTest {
                     parties,
                     members,
                     recommendations,
-                    Clock.fixed(CLOCK_NOW.toInstant(), ZoneOffset.UTC));
+                    Clock.fixed(CLOCK_NOW.toInstant(), ZoneOffset.UTC),
+                    mock(PartyPopcornSnapshots.class));
     private final PartyRecommendationService service =
             new PartyRecommendationService(parties, members, inputReader, candidateReader, writer);
 

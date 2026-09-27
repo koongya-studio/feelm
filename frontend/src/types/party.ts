@@ -143,7 +143,17 @@ export type PartyMemberPopcorn = {
  * 응답에 파티 이름이 없다. 5.8의 `금요 심야 상영회 · 멤버 2명` 부제는 API-050에서
  * 가져온다.
  */
+export type RecommendationMode = 'PERSONALIZED' | 'POPULARITY';
+export type PartyPopcornSnapshot = {
+  recommendationSetId: number;
+  exposedAt: string;
+  recommendationMode: RecommendationMode;
+  members: PartyMemberPopcorn[];
+  totalCount: number;
+  flavors: PartyMemberFlavor[];
+};
 export type PartyPopcorn = {
+  latestMix?: PartyPopcornSnapshot | null;
   partyId: number;
   members: PartyMemberPopcorn[];
 };
@@ -173,6 +183,8 @@ export type PartyRecommendationItem = {
  * 추천받기`를 감추고 더 없다고 알린다.
  */
 export type PartyRecommendationSet = {
+  popcorn?: PartyPopcornSnapshot | null;
+  recommendationMode?: RecommendationMode;
   recommendationSetId: number;
   partyId: number;
   generatedAt: string;
@@ -222,6 +234,7 @@ export type PartyHistoryItem = {
  * 같은 영화는 **가장 최신 세트에만** 들어 있어 페이지를 넘겨도 두 번 나오지 않는다.
  */
 export type PartyHistorySet = {
+  popcornSnapshots?: PartyPopcornSnapshot[];
   recommendationSetId: number;
   generatedAt: string;
   items: PartyHistoryItem[];

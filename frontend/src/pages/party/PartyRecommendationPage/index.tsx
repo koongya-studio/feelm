@@ -43,9 +43,10 @@
  *   **묶음을 새로 고르는 시점**(세트 생성 · 첫 노출 · 다시 받기)에 뺀다. 이미 노출 중인 묶음은
  *   그 사이 파티원이 무엇을 해도 바뀌지 않는다 — 조회마다 실시간으로 걸러 주지 않는다
  */
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import Button from '../../../components/Button';
+import { PARTY_POPULARITY_NOTICE } from '../../../components/PartyMixCard';
 import PartyFlowShell from '../../../components/PartyFlowShell';
 import PopcornBucket from '../../../components/PopcornBucket';
 import Poster from '../../../components/Poster';
@@ -105,6 +106,8 @@ export default function PartyRecommendationPage() {
   const [items, setItems] = useState<PartyRecommendationItem[] | null>(null);
   const [recommendationSetId, setRecommendationSetId] = useState<number | null>(null);
   /** 다시 받기로 더 보여줄 후보가 남았는지. 값이 없으면(옛 응답) 있는 것으로 본다 */
+  const [popularity, setPopularity] = useState(false);
+  const savedPopcorn = useRef(false);
   const [hasNext, setHasNext] = useState(true);
   const [page, setPage] = useState(0);
   const [members, setMembers] = useState<PartyAvatarUser[]>([]);
@@ -114,6 +117,7 @@ export default function PartyRecommendationPage() {
 
   useEffect(() => {
     let active = true;
+    savedPopcorn.current = false;
 
     getPartyRecommendations(id)
       .then((set) => {
@@ -122,6 +126,11 @@ export default function PartyRecommendationPage() {
         if (userId !== null) markPartyRecommendationSeen(userId, id, set);
         setItems(set.items);
         setPage(0);
+        setPopularity(set.recommendationMode === 'POPULARITY');
+        if (set.popcorn) {
+          savedPopcorn.current = true;
+          setPopcorn({ partyId: id, members: set.popcorn.members });
+        }
         setRecommendationSetId(set.recommendationSetId);
         setHasNext(set.hasNext !== false);
         setFailure(set.items.length === 0 ? 'empty' : null);
@@ -146,7 +155,7 @@ export default function PartyRecommendationPage() {
 
     getPartyPopcorn(id)
       .then((value) => {
-        if (active) setPopcorn(value);
+        if (active && !savedPopcorn.current) setPopcorn(value);
       })
       .catch(() => {
         // 통을 못 그려도 추천 목록은 보여준다
@@ -234,6 +243,7 @@ export default function PartyRecommendationPage() {
         </div>
       ) : null}
 
+      {popularity ? <p role="status">{PARTY_POPULARITY_NOTICE}</p> : null}
       <ul className={styles.list} aria-label="추천 영화" aria-live="polite">
         {visibleItems.map((item) => (
           <li key={item.recommendationItemId}>

@@ -145,7 +145,7 @@ def test_dependency_failure_is_not_acknowledged(stage):
         assert process_record(**args).commit_allowed
 
 
-@pytest.mark.parametrize("status", ["NEEDS_COLD_START", "EXHAUSTED"])
+@pytest.mark.parametrize("status", ["EXHAUSTED"])
 def test_explicit_empty_status_is_durable_and_acknowledgeable(status):
     member = snapshot(ratings=()) if status == "NEEDS_COLD_START" else snapshot(watched=(10, 11, 12))
     args = arguments((member,))
@@ -179,3 +179,15 @@ def test_ownership_loss_never_allows_commit(lose_at):
 def test_source_metadata_boundaries(field, value):
     with pytest.raises(GbtError, match="INVALID_PARTY_SOURCE"):
         replace(RecordSource("test", 0, 1, 1000), **{field: value})
+
+
+def test_party_popularity_publication_and_replay_preserve_mode():
+    args = arguments((snapshot(ratings=()),))
+    receipt = process_record(**args)
+    assert receipt.commit_allowed and receipt.result_status == "OK"
+    outcome = args["outcome_store"].outcomes[0]
+    assert outcome["recommendationMode"] == "POPULARITY"
+    assert outcome["candidates"][0]["memberFit"] == []
+    replay = process_record(**args)
+    assert replay.commit_allowed and replay.result_status == "OK"
+    assert args["outcome_store"].outcomes[0]["recommendationMode"] == "POPULARITY"

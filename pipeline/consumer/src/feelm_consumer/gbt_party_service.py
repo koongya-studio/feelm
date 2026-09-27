@@ -91,7 +91,8 @@ def process_record(*, scorer, snapshot_reader, outcome_store, raw: bytes | str, 
                       else calculate_party(scorer, request, snapshot_reader))
             if result.status != "OK":
                 raise GbtError(result.status)
-            payload.update(status="OK", populationCount=result.population_count,
+            payload.update(status="OK", recommendationMode=result.recommendation_mode,
+                           populationCount=result.population_count,
                            activeMemberIds=list(result.active_member_ids),
                            candidates=[candidate.to_payload() for candidate in result.candidates])
         except GbtError as exc:

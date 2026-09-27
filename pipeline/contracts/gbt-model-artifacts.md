@@ -179,3 +179,8 @@ Consumer는 Spark 코드를 import하지 않는다. HDFS loader는 기존 이미
 잘못된 새 bundle은 새 scorer 객체를 반환하지 않는다. 호출자는 이전 검증 URI/revision을 명시해서
 다시 로드하고 검증한다. 자동 ALS fallback·모델/catalog 혼합·활성 포인터 자동 수정은 없다.
 로컬/Linux fixture 성공은 실제 HDFS 권한·네트워크·클러스터·서버 처리량을 입증하지 않는다.
+
+
+### S15P21E106-959 추천 방식 보존
+
+개인 후보와 상태, 파티 성공 결과는 `recommendationMode` (`PERSONALIZED` 또는 `POPULARITY`)를 게시한다. 개인은 지원 입력 수 0인 cold start, 파티는 모든 참여자의 유효 입력이 없을 때만 `POPULARITY`다. 파티는 기존 후보 합집합과 제외 조건을 유지하고 검증된 `reach_log1p` 내림차순·영화 ID 오름차순으로 정렬한다. 빈 후보는 `EXHAUSTED`, 잘못된 feature와 게시 실패는 기존 실패 계약을 유지한다. 게시 스냅샷 재생은 추천 방식까지 그대로 복원한다. Backend의 두 방식 읽기 배포 후 새 Consumer 게시를 활성화한다. 구 payload의 필드 부재는 레거시 처리이며 이미 노출된 개인 reason을 재해석하지 않는다.

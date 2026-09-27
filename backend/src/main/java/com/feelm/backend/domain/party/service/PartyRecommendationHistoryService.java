@@ -34,6 +34,7 @@ public class PartyRecommendationHistoryService {
     private final PartyRepository partyRepository;
     private final PartyRecommendationHistoryRepository historyRepository;
     private final PartyRecommendationRepository recommendationRepository;
+    private final PartyPopcornSnapshots popcornSnapshots;
 
     /**
      * 세트 페이지와 항목을 한 스냅샷에서 읽는다.
@@ -78,6 +79,8 @@ public class PartyRecommendationHistoryService {
                     .computeIfAbsent(item.setId(), ignored -> new ArrayList<>())
                     .add(response(item, genres, otts));
         }
+        var snapshotsBySet =
+                popcornSnapshots.forSets(partyId, page.stream().map(HistorySet::id).toList());
         List<PartyRecommendationHistorySetResponse> responses =
                 page.stream()
                         .map(
@@ -85,7 +88,8 @@ public class PartyRecommendationHistoryService {
                                         new PartyRecommendationHistorySetResponse(
                                                 set.id(),
                                                 set.generatedAt(),
-                                                itemsBySet.getOrDefault(set.id(), List.of())))
+                                                itemsBySet.getOrDefault(set.id(), List.of()),
+                                                snapshotsBySet.getOrDefault(set.id(), List.of())))
                         .toList();
         HistorySet last = page.getLast();
         String nextCursor =

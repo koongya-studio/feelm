@@ -875,3 +875,13 @@ K≥1 후보 소진·파티 전원 K0·카탈로그 밖 보충은 이번 개인 
 - [x] OTT 구독 추천 후보 범위 — API-068은 `taste` 최대 500편 전체를 사용하고 점수 임계치를 두지 않는다
 - [ ] 영화 메타데이터 HDFS 스냅샷의 산출 형식과 배치 시각 — 추천 모듈 환경(S15P21E106-130)에서 확정
 - [x] 온보딩 선택의 추천 입력 — S15P21E106-649에서 실제 `ratings`로 단일화하고 보정 상수·이진 방향 fallback 제거
+
+
+## 인기도 대체 추천의 명시적 모드 (S15P21E106-959)
+개인 GBT state와 Candidate v6, 파티 성공 결과에 recommendationMode(PERSONALIZED/POPULARITY)를 추가한다.
+개인 K0와 파티 전원 유효 입력 없음만 POPULARITY이다. 기존 필드 없는 결과는 PERSONALIZED로 호환한다.
+개인 state/Candidate 모드는 일치해야 하며 새 POPULARITY는 유효 입력 0인 GBT 결과에서만 허용한다.
+파티 기존 개인 후보 합집합에서 전체 멤버의 평가·관심없음·확정감상을 제외하고 지원·적격 영화를
+reach_log1p 내림차순/movieId 오름차순으로 정렬한다. 후보가 없으면 EXHAUSTED이며 장애는 대체하지 않는다.
+POPULARITY 후보의 partyScore는 인기도 값이며 meanFit/minFit/maxFit/stddevFit은 null, memberFit은 빈 배열이다.
+입력이 있는 파티의 기존 GBT 순위와 진단 값은 유지한다. 게시·재생은 결과 모드를 보존한다.

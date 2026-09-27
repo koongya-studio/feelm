@@ -46,6 +46,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import Avatar from '../../../components/Avatar';
 import Button from '../../../components/Button';
+import { PARTY_POPULARITY_NOTICE } from '../../../components/PartyMixCard';
+import { formatDate } from '../../../utils/date';
 import ConfirmDialog from '../../../components/ConfirmDialog';
 import IconButton from '../../../components/IconButton';
 import Menu from '../../../components/Menu';
@@ -154,6 +156,7 @@ export default function PartyPopcornPage() {
   const [myUserId, setMyUserId] = useState<number | null>(null);
   const [flavors, setFlavors] = useState<PopcornFlavor[]>([]);
   const [pickedUserId, setPickedUserId] = useState<number | null>(null);
+  const [view, setView] = useState<'latest' | 'current'>('latest');
   const [expanded, setExpanded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
@@ -354,8 +357,16 @@ export default function PartyPopcornPage() {
    * 고른 친구가 없으면 첫 파티원을 본다. 와이어프레임도 첫 카드를 펼쳐 두었고 시안도
    * 첫 칩이 선택된 상태다. 강퇴 뒤에 없는 사람이 남지 않도록 목록에서 다시 찾는다.
    */
-  const picked =
-    popcorn.members.find((member) => member.user.userId === pickedUserId) ?? popcorn.members[0];
+  const historical = view === 'latest' && Boolean(popcorn.latestMix);
+  const visibleMembers = historical ? popcorn.latestMix!.members : popcorn.members;
+  const showMix = historical && pickedUserId === null;
+  const picked = showMix
+    ? {
+        user: { userId: 0, nickname: '우리의 믹스 팝콘', avatarUrl: null },
+        totalCount: popcorn.latestMix!.totalCount,
+        flavors: popcorn.latestMix!.flavors,
+      }
+    : (visibleMembers.find((member) => member.user.userId === pickedUserId) ?? visibleMembers[0]);
   const isMine = picked !== undefined && picked.user.userId === myUserId;
   const canInvite =
     party !== null && Math.max(party.members.length, popcorn.members.length) < party.maxMembers;
@@ -379,16 +390,47 @@ export default function PartyPopcornPage() {
 
       <div className={styles.page}>
         <div className={styles.friendsHead}>
-          <h2 className={styles.label}>함께하는 친구들</h2>
-          <p className={styles.count}>{popcorn.members.length}명</p>
+          <h2 className={styles.label}>{historical ? '최근 믹스 참여자' : '함께하는 친구들'}</h2>
+          <p className={styles.count}>{visibleMembers.length}명</p>
         </div>
 
         {/*
          * 친구 칩. 시안대로 사진 아바타다 — API-057 `user.avatarUrl`(업무 -811 · -762). 사진이
          * 없는 사람은 Avatar의 무채색 자리표시자다. 닉네임에서 밝기를 뽑으므로 서로 구분된다.
          */}
+        {popcorn.latestMix ? (
+          <div className={styles.friends}>
+            <button
+              type="button"
+              className={styles.friend}
+              aria-pressed={historical}
+              data-picked={historical}
+              onClick={() => {
+                setView('latest');
+                setPickedUserId(null);
+                setExpanded(false);
+              }}
+            >
+              최근 믹스
+            </button>
+            <button
+              type="button"
+              className={styles.friend}
+              aria-pressed={!historical}
+              data-picked={!historical}
+              onClick={() => {
+                setView('current');
+                setPickedUserId(null);
+                setExpanded(false);
+              }}
+            >
+              현재 친구 팝콘
+            </button>
+          </div>
+        ) : null}
+        {historical ? <p className={styles.meta}>최근 추천 당시 참여자들의 팝콘이에요</p> : null}
         <ul className={styles.friends}>
-          {popcorn.members.map((member) => {
+          {visibleMembers.map((member) => {
             const isPicked = picked?.user.userId === member.user.userId;
 
             return (
@@ -417,9 +459,17 @@ export default function PartyPopcornPage() {
 
         {picked ? (
           <section className={styles.showcase}>
-            <h1 className={styles.title}>{picked.user.nickname}의 팝콘</h1>
+            <h1 className={styles.title}>
+              {showMix ? '우리의 믹스 팝콘' : `${picked.user.nickname}의 팝콘`}
+            </h1>
             <p className={styles.subtitle}>
-              {isMine ? '내 영화 취향이 담긴 통이에요' : '친구의 영화 취향을 구경해요'}
+              {showMix
+                ? `가장 최근에 함께 섞은 팝콘 · ${formatDate(popcorn.latestMix!.exposedAt)}`
+                : historical
+                  ? '최근 추천 당시의 팝콘이에요'
+                  : isMine
+                    ? '내 영화 취향이 담긴 통이에요'
+                    : '친구의 영화 취향을 구경해요'}
             </p>
 
             <PopcornBucket
@@ -429,22 +479,33 @@ export default function PartyPopcornPage() {
             />
 
             <p className={styles.meta}>
-              대표 맛 {leadName} · 팝콘 {picked.totalCount}알
+              {showMix
+                ? picked.flavors
+                    .filter((f) => f.popcornCount > 0)
+                    .map((f) => flavorByCode.get(f.flavorCode)?.displayName ?? f.flavorCode)
+                    .join(' · ') || '아직 담긴 팝콘이 없어요'
+                : `대표 맛 ${leadName}`}{' '}
+              · 팝콘 {picked.totalCount}알
             </p>
 
-            <button
-              type="button"
-              className={styles.expand}
-              aria-expanded={expanded}
-              onClick={() => setExpanded((value) => !value)}
-            >
-              {expanded ? '접기' : '펼쳐서 8가지 맛 개수 보기'}
-              <span className={styles.chevron} aria-hidden="true">
-                {expanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
-              </span>
-            </button>
+            {picked.totalCount > 0 ? (
+              <button
+                type="button"
+                className={styles.expand}
+                aria-expanded={expanded}
+                onClick={() => setExpanded((value) => !value)}
+              >
+                {showMix ? '맛별 팝콘' : expanded ? '접기' : '펼쳐서 8가지 맛 개수 보기'}
+                <span className={styles.chevron} aria-hidden="true">
+                  {expanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
+                </span>
+              </button>
+            ) : null}
 
-            {expanded ? (
+            {showMix && popcorn.latestMix?.recommendationMode === 'POPULARITY' ? (
+              <p className={styles.meta}>{PARTY_POPULARITY_NOTICE}</p>
+            ) : null}
+            {expanded && picked.totalCount > 0 ? (
               <ul className={styles.flavorList}>
                 {flavors.map((flavor) => (
                   <li key={flavor.code} className={styles.flavorItem}>
@@ -557,7 +618,7 @@ export default function PartyPopcornPage() {
             </button>
           ) : null}
 
-          {isOwner && picked && !isMine ? (
+          {!historical && isOwner && picked && !isMine ? (
             <button
               type="button"
               className={styles.menuItem}
@@ -582,7 +643,7 @@ export default function PartyPopcornPage() {
            * 내 팝콘을 고른 동안에는 두지 않는다. 계약도 자기 차단을 `400
            * CANNOT_BLOCK_SELF`로 막는다.
            */}
-          {picked && !isMine ? (
+          {!historical && picked && !isMine ? (
             <>
               <button
                 type="button"

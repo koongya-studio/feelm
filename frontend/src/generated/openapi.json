@@ -2253,6 +2253,9 @@
       },
       "PartyPopcornResponse" : {
         "properties" : {
+          "latestMix" : {
+            "$ref" : "#/components/schemas/PartyPopcornSnapshotResponse"
+          },
           "members" : {
             "items" : {
               "$ref" : "#/components/schemas/MemberPopcorn"
@@ -2260,6 +2263,38 @@
             "type" : "array"
           },
           "partyId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "type" : "object"
+      },
+      "PartyPopcornSnapshotResponse" : {
+        "properties" : {
+          "exposedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "flavors" : {
+            "items" : {
+              "$ref" : "#/components/schemas/FlavorBucket"
+            },
+            "type" : "array"
+          },
+          "members" : {
+            "items" : {
+              "$ref" : "#/components/schemas/MemberPopcorn"
+            },
+            "type" : "array"
+          },
+          "recommendationMode" : {
+            "type" : "string"
+          },
+          "recommendationSetId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalCount" : {
             "format" : "int64",
             "type" : "integer"
           }
@@ -2294,6 +2329,12 @@
           "items" : {
             "items" : {
               "$ref" : "#/components/schemas/PartyRecommendationHistoryItemResponse"
+            },
+            "type" : "array"
+          },
+          "popcornSnapshots" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PartyPopcornSnapshotResponse"
             },
             "type" : "array"
           },
@@ -2337,6 +2378,12 @@
           "partyId" : {
             "format" : "int64",
             "type" : "integer"
+          },
+          "popcorn" : {
+            "$ref" : "#/components/schemas/PartyPopcornSnapshotResponse"
+          },
+          "recommendationMode" : {
+            "type" : "string"
           },
           "recommendationSetId" : {
             "format" : "int64",
