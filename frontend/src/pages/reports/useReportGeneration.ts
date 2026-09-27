@@ -41,6 +41,8 @@ export function useReportGeneration() {
       if (!mounted.current) return;
       if (result.reused && result.reuseReason === 'SAME_CONTENT') {
         await navigate(`${path.reportIssued(result.reportId)}?same=1`);
+      } else if (!result.reused && result.frontUnchanged) {
+        await navigate(`${path.reportIssued(result.reportId)}?similar=1`);
       } else if (!result.reused || result.issuedAt === null) {
         await navigate(path.reportIssued(result.reportId));
       } else {

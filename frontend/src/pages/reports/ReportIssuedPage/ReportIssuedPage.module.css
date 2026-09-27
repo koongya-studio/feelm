@@ -300,5 +300,6 @@
   bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
   left: 50%;
   width: min(90%, 420px);
+  white-space: pre-line;
   transform: translateX(-50%);
 }
