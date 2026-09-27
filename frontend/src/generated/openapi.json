@@ -3269,6 +3269,9 @@
             "format" : "date-time",
             "type" : "string"
           },
+          "frontUnchanged" : {
+            "type" : "boolean"
+          },
           "issuedAt" : {
             "format" : "date-time",
             "type" : "string"
