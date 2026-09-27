@@ -26,8 +26,10 @@
  * `[?]` `현재 구독 중인 OTT와 비교하기`가 무엇을 하는지 적혀 있지 않다. 이동표의 `EXT-03 ⇢ 6.1`은
  *       `OTT 관리로 이동`이 맡으므로, 이 버튼은 **구독 중인 OTT만 남겨 보는 전환**으로 두었다
  * `[?]` `추천 기준 알아보기`가 가는 화면이 없다. 기준 문장을 펼쳐 보여준다
+ *       펼친 문장은 화면 맨 아래에 붙어 버튼만 보이는 높이에선 화면 밖에 생긴다. 눌러도 반응이
+ *       없어 보였으므로(업무 -966) 펼칠 때 그 문장이 보이게 스크롤한다
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import Button from '../../../components/Button';
 import OttBadge from '../../../components/OttBadge';
@@ -50,6 +52,7 @@ export default function OttResultPage() {
   const [reloadCount, setReloadCount] = useState(0);
   const [subscribedOnly, setSubscribedOnly] = useState(false);
   const [criteriaOpen, setCriteriaOpen] = useState(false);
+  const criteriaRef = useRef<HTMLParagraphElement>(null);
   /** EXT-01이 센 분석 대상. 결과에서 빠진 OTT를 가려내는 데만 쓴다 */
   const [catalog, setCatalog] = useState<Ott[]>([]);
 
@@ -88,6 +91,12 @@ export default function OttResultPage() {
       active = false;
     };
   }, [reloadCount]);
+
+  // 펼칠 때만 따라간다. 이미 보이면 `nearest`라 움직이지 않는다
+  useEffect(() => {
+    if (criteriaOpen)
+      criteriaRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+  }, [criteriaOpen]);
 
   const header = <ScreenHeader title="OTT 추천 결과" showBack fallbackTo={path.settings()} />;
 
@@ -256,7 +265,7 @@ export default function OttResultPage() {
         </div>
 
         {criteriaOpen ? (
-          <p className={styles.criteria}>
+          <p ref={criteriaRef} className={styles.criteria}>
             {personalized
               ? '평가한 영화와 비슷한 작품 중 아직 보지 않은 영화가 OTT마다 몇 편인지 세어 순위를 매겨요.'
               : kZero

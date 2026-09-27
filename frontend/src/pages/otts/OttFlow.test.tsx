@@ -334,6 +334,35 @@ describe('EXT-03 결과에서 빠진 OTT', () => {
   });
 });
 
+describe('EXT-03 추천 기준 알아보기', () => {
+  // 펼친 문장이 화면 밖에 생겨 눌러도 반응이 없어 보였다(업무 -966)
+  it('펼칠 때만 기준 문장으로 스크롤하고 다시 누르면 접는다', async () => {
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView;
+    const scrollIntoView = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+
+    try {
+      renderApp([ROUTE_PATTERN.ottResult]);
+      const toggle = await screen.findByRole('button', { name: '추천 기준 알아보기' });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByText(/요금은 반영하지 않아요/)).not.toBeInTheDocument();
+
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      const criteria = screen.getByText(/요금은 반영하지 않아요/);
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      expect(scrollIntoView.mock.contexts[0]).toBe(criteria);
+
+      fireEvent.click(toggle);
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByText(/요금은 반영하지 않아요/)).not.toBeInTheDocument();
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    } finally {
+      HTMLElement.prototype.scrollIntoView = originalScrollIntoView;
+    }
+  });
+});
+
 describe('EXT-02 ⇢ EXT-05', () => {
   /*
    * 계약은 현재 Candidate가 있으면 취향 입력이 0건이어도 `insufficientData: false`를 준다.
