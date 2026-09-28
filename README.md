@@ -67,17 +67,29 @@ feelm은 감상과 평가를 두 가지로 시각화해 사용자가 자신의 �
 
 ## 3. 화면
 
-| 앱 홈 | 취향 초기 설정 | 취향 맞춤·발견 추천 | 영화 상세 |
-| --- | --- | --- | --- |
-| <img src="./frontend/docs/images/01-home.png" width="200"> | <img src="./frontend/docs/images/05-taste-onboarding.png" width="200"> | <img src="./frontend/docs/images/08-recommend-feed.png" width="200"> | <img src="./frontend/docs/images/10-movie-detail.png" width="200"> |
+### 모바일
 
-| 평가 | 필름에 기입 | 팝콘 버킷 | 파티 모드 |
+| 취향 필름 | 오늘의 추천 | 영화 상세 | 평가 |
 | --- | --- | --- | --- |
-| <img src="./frontend/docs/images/12-rating.png" width="200"> | <img src="./frontend/docs/images/13-frame-added.png" width="200"> | <img src="./frontend/docs/images/19-popcorn-bucket.png" width="200"> | <img src="./frontend/docs/images/17-party-mode.png" width="200"> |
+| <img src="./frontend/docs/images/app/mobile-film.jpg" width="200"> | <img src="./frontend/docs/images/app/mobile-recommendations.jpg" width="200"> | <img src="./frontend/docs/images/app/mobile-movie-detail.jpg" width="200"> | <img src="./frontend/docs/images/app/mobile-rating.jpg" width="200"> |
 
-> 이미지는 설계 단계 목업 캡처이며 실제 화면과 다를 수 있다. 29개 화면 전체는
+| 팝콘 버킷 | 파티팝콘 | 파티 믹스 팝콘 | MY |
+| --- | --- | --- | --- |
+| <img src="./frontend/docs/images/app/mobile-popcorn-bucket.jpg" width="200"> | <img src="./frontend/docs/images/app/mobile-party.jpg" width="200"> | <img src="./frontend/docs/images/app/mobile-party-popcorn.jpg" width="200"> | <img src="./frontend/docs/images/app/mobile-my.jpg" width="200"> |
+
+### PC
+
+| 취향 필름 | 추천 영화 |
+| --- | --- |
+| <img src="./frontend/docs/images/app/pc-film.jpg" width="420"> | <img src="./frontend/docs/images/app/pc-recommendations.jpg" width="420"> |
+
+| 파티팝콘 |
+| --- |
+| <img src="./frontend/docs/images/app/pc-party.jpg" width="420"> |
+
+> 2026-09-28 배포 서비스에서 캡처했다. 설계 단계 목업 29개 화면은
 > [00-overview.png](./frontend/docs/images/00-overview.png)와
-> [화면 설계 문서](./frontend/docs/screens/README.md)에서 볼 수 있다.
+> [화면 설계 문서](./frontend/docs/screens/README.md)에 있다.
 
 ---
 
