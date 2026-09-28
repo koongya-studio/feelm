@@ -1,0 +1,2 @@
+# DB 덤프 분할 조각은 압축 바이너리다. 개행 변환을 막는다.
+feelm.dump.part* binary
