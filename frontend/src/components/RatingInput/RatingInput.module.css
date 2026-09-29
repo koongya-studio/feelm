@@ -5,10 +5,15 @@
   gap: var(--space-3);
 }
 
-/* 별 그림은 표시만 담당한다. 조작은 아래 range가 받는다 */
 .visual {
   display: inline-flex;
-  pointer-events: none;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+}
+
+.visual:has(+ .slider:disabled) {
+  cursor: default;
 }
 
 /*
