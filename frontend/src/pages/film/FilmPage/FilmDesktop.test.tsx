@@ -305,7 +305,8 @@ describe('FilmPage 데스크톱 시안', () => {
 
     expect(await screen.findByRole('button', { name: '본 영화 평가하기' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '영화 추천받기' })).toBeInTheDocument();
-    expect(screen.getByTestId('popcorn-summary-kernels')).toBeInTheDocument();
+    // 팝콘 요약은 버튼과 따로 불러오므로 함께 기다린다 (S15P21E106-831)
+    expect(await screen.findByTestId('popcorn-summary-kernels')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: '나를 위한 영화 추천' })).not.toBeInTheDocument();
 
     await waitFor(() => expect(getRecommendations).not.toHaveBeenCalled());

@@ -338,9 +338,12 @@ describe('FilmPage 자동으로 이어 받기', () => {
     renderWithRouter(<ObservedFilmPage />);
 
     expect(await screen.findByText('프레임을 불러오는 중')).toBeInTheDocument();
-    // 관찰 기준은 화면이 아니라 스스로 가로 스크롤하는 릴의 트랙이다
-    expect(observers[observers.length - 1].options?.root).toBe(
-      screen.getByRole('group', { name: '취향 필름 프레임' }),
+    // 관찰 기준은 화면이 아니라 스스로 가로 스크롤하는 릴의 트랙이다.
+    // 관찰자는 로딩 칸이 그려진 뒤 effect에서 붙으므로 기다린다 (S15P21E106-831)
+    await waitFor(() =>
+      expect(observers[observers.length - 1]?.options?.root).toBe(
+        screen.getByRole('group', { name: '취향 필름 프레임' }),
+      ),
     );
 
     reveal();
@@ -381,6 +384,8 @@ describe('FilmPage 필름 위치', () => {
     renderWithRouter(<FilmPage />);
 
     const track = await screen.findByRole('group', { name: '취향 필름 프레임' });
+    // 트랙이 먼저 그려지고 칸은 뒤따라 들어온다. 칸 위치는 모든 칸이 들어온 뒤에 준다 (S15P21E106-831)
+    await waitFor(() => expect(frameCount()).toBe(5));
     layOut(track);
 
     // 처음에는 세 칸이 온전히 보인다. 넷째 칸은 잘려 있다. 첫 화면은 1부터 적는다
@@ -405,6 +410,8 @@ describe('FilmPage 필름 위치', () => {
     renderWithRouter(<FilmPage />);
 
     const track = await screen.findByRole('group', { name: '취향 필름 프레임' });
+    // 트랙이 먼저 그려지고 칸은 뒤따라 들어온다. 칸 위치는 모든 칸이 들어온 뒤에 준다 (S15P21E106-831)
+    await waitFor(() => expect(frameCount()).toBe(5));
     // 왼쪽 여백 없이 세 칸(110 · 4 · 110 · 4 · 110 = 338px)이 온전히 드는 340px 릴.
     // 한 화면 칸 수를 폭 ÷ 간격(340 ÷ 114 = 2)으로 세던 때는 `2 – 3`으로 적혔다
     Object.defineProperty(track, 'clientWidth', { configurable: true, value: 340 });
