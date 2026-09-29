@@ -93,6 +93,33 @@ describe('ReportFourCut PNG 저장', () => {
     expect(vi.mocked(toBlob).mock.calls[0][1]?.fontEmbedCSS).toBeUndefined();
   });
 
+  it.each(['Mozilla/5.0 (Linux; Android 10; SM-G965F)', 'Mozilla/5.0 (Windows NT 10.0)'])(
+    '긴 뒷면이 있어도 갤럭시·웹 앞면은 화면 경계 비율로 캡처한다 (%s)',
+    async (userAgent) => {
+      vi.spyOn(navigator, 'userAgent', 'get').mockReturnValue(userAgent);
+      const node = document.createElement('div');
+      Object.defineProperties(node, {
+        scrollWidth: { value: 328 },
+        scrollHeight: { value: 1104 },
+      });
+      vi.spyOn(node, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 328, 992.49));
+      vi.mocked(toBlob).mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+
+      await captureReportImage(node);
+
+      expect(toBlob).toHaveBeenCalledWith(
+        node,
+        expect.objectContaining({
+          width: 328,
+          height: 992.49,
+          canvasWidth: 1080,
+          canvasHeight: 3268,
+        }),
+      );
+      expect(renderIOSReportImage).not.toHaveBeenCalled();
+    },
+  );
+
   it('캡처에서는 칸 뒤집기 버튼을 제외한다', async () => {
     const node = document.createElement('div');
     const flipButton = document.createElement('button');
@@ -544,6 +571,7 @@ describe('ReportFourCut PNG 저장', () => {
       scrollWidth: { value: 385 },
       scrollHeight: { value: 1540 },
     });
+    vi.spyOn(node, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 385, 1165));
     const png = new Blob(['png'], { type: 'image/png' });
     vi.mocked(toBlob).mockResolvedValue(png);
 
