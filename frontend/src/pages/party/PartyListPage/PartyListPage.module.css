@@ -92,16 +92,12 @@
   gap: var(--space-1);
 }
 
-/*
- * 화면 이름. 한때 브랜드 빨강이었고 시안이 검정으로 돌렸다(사용자 시안 2026-09-20).
- * 화면에서 빨강을 쓰는 자리는 아래 강조 카드의 주 버튼 하나로 모았다.
- */
 .title {
   margin: 0;
-  font-size: 34px;
-  line-height: 1.15;
+  font-size: var(--font-size-title);
+  line-height: var(--line-height-title);
   letter-spacing: var(--letter-spacing-title);
-  font-weight: 700;
+  font-weight: var(--font-weight-bold);
   color: var(--color-ink);
 }
 
@@ -109,9 +105,7 @@
   margin: 0;
   font-size: var(--font-size-body);
   line-height: var(--line-height-body);
-  letter-spacing: var(--letter-spacing-body);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-ink-body);
+  color: var(--color-ink-muted);
 }
 
 /*

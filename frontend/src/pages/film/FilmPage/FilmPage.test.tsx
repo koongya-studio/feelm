@@ -98,6 +98,8 @@ describe('FilmPage', () => {
     renderWithRouter(<FilmPage />);
 
     expect(await screen.findByText('취향 필름을 불러오지 못했어요')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '나의 취향 필름' })).toBeInTheDocument();
+    expect(screen.getByText('본 영화를 한 장씩 담아봐요')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '다시 시도' })).toBeInTheDocument();
   });
 
