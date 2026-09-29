@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 
 /** 공통 오류 규약(API-000) 검증 전용 테스트 컨트롤러. 테스트 소스에만 존재하며 운영 코드에 포함되지 않는다. */
 @RestController
@@ -37,6 +38,11 @@ class ErrorContractTestController {
     @GetMapping("/unhandled")
     void unhandled() {
         throw new IllegalStateException("internal-secret-detail");
+    }
+
+    @GetMapping("/async-timeout")
+    void asyncTimeout() {
+        throw new AsyncRequestTimeoutException();
     }
 
     @GetMapping("/get-only")
