@@ -124,6 +124,16 @@ describe('API-042 내 필름(프레임 목록)', () => {
 
     expect(call()[0]).toBe('/api/v1/users/me/frames?cursor=MjAyNi0wOS0xOA');
   });
+
+  it('선택한 팝콘맛과 다음 장 커서를 함께 보낸다', async () => {
+    fetchMock.mockResolvedValue(
+      json(200, { totalCount: 1, items: [], nextCursor: null, hasNext: false }),
+    );
+
+    await getMyFrames('next', 'FLAVOR_D');
+
+    expect(call()[0]).toBe('/api/v1/users/me/frames?cursor=next&flavorCode=FLAVOR_D');
+  });
 });
 
 describe('API-043 프레임 상세', () => {

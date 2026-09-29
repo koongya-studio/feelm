@@ -102,7 +102,7 @@ it('uses recommendation wording and category when opened from the recommendation
       </Routes>
     </MemoryRouter>,
   );
-  expect(screen.getByText('오늘의 추천은 어땠나요?')).toBeInTheDocument();
+  expect(screen.getByText('나를 위한 영화 추천은 어땠나요?')).toBeInTheDocument();
   expect(screen.getByLabelText('아쉬워요')).toBeInTheDocument();
   expect(screen.getByPlaceholderText('어떤 점이 마음에 들거나 아쉬웠나요?')).toBeInTheDocument();
   fireEvent.click(screen.getByLabelText('아쉬워요'));

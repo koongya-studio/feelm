@@ -5,22 +5,22 @@
  * 계약은 0.5~5.0의 0.5 배수만 받고 4.49 같은 값을 반올림하지 않고 거절한다
  * (API-036 `multipleOf: 0.5`). 그래서 화면에서 0.5 배수만 만든다.
  *
- * 별 그림은 표시만 하고, 조작은 별 아래에 보이는 네이티브 `input[type=range]`가
- * 담당한다. 예전에는 투명한 range를 별 위에 겹쳤는데, 별 사이 간격과 0에 대응하는
- * 왼쪽 끝 때문에 누른 별과 선택되는 점수가 자주 어긋났다(S15P21E106-924).
- * 드래그 · 탭 · 키보드(화살표 · Home · End)가 모두 동작하고, 현재 값이 보조기술에
- * 읽힌다(common-components.md 6.5 — 별점 입력은 키보드로 조작 가능하고 현재 값이
- * 이름으로 읽혀야 한다).
+ * 별 위에서는 각 별의 좌우 절반을 누르거나 드래그해 0.5점 단위로 고른다.
+ * 아래 네이티브 range는 드래그 · 탭 · 키보드(화살표 · Home · End)를 담당하며
+ * 현재 값이 보조기술에 읽힌다(common-components.md 6.5).
  *
  * `0`은 아직 고르지 않은 상태를 뜻하는 화면 전용 값이다. 계약의 최소값은 0.5이므로
  * 0은 서버로 보내지 않는다.
  */
-import type { CSSProperties } from 'react';
+import { useRef } from 'react';
+import type { CSSProperties, PointerEvent } from 'react';
 import RatingStars from '../RatingStars';
 import styles from './RatingInput.module.css';
 
 const MAX_SCORE = 5;
 const STEP = 0.5;
+const STAR_SIZE = 40;
+const STAR_GAP = 10;
 
 type Props = {
   /** 0은 선택 안 함. 그 밖에는 0.5~5.0의 0.5 배수 */
@@ -30,13 +30,46 @@ type Props = {
 };
 
 export default function RatingInput({ value, onChange, disabled = false }: Props) {
+  const activePointer = useRef<number | null>(null);
   // 트랙에서 손잡이 왼쪽을 채우는 비율. CSS가 그라디언트 경계로 쓴다
   const fill = { '--rating-fill': `${(value / MAX_SCORE) * 100}%` } as CSSProperties;
 
+  function updateFromStar(event: PointerEvent<HTMLSpanElement>) {
+    const x = event.clientX - event.currentTarget.getBoundingClientRect().left;
+    const slot = Math.max(0, Math.min(MAX_SCORE - 1, Math.floor(x / (STAR_SIZE + STAR_GAP))));
+    const withinSlot = x - slot * (STAR_SIZE + STAR_GAP);
+    onChange(slot + (withinSlot < STAR_SIZE / 2 ? STEP : 1));
+  }
+
+  function handlePointerDown(event: PointerEvent<HTMLSpanElement>) {
+    if (disabled || (event.pointerType === 'mouse' && event.button !== 0)) return;
+    activePointer.current = event.pointerId;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    updateFromStar(event);
+  }
+
+  function handlePointerMove(event: PointerEvent<HTMLSpanElement>) {
+    if (!disabled && activePointer.current === event.pointerId) updateFromStar(event);
+  }
+
+  function handlePointerEnd(event: PointerEvent<HTMLSpanElement>) {
+    if (activePointer.current !== event.pointerId) return;
+    activePointer.current = null;
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
   return (
     <div className={styles.rating}>
-      <span className={styles.visual}>
-        <RatingStars score={value} size={40} gap={10} />
+      <span
+        className={styles.visual}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+      >
+        <RatingStars score={value} size={STAR_SIZE} gap={STAR_GAP} />
       </span>
 
       <input

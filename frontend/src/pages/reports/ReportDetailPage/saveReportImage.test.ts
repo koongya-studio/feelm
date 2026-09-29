@@ -1,11 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createReportImage } from '../../../api/reports';
-import {
-  captureReportImage,
-  downloadBlob,
-  downloadReportImage,
-  isIOSReportDevice,
-} from '../../../utils/reportImage';
+import { captureReportImage, downloadBlob, downloadReportImage } from '../../../utils/reportImage';
 import { saveReportImage } from './saveReportImage';
 
 vi.mock('../../../api/reports', () => ({ createReportImage: vi.fn() }));
@@ -13,13 +8,11 @@ vi.mock('../../../utils/reportImage', () => ({
   captureReportImage: vi.fn(),
   downloadBlob: vi.fn(),
   downloadReportImage: vi.fn(),
-  isIOSReportDevice: vi.fn(),
 }));
 
 describe('현재 화면의 리포트 PNG 저장', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.mocked(isIOSReportDevice).mockReturnValue(true);
   });
 
   it('서버가 기존 이미지 URL을 반환해도 방금 캡처한 정상 PNG를 내려받는다', async () => {
@@ -39,53 +32,28 @@ describe('현재 화면의 리포트 PNG 저장', () => {
     expect(onStage.mock.calls).toEqual([['upload'], ['download']]);
   });
 
-  it.each([false, true])(
-    '캡처가 실패하면 서버에 보내거나 파일을 내려받지 않는다 (iOS=%s)',
-    async (ios) => {
-      vi.mocked(isIOSReportDevice).mockReturnValue(ios);
-      vi.mocked(captureReportImage).mockRejectedValue(new Error('font fetch failed'));
-      await expect(saveReportImage(301, document.createElement('div'))).rejects.toThrow(
-        'font fetch failed',
-      );
-      expect(createReportImage).not.toHaveBeenCalled();
-      expect(downloadBlob).not.toHaveBeenCalled();
-      expect(downloadReportImage).not.toHaveBeenCalled();
-    },
-  );
-
-  it.each([false, true])(
-    '서버 인가·업로드 확인이 실패하면 성공 처리하지 않는다 (iOS=%s)',
-    async (ios) => {
-      vi.mocked(isIOSReportDevice).mockReturnValue(ios);
-      vi.mocked(captureReportImage).mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
-      vi.mocked(createReportImage).mockRejectedValue(new Error('forbidden'));
-      await expect(saveReportImage(301, document.createElement('div'))).rejects.toThrow(
-        'forbidden',
-      );
-      expect(downloadBlob).not.toHaveBeenCalled();
-      expect(downloadReportImage).not.toHaveBeenCalled();
-    },
-  );
-
-  it('갤럭시·웹은 기존처럼 API-061이 반환한 서버 PNG를 내려받는다', async () => {
-    vi.mocked(isIOSReportDevice).mockReturnValue(false);
-    const png = new Blob(['current'], { type: 'image/png' });
-    vi.mocked(captureReportImage).mockResolvedValue(png);
-    vi.mocked(createReportImage).mockResolvedValue({
-      imageId: 901,
-      format: 'PNG',
-      downloadUrl: '/signed-original.png',
-      expiresAt: '2026-09-27T02:00:00Z',
-    });
-    vi.mocked(downloadReportImage).mockResolvedValue(undefined);
-    await saveReportImage(301, document.createElement('div'));
-    expect(createReportImage).toHaveBeenCalledWith(301, png);
-    expect(downloadReportImage).toHaveBeenCalledWith('/signed-original.png', 301);
+  it('캡처가 실패하면 서버에 보내거나 파일을 내려받지 않는다', async () => {
+    vi.mocked(captureReportImage).mockRejectedValue(new Error('font fetch failed'));
+    await expect(saveReportImage(301, document.createElement('div'))).rejects.toThrow(
+      'font fetch failed',
+    );
+    expect(createReportImage).not.toHaveBeenCalled();
     expect(downloadBlob).not.toHaveBeenCalled();
+    expect(downloadReportImage).not.toHaveBeenCalled();
   });
 
-  it('갤럭시·웹의 서명 PNG 다운로드 실패도 그대로 오류로 처리한다', async () => {
-    vi.mocked(isIOSReportDevice).mockReturnValue(false);
+  it.each(['FORBIDDEN', 'REPORT_GENERATING', 'RATE_LIMITED', 'INTERNAL_SERVER_ERROR'])(
+    '서버 인가·업로드 확인이 실패하면 성공 처리하지 않는다 (%s)',
+    async (code) => {
+      vi.mocked(captureReportImage).mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+      vi.mocked(createReportImage).mockRejectedValue(new Error(code));
+      await expect(saveReportImage(301, document.createElement('div'))).rejects.toThrow(code);
+      expect(downloadBlob).not.toHaveBeenCalled();
+      expect(downloadReportImage).not.toHaveBeenCalled();
+    },
+  );
+
+  it('다운로드 시작에 실패하면 성공으로 끝내지 않는다', async () => {
     vi.mocked(captureReportImage).mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
     vi.mocked(createReportImage).mockResolvedValue({
       imageId: 901,
@@ -93,10 +61,12 @@ describe('현재 화면의 리포트 PNG 저장', () => {
       downloadUrl: '/signed-original.png',
       expiresAt: '2026-09-27T02:00:00Z',
     });
-    vi.mocked(downloadReportImage).mockRejectedValue(new Error('download failed'));
+    vi.mocked(downloadBlob).mockImplementation(() => {
+      throw new Error('download failed');
+    });
     await expect(saveReportImage(301, document.createElement('div'))).rejects.toThrow(
       'download failed',
     );
-    expect(downloadBlob).not.toHaveBeenCalled();
+    expect(downloadReportImage).not.toHaveBeenCalled();
   });
 });

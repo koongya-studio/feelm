@@ -92,6 +92,14 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    @DisplayName("알림 스트림 외 비동기 타임아웃은 기존 500 오류 응답을 유지한다")
+    void nonStreamAsyncTimeoutReturns500() throws Exception {
+        mockMvc.perform(get("/test/errors/async-timeout"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+    }
+
+    @Test
     @DisplayName("존재하지 않는 경로는 404 RESOURCE_NOT_FOUND로 응답한다")
     void unknownPathReturns404() throws Exception {
         mockMvc.perform(get("/test/errors/unknown-path"))

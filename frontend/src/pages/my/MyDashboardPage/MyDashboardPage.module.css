@@ -45,6 +45,7 @@
   height: 32px;
   align-items: center;
   justify-content: center;
+  gap: var(--space-2);
   padding: 0 var(--space-3);
   border-radius: var(--radius-pill);
   border: 1px solid var(--glass-dark-line);
@@ -58,6 +59,11 @@
   font-size: var(--font-size-meta);
   font-weight: var(--font-weight-bold);
   text-decoration: none;
+}
+
+.profileActionIcon {
+  display: inline-flex;
+  line-height: 1;
 }
 
 .profileAction::after {
@@ -220,42 +226,45 @@
   font-size: var(--font-size-caption);
 }
 
-/*
- * `최근 본 영화` 안의 거르개 (업무 -919). 탭과 격자 사이에 한 줄로 선다.
- *
- * 탭처럼 보이면 안 된다 — 탭은 세 갈래이고 이것은 켜고 끄는 스위치다. 그래서 폭을 채우지 않고
- * 왼쪽에 칩 하나로 둔다.
- */
-/*
- * 탭 구분선에 가깝게 붙이고 격자와는 띄운다. 거르개는 탭에 딸린 것이지 목록의 첫 줄이 아니다.
- */
+/* 문구를 고정하고 채운 면만으로 필터 상태를 표시한다. */
 .feedFilter {
   display: flex;
   padding: var(--space-2) 0 var(--space-4);
 }
-
-/*
- * 꺼진 것도 **누를 수 있는 것으로 보여야 한다.** 글자만 있으면 설명문으로 읽힌다. 옅은 면과
- * 또렷한 선을 줘서 칩임을 드러낸다.
- *
- * 색으로 가르지 않는다 — 디자인 방향이 `UI에 유채색을 쓰지 않는다`이고 7.1은 그 예외가 아니다
- * (`design-concept.md` 3장). 켜진 것은 흰 면에 잉크 글자로 뒤집어 대비를 최대로 준다.
- */
 .feedFilterButton {
+  display: inline-flex;
+  align-items: center;
   padding: 4px var(--space-3);
   border: 1px solid var(--color-line-on-dark);
   border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.08);
   color: var(--color-on-dark);
+  cursor: pointer;
+  font-family: inherit;
   font-size: var(--font-size-caption);
   font-weight: var(--font-weight-bold);
-  cursor: pointer;
 }
-
-.feedFilterButton[data-on='true'] {
+.feedFilterButton[aria-pressed='true'] {
   border-color: var(--color-on-dark);
   background: var(--color-on-dark);
   color: var(--color-ink);
+}
+.feedFilterButton:focus-visible {
+  outline: 2px solid var(--color-on-dark);
+  outline-offset: 2px;
+}
+.desktopPage .feedFilterButton {
+  border-color: var(--color-line-strong);
+  background: var(--color-surface-solid);
+  color: var(--color-ink-body);
+}
+.desktopPage .feedFilterButton[aria-pressed='true'] {
+  border-color: var(--color-action);
+  background: var(--color-action);
+  color: var(--color-on-action);
+}
+.desktopPage .feedFilterButton:focus-visible {
+  outline-color: var(--color-ink);
 }
 
 .tabs {
@@ -451,7 +460,7 @@
   flex: 1;
   flex-direction: column;
   gap: var(--space-5);
-  padding: var(--space-6) var(--space-4) var(--space-8);
+  padding: 24px 20px var(--space-8);
 }
 
 .desktopHead {
@@ -459,6 +468,10 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
+}
+
+.desktopStatusHead {
+  padding: 24px 20px 0;
 }
 
 .desktopTitle {
@@ -585,22 +598,6 @@
 }
 
 /*
- * 넓은 화면은 밝은 면이라 어두운 면 색을 그대로 쓰면 흰 글자가 배경에 묻는다. 이 화면의 다른
- * 요소들과 같이 잉크 계열로 되돌린다(업무 -919).
- */
-.desktopPage .feedFilterButton {
-  border-color: var(--color-line-strong);
-  background: var(--color-surface-solid);
-  color: var(--color-ink-body);
-}
-
-.desktopPage .feedFilterButton[data-on='true'] {
-  border-color: var(--color-action);
-  background: var(--color-action);
-  color: var(--color-on-action);
-}
-
-/*
  * 포스터 격자. **열 수를 고정하지 않는다** — 중앙 단은 1024px에서 넓고 1280px에서는 우측
  * 패널이 열려 좁아진다. 한 칸의 최소 폭만 정하고 좁아지면 줄을 바꾼다. 좁은 화면이 쓰던
  * 음수 여백(화면 폭 꽉 채우기)은 여기서 되돌린다 — 데스크톱 단에는 그 여백이 없다.
@@ -648,31 +645,99 @@
   bottom: var(--space-6);
 }
 
-/* 사진 배경에서도 읽을 수 있는 평가 정렬 선택란. */
+/* 평가 정렬은 최근 본 영화의 칩을 닫힌 상태의 기준으로 삼는다. */
 .ratingToolbar {
   display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: var(--space-2);
   padding: var(--space-2) 0 var(--space-4);
 }
-.ratingSortLabel {
-  color: var(--color-on-dark);
-  font-size: var(--font-size-caption);
+.feedChoiceControl {
+  position: relative;
+  flex: none;
 }
-.ratingSort {
-  min-height: var(--tap-target-min);
-  max-width: 100%;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--color-line);
+.feedChoice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px var(--space-3);
+  border: 1px solid var(--color-line-on-dark);
   border-radius: var(--radius-pill);
-  background: var(--color-surface-solid);
-  color: var(--color-ink);
-  font: inherit;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-on-dark);
+  cursor: pointer;
+  font-family: inherit;
   font-size: var(--font-size-caption);
+  font-weight: var(--font-weight-bold);
 }
-.desktopPage .ratingSortLabel {
-  color: var(--color-ink-muted);
+.feedChoice svg {
+  width: 13px;
+  height: 13px;
+}
+.feedChoiceMenu {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + var(--space-1));
+  left: 0;
+  width: max-content;
+  min-width: 100%;
+  padding: var(--space-1);
+  border: 1px solid var(--color-line-on-dark);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-dark);
+  box-shadow: var(--shadow-raised);
+}
+.feedChoiceOption {
+  display: flex;
+  width: 100%;
+  min-height: var(--tap-target-min);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--color-on-dark);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-meta);
+  text-align: left;
+}
+.feedChoiceOption[aria-checked='true'],
+.feedChoiceOption:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.feedChoiceOption[aria-checked='true'] {
+  font-weight: var(--font-weight-bold);
+}
+.feedChoiceOption svg {
+  width: 16px;
+  height: 16px;
+}
+.feedChoice:focus-visible,
+.feedChoiceOption:focus-visible {
+  outline: 2px solid var(--color-on-dark);
+  outline-offset: 2px;
+}
+/* 데스크톱 밝은 면은 원래 거르개와 같은 흰 칩을 쓴다. */
+.desktopPage .feedChoice {
+  border-color: var(--color-line-strong);
+  background: var(--color-surface-solid);
+  color: var(--color-ink-body);
+}
+.desktopPage .feedChoiceMenu {
+  border-color: var(--color-line-strong);
+  background: var(--color-surface-solid);
+}
+.desktopPage .feedChoiceOption {
+  color: var(--color-ink);
+}
+.desktopPage .feedChoiceOption[aria-checked='true'],
+.desktopPage .feedChoiceOption:hover {
+  background: var(--color-line-faint);
+}
+.desktopPage .feedChoice:focus-visible,
+.desktopPage .feedChoiceOption:focus-visible {
+  outline-color: var(--color-ink);
 }
 
 .dismissalNote {

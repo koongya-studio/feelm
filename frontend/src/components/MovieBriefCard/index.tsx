@@ -199,15 +199,11 @@ export default function MovieBriefCard({
               </>
             ) : null}
           </p>
-
-          {/* 추천 이유도 같다. 서버가 문구를 주지 않아도 줄 수만큼 자리를 지킨다 */}
-          <p className={styles.reason}>{reason}</p>
-
-          {compact ? null : ottRow}
         </div>
       </div>
 
-      {compact ? ottRow : null}
+      <p className={styles.reason}>{reason}</p>
+      {ottRow}
 
       {detailButton ? (
         <Link to={detail} state={linkState} className={styles.detailButton}>

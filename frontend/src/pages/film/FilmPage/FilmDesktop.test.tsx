@@ -216,7 +216,7 @@ describe('FilmPage 데스크톱 시안', () => {
   it('필름 아래에 오늘의 추천 카드를 세운다', async () => {
     renderFilm(1440);
 
-    expect(await screen.findByRole('heading', { name: '오늘의 추천' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: '나를 위한 영화 추천' })).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: '그랜드 부다페스트 호텔 상세 보기' }),
     ).toBeInTheDocument();
@@ -230,13 +230,17 @@ describe('FilmPage 데스크톱 시안', () => {
       .getByRole('link', { name: '그랜드 부다페스트 호텔 상세 보기' })
       .closest('article');
     expect(card).not.toBeNull();
-    const ottBadges = within(card as HTMLElement).getAllByRole('img');
-    expect(ottBadges.map((badge) => badge.getAttribute('aria-label'))).toEqual([
-      'NETFLIX',
-      'TVING',
-      'WAVVE',
+    const ottLinks = within(card as HTMLElement).getAllByRole('link', {
+      name: /에서 그랜드 부다페스트 호텔 보기 \(새 창\)/,
+    });
+    expect(ottLinks.map((link) => link.getAttribute('aria-label'))).toEqual([
+      'NETFLIX에서 그랜드 부다페스트 호텔 보기 (새 창)',
+      'TVING에서 그랜드 부다페스트 호텔 보기 (새 창)',
+      'WAVVE에서 그랜드 부다페스트 호텔 보기 (새 창)',
     ]);
-    expect(ottBadges[0].closest('ul')?.parentElement?.querySelector('h3')).not.toBeNull();
+    expect(ottLinks[0].closest('ul')?.previousElementSibling).toHaveTextContent(
+      '좋아한 케이퍼 무비와 가장 가까운 한 편이에요',
+    );
   });
 
   it('우측 보조 패널에 팝콘 · 리포트 · 감상 확인 카드를 보낸다', async () => {
@@ -262,7 +266,7 @@ describe('FilmPage 데스크톱 시안', () => {
   it('팝콘 요약과 필름 늘리기를 본문에서 뺀다', async () => {
     renderFilm(1440);
 
-    await screen.findByRole('heading', { name: '오늘의 추천' });
+    await screen.findByRole('heading', { name: '나를 위한 영화 추천' });
 
     expect(screen.getByRole('link', { name: '본 영화 평가하기' })).toHaveAttribute(
       'href',
@@ -290,7 +294,7 @@ describe('FilmPage 데스크톱 시안', () => {
   it('1280px 미만에서는 보조 패널을 그리지 않는다', async () => {
     renderFilm(1100);
 
-    await screen.findByRole('heading', { name: '오늘의 추천' });
+    await screen.findByRole('heading', { name: '나를 위한 영화 추천' });
 
     expect(screen.queryByRole('heading', { name: '나의 취향 팝콘' })).not.toBeInTheDocument();
     expect(getWatchRecords).not.toHaveBeenCalled();
@@ -302,7 +306,7 @@ describe('FilmPage 데스크톱 시안', () => {
     expect(await screen.findByRole('button', { name: '본 영화 평가하기' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '영화 추천받기' })).toBeInTheDocument();
     expect(screen.getByTestId('popcorn-summary-kernels')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: '오늘의 추천' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '나를 위한 영화 추천' })).not.toBeInTheDocument();
 
     await waitFor(() => expect(getRecommendations).not.toHaveBeenCalled());
   });

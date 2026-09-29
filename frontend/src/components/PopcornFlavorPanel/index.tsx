@@ -19,17 +19,19 @@ import AsidePanel from '../AsidePanel';
 import { kernelSprite } from '../PopcornBucket/sprites';
 import styles from './PopcornFlavorPanel.module.css';
 import type { PopcornBucket } from '../../types/taste';
+import type { ReactNode } from 'react';
 
 type Props = {
   /** 카드 제목. 3.1은 `나의 취향 팝콘`, 7.1은 `팝콘 분포도`다 */
   title: string;
+  titleIcon?: ReactNode;
   bucket: PopcornBucket;
   /** 제목 오른쪽 화살표가 가는 곳 */
   to: string;
   linkLabel: string;
 };
 
-export default function PopcornFlavorPanel({ title, bucket, to, linkLabel }: Props) {
+export default function PopcornFlavorPanel({ title, titleIcon, bucket, to, linkLabel }: Props) {
   const flavors = [...bucket.flavors]
     .filter((flavor) => flavor.popcornCount > 0)
     .sort((a, b) => b.popcornCount - a.popcornCount);
@@ -37,14 +39,16 @@ export default function PopcornFlavorPanel({ title, bucket, to, linkLabel }: Pro
   if (flavors.length === 0) return null;
 
   return (
-    <AsidePanel title={title} to={to} linkLabel={linkLabel} tone="dark">
+    <AsidePanel title={title} titleIcon={titleIcon} to={to} linkLabel={linkLabel} tone="dark">
       <table className={styles.flavorTable}>
         <thead>
           <tr>
             <th scope="col" className={styles.flavorNameHead}>
               맛
             </th>
-            <th scope="col">감상량</th>
+            <th scope="col" className={styles.flavorShareHead}>
+              감상량
+            </th>
             <th scope="col">선호도</th>
           </tr>
         </thead>
@@ -53,8 +57,10 @@ export default function PopcornFlavorPanel({ title, bucket, to, linkLabel }: Pro
           {flavors.map((flavor) => (
             <tr key={flavor.flavorCode}>
               <th scope="row" className={styles.flavorName}>
-                <img className={styles.kernel} src={kernelSprite(flavor.flavorCode)} alt="" />
-                {flavor.displayName}
+                <span className={styles.flavorNameContent}>
+                  <img className={styles.kernel} src={kernelSprite(flavor.flavorCode)} alt="" />
+                  {flavor.displayName}
+                </span>
               </th>
 
               <td className={styles.flavorShare}>

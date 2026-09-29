@@ -393,16 +393,26 @@ export default function FilmPage() {
       <>
         <AppHeader />
 
-        <StatusView title="취향 필름을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
-          <Button
-            onClick={() => {
-              setFailed(false);
-              setReloadCount((count) => count + 1);
-            }}
+        <div className={styles.page} data-desktop={desktop || undefined}>
+          <header className={styles.head}>
+            <h1 className={styles.title}>나의 취향 필름</h1>
+            <p className={styles.subtitle}>본 영화를 한 장씩 담아봐요</p>
+          </header>
+
+          <StatusView
+            title="취향 필름을 불러오지 못했어요"
+            description="잠시 후 다시 시도해 주세요"
           >
-            다시 시도
-          </Button>
-        </StatusView>
+            <Button
+              onClick={() => {
+                setFailed(false);
+                setReloadCount((count) => count + 1);
+              }}
+            >
+              다시 시도
+            </Button>
+          </StatusView>
+        </div>
       </>
     );
   }
@@ -472,7 +482,7 @@ export default function FilmPage() {
     <>
       <AppHeader />
 
-      <div className={styles.page}>
+      <div className={styles.page} data-desktop={desktop || undefined}>
         {/*
           제목 영역. 넓은 화면은 오른쪽에 `‹ 1 – 6 / 73 ›`가 붙어 가로로 놓이고, 모바일은
           지금까지처럼 세로 한 단이다. 둘을 한 덩어리로 묶지 않는 것은 `.head`의 세로 간격이
@@ -481,7 +491,6 @@ export default function FilmPage() {
         {desktop ? (
           <header className={styles.desktopHead}>
             <div className={styles.head}>
-              <p className={styles.eyebrow}>YOUR TASTE ON FILM</p>
               <h1 className={styles.title}>나의 취향 필름</h1>
 
               {frames ? (
@@ -533,7 +542,6 @@ export default function FilmPage() {
           </header>
         ) : (
           <header className={styles.head}>
-            <p className={styles.eyebrow}>YOUR TASTE ON FILM</p>
             <h1 className={styles.title}>나의 취향 필름</h1>
 
             {frames ? (

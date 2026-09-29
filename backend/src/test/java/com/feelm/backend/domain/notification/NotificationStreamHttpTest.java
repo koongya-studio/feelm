@@ -25,6 +25,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import tools.jackson.databind.ObjectMapper;
 
@@ -90,6 +91,42 @@ class NotificationStreamHttpTest {
             emitter.get().complete();
         }
         mvc.perform(asyncDispatch(result)).andExpect(status().isOk());
+    }
+
+    @Test
+    void expiredStreamDoesNotWriteJsonError() throws Exception {
+        when(repository.isActiveUser(anyLong())).thenReturn(true);
+        when(repository.streamVersion(anyLong(), any())).thenReturn("v1");
+        AtomicReference<SseEmitter> emitter = new AtomicReference<>();
+        doAnswer(
+                        invocation -> {
+                            SseEmitter value = (SseEmitter) invocation.callRealMethod();
+                            emitter.set(value);
+                            return value;
+                        })
+                .when(streams)
+                .subscribe(anyLong(), any());
+        var result =
+                mvc.perform(
+                                get("/api/v1/notifications/stream")
+                                        .header(
+                                                "Authorization",
+                                                "Bearer " + tokens.createAccessToken(10)))
+                        .andExpect(status().isOk())
+                        .andExpect(request().asyncStarted())
+                        .andReturn();
+        await().atMost(Duration.ofSeconds(3))
+                .untilAsserted(
+                        () ->
+                                assertThat(result.getResponse().getContentAsString())
+                                        .contains("event:notification-changed"));
+        assertThat(result.getRequest().getRequestURI()).isEqualTo("/api/v1/notifications/stream");
+        assertThat(result.getResponse().getContentType()).startsWith("text/event-stream");
+        emitter.get().completeWithError(new AsyncRequestTimeoutException());
+        mvc.perform(asyncDispatch(result)).andExpect(status().isOk());
+        assertThat(result.getResponse().getContentAsString())
+                .contains("event:notification-changed")
+                .doesNotContain("INTERNAL_ERROR");
     }
 
     @Test

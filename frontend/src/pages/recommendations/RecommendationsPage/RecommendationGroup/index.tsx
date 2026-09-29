@@ -18,6 +18,7 @@ import { BlockIcon } from '../../../../components/Icon';
 import styles from './RecommendationGroup.module.css';
 import type { Ott } from '../../../../types/ott';
 import type { RecommendationItem } from '../../../../types/recommendation';
+import type { ReactNode } from 'react';
 
 /** 대표 카드와 나머지 카드의 포스터 폭. 시안의 카드에서 잰 값이다 */
 const LEAD_POSTER_WIDTH = 128;
@@ -31,6 +32,7 @@ const REST_OTT_SIZE = 22;
 const DESIGN_CARD_COUNT = 3;
 
 type Props = {
+  icon: ReactNode;
   title: string;
   description: string;
   items: RecommendationItem[];
@@ -41,6 +43,7 @@ type Props = {
 };
 
 export default function RecommendationGroup({
+  icon,
   title,
   description,
   items,
@@ -90,7 +93,12 @@ export default function RecommendationGroup({
   return (
     <section className={styles.group}>
       <header className={styles.head}>
-        <h2 className={styles.title}>{title}</h2>
+        <h2 className={styles.title}>
+          <span className={styles.titleIcon} aria-hidden="true">
+            {icon}
+          </span>
+          {title}
+        </h2>
         <p className={styles.description}>{description}</p>
       </header>
 

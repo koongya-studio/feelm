@@ -59,9 +59,10 @@ import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import Snackbar from '../../../components/Snackbar';
-import { BlockIcon } from '../../../components/Icon';
+import { BlockIcon, TasteDiscoveryIcon, TasteMatchIcon } from '../../../components/Icon';
 import RecommendationCard from './RecommendationCard';
 import RecommendationFeedback from '../../../components/RecommendationFeedback';
+import { useDesktopAsideSlot } from '../../../contexts/desktopAsideContext';
 import RecommendationGroup from './RecommendationGroup';
 import RecommendationsAside from './RecommendationsAside';
 import { ApiError } from '../../../api/apiError';
@@ -123,6 +124,7 @@ export default function RecommendationsPage() {
 
 function RecommendationsContent({ desktop }: { desktop: boolean }) {
   const navigate = useNavigate();
+  const asideSlot = useDesktopAsideSlot();
   const user = useContext(AuthContext)?.user ?? null;
   const [guideDismissed, setGuideDismissed] = useState(false);
   const guideActive = Boolean(
@@ -308,12 +310,31 @@ function RecommendationsContent({ desktop }: { desktop: boolean }) {
     DESKTOP_GROUP_SIZE,
   );
 
+  const desktopHeader = (showDate = false) => (
+    <header className={styles.desktopHead}>
+      <div className={styles.desktopHeading}>
+        <h1 className={styles.desktopTitle}>나를 위한 영화 추천</h1>
+        <p className={styles.desktopSubtitle}>지금, 당신의 취향에 딱 맞는 영화를 골랐어요</p>
+      </div>
+      {showDate && generatedAt ? (
+        <p className={styles.date}>
+          <span className={styles.dateValue}>{formatMonthDayWeekday(generatedAt)}</span>
+          <span className={styles.dateNote}>오늘도 좋은 영화와 함께해요</span>
+        </p>
+      ) : null}
+    </header>
+  );
+
   if (failure || items === null) {
     const preparing = failure === 'preparing' || !failure;
 
     return (
       <>
-        <ScreenHeader title={<VisuallyHidden>오늘의 추천</VisuallyHidden>} />
+        {desktop ? (
+          <div className={styles.desktopStatusHead}>{desktopHeader()}</div>
+        ) : (
+          <ScreenHeader title={<VisuallyHidden>나를 위한 영화 추천</VisuallyHidden>} />
+        )}
 
         {/* 2.2-A 추천을 불러오지 못한 경우. 후보가 아직 없으면 준비 중으로 안내한다 */}
         <StatusView
@@ -359,7 +380,11 @@ function RecommendationsContent({ desktop }: { desktop: boolean }) {
   if (items && items.length === 0) {
     return (
       <>
-        <ScreenHeader title={<VisuallyHidden>오늘의 추천</VisuallyHidden>} />
+        {desktop ? (
+          <div className={styles.desktopStatusHead}>{desktopHeader()}</div>
+        ) : (
+          <ScreenHeader title={<VisuallyHidden>나를 위한 영화 추천</VisuallyHidden>} />
+        )}
 
         <StatusView
           variant="empty"
@@ -395,7 +420,7 @@ function RecommendationsContent({ desktop }: { desktop: boolean }) {
        */}
       {desktop ? null : (
         <h1>
-          <VisuallyHidden>오늘의 추천</VisuallyHidden>
+          <VisuallyHidden>나를 위한 영화 추천</VisuallyHidden>
         </h1>
       )}
 
@@ -412,22 +437,7 @@ function RecommendationsContent({ desktop }: { desktop: boolean }) {
       >
         {desktop ? (
           <>
-            <header className={styles.desktopHead}>
-              <div className={styles.desktopHeading}>
-                <p className={styles.eyebrow}>TODAY&rsquo;S RECOMMENDATION</p>
-                <h1 className={styles.desktopTitle}>오늘의 추천</h1>
-                <p className={styles.desktopSubtitle}>
-                  지금, 당신의 취향에 딱 맞는 영화를 골랐어요
-                </p>
-              </div>
-
-              {generatedAt ? (
-                <p className={styles.date}>
-                  <span className={styles.dateValue}>{formatMonthDayWeekday(generatedAt)}</span>
-                  <span className={styles.dateNote}>오늘도 좋은 영화와 함께해요</span>
-                </p>
-              ) : null}
-            </header>
+            {desktopHeader(true)}
 
             <div className={styles.groups}>
               {/*
@@ -435,6 +445,7 @@ function RecommendationsContent({ desktop }: { desktop: boolean }) {
                * 그 문장은 카드 안에 이미 있고 카드가 바뀌면 묶음 이름 아래 설명까지 흔들린다.
                */}
               <RecommendationGroup
+                icon={<TasteMatchIcon />}
                 title="취향 맞춤 추천"
                 description="좋아한 영화와 가장 가까운 편이에요"
                 items={desktopTasteItems}
@@ -444,6 +455,7 @@ function RecommendationsContent({ desktop }: { desktop: boolean }) {
               />
 
               <RecommendationGroup
+                icon={<TasteDiscoveryIcon />}
                 title="취향 발견 추천"
                 description="기존 취향과 연결되는 새로운 맛이에요"
                 items={desktopDiscoveryItems}
@@ -452,7 +464,7 @@ function RecommendationsContent({ desktop }: { desktop: boolean }) {
                 onDismiss={handleDismiss}
               />
             </div>
-            {items ? (
+            {items && !asideSlot ? (
               <RecommendationFeedback key={feedbackStorageKey} storageKey={feedbackStorageKey} />
             ) : null}
           </>
@@ -539,6 +551,13 @@ function RecommendationsContent({ desktop }: { desktop: boolean }) {
       {desktop ? (
         <DesktopAside>
           <RecommendationsAside items={items ?? []} />
+          {items ? (
+            <RecommendationFeedback
+              key={feedbackStorageKey}
+              storageKey={feedbackStorageKey}
+              aside
+            />
+          ) : null}
         </DesktopAside>
       ) : null}
       {guideActive && items && items.length > 0 ? (

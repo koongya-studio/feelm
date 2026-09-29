@@ -38,7 +38,7 @@ export function captureReportImage(node: HTMLElement): Promise<Blob> {
     });
   }
   return withTimeout(
-    captureReadyReportImage(node, () => REPORT_IMAGE_HEIGHT),
+    captureReadyReportImage(node, () => REPORT_IMAGE_HEIGHT, true),
     'ReportFourCut PNG capture timed out',
     CAPTURE_TIMEOUT_MS,
   );
@@ -225,6 +225,7 @@ function isIOS(): boolean {
 async function captureReadyReportImage(
   node: HTMLElement,
   canvasHeightOf: (width: number, height: number) => number,
+  frontOnly = false,
 ): Promise<Blob> {
   assertImagesAvailable(node);
   if (document.fonts) {
@@ -242,8 +243,11 @@ async function captureReadyReportImage(
     throw new Error('ReportFourCut image loading failed');
   }
 
-  const width = node.scrollWidth;
-  const height = node.scrollHeight;
+  // 앞면은 숨겨진 뒷면의 넘치는 내용 높이를 제외한다. 뒷면 캡처는 기존처럼
+  // scrollHeight를 사용해 긴 설명까지 포함한다.
+  const { width, height } = frontOnly
+    ? node.getBoundingClientRect()
+    : { width: node.scrollWidth, height: node.scrollHeight };
   if (width <= 0 || height <= 0) throw new Error('ReportFourCut is not laid out');
 
   // html-to-image는 복제한 <img>를 다시 fetch한다. 그 요청이 실패하면 빈 사진으로

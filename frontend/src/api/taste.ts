@@ -84,10 +84,10 @@ export async function getPopcornBucket(): Promise<PopcornBucket> {
  *
  * 최신순이고 한 장은 서버 기본값(20개)이다. 첫 장은 커서 없이, 다음 장은 직전 응답의
  * `nextCursor`로 부른다. 3.1이 필름을 끝까지 넘기면 다음 장을 이어 받는다(업무 -656).
- * 계약의 `flavorCode` · `size`는 쓰는 화면이 생기면 추가한다.
+ * `flavorCode`는 3.2 팝콘 상세에서 선택한 맛의 영화를 조회할 때 사용한다.
  */
-export async function getMyFrames(cursor?: string): Promise<FrameList> {
-  return request<FrameList>('/users/me/frames', { query: { cursor } });
+export async function getMyFrames(cursor?: string, flavorCode?: string): Promise<FrameList> {
+  return request<FrameList>('/users/me/frames', { query: { cursor, flavorCode } });
 }
 
 /**

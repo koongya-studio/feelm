@@ -29,13 +29,6 @@
 }
 
 /* 자간 넓은 소제목. 제목 위에 얹어 층을 만든다 */
-.eyebrow {
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-  letter-spacing: var(--letter-spacing-wide);
-  color: var(--color-ink-hint);
-}
-
 .title {
   font-size: var(--font-size-title);
   line-height: var(--line-height-title);
@@ -436,6 +429,20 @@
   display: flex;
   align-items: flex-end;
   gap: var(--space-6);
+}
+
+.page[data-desktop] {
+  padding-top: 24px;
+}
+
+.page[data-desktop] .head {
+  padding-inline: 20px;
+}
+
+.page[data-desktop] .title {
+  font-size: 34px;
+  line-height: 1.15;
+  font-weight: 700;
 }
 
 .desktopRate {

@@ -12,9 +12,11 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @RestController
@@ -22,6 +24,11 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @Tag(name = "Notifications", description = "인앱 알림")
 public class NotificationStreamController {
     private final NotificationStreamService streams;
+
+    @ExceptionHandler(AsyncRequestTimeoutException.class)
+    void handleStreamTimeout() {
+        // The five-minute SSE lifetime ended; the client reconnects and reloads the REST state.
+    }
 
     @Operation(
             summary = "인앱 알림 변경 스트림",

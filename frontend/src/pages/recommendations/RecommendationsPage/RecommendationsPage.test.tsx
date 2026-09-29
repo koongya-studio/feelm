@@ -206,7 +206,7 @@ describe('2.2 오늘의 추천', () => {
     );
     expect(screen.getByText('카드를 탭하면 영화 상세 화면으로 이동해요')).toBeInTheDocument();
     const lastCard = screen.getByRole('link', { name: '세븐 상세 보기' });
-    const feedback = screen.getByRole('region', { name: '오늘의 추천 의견' });
+    const feedback = screen.getByRole('region', { name: '나를 위한 영화 추천 의견' });
     expect(lastCard.compareDocumentPosition(feedback)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
@@ -216,7 +216,7 @@ describe('2.2 오늘의 추천', () => {
 
     expect(await screen.findByText('추천할 영화를 아직 찾지 못했어요')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /상세 보기/ })).toBeNull();
-    expect(screen.queryByRole('region', { name: '오늘의 추천 의견' })).toBeNull();
+    expect(screen.queryByRole('region', { name: '나를 위한 영화 추천 의견' })).toBeNull();
   });
 });
 
