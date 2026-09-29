@@ -393,16 +393,26 @@ export default function FilmPage() {
       <>
         <AppHeader />
 
-        <StatusView title="취향 필름을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
-          <Button
-            onClick={() => {
-              setFailed(false);
-              setReloadCount((count) => count + 1);
-            }}
+        <div className={styles.page}>
+          <header className={styles.head}>
+            <h1 className={styles.title}>나의 취향 필름</h1>
+            <p className={styles.subtitle}>본 영화를 한 장씩 담아봐요</p>
+          </header>
+
+          <StatusView
+            title="취향 필름을 불러오지 못했어요"
+            description="잠시 후 다시 시도해 주세요"
           >
-            다시 시도
-          </Button>
-        </StatusView>
+            <Button
+              onClick={() => {
+                setFailed(false);
+                setReloadCount((count) => count + 1);
+              }}
+            >
+              다시 시도
+            </Button>
+          </StatusView>
+        </div>
       </>
     );
   }
@@ -533,7 +543,6 @@ export default function FilmPage() {
           </header>
         ) : (
           <header className={styles.head}>
-            <p className={styles.eyebrow}>YOUR TASTE ON FILM</p>
             <h1 className={styles.title}>나의 취향 필름</h1>
 
             {frames ? (
