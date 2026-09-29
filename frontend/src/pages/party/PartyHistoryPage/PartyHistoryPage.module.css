@@ -6,8 +6,7 @@
  */
 .page {
   display: flex;
-  min-height: 0;
-  flex: 1;
+  flex: 1 0 auto;
   flex-direction: column;
   padding: var(--space-4) var(--screen-padding-x) var(--space-8);
   gap: var(--space-6);
