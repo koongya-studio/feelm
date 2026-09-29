@@ -32,6 +32,7 @@ import { partyStatusLabel } from '../../../../utils/party';
 import styles from './PartyDesktop.module.css';
 import type { Party, PartyInvitation, PartyPopcorn } from '../../../../types/party';
 import type { FlavorCount } from '../../../../components/PopcornBucket/kernels';
+import type { ReactNode } from 'react';
 
 /** 고른 파티 카드 안의 통. 카드 아래를 채우는 그림이다 */
 const CARD_BUCKET_WIDTH = 124;
@@ -62,6 +63,7 @@ type Props = {
   /** 끝난 파티(API-050 `status=CLOSED`). 추천 이력(5.10)으로만 들어간다(업무 -826) */
   closedParties: Party[];
   onOpenHistory: (partyId: number) => void;
+  error?: ReactNode;
 };
 
 export default function PartyDesktop({
@@ -80,12 +82,12 @@ export default function PartyDesktop({
   onCreateParty,
   closedParties,
   onOpenHistory,
+  error,
 }: Props) {
   return (
     <div className={styles.page}>
       <header className={styles.head}>
         <div className={styles.heading}>
-          <p className={styles.eyebrow}>PARTY POPCORN</p>
           <h1 className={styles.title}>파티팝콘</h1>
           <p className={styles.subtitle}>같이 볼 영화, 함께 골라요</p>
         </div>
@@ -98,6 +100,8 @@ export default function PartyDesktop({
           </Button>
         </div>
       </header>
+
+      {error}
 
       {invitations.length > 0 ? (
         <section

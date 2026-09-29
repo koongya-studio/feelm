@@ -84,7 +84,7 @@ export default function TodayRecommendations() {
   return (
     <section className={styles.section}>
       <div className={styles.head}>
-        <h2 className={styles.title}>오늘의 추천</h2>
+        <h2 className={styles.title}>나를 위한 영화 추천</h2>
 
         {/*
          * 2.2로 가는 상시 진입점. 모바일에서 `필름 늘리기` 버튼이 하던 일이며, 넓은 화면에서는
@@ -112,6 +112,7 @@ export default function TodayRecommendations() {
               reason={item.reason.summary}
               detailButton
               recommendationItemId={item.recommendationItemId}
+              ottLinks
             />
           </li>
         ))}

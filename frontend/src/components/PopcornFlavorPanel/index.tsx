@@ -44,7 +44,9 @@ export default function PopcornFlavorPanel({ title, bucket, to, linkLabel }: Pro
             <th scope="col" className={styles.flavorNameHead}>
               맛
             </th>
-            <th scope="col">감상량</th>
+            <th scope="col" className={styles.flavorShareHead}>
+              감상량
+            </th>
             <th scope="col">선호도</th>
           </tr>
         </thead>
@@ -53,8 +55,10 @@ export default function PopcornFlavorPanel({ title, bucket, to, linkLabel }: Pro
           {flavors.map((flavor) => (
             <tr key={flavor.flavorCode}>
               <th scope="row" className={styles.flavorName}>
-                <img className={styles.kernel} src={kernelSprite(flavor.flavorCode)} alt="" />
-                {flavor.displayName}
+                <span className={styles.flavorNameContent}>
+                  <img className={styles.kernel} src={kernelSprite(flavor.flavorCode)} alt="" />
+                  {flavor.displayName}
+                </span>
               </th>
 
               <td className={styles.flavorShare}>

@@ -672,7 +672,13 @@ export default function MyDashboardPage() {
     return (
       <>
         <AppHeader />
-        <ScreenHeader title="프로필" flush />
+        {desktop ? (
+          <header className={styles.desktopStatusHead}>
+            <h1 className={styles.desktopTitle}>프로필</h1>
+          </header>
+        ) : (
+          <ScreenHeader title="프로필" flush />
+        )}
 
         <StatusView title="프로필을 불러오지 못했어요" description="잠시 후 다시 시도해 주세요">
           <Button

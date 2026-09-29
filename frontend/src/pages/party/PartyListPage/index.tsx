@@ -447,20 +447,19 @@ export default function PartyListPage() {
 
     return (
       <>
-        {failed ? (
-          <div className={styles.desktopStatus}>
-            <StatusView
-              title="파티 목록을 불러오지 못했어요"
-              description="잠시 후 다시 시도해 주세요."
-            >
-              <Button variant="text" onClick={() => setReloadCount((count) => count + 1)}>
-                다시 시도
-              </Button>
-            </StatusView>
-          </div>
-        ) : null}
-
         <PartyDesktop
+          error={
+            failed ? (
+              <StatusView
+                title="파티 목록을 불러오지 못했어요"
+                description="잠시 후 다시 시도해 주세요."
+              >
+                <Button variant="text" onClick={() => setReloadCount((count) => count + 1)}>
+                  다시 시도
+                </Button>
+              </StatusView>
+            ) : undefined
+          }
           parties={parties ?? []}
           loaded={parties !== null}
           invitations={invitations ?? []}
