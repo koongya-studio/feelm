@@ -22,12 +22,14 @@ function alreadySent(storageKey: string) {
 export default function RecommendationFeedback({
   storageKey,
   partyId,
+  aside = false,
 }: {
   storageKey: string;
   partyId?: number;
+  aside?: boolean;
 }) {
   const party = partyId !== undefined;
-  const subject = party ? '이번 파티 추천' : '오늘의 추천';
+  const subject = party ? '이번 파티 추천' : '나를 위한 영화 추천';
   const [sent, setSent] = useState(() => alreadySent(storageKey));
   const [expanded, setExpanded] = useState(false);
   const [satisfaction, setSatisfaction] = useState<FeedbackInput['satisfaction']>(null);
@@ -63,7 +65,7 @@ export default function RecommendationFeedback({
 
   return (
     <section
-      className={`${styles.card} ${party ? styles.embedded : ''}`}
+      className={`${styles.card} ${party ? styles.embedded : ''} ${aside ? styles.aside : ''}`}
       aria-label={`${subject} 의견`}
     >
       {sent ? (

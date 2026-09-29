@@ -15,6 +15,26 @@
   margin: var(--space-3) auto var(--space-6);
 }
 
+.aside {
+  width: 100%;
+  margin: 0;
+  padding: var(--space-4);
+}
+
+.aside .choices {
+  gap: var(--space-1);
+}
+
+.aside .choice {
+  min-height: 80px;
+  padding: var(--space-2) var(--space-1);
+  font-size: var(--font-size-caption);
+}
+
+.aside .choice svg {
+  font-size: 24px;
+}
+
 .eyebrow {
   padding-left: var(--space-3);
   border-left: 2px solid var(--color-line-strong);

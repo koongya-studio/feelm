@@ -182,7 +182,11 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  padding: var(--space-6) var(--screen-padding-x) var(--space-10);
+  padding: 24px 20px var(--space-10);
+}
+
+.desktopStatusHead {
+  padding: 24px 20px 0;
 }
 
 .desktopHead {
@@ -208,9 +212,9 @@
 
 .desktopTitle {
   color: var(--color-ink);
-  font-size: var(--font-size-title);
-  font-weight: var(--font-weight-bold);
-  line-height: var(--line-height-title);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1.15;
   letter-spacing: var(--letter-spacing-title);
 }
 

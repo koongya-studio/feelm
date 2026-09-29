@@ -313,7 +313,7 @@ describe('RecommendationsPage 데스크톱 시안', () => {
 
     // 첫 조회 중 로딩 안내가 표시되므로 추천 응답의 날짜가 도착한 뒤 완료 화면을 확인한다.
     expect(await screen.findByText('9월 16일 (수)')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: '오늘의 추천' })).toBeVisible();
+    expect(screen.getByRole('heading', { level: 1, name: '나를 위한 영화 추천' })).toBeVisible();
   });
 
   it('우측 보조 패널에 추천 기준과 최근 본 영화를 보낸다', async () => {
@@ -328,6 +328,17 @@ describe('RecommendationsPage 데스크톱 시안', () => {
     expect(await within(aside).findByText('조커')).toBeInTheDocument();
     // 시안의 시청 시간과 진행 막대는 없는 데이터다(사용자 결정 2026-09-22)
     expect(within(aside).getByText('9월 15일 감상')).toBeInTheDocument();
+    expect(
+      within(aside).getByRole('region', { name: '나를 위한 영화 추천 의견' }),
+    ).toBeInTheDocument();
+  });
+
+  it('우측 패널이 없는 데스크톱 폭에서는 의견 카드를 본문에 둔다', async () => {
+    renderRecommendations(1100);
+
+    const feedback = await screen.findByRole('region', { name: '나를 위한 영화 추천 의견' });
+    expect(screen.getByRole('main')).toContainElement(feedback);
+    expect(screen.queryByRole('complementary', { name: '보조 정보' })).toBeNull();
   });
 
   it('탭으로 누르라는 안내를 넓은 화면에서 뺀다', async () => {
@@ -364,11 +375,9 @@ describe('RecommendationsPage 데스크톱 시안', () => {
     expect(compactDismiss).not.toHaveAttribute('data-size');
     expect(leadDismiss.className).toBe(compactDismiss.className);
     expect(
-      within(lead)
-        .getByRole('link', { name: 'NETFLIX에서 파이트 클럽 보기 (새 창)' })
-        .closest('ul')
-        ?.parentElement?.querySelector('h3'),
-    ).not.toBeNull();
+      within(lead).getByRole('link', { name: 'NETFLIX에서 파이트 클럽 보기 (새 창)' }).closest('ul')
+        ?.previousElementSibling,
+    ).toHaveTextContent('스릴러를 높게 평가하셨어요');
     expect(within(lead).queryByRole('button', { name: '파이트 클럽 OTT 메뉴' })).toBeNull();
     expect(within(compact).queryByRole('button', { name: '조디악 OTT 메뉴' })).toBeNull();
     expect(within(taste).queryByRole('button', { name: /OTT 메뉴/ })).toBeNull();

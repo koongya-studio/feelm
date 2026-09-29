@@ -95,7 +95,7 @@ export default function FeedbackPage() {
             <div className={styles.sheet}>
               <fieldset className={styles.choices}>
                 <legend>
-                  {recommendation ? '오늘의 추천은 어땠나요?' : 'Feelm은 어땠나요?'}
+                  {recommendation ? '나를 위한 영화 추천은 어땠나요?' : 'Feelm은 어땠나요?'}
                   <span className={styles.optional}>선택</span>
                 </legend>
                 <div className={styles.choiceGrid}>

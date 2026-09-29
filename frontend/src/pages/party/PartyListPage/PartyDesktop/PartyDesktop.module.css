@@ -14,7 +14,7 @@
   flex: 1;
   flex-direction: column;
   gap: var(--space-6);
-  padding: var(--space-6) var(--space-4) var(--space-8);
+  padding: 24px 20px var(--space-8);
 }
 
 /* ─────────────────────────── 제목 줄 */
@@ -35,18 +35,9 @@
 }
 
 /* `PARTY POPCORN`. 2.2 데스크톱 시안과 같은 눈썹 줄이다(업무 -783) */
-.eyebrow {
-  margin: 0;
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: 0.12em;
-  color: var(--color-ink-muted);
-}
-
 .title {
   margin: 0;
-  font-size: 40px;
+  font-size: 34px;
   line-height: 1.15;
   letter-spacing: var(--letter-spacing-title);
   font-weight: 700;
@@ -58,8 +49,8 @@
   font-size: var(--font-size-body);
   line-height: var(--line-height-body);
   letter-spacing: var(--letter-spacing-body);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-ink-body);
+  font-weight: var(--font-weight-regular);
+  color: var(--color-ink-muted);
 }
 
 /* 제목 오른쪽의 만들기 버튼. 중앙 단이 좁으면 `.head`가 줄을 바꾼다. */

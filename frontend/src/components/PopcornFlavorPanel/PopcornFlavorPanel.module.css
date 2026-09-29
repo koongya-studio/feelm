@@ -41,13 +41,20 @@
   white-space: nowrap;
 }
 
-.flavorName {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
+.flavorTable .flavorShareHead {
+  padding-right: var(--space-4);
+}
+
+.flavorTable .flavorName {
   color: var(--color-on-action);
   font-size: var(--font-size-meta);
   text-align: left;
+}
+
+.flavorNameContent {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 /* 팝콘 알 그림. 색 점으로는 밝은 면에서 4종이 구분되지 않아 스프라이트를 쓴다 */

@@ -195,6 +195,11 @@
 /* ul의 기본 들여쓰기가 로고 시작점을 밀지 않게 왼쪽 여백을 명시적으로 없앤다(업무 -889). */
 .ottList {
   padding-left: 0;
+  flex-wrap: wrap;
+}
+
+.ottList > li {
+  flex: none;
 }
 
 .ottLink {
