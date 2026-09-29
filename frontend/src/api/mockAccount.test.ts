@@ -5,7 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { login, logout, restoreSession } from './auth';
 import { MOCK_ACCOUNT, isMockSession } from './mockAccount';
 import { getAccessToken, resetSessionForTest } from './session';
-import { getMyProfile, updateMyProfile } from './users';
+import { getMyProfile, getMyProfileView, updateMyProfile } from './users';
+import { getMyRatings } from './watch';
 
 const fetchMock = vi.fn();
 
@@ -38,6 +39,24 @@ describe('목업 계정', () => {
     await logout();
     expect(isMockSession()).toBe(false);
     expect(getAccessToken()).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('백엔드 없이 MY 프로필과 정렬된 평가 목록을 보여준다', async () => {
+    await login(MOCK_ACCOUNT.email, MOCK_ACCOUNT.password);
+
+    const profile = await getMyProfileView();
+    expect(profile.nickname).toBe('김난다');
+    expect(profile.frames).toHaveLength(3);
+
+    const latest = await getMyRatings();
+    const highest = await getMyRatings({ sort: 'SCORE_DESC' });
+    const allWatched = await getMyRatings({ filter: 'ALL' });
+    const unratedOnly = await getMyRatings({ filter: 'UNRATED' });
+    expect(latest.items.map((item) => item.movie.movieId)).toEqual([401, 402, 403]);
+    expect(highest.items.map((item) => item.movie.movieId)).toEqual([403, 401, 402]);
+    expect(allWatched.items.map((item) => item.movie.movieId)).toEqual([101, 401, 402, 403]);
+    expect(unratedOnly.items.map((item) => item.movie.movieId)).toEqual([101]);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

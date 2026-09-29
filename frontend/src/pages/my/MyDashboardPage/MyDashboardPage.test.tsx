@@ -433,7 +433,8 @@ describe('7.1 MY 대시보드', () => {
 
     await renderDashboard();
     fireEvent.click(screen.getByRole('tab', { name: '최근 본 영화' }));
-    await within(feed()).findByRole('link', { name: /최근 본 영화 A/ });
+    const first = await within(feed()).findByRole('link', { name: /최근 본 영화 A/ });
+    expect(first.querySelector('[data-placeholder="true"]')).toHaveTextContent('최근 본 영화 A');
 
     fireEvent.click(within(feed()).getByRole('button', { name: '더 보기' }));
 
@@ -469,19 +470,22 @@ describe('7.1 MY 대시보드', () => {
     fireEvent.click(screen.getByRole('tab', { name: '최근 본 영화' }));
     await within(feed()).findByRole('link', { name: /최근 본 영화 A/ });
 
-    const toggle = screen.getByRole('button', { name: '평가 안 한 영화' });
-    expect(toggle).toHaveAttribute('aria-pressed', 'false');
-
-    fireEvent.click(toggle);
+    const trigger = screen.getByRole('button', { name: '평가 전만 보기' });
+    expect(trigger).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(trigger);
 
     expect(await within(feed()).findByRole('link', { name: /평가 전 영화/ })).toBeInTheDocument();
     expect(within(feed()).queryByRole('link', { name: /최근 본 영화 A/ })).toBeNull();
-    expect(screen.getByRole('button', { name: '평가 안 한 영화' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    expect(trigger).toHaveTextContent('평가 전만 보기');
+    expect(trigger).toHaveAttribute('aria-pressed', 'true');
     // 커서 없이 첫 장부터 받는다
     expect(getMyRatings).toHaveBeenLastCalledWith({ filter: 'UNRATED', size: 18 });
+
+    fireEvent.click(trigger);
+    expect(await within(feed()).findByRole('link', { name: /최근 본 영화 A/ })).toBeInTheDocument();
+    expect(trigger).toHaveTextContent('평가 전만 보기');
+    expect(trigger).toHaveAttribute('aria-pressed', 'false');
+    expect(getMyRatings).toHaveBeenLastCalledWith({ filter: 'ALL', size: 18 });
   });
 
   it('목록이 비어도 거르개는 빈 문구보다 위에 남는다', async () => {
@@ -497,20 +501,20 @@ describe('7.1 MY 대시보드', () => {
     fireEvent.click(screen.getByRole('tab', { name: '최근 본 영화' }));
 
     const empty = await within(feed()).findByText('아직 본 영화가 없어요');
-    const toggle = screen.getByRole('button', { name: '평가 안 한 영화' });
+    const filter = screen.getByRole('button', { name: '평가 전만 보기' });
 
-    expect(toggle).toBeInTheDocument();
+    expect(filter).toHaveAttribute('aria-pressed', 'false');
     // 문구보다 앞에 선다
-    expect(toggle.compareDocumentPosition(empty)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(filter.compareDocumentPosition(empty)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('거르개는 최근 본 영화 탭에서만 보인다', async () => {
     await renderDashboard();
 
-    expect(screen.queryByRole('button', { name: '평가 안 한 영화' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '평가 전만 보기' })).toBeNull();
 
     fireEvent.click(screen.getByRole('tab', { name: '최근 본 영화' }));
-    expect(screen.getByRole('button', { name: '평가 안 한 영화' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '평가 전만 보기' })).toBeInTheDocument();
   });
 
   it('평가한 영화는 API-039 내 평가 목록으로 그린다', async () => {
@@ -864,7 +868,7 @@ it.each(['success', 'failure'] as const)(
     fireEvent.click(screen.getByRole('tab', { name: '최근 본 영화' }));
     await within(feed()).findByRole('link', { name: /최근 본 영화 A/ });
     fireEvent.click(within(feed()).getByRole('button', { name: '더 보기' }));
-    fireEvent.click(screen.getByRole('button', { name: '평가 안 한 영화' }));
+    fireEvent.click(screen.getByRole('button', { name: '평가 전만 보기' }));
     expect(within(feed()).queryByRole('button', { name: '더 보기' })).toBeNull();
     expect(within(feed()).queryByRole('link', { name: /최근 본 영화 A/ })).toBeNull();
     await act(async () => resolveFiltered(watchedPage([filtered], 'unrated-next')));
@@ -888,6 +892,29 @@ it.each(['success', 'failure'] as const)(
 );
 
 describe('MY 평가 정렬', () => {
+  function chooseSort(label: string) {
+    fireEvent.click(screen.getByRole('button', { name: '정렬' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: label }));
+  }
+
+  it('열린 정렬 메뉴에 선택 상태를 표시하고 Esc와 바깥 클릭으로 닫는다', async () => {
+    await renderDashboard();
+    const trigger = screen.getByRole('button', { name: '정렬' });
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('menuitemradio', { name: '최근 평가순' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    fireEvent.keyDown(screen.getByRole('menu', { name: '정렬 기준' }), { key: 'Escape' });
+    expect(screen.queryByRole('menu', { name: '정렬 기준' })).toBeNull();
+    expect(trigger).toHaveFocus();
+
+    fireEvent.click(trigger);
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole('menu', { name: '정렬 기준' })).toBeNull();
+  });
+
   it('네 가지 정렬을 첫 장부터 조회하고 다른 피드는 다시 받지 않는다', async () => {
     await renderDashboard();
     await within(feed()).findByRole('link', { name: /평가한 영화 A/ });
@@ -896,7 +923,16 @@ describe('MY 평가 정렬', () => {
       .mocked(getMyRatings)
       .mock.calls.filter(([q]) => q?.filter === 'ALL').length;
     for (const sort of ['SCORE_DESC', 'SCORE_ASC', 'OLDEST', 'LATEST']) {
-      fireEvent.change(screen.getByRole('combobox', { name: '정렬' }), { target: { value: sort } });
+      chooseSort(
+        (
+          {
+            SCORE_DESC: '별점 높은 순',
+            SCORE_ASC: '별점 낮은 순',
+            OLDEST: '오래된 평가순',
+            LATEST: '최근 평가순',
+          } as Record<string, string>
+        )[sort],
+      );
       await within(feed()).findByRole('link', { name: /평가한 영화 A/ });
       expect(getMyRatings).toHaveBeenLastCalledWith({
         size: 18,
@@ -919,9 +955,7 @@ describe('MY 평가 정렬', () => {
     );
     await renderDashboard();
     await within(feed()).findByRole('link', { name: /평가한 영화 A/ });
-    fireEvent.change(screen.getByRole('combobox', { name: '정렬' }), {
-      target: { value: 'SCORE_DESC' },
-    });
+    chooseSort('별점 높은 순');
     await within(feed()).findByRole('link', { name: /평가한 영화 A/ });
     fireEvent.click(within(feed()).getByRole('button', { name: '더 보기' }));
     expect(getMyRatings).toHaveBeenLastCalledWith({
@@ -943,9 +977,7 @@ describe('MY 평가 정렬', () => {
       return query.sort ? Promise.resolve(ratingPage([fresh])) : old;
     });
     await renderDashboard();
-    fireEvent.change(screen.getByRole('combobox', { name: '정렬' }), {
-      target: { value: 'SCORE_DESC' },
-    });
+    chooseSort('별점 높은 순');
     await within(feed()).findByRole('link', { name: /새 정렬 영화/ });
     await act(async () => resolveOld(ratingPage(ratings, 'old-next')));
     expect(within(feed()).queryByRole('link', { name: /평가한 영화 A/ })).toBeNull();
@@ -973,9 +1005,7 @@ describe('MY 평가 정렬', () => {
       await renderDashboard();
       await within(feed()).findByRole('link', { name: /평가한 영화 A/ });
       fireEvent.click(within(feed()).getByRole('button', { name: '더 보기' }));
-      fireEvent.change(screen.getByRole('combobox', { name: '정렬' }), {
-        target: { value: 'SCORE_ASC' },
-      });
+      chooseSort('별점 낮은 순');
       await within(feed()).findByRole('link', { name: /새 정렬 영화/ });
       await act(async () => {
         if (result === 'resolve') resolveOld(ratingPage([rated(97, 407, '이전 다음 장', 1)]));

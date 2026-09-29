@@ -92,7 +92,12 @@ import ScreenHeader from '../../../components/ScreenHeader';
 import Snackbar from '../../../components/Snackbar';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
-import { ChevronRightIcon, SettingsIcon } from '../../../components/Icon';
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  SettingsIcon,
+} from '../../../components/Icon';
 import MyAside from './MyAside';
 import ServiceFeedbackPrompt from './ServiceFeedbackPrompt';
 import MyGuide from './MyGuide';
@@ -367,6 +372,123 @@ const MORE_ERROR: Record<TabKey, string> = {
   recommendations: '지난 추천을 불러오지 못했어요.',
   dismissals: '지난 관심 없음 목록을 불러오지 못했어요.',
 };
+
+const RATING_SORT_OPTIONS: { value: MyRatingSort; label: string }[] = [
+  { value: 'LATEST', label: '최근 평가순' },
+  { value: 'SCORE_DESC', label: '별점 높은 순' },
+  { value: 'SCORE_ASC', label: '별점 낮은 순' },
+  { value: 'OLDEST', label: '오래된 평가순' },
+];
+
+function FeedChoicePicker<T extends string>({
+  value,
+  options,
+  label,
+  menuLabel,
+  menuId,
+  onChange,
+}: {
+  value: T;
+  options: { value: T; label: string }[];
+  label: string;
+  menuLabel: string;
+  menuId: string;
+  onChange: (choice: T) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const selectedIndex = options.findIndex((option) => option.value === value);
+
+  useEffect(() => {
+    if (!open) return;
+    rootRef.current
+      ?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]')
+      [selectedIndex]?.focus();
+
+    function closeOutside(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener('pointerdown', closeOutside);
+    return () => document.removeEventListener('pointerdown', closeOutside);
+  }, [open, selectedIndex]);
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'Escape' && open) {
+      event.preventDefault();
+      setOpen(false);
+      triggerRef.current?.focus();
+      return;
+    }
+    if (!open || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const options = Array.from(
+      rootRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitemradio"]') ?? [],
+    );
+    const current = options.indexOf(document.activeElement as HTMLButtonElement);
+    const next =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? options.length - 1
+          : event.key === 'ArrowDown'
+            ? (current + 1) % options.length
+            : (current - 1 + options.length) % options.length;
+    options[next]?.focus();
+  }
+
+  return (
+    <div
+      ref={rootRef}
+      className={styles.feedChoiceControl}
+      onKeyDown={handleKeyDown}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+      }}
+    >
+      <button
+        ref={triggerRef}
+        type="button"
+        className={styles.feedChoice}
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        onClick={() => setOpen((current) => !current)}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            setOpen(true);
+          }
+        }}
+      >
+        {options[selectedIndex].label}
+        <ChevronDownIcon />
+      </button>
+      {open ? (
+        <div id={menuId} className={styles.feedChoiceMenu} role="menu" aria-label={menuLabel}>
+          {options.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="menuitemradio"
+              aria-checked={option.value === value}
+              className={styles.feedChoiceOption}
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+                triggerRef.current?.focus();
+              }}
+            >
+              {option.label}
+              {option.value === value ? <CheckIcon /> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 export default function MyDashboardPage() {
   /*
@@ -708,12 +830,13 @@ export default function MyDashboardPage() {
     setRatingSort(sort);
   }
 
-  function toggleUnratedOnly() {
+  function changeUnratedOnly(next: boolean) {
+    if (next === unratedOnly) return;
     watchedRequest.current?.abort();
     setUnrated({ status: 'loading' });
     setCursors((prev) => ({ ...prev, unrated: null }));
     setMore((prev) => ({ ...prev, unrated: 'idle' }));
-    setUnratedOnly((on) => !on);
+    setUnratedOnly(next);
   }
 
   function retryFeeds() {
@@ -883,7 +1006,7 @@ export default function MyDashboardPage() {
          * 읽는 중 · 실패 · 빈 목록에도 그린다. 목록이 비었을 때 사라지면 왜 비었는지(거르개를
          * 켜 둔 탓인지) 알 길이 없고, 끌 수도 없어 갇힌다.
          *
-         * **켜고 끄면 이 목록만 첫 장부터 다시 받는다** — 커서가 조회 조건에 묶여 있어(API-039)
+         * **선택을 바꾸면 이 목록만 첫 장부터 다시 받는다** — 커서가 조회 조건에 묶여 있어(API-039)
          * 조건이 바뀐 커서는 `400`이다. 다른 두 탭은 건드리지 않고, 주소도 바꾸지 않아 보던
          * 자리에 그대로 있는다.
          */}
@@ -892,20 +1015,14 @@ export default function MyDashboardPage() {
         )}
         {tab === 'ratings' && (
           <div className={styles.ratingToolbar}>
-            <label className={styles.ratingSortLabel} htmlFor="my-rating-sort">
-              정렬
-            </label>
-            <select
-              id="my-rating-sort"
-              className={styles.ratingSort}
+            <FeedChoicePicker
               value={ratingSort}
-              onChange={(event) => changeRatingSort(event.target.value as MyRatingSort)}
-            >
-              <option value="LATEST">최근 평가순</option>
-              <option value="SCORE_DESC">별점 높은 순</option>
-              <option value="SCORE_ASC">별점 낮은 순</option>
-              <option value="OLDEST">오래된 평가순</option>
-            </select>
+              options={RATING_SORT_OPTIONS}
+              label="정렬"
+              menuLabel="정렬 기준"
+              menuId="my-rating-sort-options"
+              onChange={changeRatingSort}
+            />
           </div>
         )}
 
@@ -914,11 +1031,10 @@ export default function MyDashboardPage() {
             <button
               type="button"
               className={styles.feedFilterButton}
-              data-on={unratedOnly}
               aria-pressed={unratedOnly}
-              onClick={toggleUnratedOnly}
+              onClick={() => changeUnratedOnly(!unratedOnly)}
             >
-              평가 안 한 영화
+              평가 전만 보기
             </button>
           </div>
         )}
@@ -1014,6 +1130,7 @@ export default function MyDashboardPage() {
                       src={item.movie.posterUrl ?? undefined}
                       title={item.movie.title}
                       seed={item.movie.movieId}
+                      caption={item.movie.title}
                     />
 
                     {/* 평가한 영화는 `평가한 영화` 탭과 같은 자리에 같은 배지를 얹는다 */}
@@ -1028,7 +1145,7 @@ export default function MyDashboardPage() {
                   </PosterCue>
 
                   <VisuallyHidden>
-                    {item.movie.title} {item.itemType === 'RATED' ? '평가 수정하기' : '평가하기'}
+                    {item.itemType === 'RATED' ? '평가 수정하기' : '평가하기'}
                   </VisuallyHidden>
 
                   <span className={styles.caption}>

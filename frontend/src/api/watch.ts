@@ -10,10 +10,14 @@
  * 평가한 영화도 7.1 `최근 본 영화`에 그대로 남는다(업무 -919).
  *
  * 평가 수정(API-037)은 업무 -597에서, 내 평가 목록(API-039)은 업무 -611에서 실제 호출로
- * 바꿨다. 이 파일에 목업 응답은 없다 — 남은 것은 2.6의 `이번 주 +N` 기준값 하나다
+ * 바꿨다. 개발용 목업 계정은 백엔드 없이 MY 정렬을 확인할 수 있도록 필름 기준값을 쓴다.
  * (`getRatingCounts`).
  */
 import { BASE_WEEKLY_FRAME_DELTA } from '../mocks/watch';
+import { mockFrameList } from '../mocks/frames';
+import { findMockMovie } from '../mocks/movies';
+import { isMockSession } from './mockAccount';
+import { respond } from './mockTransport';
 import { getPopcornBucket } from './taste';
 import { getMyProfile } from './users';
 import { request } from './client';
@@ -273,6 +277,53 @@ export async function deleteRating(ratingId: number): Promise<void> {
  */
 export async function getMyRatings(query: MyRatingQuery = {}): Promise<MyRatingList> {
   const { filter, sort, cursor, size } = query;
+
+  if (isMockSession()) {
+    const ratings: MyRatingList['items'] = mockFrameList.items.map((frame) => ({
+      itemType: 'RATED',
+      ratingId: frame.frameId,
+      movie: frame.movie,
+      score: frame.score,
+      comment: null,
+      visibility: 'PUBLIC',
+      spoiler: false,
+      frameId: frame.frameId,
+      createdAt: frame.createdAt,
+      activityAt: frame.createdAt,
+    }));
+    const sample = findMockMovie(101);
+    const unrated: MyRatingList['items'][number] = {
+      itemType: 'UNRATED',
+      ratingId: null,
+      movie: { movieId: sample.movieId, title: sample.title, posterUrl: sample.posterUrl },
+      score: null,
+      comment: null,
+      visibility: null,
+      spoiler: null,
+      frameId: null,
+      createdAt: null,
+      activityAt: '2026-09-07T12:00:00Z',
+    };
+    if (filter === 'UNRATED')
+      return respond({ items: [unrated], nextCursor: null, hasNext: false }, 'watch');
+    if (filter === 'COMMENTED')
+      return respond({ items: [], nextCursor: null, hasNext: false }, 'watch');
+    ratings.sort((a, b) => {
+      if (sort === 'SCORE_DESC') return (b.score ?? 0) - (a.score ?? 0);
+      if (sort === 'SCORE_ASC') return (a.score ?? 0) - (b.score ?? 0);
+      return sort === 'OLDEST'
+        ? (a.activityAt ?? '').localeCompare(b.activityAt ?? '')
+        : (b.activityAt ?? '').localeCompare(a.activityAt ?? '');
+    });
+    return respond(
+      {
+        items: filter === 'ALL' ? [unrated, ...ratings] : ratings,
+        nextCursor: null,
+        hasNext: false,
+      },
+      'watch',
+    );
+  }
 
   return request<MyRatingList>('/users/me/ratings', { query: { filter, sort, cursor, size } });
 }
