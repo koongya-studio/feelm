@@ -13,6 +13,81 @@
 
 const hidden = { 'aria-hidden': true, focusable: false } as const;
 
+/** 추천 제목 — 취향을 겨냥한 화살표 */
+export function TasteMatchIcon() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 26 26" fill="none" {...hidden}>
+      <circle cx="12" cy="14" r="8" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="12" cy="14" r="3.3" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="m10 16 11-11m-4 .2L21 5l-.2 4"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** 추천 제목 — 익숙한 취향 밖을 탐색하는 나침반 */
+export function TasteDiscoveryIcon() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 26 26" fill="none" {...hidden}>
+      <circle cx="13" cy="13" r="10" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="m17.6 8.4-2.8 6.4-6.4 2.8 2.8-6.4 6.4-2.8Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <circle cx="13" cy="13" r="1.2" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** 취향 필름 보조 카드 — 팝콘 버킷 */
+export function PopcornTitleIcon() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 26 26" fill="none" {...hidden}>
+      <path
+        d="M6 10h14l-1.4 13H7.4L6 10Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path
+        d="m10 10 .5 13m5-13-.5 13M8 10c-2.1-1.7-1.1-4.8 1.3-4.7.7-2.8 4.1-3 5.2-.5 2.7-1.2 5.1 1 5.5 1.9.1 2.7 2.6 1.5 4.7"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** 취향 필름 보조 카드 — 리포트 종이 */
+export function ReportTitleIcon() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 26 26" fill="none" {...hidden}>
+      <path
+        d="M6 2.5h10l4 4V23H6V2.5Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M16 2.5V7h4M9 11h8M9 15h8M9 19h5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 /** 하단 내비 — 검색 */
 export function SearchIcon() {
   return (

@@ -22,11 +22,20 @@
 }
 
 .title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   margin: 0;
   color: var(--color-ink);
   font-size: var(--font-size-heading);
   font-weight: var(--font-weight-bold);
   letter-spacing: var(--letter-spacing-heading);
+}
+
+.titleIcon {
+  display: inline-flex;
+  flex: none;
+  line-height: 1;
 }
 
 .description {

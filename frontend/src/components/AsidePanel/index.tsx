@@ -19,6 +19,8 @@ import styles from './AsidePanel.module.css';
 
 type Props = {
   title: string;
+  /** 제목 앞의 장식 아이콘. 접근성 이름에는 포함하지 않는다 */
+  titleIcon?: ReactNode;
   /** 제목 오른쪽 화살표가 가는 곳. 없으면 화살표를 그리지 않는다 */
   to?: string;
   /** 화살표에 읽히는 이름. `to`가 있으면 준다 */
@@ -41,6 +43,7 @@ type Props = {
 
 export default function AsidePanel({
   title,
+  titleIcon,
   to,
   linkLabel,
   mark,
@@ -52,7 +55,10 @@ export default function AsidePanel({
   return (
     <section className={styles.panel} data-tone={tone}>
       <div className={styles.head}>
-        <h2 className={styles.title}>{title}</h2>
+        <h2 className={styles.title}>
+          {titleIcon ? <span aria-hidden="true">{titleIcon}</span> : null}
+          {title}
+        </h2>
 
         {mark ? <span className={styles.mark}>{mark}</span> : null}
 

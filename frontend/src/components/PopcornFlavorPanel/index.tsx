@@ -19,17 +19,19 @@ import AsidePanel from '../AsidePanel';
 import { kernelSprite } from '../PopcornBucket/sprites';
 import styles from './PopcornFlavorPanel.module.css';
 import type { PopcornBucket } from '../../types/taste';
+import type { ReactNode } from 'react';
 
 type Props = {
   /** 카드 제목. 3.1은 `나의 취향 팝콘`, 7.1은 `팝콘 분포도`다 */
   title: string;
+  titleIcon?: ReactNode;
   bucket: PopcornBucket;
   /** 제목 오른쪽 화살표가 가는 곳 */
   to: string;
   linkLabel: string;
 };
 
-export default function PopcornFlavorPanel({ title, bucket, to, linkLabel }: Props) {
+export default function PopcornFlavorPanel({ title, titleIcon, bucket, to, linkLabel }: Props) {
   const flavors = [...bucket.flavors]
     .filter((flavor) => flavor.popcornCount > 0)
     .sort((a, b) => b.popcornCount - a.popcornCount);
@@ -37,7 +39,7 @@ export default function PopcornFlavorPanel({ title, bucket, to, linkLabel }: Pro
   if (flavors.length === 0) return null;
 
   return (
-    <AsidePanel title={title} to={to} linkLabel={linkLabel} tone="dark">
+    <AsidePanel title={title} titleIcon={titleIcon} to={to} linkLabel={linkLabel} tone="dark">
       <table className={styles.flavorTable}>
         <thead>
           <tr>

@@ -97,6 +97,8 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
   SettingsIcon,
+  PencilIcon,
+  ShareIcon,
 } from '../../../components/Icon';
 import MyAside from './MyAside';
 import ServiceFeedbackPrompt from './ServiceFeedbackPrompt';
@@ -886,6 +888,9 @@ export default function MyDashboardPage() {
         actions={
           <>
             <Link to={path.profileEdit()} className={styles.profileAction}>
+              <span className={styles.profileActionIcon}>
+                <PencilIcon />
+              </span>
               프로필 편집
             </Link>
 
@@ -894,6 +899,9 @@ export default function MyDashboardPage() {
               className={styles.profileAction}
               onClick={() => void shareProfile()}
             >
+              <span className={styles.profileActionIcon}>
+                <ShareIcon />
+              </span>
               프로필 공유
             </button>
           </>
