@@ -766,7 +766,8 @@ describe('S15P21E106-952 공개 필름 관리', () => {
     await router.navigate(-1);
     const confirmation = await screen.findByRole('alertdialog');
     expect(confirmation).toBeInTheDocument();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    // 확인 창이 뜬 뒤 편집 창이 닫히는 것은 다음 렌더에서 끝나므로 기다린다 (S15P21E106-831)
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     fireEvent.click(within(confirmation).getByRole('button', { name: '계속 편집' }));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '실제 영화 1' })).toHaveAttribute(
