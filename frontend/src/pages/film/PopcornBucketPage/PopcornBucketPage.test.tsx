@@ -8,7 +8,7 @@
  * 설명은 곁들이는 정보다. 기준정보를 받지 못해도 범례와 수치는 그대로 그려야 한다.
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import PopcornBucketPage from './index';
 import { renderWithRouter } from '../../../test/render';
 import type { PopcornBucket, PopcornBucketFlavor } from '../../../types/taste';
@@ -16,9 +16,10 @@ import type { PopcornBucket, PopcornBucketFlavor } from '../../../types/taste';
 vi.mock('../../../api/taste', () => ({
   getPopcornBucket: vi.fn(),
   getPopcornFlavors: vi.fn(),
+  getMyFrames: vi.fn(),
 }));
 
-const { getPopcornBucket, getPopcornFlavors } = await import('../../../api/taste');
+const { getMyFrames, getPopcornBucket, getPopcornFlavors } = await import('../../../api/taste');
 
 function flavor(code: string, name: string, count: number): PopcornBucketFlavor {
   return {
@@ -38,7 +39,10 @@ const bucket: PopcornBucket = {
 
 /** 범례의 한 맛 줄 */
 function legendRow(name: string) {
-  const row = screen.getByText(name).closest('li');
+  const row = screen
+    .getAllByText(name)
+    .map((text) => text.closest('li'))
+    .find(Boolean);
 
   if (!row) throw new Error(`${name} 범례 줄이 없다`);
 
@@ -66,6 +70,92 @@ const flavors = [
 beforeEach(() => {
   vi.mocked(getPopcornBucket).mockReset().mockResolvedValue(bucket);
   vi.mocked(getPopcornFlavors).mockReset().mockResolvedValue(flavors);
+  vi.mocked(getMyFrames).mockReset().mockResolvedValue({
+    totalCount: 0,
+    items: [],
+    nextCursor: null,
+    hasNext: false,
+  });
+});
+
+describe('3.2 팝콘맛 영화', () => {
+  it('맛을 누르면 그 맛의 영화만 가져오고 영화 상세로 이동한다', async () => {
+    vi.mocked(getMyFrames).mockResolvedValue({
+      totalCount: 1,
+      items: [
+        {
+          frameId: 77,
+          movie: { movieId: 550, title: '파이트 클럽', posterUrl: null },
+          score: 4.5,
+          flavorCode: 'FLAVOR_A',
+          createdAt: '2026-09-01T00:00:00Z',
+        },
+      ],
+      nextCursor: null,
+      hasNext: false,
+    });
+    renderWithRouter(<PopcornBucketPage />);
+
+    expect(await screen.findByText('맛을 눌러 영화 보기 ↓')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /오리지널 솔트/ })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    fireEvent.click(await screen.findByRole('button', { name: /오리지널 솔트/ }));
+    expect(screen.getByRole('button', { name: /오리지널 솔트/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(await screen.findByText('파이트 클럽')).toBeInTheDocument();
+    expect(getMyFrames).toHaveBeenCalledWith(undefined, 'FLAVOR_A');
+
+    fireEvent.click(screen.getByRole('link', { name: /파이트 클럽/ }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/movies/550');
+  });
+
+  it('다음 페이지를 이어 보여주고 맛을 닫으면 영화 목록을 숨긴다', async () => {
+    vi.mocked(getMyFrames)
+      .mockResolvedValueOnce({
+        totalCount: 2,
+        items: [
+          {
+            frameId: 1,
+            movie: { movieId: 1, title: '첫 영화', posterUrl: null },
+            score: 4,
+            flavorCode: 'FLAVOR_D',
+            createdAt: '2026-09-02T00:00:00Z',
+          },
+        ],
+        nextCursor: 'next',
+        hasNext: true,
+      })
+      .mockResolvedValueOnce({
+        totalCount: 2,
+        items: [
+          {
+            frameId: 2,
+            movie: { movieId: 2, title: '다음 영화', posterUrl: null },
+            score: 3.5,
+            flavorCode: 'FLAVOR_D',
+            createdAt: '2026-09-01T00:00:00Z',
+          },
+        ],
+        nextCursor: null,
+        hasNext: false,
+      });
+    renderWithRouter(<PopcornBucketPage />);
+
+    const flavorButton = await screen.findByRole('button', { name: /피스타치오/ });
+    fireEvent.click(flavorButton);
+    fireEvent.click(await screen.findByRole('button', { name: '영화 더 보기' }));
+
+    expect(await screen.findByText('다음 영화')).toBeInTheDocument();
+    expect(screen.getByText('첫 영화')).toBeInTheDocument();
+    expect(getMyFrames).toHaveBeenLastCalledWith('next', 'FLAVOR_D');
+
+    fireEvent.click(flavorButton);
+    expect(screen.queryByText('첫 영화')).toBeNull();
+  });
 });
 
 describe('3.2 맛 설명', () => {
@@ -79,7 +169,7 @@ describe('3.2 맛 설명', () => {
       legendRow('오리지널 솔트').getByText('있었던 일을 그대로 담은 이야기에 끌려요'),
     ).toBeInTheDocument();
     expect(legendRow('피스타치오').getByText('사람과 시대를 깊게 들여다봐요')).toBeInTheDocument();
-    expect(legendRow('피스타치오').getByText('17')).toBeInTheDocument();
+    expect(legendRow('피스타치오').getByText('17알')).toBeInTheDocument();
   });
 
   it('기준정보를 받지 못해도 범례와 수치는 그대로 그리고 설명 줄만 없다', async () => {
@@ -90,7 +180,7 @@ describe('3.2 맛 설명', () => {
     expect(await screen.findByText('오리지널 솔트')).toBeInTheDocument();
     await waitFor(() => expect(getPopcornFlavors).toHaveBeenCalled());
 
-    expect(legendRow('피스타치오').getByText('17')).toBeInTheDocument();
+    expect(legendRow('피스타치오').getByText('17알')).toBeInTheDocument();
     expect(screen.queryByText(/있었던 일을/)).toBeNull();
     expect(screen.queryByText('팝콘 버킷을 불러오지 못했어요')).toBeNull();
   });
@@ -108,13 +198,16 @@ describe('3.2 맛 설명', () => {
  * 구분이 FR-06 주석에만 있어 범례의 두 숫자가 무엇인지 화면에서 알 수 없었다.
  */
 describe('3.2 알 수와 별점의 뜻', () => {
-  it('핵심 수치를 `팝콘 N알`로 적고 두 숫자의 뜻을 한 줄로 푼다', async () => {
+  it('알이 쌓이는 방식과 별점의 뜻을 범례 위에 적는다', async () => {
     renderWithRouter(<PopcornBucketPage />);
 
     expect(await screen.findByText('팝콘 22알')).toBeInTheDocument();
     expect(screen.queryByText(/KERNELS/)).toBeNull();
-    expect(screen.getByText(/영화를 평가하면 그 영화의 맛 알이 하나씩 쌓여요/)).toHaveTextContent(
-      '★는 그 맛 영화들에 준 평균 별점이에요',
-    );
+    expect(legendRow('피스타치오').getByText('17알')).toBeInTheDocument();
+    expect(
+      screen.getByText('영화를 평가하면 그 영화의 맛 알이 하나씩 쌓여요.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('★ 평균 별점')).toBeInTheDocument();
+    expect(legendRow('피스타치오').getByText('★4.0')).toBeInTheDocument();
   });
 });
