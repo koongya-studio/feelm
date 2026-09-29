@@ -33,6 +33,9 @@ const ALLOWED: Record<string, Record<string, Allowed>> = {
     },
   },
   'users.ts': {
+    '../mocks/frames': {
+      reason: '개발용 목업 계정에서 백엔드 없이 MY 프로필의 필름 목록을 보여준다(업무 -984)',
+    },
     '../mocks/publicProfiles': {
       reason:
         '내 프로필(7.1 · 7.2 · 7.2-A)의 키워드 · 필름 · 소개 기준값. 내 publicId를 알려 주는 API가 없어 내 공개 프로필(API-062)을 부를 수 없다(업무 -810)',
@@ -55,8 +58,17 @@ const ALLOWED: Record<string, Record<string, Allowed>> = {
     },
   },
   'watch.ts': {
+    '../mocks/frames': {
+      reason: '개발용 목업 계정에서 백엔드 없이 MY 평가 목록을 보여준다(업무 -984)',
+    },
+    '../mocks/movies': {
+      reason: '개발용 목업 계정에서 MY 최근 본 영화의 미평가 예시를 보여준다(업무 -984)',
+    },
     '../mocks/watch': {
       reason: '2.6 `이번 주 +N`에 대응하는 응답 필드가 없어 고정 기준값을 쓴다(업무 -599)',
+    },
+    './mockTransport': {
+      reason: '개발용 목업 계정의 MY 평가 목록 응답을 목업 전송 계층으로 돌려준다(업무 -984)',
     },
   },
 };

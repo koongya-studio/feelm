@@ -11,6 +11,7 @@
  *   세션 저장소에만 남는다. 내 프로필의 키워드 · 필름 목록은 API-040 · API-042로 받는다
  */
 import { mockMyProfileView } from '../mocks/publicProfiles';
+import { mockFrameList } from '../mocks/frames';
 import { getProfileExtras, saveProfileExtras } from '../mocks/sessionStore';
 import { getMyFrames, getMyTaste } from './taste';
 import { readAsDataUrl } from '../utils/avatarImage';
@@ -133,6 +134,14 @@ export const BIO_MAX_LENGTH = 40;
 export async function getMyProfileView(
   taste?: Promise<TasteAnalysis | null>,
 ): Promise<ProfileView> {
+  if (isMockSession()) {
+    const analysis = await (taste ?? getMyTaste().catch(() => null));
+    return respond(
+      toProfileView(getMockProfile(), analysis?.keywords ?? [], mockFrameList.items),
+      'users',
+    );
+  }
+
   const [profile, analysis, frames] = await Promise.all([
     getMyProfile(),
     taste ?? getMyTaste().catch(() => null),
