@@ -4,7 +4,7 @@
  * 구성은 확정 시안을 따른다(`docs/screens/design-concept.md`). 시안은 이 화면이
  * 한 가지만 말하게 한다. **내 취향이 어느 맛으로 기울었는가.**
  *
- * 팝콘 통 · 기울기 문장 · 맛 범례
+ * 팝콘 통 · 기울기 문장 · 맛 범례. 맛을 누르면 해당 맛의 평가 영화를 펼친다.
  *
  * 연동 API는 API-041(팝콘 버킷)이다. 맛 이름·색상은 응답이 함께 주는 `displayName`·
  * `color`(기준정보 API-044와 같은 값)를 쓰고 장르명을 하드코딩하지 않는다
@@ -40,26 +40,30 @@
  * taste_id 축으로 정하면서 키워드를 뽑을 근거가 사라졌다), 대신 맛마다 한 문장(`description`)을
  * 기준정보에 두기로 했다(사용자 결정 2026-09-20). 기준정보를 받지 못하면 그 줄만 없다.
  *
- * **알 수와 별점이 무엇인지 제목 아래 한 줄로 적는다**(업무 -677, UI/UX 분석 리포트 P1-03).
- * 알 수는 감상량, 별점은 선호도인데(FR-06) 그 구분이 주석에만 있었다. -101에서 안내 문구를 뺀
- * 것은 제목과 같은 말을 되풀이해서였고, 이 줄은 제목이 말하지 않는 두 숫자의 뜻을 말한다.
+ * **알 수와 별점의 뜻을 각 맛의 수치에 적는다**(업무 -677, UI/UX 분석 리포트 P1-03).
+ * 알 수는 감상량, 별점은 선호도이므로(FR-06) 안내 문장과 범례 위의 짧은 범례로 설명한다.
  * 핵심 수치의 `73 · KERNELS`도 `팝콘 73알`로 바꿨다(사용자 결정 2026-09-19).
  */
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import Button from '../../../components/Button';
-import { ChevronLeftIcon } from '../../../components/Icon';
+import { ChevronDownIcon, ChevronLeftIcon, ChevronUpIcon } from '../../../components/Icon';
 import IconButton from '../../../components/IconButton';
 import PopcornBucket from '../../../components/PopcornBucket';
 import { kernelCounts } from '../../../components/PopcornBucket/kernels';
+import Poster from '../../../components/Poster';
 import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
-import { getPopcornBucket, getPopcornFlavors } from '../../../api/taste';
+import { getMyFrames, getPopcornBucket, getPopcornFlavors } from '../../../api/taste';
 import { useBack } from '../../../hooks/useBack';
 import { path } from '../../../routes/paths';
 import styles from './PopcornBucketPage.module.css';
-import type { PopcornBucket as PopcornBucketData, PopcornFlavor } from '../../../types/taste';
+import type {
+  FrameSummary,
+  PopcornBucket as PopcornBucketData,
+  PopcornFlavor,
+} from '../../../types/taste';
 
 /** 시안의 뒤로 가기 원 지름(px). 300px 폭 시안의 31px을 375px 기준으로 환산했다 */
 const BACK_BUTTON_SIZE = 39;
@@ -70,6 +74,110 @@ const BACK_BUTTON_SIZE = 39;
  */
 const BUCKET_WIDTH = 196;
 
+function FlavorMovies({
+  flavorCode,
+  flavorName,
+  count,
+}: {
+  flavorCode: string;
+  flavorName: string;
+  count: number;
+}) {
+  const [movies, setMovies] = useState<FrameSummary[]>([]);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasNext, setHasNext] = useState(false);
+  const [loading, setLoading] = useState(count > 0);
+  const [error, setError] = useState(false);
+  const [requestCursor, setRequestCursor] = useState<string | undefined>(undefined);
+  const [retryCount, setRetryCount] = useState(0);
+
+  useEffect(() => {
+    if (count === 0) return;
+    let active = true;
+
+    getMyFrames(requestCursor, flavorCode)
+      .then((page) => {
+        if (!active) return;
+        setMovies((current) => (requestCursor ? [...current, ...page.items] : page.items));
+        setCursor(page.nextCursor);
+        setHasNext(page.hasNext);
+        setError(false);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setError(true);
+        setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [count, flavorCode, requestCursor, retryCount]);
+
+  if (count === 0) return <p className={styles.movieStatus}>아직 담긴 영화가 없어요</p>;
+
+  return (
+    <div className={styles.movies}>
+      <div className={styles.moviesHeader}>
+        <p className={styles.moviesHeading}>이 맛에 담긴 영화</p>
+        <span className={styles.scrollHint}>옆으로 넘겨보세요 →</span>
+      </div>
+      {movies.length > 0 ? (
+        <ul className={styles.movieList} aria-label={`${flavorName} 영화 목록`}>
+          {movies.map((frame) => (
+            <li key={frame.frameId}>
+              <Link className={styles.movieCard} to={path.movieDetail(frame.movie.movieId)}>
+                <Poster
+                  width={100}
+                  height={140}
+                  radius={8}
+                  src={frame.movie.posterUrl ?? undefined}
+                  title={frame.movie.title}
+                  seed={frame.movie.movieId}
+                />
+                <span className={styles.movieTitle}>{frame.movie.title}</span>
+                <span className={styles.movieScore}>내 별점 ★ {frame.score.toFixed(1)}</span>
+              </Link>
+            </li>
+          ))}
+          {!loading && !error && hasNext && cursor ? (
+            <li>
+              <button
+                type="button"
+                className={styles.moreButton}
+                aria-label="영화 더 보기"
+                onClick={() => {
+                  setLoading(true);
+                  setRequestCursor(cursor);
+                }}
+              >
+                영화 더 보기 →
+              </button>
+            </li>
+          ) : null}
+        </ul>
+      ) : null}
+      {loading ? <p className={styles.movieStatus}>영화를 불러오는 중이에요</p> : null}
+      {error ? (
+        <button
+          type="button"
+          className={styles.retryButton}
+          onClick={() => {
+            setLoading(true);
+            setRetryCount((value) => value + 1);
+          }}
+        >
+          불러오지 못했어요 · 다시 시도
+        </button>
+      ) : null}
+      {!loading && !error && movies.length === 0 ? (
+        <p className={styles.movieStatus}>이 맛에 담긴 영화가 없어요</p>
+      ) : null}
+    </div>
+  );
+}
+
 export default function PopcornBucketPage() {
   const navigate = useNavigate();
   const back = useBack(path.film());
@@ -79,6 +187,7 @@ export default function PopcornBucketPage() {
   const [flavorInfo, setFlavorInfo] = useState<PopcornFlavor[]>([]);
   const [failed, setFailed] = useState(false);
   const [reloadCount, setReloadCount] = useState(0);
+  const [selectedFlavor, setSelectedFlavor] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -189,24 +298,22 @@ export default function PopcornBucketPage() {
 
           {leaning ? (
             <h2 className={styles.headline}>
-              {leaning.displayName} 쪽으로
+              <span className={styles.headlineFlavor}>{leaning.displayName}</span> 쪽으로
               <br />
               기울었어요
             </h2>
           ) : null}
-
-          {/* 한 줄에 한 문장씩 — 알 수와 별점을 한 줄씩 푼다(사용자 지시 2026-09-19) */}
-          <p className={styles.meaning}>
-            영화를 평가하면 그 영화의 맛 알이 하나씩 쌓여요.
-            <br />
-            ★는 그 맛 영화들에 준 평균 별점이에요
-          </p>
+          <p className={styles.meaning}>영화를 평가하면 그 영화의 맛 알이 하나씩 쌓여요.</p>
 
           {/*
            * 맛 범례. 색 · 이름 · 알 수 · 평균 평점으로 말한다. 팝콘 8색은 밝은 면에서
            * 전원 1.09~2.17:1이라 면만으로는 안 보인다. 알에 테두리를 둘러 윤곽을
            * 살린다(`.kernel` 참고).
            */}
+          <div className={styles.legendHint}>
+            <span>맛을 눌러 영화 보기 ↓</span>
+            <span className={styles.scoreHint}>★ 평균 별점</span>
+          </div>
           <ul className={styles.legend}>
             {bucket.flavors.map((flavor) => {
               const description = flavorInfo.find(
@@ -215,22 +322,53 @@ export default function PopcornBucketPage() {
 
               return (
                 <li key={flavor.flavorCode} className={styles.legendItem}>
-                  <span
-                    className={styles.kernel}
-                    style={{ background: flavor.color }}
-                    aria-hidden="true"
-                  />
-                  <span className={styles.legendText}>
-                    <span className={styles.legendName}>{flavor.displayName}</span>
-                    {description ? (
-                      <span className={styles.legendDescription}>{description}</span>
-                    ) : null}
-                  </span>
-                  <span className={styles.legendCount}>{flavor.popcornCount}</span>
-                  {/* 맛 선호도는 감상량과 구분해 표시한다 (FR-06) */}
-                  {flavor.averageScore === null ? null : (
-                    <span className={styles.legendScore}>★ {flavor.averageScore.toFixed(1)}</span>
-                  )}
+                  <button
+                    type="button"
+                    className={styles.flavorButton}
+                    aria-expanded={selectedFlavor === flavor.flavorCode}
+                    aria-controls={
+                      selectedFlavor === flavor.flavorCode
+                        ? `flavor-movies-${flavor.flavorCode}`
+                        : undefined
+                    }
+                    onClick={() =>
+                      setSelectedFlavor((current) =>
+                        current === flavor.flavorCode ? null : flavor.flavorCode,
+                      )
+                    }
+                  >
+                    <span
+                      className={styles.kernel}
+                      style={{ background: flavor.color }}
+                      aria-hidden="true"
+                    />
+                    <span className={styles.legendText}>
+                      <span className={styles.legendName}>{flavor.displayName}</span>
+                      {description ? (
+                        <span className={styles.legendDescription}>{description}</span>
+                      ) : null}
+                    </span>
+                    <span className={styles.legendCount}>{flavor.popcornCount}알</span>
+                    {flavor.averageScore === null ? null : (
+                      <span className={styles.legendScore}>★{flavor.averageScore.toFixed(1)}</span>
+                    )}
+                    <span className={styles.legendArrow} aria-hidden="true">
+                      {selectedFlavor === flavor.flavorCode ? (
+                        <ChevronUpIcon />
+                      ) : (
+                        <ChevronDownIcon />
+                      )}
+                    </span>
+                  </button>
+                  {selectedFlavor === flavor.flavorCode ? (
+                    <div id={`flavor-movies-${flavor.flavorCode}`}>
+                      <FlavorMovies
+                        flavorCode={flavor.flavorCode}
+                        flavorName={flavor.displayName}
+                        count={flavor.popcornCount}
+                      />
+                    </div>
+                  ) : null}
                 </li>
               );
             })}

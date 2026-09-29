@@ -33,13 +33,13 @@
 }
 
 /*
- * 본문은 화면 아래에 붙는다. 통은 위에 걸리고 이야기는 아래에 쌓인다.
- * 사이의 빈 범이 시안의 숨이다.
+ * 본문을 하단보다 조금 위에 두어 통에서 맛 목록까지 시선이 이어지게 한다.
  */
 .content {
   display: flex;
   flex-direction: column;
   margin-top: auto;
+  margin-bottom: min(8vh, var(--space-12));
   gap: var(--space-4);
 }
 
@@ -56,15 +56,19 @@
   font-size: var(--font-size-title);
   line-height: var(--line-height-title);
   letter-spacing: var(--letter-spacing-title);
-  font-weight: var(--font-weight-bold);
+  font-weight: var(--font-weight-medium);
 }
 
-/* 알 수(감상량)와 별점(선호도)의 뜻. 제목 아래에서 범례 숫자를 풀어 준다(업무 -677) */
+.headlineFlavor {
+  font-size: 1.2em;
+  font-weight: 700;
+}
+
 .meaning {
   margin-top: calc(var(--space-2) * -1);
+  color: var(--color-ink-muted);
   font-size: var(--font-size-meta);
   line-height: var(--line-height-meta);
-  color: var(--color-ink-muted);
 }
 
 /*
@@ -82,13 +86,61 @@
   background: var(--color-surface-raised);
 }
 
-.legendItem {
+.legendHint {
   display: flex;
-  align-items: center;
-  padding: var(--space-1) 0;
-  gap: var(--space-3);
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
+  margin-bottom: calc(var(--space-3) * -1);
+  color: var(--color-ink-body);
+  font-size: var(--font-size-meta);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-meta);
+}
+
+.scoreHint {
+  flex: none;
+  color: var(--color-ink-muted);
+  font-weight: var(--font-weight-regular);
+}
+
+.legendItem {
   font-size: var(--font-size-meta);
   line-height: var(--line-height-meta);
+}
+
+.legendItem + .legendItem {
+  border-top: 1px solid var(--color-line-faint);
+}
+
+.flavorButton {
+  display: flex;
+  width: 100%;
+  min-height: 56px;
+  align-items: center;
+  padding: var(--space-2) 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  gap: var(--space-3);
+  text-align: left;
+  cursor: pointer;
+}
+
+.flavorButton:hover,
+.flavorButton[aria-expanded='true'] {
+  background: rgba(38, 39, 41, 0.05);
+}
+
+.flavorButton:focus-visible,
+.moreButton:focus-visible,
+.retryButton:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
 }
 
 .legendText {
@@ -103,9 +155,9 @@
 }
 
 .legendDescription {
-  font-size: var(--font-size-caption);
-  line-height: var(--line-height-caption);
-  color: var(--color-ink-hint);
+  font-size: var(--font-size-meta);
+  line-height: var(--line-height-meta);
+  color: var(--color-ink-muted);
 }
 
 .legendCount {
@@ -117,6 +169,18 @@
 .legendScore {
   color: var(--color-ink-muted);
   font-variant-numeric: tabular-nums;
+}
+
+.legendArrow {
+  display: inline-flex;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-sunken);
+  color: var(--color-ink-body);
 }
 
 /*
@@ -131,4 +195,99 @@
   flex: none;
   border: 1px solid var(--color-ink-body);
   border-radius: var(--radius-pill);
+}
+
+.movies {
+  min-width: 0;
+  margin: var(--space-2) 0 var(--space-2) calc(11px + var(--space-3));
+  padding: var(--space-2) 0 var(--space-2) var(--space-3);
+  border-left: 1px solid var(--color-line-strong);
+}
+
+.moviesHeader {
+  display: flex;
+  justify-content: space-between;
+  padding-right: var(--space-2);
+  gap: var(--space-2);
+}
+
+.moviesHeading {
+  margin-bottom: var(--space-2);
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+}
+
+.scrollHint {
+  flex: none;
+  color: var(--color-ink-hint);
+  font-size: var(--font-size-caption);
+}
+
+.movieList {
+  display: flex;
+  overflow-x: auto;
+  padding: 0 var(--space-2) var(--space-2) 0;
+  gap: var(--space-3);
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+}
+
+.movieList li {
+  flex: none;
+  scroll-snap-align: start;
+}
+
+.movieCard {
+  display: flex;
+  width: 100px;
+  flex-direction: column;
+  color: inherit;
+  gap: var(--space-1);
+  text-decoration: none;
+}
+
+.movieCard:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+.movieTitle {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--color-ink);
+  font-weight: var(--font-weight-bold);
+}
+
+.movieScore {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+}
+
+.movieStatus,
+.moreButton,
+.retryButton {
+  color: var(--color-ink-muted);
+  font-size: var(--font-size-caption);
+}
+
+.moreButton {
+  width: 100px;
+  min-height: 140px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-raised);
+  text-align: left;
+  cursor: pointer;
+}
+
+.retryButton {
+  padding: var(--space-2) 0;
+  border: 0;
+  background: transparent;
+  text-decoration: underline;
+  cursor: pointer;
 }
