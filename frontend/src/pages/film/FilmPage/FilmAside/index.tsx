@@ -24,6 +24,7 @@ import type { useReportGeneration } from '../../../reports/useReportGeneration';
 import FilmReel from '../../../../components/FilmReel';
 import PopcornFlavorPanel from '../../../../components/PopcornFlavorPanel';
 import Poster from '../../../../components/Poster';
+import { PopcornTitleIcon, ReportTitleIcon } from '../../../../components/Icon';
 import { getWatchRecords } from '../../../../api/watch';
 import { formatMonthDay } from '../../../../utils/date';
 import { path } from '../../../../routes/paths';
@@ -71,13 +72,19 @@ export default function FilmAside({ bucket, frames, reportGeneration }: Props) {
       {bucket ? (
         <PopcornFlavorPanel
           title="나의 취향 팝콘"
+          titleIcon={<PopcornTitleIcon />}
           bucket={bucket}
           to={path.popcornBucket()}
           linkLabel={`나의 취향 팝콘 ${bucket.totalCount}알 자세히 보기`}
         />
       ) : null}
 
-      <AsidePanel title="취향 리포트" to={path.tasteReports()} linkLabel="리포트 목록 보기">
+      <AsidePanel
+        title="취향 리포트"
+        titleIcon={<ReportTitleIcon />}
+        to={path.tasteReports()}
+        linkLabel="리포트 목록 보기"
+      >
         {reportFrames.length > 0 ? (
           <div className={styles.reportReel}>
             <FilmReel

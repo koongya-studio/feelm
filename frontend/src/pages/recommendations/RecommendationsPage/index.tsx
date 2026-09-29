@@ -59,7 +59,7 @@ import ScreenHeader from '../../../components/ScreenHeader';
 import StatusView from '../../../components/StatusView';
 import VisuallyHidden from '../../../components/VisuallyHidden';
 import Snackbar from '../../../components/Snackbar';
-import { BlockIcon } from '../../../components/Icon';
+import { BlockIcon, TasteDiscoveryIcon, TasteMatchIcon } from '../../../components/Icon';
 import RecommendationCard from './RecommendationCard';
 import RecommendationFeedback from '../../../components/RecommendationFeedback';
 import { useDesktopAsideSlot } from '../../../contexts/desktopAsideContext';
@@ -445,6 +445,7 @@ function RecommendationsContent({ desktop }: { desktop: boolean }) {
                * 그 문장은 카드 안에 이미 있고 카드가 바뀌면 묶음 이름 아래 설명까지 흔들린다.
                */}
               <RecommendationGroup
+                icon={<TasteMatchIcon />}
                 title="취향 맞춤 추천"
                 description="좋아한 영화와 가장 가까운 편이에요"
                 items={desktopTasteItems}
@@ -454,6 +455,7 @@ function RecommendationsContent({ desktop }: { desktop: boolean }) {
               />
 
               <RecommendationGroup
+                icon={<TasteDiscoveryIcon />}
                 title="취향 발견 추천"
                 description="기존 취향과 연결되는 새로운 맛이에요"
                 items={desktopDiscoveryItems}
