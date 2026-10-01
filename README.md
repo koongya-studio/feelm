@@ -1,15 +1,22 @@
-# feelm
+# Feelm
 
 > 본 영화는 **필름**에 한 칸씩 쌓이고, 취향은 **팝콘 버킷**에 맛별로 담긴다.
 > 혼자서는 아직 맛보지 않은 취향을 발견하고, 여럿이서는 함께 볼 영화를 고르는 영화 추천 서비스
 
-SSAFY 15기 2학기 특화 프로젝트(빅데이터 분산) · 팀 E106 · 서비스 주소 <https://j15e106.p.ssafy.io>
+SSAFY 15기 2학기 특화 프로젝트(빅데이터 분산) · 팀 E106
+
+- 랜딩 페이지: <https://j15e106.p.ssafy.io/>
+- 서비스 앱: <https://j15e106.p.ssafy.io/app/>
+
+**소개 영상** · [30초 광고 보기](./docs/media/Feelm-promo-30s.mp4)
+
+![Feelm 15초 광고](./docs/media/Feelm-promo-15s.mp4){width=720px}
 
 ---
 
 ## 목차
 
-1. [feelm 소개](#1-feelm-소개)
+1. [Feelm 소개](#1-feelm-소개)
 2. [주요 기능](#2-주요-기능)
 3. [화면](#3-화면)
 4. [시스템 아키텍처](#4-시스템-아키텍처)
@@ -21,12 +28,12 @@ SSAFY 15기 2학기 특화 프로젝트(빅데이터 분산) · 팀 E106 · 서�
 
 ---
 
-## 1. feelm 소개
+## 1. Feelm 소개
 
 영화 추천 서비스는 대부분 좋아했던 영화와 비슷한 영화를 반복해서 보여 주고, 내 취향이 어떤지는
 보여 주지 않는다. 여럿이 함께 볼 영화를 고를 때는 한 사람의 취향만 반영되기 쉽다.
 
-feelm은 감상과 평가를 두 가지로 시각화해 사용자가 자신의 취향을 직접 보게 한다.
+Feelm은 감상과 평가를 두 가지로 시각화해 사용자가 자신의 취향을 직접 보게 한다.
 
 - **필름** — 감상하고 평가를 마친 영화 한 편이 프레임 한 칸이 되어 필름에 이어 붙는다. 기록의 축이다.
 - **팝콘 버킷** — 영화마다 8가지 팝콘 맛 중 하나가 정해지고, 평가할 때마다 그 맛의 팝콘이 한 알씩
@@ -71,23 +78,29 @@ feelm은 감상과 평가를 두 가지로 시각화해 사용자가 자신의 �
 
 | 취향 필름 | 오늘의 추천 | 영화 상세 | 평가 |
 | --- | --- | --- | --- |
-| <img src="./frontend/docs/images/app/mobile-film.jpg" width="200"> | <img src="./frontend/docs/images/app/mobile-recommendations.jpg" width="200"> | <img src="./frontend/docs/images/app/mobile-movie-detail.jpg" width="200"> | <img src="./frontend/docs/images/app/mobile-rating.jpg" width="200"> |
+| <img src="./frontend/docs/images/app/mobile-film.png" width="200"> | <img src="./frontend/docs/images/app/mobile-recommendations.png" width="200"> | <img src="./frontend/docs/images/app/mobile-movie-detail.png" width="200"> | <img src="./frontend/docs/images/app/mobile-rating.png" width="200"> |
 
 | 팝콘 버킷 | 파티팝콘 | 파티 믹스 팝콘 | MY |
 | --- | --- | --- | --- |
-| <img src="./frontend/docs/images/app/mobile-popcorn-bucket.jpg" width="200"> | <img src="./frontend/docs/images/app/mobile-party.jpg" width="200"> | <img src="./frontend/docs/images/app/mobile-party-popcorn.jpg" width="200"> | <img src="./frontend/docs/images/app/mobile-my.jpg" width="200"> |
+| <img src="./frontend/docs/images/app/mobile-popcorn-bucket.png" width="200"> | <img src="./frontend/docs/images/app/mobile-party.png" width="200"> | <img src="./frontend/docs/images/app/mobile-party-popcorn.png" width="200"> | <img src="./frontend/docs/images/app/mobile-my.png" width="200"> |
+
+감상 확인에서 평가로 이어지는 기록 흐름과, 취향을 활용하는 두 기능도 볼 수 있다.
+
+| 감상 확인 | 취향 4컷 리포트 | OTT 추천 결과 |
+| --- | --- | --- |
+| <img src="./frontend/docs/images/app/mobile-watch-confirm.png" width="200"> | <img src="./frontend/docs/images/app/mobile-taste-report.png" width="200"> | <img src="./frontend/docs/images/app/mobile-ott-recommendation.png" width="200"> |
 
 ### PC
 
 | 취향 필름 | 추천 영화 |
 | --- | --- |
-| <img src="./frontend/docs/images/app/pc-film.jpg" width="420"> | <img src="./frontend/docs/images/app/pc-recommendations.jpg" width="420"> |
+| <img src="./frontend/docs/images/app/pc-film.png" width="420"> | <img src="./frontend/docs/images/app/pc-recommendations.png" width="420"> |
 
 | 파티팝콘 |
 | --- |
-| <img src="./frontend/docs/images/app/pc-party.jpg" width="420"> |
+| <img src="./frontend/docs/images/app/pc-party.png" width="420"> |
 
-> 2026-09-28 배포 서비스에서 캡처했다. 설계 단계 목업 29개 화면은
+> 2026-10-01 배포 서비스의 팀 개발용 계정에서 캡처했다. 모바일은 Samsung Galaxy A55 화면 크기(360×800)로 촬영했다. 설계 단계 목업 29개 화면은
 > [00-overview.png](./frontend/docs/images/00-overview.png)와
 > [화면 설계 문서](./frontend/docs/screens/README.md)에 있다.
 
@@ -323,9 +336,15 @@ S15P21E106
 
 ## 9. 팀 구성
 
-| 분야 | 담당 |
-| --- | --- |
-| 프론트엔드·디자인 | 박은서, 박찬형 |
-| 백엔드 개발 | 박시현, 김서현, 서유정 |
-| 추천 알고리즘·Explainable AI(XAI) | 강현, 박찬형, 조은채 |
-| 인프라·Jira | 조은채 |
+`develop`의 병합을 제외한 커밋에서 확인한 주요 구현 영역을 정리했다(2026-09-29 기준).
+여러 분야에 기여한 팀원은 중복 표기했다.
+
+| 분야 | 주요 기여 팀원 | 작업 내용 |
+| --- | --- | --- |
+| 프론트엔드·디자인 | 박은서 | 디자인 시스템과 주요 화면 구현 |
+| 백엔드 | 박시현, 김서현, 서유정 | 공통 기반·계정 / 취향·추천 서빙·파티 / 영화·감상·리포트 |
+| 추천 모델·파이프라인 | 강현, 박찬형 | ALS·임베딩·추천 근거 / GBT 서빙·개인·파티 Consumer |
+| 인프라·CI/CD | 조은채 | 분산 실행 환경, 배포·운영 자동화 |
+
+표는 커밋에서 관찰된 기여를 요약한 것이다. 현재 업무 담당은 해당 Jira 항목에서 확인하고,
+도메인 간 협업 규칙은 [백엔드 역할 분배](./docs/backend-role-assignment.md)를 따른다.

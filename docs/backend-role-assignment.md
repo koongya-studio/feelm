@@ -1,7 +1,9 @@
 # 백엔드 역할 분배
 
-백엔드 3인의 담당 도메인과 도메인 간 경계 규칙을 정의한다. API 범위는
-[API 명세](./api/README.md), 업무 항목은 `docs/jira/plans/backend-role-split.yml`을 기준으로 한다.
+백엔드 3인의 초기 담당 도메인과 도메인 간 경계 규칙을 정의한다. 아래 담당 표와 착수 순서는
+초기 분업 계획을 기록한 것이다. 팀 전체의 실제 구현 기여는 커밋 분석을 바탕으로
+[루트 README의 팀 구성](../README.md#9-팀-구성)에 요약한다. 현재 진행 중인 업무의 담당·리뷰어는 해당 Jira 항목에서 확인한다.
+API 범위는 [API 명세](./api/README.md), 초기 업무 항목은 `docs/jira/plans/backend-role-split.yml`을 기준으로 한다.
 
 ## 분배 원칙
 
@@ -18,8 +20,8 @@
 | 담당 | 이름 | 도메인 | 도메인 패키지 | 1차 MVP 범위 | Epic |
 |---|---|---|---|---|---|
 | BE-A | 박시현 | 계정·온보딩 | `auth`, `user`, `onboarding`, `ott` | 사용자(API-001~022), 온보딩·OTT(API-023~027) | S15P21E106-142 |
-| BE-B | 유정 | 콘텐츠·감상·소셜 | `search`, `movie`, `watch`, `social`, `report`, `trend` | 영화·검색(API-028~030), 감상(API-033~039), 한줄평(API-032), 데이터 적재 | S15P21E106-143 |
-| BE-C | 서현 | 취향·추천·파티 | `taste`, `recommendation`, `party` | 취향(API-040~044), 추천(API-031, 045~048), 파티(API-049~058) | S15P21E106-144 |
+| BE-B | 서유정 | 콘텐츠·감상·소셜 | `search`, `movie`, `watch`, `social`, `report`, `trend` | 영화·검색(API-028~030), 감상(API-033~039), 한줄평(API-032), 데이터 적재 | S15P21E106-143 |
+| BE-C | 김서현 | 취향·추천·파티 | `taste`, `recommendation`, `party` | 취향(API-040~044), 추천(API-031, 045~048), 파티(API-049~058) | S15P21E106-144 |
 
 도메인 패키지 이름과 위치는 [백엔드 개발 컨벤션 3장](./backend-convention.md#3-패키지-구조)을 따른다.
 
